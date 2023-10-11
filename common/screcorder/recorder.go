@@ -5,11 +5,6 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"github.com/alfg/mp4"
-	"github.com/disintegration/imaging"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"image/jpeg"
 	"io"
 	"os"
@@ -19,6 +14,12 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alfg/mp4"
+	"github.com/disintegration/imaging"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type Recorder struct {
@@ -222,8 +223,12 @@ func NewRecorder(opt ...ConfigOpt) *Recorder {
 	return &Recorder{conf: c, started: utils.NewBool(false), running: utils.NewBool(true)}
 }
 
-func VideoCoverBase64(fileName string)  (imgBase64 string, err error) {
-	reader := ExampleReadFrameAsJpeg(fileName, 1)
+func VideoCoverBase64(fileName string) (imgBase64 string, err error) {
+	reader, err := ExampleReadFrameAsJpeg(fileName, 1)
+	if err != nil {
+		return "", err
+	}
+
 	img, err := imaging.Decode(reader)
 	if err != nil {
 		return "", err
@@ -240,15 +245,15 @@ func VideoCoverBase64(fileName string)  (imgBase64 string, err error) {
 	return base64Image, nil
 }
 
-func ExampleReadFrameAsJpeg(inFileName string, frameNum int) io.Reader {
-	cmd := exec.CommandContext(context.Background(), consts.GetFfmpegPath(), "-i", inFileName,  "-vf", fmt.Sprintf("select=gte(n\\,%d),scale=-1:600", frameNum), "-frames:v", "1", "-f", "image2", "-codec:v", "mjpeg", "pipe:1")
+func ExampleReadFrameAsJpeg(inFileName string, frameNum int) (io.Reader, error) {
+	cmd := exec.CommandContext(context.Background(), consts.GetFfmpegPath(), "-i", inFileName, "-vf", fmt.Sprintf("select=gte(n\\,%d),scale=-1:600", frameNum), "-frames:v", "1", "-f", "image2", "-codec:v", "mjpeg", "pipe:1")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	err := cmd.Run()
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	return &out
+	return &out, nil
 }
 
 func VideoDuration(path string) string {

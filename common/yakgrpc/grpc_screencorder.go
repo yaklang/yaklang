@@ -3,6 +3,11 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
+	"time"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -13,10 +18,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/grpc"
-	"os"
-	"path/filepath"
-	"runtime"
-	"time"
 )
 
 func (s *Server) QueryScreenRecorders(ctx context.Context, req *ypb.QueryScreenRecorderRequest) (*ypb.QueryScreenRecorderResponse, error) {
@@ -127,7 +128,11 @@ func (s *Server) StartScrecorder(req *ypb.StartScrecorderRequest, stream ypb.Yak
 	}()
 	recorder.OnFileAppended(func(r string) {
 		duration := screcorder.VideoDuration(r)
-		base64Images, _ := screcorder.VideoCoverBase64(r)
+		base64Images, err := screcorder.VideoCoverBase64(r)
+		if err != nil {
+			log.Errorf("convert video to base64 failed: %v", err)
+			return
+		}
 		record := &yakit.ScreenRecorder{
 			Filename:  r,
 			Project:   proj.ProjectName,
