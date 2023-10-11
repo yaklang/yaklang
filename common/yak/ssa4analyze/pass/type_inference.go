@@ -236,7 +236,6 @@ func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
 		if v, ok := field.Obj.(ssa.Value); ok {
 			c.Args = utils.InsertSliceItem(c.Args, v, 0)
 		}
-		field.IsMethod = false
 	}
 
 	// handler ellipsis, unpack argument
