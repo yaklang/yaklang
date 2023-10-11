@@ -130,8 +130,7 @@ func (s *Server) StartScrecorder(req *ypb.StartScrecorderRequest, stream ypb.Yak
 		duration := screcorder.VideoDuration(r)
 		base64Images, err := screcorder.VideoCoverBase64(r)
 		if err != nil {
-			log.Errorf("convert video to base64 failed: %v", err)
-			return
+			log.Errorf("convert video to base64 failed: %v, use default(empty)", err)
 		}
 		record := &yakit.ScreenRecorder{
 			Filename:  r,
