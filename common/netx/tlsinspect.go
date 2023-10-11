@@ -39,7 +39,7 @@ func TLSInspect(addr string) ([]*TLSInspectResult, error) {
 		host = addr
 	}
 
-	conn, err := DialTCPTimeout(10*time.Second, utils.HostPort(host, port), GetProxyFromEnv())
+	conn, err := DialTCPTimeout(10*time.Second, utils.HostPort(host, port))
 	if err != nil {
 		return nil, err
 	}

@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -387,9 +386,9 @@ func NewDefaultHttpPoolConfig(opts ...HttpPoolConfigOption) *httpPoolConfig {
 
 func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, error) {
 	config := NewDefaultHttpPoolConfig(opts...)
-	if len(config.Proxies) <= 0 && netx.GetProxyFromEnv() != "" && !config.NoSystemProxy {
-		WithPoolOpt_Proxy(netx.GetProxyFromEnv())(config)
-	}
+	//if len(config.Proxies) <= 0 && netx.GetProxyFromEnv() != "" && !config.NoSystemProxy {
+	//	WithPoolOpt_Proxy(netx.GetProxyFromEnv())(config)
+	//}
 
 	switch ret := i.(type) {
 	case []*MutateResult:
