@@ -137,6 +137,9 @@ func TestCallParamReturn(t *testing.T) {
 		func3(1, 2)
 		func3(1)
 		func3()
+
+		a = [1, 2, 3]
+		func3(a...) // this pass
 		`,
 			errs: []string{
 				ssa4analyze.NotEnoughArgument("func1", "", "number"),

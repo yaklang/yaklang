@@ -92,6 +92,10 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 				return
 			}
 		}
+		// call f (a ... )
+		if c.IsEllipsis {
+			return
+		}
 		str := ""
 		if f, ok := c.Method.(*ssa.Function); ok {
 			str = f.Name
