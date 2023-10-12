@@ -1,60 +1,32 @@
 package yakgrpc
 
 import (
-	"fmt"
+	"context"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
-	"testing"
 )
 
-func TestGRPCMUSTPASS_MITM_H2_RepeatHeaderError(t *testing.T) {
-	ctx := utils.TimeoutContextSeconds(2)
-	targetHost, targetPort := utils.DebugMockHTTP2(ctx, func(req []byte) []byte {
-		return []byte(`HTTP/1.1 200 OK
-Content-Type: text/html; charset=utf-8
-
-`)
+func TestH2Hijack(t *testing.T) {
+	count := 0
+	h2Host, h2Port := utils.DebugMockHTTP2(context.Background(), func(req []byte) []byte {
+		count++
+		return req
 	})
-	target := utils.HostPort(targetHost, targetPort)
-	mitmPort := utils.GetRandomAvailableTCPPort()
-	client, err := NewLocalClient()
+	h2Addr := utils.HostPort(h2Host, h2Port)
+	_, err := yak.NewScriptEngine(10).ExecuteEx(`
+rsp,req = poc.HTTP(getParam("packet"), poc.http2(true), poc.https(true))~
+`, map[string]any{
+		"packet": `GET / HTTP/2.0
+User-Agent: 111
+Host: ` + h2Addr,
+	})
 	if err != nil {
 		panic(err)
 	}
-	stream, err := client.MITM(ctx)
-	if err != nil {
-		panic(err)
-	}
-	stream.Send(&ypb.MITMRequest{
-		Host:        "127.0.0.1",
-		Port:        uint32(mitmPort),
-		EnableHttp2: true,
-	})
-	for {
-		data, err := stream.Recv()
-		if err != nil {
-			break
-		}
-		if data.GetMessage().GetIsMessage() {
-			var msg = string(data.GetMessage().GetMessage())
-			fmt.Println(msg)
-			if strings.Contains(msg, "starting mitm server") {
-				// do sth
-				packet := `GET / HTTP/2.0
-Host: ` + target + `
-content-type: text/plain
 
-{"a": 1}`
-				_, err := yak.Execute(`
-rsp, req = poc.HTTP(packet, poc.https(true), poc.http2(true), poc.proxy(f"http://127.0.0.1:${mitmPort}"))~
-dump(rsp)
-`, map[string]any{"packet": packet, "mitmPort": mitmPort})
-				if err != nil {
-					panic(err)
-				}
-			}
-		}
+	if count != 1 {
+		t.Fatal("no recv h2 request")
 	}
 }

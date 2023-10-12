@@ -3,20 +3,21 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"strings"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"net/http"
-	"strings"
-	"testing"
 )
 
 func TestGRPCMUSTPASS_DebugPlugin_SmockingWithEmptyInput(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -37,8 +38,7 @@ Host: ` + target + `
 		},
 	})
 	if err != nil {
-		spew.Dump(err)
-		panic(err)
+		t.Fatal(err)
 	}
 
 	for {
@@ -53,7 +53,7 @@ Host: ` + target + `
 func TestGRPCMUSTPASS_BuildHTTPRequest_Results(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	rsp, err := client.HTTPRequestBuilder(context.Background(), &ypb.HTTPRequestBuilderParams{
 		IsRawHTTPRequest: true,
@@ -62,7 +62,7 @@ Host: baidu.com
 `),
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	keepPathQuery := false
 	for _, i := range rsp.Results {
@@ -71,7 +71,7 @@ Host: baidu.com
 		}
 	}
 	if !keepPathQuery {
-		panic("path query not keep")
+		t.Fatal("path query not keep")
 	}
 
 	rsp, err = client.HTTPRequestBuilder(context.Background(), &ypb.HTTPRequestBuilderParams{
@@ -84,7 +84,7 @@ Host: baidu.com
 		GetParams: []*ypb.KVPair{{Key: "a", Value: "1"}, {Key: "b", Value: "2"}},
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	count := 0
 	ceq1 := false
@@ -101,10 +101,10 @@ Host: baidu.com
 	}
 	t.Logf("count: %d", count)
 	if count != 2 {
-		panic("count not match, expect 2, got: " + spew.Sprint(count))
+		t.Fatal("count not match, expect 2, got: " + spew.Sprint(count))
 	}
 	if !ceq1 || !eeq2 {
-		panic("no raw (using) path query not keep")
+		t.Fatal("no raw (using) path query not keep")
 	}
 
 	rsp, err = client.HTTPRequestBuilder(
@@ -123,14 +123,14 @@ Host: baidu.com
 		},
 	)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	count = 0
 	ceq1 = false
 	eeq2 = false
 	for _, i := range rsp.Results {
 		count++
-		fmt.Println(string(i.HTTPRequest))
+		// fmt.Println(string(i.HTTPRequest))
 		if utils.MatchAllOfSubString(string(i.HTTPRequest), "a?", "a=1", "b=2", "{{Hostname}}", "c=1", "User-Agent: yaklang") {
 			ceq1 = true
 		}
@@ -138,12 +138,12 @@ Host: baidu.com
 			eeq2 = true
 		}
 	}
-	t.Logf("count: %d", count)
+	// t.Logf("count: %d", count)
 	if count != 2 {
-		panic("header count not match, expect 2, got: " + spew.Sprint(count))
+		t.Fatal("header count not match, expect 2, got: " + spew.Sprint(count))
 	}
 	if !ceq1 || !eeq2 {
-		panic("header no raw (using) path query not keep")
+		t.Fatal("header no raw (using) path query not keep")
 	}
 
 	rsp, err = client.HTTPRequestBuilder(context.Background(), &ypb.HTTPRequestBuilderParams{
@@ -156,13 +156,13 @@ Host: baidu.com
 		MultipartFileParams: nil,
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	count = 0
 	ceq1 = false
 	for _, i := range rsp.Results {
 		count++
-		fmt.Println(string(i.HTTPRequest))
+		// fmt.Println(string(i.HTTPRequest))
 		if utils.MatchAllOfSubString(string(i.HTTPRequest), "a?", "c=1", "{{Hostname}}", "Cookie: ", "aaa=111", "bbb=222") && utils.MatchAnyOfSubString(
 			string(i.HTTPRequest), "Cookie: aaa=111; bbb=222", "Cookie: bbb=222; aaa=111") {
 			ceq1 = true
@@ -170,10 +170,10 @@ Host: baidu.com
 	}
 	t.Logf("count: %d", count)
 	if count != 1 {
-		panic("count not match, expect 1, got: " + spew.Sprint(count))
+		t.Fatal("count not match, expect 1, got: " + spew.Sprint(count))
 	}
 	if !ceq1 {
-		panic("cookie no raw (using) path query not keep")
+		t.Fatal("cookie no raw (using) path query not keep")
 	}
 
 	rsp, err = client.HTTPRequestBuilder(context.Background(), &ypb.HTTPRequestBuilderParams{
@@ -185,23 +185,23 @@ Host: baidu.com
 		MultipartFileParams: nil,
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	count = 0
 	ceq1 = false
 	for _, i := range rsp.Results {
 		count++
-		fmt.Println(string(i.HTTPRequest))
+		// fmt.Println(string(i.HTTPRequest))
 		if utils.MatchAllOfSubString(string(i.HTTPRequest), "a?c=1", "{{Hostname}}", "aabcdasdf") {
 			ceq1 = true
 		}
 	}
-	t.Logf("count: %d", count)
+	// t.Logf("count: %d", count)
 	if count != 1 {
-		panic("count not match, expect 1, got: " + spew.Sprint(count))
+		t.Fatal("count not match, expect 1, got: " + spew.Sprint(count))
 	}
 	if !ceq1 {
-		panic("body no raw (using) path query not keep")
+		t.Fatal("body no raw (using) path query not keep")
 	}
 
 	rsp, err = client.HTTPRequestBuilder(context.Background(), &ypb.HTTPRequestBuilderParams{
@@ -212,24 +212,24 @@ Host: baidu.com
 		MultipartFileParams: nil,
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	count = 0
 	ceq1 = false
 	for _, i := range rsp.Results {
 		count++
-		fmt.Println(string(i.HTTPRequest))
+		// fmt.Println(string(i.HTTPRequest))
 		if utils.MatchAllOfSubString(string(i.HTTPRequest), "a?c=1", "{{Hostname}}") &&
 			utils.MatchAnyOfSubString(string(i.HTTPRequest), "a=1&b=2", "b=2&a=1") {
 			ceq1 = true
 		}
 	}
-	t.Logf("count: %d", count)
+	// t.Logf("count: %d", count)
 	if count != 1 {
-		panic("count not match, expect 1, got: " + spew.Sprint(count))
+		t.Fatal("count not match, expect 1, got: " + spew.Sprint(count))
 	}
 	if !ceq1 {
-		panic("body no raw (using) path query not keep")
+		t.Fatal("body no raw (using) path query not keep")
 	}
 
 	// multipart
@@ -240,13 +240,13 @@ Host: baidu.com
 		MultipartFileParams: nil,
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	count = 0
 	ceq1 = false
 	for _, i := range rsp.Results {
 		count++
-		fmt.Println(string(i.HTTPRequest))
+		// fmt.Println(string(i.HTTPRequest))
 		if utils.MatchAllOfSubString(
 			string(i.HTTPRequest),
 			"a?c=1", "{{Hostname}}",
@@ -258,12 +258,12 @@ Host: baidu.com
 			ceq1 = true
 		}
 	}
-	t.Logf("count: %d", count)
+	// t.Logf("count: %d", count)
 	if count != 1 {
-		panic("count not match, expect 1, got: " + spew.Sprint(count))
+		t.Fatal("count not match, expect 1, got: " + spew.Sprint(count))
 	}
 	if !ceq1 {
-		panic("body no raw (using) path query not keep")
+		t.Fatal("body no raw (using) path query not keep")
 	}
 
 	rsp, err = client.HTTPRequestBuilder(context.Background(), &ypb.HTTPRequestBuilderParams{
@@ -273,13 +273,13 @@ Host: baidu.com
 		MultipartFileParams: []*ypb.KVPair{{Key: "c", Value: "3"}},
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	count = 0
 	ceq1 = false
 	for _, i := range rsp.Results {
 		count++
-		fmt.Println(string(i.HTTPRequest))
+		// fmt.Println(string(i.HTTPRequest))
 		if utils.MatchAllOfSubString(
 			string(i.HTTPRequest),
 			"a?c=1", "{{Hostname}}",
@@ -292,19 +292,18 @@ Host: baidu.com
 			ceq1 = true
 		}
 	}
-	t.Logf("count: %d", count)
 	if count != 1 {
-		panic("count not match, expect 1, got: " + spew.Sprint(count))
+		t.Fatal("count not match, expect 1, got: " + spew.Sprint(count))
 	}
 	if !ceq1 {
-		panic("body no raw (using) path query not keep")
+		t.Fatal("body no raw (using) path query not keep")
 	}
 }
 
 func TestGRPCMUSTPASS_HTTPRequestBuilderWithDebug(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	rsp, err := client.HTTPRequestBuilder(context.Background(), &ypb.HTTPRequestBuilderParams{
 		IsRawHTTPRequest: true,
@@ -314,10 +313,10 @@ Host: baidu.com
 `),
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	if !strings.Contains(rsp.Templates, `Host: {{Hostname}}`) {
-		panic("raw packet build failed")
+		t.Fatal("raw packet build failed")
 	}
 
 	rsp, err = client.HTTPRequestBuilder(context.Background(), &ypb.HTTPRequestBuilderParams{
@@ -332,15 +331,15 @@ Host: baidu.com
 		},
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
-	println(rsp.Templates)
+	// println(rsp.Templates)
 	if !strings.Contains(rsp.Templates, `{{BaseURL}}/admin-123?aaa=ccc`) {
-		panic("raw packet build failed")
+		t.Fatal("raw packet build failed")
 	}
 
 	if len(rsp.GetResults()) <= 0 {
-		panic("no http request is build")
+		t.Fatal("no http request is build")
 	}
 	rspRaw, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 Ok
 Content-Length: 12
@@ -366,16 +365,14 @@ aaabbbaaabbb`))
 		},
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	var checked = false
 	for {
 		t.Logf("stream.Recv() start...")
 		exec, err := stream.Recv()
-		println(spew.Sdump(exec))
+		// println(spew.Sdump(exec))
 		if err != nil {
-			t.Logf("stream.Recv() error: %v", err)
-			log.Warn(err)
 			break
 		}
 		if string(exec.Message) != "" {
@@ -385,14 +382,14 @@ aaabbbaaabbb`))
 		}
 	}
 	if !checked {
-		panic("plugin is not executed")
+		t.Fatal("plugin is not executed")
 	}
 }
 
 func TestGRPCMUSTPASS_HTTPRequestBuilderWithDebug2(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	rspRaw, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 Ok
@@ -403,23 +400,23 @@ aaacccaaabbb`))
 	log.Infof("start to debug mock http on: %v", utils.HostPort(host, port))
 	rsp, err := http.Get("http://" + utils.HostPort(host, port))
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	raw, _ := utils.HttpDumpWithBody(rsp, true)
-	println(string(raw))
+	_ = raw
+	// println(string(raw))
 	stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
 		Code:       "yakit.AutoInitYakit(); handle = result => {dump(`executed in plugin`); dump(result); yakit.Info(`PLUGIN IS EXECUTED`)}",
 		PluginType: "port-scan",
 		Input:      "http://" + utils.HostPort(host, port) + "/abc",
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	var checked = false
 	for {
 		exec, err := stream.Recv()
 		if err != nil {
-			log.Warn(err)
 			break
 		}
 		if string(exec.Message) != "" {
@@ -429,14 +426,14 @@ aaacccaaabbb`))
 		}
 	}
 	if !checked {
-		panic("plugin is not executed")
+		t.Fatal("plugin is not executed")
 	}
 }
 
 func TestGRPCMUSTPASS_HTTPRequestBuilderWithDebug3(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	rspRaw, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 Ok
@@ -447,23 +444,23 @@ aaacccaaabbb`))
 	log.Infof("start to debug mock http on: %v", utils.HostPort(host, port))
 	rsp, err := http.Get("http://" + utils.HostPort(host, port))
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	raw, _ := utils.HttpDumpWithBody(rsp, true)
-	println(string(raw))
+	_ = raw
+	// println(string(raw))
 	stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
 		Code:       "mirrorHTTPFlow = (https, url, req, rsp, body) => { yakit.Info(`MESSAGE:FETCH URL :` + url); }",
 		PluginType: "mitm",
 		Input:      "http://" + utils.HostPort(host, port) + "/abc?key=value",
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	var checked = false
 	for {
 		exec, err := stream.Recv()
 		if err != nil {
-			log.Warn(err)
 			break
 		}
 		if string(exec.Message) != "" {
@@ -474,6 +471,6 @@ aaacccaaabbb`))
 		}
 	}
 	if !checked {
-		panic("plugin is not executed")
+		t.Fatal("plugin is not executed")
 	}
 }

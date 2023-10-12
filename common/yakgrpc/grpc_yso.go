@@ -3,15 +3,16 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strconv"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"github.com/yaklang/yaklang/common/yso"
-	"sort"
-	"strconv"
-	"strings"
 )
 
 //func (s *Server) Version(ctx context.Context, _ *ypb.Empty) (*ypb.VersionResponse, error) {
@@ -125,7 +126,7 @@ func (s *Server) GetAllYsoGadgetOptions(ctx context.Context, _ *ypb.Empty) (*ypb
 	}, nil
 }
 func (s *Server) GetAllYsoClassOptions(ctx context.Context, req *ypb.YsoOptionsRequerstWithVerbose) (*ypb.YsoOptionsWithVerbose, error) {
-	log.Infof("%v", req)
+	// log.Infof("%v", req)
 	options := getClassByGadgetName(req.Gadget)
 	var allGadgetName []*ypb.YsoOption
 	for _, gadget := range options {
@@ -326,7 +327,7 @@ func optionsToYaklangCode(options []*ypb.YsoClassGeneraterOptionsWithVerbose, is
 	return className, preOptionsCode, strings.Join(optionsCode, ",")
 }
 func generateYsoCode(req *ypb.YsoOptionsRequerstWithVerbose) (string, map[string]any, error) {
-	log.Infof("%v", req)
+	// log.Infof("%v", req)
 	if req == nil {
 		return "", nil, utils.Error("request params is nil")
 	}

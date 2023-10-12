@@ -3,14 +3,15 @@ package yaktest
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/coreplugin"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net"
 	"net/http"
 	"net/url"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/coreplugin"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func getWastTime(f func()) time.Duration {
@@ -77,14 +78,14 @@ func TestMITM(t *testing.T) {
 	go func() {
 		l, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 		if err != nil {
-			t.Fatal(err)
+			panic(err)
 		}
 		defer l.Close()
 		err = http.Serve(l, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			writer.Write([]byte("hello"))
 		}))
 		if err != nil {
-			t.Fatal(err)
+			panic(err)
 		}
 	}()
 	err = utils.WaitConnect(fmt.Sprintf("127.0.0.1:%d", port), 5)

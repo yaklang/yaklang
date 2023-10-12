@@ -3,23 +3,24 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"math/rand"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"github.com/yaklang/yaklang/common/yso"
-	"math/rand"
-	"testing"
 )
 
 func TestGRPCMUSTPASS_yso(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	ctx := context.Background()
 	ysoVerboses, err := client.GetAllYsoGadgetOptions(ctx, &ypb.Empty{})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	//测试获取所有的yso选项(ysoVerboses, t)
 	assert.Equal(t, len(ysoVerboses.GetOptions()), len(yso.AllGadgets))

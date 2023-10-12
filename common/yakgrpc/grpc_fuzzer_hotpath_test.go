@@ -3,14 +3,15 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/fuzztag"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io"
-	"net/http"
-	"testing"
 )
 
 func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch(t *testing.T) {
@@ -29,17 +30,15 @@ func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch(t *testing.T) {
 		ForceFuzz:    true,
 	})
 	if err != nil {
-		t.Fatalf("expect nil, got %v", err)
+		t.Fatalf("expect error is nil, but got %v", err)
 	}
 	count := 0
 	for {
-		rsp, err := recv.Recv()
+		_, err := recv.Recv()
 		if err != nil {
 			break
 		}
 		count++
-		fmt.Println(string(rsp.RequestRaw))
-		fmt.Println(string(rsp.ResponseRaw))
 	}
 	if count != 10 {
 		t.Fatalf("expect 10, got %v", count)
@@ -49,7 +48,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch(t *testing.T) {
 func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_Mirror(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -96,7 +95,7 @@ mirrorHTTPFlow = (req, rsp) => {
 func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_Mirror2(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -119,7 +118,7 @@ mirrorHTTPFlow = (req, rsp, variables) => {
 		},
 	})
 	if err != nil {
-		t.Fatalf("expect nil, got %v", err)
+		t.Fatalf("expect error is nil, got %v", err)
 	}
 	count := 0
 	for {
@@ -167,7 +166,7 @@ mirrorHTTPFlow = (req, rsp) => {
 		ForceFuzz: true,
 	})
 	if err != nil {
-		t.Fatalf("expect nil, got %v", err)
+		t.Fatalf("expect error is nil, got %v", err)
 	}
 	count := 0
 	for {
@@ -199,15 +198,13 @@ func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch2(t *testing.T) {
 		panic(err)
 	}
 	data, _ := codec.SM2EncryptC1C3C2(key, []byte("aaa"))
-	spew.Dump(data)
 	dec, _ := codec.SM2DecryptC1C3C2(pri, data)
-	spew.Dump(dec)
 	if string(dec) != "aaa" {
-		panic("dec c1c3c2 error")
+		t.Fatalf("dec c1c3c2 error. dec: %v", string(dec))
 	}
 	client, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -228,7 +225,7 @@ return "aaa" + sprintf("_origin(%v)", param)
 		ForceFuzz: true,
 	})
 	if err != nil {
-		t.Fatalf("expect nil, got %v", err)
+		t.Fatalf("expect error is nil, got %v", err)
 	}
 	count := 0
 	for {
@@ -249,7 +246,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch3ErrCheck(t *testing.T) {
 
 	client, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -291,8 +288,6 @@ handle1 = s => {die("expected panic")}
 		if payloads[2] == "["+fuzztag.YakHotPatchErr+"expected panic]" {
 			count++
 		}
-		fmt.Println(string(rsp.RequestRaw))
-		fmt.Println(string(rsp.ResponseRaw))
 	}
 	if count != 3 {
 		t.Fatalf("expect 3, got %v", count)

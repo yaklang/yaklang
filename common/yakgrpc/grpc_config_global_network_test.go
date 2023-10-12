@@ -2,15 +2,16 @@ package yakgrpc
 
 import (
 	"context"
+	"os"
+	"strings"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"os"
-	"strings"
-	"testing"
 )
 
 func TestGRPCMUSTPASS_GLOBAL_NETWORK_DNS_CONFIG(t *testing.T) {
@@ -23,14 +24,13 @@ func TestGRPCMUSTPASS_GLOBAL_NETWORK_DNS_CONFIG(t *testing.T) {
 
 	config, err := client.GetGlobalNetworkConfig(context.Background(), &ypb.GetGlobalNetworkConfigRequest{})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	config.CustomDNSServers = []string{"127.0.0.1"}
-	spew.Dump(config)
 	defer client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
 	_, err = client.SetGlobalNetworkConfig(context.Background(), config)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	check := false
 	for _, i := range netx.NewDefaultReliableDNSConfig().SpecificDNSServers {
@@ -41,7 +41,7 @@ func TestGRPCMUSTPASS_GLOBAL_NETWORK_DNS_CONFIG(t *testing.T) {
 		}
 	}
 	if !check {
-		panic("set global network dns config failed")
+		t.Fatal("set global network dns config failed")
 	}
 	client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
 	check = false
@@ -53,7 +53,7 @@ func TestGRPCMUSTPASS_GLOBAL_NETWORK_DNS_CONFIG(t *testing.T) {
 		}
 	}
 	if check {
-		panic("set (reset) global network dns config failed")
+		t.Fatal("set (reset) global network dns config failed")
 	}
 }
 

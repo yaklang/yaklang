@@ -2,11 +2,12 @@ package yakgrpc
 
 import (
 	"context"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/go-rod/rod/lib/utils"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"testing"
 )
 
 func TestGRPCMUSTPASS_StringFuzzer(t *testing.T) {
@@ -60,6 +61,6 @@ handle1 = s => {
 	}
 	if len(result.Results) != 3 {
 		spew.Dump(result.Results)
-		t.Fatal("string (filetag + hotpatch) fuzzer fail")
+		t.Fatal("string (filetag + hotpatch) fuzzer fail, len(results) != 3")
 	}
 }

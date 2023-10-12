@@ -3,14 +3,15 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/yak"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestDemoServer(t *testing.T) {
@@ -42,11 +43,11 @@ func TestGRPCMUSTPASS_MITM_PlainProxy2(t *testing.T) {
 	mitmPort := utils.GetRandomAvailableTCPPort()
 	client, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	stream, err := client.MITM(ctx)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	stream.Send(&ypb.MITMRequest{
 		Host: "127.0.0.1",
@@ -60,7 +61,7 @@ func TestGRPCMUSTPASS_MITM_PlainProxy2(t *testing.T) {
 		}
 		if data.GetMessage().GetIsMessage() {
 			var msg = string(data.GetMessage().GetMessage())
-			fmt.Println(msg)
+			// fmt.Println(msg)
 			if strings.Contains(msg, "starting mitm server") {
 				var packet = `GET http://` + utils.HostPort(mockHost, mockPort) + `/mh/zwww/hlwjjg/index.jsp?a=` + token + ` HTTP/1.1
 Host: ` + utils.HostPort(mockHost, mockPort) + `
@@ -129,15 +130,13 @@ conn.Close()
 
 	request := string(data.GetData()[0].Request)
 	response := string(data.GetData()[0].Response)
-	fmt.Println(request)
 	if utils.MatchAnyOfSubString(request, "Proxy-Connection: ", "GET http://", "GET https://") {
-		fmt.Println(request)
-		t.Fatal("request should not contains proxy connection")
+		t.Fatalf("request should not contains proxy connection. request:\n%s", request)
 	}
 
-	fmt.Println(string(response))
+	// fmt.Println(string(response))
 	if strings.Count(response, `Set-Cookie: `) != 3 {
-		t.Fatal("response should contains 3 set-cookie")
+		t.Fatalf("response should contains 3 set-cookie. response:\n%s", response)
 	}
 
 	data, err = client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{Keyword: token3})
@@ -150,20 +149,17 @@ conn.Close()
 	}
 	request = string(data.GetData()[0].Request)
 	response = string(data.GetData()[0].Response)
-	fmt.Println(request)
 	if utils.MatchAnyOfSubString(request, "GET http://", "GET https://") {
-		fmt.Println(request)
-		t.Fatal("request should not contains proxy connection")
+		t.Fatalf("request should not contains proxy connection. request:\n%s", request)
 	}
 
-	fmt.Println(string(response))
 	if strings.Count(response, `Set-Cookie: `) != 3 && strings.Contains(response, token4) {
-		t.Fatal("response should contains 3 set-cookie")
+		t.Fatalf("response should contains 3 set-cookie. response:\n%s", response)
 	}
 }
 
 func TestGRPCMUSTPASS_MITM_PlainProxy(t *testing.T) {
-	var ctx, cancel = context.WithCancel(utils.TimeoutContextSeconds(5))
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	mockHost, mockPort := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
@@ -173,11 +169,11 @@ func TestGRPCMUSTPASS_MITM_PlainProxy(t *testing.T) {
 	mitmPort := utils.GetRandomAvailableTCPPort()
 	client, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	stream, err := client.MITM(ctx)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	stream.Send(&ypb.MITMRequest{
 		Host: "127.0.0.1",
@@ -191,7 +187,6 @@ func TestGRPCMUSTPASS_MITM_PlainProxy(t *testing.T) {
 		}
 		if data.GetMessage().GetIsMessage() {
 			var msg = string(data.GetMessage().GetMessage())
-			fmt.Println(msg)
 			if strings.Contains(msg, "starting mitm server") {
 				var packet = `GET http://` + utils.HostPort(mockHost, mockPort) + `/mh/zwww/hlwjjg/index.jsp?a=` + token + ` HTTP/1.1
 Host: ` + utils.HostPort(mockHost, mockPort) + `
@@ -231,15 +226,13 @@ conn.Close()
 	}
 
 	request := string(data.GetData()[0].Request)
-	fmt.Println(request)
 	if utils.MatchAnyOfSubString(request, "Proxy-Connection: ", "GET http://", "GET https://") {
-		fmt.Println(request)
-		t.Fatal("request should not contains proxy connection")
+		t.Fatalf("request should not contains proxy connection. request:\n%s", request)
 	}
 }
 
 func TemplateTestGRPCMUSTPASS_MITM_PlainProxy(t *testing.T) {
-	var ctx, cancel = context.WithCancel(utils.TimeoutContextSeconds(5))
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	mockHost, mockPort := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
@@ -249,11 +242,11 @@ func TemplateTestGRPCMUSTPASS_MITM_PlainProxy(t *testing.T) {
 	mitmPort := utils.GetRandomAvailableTCPPort()
 	client, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	stream, err := client.MITM(ctx)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	stream.Send(&ypb.MITMRequest{
 		Host: "127.0.0.1",
@@ -266,7 +259,6 @@ func TemplateTestGRPCMUSTPASS_MITM_PlainProxy(t *testing.T) {
 		}
 		if data.GetMessage().GetIsMessage() {
 			var msg = string(data.GetMessage().GetMessage())
-			fmt.Println(msg)
 			if strings.Contains(msg, "starting mitm server") {
 				var packet = `GET http://` + utils.HostPort(mockHost, mockPort) + `/mh/zwww/hlwjjg/index.jsp HTTP/1.1
 Host: ` + utils.HostPort(mockHost, mockPort) + `

@@ -2,30 +2,27 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/stretchr/testify/assert"
+	"os"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/utils"
 	_ "github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"os"
-	"testing"
 )
 
 func TestGRPCMUSTPASS_GetYakitCompletionRaw(t *testing.T) {
-	test := assert.New(t)
-
 	c, err := NewLocalClient()
 	if err != nil {
-		test.FailNow(err.Error())
+		t.Fatal(err)
 	}
 
 	rsp, err := c.GetYakitCompletionRaw(context.Background(), &ypb.Empty{})
 	if err != nil {
-		test.FailNow(err.Error())
+		t.Fatal(err)
 	}
 
 	if len(rsp.RawJson) <= 0 {
-		test.FailNow("empty result")
+		t.Fatal("empty result")
 	}
 
 	if !utils.MatchAllOfSubString(
@@ -33,37 +30,33 @@ func TestGRPCMUSTPASS_GetYakitCompletionRaw(t *testing.T) {
 		"QueryUrlsAll() chan string",
 		"O_RDWR: int = 0x2",
 	) {
-		panic("generate completion failed")
+		t.Fatal("generate completion failed")
 	}
 }
 
 func TestServer_GetYakitCompletionRaw_Antlr4Yak(t *testing.T) {
-	test := assert.New(t)
-
 	os.Setenv("YAKMODE", "vm")
 
 	c, err := NewLocalClient()
 	if err != nil {
-		test.FailNow(err.Error())
+		t.Fatal(err)
 	}
 
 	rsp2, err := c.GetYakVMBuildInMethodCompletion(context.Background(), &ypb.GetYakVMBuildInMethodCompletionRequest{})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	if len(rsp2.GetSuggestions()) <= 0 {
-		panic(1)
+		t.Fatal("buildin method completion empty")
 	}
 
 	rsp, err := c.GetYakitCompletionRaw(context.Background(), &ypb.Empty{})
 	if err != nil {
-		test.FailNow(err.Error())
+		t.Fatal(err)
 	}
 
 	if len(rsp.RawJson) <= 0 {
-		test.FailNow("empty result")
+		t.Fatal("empty result")
 	}
-	spew.Dump(len(rsp.RawJson))
-
 }
