@@ -55,7 +55,7 @@ func SetDefaultDialXConfig(opt ...DialXOption) {
 	defaultDialXOptionsMutex.Lock()
 	defer defaultDialXOptionsMutex.Unlock()
 
-	defaultDialXOptions = append(defaultDialXOptions, opt...)
+	defaultDialXOptions = opt
 }
 
 func DialX_WithDisableProxy(b bool) DialXOption {

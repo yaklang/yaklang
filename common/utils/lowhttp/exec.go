@@ -30,36 +30,38 @@ const (
 )
 
 type LowhttpExecConfig struct {
-	Host                 string
-	Port                 int
-	Packet               []byte
-	VerifyCertificate    bool
-	Https                bool
-	ResponseCallback     func(response *LowhttpResponse)
-	Http2                bool
-	GmTLS                bool
-	Timeout              time.Duration
-	RedirectTimes        int
-	RetryTimes           int
-	RetryInStatusCode    []int
-	RetryNotInStatusCode []int
-	RetryWaitTime        time.Duration
-	RetryMaxWaitTime     time.Duration
-	JsRedirect           bool
-	Proxy                []string
-	NoFixContentLength   bool
-	RedirectHandler      func(bool, []byte, []byte) bool
-	Session              interface{}
-	BeforeDoRequest      func([]byte) []byte
-	Ctx                  context.Context
-	SaveHTTPFlow         bool
-	RequestSource        string
-	EtcHosts             map[string]string
-	DNSServers           []string
-	RuntimeId            string
-	FromPlugin           string
-	WithConnPool         bool
-	ConnPool             *lowHttpConnPool
+	Host                             string
+	Port                             int
+	Packet                           []byte
+	VerifyCertificate                bool
+	Https                            bool
+	ResponseCallback                 func(response *LowhttpResponse)
+	Http2                            bool
+	GmTLS                            bool
+	OverrideEnableSystemProxyFromEnv bool
+	EnableSystemProxyFromEnv         bool
+	Timeout                          time.Duration
+	RedirectTimes                    int
+	RetryTimes                       int
+	RetryInStatusCode                []int
+	RetryNotInStatusCode             []int
+	RetryWaitTime                    time.Duration
+	RetryMaxWaitTime                 time.Duration
+	JsRedirect                       bool
+	Proxy                            []string
+	NoFixContentLength               bool
+	RedirectHandler                  func(bool, []byte, []byte) bool
+	Session                          interface{}
+	BeforeDoRequest                  func([]byte) []byte
+	Ctx                              context.Context
+	SaveHTTPFlow                     bool
+	RequestSource                    string
+	EtcHosts                         map[string]string
+	DNSServers                       []string
+	RuntimeId                        string
+	FromPlugin                       string
+	WithConnPool                     bool
+	ConnPool                         *lowHttpConnPool
 }
 
 type LowhttpResponse struct {
@@ -200,6 +202,13 @@ func WithPort(port int) LowhttpOpt {
 func WithPacketBytes(packet []byte) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.Packet = packet
+	}
+}
+
+func WithEnableSystemProxyFromEnv(b bool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.OverrideEnableSystemProxyFromEnv = true
+		o.EnableSystemProxyFromEnv = b
 	}
 }
 
@@ -798,6 +807,11 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		),
 		netx.DialX_WithSNI(host),
 	)
+
+	if option.OverrideEnableSystemProxyFromEnv {
+		dialopts = append(dialopts, netx.DialX_WithEnableSystemProxyFromEnv(option.EnableSystemProxyFromEnv))
+	}
+
 	cacheKey := connectKey{
 		proxy:  option.Proxy,
 		scheme: reqSchema,
