@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -63,7 +62,6 @@ requests:
 
 # Enhanced by mp on 2022/05/18
 `)
-	spew.Dump(name)
 	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n\r\nHello, world!"))
 
 	stream, err := client.ExecYakScript(context.Background(), &ypb.ExecRequest{
@@ -73,29 +71,25 @@ requests:
 		},
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	var runtimes []string
 	for {
 		data, err := stream.Recv()
 		if err != nil {
-			spew.Dump(err)
 			break
 		}
 		if data.RuntimeID == "" {
-			t.Log("NO RUNTIME ID FOUND")
-			t.FailNow()
+			t.Fatal("NO RUNTIME ID FOUND")
 		}
 		if !strings.Contains(strings.Join(runtimes, ","), data.RuntimeID) {
 			runtimes = append(runtimes, data.RuntimeID)
 		}
-		spew.Dump(data)
 	}
 
 	if len(runtimes) != 1 {
-		t.Logf("MULTI RUNTIME FOUND: %v", runtimes)
-		t.FailNow()
+		t.Fatalf("MULTI RUNTIME FOUND: %v", runtimes)
 	}
 
 	var runtimeId = runtimes[0]
@@ -103,13 +97,11 @@ requests:
 		RuntimeId: runtimeId,
 	})
 	if err != nil {
-		t.Log("Trace Flow Failed")
-		t.FailNow()
+		t.Fatal("Trace Flow Failed")
 	}
 	if p.TotalRecord > 0 {
 		t.Log("Trace Flow Success")
 	} else {
-		t.Log("Trace Flow Failed")
-		t.FailNow()
+		t.Fatal("Trace Flow Failed")
 	}
 }

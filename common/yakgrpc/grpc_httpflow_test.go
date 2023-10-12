@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -80,8 +79,6 @@ Host: www.example.com
 			}
 		} else if r.BodyLength < 100*1000 {
 			if len(r.Response) == 0 {
-				spew.Dump(r.Response)
-				println(string(r.Response))
 				t.Fatal("response should not be empty")
 			}
 		}
@@ -94,8 +91,7 @@ Host: www.example.com
 	start := time.Now()
 	response, err := client.GetHTTPFlowById(utils.TimeoutContext(1*time.Second), &ypb.GetHTTPFlowByIdRequest{Id: checkLargeBodyId})
 	if err != nil {
-		spew.Dump(err)
-		t.Fatal("cannot found large response")
+		t.Fatalf("cannot found large response. error: %v", err)
 	}
 	if time.Now().Sub(start).Seconds() > 500 {
 		t.Fatal("should be cached")
@@ -282,7 +278,7 @@ assert string(body) == token2, sprintf("get %s != %s", string(body), string(toke
 					"mitmProxy": "http://" + utils.HostPort("127.0.0.1", mitmPort),
 				})
 				if err != nil {
-					t.Fatal(err)
+					panic(err)
 				}
 				cancel()
 			}()

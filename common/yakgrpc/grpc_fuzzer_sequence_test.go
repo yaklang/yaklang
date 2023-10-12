@@ -2,15 +2,16 @@ package yakgrpc
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestGRPCMUSTPASS_FuzzerSequence(t *testing.T) {
@@ -80,12 +81,11 @@ abc`), "Host", utils.HostPort(host, port))),
 		}},
 	)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	for {
 		resp, err := client.Recv()
 		if err != nil {
-			log.Error(err)
 			break
 		}
 		if resp == nil {
@@ -106,7 +106,7 @@ abc`), "Host", utils.HostPort(host, port))),
 func TestGRPCMUSTPASS_FuzzerSequence_InheritKey(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	var (
@@ -152,14 +152,13 @@ Authorization: Bearer {{params(test)}}
 		}},
 	)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	count := 0
 	for {
 		resp, err := client.Recv()
 		if err != nil {
-			log.Error(err)
 			break
 		}
 		if resp == nil {
@@ -167,8 +166,8 @@ Authorization: Bearer {{params(test)}}
 		}
 		count++
 		if strings.Contains(string(resp.Response.RequestRaw), token+`_-9`) {
-			fmt.Println(string(resp.Response.RequestRaw))
-			t.Fatal("fuzztag variables passed failed!")
+			// fmt.Println(string(resp.Response.RequestRaw))
+			t.Fatalf("fuzztag variables passed failed. request:\n%s", string(resp.Response.RequestRaw))
 		}
 	}
 	t.Logf("FETCH COUNT: %v", count)
@@ -180,7 +179,7 @@ Authorization: Bearer {{params(test)}}
 func TestGRPCMUSTPASS_FuzzerSequence_FuzzerWithTag(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte(`{"path":` + strconv.Quote(request.URL.Path) + `}`))
@@ -225,19 +224,17 @@ abc`), "Host", utils.HostPort(host, port))),
 			}},
 	)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	var count = 0
 	for {
 		resp, err := client.Recv()
 		if err != nil {
-			log.Error(err)
 			break
 		}
 		if resp == nil {
 			break
 		}
-		println(resp.Response.GetUrl())
 		count++
 	}
 	if count != 100+10 {
@@ -248,7 +245,7 @@ abc`), "Host", utils.HostPort(host, port))),
 func TestGRPCMUSTPASS_FuzzerSequence_FuzzerWithTag2(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte(`{"path":` + strconv.Quote(request.URL.Path) + `}`))
@@ -308,7 +305,7 @@ abc`), "Host", utils.HostPort(host, port))),
 			}},
 	)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	var a int
 	var b int
@@ -316,7 +313,6 @@ abc`), "Host", utils.HostPort(host, port))),
 	for {
 		resp, err := client.Recv()
 		if err != nil {
-			log.Error(err)
 			break
 		}
 		if resp == nil {
@@ -346,7 +342,7 @@ abc`), "Host", utils.HostPort(host, port))),
 func TestGRPCMUSTPASS_FuzzerSequence_FuzzerTagWithConcurrent(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		time.Sleep(time.Millisecond * 500)
@@ -393,7 +389,7 @@ abc`), "Host", utils.HostPort(host, port))),
 			}},
 	)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	var count = 0
 	for {
@@ -405,21 +401,20 @@ abc`), "Host", utils.HostPort(host, port))),
 		if resp == nil {
 			break
 		}
-		println(resp.Response.GetUrl())
 		count++
 	}
 	if count != 100+10 {
 		t.Fatal("Fuzztag COUNT: " + fmt.Sprint(count) + " failed")
 	}
 	if time.Now().Sub(start).Seconds() <= 5 {
-		panic("concurrent(flowmax) is not working")
+		t.Fatal("concurrent(flowmax) is not working")
 	}
 }
 
 func TestGRPCMUSTPASS_FuzzerSequence_InheritCookie(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	var (
@@ -498,7 +493,7 @@ abc`), "Host", utils.HostPort(host, port))),
 		}},
 	)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	var checkFuzzerIndex = false
@@ -511,10 +506,6 @@ abc`), "Host", utils.HostPort(host, port))),
 		if resp == nil {
 			break
 		}
-		println(string(resp.Response.RequestRaw))
-		println(string(resp.Response.ResponseRaw))
-		println()
-
 		if resp.Request.GetFuzzerIndex() == "1" && resp.Request.GetRequest() == "" && len(resp.Request.GetRequestRaw()) <= 0 {
 			checkFuzzerIndex = true
 		}

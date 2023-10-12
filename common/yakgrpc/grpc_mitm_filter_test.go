@@ -2,7 +2,11 @@ package yakgrpc
 
 import (
 	"context"
-	"fmt"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/assert"
@@ -13,10 +17,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
-	"sync"
-	"testing"
-	"time"
 )
 
 func RunMITMTestServer(
@@ -38,7 +38,7 @@ func RunMITMTestServer(
 			break
 		}
 		msgStr := spew.Sdump(msg)
-		fmt.Println("MTIM CLIENT RECV: " + msgStr)
+		// fmt.Println("MTIM CLIENT RECV: " + msgStr)
 		if strings.Contains(msgStr, `MITM 服务器已启动`) {
 			go func() {
 				defer wg.Done()
@@ -63,7 +63,7 @@ func Test_ForExcludeBadCase(t *testing.T) {
 
 	client, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	var mitmPort = utils.GetRandomAvailableTCPPort()
 	var proxy = "http://" + utils.HostPort("127.0.0.1", mitmPort)
@@ -107,21 +107,17 @@ sec-ch-ua-platform: "macOS"
 			params := map[string]any{"proxy": proxy, "mockHost": "127.0.0.1", "mockPort": mockPort, "token": token}
 			params["packet"] = packet
 			_, err = yak.Execute(`
-println(string(packet))
 rsp, _ = poc.HTTP(packet, poc.proxy(proxy), poc.host(mockHost), poc.port(mockPort))~
-println(string(rsp))
 sleep(0.3)
 `, params)
 			if err != nil {
-				t.Logf("err: %v", err)
-				t.Fail()
+				t.Fatalf("err: %v", err)
 			}
 			count := yakit.QuickSearchMITMHTTPFlowCount(token)
 			log.Infof("yakit.QuickSearchMITMHTTPFlowCount("+`[`+token+`]`+") == %v", count)
 			if count != expectCount {
 				cancel()
-				t.Log("search httpflow by token failed: yakit.QuickSearchMITMHTTPFlowCount(token)")
-				t.FailNow()
+				t.Fatal("search httpflow by token failed: yakit.QuickSearchMITMHTTPFlowCount(token)")
 			}
 		}
 		cancel()
@@ -141,7 +137,7 @@ func TestGRPCMUSTPASS_MITMFilter_ForExcludeURI(t *testing.T) {
 
 	client, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	var mitmPort = utils.GetRandomAvailableTCPPort()
 	var proxy = "http://" + utils.HostPort("127.0.0.1", mitmPort)
@@ -191,9 +187,8 @@ sleep(0.3)
 			count := yakit.QuickSearchMITMHTTPFlowCount(token)
 			log.Infof("yakit.QuickSearchMITMHTTPFlowCount("+`[`+token+`]`+") == %v", count)
 			if count != expectCount {
+				t.Fatalf("search httpflow by token failed: yakit.QuickSearchMITMHTTPFlowCount(token)")
 				cancel()
-				t.Log("search httpflow by token failed: yakit.QuickSearchMITMHTTPFlowCount(token)")
-				t.FailNow()
 			}
 		}
 		cancel()
@@ -249,21 +244,17 @@ func TestGRPCMUSTPASS_MITMFilter_ForExcludeSuffixAndContentType(t *testing.T) {
 			packet = lowhttp.ReplaceHTTPPacketHeader(packet, "X-TOKEN", token)
 			params["packet"] = packet
 			_, err = yak.Execute(`
-println(string(packet))
 rsp, _ = poc.HTTP(packet, poc.proxy(proxy), poc.host(mockHost), poc.port(mockPort))~
-println(string(rsp))
 sleep(0.3)
 `, params)
 			if err != nil {
-				t.Logf("err: %v", err)
-				t.Fail()
+				t.Fatalf("err: %v", err)
 			}
 			count := yakit.QuickSearchMITMHTTPFlowCount(token)
 			log.Infof("yakit.QuickSearchMITMHTTPFlowCount("+`[`+token+`]`+") == %v", count)
 			if count != expectCount {
+				t.Fatalf("search httpflow by token failed: yakit.QuickSearchMITMHTTPFlowCount(token)")
 				cancel()
-				t.Log("search httpflow by token failed: yakit.QuickSearchMITMHTTPFlowCount(token)")
-				t.FailNow()
 			}
 		}
 
@@ -296,21 +287,17 @@ sleep(0.3)
 			packet = lowhttp.ReplaceHTTPPacketHeader(packet, "X-TOKEN", token)
 			params["packet"] = packet
 			_, err = yak.Execute(`
-println(string(packet))
 rsp, _ = poc.HTTP(packet, poc.proxy(proxy), poc.host(mockHost), poc.port(mockPort))~
-println(string(rsp))
 sleep(0.5)
 `, params)
 			if err != nil {
-				t.Logf("err: %v", err)
-				t.Fail()
+				t.Fatalf("err: %v", err)
 			}
 			count := yakit.QuickSearchMITMHTTPFlowCount(token)
 			log.Infof("yakit.QuickSearchMITMHTTPFlowCount("+`[`+token+`]`+") == %v", count)
 			if count != expectCount {
+				t.Fatalf("search httpflow by token failed: yakit.QuickSearchMITMHTTPFlowCount(token)")
 				cancel()
-				t.Log("search httpflow by token failed: yakit.QuickSearchMITMHTTPFlowCount(token)")
-				t.FailNow()
 			}
 		}
 		cancel()

@@ -30,7 +30,7 @@ func TestGRPCMUSTPASS_HTTPFuzzerWITHPLUGIN(t *testing.T) {
 		token = s
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	host, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
@@ -40,7 +40,7 @@ Content-Length: 12
 
 	c, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	client, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
@@ -76,29 +76,27 @@ Host: %v
 		},
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	haveToken := false
 	for {
 		rsp, err := client.Recv()
 		if err != nil {
-			log.Error(err)
 			break
 		}
 		if strings.Contains(rsp.Url, token) {
 			haveToken = true
 		}
-		fmt.Println(rsp.Url)
-		fmt.Printf("%v: %v\n", rsp.GetUUID(), len(rsp.ResponseRaw))
-		fmt.Println(string(rsp.GetRequestRaw()))
-		spew.Dump(rsp.GetExtractedResults())
-		spew.Dump(rsp.GetMatchedByMatcher())
+		// fmt.Println(rsp.Url)
+		// fmt.Printf("%v: %v\n", rsp.GetUUID(), len(rsp.ResponseRaw))
+		// fmt.Println(string(rsp.GetRequestRaw()))
+		// spew.Dump(rsp.GetExtractedResults())
+		// spew.Dump(rsp.GetMatchedByMatcher())
 	}
 
 	if !haveToken {
-		t.Log("NO TOKEN FOUND, PLUGIN is not executed!")
-		t.FailNow()
+		t.Fatal("NO TOKEN FOUND, PLUGIN is not executed!")
 	}
 }
 
@@ -110,7 +108,7 @@ Content-Length: 12
 
 	c, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	client, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
@@ -145,19 +143,19 @@ Host: %v
 		},
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	for {
 		rsp, err := client.Recv()
 		if err != nil {
-			log.Error(err)
 			break
 		}
-		fmt.Printf("%v: %v\n", rsp.GetUUID(), len(rsp.ResponseRaw))
-		fmt.Println(string(rsp.GetRequestRaw()))
-		spew.Dump(rsp.GetExtractedResults())
-		spew.Dump(rsp.GetMatchedByMatcher())
+		_ = rsp
+		// fmt.Printf("%v: %v\n", rsp.GetUUID(), len(rsp.ResponseRaw))
+		// fmt.Println(string(rsp.GetRequestRaw()))
+		// spew.Dump(rsp.GetExtractedResults())
+		// spew.Dump(rsp.GetMatchedByMatcher())
 	}
 }
 
@@ -170,7 +168,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer(t *testing.T) {
 
 	c, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	client, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
@@ -183,7 +181,7 @@ Host: www.baidu.com
 		PerRequestTimeoutSeconds: 5,
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	var count int
@@ -210,7 +208,7 @@ Host: www.baidu.com
 		ForceOnlyOneResponse:     true,
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	count = 0
@@ -230,7 +228,7 @@ Host: www.baidu.com
 func TestServer_HTTPFuzzerS2008(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	client, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
@@ -260,7 +258,7 @@ __getParams__ = func() {
 `,
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	for {
@@ -268,21 +266,22 @@ __getParams__ = func() {
 		if err != nil {
 			break
 		}
-		spew.Dump(rsp)
+		_ = rsp
+		// spew.Dump(rsp)
 	}
 }
 
 func TestServer_HTTPFuzzer2(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	client, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
 		HistoryWebFuzzerId: 6,
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	for {
@@ -290,19 +289,20 @@ func TestServer_HTTPFuzzer2(t *testing.T) {
 		if err != nil {
 			break
 		}
-		spew.Dump(rsp)
+		_ = rsp
+		// spew.Dump(rsp)
 	}
 }
 
 func TestServer_HTTPFuzzer3(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	client, err := c.QueryHistoryHTTPFuzzerTask(context.Background(), &ypb.Empty{})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	spew.Dump(client)
@@ -311,7 +311,7 @@ func TestServer_HTTPFuzzer3(t *testing.T) {
 func TestServer_HTTPFuzzerYYOA(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	client, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
@@ -337,7 +337,7 @@ Connection: close
 		PerRequestTimeoutSeconds: 5,
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	for {
@@ -352,7 +352,7 @@ Connection: close
 func TestServer_HTTPRequestMutateWithoutConnection(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	r, err := c.HTTPRequestMutate(context.Background(), &ypb.HTTPRequestMutateParams{
@@ -366,7 +366,7 @@ Accept-Language: zh-CN,zh;q=0.9
 		FuzzMethods: []string{"GET"},
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	fmt.Println(string(r.Result))
 }
@@ -374,7 +374,7 @@ Accept-Language: zh-CN,zh;q=0.9
 func TestServer_HTTPRequestMutateWithConnection(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	r, err := c.HTTPRequestMutate(context.Background(), &ypb.HTTPRequestMutateParams{
@@ -389,7 +389,7 @@ Connection: close
 		FuzzMethods: []string{"GET"},
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	fmt.Println(string(r.Result))
 }
@@ -397,7 +397,7 @@ Connection: close
 func TestGRPCMUSTPASS_HTTPFuzzer_FuzztagVars(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	token := utils.RandStringBytes(100)
@@ -421,7 +421,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_FuzztagVars(t *testing.T) {
 Host: ` + utils.HostPort(targetHost, targetPort) + `
 `})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	var count = 0
@@ -441,7 +441,7 @@ Host: ` + utils.HostPort(targetHost, targetPort) + `
 		log.Infof("url: %v payloads: %v", rsp.Url, rsp.Payloads)
 	}
 	if count != 30 {
-		panic("expect 30, got " + fmt.Sprint(count))
+		t.Fatal("expect 30, got " + fmt.Sprint(count))
 	}
 
 	if ret := time.Since(start); ret.Seconds() > 5 && ret.Seconds() < 6 {
@@ -456,7 +456,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_FuzztagVars2(t *testing.T) {
 
 	c, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	token := utils.RandStringBytes(100)
@@ -485,7 +485,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_FuzztagVars2(t *testing.T) {
 Host: ` + utils.HostPort(targetHost, targetPort) + `
 `})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	// only 1 request
@@ -495,16 +495,16 @@ Host: ` + utils.HostPort(targetHost, targetPort) + `
 			break
 		}
 		if len(rsp.Payloads) != 3 {
-			panic("expect payload count == 3, got " + fmt.Sprint(len(rsp.Payloads)))
+			t.Fatal("expect payload count == 3, got " + fmt.Sprint(len(rsp.Payloads)))
 		}
 		log.Infof("url: %v payloads: %v", rsp.Url, rsp.Payloads)
 
 		a, b := rsp.Payloads[1], rsp.Payloads[2]
 		if a != "-1" {
-			panic("expect params(a) == -1, got " + a)
+			t.Fatal("expect params(a) == -1, got " + a)
 		}
 		if b != "{{int(1-2)}}" {
-			panic("expect params(b) == {{int(1-2)}}, got " + b)
+			t.Fatal("expect params(b) == {{int(1-2)}}, got " + b)
 		}
 	}
 
@@ -518,7 +518,7 @@ Host: ` + utils.HostPort(targetHost, targetPort) + `
 func TestGRPCMUSTPASS_HTTPFuzzer_Matcher(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	targetHost, targetPort := lowhttp.DebugEchoServer()
@@ -568,7 +568,7 @@ key3: {{params(res)}}
 a={{base64dec(e3tyZXN9fQ==)}}&b={{base64dec(e3t4eHh4eH19)}}
 `})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	matched := false
@@ -580,20 +580,19 @@ a={{base64dec(e3tyZXN9fQ==)}}&b={{base64dec(e3t4eHh4eH19)}}
 		}
 
 		matched = rsp.MatchedByMatcher
-		fmt.Printf("%v: %v\n", rsp.GetUUID(), len(rsp.ResponseRaw))
-		fmt.Println(string(rsp.GetRequestRaw()))
+		// fmt.Printf("%v: %v\n", rsp.GetUUID(), len(rsp.ResponseRaw))
+		// fmt.Println(string(rsp.GetRequestRaw()))
 	}
 
 	if !matched {
-		t.Log("NO MATCHED")
-		t.FailNow()
+		t.Fatal("NO MATCHED")
 	}
 }
 
 func TestGRPCMUSTPASS_HTTPFuzzer_Extractor_Kv(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	targetHost, targetPort := lowhttp.DebugEchoServer()
@@ -636,14 +635,13 @@ Content-Type: application/json
 }
 `})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	matchedCount := 0
 	for {
 		rsp, err := client.Recv()
 		if err != nil {
-			log.Error(err)
 			break
 		}
 		res := rsp.GetExtractedResults()
@@ -661,13 +659,12 @@ Content-Type: application/json
 				matchedCount++
 			}
 		}
-		fmt.Printf("%v: %v\n", rsp.GetUUID(), len(rsp.ResponseRaw))
-		fmt.Println(string(rsp.GetRequestRaw()))
+		// fmt.Printf("%v: %v\n", rsp.GetUUID(), len(rsp.ResponseRaw))
+		// fmt.Println(string(rsp.GetRequestRaw()))
 	}
 
 	if matchedCount != 3 {
-		t.Log("extractor kv failed")
-		t.FailNow()
+		t.Fatalf("extractor kv failed")
 	}
 }
 

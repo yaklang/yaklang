@@ -2,17 +2,17 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestGRPCMUSTPASS_SMOKING_EVALUATE_PLUGIN(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	name, err := yakit.CreateTemporaryYakScript("port-scan", `yakit.AutoInitYakit()
@@ -21,17 +21,17 @@ handle = result => {
 	risk.NewRisk("http://baidu.com")
 }`)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	rsp, err := client.SmokingEvaluatePlugin(context.Background(), &ypb.SmokingEvaluatePluginRequest{
 		PluginName: name,
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	var checking = false
 	for _, r := range rsp.Results {
-		spew.Dump(r)
+		// spew.Dump(r)
 		if strings.Contains(r.String(), "[Negative Alarm]") {
 			checking = true
 		}
@@ -46,23 +46,23 @@ handle = result => {
 	risk.NewRisk("http://baidu.com")
 }`)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	rsp, err = client.SmokingEvaluatePlugin(context.Background(), &ypb.SmokingEvaluatePluginRequest{
 		PluginName: name,
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
-	spew.Dump(rsp)
+	// spew.Dump(rsp)
 	checking = false
 	for _, r := range rsp.Results {
-		spew.Dump(r)
+		// spew.Dump(r)
 		if strings.Contains(r.String(), "undefined variable") {
 			checking = true
 		}
 	}
 	if !checking {
-		panic("should have negative alarm")
+		t.Fatal("should have negative alarm")
 	}
 }
