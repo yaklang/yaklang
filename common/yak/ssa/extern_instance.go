@@ -11,6 +11,9 @@ const (
 )
 
 func (b *FunctionBuilder) WithExternValue(vs map[string]any) {
+	if vs == nil {
+		return
+	}
 	b.buildExternValue = func(id string, builder *FunctionBuilder) Value {
 		if v, ok := builder.externInstance[id]; ok {
 			return v
@@ -130,6 +133,7 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 		ret = NewMapType(f.handlerType(typ.Key(), level), f.handlerType(typ.Elem(), level))
 	case reflect.Struct:
 		structType := NewStructType()
+		f.externType[typStr] = structType
 		for i := 0; i < typ.NumField(); i++ {
 			field := typ.Field(i)
 			fieldType := f.handlerType(field.Type, level)
