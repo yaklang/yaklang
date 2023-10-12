@@ -4,17 +4,18 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/mux"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/vulinbox/verificationcode"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
 	"net/url"
 	"sort"
 	"strings"
 	"sync"
 	"text/template"
+
+	"github.com/gorilla/mux"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/vulinbox/verificationcode"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 //go:embed html/route.html
@@ -274,7 +275,6 @@ func addRouteWithVulInfo(router *mux.Router, info *VulInfo) {
 		log.Errorf("marshal vuln info failed: %v", err)
 		return
 	}
-	log.Infof("register: %v to route", info.Title)
 	router.HandleFunc(info.Path, info.Handler).Name(string(infoStr))
 }
 
