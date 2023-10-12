@@ -35,7 +35,11 @@ func (s *Server) PortScan(req *ypb.PortScanRequest, stream ypb.Yak_PortScanServe
 	// validation
 	for _, target := range targets {
 		if !utils.IsValidDomain(target) && !utils.IsValidCIDR(target) && !utils.IsIPv4(target) && !utils.IsIPv6(target) {
-			return utils.Errorf("invalid target: %s\ninput must be ip, domain or cidr.", strconv.Quote(target))
+			host, port, err := utils.ParseStringToHostPort(target)
+			if port <= 0 || err != nil {
+				return utils.Errorf("invalid target: %s\ninput must be ip, domain or cidr (url/host:port).", strconv.Quote(target))
+			}
+			_ = host
 		}
 	}
 
