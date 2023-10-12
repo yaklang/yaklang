@@ -2,16 +2,15 @@ package yakgrpc
 
 import (
 	"context"
-	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestGRPCMUSTPASS_BatchTarget(t *testing.T) {
@@ -36,11 +35,10 @@ abc`)
 
 	client, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	firstTarget := newTarget[0]
 	count := 0
-	spew.Dump(newTarget)
 	stream, err := client.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
 		Request:         "GET /ab HTTP/1.1\r\nHost: " + firstTarget + "\r\n\r\n",
 		BatchTargetFile: false,
@@ -54,11 +52,9 @@ abc`)
 		if err != nil {
 			break
 		}
-		fmt.Println(rsp.Url)
-		fmt.Println(string(rsp.ResponseRaw))
 		body := lowhttp.GetHTTPPacketBody(rsp.ResponseRaw)
 		if string(body) != "abc" {
-			panic("body not match")
+			t.Fatalf("body not match. body:\n%s", string(body))
 		}
 		count++
 	}
@@ -68,10 +64,9 @@ abc`)
 	}
 
 	count = 0
-	spew.Dump(newTarget)
 	fp, err := consts.TempFile("batchTarget-*")
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	fp.WriteString(strings.Join(newTarget, "\n"))
 	fp.Close()
@@ -81,18 +76,16 @@ abc`)
 		BatchTarget:     []byte(fp.Name()),
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	for {
 		rsp, err := stream.Recv()
 		if err != nil {
 			break
 		}
-		fmt.Println(rsp.Url)
-		fmt.Println(string(rsp.ResponseRaw))
 		body := lowhttp.GetHTTPPacketBody(rsp.ResponseRaw)
 		if string(body) != "abc" {
-			panic("body not match")
+			t.Fatalf("body not match. body:\n%s", string(body))
 		}
 		count++
 	}

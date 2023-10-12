@@ -3,16 +3,17 @@ package coreplugin
 import (
 	"context"
 	"fmt"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/vulinbox"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
-	"sync"
-	"testing"
-	"time"
 )
 
 func TestGRPCMUSTPASS_MITM(t *testing.T) {
@@ -27,7 +28,7 @@ func TestGRPCMUSTPASS_MITM(t *testing.T) {
 	go func() {
 		v, err := vulinbox.NewVulinServerEx(context.Background(), false, false, "127.0.0.1", vulinboxPort)
 		if err != nil {
-			t.Fatalf("start vulinbox server failed: %s", err)
+			panic(fmt.Sprintf("start vulinbox server failed: %s", err))
 		}
 		_ = v
 	}()
@@ -80,10 +81,6 @@ func TestGRPCMUSTPASS_MITM(t *testing.T) {
 
 		if strings.Contains(spew.Sdump(rsp.Message), "starting mitm server") && !started {
 			fmt.Println("---------------------------------------------")
-			fmt.Println("---------------------------------------------")
-			fmt.Println("---------------------------------------------")
-			fmt.Println("---------------------------------------------")
-			fmt.Println("---------------------------------------------")
 			started = true
 			err = stream.Send(&ypb.MITMRequest{
 				SetPluginMode: true,
@@ -101,10 +98,6 @@ func TestGRPCMUSTPASS_MITM(t *testing.T) {
 		}
 		if pluginStartLoading && strings.Contains(spew.Sdump(rsp), "初始化加载插件完成，加载成功【1】个") {
 			pluginLoaded = true
-			fmt.Println("==============================================")
-			fmt.Println("==============================================")
-			fmt.Println("==============================================")
-			fmt.Println("==============================================")
 			fmt.Println("==============================================")
 			go func() {
 				defer func() {
@@ -125,9 +118,6 @@ Host: 111
 packet = getParam("packet")
 proxy = getParam("proxy")
 
-dump(packet)
-dump(proxy)
-
 rsp, req = poc.HTTP(packet, poc.proxy(proxy), poc.https(true))~
 println(string(rsp))
 sleep(1)
@@ -135,7 +125,6 @@ sleep(1)
 vulinboxAddr  = getParam("vulinbox_addr")
 count = 0
 risks = []
-dump(vulinboxAddr)
 haveVuls = false
 for {
 	count++
@@ -157,8 +146,6 @@ if !haveVuls {
 	die("no vulns found (!haveVuls)")
 }
 risk.DeleteRiskByTarget(vulinboxAddr)
-
-
 `, params)
 				if err != nil {
 					panic(err)
@@ -166,19 +153,18 @@ risk.DeleteRiskByTarget(vulinboxAddr)
 				vulnFound = true
 			}()
 		}
-		spew.Dump(rsp)
 	}
 	wg.Wait()
 	if !started {
-		panic("MITM CANNOT START UP!!!")
+		t.Fatalf("MITM CANNOT START UP!!!")
 	}
 
 	if !pluginLoaded {
-		panic("XSS PLUGIN NOT LOADED")
+		t.Fatalf("XSS PLUGIN NOT LOADED")
 	}
 
 	if !vulnFound {
-		panic("XSS VULN CANNOT FOUND VIA MITM PLUGIN")
+		t.Fatalf("XSS VULN CANNOT FOUND VIA MITM PLUGIN")
 	}
 }
 
@@ -194,7 +180,7 @@ func TestDEBUG_MITM(t *testing.T) {
 	go func() {
 		v, err := vulinbox.NewVulinServerEx(context.Background(), false, false, "127.0.0.1", vulinboxPort)
 		if err != nil {
-			t.Fatalf("start vulinbox server failed: %s", err)
+			panic(fmt.Sprintf("start vulinbox server failed: %s", err))
 		}
 		_ = v
 	}()
@@ -247,10 +233,6 @@ func TestDEBUG_MITM(t *testing.T) {
 
 		if strings.Contains(spew.Sdump(rsp.Message), "starting mitm server") && !started {
 			fmt.Println("---------------------------------------------")
-			fmt.Println("---------------------------------------------")
-			fmt.Println("---------------------------------------------")
-			fmt.Println("---------------------------------------------")
-			fmt.Println("---------------------------------------------")
 			started = true
 			err = stream.Send(&ypb.MITMRequest{
 				SetPluginMode: true,
@@ -268,10 +250,6 @@ func TestDEBUG_MITM(t *testing.T) {
 		}
 		if pluginStartLoading && strings.Contains(spew.Sdump(rsp), "初始化加载插件完成，加载成功【1】个") {
 			pluginLoaded = true
-			fmt.Println("==============================================")
-			fmt.Println("==============================================")
-			fmt.Println("==============================================")
-			fmt.Println("==============================================")
 			fmt.Println("==============================================")
 			go func() {
 				defer func() {
@@ -292,9 +270,6 @@ Host: 111
 packet = getParam("packet")
 proxy = getParam("proxy")
 
-dump(packet)
-dump(proxy)
-
 rsp, req = poc.HTTP(packet, poc.proxy(proxy), poc.https(true))~
 println(string(rsp))
 sleep(1)
@@ -302,7 +277,6 @@ sleep(1)
 vulinboxAddr  = getParam("vulinbox_addr")
 count = 0
 risks = []
-dump(vulinboxAddr)
 haveVuls = false
 for {
 	count++
@@ -324,8 +298,6 @@ if !haveVuls {
 	die("no vulns found (!haveVuls)")
 }
 risk.DeleteRiskByTarget(vulinboxAddr)
-
-
 `, params)
 				if err != nil {
 					panic(err)
@@ -333,7 +305,6 @@ risk.DeleteRiskByTarget(vulinboxAddr)
 				vulnFound = true
 			}()
 		}
-		spew.Dump(rsp)
 	}
 	wg.Wait()
 	if !started {

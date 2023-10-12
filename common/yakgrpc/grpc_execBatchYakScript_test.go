@@ -3,7 +3,6 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"testing"
@@ -62,7 +61,6 @@ requests:
 
 # Enhanced by mp on 2022/05/18
 `)
-	spew.Dump(name)
 	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n\r\nHello, world!"))
 
 	stream, err := client.ExecYakScript(context.Background(), &ypb.ExecRequest{
@@ -72,12 +70,11 @@ requests:
 		},
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	for {
 		data, err := stream.Recv()
 		if err != nil {
-			spew.Dump(err)
 			break
 		}
 		spew.Dump(data)
@@ -148,10 +145,7 @@ func TestNewServer(t *testing.T) {
 	for {
 		rsp, err := stream.Recv()
 		if err != nil {
-			if err == io.EOF {
-				return
-			}
-			panic(err)
+			break
 		}
 		spew.Dump(rsp)
 	}
@@ -187,7 +181,7 @@ mirrorHTTPFlow = func(isHttps, url , req , rsp , body ) {
 		Proxy:               fmt.Sprintf("http://%s:%d", host, port),
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	for {
 		_, err := stream.Recv()

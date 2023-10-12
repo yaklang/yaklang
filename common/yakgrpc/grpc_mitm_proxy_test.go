@@ -4,20 +4,22 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/http"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/crep"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"net/http"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TemplateTestGRPCMUSTPASS_MITM_WithoutProxy_StatusCard(t *testing.T) {
-	ctx := utils.TimeoutContextSeconds(10)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	targetHost, targetPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("Hello Token"))
 	})
@@ -25,11 +27,11 @@ func TemplateTestGRPCMUSTPASS_MITM_WithoutProxy_StatusCard(t *testing.T) {
 	mitmPort := utils.GetRandomAvailableTCPPort()
 	client, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	stream, err := client.MITM(ctx)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	stream.Send(&ypb.MITMRequest{
 		Host: "127.0.0.1",
@@ -40,7 +42,6 @@ func TemplateTestGRPCMUSTPASS_MITM_WithoutProxy_StatusCard(t *testing.T) {
 		if err != nil {
 			break
 		}
-		spew.Dump(data)
 		if data.GetMessage().GetIsMessage() {
 			var msg = string(data.GetMessage().GetMessage())
 			if strings.Contains(msg, "starting mitm server") {
@@ -55,11 +56,11 @@ mirrorNewWebsite = (tls, url, req, rsp, body) => {
 		if data.GetMessage().GetIsMessage() && strings.Contains(string(data.GetMessage().GetMessage()), `HotPatched MITM HOOKS`) {
 			// do sth
 			_, err := yak.Execute(`rsp, req := poc.Get(targetUrl, poc.proxy(mitmProxy))~
-dump(rsp.RawPacket)
 assert string(rsp.RawPacket).Contains("Hello Token")
-`, map[string]any{"targetUrl": targetUrl, "mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort)})
+cancel()
+`, map[string]any{"targetUrl": targetUrl, "mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort), "cancel": cancel})
 			if err != nil {
-				panic(err)
+				t.Fatal(err)
 			}
 		}
 
@@ -71,7 +72,7 @@ func TemplateTestGRPCMUSTPASS_MITM_Proxy_Template(t *testing.T) {
 	port := utils.GetRandomAvailableTCPPort()
 	server, err := crep.NewMITMServer()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	addr := utils.HostPort("127.0.0.1", port)
 	go func() {
@@ -84,11 +85,11 @@ func TemplateTestGRPCMUSTPASS_MITM_Proxy_Template(t *testing.T) {
 	mitmPort := utils.GetRandomAvailableTCPPort()
 	client, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	stream, err := client.MITM(ctx)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	stream.Send(&ypb.MITMRequest{
 		Host:            "127.0.0.1",
@@ -116,15 +117,18 @@ func TestGRPCMUSTPASS_MITM_Proxy(t *testing.T) {
 		downstreamPassed bool
 		token            = utils.RandNumberStringBytes(10)
 	)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	mockHost, mockPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Query().Get("u") == token {
 			networkIsPassed = true
+			cancel()
 		}
 		writer.Write([]byte("Hello Token"))
 	})
 	var mockUrl = "http://" + utils.HostPort(mockHost, mockPort)
 
-	ctx := utils.TimeoutContextSeconds(10)
 	port := utils.GetRandomAvailableTCPPort()
 	server, err := crep.NewMITMServer(crep.MITM_SetHTTPRequestHijack(func(https bool, req *http.Request) *http.Request {
 		if req.URL.Query().Get("u") == token {
@@ -133,24 +137,24 @@ func TestGRPCMUSTPASS_MITM_Proxy(t *testing.T) {
 		return req
 	}))
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	addr := utils.HostPort("127.0.0.1", port)
 	go func() {
 		server.Serve(ctx, addr)
 	}()
 	if utils.WaitConnect(addr, 10) != nil {
-		panic("wait connect timeout")
+		t.Fatal("wait connect timeout")
 	}
 
 	mitmPort := utils.GetRandomAvailableTCPPort()
 	client, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	stream, err := client.MITM(ctx)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	stream.Send(&ypb.MITMRequest{
 		Host:            "127.0.0.1",
@@ -168,15 +172,13 @@ func TestGRPCMUSTPASS_MITM_Proxy(t *testing.T) {
 			if strings.Contains(msg, "starting mitm server") {
 				if _, err := yak.Execute(
 					`
-dump(mockUrl, token, mitmProxy)
 poc.Get(mockUrl, poc.proxy(mitmProxy), poc.replaceQueryParam("u", token))~`,
 					map[string]any{
 						"mockUrl":   mockUrl,
 						"mitmProxy": "http://" + utils.HostPort("127.0.0.1", mitmPort),
 						"token":     token,
 					}); err != nil {
-					t.Errorf("execute script failed: %v", err)
-					t.FailNow()
+					t.Fatalf("execute script failed: %v", err)
 				}
 			}
 		}
@@ -189,13 +191,12 @@ poc.Get(mockUrl, poc.proxy(mitmProxy), poc.replaceQueryParam("u", token))~`,
 	if !networkIsPassed {
 		t.Fatalf("Network not passed")
 	}
-	t.Log("PASS")
 }
 
 func TestGRPCMUSTPASS_MITM_Proxy_MITMPluginInheritProxy(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -212,7 +213,7 @@ func TestGRPCMUSTPASS_MITM_Proxy_MITMPluginInheritProxy(t *testing.T) {
 
 	stream, err := client.MITM(ctx)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	mitmPort := utils.GetRandomAvailableTCPPort()
@@ -234,13 +235,12 @@ mirrorNewWebsite = (tls, url, req, rsp, body) => {
 				go func() {
 					time.Sleep(time.Second)
 					_, err := yak.Execute(`
-dump(mitmProxy)
 poc.Get("http://www.example.com", poc.proxy(mitmProxy))
 `, map[string]any{
 						"mitmProxy": "http://127.0.0.1:" + fmt.Sprint(mitmPort),
 					})
 					if err != nil {
-						panic(err)
+						t.Fatal(err)
 					}
 				}()
 			}
@@ -257,7 +257,9 @@ func TestGRPCMUSTPASS_MITM_Proxy_StatusCard(t *testing.T) {
 yakit.AutoInitYakit()
 yakit.StatusCard("mitmId", "StatusCard")
 `)
-	ctx := utils.TimeoutContextSeconds(10)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	targetHost, targetPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("Hello Token"))
 	})
@@ -265,11 +267,11 @@ yakit.StatusCard("mitmId", "StatusCard")
 	mitmPort := utils.GetRandomAvailableTCPPort()
 	client, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	stream, err := client.MITM(ctx)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	stream.Send(&ypb.MITMRequest{
 		Host: "127.0.0.1",
@@ -278,7 +280,6 @@ yakit.StatusCard("mitmId", "StatusCard")
 	var (
 		started               bool
 		pluginStartLoading    bool
-		pluginLoaded          bool
 		pluginStatusCardFound bool
 		hotStatusCardFound    bool
 	)
@@ -295,7 +296,6 @@ yakit.StatusCard("mitmId", "StatusCard")
 					YakScriptContent: `
 mirrorNewWebsite = (tls, url, req, rsp, body) => {
 	yakit.StatusCard("abc", 1)
-	dump(req)
 }
 `,
 				})
@@ -311,9 +311,10 @@ mirrorNewWebsite = (tls, url, req, rsp, body) => {
 				// do sth
 				_, err := yak.Execute(`rsp, req := poc.Get(targetUrl, poc.proxy(mitmProxy))~
 assert string(rsp.RawPacket).Contains("Hello Token")
-`, map[string]any{"targetUrl": targetUrl, "mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort)})
+cancel()
+`, map[string]any{"targetUrl": targetUrl, "mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort), "cancel": cancel})
 				if err != nil {
-					panic(err)
+					t.Fatal(err)
 				}
 			}
 		}
@@ -326,16 +327,17 @@ assert string(rsp.RawPacket).Contains("Hello Token")
 			pluginStartLoading = true
 		}
 
-		if pluginStartLoading && strings.Contains(spew.Sdump(data), "初始化加载插件完成，加载成功【1】个") {
-			pluginLoaded = true
-		}
-
 		if strings.Contains(spew.Sdump(data), "StatusCard") && strings.Contains(spew.Sdump(data), "mitmId") {
 			pluginStatusCardFound = true
 		}
+	}
 
-		t.Logf("%v-%v-%v-%v-%v", pluginStatusCardFound, hotStatusCardFound, pluginLoaded, pluginStartLoading, pluginLoaded)
+	if !pluginStatusCardFound {
+		t.Fatal("plugin status card not found")
+	}
 
+	if !hotStatusCardFound {
+		t.Fatal("hot status card not found")
 	}
 
 	if !(pluginStatusCardFound && hotStatusCardFound) {

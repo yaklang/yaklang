@@ -2,16 +2,17 @@ package yakgrpc
 
 import (
 	"context"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"testing"
 )
 
 func TestGRPCMUSTPASS_DiagnoseNetwork(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	stream, err := client.DiagnoseNetwork(utils.TimeoutContextSeconds(30), &ypb.DiagnoseNetworkRequest{
 		NetworkTimeout:    5,
@@ -24,7 +25,7 @@ func TestGRPCMUSTPASS_DiagnoseNetwork(t *testing.T) {
 		DNSServers:        nil,
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	for {
@@ -43,13 +44,13 @@ func TestGRPCMUSTPASS_DiagnoseNetwork(t *testing.T) {
 func TestGRPCMUSTPASS_DIAGNOSE_DNS(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	stream, err := client.DiagnoseNetworkDNS(context.Background(), &ypb.DiagnoseNetworkDNSRequest{
 		Domain: "baidu.com",
 	})
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	for {
 		data, err := stream.Recv()
