@@ -151,8 +151,8 @@ func (b *FunctionBuilder) readVariableByBlock(variable string, block *BasicBlock
 		// v = nil
 		if b.CanBuildFreeValue(variable) {
 			v = b.BuildFreeValue(variable)
-			// } else if i := b.TryBuildExternValue(variable); i != nil {
-			// 	v = i
+		} else if i := b.TryBuildExternValue(variable); i != nil {
+			v = i
 		} else if create {
 			un := NewUndefine(variable, block)
 			EmitInst(un)
@@ -186,7 +186,10 @@ func (b *FunctionBuilder) CanBuildFreeValue(variable string) bool {
 	symbol := b.parentSymbolBlock
 	block := b.parentCurrentBlock
 	for parent != nil {
-		if v := parent.readVariableByBlock(GetIdByBlockSymbolTable(variable, symbol), block, false); v != nil {
+		variable = GetIdByBlockSymbolTable(variable, symbol)
+		v := parent.readVariableByBlock(variable, block, false)
+		e := parent.externInstance[variable]
+		if v != nil && e != v {
 			return true
 		}
 

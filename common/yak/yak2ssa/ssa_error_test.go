@@ -388,6 +388,16 @@ func TestExternInstance(t *testing.T) {
 					b = lib.getString()
 				}
 			}
+
+			// in loop
+			for 2 {
+				a = getInt()
+				b = lib.getString()
+				b = lib.getString()
+				for 3 {
+					b = lib.getString()
+				}
+			}
 			`,
 			ExternValue: map[string]any{
 				"getInt": func() int { return 1 },
