@@ -11,7 +11,7 @@ func NewDialContextFunc(timeout time.Duration, opts ...DNSOption) func(ctx conte
 	return func(ctx context.Context, network string, addr string) (net.Conn, error) {
 		ddl, ok := ctx.Deadline()
 		if ok {
-			if du := ddl.Sub(time.Now()); du.Seconds() > 0 {
+			if du := ddl.Sub(time.Now()); du.Seconds() > 0 && du < timeout {
 				timeout = du
 			}
 		}
