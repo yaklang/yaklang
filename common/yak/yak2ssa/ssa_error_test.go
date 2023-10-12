@@ -355,7 +355,6 @@ func TestExternStruct(t *testing.T) {
 		})
 	})
 
-	//TODO: handle type recursive
 	t.Run("check extern type recursive", func(t *testing.T) {
 		CheckTestCase(t, TestCase{
 			code: `
