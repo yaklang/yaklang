@@ -22,9 +22,16 @@ func NotEnoughArgument(funName string, have, want string) string {
 	)
 }
 
-func CallAssignmentMismatch(leftLen, rightLen int) string {
+func CallAssignmentMismatch(left int, right string) string {
 	return fmt.Sprintf(
-		"function call assignment mismatch: left: %d variable but right return %d values",
-		leftLen, rightLen,
+		"The function call returns (%s) type, but %d variables on the left side. ",
+		right, left,
+	)
+}
+
+func CallAssignmentMismatchDropError(left int, right string) string {
+	return fmt.Sprintf(
+		"The function call with ~ returns (%s) type, but %d variables on the left side. ",
+		right, left,
 	)
 }
