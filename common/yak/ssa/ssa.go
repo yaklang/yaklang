@@ -112,6 +112,8 @@ type InstructionValue interface {
 	// variable
 	GetVariable() string
 	SetVariable(string)
+	SetLeftPosition(*Position)
+	GetLeftPosition() *Position
 }
 type Program struct {
 	// package list
@@ -251,7 +253,8 @@ type anInstruction struct {
 
 	variable string
 	// source code position
-	pos *Position
+	pos     *Position
+	leftPos *Position // for left variable
 }
 
 // implement instruction
@@ -292,6 +295,14 @@ func (a *anInstruction) GetPosition() *Position {
 
 func (a *anInstruction) SetPosition(pos *Position) {
 	a.pos = pos
+}
+
+func (a *anInstruction) SetLeftPosition(pos *Position) {
+	a.leftPos = pos
+}
+
+func (a *anInstruction) GetLeftPosition() *Position {
+	return a.leftPos
 }
 
 // value

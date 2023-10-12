@@ -595,6 +595,9 @@ func (b *astbuilder) AssignList(stmt assignlist) []ssa.Value {
 		// (n) = (n), just assign
 		if len(rvalues) == len(lvalues) {
 			for i := range rvalues {
+				if inst, ok := rvalues[i].(ssa.InstructionValue); ok {
+					inst.SetLeftPosition(lvalues[i].GetPosition())
+				}
 				lvalues[i].Assign(rvalues[i], b.FunctionBuilder)
 			}
 		} else if len(rvalues) == 1 {
