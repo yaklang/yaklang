@@ -19,18 +19,19 @@ import (
 var poolingList sync.Map
 
 type httpPoolConfig struct {
-	Size                   int
-	SizedWaitGroupInstance *utils.SizedWaitGroup
-	PerRequestTimeout      time.Duration
-	IsHttps                bool
-	IsGmTLS                bool
-	Host                   string
-	Port                   int
-	NoSystemProxy          bool
-	Proxies                []string
-	UseRawMode             bool
-	RedirectTimes          int
-	NoFollowRedirect       bool
+	Size                         int
+	SizedWaitGroupInstance       *utils.SizedWaitGroup
+	PerRequestTimeout            time.Duration
+	IsHttps                      bool
+	IsGmTLS                      bool
+	Host                         string
+	Port                         int
+	OverrideEnableSystemProxyEnv bool
+	NoSystemProxy                bool
+	Proxies                      []string
+	UseRawMode                   bool
+	RedirectTimes                int
+	NoFollowRedirect             bool
 	// NoFollowMetaRedirect             bool
 	FollowJSRedirect                 bool
 	PayloadsTable                    *sync.Map
@@ -99,6 +100,7 @@ func _httpPool_RequestCountLimiter(b int) HttpPoolConfigOption {
 
 func _httpPool_NoSystemProxy(b bool) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
+		config.OverrideEnableSystemProxyEnv = true
 		config.NoSystemProxy = b
 	}
 }
@@ -583,6 +585,10 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 						lowhttp.WithETCHosts(config.EtcHosts),
 						lowhttp.WithGmTLS(config.IsGmTLS),
 						lowhttp.WithConnPool(config.WithConnPool)}
+
+					if config.OverrideEnableSystemProxyEnv {
+						lowhttpOptions = append(lowhttpOptions, lowhttp.WithEnableSystemProxyFromEnv(!config.NoSystemProxy))
+					}
 
 					rspInstance, err := lowhttp.HTTP(lowhttpOptions...)
 					var rsp []byte
