@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"fmt"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -34,7 +35,8 @@ func (s *Server) QueryTrafficPacket(ctx context.Context, req *ypb.QueryTrafficPa
 			TransportEndpointPortSrc:        int64(item.TransportEndpointPortSrc),
 			TransportEndpointPortDst:        int64(item.TransportEndpointPortDst),
 			SessionId:                       item.SessionUuid,
-			Id:                              int64(item.ID),
+			IdInt:                           int64(item.ID),
+			Id:                              fmt.Sprint(item.ID),
 		}
 	})
 
