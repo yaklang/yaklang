@@ -1,6 +1,7 @@
 package webfingerprint
 
 import (
+	"fmt"
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -9,6 +10,8 @@ import (
 	"github.com/yaklang/yaklang/embed"
 	"math/rand"
 	"path"
+	"strings"
+	"time"
 )
 
 func LoadDefaultDataSource() ([]*WebRule, error) {
@@ -57,12 +60,19 @@ func LoadDefaultDataSource() ([]*WebRule, error) {
 }
 
 func MockWebFingerPrintByName(name string) (string, int) {
+	// debug
+	//resp, _ := ioutil.ReadFile("./webfingerprint/fingerprint-rules.yml")
+	//
+	//rules, _ := ParseWebFingerprintRules(resp)
+	names := strings.Split(name, ",")
 	rules, _ := LoadDefaultDataSource()
-	var generates []string
 	var err error
 	headerStr := "HTTP/1.1 200 OK" + utils.CRLF
 	bodyStr := ""
-
+	nameMap := make(map[string]struct{})
+	for _, name := range names {
+		nameMap[name] = struct{}{}
+	}
 	for _, rule := range rules {
 		for _, m := range rule.Methods {
 			if m.MD5s != nil {
@@ -70,9 +80,9 @@ func MockWebFingerPrintByName(name string) (string, int) {
 			}
 			if m.Keywords != nil {
 				for _, keyword := range m.Keywords {
-					if keyword.Product == name {
+					if _, exists := nameMap[keyword.Product]; exists {
 						fakeBody := keyword.Regexp
-						generates, err = regen.GenerateOne(fakeBody)
+						generates, err := regen.GenerateOne(fakeBody)
 						if err != nil {
 							continue
 						}
@@ -82,13 +92,26 @@ func MockWebFingerPrintByName(name string) (string, int) {
 			}
 			if m.HTTPHeaders != nil {
 				for _, header := range m.HTTPHeaders {
-					if header.HeaderValue.Product == name {
-						fakeHeader := header.HeaderValue.Regexp
-						generates, err = regen.GenerateOne(fakeHeader)
-						if err != nil {
-							continue
+					if _, exists := nameMap[header.HeaderValue.Product]; exists {
+						if header.HeaderValue.Regexp != "" {
+							fakeHeader := header.HeaderValue.Regexp
+							generates, err := regen.GenerateVisibleOne(fakeHeader)
+							if err != nil {
+								continue
+							}
+							if generates == " " {
+								generates = "filling"
+							}
+							if strings.HasSuffix(header.HeaderValue.Regexp, " ") {
+								headerStr += header.HeaderName + ": " + generates + "filling" + utils.CRLF
+							} else {
+								headerStr += header.HeaderName + ": " + generates + utils.CRLF
+
+							}
+						} else {
+							headerStr += header.HeaderName + ": EMPTY" + utils.CRLF
+
 						}
-						headerStr += header.HeaderName + ": " + generates[0] + utils.CRLF
 					}
 				}
 			}
@@ -99,6 +122,7 @@ func MockWebFingerPrintByName(name string) (string, int) {
 	if err != nil {
 		return "", 0
 	}
+	fmt.Println(string(response))
 	return utils.DebugMockHTTP([]byte(response))
 }
 
@@ -109,16 +133,17 @@ func MockRandomWebFingerPrints() ([]string, string, int) {
 	//rules, _ := ParseWebFingerprintRules(resp)
 
 	rules, _ := LoadDefaultDataSource()
+	src := rand.NewSource(time.Now().UnixNano())
+	r := rand.New(src)
 
 	// Generate a list of 10 random rules from the rules slice
-	randomRules := make([]*WebRule, 10)
+	randomRules := make([]*WebRule, 100)
 	for i := range randomRules {
-		randomRules[i] = rules[rand.Intn(len(rules))]
+		randomRules[i] = rules[r.Intn(len(rules))]
 	}
 	// debug
 	//randomRules = rules
 	var ruleNames []string
-	var generates []string
 	var err error
 	headerStr := "HTTP/1.1 200 OK" + utils.CRLF
 	bodyStr := ""
@@ -131,23 +156,38 @@ func MockRandomWebFingerPrints() ([]string, string, int) {
 				for _, keyword := range m.Keywords {
 					ruleNames = append(ruleNames, keyword.Product)
 					fakeBody := keyword.Regexp
-					generates, err = regen.GenerateOne(fakeBody)
+					generates, err := regen.GenerateOne(fakeBody)
 					if err != nil {
 						continue
 					}
-					bodyStr += utils.CRLF + generates[0]
+					if strings.HasSuffix(keyword.Regexp, " )") || strings.HasSuffix(keyword.Regexp, " ") {
+						bodyStr += utils.CRLF + generates[0] + "filling"
+					} else {
+						bodyStr += utils.CRLF + generates[0]
+					}
 				}
 			}
 			if m.HTTPHeaders != nil {
 				for _, header := range m.HTTPHeaders {
 					ruleNames = append(ruleNames, header.HeaderValue.Product)
+					if header.HeaderValue.Regexp != "" {
+						fakeHeader := header.HeaderValue.Regexp
+						generates, err := regen.GenerateVisibleOne(fakeHeader)
+						if err != nil {
+							continue
+						}
+						if generates == " " {
+							generates = "filling"
+						}
+						if strings.HasSuffix(header.HeaderValue.Regexp, " ") {
+							headerStr += header.HeaderName + ": " + generates + "filling" + utils.CRLF
+						} else {
+							headerStr += header.HeaderName + ": " + generates + utils.CRLF
+						}
+					} else {
+						headerStr += header.HeaderName + ": EMPTY" + utils.CRLF
 
-					fakeHeader := header.HeaderValue.Regexp
-					generates, err = regen.GenerateOne(fakeHeader)
-					if err != nil {
-						continue
 					}
-					headerStr += header.HeaderName + ": " + generates[0] + utils.CRLF
 				}
 			}
 		}
@@ -157,7 +197,7 @@ func MockRandomWebFingerPrints() ([]string, string, int) {
 	if err != nil {
 		return nil, "", 0
 	}
-	//fmt.Println(string(response))
+	fmt.Println(string(response))
 
 	host, port := utils.DebugMockHTTP(response)
 	return ruleNames, host, port
