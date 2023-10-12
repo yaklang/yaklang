@@ -17,38 +17,85 @@ func check(e error) {
 	}
 }
 
+func processVs(vs []string, name string) (*string, *int, error) {
+	var version *string
+	var versionIndex *int
+
+	if len(vs) > 1 {
+		if strings.Contains(vs[1], "?") {
+			parts := strings.Split(vs[1], "?")
+			if len(parts) > 0 {
+				vIndex, err := strconv.Atoi(parts[0][1:])
+				if err == nil {
+					versionIndex = &vIndex
+				}
+			}
+			if len(parts) > 1 {
+				v := strings.TrimSuffix(parts[1], ":")
+				version = &v
+			}
+		} else {
+			vIndex, err := strconv.Atoi(strings.Trim(vs[1], "\\"))
+			if err == nil {
+				versionIndex = &vIndex
+			}
+			if err != nil && !strings.Contains(vs[1], "\\") {
+				v := strings.TrimSuffix(vs[1], ":")
+				version = &v
+			}
+		}
+	}
+
+	return version, versionIndex, nil
+}
+
 func GenerateRulesFromWappalyzer() {
-	resp, err := HttpGetWithRetry(3, "https://raw.githubusercontent.com/AliasIO/Wappalyzer/master/src/apps.json")
+	//resp, err := HttpGetWithRetry(3, "https://raw.githubusercontent.com/AliasIO/Wappalyzer/master/src/apps.json")
+	//resp, err := HttpGetWithRetry(3, "https://github.com/r0eXpeR/fingerprint/blob/main/wappalyzer-%E6%8C%87%E7%BA%B9/a.json")
+	resp, err := HttpGetWithRetry(3, "https://raw.githubusercontent.com/Lissy93/wapalyzer/main/apps.json")
+	//resp, err := ioutil.ReadFile("./apps.json")
+	if err != nil {
+		log.Errorf("HTTP GET error: %s", err)
+	}
 	f := WappalyzerBase{}
 	err = json.Unmarshal(resp, &f)
-	check(err)
+
 	var rules []WebRule
 	for name, info := range f.Apps {
 		name = strings.ReplaceAll(strings.ToLower(name), " ", "_")
 		if info.Headers != nil {
 			webRule := WebRule{}
-			methods := []*WebMatcherMethods{}
+			var methods []*WebMatcherMethods
 			method := WebMatcherMethods{}
-			headers := []*HTTPHeaderMatcher{}
+			var headers []*HTTPHeaderMatcher
 			for k, v := range info.Headers {
 				if strings.Contains(v, "?!") {
 					continue
 				}
 				header := HTTPHeaderMatcher{}
+				vc := strings.Split(fmt.Sprint(v), `\;confidence:`)
+				if len(vc) > 1 {
+					v = vc[0]
+				}
 				vs := strings.Split(v, `\;version:`)
 				if strings.HasPrefix(vs[0], "^") {
 					vs[0] = vs[0][1:]
 				}
-				if len(vs) > 1 {
-					versionIndex, err := strconv.Atoi(vs[1][1:])
-					if err == nil {
-						header.HeaderValue.VersionIndex = versionIndex
-					} else {
-						if !strings.Contains(vs[1], `\`) {
-							header.HeaderValue.Version = vs[1]
-						}
-					}
+				if strings.HasSuffix(vs[0], "$") {
+					vs[0] = vs[0][:len(vs[0])-1]
 				}
+				version, versionIndex, err := processVs(vs, name)
+				if err != nil {
+					log.Errorf("processVs error: %s", err)
+					continue
+				}
+				if versionIndex != nil {
+					header.HeaderValue.VersionIndex = *versionIndex
+				}
+				if version != nil {
+					header.HeaderValue.Version = *version
+				}
+
 				header.HeaderValue.Product = name
 				header.HeaderName = k
 				header.HeaderValue.Regexp = vs[0]
@@ -60,69 +107,120 @@ func GenerateRulesFromWappalyzer() {
 			webRule.Methods = methods
 			rules = append(rules, webRule)
 		}
-		if info.Meta != nil {
-			webRule := WebRule{}
-			methods := []*WebMatcherMethods{}
-			method := WebMatcherMethods{}
-			keywords := []*KeywordMatcher{}
-			for k, v := range info.Meta {
-				if strings.Contains(v, "?!") {
-					continue
-				}
-				keyword := KeywordMatcher{}
-				vs := strings.Split(v, `\;version:`)
-				if strings.HasPrefix(vs[0], "^") {
-					vs[0] = vs[0][1:]
-				}
-				if len(vs) > 1 {
-					version, err := strconv.Atoi(vs[1][1:])
-					if err == nil {
-						keyword.VersionIndex = version
-					} else {
-						if !strings.Contains(vs[1], `\`) {
-							keyword.CPE.Version = vs[1]
-						}
-					}
-				}
-				keyword.Regexp = fmt.Sprintf(`< *meta[^>]*name *= *['"]%s['"][^>]*content *= *['"]%s`, k, vs[0])
-				keyword.Product = name
-				keywords = append(keywords, &keyword)
-			}
-			method.Keywords = keywords
-			methods = append(methods, &method)
-			webRule.Methods = methods
-			rules = append(rules, webRule)
-		}
 		if info.Cookies != nil {
 			webRule := WebRule{}
-			methods := []*WebMatcherMethods{}
+			var methods []*WebMatcherMethods
 			method := WebMatcherMethods{}
-			headers := []*HTTPHeaderMatcher{}
+			var headers []*HTTPHeaderMatcher
 			for k, v := range info.Cookies {
 				if strings.Contains(v, "?!") {
 					continue
 				}
 				header := HTTPHeaderMatcher{}
 				header.HeaderName = "Set-Cookie"
+				vc := strings.Split(fmt.Sprint(v), `\;confidence:`)
+				if len(vc) > 1 {
+					v = vc[0]
+				}
 				vs := strings.Split(v, `\;version:`)
 				if strings.HasPrefix(vs[0], "^") {
 					vs[0] = vs[0][1:]
 				}
-				if len(vs) > 1 {
-					version, err := strconv.Atoi(vs[1][1:])
-					if err == nil {
-						header.HeaderValue.VersionIndex = version
-					} else {
-						if !strings.Contains(vs[1], `\`) {
-							header.HeaderValue.Version = vs[1]
-						}
-					}
+				if strings.HasSuffix(vs[0], "$") {
+					vs[0] = vs[0][:len(vs[0])-1]
+				}
+				version, versionIndex, err := processVs(vs, name)
+				if err != nil {
+					log.Errorf("processVs error: %s", err)
+					continue
+				}
+				if versionIndex != nil {
+					header.HeaderValue.VersionIndex = *versionIndex
+				}
+				if version != nil {
+					header.HeaderValue.Version = *version
 				}
 				header.HeaderValue.Regexp = fmt.Sprintf(`%s=%s`, k, vs[0])
 				header.HeaderValue.Product = name
 				headers = append(headers, &header)
 			}
 			method.HTTPHeaders = headers
+			methods = append(methods, &method)
+			webRule.Methods = methods
+			rules = append(rules, webRule)
+		}
+
+		switch meta := info.Meta.(type) {
+		case map[string]interface{}:
+			webRule := WebRule{}
+			var methods []*WebMatcherMethods
+			method := WebMatcherMethods{}
+			var keywords []*KeywordMatcher
+			for k, v := range meta {
+				log.Infof("k: %s, v: %s", k, v)
+				switch vv := v.(type) {
+				case string:
+					if strings.Contains(fmt.Sprint(vv), "?!") {
+						continue
+					}
+					keyword := KeywordMatcher{}
+					vc := strings.Split(fmt.Sprint(vv), `\;confidence:`)
+					if len(vc) > 1 {
+						vv = vc[0]
+					}
+					vs := strings.Split(fmt.Sprint(vv), `\;version:`)
+					if strings.HasPrefix(vs[0], "^") {
+						vs[0] = vs[0][1:]
+					}
+					if strings.HasSuffix(vs[0], "$") {
+						vs[0] = vs[0][:len(vs[0])-1]
+					}
+					if len(vs) > 1 {
+						version, err := strconv.Atoi(vs[1][1:])
+						if err == nil {
+							keyword.VersionIndex = version
+						} else {
+							if !strings.Contains(vs[1], `\`) {
+								keyword.CPE.Version = vs[1]
+							}
+						}
+					}
+					keyword.Regexp = fmt.Sprintf(`< *meta[^>]*name *= *['"]%s['"][^>]*content *= *['"]%s`, k, vs[0])
+					keyword.Product = name
+					keywords = append(keywords, &keyword)
+				case []interface{}:
+					if strings.Contains(fmt.Sprint(vv[0]), "?!") {
+						continue
+					}
+					keyword := KeywordMatcher{}
+					vc := strings.Split(fmt.Sprint(vv), `\;confidence:`)
+					if len(vc) > 1 {
+						vv[0] = vc[0]
+					}
+					vs := strings.Split(fmt.Sprint(vv[0]), `\;version:`)
+					if strings.HasPrefix(vs[0], "^") {
+						vs[0] = vs[0][1:]
+					}
+					if strings.HasSuffix(vs[0], "$") {
+						vs[0] = vs[0][:len(vs[0])-1]
+					}
+					if len(vs) > 1 {
+						version, err := strconv.Atoi(vs[1][1:])
+						if err == nil {
+							keyword.VersionIndex = version
+						} else {
+							if !strings.Contains(vs[1], `\`) {
+								keyword.CPE.Version = vs[1]
+							}
+						}
+					}
+					keyword.Regexp = fmt.Sprintf(`< *meta[^>]*name *= *['"]%s['"][^>]*content *= *['"]%s`, k, vs[0])
+					keyword.Product = name
+					keywords = append(keywords, &keyword)
+				}
+
+			}
+			method.Keywords = keywords
 			methods = append(methods, &method)
 			webRule.Methods = methods
 			rules = append(rules, webRule)
@@ -136,9 +234,16 @@ func GenerateRulesFromWappalyzer() {
 			keywords := []*KeywordMatcher{}
 			if !strings.Contains(html, "?!") {
 				keyword := KeywordMatcher{}
+				vc := strings.Split(html, `\;confidence:`)
+				if len(vc) > 1 {
+					html = vc[0]
+				}
 				vs := strings.Split(html, `\;version:`)
 				if strings.HasPrefix(vs[0], "^") {
 					vs[0] = vs[0][1:]
+				}
+				if strings.HasSuffix(vs[0], "$") {
+					vs[0] = vs[0][:len(vs[0])-1]
 				}
 				if len(vs) > 1 {
 					version, err := strconv.Atoi(vs[1][1:])
@@ -169,19 +274,27 @@ func GenerateRulesFromWappalyzer() {
 					continue
 				}
 				keyword := KeywordMatcher{}
+				vc := strings.Split(fmt.Sprint(v), `\;confidence:`)
+				if len(vc) > 1 {
+					v = vc[0]
+				}
 				vs := strings.Split(fmt.Sprint(v), `\;version:`)
 				if strings.HasPrefix(vs[0], "^") {
 					vs[0] = vs[0][1:]
 				}
-				if len(vs) > 1 {
-					version, err := strconv.Atoi(vs[1][1:])
-					if err == nil {
-						keyword.VersionIndex = version
-					} else {
-						if !strings.Contains(vs[1], `\`) {
-							keyword.CPE.Version = vs[1]
-						}
-					}
+				if strings.HasSuffix(vs[0], "$") {
+					vs[0] = vs[0][:len(vs[0])-1]
+				}
+				version, versionIndex, err := processVs(vs, name)
+				if err != nil {
+					log.Errorf("processVs error: %s", err)
+					continue
+				}
+				if versionIndex != nil {
+					keyword.VersionIndex = *versionIndex
+				}
+				if version != nil {
+					keyword.CPE.Version = *version
 				}
 				keyword.Regexp = vs[0]
 				keyword.Product = name
@@ -193,27 +306,35 @@ func GenerateRulesFromWappalyzer() {
 			rules = append(rules, webRule)
 		}
 
-		switch script := info.Script.(type) {
+		switch script := info.Scripts.(type) {
 		case string:
 			webRule := WebRule{}
 			methods := []*WebMatcherMethods{}
 			method := WebMatcherMethods{}
 			keywords := []*KeywordMatcher{}
+			vc := strings.Split(script, `\;confidence:`)
+			if len(vc) > 1 {
+				script = vc[0]
+			}
 			vs := strings.Split(script, `\;version:`)
 			if !strings.Contains(script, "?!") {
 				keyword := KeywordMatcher{}
 				if strings.HasPrefix(vs[0], "^") {
 					vs[0] = vs[0][1:]
 				}
-				if len(vs) > 1 {
-					version, err := strconv.Atoi(vs[1][1:])
-					if err == nil {
-						keyword.VersionIndex = version
-					} else {
-						if !strings.Contains(vs[1], `\`) {
-							keyword.CPE.Version = vs[1]
-						}
-					}
+				if strings.HasSuffix(vs[0], "$") {
+					vs[0] = vs[0][:len(vs[0])-1]
+				}
+				version, versionIndex, err := processVs(vs, name)
+				if err != nil {
+					log.Errorf("processVs error: %s", err)
+					continue
+				}
+				if versionIndex != nil {
+					keyword.VersionIndex = *versionIndex
+				}
+				if version != nil {
+					keyword.CPE.Version = *version
 				}
 				keyword.Regexp = `< *script[^>]*src *= *['"][^'"]*` + vs[0]
 				keyword.Product = name
@@ -234,19 +355,27 @@ func GenerateRulesFromWappalyzer() {
 					continue
 				}
 				keyword := KeywordMatcher{}
+				vc := strings.Split(fmt.Sprint(v), `\;confidence:`)
+				if len(vc) > 1 {
+					v = vc[0]
+				}
 				vs := strings.Split(fmt.Sprint(v), `\;version:`)
 				if strings.HasPrefix(vs[0], "^") {
 					vs[0] = vs[0][1:]
 				}
-				if len(vs) > 1 {
-					version, err := strconv.Atoi(vs[1][1:])
-					if err == nil {
-						keyword.VersionIndex = version
-					} else {
-						if !strings.Contains(vs[1], `\`) {
-							keyword.Version = vs[1]
-						}
-					}
+				if strings.HasSuffix(vs[0], "$") {
+					vs[0] = vs[0][:len(vs[0])-1]
+				}
+				version, versionIndex, err := processVs(vs, name)
+				if err != nil {
+					log.Errorf("processVs error: %s", err)
+					continue
+				}
+				if versionIndex != nil {
+					keyword.VersionIndex = *versionIndex
+				}
+				if version != nil {
+					keyword.CPE.Version = *version
 				}
 				keyword.Regexp = `< *script[^>]*src *= *['"][^'"]*` + vs[0]
 				keyword.Product = name
@@ -259,10 +388,13 @@ func GenerateRulesFromWappalyzer() {
 		}
 	}
 	output, err := yaml.Marshal(rules)
-	check(err)
-	output = output
-	err = ioutil.WriteFile("data/fingerprint-rules.yml", output, 0644)
-	check(err)
+	if err != nil {
+		log.Errorf("Marshal error: %s", err)
+	}
+	err = ioutil.WriteFile("./fingerprint-rules.yml", output, 0644)
+	if err != nil {
+		log.Errorf("WriteFile error: %s", err)
+	}
 }
 
 type ResponseInfo struct {
@@ -275,15 +407,16 @@ type WappalyzerBase struct {
 }
 
 type Info struct {
-	//Cats    []int
+	Cats    []int
 	Icon    string
 	Website string
 
 	Headers map[string]string
 	Html    interface{}
-	Script  interface{}
-	Meta    map[string]string
+	Scripts interface{}
+	Meta    interface{}
 	Cookies map[string]string
 	Url     string
 	Js      map[string]string
+	Implies []string
 }

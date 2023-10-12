@@ -115,6 +115,10 @@ func (f *Matcher) match(r *HTTPResponseInfo, options ...ConfigOption) ([]*CPE, e
 	return nil, errors.Errorf("failed to recognize web fingerprint: %s", "no rules matched")
 }
 
+var faviconCache = make(map[string][]byte)
+var currentTarget = ""
+var previousTarget = ""
+
 func (f *Matcher) matchByRule(r *HTTPResponseInfo, ruleToUse *WebRule, config *Config) []*CPE {
 	defer func() {
 		if err := recover(); err != nil {
@@ -142,66 +146,79 @@ func (f *Matcher) matchByRule(r *HTTPResponseInfo, ruleToUse *WebRule, config *C
 		}
 	}
 
+	// Check if the target has changed
+	if r.URL.Host != currentTarget {
+		// Delete the cache of the previous target
+		if previousTarget != "" {
+			delete(faviconCache, previousTarget)
+		}
+		// Update the current and previous targets
+		previousTarget = currentTarget
+		currentTarget = r.URL.Host
+	}
+
 	if !strings.HasPrefix(ruleToUse.Path, "/") {
 		ruleToUse.Path = "/" + ruleToUse.Path
 	}
 	if config.ActiveMode && len(ruleToUse.Path) > 1 && !strings.HasSuffix(ruleToUse.Path, path) {
-		log.Infof("sending active web-fingerprint request to: %s origin: %v", ruleToUse.Path, path)
-		newUrl := lowhttp.MergeUrlFromHTTPRequest(r.RequestRaw, ruleToUse.Path, r.IsHttps)
-		request := lowhttp.UrlToGetRequestPacket(newUrl, r.RequestRaw, r.IsHttps, lowhttp.ExtractCookieJarFromHTTPResponse(
-			append(r.ResponseHeaderBytes(), r.Body...))...)
-		host, port, _ := utils2.ParseStringToHostPort(r.URL.String())
-		isOpen, infos, err := FetchBannerFromHostPortEx(
-			utils2.TimeoutContext(config.ProbeTimeout), request, host, port, int64(config.FingerprintDataSize),
-			config.Proxies...)
-		if err != nil {
-			log.Errorf("fetch banner for %v failed: %s", newUrl, err)
-			return nil
-		}
-		_ = isOpen
-		var results []*CPE
-		for _, i := range infos {
-			if i == nil {
-				continue
+		favicon, ok := faviconCache[r.URL.Host]
+		if !ok {
+			log.Infof("sending active web-fingerprint request to: %s origin: %v", ruleToUse.Path, path)
+			newUrl := lowhttp.MergeUrlFromHTTPRequest(r.RequestRaw, ruleToUse.Path, r.IsHttps)
+			request := lowhttp.UrlToGetRequestPacket(newUrl, r.RequestRaw, r.IsHttps, lowhttp.ExtractCookieJarFromHTTPResponse(
+				append(r.ResponseHeaderBytes(), r.Body...))...)
+			host, port, _ := utils2.ParseStringToHostPort(r.URL.String())
+			isOpen, infos, err := FetchBannerFromHostPortEx(
+				utils2.TimeoutContext(config.ProbeTimeout), request, host, port, int64(config.FingerprintDataSize),
+				config.Proxies...)
+			if err != nil {
+				log.Errorf("fetch banner for %v failed: %s", newUrl, err)
+				return nil
 			}
-			results = append(results, f.matchByRule(i, ruleToUse, config)...)
+			_ = isOpen
+			var results []*CPE
+			for _, i := range infos {
+				if i == nil {
+					continue
+				}
+				if favicon == nil {
+					favicon = i.Body
+					// Save to cache
+					faviconCache[r.URL.Host] = favicon
+				}
+				// Use the cached favicon
+				i.Body = favicon
+				results = append(results, f.matchByRule(i, ruleToUse, config)...)
+			}
+			return results
 		}
-		return results
-
-		//client := http.Client{
-		//	Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
-		//	Timeout:   config.ProbeTimeout,
-		//}
-		//urlObj, err := url.Parse(r.URL.String())
-		//if err != nil {
-		//	log.Errorf("url parse failed: %s", err)
-		//	return []*CPE{}
-		//}
-		////urlObj.Path = path.Join(r.URL.Path, ruleToUse.Path)
-		//urlObj.Path = ruleToUse.Path
-		//
-		//log.Infof("web-fingerprint active query %s to fetch fingerprint", urlObj.String())
-		//httpResponse, err := client.Get(urlObj.String())
-		//if err != nil {
-		//	return []*CPE{}
-		//}
-		//responseInfo := ExtractHTTPResponseInfoFromHTTPResponseWithBodySize(httpResponse, config.FingerprintDataSize)
-		//responseInfo.URL = urlObj
-		//return f.matchByRule(responseInfo, ruleToUse, config)
+		r.Body = favicon
 	}
 
 	for _, m := range ruleToUse.Methods {
-
-		// 匹配 keyword
-		for _, k := range m.Keywords {
-			// TODO []byte 转换 string 有可能 panic, 需要处理一下
-			cpe, err := k.Match(string(r.Body))
-			if err != nil {
-				//log.Debugf("keyword match[%s] failed: %s", k.regexp.String(), err)
-				continue
+		if m.Condition == "and" {
+			allMatched := true
+			var tempCpes []*CPE
+			for _, k := range m.Keywords {
+				cpe, err := k.Match(string(r.Bytes()))
+				if err != nil {
+					allMatched = false
+					break
+				}
+				tempCpes = append(tempCpes, cpe)
 			}
-
-			cpes = append(cpes, cpe)
+			if allMatched {
+				cpes = append(cpes, tempCpes...)
+			}
+		} else {
+			for _, k := range m.Keywords {
+				cpe, err := k.Match(string(r.Bytes()))
+				if err != nil {
+					//log.Debugf("keyword match[%s] failed: %s", k.regexp.String(), err)
+					continue
+				}
+				cpes = append(cpes, cpe)
+			}
 		}
 
 		// 匹配 HTTP Headers
