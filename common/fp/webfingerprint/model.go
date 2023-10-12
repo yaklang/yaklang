@@ -105,6 +105,9 @@ func (k *KeywordMatcher) Match(raw string) (*CPE, error) {
 
 	if k.regexp == nil {
 		if k.Regexp == "" {
+			if raw == "EMPTY" {
+				return &k.CPE, nil
+			}
 			return nil, errors.New("empty regexp")
 		}
 

@@ -3,6 +3,7 @@ package regen
 import (
 	"fmt"
 	"math/rand"
+	"regexp"
 	"regexp/syntax"
 
 	"github.com/pkg/errors"
@@ -18,6 +19,9 @@ var (
 )
 
 const noBound = -1
+const invisibleCharsPattern = `[^\x20-\x7E]+`
+
+var cleanInvisibleCharsRegex = regexp.MustCompile(invisibleCharsPattern)
 
 func init() {
 	generatorFactories = map[syntax.Op]generatorFactory{
@@ -83,6 +87,10 @@ func (gen *internalGenerator) Generate() []string {
 
 func (gen *internalGenerator) String() string {
 	return gen.Name
+}
+
+func (gen *internalGenerator) Clean(str string) string {
+	return cleanInvisibleCharsRegex.ReplaceAllString(str, " ")
 }
 
 func newGenerators(regexps []*syntax.Regexp, args *GeneratorArgs) ([]*internalGenerator, error) {

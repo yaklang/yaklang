@@ -28,6 +28,7 @@ func (a *GeneratorArgs) initialize() error {
 type Generator interface {
 	Generate() []string
 	String() string
+	Clean(str string) string
 }
 
 func Generate(pattern string) ([]string, error) {
@@ -48,6 +49,20 @@ func GenerateOne(pattern string) ([]string, error) {
 		return []string{""}, err
 	}
 	return generator.Generate(), nil
+}
+
+func GenerateVisibleOne(pattern string) (string, error) {
+	generator, err := NewGeneratorOne(pattern, &GeneratorArgs{
+		Flags: syntax.Perl,
+	})
+	if err != nil {
+		return "", err
+	}
+	generated := generator.Generate()
+	if len(generated) > 0 {
+		return generator.Clean(generated[0]), nil
+	}
+	return "", nil
 }
 
 func MustGenerate(pattern string) []string {
