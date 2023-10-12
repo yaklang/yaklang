@@ -109,6 +109,9 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 		level += 1
 	}
 	typStr := typ.String()
+	if typStr == "[]uint8" {
+		typStr = "bytes"
+	}
 	if hijackType, ok := f.externType[typStr]; ok {
 		return hijackType
 	}

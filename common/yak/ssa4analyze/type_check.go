@@ -124,37 +124,45 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 		if objType.FieldTypes[len(objType.FieldTypes)-1].GetTypeKind() == ssa.ErrorType {
 			if c.IsDropError {
 				rightLen -= 1
+				hasError = false
+			} else {
+				hasError = true
 			}
-			hasError = true
-		}
-		// a = func(); a = func()~
-		if rightLen == 1 {
-			return
 		}
 
-		leftLen := len(ssa.GetFields(c))
-		if leftLen <= 1 {
+		// 如果是 没有拆包 则检查后续错误是否处理
+		if !c.Unpack {
 			if hasError {
 				// a = func() (m * any, error)
 				f := ssa.GetField(c, ssa.NewConst(len(objType.FieldTypes)-1))
 				if f == nil {
 					// c.NewError(ssa.Error, TypeCheckTAG, ErrorUnhandled())
-					c.Func.NewErrorWithPos(ssa.Error, TypeCheckTAG, c.GetLeftPosition(), ErrorUnhandledWithType(ssa.Types(objType.FieldTypes).String()))
+					c.Func.NewErrorWithPos(ssa.Error, TypeCheckTAG, c.GetLeftPosition(),
+						ErrorUnhandledWithType(c.GetType().String()),
+					)
 				} else {
 					if f.GetVariable() == "" {
 						f.SetVariable(c.GetVariable() + ".error")
 					}
 				}
 			}
-		} else if leftLen != rightLen {
-			// a = fun();
-			// if leftLen == 0 {
-			// 	leftLen = 1
-			// }
-			c.NewError(
-				ssa.Error, TypeCheckTAG,
-				CallAssignmentMismatch(leftLen, rightLen),
-			)
+			// 如果未拆包 不需要后续检查
+			return
+		}
+
+		leftLen := len(ssa.GetFields(c))
+		if leftLen != rightLen {
+			if c.IsDropError {
+				c.NewError(ssa.Error, TypeCheckTAG,
+					CallAssignmentMismatchDropError(leftLen, c.GetType().String()),
+				)
+
+			} else {
+				c.NewError(
+					ssa.Error, TypeCheckTAG,
+					CallAssignmentMismatch(leftLen, c.GetType().String()),
+				)
+			}
 		}
 
 	}

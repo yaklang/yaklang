@@ -281,11 +281,18 @@ func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
 				} else {
 					ret := ssa.NewStructType()
 					ret.FieldTypes = t.FieldTypes[:len(t.FieldTypes)-1]
+					ret.Key = t.Key[:len(t.Key)-1]
 					ret.KeyTyp = t.KeyTyp
+					ret.Combination = true
 					c.SetType(ret)
 				}
 				return
 			}
+		} else if t, ok := funcTyp.ReturnType.(*ssa.BasicType); ok && t.Kind == ssa.ErrorType {
+			// pass
+			c.SetType(ssa.BasicTypes[ssa.Null])
+			c.GetParent().NewErrorWithPos(ssa.Error, BCTag, c.GetLeftPosition(), ValueIsNull())
+			return
 		}
 		c.NewError(ssa.Error, TITAG, FunctionContReturnError())
 	} else {
