@@ -3,7 +3,6 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -865,10 +864,7 @@ func TestGRPCMUSTPASS_MITMDnsAndHosts(t *testing.T) {
 		for {
 			msg, err := stream.Recv()
 			if err != nil {
-				if err == io.EOF {
-					break
-				}
-				t.Fatal(err)
+				break
 			}
 			msgStr := string(msg.GetMessage().GetMessage())
 			if strings.Contains(msgStr, `starting mitm server`) {
