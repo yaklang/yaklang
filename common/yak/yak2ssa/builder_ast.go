@@ -616,6 +616,7 @@ func (b *astbuilder) AssignList(stmt assignlist) []ssa.Value {
 				var length int
 				// 可以通过是否存在variable确定是函数调用是否存在左值
 				c.SetVariable(uuid.NewString())
+				c.Unpack = true
 				if c.GetType().GetTypeKind() != ssa.ObjectTypeKind {
 					// b.NewError(ssa.Error, TAG, "assign right side is not interface function call")
 					// return nil

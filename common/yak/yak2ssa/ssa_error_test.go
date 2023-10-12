@@ -9,6 +9,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
+	"github.com/yaklang/yaklang/common/yak/ssa4analyze/pass"
 	"golang.org/x/exp/slices"
 )
 
@@ -322,8 +323,8 @@ func TestCallParamReturn(t *testing.T) {
 			a, b = func3()    // get error 2 vs 3
 			`,
 			errs: []string{
-				ssa4analyze.CallAssignmentMismatch(3, 2),
-				ssa4analyze.CallAssignmentMismatch(2, 3),
+				ssa4analyze.CallAssignmentMismatch(3, "number, number"),
+				ssa4analyze.CallAssignmentMismatch(2, "number, number, number"),
 			},
 
 			ExternValue: map[string]any{
@@ -454,6 +455,30 @@ func TestErrorHandler(t *testing.T) {
 			ExternValue: map[string]any{
 				"getError1": func() error { return errors.New("err") },
 				"getError2": func() (int, error) { return 1, errors.New("err") },
+				"die":       func(error) {},
+			},
+		})
+	})
+
+	t.Run("function error with drop", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			a = getError1()~
+			a = getError2()~
+			a, err = getError2()~
+			a = getError3()~
+			a, b = getError3()~
+			a, b, err = getError3()~
+			`,
+			errs: []string{
+				pass.ValueIsNull(),
+				ssa4analyze.CallAssignmentMismatchDropError(2, "number"),
+				ssa4analyze.CallAssignmentMismatchDropError(3, "number, number"),
+			},
+			ExternValue: map[string]any{
+				"getError1": func() error { return errors.New("err") },
+				"getError2": func() (int, error) { return 1, errors.New("err") },
+				"getError3": func() (int, int, error) { return 1, 2, errors.New("err") },
 				"die":       func(error) {},
 			},
 		})

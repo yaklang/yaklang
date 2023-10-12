@@ -89,6 +89,10 @@ value, _ = codec.DecodeUrl("")
 # handle error 
 value, err = codec.DecodeUrl("")
 die(err) 
+// this function with dropError return: (string)
+codec.DecodeUrl("")~
+a = codec.DecodeUrl("")~
+a, err = codec.DecodeUrl("")~
 
 # this function return: ([]byte, []byte, err)
 tls.GenerateSM2KeyPair()
@@ -103,9 +107,18 @@ a, b = tls.GenerateSM2KeyPair()
 # (3) = (3)
 a, b, _ = tls.GenerateSM2KeyPair()
 
+// # this function with dropError return: ([]byte, []byte)
+tls.GenerateSM2KeyPair()~ 
+a = tls.GenerateSM2KeyPair()~ 
+a, b = tls.GenerateSM2KeyPair()~ 
+a, b, e = tls.GenerateSM2KeyPair()~ 
+
+
 
 # this function: arg(any, string, string, int) ret(int, string)
 xhtml.MatchBetween("", "", "", 1)
+# this function con't drop error 	
+xhtml.MatchBetween("", "", "", 1)~
 # arg miss match 
 xhtml.MatchBetween("", "", "")
 
