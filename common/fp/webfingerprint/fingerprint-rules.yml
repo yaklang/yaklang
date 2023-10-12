@@ -1,0 +1,10 @@
+- methods:
+    - headers:
+        - key: Alt-Svc
+          value:
+            product: http/2
+            regexp: h2
+        - key: X-Firefox-Spdy
+          value:
+            product: http/2
+            regexp: h2
