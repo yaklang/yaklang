@@ -5,7 +5,10 @@ import (
 )
 
 func ErrorUnhandled() string {
-	return "Error Unhandled"
+	return "Error Unhandled "
+}
+func ErrorUnhandledWithType(typ string) string {
+	return "Error Unhandled: " + typ
 }
 
 func ValueUndefined(v string) string {

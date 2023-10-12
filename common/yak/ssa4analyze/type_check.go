@@ -46,7 +46,11 @@ func (t *TypeCheck) CheckOnInstruction(inst ssa.Instruction) {
 		case ssa.ErrorType:
 			variable := v.GetVariable()
 			if len(ssa.GetUserOnly(v)) == 0 && variable != "_" && variable != "" {
-				v.NewError(ssa.Error, TypeCheckTAG, ErrorUnhandled())
+				if pos := v.GetLeftPosition(); pos == nil {
+					v.NewError(ssa.Error, TypeCheckTAG, ErrorUnhandled())
+				} else {
+					v.GetParent().NewErrorWithPos(ssa.Error, TypeCheckTAG, pos, ErrorUnhandled())
+				}
 			}
 		default:
 		}
@@ -115,9 +119,13 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 	// check return number
 	if objType, ok := funcTyp.ReturnType.(*ssa.ObjectType); ok && objType.Combination {
 		// a, b, err = fun()
+		hasError := false
 		rightLen := len(objType.FieldTypes)
-		if c.IsDropError {
-			rightLen -= 1
+		if objType.FieldTypes[len(objType.FieldTypes)-1].GetTypeKind() == ssa.ErrorType {
+			if c.IsDropError {
+				rightLen -= 1
+			}
+			hasError = true
 		}
 		// a = func(); a = func()~
 		if rightLen == 1 {
@@ -125,8 +133,20 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 		}
 
 		leftLen := len(ssa.GetFields(c))
-		// a, b = fun()~
-		if leftLen != rightLen && leftLen > 1 {
+		if leftLen <= 1 {
+			if hasError {
+				// a = func() (m * any, error)
+				f := ssa.GetField(c, ssa.NewConst(len(objType.FieldTypes)-1))
+				if f == nil {
+					// c.NewError(ssa.Error, TypeCheckTAG, ErrorUnhandled())
+					c.Func.NewErrorWithPos(ssa.Error, TypeCheckTAG, c.GetLeftPosition(), ErrorUnhandledWithType(ssa.Types(objType.FieldTypes).String()))
+				} else {
+					if f.GetVariable() == "" {
+						f.SetVariable(c.GetVariable() + ".error")
+					}
+				}
+			}
+		} else if leftLen != rightLen {
 			// a = fun();
 			// if leftLen == 0 {
 			// 	leftLen = 1
@@ -136,6 +156,7 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 				CallAssignmentMismatch(leftLen, rightLen),
 			)
 		}
+
 	}
 }
 

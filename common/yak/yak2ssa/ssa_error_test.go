@@ -88,6 +88,17 @@ func TestUndefine(t *testing.T) {
 		})
 	})
 
+	t.Run("undefined value in template string", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			a = f"${undefine}"
+			`,
+			errs: []string{
+				ssa4analyze.ValueUndefined("undefine"),
+			},
+		})
+	})
+
 }
 
 func TestBasicExpression(t *testing.T) {
@@ -425,15 +436,19 @@ func TestErrorHandler(t *testing.T) {
 			panic(err)
 		}
 
-		// not handle error
+		// // not handle error
 		err = getError1()     // error 
 		a, err = getError2()  // error
 
-		// (1) = (n contain error) 
-		all = getError2()
+		// // (1) = (n contain error) 
+		all = getError2() // this has error !!
+		all2 = getError2()
+		all2[1] // err 
 		`,
 			errs: []string{
 				ssa4analyze.ErrorUnhandled(),
+				ssa4analyze.ErrorUnhandled(),
+				ssa4analyze.ErrorUnhandledWithType("number, error"),
 				ssa4analyze.ErrorUnhandled(),
 			},
 			ExternValue: map[string]any{
