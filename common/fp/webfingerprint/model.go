@@ -148,7 +148,7 @@ func (h *HTTPHeaderMatcher) String() string {
 
 func (h *HTTPHeaderMatcher) Match(name string, value string) (*CPE, error) {
 	if h.HeaderName != "" {
-		if name != h.HeaderName {
+		if strings.ToLower(name) != strings.ToLower(h.HeaderName) {
 			return nil, errors.Errorf("not matched in header name: %s", name)
 		}
 	}
@@ -159,7 +159,7 @@ func (h *HTTPHeaderMatcher) Match(name string, value string) (*CPE, error) {
 // ///////////////////////////////MD5 Matcher Model////////////////////////////////////
 // ////////////////////////////////////////////////////////////////////////////////////
 type MD5Matcher struct {
-	CPE
+	CPE `yaml:"cpe,inline,omitempty"`
 
 	md5 []byte
 	MD5 string `yaml:"md5"`
@@ -194,6 +194,8 @@ func (h *MD5Matcher) Match(raw []byte) (*CPE, error) {
 // /////////////////////////WebMatcherMethods Model ///////////////////////////////////
 // ////////////////////////////////////////////////////////////////////////////////////
 type WebMatcherMethods struct {
+	Condition string `yaml:"condition,omitempty"`
+
 	Keywords    []*KeywordMatcher    `yaml:"keywords,omitempty"`
 	HTTPHeaders []*HTTPHeaderMatcher `yaml:"headers,omitempty"`
 	MD5s        []*MD5Matcher        `yaml:"md5s,omitempty"`

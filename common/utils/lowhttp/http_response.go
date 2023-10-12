@@ -160,7 +160,7 @@ func GetOverrideContentType(bodyPrescan []byte, contentType string) (overrideCon
 		}
 
 		if actuallyMIME.MIME.Value != "" {
-			log.Infof("really content-type met: %s, origin: %v", actuallyMIME.MIME.Value, contentType)
+			log.Debugf("really content-type met: %s, origin: %v", actuallyMIME.MIME.Value, contentType)
 			overrideContentType = actuallyMIME.MIME.Value
 		}
 	}
