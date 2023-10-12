@@ -332,6 +332,8 @@ cancel()
 		}
 	}
 
+	time.Sleep(1 * time.Second)
+
 	if !pluginStatusCardFound {
 		t.Fatal("plugin status card not found")
 	}
