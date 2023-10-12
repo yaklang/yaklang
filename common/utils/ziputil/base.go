@@ -2,15 +2,16 @@ package ziputil
 
 import (
 	"archive/zip"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/memfile"
 	"io"
 	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memfile"
 )
 
 // 压缩文件
@@ -208,8 +209,6 @@ func DeCompressFromRaw(raw []byte, dest string) error {
 		if err != nil {
 			return err
 		}
-
-		log.Infof("start to unzip: %s", file.Name)
 
 		w, err := os.Create(filename)
 		if err != nil {
