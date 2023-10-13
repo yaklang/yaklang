@@ -10,16 +10,31 @@ import (
 	"testing"
 )
 
-func TestExecuteWithRam(t *testing.T) {
+// 基本语法测试
+func TestStandardFuzztag(t *testing.T) {
 	var testMap = map[string]func(string) []string{
-		"int": func(i string) []string {
+		"echo": func(i string) []string {
 			return []string{i}
+		},
+		"get1": func(i string) []string {
+			return []string{"1"}
 		},
 		"list": func(s string) []string {
 			return strings.Split(s, "|")
 		},
+		"int": func(i string) []string {
+			return funk.Map(utils.ParseStringToPorts(i), func(i int) string {
+				return strconv.Itoa(i)
+			}).([]string)
+		},
 	}
-	a, err := ExecuteWithStringHandler(`{{int::1({{list(aaa|ccc)}})}}{{int::1({{list(aaa|ccc|ddd)}})}}`, testMap)
+	executeWithRam(t, testMap)     // 测试同步渲染
+	executeWithHandler(t, testMap) // 畸形测试、渲染数量测试
+	executeWithNewLine(t, testMap) // 测试函数名后的换行符
+}
+
+func executeWithRam(t *testing.T, testMap map[string]func(string) []string) {
+	a, err := ExecuteWithStringHandler(`{{echo::1({{list(aaa|ccc)}})}}{{echo::1({{list(aaa|ccc|ddd)}})}}`, testMap)
 	if err != nil {
 		panic(err)
 	}
@@ -28,7 +43,7 @@ func TestExecuteWithRam(t *testing.T) {
 		panic(a)
 	}
 
-	a, err = ExecuteWithStringHandler(`{{int::1({{list(aaa|ccc|ddd)}})}}{{int::1({{list(aaa|ccc|ddd)}})}}`, testMap)
+	a, err = ExecuteWithStringHandler(`{{echo::1({{list(aaa|ccc|ddd)}})}}{{echo::1({{list(aaa|ccc|ddd)}})}}`, testMap)
 	if err != nil {
 		panic(err)
 	}
@@ -37,7 +52,7 @@ func TestExecuteWithRam(t *testing.T) {
 		panic(a)
 	}
 
-	a, err = ExecuteWithStringHandler(`{{int::1({{list(aaa|ccc|ddd|eee)}})}}{{int::1({{list(aaa|ccc|ddd)}})}}`, testMap)
+	a, err = ExecuteWithStringHandler(`{{echo::1({{list(aaa|ccc|ddd|eee)}})}}{{echo::1({{list(aaa|ccc|ddd)}})}}`, testMap)
 	if err != nil {
 		panic(err)
 	}
@@ -46,7 +61,7 @@ func TestExecuteWithRam(t *testing.T) {
 		panic(a)
 	}
 
-	a, err = ExecuteWithStringHandler(`{{int::3({{list(aaa|ccc|ddd)}})}}{{int::1({{list(aaa|ccc|ddd)}})}}`, testMap)
+	a, err = ExecuteWithStringHandler(`{{echo::3({{list(aaa|ccc|ddd)}})}}{{echo::1({{list(aaa|ccc|ddd)}})}}`, testMap)
 	if err != nil {
 		panic(err)
 	}
@@ -55,7 +70,7 @@ func TestExecuteWithRam(t *testing.T) {
 		panic(a)
 	}
 
-	a, err = ExecuteWithStringHandler(`{{int({{list(aaa|ccc|ddd)}})}}{{int::1({{list(aaa|ccc|ddd)}})}}`, testMap)
+	a, err = ExecuteWithStringHandler(`{{echo({{list(aaa|ccc|ddd)}})}}{{echo::1({{list(aaa|ccc|ddd)}})}}`, testMap)
 	if err != nil {
 		panic(err)
 	}
@@ -64,7 +79,7 @@ func TestExecuteWithRam(t *testing.T) {
 		panic(a)
 	}
 
-	a, err = ExecuteWithStringHandler(`{{int({{list(aaa|ccc|ddd)}})}}{{int({{list(aaa|ccc|ddd)}})}}`, testMap)
+	a, err = ExecuteWithStringHandler(`{{echo({{list(aaa|ccc|ddd)}})}}{{echo({{list(aaa|ccc|ddd)}})}}`, testMap)
 	if err != nil {
 		panic(err)
 	}
@@ -74,45 +89,9 @@ func TestExecuteWithRam(t *testing.T) {
 	}
 }
 
-func TestExecute(t *testing.T) {
-	var testMap = map[string]func(string) []string{
-		"int": func(i string) []string {
-			return funk.Map(utils.ParseStringToPorts(i), func(i int) string {
-				return strconv.Itoa(i)
-			}).([]string)
-		},
-		"test1": func(s string) []string {
-			return []string{
-				"test1(asdfasdfas)",
-				"test1(asdfasdfas)",
-				"test1(asdfasdfas)",
-				"test1(asdfasdfas)",
-			}
-		},
-		"test": func(s string) []string {
-			return []string{
-				"WRPA:" + s,
-			}
-		},
-		"punc": func(s string) []string {
-			return []string{s + "PUNC"}
-		},
-	}
-	a, err := ExecuteWithStringHandler(
-		//`{{int(1-2)}}abc{{int(1-5)}}`,
-		//`abc{{in}}^t()))1{{a111-5)}}`,
-		`{{xx12:-_(____\)____)}}[[[[}}`,
-		testMap,
-	)
-	if err != nil {
-		panic(err)
-	}
-	spew.Dump(a)
-}
-
-func TestExecuteWithHandler(t *testing.T) {
+func executeWithHandler(t *testing.T, testMap map[string]func(string) []string) {
 	for _, v := range [][]string{
-		{"{{int(1-29)}}", "1"},
+		{"{{get1(1-29)}}", "1"},
 		{"{{i$$$$$nt(1-29)}}", "{{i$$$$$nt(1-29)}}"},
 		{"{{xx12}}", ""},
 		{"{{xx12:}}", ""},
@@ -132,25 +111,18 @@ func TestExecuteWithHandler(t *testing.T) {
 		//{"{{xx12:-_(____\\)} }__)__)}}{{1[[[[}}", "{{xx12:-_(____\\)} }__)__)}}{{1[[[[}}"},
 		{"{{xx12:-_(____\\)} }__\\)__)}}{{1[[[[}}", "{{1[[[[}}"},
 		{"{{{{1[[[[}}", "{{{{1[[[[}}"},
-		{"{{{{int}}{{1[[[[}}", "{{1{{1[[[[}}"},
-		//{"{{i{{int}}nt(1-2)}}", "{{i1nt(1-2)}}"}, // 不允许渲染函数名
+		{"{{{{get1}}{{1[[[[}}", "{{1{{1[[[[}}"},
+		{"{{i{{get1}}nt(1-2)}}", "{{i1nt(1-2)}}"},
 		{"{{", "{{"},
-		//{"{{test(123123\\))}}", "123123)"}, // 括号不需要转义
+		//{"{{echo(123123\\))}}", "123123)"}, // 括号不需要转义
 		//{"{{print(list{\\())}}", "{{print(list{\\())}}"},
 		//{"{{print(list{\\(\\))}}", ""},
-		{"{{{test(123)}}", "{123"},
-		// {"{{i{{int}}n{{int}}t(1-2)}}", "{{i1nt(1-2)}}"},
+		{"{{{echo(123)}}", "{123"},
+		// {"{{i{{get1}}n{{get1}}t(1-2)}}", "{{i1nt(1-2)}}"},
 	} {
 		t, r := v[0], v[1]
 		spew.Dump(t)
-		result, err := ExecuteWithStringHandler(t, map[string]func(string) []string{
-			"int": func(s string) []string {
-				return []string{"1"}
-			},
-			"test": func(s string) []string {
-				return []string{s}
-			},
-		})
+		result, err := ExecuteWithStringHandler(t, testMap)
 		if err != nil {
 			panic(err)
 		}
@@ -163,13 +135,6 @@ func TestExecuteWithHandler(t *testing.T) {
 		}
 	}
 
-	var testMap = map[string]func(string) []string{
-		"int": func(i string) []string {
-			return funk.Map(utils.ParseStringToPorts(i), func(i int) string {
-				return strconv.Itoa(i)
-			}).([]string)
-		},
-	}
 	for _, v := range [][]string{
 		{"{{int(1-29)}}", "29"},
 		{"{{int(1-29)}}==={{int(1-29}}", fmt.Sprint(29)},
@@ -194,7 +159,7 @@ func TestExecuteWithHandler(t *testing.T) {
 
 }
 
-func TestExecuteWithNewLine(t *testing.T) {
+func executeWithNewLine(t *testing.T, testMap map[string]func(string) []string) {
 	var m = map[string]func(string) []string{
 		"s": func(s string) []string {
 			return []string{s + "a"}
