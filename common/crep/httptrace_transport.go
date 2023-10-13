@@ -3,6 +3,7 @@ package crep
 import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"net/http"
 	"net/http/httptrace"
@@ -10,6 +11,7 @@ import (
 
 type httpTraceTransport struct {
 	*http.Transport
+	config []lowhttp.LowhttpOpt
 }
 
 func (t *httpTraceTransport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -43,8 +45,29 @@ func (t *httpTraceTransport) RoundTrip(req *http.Request) (*http.Response, error
 	// Transport is golang native function call request
 	// handling transfer-encoding,
 	// do some hack to make sure packet is right
-	utils.FixHTTPRequestForGolangNativeHTTPClient(req)
-	rsp, err := t.Transport.RoundTrip(req)
+
+	bareBytes := httpctx.GetBareRequestBytes(req)
+	reqBytes := lowhttp.FixHTTPRequest(bareBytes)
+	ishttps := httpctx.GetRequestHTTPS(req)
+
+	opts := append(t.config, lowhttp.WithRequest(reqBytes), lowhttp.WithHttps(ishttps), lowhttp.WithConnPool(true))
+	lowHttpResp, err := lowhttp.HTTPWithoutRedirect(opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	rsp, err := lowhttp.ParseBytesToHTTPResponse(lowHttpResp.RawPacket)
+	if rsp == nil {
+		//utils.PrintCurrentGoroutineRuntimeStack()
+		//spew.Dump(lowHttpResp)
+	}
+	if rsp != nil {
+		rsp.Request = req
+	}
+
+	//utils.FixHTTPRequestForGolangNativeHTTPClient(req)
+	//rsp, err := t.Transport.RoundTrip(req)
+
 	utils.FixHTTPResponseForGolangNativeHTTPClient(rsp)
 	return rsp, err
 }
