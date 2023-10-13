@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/minimartian/v3"
 	"github.com/yaklang/yaklang/common/minimartian/v3/mitm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"io/ioutil"
 	"net"
@@ -198,11 +199,18 @@ func (m *MITMServer) Serve(ctx context.Context, addr string) error {
 	if m.proxyAuth != nil {
 		m.proxy.SetAuth(m.proxyAuth.Username, m.proxyAuth.Password)
 	}
-	//m.proxy.SetRoundTripper(m.httpTransport)
-	m.proxy.SetRoundTripper(&httpTraceTransport{
-		Transport: originHttpTransport,
-	})
 
+	traceTr := &httpTraceTransport{
+		Transport: originHttpTransport,
+	}
+
+	if m.proxyUrl != nil {
+		traceTr.config = []lowhttp.LowhttpOpt{
+			lowhttp.WithProxy(m.proxyUrl.String()),
+		}
+	}
+
+	m.proxy.SetRoundTripper(traceTr)
 	m.proxy.SetGMTLS(m.gmtls)
 	m.proxy.SetGMPrefer(m.gmPrefer)
 	m.proxy.SetGMOnly(m.gmOnly)

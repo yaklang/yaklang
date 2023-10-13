@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/samber/lo"
@@ -525,6 +526,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 
 	if option.WithConnPool && option.ConnPool == nil {
 		option.ConnPool = DefaultLowHttpConnPool
+		connPool = DefaultLowHttpConnPool
 	}
 
 	reqSchema := "HTTP"
@@ -894,11 +896,6 @@ RECONNECT:
 	}
 	response.RemoteAddr = conn.RemoteAddr().String()
 	response.PortIsOpen = true
-	if conn != nil {
-		defer func() {
-			conn.Close()
-		}()
-	}
 
 	if enableHttp2 {
 		//ddl, cancel := context.WithTimeout(context.Background(), timeout)
@@ -914,34 +911,80 @@ RECONNECT:
 		return response, err
 	}
 
-	// 写报文
-	if option.BeforeDoRequest != nil {
-		requestPacket = option.BeforeDoRequest(requestPacket)
-	}
-
-	if oldVersionProxyChecking {
-		var legacyRequest []byte
-		legacyRequest, err = BuildLegacyProxyRequest(requestPacket)
-		if err != nil {
-			return nil, err
-		}
-		_, err = conn.Write(legacyRequest)
-	} else {
-		_, err = conn.Write(requestPacket)
-	}
-	if err != nil {
-		return response, utils.Errorf("write request failed: %s", err)
-	}
-
-	// 读报文
+	var multiResponses []*http.Response
+	var isMultiResponses bool
+	var firstResponse *http.Response
 	var responseRaw bytes.Buffer
-	conn.SetDeadline(time.Now().Add(timeout))
-	httpResponseReader := bufio.NewReader(io.TeeReader(conn, &responseRaw))
+	var rawBytes []byte
 
-	// 统计serve时长，到服务器开始响应的第一个字节结束
-	serverTimeStart := time.Now()
-	httpResponseReader.Peek(1)
-	traceInfo.ServerTime = time.Since(serverTimeStart)
+	if withConnPool {
+		//连接池分支
+		writeErrCh := make(chan error, 1)
+		conn.(*persistConn).writeCh <- writeRequest{reqPacket: requestPacket, ch: writeErrCh}
+
+		resc := make(chan responseInfo)
+		conn.(*persistConn).reqCh <- requestAndResponseCh{
+			reqPacket: requestPacket,
+			ch:        resc,
+		}
+		pcClosed := conn.(*persistConn).closeCh
+	LOOP:
+		for {
+			select {
+			case err := <-writeErrCh:
+				//写入失败，退出等待
+				if err != nil {
+					conn.(*persistConn).removeConn()
+					break LOOP
+				}
+			case re := <-resc:
+				//收到响应
+				if (re.resp == nil) == (re.err == nil) {
+					panic(fmt.Sprintf("internal error: exactly one of res or err should be set; nil=%v", re.resp == nil))
+				}
+				if re.err != nil {
+					return nil, re.err
+				}
+				firstResponse = re.resp
+				rawBytes, err = utils.DumpHTTPResponse(firstResponse, true)
+				traceInfo.ServerTime = re.info.ServerTime
+				if err != nil {
+					return nil, err
+				}
+				break LOOP
+			case <-pcClosed:
+				pcClosed = nil
+				return nil, errors.New("connection closed")
+			}
+		}
+
+	} else {
+		//不使用连接池分支
+		if conn != nil {
+			defer func() {
+				conn.Close()
+			}()
+		}
+		// 写报文
+		if option.BeforeDoRequest != nil {
+			requestPacket = option.BeforeDoRequest(requestPacket)
+		}
+		n, err := conn.Write(requestPacket)
+		_ = n
+		if err != nil {
+			return response, utils.Errorf("write request failed: %s", err)
+		}
+
+		// 读报文
+		conn.SetDeadline(time.Now().Add(timeout))
+		httpResponseReader := bufio.NewReader(io.TeeReader(conn, &responseRaw))
+
+		// 服务器响应第一个字节
+		serverTimeStart := time.Now()
+		peek, err := httpResponseReader.Peek(1)
+		if err == nil && len(peek) == 1 {
+			traceInfo.ServerTime = time.Since(serverTimeStart)
+		}
 
 	var multiResponses []*http.Response
 	var isMultiResponses bool
@@ -964,28 +1007,29 @@ RECONNECT:
 		}
 		multiResponses = append(multiResponses, firstResponse)
 
-		// handle response
-		for noFixContentLength {
-			// log.Infof("checking next(pipeline/smuggle) response...")
-			_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-			nextResponse, err := http.ReadResponse(httpResponseReader, nil)
-			if err != nil {
-				if err == io.EOF || err == io.ErrUnexpectedEOF {
+			// handle response
+			for noFixContentLength {
+				// log.Infof("checking next(pipeline/smuggle) response...")
+				_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+				nextResponse, err := http.ReadResponse(httpResponseReader, nil)
+				if err != nil {
+					if err == io.EOF || err == io.ErrUnexpectedEOF {
+						break
+					}
+					log.Debugf("[lowhttp] read (pipeline/smuggle) response failed: %s", err)
 					break
 				}
-				log.Debugf("[lowhttp] read (pipeline/smuggle) response failed: %s", err)
-				break
-			}
-			if nextResponse != nil {
-				multiResponses = append(multiResponses, nextResponse)
-				isMultiResponses = true
-				response.MultiResponse = true
-				_, _ = io.ReadAll(nextResponse.Body)
+				if nextResponse != nil {
+					multiResponses = append(multiResponses, nextResponse)
+					isMultiResponses = true
+					response.MultiResponse = true
+					_, _ = io.ReadAll(nextResponse.Body)
+				}
 			}
 		}
+		rawBytes = responseRaw.Bytes()
 	}
 
-	rawBytes := responseRaw.Bytes()
 	var result = codec.EncodeBase64(rawBytes[:])
 	_ = result
 
@@ -1039,10 +1083,10 @@ STATUSCODERETRY:
 	if !noFixContentLength && !isMultiResponses {
 		// fix
 		//return responseRaw.Bytes(), nil
-		rspRaw, _, err := FixHTTPResponse(responseRaw.Bytes())
+		rspRaw, _, err := FixHTTPResponse(rawBytes)
 		if err != nil {
 			log.Errorf("fix http response failed: %s", err)
-			response.RawPacket = responseRaw.Bytes()
+			response.RawPacket = rawBytes
 			return response, nil
 		}
 		response.RawPacket = rspRaw
@@ -1050,6 +1094,6 @@ STATUSCODERETRY:
 	}
 
 	// 如果不修复的话，默认服务器返回的东西也有点复杂，不适合做其他处理
-	response.RawPacket = responseRaw.Bytes()
+	response.RawPacket = rawBytes
 	return response, nil
 }

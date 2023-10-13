@@ -1,28 +1,27 @@
 package lowhttp
 
 import (
+	"bufio"
 	"container/list"
+	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
+	"io"
 	"net"
+	"net/http"
 	"sync"
 	"time"
 )
 
 var DefaultLowHttpConnPool = &lowHttpConnPool{
 	maxIdleConn:        100,
-	maxIdleConnPerHost: 20,
+	maxIdleConnPerHost: 2,
 	connCount:          0,
 	idleConnTimeout:    90 * time.Second,
-	gcPool: sync.Pool{
-		New: func() interface{} {
-			return new(persistConn)
-		},
-	},
-	idleConn:         make(map[uint64][]*persistConn),
-	keepAliveTimeout: 30 * time.Second,
+	idleConn:           make(map[uint64][]*persistConn),
+	keepAliveTimeout:   30 * time.Second,
 }
 
 type lowHttpConnPool struct {
@@ -32,7 +31,6 @@ type lowHttpConnPool struct {
 	connCount          int                       //已有连接计数器
 	idleConn           map[uint64][]*persistConn //空闲连接
 	idleConnTimeout    time.Duration             //连接过期时间
-	gcPool             sync.Pool                 //回收池，用于回收conn结构体避免频繁创建销毁结构体
 	idleLRU            connLRU                   //连接池 LRU
 	keepAliveTimeout   time.Duration
 }
@@ -40,20 +38,12 @@ type lowHttpConnPool struct {
 // 取出一个空闲连接
 // want 检索一个可用的连接，并且把这个连接从连接池中取出来
 func (l *lowHttpConnPool) getIdleConn(key connectKey, opts ...netx.DialXOption) (*persistConn, error) {
-	l.idleConnMux.Lock()
-	// 检索是否有符合要求的连接
-	if len(l.idleConn[key.hash()]) > 0 {
-		for _, pConn := range l.idleConn[key.hash()] {
-			if pConn.isIdle {
-				pConn.isIdle = false
-				l.idleConnMux.Unlock()
-				//取出连接时验活
-				return pConn, nil
-			}
-		}
+	//尝试获取复用连接
+	if oldPc, ok := l.getFromConn(key); ok {
+		//log.Infof("use old conn")
+		return oldPc, nil
 	}
-	//如果没有符合要求连接则新建
-	l.idleConnMux.Unlock()
+	//没有复用连接则新建一个连接
 	pConn, err := newPersistConn(key, l, opts...)
 	if err != nil {
 		return nil, err
@@ -61,12 +51,48 @@ func (l *lowHttpConnPool) getIdleConn(key connectKey, opts ...netx.DialXOption) 
 	return pConn, nil
 }
 
+func (l *lowHttpConnPool) getFromConn(key connectKey) (oldPc *persistConn, getConn bool) {
+	l.idleConnMux.Lock()
+	defer l.idleConnMux.Unlock()
+	getConn = false
+	var oldTime time.Time
+	if l.idleConnTimeout > 0 {
+		oldTime = time.Now().Add(-l.idleConnTimeout)
+	}
+
+	if connList, ok := l.idleConn[key.hash()]; ok {
+		stop := false
+		for len(connList) > 0 && !stop {
+			oldPc = connList[len(connList)-1]
+
+			//检查获取的连接是否空闲超时，若超时再取下一个
+			tooOld := !oldTime.Before(oldPc.idleAt)
+			if tooOld {
+				oldPc.Conn.Close()
+				connList = connList[:len(connList)-1]
+				continue
+			}
+
+			l.idleLRU.remove(oldPc)
+			connList = connList[:len(connList)-1]
+			getConn = true
+			stop = true
+		}
+		if len(connList) > 0 {
+			l.idleConn[key.hash()] = connList
+		} else {
+			delete(l.idleConn, key.hash())
+		}
+	}
+	return
+}
+
 func (l *lowHttpConnPool) putIdleConn(conn *persistConn) error {
 	cacheKeyHash := conn.cacheKey.hash()
 	l.idleConnMux.Lock()
 	defer l.idleConnMux.Unlock()
 	//如果超过池规定的单个host可以拥有的最大连接数量则直接放弃添加连接
-	if len(l.idleConn[cacheKeyHash]) >= l.maxIdleConnPerHost && !conn.inPool {
+	if len(l.idleConn[cacheKeyHash]) >= l.maxIdleConnPerHost {
 		return nil
 	}
 
@@ -80,11 +106,6 @@ func (l *lowHttpConnPool) putIdleConn(conn *persistConn) error {
 		}
 	}
 
-	conn.isIdle = true
-	if conn.inPool {
-		return nil
-	}
-
 	if l.connCount >= l.maxIdleConn {
 		oldPconn := l.idleLRU.removeOldest()
 		err := l.removeConnLocked(oldPconn)
@@ -93,32 +114,31 @@ func (l *lowHttpConnPool) putIdleConn(conn *persistConn) error {
 		}
 	}
 	l.idleConn[cacheKeyHash] = append(l.idleConn[cacheKeyHash], conn)
-	conn.inPool = true
 	return nil
 }
 
-// 在有写锁的环境中从池子里删除一个连接
+// 在有写锁的环境中从池子里删除一个空闲连接
 func (l *lowHttpConnPool) removeConnLocked(pConn *persistConn) error {
 	if pConn.closeTimer != nil {
 		pConn.closeTimer.Stop()
 	}
 	key := pConn.cacheKey.hash()
-	pConns := l.idleConn[pConn.cacheKey.hash()]
-	switch len(pConns) {
+	connList := l.idleConn[pConn.cacheKey.hash()]
+	pConn.Conn.Close()
+	switch len(connList) {
 	case 0:
 		return utils.Errorf("remove Conn err : [not find this Conn from the Conn pool]")
 	case 1:
-		if pConns[0] == pConn {
-			l.gcPool.Put(pConn)
+		if connList[0] == pConn {
 			delete(l.idleConn, key)
 		}
 	default:
-		for i, v := range pConns {
+		for i, v := range connList {
 			if v != pConn {
 				continue
 			}
-			copy(pConns[i:], pConns[i+1:])
-			l.idleConn[key] = pConns[:len(pConns)-1]
+			copy(connList[i:], connList[i+1:])
+			l.idleConn[key] = connList[:len(connList)-1]
 			break
 		}
 	}
@@ -127,16 +147,129 @@ func (l *lowHttpConnPool) removeConnLocked(pConn *persistConn) error {
 
 // 长连接
 type persistConn struct {
-	net.Conn   //conn本体
-	mu         sync.Mutex
-	p          *lowHttpConnPool   //连接对应的连接池
-	cacheKey   connectKey         //连接池缓存key
-	isProxy    bool               //是否使用代理
-	idleAt     time.Time          //进入空闲的时间
-	closeTimer *time.Timer        //关闭定时器
-	isIdle     bool               //是否空闲
-	inPool     bool               //是否入池
-	dialOption []netx.DialXOption //dial 选项
+	net.Conn //conn本体
+	mu       sync.Mutex
+	p        *lowHttpConnPool //连接对应的连接池
+	cacheKey connectKey       //连接池缓存key
+	isProxy  bool             //是否使用代理
+	alive    bool             //存活判断
+	sawEOF   bool             //连接是否EOF
+
+	idleAt          time.Time                 //进入空闲的时间
+	closeTimer      *time.Timer               //关闭定时器
+	dialOption      []netx.DialXOption        //dial 选项
+	br              *bufio.Reader             // from conn
+	bw              *bufio.Writer             // to conn
+	reqCh           chan requestAndResponseCh //读取管道
+	writeCh         chan writeRequest         //写入管道
+	closeCh         chan struct{}             //关闭信号
+	writeErrCh      chan error                //写入错误信号
+	serverStartTime time.Time                 //响应时间
+
+	inPool bool
+	isIdle bool
+
+	//debug info
+	wPacket []packetInfo
+	rPacket []packetInfo
+}
+
+type requestAndResponseCh struct {
+	reqPacket []byte
+	ch        chan responseInfo
+	//respCh
+}
+
+type responseInfo struct {
+	resp *http.Response
+	err  error
+	info httpInfo
+}
+
+type httpInfo struct {
+	ServerTime time.Duration
+}
+
+type writeRequest struct {
+	reqPacket []byte
+	ch        chan error
+}
+
+type packetInfo struct {
+	localPort string
+	packet    []byte
+}
+
+type persistConnWriter struct {
+	pc *persistConn
+}
+
+func (w persistConnWriter) Write(p []byte) (n int, err error) {
+	n, err = w.pc.Conn.Write(p)
+	return
+}
+
+func (w persistConnWriter) ReadFrom(r io.Reader) (n int64, err error) {
+	n, err = io.Copy(w.pc.Conn, r)
+	return
+}
+
+type bodyEOFSignal struct {
+	body         io.ReadCloser
+	mu           sync.Mutex        // guards following 4 fields
+	closed       bool              // whether Close has been called
+	rerr         error             // sticky Read error
+	fn           func(error) error // err will be nil on Read io.EOF
+	earlyCloseFn func() error      // optional alt Close func used if io.EOF not seen
+}
+
+var errReadOnClosedResBody = errors.New("http: read on closed response body")
+
+func (es *bodyEOFSignal) Read(p []byte) (n int, err error) {
+	es.mu.Lock()
+	closed, rerr := es.closed, es.rerr
+	es.mu.Unlock()
+	if closed {
+		return 0, errReadOnClosedResBody
+	}
+	if rerr != nil {
+		return 0, rerr
+	}
+
+	n, err = es.body.Read(p)
+	if err != nil {
+		es.mu.Lock()
+		defer es.mu.Unlock()
+		if es.rerr == nil {
+			es.rerr = err
+		}
+		err = es.condfn(err)
+	}
+	return
+}
+
+func (es *bodyEOFSignal) Close() error {
+	es.mu.Lock()
+	defer es.mu.Unlock()
+	if es.closed {
+		return nil
+	}
+	es.closed = true
+	if es.earlyCloseFn != nil && es.rerr != io.EOF {
+		return es.earlyCloseFn()
+	}
+	err := es.body.Close()
+	return es.condfn(err)
+}
+
+// caller must hold es.mu.
+func (es *bodyEOFSignal) condfn(err error) error {
+	if es.fn == nil {
+		return err
+	}
+	err = es.fn(err)
+	es.fn = nil
+	return err
 }
 
 func newPersistConn(key connectKey, pool *lowHttpConnPool, opt ...netx.DialXOption) (*persistConn, error) {
@@ -146,28 +279,158 @@ func newPersistConn(key connectKey, pool *lowHttpConnPool, opt ...netx.DialXOpti
 	if err != nil {
 		return nil, err
 	}
-	// gc池里取出一个回收的persistConn结构体
-	conn := pool.gcPool.Get().(*persistConn)
-	conn.Conn = newConn
-	conn.p = pool
-	conn.cacheKey = key
-	conn.isProxy = needProxy
-	conn.dialOption = opt
-	return conn, nil
+	// 初始化连接
+	pc := &persistConn{
+		Conn:            newConn,
+		mu:              sync.Mutex{},
+		p:               pool,
+		cacheKey:        key,
+		isProxy:         needProxy,
+		sawEOF:          false,
+		idleAt:          time.Time{},
+		closeTimer:      nil,
+		dialOption:      opt,
+		reqCh:           make(chan requestAndResponseCh),
+		writeCh:         make(chan writeRequest),
+		closeCh:         make(chan struct{}),
+		writeErrCh:      make(chan error),
+		serverStartTime: time.Time{},
+		wPacket:         make([]packetInfo, 0),
+		rPacket:         make([]packetInfo, 0),
+	}
+	pc.br = bufio.NewReader(pc)
+	pc.bw = bufio.NewWriter(persistConnWriter{pc})
+
+	//启动读取写入循环
+	go pc.writeLoop()
+	go pc.readLoop()
+	return pc, nil
 }
 
-func (pc *persistConn) Write(packet []byte) (n int, err error) {
-	n, err = pc.Conn.Write(packet)
-	if err != nil {
-		//pc.removeConn()
-		//如果连接写入失败则删除本连接并尝试重新构建一个连接
-		pc.Conn, err = netx.DialX(pc.cacheKey.addr, pc.dialOption...)
+func (pc *persistConn) readLoop() {
+	defer func() {
+		pc.removeConn()
+	}()
+
+	tryPutIdleConn := func() bool {
+		err := pc.p.putIdleConn(pc)
 		if err != nil {
-			return n, err
+			return false
 		}
-		n, err = pc.Conn.Write(packet)
+		return true
 	}
-	return n, err
+
+	eofc := make(chan struct{})
+	defer close(eofc) // unblock reader on errors
+
+	count := 0
+	alive := true
+	for alive {
+		_, peekErr := pc.br.Peek(1)
+		_ = peekErr
+		if peekErr != nil {
+			//log.Infof("!!!conn [%v] connect [%v] has be read [%d] return for peek error [%s]", pc.Conn.LocalAddr(), pc.cacheKey.addr, count, peekErr)
+			pc.closeConn(peekErr)
+			return
+		}
+		info := httpInfo{ServerTime: time.Since(pc.serverStartTime)}
+
+		rc := <-pc.reqCh
+
+		//var resp *http.Response
+		resp, err := http.ReadResponse(pc.br, nil)
+		count++
+
+		if err != nil {
+			log.Errorf("conn [%s] read error , has used %d ", pc.cacheKey.addr, count)
+			if err == io.EOF {
+				pc.sawEOF = true
+			}
+			rc.ch <- responseInfo{err: err}
+			return
+		}
+		_, ok := resp.Body.(io.Writer)
+		bodyWritable := ok
+		method, _, _ := GetHTTPPacketFirstLine(rc.reqPacket)
+		hasBody := method != "HEAD" && resp.ContentLength != 0
+
+		if resp.Close || resp.StatusCode <= 199 || bodyWritable {
+			alive = false
+		}
+
+		if !hasBody || bodyWritable {
+			alive = alive &&
+				!pc.sawEOF &&
+				tryPutIdleConn()
+
+			rc.ch <- responseInfo{resp: resp, info: info}
+
+			continue
+		}
+
+		waitForBodyRead := make(chan bool, 2)
+		body := &bodyEOFSignal{
+			body: resp.Body,
+			earlyCloseFn: func() error {
+				waitForBodyRead <- false
+				<-eofc
+				return nil
+
+			},
+			fn: func(err error) error {
+				isEOF := err == io.EOF
+				waitForBodyRead <- isEOF
+				if isEOF {
+					<-eofc
+				}
+				return err
+			},
+		}
+
+		resp.Body = body
+
+		rc.ch <- responseInfo{resp: resp, info: info}
+
+		select {
+		case bodyEOF := <-waitForBodyRead:
+			alive = alive &&
+				bodyEOF &&
+				!pc.sawEOF && tryPutIdleConn()
+			if bodyEOF {
+				eofc <- struct{}{}
+			}
+		}
+	}
+}
+
+func (pc *persistConn) writeLoop() {
+	count := 0
+	for {
+		select {
+		case wr := <-pc.writeCh:
+			count++
+			_, err := pc.bw.Write(wr.reqPacket)
+			if err == nil {
+				err = pc.bw.Flush()
+			}
+			pc.serverStartTime = time.Now()
+			//pc.writeErrCh <- err // to the body reader, which might recycle us
+			wr.ch <- err // to the roundTrip function
+			if err != nil {
+				//log.Infof("!!!conn [%v] connect [%v] has be writed [%d]", pc.Conn.LocalAddr(), pc.cacheKey.addr, count)
+				return
+			}
+		case <-pc.closeCh:
+			//log.Infof("!!!conn [%v] connect [%v] has be writed [%d]", pc.Conn.LocalAddr(), pc.cacheKey.addr, count)
+			return
+		}
+	}
+}
+
+func (pc *persistConn) closeConn(err error) {
+	pc.Conn.Close()
+	pc.closeCh <- struct{}{}
+	close(pc.closeCh)
 }
 
 func (pc *persistConn) Close() error {
@@ -182,6 +445,14 @@ func (pc *persistConn) removeConn() {
 	if err != nil {
 		log.Error(err)
 	}
+}
+
+func (pc *persistConn) Read(b []byte) (n int, err error) {
+	n, err = pc.Conn.Read(b)
+	if err == io.EOF {
+		pc.sawEOF = true
+	}
+	return
 }
 
 type connectKey struct {
