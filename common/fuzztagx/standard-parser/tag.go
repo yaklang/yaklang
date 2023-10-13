@@ -6,6 +6,7 @@ import (
 )
 
 type FuzzResult []byte
+
 type TagMethod func(string) ([]FuzzResult, error)
 type Node interface {
 	IsNode()
