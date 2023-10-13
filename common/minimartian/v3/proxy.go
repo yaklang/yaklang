@@ -915,7 +915,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	err = brw.Flush()
 	if err != nil {
 		log.Errorf("handle ordinary request: got error while flushing response back to client: %v", err)
-		fmt.Println(string(responseBytes))
+		//fmt.Println(string(responseBytes))
 	}
 	return closing
 }

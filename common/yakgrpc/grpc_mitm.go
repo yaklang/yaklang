@@ -550,17 +550,21 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		2. 劫持普通 HTTP 的请求和响应
 		3. 镜像 HTTP 请求和响应
 	*/
+	var wshashFrameIndexLock sync.Mutex
 	var mServer *crep.MITMServer
 	var websocketHashCache = new(sync.Map)
 	var wshashFrameIndex = make(map[string]int)
 	var requireWsFrameIndexByWSHash = func(i string) int {
 		/*这个函数目前用在 Hijack 里面，不太需要加锁，因为 mitmLock 已经一般生效了*/
 		result, ok := wshashFrameIndex[i]
+		wshashFrameIndexLock.Lock()
 		if !ok {
 			wshashFrameIndex[i] = 1
+			wshashFrameIndexLock.Unlock()
 			return 1
 		}
 		wshashFrameIndex[i] = result + 1
+		wshashFrameIndexLock.Unlock()
 		return wshashFrameIndex[i]
 	}
 	handleHijackWsResponse := func(raw []byte, req *http.Request, rsp *http.Response, ts int64) (finalResult []byte) {
