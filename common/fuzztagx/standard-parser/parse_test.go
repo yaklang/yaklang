@@ -14,11 +14,14 @@ func TestSearch(t *testing.T) {
 }
 func TestGenerator(t *testing.T) {
 	nodes := Parse("aaa{{int(a)}}aa", NewTagDefine("fuzztag", "{{", "}}", &FuzzTag{}))
-	generator := NewGenerator(nodes, map[string]TagMethod{
+	generator, err := NewGenerator(nodes, map[string]TagMethod{
 		"int": func(s string) ([]FuzzResult, error) {
 			return []FuzzResult{FuzzResult(s)}, nil
 		},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	for {
 		if v, ok := generator.Generate(); ok {
 			println(v)
