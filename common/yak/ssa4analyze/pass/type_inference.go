@@ -194,8 +194,9 @@ func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
 		if t.GetTypeKind() == ssa.ObjectTypeKind {
 			interfaceTyp := f.Obj.GetType().(*ssa.ObjectType)
 			fTyp, _ := interfaceTyp.GetField(f.Key)
-			if fTyp != nil {
+			if !utils.IsNil(fTyp) {
 				f.SetType(fTyp)
+				return
 			}
 		}
 		if methodTyp := t.GetMethod(f.Key.String()); methodTyp != nil && f.GetType() != methodTyp {
@@ -205,12 +206,12 @@ func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
 		}
 	}
 	// use update
-	vs := lo.Map(f.Update, func(v ssa.Value, i int) ssa.Value {
+	vs := lo.FilterMap(f.GetValues(), func(v ssa.Value, i int) (ssa.Value, bool) {
 		switch v := v.(type) {
 		case *ssa.Update:
-			return v.Value
+			return v.Value, true
 		default:
-			return v
+			return nil, false
 		}
 	})
 
@@ -225,8 +226,12 @@ func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
 		vs,
 		func(i int, v ssa.Value) bool { return false },
 	)
-	if len(ts) != 0 {
+	if len(ts) == 0 {
+		f.SetType(ssa.BasicTypes[ssa.Null])
+	} else if len(ts) == 1 {
 		f.SetType(ts[0])
+	} else {
+		f.SetType(ssa.BasicTypes[ssa.Any])
 	}
 }
 func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {

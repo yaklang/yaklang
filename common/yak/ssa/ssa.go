@@ -646,7 +646,7 @@ type Field struct {
 	// capture by other function
 	OutCapture bool
 
-	Update []Value // value
+	// Update []Value // value
 
 	//TODO:map[users]update
 	// i can add the map[users]update,
