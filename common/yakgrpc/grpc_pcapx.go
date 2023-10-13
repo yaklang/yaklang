@@ -57,6 +57,7 @@ func (s *Server) GetPcapMetadata(ctx context.Context, req *ypb.PcapMetadataReque
 			return nil, err
 		}
 		if ifItem.Name == name {
+			defaultIfName = ifItem
 			break
 		}
 	}

@@ -372,6 +372,7 @@ type YakClient interface {
 	QueryTrafficSession(ctx context.Context, in *QueryTrafficSessionRequest, opts ...grpc.CallOption) (*QueryTrafficSessionResponse, error)
 	QueryTrafficPacket(ctx context.Context, in *QueryTrafficPacketRequest, opts ...grpc.CallOption) (*QueryTrafficPacketResponse, error)
 	QueryTrafficTCPReassembled(ctx context.Context, in *QueryTrafficTCPReassembledRequest, opts ...grpc.CallOption) (*QueryTrafficTCPReassembledResponse, error)
+	DuplexConnection(ctx context.Context, opts ...grpc.CallOption) (Yak_DuplexConnectionClient, error)
 }
 
 type yakClient struct {
@@ -3893,6 +3894,37 @@ func (c *yakClient) QueryTrafficTCPReassembled(ctx context.Context, in *QueryTra
 	return out, nil
 }
 
+func (c *yakClient) DuplexConnection(ctx context.Context, opts ...grpc.CallOption) (Yak_DuplexConnectionClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[43], "/ypb.Yak/DuplexConnection", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &yakDuplexConnectionClient{stream}
+	return x, nil
+}
+
+type Yak_DuplexConnectionClient interface {
+	Send(*DuplexConnectionRequest) error
+	Recv() (*DuplexConnectionResponse, error)
+	grpc.ClientStream
+}
+
+type yakDuplexConnectionClient struct {
+	grpc.ClientStream
+}
+
+func (x *yakDuplexConnectionClient) Send(m *DuplexConnectionRequest) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *yakDuplexConnectionClient) Recv() (*DuplexConnectionResponse, error) {
+	m := new(DuplexConnectionResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility
@@ -4251,6 +4283,7 @@ type YakServer interface {
 	QueryTrafficSession(context.Context, *QueryTrafficSessionRequest) (*QueryTrafficSessionResponse, error)
 	QueryTrafficPacket(context.Context, *QueryTrafficPacketRequest) (*QueryTrafficPacketResponse, error)
 	QueryTrafficTCPReassembled(context.Context, *QueryTrafficTCPReassembledRequest) (*QueryTrafficTCPReassembledResponse, error)
+	DuplexConnection(Yak_DuplexConnectionServer) error
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -5100,6 +5133,9 @@ func (UnimplementedYakServer) QueryTrafficPacket(context.Context, *QueryTrafficP
 }
 func (UnimplementedYakServer) QueryTrafficTCPReassembled(context.Context, *QueryTrafficTCPReassembledRequest) (*QueryTrafficTCPReassembledResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryTrafficTCPReassembled not implemented")
+}
+func (UnimplementedYakServer) DuplexConnection(Yak_DuplexConnectionServer) error {
+	return status.Errorf(codes.Unimplemented, "method DuplexConnection not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 
@@ -10336,6 +10372,32 @@ func _Yak_QueryTrafficTCPReassembled_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_DuplexConnection_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(YakServer).DuplexConnection(&yakDuplexConnectionServer{stream})
+}
+
+type Yak_DuplexConnectionServer interface {
+	Send(*DuplexConnectionResponse) error
+	Recv() (*DuplexConnectionRequest, error)
+	grpc.ServerStream
+}
+
+type yakDuplexConnectionServer struct {
+	grpc.ServerStream
+}
+
+func (x *yakDuplexConnectionServer) Send(m *DuplexConnectionResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *yakDuplexConnectionServer) Recv() (*DuplexConnectionRequest, error) {
+	m := new(DuplexConnectionRequest)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -11516,6 +11578,12 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "PcapX",
 			Handler:       _Yak_PcapX_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+		{
+			StreamName:    "DuplexConnection",
+			Handler:       _Yak_DuplexConnection_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},
