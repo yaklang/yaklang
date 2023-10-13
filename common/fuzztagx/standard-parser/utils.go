@@ -1,11 +1,15 @@
 package standard_parser
 
+import (
+	"strings"
+)
+
 type trieNode struct {
 	children   map[rune]*trieNode
 	failure    *trieNode
-	output     bool
 	patternLen int
 	id         int
+	flag       int // 对节点的标记，可以用来标记结束节点
 }
 
 // IndexAllSubstrings 只遍历一次查找所有子串位置
@@ -15,7 +19,7 @@ func IndexAllSubstrings(s string, patterns ...string) (result [][2]int) {
 	root := &trieNode{
 		children:   make(map[rune]*trieNode),
 		failure:    nil,
-		output:     false,
+		flag:       0,
 		patternLen: 0,
 	}
 
@@ -26,14 +30,14 @@ func IndexAllSubstrings(s string, patterns ...string) (result [][2]int) {
 				node.children[char] = &trieNode{
 					children:   make(map[rune]*trieNode),
 					failure:    nil,
-					output:     false,
+					flag:       0,
 					patternLen: 0,
 					id:         patternIndex,
 				}
 			}
 			node = node.children[char]
 		}
-		node.output = true
+		node.flag = 1
 		node.patternLen = len(pattern)
 	}
 	// 构建Failure
@@ -59,7 +63,7 @@ func IndexAllSubstrings(s string, patterns ...string) (result [][2]int) {
 
 			if next := failure.children[char]; next != nil {
 				child.failure = next
-				child.output = child.output || next.output
+				child.flag = child.flag | next.flag
 			} else {
 				child.failure = root
 			}
@@ -75,10 +79,99 @@ func IndexAllSubstrings(s string, patterns ...string) (result [][2]int) {
 
 		if next := node.children[char]; next != nil {
 			node = next
-			if node.output {
+			if node.flag == 1 {
 				result = append(result, [2]int{node.id, i - node.patternLen + 1})
 			}
 		}
 	}
 	return
+}
+
+type Escaper struct {
+	escapeSymbol string
+	escapeChars  map[string]string
+}
+
+func (e *Escaper) Unescape(s string) (string, error) {
+	// 构建trie树
+	root := &trieNode{
+		children:   make(map[rune]*trieNode),
+		failure:    nil,
+		flag:       0,
+		patternLen: 0,
+	}
+	patterns := []string{}
+	for pattern, _ := range e.escapeChars {
+		patterns = append(patterns, pattern)
+		node := root
+		for _, char := range pattern {
+			if _, ok := node.children[char]; !ok {
+				node.children[char] = &trieNode{
+					children:   make(map[rune]*trieNode),
+					failure:    nil,
+					flag:       0,
+					patternLen: 0,
+					id:         len(patterns) - 1,
+				}
+			}
+			node = node.children[char]
+		}
+		node.flag = 1
+		node.patternLen = len(pattern)
+	}
+
+	result := ""
+	escapeState := false
+	node := root
+	data := s
+	for {
+		if escapeState {
+			escapeState = false
+			runeData := []rune(data)
+			for i := 0; i < len(runeData); i++ {
+				ch := runeData[i]
+				if node.children[ch] != nil {
+					node = node.children[ch]
+					if node.flag == 1 { // 匹配成功
+						result += patterns[node.id]
+						data = string(runeData[i+1:])
+						node = root
+						break
+					}
+				} else {
+					result += string(runeData[:i])
+					data = string(runeData[i:])
+					node = root
+					break
+				}
+			}
+		} else {
+			index := strings.Index(data, e.escapeSymbol) // 查找后面第一个转义符
+			if index != -1 {
+				result += data[:index]
+				data = data[index+len(e.escapeSymbol):]
+				escapeState = true
+			} else {
+				result += data
+				break
+			}
+		}
+	}
+	return result, nil
+}
+func NewEscaper(escapeSymbol string, charsMap map[string]string) *Escaper {
+	if _, ok := charsMap[escapeSymbol]; !ok {
+		charsMap[escapeSymbol] = escapeSymbol
+	}
+	return &Escaper{
+		escapeSymbol: escapeSymbol,
+		escapeChars:  charsMap,
+	}
+}
+func NewDefaultEscaper(chars ...string) *Escaper {
+	m := map[string]string{}
+	for _, char := range chars {
+		m[char] = char
+	}
+	return NewEscaper(`\`, m)
 }
