@@ -4,20 +4,30 @@ import (
 	"strings"
 )
 
+// SuperChar 可以使用Unicode以外的字符集，可以不在Unicode字符集中自定义具有特殊含义的字符
+type SuperChar int64
+type SuperString []SuperChar
+
+func ToSuperString(s string) SuperString {
+	var supers SuperString
+	for _, c := range s {
+		supers = append(supers, SuperChar(c))
+	}
+	return supers
+}
+
 type trieNode struct {
-	children   map[rune]*trieNode
+	children   map[SuperChar]*trieNode
 	failure    *trieNode
 	patternLen int
 	id         int
 	flag       int // 对节点的标记，可以用来标记结束节点
 }
 
-// IndexAllSubstrings 只遍历一次查找所有子串位置
-// 返回值是一个二维数组，每个元素是一个[2]int类型匹配结果，其中第一个元素是规则index，第二个元素是索引位置
-func IndexAllSubstrings(s string, patterns ...string) (result [][2]int) {
+func IndexAllSub(s SuperString, patterns ...SuperString) (result [][2]int) {
 	// 构建trie树
 	root := &trieNode{
-		children:   make(map[rune]*trieNode),
+		children:   make(map[SuperChar]*trieNode),
 		failure:    nil,
 		flag:       0,
 		patternLen: 0,
@@ -28,7 +38,7 @@ func IndexAllSubstrings(s string, patterns ...string) (result [][2]int) {
 		for _, char := range pattern {
 			if _, ok := node.children[char]; !ok {
 				node.children[char] = &trieNode{
-					children:   make(map[rune]*trieNode),
+					children:   make(map[SuperChar]*trieNode),
 					failure:    nil,
 					flag:       0,
 					patternLen: 0,
@@ -87,6 +97,16 @@ func IndexAllSubstrings(s string, patterns ...string) (result [][2]int) {
 	return
 }
 
+// IndexAllSubstrings 只遍历一次查找所有子串位置
+// 返回值是一个二维数组，每个元素是一个[2]int类型匹配结果，其中第一个元素是规则index，第二个元素是索引位置
+func IndexAllSubstrings(s string, patterns ...string) (result [][2]int) {
+	newPatterns := []SuperString{}
+	for _, pattern := range patterns {
+		newPatterns = append(newPatterns, []rune(pattern))
+	}
+	return IndexAllSub[rune]([]rune(s), newPatterns...)
+}
+
 type Escaper struct {
 	escapeSymbol string
 	escapeChars  map[string]string
@@ -94,8 +114,8 @@ type Escaper struct {
 
 func (e *Escaper) Unescape(s string) (string, error) {
 	// 构建trie树
-	root := &trieNode{
-		children:   make(map[rune]*trieNode),
+	root := &trieNode[rune]{
+		children:   make(map[rune]*trieNode[rune]),
 		failure:    nil,
 		flag:       0,
 		patternLen: 0,
@@ -106,8 +126,8 @@ func (e *Escaper) Unescape(s string) (string, error) {
 		node := root
 		for _, char := range pattern {
 			if _, ok := node.children[char]; !ok {
-				node.children[char] = &trieNode{
-					children:   make(map[rune]*trieNode),
+				node.children[char] = &trieNode[rune]{
+					children:   make(map[rune]*trieNode[rune]),
 					failure:    nil,
 					flag:       0,
 					patternLen: 0,
@@ -133,7 +153,7 @@ func (e *Escaper) Unescape(s string) (string, error) {
 				if node.children[ch] != nil {
 					node = node.children[ch]
 					if node.flag == 1 { // 匹配成功
-						result += patterns[node.id]
+						result += e.escapeChars[patterns[node.id]]
 						data = string(runeData[i+1:])
 						node = root
 						break
@@ -174,4 +194,71 @@ func NewDefaultEscaper(chars ...string) *Escaper {
 		m[char] = char
 	}
 	return NewEscaper(`\`, m)
+}
+func unescape[T](escapeChars map[[]T][]T, s string) (string, error) {
+	// 构建trie树
+	root := &trieNode[rune]{
+		children:   make(map[rune]*trieNode[rune]),
+		failure:    nil,
+		flag:       0,
+		patternLen: 0,
+	}
+	patterns := []string{}
+	for pattern, _ := range e.escapeChars {
+		patterns = append(patterns, pattern)
+		node := root
+		for _, char := range pattern {
+			if _, ok := node.children[char]; !ok {
+				node.children[char] = &trieNode[rune]{
+					children:   make(map[rune]*trieNode[rune]),
+					failure:    nil,
+					flag:       0,
+					patternLen: 0,
+					id:         len(patterns) - 1,
+				}
+			}
+			node = node.children[char]
+		}
+		node.flag = 1
+		node.patternLen = len(pattern)
+	}
+
+	result := ""
+	escapeState := false
+	node := root
+	data := s
+	for {
+		if escapeState {
+			escapeState = false
+			runeData := []rune(data)
+			for i := 0; i < len(runeData); i++ {
+				ch := runeData[i]
+				if node.children[ch] != nil {
+					node = node.children[ch]
+					if node.flag == 1 { // 匹配成功
+						result += e.escapeChars[patterns[node.id]]
+						data = string(runeData[i+1:])
+						node = root
+						break
+					}
+				} else {
+					result += string(runeData[:i])
+					data = string(runeData[i:])
+					node = root
+					break
+				}
+			}
+		} else {
+			index := strings.Index(data, e.escapeSymbol) // 查找后面第一个转义符
+			if index != -1 {
+				result += data[:index]
+				data = data[index+len(e.escapeSymbol):]
+				escapeState = true
+			} else {
+				result += data
+				break
+			}
+		}
+	}
+	return result, nil
 }
