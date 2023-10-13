@@ -101,9 +101,9 @@ func NewFieldOnly(key Value, obj User, block *BasicBlock) *Field {
 	f := &Field{
 		anInstruction: newAnInstruction(block),
 		anNode:        NewNode(),
-		Update:        make([]Value, 0),
-		Key:           key,
-		Obj:           obj,
+		// Update:        make([]Value, 0),
+		Key: key,
+		Obj: obj,
 	}
 	f.AddValue(key)
 	f.AddUser(obj)

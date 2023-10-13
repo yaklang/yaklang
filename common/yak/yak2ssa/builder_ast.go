@@ -860,15 +860,7 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 		}
 
 		if s, ok := stmt.LeftMemberCall().(*yak.LeftMemberCallContext); ok {
-			if id := s.Identifier(); id != nil {
-				idText := id.GetText()
-				return b.EmitFieldMust(inter, ssa.NewConst(idText))
-			} else if id := s.IdentifierWithDollar(); id != nil {
-				key := b.ReadVariable(id.GetText()[1:], true)
-				if key == nil {
-					b.NewError(ssa.Error, TAG, "Expression: %s is not a variable", id.GetText())
-					return nil
-				}
+			if key := b.buildLeftMemberCall(s); key != nil {
 				return b.EmitFieldMust(inter, key)
 			}
 		}
@@ -882,6 +874,25 @@ func (b *astbuilder) buildLeftSliceCall(stmt *yak.LeftSliceCallContext) ssa.Valu
 	defer recoverRange()
 	if s, ok := stmt.Expression().(*yak.ExpressionContext); ok {
 		return b.buildExpression(s)
+	}
+	return nil
+}
+
+// left member call
+func (b *astbuilder) buildLeftMemberCall(stmt *yak.LeftMemberCallContext) ssa.Value {
+	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	defer recoverRange()
+	if id := stmt.Identifier(); id != nil {
+		idText := id.GetText()
+		return ssa.NewConst(idText)
+	} else if id := stmt.IdentifierWithDollar(); id != nil {
+		key := b.ReadVariable(id.GetText()[1:], true)
+		if key == nil {
+			// b.NewError(ssa.Error, TAG, ExpressionNotVariable(id.GetText()))
+			return nil
+		}
+		// return b.EmitFieldMust(inter, key)
+		return key
 	}
 	return nil
 }
