@@ -286,11 +286,19 @@ func (l *Loop) Finish(init, step []Value) {
 }
 
 func (f *Field) GetLastValue() Value {
-	if length := len(f.Update); length != 0 {
-		update, ok := f.Update[length-1].(*Update)
+	updates := lo.FilterMap(f.GetValues(), func(v Value, _ int) (*Update, bool) {
+		u, ok := v.(*Update)
 		if !ok {
-			panic("")
+			return nil, false
 		}
+		if u.Address == f {
+			return u, true
+		} else {
+			return nil, false
+		}
+	})
+	if length := len(updates); length != 0 {
+		update := updates[length-1]
 		return update.Value
 	}
 	return nil

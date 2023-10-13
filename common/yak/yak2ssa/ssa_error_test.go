@@ -239,7 +239,7 @@ func TestPhi(t *testing.T) {
 			}
 			`,
 			ExternLib: map[string]map[string]any{
-				"str": map[string]any{
+				"str": {
 					"F":  func() int { return 1 },
 					"F2": func() {},
 				},
@@ -249,19 +249,67 @@ func TestPhi(t *testing.T) {
 }
 
 func TestMemberCall(t *testing.T) {
-	CheckTestCase(t, TestCase{
-		code: `
-		b.F()
-		param.F() // param is extern variable
-		`,
-		errs: []string{
-			"member call target Error",
-			ssa4analyze.ValueUndefined("b"),
-			ssa4analyze.ValueUndefined("param"),
-		},
-		ExternValue: map[string]any{
-			"param": func() {},
-		},
+
+	t.Run("normal member call", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			a = { 
+				"F": ()=>{b = 1}, 
+				"F1": (a) => {b = 1}, 
+				"F11": (a) => {return a},
+			}
+			a.F()
+			a.F1(1)
+			b = a.F11(1)
+			`,
+		})
+	})
+
+	t.Run("extern variable member call", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			b.F()
+			param.F() // param is extern variable
+			`,
+			errs: []string{
+				"member call target Error",
+				ssa4analyze.ValueUndefined("b"),
+				ssa4analyze.ValueUndefined("param"),
+			},
+			ExternValue: map[string]any{
+				"param": func() {},
+			},
+		})
+	})
+
+	// TODO: handle this case in type check rule
+	t.Run("unable member call", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: ` 
+			a = 1 // number 
+			a.F() 
+			`,
+		})
+	})
+
+	t.Run("left member call", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			a = {
+				"A": 1,
+			}
+
+			a["A"] = 2
+			a.A = 3
+
+			Key = "A"
+			a.$Key = 4
+			a.$UndefineKey = 5 // this err in yakast
+			`,
+			errs: []string{
+				ssa4analyze.ValueUndefined("UndefineKey"),
+			},
+		})
 	})
 }
 

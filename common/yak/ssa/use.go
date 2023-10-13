@@ -263,8 +263,8 @@ func (i *Make) ReplaceValue(v, to Value) {
 func (f *Field) ReplaceValue(v, to Value) {
 	if f.Key == v {
 		f.Key = to
-	} else if index := slices.Index(f.Update, v); index > -1 {
-		f.Update[index] = to
+		// } else if index := slices.Index(f.Update, v); index > -1 {
+		// 	f.Update[index] = to
 	} else {
 		panic("field not use this value")
 	}
