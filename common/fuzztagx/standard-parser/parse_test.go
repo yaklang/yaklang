@@ -13,7 +13,10 @@ func TestSearch(t *testing.T) {
 	}
 }
 func TestGenerator(t *testing.T) {
-	nodes := Parse("aaa{{int(a)}}aa", NewTagDefine("fuzztag", "{{", "}}", &FuzzTag{}))
+	nodes, err := Parse("aaa{{int(a)}}aa", NewTagDefine("fuzztag", "{{", "}}", &FuzzTag{}))
+	if err != nil {
+		t.Fatal(err)
+	}
 	generator, err := NewGenerator(nodes, map[string]TagMethod{
 		"int": func(s string) ([]FuzzResult, error) {
 			return []FuzzResult{FuzzResult(s)}, nil

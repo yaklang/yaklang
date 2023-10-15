@@ -27,8 +27,11 @@ func (f *FuzzTag) Exec(data string, methods ...map[string]TagMethod) ([]FuzzResu
 	labels := []string{}
 	compile := func() error {
 		matchedPos := IndexAllSubstrings(data, MethodLeft, MethodRight)
-		switch len(matchedPos) {
-		case 2:
+		if len(matchedPos) == 0 {
+			if isIdentifyString(data) {
+				name = data
+			}
+		} else if len(matchedPos) > 1 && matchedPos[0][0] == 0 && matchedPos[len(matchedPos)-1][0] == 1 { // 第一个是左括号，最后一个右括号
 			leftPos := matchedPos[0]
 			rightPos := matchedPos[len(matchedPos)-1]
 			if leftPos[0] == 0 && rightPos[0] == 1 && strings.TrimSpace(data[rightPos[1]+len(MethodRight):]) == "" {
@@ -41,11 +44,7 @@ func (f *FuzzTag) Exec(data string, methods ...map[string]TagMethod) ([]FuzzResu
 			} else {
 				return errors.New("invalid quote")
 			}
-		case 0:
-			if isIdentifyString(data) {
-				name = data
-			}
-		default:
+		} else {
 			return errors.New("invalid quote")
 		}
 		splits := strings.Split(name, "::")
@@ -83,7 +82,7 @@ func (f *FuzzTag) Exec(data string, methods ...map[string]TagMethod) ([]FuzzResu
 	return fun(params)
 }
 
-func ParseFuzztag(code string, tagTypes ...*TagDefine) []Node {
+func ParseFuzztag(code string, tagTypes ...*TagDefine) ([]Node, error) {
 	return Parse(code, append([]*TagDefine{NewTagDefine("fuzztag", "{{", "}}", &FuzzTag{})}, tagTypes...)...)
 }
 
