@@ -21,7 +21,8 @@ func (f *FuzzTag) IsNode() {
 	panic("implement me")
 }
 
-func (f *FuzzTag) Exec(data string, methods ...map[string]TagMethod) ([]FuzzResult, error) {
+func (f *FuzzTag) Exec(raw FuzzResult, methods ...map[string]TagMethod) ([]FuzzResult, error) {
+	data := string(raw)
 	name := ""
 	params := ""
 	labels := []string{}

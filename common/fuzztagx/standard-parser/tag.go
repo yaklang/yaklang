@@ -19,7 +19,7 @@ func (s StringNode) IsNode() {
 
 type TagNode interface {
 	IsNode()
-	Exec(string, ...map[string]TagMethod) ([]FuzzResult, error)
+	Exec(FuzzResult, ...map[string]TagMethod) ([]FuzzResult, error)
 
 	AddData(node ...Node)
 	AddLabel(label string)
