@@ -29,8 +29,11 @@ func ExecuteWithStringHandler(code string, funcMap map[string]func(string2 strin
 	}
 	res := []string{}
 	for {
-		if v, ok := generator.Generate(); ok {
-			res = append(res, v)
+		if v, ok, err := generator.Generate(); ok {
+			if err != nil {
+				return nil, err
+			}
+			res = append(res, string(v))
 		} else {
 			break
 		}
