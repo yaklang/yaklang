@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/embed"
 	"math/rand"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -94,6 +95,9 @@ func MockWebFingerPrintByName(name string) (string, int) {
 				for _, header := range m.HTTPHeaders {
 					if _, exists := nameMap[header.HeaderValue.Product]; exists {
 						if header.HeaderValue.Regexp != "" {
+							if header.HeaderName == "" {
+								header.HeaderName = utils.RandSecret(5)
+							}
 							fakeHeader := header.HeaderValue.Regexp
 							generates, err := regen.GenerateVisibleOne(fakeHeader)
 							if err != nil {
@@ -137,16 +141,17 @@ func MockRandomWebFingerPrints() ([]string, string, int) {
 	r := rand.New(src)
 
 	// Generate a list of 10 random rules from the rules slice
-	randomRules := make([]*WebRule, 100)
+	randomRules := make([]*WebRule, 200)
 	for i := range randomRules {
 		randomRules[i] = rules[r.Intn(len(rules))]
 	}
 	// debug
 	//randomRules = rules
 	var ruleNames []string
-	var err error
+	//var err error
 	headerStr := "HTTP/1.1 200 OK" + utils.CRLF
 	bodyStr := ""
+	var serverCount = 1
 	for _, rule := range randomRules {
 		for _, m := range rule.Methods {
 			if m.MD5s != nil {
@@ -156,10 +161,12 @@ func MockRandomWebFingerPrints() ([]string, string, int) {
 				for _, keyword := range m.Keywords {
 					ruleNames = append(ruleNames, keyword.Product)
 					fakeBody := keyword.Regexp
+					//log.Infof("[%s] fakeBody: %s", keyword.Product, fakeBody)
 					generates, err := regen.GenerateOne(fakeBody)
 					if err != nil {
 						continue
 					}
+					//log.Infof("[%s] generates: %s", keyword.Product, generates)
 					if strings.HasSuffix(keyword.Regexp, " )") || strings.HasSuffix(keyword.Regexp, " ") {
 						bodyStr += utils.CRLF + generates[0] + "filling"
 					} else {
@@ -169,13 +176,23 @@ func MockRandomWebFingerPrints() ([]string, string, int) {
 			}
 			if m.HTTPHeaders != nil {
 				for _, header := range m.HTTPHeaders {
+					if header.HeaderName == "Server" {
+						header.HeaderName = "Server_" + strconv.Itoa(serverCount)
+						serverCount++
+					}
 					ruleNames = append(ruleNames, header.HeaderValue.Product)
+					if header.HeaderName == "" {
+						header.HeaderName = utils.RandSecret(5)
+					}
 					if header.HeaderValue.Regexp != "" {
 						fakeHeader := header.HeaderValue.Regexp
+						//log.Infof("[%s] fakeHeader: %s", header.HeaderValue.Product, fakeHeader)
 						generates, err := regen.GenerateVisibleOne(fakeHeader)
 						if err != nil {
 							continue
 						}
+						//log.Infof("[%s] generates: %s", header.HeaderValue.Product, generates)
+
 						if generates == " " {
 							generates = "filling"
 						}
@@ -197,7 +214,8 @@ func MockRandomWebFingerPrints() ([]string, string, int) {
 	if err != nil {
 		return nil, "", 0
 	}
-	fmt.Println(string(response))
+	//log.Infof("response: %s", string(response))
+	//fmt.Println(string(response))
 
 	host, port := utils.DebugMockHTTP(response)
 	return ruleNames, host, port
