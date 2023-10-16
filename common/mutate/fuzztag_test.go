@@ -200,3 +200,9 @@ func TestIntWithAutoZeroPadding(t *testing.T) {
 		}
 	})
 }
+
+func TestRepeatTag(t *testing.T) {
+	result := MutateQuick(`{{repeat(!|4)}}`)
+	println(len(result))
+	spew.Dump(result)
+}
