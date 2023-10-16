@@ -3,6 +3,15 @@ package yak
 import (
 	"context"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"net"
+	"os"
+	"path/filepath"
+	"runtime"
+	"sync"
+	"time"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
@@ -13,14 +22,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
-	"io"
-	"io/ioutil"
-	"net"
-	"os"
-	"path/filepath"
-	"runtime"
-	"sync"
-	"time"
 
 	"github.com/urfave/cli"
 )
@@ -517,7 +518,7 @@ die(nuclei.UpdateDatabase())`, "main")
 		},
 	},
 	{Name: "fuzz", Flags: []cli.Flag{cli.StringFlag{Name: "t,target", Usage: "想要测试的 Fuzz 字符串"}}, Action: func(c *cli.Context) {
-		for _, r := range mutate.QuickMutateSimple(c.String("t")) {
+		for _, r := range mutate.MutateQuick(c.String("t")) {
 			println(r)
 		}
 	}},
