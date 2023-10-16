@@ -531,6 +531,7 @@ service Yak {
   rpc GetGlobalNetworkConfig(GetGlobalNetworkConfigRequest) returns (GlobalNetworkConfig);
   rpc SetGlobalNetworkConfig(GlobalNetworkConfig) returns (Empty);
   rpc ResetGlobalNetworkConfig(ResetGlobalNetworkConfigRequest) returns (Empty);
+  rpc IsSetGlobalNetworkConfigPassWord(IsSetGlobalNetworkConfigPassWordRequest) returns (IsSetGlobalNetworkConfigPassWordResponse);
 
   rpc RequestYakURL(RequestYakURLParams) returns (RequestYakURLResponse);
 
@@ -777,6 +778,15 @@ message ResetGlobalNetworkConfigRequest {
 
 message GetGlobalNetworkConfigRequest {
 
+}
+
+message IsSetGlobalNetworkConfigPassWordRequest {
+  bytes Pkcs12Bytes = 1;
+  bytes Pkcs12Password = 2;
+}
+
+message IsSetGlobalNetworkConfigPassWordResponse {
+  bool IsSetPassWord = 1;
 }
 
 message GlobalNetworkConfig {
