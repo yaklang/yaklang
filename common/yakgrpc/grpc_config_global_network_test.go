@@ -117,6 +117,7 @@ try {
 	if !triggerProxy {
 		t.Fatal("proxy not triggered")
 	}
+	_, _ = client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
 }
 
 func TestGRPCMUSTPASS_GLOBAL_RPOXY(t *testing.T) {
@@ -223,4 +224,5 @@ try {
 		log.Error(err)
 		t.FailNow()
 	}
+	_, _ = client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
 }
