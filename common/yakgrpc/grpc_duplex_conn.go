@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"sync"
+	"time"
 )
 
 type serverPushDescription struct {
@@ -39,12 +40,40 @@ func unregisterServerPushCallback(id string) {
 	})
 }
 
-func BroadcastAny(i any) {
+func broadcastRaw(i any) {
 	serverPushMutex.Lock()
 	defer serverPushMutex.Unlock()
-
 	for _, item := range serverPushCallback {
-		item.Handle(&ypb.DuplexConnectionResponse{Data: utils.InterfaceToBytes(i)})
+		item.Handle(&ypb.DuplexConnectionResponse{Data: utils.Jsonify(i)})
+	}
+}
+
+var (
+	broadcastWithTypeMu      = new(sync.Mutex)
+	broadcastTypeCallerTable = make(map[string]func(func()))
+)
+
+func BroadcastData(typeString string, data any) {
+	broadcastWithTypeMu.Lock()
+	defer broadcastWithTypeMu.Unlock()
+
+	buildData := func() map[string]any {
+		return map[string]any{
+			"type":      typeString,
+			`data`:      data,
+			"timestamp": time.Now().UnixNano(),
+		}
+	}
+
+	if caller, ok := broadcastTypeCallerTable[typeString]; ok {
+		caller(func() {
+			broadcastRaw(buildData())
+		})
+	} else {
+		broadcastTypeCallerTable[typeString] = utils.NewThrottle(1)
+		broadcastTypeCallerTable[typeString](func() {
+			broadcastRaw(buildData())
+		})
 	}
 }
 
