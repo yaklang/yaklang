@@ -84,7 +84,7 @@ func (y *YakNetworkBulkConfig) handleConn(
 			}
 			response := utils.StableReaderEx(conn, 5*time.Second, bufferSize)
 			for _, extractor := range y.Extractor {
-				extractorVars, err := extractor.Execute(response)
+				extractorVars, err := extractor.Execute(response, vars)
 				if err != nil {
 					log.Warnf("YakNetworkBulkConfig extractor.Execute failed: %s", err)
 				}
@@ -105,7 +105,7 @@ func (y *YakNetworkBulkConfig) handleConn(
 		}
 		response := utils.StableReaderEx(conn, 5*time.Second, y.ReadSize)
 		for _, extractor := range y.Extractor {
-			extractorVars, err := extractor.Execute(response)
+			extractorVars, err := extractor.Execute(response, vars)
 			if err != nil {
 				log.Warnf("YakNetworkBulkConfig extractor.Execute failed: %s", err)
 			}

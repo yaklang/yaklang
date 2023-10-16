@@ -16,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"mime"
 	"net/url"
+	"reflect"
 	"regexp"
 	"strings"
 )
@@ -54,7 +55,7 @@ type YakExtractor struct {
 // group2 for value
 var kvExtractorRegexp = regexp.MustCompile(`([^\s=:,]+)\s*((:)|(=))\s*?(\S[^\n\r]*)`)
 
-func (y *YakExtractor) Execute(rsp []byte) (map[string]interface{}, error) {
+func (y *YakExtractor) Execute(rsp []byte, previous ...map[string]any) (map[string]interface{}, error) {
 	var material string
 	switch strings.TrimSpace(strings.ToLower(y.Scope)) {
 	case "body":
@@ -190,17 +191,31 @@ func (y *YakExtractor) Execute(rsp []byte) (map[string]interface{}, error) {
 				goto TRYXML
 			}
 		}
-	case "nuclei-dsl", "nuclei":
+	case "nuclei-dsl", "nuclei", "dsl":
 		box := NewNucleiDSLYakSandbox()
 		header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rsp)
+		var previousMap = make(map[string]any)
+		for _, p := range previous {
+			for k, v := range p {
+				switch reflect.TypeOf(v).Kind() {
+				case reflect.Slice, reflect.Array:
+					previousMap[k] = strings.Join(utils.InterfaceToStringSlice(v), ",")
+				default:
+					previousMap[k] = v
+				}
+			}
+		}
+		previousMap["body"] = body
+		previousMap["body_1"] = body
+		previousMap["header"] = header
+		previousMap["header_1"] = header
+		previousMap["raw"] = string(rsp)
+		previousMap["raw_1"] = string(rsp)
+		previousMap["response"] = string(rsp)
+		previousMap["response_1"] = string(rsp)
 		for _, group := range y.Groups {
 			if group != "" {
-				data, err := box.Execute(group, map[string]interface{}{
-					"body":     body,
-					"header":   header,
-					"raw":      string(rsp),
-					"response": string(rsp),
-				})
+				data, err := box.Execute(group, previousMap)
 				if err != nil {
 					continue
 				}

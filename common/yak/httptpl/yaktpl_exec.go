@@ -203,7 +203,7 @@ func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts 
 			}
 
 			for index, extractor := range req.Origin.Extractor {
-				varIns, err := extractor.Execute(rsp.RawPacket)
+				varIns, err := extractor.Execute(rsp.RawPacket, vars)
 				if err != nil {
 					log.Error("extractor execute failed: ", err)
 					continue
