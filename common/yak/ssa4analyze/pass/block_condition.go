@@ -87,7 +87,6 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 		newEdge(sw.DefaultBlock, from, defaultCond)
 	}
 
-	deleteStmt := make([]ssa.Instruction, 0)
 	// handler instruction
 	for _, b := range fun.Blocks {
 		for _, inst := range b.Insts {
@@ -113,10 +112,6 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 
 			}
 		}
-	}
-
-	for _, inst := range deleteStmt {
-		ssa.DeleteInst(inst)
 	}
 
 	// handler
