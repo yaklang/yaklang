@@ -70,3 +70,7 @@ func NotSetTypeInMakeExpression() string {
 func MakeUnknownType() string {
 	return "make unknown type"
 }
+
+func FieldCallTargetError(name string) string {
+	return fmt.Sprintf("%s call target Error", name)
+}
