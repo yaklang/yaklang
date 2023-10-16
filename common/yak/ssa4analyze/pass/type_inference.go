@@ -109,8 +109,13 @@ func (t *TypeInference) TypeInferenceNext(next *ssa.Next) {
 	if it, ok := next.Iter.GetType().(*ssa.ObjectType); ok {
 		switch it.Kind {
 		case ssa.Slice:
-			typ.AddField(ssa.NewConst("key"), it.KeyTyp)
-			typ.AddField(ssa.NewConst("field"), it.FieldType)
+			if next.InNext {
+				typ.AddField(ssa.NewConst("key"), it.FieldType)
+				typ.AddField(ssa.NewConst("field"), ssa.BasicTypes[ssa.Null])
+			} else {
+				typ.AddField(ssa.NewConst("key"), it.KeyTyp)
+				typ.AddField(ssa.NewConst("field"), it.FieldType)
+			}
 		case ssa.Struct:
 			typ.AddField(ssa.NewConst("key"), ssa.BasicTypes[ssa.String])
 			typ.AddField(ssa.NewConst("field"), ssa.BasicTypes[ssa.Any])
