@@ -36,14 +36,15 @@ func (m *MethodContext) UpdateLabels(tag *TagExecNode) {
 
 // String
 type StringExecNode struct {
-	backpropagation func(s FuzzResult) error
-	data            string
-	index           int
+	submitResult func(s FuzzResult)
+	data         string
+	index        int
 }
 
 func (s *StringExecNode) Exec() (bool, error) {
 	if s.index == 0 {
-		return false, s.backpropagation(FuzzResult(s.data))
+		s.submitResult(FuzzResult(s.data))
+		return false, nil
 	}
 	s.index++
 	return false, nil
@@ -56,14 +57,14 @@ func (s *StringExecNode) IsRep() bool {
 }
 
 type TagExecNode struct {
-	data            TagNode
-	cache           *[]FuzzResult
-	isRep           bool
-	params          []ExecNode
-	methodCtx       *MethodContext
-	generator       *Generator
-	index           int
-	backpropagation func(s FuzzResult) error
+	data         TagNode
+	cache        *[]FuzzResult
+	isRep        bool
+	params       []ExecNode
+	methodCtx    *MethodContext
+	generator    *Generator
+	index        int
+	submitResult func(s FuzzResult)
 }
 
 func NewTagGenerator(tag TagNode, ctx *MethodContext) *TagExecNode {
@@ -74,35 +75,10 @@ func NewTagGenerator(tag TagNode, ctx *MethodContext) *TagExecNode {
 }
 
 func (f *TagExecNode) Exec() (bool, error) {
-	if f.generator == nil { // 未初始化
-		P := &f.backpropagation
-		gen, err := NewBackpropagationGenerator(*P, f.params)
-		if err != nil {
-			return false, err
-		}
-		f.generator = gen
-		*P = func(s FuzzResult) error {
-			res, err := f.data.Exec(s, f.methodCtx.methodTable)
-			if err != nil {
-				return err
-			}
-			f.methodCtx.UpdateLabels(f)
-			if len(res) == 0 {
-				res = []FuzzResult{FuzzResult("")}
-			}
-			f.cache = &res
-			f.index = 1
-			return f.backpropagation((*f.cache)[0])
-		}
-		s, _, err := gen.Generate()
-		if err != nil {
-			return false, err
-		}
-		return true, (*P)(s)
-	}
 	if f.index >= len(*f.cache) {
 		if f.isRep { // 等价于StringExecNode
-			return false, f.backpropagation(utils.GetLastElement(*f.cache))
+			f.submitResult(utils.GetLastElement(*f.cache))
+			return false, nil
 		} else {
 			return false, nil
 		}
@@ -110,7 +86,8 @@ func (f *TagExecNode) Exec() (bool, error) {
 	defer func() {
 		f.index++
 	}()
-	return true, f.backpropagation((*f.cache)[f.index])
+	f.submitResult((*f.cache)[f.index])
+	return true, nil
 }
 func (s *TagExecNode) Reset() {
 	s.index = 0
@@ -134,20 +111,37 @@ type Generator struct {
 func NewBackpropagationGenerator(f func(s FuzzResult) error, nodes []ExecNode) (*Generator, error) {
 	g := &Generator{data: nodes, container: make([]FuzzResult, len(nodes)), first: true, backpropagation: f}
 	for index, d := range g.data {
-		backpropagation := func(index int) func(s FuzzResult) error {
-			return func(s FuzzResult) error {
-				g.container[index] = s
-				return nil
-			}
-		}(index)
+		index := index
 		switch ret := d.(type) {
 		case *TagExecNode:
-			ret.backpropagation = backpropagation
+			ret.submitResult = func(s FuzzResult) {
+				g.container[index] = s
+			}
+			var bp func(s FuzzResult) error
+			bpP := &bp
+			childGen, err := NewBackpropagationGenerator(*bpP, ret.params)
+			if err != nil {
+				return nil, err
+			}
+			*bpP = func(s FuzzResult) error {
+				s, _, err := childGen.Generate()
+				res, err := ret.data.Exec(s, ret.methodCtx.methodTable)
+				if err != nil {
+					return err
+				}
+				ret.methodCtx.UpdateLabels(ret)
+				if len(res) == 0 {
+					res = []FuzzResult{FuzzResult("")}
+				}
+				ret.cache = &res
+				ret.index = 1
+				ret.submitResult((*ret.cache)[0])
+				return nil
+			}
 		case *StringExecNode:
-			ret.backpropagation = backpropagation
-		}
-		if _, err := d.Exec(); err != nil {
-			return nil, err
+			ret.submitResult = func(s FuzzResult) {
+				g.container[index] = s
+			}
 		}
 	}
 	return g, nil
@@ -185,77 +179,82 @@ func NewGenerator(nodes []Node, table map[string]TagMethod) (*Generator, error) 
 	return NewBackpropagationGenerator(func(s FuzzResult) error { return nil }, node2generator(nodes))
 }
 
+func (g *Generator) ContactContainers() FuzzResult {
+	res := FuzzResult("")
+	for _, result := range g.container {
+		res = append(res, result...)
+	}
+	return res
+}
 func (g *Generator) Generate() (FuzzResult, bool, error) {
-	if g.first {
-		defer func() {
-			g.first = false
-		}()
-		res := FuzzResult("")
-		for _, result := range g.container {
-			res = append(res, result...)
+	isOk := false
+	i := 0
+	renderedNode := map[unsafe.Pointer]struct{}{}
+	successCallBacks := []func() error{}
+	for {
+		if len(g.data) == i {
+			break
 		}
-		return res, true, nil
-	} else {
-		isOk := false
-		i := 0
-		renderedNode := map[unsafe.Pointer]struct{}{}
-		successCallBacks := []func() error{}
-		for {
-			if len(g.data) == i {
-				break
-			}
-			uid := reflect.ValueOf(g.data[i]).UnsafePointer()
-			if _, ok := renderedNode[uid]; ok {
-				i++
-				continue
-			}
-			renderedNode[reflect.ValueOf(g.data[i]).UnsafePointer()] = struct{}{}
-			genOneOk, err := g.data[i].Exec()
+		uid := reflect.ValueOf(g.data[i]).UnsafePointer()
+		if _, ok := renderedNode[uid]; ok {
+			i++
+			continue
+		}
+		renderedNode[reflect.ValueOf(g.data[i]).UnsafePointer()] = struct{}{}
+		genOneOk, err := g.data[i].Exec()
+		if !g.first {
+			err := g.backpropagation(g.ContactContainers())
 			if err != nil {
 				return nil, false, err
 			}
-			if v, ok := g.data[i].(*TagExecNode); ok {
-				for _, label := range v.data.GetLabels() {
-					if ms, ok := v.methodCtx.labelTable[label]; ok {
-						for m := range ms {
-							uid1 := reflect.ValueOf(m).UnsafePointer()
-							if uid1 == uid {
-								continue
-							}
-							renderedNode[uid1] = struct{}{}
-							ok1, err := m.Exec()
-							if err != nil {
-								return nil, false, err
-							}
-							genOneOk = ok1
+		} else {
+			g.first = false
+		}
+		if err != nil {
+			return nil, false, err
+		}
+		if v, ok := g.data[i].(*TagExecNode); ok {
+			for _, label := range v.data.GetLabels() {
+				if ms, ok := v.methodCtx.labelTable[label]; ok {
+					for m := range ms {
+						uid1 := reflect.ValueOf(m).UnsafePointer()
+						if uid1 == uid {
+							continue
 						}
+						renderedNode[uid1] = struct{}{}
+						ok1, err := m.Exec()
+						if err != nil {
+							return nil, false, err
+						}
+						genOneOk = ok1
 					}
 				}
 			}
-			if !genOneOk {
-				if !g.data[i].IsRep() && i < len(g.data)-1 { // 最后一个元素无法进位
-					i := i
-					successCallBacks = append(successCallBacks, func() error {
-						g.data[i].Reset()
-						_, err := g.data[i].Exec()
-						return err
-					})
-				}
-			} else {
-				for _, back := range successCallBacks {
-					if err := back(); err != nil {
-						return nil, false, err
-					}
-				}
-				isOk = true
-				break
+		}
+		if !genOneOk {
+			if !g.data[i].IsRep() && i < len(g.data)-1 { // 最后一个元素无法进位
+				i := i
+				successCallBacks = append(successCallBacks, func() error {
+					g.data[i].Reset()
+					_, err := g.data[i].Exec()
+					return err
+				})
 			}
-			i++
+		} else {
+			for _, back := range successCallBacks {
+				if err := back(); err != nil {
+					return nil, false, err
+				}
+			}
+			isOk = true
+			break
 		}
-		res := FuzzResult("")
-		for _, result := range g.container {
-			res = append(res, result...)
-		}
-		return res, isOk, nil
+		i++
 	}
+	res := FuzzResult("")
+	for _, result := range g.container {
+		res = append(res, result...)
+	}
+	return res, isOk, nil
+
 }
