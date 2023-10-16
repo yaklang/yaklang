@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/netx"
 	"net"
 	"net/http"
 	"testing"
@@ -82,6 +83,8 @@ requests:
 }
 
 func NewLocalClient() (ypb.YakClient, error) {
+	netx.UnsetProxyFromEnv()
+	
 	consts.InitilizeDatabase("", "")
 	yakit.InitializeDefaultDatabaseSchema()
 
