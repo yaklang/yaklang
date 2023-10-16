@@ -384,15 +384,9 @@ func (b *astbuilder) buildForRangeStmt(stmt *yak.ForRangeStmtContext) {
 			// } else {
 		}
 		value := b.buildExpression(stmt.Expression().(*yak.ExpressionContext))
-		key, field, ok := b.EmitNext(value)
+		key, field, ok := b.EmitNext(value, stmt.In() != nil)
 		if len(lefts) == 1 {
-			if stmt.In() != nil {
-				// in
-				lefts[0].Assign(field, b.FunctionBuilder)
-			} else {
-				// range
-				lefts[0].Assign(key, b.FunctionBuilder)
-			}
+			lefts[0].Assign(key, b.FunctionBuilder)
 		} else if len(lefts) >= 2 {
 			lefts[0].Assign(key, b.FunctionBuilder)
 			lefts[1].Assign(field, b.FunctionBuilder)

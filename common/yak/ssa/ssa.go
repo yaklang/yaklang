@@ -718,7 +718,8 @@ var _ Instruction = (*Assert)(nil)
 type Next struct {
 	anInstruction
 	anNode
-	Iter Value
+	Iter   Value
+	InNext bool // "in" grammar
 }
 
 var _ Node = (*Next)(nil)

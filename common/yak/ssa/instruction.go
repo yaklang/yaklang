@@ -197,11 +197,12 @@ func init() {
 	NextType.AddField(NewConst("field"), BasicTypes[Any])
 }
 
-func NewNext(iter Value, block *BasicBlock) *Next {
+func NewNext(iter Value, isIn bool, block *BasicBlock) *Next {
 	n := &Next{
 		anInstruction: newAnInstruction(block),
 		anNode:        NewNode(),
 		Iter:          iter,
+		InNext:        isIn,
 	}
 	n.AddValue(iter)
 	n.SetType(NextType)

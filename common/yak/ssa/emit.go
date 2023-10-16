@@ -210,15 +210,15 @@ func (f *FunctionBuilder) EmitTypeValue(typ Type) *TypeValue {
 	return t
 }
 
-func (f *FunctionBuilder) EmitNextOnly(iter Value) *Next {
-	n := NewNext(iter, f.CurrentBlock)
+func (f *FunctionBuilder) EmitNextOnly(iter Value, isIn bool) *Next {
+	n := NewNext(iter, isIn, f.CurrentBlock)
 	fixupUseChain(n)
 	f.emit(n)
 	return n
 }
 
-func (f *FunctionBuilder) EmitNext(iter Value) (key, field, ok Value) {
-	n := f.EmitNextOnly(iter)
+func (f *FunctionBuilder) EmitNext(iter Value, isIn bool) (key, field, ok Value) {
+	n := f.EmitNextOnly(iter, isIn)
 	// n iter-type: map[T]U   n-type {key: T, field: U, ok: bool}
 	key = f.EmitField(n, NewConst("key"))
 	field = f.EmitField(n, NewConst("field"))
