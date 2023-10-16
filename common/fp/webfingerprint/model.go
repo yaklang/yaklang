@@ -151,7 +151,7 @@ func (h *HTTPHeaderMatcher) String() string {
 
 func (h *HTTPHeaderMatcher) Match(name string, value string) (*CPE, error) {
 	if h.HeaderName != "" {
-		if strings.ToLower(name) != strings.ToLower(h.HeaderName) {
+		if !strings.Contains(strings.ToLower(name), strings.ToLower(h.HeaderName)) {
 			return nil, errors.Errorf("not matched in header name: %s", name)
 		}
 	}
