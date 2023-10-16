@@ -367,14 +367,45 @@ func TestCallParamReturn(t *testing.T) {
 
 			// (m) = (n) 
 			// m != 1 && m != n
+			a, b = func1()    // get error 2 vs 1
 			a, b, c = func2() // get error 3 vs 2
 			a, b = func3()    // get error 2 vs 3
 			`,
 			errs: []string{
+				ssa4analyze.CallAssignmentMismatch(2, "number"),
 				ssa4analyze.CallAssignmentMismatch(3, "number, number"),
 				ssa4analyze.CallAssignmentMismatch(2, "number, number, number"),
 			},
 
+			ExternValue: map[string]any{
+				"func1": func() int { return 1 },
+				"func2": func() (a, b int) { return 1, 2 },
+				"func3": func() (a, b, c int) { return 1, 2, 3 },
+			},
+		})
+	})
+
+	t.Run("check return field ", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			// normal 
+			a = func1()
+			a, b = func2()
+			c = func2()
+			a = c[0]
+			b = c[1]
+			d = c[2] // error 
+
+			a, b = func1()  // error  2 vs (number)
+			c = func1()
+			a = c[0] // error invalid field
+			b = c[1] // error invalid field
+			`,
+			errs: []string{
+				pass.InvalidField("number"),
+				pass.InvalidField("number"),
+				ssa4analyze.CallAssignmentMismatch(2, "number"),
+			},
 			ExternValue: map[string]any{
 				"func1": func() int { return 1 },
 				"func2": func() (a, b int) { return 1, 2 },

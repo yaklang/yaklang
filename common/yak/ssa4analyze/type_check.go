@@ -116,8 +116,17 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 		return
 	}
 
+	leftLen := len(ssa.GetFields(c))
 	// check return number
-	if objType, ok := funcTyp.ReturnType.(*ssa.ObjectType); ok && objType.Combination {
+	objType, ok := funcTyp.ReturnType.(*ssa.ObjectType)
+	if !ok {
+		// not object type
+		if c.Unpack && leftLen != 1 {
+			c.NewError(ssa.Error, TypeCheckTAG, CallAssignmentMismatch(leftLen, c.GetType().String()))
+		}
+		return
+	}
+	if objType.Combination {
 		// a, b, err = fun()
 		hasError := false
 		rightLen := len(objType.FieldTypes)
@@ -150,7 +159,6 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 			return
 		}
 
-		leftLen := len(ssa.GetFields(c))
 		if leftLen != rightLen {
 			if c.IsDropError {
 				c.NewError(ssa.Error, TypeCheckTAG,
@@ -164,7 +172,6 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 				)
 			}
 		}
-
 	}
 }
 
