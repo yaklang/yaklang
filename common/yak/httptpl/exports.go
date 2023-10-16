@@ -15,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"math"
 	"math/rand"
 	"strings"
 	"time"
@@ -26,6 +27,36 @@ func init() {
 	}
 
 	yaklib.FuzzExports["FuzzCalcExpr"] = FuzzCalcExpr
+	yaklib.FuzzExports["FuzzCalcExprInt32Safe"] = FuzzCalcExpr2
+	yaklib.FuzzExports["FuzzCalcExprInt64Safe"] = FuzzCalcExpr3
+}
+
+func FuzzCalcExpr3() map[string]interface{} {
+	vars := NewVars()
+	// int32 max: 2147483647               (10位)
+	// int64 max: 9223372036854775807      (19位)
+	powFact := 18
+	var num1 int64 = int64(4*math.Pow10(powFact)) + int64(rand.Intn(int(4*math.Pow10(powFact)))) // int64 safe
+	var num2 int64 = int64(rand.Intn(int(4*math.Pow10(powFact) - 3)))                            // int64 safe
+	vars.Set("num1", fmt.Sprint(num1))
+	vars.Set("num2", fmt.Sprint(num2))
+	vars.SetAsNucleiTags("expr", `{{num1}}-{{num2}}`)
+	vars.Set("result", fmt.Sprint(num1-num2))
+	return vars.ToMap()
+}
+
+func FuzzCalcExpr2() map[string]interface{} {
+	vars := NewVars()
+	// int32 max: 2147483647               (10位)
+	// int64 max: 9223372036854775807      (19位)
+	powFact := 9
+	var num1 int64 = int64(4*math.Pow10(powFact)) + int64(rand.Intn(int(4*math.Pow10(powFact)))) // int32 safe
+	var num2 int64 = int64(rand.Intn(int(4*math.Pow10(powFact) - 3)))                            // int32 safe
+	vars.Set("num1", fmt.Sprint(num1))
+	vars.Set("num2", fmt.Sprint(num2))
+	vars.SetAsNucleiTags("expr", `{{num1}}-{{num2}}`)
+	vars.Set("result", fmt.Sprint(num1-num2))
+	return vars.ToMap()
 }
 
 func FuzzCalcExpr() map[string]interface{} {
