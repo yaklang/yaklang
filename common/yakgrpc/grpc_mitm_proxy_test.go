@@ -312,6 +312,10 @@ mirrorNewWebsite = (tls, url, req, rsp, body) => {
 				// do sth
 				_, err := yak.Execute(`rsp, req := poc.Get(targetUrl, poc.proxy(mitmProxy))~
 assert string(rsp.RawPacket).Contains("Hello Token")
+go func{
+	sleep(2)
+	cancel()
+}
 `, map[string]any{"targetUrl": targetUrl, "mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort), "cancel": cancel})
 				if err != nil {
 					t.Fatal(err)
