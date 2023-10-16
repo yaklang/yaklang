@@ -24,7 +24,9 @@ func (b *builder) Build() {
 	b.prog.AddPackage(pkg)
 	main := pkg.NewFunction("yak-main")
 	funcbuilder := ssa.NewBuilder(main, nil)
-	funcbuilder.WithExternInstance(b.c.symboltable)
+	funcbuilder.WithExternValue(b.c.externValue)
+	funcbuilder.WithExternLib(b.c.externLib)
+
 
 	astbuilder := astbuilder{
 		FunctionBuilder: funcbuilder,
@@ -38,15 +40,18 @@ var _ (ssa.Builder) = (*builder)(nil)
 
 type config struct {
 	analyzeOpt 	[]ssa4analyze.Option
-	symboltable map[string]any
 	typeMethod 	map[string]any
+
+	externValue map[string]any
+	externLib   map[string]map[string]any
 }
 
 func defaultConfig() *config {
 	return &config{
 		analyzeOpt: make([]ssa4analyze.Option, 0),
-		symboltable: nil,
 		typeMethod: nil,
+		externValue: nil,
+		externLib:   make(map[string]map[string]any),
 	}
 }
 
@@ -58,9 +63,15 @@ func WithAnalyzeOpt(opt ...ssa4analyze.Option) Option {
 	}
 }
 
-func WithSymbolTable(table map[string]any) Option {
+func WithExternValue(table map[string]any) Option {
 	return func(c *config) {
-		c.symboltable = table
+		c.externValue = table
+	}
+}
+
+func WithExternLib(libName string, table map[string]any) Option {
+	return func(c *config) {
+		c.externLib[libName] = table
 	}
 }
 
