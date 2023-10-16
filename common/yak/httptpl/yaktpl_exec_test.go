@@ -324,6 +324,82 @@ requests:
 	}
 }
 
+func TestMockTest_BasicWordMatcher_EXPR_WithExtractor(t *testing.T) {
+	server, port := utils.DebugMockHTTPWithTimeout(10*time.Second, []byte(`HTTP/1.1 200 OK
+TestDebug: 111
+
+ccc`))
+	spew.Dump(server, port)
+
+	demo := `
+id: test1
+info:
+  name: test1
+  author: v1ll4n
+
+requests:
+  - raw:
+    - |
+      GET / HTTP/1.1
+      Host: {{Hostname}}
+      
+      abc
+    - |
+      GET / HTTP/1.1
+      Host: {{Hostname}}
+      
+      abc
+    matchers:
+    - type: dsl
+      condition: or
+      dsl:
+        - "dump(body); contains(body, \"cc\")"
+    extractors:
+    - type: dsl
+      name: test
+      dsl:
+        - '"abc" + "123"'
+    - type: dsl
+      name: test1
+      dsl:
+        - 'test + "cccc"'
+`
+	ytpl, err := CreateYakTemplateFromNucleiTemplateRaw(demo)
+	if err != nil {
+		panic(err)
+	}
+
+	checked := false
+	var varChecking bool
+	config := NewConfig(WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+		if result {
+			checked = true
+		}
+		spew.Dump(extractor)
+		if extractor["test"] == "abc123" && extractor["test1"] == (utils.InterfaceToString(extractor["test"])+"cccc") {
+			varChecking = true
+		}
+	}))
+	_, err = ytpl.Exec(
+		config, false,
+		[]byte("GET / HTTP/1.1\r\nHost: www.baidu.com\r\n\r\n"),
+		lowhttp.WithHost(server), lowhttp.WithPort(port),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	if !checked {
+		t.Error("not checked")
+		t.FailNow()
+	}
+
+	if !varChecking {
+		t.Error("variables from extractor error")
+		t.FailNow()
+	}
+}
+
 func TestMockTest_BasicWordMatcher_EXPR2(t *testing.T) {
 	server, port := utils.DebugMockHTTPWithTimeout(10*time.Second, []byte(`HTTP/1.1 200 OK
 TestDebug: 111
