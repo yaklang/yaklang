@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/fuzztag"
 	"github.com/yaklang/yaklang/common/log"
@@ -543,13 +544,20 @@ func init() {
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "repeat",
 		Handler: func(s string) []string {
-			i, _ := strconv.Atoi(s)
-			if i > 0 {
+			i := atoi(s)
+			if i == 0 {
+				chr, right := sepToEnd(s, "|")
+				if repeatTimes := atoi(right); repeatTimes > 0 {
+					return lo.Times(repeatTimes, func(index int) string {
+						return chr
+					})
+				}
+			} else {
 				return make([]string, i)
 			}
 			return []string{""}
 		},
-		Description: "重复一个字符串，例如：`{{repeat(abc|3)}}`，结果为：abcabcabc",
+		Description: "重复一个字符串或者一个次数，例如：`{{repeat(abc|3)}}`，结果为：abcabcabc，或者`{{repeat(3)}}`，结果是重复三次",
 	})
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{
