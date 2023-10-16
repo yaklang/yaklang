@@ -23,11 +23,11 @@ import (
 type handleTCPFunc func(ctx context.Context, lis net.Listener, conn net.Conn)
 
 func IsUDPPortAvailable(p int) bool {
-	return IsPortAvailableWithUDP("0.0.0.0", p)
+	return IsPortAvailableWithUDP("127.0.0.1", p)
 }
 
 func IsTCPPortAvailable(p int) bool {
-	return IsPortAvailable("0.0.0.0", p)
+	return IsPortAvailable("127.0.0.1", p)
 }
 
 func GetRandomAvailableTCPPort() int {
@@ -158,7 +158,7 @@ func DebugMockHTTPHandlerFunc(handlerFunc http.HandlerFunc) (string, int) {
 }
 
 func DebugMockHTTPHandlerFuncContext(ctx context.Context, handlerFunc http.HandlerFunc) (string, int) {
-	host := "0.0.0.0"
+	host := "127.0.0.1"
 	port := GetRandomAvailableTCPPort()
 	lis, err := net.Listen("tcp", HostPort(host, port))
 	if err != nil {
@@ -189,7 +189,7 @@ func DebugMockHTTPHandlerFuncContext(ctx context.Context, handlerFunc http.Handl
 }
 
 func DebugMockTCPHandlerFuncContext(ctx context.Context, handlerFunc handleTCPFunc) (string, int) {
-	host := "0.0.0.0"
+	host := "127.0.0.1"
 	port := GetRandomAvailableTCPPort()
 	lis, err := net.Listen("tcp", HostPort(host, port))
 	if err != nil {
