@@ -204,18 +204,32 @@ func (t *TypeInference) TypeInferenceMake(i *ssa.Make) {
 
 func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
 	if t := f.Obj.GetType(); t.GetTypeKind() != ssa.Any {
-		if t.GetTypeKind() == ssa.ObjectTypeKind {
+		if methodTyp := t.GetMethod(f.Key.String()); methodTyp != nil && f.GetType() != methodTyp {
+			f.SetType(methodTyp)
+			f.IsMethod = true
+			return
+		}
+		if utils.IsNil(t) {
+			t = ssa.BasicTypes[ssa.Null]
+		}
+		switch t.GetTypeKind() {
+		case ssa.ObjectTypeKind:
 			interfaceTyp := f.Obj.GetType().(*ssa.ObjectType)
 			fTyp, _ := interfaceTyp.GetField(f.Key)
 			if !utils.IsNil(fTyp) {
 				f.SetType(fTyp)
 				return
 			}
-		}
-		if methodTyp := t.GetMethod(f.Key.String()); methodTyp != nil && f.GetType() != methodTyp {
-			f.SetType(methodTyp)
-			f.IsMethod = true
-			return
+		case ssa.String:
+			f.SetType(ssa.BasicTypes[ssa.Number])
+		case ssa.Any:
+			//pass
+		default:
+			if c, ok := f.Obj.(*ssa.Call); ok && c.Unpack {
+				// pass
+			} else {
+				f.NewError(ssa.Error, TITAG, InvalidField(t.String()))
+			}
 		}
 	}
 	// use update

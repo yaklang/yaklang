@@ -829,25 +829,7 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 		return ssa.NewIdentifierLV(text, b.CurrentPos)
 	}
 	if s, ok := stmt.Expression().(*yak.ExpressionContext); ok {
-		expr := b.buildExpression(s)
-		if expr == nil {
-			b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
-			return nil
-		}
-		//TODO: check interface type
-		var inter ssa.User
-		if expr, ok := expr.(ssa.User); ok {
-			inter = expr
-		} else {
-			{
-				expr := stmt.Expression().(*yak.ExpressionContext)
-				recoverRange := b.SetRange(expr.BaseParserRuleContext)
-				text := expr.GetText()
-				inter = b.EmitUndefine(text)
-				recoverRange()
-			}
-		}
-
+		inter := b.buildObject(s)
 		if s, ok := stmt.LeftSliceCall().(*yak.LeftSliceCallContext); ok {
 			index := b.buildLeftSliceCall(s)
 			return b.EmitFieldMust(inter, index)
@@ -860,6 +842,42 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 		}
 	}
 	return nil
+}
+
+func (b *astbuilder) buildObject(s *yak.ExpressionContext) ssa.User {
+	ex := b.buildExpression(s)
+	if ex == nil {
+		b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
+		return nil
+	}
+	//TODO: check interface type
+	var inter ssa.User
+	if expr, ok := ex.(ssa.User); ok {
+		return expr
+	} else {
+		if v, ok := ex.(*ssa.Const); ok {
+			if v.GetType().GetTypeKind() == ssa.String {
+				return b.EmitConstInst(v)
+			}
+		}
+		{
+			// expr := stmt.Expression().(*yak.ExpressionContext)
+			recoverRange := b.SetRange(s.BaseParserRuleContext)
+			text := s.GetText()
+			text = text + "-FieldTarget"
+			v := b.ReadVariable(text, false)
+			if user, ok := v.(ssa.User); v != nil && ok {
+				inter = user
+			} else {
+				pa := ssa.NewParam(text, false, b.Function)
+				pa.SetType(ex.GetType())
+				b.WriteVariable(text, pa)
+				inter = pa
+			}
+			recoverRange()
+			return inter
+		}
+	}
 }
 
 // left slice call
@@ -946,7 +964,6 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		v := b.ReadVariable(text, true)
 		return v
 	}
-
 	// member call
 	if s, ok := stmt.MemberCall().(*yak.MemberCallContext); ok {
 		// check extern
@@ -978,26 +995,11 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 			}
 		}
 
-		value := getValue(0)
-		var inter ssa.User
-		if user, ok := value.(ssa.User); ok {
-			inter = user
-		} else {
-			if v, ok := value.(*ssa.Const); ok {
-				inter = b.EmitConstInst(v)
-			} else {
-				b.NewError(ssa.Error, TAG, "member call target Error")
-				// return nil
-				{
-					expr := stmt.Expression(0).(*yak.ExpressionContext)
-					recoverRange := b.SetRange(expr.BaseParserRuleContext)
-					text := expr.GetText()
-					inter = b.EmitUndefine(text)
-					recoverRange()
-				}
-			}
+		expr, ok := stmt.Expression(0).(*yak.ExpressionContext)
+		if !ok {
+			return nil
 		}
-
+		inter := b.buildObject(expr)
 		if id := s.Identifier(); id != nil {
 			idText := id.GetText()
 			return b.EmitField(inter, ssa.NewConst(idText))
@@ -1013,11 +1015,11 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 
 	// slice call
 	if s, ok := stmt.SliceCall().(*yak.SliceCallContext); ok {
-		expr, ok := getValue(0).(ssa.User)
+		expression, ok := stmt.Expression(0).(*yak.ExpressionContext)
 		if !ok {
-			b.NewError(ssa.Error, TAG, "Expression: need a interface")
 			return nil
 		}
+		expr := b.buildObject(expression)
 		keys := b.buildSliceCall(s)
 		if len(keys) == 1 {
 			return b.EmitField(expr, keys[0])
