@@ -49,6 +49,18 @@ func getProxyFromEnv() string {
 	return ""
 }
 
+func UnsetProxyFromEnv() {
+	for _, k := range []string{
+		"YAK_PROXY", "yak_proxy",
+		"HTTP_PROXY", "http_proxy",
+		"HTTPS_PROXY", "https_proxy",
+		"all_proxy", "all_proxy",
+		"proxy", "proxy",
+	} {
+		os.Unsetenv(k)
+	}
+}
+
 func DialContext(ctx context.Context, target string, proxies ...string) (net.Conn, error) {
 	if proxies := utils.StringArrayFilterEmpty(proxies); len(proxies) <= 0 {
 		return DialContextWithoutProxy(ctx, "tcp", target)
