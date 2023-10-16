@@ -25,6 +25,14 @@ func (t *TypeInference) RunOnFunction(fun *ssa.Function) {
 }
 
 func (t *TypeInference) InferenceOnInstruction(inst ssa.Instruction) {
+
+	if iv, ok := inst.(ssa.InstructionValue); ok {
+		t := iv.GetType()
+		if utils.IsNil(t) {
+			iv.SetType(ssa.BasicTypes[ssa.Null])
+		}
+	}
+
 	switch inst := inst.(type) {
 	case *ssa.Phi:
 		// return t.TypeInferencePhi(inst)

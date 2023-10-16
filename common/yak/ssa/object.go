@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/slices"
 )
 
@@ -123,6 +124,9 @@ func (b *FunctionBuilder) CreateInterfaceWithVs(keys []Value, vs []Value) *Make 
 	ityp := NewObjectType()
 	itf := b.EmitMakeWithoutType(lValueLen, lValueLen)
 	for i, rv := range vs {
+		if utils.IsNil(rv) {
+			continue
+		}
 		var key Value
 		if hasKey {
 			key = keys[i]

@@ -178,6 +178,9 @@ type Function struct {
 }
 
 func (f *Function) GetType() Type {
+	if f.Type == nil {
+		return BasicTypes[Null]
+	}
 	return f.Type
 }
 
