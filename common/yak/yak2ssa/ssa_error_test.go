@@ -425,6 +425,27 @@ func TestExternStruct(t *testing.T) {
 			},
 		})
 	})
+
+	t.Run("check extern type in next-loop", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			a = getA()
+			for i, v := range a.A {
+				print(i, v)
+			}
+
+			for 1 {
+				for i, v in a.A {
+					print(i, v)
+				}
+			}
+			`,
+			ExternValue: map[string]any{
+				"getA":  func() *AStruct { return &AStruct{} },
+				"print": func(...any) {},
+			},
+		})
+	})
 }
 
 func TestExternInstance(t *testing.T) {
