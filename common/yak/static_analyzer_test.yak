@@ -27,6 +27,16 @@ b = a2
 b = a3
 
 
+a = {
+	"A": 1,
+}
+
+a["A"] = 2
+a.A = 3
+
+Key = "B"
+a.$Key = 4
+a.$UndefineKey = 5
 
 a = f"arst${undefineVariable}"
 
@@ -126,4 +136,22 @@ a, b = xhtml.MatchBetween("", "", "", 1)
 # (1) = (m not error)
 a = xhtml.MatchBetween("", "", "", 1)
 
+a, b = xhtml.MatchBetween("", "", "", 1)
+a[1] 
+b[1] 
+
+
+a = 1 
+a[1] 
+a.B 
+b = a.C 
+
+f = () => {return 1}
+f.A 
+a = f().A 
+a = [] 
+a.Append(1)
+
+a1 = "aaa"
+a1.A 
 
