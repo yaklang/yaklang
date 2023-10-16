@@ -5,6 +5,6 @@ import (
 )
 
 func TestMain(t *testing.T) {
-	prog := parseSSA(`var a = 1 + 2;`)
+	prog := parseSSA(`a = 1 + 2;`)
 	prog.Show()
 }
