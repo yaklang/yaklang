@@ -540,13 +540,15 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			}
 
 			if haveHTTPTplExtractor {
+				var params = make(map[string]any)
 				for _, extractor := range httpTplExtractor {
-					vars, err := extractor.Execute(result.ResponseRaw)
+					vars, err := extractor.Execute(result.ResponseRaw, params)
 					if err != nil {
 						log.Errorf("extractor execute failed: %s", err)
 						continue
 					}
 					for k, v := range vars {
+						params[k] = v
 						extractorResults = append(extractorResults, &ypb.KVPair{Key: k, Value: httptpl.ExtractResultToString(v)})
 					}
 				}
@@ -1108,7 +1110,7 @@ func (s *Server) ExtractHTTPResponse(ctx context.Context, req *ypb.ExtractHTTPRe
 
 	var params = make(map[string]interface{})
 	for _, i := range extractors {
-		p, err := i.Execute([]byte(req.GetHTTPResponse()))
+		p, err := i.Execute([]byte(req.GetHTTPResponse()), params)
 		if err != nil {
 			log.Errorf("extractor %s execute failed: %s", i.Name, err)
 			continue

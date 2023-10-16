@@ -339,6 +339,85 @@ abc`), "Host", utils.HostPort(host, port))),
 	}
 }
 
+func TestGRPCMUSTPASS_FuzzerSequence_FuzzerWithTag3(t *testing.T) {
+	c, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Write([]byte(`{"path":` + strconv.Quote(request.URL.Path) + `}`))
+		return
+	})
+
+	client, err := c.HTTPFuzzerSequence(
+		utils.TimeoutContextSeconds(1000),
+		&ypb.FuzzerRequests{
+			Concurrent: 1,
+			Requests: []*ypb.FuzzerRequest{
+				{
+					FuzzerIndex: "a",
+					Request: string(lowhttp.ReplaceHTTPPacketHeader([]byte(`GET /aa={{int(3)}} HTTP/1.1
+Host: www.example.com
+
+abc`), "Host", utils.HostPort(host, port))),
+					IsHTTPS:                  false,
+					PerRequestTimeoutSeconds: 5,
+					RedirectTimes:            3,
+					ForceFuzz:                true,
+					Extractors: []*ypb.HTTPResponseExtractor{
+						{
+							Name:   "test",
+							Type:   "json",
+							Scope:  "body",
+							Groups: []string{`.path`},
+						},
+						{
+							Name:   "test1",
+							Type:   "nuclei-dsl",
+							Scope:  "body",
+							Groups: []string{`"abc" + "111"`},
+						},
+						{
+							Name:   "test2",
+							Type:   "nuclei-dsl",
+							Scope:  "body",
+							Groups: []string{`"abc" + "111" + test`},
+						},
+					},
+				},
+			}},
+	)
+	if err != nil {
+		panic(err)
+	}
+	var haveResult bool
+	for {
+		resp, err := client.Recv()
+		if err != nil {
+			log.Error(err)
+			break
+		}
+		if resp == nil {
+			break
+		}
+		haveResult = true
+
+		results := resp.Response.GetExtractedResults()
+		cond1 := results[1].Key == "test1" && results[1].Value == "abc111"
+		cond2 := results[2].Key == "test2" && results[2].Value == results[1].Value+results[0].Value
+
+		if cond1 && cond2 {
+			t.Log("success")
+		} else {
+			t.Fatal("error for extractor order")
+		}
+	}
+
+	if !haveResult {
+		t.Fatal("no result response")
+	}
+}
+
 func TestGRPCMUSTPASS_FuzzerSequence_FuzzerTagWithConcurrent(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {

@@ -392,18 +392,18 @@ func IntSliceToInt64Slice(i []int) []int64 {
 	return result
 }
 
-func InterfaceToStringSlice(i interface{}) []string {
-	var result []string
+func InterfaceToStringSlice(i interface{}) (result []string) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("str.ToStringSlice failed: %s", err)
 			spew.Dump(i)
 			PrintCurrentGoroutineRuntimeStack()
+			result = []string{InterfaceToString(i)}
 		}
 	}()
 
 	if i == nil {
-		return nil
+		return []string{}
 	}
 
 	va := reflect.ValueOf(i)
