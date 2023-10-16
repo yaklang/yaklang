@@ -2,9 +2,9 @@ package yak2ssa
 
 import (
 	"errors"
-	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -31,8 +31,8 @@ func CheckTestCase(t *testing.T, tc TestCase) {
 		}
 	}
 	prog := ParseSSA(tc.code, opts...)
-	prog.Show()
-	fmt.Println(prog.GetErrors().String())
+	// prog.Show()
+	// fmt.Println(prog.GetErrors().String())
 	errs := lo.Map(prog.GetErrors(), func(e *ssa.SSAError, _ int) string { return e.Message })
 	slices.Sort(errs)
 	slices.Sort(tc.errs)
@@ -265,21 +265,28 @@ func TestMemberCall(t *testing.T) {
 		})
 	})
 
-	t.Run("extern variable member call", func(t *testing.T) {
+	t.Run("extern variable method member call", func(t *testing.T) {
 		CheckTestCase(t, TestCase{
 			code: `
-			b.F()
-			param.F() // param is extern variable
+			param().String() // param is extern variable
 			`,
-			errs: []string{
-				"member call target Error",
-				ssa4analyze.ValueUndefined("b"),
-				ssa4analyze.ValueUndefined("param"),
-			},
+			errs: []string{},
 			ExternValue: map[string]any{
-				"param": func() {},
+				"param": func() time.Duration { return time.Duration(1) },
 			},
 		})
+	})
+
+	t.Run("undefine variable member call", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			b.E = 1
+			`,
+			errs: []string{
+				ssa4analyze.ValueUndefined("b"),
+			},
+		})
+
 	})
 
 	// TODO: handle this case in type check rule
@@ -287,8 +294,20 @@ func TestMemberCall(t *testing.T) {
 		CheckTestCase(t, TestCase{
 			code: ` 
 			a = 1 // number 
-			a.F() 
+			a.F()  // invalid field number
+			b = a.B // invalid field number
+			a.B = 1
+
+			f = () => { return 1}
+			f.B   // invalid field null
+			f().B // invalid field member
 			`,
+			errs: []string{
+				pass.InvalidField("number"),
+				pass.InvalidField("number"),
+				pass.InvalidField("null"),
+				pass.InvalidField("number"),
+			},
 		})
 	})
 
@@ -311,6 +330,67 @@ func TestMemberCall(t *testing.T) {
 			},
 		})
 	})
+}
+
+func TestSliceCall(t *testing.T) {
+	t.Run("normal slice call", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			a = [1, 2, 3]
+			a[1] = 1
+			a[2] = 3
+			`,
+		})
+	})
+
+	t.Run("unable slice call", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			// undefine 
+			a1[1] = 1 // undefine a1
+			print(a1[1])
+
+			// const 
+			a = 1
+			a[1] = 1 // invalid field number
+			print(a[1])
+
+			// type
+			f = () => {return 1}
+			a = f() // number
+			a[1] = 1 // invalid field number
+			print(a[1])
+			`,
+			errs: []string{
+				ssa4analyze.ValueUndefined("a1"),
+				pass.InvalidField("number"),
+				pass.InvalidField("number"),
+			},
+			ExternValue: map[string]any{
+				"print": func(any) {},
+			},
+		})
+	})
+
+	t.Run("slice call with string type", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			a = 1
+			a[1] = 1
+			a = "abc"
+			a[1] = 1
+			a[2] = 3
+			`,
+			errs: []string{
+				pass.InvalidField("number"),
+			},
+		})
+	})
+
+}
+
+func TestTypeMethod(t *testing.T) {
+	// TODO: handle map/slice/string method
 }
 
 func TestCallParamReturn(t *testing.T) {
