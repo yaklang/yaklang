@@ -863,7 +863,7 @@ RECONNECT:
 	var multiResponses []*http.Response
 	var isMultiResponses bool
 
-	firstResponse, err := http.ReadResponse(httpResponseReader, nil)
+	firstResponse, err := utils.ReadHTTPResponseFromBufioReader(httpResponseReader, nil)
 	if err != nil {
 		if err == io.EOF || err == io.ErrUnexpectedEOF {
 			return response, nil
