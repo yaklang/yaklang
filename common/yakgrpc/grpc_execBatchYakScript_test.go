@@ -84,7 +84,7 @@ requests:
 
 func NewLocalClient() (ypb.YakClient, error) {
 	netx.UnsetProxyFromEnv()
-	
+
 	consts.InitilizeDatabase("", "")
 	yakit.InitializeDefaultDatabaseSchema()
 
