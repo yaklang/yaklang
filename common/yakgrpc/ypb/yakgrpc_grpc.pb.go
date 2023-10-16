@@ -212,7 +212,7 @@ type YakClient interface {
 	DeleteReport(ctx context.Context, in *DeleteReportRequest, opts ...grpc.CallOption) (*Empty, error)
 	QueryAvailableReportFrom(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Fields, error)
 	DownloadReport(ctx context.Context, in *DownloadReportRequest, opts ...grpc.CallOption) (*Empty, error)
-	// Yso
+	//Yso
 	GetAllYsoGadgetOptions(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*YsoOptionsWithVerbose, error)
 	GetAllYsoClassOptions(ctx context.Context, in *YsoOptionsRequerstWithVerbose, opts ...grpc.CallOption) (*YsoOptionsWithVerbose, error)
 	GetAllYsoClassGeneraterOptions(ctx context.Context, in *YsoOptionsRequerstWithVerbose, opts ...grpc.CallOption) (*YsoClassOptionsResponseWithVerbose, error)
@@ -315,7 +315,8 @@ type YakClient interface {
 	MigrateLegacyDatabase(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
 	// 从规则中提取数据
 	QueryMITMRuleExtractedData(ctx context.Context, in *QueryMITMRuleExtractedDataRequest, opts ...grpc.CallOption) (*QueryMITMRuleExtractedDataResponse, error)
-	// ChaosMakerRule: Bas
+	//
+	//ChaosMakerRule: Bas
 	ImportChaosMakerRules(ctx context.Context, in *ImportChaosMakerRulesRequest, opts ...grpc.CallOption) (*Empty, error)
 	QueryChaosMakerRule(ctx context.Context, in *QueryChaosMakerRuleRequest, opts ...grpc.CallOption) (*QueryChaosMakerRuleResponse, error)
 	DeleteChaosMakerRuleByID(ctx context.Context, in *DeleteChaosMakerRuleByIDRequest, opts ...grpc.CallOption) (*Empty, error)
@@ -365,6 +366,7 @@ type YakClient interface {
 	GetGlobalNetworkConfig(ctx context.Context, in *GetGlobalNetworkConfigRequest, opts ...grpc.CallOption) (*GlobalNetworkConfig, error)
 	SetGlobalNetworkConfig(ctx context.Context, in *GlobalNetworkConfig, opts ...grpc.CallOption) (*Empty, error)
 	ResetGlobalNetworkConfig(ctx context.Context, in *ResetGlobalNetworkConfigRequest, opts ...grpc.CallOption) (*Empty, error)
+	IsSetGlobalNetworkConfigPassWord(ctx context.Context, in *IsSetGlobalNetworkConfigPassWordRequest, opts ...grpc.CallOption) (*IsSetGlobalNetworkConfigPassWordResponse, error)
 	RequestYakURL(ctx context.Context, in *RequestYakURLParams, opts ...grpc.CallOption) (*RequestYakURLResponse, error)
 	// Wireshark
 	GetPcapMetadata(ctx context.Context, in *PcapMetadataRequest, opts ...grpc.CallOption) (*PcapMetadata, error)
@@ -3818,6 +3820,15 @@ func (c *yakClient) ResetGlobalNetworkConfig(ctx context.Context, in *ResetGloba
 	return out, nil
 }
 
+func (c *yakClient) IsSetGlobalNetworkConfigPassWord(ctx context.Context, in *IsSetGlobalNetworkConfigPassWordRequest, opts ...grpc.CallOption) (*IsSetGlobalNetworkConfigPassWordResponse, error) {
+	out := new(IsSetGlobalNetworkConfigPassWordResponse)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/IsSetGlobalNetworkConfigPassWord", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) RequestYakURL(ctx context.Context, in *RequestYakURLParams, opts ...grpc.CallOption) (*RequestYakURLResponse, error) {
 	out := new(RequestYakURLResponse)
 	err := c.cc.Invoke(ctx, "/ypb.Yak/RequestYakURL", in, out, opts...)
@@ -4123,7 +4134,7 @@ type YakServer interface {
 	DeleteReport(context.Context, *DeleteReportRequest) (*Empty, error)
 	QueryAvailableReportFrom(context.Context, *Empty) (*Fields, error)
 	DownloadReport(context.Context, *DownloadReportRequest) (*Empty, error)
-	// Yso
+	//Yso
 	GetAllYsoGadgetOptions(context.Context, *Empty) (*YsoOptionsWithVerbose, error)
 	GetAllYsoClassOptions(context.Context, *YsoOptionsRequerstWithVerbose) (*YsoOptionsWithVerbose, error)
 	GetAllYsoClassGeneraterOptions(context.Context, *YsoOptionsRequerstWithVerbose) (*YsoClassOptionsResponseWithVerbose, error)
@@ -4226,7 +4237,8 @@ type YakServer interface {
 	MigrateLegacyDatabase(context.Context, *Empty) (*Empty, error)
 	// 从规则中提取数据
 	QueryMITMRuleExtractedData(context.Context, *QueryMITMRuleExtractedDataRequest) (*QueryMITMRuleExtractedDataResponse, error)
-	// ChaosMakerRule: Bas
+	//
+	//ChaosMakerRule: Bas
 	ImportChaosMakerRules(context.Context, *ImportChaosMakerRulesRequest) (*Empty, error)
 	QueryChaosMakerRule(context.Context, *QueryChaosMakerRuleRequest) (*QueryChaosMakerRuleResponse, error)
 	DeleteChaosMakerRuleByID(context.Context, *DeleteChaosMakerRuleByIDRequest) (*Empty, error)
@@ -4276,6 +4288,7 @@ type YakServer interface {
 	GetGlobalNetworkConfig(context.Context, *GetGlobalNetworkConfigRequest) (*GlobalNetworkConfig, error)
 	SetGlobalNetworkConfig(context.Context, *GlobalNetworkConfig) (*Empty, error)
 	ResetGlobalNetworkConfig(context.Context, *ResetGlobalNetworkConfigRequest) (*Empty, error)
+	IsSetGlobalNetworkConfigPassWord(context.Context, *IsSetGlobalNetworkConfigPassWordRequest) (*IsSetGlobalNetworkConfigPassWordResponse, error)
 	RequestYakURL(context.Context, *RequestYakURLParams) (*RequestYakURLResponse, error)
 	// Wireshark
 	GetPcapMetadata(context.Context, *PcapMetadataRequest) (*PcapMetadata, error)
@@ -5115,6 +5128,9 @@ func (UnimplementedYakServer) SetGlobalNetworkConfig(context.Context, *GlobalNet
 }
 func (UnimplementedYakServer) ResetGlobalNetworkConfig(context.Context, *ResetGlobalNetworkConfigRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ResetGlobalNetworkConfig not implemented")
+}
+func (UnimplementedYakServer) IsSetGlobalNetworkConfigPassWord(context.Context, *IsSetGlobalNetworkConfigPassWordRequest) (*IsSetGlobalNetworkConfigPassWordResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method IsSetGlobalNetworkConfigPassWord not implemented")
 }
 func (UnimplementedYakServer) RequestYakURL(context.Context, *RequestYakURLParams) (*RequestYakURLResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RequestYakURL not implemented")
@@ -10256,6 +10272,24 @@ func _Yak_ResetGlobalNetworkConfig_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_IsSetGlobalNetworkConfigPassWord_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IsSetGlobalNetworkConfigPassWordRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).IsSetGlobalNetworkConfigPassWord(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/IsSetGlobalNetworkConfigPassWord",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).IsSetGlobalNetworkConfigPassWord(ctx, req.(*IsSetGlobalNetworkConfigPassWordRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_RequestYakURL_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RequestYakURLParams)
 	if err := dec(in); err != nil {
@@ -11336,6 +11370,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ResetGlobalNetworkConfig",
 			Handler:    _Yak_ResetGlobalNetworkConfig_Handler,
+		},
+		{
+			MethodName: "IsSetGlobalNetworkConfigPassWord",
+			Handler:    _Yak_IsSetGlobalNetworkConfigPassWord_Handler,
 		},
 		{
 			MethodName: "RequestYakURL",
