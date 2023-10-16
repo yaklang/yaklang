@@ -269,6 +269,7 @@ yakit.StatusCard("mitmId", "StatusCard")
 	if err != nil {
 		t.Fatal(err)
 	}
+	client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
 	stream, err := client.MITM(ctx)
 	if err != nil {
 		t.Fatal(err)
