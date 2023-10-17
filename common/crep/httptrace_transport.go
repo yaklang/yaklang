@@ -46,7 +46,7 @@ func (t *httpTraceTransport) RoundTrip(req *http.Request) (*http.Response, error
 	// handling transfer-encoding,
 	// do some hack to make sure packet is right
 
-	bareBytes := httpctx.GetBareRequestBytes(req)
+	bareBytes := httpctx.GetRequestBytes(req)
 	reqBytes := lowhttp.FixHTTPRequest(bareBytes)
 	ishttps := httpctx.GetRequestHTTPS(req)
 	addr, port, _ := utils.ParseStringToHostPort(req.Host)
