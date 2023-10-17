@@ -5,9 +5,6 @@ import (
 	"strings"
 )
 
-// 对于不合法字符 string 和 []rune 不能无损转换，所以有了stringx
-type stringx []rune
-
 type trieNode struct {
 	children   map[rune]*trieNode
 	failure    *trieNode
@@ -18,7 +15,7 @@ type trieNode struct {
 
 // IndexAllSubstrings 只遍历一次查找所有子串位置
 // 返回值是一个二维数组，每个元素是一个[2]int类型匹配结果，其中第一个元素是规则index，第二个元素是索引位置
-func IndexAllSubstringsEx(s stringx, patterns ...stringx) (result [][2]int) {
+func IndexAllSubstrings(s string, patterns ...string) (result [][2]int) {
 	// 构建trie树
 	root := &trieNode{
 		children:   make(map[rune]*trieNode),
@@ -90,17 +87,10 @@ func IndexAllSubstringsEx(s stringx, patterns ...stringx) (result [][2]int) {
 	}
 	return
 }
-func IndexAllSubstrings(s string, patterns ...string) [][2]int {
-	ps := []stringx{}
-	for _, pattern := range patterns {
-		ps = append(ps, stringx(pattern))
-	}
-	return IndexAllSubstringsEx(stringx(s), ps...)
-}
 
 type Escaper struct {
 	escapeSymbol string
-	escapeChars  map[string]stringx
+	escapeChars  map[string]string
 }
 
 func (e *Escaper) Escape(s string) string {
@@ -118,10 +108,6 @@ func (e *Escaper) Escape(s string) string {
 	return res
 }
 func (e *Escaper) Unescape(s string) (string, error) {
-	res, err := e.UnescapeEx(s)
-	return string(res), err
-}
-func (e *Escaper) UnescapeEx(s string) (stringx, error) {
 	// 构建trie树
 	root := &trieNode{
 		children:   make(map[rune]*trieNode),
@@ -149,7 +135,7 @@ func (e *Escaper) UnescapeEx(s string) (stringx, error) {
 		node.patternLen = len(pattern)
 	}
 
-	var result stringx
+	var result string
 	escapeState := false
 	node := root
 	data := s
@@ -162,13 +148,13 @@ func (e *Escaper) UnescapeEx(s string) (stringx, error) {
 				if node.children[ch] != nil {
 					node = node.children[ch]
 					if node.flag == 1 { // 匹配成功
-						result = append(result, []rune(patterns[node.id])...)
+						result += patterns[node.id]
 						data = string(runeData[i+1:])
 						node = root
 						break
 					}
 				} else {
-					result = append(result, runeData[:i]...)
+					result += string(runeData[:i])
 					data = string(runeData[i:])
 					node = root
 					break
@@ -177,20 +163,20 @@ func (e *Escaper) UnescapeEx(s string) (stringx, error) {
 		} else {
 			index := strings.Index(data, e.escapeSymbol) // 查找后面第一个转义符
 			if index != -1 {
-				result = append(result, []rune(data[:index])...)
+				result += data[:index]
 				data = data[index+len(e.escapeSymbol):]
 				escapeState = true
 			} else {
-				result = append(result, []rune(data)...)
+				result += data
 				break
 			}
 		}
 	}
 	return result, nil
 }
-func NewEscaper(escapeSymbol string, charsMap map[string]stringx) *Escaper {
+func NewEscaper(escapeSymbol string, charsMap map[string]string) *Escaper {
 	if _, ok := charsMap[escapeSymbol]; !ok {
-		charsMap[escapeSymbol] = stringx(escapeSymbol)
+		charsMap[escapeSymbol] = escapeSymbol
 	}
 	return &Escaper{
 		escapeSymbol: escapeSymbol,
@@ -198,9 +184,9 @@ func NewEscaper(escapeSymbol string, charsMap map[string]stringx) *Escaper {
 	}
 }
 func NewDefaultEscaper(chars ...string) *Escaper {
-	m := map[string]stringx{}
+	m := map[string]string{}
 	for _, char := range chars {
-		m[char] = stringx(char)
+		m[char] = char
 	}
 	return NewEscaper(`\`, m)
 }
