@@ -226,3 +226,22 @@ try {
 	}
 	_, _ = client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
 }
+
+func TestIsSetGlobalNetworkConfigPassWord(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+	_, _ = client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
+	config, err := client.GetGlobalNetworkConfig(context.Background(), &ypb.GetGlobalNetworkConfigRequest{})
+	if err != nil {
+		panic(err)
+	}
+	for _, v := range config.ClientCertificates {
+		_, err := client.IsSetGlobalNetworkConfigPassWord(context.Background(), &ypb.IsSetGlobalNetworkConfigPassWordRequest{Pkcs12Bytes: v.Pkcs12Bytes, Pkcs12Password: v.Pkcs12Password})
+		if err != nil {
+			log.Error(err)
+			t.FailNow()
+		}
+	}
+}
