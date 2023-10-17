@@ -8,16 +8,16 @@ func ErrorUnhandled() string {
 	return "Error Unhandled "
 }
 func ErrorUnhandledWithType(typ string) string {
-	return "Error Unhandled: " + typ
+	return fmt.Sprintf("The value is (%s) type, has unhandled error", typ)
 }
 
 func ValueUndefined(v string) string {
-	return fmt.Sprintf("value undefined:%s", v)
+	return fmt.Sprintf("Value undefined:%s", v)
 }
 
 func NotEnoughArgument(funName string, have, want string) string {
 	return fmt.Sprintf(
-		`not enough arguments in call %s have (%s) want (%s)`,
+		`Not enough arguments in call %s have (%s) want (%s)`,
 		funName, have, want,
 	)
 }

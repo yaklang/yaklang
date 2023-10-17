@@ -191,6 +191,7 @@ func (b *FunctionBuilder) getFieldWithCreate(i User, key Value, create bool) Val
 
 func (b *FunctionBuilder) NewCaptureField(text string) *Field {
 	f := NewFieldOnly(NewConst(text), b.symbol, b.CurrentBlock)
+	f.variable = text
 	f.OutCapture = true
 	return f
 }

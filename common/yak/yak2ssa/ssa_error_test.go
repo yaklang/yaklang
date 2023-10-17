@@ -495,6 +495,66 @@ func TestCallParamReturn(t *testing.T) {
 	})
 }
 
+func TestClosureBinding(t *testing.T) {
+	t.Run("use free value", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			{
+				a1 = 1 
+				f = () => {
+					b := a1
+				}
+				f()
+			}
+			f()
+
+			{
+				a2 := 1
+				f2 = () => {
+					b := a2
+				}
+				f2()
+			}
+			f2() // not found 
+
+			a2 = 1
+			f2()
+			`,
+			errs: []string{
+				ssa.BindingNotFound("a2"),
+			},
+		})
+	})
+
+	//TODO: more test in `ssa_var_test.go`
+	t.Run("modify free value", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			{
+				b = 1
+				f = () => {
+					b = a
+				}
+				a = 2
+				print(b) // 1
+
+				f()
+				// b1 = field yam-main-symbol [b]
+				print(b) // b1
+			}
+			a = 3
+			print(b) // b1
+			f()
+			// b2 = field yam-main-symbol [b]
+			print(b) // b2
+			`,
+			ExternValue: map[string]any{
+				"print": func(any) {},
+			},
+		})
+	})
+}
+
 // for  "check alias type method"
 type AliasType int
 

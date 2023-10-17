@@ -508,6 +508,7 @@ type FunctionType struct {
 	Name       string
 	ReturnType Type
 	Parameter  Types
+	FreeValue  map[string]bool
 	IsVariadic bool
 }
 
@@ -546,6 +547,10 @@ func NewFunctionType(name string, Parameter []Type, ReturnType []Type, IsVariadi
 	}
 	f.ReturnType = CalculateType(ReturnType)
 	return f
+}
+
+func (s *FunctionType) SetFreeValue(fv map[string]bool) {
+	s.FreeValue = fv
 }
 
 func (s *FunctionType) SetName(name string) {

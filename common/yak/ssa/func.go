@@ -126,12 +126,27 @@ func (f *Function) Finish() {
 	f.EnterBlock = f.Blocks[0]
 	f.ExitBlock = f.Blocks[len(f.Blocks)-1]
 
-	f.SetType(NewFunctionType("",
+	funType := NewFunctionType("",
 		lo.Map(f.Param, func(p *Parameter, _ int) Type {
 			t := p.GetType()
 			return t
 		}),
 		handlerReturnType(f.Return),
 		f.hasEllipsis,
-	))
+	)
+	f.SetType(funType)
+	if len(f.FreeValues) != 0 {
+		funType.SetFreeValue(
+			lo.SliceToMap(f.FreeValues, func(v Value) (string, bool) {
+				if p, ok := v.(*Parameter); ok {
+					return p.variable, false
+				}
+				if f, ok := v.(*Field); ok {
+					return f.variable, true
+				}
+				// this unreachable: freeValue only Parameter
+				return v.String(), true
+			}),
+		)
+	}
 }
