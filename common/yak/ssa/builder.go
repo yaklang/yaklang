@@ -29,7 +29,7 @@ type FunctionBuilder struct {
 	currentDef         map[string]map[*BasicBlock]Value // currentDef[variableId][block]value
 	CurrentBlock       *BasicBlock                      // current block to build
 	CurrentPos         *Position                        // current position in source code
-	symbolBlock        *blockSymbolTable                //  blockId -> variable -> variableId
+	blockSymbolTable   *blockSymbolTable                //  blockId -> variable -> variableId
 	blockId            int
 	parentSymbolBlock  *blockSymbolTable // parent symbol block for build FreeValue
 	parentCurrentBlock *BasicBlock       // parent build subFunction position
@@ -49,7 +49,7 @@ func NewBuilder(f *Function, parent *FunctionBuilder) *FunctionBuilder {
 		currentDef:   make(map[string]map[*BasicBlock]Value),
 		CurrentBlock: nil,
 		CurrentPos:   nil,
-		symbolBlock: &blockSymbolTable{
+		blockSymbolTable: &blockSymbolTable{
 			symbol:  nil,
 			blockId: "main",
 		},
@@ -69,7 +69,7 @@ func NewBuilder(f *Function, parent *FunctionBuilder) *FunctionBuilder {
 
 // new function
 func (b *FunctionBuilder) NewFunc(name string) (*Function, *blockSymbolTable) {
-	return b.Package.NewFunctionWithParent(name, b.Function), b.symbolBlock
+	return b.Package.NewFunctionWithParent(name, b.Function), b.blockSymbolTable
 }
 
 // handler current function
@@ -200,26 +200,26 @@ func (b *FunctionBuilder) NewBlockId() string {
 
 // block symbol-table stack
 func (b *FunctionBuilder) PushBlockSymbolTable() {
-	b.symbolBlock = &blockSymbolTable{
+	b.blockSymbolTable = &blockSymbolTable{
 		symbol:  make(map[string]string),
 		blockId: b.NewBlockId(),
-		next:    b.symbolBlock,
+		next:    b.blockSymbolTable,
 	}
 }
 
 func (b *FunctionBuilder) PopBlockSymbolTable() {
-	b.symbolBlock = b.symbolBlock.next
+	b.blockSymbolTable = b.blockSymbolTable.next
 }
 
 // use block symbol table map variable -> variable+blockId
 func (b *FunctionBuilder) MapBlockSymbolTable(text string) string {
-	newText := text + b.symbolBlock.blockId
-	b.symbolBlock.symbol[text] = newText
+	newText := text + b.blockSymbolTable.blockId
+	b.blockSymbolTable.symbol[text] = newText
 	return newText
 }
 
 func (b *FunctionBuilder) GetIdByBlockSymbolTable(id string) string {
-	return GetIdByBlockSymbolTable(id, b.symbolBlock)
+	return GetIdByBlockSymbolTable(id, b.blockSymbolTable)
 }
 
 func GetIdByBlockSymbolTable(id string, symbolEnter *blockSymbolTable) string {
