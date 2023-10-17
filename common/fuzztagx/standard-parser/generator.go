@@ -105,6 +105,9 @@ func (f *TagExecNode) FirstExec(bp, exec, all bool) error {
 
 	if exec {
 		err = f.exec(f.childGenerator.Result())
+		if err != nil {
+			return err
+		}
 	}
 	f.index = 1
 	f.submitResult((*f.cache)[0])

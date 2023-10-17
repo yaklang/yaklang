@@ -1,6 +1,10 @@
 package fuzztagx
 
-import "github.com/yaklang/yaklang/common/fuzztagx/standard-parser"
+import (
+	"errors"
+	"github.com/yaklang/yaklang/common/fuzztagx/standard-parser"
+	"github.com/yaklang/yaklang/common/utils"
+)
 
 func ExecuteWithStringHandler(code string, funcMap map[string]func(string2 string) []string) ([]string, error) {
 	nodes, err := ParseFuzztag(code)
@@ -14,7 +18,11 @@ func ExecuteWithStringHandler(code string, funcMap map[string]func(string2 strin
 		fMap[k] = func(s string) (res []standard_parser.FuzzResult, err error) {
 			defer func() {
 				if r := recover(); r != nil {
-					err = r.(error)
+					if v, ok := r.(error); ok {
+						err = v
+					} else {
+						err = errors.New(utils.InterfaceToString(r))
+					}
 				}
 			}()
 			for _, v := range v(s) {
@@ -24,7 +32,6 @@ func ExecuteWithStringHandler(code string, funcMap map[string]func(string2 strin
 		}
 	}
 	generator := standard_parser.NewGenerator(nodes, fMap)
-	generator.IgnoreError = true
 	res := []string{}
 	for {
 		ok, err := generator.Generate()

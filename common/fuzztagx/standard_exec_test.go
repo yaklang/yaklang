@@ -25,6 +25,10 @@ var testMap = map[string]func(string) []string{
 			return strconv.Itoa(i)
 		}).([]string)
 	},
+	"panic": func(s string) []string {
+		panic(s)
+		return nil
+	},
 }
 
 // 同步渲染数量测试
@@ -248,7 +252,7 @@ func TestMagicLabel(t *testing.T) {
 
 func TestRawTag(t *testing.T) {
 	for _, v := range [][]string{
-		{"{{=asdasd=}}", "asdasd"},
+		{"{{=asdasd=}}", "asdasd"},                                  // 常规
 		{`\{{=hello{{=hello\{{=world=}}`, `\{{=hellohello{{=world`}, // 测试 raw tag转义
 	} {
 		res, err := ExecuteWithStringHandler(v[0], map[string]func(string2 string) []string{
@@ -265,16 +269,45 @@ func TestRawTag(t *testing.T) {
 	}
 }
 func TestMutiTag(t *testing.T) {
-	res, err := ExecuteWithStringHandler("{{echo({{={{echo()}}=}})}}", testMap)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if res[0] != "{{echo()}}" {
-		t.Fatal("error")
+	for _, v := range [][]string{
+		//{"{{echo({{={{echo()}}=}})}}", "{{echo()}}"}, // 常规
+		{`{{echo({{=}}=}})}}`, `}}`}, // 测试嵌套（raw标签应该屏蔽所有语法）
+	} {
+		res, err := ExecuteWithStringHandler(v[0], map[string]func(string2 string) []string{
+			"echo": func(s string) []string {
+				return []string{s}
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if res[0] != v[1] {
+			t.Fatal(spew.Sprintf("expect: %s, got: %s", v[1], res[0]))
+		}
 	}
 }
 
 // 测试标签执行出错的情况
 func TestErrors(t *testing.T) {
+	// 执行出错的几种情况：标签编译错误（返回原文）、未找到函数名（生成空？）、函数内部执行出错（可能参数类型错误，生成的数据是无意义的，应该终止生成，输出错误信息）
+	res, err := ExecuteWithStringHandler("{{panic(error}}", testMap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res[0] != "{{panic(error}}" {
+		t.Fatal("expect `{{panic(error}}`")
+	}
 
+	res, err = ExecuteWithStringHandler("{{aaa}}", testMap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res[0] != "" {
+		t.Fatal("expect ``")
+	}
+
+	_, err = ExecuteWithStringHandler("{{panic(error)}}", testMap)
+	if err == nil || err.Error() != "error" {
+		t.Fatal("expect error")
+	}
 }
