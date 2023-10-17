@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	filter2 "github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -351,7 +352,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		}
 		return nil
 	}
-	if req.GetRequest() == "" && len(req.GetRequestRaw()) <= 0 {
+	if req.RetryTaskID == 0 && req.GetRequest() == "" && len(req.GetRequestRaw()) <= 0 {
 		return utils.Errorf("empty request is not allowed")
 	}
 
@@ -392,10 +393,12 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 	}
 
 	var rawRequest []byte
-	if len(req.GetRequestRaw()) > 0 {
-		rawRequest = req.GetRequestRaw()
-	} else {
-		rawRequest = []byte(req.GetRequest())
+	if req.RetryTaskID == 0 {
+		if len(req.GetRequestRaw()) > 0 {
+			rawRequest = req.GetRequestRaw()
+		} else {
+			rawRequest = []byte(req.GetRequest())
+		}
 	}
 
 	// 保存 request 中 host/port
@@ -433,12 +436,32 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		}
 	}
 
-	if req.GetRepeatTimes() > 0 {
-		var buf bytes.Buffer
-		buf.WriteString("{{repeat(" + fmt.Sprint(req.GetRepeatTimes()) + ")}}")
-		buf.Write(rawRequest)
-		rawRequest = buf.Bytes()
+	// 重试处理，通过taskid找到所有失败的发送包
+	var iInput any
+	var httpPoolOpts = make([]mutate.HttpPoolConfigOption, 0)
+	if req.RetryTaskID == 0 {
+		// 插入 {{repeat(n)}}的fuzz标签
+		if req.GetRepeatTimes() > 0 {
+			var buf bytes.Buffer
+			buf.WriteString("{{repeat(" + fmt.Sprint(req.GetRepeatTimes()) + ")}}")
+			buf.Write(rawRequest)
+			rawRequest = buf.Bytes()
+		}
+		iInput = rawRequest
+	} else {
+		webFuzzerResponses, err := yakit.QueryFailedWebFuzzerResponse(s.GetProjectDatabase(), req.RetryTaskID)
+		if err != nil {
+			return err
+		}
+		if len(webFuzzerResponses) == 0 {
+			return utils.Errorf("no failed web fuzzer request found")
+		}
+
+		iInput = lo.Map(webFuzzerResponses, func(i *yakit.WebFuzzerResponse, _ int) []byte {
+			return utils.UnsafeStringToBytes(i.Request)
+		})
 	}
+
 	var requestCount = 0
 	if req.GetForceOnlyOneResponse() {
 		requestCount = 1
@@ -454,10 +477,9 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				})
 			}
 		}()
-		res, err := mutate.ExecPool(
-			rawRequest,
-			//mutate.WithoutConnPool(),
-			mutate.WithPoolOpt_ForceFuzz(req.GetForceFuzz()),
+
+		httpPoolOpts = append(httpPoolOpts,
+			mutate.WithPoolOpt_FuzzParams(mergedParams),
 			mutate.WithPoolOpt_ForceFuzzfile(req.GetForceFuzz()),
 			mutate.WithPoolOpt_ExtraFuzzOptions(extraOpt...),
 			mutate.WithPoolOpt_Timeout(timeoutSeconds),
@@ -489,7 +511,17 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_EtcHosts(req.GetEtcHosts()),
 			mutate.WithPoolOpt_NoSystemProxy(req.GetNoSystemProxy()),
 			mutate.WithPoolOpt_FuzzParams(mergedParams),
-			mutate.WithPoolOpt_RequestCountLimiter(requestCount),
+			mutate.WithPoolOpt_RequestCountLimiter(requestCount))
+
+		if req.RetryTaskID > 0 {
+			// 重试的时候，不需要渲染fuzztag
+			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ForceFuzz(false))
+		} else {
+			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ForceFuzz(req.GetForceFuzz()))
+		}
+		res, err := mutate.ExecPool(
+			iInput,
+			httpPoolOpts...,
 		)
 		if err != nil {
 			task.Ok = false
@@ -518,6 +550,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 
 			if result.Error != nil {
 				rsp := &ypb.FuzzerResponse{}
+				rsp.RequestRaw = result.RequestRaw
 				rsp.UUID = uuid.NewV4().String()
 				rsp.Url = utils.EscapeInvalidUTF8Byte([]byte(result.Url))
 				rsp.Ok = false

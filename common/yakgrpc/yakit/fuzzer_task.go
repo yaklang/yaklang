@@ -166,6 +166,8 @@ type WebFuzzerResponse struct {
 	gorm.Model
 
 	WebFuzzerTaskId int    `json:"web_fuzzer_task_id" gorm:"index"`
+	OK              bool   `json:"ok"`
+	Request         string `json:"request"`
 	Content         string `json:"content"`
 	Payload         string `json:"payload"`
 	Url             string `json:"url"`
@@ -210,6 +212,18 @@ func QueryWebFuzzerResponse(db *gorm.DB, params *ypb.QueryHTTPFuzzerResponseByTa
 	return paging, ret, nil
 }
 
+func QueryFailedWebFuzzerResponse(db *gorm.DB, taskID int64) ([]*WebFuzzerResponse, error) {
+	db = db.Model(&WebFuzzerResponse{})
+	db = db.Select("request").Where("web_fuzzer_task_id = ?", taskID).Where("ok = false")
+
+	responses := make([]*WebFuzzerResponse, 0)
+
+	if db = db.Find(&responses); db.Error != nil {
+		return nil, utils.Errorf("finding failed web fuzzer response failed: %s", db.Error)
+	}
+	return responses, nil
+}
+
 func SaveWebFuzzerResponse(db *gorm.DB, taskId int, rsp *ypb.FuzzerResponse) {
 	raw, err := json.Marshal(rsp)
 	if err != nil {
@@ -218,7 +232,9 @@ func SaveWebFuzzerResponse(db *gorm.DB, taskId int, rsp *ypb.FuzzerResponse) {
 	}
 	r := &WebFuzzerResponse{
 		WebFuzzerTaskId: taskId,
-		Content:         string(raw),
+		OK:              false,
+		Request:         utils.UnsafeBytesToString(rsp.RequestRaw),
+		Content:         utils.UnsafeBytesToString(raw),
 		Payload:         strings.Join(rsp.Payloads, ","),
 		Url:             rsp.Url,
 		StatusCode:      int(rsp.StatusCode),
