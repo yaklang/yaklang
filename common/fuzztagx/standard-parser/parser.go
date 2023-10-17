@@ -51,25 +51,24 @@ func Parse(raw string, tagTypes ...*TagDefine) ([]Node, error) {
 			utagTypes = append(utagTypes, tagType)
 		}
 	}
-	// 执行转义
-	escaperMap := map[string]stringx{}
-	for k, charx := range tagBoundaryMap {
-		escaperMap[k] = []rune{charx}
-	}
-	escaper := NewEscaper(`\`, escaperMap)
-	codex, err := escaper.UnescapeEx(raw)
-	if err != nil {
-		return nil, err
-	}
-	tagBoundarysx := []stringx{}
-	for _, b := range tagBoundarys {
-		tagBoundarysx = append(tagBoundarysx, stringx(b))
-	}
+
 	// 查找所有标签位置信息
-	tagMarginPostions := IndexAllSubstringsEx(codex, tagBoundarysx...)
+	tagMarginPostions := IndexAllSubstrings(raw, tagBoundarys...)
+	escapeSymbol := `\`
 	stack := utils.NewStack[*fuzztagPos]()
 	rootTags := []*fuzztagPos{}
+	isEscapeMode := false
+	nextStart := 0
 	for _, pos := range tagMarginPostions {
+		if pos[1] < nextStart {
+			continue
+		}
+		if isEscapeMode && pos[1] >= len(escapeSymbol) { // 跳过被转义的边界符
+			if raw[pos[1]-len(escapeSymbol):pos[1]] == escapeSymbol {
+				nextStart = pos[1] + len(tagBoundarys[pos[0]])
+				continue
+			}
+		}
 		tagIndex := pos[0] / 2
 		isleft := pos[0]%2 == 0
 		typ := tagTypes[tagIndex]
@@ -80,6 +79,7 @@ func Parse(raw string, tagTypes ...*TagDefine) ([]Node, error) {
 				top.subs = append(top.subs, tag)
 			} else {
 				rootTags = append(rootTags, tag)
+				isEscapeMode = true
 			}
 			stack.Push(tag)
 		} else {
@@ -87,6 +87,9 @@ func Parse(raw string, tagTypes ...*TagDefine) ([]Node, error) {
 				if stack.Peek().tagType.name == typ.name {
 					top := stack.Pop()
 					top.end = pos[1]
+					if stack.Size() == 0 { // 根标签闭合
+						isEscapeMode = false
+					}
 				}
 			}
 		}
@@ -101,41 +104,47 @@ func Parse(raw string, tagTypes ...*TagDefine) ([]Node, error) {
 				result = append(result, tag)
 			}
 		}
+
 		return
 	}
-	newStringNode := func(s stringx) StringNode {
-		res := ""
-		for _, r := range s {
-			if v, ok := tagBoundaryMapReverse[r]; ok {
-				res += v
-			} else {
-				res += string(r)
-			}
-		}
-		return StringNode(res)
-	}
+	escaper := NewDefaultEscaper(escapeSymbol, "{{", "}}")
 	// 根据标签位位置信息解析tag
-	var newDatasFromPos func(start, end int, poss []*fuzztagPos) []Node
-	newDatasFromPos = func(start, end int, poss []*fuzztagPos) []Node {
+	var newDatasFromPos func(start, end int, poss []*fuzztagPos, deep int) []Node
+	newDatasFromPos = func(start, end int, poss []*fuzztagPos, deep int) []Node {
 		pre := start
 		res := []Node{}
+		var addRes func(s Node)
+		if deep > 0 {
+			addRes = func(s Node) {
+				if v, ok := s.(StringNode); ok {
+					v1, _ := escaper.Unescape(string(v))
+					res = append(res, StringNode(v1))
+				} else {
+					res = append(res, s)
+				}
+			}
+		} else {
+			addRes = func(s Node) {
+				res = append(res, s)
+			}
+		}
 		for _, pos := range poss {
 			if pos.start < start || pos.end > end { // 不解析参数外的fuzztag
 				continue
 			}
 			tag := pos.tagType.NewTag()
-			tag.AddData(newDatasFromPos(pos.start, pos.end, pos.subs)...)
-			s := codex[pre : pos.start-len(pos.tagType.start)]
+			tag.AddData(newDatasFromPos(pos.start, pos.end, pos.subs, deep+1)...)
+			s := raw[pre : pos.start-len(pos.tagType.start)]
 			if len(s) != 0 {
-				res = append(res, newStringNode(s))
+				addRes(StringNode(s))
 			}
-			res = append(res, tag)
+			addRes(tag)
 			pre = pos.end + len(pos.tagType.end)
 		}
 		if pre < end {
-			res = append(res, newStringNode(codex[pre:end]))
+			addRes(StringNode(raw[pre:end]))
 		}
 		return res
 	}
-	return newDatasFromPos(0, len(codex), filterValidTag(rootTags)), nil
+	return newDatasFromPos(0, len(raw), filterValidTag(rootTags), 0), nil
 }
