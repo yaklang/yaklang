@@ -1007,26 +1007,23 @@ RECONNECT:
 			traceInfo.ServerTime = time.Since(serverTimeStart)
 		}
 
-	var multiResponses []*http.Response
-	var isMultiResponses bool
-
-	firstResponse, err := utils.ReadHTTPResponseFromBufioReader(httpResponseReader, nil)
-	if err != nil {
-		if err == io.EOF || err == io.ErrUnexpectedEOF {
-			return response, nil
+		firstResponse, err = utils.ReadHTTPResponseFromBufioReader(httpResponseReader, nil)
+		if err != nil {
+			if err == io.EOF || err == io.ErrUnexpectedEOF {
+				return response, nil
+			}
+			log.Infof("[lowhttp] read response failed: %s", err)
 		}
-		log.Infof("[lowhttp] read response failed: %s", err)
-	}
-	if firstResponse == nil {
-		if len(responseRaw.Bytes()) == 0 {
-			return response, utils.Errorf("empty result. %v", err.Error())
-		}
-	} else {
-		if firstResponse.Body != nil {
-			_, _ = io.Copy(io.Discard, firstResponse.Body)
-			// read response first
-		}
-		multiResponses = append(multiResponses, firstResponse)
+		if firstResponse == nil {
+			if len(responseRaw.Bytes()) == 0 {
+				return response, utils.Errorf("empty result. %v", err.Error())
+			}
+		} else {
+			if firstResponse.Body != nil {
+				_, _ = io.ReadAll(firstResponse.Body)
+				// read response first
+			}
+			multiResponses = append(multiResponses, firstResponse)
 
 			// handle response
 			for noFixContentLength {
@@ -1044,7 +1041,9 @@ RECONNECT:
 					multiResponses = append(multiResponses, nextResponse)
 					isMultiResponses = true
 					response.MultiResponse = true
-					_, _ = io.ReadAll(nextResponse.Body)
+					if nextResponse.Body != nil {
+						_, _ = io.ReadAll(nextResponse.Body)
+					}
 				}
 			}
 		}
