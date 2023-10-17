@@ -154,7 +154,7 @@ func (s *Server) ResetGlobalNetworkConfig(ctx context.Context, req *ypb.ResetGlo
 	return &ypb.Empty{}, nil
 }
 
-func (s *Server) IsSetGlobalNetworkConfigPassWord(ctx context.Context, req *ypb.IsSetGlobalNetworkConfigPassWordRequest) (*ypb.IsSetGlobalNetworkConfigPassWordResponse, error) {
+func (s *Server) ValidP12PassWord(ctx context.Context, req *ypb.ValidP12PassWordRequest) (*ypb.ValidP12PassWordResponse, error) {
 	data := true
 	if len(req.GetPkcs12Bytes()) > 0 {
 		_, _, _, err := tlsutils.LoadP12ToPEM(req.GetPkcs12Bytes(), string(req.GetPkcs12Password()))
@@ -162,5 +162,5 @@ func (s *Server) IsSetGlobalNetworkConfigPassWord(ctx context.Context, req *ypb.
 			data = false
 		}
 	}
-	return &ypb.IsSetGlobalNetworkConfigPassWordResponse{IsSetPassWord: data}, nil
+	return &ypb.ValidP12PassWordResponse{IsSetPassWord: data}, nil
 }
