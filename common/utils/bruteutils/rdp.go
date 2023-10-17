@@ -3,14 +3,19 @@ package bruteutils
 import (
 	"errors"
 	"fmt"
+	stdlog "log"
+	"os"
+
 	"github.com/ReneKroon/ttlcache"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
-	stdlog "log"
-	"os"
+
 	//"github.com/shadow1ng/fscan/common"
+	"sync"
+	"time"
+
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/core"
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/glog"
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/protocol/nla"
@@ -20,8 +25,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/protocol/t125"
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/protocol/tpkt"
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/protocol/x224"
-	"sync"
-	"time"
 )
 
 var (
@@ -38,8 +41,8 @@ var rdpAuth = &DefaultServiceAuthInfo{
 	DefaultPasswords: append([]string{"123456", "admin", "admin123", "administrator", "guest"}, CommonUsernames...),
 	DefaultUsernames: []string{"administrator", "guest", "admin"},
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
-		result := i.Result()
 		i.Target = appendDefaultPort(i.Target, 3389)
+		result := i.Result()
 
 		conn, err := netx.DialTCPTimeout(defaultTimeout, i.Target)
 		if err != nil {

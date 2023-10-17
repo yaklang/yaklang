@@ -2,13 +2,14 @@ package bruteutils
 
 import (
 	"fmt"
+	"regexp"
+	"time"
+
 	"github.com/ReneKroon/ttlcache"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"regexp"
-	"time"
 )
 
 var defaultPassTomcat = utils.ParseStringToLines(`tomcat
@@ -113,9 +114,9 @@ var tomcat = &DefaultServiceAuthInfo{
 	DefaultUsernames: defaultUserTomcat,
 	DefaultPasswords: defaultPassTomcat,
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
+		i.Target = appendDefaultPort(i.Target, 8080)
 		result := i.Result()
 		// /host-manager/html
-		i.Target = appendDefaultPort(i.Target, 8080)
 		host, port, err := utils.ParseStringToHostPort(i.Target)
 		if err != nil {
 			result.Finished = true

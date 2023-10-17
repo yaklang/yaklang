@@ -1,10 +1,11 @@
 package bruteutils
 
 import (
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/mutate"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/mutate"
 )
 
 type DefaultServiceAuthInfo struct {
@@ -48,6 +49,8 @@ func (d *DefaultServiceAuthInfo) GetBruteHandler() BruteCallback {
 				d.targetAuthChecked.Store(item.Target, nil)
 				result := d.UnAuthVerify(item)
 				if result.Ok {
+					result.Username = ""
+					result.Password = ""
 					return result
 				}
 
