@@ -842,7 +842,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	}
 
 	cacheKey := connectKey{
-		proxy:  option.Proxy,
+		proxy:  proxy,
 		scheme: reqSchema,
 		addr:   originAddr,
 		https:  option.Https,
@@ -878,6 +878,12 @@ RECONNECT:
 				} else {
 					tried[basicProxy] = struct{}{}
 				}
+				if withConnPool {
+					cacheKey.addr = originAddr
+					conn, err = connPool.getIdleConn(cacheKey, noProxyDial...)
+				} else {
+					conn, err = netx.DialX(originAddr, noProxyDial...)
+				}
 				conn, err = netx.DialX(utils.ExtractHostPort(basicProxy), noProxyDial...)
 				if err != nil {
 					log.Debugf("try old version proxy failed: %s", err)
@@ -890,7 +896,7 @@ RECONNECT:
 			}
 		}
 
-		if conn == nil {
+		if utils.IsNil(conn) {
 			return response, err
 		}
 	}
@@ -920,6 +926,12 @@ RECONNECT:
 	if withConnPool {
 		//连接池分支
 		writeErrCh := make(chan error, 1)
+		if oldVersionProxyChecking {
+			requestPacket, err = BuildLegacyProxyRequest(requestPacket)
+			if err != nil {
+				return nil, err
+			}
+		}
 		conn.(*persistConn).writeCh <- writeRequest{reqPacket: requestPacket, ch: writeErrCh}
 
 		resc := make(chan responseInfo)
@@ -966,11 +978,20 @@ RECONNECT:
 			}()
 		}
 		// 写报文
+
 		if option.BeforeDoRequest != nil {
 			requestPacket = option.BeforeDoRequest(requestPacket)
 		}
-		n, err := conn.Write(requestPacket)
-		_ = n
+		if oldVersionProxyChecking {
+			var legacyRequest []byte
+			legacyRequest, err = BuildLegacyProxyRequest(requestPacket)
+			if err != nil {
+				return nil, err
+			}
+			_, err = conn.Write(legacyRequest)
+		} else {
+			_, err = conn.Write(requestPacket)
+		}
 		if err != nil {
 			return response, utils.Errorf("write request failed: %s", err)
 		}
