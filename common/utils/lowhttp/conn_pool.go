@@ -274,7 +274,7 @@ func (es *bodyEOFSignal) condfn(err error) error {
 
 func newPersistConn(key connectKey, pool *lowHttpConnPool, opt ...netx.DialXOption) (*persistConn, error) {
 	needProxy := len(key.proxy) > 0
-	opt = append(opt, netx.DialX_WithProxy(key.proxy...), netx.DialX_WithKeepAlive(pool.keepAliveTimeout))
+	opt = append(opt, netx.DialX_WithKeepAlive(pool.keepAliveTimeout))
 	newConn, err := netx.DialX(key.addr, opt...)
 	if err != nil {
 		return nil, err
