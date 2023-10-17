@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
@@ -49,6 +50,7 @@ type LowhttpExecConfig struct {
 	RetryMaxWaitTime                 time.Duration
 	JsRedirect                       bool
 	Proxy                            []string
+	ForceLegacyProxy                 bool
 	NoFixContentLength               bool
 	RedirectHandler                  func(bool, []byte, []byte) bool
 	Session                          interface{}
@@ -322,6 +324,12 @@ func WithProxy(proxy ...string) LowhttpOpt {
 	}
 }
 
+func WithForceLegacyProxy(b bool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.ForceLegacyProxy = b
+	}
+}
+
 func WithSaveHTTPFlow(b bool) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.SaveHTTPFlow = b
@@ -569,6 +577,20 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	}
 	proxy = newProxy
 
+	var forceProxy = len(proxy) > 0
+	var legacyProxy []string
+	if option.ForceLegacyProxy {
+		var ordinaryProxy []string
+		lo.ForEach(proxy, func(i string, idx int) {
+			if utils.IsHttpOrHttpsUrl(i) {
+				legacyProxy = append(legacyProxy, i)
+			} else {
+				ordinaryProxy = append(ordinaryProxy, i)
+			}
+		})
+		proxy = ordinaryProxy
+	}
+
 	https := forceHttps
 
 	if gmTLS {
@@ -783,6 +805,10 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		dialopts = append(dialopts, netx.DialX_WithGMTLSSupport(gmTLS), netx.DialX_WithTLS(https))
 	}
 
+	if forceProxy {
+		dialopts = append(dialopts, netx.DialX_WithForceProxy(forceProxy))
+	}
+
 	if len(proxy) > 0 {
 		dialopts = append(dialopts, netx.DialX_WithProxy(proxy...))
 	}
@@ -828,8 +854,42 @@ RECONNECT:
 	traceInfo.DNSTime = dnsEnd.Sub(dnsStart) // safe
 	response.Https = https
 
+	// checking old proxy
+	oldVersionProxyChecking := false
+	var tryOldVersionProxy []string
 	if err != nil {
-		return response, err
+		errMsg := err.Error()
+		if strings.Contains(errMsg, `no proxy available`) {
+			noProxyDial := make([]netx.DialXOption, len(dialopts), len(dialopts)+1)
+			copy(noProxyDial, dialopts)
+			noProxyDial = append(noProxyDial, netx.DialX_WithDisableProxy(true))
+			var tried = make(map[string]struct{})
+			var merged = make([]string, len(legacyProxy)+len(proxy))
+			copy(merged, legacyProxy)
+			copy(merged[len(legacyProxy):], proxy)
+			for _, basicProxy := range lo.Filter(merged, func(item string, index int) bool {
+				return utils.IsHttpOrHttpsUrl(item)
+			}) {
+				if _, ok := tried[basicProxy]; ok {
+					continue
+				} else {
+					tried[basicProxy] = struct{}{}
+				}
+				conn, err = netx.DialX(utils.ExtractHostPort(basicProxy), noProxyDial...)
+				if err != nil {
+					log.Debugf("try old version proxy failed: %s", err)
+					continue
+				}
+				oldVersionProxyChecking = true
+				enableHttp2 = false
+				tryOldVersionProxy = append(tryOldVersionProxy, basicProxy)
+				break
+			}
+		}
+
+		if conn == nil {
+			return response, err
+		}
 	}
 	response.RemoteAddr = conn.RemoteAddr().String()
 	response.PortIsOpen = true
@@ -857,7 +917,17 @@ RECONNECT:
 	if option.BeforeDoRequest != nil {
 		requestPacket = option.BeforeDoRequest(requestPacket)
 	}
-	_, err = conn.Write(requestPacket)
+
+	if oldVersionProxyChecking {
+		var legacyRequest []byte
+		legacyRequest, err = BuildLegacyProxyRequest(requestPacket)
+		if err != nil {
+			return nil, err
+		}
+		_, err = conn.Write(legacyRequest)
+	} else {
+		_, err = conn.Write(requestPacket)
+	}
 	if err != nil {
 		return response, utils.Errorf("write request failed: %s", err)
 	}

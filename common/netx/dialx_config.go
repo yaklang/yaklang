@@ -14,6 +14,7 @@ type dialXConfig struct {
 	// when empty proxy and EnableSystemProxyFromEnv(true),
 	// fetch via getProxyFromEnv()
 	EnableSystemProxyFromEnv bool
+	ForceProxy               bool
 	Proxy                    []string
 	KeepAlive                time.Duration
 
@@ -61,6 +62,12 @@ func SetDefaultDialXConfig(opt ...DialXOption) {
 func DialX_WithDisableProxy(b bool) DialXOption {
 	return func(c *dialXConfig) {
 		c.ForceDisableProxy = b
+	}
+}
+
+func DialX_WithForceProxy(b bool) DialXOption {
+	return func(c *dialXConfig) {
+		c.ForceProxy = b
 	}
 }
 

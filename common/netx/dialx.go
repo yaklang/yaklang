@@ -55,6 +55,10 @@ RETRY:
 	}
 
 	if len(config.Proxy) <= 0 || config.ForceDisableProxy {
+		if len(config.Proxy) == 0 && !config.ForceDisableProxy && config.ForceProxy {
+			return nil, utils.Errorf("force proxy but no proxy available for target: %v", target)
+		}
+
 		if config.Debug {
 			log.Infof("dial %s without proxy", target)
 		}
