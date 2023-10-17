@@ -119,7 +119,6 @@ require (
 	google.golang.org/protobuf v1.30.0
 	gopkg.in/fatih/set.v0 v0.2.1
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
-	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/sourcemap.v1 v1.0.5
 	gopkg.in/yaml.v2 v2.4.0
