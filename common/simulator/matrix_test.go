@@ -77,7 +77,7 @@ func TestDataMatrix(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			matrix := DataMatrix{
+			matrix := DataMatrix[string]{
 				ItemList: tt.args.items,
 				TagList:  tt.args.tags,
 				Data:     tt.args.data,
@@ -108,7 +108,7 @@ func TestMatrix(t *testing.T) {
 		{0.83, 0.82, 0.84, 0},
 		{0.1, 0.09, 0.08, 0},
 	}
-	matrix := DataMatrix{
+	matrix := DataMatrix[string]{
 		ItemList: selectors,
 		TagList:  tags,
 		Data:     data,

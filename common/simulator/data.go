@@ -46,15 +46,15 @@ var loginKeyword = []string{
 }
 
 var KeywordDict = map[string][]string{
-	"username": usernameKeyword,
-	"password": passwordKeyword,
-	"captcha":  captchaKeyword,
-	"login":    loginKeyword,
+	"Username": usernameKeyword,
+	"Password": passwordKeyword,
+	"Captcha":  captchaKeyword,
+	"Login":    loginKeyword,
 }
 
 var SimpleKeywordDict = map[string][]string{
-	"username": simpleUsernameKeyword,
-	"password": simplePasswordKeyword,
-	"captcha":  simpleCaptchaKeyword,
-	"login":    loginKeyword,
+	"Username": simpleUsernameKeyword,
+	"Password": simplePasswordKeyword,
+	"Captcha":  simpleCaptchaKeyword,
+	"Login":    loginKeyword,
 }
