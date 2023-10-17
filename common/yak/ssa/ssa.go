@@ -337,7 +337,7 @@ var _ InstructionValue = (*Phi)(nil)
 // ----------- Const
 // ConstInst also have block pointer, which block set this const to variable
 type ConstInst struct {
-	Const
+	*Const
 	anInstruction
 }
 
