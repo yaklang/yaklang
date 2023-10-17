@@ -3324,6 +3324,9 @@ message FuzzerRequest {
   bytes BatchTarget = 44;
   bool AfterRequested = 45;
   bool StopAtFirstMatch = 46;
+
+  // retry task id
+  int64 RetryTaskID = 47;
 }
 
 message KVPair {
