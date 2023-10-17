@@ -194,11 +194,10 @@ func isHTTPConnectWork(c net.Conn) bool {
 	if err != nil {
 		return false
 	}
-	proto, code, _, ok := utils.ParseHTTPResponseLine(strings.TrimSpace(string(firstLine)))
-	if !(ok && code >= 200 && code < 400) {
+	_, code, _, _ := utils.ParseHTTPResponseLine(strings.TrimSpace(string(firstLine)))
+	if code < 200 || code > 400 {
 		return false
 	}
-	_ = proto
 	for {
 		line, err := utils.ReadConnUntil(c, 5*time.Second, '\n')
 		if err != nil {
