@@ -41,9 +41,11 @@ func TestPerformance(t *testing.T) {
 		}
 	}
 	for _, v := range [][]any{
-		//{"{{raw()}}{{repeat(3)}}", map[string]int{"raw": 1, "repeat": 1}},
+		{"{{array(a|b)::rep}}{{repeat(3)}}", map[string]int{"raw": 1, "repeat": 1}},
+		{"{{raw()}}{{repeat(3)}}", map[string]int{"raw": 1, "repeat": 1}},
 		{"{{raw({{array(a|b|c)}})}}", map[string]int{"raw": 3, "array": 1}},
 		{"{{randstr()}}{{repeat(10)}}", map[string]int{"randstr": 1, "repeat": 1}},
+		{"{{randstr::dyn()}}{{repeat(10)}}", map[string]int{"randstr": 10, "repeat": 1}},
 		{"{{array(a|b|c)}}{{repeat(2)}}", map[string]int{"array": 1, "repeat": 1}},
 	} {
 		t, r := v[0].(string), v[1].(map[string]int)
