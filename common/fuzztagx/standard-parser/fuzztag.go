@@ -66,7 +66,8 @@ func (f *FuzzTag) Exec(raw FuzzResult, methods ...map[string]TagMethod) ([]FuzzR
 		return nil
 	}
 	if err := compile(); err != nil { // 对于编译错误，返回原文
-		return []FuzzResult{FuzzResult(fmt.Sprintf("{{%s}}", data))}, nil
+		escaper := NewDefaultEscaper(`\`, "{{", "}}")
+		return []FuzzResult{FuzzResult(fmt.Sprintf("{{%s}}", escaper.Escape(data)))}, nil
 	}
 	var fun TagMethod
 	if f.Methods != nil {
