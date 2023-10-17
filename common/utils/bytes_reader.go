@@ -69,7 +69,7 @@ func ReadConnUntil(conn net.Conn, timeout time.Duration, sep ...byte) ([]byte, e
 	var result bytes.Buffer
 	conn.SetReadDeadline(time.Now().Add(timeout))
 	defer func() {
-		conn.SetDeadline(time.Time{})
+		conn.SetReadDeadline(time.Time{})
 	}()
 
 	var stopWord = make(map[byte]struct{})
