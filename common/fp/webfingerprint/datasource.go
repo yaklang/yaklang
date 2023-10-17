@@ -83,11 +83,19 @@ func MockWebFingerPrintByName(name string) (string, int) {
 				for _, keyword := range m.Keywords {
 					if _, exists := nameMap[keyword.Product]; exists {
 						fakeBody := keyword.Regexp
+						log.Debugf("[%s] fakeBody: %s", keyword.Product, fakeBody)
+
 						generates, err := regen.GenerateOne(fakeBody)
 						if err != nil {
 							continue
 						}
-						bodyStr += utils.CRLF + generates[0]
+						log.Debugf("[%s] generates: %s", keyword.Product, generates)
+
+						if strings.HasSuffix(keyword.Regexp, " )") || strings.HasSuffix(keyword.Regexp, " ") {
+							bodyStr += utils.CRLF + generates[0] + "filling"
+						} else {
+							bodyStr += utils.CRLF + generates[0]
+						}
 					}
 				}
 			}
@@ -99,10 +107,14 @@ func MockWebFingerPrintByName(name string) (string, int) {
 								header.HeaderName = utils.RandSecret(5)
 							}
 							fakeHeader := header.HeaderValue.Regexp
+							log.Debugf("[%s] fakeHeader: %s", header.HeaderValue.Product, fakeHeader)
+
 							generates, err := regen.GenerateVisibleOne(fakeHeader)
 							if err != nil {
 								continue
 							}
+							log.Debugf("[%s] generates: %s", header.HeaderValue.Product, generates)
+
 							if generates == " " {
 								generates = "filling"
 							}
@@ -141,7 +153,7 @@ func MockRandomWebFingerPrints() ([]string, string, int) {
 	r := rand.New(src)
 
 	// Generate a list of 10 random rules from the rules slice
-	randomRules := make([]*WebRule, 200)
+	randomRules := make([]*WebRule, 100)
 	for i := range randomRules {
 		randomRules[i] = rules[r.Intn(len(rules))]
 	}
@@ -161,12 +173,12 @@ func MockRandomWebFingerPrints() ([]string, string, int) {
 				for _, keyword := range m.Keywords {
 					ruleNames = append(ruleNames, keyword.Product)
 					fakeBody := keyword.Regexp
-					//log.Infof("[%s] fakeBody: %s", keyword.Product, fakeBody)
+					log.Debugf("[%s] fakeBody: %s", keyword.Product, fakeBody)
 					generates, err := regen.GenerateOne(fakeBody)
 					if err != nil {
 						continue
 					}
-					//log.Infof("[%s] generates: %s", keyword.Product, generates)
+					log.Debugf("[%s] generates: %s", keyword.Product, generates)
 					if strings.HasSuffix(keyword.Regexp, " )") || strings.HasSuffix(keyword.Regexp, " ") {
 						bodyStr += utils.CRLF + generates[0] + "filling"
 					} else {
@@ -186,12 +198,12 @@ func MockRandomWebFingerPrints() ([]string, string, int) {
 					}
 					if header.HeaderValue.Regexp != "" {
 						fakeHeader := header.HeaderValue.Regexp
-						//log.Infof("[%s] fakeHeader: %s", header.HeaderValue.Product, fakeHeader)
+						log.Debugf("[%s] fakeHeader: %s", header.HeaderValue.Product, fakeHeader)
 						generates, err := regen.GenerateVisibleOne(fakeHeader)
 						if err != nil {
 							continue
 						}
-						//log.Infof("[%s] generates: %s", header.HeaderValue.Product, generates)
+						log.Debugf("[%s] generates: %s", header.HeaderValue.Product, generates)
 
 						if generates == " " {
 							generates = "filling"
