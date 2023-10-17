@@ -53,7 +53,6 @@ func IndexAllSubstrings(s string, patterns ...string) (result [][2]int) {
 	for len(queue) > 0 {
 		node := queue[0]
 		queue = queue[1:]
-
 		for char, child := range node.children {
 			queue = append(queue, child)
 			failure := node.failure
@@ -61,7 +60,6 @@ func IndexAllSubstrings(s string, patterns ...string) (result [][2]int) {
 			for failure != root && failure.children[char] == nil {
 				failure = failure.failure
 			}
-
 			if next := failure.children[char]; next != nil {
 				child.failure = next
 				child.flag = child.flag | next.flag

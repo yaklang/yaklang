@@ -1,9 +1,7 @@
 package standard_parser
 
 import (
-	"errors"
 	"github.com/yaklang/yaklang/common/utils"
-	"math"
 )
 
 type fuzztagPos struct {
@@ -13,20 +11,9 @@ type fuzztagPos struct {
 }
 
 func Parse(raw string, tagTypes ...*TagDefine) ([]Node, error) {
-	// 用不合法字符表示转义符
-	var invilidUnicode rune = 0
-	getInvilidUnicode := func() rune {
-		invilidUnicode--
-		if invilidUnicode == ^math.MaxInt32 {
-			return 0
-		}
-		return invilidUnicode
-	}
-
 	// 去重、提取标签边界符
 	utagTypes := []*TagDefine{}
 	tagBoundaryMap := map[string]rune{} // 转义符映射
-	tagBoundaryMapReverse := map[rune]string{}
 	var tagBoundarys []string
 	typeMap := map[string]struct{}{}
 	for _, tagType := range tagTypes {
@@ -37,12 +24,6 @@ func Parse(raw string, tagTypes ...*TagDefine) ([]Node, error) {
 			}
 			for _, t := range l {
 				if _, ok := tagBoundaryMap[t]; !ok {
-					c := getInvilidUnicode()
-					if c == 0 {
-						return nil, errors.New("too many tags")
-					}
-					tagBoundaryMapReverse[c] = t
-					tagBoundaryMap[t] = c
 					tagBoundarys = append(tagBoundarys, t)
 				} else {
 					return nil, utils.Errorf("tag boundary of tag `%s` conflicts with other tags", tagType.name)
@@ -53,13 +34,27 @@ func Parse(raw string, tagTypes ...*TagDefine) ([]Node, error) {
 	}
 
 	// 查找所有标签位置信息
-	tagMarginPostions := IndexAllSubstrings(raw, tagBoundarys...)
+	tagBoundaryPostions1 := IndexAllSubstrings(raw, tagBoundarys...)
+	pre := [2]int{-1, -1}
+	tagBoundaryPostions := [][2]int{}
+	for _, postion := range tagBoundaryPostions1 {
+		if pre[0] != -1 {
+			if pre[1] == postion[1] { // 当多个字符串之前存在包含关系时，只保留长的字符串
+				//tagBoundaryPostions = append(tagBoundaryPostions, postion)
+
+			} else {
+				tagBoundaryPostions = append(tagBoundaryPostions, pre)
+			}
+		}
+		pre = postion
+	}
+	tagBoundaryPostions = append(tagBoundaryPostions, pre)
 	escapeSymbol := `\`
 	stack := utils.NewStack[*fuzztagPos]()
 	rootTags := []*fuzztagPos{}
 	isEscapeMode := false
 	nextStart := 0
-	for _, pos := range tagMarginPostions {
+	for _, pos := range tagBoundaryPostions {
 		if pos[1] < nextStart {
 			continue
 		}
@@ -73,7 +68,10 @@ func Parse(raw string, tagTypes ...*TagDefine) ([]Node, error) {
 		isleft := pos[0]%2 == 0
 		typ := tagTypes[tagIndex]
 		if isleft {
-			tag := &fuzztagPos{start: pos[1] + 2, tagType: typ}
+			if stack.Size() != 0 && stack.Peek().tagType.raw {
+				continue
+			}
+			tag := &fuzztagPos{start: pos[1] + len(typ.start), tagType: typ}
 			if stack.Size() != 0 {
 				top := stack.Peek()
 				top.subs = append(top.subs, tag)

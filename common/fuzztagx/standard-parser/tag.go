@@ -35,6 +35,10 @@ type BaseTag struct {
 	initOnce sync.Once
 }
 
+func (*BaseTag) IsNode() {
+
+}
+
 // DoOnce 用来对子结构体的初始化，可以在Exec函数中调用
 func (b *BaseTag) DoOnce(f func()) {
 	b.initOnce.Do(f)
@@ -60,6 +64,7 @@ type TagDefine struct {
 	start     string
 	end       string
 	tagStruct TagNode
+	raw       bool
 }
 
 func (t *TagDefine) NewTag() TagNode {
@@ -67,11 +72,16 @@ func (t *TagDefine) NewTag() TagNode {
 }
 
 // NewTagDefine hooks参数用于判断数据是否需要解析tag
-func NewTagDefine(name, start, end string, tagStruct TagNode) *TagDefine {
+func NewTagDefine(name, start, end string, tagStruct TagNode, raw ...bool) *TagDefine {
+	var r bool
+	if len(raw) > 0 {
+		r = raw[0]
+	}
 	return &TagDefine{
 		name:      name,
 		start:     start,
 		end:       end,
 		tagStruct: tagStruct,
+		raw:       r,
 	}
 }
