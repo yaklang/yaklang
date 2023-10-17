@@ -1373,6 +1373,9 @@ func (b *astbuilder) buildAnonymousFunctionDecl(stmt *yak.AnonymousFunctionDeclC
 	newFunc, symbol := b.NewFunc(funcName)
 	current := b.CurrentBlock
 	buildFunc := func() {
+		recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+		defer recoverRange()
+
 		b.FunctionBuilder = b.PushFunction(newFunc, symbol, current)
 
 		if stmt.EqGt() != nil {
