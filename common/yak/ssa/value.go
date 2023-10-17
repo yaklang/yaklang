@@ -8,7 +8,7 @@ func IsConst(v Value) bool {
 
 func ToConst(v Value) *Const {
 	if cinst, ok := v.(*ConstInst); ok {
-		return &cinst.Const
+		return cinst.Const
 	}
 
 	if c, ok := v.(*Const); ok {
