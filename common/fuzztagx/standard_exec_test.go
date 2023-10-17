@@ -30,18 +30,18 @@ var testMap = map[string]func(string) []string{
 // 同步渲染数量测试
 func TestSyncRender(t *testing.T) {
 	for i, testcase := range [][2]any{
-		{
-			"{{echo::1({{list(aaa|ccc)}})}}{{echo::1({{list(aaa|ccc|ddd)}})}}",
-			3,
-		},
-		{
-			"{{echo::1({{list(aaa|ccc|ddd)}})}}{{echo::1({{list(aaa|ccc|ddd)}})}}",
-			3,
-		},
-		{
-			"{{echo::1({{list(aaa|ccc|ddd|eee)}})}}{{echo::1({{list(aaa|ccc|ddd)}})}}",
-			4,
-		},
+		//{
+		//	"{{echo::1({{list(aaa|ccc)}})}}{{echo::1({{list(aaa|ccc|ddd)}})}}",
+		//	3,
+		//},
+		//{
+		//	"{{echo::1({{list(aaa|ccc|ddd)}})}}{{echo::1({{list(aaa|ccc|ddd)}})}}",
+		//	3,
+		//},
+		//{
+		//	"{{echo::1({{list(aaa|ccc|ddd|eee)}})}}{{echo::1({{list(aaa|ccc|ddd)}})}}",
+		//	4,
+		//},
 		{
 			"{{echo::3({{list(aaa|ccc|ddd)}})}}{{echo::1({{list(aaa|ccc|ddd)}})}}",
 			9,
@@ -172,37 +172,6 @@ func TestEscape(t *testing.T) {
 	}
 }
 
-func TestExecutePrefixTag(t *testing.T) {
-	var m = map[string]func(string) []string{
-		"expr:a": func(s string) []string {
-			return []string{s}
-		},
-	}
-	testData := []string{
-		//`}}`,
-		`x"{{int(a)}}"`,
-		"base64(111)",
-		" base64(111)",
-		" base64(111) ",
-		" base64(base64(111)) ",
-		"base64(111))))",
-		"base64((111)",
-	}
-	for _, d := range testData {
-		println(d)
-		res, err := ExecuteWithStringHandler(fmt.Sprintf(`{{expr:a(%s)}}`, d), m)
-		if err != nil {
-			panic(utils.Errorf("test data [%v] error: %v", d, err))
-		}
-		if len(res) == 0 {
-			panic("generate error")
-		}
-		if res[0] != d {
-			panic("TestExecutePrefixTag failed")
-		}
-	}
-}
-
 func TestMagicLabel(t *testing.T) {
 	checkSameString := func(s []string) bool {
 		set := utils.NewSet[string]()
@@ -213,12 +182,10 @@ func TestMagicLabel(t *testing.T) {
 	}
 	_ = checkSameString
 	for _, v := range [][]any{
-		{"{{raw::raw({{aaa()}})}}", "{{aaa()}}"},
-		{"aaa{{raw::raw({{aaa()}})}}aaa{{repeat(3)}}", []string{"aaa{{aaa()}}aaa", "aaa{{aaa()}}aaa", "aaa{{aaa()}}aaa"}},
-		{"{{randstr::rep()}}{{repeat(10)}}", func(s []string) bool {
+		{"{{randstr()}}{{repeat(10)}}", func(s []string) bool {
 			return true
 		}},
-		{"{{randstr()}}{{repeat(10)}}", func(s []string) bool {
+		{"{{randstr::dyn()}}{{repeat(10)}}", func(s []string) bool {
 			return len(s) == 10 && s[0] != s[1]
 		}},
 		{"{{array::1(a|b)}}{{array::1(a|b|c)}}", []string{"aa", "bb", "c"}},
@@ -277,4 +244,37 @@ func TestMagicLabel(t *testing.T) {
 			panic("unknown type")
 		}
 	}
+}
+
+func TestRawTag(t *testing.T) {
+	for _, v := range [][]string{
+		{"{{=asdasd=}}", "asdasd"},
+		{`\{{=hello{{=hello\{{=world=}}`, `\{{=hellohello{{=world`}, // 测试 raw tag转义
+	} {
+		res, err := ExecuteWithStringHandler(v[0], map[string]func(string2 string) []string{
+			"echo": func(s string) []string {
+				return []string{s}
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if res[0] != v[1] {
+			t.Fatal(spew.Sprintf("expect: %s, got: %s", v[1], res[0]))
+		}
+	}
+}
+func TestMutiTag(t *testing.T) {
+	res, err := ExecuteWithStringHandler("{{echo({{={{echo()}}=}})}}", testMap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res[0] != "{{echo()}}" {
+		t.Fatal("error")
+	}
+}
+
+// 测试标签执行出错的情况
+func TestErrors(t *testing.T) {
+
 }

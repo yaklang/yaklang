@@ -8,6 +8,10 @@ import (
 	"testing"
 )
 
+func TestIndexString(t *testing.T) {
+	res := IndexAllSubstrings("{{=aa=}}", "{{", "{{=", "}}", "=}}") //有点小bug
+	spew.Dump(res)
+}
 func TestEscaper_Unescape(t *testing.T) {
 	chars := []string{"{{", "("} // 单双字符
 	escaper := NewDefaultEscaper(chars...)

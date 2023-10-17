@@ -3,7 +3,7 @@ package fuzztagx
 import "github.com/yaklang/yaklang/common/fuzztagx/standard-parser"
 
 func ExecuteWithStringHandler(code string, funcMap map[string]func(string2 string) []string) ([]string, error) {
-	nodes, err := standard_parser.ParseFuzztag(code)
+	nodes, err := ParseFuzztag(code)
 	if err != nil {
 		return nil, err
 	}
@@ -24,12 +24,14 @@ func ExecuteWithStringHandler(code string, funcMap map[string]func(string2 strin
 		}
 	}
 	generator := standard_parser.NewGenerator(nodes, fMap)
+	generator.IgnoreError = true
 	res := []string{}
 	for {
-		if ok, err := generator.Generate(); ok {
-			if err != nil {
-				return nil, err
-			}
+		ok, err := generator.Generate()
+		if err != nil {
+			return nil, err
+		}
+		if ok {
 			res = append(res, string(generator.Result()))
 		} else {
 			break

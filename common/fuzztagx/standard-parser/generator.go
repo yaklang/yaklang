@@ -5,10 +5,12 @@ import (
 	"unsafe"
 )
 
+type GenerateConfig struct {
+	IgnoreError bool
+}
 type ExecNode interface {
 	Reset()              // 重置生成器
 	Exec() (bool, error) // 优先读取缓存，读完缓存后调用子生成器
-	FirstExec() error    // 第一次执行不进行反向传播
 	IsRep() bool
 }
 
@@ -54,11 +56,13 @@ func (s *StringExecNode) FirstExec() error {
 	return nil
 }
 func (s *StringExecNode) Exec() (bool, error) {
+	defer func() {
+		s.index++
+	}()
 	if s.index == 0 {
 		s.submitResult(FuzzResult(s.data))
-		return true, nil
+		return false, nil
 	}
-	s.index++
 	return false, nil
 }
 
@@ -70,6 +74,7 @@ func (s *StringExecNode) IsRep() bool {
 }
 
 type TagExecNode struct {
+	config          *GenerateConfig
 	data            TagNode
 	cache           *[]FuzzResult
 	isRep           bool
@@ -80,6 +85,7 @@ type TagExecNode struct {
 	index           int
 	submitResult    func(s FuzzResult)
 	backpropagation func() error
+	ignoreError     bool
 }
 
 func NewTagGenerator(tag TagNode, ctx *MethodContext) *TagExecNode {
@@ -90,15 +96,32 @@ func NewTagGenerator(tag TagNode, ctx *MethodContext) *TagExecNode {
 }
 
 // FirstExec 重置并执行
-func (f *TagExecNode) FirstExec() error {
+func (f *TagExecNode) FirstExec(bp, exec, all bool) error {
+	f.childGenerator.first = exec
 	_, err := f.childGenerator.Generate()
 	if err != nil {
 		return err
 	}
-	return f.exec(f.childGenerator.Result())
+
+	if exec {
+		err = f.exec(f.childGenerator.Result())
+	}
+	f.index = 1
+	f.submitResult((*f.cache)[0])
+	if all {
+		for _, param := range f.params {
+			if v, ok := param.(*TagExecNode); ok {
+				v.FirstExec(bp, exec, all)
+			}
+		}
+	}
+	return err
 }
 func (f *TagExecNode) exec(s FuzzResult) error {
 	res, err := f.data.Exec(s, f.methodCtx.methodTable)
+	if f.config.IgnoreError {
+		err = nil
+	}
 	if err != nil {
 		return err
 	}
@@ -107,52 +130,67 @@ func (f *TagExecNode) exec(s FuzzResult) error {
 		res = []FuzzResult{FuzzResult("")}
 	}
 	f.cache = &res
-	f.index = 1
-	f.submitResult((*f.cache)[0])
 	return nil
 }
 func (f *TagExecNode) Exec() (bool, error) {
+	defer func() {
+		f.index++
+	}()
 	if f.index >= len(*f.cache) {
-		ok, err := f.childGenerator.Generate()
-		if err != nil {
-			return false, err
-		}
 		if f.isRep { // 当生成失败且存在rep标签时，使用最后一个元素
 			f.submitResult((*f.cache)[len(*f.cache)-1])
 			return false, f.backpropagation()
 		}
-		if !ok {
-			return false, nil
+		ok, err := f.childGenerator.Generate()
+		if err != nil {
+			return false, err
 		}
-		return true, f.backpropagation()
+		if !ok {
+			f.submitResult(FuzzResult{})
+			return false, nil
+		} else {
+			return true, f.backpropagation()
+		}
 	}
-	defer func() {
-		f.index++
-	}()
 	f.submitResult((*f.cache)[f.index])
 	return true, f.backpropagation()
 }
 func (s *TagExecNode) Reset() {
 	s.index = 0
+	var bp func() error
+	for _, param := range s.params {
+		param.Reset()
+		v, ok := param.(*TagExecNode)
+		if ok {
+			v.submitResult((*v.cache)[v.index])
+			bp = v.backpropagation
+		}
+	}
+	if bp != nil {
+		bp()
+	}
 }
 func (s *TagExecNode) IsRep() bool {
 	return s.isRep
 }
 
 type Generator struct {
+	config    *GenerateConfig
 	container []FuzzResult
 	//index     int
 	data            []ExecNode
 	first           bool
 	backpropagation func() error
+	IgnoreError     bool
 }
 
-func newBackpropagationGenerator(f func() error, nodes []ExecNode) *Generator {
-	g := &Generator{data: nodes, container: make([]FuzzResult, len(nodes)), first: true, backpropagation: f}
+func newBackpropagationGenerator(f func() error, nodes []ExecNode, cfg *GenerateConfig) *Generator {
+	g := &Generator{data: nodes, container: make([]FuzzResult, len(nodes)), first: true, backpropagation: f, config: cfg}
 	for index, d := range g.data {
 		index := index
 		switch ret := d.(type) {
 		case *TagExecNode:
+			ret.config = cfg
 			ret.submitResult = func(s FuzzResult) {
 				g.container[index] = s
 			}
@@ -160,9 +198,12 @@ func newBackpropagationGenerator(f func() error, nodes []ExecNode) *Generator {
 			var bp func() error
 			childGen := newBackpropagationGenerator(func() error {
 				return bp()
-			}, ret.params)
+			}, ret.params, cfg)
 			bp = func() error {
-				return ret.exec(childGen.Result())
+				err := ret.exec(childGen.Result())
+				ret.index = 1
+				ret.submitResult((*ret.cache)[0])
+				return err
 			}
 			ret.childGenerator = childGen
 		case *StringExecNode:
@@ -174,6 +215,7 @@ func newBackpropagationGenerator(f func() error, nodes []ExecNode) *Generator {
 	return g
 }
 func NewGenerator(nodes []Node, table map[string]TagMethod) *Generator {
+	cfg := &GenerateConfig{}
 	methodCtx := &MethodContext{
 		methodTable:    table,
 		labelTable:     map[string]map[*TagExecNode]struct{}{},
@@ -200,7 +242,7 @@ func NewGenerator(nodes []Node, table map[string]TagMethod) *Generator {
 	}
 	g := newBackpropagationGenerator(func() error {
 		return nil
-	}, node2generator(nodes))
+	}, node2generator(nodes), cfg)
 	return g
 }
 
@@ -212,11 +254,19 @@ func (g *Generator) Result() FuzzResult {
 	return res
 }
 func (g *Generator) Generate() (bool, error) {
+	if g.IgnoreError {
+		g.config.IgnoreError = true
+	}
 	if g.first {
 		for _, d := range g.data {
-			err := d.FirstExec()
-			if err != nil {
-				return false, err
+			switch ret := d.(type) {
+			case *TagExecNode:
+				err := ret.FirstExec(false, true, false)
+				if err != nil {
+					return false, err
+				}
+			case *StringExecNode:
+				ret.submitResult(FuzzResult(ret.data))
 			}
 		}
 		g.first = false
@@ -253,13 +303,13 @@ func (g *Generator) Generate() (bool, error) {
 						if err != nil {
 							return false, err
 						}
-						genOneOk = ok1
+						genOneOk = genOneOk || ok1
 					}
 				}
 			}
 		}
 		if !genOneOk {
-			if !g.data[i].IsRep() && i < len(g.data)-1 { // 最后一个元素无法进位
+			if i < len(g.data)-1 { // 最后一个元素无法进位
 				i := i
 				successCallBacks = append(successCallBacks, func() error {
 					if v, ok := g.data[i].(*TagExecNode); ok {
@@ -270,16 +320,15 @@ func (g *Generator) Generate() (bool, error) {
 									for _, param := range v1.params {
 										execAllFirst(param)
 									}
-									t.FirstExec() //在这个节点第一次执行时已经判断了err，这里不用判断了
+									v1.FirstExec(false, true, true) //在这个节点第一次执行时已经判断了err，这里不用判断了
 								}
 							}
 							execAllFirst(v)
 							return v.backpropagation()
 						}
+						return v.FirstExec(true, false, true)
 					}
-					g.data[i].Reset()
-					_, err := g.data[i].Exec()
-					return err
+					return nil
 				})
 			}
 		} else {

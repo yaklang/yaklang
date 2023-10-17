@@ -1,8 +1,9 @@
-package standard_parser
+package fuzztagx
 
 import (
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/fuzztagx/standard-parser"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 )
@@ -13,21 +14,16 @@ const (
 )
 
 type FuzzTag struct {
-	BaseTag
+	standard_parser.BaseTag
 }
 
-func (f *FuzzTag) IsNode() {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (f *FuzzTag) Exec(raw FuzzResult, methods ...map[string]TagMethod) ([]FuzzResult, error) {
+func (f *FuzzTag) Exec(raw standard_parser.FuzzResult, methods ...map[string]standard_parser.TagMethod) ([]standard_parser.FuzzResult, error) {
 	data := string(raw)
 	name := ""
 	params := ""
 	labels := []string{}
 	compile := func() error {
-		matchedPos := IndexAllSubstrings(data, MethodLeft, MethodRight)
+		matchedPos := standard_parser.IndexAllSubstrings(data, MethodLeft, MethodRight)
 		if len(matchedPos) == 0 {
 			if isIdentifyString(data) {
 				name = data
@@ -66,10 +62,10 @@ func (f *FuzzTag) Exec(raw FuzzResult, methods ...map[string]TagMethod) ([]FuzzR
 		return nil
 	}
 	if err := compile(); err != nil { // 对于编译错误，返回原文
-		escaper := NewDefaultEscaper(`\`, "{{", "}}")
-		return []FuzzResult{FuzzResult(fmt.Sprintf("{{%s}}", escaper.Escape(data)))}, nil
+		escaper := standard_parser.NewDefaultEscaper(`\`, "{{", "}}")
+		return []standard_parser.FuzzResult{standard_parser.FuzzResult(fmt.Sprintf("{{%s}}", escaper.Escape(data)))}, nil
 	}
-	var fun TagMethod
+	var fun standard_parser.TagMethod
 	if f.Methods != nil {
 		methods = append(methods, *f.Methods)
 	}
@@ -84,8 +80,19 @@ func (f *FuzzTag) Exec(raw FuzzResult, methods ...map[string]TagMethod) ([]FuzzR
 	return fun(params)
 }
 
-func ParseFuzztag(code string) ([]Node, error) {
-	return Parse(code, NewTagDefine("fuzztag", "{{", "}}", &FuzzTag{}))
+type RawTag struct {
+	standard_parser.BaseTag
+}
+
+func (r *RawTag) Exec(result standard_parser.FuzzResult, m ...map[string]standard_parser.TagMethod) ([]standard_parser.FuzzResult, error) {
+	return []standard_parser.FuzzResult{result}, nil
+}
+
+func ParseFuzztag(code string) ([]standard_parser.Node, error) {
+	return standard_parser.Parse(code,
+		standard_parser.NewTagDefine("fuzztag", "{{", "}}", &FuzzTag{}),
+		standard_parser.NewTagDefine("rawtag", "{{=", "=}}", &RawTag{}, true),
+	)
 }
 
 func isIdentifyString(s string) bool {
