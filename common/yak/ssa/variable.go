@@ -78,7 +78,7 @@ func (f *Function) WriteSymbolTable(variable string, value Value) {
 		v = value
 	case *Const:
 		v = &ConstInst{
-			Const:         *value,
+			Const:         value,
 			anInstruction: newAnInstruction(f.builder.CurrentBlock),
 		}
 	default:

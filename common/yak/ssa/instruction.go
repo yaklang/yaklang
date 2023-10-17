@@ -73,7 +73,7 @@ func NewLoop(block *BasicBlock, cond Value) *Loop {
 
 func NewConstInst(c *Const, block *BasicBlock) *ConstInst {
 	v := &ConstInst{
-		Const:         *c,
+		Const:         c,
 		anInstruction: newAnInstruction(block),
 	}
 	return v
