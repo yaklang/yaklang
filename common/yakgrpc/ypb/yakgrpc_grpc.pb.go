@@ -366,7 +366,7 @@ type YakClient interface {
 	GetGlobalNetworkConfig(ctx context.Context, in *GetGlobalNetworkConfigRequest, opts ...grpc.CallOption) (*GlobalNetworkConfig, error)
 	SetGlobalNetworkConfig(ctx context.Context, in *GlobalNetworkConfig, opts ...grpc.CallOption) (*Empty, error)
 	ResetGlobalNetworkConfig(ctx context.Context, in *ResetGlobalNetworkConfigRequest, opts ...grpc.CallOption) (*Empty, error)
-	IsSetGlobalNetworkConfigPassWord(ctx context.Context, in *IsSetGlobalNetworkConfigPassWordRequest, opts ...grpc.CallOption) (*IsSetGlobalNetworkConfigPassWordResponse, error)
+	ValidP12PassWord(ctx context.Context, in *ValidP12PassWordRequest, opts ...grpc.CallOption) (*ValidP12PassWordResponse, error)
 	RequestYakURL(ctx context.Context, in *RequestYakURLParams, opts ...grpc.CallOption) (*RequestYakURLResponse, error)
 	// Wireshark
 	GetPcapMetadata(ctx context.Context, in *PcapMetadataRequest, opts ...grpc.CallOption) (*PcapMetadata, error)
@@ -3820,9 +3820,9 @@ func (c *yakClient) ResetGlobalNetworkConfig(ctx context.Context, in *ResetGloba
 	return out, nil
 }
 
-func (c *yakClient) IsSetGlobalNetworkConfigPassWord(ctx context.Context, in *IsSetGlobalNetworkConfigPassWordRequest, opts ...grpc.CallOption) (*IsSetGlobalNetworkConfigPassWordResponse, error) {
-	out := new(IsSetGlobalNetworkConfigPassWordResponse)
-	err := c.cc.Invoke(ctx, "/ypb.Yak/IsSetGlobalNetworkConfigPassWord", in, out, opts...)
+func (c *yakClient) ValidP12PassWord(ctx context.Context, in *ValidP12PassWordRequest, opts ...grpc.CallOption) (*ValidP12PassWordResponse, error) {
+	out := new(ValidP12PassWordResponse)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/ValidP12PassWord", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4288,7 +4288,7 @@ type YakServer interface {
 	GetGlobalNetworkConfig(context.Context, *GetGlobalNetworkConfigRequest) (*GlobalNetworkConfig, error)
 	SetGlobalNetworkConfig(context.Context, *GlobalNetworkConfig) (*Empty, error)
 	ResetGlobalNetworkConfig(context.Context, *ResetGlobalNetworkConfigRequest) (*Empty, error)
-	IsSetGlobalNetworkConfigPassWord(context.Context, *IsSetGlobalNetworkConfigPassWordRequest) (*IsSetGlobalNetworkConfigPassWordResponse, error)
+	ValidP12PassWord(context.Context, *ValidP12PassWordRequest) (*ValidP12PassWordResponse, error)
 	RequestYakURL(context.Context, *RequestYakURLParams) (*RequestYakURLResponse, error)
 	// Wireshark
 	GetPcapMetadata(context.Context, *PcapMetadataRequest) (*PcapMetadata, error)
@@ -5129,8 +5129,8 @@ func (UnimplementedYakServer) SetGlobalNetworkConfig(context.Context, *GlobalNet
 func (UnimplementedYakServer) ResetGlobalNetworkConfig(context.Context, *ResetGlobalNetworkConfigRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ResetGlobalNetworkConfig not implemented")
 }
-func (UnimplementedYakServer) IsSetGlobalNetworkConfigPassWord(context.Context, *IsSetGlobalNetworkConfigPassWordRequest) (*IsSetGlobalNetworkConfigPassWordResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method IsSetGlobalNetworkConfigPassWord not implemented")
+func (UnimplementedYakServer) ValidP12PassWord(context.Context, *ValidP12PassWordRequest) (*ValidP12PassWordResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ValidP12PassWord not implemented")
 }
 func (UnimplementedYakServer) RequestYakURL(context.Context, *RequestYakURLParams) (*RequestYakURLResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RequestYakURL not implemented")
@@ -10272,20 +10272,20 @@ func _Yak_ResetGlobalNetworkConfig_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Yak_IsSetGlobalNetworkConfigPassWord_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(IsSetGlobalNetworkConfigPassWordRequest)
+func _Yak_ValidP12PassWord_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ValidP12PassWordRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(YakServer).IsSetGlobalNetworkConfigPassWord(ctx, in)
+		return srv.(YakServer).ValidP12PassWord(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/ypb.Yak/IsSetGlobalNetworkConfigPassWord",
+		FullMethod: "/ypb.Yak/ValidP12PassWord",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(YakServer).IsSetGlobalNetworkConfigPassWord(ctx, req.(*IsSetGlobalNetworkConfigPassWordRequest))
+		return srv.(YakServer).ValidP12PassWord(ctx, req.(*ValidP12PassWordRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -11372,8 +11372,8 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Yak_ResetGlobalNetworkConfig_Handler,
 		},
 		{
-			MethodName: "IsSetGlobalNetworkConfigPassWord",
-			Handler:    _Yak_IsSetGlobalNetworkConfigPassWord_Handler,
+			MethodName: "ValidP12PassWord",
+			Handler:    _Yak_ValidP12PassWord_Handler,
 		},
 		{
 			MethodName: "RequestYakURL",
