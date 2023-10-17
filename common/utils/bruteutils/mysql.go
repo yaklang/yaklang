@@ -3,13 +3,14 @@ package bruteutils
 import (
 	"database/sql"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
-	"github.com/yaklang/yaklang/common/utils"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/utils"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -20,10 +21,9 @@ var mysqlAuth = &DefaultServiceAuthInfo{
 	DefaultUsernames: append([]string{"mysql", "root", "guest", "op", "ops"}),
 	DefaultPasswords: CommonPasswords,
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
+		i.Target = appendDefaultPort(i.Target, 3306)
 		res := i.Result()
 
-		// 208.97.164.65
-		i.Target = appendDefaultPort(i.Target, 3306)
 		conn, err := netx.DialTCPTimeout(defaultTimeout, i.Target)
 		if err != nil {
 			res.Finished = true
