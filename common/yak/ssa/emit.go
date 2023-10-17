@@ -47,7 +47,7 @@ func (f *FunctionBuilder) emit(i Instruction) {
 	// 		c.SetType(BasicTypes[Any])
 	// 	}
 	// }
-
+	i.SetSymbolTable(f.blockSymbolTable)
 	f.CurrentBlock.Insts = append(f.CurrentBlock.Insts, i)
 	f.SetReg(i)
 }
