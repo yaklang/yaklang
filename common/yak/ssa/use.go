@@ -38,6 +38,48 @@ func ReplaceValue(v Value, to Value) {
 	}
 }
 
+func ReplaceValueInRange(v Value, to Value, inRange func(Instruction) bool) {
+	for _, user := range v.GetUsers() {
+		if inst, ok := user.(Instruction); ok {
+			if m, ok := inst.(*Make); ok && m == m.Func.symbol {
+				continue
+			}
+			if !inRange(inst) {
+				continue
+			}
+			user.ReplaceValue(v, to)
+			// user.InferenceType()
+			to.AddUser(user)
+			v.RemoveUser(user)
+		}
+	}
+
+	// delete user in v.Value
+	if user, ok := v.(User); ok {
+		if toUser, ok := to.(User); ok {
+			values := user.GetValues()
+			for _, value := range values {
+				if inst, ok := value.(Instruction); ok {
+					if !inRange(inst) {
+						continue
+					}
+					switch v := value.(type) {
+					// 		//TODO:handler field chain direction
+					case *Field:
+						v.Obj = toUser
+						toUser.AddValue(v)
+						v.RemoveUser(user)
+						user.RemoveValue(v)
+						// AddValue(user, v)
+					default:
+						// 			value.RemoveUser(user)
+					}
+				}
+			}
+		}
+	}
+}
+
 func GetUser(v Value) []User {
 	user, ok := v.(User)
 	return lo.Filter(v.GetUsers(), func(u User, _ int) bool {

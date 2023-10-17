@@ -1,6 +1,8 @@
 package ssa
 
 import (
+	"sort"
+
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -84,10 +86,16 @@ func (f *Function) WriteSymbolTable(variable string, value Value) {
 	default:
 		return
 	}
-	if _, ok := f.symbolTable[variable]; !ok {
-		f.symbolTable[variable] = make([]InstructionValue, 0, 1)
+
+	list, ok := f.symbolTable[variable]
+	if !ok {
+		list = make([]InstructionValue, 0, 1)
 	}
-	f.symbolTable[variable] = append(f.symbolTable[variable], v)
+	list = append(list, v)
+	sort.Slice(list, func(i, j int) bool {
+		return list[i].GetPosition().StartLine > list[j].GetPosition().StartLine
+	})
+	f.symbolTable[variable] = list
 	v.SetVariable(variable)
 }
 
@@ -200,4 +208,20 @@ func (b *FunctionBuilder) CanBuildFreeValue(variable string) bool {
 		parent = parent.parentBuilder
 	}
 	return false
+}
+
+func (f *FunctionBuilder) GetVariableBefore(name string, before Instruction) Value {
+	name = f.GetIdByBlockSymbolTable(name)
+	if ivs, ok := f.symbolTable[name]; ok {
+		for _, iv := range ivs {
+			if iv.GetPosition().StartLine < before.GetPosition().StartLine {
+				if ci, ok := iv.(*ConstInst); ok {
+					return ci.Const
+				} else {
+					return iv
+				}
+			}
+		}
+	}
+	return nil
 }

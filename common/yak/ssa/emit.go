@@ -41,6 +41,21 @@ func EmitBefore(before, inst Instruction) {
 	}
 }
 
+func EmitAfter(after, inst Instruction) {
+	block := after.GetBlock()
+	insts := block.Insts
+	if index := slices.Index(insts, after); index > -1 {
+		// Extend the slice
+		insts = append(insts, nil)
+		// Move elements to create a new space
+		copy(insts[index+2:], insts[index+1:])
+		// Insert new element
+		insts[index+1] = inst
+		block.Insts = insts
+		block.Parent.SetReg(inst)
+	}
+}
+
 func (f *FunctionBuilder) emit(i Instruction) {
 	// if c, ok := i.(Value); ok {
 	// 	if utils.IsNil(c.GetType()) {
