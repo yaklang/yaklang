@@ -83,8 +83,8 @@ func (f *FuzzTag) Exec(raw FuzzResult, methods ...map[string]TagMethod) ([]FuzzR
 	return fun(params)
 }
 
-func ParseFuzztag(code string, tagTypes ...*TagDefine) ([]Node, error) {
-	return Parse(code, append([]*TagDefine{NewTagDefine("fuzztag", "{{", "}}", &FuzzTag{})}, tagTypes...)...)
+func ParseFuzztag(code string) ([]Node, error) {
+	return Parse(code, NewTagDefine("fuzztag", "{{", "}}", &FuzzTag{}))
 }
 
 func isIdentifyString(s string) bool {
