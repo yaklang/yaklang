@@ -1,9 +1,7 @@
 package netx
 
 import (
-	"bufio"
 	"context"
-	"crypto/tls"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -114,7 +112,6 @@ func connectForceProxy(ctx context.Context, target string, proxy string, connect
 		if err != nil {
 			return nil, err
 		}
-		conn = tls.Client(conn, utils.NewDefaultTLSConfig())
 		if urlIns.User != nil && urlIns.User.String() != "" {
 			// 有密码
 			_, _ = conn.Write(generateHTTPProxyConnectWithCredential(target, urlIns.User.String()))
@@ -122,9 +119,10 @@ func connectForceProxy(ctx context.Context, target string, proxy string, connect
 			// 无密码
 			_, _ = conn.Write(generateHTTPProxyConnect(target))
 		}
-		if readHTTP200(conn) {
+		if isHTTPConnectWork(conn) {
 			return conn, nil
 		}
+		conn.Close()
 		return nil, utils.Errorf("connect proxy(https) [%s] failed", proxy)
 	case strings.HasPrefix(proxy, "socks://"):
 		fallthrough
@@ -170,9 +168,10 @@ func connectForceProxy(ctx context.Context, target string, proxy string, connect
 		} else {
 			_, err = conn.Write(generateHTTPProxyConnect(target))
 		}
-		if readHTTP200(conn) {
+		if isHTTPConnectWork(conn) {
 			return conn, nil
 		}
+		conn.Close()
 		if err != nil {
 			return nil, utils.Errorf("connect proxy(http) [%s] failed: %s", proxy, err)
 		}
@@ -190,13 +189,37 @@ func parseProxyCredential(proxyURL string) (string, string) {
 	return username, password
 }
 
-func readHTTP200(c net.Conn) bool {
-	rsp, err := utils.ReadHTTPResponseFromBufioReader(bufio.NewReader(c), nil)
+func isHTTPConnectWork(c net.Conn) bool {
+	firstLine, err := utils.ReadConnUntil(c, 5*time.Second, '\n')
 	if err != nil {
-		log.Debugf("read response(readHTTP200) failed: %s", err)
 		return false
 	}
-	return rsp.StatusCode >= 200 && rsp.StatusCode < 400
+	_, code, _, _ := utils.ParseHTTPResponseLine(strings.TrimSpace(string(firstLine)))
+	if code < 200 || code > 400 {
+		return false
+	}
+	for {
+		line, err := utils.ReadConnUntil(c, 5*time.Second, '\n')
+		if err != nil {
+			return false
+		}
+		lineStr := string(line)
+		k, v, ok := strings.Cut(lineStr, ":")
+		if ok {
+			switch strings.ToLower(strings.TrimSpace(k)) {
+			case "content-length":
+				if codec.Atoi(strings.TrimSpace(v)) != 0 {
+					return false
+				}
+			case "transfer-encoding":
+				return false
+			}
+		}
+		if strings.TrimSuffix(lineStr, "\r\n") == "" || strings.TrimSuffix(lineStr, "\n") == "" {
+			break
+		}
+	}
+	return true
 }
 
 func generateHTTPProxyConnect(target string) []byte {

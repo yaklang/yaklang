@@ -60,6 +60,46 @@ func ReadWithContextTickCallback(ctx context.Context, rc io.Reader, callback fun
 	}
 }
 
+func ReadConnUntil(conn net.Conn, timeout time.Duration, sep ...byte) ([]byte, error) {
+	if conn == nil {
+		return nil, Error("empty(nil) conn")
+	}
+
+	var buf = make([]byte, 1)
+	var result bytes.Buffer
+	conn.SetReadDeadline(time.Now().Add(timeout))
+	defer func() {
+		conn.SetReadDeadline(time.Time{})
+	}()
+
+	var stopWord = make(map[byte]struct{})
+	for _, stop := range sep {
+		stopWord[stop] = struct{}{}
+	}
+
+	for {
+		n, err := conn.Read(buf)
+		if err != nil {
+			var netOpError interface{ Timeout() bool }
+			if errors.As(err, &netOpError) && netOpError != nil && netOpError.Timeout() {
+				if result.Len() > 0 {
+					return result.Bytes(), nil
+				} else {
+					return nil, err
+				}
+			}
+			return result.Bytes(), err
+		}
+		result.Write(buf[:n])
+		if n == 1 {
+			_, isStop := stopWord[buf[0]]
+			if isStop {
+				return result.Bytes(), nil
+			}
+		}
+	}
+}
+
 func StableReaderEx(conn net.Conn, timeout time.Duration, maxSize int) []byte {
 	ch := make([]byte, 1)
 	var n int

@@ -1,8 +1,11 @@
 package yakgrpc
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/netx"
 	"net/http"
 	"strings"
 	"sync"
@@ -1148,4 +1151,137 @@ rsp, req = poc.HTTP(packet, poc.proxy(mitmProxy))~
 		}
 	}
 
+}
+
+func TestGRPCMUSTPASS_MITM_LegacyProxy(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(40))
+	defer cancel()
+	stream, err := client.MITM(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	stream.Send(&ypb.MITMRequest{
+		Host: "127.0.0.1",
+		Port: uint32(mitmPort),
+	})
+
+	var token = utils.RandSecret(100)
+	var pass = false
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/abc" {
+			pass = true
+			writer.Write([]byte(token))
+		}
+	})
+
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			break
+		}
+
+		msg := string(rsp.GetMessage().GetMessage())
+		fmt.Println(msg)
+		if strings.Contains(msg, `starting mitm server`) {
+			packet, err := lowhttp.BuildLegacyProxyRequest(
+				lowhttp.ReplaceHTTPPacketHeader([]byte(`GET /abc HTTP/1.1
+Host: example.com
+
+`), "Host", utils.HostPort(host, port)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			conn, err := netx.DialX(utils.HostPort("127.0.0.1", mitmPort), netx.DialX_WithDisableProxy(true))
+			if err != nil {
+				spew.Dump(err)
+				t.Fatal("dialx mitm proxy failed")
+			}
+			conn.Write(packet)
+			rsp, err := utils.ReadHTTPResponseFromBufioReader(bufio.NewReader(conn), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw, _ := utils.HttpDumpWithBody(rsp, true)
+			if !bytes.Contains(raw, []byte(token)) {
+				t.Fatal("no token found")
+			}
+			cancel()
+			break
+		}
+	}
+
+	if !pass {
+		t.Fatal("not pass")
+	}
+}
+
+func TestGRPCMUSTPASS_MITM_LegacyProxyLowhttp(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(40))
+	defer cancel()
+	stream, err := client.MITM(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	stream.Send(&ypb.MITMRequest{
+		Host: "127.0.0.1",
+		Port: uint32(mitmPort),
+	})
+
+	var token = utils.RandSecret(100)
+	var pass = false
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/abc" {
+			pass = true
+			writer.Write([]byte(token))
+		}
+	})
+
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			break
+		}
+
+		msg := string(rsp.GetMessage().GetMessage())
+		fmt.Println(msg)
+		if strings.Contains(msg, `starting mitm server`) {
+			packet := lowhttp.ReplaceHTTPPacketHeader([]byte(`GET /abc HTTP/1.1
+Host: example.com
+
+`), "Host", utils.HostPort(host, port))
+			rsp, err := lowhttp.HTTP(
+				lowhttp.WithPacketBytes(packet),
+				lowhttp.WithProxy("http://"+utils.HostPort("127.0.0.1", mitmPort)),
+				lowhttp.WithForceLegacyProxy(true),
+				lowhttp.WithHost("127.0.0.1"),
+				lowhttp.WithPort(mitmPort),
+			)
+			if err != nil {
+				spew.Dump(err)
+				t.Fatal("lowhttp mitm proxy failed")
+			}
+			var raw = rsp.RawPacket
+			if !bytes.Contains(raw, []byte(token)) {
+				t.Fatal("no token found")
+			}
+			cancel()
+			break
+		}
+	}
+
+	if !pass {
+		t.Fatal("not pass")
+	}
 }
