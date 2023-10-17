@@ -4,6 +4,8 @@ package simulator
 
 import (
 	"github.com/PuerkitoBio/goquery"
+	"github.com/go-rod/rod"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"net/http"
@@ -186,4 +188,40 @@ func getDomCssList(doc *goquery.Document) ([]string, []string) {
 		queue = append(queue, curSel.Children())
 	}
 	return domRes[1:], cssRes
+}
+
+func ListRemove(targetList []string, obj string) []string {
+	for num, item := range targetList {
+		if item == obj {
+			return append(targetList[:num], targetList[num+1:]...)
+		}
+	}
+	return targetList
+}
+
+func ElementsMinus(origins, targets rod.Elements) rod.Elements {
+	result := make(rod.Elements, 0)
+	for count, origin := range origins {
+		flag := false
+		for num, target := range targets {
+			equal, err := origin.Equal(target)
+			if err != nil {
+				log.Errorf("check element equal error: %v", err)
+				continue
+			}
+			if equal {
+				targets = append(targets[:num], targets[num+1:]...)
+				flag = true
+				break
+			}
+		}
+		if !flag {
+			result = append(result, origin)
+		}
+		if len(targets) == 0 {
+			result = append(result, origins[count+1:]...)
+			return result
+		}
+	}
+	return result
 }

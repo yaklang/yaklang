@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"net/url"
+	"reflect"
 	"regexp"
 	"strings"
 	"time"
@@ -27,11 +28,11 @@ type HttpBruteForceCore struct {
 
 	starter             *BrowserStarter
 	page                *rod.Page
-	usernameSelector    string
-	passwordSelector    string
-	captchaSelector     string
-	captchaImgSelector  string
-	loginButtonSelector string
+	UsernameSelector    string
+	PasswordSelector    string
+	CaptchaSelector     string
+	CaptchaImgSelector  string
+	LoginButtonSelector string
 
 	compiler *regexp.Regexp
 	observer bool
@@ -49,11 +50,11 @@ func NewHttpBruteForceCore(targetUrl string, opts ...BruteConfigOpt) (*HttpBrute
 		resultChannel: config.ch,
 		similarity:    config.similarityDegree,
 
-		usernameSelector:    config.usernameSelector,
-		passwordSelector:    config.passwordSelector,
-		captchaSelector:     config.captchaSelector,
-		captchaImgSelector:  config.captchaImgSelector,
-		loginButtonSelector: config.loginButtonSelector,
+		UsernameSelector:    config.usernameSelector,
+		PasswordSelector:    config.passwordSelector,
+		CaptchaSelector:     config.captchaSelector,
+		CaptchaImgSelector:  config.captchaImgSelector,
+		LoginButtonSelector: config.loginButtonSelector,
 
 		observer: true,
 	}
@@ -162,6 +163,19 @@ func (bruteForce *HttpBruteForceCore) captchaModeInit() (err error) {
 }
 
 func (bruteForce *HttpBruteForceCore) elementDetect() (err error) {
+	err = bruteForce.inputElementDetect()
+	if err != nil {
+		return
+	}
+	err = bruteForce.imgElementDetect()
+	if err != nil {
+		return
+	}
+	err = bruteForce.buttonElementDetect()
+	return
+}
+
+func (bruteForce *HttpBruteForceCore) inputElementDetect() error {
 	inputSearchInfo := map[string]map[string][]string{
 		"input": {
 			"type": {
@@ -172,70 +186,133 @@ func (bruteForce *HttpBruteForceCore) elementDetect() (err error) {
 			},
 		},
 	}
-	if bruteForce.config.extraWaitLoadTime != 0 {
-		time.Sleep(time.Duration(bruteForce.config.extraWaitLoadTime) * time.Millisecond)
-	}
-	inputElements, err := customizedGetElement(bruteForce.page, inputSearchInfo)
+	originInputElements, err := customizedGetElement(bruteForce.page, inputSearchInfo)
 	if err != nil {
-		return
+		return err
 	}
-	if len(inputElements) == 0 {
+	if len(originInputElements) == 0 {
 		return utils.Error(`cannot find target input elements`)
 	}
-	log.Infof(`find input elements: %d`, len(inputElements))
-	tags := []string{"username", "password", "captcha"}
-	result, err := CalculateRelevanceMatrix(inputElements, tags)
+	removeElements := make(rod.Elements, 0)
+	toCheckTags := make([]string, 0)
+	//username
+	if bruteForce.UsernameSelector != "" {
+		usernameElement, err := bruteForce.page.Element(bruteForce.UsernameSelector)
+		if err != nil {
+			return utils.Errorf("find username element error: %v", err)
+		}
+		removeElements = append(removeElements, usernameElement)
+	} else {
+		toCheckTags = append(toCheckTags, "Username")
+	}
+	//password
+	if bruteForce.PasswordSelector != "" {
+		passwordElement, err := bruteForce.page.Element(bruteForce.PasswordSelector)
+		if err != nil {
+			return utils.Errorf("find password element error: %v", err)
+		}
+		removeElements = append(removeElements, passwordElement)
+	} else {
+		toCheckTags = append(toCheckTags, "Password")
+	}
+	//captcha
+	if bruteForce.CaptchaSelector != "" {
+		captchaElement, err := bruteForce.page.Element(bruteForce.CaptchaSelector)
+		if err != nil {
+			return utils.Errorf("find captcha element error: %v", err)
+		}
+		removeElements = append(removeElements, captchaElement)
+	} else {
+		toCheckTags = append(toCheckTags, "Captcha")
+	}
+	inputElements := ElementsMinus(originInputElements, removeElements)
+	// calculate
+	result, err := CalculateRelevanceMatrix(inputElements, toCheckTags)
 	if err != nil {
-		return
+		return err
 	}
-	if bruteForce.usernameSelector == "" {
-		if selector, ok := result["username"]; !ok || selector == "" {
-			return utils.Error(`username selector not found`)
+	unCheckTags := make([]string, 0)
+	removeElements = removeElements[:0]
+	values := reflect.ValueOf(bruteForce).Elem()
+	for _, tag := range toCheckTags {
+		tagResult, ok := result[tag]
+		if !ok || result[tag] == nil {
+			unCheckTags = append(unCheckTags, tag)
 		} else {
-			bruteForce.usernameSelector = selector
+			val := values.FieldByName(tag + "Selector")
+			tagSelector, err := GetSelector(tagResult)
+			if err != nil {
+				return utils.Errorf("element get selector error: %v", err)
+			}
+			t := reflect.ValueOf(tagSelector)
+			val.Set(t)
+			removeElements = append(removeElements, tagResult)
 		}
 	}
-	if bruteForce.passwordSelector == "" {
-		if selector, ok := result["password"]; !ok || selector == "" {
-			return utils.Error(`password selector not found`)
-		} else {
-			bruteForce.passwordSelector = selector
+	// left tags
+	if len(unCheckTags) > 0 {
+		leftElements := ElementsMinus(inputElements, removeElements)
+		unCheckResult, err := CheckTagElementFromParent(leftElements, unCheckTags)
+		if err != nil {
+			return utils.Errorf("check tag element from parent error: %v", err)
+		}
+		for _, tag := range unCheckTags {
+			r, _ := unCheckResult[tag]
+			if r == "" && tag != "Captcha" {
+				return utils.Errorf("%v selector not found", tag)
+			}
+			val := values.FieldByName(tag + "Selector")
+			_r := reflect.ValueOf(r)
+			val.Set(_r)
 		}
 	}
-	if bruteForce.captchaSelector == "" {
-		if selector, ok := result["captcha"]; ok && selector != "" {
-			bruteForce.captchaSelector = selector
-		}
+	return nil
+}
+
+func (bruteForce *HttpBruteForceCore) imgElementDetect() error {
+	if bruteForce.CaptchaSelector == "" {
+		log.Debugf("null captcha selector. img detect canceled")
+		return nil
 	}
-	if bruteForce.captchaSelector != "" {
-		var selector string
-		var ok bool
-		elements, err := FindLatestElement(bruteForce.page, bruteForce.captchaSelector, "img", 5)
+	if bruteForce.CaptchaImgSelector != "" {
+		return nil
+	}
+
+	elements, err := FindLatestElement(bruteForce.page, bruteForce.CaptchaSelector, "img", 5)
+	if err != nil {
+		return utils.Error(err)
+	}
+	if len(elements) == 0 {
+		return utils.Error(`cannot find target img elements`)
+	} else if len(elements) == 1 {
+		selector, err := GetSelector(elements.First())
 		if err != nil {
 			return utils.Error(err)
 		}
-		if len(elements) == 0 {
-			return utils.Error(`cannot find target img elements`)
-		} else if len(elements) == 1 {
-			selector, err = GetSelector(elements.First())
-			if err != nil {
-				return utils.Error(err)
-			}
-		} else {
-			log.Infof(`find img elements: %d`, len(elements))
-			imgResult, err := CalculateRelevanceMatrix(elements, []string{"captcha"})
-			if err != nil {
-				return utils.Error(err)
-			}
-			if selector, ok = imgResult["captcha"]; !ok || selector == "" {
-				return utils.Error(`captcha img element not found`)
-			}
+		bruteForce.CaptchaImgSelector = selector
+	} else {
+		log.Debugf(`find img elements: %d`, len(elements))
+		imgResult, err := CalculateRelevanceMatrix(elements, []string{"captcha"})
+		if err != nil {
+			return utils.Error(err)
 		}
-		if bruteForce.captchaImgSelector == "" {
-			bruteForce.captchaImgSelector = selector
+		imgElement, ok := imgResult["captcha"]
+		if !ok || imgElement == nil {
+			return utils.Error(`captcha img element not found`)
 		}
+		selector, err := GetSelector(imgElement)
+		if err != nil {
+			return utils.Error(err)
+		}
+		bruteForce.CaptchaImgSelector = selector
 	}
-	// captcha img
+	return nil
+}
+
+func (bruteForce *HttpBruteForceCore) buttonElementDetect() error {
+	if bruteForce.LoginButtonSelector != "" {
+		return nil
+	}
 	buttonSearchInfo := map[string]map[string][]string{
 		"input": {
 			"type": {
@@ -247,25 +324,37 @@ func (bruteForce *HttpBruteForceCore) elementDetect() (err error) {
 	}
 	buttonElements, err := customizedGetElement(bruteForce.page, buttonSearchInfo)
 	if err != nil {
-		return
+		return utils.Errorf("get summit/button element error: %v", err)
 	}
 	if len(buttonElements) == 0 {
-		return utils.Error(`cannot find target button elements`)
+		return utils.Error(`cannot find target summit/button elements`)
 	}
-	log.Infof(`find button elements: %d`, len(buttonElements))
-	buttonTags := []string{"login"}
+	log.Debugf(`find summit/button elements: %d`, len(buttonElements))
+	buttonTags := []string{"Login"}
 	buttonResult, err := CalculateRelevanceMatrix(buttonElements, buttonTags)
 	if err != nil {
-		return
+		return err
 	}
-	if bruteForce.loginButtonSelector == "" {
-		if selector, ok := buttonResult["login"]; !ok || selector == "" {
-			return utils.Error(`login button selector not found`)
-		} else {
-			bruteForce.loginButtonSelector = selector
+	if buttonElement, ok := buttonResult["Login"]; !ok || buttonElement == nil {
+		loginResult, err := CheckTagElementFromParent(buttonElements, buttonTags)
+		if err != nil {
+			return utils.Errorf("check login element from parents error: %v", err)
 		}
+		var loginSelector string
+		var ok bool
+		if loginSelector, ok = loginResult["Login"]; !ok || loginSelector == "" {
+			return utils.Error(`login button selector not found`)
+		}
+		bruteForce.LoginButtonSelector = loginSelector
+	} else {
+		loginSelector, err := GetSelector(buttonElement)
+		if err != nil {
+			return utils.Error(err)
+		}
+		bruteForce.LoginButtonSelector = loginSelector
 	}
-	return
+
+	return nil
 }
 
 func (bruteForce *HttpBruteForceCore) bruteForce() (err error) {
@@ -291,20 +380,20 @@ func (bruteForce *HttpBruteForceCore) login(username, password string) (bool, er
 	if bruteForce.config.extraWaitLoadTime != 0 {
 		time.Sleep(time.Duration(bruteForce.config.extraWaitLoadTime) * time.Millisecond)
 	}
-	err = ElementInput(bruteForce.page, bruteForce.usernameSelector, username)
+	err = ElementInput(bruteForce.page, bruteForce.UsernameSelector, username)
 	if err != nil {
 		return false, utils.Error(err)
 	}
-	err = ElementInput(bruteForce.page, bruteForce.passwordSelector, password)
+	err = ElementInput(bruteForce.page, bruteForce.PasswordSelector, password)
 	if err != nil {
 		return false, utils.Error(err)
 	}
-	if bruteForce.captchaSelector != "" {
-		captchaWords, err := bruteForce.captchaDetect.Detect(bruteForce.page, bruteForce.captchaImgSelector)
+	if bruteForce.CaptchaSelector != "" {
+		captchaWords, err := bruteForce.captchaDetect.Detect(bruteForce.page, bruteForce.CaptchaImgSelector)
 		if err != nil {
 			return false, utils.Error(err)
 		}
-		err = ElementInput(bruteForce.page, bruteForce.captchaSelector, captchaWords)
+		err = ElementInput(bruteForce.page, bruteForce.CaptchaSelector, captchaWords)
 		if err != nil {
 			return false, utils.Error(err)
 		}
@@ -316,7 +405,7 @@ func (bruteForce *HttpBruteForceCore) login(username, password string) (bool, er
 			bruteForce.observer = false
 		}
 	}
-	err = ElementClick(bruteForce.page, bruteForce.loginButtonSelector)
+	err = ElementClick(bruteForce.page, bruteForce.LoginButtonSelector)
 	if err != nil {
 		return false, utils.Error(err)
 	}
@@ -350,6 +439,7 @@ func (bruteForce *HttpBruteForceCore) login(username, password string) (bool, er
 		return false, utils.Error(err)
 	}
 	if status {
+		time.Sleep(time.Second)
 		b64, _ := ScreenShot(bruteForce.page)
 		result.b64 = b64
 		result.status = true
@@ -370,7 +460,7 @@ func (bruteForce *HttpBruteForceCore) loginDetectByUrl() (bool, error) {
 	if err != nil {
 		return false, utils.Error(err)
 	}
-	log.Infof(`%v %v`, info.URL, bruteForce.originUrl)
+	log.Debugf(`%v %v`, info.URL, bruteForce.originUrl)
 	if info.URL != bruteForce.originUrl {
 		return true, nil
 	}
@@ -383,7 +473,7 @@ func (bruteForce *HttpBruteForceCore) loginDetectByHTML() (bool, error) {
 		return false, utils.Error(err)
 	}
 	degree := GetPageSimilarity(currentHtml, bruteForce.html)
-	log.Infof(`%f %f`, degree, bruteForce.similarity)
+	log.Debugf(`%f %f`, degree, bruteForce.similarity)
 	if degree < bruteForce.similarity {
 		return true, nil
 	}
@@ -420,8 +510,8 @@ func (bruteForce *HttpBruteForceCore) Start() error {
 	if err != nil {
 		return utils.Errorf(`element detect error: %v`, err.Error())
 	}
-	log.Infof("username: %v\npassword: %v\ncaptcha: %v\ncaptcha img: %v\nlogin button: %v\n",
-		bruteForce.usernameSelector, bruteForce.passwordSelector, bruteForce.captchaSelector, bruteForce.captchaImgSelector, bruteForce.loginButtonSelector)
+	log.Debugf("username: %v\npassword: %v\ncaptcha: %v\ncaptcha img: %v\nlogin button: %v\n",
+		bruteForce.UsernameSelector, bruteForce.PasswordSelector, bruteForce.CaptchaSelector, bruteForce.CaptchaImgSelector, bruteForce.LoginButtonSelector)
 	err = bruteForce.bruteForce()
 	if err != nil {
 		return utils.Errorf(`brute force error: %v`, err.Error())

@@ -11,6 +11,8 @@ import (
 	"strings"
 )
 
+const maxParentLevel = 3
+
 func customizedGetElement(page *rod.Page, searchInfo map[string]map[string][]string) (rod.Elements, error) {
 	resultElements := make([]*rod.Element, 0)
 	for tagName, tagInfo := range searchInfo {
@@ -210,7 +212,7 @@ func ElementClick(page *rod.Page, selector string) (err error) {
 	if err != nil {
 		return
 	}
-	return element.Click(proto.InputMouseButtonLeft)
+	return element.Click(proto.InputMouseButtonLeft, 1)
 }
 
 func FindLatestElement(page *rod.Page, origin, tagName string, maxLevel int) (rod.Elements, error) {
@@ -260,4 +262,65 @@ func GetSelector(element *rod.Element) (string, error) {
 		return "", utils.Error(err)
 	}
 	return obj.Value.String(), nil
+}
+
+func CheckTagElementFromParent(elements rod.Elements, tags []string) (map[string]string, error) {
+	result := make(map[string]string)
+	for _, tag := range tags {
+		result[tag] = ""
+	}
+	for _, element := range elements {
+		if len(tags) == 0 {
+			break
+		}
+		tag, err := checkTagElementFromParent(element, tags)
+		if err != nil {
+			log.Errorf("check element tag error: %v", err)
+			continue
+		}
+		if tag != "" {
+			selector, err := GetSelector(element)
+			if err != nil {
+				return result, utils.Errorf("get element selector error: %v", err)
+			}
+			result[tag] = selector
+			tags = ListRemove(tags, tag)
+		}
+	}
+	return result, nil
+}
+
+func checkTagElementFromParent(element *rod.Element, tags []string) (string, error) {
+	for i := 0; i < maxParentLevel; i++ {
+		element, err := element.Parent()
+		if err != nil {
+			return "", utils.Errorf("get element parent error: %v", err)
+		}
+		outer, err := ElementToValue(element, `()=>this.outerHTML.replace(this.innerHTML, "")`)
+		if err != nil {
+			return "", utils.Errorf("get element html error: %v", err)
+		}
+		for _, tag := range tags {
+			simpleElementTypeList, _ := SimpleKeywordDict[tag]
+			if ArrayStringContains(simpleElementTypeList, outer) {
+				return tag, nil
+			}
+		}
+	}
+	return "", nil
+}
+
+func ElementsFilter(elements rod.Elements, selectors []string) rod.Elements {
+	result := make(rod.Elements, 0)
+	for _, element := range elements {
+		elementSelector, err := GetSelector(element)
+		if err != nil {
+			log.Errorf("get element selector error: %v", err)
+			continue
+		}
+		if !StringArrayContains(selectors, elementSelector) {
+			result = append(result, element)
+		}
+	}
+	return result
 }

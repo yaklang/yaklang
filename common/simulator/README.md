@@ -20,6 +20,9 @@
     - [simulator.captchaImgSelector](#captchaImgSelector)
     - [simulator.submitButtonSelector](#submitButtonSelector)
     - [simulator.loginDetectMode](#loginDetectMode)
+    - [simulator.exePath](#exePath)
+    - [simulator.extraWaitLoadTime](#extraWaitLoadTime)
+    - [simulator.leaklessStatus](#leaklessStatus)
 
 # simulator模块使用说明：
 
@@ -132,6 +135,8 @@
         
             func Info() return (string)
             func Base64() return (string)
+
+            func LoginSuccessUrl() return (string)
     }
 
 #### method
@@ -145,6 +150,8 @@
 `func (*BruteResult) Info() return (r0: string)` 本次爆破过程的部分信息
 
 `func (*BruteResult) Base64() return (r0: string)` 爆破成功时浏览器页面截图的base64编码
+
+`func (*BruteResult) LoginSuccessUrl() return (r0: string)` 爆破成功后跳转到的url
 
 ## <a id="httpbrute_3">API</a>
 
@@ -458,6 +465,75 @@ loginDetectMode包括三种：
 - `simulator.defaultChangeMode` 同时使用以上两种判断方法，两种方法都通过才确定登陆成功（默认）
 
 当使用了html页面变化程度进行判断时，可以通过degree设置判断相似程度的阈值，值越小表示尝试登陆后的页面相似程度越小，默认为0.6
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | simulator.BruteConfigOpt | 参数设置函数 |
+
+### <a id="exePath">simulator.exePath</a>
+
+设置chrome浏览器可执行文件路径
+
+#### 定义
+
+`simulator.exePath(exePath string) return (r0: simulator.BruteConfigOpt)`
+
+#### 参数
+
+| 参数名      | 参数类型   | 参数解释             |
+|----------|--------|------------------|
+| exePath  | string | chrome浏览器可执行文件路径 |
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | simulator.BruteConfigOpt | 参数设置函数 |
+
+### <a id="extraWaitLoadTime">simulator.extraWaitLoadTime</a>
+
+设置页面的额外等待时间 因为有些时候通过devtools拿到的页面状态为加载完成 但是实际上页面仍然在渲染部分内容
+此时可以通过该函数进行额外的等待时间的设置
+
+#### 定义
+
+`simulator.extraWaitLoadTime(timeout: int) return (r0: simulator.BruteConfigOpt)`
+
+#### 参数
+
+| 参数名     | 参数类型 | 参数解释                   |
+|---------|------|------------------------|
+| timeout | int  | 额外等待时间 (单位Millisecond) |
+
+#### 返回值
+
+| 返回值  | 返回值类型                    | 返回值解释  |
+|------|--------------------------|--------|
+| r0   | simulator.BruteConfigOpt | 参数设置函数 |
+
+### <a id="leaklessStatus">simulator.leaklessStatus</a>
+
+浏览器是否自动进程关闭设置
+浏览器自动进程关闭进行在windows下会报病毒 默认在windows下会关闭 如在windows下开启请关闭相关安全软件
+当关闭时 如果强制关闭爬虫进程时chrome.exe会存在后台 过多时需要手动进行关闭
+默认是`simulator.leaklessDefault`, 强制开启为`simulator.leaklessOn`，强制关闭为`simulator.leaklessOff`
+
+#### 定义
+
+`simulator.leaklessStatus(status: simulator.LeaklessMode) return (r0: simulator.BruteConfigOpt)`
+
+#### 参数
+
+| 参数名    | 参数类型                    | 参数解释     |
+|--------|-------------------------|----------|
+| status | simulator.LeaklessMode  | 自动进程关闭模式 |
+
+`simulator.LeaklessMode`包括三种：
+- `simulator.leaklessDefault` 默认根据系统进行选择 不设置为默认选项
+- `simulator.leaklessOn` 强制开启自动进程关闭模式
+- `simulator.leaklessOff` 强制关闭自动进程关闭模式
 
 #### 返回值
 

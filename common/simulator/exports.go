@@ -2,7 +2,9 @@
 // @Author bcy2007  2023/8/21 15:19
 package simulator
 
-var tempExports = map[string]interface{}{
+import "github.com/yaklang/yaklang/common/simulator/simple"
+
+var Exports = map[string]interface{}{
 	"HttpBruteForce": HttpBruteForce,
 
 	"username":             WithUsernameList,
@@ -30,4 +32,22 @@ var tempExports = map[string]interface{}{
 	"leaklessDefault": LeaklessDefault,
 	"leaklessOn":      LeaklessOn,
 	"leaklessOff":     LeaklessOff,
+
+	"simple": SimpleExports,
+}
+
+var SimpleExports = map[string]interface{}{
+	"createBrowser": simple.CreateHeadlessBrowser,
+
+	"wsAddress":      simple.WithWsAddress,
+	"proxy":          simple.WithProxy,
+	"noSandBox":      simple.WithNoSandBox,
+	"headless":       simple.WithHeadless,
+	"requestModify":  simple.WithRequestModification,
+	"responseModify": simple.WithResponseModification,
+
+	"bodyModifyTarget":    simple.BodyModifyTarget,
+	"bodyReplaceTarget":   simple.BodyReplaceTarget,
+	"headersModifyTarget": simple.HeadersModifyTarget,
+	"hostModifyTarget":    simple.HostModifyTarget,
 }

@@ -4,15 +4,17 @@ package simulator
 
 import (
 	"github.com/yaklang/yaklang/common/utils"
+	"golang.org/x/exp/slices"
 )
 
-type DataMatrix struct {
-	ItemList []string
+type DataMatrix[T any] struct {
+	//ItemList rod.Elements
+	ItemList []T
 	TagList  []string
 	Data     [][]float64
 }
 
-func (matrix *DataMatrix) ValidCheck() error {
+func (matrix *DataMatrix[T]) ValidCheck() error {
 	if len(matrix.Data) != len(matrix.ItemList) {
 		return utils.Errorf(`data items number: %v, item list length: %v`, len(matrix.Data), len(matrix.ItemList))
 	}
@@ -25,11 +27,11 @@ func (matrix *DataMatrix) ValidCheck() error {
 	return nil
 }
 
-func (matrix *DataMatrix) GetResult() (map[string]string, error) {
-	result := make(map[string]string)
-	var tempData = matrix.Data
-	var tempItem = matrix.ItemList
-	var tempTag = matrix.TagList
+func (matrix *DataMatrix[T]) GetResult() (map[string]T, error) {
+	result := make(map[string]T)
+	var tempData = slices.Clone(matrix.Data)
+	var tempItem = slices.Clone(matrix.ItemList)
+	var tempTag = slices.Clone(matrix.TagList)
 	var num int
 	for len(tempData) != 0 {
 		num++
@@ -55,7 +57,8 @@ func (matrix *DataMatrix) GetResult() (map[string]string, error) {
 			}
 		}
 		if maxData <= 0 {
-			result[tempTag[maxColumn]] = ""
+			var null T
+			result[tempTag[maxColumn]] = null
 		} else {
 			result[tempTag[maxColumn]] = tempItem[maxRow]
 		}
@@ -63,7 +66,7 @@ func (matrix *DataMatrix) GetResult() (map[string]string, error) {
 		tempTag = append(tempTag[:maxColumn], tempTag[maxColumn+1:]...)
 		tempData = afterRemove
 		//info := fmt.Sprintf("round %d result: %v %v %v %v", num, tempTag, tempItem, tempData, result)
-		//log.Info(info)
+		//log.Debug(info)
 	}
 	return result, nil
 }
