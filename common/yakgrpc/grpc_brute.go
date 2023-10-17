@@ -174,13 +174,24 @@ scan = func(bruteType) {
             if result.Ok {
                 success++
                 yakit.StatusCard("成功次数: "+bruteType, success, bruteType, "success")
-                risk.NewRisk(
-                    result.Target, risk.severity("high"), risk.type("weak-pass"),
-                    risk.typeVerbose("弱口令"),
-                    risk.title(sprintf("Weak Password[%v]：%v user(%v) pass(%v)", result.Type, result.Target, result.Username, result.Password)),
-                    risk.titleVerbose(sprintf("弱口令[%v]：%v user(%v) pass(%v)", result.Type, result.Target, result.Username, result.Password)),
-                    risk.details({"username": result.Username, "password": result.Password, "target": result.Target}),
-                )
+				if result.Username == "" && result.Password == "" {
+					risk.NewRisk(
+						result.Target, risk.severity("high"), risk.type("weak-pass"),
+						risk.typeVerbose("未授权访问"),
+						risk.title(sprintf("未授权访问[%v]：%v", result.Type, result.Target)),
+						risk.titleVerbose(sprintf("未授权访问[%v]：%v", result.Type, result.Target)),
+						risk.details({"target": result.Target}),
+					)
+				} else {
+					risk.NewRisk(
+						result.Target, risk.severity("high"), risk.type("weak-pass"),
+						risk.typeVerbose("弱口令"),
+						risk.title(sprintf("Weak Password[%v]：%v user(%v) pass(%v)", result.Type, result.Target, result.Username, result.Password)),
+						risk.titleVerbose(sprintf("弱口令[%v]：%v user(%v) pass(%v)", result.Type, result.Target, result.Username, result.Password)),
+						risk.details({"username": result.Username, "password": result.Password, "target": result.Target}),
+					)
+				}
+               
                 yakit.Output(yakit.TableData(tableName, {
                     columnType: result.Type,
                     columnTarget: result.Target,
