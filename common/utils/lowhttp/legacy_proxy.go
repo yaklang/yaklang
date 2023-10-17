@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func buildLegacyProxyRequest(req []byte) ([]byte, error) {
+func BuildLegacyProxyRequest(req []byte) ([]byte, error) {
 	var packetRequest bytes.Buffer
 	var writePath bool
 	var headerBytes bytes.Buffer

@@ -6,7 +6,7 @@ import (
 )
 
 func TestLegacyRequestProxy(t *testing.T) {
-	reqs, err := buildLegacyProxyRequest([]byte(`HEAD / HTTP/1.1
+	reqs, err := BuildLegacyProxyRequest([]byte(`HEAD / HTTP/1.1
 Host: www.baidu.com`))
 	if err != nil {
 		t.Fatal(err)
