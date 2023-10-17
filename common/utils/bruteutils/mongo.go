@@ -3,13 +3,24 @@ package bruteutils
 import (
 	"context"
 	"fmt"
+	"net"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
+
+type MongoDialer struct {
+}
+
+var defaultMongoDialer = &MongoDialer{}
+
+func (d *MongoDialer) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	return netx.DialContext(ctx, address)
+}
 
 var mongoAuth = &DefaultServiceAuthInfo{
 	ServiceName:      "mongodb",
@@ -23,7 +34,7 @@ var mongoAuth = &DefaultServiceAuthInfo{
 		ctx := context.Background()
 		host, port, _ := utils.ParseStringToHostPort(i.Target)
 		addr := fmt.Sprintf("mongodb://%s:%d", host, port)
-		clientOptions := options.Client().ApplyURI(addr)
+		clientOptions := options.Client().ApplyURI(addr).SetDialer(defaultMongoDialer)
 		mgoCli, err := mongo.Connect(ctx, clientOptions)
 		if err != nil {
 			log.Errorf("connect unauath mongodb failed: %s", err)
@@ -56,7 +67,7 @@ var mongoAuth = &DefaultServiceAuthInfo{
 		ctx := context.Background()
 
 		addr := fmt.Sprintf("mongodb://%s:%d", host, port)
-		clientOptions := options.Client().ApplyURI(addr).SetAuth(options.Credential{Username: username, Password: password})
+		clientOptions := options.Client().ApplyURI(addr).SetDialer(defaultMongoDialer).SetAuth(options.Credential{Username: username, Password: password})
 
 		mgoCli, err := mongo.Connect(ctx, clientOptions)
 		if err != nil {
