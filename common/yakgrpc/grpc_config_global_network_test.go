@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"os"
 	"strings"
 	"testing"
@@ -227,21 +228,27 @@ try {
 	_, _ = client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
 }
 
-func TestIsSetGlobalNetworkConfigPassWord(t *testing.T) {
+func TestValidP12PassWord(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		panic(err)
 	}
-	_, _ = client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
-	config, err := client.GetGlobalNetworkConfig(context.Background(), &ypb.GetGlobalNetworkConfigRequest{})
+	ca, key, err := tlsutils.GenerateSelfSignedCertKey("127.0.0.1", nil, nil)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
-	for _, v := range config.ClientCertificates {
-		_, err := client.ValidP12PassWord(context.Background(), &ypb.ValidP12PassWordRequest{Pkcs12Bytes: v.Pkcs12Bytes, Pkcs12Password: v.Pkcs12Password})
-		if err != nil {
-			log.Error(err)
-			t.FailNow()
-		}
+	cert, sKey, err := tlsutils.SignServerCrtNKeyEx(ca, key, "", false)
+	if err != nil {
+		t.Fatal(err)
 	}
+	p12Bytes, err := tlsutils.BuildP12(cert, sKey, "123456", ca)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.ValidP12PassWord(context.Background(), &ypb.ValidP12PassWordRequest{Pkcs12Bytes: p12Bytes, Pkcs12Password: []byte("123456")})
+	if err != nil {
+		log.Error(err)
+		t.FailNow()
+	}
+
 }
