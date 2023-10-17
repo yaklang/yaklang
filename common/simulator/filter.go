@@ -10,8 +10,8 @@ import (
 	"strings"
 )
 
-func CalculateRelevanceMatrix(elements rod.Elements, elementTypes []string) (map[string]string, error) {
-	result := make(map[string]string)
+func CalculateRelevanceMatrix(elements rod.Elements, elementTypes []string) (map[string]*rod.Element, error) {
+	result := make(map[string]*rod.Element)
 	keys := maps.Keys(KeywordDict)
 	if !ArrayInArray(elementTypes, keys) {
 		return result, utils.Error(`detect type more than exist type`)
@@ -39,16 +39,16 @@ func CalculateRelevanceMatrix(elements rod.Elements, elementTypes []string) (map
 		}
 		matrix = append(matrix, elementVector)
 	}
-	selectors := ElementsToSelectors(elements...)
+	//selectors := ElementsToSelectors(elements...)
 	//items := ElementsToValue(elements, `()=>this.outerHTML`)
-	m := DataMatrix{
-		ItemList: selectors,
+	m := DataMatrix[*rod.Element]{
+		ItemList: elements,
 		TagList:  elementTypes,
 		Data:     matrix,
 	}
 	err := m.ValidCheck()
 	if err != nil {
-		log.Info(selectors, elementTypes, matrix, len(selectors))
+		//log.Info(selectors, elementTypes, matrix, len(selectors))
 		return result, utils.Error("matrix valid check failed")
 
 	}

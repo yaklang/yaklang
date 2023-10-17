@@ -137,7 +137,7 @@ func (browser *VBrowser) createHijack() error {
 			if reg.MatchString(hijack.Request.URL().String()) {
 				err := modify.Modify(hijack.Response)
 				if err != nil {
-					log.Info(err)
+					log.Error(err)
 				}
 			}
 		}
