@@ -75,7 +75,8 @@ func (f *FuzzTag) Exec(raw standard_parser.FuzzResult, methods ...map[string]sta
 		}
 	}
 	if fun == nil {
-		return nil, utils.Errorf("fuzztag name %s not found", name)
+		return []standard_parser.FuzzResult{{}}, nil
+		//return nil, utils.Errorf("fuzztag name %s not found", name)
 	}
 	return fun(params)
 }

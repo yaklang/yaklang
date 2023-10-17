@@ -52,13 +52,12 @@ func Parse(raw string, tagTypes ...*TagDefine) ([]Node, error) {
 	escapeSymbol := `\`
 	stack := utils.NewStack[*fuzztagPos]()
 	rootTags := []*fuzztagPos{}
-	isEscapeMode := false
 	nextStart := 0
 	for _, pos := range tagBoundaryPostions {
 		if pos[1] < nextStart {
 			continue
 		}
-		if isEscapeMode && pos[1] >= len(escapeSymbol) { // 跳过被转义的边界符
+		if stack.Size() > 0 && pos[1] >= len(escapeSymbol) { // 跳过被转义的边界符
 			if raw[pos[1]-len(escapeSymbol):pos[1]] == escapeSymbol {
 				nextStart = pos[1] + len(tagBoundarys[pos[0]])
 				continue
@@ -68,7 +67,7 @@ func Parse(raw string, tagTypes ...*TagDefine) ([]Node, error) {
 		isleft := pos[0]%2 == 0
 		typ := tagTypes[tagIndex]
 		if isleft {
-			if stack.Size() != 0 && stack.Peek().tagType.raw {
+			if stack.Size() != 0 && stack.Peek().tagType.raw && !typ.raw {
 				continue
 			}
 			tag := &fuzztagPos{start: pos[1] + len(typ.start), tagType: typ}
@@ -77,19 +76,11 @@ func Parse(raw string, tagTypes ...*TagDefine) ([]Node, error) {
 				top.subs = append(top.subs, tag)
 			} else {
 				rootTags = append(rootTags, tag)
-				isEscapeMode = true
 			}
 			stack.Push(tag)
-		} else {
-			if stack.Size() != 0 {
-				if stack.Peek().tagType.name == typ.name {
-					top := stack.Pop()
-					top.end = pos[1]
-					if stack.Size() == 0 { // 根标签闭合
-						isEscapeMode = false
-					}
-				}
-			}
+		} else if stack.Size() != 0 && stack.Peek().tagType.name == typ.name {
+			top := stack.Pop()
+			top.end = pos[1]
 		}
 	}
 	// 过滤未闭合的标签
@@ -105,17 +96,21 @@ func Parse(raw string, tagTypes ...*TagDefine) ([]Node, error) {
 
 		return
 	}
-	escaper := NewDefaultEscaper(escapeSymbol, "{{", "}}")
+
+	escapersMap := map[*TagDefine]*Escaper{}
+	for _, tagType := range tagTypes {
+		escapersMap[tagType] = NewDefaultEscaper(escapeSymbol, tagType.start, tagType.end)
+	}
 	// 根据标签位位置信息解析tag
-	var newDatasFromPos func(start, end int, poss []*fuzztagPos, deep int) []Node
-	newDatasFromPos = func(start, end int, poss []*fuzztagPos, deep int) []Node {
+	var newDatasFromPos func(start, end int, tagType *TagDefine, poss []*fuzztagPos, deep int) []Node
+	newDatasFromPos = func(start, end int, tagType *TagDefine, poss []*fuzztagPos, deep int) []Node {
 		pre := start
 		res := []Node{}
 		var addRes func(s Node)
 		if deep > 0 {
 			addRes = func(s Node) {
-				if v, ok := s.(StringNode); ok {
-					v1, _ := escaper.Unescape(string(v))
+				if v, ok := s.(StringNode); ok && tagType != nil {
+					v1, _ := escapersMap[tagType].Unescape(string(v))
 					res = append(res, StringNode(v1))
 				} else {
 					res = append(res, s)
@@ -131,7 +126,7 @@ func Parse(raw string, tagTypes ...*TagDefine) ([]Node, error) {
 				continue
 			}
 			tag := pos.tagType.NewTag()
-			tag.AddData(newDatasFromPos(pos.start, pos.end, pos.subs, deep+1)...)
+			tag.AddData(newDatasFromPos(pos.start, pos.end, pos.tagType, pos.subs, deep+1)...)
 			s := raw[pre : pos.start-len(pos.tagType.start)]
 			if len(s) != 0 {
 				addRes(StringNode(s))
@@ -144,5 +139,5 @@ func Parse(raw string, tagTypes ...*TagDefine) ([]Node, error) {
 		}
 		return res
 	}
-	return newDatasFromPos(0, len(raw), filterValidTag(rootTags), 0), nil
+	return newDatasFromPos(0, len(raw), nil, filterValidTag(rootTags), 0), nil
 }
