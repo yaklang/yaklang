@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
@@ -828,8 +829,32 @@ RECONNECT:
 	traceInfo.DNSTime = dnsEnd.Sub(dnsStart) // safe
 	response.Https = https
 
+	// checking old proxy
+	oldVersionProxyChecking := false
+	var tryOldVersionProxy []string
 	if err != nil {
-		return response, err
+		errMsg := err.Error()
+		if strings.Contains(errMsg, `no proxy available`) {
+			noProxyDial := make([]netx.DialXOption, len(dialopts), len(dialopts)+1)
+			copy(noProxyDial, dialopts)
+			noProxyDial = append(noProxyDial, netx.DialX_WithDisableProxy(true))
+			for _, basicProxy := range lo.Filter(proxy, func(item string, index int) bool {
+				return utils.IsHttpOrHttpsUrl(item)
+			}) {
+				conn, err = netx.DialX(utils.ExtractHostPort(basicProxy), noProxyDial...)
+				if err != nil {
+					log.Debugf("try old version proxy failed: %s", err)
+					continue
+				}
+				oldVersionProxyChecking = true
+				enableHttp2 = false
+				tryOldVersionProxy = append(tryOldVersionProxy, basicProxy)
+			}
+		}
+
+		if conn == nil {
+			return response, err
+		}
 	}
 	response.RemoteAddr = conn.RemoteAddr().String()
 	response.PortIsOpen = true
@@ -857,7 +882,17 @@ RECONNECT:
 	if option.BeforeDoRequest != nil {
 		requestPacket = option.BeforeDoRequest(requestPacket)
 	}
-	_, err = conn.Write(requestPacket)
+
+	if oldVersionProxyChecking {
+		var legacyRequest []byte
+		legacyRequest, err = buildLegacyProxyRequest(requestPacket)
+		if err != nil {
+			return nil, err
+		}
+		_, err = conn.Write(legacyRequest)
+	} else {
+		_, err = conn.Write(requestPacket)
+	}
 	if err != nil {
 		return response, utils.Errorf("write request failed: %s", err)
 	}
