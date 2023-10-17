@@ -50,11 +50,34 @@ func TestEscaper_Unescape(t *testing.T) {
 			t.Fatal(errors.New(spew.Sprintf("unescape string `%s` error", s1)))
 		}
 	}
-	res, err := escaper.Unescape("\\")
+	res, err := escaper.Unescape(`\\`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res != "\\" {
-		t.Fatal(errors.New(spew.Sprintf("unescape string `%s` error", "\\\\")))
+	if res != `\` {
+		t.Fatal(errors.New(spew.Sprintf("unescape string `%s` error", `\\`)))
+	}
+}
+func TestAutoEscape(t *testing.T) {
+	chars := []string{"{{", "}}", "(", ")"} // 单双字符
+	escaper := NewDefaultEscaper(chars...)
+	for _, testcase := range [][2]string{
+		{
+			"{{asd())", // 测试边界
+			`\{{asd\(\)\)`,
+		},
+		{
+			"asd{{asd())aaa",
+			`asd\{{asd\(\)\)aaa`,
+		},
+		{
+			`asd\{{asd\())aaa`,
+			`asd\\\{{asd\\\(\)\)aaa`,
+		},
+	} {
+		res := escaper.Escape(testcase[0])
+		if testcase[1] != res {
+			t.Fatal(spew.Sprintf("expect: %s, got: %s", testcase[1], res))
+		}
 	}
 }

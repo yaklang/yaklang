@@ -20,7 +20,6 @@ func (s StringNode) IsNode() {
 type TagNode interface {
 	IsNode()
 	Exec(FuzzResult, ...map[string]TagMethod) ([]FuzzResult, error)
-
 	AddData(node ...Node)
 	AddLabel(label string)
 
@@ -36,7 +35,7 @@ type BaseTag struct {
 	initOnce sync.Once
 }
 
-// DoOnce 用来对子结构体的初始化
+// DoOnce 用来对子结构体的初始化，可以在Exec函数中调用
 func (b *BaseTag) DoOnce(f func()) {
 	b.initOnce.Do(f)
 }
@@ -66,6 +65,8 @@ type TagDefine struct {
 func (t *TagDefine) NewTag() TagNode {
 	return reflect.New(reflect.ValueOf(t.tagStruct).Type().Elem()).Interface().(TagNode)
 }
+
+// NewTagDefine hooks参数用于判断数据是否需要解析tag
 func NewTagDefine(name, start, end string, tagStruct TagNode) *TagDefine {
 	return &TagDefine{
 		name:      name,

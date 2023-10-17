@@ -23,17 +23,14 @@ func ExecuteWithStringHandler(code string, funcMap map[string]func(string2 strin
 			return
 		}
 	}
-	generator, err := standard_parser.NewGenerator(nodes, fMap)
-	if err != nil {
-		return nil, err
-	}
+	generator := standard_parser.NewGenerator(nodes, fMap)
 	res := []string{}
 	for {
-		if v, ok, err := generator.Generate(); ok {
+		if ok, err := generator.Generate(); ok {
 			if err != nil {
 				return nil, err
 			}
-			res = append(res, string(v))
+			res = append(res, string(generator.Result()))
 		} else {
 			break
 		}

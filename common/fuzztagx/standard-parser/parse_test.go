@@ -17,17 +17,17 @@ func TestGenerator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	generator, err := NewGenerator(nodes, map[string]TagMethod{
+	generator := NewGenerator(nodes, map[string]TagMethod{
 		"int": func(s string) ([]FuzzResult, error) {
 			return []FuzzResult{FuzzResult(s)}, nil
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
 	for {
-		if v, ok := generator.Generate(); ok {
-			println(v)
+		if ok, err := generator.Generate(); ok {
+			if err != nil {
+				t.Fatal(err)
+			}
+			println(generator.Result())
 		} else {
 			break
 		}

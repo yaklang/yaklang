@@ -1,6 +1,7 @@
 package standard_parser
 
 import (
+	"golang.org/x/exp/maps"
 	"strings"
 )
 
@@ -102,6 +103,20 @@ type Escaper struct {
 	escapeChars  map[string]stringx
 }
 
+func (e *Escaper) Escape(s string) string {
+	keys := maps.Keys(e.escapeChars)
+	poses := IndexAllSubstrings(s, keys...)
+	res := ""
+	pre := 0
+	for _, pos := range poses {
+		key := keys[pos[0]]
+		res += s[pre:pos[1]]
+		res += (e.escapeSymbol + key)
+		pre = pos[1] + len(key)
+	}
+	res += s[pre:]
+	return res
+}
 func (e *Escaper) Unescape(s string) (string, error) {
 	res, err := e.UnescapeEx(s)
 	return string(res), err
