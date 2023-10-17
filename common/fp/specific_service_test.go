@@ -20,7 +20,7 @@ func TestFingerprintRule(t *testing.T) {
 		t.FailNow()
 	}
 
-	host, port := webfingerprint.MockWebFingerPrintByName("lift")
+	host, port := webfingerprint.MockWebFingerPrintByName("bloomreach")
 
 	result, err := matcher.Match(host, port)
 
@@ -60,22 +60,10 @@ func TestMUSTPASS_FingerprintRule(t *testing.T) {
 		//fmt.Println(productName)
 		resultMap[productName] = true
 	}
-	var noMatchRes []string
-	var noMatchCount int
+
 	for _, want := range wantRules {
-		found := false
-		for productName := range resultMap {
-			if strings.Contains(productName, want) {
-				found = true
-				break
-			}
-		}
-		if !found {
-			noMatchRes = append(noMatchRes, want)
+		if _, exists := resultMap[want]; !exists {
 			t.Errorf("Expected product [%s] not found in the actual results", want)
 		}
-	}
-	if noMatchCount > 0 {
-		t.Errorf("names : %s all : %d", strings.Join(noMatchRes, ","), noMatchCount)
 	}
 }
