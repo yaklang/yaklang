@@ -102,6 +102,8 @@ type Instruction interface {
 
 	GetPosition() *Position
 	SetPosition(pos *Position)
+	SetSymbolTable(*blockSymbolTable)
+	GetSymbolTable() *blockSymbolTable
 }
 
 // both instruction and value
@@ -250,7 +252,8 @@ type anInstruction struct {
 	// function
 	Func *Function
 	// BasicBlock
-	Block *BasicBlock
+	Block       *BasicBlock
+	symbolTable *blockSymbolTable
 	// type
 	typs Type
 
@@ -261,8 +264,10 @@ type anInstruction struct {
 }
 
 // implement instruction
-func (a *anInstruction) GetBlock() *BasicBlock { return a.Block }
-func (a *anInstruction) GetParent() *Function  { return a.Func }
+func (a *anInstruction) GetBlock() *BasicBlock                        { return a.Block }
+func (a *anInstruction) GetParent() *Function                         { return a.Func }
+func (a *anInstruction) SetSymbolTable(symbolTable *blockSymbolTable) { a.symbolTable = symbolTable }
+func (a *anInstruction) GetSymbolTable() *blockSymbolTable            { return a.symbolTable }
 func (a *anInstruction) Pos() string {
 	if a.pos != nil {
 		return a.pos.String()
