@@ -50,7 +50,7 @@ func init() {
 		syntax.OpAnyCharNotNL:   opAnyCharNotNlOne,
 		syntax.OpAnyChar:        opAnyCharOne,
 		syntax.OpQuest:          opQuestOne,
-		syntax.OpStar:           opStar,
+		syntax.OpStar:           opStarOne,
 		syntax.OpPlus:           opPlusOne,
 		syntax.OpRepeat:         opRepeatOne,
 		syntax.OpCharClass:      opCharClassOne,
@@ -209,6 +209,10 @@ func opQuestOne(regexp *syntax.Regexp, args *GeneratorArgs) (*internalGenerator,
 func opStar(regexp *syntax.Regexp, args *GeneratorArgs) (*internalGenerator, error) {
 
 	return createRepeatingGenerator(regexp, args, noBound, noBound)
+}
+
+func opStarOne(regexp *syntax.Regexp, args *GeneratorArgs) (*internalGenerator, error) {
+	return createRepeatingGeneratorOne(regexp, args, 1, noBound)
 }
 
 func opPlus(regexp *syntax.Regexp, args *GeneratorArgs) (*internalGenerator, error) {
