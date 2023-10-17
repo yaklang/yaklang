@@ -195,7 +195,7 @@ func isHTTPConnectWork(c net.Conn) bool {
 		return false
 	}
 	proto, code, _, ok := utils.ParseHTTPResponseLine(strings.TrimSpace(string(firstLine)))
-	if ok && code >= 200 && code < 400 {
+	if !(ok && code >= 200 && code < 400) {
 		return false
 	}
 	_ = proto
