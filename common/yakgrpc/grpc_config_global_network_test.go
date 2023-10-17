@@ -238,7 +238,7 @@ func TestIsSetGlobalNetworkConfigPassWord(t *testing.T) {
 		panic(err)
 	}
 	for _, v := range config.ClientCertificates {
-		_, err := client.IsSetGlobalNetworkConfigPassWord(context.Background(), &ypb.IsSetGlobalNetworkConfigPassWordRequest{Pkcs12Bytes: v.Pkcs12Bytes, Pkcs12Password: v.Pkcs12Password})
+		_, err := client.ValidP12PassWord(context.Background(), &ypb.ValidP12PassWordRequest{Pkcs12Bytes: v.Pkcs12Bytes, Pkcs12Password: v.Pkcs12Password})
 		if err != nil {
 			log.Error(err)
 			t.FailNow()
