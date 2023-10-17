@@ -1,7 +1,5 @@
 package ssa
 
-import "github.com/yaklang/yaklang/common/utils"
-
 func NewCall(target Value, args, binding []Value, block *BasicBlock) *Call {
 	c := &Call{
 		anInstruction: newAnInstruction(block),
@@ -21,93 +19,52 @@ func NewCall(target Value, args, binding []Value, block *BasicBlock) *Call {
 }
 
 func (f *FunctionBuilder) NewCall(target Value, args []Value) *Call {
-	var freeValue []Value
-	var parent *Function
-	binding := make([]Value, 0, len(freeValue))
+	return NewCall(target, args, nil, f.CurrentBlock)
+}
 
-	switch inst := target.(type) {
-	case *Field:
-		// field
-		// if v, ok := inst.Obj.(Value); ok && inst.IsMethod {
-		// 	args = append([]Value{v}, args...)
-		// 	inst.IsMethod = false
-		// }
-		fun, ok := inst.GetLastValue().(*Function)
-		if ok {
-			freeValue = fun.FreeValues
-			parent = fun.parent
-		}
-	case *Function:
-		// Function
-		freeValue = inst.FreeValues
-	case *Parameter:
-		// is a freeValue, pass
-	case *Call:
-		// call, check the function
-		switch method := inst.Method.(type) {
-		case *Function:
-			fun := method.ReturnValue()[0].(*Function)
-			freeValue = fun.FreeValues
-			parent = fun.parent
-		}
-	default:
-		// other
-		// con't call
-		// f.NewError(Error, SSATAG, "call target is con't call: "+target.String())
-	}
+func (c *Call) HandleFreeValue(fvs map[string]bool) {
+	builder := c.GetParent().builder
 
-	if parent == nil {
-		parent = f.Function
-	}
-	getField := func(fun *Function, key string) bool {
-		if v := fun.builder.ReadField(key); v != nil {
-			binding = append(binding, v)
-			return true
-		}
-		return false
-	}
-	for index := range freeValue {
-		if para, ok := freeValue[index].(*Parameter); ok { // not modify
-			// find freeValue in parent function
-			if v := parent.builder.ReadVariable(para.variable, false); !utils.IsNil(v) {
-				switch v := v.(type) {
-				case *Parameter:
-					if !v.IsFreeValue {
-						// is parameter, just abort
-						continue
+	recoverBlock := builder.CurrentBlock
+	recoverSymbol := builder.blockSymbolTable
+	builder.CurrentBlock = c.Block
+	builder.blockSymbolTable = c.symbolTable
+	defer func() {
+		builder.CurrentBlock = recoverBlock
+		builder.blockSymbolTable = recoverSymbol
+	}()
+
+	// parent := builder.parentBuilder
+
+	for name, modify := range fvs {
+		// v := parent.readVariableByBlock(name, c.Block)
+		if v := builder.GetVariableBefore(name, c); v != nil {
+			// if v := builder.ReadVariable(name, false); v != nil {
+			if modify {
+				field := builder.NewCaptureField(name)
+				field.OutCapture = false
+				// EmitBefore(c, field)
+				EmitAfter(c, field)
+				field.SetPosition(c.GetPosition())
+				field.SetType(BasicTypes[Any])
+				builder.WriteVariable(name, field)
+				ReplaceValueInRange(v, field, func(inst Instruction) bool {
+					if inst.GetPosition() == nil {
+						return false
 					}
-					// is freeValue, find in current function
-				default:
-					binding = append(binding, v)
-					continue
-				}
+					if inst.GetPosition().StartLine > c.pos.StartLine {
+						return true
+					} else {
+						return false
+					}
+				})
+				//TODO: modify this binding
+				c.binding = append(c.binding, v)
+			} else {
+				c.binding = append(c.binding, v)
 			}
-			if parent != f.Function {
-				// find freeValue in current function
-				if v := f.ReadVariable(para.variable, false); !utils.IsNil(v) {
-					binding = append(binding, v)
-					continue
-				}
-			}
-			f.NewError(Error, SSATAG, BindingNotFound(para))
-		}
-
-		if field, ok := freeValue[index].(*Field); ok { // will modify in function must field
-			if getField(parent, field.Key.String()) {
-				continue
-			}
-			if parent != f.Function {
-				if getField(f.Function, field.Key.String()) {
-					continue
-				}
-			}
-			f.NewError(Error, SSATAG, BindingNotFound(field))
+		} else {
+			c.NewError(Error, SSATAG, BindingNotFound(name))
 		}
 	}
-	// if t := target.GetType(); !utils.IsNil(t) {
-	// 	if ft, ok := t.(*FunctionType); ok {
-	// c.SetType(ft.ReturnType)
-	// 	}
-	// }
-	return NewCall(target, args, binding, f.CurrentBlock)
 }

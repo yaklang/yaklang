@@ -3,16 +3,16 @@ package pass
 import "fmt"
 
 func BlockUnreachable() string {
-	return "this block unreachable!"
+	return "This block unreachable!"
 
 }
 
 func FunctionContReturnError() string {
-	return "this function con't return error"
+	return "This function con't return error"
 }
 
 func ValueIsNull() string {
-	return "this value is null"
+	return "This value is null"
 }
 
 func InvalidField(typ string) string {

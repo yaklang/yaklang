@@ -155,3 +155,22 @@ a.Append(1)
 a1 = "aaa"
 a1.A 
 
+
+
+{
+	a1 = 1 
+	f = () => {
+		print(a1) 
+	}
+	f()
+}
+f()
+
+{
+	closureA1 := 1
+	f2 = () => {
+		print(closureA1)
+	}
+	f2()
+}
+f2()

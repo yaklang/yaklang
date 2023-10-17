@@ -45,7 +45,12 @@ func getStrFlag(v Node, hasType bool) string {
 	case Instruction:
 		if i, ok := v.(*Field); ok {
 			if i.OutCapture {
-				return i.Key.String() + "-capture"
+				return i.Key.String() + "(modify)"
+			}
+		}
+		if m, ok := v.(*Make); ok {
+			if m.Func.symbol == m {
+				return m.Func.Name + "-symbol"
 			}
 		}
 		if f := v.GetParent(); f != nil {

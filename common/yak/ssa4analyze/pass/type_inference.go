@@ -270,7 +270,18 @@ func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
 		}
 	}
 
-	// handler ellipsis, unpack argument
+	// get function type
+	funcTyp, ok := c.Method.GetType().(*ssa.FunctionType)
+	if !ok {
+		return
+	}
+
+	// handle FreeValue
+	if funcTyp.FreeValue != nil {
+		c.HandleFreeValue(funcTyp.FreeValue)
+	}
+
+	// handle ellipsis, unpack argument
 	if c.IsEllipsis {
 		// getField := func(object ssa.User, key ssa.Value) *ssa.Field {
 		// 	var f *ssa.Field
@@ -293,12 +304,6 @@ func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
 		// for i := 1; i < num; i++ {
 		// 	c.Args = append(c.Args, getField(obj, ssa.NewConst(i)))
 		// }
-	}
-
-	// get function type
-	funcTyp, ok := c.Method.GetType().(*ssa.FunctionType)
-	if !ok {
-		return
 	}
 
 	// inference call instruction type
