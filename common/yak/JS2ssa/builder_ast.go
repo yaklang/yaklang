@@ -7,7 +7,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-const TAG ssa.ErrorTag = "JS"
 
 // entry point
 func (b *astbuilder) build(ast *JS.JavaScriptParser) {
@@ -123,29 +122,71 @@ func (b *astbuilder) buildSingleExpression(stmt JS.ISingleExpressionContext, Isl
 			return rValue, nil
 		}
 	}
-
-	return nil, nil
 }
 
 
 func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionContext) ssa.Value {
 	
-	//字面量
-	if s, ok := stmt.(*JS.LiteralExpressionContext); ok {
-		return b.buildLiteralExpression(s)
-	}
-
-	if s, ok := stmt.(*JS.AssignmentExpressionContext); ok {
-		return b.buildAssignmentExpression(s)
-	}
-
-	//数学运算
 	getValue := func(single getSingleExpr, i int) ssa.Value {
 		if s := single.SingleExpression(i); s != nil {
 			v, _ := b.buildSingleExpression(s, false)
 			return v
 		} else {
 			return nil
+		}
+	}
+	
+	// 字面量
+	if s, ok := stmt.(*JS.LiteralExpressionContext); ok {
+		return b.buildLiteralExpression(s)
+	}
+	// expr
+	if s, ok := stmt.(*JS.AssignmentExpressionContext); ok {
+		return b.buildAssignmentExpression(s)
+	}
+
+	// ++
+	if s, ok := stmt.(*JS.PostIncrementExpressionContext); ok {
+		if expr, ok := s.SingleExpression().(JS.ISingleExpressionContext); ok {
+			_, lValue := b.buildSingleExpression(expr, true)
+			if v := lValue.GetValue(b.FunctionBuilder); v == nil {
+				b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
+				return nil
+			} else {
+				rValue := b.EmitBinOp(ssa.OpAdd, lValue.GetValue(b.FunctionBuilder), ssa.NewConst(1))
+				lValue.Assign(rValue, b.FunctionBuilder)
+				return lValue.GetValue(b.FunctionBuilder)
+			}
+		}
+	}
+
+	// --
+	if s, ok := stmt.(*JS.PostIncrementExpressionContext); ok {
+		if expr, ok := s.SingleExpression().(JS.ISingleExpressionContext); ok {
+			_, lValue := b.buildSingleExpression(expr, true)
+			if v := lValue.GetValue(b.FunctionBuilder); v == nil {
+				b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
+				return nil
+			} else {
+				rValue := b.EmitBinOp(ssa.OpSub, lValue.GetValue(b.FunctionBuilder), ssa.NewConst(1))
+				lValue.Assign(rValue, b.FunctionBuilder)
+				return lValue.GetValue(b.FunctionBuilder)
+			}
+		}
+	}
+
+
+	if s, ok := stmt.(*JS.AssignmentOperatorExpressionContext); ok {
+		_, lValue := b.buildSingleExpression(s.SingleExpression(0), true)
+		rValue, _ := b.buildSingleExpression(s.SingleExpression(1), false)
+
+		if lValue == nil || rValue == nil {
+			b.NewError(ssa.Error, TAG, "in operator need two expression")
+			return nil
+		}
+
+		if f, ok := s.AssignmentOperator().(*JS.AssignmentOperatorContext); ok {
+			return b.buildAssignmentOperatorContext(f, lValue, rValue)
 		}
 	}
 
@@ -168,14 +209,34 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 			if s, ok := stmt.(*JS.EqualityExpressionContext); ok {
 				if op := s.Equals_(); op != nil {
 					single, Op, IsBinOp = s, ssa.OpEq, true
+				} else if op := s.NotEquals(); op != nil {
+					single, Op, IsBinOp = s, ssa.OpNotEq, true
+				} else {
+					break
 				}
 			}
-			return 
+
+			if s, ok := stmt.(*JS.RelationalExpressionContext); ok {
+				if op := s.LessThan(); op != nil {
+					single, Op, IsBinOp = s, ssa.OpLt, true
+				} else if op := s.MoreThan(); op != nil {
+					single, Op, IsBinOp = s, ssa.OpGt, true
+				} else if op := s.LessThanEquals(); op != nil {
+					single, Op, IsBinOp = s, ssa.OpLtEq, true
+				} else if op := s.GreaterThanEquals(); op != nil {
+					single, Op, IsBinOp = s, ssa.OpGtEq, true
+				} else {
+					break
+				}
+			}
+			return
 		}
 		b.NewError(ssa.Error, TAG, "binary operator not support: %s", stmt.GetText())
 		return
 	}
 
+	// 数学运算
+	
 	single, opcode, IsBinOp := getBinaryOp()
 	if IsBinOp {
 		op1 := getValue(single, 0)
@@ -201,6 +262,46 @@ func (b *astbuilder) buildSingleExpressionEx(stmt JS.ISingleExpressionContext, I
 	}
 	
 	return nil, nil
+}
+
+
+func (b *astbuilder) buildAssignmentOperatorContext(stmt *JS.AssignmentOperatorContext, lValue ssa.LeftValue, rValue ssa.Value) ssa.Value{
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
+	defer recoverRange()
+	
+	var Op ssa.BinaryOpcode
+	if op := stmt.PlusAssign(); op != nil{
+		Op = ssa.OpAdd
+	} else if op := stmt.MinusAssign(); op != nil{
+		Op = ssa.OpSub
+	} else if op := stmt.DivideAssign(); op != nil{
+		Op = ssa.OpDiv
+	} else if op := stmt.ModulusAssign(); op != nil{
+		Op = ssa.OpMod
+	} else if op := stmt.DivideAssign(); op != nil{
+		Op = ssa.OpDiv
+	} else if op := stmt.MultiplyAssign(); op != nil{
+		Op = ssa.OpMul
+	} else if op := stmt.LeftShiftArithmeticAssign(); op != nil{
+		Op = ssa.OpShl
+	} else if op := stmt.RightShiftArithmeticAssign(); op != nil{
+		Op = ssa.OpShr
+	} else if op := stmt.BitOrAssign(); op != nil{
+		Op = ssa.OpOr
+	} else if op := stmt.BitXorAssign(); op != nil{
+		Op = ssa.OpXor
+	} else if op := stmt.BitAndAssign(); op != nil{
+		Op = ssa.OpAnd
+	}
+	
+	// TODO:powerAssign **=, RightShiftLogicalAssign >>>=
+
+	value := b.EmitBinOp(Op, lValue.GetValue(b.FunctionBuilder), rValue)
+	lValue.Assign(value, b.FunctionBuilder)
+
+
+	fmt.Println("test assignOpreator: ",lValue.GetValue(b.FunctionBuilder))
+	return lValue.GetValue(b.FunctionBuilder)
 }
 
 
@@ -349,11 +450,11 @@ func (b *astbuilder) buildForStatement(stmt *JS.ForStatementContext) {
 	// 分为var和expr
 	var cond *JS.ExpressionSequenceContext
 
-	e := stmt.AllExpressionSequence()
-	fmt.Println("----------------------", stmt.GetText())
-	for i, v := range e{
-		println("for: ",i, v.GetText())
-	}
+	// e := stmt.AllExpressionSequence()
+	// fmt.Println("----------------------", stmt.GetText())
+	// for i, v := range e{
+	// 	println("for: ",i, v.GetText())
+	// }
 	// fmt.Println("for v1:",e[0].GetText())
 	// fmt.Println("for v2:",e[1].GetText())
 	// fmt.Println("for v3:",e[2].GetText())
@@ -367,24 +468,62 @@ func (b *astbuilder) buildForStatement(stmt *JS.ForStatementContext) {
 	// if len(e) == 1 {
 		// cond = nil
 	// }
-	
-	
-	if s, ok := stmt.VariableDeclarationList().(*JS.VariableDeclarationListContext); ok {
-		loop.BuildFirstExpr(func () []ssa.Value {
-			recoverRange := b.SetRange(&s.BaseParserRuleContext)
-			defer recoverRange()
-			return b.buildAllVariableDeclaration(s)
-		})
-	} else if s, ok := stmt.ExpressionSequence(0).(*JS.ExpressionSequenceContext); ok {
-		loop.BuildFirstExpr(func () []ssa.Value {
-			recoverRange := b.SetRange(&s.BaseParserRuleContext)
-			defer recoverRange()
-			var ret []ssa.Value
-			v := b.buildExpressionSequence(s)
-			ret = append(ret, v)
-			return ret
-		})
+
+	fmt.Println("---------------------")
+	if first, ok := stmt.ForFirst().(*JS.ForFirstContext); ok {
+		if f, ok := first.VariableDeclarationList().(*JS.VariableDeclarationListContext); ok {
+			loop.BuildFirstExpr(func() []ssa.Value {
+				recoverRange := b.SetRange(&f.BaseParserRuleContext)
+				defer recoverRange()
+				return b.buildAllVariableDeclaration(f)
+			})
+		} else if f, ok := first.ExpressionSequence().(*JS.ExpressionSequenceContext); ok {
+			loop.BuildFirstExpr(func() []ssa.Value {
+				recoverRange := b.SetRange(&f.BaseParserRuleContext)
+				defer recoverRange()
+				var ret []ssa.Value
+				ret = append(ret, b.buildExpressionSequence(f))
+				return ret
+			})
+		}
 	}
+
+	if expr, ok := stmt.ForSecond().(*JS.ForSecondContext); ok {
+		if e, ok := expr.ExpressionSequence().(*JS.ExpressionSequenceContext); ok {
+			cond = e
+		}
+	}
+
+	if third, ok := stmt.ForThird().(*JS.ForThirdContext); ok {
+		if t, ok := third.ExpressionSequence().(*JS.ExpressionSequenceContext); ok {
+			loop.BuildThird(func() []ssa.Value {
+				// build third expression in loop.latch
+				recoverRange := b.SetRange(&t.BaseParserRuleContext)
+				defer recoverRange()
+				var ret []ssa.Value
+				ret = append(ret, b.buildExpressionSequence(t))
+				return ret
+			})
+		}
+	}
+	
+	
+	// if s, ok := stmt.VariableDeclarationList().(*JS.VariableDeclarationListContext); ok {
+	// 	loop.BuildFirstExpr(func () []ssa.Value {
+	// 		recoverRange := b.SetRange(&s.BaseParserRuleContext)
+	// 		defer recoverRange()
+	// 		return b.buildAllVariableDeclaration(s)
+	// 	})
+	// } else if s, ok := stmt.ExpressionSequence(0).(*JS.ExpressionSequenceContext); ok {
+	// 	loop.BuildFirstExpr(func () []ssa.Value {
+	// 		recoverRange := b.SetRange(&s.BaseParserRuleContext)
+	// 		defer recoverRange()
+	// 		var ret []ssa.Value
+	// 		v := b.buildExpressionSequence(s)
+	// 		ret = append(ret, v)
+	// 		return ret
+	// 	})
+	// }
 
 
 	// 构建条件
@@ -412,6 +551,4 @@ func (b *astbuilder) buildForStatement(stmt *JS.ForStatementContext) {
 
 	loop.Finish()
 
-
-	fmt.Println(cond)
 }

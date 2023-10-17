@@ -1,4 +1,4 @@
-// Code generated from ./JavaScriptParser.g4 by ANTLR 4.13.0. DO NOT EDIT.
+// Code generated from ./JavaScriptParser.g4 by ANTLR 4.13.1. DO NOT EDIT.
 
 package parser // JavaScriptParser
 
@@ -88,6 +88,15 @@ type JavaScriptParserVisitor interface {
 
 	// Visit a parse tree produced by JavaScriptParser#ifStatement.
 	VisitIfStatement(ctx *IfStatementContext) interface{}
+
+	// Visit a parse tree produced by JavaScriptParser#forFirst.
+	VisitForFirst(ctx *ForFirstContext) interface{}
+
+	// Visit a parse tree produced by JavaScriptParser#forSecond.
+	VisitForSecond(ctx *ForSecondContext) interface{}
+
+	// Visit a parse tree produced by JavaScriptParser#forThird.
+	VisitForThird(ctx *ForThirdContext) interface{}
 
 	// Visit a parse tree produced by JavaScriptParser#DoStatement.
 	VisitDoStatement(ctx *DoStatementContext) interface{}
