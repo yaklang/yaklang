@@ -87,6 +87,10 @@ func (f *Function) WriteSymbolTable(variable string, value Value) {
 		return
 	}
 
+	if utils.IsNil(v) {
+		return
+	}
+
 	list, ok := f.symbolTable[variable]
 	if !ok {
 		list = make([]InstructionValue, 0, 1)
