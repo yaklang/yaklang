@@ -36,6 +36,25 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
+var (
+	taskIDBackTrackMap = make(map[int64]int64)
+	taskIDBackTrackMu  sync.Mutex
+)
+
+func taskIDBackTrack(taskID int64) []int64 {
+	var ok bool
+
+	results := make([]int64, 0)
+	for {
+		taskID, ok = taskIDBackTrackMap[taskID]
+		if !ok || taskID == 0 {
+			break
+		}
+		results = append(results, taskID)
+	}
+	return results
+}
+
 func Chardet(raw []byte) string {
 	res, err := chardet.NewTextDetector().DetectBest(raw)
 	if err != nil {
@@ -379,6 +398,10 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		}
 	}()
 
+	taskIDBackTrackMu.Lock()
+	taskIDBackTrackMap[int64(task.ID)] = req.RetryTaskID
+	taskIDBackTrackMu.Unlock()
+
 	/* 丢包过滤器 */
 	includeStatusCodeFilter := utils.NewPortsFilter()
 	var maxBody, minBody int64
@@ -449,15 +472,44 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		}
 		iInput = rawRequest
 	} else {
-		webFuzzerResponses, err := yakit.QueryFailedWebFuzzerResponse(s.GetProjectDatabase(), req.RetryTaskID)
+		webFuzzerResponses, err := yakit.QueryWebFuzzerResponseWithoutPaging(s.GetProjectDatabase(), req.RetryTaskID)
 		if err != nil {
 			return err
 		}
-		if len(webFuzzerResponses) == 0 {
+		failedResponses := make([]*yakit.WebFuzzerResponse, 0)
+		for _, resp := range webFuzzerResponses {
+			if !resp.OK {
+				failedResponses = append(failedResponses, resp)
+			} else {
+				respModel, err := resp.ToGRPCModel()
+				if err != nil {
+					log.Errorf("convert web fuzzer response to grpc model failed: %s", err)
+					continue
+				}
+				feedbackResponse(respModel, true)
+			}
+		}
+
+		oldIDs := taskIDBackTrack(int64(req.RetryTaskID))
+		oldSuccessResponses, err := yakit.QueryWebFuzzerResponseByTaskIDsWithOk(s.GetProjectDatabase(), oldIDs)
+		if err != nil {
+			log.Errorf("query old web fuzzer succes response failed: %s", err)
+		}
+
+		for _, resp := range oldSuccessResponses {
+			respModel, err := resp.ToGRPCModel()
+			if err != nil {
+				log.Errorf("convert web fuzzer response to grpc model failed: %s", err)
+				continue
+			}
+			feedbackResponse(respModel, true)
+		}
+
+		if len(failedResponses) == 0 {
 			return utils.Errorf("no failed web fuzzer request found")
 		}
 
-		iInput = lo.Map(webFuzzerResponses, func(i *yakit.WebFuzzerResponse, _ int) []byte {
+		iInput = lo.Map(failedResponses, func(i *yakit.WebFuzzerResponse, _ int) []byte {
 			return utils.UnsafeStringToBytes(i.Request)
 		})
 	}
