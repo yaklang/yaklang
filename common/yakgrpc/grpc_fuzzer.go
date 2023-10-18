@@ -263,6 +263,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
+	// retry
+	isRetry := req.RetryTaskID > 0
 
 	// hot code
 	var extraOpt []mutate.FuzzConfigOpt
@@ -371,7 +373,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		}
 		return nil
 	}
-	if req.RetryTaskID == 0 && req.GetRequest() == "" && len(req.GetRequestRaw()) <= 0 {
+	if !isRetry && req.GetRequest() == "" && len(req.GetRequestRaw()) <= 0 {
 		return utils.Errorf("empty request is not allowed")
 	}
 
@@ -416,7 +418,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 	}
 
 	var rawRequest []byte
-	if req.RetryTaskID == 0 {
+	if !isRetry {
 		if len(req.GetRequestRaw()) > 0 {
 			rawRequest = req.GetRequestRaw()
 		} else {
@@ -461,8 +463,11 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 
 	// 重试处理，通过taskid找到所有失败的发送包
 	var iInput any
-	var httpPoolOpts = make([]mutate.HttpPoolConfigOption, 0)
-	if req.RetryTaskID == 0 {
+	httpPoolOpts := make([]mutate.HttpPoolConfigOption, 0)
+	retryPayloadsMap := make(map[string][]string, 0) // key 是原始请求报文，value 是重试的payload，我们需要将重试的payload绑定回去
+	// 这里可能会出现原始请求报文一样的情况，但是这样也是因为payload没有而导致的，例如{{repeat(10)}}
+
+	if !isRetry {
 		// 插入 {{repeat(n)}}的fuzz标签
 		if req.GetRepeatTimes() > 0 {
 			var buf bytes.Buffer
@@ -472,6 +477,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		}
 		iInput = rawRequest
 	} else {
+		// 找到上次任务的包
 		webFuzzerResponses, err := yakit.QueryWebFuzzerResponseWithoutPaging(s.GetProjectDatabase(), req.RetryTaskID)
 		if err != nil {
 			return err
@@ -480,6 +486,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		for _, resp := range webFuzzerResponses {
 			if !resp.OK {
 				failedResponses = append(failedResponses, resp)
+				retryPayloadsMap[resp.Request] = strings.Split(resp.Payload, ",")
 			} else {
 				respModel, err := resp.ToGRPCModel()
 				if err != nil {
@@ -490,6 +497,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			}
 		}
 
+		// 回溯找到所有之前重试成功的包
 		oldIDs := taskIDBackTrack(int64(req.RetryTaskID))
 		oldSuccessResponses, err := yakit.QueryWebFuzzerResponseByTaskIDsWithOk(s.GetProjectDatabase(), oldIDs)
 		if err != nil {
@@ -565,7 +573,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_FuzzParams(mergedParams),
 			mutate.WithPoolOpt_RequestCountLimiter(requestCount))
 
-		if req.RetryTaskID > 0 {
+		if isRetry {
 			// 重试的时候，不需要渲染fuzztag
 			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ForceFuzz(false))
 		} else {
@@ -584,12 +592,17 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		var firstHeader, firstBody []byte
 		for result := range res {
 			task.HTTPFlowTotal++
-			var payloads = make([]string, len(result.Payloads))
-			for i, payload := range result.Payloads {
-				if len(payload) > 100 {
-					payload = payload[:100] + "..."
+			var payloads []string
+			if !isRetry {
+				payloads = make([]string, len(result.Payloads))
+				for i, payload := range result.Payloads {
+					if len(payload) > 100 {
+						payload = payload[:100] + "..."
+					}
+					payloads[i] = utils.ParseStringToVisible(payload)
 				}
-				payloads[i] = utils.ParseStringToVisible(payload)
+			} else {
+				payloads, _ = retryPayloadsMap[utils.UnsafeBytesToString(result.RequestRaw)]
 			}
 
 			var extractorResults []*ypb.KVPair
