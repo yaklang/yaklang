@@ -24,7 +24,7 @@ func init() {
 			}
 			log.Infof("use config: %v", string(raw))
 			yakit.Set(consts.GLOBAL_NETWORK_CONFIG, string(raw))
-			ConfigureNetX(defaultConfig)
+			ConfigureNetWork(defaultConfig)
 			yakit.Set(consts.GLOBAL_NETWORK_CONFIG_INIT, "1")
 			return nil
 		} else {
@@ -49,7 +49,7 @@ func init() {
 			log.Debugf("disallow ip address: %v", config.DisallowIPAddress)
 			log.Debugf("disallow domain: %v", config.DisallowDomain)
 			log.Debugf("global proxy: %v", config.GlobalProxy)
-			ConfigureNetX(&config)
+			ConfigureNetWork(&config)
 			return nil
 		}
 	})
@@ -73,10 +73,12 @@ func GetDefaultNetworkConfig() *ypb.GlobalNetworkConfig {
 	return defaultConfig
 }
 
-func ConfigureNetX(c *ypb.GlobalNetworkConfig) {
+func ConfigureNetWork(c *ypb.GlobalNetworkConfig) {
 	if c == nil {
 		return
 	}
+
+	consts.SetGlobalHTTPFlowSave(c.GetSaveHTTPFlow())
 
 	netx.SetDefaultDNSOptions(
 		netx.WithDNSFallbackDoH(c.DNSFallbackDoH),
@@ -137,7 +139,7 @@ func (s *Server) SetGlobalNetworkConfig(ctx context.Context, req *ypb.GlobalNetw
 	if err != nil {
 		return nil, err
 	}
-	ConfigureNetX(req)
+	ConfigureNetWork(req)
 	yakit.Set(consts.GLOBAL_NETWORK_CONFIG, string(defaultBytes))
 	return &ypb.Empty{}, nil
 }
@@ -149,7 +151,7 @@ func (s *Server) ResetGlobalNetworkConfig(ctx context.Context, req *ypb.ResetGlo
 		return nil, err
 	}
 	yakit.Set(consts.GLOBAL_NETWORK_CONFIG, string(raw))
-	ConfigureNetX(defaultConfig)
+	ConfigureNetWork(defaultConfig)
 	return &ypb.Empty{}, nil
 }
 
