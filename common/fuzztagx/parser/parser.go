@@ -1,4 +1,4 @@
-package standard_parser
+package parser
 
 import (
 	"github.com/yaklang/yaklang/common/utils"
