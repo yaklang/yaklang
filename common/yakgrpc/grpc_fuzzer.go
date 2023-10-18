@@ -43,11 +43,13 @@ var (
 
 func taskIDBackTrack(taskID int64) []int64 {
 	var ok bool
+	count := 0
 
 	results := make([]int64, 0)
 	for {
+		count++
 		taskID, ok = taskIDBackTrackMap[taskID]
-		if !ok || taskID == 0 {
+		if !ok || taskID == 0 || count > 1000 {
 			break
 		}
 		results = append(results, taskID)
