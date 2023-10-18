@@ -24,6 +24,7 @@ jobs:
               go test -timeout 20s ./common/jsonpath -v
               go test -timeout 20s ./common/domainextractor -v
               go test -timeout 20s ./common/mutate_tests ./common/fuzztag -v
+              go test -timeout 20s ./common/mutate_tests ./common/fuzztagx -v
               go test -timeout 20s ./common/utils -v
               go test -timeout 20s ./common/utils/tlsutils/...
               go test -timeout 20s -run TestQueryCVEWithFixName ./common/cve -v
