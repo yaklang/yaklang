@@ -15,14 +15,17 @@ import (
 	"time"
 )
 
-var DefaultLowHttpConnPool = &lowHttpConnPool{
-	maxIdleConn:        100,
-	maxIdleConnPerHost: 2,
-	connCount:          0,
-	idleConnTimeout:    90 * time.Second,
-	idleConn:           make(map[uint64][]*persistConn),
-	keepAliveTimeout:   30 * time.Second,
-}
+var (
+	DefaultLowHttpConnPool = &lowHttpConnPool{
+		maxIdleConn:        100,
+		maxIdleConnPerHost: 2,
+		connCount:          0,
+		idleConnTimeout:    90 * time.Second,
+		idleConn:           make(map[uint64][]*persistConn),
+		keepAliveTimeout:   30 * time.Second,
+	}
+	errServerClosedIdle = errors.New("conn pool: server closed idle connection")
+)
 
 type lowHttpConnPool struct {
 	idleConnMux        sync.RWMutex              //空闲连接访问锁
@@ -114,6 +117,7 @@ func (l *lowHttpConnPool) putIdleConn(conn *persistConn) error {
 		}
 	}
 	l.idleConn[cacheKeyHash] = append(l.idleConn[cacheKeyHash], conn)
+	conn.markReused()
 	return nil
 }
 
@@ -127,7 +131,8 @@ func (l *lowHttpConnPool) removeConnLocked(pConn *persistConn) error {
 	pConn.Conn.Close()
 	switch len(connList) {
 	case 0:
-		return utils.Errorf("remove Conn err : [not find this Conn from the Conn pool]")
+		log.Warn("remove Conn warning : [not find this Conn from the Conn pool]")
+		return nil
 	case 1:
 		if connList[0] == pConn {
 			delete(l.idleConn, key)
@@ -155,16 +160,19 @@ type persistConn struct {
 	alive    bool             //存活判断
 	sawEOF   bool             //连接是否EOF
 
-	idleAt          time.Time                 //进入空闲的时间
-	closeTimer      *time.Timer               //关闭定时器
-	dialOption      []netx.DialXOption        //dial 选项
-	br              *bufio.Reader             // from conn
-	bw              *bufio.Writer             // to conn
-	reqCh           chan requestAndResponseCh //读取管道
-	writeCh         chan writeRequest         //写入管道
-	closeCh         chan struct{}             //关闭信号
-	writeErrCh      chan error                //写入错误信号
-	serverStartTime time.Time                 //响应时间
+	idleAt               time.Time                 //进入空闲的时间
+	closeTimer           *time.Timer               //关闭定时器
+	dialOption           []netx.DialXOption        //dial 选项
+	br                   *bufio.Reader             // from conn
+	bw                   *bufio.Writer             // to conn
+	reqCh                chan requestAndResponseCh //读取管道
+	writeCh              chan writeRequest         //写入管道
+	closeCh              chan struct{}             //关闭信号
+	writeErrCh           chan error                //写入错误信号
+	serverStartTime      time.Time                 //响应时间
+	numExpectedResponses int                       //预期的响应数量
+	reused               bool                      //是否复用
+	closed               error                     //连接关闭原因
 
 	inPool bool
 	isIdle bool
@@ -281,22 +289,23 @@ func newPersistConn(key connectKey, pool *lowHttpConnPool, opt ...netx.DialXOpti
 	}
 	// 初始化连接
 	pc := &persistConn{
-		Conn:            newConn,
-		mu:              sync.Mutex{},
-		p:               pool,
-		cacheKey:        key,
-		isProxy:         needProxy,
-		sawEOF:          false,
-		idleAt:          time.Time{},
-		closeTimer:      nil,
-		dialOption:      opt,
-		reqCh:           make(chan requestAndResponseCh),
-		writeCh:         make(chan writeRequest),
-		closeCh:         make(chan struct{}),
-		writeErrCh:      make(chan error),
-		serverStartTime: time.Time{},
-		wPacket:         make([]packetInfo, 0),
-		rPacket:         make([]packetInfo, 0),
+		Conn:                 newConn,
+		mu:                   sync.Mutex{},
+		p:                    pool,
+		cacheKey:             key,
+		isProxy:              needProxy,
+		sawEOF:               false,
+		idleAt:               time.Time{},
+		closeTimer:           nil,
+		dialOption:           opt,
+		reqCh:                make(chan requestAndResponseCh),
+		writeCh:              make(chan writeRequest),
+		closeCh:              make(chan struct{}),
+		writeErrCh:           make(chan error),
+		serverStartTime:      time.Time{},
+		wPacket:              make([]packetInfo, 0),
+		rPacket:              make([]packetInfo, 0),
+		numExpectedResponses: 0,
 	}
 	pc.br = bufio.NewReader(pc)
 	pc.bw = bufio.NewWriter(persistConnWriter{pc})
@@ -309,7 +318,9 @@ func newPersistConn(key connectKey, pool *lowHttpConnPool, opt ...netx.DialXOpti
 
 func (pc *persistConn) readLoop() {
 	defer func() {
-		pc.removeConn()
+		if pc.reused {
+			pc.removeConn()
+		}
 	}()
 
 	tryPutIdleConn := func() bool {
@@ -326,29 +337,45 @@ func (pc *persistConn) readLoop() {
 	count := 0
 	alive := true
 	for alive {
-		_, peekErr := pc.br.Peek(1)
-		_ = peekErr
-		if peekErr != nil {
-			//log.Infof("!!!conn [%v] connect [%v] has be read [%d] return for peek error [%s]", pc.Conn.LocalAddr(), pc.cacheKey.addr, count, peekErr)
-			pc.closeConn(peekErr)
+		// 尝试peek error
+		_, err := pc.br.Peek(1)
+
+		// 检查是否有需要返回的响应，如果没有则可以直接返回，不需要往管道里返回数据（err）
+		if pc.numExpectedResponses == 0 {
+			if err == io.EOF {
+				pc.closeConn(errServerClosedIdle)
+			} else {
+				pc.closeConn(err)
+			}
 			return
 		}
 		info := httpInfo{ServerTime: time.Since(pc.serverStartTime)}
 
 		rc := <-pc.reqCh
 
-		//var resp *http.Response
-		resp, err := http.ReadResponse(pc.br, nil)
-		count++
+		var resp *http.Response
+
+		if err == nil {
+			resp, err = http.ReadResponse(pc.br, nil)
+			count++
+		} else {
+			// 包装一层error作为标识
+			err = connPoolReadFromServerError{err: err}
+		}
 
 		if err != nil {
-			log.Errorf("conn [%s] read error , has used %d ", pc.cacheKey.addr, count)
+			//log.Errorf("conn [%s] read error , has used %d ", pc.cacheKey.addr, count)
 			if err == io.EOF {
 				pc.sawEOF = true
 			}
 			rc.ch <- responseInfo{err: err}
 			return
 		}
+
+		pc.mu.Lock()
+		pc.numExpectedResponses--
+		pc.mu.Unlock()
+
 		_, ok := resp.Body.(io.Writer)
 		bodyWritable := ok
 		method, _, _ := GetHTTPPacketFirstLine(rc.reqPacket)
@@ -414,12 +441,14 @@ func (pc *persistConn) writeLoop() {
 				err = pc.bw.Flush()
 			}
 			pc.serverStartTime = time.Now()
-			//pc.writeErrCh <- err // to the body reader, which might recycle us
-			wr.ch <- err // to the roundTrip function
+			wr.ch <- err //to exec.go
 			if err != nil {
 				//log.Infof("!!!conn [%v] connect [%v] has be writed [%d]", pc.Conn.LocalAddr(), pc.cacheKey.addr, count)
 				return
 			}
+			pc.mu.Lock()
+			pc.numExpectedResponses++
+			pc.mu.Unlock()
 		case <-pc.closeCh:
 			//log.Infof("!!!conn [%v] connect [%v] has be writed [%d]", pc.Conn.LocalAddr(), pc.cacheKey.addr, count)
 			return
@@ -429,7 +458,7 @@ func (pc *persistConn) writeLoop() {
 
 func (pc *persistConn) closeConn(err error) {
 	pc.Conn.Close()
-	pc.closeCh <- struct{}{}
+	pc.closed = err
 	close(pc.closeCh)
 }
 
@@ -453,6 +482,42 @@ func (pc *persistConn) Read(b []byte) (n int, err error) {
 		pc.sawEOF = true
 	}
 	return
+}
+
+// markReused 标识此连接已经被复用
+func (pc *persistConn) markReused() {
+	pc.mu.Lock()
+	pc.reused = true
+	pc.mu.Unlock()
+}
+
+func (pc *persistConn) shouldRetryRequest(err error) bool {
+	//todo H2处理
+	if !pc.reused {
+		//初次连接失败，则不重试
+		return false
+	}
+	var connPoolReadFromServerError connPoolReadFromServerError
+	if errors.As(err, &connPoolReadFromServerError) {
+		//除了EOF以外的服务器错误，重试
+		return true
+	}
+	//todo 幂等性请求
+	if errors.Is(err, errServerClosedIdle) {
+		// peek 到 EOF 大可能是连接池中的连接已经被服务器关闭，所以尝试重试
+		return true
+	}
+	return false // 保守不重试
+}
+
+type connPoolReadFromServerError struct {
+	err error
+}
+
+func (e connPoolReadFromServerError) Unwrap() error { return e.err }
+
+func (e connPoolReadFromServerError) Error() string {
+	return fmt.Sprintf("lowhttp: conn pool failed to read from server: %v", e.err)
 }
 
 type connectKey struct {
