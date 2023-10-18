@@ -1,9 +1,8 @@
-package standard_parser
+package parser
 
 import (
 	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
-	"strings"
 	"sync"
 )
 
@@ -40,22 +39,21 @@ func (f *FuzzResult) GetData() []byte {
 		return utils.InterfaceToBytes(ret)
 	}
 }
-func (f *FuzzResult) getVerbose() []string {
+func (f *FuzzResult) GetVerbose() []string {
 	var verboses []string
 	for _, datum := range f.source {
 		switch ret := datum.(type) {
 		case *FuzzResult:
-			verboses = append(verboses, ret.getVerbose()...)
+			verboses = append(verboses, ret.GetVerbose()...)
 		}
 	}
 	if !f.byTag {
 		return verboses
 	}
+	if f.verbose == "" {
+		f.verbose = utils.InterfaceToString(f.data)
+	}
 	return append([]string{f.verbose}, verboses...)
-}
-func (f *FuzzResult) GetVerbose() string {
-	vs := f.getVerbose()
-	return strings.Join(vs, ",")
 }
 
 type TagMethod struct {

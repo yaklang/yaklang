@@ -3,84 +3,34 @@ package mutate
 import (
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/fuzztag"
+	"github.com/yaklang/yaklang/common/fuzztagx"
+	"github.com/yaklang/yaklang/common/fuzztagx/parser"
+	"github.com/yaklang/yaklang/common/log"
 	utils2 "github.com/yaklang/yaklang/common/utils"
 )
 
 type FuzzTagConfig struct {
-	tagHandlersEx map[string]func(string) []*fuzztag.FuzzExecResult
-	tagHandlers   map[string]func(string) []string
 	resultHandler func(string, []string) bool
+	tagMethodMap  map[string]*parser.TagMethod
 }
 
 func NewFuzzTagConfig() *FuzzTagConfig {
 	return &FuzzTagConfig{
-		tagHandlers:   make(map[string]func(string) []string),
-		tagHandlersEx: make(map[string]func(string) []*fuzztag.FuzzExecResult),
+		tagMethodMap: map[string]*parser.TagMethod{},
 	}
 }
 
-func (f *FuzzTagConfig) AddFuzzTagHandler(tag string, handler func(string) []string) {
-	f.tagHandlers[tag] = handler
+func (f *FuzzTagConfig) AddFuzzTagHandler(name string, handler func(string) []string) {
+	AddFuzzTagDescriptionToMap(f.tagMethodMap, &FuzzTagDescription{
+		TagName: name,
+		Handler: handler,
+	})
 }
-
-func (f *FuzzTagConfig) AddFuzzTagHandlerEx(tag string, handler func(string) []*fuzztag.FuzzExecResult) {
-	f.tagHandlersEx[tag] = handler
-}
-
-func (f *FuzzTagConfig) GetFuzzTagHandler(tag string) func(string) []string {
-	return f.tagHandlers[tag]
-}
-
-func (f *FuzzTagConfig) GetFuzzTagHandlerKeys() []string {
-	keys := make([]string, 0, len(f.tagHandlers))
-	for k := range f.tagHandlers {
-		keys = append(keys, k)
-	}
-	return keys
-}
-
-func (f *FuzzTagConfig) GetFuzzTagHandlerValues() []func(string) []string {
-	values := make([]func(string) []string, 0, len(f.tagHandlers))
-	for _, v := range f.tagHandlers {
-		values = append(values, v)
-	}
-	return values
-}
-
-func (f *FuzzTagConfig) GetFuzzTagHandlerLen() int {
-	return len(f.tagHandlers)
-}
-
-func (f *FuzzTagConfig) GetFuzzTagHandlerMap() map[string]func(string) []string {
-	return f.tagHandlers
-}
-func (f *FuzzTagConfig) GetFuzzTagHandlerExMap() map[string]func(string) []*fuzztag.FuzzExecResult {
-	return f.tagHandlersEx
-}
-
-func (f *FuzzTagConfig) SetFuzzTagHandlerMap(m map[string]func(string) []string) {
-	f.tagHandlers = m
-}
-
-func (f *FuzzTagConfig) MergeFuzzTagHandlerExMap(m map[string]func(string) []*fuzztag.FuzzExecResult) {
-	for k, v := range m {
-		f.tagHandlersEx[k] = v
-	}
-}
-func (f *FuzzTagConfig) MergeFuzzTagHandlerMap(m map[string]func(string) []string) {
-	for k, v := range m {
-		f.tagHandlers[k] = v
-	}
-}
-
-func (f *FuzzTagConfig) MergeFuzzTagHandlerConfig(c *FuzzTagConfig) {
-	for k, v := range c.tagHandlers {
-		f.tagHandlers[k] = v
-	}
-}
-
-func (f *FuzzTagConfig) ClearFuzzTagHandler() {
-	f.tagHandlers = make(map[string]func(string) []string)
+func (f *FuzzTagConfig) AddFuzzTagHandlerEx(name string, handler func(string) []*fuzztag.FuzzExecResult) {
+	AddFuzzTagDescriptionToMap(f.tagMethodMap, &FuzzTagDescription{
+		TagName:   name,
+		HandlerEx: handler,
+	})
 }
 
 type FuzzConfigOpt func(config *FuzzTagConfig)
@@ -117,12 +67,16 @@ func Fuzz_WithParams(i interface{}) FuzzConfigOpt {
 }
 
 func FuzzTagExec(input interface{}, opts ...FuzzConfigOpt) (_ []string, err error) {
-
 	config := NewFuzzTagConfig()
-	config.MergeFuzzTagHandlerMap(defaultFuzzTag)
-	config.MergeFuzzTagHandlerExMap(defaultFuzzTagEx)
+	for k, method := range tagMethodMap {
+		config.tagMethodMap[k] = method
+	}
 	for _, opt := range opts {
 		opt(config)
+	}
+	if v, ok := config.tagMethodMap["params"]; ok {
+		config.tagMethodMap["param"] = v
+		config.tagMethodMap["p"] = v
 	}
 	defer func() {
 		if recoveredErr := recover(); recoveredErr != nil {
@@ -132,8 +86,34 @@ func FuzzTagExec(input interface{}, opts ...FuzzConfigOpt) (_ []string, err erro
 			}
 		}
 	}()
-	return fuzztag.ExecuteWithStringHandlerWithCallbackEx(
-		input, config.GetFuzzTagHandlerMap(), config.GetFuzzTagHandlerExMap(),
-		config.resultHandler,
-	)
+	generator, err := fuzztagx.NewGenerator(utils2.InterfaceToString(input), config.tagMethodMap)
+	if err != nil {
+		return nil, err
+	}
+	res := []string{}
+	for generator.Next() {
+		if generator.Error != nil {
+			return nil, generator.Error
+		}
+		result := generator.Result()
+		data := result.GetData()
+		res = append(res, string(data))
+		if config.resultHandler != nil {
+			config.resultHandler(string(data), result.GetVerbose())
+		}
+	}
+	return res, nil
+}
+func MutateQuick(i interface{}) (finalResult []string) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("fuzztag execute failed: %s", err)
+			finalResult = []string{utils2.InterfaceToString(i)}
+		}
+	}()
+	results, err := FuzzTagExec(i)
+	if err != nil {
+		return []string{utils2.InterfaceToString(i)}
+	}
+	return results
 }

@@ -1,4 +1,4 @@
-package standard_parser
+package parser
 
 import (
 	"golang.org/x/exp/maps"
