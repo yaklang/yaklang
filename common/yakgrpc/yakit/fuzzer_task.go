@@ -232,7 +232,7 @@ func SaveWebFuzzerResponse(db *gorm.DB, taskId int, rsp *ypb.FuzzerResponse) {
 	}
 	r := &WebFuzzerResponse{
 		WebFuzzerTaskId: taskId,
-		OK:              false,
+		OK:              rsp.Ok,
 		Request:         utils.UnsafeBytesToString(rsp.RequestRaw),
 		Content:         utils.UnsafeBytesToString(raw),
 		Payload:         strings.Join(rsp.Payloads, ","),
