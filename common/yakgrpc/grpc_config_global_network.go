@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
@@ -10,29 +11,26 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-const GLOBAL_NETWORK_CONFIG = "GLOBAL_NETWORK_CONFIG"
-const GLOBAL_NETWORK_CONFIG_INIT = "GLOBAL_NETWORK_CONFIG_INIT"
-
 func init() {
 	yakit.RegisterPostInitDatabaseFunction(func() error {
 
 	INIT:
-		if yakit.Get(GLOBAL_NETWORK_CONFIG_INIT) == "" {
+		if yakit.Get(consts.GLOBAL_NETWORK_CONFIG_INIT) == "" {
 			log.Info("initialize global network config")
-			defaultConfig := getDefaultNetworkConfig()
+			defaultConfig := GetDefaultNetworkConfig()
 			raw, err := json.Marshal(defaultConfig)
 			if err != nil {
 				return err
 			}
 			log.Infof("use config: %v", string(raw))
-			yakit.Set(GLOBAL_NETWORK_CONFIG, string(raw))
+			yakit.Set(consts.GLOBAL_NETWORK_CONFIG, string(raw))
 			ConfigureNetX(defaultConfig)
-			yakit.Set(GLOBAL_NETWORK_CONFIG_INIT, "1")
+			yakit.Set(consts.GLOBAL_NETWORK_CONFIG_INIT, "1")
 			return nil
 		} else {
-			data := yakit.Get(GLOBAL_NETWORK_CONFIG)
+			data := yakit.Get(consts.GLOBAL_NETWORK_CONFIG)
 			if data == "" {
-				yakit.Set(GLOBAL_NETWORK_CONFIG_INIT, "")
+				yakit.Set(consts.GLOBAL_NETWORK_CONFIG_INIT, "")
 				goto INIT
 			}
 			var config ypb.GlobalNetworkConfig
@@ -57,13 +55,14 @@ func init() {
 	})
 }
 
-func getDefaultNetworkConfig() *ypb.GlobalNetworkConfig {
+func GetDefaultNetworkConfig() *ypb.GlobalNetworkConfig {
 	defaultConfig := &ypb.GlobalNetworkConfig{
 		DisableSystemDNS: false,
 		CustomDNSServers: nil,
 		DNSFallbackTCP:   false,
 		DNSFallbackDoH:   false,
 		CustomDoHServers: nil,
+		SaveHTTPFlow:     true,
 	}
 	config := netx.NewBackupInitilizedReliableDNSConfig()
 	defaultConfig.CustomDoHServers = config.SpecificDoH
@@ -115,14 +114,14 @@ func ConfigureNetX(c *ypb.GlobalNetworkConfig) {
 }
 
 func (s *Server) GetGlobalNetworkConfig(ctx context.Context, req *ypb.GetGlobalNetworkConfigRequest) (*ypb.GlobalNetworkConfig, error) {
-	data := yakit.Get(GLOBAL_NETWORK_CONFIG)
+	data := yakit.Get(consts.GLOBAL_NETWORK_CONFIG)
 	if data == "" {
-		defaultConfig := getDefaultNetworkConfig()
+		defaultConfig := GetDefaultNetworkConfig()
 		raw, err := json.Marshal(defaultConfig)
 		if err != nil {
 			return nil, err
 		}
-		yakit.Set(GLOBAL_NETWORK_CONFIG, string(raw))
+		yakit.Set(consts.GLOBAL_NETWORK_CONFIG, string(raw))
 		return defaultConfig, nil
 	}
 	var config ypb.GlobalNetworkConfig
@@ -139,17 +138,17 @@ func (s *Server) SetGlobalNetworkConfig(ctx context.Context, req *ypb.GlobalNetw
 		return nil, err
 	}
 	ConfigureNetX(req)
-	yakit.Set(GLOBAL_NETWORK_CONFIG, string(defaultBytes))
+	yakit.Set(consts.GLOBAL_NETWORK_CONFIG, string(defaultBytes))
 	return &ypb.Empty{}, nil
 }
 
 func (s *Server) ResetGlobalNetworkConfig(ctx context.Context, req *ypb.ResetGlobalNetworkConfigRequest) (*ypb.Empty, error) {
-	defaultConfig := getDefaultNetworkConfig()
+	defaultConfig := GetDefaultNetworkConfig()
 	raw, err := json.Marshal(defaultConfig)
 	if err != nil {
 		return nil, err
 	}
-	yakit.Set(GLOBAL_NETWORK_CONFIG, string(raw))
+	yakit.Set(consts.GLOBAL_NETWORK_CONFIG, string(raw))
 	ConfigureNetX(defaultConfig)
 	return &ypb.Empty{}, nil
 }

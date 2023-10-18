@@ -6,6 +6,8 @@ import (
 	"compress/flate"
 	"compress/zlib"
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 	"io/ioutil"
 	"math"
@@ -709,4 +711,16 @@ func IsResp(data any) bool {
 		return true
 	}
 	return false
+}
+
+func getNetConfig() string {
+	db := consts.GetGormProfileDatabase()
+	var data ypb.GeneralStorage
+	db.Model(&data).Where("key = ?", strconv.Quote(consts.GLOBAL_NETWORK_CONFIG)).Select("value").First(&data)
+
+	v, err := strconv.Unquote(data.Value)
+	if err != nil {
+		return data.Value
+	}
+	return v
 }
