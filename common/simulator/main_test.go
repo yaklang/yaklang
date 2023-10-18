@@ -402,8 +402,8 @@ func TestHttpBruteForce(t *testing.T) {
 	time.Sleep(time.Second)
 	opts := []BruteConfigOpt{
 		WithExePath(`/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`),
-		WithCaptchaUrl(`http://192.168.3.20:8008/runtime/text/invoke`),
-		WithCaptchaMode(`common_arithmetic`),
+		//WithCaptchaUrl(`http://192.168.3.20:8008/runtime/text/invoke`),
+		//WithCaptchaMode(`common_arithmetic`),
 		WithUsernameList("admin"),
 		WithPasswordList("admin", "luckyadmin123"),
 		WithExtraWaitLoadTime(1000),
@@ -412,8 +412,8 @@ func TestHttpBruteForce(t *testing.T) {
 		//WithCaptchaSelector("#loginpage > div > div > form > div:nth-child(4) > div > div > input"),
 	}
 	log.SetLevel(log.DebugLevel)
-	//ch, err := HttpBruteForce(base.URL, opts...)
-	ch, err := HttpBruteForce("http://192.168.3.20/#/login", opts...)
+	ch, err := HttpBruteForce(base.URL, opts...)
+	//ch, err := HttpBruteForce("http://192.168.3.20/#/login", opts...)
 	if err != nil {
 		t.Error(err)
 	}
