@@ -6,9 +6,7 @@ import (
 
 func TestMain(t *testing.T) {
 	prog := parseSSA(`
-	a=0;
-	a++;
-	a+=1
+	for(a = 0;a<3;a++){}
 	`)
 	prog.Show()
 }
