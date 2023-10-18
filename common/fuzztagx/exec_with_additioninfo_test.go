@@ -59,14 +59,19 @@ func TestAdditionInfo(t *testing.T) {
 		yield(codec.EncodeToHex(s), fmt.Sprintf("hex(%s)", s))
 		return nil
 	})
-	gener, err := newGenerate("{{hex({{base64({{url(1)}},{{url(2)}},{{url(3)}})}})}}")
+	gener, err := newGenerate("{{hex({{base64({{url(1)}}{{url(2)}}{{url(3)}})}})}}")
 	if err != nil {
 		t.Fatal(err)
 	}
-	for gener.Next() {
-		res := gener.Result()
-		data := res.GetData()
-		verbose := res.GetVerbose()
-		fmt.Printf("data: %s\nverbose record: %s\n", string(data), verbose)
+	gener.Next()
+	res := gener.Result()
+	data := res.GetData()
+	verbose := res.GetVerbose()
+	fmt.Printf("data: %s\nverbose record: %s\n", string(data), verbose)
+	if string(data) != "4a544d784a544d794a544d7a" {
+		t.Fatal("get data error")
+	}
+	if verbose != "hex(JTMxJTMyJTMz),base64(%31%32%33),url(1),url(2),url(3)" {
+		t.Fatal("get verbose error")
 	}
 }
