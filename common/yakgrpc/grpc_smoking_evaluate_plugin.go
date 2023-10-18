@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"sync"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -11,7 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"sync"
 )
 
 type fakeStreamInstance struct {
@@ -95,11 +96,15 @@ func (s *Server) SmokingEvaluatePlugin(ctx context.Context, req *ypb.SmokingEval
 	}
 
 	staticCheckingFailed := false
-	staticResults := yak.AnalyzeStaticYaklangEx(pluginCode, true)
+	staticResults := yak.AnalyzeStaticYaklangEx(pluginCode, false)
 	if len(staticResults) > 0 {
 		for _, sRes := range staticResults {
-			staticCheckingFailed = true
-			pushSuggestion(`静态代码检测失败[`+sRes.Severity+`]`, sRes.Message)
+			if sRes.Severity == "error" {
+				staticCheckingFailed = true
+				pushSuggestion(`静态代码检测失败[`+sRes.Severity+`]`, sRes.Message, []byte(sRes.From))
+			} else {
+				pushSuggestion(`静态代码检测警告[`+sRes.Severity+`]`, sRes.Message, []byte(sRes.From))
+			}
 		}
 		log.Error("static analyze failed")
 	}

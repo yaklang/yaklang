@@ -22,6 +22,7 @@ type StaticAnalyzeResult struct {
 	EndLineNumber   int    `json:"endLineNumber"`
 	EndColumn       int    `json:"endColumn"`
 	RawMessage      string `json:"rawMessage"`
+	From            string `json: "from"`
 }
 
 var (
@@ -39,7 +40,7 @@ func AnalyzeStaticYaklangEx(r interface{}, strictMode bool) []*StaticAnalyzeResu
 
 	// compiler
 	newEngine := yaklang.New()
-	newEngine.SetStrictMode(strictMode)
+	newEngine.SetStrictMode(false)
 	_, err := newEngine.Compile(code)
 	if err != nil {
 		switch ret := err.(type) {
@@ -53,6 +54,7 @@ func AnalyzeStaticYaklangEx(r interface{}, strictMode bool) []*StaticAnalyzeResu
 					EndLineNumber:   e.EndPos.LineNumber,
 					EndColumn:       e.EndPos.ColumnNumber + 2,
 					RawMessage:      e.Error(),
+					From:            "compiler",
 				})
 			}
 		default:
@@ -120,6 +122,7 @@ func AnalyzeStaticYaklangEx(r interface{}, strictMode bool) []*StaticAnalyzeResu
 			EndLineNumber:   err.Pos.EndLine,
 			EndColumn:       err.Pos.EndColumn + 2,
 			RawMessage:      err.String(),
+			From:            "SSA",
 		})
 	}
 	// debug printf json
