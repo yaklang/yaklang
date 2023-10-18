@@ -12,6 +12,12 @@ type FuzzExecResult struct {
 	showInfo []string
 }
 
+func (f *FuzzExecResult) Data() []byte {
+	return f.data
+}
+func (f *FuzzExecResult) ShowInfo() []string {
+	return f.showInfo
+}
 func NewFuzzExecResult(data []byte, showInfo []string) *FuzzExecResult {
 	return &FuzzExecResult{
 		data:     data,

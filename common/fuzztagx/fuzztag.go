@@ -3,7 +3,7 @@ package fuzztagx
 import (
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/fuzztagx/standard-parser"
+	"github.com/yaklang/yaklang/common/fuzztagx/parser"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 )
@@ -14,16 +14,16 @@ const (
 )
 
 type FuzzTag struct {
-	standard_parser.BaseTag
+	parser.BaseTag
 }
 
-func (f *FuzzTag) Exec(raw *standard_parser.FuzzResult, methods ...map[string]*standard_parser.TagMethod) ([]*standard_parser.FuzzResult, error) {
+func (f *FuzzTag) Exec(raw *parser.FuzzResult, methods ...map[string]*parser.TagMethod) ([]*parser.FuzzResult, error) {
 	data := string(raw.GetData())
 	name := ""
 	params := ""
 	labels := []string{}
 	compile := func() error {
-		matchedPos := standard_parser.IndexAllSubstrings(data, MethodLeft, MethodRight)
+		matchedPos := parser.IndexAllSubstrings(data, MethodLeft, MethodRight)
 		if len(matchedPos) == 0 {
 			if isIdentifyString(data) {
 				name = data
@@ -62,10 +62,10 @@ func (f *FuzzTag) Exec(raw *standard_parser.FuzzResult, methods ...map[string]*s
 		return nil
 	}
 	if err := compile(); err != nil { // 对于编译错误，返回原文
-		escaper := standard_parser.NewDefaultEscaper(`\`, "{{", "}}")
-		return []*standard_parser.FuzzResult{standard_parser.NewFuzzResultWithData(fmt.Sprintf("{{%s}}", escaper.Escape(data)))}, nil
+		escaper := parser.NewDefaultEscaper(`\`, "{{", "}}")
+		return []*parser.FuzzResult{parser.NewFuzzResultWithData(fmt.Sprintf("{{%s}}", escaper.Escape(data)))}, nil
 	}
-	var fun *standard_parser.TagMethod
+	var fun *parser.TagMethod
 	if f.Methods != nil {
 		methods = append(methods, *f.Methods)
 	}
@@ -75,27 +75,33 @@ func (f *FuzzTag) Exec(raw *standard_parser.FuzzResult, methods ...map[string]*s
 		}
 	}
 	if fun == nil {
-		return []*standard_parser.FuzzResult{standard_parser.NewFuzzResultWithData("")}, nil
+		return []*parser.FuzzResult{parser.NewFuzzResultWithData("")}, nil
 		//return nil, utils.Errorf("fuzztag name %s not found", name)
 	}
 	return fun.Fun(params)
 }
 
 type RawTag struct {
-	standard_parser.BaseTag
+	parser.BaseTag
 }
 
-func (r *RawTag) Exec(result *standard_parser.FuzzResult, m ...map[string]*standard_parser.TagMethod) ([]*standard_parser.FuzzResult, error) {
-	return []*standard_parser.FuzzResult{result}, nil
+func (r *RawTag) Exec(result *parser.FuzzResult, m ...map[string]*parser.TagMethod) ([]*parser.FuzzResult, error) {
+	return []*parser.FuzzResult{result}, nil
 }
 
-func ParseFuzztag(code string) ([]standard_parser.Node, error) {
-	return standard_parser.Parse(code,
-		standard_parser.NewTagDefine("fuzztag", "{{", "}}", &FuzzTag{}),
-		standard_parser.NewTagDefine("rawtag", "{{=", "=}}", &RawTag{}, true),
+func ParseFuzztag(code string) ([]parser.Node, error) {
+	return parser.Parse(code,
+		parser.NewTagDefine("fuzztag", "{{", "}}", &FuzzTag{}),
+		parser.NewTagDefine("rawtag", "{{=", "=}}", &RawTag{}, true),
 	)
 }
-
+func NewGenerator(code string, table map[string]*parser.TagMethod) (*parser.Generator, error) {
+	nodes, err := ParseFuzztag(code)
+	if err != nil {
+		return nil, err
+	}
+	return parser.NewGenerator(nodes,table),nil
+}
 func isIdentifyString(s string) bool {
 	return utils.MatchAllOfRegexp(s, "^[a-zA-Z_][a-zA-Z0-9_:-]*$")
 }

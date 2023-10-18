@@ -2,25 +2,28 @@ package mutate
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
+	"github.com/google/uuid"
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/fuzztagx/parser"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/utils/regen"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yso"
 	"io/ioutil"
 	"math/rand"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/fuzztag"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/bizhelper"
-	"github.com/yaklang/yaklang/common/utils/regen"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"github.com/yaklang/yaklang/common/yso"
 )
 
+// 空内容
 var fuzztagfallback = []string{""}
 
 type FuzzTagDescription struct {
@@ -31,308 +34,60 @@ type FuzzTagDescription struct {
 	Description string
 }
 
-var existedFuzztag []*FuzzTagDescription
-
-func AddFuzzTagToGlobal(f *FuzzTagDescription) {
+func AddFuzzTagDescriptionToMap(methodMap map[string]*parser.TagMethod, f *FuzzTagDescription) {
 	if f == nil {
 		return
 	}
-	existedFuzztag = append(existedFuzztag, f)
+	name := f.TagName
+	alias := f.Alias
+	var handle any
 	if f.Handler != nil {
-		defaultFuzzTag[f.TagName] = f.Handler
+		handle = f.Handler
+	} else if f.HandlerEx != nil {
+		handle = f.HandlerEx
+	} else {
+		return
 	}
-	if f.HandlerEx != nil {
-		defaultFuzzTagEx[f.TagName] = f.HandlerEx
-	}
-	for _, i := range f.Alias {
-		fuzztag.SetMethodAlias(f.TagName, i)
-	}
-}
-
-func atoi(s string) int {
-	v, _ := strconv.Atoi(s)
-	return v
-}
-
-// 读取一个分隔符最后出现位置的部分
-func sepToEnd(s string, sep string) (string, string) {
-	if strings.LastIndex(s, sep) < 0 {
-		return s, ""
-	}
-	return s[:strings.LastIndex(s, sep)], s[strings.LastIndex(s, sep)+1:]
-}
-
-var (
-	passSuffix1 = []string{
-		"", "!", "!@", "!@#", "!@$", "@", "#",
-		"_", "$", ".",
-		"*",
-	}
-	passSuffix2 = []string{
-		"1", "123", "12345", "123456", "qwerty",
-		"qwe", "q1w2e3", "666", "888",
-		"666666", "88888888", "111", "111111",
-	}
-	passPrefix = []string{
-		"", "web", "@", "$", "*",
-	}
-)
-
-func fuzzLowerNUpper(i string) []string {
-	if len(i) > 18 {
-		return []string{i}
-	}
-
-	var res []string
-	var bytes = []byte(strings.ToLower(i))
-	res = append(res, strings.ToLower(i))
-	res = append(res, strings.ToUpper(i))
-	// one upper
-	for index := 0; index < len(i); index++ {
-		copiedBytes := make([]byte, len(bytes))
-		copy(copiedBytes, bytes)
-		copiedBytes[index] = strings.ToUpper(string([]byte{copiedBytes[index]}))[0]
-		res = append(res, string(copiedBytes))
-	}
-
-	// two
-	for firstIndex := 0; firstIndex < len(i); firstIndex++ {
-		for secondIndex := firstIndex + 2; secondIndex < len(i); secondIndex++ {
-			if firstIndex == secondIndex {
-				continue
-			}
-			copiedBytes := make([]byte, len(bytes))
-			copy(copiedBytes, bytes)
-			copiedBytes[firstIndex] = strings.ToUpper(string([]byte{copiedBytes[firstIndex]}))[0]
-			copiedBytes[secondIndex] = strings.ToUpper(string([]byte{copiedBytes[secondIndex]}))[0]
-			res = append(res, string([]byte{copiedBytes[firstIndex], copiedBytes[secondIndex]}))
-			res = append(res, string(copiedBytes))
-		}
-	}
-
-	// three
-	for firstIndex := 0; firstIndex < len(i); firstIndex++ {
-		for secondIndex := firstIndex + 2; secondIndex < len(i); secondIndex++ {
-			for thirdIndex := secondIndex + 2; thirdIndex < len(i); thirdIndex++ {
-				if firstIndex == secondIndex || firstIndex == thirdIndex || secondIndex == thirdIndex {
-					continue
-				}
-				copiedBytes := make([]byte, len(bytes))
-				copy(copiedBytes, bytes)
-				copiedBytes[firstIndex] = strings.ToUpper(string([]byte{copiedBytes[firstIndex]}))[0]
-				copiedBytes[secondIndex] = strings.ToUpper(string([]byte{copiedBytes[secondIndex]}))[0]
-				copiedBytes[thirdIndex] = strings.ToUpper(string([]byte{copiedBytes[thirdIndex]}))[0]
-
-				res = append(res, string([]byte{copiedBytes[firstIndex], copiedBytes[secondIndex], copiedBytes[thirdIndex]}))
-				res = append(res, string(copiedBytes))
-			}
-		}
-	}
-	return res
-}
-
-func fuzzuser(i string, level int) []string {
-	if i == "" {
-		i = "admin,root"
-	}
-
-	var res []string
-	splited := utils.PrettifyListFromStringSplitEx(i, ",", "|")
-	if len(splited) <= 2 {
-		res = append(res, i)
-	}
-	res = append(res, splited...)
-	passSuffix2 := passSuffix2
-	switch level {
-	case 3:
-		for i := 1970; i <= time.Now().Year(); i++ {
-			passSuffix2 = append(passSuffix2, fmt.Sprint(i))
-		}
-	case 2:
-		for i := 1990; i <= time.Now().Year(); i++ {
-			passSuffix2 = append(passSuffix2, fmt.Sprint(i))
-		}
-	default:
-		for i := 2000; i <= time.Now().Year(); i++ {
-			passSuffix2 = append(passSuffix2, fmt.Sprint(i))
-		}
-	}
-
-	handleItem := func(item string) {
-		for _, prefix := range passPrefix {
-			item2 := prefix + item
-			for _, suffix2 := range passSuffix2 {
-				res = append(res, item2+suffix2)
-			}
-		}
-	}
-
-	for _, r := range res {
-		for _, item := range fuzzLowerNUpper(r) {
-			handleItem(item)
-		}
-	}
-	return res
-}
-
-func fuzzpass(i string, level int) []string {
-	if i == "" {
-		i = "admin,root"
-	}
-
-	var res []string
-	splited := utils.PrettifyListFromStringSplitEx(i, ",", "|")
-	if len(splited) <= 2 {
-		res = append(res, i)
-	}
-	res = append(res, splited...)
-
-	passSuffix2 := passSuffix2
-	switch level {
-	case 3:
-		for i := 1970; i <= time.Now().Year(); i++ {
-			passSuffix2 = append(passSuffix2, fmt.Sprint(i))
-		}
-	case 2:
-		for i := 1990; i <= time.Now().Year(); i++ {
-			passSuffix2 = append(passSuffix2, fmt.Sprint(i))
-		}
-	default:
-		for i := 2000; i <= time.Now().Year(); i++ {
-			passSuffix2 = append(passSuffix2, fmt.Sprint(i))
-		}
-	}
-
-	handleItem := func(item string) {
-		for _, prefix := range passPrefix {
-			item2 := prefix + item
-			for _, suffix := range passSuffix1 {
-				res = append(res, item2+suffix)
-			}
-			for _, suffix2 := range passSuffix2 {
-				res = append(res, item2+suffix2)
-			}
-			for _, suffix1 := range passSuffix1 {
-				for _, suffix2 := range passSuffix2 {
-					res = append(res, item2+suffix1+suffix2)
-				}
-			}
-			for _, suffix2 := range passSuffix2 {
-				for _, suffix1 := range passSuffix1 {
-					res = append(res, item2+suffix1+suffix2)
-				}
-			}
-		}
-	}
-
-	for _, r := range res {
-		for _, item := range fuzzLowerNUpper(r) {
-			handleItem(item)
-		}
-	}
-	return res
-}
-
-func FuzzFileOptions() []FuzzConfigOpt {
-	var opt []FuzzConfigOpt
-	for _, t := range Filetag() {
-		opt = append(opt, Fuzz_WithExtraFuzzTagHandler(t.TagName, t.Handler))
-		for _, a := range t.Alias {
-			opt = append(opt, Fuzz_WithExtraFuzzTagHandler(a, t.Handler))
-		}
-	}
-	return opt
-}
-
-func Fuzz_WithEnableFiletag() FuzzConfigOpt {
-	return func(config *FuzzTagConfig) {
-		for _, opt := range FuzzFileOptions() {
-			opt(config)
-		}
-	}
-}
-
-func Filetag() []*FuzzTagDescription {
-	return []*FuzzTagDescription{
-		{
-			TagName: "file:line",
-			Handler: func(s string) []string {
-				s = strings.Trim(s, " ()")
-				var result []string
-				for _, lineFile := range utils.PrettifyListFromStringSplited(s, "|") {
-					lineChan, err := utils.FileLineReader(lineFile)
-					if err != nil {
-						log.Errorf("fuzztag read file failed: %s", err)
-						continue
-					}
-					for line := range lineChan {
-						result = append(result, string(line))
+	methodMap[name] = &parser.TagMethod{
+		Name:  name,
+		IsDyn: false,
+		Fun: func(s string) (result []*parser.FuzzResult, err error) {
+			defer func() {
+				if r := recover(); r != nil {
+					if v, ok := r.(error); ok {
+						err = v
+					} else {
+						err = errors.New(utils.InterfaceToString(r))
 					}
 				}
-				if len(result) <= 0 {
-					return fuzztagfallback
+			}()
+			switch f := handle.(type) {
+			case func(string2 string) []string:
+				for _, d := range f(s) {
+					result = append(result, parser.NewFuzzResultWithData(d))
 				}
-				return result
-			},
-			Alias:       []string{"fileline", "file:lines"},
-			Description: "解析文件名（可以用 `|` 分割），把文件中的内容按行反回成数组，定义为 `{{file:line(/tmp/test.txt)}}` 或 `{{file:line(/tmp/test.txt|/tmp/1.txt)}}`",
-		},
-		{
-			TagName: "file:dir",
-			Handler: func(s string) []string {
-				s = strings.Trim(s, " ()")
-				var result []string
-				for _, lineFile := range utils.PrettifyListFromStringSplited(s, "|") {
-					fileRaw, err := ioutil.ReadDir(lineFile)
-					if err != nil {
-						log.Errorf("fuzz.filedir read dir failed: %s", err)
-						continue
-					}
-					for _, info := range fileRaw {
-						if info.IsDir() {
-							continue
-						}
-						fileContent, err := ioutil.ReadFile(info.Name())
-						if err != nil {
-							continue
-						}
-						result = append(result, string(fileContent))
-					}
+
+			case func(string) []*fuzztag.FuzzExecResult:
+				for _, data := range f(s) {
+					result = append(result, parser.NewFuzzResultWithDataVerbose(data.Data(), strings.Join(data.ShowInfo(), ",")))
 				}
-				if len(result) <= 0 {
-					return fuzztagfallback
-				}
-				return result
-			},
-			Alias:       []string{"filedir"},
-			Description: "解析文件夹，把文件夹中文件的内容读取出来，读取成数组返回，定义为 `{{file:dir(/tmp/test)}}` 或 `{{file:dir(/tmp/test|/tmp/1)}}`",
-		},
-		{
-			TagName: "file",
-			Handler: func(s string) []string {
-				s = strings.Trim(s, " ()")
-				var result []string
-				for _, lineFile := range utils.PrettifyListFromStringSplited(s, "|") {
-					fileRaw, err := ioutil.ReadFile(lineFile)
-					if err != nil {
-						log.Errorf("fuzz.files read file failed: %s", err)
-						continue
-					}
-					result = append(result, string(fileRaw))
-				}
-				if len(result) <= 0 {
-					return fuzztagfallback
-				}
-				return result
-			},
-			Description: "读取文件内容，可以支持多个文件，用竖线分割，`{{file(/tmp/1.txt)}}` 或 `{{file(/tmp/1.txt|/tmp/test.txt)}}`",
+			}
+			return
 		},
 	}
+	for _, a := range alias {
+		methodMap[a] = methodMap[name]
+	}
+}
+
+var existedFuzztag []*FuzzTagDescription
+var tagMethodMap = map[string]*parser.TagMethod{}
+
+func AddFuzzTagToGlobal(f *FuzzTagDescription) {
+	AddFuzzTagDescriptionToMap(tagMethodMap, f)
 }
 
 func init() {
-	fuzztag.SetMethodAlias("params", "param", "p")
-
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "fuzz:password",
 		Handler: func(s string) []string {
@@ -1501,19 +1256,99 @@ func init() {
 	})
 }
 
-var defaultFuzzTag = map[string]func(string) []string{}
-var defaultFuzzTagEx = map[string]func(string) []*fuzztag.FuzzExecResult{}
-
-func MutateQuick(i interface{}) (finalResult []string) {
-	defer func() {
-		if err := recover(); err != nil {
-			log.Errorf("fuzztag execute failed: %s", err)
-			finalResult = []string{utils.InterfaceToString(i)}
+func FuzzFileOptions() []FuzzConfigOpt {
+	var opt []FuzzConfigOpt
+	for _, t := range Filetag() {
+		opt = append(opt, Fuzz_WithExtraFuzzTagHandler(t.TagName, t.Handler))
+		for _, a := range t.Alias {
+			opt = append(opt, Fuzz_WithExtraFuzzTagHandler(a, t.Handler))
 		}
-	}()
-	results, err := FuzzTagExec(i)
-	if err != nil {
-		return []string{utils.InterfaceToString(i)}
 	}
-	return results
+	return opt
+}
+
+func Fuzz_WithEnableFiletag() FuzzConfigOpt {
+	return func(config *FuzzTagConfig) {
+		for _, opt := range FuzzFileOptions() {
+			opt(config)
+		}
+	}
+}
+
+func Filetag() []*FuzzTagDescription {
+	return []*FuzzTagDescription{
+		{
+			TagName: "file:line",
+			Handler: func(s string) []string {
+				s = strings.Trim(s, " ()")
+				var result []string
+				for _, lineFile := range utils.PrettifyListFromStringSplited(s, "|") {
+					lineChan, err := utils.FileLineReader(lineFile)
+					if err != nil {
+						log.Errorf("fuzztag read file failed: %s", err)
+						continue
+					}
+					for line := range lineChan {
+						result = append(result, string(line))
+					}
+				}
+				if len(result) <= 0 {
+					return fuzztagfallback
+				}
+				return result
+			},
+			Alias:       []string{"fileline", "file:lines"},
+			Description: "解析文件名（可以用 `|` 分割），把文件中的内容按行反回成数组，定义为 `{{file:line(/tmp/test.txt)}}` 或 `{{file:line(/tmp/test.txt|/tmp/1.txt)}}`",
+		},
+		{
+			TagName: "file:dir",
+			Handler: func(s string) []string {
+				s = strings.Trim(s, " ()")
+				var result []string
+				for _, lineFile := range utils.PrettifyListFromStringSplited(s, "|") {
+					fileRaw, err := ioutil.ReadDir(lineFile)
+					if err != nil {
+						log.Errorf("fuzz.filedir read dir failed: %s", err)
+						continue
+					}
+					for _, info := range fileRaw {
+						if info.IsDir() {
+							continue
+						}
+						fileContent, err := ioutil.ReadFile(info.Name())
+						if err != nil {
+							continue
+						}
+						result = append(result, string(fileContent))
+					}
+				}
+				if len(result) <= 0 {
+					return fuzztagfallback
+				}
+				return result
+			},
+			Alias:       []string{"filedir"},
+			Description: "解析文件夹，把文件夹中文件的内容读取出来，读取成数组返回，定义为 `{{file:dir(/tmp/test)}}` 或 `{{file:dir(/tmp/test|/tmp/1)}}`",
+		},
+		{
+			TagName: "file",
+			Handler: func(s string) []string {
+				s = strings.Trim(s, " ()")
+				var result []string
+				for _, lineFile := range utils.PrettifyListFromStringSplited(s, "|") {
+					fileRaw, err := ioutil.ReadFile(lineFile)
+					if err != nil {
+						log.Errorf("fuzz.files read file failed: %s", err)
+						continue
+					}
+					result = append(result, string(fileRaw))
+				}
+				if len(result) <= 0 {
+					return fuzztagfallback
+				}
+				return result
+			},
+			Description: "读取文件内容，可以支持多个文件，用竖线分割，`{{file(/tmp/1.txt)}}` 或 `{{file(/tmp/1.txt|/tmp/test.txt)}}`",
+		},
+	}
 }

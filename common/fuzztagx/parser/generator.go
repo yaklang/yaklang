@@ -1,4 +1,4 @@
-package standard_parser
+package parser
 
 import (
 	"reflect"
@@ -223,11 +223,7 @@ func newBackpropagationGenerator(f func() error, nodes []ExecNode, cfg *Generate
 	}
 	return g
 }
-func NewGenerator(nodes []Node, m []*TagMethod) *Generator {
-	table := map[string]*TagMethod{}
-	for _, method := range m {
-		table[method.Name] = method
-	}
+func NewGenerator(nodes []Node, table map[string]*TagMethod) *Generator {
 	cfg := &GenerateConfig{}
 	methodCtx := &MethodContext{
 		methodTable:    table,
