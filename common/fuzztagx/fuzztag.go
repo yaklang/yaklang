@@ -17,8 +17,8 @@ type FuzzTag struct {
 	standard_parser.BaseTag
 }
 
-func (f *FuzzTag) Exec(raw standard_parser.FuzzResult, methods ...map[string]standard_parser.TagMethod) ([]standard_parser.FuzzResult, error) {
-	data := string(raw)
+func (f *FuzzTag) Exec(raw *standard_parser.FuzzResult, methods ...map[string]*standard_parser.TagMethod) ([]*standard_parser.FuzzResult, error) {
+	data := string(raw.GetData())
 	name := ""
 	params := ""
 	labels := []string{}
@@ -63,9 +63,9 @@ func (f *FuzzTag) Exec(raw standard_parser.FuzzResult, methods ...map[string]sta
 	}
 	if err := compile(); err != nil { // 对于编译错误，返回原文
 		escaper := standard_parser.NewDefaultEscaper(`\`, "{{", "}}")
-		return []standard_parser.FuzzResult{standard_parser.FuzzResult(fmt.Sprintf("{{%s}}", escaper.Escape(data)))}, nil
+		return []*standard_parser.FuzzResult{standard_parser.NewFuzzResultWithData(fmt.Sprintf("{{%s}}", escaper.Escape(data)))}, nil
 	}
-	var fun standard_parser.TagMethod
+	var fun *standard_parser.TagMethod
 	if f.Methods != nil {
 		methods = append(methods, *f.Methods)
 	}
@@ -75,18 +75,18 @@ func (f *FuzzTag) Exec(raw standard_parser.FuzzResult, methods ...map[string]sta
 		}
 	}
 	if fun == nil {
-		return []standard_parser.FuzzResult{{}}, nil
+		return []*standard_parser.FuzzResult{standard_parser.NewFuzzResultWithData("")}, nil
 		//return nil, utils.Errorf("fuzztag name %s not found", name)
 	}
-	return fun(params)
+	return fun.Fun(params)
 }
 
 type RawTag struct {
 	standard_parser.BaseTag
 }
 
-func (r *RawTag) Exec(result standard_parser.FuzzResult, m ...map[string]standard_parser.TagMethod) ([]standard_parser.FuzzResult, error) {
-	return []standard_parser.FuzzResult{result}, nil
+func (r *RawTag) Exec(result *standard_parser.FuzzResult, m ...map[string]*standard_parser.TagMethod) ([]*standard_parser.FuzzResult, error) {
+	return []*standard_parser.FuzzResult{result}, nil
 }
 
 func ParseFuzztag(code string) ([]standard_parser.Node, error) {

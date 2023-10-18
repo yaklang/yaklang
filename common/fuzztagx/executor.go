@@ -11,38 +11,37 @@ func ExecuteWithStringHandler(code string, funcMap map[string]func(string2 strin
 	if err != nil {
 		return nil, err
 	}
-	fMap := map[string]standard_parser.TagMethod{}
+	fMap := []*standard_parser.TagMethod{}
 	for k, v := range funcMap { // 转换成标准的TagMethod，旧版的TagMethod可以通过panic的方式传递错误信息
 		k := k
 		v := v
-		fMap[k] = func(s string) (res []standard_parser.FuzzResult, err error) {
-			defer func() {
-				if r := recover(); r != nil {
-					if v, ok := r.(error); ok {
-						err = v
-					} else {
-						err = errors.New(utils.InterfaceToString(r))
+		fMap = append(fMap, &standard_parser.TagMethod{
+			Fun: func(s string) (res []*standard_parser.FuzzResult, err error) {
+				defer func() {
+					if r := recover(); r != nil {
+						if v, ok := r.(error); ok {
+							err = v
+						} else {
+							err = errors.New(utils.InterfaceToString(r))
+						}
 					}
+				}()
+				for _, v := range v(s) {
+					res = append(res, standard_parser.NewFuzzResultWithData(v))
 				}
-			}()
-			for _, v := range v(s) {
-				res = append(res, standard_parser.FuzzResult(v))
-			}
-			return
-		}
+				return
+			},
+			Name:  k,
+			IsDyn: false,
+		})
 	}
 	generator := standard_parser.NewGenerator(nodes, fMap)
 	res := []string{}
-	for {
-		ok, err := generator.Generate()
-		if err != nil {
-			return nil, err
+	for generator.Next() {
+		if generator.Error != nil {
+			return nil, generator.Error
 		}
-		if ok {
-			res = append(res, string(generator.Result()))
-		} else {
-			break
-		}
+		res = append(res, string(generator.Result().GetData()))
 	}
 	return res, nil
 }

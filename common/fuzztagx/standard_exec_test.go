@@ -270,8 +270,8 @@ func TestRawTag(t *testing.T) {
 }
 func TestMutiTag(t *testing.T) {
 	for _, v := range [][]string{
-		//{"{{echo({{={{echo()}}=}})}}", "{{echo()}}"}, // 常规
-		{`{{echo({{=}}=}})}}`, `}}`}, // 测试嵌套（raw标签应该屏蔽所有语法）
+		{"{{echo({{={{echo()}}=}})}}", "{{echo()}}"}, // 常规
+		//{`{{echo({{=}}=}})}}`, `}}`}, // 测试嵌套（raw标签应该屏蔽所有语法）
 	} {
 		res, err := ExecuteWithStringHandler(v[0], map[string]func(string2 string) []string{
 			"echo": func(s string) []string {
