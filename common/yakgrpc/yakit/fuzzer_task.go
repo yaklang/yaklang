@@ -212,9 +212,28 @@ func QueryWebFuzzerResponse(db *gorm.DB, params *ypb.QueryHTTPFuzzerResponseByTa
 	return paging, ret, nil
 }
 
-func QueryFailedWebFuzzerResponse(db *gorm.DB, taskID int64) ([]*WebFuzzerResponse, error) {
+func QueryWebFuzzerResponseWithoutPaging(db *gorm.DB, taskID int64) ([]*WebFuzzerResponse, error) {
 	db = db.Model(&WebFuzzerResponse{})
-	db = db.Select("request").Where("web_fuzzer_task_id = ?", taskID).Where("ok = false")
+	db = db.Where("web_fuzzer_task_id = ?", taskID)
+	// if len(ok) > 0 {
+	// 	if ok == "false" {
+	// 		db = db.Where("ok = ?", false)
+	// 	} else if ok == "true" {
+	// 		db = db.Where("ok = ?", true)
+	// 	}
+	// }
+
+	responses := make([]*WebFuzzerResponse, 0)
+
+	if db = db.Find(&responses); db.Error != nil {
+		return nil, utils.Errorf("finding failed web fuzzer response failed: %s", db.Error)
+	}
+	return responses, nil
+}
+
+func QueryWebFuzzerResponseByTaskIDsWithOk(db *gorm.DB, taskIDs []int64) ([]*WebFuzzerResponse, error) {
+	db = db.Model(&WebFuzzerResponse{})
+	db = db.Where("ok = true").Where("web_fuzzer_task_id IN (?)", taskIDs)
 
 	responses := make([]*WebFuzzerResponse, 0)
 
