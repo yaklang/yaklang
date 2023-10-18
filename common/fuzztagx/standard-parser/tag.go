@@ -1,13 +1,68 @@
 package standard_parser
 
 import (
+	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
+	"strings"
 	"sync"
 )
 
-type FuzzResult []byte
+type FuzzResult struct {
+	source  []any // []*FuzzResult | [][]byte
+	data    any   // []byte | string
+	byTag   bool
+	verbose string
+	contact bool
+}
 
-type TagMethod func(string) ([]FuzzResult, error)
+func NewFuzzResultWithData(d any) *FuzzResult {
+	return &FuzzResult{
+		data: d,
+	}
+}
+func NewFuzzResultWithDataVerbose(d any, v string) *FuzzResult {
+	return &FuzzResult{
+		data:    d,
+		verbose: v,
+	}
+}
+func NewFuzzResult() *FuzzResult {
+	return &FuzzResult{}
+}
+
+func (f *FuzzResult) GetData() []byte {
+	switch ret := f.data.(type) {
+	case []byte:
+		return ret
+	case string:
+		return []byte(ret)
+	default:
+		return utils.InterfaceToBytes(ret)
+	}
+}
+func (f *FuzzResult) getVerbose() []string {
+	var verboses []string
+	for _, datum := range f.source {
+		switch ret := datum.(type) {
+		case *FuzzResult:
+			verboses = append(verboses, ret.getVerbose()...)
+		}
+	}
+	if !f.byTag {
+		return verboses
+	}
+	return append([]string{f.verbose}, verboses...)
+}
+func (f *FuzzResult) GetVerbose() string {
+	vs := f.getVerbose()
+	return strings.Join(vs, ",")
+}
+
+type TagMethod struct {
+	Name  string
+	IsDyn bool
+	Fun   func(string) ([]*FuzzResult, error)
+}
 type Node interface {
 	IsNode()
 }
@@ -19,7 +74,7 @@ func (s StringNode) IsNode() {
 
 type TagNode interface {
 	IsNode()
-	Exec(FuzzResult, ...map[string]TagMethod) ([]FuzzResult, error)
+	Exec(*FuzzResult, ...map[string]*TagMethod) ([]*FuzzResult, error)
 	AddData(node ...Node)
 	AddLabel(label string)
 
@@ -30,7 +85,7 @@ type TagNode interface {
 type BaseTag struct {
 	Data    []Node
 	Labels  []string
-	Methods *map[string]TagMethod
+	Methods *map[string]*TagMethod
 	// initOnce 用来对子结构体的初始化
 	initOnce sync.Once
 }

@@ -15,7 +15,7 @@ type ExecNode interface {
 }
 
 type MethodContext struct {
-	methodTable    map[string]TagMethod
+	methodTable    map[string]*TagMethod
 	labelTable     map[string]map[*TagExecNode]struct{}
 	tagToLabelsMap map[*TagExecNode][]string
 }
@@ -45,14 +45,14 @@ func (m *MethodContext) UpdateLabels(tag *TagExecNode) {
 
 // String
 type StringExecNode struct {
-	submitResult func(s FuzzResult)
+	submitResult func(s *FuzzResult)
 	data         string
 	index        int
 }
 
 func (s *StringExecNode) FirstExec() error {
 	s.index = 1
-	s.submitResult(FuzzResult(s.data))
+	s.submitResult(NewFuzzResultWithData(s.data))
 	return nil
 }
 func (s *StringExecNode) Exec() (bool, error) {
@@ -60,7 +60,7 @@ func (s *StringExecNode) Exec() (bool, error) {
 		s.index++
 	}()
 	if s.index == 0 {
-		s.submitResult(FuzzResult(s.data))
+		s.submitResult(NewFuzzResultWithData(s.data))
 		return false, nil
 	}
 	return false, nil
@@ -76,14 +76,14 @@ func (s *StringExecNode) IsRep() bool {
 type TagExecNode struct {
 	config          *GenerateConfig
 	data            TagNode
-	cache           *[]FuzzResult
+	cache           *[]*FuzzResult
 	isRep           bool
 	isDyn           bool
 	params          []ExecNode
 	methodCtx       *MethodContext
 	childGenerator  *Generator //
 	index           int
-	submitResult    func(s FuzzResult)
+	submitResult    func(s *FuzzResult)
 	backpropagation func() error
 	ignoreError     bool
 }
@@ -98,7 +98,7 @@ func NewTagGenerator(tag TagNode, ctx *MethodContext) *TagExecNode {
 // FirstExec 重置并执行
 func (f *TagExecNode) FirstExec(bp, exec, all bool) error {
 	f.childGenerator.first = exec
-	_, err := f.childGenerator.Generate()
+	_, err := f.childGenerator.generate()
 	if err != nil {
 		return err
 	}
@@ -120,8 +120,13 @@ func (f *TagExecNode) FirstExec(bp, exec, all bool) error {
 	}
 	return err
 }
-func (f *TagExecNode) exec(s FuzzResult) error {
+func (f *TagExecNode) exec(s *FuzzResult) error {
 	res, err := f.data.Exec(s, f.methodCtx.methodTable)
+	for _, r := range res {
+		r.source = append(r.source, s)
+		r.byTag = true
+	}
+
 	if f.config.IgnoreError {
 		err = nil
 	}
@@ -130,7 +135,7 @@ func (f *TagExecNode) exec(s FuzzResult) error {
 	}
 	f.methodCtx.UpdateLabels(f)
 	if len(res) == 0 {
-		res = []FuzzResult{FuzzResult("")}
+		res = []*FuzzResult{NewFuzzResultWithData("")}
 	}
 	f.cache = &res
 	return nil
@@ -144,12 +149,12 @@ func (f *TagExecNode) Exec() (bool, error) {
 			f.submitResult((*f.cache)[len(*f.cache)-1])
 			return false, f.backpropagation()
 		}
-		ok, err := f.childGenerator.Generate()
+		ok, err := f.childGenerator.generate()
 		if err != nil {
-			return false, err
+			return ok, err
 		}
 		if !ok {
-			f.submitResult(FuzzResult{})
+			f.submitResult(NewFuzzResultWithData(""))
 			return false, nil
 		} else {
 			return true, f.backpropagation()
@@ -179,22 +184,23 @@ func (s *TagExecNode) IsRep() bool {
 
 type Generator struct {
 	config    *GenerateConfig
-	container []FuzzResult
+	container []*FuzzResult
 	//index     int
 	data            []ExecNode
 	first           bool
 	backpropagation func() error
 	IgnoreError     bool
+	Error           error
 }
 
 func newBackpropagationGenerator(f func() error, nodes []ExecNode, cfg *GenerateConfig) *Generator {
-	g := &Generator{data: nodes, container: make([]FuzzResult, len(nodes)), first: true, backpropagation: f, config: cfg}
+	g := &Generator{data: nodes, container: make([]*FuzzResult, len(nodes)), first: true, backpropagation: f, config: cfg}
 	for index, d := range g.data {
 		index := index
 		switch ret := d.(type) {
 		case *TagExecNode:
 			ret.config = cfg
-			ret.submitResult = func(s FuzzResult) {
+			ret.submitResult = func(s *FuzzResult) {
 				g.container[index] = s
 			}
 			ret.backpropagation = f
@@ -210,14 +216,18 @@ func newBackpropagationGenerator(f func() error, nodes []ExecNode, cfg *Generate
 			}
 			ret.childGenerator = childGen
 		case *StringExecNode:
-			ret.submitResult = func(s FuzzResult) {
+			ret.submitResult = func(s *FuzzResult) {
 				g.container[index] = s
 			}
 		}
 	}
 	return g
 }
-func NewGenerator(nodes []Node, table map[string]TagMethod) *Generator {
+func NewGenerator(nodes []Node, m []*TagMethod) *Generator {
+	table := map[string]*TagMethod{}
+	for _, method := range m {
+		table[method.Name] = method
+	}
 	cfg := &GenerateConfig{}
 	methodCtx := &MethodContext{
 		methodTable:    table,
@@ -249,14 +259,23 @@ func NewGenerator(nodes []Node, table map[string]TagMethod) *Generator {
 	return g
 }
 
-func (g *Generator) Result() FuzzResult {
-	res := FuzzResult("")
+func (g *Generator) Result() *FuzzResult {
+	res := NewFuzzResult()
+	data := []byte{}
 	for _, result := range g.container {
-		res = append(res, result...)
+		data = append(data, result.GetData()...)
+		res.source = append(res.source, result)
 	}
+	res.data = data
+	res.contact = true
 	return res
 }
-func (g *Generator) Generate() (bool, error) {
+func (g *Generator) Next() bool {
+	ok, err := g.generate()
+	g.Error = err
+	return ok
+}
+func (g *Generator) generate() (bool, error) {
 	if g.IgnoreError {
 		g.config.IgnoreError = true
 	}
@@ -266,10 +285,10 @@ func (g *Generator) Generate() (bool, error) {
 			case *TagExecNode:
 				err := ret.FirstExec(false, true, false)
 				if err != nil {
-					return false, err
+					return true, err
 				}
 			case *StringExecNode:
-				ret.submitResult(FuzzResult(ret.data))
+				ret.submitResult(NewFuzzResultWithData(ret.data))
 			}
 		}
 		g.first = false
@@ -291,7 +310,7 @@ func (g *Generator) Generate() (bool, error) {
 		renderedNode[reflect.ValueOf(g.data[i]).UnsafePointer()] = struct{}{}
 		genOneOk, err := g.data[i].Exec()
 		if err != nil {
-			return false, err
+			return genOneOk, err
 		}
 		if v, ok := g.data[i].(*TagExecNode); ok {
 			for _, label := range v.data.GetLabels() {
@@ -304,7 +323,7 @@ func (g *Generator) Generate() (bool, error) {
 						renderedNode[uid1] = struct{}{}
 						ok1, err := m.Exec()
 						if err != nil {
-							return false, err
+							return ok1, err
 						}
 						genOneOk = genOneOk || ok1
 					}
@@ -337,7 +356,7 @@ func (g *Generator) Generate() (bool, error) {
 		} else {
 			for _, back := range successCallBacks {
 				if err := back(); err != nil {
-					return false, err
+					return true, err
 				}
 			}
 			isOk = true
