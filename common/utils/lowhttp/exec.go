@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/samber/lo"
@@ -490,7 +489,7 @@ var commonHTTPMethod = map[string]struct{}{
 	http.MethodTrace:   {},
 }
 
-// SendHttpRequestWithRawPacketWithOpt
+// HTTPWithoutRedirect SendHttpRequestWithRawPacketWithOpt
 func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	option := NewLowhttpOption()
 	for _, opt := range opts {
@@ -925,6 +924,7 @@ RECONNECT:
 
 	if withConnPool {
 		//连接池分支
+		pc := conn.(*persistConn)
 		writeErrCh := make(chan error, 1)
 		if oldVersionProxyChecking {
 			requestPacket, err = BuildLegacyProxyRequest(requestPacket)
@@ -932,14 +932,14 @@ RECONNECT:
 				return nil, err
 			}
 		}
-		conn.(*persistConn).writeCh <- writeRequest{reqPacket: requestPacket, ch: writeErrCh}
+		pc.writeCh <- writeRequest{reqPacket: requestPacket, ch: writeErrCh}
 
 		resc := make(chan responseInfo)
-		conn.(*persistConn).reqCh <- requestAndResponseCh{
+		pc.reqCh <- requestAndResponseCh{
 			reqPacket: requestPacket,
 			ch:        resc,
 		}
-		pcClosed := conn.(*persistConn).closeCh
+		pcClosed := pc.closeCh
 	LOOP:
 		for {
 			select {
@@ -955,6 +955,9 @@ RECONNECT:
 					panic(fmt.Sprintf("internal error: exactly one of res or err should be set; nil=%v", re.resp == nil))
 				}
 				if re.err != nil {
+					if pc.shouldRetryRequest(re.err) {
+						goto RECONNECT
+					}
 					return nil, re.err
 				}
 				firstResponse = re.resp
@@ -966,7 +969,10 @@ RECONNECT:
 				break LOOP
 			case <-pcClosed:
 				pcClosed = nil
-				return nil, errors.New("connection closed")
+				if pc.shouldRetryRequest(pc.closed) {
+					goto RECONNECT
+				}
+				return nil, pc.closed
 			}
 		}
 
