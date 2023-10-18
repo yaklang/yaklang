@@ -46,7 +46,18 @@ var (
 	//全局网络配置
 	GLOBAL_NETWORK_CONFIG      = "GLOBAL_NETWORK_CONFIG"
 	GLOBAL_NETWORK_CONFIG_INIT = "GLOBAL_NETWORK_CONFIG_INIT"
+
+	// default  http flow save config
+	GLOBAL_HTTP_FLOW_SAVE = true
 )
+
+func GetGlobalHTTPFlowSave() bool {
+	return GLOBAL_HTTP_FLOW_SAVE
+}
+
+func SetGlobalHTTPFlowSave(b bool) {
+	GLOBAL_HTTP_FLOW_SAVE = b
+}
 
 func GetCurrentYakitPluginID() string {
 	return utils.EscapeInvalidUTF8Byte([]byte(os.Getenv(YAKIT_PLUGIN_ID)))

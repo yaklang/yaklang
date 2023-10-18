@@ -5,16 +5,15 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"golang.org/x/net/http2"
 	"io"
 	"net"
@@ -127,15 +126,6 @@ func newLowhttpTraceInfo() *LowhttpTraceInfo {
 
 // NewLowhttpOption create a new LowhttpExecConfig
 func NewLowhttpOption() *LowhttpExecConfig {
-	saveHTTPFlowFlag := true
-	data := getNetConfig()
-	if data != "" {
-		var config ypb.GlobalNetworkConfig
-		err := json.Unmarshal([]byte(data), &config)
-		if err == nil {
-			saveHTTPFlowFlag = config.SaveHTTPFlow
-		}
-	}
 
 	return &LowhttpExecConfig{
 		Host:                 "",
@@ -152,7 +142,7 @@ func NewLowhttpOption() *LowhttpExecConfig {
 		RedirectTimes:        5,
 		Proxy:                nil,
 		RedirectHandler:      nil,
-		SaveHTTPFlow:         saveHTTPFlowFlag,
+		SaveHTTPFlow:         consts.GetGlobalHTTPFlowSave(),
 	}
 }
 
