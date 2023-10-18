@@ -7,7 +7,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-
 // entry point
 func (b *astbuilder) build(ast *JS.JavaScriptParser) {
 	b.buildStatementList(ast.StatementList().(*JS.StatementListContext))
@@ -59,8 +58,13 @@ func (b *astbuilder) buildStatement(stmt *JS.StatementContext) {
 		b.buildDoStatement(s)
 	}
 
+	// for
 	if s, ok := stmt.IterationStatement().(*JS.ForStatementContext); ok {
 		b.buildForStatement(s)
+	}
+
+	if s, ok := stmt.FunctionDeclaration().(*JS.FunctionDeclarationContext); ok {
+		b.buildFunctionDeclaration(s)
 	}
 
 }
@@ -155,6 +159,7 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 			} else {
 				rValue := b.EmitBinOp(ssa.OpAdd, lValue.GetValue(b.FunctionBuilder), ssa.NewConst(1))
 				lValue.Assign(rValue, b.FunctionBuilder)
+				fmt.Println("++ result: ",lValue.GetValue(b.FunctionBuilder))
 				return lValue.GetValue(b.FunctionBuilder)
 			}
 		}
@@ -410,8 +415,6 @@ func (b *astbuilder) buildIfStatementContext(stmt *JS.IfStatementContext) {
 
 		return i
 	} 
-	
-
 
 	i := buildIf(stmt)
 	i.Finish()
@@ -426,18 +429,47 @@ func (b *astbuilder) buildBlock(stmt *JS.BlockContext) {
 	}
 }
 
-// 没有do while
+// do while
 func (b *astbuilder) buildDoStatement(stmt *JS.DoStatementContext) {
 	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
+	// do while需要分次
+
+	// 先进行一次do
 	if s, ok := stmt.Statement().(*JS.StatementContext); ok {
 		b.buildStatement(s)
 	}
 
+	// 构建循环进行条件判断
+	loop := b.BuildLoop()
+
+	var cond *JS.ExpressionSequenceContext
+
 	if s, ok := stmt.ExpressionSequence().(*JS.ExpressionSequenceContext); ok {
-		b.buildExpressionSequence(s)
+		cond = s
 	}
+
+	loop.BuildCondition(func () ssa.Value  {
+		var condition ssa.Value
+		if cond == nil {
+			condition = ssa.NewConst(true)
+		} else {
+			condition = b.buildExpressionSequence(cond)
+			if condition == nil {
+				condition = ssa.NewConst(true)
+			}
+		}
+		return condition
+	})
+
+	loop.BuildBody(func ()  {
+		if s, ok := stmt.Statement().(*JS.StatementContext); ok {
+			b.buildStatement(s)
+		}
+	})
+
+	loop.Finish()
 
 }
 
@@ -447,27 +479,7 @@ func (b *astbuilder) buildForStatement(stmt *JS.ForStatementContext) {
 
 	loop := b.BuildLoop()
 
-	// 分为var和expr
 	var cond *JS.ExpressionSequenceContext
-
-	// e := stmt.AllExpressionSequence()
-	// fmt.Println("----------------------", stmt.GetText())
-	// for i, v := range e{
-	// 	println("for: ",i, v.GetText())
-	// }
-	// fmt.Println("for v1:",e[0].GetText())
-	// fmt.Println("for v2:",e[1].GetText())
-	// fmt.Println("for v3:",e[2].GetText())
-
-
-	// 只有一个exprsque
-	// if e, ok := stmt.Statement().(*JS.StatementContext); ok {
-	// 	cond_v = e
-	// } 
-	// e := stmt.AllExpressionSequence()
-	// if len(e) == 1 {
-		// cond = nil
-	// }
 
 	fmt.Println("---------------------")
 	if first, ok := stmt.ForFirst().(*JS.ForFirstContext); ok {
@@ -507,25 +519,6 @@ func (b *astbuilder) buildForStatement(stmt *JS.ForStatementContext) {
 		}
 	}
 	
-	
-	// if s, ok := stmt.VariableDeclarationList().(*JS.VariableDeclarationListContext); ok {
-	// 	loop.BuildFirstExpr(func () []ssa.Value {
-	// 		recoverRange := b.SetRange(&s.BaseParserRuleContext)
-	// 		defer recoverRange()
-	// 		return b.buildAllVariableDeclaration(s)
-	// 	})
-	// } else if s, ok := stmt.ExpressionSequence(0).(*JS.ExpressionSequenceContext); ok {
-	// 	loop.BuildFirstExpr(func () []ssa.Value {
-	// 		recoverRange := b.SetRange(&s.BaseParserRuleContext)
-	// 		defer recoverRange()
-	// 		var ret []ssa.Value
-	// 		v := b.buildExpressionSequence(s)
-	// 		ret = append(ret, v)
-	// 		return ret
-	// 	})
-	// }
-
-
 	// 构建条件
 	loop.BuildCondition(func() ssa.Value {
 		var condition ssa.Value
@@ -550,5 +543,89 @@ func (b *astbuilder) buildForStatement(stmt *JS.ForStatementContext) {
 	})
 
 	loop.Finish()
+}
+func (b *astbuilder) buildIdentifierContext(stmt *JS.IdentifierContext, IslValue bool) (ssa.Value, ssa.LeftValue) {
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
+	defer recoverRange()
+	
+	text := stmt.GetText()
+	
+	if IslValue {
+		//leftValue
+		lValue := ssa.NewIdentifierLV(text, b.CurrentPos)
+		return nil, lValue
+	} else {
+		rValue := b.ReadVariable(text, true)
+		return rValue, nil
+	}
+}
 
+
+
+func (b *astbuilder) buildFunctionDeclaration(stmt *JS.FunctionDeclarationContext) ssa.Value {
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
+	defer recoverRange()
+
+	funcName := ""
+	if Name := stmt.Identifier(); Name != nil {
+		funcName = Name.GetText()
+	}
+
+	newFunc, symbol := b.NewFunc(funcName)
+	current := b.CurrentBlock
+	buildFunc := func() {
+		b.FunctionBuilder = b.PushFunction(newFunc, symbol, current)
+
+		if s, ok := stmt.FormalParameterList().(*JS.FormalParameterListContext); ok {
+			b.buildFormalParameterList(s)
+		}
+
+		if f, ok := stmt.FunctionBody().(*JS.FunctionBodyContext); ok {
+			b.buildFunctionBody(f)
+		}
+
+		b.Finish()
+		b.FunctionBuilder = b.PopFunction()
+
+	}
+	
+	if i, ok := stmt.Identifier().(*JS.IdentifierContext); ok {
+		b.buildIdentifierContext(i, true)
+	}
+
+	b.AddSubFunction(buildFunc)
+
+	if funcName != "" {
+		b.WriteVariable(funcName, newFunc)
+	}
+	return newFunc
+}
+
+
+
+func (b *astbuilder) buildFunctionBody(stmt *JS.FunctionBodyContext) {
+
+}
+
+func (b *astbuilder) buildFormalParameterList(stmt *JS.FormalParameterListContext) {
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
+	defer recoverRange()
+
+	if f := stmt.AllFormalParameterArg(); f != nil{
+		for _, i := range f{
+			b.buildFormalParameterArg(i)
+		}
+
+		if l := stmt.LastFormalParameterArg(); l != nil{
+			b.buildLastFormalParameterArg(l)
+		}
+	}
+}
+
+func (b *astbuilder) buildFormalParameterArg(stmt JS.IFormalParameterArgContext) {
+
+}
+
+func (b *astbuilder) buildLastFormalParameterArg(stmt JS.ILastFormalParameterArgContext) {
+	
 }
