@@ -151,7 +151,7 @@ func NewDefaultPoCConfig() *_pocConfig {
 		JsRedirect:             false,
 		RedirectHandler:        nil,
 		Session:                nil,
-		SaveHTTPFlow:           consts.GetGlobalHTTPFlowSave(),
+		SaveHTTPFlow:           consts.GLOBAL_HTTP_FLOW_SAVE.IsSet(),
 		Source:                 "",
 		Websocket:              false,
 		WebsocketHandler:       nil,

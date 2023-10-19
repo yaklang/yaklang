@@ -48,21 +48,8 @@ var (
 	GLOBAL_NETWORK_CONFIG_INIT = "GLOBAL_NETWORK_CONFIG_INIT"
 
 	// default  http flow save config
-	GLOBAL_HTTP_FLOW_SAVE_MUTEX = new(sync.RWMutex)
-	GLOBAL_HTTP_FLOW_SAVE       = true
+	GLOBAL_HTTP_FLOW_SAVE = utils.NewBool(true)
 )
-
-func GetGlobalHTTPFlowSave() bool {
-	GLOBAL_HTTP_FLOW_SAVE_MUTEX.RLock()
-	defer GLOBAL_HTTP_FLOW_SAVE_MUTEX.RUnlock()
-	return GLOBAL_HTTP_FLOW_SAVE
-}
-
-func SetGlobalHTTPFlowSave(b bool) {
-	GLOBAL_HTTP_FLOW_SAVE_MUTEX.Lock()
-	defer GLOBAL_HTTP_FLOW_SAVE_MUTEX.Unlock()
-	GLOBAL_HTTP_FLOW_SAVE = b
-}
 
 func GetCurrentYakitPluginID() string {
 	return utils.EscapeInvalidUTF8Byte([]byte(os.Getenv(YAKIT_PLUGIN_ID)))
