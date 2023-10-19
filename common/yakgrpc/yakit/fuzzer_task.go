@@ -212,35 +212,12 @@ func QueryWebFuzzerResponse(db *gorm.DB, params *ypb.QueryHTTPFuzzerResponseByTa
 	return paging, ret, nil
 }
 
-func QueryWebFuzzerResponseWithoutPaging(db *gorm.DB, taskID int64) ([]*WebFuzzerResponse, error) {
-	db = db.Model(&WebFuzzerResponse{})
-	db = db.Where("web_fuzzer_task_id = ?", taskID)
-	// if len(ok) > 0 {
-	// 	if ok == "false" {
-	// 		db = db.Where("ok = ?", false)
-	// 	} else if ok == "true" {
-	// 		db = db.Where("ok = ?", true)
-	// 	}
-	// }
-
-	responses := make([]*WebFuzzerResponse, 0)
-
-	if db = db.Find(&responses); db.Error != nil {
-		return nil, utils.Errorf("finding failed web fuzzer response failed: %s", db.Error)
-	}
-	return responses, nil
-}
-
-func QueryWebFuzzerResponseByTaskIDsWithOk(db *gorm.DB, taskIDs []int64) ([]*WebFuzzerResponse, error) {
+func YieldWebFuzzerResponseByTaskIDsWithOk(db *gorm.DB, ctx context.Context, taskIDs []int64) chan *WebFuzzerResponse {
 	db = db.Model(&WebFuzzerResponse{})
 	db = db.Where("ok = true").Where("web_fuzzer_task_id IN (?)", taskIDs)
-
-	responses := make([]*WebFuzzerResponse, 0)
-
-	if db = db.Find(&responses); db.Error != nil {
-		return nil, utils.Errorf("finding failed web fuzzer response failed: %s", db.Error)
-	}
-	return responses, nil
+	outC := make(chan *WebFuzzerResponse)
+	yieldWebFuzzerResponsesToChan(outC, db, ctx)
+	return outC
 }
 
 func SaveWebFuzzerResponse(db *gorm.DB, taskId int, rsp *ypb.FuzzerResponse) {
@@ -268,8 +245,12 @@ func SaveWebFuzzerResponse(db *gorm.DB, taskId int, rsp *ypb.FuzzerResponse) {
 
 func YieldWebFuzzerResponses(db *gorm.DB, ctx context.Context, id int) chan *WebFuzzerResponse {
 	db = db.Model(&WebFuzzerResponse{}).Where("web_fuzzer_task_id = ?", id)
-
 	outC := make(chan *WebFuzzerResponse)
+	yieldWebFuzzerResponsesToChan(outC, db, ctx)
+	return outC
+}
+
+func yieldWebFuzzerResponsesToChan(outC chan *WebFuzzerResponse, db *gorm.DB, ctx context.Context) {
 	go func() {
 		defer close(outC)
 
@@ -300,5 +281,4 @@ func YieldWebFuzzerResponses(db *gorm.DB, ctx context.Context, id int) chan *Web
 			}
 		}
 	}()
-	return outC
 }
