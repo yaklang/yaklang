@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"github.com/kataras/golog"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"os"
 	"path/filepath"
 
@@ -77,16 +79,18 @@ func CreateYakLogger(yakFiles ...string) *YakLogger {
 	return res
 }
 func (y *YakLogger) SetEngine(engine *antlr4yak.Engine) {
-	y.Logger.SetVMRuntimeInfoGetter(func(infoType string) (any, error) {
-		getRuntimeInfo, ok := engine.GetFieldVar("runtime", "GetInfo")
-		if ok {
-			if v, ok := getRuntimeInfo.(func(string, ...any) (any, error)); ok {
-				return v(infoType)
-			} else {
-				return nil, fmt.Errorf("call runtime.GetInfo error: maybe runtime.GetInfo function has changed")
+	y.Logger.SetVMRuntimeInfoGetter(func(infoType string) (res any, err error) {
+		defer func() {
+			if e := recover(); e != nil {
+				err = fmt.Errorf("%v", e)
 			}
+		}()
+		frame := engine.GetVM().VMStack.Peek()
+		if frame == nil {
+			return nil, fmt.Errorf("not found runtime.GetInfo")
 		}
-		return nil, fmt.Errorf("not found runtime.GetInfo")
+		f := frame.(*yakvm.Frame).GlobalVariables["runtime"].(map[string]any)["GetInfo"].(func(string, ...any) (any, error))
+		return f(infoType)
 	})
 }
 
