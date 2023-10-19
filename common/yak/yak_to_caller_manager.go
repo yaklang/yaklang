@@ -113,7 +113,7 @@ func Fuzz_WithHotPatch(ctx context.Context, code string) mutate.FuzzConfigOpt {
 		}
 		res := utils.InterfaceToStringSlice(data)
 		for _, item := range res {
-			pushNewResult([]byte(item), []string{""})
+			pushNewResult([]byte(item), []string{})
 		}
 		return result
 	})

@@ -69,7 +69,12 @@ func AddFuzzTagDescriptionToMap(methodMap map[string]*parser.TagMethod, f *FuzzT
 
 			case func(string) []*fuzztag.FuzzExecResult:
 				for _, data := range f(s) {
-					result = append(result, parser.NewFuzzResultWithDataVerbose(data.Data(), strings.Join(data.ShowInfo(), ",")))
+					var verbose string
+					showInfo := data.ShowInfo()
+					if len(showInfo) != 0 {
+						verbose = utils.InterfaceToString(showInfo)
+					}
+					result = append(result, parser.NewFuzzResultWithDataVerbose(data.Data(), verbose))
 				}
 			}
 			return
