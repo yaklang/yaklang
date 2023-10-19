@@ -203,11 +203,13 @@ func (m *MITMServer) Serve(ctx context.Context, addr string) error {
 	traceTr := &httpTraceTransport{
 		Transport: originHttpTransport,
 	}
-
+	traceTr.config = []lowhttp.LowhttpOpt{}
 	if m.proxyUrl != nil {
-		traceTr.config = []lowhttp.LowhttpOpt{
-			lowhttp.WithProxy(m.proxyUrl.String()),
-		}
+		traceTr.config = append(traceTr.config, lowhttp.WithProxy(m.proxyUrl.String()))
+	}
+
+	if len(m.DNSServers) > 0 {
+		traceTr.config = append(traceTr.config, lowhttp.WithDNSServers(m.DNSServers))
 	}
 
 	m.proxy.SetRoundTripper(traceTr)
