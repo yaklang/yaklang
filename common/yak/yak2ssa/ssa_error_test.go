@@ -547,6 +547,22 @@ func TestClosureBinding(t *testing.T) {
 		})
 	})
 
+	t.Run("use parameter value", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			f = (a) => {
+				innerF = () => {
+					print(a)
+				}
+				innerF()
+			}
+			`,
+			ExternValue: map[string]any{
+				"print": func(a any) {},
+			},
+		})
+	})
+
 	//TODO: more test in `ssa_var_test.go`
 	t.Run("modify free value", func(t *testing.T) {
 		CheckTestCase(t, TestCase{
@@ -568,6 +584,24 @@ func TestClosureBinding(t *testing.T) {
 			f()
 			// b2 = field yam-main-symbol [b]
 			print(b) // b2
+			`,
+			ExternValue: map[string]any{
+				"print": func(any) {},
+			},
+		})
+	})
+
+	t.Run("modify parameter value", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			f = (a) => {
+				innerF = () => {
+					a = 1
+				}
+				print(a)
+				innerF()
+				print(a)
+			}
 			`,
 			ExternValue: map[string]any{
 				"print": func(any) {},

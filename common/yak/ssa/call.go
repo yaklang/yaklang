@@ -52,7 +52,7 @@ func (c *Call) HandleFreeValue(fvs map[string]bool) {
 					if inst.GetPosition() == nil {
 						return false
 					}
-					if inst.GetPosition().StartLine > c.pos.StartLine {
+					if inst.GetPosition().StartLine > c.GetPosition().StartLine {
 						return true
 					} else {
 						return false
