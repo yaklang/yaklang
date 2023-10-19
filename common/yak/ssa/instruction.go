@@ -164,9 +164,7 @@ func NewParam(variable string, isFreeValue bool, fun *Function) *Parameter {
 		anInstruction: NewInstruction(),
 		anValue:       NewValue(),
 		variable:      variable,
-		Func:          fun,
 		IsFreeValue:   isFreeValue,
-		typs:          nil,
 	}
 	p.SetFunc(fun)
 	p.SetBlock(fun.EnterBlock)

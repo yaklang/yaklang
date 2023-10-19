@@ -58,11 +58,12 @@ func (f *Function) addAnonymous(anon *Function) {
 	anon.symbolObject.parentI = f.symbolObject
 }
 
-func (f *Function) NewParam(name string) {
+func (f *Function) NewParam(name string) *Parameter {
 	p := NewParam(name, false, f)
 	// p.typs = append(p.typs, BasicTypesKind[Any])
 	f.Param = append(f.Param, p)
 	f.writeVariableByBlock(name, p, f.EnterBlock)
+	return p
 }
 
 func (f *Function) ReturnValue() []Value {

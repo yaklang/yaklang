@@ -324,15 +324,18 @@ type Parameter struct {
 
 	// pos *Position
 	variable    string
-	Func        *Function
 	IsFreeValue bool
 
 	// for extern lib
 	BuildField func(string) Value
 
 	//TODO: is modify , not cover
-	IsModify bool
-	typs     Type
+	IsModify     bool
+	defaultValue Value
+}
+
+func (p *Parameter) SetDefault(v Value) {
+	p.defaultValue = v
 }
 
 var _ Node = (*Parameter)(nil)
