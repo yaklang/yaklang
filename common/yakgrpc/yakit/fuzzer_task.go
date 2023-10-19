@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/ReneKroon/ttlcache"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -13,6 +15,17 @@ import (
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+var (
+	_WebFuzzerTaskTTLCache     = ttlcache.NewCache()
+	_WebFuzzerResponseTTLCache = ttlcache.NewCache()
+)
+
+func init() {
+	ttl := 30 * time.Minute
+	_WebFuzzerResponseTTLCache.SetTTL(ttl)
+	_WebFuzzerTaskTTLCache.SetTTL(ttl)
+}
 
 /*
 这个结构用于保存当前测试的结果
@@ -47,8 +60,30 @@ type WebFuzzerTask struct {
 	RetryRootID uint `json:"retry_root_id"`
 }
 
+func (w *WebFuzzerTask) CalcCacheHash() string {
+	return utils.CalcSha1(w.ID, w.FuzzerIndex, w.FuzzerTabIndex, w.HTTPFlowTotal, w.HTTPFlowFailedCount, w.HTTPFlowSuccessCount, w.Ok, w.Reason, w.Host, w.Port, w.RetryRootID)
+}
+
+func (w *WebFuzzerTask) getCacheGRPCModel() *ypb.HistoryHTTPFuzzerTask {
+	i, ok := _WebFuzzerTaskTTLCache.Get(w.CalcCacheHash())
+	if ok {
+		return i.(*ypb.HistoryHTTPFuzzerTask)
+	}
+	return nil
+}
+
+func (w *WebFuzzerTask) setCacheGRPCModel(t *ypb.HistoryHTTPFuzzerTask) {
+	_WebFuzzerTaskTTLCache.Set(w.CalcCacheHash(), t)
+}
+
 func (w *WebFuzzerTask) ToGRPCModel() *ypb.HistoryHTTPFuzzerTask {
-	return &ypb.HistoryHTTPFuzzerTask{
+	var t *ypb.HistoryHTTPFuzzerTask
+
+	if t = w.getCacheGRPCModel(); t != nil {
+		return t
+	}
+
+	t = &ypb.HistoryHTTPFuzzerTask{
 		Id:                   int32(w.ID),
 		CreatedAt:            w.CreatedAt.Unix(),
 		HTTPFlowTotal:        int32(w.HTTPFlowTotal),
@@ -57,6 +92,8 @@ func (w *WebFuzzerTask) ToGRPCModel() *ypb.HistoryHTTPFuzzerTask {
 		Host:                 w.Host,
 		Port:                 int32(w.Port),
 	}
+	w.setCacheGRPCModel(t)
+	return t
 }
 
 func (w *WebFuzzerTask) ToGRPCModelDetail() *ypb.HistoryHTTPFuzzerTaskDetail {
@@ -194,13 +231,34 @@ type WebFuzzerResponse struct {
 	Timestamp       int64  `json:"timestamp"`
 }
 
+func (w *WebFuzzerResponse) CalcCacheHash() string {
+	return utils.CalcSha1(w.ID, w.WebFuzzerTaskId, w.OK, w.Request, w.Content, w.Payload, w.Url, w.StatusCode, w.DurationMs, w.Timestamp)
+}
+
+func (w *WebFuzzerResponse) getCacheGRPCModel() *ypb.FuzzerResponse {
+	i, ok := _WebFuzzerResponseTTLCache.Get(w.CalcCacheHash())
+	if ok {
+		return i.(*ypb.FuzzerResponse)
+	}
+	return nil
+}
+
+func (w *WebFuzzerResponse) setCacheGRPCModel(r *ypb.FuzzerResponse) {
+	_WebFuzzerResponseTTLCache.Set(w.CalcCacheHash(), r)
+}
+
 func (w *WebFuzzerResponse) ToGRPCModel() (*ypb.FuzzerResponse, error) {
 	var rsp ypb.FuzzerResponse
+	if r := w.getCacheGRPCModel(); r != nil {
+		return r, nil
+	}
+
 	err := json.Unmarshal([]byte(w.Content), &rsp)
 	if err != nil {
 		log.Errorf("unmarshal fuzzer failed: %s", err)
 		return nil, err
 	}
+	w.setCacheGRPCModel(&rsp)
 	return &rsp, nil
 }
 
