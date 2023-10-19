@@ -1101,6 +1101,7 @@ func (s *Server) HTTPResponseMutate(ctx context.Context, req *ypb.HTTPResponseMu
 	return nil, nil
 }
 
+// Deprecated
 func (s *Server) QueryHistoryHTTPFuzzerTask(ctx context.Context, req *ypb.Empty) (*ypb.HistoryHTTPFuzzerTasks, error) {
 	return &ypb.HistoryHTTPFuzzerTasks{Tasks: yakit.QueryFirst50WebFuzzerTask(s.GetProjectDatabase())}, nil
 }

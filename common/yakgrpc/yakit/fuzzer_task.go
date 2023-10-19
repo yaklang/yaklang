@@ -9,6 +9,7 @@ import (
 
 	"github.com/ReneKroon/ttlcache"
 	"github.com/jinzhu/gorm"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -105,9 +106,10 @@ func (w *WebFuzzerTask) ToGRPCModelDetail() *ypb.HistoryHTTPFuzzerTaskDetail {
 	}
 }
 
+// Deprecated
 func QueryFirst50WebFuzzerTask(db *gorm.DB) []*ypb.HistoryHTTPFuzzerTask {
 	var task []*WebFuzzerTask
-	if db := db.Model(&WebFuzzerTask{}).Order("created_at desc").Find(&task); db.Error != nil {
+	if db := db.Model(&WebFuzzerTask{}).Where("id = retry_root_id").Order("created_at desc").Find(&task); db.Error != nil {
 		log.Errorf("query web fuzzer task failed: %s", db.Error)
 		return nil
 	} else {
@@ -118,6 +120,8 @@ func QueryFirst50WebFuzzerTask(db *gorm.DB) []*ypb.HistoryHTTPFuzzerTask {
 }
 
 func QueryFuzzerHistoryTasks(db *gorm.DB, req *ypb.QueryHistoryHTTPFuzzerTaskExParams) (*bizhelper.Paginator, []*WebFuzzerTask, error) {
+	oldDB := db
+
 	var keywords []string
 	if req.GetKeyword() != "" {
 		keywords = append(keywords, req.GetKeyword())
@@ -139,14 +143,45 @@ func QueryFuzzerHistoryTasks(db *gorm.DB, req *ypb.QueryHistoryHTTPFuzzerTaskExP
 		orderby = "id"
 	}
 
-	var task []*WebFuzzerTask
+	// 返回的任务跳过重试的任务
+	db = db.Where("id = retry_root_id")
+
+	var (
+		returnTasks, tasks []*WebFuzzerTask
+	)
 
 	db = bizhelper.QueryOrder(db, orderby, order)
-	paging, db := bizhelper.Paging(db, int(pagination.GetPage()), int(pagination.GetLimit()), &task)
+	paging, db := bizhelper.Paging(db, int(pagination.GetPage()), int(pagination.GetLimit()), &returnTasks)
 	if db.Error != nil {
 		return nil, nil, utils.Errorf("pagination failed: %s", db.Error)
 	}
-	return paging, task, nil
+
+	// 对重试任务进行处理
+
+	// 先获取所有task的id
+	ids := lo.Map(returnTasks, func(i *WebFuzzerTask, _ int) uint {
+		return uint(i.ID)
+	})
+	// 找到重试任务，计算总共成功的数量
+	if db = oldDB.Model(&WebFuzzerTask{}).Select([]string{"retry_root_id", "http_flow_success_count"}).Where("retry_root_id IN (?)", ids).Find(&tasks); db.Error != nil {
+		return nil, nil, utils.Errorf("search by retry_root_id failed: %s", db.Error)
+	}
+	successCountMap := make(map[uint]int)
+	for _, task := range tasks {
+		if _, ok := successCountMap[task.RetryRootID]; !ok {
+			successCountMap[task.RetryRootID] = 0
+		}
+		successCountMap[task.RetryRootID] += task.HTTPFlowSuccessCount
+	}
+	// 更新返回的任务
+	for _, task := range returnTasks {
+		if successCount, ok := successCountMap[uint(task.ID)]; ok {
+			task.HTTPFlowSuccessCount = successCount
+			task.HTTPFlowFailedCount = task.HTTPFlowTotal - successCount
+		}
+	}
+
+	return paging, returnTasks, nil
 }
 
 func SaveWebFuzzerTask(db *gorm.DB, req *ypb.FuzzerRequest, total int, ok bool, reason string) (*WebFuzzerTask, error) {
