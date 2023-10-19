@@ -322,16 +322,16 @@ func javascriptparserParserInit() {
 		68, 0, 356, 354, 1, 0, 0, 0, 356, 357, 1, 0, 0, 0, 357, 45, 1, 0, 0, 0,
 		358, 359, 5, 12, 0, 0, 359, 47, 1, 0, 0, 0, 360, 361, 4, 24, 0, 0, 361,
 		362, 3, 134, 67, 0, 362, 363, 3, 176, 88, 0, 363, 49, 1, 0, 0, 0, 364,
-		365, 5, 93, 0, 0, 365, 366, 5, 7, 0, 0, 366, 367, 3, 134, 67, 0, 367, 368,
+		365, 5, 93, 0, 0, 365, 366, 5, 7, 0, 0, 366, 367, 3, 136, 68, 0, 367, 368,
 		5, 8, 0, 0, 368, 371, 3, 4, 2, 0, 369, 370, 5, 77, 0, 0, 370, 372, 3, 4,
 		2, 0, 371, 369, 1, 0, 0, 0, 371, 372, 1, 0, 0, 0, 372, 51, 1, 0, 0, 0,
-		373, 376, 3, 134, 67, 0, 374, 376, 3, 42, 21, 0, 375, 373, 1, 0, 0, 0,
-		375, 374, 1, 0, 0, 0, 376, 53, 1, 0, 0, 0, 377, 378, 3, 134, 67, 0, 378,
-		55, 1, 0, 0, 0, 379, 380, 3, 134, 67, 0, 380, 57, 1, 0, 0, 0, 381, 382,
+		373, 376, 3, 136, 68, 0, 374, 376, 3, 42, 21, 0, 375, 373, 1, 0, 0, 0,
+		375, 374, 1, 0, 0, 0, 376, 53, 1, 0, 0, 0, 377, 378, 3, 136, 68, 0, 378,
+		55, 1, 0, 0, 0, 379, 380, 3, 136, 68, 0, 380, 57, 1, 0, 0, 0, 381, 382,
 		5, 73, 0, 0, 382, 383, 3, 4, 2, 0, 383, 384, 5, 87, 0, 0, 384, 385, 5,
-		7, 0, 0, 385, 386, 3, 134, 67, 0, 386, 387, 5, 8, 0, 0, 387, 388, 3, 176,
+		7, 0, 0, 385, 386, 3, 136, 68, 0, 386, 387, 5, 8, 0, 0, 387, 388, 3, 176,
 		88, 0, 388, 437, 1, 0, 0, 0, 389, 390, 5, 87, 0, 0, 390, 391, 5, 7, 0,
-		0, 391, 392, 3, 134, 67, 0, 392, 393, 5, 8, 0, 0, 393, 394, 3, 4, 2, 0,
+		0, 391, 392, 3, 136, 68, 0, 392, 393, 5, 8, 0, 0, 393, 394, 3, 4, 2, 0,
 		394, 437, 1, 0, 0, 0, 395, 396, 5, 85, 0, 0, 396, 398, 5, 7, 0, 0, 397,
 		399, 3, 52, 26, 0, 398, 397, 1, 0, 0, 0, 398, 399, 1, 0, 0, 0, 399, 400,
 		1, 0, 0, 0, 400, 402, 5, 12, 0, 0, 401, 403, 3, 54, 27, 0, 402, 401, 1,
@@ -5296,7 +5296,7 @@ type IIfStatementContext interface {
 	// Getter signatures
 	If() antlr.TerminalNode
 	OpenParen() antlr.TerminalNode
-	ExpressionSequence() IExpressionSequenceContext
+	SingleExpression() ISingleExpressionContext
 	CloseParen() antlr.TerminalNode
 	AllStatement() []IStatementContext
 	Statement(i int) IStatementContext
@@ -5346,10 +5346,10 @@ func (s *IfStatementContext) OpenParen() antlr.TerminalNode {
 	return s.GetToken(JavaScriptParserOpenParen, 0)
 }
 
-func (s *IfStatementContext) ExpressionSequence() IExpressionSequenceContext {
+func (s *IfStatementContext) SingleExpression() ISingleExpressionContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IExpressionSequenceContext); ok {
+		if _, ok := ctx.(ISingleExpressionContext); ok {
 			t = ctx.(antlr.RuleContext)
 			break
 		}
@@ -5359,7 +5359,7 @@ func (s *IfStatementContext) ExpressionSequence() IExpressionSequenceContext {
 		return nil
 	}
 
-	return t.(IExpressionSequenceContext)
+	return t.(ISingleExpressionContext)
 }
 
 func (s *IfStatementContext) CloseParen() antlr.TerminalNode {
@@ -5451,7 +5451,7 @@ func (p *JavaScriptParser) IfStatement() (localctx IIfStatementContext) {
 	}
 	{
 		p.SetState(366)
-		p.ExpressionSequence()
+		p.singleExpression(0)
 	}
 	{
 		p.SetState(367)
@@ -5507,7 +5507,7 @@ type IForFirstContext interface {
 	GetParser() antlr.Parser
 
 	// Getter signatures
-	ExpressionSequence() IExpressionSequenceContext
+	SingleExpression() ISingleExpressionContext
 	VariableDeclarationList() IVariableDeclarationListContext
 
 	// IsForFirstContext differentiates from other interfaces.
@@ -5546,10 +5546,10 @@ func NewForFirstContext(parser antlr.Parser, parent antlr.ParserRuleContext, inv
 
 func (s *ForFirstContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *ForFirstContext) ExpressionSequence() IExpressionSequenceContext {
+func (s *ForFirstContext) SingleExpression() ISingleExpressionContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IExpressionSequenceContext); ok {
+		if _, ok := ctx.(ISingleExpressionContext); ok {
 			t = ctx.(antlr.RuleContext)
 			break
 		}
@@ -5559,7 +5559,7 @@ func (s *ForFirstContext) ExpressionSequence() IExpressionSequenceContext {
 		return nil
 	}
 
-	return t.(IExpressionSequenceContext)
+	return t.(ISingleExpressionContext)
 }
 
 func (s *ForFirstContext) VariableDeclarationList() IVariableDeclarationListContext {
@@ -5610,7 +5610,7 @@ func (p *JavaScriptParser) ForFirst() (localctx IForFirstContext) {
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(373)
-			p.ExpressionSequence()
+			p.singleExpression(0)
 		}
 
 	case 2:
@@ -5645,7 +5645,7 @@ type IForSecondContext interface {
 	GetParser() antlr.Parser
 
 	// Getter signatures
-	ExpressionSequence() IExpressionSequenceContext
+	SingleExpression() ISingleExpressionContext
 
 	// IsForSecondContext differentiates from other interfaces.
 	IsForSecondContext()
@@ -5683,10 +5683,10 @@ func NewForSecondContext(parser antlr.Parser, parent antlr.ParserRuleContext, in
 
 func (s *ForSecondContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *ForSecondContext) ExpressionSequence() IExpressionSequenceContext {
+func (s *ForSecondContext) SingleExpression() ISingleExpressionContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IExpressionSequenceContext); ok {
+		if _, ok := ctx.(ISingleExpressionContext); ok {
 			t = ctx.(antlr.RuleContext)
 			break
 		}
@@ -5696,7 +5696,7 @@ func (s *ForSecondContext) ExpressionSequence() IExpressionSequenceContext {
 		return nil
 	}
 
-	return t.(IExpressionSequenceContext)
+	return t.(ISingleExpressionContext)
 }
 
 func (s *ForSecondContext) GetRuleContext() antlr.RuleContext {
@@ -5723,7 +5723,7 @@ func (p *JavaScriptParser) ForSecond() (localctx IForSecondContext) {
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(377)
-		p.ExpressionSequence()
+		p.singleExpression(0)
 	}
 
 errorExit:
@@ -5747,7 +5747,7 @@ type IForThirdContext interface {
 	GetParser() antlr.Parser
 
 	// Getter signatures
-	ExpressionSequence() IExpressionSequenceContext
+	SingleExpression() ISingleExpressionContext
 
 	// IsForThirdContext differentiates from other interfaces.
 	IsForThirdContext()
@@ -5785,10 +5785,10 @@ func NewForThirdContext(parser antlr.Parser, parent antlr.ParserRuleContext, inv
 
 func (s *ForThirdContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *ForThirdContext) ExpressionSequence() IExpressionSequenceContext {
+func (s *ForThirdContext) SingleExpression() ISingleExpressionContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IExpressionSequenceContext); ok {
+		if _, ok := ctx.(ISingleExpressionContext); ok {
 			t = ctx.(antlr.RuleContext)
 			break
 		}
@@ -5798,7 +5798,7 @@ func (s *ForThirdContext) ExpressionSequence() IExpressionSequenceContext {
 		return nil
 	}
 
-	return t.(IExpressionSequenceContext)
+	return t.(ISingleExpressionContext)
 }
 
 func (s *ForThirdContext) GetRuleContext() antlr.RuleContext {
@@ -5825,7 +5825,7 @@ func (p *JavaScriptParser) ForThird() (localctx IForThirdContext) {
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(379)
-		p.ExpressionSequence()
+		p.singleExpression(0)
 	}
 
 errorExit:
@@ -5941,10 +5941,10 @@ func (s *DoStatementContext) OpenParen() antlr.TerminalNode {
 	return s.GetToken(JavaScriptParserOpenParen, 0)
 }
 
-func (s *DoStatementContext) ExpressionSequence() IExpressionSequenceContext {
+func (s *DoStatementContext) SingleExpression() ISingleExpressionContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IExpressionSequenceContext); ok {
+		if _, ok := ctx.(ISingleExpressionContext); ok {
 			t = ctx.(antlr.RuleContext)
 			break
 		}
@@ -5954,7 +5954,7 @@ func (s *DoStatementContext) ExpressionSequence() IExpressionSequenceContext {
 		return nil
 	}
 
-	return t.(IExpressionSequenceContext)
+	return t.(ISingleExpressionContext)
 }
 
 func (s *DoStatementContext) CloseParen() antlr.TerminalNode {
@@ -6013,10 +6013,10 @@ func (s *WhileStatementContext) OpenParen() antlr.TerminalNode {
 	return s.GetToken(JavaScriptParserOpenParen, 0)
 }
 
-func (s *WhileStatementContext) ExpressionSequence() IExpressionSequenceContext {
+func (s *WhileStatementContext) SingleExpression() ISingleExpressionContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IExpressionSequenceContext); ok {
+		if _, ok := ctx.(ISingleExpressionContext); ok {
 			t = ctx.(antlr.RuleContext)
 			break
 		}
@@ -6026,7 +6026,7 @@ func (s *WhileStatementContext) ExpressionSequence() IExpressionSequenceContext 
 		return nil
 	}
 
-	return t.(IExpressionSequenceContext)
+	return t.(ISingleExpressionContext)
 }
 
 func (s *WhileStatementContext) CloseParen() antlr.TerminalNode {
@@ -6448,7 +6448,7 @@ func (p *JavaScriptParser) IterationStatement() (localctx IIterationStatementCon
 		}
 		{
 			p.SetState(385)
-			p.ExpressionSequence()
+			p.singleExpression(0)
 		}
 		{
 			p.SetState(386)
@@ -6484,7 +6484,7 @@ func (p *JavaScriptParser) IterationStatement() (localctx IIterationStatementCon
 		}
 		{
 			p.SetState(391)
-			p.ExpressionSequence()
+			p.singleExpression(0)
 		}
 		{
 			p.SetState(392)

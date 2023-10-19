@@ -166,24 +166,24 @@ expressionStatement
     ;
 
 ifStatement
-    : If '(' expressionSequence ')' statement (Else statement)?
+    : If '(' singleExpression ')' statement (Else statement)?
     ;
 
 forFirst
-    : expressionSequence | variableDeclarationList
+    : singleExpression | variableDeclarationList
     ;
 
 forSecond
-    : expressionSequence
+    : singleExpression
     ;
 
 forThird
-    : expressionSequence
+    : singleExpression
     ;
 
 iterationStatement
-    : Do statement While '(' expressionSequence ')' eos                                                                       # DoStatement
-    | While '(' expressionSequence ')' statement                                                                              # WhileStatement
+    : Do statement While '(' singleExpression ')' eos                                                                       # DoStatement
+    | While '(' singleExpression ')' statement                                                                              # WhileStatement
     | For '(' forFirst? ';' forSecond? ';' forThird? ')' statement   # ForStatement
     | For '(' (singleExpression | variableDeclarationList) In expressionSequence ')' statement                                # ForInStatement
     // strange, 'of' is an identifier. and p.p("of") not work in sometime.
