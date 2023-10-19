@@ -419,13 +419,17 @@ func opConcatVisibleOne(regexp *syntax.Regexp, genArgs *GeneratorArgs) (*interna
 	return &internalGenerator{Name: regexp.String(), GenerateFunc: func() []string {
 		var sets [][]string
 		for i, generator := range generators {
-			if generator.Name == "\b" && i > 0 && i < len(generators)-1 {
-				prevGenerated := sets[len(sets)-1][0] // Last generated string for previous pattern
-				nextString := generators[i+1].Peek()  // Fetch a sample string from the next generator without actually generating it
+			if generator.Name == "\\b" && i > 0 && i < len(generators)-1 {
+				prevGenerated := sets[len(sets)-1][0]   // Last generated string for previous pattern
+				nextString := generators[i+1].Peek()[0] // Fetch a sample string from the next generator without actually generating it
 
-				if !isWordBoundaryCompatible(lastChar(prevGenerated), firstChar(nextString[0])) {
-					// Insert a character to satisfy the word boundary
-					sets[len(sets)-1][0] += "a" // This is a simplistic approach. You may need a more refined logic based on the context.
+				if !isWordBoundaryCompatible(lastChar(prevGenerated), firstChar(nextString)) {
+					if isWordBoundaryCompatible('a', firstChar(nextString)) {
+						sets[len(sets)-1][0] += "a"
+					} else if isWordBoundaryCompatible(' ', firstChar(nextString)) {
+						// If "a" doesn't work, try with " "
+						sets[len(sets)-1][0] += " "
+					}
 				}
 			}
 			rets := generator.Generate()

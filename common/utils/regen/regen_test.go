@@ -15,7 +15,7 @@ func Test_ExampleGenerate(t *testing.T) {
 }
 
 func Test_GenerateOne(t *testing.T) {
-	pattern := `<[^>]{1,512}\bwire:`
+	pattern := `(?:ATGPlatform/([\d.]+))?`
 	results, _ := GenerateOne(pattern)
 	spew.Dump(results)
 	results, _ = GenerateVisibleOne(pattern)
@@ -106,9 +106,15 @@ func TestGenerateVisibleOne(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "Test Multiple2",
-			args:    args{patterns: []string{`<[^>]{1,512}\b!wire:`}},
-			wantRes: []string{"<[^>]{1,512}\\b!wire:"},
+			name:    "Test OpWordBoundary",
+			args:    args{patterns: []string{`<[^>]{1,512}\bwire:`, `<iframe[^>]+\blocalfocus\b`}},
+			wantRes: []string{"<[^>]{1,512}\\bwire:", "<iframe[^>]+\\blocalfocus\\b"},
+			wantErr: false,
+		},
+		{
+			name:    "Test Multiple",
+			args:    args{patterns: []string{`(?:ATGPlatform/([\d.]+))?`}},
+			wantRes: []string{"(?:ATGPlatform/([\\d.]+))?"},
 			wantErr: false,
 		},
 	}

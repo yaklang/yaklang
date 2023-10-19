@@ -2067,7 +2067,7 @@
           regexp: (?i)(window.location = '/ui/modules/login/')
 - methods:
     - keywords:
-        - product: cgi:irc
+        - product: cgi-irc
           regexp: (?i)(<!-- this is part of cgi:irc|<small id="ietest"><a href="http://cgiirc.org/)
 - methods:
     - keywords:
