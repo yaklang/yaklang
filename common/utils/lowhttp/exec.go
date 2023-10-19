@@ -878,12 +878,11 @@ RECONNECT:
 					tried[basicProxy] = struct{}{}
 				}
 				if withConnPool {
-					cacheKey.addr = originAddr
+					cacheKey.addr = utils.ExtractHostPort(basicProxy)
 					conn, err = connPool.getIdleConn(cacheKey, noProxyDial...)
 				} else {
-					conn, err = netx.DialX(originAddr, noProxyDial...)
+					conn, err = netx.DialX(utils.ExtractHostPort(basicProxy), noProxyDial...)
 				}
-				conn, err = netx.DialX(utils.ExtractHostPort(basicProxy), noProxyDial...)
 				if err != nil {
 					log.Debugf("try old version proxy failed: %s", err)
 					continue
