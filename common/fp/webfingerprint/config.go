@@ -51,6 +51,12 @@ func NewWebFingerprintConfig(options ...ConfigOption) *Config {
 
 type ConfigOption func(config *Config)
 
+func WithWebFingerprintDataSize(size int) ConfigOption {
+	return func(config *Config) {
+		config.FingerprintDataSize = size
+	}
+}
+
 func WithWebFingerprintRules(rules []*WebRule) ConfigOption {
 	return func(config *Config) {
 		config.Rules = rules

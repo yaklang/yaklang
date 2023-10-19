@@ -153,6 +153,7 @@ func (f *Config) GenerateWebFingerprintConfigOptions() []webfingerprint.ConfigOp
 		webfingerprint.WithForceAllRuleMatching(f.WebFingerprintUseAllRules),
 		webfingerprint.WithProbeTimeout(f.ProbeTimeout),
 		webfingerprint.WithWebFingerprintRules(f.WebFingerprintRules),
+		webfingerprint.WithWebFingerprintDataSize(f.FingerprintDataSize),
 		webfingerprint.WithWebProxy(f.Proxies...),
 	}
 }

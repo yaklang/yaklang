@@ -141,6 +141,12 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 	var matchResult *MatchResult
 	portStr := fmt.Sprint(port)
 	switch true {
+	case config.OnlyEnableWebFingerprint:
+		log.Debugf("web-detect first for: %v", utils2.HostPort(host, port))
+		matchResult, err = webFirst()
+	case config.DisableWebFingerprint:
+		log.Debugf("service-detect first for: %v", utils2.HostPort(host, port))
+		matchResult, err = serviceFirst()
 	case ((port >= 80 && port <= 90) ||
 		port == 443 ||
 		port >= 7000 ||

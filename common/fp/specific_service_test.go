@@ -14,13 +14,13 @@ func TestFingerprintRule(t *testing.T) {
 	//rules, _ := webfingerprint.ParseWebFingerprintRules(resp)
 	rules, _ := webfingerprint.LoadDefaultDataSource()
 
-	config := NewConfig(WithWebFingerprintRule(rules))
+	config := NewConfig(WithWebFingerprintRule(rules), WithOnlyEnableWebFingerprint(true))
 	matcher, err := NewFingerprintMatcher(nil, config)
 	if err != nil {
 		t.FailNow()
 	}
 
-	host, port := webfingerprint.MockWebFingerPrintByName("bloomreach")
+	host, port := webfingerprint.MockWebFingerPrintByName("livewire")
 
 	result, err := matcher.Match(host, port)
 
@@ -39,7 +39,11 @@ func TestMUSTPASS_FingerprintRule(t *testing.T) {
 
 	rules, _ := webfingerprint.LoadDefaultDataSource()
 
-	config := NewConfig(WithWebFingerprintRule(rules))
+	config := NewConfig(WithWebFingerprintRule(
+		rules),
+		WithOnlyEnableWebFingerprint(true),
+		WithFingerprintDataSize(204800),
+	)
 	matcher, err := NewFingerprintMatcher(nil, config)
 	if err != nil {
 		t.FailNow()
@@ -54,6 +58,8 @@ func TestMUSTPASS_FingerprintRule(t *testing.T) {
 	}
 	//spew.Dump(wantRules)
 	//spew.Dump(result.GetServiceName())
+	spew.Dump(result.GetServiceName())
+	spew.Dump(len(result.GetCPEs()))
 	resultMap := make(map[string]bool)
 	for _, cpe := range result.Fingerprint.CPEs {
 		productName := strings.Split(cpe, ":")[3]
