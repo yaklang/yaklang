@@ -20,7 +20,7 @@ func TestFingerprintRule(t *testing.T) {
 		t.FailNow()
 	}
 
-	host, port := webfingerprint.MockWebFingerPrintByName("livewire")
+	host, port := webfingerprint.MockWebFingerPrintByName("oracle_commerce,outlook_web_app")
 
 	result, err := matcher.Match(host, port)
 
@@ -56,9 +56,9 @@ func TestMUSTPASS_FingerprintRule(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	//spew.Dump(wantRules)
+	spew.Dump(len(wantRules))
 	//spew.Dump(result.GetServiceName())
-	spew.Dump(result.GetServiceName())
+	//spew.Dump(result.GetServiceName())
 	spew.Dump(len(result.GetCPEs()))
 	resultMap := make(map[string]bool)
 	for _, cpe := range result.Fingerprint.CPEs {
@@ -68,6 +68,9 @@ func TestMUSTPASS_FingerprintRule(t *testing.T) {
 	}
 
 	for _, want := range wantRules {
+		if want == "" {
+			continue
+		}
 		if _, exists := resultMap[want]; !exists {
 			t.Errorf("Expected product [%s] not found in the actual results", want)
 		}
