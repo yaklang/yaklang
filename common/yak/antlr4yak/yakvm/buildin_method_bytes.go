@@ -226,10 +226,7 @@ var bytesBuildinMethod = map[string]*buildinMethod{
 		ParamTable: []string{"prefix"},
 		HandlerFactory: NewBytesMethodFactory(func(s []byte) interface{} {
 			return func(prefix []byte) []byte {
-				if bytes.HasPrefix(s, prefix) {
-					return s[len(prefix):]
-				}
-				return s
+				return bytes.TrimPrefix(s, prefix)
 			}
 		},
 		),
@@ -251,10 +248,7 @@ var bytesBuildinMethod = map[string]*buildinMethod{
 		ParamTable: []string{"suffix"},
 		HandlerFactory: NewBytesMethodFactory(func(s []byte) interface{} {
 			return func(suffix []byte) []byte {
-				if bytes.HasSuffix(s, suffix) {
-					return s[:len(suffix)]
-				}
-				return s
+				return bytes.TrimSuffix(s, suffix)
 			}
 		},
 		),

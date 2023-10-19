@@ -90,16 +90,18 @@ func FuzzTagExec(input interface{}, opts ...FuzzConfigOpt) (_ []string, err erro
 	if err != nil {
 		return nil, err
 	}
-	res := []string{}
+	var res []string
 	for generator.Next() {
 		if generator.Error != nil {
-			return nil, generator.Error
+			return res, generator.Error
 		}
 		result := generator.Result()
 		data := result.GetData()
 		res = append(res, string(data))
 		if config.resultHandler != nil {
-			config.resultHandler(string(data), result.GetVerbose())
+			if !config.resultHandler(string(data), result.GetVerbose()) {
+				return res, nil
+			}
 		}
 	}
 	return res, nil
