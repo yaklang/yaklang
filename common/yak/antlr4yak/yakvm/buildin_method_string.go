@@ -226,10 +226,7 @@ var stringBuildinMethod = map[string]*buildinMethod{
 		ParamTable: []string{"prefix"},
 		HandlerFactory: NewStringMethodFactory(func(s string) interface{} {
 			return func(prefix string) string {
-				if strings.HasPrefix(s, prefix) {
-					return s[len(prefix):]
-				}
-				return s
+				return strings.TrimPrefix(s, prefix)
 			}
 		},
 		),
@@ -251,10 +248,7 @@ var stringBuildinMethod = map[string]*buildinMethod{
 		ParamTable: []string{"suffix"},
 		HandlerFactory: NewStringMethodFactory(func(s string) interface{} {
 			return func(suffix string) string {
-				if strings.HasSuffix(s, suffix) {
-					return s[:len(suffix)]
-				}
-				return s
+				return strings.TrimSuffix(s, suffix)
 			}
 		},
 		),
