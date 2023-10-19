@@ -65,6 +65,40 @@ func parseCharClass(runes []rune) (*tCharClass, error) {
 	return &tCharClass{ranges, totalSize}, nil
 }
 
+func (class *tCharClass) filterVisible() *tCharClass {
+	var filteredRanges []*tCharClassRange
+	var totalSize int32
+
+	// Loop over each range in the character class
+	for _, r := range class.Ranges {
+		start := maxRune(r.Start, 32)               // Visible characters start from rune value 32
+		end := minRune(r.Start+rune(r.Size-1), 126) // ... and end at rune value 126
+
+		if start <= end { // Ensure the filtered range is valid
+			size := end - start + 1
+			filteredRanges = append(filteredRanges, &tCharClassRange{start, int32(size)})
+			totalSize += int32(size)
+		}
+	}
+
+	return &tCharClass{filteredRanges, totalSize}
+}
+
+// Helper functions
+func minRune(a, b rune) rune {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func maxRune(a, b rune) rune {
+	if a > b {
+		return a
+	}
+	return b
+}
+
 func (class *tCharClass) GetAllRune() []rune {
 	var runes []rune
 	for _, r := range class.Ranges {
@@ -102,6 +136,11 @@ func (class *tCharClass) GetOneRuneAsString() []string {
 		}
 	}
 	return runes
+}
+
+func (class *tCharClass) GetVisibleOneRuneAsString() []string {
+	visibleClass := class.filterVisible()
+	return visibleClass.GetOneRuneAsString()
 }
 
 func (class *tCharClass) String() string {

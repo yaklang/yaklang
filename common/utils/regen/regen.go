@@ -1,6 +1,7 @@
 package regen
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"regexp/syntax"
 
 	"github.com/pkg/errors"
@@ -28,7 +29,7 @@ func (a *GeneratorArgs) initialize() error {
 type Generator interface {
 	Generate() []string
 	String() string
-	Clean(str string) string
+	CheckVisible(str string) bool
 }
 
 func Generate(pattern string) ([]string, error) {
@@ -51,18 +52,20 @@ func GenerateOne(pattern string) ([]string, error) {
 	return generator.Generate(), nil
 }
 
-func GenerateVisibleOne(pattern string) (string, error) {
-	generator, err := NewGeneratorOne(pattern, &GeneratorArgs{
+func GenerateVisibleOne(pattern string) ([]string, error) {
+	generator, err := NewGeneratorVisibleOne(pattern, &GeneratorArgs{
 		Flags: syntax.Perl,
 	})
 	if err != nil {
-		return "", err
+		return []string{""}, err
 	}
 	generated := generator.Generate()
 	if len(generated) > 0 {
-		return generator.Clean(generated[0]), nil
+		if !generator.CheckVisible(generated[0]) {
+			log.Warnf("pattern %s,res [%s] is not visible one", pattern, generated[0])
+		}
 	}
-	return "", nil
+	return generated, nil
 }
 
 func MustGenerate(pattern string) []string {
@@ -120,6 +123,32 @@ func NewGeneratorOne(pattern string, inputArgs *GeneratorArgs) (geneator Generat
 
 	var gen *internalGenerator
 	gen, err = newGeneratorOne(regexp, &args)
+	if err != nil {
+		return
+	}
+
+	return gen, nil
+}
+
+func NewGeneratorVisibleOne(pattern string, inputArgs *GeneratorArgs) (geneator Generator, err error) {
+	args := GeneratorArgs{}
+
+	// Copy inputArgs so the caller can't change them.
+	if inputArgs != nil {
+		args = *inputArgs
+	}
+	if err = args.initialize(); err != nil {
+		return nil, err
+	}
+
+	var regexp *syntax.Regexp
+	regexp, err = syntax.Parse(pattern, args.Flags)
+	if err != nil {
+		return
+	}
+
+	var gen *internalGenerator
+	gen, err = newGeneratorVisibleOne(regexp, &args)
 	if err != nil {
 		return
 	}
