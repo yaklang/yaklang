@@ -960,7 +960,7 @@ RECONNECT:
 					return nil, re.err
 				}
 				firstResponse = re.resp
-				rawBytes, err = utils.DumpHTTPResponse(firstResponse, true)
+				rawBytes = re.respBytes
 				traceInfo.ServerTime = re.info.ServerTime
 				if err != nil {
 					return nil, err
@@ -1012,6 +1012,7 @@ RECONNECT:
 			traceInfo.ServerTime = time.Since(serverTimeStart)
 		}
 
+		//firstResponse,err = http.ReadResponse(httpResponseReader, nil)
 		firstResponse, err = utils.ReadHTTPResponseFromBufioReader(httpResponseReader, nil)
 		if err != nil {
 			if err == io.EOF || err == io.ErrUnexpectedEOF {

@@ -2,6 +2,7 @@ package lowhttp
 
 import (
 	"bufio"
+	"bytes"
 	"container/list"
 	"errors"
 	"fmt"
@@ -189,9 +190,10 @@ type requestAndResponseCh struct {
 }
 
 type responseInfo struct {
-	resp *http.Response
-	err  error
-	info httpInfo
+	resp      *http.Response
+	respBytes []byte
+	err       error
+	info      httpInfo
 }
 
 type httpInfo struct {
@@ -353,10 +355,12 @@ func (pc *persistConn) readLoop() {
 
 		rc := <-pc.reqCh
 
-		var resp *http.Response
+		var responseRaw bytes.Buffer
+		httpResponseReader := bufio.NewReader(io.TeeReader(pc.br, &responseRaw))
 
+		var resp *http.Response
 		if err == nil {
-			resp, err = http.ReadResponse(pc.br, nil)
+			resp, err = utils.ReadHTTPResponseFromBufioReader(httpResponseReader, nil)
 			count++
 		} else {
 			// 包装一层error作为标识
@@ -376,57 +380,11 @@ func (pc *persistConn) readLoop() {
 		pc.numExpectedResponses--
 		pc.mu.Unlock()
 
-		_, ok := resp.Body.(io.Writer)
-		bodyWritable := ok
-		method, _, _ := GetHTTPPacketFirstLine(rc.reqPacket)
-		hasBody := method != "HEAD" && resp.ContentLength != 0
+		rc.ch <- responseInfo{resp: resp, respBytes: responseRaw.Bytes(), info: info}
+		alive = alive &&
+			!pc.sawEOF &&
+			tryPutIdleConn()
 
-		if resp.Close || resp.StatusCode <= 199 || bodyWritable {
-			alive = false
-		}
-
-		if !hasBody || bodyWritable {
-			alive = alive &&
-				!pc.sawEOF &&
-				tryPutIdleConn()
-
-			rc.ch <- responseInfo{resp: resp, info: info}
-
-			continue
-		}
-
-		waitForBodyRead := make(chan bool, 2)
-		body := &bodyEOFSignal{
-			body: resp.Body,
-			earlyCloseFn: func() error {
-				waitForBodyRead <- false
-				<-eofc
-				return nil
-
-			},
-			fn: func(err error) error {
-				isEOF := err == io.EOF
-				waitForBodyRead <- isEOF
-				if isEOF {
-					<-eofc
-				}
-				return err
-			},
-		}
-
-		resp.Body = body
-
-		rc.ch <- responseInfo{resp: resp, info: info}
-
-		select {
-		case bodyEOF := <-waitForBodyRead:
-			alive = alive &&
-				bodyEOF &&
-				!pc.sawEOF && tryPutIdleConn()
-			if bodyEOF {
-				eofc <- struct{}{}
-			}
-		}
 	}
 }
 
