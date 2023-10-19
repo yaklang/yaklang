@@ -1,12 +1,11 @@
 package ssa
 
 type InspectVariableResult struct {
-	VariableName string
-	// values         []Value
+	VariableName   string
 	ProbablyTypes  []string
-	ProbablyValues []string
+	ProbablyValues []ValueCodeItem
 	MustTypes      []string
-	MustValue      []string
+	MustValue      []ValueCodeItem
 }
 
 func (r *InspectVariableResult) Merge(other *InspectVariableResult) {
@@ -26,7 +25,7 @@ func (p *Program) InspectVariableLast(varName string) *InspectVariableResult {
 			if res, ok := funcIns.symbolTable[varName]; ok {
 				last := res[len(res)-1]
 				result.ProbablyTypes = append(result.ProbablyTypes, last.GetType().String())
-				result.ProbablyValues = append(result.ProbablyValues, last.String())
+				result.ProbablyValues = append(result.ProbablyValues, last)
 			}
 		}
 	}
@@ -59,19 +58,19 @@ func (f *Function) InspectVariable(varName string) *InspectVariableResult {
 		return result
 	}
 	var probablyTypes []string
-	var probablyValue []string
-	var mustValue []string
+	var probablyValue []ValueCodeItem
+	var mustValue []ValueCodeItem
 	var mustTypes []string
 	values := make([]Value, 0)
 	for _, v := range res {
 		values = append(values, v)
-		probablyValue = append(probablyValue, v.String())
+		probablyValue = append(probablyValue, v)
 		probablyTypes = append(probablyTypes, v.GetType().String())
 		if inst, ok := v.(Instruction); ok {
 			reachable := inst.GetBlock().Reachable()
 			if reachable == 1 {
 				mustTypes = append(mustTypes, v.GetType().String())
-				mustValue = append(mustValue, v.String())
+				mustValue = append(mustValue, v)
 			}
 		}
 	}
