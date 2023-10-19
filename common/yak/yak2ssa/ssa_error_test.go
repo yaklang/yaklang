@@ -330,6 +330,17 @@ func TestMemberCall(t *testing.T) {
 			},
 		})
 	})
+
+	t.Run("any value member call", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			f = (a) => {
+				b = a.Field
+				c = b.Field
+			}
+			`,
+		})
+	})
 }
 
 func TestSliceCall(t *testing.T) {
@@ -387,6 +398,16 @@ func TestSliceCall(t *testing.T) {
 		})
 	})
 
+	t.Run("any value slice call", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			f = (a) => {
+				b = a[0]
+				c = b[0]
+			}
+			`,
+		})
+	})
 }
 
 func TestTypeMethod(t *testing.T) {
