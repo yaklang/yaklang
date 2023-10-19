@@ -1,14 +1,37 @@
 package bruteutils
 
 import (
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
-	"github.com/yaklang/yaklang/common/utils"
-	"golang.org/x/crypto/ssh"
-	"strconv"
+	"bytes"
+	"fmt"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"golang.org/x/crypto/ssh"
 )
+
+func handleSSHError(result *BruteItemResult, target string, err error) {
+	switch true {
+	// 			case m, err := regexp.MatchString(`ssh: handshake failed.*?connection reset by peer`, err.Error()); m
+	case strings.Contains(err.Error(), "connection reset by peer"):
+		utils.Debug(func() {
+			log.Errorf("%v's connection is closed by peer", target)
+		})
+		fallthrough
+	case strings.Contains(err.Error(), "connect: connection refused"):
+		utils.Debug(func() {
+			log.Errorf("%v's connection is refused", target)
+		})
+		result.Finished = true
+	case strings.Contains(err.Error(), "too many colons in address"):
+		result.Finished = true
+	// case strings.Contains(err.Error(), "attempted methods [none], no supported"):
+	// 	result.Finished = true
+	default:
+		log.Warnf("dial ssh://%s failed: %s", target, err)
+	}
+}
 
 var sshAuth = &DefaultServiceAuthInfo{
 	ServiceName:  "ssh",
@@ -22,80 +45,69 @@ var sshAuth = &DefaultServiceAuthInfo{
 	},
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
 		i.Target = appendDefaultPort(i.Target, 22)
-
-		conn, err := netx.DialTCPTimeout(10*time.Second, i.Target)
-		if err != nil {
-			log.Errorf("ssh:\\\\%v conn failed: %s", i.Target, err)
-			res := i.Result()
-			res.Finished = true
-			return res
-		}
-		defer conn.Close()
-
-		raw, _ := utils.ReadConnWithTimeout(conn, 2*time.Second)
-		if raw == nil {
-			res := i.Result()
-			res.Finished = true
-			return res
-		}
-		println(strconv.Quote(string(raw)))
-		return i.Result()
-	},
-	BrutePass: func(item *BruteItem) *BruteItemResult {
-		log.Infof("ssh client start to handle: %s", item.String())
-		defer log.Infof("ssh finished to handle: %s", item.String())
-
-		result := item.Result()
-
-		var target = fixToTarget(item.Target, 22)
+		result := i.Result()
 
 		config := &ssh.ClientConfig{
-			User:            item.Username,
 			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 			Timeout:         10 * time.Second,
 		}
-		config.Auth = []ssh.AuthMethod{ssh.Password(item.Password)}
+		client, err := ssh.Dial("tcp", i.Target, config)
+		if err != nil {
+			log.Errorf("ssh: %v conn failed: %s", i.Target, err)
+			handleSSHError(result, i.Target, err)
+			return result
+		}
+		defer client.Close()
+
+		result.Ok = true
+		return result
+	},
+	BrutePass: func(i *BruteItem) *BruteItemResult {
+		log.Infof("ssh client start to handle: %s", i.String())
+		defer log.Infof("ssh finished to handle: %s", i.String())
+
+		result := i.Result()
+
+		var target = fixToTarget(i.Target, 22)
+
+		config := &ssh.ClientConfig{
+			User:            i.Username,
+			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+			Timeout:         10 * time.Second,
+		}
+		config.Auth = []ssh.AuthMethod{ssh.Password(i.Password)}
 
 		client, err := ssh.Dial("tcp", target, config)
 		if err != nil {
 			// 107.187.110.241/24
-			switch true {
-			// 			case m, err := regexp.MatchString(`ssh: handshake failed.*?connection reset by peer`, err.Error()); m
-			case strings.Contains(err.Error(), "connection reset by peer"):
-				utils.Debug(func() {
-					log.Errorf("%v's connection is closed by peer", target)
-				})
-				fallthrough
-			case strings.Contains(err.Error(), "connect: connection refused"):
-				utils.Debug(func() {
-					log.Errorf("%v's connection is refused", target)
-				})
-				result.Finished = true
-				return result
-			case strings.Contains(err.Error(), "too many colons in address"):
-				result.Finished = true
-				return result
-			case strings.Contains(err.Error(), "attempted methods [none], no supported"):
-				result.Finished = true
-				return result
-			default:
-				log.Warnf("dial ssh://%s failed: %s", target, err)
-				return result
-			}
+			log.Errorf("ssh: %v conn failed: %s", i.Target, err)
+			handleSSHError(result, target, err)
+			return result
 		}
 		defer client.Close()
 
-		//session, err := client.NewSession()
-		//if err != nil {
-		//	return result
-		//}
-		//
-		//err = session.Run("echo 123123123")
-		//if err != nil {
-		//	return result
-		//}
+		// 创建SSH会话
+		session, err := client.NewSession()
+		if err != nil {
+			log.Errorf("ssh: %v create session failed: %s", i.Target, err)
+			handleSSHError(result, target, err)
+			return result
+		}
+		defer session.Close()
 
-		result.Ok = true
+		var stdoutBuf bytes.Buffer
+		session.Stdout = &stdoutBuf
+		verifyRandomString := utils.RandStringBytes(10)
+		err = session.Run(fmt.Sprintf("echo %s", verifyRandomString))
+		if err != nil {
+			log.Errorf("ssh: %v run command failed: %s", i.Target, err)
+			handleSSHError(result, target, err)
+			return result
+		}
+		if strings.Contains(stdoutBuf.String(), verifyRandomString) {
+			result.Ok = true
+		}
+
 		return result
 	},
 }
