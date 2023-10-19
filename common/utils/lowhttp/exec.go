@@ -142,7 +142,7 @@ func NewLowhttpOption() *LowhttpExecConfig {
 		RedirectTimes:        5,
 		Proxy:                nil,
 		RedirectHandler:      nil,
-		SaveHTTPFlow:         consts.GetGlobalHTTPFlowSave(),
+		SaveHTTPFlow:         consts.GLOBAL_HTTP_FLOW_SAVE.IsSet(),
 	}
 }
 

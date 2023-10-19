@@ -78,7 +78,7 @@ func ConfigureNetWork(c *ypb.GlobalNetworkConfig) {
 		return
 	}
 
-	consts.SetGlobalHTTPFlowSave(c.GetSaveHTTPFlow())
+	consts.GLOBAL_HTTP_FLOW_SAVE.SetTo(c.GetSaveHTTPFlow())
 
 	netx.SetDefaultDNSOptions(
 		netx.WithDNSFallbackDoH(c.DNSFallbackDoH),
