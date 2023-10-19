@@ -50,7 +50,7 @@ func init() {
 }
 
 func TestMustPassDebug(t *testing.T) {
-	var debugName = "yakit_log.yak"
+	var debugName = "output.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {
