@@ -10,7 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"github.com/yaklang/yaklang/common/yakgrpc"
 	"strings"
 	"testing"
 	"time"
