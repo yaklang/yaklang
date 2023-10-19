@@ -97,7 +97,7 @@ func (s *Server) ExecuteChaosMakerRule(req *ypb.ExecuteChaosMakerRuleRequest, st
 				t.Stop()
 				return
 			case <-t.C:
-				sendLogger.YakitAutoLog(&yaklib.YakitStatusCard{
+				sendLogger.Output(&yaklib.YakitStatusCard{
 					Id:   "Agent命中流量",
 					Data: fmt.Sprintf("%d", matchCounter),
 				})

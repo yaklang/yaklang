@@ -7,12 +7,21 @@ import (
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/consts"
 	log "github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"google.golang.org/grpc"
+	"gopkg.in/yaml.v2"
 	"io"
 	"io/ioutil"
 	"net"
 	"os"
+	"reflect"
+	"strconv"
+	"strings"
+	"time"
 )
 
 // OpenPortServerStreamerHelperRWC
@@ -121,6 +130,8 @@ func appendPluginNamesEx(key string, splitStr string, params []*ypb.ExecParamIte
 	return params, callback, nil
 }
 func NewLocalClient() (ypb.YakClient, error) {
+	netx.UnsetProxyFromEnv()
+
 	consts.InitilizeDatabase("", "")
 	yakit.InitializeDefaultDatabaseSchema()
 
@@ -130,7 +141,7 @@ func NewLocalClient() (ypb.YakClient, error) {
 		grpc.MaxRecvMsgSize(100*1024*1024),
 		grpc.MaxSendMsgSize(100*1024*1024),
 	)
-	s, err := NewServer()
+	s, err := NewServerWithLogCache(false)
 	if err != nil {
 		log.Errorf("build yakit server failed: %s", err)
 		return nil, err

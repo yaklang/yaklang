@@ -171,5 +171,6 @@ func NewFrame(vm *VirtualMachine) *Frame {
 	if vm.debugMode && vm.debugger != nil {
 		vm.debugger.AddScopeRef(vm.rootScope)
 	}
+	ImportRuntimeLib(frame)
 	return frame
 }
