@@ -400,8 +400,9 @@ func (b *astbuilder) buildIfStatementContext(stmt *JS.IfStatementContext) {
 		// if instruction condition
 		i.BuildCondition(
 			func() ssa.Value {
-				if s, ok := stmt.ExpressionSequence().(*JS.ExpressionSequenceContext); ok {
-					return b.buildExpressionSequence(s)
+				if s, ok := stmt.SingleExpression().(JS.ISingleExpressionContext); ok {
+					value, _ := b.buildSingleExpression(s, false)
+					return value
 				}
 				return nil
 			})
@@ -457,9 +458,9 @@ func (b *astbuilder) buildDoStatement(stmt *JS.DoStatementContext) {
 	// 构建循环进行条件判断
 	loop := b.BuildLoop()
 
-	var cond *JS.ExpressionSequenceContext
+	var cond JS.ISingleExpressionContext
 
-	if s, ok := stmt.ExpressionSequence().(*JS.ExpressionSequenceContext); ok {
+	if s, ok := stmt.SingleExpression().(JS.ISingleExpressionContext); ok {
 		cond = s
 	}
 
@@ -468,7 +469,7 @@ func (b *astbuilder) buildDoStatement(stmt *JS.DoStatementContext) {
 		if cond == nil {
 			condition = ssa.NewConst(true)
 		} else {
-			condition = b.buildExpressionSequence(cond)
+			condition, _ = b.buildSingleExpression(cond, false)
 			if condition == nil {
 				condition = ssa.NewConst(true)
 			}
@@ -492,7 +493,7 @@ func (b *astbuilder) buildForStatement(stmt *JS.ForStatementContext) {
 
 	loop := b.BuildLoop()
 
-	var cond *JS.ExpressionSequenceContext
+	var cond JS.ISingleExpressionContext
 
 	fmt.Println("---------------------")
 	if first, ok := stmt.ForFirst().(*JS.ForFirstContext); ok {
@@ -502,31 +503,33 @@ func (b *astbuilder) buildForStatement(stmt *JS.ForStatementContext) {
 				defer recoverRange()
 				return b.buildAllVariableDeclaration(f)
 			})
-		} else if f, ok := first.ExpressionSequence().(*JS.ExpressionSequenceContext); ok {
+		} else if f, ok := first.SingleExpression().(JS.ISingleExpressionContext); ok {
 			loop.BuildFirstExpr(func() []ssa.Value {
-				recoverRange := b.SetRange(&f.BaseParserRuleContext)
-				defer recoverRange()
+				// recoverRange := b.SetRange(&f.BaseParserRuleContext)
+				// defer recoverRange()
 				var ret []ssa.Value
-				ret = append(ret, b.buildExpressionSequence(f))
+				value, _ := b.buildSingleExpression(f, false)
+				ret = append(ret, value)
 				return ret
 			})
 		}
 	}
 
 	if expr, ok := stmt.ForSecond().(*JS.ForSecondContext); ok {
-		if e, ok := expr.ExpressionSequence().(*JS.ExpressionSequenceContext); ok {
+		if e, ok := expr.SingleExpression().(JS.ISingleExpressionContext); ok {
 			cond = e
 		}
 	}
 
 	if third, ok := stmt.ForThird().(*JS.ForThirdContext); ok {
-		if t, ok := third.ExpressionSequence().(*JS.ExpressionSequenceContext); ok {
+		if t, ok := third.SingleExpression().(JS.ISingleExpressionContext); ok {
 			loop.BuildThird(func() []ssa.Value {
 				// build third expression in loop.latch
-				recoverRange := b.SetRange(&t.BaseParserRuleContext)
-				defer recoverRange()
+				// recoverRange := b.SetRange(&t.BaseParserRuleContext)
+				// defer recoverRange()
 				var ret []ssa.Value
-				ret = append(ret, b.buildExpressionSequence(t))
+				value, _ := b.buildSingleExpression(t, false)
+				ret = append(ret, value)
 				return ret
 			})
 		}
@@ -539,7 +542,7 @@ func (b *astbuilder) buildForStatement(stmt *JS.ForStatementContext) {
 		if cond == nil {
 			condition = ssa.NewConst(true)
 		} else {
-			condition = b.buildExpressionSequence(cond)
+			condition, _ = b.buildSingleExpression(cond, false)
 			if condition == nil {
 				condition = ssa.NewConst(true)
 			}
