@@ -340,16 +340,37 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		return nil
 	}
 
-	if req.GetHistoryWebFuzzerId() > 0 {
-		for resp := range yakit.YieldWebFuzzerResponses(s.GetProjectDatabase(), stream.Context(), int(req.GetHistoryWebFuzzerId())) {
-			rsp, err := resp.ToGRPCModel()
-			if err != nil {
-				continue
+	historyID := req.GetHistoryWebFuzzerId()
+	if historyID > 0 {
+		// 回溯找到所有之前的包，进行整合
+		oldIDs, err := yakit.GetWebFuzzerTasksIDByRetryRootID(s.GetProjectDatabase(), uint(historyID))
+		// 找到最新的任务并排除
+		latestID := lo.Max(oldIDs)
+		oldIDs = lo.Filter(oldIDs, func(item uint, _ int) bool {
+			return item != latestID
+		})
+
+		if err != nil {
+			log.Errorf("get old web fuzzer success response failed: %s", err)
+		} else {
+			// 只展示之前成功的包
+			for resp := range yakit.YieldWebFuzzerResponseByTaskIDs(s.GetProjectDatabase(), stream.Context(), oldIDs, true) {
+				respModel, err := resp.ToGRPCModel()
+				if err != nil {
+					log.Errorf("convert web fuzzer response to grpc model failed: %s", err)
+					continue
+				}
+				feedbackResponse(respModel, true)
 			}
-			err = feedbackResponse(rsp, true)
-			if err != nil {
-				log.Errorf("stream send failed: %s", err)
-				continue
+
+			// 展示最新任务的所有包
+			for resp := range yakit.YieldWebFuzzerResponses(s.GetProjectDatabase(), stream.Context(), int(latestID)) {
+				respModel, err := resp.ToGRPCModel()
+				if err != nil {
+					log.Errorf("convert web fuzzer response to grpc model failed: %s", err)
+					continue
+				}
+				feedbackResponse(respModel, true)
 			}
 		}
 		return nil
@@ -484,7 +505,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		if err != nil {
 			log.Errorf("get old web fuzzer success response failed: %s", err)
 		} else {
-			for resp := range yakit.YieldWebFuzzerResponseByTaskIDsWithOk(s.GetProjectDatabase(), stream.Context(), oldIDs) {
+			for resp := range yakit.YieldWebFuzzerResponseByTaskIDs(s.GetProjectDatabase(), stream.Context(), oldIDs, true) {
 				respModel, err := resp.ToGRPCModel()
 				if err != nil {
 					log.Errorf("convert web fuzzer response to grpc model failed: %s", err)
