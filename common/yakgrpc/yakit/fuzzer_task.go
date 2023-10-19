@@ -43,9 +43,11 @@ type WebFuzzerTask struct {
 	Reason               string `json:"reason"` // if not ok
 	Host                 string `json:"host"`
 	Port                 int    `json:"port"`
+	// retry 相关
+	RetryRootID uint `json:"retry_root_id"`
 }
 
-func (w *WebFuzzerTask) ToSwaggerModel() *ypb.HistoryHTTPFuzzerTask {
+func (w *WebFuzzerTask) ToGRPCModel() *ypb.HistoryHTTPFuzzerTask {
 	return &ypb.HistoryHTTPFuzzerTask{
 		Id:                   int32(w.ID),
 		CreatedAt:            w.CreatedAt.Unix(),
@@ -57,11 +59,11 @@ func (w *WebFuzzerTask) ToSwaggerModel() *ypb.HistoryHTTPFuzzerTask {
 	}
 }
 
-func (w *WebFuzzerTask) ToSwaggerModelDetail() *ypb.HistoryHTTPFuzzerTaskDetail {
+func (w *WebFuzzerTask) ToGRPCModelDetail() *ypb.HistoryHTTPFuzzerTaskDetail {
 	var reqRaw ypb.FuzzerRequest
 	_ = json.Unmarshal([]byte(w.RawFuzzTaskRequest), &reqRaw)
 	return &ypb.HistoryHTTPFuzzerTaskDetail{
-		BasicInfo:     w.ToSwaggerModel(),
+		BasicInfo:     w.ToGRPCModel(),
 		OriginRequest: &reqRaw,
 	}
 }
@@ -73,7 +75,7 @@ func QueryFirst50WebFuzzerTask(db *gorm.DB) []*ypb.HistoryHTTPFuzzerTask {
 		return nil
 	} else {
 		return funk.Map(task, func(i *WebFuzzerTask) *ypb.HistoryHTTPFuzzerTask {
-			return i.ToSwaggerModel()
+			return i.ToGRPCModel()
 		}).([]*ypb.HistoryHTTPFuzzerTask)
 	}
 }
@@ -162,6 +164,22 @@ func GetWebFuzzerTaskById(db *gorm.DB, id int) (*WebFuzzerTask, error) {
 	return &t, nil
 }
 
+func GetWebFuzzerRetryRootID(db *gorm.DB, id uint) (uint, error) {
+	var t WebFuzzerTask
+	if db := db.Model(&WebFuzzerTask{}).Select("retry_root_id").Where("id = ?", id).First(&t); db.Error != nil {
+		return 0, utils.Errorf("get web fuzzer task retry_root_id failed: %s", db.Error)
+	}
+	return t.RetryRootID, nil
+}
+
+func GetWebFuzzerTasksIDByRetryRootID(db *gorm.DB, root_id uint) ([]uint, error) {
+	var ids []uint
+	if db := db.Model(&WebFuzzerTask{}).Where("retry_root_id = ?", root_id).Pluck("id", &ids); db.Error != nil {
+		return nil, utils.Errorf("get web fuzzer task id by retry_root_id failed: %s", db.Error)
+	}
+	return ids, nil
+}
+
 type WebFuzzerResponse struct {
 	gorm.Model
 
@@ -212,7 +230,7 @@ func QueryWebFuzzerResponse(db *gorm.DB, params *ypb.QueryHTTPFuzzerResponseByTa
 	return paging, ret, nil
 }
 
-func YieldWebFuzzerResponseByTaskIDsWithOk(db *gorm.DB, ctx context.Context, taskIDs []int64) chan *WebFuzzerResponse {
+func YieldWebFuzzerResponseByTaskIDsWithOk(db *gorm.DB, ctx context.Context, taskIDs []uint) chan *WebFuzzerResponse {
 	db = db.Model(&WebFuzzerResponse{})
 	db = db.Where("ok = true").Where("web_fuzzer_task_id IN (?)", taskIDs)
 	outC := make(chan *WebFuzzerResponse)
