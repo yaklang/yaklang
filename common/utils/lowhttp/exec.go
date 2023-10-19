@@ -124,8 +124,9 @@ func newLowhttpTraceInfo() *LowhttpTraceInfo {
 	return &LowhttpTraceInfo{}
 }
 
-// new LowhttpOpt
+// NewLowhttpOption create a new LowhttpExecConfig
 func NewLowhttpOption() *LowhttpExecConfig {
+
 	return &LowhttpExecConfig{
 		Host:                 "",
 		Port:                 0,
@@ -141,7 +142,7 @@ func NewLowhttpOption() *LowhttpExecConfig {
 		RedirectTimes:        5,
 		Proxy:                nil,
 		RedirectHandler:      nil,
-		SaveHTTPFlow:         consts.GetDefaultSaveHTTPFlowFromEnv(),
+		SaveHTTPFlow:         consts.GLOBAL_HTTP_FLOW_SAVE.IsSet(),
 	}
 }
 
@@ -540,7 +541,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	}
 
 	defer func() {
-		if response == nil && !saveHTTPFlow {
+		if response == nil || !saveHTTPFlow {
 			return
 		}
 
