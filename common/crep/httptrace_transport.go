@@ -51,7 +51,13 @@ func (t *httpTraceTransport) RoundTrip(req *http.Request) (*http.Response, error
 	ishttps := httpctx.GetRequestHTTPS(req)
 	addr, port, _ := utils.ParseStringToHostPort(req.Host)
 
-	opts := append(t.config, lowhttp.WithRequest(reqBytes), lowhttp.WithHttps(ishttps), lowhttp.WithConnPool(true), lowhttp.WithHost(addr), lowhttp.WithPort(port))
+	opts := append(t.config,
+		lowhttp.WithRequest(reqBytes),
+		lowhttp.WithHttps(ishttps),
+		lowhttp.WithConnPool(true),
+		lowhttp.WithHost(addr),
+		lowhttp.WithPort(port),
+		lowhttp.WithSaveHTTPFlow(false))
 	lowHttpResp, err := lowhttp.HTTPWithoutRedirect(opts...)
 	if err != nil {
 		return nil, err
