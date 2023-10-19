@@ -36,27 +36,6 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-var (
-	taskIDBackTrackMap = make(map[int64]int64)
-	taskIDBackTrackMu  sync.Mutex
-)
-
-func taskIDBackTrack(taskID int64) []int64 {
-	var ok bool
-	count := 0
-
-	results := make([]int64, 0)
-	for {
-		count++
-		taskID, ok = taskIDBackTrackMap[taskID]
-		if !ok || taskID == 0 || count > 1000 {
-			break
-		}
-		results = append(results, taskID)
-	}
-	return results
-}
-
 func Chardet(raw []byte) string {
 	res, err := chardet.NewTextDetector().DetectBest(raw)
 	if err != nil {
@@ -393,18 +372,26 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 	if err != nil {
 		return utils.Errorf("save to web fuzzer to database failed: %s", err)
 	}
-	var taskId = task.ID
+	var retryRootID uint
+
+	taskID := task.ID
 	task.FuzzerIndex = req.GetFuzzerIndex()
 	task.FuzzerTabIndex = req.GetFuzzerTabIndex()
+	if !isRetry {
+		task.RetryRootID = task.ID
+	} else {
+		retryRootID, err = yakit.GetWebFuzzerRetryRootID(s.GetProjectDatabase(), uint(req.RetryTaskID))
+		if err != nil {
+			return err
+		}
+		task.RetryRootID = retryRootID
+	}
+
 	defer func() {
 		if db := s.GetProjectDatabase().Save(task); db.Error != nil {
 			log.Errorf("update web fuzzer task failed: %s", db.Error)
 		}
 	}()
-
-	taskIDBackTrackMu.Lock()
-	taskIDBackTrackMap[int64(task.ID)] = req.RetryTaskID
-	taskIDBackTrackMu.Unlock()
 
 	/* 丢包过滤器 */
 	includeStatusCodeFilter := utils.NewPortsFilter()
@@ -485,7 +472,19 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			if !resp.OK {
 				failedResponses = append(failedResponses, resp)
 				retryPayloadsMap[resp.Request] = strings.Split(resp.Payload, ",")
-			} else {
+			}
+		}
+
+		if len(failedResponses) == 0 {
+			return utils.Errorf("no failed web fuzzer request found")
+		}
+
+		// 回溯找到所有之前重试成功的包
+		oldIDs, err := yakit.GetWebFuzzerTasksIDByRetryRootID(s.GetProjectDatabase(), retryRootID)
+		if err != nil {
+			log.Errorf("get old web fuzzer success response failed: %s", err)
+		} else {
+			for resp := range yakit.YieldWebFuzzerResponseByTaskIDsWithOk(s.GetProjectDatabase(), stream.Context(), oldIDs) {
 				respModel, err := resp.ToGRPCModel()
 				if err != nil {
 					log.Errorf("convert web fuzzer response to grpc model failed: %s", err)
@@ -493,20 +492,6 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				}
 				feedbackResponse(respModel, true)
 			}
-		}
-		// 回溯找到所有之前重试成功的包
-		oldIDs := taskIDBackTrack(int64(req.RetryTaskID))
-		for resp := range yakit.YieldWebFuzzerResponseByTaskIDsWithOk(s.GetProjectDatabase(), stream.Context(), oldIDs) {
-			respModel, err := resp.ToGRPCModel()
-			if err != nil {
-				log.Errorf("convert web fuzzer response to grpc model failed: %s", err)
-				continue
-			}
-			feedbackResponse(respModel, true)
-		}
-
-		if len(failedResponses) == 0 {
-			return utils.Errorf("no failed web fuzzer request found")
 		}
 
 		iInput = lo.Map(failedResponses, func(i *yakit.WebFuzzerResponse, _ int) []byte {
@@ -612,7 +597,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				rsp.Url = utils.EscapeInvalidUTF8Byte([]byte(result.Url))
 				rsp.Ok = false
 				rsp.Reason = result.Error.Error()
-				rsp.TaskId = int64(taskId)
+				rsp.TaskId = int64(taskID)
 				rsp.Payloads = payloads
 				if result.LowhttpResponse != nil && result.LowhttpResponse.TraceInfo != nil {
 					rsp.TotalDurationMs = result.LowhttpResponse.TraceInfo.TotalTime.Milliseconds()
@@ -872,7 +857,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 						}
 					}
 					yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), redirectRsp)
-					rsp.TaskId = int64(taskId)
+					rsp.TaskId = int64(taskID)
 					err := feedbackResponse(redirectRsp, false)
 					if err != nil {
 						log.Errorf("send to client failed: %s", err)
@@ -885,7 +870,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				}
 			}
 			yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), rsp)
-			rsp.TaskId = int64(taskId)
+			rsp.TaskId = int64(taskID)
 			err := feedbackResponse(rsp, false)
 			if err != nil {
 				log.Errorf("send to client failed: %s", err)
@@ -1126,7 +1111,7 @@ func (s *Server) QueryHistoryHTTPFuzzerTaskEx(ctx context.Context, req *ypb.Quer
 		return nil, err
 	}
 	newTasks := funk.Map(tasks, func(i *yakit.WebFuzzerTask) *ypb.HistoryHTTPFuzzerTaskDetail {
-		return i.ToSwaggerModelDetail()
+		return i.ToGRPCModelDetail()
 	}).([]*ypb.HistoryHTTPFuzzerTaskDetail)
 	return &ypb.HistoryHTTPFuzzerTasksResponse{
 		Data:       newTasks,
@@ -1147,7 +1132,7 @@ func (s *Server) GetHistoryHTTPFuzzerTask(ctx context.Context, req *ypb.GetHisto
 		return nil, err
 	}
 	return &ypb.HistoryHTTPFuzzerTaskDetail{
-		BasicInfo:     task.ToSwaggerModel(),
+		BasicInfo:     task.ToGRPCModel(),
 		OriginRequest: &reqRaw,
 	}, nil
 }
