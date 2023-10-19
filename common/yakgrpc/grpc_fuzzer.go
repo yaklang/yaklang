@@ -480,12 +480,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		iInput = rawRequest
 	} else {
 		// 找到上次任务的包
-		webFuzzerResponses, err := yakit.QueryWebFuzzerResponseWithoutPaging(s.GetProjectDatabase(), req.RetryTaskID)
-		if err != nil {
-			return err
-		}
 		failedResponses := make([]*yakit.WebFuzzerResponse, 0)
-		for _, resp := range webFuzzerResponses {
+		for resp := range yakit.YieldWebFuzzerResponses(s.GetProjectDatabase(), stream.Context(), int(req.RetryTaskID)) {
 			if !resp.OK {
 				failedResponses = append(failedResponses, resp)
 				retryPayloadsMap[resp.Request] = strings.Split(resp.Payload, ",")
@@ -498,15 +494,9 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				feedbackResponse(respModel, true)
 			}
 		}
-
 		// 回溯找到所有之前重试成功的包
 		oldIDs := taskIDBackTrack(int64(req.RetryTaskID))
-		oldSuccessResponses, err := yakit.QueryWebFuzzerResponseByTaskIDsWithOk(s.GetProjectDatabase(), oldIDs)
-		if err != nil {
-			log.Errorf("query old web fuzzer succes response failed: %s", err)
-		}
-
-		for _, resp := range oldSuccessResponses {
+		for resp := range yakit.YieldWebFuzzerResponseByTaskIDsWithOk(s.GetProjectDatabase(), stream.Context(), oldIDs) {
 			respModel, err := resp.ToGRPCModel()
 			if err != nil {
 				log.Errorf("convert web fuzzer response to grpc model failed: %s", err)
