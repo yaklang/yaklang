@@ -4,9 +4,10 @@ import (
 	"testing"
 )
 func TestMain(t *testing.T) {
-	prog := parseSSA(`
-	function myFunction(){
-		a = 0;
+	prog := ParseSSA(`
+	a = 0;
+	if(a <= 3){
+		a++;
 	}`)
 	prog.Show()
 }

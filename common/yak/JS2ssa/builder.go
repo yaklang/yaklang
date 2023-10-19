@@ -81,7 +81,7 @@ func WithTypeMethod(table map[string]any) Option {
 	}
 }
 
-func parseSSA(src string, opt ...Option) (prog *ssa.Program) {
+func ParseSSA(src string, opt ...Option) (prog *ssa.Program) {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered in parseSSA", r)
