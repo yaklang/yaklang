@@ -2,6 +2,7 @@ package bruteutils
 
 import (
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -67,14 +68,23 @@ var rtspAuth = &DefaultServiceAuthInfo{
 		"12345", "admin", "1234", "123456", "123", "1111",
 	},
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
+		res := i.Result()
 		u := i.Target
+
 		if !strings.Contains(i.Target, "://") {
 			target := fixToTarget(i.Target, 554)
 			i.Target = target
 			u = "rtsp://" + target
+		} else {
+			parsed, err := url.Parse(u)
+			if err != nil {
+				log.Errorf("rtsp: %v parse failed: %s", i.Target, err)
+				return i.Result()
+			}
+			parsed.Host = fixToTarget(parsed.Host, 554)
+			i.Target = parsed.Host
+			u = parsed.String()
 		}
-
-		res := i.Result()
 
 		conn, err := netx.DialTCPTimeout(10*time.Second, i.Target)
 		if err != nil {
@@ -86,12 +96,14 @@ var rtspAuth = &DefaultServiceAuthInfo{
 
 		_, err = conn.Write(utils.UnsafeStringToBytes(genDESCRIBLE(u, 2)))
 		if err != nil {
+			log.Errorf("rtsp: %v write failed: %s", i.Target, err)
 			res.Finished = true
 			return res
 		}
 
 		raw, err := utils.ReadConnWithTimeout(conn, 2*time.Second)
 		if err != nil {
+			log.Errorf("rtsp: %v read failed: %s", i.Target, err)
 			res.Finished = true
 			return res
 		}
@@ -100,7 +112,6 @@ var rtspAuth = &DefaultServiceAuthInfo{
 
 		if sc == 200 {
 			res.Ok = true
-			res.Finished = true
 			return res
 		}
 
@@ -117,7 +128,7 @@ var rtspAuth = &DefaultServiceAuthInfo{
 		_ = u
 		conn, err := netx.DialTCPTimeout(10*time.Second, target)
 		if err != nil {
-			log.Errorf("rtsp:\\\\%v conn failed: %s", target, err)
+			log.Errorf("rtsp: %v conn failed: %s", target, err)
 			res.Finished = true
 			return res
 		}
@@ -125,12 +136,14 @@ var rtspAuth = &DefaultServiceAuthInfo{
 
 		_, err = conn.Write(utils.UnsafeStringToBytes(genDESCRIBLE(u, 2)))
 		if err != nil {
+			log.Errorf("rtsp: %v write failed: %s", i.Target, err)
 			res.Finished = true
 			return res
 		}
 
 		raw, err := utils.ReadConnWithTimeout(conn, 2*time.Second)
 		if err != nil {
+			log.Errorf("rtsp: %v read failed: %s", i.Target, err)
 			res.Finished = true
 			return res
 		}
@@ -154,6 +167,7 @@ var rtspAuth = &DefaultServiceAuthInfo{
 
 		_, err = conn.Write(utils.UnsafeStringToBytes(genDESCRIBLEWithAuth(u, 2, i.Username, i.Password, authMethod, authResponseHeader)))
 		if err != nil {
+			log.Errorf("rtsp: %v write failed: %s", i.Target, err)
 			res.Finished = true
 			return res
 		}
@@ -161,7 +175,6 @@ var rtspAuth = &DefaultServiceAuthInfo{
 		raw, _ = utils.ReadConnWithTimeout(conn, 2*time.Second)
 
 		sc = lowhttp.GetStatusCodeFromResponse(raw)
-
 		if sc == 200 {
 			res.Ok = true
 			res.Finished = true
