@@ -203,7 +203,7 @@ func (t *TypeInference) TypeInferenceMake(i *ssa.Make) {
 }
 
 func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
-	if t := f.Obj.GetType(); t.GetTypeKind() != ssa.Any {
+	if t := f.Obj.GetType(); t != nil {
 		if methodTyp := t.GetMethod(f.Key.String()); methodTyp != nil && f.GetType() != methodTyp {
 			f.SetType(methodTyp)
 			f.IsMethod = true
@@ -224,6 +224,8 @@ func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
 			f.SetType(ssa.BasicTypes[ssa.Number])
 		case ssa.Any:
 			//pass
+			f.SetType(ssa.BasicTypes[ssa.Any])
+			return
 		default:
 			if c, ok := f.Obj.(*ssa.Call); ok && c.Unpack {
 				// pass
