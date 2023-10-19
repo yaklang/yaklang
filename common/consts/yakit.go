@@ -42,6 +42,13 @@ var (
 	CONST_YAK_EXTRA_DNS_SERVERS             = "YAK_EXTRA_DNS_SERVERS"
 	CONST_YAK_OVERRIDE_DNS_SERVERS          = "YAK_OVERRIDE_DNS_SERVERS"
 	CONST_YAK_SAVE_HTTPFLOW                 = "YAK_SAVE_HTTPFLOW"
+
+	//全局网络配置
+	GLOBAL_NETWORK_CONFIG      = "GLOBAL_NETWORK_CONFIG"
+	GLOBAL_NETWORK_CONFIG_INIT = "GLOBAL_NETWORK_CONFIG_INIT"
+
+	// default  http flow save config
+	GLOBAL_HTTP_FLOW_SAVE = utils.NewBool(true)
 )
 
 func GetCurrentYakitPluginID() string {

@@ -656,7 +656,7 @@ func TestGRPCMUSTPASS_MITM_Drop(t *testing.T) {
 	var proxy = "http://127.0.0.1:" + fmt.Sprint(rPort)
 	// 测试我们的h2 mock服务器是否正常工作
 	_, err = yak.NewScriptEngine(10).ExecuteEx(`
-rsp,req = poc.HTTP(getParam("packet"), poc.http2(true), poc.https(true))~
+rsp,req = poc.HTTP(getParam("packet"), poc.http2(true), poc.https(true),poc.save(false))~
 `, map[string]any{
 		"packet": `GET / HTTP/2.0
 User-Agent: 111
@@ -720,7 +720,7 @@ D: 1
 log.info("Start to send packet h2")
 packet := getParam("h2packet")
 println("-------------------------------------------------------------------------------------")
-_, _, _ = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.https(true), poc.http2(true), poc.timeout(120))
+a, b, _ = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.https(true), poc.http2(true), poc.timeout(120),poc.save(false))
 `, params)
 				if err != nil {
 					t.Fatal(err)
@@ -736,14 +736,14 @@ _, _, _ = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.https(true)
 					if err != nil {
 						t.Fatal(err)
 					}
-					if len(flows) > 0 && strings.Contains(flows[0].Response, "请求被用户丢弃") { // 被用户手动丢弃的请求 不会有响应
+					if len(flows) > 0 && len(flows[0].Response) == 0 { // 被用户手动丢弃的请求 不会有响应
 						h2Test = true
 					} else if len(flows) == 0 {
-						panic("/mitm/test/h2/drop/token/" + token + " not found")
-					} else if !strings.Contains(flows[0].Response, "请求被用户丢弃") {
-						panic("/mitm/test/h2/drop/token/" + token + "should indicate user manually drop in http history")
+						t.Fatal("/mitm/test/h2/drop/token/" + token + " not found")
+					} else if !strings.Contains(flows[0].Tags, "被丢弃") {
+						t.Fatal("/mitm/test/h2/drop/token/" + token + "should indicate user manually drop in http history")
 					} else {
-						panic("unknown err")
+						t.Fatal("unknown err")
 					}
 				}
 
@@ -763,15 +763,15 @@ _, _, _ = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.https(true)
 	}
 	wg.Wait()
 	if !started {
-		panic("MITM NOT STARTED!")
+		t.Fatal("MITM NOT STARTED!")
 	}
 
 	if !h2Test {
-		panic("H2 TEST FAILED")
+		t.Fatal("H2 TEST FAILED")
 	}
 
 	if h2serverHandled <= 0 {
-		panic("H2 SERVER NOT HANDLED")
+		t.Fatal("H2 SERVER NOT HANDLED")
 	}
 }
 
