@@ -252,7 +252,7 @@ func (s *Server) execRequest(req *ypb.ExecRequest, moduleName string, ctx contex
 func (s *Server) execRequestInCurrentServerEngine(req *ypb.ExecRequest, moduleName string, ctx context.Context, handler func(
 	result *ypb.ExecResult, logInfo *yaklib.YakitLog,
 ) error, writer io.Writer) error {
-	var feedbackClient = yaklib.NewVirtualYakitClientWithExecResult(func(result *ypb.ExecResult) error {
+	var feedbackClient = yaklib.NewVirtualYakitClient(func(result *ypb.ExecResult) error {
 		return handler(result, nil)
 	})
 	vAttach := NewVAttachCombinedOutputServer(func(msg *ypb.ExecResult) error {
