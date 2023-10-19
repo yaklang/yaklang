@@ -179,10 +179,11 @@ func MockWebFingerPrintByName(name string) (string, int) {
 							}
 							log.Debugf("[%s] generates: %s", header.HeaderValue.Product, generates)
 
-							if generates[0] == " " {
+							if generates[0] == " " || generates[0] == "" {
 								generates[0] = "filling"
 							}
-							if strings.HasSuffix(header.HeaderValue.Regexp, " ") {
+
+							if strings.HasSuffix(header.HeaderValue.Regexp, " ") || strings.HasSuffix(generates[0], " ") {
 								headerStr += header.HeaderName + ": " + generates[0] + "filling" + utils.CRLF
 							} else {
 								headerStr += header.HeaderName + ": " + generates[0] + utils.CRLF
@@ -224,7 +225,7 @@ func MockRandomWebFingerPrints() ([]string, string, int) {
 	r := rand.New(src)
 
 	// Generate a list of 10 random rules from the rules slice
-	randomRules := make([]*WebRule, 2000)
+	randomRules := make([]*WebRule, 100)
 	for i := range randomRules {
 		randomRules[i] = rules[r.Intn(len(rules))]
 	}
@@ -251,6 +252,7 @@ func MockRandomWebFingerPrints() ([]string, string, int) {
 
 	// 去重
 	ruleNames = utils.RemoveRepeatStringSlice(ruleNames)
+	log.Infof("Product count : %d", len(ruleNames))
 	host, port := MockWebFingerPrintByName(strings.Join(ruleNames, ","))
 	return ruleNames, host, port
 }
