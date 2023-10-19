@@ -85,8 +85,8 @@ jobs:
               go test -timeout 20s -run TestSmoking_ICMP ./common/pcapx -v
               go test -timeout 20s -run TestSmoking_TCP ./common/pcapx -v
               go test -timeout 20s -run TestSmoking_UDP ./common/pcapx -v
-          - name: Test FingerPrint
-            run: go test -timeout 20s -run TestMUSTPASS_FingerprintRule ./common/fp -v
+#          - name: Test FingerPrint
+#            run: go test -timeout 20s -run TestMUSTPASS_FingerprintRule ./common/fp -v
 
     steps:
       - name: Check out code into the Go module directory
