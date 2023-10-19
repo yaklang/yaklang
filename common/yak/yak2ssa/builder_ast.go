@@ -23,6 +23,7 @@ func (b *astbuilder) build(ast *yak.YaklangParser) {
 func (b *astbuilder) buildStatementList(stmtlist *yak.StatementListContext) {
 	recoverRange := b.SetRange(stmtlist.BaseParserRuleContext)
 	defer recoverRange()
+	b.Function.SetPosition(b.CurrentPos)
 	allstmt := stmtlist.AllStatement()
 	for _, stmt := range allstmt {
 		if stmt, ok := stmt.(*yak.StatementContext); ok {

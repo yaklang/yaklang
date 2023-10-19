@@ -69,7 +69,9 @@ func NewBuilder(f *Function, parent *FunctionBuilder) *FunctionBuilder {
 
 // new function
 func (b *FunctionBuilder) NewFunc(name string) (*Function, *blockSymbolTable) {
-	return b.Package.NewFunctionWithParent(name, b.Function), b.blockSymbolTable
+	f := b.Package.NewFunctionWithParent(name, b.Function)
+	f.SetPosition(b.CurrentPos)
+	return f, b.blockSymbolTable
 }
 
 // handler current function

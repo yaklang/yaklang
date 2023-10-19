@@ -20,6 +20,7 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 	}
 	f := &Function{
 		Name:        name,
+		anCodeItem:  *NewCodeItem(),
 		Package:     p,
 		Param:       make([]*Parameter, 0),
 		Blocks:      make([]*BasicBlock, 0),
@@ -29,11 +30,11 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		parent:      nil,
 		FreeValues:  make([]Value, 0),
 		user:        make([]User, 0),
-		symbolTable: make(map[string][]InstructionValue),
+		symbolTable: make(map[string][]ValueCodeItem),
 		InstReg:     make(map[Instruction]string),
 		symbol: &Make{
 			anInstruction: anInstruction{
-				variable: name + "-symbol",
+				// variable: name + "-symbol",
 			},
 			// I:     parent.symbol,
 			anNode: NewNode(),
@@ -45,6 +46,7 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 	}
 	p.Funcs = append(p.Funcs, f)
 	f.symbol.Func = f
+	f.symbol.SetVariable(name + "-symbol")
 	if parent != nil {
 		parent.addAnonymous(f)
 		// Pos: parent.CurrentPos,

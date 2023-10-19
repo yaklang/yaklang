@@ -34,10 +34,6 @@ func (f *Function) newBasicBlockWithSealed(name string, isSealed bool) *BasicBlo
 	return b
 }
 
-func (b *BasicBlock) SetPosition(pos *Position) {
-	b.pos = pos
-}
-
 /*
 	if condition is true  :  1 reach
 	if condition is false : -1 unreachable

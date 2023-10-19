@@ -8,6 +8,14 @@ import (
 
 // TODO: save use-def chain in map[Node]struct{}
 
+type CodeItem interface {
+	GetPosition() *Position
+	SetPosition(pos *Position)
+
+	GetVariable() string
+	SetVariable(variable string)
+}
+
 // data flow graph node
 type Node interface {
 	String() string
@@ -29,6 +37,11 @@ type Value interface {
 	SetType(Type)
 }
 
+type ValueCodeItem interface {
+	Value
+	CodeItem
+}
+
 type User interface {
 	Node
 
@@ -37,6 +50,35 @@ type User interface {
 
 	ReplaceValue(Value, Value)
 }
+
+type anCodeItem struct {
+	variable string
+	Pos      *Position
+}
+
+func NewCodeItem() *anCodeItem {
+	return &anCodeItem{}
+}
+
+func (c *anCodeItem) GetPosition() *Position {
+	return c.Pos
+}
+
+func (c *anCodeItem) SetPosition(pos *Position) {
+	c.Pos = pos
+}
+
+func (c *anCodeItem) GetVariable() string {
+	return c.variable
+}
+
+func (c *anCodeItem) SetVariable(variable string) {
+	if c.variable == "" {
+		c.variable = variable
+	}
+}
+
+var _ CodeItem = (*anCodeItem)(nil)
 
 type anNode struct {
 	user  map[User]struct{}
@@ -87,6 +129,8 @@ func (n *anNode) RemoveUser(u User) {
 // }
 
 type Instruction interface {
+	CodeItem
+
 	GetParent() *Function
 	GetBlock() *BasicBlock
 
@@ -100,8 +144,6 @@ type Instruction interface {
 	// pos
 	Pos() string
 
-	GetPosition() *Position
-	SetPosition(pos *Position)
 	SetSymbolTable(*blockSymbolTable)
 	GetSymbolTable() *blockSymbolTable
 }
@@ -109,11 +151,8 @@ type Instruction interface {
 // both instruction and value
 type InstructionValue interface {
 	Instruction
-	Value
+	ValueCodeItem
 
-	// variable
-	GetVariable() string
-	SetVariable(string)
 	SetLeftPosition(*Position)
 	GetLeftPosition() *Position
 }
@@ -136,6 +175,8 @@ type Package struct {
 // implement Value
 type Function struct {
 	Name string
+
+	anCodeItem
 
 	Type *FunctionType
 
@@ -166,7 +207,7 @@ type Function struct {
 
 	// for instruction
 	InstReg     map[Instruction]string // instruction -> virtual register
-	symbolTable map[string][]InstructionValue
+	symbolTable map[string][]ValueCodeItem
 
 	// extern lib
 	externInstance map[string]Value // lib and value
@@ -194,9 +235,11 @@ func (f *Function) SetType(t Type) {
 
 var _ Node = (*Function)(nil)
 var _ Value = (*Function)(nil)
+var _ ValueCodeItem = (*Function)(nil)
 
 // implement Value
 type BasicBlock struct {
+	anCodeItem
 	Index int
 	Name  string
 	// function
@@ -238,6 +281,7 @@ func (b *BasicBlock) SetType(ts Type) {
 
 var _ Node = (*BasicBlock)(nil)
 var _ Value = (*BasicBlock)(nil)
+var _ ValueCodeItem = (*BasicBlock)(nil)
 
 type Position struct {
 	// SourceCodeFilePath *string
@@ -249,6 +293,8 @@ type Position struct {
 }
 
 type anInstruction struct {
+	anCodeItem
+
 	// function
 	Func *Function
 	// BasicBlock
@@ -257,9 +303,6 @@ type anInstruction struct {
 	// type
 	typs Type
 
-	variable string
-	// source code position
-	pos     *Position
 	leftPos *Position // for left variable
 }
 
@@ -269,8 +312,8 @@ func (a *anInstruction) GetParent() *Function                         { return a
 func (a *anInstruction) SetSymbolTable(symbolTable *blockSymbolTable) { a.symbolTable = symbolTable }
 func (a *anInstruction) GetSymbolTable() *blockSymbolTable            { return a.symbolTable }
 func (a *anInstruction) Pos() string {
-	if a.pos != nil {
-		return a.pos.String()
+	if a.anCodeItem.Pos != nil {
+		return a.anCodeItem.Pos.String()
 	} else {
 		return ""
 	}
@@ -287,24 +330,6 @@ func (a *anInstruction) SetType(ts Type) {
 	a.typs = ts
 }
 
-func (a *anInstruction) SetVariable(name string) {
-	if a.variable == "" {
-		a.variable = name
-	}
-}
-
-func (a *anInstruction) GetVariable() string {
-	return a.variable
-}
-
-func (a *anInstruction) GetPosition() *Position {
-	return a.pos
-}
-
-func (a *anInstruction) SetPosition(pos *Position) {
-	a.pos = pos
-}
-
 func (a *anInstruction) SetLeftPosition(pos *Position) {
 	a.leftPos = pos
 }
@@ -312,6 +337,8 @@ func (a *anInstruction) SetLeftPosition(pos *Position) {
 func (a *anInstruction) GetLeftPosition() *Position {
 	return a.leftPos
 }
+
+var _ CodeItem = (*anInstruction)(nil)
 
 // value
 
@@ -391,13 +418,15 @@ func (c *Const) SetType(ts Type) {
 	// const don't need set type
 }
 
-var _ Node = (*Const)(nil)
-var _ Value = (*Const)(nil)
+// var _ Node = (*Const)(nil)
+// var _ Value = (*Const)(nil)
 
 // ----------- Parameter
 type Parameter struct {
 	anNode
+	anCodeItem
 
+	// pos *Position
 	variable    string
 	Func        *Function
 	IsFreeValue bool
@@ -419,6 +448,7 @@ func (p *Parameter) SetType(ts Type) {
 
 var _ Node = (*Parameter)(nil)
 var _ Value = (*Parameter)(nil)
+var _ ValueCodeItem = (*Parameter)(nil)
 var _ User = (*Parameter)(nil)
 
 // control-flow instructions  ----------------------------------------

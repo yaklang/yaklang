@@ -46,13 +46,14 @@ func DeleteInst(i Instruction) {
 }
 
 func newAnInstruction(block *BasicBlock) anInstruction {
-	return anInstruction{
-		Func:     block.Parent,
-		Block:    block,
-		typs:     nil,
-		variable: "",
-		pos:      block.Parent.builder.CurrentPos,
+	a := anInstruction{
+		anCodeItem: *NewCodeItem(),
+		Func:       block.Parent,
+		Block:      block,
+		typs:       nil,
 	}
+	a.SetPosition(block.Parent.builder.CurrentPos)
+	return a
 }
 
 func NewJump(to *BasicBlock, block *BasicBlock) *Jump {
@@ -225,11 +226,13 @@ func NewErrorHandler(try, catch, block *BasicBlock) *ErrorHandler {
 func NewParam(variable string, isFreeValue bool, fun *Function) *Parameter {
 	p := &Parameter{
 		anNode:      NewNode(),
+		anCodeItem:  *NewCodeItem(),
 		variable:    variable,
 		Func:        fun,
 		IsFreeValue: isFreeValue,
 		typs:        nil,
 	}
+	p.SetPosition(fun.GetPosition())
 	return p
 }
 

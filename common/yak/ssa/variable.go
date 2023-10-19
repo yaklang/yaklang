@@ -64,7 +64,7 @@ func (f *Function) WriteVariable(variable string, value Value) {
 	f.WriteSymbolTable(variable, value)
 }
 
-func (f *Function) ReplaceSymbolTable(v InstructionValue, to Value) {
+func (f *Function) ReplaceSymbolTable(v ValueCodeItem, to Value) {
 	variable := v.GetVariable()
 	// remove
 	if t, ok := f.symbolTable[variable]; ok {
@@ -74,9 +74,9 @@ func (f *Function) ReplaceSymbolTable(v InstructionValue, to Value) {
 }
 
 func (f *Function) WriteSymbolTable(variable string, value Value) {
-	var v InstructionValue
+	var v ValueCodeItem
 	switch value := value.(type) {
-	case InstructionValue:
+	case ValueCodeItem:
 		v = value
 	case *Const:
 		v = &ConstInst{
@@ -93,7 +93,7 @@ func (f *Function) WriteSymbolTable(variable string, value Value) {
 
 	list, ok := f.symbolTable[variable]
 	if !ok {
-		list = make([]InstructionValue, 0, 1)
+		list = make([]ValueCodeItem, 0, 1)
 	}
 	list = append(list, v)
 	sort.Slice(list, func(i, j int) bool {
