@@ -323,9 +323,11 @@ func QueryWebFuzzerResponse(db *gorm.DB, params *ypb.QueryHTTPFuzzerResponseByTa
 	return paging, ret, nil
 }
 
-func YieldWebFuzzerResponseByTaskIDsWithOk(db *gorm.DB, ctx context.Context, taskIDs []uint) chan *WebFuzzerResponse {
-	db = db.Model(&WebFuzzerResponse{})
-	db = db.Where("ok = true").Where("web_fuzzer_task_id IN (?)", taskIDs)
+func YieldWebFuzzerResponseByTaskIDs(db *gorm.DB, ctx context.Context, taskIDs []uint, oks ...bool) chan *WebFuzzerResponse {
+	db = db.Model(&WebFuzzerResponse{}).Where("web_fuzzer_task_id IN (?)", taskIDs)
+	if len(oks) > 0 {
+		db = db.Where("ok = ?", oks[0])
+	}
 	outC := make(chan *WebFuzzerResponse)
 	yieldWebFuzzerResponsesToChan(outC, db, ctx)
 	return outC
