@@ -491,6 +491,12 @@ bruteScan = func(result) {
         } else if bruteType == "vnc" {
             defaultusers = ["vnc"]
             defaultpass = ["123456", "admin", "root"]
+        } else if bruteType == "oracle" {
+            defaultusers = ["sys", "system", "oracle"]
+            defaultpass = ["sys", "system", "oracle","123456",""]
+        } else if bruteType == "rtsp" {
+            defaultusers = ["admin"]
+            defaultpass = ["12345","123456",""]
         }
 
 
