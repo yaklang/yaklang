@@ -1,2 +1,5 @@
 log.info("a")
 yakit.Info("a")
+
+assert "abc.com".RemoveSuffix(".com") == "abc"
+assert "abc.com".RemovePrefix("abc.") == "com"
