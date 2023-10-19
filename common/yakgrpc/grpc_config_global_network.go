@@ -62,7 +62,7 @@ func GetDefaultNetworkConfig() *ypb.GlobalNetworkConfig {
 		DNSFallbackTCP:   false,
 		DNSFallbackDoH:   false,
 		CustomDoHServers: nil,
-		SaveHTTPFlow:     true,
+		SkipSaveHTTPFlow: false,
 	}
 	config := netx.NewBackupInitilizedReliableDNSConfig()
 	defaultConfig.CustomDoHServers = config.SpecificDoH
@@ -78,7 +78,7 @@ func ConfigureNetWork(c *ypb.GlobalNetworkConfig) {
 		return
 	}
 
-	consts.GLOBAL_HTTP_FLOW_SAVE.SetTo(c.GetSaveHTTPFlow())
+	consts.GLOBAL_HTTP_FLOW_SAVE.SetTo(!c.GetSkipSaveHTTPFlow())
 
 	netx.SetDefaultDNSOptions(
 		netx.WithDNSFallbackDoH(c.DNSFallbackDoH),
