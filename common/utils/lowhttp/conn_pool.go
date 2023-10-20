@@ -342,7 +342,7 @@ func (pc *persistConn) readLoop() {
 		// 尝试peek error
 		_, err := pc.br.Peek(1)
 
-		// 检查是否有需要返回的响应，如果没有则可以直接返回，不需要往管道里返回数据（err）
+		// 检查是否有需要返回的响应,如果没有则可以直接返回,不需要往管道里返回数据（err）
 		if pc.numExpectedResponses == 0 {
 			if err == io.EOF {
 				pc.closeConn(errServerClosedIdle)
@@ -355,32 +355,39 @@ func (pc *persistConn) readLoop() {
 
 		rc := <-pc.reqCh
 
-		var responseRaw bytes.Buffer
-		httpResponseReader := bufio.NewReader(io.TeeReader(pc.br, &responseRaw))
-
-		var resp *http.Response
-		if err == nil {
-			resp, err = utils.ReadHTTPResponseFromBufioReader(httpResponseReader, nil)
-			count++
-		} else {
-			// 包装一层error作为标识
-			err = connPoolReadFromServerError{err: err}
-		}
-
-		if err != nil {
-			//log.Errorf("conn [%s] read error , has used %d ", pc.cacheKey.addr, count)
-			if err == io.EOF {
+		if err != nil { //需要向主进程返回一个带标识的错误,主进程用于判断是否重试
+			if errors.Is(err, io.EOF) {
 				pc.sawEOF = true
 			}
-			rc.ch <- responseInfo{err: err}
+			rc.ch <- responseInfo{err: connPoolReadFromServerError{err: err}}
 			return
 		}
 
+		var responseRaw bytes.Buffer
+		var respPacket []byte
+		var resp *http.Response
+
+		httpResponseReader := bufio.NewReader(io.TeeReader(pc.br, &responseRaw))
+		resp, err = utils.ReadHTTPResponseFromBufioReader(httpResponseReader, nil)
+		count++
+
+		if err != nil {
+			if len(responseRaw.Bytes()) > 0 { // 如果 TeaReader内部还有数据证明,证明有响应数据,只是解析失败
+				_, err = io.ReadAll(httpResponseReader) // 尝试读取所有数据,主要是超过缓冲区的问题
+				if errors.Is(err, io.EOF) {
+					pc.sawEOF = true
+				}
+				respPacket = responseRaw.Bytes()
+			}
+		} else {
+			respPacket, err = utils.DumpHTTPResponse(resp, true)
+		}
+
 		pc.mu.Lock()
-		pc.numExpectedResponses--
+		pc.numExpectedResponses-- //减少预期响应数量
 		pc.mu.Unlock()
 
-		rc.ch <- responseInfo{resp: resp, respBytes: responseRaw.Bytes(), info: info}
+		rc.ch <- responseInfo{resp: resp, respBytes: respPacket, info: info}
 		alive = alive &&
 			!pc.sawEOF &&
 			tryPutIdleConn()
