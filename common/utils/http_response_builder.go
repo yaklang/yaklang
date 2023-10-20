@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -70,7 +71,8 @@ func readHTTPResponseFromBufioReader(reader *bufio.Reader, fixContentLength bool
 	}
 	firstLine, err := BufioReadLine(reader)
 	if err != nil {
-		return nil, Errorf("read HTTPResponse firstline failed: %s", err)
+
+		return nil, errors.Wrap(err, "read HTTPResponse firstline failed")
 	}
 	rawPacket.Write(firstLine)
 	rawPacket.WriteString(CRLF)
@@ -96,7 +98,7 @@ func readHTTPResponseFromBufioReader(reader *bufio.Reader, fixContentLength bool
 	for {
 		lineBytes, err := BufioReadLine(reader)
 		if err != nil {
-			return nil, Errorf("read HTTPResponse header failed: %s", err)
+			return nil, errors.Wrap(err, "read HTTPResponse header failed")
 		}
 		if len(bytes.TrimSpace(lineBytes)) == 0 {
 			rawPacket.WriteString(CRLF)
@@ -171,7 +173,8 @@ func readHTTPResponseFromBufioReader(reader *bufio.Reader, fixContentLength bool
 				_, fixed, _, err := codec.HTTPChunkedDecoderWithRestBytes(reader)
 				rawPacket.Write(fixed)
 				if err != nil {
-					return nil, Errorf("chunked decoder error: %v", err)
+					return nil, errors.Wrap(err, "chunked decoder error")
+
 				}
 				bodyRawBuf.Write(fixed)
 			}
@@ -180,7 +183,7 @@ func readHTTPResponseFromBufioReader(reader *bufio.Reader, fixContentLength bool
 			_, fixed, _, err := codec.HTTPChunkedDecoderWithRestBytes(reader)
 			rawPacket.Write(fixed)
 			if err != nil {
-				return nil, Errorf("chunked decoder error: %v", err)
+				return nil, errors.Wrap(err, "chunked decoder error")
 			}
 			if len(fixed) > 0 {
 				bodyRawBuf.Write(fixed)
@@ -191,7 +194,7 @@ func readHTTPResponseFromBufioReader(reader *bufio.Reader, fixContentLength bool
 				var bodyRaw, err = io.ReadAll(io.NopCloser(io.LimitReader(reader, int64(contentLengthInt))))
 				rawPacket.Write(bodyRaw)
 				if err != nil && err != io.EOF {
-					return nil, Errorf("read body error: %v", err)
+					return nil, errors.Wrap(err, "read body error")
 				}
 				bodyLen := len(bodyRaw)
 				bodyRawBuf.Write(bodyRaw)
