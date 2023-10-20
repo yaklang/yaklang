@@ -1030,7 +1030,7 @@ RECONNECT:
 			}
 		} else {
 			rawBytes, err = utils.DumpHTTPResponse(firstResponse, true)
-			if err == nil {
+			if err != nil {
 				rawBytes = responseRaw.Bytes()
 			} else {
 				multiResponses = append(multiResponses, firstResponse)

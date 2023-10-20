@@ -71,7 +71,6 @@ func readHTTPResponseFromBufioReader(reader *bufio.Reader, fixContentLength bool
 	}
 	firstLine, err := BufioReadLine(reader)
 	if err != nil {
-
 		return nil, errors.Wrap(err, "read HTTPResponse firstline failed")
 	}
 	rawPacket.Write(firstLine)
