@@ -3,6 +3,8 @@ package codec
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
+	"github.com/yaklang/yaklang/common/log"
 	"html"
 	"net/url"
 	"regexp"
@@ -27,6 +29,53 @@ var htmlEntityRegexp = regexp.MustCompile(`^((&[a-zA-Z]+;)|(&#[a-fA-F0-9]+;))+$`
 var hexRegexp = regexp.MustCompile(`^\b([0-9A-Fa-f]{2}\s?)+[0-9A-Fa-f]{2}\b$`)
 var base32Regexp = regexp.MustCompile(`^([A-Z2-7]{8})*([A-Z2-7]{8}|[A-Z2-7]{2}([A-Z2-7]{6})*|[A-Z2-7]{4}([A-Z2-7]{4})*|[A-Z2-7]{5}([A-Z2-7]{3})*|[A-Z2-7]{7})(=){0,6}$`)
 
+var encodeMap = map[string]func(string) string{
+	"UrlDecode":          url.QueryEscape,
+	"Html Entity Decode": html.EscapeString,
+	"Hex Decode": func(s string) string {
+		return EncodeToHex(s)
+	},
+	"Json Unicode Decode": func(s string) string {
+		buf := bytes.Buffer{}
+		err := json.NewEncoder(&buf).Encode(s)
+		if err != nil {
+			log.Errorf("json encode error: %v", err)
+			return ""
+		}
+		return buf.String()
+	},
+	"Base64 Decode": func(s string) string {
+		return EncodeBase64(s)
+	},
+	"Base32 Decode": func(s string) string {
+		return EncodeBase32(s)
+	},
+	"Base64Url Decode": func(s string) string {
+		return EncodeBase64Url(s)
+	},
+	"Base64Utf8 Decode": func(s string) string {
+		byt, err := Utf8ToGB18030([]byte(s))
+		if err != nil {
+			return ""
+		}
+		return string(byt)
+	},
+	"jwt": func(s string) string {
+		blocks := strings.Split(s, ".")
+		encodeBlocks := []string{}
+		for _, i := range blocks {
+			encodeBlocks = append(encodeBlocks, EncodeBase64(i))
+		}
+		return strings.Join(encodeBlocks, ".")
+	},
+}
+
+func EncodeByType(t string, i interface{}) string {
+	if f, ok := encodeMap[t]; ok {
+		return f(AnyToString(i))
+	}
+	return ""
+}
 func AutoDecode(i interface{}) []*AutoDecodeResult {
 	rawBytes := interfaceToBytes(i)
 	rawStr := string(rawBytes)
@@ -168,7 +217,7 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 		if len(decodedByBas64) > 0 && err == nil {
 			if utf8.Valid(decodedByBas64) {
 				results = append(results, &AutoDecodeResult{
-					Type:        "Base64 Decode",
+					Type:        "Base64Url Decode",
 					TypeVerbose: "Base64 解码",
 					Origin:      origin,
 					Result:      string(decodedByBas64),
@@ -181,7 +230,7 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 			decoded, err := GB18030ToUtf8(decodedByBas64)
 			if err == nil && len(decoded) > 0 {
 				results = append(results, &AutoDecodeResult{
-					Type:        "Base64 Decode",
+					Type:        "Base64Utf8 Decode",
 					TypeVerbose: "Base64 解码（UTF8-Invalid）",
 					Origin:      origin,
 					Result:      EscapeInvalidUTF8Byte(decodedByBas64),
