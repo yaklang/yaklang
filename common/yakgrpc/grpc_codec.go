@@ -25,15 +25,34 @@ import (
 )
 
 func (s *Server) AutoDecode(ctx context.Context, req *ypb.AutoDecodeRequest) (*ypb.AutoDecodeResponse, error) {
-	results := funk.Map(codec.AutoDecode(req.GetData()), func(i *codec.AutoDecodeResult) *ypb.AutoDecodeResult {
-		return &ypb.AutoDecodeResult{
-			Type:        i.Type,
-			TypeVerbose: i.TypeVerbose,
-			Origin:      []byte(i.Origin),
-			Result:      []byte(i.Result),
+	if len(req.GetModifyResult()) == 0 { // 兼容旧版本
+		results := funk.Map(codec.AutoDecode(req.GetData()), func(i *codec.AutoDecodeResult) *ypb.AutoDecodeResult {
+			return &ypb.AutoDecodeResult{
+				Type:        i.Type,
+				TypeVerbose: i.TypeVerbose,
+				Origin:      []byte(i.Origin),
+				Result:      []byte(i.Result),
+			}
+		}).([]*ypb.AutoDecodeResult)
+		return &ypb.AutoDecodeResponse{Results: results}, nil
+	} else {
+		modifyResult := req.GetModifyResult()
+		current := ""
+		modify := false
+		for i := len(modifyResult) - 1; i >= 0; i-- {
+			if modify {
+				modifyResult[i].Origin = []byte(current)
+				modifyResult[i].Result = []byte(codec.EncodeByType(modifyResult[i].Type, current))
+			} else {
+				if modifyResult[i].Modify {
+					modify = true
+					current = string(modifyResult[i].Origin)
+				}
+			}
+			modifyResult[i].Modify = false
 		}
-	}).([]*ypb.AutoDecodeResult)
-	return &ypb.AutoDecodeResponse{Results: results}, nil
+		return &ypb.AutoDecodeResponse{Results: modifyResult}, nil
+	}
 }
 
 func (s *Server) PacketPrettifyHelper(ctx context.Context, req *ypb.PacketPrettifyHelperRequest) (*ypb.PacketPrettifyHelperResponse, error) {
