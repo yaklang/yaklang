@@ -68,9 +68,7 @@ var rtspAuth = &DefaultServiceAuthInfo{
 		"12345", "admin", "1234", "123456", "123", "1111",
 	},
 	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
-		res := i.Result()
 		u := i.Target
-
 		if !strings.Contains(i.Target, "://") {
 			target := fixToTarget(i.Target, 554)
 			i.Target = target
@@ -85,7 +83,7 @@ var rtspAuth = &DefaultServiceAuthInfo{
 			i.Target = parsed.Host
 			u = parsed.String()
 		}
-
+		res := i.Result()
 		conn, err := netx.DialTCPTimeout(10*time.Second, i.Target)
 		if err != nil {
 			log.Errorf("rtsp: %v conn failed: %s", i.Target, err)
