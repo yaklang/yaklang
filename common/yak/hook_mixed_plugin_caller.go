@@ -359,6 +359,10 @@ func (m *MixPluginCaller) LoadPluginByName(ctx context.Context, name string, par
 				return utils.Errorf("load plugin name (yakScript name: %v) failed: %s", name, err)
 			}
 
+			if ins.Type == "yak" || ins.Type == "codec" {
+				return utils.Errorf("cannot load yak script[%v] - %v: not supported", name, ins.Type)
+			}
+
 			if ins.ForceInteractive {
 				log.Infof("script[%v] is interactive, skip load", name)
 				return nil

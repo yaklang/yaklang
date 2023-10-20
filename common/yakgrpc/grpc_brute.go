@@ -180,6 +180,10 @@ scan = func(bruteType) {
 						risk.typeVerbose("未授权访问"),
 						risk.title(sprintf("未授权访问[%v]：%v", result.Type, result.Target)),
 						risk.titleVerbose(sprintf("未授权访问[%v]：%v", result.Type, result.Target)),
+						risk.description("由于配置不当或管理疏忽，某些服务、接口或应用存在未授权访问的风险。攻击者可以直接访问这些资源而不需要任何身份验证，这可能会导致敏感数据的泄露、系统的滥用或其他恶意行为。"),
+risk.solution(` + "`" + `1. 审核所有公开可访问的服务、接口和应用，确保它们都有适当的访问控制。
+2. 使用身份验证机制，如用户名/密码、API密钥或OAuth。
+3. 定期监控和审查访问日志，以检测任何可疑或未授权的活动。` + "`" + `),
 						risk.details({"target": result.Target}),
 					)
 				} else {

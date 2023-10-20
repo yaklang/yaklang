@@ -544,36 +544,45 @@ bruteScan = func(result) {
 
 
         riskTarget = addr
-
-        for rt = range res {
+        for rt := range res {
             yakit.Info("rt string %v ", rt.String())
             updateProgress(1) // 更新进度
             if rt == nil {
                 continue
             }
 
-
             if !rt.Ok {
                 continue
             }
-
-            risk.NewRisk(
-                riskTarget,
-                risk.severity("high"),
-                risk.type("weak-pass"),
-                risk.typeVerbose("弱口令"),
-                risk.description("网站管理、运营人员由于安全意识不足，为了方便、避免忘记密码等，使用了非常容易记住的密码，或者是直接采用了系统的默认密码等。攻击者利用此漏洞可直接进入应用系统或者管理系统，从而进行系统、网页、数据的篡改与删除，非法获取系统、用户的数据，甚至可能导致服务器沦陷。"),
-                risk.solution("用户层面 : 不要使用常见的弱口令作为密码,不要多个系统或者社交账号使用同一套密码,定期修改密码,建议使用包含随机值的或者随机生成的字符串作为系统密码"),
-                risk.title(sprintf(
-                    "Weak Password[%v]：%v user(%v) pass(%v)",
-                    rt.Type,
-                    rt.Target,
-                    rt.Username,
-                    rt.Password,
-                )),
-                risk.titleVerbose(sprintf("弱口令[%v]：%v user(%v) pass(%v)", rt.Type, rt.Target, rt.Username, rt.Password)),
-                risk.details({"username": rt.Username, "password": rt.Password, "target": rt.Target}),
-            )
+            if rt.Username == "" && rt.Password == "" {
+                risk.NewRisk(
+                    riskTarget, risk.severity("high"), risk.type("weak-pass"),
+                    risk.typeVerbose("未授权访问"),
+                    risk.title(sprintf("未授权访问[%v]：%v", rt.Type, rt.Target)),
+                    risk.titleVerbose(sprintf("未授权访问[%v]：%v", rt.Type, rt.Target)),
+                    risk.description("由于配置不当或管理疏忽，某些服务、接口或应用存在未授权访问的风险。攻击者可以直接访问这些资源而不需要任何身份验证，这可能会导致敏感数据的泄露、系统的滥用或其他恶意行为。"),
+                    risk.solution(`1. 审核所有公开可访问的服务、接口和应用，确保它们都有适当的访问控制。
+2. 使用身份验证机制，如用户名/密码、API密钥或OAuth。
+3. 定期监控和审查访问日志，以检测任何可疑或未授权的活动。`),
+                    risk.details({"username": rt.Username, "password": rt.Password, "target": rt.Target}),
+                )
+            } else {
+                risk.NewRisk(
+                    riskTarget,risk.severity("high"),risk.type("weak-pass"),
+                    risk.typeVerbose("弱口令"),
+                    risk.description("网站管理、运营人员由于安全意识不足，为了方便、避免忘记密码等，使用了非常容易记住的密码，或者是直接采用了系统的默认密码等。攻击者利用此漏洞可直接进入应用系统或者管理系统，从而进行系统、网页、数据的篡改与删除，非法获取系统、用户的数据，甚至可能导致服务器沦陷。"),
+                    risk.solution("用户层面 : 不要使用常见的弱口令作为密码,不要多个系统或者社交账号使用同一套密码,定期修改密码,建议使用包含随机值的或者随机生成的字符串作为系统密码"),
+                    risk.title(sprintf(
+                        "Weak Password[%v]：%v user(%v) pass(%v)",
+                        rt.Type,
+                        rt.Target,
+                        rt.Username,
+                        rt.Password,
+                    )),
+                    risk.titleVerbose(sprintf("弱口令[%v]：%v user(%v) pass(%v)", rt.Type, rt.Target, rt.Username, rt.Password)),
+                    risk.details({"username": rt.Username, "password": rt.Password, "target": rt.Target}),
+                )
+            }
         }
     }
 }
@@ -768,7 +777,10 @@ if hostCountSec != 0 {
     // 定时器，超过一定时间，就扫描结束
     waitTimeSec = hostCountSec + (loadPluginFinished * 2)/20 + OpenPortCount
     yakit.Info("waitTimeSec %v", waitTimeSec)
-    time.AfterFunc(waitTimeSec, func() {
+    if waitTimeSec < 10 {
+        waitTimeSec = 60
+    }
+    time.AfterFunc(waitTimeSec * 1000 * 1000 * 1000, func() {
         yakit.SetProgress(1)
         yakit.Info("AfterFunc 本次扫描任务已完成。")
         os.Exit(0)
