@@ -41,11 +41,31 @@ func LoadDefaultDataSource() ([]*WebRule, error) {
 	}
 	userRules := make([]*WebRule, 0)
 	for _, fileName := range files {
-		absFileName := path.Join(userDefinedPath, fileName)
-		content, err := embed.Asset(absFileName)
-		if err != nil {
-			log.Warnf("bindata fetch asset: %s failed: %s", absFileName, err)
-			continue
+		var (
+			content     []byte
+			err         error
+			absFileName string
+		)
+
+		if strings.HasSuffix(fileName, ".gz") || strings.HasSuffix(fileName, ".gzip") {
+			absFileName = path.Join(userDefinedPath, fileName)
+			content, err = embed.Asset(absFileName)
+			if err != nil {
+				log.Warnf("bindata fetch asset: %s failed: %s", absFileName, err)
+				continue
+			}
+			content, err = utils.GzipDeCompress(content)
+			if err != nil {
+				log.Warnf("web fp rules[%v] decompress failed: %s", absFileName, err)
+				continue
+			}
+		} else {
+			absFileName = path.Join(userDefinedPath, fileName)
+			content, err = embed.Asset(absFileName)
+			if err != nil {
+				log.Warnf("bindata fetch asset: %s failed: %s", absFileName, err)
+				continue
+			}
 		}
 
 		subRules, err := ParseWebFingerprintRules(content)
