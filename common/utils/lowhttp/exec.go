@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/pkg/errors"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
@@ -983,7 +984,6 @@ RECONNECT:
 			}()
 		}
 		// 写报文
-
 		if option.BeforeDoRequest != nil {
 			requestPacket = option.BeforeDoRequest(requestPacket)
 		}
@@ -998,11 +998,12 @@ RECONNECT:
 			_, err = conn.Write(requestPacket)
 		}
 		if err != nil {
-			return response, utils.Errorf("write request failed: %s", err)
+			return response, errors.Wrap(err, "write request failed")
 		}
 
 		// 读报文
 		conn.SetDeadline(time.Now().Add(timeout))
+		//TeeReader 用于畸形响应包: 即 ReadHTTPResponseFromBufioReader 无法解析但是conn中存在数据的情况
 		httpResponseReader := bufio.NewReader(io.TeeReader(conn, &responseRaw))
 
 		// 服务器响应第一个字节
@@ -1012,48 +1013,64 @@ RECONNECT:
 			traceInfo.ServerTime = time.Since(serverTimeStart)
 		}
 
-		//firstResponse,err = http.ReadResponse(httpResponseReader, nil)
 		firstResponse, err = utils.ReadHTTPResponseFromBufioReader(httpResponseReader, nil)
 		if err != nil {
-			if err == io.EOF || err == io.ErrUnexpectedEOF {
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 				return response, nil
 			}
 			log.Infof("[lowhttp] read response failed: %s", err)
 		}
+
 		if firstResponse == nil {
 			if len(responseRaw.Bytes()) == 0 {
-				return response, utils.Errorf("empty result. %v", err.Error())
+				return response, errors.Wrap(err, "empty result.")
+			} else { // peek 到了数据,但是无法解析,说明是畸形响应包
+				_, _ = io.ReadAll(httpResponseReader)
+				rawBytes = responseRaw.Bytes()
 			}
 		} else {
-			if firstResponse.Body != nil {
-				_, _ = io.ReadAll(firstResponse.Body)
-				// read response first
+			rawBytes, err = utils.DumpHTTPResponse(firstResponse, true)
+			if err == nil {
+				rawBytes = responseRaw.Bytes()
+			} else {
+				multiResponses = append(multiResponses, firstResponse)
 			}
-			multiResponses = append(multiResponses, firstResponse)
 
 			// handle response
-			for noFixContentLength {
+			for noFixContentLength { // 尝试读取pipeline/smuggle响应包
 				// log.Infof("checking next(pipeline/smuggle) response...")
+
 				_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-				nextResponse, err := http.ReadResponse(httpResponseReader, nil)
+				nextResponse, err := utils.ReadHTTPResponseFromBufioReader(httpResponseReader, nil)
+
 				if err != nil {
-					if err == io.EOF || err == io.ErrUnexpectedEOF {
+					if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) { // 停止读取
 						break
 					}
-					log.Debugf("[lowhttp] read (pipeline/smuggle) response failed: %s", err)
+					// 非EOF错误,说明是conn内部大概率还有数据,但是解析失败证明是畸形响应包,所以改用TeeReader里的数据
+					for {
+						_ = conn.SetReadDeadline(time.Now().Add(1 * time.Second))
+						_, err = io.ReadAll(httpResponseReader)
+						if err != nil {
+							break //如果ReadAll失败则出现了问题,直接退出
+						}
+					}
+					rawBytes = responseRaw.Bytes()
 					break
 				}
+
 				if nextResponse != nil {
 					multiResponses = append(multiResponses, nextResponse)
 					isMultiResponses = true
 					response.MultiResponse = true
-					if nextResponse.Body != nil {
-						_, _ = io.ReadAll(nextResponse.Body)
+					nextRaw, err := utils.DumpHTTPResponse(nextResponse, true)
+					if err != nil {
+						break
 					}
+					rawBytes = append(rawBytes, nextRaw...)
 				}
 			}
 		}
-		rawBytes = responseRaw.Bytes()
 	}
 
 	var result = codec.EncodeBase64(rawBytes[:])
