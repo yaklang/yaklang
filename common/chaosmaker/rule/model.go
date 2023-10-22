@@ -62,6 +62,14 @@ func QueryRule(db *gorm.DB, req *ypb.QueryChaosMakerRuleRequest) (*bizhelper.Pag
 
 	db = bizhelper.ExactQueryString(db, "rule_type", req.GetRuleType())
 
+	if req.GetFromId() > 0 {
+		db = db.Where("id > ?", req.GetFromId())
+	}
+
+	if req.GetUntilId() > 0 {
+		db = db.Where("id < ?", req.GetUntilId())
+	}
+
 	db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{
 		"name", "name_zh", "class_type", "class_type_zh", "group", "keywords", "keywords_zh", "description", "description_zh",
 	}, req.GetKeywords(), false)
