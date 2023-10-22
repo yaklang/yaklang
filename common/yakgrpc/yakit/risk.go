@@ -275,6 +275,15 @@ func QueryRisks(db *gorm.DB, params *ypb.QueryRisksRequest) (*bizhelper.Paginato
 	p := params.Pagination
 	db = bizhelper.QueryOrder(db, p.OrderBy, p.Order)
 
+	if params.GetFromId() > 0 {
+		log.Infof("query offset from id: %v", params.GetFromId())
+		db = db.Where("id > ?", params.GetFromId())
+	}
+
+	if params.GetUntilId() > 0 {
+		db = db.Where("id < ?", params.GetUntilId())
+	}
+
 	var err error
 	db, err = FilterByQueryRisks(db, params)
 	if err != nil {
