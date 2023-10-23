@@ -507,7 +507,7 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 			return engine, engine.SafeExecYakcWithCode(ctx, yakcBytes, e.cryptoKey, code)
 		}
 	}
-	return engine, engine.Eval(ctx, code)
+	return engine, engine.SafeEval(ctx, code)
 }
 
 func (e *ScriptEngine) ExecuteWithTaskID(taskId, code string) error {

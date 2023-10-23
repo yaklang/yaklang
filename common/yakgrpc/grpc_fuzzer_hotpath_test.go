@@ -14,6 +14,37 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_ErrorCode(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("abc"))
+	})
+	target := utils.HostPort(host, port)
+	recv, err := client.HTTPFuzzer(utils.TimeoutContextSeconds(10), &ypb.FuzzerRequest{
+		Request:      "GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n{{yak(handle)}}",
+		HotPatchCode: `handle = result => x"{{int(1-10)}}"; panic(1aaa)`,
+		ForceFuzz:    true,
+	})
+	if err != nil {
+		t.Fatalf("expect error is nil, but got %v", err)
+	}
+	count := 0
+	for {
+		_, err := recv.Recv()
+		if err != nil {
+			break
+		}
+		count++
+	}
+	if count != 1 {
+		t.Fatalf("expect 1, got %v", count)
+	}
+}
+
 func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
