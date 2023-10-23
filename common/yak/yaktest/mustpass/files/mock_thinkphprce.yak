@@ -1,4 +1,4 @@
-host, port = tcp.MockServe("HTTP/1.1 200 OK\r\nContent-Type: aaaa \r\n\r\nPHP Extension PHP Version ThinkPHP")
+host, port = httpserver.MockServe("HTTP/1.1 200 OK\r\nContent-Type: aaaa \r\n\r\nPHP Extension PHP Version ThinkPHP")
 
 checked = false
 for result in nuclei.Scan("http://vulinbox.aws-4c16.yaklang.io:8004", poc.host(host), poc.port(port), nuclei.rawTemplate(`
@@ -6,7 +6,7 @@ id: thinkphp-5023-rce
 
 info:
   name: ThinkPHP 5.0.23 - Remote Code Execution
-  author: dr_set
+  author: dr_setF
   severity: critical
   description: ThinkPHP 5.0.23 is susceptible to remote code execution. An attacker can execute malware, obtain sensitive information, modify data, and/or gain full control over a compromised system without entering necessary credentials.
   reference: https://github.com/vulhub/vulhub/tree/0a0bc719f9a9ad5b27854e92bc4dfa17deea25b4/thinkphp/5.0.23-rce

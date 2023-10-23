@@ -849,7 +849,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		gmTls:  option.GmTLS,
 	}
 RECONNECT:
-	if withConnPool {
+	if withConnPool && !enableHttp2 {
 		conn, err = connPool.getIdleConn(cacheKey, dialopts...)
 	} else {
 		conn, err = netx.DialX(originAddr, dialopts...)
@@ -946,8 +946,11 @@ RECONNECT:
 			case err := <-writeErrCh:
 				//写入失败，退出等待
 				if err != nil {
-					conn.(*persistConn).removeConn()
-					break LOOP
+					if pc.shouldRetryRequest(err) {
+						conn.(*persistConn).removeConn()
+						goto RECONNECT
+					}
+					return nil, err
 				}
 			case re := <-resc:
 				//收到响应
@@ -963,9 +966,6 @@ RECONNECT:
 				firstResponse = re.resp
 				rawBytes = re.respBytes
 				traceInfo.ServerTime = re.info.ServerTime
-				if err != nil {
-					return nil, err
-				}
 				break LOOP
 			case <-pcClosed:
 				pcClosed = nil

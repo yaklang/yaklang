@@ -94,6 +94,9 @@ type Proxy struct {
 	// 限制用户名和密码
 	proxyUsername string
 	proxyPassword string
+
+	//lowhttp config
+	lowhttpConfig []lowhttp.LowhttpOpt
 }
 
 func (p *Proxy) saveCache(r *http.Request, ctx *Context) {
@@ -228,6 +231,11 @@ func (p *Proxy) SetDialContext(dial func(context.Context, string, string) (net.C
 	if tr, ok := p.roundTripper.(*http.Transport); ok {
 		tr.DialContext = p.dial
 	}
+}
+
+// SetLowhttpConfig sets the lowhttp config
+func (p *Proxy) SetLowhttpConfig(config []lowhttp.LowhttpOpt) {
+	p.lowhttpConfig = config
 }
 
 // Close sets the proxy to the closing state so it stops receiving new connections,
@@ -951,7 +959,8 @@ func (p *Proxy) roundTrip(ctx *Context, req *http.Request) (*http.Response, erro
 	inherit(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo)
 	inherit(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort)
 	inherit(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost)
-	return p.roundTripper.RoundTrip(req)
+
+	return p.roundTripBase(req)
 }
 
 func (p *Proxy) connect(req *http.Request) (*http.Response, net.Conn, error) {
@@ -1070,16 +1079,10 @@ func (p *Proxy) proxyH2(closing chan bool, cc *tls.Conn, url *url.URL) error {
 		cc.Close()
 	}()
 
-	var tr http.RoundTripper
-
-	tr = p.roundTripper
 	proxyClient := lowhttp2.Server{
 		PermitProhibitedCipherSuites: true,
 	}
-	proxyToServer := http.Client{
-		Transport: tr,
-	}
-	handler := makeNewH2Handler(p.reqmod, p.resmod, &proxyToServer, url.Host)
+	handler := makeNewH2Handler(p.reqmod, p.resmod, url.Host, p)
 	proxyClientConfig := &lowhttp2.ServeConnOpts{Handler: handler}
 	proxyClient.ServeConn(cc, proxyClientConfig)
 	return nil
@@ -1087,15 +1090,15 @@ func (p *Proxy) proxyH2(closing chan bool, cc *tls.Conn, url *url.URL) error {
 }
 
 type H2Handler struct {
-	reqmod        RequestModifier
-	resmod        ResponseModifier
-	proxyToServer *http.Client
-	serverHost    string
+	reqmod     RequestModifier
+	resmod     ResponseModifier
+	proxy      *Proxy
+	serverHost string
 	//flowMux       sync.Mutex
 }
 
-func makeNewH2Handler(reqmod RequestModifier, resmod ResponseModifier, proxyToServer *http.Client, serverHost string) *H2Handler {
-	return &H2Handler{reqmod: reqmod, resmod: resmod, proxyToServer: proxyToServer, serverHost: serverHost}
+func makeNewH2Handler(reqmod RequestModifier, resmod ResponseModifier, serverHost string, proxy *Proxy) *H2Handler {
+	return &H2Handler{reqmod: reqmod, resmod: resmod, serverHost: serverHost, proxy: proxy}
 }
 
 func (h *H2Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -1113,7 +1116,7 @@ func (h *H2Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(200)
 		w.Write([]byte(proxyutil.GetErrorRspBody("请求被用户丢弃")))
 	} else {
-		rsp, err := h.proxyToServer.Transport.RoundTrip(req)
+		rsp, err := h.proxy.roundTripBase(req)
 		if err != nil {
 			log.Errorf("martian: error requesting to remote server: %v", err)
 			return
@@ -1134,4 +1137,50 @@ func (h *H2Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		w.Write(rspBody)
 	}
 
+}
+
+func (p *Proxy) roundTripBase(req *http.Request) (*http.Response, error) {
+	bareBytes := httpctx.GetRequestBytes(req)
+	reqBytes := lowhttp.FixHTTPRequest(bareBytes)
+
+	ishttps := httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_IsHttps)
+	opts := append(p.lowhttpConfig,
+		lowhttp.WithRequest(reqBytes),
+		lowhttp.WithHttps(ishttps),
+		lowhttp.WithConnPool(true),
+		lowhttp.WithSaveHTTPFlow(false))
+
+	if connectedPort := httpctx.GetContextIntInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort); connectedPort > 0 {
+		var noModified = false
+		if (connectedPort == 80 && !ishttps) || (connectedPort == 443 && ishttps) {
+			noModified = true
+		}
+		if !noModified {
+			//修复host和port
+			if host := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost); host != "" {
+				opts = append(opts, lowhttp.WithHost(host))
+			}
+			opts = append(opts, lowhttp.WithPort(connectedPort))
+		}
+	}
+
+	lowHttpResp, err := lowhttp.HTTPWithoutRedirect(opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	rsp, err := lowhttp.ParseBytesToHTTPResponse(lowHttpResp.RawPacket)
+	if rsp == nil {
+		//utils.PrintCurrentGoroutineRuntimeStack()
+		//spew.Dump(lowHttpResp)
+	}
+	if rsp != nil {
+		rsp.Request = req
+	}
+
+	//utils.FixHTTPRequestForGolangNativeHTTPClient(req)
+	//rsp, err := t.Transport.RoundTrip(req)
+
+	utils.FixHTTPResponseForGolangNativeHTTPClient(rsp)
+	return rsp, err
 }

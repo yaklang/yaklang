@@ -81,7 +81,7 @@ func TestMustPassDebug(t *testing.T) {
 }
 
 func TestMustPass(t *testing.T) {
-	var debugName = "nuclei_scan.yak"
+	var debugName = "mock_thinkphprce.yak"
 	var debugCases [][]string
 	var cases [][]string
 	for k, v := range files {

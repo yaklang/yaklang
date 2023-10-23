@@ -225,13 +225,13 @@ func DebugMockTCPHandlerFuncContext(ctx context.Context, handlerFunc handleTCPFu
 }
 
 func DebugMockTCP(rsp []byte) (string, int) {
-	return DebugMockTCPHandlerFuncContext(TimeoutContext(time.Minute*5), func(ctx context.Context, lis net.Listener, conn net.Conn) {
+	return DebugMockTCPHandlerFuncContext(TimeoutContext(time.Second*30), func(ctx context.Context, lis net.Listener, conn net.Conn) {
 		_, err := conn.Write(rsp)
 		if err != nil {
 			log.Errorf("write tcp failed: %v", err)
 		}
-		_ = conn.Close()
-		_ = lis.Close()
+		_ = conn.(*net.TCPConn).CloseWrite()
+		//_ = lis.Close()
 	},
 	)
 }
@@ -241,9 +241,8 @@ func DebugMockTCPEx(handleFunc handleTCPFunc) (string, int) {
 }
 
 func DebugMockHTTP(rsp []byte) (string, int) {
-	res, _ := ReadHTTPResponseFromBytes(rsp, nil)
-	response, _ := DumpHTTPResponse(res, true)
-	return DebugMockHTTPWithTimeout(time.Minute, response)
+	rsp = FixRespCL(rsp)
+	return DebugMockHTTPWithTimeout(time.Minute, rsp)
 }
 
 func DebugMockHTTPNotFixCL(rsp []byte) (string, int) {
@@ -460,6 +459,7 @@ func DebugMockHTTPServerWithContext(ctx context.Context, https bool, h2 bool, gm
 }
 
 func DebugMockHTTPWithTimeout(du time.Duration, rsp []byte) (string, int) {
+	rsp = FixRespCL(rsp)
 	addr := GetRandomLocalAddr()
 	time.Sleep(time.Millisecond * 300)
 	host, port, _ := ParseStringToHostPort(addr)
@@ -492,4 +492,10 @@ func DebugMockHTTPWithTimeout(du time.Duration, rsp []byte) (string, int) {
 
 	time.Sleep(time.Millisecond * 100)
 	return host, port
+}
+
+func FixRespCL(rsp []byte) []byte {
+	res, _ := ReadHTTPResponseFromBytes(rsp, nil)
+	response, _ := DumpHTTPResponse(res, true)
+	return response
 }
