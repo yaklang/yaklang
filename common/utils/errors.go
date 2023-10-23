@@ -72,6 +72,7 @@ func Wrap(err error, msg string) error {
 		msg += ": "
 	}
 	if yakErr, ok := err.(YakError); ok {
+		yakErr.msg = fmt.Sprintf("%s%s", msg, yakErr.Error())
 		yakErr.stack = appendCallers(yakErr.stack)
 		yakErr.originalErrors = append(yakErr.originalErrors, err)
 		return yakErr
@@ -90,6 +91,7 @@ func Wrapf(err error, format string, args ...interface{}) error {
 	}
 
 	if yakErr, ok := err.(YakError); ok {
+		yakErr.msg = fmt.Sprintf("%s%s", msg, yakErr.Error())
 		yakErr.stack = appendCallers(yakErr.stack)
 		yakErr.originalErrors = append(yakErr.originalErrors, err)
 		return yakErr
