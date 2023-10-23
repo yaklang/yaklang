@@ -31,7 +31,7 @@ func CheckTestCase(t *testing.T, tc TestCase) {
 		}
 	}
 	prog := ParseSSA(tc.code, opts...)
-	// prog.Show()
+	// prog.ShowWithSource()
 	// fmt.Println(prog.GetErrors().String())
 	errs := lo.Map(prog.GetErrors(), func(e *ssa.SSAError, _ int) string { return e.Message })
 	slices.Sort(errs)
@@ -111,7 +111,16 @@ func TestBasicExpression(t *testing.T) {
 
 				a1 := 1
 				b = a1
+
+				{
+					a2 := 1
+					b = a2
+				}
+				b = a2 // undefine 
 				`,
+			errs: []string{
+				ssa4analyze.ValueUndefined("a2"),
+			},
 		})
 	})
 
@@ -304,8 +313,8 @@ func TestMemberCall(t *testing.T) {
 			`,
 			errs: []string{
 				pass.InvalidField("number"),
+				pass.InvalidField("( ) -> number"),
 				pass.InvalidField("number"),
-				pass.InvalidField("null"),
 				pass.InvalidField("number"),
 			},
 		})

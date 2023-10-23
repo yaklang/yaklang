@@ -454,7 +454,7 @@ func (s *ObjectType) GetField(key Value) (Type, Type) {
 		return s.FieldType, s.KeyTyp
 	case Struct:
 		getField := func(o *ObjectType) Type {
-			if index := slices.Index(o.Key, key); index != -1 {
+			if index := slices.IndexFunc(o.Key, func(v Value) bool { return v.String() == key.String() }); index != -1 {
 				return o.FieldTypes[index]
 			} else {
 				return nil

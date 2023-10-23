@@ -2,62 +2,104 @@ package ssa
 
 import (
 	"fmt"
+	"sync"
 )
 
-func init() {
-	ConstMap[nil] = &Const{
-		anNode: NewNode(),
-		value:  nil,
-		typ:    BasicTypes[Null],
-		str:    "nil",
-		Unary:  0,
-	}
-
-	ConstMap[struct{}{}] = &Const{
-		anNode: NewNode(),
-		value:  struct{}{},
-		typ:    BasicTypes[Any],
-		str:    "any",
-		Unary:  0,
-	}
+type Const struct {
+	value any
+	// only one type
+	typ Type
+	str string
 }
 
-func NewNil() *Const {
-	return ConstMap[nil]
+// get type
+func (c *Const) GetType() Type {
+	t := c.typ
+	if t == nil {
+		t = BasicTypes[Any]
+	}
+	return t
 }
 
-func NewAny() *Const {
-	return ConstMap[struct{}{}]
+func (c *Const) SetType(ts Type) {
+	// const don't need set type
 }
 
 var (
-	ConstMap = make(map[any]*Const)
+	ConstMap      = make(map[any]*Const)
+	ConstMapMutex = &sync.RWMutex{}
 )
 
+func init() {
+	// ConstMapMutex.Lock()
+	// defer ConstMapMutex.Unlock()
+
+	ConstMap[nil] = &Const{
+		value: nil,
+		typ:   BasicTypes[Null],
+		str:   "nil",
+	}
+
+	ConstMap[struct{}{}] = &Const{
+		value: struct{}{},
+		typ:   BasicTypes[Any],
+		str:   "any",
+	}
+}
+
+func NewNil() *ConstInst {
+	return NewConst(nil)
+}
+
+func NewAny() *ConstInst {
+	return NewConst(struct{}{})
+}
+
 // create const
-func NewConstWithUnary(i any, un int) *Const {
+func NewConstWithUnary(i any, un int) *ConstInst {
 	c := NewConst(i)
 	c.Unary = un
 	return c
 }
 
-func NewConst(i any) *Const {
-	// after update i
-	if c, ok := ConstMap[i]; ok {
-		return c
+func NewConst(i any) *ConstInst {
+	c := newConstByMap(i)
+	if c == nil {
+		c = newConstCreate(i)
 	}
+	ci := &ConstInst{
+		Const:         c,
+		anInstruction: NewInstruction(),
+		anValue:       NewValue(),
+		Unary:         0,
+	}
+	return ci
+}
+
+func newConstCreate(i any) *Const {
 	// build new const
 	typ := GetType(i)
 	c := &Const{
-		anNode: NewNode(),
-		value:  i,
-		typ:    typ,
-		str:    fmt.Sprintf("%v", i),
+		value: i,
+		typ:   typ,
+		str:   fmt.Sprintf("%v", i),
 	}
-	// const should same
-	// assert newConst(1) ==newConst(1)
+	ConstMapMutex.Lock()
 	ConstMap[i] = c
+	ConstMapMutex.Unlock()
 	return c
+}
+
+func newConstByMap(i any) *Const {
+	// after update i
+	ConstMapMutex.RLock()
+	defer ConstMapMutex.RUnlock()
+	c, ok := ConstMap[i]
+	if ok {
+		return c
+	} else {
+		return nil
+	}
 }
 
 func (c *Const) GetTypeKind() TypeKind {

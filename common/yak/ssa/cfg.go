@@ -17,10 +17,10 @@ const (
 )
 
 func (b *BasicBlock) IsBlock(name string) bool {
-	return strings.HasPrefix(b.Name, name)
+	return strings.HasPrefix(b.GetVariable(), name)
 }
 
-func (b *BasicBlock) GetBlock(name string) *BasicBlock {
+func (b *BasicBlock) GetBlockById(name string) *BasicBlock {
 	for _, prev := range b.Preds {
 		if prev.IsBlock(name) {
 			return prev

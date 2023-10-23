@@ -1,7 +1,6 @@
 package pass
 
 import (
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -13,7 +12,7 @@ func init() {
 }
 
 type TypeInference struct {
-	Finish map[ssa.InstructionValue]struct{}
+	Finish map[ssa.Value]struct{}
 }
 
 func (t *TypeInference) RunOnFunction(fun *ssa.Function) {
@@ -26,7 +25,7 @@ func (t *TypeInference) RunOnFunction(fun *ssa.Function) {
 
 func (t *TypeInference) InferenceOnInstruction(inst ssa.Instruction) {
 
-	if iv, ok := inst.(ssa.InstructionValue); ok {
+	if iv, ok := inst.(ssa.Value); ok {
 		t := iv.GetType()
 		if utils.IsNil(t) {
 			iv.SetType(ssa.BasicTypes[ssa.Null])
@@ -77,11 +76,7 @@ func collectTypeFromValues(values []ssa.Value, skip func(int, ssa.Value) bool) [
 // if all finish, return false
 func (t *TypeInference) checkValuesNotFinish(vs []ssa.Value) bool {
 	for _, v := range vs {
-		inst, ok := v.(ssa.InstructionValue)
-		if !ok {
-			continue
-		}
-		if _, ok := t.Finish[inst]; !ok {
+		if _, ok := t.Finish[v]; !ok {
 			return true
 		}
 	}
@@ -148,7 +143,7 @@ func (t *TypeInference) TypeInferencePhi(phi *ssa.Phi) {
 		phi.Edge,
 		// // skip unreachable block
 		func(index int, value ssa.Value) bool {
-			block := phi.Block.Preds[index]
+			block := phi.GetBlock().Preds[index]
 			return block.Reachable() == -1
 		},
 	)
@@ -235,33 +230,33 @@ func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
 		}
 	}
 	// use update
-	vs := lo.FilterMap(f.GetValues(), func(v ssa.Value, i int) (ssa.Value, bool) {
-		switch v := v.(type) {
-		case *ssa.Update:
-			return v.Value, true
-		default:
-			return nil, false
-		}
-	})
+	// vs := lo.FilterMap(f.GetValues(), func(v ssa.Value, i int) (ssa.Value, bool) {
+	// 	// switch v := v.(type) {
+	// 	// // case *ssa.Update:
+	// 	// // 	return v.Value, true
+	// 	// default:
+	// 	// 	return nil, false
+	// 	// }
+	// })
 
-	// check value finish
-	// TODO: handler Acyclic Graph
-	if t.checkValuesNotFinish(vs) {
-		return
-	}
+	// // check value finish
+	// // TODO: handler Acyclic Graph
+	// if t.checkValuesNotFinish(vs) {
+	// 	return
+	// }
 
-	ts := collectTypeFromValues(
-		// f.Update,
-		vs,
-		func(i int, v ssa.Value) bool { return false },
-	)
-	if len(ts) == 0 {
-		f.SetType(ssa.BasicTypes[ssa.Null])
-	} else if len(ts) == 1 {
-		f.SetType(ts[0])
-	} else {
-		f.SetType(ssa.BasicTypes[ssa.Any])
-	}
+	// ts := collectTypeFromValues(
+	// 	// f.Update,
+	// 	vs,
+	// 	func(i int, v ssa.Value) bool { return false },
+	// )
+	// if len(ts) == 0 {
+	// 	f.SetType(ssa.BasicTypes[ssa.Null])
+	// } else if len(ts) == 1 {
+	// 	f.SetType(ts[0])
+	// } else {
+	// 	f.SetType(ssa.BasicTypes[ssa.Any])
+	// }
 }
 func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
 
@@ -273,7 +268,7 @@ func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
 	}
 
 	// get function type
-	funcTyp, ok := c.Method.GetType().(*ssa.FunctionType)
+	funcTyp, ok := ssa.ToFunctionType(c.Method.GetType())
 	if !ok {
 		return
 	}
@@ -330,7 +325,7 @@ func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
 		} else if t, ok := funcTyp.ReturnType.(*ssa.BasicType); ok && t.Kind == ssa.ErrorType {
 			// pass
 			c.SetType(ssa.BasicTypes[ssa.Null])
-			c.GetParent().NewErrorWithPos(ssa.Error, BCTag, c.GetLeftPosition(), ValueIsNull())
+			// c.GetFunc().NewErrorWithPos(ssa.Error, BCTag, c.GetLeftPosition(), ValueIsNull())
 			return
 		}
 		c.NewError(ssa.Error, TITAG, FunctionContReturnError())

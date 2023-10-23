@@ -19,17 +19,23 @@ func (f *Function) newBasicBlockWithSealed(name string, isSealed bool) *BasicBlo
 		name = fmt.Sprintf("b%d", index)
 	}
 	b := &BasicBlock{
+		anInstruction: NewInstruction(),
+		anValue:       NewValue(),
 		Index:         index,
-		Name:          name,
-		Parent:        f,
 		Preds:         make([]*BasicBlock, 0),
 		Succs:         make([]*BasicBlock, 0),
+		Condition:     nil,
 		Insts:         make([]Instruction, 0),
 		Phis:          make([]*Phi, 0),
+		Handler:       nil,
+		finish:        false,
 		isSealed:      isSealed,
 		inCompletePhi: make([]*Phi, 0),
-		user:          make([]User, 0),
+		Skip:          false,
 	}
+	b.SetVariable(name)
+	b.SetFunc(f)
+	b.SetBlock(b)
 	f.Blocks = append(f.Blocks, b)
 	return b
 }
@@ -41,7 +47,7 @@ func (f *Function) newBasicBlockWithSealed(name string, isSealed bool) *BasicBlo
 */
 
 func (b *BasicBlock) Reachable() int {
-	if c, ok := b.Condition.(*Const); ok {
+	if c, ok := b.Condition.(*ConstInst); ok {
 		if c.IsBoolean() {
 			if c.Boolean() {
 				return 1

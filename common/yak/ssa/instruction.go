@@ -2,186 +2,123 @@ package ssa
 
 import (
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/utils"
-	"golang.org/x/exp/slices"
 )
 
-func EmitInst(i Instruction) {
-	block := i.GetBlock()
-	if block == nil {
-		// println("void block!! %s")
-		return
-	}
-	if index := slices.Index(block.Insts, i); index != -1 {
-		return
-	}
-	if len(block.Insts) == 0 {
-		b := block.Parent.builder
-		current := b.CurrentBlock
-		b.CurrentBlock = block
-		b.emit(i)
-		b.CurrentBlock = current
-	} else {
-		EmitBefore(block.LastInst(), i)
-	}
-}
-
-func Insert(i Instruction, b *BasicBlock) {
-	b.Insts = append(b.Insts, i)
-}
-
-func DeleteInst(i Instruction) {
-	b := i.GetBlock()
-	if phi, ok := i.(*Phi); ok {
-		b.Phis = utils.RemoveSliceItem(b.Phis, phi)
-	} else {
-		b.Insts = utils.RemoveSliceItem(b.Insts, i)
-	}
-	f := i.GetParent()
-	delete(f.InstReg, i)
-	// if v, ok := i.(Value); ok {
-	// 	f := i.GetParent()
-	// 	f.symbolTable[v.GetVariable()] = remove(f.symbolTable[v.GetVariable()], v)
-	// }
-}
-
-func newAnInstruction(block *BasicBlock) anInstruction {
-	a := anInstruction{
-		anCodeItem: *NewCodeItem(),
-		Func:       block.Parent,
-		Block:      block,
-		typs:       nil,
-	}
-	a.SetPosition(block.Parent.builder.CurrentPos)
-	return a
-}
-
-func NewJump(to *BasicBlock, block *BasicBlock) *Jump {
+func NewJump(to *BasicBlock) *Jump {
 	j := &Jump{
-		anInstruction: newAnInstruction(block),
+		anInstruction: NewInstruction(),
 		To:            to,
 	}
 	return j
 }
 
-func NewLoop(block *BasicBlock, cond Value) *Loop {
+func NewLoop(cond Value) *Loop {
 	l := &Loop{
-		anInstruction: newAnInstruction(block),
+		anInstruction: NewInstruction(),
 		Cond:          cond,
 	}
 	return l
 }
 
-func NewConstInst(c *Const, block *BasicBlock) *ConstInst {
+func NewConstInst(c *Const) *ConstInst {
 	v := &ConstInst{
 		Const:         c,
-		anInstruction: newAnInstruction(block),
+		anInstruction: NewInstruction(),
 	}
 	return v
 }
 
-func NewUndefine(name string, block *BasicBlock) *Undefine {
+func NewUndefine(name string) *Undefine {
 	u := &Undefine{
-		anInstruction: newAnInstruction(block),
-		anNode:        NewNode(),
+		anInstruction: NewInstruction(),
+		anValue:       NewValue(),
 	}
 	u.SetVariable(name)
-	block.Parent.builder.writeVariableByBlock(name, u, block)
 	return u
 }
 
-func NewBinOpOnly(op BinaryOpcode, x, y Value, block *BasicBlock) *BinOp {
+func NewBinOpOnly(op BinaryOpcode, x, y Value) *BinOp {
 	b := &BinOp{
-		anInstruction: newAnInstruction(block),
-		anNode:        NewNode(),
+		anInstruction: NewInstruction(),
+		anValue:       NewValue(),
 		Op:            op,
 		X:             x,
 		Y:             y,
 	}
-	b.AddValue(x)
-	b.AddValue(y)
 	if op >= OpGt && op <= OpIn {
 		b.SetType(BasicTypes[Boolean])
 	}
-	// fixupUseChain(b)
 	return b
 }
 
-func NewBinOp(op BinaryOpcode, x, y Value, block *BasicBlock) Value {
-	v := HandlerBinOp(NewBinOpOnly(op, x, y, block))
+func NewBinOp(op BinaryOpcode, x, y Value) Value {
+	v := HandlerBinOp(NewBinOpOnly(op, x, y))
 	return v
 }
 
-func NewUnOpOnly(op UnaryOpcode, x Value, block *BasicBlock) *UnOp {
+func NewUnOpOnly(op UnaryOpcode, x Value) *UnOp {
 	u := &UnOp{
-		anInstruction: newAnInstruction(block),
-		anNode:        NewNode(),
+		anInstruction: NewInstruction(),
+		anValue:       NewValue(),
 		Op:            op,
 		X:             x,
 	}
-	u.AddValue(x)
 	return u
 }
 
-func NewUnOp(op UnaryOpcode, x Value, block *BasicBlock) Value {
-	b := HandlerUnOp(NewUnOpOnly(op, x, block))
-	fixupUseChain(b)
+func NewUnOp(op UnaryOpcode, x Value) Value {
+	b := HandlerUnOp(NewUnOpOnly(op, x))
 	return b
 }
 
-func NewIf(cond Value, block *BasicBlock) *If {
+func NewIf(cond Value) *If {
 	ifSSA := &If{
-		anInstruction: newAnInstruction(block),
+		anInstruction: NewInstruction(),
 		Cond:          cond,
 	}
-	fixupUseChain(ifSSA)
 	return ifSSA
 }
 
-func NewSwitch(cond Value, defaultb *BasicBlock, label []SwitchLabel, block *BasicBlock) *Switch {
+func NewSwitch(cond Value, defaultb *BasicBlock, label []SwitchLabel) *Switch {
 	sw := &Switch{
-		anInstruction: newAnInstruction(block),
+		anInstruction: NewInstruction(),
 		Cond:          cond,
 		DefaultBlock:  defaultb,
 		Label:         label,
 	}
-	fixupUseChain(sw)
 	return sw
 }
 
-func NewReturn(vs []Value, block *BasicBlock) *Return {
+func NewReturn(vs []Value) *Return {
 	r := &Return{
-		anInstruction: newAnInstruction(block),
+		anInstruction: NewInstruction(),
 		Results:       vs,
 	}
-	fixupUseChain(r)
-	r.SetType(CalculateType(lo.Map(vs, func(v Value, _ int) Type { return v.GetType() })))
 	return r
 }
 
-func NewTypeCast(typ Type, v Value, block *BasicBlock) *TypeCast {
+func NewTypeCast(typ Type, v Value) *TypeCast {
 	t := &TypeCast{
-		anInstruction: newAnInstruction(block),
-		anNode:        NewNode(),
+		anInstruction: NewInstruction(),
+		anValue:       NewValue(),
 		Value:         v,
 	}
-	t.AddValue(v)
 	t.SetType(typ)
 	return t
 }
 
-func NewTypeValue(typ Type, block *BasicBlock) *TypeValue {
+func NewTypeValue(typ Type) *TypeValue {
 	t := &TypeValue{
-		anInstruction: newAnInstruction(block),
-		anNode:        NewNode(),
+		anInstruction: NewInstruction(),
+		anValue:       NewValue(),
 	}
 	t.SetType(typ)
 	return t
 }
 
-func NewAssert(cond, msgValue Value, msg string, block *BasicBlock) *Assert {
+func NewAssert(cond, msgValue Value, msg string) *Assert {
 	a := &Assert{
-		anInstruction: newAnInstruction(block),
+		anInstruction: NewInstruction(),
 		Cond:          cond,
 		Msg:           msg,
 		MsgValue:      msgValue,
@@ -189,67 +126,68 @@ func NewAssert(cond, msgValue Value, msg string, block *BasicBlock) *Assert {
 	return a
 }
 
-var NextType = NewObjectType()
+var NextType *ObjectType = nil
 
-func init() {
-	NextType.Kind = Struct
-	NextType.AddField(NewConst("ok"), BasicTypes[Boolean])
-	NextType.AddField(NewConst("key"), BasicTypes[Any])
-	NextType.AddField(NewConst("field"), BasicTypes[Any])
-}
-
-func NewNext(iter Value, isIn bool, block *BasicBlock) *Next {
+func NewNext(iter Value, isIn bool) *Next {
 	n := &Next{
-		anInstruction: newAnInstruction(block),
-		anNode:        NewNode(),
+		anInstruction: NewInstruction(),
+		anValue:       NewValue(),
 		Iter:          iter,
 		InNext:        isIn,
 	}
-	n.AddValue(iter)
+	if NextType == nil {
+		NextType = NewObjectType()
+		NextType.Kind = Struct
+		NextType.AddField(NewConst("ok"), BasicTypes[Boolean])
+		NextType.AddField(NewConst("key"), BasicTypes[Any])
+		NextType.AddField(NewConst("field"), BasicTypes[Any])
+	}
 	n.SetType(NextType)
 	return n
 }
 
-func NewErrorHandler(try, catch, block *BasicBlock) *ErrorHandler {
+func NewErrorHandler(try, catch *BasicBlock) *ErrorHandler {
 	e := &ErrorHandler{
-		anInstruction: newAnInstruction(block),
+		anInstruction: NewInstruction(),
 		try:           try,
 		catch:         catch,
 	}
-	block.AddSucc(try)
+	// block.AddSucc(try)
 	try.Handler = e
-	block.AddSucc(catch)
+	// block.AddSucc(catch)
 	catch.Handler = e
 	return e
 }
 
 func NewParam(variable string, isFreeValue bool, fun *Function) *Parameter {
 	p := &Parameter{
-		anNode:      NewNode(),
-		anCodeItem:  *NewCodeItem(),
-		variable:    variable,
-		Func:        fun,
-		IsFreeValue: isFreeValue,
-		typs:        nil,
+		anInstruction: NewInstruction(),
+		anValue:       NewValue(),
+		variable:      variable,
+		Func:          fun,
+		IsFreeValue:   isFreeValue,
+		typs:          nil,
 	}
+	p.SetFunc(fun)
+	p.SetBlock(fun.EnterBlock)
 	p.SetPosition(fun.GetPosition())
 	return p
 }
 
 func (i *If) AddTrue(t *BasicBlock) {
 	i.True = t
-	i.Block.AddSucc(t)
+	i.GetBlock().AddSucc(t)
 }
 
 func (i *If) AddFalse(f *BasicBlock) {
 	i.False = f
-	i.Block.AddSucc(f)
+	i.GetBlock().AddSucc(f)
 }
 
 func (l *Loop) Finish(init, step []Value) {
 	// check cond
 	check := func(v Value) bool {
-		if _, ok := v.(*Phi); ok {
+		if _, ok := ToPhi(v); ok {
 			return true
 		} else {
 			return false
@@ -261,9 +199,9 @@ func (l *Loop) Finish(init, step []Value) {
 			l.NewError(Error, SSATAG, "this condition not compare")
 		}
 		if check(b.X) {
-			l.Key = b.X.(*Phi)
+			l.Key = b.X
 		} else if check(b.Y) {
-			l.Key = b.Y.(*Phi)
+			l.Key = b.Y
 		} else {
 			l.NewError(Error, SSATAG, "this condition not change")
 		}
@@ -272,7 +210,7 @@ func (l *Loop) Finish(init, step []Value) {
 	if l.Key == nil {
 		return
 	}
-	tmp := lo.SliceToMap(l.Key.Edge, func(v Value) (Value, struct{}) { return v, struct{}{} })
+	tmp := lo.SliceToMap(l.Key.GetValues(), func(v Value) (Value, struct{}) { return v, struct{}{} })
 
 	set := func(vs []Value) Value {
 		for _, v := range vs {
@@ -287,25 +225,6 @@ func (l *Loop) Finish(init, step []Value) {
 	l.Step = set(step)
 
 	fixupUseChain(l)
-}
-
-func (f *Field) GetLastValue() Value {
-	updates := lo.FilterMap(f.GetValues(), func(v Value, _ int) (*Update, bool) {
-		u, ok := v.(*Update)
-		if !ok {
-			return nil, false
-		}
-		if u.Address == f {
-			return u, true
-		} else {
-			return nil, false
-		}
-	})
-	if length := len(updates); length != 0 {
-		update := updates[length-1]
-		return update.Value
-	}
-	return nil
 }
 
 func (e *ErrorHandler) AddFinal(f *BasicBlock) {
