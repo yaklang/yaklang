@@ -13,46 +13,47 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 	index := len(p.Funcs)
 	if name == "" {
 		if parent != nil {
-			name = fmt.Sprintf("%s$%d", parent.Name, index)
+			name = fmt.Sprintf("%s$%d", parent.GetVariable(), index)
 		} else {
 			name = fmt.Sprintf("AnonymousFunc-%d", index)
 		}
 	}
 	f := &Function{
-		Name:        name,
-		anCodeItem:  *NewCodeItem(),
-		Package:     p,
-		Param:       make([]*Parameter, 0),
-		Blocks:      make([]*BasicBlock, 0),
-		EnterBlock:  nil,
-		ExitBlock:   nil,
-		AnonFuncs:   make([]*Function, 0),
-		parent:      nil,
-		FreeValues:  make([]Value, 0),
-		user:        make([]User, 0),
-		symbolTable: make(map[string][]ValueCodeItem),
-		InstReg:     make(map[Instruction]string),
+		anInstruction: NewInstruction(),
+		anValue:       NewValue(),
+		Package:       p,
+		Param:         make([]*Parameter, 0),
+		Blocks:        make([]*BasicBlock, 0),
+		EnterBlock:    nil,
+		ExitBlock:     nil,
+		AnonFuncs:     make([]*Function, 0),
+		parent:        nil,
+		FreeValues:    make([]Value, 0),
+		symbolTable:   make(map[string][]Value),
+		InstReg:       make(map[Instruction]string),
 		symbol: &Make{
 			anInstruction: anInstruction{
 				// variable: name + "-symbol",
 			},
 			// I:     parent.symbol,
-			anNode: NewNode(),
+			anValue: NewValue(),
 		},
 		err: make(SSAErrors, 0),
 
 		externInstance: make(map[string]Value),
 		externType:     make(map[string]Type),
 	}
+	f.SetVariable(name)
 	p.Funcs = append(p.Funcs, f)
-	f.symbol.Func = f
-	f.symbol.SetVariable(name + "-symbol")
 	if parent != nil {
 		parent.addAnonymous(f)
 		// Pos: parent.CurrentPos,
 		f.Pos = parent.builder.CurrentPos
 	}
 	f.EnterBlock = f.NewBasicBlock("entry")
+	f.symbol.SetFunc(f)
+	f.symbol.SetBlock(f.EnterBlock)
+	// f.symbol.SetVariable(name + "-symbol")
 	return f
 }
 
@@ -85,9 +86,11 @@ func (f *Function) GetParent() *Function {
 // just create a function define, only function parameter type \ return type \ ellipsis
 func NewFunctionWithType(name string, typ *FunctionType) *Function {
 	f := &Function{
-		Name: name,
-		Type: typ,
+		anInstruction: NewInstruction(),
+		anValue:       NewValue(),
 	}
+	f.SetType(typ)
+	f.SetVariable(name)
 	return f
 }
 
@@ -143,8 +146,8 @@ func (f *Function) Finish() {
 				if p, ok := v.(*Parameter); ok {
 					return p.variable, false
 				}
-				if f, ok := v.(*Field); ok {
-					return f.variable, true
+				if f, ok := ToField(v); ok {
+					return f.GetVariable(), true
 				}
 				// this unreachable: freeValue only Parameter
 				return v.String(), true

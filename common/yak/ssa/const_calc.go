@@ -1,26 +1,70 @@
 package ssa
 
-func HandlerBinOp(b *BinOp) Value {
-	if IsConst(b.X) {
-		if IsConst(b.Y) {
-			// both const
-			if v := CalcConstBinary(ToConst(b.X), ToConst(b.Y), b.Op); v != nil {
-				return v
-			}
+type BinaryOpcode int
 
-		} else {
-			// x const
-			if v := CalcConstBinarySide(ToConst(b.X), b.Y, b.Op); v != nil {
-				return v
-			}
-		}
-	}
-	if IsConst(b.Y) {
-		// y const
-		if v := CalcConstBinarySide(ToConst(b.Y), b.X, b.Op); v != nil {
-			return v
-		}
-	}
+const (
+	// Binary
+	OpShl BinaryOpcode = iota // <<
+
+	OpLogicAnd // &&
+	OpLogicOr  // ||
+
+	OpShr    // >>
+	OpAnd    // &
+	OpAndNot // &^
+	OpOr     // |
+	OpXor    // ^
+	OpAdd    // +
+	OpSub    // -
+	OpDiv    // /
+	OpMod    // %
+	// mul
+	OpMul // *
+
+	// boolean opcode
+	OpGt    // >
+	OpLt    // <
+	OpGtEq  // >=
+	OpLtEq  // <=
+	OpEq    // ==
+	OpNotEq // != <>
+	OpIn    //  a in b
+
+	OpSend // <-
+)
+
+type UnaryOpcode int
+
+const (
+	OpNone       UnaryOpcode = iota
+	OpNot                    // !
+	OpPlus                   // +
+	OpNeg                    // -
+	OpChan                   // <-
+	OpBitwiseNot             // ^
+)
+
+func HandlerBinOp(b *BinOp) Value {
+	// if IsConst(b.X) {
+	// 	if IsConst(b.Y) {
+	// 		// both const
+	// 		if v := CalcConstBinary(ToConst(b.X), ToConst(b.Y), b.Op); v != nil {
+	// 			return v
+	// 		}
+
+	// 	} else {
+	// 		// x const
+	// 		if v := CalcConstBinarySide(ToConst(b.X), b.Y, b.Op); v != nil {
+	// 			return v
+	// 		}
+	// 	}
+	// }
+	// if IsConst(b.Y) {
+	// 	// y const
+	// 	if v := CalcConstBinarySide(ToConst(b.Y), b.X, b.Op); v != nil {
+	// 		return v
+	// 	}
+	// }
 
 	// both not const
 
@@ -28,11 +72,11 @@ func HandlerBinOp(b *BinOp) Value {
 }
 
 func HandlerUnOp(u *UnOp) Value {
-	if IsConst(u.X) {
-		if v := CalcConstUnary(ToConst(u.X), u.Op); v != nil {
-			return v
-		}
-	}
+	// if IsConst(u.X) {
+	// 	if v := CalcConstUnary(ToConst(u.X), u.Op); v != nil {
+	// 		return v
+	// 	}
+	// }
 	return u
 }
 
@@ -61,7 +105,7 @@ func CalcBinary(b *BinOp) Value {
 	return b
 }
 
-func CalcConstBinarySide(c *Const, v Value, op BinaryOpcode) Value {
+func CalcConstBinarySide(c *ConstInst, v Value, op BinaryOpcode) Value {
 	switch op {
 	case OpLogicAnd:
 		if c.IsBoolean() {
@@ -92,7 +136,7 @@ func CalcConstBinarySide(c *Const, v Value, op BinaryOpcode) Value {
 	return nil
 }
 
-func CalcConstBinary(x, y *Const, op BinaryOpcode) *Const {
+func CalcConstBinary(x, y *Const, op BinaryOpcode) *ConstInst {
 	switch op {
 	case OpShl:
 		if x.IsNumber() && y.IsNumber() {
@@ -176,7 +220,7 @@ func CalcConstBinary(x, y *Const, op BinaryOpcode) *Const {
 // OpPlus             // +
 // OpNeg              // -
 // OpChan             // ->
-func CalcConstUnary(x *Const, op UnaryOpcode) *Const {
+func CalcConstUnary(x *ConstInst, op UnaryOpcode) *ConstInst {
 	switch op {
 	case OpNone:
 		return x

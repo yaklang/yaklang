@@ -1,40 +1,14 @@
 package ssa
 
 import (
-	"fmt"
-
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/slices"
 )
 
-func IsObject(v Value) bool {
-	_, ok := v.(*Make)
-	return ok
-}
-
-func ToObject(v Value) *Make {
-	o, _ := v.(*Make)
-	return o
-}
-
-func IsField(v Value) bool {
-	_, ok := v.(*Field)
-	return ok
-}
-
-func ToField(v Value) *Field {
-	if o, ok := v.(*Field); ok {
-		return o
-	} else {
-		return nil
-	}
-}
-
-func GetFields(u User) []*Field {
+func GetFields(u Node) []*Field {
 	f := make([]*Field, 0)
-	for _, v := range u.GetValues() {
-		if field, ok := v.(*Field); ok {
+	for _, v := range u.GetUsers() {
+		if field, ok := ToField(v); ok {
 			if field.Obj == u {
 				f = append(f, field)
 			}
@@ -43,10 +17,10 @@ func GetFields(u User) []*Field {
 	return f
 }
 
-func GetField(u User, key Value) *Field {
+func GetField(u, key Value) *Field {
 	fields := GetFields(u)
 	if index := slices.IndexFunc(fields, func(v *Field) bool {
-		return v.Key == key
+		return v.Key.String() == key.String()
 	}); index != -1 {
 		return fields[index]
 	} else {
@@ -54,63 +28,39 @@ func GetField(u User, key Value) *Field {
 	}
 }
 
-// get user without object
-func GetUserOnly(n Node) []User {
-	if f, ok := n.(*Field); ok {
-		return lo.Filter(f.GetUsers(), func(u User, _ int) bool {
-			if u == f.Obj {
-				return false
-			} else {
-				return true
-			}
-		})
-	} else {
-		return n.GetUsers()
-	}
-}
-
-func NewMake(parentI User, typ Type, low, high, step, Len, Cap Value, block *BasicBlock) *Make {
+func NewMake(parentI Value, typ Type, low, high, step, Len, Cap Value) *Make {
 	i := &Make{
-		anInstruction: newAnInstruction(block),
-		anNode:        NewNode(),
-		parentI:       parentI,
+		anInstruction: NewInstruction(),
+		anValue:       NewValue(),
 		low:           low,
 		high:          high,
 		step:          step,
+		parentI:       parentI,
 		Len:           Len,
 		Cap:           Cap,
 	}
 	i.SetType(typ)
-	//TODO: add this variable
-	fixupUseChain(i)
 	return i
 }
 
-func NewUpdate(address User, v Value, block *BasicBlock) *Update {
+func NewUpdate(address, v Value) *Update {
 	s := &Update{
-		anInstruction: newAnInstruction(block),
+		anInstruction: NewInstruction(),
 		Value:         v,
 		Address:       address,
 	}
-	s.AddValue(v)
-	s.AddUser(address)
-	fixupUseChain(s)
 	return s
 }
 
-func NewFieldOnly(key Value, obj User, block *BasicBlock) *Field {
+func NewFieldOnly(key, obj Value, block *BasicBlock) *Field {
 	f := &Field{
-		anInstruction: newAnInstruction(block),
-		anNode:        NewNode(),
-		// Update:        make([]Value, 0),
-		Key: key,
-		Obj: obj,
-	}
-	f.AddValue(key)
-	f.AddUser(obj)
-	if t, ok := obj.GetType().(*ObjectType); ok {
-		ft, _ := t.GetField(key)
-		f.SetType(ft)
+		anInstruction: NewInstruction(),
+		anValue:       NewValue(),
+		Key:           key,
+		Obj:           obj,
+		update:        make([]User, 0),
+		IsMethod:      false,
+		OutCapture:    false,
 	}
 	return f
 }
@@ -145,44 +95,32 @@ func (b *FunctionBuilder) CreateInterfaceWithVs(keys []Value, vs []Value) *Make 
 }
 
 // --------------- `f.symbol` handler, read && write
-func (b *FunctionBuilder) getFieldWithCreate(i User, key Value, create bool) Value {
+func (b *FunctionBuilder) getFieldWithCreate(i, key Value, create bool) Value {
 	var fTyp Type
-	var isMethod bool
 
-	if c, ok := key.(*Const); ok && c.IsString() {
-		if v := i.GetType().GetMethod(c.VarString()); v != nil {
-			isMethod = true
-			fTyp = v
-		}
-	}
-
-	if t := i.GetType(); t.GetTypeKind() == ObjectTypeKind {
-		if it, ok := t.(*ObjectType); ok {
-			if t, _ := it.GetField(key); t != nil {
-				fTyp = t
-				isMethod = false
-			}
-		}
-	}
+	// if it, ok := ToObjectType(i.GetType()); ok {
+	// 	if t, _ := it.GetField(key); t != nil {
+	// 		fTyp = t
+	// 	}
+	// }
 	if f := GetField(i, key); f != nil {
 		return f
 	}
 
-	if parent := b.parentBuilder; parent != nil {
-		// find in parent
-		if field := parent.ReadField(key.String()); field != nil {
-			return field
-		}
-	}
+	// TODO:field freeValue
+	// if parent := b.parentBuilder; parent != nil {
+	// 	// find in parent
+	// 	if field := parent.ReadField(key.String()); field != nil {
+	// 		return field
+	// 	}
+	// }
 
 	if create {
 		field := NewFieldOnly(key, i, b.CurrentBlock)
 		if fTyp != nil {
 			field.SetType(fTyp)
 		}
-		field.IsMethod = isMethod
 		b.emit(field)
-		fixupUseChain(field)
 		return field
 	} else {
 		return nil
@@ -191,13 +129,13 @@ func (b *FunctionBuilder) getFieldWithCreate(i User, key Value, create bool) Val
 
 func (b *FunctionBuilder) NewCaptureField(text string) *Field {
 	f := NewFieldOnly(NewConst(text), b.symbol, b.CurrentBlock)
-	f.variable = text
+	f.SetVariable(text)
 	f.OutCapture = true
 	return f
 }
 
-func (b *FunctionBuilder) GetField(i User, key Value, create bool) *Field {
-	if field, ok := b.getFieldWithCreate(i, key, create).(*Field); ok {
+func (b *FunctionBuilder) GetField(i, key Value, create bool) *Field {
+	if field, ok := ToField(b.getFieldWithCreate(i, key, create)); ok {
 		return field
 	}
 	return nil
@@ -208,14 +146,4 @@ func (b *FunctionBuilder) ReadField(key string) *Field {
 }
 func (b *FunctionBuilder) NewField(key string) *Field {
 	return b.GetField(b.symbol, NewConst(key), true)
-}
-
-func (b *FunctionBuilder) writeField(key string, v Value) {
-	field := b.NewField(key)
-	if field == nil {
-		panic(fmt.Sprintf("writeField: %s not found", key))
-	}
-	if field.GetLastValue() != v {
-		b.EmitUpdate(field, v)
-	}
 }

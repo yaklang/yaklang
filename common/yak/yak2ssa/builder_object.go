@@ -15,7 +15,7 @@ func (b *astbuilder) buildSliceFromExprList(stmt ExpressionListMultiline) ssa.Va
 		b.NewError(ssa.Warn, TAG, "slice literal not have expression")
 		return b.EmitMakeBuildWithType(
 			ssa.NewSliceType(ssa.BasicTypes[ssa.Any]),
-			ssa.NewConst(0), ssa.NewConst(0),
+			b.EmitConstInst(0), b.EmitConstInst(0),
 		)
 	}
 	s, ok := _s.(*yak.ExpressionListMultilineContext)
@@ -60,7 +60,7 @@ func (b *astbuilder) buildMapFromMapPairs(stmt MapPairs) ssa.Value {
 		b.NewError(ssa.Warn, TAG, "map literal not have map pairs")
 		return b.EmitMakeBuildWithType(
 			ssa.NewMapType(ssa.BasicTypes[ssa.Any], ssa.BasicTypes[ssa.Any]),
-			ssa.NewConst(0), ssa.NewConst(0),
+			b.EmitConstInst(0), b.EmitConstInst(0),
 		)
 	}
 	s, ok := _s.(*yak.MapPairsContext)

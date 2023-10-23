@@ -24,26 +24,19 @@ type SSAError struct {
 
 type SSAErrors []*SSAError
 
-func (f *Function) NewErrorWithPos(kind ErrorKind, tag ErrorTag, Pos *Position, format string, arg ...any) {
+func (f *Function) NewErrorWithPos(kind ErrorKind, tag ErrorTag, Pos *Position, message string) {
 	if Pos == nil {
 		return
 	}
 	f.err = append(f.err, &SSAError{
 		Pos:     Pos,
 		tag:     tag,
-		Message: fmt.Sprintf(format, arg...),
+		Message: message,
 		Kind:    kind,
 	})
 }
 func (b *FunctionBuilder) NewError(kind ErrorKind, tag ErrorTag, format string, arg ...any) {
-	b.NewErrorWithPos(kind, tag, b.CurrentPos, format, arg...)
-}
-func (an anInstruction) NewError(kind ErrorKind, tag ErrorTag, format string, arg ...any) {
-	an.Func.NewErrorWithPos(kind, tag, an.GetPosition(), format, arg...)
-}
-
-func (b *BasicBlock) NewError(kind ErrorKind, tag ErrorTag, format string, arg ...any) {
-	b.Parent.NewErrorWithPos(kind, tag, b.pos, format, arg...)
+	b.NewErrorWithPos(kind, tag, b.CurrentPos, format)
 }
 
 func (prog *Program) GetErrors() SSAErrors {

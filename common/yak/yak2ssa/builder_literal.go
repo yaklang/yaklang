@@ -13,7 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
-func (b *astbuilder) buildLiteral(stmt *yak.LiteralContext) ssa.Value {
+func (b *astbuilder) buildLiteral(stmt *yak.LiteralContext) (v ssa.Value) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 
@@ -32,12 +32,12 @@ func (b *astbuilder) buildLiteral(stmt *yak.LiteralContext) ssa.Value {
 		if err != nil {
 			b.NewError(ssa.Error, TAG, "Unhandled bool literal")
 		}
-		return ssa.NewConst(boolLit)
+		return b.EmitConstInst(boolLit)
 	} else if stmt.UndefinedLiteral() != nil {
 		//TODO: this ok??
 		return ssa.NewParam("undefined", false, b.Function)
 	} else if stmt.NilLiteral() != nil {
-		return ssa.NewConst(nil)
+		return b.EmitConstInst(nil)
 	} else if stmt.CharacterLiteral() != nil {
 		lit := stmt.CharacterLiteral().GetText()
 		var s string
@@ -54,11 +54,11 @@ func (b *astbuilder) buildLiteral(stmt *yak.LiteralContext) ssa.Value {
 		}
 		runeChar := []rune(s)[0]
 		if runeChar < 256 {
-			return ssa.NewConst(byte(runeChar))
+			return b.EmitConstInst(byte(runeChar))
 		} else {
 			// unbelievable
 			// log.Warnf("Character literal is rune: %s", stmt.CharacterLiteral().GetText())
-			return ssa.NewConst(runeChar)
+			return b.EmitConstInst(runeChar)
 		}
 	} else if s := stmt.MapLiteral(); s != nil {
 		if s, ok := s.(*yak.MapLiteralContext); ok {
@@ -192,9 +192,9 @@ func (b *astbuilder) buildNumericLiteral(stmt *yak.NumericLiteralContext) ssa.Va
 			return nil
 		}
 		if resultInt64 > math.MaxInt {
-			return ssa.NewConst(int64(resultInt64))
+			return b.EmitConstInst(int64(resultInt64))
 		} else {
-			return ssa.NewConst(int(resultInt64))
+			return b.EmitConstInst(int(resultInt64))
 		}
 	}
 
@@ -205,7 +205,7 @@ func (b *astbuilder) buildNumericLiteral(stmt *yak.NumericLiteralContext) ssa.Va
 			lit = "0" + lit
 		}
 		var f, _ = strconv.ParseFloat(lit, 64)
-		return ssa.NewConst(f)
+		return b.EmitConstInst(f)
 	}
 	b.NewError(ssa.Error, TAG, "cannot parse num for literal: %s", stmt.GetText())
 	return nil
@@ -221,7 +221,7 @@ func (b *astbuilder) buildTemplateStringLiteral(stmt *yak.TemplateStringLiteralC
 
 	var tmpStr string
 	var value ssa.Value
-	value = ssa.NewConst("")
+	value = b.EmitConstInst("")
 	templateQuoteEscapeChar := func(quote byte, s string) string {
 		s = strings.Replace(s, "\\$", "$", -1)
 		if quote == '`' {
@@ -241,7 +241,7 @@ func (b *astbuilder) buildTemplateStringLiteral(stmt *yak.TemplateStringLiteralC
 		if expr != nil {
 			s := templateQuoteEscapeChar(prefix, tmpStr)
 			tmpStr = ""
-			value = b.EmitBinOp(ssa.OpAdd, value, ssa.NewConst(s))
+			value = b.EmitBinOp(ssa.OpAdd, value, b.EmitConstInst(s))
 
 			v := b.buildExpression(expr.(*yak.ExpressionContext))
 			t := b.EmitTypeCast(v, ssa.BasicTypes[ssa.String])
@@ -258,7 +258,7 @@ func (b *astbuilder) buildTemplateStringLiteral(stmt *yak.TemplateStringLiteralC
 
 		if tmpStr != "" {
 			s := templateQuoteEscapeChar(prefix, tmpStr)
-			value = b.EmitBinOp(ssa.OpAdd, value, ssa.NewConst(s))
+			value = b.EmitBinOp(ssa.OpAdd, value, b.EmitConstInst(s))
 		}
 	}
 
@@ -296,7 +296,7 @@ func (b *astbuilder) buildStringLiteral(stmt *yak.StringLiteralContext) ssa.Valu
 	defer recoverRange()
 	var text = stmt.GetText()
 	if text == "" {
-		return ssa.NewConst(text)
+		return b.EmitConstInst(text)
 	}
 
 	var prefix byte
@@ -313,13 +313,13 @@ ParseStrLit:
 				val = lit
 			}
 			prefix = 0
-			return ssa.NewConstWithUnary(val, int(prefix))
+			return b.EmitConstInstWithUnary(val, int(prefix))
 		} else {
 			val, err := strconv.Unquote(text)
 			if err != nil {
 				fmt.Printf("parse %v to string literal failed: %s", stmt.GetText(), err.Error())
 			}
-			return ssa.NewConstWithUnary(val, int(prefix))
+			return b.EmitConstInstWithUnary(val, int(prefix))
 		}
 	case '\'':
 		if prefix == 'r' {
@@ -330,7 +330,7 @@ ParseStrLit:
 				val = lit
 			}
 			prefix = 0
-			return ssa.NewConstWithUnary(val, int(prefix))
+			return b.EmitConstInstWithUnary(val, int(prefix))
 
 		} else {
 			if lit := stmt.GetText(); len(lit) >= 2 {
@@ -344,11 +344,11 @@ ParseStrLit:
 			if err != nil {
 				fmt.Printf("pars %v to string literal field: %s", stmt.GetText(), err.Error())
 			}
-			return ssa.NewConstWithUnary(val, int(prefix))
+			return b.EmitConstInstWithUnary(val, int(prefix))
 		}
 	case '`':
 		val := text[1 : len(text)-1]
-		return ssa.NewConstWithUnary(val, int(prefix))
+		return b.EmitConstInstWithUnary(val, int(prefix))
 	case '0':
 		switch text[1] {
 		case 'h':
@@ -357,7 +357,7 @@ ParseStrLit:
 			if err != nil {
 				fmt.Printf("parse hex string error: %v", err)
 			}
-			return ssa.NewConst(hex)
+			return b.EmitConstInst(hex)
 		}
 	default:
 		if !hasPrefix {

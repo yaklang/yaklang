@@ -6,156 +6,189 @@ import (
 	"github.com/samber/lo"
 )
 
-// TODO: save use-def chain in map[Node]struct{}
+type Position struct {
+	SourceCode  string
+	StartLine   int
+	StartColumn int
+	EndLine     int
+	EndColumn   int
+}
+type ErrorLogger interface {
+	NewError(ErrorKind, ErrorTag, string)
+}
 
-type CodeItem interface {
-	GetPosition() *Position
-	SetPosition(pos *Position)
+type LeftInstruction interface {
+	Instruction
+	// variable
+	GetLeftVariables() []string
+	AddLeftVariables(variable string)
+
+	// must
+	// left-value position
+	// get all left position
+	GetLeftPositions() []*Position
+	// get last left position
+	GetLeftPosition() *Position
+	AddLeftPositions(*Position) // add left position
+}
+
+type Instruction interface {
+	ErrorLogger
+
+	// function
+	GetFunc() *Function
+	SetFunc(*Function)
+	// block
+	GetBlock() *BasicBlock
+	SetBlock(*BasicBlock)
 
 	GetVariable() string
 	SetVariable(variable string)
-}
 
-// data flow graph node
+	// position
+	GetPosition() *Position
+	SetPosition(*Position)
+
+	// symbol-table
+	SetSymbolTable(*blockSymbolTable)
+	GetSymbolTable() *blockSymbolTable
+
+	// has left-value
+	HasLeftVariable() bool
+	GetLeftItem() LeftInstruction
+}
+type Users []User
+type Values []Value
+
+// data-flow
 type Node interface {
+	// string
 	String() string
 
-	GetType() Type
-
-	GetUsers() []User
-	GetValues() []Value
+	// for graph
+	HasUsers() bool
+	GetUsers() Users
+	HasValues() bool
+	GetValues() Values
 }
-
-type Value interface {
+type TypedNode interface {
 	Node
-
-	// user
-	AddUser(User)
-	RemoveUser(User)
-
 	// type
+	GetType() Type
 	SetType(Type)
 }
 
-type ValueCodeItem interface {
-	Value
-	CodeItem
+// basic handle item (interface)
+type Value interface {
+	LeftInstruction
+	TypedNode
+	AddUser(User)
+	RemoveUser(User)
+
+	SetType(Type)
+	GetType() Type
 }
 
 type User interface {
+	Instruction
 	Node
-
-	AddValue(Value)
-	RemoveValue(Value)
-
 	ReplaceValue(Value, Value)
 }
 
-type anCodeItem struct {
+type anInstruction struct {
+	fun    *Function
+	block  *BasicBlock
+	Pos    *Position
+	symbol *blockSymbolTable
+
 	variable string
-	Pos      *Position
+
+	// left
+	hasLeft   bool
+	variables []string
+	LeftPos   []*Position
 }
 
-func NewCodeItem() *anCodeItem {
-	return &anCodeItem{}
+func NewInstruction() anInstruction {
+	return anInstruction{}
 }
 
-func (c *anCodeItem) GetPosition() *Position {
-	return c.Pos
+// ssa function and block
+func (a *anInstruction) SetFunc(f *Function)        { a.fun = f }
+func (a *anInstruction) GetFunc() *Function         { return a.fun }
+func (a *anInstruction) SetBlock(block *BasicBlock) { a.block = block }
+func (a *anInstruction) GetBlock() *BasicBlock      { return a.block }
+
+// source code position
+func (c *anInstruction) GetPosition() *Position    { return c.Pos }
+func (c *anInstruction) SetPosition(pos *Position) { c.Pos = pos }
+
+// error logger
+func (c *anInstruction) NewError(kind ErrorKind, tag ErrorTag, msg string) {
+	c.GetFunc().NewErrorWithPos(kind, tag, c.GetPosition(), msg)
 }
 
-func (c *anCodeItem) SetPosition(pos *Position) {
-	c.Pos = pos
+// symbol-table
+func (a *anInstruction) GetSymbolTable() *blockSymbolTable       { return a.symbol }
+func (a *anInstruction) SetSymbolTable(symbol *blockSymbolTable) { a.symbol = symbol }
+
+// variable
+func (a *anInstruction) SetVariable(v string) { a.variable = v }
+func (a *anInstruction) GetVariable() string  { return a.variable }
+
+// has left-instruction
+func (a *anInstruction) HasLeftVariable() bool        { return a.hasLeft }
+func (a *anInstruction) GetLeftItem() LeftInstruction { return LeftInstruction(a) }
+
+// left-instruction: variable
+func (a *anInstruction) GetLeftVariables() []string { return a.variables }
+func (a *anInstruction) AddLeftVariables(name string) {
+	a.variables = append(a.variables, name)
 }
 
-func (c *anCodeItem) GetVariable() string {
-	return c.variable
+// left-instruction: left-position
+func (a *anInstruction) GetLeftPositions() []*Position { return a.LeftPos }
+func (a *anInstruction) GetLeftPosition() *Position {
+	if len(a.LeftPos) > 0 {
+		return a.LeftPos[len(a.LeftPos)-1]
+	} else {
+		return nil
+	}
+}
+func (a *anInstruction) AddLeftPositions(pos *Position) {
+	a.LeftPos = append(a.LeftPos, pos)
 }
 
-func (c *anCodeItem) SetVariable(variable string) {
-	if c.variable == "" {
-		c.variable = variable
+var _ Instruction = (*anInstruction)(nil)
+var _ LeftInstruction = (*anInstruction)(nil)
+
+type anValue struct {
+	typ  Type
+	user map[User]struct{}
+}
+
+func NewValue() anValue {
+	return anValue{
+		typ:  BasicTypes[Any],
+		user: make(map[User]struct{}),
 	}
 }
 
-var _ CodeItem = (*anCodeItem)(nil)
+func (n *anValue) String() string { return "" }
 
-type anNode struct {
-	user  map[User]struct{}
-	value map[Value]struct{}
-	// field map[*Field]struct{}
-}
+// has/get user and value
+func (n *anValue) HasUsers() bool  { return len(n.user) != 0 }
+func (n *anValue) GetUsers() Users { return lo.Keys(n.user) }
 
-func NewNode() anNode {
-	return anNode{
-		user:  make(map[User]struct{}),
-		value: make(map[Value]struct{}),
-	}
-}
+// for Value
+func (n *anValue) AddUser(u User)    { n.user[u] = struct{}{} }
+func (n *anValue) RemoveUser(u User) { delete(n.user, u) }
 
-func (n *anNode) GetUsers() []User {
-	return lo.Keys(n.user)
-}
-
-func (n *anNode) GetValues() []Value {
-	return lo.Keys(n.value)
-}
-
-func (n *anNode) AddUser(u User) {
-	n.user[u] = struct{}{}
-}
-
-func (n *anNode) AddValue(v Value) {
-	n.value[v] = struct{}{}
-}
-
-func (n *anNode) RemoveValue(v Value) {
-	delete(n.value, v)
-}
-func (n *anNode) RemoveUser(u User) {
-	delete(n.user, u)
-}
-
-// func (n *anNode) GetField() []*Field {
-// 	return lo.Keys(n.field)
-// }
-
-// func (n *anNode) AddField(f *Field) {
-// 	n.field[f] = struct{}{}
-// }
-
-// func (n *anNode) RemoveField(f *Field) {
-// 	delete(n.field, f)
-// }
-
-type Instruction interface {
-	CodeItem
-
-	GetParent() *Function
-	GetBlock() *BasicBlock
-
-	String() string
-	// asm
-	// ParseByString(string) *Function
-
-	// error
-	NewError(ErrorKind, ErrorTag, string, ...any)
-
-	// pos
-	Pos() string
-
-	SetSymbolTable(*blockSymbolTable)
-	GetSymbolTable() *blockSymbolTable
-}
+// for Value : type
+func (n *anValue) GetType() Type    { return n.typ }
+func (n *anValue) SetType(typ Type) { n.typ = typ }
 
 // both instruction and value
-type InstructionValue interface {
-	Instruction
-	ValueCodeItem
-
-	SetLeftPosition(*Position)
-	GetLeftPosition() *Position
-}
 type Program struct {
 	// package list
 	Packages []*Package
@@ -174,11 +207,8 @@ type Package struct {
 
 // implement Value
 type Function struct {
-	Name string
-
-	anCodeItem
-
-	Type *FunctionType
+	anInstruction
+	anValue
 
 	// package
 	Package *Package
@@ -197,17 +227,13 @@ type Function struct {
 	AnonFuncs []*Function
 
 	// if this function is anonFunc
-	parent     *Function // parent function if anonymous function; nil if global function.
-	FreeValues []Value   // the value, captured variable form parent-function,
-	symbol     *Make     // for function symbol table
-
-	// User
-	user []User
-	Pos  *Position // current position
+	parent       *Function // parent function if anonymous function; nil if global function.
+	FreeValues   []Value   // the value, captured variable form parent-function,
+	symbolObject *Make     // for function symbol table
 
 	// for instruction
 	InstReg     map[Instruction]string // instruction -> virtual register
-	symbolTable map[string][]ValueCodeItem
+	symbolTable map[string]map[*BasicBlock]Values
 
 	// extern lib
 	externInstance map[string]Value // lib and value
@@ -220,30 +246,15 @@ type Function struct {
 	builder *FunctionBuilder
 }
 
-func (f *Function) GetType() Type {
-	if f.Type == nil {
-		return BasicTypes[Null]
-	}
-	return f.Type
-}
-
-func (f *Function) SetType(t Type) {
-	if ft, ok := t.(*FunctionType); ok {
-		f.Type = ft
-	}
-}
-
 var _ Node = (*Function)(nil)
 var _ Value = (*Function)(nil)
-var _ ValueCodeItem = (*Function)(nil)
 
 // implement Value
 type BasicBlock struct {
-	anCodeItem
+	anInstruction
+	anValue
+
 	Index int
-	Name  string
-	// function
-	Parent *Function
 	// BasicBlock graph
 	Preds, Succs []*BasicBlock
 
@@ -259,17 +270,11 @@ type BasicBlock struct {
 	// error catch
 	Handler *ErrorHandler
 
-	// position
-	pos *Position
-
 	// for build
 	finish        bool // if emitJump finish!
 	isSealed      bool
 	inCompletePhi []*Phi // variable -> phi
 	Skip          bool   // for phi build, avoid recursive
-
-	// User
-	user []User
 }
 
 func (b *BasicBlock) GetType() Type {
@@ -281,71 +286,14 @@ func (b *BasicBlock) SetType(ts Type) {
 
 var _ Node = (*BasicBlock)(nil)
 var _ Value = (*BasicBlock)(nil)
-var _ ValueCodeItem = (*BasicBlock)(nil)
 
-type Position struct {
-	// SourceCodeFilePath *string
-	SourceCode  string
-	StartLine   int
-	StartColumn int
-	EndLine     int
-	EndColumn   int
-}
-
-type anInstruction struct {
-	anCodeItem
-
-	// function
-	Func *Function
-	// BasicBlock
-	Block       *BasicBlock
-	symbolTable *blockSymbolTable
-	// type
-	typs Type
-
-	leftPos *Position // for left variable
-}
-
-// implement instruction
-func (a *anInstruction) GetBlock() *BasicBlock                        { return a.Block }
-func (a *anInstruction) GetParent() *Function                         { return a.Func }
-func (a *anInstruction) SetSymbolTable(symbolTable *blockSymbolTable) { a.symbolTable = symbolTable }
-func (a *anInstruction) GetSymbolTable() *blockSymbolTable            { return a.symbolTable }
-func (a *anInstruction) Pos() string {
-	if a.anCodeItem.Pos != nil {
-		return a.anCodeItem.Pos.String()
-	} else {
-		return ""
-	}
-}
-func (a *anInstruction) GetType() Type {
-	t := a.typs
-	if t == nil {
-		return BasicTypes[Any]
-	}
-	return t
-}
-
-func (a *anInstruction) SetType(ts Type) {
-	a.typs = ts
-}
-
-func (a *anInstruction) SetLeftPosition(pos *Position) {
-	a.leftPos = pos
-}
-
-func (a *anInstruction) GetLeftPosition() *Position {
-	return a.leftPos
-}
-
-var _ CodeItem = (*anInstruction)(nil)
-
-// value
+// =========================================  Value ===============================
+// ================================= Spec Value
 
 // ----------- Phi
 type Phi struct {
 	anInstruction
-	anNode
+	anValue
 
 	Edge []Value // edge[i] from phi.Block.Preds[i]
 	//	what instruction create this control-flow merge?
@@ -359,97 +307,262 @@ var _ Node = (*Phi)(nil)
 var _ Value = (*Phi)(nil)
 var _ User = (*Phi)(nil)
 var _ Instruction = (*Phi)(nil)
-var _ InstructionValue = (*Phi)(nil)
+
+// ----------- Parameter
+type Parameter struct {
+	anValue
+	anInstruction
+
+	// pos *Position
+	variable    string
+	Func        *Function
+	IsFreeValue bool
+	//TODO: is modify , not cover
+	IsModify bool
+	typs     Type
+}
+
+var _ Node = (*Parameter)(nil)
+var _ Value = (*Parameter)(nil)
+
+// ================================= Normal Value
 
 // ----------- Const
 // ConstInst also have block pointer, which block set this const to variable
 type ConstInst struct {
 	*Const
 	anInstruction
+	anValue
+	Unary int
 }
 
-func (c *ConstInst) GetType() Type {
-	return c.Const.GetType()
-}
-
-func (c *ConstInst) SetType(ts Type) {
-	// c.typs = ts
-}
+// ConstInst cont set Type
+func (c *ConstInst) GetType() Type   { return c.Const.GetType() }
+func (c *ConstInst) SetType(ts Type) {}
 
 var _ Node = (*ConstInst)(nil)
 var _ Value = (*ConstInst)(nil)
-var _ User = (*ConstInst)(nil)
 var _ Instruction = (*ConstInst)(nil)
-var _ InstructionValue = (*ConstInst)(nil)
 
+// ----------- Undefine
 type Undefine struct {
 	anInstruction
-	anNode
+	anValue
 }
 
 var _ Node = (*Undefine)(nil)
 var _ Value = (*Undefine)(nil)
-var _ User = (*Undefine)(nil)
 var _ Instruction = (*Undefine)(nil)
-var _ InstructionValue = (*Undefine)(nil)
 
-// const only Value
-type Const struct {
-	anNode
-	value any
-	// only one type
-	typ Type
-	str string
-
-	// other
-	Unary int
+// ----------- BinOp
+type BinOp struct {
+	anInstruction
+	anValue
+	Op   BinaryOpcode
+	X, Y Value
 }
 
-// get type
-func (c *Const) GetType() Type {
-	t := c.typ
-	if t == nil {
-		t = BasicTypes[Any]
-	}
-	return t
+var _ Value = (*BinOp)(nil)
+var _ User = (*BinOp)(nil)
+var _ Node = (*BinOp)(nil)
+var _ Instruction = (*BinOp)(nil)
+
+type UnOp struct {
+	anValue
+
+	anInstruction
+
+	Op UnaryOpcode
+	X  Value
 }
 
-func (c *Const) SetType(ts Type) {
-	// const don't need set type
+var _ Value = (*UnOp)(nil)
+var _ User = (*UnOp)(nil)
+var _ Node = (*UnOp)(nil)
+var _ Instruction = (*UnOp)(nil)
+
+// ================================= Function Call
+
+// ----------- Call
+// call instruction call method function  with args as argument
+type Call struct {
+	anInstruction
+	// call is a value
+	anValue
+
+	// for call function
+	Method  Value
+	Args    []Value
+	binding []Value
+
+	// go function
+	Async  bool
+	Unpack bool
+
+	// caller
+	// caller Value
+	// ~ drop error
+	IsDropError bool
+	IsEllipsis  bool
 }
 
-// var _ Node = (*Const)(nil)
-// var _ Value = (*Const)(nil)
+var _ Node = (*Call)(nil)
+var _ Value = (*Call)(nil)
+var _ User = (*Call)(nil)
+var _ Instruction = (*Call)(nil)
 
-// ----------- Parameter
-type Parameter struct {
-	anNode
-	anCodeItem
-
-	// pos *Position
-	variable    string
-	Func        *Function
-	IsFreeValue bool
-	typs        Type
+// ----------- Return
+// The Return instruction returns values and control back to the calling
+// function.
+type Return struct {
+	anInstruction
+	Results []Value
 }
 
-func (p *Parameter) GetType() Type {
-	t := p.typs
-	if t == nil {
-		t = BasicTypes[Any]
-		p.SetType(t)
-	}
-	return t
+var _ Node = (*Return)(nil)
+var _ User = (*Return)(nil)
+var _ Instruction = (*Return)(nil)
+
+// ================================= Memory Value
+
+// ----------- Make
+type Make struct {
+	anInstruction
+	anValue
+
+	// when slice
+	low, high, step Value
+
+	parentI Value // parent interface
+
+	// when slice or map
+	Len, Cap Value
 }
 
-func (p *Parameter) SetType(ts Type) {
-	p.typs = ts
+var _ Node = (*Make)(nil)
+var _ Value = (*Make)(nil)
+var _ User = (*Make)(nil)
+var _ Instruction = (*Make)(nil)
+
+// instruction
+// ----------- Field
+type Field struct {
+	anInstruction
+	anValue
+
+	// field
+	Key Value
+	Obj Value
+	// this field is Obj[Key]
+
+	update []User
+	// all update for this Field, also contain this update in field.GetUser()
+
+	// Method or Field
+	IsMethod bool
+	// capture by other function
+	OutCapture bool
 }
 
-var _ Node = (*Parameter)(nil)
-var _ Value = (*Parameter)(nil)
-var _ ValueCodeItem = (*Parameter)(nil)
-var _ User = (*Parameter)(nil)
+var _ Node = (*Field)(nil)
+var _ Value = (*Field)(nil)
+var _ User = (*Field)(nil)
+var _ Instruction = (*Field)(nil)
+
+// ----------- Update
+type Update struct {
+	anInstruction
+
+	Value   Value
+	Address Value // this point to field
+}
+
+var _ Node = (*Update)(nil)
+var _ User = (*Update)(nil)
+var _ Instruction = (*Update)(nil)
+
+// ------------- Next
+type Next struct {
+	anInstruction
+	anValue
+	Iter   Value
+	InNext bool // "in" grammar
+}
+
+var _ Node = (*Next)(nil)
+var _ User = (*Next)(nil)
+var _ Value = (*Next)(nil)
+var _ Instruction = (*Next)(nil)
+
+// ================================= Assert Value
+
+// ----------- assert
+type Assert struct {
+	anInstruction
+
+	Cond     Value
+	Msg      string
+	MsgValue Value
+}
+
+var _ Node = (*Assert)(nil)
+var _ User = (*Assert)(nil)
+var _ Instruction = (*Assert)(nil)
+
+// ----------- Type-cast
+// cast value -> type
+type TypeCast struct {
+	anInstruction
+	anValue
+
+	Value Value
+}
+
+var _ Node = (*TypeCast)(nil)
+var _ Value = (*TypeCast)(nil)
+var _ User = (*TypeCast)(nil)
+var _ Instruction = (*TypeCast)(nil)
+
+// ------------- type value
+type TypeValue struct {
+	anInstruction
+	anValue
+}
+
+var _ Node = (*TypeValue)(nil)
+var _ Value = (*TypeValue)(nil)
+var _ Instruction = (*TypeValue)(nil)
+
+// ================================= Error Handler
+
+// ------------- ErrorHandler
+type ErrorHandler struct {
+	anInstruction
+	try, catch, final, done *BasicBlock
+}
+
+var _ Instruction = (*ErrorHandler)(nil)
+
+// -------------- PANIC
+type Panic struct {
+	anInstruction
+	anValue
+	Info Value
+}
+
+var _ Node = (*Panic)(nil)
+var _ User = (*Panic)(nil)
+var _ Instruction = (*Panic)(nil)
+
+// --------------- RECOVER
+type Recover struct {
+	anInstruction
+	anValue
+}
+
+var _ Node = (*Recover)(nil)
+var _ Value = (*Recover)(nil)
+var _ Instruction = (*Recover)(nil)
 
 // control-flow instructions  ----------------------------------------
 // jump / if / return / call / switch
@@ -472,6 +585,7 @@ var _ Instruction = (*Jump)(nil)
 // true, the second if false.
 type If struct {
 	anInstruction
+
 	Cond  Value
 	True  *BasicBlock
 	False *BasicBlock
@@ -489,55 +603,12 @@ type Loop struct {
 	Body, Exit *BasicBlock
 
 	Init, Cond, Step Value
-	Key              *Phi
+	Key              Value
 }
 
 var _ Node = (*Loop)(nil)
 var _ User = (*Loop)(nil)
 var _ Instruction = (*Loop)(nil)
-
-// ----------- Return
-// The Return instruction returns values and control back to the calling
-// function.
-type Return struct {
-	anInstruction
-	Results []Value
-}
-
-var _ Node = (*Return)(nil)
-var _ User = (*Return)(nil)
-var _ Instruction = (*Return)(nil)
-
-// ----------- Call
-// call instruction call method function  with args as argument
-type Call struct {
-	anInstruction
-	// call is a value
-	anNode
-
-	// for call function
-	Method Value
-	Args   []Value
-
-	// go function
-	Async bool
-
-	binding []Value
-
-	Unpack bool
-
-	// caller
-	// caller Value
-	// ~ drop error
-	IsDropError bool
-	IsEllipsis  bool
-}
-
-var _ Node = (*Call)(nil)
-var _ Value = (*Call)(nil)
-var _ User = (*Call)(nil)
-var _ Instruction = (*Call)(nil)
-var _ InstructionValue = (*Call)(nil)
 
 // ----------- Switch
 type SwitchLabel struct {
@@ -564,234 +635,3 @@ type Switch struct {
 var _ Node = (*Switch)(nil)
 var _ User = (*Switch)(nil)
 var _ Instruction = (*Switch)(nil)
-
-// data-flow instructions  ----------------------------------------
-// BinOp / UnOp
-
-type BinaryOpcode int
-
-const (
-	// Binary
-	OpShl BinaryOpcode = iota // <<
-
-	OpLogicAnd // &&
-	OpLogicOr  // ||
-
-	OpShr    // >>
-	OpAnd    // &
-	OpAndNot // &^
-	OpOr     // |
-	OpXor    // ^
-	OpAdd    // +
-	OpSub    // -
-	OpDiv    // /
-	OpMod    // %
-	// mul
-	OpMul // *
-
-	// boolean opcode
-	OpGt    // >
-	OpLt    // <
-	OpGtEq  // >=
-	OpLtEq  // <=
-	OpEq    // ==
-	OpNotEq // != <>
-	OpIn    //  a in b
-
-	OpSend // <-
-)
-
-// ----------- BinOp
-type BinOp struct {
-	anInstruction
-	anNode
-	Op   BinaryOpcode
-	X, Y Value
-}
-
-var _ Value = (*BinOp)(nil)
-var _ User = (*BinOp)(nil)
-var _ Node = (*BinOp)(nil)
-var _ Instruction = (*BinOp)(nil)
-var _ InstructionValue = (*BinOp)(nil)
-
-type UnaryOpcode int
-
-const (
-	OpNone       UnaryOpcode = iota
-	OpNot                    // !
-	OpPlus                   // +
-	OpNeg                    // -
-	OpChan                   // <-
-	OpBitwiseNot             // ^
-)
-
-type UnOp struct {
-	anNode
-
-	anInstruction
-
-	Op UnaryOpcode
-	X  Value
-}
-
-var _ Value = (*UnOp)(nil)
-var _ User = (*UnOp)(nil)
-var _ Node = (*UnOp)(nil)
-var _ Instruction = (*UnOp)(nil)
-var _ InstructionValue = (*UnOp)(nil)
-
-// special instruction ------------------------------------------
-
-// ----------- Make
-// instruction + value + user
-// use-chain: *interface(self) -> multiple field(value)
-type Make struct {
-	anInstruction
-	anNode
-
-	// when slice
-	low, high, step Value
-
-	parentI User // parent interface
-
-	IsNew bool
-
-	// when slice or map
-	Len, Cap Value
-}
-
-var _ Node = (*Make)(nil)
-var _ Value = (*Make)(nil)
-var _ User = (*Make)(nil)
-var _ Instruction = (*Make)(nil)
-var _ InstructionValue = (*Make)(nil)
-
-// instruction
-// ----------- Field
-// use-chain: interface(user) -> *field(self) -> multiple update(value) -> value
-type Field struct {
-	anInstruction
-	anNode
-
-	// field
-	Key Value
-	Obj User
-
-	// Method or Field
-	IsMethod bool
-
-	// capture by other function
-	OutCapture bool
-
-	// Update []Value // value
-
-	//TODO:map[users]update
-	// i can add the map[users]update,
-	// to point what update value when user use this field
-
-}
-
-var _ Node = (*Field)(nil)
-var _ Value = (*Field)(nil)
-var _ User = (*Field)(nil)
-var _ Instruction = (*Field)(nil)
-var _ InstructionValue = (*Field)(nil)
-
-// ----------- Update
-// use-chain: field(user) -> *update -> value
-type Update struct {
-	anInstruction
-
-	Value   Value
-	Address User
-}
-
-var _ Node = (*Update)(nil)
-var _ Value = (*Update)(nil)
-var _ User = (*Update)(nil)
-var _ Instruction = (*Update)(nil)
-var _ InstructionValue = (*Update)(nil)
-
-// ----------- Type-cast
-// cast value -> type
-type TypeCast struct {
-	anInstruction
-	anNode
-
-	Value Value
-}
-
-var _ Node = (*TypeCast)(nil)
-var _ Value = (*TypeCast)(nil)
-var _ User = (*TypeCast)(nil)
-var _ Instruction = (*TypeCast)(nil)
-var _ InstructionValue = (*TypeCast)(nil)
-
-// ------------- type value
-type TypeValue struct {
-	anInstruction
-	anNode
-}
-
-var _ Node = (*TypeValue)(nil)
-var _ Value = (*TypeValue)(nil)
-var _ User = (*TypeValue)(nil)
-var _ Instruction = (*TypeValue)(nil)
-var _ InstructionValue = (*TypeValue)(nil)
-
-// ----------- assert
-type Assert struct {
-	anInstruction
-	Cond     Value
-	Msg      string
-	MsgValue Value
-}
-
-var _ Node = (*Assert)(nil)
-var _ User = (*Assert)(nil)
-var _ Instruction = (*Assert)(nil)
-
-// ------------- Next
-type Next struct {
-	anInstruction
-	anNode
-	Iter   Value
-	InNext bool // "in" grammar
-}
-
-var _ Node = (*Next)(nil)
-var _ User = (*Next)(nil)
-var _ Value = (*Next)(nil)
-var _ Instruction = (*Next)(nil)
-var _ InstructionValue = (*Next)(nil)
-
-// ------------- ErrorHandler
-type ErrorHandler struct {
-	anInstruction
-	try, catch, final, done *BasicBlock
-}
-
-var _ Instruction = (*ErrorHandler)(nil)
-
-// -------------- PANIC
-type Panic struct {
-	anInstruction
-	anNode
-	Info Value
-}
-
-var _ Node = (*Panic)(nil)
-var _ User = (*Panic)(nil)
-var _ Instruction = (*Panic)(nil)
-
-// --------------- RECOVER
-type Recover struct {
-	anInstruction
-	anNode
-}
-
-var _ Node = (*Recover)(nil)
-var _ Value = (*Recover)(nil)
-var _ User = (*Recover)(nil)
-var _ Instruction = (*Recover)(nil)
