@@ -455,6 +455,12 @@ func InterfaceToInt(i any) int {
 		return 0
 	}
 	switch ret := i.(type) {
+	case bool:
+		if ret {
+			return 1
+		} else {
+			return 0
+		}
 	case int:
 		return ret
 	case int64:
