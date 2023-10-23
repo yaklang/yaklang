@@ -124,7 +124,7 @@ func TestErrorf(t *testing.T) {
 func TestJoin(t *testing.T) {
 	t.Run("two-errors", func(t *testing.T) {
 		err := io.EOF
-		err = Join(err, io.ErrUnexpectedEOF)
+		err = JoinErrors(err, io.ErrUnexpectedEOF)
 		if !errors.Is(err, io.EOF) {
 			t.Errorf("expected %v to contain %v", err, io.EOF)
 		}
@@ -136,7 +136,7 @@ func TestJoin(t *testing.T) {
 
 	t.Run("nil", func(t *testing.T) {
 		var err error = nil
-		err = Join(err, nil)
+		err = JoinErrors(err, nil)
 		if !errors.Is(err, nil) {
 			t.Errorf("expected nil but got %v", err)
 		}

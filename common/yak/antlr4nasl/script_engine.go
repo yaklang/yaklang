@@ -452,7 +452,7 @@ func (e *ScriptEngine) Scan(host string, ports string) error {
 		err := runScriptWithDep(script)
 		if err != nil {
 			log.Errorf("run script %s met error: %s", script.OriginFileName, err)
-			allErrors = utils.Join(allErrors, err)
+			allErrors = utils.JoinErrors(allErrors, err)
 		}
 	}
 	if !errors.Is(allErrors, nil) {
