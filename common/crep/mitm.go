@@ -193,20 +193,13 @@ func (m *MITMServer) Serve(ctx context.Context, addr string) error {
 		return utils.Errorf("mitm transport empty")
 	}
 
-	originHttpTransport := m.httpTransport
-	m.proxy.SetDownstreamProxy(m.proxyUrl)
+	//m.proxy.SetDownstreamProxy(m.proxyUrl)
 	m.proxy.SetH2(m.http2)
 	if m.proxyAuth != nil {
 		m.proxy.SetAuth(m.proxyAuth.Username, m.proxyAuth.Password)
 	}
 
-	traceTr := &httpTraceTransport{
-		Transport: originHttpTransport,
-	}
-
 	var config []lowhttp.LowhttpOpt
-
-	traceTr.config = config
 
 	if m.proxyUrl != nil {
 		config = append(config, lowhttp.WithProxy(m.proxyUrl.String()))
@@ -217,8 +210,6 @@ func (m *MITMServer) Serve(ctx context.Context, addr string) error {
 	}
 
 	m.proxy.SetLowhttpConfig(config)
-
-	m.proxy.SetRoundTripper(traceTr)
 	m.proxy.SetGMTLS(m.gmtls)
 	m.proxy.SetGMPrefer(m.gmPrefer)
 	m.proxy.SetGMOnly(m.gmOnly)
