@@ -160,7 +160,8 @@ func TestEscape(t *testing.T) {
 		{"\\{{echo(1)}}", "\\1"},                   // 标签外不转义
 		{"\\{{echo(1)\\}}", "\\{{echo(1)\\}}"},     // {{之后开始tag语法，需要转义，\}}转义后不能作为标签闭合符号，导致标签解析失败，原文输出
 		{"\\{{echo(1)\\}}}}", "\\{{echo(1)\\}}}}"}, // 标签解析成功，但由于标签内数据`echo(1)}`编译失败，导致原文输出
-		{`{{echo({{echo(\\\\)}})}}`, `\\`},         // 多层标签嵌套转义
+		//{`{{echo({{echo(\\\\)}})}}`, `\\`},         // 多层标签嵌套转义
+		{`{{echo({{echo(\\)}})}}`, `\\`}, // \不转义
 	} {
 		res, err := ExecuteWithStringHandler(v[0], map[string]func(string2 string) []string{
 			"echo": func(s string) []string {

@@ -2,6 +2,7 @@ package parser
 
 import (
 	"github.com/yaklang/yaklang/common/utils"
+	"strings"
 )
 
 type fuzztagPos struct {
@@ -97,9 +98,18 @@ func Parse(raw string, tagTypes ...*TagDefine) ([]Node, error) {
 		return
 	}
 
-	escapersMap := map[*TagDefine]*Escaper{}
+	//escapersMap := map[*TagDefine]*Escaper{}
+	//for _, tagType := range tagTypes {
+	//	escapersMap[tagType] = NewDefaultEscaper(escapeSymbol, tagType.start, tagType.end)
+	//}
+	escapersMap := map[*TagDefine]func(s string) string{}
 	for _, tagType := range tagTypes {
-		escapersMap[tagType] = NewDefaultEscaper(escapeSymbol, tagType.start, tagType.end)
+		tagType := tagType
+		escapersMap[tagType] = func(s string) string {
+			s = strings.Replace(s, escapeSymbol+tagType.start, tagType.start, -1)
+			s = strings.Replace(s, escapeSymbol+tagType.end, tagType.end, -1)
+			return s
+		}
 	}
 	// 根据标签位位置信息解析tag
 	var newDatasFromPos func(start, end int, tagType *TagDefine, poss []*fuzztagPos, deep int) []Node
@@ -110,7 +120,7 @@ func Parse(raw string, tagTypes ...*TagDefine) ([]Node, error) {
 		if deep > 0 {
 			addRes = func(s Node) {
 				if v, ok := s.(StringNode); ok && tagType != nil {
-					v1, _ := escapersMap[tagType].Unescape(string(v))
+					v1 := escapersMap[tagType](string(v))
 					res = append(res, StringNode(v1))
 				} else {
 					res = append(res, s)
