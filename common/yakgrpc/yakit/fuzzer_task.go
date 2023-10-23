@@ -109,7 +109,7 @@ func (w *WebFuzzerTask) ToGRPCModelDetail() *ypb.HistoryHTTPFuzzerTaskDetail {
 // Deprecated
 func QueryFirst50WebFuzzerTask(db *gorm.DB) []*ypb.HistoryHTTPFuzzerTask {
 	var task []*WebFuzzerTask
-	if db := db.Model(&WebFuzzerTask{}).Where("id = retry_root_id").Order("created_at desc").Find(&task); db.Error != nil {
+	if db := db.Model(&WebFuzzerTask{}).Where("id = retry_root_id or retry_root_id is null or retry_root_id = 0").Order("created_at desc").Find(&task); db.Error != nil {
 		log.Errorf("query web fuzzer task failed: %s", db.Error)
 		return nil
 	} else {
@@ -144,7 +144,7 @@ func QueryFuzzerHistoryTasks(db *gorm.DB, req *ypb.QueryHistoryHTTPFuzzerTaskExP
 	}
 
 	// 返回的任务跳过重试的任务
-	db = db.Where("id = retry_root_id")
+	db = db.Where("id = retry_root_id or retry_root_id is null or retry_root_id = 0")
 
 	var (
 		returnTasks, tasks []*WebFuzzerTask
