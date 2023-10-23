@@ -2,9 +2,11 @@ package yak
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/fuzztag"
+	"github.com/yaklang/yaklang/common/fuzztagx/parser"
 	"github.com/yaklang/yaklang/common/yak/yaklib/yakhttp"
 	"net/http"
 	"strings"
@@ -47,37 +49,28 @@ func Fuzz_WithHotPatch(ctx context.Context, code string) mutate.FuzzConfigOpt {
 			return []string{s}
 		})
 	}
-	return mutate.Fuzz_WithExtraFuzzTagHandlerEx("yak", func(s string) (result []*fuzztag.FuzzExecResult) {
-
+	return mutate.Fuzz_WithExtraFuzzErrorTagHandler("yak", func(s string) (result []*parser.FuzzResult, err error) {
 		var handle, params, _ = strings.Cut(s, "|")
-		pushNewResult := func(d []byte, verbose []string) {
-			result = append(result, fuzztag.NewFuzzExecResult(d, verbose))
-		}
 
 		defer func() {
 			if r := recover(); r != nil {
-				if err, ok := r.(*yakvm.VMPanic); ok {
-					errInfo := fmt.Sprintf("%s%v", fuzztag.YakHotPatchErr, err.GetData())
-					pushNewResult([]byte(errInfo), []string{errInfo})
-					log.Errorf("call hotPatch code error: %v", err.GetData())
+				if e, ok := r.(*yakvm.VMPanic); ok {
+					log.Errorf("call hotPatch code error: %v", e.GetData())
+					err = fmt.Errorf("%v", e.GetData())
 				}
 			}
 		}()
 		yakVar, ok := codeEnv.GetVar(handle)
 		if !ok {
 			errorStr := spew.Sprintf("function %s not found", handle)
-			errInfo := fmt.Sprintf("%s%s", fuzztag.YakHotPatchErr, errorStr)
-			pushNewResult([]byte(errInfo), []string{errInfo})
 			log.Errorf("call hotPatch code error: %s", errorStr)
-			return result
+			return nil, errors.New(errorStr)
 		}
 		yakFunc, ok := yakVar.(*yakvm.Function)
 		if !ok {
 			errorStr := spew.Sprintf("function %s not found", handle)
-			errInfo := fmt.Sprintf("%s%s", fuzztag.YakHotPatchErr, errorStr)
-			pushNewResult([]byte(errInfo), []string{errInfo})
 			log.Errorf("call hotPatch code error: %s", errorStr)
-			return result
+			return nil, errors.New(errorStr)
 		}
 		iparams := []any{}
 		if yakFunc.IsVariableParameter() {
@@ -101,21 +94,19 @@ func Fuzz_WithHotPatch(ctx context.Context, code string) mutate.FuzzConfigOpt {
 		data, err := codeEnv.CallYakFunction(ctx, handle, iparams)
 		if err != nil {
 			errInfo := fmt.Sprintf("%s%s", fuzztag.YakHotPatchErr, err.Error())
-			pushNewResult([]byte(errInfo), []string{errInfo})
 			log.Errorf("call hotPatch code error: %s", err)
-			return result
+			return nil, errors.New(errInfo)
 		}
 		if data == nil {
 			errInfo := fmt.Sprintf("%s%s", fuzztag.YakHotPatchErr, "return nil")
-			pushNewResult([]byte(errInfo), []string{errInfo})
 			log.Errorf("call hotPatch code error: %s", "return nil")
-			return result
+			return result, errors.New(errInfo)
 		}
 		res := utils.InterfaceToStringSlice(data)
 		for _, item := range res {
-			pushNewResult([]byte(item), []string{})
+			result = append(result, parser.NewFuzzResultWithData(item))
 		}
-		return result
+		return result, nil
 	})
 }
 

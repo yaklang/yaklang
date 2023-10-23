@@ -7,22 +7,23 @@ import (
 )
 
 type FuzzResult struct {
-	source  []any // []*FuzzResult | [][]byte
-	data    any   // []byte | string
-	byTag   bool
-	verbose string
-	contact bool
+	Source  []any // []*FuzzResult | [][]byte
+	Data    any   // []byte | string
+	ByTag   bool
+	Verbose string
+	Contact bool
+	Error   error
 }
 
 func NewFuzzResultWithData(d any) *FuzzResult {
 	return &FuzzResult{
-		data: d,
+		Data: d,
 	}
 }
 func NewFuzzResultWithDataVerbose(d any, v string) *FuzzResult {
 	return &FuzzResult{
-		data:    d,
-		verbose: v,
+		Data:    d,
+		Verbose: v,
 	}
 }
 func NewFuzzResult() *FuzzResult {
@@ -30,7 +31,7 @@ func NewFuzzResult() *FuzzResult {
 }
 
 func (f *FuzzResult) GetData() []byte {
-	switch ret := f.data.(type) {
+	switch ret := f.Data.(type) {
 	case []byte:
 		return ret
 	case string:
@@ -41,19 +42,19 @@ func (f *FuzzResult) GetData() []byte {
 }
 func (f *FuzzResult) GetVerbose() []string {
 	var verboses []string
-	for _, datum := range f.source {
+	for _, datum := range f.Source {
 		switch ret := datum.(type) {
 		case *FuzzResult:
 			verboses = append(verboses, ret.GetVerbose()...)
 		}
 	}
-	if !f.byTag {
+	if !f.ByTag {
 		return verboses
 	}
-	if f.verbose == "" {
-		f.verbose = utils.InterfaceToString(f.data)
+	if f.Verbose == "" {
+		f.Verbose = utils.InterfaceToString(f.Data)
 	}
-	return append([]string{f.verbose}, verboses...)
+	return append([]string{f.Verbose}, verboses...)
 }
 
 type TagMethod struct {

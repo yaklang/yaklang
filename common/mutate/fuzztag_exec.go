@@ -47,6 +47,15 @@ func Fuzz_WithExtraFuzzTagHandlerEx(tag string, handler func(string) []*fuzztag.
 	}
 }
 
+func Fuzz_WithExtraFuzzErrorTagHandler(tag string, handler func(string) ([]*parser.FuzzResult, error)) FuzzConfigOpt {
+	return func(config *FuzzTagConfig) {
+		config.tagMethodMap[tag] = &parser.TagMethod{
+			Name: tag,
+			Fun:  handler,
+		}
+	}
+}
+
 func Fuzz_WithResultHandler(handler func(string, []string) bool) FuzzConfigOpt {
 	return func(config *FuzzTagConfig) {
 		config.resultHandler = handler
@@ -92,14 +101,12 @@ func FuzzTagExec(input interface{}, opts ...FuzzConfigOpt) (_ []string, err erro
 	}
 	var res []string
 	for generator.Next() {
-		if generator.Error != nil {
-			return res, generator.Error
-		}
 		result := generator.Result()
 		data := result.GetData()
 		res = append(res, string(data))
 		if config.resultHandler != nil {
-			if !config.resultHandler(string(data), result.GetVerbose()) {
+			verbose := fuzztagx.GetResultVerbose(result)
+			if !config.resultHandler(string(data), verbose) {
 				return res, nil
 			}
 		}

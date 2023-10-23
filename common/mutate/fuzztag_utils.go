@@ -181,10 +181,7 @@ func fuzzpass(i string, level int) []string {
 
 // 解析失败会panic，只能在fuzztagx中使用
 func atoi(s string) int {
-	v, err := strconv.Atoi(s)
-	if err != nil {
-		panic(err)
-	}
+	v, _ := strconv.Atoi(s)
 	return v
 }
 
