@@ -121,7 +121,7 @@ func TestErrorf(t *testing.T) {
 // 	}
 // }
 
-func TestJoin(t *testing.T) {
+func TestJoinErrors(t *testing.T) {
 	t.Run("two-errors", func(t *testing.T) {
 		err := io.EOF
 		err = JoinErrors(err, io.ErrUnexpectedEOF)
