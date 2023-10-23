@@ -31,7 +31,7 @@ func Errorf(format string, args ...interface{}) error {
 	}
 }
 
-func Join(errs ...error) error {
+func JoinErrors(errs ...error) error {
 	errs = lo.Filter(errs, func(err error, _ int) bool {
 		return err != nil
 	})

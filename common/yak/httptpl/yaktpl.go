@@ -136,7 +136,7 @@ func (y *YakTemplate) SignMainParams() string {
 func (y *YakTemplate) CheckTemplateRisks() error {
 	var errs error = nil
 	addErrorMsg := func(msg string) {
-		errs = utils.Join(errs, errors.New(msg))
+		errs = utils.JoinErrors(errs, errors.New(msg))
 	}
 	hasMatcherOrExtractor := false
 	for _, sequence := range y.HTTPRequestSequences {
