@@ -21,6 +21,7 @@ type IdentifierLV struct {
 }
 
 func (i *IdentifierLV) Assign(v Value, f *FunctionBuilder) {
+	v.AddLeftPosition(i.GetPosition())
 	f.WriteVariable(i.variable, v)
 }
 
@@ -64,7 +65,7 @@ func (f *Function) WriteVariable(variable string, value Value) {
 	f.WriteSymbolTable(variable, value)
 }
 
-func (f *Function) ReplaceSymbolTable(v ValueCodeItem, to Value) {
+func (f *Function) ReplaceSymbolTable(v, to Value) {
 	variable := v.GetVariable()
 	// remove
 	if t, ok := f.symbolTable[variable]; ok {
@@ -74,33 +75,25 @@ func (f *Function) ReplaceSymbolTable(v ValueCodeItem, to Value) {
 }
 
 func (f *Function) WriteSymbolTable(variable string, value Value) {
-	var v ValueCodeItem
-	switch value := value.(type) {
-	case ValueCodeItem:
-		v = value
-	case *Const:
-		v = &ConstInst{
-			Const:         value,
-			anInstruction: newAnInstruction(f.builder.CurrentBlock),
-		}
-	default:
-		return
-	}
-
-	if utils.IsNil(v) {
+	if utils.IsNil(value) {
 		return
 	}
 
 	list, ok := f.symbolTable[variable]
 	if !ok {
-		list = make([]ValueCodeItem, 0, 1)
+		list = make([]Value, 0, 1)
 	}
-	list = append(list, v)
+	pos := value.GetPosition()
+	_ = pos
+	list = append(list, value)
 	sort.Slice(list, func(i, j int) bool {
-		return list[i].GetPosition().StartLine > list[j].GetPosition().StartLine
+		// return list[i].GetPosition().StartLine > list[j].GetPosition().StartLine
+		iPos := list[i].GetPosition()
+		jPos := list[j].GetPosition()
+		return iPos.StartLine > jPos.StartLine
 	})
 	f.symbolTable[variable] = list
-	v.SetVariable(variable)
+	value.AddLeftVariables(variable)
 }
 
 func (b *FunctionBuilder) ReplaceVariable(variable string, v, to Value) {
@@ -156,6 +149,7 @@ func (b *FunctionBuilder) readVariableByBlock(variable string, block *BasicBlock
 	if !block.isSealed {
 		if create {
 			phi := NewPhi(block, variable, create)
+			phi.SetPosition(b.CurrentPos)
 			block.inCompletePhi = append(block.inCompletePhi, phi)
 			v = phi
 		}
@@ -166,8 +160,9 @@ func (b *FunctionBuilder) readVariableByBlock(variable string, block *BasicBlock
 		} else if i := b.TryBuildExternValue(variable); i != nil {
 			v = i
 		} else if create {
-			un := NewUndefine(variable, block)
-			EmitInst(un)
+			un := NewUndefine(variable)
+			// b.emitInstructionBefore(un, block.LastInst())
+			b.emitToBlock(un, block)
 			v = un
 		} else {
 			v = nil
@@ -175,9 +170,10 @@ func (b *FunctionBuilder) readVariableByBlock(variable string, block *BasicBlock
 	} else if len(block.Preds) == 1 {
 		v = b.readVariableByBlock(variable, block.Preds[0], create)
 	} else {
-		v = NewPhi(block, variable, create).Build()
+		phi := NewPhi(block, variable, create)
+		phi.SetPosition(b.CurrentPos)
+		v = phi.Build()
 	}
-	// if _, ok := v.(*Undefine); !ok && v != nil {
 	if v != nil {
 		b.writeVariableByBlock(variable, v, block)
 	}
@@ -220,7 +216,7 @@ func (f *FunctionBuilder) GetVariableBefore(name string, before Instruction) Val
 		for _, iv := range ivs {
 			if iv.GetPosition().StartLine < before.GetPosition().StartLine {
 				if ci, ok := iv.(*ConstInst); ok {
-					return ci.Const
+					return ci
 				} else {
 					return iv
 				}

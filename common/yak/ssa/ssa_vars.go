@@ -3,9 +3,9 @@ package ssa
 type InspectVariableResult struct {
 	VariableName   string
 	ProbablyTypes  []string
-	ProbablyValues []ValueCodeItem
+	ProbablyValues Values
 	MustTypes      []string
-	MustValue      []ValueCodeItem
+	MustValue      Values
 }
 
 func (r *InspectVariableResult) Merge(other *InspectVariableResult) {
@@ -23,9 +23,10 @@ func (p *Program) InspectVariableLast(varName string) *InspectVariableResult {
 	for _, pkg := range p.Packages {
 		for _, funcIns := range pkg.Funcs {
 			if res, ok := funcIns.symbolTable[varName]; ok {
-				last := res[len(res)-1]
-				result.ProbablyTypes = append(result.ProbablyTypes, last.GetType().String())
-				result.ProbablyValues = append(result.ProbablyValues, last)
+				_ = res
+				// last := res[len(res)-1]
+				// result.ProbablyTypes = append(result.ProbablyTypes, last.GetType().String())
+				// result.ProbablyValues = append(result.ProbablyValues, last)
 			}
 		}
 	}
@@ -58,21 +59,22 @@ func (f *Function) InspectVariable(varName string) *InspectVariableResult {
 		return result
 	}
 	var probablyTypes []string
-	var probablyValue []ValueCodeItem
-	var mustValue []ValueCodeItem
+	var probablyValue Values
+	var mustValue Values
 	var mustTypes []string
 	values := make([]Value, 0)
 	for _, v := range res {
-		values = append(values, v)
-		probablyValue = append(probablyValue, v)
-		probablyTypes = append(probablyTypes, v.GetType().String())
-		if inst, ok := v.(Instruction); ok {
-			reachable := inst.GetBlock().Reachable()
-			if reachable == 1 {
-				mustTypes = append(mustTypes, v.GetType().String())
-				mustValue = append(mustValue, v)
-			}
-		}
+		_ = v
+		// values = append(values, v)
+		// probablyValue = append(probablyValue, v)
+		// probablyTypes = append(probablyTypes, v.GetType().String())
+		// if inst, ok := v.(Instruction); ok {
+		// 	reachable := inst.GetBlock().Reachable()
+		// 	if reachable == 1 {
+		// 		mustTypes = append(mustTypes, v.GetType().String())
+		// 		mustValue = append(mustValue, v)
+		// 	}
+		// }
 	}
 	result.ProbablyTypes = probablyTypes
 	result.ProbablyValues = probablyValue

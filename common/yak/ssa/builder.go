@@ -112,6 +112,9 @@ func (b *FunctionBuilder) Finish() {
 // handler position: set new position and return original position for backup
 func (b *FunctionBuilder) SetPosition(pos *Position) *Position {
 	backup := b.CurrentPos
+	if b.CurrentBlock.GetPosition() == nil {
+		b.CurrentBlock.SetPosition(pos)
+	}
 	b.CurrentPos = pos
 	return backup
 }

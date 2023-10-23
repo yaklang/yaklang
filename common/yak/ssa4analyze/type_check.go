@@ -40,17 +40,16 @@ func (t *TypeCheck) Analyze(config config, prog *ssa.Program) {
 }
 
 func (t *TypeCheck) CheckOnInstruction(inst ssa.Instruction) {
-
-	if v, ok := inst.(ssa.InstructionValue); ok {
+	if v, ok := inst.(ssa.Value); ok {
 		switch v.GetType().GetTypeKind() {
 		case ssa.ErrorType:
 			variable := v.GetVariable()
-			if len(ssa.GetUserOnly(v)) == 0 && variable != "_" && variable != "" {
-				if pos := v.GetLeftPosition(); pos == nil {
-					v.NewError(ssa.Error, TypeCheckTAG, ErrorUnhandled())
-				} else {
-					v.GetParent().NewErrorWithPos(ssa.Error, TypeCheckTAG, pos, ErrorUnhandled())
-				}
+			if len(v.GetValues()) == 0 && variable != "_" && variable != "" {
+				// if pos := v.GetLeftPosition(); pos == nil {
+				// 	v.NewError(ssa.Error, TypeCheckTAG, ErrorUnhandled())
+				// } else {
+				// 	v.GetParent().NewErrorWithPos(ssa.Error, TypeCheckTAG, pos, ErrorUnhandled())
+				// }
 			}
 		default:
 		}
@@ -102,7 +101,7 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 		}
 		str := ""
 		if f, ok := c.Method.(*ssa.Function); ok {
-			str = f.Name
+			str = f.GetVariable()
 		} else if funcTyp.Name != "" {
 			str = funcTyp.Name
 		}
@@ -146,9 +145,9 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 				f := ssa.GetField(c, ssa.NewConst(len(objType.FieldTypes)-1))
 				if f == nil {
 					// c.NewError(ssa.Error, TypeCheckTAG, ErrorUnhandled())
-					c.Func.NewErrorWithPos(ssa.Error, TypeCheckTAG, c.GetLeftPosition(),
-						ErrorUnhandledWithType(c.GetType().String()),
-					)
+					// // c.GetFunc().NewErrorWithPos(ssa.Error, TypeCheckTAG, c.GetLeftPosition(),
+					// 	ErrorUnhandledWithType(c.GetType().String()),
+					// )
 				} else {
 					if f.GetVariable() == "" {
 						f.SetVariable(c.GetVariable() + ".error")

@@ -2,41 +2,46 @@ package ssa
 
 func NewPhi(block *BasicBlock, variable string, create bool) *Phi {
 	p := &Phi{
-		anInstruction: newAnInstruction(block),
-		anNode:        NewNode(),
+		anInstruction: NewInstruction(),
+		anValue:       NewValue(),
 		Edge:          make([]Value, 0, len(block.Preds)),
 		create:        create,
 	}
 	p.SetVariable(variable)
+	p.SetBlock(block)
+	p.SetFunc(block.GetFunc())
 	return p
 }
 
 func (b *BasicBlock) Sealed() {
 	for _, p := range b.inCompletePhi {
 		v := p.Build()
-		if inst, ok := v.(Instruction); ok {
-			inst.SetPosition(p.GetPosition())
-		}
+		v.SetPosition(p.GetPosition())
 	}
 	b.inCompletePhi = nil
 	b.isSealed = true
 }
 
+func (p *Phi) AddEdge(v Value) {
+	p.Edge = append(p.Edge, v)
+}
+
 func (phi *Phi) Name() string { return phi.GetVariable() }
 
 func (phi *Phi) Build() Value {
-	phi.Block.Skip = true
-	for _, predBlock := range phi.Block.Preds {
-		v := phi.Func.builder.readVariableByBlock(phi.GetVariable(), predBlock, phi.create)
+	phi.GetBlock().Skip = true
+	for _, predBlock := range phi.GetBlock().Preds {
+		v := phi.GetFunc().builder.readVariableByBlock(phi.GetVariable(), predBlock, phi.create)
 		phi.Edge = append(phi.Edge, v)
 	}
-	phi.Block.Skip = false
+	phi.GetBlock().Skip = false
+	// phi.SetPosition(phi.GetBlock().GetPosition())
 	v := phi.tryRemoveTrivialPhi()
 	if v == phi {
-		block := phi.Block
+		block := phi.GetBlock()
 		block.Phis = append(block.Phis, phi)
-		phi.Func.SetReg(phi)
-		phi.Func.WriteSymbolTable(phi.GetVariable(), phi)
+		phi.GetFunc().SetReg(phi)
+		phi.GetFunc().WriteSymbolTable(phi.GetVariable(), phi)
 	}
 	if v != nil {
 		fixupUseChain(v)

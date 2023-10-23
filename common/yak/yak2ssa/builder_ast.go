@@ -332,13 +332,13 @@ func (b *astbuilder) buildForStmt(stmt *yak.ForStmtContext) {
 	loop.BuildCondition(func() ssa.Value {
 		var condition ssa.Value
 		if cond == nil {
-			condition = ssa.NewConst(true)
+			condition = b.EmitConstInst(true)
 		} else {
 			// recoverRange := b.SetRange(cond.BaseParserRuleContext)
 			// defer recoverRange()
 			condition = b.buildExpression(cond)
 			if condition == nil {
-				condition = ssa.NewConst(true)
+				condition = b.EmitConstInst(true)
 				// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
 			}
 		}
@@ -590,9 +590,9 @@ func (b *astbuilder) AssignList(stmt assignlist) []ssa.Value {
 		// (n) = (n), just assign
 		if len(rvalues) == len(lvalues) {
 			for i := range rvalues {
-				if inst, ok := rvalues[i].(ssa.InstructionValue); ok {
-					inst.SetLeftPosition(lvalues[i].GetPosition())
-				}
+				// if inst, ok := rvalues[i].(ssa.va); ok {
+				// 	inst.SetLeftPosition(lvalues[i].GetPosition())
+				// }
 				lvalues[i].Assign(rvalues[i], b.FunctionBuilder)
 			}
 		} else if len(rvalues) == 1 {
@@ -603,7 +603,7 @@ func (b *astbuilder) AssignList(stmt assignlist) []ssa.Value {
 			}
 
 			// (n) = (1)
-			inter, ok := rvalues[0].(ssa.User)
+			inter, ok := rvalues[0].(ssa.Value)
 			if !ok {
 				return nil
 			}
@@ -622,7 +622,7 @@ func (b *astbuilder) AssignList(stmt assignlist) []ssa.Value {
 				}
 				vs := make([]ssa.Value, 0)
 				for i := 0; i < length; i++ {
-					field := b.EmitField(c, ssa.NewConst(i))
+					field := b.EmitField(c, b.EmitConstInst(i))
 					vs = append(vs, field)
 				}
 				if len(vs) == len(lvalues) {
@@ -642,7 +642,7 @@ func (b *astbuilder) AssignList(stmt assignlist) []ssa.Value {
 
 			// (n) = field(1, #index)
 			for i, lv := range lvalues {
-				field := b.EmitField(inter, ssa.NewConst(i))
+				field := b.EmitField(inter, b.EmitConstInst(i))
 				// if inst, ok := field.(ssa.Instruction); ok {
 				// 	inst.SetPosition(lv.GetPosition())
 				// }
@@ -683,7 +683,7 @@ func (b *astbuilder) buildAssignExpression(stmt *yak.AssignExpressionContext) []
 			b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
 			return nil
 		}
-		rvalue := b.EmitBinOp(ssa.OpAdd, lvalue.GetValue(b.FunctionBuilder), ssa.NewConst(1))
+		rvalue := b.EmitBinOp(ssa.OpAdd, lvalue.GetValue(b.FunctionBuilder), b.EmitConstInst(1))
 		lvalue.Assign(rvalue, b.FunctionBuilder)
 		return []ssa.Value{lvalue.GetValue(b.FunctionBuilder)}
 	} else if stmt.SubSub() != nil { // --
@@ -692,7 +692,7 @@ func (b *astbuilder) buildAssignExpression(stmt *yak.AssignExpressionContext) []
 			b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
 			return nil
 		}
-		rvalue := b.EmitBinOp(ssa.OpSub, lvalue.GetValue(b.FunctionBuilder), ssa.NewConst(1))
+		rvalue := b.EmitBinOp(ssa.OpSub, lvalue.GetValue(b.FunctionBuilder), b.EmitConstInst(1))
 		lvalue.Assign(rvalue, b.FunctionBuilder)
 		return []ssa.Value{lvalue.GetValue(b.FunctionBuilder)}
 	}
@@ -762,7 +762,7 @@ func (b *astbuilder) buildDeclareVariableOnly(stmt *yak.DeclareVariableOnlyConte
 	defer recoverRange()
 	for _, idstmt := range stmt.AllIdentifier() {
 		id := idstmt.GetText()
-		b.WriteVariable(id, ssa.NewAny())
+		b.WriteVariable(id, b.EmitConstInstAny())
 	}
 }
 
@@ -845,20 +845,20 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 	return nil
 }
 
-func (b *astbuilder) buildObject(s *yak.ExpressionContext) ssa.User {
+func (b *astbuilder) buildObject(s *yak.ExpressionContext) ssa.Value {
 	ex := b.buildExpression(s)
 	if ex == nil {
 		b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
 		return nil
 	}
 	//TODO: check interface type
-	var inter ssa.User
-	if expr, ok := ex.(ssa.User); ok {
+	var inter ssa.Value
+	if expr, ok := ex.(ssa.Value); ok {
 		return expr
 	} else {
-		if v, ok := ex.(*ssa.Const); ok {
+		if v, ok := ex.(*ssa.ConstInst); ok {
 			if v.GetType().GetTypeKind() == ssa.String {
-				return b.EmitConstInst(v)
+				// return b.EmitConstInst(v)
 			}
 		}
 		{
@@ -867,7 +867,7 @@ func (b *astbuilder) buildObject(s *yak.ExpressionContext) ssa.User {
 			text := s.GetText()
 			text = text + "-FieldTarget"
 			v := b.ReadVariable(text, false)
-			if user, ok := v.(ssa.User); v != nil && ok {
+			if user, ok := v.(ssa.Value); v != nil && ok {
 				inter = user
 			} else {
 				pa := ssa.NewParam(text, false, b.Function)
@@ -897,7 +897,7 @@ func (b *astbuilder) buildLeftMemberCall(stmt *yak.LeftMemberCallContext) ssa.Va
 	defer recoverRange()
 	if id := stmt.Identifier(); id != nil {
 		idText := id.GetText()
-		return ssa.NewConst(idText)
+		return b.EmitConstInst(idText)
 	} else if id := stmt.IdentifierWithDollar(); id != nil {
 		key := b.ReadVariable(id.GetText()[1:], true)
 		if key == nil {
@@ -1003,7 +1003,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		inter := b.buildObject(expr)
 		if id := s.Identifier(); id != nil {
 			idText := id.GetText()
-			return b.EmitField(inter, ssa.NewConst(idText))
+			return b.EmitField(inter, b.EmitConstInst(idText))
 		} else if id := s.IdentifierWithDollar(); id != nil {
 			key := b.ReadVariable(id.GetText()[1:], true)
 			if key == nil {
@@ -1166,8 +1166,8 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 	// | expression '<-' expression
 	if stmt.ChanIn() == nil {
 		op1, op2 := getValue(0), getValue(1)
-		if u, ok := op1.(ssa.User); ok {
-			return b.EmitUpdate(u, op2)
+		if u, ok := op1.(ssa.Value); ok {
+			b.EmitUpdate(u, op2)
 		} else {
 			b.NewError(ssa.Error, TAG, "left of <- must be a chan variable")
 			return nil
@@ -1311,7 +1311,7 @@ func (b *astbuilder) buildMakeExpression(stmt *yak.MakeExpressionContext) ssa.Va
 	if s, ok := stmt.ExpressionListMultiline().(*yak.ExpressionListMultilineContext); ok {
 		exprs = b.buildExpressionListMultiline(s)
 	}
-	zero := ssa.NewConst(0)
+	zero := b.EmitConstInst(0)
 	switch typ := typ.(type) {
 	case *ssa.ObjectType:
 		switch typ.Kind {
@@ -1501,7 +1501,7 @@ func (b *astbuilder) buildSliceCall(stmt *yak.SliceCallContext) []ssa.Value {
 		if s, ok := expr.(*yak.ExpressionContext); ok {
 			values[i] = b.buildExpression(s)
 		} else {
-			values[i] = ssa.NewConst(0)
+			values[i] = b.EmitConstInst(0)
 		}
 	}
 	return values

@@ -32,9 +32,9 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 	}
 
 	handleIfEdge := func(i *ssa.If) {
-		from := i.Block
+		from := i.GetBlock()
 		newEdge(i.True, from, i.Cond)
-		newEdge(i.False, from, newUnOp(ssa.OpNot, i.Cond, i.Block))
+		newEdge(i.False, from, newUnOp(ssa.OpNot, i.Cond, i.GetBlock()))
 	}
 	handleLoopEdge := func(l *ssa.Loop) {
 		canReach := func() bool {
@@ -54,25 +54,25 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 				x = cond.X
 				y = l.Init
 			}
-			canReach := newBinOp(cond.Op, x, y, cond.Block)
-			can, ok := canReach.(*ssa.Const)
+			canReach := newBinOp(cond.Op, x, y, cond.GetBlock())
+			can, ok := canReach.(*ssa.ConstInst)
 			if ok && can.IsBoolean() {
 				return can.Boolean()
 			}
 			return true
 		}
-		from := l.Block
+		from := l.GetBlock()
 		if !canReach() {
 			newEdge(l.Body, from, ssa.NewConst(false))
 			newEdge(l.Exit, from, ssa.NewConst(true))
 		} else {
 			newEdge(l.Body, from, l.Cond)
-			newEdge(l.Exit, from, newUnOp(ssa.OpNot, l.Cond, l.Block))
+			newEdge(l.Exit, from, newUnOp(ssa.OpNot, l.Cond, l.GetBlock()))
 		}
 	}
 
 	handleSwitchEdge := func(sw *ssa.Switch) {
-		from := sw.Block
+		from := sw.GetBlock()
 		var defaultCond ssa.Value
 		for _, lab := range sw.Label {
 			cond := newBinOp(ssa.OpEq, sw.Cond, lab.Value, lab.Dest)
@@ -168,7 +168,7 @@ func (s *BlockCondition) calcCondition(block *ssa.BasicBlock) ssa.Value {
 	skipBlock := make(map[*ssa.BasicBlock]struct{})
 	if block.IsBlock(ssa.LoopHeader) {
 		// loop.header get prev, but skip latch
-		if b := block.GetBlock(ssa.LoopLatch); b != nil {
+		if b := block.GetBlockById(ssa.LoopLatch); b != nil {
 			skipBlock[b] = struct{}{}
 		}
 	}
@@ -196,17 +196,17 @@ func (s *BlockCondition) calcCondition(block *ssa.BasicBlock) ssa.Value {
 }
 
 func newBinOp(op ssa.BinaryOpcode, x ssa.Value, y ssa.Value, block *ssa.BasicBlock) ssa.Value {
-	b := ssa.NewBinOp(op, x, y, block)
-	if inst, ok := b.(ssa.Instruction); ok {
-		ssa.EmitInst(inst)
-	}
+	b := ssa.NewBinOp(op, x, y)
+	// if inst, ok := b.(ssa.Instruction); ok {
+	// 	ssa.EmitInst(inst)
+	// }
 	return b
 }
 
 func newUnOp(op ssa.UnaryOpcode, x ssa.Value, block *ssa.BasicBlock) ssa.Value {
-	u := ssa.NewUnOp(op, x, block)
-	if inst, ok := u.(ssa.Instruction); ok {
-		ssa.EmitInst(inst)
-	}
+	u := ssa.NewUnOp(op, x)
+	// if inst, ok := u.(ssa.Instruction); ok {
+	// ssa.EmitInst(inst)
+	// }
 	return u
 }

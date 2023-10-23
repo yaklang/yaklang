@@ -15,7 +15,7 @@ func (f *Function) SetReg(i Instruction) {
 	}
 }
 
-func GetTypeStr(n Node) string {
+func GetTypeStr(n Value) string {
 	return fmt.Sprintf(
 		"<%s> ", n.GetType(),
 	)
@@ -30,42 +30,41 @@ func (p *Position) String() string {
 	)
 }
 
-func getStr(v Node) string {
+func getStr(v Value) string {
 	return getStrFlag(v, true)
 }
-func getStrFlag(v Node, hasType bool) string {
+func getStrFlag(v Value, hasType bool) (op string) {
 	if utils.IsNil(v) {
 		return "<nil>"
 	}
-	op := ""
 	if hasType {
 		op += GetTypeStr(v)
 	}
 	switch v := v.(type) {
-	case Instruction:
-		if i, ok := v.(*Field); ok {
-			if i.OutCapture {
-				return i.Key.String() + "(modify)"
-			}
-		}
-		if m, ok := v.(*Make); ok {
-			if m.Func.symbol == m {
-				return m.Func.Name + "-symbol"
-			}
-		}
-		if f := v.GetParent(); f != nil {
-			if str, ok := f.InstReg[v]; ok {
-				op += str
-			}
-		}
-	case *Const:
-		op += v.String()
+	// case Instruction:
+	case *Make:
+		// if m.Func.symbol == m {
+		// 	return m.Func.Name + "-symbol"
+		// }
+	case *ConstInst:
+		op += v.Const.String()
+		return
 	case *Parameter:
 		op += v.String()
+		return
 	case *Function:
-		op += v.Name
-	default:
-		panic("instruction unknown value type: " + v.String())
+		op += v.GetVariable()
+		return
+	case *Field:
+		if v.OutCapture {
+			return getStr(v.Key) + "(modify)"
+		}
+	}
+
+	if f := v.GetFunc(); f != nil {
+		if str, ok := f.InstReg[v]; ok {
+			op += str
+		}
 	}
 	return op
 }
@@ -84,14 +83,14 @@ func (f *Function) String() string {
 	return f.DisAsm(DisAsmDefault)
 }
 func (f *Function) DisAsm(flag FunctionAsmFlag) string {
-	ret := f.Name + " "
+	ret := f.GetVariable() + " "
 	ret += strings.Join(
 		lo.Map(f.Param, func(item *Parameter, _ int) string { return GetTypeStr(item) + item.variable }),
 		", ")
 	ret += "\n"
 
 	if parent := f.parent; parent != nil {
-		ret += fmt.Sprintf("parent: %s\n", parent.Name)
+		ret += fmt.Sprintf("parent: %s\n", parent.GetVariable())
 	}
 
 	if f.Pos != nil {
@@ -106,8 +105,8 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 			// f.FreeValue,
 			", ") + "\n"
 	}
-	if f.Type != nil {
-		ret += "type: " + f.Type.String() + "\n"
+	if f.GetType() != nil {
+		ret += "type: " + f.GetType().String() + "\n"
 	}
 
 	for _, b := range f.Blocks {
@@ -125,11 +124,11 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 			pos := make([]string, 0, len(b.Insts)+len(b.Phis))
 			for _, p := range b.Phis {
 				insts = append(insts, fmt.Sprintf("\t%s", p))
-				pos = append(pos, p.Pos())
+				pos = append(pos, p.GetPosition().String())
 			}
 			for _, i := range b.Insts {
 				insts = append(insts, fmt.Sprintf("\t%s", i))
-				pos = append(pos, i.Pos())
+				pos = append(pos, i.GetPosition().String())
 			}
 			// get MaxLen
 			max := 0
@@ -149,11 +148,11 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 
 // ----------- basic block
 func (b *BasicBlock) String() string {
-	ret := b.Name + ":"
+	ret := b.GetVariable() + ":"
 	if len(b.Preds) != 0 {
 		ret += " <- "
 		for _, pred := range b.Preds {
-			ret += pred.Name + " "
+			ret += pred.GetVariable() + " "
 		}
 	}
 	if !utils.IsNil(b.Condition) {
@@ -169,7 +168,7 @@ func (c Const) String() string {
 
 // ----------- const instruction
 func (c *ConstInst) String() string {
-	return fmt.Sprintf("%s = const <%s> %s", getStr(c), c.GetType(), c.Const)
+	return c.Const.String()
 }
 
 // ----------- undefine
@@ -183,11 +182,11 @@ func (p *Phi) String() string {
 	ret := fmt.Sprintf("%s = phi ", getStr(p))
 	for i := range p.Edge {
 		v := p.Edge[i]
-		b := p.Block.Preds[i]
+		b := p.GetBlock().Preds[i]
 		if utils.IsNil(v) {
 			continue
 		}
-		ret += fmt.Sprintf("[%s, %s] ", getStr(v), b.Name)
+		ret += fmt.Sprintf("[%s, %s] ", getStr(v), b.GetVariable())
 	}
 	return ret
 }
@@ -199,18 +198,18 @@ func (p *Parameter) String() string {
 
 // ----------- Jump
 func (j *Jump) String() string {
-	return fmt.Sprintf("jump -> %s", j.To.Name)
+	return fmt.Sprintf("jump -> %s", j.To.GetVariable())
 }
 
 // ----------- IF
 func (i *If) String() string {
 	// return i.StringByFunc(DefaultValueString)
-	return fmt.Sprintf("If [%s] true -> %s, false -> %s", getStr(i.Cond), i.True.Name, i.False.Name)
+	return fmt.Sprintf("If [%s] true -> %s, false -> %s", getStr(i.Cond), i.True.GetVariable(), i.False.GetVariable())
 }
 
 // ----------- Loop
 func (l *Loop) String() string {
-	return fmt.Sprintf("Loop [%s; %s; %s] body -> %s, exit -> %s", getStr(l.Init), getStr(l.Cond), getStr(l.Step), l.Body.Name, l.Exit.Name)
+	return fmt.Sprintf("Loop [%s; %s; %s] body -> %s, exit -> %s", getStr(l.Init), getStr(l.Cond), getStr(l.Step), l.Body.GetVariable(), l.Exit.GetVariable())
 }
 
 // ----------- Return
@@ -256,10 +255,10 @@ func (sw *Switch) String() string {
 	return fmt.Sprintf(
 		"switch %s default:[%s] {%s}",
 		getStr(sw.Cond),
-		sw.DefaultBlock.Name,
+		sw.DefaultBlock.GetVariable(),
 		strings.Join(
 			lo.Map(sw.Label, func(label SwitchLabel, _ int) string {
-				return fmt.Sprintf("%s:%s", getStr(label.Value), label.Dest.Name)
+				return fmt.Sprintf("%s:%s", getStr(label.Value), label.Dest.GetVariable())
 			}),
 			", ",
 		),
@@ -320,7 +319,7 @@ func (i *Make) String() string {
 	} else {
 		return fmt.Sprintf(
 			"%s = make %s [%s, %s]",
-			getStr(i), i.typs, getStr(i.Len), getStr(i.Cap),
+			getStr(i), i.GetType(), getStr(i.Len), getStr(i.Cap),
 		)
 	}
 }
@@ -377,11 +376,11 @@ func (n *Next) String() string {
 func (e *ErrorHandler) String() string {
 	finalName := "nil"
 	if e.final != nil {
-		finalName = e.final.Name
+		finalName = e.final.GetVariable()
 	}
 	return fmt.Sprintf(
 		"try %s; catch %s; final %s; rest %s",
-		e.try.Name, e.catch.Name, finalName, e.done.Name,
+		e.try.GetVariable(), e.catch.GetVariable(), finalName, e.done.GetVariable(),
 	)
 }
 
