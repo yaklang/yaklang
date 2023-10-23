@@ -1,15 +1,17 @@
 package antlr4nasl
 
 import (
+	"errors"
 	"fmt"
+	"path"
+	"time"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/pingutil"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"path"
-	"time"
 )
 
 type ScriptEngine struct {
@@ -418,7 +420,8 @@ func (e *ScriptEngine) Scan(host string, ports string) error {
 	}
 
 	executedScripts := map[string]struct{}{}
-	var allErrors utils.MergeErrors
+	var allErrors error = nil
+
 	var runScriptWithDep func(script *NaslScriptInfo) error
 	runScriptWithDep = func(script *NaslScriptInfo) error {
 		if _, ok := executedScripts[script.OriginFileName]; ok {
@@ -449,10 +452,10 @@ func (e *ScriptEngine) Scan(host string, ports string) error {
 		err := runScriptWithDep(script)
 		if err != nil {
 			log.Errorf("run script %s met error: %s", script.OriginFileName, err)
-			allErrors = append(allErrors, err)
+			allErrors = utils.Join(allErrors, err)
 		}
 	}
-	if len(allErrors) != 0 {
+	if !errors.Is(allErrors, nil) {
 		return allErrors
 	}
 	return nil

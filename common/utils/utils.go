@@ -6,13 +6,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
-	"errors"
 	"fmt"
-	uuid "github.com/satori/go.uuid"
-	"github.com/yaklang/yaklang/common/gmsm/gmtls"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/progresswriter"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"io/ioutil"
 	"net"
@@ -27,31 +21,15 @@ import (
 	"strings"
 	"time"
 
+	uuid "github.com/satori/go.uuid"
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/progresswriter"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/denisbrodbeck/machineid"
 )
-
-type MergeErrors []error
-
-func (m MergeErrors) Error() string {
-	var s []string
-	for _, e := range m {
-		s = append(s, e.Error())
-	}
-	return strings.Join(s, "\n")
-}
-
-func IContains(s, sub string) bool {
-	return strings.Contains(strings.ToLower(s), strings.ToLower(sub))
-}
-
-func Errorf(origin string, args ...interface{}) error {
-	return errors.New(fmt.Sprintf(origin, args...))
-}
-
-func Error(i interface{}) error {
-	return errors.New(fmt.Sprint(i))
-}
 
 func StringLowerAndTrimSpace(raw string) string {
 	return strings.ToLower(strings.TrimSpace(raw))
@@ -64,6 +42,10 @@ func TrimFileNameExt(raw string) string {
 	}
 
 	return strings.Trim(strings.TrimSuffix(raw, e), ". ")
+}
+
+func IContains(s, sub string) bool {
+	return strings.Contains(strings.ToLower(s), strings.ToLower(sub))
 }
 
 func IntArrayContains(array []int, element int) bool {
