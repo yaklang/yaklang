@@ -185,9 +185,9 @@ iterationStatement
     : Do statement While '(' singleExpression ')' eos                                                                       # DoStatement
     | While '(' singleExpression ')' statement                                                                              # WhileStatement
     | For '(' forFirst? ';' forSecond? ';' forThird? ')' statement   # ForStatement
-    | For '(' (singleExpression | variableDeclarationList) In expressionSequence ')' statement                                # ForInStatement
+    | For '(' (singleExpression | variableDeclaration) In singleExpression ')' statement                                # ForInStatement
     // strange, 'of' is an identifier. and p.p("of") not work in sometime.
-    | For Await? '(' (singleExpression | variableDeclarationList) identifier{p.p("of")}? expressionSequence ')' statement  # ForOfStatement
+    | For Await? '(' (singleExpression | variableDeclaration) identifier{p.p("of")}? singleExpression ')' statement  # ForOfStatement
     ;
 
 varModifier  // let, const - ECMAScript 6
@@ -363,7 +363,7 @@ singleExpression
     : anonymousFunction                                                     # FunctionExpression
     | Class identifier? classTail                                           # ClassExpression
     | singleExpression '?.' singleExpression                                # OptionalChainExpression
-    | singleExpression '?.'? '[' expressionSequence ']'                     # MemberIndexExpression
+    | singleExpression '?.'? '[' singleExpression ']'                     # MemberIndexExpression
     | singleExpression '?'? '.' '#'? identifierName                         # MemberDotExpression
     // Split to try `new Date()` first, then `new Date`.
     | New singleExpression arguments                                        # NewExpression
