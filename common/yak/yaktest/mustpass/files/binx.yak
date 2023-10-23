@@ -1,0 +1,9 @@
+
+
+
+c = "\x33\x22\x80\xff\xff\x03aaa"
+result = bin.Read(c, bin.toUint16("ccc"))~
+result1 = result[0]
+
+dump(result1.Value())
+assert result1.Value() == 0x3322
