@@ -4,11 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"net/url"
-	"strconv"
-	"strings"
-
 	"github.com/davecgh/go-spew/spew"
 	"github.com/h2non/filetype"
 	"github.com/yaklang/yaklang/common/authhack"
@@ -22,6 +17,10 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"github.com/yaklang/yaklang/common/yserx"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
 )
 
 func (s *Server) AutoDecode(ctx context.Context, req *ypb.AutoDecodeRequest) (*ypb.AutoDecodeResponse, error) {
@@ -37,21 +36,34 @@ func (s *Server) AutoDecode(ctx context.Context, req *ypb.AutoDecodeRequest) (*y
 		return &ypb.AutoDecodeResponse{Results: results}, nil
 	} else {
 		modifyResult := req.GetModifyResult()
-		current := ""
-		modify := false
-		for i := len(modifyResult) - 1; i >= 0; i-- {
-			if modify {
-				modifyResult[i].Origin = []byte(current)
-				modifyResult[i].Result = []byte(codec.EncodeByType(modifyResult[i].Type, current))
-			} else {
-				if modifyResult[i].Modify {
-					modify = true
-					current = string(modifyResult[i].Origin)
-				}
+		modifyIndex := -1
+		for i := 0; i < len(modifyResult); i++ {
+			if modifyResult[i].Modify {
+				modifyIndex = i
 			}
-			modifyResult[i].Modify = false
 		}
-		return &ypb.AutoDecodeResponse{Results: modifyResult}, nil
+		if modifyIndex == -1 {
+			return &ypb.AutoDecodeResponse{Results: modifyResult}, nil
+		}
+		for i := modifyIndex; i >= 0; i-- { // 从 result 推origin
+			modifyResult[i].Modify = false
+			modifyResult[i].Origin = []byte(codec.EncodeByType(modifyResult[i].Type, modifyResult[i].Result))
+			if i-1 >= 0 { // 传递给上一级
+				modifyResult[i-1].Result = modifyResult[i].Origin
+			}
+		}
+		results2 := funk.Map(codec.AutoDecode(modifyResult[modifyIndex].Result), func(i *codec.AutoDecodeResult) *ypb.AutoDecodeResult {
+			return &ypb.AutoDecodeResult{
+				Type:        i.Type,
+				TypeVerbose: i.TypeVerbose,
+				Origin:      []byte(i.Origin),
+				Result:      []byte(i.Result),
+			}
+		}).([]*ypb.AutoDecodeResult)
+		if len(results2) == 1 && results2[0].Type == "No" {
+			results2 = []*ypb.AutoDecodeResult{}
+		}
+		return &ypb.AutoDecodeResponse{Results: append(modifyResult[:modifyIndex+1], results2...)}, nil
 	}
 }
 
