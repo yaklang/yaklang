@@ -30,7 +30,9 @@ var hexRegexp = regexp.MustCompile(`^\b([0-9A-Fa-f]{2}\s?)+[0-9A-Fa-f]{2}\b$`)
 var base32Regexp = regexp.MustCompile(`^([A-Z2-7]{8})*([A-Z2-7]{8}|[A-Z2-7]{2}([A-Z2-7]{6})*|[A-Z2-7]{4}([A-Z2-7]{4})*|[A-Z2-7]{5}([A-Z2-7]{3})*|[A-Z2-7]{7})(=){0,6}$`)
 
 var encodeMap = map[string]func(string) string{
-	"UrlDecode":          url.QueryEscape,
+	"UrlDecode": func(s string) string {
+		return EncodeUrlCode(s)
+	},
 	"Html Entity Decode": html.EscapeString,
 	"Hex Decode": func(s string) string {
 		return EncodeToHex(s)
