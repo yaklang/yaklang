@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/binx"
 	"github.com/yaklang/yaklang/common/utils/yakgit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"path/filepath"
@@ -259,6 +260,9 @@ func initYaklangLib() {
 
 	// git
 	yaklang.Import("git", yakgit.Exports)
+
+	// binx
+	yaklang.Import("bin", binx.Exports)
 }
 
 type ScriptEngine struct {
