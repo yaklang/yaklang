@@ -6,7 +6,7 @@ import (
 )
 
 type GenerateConfig struct {
-	IgnoreError bool
+	AssertError bool
 }
 type ExecNode interface {
 	Reset()              // 重置生成器
@@ -122,21 +122,22 @@ func (f *TagExecNode) FirstExec(bp, exec, all bool) error {
 }
 func (f *TagExecNode) exec(s *FuzzResult) error {
 	res, err := f.data.Exec(s, f.methodCtx.methodTable)
+	if len(res) == 0 {
+		res = []*FuzzResult{NewFuzzResultWithData("")}
+	}
 	for _, r := range res {
-		r.source = append(r.source, s)
-		r.byTag = true
+		r.Source = append(r.Source, s)
+		r.ByTag = true
+		r.Error = err
 	}
 
-	if f.config.IgnoreError {
+	if !f.config.AssertError {
 		err = nil
 	}
 	if err != nil {
 		return err
 	}
 	f.methodCtx.UpdateLabels(f)
-	if len(res) == 0 {
-		res = []*FuzzResult{NewFuzzResultWithData("")}
-	}
 	f.cache = &res
 	return nil
 }
@@ -183,18 +184,18 @@ func (s *TagExecNode) IsRep() bool {
 }
 
 type Generator struct {
-	config    *GenerateConfig
+	*GenerateConfig
 	container []*FuzzResult
 	//index     int
 	data            []ExecNode
 	first           bool
 	backpropagation func() error
-	IgnoreError     bool
+	AssertError     bool
 	Error           error
 }
 
 func newBackpropagationGenerator(f func() error, nodes []ExecNode, cfg *GenerateConfig) *Generator {
-	g := &Generator{data: nodes, container: make([]*FuzzResult, len(nodes)), first: true, backpropagation: f, config: cfg}
+	g := &Generator{data: nodes, container: make([]*FuzzResult, len(nodes)), first: true, backpropagation: f, GenerateConfig: cfg}
 	for index, d := range g.data {
 		index := index
 		switch ret := d.(type) {
@@ -210,7 +211,7 @@ func newBackpropagationGenerator(f func() error, nodes []ExecNode, cfg *Generate
 			}, ret.params, cfg)
 			bp = func() error {
 				err := ret.exec(childGen.Result())
-				ret.index = 1
+				ret.index = 0
 				ret.submitResult((*ret.cache)[0])
 				return err
 			}
@@ -260,10 +261,10 @@ func (g *Generator) Result() *FuzzResult {
 	data := []byte{}
 	for _, result := range g.container {
 		data = append(data, result.GetData()...)
-		res.source = append(res.source, result)
+		res.Source = append(res.Source, result)
 	}
-	res.data = data
-	res.contact = true
+	res.Data = data
+	res.Contact = true
 	return res
 }
 func (g *Generator) Next() bool {
@@ -272,9 +273,6 @@ func (g *Generator) Next() bool {
 	return ok
 }
 func (g *Generator) generate() (bool, error) {
-	if g.IgnoreError {
-		g.config.IgnoreError = true
-	}
 	if g.first {
 		for _, d := range g.data {
 			switch ret := d.(type) {
