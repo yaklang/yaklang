@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -205,4 +206,31 @@ func TestRepeatTag(t *testing.T) {
 	result := MutateQuick(`{{repeat(!|4)}}`)
 	println(len(result))
 	spew.Dump(result)
+}
+func TestFuzzTagExec(t *testing.T) {
+	expect := []string{
+		"a", "a,1,1",
+		"a", "a,strconv.Atoi: parsing \\\"a\\\": invalid syntax,a",
+		"a", "a,2,2",
+	}
+	i := 0
+	_, err := FuzzTagExec("{{a({{int({{array(1|a|2)}})}})}}", Fuzz_WithResultHandler(func(s string, payloads []string) bool {
+		if fmt.Sprintf("result: %s, payloads: %v\n", s, strings.Join(payloads, ",")) != expect[i] {
+			t.Fatal("test verbose info failed")
+		}
+		i++
+		return true
+	}), Fuzz_WithExtraFuzzTagHandler("int", func(s string) []string {
+		_, err := strconv.Atoi(s)
+		if err != nil {
+			panic(err)
+		}
+		return []string{s}
+	}), Fuzz_WithExtraFuzzTagHandler("a", func(s string) []string {
+		return []string{"a"}
+	}))
+	//res, err := FuzzTagExec("{{uuid(a)}}")
+	if err != nil {
+		t.Fatal(err)
+	}
 }

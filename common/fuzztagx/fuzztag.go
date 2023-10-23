@@ -12,6 +12,7 @@ const (
 	MethodLeft  = "("
 	MethodRight = ")"
 )
+const YakHotPatchErr = "__YakHotPatchErr@"
 
 type FuzzTag struct {
 	parser.BaseTag
@@ -100,8 +101,26 @@ func NewGenerator(code string, table map[string]*parser.TagMethod) (*parser.Gene
 	if err != nil {
 		return nil, err
 	}
-	return parser.NewGenerator(nodes,table),nil
+	return parser.NewGenerator(nodes, table), nil
 }
 func isIdentifyString(s string) bool {
 	return utils.MatchAllOfRegexp(s, "^[a-zA-Z_][a-zA-Z0-9_:-]*$")
+}
+func GetResultVerbose(f *parser.FuzzResult) []string {
+	var verboses []string
+	for _, datum := range f.Source {
+		switch ret := datum.(type) {
+		case *parser.FuzzResult:
+			verboses = append(verboses, GetResultVerbose(ret)...)
+		}
+	}
+	if !f.ByTag {
+		return verboses
+	}
+	if f.Error != nil {
+		f.Verbose = fmt.Sprintf("[%s]", YakHotPatchErr+f.Error.Error())
+	} else if f.Verbose == "" {
+		f.Verbose = utils.InterfaceToString(f.Data)
+	}
+	return append([]string{f.Verbose}, verboses...)
 }
