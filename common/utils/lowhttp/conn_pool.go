@@ -300,10 +300,10 @@ func newPersistConn(key connectKey, pool *lowHttpConnPool, opt ...netx.DialXOpti
 		idleAt:               time.Time{},
 		closeTimer:           nil,
 		dialOption:           opt,
-		reqCh:                make(chan requestAndResponseCh),
-		writeCh:              make(chan writeRequest),
-		closeCh:              make(chan struct{}),
-		writeErrCh:           make(chan error),
+		reqCh:                make(chan requestAndResponseCh, 1),
+		writeCh:              make(chan writeRequest, 1),
+		closeCh:              make(chan struct{}, 1),
+		writeErrCh:           make(chan error, 1),
 		serverStartTime:      time.Time{},
 		wPacket:              make([]packetInfo, 0),
 		rPacket:              make([]packetInfo, 0),
@@ -404,10 +404,11 @@ func (pc *persistConn) writeLoop() {
 			_, err := pc.bw.Write(wr.reqPacket)
 			if err == nil {
 				err = pc.bw.Flush()
+				pc.serverStartTime = time.Now()
 			}
-			pc.serverStartTime = time.Now()
 			wr.ch <- err //to exec.go
 			if err != nil {
+				pc.writeErrCh <- err
 				//log.Infof("!!!conn [%v] connect [%v] has be writed [%d]", pc.Conn.LocalAddr(), pc.cacheKey.addr, count)
 				return
 			}
@@ -422,6 +423,14 @@ func (pc *persistConn) writeLoop() {
 }
 
 func (pc *persistConn) closeConn(err error) {
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
+	if pc.closed != nil {
+		return
+	}
+	if err == nil {
+		err = errors.New("lowhttp: conn pool unknown error")
+	}
 	pc.Conn.Close()
 	pc.closed = err
 	close(pc.closeCh)

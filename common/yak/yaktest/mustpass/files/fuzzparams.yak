@@ -1,4 +1,4 @@
-host, port = tcp.MockServe("HTTP/1.1 200 OK\r\n\r\nHello, world!")
+host, port = httpserver.MockServe("HTTP/1.1 200 OK\r\n\r\nHello, world!")
 
 // post-json
 raw = f`GET / HTTP/1.1
