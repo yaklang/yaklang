@@ -142,14 +142,14 @@ func (p *Proxy) deleteCache(req *http.Request) {
 // NewProxy returns a new HTTP proxy.
 func NewProxy() *Proxy {
 	proxy := &Proxy{
-		roundTripper: &http.Transport{
-			// TODO(adamtanner): This forces the http.Transport to not upgrade requests
-			// to HTTP/2 in Go 1.6+. Remove this once Martian can support HTTP/2.
-			TLSNextProto:          make(map[string]func(string, *tls.Conn) http.RoundTripper),
-			Proxy:                 http.ProxyFromEnvironment,
-			TLSHandshakeTimeout:   10 * time.Second,
-			ExpectContinueTimeout: time.Second,
-		},
+		//roundTripper: &http.Transport{
+		//	// TODO(adamtanner): This forces the http.Transport to not upgrade requests
+		//	// to HTTP/2 in Go 1.6+. Remove this once Martian can support HTTP/2.
+		//	TLSNextProto:          make(map[string]func(string, *tls.Conn) http.RoundTripper),
+		//	Proxy:                 http.ProxyFromEnvironment,
+		//	TLSHandshakeTimeout:   10 * time.Second,
+		//	ExpectContinueTimeout: time.Second,
+		//},
 		timeout:          5 * time.Minute,
 		closing:          make(chan bool),
 		reqmod:           noop,
@@ -159,30 +159,30 @@ func NewProxy() *Proxy {
 		ctxCache:         ttlcache.NewCache(),
 	}
 	proxy.ctxCache.SetTTL(5 * time.Minute)
-	proxy.SetDialContext(netx.NewDialContextFunc(30 * time.Second))
+	//proxy.SetDialContext(netx.NewDialContextFunc(30 * time.Second))
 	return proxy
 }
 
 // SetRoundTripper sets the http.RoundTripper of the proxy.
-func (p *Proxy) SetRoundTripper(rt http.RoundTripper) {
-	p.roundTripper = rt
-
-	if tr, ok := p.roundTripper.(*http.Transport); ok {
-		tr.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper)
-		tr.Proxy = http.ProxyURL(p.proxyURL)
-		tr.DialContext = p.dial
-	}
-}
+//func (p *Proxy) SetRoundTripper(rt http.RoundTripper) {
+//	p.roundTripper = rt
+//
+//	if tr, ok := p.roundTripper.(*http.Transport); ok {
+//		tr.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper)
+//		tr.Proxy = http.ProxyURL(p.proxyURL)
+//		tr.DialContext = p.dial
+//	}
+//}
 
 // SetDownstreamProxy sets the proxy that receives requests from the upstream
 // proxy.
-func (p *Proxy) SetDownstreamProxy(proxyURL *url.URL) {
-	p.proxyURL = proxyURL
-
-	if tr, ok := p.roundTripper.(*http.Transport); ok {
-		tr.Proxy = http.ProxyURL(p.proxyURL)
-	}
-}
+//func (p *Proxy) SetDownstreamProxy(proxyURL *url.URL) {
+//	p.proxyURL = proxyURL
+//
+//	if tr, ok := p.roundTripper.(*http.Transport); ok {
+//		tr.Proxy = http.ProxyURL(p.proxyURL)
+//	}
+//}
 
 // SetTimeout sets the request timeout of the proxy.
 func (p *Proxy) SetTimeout(timeout time.Duration) {
@@ -221,17 +221,17 @@ func (p *Proxy) SetGMOnly(enable bool) {
 }
 
 // SetDial sets the dial func used to establish a connection.
-func (p *Proxy) SetDialContext(dial func(context.Context, string, string) (net.Conn, error)) {
-	p.dial = func(ctx context.Context, a, b string) (net.Conn, error) {
-		c, e := dial(ctx, a, b)
-		nosigpipe.IgnoreSIGPIPE(c)
-		return c, e
-	}
-
-	if tr, ok := p.roundTripper.(*http.Transport); ok {
-		tr.DialContext = p.dial
-	}
-}
+//func (p *Proxy) SetDialContext(dial func(context.Context, string, string) (net.Conn, error)) {
+//	p.dial = func(ctx context.Context, a, b string) (net.Conn, error) {
+//		c, e := dial(ctx, a, b)
+//		nosigpipe.IgnoreSIGPIPE(c)
+//		return c, e
+//	}
+//
+//	if tr, ok := p.roundTripper.(*http.Transport); ok {
+//		tr.DialContext = p.dial
+//	}
+//}
 
 // SetLowhttpConfig sets the lowhttp config
 func (p *Proxy) SetLowhttpConfig(config []lowhttp.LowhttpOpt) {
