@@ -241,6 +241,12 @@ func DebugMockTCPEx(handleFunc handleTCPFunc) (string, int) {
 }
 
 func DebugMockHTTP(rsp []byte) (string, int) {
+	res, _ := ReadHTTPResponseFromBytes(rsp, nil)
+	response, _ := DumpHTTPResponse(res, true)
+	return DebugMockHTTPWithTimeout(time.Minute, response)
+}
+
+func DebugMockHTTPNotFixCL(rsp []byte) (string, int) {
 	return DebugMockHTTPWithTimeout(time.Minute, rsp)
 }
 
