@@ -3,13 +3,14 @@ package httptpl
 import (
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"golang.org/x/exp/maps"
 	"path"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"golang.org/x/exp/maps"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -133,9 +134,9 @@ func (y *YakTemplate) SignMainParams() string {
 	return codec.Md5(signDataStr)
 }
 func (y *YakTemplate) CheckTemplateRisks() error {
-	var errs utils.MergeErrors
+	var errs error = nil
 	addErrorMsg := func(msg string) {
-		errs = append(errs, errors.New(msg))
+		errs = utils.Join(errs, errors.New(msg))
 	}
 	hasMatcherOrExtractor := false
 	for _, sequence := range y.HTTPRequestSequences {
