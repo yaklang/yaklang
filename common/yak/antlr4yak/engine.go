@@ -322,7 +322,7 @@ func (n *Engine) EvalWithInline(ctx context.Context, code string, inline bool) e
 
 	compiler, err := n._compile(code)
 	if err != nil {
-		return utils.Errorf("compile error: \b%s", err)
+		return utils.Errorf("compile error: \n%s", err)
 	}
 	n.vm.SetDebug(n.debug)
 	n.vm.SetDebugMode(n.debugMode, code, compiler.GetOpcodes(), n.debugInit, n.debugCallBack)
