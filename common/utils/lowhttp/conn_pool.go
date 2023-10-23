@@ -373,8 +373,8 @@ func (pc *persistConn) readLoop() {
 
 		if err != nil {
 			if len(responseRaw.Bytes()) > 0 { // 如果 TeaReader内部还有数据证明,证明有响应数据,只是解析失败
-				_, err = io.ReadAll(httpResponseReader) // 尝试读取所有数据,主要是超过缓冲区的问题
-				if errors.Is(err, io.EOF) {
+				_, readErr := io.ReadAll(httpResponseReader) // 尝试读取所有数据,主要是超过缓冲区的问题
+				if errors.Is(readErr, io.EOF) {
 					pc.sawEOF = true
 				}
 				respPacket = responseRaw.Bytes()
@@ -387,7 +387,7 @@ func (pc *persistConn) readLoop() {
 		pc.numExpectedResponses-- //减少预期响应数量
 		pc.mu.Unlock()
 
-		rc.ch <- responseInfo{resp: resp, respBytes: respPacket, info: info}
+		rc.ch <- responseInfo{resp: resp, respBytes: respPacket, info: info, err: err}
 		alive = alive &&
 			!pc.sawEOF &&
 			tryPutIdleConn()

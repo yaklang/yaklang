@@ -957,7 +957,7 @@ RECONNECT:
 				if (re.resp == nil) == (re.err == nil) {
 					panic(fmt.Sprintf("internal error: exactly one of res or err should be set; nil=%v", re.resp == nil))
 				}
-				if re.err != nil {
+				if re.err != nil && len(rawBytes) == 0 {
 					if pc.shouldRetryRequest(re.err) {
 						goto RECONNECT
 					}
