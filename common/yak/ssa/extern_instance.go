@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 const (
@@ -130,6 +132,7 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 		ret = NewAliasType(typStr, t)
 	}
 
+	isInterface := false
 	// complex type
 	switch typ.Kind() {
 	case reflect.Array, reflect.Slice:
@@ -159,6 +162,7 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 		obj.SetName(typStr)
 		ret = obj
 	case reflect.Interface:
+		isInterface = true
 		ret = NewInterfaceType(typStr)
 	case reflect.Chan:
 		ret = NewChanType(f.handlerType(typ.Elem(), level))
@@ -179,19 +183,20 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 	// handler method
 	pTyp := reflect.PointerTo(typ)
 	Methods := make(map[string]*FunctionType, typ.NumMethod()+pTyp.NumMethod())
-	handlerMethod := func(typ reflect.Type, i int) {
-		method := typ.Method(i)
-		funTyp := f.CoverReflectFunctionType(method.Type, level)
-		funTyp.SetName(method.Name)
-		Methods[method.Name] = funTyp
+	handlerMethod := func(typ reflect.Type) {
+		for i := 0; i < typ.NumMethod(); i++ {
+			method := typ.Method(i)
+			funTyp := f.CoverReflectFunctionType(method.Type, level)
+			if isInterface {
+				funTyp.Parameter = utils.InsertSliceItem(funTyp.Parameter, ret, 0)
+			}
+			funTyp.SetName(method.Name)
+			Methods[method.Name] = funTyp
+		}
 	}
 
-	for i := 0; i < typ.NumMethod(); i++ {
-		handlerMethod(typ, i)
-	}
-	for i := 0; i < pTyp.NumMethod(); i++ {
-		handlerMethod(pTyp, i)
-	}
+	handlerMethod(typ)
+	handlerMethod(pTyp)
 	ret.SetMethod(Methods)
 	return ret
 }
