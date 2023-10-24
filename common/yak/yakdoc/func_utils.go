@@ -205,9 +205,9 @@ func funcDescriptionAndDeclaration(f interface{}, libName string, overideName st
 		decl := theFunc.Decl
 		// 获取函数注释
 		document = theFunc.Doc
-		// 删除CRLF
-		document = strings.ReplaceAll(document, "\r", "")
-		document = strings.ReplaceAll(document, "\n", "")
+		// // 删除CRLF
+		// document = strings.ReplaceAll(document, "\r", "")
+		// document = strings.ReplaceAll(document, "\n", "")
 
 		// 获取参数
 		if decl != nil && decl.Type != nil && decl.Type.Params != nil {
