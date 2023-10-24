@@ -87,12 +87,12 @@ func (b *Function) writeVariableByBlock(variable string, value Value, block *Bas
 
 // get value by variable and block
 //
-//	return : undefine \ value \ phi
+//	return : undefined \ value \ phi
 
 // * first check builder.currentDef
 //
 // * if block sealed; just create a phi
-// * if len(block.preds) == 0: undefine
+// * if len(block.preds) == 0: undefined
 // * if len(block.preds) == 1: just recursive
 // * if len(block.preds) >  1: create phi and builder
 func (b *FunctionBuilder) ReadVariable(variable string, create bool) Value {
@@ -168,7 +168,7 @@ func (b *FunctionBuilder) readVariableByBlockEx(variable string, block *BasicBlo
 		} else if i := b.TryBuildExternValue(variable); i != nil {
 			v = i
 		} else if create {
-			un := NewUndefine(variable)
+			un := NewUndefined(variable)
 			// b.emitInstructionBefore(un, block.LastInst())
 			b.emitToBlock(un, block)
 			v = un

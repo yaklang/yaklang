@@ -67,9 +67,9 @@ func (p *Parameter) GetValues() Values { return nil }
 func (c *ConstInst) HasValues() bool   { return false }
 func (c *ConstInst) GetValues() Values { return nil }
 
-// ----------- undefine
-func (u *Undefine) HasValues() bool   { return false }
-func (u *Undefine) GetValues() Values { return nil }
+// ----------- undefined
+func (u *Undefined) HasValues() bool   { return false }
+func (u *Undefined) GetValues() Values { return nil }
 
 // ----------- BinOp
 func (b *BinOp) HasValues() bool   { return true }

@@ -28,8 +28,8 @@ func NewConstInst(c *Const) *ConstInst {
 	return v
 }
 
-func NewUndefine(name string) *Undefine {
-	u := &Undefine{
+func NewUndefined(name string) *Undefined {
+	u := &Undefined{
 		anInstruction: NewInstruction(),
 		anValue:       NewValue(),
 	}

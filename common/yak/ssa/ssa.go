@@ -344,15 +344,15 @@ var _ Node = (*ConstInst)(nil)
 var _ Value = (*ConstInst)(nil)
 var _ Instruction = (*ConstInst)(nil)
 
-// ----------- Undefine
-type Undefine struct {
+// ----------- Undefined
+type Undefined struct {
 	anInstruction
 	anValue
 }
 
-var _ Node = (*Undefine)(nil)
-var _ Value = (*Undefine)(nil)
-var _ Instruction = (*Undefine)(nil)
+var _ Node = (*Undefined)(nil)
+var _ Value = (*Undefined)(nil)
+var _ Instruction = (*Undefined)(nil)
 
 // ----------- BinOp
 type BinOp struct {

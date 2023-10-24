@@ -68,7 +68,7 @@ func TestUndefine(t *testing.T) {
 		})
 	})
 
-	t.Run("undefine field function", func(t *testing.T) {
+	t.Run("undefined field function", func(t *testing.T) {
 		CheckTestCase(t, TestCase{
 			code: `
 			a = c
@@ -92,10 +92,10 @@ func TestUndefine(t *testing.T) {
 	t.Run("undefined value in template string", func(t *testing.T) {
 		CheckTestCase(t, TestCase{
 			code: `
-			a = f"${undefine}"
+			a = f"${undefined}"
 			`,
 			errs: []string{
-				ssa4analyze.ValueUndefined("undefine"),
+				ssa4analyze.ValueUndefined("undefined"),
 			},
 		})
 	})
@@ -116,7 +116,7 @@ func TestBasicExpression(t *testing.T) {
 					a2 := 1
 					b = a2
 				}
-				b = a2 // undefine 
+				b = a2 // undefined
 				`,
 			errs: []string{
 				ssa4analyze.ValueUndefined("a2"),
@@ -133,7 +133,7 @@ func TestBasicExpression(t *testing.T) {
 			}
 			b = a1
 
-			// var a2 -> undefine
+			// var a2 -> undefined
 			if 1 {
 				a2 = 1
 			}
@@ -286,7 +286,7 @@ func TestMemberCall(t *testing.T) {
 		})
 	})
 
-	t.Run("undefine variable member call", func(t *testing.T) {
+	t.Run("undefined variable member call", func(t *testing.T) {
 		CheckTestCase(t, TestCase{
 			code: `
 			b.E = 1
@@ -366,8 +366,8 @@ func TestSliceCall(t *testing.T) {
 	t.Run("unable slice call", func(t *testing.T) {
 		CheckTestCase(t, TestCase{
 			code: `
-			// undefine 
-			a1[1] = 1 // undefine a1
+			// undefined
+			a1[1] = 1 // undefined a1
 			print(a1[1])
 
 			// const 
@@ -744,6 +744,8 @@ func TestExternInstance(t *testing.T) {
 			},
 		})
 	})
+
+	// t.Run()
 }
 
 func TestErrorHandler(t *testing.T) {
@@ -833,7 +835,7 @@ func TestTryCatch(t *testing.T) {
 				a1 = 1
 			} catch err {
 				a = 2
-				// a1 = 2 // a1 undefine
+				// a1 = 2 // a1 undefined
 			}
 			b = a
 			b = a1
@@ -846,7 +848,7 @@ func TestTryCatch(t *testing.T) {
 				a3 = 2
 			} finally {
 				a2 = 3
-				// a3 = 3 // a3 undefine
+				// a3 = 3 // a3 undefined
 			}
 			b = a2
 			b = a3
