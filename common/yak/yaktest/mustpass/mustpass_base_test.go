@@ -88,7 +88,7 @@ func TestMustPass(t *testing.T) {
 		if k == debugName {
 			debugCases = append(debugCases, []string{k, v})
 		} else {
-			//cases = append(cases, []string{k, v})
+			cases = append(cases, []string{k, v})
 		}
 	}
 
