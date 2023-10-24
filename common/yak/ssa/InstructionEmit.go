@@ -90,16 +90,21 @@ func (f *FunctionBuilder) SetCurrent(i Instruction) func() {
 	}
 }
 
-func (f *FunctionBuilder) emitToBlock(i Instruction, block *BasicBlock) {
+func (b *BasicBlock) EmitInst(i Instruction) {
+	if index := slices.Index(b.Insts, i); index == -1 {
+		b.GetFunc().builder.EmitToBlock(i, b)
+	}
+}
+
+func (f *FunctionBuilder) EmitToBlock(i Instruction, block *BasicBlock) {
 	if len(block.Insts) == 0 {
 		f.emit(i)
 	} else {
-		f.emitInstructionBefore(i, block.LastInst())
+		f.EmitInstructionBefore(i, block.LastInst())
 	}
-
 }
 
-func (f *FunctionBuilder) emitInstructionBefore(i, before Instruction) {
+func (f *FunctionBuilder) EmitInstructionBefore(i, before Instruction) {
 	f.emitAroundInstruction(i, before, func(i Instruction) {
 		insts := f.CurrentBlock.Insts
 		if index := slices.Index(insts, before); index > -1 {
@@ -113,7 +118,7 @@ func (f *FunctionBuilder) emitInstructionBefore(i, before Instruction) {
 		}
 	})
 }
-func (f *FunctionBuilder) emitInstructionAfter(i, after Instruction) {
+func (f *FunctionBuilder) EmitInstructionAfter(i, after Instruction) {
 	f.emitAroundInstruction(i, after, func(i Instruction) {
 		insts := f.CurrentBlock.Insts
 		if index := slices.Index(insts, after); index > -1 {

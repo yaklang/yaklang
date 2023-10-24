@@ -270,45 +270,11 @@ func (sw *Switch) String() string {
 }
 
 // ----------- BinOp
-var BinaryOpcodeName = map[BinaryOpcode]string{
-	OpLogicAnd: `&&`,
-	OpLogicOr:  `||`,
-
-	OpAnd:    `and`,
-	OpAndNot: `and-not`,
-	OpOr:     `or`,
-	OpXor:    `xor`,
-	OpShl:    `shl`,
-	OpShr:    `shr`,
-	OpAdd:    `add`,
-	OpSub:    `sub`,
-	OpMod:    `mod`,
-	OpMul:    `mul`,
-	OpDiv:    `div`,
-	OpGt:     `gt`,
-	OpLt:     `lt`,
-	OpLtEq:   `lt-eq`,
-	OpGtEq:   `gt-eq`,
-	OpNotEq:  `neq`,
-	OpEq:     `eq`,
-	OpIn:     `in`,
-	OpSend:   `send`,
-}
-
 func (b *BinOp) String() string {
 	return fmt.Sprintf("%s = %s %s %s", getStr(b), getStr(b.X), BinaryOpcodeName[b.Op], getStr(b.Y))
 }
 
 // ----------- UnOp
-var UnaryOpcodeName = map[UnaryOpcode]string{
-	OpNone:       ``,
-	OpNot:        `not`,
-	OpPlus:       `plus`,
-	OpNeg:        `neg`,
-	OpChan:       `chan`,
-	OpBitwiseNot: `bitwise-not`,
-}
-
 func (u *UnOp) String() string {
 	return fmt.Sprintf("%s = %s %s", getStr(u), UnaryOpcodeName[u.Op], getStr(u.X))
 }
