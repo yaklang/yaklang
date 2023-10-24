@@ -241,11 +241,6 @@ func DebugMockTCPEx(handleFunc handleTCPFunc) (string, int) {
 }
 
 func DebugMockHTTP(rsp []byte) (string, int) {
-	rsp = FixRespCL(rsp)
-	return DebugMockHTTPWithTimeout(time.Minute, rsp)
-}
-
-func DebugMockHTTPNotFixCL(rsp []byte) (string, int) {
 	return DebugMockHTTPWithTimeout(time.Minute, rsp)
 }
 
@@ -459,7 +454,6 @@ func DebugMockHTTPServerWithContext(ctx context.Context, https bool, h2 bool, gm
 }
 
 func DebugMockHTTPWithTimeout(du time.Duration, rsp []byte) (string, int) {
-	rsp = FixRespCL(rsp)
 	addr := GetRandomLocalAddr()
 	time.Sleep(time.Millisecond * 300)
 	host, port, _ := ParseStringToHostPort(addr)
@@ -492,10 +486,4 @@ func DebugMockHTTPWithTimeout(du time.Duration, rsp []byte) (string, int) {
 
 	time.Sleep(time.Millisecond * 100)
 	return host, port
-}
-
-func FixRespCL(rsp []byte) []byte {
-	res, _ := ReadHTTPResponseFromBytes(rsp, nil)
-	response, _ := DumpHTTPResponse(res, true)
-	return response
 }
