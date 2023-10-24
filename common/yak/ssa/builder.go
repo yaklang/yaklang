@@ -37,6 +37,8 @@ type FunctionBuilder struct {
 	ExternLib      map[string]map[string]any
 
 	parentBuilder *FunctionBuilder
+	cmap          map[string]struct{}
+	lmap          map[string]struct{}
 }
 
 func NewBuilder(f *Function, parent *FunctionBuilder) *FunctionBuilder {
@@ -53,6 +55,8 @@ func NewBuilder(f *Function, parent *FunctionBuilder) *FunctionBuilder {
 		},
 		blockId:       0,
 		parentBuilder: parent,
+		cmap:          make(map[string]struct{}),
+		lmap:          make(map[string]struct{}),
 	}
 	if parent != nil {
 		b.ExternInstance = parent.ExternInstance
@@ -232,4 +236,28 @@ func GetIdByBlockSymbolTable(id string, symbolEnter *blockSymbolTable) string {
 		}
 	}
 	return id
+}
+
+func (b *FunctionBuilder) AddToCmap(key string) {
+	b.cmap[key] = struct{}{}
+}
+
+func (b *FunctionBuilder) GetFromCmap(key string) bool {
+	if _, ok := b.cmap[key]; ok {
+		return true
+	} else {
+		return false
+	}
+}
+
+func (b *FunctionBuilder) AddToLmap(key string) {
+	b.lmap[key] = struct{}{}
+}
+
+func (b *FunctionBuilder) GetFromLmap(key string) bool {
+	if _, ok := b.lmap[key]; ok {
+		return true
+	} else {
+		return false
+	}
 }
