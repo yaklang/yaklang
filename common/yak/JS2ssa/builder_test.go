@@ -1,18 +1,14 @@
 package js2ssa
 
 import (
+	"fmt"
 	"testing"
 )
 
 func TestDemo1(m *testing.T) {
 	prog := ParseSSA(`
-	b = 1
-	function functionName(arg1, arg2) {
-		a = arg1 + arg2;
-		return a;
-	}
-	b = functionName(1, 2);
-	print(b);
+	a = 2;
 	`)
 	prog.Show()
+	fmt.Println(prog.GetErrors())
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 
 	JS "github.com/yaklang/yaklang/common/yak/antlr4JS/parser"
@@ -86,6 +87,7 @@ func (b *astbuilder) buildStatement(stmt *JS.StatementContext) {
 		b.buildFunctionDeclaration(s)
 	}
 
+	// ret
 	if s, ok := stmt.ReturnStatement().(*JS.ReturnStatementContext); ok {
 		b.buildReturnStatement(s)
 	}
@@ -108,49 +110,104 @@ func (b *astbuilder) buildAllVariableDeclaration(stmt *JS.VariableDeclarationLis
 	defer recoverRange()
 	var ret []ssa.Value
 
+	// TODO: 如何去实现一个不可以被重复赋值的变量
+
 	// checking varModifier - decorator (var / let / const)
 	// think `var a = 1`, `let a = 1`, `const a = 1`;
+
+	declare := ""
 	if m := stmt.VarModifier(); m != nil {
 		if m.Const() != nil {
-
+			declare = "c"
 		} else if m.Var() != nil {
 			// 定义域特殊，允许重赋值，宽松的很
+			declare = "v"
 		} else if m.Let_() != nil {
 			// 脑子正常的定义域处理，不允许重复定义
+			declare = "l"
 		} else {
 			// strict mode ?
-
+			b.NewError(ssa.Error, TAG, "wrong declare varmodifier")
+			return nil
 		}
+		for _, jsstmt := range stmt.AllVariableDeclaration() {
+			v, _ := b.buildVariableDeclaration(jsstmt, declare)
+			ret = append(ret, v)
+		}
+		// fmt.Println(ret)
+		return ret
 	}
-
-	for _, jsstmt := range stmt.AllVariableDeclaration() {
-		v, _ := b.buildVariableDeclaration(jsstmt)
-		ret = append(ret, v)
-	}
-	// fmt.Println(ret)
-	return ret
+	return nil
 }
 
-func (b *astbuilder) buildVariableDeclaration(stmt JS.IVariableDeclarationContext) (ssa.Value, ssa.LeftValue) {
+func (b *astbuilder) buildVariableDeclaration(stmt JS.IVariableDeclarationContext, Type string) (ssa.Value, ssa.LeftValue) {
 	a := stmt.Assign()
+	varText := stmt.Assignable().GetText()
+
 
 	if a == nil {
+		if Type == "c" {
+			v := b.GetFromCmap(varText)
+			if v {
+				b.NewError(ssa.Error, TAG, "the const have been declared in the block")
+			} else {
+				b.NewError(ssa.Error, TAG, "const must have value")
+			}
+			return nil, nil
+		} else if Type == "l" {
+			v := b.GetFromLmap(varText)
+			if v {
+				b.NewError(ssa.Error, TAG, "the let have been declared in the block")
+				return nil, nil
+			} else {
+				b.AddToLmap(varText)
+			}
+		}
+
 		// 返回一个any
 		return ssa.NewAny(), nil
 	} else {
-		var lValue ssa.LeftValue
+		assignValue := func () (ssa.Value, ssa.LeftValue){
+			var lValue ssa.LeftValue
 
-		// 得到一个左值
-		if as, ok := stmt.Assignable().(*JS.AssignableContext); ok {
-			lValue = b.buildAssignableContext(as)
+			// 得到一个左值
+			if as, ok := stmt.Assignable().(*JS.AssignableContext); ok {
+				lValue = b.buildAssignableContext(as)
+			}
+
+			x := stmt.SingleExpression()
+			result, _ := b.buildSingleExpression(x, false)
+			// fmt.Println("result :", result)
+
+			lValue.Assign(result, b.FunctionBuilder)
+			return lValue.GetValue(b.FunctionBuilder), lValue
+		} 
+
+
+		if Type == "c" {
+			v := b.GetFromCmap(varText)
+			if v {
+				b.NewError(ssa.Error, TAG, "the const have been declared in the block")
+				return nil, nil
+			} else {
+				rv, lv := assignValue()
+				b.AddToCmap(varText)
+				return rv, lv
+			}
+		} else if Type == "l" {
+			v := b.GetFromLmap(varText)
+			if v {
+				b.NewError(ssa.Error, TAG, "the let have been declared in the block")
+				return nil, nil
+			} else {
+				rv, lv := assignValue()
+				b.AddToLmap(varText)
+				return rv, lv
+			}
+		} else {
+			return assignValue()
 		}
 
-		x := stmt.SingleExpression()
-		result, _ := b.buildSingleExpression(x, false)
-		// fmt.Println("result :", result)
-
-		lValue.Assign(result, b.FunctionBuilder)
-		return lValue.GetValue(b.FunctionBuilder), lValue
 	}
 }
 
@@ -204,6 +261,8 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 		for {
 			a := stmt
 			fmt.Println(a.GetText())
+
+			// +/-
 			if s, ok := stmt.(*JS.AdditiveExpressionContext); ok {
 				if op := s.Plus(); op != nil {
 					single, Op, IsBinOp = s, ssa.OpAdd, true
@@ -215,6 +274,7 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 			}
 
 			// TODO: need more expressions
+			// ('==' | '!=' | '===' | '!==')
 			if s, ok := stmt.(*JS.EqualityExpressionContext); ok {
 				if op := s.Equals_(); op != nil {
 					single, Op, IsBinOp = s, ssa.OpEq, true
@@ -225,6 +285,7 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 				}
 			}
 
+			// ('<' | '>' | '<=' | '>=')
 			if s, ok := stmt.(*JS.RelationalExpressionContext); ok {
 				if op := s.LessThan(); op != nil {
 					single, Op, IsBinOp = s, ssa.OpLt, true
@@ -238,8 +299,61 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 					break
 				}
 			}
+
+			// ('<<' | '>>' | '>>>') 缺>>>
+			if s, ok := stmt.(*JS.BitShiftExpressionContext); ok {
+				if op := s.LeftShiftArithmetic(); op != nil {
+					single, Op, IsBinOp = s, ssa.OpShl, true
+				} else if op := s.RightShiftArithmetic(); op != nil {
+					single, Op, IsBinOp = s, ssa.OpShr, true
+				} else {
+					break
+				}
+			}
+
+			// ('*' | '/' | '%')
+			if s, ok := stmt.(*JS.MultiplicativeExpressionContext); ok {
+				if op := s.Multiply(); op != nil {
+					single, Op, IsBinOp = s, ssa.OpMul, true
+				} else if op := s.Divide(); op != nil {
+					single, Op, IsBinOp = s, ssa.OpDiv, true
+				} else if op := s.Modulus(); op != nil {
+					single, Op, IsBinOp = s, ssa.OpMod, true
+				} else {
+					break
+				}
+			}
+
+			// '^'
+			if s, ok := stmt.(*JS.BitXOrExpressionContext); ok {
+				if op := s.BitXOr(); op != nil {
+					single, Op, IsBinOp = s, ssa.OpXor, true
+				} else {
+					break
+				}
+			}
+
+			// '&'
+			if s, ok := stmt.(*JS.BitAndExpressionContext); ok {
+				if op := s.BitAnd(); op != nil {
+					single, Op, IsBinOp = s, ssa.OpAnd, true
+				} else {
+					break
+				}
+			}
+
+			// '|'
+			if s, ok := stmt.(*JS.BitOrExpressionContext); ok {
+				if op := s.BitOr(); op != nil {
+					single, Op, IsBinOp = s, ssa.OpOr, true
+				} else {
+					break
+				}
+			}
+
 			return
 		}
+
 		b.NewError(ssa.Error, TAG, "binary operator not support: %s", stmt.GetText())
 		return
 	}
@@ -265,6 +379,37 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 		// fallback is right?
 		b.NewError(ssa.Error, TAG, "error binary operator")
 		return nil
+	}
+
+	//advanced expression
+	handlerAdvancedExpression := func(cond func(string) ssa.Value, trueExpr, falseExpr func() ssa.Value) ssa.Value {
+		// 逻辑运算聚合产生phi指令
+		id := uuid.NewString()
+
+		ifb := b.BuildIf()
+		ifb.BuildCondition(
+			func() ssa.Value {
+				return cond(id)
+			},
+		)
+
+		ifb.BuildTrue(
+			func() {
+				v := trueExpr()
+				b.WriteVariable(id, v)
+			},
+		)
+
+		if falseExpr != nil {
+			ifb.BuildFalse(func() {
+				v := falseExpr()
+				b.WriteVariable(id, v)
+			})
+		}
+
+		ifb.Finish()
+		return b.ReadVariable(id, true)
+
 	}
 
 	switch s := stmt.(type) {
@@ -348,14 +493,21 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 		return handlePrimaryBinaryOperation()
 	case *JS.CoalesceExpressionContext:
 		// advanced
+		if expr := s.SingleExpression(0); expr != nil {
+			rv, _ := b.buildSingleExpression(expr, false)
+			if rv != nil {
+				return rv
+			} else {
+				v, _ := b.buildSingleExpression(expr, false)
+				return v
+			}
+		}
 	case *JS.BitShiftExpressionContext:
 		return handlePrimaryBinaryOperation()
 	case *JS.RelationalExpressionContext:
 		return handlePrimaryBinaryOperation()
 	case *JS.InstanceofExpressionContext:
-		return handlePrimaryBinaryOperation()
 	case *JS.InExpressionContext:
-		return handlePrimaryBinaryOperation()
 	case *JS.EqualityExpressionContext:
 		return handlePrimaryBinaryOperation()
 	case *JS.BitAndExpressionContext:
@@ -366,10 +518,43 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 		return handlePrimaryBinaryOperation()
 	case *JS.LogicalAndExpressionContext:
 		// advanced
+		return handlerAdvancedExpression(
+			func(id string) ssa.Value {
+				v := getValue(s, 0)
+				b.WriteVariable(id, v)
+				return v
+			},
+			func() ssa.Value {
+				return getValue(s, 1)
+			},
+			nil,
+		)
 	case *JS.LogicalOrExpressionContext:
 		// advanced
+		return handlerAdvancedExpression(
+			func(id string) ssa.Value {
+				v := getValue(s, 0)
+				b.WriteVariable(id, v)
+				return b.EmitUnOp(ssa.OpNot, v)
+			},
+			func() ssa.Value {
+				return getValue(s, 1)
+			},
+			nil,
+		)
 	case *JS.TernaryExpressionContext:
 		// advanced
+		return handlerAdvancedExpression(
+			func(_ string) ssa.Value {
+				return getValue(s, 0)
+			},
+			func() ssa.Value {
+				return getValue(s, 1)
+			},
+			func() ssa.Value {
+				return getValue(s, 2)
+			},
+		)
 	case *JS.AssignmentExpressionContext:
 		return b.buildAssignmentExpression(s)
 	case *JS.AssignmentOperatorExpressionContext:
@@ -388,8 +573,9 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 	case *JS.TemplateStringExpressionContext:
 	case *JS.YieldExpressionContext:
 	case *JS.ThisExpressionContext:
-	// identify是左值那边的
+
 	case *JS.IdentifierExpressionContext:
+	// identify是左值那边的
 	// 	rv, _ :=  b.buildIdentifierExpression(s.GetText(), false)
 	// 	return rv
 	case *JS.SuperExpressionContext:
@@ -523,6 +709,11 @@ func (b *astbuilder) buildIdentifierExpression(text string, IslValue bool) (ssa.
 	// defer recoverRange()
 
 	if IslValue {
+		if b.GetFromCmap(text) {
+			b.NewError(ssa.Error, TAG, "const cannot be assigned")
+			return nil, nil
+		}
+
 		// leftValue
 		if v := b.ReadVariable(text, false); v != nil {
 			switch value := v.(type) {
@@ -611,7 +802,7 @@ func (b *astbuilder) buildAssignmentExpression(stmt *JS.AssignmentExpressionCont
 	_, op1 := b.buildSingleExpression(stmt.SingleExpression(0), true)
 	op2, _ := b.buildSingleExpression(stmt.SingleExpression(1), false)
 
-	if op1 != nil && op2 != nil {
+	if (op1 != nil && op2 != nil) {
 		text := stmt.SingleExpression(0).GetText()
 		// lValue := ssa.NewIdentifierLV(text, b.CurrentPos)
 		op1.Assign(op2, b.FunctionBuilder)
@@ -944,7 +1135,7 @@ func (b *astbuilder) buildForInStatement(stmt *JS.ForInStatementContext) {
 		var value ssa.Value
 
 		if s, ok := stmt.VariableDeclaration().(*JS.VariableDeclarationContext); ok {
-			_, left = b.buildVariableDeclaration(s)
+			_, left = b.buildVariableDeclaration(s, "v")
 			value, _ = b.buildSingleExpression(stmt.SingleExpression(0), false)
 		} else {
 			_, left = b.buildSingleExpression(stmt.SingleExpression(0), true)
@@ -980,7 +1171,7 @@ func (b *astbuilder) buildForOfStatement(stmt *JS.ForOfStatementContext) {
 		var value ssa.Value
 
 		if s, ok := stmt.VariableDeclaration().(*JS.VariableDeclarationContext); ok {
-			_, left = b.buildVariableDeclaration(s)
+			_, left = b.buildVariableDeclaration(s, "v")
 			value, _ = b.buildSingleExpression(stmt.SingleExpression(0), false)
 		} else {
 			_, left = b.buildSingleExpression(stmt.SingleExpression(0), true)
@@ -1123,7 +1314,6 @@ func (b *astbuilder) buildLastFormalParameterArg(stmt *JS.LastFormalParameterArg
 		b.buildSingleExpression(s, false)
 	}
 }
-
 
 func (b *astbuilder) buildReturnStatement(stmt *JS.ReturnStatementContext) {
 	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
