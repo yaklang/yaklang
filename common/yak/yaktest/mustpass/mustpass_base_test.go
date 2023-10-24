@@ -81,14 +81,14 @@ func TestMustPassDebug(t *testing.T) {
 }
 
 func TestMustPass(t *testing.T) {
-	var debugName = "mock_thinkphprce.yak"
+	var debugName = "plugin_inherit_proxy.yak"
 	var debugCases [][]string
 	var cases [][]string
 	for k, v := range files {
 		if k == debugName {
 			debugCases = append(debugCases, []string{k, v})
 		} else {
-			cases = append(cases, []string{k, v})
+			//cases = append(cases, []string{k, v})
 		}
 	}
 

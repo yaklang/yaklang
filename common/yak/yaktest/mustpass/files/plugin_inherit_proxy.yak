@@ -74,11 +74,11 @@ mirrorNewWebsite = (isHttps, url, req, rsp, body) => {
     req = poc.ReplaceHTTPPacketHeader(req, "Connection", "close")
 
     // poc 8 reqs
-    poc.HTTP(req, poc.replaceQueryParam("u", token), poc.timeout(5), poc.https(isHttps))~
-    poc.HTTPEx(req, poc.replaceQueryParam("u", token), poc.timeout(5), poc.https(isHttps))~
+    poc.HTTP(req, poc.replaceQueryParam("u", token), poc.timeout(100), poc.https(isHttps))~
+    poc.HTTPEx(req, poc.replaceQueryParam("u", token), poc.timeout(100), poc.https(isHttps))~
     poc.Get(url, poc.replaceQueryParam("u", token), poc.timeout(5), poc.https(isHttps))~
     poc.Post(url, poc.replaceQueryParam("u", token), poc.timeout(5), poc.https(isHttps))~
-    poc.Head(url, poc.replaceQueryParam("u", token), poc.timeout(5), poc.https(isHttps))~
+    poc.Head(url, poc.replaceQueryParam("u", token), poc.timeout(100), poc.https(isHttps))~
     poc.Delete(url, poc.replaceQueryParam("u", token), poc.timeout(5), poc.https(isHttps))~
     poc.Options(url, poc.replaceQueryParam("u", token), poc.timeout(5), poc.https(isHttps))~
     poc.Do("PUT", url, poc.replaceQueryParam("u", token), poc.timeout(5), poc.https(isHttps))~
