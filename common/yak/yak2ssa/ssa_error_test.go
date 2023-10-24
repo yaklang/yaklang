@@ -620,6 +620,13 @@ func TestClosureBinding(t *testing.T) {
 }
 
 // for  "check alias type method"
+
+type CanGetInt interface {
+	GetInt() int
+}
+
+var _ CanGetInt = (*AliasType)(nil)
+
 type AliasType int
 
 func (a AliasType) GetInt() int {
@@ -681,6 +688,19 @@ func TestExternStruct(t *testing.T) {
 			},
 		})
 	})
+
+	t.Run("check interface type method", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			a = getCanGetInt()
+			a.GetInt()
+			`,
+			ExternValue: map[string]any{
+				"getCanGetInt": func() CanGetInt { return AliasType(1) },
+			},
+		})
+	})
+
 }
 
 func TestExternInstance(t *testing.T) {
