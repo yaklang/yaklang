@@ -60,6 +60,11 @@ func ReadWithContextTickCallback(ctx context.Context, rc io.Reader, callback fun
 	}
 }
 
+func IsErrorNetOpTimeout(err error) bool {
+	var netOpError interface{ Timeout() bool }
+	return errors.As(err, &netOpError) && netOpError != nil && netOpError.Timeout()
+}
+
 func ReadConnUntil(conn net.Conn, timeout time.Duration, sep ...byte) ([]byte, error) {
 	if conn == nil {
 		return nil, Error("empty(nil) conn")
@@ -78,7 +83,7 @@ func ReadConnUntil(conn net.Conn, timeout time.Duration, sep ...byte) ([]byte, e
 	}
 
 	for {
-		n, err := conn.Read(buf)
+		n, err := io.ReadFull(conn, buf)
 		if err != nil {
 			var netOpError interface{ Timeout() bool }
 			if errors.As(err, &netOpError) && netOpError != nil && netOpError.Timeout() {
@@ -91,6 +96,69 @@ func ReadConnUntil(conn net.Conn, timeout time.Duration, sep ...byte) ([]byte, e
 			return result.Bytes(), err
 		}
 		result.Write(buf[:n])
+		if n == 1 {
+			_, isStop := stopWord[buf[0]]
+			if isStop {
+				return result.Bytes(), nil
+			}
+		}
+	}
+}
+
+// ReadConnUntilStable is a stable reader check interval(stableTimeout)
+// safe for conn is empty
+func ReadConnUntilStable(reader io.Reader, conn net.Conn, timeout time.Duration, stableTimeout time.Duration, sep ...byte) ([]byte, error) {
+	var buf = make([]byte, 1)
+	var result bytes.Buffer
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	var stopWord = make(map[byte]struct{})
+	for _, stop := range sep {
+		stopWord[stop] = struct{}{}
+	}
+
+	wrapperTimeout := func(originReader io.Reader) io.Reader {
+		if conn != nil {
+			_ = conn.SetReadDeadline(time.Now().Add(stableTimeout))
+			return originReader
+		} else {
+			return ctxio.NewReader(TimeoutContext(stableTimeout), originReader)
+		}
+	}
+	recoverTimeout := func() {
+		if conn != nil {
+			_ = conn.SetReadDeadline(time.Time{})
+		}
+	}
+
+	for {
+		n, err := io.ReadFull(wrapperTimeout(reader), buf)
+		recoverTimeout()
+
+		if err != nil {
+			var netOpError interface{ Timeout() bool }
+			if errors.As(err, &netOpError) && netOpError != nil && netOpError.Timeout() {
+				if result.Len() > 0 {
+					return result.Bytes(), nil
+				} else {
+					return nil, err
+				}
+			}
+			return result.Bytes(), err
+		}
+		if n > 0 {
+			result.Write(buf[:n])
+		}
+		select {
+		case <-ctx.Done():
+			if result.Len() > 0 {
+				return result.Bytes(), nil
+			}
+			return nil, Error("i/o timeout")
+		default:
+		}
 		if n == 1 {
 			_, isStop := stopWord[buf[0]]
 			if isStop {
