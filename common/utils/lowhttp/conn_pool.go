@@ -387,7 +387,7 @@ func (pc *persistConn) readLoop() {
 		}
 
 		if err != nil {
-			if responseRaw.Len() > 0 { // 如果 TeaReader内部还有数据证明,证明有响应数据,只是解析失败
+			if responseRaw.Len() >= len(respPacket) { // 如果 TeaReader内部还有数据证明,证明有响应数据,只是解析失败
 				// continue read 5 seconds, to receive rest data
 				// ignore error, treat as bad conn
 				restBytes, _ := utils.ReadConnUntilStable(pc.br, pc.Conn, 5*time.Second, 300*time.Millisecond)
@@ -399,12 +399,15 @@ func (pc *persistConn) readLoop() {
 			}
 		}
 
+		if len(respPacket) > 0 {
+			err = nil
+		}
+
 		pc.mu.Lock()
 		pc.numExpectedResponses-- //减少预期响应数量
 		pc.mu.Unlock()
 
 		rc.ch <- responseInfo{resp: resp, respBytes: respPacket, info: info, err: err}
-		_ = pc.Conn.SetReadDeadline(time.Time{}) //重置超时限制为peek做准备
 		alive = alive &&
 			!pc.sawEOF &&
 			tryPutIdleConn()
