@@ -197,16 +197,18 @@ func (s *BlockCondition) calcCondition(block *ssa.BasicBlock) ssa.Value {
 
 func newBinOp(op ssa.BinaryOpcode, x ssa.Value, y ssa.Value, block *ssa.BasicBlock) ssa.Value {
 	b := ssa.NewBinOp(op, x, y)
-	// if inst, ok := b.(ssa.Instruction); ok {
-	// 	ssa.EmitInst(inst)
-	// }
+	if b, ok := ssa.ToBinOp(b); ok {
+		block.EmitInst(b)
+		b.SetPosition(block.GetPosition())
+	}
 	return b
 }
 
 func newUnOp(op ssa.UnaryOpcode, x ssa.Value, block *ssa.BasicBlock) ssa.Value {
 	u := ssa.NewUnOp(op, x)
-	// if inst, ok := u.(ssa.Instruction); ok {
-	// ssa.EmitInst(inst)
-	// }
+	if u, ok := ssa.ToUnOp(u); ok {
+		block.EmitInst(u)
+		u.SetPosition(block.GetPosition())
+	}
 	return u
 }

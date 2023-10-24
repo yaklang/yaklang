@@ -170,7 +170,7 @@ func (b *FunctionBuilder) readVariableByBlockEx(variable string, block *BasicBlo
 		} else if create {
 			un := NewUndefined(variable)
 			// b.emitInstructionBefore(un, block.LastInst())
-			b.emitToBlock(un, block)
+			b.EmitToBlock(un, block)
 			v = un
 		} else {
 			v = nil
