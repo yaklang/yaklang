@@ -157,7 +157,13 @@ func readHTTPResponseFromBufioReader(reader *bufio.Reader, fixContentLength bool
 	var bodyRawBuf = new(bytes.Buffer)
 	var peekabledData = new(bytes.Buffer)
 	if conn != nil {
+		if !useContentLength && !useTransferEncodingChunked {
+			_ = conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+		}
 		bt, err := reader.ReadByte()
+		if !useContentLength && !useTransferEncodingChunked {
+			_ = conn.SetReadDeadline(time.Time{})
+		}
 		if err != nil {
 			rsp.Body = http.NoBody
 			if req != nil {
