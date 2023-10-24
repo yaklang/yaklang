@@ -154,11 +154,11 @@ func (f *FunctionBuilder) emitEx(i Instruction, insert func(Instruction)) {
 	insert(i)
 }
 
-func (f *FunctionBuilder) EmitUndefine(name string) *Undefine {
+func (f *FunctionBuilder) EmitUndefine(name string) *Undefined {
 	if f.CurrentBlock.finish {
 		return nil
 	}
-	u := NewUndefine(name)
+	u := NewUndefined(name)
 	f.emit(u)
 	return u
 }

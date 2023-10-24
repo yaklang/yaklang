@@ -171,10 +171,9 @@ func (c *ConstInst) String() string {
 	return c.Const.String()
 }
 
-// ----------- undefine
-func (u *Undefine) String() string {
-	// return "undefine-" + u.GetVariable()
-	return fmt.Sprintf("%s = undefine-%s", getStr(u), u.GetVariable())
+// ----------- undefined
+func (u *Undefined) String() string {
+	return fmt.Sprintf("%s = undefined-%s", getStr(u), u.GetVariable())
 }
 
 // ----------- Phi
