@@ -339,11 +339,9 @@ func (pc *persistConn) readLoop() {
 	count := 0
 	alive := true
 	for alive {
-		// peek first byte in 30 seconds timeout
 		// if failed, handle it (re-conn / or abandoned)
-		_ = pc.Conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+		_ = pc.Conn.SetReadDeadline(time.Time{})
 		_, err := pc.br.Peek(1)
-		_ = pc.Conn.SetReadDeadline(time.Time{}) // cancel
 
 		// 检查是否有需要返回的响应,如果没有则可以直接返回,不需要往管道里返回数据（err）
 		if pc.numExpectedResponses == 0 {
@@ -373,7 +371,8 @@ func (pc *persistConn) readLoop() {
 		// peek is executed, so we can read without timeout
 		// for long time chunked supported
 		_ = pc.Conn.SetReadDeadline(time.Time{})
-		resp, err = utils.ReadHTTPResponseFromBufioReader(pc.br, stashRequest)
+		resp, err = utils.ReadHTTPResponseFromBufioReaderConn(pc.br, pc.Conn, stashRequest)
+		resp.Request = nil
 
 		count++
 		var responseRaw bytes.Buffer
@@ -384,11 +383,10 @@ func (pc *persistConn) readLoop() {
 
 		if err != nil {
 			if responseRaw.Len() > 0 { // 如果 TeaReader内部还有数据证明,证明有响应数据,只是解析失败
-				// continue read 3 seconds, to receive rest data
-				restBytes, readErr := utils.ReadConnUntil(pc.Conn, 3*time.Second)
-				if errors.Is(readErr, io.EOF) {
-					pc.sawEOF = true
-				}
+				// continue read 5 seconds, to receive rest data
+				// ignore error, treat as bad conn
+				restBytes, _ := utils.ReadConnUntilStable(pc.br, pc.Conn, 5*time.Second, 300*time.Millisecond)
+				pc.sawEOF = true
 				if len(restBytes) > 0 {
 					responseRaw.Write(restBytes)
 					respPacket = responseRaw.Bytes()

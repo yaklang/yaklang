@@ -9,9 +9,11 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -38,7 +40,16 @@ func ParseHTTPResponseLine(line string) (string, int, string, bool) {
 }
 
 func ReadHTTPResponseFromBufioReader(reader *bufio.Reader, req *http.Request) (*http.Response, error) {
-	rsp, err := readHTTPResponseFromBufioReader(reader, false, req)
+	rsp, err := readHTTPResponseFromBufioReader(reader, false, req, nil)
+	if err != nil {
+		return nil, err
+	}
+	rsp.Request = req
+	return rsp, nil
+}
+
+func ReadHTTPResponseFromBufioReaderConn(reader *bufio.Reader, conn net.Conn, req *http.Request) (*http.Response, error) {
+	rsp, err := readHTTPResponseFromBufioReader(reader, false, req, conn)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +58,7 @@ func ReadHTTPResponseFromBufioReader(reader *bufio.Reader, req *http.Request) (*
 }
 
 func ReadHTTPResponseFromBytes(raw []byte, req *http.Request) (*http.Response, error) {
-	rsp, err := readHTTPResponseFromBufioReader(bufio.NewReader(bytes.NewReader(raw)), true, req)
+	rsp, err := readHTTPResponseFromBufioReader(bufio.NewReader(bytes.NewReader(raw)), true, req, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +66,7 @@ func ReadHTTPResponseFromBytes(raw []byte, req *http.Request) (*http.Response, e
 	return rsp, nil
 }
 
-func readHTTPResponseFromBufioReader(reader *bufio.Reader, fixContentLength bool, req *http.Request) (*http.Response, error) {
+func readHTTPResponseFromBufioReader(reader *bufio.Reader, fixContentLength bool, req *http.Request, conn net.Conn) (*http.Response, error) {
 	var rawPacket = new(bytes.Buffer)
 
 	var rsp = &http.Response{
@@ -144,9 +155,31 @@ func readHTTPResponseFromBufioReader(reader *bufio.Reader, fixContentLength bool
 	rsp.Header = header
 
 	var bodyRawBuf = new(bytes.Buffer)
+	var peekabledData = new(bytes.Buffer)
+	if conn != nil {
+		bt, err := reader.ReadByte()
+		if err != nil {
+			rsp.Body = http.NoBody
+			if req != nil {
+				rsp.Request = req
+				httpctx.SetBareResponseBytes(req, rawPacket.Bytes())
+			}
+			return rsp, err
+		} else {
+			peekabledData.WriteByte(bt)
+		}
+	}
+
+	getPeekableReader := func() io.Reader {
+		if conn == nil {
+			return reader
+		}
+		return io.MultiReader(peekabledData, reader)
+	}
+
 	if fixContentLength || (!useContentLength && !useTransferEncodingChunked) { //在设置修复长度,或者CL合Chunk两者都没有的情况下尽可能的读取
 		// by reader
-		raw, _ := io.ReadAll(reader)
+		raw, _ := ReadConnUntilStable(getPeekableReader(), conn, 5*time.Second, 300*time.Millisecond)
 		rawPacket.Write(raw)
 		if useContentLength && !useTransferEncodingChunked {
 			rsp.ContentLength = int64(len(raw))
@@ -161,7 +194,7 @@ func readHTTPResponseFromBufioReader(reader *bufio.Reader, fixContentLength bool
 			log.Debug("content-length and transfer-encoding chunked both exist, try smuggle? use content-length first!")
 			if contentLengthInt > 0 {
 				// smuggle
-				bodyRaw, _ := io.ReadAll(io.NopCloser(io.LimitReader(reader, int64(contentLengthInt))))
+				bodyRaw, _ := io.ReadAll(io.NopCloser(io.LimitReader(getPeekableReader(), int64(contentLengthInt))))
 				rawPacket.Write(bodyRaw)
 				bodyRawBuf.Write(bodyRaw)
 				if ret := contentLengthInt - len(bodyRaw); ret > 0 {
@@ -169,7 +202,7 @@ func readHTTPResponseFromBufioReader(reader *bufio.Reader, fixContentLength bool
 				}
 			} else {
 				// chunked
-				_, fixed, _, err := codec.HTTPChunkedDecoderWithRestBytes(reader)
+				_, fixed, _, err := codec.HTTPChunkedDecoderWithRestBytes(getPeekableReader())
 				rawPacket.Write(fixed)
 				if err != nil {
 					return nil, errors.Wrap(err, "chunked decoder error")
@@ -179,7 +212,7 @@ func readHTTPResponseFromBufioReader(reader *bufio.Reader, fixContentLength bool
 			}
 		} else if !useContentLength && useTransferEncodingChunked {
 			// handle chunked
-			_, fixed, _, err := codec.HTTPChunkedDecoderWithRestBytes(reader)
+			_, fixed, _, err := codec.HTTPChunkedDecoderWithRestBytes(getPeekableReader())
 			rawPacket.Write(fixed)
 			if err != nil {
 				return nil, errors.Wrap(err, "chunked decoder error")
@@ -190,7 +223,7 @@ func readHTTPResponseFromBufioReader(reader *bufio.Reader, fixContentLength bool
 		} else {
 			// handle content-length as default
 			if contentLengthInt > 0 {
-				var bodyRaw, err = io.ReadAll(io.NopCloser(io.LimitReader(reader, int64(contentLengthInt))))
+				var bodyRaw, err = io.ReadAll(io.NopCloser(io.LimitReader(getPeekableReader(), int64(contentLengthInt))))
 				rawPacket.Write(bodyRaw)
 				if err != nil && err != io.EOF {
 					return nil, errors.Wrap(err, "read body error")
