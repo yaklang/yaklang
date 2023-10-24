@@ -12,8 +12,6 @@ import (
 
 var HttpServeExports = map[string]interface{}{
 	"Serve":                _httpServe,
-	"MockServe":            utils.DebugMockHTTP,
-	"MockServeBare":        utils.DebugMockHTTPNotFixCL,
 	"tlsCertAndKey":        _httpServerOptCaAndKey,
 	"context":              _httpServerOptContext,
 	"handler":              _httpServerOptCallback,

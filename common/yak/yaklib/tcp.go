@@ -151,7 +151,7 @@ func _tcpClientProxy(proxy string) dialerOpt {
 }
 
 var TcpExports = map[string]interface{}{
-	"MockServe":       utils.DebugMockTCP,
+	"MockServe":       utils.DebugMockHTTP,
 	"MockTCPProtocol": DebugMockTCPProtocol,
 
 	"Connect": _tcpConnect,
