@@ -2,26 +2,41 @@ package yaklib
 
 import (
 	"fmt"
+	"regexp"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"regexp"
 )
 
-var reMatch = func(pattern string, i interface{}) bool {
+// RegexpMatch 使用正则尝试匹配字符串 s，如果匹配成功返回 true，否则返回 false
+// Example:
+// ```
+// str.RegexpMatch("^[a-z]+$", "abc") // true
+// ```
+func strRegexpMatch(pattern string, s interface{}) bool {
+	return reMatch(pattern, s)
+}
+
+// Match 使用正则尝试匹配字符串 s，如果匹配成功返回 true，否则返回 false
+// Example:
+// ```
+// re.Match("^[a-z]+$", "abc") // true
+// ```
+func reMatch(pattern string, s interface{}) bool {
 	r, err := regexp.Compile(pattern)
 	if err != nil {
 		_diewith(utils.Errorf("compile[%v] failed: %v", pattern, err))
 		return false
 	}
 
-	switch ret := i.(type) {
+	switch ret := s.(type) {
 	case []byte:
 		return r.Match(ret)
 	case string:
 		return r.MatchString(ret)
 	default:
-		_diewith(utils.Errorf("target: %v should be []byte or string", spew.Sdump(i)))
+		_diewith(utils.Errorf("target: %v should be []byte or string", spew.Sdump(s)))
 	}
 	return false
 }

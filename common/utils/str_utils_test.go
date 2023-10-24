@@ -1,10 +1,11 @@
 package utils
 
 import (
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
-	"testing"
 )
 
 func TestRemoveUnprintableChars(t *testing.T) {

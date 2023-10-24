@@ -2,10 +2,11 @@ package utils
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"net"
 	"sort"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 func ConcatPorts(ports []int) string {
@@ -110,7 +111,12 @@ func SplitHostsAndPorts(hosts, ports string, portGroupSize int, proto string) []
 	return rawTarget
 }
 
-func GetCClassByIPv4(s string) (string, error) {
+// IPv4ToCClassNetwork 尝试从一个 IPv4 地址中获取 C 类网络地址，并返回错误
+// Example:
+// ```
+// network, err = str.IPv4ToCClassNetwork("192.168.0.1") // network = "192.168.0.0/24", err = nil
+// ```
+func GetCClassByIPv4(s string) (network string, err error) {
 	ip := net.ParseIP(FixForParseIP(s))
 	if ip != nil && ip.To4() != nil {
 		_, network, err := net.ParseCIDR(fmt.Sprintf("%v/24", s))

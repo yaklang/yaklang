@@ -31,6 +31,11 @@ import (
 	"github.com/denisbrodbeck/machineid"
 )
 
+// LowerAndTrimSpace 将字符串raw转换为小写并去除前后空白字符
+// Example:
+// ```
+// str.LowerAndTrimSpace("  Hello  ") // "hello"
+// ```
 func StringLowerAndTrimSpace(raw string) string {
 	return strings.ToLower(strings.TrimSpace(raw))
 }
