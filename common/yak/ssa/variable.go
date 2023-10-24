@@ -1,10 +1,6 @@
 package ssa
 
-import (
-	"sort"
-
-	"github.com/yaklang/yaklang/common/utils"
-)
+import "github.com/yaklang/yaklang/common/utils"
 
 // --------------- for assign
 type LeftValue interface {
@@ -21,7 +17,7 @@ type IdentifierLV struct {
 }
 
 func (i *IdentifierLV) Assign(v Value, f *FunctionBuilder) {
-	v.AddLeftPosition(i.GetPosition())
+	v.AddLeftPositions(i.GetPosition())
 	f.WriteVariable(i.variable, v)
 }
 
@@ -56,61 +52,37 @@ func (f *Field) GetValue(_ *FunctionBuilder) Value {
 var _ LeftValue = (*Field)(nil)
 
 // --------------- `f.currentDef` handler, read && write
-func (f *Function) WriteVariable(variable string, value Value) {
-	if b := f.builder; b != nil {
-		variable = b.GetIdByBlockSymbolTable(variable)
-		b.writeVariableByBlock(variable, value, b.CurrentBlock)
-	}
-	// if value is InstructionValue
-	f.WriteSymbolTable(variable, value)
+func (f *FunctionBuilder) WriteVariable(variable string, value Value) {
+	f.WriteVariableWithBlockSymbol(variable, value, f.GetSymbolTable(), f.CurrentBlock)
+}
+func (f *Function) WriteVariableWithBlockSymbol(variable string, value Value, blockSymbol *blockSymbolTable, block *BasicBlock) {
+	variable = GetIdByBlockSymbolTable(variable, blockSymbol)
+	f.writeVariableByBlock(variable, value, block)
 }
 
-func (f *Function) ReplaceSymbolTable(v, to Value) {
-	variable := v.GetVariable()
-	// remove
-	if t, ok := f.symbolTable[variable]; ok {
-		f.symbolTable[variable] = utils.RemoveSliceItem(t, v)
-	}
-	f.WriteSymbolTable(variable, to)
-}
-
-func (f *Function) WriteSymbolTable(variable string, value Value) {
-	if utils.IsNil(value) {
-		return
-	}
-
-	list, ok := f.symbolTable[variable]
-	if !ok {
-		list = make([]Value, 0, 1)
-	}
-	pos := value.GetPosition()
-	_ = pos
-	list = append(list, value)
-	sort.Slice(list, func(i, j int) bool {
-		// return list[i].GetPosition().StartLine > list[j].GetPosition().StartLine
-		iPos := list[i].GetPosition()
-		jPos := list[j].GetPosition()
-		return iPos.StartLine > jPos.StartLine
-	})
-	f.symbolTable[variable] = list
-	value.AddLeftVariables(variable)
-}
-
-func (b *FunctionBuilder) ReplaceVariable(variable string, v, to Value) {
-	if m, ok := b.currentDef[variable]; ok {
+func (b *Function) ReplaceVariable(variable string, v, to Value) {
+	if m, ok := b.symbolTable[variable]; ok {
 		for block, value := range m {
-			if value == v {
-				m[block] = to
-			}
+			m[block] = utils.ReplaceSliceItem(value, v, to)
 		}
 	}
 }
 
-func (b *FunctionBuilder) writeVariableByBlock(variable string, value Value, block *BasicBlock) {
-	if _, ok := b.currentDef[variable]; !ok {
-		b.currentDef[variable] = make(map[*BasicBlock]Value)
+func (b *Function) writeVariableByBlock(variable string, value Value, block *BasicBlock) {
+	if _, ok := b.symbolTable[variable]; !ok {
+		b.symbolTable[variable] = make(map[*BasicBlock]Values)
 	}
-	b.currentDef[variable][block] = value
+	vs, ok := b.symbolTable[variable][block]
+	if !ok {
+		vs = make(Values, 0)
+	}
+	if value.GetVariable() == "" {
+		value.SetVariable(variable)
+	} else {
+		value.AddLeftVariables(variable)
+	}
+	vs = append(vs, value)
+	b.symbolTable[variable][block] = vs
 }
 
 // get value by variable and block
@@ -123,24 +95,60 @@ func (b *FunctionBuilder) writeVariableByBlock(variable string, value Value, blo
 // * if len(block.preds) == 0: undefine
 // * if len(block.preds) == 1: just recursive
 // * if len(block.preds) >  1: create phi and builder
-func (b *FunctionBuilder) ReadVariable(variable string, create bool) (ret Value) {
-	variable = b.GetIdByBlockSymbolTable(variable)
-	if b.CurrentBlock != nil {
-		// for building function
-		ret = b.readVariableByBlock(variable, b.CurrentBlock, create)
-	} else {
-		// for finish function
-		ret = b.readVariableByBlock(variable, b.ExitBlock, create)
-	}
-	return
+func (b *FunctionBuilder) ReadVariable(variable string, create bool) Value {
+	var ret Value
+	b.ReadVariableEx(variable, create, func(vs []Value) {
+		if len(vs) > 0 {
+			ret = vs[len(vs)-1]
+		} else {
+			ret = nil
+		}
+	})
+	return ret
 }
+
+func (b *FunctionBuilder) ReadVariableBefore(variable string, create bool, before Instruction) Value {
+	var ret Value
+	b.ReadVariableEx(variable, create, func(vs []Value) {
+		for i := len(vs) - 1; i >= 0; i-- {
+			vpos := vs[i].GetPosition()
+			bpos := before.GetPosition()
+			if vpos.StartLine <= bpos.StartLine {
+				ret = vs[i]
+				return
+			}
+		}
+	})
+	return ret
+}
+
+func (b *FunctionBuilder) ReadVariableEx(variable string, create bool, fun func([]Value)) {
+	variable = b.GetIdByBlockSymbolTable(variable)
+	var ret []Value
+	block := b.CurrentBlock
+	if block == nil {
+		block = b.ExitBlock
+	}
+	ret = b.readVariableByBlockEx(variable, block, create)
+	fun(ret)
+}
+
 func (b *FunctionBuilder) readVariableByBlock(variable string, block *BasicBlock, create bool) Value {
+	ret := b.readVariableByBlockEx(variable, block, create)
+	if len(ret) > 0 {
+		return ret[len(ret)-1]
+	} else {
+		return nil
+	}
+}
+
+func (b *FunctionBuilder) readVariableByBlockEx(variable string, block *BasicBlock, create bool) []Value {
 	if block.Skip {
 		return nil
 	}
-	if map2, ok := b.currentDef[variable]; ok {
-		if value, ok := map2[block]; ok {
-			return value
+	if map2, ok := b.symbolTable[variable]; ok {
+		if vs, ok := map2[block]; ok && len(vs) > 0 {
+			return vs
 		}
 	}
 
@@ -168,7 +176,7 @@ func (b *FunctionBuilder) readVariableByBlock(variable string, block *BasicBlock
 			v = nil
 		}
 	} else if len(block.Preds) == 1 {
-		v = b.readVariableByBlock(variable, block.Preds[0], create)
+		return b.readVariableByBlockEx(variable, block.Preds[0], create)
 	} else {
 		phi := NewPhi(block, variable, create)
 		phi.SetPosition(b.CurrentPos)
@@ -176,8 +184,10 @@ func (b *FunctionBuilder) readVariableByBlock(variable string, block *BasicBlock
 	}
 	if v != nil {
 		b.writeVariableByBlock(variable, v, block)
+		return []Value{v}
+	} else {
+		return nil
 	}
-	return v
 }
 
 // --------------- `f.freeValue`
@@ -208,20 +218,4 @@ func (b *FunctionBuilder) CanBuildFreeValue(variable string) bool {
 		parent = parent.parentBuilder
 	}
 	return false
-}
-
-func (f *FunctionBuilder) GetVariableBefore(name string, before Instruction) Value {
-	name = f.GetIdByBlockSymbolTable(name)
-	if ivs, ok := f.symbolTable[name]; ok {
-		for _, iv := range ivs {
-			if iv.GetPosition().StartLine < before.GetPosition().StartLine {
-				if ci, ok := iv.(*ConstInst); ok {
-					return ci
-				} else {
-					return iv
-				}
-			}
-		}
-	}
-	return nil
 }

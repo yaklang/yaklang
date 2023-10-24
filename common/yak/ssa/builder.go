@@ -26,10 +26,9 @@ type FunctionBuilder struct {
 	deferExpr []*Call // defer function, reverse  for-range
 
 	// for build
-	currentDef         map[string]map[*BasicBlock]Value // currentDef[variableId][block]value
-	CurrentBlock       *BasicBlock                      // current block to build
-	CurrentPos         *Position                        // current position in source code
-	blockSymbolTable   *blockSymbolTable                //  blockId -> variable -> variableId
+	CurrentBlock       *BasicBlock       // current block to build
+	CurrentPos         *Position         // current position in source code
+	blockSymbolTable   *blockSymbolTable //  blockId -> variable -> variableId
 	blockId            int
 	parentSymbolBlock  *blockSymbolTable // parent symbol block for build FreeValue
 	parentCurrentBlock *BasicBlock       // parent build subFunction position
@@ -46,7 +45,6 @@ func NewBuilder(f *Function, parent *FunctionBuilder) *FunctionBuilder {
 		target:       &target{},
 		subFuncBuild: make([]func(), 0),
 		deferExpr:    make([]*Call, 0),
-		currentDef:   make(map[string]map[*BasicBlock]Value),
 		CurrentBlock: nil,
 		CurrentPos:   nil,
 		blockSymbolTable: &blockSymbolTable{

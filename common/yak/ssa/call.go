@@ -28,33 +28,33 @@ func (c *Call) HandleFreeValue(fvs map[string]bool) {
 
 	for name, modify := range fvs {
 		_ = modify
-		if v := builder.GetVariableBefore(name, c); v != nil {
-			// 		// if v := builder.ReadVariable(name, false); v != nil {
-			// 		if modify {
-			// 			field := builder.NewCaptureField(name)
-			// 			field.OutCapture = false
-			// 			// EmitBefore(c, field)
-			// 			EmitAfter(c, field)
-			// 			field.SetPosition(c.GetPosition())
-			// 			field.SetType(BasicTypes[Any])
-			// 			builder.WriteVariable(name, field)
-			// 			ReplaceValueInRange(v, field, func(inst Instruction) bool {
-			// 				if inst.GetPosition() == nil {
-			// 					return false
-			// 				}
-			// 				if inst.GetPosition().StartLine > c.GetPosition().StartLine {
-			// 					return true
-			// 				} else {
-			// 					return false
-			// 				}
-			// 			})
-			// 			//TODO: modify this binding
-			// 			c.binding = append(c.binding, v)
-			// 		} else {
-			// 			c.binding = append(c.binding, v)
-			// 		}
-			// 	} else {
-			// 		c.NewError(Error, SSATAG, BindingNotFound(name))
+		_ = name
+		if v := builder.ReadVariableBefore(name, false, c); v != nil {
+			if modify {
+				field := builder.NewCaptureField(name)
+				field.OutCapture = false
+				// EmitBefore(c, field)
+				builder.emitInstructionAfter(field, c)
+				field.SetPosition(c.GetPosition())
+				field.SetType(BasicTypes[Any])
+				builder.WriteVariable(name, field)
+				ReplaceValueInRange(v, field, func(inst Instruction) bool {
+					if inst.GetPosition() == nil {
+						return false
+					}
+					if inst.GetPosition().StartLine > c.GetPosition().StartLine {
+						return true
+					} else {
+						return false
+					}
+				})
+				//TODO: modify this binding
+				c.binding = append(c.binding, v)
+			} else {
+				c.binding = append(c.binding, v)
+			}
+		} else {
+			c.NewError(Error, SSATAG, BindingNotFound(name))
 		}
 	}
 }
