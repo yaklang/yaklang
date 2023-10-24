@@ -1029,6 +1029,7 @@ RECONNECT:
 			if len(responseRaw.Bytes()) == 0 {
 				return response, errors.Wrap(err, "empty result.")
 			} else { // peek 到了数据,但是无法解析,说明是畸形响应包
+				_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 				_, _ = io.ReadAll(httpResponseReader)
 				rawBytes = responseRaw.Bytes()
 			}

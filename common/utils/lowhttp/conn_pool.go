@@ -12,7 +12,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 )
@@ -133,7 +132,6 @@ func (l *lowHttpConnPool) removeConnLocked(pConn *persistConn) error {
 	pConn.Conn.Close()
 	switch len(connList) {
 	case 0:
-		log.Warn("remove Conn warning : [not find this Conn from the Conn pool]")
 		return nil
 	case 1:
 		if connList[0] == pConn {
@@ -369,11 +367,13 @@ func (pc *persistConn) readLoop() {
 		var resp *http.Response
 
 		httpResponseReader := bufio.NewReader(io.TeeReader(pc.br, &responseRaw))
+		_ = pc.Conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 		resp, err = utils.ReadHTTPResponseFromBufioReader(httpResponseReader, nil)
 		count++
 
 		if err != nil {
 			if len(responseRaw.Bytes()) > 0 { // 如果 TeaReader内部还有数据证明,证明有响应数据,只是解析失败
+				_ = pc.Conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 				_, readErr := io.ReadAll(httpResponseReader) // 尝试读取所有数据,主要是超过缓冲区的问题
 				if errors.Is(readErr, io.EOF) {
 					pc.sawEOF = true
@@ -389,6 +389,7 @@ func (pc *persistConn) readLoop() {
 		pc.mu.Unlock()
 
 		rc.ch <- responseInfo{resp: resp, respBytes: respPacket, info: info, err: err}
+		_ = pc.Conn.SetReadDeadline(time.Time{}) //重置超时限制为peek做准备
 		alive = alive &&
 			!pc.sawEOF &&
 			tryPutIdleConn()
@@ -452,15 +453,9 @@ func (pc *persistConn) removeConn() {
 }
 
 func (pc *persistConn) Read(b []byte) (n int, err error) {
-	_ = pc.Conn.SetReadDeadline(time.Now().Add(2 * time.Second))
 	n, err = pc.Conn.Read(b)
-	if err != nil {
-		if err == io.EOF {
-			pc.sawEOF = true
-		}
-		if strings.Contains(err.Error(), "timeout") {
-			err = io.EOF
-		}
+	if err == io.EOF {
+		pc.sawEOF = true
 	}
 	return
 }
