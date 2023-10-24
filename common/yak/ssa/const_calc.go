@@ -33,6 +33,31 @@ const (
 	OpSend // <-
 )
 
+var BinaryOpcodeName = map[BinaryOpcode]string{
+	OpLogicAnd: `&&`,
+	OpLogicOr:  `||`,
+
+	OpAnd:    `and`,
+	OpAndNot: `and-not`,
+	OpOr:     `or`,
+	OpXor:    `xor`,
+	OpShl:    `shl`,
+	OpShr:    `shr`,
+	OpAdd:    `add`,
+	OpSub:    `sub`,
+	OpMod:    `mod`,
+	OpMul:    `mul`,
+	OpDiv:    `div`,
+	OpGt:     `gt`,
+	OpLt:     `lt`,
+	OpLtEq:   `lt-eq`,
+	OpGtEq:   `gt-eq`,
+	OpNotEq:  `neq`,
+	OpEq:     `eq`,
+	OpIn:     `in`,
+	OpSend:   `send`,
+}
+
 type UnaryOpcode int
 
 const (
@@ -44,27 +69,36 @@ const (
 	OpBitwiseNot             // ^
 )
 
-func HandlerBinOp(b *BinOp) Value {
-	// if IsConst(b.X) {
-	// 	if IsConst(b.Y) {
-	// 		// both const
-	// 		if v := CalcConstBinary(ToConst(b.X), ToConst(b.Y), b.Op); v != nil {
-	// 			return v
-	// 		}
+var UnaryOpcodeName = map[UnaryOpcode]string{
+	OpNone:       ``,
+	OpNot:        `not`,
+	OpPlus:       `plus`,
+	OpNeg:        `neg`,
+	OpChan:       `chan`,
+	OpBitwiseNot: `bitwise-not`,
+}
 
-	// 	} else {
-	// 		// x const
-	// 		if v := CalcConstBinarySide(ToConst(b.X), b.Y, b.Op); v != nil {
-	// 			return v
-	// 		}
-	// 	}
-	// }
-	// if IsConst(b.Y) {
-	// 	// y const
-	// 	if v := CalcConstBinarySide(ToConst(b.Y), b.X, b.Op); v != nil {
-	// 		return v
-	// 	}
-	// }
+func HandlerBinOp(b *BinOp) Value {
+	if cX, ok := ToConst(b.X); ok {
+		if cY, ok := ToConst(b.Y); ok {
+			// both const
+			if v := CalcConstBinary(cX, cY, b.Op); v != nil {
+				return v
+			}
+
+		} else {
+			// x const
+			if v := CalcConstBinarySide(cX, b.Y, b.Op); v != nil {
+				return v
+			}
+		}
+	}
+	if c, ok := ToConst(b.Y); ok {
+		// y const
+		if v := CalcConstBinarySide(c, b.X, b.Op); v != nil {
+			return v
+		}
+	}
 
 	// both not const
 
@@ -72,11 +106,11 @@ func HandlerBinOp(b *BinOp) Value {
 }
 
 func HandlerUnOp(u *UnOp) Value {
-	// if IsConst(u.X) {
-	// 	if v := CalcConstUnary(ToConst(u.X), u.Op); v != nil {
-	// 		return v
-	// 	}
-	// }
+	if c, ok := ToConst(u.X); ok {
+		if v := CalcConstUnary(c, u.Op); v != nil {
+			return v
+		}
+	}
 	return u
 }
 
@@ -136,7 +170,7 @@ func CalcConstBinarySide(c *ConstInst, v Value, op BinaryOpcode) Value {
 	return nil
 }
 
-func CalcConstBinary(x, y *Const, op BinaryOpcode) *ConstInst {
+func CalcConstBinary(x, y *ConstInst, op BinaryOpcode) *ConstInst {
 	switch op {
 	case OpShl:
 		if x.IsNumber() && y.IsNumber() {
@@ -146,15 +180,19 @@ func CalcConstBinary(x, y *Const, op BinaryOpcode) *ConstInst {
 		if x.IsNumber() && y.IsNumber() {
 			return NewConst(x.Number() >> y.Number())
 		}
-	case OpAnd:
+	case OpAnd, OpLogicAnd:
 		if x.IsNumber() && y.IsNumber() {
 			return NewConst(x.Number() & y.Number())
 		} else if x.IsBoolean() && y.IsBoolean() {
 			return NewConst(x.Boolean() && y.Boolean())
+		} else if x.IsBoolean() && y.IsNumber() {
+			return NewConst(x.Boolean() && y.Number() != 0)
+		} else if x.IsNumber() && y.IsBoolean() {
+			return NewConst(x.Number() != 0 && y.Boolean())
 		}
 	case OpAndNot:
 
-	case OpOr:
+	case OpOr, OpLogicOr:
 		if x.IsNumber() && y.IsNumber() {
 			return NewConst(x.Number() | y.Number())
 		} else if x.IsBoolean() && y.IsBoolean() {

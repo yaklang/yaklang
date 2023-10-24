@@ -9,6 +9,9 @@ func ToUser(n Node) (User, bool)   { u, ok := n.(User); return u, ok }
 func ToConst(v Instruction) (*ConstInst, bool) { c, ok := v.(*ConstInst); return c, ok }
 func ToPhi(v Instruction) (*Phi, bool)         { p, ok := v.(*Phi); return p, ok }
 
+func ToBinOp(v Instruction) (*BinOp, bool) { c, ok := v.(*BinOp); return c, ok }
+func ToUnOp(v Instruction) (*UnOp, bool)   { c, ok := v.(*UnOp); return c, ok }
+
 // memory
 func ToObject(v Instruction) (*Make, bool) { o, ok := v.(*Make); return o, ok }
 func ToField(v Instruction) (*Field, bool) { o, ok := v.(*Field); return o, ok }

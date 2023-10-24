@@ -34,7 +34,7 @@ func (c *Call) HandleFreeValue(fvs map[string]bool) {
 				field := builder.NewCaptureField(name)
 				field.OutCapture = false
 				// EmitBefore(c, field)
-				builder.emitInstructionAfter(field, c)
+				builder.EmitInstructionAfter(field, c)
 				field.SetPosition(c.GetPosition())
 				field.SetType(BasicTypes[Any])
 				builder.WriteVariable(name, field)
