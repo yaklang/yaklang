@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"io"
 	"net"
 	"net/http"
@@ -338,8 +339,11 @@ func (pc *persistConn) readLoop() {
 	count := 0
 	alive := true
 	for alive {
-		// 尝试peek error
+		// peek first byte in 30 seconds timeout
+		// if failed, handle it (re-conn / or abandoned)
+		_ = pc.Conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 		_, err := pc.br.Peek(1)
+		_ = pc.Conn.SetReadDeadline(time.Time{}) // cancel
 
 		// 检查是否有需要返回的响应,如果没有则可以直接返回,不需要往管道里返回数据（err）
 		if pc.numExpectedResponses == 0 {
@@ -362,26 +366,34 @@ func (pc *persistConn) readLoop() {
 			return
 		}
 
-		var responseRaw bytes.Buffer
-		var respPacket []byte
 		var resp *http.Response
 
-		httpResponseReader := bufio.NewReader(io.TeeReader(pc.br, &responseRaw))
-		_ = pc.Conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-		resp, err = utils.ReadHTTPResponseFromBufioReader(httpResponseReader, nil)
+		var stashRequest = new(http.Request)
+
+		// peek is executed, so we can read without timeout
+		// for long time chunked supported
+		_ = pc.Conn.SetReadDeadline(time.Time{})
+		resp, err = utils.ReadHTTPResponseFromBufioReader(pc.br, stashRequest)
+
 		count++
+		var responseRaw bytes.Buffer
+		var respPacket = httpctx.GetBareResponseBytes(stashRequest)
+		if len(respPacket) > 0 {
+			responseRaw.Write(respPacket)
+		}
 
 		if err != nil {
-			if len(responseRaw.Bytes()) > 0 { // 如果 TeaReader内部还有数据证明,证明有响应数据,只是解析失败
-				_ = pc.Conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-				_, readErr := io.ReadAll(httpResponseReader) // 尝试读取所有数据,主要是超过缓冲区的问题
+			if responseRaw.Len() > 0 { // 如果 TeaReader内部还有数据证明,证明有响应数据,只是解析失败
+				// continue read 3 seconds, to receive rest data
+				restBytes, readErr := utils.ReadConnUntil(pc.Conn, 3*time.Second)
 				if errors.Is(readErr, io.EOF) {
 					pc.sawEOF = true
 				}
-				respPacket = responseRaw.Bytes()
+				if len(restBytes) > 0 {
+					responseRaw.Write(restBytes)
+					respPacket = responseRaw.Bytes()
+				}
 			}
-		} else {
-			respPacket, err = utils.DumpHTTPResponse(resp, true)
 		}
 
 		pc.mu.Lock()
@@ -393,7 +405,6 @@ func (pc *persistConn) readLoop() {
 		alive = alive &&
 			!pc.sawEOF &&
 			tryPutIdleConn()
-
 	}
 }
 
