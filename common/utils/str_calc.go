@@ -2,20 +2,31 @@ package utils
 
 import (
 	"fmt"
+	"sort"
+	"strconv"
+
 	"github.com/glaslos/ssdeep"
 	"github.com/mfonda/simhash"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/mixer"
 	"gopkg.in/fatih/set.v0"
-	"sort"
-	"strconv"
 )
 
+// CalcSimHash 计算并返回一段文本的 SimHash 值
+// Example:
+// ```
+// str.CalcSimHash("hello")
+// ```
 func SimHash(raw []byte) uint64 {
 	return simhash.Simhash(simhash.NewWordFeatureSet(raw))
 }
 
+// CalcSSDeep 计算并返回一段文本的模糊哈希值
+// Example:
+// ```
+// str.CalcSSDeep("hello")
+// ```
 func SSDeepHash(raw []byte) string {
 	hash, err := ssdeep.FuzzyBytes(raw)
 	if err != nil {
@@ -26,6 +37,14 @@ func SSDeepHash(raw []byte) string {
 	return hash
 }
 
+// CalcSimilarity 计算多段文本之间的相似度，根据最长的文本长度选择不同的算法
+// 如果最长的文本长度小于等于 2000，使用文本子串匹配算法
+// 如果最短的文本长度大于等于 30000，使用模糊哈希算法
+// 如果上述算法出现错误，则使用 SimHash 算法
+// Example:
+// ```
+// str.CalcSimilarity("hello", "hello world") // 0.625
+// ```
 func CalcSimilarity(raw ...[]byte) float64 {
 	var (
 		err     error
@@ -65,6 +84,11 @@ func CalcSimilarity(raw ...[]byte) float64 {
 	return 0
 }
 
+// CalcTextMaxSubStrStability 使用文本子串匹配算法计算多段文本之间的相似度，返回相似度与错误
+// Example:
+// ```
+// p, err = str.CalcTextMaxSubStrStability("hello", "hello world") // p = 0.625
+// ```
 func CalcTextSubStringStability(raw ...[]byte) (float64, error) {
 	var samples []string
 	for _, i := range raw {
@@ -97,7 +121,11 @@ func CalcTextSubStringStability(raw ...[]byte) (float64, error) {
 	return min, nil
 }
 
-// 稳定性定义为最远距离 / 最低分数
+// CalcSSDeepStability 使用模糊哈希算法计算多段文本之间的相似度，返回相似度与错误。传入的文本应该为大文本，即长度大于 30 kb。
+// Example:
+// ```
+// p, err = str.CalcSSDeepStability(str.RandStr(100000), str.RandStr(100000))
+// ```
 func CalcSSDeepStability(req ...[]byte) (float64, error) {
 	var hash []string
 	for _, r := range req {
@@ -137,7 +165,11 @@ func CalcSSDeepStability(req ...[]byte) (float64, error) {
 	return float64(min) / float64(100), nil
 }
 
-// 计算 simhash 稳定性
+// CalcSimHashStability 使用 SimHash 算法计算多段文本之间的相似度，返回相似度与错误。
+// Example:
+// ```
+// p, err = str.CalcSimHashStability("hello", "hello world") // p = 0.96484375
+// ```
 func CalcSimHashStability(req ...[]byte) (float64, error) {
 	var hash []string
 	for _, r := range req {

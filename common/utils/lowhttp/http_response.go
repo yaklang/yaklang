@@ -5,18 +5,19 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/h2non/filetype"
-	"github.com/yaklang/yaklang/common/log"
-	utils "github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"golang.org/x/net/html/charset"
-	"golang.org/x/text/encoding"
 	"io"
 	"mime"
 	"net/http"
 	"regexp"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/h2non/filetype"
+	"github.com/yaklang/yaklang/common/log"
+	utils "github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"golang.org/x/net/html/charset"
+	"golang.org/x/text/encoding"
 )
 
 var charsetRegexp = regexp.MustCompile(`(?i)charset\s*=\s*"?\s*([^\s;\n\r"]+)`)
@@ -167,7 +168,11 @@ func GetOverrideContentType(bodyPrescan []byte, contentType string) (overrideCon
 	return overrideContentType, originCharset
 }
 
-// FixHTTPResponse try its best to fix and present human-readable response
+// FixHTTPResponse 尝试对传入的响应进行修复，并返回修复后的响应，响应体和错误
+// Example:
+// ```
+// fixedResponse, body, err = str.FixHTTPResponse(b"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=gbk\r\n\r\n<html>你好</html>")
+// ```
 func FixHTTPResponse(raw []byte) (rsp []byte, body []byte, _ error) {
 	// log.Infof("response raw: \n%v", codec.EncodeBase64(raw))
 
@@ -315,7 +320,8 @@ func RemoveCEHeaders(headerBytes []byte) []byte {
 //	return contentLengthRegexpCase.ReplaceAll(headerBytes, []byte{})
 //}
 
-func ReplaceHTTPPacketBody(raw []byte, body []byte, chunk bool) []byte {
+// ReplaceHTTPPacketBody 将原始 HTTP 请求报文中的 body 替换为指定的 body，并指定是否为 chunked，返回新的 HTTP 请求报文
+func ReplaceHTTPPacketBody(raw []byte, body []byte, chunk bool) (newHTTPRequest []byte) {
 	return ReplaceHTTPPacketBodyEx(raw, body, chunk, false)
 }
 
@@ -397,6 +403,11 @@ func ReplaceHTTPPacketBodyEx(raw []byte, body []byte, chunk bool, forceCL bool) 
 	return buf.Bytes()
 }
 
+// ParseBytesToHTTPResponse 将字节数组解析为 HTTP 响应
+// Example:
+// ```
+// res, err := str.ParseBytesToHTTPResponse(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")
+// ```
 func ParseBytesToHTTPResponse(res []byte) (*http.Response, error) {
 	if len(res) <= 0 {
 		return nil, utils.Errorf("empty http response")

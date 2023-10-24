@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+
 	"github.com/bcicen/jstream"
 	"github.com/jinzhu/gorm/dialects/postgres"
 	"github.com/pkg/errors"
 	"github.com/vjeantet/grok"
 	"github.com/yaklang/yaklang/common/log"
-	"io"
 )
 
 var (
@@ -94,6 +95,11 @@ func (g GrokResult) GetOr(key string, value string) string {
 	return g.Get(key)
 }
 
+// Grok 用于将字符串 line 使用 Grok 以规则 rule 进行解析，并返回解析结果(map)，参考 https://doc.yonyoucloud.com/doc/logstash-best-practice-cn/filter/grok.html 获取更多信息。
+// Example:
+// ```
+// str.Grok("04/18-00:59:45.385191", "%{MONTHNUM:month}/%{MONTHDAY:day}-%{TIME:time}") // map[HOUR:[00] MINUTE:[59] SECOND:[45.385191] day:[18] month:[04] time:[00:59:45.385191]]
+// ```
 func Grok(line string, rule string) GrokResult {
 	results, err := grokParser.ParseToMultiMap(rule, line)
 	if err != nil {
@@ -150,10 +156,27 @@ func JsonStreamToMapListWithDepth(reader io.Reader, i int) []map[string]interfac
 	return r
 }
 
+// JsonStreamToMapList 从 reader 中读取字符串并解析为 map 列表
+// Example:
+// ```
+// reader, writer = io.Pipe()
+//
+//	go fn {
+//	    writer.Write(`{"a":1,"b":2} {"c":3, "d":4}`)
+//	    writer.Close()
+//	}
+//
+// println(str.JsonStreamToMapList(reader)) // [map[a:1 b:2] map[c:3 d:4]]
+// ```
 func JsonStreamToMapList(reader io.Reader) []map[string]interface{} {
 	return JsonStreamToMapListWithDepth(reader, 0)
 }
 
+// JsonToMapList 将 json 字符串 line 解析为 map 列表
+// Example:
+// ```
+// str.JsonToMapList(`{"a":1,"b":2} {"c":3, "d":4}`) // [map[a:1 b:2] map[c:3 d:4]]
+// ```
 func JsonToMapList(line string) []map[string]string {
 	var r []map[string]string
 	for kv := range jstream.NewDecoder(bytes.NewBufferString(line), 0).Stream() {
@@ -174,6 +197,11 @@ func JsonToMapList(line string) []map[string]string {
 	return r
 }
 
+// JsonToMap 将 json 字符串 line 解析为 map
+// Example:
+// ```
+// str.JsonToMap(`{"a":1,"b":2}`) // map[a:1 b:2]
+// ```
 func JsonToMap(line string) map[string]string {
 	raws := JsonToMapList(line)
 	if len(raws) > 0 {
@@ -182,9 +210,15 @@ func JsonToMap(line string) map[string]string {
 	return nil
 }
 
-func ParamsGetOr(i map[string]string, keyValue, defaultValue string) string {
+// ParamsGetOr 从 map 中获取 key 对应的值，如果不存在则返回 defaultValue
+// Example:
+// ```
+// str.ParamsGetOr({"a": "1"}, "a", "2") // 1
+// str.ParamsGetOr({"a": "1"}, "b", "2") // 2
+// ```
+func ParamsGetOr(i map[string]string, key, defaultValue string) string {
 	if i != nil {
-		raw, ok := i[keyValue]
+		raw, ok := i[key]
 		if ok {
 			return raw
 		}

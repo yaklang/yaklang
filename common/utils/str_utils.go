@@ -4,9 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/go-funk"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -19,30 +16,38 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gobwas/glob"
 	"github.com/pkg/errors"
 )
 
-func ExtractStrContextByKeyword(raw []byte, res []string) []string {
-	rawStrContent := string(raw)
+// ExtractStrContext 从字符串raw中提取一组关键字res上下文的内容，上下文的长度是512个字符确定。
+// Example:
+// ```
+// str.ExtractStrContext("hello yak", ["hello"]) // ["hello yak"]
+// ```
+func ExtractStrContextByKeyword(raw string, res []string) []string {
 	var details []string
 	for _, keyword := range res {
-		if index := strings.Index(rawStrContent, keyword); index > 0 {
+		if index := strings.Index(raw, keyword); index >= 0 {
 			info := ""
 
 			end := index + len(keyword) + 512
 
 			if index <= 512 {
-				info += rawStrContent[:index]
+				info += raw[:index]
 			} else {
-				info += rawStrContent[index-512 : index+len(keyword)]
+				info += raw[index-512 : index+len(keyword)]
 			}
 
-			if end >= len(rawStrContent) {
-				info += rawStrContent[index:]
+			if end >= len(raw) {
+				info += raw[index:]
 			} else {
-				info += rawStrContent[index:end]
+				info += raw[index:end]
 			}
 
 			details = RemoveRepeatStringSlice(append(details, EscapeInvalidUTF8Byte([]byte(info))))
@@ -71,16 +76,26 @@ func StringAfter(value string, a string) string {
 	return value[adjustedPos:]
 }
 
-func StringSliceContainsAll(o []string, elements ...string) bool {
+// StringSliceContainsAll 判断字符串切片s中是否完全包含elements中的所有元素，对于非字符串的切片，会尝试将其元素转换为字符串再判断是否包含
+// Example:
+// ```
+// str.StringSliceContainsAll(["hello", "yak"], "hello", "yak") // true
+// str.StringSliceContainsAll(["hello", "yak"], "hello", "yak", "world") // false
+// ```
+func StringSliceContainsAll(s []string, elements ...string) bool {
 	for _, e := range elements {
-		if !StringArrayContains(o, e) {
+		if !StringArrayContains(s, e) {
 			return false
 		}
 	}
 	return true
 }
 
-// 元素去重
+// RemoveRepeat 移除字符串切片slc中的重复元素
+// Example:
+// ```
+// str.RemoveRepeat(["hello", "yak", "hello"]) // ["hello", "yak"]
+// ```
 func RemoveRepeatStringSlice(slc []string) []string {
 	if len(slc) < 1024 {
 		return RemoveRepeatStringSliceByLoop(slc)
@@ -392,6 +407,12 @@ func IntSliceToInt64Slice(i []int) []int64 {
 	return result
 }
 
+// ToStringSlice 将任意类型的数据转换为字符串切片
+// Example:
+// ```
+// str.ToStringSlice("hello") // ["hello"]
+// str.ToStringSlice([1, 2]) // ["1", "2"]
+// ```
 func InterfaceToStringSlice(i interface{}) (result []string) {
 	defer func() {
 		if err := recover(); err != nil {
@@ -526,10 +547,15 @@ func InterfaceToMap(i interface{}) map[string][]string {
 	return finalResult
 }
 
-func ParseStringUrlToWebsiteRootPath(s string) string {
-	ins, _ := ParseStringUrlToUrlInstance(s)
+// ParseStringUrlToWebsiteRootPath 将字符串 url 解析为其根路径的URL
+// Example:
+// ```
+// str.ParseStringUrlToWebsiteRootPath("https://yaklang.com/abc?a=1") // https://yaklang.com/
+// ```
+func ParseStringUrlToWebsiteRootPath(url string) (newURL string) {
+	ins, _ := ParseStringUrlToUrlInstance(url)
 	if ins == nil {
-		return s
+		return url
 	}
 
 	ins.Path = "/"
@@ -538,6 +564,11 @@ func ParseStringUrlToWebsiteRootPath(s string) string {
 	return ins.String()
 }
 
+// ParseStringUrlToUrlInstance 将字符串 url 解析为 URL 结构体并返回错误
+// Example:
+// ```
+// str.ParseStringUrlToUrlInstance("https://yaklang.com/abc?a=1")
+// ```
 func ParseStringUrlToUrlInstance(s string) (*url.URL, error) {
 	return url.Parse(s)
 }
@@ -556,6 +587,13 @@ func AppendDefaultPort(raw string, port int) string {
 	return HostPort(raw, port)
 }
 
+// ParseStringToHostPort 尝试从字符串中解析出host和port，并与错误一起返回
+// Example:
+// ```
+// host, port, err = str.ParseStringToHostPort("127.0.0.1:8888") // host = "127.0.0.1", port = 8888, err = nil
+// host, port, err = str.ParseStringToHostPort("https://example.com") // host = "example.com", port = 443, err = nil
+// host, port, err = str.ParseStringToHostPort("Hello Yak") // host = "", port = 0, err = error("unknown port for [Hello Yak]")
+// ```
 func ParseStringToHostPort(raw string) (host string, port int, err error) {
 	if strings.Contains(raw, "://") {
 		urlObject, _ := url.Parse(raw)
@@ -597,13 +635,19 @@ func ParseStringToHostPort(raw string) (host string, port int, err error) {
 	return
 }
 
-/*
-https://baidu.com/abc   a?key=value
-https://baidu.com/abc/a?key=value => [X] https://baidu.com/abc/a%xxkey=value
+// UrlJoin 将 字符串 origin 和 字符串数组 paths 拼接成一个新的 URL 字符串，并返回错误
+// Example:
+// ```
+// newURL, err = str.UrlJoin("https://yaklang.com", "asd", "qwe") // newURL = "https://yaklang.com/asd/qwe", err = nil
+// newURL, err = str.UrlJoin("https://yaklang.com/zxc", "/asd", "qwe") // newURL = "https://yaklang.com/asd/qwe", err = nil
+// ```
+func UrlJoin(origin string, paths ...string) (newURL string, err error) {
+	/*
+		https://baidu.com/abc   a?key=value
+		https://baidu.com/abc/a?key=value => [X] https://baidu.com/abc/a%xxkey=value
 
-[X] https://baidu.com/a?key=value
-*/
-func UrlJoin(origin string, paths ...string) (string, error) {
+		[X] https://baidu.com/a?key=value
+	*/
 	u, err := url.Parse(origin)
 	if err != nil {
 		return "", errors.Errorf("origin:[%s] is not a valid url: %s", origin, err)
@@ -797,7 +841,11 @@ func ToNsServer(server string) string {
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
-// RandStringBytes return length `n` alphabet random string
+// RandStringBytes 返回在大小写字母表中随机挑选 n 个字符组成的字符串
+// Example:
+// ```
+// str.RandStr(10)
+// ```
 func RandStringBytes(n int) string {
 	b := make([]byte, n)
 	for i := range b {
@@ -826,6 +874,14 @@ var (
 	passwordBase = passwordSepcialChars + LittleChar + BigChar + NumberChar
 )
 
+// IsStrongPassword 判断字符串是否为强密码，强密码的定义为：长度大于8，同时包含特殊字符、小写字母、大写字母、数字
+// Example:
+// ```
+// str.IsStrongPassword("12345678") // false
+// str.IsStrongPassword("12345678a") // false
+// str.IsStrongPassword("12345678aA") // false
+// str.IsStrongPassword("12345678aA!") // true
+// ```
 func IsStrongPassword(s string) bool {
 	if len(s) <= 8 {
 		return false
@@ -854,6 +910,11 @@ func IsStrongPassword(s string) bool {
 	return haveSpecial && haveLittleChar && haveBigChar && haveNumber
 }
 
+// RandSecret 返回在所有可见ascii字符表中随机挑选 n 个字符组成的密码字符串，这个密码经过str.IsStrongPassword验证，即为强密码
+// Example:
+// ```
+// str.RandSecret(10)
+// ```
 func RandSecret(n int) string {
 	if n <= 8 {
 		n = 12
@@ -895,6 +956,11 @@ func ExtractRawPath(target string) string {
 	return rawPath
 }
 
+// ParseStringToUrls 尝试从给定的字符串(ip,域名)中解析出 URL 列表，补全协议和端口
+// Example:
+// ```
+// str.ParseStringToUrls("yaklang.com:443", "https://yaklang.io") // [https://yaklang.com, https://yaklang.io]
+// ```
 func ParseStringToUrls(targets ...string) []string {
 
 	var urls []string
@@ -998,6 +1064,11 @@ func DumpFileWithTextAndFiles(raw string, divider string, files ...string) (stri
 	return fp.Name(), nil
 }
 
+// ParseStringToLines 将字符串按换行符(\n)分割成字符串数组，并去除BOM头和空行
+// Example:
+// ```
+// str.ParseStringToLines("Hello World\nHello Yak") // ["Hello World", "Hello Yak"]
+// ```
 func ParseStringToLines(raw string) []string {
 	var lines []string
 

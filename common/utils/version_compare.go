@@ -1,11 +1,12 @@
 package utils
 
 import (
-	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/log"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 var (
@@ -33,7 +34,12 @@ type versionPart struct {
 	level int
 }
 
-// VersionGreater v1 大于 v2 返回 true
+// VersionGreater 使用版本比较算法比较版本 v1 与版本 v2，如果 v1 大于 v2 返回 true，否则返回 false
+// Example:
+// ```
+// str.VersionGreater("1.0.0", "0.9.9") // true
+// str.VersionGreater("3.0", "2.8.8alpha") // true
+// ```
 func VersionGreater(v1, v2 string) bool {
 	res, err := VersionCompare(v1, v2)
 	if err != nil {
@@ -49,7 +55,13 @@ func VersionGreater(v1, v2 string) bool {
 
 }
 
-// VersionGreaterEqual v1 大于等于 v2 返回 true
+// VersionGreaterEqual 使用版本比较算法比较版本 v1 与版本 v2，如果 v1 大于等于 v2 返回 true，否则返回 false
+// Example:
+// ```
+// str.VersionGreaterEqual("1.0.0", "0.9.9") // true
+// str.VersionGreaterEqual("3.0", "3.0") // true
+// str.VersionGreaterEqual("3.0", "3.0a") // false
+// ```
 func VersionGreaterEqual(v1, v2 string) bool {
 	res, err := VersionCompare(v1, v2)
 	if err != nil {
@@ -63,7 +75,12 @@ func VersionGreaterEqual(v1, v2 string) bool {
 	}
 }
 
-// VersionEqual v1 等于 v2 返回 true
+// VersionEqual 使用版本比较算法比较版本 v1 与版本 v2，如果 v1 等于 v2 返回 true，否则返回 false
+// Example:
+// ```
+// str.VersionEqual("3.0", "3.0") // true
+// str.VersionEqual("3.0", "3.0a") // false
+// ```
 func VersionEqual(v1, v2 string) bool {
 	res, err := VersionCompare(v1, v2)
 	if err != nil {
@@ -77,7 +94,13 @@ func VersionEqual(v1, v2 string) bool {
 	}
 }
 
-// VersionLessEqual v1 小于等于 v2 返回true
+// VersionLessEqual 使用版本比较算法比较版本 v1 与版本 v2，如果 v1 小于等于 v2 返回 true，否则返回 false
+// Example:
+// ```
+// str.VersionLessEqual("0.9.9", "1.0.0") // true
+// str.VersionLessEqual("3.0", "3.0") // true
+// str.VersionLessEqual("3.0a", "3.0") // false
+// ```
 func VersionLessEqual(v1, v2 string) bool {
 	res, err := VersionCompare(v1, v2)
 	if err != nil {
@@ -92,7 +115,12 @@ func VersionLessEqual(v1, v2 string) bool {
 	}
 }
 
-// VersionLess v1 小于 v2 返回true
+// VersionLess 使用版本比较算法比较版本 v1 与版本 v2，如果 v1 小于 v2 返回 true，否则返回 false
+// Example:
+// ```
+// str.VersionLess("0.9.9", "1.0.0") // true
+// str.VersionLess("3.0", "3.0a") // true
+// ```
 func VersionLess(v1, v2 string) bool {
 	res, err := VersionCompare(v1, v2)
 	if err != nil {

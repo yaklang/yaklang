@@ -2,10 +2,11 @@ package filter
 
 import (
 	"encoding/binary"
+	"sync"
+
 	"github.com/valyala/bytebufferpool"
 	"github.com/yaklang/yaklang/common/cuckoo"
 	"github.com/yaklang/yaklang/common/utils"
-	"sync"
 )
 
 var bufferPool = bytebufferpool.Pool{}
@@ -57,6 +58,13 @@ func NewStringFilter(config *Config, container *cuckoo.Filter) *StringFilter {
 	}
 }
 
+// NewFilter 创建一个默认的字符串布谷鸟过滤器，布谷鸟过滤器用于判断一个元素是否在一个集合中，它存在极低的假阳性（即说存在的元素实际上不存在），通常这个集合中的元素数量非常大才会使用布谷鸟过滤器。
+// Example:
+// ```
+// f = str.NewFilter()
+// f.Insert("hello")
+// f.Exist("hello") // true
+// ```
 func NewFilter() *StringFilter {
 	filterConfig := NewDefaultConfig()
 	filterConfig.CaseSensitive = true

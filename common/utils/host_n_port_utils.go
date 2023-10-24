@@ -125,7 +125,11 @@ func GetNExcludeExcludeHighPort(n int, excluded ...string) []int {
 
 var ParseStringToInts = ParseStringToPorts
 
-// ParseStringToPorts 负数端口代表了是 UDP 扫描端口
+// ParseStringToPorts 将字符串解析成 Port 列表， Port 可以以逗号分隔，并且会解析-分隔的范围
+// Example:
+// ```
+// str.ParseStringToPorts("10086-10088,23333") // [10086, 10087, 10088, 23333]
+// ```
 func ParseStringToPorts(ports string) []int {
 	var lports []int
 
@@ -200,6 +204,12 @@ func ParsePortToProtoPort(port int) (string, int) {
 	}
 	return "tcp", port
 }
+
+// SplitHostsToPrivateAndPublic 将 hosts 按照私有 IP 和公有 IP 分开
+// Example:
+// ```
+// str.SplitHostsToPrivateAndPublic("127.0.0.1", "8.8.8.8", "10.0.0.1") // ["127.0.0.1", "10.0.0.1"], ["8.8.8.8"]
+// ```
 func SplitHostsToPrivateAndPublic(hosts ...string) (privs, pub []string) {
 	for _, host := range ParseStringToHosts(strings.Join(hosts, ",")) {
 		if IsPrivateIP(net.ParseIP(FixForParseIP(host))) {
@@ -211,6 +221,12 @@ func SplitHostsToPrivateAndPublic(hosts ...string) (privs, pub []string) {
 	return
 }
 
+// ExtractHost 尝试从字符串中解析出host和port，并返回host
+// Example:
+// ```
+// str.ExtractHost("127.0.0.1:8888") // 127.0.0.1
+// str.ExtractHost("https://example.com") // example.com
+// ```
 func ExtractHost(raw string) string {
 	host, _, _ := ParseStringToHostPort(raw)
 	if host != "" && host != raw {
@@ -227,6 +243,11 @@ func ExtractHostPort(raw string) string {
 	return raw
 }
 
+// ParseStringToHosts 将字符串解析成 Host 列表， Host 可以以逗号分隔，并且会解析 CIDR 网段
+// Example:
+// ```
+// str.ParseStringToHosts("192.168.0.1/32,127.0.0.1") // ["192.168.0.1", "127.0.0.1"]
+// ```
 func ParseStringToHosts(raw string) []string {
 	targets := []string{}
 	for _, h := range strings.Split(raw, ",") {
@@ -353,6 +374,12 @@ func ParseHostToAddrString(host string) string {
 	return host
 }
 
+// IsIPv6 判断字符串是否是 IPv6 地址
+// Example:
+// ```
+// str.IsIPv6("::1") // true
+// str.IsIPv6("127.0.0.1") // false
+// ```
 func IsIPv6(raw string) bool {
 	raw = FixForParseIP(raw)
 	if ip := net.ParseIP(raw); ip != nil {
@@ -361,6 +388,12 @@ func IsIPv6(raw string) bool {
 	return false
 }
 
+// IsIPv4 判断字符串是否是 IPv4 地址
+// Example:
+// ```
+// str.IsIPv4("::1") // false
+// str.IsIPv4("127.0.0.1") // true
+// ```
 func IsIPv4(raw string) bool {
 	raw = FixForParseIP(raw)
 	if ip := net.ParseIP(raw); ip != nil {
@@ -416,6 +449,11 @@ func IsProtobuf(raw []byte) bool {
 
 }
 
+// HostPort 将 host 和 port 拼接成 host:port 的形式
+// Example:
+// ```
+// str.HostPort("yaklang.com", 443) // yaklang.com:443
+// ```
 func HostPort(host string, port interface{}) string {
 	return fmt.Sprintf("%v:%v", ParseHostToAddrString(host), port)
 }

@@ -3,10 +3,6 @@ package yaklib
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklang/spec"
-	"github.com/yaklang/yaklang/common/yakdocument"
 	"io"
 	"math/rand"
 	"os"
@@ -15,10 +11,21 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklang/spec"
+	"github.com/yaklang/yaklang/common/yakdocument"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 )
 
+// f 用于对字符串进行格式化
+// Example:
+// ```
+//
+// str.f("hello %s", "yak") // hello yak
+// ```
 func _sfmt(f string, items ...interface{}) string {
 	return fmt.Sprintf(f, items...)
 }

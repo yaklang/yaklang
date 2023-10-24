@@ -48,7 +48,11 @@ func Intersect(x interface{}, y interface{}) interface{} {
 	return zSlice.Interface()
 }
 
-// IntersectString returns the intersection between two collections of string.
+// Intersect / IntersectString 返回两个字符串切片之间的交集
+// Example:
+// ```
+// str.Intersect(["1", "2", "3"], ["3", "4", "5"]) // ["3"]
+// ```
 func IntersectString(x []string, y []string) []string {
 	if len(x) == 0 || len(y) == 0 {
 		return []string{}
