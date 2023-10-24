@@ -144,7 +144,7 @@ func readHTTPResponseFromBufioReader(reader *bufio.Reader, fixContentLength bool
 	rsp.Header = header
 
 	var bodyRawBuf = new(bytes.Buffer)
-	if fixContentLength {
+	if fixContentLength || (!useContentLength && !useTransferEncodingChunked) { //在设置修复长度,或者CL合Chunk两者都没有的情况下尽可能的读取
 		// by reader
 		raw, _ := io.ReadAll(reader)
 		rawPacket.Write(raw)
