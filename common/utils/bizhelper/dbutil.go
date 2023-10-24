@@ -6,6 +6,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net"
 	"strconv"
 	"strings"
@@ -595,6 +596,14 @@ func Paging(db *gorm.DB, page int, limit int, data interface{}) (*Paginator, *go
 		//ShowSQL: true,
 	}, data)
 	return p, db
+}
+
+func PagingByPagination(db *gorm.DB, p *ypb.Paging, data any) (*Paginator, *gorm.DB) {
+	return NewPagination(&Param{
+		DB:    db,
+		Page:  int(p.GetPage()),
+		Limit: int(p.GetLimit()),
+	}, data)
 }
 
 func PagingP(db *gorm.DB, page *int64, limit *int64, data interface{}) (*Paginator, *gorm.DB) {

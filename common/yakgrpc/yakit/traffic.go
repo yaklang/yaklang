@@ -108,15 +108,46 @@ func SaveTrafficPacket(db *gorm.DB, packet *TrafficPacket) error {
 	return db.Save(packet).Error
 }
 
+func QueryTrafficTCPReassembled(db *gorm.DB, request *ypb.QueryTrafficTCPReassembledRequest) (*bizhelper.Paginator, []*TrafficTCPReassembledFrame, error) {
+	db = db.Model(&TrafficTCPReassembledFrame{})
+
+	if request.GetTimestampNow() > 0 {
+		db = db.Where("created_at >= ?", time.Unix(request.GetTimestampNow(), 0))
+	}
+
+	if request.GetFromId() > 0 {
+		db = db.Where("id > ?", request.GetFromId())
+	}
+
+	if request.GetUntilId() > 0 {
+		db = db.Where("id <= ?", request.GetUntilId())
+	}
+
+	var data []*TrafficTCPReassembledFrame
+	p, db := bizhelper.PagingByPagination(db, request.GetPagination(), &data)
+	if db.Error != nil {
+		return nil, nil, db.Error
+	}
+	return p, data, nil
+}
+
 func QueryTrafficSession(db *gorm.DB, request *ypb.QueryTrafficSessionRequest) (*bizhelper.Paginator, []*TrafficSession, error) {
 	db = db.Model(&TrafficSession{})
+
+	if request.GetTimestampNow() > 0 {
+		db = db.Where("created_at >= ?", time.Unix(request.GetTimestampNow(), 0))
+	}
+
+	if request.GetFromId() > 0 {
+		db = db.Where("id > ?", request.GetFromId())
+	}
+
+	if request.GetUntilId() > 0 {
+		db = db.Where("id <= ?", request.GetUntilId())
+	}
+
 	var data []*TrafficSession
-	p, err := bizhelper.Paging(
-		db,
-		int(request.GetPagination().GetPage()),
-		int(request.GetPagination().GetLimit()),
-		&data,
-	)
+	p, err := bizhelper.PagingByPagination(db, request.GetPagination(), &data)
 	if err.Error != nil {
 		return nil, nil, err.Error
 	}
@@ -130,8 +161,9 @@ func QueryTrafficPacket(db *gorm.DB, request *ypb.QueryTrafficPacketRequest) (*b
 	if request.GetTimestampNow() > 0 {
 		db = db.Where("created_at >= ?", time.Unix(request.GetTimestampNow(), 0))
 	}
-	
+
 	db = db.Where("id > ?", request.GetFromId())
+
 	p, err := bizhelper.Paging(
 		db,
 		int(request.GetPagination().GetPage()),
