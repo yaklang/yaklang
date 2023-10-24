@@ -19,29 +19,24 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		}
 	}
 	f := &Function{
-		anInstruction: NewInstruction(),
-		anValue:       NewValue(),
-		Package:       p,
-		Param:         make([]*Parameter, 0),
-		Blocks:        make([]*BasicBlock, 0),
-		EnterBlock:    nil,
-		ExitBlock:     nil,
-		AnonFuncs:     make([]*Function, 0),
-		parent:        nil,
-		FreeValues:    make([]Value, 0),
-		symbolTable:   make(map[string][]Value),
-		InstReg:       make(map[Instruction]string),
-		symbol: &Make{
-			anInstruction: anInstruction{
-				// variable: name + "-symbol",
-			},
-			// I:     parent.symbol,
-			anValue: NewValue(),
-		},
-		err: make(SSAErrors, 0),
-
+		anInstruction:  NewInstruction(),
+		anValue:        NewValue(),
+		Package:        p,
+		Param:          make([]*Parameter, 0),
+		hasEllipsis:    false,
+		Blocks:         make([]*BasicBlock, 0),
+		EnterBlock:     nil,
+		ExitBlock:      nil,
+		AnonFuncs:      make([]*Function, 0),
+		parent:         nil,
+		FreeValues:     make([]Value, 0),
+		symbolObject:   &Make{anInstruction: anInstruction{}, anValue: NewValue()},
+		InstReg:        make(map[Instruction]string),
+		symbolTable:    make(map[string]map[*BasicBlock]Values),
 		externInstance: make(map[string]Value),
 		externType:     make(map[string]Type),
+		err:            make(SSAErrors, 0),
+		builder:        &FunctionBuilder{},
 	}
 	f.SetVariable(name)
 	p.Funcs = append(p.Funcs, f)
@@ -51,8 +46,8 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		f.Pos = parent.builder.CurrentPos
 	}
 	f.EnterBlock = f.NewBasicBlock("entry")
-	f.symbol.SetFunc(f)
-	f.symbol.SetBlock(f.EnterBlock)
+	f.symbolObject.SetFunc(f)
+	f.symbolObject.SetBlock(f.EnterBlock)
 	// f.symbol.SetVariable(name + "-symbol")
 	return f
 }
@@ -60,14 +55,14 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 func (f *Function) addAnonymous(anon *Function) {
 	f.AnonFuncs = append(f.AnonFuncs, anon)
 	anon.parent = f
-	anon.symbol.parentI = f.symbol
+	anon.symbolObject.parentI = f.symbolObject
 }
 
 func (f *Function) NewParam(name string) {
 	p := NewParam(name, false, f)
 	// p.typs = append(p.typs, BasicTypesKind[Any])
 	f.Param = append(f.Param, p)
-	f.WriteVariable(name, p)
+	f.writeVariableByBlock(name, p, f.EnterBlock)
 }
 
 func (f *Function) ReturnValue() []Value {
@@ -76,7 +71,7 @@ func (f *Function) ReturnValue() []Value {
 }
 
 func (f *Function) GetSymbol() *Make {
-	return f.symbol
+	return f.symbolObject
 }
 
 func (f *Function) GetParent() *Function {

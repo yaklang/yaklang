@@ -41,7 +41,6 @@ func (phi *Phi) Build() Value {
 		block := phi.GetBlock()
 		block.Phis = append(block.Phis, phi)
 		phi.GetFunc().SetReg(phi)
-		phi.GetFunc().WriteSymbolTable(phi.GetVariable(), phi)
 	}
 	if v != nil {
 		fixupUseChain(v)

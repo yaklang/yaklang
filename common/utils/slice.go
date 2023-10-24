@@ -18,3 +18,10 @@ func InsertSliceItem[T comparable](slices []T, e T, index int) []T {
 	slices[index] = e
 	return slices
 }
+
+func ReplaceSliceItem[T comparable](s []T, t T, to T) []T {
+	if index := slices.Index(s, t); index > -1 {
+		s[index] = to
+	}
+	return s
+}

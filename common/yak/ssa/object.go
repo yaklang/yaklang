@@ -128,7 +128,7 @@ func (b *FunctionBuilder) getFieldWithCreate(i, key Value, create bool) Value {
 }
 
 func (b *FunctionBuilder) NewCaptureField(text string) *Field {
-	f := NewFieldOnly(NewConst(text), b.symbol, b.CurrentBlock)
+	f := NewFieldOnly(NewConst(text), b.symbolObject, b.CurrentBlock)
 	f.SetVariable(text)
 	f.OutCapture = true
 	return f
@@ -142,8 +142,8 @@ func (b *FunctionBuilder) GetField(i, key Value, create bool) *Field {
 
 }
 func (b *FunctionBuilder) ReadField(key string) *Field {
-	return b.GetField(b.symbol, NewConst(key), false)
+	return b.GetField(b.symbolObject, NewConst(key), false)
 }
 func (b *FunctionBuilder) NewField(key string) *Field {
-	return b.GetField(b.symbol, NewConst(key), true)
+	return b.GetField(b.symbolObject, NewConst(key), true)
 }

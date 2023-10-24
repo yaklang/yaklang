@@ -44,12 +44,12 @@ func (t *TypeCheck) CheckOnInstruction(inst ssa.Instruction) {
 		switch v.GetType().GetTypeKind() {
 		case ssa.ErrorType:
 			variable := v.GetVariable()
-			if len(v.GetValues()) == 0 && variable != "_" && variable != "" {
-				// if pos := v.GetLeftPosition(); pos == nil {
-				// 	v.NewError(ssa.Error, TypeCheckTAG, ErrorUnhandled())
-				// } else {
-				// 	v.GetParent().NewErrorWithPos(ssa.Error, TypeCheckTAG, pos, ErrorUnhandled())
-				// }
+			if len(v.GetUsers()) == 0 && variable != "_" && variable != "" {
+				if pos := v.GetLeftPosition(); pos != nil {
+					v.GetFunc().NewErrorWithPos(ssa.Error, TypeCheckTAG, v.GetLeftPosition(), ErrorUnhandled())
+				} else {
+					v.NewError(ssa.Error, TypeCheckTAG, ErrorUnhandled())
+				}
 			}
 		default:
 		}
@@ -144,10 +144,9 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 				// a = func() (m * any, error)
 				f := ssa.GetField(c, ssa.NewConst(len(objType.FieldTypes)-1))
 				if f == nil {
-					// c.NewError(ssa.Error, TypeCheckTAG, ErrorUnhandled())
-					// // c.GetFunc().NewErrorWithPos(ssa.Error, TypeCheckTAG, c.GetLeftPosition(),
-					// 	ErrorUnhandledWithType(c.GetType().String()),
-					// )
+					c.GetFunc().NewErrorWithPos(ssa.Error, TypeCheckTAG, c.GetLeftPosition(),
+						ErrorUnhandledWithType(c.GetType().String()),
+					)
 				} else {
 					if f.GetVariable() == "" {
 						f.SetVariable(c.GetVariable() + ".error")
