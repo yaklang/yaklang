@@ -58,6 +58,15 @@ var StrConvQuote = func(s string) string {
 	buf.WriteString("\"")
 	return buf.String()
 }
+
+func StrConvUnquoteForce(s string) []byte {
+	raw, err := StrConvUnquote(s)
+	if err != nil {
+		return []byte(s)
+	}
+	return []byte(raw)
+}
+
 var StrConvUnquote = strconv.Unquote
 
 var DoubleEncodeUrl = func(i interface{}) string {

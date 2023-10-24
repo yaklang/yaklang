@@ -4,6 +4,8 @@ import (
 	"context"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strconv"
@@ -45,9 +47,33 @@ func (s *Server) QueryTrafficPacket(ctx context.Context, req *ypb.QueryTrafficPa
 	}, nil
 }
 
+func (s *Server) QueryTrafficTCPReassembled(ctx context.Context, req *ypb.QueryTrafficTCPReassembledRequest) (*ypb.QueryTrafficTCPReassembledResponse, error) {
+	pg, data, err := yakit.QueryTrafficTCPReassembled(consts.GetGormProjectDatabase(), req)
+	if err != nil {
+		log.Info("query traffic tcp reassembled failed: %s", err)
+		return nil, err
+	}
+	rspData := lo.Map(data, func(item *yakit.TrafficTCPReassembledFrame, index int) *ypb.TrafficTCPReassembled {
+		return &ypb.TrafficTCPReassembled{
+			Id:          int64(item.ID),
+			SessionUuid: item.SessionUuid,
+			Raw:         codec.StrConvUnquoteForce(item.QuotedData),
+			Seq:         int64(item.Seq),
+			Timestamp:   int64(item.Timestamp),
+		}
+	})
+	return &ypb.QueryTrafficTCPReassembledResponse{
+		Data:       rspData,
+		Pagination: req.GetPagination(),
+		Total:      int64(pg.TotalRecord),
+	}, nil
+}
+
 func (s *Server) QueryTrafficSession(ctx context.Context, req *ypb.QueryTrafficSessionRequest) (*ypb.QueryTrafficSessionResponse, error) {
+	log.Infof("query traffic session from id: %v", req.GetFromId())
 	pg, data, err := yakit.QueryTrafficSession(consts.GetGormProjectDatabase(), req)
 	if err != nil {
+		log.Infof("query traffic session failed: %s", err)
 		return nil, err
 	}
 
