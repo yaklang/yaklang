@@ -923,6 +923,9 @@ RECONNECT:
 	var rawBytes []byte
 
 	if withConnPool {
+		if bytes.Contains(requestPacket, []byte("HEAD")) {
+			log.Errorf("test")
+		}
 		//连接池分支
 		pc := conn.(*persistConn)
 		writeErrCh := make(chan error, 1)
@@ -1013,6 +1016,7 @@ RECONNECT:
 			traceInfo.ServerTime = time.Since(serverTimeStart)
 		}
 
+		_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 		firstResponse, err = utils.ReadHTTPResponseFromBufioReader(httpResponseReader, nil)
 		if err != nil {
 			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
