@@ -325,7 +325,7 @@ func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
 		} else if t, ok := funcTyp.ReturnType.(*ssa.BasicType); ok && t.Kind == ssa.ErrorType {
 			// pass
 			c.SetType(ssa.BasicTypes[ssa.Null])
-			// c.GetFunc().NewErrorWithPos(ssa.Error, BCTag, c.GetLeftPosition(), ValueIsNull())
+			c.GetFunc().NewErrorWithPos(ssa.Error, TITAG, c.GetLeftPosition(), ValueIsNull())
 			return
 		}
 		c.NewError(ssa.Error, TITAG, FunctionContReturnError())

@@ -236,6 +236,11 @@ func (c *Call) String() string {
 		}),
 		", ",
 	)
+	drop := ""
+	if c.IsDropError {
+		drop = "~"
+	}
+
 	if c.Async {
 		return fmt.Sprintf(
 			"go %s (%s) [%s]",
@@ -243,9 +248,9 @@ func (c *Call) String() string {
 		)
 	} else {
 		return fmt.Sprintf(
-			"%s = call %s (%s) [%s]",
+			"%s = call %s (%s)%s [%s]",
 			getStr(c),
-			methodStr, argStr, binding,
+			methodStr, argStr, drop, binding,
 		)
 	}
 }
