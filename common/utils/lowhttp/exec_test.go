@@ -294,7 +294,7 @@ asd`), false)
 }
 
 func TestLowhttpTraceInfo_GetServerDurationMS(t *testing.T) {
-	server, port := utils.DebugMockHTTPNotFixCL([]byte(`HTTP/1.1 200 OK
+	server, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
 Content-Length: 11
 
 asdfas

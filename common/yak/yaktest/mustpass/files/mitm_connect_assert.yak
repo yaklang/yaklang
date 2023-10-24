@@ -1,5 +1,5 @@
 mitmProxyPort = os.GetRandomAvailableTCPPort()
-host,port = httpserver.MockServe(`HTTP/1.1 200 OK
+host,port = tcp.MockServe(`HTTP/1.1 200 OK
 Content-Length: 1
 
 d`)
