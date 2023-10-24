@@ -372,11 +372,16 @@ func (pc *persistConn) readLoop() {
 		// for long time chunked supported
 		_ = pc.Conn.SetReadDeadline(time.Time{})
 		resp, err = utils.ReadHTTPResponseFromBufioReaderConn(pc.br, pc.Conn, stashRequest)
-		resp.Request = nil
+		if resp != nil {
+			resp.Request = nil
+		}
 
 		count++
 		var responseRaw bytes.Buffer
-		var respPacket = httpctx.GetBareResponseBytes(stashRequest)
+		var respPacket []byte
+		if resp != nil {
+			respPacket = httpctx.GetBareResponseBytes(stashRequest)
+		}
 		if len(respPacket) > 0 {
 			responseRaw.Write(respPacket)
 		}
