@@ -650,7 +650,7 @@ func (b *astbuilder) AssignList(stmt assignlist) []ssa.Value {
 			}
 		} else if len(lvalues) == 1 {
 			if len(rvalues) == 0 {
-				// (1) = (0) undefine
+				// (1) = (0) undefined
 				b.NewError(ssa.Error, TAG, AssignRightSideEmpty())
 				return nil
 			}
@@ -927,7 +927,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		if stmt.LParen() != nil && stmt.RParen() != nil {
 			v := getValue(0)
 			if v == nil {
-				//TODO:  int() => type-cast [number] undefine-""
+				//TODO:  int() => type-cast [number] undefined-""
 				v = b.EmitUndefine("")
 			}
 			typ := b.buildTypeLiteral(s)

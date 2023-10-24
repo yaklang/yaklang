@@ -66,12 +66,12 @@ func (t *TypeCheck) CheckOnInstruction(inst ssa.Instruction) {
 	// case *ssa.BinOp:
 	case *ssa.Call:
 		t.TypeCheckCall(inst)
-	case *ssa.Undefine:
+	case *ssa.Undefined:
 		t.TypeCheckUndefine(inst)
 	}
 }
 
-func (t *TypeCheck) TypeCheckUndefine(inst *ssa.Undefine) {
+func (t *TypeCheck) TypeCheckUndefine(inst *ssa.Undefined) {
 	inst.NewError(ssa.Error, TypeCheckTAG, ValueUndefined(inst.GetVariable()))
 }
 

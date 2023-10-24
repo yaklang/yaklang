@@ -6,7 +6,7 @@ if 1 {
 b = a1
 
 // not declare variable 
-// var a2 -> undefine
+// var a2 -> undefined
 if 1 {
 	a2 = 1
 }
@@ -21,7 +21,7 @@ try {
 	a3 = 2
 } finally {
 	a2 = 3
-	// a3 = 3 // a3 undefine
+	// a3 = 3 // a3 undefined
 }
 b = a2
 b = a3

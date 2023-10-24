@@ -95,9 +95,9 @@ const (
 	Number TypeKind = iota
 	String
 	Boolean
-	UndefineType // undefine is nil in golang
-	Null         //
-	Any          // any type
+	UndefinedType // undefined is nil in golang
+	Null          //
+	Any           // any type
 	ChanTypeKind
 	ErrorType
 	ObjectTypeKind
@@ -137,20 +137,20 @@ func (b *BasicType) SetMethod(method map[string]*FunctionType) {
 var _ Type = (*BasicType)(nil)
 
 var BasicTypes = []*BasicType{
-	Number:       {Number, "number", make(map[string]*FunctionType, 0)},
-	String:       {String, "string", make(map[string]*FunctionType, 0)},
-	Boolean:      {Boolean, "boolean", make(map[string]*FunctionType, 0)},
-	UndefineType: {UndefineType, "undefine", make(map[string]*FunctionType, 0)},
-	Null:         {Null, "null", make(map[string]*FunctionType, 0)},
-	Any:          {Any, "any", make(map[string]*FunctionType, 0)},
-	ErrorType:    {ErrorType, "error", make(map[string]*FunctionType, 0)},
+	Number:        {Number, "number", make(map[string]*FunctionType, 0)},
+	String:        {String, "string", make(map[string]*FunctionType, 0)},
+	Boolean:       {Boolean, "boolean", make(map[string]*FunctionType, 0)},
+	UndefinedType: {UndefinedType, "undefined", make(map[string]*FunctionType, 0)},
+	Null:          {Null, "null", make(map[string]*FunctionType, 0)},
+	Any:           {Any, "any", make(map[string]*FunctionType, 0)},
+	ErrorType:     {ErrorType, "error", make(map[string]*FunctionType, 0)},
 }
 
 func GetType(i any) Type {
 	if typ := GetTypeByStr(reflect.TypeOf(i).String()); typ != nil {
 		return typ
 	} else {
-		panic("undefine type")
+		panic("undefined type")
 	}
 }
 func GetTypeByStr(typ string) Type {
