@@ -153,6 +153,11 @@ func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 	return buf.Bytes()
 }
 
+// FixHTTPRequest 尝试对传入的请求进行修复，并返回修复后的请求
+// Example:
+// ```
+// fixedRequest = str.FixHTTPRequest(b"GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+// ```
 func FixHTTPRequest(raw []byte) []byte {
 	return FixHTTPPacketCRLF(raw, false)
 }
@@ -369,6 +374,11 @@ func ToUnquoteFuzzTag(i []byte) string {
 //	return finalRaw
 //}
 
+// ParseStringToHTTPRequest 将字符串解析为 HTTP 请求
+// Example:
+// ```
+// req, err = str.ParseStringToHTTPRequest("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+// ```
 func ParseStringToHttpRequest(raw string) (*http.Request, error) {
 	return ParseBytesToHttpRequest([]byte(raw))
 }
@@ -405,6 +415,11 @@ func CopyRequest(r *http.Request) *http.Request {
 	return result
 }
 
+// ParseBytesToHTTPRequest 将字节数组解析为 HTTP 请求
+// Example:
+// ```
+// req, err := str.ParseBytesToHTTPRequest(b"GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+// ```
 func ParseBytesToHttpRequest(raw []byte) (*http.Request, error) {
 	fixed := FixHTTPPacketCRLF(raw, false)
 	if fixed == nil {

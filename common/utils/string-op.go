@@ -4,16 +4,22 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/go-funk"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"regexp"
 	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
+// SplitAndTrim 将字符串s按照sep分割成字符串切片，并且去除每个字符串的前后空白字符
+// Example:
+// ```
+// str.SplitAndTrim(" hello yak ", " ") // ["hello", "yak"]
+// ```
 func PrettifyListFromStringSplited(Raw string, sep string) (targets []string) {
 	targetsRaw := strings.Split(Raw, sep)
 	for _, tRaw := range targetsRaw {
@@ -60,6 +66,12 @@ func ToLowerAndStrip(s string) string {
 	return strings.TrimSpace(strings.ToLower(s))
 }
 
+// StringSliceContains 判断字符串切片s中是否包含raw，对于非字符串的切片，会尝试将其元素转换为字符串再判断是否包含
+// Example:
+// ```
+// str.StringSliceContains(["hello", "yak"], "yak") // true
+// str.StringSliceContains([1, 2, 3], "4") // false
+// ```
 func StringSliceContain(s interface{}, raw string) (result bool) {
 	defer func() {
 		if err := recover(); err != nil {
@@ -87,6 +99,11 @@ func StringSliceContain(s interface{}, raw string) (result bool) {
 	return haveResult
 }
 
+// StringContainsAnyOfSubString 判断字符串s中是否包含subs中的任意一个子串
+// Example:
+// ```
+// str.StringContainsAnyOfSubString("hello yak", ["yak", "world"]) // true
+// ```
 func StringContainsAnyOfSubString(s string, subs []string) bool {
 	for _, sub := range subs {
 		if strings.Contains(s, sub) {

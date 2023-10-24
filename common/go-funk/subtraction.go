@@ -52,7 +52,11 @@ func Subtract(x interface{}, y interface{}) interface{} {
 	return zSlice.Interface()
 }
 
-// SubtractString returns the subtraction between two collections of string
+// Subtract 返回两个字符串切片的差集
+// Example:
+// ```
+// str.Subtract(["1", "2", "3"], ["3", "4", "5"]) // ["1", "2"]
+// ```
 func SubtractString(x []string, y []string) []string {
 	if len(x) == 0 {
 		return []string{}

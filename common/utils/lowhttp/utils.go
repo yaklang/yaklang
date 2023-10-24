@@ -37,6 +37,11 @@ var (
 	TAIL = []byte{0, 0, 0xff, 0xff, 0x01, 0x00, 0x00, 0xff, 0xff}
 )
 
+// ExtractURLFromHTTPRequestRaw 从原始 HTTP 请求报文中提取 URL，返回URL结构体与错误
+// Example:
+// ```
+// url, err := str.ExtractURLFromHTTPRequestRaw(b"GET / HTTP/1.1\r\nHost: www.yaklang.com\r\n\r\n", false)
+// ```
 func ExtractURLFromHTTPRequestRaw(req []byte, isHttps bool) (*url.URL, error) {
 	r, err := ParseBytesToHttpRequest(req)
 	if err != nil {
@@ -108,6 +113,12 @@ func TrimSpaceHTTPPacket(raw []byte) []byte {
 	return bytes.TrimFunc(raw, unicode.IsSpace)
 }
 
+// ExtractURLFromHTTPRequest 从 HTTP 请求结构体中提取 URL，返回URL结构体与错误
+// Example:
+// ```
+// v, err = http.Raw("GET / HTTP/1.1\r\nHost: www.yaklang.com\r\n\r\n")
+// url, err = str.ExtractURLFromHTTPRequest(v, false)
+// ```
 func ExtractURLFromHTTPRequest(r *http.Request, https bool) (*url.URL, error) {
 	if r == nil {
 		return nil, utils.Error("no request")
@@ -193,16 +204,31 @@ func ExtractURLFromHTTPRequest(r *http.Request, https bool) (*url.URL, error) {
 	return uIns, nil
 }
 
+// ExtractBodyFromHTTPResponseRaw 从原始 HTTP 响应报文中提取 body
+// Example:
+// ```
+// body, err = str.ExtractBodyFromHTTPResponseRaw(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok") // body = b"ok"
+// ```
 func ExtractBodyFromHTTPResponseRaw(res []byte) ([]byte, error) {
 	_, raw := SplitHTTPHeadersAndBodyFromPacket(res)
 	return raw, nil
 }
 
+// ParseStringToHTTPResponse 将字符串解析为 HTTP 响应
+// Example:
+// ```
+// res, err := str.ParseStringToHTTPResponse("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")
+// ```
 func ParseStringToHTTPResponse(res string) (*http.Response, error) {
 	return ParseBytesToHTTPResponse([]byte(res))
 }
 
-func MergeUrlFromHTTPRequest(rawRequest []byte, target string, isHttps bool) string {
+// MergeUrlFromHTTPRequest 将传入的 target 与 原始 HTTP 请求报文中的 URL 进行合并，并返回合并后的 URL
+// Example:
+// ```
+// url = str.MergeUrlFromHTTPRequest(b"GET /z HTTP/1.1\r\nHost: www.yaklang.com\r\n\r\n", "/a/b", true) // url = "https://www.yaklang.com/z/a/b"
+// ```
+func MergeUrlFromHTTPRequest(rawRequest []byte, target string, isHttps bool) (newURL string) {
 	if utils.IsHttpOrHttpsUrl(target) {
 		return target
 	}
@@ -434,7 +460,12 @@ func SplitHTTPPacket(
 	return headersRaw, bodyRaw
 }
 
-func SplitHTTPHeadersAndBodyFromPacket(raw []byte, hook ...func(line string)) (string, []byte) {
+// SplitHTTPHeadersAndBodyFromPacket 将传入的 HTTP 报文分割为 headers 和 body，如果传入了hook，则会在每次读取到一行 header 时调用 hook
+// Example:
+// ```
+// headers, body = str.SplitHTTPHeadersAndBodyFromPacket(b"GET / HTTP/1.1\r\nHost: www.yaklang.com\r\n\r\n")
+// ```
+func SplitHTTPHeadersAndBodyFromPacket(raw []byte, hook ...func(line string)) (headers string, body []byte) {
 	return SplitHTTPHeadersAndBodyFromPacketEx(raw, nil, hook...)
 }
 
