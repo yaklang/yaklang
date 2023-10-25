@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 )
 
 type HTTPResponseInfo struct {
@@ -115,7 +116,7 @@ func (f *Matcher) match(r *HTTPResponseInfo, options ...ConfigOption) ([]*CPE, e
 	return nil, errors.Errorf("failed to recognize web fingerprint: %s", "no rules matched")
 }
 
-var faviconCache = make(map[string][]byte)
+var faviconCache sync.Map
 var currentTarget = ""
 var previousTarget = ""
 
@@ -150,7 +151,7 @@ func (f *Matcher) matchByRule(r *HTTPResponseInfo, ruleToUse *WebRule, config *C
 	if r.URL.Host != currentTarget {
 		// Delete the cache of the previous target
 		if previousTarget != "" {
-			delete(faviconCache, previousTarget)
+			faviconCache.Delete(previousTarget)
 		}
 		// Update the current and previous targets
 		previousTarget = currentTarget
@@ -161,7 +162,7 @@ func (f *Matcher) matchByRule(r *HTTPResponseInfo, ruleToUse *WebRule, config *C
 		ruleToUse.Path = "/" + ruleToUse.Path
 	}
 	if config.ActiveMode && len(ruleToUse.Path) > 1 && !strings.HasSuffix(ruleToUse.Path, path) {
-		favicon, ok := faviconCache[r.URL.Host]
+		value, ok := faviconCache.Load(r.URL.Host)
 		if !ok {
 			log.Infof("sending active web-fingerprint request to: %s origin: %v", ruleToUse.Path, path)
 			newUrl := lowhttp.MergeUrlFromHTTPRequest(r.RequestRaw, ruleToUse.Path, r.IsHttps)
@@ -181,18 +182,24 @@ func (f *Matcher) matchByRule(r *HTTPResponseInfo, ruleToUse *WebRule, config *C
 				if i == nil {
 					continue
 				}
-				if favicon == nil {
-					favicon = i.Body
-					// Save to cache
-					faviconCache[r.URL.Host] = favicon
+				byteFavicon, ok := value.([]byte)
+				if !ok {
+					byteFavicon = i.Body
+					faviconCache.Store(r.URL.Host, byteFavicon)
 				}
 				// Use the cached favicon
-				i.Body = favicon
+				i.Body = byteFavicon
 				results = append(results, f.matchByRule(i, ruleToUse, config)...)
 			}
 			return results
+		} else {
+			favicon, ok := value.([]byte)
+			if !ok {
+				log.Errorf("Expected []byte but got %T", value)
+				return nil
+			}
+			r.Body = favicon
 		}
-		r.Body = favicon
 	}
 
 	for _, m := range ruleToUse.Methods {
