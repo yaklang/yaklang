@@ -94,18 +94,46 @@ func (b *FunctionBuilder) CreateInterfaceWithVs(keys []Value, vs []Value) *Make 
 	return itf
 }
 
+// func (b *FunctionBuilder) getExternLibInstanceForLeft(pa *Parameter, ci ConstInst) LeftValue {
+// }
+func (b *FunctionBuilder) getExternLibInstance(i, key Value) Value {
+	pa, ok := ToParameter(i)
+	ci, ok2 := ToConst(key)
+	if ok && ok2 && pa.BuildField != nil {
+		if v := pa.BuildField(ci.String()); v != nil {
+			return v
+		} else {
+			// handler
+			want := b.TryGetSimilarityKey(pa.GetVariable(), ci.String())
+			b.NewErrorWithPos(Error, SSATAG, b.CurrentPos, ExternLibError(pa.GetVariable(), ci.String(), want))
+			p := NewParam(pa.GetVariable()+"."+ci.String(), false, b.Function)
+			p.SetExtern(true)
+			return p
+		}
+	}
+	return nil
+}
+
 // --------------- `f.symbol` handler, read && write
-func (b *FunctionBuilder) getFieldWithCreate(i, key Value, create bool) Value {
+func (b *FunctionBuilder) getFieldWithCreate(i, key Value, forceCreate bool) Value {
 	var fTyp Type
 
+	if !forceCreate {
+		// handler extern lib
+		if v := b.getExternLibInstance(i, key); v != nil {
+			return v
+		}
+	}
+
+	// use last field
+	if f := GetField(i, key); f != nil {
+		return f
+	}
 	// if it, ok := ToObjectType(i.GetType()); ok {
 	// 	if t, _ := it.GetField(key); t != nil {
 	// 		fTyp = t
 	// 	}
 	// }
-	if f := GetField(i, key); f != nil {
-		return f
-	}
 
 	// TODO:field freeValue
 	// if parent := b.parentBuilder; parent != nil {
@@ -115,16 +143,13 @@ func (b *FunctionBuilder) getFieldWithCreate(i, key Value, create bool) Value {
 	// 	}
 	// }
 
-	if create {
-		field := NewFieldOnly(key, i, b.CurrentBlock)
-		if fTyp != nil {
-			field.SetType(fTyp)
-		}
-		b.emit(field)
-		return field
-	} else {
-		return nil
+	// create new field
+	field := NewFieldOnly(key, i, b.CurrentBlock)
+	if fTyp != nil {
+		field.SetType(fTyp)
 	}
+	b.emit(field)
+	return field
 }
 
 func (b *FunctionBuilder) NewCaptureField(text string) *Field {
@@ -132,18 +157,4 @@ func (b *FunctionBuilder) NewCaptureField(text string) *Field {
 	f.SetVariable(text)
 	f.OutCapture = true
 	return f
-}
-
-func (b *FunctionBuilder) GetField(i, key Value, create bool) *Field {
-	if field, ok := ToField(b.getFieldWithCreate(i, key, create)); ok {
-		return field
-	}
-	return nil
-
-}
-func (b *FunctionBuilder) ReadField(key string) *Field {
-	return b.GetField(b.symbolObject, NewConst(key), false)
-}
-func (b *FunctionBuilder) NewField(key string) *Field {
-	return b.GetField(b.symbolObject, NewConst(key), true)
 }
