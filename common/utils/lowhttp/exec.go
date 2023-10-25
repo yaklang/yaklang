@@ -67,23 +67,25 @@ type LowhttpExecConfig struct {
 	WithConnPool                     bool
 	ConnPool                         *lowHttpConnPool
 	NativeHTTPRequestInstance        *http.Request
+	DefaultBufferSize                int
 }
 
 type LowhttpResponse struct {
-	RawPacket          []byte
-	RedirectRawPackets []*RedirectFlow
-	PortIsOpen         bool
-	TraceInfo          *LowhttpTraceInfo
-	Url                string
-	RemoteAddr         string
-	Proxy              string
-	Https              bool
-	Http2              bool
-	RawRequest         []byte
-	Source             string // 请求源
-	RuntimeId          string
-	FromPlugin         string
-	MultiResponse      bool
+	RawPacket              []byte
+	RedirectRawPackets     []*RedirectFlow
+	PortIsOpen             bool
+	TraceInfo              *LowhttpTraceInfo
+	Url                    string
+	RemoteAddr             string
+	Proxy                  string
+	Https                  bool
+	Http2                  bool
+	RawRequest             []byte
+	Source                 string // 请求源
+	RuntimeId              string
+	FromPlugin             string
+	MultiResponse          bool
+	MultiResponseInstances []*http.Response
 }
 
 func (l *LowhttpResponse) GetDurationFloat() float64 {
@@ -214,6 +216,12 @@ func WithPort(port int) LowhttpOpt {
 func WithPacketBytes(packet []byte) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.Packet = packet
+	}
+}
+
+func WithDefaultBufferSize(size int) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.DefaultBufferSize = size
 	}
 }
 
@@ -1021,7 +1029,7 @@ RECONNECT:
 			var legacyRequest []byte
 			legacyRequest, err = BuildLegacyProxyRequest(requestPacket)
 			if err != nil {
-				return nil, err
+				return response, err
 			}
 			_, err = conn.Write(legacyRequest)
 		} else {
@@ -1031,37 +1039,31 @@ RECONNECT:
 			return response, errors.Wrap(err, "write request failed")
 		}
 
-		// 读报文
-		conn.SetDeadline(time.Now().Add(timeout))
 		//TeeReader 用于畸形响应包: 即 ReadHTTPResponseFromBufioReader 无法解析但是conn中存在数据的情况
-		httpResponseReader := bufio.NewReader(io.TeeReader(conn, &responseRaw))
+		if option.DefaultBufferSize <= 0 {
+			option.DefaultBufferSize = 4096
+		}
+		httpResponseReader := bufio.NewReaderSize(io.TeeReader(conn, &responseRaw), option.DefaultBufferSize)
 
 		// 服务器响应第一个字节
 		serverTimeStart := time.Now()
-		peek, err := httpResponseReader.Peek(1)
-		if err == nil && len(peek) == 1 {
-			traceInfo.ServerTime = time.Since(serverTimeStart)
+		_ = conn.SetReadDeadline(serverTimeStart.Add(timeout))
+		_, err := httpResponseReader.Peek(1)
+		if err != nil {
+			return response, err
 		}
 
-		_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-
+		traceInfo.ServerTime = time.Since(serverTimeStart)
 		var stashedRequest = new(http.Request)
 		firstResponse, err = utils.ReadHTTPResponseFromBufioReader(httpResponseReader, stashedRequest)
 		if err != nil {
-			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-				return response, nil
-			}
 			log.Infof("[lowhttp] read response failed: %s", err)
 		}
-		if haveNativeHTTPRequestInstance {
-			httpctx.SetBareResponseBytes(option.NativeHTTPRequestInstance, responseRaw.Bytes())
-		}
-
 		if firstResponse == nil {
 			if len(responseRaw.Bytes()) == 0 {
 				return response, errors.Wrap(err, "empty result.")
 			} else { // peek 到了数据,但是无法解析,说明是畸形响应包
-				restBytes, _ := utils.ReadConnUntilStable(conn, conn, 5*time.Second, 300*time.Millisecond)
+				restBytes, _ := utils.ReadConnUntilStable(conn, conn, timeout, 300*time.Millisecond)
 				if len(restBytes) > 0 {
 					if len(restBytes) > 256 {
 						restBytes = restBytes[:256]
@@ -1070,6 +1072,7 @@ RECONNECT:
 				}
 			}
 		} else {
+			firstResponse.Request = option.NativeHTTPRequestInstance
 			multiResponses = append(multiResponses, firstResponse)
 
 			// handle response
@@ -1081,7 +1084,7 @@ RECONNECT:
 						break
 					}
 					// read second response rest in buffer
-					restBytes, _ := utils.ReadConnUntilStable(conn, conn, 5*time.Second, 300*time.Millisecond)
+					restBytes, _ := utils.ReadConnUntilStable(conn, conn, timeout, 300*time.Millisecond)
 					if len(restBytes) > 0 {
 						if len(restBytes) > 256 {
 							restBytes = restBytes[:256]
@@ -1097,8 +1100,13 @@ RECONNECT:
 					response.MultiResponse = true
 				}
 			}
+			response.MultiResponseInstances = multiResponses
 		}
+
 		rawBytes = responseRaw.Bytes()
+		if haveNativeHTTPRequestInstance {
+			httpctx.SetBareResponseBytes(option.NativeHTTPRequestInstance, rawBytes)
+		}
 	}
 
 	// 更新cookiejar中的cookie
