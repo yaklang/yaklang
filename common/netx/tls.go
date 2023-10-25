@@ -16,7 +16,7 @@ func UpgradeToTLSConnection(conn net.Conn, sni string, i any) (net.Conn, error) 
 	return UpgradeToTLSConnectionWithTimeout(conn, sni, i, 10*time.Second)
 }
 
-func UpgradeToTLSConnectionWithTimeout(conn net.Conn, sni string, i any, timeout time.Duration) (net.Conn, error) {
+func UpgradeToTLSConnectionWithTimeout(conn net.Conn, sni string, i any, timeout time.Duration, tlsNextProto ...string) (net.Conn, error) {
 	if i == nil {
 		i = &tls.Config{
 			ServerName:         sni,
@@ -28,10 +28,10 @@ func UpgradeToTLSConnectionWithTimeout(conn net.Conn, sni string, i any, timeout
 	}
 	var gmtlsConfig *gmtls.Config
 	var tlsConfig *tls.Config
+	var overrideNextProtos = len(tlsNextProto) > 0
 	// i is a *tls.Config or *gmtls.Config
 	switch ret := i.(type) {
 	case *tls.Config:
-		ret.Renegotiation = tls.RenegotiateFreelyAsClient
 		tlsConfig = ret
 	case *gmtls.Config:
 		gmtlsConfig = ret
@@ -48,6 +48,9 @@ func UpgradeToTLSConnectionWithTimeout(conn net.Conn, sni string, i any, timeout
 	}
 
 	if tlsConfig != nil {
+		if overrideNextProtos {
+			tlsConfig.NextProtos = tlsNextProto
+		}
 		tlsConfig.Renegotiation = tls.RenegotiateFreelyAsClient
 		err := LoadCertificatesConfig(tlsConfig)
 		if err != nil {
@@ -61,6 +64,9 @@ func UpgradeToTLSConnectionWithTimeout(conn net.Conn, sni string, i any, timeout
 		}
 		return sConn, nil
 	} else if gmtlsConfig != nil {
+		if overrideNextProtos {
+			gmtlsConfig.NextProtos = tlsNextProto
+		}
 		gmtlsConfig.Renegotiation = gmtls.RenegotiateFreelyAsClient
 		var sConn = gmtls.Client(conn, gmtlsConfig)
 		err := sConn.HandshakeContext(utils.TimeoutContext(timeout))

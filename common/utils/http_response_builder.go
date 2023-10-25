@@ -13,7 +13,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 	"unicode"
 )
 
@@ -154,38 +153,16 @@ func readHTTPResponseFromBufioReader(reader *bufio.Reader, fixContentLength bool
 	rsp.Close = defaultClose
 	rsp.Header = header
 
+	// handled body
 	var bodyRawBuf = new(bytes.Buffer)
-	var peekabledData = new(bytes.Buffer)
-	if conn != nil {
-		if !useContentLength && !useTransferEncodingChunked {
-			_ = conn.SetReadDeadline(time.Now().Add(3 * time.Second))
-		}
-		bt, err := reader.ReadByte()
-		if !useContentLength && !useTransferEncodingChunked {
-			_ = conn.SetReadDeadline(time.Time{})
-		}
-		if err != nil {
-			rsp.Body = http.NoBody
-			if req != nil {
-				rsp.Request = req
-				httpctx.SetBareResponseBytes(req, rawPacket.Bytes())
-			}
-			return rsp, err
-		} else {
-			peekabledData.WriteByte(bt)
-		}
-	}
-
 	getPeekableReader := func() io.Reader {
-		if conn == nil {
-			return reader
-		}
-		return io.MultiReader(peekabledData, reader)
+		return reader
 	}
 
-	if fixContentLength || (!useContentLength && !useTransferEncodingChunked) { //在设置修复长度,或者CL合Chunk两者都没有的情况下尽可能的读取
+	if fixContentLength {
+		// just for bytes condition
 		// by reader
-		raw, _ := ReadConnUntilStable(getPeekableReader(), conn, 5*time.Second, 300*time.Millisecond)
+		raw, _ := io.ReadAll(io.NopCloser(reader))
 		rawPacket.Write(raw)
 		if useContentLength && !useTransferEncodingChunked {
 			rsp.ContentLength = int64(len(raw))

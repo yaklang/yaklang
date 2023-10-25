@@ -28,7 +28,6 @@ func (m *MITMServer) setHijackHandler(rootCtx context.Context) {
 		websocketResponseHijackHandler: m.websocketResponseHijackHandler,
 		websocketRequestMirror:         m.websocketRequestMirror,
 		websocketResponseMirror:        m.websocketResponseMirror,
-		TR:                             m.httpTransport,
 		ProxyGetter:                    m.GetMartianProxy,
 		RequestHijackCallback: func(req *http.Request) error {
 			var isHttps bool

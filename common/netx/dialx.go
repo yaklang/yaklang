@@ -205,7 +205,7 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 
 		switch strategy {
 		case TLS_Strategy_Ordinary:
-			tlsConn, err := UpgradeToTLSConnectionWithTimeout(conn, sni, tlsConfig, tlsTimeout)
+			tlsConn, err := UpgradeToTLSConnectionWithTimeout(conn, sni, tlsConfig, tlsTimeout, config.TLSNextProto...)
 			if err != nil {
 				errs = append(errs, err)
 				continue
@@ -226,7 +226,7 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 					Renegotiation:      gmtls.RenegotiateFreelyAsClient,
 				}
 			}
-			tlsConn, err := UpgradeToTLSConnectionWithTimeout(conn, sni, tlsConfig, tlsTimeout)
+			tlsConn, err := UpgradeToTLSConnectionWithTimeout(conn, sni, tlsConfig, tlsTimeout, config.TLSNextProto...)
 			if err != nil {
 				errs = append(errs, err)
 				continue
@@ -240,7 +240,7 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 				InsecureSkipVerify: true,
 				Renegotiation:      gmtls.RenegotiateFreelyAsClient,
 			}
-			tlsConn, err := UpgradeToTLSConnectionWithTimeout(conn, sni, gmtlsConfig, tlsTimeout)
+			tlsConn, err := UpgradeToTLSConnectionWithTimeout(conn, sni, gmtlsConfig, tlsTimeout, config.TLSNextProto...)
 			if err != nil {
 				errs = append(errs, err)
 				continue
