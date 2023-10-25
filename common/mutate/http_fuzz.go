@@ -26,14 +26,36 @@ type FuzzHTTPRequest struct {
 	isHttps                bool
 	source                 string
 	runtimeId              string
+	noAutoEncode           bool
 	proxy                  string
 	originRequest          []byte
 	_originRequestInstance *http.Request
 	chunked                bool
 }
 
+func (r *FuzzHTTPRequest) NoAutoEncode() bool {
+	if r == nil {
+		return false
+	}
+	return r.noAutoEncode
+}
+
+func (r *FuzzHTTPRequest) SetNoAutoEncode(b bool) FuzzHTTPRequestIf {
+	if r != nil {
+		r.noAutoEncode = b
+	}
+	return r
+}
+
 type FuzzHTTPRequestIf interface {
+	// 重复数据包
 	Repeat(i int) FuzzHTTPRequestIf
+
+	// 模糊测试参数时不进行自动编码
+	SetNoAutoEncode(bool) FuzzHTTPRequestIf
+
+	// 标注是否进行自动编码
+	NoAutoEncode() bool
 
 	// 模糊测试 http.Request 的 method 字段
 	FuzzMethod(method ...string) FuzzHTTPRequestIf
@@ -180,10 +202,11 @@ func (f *FuzzHTTPRequest) IsBodyFormEncoded() bool {
 }
 
 type buildFuzzHTTPRequestConfig struct {
-	IsHttps   bool
-	Source    string
-	RuntimeId string
-	Proxy     string
+	IsHttps      bool
+	Source       string
+	RuntimeId    string
+	NoAutoEncode bool
+	Proxy        string
 }
 
 type BuildFuzzHTTPRequestOption func(config *buildFuzzHTTPRequestConfig)
@@ -191,6 +214,12 @@ type BuildFuzzHTTPRequestOption func(config *buildFuzzHTTPRequestConfig)
 func OptProxy(i string) BuildFuzzHTTPRequestOption {
 	return func(config *buildFuzzHTTPRequestConfig) {
 		config.Proxy = i
+	}
+}
+
+func OptDisableAutoEncode(i bool) BuildFuzzHTTPRequestOption {
+	return func(config *buildFuzzHTTPRequestConfig) {
+		config.NoAutoEncode = i
 	}
 }
 
@@ -404,6 +433,7 @@ func NewFuzzHTTPRequest(i interface{}, opts ...BuildFuzzHTTPRequestOption) (*Fuz
 	req.source = config.Source
 	req.runtimeId = config.RuntimeId
 	req.proxy = config.Proxy
+	req.noAutoEncode = config.NoAutoEncode
 	req.Opts = opts
 
 	return req, nil

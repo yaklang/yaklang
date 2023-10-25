@@ -8,6 +8,7 @@ import (
 )
 
 type FuzzHTTPRequestBatch struct {
+	noAutoEncode     bool
 	originRequest    *FuzzHTTPRequest
 	fallback         FuzzHTTPRequestIf
 	nextFuzzRequests []FuzzHTTPRequestIf
@@ -26,6 +27,20 @@ func NewFuzzHTTPRequestBatch(f *FuzzHTTPRequest, reqs ...*http.Request) *FuzzHTT
 		return &FuzzHTTPRequestBatch{fallback: f, originRequest: f}
 	}
 	return &FuzzHTTPRequestBatch{nextFuzzRequests: fReqs, originRequest: f}
+}
+
+func (r *FuzzHTTPRequestBatch) SetNoAutoEncode(b bool) FuzzHTTPRequestIf {
+	if r != nil {
+		r.noAutoEncode = b
+	}
+	return r
+}
+
+func (f *FuzzHTTPRequestBatch) NoAutoEncode() bool {
+	if f == nil {
+		return false
+	}
+	return f.noAutoEncode
 }
 
 func (f *FuzzHTTPRequestBatch) Show() FuzzHTTPRequestIf {

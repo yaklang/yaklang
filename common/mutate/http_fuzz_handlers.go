@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -165,6 +166,29 @@ func (f *FuzzHTTPRequest) fuzzPath(paths ...string) ([]*http.Request, error) {
 	}
 
 	var pathTotal = QuickMutateSimple(paths...)
+	if f.NoAutoEncode() {
+		var results = make([]*http.Request, 0, len(pathTotal))
+		for i := 0; i < len(pathTotal); i++ {
+			rawRequest := httpctx.GetBareRequestBytes(req)
+			proto := req.Proto
+			if !strings.HasPrefix(proto, "HTTP/") {
+				proto = "HTTP/1.1"
+			}
+			reqIns, err := lowhttp.ParseBytesToHttpRequest(lowhttp.ReplaceHTTPPacketFirstLine(
+				rawRequest, fmt.Sprintf("%v %v %v", req.Method, pathTotal[i], proto),
+			))
+			if err != nil {
+				log.Infof("parse (in FuzzPath) request failed: %v", err)
+				continue
+			}
+			results = append(results, reqIns)
+		}
+		if len(results) == 0 {
+			return []*http.Request{req}, nil
+		}
+		return results, nil
+	}
+
 	var reqs []*http.Request
 	var originUrl = req.URL
 	req.RequestURI = ""
@@ -316,9 +340,35 @@ func (f *FuzzHTTPRequest) fuzzGetParamsRaw(queryRaw ...string) ([]*http.Request,
 	}
 
 	var raws = QuickMutateSimple(queryRaw...)
+	if f.NoAutoEncode() {
+		originBytes := f.GetBytes()
+		method, pathStr, proto := lowhttp.GetHTTPPacketFirstLine(originBytes)
+		if !strings.HasPrefix(proto, "HTTP/") {
+			proto = "HTTP/1.1"
+		}
+
+		originPath, _, _ := strings.Cut(pathStr, "?")
+		var results = make([]*http.Request, 0, len(raws))
+		for i := 0; i < len(raws); i++ {
+			rawQuery := raws[i]
+			if rawQuery == "" {
+				continue
+			}
+			firstLine := fmt.Sprintf("%v %v?%v %v", method, originPath, rawQuery, proto)
+			reqInstance, err := lowhttp.ParseBytesToHttpRequest(lowhttp.ReplaceHTTPPacketFirstLine(originBytes, firstLine))
+			if err != nil {
+				log.Infof("parse (in FuzzGetParamsRaw) request failed: %v", err)
+				continue
+			}
+			results = append(results, reqInstance)
+		}
+		if len(results) <= 0 {
+			return []*http.Request{req}, nil
+		}
+		return results, nil
+	}
 
 	originRawQuery := req.URL.RawQuery
-
 	var reqs []*http.Request
 	for _, targetQuery := range raws {
 		req.RequestURI = ""
@@ -484,40 +534,68 @@ func (f *FuzzHTTPRequest) fuzzGetParams(key interface{}, value interface{}, enco
 	if len(keys) <= 0 || len(values) <= 0 {
 		return nil, utils.Errorf("GetQuery key or Values are empty...")
 	}
-	mix, err := mixer.NewMixer(keys, values)
+
+	origin := httpctx.GetBareRequestBytes(req)
+	var results = make([]*http.Request, 0, len(keys)*len(values))
+	err = cartesian.ProductEx([][]string{keys, values}, func(result []string) error {
+		if len(result) != 2 {
+			return utils.Error("BUG in fuzz GetQuery KeyValue")
+		}
+
+		key := result[0]
+		value := result[1]
+
+		reqIns, err := lowhttp.ParseBytesToHttpRequest(lowhttp.ReplaceHTTPPacketQueryParam(origin, key, value))
+		if err != nil {
+			log.Infof("parse (in FuzzGetParams) request failed: %v", err)
+			return nil
+		}
+		results = append(results, reqIns)
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	var reqs []*http.Request
-	for {
-		pairs := mix.Value()
-		key, value := pairs[0], pairs[1]
-		for _, e := range encoded {
-			value = e(value)
-		}
-
-		req.RequestURI = ""
-		newVals, err := deepCopyUrlValues(vals)
-		if err != nil {
-			continue
-		}
-		newVals.Set(key, value)
-		req.URL.RawQuery = newVals.Encode()
-
-		_req, err := rebuildHTTPRequest(req, 0)
-		if err != nil {
-			continue
-		}
-		req.URL.RawQuery = vals.Encode()
-		reqs = append(reqs, _req)
-
-		err = mix.Next()
-		if err != nil {
-			break
-		}
+	if len(results) <= 0 {
+		return []*http.Request{req}, nil
 	}
-	return reqs, nil
+	return results, nil
+	//lowhttp.ReplaceHTTPPacketQueryParam()
+	//
+	//mix, err := mixer.NewMixer(keys, values)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//
+	//var reqs []*http.Request
+	//for {
+	//	pairs := mix.Value()
+	//	key, value := pairs[0], pairs[1]
+	//	for _, e := range encoded {
+	//		value = e(value)
+	//	}
+	//
+	//	req.RequestURI = ""
+	//	newVals, err := deepCopyUrlValues(vals)
+	//	if err != nil {
+	//		continue
+	//	}
+	//	newVals.Set(key, value)
+	//	req.URL.RawQuery = newVals.Encode()
+	//
+	//	_req, err := rebuildHTTPRequest(req, 0)
+	//	if err != nil {
+	//		continue
+	//	}
+	//	req.URL.RawQuery = vals.Encode()
+	//	reqs = append(reqs, _req)
+	//
+	//	err = mix.Next()
+	//	if err != nil {
+	//		break
+	//	}
+	//}
+	//return reqs, nil
 }
 
 func (f *FuzzHTTPRequest) FuzzGetParams(k, v interface{}) FuzzHTTPRequestIf {
