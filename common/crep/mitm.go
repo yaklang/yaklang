@@ -135,11 +135,11 @@ type MITMServer struct {
 
 	clientCerts []*ClientCertificationPair
 
-	DNSServers               []string
-	HostMapping              map[string]string
-	via                      string
-	allowForwarded           bool
-	httpTransport            *http.Transport
+	DNSServers     []string
+	HostMapping    map[string]string
+	via            string
+	allowForwarded bool
+	// httpTransport            *http.Transport
 	proxyUrl                 *url.URL
 	hijackedMaxContentLength int
 
@@ -187,10 +187,6 @@ func (m *MITMServer) GetCaCert() []byte {
 func (m *MITMServer) Serve(ctx context.Context, addr string) error {
 	if m.mitmConfig == nil {
 		return utils.Errorf("mitm config empty")
-	}
-
-	if m.httpTransport == nil {
-		return utils.Errorf("mitm transport empty")
 	}
 
 	//m.proxy.SetDownstreamProxy(m.proxyUrl)
@@ -288,30 +284,10 @@ func NewMITMServer(options ...MITMConfig) (*MITMServer, error) {
 	opts.DnsServers = server.DNSServers
 	opts.HostMapping = server.HostMapping
 	opts.ClientCerts = server.clientCerts
-	// Do custom transport configuration here
-	// 按理说在这之后transport就不应该被改动了 除了最后传给martian做roundTripper时套了个Trace
-	loadTransport, err := MITM_SetTransportByHTTPClientOptions(opts)
-	if err != nil {
-		return nil, err
-	}
-	err = loadTransport(server)
-	if err != nil {
-		return nil, utils.Errorf("create http transport failed: %v", err)
-	}
-
 	if server.mitmConfig == nil { // currently seems it must be nil since no function is exposed to directly create
 		err := MITM_SetCaCertAndPrivKey(defaultCA, defaultKey)(server)
 		if err != nil {
 			return nil, utils.Errorf("set ca/key failed: %s", err)
-		}
-	}
-
-	if server.proxyUrl != nil {
-		log.Infof("server go with proxy: %v", server.proxyUrl.String())
-		if server.httpTransport != nil {
-			server.httpTransport.Proxy = func(request *http.Request) (*url.URL, error) {
-				return server.proxyUrl, nil
-			}
 		}
 	}
 

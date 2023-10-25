@@ -30,6 +30,7 @@ type dialXConfig struct {
 	TLSTimeout                time.Duration
 	ShouldOverrideSNI         bool
 	SNI                       string
+	TLSNextProto              []string
 
 	// Retry
 	EnableTimeoutRetry  bool
@@ -175,6 +176,12 @@ func DialX_WithTimeout(timeout time.Duration) DialXOption {
 func DialX_WithProxy(proxy ...string) DialXOption {
 	return func(c *dialXConfig) {
 		c.Proxy = utils.StringArrayFilterEmpty(proxy)
+	}
+}
+
+func DialX_WithTLSNextProto(nextProtos ...string) DialXOption {
+	return func(c *dialXConfig) {
+		c.TLSNextProto = nextProtos
 	}
 }
 

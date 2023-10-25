@@ -28,7 +28,6 @@ type WebSocketModifier struct {
 	websocketResponseHijackHandler func(rsp []byte, r *http.Request, rspIns *http.Response, startTs int64) []byte
 	websocketRequestMirror         func(req []byte)
 	websocketResponseMirror        func(rsp []byte)
-	TR                             *http.Transport
 	writeExcludeHeader             map[string]bool
 	wsCanonicalHeader              []string
 	ProxyGetter                    func() *martian.Proxy
@@ -113,11 +112,21 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 	switch strings.ToLower(scheme) {
 	case "https", "wss":
 		logger.Infof("building websocket tls tunnel to %s", addr)
-		remoteConn, err = netx.DialTLSTimeout(30*time.Second, addr, w.TR.TLSClientConfig, w.ProxyStr)
+		remoteConn, err = netx.DialX(
+			addr,
+			netx.DialX_WithProxy(w.ProxyStr),
+			netx.DialX_WithTimeout(30*time.Second),
+			netx.DialX_WithTLS(true),
+		)
 		break
 	default:
 		logger.Infof("building websocket tunnel to %s", addr)
-		remoteConn, err = netx.DialTCPTimeout(30*time.Second, addr, w.ProxyStr)
+		remoteConn, err = netx.DialX(
+			addr,
+			netx.DialX_WithProxy(w.ProxyStr),
+			netx.DialX_WithTimeout(30*time.Second),
+			netx.DialX_WithTLS(false),
+		)
 	}
 	if err != nil {
 		logger.Error(err)

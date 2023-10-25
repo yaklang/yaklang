@@ -379,21 +379,6 @@ func MITM_MergeOptions(b ...MITMConfig) MITMConfig {
 	}
 }
 
-func MITM_SetTransport(tr *http.Transport) MITMConfig {
-	return func(server *MITMServer) error {
-		server.httpTransport = tr
-		return nil
-	}
-}
-
-func MITM_SetTransportByHTTPClientOptions(client *HTTPClientOptions) (MITMConfig, error) {
-	tr, err := NewTransport(client)
-	if err != nil {
-		return nil, err
-	}
-	return MITM_SetTransport(tr), nil
-}
-
 func MITM_SetDownstreamProxy(s string) MITMConfig {
 	return func(server *MITMServer) error {
 		if s == "" {
@@ -405,18 +390,6 @@ func MITM_SetDownstreamProxy(s string) MITMConfig {
 		}
 		log.Infof("set downstream proxy as %v", urlRaw.String())
 		server.proxyUrl = urlRaw
-
-		if server.httpTransport != nil {
-			server.httpTransport.Proxy = func(request *http.Request) (u *url.URL, err error) {
-				ur, err := lowhttp.ExtractURLFromHTTPRequest(request, true)
-				if err != nil {
-					log.Errorf("url: %s cannot use proxy: %s", ur, urlRaw.String())
-					return nil, utils.Errorf("invalid http.Request: %v", err)
-				}
-				log.Infof("url: %s use proxy: %s", ur, urlRaw.String())
-				return urlRaw, nil
-			}
-		}
 		return nil
 	}
 }
