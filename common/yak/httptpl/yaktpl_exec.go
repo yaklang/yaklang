@@ -3,7 +3,9 @@ package httptpl
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"regexp"
+	"strings"
 	"sync/atomic"
 
 	"github.com/davecgh/go-spew/spew"
@@ -40,7 +42,34 @@ func (y *YakTemplate) generateRequests() chan *RequestBulk {
 	}()
 	return requests
 }
-
+func (y *YakTemplate) RenderToFuzzerRequestsByUrl(u string) *ypb.FuzzerRequests {
+	result := &ypb.FuzzerRequests{}
+	for _, sequence := range y.HTTPRequestSequences {
+		for _, path := range sequence.Paths {
+			var firstLine string = fmt.Sprintf("%v %v HTTP/1.1", sequence.Method, path)
+			var lines []string
+			lines = append(lines, firstLine)
+			_, hostOk1 := sequence.Headers["Host"]
+			_, hostOk2 := sequence.Headers["host"]
+			if !hostOk1 && !hostOk2 {
+				lines = append(lines, "Host: "+"{{Hostname}}")
+			}
+			for k, v := range sequence.Headers {
+				lines = append(lines, fmt.Sprintf(`%v: %v`, k, v))
+			}
+			if len(sequence.Headers) <= 0 {
+				lines = append(lines, `User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0`)
+			}
+			var rawPacket = strings.Join(lines, "\r\n") + "\r\n\r\n"
+			rawPacket += sequence.Body
+			result.Requests = append(result.Requests, &ypb.FuzzerRequest{
+				Request:    rawPacket,
+				RequestRaw: toBytes(rawPacket),
+			})
+		}
+	}
+	return result
+}
 func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts ...lowhttp.LowhttpOpt) (int, error) {
 	defer func() {
 		if err := recover(); err != nil {

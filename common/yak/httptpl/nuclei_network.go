@@ -27,24 +27,17 @@ func parseNetworkInputs(data map[string]any) []*YakTcpInput {
 	return inputs
 }
 
-func buildNetworkRequests(inputs []*YakTcpInput, hosts []string) *YakNetworkBulkConfig {
-	return &YakNetworkBulkConfig{
-		Inputs:   inputs,
-		Hosts:    hosts,
-		ReadSize: 2048,
-	}
-}
-
-func parseNetworkBulk(ret []any, tagsToPlaceHolderMap map[string]string) ([]*YakNetworkBulkConfig, error) {
+func parseNetworkBulk(ret []any) ([]*YakNetworkBulkConfig, error) {
 	var confs []*YakNetworkBulkConfig
 	for _, i := range utils.InterfaceToSliceInterface(ret) {
 		data := utils.InterfaceToGeneralMap(i)
 		inputs := parseNetworkInputs(data)
-		var hosts []string
-		for _, h := range utils.InterfaceToStringSlice(utils.MapGetFirstRaw(data, "host", "hosts")) {
-			hosts = append(hosts, nucleiFormatToFuzzTagMode(h))
+		hosts := utils.InterfaceToStringSlice(utils.MapGetFirstRaw(data, "host", "hosts"))
+		network := &YakNetworkBulkConfig{
+			Inputs:   inputs,
+			Hosts:    hosts,
+			ReadSize: 2048,
 		}
-		network := buildNetworkRequests(inputs, hosts)
 		_ = network
 		readSize := utils.MapGetIntEx(data, "read-size", "read_size", "readSize", "readsize")
 		network.ReadSize = readSize
