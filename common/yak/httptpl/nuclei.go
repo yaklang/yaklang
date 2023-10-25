@@ -4,12 +4,10 @@ import (
 	"bufio"
 	"fmt"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -27,32 +25,6 @@ import (
 // {{Path}} - This will replace on runtime in the request by the input path as specified in the target file.
 // {{File}} - This will replace on runtime in the request by the input filename as specified in the target file.
 // {{Scheme}} - This will replace on runtime in the request by protocol scheme as specified in the target file.
-var preprocessorRegex = regexp.MustCompile(`{{([a-z0-9_]+)}}`)
-
-// ExpandPreprocessor expands the pre-processors if any for a template data.
-func ExpandPreprocessor(data string) string {
-	foundMap := make(map[string]struct{})
-	for _, expression := range preprocessorRegex.FindAllStringSubmatch(string(data), -1) {
-		if len(expression) != 2 {
-			continue
-		}
-		value := expression[1]
-		if strings.Contains(value, "(") || strings.Contains(value, ")") {
-			continue
-		}
-
-		if _, ok := foundMap[value]; ok {
-			continue
-		}
-		foundMap[value] = struct{}{}
-		if strings.EqualFold(value, "randstr") || strings.HasPrefix(value, "randstr_") {
-			data = strings.ReplaceAll(data, expression[0], ksuid.New().String())
-		}
-	}
-	return data
-}
-
-const nucleiReverseTag = `{{interactsh-url}}`
 
 type NucleiTagData struct {
 	IsExpr  bool
@@ -124,61 +96,12 @@ func ParseNucleiTag(raw string) []*NucleiTagData {
 }
 
 func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error) {
-	if strings.Contains(tplRaw, "{{") {
-		tplRaw = ExpandPreprocessor(tplRaw)
-	}
+	// 渲染了randstr
+	//if strings.Contains(tplRaw, "{{") {
+	//	tplRaw = ExpandPreprocessor(tplRaw)
+	//}
 
 	yakTemp := &YakTemplate{}
-
-	// for fix fuzztag, use placeholder
-	ph := GetPlaceHolderMap()
-	placeHolderMap := map[string]string{
-		ph: "reverse_url",
-	}
-	yakTemp.PlaceHolderMap = placeHolderMap
-	tagsToPlaceHolderMap := make(map[string]string, 0)
-
-	for _, interactshTag := range []string{nucleiReverseTag, `{{interactsh}}`, `{{interactsh_url}}`, `interactsh`} {
-		if !yakTemp.ReverseConnectionNeed {
-			yakTemp.ReverseConnectionNeed = strings.Contains(tplRaw, interactshTag)
-		}
-	}
-	if yakTemp.ReverseConnectionNeed {
-		tplRaw = strings.ReplaceAll(tplRaw, nucleiReverseTag, ph)
-	}
-
-	// other vars
-	registerNucleiTags := func(nucleiTags, paramsKey string) string {
-		ph := GetPlaceHolderMap()
-		placeHolderMap[ph] = paramsKey
-		tagsToPlaceHolderMap[nucleiTags] = ph
-		return ph
-	}
-	replaceNucleiTags := func(r, nucleiTags, paramsKey string) string {
-		ph := registerNucleiTags(nucleiTags, paramsKey)
-		r = strings.ReplaceAll(r, nucleiTags, ph)
-		return r
-	}
-	tplRaw = replaceNucleiTags(tplRaw, `{{BaseURL}}`, "__base_url__")
-	tplRaw = replaceNucleiTags(tplRaw, `{{BaseUrl}}`, "__base_url__")
-	tplRaw = replaceNucleiTags(tplRaw, `{{RootURL}}`, "__root_url__")
-	tplRaw = replaceNucleiTags(tplRaw, `{{RootUrl}}`, "__root_url__")
-	tplRaw = replaceNucleiTags(tplRaw, `{{Hostname}}`, "__hostname__")
-	tplRaw = replaceNucleiTags(tplRaw, `{{Host}}`, "__host__")
-	tplRaw = replaceNucleiTags(tplRaw, `{{Port}}`, "__port__")
-	tplRaw = replaceNucleiTags(tplRaw, `{{Path}}`, "__path__")
-	tplRaw = replaceNucleiTags(tplRaw, `{{File}}`, "__file__")
-	tplRaw = replaceNucleiTags(tplRaw, `{{Schema}}`, "__schema__")
-	if variableRegexp.MatchString(tplRaw) {
-		tplRaw = variableRegexp.ReplaceAllStringFunc(tplRaw, func(s string) string {
-			paramsKey := strings.Trim(s, "{}")
-			ph := GetPlaceHolderMap()
-			placeHolderMap[ph] = paramsKey
-			tagsToPlaceHolderMap[s] = ph
-			return ph
-		})
-	}
-
 	var mid = map[string]interface{}{}
 	err := yaml.Unmarshal([]byte(tplRaw), &mid)
 	if err != nil {
@@ -208,7 +131,7 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 				return nil, utils.Error("nuclei template `network` is not slice")
 			}
 			// network means tcp packets...
-			yakTemp.TCPRequestSequences, err = parseNetworkBulk(utils.InterfaceToSliceInterface(ret), tagsToPlaceHolderMap)
+			yakTemp.TCPRequestSequences, err = parseNetworkBulk(utils.InterfaceToSliceInterface(ret))
 			if err != nil {
 				return nil, utils.Errorf("parse network bulk failed: %v", err)
 			}
@@ -314,45 +237,12 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 				return nucleiRawPacketToYakHTTPRequestPacket(i)
 			}).([]*YakHTTPRequestPacket)
 		} else {
-			method := utils.MapGetString(req, "method")
-			paths := utils.InterfaceToStringSlice(utils.MapGetRaw(req, "path"))
-			for _, path := range paths {
-				var firstLine string = fmt.Sprintf("%v %v HTTP/1.1", method, path)
-				baseURLph := tagsToPlaceHolderMap["{{BaseURL}}"]
-				if strings.HasPrefix(path, baseURLph) {
-					if strings.HasPrefix(path, fmt.Sprintf("%s/", baseURLph)) {
-						ph = registerNucleiTags("{{EndSlashBaseURL}}", "__path_trim_end_slash__")
-						firstLine = fmt.Sprintf("%v %v HTTP/1.1", method, strings.ReplaceAll(path, tagsToPlaceHolderMap["{{BaseURL}}"], ph))
-					} else {
-						ph = tagsToPlaceHolderMap["{{BaseURL}}"]
-						firstLine = fmt.Sprintf("%v %v HTTP/1.1", method, strings.ReplaceAll(path, "{{BaseURL}}", ph))
-					}
-				} else if strings.HasPrefix(path, tagsToPlaceHolderMap["{{RootURL}}"]) {
-					firstLine = fmt.Sprintf("%v %v HTTP/1.1", method, strings.ReplaceAll(path, tagsToPlaceHolderMap["{{RootURL}}"], ""))
-				}
-				firstLine = nucleiFormatToFuzzTagMode(firstLine)
-
-				// 处理
-				var lines []string
-				lines = append(lines, firstLine)
-				headersRaw := utils.MapGetRaw(req, "headers")
-				headers := utils.InterfaceToMapInterface(headersRaw)
-				_, hostOk1 := headers["Host"]
-				_, hostOk2 := headers["host"]
-				if !hostOk1 && !hostOk2 {
-					lines = append(lines, "Host: "+tagsToPlaceHolderMap["{{Hostname}}"])
-				}
-				for k, v := range headers {
-					lines = append(lines, fmt.Sprintf(`%v: %v`, k, nucleiFormatToFuzzTagMode(utils.InterfaceToString(v))))
-				}
-				if len(headers) <= 0 {
-					lines = append(lines, `User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0`)
-				}
-				var rawPacket = strings.Join(lines, "\r\n") + "\r\n\r\n"
-				rawPacket += utils.MapGetString(req, "body")
-				rawPacket = nucleiFormatToFuzzTagMode(rawPacket)
-				reqIns.HTTPRequests = append(reqIns.HTTPRequests, &YakHTTPRequestPacket{Request: rawPacket})
+			reqIns.Method = utils.MapGetString(req, "method")
+			reqIns.Paths = utils.InterfaceToStringSlice(utils.MapGetRaw(req, "path"))
+			for k, v := range utils.InterfaceToMapInterface(utils.MapGetRaw(req, "headers")) {
+				reqIns.Headers[k] = toString(v)
 			}
+			reqIns.Body = utils.MapGetString(req, "body")
 		}
 
 		if len(reqIns.HTTPRequests) <= 0 {
@@ -368,27 +258,6 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 	yakTemp.HTTPRequestSequences = reqSeq
 	//extractConfig(&yakTemp.RequestConfig, mid)
 	return yakTemp, nil
-}
-
-// variableTag
-var variableRegexp = regexp.MustCompile(`(?i)\{\{([a-z_][a-z0-9_]*)}}`)
-var exprRegexp = regexp.MustCompile(`(?i)\{\{[^}\r\n]+}}`)
-
-func GetPlaceHolderMap() string {
-	return fmt.Sprintf("__%s__", utils.RandStringBytes(8))
-}
-
-func nucleiFormatToFuzzTagMode(r string) string {
-	if exprRegexp.MatchString(r) {
-		r = exprRegexp.ReplaceAllStringFunc(r, func(s string) string {
-			if strings.HasPrefix(s, "{{params") {
-				return s
-			}
-			return fmt.Sprintf("{{expr:nucleidsl(%v)}}", strings.Trim(s, "{}"))
-		})
-	}
-
-	return r
 }
 
 func nucleiRawPacketToYakHTTPRequestPacket(i string) *YakHTTPRequestPacket {
@@ -426,7 +295,6 @@ func nucleiRawPacketToYakHTTPRequestPacket(i string) *YakHTTPRequestPacket {
 	if strings.HasSuffix(packet.Request, "\r\n") {
 		packet.Request += "\r\n"
 	}
-	packet.Request = nucleiFormatToFuzzTagMode(packet.Request)
 	return packet
 }
 
