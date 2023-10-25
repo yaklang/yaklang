@@ -9,7 +9,6 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
-	"github.com/yaklang/yaklang/common/yak/ssa4analyze/pass"
 	"golang.org/x/exp/slices"
 )
 
@@ -92,10 +91,10 @@ func TestUndefine(t *testing.T) {
 	t.Run("undefined value in template string", func(t *testing.T) {
 		CheckTestCase(t, TestCase{
 			code: `
-			a = f"${undefined}"
+			a = f"${undefined_var}"
 			`,
 			errs: []string{
-				ssa4analyze.ValueUndefined("undefined"),
+				ssa4analyze.ValueUndefined("undefined_var"),
 			},
 		})
 	})
@@ -204,6 +203,9 @@ func TestFreeValue(t *testing.T) {
 				param.a().b() // freeValue 
 			}
 			`,
+			errs: []string{
+				ssa.ContAssignExtern("param"),
+			},
 			ExternValue: map[string]any{
 				"param": func() {},
 			},
@@ -246,7 +248,17 @@ func TestPhi(t *testing.T) {
 			for 2 {
 				str.F2() // only handler "field str[F2]" 
 			}
+
+			for 3 {
+				str.F()
+				str.F = 1
+				str.F2() 
+				str.F()
+			}
 			`,
+			errs: []string{
+				ssa.ContAssignExtern("str.F"),
+			},
 			ExternLib: map[string]map[string]any{
 				"str": {
 					"F":  func() int { return 1 },
@@ -312,10 +324,10 @@ func TestMemberCall(t *testing.T) {
 			f().B // invalid field member
 			`,
 			errs: []string{
-				pass.InvalidField("number"),
-				pass.InvalidField("( ) -> number"),
-				pass.InvalidField("number"),
-				pass.InvalidField("number"),
+				ssa4analyze.InvalidField("number"),
+				ssa4analyze.InvalidField("( ) -> number"),
+				ssa4analyze.InvalidField("number"),
+				ssa4analyze.InvalidField("number"),
 			},
 		})
 	})
@@ -383,8 +395,8 @@ func TestSliceCall(t *testing.T) {
 			`,
 			errs: []string{
 				ssa4analyze.ValueUndefined("a1"),
-				pass.InvalidField("number"),
-				pass.InvalidField("number"),
+				ssa4analyze.InvalidField("number"),
+				ssa4analyze.InvalidField("number"),
 			},
 			ExternValue: map[string]any{
 				"print": func(any) {},
@@ -402,7 +414,7 @@ func TestSliceCall(t *testing.T) {
 			a[2] = 3
 			`,
 			errs: []string{
-				pass.InvalidField("number"),
+				ssa4analyze.InvalidField("number"),
 			},
 		})
 	})
@@ -512,8 +524,8 @@ func TestCallParamReturn(t *testing.T) {
 			b = c[1] // error invalid field
 			`,
 			errs: []string{
-				pass.InvalidField("number"),
-				pass.InvalidField("number"),
+				ssa4analyze.InvalidField("number"),
+				ssa4analyze.InvalidField("number"),
 				ssa4analyze.CallAssignmentMismatch(2, "number"),
 			},
 			ExternValue: map[string]any{
@@ -745,7 +757,41 @@ func TestExternInstance(t *testing.T) {
 		})
 	})
 
-	// t.Run()
+	t.Run("wrong method name", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			lib.getString()
+			lib.getInt()
+			lib.GetInt() // error; you meant "getInt"?
+
+			lib.getInt = 1 // warn 
+			lib.GetInt = 1 // warn 
+			lib.getInt()
+			lib = {"a":1} // warn
+			lib.GetInt() 
+
+			print(1)
+			print = func(a) {a = 1} // warn
+			print(1)
+			`,
+			errs: []string{
+				ssa.ExternLibError("lib", "GetInt", "getInt"),
+				ssa.ContAssignExtern("lib.getInt"),
+				ssa.ContAssignExtern("lib.GetInt"),
+				ssa.ContAssignExtern("lib"),
+				ssa.ContAssignExtern("print"),
+			},
+			ExternValue: map[string]any{
+				"print": func(any) {},
+			},
+			ExternLib: map[string]map[string]any{
+				"lib": {
+					"getString": func() string { return "1" },
+					"getInt":    func() int { return 1 },
+				},
+			},
+		})
+	})
 }
 
 func TestErrorHandler(t *testing.T) {
@@ -797,7 +843,7 @@ func TestErrorHandler(t *testing.T) {
 			a, b, err = getError3()~
 			`,
 			errs: []string{
-				pass.ValueIsNull(),
+				ssa4analyze.ValueIsNull(),
 				ssa4analyze.CallAssignmentMismatchDropError(2, "number"),
 				ssa4analyze.CallAssignmentMismatchDropError(3, "number, number"),
 			},

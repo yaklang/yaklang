@@ -7,14 +7,14 @@ import (
 )
 
 func ReplaceValue(v Value, to Value) {
-	ReplaceValueInRange(v, to, func(inst Instruction) bool {
-		return true
+	ReplaceValueSkip(v, to, func(inst Instruction) bool {
+		return false
 	})
 }
 
-func ReplaceValueInRange(v Value, to Value, inRange func(Instruction) bool) {
+func ReplaceValueSkip(v Value, to Value, skip func(Instruction) bool) {
 	for _, user := range v.GetUsers() {
-		if !inRange(user) {
+		if skip(user) {
 			continue
 		}
 		user.ReplaceValue(v, to)
@@ -23,9 +23,7 @@ func ReplaceValueInRange(v Value, to Value, inRange func(Instruction) bool) {
 		v.RemoveUser(user)
 	}
 
-	//TODO: replace symbol table
-	// v.GetFunc().ReplaceSymbolTable(v, to)
-	// v.GetFunc().builder.ReplaceVariable(v.GetVariable(), v, to)
+	v.GetFunc().ReplaceVariable(v.GetVariable(), v, to)
 }
 
 func GetValues(n Node) Values {
@@ -167,6 +165,8 @@ func (s *Update) GetValues() Values { return []Value{s.Address, s.Value} }
 func (s *Update) ReplaceValue(v, to Value) {
 	if s.Value == v {
 		s.Value = to
+	} else if s.Address == v {
+		s.Address = to
 	} else {
 		panic("update not use this value")
 	}

@@ -53,6 +53,10 @@ type Instruction interface {
 	SetSymbolTable(*blockSymbolTable)
 	GetSymbolTable() *blockSymbolTable
 
+	// extern
+	IsExtern() bool
+	SetExtern(bool)
+
 	// has left-value
 	HasLeftVariable() bool
 	GetLeftItem() LeftInstruction
@@ -103,6 +107,7 @@ type anInstruction struct {
 
 	variable string
 
+	isExtern bool
 	// left
 	hasLeft   bool
 	variables []string
@@ -122,6 +127,9 @@ func (a *anInstruction) GetBlock() *BasicBlock      { return a.block }
 // source code position
 func (c *anInstruction) GetPosition() *Position    { return c.Pos }
 func (c *anInstruction) SetPosition(pos *Position) { c.Pos = pos }
+
+func (c *anInstruction) IsExtern() bool   { return c.isExtern }
+func (c *anInstruction) SetExtern(b bool) { c.isExtern = b }
 
 // error logger
 func (c *anInstruction) NewError(kind ErrorKind, tag ErrorTag, msg string) {
@@ -317,6 +325,10 @@ type Parameter struct {
 	variable    string
 	Func        *Function
 	IsFreeValue bool
+
+	// for extern lib
+	BuildField func(string) Value
+
 	//TODO: is modify , not cover
 	IsModify bool
 	typs     Type

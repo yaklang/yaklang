@@ -821,91 +821,40 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 				}
 			default:
 			}
-			// } else if b.CanBuildFreeValue(text) {
-			// 	field := b.NewCaptureField(text)
-			// 	b.FreeValues = append(b.FreeValues, field)
-			// 	b.SetReg(field)
-			// 	return field
+			if v.IsExtern() {
+				b.NewErrorWithPos(ssa.Warn, TAG, b.CurrentPos, ssa.ContAssignExtern(text))
+			}
 		}
 		return ssa.NewIdentifierLV(text, b.CurrentPos)
 	}
 	if s, ok := stmt.Expression().(*yak.ExpressionContext); ok {
-		inter := b.buildObject(s)
+		var ret ssa.LeftValue
+		inter := b.buildExpression(s)
 		if s, ok := stmt.LeftSliceCall().(*yak.LeftSliceCallContext); ok {
-			index := b.buildLeftSliceCall(s)
-			return b.EmitFieldMust(inter, index)
-		}
-
-		if s, ok := stmt.LeftMemberCall().(*yak.LeftMemberCallContext); ok {
-			if key := b.buildLeftMemberCall(s); key != nil {
-				return b.EmitFieldMust(inter, key)
-			}
-		}
-	}
-	return nil
-}
-
-func (b *astbuilder) buildObject(s *yak.ExpressionContext) ssa.Value {
-	ex := b.buildExpression(s)
-	if ex == nil {
-		b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
-		return nil
-	}
-	//TODO: check interface type
-	var inter ssa.Value
-	if expr, ok := ex.(ssa.Value); ok {
-		return expr
-	} else {
-		if v, ok := ex.(*ssa.ConstInst); ok {
-			if v.GetType().GetTypeKind() == ssa.String {
-				// return b.EmitConstInst(v)
-			}
-		}
-		{
-			// expr := stmt.Expression().(*yak.ExpressionContext)
 			recoverRange := b.SetRange(s.BaseParserRuleContext)
-			text := s.GetText()
-			text = text + "-FieldTarget"
-			v := b.ReadVariable(text, false)
-			if user, ok := v.(ssa.Value); v != nil && ok {
-				inter = user
-			} else {
-				pa := ssa.NewParam(text, false, b.Function)
-				pa.SetType(ex.GetType())
-				b.WriteVariable(text, pa)
-				inter = pa
+			if s, ok := s.Expression().(*yak.ExpressionContext); ok {
+				index := b.buildExpression(s)
+				ret = b.EmitFieldMust(inter, index)
 			}
 			recoverRange()
-			return inter
 		}
-	}
-}
 
-// left slice call
-func (b *astbuilder) buildLeftSliceCall(stmt *yak.LeftSliceCallContext) ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
-	defer recoverRange()
-	if s, ok := stmt.Expression().(*yak.ExpressionContext); ok {
-		return b.buildExpression(s)
-	}
-	return nil
-}
-
-// left member call
-func (b *astbuilder) buildLeftMemberCall(stmt *yak.LeftMemberCallContext) ssa.Value {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
-	defer recoverRange()
-	if id := stmt.Identifier(); id != nil {
-		idText := id.GetText()
-		return b.EmitConstInst(idText)
-	} else if id := stmt.IdentifierWithDollar(); id != nil {
-		key := b.ReadVariable(id.GetText()[1:], true)
-		if key == nil {
-			// b.NewError(ssa.Error, TAG, ExpressionNotVariable(id.GetText()))
-			return nil
+		//TODO:
+		if s, ok := stmt.LeftMemberCall().(*yak.LeftMemberCallContext); ok {
+			recoverRange := b.SetRange(s.BaseParserRuleContext)
+			if inter.IsExtern() {
+				b.NewErrorWithPos(ssa.Warn, TAG, b.CurrentPos, ssa.ContAssignExtern(stmt.GetText()))
+			}
+			if id := s.Identifier(); id != nil {
+				idText := id.GetText()
+				ret = b.EmitFieldMust(inter, b.EmitConstInst(idText))
+			} else if id := s.IdentifierWithDollar(); id != nil {
+				key := b.ReadVariable(id.GetText()[1:], true)
+				ret = b.EmitFieldMust(inter, key)
+			}
+			recoverRange()
 		}
-		// return b.EmitFieldMust(inter, key)
-		return key
+		return ret
 	}
 	return nil
 }
@@ -967,40 +916,11 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 	}
 	// member call
 	if s, ok := stmt.MemberCall().(*yak.MemberCallContext); ok {
-		// check extern
-		if v := b.TryBuildExternValue(stmt.GetText()); v != nil {
-			// check cache
-			return v
-		} else {
-			// try build
-			var name, key string
-			// before .
-			if s, ok := stmt.Expression(0).(*yak.ExpressionContext); ok {
-				if before := s.Identifier(); before != nil {
-					name = before.GetText()
-				}
-			}
-
-			// after .
-			after := s.Identifier()
-			if after != nil {
-				key = after.GetText()
-			}
-
-			if name != "" && key != "" {
-				if f := b.TryBuildExternLib(name); f != nil {
-					if v := f(key); v != nil {
-						return v
-					}
-				}
-			}
-		}
-
 		expr, ok := stmt.Expression(0).(*yak.ExpressionContext)
 		if !ok {
 			return nil
 		}
-		inter := b.buildObject(expr)
+		inter := b.buildExpression(expr)
 		if id := s.Identifier(); id != nil {
 			idText := id.GetText()
 			return b.EmitField(inter, b.EmitConstInst(idText))
@@ -1020,7 +940,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		if !ok {
 			return nil
 		}
-		expr := b.buildObject(expression)
+		expr := b.buildExpression(expression)
 		keys := b.buildSliceCall(s)
 		if len(keys) == 1 {
 			return b.EmitField(expr, keys[0])

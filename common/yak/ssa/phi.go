@@ -14,9 +14,30 @@ func NewPhi(block *BasicBlock, variable string, create bool) *Phi {
 }
 
 func (b *BasicBlock) Sealed() {
+	builder := b.GetFunc().builder
 	for _, p := range b.inCompletePhi {
 		v := p.Build()
 		v.SetPosition(p.GetPosition())
+		if pa, ok := ToParameter(v); ok && pa.IsExtern() {
+			pa.GetUsers().RunOnField(func(f *Field) {
+				if v := builder.getExternLibInstance(v, f.Key); v != nil {
+					f.GetUsers().RunOnUpdate(func(u *Update) {
+						u.NewError(Warn, SSATAG, ContAssignExtern(v.GetVariable()))
+					})
+					hasUpdate := false
+					// replace but skip update
+					ReplaceValueSkip(f, v, func(i Instruction) bool {
+						// return false
+						_, ok := ToUpdate(i)
+						hasUpdate = hasUpdate || ok
+						return ok
+					})
+					if !hasUpdate {
+						DeleteInst(f)
+					}
+				}
+			})
+		}
 	}
 	b.inCompletePhi = nil
 	b.isSealed = true
