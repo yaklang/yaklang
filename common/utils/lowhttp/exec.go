@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"golang.org/x/net/http2"
 	"io"
@@ -65,6 +66,7 @@ type LowhttpExecConfig struct {
 	FromPlugin                       string
 	WithConnPool                     bool
 	ConnPool                         *lowHttpConnPool
+	NativeHTTPRequestInstance        *http.Request
 }
 
 type LowhttpResponse struct {
@@ -182,6 +184,12 @@ func WithRuntimeId(runtimeId string) LowhttpOpt {
 func WithFromPlugin(fromPlugin string) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.FromPlugin = fromPlugin
+	}
+}
+
+func WithNativeHTTPRequestInstance(req *http.Request) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.NativeHTTPRequestInstance = req
 	}
 }
 
@@ -848,7 +856,11 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		https:  option.Https,
 		gmTls:  option.GmTLS,
 	}
+	var haveNativeHTTPRequestInstance = option.NativeHTTPRequestInstance != nil
 RECONNECT:
+	if haveNativeHTTPRequestInstance {
+		httpctx.SetRequestHTTPS(option.NativeHTTPRequestInstance, https)
+	}
 	if withConnPool && !enableHttp2 {
 		conn, err = connPool.getIdleConn(cacheKey, dialopts...)
 	} else {
@@ -900,6 +912,9 @@ RECONNECT:
 		}
 	}
 	response.RemoteAddr = conn.RemoteAddr().String()
+	if haveNativeHTTPRequestInstance {
+		httpctx.SetRemoteAddr(option.NativeHTTPRequestInstance, response.RemoteAddr)
+	}
 	response.PortIsOpen = true
 
 	if enableHttp2 {
@@ -923,12 +938,17 @@ RECONNECT:
 	var rawBytes []byte
 
 	if withConnPool {
-		if bytes.Contains(requestPacket, []byte("HEAD")) {
-			log.Errorf("test")
-		}
 		//连接池分支
 		pc := conn.(*persistConn)
 		writeErrCh := make(chan error, 1)
+		if option.BeforeDoRequest != nil {
+			requestPacket = option.BeforeDoRequest(requestPacket)
+		}
+
+		if haveNativeHTTPRequestInstance {
+			httpctx.SetBareRequestBytes(option.NativeHTTPRequestInstance, requestPacket)
+		}
+
 		if oldVersionProxyChecking {
 			requestPacket, err = BuildLegacyProxyRequest(requestPacket)
 			if err != nil {
@@ -936,7 +956,6 @@ RECONNECT:
 			}
 		}
 		pc.writeCh <- writeRequest{reqPacket: requestPacket, ch: writeErrCh}
-
 		resc := make(chan responseInfo)
 		pc.reqCh <- requestAndResponseCh{
 			reqPacket: requestPacket,
@@ -958,7 +977,7 @@ RECONNECT:
 			case re := <-resc:
 				//收到响应
 				if (re.resp == nil) == (re.err == nil) {
-					panic(fmt.Sprintf("internal error: exactly one of res or err should be set; nil=%v", re.resp == nil))
+					return nil, utils.Errorf("BUG: internal error: exactly one of res or err should be set; nil=%v", re.resp == nil)
 				}
 				if re.err != nil && len(rawBytes) == 0 {
 					if pc.shouldRetryRequest(re.err) {
@@ -968,6 +987,10 @@ RECONNECT:
 				}
 				firstResponse = re.resp
 				rawBytes = re.respBytes
+				response.MultiResponse = false
+				if haveNativeHTTPRequestInstance {
+					httpctx.SetBareResponseBytes(option.NativeHTTPRequestInstance, rawBytes)
+				}
 				traceInfo.ServerTime = re.info.ServerTime
 				break LOOP
 			case <-pcClosed:
@@ -989,6 +1012,10 @@ RECONNECT:
 		// 写报文
 		if option.BeforeDoRequest != nil {
 			requestPacket = option.BeforeDoRequest(requestPacket)
+		}
+
+		if haveNativeHTTPRequestInstance {
+			httpctx.SetBareRequestBytes(option.NativeHTTPRequestInstance, requestPacket)
 		}
 		if oldVersionProxyChecking {
 			var legacyRequest []byte
@@ -1017,50 +1044,50 @@ RECONNECT:
 		}
 
 		_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-		firstResponse, err = utils.ReadHTTPResponseFromBufioReader(httpResponseReader, nil)
+
+		var stashedRequest = new(http.Request)
+		firstResponse, err = utils.ReadHTTPResponseFromBufioReader(httpResponseReader, stashedRequest)
 		if err != nil {
 			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 				return response, nil
 			}
 			log.Infof("[lowhttp] read response failed: %s", err)
 		}
+		if haveNativeHTTPRequestInstance {
+			httpctx.SetBareResponseBytes(option.NativeHTTPRequestInstance, responseRaw.Bytes())
+		}
 
 		if firstResponse == nil {
 			if len(responseRaw.Bytes()) == 0 {
 				return response, errors.Wrap(err, "empty result.")
 			} else { // peek 到了数据,但是无法解析,说明是畸形响应包
-				_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-				_, _ = io.ReadAll(httpResponseReader)
-				rawBytes = responseRaw.Bytes()
+				restBytes, _ := utils.ReadConnUntilStable(conn, conn, 5*time.Second, 300*time.Millisecond)
+				if len(restBytes) > 0 {
+					if len(restBytes) > 256 {
+						restBytes = restBytes[:256]
+					}
+					log.Errorf("unhandled rest data in connection: %#v ...", string(restBytes))
+				}
 			}
 		} else {
-			rawBytes, err = utils.DumpHTTPResponse(firstResponse, true)
-			if err != nil {
-				rawBytes = responseRaw.Bytes()
-			} else {
-				multiResponses = append(multiResponses, firstResponse)
-			}
+			multiResponses = append(multiResponses, firstResponse)
 
 			// handle response
 			for noFixContentLength { // 尝试读取pipeline/smuggle响应包
 				// log.Infof("checking next(pipeline/smuggle) response...")
-
-				_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-				nextResponse, err := utils.ReadHTTPResponseFromBufioReader(httpResponseReader, nil)
-
+				nextResponse, err := utils.ReadHTTPResponseFromBufioReaderConn(httpResponseReader, conn, nil)
 				if err != nil {
 					if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) { // 停止读取
 						break
 					}
-					// 非EOF错误,说明是conn内部大概率还有数据,但是解析失败证明是畸形响应包,所以改用TeeReader里的数据
-					for {
-						_ = conn.SetReadDeadline(time.Now().Add(1 * time.Second))
-						_, err = io.ReadAll(httpResponseReader)
-						if err != nil {
-							break //如果ReadAll失败则出现了问题,直接退出
+					// read second response rest in buffer
+					restBytes, _ := utils.ReadConnUntilStable(conn, conn, 5*time.Second, 300*time.Millisecond)
+					if len(restBytes) > 0 {
+						if len(restBytes) > 256 {
+							restBytes = restBytes[:256]
 						}
+						log.Errorf("unhandled rest data in connection: %#v ...", string(restBytes))
 					}
-					rawBytes = responseRaw.Bytes()
 					break
 				}
 
@@ -1068,18 +1095,11 @@ RECONNECT:
 					multiResponses = append(multiResponses, nextResponse)
 					isMultiResponses = true
 					response.MultiResponse = true
-					nextRaw, err := utils.DumpHTTPResponse(nextResponse, true)
-					if err != nil {
-						break
-					}
-					rawBytes = append(rawBytes, nextRaw...)
 				}
 			}
 		}
+		rawBytes = responseRaw.Bytes()
 	}
-
-	var result = codec.EncodeBase64(rawBytes[:])
-	_ = result
 
 	// 更新cookiejar中的cookie
 	if session != nil {

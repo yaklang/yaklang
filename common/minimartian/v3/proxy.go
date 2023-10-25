@@ -519,6 +519,150 @@ func (p *Proxy) handleLoop(conn net.Conn, rootCtx context.Context) {
 	}
 }
 
+// handleConnectionTunnel handles a CONNECT request.
+// connect to request host and port
+func (p *Proxy) handleConnectionTunnel(req *http.Request, conn net.Conn, ctx *Context, session *Session, brw *bufio.ReadWriter) error {
+	httpctx.SetRequestViaCONNECT(req, true)
+	connectedTo, err := utils.GetConnectedToHostPortFromHTTPRequest(req)
+	if err != nil {
+		conn.Close()
+		return utils.Errorf("martian: no host (and not connect to) in connect request: \n%v\n\n", err)
+	}
+
+	parsedConnectedToPort := httpctx.GetContextIntInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort)
+	parsedConnectedToHost := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost)
+	ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost, parsedConnectedToHost)
+	ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, parsedConnectedToPort)
+	ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo, connectedTo)
+	ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ViaConnect, true)
+
+	if err := p.reqmod.ModifyRequest(req); err != nil {
+		if !strings.Contains(err.Error(), "ignore connect") {
+			log.Errorf("martian: error modifying CONNECT request: %v", err)
+			proxyutil.Warning(req.Header, err)
+		}
+	}
+	if session.Hijacked() {
+		log.Debugf("martian: connection hijacked by request modifier")
+		return nil
+	}
+
+	if p.mitm == nil {
+		conn.Close()
+		return utils.Errorf("martian: no MITM config set for CONNECT request: %s", req.Host)
+	}
+
+	log.Debugf("martian: attempting MITM for connection: %s", req.Host)
+	/*
+		return a const response connection established...
+	*/
+	res := p.connectResponse(req)
+
+	if err := p.resmod.ModifyResponse(res); err != nil {
+		log.Errorf("martian: error modifying CONNECT response: %v", err)
+		proxyutil.Warning(res.Header, err)
+	}
+	if session.Hijacked() {
+		log.Debugf("martian: connection hijacked by response modifier")
+		return nil
+	}
+	var responseBytes []byte
+	responseBytes, err = utils.DumpHTTPResponse(res, true, brw)
+	_ = responseBytes
+	if err != nil {
+		log.Errorf("CONNECT Request: got error while writing response back to client: %v", err)
+	}
+	if err := brw.Flush(); err != nil {
+		log.Errorf("CONNECT Request: got error while flushing response back to client: %v", err)
+	}
+
+	log.Debugf("martian: completed MITM for connection: %s", req.Host)
+
+	// peek the first byte to determine if this is an HTTPS connection.
+	conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+	b := make([]byte, 1)
+	if _, err := io.ReadFull(brw, b); err != nil {
+		log.Errorf("martian: error peeking message through CONNECT tunnel to determine type: %v", err)
+		return err
+	}
+	conn.SetReadDeadline(time.Time{})
+
+	// Drain all of the rest of the buffered data.
+	buf := make([]byte, brw.Reader.Buffered())
+	brw.Read(buf)
+
+	// 22 is the TLS handshake.
+	isHttps := b[0] == 0x16
+	ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_IsHttps, isHttps)
+	if parsedConnectedToPort == 0 {
+		if isHttps {
+			parsedConnectedToPort = 443
+		} else {
+			parsedConnectedToPort = 80
+		}
+		ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, parsedConnectedToPort)
+	}
+
+	// https://tools.ietf.org/html/rfc5246#section-6.2.1
+	if isHttps {
+		ctx.Session().MarkSecure()
+
+		var serverUseH2 bool
+		if p.http2 {
+			// does remote server use h2?
+			var proxyStr string
+			if p.proxyURL != nil {
+				proxyStr = p.proxyURL.String()
+			}
+
+			// TODO: should connect every connection?
+			netConn, _ := netx.DialX(
+				utils.HostPort(parsedConnectedToHost, parsedConnectedToPort),
+				netx.DialX_WithTimeout(10*time.Second),
+				netx.DialX_WithProxy(proxyStr),
+				netx.DialX_WithForceProxy(proxyStr != ""),
+				netx.DialX_WithTLSNextProto("h2"),
+				netx.DialX_WithTLS(true),
+			)
+			if netConn != nil {
+				switch ret := netConn.(type) {
+				case *tls.Conn:
+					if ret.ConnectionState().NegotiatedProtocol == "h2" {
+						serverUseH2 = true
+					}
+				}
+				netConn.Close()
+			}
+		}
+
+		// fallback: 最普通的情况，没有任何 http2 支持
+		// do as ordinary https server and use *tls.Conn
+		tlsConfig := p.mitm.TLSForHost(req.Host, p.http2 && serverUseH2)
+		tlsconn := tls.Server(&peekedConn{
+			Conn: conn,
+			r:    io.MultiReader(bytes.NewReader(b), bytes.NewReader(buf), conn),
+		}, tlsConfig)
+		if err := tlsconn.Handshake(); err != nil {
+			p.mitm.HandshakeErrorCallback(req, err)
+			return err
+		}
+		nextProto := tlsconn.ConnectionState().NegotiatedProtocol
+		log.Debugf("connect from browser: %v use: %v", tlsconn.RemoteAddr().String(), nextProto)
+		if nextProto == "h2" {
+			return p.proxyH2(p.closing, tlsconn, req.URL)
+		}
+
+		brw.Writer.Reset(tlsconn)
+		brw.Reader.Reset(tlsconn)
+		// -> Client Connection <- is none HTTP2 HTTPS connection
+		return p.handle(ctx, tlsconn, brw)
+	}
+	// -> Client Connection <- is plain HTTP connection
+	// Prepend the previously read data to be read again.
+	brw.Reader.Reset(io.MultiReader(bytes.NewReader(b), bytes.NewReader(buf), conn))
+	return p.handle(ctx, conn, brw)
+}
+
 func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error {
 	log.Debugf("martian: waiting for request: %v", conn.RemoteAddr())
 	defer func() {
@@ -654,209 +798,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	}
 
 	if req.Method == "CONNECT" {
-		httpctx.SetRequestViaCONNECT(req, true)
-		connectedTo, err := utils.GetConnectedToHostPortFromHTTPRequest(req)
-		if err != nil {
-			conn.Close()
-			return utils.Errorf("martian: no host (and not connect to) in connect request: \n%v\n\n", err)
-		}
-		parsedConnectedToPort := httpctx.GetContextIntInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort)
-		parsedConnectedToHost := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost)
-		ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost, parsedConnectedToHost)
-		ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, parsedConnectedToPort)
-		ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo, connectedTo)
-		ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ViaConnect, true)
-
-		if err := p.reqmod.ModifyRequest(req); err != nil {
-			if !strings.Contains(err.Error(), "ignore connect") {
-				log.Errorf("martian: error modifying CONNECT request: %v", err)
-				proxyutil.Warning(req.Header, err)
-			}
-		}
-		if session.Hijacked() {
-			log.Debugf("martian: connection hijacked by request modifier")
-			return nil
-		}
-
-		if p.mitm != nil {
-			log.Debugf("martian: attempting MITM for connection: %s", req.Host)
-			res := p.connectResponse(req)
-
-			if err := p.resmod.ModifyResponse(res); err != nil {
-				log.Errorf("martian: error modifying CONNECT response: %v", err)
-				proxyutil.Warning(res.Header, err)
-			}
-			if session.Hijacked() {
-				log.Debugf("martian: connection hijacked by response modifier")
-				return nil
-			}
-
-			var responseBytes []byte
-			responseBytes, err = utils.DumpHTTPResponse(res, true, brw)
-			_ = responseBytes
-			if err != nil {
-				log.Errorf("CONNECT Request: got error while writing response back to client: %v", err)
-			}
-			if err := brw.Flush(); err != nil {
-				log.Errorf("CONNECT Request: got error while flushing response back to client: %v", err)
-			}
-
-			log.Debugf("martian: completed MITM for connection: %s", req.Host)
-
-			conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-			b := make([]byte, 1)
-			if _, err := brw.Read(b); err != nil {
-				log.Errorf("martian: error peeking message through CONNECT tunnel to determine type: %v", err)
-				return err
-			}
-			conn.SetReadDeadline(time.Time{})
-
-			// Drain all of the rest of the buffered data.
-			buf := make([]byte, brw.Reader.Buffered())
-			brw.Read(buf)
-
-			isHttps := b[0] == 0x16
-			ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_IsHttps, isHttps)
-			if parsedConnectedToPort == 0 {
-				if isHttps {
-					parsedConnectedToPort = 443
-				} else {
-					parsedConnectedToPort = 80
-				}
-				ctx.Session().Set(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, parsedConnectedToPort)
-			}
-
-			// 22 is the TLS handshake.
-			// https://tools.ietf.org/html/rfc5246#section-6.2.1
-			if isHttps {
-				ctx.Session().MarkSecure()
-
-				var serverUseH2 bool
-				if p.http2 {
-					// does remote server use h2?
-					defaultTLSConfig := utils.NewDefaultTLSConfig()
-					defaultTLSConfig.NextProtos = []string{"h2"}
-					var proxyStr string
-					if p.proxyURL != nil {
-						proxyStr = p.proxyURL.String()
-					}
-					netConn, _ := netx.DialTLSTimeout(5*time.Second, utils.HostPort(parsedConnectedToHost, parsedConnectedToPort), defaultTLSConfig, proxyStr)
-					if netConn != nil {
-						switch ret := netConn.(type) {
-						case *tls.Conn:
-							if ret.ConnectionState().NegotiatedProtocol == "h2" {
-								serverUseH2 = true
-							}
-						}
-						netConn.Close()
-					}
-				}
-
-				// fallback: 最普通的情况，没有任何 http2 支持
-				// do as ordinary https server and use *tls.Conn
-				tlsConfig := p.mitm.TLSForHost(req.Host, p.http2 && serverUseH2)
-				tlsconn := tls.Server(&peekedConn{
-					Conn: conn,
-					r:    io.MultiReader(bytes.NewReader(b), bytes.NewReader(buf), conn),
-				}, tlsConfig)
-				if err := tlsconn.Handshake(); err != nil {
-					p.mitm.HandshakeErrorCallback(req, err)
-					return err
-				}
-				nextProto := tlsconn.ConnectionState().NegotiatedProtocol
-				log.Debugf("connect from browser: %v use: %v", tlsconn.RemoteAddr().String(), nextProto)
-				var nconn net.Conn = tlsconn
-
-				if nextProto == "h2" {
-					return p.proxyH2(p.closing, tlsconn, req.URL)
-				}
-
-				brw.Writer.Reset(nconn)
-				brw.Reader.Reset(nconn)
-				// -> Client Connection <- is none HTTP2 HTTPS connection
-				return p.handle(ctx, nconn, brw)
-			}
-			// -> Client Connection <- is plain HTTP connection
-			// Prepend the previously read data to be read again.
-			brw.Reader.Reset(io.MultiReader(bytes.NewReader(b), bytes.NewReader(buf), conn))
-			return p.handle(ctx, conn, brw)
-		}
-
-		log.Infof("martian: attempting to establish CONNECT tunnel: %s", req.URL.Host)
-		res, cconn, cerr := p.connect(req)
-		if cerr != nil {
-			log.Errorf("martian: failed to CONNECT: %v", err)
-			res = proxyutil.NewResponse(502, nil, req)
-			proxyutil.Warning(res.Header, cerr)
-
-			if err := p.resmod.ModifyResponse(res); err != nil {
-				log.Errorf("martian: error modifying CONNECT response: %v", err)
-				proxyutil.Warning(res.Header, err)
-			}
-			if session.Hijacked() {
-				log.Debugf("martian: connection hijacked by response modifier")
-				return nil
-			}
-
-			var responseBytes []byte
-			responseBytes, err = utils.DumpHTTPResponse(res, true, brw)
-			_ = responseBytes
-			if err != nil {
-				log.Errorf("feedback to client via response: got error while writing response back to client: %v", err)
-			}
-			err := brw.Flush()
-			if err != nil {
-				log.Errorf("feedback to client via response: got error while flushing response back to client: %v", err)
-				fmt.Println(string(responseBytes))
-			}
-			return err
-		}
-		defer res.Body.Close()
-		defer cconn.Close()
-
-		if err := p.resmod.ModifyResponse(res); err != nil {
-			log.Errorf("martian: error modifying CONNECT response: %v", err)
-			proxyutil.Warning(res.Header, err)
-		}
-		if session.Hijacked() {
-			log.Debugf("martian: connection hijacked by response modifier")
-			return nil
-		}
-		res.ContentLength = -1
-		var responseBytes []byte
-		responseBytes, err = utils.DumpHTTPResponse(res, true, brw)
-		_ = responseBytes
-		if err != nil {
-			log.Errorf("handle response: got error while writing response back to client: %v", err)
-		}
-		if err := brw.Flush(); err != nil {
-			log.Errorf("handle response: got error while flushing response back to client: %v", err)
-			fmt.Println(string(responseBytes))
-		}
-
-		cbw := bufio.NewWriter(cconn)
-		cbr := bufio.NewReader(cconn)
-		defer cbw.Flush()
-
-		copySync := func(w io.Writer, r io.Reader, donec chan<- bool) {
-			if _, err := io.Copy(w, r); err != nil && err != io.EOF {
-				log.Errorf("martian: failed to copy CONNECT tunnel: %v", err)
-			}
-
-			log.Debugf("martian: CONNECT tunnel finished copying")
-			donec <- true
-		}
-
-		donec := make(chan bool, 2)
-		go copySync(cbw, brw, donec)
-		go copySync(brw, cbr, donec)
-
-		log.Debugf("martian: established CONNECT tunnel, proxying traffic")
-		<-donec
-		<-donec
-		log.Debugf("martian: closed CONNECT tunnel")
-
-		return errClose
+		return p.handleConnectionTunnel(req, conn, ctx, session, brw)
 	}
 
 	if err := p.reqmod.ModifyRequest(req); err != nil {
@@ -921,6 +863,15 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	}
 
 	err = brw.Flush()
+	log.Info("feedback to client...")
+	log.Info("feedback to client...")
+	log.Info("feedback to client...")
+	log.Info("feedback to client...")
+	log.Info("feedback to client...")
+	log.Info("feedback to client...")
+	log.Info("feedback to client...")
+	log.Info("feedback to client...")
+	log.Info("feedback to client...")
 	if err != nil {
 		log.Errorf("handle ordinary request: got error while flushing response back to client: %v", err)
 		//fmt.Println(string(responseBytes))
@@ -950,9 +901,7 @@ func (p *Proxy) roundTrip(ctx *Context, req *http.Request) (*http.Response, erro
 		return proxyutil.NewResponse(200, strings.NewReader(proxyutil.GetErrorRspBody("请求被用户丢弃")), req), nil
 	}
 
-	https := ctx.GetSessionBoolValue(httpctx.REQUEST_CONTEXT_KEY_IsHttps)
-	httpctx.SetContextValueInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_IsHttps, https)
-
+	httpctx.SetRequestHTTPS(req, ctx.GetSessionBoolValue(httpctx.REQUEST_CONTEXT_KEY_IsHttps))
 	inherit := func(i string) {
 		httpctx.SetContextValueInfoFromRequest(req, i, ctx.GetSessionStringValue(i))
 	}
@@ -1143,19 +1092,18 @@ func (p *Proxy) roundTripBase(req *http.Request) (*http.Response, error) {
 	bareBytes := httpctx.GetRequestBytes(req)
 	reqBytes := lowhttp.FixHTTPRequest(bareBytes)
 
-	ishttps := httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_IsHttps)
+	var isHttps = httpctx.GetRequestHTTPS(req)
+
 	opts := append(p.lowhttpConfig,
 		lowhttp.WithRequest(reqBytes),
-		lowhttp.WithHttps(ishttps),
+		lowhttp.WithHttps(isHttps),
 		lowhttp.WithConnPool(true),
-		lowhttp.WithSaveHTTPFlow(false))
+		lowhttp.WithSaveHTTPFlow(false),
+	)
 
 	if connectedPort := httpctx.GetContextIntInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort); connectedPort > 0 {
-		var noModified = false
-		if (connectedPort == 80 && !ishttps) || (connectedPort == 443 && ishttps) {
-			noModified = true
-		}
-		if !noModified {
+		portValid := (connectedPort == 443 && isHttps) || (connectedPort == 80 && !isHttps)
+		if !portValid {
 			//修复host和port
 			if host := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost); host != "" {
 				opts = append(opts, lowhttp.WithHost(host))
