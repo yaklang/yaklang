@@ -291,7 +291,7 @@ func TestMutiTag(t *testing.T) {
 
 // 测试标签执行出错的情况
 func TestErrors(t *testing.T) {
-	// 执行出错的几种情况：标签编译错误（返回原文）、未找到函数名（生成空？）、函数内部执行出错（可能参数类型错误，生成的数据是无意义的，应该终止生成，输出错误信息）
+	// 执行出错的几种情况：标签编译错误（返回原文）、未找到函数名（生成空？）、函数内部执行出错继续生成
 	res, err := ExecuteWithStringHandler("{{panic(error}}", testMap)
 	if err != nil {
 		t.Fatal(err)
@@ -308,8 +308,8 @@ func TestErrors(t *testing.T) {
 		t.Fatal("expect ``")
 	}
 
-	_, err = ExecuteWithStringHandler("{{panic(error)}}", testMap)
-	if err == nil || err.Error() != "error" {
-		t.Fatal("expect error")
+	res, err = ExecuteWithStringHandler("{{echo(a{{panic(error)}}b)}}", testMap)
+	if res[0] != "ab" {
+		t.Fatal("expect `ab`")
 	}
 }
