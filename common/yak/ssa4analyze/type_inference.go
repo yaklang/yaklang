@@ -1,4 +1,4 @@
-package pass
+package ssa4analyze
 
 import (
 	"github.com/yaklang/yaklang/common/utils"
@@ -7,12 +7,22 @@ import (
 
 const TITAG = "TypeInference"
 
-func init() {
-	RegisterFunctionPass(&TypeInference{})
-}
-
 type TypeInference struct {
 	Finish map[ssa.Value]struct{}
+}
+
+func NewTypeInference(config) Analyzer {
+	return &TypeInference{
+		Finish: make(map[ssa.Value]struct{}),
+	}
+}
+
+func (t *TypeInference) Run(prog *ssa.Program) {
+	for _, pkg := range prog.Packages {
+		for _, fun := range pkg.Funcs {
+			t.RunOnFunction(fun)
+		}
+	}
 }
 
 func (t *TypeInference) RunOnFunction(fun *ssa.Function) {
