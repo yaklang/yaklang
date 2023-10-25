@@ -204,6 +204,9 @@ func (m *MITMServer) Serve(ctx context.Context, addr string) error {
 	if len(m.DNSServers) > 0 {
 		config = append(config, lowhttp.WithDNSServers(m.DNSServers))
 	}
+	if len(m.HostMapping) > 0 {
+		config = append(config, lowhttp.WithETCHosts(m.HostMapping))
+	}
 
 	m.proxy.SetLowhttpConfig(config)
 	m.proxy.SetGMTLS(m.gmtls)
