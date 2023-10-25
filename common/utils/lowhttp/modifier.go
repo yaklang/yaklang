@@ -223,7 +223,47 @@ func AppendHTTPPacketPath(packet []byte, p string) []byte {
 	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
 }
 
-func handleHTTPPacketQueryParam(packet []byte, callback func(url.Values)) []byte {
+func handleHTTPPacketQueryParam(packet []byte, noAutoEncode bool, callback func(url.Values)) []byte {
+	var isChunked bool
+	var buf bytes.Buffer
+	var header []string
+
+	_, body := SplitHTTPPacket(packet,
+		func(method string, requestUri string, proto string) error {
+			defer func() {
+				buf.WriteString(method + " " + requestUri + " " + proto)
+				buf.WriteString(CRLF)
+			}()
+
+			// handle requestUri
+			u, _ := url.Parse(requestUri)
+			if u == nil { // invalid url
+				return nil
+			}
+			q := u.Query()
+			callback(q)
+			u.RawQuery = q.Encode()
+			requestUri = u.String()
+			return nil
+		},
+		nil,
+		func(line string) string {
+			if !isChunked {
+				isChunked = IsChunkedHeaderLine(line)
+			}
+			header = append(header, line)
+			return line
+		},
+	)
+
+	for _, line := range header {
+		buf.WriteString(line)
+		buf.WriteString(CRLF)
+	}
+	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
+}
+
+func handleHTTPPacketQueryParamWithoutEncoding(packet []byte, callback func(url.Values)) []byte {
 	var isChunked bool
 	var buf bytes.Buffer
 	var header []string
@@ -280,6 +320,12 @@ func ReplaceAllHTTPPacketQueryParams(packet []byte, values map[string]string) []
 
 func ReplaceHTTPPacketQueryParam(packet []byte, key, value string) []byte {
 	return handleHTTPPacketQueryParam(packet, func(q url.Values) {
+		q.Set(key, value)
+	})
+}
+
+func ReplaceHTTPPacketQueryParamWithoutEncoding(packet []byte, key, value string) []byte {
+	return handleHTTPPacketQueryParamWithoutEncoding(packet, func(q url.Values) {
 		q.Set(key, value)
 	})
 }
