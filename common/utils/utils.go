@@ -53,6 +53,10 @@ func IContains(s, sub string) bool {
 	return strings.Contains(strings.ToLower(s), strings.ToLower(sub))
 }
 
+func IHasPrefix(s, sub string) bool {
+	return strings.HasPrefix(strings.ToLower(s), strings.ToLower(sub))
+}
+
 func IntArrayContains(array []int, element int) bool {
 	for _, s := range array {
 		if element == s {
