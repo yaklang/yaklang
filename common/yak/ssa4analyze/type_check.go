@@ -10,13 +10,12 @@ const TypeCheckTAG ssa.ErrorTag = "TypeCheck"
 type TypeCheck struct {
 }
 
-func init() {
-	RegisterAnalyzer(&TypeCheck{})
+func NewTypeCheck(config) Analyzer {
+	return &TypeCheck{}
 }
 
 // Analyze(config, *ssa.Program)
-func (t *TypeCheck) Analyze(config config, prog *ssa.Program) {
-
+func (t *TypeCheck) Run(prog *ssa.Program) {
 	check := func(inst ssa.Instruction) {
 		t.CheckOnInstruction(inst)
 	}

@@ -2,21 +2,21 @@ package ssa4analyze
 
 import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"github.com/yaklang/yaklang/common/yak/ssa4analyze/pass"
 )
 
-// analyzer
+// program pass
 type Analyzer interface {
-	Analyze(config, *ssa.Program)
+	Run(*ssa.Program)
 }
+type AnalyzerBuilder func(config) Analyzer
 
 var (
-	analyzers = make([]Analyzer, 0)
+	analyzerBuilders = []AnalyzerBuilder{
+		NewBlockCondition,
+		NewTypeInference,
+		NewTypeCheck,
+	}
 )
-
-func RegisterAnalyzer(a Analyzer) {
-	analyzers = append(analyzers, a)
-}
 
 // analyzer group
 type AnalyzerGroup struct {
@@ -29,13 +29,8 @@ func (ag *AnalyzerGroup) GetError() ssa.SSAErrors {
 }
 
 func (ag *AnalyzerGroup) Run() {
-	if ag.config.enablePass {
-		for _, pass := range pass.GetPass() {
-			pass.Run(ag.Ir)
-		}
-	}
-	for _, a := range ag.config.analyzers {
-		a.Analyze(ag.config, ag.Ir)
+	for _, builder := range analyzerBuilders {
+		builder(ag.config).Run(ag.Ir)
 	}
 }
 

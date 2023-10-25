@@ -1,4 +1,4 @@
-package pass
+package ssa4analyze
 
 import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -6,18 +6,31 @@ import (
 
 const BCTag ssa.ErrorTag = "BlockCondition"
 
-func init() {
-	RegisterFunctionPass(&BlockCondition{})
-}
-
 // block condition
 type BlockCondition struct {
 	edge   Edge
 	Finish map[*ssa.BasicBlock]struct{}
 }
 
+var _ Analyzer = (*BlockCondition)(nil)
+
+func NewBlockCondition(config) Analyzer {
+	return &BlockCondition{
+		edge:   make(Edge),
+		Finish: make(map[*ssa.BasicBlock]struct{}),
+	}
+}
+
 // map to -> from -> condition
 type Edge map[*ssa.BasicBlock]map[*ssa.BasicBlock]ssa.Value
+
+func (s *BlockCondition) Run(prog *ssa.Program) {
+	for _, pkg := range prog.Packages {
+		for _, fun := range pkg.Funcs {
+			s.RunOnFunction(fun)
+		}
+	}
+}
 
 func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 	s.edge = make(Edge)
