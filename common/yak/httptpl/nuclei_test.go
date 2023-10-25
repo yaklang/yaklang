@@ -87,6 +87,8 @@ variables:
   a2: "{{rand_int(1000,9000)}}"
   a3: "{{rand_int(1000,9000)}}{{a1}}"
   a4: "{{rand_int(1000,9000)}}{{a2}}------{{a1+a2}}=={{a1}}+{{a2}}  {{to_number(a1)*to_number(a2)}}=={{a1}}*{{a2}}"
+  a5: "{{randstr}}"
+  a6: "{{randstr}}"
 
 requests:
   - method: GET
