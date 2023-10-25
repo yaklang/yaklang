@@ -6,15 +6,20 @@ func ToValue(n Node) (Value, bool) { v, ok := n.(Value); return v, ok }
 func ToUser(n Node) (User, bool)   { u, ok := n.(User); return u, ok }
 
 // value
-func ToConst(v Instruction) (*ConstInst, bool) { c, ok := v.(*ConstInst); return c, ok }
-func ToPhi(v Instruction) (*Phi, bool)         { p, ok := v.(*Phi); return p, ok }
+func ToConst(v Instruction) (*ConstInst, bool)     { c, ok := v.(*ConstInst); return c, ok }
+func ToPhi(v Instruction) (*Phi, bool)             { p, ok := v.(*Phi); return p, ok }
+func ToParameter(v Instruction) (*Parameter, bool) { p, ok := v.(*Parameter); return p, ok }
+func ToUndefined(v Instruction) (*Undefined, bool) { p, ok := v.(*Undefined); return p, ok }
 
 func ToBinOp(v Instruction) (*BinOp, bool) { c, ok := v.(*BinOp); return c, ok }
 func ToUnOp(v Instruction) (*UnOp, bool)   { c, ok := v.(*UnOp); return c, ok }
 
+func ToCall(v Instruction) (*Call, bool) { p, ok := v.(*Call); return p, ok }
+
 // memory
-func ToObject(v Instruction) (*Make, bool) { o, ok := v.(*Make); return o, ok }
-func ToField(v Instruction) (*Field, bool) { o, ok := v.(*Field); return o, ok }
+func ToObject(v Instruction) (*Make, bool)   { o, ok := v.(*Make); return o, ok }
+func ToField(v Instruction) (*Field, bool)   { o, ok := v.(*Field); return o, ok }
+func ToUpdate(v Instruction) (*Update, bool) { o, ok := v.(*Update); return o, ok }
 
 // type cover
 

@@ -294,10 +294,13 @@ func (f *FunctionBuilder) EmitConstInst(i any) *ConstInst {
 }
 
 func (f *FunctionBuilder) EmitField(i, key Value) Value {
-	return f.getFieldWithCreate(i, key, true)
+	return f.getFieldWithCreate(i, key, false)
 }
 func (f *FunctionBuilder) EmitFieldMust(i, key Value) *Field {
-	return f.GetField(i, key, true)
+	if field, ok := ToField(f.getFieldWithCreate(i, key, true)); ok {
+		return field
+	}
+	return nil
 }
 
 func (f *FunctionBuilder) EmitUpdate(address, v Value) *Update {

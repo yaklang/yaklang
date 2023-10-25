@@ -13,47 +13,56 @@ const (
 )
 
 func (b *FunctionBuilder) WithExternValue(vs map[string]any) {
-	if vs == nil {
-		return
-	}
-	b.buildExternValue = func(id string, builder *FunctionBuilder) Value {
-		if v, ok := builder.externInstance[id]; ok {
-			return v
-		}
-		if v, ok := vs[id]; ok {
-			return builder.BuildValueFromAny(id, v)
-		}
-		return nil
-	}
+	b.ExternInstance = vs
 }
 
 func (b *FunctionBuilder) WithExternLib(lib map[string]map[string]any) {
-	b.buildExternLib = func(name string, builder *FunctionBuilder) func(string) Value {
-		if table, ok := lib[name]; ok {
-			return func(key string) Value {
+	b.ExternLib = lib
+}
+
+func (b *FunctionBuilder) TryGetSimilarityKey(name, key string) string {
+	if b.ExternLib == nil {
+		return ""
+	}
+	var score float64
+	var ret string
+	if table, ok := b.ExternLib[name]; ok {
+		for libKey := range table {
+			s := utils.CalcSimilarity(utils.UnsafeStringToBytes(key), utils.UnsafeStringToBytes(libKey))
+			if score < s {
+				score = s
+				ret = libKey
+			}
+		}
+	}
+
+	return ret
+}
+
+func (b *FunctionBuilder) TryBuildExternValue(id string) Value {
+	if v, ok := b.externInstance[id]; ok {
+		return v
+	}
+	if b.ExternInstance != nil {
+		if v, ok := b.ExternInstance[id]; ok {
+			return b.BuildValueFromAny(id, v)
+		}
+	}
+	if b.ExternLib != nil {
+		if table, ok := b.ExternLib[id]; ok {
+			pa := NewParam(id, false, b.Function)
+			pa.SetExtern(true)
+			pa.BuildField = func(key string) Value {
 				if v, ok := table[key]; ok {
-					return builder.BuildValueFromAny(name+"."+key, v)
+					return b.BuildValueFromAny(id+"."+key, v)
 				} else {
 					return nil
 				}
 			}
+			return pa
 		}
-		return nil
 	}
-}
-
-func (b *FunctionBuilder) TryBuildExternValue(id string) Value {
-	if b.buildExternValue == nil {
-		return nil
-	}
-	return b.buildExternValue(id, b)
-}
-
-func (b *FunctionBuilder) TryBuildExternLib(name string) func(string) Value {
-	if b.buildExternLib == nil {
-		return nil
-	}
-	return b.buildExternLib(name, b)
+	return nil
 }
 
 func (b *FunctionBuilder) BuildValueFromAny(id string, v any) (value Value) {
@@ -80,6 +89,7 @@ func (b *FunctionBuilder) BuildValueFromAny(id string, v any) (value Value) {
 		value = NewParam(str, false, b.Function)
 		value.SetType(b.handlerType(itype, 0))
 	}
+	value.SetExtern(true)
 	b.externInstance[str] = value
 	return
 }

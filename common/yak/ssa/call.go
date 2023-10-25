@@ -38,14 +38,14 @@ func (c *Call) HandleFreeValue(fvs map[string]bool) {
 				field.SetPosition(c.GetPosition())
 				field.SetType(BasicTypes[Any])
 				builder.WriteVariable(name, field)
-				ReplaceValueInRange(v, field, func(inst Instruction) bool {
+				ReplaceValueSkip(v, field, func(inst Instruction) bool {
 					if inst.GetPosition() == nil {
-						return false
+						return true
 					}
 					if inst.GetPosition().StartLine > c.GetPosition().StartLine {
-						return true
-					} else {
 						return false
+					} else {
+						return true
 					}
 				})
 				//TODO: modify this binding
