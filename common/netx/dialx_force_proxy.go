@@ -91,7 +91,6 @@ func connectForceProxy(ctx context.Context, target string, proxy string, connect
 	}
 	ctx, _ = context.WithTimeout(ctx, connectTimeout)
 
-	proxy = strings.ToLower(proxy)
 	host, port, _ := utils.ParseStringToHostPort(proxy)
 	if host == "" || port <= 0 {
 		return nil, utils.Errorf("proxy need host:port... at least[%v]", proxy)
@@ -99,7 +98,7 @@ func connectForceProxy(ctx context.Context, target string, proxy string, connect
 
 	proxyAddr := utils.HostPort(host, port)
 	switch true {
-	case strings.HasPrefix(proxy, "https://"):
+	case utils.IHasPrefix(proxy, "https://"):
 		urlIns, err := url.Parse(proxy)
 		if err != nil {
 			return nil, utils.Errorf("parse proxy url failed: %s", err)
@@ -124,32 +123,32 @@ func connectForceProxy(ctx context.Context, target string, proxy string, connect
 		}
 		conn.Close()
 		return nil, utils.Errorf("connect proxy(https) [%s] failed", proxy)
-	case strings.HasPrefix(proxy, "socks://"):
+	case utils.IHasPrefix(proxy, "socks://"):
 		fallthrough
-	case strings.HasPrefix(proxy, "socks5://"):
+	case utils.IHasPrefix(proxy, "socks5://"):
 		fallthrough
-	case strings.HasPrefix(proxy, "s5://"):
+	case utils.IHasPrefix(proxy, "s5://"):
 		username, password := parseProxyCredential(proxy)
 		conn, err := DialSocksProxy(SOCKS5, proxyAddr, username, password)("tcp", target)
 		if err != nil {
 			return nil, err
 		}
 		return conn, nil
-	case strings.HasPrefix(proxy, "s4://") || strings.HasPrefix(proxy, "socks4://"):
+	case utils.IHasPrefix(proxy, "s4://") || utils.IHasPrefix(proxy, "socks4://"):
 		username, password := parseProxyCredential(proxy)
 		conn, err := DialSocksProxy(SOCKS4, proxyAddr, username, password)("tcp", target)
 		if err != nil {
 			return nil, err
 		}
 		return conn, nil
-	case strings.HasPrefix(proxy, "s4a://") || strings.HasPrefix(proxy, "socks4a://"):
+	case utils.IHasPrefix(proxy, "s4a://") || utils.IHasPrefix(proxy, "socks4a://"):
 		username, password := parseProxyCredential(proxy)
 		conn, err := DialSocksProxy(SOCKS4A, proxyAddr, username, password)("tcp", target)
 		if err != nil {
 			return nil, err
 		}
 		return conn, nil
-	case strings.HasPrefix(proxy, "http://"):
+	case utils.IHasPrefix(proxy, "http://"):
 		fallthrough
 	default:
 		urlIns, err := url.Parse(proxy)
