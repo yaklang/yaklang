@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"io/ioutil"
 	"net/http"
 	"reflect"
@@ -86,8 +87,10 @@ func HttpDumpWithBody(i interface{}, body bool) ([]byte, error) {
 	}()
 	switch ret := i.(type) {
 	case *http.Request:
-		// fix: single "Connection: close"
 		ret.Close = false
+		if retBytes := httpctx.GetBareRequestBytes(ret); len(retBytes) > 0 {
+			return retBytes, nil
+		}
 		return DumpHTTPRequest(ret, body)
 	case http.Request:
 		return HttpDumpWithBody(&ret, body)

@@ -7,3 +7,15 @@ Host: www.baidu.com
 assert raw.Contains(`-000==={{}}{:`)
 assert raw.Contains(`ccc=cc%26%26`)
 assert raw.Contains(`ddd=&&&&`)
+
+check = false
+for param in fuzz.HTTPRequest(`
+GET /?a=1 HTTP/1.1
+Host: www.baidu.com
+
+`)~.GetCommonParams()~ {
+    resp = param.DisableAutoEncode(true).Fuzz("&&&").GetFirstFuzzHTTPRequest()~.GetBytes()~
+    dump(resp)
+    check = resp.Contains("a=&&&")
+}
+assert check
