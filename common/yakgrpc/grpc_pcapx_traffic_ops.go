@@ -50,7 +50,7 @@ func (s *Server) QueryTrafficPacket(ctx context.Context, req *ypb.QueryTrafficPa
 func (s *Server) QueryTrafficTCPReassembled(ctx context.Context, req *ypb.QueryTrafficTCPReassembledRequest) (*ypb.QueryTrafficTCPReassembledResponse, error) {
 	pg, data, err := yakit.QueryTrafficTCPReassembled(consts.GetGormProjectDatabase(), req)
 	if err != nil {
-		log.Info("query traffic tcp reassembled failed: %s", err)
+		log.Infof("query traffic tcp reassembled failed: %s", err)
 		return nil, err
 	}
 	rspData := lo.Map(data, func(item *yakit.TrafficTCPReassembledFrame, index int) *ypb.TrafficTCPReassembled {
