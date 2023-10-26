@@ -29,18 +29,18 @@ func NewFuzzHTTPRequestBatch(f *FuzzHTTPRequest, reqs ...*http.Request) *FuzzHTT
 	return &FuzzHTTPRequestBatch{nextFuzzRequests: fReqs, originRequest: f, noAutoEncode: f.noAutoEncode}
 }
 
-func (r *FuzzHTTPRequestBatch) DisableNoAutoEncode(b bool) FuzzHTTPRequestIf {
+func (r *FuzzHTTPRequestBatch) DisableAutoEncode(b bool) FuzzHTTPRequestIf {
 	if r != nil {
 		r.noAutoEncode = b
 		if r.fallback != nil && r.fallback != r {
-			r.fallback.DisableNoAutoEncode(b)
+			r.fallback.DisableAutoEncode(b)
 		}
 		if r.originRequest != nil {
-			r.originRequest.DisableNoAutoEncode(b)
+			r.originRequest.DisableAutoEncode(b)
 		}
 		for _, nreq := range r.nextFuzzRequests {
 			if nreq != nil {
-				nreq.DisableNoAutoEncode(b)
+				nreq.DisableAutoEncode(b)
 			}
 		}
 
@@ -107,7 +107,7 @@ func (f *FuzzHTTPRequestBatch) FuzzMethod(p ...string) FuzzHTTPRequestIf {
 func (f *FuzzHTTPRequestBatch) toFuzzHTTPRequestIf(reqs []FuzzHTTPRequestIf) FuzzHTTPRequestIf {
 	origin := f.GetOriginRequest()
 	if origin != nil {
-		origin.DisableNoAutoEncode(f.noAutoEncode)
+		origin.DisableAutoEncode(f.noAutoEncode)
 	}
 	if len(reqs) <= 0 {
 		return &FuzzHTTPRequestBatch{
