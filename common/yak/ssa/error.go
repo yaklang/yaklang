@@ -1,6 +1,8 @@
 package ssa
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type ErrorKind int
 
@@ -15,6 +17,44 @@ const (
 	SSATAG ErrorTag = "ssa"
 )
 
+type ErrorCommentId string
+type ErrorComment struct {
+	ignorePos []int
+	noCheck   bool
+}
+
+const (
+	SSAIgnore  ErrorCommentId = "// @ssa-ignore"
+	SSANoCheck ErrorCommentId = "// @ssa-nocheck"
+)
+
+func (ec ErrorComment) Skip(pos *Position) bool {
+	if ec.noCheck {
+		return true
+	}
+	for _, line := range ec.ignorePos {
+		if pos.StartLine == line+1 {
+			return true
+		}
+	}
+	return false
+}
+
+func (f *Function) AddErrorComment(str string, line int) {
+	switch ErrorCommentId(str) {
+	case SSAIgnore:
+		{
+			f.errComment.ignorePos = append(f.errComment.ignorePos, line)
+		}
+	case SSANoCheck:
+		if line == 1 {
+			f.errComment.noCheck = true
+		}
+	default:
+		// skip
+	}
+}
+
 type SSAError struct {
 	Pos     *Position
 	tag     ErrorTag
@@ -28,6 +68,10 @@ func (f *Function) NewErrorWithPos(kind ErrorKind, tag ErrorTag, Pos *Position, 
 	if Pos == nil {
 		return
 	}
+	if f.errComment.Skip(Pos) {
+		return
+	}
+
 	f.err = append(f.err, &SSAError{
 		Pos:     Pos,
 		tag:     tag,
