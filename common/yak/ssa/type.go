@@ -313,8 +313,8 @@ type ObjectType struct {
 
 	AnonymousField []*ObjectType
 
-	Combination  bool // function multiple return will combined to struct
-	VariadicPara bool // function last variadic parameter will become slice
+	Combination bool // function multiple return will combined to struct
+	// VariadicPara bool // function last variadic parameter will become slice
 
 	method map[string]*FunctionType
 
@@ -386,9 +386,6 @@ func (itype ObjectType) String() string {
 			),
 			", ",
 		)
-	}
-	if itype.VariadicPara {
-		return "..." + itype.FieldType.String()
 	}
 	if itype.Name != "" {
 		return itype.Name
@@ -579,6 +576,26 @@ func (s *FunctionType) RawString() string {
 		str,
 		s.ReturnType,
 	)
+}
+
+func (s *FunctionType) GetParamString() string {
+	ret := ""
+	for index, t := range s.Parameter {
+		if index == len(s.Parameter)-1 {
+			if s.IsVariadic {
+				if obj, ok := ToObjectType(t); ok && obj.Kind == Slice {
+					// last
+					ret += "..." + obj.FieldType.String()
+				}
+			} else {
+				ret += t.String()
+
+			}
+		} else {
+			ret += t.String() + ", "
+		}
+	}
+	return ret
 }
 
 func (s *FunctionType) GetTypeKind() TypeKind {

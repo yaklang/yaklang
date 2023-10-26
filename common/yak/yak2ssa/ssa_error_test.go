@@ -792,6 +792,22 @@ func TestExternInstance(t *testing.T) {
 			},
 		})
 	})
+
+	t.Run("test bytes", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			fun1("1")
+			fun("1")
+			`,
+			errs: []string{
+				ssa4analyze.NotEnoughArgument("fun", "string", "bytes, boolean"),
+			},
+			ExternValue: map[string]any{
+				"fun":  func([]byte, bool) {},
+				"fun1": func(...byte) {},
+			},
+		})
+	})
 }
 
 func TestErrorHandler(t *testing.T) {
