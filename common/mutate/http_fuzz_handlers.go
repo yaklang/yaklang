@@ -622,7 +622,7 @@ func (f *FuzzHTTPRequest) fuzzPostParams(k, v interface{}, encoded ...EncodedFun
 
 	var results []*http.Request
 	var origin = httpctx.GetBareRequestBytes(req)
-	err := cartesian.ProductEx([][]string{keys, values}, func(result []string) error {
+	err = cartesian.ProductEx([][]string{keys, values}, func(result []string) error {
 		if len(result) != 2 {
 			return utils.Error("BUG in fuzz PostParams KeyValue")
 		}
@@ -647,6 +647,7 @@ func (f *FuzzHTTPRequest) fuzzPostParams(k, v interface{}, encoded ...EncodedFun
 	if err != nil {
 		return nil, err
 	}
+	return results, nil
 }
 
 func (f *FuzzHTTPRequest) FuzzPostParams(k, v interface{}) FuzzHTTPRequestIf {
