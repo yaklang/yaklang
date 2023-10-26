@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+	"strings"
 )
 
 type Builder interface {
@@ -24,6 +25,8 @@ type FunctionBuilder struct {
 	target *target // for break and continue
 	// defer function call
 	deferExpr []*Call // defer function, reverse  for-range
+	// unsealed block
+	unsealedBlock []*BasicBlock
 
 	// for build
 	CurrentBlock       *BasicBlock       // current block to build
@@ -94,6 +97,10 @@ func (b *FunctionBuilder) AddDefer(call *Call) {
 	b.deferExpr = append(b.deferExpr, call)
 }
 
+func (b *FunctionBuilder) AddUnsealedBlock(block *BasicBlock) {
+	b.unsealedBlock = append(b.unsealedBlock, block)
+}
+
 // finish current function builder
 func (b *FunctionBuilder) Finish() {
 	// fmt.Println("finish func: ", b.Name)
@@ -101,6 +108,9 @@ func (b *FunctionBuilder) Finish() {
 	// sub-function
 	for _, builder := range b.subFuncBuild {
 		builder()
+	}
+	for _, block := range b.unsealedBlock {
+		block.Sealed()
 	}
 	// set defer function
 	b.CurrentBlock = b.Blocks[len(b.Blocks)-1]
@@ -167,6 +177,17 @@ func (b *FunctionBuilder) PopTarget() bool {
 }
 
 // get target field
+func (b *FunctionBuilder) GetBreakByName(name string) *BasicBlock {
+	for target := b.target; target != nil; target = target.tail {
+		if _break := target._break; _break != nil {
+			blockName := strings.Split(_break.GetVariable(), "-")[0]
+			if blockName == name {
+				return _break
+			}
+		}
+	}
+	return nil
+}
 func (b *FunctionBuilder) GetBreak() *BasicBlock {
 	for target := b.target; target != nil; target = target.tail {
 		if target._break != nil {
