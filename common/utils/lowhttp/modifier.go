@@ -639,7 +639,7 @@ func handleHTTPRequestForm(packet []byte, fixMethod bool, fixContentType bool, c
 					}
 				} else if fixContentType {
 					// rewrite content-type
-					line = multipartWriter.FormDataContentType()
+					line = fmt.Sprintf("Content-Type: %s", multipartWriter.FormDataContentType())
 				}
 			}
 			header = append(header, line)
@@ -662,7 +662,7 @@ func handleHTTPRequestForm(packet []byte, fixMethod bool, fixContentType bool, c
 	}
 
 	if fixContentType && !hasContentType {
-		header = append(header, multipartWriter.FormDataContentType())
+		header = append(header, fmt.Sprintf("Content-Type: %s", multipartWriter.FormDataContentType()))
 	}
 
 	for _, line := range header {
