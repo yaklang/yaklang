@@ -1458,9 +1458,23 @@ Content-Disposition: form-data; name="a"
 		actual := AppendHTTPPacketFormEncoded([]byte(testcase.origin), testcase.key, testcase.value)
 
 		blocks := strings.SplitN(string(actual), "\r\n\r\n", 2)
+		headers := blocks[0]
+		re := regexp.MustCompile(`(?m)boundary=([-\w]+)`)
+		headers = re.ReplaceAllString(headers, "boundary=test")
+		for _, header := range strings.Split(headers, "\r\n") {
+			if !strings.HasPrefix(header, "Content-Type") {
+				continue
+			}
+			spilted := strings.Split(header, ":")
+			if len(spilted) != 2 {
+				t.Fatalf("AppendHTTPPacketFormEncoded failed: Content-Type not have colon : %s", header)
+			}
+			if strings.TrimSpace(spilted[1]) != "multipart/form-data; boundary=test" {
+				t.Fatalf("AppendHTTPPacketFormEncoded failed: wrong Content-Type: %s", header)
+			}
+		}
 		body := blocks[1]
-		_ = body
-		re := regexp.MustCompile(`(?m)(--\w+)`)
+		re = regexp.MustCompile(`(?m)(--\w+)`)
 		result := re.ReplaceAllString(body, "--test")
 
 		// multipart reader
