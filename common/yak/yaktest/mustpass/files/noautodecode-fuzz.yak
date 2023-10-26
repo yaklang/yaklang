@@ -3,7 +3,7 @@
 raw = fuzz.HTTPRequest(`
 GET / HTTP/1.1
 Host: www.baidu.com
-`)~.FuzzGetParams("ccc", "cc&&").Show().DisableNoAutoEncode(true).FuzzGetParams("cc1c", "----000==={{}}{:").FuzzPostParams("ddd", "&&&&").GetFirstFuzzHTTPRequest()~.Show().GetBytes()
+`)~.FuzzGetParams("ccc", "cc&&").Show().DisableAutoEncode(true).FuzzGetParams("cc1c", "----000==={{}}{:").FuzzPostParams("ddd", "&&&&").GetFirstFuzzHTTPRequest()~.Show().GetBytes()
 assert raw.Contains(`-000==={{}}{:`)
 assert raw.Contains(`ccc=cc%26%26`)
 assert raw.Contains(`ddd=&&&&`)
