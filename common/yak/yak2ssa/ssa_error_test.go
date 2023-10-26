@@ -129,6 +129,7 @@ func TestErrorComment(t *testing.T) {
 				ssa4analyze.ValueUndefined("d"),
 				ssa4analyze.ValueUndefined("e"),
 				ssa4analyze.ValueUndefined("f"),
+				ssa.NoCheckMustInFirst(),
 			},
 		})
 	})
