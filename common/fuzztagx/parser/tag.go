@@ -122,7 +122,18 @@ type TagDefine struct {
 }
 
 func (t *TagDefine) NewTag() TagNode {
-	return reflect.New(reflect.ValueOf(t.tagStruct).Type().Elem()).Interface().(TagNode)
+	dest := reflect.New(reflect.ValueOf(t.tagStruct).Type().Elem()).Interface()
+
+	srcValue := reflect.ValueOf(t.tagStruct).Elem()
+	destValue := reflect.ValueOf(dest).Elem()
+
+	for i := 0; i < srcValue.NumField(); i++ {
+		destField := destValue.Field(i)
+		srcField := srcValue.Field(i)
+		destField.Set(srcField)
+	}
+	return dest.(TagNode)
+	//return reflect.New(reflect.ValueOf(t.tagStruct).Type().Elem()).Interface().(TagNode)
 }
 
 // NewTagDefine hooks参数用于判断数据是否需要解析tag

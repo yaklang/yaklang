@@ -31,7 +31,7 @@ type NucleiTagData struct {
 	Content string
 }
 
-func ParseNucleiTag(raw string) []*NucleiTagData {
+func _ParseNucleiTag(raw string) []*NucleiTagData {
 	scanner := bufio.NewScanner(strings.NewReader(raw))
 	scanner.Split(bufio.ScanBytes)
 	var data []*NucleiTagData
@@ -190,7 +190,9 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 	}
 	_ = extractConfig
 	for _, i := range utils.InterfaceToSliceInterface(reqs) {
-		reqIns := &YakRequestBulkConfig{}
+		reqIns := &YakRequestBulkConfig{
+			Headers: map[string]string{},
+		}
 		//extractConfig(&reqIns.RequestConfig, utils.InterfaceToMapInterface(i))
 		req := utils.InterfaceToMapInterface(i)
 		matcher, err := generateYakMatcher(req)
@@ -245,7 +247,7 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 			reqIns.Body = utils.MapGetString(req, "body")
 		}
 
-		if len(reqIns.HTTPRequests) <= 0 {
+		if len(reqIns.HTTPRequests) <= 0 && len(reqIns.Paths) == 0 {
 			log.Error("http request is empty")
 			return nil, utils.Error("http request is empty")
 		}
@@ -422,26 +424,7 @@ func generateYakMatcher(req map[string]interface{}) (*YakMatcher, error) {
 
 func NewYakPayloads(data map[string]any) (*YakPayloads, error) {
 	payloads := &YakPayloads{raw: map[string]*YakPayload{}}
-	for k, v := range data {
-		if reflect.TypeOf(v).Kind() == reflect.Slice {
-			payloads.raw[k] = &YakPayload{
-				Data: utils.InterfaceToStringSlice(v),
-			}
-		} else {
-			payload := &YakPayload{
-				FromFile: toString(v),
-			}
-			if utils.GetFirstExistedFile(payload.FromFile) != "" {
-				payload.Data = utils.ParseStringToLines(payload.FromFile)
-				payloads.raw[k] = payload
-			} else {
-				err := utils.Errorf("nuclei template payloads file not found: %s", payload.FromFile)
-				log.Error(err)
-				return nil, err
-			}
-		}
-	}
-	return payloads, nil
+	return payloads, payloads.AddPayloads(data)
 }
 
 func generateYakPayloads(req map[string]interface{}) (*YakPayloads, error) {
@@ -459,16 +442,16 @@ func generateYakVariables(req map[string]interface{}) *YakVariables {
 	}
 	vars := NewVars()
 	for k, v := range utils.InterfaceToMapInterface(data) {
-		tags := ParseNucleiTag(toString(v))
-		if len(tags) == 0 {
-			vars.Set(k, toString(v))
-			continue
-		}
-		if len(tags) == 1 && !tags[0].IsExpr {
-			vars.Set(k, tags[0].Content)
-			continue
-		}
-		vars.SetNucleiDSL(k, tags)
+		//tags := ParseNucleiTag(toString(v))
+		//if len(tags) == 0 {
+		//	vars.Set(k, toString(v))
+		//	continue
+		//}
+		//if len(tags) == 1 && !tags[0].IsExpr {
+		//	vars.Set(k, tags[0].Content)
+		//	continue
+		//}
+		vars.SetNucleiDSL(k, toString(v))
 	}
 	return vars
 }

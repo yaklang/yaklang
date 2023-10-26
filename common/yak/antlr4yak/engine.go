@@ -420,3 +420,6 @@ func (n *Engine) ExecuteAsExpression(expr string, dependencies map[string]interf
 	}
 	return val.Value, nil
 }
+func (n *Engine) SetExternalVarGetter(f func(name string) (any, bool)) {
+	n.vm.GetExternalVar = f
+}
