@@ -341,36 +341,147 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 	}
 
 	historyID := req.GetHistoryWebFuzzerId()
+	reMatch := req.GetReMatch()
 	if historyID > 0 {
 		// 回溯找到所有之前的包，进行整合
 		oldIDs, err := yakit.GetWebFuzzerTasksIDByRetryRootID(s.GetProjectDatabase(), uint(historyID))
 		// 找到最新的任务并排除
 		latestID := lo.Max(oldIDs)
-		oldIDs = lo.Filter(oldIDs, func(item uint, _ int) bool {
-			return item != latestID
-		})
+		if !reMatch {
+			oldIDs = lo.Filter(oldIDs, func(item uint, _ int) bool {
+				return item != latestID
+			})
+		}
 
 		if err != nil {
 			log.Errorf("get old web fuzzer success response failed: %s", err)
 		} else {
-			// 只展示之前成功的包
-			for resp := range yakit.YieldWebFuzzerResponseByTaskIDs(s.GetProjectDatabase(), stream.Context(), oldIDs, true) {
-				respModel, err := resp.ToGRPCModel()
-				if err != nil {
-					log.Errorf("convert web fuzzer response to grpc model failed: %s", err)
-					continue
+			// 重匹配的分支
+			if reMatch {
+				if len(oldIDs) == 0 { // 尝试修复
+					oldIDs = []uint{uint(historyID)}
 				}
-				feedbackResponse(respModel, true)
-			}
+				var httpTplMatcher = make([]*httptpl.YakMatcher, len(req.GetMatchers()))
+				var httpTplExtractor = make([]*httptpl.YakExtractor, len(req.GetExtractors()))
+				var haveHTTPTplMatcher = len(httpTplMatcher) > 0
+				var haveHTTPTplExtractor = len(httpTplExtractor) > 0
 
-			// 展示最新任务的所有包
-			for resp := range yakit.YieldWebFuzzerResponses(s.GetProjectDatabase(), stream.Context(), int(latestID)) {
-				respModel, err := resp.ToGRPCModel()
-				if err != nil {
-					log.Errorf("convert web fuzzer response to grpc model failed: %s", err)
-					continue
+				if haveHTTPTplExtractor {
+					for i, e := range req.GetExtractors() {
+						httpTplExtractor[i] = httptpl.NewExtractorFromGRPCModel(e)
+					}
 				}
-				feedbackResponse(respModel, true)
+
+				if haveHTTPTplMatcher {
+					for i, m := range req.GetMatchers() {
+						httpTplMatcher[i] = httptpl.NewMatcherFromGRPCModel(m)
+					}
+				}
+
+				cond := "and"
+				if ret := strings.ToLower(req.GetMatchersCondition()); ret == "or" {
+					cond = ret
+				}
+
+				for i, m := range req.GetMatchers() {
+					httpTplMatcher[i] = httptpl.NewMatcherFromGRPCModel(m)
+				}
+
+				var extractorResults []*ypb.KVPair
+
+				// new Matcher
+				ins := &httptpl.YakMatcher{
+					SubMatcherCondition: cond,
+					SubMatchers:         httpTplMatcher,
+				}
+				count := 0
+				log.Infof("oldIDs: %v start yield resp", oldIDs)
+				for resp := range yakit.YieldWebFuzzerResponseByTaskIDs(s.GetProjectDatabase(), stream.Context(), oldIDs, true) {
+					count++
+					log.Infof("get resp : %v", count)
+					respModel, _ := resp.ToGRPCModel()
+					_, _, getMirrorHTTPFlowParams := yak.MutateHookCaller(req.GetHotPatchCode())
+
+					if len(req.GetExtractors()) > 0 {
+						var params = make(map[string]any)
+						for _, extractor := range httpTplExtractor {
+							vars, err := extractor.Execute(respModel.ResponseRaw, params)
+							if err != nil {
+								log.Errorf("extractor execute failed: %s", err)
+								continue
+							}
+							for k, v := range vars {
+								params[k] = v
+								extractorResults = append(extractorResults, &ypb.KVPair{Key: k, Value: httptpl.ExtractResultToString(v)}) // 提取器 参数
+							}
+						}
+					}
+					extractorResultsOrigin := extractorResults
+					for mergedParams := range s.PreRenderVariables(stream.Context(), req.GetParams(), req.GetIsHTTPS(), req.GetIsGmTLS()) {
+						existedParams := make(map[string]string) // 用户设置的参数
+						if mergedParams != nil {
+							for k, v := range utils.InterfaceToMap(mergedParams) {
+								existedParams[k] = strings.Join(v, ",")
+							}
+						}
+
+						if respModel != nil && getMirrorHTTPFlowParams != nil {
+							for k, v := range getMirrorHTTPFlowParams(respModel.RequestRaw, respModel.ResponseRaw, existedParams) { // 热加载的参数
+								extractorResults = append(extractorResults, &ypb.KVPair{Key: utils.EscapeInvalidUTF8Byte([]byte(k)), Value: utils.EscapeInvalidUTF8Byte([]byte(v))})
+							}
+						}
+
+						for k, v := range mergedParams {
+							extractorResults = append(extractorResults, &ypb.KVPair{
+								Key: k, Value: utils.EscapeInvalidUTF8Byte(codec.AnyToBytes(v))},
+							)
+						}
+
+						matcherParams := utils.CopyMapInterface(mergedParams)
+						for _, kv := range extractorResultsOrigin { // 与原提取提取器合并
+							matcherParams[kv.GetKey()] = kv.GetValue()
+						}
+						httpTPLmatchersResult, err := ins.Execute(
+							&lowhttp.LowhttpResponse{
+								RawPacket: respModel.ResponseRaw,
+								TraceInfo: &lowhttp.LowhttpTraceInfo{
+									ServerTime: time.Duration(respModel.DurationMs),
+								},
+							},
+							matcherParams)
+
+						if err != nil {
+							log.Errorf("convert web fuzzer response to grpc model failed: %s", err)
+							continue
+						}
+						if httpTPLmatchersResult {
+							respModel.MatchedByMatcher = true
+							break
+						}
+					}
+					feedbackResponse(respModel, true)
+				}
+
+			} else {
+				// 只展示之前成功的包
+				for resp := range yakit.YieldWebFuzzerResponseByTaskIDs(s.GetProjectDatabase(), stream.Context(), oldIDs, true) {
+					respModel, err := resp.ToGRPCModel()
+					if err != nil {
+						log.Errorf("convert web fuzzer response to grpc model failed: %s", err)
+						continue
+					}
+					feedbackResponse(respModel, true)
+				}
+
+				// 展示最新任务的所有包
+				for resp := range yakit.YieldWebFuzzerResponses(s.GetProjectDatabase(), stream.Context(), int(latestID)) {
+					respModel, err := resp.ToGRPCModel()
+					if err != nil {
+						log.Errorf("convert web fuzzer response to grpc model failed: %s", err)
+						continue
+					}
+					feedbackResponse(respModel, true)
+				}
 			}
 		}
 		return nil
@@ -1403,38 +1514,4 @@ func (s *Server) PreRenderVariables(ctx context.Context, params []*ypb.FuzzerPar
 func (s *Server) GetSystemDefaultDnsServers(ctx context.Context, req *ypb.Empty) (*ypb.DefaultDnsServerResponse, error) {
 	servers, err := utils.GetSystemDnsServers()
 	return &ypb.DefaultDnsServerResponse{DefaultDnsServer: servers}, err
-}
-
-func (s *Server) MatchTaskResponse(matcherTask *ypb.MatchTask, stream ypb.Yak_MatchTaskResponseServer) error {
-	var httpTplMatcher = make([]*httptpl.YakMatcher, len(matcherTask.GetMatchers()))
-	for i, m := range matcherTask.GetMatchers() {
-		httpTplMatcher[i] = httptpl.NewMatcherFromGRPCModel(m)
-	}
-
-	cond := "and"
-	if ret := strings.ToLower(matcherTask.GetMatchersCondition()); ret == "or" {
-		cond = ret
-	}
-
-	// new Matcher
-	ins := &httptpl.YakMatcher{
-		SubMatcherCondition: cond,
-		SubMatchers:         httpTplMatcher,
-	}
-
-	for resp := range yakit.YieldWebFuzzerResponses(s.GetProjectDatabase(), stream.Context(), int(matcherTask.GetTaskID())) {
-		var respIns ypb.FuzzerResponse
-		if err := json.Unmarshal([]byte(resp.Content), &respIns); err == nil {
-			httpTPLmatchersResult, err := ins.Execute(&lowhttp.LowhttpResponse{RawPacket: respIns.ResponseRaw}, make(map[string]interface{}))
-			if err != nil {
-				stream.SendMsg(err)
-			}
-			respIns.HitColor = matcherTask.HitColor
-			respIns.MatchedByMatcher = httpTPLmatchersResult
-			stream.Send(&respIns)
-		} else {
-			stream.SendMsg(err)
-		}
-	}
-	return nil
 }
