@@ -101,6 +101,49 @@ func TestUndefine(t *testing.T) {
 
 }
 
+func TestErrorComment(t *testing.T) {
+	t.Run("test basic undefine error", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			// @ssa-ignore
+			print(a)
+			// @ssa-ignore
+			print(b)
+			print(c) // error
+
+			// @ssa-ignore
+
+			print(d) // error
+
+
+			// @ssa-ignore
+			// this is other commend 
+			print(e) // err
+
+			// @ssa-nocheck
+			// not in first line; don't work
+			print(f)
+			`,
+			errs: []string{
+				ssa4analyze.ValueUndefined("c"),
+				ssa4analyze.ValueUndefined("d"),
+				ssa4analyze.ValueUndefined("e"),
+				ssa4analyze.ValueUndefined("f"),
+			},
+		})
+	})
+
+	t.Run("test nocheck in first line ", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `// @ssa-nocheck
+			print(a)
+			print(b)
+			print(c)
+			`,
+		})
+	})
+}
+
 func TestBasicExpression(t *testing.T) {
 	t.Run("basic assign", func(t *testing.T) {
 		CheckTestCase(t, TestCase{

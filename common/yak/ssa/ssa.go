@@ -248,7 +248,8 @@ type Function struct {
 	externType     map[string]Type
 
 	// ssa error
-	err SSAErrors
+	err        SSAErrors
+	errComment ErrorComment
 
 	// for builder
 	builder *FunctionBuilder

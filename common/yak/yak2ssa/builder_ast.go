@@ -11,9 +11,21 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
+func (b *astbuilder) handlerWs(ws *yak.WsContext) {
+	recoverRange := b.SetRange(ws.BaseParserRuleContext)
+	defer recoverRange()
+	for _, line := range ws.AllLINE_COMMENT() {
+		token := line.GetSymbol()
+		b.AddErrorComment(line.GetText(), token.GetLine())
+	}
+}
+
 // entry point
 func (b *astbuilder) build(ast *yak.YaklangParser) {
 	// ast.StatementList()
+	if ws, ok := ast.Ws().(*yak.WsContext); ok {
+		b.handlerWs(ws)
+	}
 	if stmt, ok := ast.StatementList().(*yak.StatementListContext); ok {
 		b.buildStatementList(stmt)
 	}
@@ -32,9 +44,32 @@ func (b *astbuilder) buildStatementList(stmtlist *yak.StatementListContext) {
 	}
 }
 
+func (b *astbuilder) buildLineComment(stmt *yak.LineCommentStmtContext) {
+	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	defer recoverRange()
+	if line := stmt.LINE_COMMENT(); line != nil {
+		b.AddErrorComment(line.GetText(), line.GetSymbol().GetLine())
+	}
+}
+
+func (b *astbuilder) buildEmpty(stmt *yak.EmptyContext) {
+	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	defer recoverRange()
+
+	if ws, ok := stmt.Ws().(*yak.WsContext); ok {
+		b.handlerWs(ws)
+	}
+}
+
 func (b *astbuilder) buildStatement(stmt *yak.StatementContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
+	if s, ok := stmt.LineCommentStmt().(*yak.LineCommentStmtContext); ok {
+		b.buildLineComment(s)
+	}
+	if s, ok := stmt.Empty().(*yak.EmptyContext); ok {
+		b.buildEmpty(s)
+	}
 	// declare Variable Expression
 	if s, ok := stmt.DeclareVariableExpressionStmt().(*yak.DeclareVariableExpressionStmtContext); ok {
 		b.buildDeclareVariableExpressionStmt(s)
