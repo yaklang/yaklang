@@ -1404,3 +1404,37 @@ func (s *Server) GetSystemDefaultDnsServers(ctx context.Context, req *ypb.Empty)
 	servers, err := utils.GetSystemDnsServers()
 	return &ypb.DefaultDnsServerResponse{DefaultDnsServer: servers}, err
 }
+
+func (s *Server) MatchTaskResponse(matcherTask *ypb.MatchTask, stream ypb.Yak_MatchTaskResponseServer) error {
+	var httpTplMatcher = make([]*httptpl.YakMatcher, len(matcherTask.GetMatchers()))
+	for i, m := range matcherTask.GetMatchers() {
+		httpTplMatcher[i] = httptpl.NewMatcherFromGRPCModel(m)
+	}
+
+	cond := "and"
+	if ret := strings.ToLower(matcherTask.GetMatchersCondition()); ret == "or" {
+		cond = ret
+	}
+
+	// new Matcher
+	ins := &httptpl.YakMatcher{
+		SubMatcherCondition: cond,
+		SubMatchers:         httpTplMatcher,
+	}
+
+	for resp := range yakit.YieldWebFuzzerResponses(s.GetProjectDatabase(), stream.Context(), int(matcherTask.GetTaskID())) {
+		var respIns ypb.FuzzerResponse
+		if err := json.Unmarshal([]byte(resp.Content), &respIns); err == nil {
+			httpTPLmatchersResult, err := ins.Execute(&lowhttp.LowhttpResponse{RawPacket: respIns.ResponseRaw}, make(map[string]interface{}))
+			if err != nil {
+				stream.SendMsg(err)
+			}
+			respIns.HitColor = matcherTask.HitColor
+			respIns.MatchedByMatcher = httpTPLmatchersResult
+			stream.Send(&respIns)
+		} else {
+			stream.SendMsg(err)
+		}
+	}
+	return nil
+}
