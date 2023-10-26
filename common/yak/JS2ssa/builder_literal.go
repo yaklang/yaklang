@@ -47,15 +47,10 @@ func (b *astbuilder) buildLiteral(stmt *JS.LiteralContext) ssa.Value {
 	
 	} else if stmt.BooleanLiteral() != nil {
 		bo := stmt.GetText()
-		boolLit, err := strconv.ParseBool(bo)
-		if err != nil {
-			b.NewError(ssa.Error, TAG, "Unhandled bool literal")
-		}
-		return ssa.NewConst(boolLit)
+		b.buildBooleanLiteral(bo)
 	
 	} else if stmt.NullLiteral() != nil {
-		return ssa.NewConst(nil)
-	
+		return b.buildNullLiteral()
 	} else if stmt.RegularExpressionLiteral() != nil {
 		// TODO
 	}
@@ -159,4 +154,16 @@ func (b *astbuilder) buildStringLiteral(stmt antlr.TerminalNode) ssa.Value {
 	
 
 	return nil
+}
+
+func (b *astbuilder) buildBooleanLiteral(bo string) ssa.Value {
+	boolLit, err := strconv.ParseBool(bo)
+	if err != nil {
+		b.NewError(ssa.Error, TAG, "Unhandled bool literal")
+	}
+	return ssa.NewConst(boolLit)
+}
+
+func (b *astbuilder) buildNullLiteral() ssa.Value {
+	return ssa.NewConst(nil)
 }

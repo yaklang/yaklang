@@ -204,57 +204,38 @@ func (b *astbuilder) buildAssertStmt(stmt *yak.AssertStmtContext) {
 
 // try stmt
 func (b *astbuilder) buildTryCatchStmt(stmt *yak.TryStmtContext) {
-	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
-	defer recoverRange()
-	var final *ssa.BasicBlock
-	enter := b.CurrentBlock
+	revcoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	defer revcoverRange()
 
-	b.CurrentBlock = enter
-	try := b.NewBasicBlock("error.try")
-	catch := b.NewBasicBlock("error.catch")
-	e := b.EmitErrorHandler(try, catch)
+	tryBuilder := b.BuildTry()
 
-	b.CurrentBlock = try
-	b.buildBlock(stmt.Block(0).(*yak.BlockContext))
+	tryBuilder.BuildTryBlock(func() {
+		if s, ok := stmt.Block(0).(*yak.BlockContext); ok {
+			b.buildBlock(s)
+		}
+	})
 
-	b.CurrentBlock = catch
-	if id := stmt.Identifier(); id != nil {
-		p := ssa.NewParam(id.GetText(), false, b.Function)
-		p.SetType(ssa.BasicTypes[ssa.Error])
-		b.WriteVariable(id.GetText(), p)
-	}
-	b.buildBlock(stmt.Block(1).(*yak.BlockContext))
+	tryBuilder.BuildCatch(func() string {
+		var id string
 
-	var target *ssa.BasicBlock
+		if i := stmt.Identifier(); i != nil {
+			id = i.GetText()
+		}
 
-	if fblock, ok := stmt.Block(2).(*yak.BlockContext); ok {
-		b.CurrentBlock = enter
-		final = b.NewBasicBlock("error.final")
-		e.AddFinal(final)
-		b.CurrentBlock = final
-		b.buildBlock(fblock)
+		if s, ok := stmt.Block(1).(*yak.BlockContext); ok {
+			b.buildBlock(s)
+		}
+		return id
+	})
 
-		target = final
-	}
+	if s, ok := stmt.Block(2).(*yak.BlockContext); ok {
 
-	b.CurrentBlock = enter
-	done := b.NewBasicBlock("")
-	e.AddDone(done)
-
-	if target == nil {
-		target = done
-	}
-
-	b.CurrentBlock = try
-	b.EmitJump(target)
-	b.CurrentBlock = catch
-	b.EmitJump(target)
-	if target != done {
-		b.CurrentBlock = target
-		b.EmitJump(done)
-	}
-
-	b.CurrentBlock = done
+		tryBuilder.BuildFinally(func() {
+			b.buildBlock(s)
+		})
+	} 
+	
+	tryBuilder.Finish()
 }
 
 // expression stmt
