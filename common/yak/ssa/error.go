@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+	"strings"
 )
 
 type ErrorKind int
@@ -41,7 +42,7 @@ func (ec ErrorComment) Skip(pos *Position) bool {
 }
 
 func (f *Function) AddErrorComment(str string, line int) {
-	switch ErrorCommentId(str) {
+	switch ErrorCommentId(strings.TrimSpace(str)) {
 	case SSAIgnore:
 		{
 			f.errComment.ignorePos = append(f.errComment.ignorePos, line)

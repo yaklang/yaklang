@@ -12,7 +12,7 @@ type astbuilder struct {
 }
 
 type builder struct {
-	ast  *yak.YaklangParser
+	ast  *yak.ProgramContext
 	prog *ssa.Program
 	// symbolTable map[string]any
 	c *config
@@ -97,7 +97,8 @@ func ParseSSA(src string, opt ...Option) (prog *ssa.Program) {
 	inputStream := antlr.NewInputStream(src)
 	lex := yak.NewYaklangLexer(inputStream)
 	tokenStream := antlr.NewCommonTokenStream(lex, antlr.TokenDefaultChannel)
-	ast := yak.NewYaklangParser(tokenStream)
+	ast := yak.NewYaklangParser(tokenStream).Program().(*yak.ProgramContext)
+	// yak.NewProgramContext(ast, )
 	prog = ssa.NewProgram()
 	builder := &builder{
 		ast:  ast,
