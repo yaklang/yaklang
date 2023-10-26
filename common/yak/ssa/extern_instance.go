@@ -106,13 +106,6 @@ func (f *FunctionBuilder) CoverReflectFunctionType(itype reflect.Type, level int
 	for i := 0; i < itype.NumOut(); i++ {
 		returns = append(returns, f.handlerType(itype.Out(i), level))
 	}
-	if isVariadic {
-		if t, ok := params[len(params)-1].(*ObjectType); ok {
-			t.VariadicPara = true
-		} else {
-			// error
-		}
-	}
 	return NewFunctionType(itype.String(), params, returns, isVariadic)
 }
 
