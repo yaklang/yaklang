@@ -322,12 +322,15 @@ func TestMemberCall(t *testing.T) {
 			f = () => { return 1}
 			f.B   // invalid field null
 			f().B // invalid field member
+			Key = f()
+			a.$Key
 			`,
 			errs: []string{
-				ssa4analyze.InvalidField("number"),
-				ssa4analyze.InvalidField("( ) -> number"),
-				ssa4analyze.InvalidField("number"),
-				ssa4analyze.InvalidField("number"),
+				ssa4analyze.InvalidField("number", "F"),
+				ssa4analyze.InvalidField("number", "B"),
+				ssa4analyze.InvalidField("( ) -> number", "B"),
+				ssa4analyze.InvalidField("number", "B"),
+				ssa4analyze.InvalidField("number", "$Key"),
 			},
 		})
 	})
@@ -395,8 +398,8 @@ func TestSliceCall(t *testing.T) {
 			`,
 			errs: []string{
 				ssa4analyze.ValueUndefined("a1"),
-				ssa4analyze.InvalidField("number"),
-				ssa4analyze.InvalidField("number"),
+				ssa4analyze.InvalidField("number", "1"),
+				ssa4analyze.InvalidField("number", "1"),
 			},
 			ExternValue: map[string]any{
 				"print": func(any) {},
@@ -414,7 +417,7 @@ func TestSliceCall(t *testing.T) {
 			a[2] = 3
 			`,
 			errs: []string{
-				ssa4analyze.InvalidField("number"),
+				ssa4analyze.InvalidField("number", "1"),
 			},
 		})
 	})
@@ -524,9 +527,10 @@ func TestCallParamReturn(t *testing.T) {
 			b = c[1] // error invalid field
 			`,
 			errs: []string{
-				ssa4analyze.InvalidField("number"),
-				ssa4analyze.InvalidField("number"),
+				ssa4analyze.InvalidField("number, number", "2"),
 				ssa4analyze.CallAssignmentMismatch(2, "number"),
+				ssa4analyze.InvalidField("number", "0"),
+				ssa4analyze.InvalidField("number", "1"),
 			},
 			ExternValue: map[string]any{
 				"func1": func() int { return 1 },
@@ -650,6 +654,11 @@ type AStruct struct {
 	A []AStruct
 	B BStruct
 }
+
+func (a AStruct) GetAStruct() AStruct {
+	return a
+}
+
 type BStruct struct {
 	A *AStruct
 }
@@ -713,6 +722,25 @@ func TestExternStruct(t *testing.T) {
 		})
 	})
 
+	t.Run("extern type field error", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			a = getA()
+			b = a.C
+			print(b)
+			a.GetA()
+			`,
+			errs: []string{
+				ssa.ExternFieldError("Type", "yak2ssa.AStruct", "GetA", "GetAStruct"),
+				ssa4analyze.InvalidField("yak2ssa.AStruct", "C"),
+			},
+			ExternValue: map[string]any{
+				"getA":  func() *AStruct { return &AStruct{} },
+				"print": func(...any) {},
+			},
+		})
+	})
+
 }
 
 func TestExternInstance(t *testing.T) {
@@ -763,6 +791,7 @@ func TestExternInstance(t *testing.T) {
 			lib.getString()
 			lib.getInt()
 			lib.GetInt() // error; you meant "getInt"?
+			lib.GetaInt() // error; you meant "getInt"?
 
 			lib.getInt = 1 // warn 
 			lib.GetInt = 1 // warn 
@@ -775,7 +804,8 @@ func TestExternInstance(t *testing.T) {
 			print(1)
 			`,
 			errs: []string{
-				ssa.ExternLibError("lib", "GetInt", "getInt"),
+				ssa.ExternFieldError("Lib", "lib", "GetInt", "getInt"),
+				ssa.ExternFieldError("Lib", "lib", "GetaInt", "getAInt"),
 				ssa.ContAssignExtern("lib.getInt"),
 				ssa.ContAssignExtern("lib.GetInt"),
 				ssa.ContAssignExtern("lib"),
@@ -788,6 +818,7 @@ func TestExternInstance(t *testing.T) {
 				"lib": {
 					"getString": func() string { return "1" },
 					"getInt":    func() int { return 1 },
+					"getAInt":   func() int { return 1 },
 				},
 			},
 		})

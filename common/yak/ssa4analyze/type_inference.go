@@ -1,6 +1,8 @@
 package ssa4analyze
 
 import (
+	"strings"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -227,16 +229,30 @@ func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
 			}
 		case ssa.String:
 			f.SetType(ssa.BasicTypes[ssa.Number])
+			return
 		case ssa.Any:
 			//pass
 			f.SetType(ssa.BasicTypes[ssa.Any])
 			return
 		default:
-			if c, ok := f.Obj.(*ssa.Call); ok && c.Unpack {
-				// pass
-			} else {
-				f.NewError(ssa.Error, TITAG, InvalidField(t.String()))
+		}
+		if c, ok := ssa.ToCall(f.Obj); ok && c.Unpack {
+			// pass
+		} else {
+			text := ""
+			if ci, ok := ssa.ToConst(f.Key); ok {
+				text = ci.String()
+				want := ssa.TryGetSimilarityKey(t.GetAllKey(), text)
+				if want != "" {
+					f.NewError(ssa.Error, TITAG, ssa.ExternFieldError("Type", t.String(), text, want))
+					return
+				}
 			}
+			if text == "" {
+				list := strings.Split(f.GetPosition().SourceCode, ".")
+				text = list[len(list)-1]
+			}
+			f.Key.NewError(ssa.Error, TITAG, InvalidField(t.String(), text))
 		}
 	}
 	// use update
