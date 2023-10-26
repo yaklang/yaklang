@@ -1103,6 +1103,7 @@ Host: www.baidu.com
 	for _, testcase := range testcases {
 		actual := AppendHTTPPacketQueryParam([]byte(testcase.origin), testcase.key, testcase.value)
 		expected := FixHTTPPacketCRLF([]byte(testcase.expected), false)
+		spew.Dump(actual, expected)
 		if bytes.Compare(actual, expected) != 0 {
 			t.Fatalf("AddHTTPPacketQueryParam failed: %s", string(actual))
 		}
