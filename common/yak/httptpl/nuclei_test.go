@@ -150,7 +150,7 @@ requests:
 		panic("variable failed!")
 	}
 
-	if ret := data.Variables.ToMap(); len(ret) != 4 {
+	if ret := data.Variables.ToMap(); len(ret) != 6 {
 		spew.Dump(ret)
 		panic("variable failed!111")
 	} else {

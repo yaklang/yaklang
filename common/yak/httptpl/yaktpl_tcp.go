@@ -31,10 +31,8 @@ type YakTcpHosts struct {
 func (y *YakTcpInput) BuildPayload(vars map[string]any) {
 	var data = y.Data
 	if strings.Contains(y.Data, `{{`) && strings.Contains(y.Data, "}}") {
-		tags := ParseNucleiTag(y.Data)
-		sandbox := NewNucleiDSLYakSandbox()
-		dataRaw, ok, err := ExecuteNucleiTags(tags, sandbox, vars)
-		if !ok || err != nil {
+		dataRaw, err := ExecNucleiTag(y.Data, vars)
+		if err != nil {
 			log.Warnf(`YakTcpInput.Execute.ExecuteNucleiTags failed: %s`, err)
 		} else {
 			data = dataRaw

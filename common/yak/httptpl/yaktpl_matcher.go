@@ -148,7 +148,6 @@ func (y *YakMatcher) ExecuteWithConfig(config *Config, rsp *lowhttp.LowhttpRespo
 }
 
 func (y *YakMatcher) executeRaw(config *Config, rsp []byte, duration float64, vars map[string]any, sufs ...string) (bool, error) {
-	var nucleiSandbox = NewNucleiDSLYakSandbox()
 	var isExpr = false
 
 	var reverseProto []string
@@ -277,9 +276,8 @@ func (y *YakMatcher) executeRaw(config *Config, rsp []byte, duration float64, va
 				return strings.Contains(s, sub)
 			} else {
 				if strings.Contains(sub, "{{") && strings.Contains(sub, "}}") {
-					tags := ParseNucleiTag(sub)
-					results, ok, _ := ExecuteNucleiTags(tags, nucleiSandbox, vars)
-					if ok {
+					results, err := ExecNucleiTag(sub, vars)
+					if err != nil {
 						return strings.Contains(s, results)
 					}
 				}

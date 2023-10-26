@@ -35,23 +35,12 @@ import (
 	"github.com/yaklang/yaklang/common/yso"
 )
 
-var varsOperatorMutex sync.Mutex
-
 var (
 	publicIP        string
 	PublicIPGetOnce sync.Once
 )
 
-func appendMap(m map[string]interface{}, key string, value interface{}) {
-	varsOperatorMutex.Lock()
-	defer varsOperatorMutex.Unlock()
-	m[key] = value
-}
-
 func getMap(m map[string]interface{}, key string) (interface{}, bool) {
-	varsOperatorMutex.Lock()
-	defer varsOperatorMutex.Unlock()
-
 	data, ok := m[key]
 	return data, ok
 }
@@ -880,13 +869,19 @@ func (d *NucleiDSL) _execute(expr string, items ...map[string]interface{}) (*ant
 		if v == nil {
 			continue
 		}
-		varsOperatorMutex.Lock()
 		for k, v := range v {
 			merged[k] = v
 		}
-		varsOperatorMutex.Unlock()
 	}
 	return box, merged, nil
+}
+func (d *NucleiDSL) ExecuteWithOnGetVar(expr string, getter func(name string) (any, bool), items ...map[string]interface{}) (interface{}, error) {
+	box, merged, err := d._execute(expr, items...)
+	if err != nil {
+		return nil, err
+	}
+	box.SetExternalVarGetter(getter)
+	return box.ExecuteAsExpression(expr, merged)
 }
 
 func (d *NucleiDSL) Execute(expr string, items ...map[string]interface{}) (interface{}, error) {
