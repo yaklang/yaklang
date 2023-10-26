@@ -1,6 +1,8 @@
 package ssa
 
-import "strings"
+import (
+	"strings"
+)
 
 const (
 	// loop
@@ -14,6 +16,12 @@ const (
 	IfTrue  = "if.true"
 	IfFalse = "if.false"
 	IfElif  = "if.elif"
+
+	// try-catch
+	TryStart   = "error.try"
+	TryCatch   = "error.catch"
+	TryFinally = "error.final"
+	TryDone    = ""
 )
 
 func (b *BasicBlock) IsBlock(name string) bool {
@@ -287,4 +295,90 @@ func (i *IfBuilder) Finish() {
 		i.b.EmitJump(rest)
 		i.b.CurrentBlock = rest
 	}
+}
+
+type TryBuilder struct {
+	// b
+	b *FunctionBuilder
+
+	// block
+	enter 		 *BasicBlock
+	buildTry     func()
+	buildCatch   func() string
+	buildFinally func()
+}
+
+func (b *FunctionBuilder) BuildTry() *TryBuilder {
+	enter := b.CurrentBlock
+
+	return &TryBuilder{
+		enter: enter,
+		b:     b,
+	}
+}
+
+func (t *TryBuilder) BuildTryBlock(f func()) {
+	t.buildTry = f
+}
+
+func (t *TryBuilder) BuildCatch(f func() string) {
+	t.buildCatch = f
+}
+
+func (t *TryBuilder) BuildFinally(f func()) {
+	t.buildFinally = f
+}
+
+func (t *TryBuilder) Finish() {
+	var final *BasicBlock
+	var id string
+
+	t.b.CurrentBlock = t.enter
+	try := t.b.NewBasicBlock(TryStart)
+	catch := t.b.NewBasicBlock(TryCatch)
+	e := t.b.EmitErrorHandler(try, catch)
+
+	// buildtry
+	t.b.CurrentBlock = try
+	t.buildTry()
+
+	// buildcatch
+	t.b.CurrentBlock = catch
+	id = t.buildCatch()
+	if id != "" {
+		p := NewParam(id, false, t.b.Function)
+		p.SetType(BasicTypes[Error])
+		t.b.WriteVariable(id, p)
+	}
+
+	// buildfinally
+	var target *BasicBlock
+	if t.buildFinally != nil {
+		t.b.CurrentBlock = t.enter
+		final = t.b.NewBasicBlock(TryFinally)
+		e.AddFinal(final)
+		t.b.CurrentBlock = final
+		t.buildFinally()
+
+		target = final
+	}
+
+	t.b.CurrentBlock = t.enter
+	done := t.b.NewBasicBlock("")
+	e.AddDone(done)
+
+	if target == nil {
+		target = done
+	}
+
+	t.b.CurrentBlock = try
+	t.b.EmitJump(target)
+	t.b.CurrentBlock = catch
+	t.b.EmitJump(target)
+	if target != done {
+		t.b.CurrentBlock = target
+		t.b.EmitJump(done)
+	}
+
+	t.b.CurrentBlock = done
 }
