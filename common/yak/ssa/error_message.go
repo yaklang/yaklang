@@ -12,3 +12,7 @@ func ExternFieldError(instance, name, key, want string) string {
 func ContAssignExtern(name string) string {
 	return fmt.Sprintf("cannot assign to  %s, this is extern-instance", name)
 }
+
+func NoCheckMustInFirst() string {
+	return "@ssa-nocheck must be the first line in the file"
+}

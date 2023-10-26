@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -41,7 +42,7 @@ func (ec ErrorComment) Skip(pos *Position) bool {
 	return false
 }
 
-func (f *Function) AddErrorComment(str string, line int) {
+func (f *Function) AddErrorComment(str string, line int) error {
 	switch ErrorCommentId(strings.TrimSpace(str)) {
 	case SSAIgnore:
 		{
@@ -50,10 +51,13 @@ func (f *Function) AddErrorComment(str string, line int) {
 	case SSANoCheck:
 		if line == 1 {
 			f.errComment.noCheck = true
+		} else {
+			return errors.New(NoCheckMustInFirst())
 		}
 	default:
 		// skip
 	}
+	return nil
 }
 
 type SSAError struct {

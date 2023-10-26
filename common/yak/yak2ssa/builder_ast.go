@@ -16,7 +16,9 @@ func (b *astbuilder) handlerWs(ws *yak.WsContext) {
 	defer recoverRange()
 	for _, line := range ws.AllLINE_COMMENT() {
 		token := line.GetSymbol()
-		b.AddErrorComment(line.GetText(), token.GetLine())
+		if err := b.AddErrorComment(line.GetText(), token.GetLine()); err != nil {
+			b.NewErrorWithPos(ssa.Warn, TAG, b.CurrentPos, err.Error())
+		}
 	}
 }
 
@@ -47,7 +49,9 @@ func (b *astbuilder) buildLineComment(stmt *yak.LineCommentStmtContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 	if line := stmt.LINE_COMMENT(); line != nil {
-		b.AddErrorComment(line.GetText(), line.GetSymbol().GetLine())
+		if err := b.AddErrorComment(line.GetText(), line.GetSymbol().GetLine()); err != nil {
+			b.NewErrorWithPos(ssa.Warn, TAG, b.CurrentPos, err.Error())
+		}
 	}
 }
 
