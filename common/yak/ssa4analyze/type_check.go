@@ -106,7 +106,7 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 		}
 		c.NewError(
 			ssa.Error, TypeCheckTAG,
-			NotEnoughArgument(str, gotPara.String(), funcTyp.Parameter.String()),
+			NotEnoughArgument(str, gotPara.String(), funcTyp.GetParamString()),
 		)
 	}()
 
