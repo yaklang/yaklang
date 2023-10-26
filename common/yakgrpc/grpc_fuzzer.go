@@ -386,23 +386,18 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				for i, m := range req.GetMatchers() {
 					httpTplMatcher[i] = httptpl.NewMatcherFromGRPCModel(m)
 				}
-
-				var extractorResults []*ypb.KVPair
-
 				// new Matcher
 				ins := &httptpl.YakMatcher{
 					SubMatcherCondition: cond,
 					SubMatchers:         httpTplMatcher,
 				}
-				count := 0
-				log.Infof("oldIDs: %v start yield resp", oldIDs)
+
+				var extractorResults []*ypb.KVPair
 				for resp := range yakit.YieldWebFuzzerResponseByTaskIDs(s.GetProjectDatabase(), stream.Context(), oldIDs, true) {
-					count++
-					log.Infof("get resp : %v", count)
 					respModel, _ := resp.ToGRPCModel()
 					_, _, getMirrorHTTPFlowParams := yak.MutateHookCaller(req.GetHotPatchCode())
 
-					if len(req.GetExtractors()) > 0 {
+					if len(req.GetExtractors()) > 0 { // 提取器提取参数
 						var params = make(map[string]any)
 						for _, extractor := range httpTplExtractor {
 							vars, err := extractor.Execute(respModel.ResponseRaw, params)
@@ -416,9 +411,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 							}
 						}
 					}
-					extractorResultsOrigin := extractorResults
 					for mergedParams := range s.PreRenderVariables(stream.Context(), req.GetParams(), req.GetIsHTTPS(), req.GetIsGmTLS()) {
-						existedParams := make(map[string]string) // 用户设置的参数
+						existedParams := make(map[string]string) // 传入的参数
 						if mergedParams != nil {
 							for k, v := range utils.InterfaceToMap(mergedParams) {
 								existedParams[k] = strings.Join(v, ",")
@@ -431,14 +425,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 							}
 						}
 
-						for k, v := range mergedParams {
-							extractorResults = append(extractorResults, &ypb.KVPair{
-								Key: k, Value: utils.EscapeInvalidUTF8Byte(codec.AnyToBytes(v))},
-							)
-						}
-
 						matcherParams := utils.CopyMapInterface(mergedParams)
-						for _, kv := range extractorResultsOrigin { // 与原提取提取器合并
+						for _, kv := range extractorResults { // 合并
 							matcherParams[kv.GetKey()] = kv.GetValue()
 						}
 						httpTPLmatchersResult, err := ins.Execute(
