@@ -839,7 +839,6 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 			recoverRange()
 		}
 
-		//TODO:
 		if s, ok := stmt.LeftMemberCall().(*yak.LeftMemberCallContext); ok {
 			recoverRange := b.SetRange(s.BaseParserRuleContext)
 			if inter.IsExtern() {

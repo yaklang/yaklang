@@ -27,6 +27,7 @@ type Type interface {
 	// set/get method
 	SetMethod(map[string]*FunctionType)
 	GetMethod(id string) *FunctionType
+	GetAllKey() []string
 }
 type Types []Type // each value can have multiple type possible
 
@@ -133,6 +134,9 @@ func (b *BasicType) GetMethod(id string) *FunctionType {
 func (b *BasicType) SetMethod(method map[string]*FunctionType) {
 	b.method = method
 }
+func (b *BasicType) GetAllKey() []string {
+	return lo.Keys(b.method)
+}
 
 var _ Type = (*BasicType)(nil)
 
@@ -201,6 +205,10 @@ func (a *AliasType) GetMethod(id string) *FunctionType {
 	}
 }
 
+func (b *AliasType) GetAllKey() []string {
+	return lo.Keys(b.method)
+}
+
 func (a *AliasType) String() string {
 	if a.Name != "" {
 		return a.Name
@@ -243,6 +251,9 @@ func (i *InterfaceType) GetMethod(id string) *FunctionType {
 		return nil
 	}
 }
+func (b *InterfaceType) GetAllKey() []string {
+	return lo.Keys(b.method)
+}
 
 func (i *InterfaceType) GetTypeKind() TypeKind {
 	return InterfaceTypeKind
@@ -273,6 +284,9 @@ func (c *ChanType) SetMethod(m map[string]*FunctionType) {
 }
 func (c *ChanType) GetMethod(id string) *FunctionType {
 	return c.method[id]
+}
+func (b *ChanType) GetAllKey() []string {
+	return lo.Keys(b.method)
 }
 
 func (c *ChanType) GetTypeKind() TypeKind {
@@ -336,6 +350,10 @@ func (i *ObjectType) GetMethod(id string) *FunctionType {
 
 func (i *ObjectType) SetMethod(m map[string]*FunctionType) {
 	i.method = m
+}
+
+func (b *ObjectType) GetAllKey() []string {
+	return append(lo.Keys(b.method), lo.Map(b.Key, func(v Value, _ int) string { return v.String() })...)
 }
 
 var _ (Type) = (*ObjectType)(nil)
@@ -516,6 +534,9 @@ func (f *FunctionType) GetMethod(string) *FunctionType {
 }
 
 func (f *FunctionType) SetMethod(m map[string]*FunctionType) {
+}
+func (b *FunctionType) GetAllKey() []string {
+	return []string{}
 }
 
 func CalculateType(ts []Type) Type {
