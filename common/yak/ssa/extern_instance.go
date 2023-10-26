@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -20,22 +21,31 @@ func (b *FunctionBuilder) WithExternLib(lib map[string]map[string]any) {
 	b.ExternLib = lib
 }
 
+func TryGetSimilarityKey(table []string, name string) string {
+	var score float64
+	var ret string
+	for _, libKey := range table {
+		if strings.EqualFold(libKey, name) {
+			// if strings.ToLower(libKey) == strings.ToLower(name) {
+			return libKey
+		}
+		s := utils.CalcSimilarity(utils.UnsafeStringToBytes(name), utils.UnsafeStringToBytes(libKey))
+		if score < s {
+			score = s
+			ret = libKey
+		}
+	}
+	return ret
+}
+
 func (b *FunctionBuilder) TryGetSimilarityKey(name, key string) string {
 	if b.ExternLib == nil {
 		return ""
 	}
-	var score float64
 	var ret string
 	if table, ok := b.ExternLib[name]; ok {
-		for libKey := range table {
-			s := utils.CalcSimilarity(utils.UnsafeStringToBytes(key), utils.UnsafeStringToBytes(libKey))
-			if score < s {
-				score = s
-				ret = libKey
-			}
-		}
+		ret = TryGetSimilarityKey(lo.Keys(table), key)
 	}
-
 	return ret
 }
 

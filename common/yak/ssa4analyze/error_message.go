@@ -49,6 +49,6 @@ func ValueIsNull() string {
 	return "This value is null"
 }
 
-func InvalidField(typ string) string {
-	return fmt.Sprintf("Invalid operation: connot get member or index (variable of type %s)", typ)
+func InvalidField(typ, key string) string {
+	return fmt.Sprintf("Invalid operation: unable to access the member or index of variable of type {%s} with name or index {%s}.", typ, key)
 }
