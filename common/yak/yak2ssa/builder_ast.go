@@ -21,10 +21,9 @@ func (b *astbuilder) handlerWs(ws *yak.WsContext) {
 }
 
 // entry point
-func (b *astbuilder) build(ast *yak.YaklangParser) {
-	// ast.StatementList()
-	if ws, ok := ast.Ws().(*yak.WsContext); ok {
-		b.handlerWs(ws)
+func (b *astbuilder) build(ast *yak.ProgramContext) {
+	for _, ws := range ast.AllWs() {
+		b.handlerWs(ws.(*yak.WsContext))
 	}
 	if stmt, ok := ast.StatementList().(*yak.StatementListContext); ok {
 		b.buildStatementList(stmt)
