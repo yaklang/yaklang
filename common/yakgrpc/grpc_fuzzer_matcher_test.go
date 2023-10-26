@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 )
@@ -14,11 +15,19 @@ import (
 func TestReMatcher(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
+	var mu sync.Mutex
 	first := true
 	host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(w http.ResponseWriter, r *http.Request) {
+
 		if first {
-			w.Write([]byte("abc"))
-			first = false
+			mu.Lock()
+			if first {
+				w.Write([]byte("abc"))
+				first = false
+			} else {
+				w.Write([]byte("123"))
+			}
+			mu.Unlock()
 		} else {
 			w.Write([]byte("123"))
 		}
@@ -83,11 +92,19 @@ func TestReMatcher(t *testing.T) {
 func TestReMatcherWithParams(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
+	var mu sync.Mutex
 	first := true
 	host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(w http.ResponseWriter, r *http.Request) {
 		if first {
-			w.Write([]byte("abc"))
-			first = false
+			mu.Lock()
+			if first {
+				w.Write([]byte("abc"))
+				first = false
+			} else {
+				w.Header().Add("test", "123")
+				w.Write([]byte("123"))
+			}
+			mu.Unlock()
 		} else {
 			w.Header().Add("test", "123")
 			w.Write([]byte("123"))
