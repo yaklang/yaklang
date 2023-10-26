@@ -153,7 +153,7 @@ func (f *FuzzHTTPRequest) Repeat(i int) FuzzHTTPRequestIf {
 func (f *FuzzHTTPRequest) FuzzMethod(methods ...string) FuzzHTTPRequestIf {
 	reqs, err := f.fuzzMethod(methods...)
 	if err != nil {
-		return &FuzzHTTPRequestBatch{fallback: f, originRequest: f}
+		return f.toFuzzHTTPRequestBatch()
 	}
 
 	return NewFuzzHTTPRequestBatch(f, reqs...)
@@ -251,7 +251,7 @@ func (f *FuzzHTTPRequest) fuzzPath(paths ...string) ([]*http.Request, error) {
 func (f *FuzzHTTPRequest) FuzzPath(paths ...string) FuzzHTTPRequestIf {
 	reqs, err := f.fuzzPath(paths...)
 	if err != nil {
-		return &FuzzHTTPRequestBatch{fallback: f, originRequest: f}
+		return f.toFuzzHTTPRequestBatch()
 	}
 
 	return NewFuzzHTTPRequestBatch(f, reqs...)
@@ -327,7 +327,7 @@ func (f *FuzzHTTPRequest) fuzzHTTPHeader(key interface{}, value interface{}) ([]
 func (f *FuzzHTTPRequest) FuzzHTTPHeader(k, v interface{}) FuzzHTTPRequestIf {
 	reqs, err := f.fuzzHTTPHeader(k, v)
 	if err != nil {
-		return &FuzzHTTPRequestBatch{fallback: f, originRequest: f}
+		return f.toFuzzHTTPRequestBatch()
 	}
 
 	return NewFuzzHTTPRequestBatch(f, reqs...)
@@ -386,7 +386,7 @@ func (f *FuzzHTTPRequest) fuzzGetParamsRaw(queryRaw ...string) ([]*http.Request,
 func (f *FuzzHTTPRequest) FuzzGetParamsRaw(queryRaws ...string) FuzzHTTPRequestIf {
 	reqs, err := f.fuzzGetParamsRaw(queryRaws...)
 	if err != nil {
-		return &FuzzHTTPRequestBatch{fallback: f, originRequest: f}
+		return f.toFuzzHTTPRequestBatch()
 	}
 	return NewFuzzHTTPRequestBatch(f, reqs...)
 }
@@ -394,7 +394,7 @@ func (f *FuzzHTTPRequest) FuzzGetParamsRaw(queryRaws ...string) FuzzHTTPRequestI
 func (f *FuzzHTTPRequest) FuzzGetJsonPathParams(key any, jsonPath string, val any) FuzzHTTPRequestIf {
 	reqs, err := f.fuzzGetParamsJsonPath(key, jsonPath, val)
 	if err != nil {
-		return &FuzzHTTPRequestBatch{fallback: f, originRequest: f}
+		return f.toFuzzHTTPRequestBatch()
 	}
 	return NewFuzzHTTPRequestBatch(f, reqs...)
 }
@@ -402,7 +402,7 @@ func (f *FuzzHTTPRequest) FuzzGetJsonPathParams(key any, jsonPath string, val an
 func (f *FuzzHTTPRequest) FuzzPostJsonPathParams(key any, jsonPath string, val any) FuzzHTTPRequestIf {
 	reqs, err := f.fuzzPostParamsJsonPath(key, jsonPath, val)
 	if err != nil {
-		return &FuzzHTTPRequestBatch{fallback: f, originRequest: f}
+		return f.toFuzzHTTPRequestBatch()
 	}
 	return NewFuzzHTTPRequestBatch(f, reqs...)
 }
@@ -574,7 +574,7 @@ func (f *FuzzHTTPRequest) fuzzGetParams(key interface{}, value interface{}, enco
 func (f *FuzzHTTPRequest) FuzzGetParams(k, v interface{}) FuzzHTTPRequestIf {
 	reqs, err := f.fuzzGetParams(k, v)
 	if err != nil {
-		return &FuzzHTTPRequestBatch{fallback: f, originRequest: f}
+		return f.toFuzzHTTPRequestBatch()
 	}
 
 	return NewFuzzHTTPRequestBatch(f, reqs...)
@@ -602,7 +602,7 @@ func (f *FuzzHTTPRequest) fuzzPostRaw(body ...string) ([]*http.Request, error) {
 func (f *FuzzHTTPRequest) FuzzPostRaw(body ...string) FuzzHTTPRequestIf {
 	reqs, err := f.fuzzPostRaw(body...)
 	if err != nil {
-		return &FuzzHTTPRequestBatch{fallback: f, originRequest: f}
+		return f.toFuzzHTTPRequestBatch()
 	}
 
 	return NewFuzzHTTPRequestBatch(f, reqs...)
@@ -635,8 +635,6 @@ func (f *FuzzHTTPRequest) fuzzPostParams(k, v interface{}, encoded ...EncodedFun
 
 		vals.DisableAutoEncode(f.NoAutoEncode())
 		vals.Set(key, value)
-		vals.Encode()
-
 		reqIns, err := lowhttp.ParseBytesToHttpRequest(lowhttp.ReplaceHTTPPacketBodyFast(origin, []byte(vals.Encode())))
 		if err != nil {
 			return nil
@@ -653,7 +651,7 @@ func (f *FuzzHTTPRequest) fuzzPostParams(k, v interface{}, encoded ...EncodedFun
 func (f *FuzzHTTPRequest) FuzzPostParams(k, v interface{}) FuzzHTTPRequestIf {
 	reqs, err := f.fuzzPostParams(k, v)
 	if err != nil {
-		return &FuzzHTTPRequestBatch{fallback: f, originRequest: f}
+		return f.toFuzzHTTPRequestBatch()
 	}
 	return NewFuzzHTTPRequestBatch(f, reqs...)
 }
@@ -837,7 +835,7 @@ func (f *FuzzHTTPRequest) fuzzPostJsonParamsWithRaw(k, v interface{}) ([]*http.R
 func (f *FuzzHTTPRequest) FuzzPostJsonParams(k, v interface{}) FuzzHTTPRequestIf {
 	reqs, err := f.fuzzPostJsonParams(k, v)
 	if err != nil {
-		return &FuzzHTTPRequestBatch{fallback: f, originRequest: f}
+		return f.toFuzzHTTPRequestBatch()
 	}
 	return NewFuzzHTTPRequestBatch(f, reqs...)
 }
@@ -849,7 +847,7 @@ func (f *FuzzHTTPRequest) FuzzCookieRaw(v interface{}) FuzzHTTPRequestIf {
 func (f *FuzzHTTPRequest) FuzzCookie(k, v interface{}) FuzzHTTPRequestIf {
 	reqs, err := f.fuzzCookie(k, v)
 	if err != nil {
-		return &FuzzHTTPRequestBatch{fallback: f, originRequest: f}
+		return f.toFuzzHTTPRequestBatch()
 	}
 	r := NewFuzzHTTPRequestBatch(f, reqs...)
 	return r
@@ -858,7 +856,7 @@ func (f *FuzzHTTPRequest) FuzzCookie(k, v interface{}) FuzzHTTPRequestIf {
 func (f *FuzzHTTPRequest) FuzzFormEncoded(k, v interface{}) FuzzHTTPRequestIf {
 	reqs, err := f.fuzzFormEncoded(k, v)
 	if err != nil {
-		return &FuzzHTTPRequestBatch{fallback: f, originRequest: f}
+		return f.toFuzzHTTPRequestBatch()
 	}
 	r := NewFuzzHTTPRequestBatch(f, reqs...)
 	return r
@@ -867,7 +865,7 @@ func (f *FuzzHTTPRequest) FuzzFormEncoded(k, v interface{}) FuzzHTTPRequestIf {
 func (f *FuzzHTTPRequest) FuzzUploadFile(k, v interface{}, raw []byte) FuzzHTTPRequestIf {
 	reqs, err := f.fuzzUploadedFile(k, v, raw)
 	if err != nil {
-		return &FuzzHTTPRequestBatch{fallback: f, originRequest: f}
+		return f.toFuzzHTTPRequestBatch()
 	}
 	r := NewFuzzHTTPRequestBatch(f, reqs...)
 	return r
@@ -876,7 +874,7 @@ func (f *FuzzHTTPRequest) FuzzUploadFile(k, v interface{}, raw []byte) FuzzHTTPR
 func (f *FuzzHTTPRequest) FuzzUploadKVPair(k, v interface{}) FuzzHTTPRequestIf {
 	reqs, err := f.fuzzMultipartKeyValue(k, v)
 	if err != nil {
-		return &FuzzHTTPRequestBatch{fallback: f, originRequest: f}
+		return f.toFuzzHTTPRequestBatch()
 	}
 	r := NewFuzzHTTPRequestBatch(f, reqs...)
 	return r
@@ -885,7 +883,7 @@ func (f *FuzzHTTPRequest) FuzzUploadKVPair(k, v interface{}) FuzzHTTPRequestIf {
 func (f *FuzzHTTPRequest) FuzzUploadFileName(k, v interface{}) FuzzHTTPRequestIf {
 	reqs, err := f.fuzzUploadedFileName(k, v)
 	if err != nil {
-		return &FuzzHTTPRequestBatch{fallback: f, originRequest: f}
+		return f.toFuzzHTTPRequestBatch()
 	}
 	r := NewFuzzHTTPRequestBatch(f, reqs...)
 	return r

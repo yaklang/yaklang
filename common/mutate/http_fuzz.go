@@ -22,7 +22,7 @@ import (
 )
 
 type FuzzHTTPRequest struct {
-	Opts                   []BuildFuzzHTTPRequestOption
+	opts                   []BuildFuzzHTTPRequestOption
 	isHttps                bool
 	source                 string
 	runtimeId              string
@@ -40,7 +40,7 @@ func (r *FuzzHTTPRequest) NoAutoEncode() bool {
 	return r.noAutoEncode
 }
 
-func (r *FuzzHTTPRequest) SetNoAutoEncode(b bool) FuzzHTTPRequestIf {
+func (r *FuzzHTTPRequest) DisableNoAutoEncode(b bool) FuzzHTTPRequestIf {
 	if r != nil {
 		r.noAutoEncode = b
 	}
@@ -52,7 +52,7 @@ type FuzzHTTPRequestIf interface {
 	Repeat(i int) FuzzHTTPRequestIf
 
 	// 模糊测试参数时不进行自动编码
-	SetNoAutoEncode(bool) FuzzHTTPRequestIf
+	DisableNoAutoEncode(bool) FuzzHTTPRequestIf
 
 	// 标注是否进行自动编码
 	NoAutoEncode() bool
@@ -241,34 +241,6 @@ func OptSource(i string) BuildFuzzHTTPRequestOption {
 	}
 }
 
-func RawRequestsToFuzzHTTPRequests(targets []string, onError func(string, error), opts ...BuildFuzzHTTPRequestOption) (*FuzzHTTPRequestBatch, error) {
-	var freqs []FuzzHTTPRequestIf
-	var firstReq *FuzzHTTPRequest
-	for _, req := range targets {
-		f, err := NewFuzzHTTPRequest(req, opts...)
-		if err != nil {
-			log.Errorf("build request failed: %s", err)
-			if onError != nil {
-				onError(req, err)
-			}
-			continue
-		}
-		if firstReq == nil {
-			firstReq = f
-		}
-		freqs = append(freqs, f)
-	}
-	if len(freqs) <= 0 {
-		return nil, utils.Errorf("fuzz http requests EMPTY!")
-	}
-	batch := &FuzzHTTPRequestBatch{
-		fallback:         nil,
-		nextFuzzRequests: freqs,
-		originRequest:    firstReq,
-	}
-	return batch, nil
-}
-
 func UrlsToHTTPRequests(target ...interface{}) (*FuzzHTTPRequestBatch, error) {
 	var reqs []*http.Request
 	for _, urlBase := range InterfaceToFuzzResults(target) {
@@ -418,6 +390,8 @@ func NewFuzzHTTPRequest(i interface{}, opts ...BuildFuzzHTTPRequestOption) (*Fuz
 		originHttpRequest = raw
 	case *yakhttp.YakHttpRequest:
 		return NewFuzzHTTPRequest(ret.Request, opts...)
+	case *FuzzHTTPRequest:
+		opts = ret.MergeOption(opts...)
 	default:
 		return nil, utils.Errorf("unsupported type[%v] to FuzzHTTPRequest", reflect.TypeOf(i))
 	}
@@ -434,9 +408,35 @@ func NewFuzzHTTPRequest(i interface{}, opts ...BuildFuzzHTTPRequestOption) (*Fuz
 	req.runtimeId = config.RuntimeId
 	req.proxy = config.Proxy
 	req.noAutoEncode = config.NoAutoEncode
-	req.Opts = opts
-
+	req.opts = opts
 	return req, nil
+}
+
+func (f *FuzzHTTPRequest) GetCurrentOptions() []BuildFuzzHTTPRequestOption {
+	result := make([]BuildFuzzHTTPRequestOption, 0, len(f.opts))
+	if f.runtimeId != "" {
+		result = append(result, OptRuntimeId(f.runtimeId))
+	}
+	if f.source != "" {
+		result = append(result, OptSource(f.source))
+	}
+	if f.isHttps {
+		result = append(result, OptHTTPS(f.isHttps))
+	}
+	if f.proxy != "" {
+		result = append(result, OptProxy(f.proxy))
+	}
+	if f.noAutoEncode {
+		result = append(result, OptDisableAutoEncode(f.noAutoEncode))
+	}
+	return result
+}
+
+func (f *FuzzHTTPRequest) MergeOption(opts ...BuildFuzzHTTPRequestOption) []BuildFuzzHTTPRequestOption {
+	result := make([]BuildFuzzHTTPRequestOption, len(f.opts)+len(opts))
+	copy(result, f.opts)
+	copy(result[len(f.opts):], opts)
+	return result
 }
 
 func (f *FuzzHTTPRequest) GetOriginHTTPRequest() (*http.Request, error) {
