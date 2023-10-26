@@ -92,6 +92,16 @@ func (b *astbuilder) buildStatement(stmt *JS.StatementContext) {
 		b.buildReturnStatement(s)
 	}
 
+	// break
+	if s, ok := stmt.BreakStatement().(*JS.BreakStatementContext); ok {
+		b.buildBreakStatement(s)
+	}
+
+	// try
+	if s, ok := stmt.TryStatement().(*JS.TryStatementContext); ok {
+		b.buildTryStatement(s)
+	}
+
 }
 
 func (b *astbuilder) buildVariableStatement(stmt *JS.VariableStatementContext) {
@@ -110,7 +120,7 @@ func (b *astbuilder) buildAllVariableDeclaration(stmt *JS.VariableDeclarationLis
 	defer recoverRange()
 	var ret []ssa.Value
 
-	// TODO: 如何去实现一个不可以被重复赋值的变量
+	// TODO: 如何去实现一个不可以被重复赋值的变量 complete
 
 	// checking varModifier - decorator (var / let / const)
 	// think `var a = 1`, `let a = 1`, `const a = 1`;
@@ -229,7 +239,7 @@ type getSingleExpr interface {
 }
 
 func (b *astbuilder) buildSingleExpression(stmt JS.ISingleExpressionContext, IslValue bool) (ssa.Value, ssa.LeftValue) {
-	// TODO: unfinish
+	// TODO: singleExpressions unfinish
 
 	if v := b.buildOnlyRightSingleExpression(stmt); v != nil {
 		return v, nil
@@ -748,7 +758,6 @@ func (b *astbuilder) buildMemberIndexExpression(stmt *JS.MemberIndexExpressionCo
 
 	// fmt.Println("memberIndex: ", stmt.GetText())
 
-	var inter ssa.User
 	var expr ssa.Value
 
 	if IsValue {
@@ -759,21 +768,13 @@ func (b *astbuilder) buildMemberIndexExpression(stmt *JS.MemberIndexExpressionCo
 			return nil, nil
 		}
 
-		if expr, ok := expr.(ssa.User); ok {
-			inter = expr
-		} else {
-			expr := stmt.SingleExpression(0)
-			text := expr.GetText()
-			inter = b.EmitUndefine(text)
-		}
-
 		// left
 		var index ssa.Value
 		if s := stmt.SingleExpression(1); s != nil {
 			index, _ = b.buildSingleExpression(s, false)
 		}
 
-		lv := b.EmitFieldMust(inter, index)
+		lv := b.EmitFieldMust(expr, index)
 		lv.GetValue(b.FunctionBuilder)
 
 		return nil, lv
@@ -782,11 +783,7 @@ func (b *astbuilder) buildMemberIndexExpression(stmt *JS.MemberIndexExpressionCo
 		if s := stmt.SingleExpression(0); s != nil {
 			expr, _ = b.buildSingleExpression(s, false)
 		}
-		expr, ok := expr.(ssa.User)
-		if !ok {
-			b.NewError(ssa.Error, TAG, "Expression: need a interface")
-			return nil, nil
-		}
+	
 		var value ssa.Value
 		if s := stmt.SingleExpression(1); s != nil {
 			value, _ = b.buildSingleExpression(s, false)
@@ -848,7 +845,7 @@ func (b *astbuilder) buildObjectLiteral(stmt *JS.ObjectLiteralContext) ssa.Value
 	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
-	// TODO: propertyAssignment
+	// TODO: ObjectLiteral propertyAssignment remain 2
 
 	var value []ssa.Value
 	var keys []ssa.Value
@@ -866,15 +863,57 @@ func (b *astbuilder) buildObjectLiteral(stmt *JS.ObjectLiteralContext) ssa.Value
 				rv, _ = b.buildSingleExpression(s, false)
 			}
 		} else if pro, ok := p.(*JS.ComputedPropertyExpressionAssignmentContext); ok {
-			fmt.Println(pro)
+			if s := pro.SingleExpression(0); s != nil {
+				key, _ = b.buildSingleExpression(s, false)
+			}
+			if s := pro.SingleExpression(1); s != nil {
+				rv, _ = b.buildSingleExpression(s, false)
+			}
 		} else if pro, ok := p.(*JS.FunctionPropertyContext); ok {
-			fmt.Println(pro)
+			var funcName string
+			if s, ok := pro.PropertyName().(*JS.PropertyNameContext); ok {
+				funcName = s.GetText()
+			}
+			
+			newFunc, symbol := b.NewFunc(funcName)
+			current := b.CurrentBlock
+
+			buildFunc := func() {
+				b.FunctionBuilder = b.PushFunction(newFunc, symbol, current)
+		
+				if s, ok := pro.FormalParameterList().(*JS.FormalParameterListContext); ok {
+					b.buildFormalParameterList(s)
+				}
+		
+				if f, ok := pro.FunctionBody().(*JS.FunctionBodyContext); ok {
+					b.buildFunctionBody(f)
+				}
+		
+				b.Finish()
+				b.FunctionBuilder = b.PopFunction()
+		
+			}
+		
+			b.AddSubFunction(buildFunc)
+
+			if funcName != "" {
+				b.WriteVariable(funcName, newFunc)
+			}
+			return newFunc
+
 		} else if pro, ok := p.(*JS.PropertyGetterContext); ok {
 			fmt.Println(pro)
 		} else if pro, ok := p.(*JS.PropertySetterContext); ok {
 			fmt.Println(pro)
 		} else if pro, ok := p.(*JS.PropertyShorthandContext); ok {
-			fmt.Println(pro)
+			if s := pro.SingleExpression(); s != nil {
+				rv, _ = b.buildSingleExpression(s, false)
+			}
+
+			// TODO: how to handle ellipsis
+			if pro.Ellipsis() != nil {
+				b.HandlerEllipsis()
+			}
 		} else {
 			b.NewError(ssa.Error, TAG, "Not propertyAssignment")
 		}
@@ -887,9 +926,45 @@ func (b *astbuilder) buildObjectLiteral(stmt *JS.ObjectLiteralContext) ssa.Value
 }
 
 func (b *astbuilder) buildPropertyName(stmt *JS.PropertyNameContext) ssa.Value {
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
+	defer recoverRange()
 
-	return ssa.NewConst("a")
+	if s, ok := stmt.IdentifierName().(*JS.IdentifierNameContext); ok {
+		return b.buildIdentifierName(s)
+	} else if s := stmt.StringLiteral(); s != nil {
+		return b.buildStringLiteral(s)
+	} else if s, ok  := stmt.NumericLiteral().(*JS.NumericLiteralContext); ok {
+		return b.buildNumericLiteral(s)
+	} else if s := stmt.SingleExpression(); s != nil {
+		rv, _ := b.buildSingleExpression(s, false)
+		return rv
+	} else {
+		b.NewError(ssa.Error, TAG, "Not support the propertyName")
+	} 
+
+	return nil
 }
+
+func (b *astbuilder) buildIdentifierName(stmt *JS.IdentifierNameContext) ssa.Value {
+	if s, ok := stmt.Identifier().(*JS.IdentifierContext); ok {
+		text := s.GetText()
+		_, lv := b.buildIdentifierExpression(text, true)
+		return lv.GetValue(b.FunctionBuilder)
+	} else if s := stmt.ReservedWord(); s != nil{
+		if v := s.Keyword(); v != nil {
+			text := v.GetText()
+			return ssa.NewConst(text)
+		} else if v := s.NullLiteral(); v != nil{
+			return b.buildNullLiteral()
+		} else if v := s.BooleanLiteral(); v != nil{
+			return b.buildBooleanLiteral(stmt.GetText())
+		} else {
+			b.NewError(ssa.Error, TAG, "not support the format")
+		}
+	}
+	return nil
+}
+
 
 func (b *astbuilder) buildExpressionSequence(stmt *JS.ExpressionSequenceContext) []ssa.Value {
 	// 需要修改改函数及引用，不存在if中存在多个singleExpression的情况
@@ -1142,7 +1217,7 @@ func (b *astbuilder) buildForInStatement(stmt *JS.ForInStatementContext) {
 			value, _ = b.buildSingleExpression(stmt.SingleExpression(1), false)
 		}
 
-		key, _, ok := b.EmitNext(value)
+		key, _, ok := b.EmitNext(value, false)
 		left.Assign(key, b.FunctionBuilder)
 
 		return ok
@@ -1178,7 +1253,7 @@ func (b *astbuilder) buildForOfStatement(stmt *JS.ForOfStatementContext) {
 			value, _ = b.buildSingleExpression(stmt.SingleExpression(1), false)
 		}
 
-		_, field, ok := b.EmitNext(value)
+		_, field, ok := b.EmitNext(value, true)
 		left.Assign(field, b.FunctionBuilder)
 
 		return ok
@@ -1324,4 +1399,82 @@ func (b *astbuilder) buildReturnStatement(stmt *JS.ReturnStatementContext) {
 	} else {
 		b.EmitReturn(nil)
 	}
+}
+
+
+func (b *astbuilder) buildImportStatement(stmt *JS.ImportStatementContext) {
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
+	defer recoverRange()
+
+	if s := stmt.ImportFromBlock(); s != nil {
+		if str := s.StringLiteral(); s != nil {
+			b.buildStringLiteral(str)
+		}
+	}
+}
+
+func (b *astbuilder) buildBreakStatement(stmt *JS.BreakStatementContext) {
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
+	defer recoverRange()
+
+	var _break *ssa.BasicBlock
+	
+	if s, ok := stmt.Identifier().(*JS.IdentifierContext); ok {
+		// TODO: break数据流冲突
+		s.GetText()
+
+	} else {
+
+		if _break = b.GetBreak(); _break != nil {
+			b.EmitJump(_break)
+		} else {
+			b.NewError(ssa.Error, TAG, UnexpectedBreakStmt())
+		}
+		return
+	}
+
+}
+
+func (b *astbuilder) buildTryStatement(stmt *JS.TryStatementContext) {
+	revcoverRange := b.SetRange(&stmt.BaseParserRuleContext)
+	defer revcoverRange()
+
+	try := b.BuildTry()
+
+	try.BuildTryBlock(func() {
+		if s, ok := stmt.Block().(*JS.BlockContext); ok {
+			b.buildBlock(s)
+		}
+	})
+
+	
+	try.BuildCatch(func() string {
+		var id string
+		// TODO: Assignable could be wrong, need to fix
+		if s, ok := stmt.CatchProduction().(*JS.CatchProductionContext); ok {
+			if a, ok := s.Assignable().(*JS.AssignableContext); ok {
+				b.buildAssignableContext(a)
+				id = a.GetText()
+			}
+
+			if bl, ok := stmt.Block().(*JS.BlockContext); ok {
+				b.buildBlock(bl)
+			}
+		}
+		return id
+	})
+
+	if s, ok := stmt.FinallyProduction().(*JS.FinallyProductionContext); ok {
+
+
+		try.BuildFinally(func ()  {
+			if bl, ok := s.Block().(*JS.BlockContext); ok {
+				b.buildBlock(bl)
+			}
+		})
+	} 
+
+
+	try.Finish()
+
 }
