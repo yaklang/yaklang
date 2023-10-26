@@ -748,19 +748,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		// 通过 GlobalVariables 可以很棒的处理这个问题
 		name := c.Op1.String()
 		value, ok := v.GlobalVariables[name]
-		if !ok {
-			id, ok := v.CurrentScope().symtbl.GetSymbolByVariableName(name)
-			if ok {
-				val, ok := v.CurrentScope().GetValueByID(id)
-				if ok {
-					v.push(val)
-					return
-				}
-			}
-			log.Warnf("yakvm: cannot found variable: %v, use undefined", c.Op1.String())
-			v.push(undefined)
-			return
-		} else {
+		if ok {
 			val := &Value{
 				TypeVerbose: "global",
 				Literal:     name,
@@ -768,7 +756,33 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			}
 			val.AddExtraInfo("global", true)
 			v.push(val)
+			return
 		}
+
+		id, ok := v.CurrentScope().symtbl.GetSymbolByVariableName(name)
+		if ok {
+			val, ok := v.CurrentScope().GetValueByID(id)
+			if ok {
+				v.push(val)
+				return
+			}
+		}
+		if v.vm.GetExternalVar != nil {
+			val, ok := v.vm.GetExternalVar(name)
+			if ok {
+				val := &Value{
+					TypeVerbose: "global",
+					Literal:     name,
+					Value:       val,
+				}
+				val.AddExtraInfo("global", true)
+				v.push(val)
+				return
+			}
+		}
+		log.Warnf("yakvm: cannot found variable: %v, use undefined", c.Op1.String())
+		v.push(undefined)
+		return
 	case OpTypeCast:
 		typ := v.pop()
 		val := v.pop()

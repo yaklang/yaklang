@@ -49,6 +49,7 @@ type VirtualMachine struct {
 	// map[sha1(caller, callee)]func(any)any
 	hijackMapMemberCallHandlers sync.Map
 	globalVarFallback           func(string) interface{}
+	GetExternalVar              func(name string) (any, bool)
 }
 
 func (n *VirtualMachine) RegisterMapMemberCallHandler(caller, callee string, h func(interface{}) interface{}) {
