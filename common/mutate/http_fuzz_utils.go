@@ -3,7 +3,7 @@ package mutate
 import "github.com/yaklang/yaklang/common/utils"
 
 func (s *FuzzHTTPRequest) GetFirstFuzzHTTPRequest() (*FuzzHTTPRequest, error) {
-	return NewFuzzHTTPRequest(s.originRequest, s.Opts...)
+	return NewFuzzHTTPRequest(s.originRequest, s.GetCurrentOptions()...)
 }
 
 func (s *FuzzHTTPRequestBatch) GetFirstFuzzHTTPRequest() (*FuzzHTTPRequest, error) {

@@ -169,7 +169,7 @@ func (f *FuzzHTTPRequest) fuzzCookieJsonPath(key any, jsonPath string, val any) 
 func (f *FuzzHTTPRequest) FuzzCookieJsonPath(k any, jp string, v any) FuzzHTTPRequestIf {
 	reqs, err := f.fuzzCookieJsonPath(k, jp, v)
 	if err != nil {
-		return &FuzzHTTPRequestBatch{fallback: f, originRequest: f}
+		return f.toFuzzHTTPRequestBatch()
 	}
 	return NewFuzzHTTPRequestBatch(f, reqs...)
 }
@@ -177,7 +177,7 @@ func (f *FuzzHTTPRequest) FuzzCookieJsonPath(k any, jp string, v any) FuzzHTTPRe
 func (f *FuzzHTTPRequest) FuzzCookieBase64JsonPath(k any, jp string, v any) FuzzHTTPRequestIf {
 	reqs, err := f.fuzzCookieBase64JsonPath(k, jp, v)
 	if err != nil {
-		return &FuzzHTTPRequestBatch{fallback: f, originRequest: f}
+		return f.toFuzzHTTPRequestBatch()
 	}
 	return NewFuzzHTTPRequestBatch(f, reqs...)
 }
@@ -191,16 +191,7 @@ func (f *FuzzHTTPRequestBatch) FuzzCookieBase64JsonPath(k any, jp string, v any)
 		reqs = append(reqs, req.FuzzCookieBase64JsonPath(k, jp, v))
 	}
 
-	if len(reqs) <= 0 {
-		return &FuzzHTTPRequestBatch{
-			fallback:      f.fallback,
-			originRequest: f.GetOriginRequest(),
-		}
-	}
-	return &FuzzHTTPRequestBatch{
-		nextFuzzRequests: reqs,
-		originRequest:    f.GetOriginRequest(),
-	}
+	return f.toFuzzHTTPRequestIf(reqs)
 }
 
 func (f *FuzzHTTPRequestBatch) FuzzCookieJsonPath(k any, jp string, v any) FuzzHTTPRequestIf {
@@ -212,14 +203,5 @@ func (f *FuzzHTTPRequestBatch) FuzzCookieJsonPath(k any, jp string, v any) FuzzH
 		reqs = append(reqs, req.FuzzCookieJsonPath(k, jp, v))
 	}
 
-	if len(reqs) <= 0 {
-		return &FuzzHTTPRequestBatch{
-			fallback:      f.fallback,
-			originRequest: f.GetOriginRequest(),
-		}
-	}
-	return &FuzzHTTPRequestBatch{
-		nextFuzzRequests: reqs,
-		originRequest:    f.GetOriginRequest(),
-	}
+	return f.toFuzzHTTPRequestIf(reqs)
 }
