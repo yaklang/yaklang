@@ -219,6 +219,11 @@ func (p *FuzzHTTPRequestParam) Repeat(i int) FuzzHTTPRequestIf {
 	return p.origin.Repeat(i)
 }
 
+func (p *FuzzHTTPRequestParam) DisableAutoEncode(b bool) *FuzzHTTPRequestParam {
+	p.origin.DisableAutoEncode(b)
+	return p
+}
+
 func (p *FuzzHTTPRequestParam) Fuzz(i ...interface{}) FuzzHTTPRequestIf {
 	switch p.typePosition {
 	case posMethod:

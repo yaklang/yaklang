@@ -416,9 +416,9 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 		}
 
 		if !config.UseRawMode {
-			log.Warnf("do not use golang native http.Client, it's not recommended")
 			config.UseRawMode = true
 		}
+
 		var results [][]byte
 		for _, e := range ret {
 			res, err := utils.HttpDumpWithBody(e, true)
