@@ -197,6 +197,7 @@ service Yak {
   rpc ExtractData(stream ExtractDataRequest) returns (stream ExtractDataResponse);
   rpc ImportHTTPFuzzerTaskFromYaml(ImportHTTPFuzzerTaskFromYamlRequest) returns (ImportHTTPFuzzerTaskFromYamlResponse);
   rpc ExportHTTPFuzzerTaskToYaml(ExportHTTPFuzzerTaskToYamlRequest) returns (ExportHTTPFuzzerTaskToYamlResponse);
+  rpc MatchTaskResponse(MatchTask) returns (stream FuzzerResponse);
 
   rpc SaveFuzzerLabel(SaveFuzzerLabelRequest) returns (Empty);
   rpc QueryFuzzerLabel(Empty) returns (QueryFuzzerLabelResponse);
@@ -3348,6 +3349,16 @@ message FuzzerRequest {
 
   // retry task id
   int64 RetryTaskID = 47;
+}
+
+message MatchTask {
+  // match task id
+  int64 TaskID = 1;
+
+  // matcher info
+  repeated HTTPResponseMatcher Matchers = 33;
+  string MatchersCondition = 34;
+  string HitColor = 36;
 }
 
 message KVPair {
