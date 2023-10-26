@@ -383,9 +383,6 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					cond = ret
 				}
 
-				for i, m := range req.GetMatchers() {
-					httpTplMatcher[i] = httptpl.NewMatcherFromGRPCModel(m)
-				}
 				// new Matcher
 				ins := &httptpl.YakMatcher{
 					SubMatcherCondition: cond,
@@ -397,7 +394,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					respModel, _ := resp.ToGRPCModel()
 					_, _, getMirrorHTTPFlowParams := yak.MutateHookCaller(req.GetHotPatchCode())
 
-					if len(req.GetExtractors()) > 0 { // 提取器提取参数
+					if haveHTTPTplExtractor { // 提取器提取参数
 						var params = make(map[string]any)
 						for _, extractor := range httpTplExtractor {
 							vars, err := extractor.Execute(respModel.ResponseRaw, params)
