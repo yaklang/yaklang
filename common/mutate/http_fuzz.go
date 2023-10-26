@@ -40,7 +40,7 @@ func (r *FuzzHTTPRequest) NoAutoEncode() bool {
 	return r.noAutoEncode
 }
 
-func (r *FuzzHTTPRequest) DisableNoAutoEncode(b bool) FuzzHTTPRequestIf {
+func (r *FuzzHTTPRequest) DisableAutoEncode(b bool) FuzzHTTPRequestIf {
 	if r != nil {
 		r.noAutoEncode = b
 	}
@@ -52,7 +52,7 @@ type FuzzHTTPRequestIf interface {
 	Repeat(i int) FuzzHTTPRequestIf
 
 	// 模糊测试参数时不进行自动编码
-	DisableNoAutoEncode(bool) FuzzHTTPRequestIf
+	DisableAutoEncode(bool) FuzzHTTPRequestIf
 
 	// 标注是否进行自动编码
 	NoAutoEncode() bool
