@@ -33,6 +33,14 @@ import (
 	"golang.org/x/text/transform"
 )
 
+func ForceQueryUnescape(s string) string {
+	var val, err = url.QueryUnescape(s)
+	if err != nil {
+		return s
+	}
+	return val
+}
+
 var QueryUnescape = url.QueryUnescape
 var PathEscape = url.PathEscape
 var PathUnescape = url.PathUnescape
