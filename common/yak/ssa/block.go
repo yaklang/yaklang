@@ -14,9 +14,9 @@ func (f *Function) NewBasicBlockUnSealed(name string) *BasicBlock {
 func (f *Function) newBasicBlockWithSealed(name string, isSealed bool) *BasicBlock {
 	index := len(f.Blocks)
 	if name != "" {
-		name = fmt.Sprintf("%s%d", name, index)
+		name = fmt.Sprintf("%s-%d", name, index)
 	} else {
-		name = fmt.Sprintf("b%d", index)
+		name = fmt.Sprintf("b-%d", index)
 	}
 	b := &BasicBlock{
 		anInstruction: NewInstruction(),

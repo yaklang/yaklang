@@ -97,6 +97,10 @@ func (b *astbuilder) buildStatement(stmt *JS.StatementContext) {
 		b.buildBreakStatement(s)
 	}
 
+	if s, ok := stmt.LabelledStatement().(*JS.LabelledStatementContext); ok {
+		b.buildLabelledStatement(s)
+	}
+
 	// try
 	if s, ok := stmt.TryStatement().(*JS.TryStatementContext); ok {
 		b.buildTryStatement(s)
@@ -1418,13 +1422,19 @@ func (b *astbuilder) buildBreakStatement(stmt *JS.BreakStatementContext) {
 	defer recoverRange()
 
 	var _break *ssa.BasicBlock
-	
+
 	if s, ok := stmt.Identifier().(*JS.IdentifierContext); ok {
 		// TODO: break数据流冲突
-		s.GetText()
+		text := s.GetText()
+		if _break = b.GetBreakByName(text); _break != nil {
+			b.EmitJump(_break)
+		} else {
+			b.NewError(ssa.Error, TAG, UnexpectedBreakStmt())
+		}
+		return
 
+		// fmt.Println("want break to :", text)
 	} else {
-
 		if _break = b.GetBreak(); _break != nil {
 			b.EmitJump(_break)
 		} else {
@@ -1432,6 +1442,31 @@ func (b *astbuilder) buildBreakStatement(stmt *JS.BreakStatementContext) {
 		}
 		return
 	}
+
+}
+
+func (b *astbuilder) buildLabelledStatement(stmt *JS.LabelledStatementContext) {
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
+	defer recoverRange()
+	text := ""
+	if s, ok := stmt.Identifier().(*JS.IdentifierContext); ok {
+		text = s.GetText()
+	}
+
+	// unsealed block
+	block := b.NewBasicBlockUnSealed(text)
+	b.AddUnsealedBlock(block)
+	b.PushTarget(block, nil, nil)
+	// to block
+	b.EmitJump(block)
+	b.CurrentBlock = block
+	if s, ok := stmt.Statement().(*JS.StatementContext); ok {
+		b.buildStatement(s)
+	}
+	// to done
+	done := b.NewBasicBlock("done")
+	b.EmitJump(done)
+	b.CurrentBlock = done
 
 }
 
