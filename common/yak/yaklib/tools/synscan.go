@@ -475,7 +475,7 @@ func pingutilsToChan(res chan *pingutil.PingResult) chan string {
 		defer close(c)
 		for result := range res {
 			if result.Ok {
-				log.Infof("ping to synscan for target: %s", result.IP)
+				log.Infof("ping(%v) to synscan for target: %s", result.Reason, result.IP)
 				c <- result.IP
 			}
 		}
