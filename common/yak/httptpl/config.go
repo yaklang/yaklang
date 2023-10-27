@@ -87,7 +87,8 @@ type Config struct {
 	OOBRequireCheckingTrigger func(string, ...float64) bool
 
 	// onTempalteLoaded
-	OnTemplateLoaded func(*YakTemplate) bool
+	OnTemplateLoaded  func(*YakTemplate) bool
+	BeforeSendPackage func(data []byte, isHttps bool) []byte
 }
 
 func WithOOBRequireCallback(f func(...float64) (string, string, error)) ConfigOption {
@@ -208,6 +209,11 @@ func WithMode(s string) ConfigOption {
 	}
 }
 
+func WithBeforeSendPackage(f func(data []byte, isHttps bool) []byte) ConfigOption {
+	return func(config *Config) {
+		config.BeforeSendPackage = f
+	}
+}
 func WithResultCallback(f HTTPResultCallback) ConfigOption {
 	return func(config *Config) {
 		if config.Callback != nil {

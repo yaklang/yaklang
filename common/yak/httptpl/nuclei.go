@@ -100,8 +100,12 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 	//if strings.Contains(tplRaw, "{{") {
 	//	tplRaw = ExpandPreprocessor(tplRaw)
 	//}
-
 	yakTemp := &YakTemplate{}
+	for _, v := range []string{`{{interactsh-url}}`, `{{interactsh}}`, `{{interactsh_url}}`} {
+		if strings.Contains(tplRaw, v) {
+			yakTemp.ReverseConnectionNeed = true
+		}
+	}
 	var mid = map[string]interface{}{}
 	err := yaml.Unmarshal([]byte(tplRaw), &mid)
 	if err != nil {
