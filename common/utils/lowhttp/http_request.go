@@ -24,6 +24,15 @@ var _contentLengthRE = regexp.MustCompile(`(?i)Content-Length:(\s+)?(\d+)?\r?\n?
 var _transferEncodingRE = regexp.MustCompile(`(?i)Transfer-Encoding:(\s+)?.*?(chunked).*?\r?\n?`)
 var fetchBoundaryRegexp = regexp.MustCompile(`boundary\s?=\s?([^;]+)`)
 
+// HTTPPacketForceChunked 将一个HTTP报文的body强制转换为chunked编码
+// Example:
+// ```
+// poc.HTTPPacketForceChunked(`POST / HTTP/1.1
+// Host: example.com
+// Content-Length: 11
+
+// hello world`)
+// ```
 func HTTPPacketForceChunked(raw []byte) []byte {
 	header, body := SplitHTTPHeadersAndBodyFromPacket(raw)
 	return ReplaceHTTPPacketBodyEx([]byte(header), body, true, false)
@@ -35,6 +44,15 @@ func AppendHeaderToHTTPPacket(raw []byte, line string) []byte {
 	return []byte(header + string(body))
 }
 
+// FixHTTPPacketCRLF 修复一个HTTP报文的CRLF问题（正常的报文每行末尾为\r\n，但是某些报文可能是有\n），如果noFixLength为true，则不会修复Content-Length，否则会尝试修复Content-Length
+// Example:
+// ```
+// poc.FixHTTPPacketCRLF(`POST / HTTP/1.1
+// Host: example.com
+// Content-Length: 11
+//
+// hello world`, false)
+// ```
 func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 	// 移除左边空白字符
 	raw = TrimLeftHTTPPacket(raw)
@@ -153,10 +171,10 @@ func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 	return buf.Bytes()
 }
 
-// FixHTTPRequest 尝试对传入的请求进行修复，并返回修复后的请求
+// FixHTTPRequest 尝试对传入的HTTP请求报文进行修复，并返回修复后的请求
 // Example:
 // ```
-// fixedRequest = str.FixHTTPRequest(b"GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+// str.FixHTTPRequest(b"GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
 // ```
 func FixHTTPRequest(raw []byte) []byte {
 	return FixHTTPPacketCRLF(raw, false)
@@ -386,6 +404,11 @@ func ParseStringToHttpRequest(raw string) (*http.Request, error) {
 var contentTypeChineseCharset = regexp.MustCompile(`(?i)charset\s*=\s*['"]?(.*?)(gb[^'^"^\s]+)['"]?`)          // 2 gkxxxx
 var charsetInMeta = regexp.MustCompile(`(?i)<\s*meta.*?(charset|content)\s*=\s*['"]?(.*?)(gb[^'^"^\s]+)['"]?`) // 3 gbxxx
 
+// ParseUrlToHTTPRequestRaw 将URL解析为原始 HTTP 请求报文，返回是否为 HTTPS，原始请求报文与错误
+// Example:
+// ```
+// ishttps, raw, err = poc.ParseUrlToHTTPRequestRaw("GET", "https://yaklang.com")
+// ```
 func ParseUrlToHttpRequestRaw(method string, i interface{}) (bool, []byte, error) {
 	urlStr := utils.InterfaceToString(i)
 	req, err := http.NewRequest(strings.ToUpper(method), urlStr, http.NoBody)

@@ -82,8 +82,13 @@ func SetHTTPPacketUrl(packet []byte, rawURL string) []byte {
 	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
 }
 
-// ReplaceHTTPPacketFirstLine replace http packet first line
-// enable for request and response all
+// ReplaceHTTPPacketFirstLine 是一个辅助，用于改变请求报文，修改第一行（即请求方法，请求路径，协议版本）
+// Example:
+// ```
+// poc.ReplaceHTTPPacketFirstLine(`GET / HTTP/1.1
+// Host: Example.com
+// `, "GET /test HTTP/1.1")) // 向 example.com 发起请求，修改请求报文的第一行，请求/test路径
+// ```
 func ReplaceHTTPPacketFirstLine(packet []byte, firstLine string) []byte {
 	var isChunked bool
 	var header = []string{firstLine}
@@ -97,6 +102,11 @@ func ReplaceHTTPPacketFirstLine(packet []byte, firstLine string) []byte {
 	return ReplaceHTTPPacketBody([]byte(strings.Join(header, CRLF)+CRLF), body, isChunked)
 }
 
+// ReplaceHTTPPacketMethod 是一个辅助函数，用于改变请求报文，修改请求方法
+// Example:
+// ```
+// poc.ReplaceHTTPPacketMethod(poc.BasicRequest(), "OPTIONS") // 修改请求方法为OPTIONS
+// ```
 func ReplaceHTTPPacketMethod(packet []byte, newMethod string) []byte {
 	var buf bytes.Buffer
 	var header []string
@@ -140,6 +150,11 @@ func ReplaceHTTPPacketMethod(packet []byte, newMethod string) []byte {
 	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
 }
 
+// ReplaceHTTPPacketPath 是一个辅助函数，用于改变请求报文，修改请求路径
+// Example:
+// ```
+// poc.ReplaceHTTPPacketPath(poc.BasicRequest(), "/get") // 修改请求路径为/get
+// ```
 func ReplaceHTTPPacketPath(packet []byte, p string) []byte {
 	var isChunked bool
 	var buf bytes.Buffer
@@ -183,6 +198,13 @@ func ReplaceHTTPPacketPath(packet []byte, p string) []byte {
 	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
 }
 
+// AppendHTTPPacketPath 是一个辅助函数，用于改变请求报文，在现有请求路径后添加请求路径
+// Example:
+// ```
+// poc.AppendHTTPPacketPath(`GET /docs HTTP/1.1
+// Host: yaklang.com
+// `, "/api/poc")) // 向 example.com 发起请求，实际上请求路径改为/docs/api/poc
+// ```
 func AppendHTTPPacketPath(packet []byte, p string) []byte {
 	var isChunked bool
 	var buf bytes.Buffer
@@ -264,6 +286,11 @@ func handleHTTPPacketQueryParam(packet []byte, callback func(url.Values)) []byte
 	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
 }
 
+// ReplaceAllHTTPPacketQueryParams 是一个辅助函数，用于改变请求报文，修改所有GET请求参数，如果不存在则会增加，其接收一个map[string]string类型的参数，其中key为请求参数名，value为请求参数值
+// Example:
+// ```
+// poc.ReplaceAllHTTPPacketQueryParams(poc.BasicRequest(), {"a":"b", "c":"d"}) // 添加GET请求参数a，值为b，添加GET请求参数c，值为d
+// ```
 func ReplaceAllHTTPPacketQueryParams(packet []byte, values map[string]string) []byte {
 	return handleHTTPPacketQueryParam(packet, func(q url.Values) {
 		// clear all values
@@ -278,18 +305,38 @@ func ReplaceAllHTTPPacketQueryParams(packet []byte, values map[string]string) []
 	})
 }
 
+// ReplaceHTTPPacketQueryParam 是一个辅助函数，用于改变请求报文，修改GET请求参数，如果不存在则会增加
+// Example:
+// ```
+// _, raw, _ = poc.ParseUrlToHTTPRequestRaw("GET", "https://pie.dev/get")
+// poc.ReplaceHTTPPacketQueryParam(raw, "a", "b") // 添加GET请求参数a，值为b
+// ```
 func ReplaceHTTPPacketQueryParam(packet []byte, key, value string) []byte {
 	return handleHTTPPacketQueryParam(packet, func(q url.Values) {
 		q.Set(key, value)
 	})
 }
 
+// AppendHTTPPacketQueryParam 是一个辅助函数，用于改变请求报文，添加GET请求参数
+// Example:
+// ```
+// poc.AppendHTTPPacketQueryParam(poc.BasicRequest(), "a", "b") // 添加GET请求参数a，值为b
+// ```
 func AppendHTTPPacketQueryParam(packet []byte, key, value string) []byte {
 	return handleHTTPPacketQueryParam(packet, func(q url.Values) {
 		q.Add(key, value)
 	})
 }
 
+// DeleteHTTPPacketQueryParam 是一个辅助函数，用于改变请求报文，删除GET请求参数
+// Example:
+// ```
+// poc.DeleteHTTPPacketQueryParam(`GET /get?a=b&c=d HTTP/1.1
+// Content-Type: application/json
+// Host: pie.dev
+//
+// `, "a") // 删除GET请求参数a
+// ```
 func DeleteHTTPPacketQueryParam(packet []byte, key string) []byte {
 	return handleHTTPPacketQueryParam(packet, func(q url.Values) {
 		q.Del(key)
@@ -312,6 +359,12 @@ func handleHTTPPacketPostParam(packet []byte, callback func(url.Values)) []byte 
 	return ReplaceHTTPPacketBody([]byte(headersRaw), bodyRaw, isChunked)
 }
 
+// ReplaceAllHTTPPacketPostParams 是一个辅助函数，用于改变请求报文，修改所有POST请求参数，如果不存在则会增加，其接收一个map[string]string类型的参数，其中key为POST请求参数名，value为POST请求参数值
+// Example:
+// ```
+// _, raw, _ = poc.ParseUrlToHTTPRequestRaw("POST", "https://pie.dev/post")
+// poc.ReplaceAllHTTPPacketPostParams(raw, {"a":"b", "c":"d"}) // 添加POST请求参数a，值为b，POST请求参数c，值为d
+// ```
 func ReplaceAllHTTPPacketPostParams(packet []byte, values map[string]string) []byte {
 	return handleHTTPPacketPostParam(packet, func(q url.Values) {
 		// clear all values
@@ -325,24 +378,50 @@ func ReplaceAllHTTPPacketPostParams(packet []byte, values map[string]string) []b
 	})
 }
 
+// ReplaceHTTPPacketPostParam 是一个辅助函数，用于改变请求报文，修改POST请求参数，如果不存在则会增加
+// Example:
+// ```
+// _, raw, _ = poc.ParseUrlToHTTPRequestRaw("POST", "https://pie.dev/post")
+// poc.ReplaceHTTPPacketPostParam(raw, "a", "b") // 添加POST请求参数a，值为b
+// ```
 func ReplaceHTTPPacketPostParam(packet []byte, key, value string) []byte {
 	return handleHTTPPacketPostParam(packet, func(q url.Values) {
 		q.Set(key, value)
 	})
 }
 
+// AppendHTTPPacketPostParam 是一个辅助函数，用于改变请求报文，添加POST请求参数
+// Example:
+// ```
+// poc.AppendHTTPPacketPostParam(poc.BasicRequest(), "a", "b") // 向 pie.dev 发起请求，添加POST请求参数a，值为b
+// ```
 func AppendHTTPPacketPostParam(packet []byte, key, value string) []byte {
 	return handleHTTPPacketPostParam(packet, func(q url.Values) {
 		q.Add(key, value)
 	})
 }
 
+// DeleteHTTPPacketPostParam 是一个辅助函数，用于改变请求报文，删除POST请求参数
+// Example:
+// ```
+// poc.DeleteHTTPPacketPostParam(`POST /post HTTP/1.1
+// Content-Type: application/json
+// Content-Length: 7
+// Host: pie.dev
+//
+// a=b&c=d`, "a") // 删除POST请求参数a
+// ```
 func DeleteHTTPPacketPostParam(packet []byte, key string) []byte {
 	return handleHTTPPacketPostParam(packet, func(q url.Values) {
 		q.Del(key)
 	})
 }
 
+// ReplaceHTTPPacketHeader 是一个辅助函数，用于改变请求报文，修改修改请求头，如果不存在则会增加
+// Example:
+// ```
+// poc.ReplaceHTTPPacketHeader(poc.BasicRequest(),"AAA", "BBB") // 修改AAA请求头的值为BBB，这里没有AAA请求头，所以会增加该请求头
+// ```
 func ReplaceHTTPPacketHeader(packet []byte, headerKey string, headerValue any) []byte {
 	var firstLine string
 	var header []string
@@ -383,14 +462,31 @@ func ReplaceHTTPPacketHeader(packet []byte, headerKey string, headerValue any) [
 	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
 }
 
+// ReplaceHTTPPacketHost 是一个辅助函数，用于改变请求报文，修改Host请求头，如果不存在则会增加，实际上是ReplaceHTTPPacketHeader("Host", host)的简写
+// Example:
+// ```
+// _, raw, _ = poc.ParseUrlToHTTPRequestRaw("GET", "https://yaklang.com")
+// poc.ReplaceHTTPPacketHost(raw, "www.yaklang.com") // 修改Host请求头的值为 www.yaklang.com
+// ```
 func ReplaceHTTPPacketHost(packet []byte, host string) []byte {
 	return ReplaceHTTPPacketHeader(packet, "Host", host)
 }
 
+// ReplaceHTTPPacketBasicAuth 是一个辅助函数，用于改变请求报文，修改Authorization请求头为基础认证的密文，如果不存在则会增加，实际上是ReplaceHTTPPacketHeader("Authorization", codec.EncodeBase64(username + ":" + password))的简写
+// Example:
+// ```
+// _, raw, _ = poc.ParseUrlToHTTPRequestRaw("GET", "https://pie.dev/basic-auth/admin/password")
+// poc.ReplaceHTTPPacketBasicAuth(raw, "admin", "password") // 修改Authorization请求头
+// ```
 func ReplaceHTTPPacketBasicAuth(packet []byte, username, password string) []byte {
 	return ReplaceHTTPPacketHeader(packet, "Authorization", "Basic "+codec.EncodeBase64(username+":"+password))
 }
 
+// AppendHTTPPacketHeader 是一个辅助函数，用于改变请求报文，添加请求头
+// Example:
+// ```
+// poc.AppendHTTPPacketHeader(poc.BasicRequest(), "AAA", "BBB") // 添加AAA请求头的值为BBB
+// ```
 func AppendHTTPPacketHeader(packet []byte, headerKey string, headerValue any) []byte {
 	var firstLine string
 	var header []string
@@ -420,6 +516,16 @@ func AppendHTTPPacketHeader(packet []byte, headerKey string, headerValue any) []
 	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
 }
 
+// DeleteHTTPPacketHeader 是一个辅助函数，用于改变请求报文，删除请求头
+// Example:
+// ```
+// poc.DeleteHTTPPacketHeader(`GET /get HTTP/1.1
+// Content-Type: application/json
+// AAA: BBB
+// Host: pie.dev
+//
+// `, "AAA") // 删除AAA请求头
+// ```
 func DeleteHTTPPacketHeader(packet []byte, headerKey string) []byte {
 	var firstLine string
 	var header []string
@@ -452,6 +558,11 @@ func DeleteHTTPPacketHeader(packet []byte, headerKey string) []byte {
 	return ReplaceHTTPPacketBody(buf.Bytes(), body, false)
 }
 
+// ReplaceHTTPPacketCookie 是一个辅助函数，用于改变请求报文，修改Cookie请求头中的值，如果不存在则会增加
+// Example:
+// ```
+// poc.ReplaceHTTPPacketCookie(poc.BasicRequest(), p"aaa", "bbb") // 修改cookie值，由于这里没有aaa的cookie值，所以会增加
+// ```
 func ReplaceHTTPPacketCookie(packet []byte, key string, value any) []byte {
 	var isReq bool
 	var isRsp bool
@@ -497,11 +608,11 @@ func ReplaceHTTPPacketCookie(packet []byte, key string, value any) []byte {
 	return AppendHTTPPacketCookie(data, key, value)
 }
 
-// AppendHTTPPacketCookie append cookie to http packet
-// if packet is request, it will append to Cookie header
-// if packet is response, it will append to Set-Cookie header
-//
-//	packet = AppendHTTPPacketCookie(packet, "key", "value")
+// AppendHTTPPacketCookie 是一个辅助函数，用于改变请求报文，添加Cookie请求头中的值
+// Example:
+// ```
+// poc.AppendHTTPPacketCookie(poc.BasicRequest(), "aaa", "bbb") // 添加cookie键值对aaa:bbb
+// ```
 func AppendHTTPPacketCookie(packet []byte, key string, value any) []byte {
 	var isReq bool
 	var added bool
@@ -552,11 +663,16 @@ func AppendHTTPPacketCookie(packet []byte, key string, value any) []byte {
 	return ReplaceHTTPPacketBody([]byte(header), body, isChunked)
 }
 
-// DeleteHTTPPacketCookie delete cookie from http packet
-// if packet is request, it will delete from Cookie header
-// if packet is response, it will delete from Set-Cookie header
+// DeleteHTTPPacketCookie 是一个辅助函数，用于改变请求报文，删除Cookie中的值
+// Example:
+// ```
+// poc.DeleteHTTPPacketCookie(`GET /get HTTP/1.1
+// Content-Type: application/json
+// Cookie: aaa=bbb; ccc=ddd
+// Host: pie.dev
 //
-// packet = DeleteHTTPPacketCookie(packet, "key")
+// `, "aaa") // 删除Cookie中的aaa
+// ```
 func DeleteHTTPPacketCookie(packet []byte, key string) []byte {
 	var isReq bool
 	var isRsp bool
@@ -672,16 +788,19 @@ func handleHTTPRequestForm(packet []byte, fixMethod bool, fixContentType bool, c
 	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
 }
 
-// AppendHTTPPacketFormEncoded replace form data in http packet
-// enable for request, it will replace form data in body
+// AppendHTTPPacketFormEncoded 是一个辅助函数，用于改变请求报文，添加请求体中的表单
+// Example:
+// ```
+// poc.AppendHTTPPacketFormEncoded(`POST /post HTTP/1.1
+// Host: pie.dev
+// Content-Type: multipart/form-data; boundary=------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm
+// Content-Length: 203
 //
-//	 packet = AppendHTTPPacketFormEncoded(packet, "key", "value")
+// --------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm
+// Content-Disposition: form-data; name="aaa"
 //
-//		--BOUNDARY---
-//		Content-Disposition: form-data; name="key"
-//
-//		value
-//		...
+// bbb
+// --------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm--`, "ccc", "ddd") // 添加POST请求表单，其中ccc为键，ddd为值
 func AppendHTTPPacketFormEncoded(packet []byte, key, value string) []byte {
 	return handleHTTPRequestForm(packet, true, true, func(_ string, multipartReader *multipart.Reader, multipartWriter *multipart.Writer) bool {
 		if multipartReader != nil {
@@ -710,10 +829,12 @@ func AppendHTTPPacketFormEncoded(packet []byte, key, value string) []byte {
 	})
 }
 
-// AppendHTTPPacketUploadFile replace form file in http packet
-// enable for request, it will replace form file in body
-// if fileContent is string, it will be treated as file path
-// variadic is content-type, if not set, it will be detected auto.
+// AppendHTTPPacketUploadFile 是一个辅助函数，用于改变请求报文，添加请求体中的上传的文件，其中第一个参数为原始请求报文，第二个参数为表单名，第三个参数为文件名，第四个参数为文件内容，第五个参数是可选参数，为文件类型(Content-Type)
+// Example:
+// ```
+// _, raw, _ = poc.ParseUrlToHTTPRequestRaw("POST", "https://pie.dev/post")
+// poc.AppendHTTPPacketUploadFile(raw, "file", "phpinfo.php", "<?php phpinfo(); ?>", "image/jpeg")) // 添加POST请求表单，其文件名为phpinfo.php，内容为<?php phpinfo(); ?>，文件类型为image/jpeg
+// ```
 func AppendHTTPPacketUploadFile(packet []byte, fieldName, fileName string, fileContent interface{}, contentType ...string) []byte {
 	hasContentType := len(contentType) > 0
 
@@ -777,6 +898,24 @@ func AppendHTTPPacketUploadFile(packet []byte, fieldName, fileName string, fileC
 	})
 }
 
+// DeleteHTTPPacketForm 是一个辅助函数，用于改变请求报文，删除POST请求表单
+// Example:
+// ```
+// poc.DeleteHTTPPacketForm(`POST /post HTTP/1.1
+// Host: pie.dev
+// Content-Type: multipart/form-data; boundary=------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm
+// Content-Length: 308
+//
+// --------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm
+// Content-Disposition: form-data; name="aaa"
+//
+// bbb
+// --------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm
+// Content-Disposition: form-data; name="ccc"
+//
+// ddd
+// --------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm--`, "aaa") // 删除POST请求表单aaa
+// ```
 func DeleteHTTPPacketForm(packet []byte, key string) []byte {
 	return handleHTTPRequestForm(packet, false, false, func(method string, multipartReader *multipart.Reader, multipartWriter *multipart.Writer) bool {
 		if strings.ToUpper(method) != "POST" {
@@ -812,6 +951,16 @@ func DeleteHTTPPacketForm(packet []byte, key string) []byte {
 	})
 }
 
+// GetHTTPPacketCookieValues 是一个辅助函数，用于获取请求报文中Cookie值，其返回值为[]string，这是因为Cookie可能存在多个相同键名的值
+// Example:
+// ```
+// poc.GetHTTPPacketCookieValues(`GET /get HTTP/1.1
+// Content-Type: application/json
+// Cookie: a=b; a=c
+// Host: pie.dev
+//
+// `, "a") // 获取键名为a的Cookie值，这里会返回["b", "c"]
+// ```
 func GetHTTPPacketCookieValues(packet []byte, key string) []string {
 	var val []string
 	SplitHTTPPacket(packet, nil, nil, func(line string) string {
@@ -838,6 +987,16 @@ func GetHTTPPacketCookieValues(packet []byte, key string) []string {
 	return val
 }
 
+// GetHTTPPacketCookieFirst 是一个辅助函数，用于获取请求报文中Cookie值，其返回值为string
+// Example:
+// ```
+// poc.GetHTTPPacketCookieFirst(`GET /get HTTP/1.1
+// Content-Type: application/json
+// Cookie: a=b; c=d
+// Host: pie.dev
+//
+// `, "a") // 获取键名为a的Cookie值，这里会返回"b"
+// ```
 func GetHTTPPacketCookieFirst(packet []byte, key string) string {
 	ret := GetHTTPPacketCookieValues(packet, key)
 	if len(ret) > 0 {
@@ -846,10 +1005,30 @@ func GetHTTPPacketCookieFirst(packet []byte, key string) string {
 	return ""
 }
 
+// GetHTTPPacketCookie 是一个辅助函数，用于获取请求报文中Cookie值，其返回值为string
+// Example:
+// ```
+// poc.GetHTTPPacketCookie(`GET /get HTTP/1.1
+// Content-Type: application/json
+// Cookie: a=b; c=d
+// Host: pie.dev
+//
+// `, "a") // 获取键名为a的Cookie值，这里会返回"b"
+// ```
 func GetHTTPPacketCookie(packet []byte, key string) string {
 	return GetHTTPPacketCookieFirst(packet, key)
 }
 
+// GetHTTPPacketContentType 是一个辅助函数，用于获取请求报文中的Content-Type请求头，其返回值为string
+// Example:
+// ```
+// poc.GetHTTPPacketContentType(`POST /post HTTP/1.1
+// Content-Type: application/json
+// COntent-Length: 7
+// Host: pie.dev
+//
+// a=b&c=d`) // 获取Content-Type请求头
+// ```
 func GetHTTPPacketContentType(packet []byte) string {
 	var val string
 	var fetched = false
@@ -866,6 +1045,16 @@ func GetHTTPPacketContentType(packet []byte) string {
 	return val
 }
 
+// GetHTTPPacketCookies 是一个辅助函数，用于获取请求报文中所有Cookie值，其返回值为map[string]string
+// Example:
+// ```
+// poc.GetHTTPPacketCookies(`GET /get HTTP/1.1
+// Content-Type: application/json
+// Cookie: a=b; c=d
+// Host: pie.dev
+//
+// `) // 获取所有Cookie值，这里会返回{"a":"b", "c":"d"}
+// ```
 func GetHTTPPacketCookies(packet []byte) map[string]string {
 	var val = make(map[string]string)
 	SplitHTTPPacket(packet, nil, nil, func(line string) string {
@@ -888,6 +1077,16 @@ func GetHTTPPacketCookies(packet []byte) map[string]string {
 	return val
 }
 
+// GetHTTPPacketCookiesFull 是一个辅助函数，用于获取请求报文中所有Cookie值，其返回值为map[string][]string，这是因为Cookie可能存在多个相同键名的值
+// Example:
+// ```
+// poc.GetHTTPPacketCookiesFull(`GET /get HTTP/1.1
+// Content-Type: application/json
+// Cookie: a=b; a=c; c=d
+// Host: pie.dev
+//
+// `) // 获取所有Cookie值，这里会返回{"a":["b", "c"], "c":["d"]}
+// ```
 func GetHTTPPacketCookiesFull(packet []byte) map[string][]string {
 	var val = make(map[string][]string)
 	SplitHTTPPacket(packet, nil, nil, func(line string) string {
@@ -915,6 +1114,16 @@ func GetHTTPPacketCookiesFull(packet []byte) map[string][]string {
 	return val
 }
 
+// GetHTTPPacketHeaders 是一个辅助函数，用于获取请求报文中所有请求头，其返回值为map[string]string
+// Example:
+// ```
+// poc.GetHTTPPacketCookiesFull(`GET /get HTTP/1.1
+// Content-Type: application/json
+// Cookie: a=b; a=c; c=d
+// Host: pie.dev
+//
+// `) // 获取所有请求头，这里会返回{"Content-Type": "application/json", "Cookie": "a=b; a=c; c=d", "Host": "pie.dev"}
+// ```
 func GetHTTPPacketHeaders(packet []byte) map[string]string {
 	var val = make(map[string]string)
 	SplitHTTPPacket(packet, nil, nil, func(line string) string {
@@ -926,6 +1135,17 @@ func GetHTTPPacketHeaders(packet []byte) map[string]string {
 	return val
 }
 
+// GetHTTPPacketHeadersFull 是一个辅助函数，用于获取请求报文中所有请求头，其返回值为map[string][]string，这是因为请求头可能存在多个相同键名的值
+// Example:
+// ```
+// poc.GetHTTPPacketHeadersFull(`GET /get HTTP/1.1
+// Content-Type: application/json
+// Cookie: a=b; a=c; c=d
+// Cookie: e=f
+// Host: pie.dev
+//
+// `) // 获取所有请求头，这里会返回{"Content-Type": ["application/json"], "Cookie": []"a=b; a=c; c=d", "e=f"], "Host": ["pie.dev"]}
+// ```
 func GetHTTPPacketHeadersFull(packet []byte) map[string][]string {
 	var val = make(map[string][]string)
 	SplitHTTPPacket(packet, nil, nil, func(line string) string {
@@ -940,6 +1160,16 @@ func GetHTTPPacketHeadersFull(packet []byte) map[string][]string {
 	return val
 }
 
+// GetHTTPPacketHeaders 是一个辅助函数，用于获取请求报文中指定的请求头，其返回值为string
+// Example:
+// ```
+// poc.GetHTTPPacketCookiesFull(`GET /get HTTP/1.1
+// Content-Type: application/json
+// Cookie: a=b; a=c; c=d
+// Host: pie.dev
+//
+// `) // 获取Content-Type请求头，这里会返回"application/json"
+// ```
 func GetHTTPPacketHeader(packet []byte, key string) string {
 	raw, ok := GetHTTPPacketHeaders(packet)[key]
 	if !ok {
@@ -948,6 +1178,15 @@ func GetHTTPPacketHeader(packet []byte, key string) string {
 	return raw
 }
 
+// GetHTTPPacketQueryParam 是一个辅助函数，用于获取请求报文中指定的GET请求参数，其返回值为string
+// Example:
+// ```
+// poc.GetHTTPPacketQueryParam(`GET /get?a=b&c=d HTTP/1.1
+// Content-Type: application/json
+// Host: pie.dev
+//
+// `, "a") // 获取GET请求参数a的值
+// ```
 func GetHTTPRequestQueryParam(packet []byte, key string) string {
 	vals := GetHTTPRequestQueryParamFull(packet, key)
 	if len(vals) > 0 {
@@ -956,11 +1195,31 @@ func GetHTTPRequestQueryParam(packet []byte, key string) string {
 	return ""
 }
 
+// GetHTTPPacketBody 是一个辅助函数，用于获取请求报文中的请求体，其返回值为bytes
+// Example:
+// ```
+// poc.GetHTTPPacketBody(`POST /post HTTP/1.1
+// Content-Type: application/json
+// COntent-Length: 7
+// Host: pie.dev
+//
+// a=b&c=d`) // 获取请求头，这里为b"a=b&c=d"
+// ```
 func GetHTTPPacketBody(packet []byte) []byte {
 	_, body := SplitHTTPHeadersAndBodyFromPacket(packet)
 	return body
 }
 
+// GetHTTPPacketPostParam 是一个辅助函数，用于获取请求报文中指定的POST请求参数，其返回值为string
+// Example:
+// ```
+// poc.GetHTTPPacketPostParam(`POST /post HTTP/1.1
+// Content-Type: application/json
+// COntent-Length: 7
+// Host: pie.dev
+//
+// a=b&c=d`, "a") // 获取POST请求参数a的值
+// ```
 func GetHTTPRequestPostParam(packet []byte, key string) string {
 	vals := GetHTTPRequestPostParamFull(packet, key)
 	if len(vals) > 0 {
@@ -1003,6 +1262,16 @@ func GetHTTPRequestQueryParamFull(packet []byte, key string) []string {
 	return []string{}
 }
 
+// GetAllHTTPPacketPostParams 是一个辅助函数，用于获取请求报文中的所有POST请求参数，其返回值为map[string]string，其中键为参数名，值为参数值
+// Example:
+// ```
+// poc.GetAllHTTPPacketPostParams(`POST /post HTTP/1.1
+// Content-Type: application/json
+// COntent-Length: 7
+// Host: pie.dev
+//
+// a=b&c=d`) // 获取所有POST请求参数
+// ```
 func GetAllHTTPRequestPostParams(packet []byte) map[string]string {
 	body := GetHTTPPacketBody(packet)
 	vals, err := url.ParseQuery(string(body))
@@ -1016,6 +1285,15 @@ func GetAllHTTPRequestPostParams(packet []byte) map[string]string {
 	return ret
 }
 
+// GetAllHTTPPacketQueryParams 是一个辅助函数，用于获取请求报文中的所有GET请求参数，其返回值为map[string]string，其中键为参数名，值为参数值
+// Example:
+// ```
+// poc.GetAllHTTPPacketQueryParams(`GET /get?a=b&c=d HTTP/1.1
+// Content-Type: application/json
+// Host: pie.dev
+//
+// `) // 获取所有GET请求参数
+// ```
 func GetAllHTTPRequestQueryParams(packet []byte) map[string]string {
 	u, err := ExtractURLFromHTTPRequestRaw(packet, false)
 	if err != nil {
@@ -1029,6 +1307,14 @@ func GetAllHTTPRequestQueryParams(packet []byte) map[string]string {
 	return ret
 }
 
+// GetStatusCodeFromResponse 是一个辅助函数，用于获取响应报文中的状态码，其返回值为int
+// Example:
+// ```
+// poc.GetStatusCodeFromResponse(`HTTP/1.1 200 OK
+// Content-Length: 5
+//
+// hello`) // 获取响应报文中的状态码，这里会返回200
+// ```
 func GetStatusCodeFromResponse(packet []byte) int {
 	var statusCode int
 	SplitHTTPPacket(packet, nil, func(proto string, code int, codeMsg string) error {
@@ -1038,6 +1324,18 @@ func GetStatusCodeFromResponse(packet []byte) int {
 	return statusCode
 }
 
+// GetHTTPPacketFirstLine 是一个辅助函数，用于获取 HTTP 报文中第一行的值，其返回值为string，string，string
+// 在请求报文中，其三个返回值分别为：请求方法，请求URI，协议版本
+// 在响应报文中，其三个返回值分别为：协议版本，状态码，状态码描述
+// Example:
+// ```
+// poc.GetHTTPPacketFirstLine(`GET /get HTTP/1.1
+// Content-Type: application/json
+// Cookie: a=b; a=c; c=d
+// Host: pie.dev
+//
+// `) // 获取请求方法，请求URI，协议版本，这里会返回"GET", "/get", "HTTP/1.1"
+// ```
 func GetHTTPPacketFirstLine(packet []byte) (string, string, string) {
 	packet = TrimLeftHTTPPacket(packet)
 	reader := bufio.NewReader(bytes.NewBuffer(packet))
@@ -1061,6 +1359,11 @@ func GetHTTPPacketFirstLine(packet []byte) (string, string, string) {
 	}
 }
 
+// ReplaceHTTPPacketBody 是一个辅助函数，用于改变请求报文，修改请求体内容，第一个参数为修改后的请求体内容，第二个参数为是否分块传输
+// Example:
+// ```
+// poc.ReplaceHTTPPacketBody(poc.BasicRequest(), "a=b") // 修改请求体内容为a=b
+// ```
 func ReplaceHTTPPacketBodyFast(packet []byte, body []byte) []byte {
 	var isChunked bool
 	SplitHTTPHeadersAndBodyFromPacket(packet, func(line string) {
