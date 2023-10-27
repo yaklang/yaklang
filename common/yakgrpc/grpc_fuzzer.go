@@ -389,10 +389,10 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					SubMatchers:         httpTplMatcher,
 				}
 
+				_, _, getMirrorHTTPFlowParams := yak.MutateHookCaller(req.GetHotPatchCode())
 				var extractorResults []*ypb.KVPair
 				for resp := range yakit.YieldWebFuzzerResponseByTaskIDs(s.GetProjectDatabase(), stream.Context(), oldIDs, true) {
 					respModel, _ := resp.ToGRPCModel()
-					_, _, getMirrorHTTPFlowParams := yak.MutateHookCaller(req.GetHotPatchCode())
 
 					if haveHTTPTplExtractor { // 提取器提取参数
 						var params = make(map[string]any)
@@ -664,7 +664,6 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_DNSServers(req.GetDNSServers()),
 			mutate.WithPoolOpt_EtcHosts(req.GetEtcHosts()),
 			mutate.WithPoolOpt_NoSystemProxy(req.GetNoSystemProxy()),
-			mutate.WithPoolOpt_FuzzParams(mergedParams),
 			mutate.WithPoolOpt_RequestCountLimiter(requestCount))
 
 		if isRetry {
