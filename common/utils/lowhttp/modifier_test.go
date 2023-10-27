@@ -1039,6 +1039,12 @@ Host: www.baidu.com
 }
 
 func TestReplaceAllHttpPacketQueryParams(t *testing.T) {
+	for i := 0; i < 100; i++ {
+		_testReplaceAllHttpPacketQueryParams(t)
+	}
+}
+
+func _testReplaceAllHttpPacketQueryParams(t *testing.T) {
 	testcases := []struct {
 		origin   string
 		values   map[string]string
@@ -1067,6 +1073,7 @@ Host: www.baidu.com
 		actual := ReplaceAllHTTPPacketQueryParams([]byte(testcase.origin), testcase.values)
 		expected := FixHTTPPacketCRLF([]byte(testcase.expected), false)
 		if bytes.Compare(actual, expected) != 0 {
+			spew.Dump(actual, expected)
 			t.Fatalf("ReplaceAllHTTPPacketQueryParams failed: %s", string(actual))
 		}
 	}
