@@ -2,21 +2,22 @@ package js2ssa
 
 import (
 	"fmt"
+	"runtime/debug"
 
 	"github.com/antlr4-go/antlr/v4"
 	JS "github.com/yaklang/yaklang/common/yak/antlr4JS/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
-
 )
+
 type astbuilder struct {
 	*ssa.FunctionBuilder
 }
 
 type builder struct {
-	ast *JS.JavaScriptParser
+	ast  *JS.JavaScriptParser
 	prog *ssa.Program
-	c *config
+	c    *config
 }
 
 func (b *builder) Build() {
@@ -26,7 +27,6 @@ func (b *builder) Build() {
 	funcbuilder := ssa.NewBuilder(main, nil)
 	funcbuilder.WithExternValue(b.c.externValue)
 	funcbuilder.WithExternLib(b.c.externLib)
-
 
 	astbuilder := astbuilder{
 		FunctionBuilder: funcbuilder,
@@ -39,8 +39,8 @@ func (b *builder) Build() {
 var _ (ssa.Builder) = (*builder)(nil)
 
 type config struct {
-	analyzeOpt 	[]ssa4analyze.Option
-	typeMethod 	map[string]any
+	analyzeOpt []ssa4analyze.Option
+	typeMethod map[string]any
 
 	externValue map[string]any
 	externLib   map[string]map[string]any
@@ -48,14 +48,14 @@ type config struct {
 
 func defaultConfig() *config {
 	return &config{
-		analyzeOpt: make([]ssa4analyze.Option, 0),
-		typeMethod: nil,
+		analyzeOpt:  make([]ssa4analyze.Option, 0),
+		typeMethod:  nil,
 		externValue: nil,
 		externLib:   make(map[string]map[string]any),
 	}
 }
 
-type Option func (*config)
+type Option func(*config)
 
 func WithAnalyzeOpt(opt ...ssa4analyze.Option) Option {
 	return func(c *config) {
@@ -85,12 +85,13 @@ func ParseSSA(src string, opt ...Option) (prog *ssa.Program) {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered in parseSSA", r)
+			debug.PrintStack()
 			prog = nil
 		}
 	}()
-	
+
 	c := defaultConfig()
-	for _, f:= range opt {
+	for _, f := range opt {
 		f(c)
 	}
 
@@ -100,9 +101,9 @@ func ParseSSA(src string, opt ...Option) (prog *ssa.Program) {
 	ast := JS.NewJavaScriptParser(tokenStream)
 	prog = ssa.NewProgram()
 	builder := &builder{
-		ast: ast,
+		ast:  ast,
 		prog: prog,
-		c: c,
+		c:    c,
 	}
 	prog.Build(builder)
 	ssa4analyze.NewAnalyzerGroup(

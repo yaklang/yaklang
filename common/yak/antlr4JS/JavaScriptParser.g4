@@ -217,7 +217,7 @@ withStatement
     ;
 
 switchStatement
-    : Switch '(' expressionSequence ')' caseBlock
+    : Switch '(' singleExpression ')' caseBlock
     ;
 
 caseBlock
@@ -229,7 +229,7 @@ caseClauses
     ;
 
 caseClause
-    : Case expressionSequence ':' statementList?
+    : Case singleExpression ':' statementList?
     ;
 
 defaultClause

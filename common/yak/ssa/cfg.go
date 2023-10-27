@@ -22,6 +22,11 @@ const (
 	TryCatch   = "error.catch"
 	TryFinally = "error.final"
 	TryDone    = ""
+
+	// switch
+	SwitchDone    = "switch.done"
+	SwitchDefault = "switch.default"
+	SwitchHandler = "switch.handler"
 )
 
 func (b *BasicBlock) IsBlock(name string) bool {
@@ -302,7 +307,7 @@ type TryBuilder struct {
 	b *FunctionBuilder
 
 	// block
-	enter 		 *BasicBlock
+	enter        *BasicBlock
 	buildTry     func()
 	buildCatch   func() string
 	buildFinally func()
@@ -381,4 +386,120 @@ func (t *TryBuilder) Finish() {
 	}
 
 	t.b.CurrentBlock = done
+}
+
+type SwitchBuilder struct {
+	// b
+	b *FunctionBuilder
+
+	// block
+	enter          *BasicBlock
+	buildCondition func() Value
+	buildHanlder   func() (int, []Value)
+	buildBody      func(int)
+	buildDefault   func()
+
+	// case
+	caseNum int
+
+	DefaultBreak bool
+}
+
+func (b *FunctionBuilder) BuildSwitch() *SwitchBuilder {
+	enter := b.CurrentBlock
+
+	return &SwitchBuilder{
+		b:     b,
+		enter: enter,
+	}
+}
+
+func (t *SwitchBuilder) BuildCondition(f func() Value) {
+	t.buildCondition = f
+}
+
+func (t *SwitchBuilder) BuildHanlder(f func() (int, []Value)) {
+	t.buildHanlder = f
+}
+
+func (t *SwitchBuilder) BuildBody(f func(int)) {
+	t.buildBody = f
+}
+
+func (t *SwitchBuilder) BuildDefault(f func()) {
+	t.buildDefault = f
+}
+
+func (t *SwitchBuilder) Finsh() {
+	var cond Value
+	if t.buildCondition != nil {
+		cond = t.buildCondition()
+	}
+
+	done := t.b.NewBasicBlock(SwitchDone)
+	defaultb := t.b.NewBasicBlock(SwitchDefault)
+	t.enter.AddSucc(defaultb)
+
+	// build handler and body
+	var exprs []Value
+	t.caseNum, exprs = t.buildHanlder()
+
+	handlers := make([]*BasicBlock, 0, t.caseNum)
+	slabel := make([]SwitchLabel, 0)
+	for i := 0; i < t.caseNum; i++ {
+		// build handler
+		handler := t.b.NewBasicBlock(SwitchHandler)
+		t.enter.AddSucc(handler)
+		handlers = append(handlers, handler)
+		slabel = append(slabel, NewSwitchLabel(exprs[i], handler))
+	}
+
+	NextBlock := func(i int) *BasicBlock {
+		if t.DefaultBreak {
+			return done
+		} else {
+			if i == t.caseNum-1 {
+				return defaultb
+			} else {
+				return handlers[i+1]
+			}
+		}
+	}
+
+	for i := 0; i < t.caseNum; i++ {
+		// build body
+		var _fallthrough *BasicBlock
+		if i == t.caseNum-1 {
+			_fallthrough = defaultb
+		} else {
+			_fallthrough = handlers[i+1]
+		}
+		t.b.PushTarget(done, nil, _fallthrough) // fallthrough just jump to next handler
+		// build handlers block
+		t.b.CurrentBlock = handlers[i]
+		t.buildBody(i)
+		// jump handlers-block -> done
+		t.b.EmitJump(NextBlock(i))
+		t.b.PopTarget()
+
+	}
+
+	// build default
+	if t.buildDefault != nil {
+		// can't fallthrough
+		t.b.PushTarget(done, nil, nil)
+		// build default block
+		t.b.CurrentBlock = defaultb
+		t.buildDefault()
+		// jump default -> done
+		t.b.EmitJump(done)
+		t.b.PopTarget()
+	}
+
+	t.b.CurrentBlock = t.enter
+	t.b.EmitSwitch(cond, defaultb, slabel)
+	rest := t.b.NewBasicBlock("")
+	t.b.CurrentBlock = done
+	t.b.EmitJump(rest)
+	t.b.CurrentBlock = rest
 }
