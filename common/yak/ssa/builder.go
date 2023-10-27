@@ -2,7 +2,6 @@ package ssa
 
 import (
 	"fmt"
-	"strings"
 )
 
 type Builder interface {
@@ -23,6 +22,7 @@ type FunctionBuilder struct {
 	subFuncBuild []func()
 
 	target *target // for break and continue
+	labels map[string]*BasicBlock
 	// defer function call
 	deferExpr []*Call // defer function, reverse  for-range
 	// unsealed block
@@ -48,6 +48,7 @@ func NewBuilder(f *Function, parent *FunctionBuilder) *FunctionBuilder {
 	b := &FunctionBuilder{
 		Function:     f,
 		target:       &target{},
+		labels:       make(map[string]*BasicBlock),
 		subFuncBuild: make([]func(), 0),
 		deferExpr:    make([]*Call, 0),
 		CurrentBlock: nil,
@@ -176,18 +177,23 @@ func (b *FunctionBuilder) PopTarget() bool {
 	}
 }
 
-// get target field
-func (b *FunctionBuilder) GetBreakByName(name string) *BasicBlock {
-	for target := b.target; target != nil; target = target.tail {
-		if _break := target._break; _break != nil {
-			blockName := strings.Split(_break.GetVariable(), "-")[0]
-			if blockName == name {
-				return _break
-			}
-		}
-	}
-	return nil
+// for goto and label
+func (b *FunctionBuilder) AddLabel(name string, block *BasicBlock) {
+	b.labels[name] = block
 }
+
+func (b *FunctionBuilder) GetLabel(name string) *BasicBlock {
+	if b, ok := b.labels[name]; ok {
+		return b
+	} else {
+		return nil
+	}
+}
+
+func (b *FunctionBuilder) DeleteLabel(name string) {
+	delete(b.labels, name)
+}
+
 func (b *FunctionBuilder) GetBreak() *BasicBlock {
 	for target := b.target; target != nil; target = target.tail {
 		if target._break != nil {

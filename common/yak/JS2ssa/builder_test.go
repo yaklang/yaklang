@@ -38,6 +38,12 @@ func TestBreak(t *testing.T) {
 		print(a)
 		a = 1 
 		print(a)
+		if 1 {
+			a = 3 
+			print(a)
+			break label
+		}
+		print(a)
 	}
 
 	// print(a)
@@ -47,7 +53,7 @@ func TestBreak(t *testing.T) {
 	if 1 {
 		a = 3 
 		print(a)
-		break label
+		break label // error
 	}
 	print(a)
 
@@ -55,16 +61,17 @@ func TestBreak(t *testing.T) {
 		a = 2 
 		print(a)
 		if (i == 2) {
-			break label
+			break label // error 
 		}else {
 			if (i == 4){
 				a = 4 
-				break label
+				break label // error
 			}
 		}
 	}
 	`)
 	prog.Show()
+	fmt.Println(prog.GetErrors().String())
 }
 
 func TestSwitch(t *testing.T) {

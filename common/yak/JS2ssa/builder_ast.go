@@ -1427,7 +1427,7 @@ func (b *astbuilder) buildBreakStatement(stmt *JS.BreakStatementContext) {
 	if s, ok := stmt.Identifier().(*JS.IdentifierContext); ok {
 		// TODO: break数据流冲突
 		text := s.GetText()
-		if _break = b.GetBreakByName(text); _break != nil {
+		if _break = b.GetLabel(text); _break != nil {
 			b.EmitJump(_break)
 		} else {
 			b.NewError(ssa.Error, TAG, UnexpectedBreakStmt())
@@ -1457,17 +1457,18 @@ func (b *astbuilder) buildLabelledStatement(stmt *JS.LabelledStatementContext) {
 	// unsealed block
 	block := b.NewBasicBlockUnSealed(text)
 	b.AddUnsealedBlock(block)
-	b.PushTarget(block, nil, nil)
+	b.AddLabel(text, block)
 	// to block
 	b.EmitJump(block)
 	b.CurrentBlock = block
 	if s, ok := stmt.Statement().(*JS.StatementContext); ok {
 		b.buildStatement(s)
 	}
-	// to done
-	done := b.NewBasicBlock("done")
-	b.EmitJump(done)
-	b.CurrentBlock = done
+	b.DeleteLabel(text)
+	// // to done
+	// done := b.NewBasicBlock("done")
+	// b.EmitJump(done)
+	// b.CurrentBlock = done
 
 }
 
