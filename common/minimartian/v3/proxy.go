@@ -1088,6 +1088,7 @@ func (p *Proxy) roundTripBase(req *http.Request) (*http.Response, error) {
 	opts := append(p.lowhttpConfig,
 		lowhttp.WithRequest(reqBytes),
 		lowhttp.WithHttps(isHttps),
+		lowhttp.WithGmTLS(p.gmTLS),
 		lowhttp.WithConnPool(true),
 		lowhttp.WithSaveHTTPFlow(false),
 	)
