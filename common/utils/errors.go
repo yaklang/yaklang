@@ -40,8 +40,8 @@ func JoinErrors(errs ...error) error {
 	}
 
 	msg := ""
+	var st *stack = nil
 	newErrs := make([]error, 0, len(errs))
-	st := callers()
 
 	lenOfErrors := len(errs)
 	for i, err := range errs {
@@ -51,10 +51,20 @@ func JoinErrors(errs ...error) error {
 		}
 		if yakError, ok := err.(YakError); ok {
 			newErrs = append(newErrs, yakError.originalErrors...)
-			st = appendCallers(st)
+			if st == nil {
+				st = yakError.stack
+				st.appendCurrentFrame()
+			} else {
+				st.appendEmptyFrame()
+				st.appendStack(yakError.stack)
+			}
 		} else {
 			newErrs = append(newErrs, err)
 		}
+	}
+
+	if st == nil {
+		st = callers()
 	}
 
 	return YakError{
@@ -73,7 +83,7 @@ func Wrap(err error, msg string) error {
 	}
 	if yakErr, ok := err.(YakError); ok {
 		yakErr.msg = fmt.Sprintf("%s%s", msg, yakErr.Error())
-		yakErr.stack = appendCallers(yakErr.stack)
+		yakErr.stack.appendCurrentFrame()
 		yakErr.originalErrors = append(yakErr.originalErrors, err)
 		return yakErr
 	}
@@ -92,7 +102,7 @@ func Wrapf(err error, format string, args ...interface{}) error {
 
 	if yakErr, ok := err.(YakError); ok {
 		yakErr.msg = fmt.Sprintf("%s%s", msg, yakErr.Error())
-		yakErr.stack = appendCallers(yakErr.stack)
+		yakErr.stack.appendCurrentFrame()
 		yakErr.originalErrors = append(yakErr.originalErrors, err)
 		return yakErr
 	}
