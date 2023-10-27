@@ -106,6 +106,11 @@ func (b *astbuilder) buildStatement(stmt *JS.StatementContext) {
 		b.buildTryStatement(s)
 	}
 
+	// switch
+	if s, ok := stmt.SwitchStatement().(*JS.SwitchStatementContext); ok {
+		b.buildSwitchStatement(s)
+	}
+
 }
 
 func (b *astbuilder) buildVariableStatement(stmt *JS.VariableStatementContext) {
@@ -158,7 +163,6 @@ func (b *astbuilder) buildVariableDeclaration(stmt JS.IVariableDeclarationContex
 	a := stmt.Assign()
 	varText := stmt.Assignable().GetText()
 
-
 	if a == nil {
 		if Type == "c" {
 			v := b.GetFromCmap(varText)
@@ -181,7 +185,7 @@ func (b *astbuilder) buildVariableDeclaration(stmt JS.IVariableDeclarationContex
 		// 返回一个any
 		return ssa.NewAny(), nil
 	} else {
-		assignValue := func () (ssa.Value, ssa.LeftValue){
+		assignValue := func() (ssa.Value, ssa.LeftValue) {
 			var lValue ssa.LeftValue
 
 			// 得到一个左值
@@ -195,8 +199,7 @@ func (b *astbuilder) buildVariableDeclaration(stmt JS.IVariableDeclarationContex
 
 			lValue.Assign(result, b.FunctionBuilder)
 			return lValue.GetValue(b.FunctionBuilder), lValue
-		} 
-
+		}
 
 		if Type == "c" {
 			v := b.GetFromCmap(varText)
@@ -787,7 +790,7 @@ func (b *astbuilder) buildMemberIndexExpression(stmt *JS.MemberIndexExpressionCo
 		if s := stmt.SingleExpression(0); s != nil {
 			expr, _ = b.buildSingleExpression(s, false)
 		}
-	
+
 		var value ssa.Value
 		if s := stmt.SingleExpression(1); s != nil {
 			value, _ = b.buildSingleExpression(s, false)
@@ -803,7 +806,7 @@ func (b *astbuilder) buildAssignmentExpression(stmt *JS.AssignmentExpressionCont
 	_, op1 := b.buildSingleExpression(stmt.SingleExpression(0), true)
 	op2, _ := b.buildSingleExpression(stmt.SingleExpression(1), false)
 
-	if (op1 != nil && op2 != nil) {
+	if op1 != nil && op2 != nil {
 		text := stmt.SingleExpression(0).GetText()
 		// lValue := ssa.NewIdentifierLV(text, b.CurrentPos)
 		op1.Assign(op2, b.FunctionBuilder)
@@ -878,26 +881,26 @@ func (b *astbuilder) buildObjectLiteral(stmt *JS.ObjectLiteralContext) ssa.Value
 			if s, ok := pro.PropertyName().(*JS.PropertyNameContext); ok {
 				funcName = s.GetText()
 			}
-			
+
 			newFunc, symbol := b.NewFunc(funcName)
 			current := b.CurrentBlock
 
 			buildFunc := func() {
 				b.FunctionBuilder = b.PushFunction(newFunc, symbol, current)
-		
+
 				if s, ok := pro.FormalParameterList().(*JS.FormalParameterListContext); ok {
 					b.buildFormalParameterList(s)
 				}
-		
+
 				if f, ok := pro.FunctionBody().(*JS.FunctionBodyContext); ok {
 					b.buildFunctionBody(f)
 				}
-		
+
 				b.Finish()
 				b.FunctionBuilder = b.PopFunction()
-		
+
 			}
-		
+
 			b.AddSubFunction(buildFunc)
 
 			if funcName != "" {
@@ -937,14 +940,14 @@ func (b *astbuilder) buildPropertyName(stmt *JS.PropertyNameContext) ssa.Value {
 		return b.buildIdentifierName(s)
 	} else if s := stmt.StringLiteral(); s != nil {
 		return b.buildStringLiteral(s)
-	} else if s, ok  := stmt.NumericLiteral().(*JS.NumericLiteralContext); ok {
+	} else if s, ok := stmt.NumericLiteral().(*JS.NumericLiteralContext); ok {
 		return b.buildNumericLiteral(s)
 	} else if s := stmt.SingleExpression(); s != nil {
 		rv, _ := b.buildSingleExpression(s, false)
 		return rv
 	} else {
 		b.NewError(ssa.Error, TAG, "Not support the propertyName")
-	} 
+	}
 
 	return nil
 }
@@ -954,13 +957,13 @@ func (b *astbuilder) buildIdentifierName(stmt *JS.IdentifierNameContext) ssa.Val
 		text := s.GetText()
 		_, lv := b.buildIdentifierExpression(text, true)
 		return lv.GetValue(b.FunctionBuilder)
-	} else if s := stmt.ReservedWord(); s != nil{
+	} else if s := stmt.ReservedWord(); s != nil {
 		if v := s.Keyword(); v != nil {
 			text := v.GetText()
 			return ssa.NewConst(text)
-		} else if v := s.NullLiteral(); v != nil{
+		} else if v := s.NullLiteral(); v != nil {
 			return b.buildNullLiteral()
-		} else if v := s.BooleanLiteral(); v != nil{
+		} else if v := s.BooleanLiteral(); v != nil {
 			return b.buildBooleanLiteral(stmt.GetText())
 		} else {
 			b.NewError(ssa.Error, TAG, "not support the format")
@@ -968,7 +971,6 @@ func (b *astbuilder) buildIdentifierName(stmt *JS.IdentifierNameContext) ssa.Val
 	}
 	return nil
 }
-
 
 func (b *astbuilder) buildExpressionSequence(stmt *JS.ExpressionSequenceContext) []ssa.Value {
 	// 需要修改改函数及引用，不存在if中存在多个singleExpression的情况
@@ -1405,7 +1407,6 @@ func (b *astbuilder) buildReturnStatement(stmt *JS.ReturnStatementContext) {
 	}
 }
 
-
 func (b *astbuilder) buildImportStatement(stmt *JS.ImportStatementContext) {
 	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
@@ -1482,7 +1483,6 @@ func (b *astbuilder) buildTryStatement(stmt *JS.TryStatementContext) {
 		}
 	})
 
-	
 	try.BuildCatch(func() string {
 		var id string
 		// TODO: Assignable could be wrong, need to fix
@@ -1501,15 +1501,84 @@ func (b *astbuilder) buildTryStatement(stmt *JS.TryStatementContext) {
 
 	if s, ok := stmt.FinallyProduction().(*JS.FinallyProductionContext); ok {
 
-
-		try.BuildFinally(func ()  {
+		try.BuildFinally(func() {
 			if bl, ok := s.Block().(*JS.BlockContext); ok {
 				b.buildBlock(bl)
 			}
 		})
-	} 
-
+	}
 
 	try.Finish()
+
+}
+
+func (b *astbuilder) buildSwitchStatement(stmt *JS.SwitchStatementContext) {
+	revcoverRange := b.SetRange(&stmt.BaseParserRuleContext)
+	defer revcoverRange()
+
+	Switchb := b.BuildSwitch()
+	Switchb.DefaultBreak = false
+
+	if s := stmt.SingleExpression(); s != nil {
+		Switchb.BuildCondition(func() ssa.Value {
+			rv, _ := b.buildSingleExpression(s, false)
+			return rv
+		})
+	} else {
+		b.NewError(ssa.Warn, TAG, "switch expression is nil")
+	}
+
+	if s, ok := stmt.CaseBlock().(*JS.CaseBlockContext); ok {
+		b.buildCaseBlock(s, Switchb)
+	}
+}
+
+func (b *astbuilder) buildCaseBlock(stmt *JS.CaseBlockContext, Switchb *ssa.SwitchBuilder) {
+	revcoverRange := b.SetRange(&stmt.BaseParserRuleContext)
+	defer revcoverRange()
+
+	var stList []*JS.StatementListContext
+
+	var caseNum int
+	var exprs []ssa.Value
+	caseNum = 0
+	for _, s := range stmt.AllCaseClauses() {
+		if cs, ok := s.(*JS.CaseClausesContext); ok {
+			for _, i := range cs.AllCaseClause() {
+				if c, ok := i.(*JS.CaseClauseContext); ok {
+					rv, _ := b.buildSingleExpression(c.SingleExpression(), false)
+					exprs = append(exprs, rv)
+
+					if st, ok := c.StatementList().(*JS.StatementListContext); ok {
+						stList = append(stList, st)
+					} else {
+						stList = append(stList, nil)
+					}
+
+					caseNum += 1
+				}
+			}
+		}
+	}
+
+	Switchb.BuildHanlder(func() (int, []ssa.Value) {
+		return caseNum, exprs
+	})
+
+	Switchb.BuildBody(func(i int) {
+		if stList[i] != nil {
+			b.buildStatementList(stList[i])
+		}
+	})
+
+	if s, ok := stmt.DefaultClause().(*JS.DefaultClauseContext); ok {
+		if st, ok := s.StatementList().(*JS.StatementListContext); ok {
+			Switchb.BuildDefault(func() {
+				b.buildStatementList(st)
+			})
+		}
+	}
+
+	Switchb.Finsh()
 
 }

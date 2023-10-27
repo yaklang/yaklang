@@ -229,12 +229,11 @@ func (b *astbuilder) buildTryCatchStmt(stmt *yak.TryStmtContext) {
 	})
 
 	if s, ok := stmt.Block(2).(*yak.BlockContext); ok {
-
 		tryBuilder.BuildFinally(func() {
 			b.buildBlock(s)
 		})
-	} 
-	
+	}
+
 	tryBuilder.Finish()
 }
 
@@ -426,76 +425,56 @@ func (b *astbuilder) buildSwitchStmt(stmt *yak.SwitchStmtContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 
+	Switchb := b.BuildSwitch()
+	Switchb.DefaultBreak = true
+
 	//  parse expression
 	var cond ssa.Value
 	if expr, ok := stmt.Expression().(*yak.ExpressionContext); ok {
-		cond = b.buildExpression(expr)
+		Switchb.BuildCondition(func() ssa.Value {
+			cond = b.buildExpression(expr)
+			return cond
+		})
 	} else {
 		// expression is nil
 		b.NewError(ssa.Warn, TAG, "switch expression is nil")
 	}
-	enter := b.CurrentBlock
-	allcase := stmt.AllCase()
-	slabel := make([]ssa.SwitchLabel, 0)
-	handlers := make([]*ssa.BasicBlock, 0, len(allcase))
-	done := b.NewBasicBlock("switch.done")
-	defaultb := b.NewBasicBlock("switch.default")
-	enter.AddSucc(defaultb)
 
+	allcase := stmt.AllCase()
+	var exprs []ssa.Value
+	var stList []*yak.StatementListContext
 	// handler label
 	for i := range allcase {
 		if exprlist, ok := stmt.ExpressionList(i).(*yak.ExpressionListContext); ok {
-			exprs := b.buildExpressionList(exprlist)
-			handler := b.NewBasicBlock("switch.handler")
-			enter.AddSucc(handler)
-			handlers = append(handlers, handler)
-			if len(exprs) == 1 {
-				// only one expr
-				slabel = append(slabel, ssa.NewSwitchLabel(exprs[0], handler))
-			} else {
-				for _, expr := range exprs {
-					slabel = append(slabel, ssa.NewSwitchLabel(expr, handler))
-				}
-			}
-		}
-	}
-	// build body
-	for i := range allcase {
-		if stmtlist, ok := stmt.StatementList(i).(*yak.StatementListContext); ok {
-			var _fallthrough *ssa.BasicBlock
-			if i == len(allcase)-1 {
-				_fallthrough = defaultb
-			} else {
-				_fallthrough = handlers[i+1]
-			}
-			b.PushTarget(done, nil, _fallthrough) // fallthrough just jump to next handler
-			// build handlers block
-			b.CurrentBlock = handlers[i]
-			b.buildStatementList(stmtlist)
-			// jump handlers-block -> done
-			b.EmitJump(done)
-			b.PopTarget()
-		}
-	}
-	// default
-	if stmt.Default() != nil {
-		if stmtlist, ok := stmt.StatementList(len(allcase)).(*yak.StatementListContext); ok {
-			b.PushTarget(done, nil, nil) // con't fallthrough
-			// build default block
-			b.CurrentBlock = defaultb
-			b.buildStatementList(stmtlist)
-			// jump default -> done
-			b.EmitJump(done)
-			b.PopTarget() // pop target
+			exprs = append(exprs, b.buildExpressionList(exprlist)...)
 		}
 	}
 
-	b.CurrentBlock = enter
-	b.EmitSwitch(cond, defaultb, slabel)
-	rest := b.NewBasicBlock("")
-	b.CurrentBlock = done
-	b.EmitJump(rest)
-	b.CurrentBlock = rest
+	Switchb.BuildHanlder(func() (int, []ssa.Value) {
+		return len(allcase), exprs
+	})
+
+	// build body
+	for i := range allcase {
+		if stmtlist, ok := stmt.StatementList(i).(*yak.StatementListContext); ok {
+			stList = append(stList, stmtlist)
+		}
+	}
+
+	Switchb.BuildBody(func(i int) {
+		b.buildStatementList(stList[i])
+	})
+
+	// default
+	if stmt.Default() != nil {
+		if stmtlist, ok := stmt.StatementList(len(allcase)).(*yak.StatementListContext); ok {
+			Switchb.BuildDefault(func() {
+				b.buildStatementList(stmtlist)
+			})
+		}
+	}
+
+	Switchb.Finsh()
 }
 
 // if stmt
