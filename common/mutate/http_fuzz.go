@@ -745,12 +745,13 @@ func (f *FuzzHTTPRequest) GetAllParams() []*FuzzHTTPRequestParam {
 	params = append(params, &FuzzHTTPRequestParam{
 		typePosition:     posMethod,
 		paramOriginValue: f.GetMethod(),
+		origin:           f,
 	})
 	params = append(params, &FuzzHTTPRequestParam{
 		typePosition:     posBody,
 		paramOriginValue: f.GetBody(),
+		origin:           f,
 	})
-	f.IsBodyFormEncoded()
 	return params
 }
 
