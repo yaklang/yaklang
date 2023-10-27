@@ -143,3 +143,42 @@ func TestJoinErrors(t *testing.T) {
 	})
 
 }
+
+func format1C() error {
+	return Wrap(format1B(), "wrap1-3")
+}
+
+func format1B() error {
+	return Wrap(format1A(), "wrap1-2")
+}
+
+func format1A() error {
+	return Wrap(io.EOF, "wrap1-1")
+}
+
+func format2C() error {
+	return Wrap(format2B(), "wrap2-3")
+}
+
+func format2B() error {
+	return Wrap(format2A(), "wrap2-2")
+}
+
+func format2A() error {
+	return Wrap(io.EOF, "wrap2-1")
+}
+
+func TestFormat(t *testing.T) {
+	t.Run("format1", func(t *testing.T) {
+		err := format1C()
+		_ = err
+		// t.Logf("%#v", err)
+	})
+
+	t.Run("format2-join", func(t *testing.T) {
+		err1, err2 := format1C(), format2C()
+		err := JoinErrors(err1, err2)
+		_ = err
+		// t.Logf("%#v", err)
+	})
+}
