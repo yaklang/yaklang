@@ -25,6 +25,15 @@ const (
 	defaultMaxWaitTime = time.Duration(2000) * time.Millisecond
 )
 
+// for export
+var (
+	PoCOptWithSource       = _pocOptWIthSource
+	PoCOptWithRuntimeId    = _pocOptWithRuntimeId
+	PoCOptWithFromPlugin   = _pocOptWithFromPlugin
+	PoCOptWithSaveHTTPFlow = _pocOptWithSave
+	PoCOptWithProxy        = _pocOptWithProxy
+)
+
 type _pocConfig struct {
 	Host                 string
 	Port                 int
@@ -163,75 +172,127 @@ func NewDefaultPoCConfig() *_pocConfig {
 
 type PocConfig func(c *_pocConfig)
 
+// params 是一个请求选项参数，用于在请求时使用传入的值，需要注意的是，它可以很方便地使用str.f()代替
+// Example:
+// rsp, req, err = poc.HTTP(x`POST /post HTTP/1.1
+// Content-Type: application/json
+// Host: pie.dev
+//
+// {"key": "{{params(a)}}"}`, poc.params({"a":"bbb"})) // 实际上发送的POST参数为{"key": "bbb"}
 func _pocOptWithParams(i interface{}) PocConfig {
 	return func(c *_pocConfig) {
 		c.FuzzParams = utils.InterfaceToMap(i)
 	}
 }
 
+// redirectHandler 是一个请求选项参数，用于作为重定向处理函数，如果设置了该选项，则会在重定向时调用该函数，如果该函数返回true，则会继续重定向，否则不会重定向。其第一个参数为是否使用https协议，第二个参数为原始请求报文，第三个参数为原始响应报文
+// Example:
+// ```
+// count = 3
+// poc.Get("https://pie.dev/redirect/5", poc.redirectHandler(func(https, req, rsp) {
+// count--
+// return count >= 0
+// })) // 向 pie.edv 发起请求，使用自定义 redirectHandler 函数，使用count控制，进行最多3次重定向
+// ```
 func _pocOptWithRedirectHandler(i func(isHttps bool, req, rsp []byte) bool) PocConfig {
 	return func(c *_pocConfig) {
 		c.RedirectHandler = i
 	}
 }
 
-// params: use it like: `poc.HTTP(..., poc.retryTimes(3))` control retry times.
+// retryTimes 是一个请求选项参数，用于指定请求失败时的重试次数，需要搭配retryInStatusCode或retryNotInStatusCode使用，来设置在什么响应码的情况下重试
+// Example:
+// ```
+// poc.HTTP(poc.BasicRequest(), poc.retryTimes(5), poc.retryInStatusCode(500, 502)) // 向 example.com 发起请求，如果响应状态码500或502则进行重试，最多进行5次重试
+// ```
 func _pocOptWithRetryTimes(t int) PocConfig {
 	return func(c *_pocConfig) {
 		c.RetryTimes = t
 	}
 }
 
-// params: use it like: `poc.HTTP(..., poc.retryInStatusCode(200, 404))` control retry in(matched) status code.
+// retryInStatusCode 是一个请求选项参数，用于指定在某些响应状态码的情况下重试，需要搭配retryTimes使用
+// Example:
+// ```
+// poc.HTTP(poc.BasicRequest(), poc.retryTimes(5), poc.retryInStatusCode(500, 502)) // 向 example.com 发起请求，如果响应状态码500或502则进行重试，最多进行5次重试
+// ```
 func _pocOptWithRetryInStatusCode(codes ...int) PocConfig {
 	return func(c *_pocConfig) {
 		c.RetryInStatusCode = codes
 	}
 }
 
-// params: use it like: `poc.HTTP(..., poc.retryNotInStatusCode(200, 404))` control retry not in(matched) status code.
+// retryNotInStatusCode 是一个请求选项参数，用于指定非某些响应状态码的情况下重试，需要搭配retryTimes使用
+// Example:
+// ```
+// poc.HTTP(poc.BasicRequest(), poc.retryTimes(5), poc.retryNotInStatusCode(200)) // 向 example.com 发起请求，如果响应状态码不等于200则进行重试，最多进行5次重试
+// ```
 func _pocOptWithRetryNotInStausCode(codes ...int) PocConfig {
 	return func(c *_pocConfig) {
 		c.RetryNotInStatusCode = codes
 	}
 }
 
-// params: use it like: `poc.HTTP(..., poc.retryWaitTime(1))` control retry wait time(seconds).
-func _pocOptWithRetryWaitTime(t int) PocConfig {
+// retryWaitTime 是一个请求选项参数，用于指定重试时最小等待时间，需要搭配retryTimes使用，默认为0.1秒
+// Example:
+// ```
+// poc.HTTP(poc.BasicRequest(), poc.retryTimes(5), poc.retryNotInStatusCode(200), poc.retryWaitTime(0.1)) // 向 example.com 发起请求，如果响应状态码不等于200则进行重试，最多进行5次重试，重试时最小等待0.1秒
+// ```
+func _pocOptWithRetryWaitTime(f float64) PocConfig {
 	return func(c *_pocConfig) {
-		c.RetryWaitTime = time.Duration(t) * time.Second
+		c.RetryWaitTime = utils.FloatSecondDuration(f)
 	}
 }
 
-func _pocOptWithRetryMaxWaitTime(t int) PocConfig {
+// retryMaxWaitTime 是一个请求选项参数，用于指定重试时最大等待时间，需要搭配retryTimes使用，默认为2秒
+// Example:
+// ```
+// poc.HTTP(poc.BasicRequest(), poc.retryTimes(5), poc.retryNotInStatusCode(200), poc.retryWaitTime(2)) // 向 example.com 发起请求，如果响应状态码不等于200则进行重试，最多进行5次重试，重试时最多等待2秒
+// ```
+func _pocOptWithRetryMaxWaitTime(f float64) PocConfig {
 	return func(c *_pocConfig) {
-		c.RetryMaxWaitTime = time.Duration(t) * time.Second
+		c.RetryMaxWaitTime = utils.FloatSecondDuration(f)
 	}
 }
 
-// params: use it `poc.HTTP(..., poc.redirectTimes(3))` control redirect times.
+// redirectTimes 是一个请求选项参数，用于指定最大重定向次数，默认为5次
+// Example:
+// ```
+// poc.HTTP(poc.BasicRequest(), poc.redirectTimes(5)) // 向 example.com 发起请求，如果响应重定向到其他链接，则会自动跟踪重定向最多5次
+// ```
 func _pocOptWithRedirectTimes(t int) PocConfig {
 	return func(c *_pocConfig) {
 		c.RedirectTimes = t
 	}
 }
 
-// params: use it like: `poc.HTTP(..., poc.noFixContentLength(true))` control fix content length.
-// use it in pipeline or smuggle case.
+// noFixContentLength 是一个请求选项参数，用于指定是否修复响应报文中的Content-Length字段，默认为false即会自动修复Content-Length字段
+// Example:
+// ```
+// poc.HTTP(poc.BasicRequest(), poc.noFixContentLength()) // 向 example.com 发起请求，如果响应报文中的Content-Length字段不正确或不存在	也不会自动修复
+// ```
 func _pocOptWithNoFixContentLength(b bool) PocConfig {
 	return func(c *_pocConfig) {
 		c.NoFixContentLength = b
 	}
 }
 
-// params: use it like: `poc.HTTP(..., poc.noRedirect(true))` control redirect.
+// noRedirect 是一个请求选项参数，用于指定是否跟踪重定向，默认为false即会自动跟踪重定向
+// Example:
+// ```
+// poc.HTTP(poc.BasicRequest(), poc.noRedirect()) // 向 example.com 发起请求，如果响应重定向到其他链接也不会自动跟踪重定向
+// ```
 func _pocOptWithNoRedirect(b bool) PocConfig {
 	return func(c *_pocConfig) {
 		c.NoRedirect = b
 	}
 }
 
-// params: use it: `poc.HTTP(..., poc.proxy(15))` control proxy.
+// proxy 是一个请求选项参数，用于指定请求使用的代理，可以指定多个代理，默认会使用系统代理
+// Example:
+// ```
+// poc.HTTP(poc.BasicRequest(), poc.proxy("http://127.0.0.1:7890")) // 向 example.com 发起请求，使用 http://127.0.0.1:7890 代理
+// ```
 func _pocOptWithProxy(proxies ...string) PocConfig {
 	return func(c *_pocConfig) {
 		data := utils.StringArrayFilterEmpty(proxies)
@@ -241,40 +302,50 @@ func _pocOptWithProxy(proxies ...string) PocConfig {
 	}
 }
 
-// params: use it `poc.HTTP(packet, poc.https(true))` control tls schema
+// https 是一个请求选项参数，用于指定是否使用https协议，默认为false即使用http协议
+// Example:
+// ```
+// poc.HTTP(poc.BasicRequest(), poc.https(true)) // 向 example.com 发起请求，使用 https 协议
+// ```
 func _pocOptWithForceHTTPS(isHttps bool) PocConfig {
 	return func(c *_pocConfig) {
 		c.ForceHttps = isHttps
 	}
 }
 
-// params: use it `poc.HTTP(packet, poc.http2(true))` control http2 schema
+// http2 是一个请求选项参数，用于指定是否使用http2协议，默认为false即使用http1协议
+// Example:
+// ```
+// poc.Get("https://www.example.com", poc.http2(true), poc.https(true)) // 向 www.example.com 发起请求，使用 http2 协议
+// ```
 func _pocOptWithForceHTTP2(isHttp2 bool) PocConfig {
 	return func(c *_pocConfig) {
 		c.ForceHttp2 = isHttp2
 	}
 }
 
-// params: use it like: `poc.HTTP(..., poc.timeout(15))` control network timeout
+// timeout 是一个请求选项参数，用于指定读取超时时间，默认为15秒
+// Example:
+// ```
+// poc.Get("https://www.example.com", poc.timeout(15)) // 向 www.baidu.com 发起请求，读取超时时间为15秒
+// ```
 func _pocOptWithTimeout(f float64) PocConfig {
 	return func(c *_pocConfig) {
 		c.Timeout = utils.FloatSecondDuration(f)
 	}
 }
 
-// params: poc packet builder and sender params, use it like: `poc.HTTP(..., poc.host("127.0.0.1"))`
+// host 是一个请求选项参数，用于指定实际请求的 host，如果没有设置该请求选项，则会依据原始请求报文中的Host字段来确定实际请求的host
+// Example:
+// ```
+// poc.HTTP(poc.BasicRequest(), poc.host("yaklang.com")) // 实际上请求 yaklang.com
+// ```
 func _pocOptWithHost(h string) PocConfig {
 	return func(c *_pocConfig) {
 		c.Host = h
 	}
 }
 
-var PoCOptWithSource = _pocOptWIthSource
-var PoCOptWithRuntimeId = _pocOptWithRuntimeId
-var PoCOptWithFromPlugin = _pocOptWithFromPlugin
-
-// params: bind runtimeId for http request and response
-// it 's useful for combining context, `poc.HTTP(..., poc.runtimeId(id))`
 func _pocOptWithRuntimeId(r string) PocConfig {
 	return func(c *_pocConfig) {
 		c.RuntimeId = r
@@ -287,68 +358,148 @@ func _pocOptWithFromPlugin(b string) PocConfig {
 	}
 }
 
+// websocket 是一个请求选项参数，用于允许将链接升级为websocket，此时发送的请求应该为websocket握手请求
+// Example:
+// ```
+// rsp, req, err = poc.HTTP(`GET / HTTP/1.1
+// Connection: Upgrade
+// Upgrade: websocket
+// Sec-Websocket-Version: 13
+// Sec-Websocket-Extensions: permessage-deflate; client_max_window_bits
+// Host: echo.websocket.events
+// Accept-Language: zh-CN,zh;q=0.9,en;q=0.8,en-US;q=0.7
+// Sec-Websocket-Key: L31R1As+71fwuXqhwhABuA==`,
+//
+//	poc.proxy("http://127.0.0.1:7890"), poc.websocketFromServer(func(rsp, cancel) {
+//		    dump(rsp)
+//		}), poc.websocketOnClient(func(c) {
+//		    c.WriteText("123")
+//		}), poc.websocket(true),
+//
+// )
+// time.Sleep(100)
+// ```
 func _pocOptWebsocket(w bool) PocConfig {
 	return func(c *_pocConfig) {
 		c.Websocket = w
 	}
 }
 
+// websocketFromServer 是一个请求选项参数，它接收一个回调函数，这个函数有两个参数，其中第一个参数为服务端发送的数据，第二个参数为取消函数，调用将会强制断开 websocket
+// Example:
+// ```
+// rsp, req, err = poc.HTTP(`GET / HTTP/1.1
+// Connection: Upgrade
+// Upgrade: websocket
+// Sec-Websocket-Version: 13
+// Sec-Websocket-Extensions: permessage-deflate; client_max_window_bits
+// Host: echo.websocket.events
+// Accept-Language: zh-CN,zh;q=0.9,en;q=0.8,en-US;q=0.7
+// Sec-Websocket-Key: L31R1As+71fwuXqhwhABuA==`,
+//
+//	poc.proxy("http://127.0.0.1:7890"), poc.websocketFromServer(func(rsp, cancel) {
+//		    dump(rsp)
+//		}), poc.websocketOnClient(func(c) {
+//		    c.WriteText("123")
+//		}), poc.websocket(true),
+//
+// )
+// time.Sleep(100)
+// ```
 func _pocOptWebsocketHandler(w func(i []byte, cancel func())) PocConfig {
 	return func(c *_pocConfig) {
 		c.WebsocketHandler = w
 	}
 }
 
+// websocketOnClient 是一个请求选项参数，它接收一个回调函数，这个函数有一个参数，是WebsocketClient结构体，通过该结构体可以向服务端发送数据
+// Example:
+// ```
+// rsp, req, err = poc.HTTP(`GET / HTTP/1.1
+// Connection: Upgrade
+// Upgrade: websocket
+// Sec-Websocket-Version: 13
+// Sec-Websocket-Extensions: permessage-deflate; client_max_window_bits
+// Host: echo.websocket.events
+// Accept-Language: zh-CN,zh;q=0.9,en;q=0.8,en-US;q=0.7
+// Sec-Websocket-Key: L31R1As+71fwuXqhwhABuA==`,
+//
+//	poc.proxy("http://127.0.0.1:7890"), poc.websocketFromServer(func(rsp, cancel) {
+//		    dump(rsp)
+//		}), poc.websocketOnClient(func(c) {
+//		    c.WriteText("123")
+//		}), poc.websocket(true),
+//
+// )
+// time.Sleep(100)
+// ```
 func _pocOptWebsocketClientHandler(w func(c *lowhttp.WebsocketClient)) PocConfig {
 	return func(c *_pocConfig) {
 		c.WebsocketClientHandler = w
 	}
 }
 
-// params: poc packet builder and sender params, use it like: `poc.HTTP(..., poc.port(8080))`
+// port 是一个请求选项参数，用于指定实际请求的 port，如果没有设置该请求选项，则会依据原始请求报文中的Host字段来确定实际请求的port
+// Example:
+// ```
+// poc.HTTP(poc.BasicRequest(), poc.host("yaklang.com"), poc.port(443), poc.https(true)) // 实际上请求 yaklang.com 的443端口
+// ```
 func _pocOptWithPort(port int) PocConfig {
 	return func(c *_pocConfig) {
 		c.Port = port
 	}
 }
 
-// params, use it as `poc.HTTP(packet, poc.jsRedirect(true))` to recognize js href(regexp)
+// jsRedirect 是一个请求选项参数，用于指定是否跟踪JS重定向，默认为false即不会自动跟踪JS重定向
+// Example:
+// ```
+// poc.HTTP(poc.BasicRequest(), poc.redirectTimes(5), poc.jsRedirect(true)) // 向 www.baidu.com 发起请求，如果响应重定向到其他链接也会自动跟踪JS重定向，最多进行5次重定向
+// ```
 func _pocOptWithJSRedirect(b bool) PocConfig {
 	return func(c *_pocConfig) {
 		c.JsRedirect = b
 	}
 }
 
-// params, inherit cookie via the same session key,
-// use it as `poc.HTTP(packet, poc.session("key"))`
-// it's useful for login case
+// session 是一个请求选项参数，用于指定请求的session，参数可以是任意类型的值，用此值做标识符从而找到唯一的session。使用session进行请求时会自动管理cookie，这在登录后操作的场景非常有用
+// Example:
+// ```
+// poc.Get("https://pie.dev/cookies/set/AAA/BBB", poc.session("test")) // 向 pie.dev 发起第一次请求，这会设置一个名为AAA，值为BBB的cookie
+// rsp, req, err = poc.Get("https://pie.dev/cookies", poc.session("test")) // 向 pie.dev 发起第二次请求，这个请求会输出所有的cookies，可以看到第一次请求设置的cookie已经存在了
+// ```
 func _pocOptWithSession(i interface{}) PocConfig {
 	return func(c *_pocConfig) {
 		c.Session = i
 	}
 }
 
-// params, save the current request and response to database
-// find it in `yakit.QueryHTTPFlow`
+// save 是一个请求选项参数，用于指定是否将此次请求的记录保存在数据库中，默认为true即会保存到数据库
+// Example:
+// ```
+// poc.Get("https://exmaple.com", poc.save(true)) // 向 example.com 发起请求，会将此次请求保存到数据库中
+// ```
 func _pocOptWithSave(i bool) PocConfig {
 	return func(c *_pocConfig) {
 		c.SaveHTTPFlow = i
 	}
 }
 
-var PoCOptWithSaveHTTPFlow = _pocOptWithSave
-
-// params, set request source field, for saving to database
+// source 是一个请求选项参数，用于在请求记录保存到数据库时标识此次请求的来源
+// Example:
+// ```
+// poc.Get("https://exmaple.com", poc.save(true), poc.source("test")) // 向 example.com 发起请求，会将此次请求保存到数据库中，指示此次请求的来源为test
+// ```
 func _pocOptWIthSource(i string) PocConfig {
 	return func(c *_pocConfig) {
 		c.Source = i
 	}
 }
 
-var PoCOptWithProxy = _pocOptWithProxy
-
-// params, replace request first line, it's hacky!
-// modified request bytes before request sent out
+// replaceFirstLine 是一个请求选项参数，用于改变请求报文，修改第一行（即请求方法，请求路径，协议版本）
+// Example:
+// ```
+// poc.Get("https://exmaple.com", poc.replaceFirstLine("GET /test HTTP/1.1")) // 向 example.com 发起请求，修改请求报文的第一行，请求/test路径
+// ```
 func _pocOptReplaceHttpPacketFirstLine(firstLine string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -358,7 +509,11 @@ func _pocOptReplaceHttpPacketFirstLine(firstLine string) PocConfig {
 	}
 }
 
-// params, replace request method before sending.
+// replaceMethod 是一个请求选项参数，用于改变请求报文，修改请求方法
+// Example:
+// ```
+// poc.Options("https://exmaple.com", poc.replaceMethod("GET")) // 向 example.com 发起请求，修改请求方法为GET
+// ```
 func _pocOptReplaceHttpPacketMethod(method string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -368,7 +523,11 @@ func _pocOptReplaceHttpPacketMethod(method string) PocConfig {
 	}
 }
 
-// params, replace request header before sending.
+// replaceHeader 是一个请求选项参数，用于改变请求报文，修改修改请求头，如果不存在则会增加
+// Example:
+// ```
+// poc.Get("https://pie.dev/get", poc.replaceHeader("AAA", "BBB")) // 向 pie.dev 发起请求，修改AAA请求头的值为BBB，这里没有AAA请求头，所以会增加该请求头
+// ```
 func _pocOptReplaceHttpPacketHeader(key, value string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -378,14 +537,29 @@ func _pocOptReplaceHttpPacketHeader(key, value string) PocConfig {
 	}
 }
 
+// replaceHost 是一个请求选项参数，用于改变请求报文，修改Host请求头，如果不存在则会增加，实际上是replaceHeader("Host", host)的简写
+// Example:
+// ```
+// poc.Get("https://yaklang.com/", poc.replaceHost("www.yaklang.com")) // 向 yaklang.com 发起请求，修改Host请求头的值为 www.yaklang.com
+// ```
 func _pocOptReplaceHttpPacketHost(host string) PocConfig {
 	return _pocOptReplaceHttpPacketHeader("Host", host)
 }
 
+// replaceBasicAuth 是一个请求选项参数，用于改变请求报文，修改Authorization请求头为基础认证的密文，如果不存在则会增加，实际上是replaceHeader("Authorization", codec.EncodeBase64(username + ":" + password))的简写
+// Example:
+// ```
+// poc.Get("https://pie.dev/basic-auth/admin/password", poc.replaceBasicAuth("admin", "password")) // 向 pie.dev 发起请求进行基础认证，会得到200响应状态码
+// ```
 func _pocOptReplaceHttpPacketBasicAuth(username, password string) PocConfig {
 	return _pocOptReplaceHttpPacketHeader("Authorization", "Basic "+codec.EncodeBase64(username+":"+password))
 }
 
+// replaceCookie 是一个请求选项参数，用于改变请求报文，修改Cookie请求头中的值，如果不存在则会增加
+// Example:
+// ```
+// poc.Get("https://pie.dev/get", poc.replaceCookie("aaa", "bbb")) // 向 pie.dev 发起请求，这里没有aaa的cookie值，所以会增加
+// ```
 func _pocOptReplaceHttpPacketCookie(key, value string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -395,6 +569,11 @@ func _pocOptReplaceHttpPacketCookie(key, value string) PocConfig {
 	}
 }
 
+// replaceBody 是一个请求选项参数，用于改变请求报文，修改请求体内容，第一个参数为修改后的请求体内容，第二个参数为是否分块传输
+// Example:
+// ```
+// poc.Post("https://pie.dev/post", poc.replaceBody("a=b", false)) // 向 pie.dev 发起请求，修改请求体内容为a=b
+// ```
 func _pocOptReplaceHttpPacketBody(body []byte, chunk bool) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -404,6 +583,11 @@ func _pocOptReplaceHttpPacketBody(body []byte, chunk bool) PocConfig {
 	}
 }
 
+// replacePath 是一个请求选项参数，用于改变请求报文，修改请求路径
+// Example:
+// ```
+// poc.Get("https://pie.dev/post", poc.replacePath("/get")) // 向 pie.dev 发起请求，实际上请求路径为/get
+// ```
 func _pocOptReplaceHttpPacketPath(path string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -413,6 +597,11 @@ func _pocOptReplaceHttpPacketPath(path string) PocConfig {
 	}
 }
 
+// replaceQueryParam 是一个请求选项参数，用于改变请求报文，修改GET请求参数，如果不存在则会增加
+// Example:
+// ```
+// poc.Get("https://pie.dev/get", poc.replaceQueryParam("a", "b")) // 向 pie.dev 发起请求，添加GET请求参数a，值为b
+// ```
 func _pocOptReplaceHttpPacketQueryParam(key, value string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -422,6 +611,11 @@ func _pocOptReplaceHttpPacketQueryParam(key, value string) PocConfig {
 	}
 }
 
+// replaceAllQueryParams 是一个请求选项参数，用于改变请求报文，修改所有GET请求参数，如果不存在则会增加，其接收一个map[string]string类型的参数，其中key为请求参数名，value为请求参数值
+// Example:
+// ```
+// poc.Get("https://pie.dev/get", poc.replaceAllQueryParams({"a":"b", "c":"d"})) // 向 pie.dev 发起请求，添加GET请求参数a，值为b，添加GET请求参数c，值为d
+// ```
 func _pocOptReplaceAllHttpPacketQueryParams(values map[string]string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -431,6 +625,11 @@ func _pocOptReplaceAllHttpPacketQueryParams(values map[string]string) PocConfig 
 	}
 }
 
+// replacePostParam 是一个请求选项参数，用于改变请求报文，修改POST请求参数，如果不存在则会增加
+// Example:
+// ```
+// poc.Post("https://pie.dev/post", poc.replacePostParam("a", "b")) // 向 pie.dev 发起请求，添加POST请求参数a，值为b
+// ```
 func _pocOptReplaceHttpPacketPostParam(key, value string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -440,6 +639,11 @@ func _pocOptReplaceHttpPacketPostParam(key, value string) PocConfig {
 	}
 }
 
+// replaceAllPostParams 是一个请求选项参数，用于改变请求报文，修改所有POST请求参数，如果不存在则会增加，其接收一个map[string]string类型的参数，其中key为POST请求参数名，value为POST请求参数值
+// Example:
+// ```
+// poc.Post("https://pie.dev/post", poc.replaceAllPostParams({"a":"b", "c":"d"})) // 向 pie.dev 发起请求，添加POST请求参数a，值为b，POST请求参数c，值为d
+// ```
 func _pocOptReplaceAllHttpPacketPostParams(values map[string]string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -448,6 +652,12 @@ func _pocOptReplaceAllHttpPacketPostParams(values map[string]string) PocConfig {
 		)
 	}
 }
+
+// appendHeader 是一个请求选项参数，用于改变请求报文，添加请求头
+// Example:
+// ```
+// poc.Post("https://pie.dev/post", poc.appendHeader("AAA", "BBB")) // 向 pie.dev 发起请求，添加AAA请求头的值为BBB
+// ```
 func _pocOptAppendHeader(key, value string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -457,6 +667,11 @@ func _pocOptAppendHeader(key, value string) PocConfig {
 	}
 }
 
+// appendCookie 是一个请求选项参数，用于改变请求报文，添加Cookie请求头中的值
+// Example:
+// ```
+// poc.Get("https://pie.dev/get", poc.appendCookie("aaa", "bbb")) // 向 pie.dev 发起请求，添加cookie键值对aaa:bbb
+// ```
 func _pocOptAppendCookie(key, value string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -466,6 +681,11 @@ func _pocOptAppendCookie(key, value string) PocConfig {
 	}
 }
 
+// appendQueryParam 是一个请求选项参数，用于改变请求报文，添加GET请求参数
+// Example:
+// ```
+// poc.Get("https://pie.dev/get", poc.appendQueryParam("a", "b")) // 向 pie.dev 发起请求，添加GET请求参数a，值为b
+// ```
 func _pocOptAppendQueryParam(key, value string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -475,6 +695,11 @@ func _pocOptAppendQueryParam(key, value string) PocConfig {
 	}
 }
 
+// appendPostParam 是一个请求选项参数，用于改变请求报文，添加POST请求参数
+// Example:
+// ```
+// poc.Post("https://pie.dev/post", poc.appendPostParam("a", "b")) // 向 pie.dev 发起请求，添加POST请求参数a，值为b
+// ```
 func _pocOptAppendPostParam(key, value string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -484,6 +709,11 @@ func _pocOptAppendPostParam(key, value string) PocConfig {
 	}
 }
 
+// appendPath 是一个请求选项参数，用于改变请求报文，在现有请求路径后添加请求路径
+// Example:
+// ```
+// poc.Get("https://yaklang.com/docs", poc.appendPath("/api/poc")) // 向 yaklang.com 发起请求，实际上请求路径为/docs/api/poc
+// ```
 func _pocOptAppendHttpPacketPath(path string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -493,6 +723,11 @@ func _pocOptAppendHttpPacketPath(path string) PocConfig {
 	}
 }
 
+// appendFormEncoded 是一个请求选项参数，用于改变请求报文，添加请求体中的表单
+// Example:
+// ```
+// poc.Post("https://pie.dev/post", poc.appendFormEncoded("aaa", "bbb")) // 向 pie.dev 发起请求，添加POST请求表单，其中aaa为键，bbb为值
+// ```
 func _pocOptAppendHttpPacketFormEncoded(key, value string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -502,6 +737,11 @@ func _pocOptAppendHttpPacketFormEncoded(key, value string) PocConfig {
 	}
 }
 
+// appendUploadFile 是一个请求选项参数，用于改变请求报文，添加请求体中的上传的文件，其中第一个参数为表单名，第二个参数为文件名，第三个参数为文件内容，第四个参数是可选参数，为文件类型(Content-Type)
+// Example:
+// ```
+// poc.Post("https://pie.dev/post", poc.appendUploadFile("file", "phpinfo.php", "<?php phpinfo(); ?>", "image/jpeg"))// 向 pie.dev 发起请求，添加POST请求表单，其文件名为phpinfo.php，内容为<?php phpinfo(); ?>，文件类型为image/jpeg
+// ```
 func _pocOptAppendHttpPacketUploadFile(fieldName, fileName string, fileContent interface{}, contentType ...string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -511,6 +751,16 @@ func _pocOptAppendHttpPacketUploadFile(fieldName, fileName string, fileContent i
 	}
 }
 
+// deleteHeader 是一个请求选项参数，用于改变请求报文，删除请求头
+// Example:
+// ```
+// poc.HTTP(`GET /get HTTP/1.1
+// Content-Type: application/json
+// AAA: BBB
+// Host: pie.dev
+//
+// `, poc.deleteHeader("AAA"))// 向 pie.dev 发起请求，删除AAA请求头
+// ```
 func _pocOptDeleteHeader(key string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -520,6 +770,16 @@ func _pocOptDeleteHeader(key string) PocConfig {
 	}
 }
 
+// deleteCookie 是一个请求选项参数，用于改变请求报文，删除Cookie中的值
+// Example:
+// ```
+// poc.HTTP(`GET /get HTTP/1.1
+// Content-Type: application/json
+// Cookie: aaa=bbb; ccc=ddd
+// Host: pie.dev
+//
+// `, poc.deleteCookie("aaa"))// 向 pie.dev 发起请求，删除Cookie中的aaa
+// ```
 func _pocOptDeleteCookie(key string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -529,6 +789,15 @@ func _pocOptDeleteCookie(key string) PocConfig {
 	}
 }
 
+// deleteQueryParam 是一个请求选项参数，用于改变请求报文，删除GET请求参数
+// Example:
+// ```
+// poc.HTTP(`GET /get?a=b&c=d HTTP/1.1
+// Content-Type: application/json
+// Host: pie.dev
+//
+// `, poc.deleteQueryParam("a")) // 向 pie.dev 发起请求，删除GET请求参数a
+// ```
 func _pocOptDeleteQueryParam(key string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -538,6 +807,16 @@ func _pocOptDeleteQueryParam(key string) PocConfig {
 	}
 }
 
+// deletePostParam 是一个请求选项参数，用于改变请求报文，删除POST请求参数
+// Example:
+// ```
+// poc.HTTP(`POST /post HTTP/1.1
+// Content-Type: application/json
+// Content-Length: 7
+// Host: pie.dev
+//
+// a=b&c=d`, poc.deletePostParam("a")) // 向 pie.dev 发起请求，删除POST请求参数a
+// ```
 func _pocOptDeletePostParam(key string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -547,6 +826,24 @@ func _pocOptDeletePostParam(key string) PocConfig {
 	}
 }
 
+// deleteForm 是一个请求选项参数，用于改变请求报文，删除POST请求表单
+// Example:
+// ```
+// poc.HTTP(`POST /post HTTP/1.1
+// Host: pie.dev
+// Content-Type: multipart/form-data; boundary=------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm
+// Content-Length: 308
+//
+// --------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm
+// Content-Disposition: form-data; name="aaa"
+//
+// bbb
+// --------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm
+// Content-Disposition: form-data; name="ccc"
+//
+// ddd
+// --------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm--`, poc.deleteForm("aaa")) // 向 pie.dev 发起请求，删除POST请求表单aaa
+// ```
 func _pocOptDeleteForm(key string) PocConfig {
 	return func(c *_pocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
@@ -755,9 +1052,13 @@ func pochttp(packet []byte, config *_pocConfig) (*lowhttp.LowhttpResponse, error
 	return response, err
 }
 
-// poc.HTTPEx means send http request and return (*LowhttpResponse, *http.Request, error)
-// it support many option, use it via: `poc.HTTPEx(packet, poc.https(true), poc.proxy(proxy))`.
-// you will handle *lowhttp.LowhttpResponse with your own code. LowhttpResponse include many details.
+// HTTPEx 与HTTP类似，它发送请求并且返回响应结构体，请求结构体以及错误，它的第一个参数可以接收[]byte, string, http.Request结构体，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如对设置超时时间，或者修改请求报文等
+// 关于结构体中的可用字段和方法可以使用desc函数进行查看
+// Example:
+// ```
+// rsp, req, err = poc.HTTPEx(`GET / HTTP/1.1\r\nHost: www.yaklang.com\r\n\r\n`, poc.https(true), poc.replaceHeader("AAA", "BBB")) // 向yaklang.com发送一个基于HTTPS协议的GET请求，并且添加一个请求头AAA，它的值为BBB
+// desc(rsp) // 查看响应结构体中的可用字段
+// ```
 func pocHTTPEx(i interface{}, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
 	packet, config, err := handleRawPacketAndConfig(i, opts...)
 	if err != nil {
@@ -774,7 +1075,12 @@ func pocHTTPEx(i interface{}, opts ...PocConfig) (*lowhttp.LowhttpResponse, *htt
 	return response, request, nil
 }
 
-// BuildRequest will build a bytes request, you can use it to send request by yourself.
+// BuildRequest 是一个用于辅助构建请求报文的工具函数，它第一个参数可以接收[]byte, string, http.Request结构体，接下来可以接收零个到多个请求选项，修改请求报文的选项将被作用，最后返回构建好的请求报文
+// Example:
+// ```
+// raw = poc.BuildRequest(poc.BasicRequest(), poc.https(true), poc.replaceHost("yaklang.com"), poc.replacePath("/docs/api/poc")) // 构建一个基础GET请求，修改其Host为yaklang.com，访问的URI路径为/docs/api/poc
+// // raw = b"GET /docs/api/poc HTTP/1.1\r\nHost: www.yaklang.com\r\n\r\n"
+// ```
 func buildRequest(i interface{}, opts ...PocConfig) []byte {
 	packet, _, err := handleRawPacketAndConfig(i, opts...)
 	if err != nil {
@@ -783,8 +1089,11 @@ func buildRequest(i interface{}, opts ...PocConfig) []byte {
 	return packet
 }
 
-// poc.HTTP means send http request and return (response, request, error)
-// it support many option, use it via: `poc.HTTP(packet, poc.https(true), poc.proxy(proxy))`
+// HTTP 发送请求并且返回原始响应报文，原始请求报文以及错误，它的第一个参数可以接收[]byte, string, http.Request结构体，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如对设置超时时间，或者修改请求报文等
+// Example:
+// ```
+// poc.HTTP("GET / HTTP/1.1\r\nHost: www.yaklang.com\r\n\r\n", poc.https(true), poc.replaceHeader("AAA", "BBB")) // yaklang.com发送一个基于HTTPS协议的GET请求，并且添加一个请求头AAA，它的值为BBB
+// ```
 func pocHTTP(i interface{}, opts ...PocConfig) ([]byte, []byte, error) {
 	packet, config, err := handleRawPacketAndConfig(i, opts...)
 	if err != nil {
@@ -794,8 +1103,14 @@ func pocHTTP(i interface{}, opts ...PocConfig) ([]byte, []byte, error) {
 	return response.RawPacket, lowhttp.FixHTTPPacketCRLF(packet, config.NoFixContentLength), err
 }
 
-// poc.Do is something like poc.HTTPEx, but the params is (method string, url string, opt...)
-// use it like `poc.Do("GET", "https://www.example.com", poc.proxy(proxy))`
+// Do 向指定URL发送指定请求方法的请求并且返回响应结构体，请求结构体以及错误，它的是第一个参数是请求方法，第二个参数URL字符串，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如对设置超时时间，或者修改请求报文等
+
+// 关于结构体中的可用字段和方法可以使用desc函数进行查看
+// Example:
+// ```
+// poc.Do("GET","https://yaklang.com", poc.https(true)) // 向yaklang.com发送一个基于HTTPS协议的GET请求
+// desc(rsp) // 查看响应结构体中的可用字段
+// ```
 func do(method string, urlStr string, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
 	config, err := handleUrlAndConfig(urlStr, opts...)
 	if err != nil {
@@ -816,30 +1131,161 @@ func do(method string, urlStr string, opts ...PocConfig) (*lowhttp.LowhttpRespon
 	return response, request, nil
 }
 
-func methodDo(method string) func(urlStr string, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
-	return func(urlStr string, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
-		return do(method, urlStr, opts...)
-	}
+// Get 向指定URL发送GET请求并且返回响应结构体，请求结构体以及错误，它的第一个参数是URL字符串，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如对设置超时时间，或者修改请求报文等
+// 关于结构体中的可用字段和方法可以使用desc函数进行查看
+// Example:
+// ```
+// poc.Get("https://yaklang.com", poc.https(true)) // 向yaklang.com发送一个基于HTTPS协议的GET请求
+// desc(rsp) // 查看响应结构体中的可用字段
+// ```
+func doGET(urlStr string, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
+	return do("GET", urlStr, opts...)
 }
 
-// poc.Websocket is shortcut for `poc.HTTP(..., poc.websocket(true))`
-func wsShortcut(raw interface{}, opts ...PocConfig) ([]byte, []byte, error) {
+// Post 向指定URL发送POST请求并且返回响应结构体，请求结构体以及错误，它的第一个参数是URL字符串，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如对设置超时时间，或者修改请求报文等
+// 关于结构体中的可用字段和方法可以使用desc函数进行查看
+// Example:
+// ```
+// poc.Post("https://yaklang.com", poc.https(true)) // 向yaklang.com发送一个基于HTTPS协议的POST请求
+// desc(rsp) // 查看响应结构体中的可用字段
+// ```
+func doPOST(urlStr string, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
+	return do("POST", urlStr, opts...)
+}
+
+// Head 向指定URL发送HEAD请求并且返回响应结构体，请求结构体以及错误，它的第一个参数是URL字符串，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如对设置超时时间，或者修改请求报文等
+// 关于结构体中的可用字段和方法可以使用desc函数进行查看
+// Example:
+// ```
+// poc.Head("https://yaklang.com", poc.https(true)) // 向yaklang.com发送一个基于HTTPS协议的HEAD请求
+// desc(rsp) // 查看响应结构体中的可用字段
+// ```
+func doHEAD(urlStr string, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
+	return do("HEAD", urlStr, opts...)
+}
+
+// Delete 向指定URL发送DELETE请求并且返回响应结构体，请求结构体以及错误，它的第一个参数是URL字符串，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如对设置超时时间，或者修改请求报文等
+// 关于结构体中的可用字段和方法可以使用desc函数进行查看
+// Example:
+// ```
+// poc.Delete("https://yaklang.com", poc.https(true)) // 向yaklang.com发送一个基于HTTPS协议的DELETE请求
+// desc(rsp) // 查看响应结构体中的可用字段
+// ```
+func doDELETE(urlStr string, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
+	return do("DELETE", urlStr, opts...)
+}
+
+// Options 向指定URL发送OPTIONS请求并且返回响应结构体，请求结构体以及错误，它的第一个参数是URL字符串，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如对设置超时时间，或者修改请求报文等
+// 关于结构体中的可用字段和方法可以使用desc函数进行查看
+// Example:
+// ```
+// poc.Options("https://yaklang.com", poc.https(true)) // 向yaklang.com发送一个基于HTTPS协议的Options请求
+// desc(rsp) // 查看响应结构体中的可用字段
+// ```
+func doOPTIONS(urlStr string, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
+	return do("OPTIONS", urlStr, opts...)
+}
+
+// Websocket 实际上等价于`poc.HTTP(..., poc.websocket(true))`，用于快速发送请求并建立websocket连接并且返回原始响应报文，原始请求报文以及错误
+// Example:
+// ```
+// rsp, req, err = poc.Websocket(`GET / HTTP/1.1
+// Connection: Upgrade
+// Upgrade: websocket
+// Sec-Websocket-Version: 13
+// Sec-Websocket-Extensions: permessage-deflate; client_max_window_bits
+// Host: echo.websocket.events
+// Accept-Language: zh-CN,zh;q=0.9,en;q=0.8,en-US;q=0.7
+// Sec-Websocket-Key: L31R1As+71fwuXqhwhABuA==`,
+//
+//	poc.proxy("http://127.0.0.1:7890"), poc.websocketFromServer(func(rsp, cancel) {
+//		    dump(rsp)
+//		}), poc.websocketOnClient(func(c) {
+//		    c.WriteText("123")
+//		})
+//
+// )
+// time.Sleep(100)
+// ```
+func doWebSocket(raw interface{}, opts ...PocConfig) ([]byte, []byte, error) {
 	opts = append(opts, _pocOptWebsocket(true))
 	return pocHTTP(raw, opts...)
+}
+
+// Split 切割HTTP报文，返回响应头和响应体，其第一个参数是原始HTTP报文，接下来可以接收零个到多个回调函数，其在每次解析到请求头时回调
+// Example:
+// ```
+// poc.Split(`POST / HTTP/1.1
+// Content-Type: application/json
+// Host: www.example.com
+
+// {"key": "value"}`, func(header) {
+// dump(header)
+// })
+// ```
+func split(raw []byte, hook ...func(line string)) (headers string, body []byte) {
+	return lowhttp.SplitHTTPHeadersAndBodyFromPacket(raw, hook...)
+}
+
+// FixHTTPRequest 尝试对传入的HTTP请求报文进行修复，并返回修复后的请求
+// Example:
+// ```
+// poc.FixHTTPRequest(b"GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+// ```
+func fixHTTPRequest(raw []byte) []byte {
+	return lowhttp.FixHTTPRequest(raw)
+}
+
+// FixHTTPResponse 尝试对传入的HTTP响应报文进行修复，并返回修复后的响应
+// Example:
+// ```
+// poc.FixHTTPResponse(b"HTTP/1.1 200 OK\nContent-Length: 5\n\nhello")
+// ```
+func fixHTTPResponse(r []byte) []byte {
+	rsp, _, _ := lowhttp.FixHTTPResponse(r)
+	return rsp
+}
+
+// CurlToHTTPRequest 尝试将curl命令转换为HTTP请求报文，其返回值为bytes，即转换后的HTTP请求报文
+// Example:
+// ```
+// poc.CurlToHTTPRequest("curl -X POST -d 'a=b&c=d' http://example.com")
+// ```
+func curlToHTTPRequest(command string) []byte {
+	raw, err := lowhttp.CurlToHTTPRequest(command)
+	if err != nil {
+		log.Errorf(`CurlToHTTPRequest failed: %s`, err)
+	}
+	return raw
+}
+
+// HTTPRequestToCurl 尝试将HTTP请求报文转换为curl命令。第一个参数为是否使用HTTPS，第二个参数为HTTP请求报文，其返回值为string，即转换后的curl命令
+// Example:
+// ```
+// poc.HTTPRequestToCurl(true, "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+// ```
+func httpRequestToCurl(https bool, i any) string {
+	cmd, err := lowhttp.GetCurlCommand(https, utils.InterfaceToBytes(i))
+	if err != nil {
+		log.Errorf(`http2curl.GetCurlCommand(req): %v`, err)
+		return ""
+	}
+	return cmd.String()
 }
 
 var PoCExports = map[string]interface{}{
 	"HTTP":         pocHTTP,
 	"HTTPEx":       pocHTTPEx,
+	"BasicRequest": lowhttp.BasicRequest,
 	"BuildRequest": buildRequest,
-	"Get":          methodDo("GET"),
-	"Post":         methodDo("POST"),
-	"Head":         methodDo("HEAD"),
-	"Delete":       methodDo("DELETE"),
-	"Options":      methodDo("OPTIONS"),
+	"Get":          doGET,
+	"Post":         doPOST,
+	"Head":         doHEAD,
+	"Delete":       doDELETE,
+	"Options":      doOPTIONS,
 	"Do":           do,
 	// websocket，可以直接复用 HTTP 参数
-	"Websocket": wsShortcut,
+	"Websocket": doWebSocket,
 
 	// options
 	"host":                 _pocOptWithHost,
@@ -848,6 +1294,7 @@ var PoCExports = map[string]interface{}{
 	"retryInStatusCode":    _pocOptWithRetryInStatusCode,
 	"retryNotInStatusCode": _pocOptWithRetryNotInStausCode,
 	"retryWaitTime":        _pocOptWithRetryWaitTime,
+	"retryMaxWaitTime":     _pocOptWithRetryMaxWaitTime,
 	"redirectTimes":        _pocOptWithRedirectTimes,
 	"noRedirect":           _pocOptWithNoRedirect,
 	"jsRedirect":           _pocOptWithJSRedirect,
@@ -891,12 +1338,9 @@ var PoCExports = map[string]interface{}{
 	"deleteForm":            _pocOptDeleteForm,
 
 	// split
-	"Split":          lowhttp.SplitHTTPHeadersAndBodyFromPacket,
-	"FixHTTPRequest": lowhttp.FixHTTPRequest,
-	"FixHTTPResponse": func(r []byte) []byte {
-		rsp, _, _ := lowhttp.FixHTTPResponse(r)
-		return rsp
-	},
+	"Split":           split,
+	"FixHTTPRequest":  fixHTTPRequest,
+	"FixHTTPResponse": fixHTTPResponse,
 
 	// packet helper
 	"ReplaceBody":              lowhttp.ReplaceHTTPPacketBody,
@@ -948,20 +1392,7 @@ var PoCExports = map[string]interface{}{
 	"GetHTTPPacketFirstLine":      lowhttp.GetHTTPPacketFirstLine,
 	"GetStatusCodeFromResponse":   lowhttp.GetStatusCodeFromResponse,
 
-	"CurlToHTTPRequest": func(c string) []byte {
-		raw, err := lowhttp.CurlToHTTPRequest(c)
-		if err != nil {
-			log.Errorf(`CurlToHTTPRequest failed: %s`, err)
-		}
-		return raw
-	},
-	"HTTPRequestToCurl": func(https bool, i any) string {
-		cmd, err := lowhttp.GetCurlCommand(https, utils.InterfaceToBytes(i))
-		if err != nil {
-			log.Errorf(`http2curl.GetCurlCommand(req): %v`, err)
-			return ""
-		}
-		return cmd.String()
-	},
-	"IsResponse": lowhttp.IsResp,
+	"CurlToHTTPRequest": curlToHTTPRequest,
+	"HTTPRequestToCurl": httpRequestToCurl,
+	"IsResponse":        lowhttp.IsResp,
 }

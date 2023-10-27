@@ -320,7 +320,14 @@ func RemoveCEHeaders(headerBytes []byte) []byte {
 //	return contentLengthRegexpCase.ReplaceAll(headerBytes, []byte{})
 //}
 
-// ReplaceHTTPPacketBody 将原始 HTTP 请求报文中的 body 替换为指定的 body，并指定是否为 chunked，返回新的 HTTP 请求报文
+// ReplaceBody 将原始 HTTP 请求报文中的 body 替换为指定的 body，并指定是否为 chunked，返回新的 HTTP 请求报文
+// Example:
+// ```
+// poc.ReplaceBody(`POST / HTTP/1.1
+// Host: example.com
+// Content-Length: 11
+//
+// hello world`, "hello yak", false)
 func ReplaceHTTPPacketBody(raw []byte, body []byte, chunk bool) (newHTTPRequest []byte) {
 	return ReplaceHTTPPacketBodyEx(raw, body, chunk, false)
 }

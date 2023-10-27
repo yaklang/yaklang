@@ -40,8 +40,12 @@ func GenerateSingleFile(basepath string, lib *yakdoc.ScriptLib) {
 		document = strings.ReplaceAll(document, "<", "&lt;")
 		document = strings.ReplaceAll(document, ">", "&gt;")
 		ellipsis := document
-		if len(ellipsis) > 150 {
-			ellipsis = ellipsis[:150] + "..."
+		ellipsis = strings.ReplaceAll(ellipsis, "\r", "")
+		ellipsis = strings.ReplaceAll(ellipsis, "\n", " ")
+		ellipsisRunes := []rune(ellipsis)
+		if len(ellipsisRunes) > 150 {
+			ellipsis = fmt.Sprintf("%s...", string(ellipsisRunes[:150]))
+			ellipsis = strings.ReplaceAll(ellipsis, "|", "\\|")
 		}
 
 		lowerMethodName := strings.ToLower(fun.MethodName)
