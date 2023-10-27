@@ -118,6 +118,15 @@ func (q *QueryParams) Set(key, val string) {
 	q.Items = append(q.Items, &QueryParamItem{Key: key, Value: val, NoAutoEncode: q.NoAutoEncode})
 }
 
+func (q *QueryParams) Have(key string) bool {
+	for _, item := range q.Items {
+		if item.Key == key {
+			return true
+		}
+	}
+	return false
+}
+
 func (q *QueryParams) Remove(key string) {
 	q.Items = lo.Filter(q.Items, func(item *QueryParamItem, _ int) bool {
 		if item.Key == key {

@@ -11,6 +11,7 @@ import (
 	"net/textproto"
 	"net/url"
 	"path"
+	"sort"
 	"strings"
 	"unsafe"
 
@@ -262,9 +263,35 @@ func handleHTTPPacketQueryParam(packet []byte, noAutoEncode bool, callback func(
 func ReplaceAllHTTPPacketQueryParams(packet []byte, values map[string]string) []byte {
 	return handleHTTPPacketQueryParam(packet, false, func(q *QueryParams) {
 		// clear all values
-		q.Items = make([]*QueryParamItem, 0, len(values))
+		var shouldRemove = make(map[string]struct{})
+		var shouldReplace = make(map[string]string)
+		for _, item := range q.Items {
+			_, ok := values[item.Key]
+			if !ok {
+				shouldRemove[item.Key] = struct{}{}
+			} else {
+				shouldReplace[item.Key] = values[item.Key]
+			}
+		}
+
+		for k := range shouldRemove {
+			q.Remove(k)
+		}
+		var extraItem []*QueryParamItem
 		for k, v := range values {
-			q.Set(k, v)
+			_, ok := shouldReplace[k]
+			if ok {
+				q.Set(k, v)
+			} else {
+				extraItem = append(extraItem, &QueryParamItem{Key: k, Value: v})
+			}
+		}
+
+		if len(extraItem) > 0 {
+			sort.SliceStable(extraItem, func(i, j int) bool {
+				return extraItem[i].Key < extraItem[j].Key
+			})
+			q.Items = append(q.Items, extraItem...)
 		}
 	})
 }
