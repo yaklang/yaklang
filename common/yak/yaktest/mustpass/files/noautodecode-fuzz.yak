@@ -19,3 +19,23 @@ Host: www.baidu.com
     check = resp.Contains("a=&&&")
 }
 assert check
+
+methodpass = false
+bodypass = false
+for param in fuzz.HTTPRequest(`GET / HTTP/1.1
+Host: www.example.com
+
+`)~.GetAllParams()~ {
+    dump(param.Position())
+    if param.Position() in [ "method", "body"] {
+        resp = param.Fuzz("HEHAD").Show().GetFirstFuzzHTTPRequest()~.GetBytes()~
+        if !methodpass {
+            methodpass = resp.Contains("HEHAD / HTTP/1.1")
+        }
+        if !bodypass {
+            bodypass = resp.Contains("Content-Length: 5\r\n\r\nHEHAD")
+        }
+    }
+}
+assert methodpass, "method fuzz failed"
+assert bodypass, "body fuzz failed"
