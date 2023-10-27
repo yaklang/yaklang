@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-func TestReMatcher(t *testing.T) {
+func TestGRPCMUSTPASS_ReMatcher(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
 	var mu sync.Mutex
@@ -89,7 +89,7 @@ func TestReMatcher(t *testing.T) {
 	}
 }
 
-func TestReMatcherWithParams(t *testing.T) {
+func TestGRPCMUSTPASS_ReMatcherWithParams(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
 	var mu sync.Mutex
@@ -142,7 +142,7 @@ func TestReMatcherWithParams(t *testing.T) {
 		MatcherType: "expr",
 		Scope:       "raw",
 		Condition:   "and",
-		Group:       []string{"extractParam == fuzzParam"},
+		Group:       []string{"contains(body,fuzzParam)", "extractParam == fuzzParam"},
 		ExprType:    "nuclei-dsl",
 	}
 

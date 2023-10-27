@@ -301,15 +301,15 @@ func (y *YakMatcher) executeRaw(config *Config, rsp []byte, duration float64, va
 		case "nuclei-dsl", "nuclei":
 			dslEngine := NewNucleiDSLYakSandbox()
 			matcherFunc = func(fullResponse string, sub string) bool {
-				if vars == nil {
-					vars = LoadVarFromRawResponse(rsp, duration, sufs...)
-				}
-
+				loadVars := LoadVarFromRawResponse(rsp, duration, sufs...)
+				//加载 resp 中的变量
 				varsOperatorMutex.Lock()
-				vars = utils.CopyMapInterface(vars)
+				for k, v := range vars { // 合并若有重名以 vars 为准
+					loadVars[k] = v
+				}
 				varsOperatorMutex.Unlock()
 
-				result, err := dslEngine.ExecuteAsBool(sub, vars)
+				result, err := dslEngine.ExecuteAsBool(sub, loadVars)
 				if err != nil {
 					log.Errorf("dsl engine execute as bool failed: %s", err)
 					return false
