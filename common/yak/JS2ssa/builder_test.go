@@ -66,3 +66,21 @@ func TestBreak(t *testing.T) {
 	`)
 	prog.Show()
 }
+
+func TestSwitch(t *testing.T) {
+	prog := ParseSSA(`
+	const fruit = "apple";
+
+switch (fruit) {
+  case "apple":
+  case "banana":
+    print("这是一个香蕉");
+  case "orange":
+    print("这是一个橙子");
+  default:
+    print("未知水果");
+}
+	`)
+
+	prog.Show()
+}

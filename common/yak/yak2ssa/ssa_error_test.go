@@ -998,3 +998,28 @@ func TestTryCatch(t *testing.T) {
 	})
 
 }
+
+func TestSwitch(t *testing.T) {
+	t.Run("test switch cfg", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+		fruit = "banana";
+
+		switch (fruit) {
+ 			case "apple":
+  			case "banana":
+    			a = 1
+  			case "orange":
+    			a = 2
+  			default:
+    			b = a
+			}
+        `,
+			errs: []string{
+				ssa4analyze.ValueUndefined("a"),
+				ssa4analyze.BlockUnreachable(),
+				ssa4analyze.BlockUnreachable(),
+			},
+		})
+	})
+}
