@@ -31,7 +31,7 @@ func init() {
 	yaklib.FuzzExports["FuzzCalcExprInt64Safe"] = FuzzCalcExpr3
 }
 
-func FuzzCalcExpr3() map[string]interface{} {
+func FuzzCalcExpr3() map[string]any {
 	vars := NewVars()
 	// int32 max: 2147483647               (10位)
 	// int64 max: 9223372036854775807      (19位)
@@ -45,7 +45,7 @@ func FuzzCalcExpr3() map[string]interface{} {
 	return vars.ToMap()
 }
 
-func FuzzCalcExpr2() map[string]interface{} {
+func FuzzCalcExpr2() map[string]any {
 	vars := NewVars()
 	// int32 max: 2147483647               (10位)
 	// int64 max: 9223372036854775807      (19位)
@@ -59,7 +59,7 @@ func FuzzCalcExpr2() map[string]interface{} {
 	return vars.ToMap()
 }
 
-func FuzzCalcExpr() map[string]interface{} {
+func FuzzCalcExpr() map[string]any {
 	vars := NewVars()
 	var day string
 	var month string

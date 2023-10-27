@@ -2,6 +2,7 @@ package httptpl
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -10,6 +11,94 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
+func TestCreateYakTemplate(t *testing.T) {
+	raw := `
+id: hue-default-credential
+
+info:
+  name: Cloudera Hue Default Admin Login
+  author: For3stCo1d
+  severity: high
+  description: Cloudera Hue default admin credentials were discovered.
+  reference:
+    - https://github.com/cloudera/hue
+  classification:
+    cvss-metrics: CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:C/C:L/I:L/A:L
+    cvss-score: 8.3
+    cwe-id: CWE-522
+  metadata:
+    max-request: 8
+    shodan-query: title:"Hue - Welcome to Hue"
+  tags: hue,default-login,oss,cloudera
+variables:
+  filename: '{{replace(BaseURL,"/","_")}}'
+  dir: "screenshots"
+http:
+  - raw:
+      - |
+        GET /hue/accounts/login?next=/ HTTP/1.1
+        Host: {{Hostname}}
+      - |
+        POST /hue/accounts/login HTTP/1.1
+        Host: {{Hostname}}
+        Content-Type: application/x-www-form-urlencoded
+
+        csrfmiddlewaretoken={{csrfmiddlewaretoken}}&username={{user}}&password={{pass}}&next=%2F
+
+  - method: GET
+    path:
+      - "{{BaseURL}}/wp-content/plugins/sucuri-scanner/readme.txt"
+
+    attack: pitchfork
+    payloads:
+      user:
+        - admin
+        - hue
+        - hadoop
+        - cloudera
+      pass:
+        - admin
+        - hue
+        - hadoop
+        - cloudera
+    cookie-reuse: true
+
+    extractors:
+      - type: regex
+        name: csrfmiddlewaretoken
+        part: body
+        internal: true
+        group: 1
+        regex:
+          - name='csrfmiddlewaretoken' value='(.+?)'
+    req-condition: true
+    stop-at-first-match: true
+
+    matchers-condition: and
+    matchers:
+      - type: dsl
+        dsl:
+          - contains(tolower(body_1), 'welcome to hue')
+          - contains(tolower(header_2), 'csrftoken=')
+          - contains(tolower(header_2), 'sessionid=')
+        condition: and
+
+      - type: status
+        status:
+          - 302
+`
+	tmp, err := CreateYakTemplateFromNucleiTemplateRaw(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, 2, len(tmp.HTTPRequestSequences), "parse HTTPRequestSequences error")
+	assert.Equal(t, 2, len(tmp.HTTPRequestSequences[0].HTTPRequests), "parse HTTPRequests error")
+	assert.Equal(t, 1, len(tmp.HTTPRequestSequences[1].Paths), "parse HTTPRequests error")
+	assert.Equal(t, "GET", tmp.HTTPRequestSequences[1].Method, "parse HTTPRequests error")
+	rawVarMap := tmp.Variables.GetRaw()
+	assert.Equal(t, "{{replace(BaseURL,\"/\",\"_\")}}", rawVarMap["filename"].Data, "parse variables error")
+	assert.Equal(t, "screenshots", rawVarMap["dir"].Data, "parse variables error")
+}
 func TestCreateYakTemplateFromSelfContained(t *testing.T) {
 	var demo = `
 id: self-contained-file-input

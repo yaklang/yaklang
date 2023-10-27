@@ -1,9 +1,8 @@
 package httptpl
 
 import (
-	"bytes"
 	"errors"
-	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/log"
 	"strings"
 	"sync"
 )
@@ -18,14 +17,16 @@ const (
 type TemplateVarType string
 
 const (
-	FuzztagType   TemplateVarType = "fuzztag"
-	RawType       TemplateVarType = "raw"
-	NucleiDslType TemplateVarType = "nuclei-dsl"
+	FuzztagType       TemplateVarType = "fuzztag"
+	RawType           TemplateVarType = "raw"
+	NucleiDslType     TemplateVarType = "nuclei-dsl"
+	NucleiDynDataType TemplateVarType = "nuclei-dyn-data"
 )
 
 type Var struct {
-	Type TemplateVarType // 需要在保证nuclei中可以正确解析的情况下，携带类型信息，所以对于除nuclei-dsl类型的变量，在值前增加@raw、@fuzztag标记类型
-	Data string
+	Type    TemplateVarType // 需要在保证nuclei中可以正确解析的情况下，携带类型信息，所以对于除nuclei-dsl类型的变量，在值前增加@raw、@fuzztag标记类型
+	Data    string
+	DynData func() string
 	//Tags []*NucleiTagData
 }
 
@@ -60,14 +61,22 @@ type YakVariables struct {
 	nucleiSandboxInitOnce *sync.Once
 	raw                   map[string]*Var
 
-	outputCache map[string]interface{}
+	exprCache   map[string]any
 	outputMutex *sync.Mutex
 }
 
+func (v *YakVariables) SetDynamicData(key string, d func() string) {
+	v.raw[key] = &Var{
+		Type:    NucleiDynDataType,
+		DynData: d,
+	}
+}
 func (v *YakVariables) Set(key string, value string) {
 	v.SetWithType(key, value, string(RawType))
 }
 func (v *YakVariables) SetWithType(key string, value string, typeName string) error {
+	v.outputMutex.Lock()
+	defer v.outputMutex.Unlock()
 	var tempType TemplateVarType
 	switch typeName {
 	case string(FuzztagType):
@@ -84,6 +93,8 @@ func (v *YakVariables) SetWithType(key string, value string, typeName string) er
 }
 
 func (v *YakVariables) SetAsNucleiTags(key string, value string) {
+	v.outputMutex.Lock()
+	defer v.outputMutex.Unlock()
 	v.raw[key] = &Var{
 		Type: "nuclei-dsl",
 		Data: value,
@@ -91,10 +102,14 @@ func (v *YakVariables) SetAsNucleiTags(key string, value string) {
 }
 
 func (v *YakVariables) AutoSet(key string, value string) {
+	v.outputMutex.Lock()
+	defer v.outputMutex.Unlock()
 	v.raw[key] = NewVar(value)
 }
 
 func (v *YakVariables) SetNucleiDSL(key string, value string) {
+	v.outputMutex.Lock()
+	defer v.outputMutex.Unlock()
 	v.raw[key] = &Var{
 		Type: NucleiDslType,
 		Data: value,
@@ -103,39 +118,66 @@ func (v *YakVariables) SetNucleiDSL(key string, value string) {
 func (v *YakVariables) GetRaw() map[string]*Var {
 	return v.raw
 }
-func (v *YakVariables) ToMap() map[string]interface{} {
+
+func (v *YakVariables) ToMap() map[string]any {
+	res := map[string]any{}
+	if v == nil {
+		return nil
+	}
 	v.outputMutex.Lock()
 	defer v.outputMutex.Unlock()
 
-	if v.outputCache != nil {
-		return v.outputCache
-	}
-	res := map[string]any{}
-	for k, v := range VariablesToMap(v) {
-		res[k] = v
-	}
-	return res
-}
-
-func ExecuteNucleiTags(tags []*NucleiTagData, sandbox *NucleiDSL, vars map[string]interface{}) (string, bool, []string) {
-	var buf bytes.Buffer
-	var deps []string
-	for _, tag := range tags {
-		if tag.IsExpr {
-			if result, missed := IsExprReady(tag.Content, vars); !result {
-				deps = append(deps, missed...)
-			} else {
-				exprResult, _ := sandbox.Execute(tag.Content, vars)
-				buf.WriteString(toString(exprResult))
+	var getVar, getVarAndWriteCache func(v *Var) (any, error)
+	getVar = func(s *Var) (any, error) {
+		switch s.Type {
+		case NucleiDslType:
+			res, err := execNucleiTag(s.Data, nil, func(s string) (string, error) {
+				if v, ok := res[s]; ok {
+					return toString(v), nil
+				}
+				v, err := getVarAndWriteCache(v.raw[s])
+				if err != nil {
+					return "", err
+				}
+				res[s] = toString(v)
+				return toString(v), nil
+			}, "")
+			if err != nil {
+				return nil, err
 			}
-		} else {
-			buf.WriteString(tag.Content)
+			return res[0], err
+		case NucleiDynDataType:
+			return []byte(s.DynData()), nil
+		case RawType:
+			return []byte(s.Data), nil
+		default:
+			return nil, errors.New("unsupported var type")
 		}
 	}
-	if len(deps) > 0 {
-		return "", false, utils.RemoveRepeatStringSlice(deps)
+	getVarAndWriteCache = func(yakVar *Var) (any, error) {
+		if yakVar.Type == NucleiDslType {
+			if val, ok := v.exprCache[yakVar.Data]; ok {
+				return toBytes(val), nil
+			}
+		}
+		res, err := getVar(yakVar)
+		if yakVar.Type == NucleiDslType {
+			v.exprCache[yakVar.Data] = res
+		}
+		return res, err
 	}
-	return buf.String(), true, nil
+	for k, v := range v.raw {
+		if _, ok := res[k]; ok {
+			continue
+		}
+		val, err := getVarAndWriteCache(v)
+		if err != nil {
+			log.Error(err)
+			continue
+		}
+		res[k] = val
+	}
+	return res
 }
 
 func NewVars() *YakVariables {
@@ -143,5 +185,6 @@ func NewVars() *YakVariables {
 		raw:                   make(map[string]*Var),
 		nucleiSandboxInitOnce: new(sync.Once),
 		outputMutex:           new(sync.Mutex),
+		exprCache:             make(map[string]any),
 	}
 }

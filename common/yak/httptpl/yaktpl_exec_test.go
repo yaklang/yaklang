@@ -1,10 +1,17 @@
 package httptpl
 
 import (
+	"bytes"
+	"context"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/facades"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"net/http"
+	"net/url"
 	"testing"
 	"time"
 )
@@ -1392,6 +1399,274 @@ requests:
 			t.Error("not checked")
 			println(demo)
 			t.FailNow()
+		}
+	}
+}
+func TestRenderPackage(t *testing.T) {
+	server, port := utils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
+TestDebug: 111
+`))
+	spew.Dump(server, port)
+
+	for _, caseItem := range [][]any{
+		{`
+id: CVE-2017-12149
+
+info:
+  name: Jboss Application Server - Remote Code Execution
+  author: fopina,s0obi
+  severity: critical
+  description: Jboss Application Server as shipped with Red Hat Enterprise Application Platform 5.2 is susceptible to a remote code execution vulnerability because  the doFilter method in the ReadOnlyAccessFilter of the HTTP Invoker does not restrict classes for which it performs deserialization, thus allowing an attacker to execute arbitrary code via crafted serialized data.
+  reference:
+    - https://chowdera.com/2020/12/20201229190934023w.html
+    - https://github.com/vulhub/vulhub/tree/master/jboss/CVE-2017-12149
+    - https://nvd.nist.gov/vuln/detail/CVE-2017-12149
+    - https://bugzilla.redhat.com/show_bug.cgi?id=1486220
+  classification:
+    cvss-metrics: CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H
+    cvss-score: 9.8
+    cve-id: CVE-2017-12149
+    cwe-id: CWE-502
+  tags: java,rce,deserialization,kev,vulhub,cve,cve2017,jboss
+
+requests:
+  - raw:
+      - |
+        POST /invoker/JMXInvokerServlet/ HTTP/1.1
+        Host: {{Hostname}}
+        Content-Type: application/octet-stream
+
+        aaa
+
+      - |
+        POST /invoker/EJBInvokerServlet/ HTTP/1.1
+        Host: {{Hostname}}
+        Content-Type: application/octet-stream
+
+        aaa
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "ClassCastException"
+
+      - type: status
+        status:
+          - 200
+          - 500
+  - method: GET
+    path:
+      - '{{BaseURL}}/wp-content/'
+    matchers-condition: and
+    matchers:
+      - type: word
+        part: body
+        words:
+          - "ClassCastException"
+
+      - type: status
+        status:
+          - 200
+          - 500
+`, true},
+	} {
+		demo, expected := caseItem[0].(string), caseItem[1].(bool)
+		expectedMatched := expected
+		_ = expectedMatched
+		if len(caseItem) > 2 {
+			expectedMatched = caseItem[2].(bool)
+		}
+
+		ytpl, err := CreateYakTemplateFromNucleiTemplateRaw(demo)
+		if err != nil {
+			panic(err)
+		}
+
+		expect := []string{
+			`POST /invoker/JMXInvokerServlet/ HTTP/1.1
+Host: www.baidu.com
+Content-Type: application/octet-stream
+
+aaa`,
+			`POST /invoker/EJBInvokerServlet/ HTTP/1.1
+Host: www.baidu.com
+Content-Type: application/octet-stream
+
+aaa`,
+			`GET /wp-content/ HTTP/1.1
+Host: www.baidu.com
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Safari/537.36
+
+`,
+		}
+		i := 0
+		_ = expect
+		config := NewConfig(WithBeforeSendPackage(func(data []byte, isHttps bool) []byte {
+			defer func() { i++ }()
+			stringData := string(bytes.Replace(data, []byte("\r"), []byte{}, -1))
+			assert.Equal(t, expect[i], stringData, "unexpect packet")
+			return data
+		}), WithConcurrentInTemplates(1))
+		n, err := ytpl.ExecWithUrl("http://www.baidu.com", config, lowhttp.WithHost(server), lowhttp.WithPort(port))
+		if err != nil {
+			panic(err)
+		}
+		assert.Equal(t, 3, n, "send packet number is wrong")
+
+	}
+}
+func TestMockTest_OOB(t *testing.T) {
+	dnsserver := facades.MockDNSServer(context.Background(), "aaa.asdgiqwfkbas.com", 8901, func(record string, domain string) string {
+		return "1.1.1.1"
+	})
+	server, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Write([]byte("ok"))
+		u := request.URL.Query().Get("consumerUri")
+		urlIns, err := url.Parse(u)
+		if err != nil {
+			t.Fatal(err)
+			return
+		}
+		netx.LookupFirst(urlIns.Host, netx.WithTimeout(time.Second), netx.WithDNSServers(dnsserver), netx.WithDNSDisableSystemResolver(true))
+	})
+	tmp := `id: CVE-2017-9506
+
+info:
+  name: Atlassian Jira IconURIServlet - Cross-Site Scripting/Server-Side Request Forgery
+  author: pdteam
+  severity: medium
+  description: The Atlassian Jira IconUriServlet of the OAuth Plugin from version 1.3.0 before version 1.9.12 and from version 2.0.0 before version 2.0.4 contains a cross-site scripting vulnerability which allows remote attackers to access the content of internal network resources and/or perform an attack via Server Side Request Forgery.
+  remediation: |
+    Apply the latest security patches provided by Atlassian to mitigate these vulnerabilities.
+  reference:
+    - http://dontpanic.42.nl/2017/12/there-is-proxy-in-your-atlassian.html
+    - https://ecosystem.atlassian.net/browse/OAUTH-344
+    - https://medium.com/bugbountywriteup/piercing-the-veil-server-side-request-forgery-to-niprnet-access-171018bca2c3
+    - https://nvd.nist.gov/vuln/detail/CVE-2017-9506
+  classification:
+    cvss-metrics: CVSS:3.0/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N
+    cvss-score: 6.1
+    cve-id: CVE-2017-9506
+    cwe-id: CWE-918
+    epss-score: 0.00575
+    epss-percentile: 0.75469
+    cpe: cpe:2.3:a:atlassian:oauth:1.3.0:*:*:*:*:*:*:*
+  metadata:
+    max-request: 1
+    vendor: atlassian
+    product: oauth
+    shodan-query: http.component:"Atlassian Jira"
+  tags: cve,cve2017,atlassian,jira,ssrf,oast
+
+http:
+  - raw:
+      - |
+        GET /plugins/servlet/oauth/users/icon-uri?consumerUri=http://{{interactsh-url}} HTTP/1.1
+        Host: {{Hostname}}
+        Origin: {{BaseURL}}
+
+    matchers:
+      - type: word
+        part: interactsh_protocol # Confirms the HTTP Interaction
+        words:
+          - "http"
+
+# digest: 4a0a0047304502203f149b24ebd177d43629ee418d28fc0878939ccdd4283537cbaced55a753b59f0221008b8e75e9de7c7ddd6fd2ffe85e574fc9b523f0980011ed7a71df7e6d8475ec4a:922c64590222798bb761d5b6d8e72950`
+	tmpIns, err := CreateYakTemplateFromNucleiTemplateRaw(tmp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ok := false
+	config := NewConfig(WithOOBRequireCallback(func(f ...float64) (string, string, error) {
+		return "a.aaa.asdgiqwfkbas.com", "token", nil
+	}), WithOOBRequireCheckingTrigger(func(s string, f ...float64) bool {
+		if s == "token" {
+			ok = true
+			return true
+		}
+		return false
+	}))
+	tmpIns.ExecWithUrl("http://www.baidu.com", config, lowhttp.WithHost(server), lowhttp.WithPort(port))
+	if !ok {
+		t.Error("test oob error")
+	}
+}
+func TestMockTest_Body(t *testing.T) {
+	server, port := utils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
+TestDebug: 111
+
+Post Meta Setting Deleted Successfully
+`))
+	spew.Dump(server, port)
+
+	for _, caseItem := range [][]any{
+		{`id: CVE-2022-0693
+
+info:
+  name: WordPress Master Elements <=8.0 - SQL Injection
+  author: theamanrawat
+  severity: critical
+  description: |
+    WordPress Master Elements plugin through 8.0 contains a SQL injection vulnerability. The plugin does not validate and escape the meta_ids parameter of its remove_post_meta_condition AJAX action, available to both unauthenticated and authenticated users, before using it in a SQL statement. An attacker can possibly obtain sensitive information, modify data, and/or execute unauthorized administrative operations in the context of the affected site.
+  remediation: |
+    Update to the latest version of WordPress Master Elements plugin (>=8.1) to mitigate the SQL Injection vulnerability.
+  reference:
+    - https://wpscan.com/vulnerability/a72bf075-fd4b-4aa5-b4a4-5f62a0620643
+    - https://wordpress.org/plugins/master-elements
+    - https://nvd.nist.gov/vuln/detail/CVE-2022-0693
+  classification:
+    cvss-metrics: CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H
+    cvss-score: 9.8
+    cve-id: CVE-2022-0693
+    cwe-id: CWE-89
+    epss-score: 0.01519
+    epss-percentile: 0.85576
+    cpe: cpe:2.3:a:devbunch:master_elements:*:*:*:*:*:wordpress:*:*
+  metadata:
+    verified: true
+    max-request: 1
+    vendor: devbunch
+    product: master_elements
+    framework: wordpress
+  tags: unauth,wpscan,wp-plugin,wp,sqli,wordpress,master-elements,cve,cve2022
+
+http:
+  - raw:
+      - |
+        @timeout: 10s
+        GET /wp-admin/admin-ajax.php?meta_ids=1+AND+(SELECT+3066+FROM+(SELECT(SLEEP(6)))CEHy)&action=remove_post_meta_condition HTTP/1.1
+        Host: {{Hostname}}
+
+    matchers:
+      - type: dsl
+        dsl:
+          - 'duration>=0'
+          - 'status_code == 200'
+          - 'contains(body, "Post Meta Setting Deleted Successfully")'
+        condition: and
+# digest: 4a0a00473045022100d388bf1ba27db50c2339d0dfda041fa175e2b526fdf0eaa555ce4f128caa2c3e02206509a935080f2a103a7539246f094281fdee05b4f25403196fa77f93a3880b40:922c64590222798bb761d5b6d8e72950`, true},
+	} {
+		demo, expected := caseItem[0].(string), caseItem[1].(bool)
+		expectedMatched := expected
+		_ = expectedMatched
+		if len(caseItem) > 2 {
+			expectedMatched = caseItem[2].(bool)
+		}
+
+		ytpl, err := CreateYakTemplateFromNucleiTemplateRaw(demo)
+		if err != nil {
+			panic(err)
+		}
+		check := false
+		config := NewConfig(WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+			check = result
+		}))
+		_, err = ytpl.ExecWithUrl("http://www.baidu.com", config, lowhttp.WithHost(server), lowhttp.WithPort(port))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !check {
+			t.Fatal("check body error")
 		}
 	}
 }
