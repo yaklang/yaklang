@@ -729,13 +729,20 @@ func FixRequestHostAndPort(r *http.Request) {
 	r.URL.Host = r.Host
 }
 
-// IsResp test if bytesstream is http response
-func IsResp(data any) bool {
-	switch data := data.(type) {
-	case string:
-		return strings.HasPrefix(strings.TrimLeftFunc(data, unicode.IsSpace), "HTTP/")
+// IsResp 判断传入的数据是否为 HTTP 响应报文
+// Example:
+// ```
+// poc.IsResp(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok") // true
+// ```
+func IsResp(i any) bool {
+
+	switch data := i.(type) {
 	case []byte:
-		return bytes.HasPrefix(bytes.TrimLeftFunc(data, unicode.IsSpace), []byte("HTTP/"))
+		_, err := ParseBytesToHTTPResponse(data)
+		return err == nil
+	case string:
+		_, err := ParseBytesToHTTPResponse(utils.UnsafeStringToBytes(data))
+		return err == nil
 	case http.Response, *http.Response:
 		return true
 	}
