@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/samber/lo"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -291,7 +292,9 @@ func ReplaceAllHTTPPacketQueryParams(packet []byte, values map[string]string) []
 			sort.SliceStable(extraItem, func(i, j int) bool {
 				return extraItem[i].Key < extraItem[j].Key
 			})
-			q.Items = append(q.Items, extraItem...)
+			lo.ForEach(extraItem, func(item *QueryParamItem, _ int) {
+				q.Set(item.Key, item.Value)
+			})
 		}
 	})
 }
