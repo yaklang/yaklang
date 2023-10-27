@@ -1039,37 +1039,41 @@ Host: www.baidu.com
 }
 
 func TestReplaceAllHttpPacketQueryParams(t *testing.T) {
-	testcases := []struct {
-		origin   string
-		values   map[string]string
-		expected string
-	}{
-		{
-			origin: `GET / HTTP/1.1
+	for i := 0; i < 500; i++ {
+		testcases := []struct {
+			origin   string
+			values   map[string]string
+			expected string
+		}{
+			{
+				origin: `GET / HTTP/1.1
 Host: www.baidu.com
-`,
-			values: map[string]string{"a": "1", "b": "2"},
-			expected: `GET /?a=1&b=2 HTTP/1.1
+	`,
+				values: map[string]string{"a": "1", "b": "2"},
+				expected: `GET /?a=1&b=2 HTTP/1.1
 Host: www.baidu.com
-`,
-		},
-		{
-			origin: `GET /?c=3 HTTP/1.1
+	`,
+			},
+			{
+				origin: `GET /?c=3 HTTP/1.1
 Host: www.baidu.com
-`,
-			values: map[string]string{"a": "1", "b": "2"},
-			expected: `GET /?a=1&b=2 HTTP/1.1
+	`,
+				values: map[string]string{"a": "1", "b": "2"},
+				expected: `GET /?a=1&b=2 HTTP/1.1
 Host: www.baidu.com
-`,
-		},
-	}
-	for _, testcase := range testcases {
-		actual := ReplaceAllHTTPPacketQueryParams([]byte(testcase.origin), testcase.values)
-		expected := FixHTTPPacketCRLF([]byte(testcase.expected), false)
-		if bytes.Compare(actual, expected) != 0 {
-			t.Fatalf("ReplaceAllHTTPPacketQueryParams failed: %s", string(actual))
+	`,
+			},
+		}
+		for _, testcase := range testcases {
+			actual := ReplaceAllHTTPPacketQueryParams([]byte(testcase.origin), testcase.values)
+			expected := FixHTTPPacketCRLF([]byte(testcase.expected), false)
+			if bytes.Compare(actual, expected) != 0 {
+				expected = FixHTTPPacketCRLF([]byte(testcase.expected), false)
+				t.Fatalf("ReplaceAllHTTPPacketQueryParams failed:\n %s\n!=\n%s", spew.Sdump(actual), spew.Sdump(expected))
+			}
 		}
 	}
+
 }
 
 func TestAppendHTTPPacketQueryParam(t *testing.T) {
