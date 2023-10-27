@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"crypto/sha1"
 	"fmt"
 	"io"
 	"os"
@@ -18,6 +19,7 @@ const (
 var (
 	currentAbsPath string = getCurrentAbsPathByExecutable()
 	skipNum        int    = 3
+	skipBottomNum  int    = 2
 )
 
 // Frame represents a program counter inside a stack frame.
@@ -34,7 +36,7 @@ func (f Frame) pc() uintptr { return uintptr(f) - 1 }
 func (f Frame) file() string {
 	fn := runtime.FuncForPC(f.pc())
 	if fn == nil {
-		return "unknown"
+		return ""
 	}
 	file, _ := fn.FileLine(f.pc())
 	return file
@@ -55,7 +57,7 @@ func (f Frame) line() int {
 func (f Frame) name() string {
 	fn := runtime.FuncForPC(f.pc())
 	if fn == nil {
-		return "unknown"
+		return ""
 	}
 	return fn.Name()
 }
@@ -77,6 +79,9 @@ func (f Frame) Format(s fmt.State, verb rune) {
 	case 's':
 		switch {
 		case s.Flag('+'):
+			if f == 0 {
+				break
+			}
 			io.WriteString(s, f.name())
 			io.WriteString(s, "\n\t")
 			io.WriteString(s, filename(f.file()))
@@ -98,7 +103,7 @@ func (f Frame) Format(s fmt.State, verb rune) {
 // same as that of fmt.Sprintf("%+v", f), but without newlines or tabs.
 func (f Frame) MarshalText() ([]byte, error) {
 	name := f.name()
-	if name == "unknown" {
+	if name == "" {
 		return []byte(name), nil
 	}
 	return []byte(fmt.Sprintf("%s %s:%d", name, filename(f.file()), f.line())), nil
@@ -121,6 +126,10 @@ func (st StackTrace) Format(s fmt.State, verb rune) {
 		switch {
 		case s.Flag('+'):
 			for _, f := range st {
+				if f == 0 {
+					fmt.Fprintf(s, "\n--------------------------------------------------")
+					continue
+				}
 				io.WriteString(s, "\n")
 				f.Format(s, verb)
 			}
@@ -148,14 +157,21 @@ func (st StackTrace) formatSlice(s fmt.State, verb rune) {
 }
 
 // stack represents a stack of program counters.
-type stack []uintptr
+type stack struct {
+	st    []uintptr
+	hashs map[[20]byte]struct{}
+}
 
 func (s *stack) Format(st fmt.State, verb rune) {
 	switch verb {
 	case 'v':
 		switch {
 		case st.Flag('+'):
-			for _, pc := range *s {
+			for _, pc := range s.st {
+				if pc == 0 {
+					fmt.Fprintf(st, "\n--------------------------------------------------")
+					continue
+				}
 				f := Frame(pc)
 				fmt.Fprintf(st, "\n%+v", f)
 			}
@@ -165,36 +181,58 @@ func (s *stack) Format(st fmt.State, verb rune) {
 
 func (s *stack) StackTrace() StackTrace {
 	vs := *s
-	lenOfStack := len(vs)
+	lenOfStack := len(vs.st)
 
 	f := make([]Frame, lenOfStack)
 	for i := 0; i < lenOfStack; i++ {
-		f[i] = Frame(vs[i])
+		f[i] = Frame(vs.st[i])
 	}
 	return f
 }
 
 func callers() *stack {
-	pc, _, _, ok := runtime.Caller(skipNum - 1)
-	if ok {
-		var st stack = []uintptr{pc}
-		return &st
+	var pcs [depth]uintptr
+	n := runtime.Callers(skipNum, pcs[:])
+	if n-skipBottomNum < 0 {
+		return &stack{hashs: make(map[[20]byte]struct{})}
+	} else {
+		return &stack{st: pcs[0 : n-skipBottomNum], hashs: make(map[[20]byte]struct{})}
 	}
-	return nil
 }
 
-func appendCallers(st *stack) *stack {
-	pc, _, _, ok := runtime.Caller(skipNum - 1)
-	if ok {
-		var newSt stack = append([]uintptr{pc}, *st...)
-		return &newSt
+func (st *stack) appendCurrentFrame() {
+	pc, file, line, ok := runtime.Caller(skipNum - 1)
+	if ok && st.hash(file, line) {
+		st.st = append([]uintptr{pc}, st.st...)
 	}
-	return st
+}
+
+func (st *stack) appendEmptyFrame() {
+	st.st = append(st.st, 0)
+}
+
+func (st *stack) appendStack(otherStack *stack) {
+	st.st = append(st.st, otherStack.st...)
+}
+
+func (st *stack) hash(file string, line int) bool {
+	var ok bool
+	s := fmt.Sprintf("%s:%d", file, line)
+	raw := sha1.Sum(UnsafeStringToBytes(s))
+	if _, ok = st.hashs[raw]; !ok {
+		st.hashs[raw] = struct{}{}
+	}
+	return ok
 }
 
 // SetSkipFrameNum set the number of frames to skip, default is 3
 func SetSkipFrameNum(skip int) {
 	skipNum = skip
+}
+
+// SetSkipBottomFrameNum set the number of frames to skip from bottom, default is 2
+func SetSkipBottomFrameNum(skip int) {
+	skipBottomNum = skip
 }
 
 // SetCurrentAbsPath set absolute path as current project path, ff you pass a string parameter, use this string as the absolute path of the project
