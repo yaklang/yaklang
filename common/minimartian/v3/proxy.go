@@ -1085,10 +1085,12 @@ func (p *Proxy) roundTripBase(req *http.Request) (*http.Response, error) {
 
 	var isHttps = httpctx.GetRequestHTTPS(req)
 
+	var isGmTLS = p.gmTLS && isHttps
+
 	opts := append(p.lowhttpConfig,
 		lowhttp.WithRequest(reqBytes),
 		lowhttp.WithHttps(isHttps),
-		lowhttp.WithGmTLS(p.gmTLS),
+		lowhttp.WithGmTLS(isGmTLS),
 		lowhttp.WithConnPool(true),
 		lowhttp.WithSaveHTTPFlow(false),
 	)
