@@ -53,6 +53,10 @@ func IsGBK(data []byte) bool {
 			i++
 			continue
 		} else {
+			//非双字节编码 最后只剩一位
+			if i+1 == length {
+				return false
+			}
 			//大于127的使用双字节编码，落在gbk编码范围内的字符
 			if data[i] >= 0x81 &&
 				data[i] <= 0xfe &&
