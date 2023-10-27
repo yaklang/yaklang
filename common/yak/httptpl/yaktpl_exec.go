@@ -26,18 +26,6 @@ type RequestBulk struct {
 	RequestConfig *YakRequestBulkConfig
 }
 
-func (y *YakTemplate) generateRequests() chan *RequestBulk {
-	var requests = make(chan *RequestBulk)
-	go func() {
-		for _, req := range y.HTTPRequestSequences {
-			for _, raw := range req.GenerateRaw() {
-				requests <- raw
-			}
-		}
-		close(requests)
-	}()
-	return requests
-}
 func (y *YakTemplate) RenderToFuzzerRequestsByUrl(u string) []*ypb.FuzzerRequests {
 	result := []*ypb.FuzzerRequests{}
 	for _, sequence := range y.HTTPRequestSequences {
@@ -68,39 +56,98 @@ func (y *YakTemplate) RenderToFuzzerRequestsByUrl(u string) []*ypb.FuzzerRequest
 	}
 	return result
 }
-func (y *YakTemplate) GenerateRequestSequences() []*RequestBulk {
+func (y *YakTemplate) GenerateRequestSequences(u string) []*RequestBulk {
+	urlIns, err := url.Parse(u)
+	if err != nil {
+		log.Error(err)
+		return nil
+	}
+	baseUrl := urlIns.String()
+	var rootUrl string
+	if urlIns.Scheme == "https" {
+		if urlIns.Port() == "443" {
+			rootUrl = fmt.Sprintf("https://%v", urlIns.Host)
+		} else {
+			rootUrl = fmt.Sprintf("https://%v", utils.HostPort(urlIns.Host, urlIns.Port()))
+		}
+	} else {
+		if urlIns.Port() == "80" {
+			rootUrl = fmt.Sprintf("http://%v", urlIns.Host)
+		} else {
+			rootUrl = fmt.Sprintf("http://%v", utils.HostPort(urlIns.Host, urlIns.Port()))
+		}
+	}
+	var file string
+	pathRaw := urlIns.RequestURI()
+	if strings.Contains(pathRaw, "?") {
+		pathNoQuery := pathRaw[:strings.Index(pathRaw, "?")]
+		_, file = path.Split(pathNoQuery)
+	}
+	baseUrl = strings.TrimRight(baseUrl, "/")
+	rootUrl = strings.TrimRight(rootUrl, "/")
+	vars := map[string]string{
+		"URL":              urlIns.String(),
+		"Host":             urlIns.Host,
+		"Port":             urlIns.Port(),
+		"Hostname":         urlIns.Hostname(),
+		"RootURL":          rootUrl,
+		"BaseURL":          baseUrl,
+		"Path":             urlIns.RequestURI(),
+		"PathTrimEndSlash": strings.TrimRight(urlIns.RequestURI(), "/"),
+		"File":             file,
+		"Schema":           urlIns.Scheme,
+	}
+	for k, v := range vars {
+		y.Variables.Set(k, v)
+	}
 	result := []*RequestBulk{}
 	for _, sequenceCfg := range y.HTTPRequestSequences {
 		seq := &RequestBulk{
 			RequestConfig: sequenceCfg,
 		}
 		for _, path := range sequenceCfg.Paths {
-			var firstLine string = fmt.Sprintf("%v %v HTTP/1.1", sequenceCfg.Method, path)
-			var lines []string
-			lines = append(lines, firstLine)
-			_, hostOk1 := sequenceCfg.Headers["Host"]
-			_, hostOk2 := sequenceCfg.Headers["host"]
-			if !hostOk1 && !hostOk2 {
-				lines = append(lines, "Host: "+"{{Hostname}}")
+			path, err = ExecNucleiTag(path, y.Variables.ToMap())
+			if err != nil {
+				log.Error(err)
+				continue
+			}
+			isHttps, packet, err := lowhttp.ParseUrlToHttpRequestRaw(sequenceCfg.Method, path)
+			if err != nil {
+				log.Error(err)
+				continue
 			}
 			for k, v := range sequenceCfg.Headers {
-				lines = append(lines, fmt.Sprintf(`%v: %v`, k, v))
+				packet = lowhttp.ReplaceHTTPPacketHeader(packet, k, v)
 			}
-			if len(sequenceCfg.Headers) <= 0 {
-				lines = append(lines, `User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0`)
+			packet = lowhttp.ReplaceHTTPPacketBody(packet, []byte(sequenceCfg.Body), false)
+			packetRaw, err := ExecNucleiTag(string(packet), y.Variables.ToMap())
+			if err != nil {
+				log.Error(err)
+				continue
 			}
-			var rawPacket = strings.Join(lines, "\r\n") + "\r\n\r\n"
-			rawPacket += sequenceCfg.Body
 			seq.Requests = append(seq.Requests, &requestRaw{
-				Raw:    []byte(rawPacket),
-				Origin: sequenceCfg,
+				Raw:     []byte(packetRaw),
+				Origin:  sequenceCfg,
+				IsHttps: isHttps,
+			})
+		}
+		for _, request := range sequenceCfg.HTTPRequests {
+			req, err := ExecNucleiTag(request.Request, y.Variables.ToMap())
+			if err != nil {
+				log.Error(err)
+				continue
+			}
+			seq.Requests = append(seq.Requests, &requestRaw{
+				Raw:     []byte(req),
+				Origin:  sequenceCfg,
+				IsHttps: urlIns.Scheme == "https",
 			})
 		}
 		result = append(result, seq)
 	}
 	return result
 }
-func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts ...lowhttp.LowhttpOpt) (int, error) {
+func (y *YakTemplate) ExecWithUrl(u string, config *Config, opts ...lowhttp.LowhttpOpt) (int, error) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Error(err)
@@ -127,7 +174,9 @@ func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts 
 			require = config.OOBRequireCallback
 		}
 		reverse_url, reverse_dnslog_token, err := require(config.OOBTimeout)
-		y.Variables.Set("reverse_url", reverse_url)
+		y.Variables.Set("interactsh-url", reverse_url)
+		y.Variables.Set("interactsh", reverse_url)
+		y.Variables.Set("interactsh_url", reverse_url)
 		y.Variables.Set("reverse_dnslog_token", reverse_dnslog_token)
 		if err != nil {
 			log.Errorf("require oob addr failed: %v", err)
@@ -136,18 +185,16 @@ func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts 
 	}
 
 	tplConcurrent := config.ConcurrentInTemplates
-	urlIns, err := lowhttp.ExtractURLFromHTTPRequestRaw(reqOrigin, isHttps)
-	if err != nil {
-		return 0, err
-	}
-	variables := y.Variables.ToMap()
 	if len(y.HTTPRequestSequences) > 0 {
 		swg := utils.NewSizedWaitGroup(tplConcurrent)
-		for _, reqSeq := range y.GenerateRequestSequences() {
+		for _, reqSeq := range y.GenerateRequestSequences(u) {
 			swg.Add()
 			go func(ret *RequestBulk, payload map[string][]string) {
 				defer swg.Done()
-				rsps, result, extracted, reqCount := y.handleRequestSequences(urlIns.String(), config, ret.RequestConfig, ret.Requests, payload, variables, func(reqRaw []byte) *lowhttp.LowhttpResponse {
+				rsps, result, extracted, reqCount := y.handleRequestSequences(config, ret.RequestConfig, ret.Requests, payload, func(reqRaw []byte, isHttps bool) (*lowhttp.LowhttpResponse, error) {
+					if config.BeforeSendPackage != nil {
+						reqRaw = config.BeforeSendPackage(reqRaw, isHttps)
+					}
 					var packetOpt []lowhttp.LowhttpOpt
 					packetOpt = append(
 						packetOpt, lowhttp.WithPacketBytes([]byte(reqRaw)), lowhttp.WithHttps(isHttps),
@@ -166,13 +213,13 @@ func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts 
 					rsp, err := lowhttp.HTTP(packetOpt...)
 					if err != nil {
 						log.Error(err)
-						return nil
+						return nil, err
 					}
 					if config.Debug && config.DebugResponse {
 						fmt.Printf("--------------RSP---------------\n")
 						fmt.Println(string(rsp.RawPacket))
 					}
-					return rsp
+					return rsp, nil
 				})
 				if result {
 					log.Infof("[%v]-[%v] matched", y.Name, y.Id)
@@ -232,49 +279,17 @@ func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts 
 		return 0, utils.Errorf("[%s] tcp/http is all empty!", y.Name)
 	}
 }
+func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts ...lowhttp.LowhttpOpt) (int, error) {
+	urlIns, err := lowhttp.ExtractURLFromHTTPRequestRaw(reqOrigin, isHttps)
+	if err != nil {
+		return 0, err
+	}
+	return y.ExecWithUrl(urlIns.String(), config, opts...)
+}
 
 // handleRequestSequences 渲染、发包、匹配、提取
-func (y *YakTemplate) handleRequestSequences(u string, config *Config, reqOrigin *YakRequestBulkConfig, reqSeqs []*requestRaw, payload map[string][]string, params map[string]any, sender func(raw []byte) *lowhttp.LowhttpResponse) ([]*lowhttp.LowhttpResponse, bool, map[string]interface{}, int64) {
-	urlIns, err := url.Parse(u)
-	if err != nil {
-		return nil, false, nil, 0
-	}
-	baseUrl := urlIns.String()
-	var rootUrl string
-	if urlIns.Scheme == "https" {
-		if urlIns.Port() == "443" {
-			rootUrl = fmt.Sprintf("https://%v", urlIns.Host)
-		} else {
-			rootUrl = fmt.Sprintf("https://%v", utils.HostPort(urlIns.Host, urlIns.Port()))
-		}
-	} else {
-		if urlIns.Port() == "80" {
-			rootUrl = fmt.Sprintf("http://%v", urlIns.Host)
-		} else {
-			rootUrl = fmt.Sprintf("http://%v", utils.HostPort(urlIns.Host, urlIns.Port()))
-		}
-	}
-	var file string
-	pathRaw := urlIns.RequestURI()
-	if strings.Contains(pathRaw, "?") {
-		pathNoQuery := pathRaw[:strings.Index(pathRaw, "?")]
-		_, file = path.Split(pathNoQuery)
-	}
-	vars := map[string]string{
-		"URL":              urlIns.String(),
-		"Host":             urlIns.Host,
-		"Port":             urlIns.Port(),
-		"Hostname":         urlIns.Hostname(),
-		"RootURL":          rootUrl,
-		"BaseURL":          baseUrl,
-		"Path":             urlIns.RequestURI(),
-		"PathTrimEndSlash": strings.TrimRight(urlIns.RequestURI(), "/"),
-		"File":             file,
-		"Schema":           urlIns.Scheme,
-	}
-	for k, v := range vars {
-		params[k] = v
-	}
+func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakRequestBulkConfig, reqSeqs []*requestRaw, payload map[string][]string, sender func(raw []byte, isHttps bool) (*lowhttp.LowhttpResponse, error)) ([]*lowhttp.LowhttpResponse, bool, map[string]interface{}, int64) {
+
 	defer func() {
 		if err := recover(); err != nil {
 			log.Error(err)
@@ -301,12 +316,9 @@ func (y *YakTemplate) handleRequestSequences(u string, config *Config, reqOrigin
 	var responses []*lowhttp.LowhttpResponse
 
 	for index, req := range reqSeqs {
-		atomic.AddInt64(&count, 1)
 		log.Debugf("sequence exec with Req Index:%v", index)
 		raw := req.Raw
-
-		reqs, err := FuzzNucleiTag(string(raw), params, payload, reqConfig.AttackMode)
-
+		reqs, err := FuzzNucleiTag(string(raw), y.Variables.ToMap(), payload, reqConfig.AttackMode)
 		if err != nil {
 			log.Errorf("cannot mutate request: %v", err)
 			continue
@@ -315,50 +327,53 @@ func (y *YakTemplate) handleRequestSequences(u string, config *Config, reqOrigin
 			log.Error("mutate request failed, empty requests")
 			continue
 		}
-
-		reqRaw := reqs[0]
-		var sufs = []string{fmt.Sprintf("_%v", index+1)}
-		_ = reqRaw
-		_ = sufs
-		rsp := sender([]byte(reqRaw))
-		if rsp != nil {
-			responses = append(responses, rsp)
-		}
-
-		for index, extractor := range req.Origin.Extractor {
-			varIns, err := extractor.Execute(rsp.RawPacket, y.Variables.ToMap())
-			if err != nil {
-				log.Error("extractor execute failed: ", err)
+		for _, reqRaw := range reqs {
+			atomic.AddInt64(&count, 1)
+			var sufs = []string{fmt.Sprintf("_%v", index+1)}
+			_ = reqRaw
+			_ = sufs
+			rsp, err := sender([]byte(reqRaw), req.IsHttps)
+			if err == nil {
+				responses = append(responses, rsp)
+			} else {
+				log.Error(err)
 				continue
 			}
-			_ = index
-			if varIns != nil {
-				for k, v := range varIns {
-					v := ExtractResultToString(v)
-					y.Variables.Set(k, v)
-					extracted[k] = v
-				}
-			}
-		}
 
-		if req.Origin.Matcher != nil {
-			var varsInResponse = make(map[string]interface{})
-			varsInResponse = LoadVarFromRawResponse(rsp.RawPacket, rsp.GetDurationFloat(), sufs...)
-			if varsInResponse != nil {
-				for k, v := range varsInResponse {
-					y.Variables.Set(k, toString(v))
-				}
-			}
-
-			if !reqOrigin.AfterRequested {
-				matchResult, err := matcher.ExecuteWithConfig(config, rsp, y.Variables.ToMap())
+			for index, extractor := range reqOrigin.Extractor {
+				varIns, err := extractor.Execute(rsp.RawPacket, y.Variables.ToMap())
 				if err != nil {
-					log.Error("matcher execute failed: ", err)
+					log.Error("extractor execute failed: ", err)
+					continue
 				}
-				matchResults = append(matchResults, matchResult)
-				if matchResult && reqOrigin.StopAtFirstMatch {
-					// 第一次匹配就退出
-					return responses, true, extracted, count
+				_ = index
+				if varIns != nil {
+					for k, v := range varIns {
+						v := ExtractResultToString(v)
+						y.Variables.Set(k, v)
+						extracted[k] = v
+					}
+				}
+			}
+			if reqOrigin.Matcher != nil {
+				var varsInResponse = make(map[string]interface{})
+				varsInResponse = LoadVarFromRawResponse(rsp.RawPacket, rsp.GetDurationFloat(), sufs...)
+				if varsInResponse != nil {
+					for k, v := range varsInResponse {
+						y.Variables.Set(k, toString(v))
+					}
+				}
+
+				if !reqOrigin.AfterRequested {
+					matchResult, err := matcher.ExecuteWithConfig(config, rsp, y.Variables.ToMap())
+					if err != nil {
+						log.Error("matcher execute failed: ", err)
+					}
+					matchResults = append(matchResults, matchResult)
+					if matchResult && reqOrigin.StopAtFirstMatch {
+						// 第一次匹配就退出
+						return responses, true, extracted, count
+					}
 				}
 			}
 		}

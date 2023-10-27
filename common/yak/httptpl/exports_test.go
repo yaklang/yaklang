@@ -144,7 +144,7 @@ requests:
 	}
 
 	checked := false
-	for req := range tpl.generateRequests() {
+	for _, req := range tpl.GenerateRequestSequences("http://www.baidu.com") {
 		if bytes.Contains(req.Requests[0].Raw, []byte("\r\n\r\n_method=__construct&filter[]=phpinfo&method=get&server[REQUEST_METHOD]=1")) {
 			spew.Dump(req.Requests[0].Raw)
 			checked = true
@@ -200,7 +200,7 @@ requests:
 	}
 
 	checked := false
-	for req := range tpl.generateRequests() {
+	for _, req := range tpl.GenerateRequestSequences("http://www.baidu.com") {
 		var reqIns = req.Requests[0]
 		println(string(reqIns.Raw))
 		if bytes.Contains(req.Requests[0].Raw, []byte("\r\n\r\n_method=__construct&filter[]=phpinfo&method=get&server[REQUEST_METHOD]=1")) {
