@@ -977,7 +977,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					JustContentReplacer: true,
 					Replacers:           replacer.GetRules(),
 					IsWebsocket:         true,
-					RemoteAddr:          remoteAddr,
+					RemoteAddr:          httpctx.GetRemoteAddr(req),
 				}
 				err = send(feedbackOrigin)
 				if err != nil {
