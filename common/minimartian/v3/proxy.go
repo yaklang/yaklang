@@ -1111,11 +1111,12 @@ func (p *Proxy) roundTripBase(req *http.Request) (*http.Response, error) {
 		return nil, err
 	}
 
-	rsp, err := lowhttp.ParseBytesToHTTPResponse(lowHttpResp.RawPacket)
-	if rsp == nil {
-		//utils.PrintCurrentGoroutineRuntimeStack()
-		//spew.Dump(lowHttpResp)
+	if lowHttpResp.RemoteAddr != "" {
+		httpctx.SetRemoteAddr(req, lowHttpResp.RemoteAddr)
+		req.RemoteAddr = lowHttpResp.RemoteAddr
 	}
+
+	rsp, err := lowhttp.ParseBytesToHTTPResponse(lowHttpResp.RawPacket)
 	if rsp != nil {
 		rsp.Request = req
 	}
