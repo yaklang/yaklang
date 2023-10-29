@@ -164,6 +164,15 @@ type MITMServer struct {
 	websocketResponseHijackHandler func(rsp []byte, r *http.Request, rspIns *http.Response, startTs int64) []byte
 	websocketRequestMirror         func(req []byte)
 	websocketResponseMirror        func(rsp []byte)
+
+	maxContentLength int
+}
+
+func (m *MITMServer) GetMaxContentLength() int {
+	if m == nil || m.maxContentLength <= 0 {
+		return 10 * 1000 * 1000 // 10MB roughly
+	}
+	return m.maxContentLength
 }
 
 func (m *MITMServer) Configure(options ...MITMConfig) error {
@@ -265,11 +274,8 @@ func NewMITMServer(options ...MITMConfig) (*MITMServer, error) {
 		HostMapping:              make(map[string]string),
 		hijackedMaxContentLength: 10 * 1000 * 1000,
 		http2:                    false,
+		maxContentLength:         10 * 1000 * 1000,
 	}
-
-	// 配置 transport
-	opts := NewDefaultClientOptions()
-
 	for _, op := range options {
 		err := op(server)
 		if err != nil {
@@ -278,21 +284,11 @@ func NewMITMServer(options ...MITMConfig) (*MITMServer, error) {
 	}
 
 	// MITM option configured above
-
-	// sync config with MITMServer
-	opts.EnableHTTP2 = server.http2
-	opts.EnableGMTLS = server.gmtls
-	opts.OnlyGM = server.gmOnly
-	opts.PreferGM = server.gmPrefer
-	opts.DnsServers = server.DNSServers
-	opts.HostMapping = server.HostMapping
-	opts.ClientCerts = server.clientCerts
 	if server.mitmConfig == nil { // currently seems it must be nil since no function is exposed to directly create
 		err := MITM_SetCaCertAndPrivKey(defaultCA, defaultKey)(server)
 		if err != nil {
 			return nil, utils.Errorf("set ca/key failed: %s", err)
 		}
 	}
-
 	return server, nil
 }

@@ -7,38 +7,17 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
-	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	log "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian"
 	"github.com/yaklang/yaklang/common/minimartian/h2"
 	"github.com/yaklang/yaklang/common/minimartian/mitm"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
-	"github.com/yaklang/yaklang/common/utils/lowhttp/lowhttp2"
-	"github.com/yaklang/yaklang/common/utils/tlsutils"
-	"github.com/yaklang/yaklang/common/utils/tlsutils/go-pkcs12"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"time"
 )
-
-// round trip
-type HTTPRoundTripHandler func(req *http.Request) (*http.Response, error)
-
-func NewRoundTripHandler(f HTTPRoundTripHandler) *mitmRoundTrip {
-	return &mitmRoundTrip{f: f}
-}
-
-type mitmRoundTrip struct {
-	f HTTPRoundTripHandler
-}
-
-func (r *mitmRoundTrip) RoundTrip(req *http.Request) (*http.Response, error) {
-	return r.f(req)
-}
 
 // request modifier
 func NewRequestModifier(f minimartian.RequestModifierFunc) minimartian.RequestModifier {
@@ -180,163 +159,6 @@ func MITM_SetXForwarded(b bool) MITMConfig {
 type PKCS12Config struct {
 	Path     string
 	Password string
-}
-
-func NewDefaultClientOptions() *HTTPClientOptions {
-	return &HTTPClientOptions{
-		DialTimeout:         120,
-		DnsResolveTimeout:   120,
-		TLSHandshakeTimeout: 120,
-		ReadTimeout:         120,
-		IdleConnTimeout:     120,
-		MaxConnsPerHost:     10,
-		MaxIdleConns:        50,
-		TLSSkipVerify:       true,
-		TLSMinVersion:       tls.VersionSSL30, // nolint[:staticcheck]
-		TLSMaxVersion:       tls.VersionTLS13,
-	}
-}
-
-type HTTPClientOptions struct {
-	Proxy               string       `json:"proxy" yaml:"proxy"`               // HTTP 代理
-	DialTimeout         int          `json:"dial_timeout" yaml:"dial_timeout"` // tcp connect timeout
-	DnsResolveTimeout   int          `json:"dns_resolve_timeout" yaml:"dns_resolve_timeout"`
-	TLSHandshakeTimeout int          `json:"tls_handshake_timeout" yaml:"tls_handshake_timeout"`
-	ReadTimeout         int          `json:"read_timeout" yaml:"read_timeout"` // http read timeout
-	IdleConnTimeout     int          `json:"idle_conn_timeout" yaml:"idle_conn_timeout"`
-	MaxConnsPerHost     int          `json:"max_conns_per_host" yaml:"max_conns_per_host"`
-	MaxIdleConns        int          `json:"max_idle_conns" yaml:"max_idle_conns"`
-	TLSSkipVerify       bool         `json:"tls_skip_verify" yaml:"tls_skip_verify"` // 是否验证证书
-	TLSMinVersion       uint16       `json:"tls_min_version" yaml:"tls_min_version"` // ssl / tls 版本号
-	TLSMaxVersion       uint16       `json:"tls_max_version" yaml:"tls_max_version"`
-	PKCS12              PKCS12Config `json:"pkcs12" yaml:"pkcs12"`
-	EnableHTTP2         bool         `json:"enable_http2" yaml:"enable_http2"`
-	EnableGMTLS         bool
-	PreferGM            bool
-	OnlyGM              bool
-	DnsServers          []string
-	HostMapping         map[string]string
-	ClientCerts         []*ClientCertificationPair
-	// 下面的需要自己实现
-	//FailRetries     int               `json:"fail_retries" yaml:"fail_retries"`
-	//MaxRedirect     int               `json:"max_redirect" yaml:"max_redirect"`
-	//MaxRespBodySize int64             `json:"max_resp_body_size" yaml:"max_resp_body_size"`
-	//MaxQPS          rate.Limit        `json:"max_qps" yaml:"max_qps"` // 全局最大每秒请求数
-	//Headers         Header            `json:"headers" yaml:"headers"`
-	//Cookies         map[string]string `json:"cookies" yaml:"cookies"`
-	//AllowMethods    []string          `json:"allow_methods" yaml:"allow_methods"`
-	//ExemptPathRegex string            `json:"exempt_path_regex" yaml:"exempt_path_regex"`
-}
-
-func NewTransport(opts *HTTPClientOptions) (*http.Transport, error) {
-	var proxyFunc func(r *http.Request) (*url.URL, error) // := http.ProxyFromEnvironment
-	if opts.Proxy != "" {
-		parsedURL, err := url.Parse(opts.Proxy)
-		if err != nil {
-			log.Error("incorrect proxy url", opts.Proxy)
-		} else {
-			proxyFunc = http.ProxyURL(parsedURL)
-		}
-	}
-
-	certificates := make([]tls.Certificate, 0, 1)
-	if opts.PKCS12.Path != "" {
-		clientCertificate, err := ParsePKCS12FromFile(opts.PKCS12)
-		if err != nil {
-			log.Fatal(err)
-		}
-		certificates = append(certificates, *clientCertificate)
-	}
-
-	var extraDNSOpt []netx.DNSOption
-	if len(opts.DnsServers) > 0 {
-		extraDNSOpt = append(extraDNSOpt, netx.WithDNSServers(opts.DnsServers...), netx.WithDNSDisableSystemResolver(true))
-	}
-	for host, ip := range opts.HostMapping {
-		netx.AddHost(host, ip)
-	}
-	var dialContext = netx.NewDialContextFunc(
-		time.Duration(opts.DialTimeout)*time.Second,
-		extraDNSOpt...)
-	t := &http.Transport{
-		Proxy:                 proxyFunc,
-		DialContext:           dialContext,
-		DisableCompression:    true,
-		DisableKeepAlives:     false,
-		MaxIdleConns:          opts.MaxIdleConns,
-		MaxConnsPerHost:       opts.MaxConnsPerHost,
-		IdleConnTimeout:       time.Duration(opts.IdleConnTimeout) * time.Second,
-		TLSHandshakeTimeout:   time.Duration(opts.TLSHandshakeTimeout) * time.Second,
-		ResponseHeaderTimeout: time.Duration(opts.ReadTimeout) * time.Second,
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
-			MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-			MaxVersion:         tls.VersionTLS13,
-			Certificates:       certificates,
-		},
-	}
-
-	if opts.EnableGMTLS {
-		var gmDialCtx = netx.NewDialGMTLSContextFunc(
-			true,
-			opts.PreferGM, opts.OnlyGM, time.Duration(opts.DialTimeout)*time.Second,
-			extraDNSOpt...)
-		t.DialTLSContext = gmDialCtx
-	} else {
-		t.DialTLSContext = netx.NewDialGMTLSContextFunc(false, false, false, time.Duration(opts.DialTimeout)*time.Second, extraDNSOpt...)
-	}
-
-	if opts.EnableHTTP2 {
-		err := lowhttp2.ConfigureTransport(t)
-		if err != nil {
-			log.Errorf("http2 config failed: %s", err)
-		} else {
-			log.Info("http2 config success")
-			return t, nil
-		}
-	}
-
-	/*
-		为 httpTransport 设置 TLS 证书
-	*/
-	var gmCerts []gmtls.Certificate
-	pool := x509.NewCertPool()
-	for _, certs := range opts.ClientCerts {
-		for _, ca := range certs.CaPem {
-			pool.AppendCertsFromPEM(ca)
-		}
-		pair, _, err := tlsutils.ParseCertAndPriKeyAndPool(certs.CrtPem, certs.KeyPem)
-		if err != nil {
-			return nil, utils.Errorf("initial tls with client cert error (mTLS error): %s", err)
-		}
-		t.TLSClientConfig.Certificates = append(t.TLSClientConfig.Certificates, pair)
-		if opts.EnableGMTLS {
-			pairGM, _, err := tlsutils.ParseCertAndPriKeyAndPoolForGM(certs.CrtPem, certs.KeyPem)
-			if err != nil {
-				return nil, utils.Errorf("initial tls with client cert error (mTLS error) for GM: %s", err)
-			}
-			gmCerts = append(gmCerts, pairGM)
-		}
-	}
-
-	return t, nil
-}
-
-func ParsePKCS12FromFile(c PKCS12Config) (*tls.Certificate, error) {
-	data, err := ioutil.ReadFile(c.Path)
-	if err != nil {
-		return nil, err
-	}
-
-	privateKey, certificate, _, err := pkcs12.DecodeChain(data, c.Password)
-	if err != nil {
-		return nil, err
-	}
-	return &tls.Certificate{
-		Certificate: [][]byte{certificate.Raw},
-		PrivateKey:  privateKey,
-		Leaf:        certificate,
-	}, nil
 }
 
 func MITM_SetHTTP2(b bool) MITMConfig {
