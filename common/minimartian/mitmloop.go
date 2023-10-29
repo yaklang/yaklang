@@ -1,28 +1,23 @@
-// Copyright 2015 Google Inc. All rights reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-package martian
+package minimartian
 
 import (
 	"bufio"
 	"bytes"
 	"context"
 	"crypto/tls"
-	_ "embed"
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/segmentio/ksuid"
+	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/minimartian/nosigpipe"
+	"github.com/yaklang/yaklang/common/minimartian/proxyutil"
+	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"io"
 	"net"
 	"net/http"
@@ -31,255 +26,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/ReneKroon/ttlcache"
-	"github.com/segmentio/ksuid"
-	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
-	"github.com/yaklang/yaklang/common/gmsm/gmtls"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
-	"github.com/yaklang/yaklang/common/utils/lowhttp/lowhttp2"
-
-	"github.com/yaklang/yaklang/common/minimartian/v3/mitm"
-	"github.com/yaklang/yaklang/common/minimartian/v3/nosigpipe"
-	"github.com/yaklang/yaklang/common/minimartian/v3/proxyutil"
 )
-
-var errClose = errors.New("closing connection")
-var noop = Noop("martian")
-
-func isCloseable(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	if neterr, ok := err.(net.Error); ok && neterr.Timeout() {
-		return true
-	}
-
-	switch err {
-	case io.EOF, io.ErrClosedPipe, errClose, io.ErrUnexpectedEOF:
-		return true
-	default:
-		log.Debugf("Unhandled CONNECTION ERROR: %v", err.Error())
-		return true
-	}
-}
-
-// Proxy is an HTTP proxy with support for TLS MITM and customizable behavior.
-type Proxy struct {
-	roundTripper http.RoundTripper
-	dial         func(context.Context, string, string) (net.Conn, error)
-	timeout      time.Duration
-	mitm         *mitm.Config
-	proxyURL     *url.URL
-	conns        sync.WaitGroup
-	connsMu      sync.Mutex // protects conns.Add/Wait from concurrent access
-	closing      chan bool
-	http2        bool
-	gmTLS        bool
-	gmPrefer     bool
-	gmTLSOnly    bool
-	reqmod       RequestModifier
-	resmod       ResponseModifier
-
-	// context cache
-	ctxCacheLock     *sync.Mutex
-	ctxCacheInitOnce *sync.Once
-	ctxCache         *ttlcache.Cache
-
-	// 限制用户名和密码
-	proxyUsername string
-	proxyPassword string
-
-	//lowhttp config
-	lowhttpConfig []lowhttp.LowhttpOpt
-}
-
-func (p *Proxy) saveCache(r *http.Request, ctx *Context) {
-	if p == nil {
-		return
-	}
-	p.ctxCacheLock.Lock()
-	defer p.ctxCacheLock.Unlock()
-	key := fmt.Sprintf("%p", r)
-	if p.ctxCache == nil {
-		p.ctxCacheInitOnce.Do(func() {
-			p.ctxCache = ttlcache.NewCache()
-			p.ctxCache.SetTTL(5 * time.Minute)
-		})
-	}
-	p.ctxCache.Set(key, ctx)
-}
-
-func (p *Proxy) getCacheContext(r *http.Request) (*Context, bool) {
-	if p == nil || p.ctxCache == nil {
-		return nil, false
-	}
-	key := fmt.Sprintf("%p", r)
-	raw, ok := p.ctxCache.Get(key)
-	if !ok {
-		return nil, false
-	}
-	ins, ok := raw.(*Context)
-	if !ok {
-		return nil, false
-	}
-	return ins, true
-}
-
-func (p *Proxy) deleteCache(req *http.Request) {
-	if p == nil || p.ctxCache == nil {
-		return
-	}
-	key := fmt.Sprintf("%p", req)
-	p.ctxCache.Remove(key)
-}
-
-// NewProxy returns a new HTTP proxy.
-func NewProxy() *Proxy {
-	proxy := &Proxy{
-		//roundTripper: &http.Transport{
-		//	// TODO(adamtanner): This forces the http.Transport to not upgrade requests
-		//	// to HTTP/2 in Go 1.6+. Remove this once Martian can support HTTP/2.
-		//	TLSNextProto:          make(map[string]func(string, *tls.Conn) http.RoundTripper),
-		//	Proxy:                 http.ProxyFromEnvironment,
-		//	TLSHandshakeTimeout:   10 * time.Second,
-		//	ExpectContinueTimeout: time.Second,
-		//},
-		timeout:          5 * time.Minute,
-		closing:          make(chan bool),
-		reqmod:           noop,
-		resmod:           noop,
-		ctxCacheInitOnce: new(sync.Once),
-		ctxCacheLock:     new(sync.Mutex),
-		ctxCache:         ttlcache.NewCache(),
-	}
-	proxy.ctxCache.SetTTL(5 * time.Minute)
-	//proxy.SetDialContext(netx.NewDialContextFunc(30 * time.Second))
-	return proxy
-}
-
-// SetRoundTripper sets the http.RoundTripper of the proxy.
-//func (p *Proxy) SetRoundTripper(rt http.RoundTripper) {
-//	p.roundTripper = rt
-//
-//	if tr, ok := p.roundTripper.(*http.Transport); ok {
-//		tr.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper)
-//		tr.Proxy = http.ProxyURL(p.proxyURL)
-//		tr.DialContext = p.dial
-//	}
-//}
-
-// SetDownstreamProxy sets the proxy that receives requests from the upstream
-// proxy.
-//func (p *Proxy) SetDownstreamProxy(proxyURL *url.URL) {
-//	p.proxyURL = proxyURL
-//
-//	if tr, ok := p.roundTripper.(*http.Transport); ok {
-//		tr.Proxy = http.ProxyURL(p.proxyURL)
-//	}
-//}
-
-// SetTimeout sets the request timeout of the proxy.
-func (p *Proxy) SetTimeout(timeout time.Duration) {
-	p.timeout = timeout
-}
-
-// SetMITM sets the config to use for MITMing of CONNECT requests.
-func (p *Proxy) SetMITM(config *mitm.Config) {
-	p.mitm = config
-}
-
-// SetH2 sets the switch to turn on HTTP2 support
-func (p *Proxy) SetH2(enable bool) {
-	p.http2 = enable
-}
-
-// SetAuth sets the username and password for proxy authentication.
-func (p *Proxy) SetAuth(user, pass string) {
-	p.proxyUsername = user
-	p.proxyPassword = pass
-}
-
-// SetGMTLS sets the switch to turn on GM support
-func (p *Proxy) SetGMTLS(enable bool) {
-	p.gmTLS = enable
-}
-
-// SetGMPrefer sets the switch to prefer using GM style TLS
-func (p *Proxy) SetGMPrefer(enable bool) {
-	p.gmPrefer = enable
-}
-
-// SetGMOnly sets the switch to use ONLY GM TLS
-func (p *Proxy) SetGMOnly(enable bool) {
-	p.gmTLSOnly = enable
-}
-
-// SetDial sets the dial func used to establish a connection.
-//func (p *Proxy) SetDialContext(dial func(context.Context, string, string) (net.Conn, error)) {
-//	p.dial = func(ctx context.Context, a, b string) (net.Conn, error) {
-//		c, e := dial(ctx, a, b)
-//		nosigpipe.IgnoreSIGPIPE(c)
-//		return c, e
-//	}
-//
-//	if tr, ok := p.roundTripper.(*http.Transport); ok {
-//		tr.DialContext = p.dial
-//	}
-//}
-
-// SetLowhttpConfig sets the lowhttp config
-func (p *Proxy) SetLowhttpConfig(config []lowhttp.LowhttpOpt) {
-	p.lowhttpConfig = config
-}
-
-// Close sets the proxy to the closing state so it stops receiving new connections,
-// finishes processing any inflight requests, and closes existing connections without
-// reading anymore requests from them.
-func (p *Proxy) Close() {
-	log.Infof("martian: closing down proxy")
-
-	close(p.closing)
-
-	log.Infof("martian: waiting for connections to close")
-	p.connsMu.Lock()
-	p.conns.Wait()
-	p.connsMu.Unlock()
-	log.Infof("martian: all connections closed")
-}
-
-// Closing returns whether the proxy is in the closing state.
-func (p *Proxy) Closing() bool {
-	select {
-	case <-p.closing:
-		return true
-	default:
-		return false
-	}
-}
-
-// SetRequestModifier sets the request modifier.
-func (p *Proxy) SetRequestModifier(reqmod RequestModifier) {
-	if reqmod == nil {
-		reqmod = noop
-	}
-
-	p.reqmod = reqmod
-}
-
-// SetResponseModifier sets the response modifier.
-func (p *Proxy) SetResponseModifier(resmod ResponseModifier) {
-	if resmod == nil {
-		resmod = noop
-	}
-
-	p.resmod = resmod
-}
 
 // Serve accepts connections from the listener and handles the requests.
 func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
@@ -395,11 +142,11 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 					delay = max
 				}
 
-				log.Debugf("martian: temporary error on accept: %v", err)
+				log.Debugf("mitm: temporary error on accept: %v", err)
 				time.Sleep(delay)
 				continue
 			}
-			log.Errorf("martian: failed to accept: %v", err)
+			log.Errorf("mitm: failed to accept: %v", err)
 			return err
 		}
 		if conn == nil {
@@ -421,13 +168,7 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 		}
 		delay = 0
 
-		log.Debugf("martian: accepted connection from %s", conn.RemoteAddr())
-		if tconn, ok := conn.(*net.TCPConn); ok {
-			_ = tconn
-			//tconn.SetKeepAlive(true)
-			//tconn.SetKeepAlivePeriod(3 * time.Minute)
-		}
-
+		log.Debugf("mitm: accepted connection from %s", conn.RemoteAddr())
 		go func(uidStr string, originConn net.Conn) {
 			defer func() {
 				if err := recover(); err != nil {
@@ -438,13 +179,10 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 					utils.PrintCurrentGoroutineRuntimeStack()
 				}
 			}()
-			var ok bool
+			var isS5 bool
 			var handledConnection net.Conn
-			//utils.Debug(func() {
-			//	// time.Sleep(50 * time.Millisecond)
-			//})
-			// TODO: s5config.IsSocks5HandleShake May be blocked... why? need more tests
-			handledConnection, ok, err = s5config.IsSocks5HandleShake(originConn)
+			var firstByte byte
+			handledConnection, isS5, firstByte, err = s5config.IsSocks5HandleShake(originConn)
 			if err != nil {
 				removeConns(uidStr, originConn)
 				log.Errorf("check socks5 handle shake failed: %s", err)
@@ -453,21 +191,22 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 			defer func() {
 				removeConns(uidStr, handledConnection)
 			}()
-			if ok {
+
+			if isS5 {
 				err := s5config.ServeConn(handledConnection)
 				if err != nil {
 					log.Errorf("socks5 handle failed: %s", err)
 					return
 				}
 				return
-			} else {
-				p.handleLoop(handledConnection, ctx)
 			}
+
+			p.handleLoop(firstByte == 0x16, handledConnection, ctx)
 		}(uid, conn)
 	}
 }
 
-func (p *Proxy) handleLoop(conn net.Conn, rootCtx context.Context) {
+func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, rootCtx context.Context) {
 	if conn == nil {
 		return
 	}
@@ -492,17 +231,32 @@ func (p *Proxy) handleLoop(conn net.Conn, rootCtx context.Context) {
 		}
 	}()
 
-	brw := bufio.NewReadWriter(bufio.NewReader(ctxio.NewReader(rootCtx, conn)), bufio.NewWriter(ctxio.NewWriter(rootCtx, conn)))
+	/* TLS */
+	if isTLSConn {
+		conn = tls.Server(conn, p.mitm.TLS())
+		if tlsConn, ok := conn.(*tls.Conn); ok && tlsConn != nil {
+			err := tlsConn.HandshakeContext(utils.TimeoutContextSeconds(5))
+			if err != nil {
+				log.Errorf("mitm recv tls conn from client, but handshake error!")
+				return
+			}
+			conn = tlsConn
+		}
+		p.handleLoop(false, conn, rootCtx)
+		return
+	}
 
+	/* handle cleaning proxy! */
+	brw := bufio.NewReadWriter(bufio.NewReader(ctxio.NewReader(rootCtx, conn)), bufio.NewWriter(ctxio.NewWriter(rootCtx, conn)))
 	s, err := newSession(conn, brw)
 	if err != nil {
-		log.Errorf("martian: failed to create session: %v", err)
+		log.Errorf("mitm: failed to create session: %v", err)
 		return
 	}
 
 	ctx, err := withSession(s)
 	if err != nil {
-		log.Errorf("martian: failed to create context: %v", err)
+		log.Errorf("mitm: failed to create context: %v", err)
 		return
 	}
 
@@ -526,7 +280,7 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, conn net.Conn, ctx *Co
 	connectedTo, err := utils.GetConnectedToHostPortFromHTTPRequest(req)
 	if err != nil {
 		conn.Close()
-		return utils.Errorf("martian: no host (and not connect to) in connect request: \n%v\n\n", err)
+		return utils.Errorf("mitm: no host (and not connect to) in connect request: \n%v\n\n", err)
 	}
 
 	parsedConnectedToPort := httpctx.GetContextIntInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort)
@@ -538,32 +292,32 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, conn net.Conn, ctx *Co
 
 	if err := p.reqmod.ModifyRequest(req); err != nil {
 		if !strings.Contains(err.Error(), "ignore connect") {
-			log.Errorf("martian: error modifying CONNECT request: %v", err)
+			log.Errorf("mitm: error modifying CONNECT request: %v", err)
 			proxyutil.Warning(req.Header, err)
 		}
 	}
 	if session.Hijacked() {
-		log.Debugf("martian: connection hijacked by request modifier")
+		log.Debugf("mitm: connection hijacked by request modifier")
 		return nil
 	}
 
 	if p.mitm == nil {
 		conn.Close()
-		return utils.Errorf("martian: no MITM config set for CONNECT request: %s", req.Host)
+		return utils.Errorf("mitm: no MITM config set for CONNECT request: %s", req.Host)
 	}
 
-	log.Debugf("martian: attempting MITM for connection: %s", req.Host)
+	log.Debugf("mitm: attempting MITM for connection: %s", req.Host)
 	/*
 		return a const response connection established...
 	*/
 	res := p.connectResponse(req)
 
 	if err := p.resmod.ModifyResponse(res); err != nil {
-		log.Errorf("martian: error modifying CONNECT response: %v", err)
+		log.Errorf("mitm: error modifying CONNECT response: %v", err)
 		proxyutil.Warning(res.Header, err)
 	}
 	if session.Hijacked() {
-		log.Debugf("martian: connection hijacked by response modifier")
+		log.Debugf("mitm: connection hijacked by response modifier")
 		return nil
 	}
 	var responseBytes []byte
@@ -576,13 +330,13 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, conn net.Conn, ctx *Co
 		log.Errorf("CONNECT Request: got error while flushing response back to client: %v", err)
 	}
 
-	log.Debugf("martian: completed MITM for connection: %s", req.Host)
+	log.Debugf("mitm: completed MITM for connection: %s", req.Host)
 
 	// peek the first byte to determine if this is an HTTPS connection.
 	conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 	b := make([]byte, 1)
 	if _, err := io.ReadFull(brw, b); err != nil {
-		log.Errorf("martian: error peeking message through CONNECT tunnel to determine type: %v", err)
+		log.Errorf("mitm: error peeking message through CONNECT tunnel to determine type: %v", err)
 		return err
 	}
 	conn.SetReadDeadline(time.Time{})
@@ -664,7 +418,7 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, conn net.Conn, ctx *Co
 }
 
 func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error {
-	log.Debugf("martian: waiting for request: %v", conn.RemoteAddr())
+	log.Debugf("mitm: waiting for request: %v", conn.RemoteAddr())
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("handle proxy request panic: %v", err)
@@ -686,10 +440,10 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	select {
 	case err := <-errc:
 		if isCloseable(err) {
-			log.Debugf("martian: connection closed prematurely: %v", err)
+			log.Debugf("mitm: connection closed prematurely: %v", err)
 			conn.Close()
 		} else {
-			log.Errorf("martian: failed to read request: %v", err)
+			log.Errorf("mitm: failed to read request: %v", err)
 		}
 		// TODO: TCPConn.WriteClose() to avoid sending an RST to the client.
 		return errClose
@@ -702,7 +456,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	session := ctx.Session()
 	ctx, err := withSession(session)
 	if err != nil {
-		log.Errorf("martian: failed to build new context: %v", err)
+		log.Errorf("mitm: failed to build new context: %v", err)
 		return err
 	}
 
@@ -721,7 +475,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	}
 
 	if session.IsSecure() {
-		log.Debugf("martian: forcing HTTPS inside secure session")
+		log.Debugf("mitm: forcing HTTPS inside secure session")
 		req.URL.Scheme = "https"
 	}
 
@@ -739,7 +493,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 
 		if host == "" {
 			conn.Close()
-			return utils.Errorf("martian: no host (and not connect to) in request: \n%v\n\n", string(httpctx.GetBareRequestBytes(req)))
+			return utils.Errorf("mitm: no host (and not connect to) in request: \n%v\n\n", string(httpctx.GetBareRequestBytes(req)))
 		}
 	}
 
@@ -802,21 +556,21 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	}
 
 	if err := p.reqmod.ModifyRequest(req); err != nil {
-		log.Errorf("martian: error modifying request: %v", err)
+		log.Errorf("mitm: error modifying request: %v", err)
 		proxyutil.Warning(req.Header, err)
 	}
 	if session.Hijacked() {
-		log.Debugf("martian: connection hijacked by request modifier")
+		log.Debugf("mitm: connection hijacked by request modifier")
 		return nil
 	}
 
-	res, err := p.roundTrip(ctx, req)
+	res, err := p.doHTTPRequest(ctx, req)
 	if (err != nil && err != io.EOF) || res == nil {
 		if strings.Contains(err.Error(), "no such host") {
 			httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_NOLOG, true)
 			res = proxyutil.NewResponse(200, strings.NewReader(proxyutil.GetErrorRspBody(fmt.Sprintf("Unknown host: %s", req.Host))), req)
 		} else {
-			log.Debugf("martian: failed to round trip: %v", err)
+			log.Debugf("mitm: failed to round trip: %v", err)
 			res = proxyutil.NewResponse(502, nil, req)
 			proxyutil.Warning(res.Header, err)
 		}
@@ -833,19 +587,19 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 
 	if !httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_IsDropped) {
 		if err := p.resmod.ModifyResponse(res); err != nil {
-			log.Errorf("martian: error modifying response: %v", err)
+			log.Errorf("mitm: error modifying response: %v", err)
 			proxyutil.Warning(res.Header, err)
 		}
 	}
 
 	if session.Hijacked() {
-		log.Debugf("martian: connection hijacked by response modifier")
+		log.Debugf("mitm: connection hijacked by response modifier")
 		return nil
 	}
 
 	var closing error
 	if req.Close || res.Close || p.Closing() {
-		log.Debugf("martian: received close request: %v", req.RemoteAddr)
+		log.Debugf("mitm: received close request: %v", req.RemoteAddr)
 		res.Close = true
 		closing = errClose
 	}
@@ -882,30 +636,9 @@ type peekedConn struct {
 // be read again.
 func (c *peekedConn) Read(buf []byte) (int, error) { return c.r.Read(buf) }
 
-func (p *Proxy) roundTrip(ctx *Context, req *http.Request) (*http.Response, error) {
-	if ctx.SkippingRoundTrip() {
-		log.Debugf("martian: skipping round trip")
-		return proxyutil.NewResponse(200, nil, req), nil
-	}
-	if httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_IsDropped) {
-		log.Debugf("martian: skipping round trip due to user manually drop")
-		return proxyutil.NewResponse(200, strings.NewReader(proxyutil.GetErrorRspBody("请求被用户丢弃")), req), nil
-	}
-
-	httpctx.SetRequestHTTPS(req, ctx.GetSessionBoolValue(httpctx.REQUEST_CONTEXT_KEY_IsHttps))
-	inherit := func(i string) {
-		httpctx.SetContextValueInfoFromRequest(req, i, ctx.GetSessionStringValue(i))
-	}
-	inherit(httpctx.REQUEST_CONTEXT_KEY_ConnectedTo)
-	inherit(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort)
-	inherit(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost)
-
-	return p.roundTripBase(req)
-}
-
 func (p *Proxy) connect(req *http.Request) (*http.Response, net.Conn, error) {
 	if p.proxyURL != nil {
-		log.Debugf("martian: CONNECT with downstream proxy: %s", p.proxyURL.Host)
+		log.Debugf("mitm: CONNECT with downstream proxy: %s", p.proxyURL.Host)
 
 		conn, err := p.dial(context.Background(), "tcp", p.proxyURL.Host)
 		if err != nil {
@@ -925,7 +658,7 @@ func (p *Proxy) connect(req *http.Request) (*http.Response, net.Conn, error) {
 		return res, conn, nil
 	}
 
-	log.Debugf("martian: CONNECT to host directly: %s", req.URL.Host)
+	log.Debugf("mitm: CONNECT to host directly: %s", req.URL.Host)
 
 	conn, err := p.dial(req.Context(), "tcp", req.URL.Host)
 	if err != nil {
@@ -1001,129 +734,4 @@ func (p *Proxy) handshakeWithTarget(req *http.Request) (net.Conn, error) {
 		}
 	}
 	return rawConn, err
-
-}
-
-// proxyH2 proxies HTTP/2 traffic between a client connection, `cc`, and the HTTP/2 `url` assuming
-// h2 is being used. Since no browsers use h2c, it's safe to assume all traffic uses TLS.
-// Revision this func from martian h2 package since it was not compatible with martian modifier style
-func (p *Proxy) proxyH2(closing chan bool, cc *tls.Conn, url *url.URL) error {
-	if p.mitm.H2Config().EnableDebugLogs {
-		log.Infof("\u001b[1;35mProxying %v with HTTP/2\u001b[0m", url)
-	}
-
-	go func() {
-		select {
-		case <-closing:
-		}
-		cc.Close()
-	}()
-
-	proxyClient := lowhttp2.Server{
-		PermitProhibitedCipherSuites: true,
-	}
-	handler := makeNewH2Handler(p.reqmod, p.resmod, url.Host, p)
-	proxyClientConfig := &lowhttp2.ServeConnOpts{Handler: handler}
-	proxyClient.ServeConn(cc, proxyClientConfig)
-	return nil
-
-}
-
-type H2Handler struct {
-	reqmod     RequestModifier
-	resmod     ResponseModifier
-	proxy      *Proxy
-	serverHost string
-	//flowMux       sync.Mutex
-}
-
-func makeNewH2Handler(reqmod RequestModifier, resmod ResponseModifier, serverHost string, proxy *Proxy) *H2Handler {
-	return &H2Handler{reqmod: reqmod, resmod: resmod, serverHost: serverHost, proxy: proxy}
-}
-
-func (h *H2Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	//if strings.Contains(req.URL.String(), "/xxx") {
-	//	log.Infof("Hit")
-	//	reqRaw, _ := utils.HttpDumpWithBody(req, true)
-	//	println(string(reqRaw))
-	//}
-	if err := h.reqmod.ModifyRequest(req); err != nil {
-		log.Errorf("martian: error modifying request: %v", err)
-		proxyutil.Warning(req.Header, err)
-		return
-	}
-	if httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_IsDropped) {
-		w.WriteHeader(200)
-		w.Write([]byte(proxyutil.GetErrorRspBody("请求被用户丢弃")))
-	} else {
-		rsp, err := h.proxy.roundTripBase(req)
-		if err != nil {
-			log.Errorf("martian: error requesting to remote server: %v", err)
-			return
-		}
-		defer rsp.Body.Close()
-
-		if err := h.resmod.ModifyResponse(rsp); err != nil {
-			log.Errorf("martian: error modifying response: %v", err)
-			proxyutil.Warning(req.Header, err)
-			return
-		}
-
-		for k, v := range rsp.Header {
-			w.Header().Set(k, v[0])
-		}
-		w.WriteHeader(rsp.StatusCode)
-		rspBody, _ := io.ReadAll(rsp.Body)
-		w.Write(rspBody)
-	}
-
-}
-
-func (p *Proxy) roundTripBase(req *http.Request) (*http.Response, error) {
-	bareBytes := httpctx.GetRequestBytes(req)
-	reqBytes := lowhttp.FixHTTPRequest(bareBytes)
-
-	var isHttps = httpctx.GetRequestHTTPS(req)
-
-	var isGmTLS = p.gmTLS && isHttps
-
-	opts := append(p.lowhttpConfig,
-		lowhttp.WithRequest(reqBytes),
-		lowhttp.WithHttps(isHttps),
-		lowhttp.WithGmTLS(isGmTLS),
-		lowhttp.WithConnPool(true),
-		lowhttp.WithSaveHTTPFlow(false),
-	)
-
-	if connectedPort := httpctx.GetContextIntInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort); connectedPort > 0 {
-		portValid := (connectedPort == 443 && isHttps) || (connectedPort == 80 && !isHttps)
-		if !portValid {
-			//修复host和port
-			if host := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost); host != "" {
-				opts = append(opts, lowhttp.WithHost(host))
-			}
-			opts = append(opts, lowhttp.WithPort(connectedPort))
-		}
-	}
-
-	lowHttpResp, err := lowhttp.HTTPWithoutRedirect(opts...)
-	if err != nil {
-		return nil, err
-	}
-
-	if lowHttpResp.RemoteAddr != "" {
-		httpctx.SetRemoteAddr(req, lowHttpResp.RemoteAddr)
-		req.RemoteAddr = lowHttpResp.RemoteAddr
-	}
-
-	rsp, err := lowhttp.ParseBytesToHTTPResponse(lowHttpResp.RawPacket)
-	if rsp != nil {
-		rsp.Request = req
-	}
-
-	//utils.FixHTTPRequestForGolangNativeHTTPClient(req)
-	//rsp, err := t.Transport.RoundTrip(req)
-
-	utils.FixHTTPResponseForGolangNativeHTTPClient(rsp)
-	return rsp, err
 }

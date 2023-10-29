@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package martian
+package minimartian
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"net/http"
 )
 
@@ -32,12 +31,10 @@ func Noop(id string) RequestResponseModifier {
 
 // ModifyRequest logs a debug line.
 func (nm *noopModifier) ModifyRequest(*http.Request) error {
-	log.Debugf("%s: no request modifier configured", nm.id)
 	return nil
 }
 
 // ModifyResponse logs a debug line.
 func (nm *noopModifier) ModifyResponse(*http.Response) error {
-	log.Debugf("%s: no response modifier configured", nm.id)
 	return nil
 }
