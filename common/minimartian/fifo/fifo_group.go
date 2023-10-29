@@ -22,12 +22,12 @@ package fifo
 
 import (
 	"encoding/json"
+	martian "github.com/yaklang/yaklang/common/minimartian"
 	"github.com/yaklang/yaklang/common/utils"
 	"net/http"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/minimartian/v3"
 )
 
 // Group is a martian.RequestResponseModifier that maintains lists of

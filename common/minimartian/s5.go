@@ -1,4 +1,4 @@
-package martian
+package minimartian
 
 import (
 	"context"
@@ -45,7 +45,7 @@ const (
 	replySuccess = 0x00
 )
 
-func (c *S5Config) IsSocks5HandleShake(conn net.Conn) (fConn net.Conn, _ bool, _ error) {
+func (c *S5Config) IsSocks5HandleShake(conn net.Conn) (fConn net.Conn, _ bool, _ byte, _ error) {
 	peekable := utils.NewPeekableNetConn(conn)
 
 	defer func() {
@@ -58,24 +58,18 @@ func (c *S5Config) IsSocks5HandleShake(conn net.Conn) (fConn net.Conn, _ bool, _
 	raw, err := peekable.Peek(2)
 	if err != nil {
 		if err == io.EOF {
-			return peekable, false, nil
+			return peekable, false, 0, nil
 		}
-		return nil, false, utils.Errorf("peek failed: %s", err)
+		return nil, false, 0, utils.Errorf("peek failed: %s", err)
 	}
 	if len(raw) != 2 {
-		return nil, false, utils.Errorf("check s5 failed: %v", raw)
+		return nil, false, 0, utils.Errorf("check s5 failed: %v", raw)
 	}
-
-	if raw[0] == socks5Version {
-		if raw[1] > 0 {
-			return peekable, true, nil
-		}
-	}
-	return peekable, false, nil
+	return peekable, raw[0] == socks5Version && raw[1] > 0, raw[0], nil
 }
 
 func (c *S5Config) Handshake(conn net.Conn) (net.Conn, error) {
-	peekable, isSocks5, err := c.IsSocks5HandleShake(conn)
+	peekable, isSocks5, _, err := c.IsSocks5HandleShake(conn)
 	if err != nil {
 		return nil, utils.Errorf("check s5 failed: %s", err)
 	}

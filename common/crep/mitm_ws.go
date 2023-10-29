@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	logger "github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/minimartian/v3"
+	"github.com/yaklang/yaklang/common/minimartian"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -30,7 +30,7 @@ type WebSocketModifier struct {
 	websocketResponseMirror        func(rsp []byte)
 	writeExcludeHeader             map[string]bool
 	wsCanonicalHeader              []string
-	ProxyGetter                    func() *martian.Proxy
+	ProxyGetter                    func() *minimartian.Proxy
 	RequestHijackCallback          func(req *http.Request) error
 }
 
@@ -67,7 +67,7 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 		return err
 	}
 
-	ctx := martian.NewContext(req, w.ProxyGetter())
+	ctx := minimartian.NewContext(req, w.ProxyGetter())
 	if ctx == nil {
 		return nil
 	}
