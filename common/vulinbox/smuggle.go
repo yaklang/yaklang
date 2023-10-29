@@ -102,7 +102,9 @@ Content-Type: text/html; charset=utf-8
 		for {
 			req, err := http.ReadRequest(reader)
 			if err != nil {
-				log.Error(err)
+				if err != io.EOF {
+					log.Error(err)
+				}
 				return
 			}
 			log.Infof("method: %v, url: %v", req.Method, req.URL)
