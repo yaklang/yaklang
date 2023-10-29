@@ -206,6 +206,27 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 	}
 }
 
+var cachedTLSConfig *tls.Config
+
+func (p *Proxy) defaultTLSConfig() *tls.Config {
+	if cachedTLSConfig != nil {
+		cachedTLSConfig = &tls.Config{
+			InsecureSkipVerify: true,
+			GetCertificate: func(info *tls.ClientHelloInfo) (*tls.Certificate, error) {
+				var hostname string
+				if info.ServerName != "" {
+					hostname = info.ServerName
+				} else {
+					hostname = "127.0.0.1"
+				}
+				return p.mitm.GetCertificateByHostname(hostname)
+			},
+			NextProtos: make([]string, 0),
+		}
+	}
+	return cachedTLSConfig
+}
+
 func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, rootCtx context.Context) {
 	if conn == nil {
 		return
@@ -233,11 +254,11 @@ func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, rootCtx context.Contex
 
 	/* TLS */
 	if isTLSConn {
-		conn = tls.Server(conn, p.mitm.TLS())
+		conn = tls.Server(conn, p.mitm.TLSForHost("127.0.0.1", false))
 		if tlsConn, ok := conn.(*tls.Conn); ok && tlsConn != nil {
 			err := tlsConn.HandshakeContext(utils.TimeoutContextSeconds(5))
 			if err != nil {
-				log.Errorf("mitm recv tls conn from client, but handshake error!")
+				log.Errorf("mitm recv tls conn from client, but handshake error: %v", err)
 				return
 			}
 			conn = tlsConn
