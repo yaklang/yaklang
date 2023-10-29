@@ -9,9 +9,9 @@ import (
 	"encoding/pem"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	log "github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/minimartian/v3"
-	"github.com/yaklang/yaklang/common/minimartian/v3/h2"
-	"github.com/yaklang/yaklang/common/minimartian/v3/mitm"
+	"github.com/yaklang/yaklang/common/minimartian"
+	"github.com/yaklang/yaklang/common/minimartian/h2"
+	"github.com/yaklang/yaklang/common/minimartian/mitm"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -41,12 +41,12 @@ func (r *mitmRoundTrip) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 // request modifier
-func NewRequestModifier(f martian.RequestModifierFunc) martian.RequestModifier {
+func NewRequestModifier(f minimartian.RequestModifierFunc) minimartian.RequestModifier {
 	return &requestModifierFunc{f: f}
 }
 
 type requestModifierFunc struct {
-	f martian.RequestModifierFunc
+	f minimartian.RequestModifierFunc
 }
 
 func (r *requestModifierFunc) ModifyRequest(req *http.Request) error {
@@ -54,12 +54,12 @@ func (r *requestModifierFunc) ModifyRequest(req *http.Request) error {
 }
 
 // response modifier
-func NewResponseModifier(f martian.ResponseModifierFunc) martian.ResponseModifier {
+func NewResponseModifier(f minimartian.ResponseModifierFunc) minimartian.ResponseModifier {
 	return &responseModifierFunc{f: f}
 }
 
 type responseModifierFunc struct {
-	f martian.ResponseModifierFunc
+	f minimartian.ResponseModifierFunc
 }
 
 func (r *responseModifierFunc) ModifyResponse(req *http.Response) error {

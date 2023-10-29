@@ -10,8 +10,8 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/minimartian/v3"
-	"github.com/yaklang/yaklang/common/minimartian/v3/mitm"
+	"github.com/yaklang/yaklang/common/minimartian"
+	"github.com/yaklang/yaklang/common/minimartian/mitm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
@@ -122,7 +122,7 @@ type ProxyAuth struct {
 }
 
 type MITMServer struct {
-	proxy        *martian.Proxy
+	proxy        *minimartian.Proxy
 	mitmConfig   *mitm.Config
 	caCert       []byte
 	caKey        []byte
@@ -176,7 +176,7 @@ func (m *MITMServer) Configure(options ...MITMConfig) error {
 	return nil
 }
 
-func (m *MITMServer) GetMartianProxy() *martian.Proxy {
+func (m *MITMServer) GetMartianProxy() *minimartian.Proxy {
 	return m.proxy
 }
 
@@ -257,7 +257,7 @@ var (
 func NewMITMServer(options ...MITMConfig) (*MITMServer, error) {
 	initMITMCertOnce.Do(InitMITMCert)
 
-	proxy := martian.NewProxy()
+	proxy := minimartian.NewProxy()
 	server := &MITMServer{
 		proxy:                    proxy,
 		DNSServers:               make([]string, 0),

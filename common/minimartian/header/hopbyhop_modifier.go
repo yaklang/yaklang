@@ -15,10 +15,9 @@
 package header
 
 import (
+	"github.com/yaklang/yaklang/common/minimartian"
 	"net/http"
 	"strings"
-
-	"github.com/yaklang/yaklang/common/minimartian/v3"
 )
 
 // Hop-by-hop headers as defined by RFC2616.
@@ -40,7 +39,7 @@ type hopByHopModifier struct{}
 
 // NewHopByHopModifier removes Hop-By-Hop headers from requests and
 // responses.
-func NewHopByHopModifier() martian.RequestResponseModifier {
+func NewHopByHopModifier() minimartian.RequestResponseModifier {
 	return &hopByHopModifier{}
 }
 
