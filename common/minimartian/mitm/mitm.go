@@ -235,6 +235,10 @@ func (c *Config) h2AllowedHost(host string) bool {
 	//	c.h2Config.AllowedHostsFilter(host)
 }
 
+func (c *Config) GetCertificateByHostname(hostname string) (*tls.Certificate, error) {
+	return c.cert(hostname)
+}
+
 func (c *Config) cert(hostname string) (*tls.Certificate, error) {
 	// Remove the port if it exists.
 	host, _, err := net.SplitHostPort(hostname)
