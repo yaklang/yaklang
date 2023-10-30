@@ -990,11 +990,13 @@ CASE WHEN LENGTH(response) > 512000 THEN '' ELSE response END as response
 		db = bizhelper.QueryByTimeRangeWithTimestamp(db, "updated_at", 0, params.GetBeforeUpdatedAt())
 		p.OrderBy = "updated_at"
 		p.Order = "desc"
+		needReverse = false //如果同时进入两个条件,则不倒序,下同
 	}
 	if params.GetBeforeId() > 0 {
 		db = db.Where("id < ?", params.GetBeforeId())
 		p.OrderBy = "id"
 		p.Order = "desc"
+		needReverse = false
 	}
 
 	if params.GetOnlyWebsocket() {
