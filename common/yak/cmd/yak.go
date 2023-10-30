@@ -11,12 +11,12 @@ import (
 	"io"
 	"io/ioutil"
 	"net"
-	"net/http"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
 	"runtime"
+	"runtime/pprof"
 	"strings"
 	"sync"
 	"time"
@@ -407,8 +407,10 @@ var startGRPCServerCommand = cli.Command{
 			Name:  "gen-tls-crt",
 			Value: "build/",
 		},
-		cli.BoolFlag{
-			Name: "pprof",
+		cli.Float64Flag{
+			Name:  "pprof",
+			Usage: "指定 pprof 采集秒数间隔,eg. 10",
+			Value: 10,
 		},
 		cli.BoolFlag{
 			Name: "debug",
@@ -423,22 +425,22 @@ var startGRPCServerCommand = cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		enablePProfile := c.Bool("pprof")
-		_ = enablePProfile
-		if enablePProfile {
+		pprofSec := c.Float64("pprof")
+		if pprofSec > 0 {
 			println("----------------------------------------------------------------------")
 			println("----------------------------------------------------------------------")
 			println("---------------------------YAK GRPC PPROF-----------------------------")
 			println("----------------------------------------------------------------------")
 			println("----------------------------------------------------------------------")
-			println("----------------------------------------------------------------------")
-			println("USE: go tool pprof --seconds 30 http://127.0.0.1:18080/debug/pprof/profile")
-			go func() {
-				err := http.ListenAndServe(":18080", nil)
-				if err != nil {
-					return
-				}
-			}()
+			//println("----------------------------------------------------------------------")
+			//println("USE: go tool pprof --seconds 30 http://127.0.0.1:18080/debug/pprof/profile")
+			//go func() {
+			//	err := http.ListenAndServe(":18080", nil)
+			//	if err != nil {
+			//		return
+			//	}
+			//}()
+			go startPProf(pprofSec)
 		}
 		//log.SetLevel(log.DebugLevel)
 		log.Info("start to initialize database")
@@ -578,6 +580,40 @@ var startGRPCServerCommand = cli.Command{
 		}
 		return nil
 	},
+}
+
+func startPProf(sec float64) {
+	day := time.Now().Format("20060102")
+	pprofCpuDir := path.Join(consts.GetDefaultYakitBaseTempDir(), "pprof", day, "cpu")
+	err := os.MkdirAll(pprofCpuDir, 0755)
+
+	pprofMemDir := path.Join(consts.GetDefaultYakitBaseTempDir(), "pprof", day, "mem")
+	err = os.MkdirAll(pprofMemDir, 0755)
+	if err != nil {
+		log.Errorf("mkdir pprof dir failed: %s", err)
+		return
+	}
+	for {
+		// 启动 CPU 采样
+		go func() {
+			cpuFile, _ := os.Create(path.Join(pprofCpuDir, fmt.Sprintf("cpu_%d.pprof", time.Now().Unix())))
+			defer cpuFile.Close()
+
+			pprof.StartCPUProfile(cpuFile)
+			time.Sleep(time.Duration(sec) * time.Second) // 采样 sec 秒
+			pprof.StopCPUProfile()
+		}()
+
+		// 启动内存采样
+		go func() {
+			memFile, _ := os.Create(path.Join(pprofMemDir, fmt.Sprintf("mem_%d.pprof", time.Now().Unix())))
+			defer memFile.Close()
+
+			pprof.WriteHeapProfile(memFile)
+		}()
+
+		time.Sleep(time.Duration(sec) * time.Second) // 等待 sec 秒后再次采样
+	}
 }
 
 var distYakCommand = scannode.DistYakCommand
