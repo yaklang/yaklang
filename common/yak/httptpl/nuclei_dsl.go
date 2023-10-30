@@ -854,7 +854,10 @@ func LoadVarFromRawResponse(rsp []byte, duration float64, sufs ...string) map[st
 		vars := utils.CopyMapInterface(rs)
 		for _, i := range sufs {
 			for k, v := range rs {
-				vars[k+utils.InterfaceToString(i)] = v
+				if i == "_1" {
+					vars[k] = v
+				}
+				vars[k+i] = v
 			}
 		}
 		return vars
