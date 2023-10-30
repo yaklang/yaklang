@@ -3,16 +3,14 @@ package suspect
 import (
 	"bytes"
 	"encoding/base64"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"fmt"
 	"io"
 	"io/ioutil"
-	"unicode"
-)
-
-import (
-	"fmt"
 	"regexp"
 	"strings"
+	"unicode"
+
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
 var (
@@ -28,7 +26,7 @@ var (
 	commonURLPathExtRegex = regexp.MustCompile(`(?i)(\.php)|(\.jsp)|(\.asp)|(\.aspx)|(\.html)|(\.action)|(\.do)`)
 	maybeSQLColumnNameKey = regexp.MustCompile(`(?i)(sort)|(order)|(field)|(column)`)
 	maybePasswordKeyRegex = regexp.MustCompile("(?i)(password)|(pass_word)|(pass_code)|(passcode)|(passw)|(pwd)|(psw)|(psd)|(pswd)|(passwd)|(mima)|(txtmm)|(yhmm)|(pass$)")
-	maybeUsernameKeyRegex = regexp.MustCompile(`(?i)(^name$)|(uname)|(^uid$)|(^uin$)|(account)|(user_id)|(userid)|(txtuser$)|(nick)|(:user$)`)
+	maybeUsernameKeyRegex = regexp.MustCompile(`(?i)(^name$)|(uname)|(^uid$)|(^uin$)|(account)|(user_id)|(userid)|(txtuser$)|(nick)|(user$)`)
 	maybeCaptchaKeyRegex  = regexp.MustCompile(`(?i)(captcha)|(vcode)|(v_code)|(yzm)|(yanzhengma)`)
 
 	maybeServerErrorPageKeyword = regexp.MustCompile(`(?i)(stack\s?trace)|(exception)|(error)|(panic)|(warning)|(notice)`)

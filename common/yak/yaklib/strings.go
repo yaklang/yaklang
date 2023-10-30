@@ -353,6 +353,78 @@ func ToValidUTF8(s string, replacement string) string {
 	return strings.ToValidUTF8(s, replacement)
 }
 
+// ExtractJson 尝试提取字符串中的 JSON 并进行修复返回
+// Example:
+// ```
+// str.ExtractJson("hello yak") // []
+// str.ExtractJson(`{"hello": "yak"}`) // [{"hello": "yak"}]
+// ```
+func extractValidJson(i interface{}) []string {
+	return jsonextractor.ExtractStandardJSON(utils.InterfaceToString(i))
+}
+
+// ExtractJsonWithRaw 尝试提取字符串中的 JSON 并返回，第一个返回值返回经过修复后的JSON字符串数组，第二个返回值返回原始JSON字符串数组(如果修复失败)
+// Example:
+// ```
+// str.ExtractJsonWithRaw("hello yak") // [], []
+// str.ExtractJsonWithRaw(`{"hello": "yak"}`) // [{"hello": "yak"}], []
+// ```
+func extractJsonEx(i interface{}) ([]string, []string) {
+	return jsonextractor.ExtractJSONWithRaw(utils.InterfaceToString(i))
+}
+
+// ExtractDomain 尝试提取字符串中的域名并返回
+// Example:
+// ```
+// str.ExtractDomain("hello yak") // []
+// str.ExtractDomain("hello yaklang.com or yaklang.io") // ["yaklang.com", "yaklang.io"]
+// ```
+func extractDomain(i interface{}) []string {
+	return domainextractor.ExtractDomains(utils.InterfaceToString(i))
+}
+
+// ExtractRootDomain 尝试提取字符串中的根域名并返回
+// Example:
+// ```
+// str.ExtractRootDomain("hello yak") // []
+// str.ExtractRootDomain("hello www.yaklang.com or www.yaklang.io") // ["yaklang.com", "yaklang.io"]
+// ```
+func extractRootDomain(i interface{}) []string {
+	return domainextractor.ExtractRootDomains(utils.InterfaceToString(i))
+}
+
+// ExtractTitle 尝试将传入的字符串进行HTML解析并提取其中的标题(title标签)返回
+// Example:
+// ```
+// str.ExtractTitle("hello yak") // ""
+// str.ExtractTitle("<title>hello yak</title>") // "hello yak"
+// ```
+func extractTitle(i interface{}) string {
+	return utils.ExtractTitleFromHTMLTitle(utils.InterfaceToString(i), "")
+}
+
+// PathJoin 将传入的文件路径进行拼接并返回
+// Example:
+// ```
+// str.PathJoin("/var", "www", "html") // in *unix: "/var/www/html"    in Windows: \var\www\html
+// ```
+func pathJoin(elem ...string) (newPath string) {
+	return filepath.Join(elem...)
+}
+
+// ToJsonIndentStr 将v转换为格式化的JSON字符串并返回，如果转换失败，则返回空字符串
+// Example:
+// ```
+// str.ToJsonIndentStr({"hello":"yak"}) // {"hello": "yak"}
+// ```
+func toJsonIndentStr(d interface{}) string {
+	raw, err := json.MarshalIndent(d, "", "    ")
+	if err != nil {
+		return ""
+	}
+	return string(raw)
+}
+
 var (
 	StringsExport = map[string]interface{}{
 		// 基础字符串工具
@@ -485,76 +557,4 @@ func init() {
 	for k, v := range suspect.GuessExports {
 		StringsExport[k] = v
 	}
-}
-
-// ExtractJson 尝试提取字符串中的 JSON 并进行修复返回
-// Example:
-// ```
-// str.ExtractJson("hello yak") // []
-// str.ExtractJson(`{"hello": "yak"}`) // [{"hello": "yak"}]
-// ```
-func extractValidJson(i interface{}) []string {
-	return jsonextractor.ExtractStandardJSON(utils.InterfaceToString(i))
-}
-
-// ExtractJsonWithRaw 尝试提取字符串中的 JSON 并返回，第一个返回值返回经过修复后的JSON字符串数组，第二个返回值返回原始JSON字符串数组(如果修复失败)
-// Example:
-// ```
-// str.ExtractJsonWithRaw("hello yak") // [], []
-// str.ExtractJsonWithRaw(`{"hello": "yak"}`) // [{"hello": "yak"}], []
-// ```
-func extractJsonEx(i interface{}) ([]string, []string) {
-	return jsonextractor.ExtractJSONWithRaw(utils.InterfaceToString(i))
-}
-
-// ExtractDomain 尝试提取字符串中的域名并返回
-// Example:
-// ```
-// str.ExtractDomain("hello yak") // []
-// str.ExtractDomain("hello yaklang.com or yaklang.io") // ["yaklang.com", "yaklang.io"]
-// ```
-func extractDomain(i interface{}) []string {
-	return domainextractor.ExtractDomains(utils.InterfaceToString(i))
-}
-
-// ExtractRootDomain 尝试提取字符串中的根域名并返回
-// Example:
-// ```
-// str.ExtractRootDomain("hello yak") // []
-// str.ExtractRootDomain("hello www.yaklang.com or www.yaklang.io") // ["yaklang.com", "yaklang.io"]
-// ```
-func extractRootDomain(i interface{}) []string {
-	return domainextractor.ExtractRootDomains(utils.InterfaceToString(i))
-}
-
-// ExtractTitle 尝试将传入的字符串进行HTML解析并提取其中的标题(title标签)返回
-// Example:
-// ```
-// str.ExtractTitle("hello yak") // ""
-// str.ExtractTitle("<title>hello yak</title>") // "hello yak"
-// ```
-func extractTitle(i interface{}) string {
-	return utils.ExtractTitleFromHTMLTitle(utils.InterfaceToString(i), "")
-}
-
-// PathJoin 将传入的文件路径进行拼接并返回
-// Example:
-// ```
-// str.PathJoin("/var", "www", "html") // in *unix: "/var/www/html"    in Windows: \var\www\html
-// ```
-func pathJoin(elem ...string) (newPath string) {
-	return filepath.Join(elem...)
-}
-
-// ToJsonIndentStr 将v转换为格式化的JSON字符串并返回，如果转换失败，则返回空字符串
-// Example:
-// ```
-// str.ToJsonIndentStr({"hello":"yak"}) // {"hello": "yak"}
-// ```
-func toJsonIndentStr(d interface{}) string {
-	raw, err := json.MarshalIndent(d, "", "    ")
-	if err != nil {
-		return ""
-	}
-	return string(raw)
 }
