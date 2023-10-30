@@ -14,6 +14,12 @@ import (
 )
 
 func GetContextInfoMap(r *http.Request) *sync.Map {
+	if r == nil {
+		return new(sync.Map)
+	}
+	if r.Context() == nil {
+		*r = *r.WithContext(context.Background())
+	}
 	raw := r.Context().Value(REQUEST_CONTEXT_INFOMAP)
 	if raw == nil {
 		return _getContextInfoMap(r)
@@ -246,10 +252,98 @@ const (
 	REQUEST_CONTEXT_KEY_ResponseMaxContentLength     = "responseMaxContentLength"
 	REQUEST_CONTEXT_KEY_ResponseTooLarge             = "responseTooLarge"
 	REQUEST_CONTEXT_KEY_RequestTooLarge              = "requestTooLarge"
+	REQUEST_CONTEXT_KEY_ResponseHeaderParsed         = "responseHeaderParsed"
+	REQUEST_CONTEXT_KEY_ResponseContentTypeFiltered  = "ResponseContentTypeFiltered"
+	REQUEST_CONTEXT_KEY_MitmFrontendReadWriter       = "mitmFrontendReadWriter"
+	REQUEST_CONTEXT_KEY_MitmSkipFrontendFeedback     = "mitmSkipFrontendFeedback"
 
 	// matched mitm rules
 	REQUEST_CONTEXT_KEY_MatchedRules = "MatchedRules"
 )
+
+func SetResponseContentTypeFiltered(req *http.Request, matcher func(contentType string) bool) {
+	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseContentTypeFiltered, matcher)
+}
+
+func GetResponseContentTypeFiltered(req *http.Request) func(contentType string) bool {
+	if req == nil {
+		return nil
+	}
+	if ret := GetContextAnyFromRequest(req, REQUEST_CONTEXT_KEY_ResponseContentTypeFiltered); ret != nil {
+		if rw, ok := ret.(func(contentType string) bool); ok {
+			return rw
+		}
+	}
+	return nil
+}
+
+// SetMITMFrontendReadWriter sets the mitm frontend read writer
+func SetMITMFrontendReadWriter(r *http.Request, rw io.ReadWriter) {
+	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_MitmFrontendReadWriter, rw)
+}
+
+// SetMITMSkipFrontendFeedback means: the frontend should skip feedback
+func SetMITMSkipFrontendFeedback(r *http.Request, b bool) {
+	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_MitmSkipFrontendFeedback, b)
+}
+
+// GetMITMSkipFrontendFeedback gets the mitm frontend read writer
+func GetMITMSkipFrontendFeedback(r *http.Request) bool {
+	if r == nil {
+		return false
+	}
+	if ret := GetContextAnyFromRequest(r, REQUEST_CONTEXT_KEY_MitmSkipFrontendFeedback); ret != nil {
+		if rw, ok := ret.(bool); ok {
+			return rw
+		}
+	}
+	return false
+}
+
+// GetMITMFrontendReadWriter gets the mitm frontend read writer
+func GetMITMFrontendReadWriter(r *http.Request) io.ReadWriter {
+	if r == nil {
+		return nil
+	}
+	if ret := GetContextAnyFromRequest(r, REQUEST_CONTEXT_KEY_MitmFrontendReadWriter); ret != nil {
+		if rw, ok := ret.(io.ReadWriter); ok {
+			return rw
+		}
+	}
+	return nil
+}
+
+// ResponseHeaderParsedCallback defines how response header is parsed for handling
+type ResponseHeaderParsedCallback func(key string, value string)
+
+func SetResponseHeaderParsed(r *http.Request, cb ResponseHeaderParsedCallback) {
+	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponseHeaderParsed, cb)
+}
+
+func GetResponseHeaderParsed(r *http.Request) ResponseHeaderParsedCallback {
+	if r == nil {
+		return nil
+	}
+	rs := GetContextAnyFromRequest(r, REQUEST_CONTEXT_KEY_ResponseHeaderParsed)
+	if rs == nil {
+		return nil
+	}
+	cb, ok := rs.(ResponseHeaderParsedCallback)
+	if !ok {
+		return nil
+	}
+	return cb
+}
+
+// IsFiltered returns true if the request is filtered out
+// filtered request/response will not be logged into database
+func IsFiltered(req *http.Request) bool {
+	return GetContextBoolInfoFromRequest(req, REQUEST_CONTEXT_KEY_RequestIsFiltered) || GetContextBoolInfoFromRequest(req, RESPONSE_CONTEXT_KEY_ResponseIsFiltered)
+}
+
+func IsResponseFiltered(req *http.Request) bool {
+	return GetContextBoolInfoFromRequest(req, RESPONSE_CONTEXT_KEY_ResponseIsFiltered)
+}
 
 func GetResponseTooLarge(req *http.Request) bool {
 	return GetContextBoolInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseTooLarge)
@@ -305,7 +399,7 @@ func GetResponseHeaderCallback(req *http.Request) ResponseHeaderCallbackType {
 	if rs == nil {
 		return nil
 	}
-	cb, ok := rs.(func(response *http.Response, reader io.Reader))
+	cb, ok := rs.(ResponseHeaderCallbackType)
 	if !ok {
 		return nil
 	}

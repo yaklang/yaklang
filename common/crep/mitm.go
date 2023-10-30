@@ -223,6 +223,7 @@ func (m *MITMServer) Serve(ctx context.Context, addr string) error {
 	m.proxy.SetGMOnly(m.gmOnly)
 
 	m.proxy.SetMITM(m.mitmConfig)
+	m.proxy.SetMaxContentLength(m.GetMaxContentLength())
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -290,5 +291,6 @@ func NewMITMServer(options ...MITMConfig) (*MITMServer, error) {
 			return nil, utils.Errorf("set ca/key failed: %s", err)
 		}
 	}
+
 	return server, nil
 }

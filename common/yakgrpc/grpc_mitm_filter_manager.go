@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"mime"
 	"strings"
 )
 
@@ -124,8 +125,16 @@ func (m *MITMFilterManager) Save() {
 	}
 }
 
-// Filter return true if passed, false if filtered out
-func (m *MITMFilterManager) Filter(method string, hostport, urlStr string, ext string, isHttps bool) bool {
+func (m *MITMFilterManager) IsMIMEPassed(ct string) bool {
+	var parsed, _, _ = mime.ParseMediaType(ct)
+	if parsed != "" {
+		ct = parsed
+	}
+	return _checker(nil, m.ExcludeMIME, ct)
+}
+
+// IsPassed return true if passed, false if filtered out
+func (m *MITMFilterManager) IsPassed(method string, hostport, urlStr string, ext string, isHttps bool) bool {
 	var passed bool
 
 	passed = _exactChecker(nil, m.ExcludeMethods, method)

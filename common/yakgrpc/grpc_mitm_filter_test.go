@@ -341,7 +341,7 @@ func TestMITMFilterManager_Filter(t *testing.T) {
 	for _, c := range cases {
 		var count int
 		for _, send := range c.Send {
-			if c.Filter.Filter(send[0].(string), send[1].(string), send[2].(string), send[3].(string), send[4].(bool)) {
+			if c.Filter.IsPassed(send[0].(string), send[1].(string), send[2].(string), send[3].(string), send[4].(bool)) {
 				count++
 			}
 		}
