@@ -14,6 +14,9 @@ var testMap = map[string]func(string) []string{
 	"echo": func(i string) []string {
 		return []string{i}
 	},
+	"array": func(i string) []string {
+		return strings.Split(i, "|")
+	},
 	"get1": func(i string) []string {
 		return []string{"1"}
 	},
@@ -66,6 +69,13 @@ func TestSyncRender(t *testing.T) {
 		if len(result) != testcase[1].(int) {
 			t.Fatal(utils.Errorf("testcase %d error,got: length %d, expect length: %d", i, len(result), testcase[1].(int)))
 		}
+	}
+	result, err := ExecuteWithStringHandler("{{echo::1({{array::1(a|b)}})}}", testMap)
+	if err != nil {
+		panic(err)
+	}
+	if result[0] != "a" || result[1] != "b" {
+		panic("test sync render error")
 	}
 }
 
