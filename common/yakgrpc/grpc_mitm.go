@@ -57,19 +57,16 @@ func _checker(includes, excludes []string, target string) bool {
 	includes = utils.StringArrayFilterEmpty(includes)
 
 	if includes == nil {
-		if utils.StringGlobArrayContains(excludes, target) {
-			return false
-		}
-		return true
-	} else {
-		if utils.StringGlobArrayContains(excludes, target) {
-			return false
-		}
-		if utils.StringGlobArrayContains(includes, target) {
-			return true
-		}
+		return !utils.StringGlobArrayContains(excludes, target)
+	}
+
+	if utils.StringGlobArrayContains(excludes, target) {
 		return false
 	}
+	if utils.StringGlobArrayContains(includes, target) {
+		return true
+	}
+	return false
 }
 
 var enabledHooks = yak.MITMAndPortScanHooks
@@ -279,10 +276,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			JustContentReplacer: true,
 			Replacers:           replacer.GetRules(),
 		})
-	}
-
-	var responseShouldBeHijacked = func(contentType string, isHttps bool) bool {
-		return _checker(nil, filterManager.ExcludeMIME, contentType)
 	}
 
 	feedbackToUser("初始化过滤器... / initializing filters")
@@ -660,6 +653,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			return reqInstance.GetResponse()
 		}
 	}
+
 	handleHijackResponse := func(isHttps bool, req *http.Request, rspInstance *http.Response, rsp []byte, remoteAddr string) []byte {
 		defer func() {
 			if err := recover(); err != nil {
@@ -755,20 +749,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				自动过滤下，不是所有 response 都应该替换
 				应该替换的条件是不匹配过滤器的内容
 			*/
-
-			// 这个来过滤一些媒体文件
-			var contentTypeStr string
-			if handleResponseModified(rsp) {
-				contentTypeStr = lowhttp.GetHTTPPacketContentType(rsp)
-			} else {
-				contentTypeStr = rspInstance.Header.Get("Content-Type")
-			}
-			if contentTypeStr != "" {
-				if !responseShouldBeHijacked(contentTypeStr, isHttps) {
-					httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ResponseIsFiltered, true)
-					return rsp
-				}
-			}
 
 			// 处理响应规则
 			if replacer.haveHijackingRules() {
@@ -1033,6 +1013,12 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 	}
 	handleHijackRequest := func(isHttps bool, originReqIns *http.Request, req []byte) []byte {
+		httpctx.SetResponseContentTypeFiltered(originReqIns, func(t string) bool {
+			ret := !filterManager.IsMIMEPassed(t)
+			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ResponseIsFiltered, ret)
+			return ret
+		})
+
 		var shouldHijackResponse bool
 		mitmLock.Lock()
 		defer func() {
@@ -1144,7 +1130,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 
 		// 过滤
-		if !filterManager.Filter(method, hostname, urlStr, extName, isHttps) {
+		if !filterManager.IsPassed(method, hostname, urlStr, extName, isHttps) {
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_RequestIsFiltered, true)
 			return req
 		}
@@ -1312,7 +1298,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		// 不符合劫持条件就不劫持
 		var isFilteredByResponse = httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ResponseIsFiltered)
 		var isFilteredByRequest = httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestIsFiltered)
-		var isFilter = isFilteredByResponse || isFilteredByRequest
+		var isFiltered = isFilteredByResponse || isFilteredByRequest
 		var modified = httpctx.GetRequestIsModified(req) || httpctx.GetResponseIsModified(req)
 		var viewed = httpctx.GetRequestViewedByUser(req) || httpctx.GetResponseViewedByUser(req)
 
@@ -1344,13 +1330,13 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			plainResponse = []byte(header)
 		}
 
-		shouldBeHijacked := !isFilter
+		shouldBeHijacked := !isFiltered
 		go func() {
 			mitmPluginCaller.MirrorHTTPFlow(isHttps, reqUrl, plainRequest, plainResponse, body, shouldBeHijacked)
 		}()
 
 		// 劫持过滤
-		if isFilter {
+		if isFiltered {
 			return
 		}
 

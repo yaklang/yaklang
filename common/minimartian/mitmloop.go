@@ -295,7 +295,6 @@ func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, rootCtx context.Contex
 }
 
 // handleConnectionTunnel handles a CONNECT request.
-// connect to request host and port
 func (p *Proxy) handleConnectionTunnel(req *http.Request, conn net.Conn, ctx *Context, session *Session, brw *bufio.ReadWriter) error {
 	httpctx.SetRequestViaCONNECT(req, true)
 	connectedTo, err := utils.GetConnectedToHostPortFromHTTPRequest(req)
@@ -474,6 +473,8 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	}
 	defer req.Body.Close()
 
+	httpctx.SetMITMFrontendReadWriter(req, brw)
+
 	session := ctx.Session()
 	ctx, err := withSession(session)
 	if err != nil {
@@ -625,12 +626,26 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		closing = errClose
 	}
 
+	if httpctx.GetMITMSkipFrontendFeedback(req) {
+		// skip frontend feedback
+		// if met this case, means that "response" is handled.
+		err = brw.Flush()
+		if err != nil {
+			log.Errorf("handle ordinary request: got error while flushing response back to client: %v", err)
+		}
+		if errors.Is(err, io.ErrUnexpectedEOF) {
+			closing = errClose
+		}
+		return closing
+	}
+
 	var responseBytes []byte
 	responseBytes, err = utils.DumpHTTPResponse(res, true, brw)
 	_ = responseBytes
 	if err != nil {
 		log.Errorf("handle ordinary request: got error while writing response back to client: %v", err)
 	}
+
 	//Handle proxy getting stuck when upstream stops responding midway
 	//see https://github.com/google/martian/pull/349
 	if errors.Is(err, io.ErrUnexpectedEOF) {
@@ -640,8 +655,11 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	err = brw.Flush()
 	if err != nil {
 		log.Errorf("handle ordinary request: got error while flushing response back to client: %v", err)
-		//fmt.Println(string(responseBytes))
 	}
+	if errors.Is(err, io.ErrUnexpectedEOF) {
+		closing = errClose
+	}
+
 	return closing
 }
 
@@ -656,38 +674,6 @@ type peekedConn struct {
 // io.MultiReader one can read from a conn, and then replace what they read, to
 // be read again.
 func (c *peekedConn) Read(buf []byte) (int, error) { return c.r.Read(buf) }
-
-func (p *Proxy) connect(req *http.Request) (*http.Response, net.Conn, error) {
-	if p.proxyURL != nil {
-		log.Debugf("mitm: CONNECT with downstream proxy: %s", p.proxyURL.Host)
-
-		conn, err := p.dial(context.Background(), "tcp", p.proxyURL.Host)
-		if err != nil {
-			return nil, nil, err
-		}
-		pbw := bufio.NewWriter(conn)
-		pbr := bufio.NewReader(conn)
-
-		req.Write(pbw)
-		pbw.Flush()
-
-		res, err := http.ReadResponse(pbr, req)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		return res, conn, nil
-	}
-
-	log.Debugf("mitm: CONNECT to host directly: %s", req.URL.Host)
-
-	conn, err := p.dial(req.Context(), "tcp", req.URL.Host)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return p.connectResponse(req), conn, nil
-}
 
 // connectResponse fix previous 200 CONNECT response with content-length issue
 func (p *Proxy) connectResponse(req *http.Request) *http.Response {

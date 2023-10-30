@@ -600,11 +600,12 @@ RECONNECT:
 				return nil, err
 			}
 		}
-		pc.writeCh <- writeRequest{reqPacket: requestPacket, ch: writeErrCh}
+		pc.writeCh <- writeRequest{reqPacket: requestPacket, ch: writeErrCh, reqInstance: option.NativeHTTPRequestInstance}
 		resc := make(chan responseInfo)
 		pc.reqCh <- requestAndResponseCh{
-			reqPacket: requestPacket,
-			ch:        resc,
+			reqPacket:   requestPacket,
+			ch:          resc,
+			reqInstance: option.NativeHTTPRequestInstance,
 		}
 		pcClosed := pc.closeCh
 	LOOP:
@@ -691,7 +692,10 @@ RECONNECT:
 		}
 
 		traceInfo.ServerTime = time.Since(serverTimeStart)
-		var stashedRequest = new(http.Request)
+		var stashedRequest = option.NativeHTTPRequestInstance
+		if stashedRequest == nil {
+			stashedRequest = new(http.Request)
+		}
 		firstResponse, err = utils.ReadHTTPResponseFromBufioReader(httpResponseReader, stashedRequest)
 		if err != nil {
 			log.Infof("[lowhttp] read response failed: %s", err)

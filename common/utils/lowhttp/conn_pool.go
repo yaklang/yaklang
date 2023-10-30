@@ -184,8 +184,9 @@ type persistConn struct {
 }
 
 type requestAndResponseCh struct {
-	reqPacket []byte
-	ch        chan responseInfo
+	reqPacket   []byte
+	ch          chan responseInfo
+	reqInstance *http.Request
 	//respCh
 }
 
@@ -201,8 +202,9 @@ type httpInfo struct {
 }
 
 type writeRequest struct {
-	reqPacket []byte
-	ch        chan error
+	reqPacket   []byte
+	ch          chan error
+	reqInstance *http.Request
 }
 
 type packetInfo struct {
@@ -366,7 +368,10 @@ func (pc *persistConn) readLoop() {
 
 		var resp *http.Response
 
-		var stashRequest = new(http.Request)
+		var stashRequest = rc.reqInstance
+		if stashRequest == nil {
+			stashRequest = new(http.Request)
+		}
 
 		// peek is executed, so we can read without timeout
 		// for long time chunked supported
