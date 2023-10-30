@@ -24,10 +24,8 @@ const (
 )
 
 type Var struct {
-	Type    TemplateVarType // 需要在保证nuclei中可以正确解析的情况下，携带类型信息，所以对于除nuclei-dsl类型的变量，在值前增加@raw、@fuzztag标记类型
-	Data    string
-	DynData func() string
-	//Tags []*NucleiTagData
+	Type TemplateVarType // 需要在保证nuclei中可以正确解析的情况下，携带类型信息，所以对于除nuclei-dsl类型的变量，在值前增加@raw、@fuzztag标记类型
+	Data string
 }
 
 func NewVar(v string) *Var {
@@ -65,12 +63,6 @@ type YakVariables struct {
 	outputMutex *sync.Mutex
 }
 
-func (v *YakVariables) SetDynamicData(key string, d func() string) {
-	v.raw[key] = &Var{
-		Type:    NucleiDynDataType,
-		DynData: d,
-	}
-}
 func (v *YakVariables) Set(key string, value string) {
 	v.SetWithType(key, value, string(RawType))
 }
@@ -135,21 +127,24 @@ func (v *YakVariables) ToMap() map[string]any {
 				if v, ok := res[s]; ok {
 					return toString(v), nil
 				}
-				v, err := getVarAndWriteCache(v.raw[s])
-				if err != nil {
-					return "", err
+				if v, ok := v.raw[s]; ok {
+					v, err := getVarAndWriteCache(v)
+					if err != nil {
+						return "", err
+					}
+					res[s] = toString(v)
+					return toString(v), nil
+				} else {
+					return "", errors.New("not found var " + s)
 				}
-				res[s] = toString(v)
-				return toString(v), nil
+
 			}, "")
 			if err != nil {
 				return nil, err
 			}
-			return res[0], err
-		case NucleiDynDataType:
-			return []byte(s.DynData()), nil
+			return toString(res[0]), err
 		case RawType:
-			return []byte(s.Data), nil
+			return s.Data, nil
 		default:
 			return nil, errors.New("unsupported var type")
 		}

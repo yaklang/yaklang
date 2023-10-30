@@ -136,7 +136,7 @@ requests:
 	}
 	config := NewConfig()
 
-	n, err := data.Exec(config, false, nil)
+	n, err := data.ExecWithUrl("http://www.baidu.com", config)
 	if err != nil {
 		t.Fatal(err)
 	}

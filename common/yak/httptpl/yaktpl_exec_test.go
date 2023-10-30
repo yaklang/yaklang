@@ -1643,6 +1643,7 @@ http:
           - 'duration>=0'
           - 'status_code == 200'
           - 'contains(body, "Post Meta Setting Deleted Successfully")'
+          - 'contains(body_1, "Post Meta Setting Deleted Successfully")'
         condition: and
 # digest: 4a0a00473045022100d388bf1ba27db50c2339d0dfda041fa175e2b526fdf0eaa555ce4f128caa2c3e02206509a935080f2a103a7539246f094281fdee05b4f25403196fa77f93a3880b40:922c64590222798bb761d5b6d8e72950`, true},
 	} {
