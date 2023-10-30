@@ -85,7 +85,7 @@ func (y *YakTemplate) GenerateRequestSequences(u string) []*RequestBulk {
 	}
 	baseUrl = strings.TrimRight(baseUrl, "/")
 	rootUrl = strings.TrimRight(rootUrl, "/")
-	vars := map[string]string{
+	vars := map[string]any{
 		"URL":              urlIns.String(),
 		"Host":             urlIns.Host,
 		"Port":             urlIns.Port(),
@@ -97,16 +97,13 @@ func (y *YakTemplate) GenerateRequestSequences(u string) []*RequestBulk {
 		"File":             file,
 		"Schema":           urlIns.Scheme,
 	}
-	for k, v := range vars {
-		y.Variables.Set(k, v)
-	}
 	result := []*RequestBulk{}
 	for _, sequenceCfg := range y.HTTPRequestSequences {
 		seq := &RequestBulk{
 			RequestConfig: sequenceCfg,
 		}
 		for _, path := range sequenceCfg.Paths {
-			path, err = ExecNucleiTag(path, y.Variables.ToMap())
+			path, err = RenderNucleiTagWithVar(path, vars)
 			if err != nil {
 				log.Error(err)
 				continue
@@ -119,8 +116,8 @@ func (y *YakTemplate) GenerateRequestSequences(u string) []*RequestBulk {
 			for k, v := range sequenceCfg.Headers {
 				packet = lowhttp.ReplaceHTTPPacketHeader(packet, k, v)
 			}
-			packet = lowhttp.ReplaceHTTPPacketBody(packet, []byte(sequenceCfg.Body), false)
-			packetRaw, err := ExecNucleiTag(string(packet), y.Variables.ToMap())
+			packet = append(packet, sequenceCfg.Body...)
+			packetRaw, err := RenderNucleiTagWithVar(string(packet), vars)
 			if err != nil {
 				log.Error(err)
 				continue
@@ -132,7 +129,7 @@ func (y *YakTemplate) GenerateRequestSequences(u string) []*RequestBulk {
 			})
 		}
 		for _, request := range sequenceCfg.HTTPRequests {
-			req, err := ExecNucleiTag(request.Request, y.Variables.ToMap())
+			req, err := RenderNucleiTagWithVar(request.Request, vars)
 			if err != nil {
 				log.Error(err)
 				continue
@@ -197,8 +194,8 @@ func (y *YakTemplate) ExecWithUrl(u string, config *Config, opts ...lowhttp.Lowh
 					}
 					var packetOpt []lowhttp.LowhttpOpt
 					packetOpt = append(
-						packetOpt, lowhttp.WithPacketBytes([]byte(reqRaw)), lowhttp.WithHttps(isHttps),
-						lowhttp.WithSaveHTTPFlow(true), lowhttp.WithSource(y.Name),
+						packetOpt, lowhttp.WithPacketBytes(reqRaw), lowhttp.WithHttps(isHttps),
+						lowhttp.WithSaveHTTPFlow(true), lowhttp.WithSource(y.Name), lowhttp.WithNoFixContentLength(ret.RequestConfig.NoFixContentLength),
 					)
 					packetOpt = append(packetOpt, opts...)
 					if config.Debug && config.DebugRequest {
@@ -314,7 +311,7 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 
 	var matchResults []any
 	var responses []*lowhttp.LowhttpResponse
-
+	runtimeVars := map[string]any{}
 	for index, req := range reqSeqs {
 		log.Debugf("sequence exec with Req Index:%v", index)
 		raw := req.Raw
@@ -329,9 +326,6 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 		}
 		for _, reqRaw := range reqs {
 			atomic.AddInt64(&count, 1)
-			var sufs = []string{fmt.Sprintf("_%v", index+1)}
-			_ = reqRaw
-			_ = sufs
 			rsp, err := sender([]byte(reqRaw), req.IsHttps)
 			if err == nil {
 				responses = append(responses, rsp)
@@ -339,7 +333,10 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 				log.Error(err)
 				continue
 			}
-
+			varsInResponse := LoadVarFromRawResponse(rsp.RawPacket, rsp.GetDurationFloat(), fmt.Sprintf("_%d", index+1))
+			for k, v := range varsInResponse {
+				runtimeVars[k] = v
+			}
 			for index, extractor := range reqOrigin.Extractor {
 				varIns, err := extractor.Execute(rsp.RawPacket, y.Variables.ToMap())
 				if err != nil {
@@ -356,16 +353,11 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 				}
 			}
 			if reqOrigin.Matcher != nil {
-				var varsInResponse = make(map[string]interface{})
-				varsInResponse = LoadVarFromRawResponse(rsp.RawPacket, rsp.GetDurationFloat(), sufs...)
-				if varsInResponse != nil {
-					for k, v := range varsInResponse {
-						y.Variables.Set(k, toString(v))
-					}
+				for k, v := range y.Variables.ToMap() {
+					runtimeVars[k] = v
 				}
-
 				if !reqOrigin.AfterRequested {
-					matchResult, err := matcher.ExecuteWithConfig(config, rsp, y.Variables.ToMap())
+					matchResult, err := matcher.ExecuteWithConfig(config, rsp, runtimeVars)
 					if err != nil {
 						log.Error("matcher execute failed: ", err)
 					}
@@ -377,12 +369,16 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 				}
 			}
 		}
-	}
 
+	}
+	//if len(responses) > 0 {
+	//	lastRsp := responses[len(responses)-1]
+	//
+	//}
 	if reqOrigin.AfterRequested {
 		if matcher != nil {
 			for _, rsp := range responses {
-				matchResult, err := matcher.ExecuteWithConfig(config, rsp, y.Variables.ToMap())
+				matchResult, err := matcher.ExecuteWithConfig(config, rsp, runtimeVars)
 				if err != nil {
 					log.Error("matcher execute failed: ", err)
 				}
