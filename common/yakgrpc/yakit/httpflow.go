@@ -1027,6 +1027,7 @@ too_large_response_header_file, too_large_response_body_file
 		db = db.Where("(is_websocket = true) AND (url LIKE 'ws%')")
 	}
 
+	p.OrderBy = "id"
 	db = bizhelper.QueryOrder(db, p.OrderBy, p.Order)
 
 	db = FilterHTTPFlow(db, params)
