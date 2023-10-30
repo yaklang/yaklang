@@ -14,6 +14,8 @@ type File struct {
 	m sync.Mutex
 	b []byte
 	i int
+
+	closed bool
 }
 
 // New creates and initializes a new File using b as its initial contents.
@@ -42,7 +44,14 @@ func (fb *File) ReadAt(b []byte, offset int64) (int, error) {
 	defer fb.m.Unlock()
 	return fb.readAt(b, offset)
 }
+
+var errClosed = errors.New("memfile: read/write on closed file")
+
 func (fb *File) readAt(b []byte, off int64) (int, error) {
+	if fb.closed {
+		return 0, errClosed
+	}
+
 	if off < 0 || int64(int(off)) < off {
 		return 0, errInvalid
 	}
@@ -79,6 +88,10 @@ func (fb *File) WriteAt(b []byte, offset int64) (int, error) {
 	return fb.writeAt(b, offset)
 }
 func (fb *File) writeAt(b []byte, off int64) (int, error) {
+	if fb.closed {
+		return 0, errClosed
+	}
+
 	if off < 0 || int64(int(off)) < off {
 		return 0, errInvalid
 	}
@@ -96,6 +109,10 @@ func (fb *File) writeAt(b []byte, off int64) (int, error) {
 func (fb *File) Seek(offset int64, whence int) (int64, error) {
 	fb.m.Lock()
 	defer fb.m.Unlock()
+
+	if fb.closed {
+		return 0, errClosed
+	}
 
 	var abs int64
 	switch whence {
@@ -122,6 +139,10 @@ func (fb *File) Truncate(n int64) error {
 	return fb.truncate(n)
 }
 func (fb *File) truncate(n int64) error {
+	if fb.closed {
+		return errClosed
+	}
+
 	switch {
 	case n < 0 || int64(int(n)) < n:
 		return errInvalid
@@ -140,4 +161,11 @@ func (fb *File) Bytes() []byte {
 	fb.m.Lock()
 	defer fb.m.Unlock()
 	return fb.b
+}
+
+func (fb *File) Close() error {
+	fb.m.Lock()
+	defer fb.m.Unlock()
+	fb.closed = true
+	return nil
 }

@@ -47,11 +47,6 @@ func NewMITMTestCase(t *testing.T, opts ...MITMTestCaseOption) {
 		t.Fatal(err)
 	}
 
-	stream, err := client.MITM(utils.TimeoutContextSeconds(60))
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	mitmPort := utils.GetRandomAvailableTCPPort()
 	config := &MITMTestConfig{}
 	for _, opt := range opts {
@@ -59,6 +54,14 @@ func NewMITMTestCase(t *testing.T, opts ...MITMTestCaseOption) {
 	}
 	if config.OnPortFound != nil {
 		config.OnPortFound(mitmPort)
+	}
+
+	if config.Context == nil {
+		config.Context = utils.TimeoutContextSeconds(20)
+	}
+	stream, err := client.MITM(config.Context)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	stream.Send(&ypb.MITMRequest{
@@ -70,7 +73,7 @@ func NewMITMTestCase(t *testing.T, opts ...MITMTestCaseOption) {
 	for {
 		rsp, err := stream.Recv()
 		if err != nil {
-			t.Fatal(err)
+			break
 		}
 		if rsp.GetHaveMessage() {
 			msg := rsp.GetMessage().GetMessage()
