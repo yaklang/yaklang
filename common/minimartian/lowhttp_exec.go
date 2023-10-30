@@ -71,7 +71,6 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 			if ret := httpctx.GetResponseContentTypeFiltered(req); ret != nil {
 				if ret(value) {
 					// filtered by content-type
-					log.Infof("content-type: %v is filtered", value)
 					httpctx.SetMITMSkipFrontendFeedback(req, true)
 					httpctx.SetResponseHeaderCallback(req, func(response *http.Response, headerBytes []byte, bodyReader io.Reader) (io.Reader, error) {
 						bwr.Write(headerBytes)
@@ -93,13 +92,12 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 					utils.FlushWriter(bwr)
 					go func() {
 						_, err := io.Copy(bwr, buffer)
-						if err != nil {
+						if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
 							log.Errorf("io.Copy error: %s", err)
 						}
 					}()
 				})
 				httpctx.SetResponseFinishedCallback(req, func() {
-					log.Infof("response finished, close writer")
 					writerCloser.Close()
 				})
 				return io.TeeReader(bodyReader, writerCloser), nil
