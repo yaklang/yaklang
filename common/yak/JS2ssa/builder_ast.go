@@ -12,8 +12,10 @@ import (
 )
 
 // entry point
-func (b *astbuilder) build(ast *JS.JavaScriptParser) {
-	b.buildStatementList(ast.StatementList().(*JS.StatementListContext))
+func (b *astbuilder) build(ast *JS.ProgramContext) {
+	if s, ok := ast.SourceElements().(*JS.SourceElementsContext); ok {
+		b.buildSourceElements(s)
+	}
 }
 
 // statement list
@@ -429,8 +431,11 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 
 	}
 
+	// fmt.Println("the expression: ", stmt.GetText())
+
 	switch s := stmt.(type) {
 	case *JS.FunctionExpressionContext:
+		return b.buildFunctionExpression(s)
 	case *JS.ClassExpressionContext:
 	case *JS.OptionalChainExpressionContext:
 		// advanced
@@ -630,7 +635,62 @@ func (b *astbuilder) buildSingleExpressionEx(stmt JS.ISingleExpressionContext, I
 		return value, lValue
 	}
 
+	if s, ok := stmt.(*JS.MemberDotExpressionContext); ok {
+		value, lValue := b.buildMemberDotExpression(s, IslValue)
+		return value, lValue
+	}
+
 	return nil, nil
+}
+
+func (b *astbuilder) buildFunctionExpression(stmt *JS.FunctionExpressionContext) ssa.Value {
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
+	defer recoverRange()
+
+	if s, ok := stmt.AnonymousFunction().(*JS.ArrowFunctionContext); ok {
+		funcName := ""
+		if a, ok := s.ArrowFunctionParameters().(*JS.ArrowFunctionParametersContext); ok {
+			if Name := a.Identifier(); Name != nil {
+				funcName = Name.GetText()
+			}
+		}
+
+		newFunc, symbol := b.NewFunc(funcName)
+		current := b.CurrentBlock
+		buildFunc := func() {
+			b.FunctionBuilder = b.PushFunction(newFunc, symbol, current)
+
+			if p, ok := s.ArrowFunctionParameters().(*JS.ArrowFunctionParametersContext); ok {
+				if f, ok := p.FormalParameterList().(*JS.FormalParameterListContext); ok {
+					b.buildFormalParameterList(f)
+				}
+			}
+
+			if f, ok := s.ArrowFunctionBody().(*JS.ArrowFunctionBodyContext); ok {
+				if fb, ok := f.FunctionBody().(*JS.FunctionBodyContext); ok {
+					b.buildFunctionBody(fb)
+				} else if s := f.SingleExpression(); s != nil {
+					rv, _ := b.buildSingleExpression(s, false)
+					var values []ssa.Value
+					values = append(values, rv)
+					b.EmitReturn(values)
+				}
+			}
+
+			b.Finish()
+			b.FunctionBuilder = b.PopFunction()
+		}
+
+		b.AddSubFunction(buildFunc)
+
+		if funcName != "" {
+			b.WriteVariable(funcName, newFunc)
+		}
+
+		return newFunc
+	}
+
+	return nil
 }
 
 func (b *astbuilder) buildArgumentsExpression(stmt *JS.ArgumentsExpressionContext) *ssa.Call {
@@ -664,6 +724,7 @@ func (b *astbuilder) buildArguments(stmt *JS.ArgumentsContext) ([]ssa.Value, boo
 	defer recoverRange()
 	hasEll := false
 	var v []ssa.Value
+
 	for _, i := range stmt.AllArgument() {
 		if a, ok := i.(*JS.ArgumentContext); ok {
 			if a.Ellipsis() != nil {
@@ -799,6 +860,36 @@ func (b *astbuilder) buildMemberIndexExpression(stmt *JS.MemberIndexExpressionCo
 	}
 }
 
+func (b *astbuilder) buildMemberDotExpression(stmt *JS.MemberDotExpressionContext, IsValue bool) (ssa.Value, ssa.LeftValue) {
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
+	defer recoverRange()
+
+	var expr ssa.Value
+
+	if s := stmt.SingleExpression(); s != nil {
+		expr, _ = b.buildSingleExpression(s, false)
+	} else {
+		b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
+		return nil, nil
+	}
+
+	// left
+	var index ssa.Value
+	if s, ok := stmt.IdentifierName().(*JS.IdentifierNameContext); ok {
+		index = b.buildIdentifierName(s)
+	}
+
+	if IsValue {
+		lv := b.EmitFieldMust(expr, index)
+		lv.GetValue(b.FunctionBuilder)
+
+		return nil, lv
+	} else {
+		return b.EmitField(expr, index), nil
+	}
+
+}
+
 func (b *astbuilder) buildAssignmentExpression(stmt *JS.AssignmentExpressionContext) ssa.Value {
 	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
@@ -835,13 +926,15 @@ func (b *astbuilder) buildArrayLiteral(stmt *JS.ArrayLiteralContext) ssa.Value {
 
 	var value []ssa.Value
 
-	for _, i := range stmt.ElementList().AllArrayElement() {
-		if e := i.Ellipsis(); e != nil {
-			b.HandlerEllipsis()
-		}
-		if s := i.SingleExpression(); s != nil {
-			rv, _ := b.buildSingleExpression(s, false)
-			value = append(value, rv)
+	if s, ok := stmt.ElementList().(*JS.ElementListContext); ok {
+		for _, i := range s.AllArrayElement() {
+			if e := i.Ellipsis(); e != nil {
+				b.HandlerEllipsis()
+			}
+			if s := i.SingleExpression(); s != nil {
+				rv, _ := b.buildSingleExpression(s, false)
+				value = append(value, rv)
+			}
 		}
 	}
 
@@ -917,7 +1010,6 @@ func (b *astbuilder) buildObjectLiteral(stmt *JS.ObjectLiteralContext) ssa.Value
 				rv, _ = b.buildSingleExpression(s, false)
 			}
 
-			// TODO: how to handle ellipsis
 			if pro.Ellipsis() != nil {
 				b.HandlerEllipsis()
 			}
@@ -927,6 +1019,10 @@ func (b *astbuilder) buildObjectLiteral(stmt *JS.ObjectLiteralContext) ssa.Value
 
 		value = append(value, rv)
 		keys = append(keys, key)
+	}
+
+	if keys[0] == nil {
+		return b.CreateInterfaceWithVs(nil, value)
 	}
 
 	return b.CreateInterfaceWithVs(keys, value)
@@ -1425,12 +1521,11 @@ func (b *astbuilder) buildBreakStatement(stmt *JS.BreakStatementContext) {
 	var _break *ssa.BasicBlock
 
 	if s, ok := stmt.Identifier().(*JS.IdentifierContext); ok {
-		// TODO: break数据流冲突
 		text := s.GetText()
 		if _break = b.GetLabel(text); _break != nil {
 			b.EmitJump(_break)
 		} else {
-			b.NewError(ssa.Error, TAG, UnexpectedBreakStmt())
+			b.NewError(ssa.Error, TAG, UndefineLabelstmt())
 		}
 		return
 

@@ -15,7 +15,7 @@ type astbuilder struct {
 }
 
 type builder struct {
-	ast  *JS.JavaScriptParser
+	ast  *JS.ProgramContext
 	prog *ssa.Program
 	c    *config
 }
@@ -98,7 +98,7 @@ func ParseSSA(src string, opt ...Option) (prog *ssa.Program) {
 	inputStream := antlr.NewInputStream(src)
 	lex := JS.NewJavaScriptLexer(inputStream)
 	tokenStream := antlr.NewCommonTokenStream(lex, antlr.TokenDefaultChannel)
-	ast := JS.NewJavaScriptParser(tokenStream)
+	ast := JS.NewJavaScriptParser(tokenStream).Program().(*JS.ProgramContext)
 	prog = ssa.NewProgram()
 	builder := &builder{
 		ast:  ast,

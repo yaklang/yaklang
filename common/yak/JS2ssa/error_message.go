@@ -35,6 +35,10 @@ func ExpressionNotVariable(expr string) string {
 	return fmt.Sprintf("Expression: %s is not a variable", expr)
 }
 
+func UndefineLabelstmt() string {
+	return "can not find the label"
+}
+
 func UnexpectedBreakStmt() string {
 	return "unexpected break stmt"
 }

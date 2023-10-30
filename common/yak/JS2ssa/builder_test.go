@@ -31,42 +31,20 @@ func TestDemo2(t *testing.T) {
 
 func TestBreak(t *testing.T) {
 	prog := ParseSSA(`
-	a = 0 
-	print(a)
-
-	label : {
-		print(a)
-		a = 1 
-		print(a)
-		if 1 {
-			a = 3 
-			print(a)
-			break label
-		}
-		print(a)
+	a = 1;
+	for (;;) {
+		a = 2;
+		break;
 	}
 
-	// print(a)
-	// a = 3
-	// break label
+	a = 3;
 
-	if 1 {
-		a = 3 
-		print(a)
-		break label // error
-	}
-	print(a)
-
-	for (i=1;i<10;i++){
-		a = 2 
-		print(a)
-		if (i == 2) {
-			break label // error 
-		}else {
-			if (i == 4){
-				a = 4 
-				break label // error
-			}
+	label1: {
+		// print(a)
+		for (;;) {
+			a = 4;
+			// print(a)
+			break label1;
 		}
 	}
 	`)
@@ -89,5 +67,44 @@ switch (fruit) {
 }
 	`)
 
+	prog.Show()
+}
+
+func TestPoint(t *testing.T) {
+	prog := ParseSSA(`
+		// setTimeout(()=>{window.location = "www"});
+		// setTimeout(()=>1);
+		// function b() {
+		// 	return 1;
+		// }
+
+		a = setTimeout
+
+if (true) {
+    setTimeout(a('window.location.href= "http://www.baidu.com"'))
+}
+
+if (window){// 弱类型 这个为true 定义了就true
+    setTimeout(a('window.location.href= "http://www.baidu.com"'))
+}
+
+if (NaN){// JS的特色 这里视为false
+    setTimeout(a('window.location.href= "http://www.baidu.com"'))
+}
+
+for (var i=0; i<5; i++) {
+      if (i = 5){
+        setTimeout(a('window.location.href= "http://www.baidu.com"'))
+      }
+}
+
+a =  window
+a.location.href = "www.baidu.com"
+
+function b(c) {
+    c.location.href = "www.baidu.com"
+}
+b(a)
+	`)
 	prog.Show()
 }
