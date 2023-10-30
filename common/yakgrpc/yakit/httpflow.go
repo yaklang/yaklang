@@ -984,14 +984,14 @@ too_large_response_header_file, too_large_response_body_file
 			Order:   "desc",
 		}
 	}
-	p := params.Pagination
 
-	var needReverse = false
+	p := params.Pagination
+	if p.OrderBy == "" {
+		p.OrderBy = "id" // 如果 没有设置 orderby 则以ID排序
+	}
+
 	if params.GetAfterUpdatedAt() > 0 {
 		db = bizhelper.QueryByTimeRangeWithTimestamp(db, "updated_at", params.GetAfterUpdatedAt(), time.Now().Add(10*time.Minute).Unix())
-		p.OrderBy = "updated_at"
-		p.Order = "asc"
-		needReverse = true
 	}
 	db = bizhelper.FuzzSearchEx(db, []string{
 		"tags", "url", "path", "request",
@@ -999,21 +999,12 @@ too_large_response_header_file, too_large_response_body_file
 	}, params.GetKeyword(), false)
 	if params.GetAfterId() > 0 {
 		db = db.Where("id > ?", params.GetAfterId())
-		p.OrderBy = "id"
-		p.Order = "asc"
-		needReverse = true
 	}
 	if params.GetBeforeUpdatedAt() > 0 {
 		db = bizhelper.QueryByTimeRangeWithTimestamp(db, "updated_at", 0, params.GetBeforeUpdatedAt())
-		p.OrderBy = "updated_at"
-		p.Order = "desc"
-		needReverse = false //如果同时进入两个条件,则不倒序,下同
 	}
 	if params.GetBeforeId() > 0 {
 		db = db.Where("id < ?", params.GetBeforeId())
-		p.OrderBy = "id"
-		p.Order = "desc"
-		needReverse = false
 	}
 
 	if params.GetOnlyWebsocket() {
@@ -1027,7 +1018,6 @@ too_large_response_header_file, too_large_response_body_file
 		db = db.Where("(is_websocket = true) AND (url LIKE 'ws%')")
 	}
 
-	p.OrderBy = "id"
 	db = bizhelper.QueryOrder(db, p.OrderBy, p.Order)
 
 	db = FilterHTTPFlow(db, params)
@@ -1049,10 +1039,6 @@ too_large_response_header_file, too_large_response_body_file
 
 	if db.Error != nil {
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
-	}
-
-	if needReverse {
-		ret = funk.Reverse(ret).([]*HTTPFlow)
 	}
 
 	return paging, ret, nil
