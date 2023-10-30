@@ -301,11 +301,9 @@ func (y *YakMatcher) executeRaw(config *Config, rsp []byte, duration float64, va
 			matcherFunc = func(fullResponse string, sub string) bool {
 				loadVars := LoadVarFromRawResponse(rsp, duration, sufs...)
 				//加载 resp 中的变量
-				varsOperatorMutex.Lock()
 				for k, v := range vars { // 合并若有重名以 vars 为准
 					loadVars[k] = v
 				}
-				varsOperatorMutex.Unlock()
 
 				result, err := dslEngine.ExecuteAsBool(sub, loadVars)
 				if err != nil {
