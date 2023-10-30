@@ -256,6 +256,7 @@ const (
 	REQUEST_CONTEXT_KEY_ResponseContentTypeFiltered  = "ResponseContentTypeFiltered"
 	REQUEST_CONTEXT_KEY_MitmFrontendReadWriter       = "mitmFrontendReadWriter"
 	REQUEST_CONTEXT_KEY_MitmSkipFrontendFeedback     = "mitmSkipFrontendFeedback"
+	REQUEST_CONTEXT_KEY_ResponseFinishedCallback     = "responseFinishedCallback"
 
 	// matched mitm rules
 	REQUEST_CONTEXT_KEY_MatchedRules = "MatchedRules"
@@ -367,6 +368,27 @@ func GetResponseMaxContentLength(req *http.Request) int {
 
 func SetResponseMaxContentLength(req *http.Request, length int) {
 	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseMaxContentLength, length)
+}
+
+type ResponseFinishedCallbackType func()
+
+func GetResponseFinishedCallback(r *http.Request) ResponseFinishedCallbackType {
+	if r == nil {
+		return nil
+	}
+	rs := GetContextAnyFromRequest(r, REQUEST_CONTEXT_KEY_ResponseFinishedCallback)
+	if rs == nil {
+		return nil
+	}
+	cb, ok := rs.(ResponseFinishedCallbackType)
+	if !ok {
+		return nil
+	}
+	return cb
+}
+
+func SetResponseFinishedCallback(req *http.Request, h ResponseFinishedCallbackType) {
+	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseFinishedCallback, h)
 }
 
 type ResponseHeaderCallbackType func(response *http.Response, headerBytes []byte, bodyReader io.Reader) (io.Reader, error)

@@ -1,10 +1,10 @@
 package utils
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"io"
 	"net"
 	"net/http"
 	"strings"
@@ -83,18 +83,16 @@ func TestReadConnWithTimeout(t *testing.T) {
 
 func TestTrigger(t *testing.T) {
 	var check = false
-	NewTriggerWriter(10, func(buffer *bytes.Buffer) {
+	NewTriggerWriter(10, func(buffer io.ReadCloser) {
 		check = true
-		t.Logf("trigger: %s", buffer.String())
 	}).Write([]byte("àf.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)"))
 	if !check {
 		t.Fatal("should have triggered")
 	}
 
 	check = true
-	NewTriggerWriter(100000, func(buffer *bytes.Buffer) {
+	NewTriggerWriter(100000, func(buffer io.ReadCloser) {
 		check = false
-		t.Logf("trigger: %s", buffer.String())
 	}).Write([]byte("àf.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)f.h(f.w)"))
 	if !check {
 		t.Fatal("should have non-triggered")
