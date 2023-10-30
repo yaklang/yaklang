@@ -1537,6 +1537,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		crep.MITM_SetGMOnly(onlyGMTLS),
 		crep.MITM_SetDNSServers(dnsServers...),
 		crep.MITM_SetHostMapping(hostMapping),
+		crep.MITM_SetMaxContentLength(firstReq.GetMaxContentLength()),
 	)
 	if err != nil {
 		log.Error(err)
