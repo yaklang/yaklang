@@ -192,6 +192,7 @@ type Generator struct {
 	backpropagation func() error
 	AssertError     bool
 	Error           error
+	allowedLabels   bool
 }
 
 func newBackpropagationGenerator(f func() error, nodes []ExecNode, cfg *GenerateConfig) *Generator {
@@ -253,6 +254,7 @@ func NewGenerator(nodes []Node, table map[string]*TagMethod) *Generator {
 	g := newBackpropagationGenerator(func() error {
 		return nil
 	}, node2generator(nodes), cfg)
+	g.allowedLabels = true
 	return g
 }
 
@@ -306,7 +308,7 @@ func (g *Generator) generate() (bool, error) {
 		if err != nil {
 			return genOneOk, err
 		}
-		if v, ok := g.data[i].(*TagExecNode); ok {
+		if v, ok := g.data[i].(*TagExecNode); ok && g.allowedLabels {
 			for _, label := range v.data.GetLabels() {
 				if ms, ok := v.methodCtx.labelTable[label]; ok {
 					for m := range ms {
