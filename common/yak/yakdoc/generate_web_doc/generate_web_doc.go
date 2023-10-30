@@ -39,19 +39,29 @@ func GenerateSingleFile(basepath string, lib *yakdoc.ScriptLib) {
 		// html escape
 		document = strings.ReplaceAll(document, "<", "&lt;")
 		document = strings.ReplaceAll(document, ">", "&gt;")
-		ellipsis := document
-		ellipsis = strings.ReplaceAll(ellipsis, "\r", "")
-		ellipsis = strings.ReplaceAll(ellipsis, "\n", " ")
-		ellipsisRunes := []rune(ellipsis)
+
+		// 简略的描述，去除\r，替换\n，删除Example:后面的内容，转义|，截取150个字符
+		simpleDocument := document
+		simpleDocument = strings.ReplaceAll(simpleDocument, "\r", "")
+		simpleDocument = strings.ReplaceAll(simpleDocument, "\n", " ")
+		exampleIndex := strings.Index(simpleDocument, "Example:")
+		if exampleIndex != -1 {
+			simpleDocument = simpleDocument[:exampleIndex]
+		}
+		ellipsisRunes := []rune(simpleDocument)
 		if len(ellipsisRunes) > 150 {
-			ellipsis = fmt.Sprintf("%s...", string(ellipsisRunes[:150]))
-			ellipsis = strings.ReplaceAll(ellipsis, "|", "\\|")
+			simpleDocument = fmt.Sprintf("%s...", string(ellipsisRunes[:150]))
+			simpleDocument = strings.ReplaceAll(simpleDocument, "|", "\\|")
 		}
 
+		exampleIndex = strings.Index(document, "Example:")
+		if exampleIndex != -1 {
+			document = strings.ReplaceAll(document[:exampleIndex], "\n", "\n\n") + document[exampleIndex:]
+		}
 		lowerMethodName := strings.ToLower(fun.MethodName)
-		file.WriteString(fmt.Sprintf("| [%s.%s](#%s) |%s|\n", fun.LibName, fun.MethodName, lowerMethodName, ellipsis))
+		file.WriteString(fmt.Sprintf("| [%s.%s](#%s) |%s|\n", fun.LibName, fun.MethodName, lowerMethodName, simpleDocument))
 		buf := strings.Builder{}
-		buf.WriteString(fmt.Sprintf("### %s\n\n", lowerMethodName))
+		buf.WriteString(fmt.Sprintf("### %s\n\n", fun.MethodName))
 		buf.WriteString(fmt.Sprintf("#### 详细描述\n%s\n\n", document))
 		buf.WriteString(fmt.Sprintf("#### 定义\n\n`%s`\n\n", fun.Decl))
 		if len(fun.Params) > 0 {

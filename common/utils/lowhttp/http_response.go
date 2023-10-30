@@ -316,10 +316,6 @@ func RemoveCEHeaders(headerBytes []byte) []byte {
 	return contentEncodingRegexp.ReplaceAll(headerBytes, []byte{})
 }
 
-//func RemoveCLHeaders(headerBytes []byte) []byte {
-//	return contentLengthRegexpCase.ReplaceAll(headerBytes, []byte{})
-//}
-
 // ReplaceBody 将原始 HTTP 请求报文中的 body 替换为指定的 body，并指定是否为 chunked，返回新的 HTTP 请求报文
 // Example:
 // ```
@@ -328,6 +324,7 @@ func RemoveCEHeaders(headerBytes []byte) []byte {
 // Content-Length: 11
 //
 // hello world`, "hello yak", false)
+// ```
 func ReplaceHTTPPacketBody(raw []byte, body []byte, chunk bool) (newHTTPRequest []byte) {
 	return ReplaceHTTPPacketBodyEx(raw, body, chunk, false)
 }
