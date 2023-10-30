@@ -56,7 +56,7 @@ func (y *YakTemplate) RenderToFuzzerRequestsByUrl(u string) []*ypb.FuzzerRequest
 	}
 	return result
 }
-func (y *YakTemplate) GenerateRequestSequences(u string) []*RequestBulk {
+func (y *YakTemplate) ExtractorVarsFromUrl(u string) map[string]string {
 	urlIns, err := url.Parse(u)
 	if err != nil {
 		log.Error(err)
@@ -85,11 +85,11 @@ func (y *YakTemplate) GenerateRequestSequences(u string) []*RequestBulk {
 	}
 	baseUrl = strings.TrimRight(baseUrl, "/")
 	rootUrl = strings.TrimRight(rootUrl, "/")
-	vars := map[string]any{
+	return map[string]string{
 		"URL":              urlIns.String(),
-		"Host":             urlIns.Host,
+		"Host":             urlIns.Hostname(),
 		"Port":             urlIns.Port(),
-		"Hostname":         urlIns.Hostname(),
+		"Hostname":         urlIns.Host,
 		"RootURL":          rootUrl,
 		"BaseURL":          baseUrl,
 		"Path":             urlIns.RequestURI(),
@@ -97,13 +97,17 @@ func (y *YakTemplate) GenerateRequestSequences(u string) []*RequestBulk {
 		"File":             file,
 		"Schema":           urlIns.Scheme,
 	}
+
+}
+func (y *YakTemplate) GenerateRequestSequences(u string) []*RequestBulk {
+	vars := utils.InterfaceToMapInterface(y.ExtractorVarsFromUrl(u))
 	result := []*RequestBulk{}
 	for _, sequenceCfg := range y.HTTPRequestSequences {
 		seq := &RequestBulk{
 			RequestConfig: sequenceCfg,
 		}
 		for _, path := range sequenceCfg.Paths {
-			path, err = RenderNucleiTagWithVar(path, vars)
+			path, err := RenderNucleiTagWithVar(path, vars)
 			if err != nil {
 				log.Error(err)
 				continue
@@ -134,10 +138,15 @@ func (y *YakTemplate) GenerateRequestSequences(u string) []*RequestBulk {
 				log.Error(err)
 				continue
 			}
+			isHttps := false
+			v, ok := vars["Schema"]
+			if ok {
+				isHttps = v == "https"
+			}
 			seq.Requests = append(seq.Requests, &requestRaw{
 				Raw:     []byte(req),
 				Origin:  sequenceCfg,
-				IsHttps: urlIns.Scheme == "https",
+				IsHttps: isHttps,
 			})
 		}
 		result = append(result, seq)
@@ -246,8 +255,8 @@ func (y *YakTemplate) ExecWithUrl(u string, config *Config, opts ...lowhttp.Lowh
 				for _, opt := range opts {
 					opt(lowhttpConfig)
 				}
-
-				err := tcpReq.Execute(config, p, y.PlaceHolderMap, lowhttpConfig, func(response []*NucleiTcpResponse, matched bool, extractorResults map[string]any) {
+				renderVars := y.ExtractorVarsFromUrl(u)
+				err := tcpReq.Execute(config, p, renderVars, lowhttpConfig, func(response []*NucleiTcpResponse, matched bool, extractorResults map[string]any) {
 					atomic.AddInt64(&count, 1)
 					config.ExecuteTCPResultCallback(y, tcpReq, response, matched, extractorResults)
 					if config.Debug || config.DebugResponse {
