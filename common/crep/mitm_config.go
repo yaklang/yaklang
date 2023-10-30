@@ -439,6 +439,13 @@ func MITM_SetHostMapping(m map[string]string) MITMConfig {
 	}
 }
 
+func MITM_SetMaxContentLength(m int64) MITMConfig {
+	return func(server *MITMServer) error {
+		server.maxContentLength = int(m)
+		return nil
+	}
+}
+
 func MITM_AppendDNSServers(servers ...string) MITMConfig {
 	return func(server *MITMServer) error {
 		server.DNSServers = utils.RemoveRepeatStringSlice(append(server.DNSServers, servers...))

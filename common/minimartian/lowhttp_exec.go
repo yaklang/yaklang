@@ -1,6 +1,7 @@
 package minimartian
 
 import (
+	"bytes"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian/proxyutil"
 	"github.com/yaklang/yaklang/common/utils"
@@ -86,7 +87,13 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 
 		if key == "transfer-encoding" && value == "chunked" {
 			httpctx.SetResponseHeaderCallback(req, func(response *http.Response, headerBytes []byte, bodyReader io.Reader) (io.Reader, error) {
-				return bodyReader, nil
+				return io.TeeReader(bodyReader, utils.NewTriggerWriter(uint64(p.GetMaxContentLength()), func(buffer *bytes.Buffer) {
+					httpctx.SetResponseTooLarge(req, true)
+					httpctx.SetMITMSkipFrontendFeedback(req, true)
+					bwr.Write(headerBytes)
+					utils.FlushWriter(bwr)
+					go io.Copy(bwr, buffer)
+				})), nil
 			})
 			return
 		}

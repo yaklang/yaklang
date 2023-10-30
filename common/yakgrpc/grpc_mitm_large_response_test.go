@@ -3,7 +3,6 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/vulinbox"
 	"github.com/yaklang/yaklang/common/yak"
@@ -17,11 +16,11 @@ func TestGRPCMUSTPASS_LARGE_RESPOSNE(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	spew.Dump(addr)
 	host, port, _ := utils.ParseStringToHostPort(addr)
 	vulinboxAddr := utils.HostPort(host, port)
 	NewMITMTestCase(
 		t,
+		CaseWithMaxContentLength(100),
 		CaseWithContext(ctx),
 		CaseWithPort(func(i int) {
 			port = i
@@ -31,7 +30,7 @@ func TestGRPCMUSTPASS_LARGE_RESPOSNE(t *testing.T) {
 				`rsp, req = poc.HTTP(packet, poc.proxy(mitmProxy))~;
 dump(rsp)`,
 				map[string]any{
-					"packet": `GET /misc/response/content_length?cl=11111 HTTP/1.1
+					"packet": `GET /misc/response/content_length?cl=11111000 HTTP/1.1
 Host: ` + vulinboxAddr + "\r\n\r\n",
 					`cancel`:    cancel,
 					"mitmProxy": fmt.Sprintf(`http://127.0.0.1:%v`, port),
