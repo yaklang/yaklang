@@ -65,21 +65,12 @@ func ReadHTTPResponseFromBytes(raw []byte, req *http.Request) (*http.Response, e
 	return rsp, nil
 }
 
-func readHTTPResponseFromBufioReader(reader *bufio.Reader, fixContentLength bool, req *http.Request, conn net.Conn) (*http.Response, error) {
+func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bool, req *http.Request, conn net.Conn) (*http.Response, error) {
 	var rawPacket = new(bytes.Buffer)
 
-	var rsp = &http.Response{
-		Header:           nil,
-		Body:             nil,
-		ContentLength:    0,
-		TransferEncoding: nil,
-		Close:            false,
-		Uncompressed:     false,
-		Trailer:          nil,
-		Request:          nil,
-		TLS:              nil,
-	}
-	firstLine, err := BufioReadLine(reader)
+	var headerReader = originReader
+	var rsp = new(http.Response)
+	firstLine, err := ReadLine(headerReader)
 	if err != nil {
 		return nil, errors.Wrap(err, "read HTTPResponse firstline failed")
 	}
@@ -105,7 +96,7 @@ func readHTTPResponseFromBufioReader(reader *bufio.Reader, fixContentLength bool
 	var defaultClose = (rsp.ProtoMajor == 1 && rsp.ProtoMinor == 0) || rsp.ProtoMajor < 1
 
 	for {
-		lineBytes, err := BufioReadLine(reader)
+		lineBytes, err := ReadLine(headerReader)
 		if err != nil {
 			return nil, errors.Wrap(err, "read HTTPResponse header failed")
 		}
@@ -153,16 +144,32 @@ func readHTTPResponseFromBufioReader(reader *bufio.Reader, fixContentLength bool
 	rsp.Close = defaultClose
 	rsp.Header = header
 
+	var headerBytes []byte
+	if ret := httpctx.GetResponseHeaderWriter(req); ret != nil {
+		headerBytes = rawPacket.Bytes()
+		_, _ = ret.Write(rawPacket.Bytes())
+	}
+	var bodyReader io.Reader = originReader
+	if ret := httpctx.GetResponseMaxContentLength(req); ret > 0 && contentLengthInt > ret {
+		bodyReader = io.LimitReader(bodyReader, int64(ret))
+	}
+	if ret := httpctx.GetResponseHeaderCallback(req); ret != nil {
+		if len(headerBytes) <= 0 {
+			headerBytes = rawPacket.Bytes()
+		}
+		bodyReader, err = ret(rsp, headerBytes, bodyReader)
+		if err != nil {
+			return nil, Wrapf(err, "get response header callback failed")
+		}
+	}
+
 	// handled body
 	var bodyRawBuf = new(bytes.Buffer)
-	getPeekableReader := func() io.Reader {
-		return reader
-	}
 
 	if fixContentLength {
 		// just for bytes condition
 		// by reader
-		raw, _ := io.ReadAll(io.NopCloser(reader))
+		raw, _ := io.ReadAll(io.NopCloser(bodyReader))
 		rawPacket.Write(raw)
 		if useContentLength && !useTransferEncodingChunked {
 			rsp.ContentLength = int64(len(raw))
@@ -177,7 +184,7 @@ func readHTTPResponseFromBufioReader(reader *bufio.Reader, fixContentLength bool
 			log.Debug("content-length and transfer-encoding chunked both exist, try smuggle? use content-length first!")
 			if contentLengthInt > 0 {
 				// smuggle
-				bodyRaw, _ := io.ReadAll(io.NopCloser(io.LimitReader(getPeekableReader(), int64(contentLengthInt))))
+				bodyRaw, _ := io.ReadAll(io.NopCloser(io.LimitReader(bodyReader, int64(contentLengthInt))))
 				rawPacket.Write(bodyRaw)
 				bodyRawBuf.Write(bodyRaw)
 				if ret := contentLengthInt - len(bodyRaw); ret > 0 {
@@ -185,7 +192,7 @@ func readHTTPResponseFromBufioReader(reader *bufio.Reader, fixContentLength bool
 				}
 			} else {
 				// chunked
-				_, fixed, _, err := codec.HTTPChunkedDecoderWithRestBytes(getPeekableReader())
+				_, fixed, _, err := codec.HTTPChunkedDecoderWithRestBytes(bodyReader)
 				rawPacket.Write(fixed)
 				if err != nil {
 					return nil, errors.Wrap(err, "chunked decoder error")
@@ -195,7 +202,7 @@ func readHTTPResponseFromBufioReader(reader *bufio.Reader, fixContentLength bool
 			}
 		} else if !useContentLength && useTransferEncodingChunked {
 			// handle chunked
-			_, fixed, _, err := codec.HTTPChunkedDecoderWithRestBytes(getPeekableReader())
+			_, fixed, _, err := codec.HTTPChunkedDecoderWithRestBytes(bodyReader)
 			rawPacket.Write(fixed)
 			if err != nil {
 				return nil, errors.Wrap(err, "chunked decoder error")
@@ -206,7 +213,7 @@ func readHTTPResponseFromBufioReader(reader *bufio.Reader, fixContentLength bool
 		} else {
 			// handle content-length as default
 			if contentLengthInt > 0 {
-				var bodyRaw, err = io.ReadAll(io.NopCloser(io.LimitReader(getPeekableReader(), int64(contentLengthInt))))
+				var bodyRaw, err = io.ReadAll(io.NopCloser(io.LimitReader(bodyReader, int64(contentLengthInt))))
 				rawPacket.Write(bodyRaw)
 				if err != nil && err != io.EOF {
 					return nil, errors.Wrap(err, "read body error")

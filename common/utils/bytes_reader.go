@@ -105,9 +105,14 @@ func ReadConnUntil(conn net.Conn, timeout time.Duration, sep ...byte) ([]byte, e
 	}
 }
 
-// ReadConnUntilStable is a stable reader check interval(stableTimeout)
+// ReadUntilStable is a stable reader check interval(stableTimeout)
 // safe for conn is empty
-func ReadConnUntilStable(reader io.Reader, conn net.Conn, timeout time.Duration, stableTimeout time.Duration, sep ...byte) ([]byte, error) {
+func ReadUntilStable(reader io.Reader, conn net.Conn, timeout time.Duration, stableTimeout time.Duration, sep ...byte) ([]byte, error) {
+	return ReadUntilStableEx(reader, false, conn, timeout, stableTimeout, sep...)
+}
+
+// ReadUntilStableEx allow skip timeout, read until stop word or timeout
+func ReadUntilStableEx(reader io.Reader, noTimeout bool, conn net.Conn, timeout time.Duration, stableTimeout time.Duration, sep ...byte) ([]byte, error) {
 	var buf = make([]byte, 1)
 	var result bytes.Buffer
 
@@ -120,6 +125,10 @@ func ReadConnUntilStable(reader io.Reader, conn net.Conn, timeout time.Duration,
 	}
 
 	wrapperTimeout := func(originReader io.Reader) io.Reader {
+		if noTimeout {
+			return originReader
+		}
+
 		if conn != nil {
 			_ = conn.SetReadDeadline(time.Now().Add(stableTimeout))
 			return originReader
@@ -128,6 +137,10 @@ func ReadConnUntilStable(reader io.Reader, conn net.Conn, timeout time.Duration,
 		}
 	}
 	recoverTimeout := func() {
+		if noTimeout {
+			return
+		}
+
 		if conn != nil {
 			_ = conn.SetReadDeadline(time.Time{})
 		}
@@ -335,6 +348,14 @@ func BufioReadLine(reader *bufio.Reader) ([]byte, error) {
 			return buf.Bytes(), nil
 		}
 	}
+}
+
+func ReadLine(reader io.Reader) ([]byte, error) {
+	lineRaw, err := ReadUntilStableEx(reader, true, nil, 0, 0, '\n')
+	if err != nil {
+		return nil, err
+	}
+	return bytes.TrimRight(lineRaw, "\r\n"), nil
 }
 
 func ReadLineEx(reader io.Reader) (string, int64, error) {
