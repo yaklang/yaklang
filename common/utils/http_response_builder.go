@@ -154,9 +154,6 @@ func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bo
 		_, _ = ret.Write(rawPacket.Bytes())
 	}
 	var bodyReader io.Reader = originReader
-	if ret := httpctx.GetResponseMaxContentLength(req); ret > 0 && contentLengthInt > ret {
-		bodyReader = io.LimitReader(bodyReader, int64(ret))
-	}
 	if ret := httpctx.GetResponseHeaderCallback(req); ret != nil {
 		if len(headerBytes) <= 0 {
 			headerBytes = rawPacket.Bytes()
@@ -166,6 +163,11 @@ func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bo
 			return nil, Wrapf(err, "get response header callback failed")
 		}
 	}
+	defer func() {
+		if ret := httpctx.GetResponseFinishedCallback(req); ret != nil {
+			ret()
+		}
+	}()
 
 	// handled body
 	var bodyRawBuf = new(bytes.Buffer)

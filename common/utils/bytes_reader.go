@@ -385,26 +385,32 @@ func ReadLineEx(reader io.Reader) (string, int64, error) {
 type TriggerWriter struct {
 	trigger    uint64
 	bytesCount uint64
-	w          *bytes.Buffer
+	r          io.ReadCloser
+	w          io.WriteCloser
 	once       *sync.Once
-	h          func(buffer *bytes.Buffer)
+	h          func(buffer io.ReadCloser)
 }
 
-func NewTriggerWriter(trigger uint64, h func(buffer *bytes.Buffer)) *TriggerWriter {
+func NewTriggerWriter(trigger uint64, h func(buffer io.ReadCloser)) *TriggerWriter {
+	r, w := NewBufPipe(nil)
 	return &TriggerWriter{
 		trigger: trigger,
-		w:       new(bytes.Buffer),
-		once:    new(sync.Once),
-		h:       h,
+		w:       w, r: r,
+		once: new(sync.Once),
+		h:    h,
 	}
 }
 
 func (f *TriggerWriter) Write(p []byte) (n int, err error) {
-	n, err = f.w.Write(p)
-	if f.trigger > 0 && atomic.AddUint64(&f.bytesCount, uint64(n)) > f.trigger {
+	if f.trigger > 0 && atomic.AddUint64(&f.bytesCount, uint64(len(p))) > f.trigger {
 		f.once.Do(func() {
-			f.h(f.w)
+			f.h(f.r)
 		})
 	}
+	n, err = f.w.Write(p)
 	return
+}
+
+func (f *TriggerWriter) Close() error {
+	return f.w.Close()
 }
