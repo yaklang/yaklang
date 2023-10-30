@@ -143,21 +143,19 @@ func (y *YakNetworkBulkConfig) handleConn(
 
 func (y *YakNetworkBulkConfig) Execute(
 	config *Config,
-	vars map[string]interface{}, placeHolderMap map[string]string, lowhttpConfig *lowhttp.LowhttpExecConfig,
+	vars map[string]interface{}, params map[string]string, lowhttpConfig *lowhttp.LowhttpExecConfig,
 	callback func(rsp []*NucleiTcpResponse, matched bool, extractorResults map[string]any),
 ) error {
 	if len(y.Hosts) == 0 {
 		return utils.Error("YakNetworkBulkConfig hosts is empty")
 	}
 
+	var err error
 	for _, host := range y.Hosts {
-		//? 2023-8-2 暂时性解决方案 fix host
-		if len(placeHolderMap) > 0 {
-			for ph, k := range placeHolderMap {
-				if v, ok := vars[k]; ok {
-					host = strings.ReplaceAll(host, ph, toString(v))
-				}
-			}
+		host, err = RenderNucleiTagWithVar(host, utils.InterfaceToMapInterface(params))
+		if err != nil {
+			log.Error("YakNetworkBulkConfig render host error " + err.Error())
+			continue
 		}
 		host = utils.ExtractHostPort(host)
 

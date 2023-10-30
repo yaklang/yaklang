@@ -23,7 +23,6 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 	}
 	// 转Template
 	yakTemplate, err := httptpl.CreateYakTemplateFromNucleiTemplateRaw(content)
-	yakTemplate.RecoverPlaceHolder()
 	warningMsgStr := ""
 	if err := yakTemplate.CheckTemplateRisks(); err != nil {
 		warningMsgStr = err.Error()

@@ -50,7 +50,7 @@ func init() {
 }
 
 func TestMustPassDebug(t *testing.T) {
-	var debugName = "mitm_https_connect_assert.yak"
+	var debugName = "mock_weblogic.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {

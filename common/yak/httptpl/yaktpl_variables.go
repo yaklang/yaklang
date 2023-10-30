@@ -114,7 +114,7 @@ func (v *YakVariables) GetRaw() map[string]*Var {
 func (v *YakVariables) ToMap() map[string]any {
 	res := map[string]any{}
 	if v == nil {
-		return nil
+		return res
 	}
 	v.outputMutex.Lock()
 	defer v.outputMutex.Unlock()

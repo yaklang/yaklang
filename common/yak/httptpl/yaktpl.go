@@ -128,9 +128,6 @@ func (y *YakTemplate) SignMainParams() string {
 	}
 
 	signDataStr := fmt.Sprintf("%#v", signData)
-	for k, v := range y.PlaceHolderMap {
-		signDataStr = strings.Replace(signDataStr, k, v, -1)
-	}
 	return codec.Md5(signDataStr)
 }
 func (y *YakTemplate) CheckTemplateRisks() error {
@@ -160,32 +157,6 @@ func (y *YakTemplate) CheckTemplateRisks() error {
 		addErrorMsg("lack of signature information, unable to verify script validity")
 	}
 	return errs
-}
-
-// 做替换这些事应该是执行时做，需要改，这里暂时做下兼容
-func (y *YakTemplate) RecoverPlaceHolder() {
-	for _, sequence := range y.HTTPRequestSequences {
-		for _, request := range sequence.HTTPRequests {
-			for k, v := range y.PlaceHolderMap {
-				if strings.HasPrefix(v, "__") && strings.HasSuffix(v, "__") {
-					newv := ""
-					var nextAdd = ('A' - 'a') //首字母大写
-					for _, ch := range v[2 : len(v)-2] {
-						if ch == '_' {
-							nextAdd += ('A' - 'a')
-							continue
-						} else {
-							newv += string(ch + nextAdd)
-							nextAdd = 0
-						}
-					}
-					v = newv
-				}
-				v = "{{" + v + "}}"
-				request.Request = strings.ReplaceAll(request.Request, k, v)
-			}
-		}
-	}
 }
 
 // GeneralizeTemplateVar 将模板中的变量位置替换为通用的变量名
