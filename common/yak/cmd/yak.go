@@ -11,6 +11,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path"
@@ -407,10 +408,13 @@ var startGRPCServerCommand = cli.Command{
 			Name:  "gen-tls-crt",
 			Value: "build/",
 		},
-		cli.Float64Flag{
+		cli.BoolFlag{
 			Name:  "pprof",
+			Usage: "手动 pprof 采集",
+		},
+		cli.Float64Flag{
+			Name:  "auto-pprof",
 			Usage: "指定 pprof 采集秒数间隔,eg. 10",
-			Value: 10,
 		},
 		cli.BoolFlag{
 			Name: "debug",
@@ -425,21 +429,32 @@ var startGRPCServerCommand = cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		pprofSec := c.Float64("pprof")
-		if pprofSec > 0 {
+		if c.Bool("pprof") && c.IsSet("auto-pprof") {
+			return utils.Error("Parameters 'pprof' and 'auto-pprof' cannot be set at the same time")
+		}
+		enableProfile := c.Bool("pprof")
+		if enableProfile {
 			println("----------------------------------------------------------------------")
 			println("----------------------------------------------------------------------")
 			println("---------------------------YAK GRPC PPROF-----------------------------")
 			println("----------------------------------------------------------------------")
 			println("----------------------------------------------------------------------")
-			//println("----------------------------------------------------------------------")
-			//println("USE: go tool pprof --seconds 30 http://127.0.0.1:18080/debug/pprof/profile")
-			//go func() {
-			//	err := http.ListenAndServe(":18080", nil)
-			//	if err != nil {
-			//		return
-			//	}
-			//}()
+			println("USE: go tool pprof --seconds 30 http://127.0.0.1:18080/debug/pprof/profile")
+			go func() {
+				err := http.ListenAndServe(":18080", nil)
+				if err != nil {
+					return
+				}
+			}()
+		}
+		pprofSec := c.Float64("auto-pprof")
+		if pprofSec > 0 && c.IsSet("auto-pprof") {
+			println("----------------------------------------------------------------------")
+			println("----------------------------------------------------------------------")
+			println("---------------------------YAK GRPC AUTO PPROF-----------------------------")
+			println("----------------------------------------------------------------------")
+			println("----------------------------------------------------------------------")
+			println("USE: go tool pprof -http=:18080 pprof file")
 			go startPProf(pprofSec)
 		}
 		//log.SetLevel(log.DebugLevel)
