@@ -700,7 +700,7 @@ RECONNECT:
 			if len(responseRaw.Bytes()) == 0 {
 				return response, errors.Wrap(err, "empty result.")
 			} else { // peek 到了数据,但是无法解析,说明是畸形响应包
-				restBytes, _ := utils.ReadConnUntilStable(conn, conn, timeout, 300*time.Millisecond)
+				restBytes, _ := utils.ReadUntilStable(conn, conn, timeout, 300*time.Millisecond)
 				if len(restBytes) > 0 {
 					if len(restBytes) > 256 {
 						restBytes = restBytes[:256]
@@ -721,7 +721,7 @@ RECONNECT:
 						break
 					}
 					// read second response rest in buffer
-					restBytes, _ := utils.ReadConnUntilStable(conn, conn, timeout, 300*time.Millisecond)
+					restBytes, _ := utils.ReadUntilStable(conn, conn, timeout, 300*time.Millisecond)
 					if len(restBytes) > 0 {
 						if len(restBytes) > 256 {
 							restBytes = restBytes[:256]

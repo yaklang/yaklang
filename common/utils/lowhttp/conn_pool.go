@@ -390,7 +390,7 @@ func (pc *persistConn) readLoop() {
 			if responseRaw.Len() >= len(respPacket) { // 如果 TeaReader内部还有数据证明,证明有响应数据,只是解析失败
 				// continue read 5 seconds, to receive rest data
 				// ignore error, treat as bad conn
-				restBytes, _ := utils.ReadConnUntilStable(pc.br, pc.Conn, 5*time.Second, 300*time.Millisecond)
+				restBytes, _ := utils.ReadUntilStable(pc.br, pc.Conn, 5*time.Second, 300*time.Millisecond)
 				pc.sawEOF = true
 				if len(restBytes) > 0 {
 					responseRaw.Write(restBytes)
