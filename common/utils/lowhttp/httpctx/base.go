@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -240,10 +241,76 @@ const (
 	REQUEST_CONTEXT_KEY_ConnectedToHost              = "connectedToHost"
 	REQUEST_CONTEXT_KEY_RemoteAddr                   = "remoteAddr"
 	REQUEST_CONTEXT_KEY_ViaConnect                   = "viaConnect"
+	REQUEST_CONTEXT_KEY_ResponseHeaderCallback       = "responseHeaderCallback"
+	REQUEST_CONTEXT_KEY_ResponseHeaderWriter         = "responseHeaderWriter"
+	REQUEST_CONTEXT_KEY_ResponseMaxContentLength     = "responseMaxContentLength"
+	REQUEST_CONTEXT_KEY_ResponseTooLarge             = "responseTooLarge"
+	REQUEST_CONTEXT_KEY_RequestTooLarge              = "requestTooLarge"
 
 	// matched mitm rules
 	REQUEST_CONTEXT_KEY_MatchedRules = "MatchedRules"
 )
+
+func GetResponseTooLarge(req *http.Request) bool {
+	return GetContextBoolInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseTooLarge)
+}
+
+func SetResponseTooLarge(req *http.Request, b bool) {
+	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseTooLarge, b)
+}
+
+func GetRequestTooLarge(req *http.Request) bool {
+	return GetContextBoolInfoFromRequest(req, REQUEST_CONTEXT_KEY_RequestTooLarge)
+}
+
+func SetRequestTooLarge(req *http.Request, b bool) {
+	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_RequestTooLarge, b)
+}
+
+func GetResponseMaxContentLength(req *http.Request) int {
+	return GetContextIntInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseMaxContentLength)
+}
+
+func SetResponseMaxContentLength(req *http.Request, length int) {
+	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseMaxContentLength, length)
+}
+
+type ResponseHeaderCallbackType func(response *http.Response, headerBytes []byte, bodyReader io.Reader) (io.Reader, error)
+
+func SetResponseHeaderCallback(req *http.Request, callback ResponseHeaderCallbackType) {
+	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseHeaderCallback, callback)
+}
+
+func SetResponseHeaderWriter(req *http.Request, w io.Writer) {
+	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseHeaderWriter, w)
+}
+
+func GetResponseHeaderWriter(req *http.Request) io.Writer {
+	if req == nil {
+		return nil
+	}
+	if ret := GetContextAnyFromRequest(req, REQUEST_CONTEXT_KEY_ResponseHeaderWriter); ret != nil {
+		if w, ok := ret.(io.Writer); ok {
+			return w
+		}
+	}
+	return nil
+}
+
+func GetResponseHeaderCallback(req *http.Request) ResponseHeaderCallbackType {
+	if req == nil {
+		return nil
+	}
+	rs := GetContextAnyFromRequest(req, REQUEST_CONTEXT_KEY_ResponseHeaderCallback)
+	if rs == nil {
+		return nil
+	}
+	cb, ok := rs.(func(response *http.Response, reader io.Reader))
+	if !ok {
+		return nil
+	}
+	return cb
+}
 
 func GetMatchedRule(req *http.Request) []*ypb.MITMContentReplacer {
 	results, ok := GetContextAnyFromRequest(req, REQUEST_CONTEXT_KEY_MatchedRules).([]*ypb.MITMContentReplacer)
