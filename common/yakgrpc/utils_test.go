@@ -9,9 +9,10 @@ import (
 )
 
 type MITMTestConfig struct {
-	Context         context.Context
-	OnServerStarted func()
-	OnPortFound     func(int)
+	Context          context.Context
+	OnServerStarted  func()
+	OnPortFound      func(int)
+	MaxContentLength int
 }
 
 type MITMTestCaseOption func(config *MITMTestConfig)
@@ -19,6 +20,12 @@ type MITMTestCaseOption func(config *MITMTestConfig)
 func CaseWithContext(ctx context.Context) MITMTestCaseOption {
 	return func(config *MITMTestConfig) {
 		config.Context = ctx
+	}
+}
+
+func CaseWithMaxContentLength(i int) MITMTestCaseOption {
+	return func(config *MITMTestConfig) {
+		config.MaxContentLength = i
 	}
 }
 
@@ -46,10 +53,6 @@ func NewMITMTestCase(t *testing.T, opts ...MITMTestCaseOption) {
 	}
 
 	mitmPort := utils.GetRandomAvailableTCPPort()
-	stream.Send(&ypb.MITMRequest{
-		Host: "127.0.0.1",
-		Port: uint32(mitmPort),
-	})
 	config := &MITMTestConfig{}
 	for _, opt := range opts {
 		opt(config)
@@ -57,6 +60,12 @@ func NewMITMTestCase(t *testing.T, opts ...MITMTestCaseOption) {
 	if config.OnPortFound != nil {
 		config.OnPortFound(mitmPort)
 	}
+
+	stream.Send(&ypb.MITMRequest{
+		Host:             "127.0.0.1",
+		Port:             uint32(mitmPort),
+		MaxContentLength: int64(config.MaxContentLength),
+	})
 
 	for {
 		rsp, err := stream.Recv()
