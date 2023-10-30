@@ -828,6 +828,7 @@ func handleHTTPRequestForm(packet []byte, fixMethod bool, fixContentType bool, c
 //
 // bbb
 // --------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm--`, "ccc", "ddd") // 添加POST请求表单，其中ccc为键，ddd为值
+// ```
 func AppendHTTPPacketFormEncoded(packet []byte, key, value string) []byte {
 	return handleHTTPRequestForm(packet, true, true, func(_ string, multipartReader *multipart.Reader, multipartWriter *multipart.Writer) bool {
 		if multipartReader != nil {
