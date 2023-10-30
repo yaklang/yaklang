@@ -566,7 +566,7 @@ func javascriptparserParserInit() {
 		0, 986, 988, 5, 7, 0, 0, 987, 989, 3, 110, 55, 0, 988, 987, 1, 0, 0, 0,
 		988, 989, 1, 0, 0, 0, 989, 990, 1, 0, 0, 0, 990, 992, 5, 8, 0, 0, 991,
 		985, 1, 0, 0, 0, 991, 986, 1, 0, 0, 0, 992, 147, 1, 0, 0, 0, 993, 996,
-		3, 136, 68, 0, 994, 996, 3, 116, 58, 0, 995, 993, 1, 0, 0, 0, 995, 994,
+		3, 116, 58, 0, 994, 996, 3, 136, 68, 0, 995, 993, 1, 0, 0, 0, 995, 994,
 		1, 0, 0, 0, 996, 149, 1, 0, 0, 0, 997, 998, 7, 6, 0, 0, 998, 151, 1, 0,
 		0, 0, 999, 1007, 5, 61, 0, 0, 1000, 1007, 5, 62, 0, 0, 1001, 1007, 5, 120,
 		0, 0, 1002, 1007, 3, 154, 77, 0, 1003, 1007, 5, 4, 0, 0, 1004, 1007, 3,
@@ -18867,8 +18867,8 @@ type IArrowFunctionBodyContext interface {
 	GetParser() antlr.Parser
 
 	// Getter signatures
-	SingleExpression() ISingleExpressionContext
 	FunctionBody() IFunctionBodyContext
+	SingleExpression() ISingleExpressionContext
 
 	// IsArrowFunctionBodyContext differentiates from other interfaces.
 	IsArrowFunctionBodyContext()
@@ -18906,22 +18906,6 @@ func NewArrowFunctionBodyContext(parser antlr.Parser, parent antlr.ParserRuleCon
 
 func (s *ArrowFunctionBodyContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *ArrowFunctionBodyContext) SingleExpression() ISingleExpressionContext {
-	var t antlr.RuleContext
-	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(ISingleExpressionContext); ok {
-			t = ctx.(antlr.RuleContext)
-			break
-		}
-	}
-
-	if t == nil {
-		return nil
-	}
-
-	return t.(ISingleExpressionContext)
-}
-
 func (s *ArrowFunctionBodyContext) FunctionBody() IFunctionBodyContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
@@ -18936,6 +18920,22 @@ func (s *ArrowFunctionBodyContext) FunctionBody() IFunctionBodyContext {
 	}
 
 	return t.(IFunctionBodyContext)
+}
+
+func (s *ArrowFunctionBodyContext) SingleExpression() ISingleExpressionContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(ISingleExpressionContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(ISingleExpressionContext)
 }
 
 func (s *ArrowFunctionBodyContext) GetRuleContext() antlr.RuleContext {
@@ -18970,14 +18970,14 @@ func (p *JavaScriptParser) ArrowFunctionBody() (localctx IArrowFunctionBodyConte
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(993)
-			p.singleExpression(0)
+			p.FunctionBody()
 		}
 
 	case 2:
 		p.EnterOuterAlt(localctx, 2)
 		{
 			p.SetState(994)
-			p.FunctionBody()
+			p.singleExpression(0)
 		}
 
 	case antlr.ATNInvalidAltNumber:

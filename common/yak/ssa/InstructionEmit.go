@@ -342,6 +342,7 @@ func (f *FunctionBuilder) EmitErrorHandler(try, catch *BasicBlock) *ErrorHandler
 	block := f.CurrentBlock
 	block.AddSucc(try)
 	block.AddSucc(catch)
+	try.AddSucc(catch)
 	f.emit(e)
 	return e
 }

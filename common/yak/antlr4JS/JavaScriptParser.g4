@@ -429,7 +429,7 @@ objectLiteral
 
 anonymousFunction
     : Async? Function_ '*'? '(' formalParameterList? ')' functionBody    # AnonymousFunctionDecl
-    | Async? arrowFunctionParameters '=>' arrowFunctionBody                     # ArrowFunction
+    | Async? arrowFunctionParameters '=>' arrowFunctionBody                    # ArrowFunction
     ;
 
 arrowFunctionParameters
@@ -438,8 +438,8 @@ arrowFunctionParameters
     ;
 
 arrowFunctionBody
-    : singleExpression
-    | functionBody
+    : functionBody
+    | singleExpression
     ;
 
 assignmentOperator
