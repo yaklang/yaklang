@@ -631,12 +631,14 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 		// if met this case, means that "response" is handled.
 		err = brw.Flush()
 		if err != nil {
-			log.Errorf("handle ordinary request: got error while flushing response back to client: %v", err)
+			if errors.Is(err, io.ErrUnexpectedEOF) {
+				closing = errClose
+			} else if strings.Contains(err.Error(), `write: broken pipe`) {
+				closing = errClose
+			}
+			return closing
 		}
-		if errors.Is(err, io.ErrUnexpectedEOF) {
-			closing = errClose
-		}
-		return closing
+		return nil
 	}
 
 	var responseBytes []byte
