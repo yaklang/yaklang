@@ -56,20 +56,19 @@ func isCloseable(err error) bool {
 
 // Proxy is an HTTP proxy with support for TLS MITM and customizable behavior.
 type Proxy struct {
-	roundTripper http.RoundTripper
-	dial         func(context.Context, string, string) (net.Conn, error)
-	timeout      time.Duration
-	mitm         *mitm.Config
-	proxyURL     *url.URL
-	conns        sync.WaitGroup
-	connsMu      sync.Mutex // protects conns.Add/Wait from concurrent access
-	closing      chan bool
-	http2        bool
-	gmTLS        bool
-	gmPrefer     bool
-	gmTLSOnly    bool
-	reqmod       RequestModifier
-	resmod       ResponseModifier
+	dial      func(context.Context, string, string) (net.Conn, error)
+	timeout   time.Duration
+	mitm      *mitm.Config
+	proxyURL  *url.URL
+	conns     sync.WaitGroup
+	connsMu   sync.Mutex // protects conns.Add/Wait from concurrent access
+	closing   chan bool
+	http2     bool
+	gmTLS     bool
+	gmPrefer  bool
+	gmTLSOnly bool
+	reqmod    RequestModifier
+	resmod    ResponseModifier
 
 	// context cache
 	ctxCacheLock     *sync.Mutex
@@ -82,6 +81,8 @@ type Proxy struct {
 
 	//lowhttp config
 	lowhttpConfig []lowhttp.LowhttpOpt
+
+	maxContentLength int
 }
 
 func (p *Proxy) saveCache(r *http.Request, ctx *Context) {
@@ -147,6 +148,17 @@ func (p *Proxy) SetTimeout(timeout time.Duration) {
 // SetMITM sets the config to use for MITMing of CONNECT requests.
 func (p *Proxy) SetMITM(config *mitm.Config) {
 	p.mitm = config
+}
+
+func (p *Proxy) SetMaxContentLength(i int) {
+	p.maxContentLength = i
+}
+
+func (p *Proxy) GetMaxContentLength() int {
+	if p == nil || p.maxContentLength <= 0 {
+		return 10 * 1000 * 1000
+	}
+	return p.maxContentLength
 }
 
 // SetH2 sets the switch to turn on HTTP2 support

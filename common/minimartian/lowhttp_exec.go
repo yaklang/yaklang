@@ -6,6 +6,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"io"
 	"net/http"
 	"strings"
 )
@@ -38,12 +40,14 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 
 	var isGmTLS = p.gmTLS && isHttps
 
-	opts := append(p.lowhttpConfig,
+	opts := append(
+		p.lowhttpConfig,
 		lowhttp.WithRequest(reqBytes),
 		lowhttp.WithHttps(isHttps),
 		lowhttp.WithGmTLS(isGmTLS),
 		lowhttp.WithConnPool(true),
 		lowhttp.WithSaveHTTPFlow(false),
+		lowhttp.WithNativeHTTPRequestInstance(req),
 	)
 
 	if connectedPort := httpctx.GetContextIntInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort); connectedPort > 0 {
@@ -56,6 +60,52 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 			opts = append(opts, lowhttp.WithPort(connectedPort))
 		}
 	}
+
+	httpctx.SetResponseHeaderParsed(req, func(key string, value string) {
+		bwr := httpctx.GetMITMFrontendReadWriter(req)
+		if bwr == nil {
+			return
+		}
+
+		if key == "content-type" {
+			if ret := httpctx.GetResponseContentTypeFiltered(req); ret != nil {
+				if ret(value) {
+					// filtered by content-type
+					log.Infof("content-type: %v is filtered", value)
+					httpctx.SetMITMSkipFrontendFeedback(req, true)
+					httpctx.SetResponseHeaderCallback(req, func(response *http.Response, headerBytes []byte, bodyReader io.Reader) (io.Reader, error) {
+						bwr.Write(headerBytes)
+						utils.FlushWriter(bwr)
+						bodyReader = io.TeeReader(bodyReader, bwr)
+						return bodyReader, nil
+					})
+					return
+				}
+			}
+		}
+
+		if key == "transfer-encoding" && value == "chunked" {
+			httpctx.SetResponseHeaderCallback(req, func(response *http.Response, headerBytes []byte, bodyReader io.Reader) (io.Reader, error) {
+				return bodyReader, nil
+			})
+			return
+		}
+
+		if key == "content-length" {
+			if contentLength := codec.Atoi(value); contentLength > 0 && contentLength > p.GetMaxContentLength() && httpctx.GetMITMFrontendReadWriter(req) != nil {
+				// too large
+				httpctx.SetResponseTooLarge(req, true)
+				httpctx.SetMITMSkipFrontendFeedback(req, true)
+				httpctx.SetResponseHeaderCallback(req, func(response *http.Response, headerBytes []byte, bodyReader io.Reader) (io.Reader, error) {
+					bwr.Write(headerBytes)
+					utils.FlushWriter(bwr)
+					bodyReader = io.TeeReader(bodyReader, bwr)
+					return bodyReader, nil
+				})
+				return
+			}
+		}
+	})
 
 	lowHttpResp, err := lowhttp.HTTPWithoutRedirect(opts...)
 	if err != nil {
@@ -71,9 +121,6 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 	if rsp != nil {
 		rsp.Request = req
 	}
-
-	//utils.FixHTTPRequestForGolangNativeHTTPClient(req)
-	//rsp, err := t.Transport.RoundTrip(req)
 
 	utils.FixHTTPResponseForGolangNativeHTTPClient(rsp)
 	return rsp, err

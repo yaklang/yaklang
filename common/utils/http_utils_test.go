@@ -3,7 +3,11 @@ package utils
 import (
 	"bufio"
 	"bytes"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/k0kubun/pp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -37,6 +41,65 @@ func TestMarshalHTTPRequest(t *testing.T) {
 	_, err = ReadHTTPRequestFromBufioReader(bufio.NewReader(bytes.NewBuffer(req)))
 	if err != nil {
 		t.Errorf("marshal http request for re-building request failed: %s", err)
+		t.FailNow()
+	}
+}
+
+func TestCtxEffectReader(t *testing.T) {
+	req := new(http.Request)
+	var body bytes.Buffer
+	httpctx.SetResponseHeaderCallback(req, func(response *http.Response, headerBytes []byte, bodyReader io.Reader) (io.Reader, error) {
+		return io.TeeReader(bodyReader, &body), nil
+	})
+	rsp, err := ReadHTTPResponseFromBufioReader(bytes.NewReader([]byte(`HTTP/1.1 200 OK
+Content-Length: 11
+
+aaaaaaaaaaa`)), req)
+	if err != nil {
+		t.Errorf("read http response failed: %s", err)
+		t.FailNow()
+	}
+	t.Logf("rsp: %p", rsp)
+	if body.Len() != 11 {
+		t.Errorf("invalid body length: %d", body.Len())
+		t.FailNow()
+	}
+	if body.String() == "aaaaaaaaaaa" {
+		spew.Dump(body.Bytes())
+	}
+}
+
+func TestCtxEffectReader_KeyValue(t *testing.T) {
+	req := new(http.Request)
+	var body bytes.Buffer
+	var clInt int
+	httpctx.SetResponseHeaderParsed(req, func(key string, value string) {
+		spew.Dump(key, value)
+		if key == "content-length" {
+			clInt = codec.Atoi(value)
+		}
+	})
+	httpctx.SetResponseHeaderCallback(req, func(response *http.Response, headerBytes []byte, bodyReader io.Reader) (io.Reader, error) {
+		if clInt == 11 {
+			return io.TeeReader(bodyReader, &body), nil
+		}
+		return bodyReader, nil
+	})
+	rsp, err := ReadHTTPResponseFromBufioReader(bytes.NewReader([]byte(`HTTP/1.1 200 OK
+Content-Length: 11
+
+aaaaaaaaaaa`)), req)
+	if err != nil {
+		t.Errorf("read http response failed: %s", err)
+		t.FailNow()
+	}
+	t.Logf("rsp: %p", rsp)
+	if body.Len() != 11 {
+		t.Errorf("invalid body length: %d", body.Len())
+		t.FailNow()
+	}
+	if clInt != 11 {
+		t.Errorf("invalid content-length: %d", clInt)
 		t.FailNow()
 	}
 }

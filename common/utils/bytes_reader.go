@@ -116,7 +116,13 @@ func ReadUntilStableEx(reader io.Reader, noTimeout bool, conn net.Conn, timeout 
 	var buf = make([]byte, 1)
 	var result bytes.Buffer
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	var ctx context.Context
+	var cancel context.CancelFunc
+	if noTimeout {
+		ctx, cancel = context.WithCancel(context.Background())
+	} else {
+		ctx, cancel = context.WithTimeout(context.Background(), timeout)
+	}
 	defer cancel()
 
 	var stopWord = make(map[byte]struct{})

@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"github.com/pkg/errors"
@@ -38,7 +37,7 @@ func ParseHTTPResponseLine(line string) (string, int, string, bool) {
 	return proto, code, status, code != 0
 }
 
-func ReadHTTPResponseFromBufioReader(reader *bufio.Reader, req *http.Request) (*http.Response, error) {
+func ReadHTTPResponseFromBufioReader(reader io.Reader, req *http.Request) (*http.Response, error) {
 	rsp, err := readHTTPResponseFromBufioReader(reader, false, req, nil)
 	if err != nil {
 		return nil, err
@@ -47,7 +46,7 @@ func ReadHTTPResponseFromBufioReader(reader *bufio.Reader, req *http.Request) (*
 	return rsp, nil
 }
 
-func ReadHTTPResponseFromBufioReaderConn(reader *bufio.Reader, conn net.Conn, req *http.Request) (*http.Response, error) {
+func ReadHTTPResponseFromBufioReaderConn(reader io.Reader, conn net.Conn, req *http.Request) (*http.Response, error) {
 	rsp, err := readHTTPResponseFromBufioReader(reader, false, req, conn)
 	if err != nil {
 		return nil, err
@@ -57,7 +56,7 @@ func ReadHTTPResponseFromBufioReaderConn(reader *bufio.Reader, conn net.Conn, re
 }
 
 func ReadHTTPResponseFromBytes(raw []byte, req *http.Request) (*http.Response, error) {
-	rsp, err := readHTTPResponseFromBufioReader(bufio.NewReader(bytes.NewReader(raw)), true, req, nil)
+	rsp, err := readHTTPResponseFromBufioReader(bytes.NewReader(raw), true, req, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +114,12 @@ func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bo
 			keyStr = http.CanonicalHeaderKey(keyStr)
 		}
 
-		switch strings.ToLower(keyStr) {
+		lowerKey := strings.ToLower(keyStr)
+		if ret := httpctx.GetResponseHeaderParsed(req); ret != nil {
+			ret(lowerKey, valStr)
+		}
+
+		switch lowerKey {
 		case "content-length":
 			useContentLength = true
 			contentLengthInt = codec.Atoi(valStr)
@@ -233,4 +237,17 @@ func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bo
 		httpctx.SetBareResponseBytes(req, rawPacket.Bytes())
 	}
 	return rsp, nil
+}
+
+type flusher interface {
+	Flush() error
+}
+
+func FlushWriter(writer io.Writer) {
+	if f, ok := writer.(flusher); ok {
+		err := f.Flush()
+		if err != nil {
+			log.Warnf("flush writer failed: %s", err)
+		}
+	}
 }
