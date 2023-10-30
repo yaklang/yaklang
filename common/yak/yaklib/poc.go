@@ -1218,7 +1218,7 @@ func doWebSocket(raw interface{}, opts ...PocConfig) ([]byte, []byte, error) {
 // poc.Split(`POST / HTTP/1.1
 // Content-Type: application/json
 // Host: www.example.com
-
+//
 // {"key": "value"}`, func(header) {
 // dump(header)
 // })

@@ -30,7 +30,7 @@ var fetchBoundaryRegexp = regexp.MustCompile(`boundary\s?=\s?([^;]+)`)
 // poc.HTTPPacketForceChunked(`POST / HTTP/1.1
 // Host: example.com
 // Content-Length: 11
-
+//
 // hello world`)
 // ```
 func HTTPPacketForceChunked(raw []byte) []byte {
