@@ -972,10 +972,14 @@ tags, is_websocket, websocket_hash, runtime_id, from_plugin,
 -- request is larger than 200K, return empty string
 LENGTH(request) > 204800 as is_request_oversize,
 CASE WHEN LENGTH(request) > 204800 THEN '' ELSE request END as request,
+
 -- response is larger than 500K, return empty string
 LENGTH(response) > 512000 as is_response_oversize,
-CASE WHEN LENGTH(response) > 512000 THEN '' ELSE response END as response
+CASE WHEN LENGTH(response) > 512000 THEN '' ELSE response END as response,
 
+-- is response too large
+is_too_large_response, 
+too_large_response_header_file, too_large_response_body_file
 `)
 	}
 

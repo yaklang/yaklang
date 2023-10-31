@@ -67,6 +67,7 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 			return
 		}
 
+		// filter / forward to client conn via Content-Type
 		if key == "content-type" {
 			if ret := httpctx.GetResponseContentTypeFiltered(req); ret != nil {
 				if ret(value) {
@@ -83,44 +84,34 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 			}
 		}
 
-		if key == "transfer-encoding" && value == "chunked" {
-			httpctx.SetResponseHeaderCallback(req, func(response *http.Response, headerBytes []byte, bodyReader io.Reader) (io.Reader, error) {
-				writerCloser := utils.NewTriggerWriter(uint64(p.GetMaxContentLength()), func(buffer io.ReadCloser) {
-					httpctx.SetResponseTooLarge(req, true)
-					httpctx.SetMITMSkipFrontendFeedback(req, true)
-					bwr.Write(headerBytes)
-					utils.FlushWriter(bwr)
-					go func() {
-						_, err := io.Copy(bwr, buffer)
-						if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
-							log.Errorf("io.Copy error: %s", err)
-						}
-					}()
-				})
-				httpctx.SetResponseFinishedCallback(req, func() {
-					httpctx.SetResponseTooLargeSize(req, writerCloser.GetCount())
-					writerCloser.Close()
-				})
-				return io.TeeReader(bodyReader, writerCloser), nil
-			})
-			return
-		}
-
+		// content-length is too short
 		if key == "content-length" {
-			if contentLength := codec.Atoi(value); contentLength > 0 && contentLength > p.GetMaxContentLength() && httpctx.GetMITMFrontendReadWriter(req) != nil {
-				// too large
-				httpctx.SetResponseTooLarge(req, true)
-				httpctx.SetResponseTooLargeSize(req, int64(contentLength))
-				httpctx.SetMITMSkipFrontendFeedback(req, true)
-				httpctx.SetResponseHeaderCallback(req, func(response *http.Response, headerBytes []byte, bodyReader io.Reader) (io.Reader, error) {
-					bwr.Write(headerBytes)
-					utils.FlushWriter(bwr)
-					bodyReader = io.TeeReader(bodyReader, bwr)
-					return bodyReader, nil
-				})
+			if contentLength := codec.Atoi(value); contentLength > 0 && contentLength < p.GetMaxContentLength() {
 				return
 			}
 		}
+
+		// trigger: content-length is too large
+		httpctx.SetResponseHeaderCallback(req, func(response *http.Response, headerBytes []byte, bodyReader io.Reader) (io.Reader, error) {
+			writerCloser := utils.NewTriggerWriter(uint64(p.GetMaxContentLength()), func(buffer io.ReadCloser) {
+				httpctx.SetResponseTooLarge(req, true)
+				httpctx.SetMITMSkipFrontendFeedback(req, true)
+				bwr.Write(headerBytes)
+				utils.FlushWriter(bwr)
+				go func() {
+					_, err := io.Copy(bwr, buffer)
+					utils.FlushWriter(bwr)
+					if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+						log.Errorf("io.Copy error: %s", err)
+					}
+				}()
+			})
+			httpctx.SetResponseFinishedCallback(req, func() {
+				httpctx.SetResponseTooLargeSize(req, writerCloser.GetCount())
+				writerCloser.Close()
+			})
+			return io.TeeReader(bodyReader, writerCloser), nil
+		})
 	})
 
 	lowHttpResp, err := lowhttp.HTTPWithoutRedirect(opts...)

@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"os"
 	"testing"
 )
 
@@ -61,6 +62,33 @@ Host: ` + vulinboxAddr + "\r\n\r\n",
 			}
 			if !data[0].IsTooLargeResponse {
 				t.Fatal("too-large-response tag not found")
+			}
+			bodyFile := data[0].TooLargeResponseBodyFile
+			if bodyFile == "" {
+				t.Fatal("too-large-response body file not found")
+			}
+			rawBody, _ := os.ReadFile(bodyFile)
+			if len(rawBody) < 111110000 {
+				t.Fatal("too-large-response body file not found")
+			}
+			headerFile := data[0].TooLargeResponseHeaderFile
+			if headerFile == "" {
+				t.Fatal("too-large-response header file not found")
+			}
+			rawHeader, _ := os.ReadFile(headerFile)
+			if len(rawHeader) < 100 {
+				t.Fatal("too-large-response header file not found")
+			}
+			raw, err := yakit.GetHTTPFlow(consts.GetGormProjectDatabase(), int64(data[0].ID))
+			if err != nil {
+				t.Fatal("query taged flow failed", err)
+			}
+			ins, _ := raw.ToGRPCModel(true)
+			if len(ins.Response) > 111110000 {
+				t.Fatal("query taged flow failed")
+			}
+			if len(ins.Response) == 0 {
+				t.Fatal("query taged flow failed")
 			}
 		}),
 	)
