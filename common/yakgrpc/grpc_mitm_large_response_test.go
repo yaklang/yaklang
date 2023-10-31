@@ -32,7 +32,7 @@ func TestGRPCMUSTPASS_LARGE_RESPOSNE(t *testing.T) {
 cancel()
 assert len(rsp) > 1111100`,
 				map[string]any{
-					"packet": `GET /misc/response/content_length?cl=1111100 HTTP/1.1
+					"packet": `GET /misc/response/content_length?cl=111110000 HTTP/1.1
 Host: ` + vulinboxAddr + "\r\n\r\n",
 					`cancel`:    cancel,
 					"mitmProxy": fmt.Sprintf(`http://127.0.0.1:%v`, port),
