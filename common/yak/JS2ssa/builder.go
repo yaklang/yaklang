@@ -50,7 +50,7 @@ func defaultConfig() *config {
 	return &config{
 		analyzeOpt:  make([]ssa4analyze.Option, 0),
 		typeMethod:  nil,
-		externValue: nil,
+		externValue: make(map[string]any),
 		externLib:   make(map[string]map[string]any),
 	}
 }
@@ -65,7 +65,11 @@ func WithAnalyzeOpt(opt ...ssa4analyze.Option) Option {
 
 func WithExternValue(table map[string]any) Option {
 	return func(c *config) {
-		c.externValue = table
+		for i := range table {
+			if _, ok := c.externValue[i]; !ok{
+				c.externValue[i] = table[i]
+			}
+		}
 	}
 }
 

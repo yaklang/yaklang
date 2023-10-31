@@ -688,6 +688,31 @@ func (b *astbuilder) buildFunctionExpression(stmt *JS.FunctionExpressionContext)
 		}
 
 		return newFunc
+	} else {
+		if s, ok := stmt.AnonymousFunction().(*JS.AnonymousFunctionDeclContext); ok {
+			funcName := ""
+			newFunc, symbol := b.NewFunc(funcName)
+			current := b.CurrentBlock
+
+			buildFunc := func() {
+				b.PushFunction(newFunc, symbol, current)
+
+				if f, ok := s.FormalParameterList().(*JS.FormalParameterListContext); ok {
+					b.buildFormalParameterList(f)
+				}
+
+				if f, ok := s.FunctionBody().(*JS.FunctionBodyContext); ok {
+					b.buildFunctionBody(f)
+				}
+
+				b.Finish()
+				b.PopFunction()
+			}
+
+			b.AddSubFunction(buildFunc)
+
+			return newFunc
+		}
 	}
 
 	return nil
@@ -873,16 +898,14 @@ func (b *astbuilder) buildMemberDotExpression(stmt *JS.MemberDotExpressionContex
 		return nil, nil
 	}
 
-	// left
 	var index ssa.Value
 	if s, ok := stmt.IdentifierName().(*JS.IdentifierNameContext); ok {
-		index = b.buildIdentifierName(s)
+		index = ssa.NewConst(s.GetText())
 	}
 
 	if IsValue {
 		lv := b.EmitFieldMust(expr, index)
 		lv.GetValue(b.FunctionBuilder)
-
 		return nil, lv
 	} else {
 		return b.EmitField(expr, index), nil
