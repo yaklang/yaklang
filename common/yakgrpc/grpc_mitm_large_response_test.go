@@ -170,8 +170,8 @@ Host: ` + vulinboxAddr + "\r\n\r\n",
 			if len(ins.Response) == 0 {
 				t.Fatal("query taged flow failed")
 			}
-			if !ins.DisableRenderStyles {
-				t.Fatal("render is disabled!")
+			if !(ins.TooLargeResponseBodyFile != "" && ins.TooLargeResponseHeaderFile != "" && ins.IsTooLargeResponse) {
+				t.Fatal("too-large-response is not effect")
 			}
 		}),
 	)
