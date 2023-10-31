@@ -428,9 +428,7 @@ func (f *HTTPFlow) toGRPCModel(full bool) (*ypb.HTTPFlow, error) {
 	if requireResponse {
 		flow.Response = []byte(unquotedResponse)
 		// 显示最多 1M
-		if len(flow.Response) > 1000*1000 {
-			flow.Response = append(flow.Response[:1000*1000], []byte("...")...)
-		}
+		flow.DisableRenderStyles = len(flow.Response) > 2*1000*1000
 		if isStandardRequest && haveResponse {
 			_, responseBody = lowhttp.SplitHTTPPacket(flow.Response, nil, nil, func(line string) string {
 				k, v := lowhttp.SplitHTTPHeader(line)
@@ -569,13 +567,6 @@ func CreateHTTPFlowFromHTTPWithBodySavedFromRaw(isHttps bool, reqRaw []byte, rsp
 			rspContentType = v
 		}
 	})
-	var rspBody = body
-	var bodyLength = int64(len(rspBody))
-	if bodyLength > maxBodyLength {
-		rspBody = append(rspBody[:maxBodyLength], []byte("(dropped for huge body...)")...)
-		rspRaw = lowhttp.ReplaceHTTPPacketBody([]byte(header), rspBody, false)
-	}
-
 	var responseRaw = strconv.Quote(string(rspRaw))
 	fReq, _ := mutate.NewFuzzHTTPRequest(reqRaw)
 
@@ -584,7 +575,7 @@ func CreateHTTPFlowFromHTTPWithBodySavedFromRaw(isHttps bool, reqRaw []byte, rsp
 		Url:         url,
 		Path:        requestUri,
 		Method:      method,
-		BodyLength:  bodyLength,
+		BodyLength:  int64(len(body)),
 		ContentType: rspContentType,
 		StatusCode:  int64(lowhttp.ExtractStatusCodeFromResponse(rspRaw)),
 		SourceType:  source,

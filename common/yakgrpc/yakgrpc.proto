@@ -3619,6 +3619,11 @@ message HTTPFlow {
   repeated string Domains = 40;
   repeated string RootDomains = 41;
   repeated string JsonObjects = 42;
+
+  bool IsTooLargeResponse = 43;
+  string TooLargeResponseHeaderFile = 44;
+  string TooLargeResponseBodyFile = 45;
+  bool DisableRenderStyles = 46;
 }
 
 message FuzzableParam {
