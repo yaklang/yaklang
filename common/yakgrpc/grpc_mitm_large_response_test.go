@@ -8,11 +8,140 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/vulinbox"
 	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"os"
+	"strings"
 	"testing"
 )
+
+func TestGRPCMUSTPASS_LARGE_RESPONSE_FOR_WEBFUZZER_NEGATIVE(t *testing.T) {
+	var port int
+	var ctx, cancel = context.WithCancel(utils.TimeoutContextSeconds(60))
+	defer cancel()
+	addr, err := vulinbox.NewVulinServerEx(ctx, true, false, "127.0.0.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	host, port, _ := utils.ParseStringToHostPort(addr)
+	vulinboxAddr := utils.HostPort(host, port)
+
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	token := ksuid.New().String()
+	expectedCL := 4 * 1000 * 1000
+	limit := int64(expectedCL + 1000)
+	stream, err := client.HTTPFuzzer(ctx, &ypb.FuzzerRequest{
+		Request: `GET /misc/response/content_length?cl=` + codec.Itoa(expectedCL) + `&c=` + token + ` HTTP/1.1
+Host: ` + vulinboxAddr + "\r\n\r\n",
+		MaxBodySize: limit,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rsp, err := stream.Recv()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if rsp.IsTooLargeResponse {
+		t.Fatal("too-large-response tag not right")
+	}
+
+	if rsp.TooLargeResponseHeaderFile != "" {
+		t.Fatal("too-large-response header file not right")
+	}
+
+	if rsp.TooLargeResponseBodyFile != "" {
+		t.Fatal("too-large-response body file not right")
+	}
+
+	dataResponse, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{Keyword: token})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dataResponse.Data) != 1 {
+		t.Fatal("query taged flow failed(count is not right)")
+	}
+
+	if len(dataResponse.Data[0].Response) != 0 {
+		t.Fatal("large response is not show(500K)")
+	}
+	id := dataResponse.Data[0].Id
+	if id == 0 {
+		t.Fatal("id is 0")
+	}
+
+	response, err := client.GetHTTPFlowById(context.Background(), &ypb.GetHTTPFlowByIdRequest{
+		Id: int64(id),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if l := len(response.Response); l > 0 && l > expectedCL && int64(l) < limit {
+		return
+	} else {
+		t.Fatal("response is not right")
+	}
+}
+
+func TestGRPCMUSTPASS_LARGE_RESPONSE_FOR_WEBFUZZER_POSITIVE(t *testing.T) {
+	var port int
+	var ctx, cancel = context.WithCancel(utils.TimeoutContextSeconds(60))
+	defer cancel()
+	addr, err := vulinbox.NewVulinServerEx(ctx, true, false, "127.0.0.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	host, port, _ := utils.ParseStringToHostPort(addr)
+	vulinboxAddr := utils.HostPort(host, port)
+
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	token := ksuid.New().String()
+	expectedCL := 4 * 1000 * 1000
+	stream, err := client.HTTPFuzzer(ctx, &ypb.FuzzerRequest{
+		Request: `GET /misc/response/content_length?cl=` + codec.Itoa(expectedCL) + `&c=` + token + ` HTTP/1.1
+Host: ` + vulinboxAddr + "\r\n\r\n",
+		MaxBodySize: int64(expectedCL - 1),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rsp, err := stream.Recv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rsp.IsTooLargeResponse && rsp.TooLargeResponseHeaderFile != "" && rsp.TooLargeResponseBodyFile != "" {
+		raw, _ := os.ReadFile(rsp.TooLargeResponseBodyFile)
+		if len(raw) >= expectedCL {
+			dataResponse, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{Keyword: token})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(dataResponse.Data) != 1 {
+				t.Fatal("query taged flow failed(count is not right)")
+			}
+			if len(dataResponse.Data[0].Response) > expectedCL-10 {
+				t.Fatal("response is too large")
+			}
+			if !strings.Contains(string(dataResponse.Data[0].Response), `find more in web fuzzer history`) {
+				t.Fatal("response is not right")
+			}
+			return
+		} else {
+			t.Fatal("too-large-response body file not right")
+		}
+	}
+	t.Fatal("too-large-response not found(MaxBodySize is not right)")
+}
 
 func TestGRPCMUSTPASS_LARGE_RESPOSNE_NEGATIVE(t *testing.T) {
 	var port int

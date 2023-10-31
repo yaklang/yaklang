@@ -195,10 +195,6 @@ func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bo
 		}
 	}()
 
-	// handled body
-	var isTooLarge = httpctx.GetResponseTooLarge(req)
-	_ = isTooLarge
-
 	var bodyRawBuf = new(bytes.Buffer)
 	if fixContentLength {
 		// just for bytes condition
@@ -230,7 +226,6 @@ func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bo
 				rawPacket.Write(fixed)
 				if err != nil {
 					return nil, errors.Wrap(err, "chunked decoder error")
-
 				}
 				bodyRawBuf.Write(fixed)
 			}
@@ -258,9 +253,10 @@ func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bo
 			}
 		}
 	}
-	if bodyRawBuf.Len() == 0 {
+	if ret := bodyRawBuf.Len(); ret == 0 {
 		rsp.Body = http.NoBody
 	} else {
+		httpctx.SetResponseBodySize(req, int64(ret))
 		rsp.Body = io.NopCloser(bodyRawBuf)
 	}
 	if req != nil {

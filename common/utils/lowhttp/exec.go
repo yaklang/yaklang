@@ -218,6 +218,10 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 			if option.ResponseCallback != nil {
 				option.ResponseCallback(response)
 			}
+			if option.EnableMaxContentLength && option.MaxContentLength > 0 && response.ResponseBodySize > int64(option.MaxContentLength) {
+				response.TooLarge = true
+				response.TooLargeLimit = int64(option.MaxContentLength)
+			}
 			SaveResponse(response)
 		}()
 		select {
@@ -700,6 +704,7 @@ RECONNECT:
 		if err != nil {
 			log.Infof("[lowhttp] read response failed: %s", err)
 		}
+		response.ResponseBodySize = httpctx.GetResponseBodySize(stashedRequest)
 		if firstResponse == nil {
 			if len(responseRaw.Bytes()) == 0 {
 				return response, errors.Wrap(err, "empty result.")

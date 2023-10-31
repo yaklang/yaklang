@@ -259,10 +259,17 @@ const (
 	REQUEST_CONTEXT_KEY_ResponseFinishedCallback     = "responseFinishedCallback"
 	REQUEST_CONTEXT_KEY_ResponseTooLargeHeaderFile   = "ResponseTooLargeHeaderFile"
 	REQUEST_CONTEXT_KEY_ResponseTooLargeBodyFile     = "ResponseTooLargeBodyFile"
-
-	// matched mitm rules
-	REQUEST_CONTEXT_KEY_MatchedRules = "MatchedRules"
+	REQUEST_CONTEXT_KEY_ResponseBodySize             = "ResponseBodySize"
+	REQUEST_CONTEXT_KEY_MatchedRules                 = "MatchedRules"
 )
+
+func SetResponseBodySize(req *http.Request, i int64) {
+	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseBodySize, i)
+}
+
+func GetResponseBodySize(req *http.Request) int64 {
+	return int64(GetContextIntInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseBodySize))
+}
 
 func SetResponseTooLargeHeaderFile(req *http.Request, b string) {
 	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseTooLargeHeaderFile, b)

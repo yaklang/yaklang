@@ -31,5 +31,9 @@ func SaveResponse(r *LowhttpResponse) {
 		})
 		return
 	}
-	saveHTTPFlowFunc(r.Https, r.RawRequest, r.RawPacket, r.Url, r.RemoteAddr, r.Source, r.RuntimeId, r.FromPlugin)
+	var rawPacket = r.RawPacket
+	if r.TooLarge {
+		rawPacket = ReplaceHTTPPacketBodyFast(rawPacket, []byte(`[[response too large(`+utils.ByteSize(uint64(r.TooLargeLimit))+`), truncated]] find more in web fuzzer history!`))
+	}
+	saveHTTPFlowFunc(r.Https, r.RawRequest, rawPacket, r.Url, r.RemoteAddr, r.Source, r.RuntimeId, r.FromPlugin)
 }
