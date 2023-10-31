@@ -2,10 +2,10 @@ package js2ssa
 
 import (
 	"fmt"
-	"slices"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
+	"golang.org/x/exp/slices"
 
 	JS "github.com/yaklang/yaklang/common/yak/antlr4JS/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
