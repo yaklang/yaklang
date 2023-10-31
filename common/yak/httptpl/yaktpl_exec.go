@@ -7,18 +7,21 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/url"
 	"path"
 	"strings"
 	"sync/atomic"
+	"time"
 )
 
 type requestRaw struct {
-	Raw     []byte
-	IsHttps bool
-	Params  map[string]interface{}
-	Origin  *YakRequestBulkConfig
+	Raw          []byte
+	IsHttps      bool
+	SNI          string
+	Timeout      time.Duration
+	OverrideHost string
+	Params       map[string]interface{}
+	Origin       *YakRequestBulkConfig
 }
 
 type RequestBulk struct {
@@ -26,36 +29,6 @@ type RequestBulk struct {
 	RequestConfig *YakRequestBulkConfig
 }
 
-func (y *YakTemplate) RenderToFuzzerRequestsByUrl(u string) []*ypb.FuzzerRequests {
-	result := []*ypb.FuzzerRequests{}
-	for _, sequence := range y.HTTPRequestSequences {
-		seq := &ypb.FuzzerRequests{}
-		for _, path := range sequence.Paths {
-			var firstLine string = fmt.Sprintf("%v %v HTTP/1.1", sequence.Method, path)
-			var lines []string
-			lines = append(lines, firstLine)
-			_, hostOk1 := sequence.Headers["Host"]
-			_, hostOk2 := sequence.Headers["host"]
-			if !hostOk1 && !hostOk2 {
-				lines = append(lines, "Host: "+"{{Hostname}}")
-			}
-			for k, v := range sequence.Headers {
-				lines = append(lines, fmt.Sprintf(`%v: %v`, k, v))
-			}
-			if len(sequence.Headers) <= 0 {
-				lines = append(lines, `User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0`)
-			}
-			var rawPacket = strings.Join(lines, "\r\n") + "\r\n\r\n"
-			rawPacket += sequence.Body
-			seq.Requests = append(seq.Requests, &ypb.FuzzerRequest{
-				Request:    rawPacket,
-				RequestRaw: toBytes(rawPacket),
-			})
-		}
-		result = append(result, seq)
-	}
-	return result
-}
 func (y *YakTemplate) ExtractorVarsFromUrl(u string) map[string]string {
 	urlIns, err := url.Parse(u)
 	if err != nil {
@@ -86,16 +59,15 @@ func (y *YakTemplate) ExtractorVarsFromUrl(u string) map[string]string {
 	baseUrl = strings.TrimRight(baseUrl, "/")
 	rootUrl = strings.TrimRight(rootUrl, "/")
 	return map[string]string{
-		"URL":              urlIns.String(),
-		"Host":             urlIns.Hostname(),
-		"Port":             urlIns.Port(),
-		"Hostname":         urlIns.Host,
-		"RootURL":          rootUrl,
-		"BaseURL":          baseUrl,
-		"Path":             urlIns.RequestURI(),
-		"PathTrimEndSlash": strings.TrimRight(urlIns.RequestURI(), "/"),
-		"File":             file,
-		"Schema":           urlIns.Scheme,
+		"URL":      urlIns.String(),
+		"Host":     urlIns.Hostname(),
+		"Port":     urlIns.Port(),
+		"Hostname": urlIns.Host,
+		"RootURL":  rootUrl,
+		"BaseURL":  baseUrl,
+		"Path":     urlIns.RequestURI(),
+		"File":     file,
+		"Schema":   urlIns.Scheme,
 	}
 
 }
@@ -144,9 +116,12 @@ func (y *YakTemplate) GenerateRequestSequences(u string) []*RequestBulk {
 				isHttps = v == "https"
 			}
 			seq.Requests = append(seq.Requests, &requestRaw{
-				Raw:     []byte(req),
-				Origin:  sequenceCfg,
-				IsHttps: isHttps,
+				Raw:          []byte(req),
+				SNI:          request.SNI,
+				Timeout:      request.Timeout,
+				OverrideHost: request.OverrideHost,
+				Origin:       sequenceCfg,
+				IsHttps:      isHttps,
 			})
 		}
 		result = append(result, seq)

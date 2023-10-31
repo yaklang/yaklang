@@ -27,39 +27,24 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 	if err := yakTemplate.CheckTemplateRisks(); err != nil {
 		warningMsgStr = err.Error()
 	}
-	yakTemplate.RenderTemplateWithDefaultValue()
 
 	if err != nil {
 		return nil, utils.Errorf("cannot create yak template from yaml: %v", err)
 	}
 
 	// 转FuzzerRequest
-	for _, sequence := range yakTemplate.HTTPRequestSequences {
-		var fuzzerReqs []*ypb.FuzzerRequest
-		if len(sequence.HTTPRequests) != 0 {
-			fuzzerReqs = make([]*ypb.FuzzerRequest, len(sequence.HTTPRequests)) // 每个package对应一个fuzzerRequest,使用相同配置
-			for i, request := range sequence.HTTPRequests {
-				fuzzerReqs[i] = &ypb.FuzzerRequest{
-					Request:                  request.Request,
-					RequestRaw:               []byte(request.Request),
-					PerRequestTimeoutSeconds: request.Timeout.Seconds(),
-				}
-			}
-		} else {
-			fuzzerReqs = make([]*ypb.FuzzerRequest, len(sequence.Paths))
-			for i, path := range sequence.Paths {
-				httpPackage := lowhttp.UrlToRequestPacket(sequence.Method, path, nil, false)
-				for k, v := range sequence.Headers {
-					httpPackage = lowhttp.ReplaceHTTPPacketHeader(httpPackage, k, v)
-				}
-				lowhttp.ReplaceHTTPPacketBody(httpPackage, []byte(sequence.Body), false)
-				fuzzerReqs[i] = &ypb.FuzzerRequest{
-					Request:    string(httpPackage),
-					RequestRaw: httpPackage,
-				}
-			}
+	seqs := yakTemplate.GenerateRequestSequences("http://www.example.com")
+	for _, sequence := range seqs {
+		fuzzerReqs := []*ypb.FuzzerRequest{}
+		for _, request := range sequence.Requests {
+			fuzzerReqs = append(fuzzerReqs, &ypb.FuzzerRequest{
+				Request:                  string(request.Raw),
+				RequestRaw:               request.Raw,
+				PerRequestTimeoutSeconds: request.Timeout.Seconds(),
+			})
 		}
-		extractors := funk.Map(sequence.Extractor, func(extractor *httptpl.YakExtractor) *ypb.HTTPResponseExtractor {
+		config := sequence.RequestConfig
+		extractors := funk.Map(config.Extractor, func(extractor *httptpl.YakExtractor) *ypb.HTTPResponseExtractor {
 			typeName := ""
 			switch extractor.Type {
 			case "dsl":
@@ -109,22 +94,22 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 		}
 		var matchers []*ypb.HTTPResponseMatcher
 		var matchersCondition string
-		if sequence.Matcher != nil {
-			if len(sequence.Matcher.SubMatchers) > 0 {
-				matchers = yakMatchers2HttpResponseMatchers(sequence.Matcher.SubMatchers)
-				matchersCondition = sequence.Matcher.SubMatcherCondition
+		if config.Matcher != nil {
+			if len(config.Matcher.SubMatchers) > 0 {
+				matchers = yakMatchers2HttpResponseMatchers(config.Matcher.SubMatchers)
+				matchersCondition = config.Matcher.SubMatcherCondition
 			} else {
-				matchers = yakMatchers2HttpResponseMatchers([]*httptpl.YakMatcher{sequence.Matcher})
-				matchersCondition = sequence.Matcher.SubMatcherCondition
+				matchers = yakMatchers2HttpResponseMatchers([]*httptpl.YakMatcher{config.Matcher})
+				matchersCondition = config.Matcher.SubMatcherCondition
 			}
 		}
 		var redirectTimes float64
-		if sequence.EnableRedirect {
-			redirectTimes = float64(sequence.MaxRedirects)
+		if config.EnableRedirect {
+			redirectTimes = float64(config.MaxRedirects)
 		} else {
 			redirectTimes = 0
 		}
-		noFixContentLength := sequence.NoFixContentLength
+		noFixContentLength := config.NoFixContentLength
 
 		vars := yakTemplate.Variables.ToMap()
 		var params []*ypb.FuzzerParamItem
@@ -154,12 +139,12 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 		//fuzzerReq.RetryInStatusCode = sequence.RetryInStatusCode
 		//fuzzerReq.RetryNotInStatusCode = sequence.RetryNotInStatusCode
 		//
-		noFollowRedirect := !sequence.EnableRedirect
+		noFollowRedirect := !config.EnableRedirect
 		//
 		//fuzzerReq.FollowJSRedirect = sequence.JsEnableRedirect
 		//fuzzerReq.DNSServers = sequence.DNSServers
 
-		inheritCookies := sequence.CookieInherit
+		inheritCookies := config.CookieInherit
 		//inheritVariables := sequence.InheritVariables
 
 		for _, fuzzerReq := range fuzzerReqs {
@@ -171,7 +156,7 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 			fuzzerReq.RedirectTimes = redirectTimes
 			fuzzerReq.InheritCookies = inheritCookies
 			fuzzerReq.InheritVariables = true
-			for name, v := range sequence.Payloads.GetRawPayloads() {
+			for name, v := range config.Payloads.GetRawPayloads() {
 				params = append(params, &ypb.FuzzerParamItem{
 					Key:   name,
 					Value: strings.Join(v.Data, "\n"),
@@ -352,7 +337,15 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 	template.Severity = "low"
 	template.Description = "write your description here"
 	template.Reference = []string{"https://github.com/", "https://cve.mitre.org/"}
-	template.GeneralizeTemplateVar()
+	for _, sequence := range template.HTTPRequestSequences {
+		for _, request := range sequence.HTTPRequests {
+			request.Request = string(lowhttp.ReplaceHTTPPacketHeader([]byte(request.Request), "Host", "{{Hostname}}"))
+		}
+		for i, path := range sequence.Paths {
+			rootPath := utils.ParseStringUrlToWebsiteRootPath(path)
+			sequence.Paths[i] = strings.Replace(path, rootPath, "{{RootUrl}}", 1)
+		}
+	}
 	template.Sign = template.SignMainParams()
 	// 转换为Yaml
 	yamlContent, err := MarshalYakTemplateToYaml(template)
