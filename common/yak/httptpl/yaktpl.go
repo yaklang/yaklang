@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"golang.org/x/exp/maps"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -157,38 +156,6 @@ func (y *YakTemplate) CheckTemplateRisks() error {
 		addErrorMsg("lack of signature information, unable to verify script validity")
 	}
 	return errs
-}
-
-// GeneralizeTemplateVar 将模板中的变量位置替换为通用的变量名
-func (y *YakTemplate) GeneralizeTemplateVar() {
-	for _, sequence := range y.HTTPRequestSequences {
-		for _, request := range sequence.HTTPRequests {
-			request.Request = string(lowhttp.ReplaceHTTPPacketHeader([]byte(request.Request), "Host", "{{Hostname}}"))
-		}
-		for i, path := range sequence.Paths {
-			rootPath := utils.ParseStringUrlToWebsiteRootPath(path)
-			sequence.Paths[i] = strings.Replace(path, rootPath, "{{RootUrl}}", 1)
-		}
-	}
-}
-
-// RenderTemplateWithPacket 使用数据包渲染模板
-func (y *YakTemplate) RenderTemplateWithPacket(packet []byte) *ypb.FuzzerRequests {
-	_ = packet
-	return nil
-}
-
-// RenderTemplateWithDefaultValue 使用默认值渲染模板
-func (y *YakTemplate) RenderTemplateWithDefaultValue() {
-	for _, sequence := range y.HTTPRequestSequences {
-		for _, request := range sequence.HTTPRequests {
-			request.Request = strings.ReplaceAll(request.Request, "{{Hostname}}", "www.example.com")
-			request.Request = strings.ReplaceAll(request.Request, "{{RootUrl}}", "/")
-		}
-		for i := range sequence.Paths {
-			sequence.Paths[i] = strings.ReplaceAll(sequence.Paths[i], "{{RootUrl}}", "/")
-		}
-	}
 }
 
 type YakRequestBulkConfig struct {
