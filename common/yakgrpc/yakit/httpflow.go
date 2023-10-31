@@ -298,26 +298,29 @@ func (f *HTTPFlow) toGRPCModel(full bool) (*ypb.HTTPFlow, error) {
 		return flow, nil
 	}
 	flow := &ypb.HTTPFlow{
-		Id:                 uint64(f.ID),
-		IsHTTPS:            f.IsHTTPS,
-		Url:                utf8safe(f.Url),
-		SourceType:         f.SourceType,
-		Path:               utf8safe(f.Path),
-		Method:             utf8safe(f.Method),
-		BodyLength:         f.BodyLength,
-		ContentType:        utf8safe(f.ContentType),
-		StatusCode:         f.StatusCode,
-		GetParamsTotal:     int64(f.GetParamsTotal),
-		PostParamsTotal:    int64(f.PostParamsTotal),
-		UpdatedAt:          f.UpdatedAt.Unix(),
-		CreatedAt:          f.CreatedAt.Unix(),
-		HostPort:           utf8safe(f.RemoteAddr),
-		IPAddress:          utf8safe(f.IPAddress),
-		HtmlTitle:          "",
-		Tags:               f.Tags,
-		NoFixContentLength: f.NoFixContentLength,
-		IsWebsocket:        f.IsWebsocket,
-		WebsocketHash:      f.WebsocketHash,
+		Id:                         uint64(f.ID),
+		IsHTTPS:                    f.IsHTTPS,
+		Url:                        utf8safe(f.Url),
+		SourceType:                 f.SourceType,
+		Path:                       utf8safe(f.Path),
+		Method:                     utf8safe(f.Method),
+		BodyLength:                 f.BodyLength,
+		ContentType:                utf8safe(f.ContentType),
+		StatusCode:                 f.StatusCode,
+		GetParamsTotal:             int64(f.GetParamsTotal),
+		PostParamsTotal:            int64(f.PostParamsTotal),
+		UpdatedAt:                  f.UpdatedAt.Unix(),
+		CreatedAt:                  f.CreatedAt.Unix(),
+		HostPort:                   utf8safe(f.RemoteAddr),
+		IPAddress:                  utf8safe(f.IPAddress),
+		HtmlTitle:                  "",
+		Tags:                       f.Tags,
+		NoFixContentLength:         f.NoFixContentLength,
+		IsWebsocket:                f.IsWebsocket,
+		WebsocketHash:              f.WebsocketHash,
+		IsTooLargeResponse:         f.IsTooLargeResponse,
+		TooLargeResponseBodyFile:   f.TooLargeResponseBodyFile,
+		TooLargeResponseHeaderFile: f.TooLargeResponseHeaderFile,
 	}
 	// 设置 title
 	var (
@@ -427,7 +430,6 @@ func (f *HTTPFlow) toGRPCModel(full bool) (*ypb.HTTPFlow, error) {
 	var responseBody []byte
 	if requireResponse {
 		flow.Response = []byte(unquotedResponse)
-		// 显示最多 1M
 		flow.DisableRenderStyles = len(flow.Response) > 2*1000*1000
 		if isStandardRequest && haveResponse {
 			_, responseBody = lowhttp.SplitHTTPPacket(flow.Response, nil, nil, func(line string) string {
