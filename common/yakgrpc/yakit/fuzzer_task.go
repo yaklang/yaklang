@@ -202,7 +202,7 @@ func SaveWebFuzzerTask(db *gorm.DB, req *ypb.FuzzerRequest, total int, ok bool, 
 		Reason:             reason,
 	}
 	if db := db.Save(t); db.Error != nil {
-		return nil, err
+		return nil, db.Error
 	}
 	return t, nil
 }
