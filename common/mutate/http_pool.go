@@ -78,6 +78,9 @@ type httpPoolConfig struct {
 
 	//with conn_pool
 	WithConnPool bool
+
+	EnableMaxContentLength bool
+	MaxContentLength       int64
 }
 
 func WithPoolOpt_ExtraFuzzOptions(opts ...FuzzConfigOpt) HttpPoolConfigOption {
@@ -125,6 +128,13 @@ func _httpPool_EtcHosts(kv []*ypb.KVPair) HttpPoolConfigOption {
 func _httpPool_Retry(i int) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.RetryTimes = i
+	}
+}
+
+func _httpPool_MaxContentLength(i int) HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.EnableMaxContentLength = i > 0
+		config.MaxContentLength = int64(i)
 	}
 }
 
@@ -590,6 +600,10 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 						lowhttpOptions = append(lowhttpOptions, lowhttp.WithEnableSystemProxyFromEnv(!config.NoSystemProxy))
 					}
 
+					if config.EnableMaxContentLength {
+						lowhttpOptions = append(lowhttpOptions, lowhttp.WithMaxContentLength(int(config.MaxContentLength)))
+					}
+
 					rspInstance, err := lowhttp.HTTP(lowhttpOptions...)
 					var rsp []byte
 					if rspInstance != nil {
@@ -813,6 +827,7 @@ var WithPoolOpt_HookCodeCaller = _hoopPool_SetHookCaller
 var WithPoolOpt_Source = _httpPool_Source
 var WithPoolOpt_NamingContext = _httpPool_namingContext
 var WithPoolOpt_RetryTimes = _httpPool_Retry
+var WithPoolOpt_MaxContentLength = _httpPool_MaxContentLength
 var WithPoolOpt_RetryInStatusCode = _httpPool_RetryInStatusCode
 var WithPoolOpt_RetryNotInStatusCode = _httpPool_RetryNotInStatusCode
 var WithPoolOpt_RetryWaitTime = _httpPool_RetryWaitTime

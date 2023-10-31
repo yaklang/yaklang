@@ -3351,6 +3351,10 @@ message FuzzerRequest {
 
   // re matcher
   bool ReMatch = 48;
+
+  // default 5M?
+  // packet is too large (> MaxBodySize)
+  int64 MaxBodySize = 49;
 }
 
 message KVPair {
@@ -3452,6 +3456,12 @@ message FuzzerResponse {
   bool MatchedByMatcher = 46;
   string HitColor = 47;
   repeated RedirectHTTPFlow RedirectFlows = 48;
+
+  // too large file operators
+  bool IsTooLargeResponse = 49;
+  string TooLargeResponseHeaderFile = 50;
+  string TooLargeResponseBodyFile = 51;
+  bool DisableRenderStyles = 52;
 }
 
 message RedirectHTTPFlow {
