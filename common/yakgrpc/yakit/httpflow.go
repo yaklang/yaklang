@@ -119,11 +119,27 @@ type HTTPFlow struct {
 	// 主要用来标记用户的 Request 和 Response 是否超大
 	IsRequestOversize  bool `gorm:"-"`
 	IsResponseOversize bool `gorm:"-"`
+
+	IsTooLargeResponse         bool
+	TooLargeResponseHeaderFile string
+	TooLargeResponseBodyFile   string
 }
 
 type TagAndStatusCode struct {
 	Value string
 	Count int
+}
+
+func (f *HTTPFlow) FitHTTPRequest(req *http.Request) {
+	if req == nil {
+		return
+	}
+	if httpctx.GetResponseTooLarge(req) {
+		f.IsTooLargeResponse = true
+		f.TooLargeResponseHeaderFile = httpctx.GetResponseTooLargeHeaderFile(req)
+		f.TooLargeResponseBodyFile = httpctx.GetResponseTooLargeBodyFile(req)
+		f.BodyLength = httpctx.GetResponseTooLargeSize(req)
+	}
 }
 
 // 颜色与 Tag API
@@ -630,7 +646,11 @@ func CreateHTTPFlowFromHTTPWithNoRspSaved(isHttps bool, req *http.Request, sourc
 		}
 	}
 
-	return CreateHTTPFlowFromHTTPWithBodySavedFromRaw(isHttps, reqRaw, make([]byte, 0), source, urlRaw, remoteAddr)
+	flow, err := CreateHTTPFlowFromHTTPWithBodySavedFromRaw(isHttps, reqRaw, make([]byte, 0), source, urlRaw, remoteAddr)
+	if err != nil {
+		return nil, err
+	}
+	return flow, nil
 }
 
 func CreateHTTPFlowFromHTTPWithBodySaved(isHttps bool, req *http.Request, rsp *http.Response, source string, url string, remoteAddr string) (*HTTPFlow, error) {
