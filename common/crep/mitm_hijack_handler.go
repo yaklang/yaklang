@@ -13,7 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -197,15 +196,6 @@ func (m *MITMServer) hijackRequestHandler(rootCtx context.Context, wsModifier *W
 	return nil
 }
 
-func (m *MITMServer) largerThanMaxContentLength(res *http.Response) bool {
-	length, _ := strconv.Atoi(res.Header.Get("Content-Length"))
-	if length > m.hijackedMaxContentLength && m.hijackedMaxContentLength > 0 {
-		log.Infof("allow rsp: %p's content-length: %v passed for limit content-length", res, length)
-		return true
-	}
-	return false
-}
-
 func (m *MITMServer) hijackResponseHandler(rsp *http.Response) error {
 	defer func() {
 		if err := recover(); err != nil {
@@ -229,22 +219,18 @@ func (m *MITMServer) hijackResponseHandler(rsp *http.Response) error {
 	}
 
 	var (
-		responseBytes    []byte
-		dropped          = utils.NewBool(false)
-		shouldHandleBody = true
+		responseBytes []byte
+		dropped       = utils.NewBool(false)
 	)
 
-	// max content-length
-	if m.largerThanMaxContentLength(rsp) {
-		shouldHandleBody = false
-	}
+	tooLarge := httpctx.GetResponseTooLarge(requestOrigin)
 
 	// response hijacker
 	if m.responseHijackHandler != nil {
 		responseBytes = httpctx.GetBareResponseBytes(requestOrigin)
 		if len(responseBytes) <= 0 {
 			var err error
-			responseBytes, err = utils.DumpHTTPResponse(rsp, shouldHandleBody)
+			responseBytes, err = utils.DumpHTTPResponse(rsp, !tooLarge)
 			if err != nil {
 				log.Errorf("mitm-hijack marshal response to bytes failed: %s", err)
 				return nil
@@ -282,7 +268,7 @@ func (m *MITMServer) hijackResponseHandler(rsp *http.Response) error {
 	if m.httpFlowMirror != nil {
 		if len(responseBytes) <= 0 {
 			var err error
-			responseBytes, err = utils.HttpDumpWithBody(rsp, shouldHandleBody)
+			responseBytes, err = utils.HttpDumpWithBody(rsp, !tooLarge)
 			if err != nil {
 				log.Errorf("dump response mirror failed: %s", err)
 				return nil
