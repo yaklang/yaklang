@@ -16,7 +16,7 @@ import (
 	"testing"
 )
 
-func TestGRPCMUSTPASS_LARGE_RESPONSE_FOR_WEBFUZZER_NEGATIVE(t *testing.T) {
+func TestLARGEGRPCMUSTPASS_LARGE_RESPONSE_FOR_WEBFUZZER_NEGATIVE(t *testing.T) {
 	var port int
 	var ctx, cancel = context.WithCancel(utils.TimeoutContextSeconds(60))
 	defer cancel()
@@ -89,7 +89,7 @@ Host: ` + vulinboxAddr + "\r\n\r\n",
 	}
 }
 
-func TestGRPCMUSTPASS_LARGE_RESPONSE_FOR_WEBFUZZER_POSITIVE(t *testing.T) {
+func TestLARGEGRPCMUSTPASS_LARGE_RESPONSE_FOR_WEBFUZZER_POSITIVE(t *testing.T) {
 	var port int
 	var ctx, cancel = context.WithCancel(utils.TimeoutContextSeconds(60))
 	defer cancel()
@@ -143,7 +143,7 @@ Host: ` + vulinboxAddr + "\r\n\r\n",
 	t.Fatal("too-large-response not found(MaxBodySize is not right)")
 }
 
-func TestGRPCMUSTPASS_LARGE_RESPOSNE_NEGATIVE(t *testing.T) {
+func TestLARGEGRPCMUSTPASS_LARGE_RESPOSNE_NEGATIVE(t *testing.T) {
 	var port int
 	var ctx, cancel = context.WithCancel(utils.TimeoutContextSeconds(60))
 	defer cancel()
@@ -223,7 +223,7 @@ Host: ` + vulinboxAddr + "\r\n\r\n",
 	)
 }
 
-func TestGRPCMUSTPASS_LARGE_RESPOSNE(t *testing.T) {
+func TestLARGEGRPCMUSTPASS_LARGE_RESPOSNE(t *testing.T) {
 	var port int
 	var ctx, cancel = context.WithCancel(utils.TimeoutContextSeconds(60))
 	defer cancel()
