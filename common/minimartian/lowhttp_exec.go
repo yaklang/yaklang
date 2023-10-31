@@ -72,12 +72,14 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 			if ret := httpctx.GetResponseContentTypeFiltered(req); ret != nil {
 				if ret(value) {
 					// filtered by content-type
-					httpctx.SetMITMSkipFrontendFeedback(req, true)
 					httpctx.SetResponseHeaderCallback(req, func(response *http.Response, headerBytes []byte, bodyReader io.Reader) (io.Reader, error) {
+						httpctx.SetMITMSkipFrontendFeedback(req, true)
 						bwr.Write(headerBytes)
 						utils.FlushWriter(bwr)
-						bodyReader = io.TeeReader(bodyReader, bwr)
-						return bodyReader, nil
+						httpctx.SetResponseFinishedCallback(req, func() {
+							utils.FlushWriter(bwr)
+						})
+						return io.TeeReader(bodyReader, bwr), nil
 					})
 					return
 				}
