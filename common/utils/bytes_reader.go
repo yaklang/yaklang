@@ -401,6 +401,10 @@ func NewTriggerWriter(trigger uint64, h func(buffer io.ReadCloser)) *TriggerWrit
 	}
 }
 
+func (f *TriggerWriter) GetCount() int64 {
+	return int64(atomic.LoadUint64(&f.bytesCount))
+}
+
 func (f *TriggerWriter) Write(p []byte) (n int, err error) {
 	if f.trigger > 0 && atomic.AddUint64(&f.bytesCount, uint64(len(p))) > f.trigger {
 		f.once.Do(func() {

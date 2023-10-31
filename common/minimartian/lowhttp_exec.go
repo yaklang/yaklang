@@ -98,6 +98,7 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 					}()
 				})
 				httpctx.SetResponseFinishedCallback(req, func() {
+					httpctx.SetResponseTooLargeSize(req, writerCloser.GetCount())
 					writerCloser.Close()
 				})
 				return io.TeeReader(bodyReader, writerCloser), nil
@@ -109,6 +110,7 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 			if contentLength := codec.Atoi(value); contentLength > 0 && contentLength > p.GetMaxContentLength() && httpctx.GetMITMFrontendReadWriter(req) != nil {
 				// too large
 				httpctx.SetResponseTooLarge(req, true)
+				httpctx.SetResponseTooLargeSize(req, int64(contentLength))
 				httpctx.SetMITMSkipFrontendFeedback(req, true)
 				httpctx.SetResponseHeaderCallback(req, func(response *http.Response, headerBytes []byte, bodyReader io.Reader) (io.Reader, error) {
 					bwr.Write(headerBytes)
