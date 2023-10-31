@@ -16,6 +16,10 @@ type pipe struct {
 	rerr, werr error
 }
 
+func (p *pipe) BytesBuffer() *bytes.Buffer {
+	return p.buf
+}
+
 // A PipeReader is the read half of a pipe.
 type PipeReader struct {
 	*pipe
@@ -24,6 +28,14 @@ type PipeReader struct {
 // A PipeWriter is the write half of a pipe.
 type PipeWriter struct {
 	*pipe
+}
+
+func (p *PipeWriter) BytesBuffer() *bytes.Buffer {
+	return p.buf
+}
+
+func (p *PipeReader) BytesBuffer() *bytes.Buffer {
+	return p.buf
 }
 
 // NewBufPipe creates a synchronous pipe using buf as its initial contents. It can be

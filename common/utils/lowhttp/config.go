@@ -57,7 +57,9 @@ type LowhttpExecConfig struct {
 	DefaultBufferSize int
 
 	// MaxContentLength: too large content-length will be ignored(truncated)
-	MaxContentLength int
+	EnableMaxContentLength bool
+	MaxContentLength       int
+
 	// ResponseBodyMirrorWriter will be not effected by MaxContentLength
 	// response body will be TeeReader to ResponseBodyMirrorWriter
 	ResponseBodyMirrorWriter io.Writer
@@ -79,6 +81,11 @@ type LowhttpResponse struct {
 	FromPlugin             string
 	MultiResponse          bool
 	MultiResponseInstances []*http.Response
+
+	// if TooLarge, the database will drop some response data
+	TooLarge         bool
+	TooLargeLimit    int64
+	ResponseBodySize int64
 }
 
 func (l *LowhttpResponse) GetDurationFloat() float64 {
@@ -149,6 +156,7 @@ type LowhttpOpt func(o *LowhttpExecConfig)
 
 func WithMaxContentLength(m int) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
+		o.EnableMaxContentLength = m > 0
 		o.MaxContentLength = m
 	}
 }

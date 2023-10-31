@@ -621,6 +621,11 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		requestCount = 1
 	}
 
+	var maxBodySize = 5 * 1024 * 1024
+	if req.GetMaxBodySize() > 1024 {
+		maxBodySize = int(req.GetMaxBodySize())
+	}
+
 	fuzzerRequestSwg := utils.NewSizedWaitGroup(int(concurrent))
 	executeBatchRequestsWithParams := func(mergedParams map[string]any) (retErr error) {
 		defer func() {
@@ -657,6 +662,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_HookCodeCaller(yak.MutateHookCaller(req.GetHotPatchCode())),
 			mutate.WithPoolOpt_Source("webfuzzer"),
 			mutate.WithPoolOpt_RetryTimes(int(req.GetMaxRetryTimes())),
+			mutate.WithPoolOpt_MaxContentLength(maxBodySize),
 			mutate.WithPoolOpt_RetryInStatusCode(inStatusCode),
 			mutate.WithPoolOpt_RetryNotInStatusCode(notInStatusCode),
 			mutate.WithPoolOpt_RetryWaitTime(req.GetRetryWaitSeconds()),
@@ -774,9 +780,37 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			}
 
 			_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(result.ResponseRaw)
-			if len(body) > 2*1024*1024 {
-				body = body[:2*1024*1024]
-				body = append(body, []byte("...chunked by yakit web fuzzer")...)
+			var tooLarge bool
+			var tooLargeBodyFile string
+			var tooLargeHeaderFile string
+			if bodyLength := len(body); bodyLength > maxBodySize {
+				tooLarge = true
+				uid := uuid.NewV4().String()
+				suffix := fmt.Sprintf("%v_%v",
+					time.Now().Format(utils.DatetimePretty()),
+					uid,
+				)
+				bodyFp, _ := consts.TempFile(fmt.Sprintf("webfuzzer_large_body_%v.txt", suffix))
+				if bodyFp != nil {
+					bodyFp.Write(body)
+					bodyFp.Close()
+					tooLargeBodyFile = bodyFp.Name()
+				}
+
+				headerFp, _ := consts.TempFile(fmt.Sprintf("webfuzzer_large_header_%v.txt", suffix))
+				if headerFp != nil {
+					headerFp.Write(result.ResponseRaw)
+					headerFp.Close()
+					tooLargeHeaderFile = headerFp.Name()
+				}
+
+				if bodyLength > 5*1024*1024 {
+					var buf bytes.Buffer
+					buf.Write(body[:1024*1024])
+					buf.WriteString("...\n...\n...\n(response > 5M)\n...\n...\n...")
+					buf.Write(body[bodyLength-1024*1024:])
+					body = buf.Bytes()
+				}
 			}
 
 			if !req.GetNoFixContentLength() && (result.Request != nil && result.Request.ProtoMajor != 2) { // no fix for h2 rsp
@@ -786,21 +820,25 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 
 			if len(result.RequestRaw) > 1*1024*1024 {
 				result.RequestRaw = result.RequestRaw[:1*1024*1024]
-				result.RequestRaw = append(result.RequestRaw, []byte("...chunked by yakit web fuzzer")...)
+				result.RequestRaw = append(result.RequestRaw, []byte("...(request > 1M) chunked by yakit web fuzzer")...)
 			}
 
 			task.HTTPFlowSuccessCount++
 			var rsp = &ypb.FuzzerResponse{
-				Url:                   utils.EscapeInvalidUTF8Byte([]byte(result.Url)),
-				Method:                utils.EscapeInvalidUTF8Byte([]byte(result.Request.Method)),
-				ResponseRaw:           result.ResponseRaw,
-				GuessResponseEncoding: Chardet(result.ResponseRaw),
-				RequestRaw:            result.RequestRaw,
-				Payloads:              payloads,
-				IsHTTPS:               strings.HasPrefix(strings.ToLower(result.Url), "https://"),
-				ExtractedResults:      extractorResults,
-				MatchedByMatcher:      httpTPLmatchersResult,
-				HitColor:              req.GetHitColor(),
+				Url:                        utils.EscapeInvalidUTF8Byte([]byte(result.Url)),
+				Method:                     utils.EscapeInvalidUTF8Byte([]byte(result.Request.Method)),
+				ResponseRaw:                result.ResponseRaw,
+				GuessResponseEncoding:      Chardet(result.ResponseRaw),
+				RequestRaw:                 result.RequestRaw,
+				Payloads:                   payloads,
+				IsHTTPS:                    strings.HasPrefix(strings.ToLower(result.Url), "https://"),
+				ExtractedResults:           extractorResults,
+				MatchedByMatcher:           httpTPLmatchersResult,
+				HitColor:                   req.GetHitColor(),
+				IsTooLargeResponse:         tooLarge,
+				TooLargeResponseBodyFile:   tooLargeBodyFile,
+				TooLargeResponseHeaderFile: tooLargeHeaderFile,
+				DisableRenderStyles:        len(body) > 1024*1024*2,
 			}
 
 			redirectPacket := result.LowhttpResponse.RedirectRawPackets

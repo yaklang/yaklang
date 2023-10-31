@@ -10,6 +10,10 @@ func Atoi(i string) int {
 	return raw
 }
 
+func Itoa(i int) string {
+	return fmt.Sprint(i)
+}
+
 func Atof(i string) float64 {
 	raw, _ := strconv.ParseFloat(i, 64)
 	return raw
