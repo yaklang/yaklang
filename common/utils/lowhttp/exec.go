@@ -709,7 +709,7 @@ RECONNECT:
 					if len(restBytes) > 256 {
 						restBytes = restBytes[:256]
 					}
-					log.Errorf("unhandled rest data in connection: %#v ...", string(restBytes))
+					log.Warnf("unhandled rest data in connection: %#v ...", string(restBytes))
 				}
 			}
 		} else {

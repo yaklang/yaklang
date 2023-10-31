@@ -372,6 +372,14 @@ func SetResponseTooLarge(req *http.Request, b bool) {
 	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseTooLarge, b)
 }
 
+func SetResponseTooLargeSize(req *http.Request, size int64) {
+	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseMaxContentLength, size)
+}
+
+func GetResponseTooLargeSize(req *http.Request) int64 {
+	return int64(GetContextIntInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseMaxContentLength))
+}
+
 func GetRequestTooLarge(req *http.Request) bool {
 	return GetContextBoolInfoFromRequest(req, REQUEST_CONTEXT_KEY_RequestTooLarge)
 }
