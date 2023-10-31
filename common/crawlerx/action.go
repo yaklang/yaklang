@@ -106,6 +106,10 @@ func (starter *BrowserStarter) normalActionOnPage(page *rod.Page) error {
 	if err != nil {
 		return utils.Errorf(`do input error: %v`, err)
 	}
+	err = starter.extraInputElementsOperator(page)
+	if err != nil {
+		return utils.Errorf(`do extra input error: %v`, err)
+	}
 	for _, url := range urls {
 		if starter.banList.Exist(url) {
 			continue
@@ -133,6 +137,10 @@ func (starter *BrowserStarter) eventActionOnPage(page *rod.Page) error {
 	err := starter.doInput(originUrl, page)
 	if err != nil {
 		return utils.Errorf(`do input error: %v`, err)
+	}
+	err = starter.extraInputElementsOperator(page)
+	if err != nil {
+		return utils.Errorf(`do extra input error: %v`, err)
 	}
 	eventSelectors, err := starter.getEventElements(page)
 	if err != nil {
@@ -402,13 +410,7 @@ func (starter *BrowserStarter) generateInputElementsExploit() func(*rod.Element)
 		attribute, _ := getAttribute(element, "type")
 		switch attribute {
 		case "text", "password":
-			keywordStr := getAllKeywords(element)
-			for k, v := range starter.formFill {
-				if strings.Contains(keywordStr, k) {
-					return element.Input(v)
-				}
-			}
-			return element.Input("test")
+			return inputStr(element, starter.formFill, getAllKeywords(element))
 		case "file":
 			return starter.defaultUploadFile(element)
 		case "radio", "checkbox":
@@ -541,4 +543,65 @@ func (starter *BrowserStarter) defaultUploadFile(element *rod.Element) error {
 
 func testUploadFile(element *rod.Element, filePath string) error {
 	return element.SetFiles([]string{filePath})
+}
+
+func (starter *BrowserStarter) extraInputElementsOperator(page *rod.Page) error {
+	// textarea
+	textElements, err := page.Elements("textarea")
+	if err != nil {
+		return utils.Errorf("page get textarea elements error: %v", err)
+	}
+	for _, textElement := range textElements {
+		visible, err := textElement.Visible()
+		if err != nil {
+			return err
+		}
+		if !visible {
+			continue
+		}
+		keywordStr := getAllKeywords(textElement)
+		err = inputStr(textElement, starter.formFill, keywordStr)
+		if err != nil {
+			return utils.Errorf("input element %v error: %v", textElement, err)
+		}
+	}
+	// select
+	selectElements, err := page.Elements("select")
+	if err != nil {
+		return utils.Errorf("page get select elements error: %v", err)
+	}
+	for _, selectElement := range selectElements {
+		visible, err := selectElement.Visible()
+		if err != nil {
+			return err
+		}
+		if !visible {
+			continue
+		}
+		options, err := selectElement.Elements("option")
+		if err != nil {
+			return utils.Errorf("page get option elements error: %v", err)
+		}
+		optionsLength := len(options)
+		if optionsLength == 0 {
+			log.Debugf("select element %v get no options", selectElement)
+			continue
+		}
+		selectedOptionElement := options[optionsLength-1]
+		optionValue, _ := getAttribute(selectedOptionElement, "value")
+		err = selectElement.Select([]string{optionValue}, true, rod.SelectorTypeText)
+		if err != nil {
+			return utils.Errorf("%v select element %v error: %v", selectElement, optionValue, err)
+		}
+	}
+	return nil
+}
+
+func inputStr(element *rod.Element, dict map[string]string, keywordStr string) error {
+	for k, v := range dict {
+		if strings.Contains(keywordStr, k) {
+			return element.Input(v)
+		}
+	}
+	return element.Input("test")
 }
