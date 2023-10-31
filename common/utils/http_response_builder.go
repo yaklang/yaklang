@@ -4,14 +4,18 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -44,6 +48,28 @@ func ReadHTTPResponseFromBufioReader(reader io.Reader, req *http.Request) (*http
 	}
 	rsp.Request = req
 	return rsp, nil
+}
+
+type FileOpenerType func(s string) (*os.File, error)
+
+var (
+	tempFileOpener    FileOpenerType
+	constsTempFileDir = filepath.Join(GetHomeDirDefault("."), "yakit-projects", "temp")
+)
+
+func RegisterTempFileOpener(dialer FileOpenerType) {
+	tempFileOpener = dialer
+}
+
+func OpenTempFile(s string) (*os.File, error) {
+	if tempFileOpener != nil {
+		return tempFileOpener(s)
+	}
+
+	if !IsDir(constsTempFileDir) {
+		_ = os.MkdirAll(constsTempFileDir, 0755)
+	}
+	return os.OpenFile(filepath.Join(constsTempFileDir, s), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 }
 
 func ReadHTTPResponseFromBufioReaderConn(reader io.Reader, conn net.Conn, req *http.Request) (*http.Response, error) {
@@ -170,8 +196,10 @@ func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bo
 	}()
 
 	// handled body
-	var bodyRawBuf = new(bytes.Buffer)
+	var isTooLarge = httpctx.GetResponseTooLarge(req)
+	_ = isTooLarge
 
+	var bodyRawBuf = new(bytes.Buffer)
 	if fixContentLength {
 		// just for bytes condition
 		// by reader
@@ -236,7 +264,25 @@ func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bo
 		rsp.Body = io.NopCloser(bodyRawBuf)
 	}
 	if req != nil {
-		httpctx.SetBareResponseBytes(req, rawPacket.Bytes())
+		if httpctx.GetResponseTooLarge(req) {
+			httpctx.SetBareResponseBytes(req, headerBytes)
+			uid := ksuid.New().String()
+			suffix := fmt.Sprintf(`%v_%v`, time.Now().Format(DatetimePretty()), uid)
+			fp, _ := OpenTempFile(fmt.Sprintf("large-response-header-%v.txt", suffix))
+			if fp != nil {
+				fp.Write(headerBytes)
+				fp.Close()
+				httpctx.SetResponseTooLargeHeaderFile(req, fp.Name())
+			}
+			fp, _ = OpenTempFile(fmt.Sprintf("large-response-body-%v.txt", suffix))
+			if fp != nil {
+				fp.Write(bodyRawBuf.Bytes())
+				fp.Close()
+				httpctx.SetResponseTooLargeBodyFile(req, fp.Name())
+			}
+		} else {
+			httpctx.SetBareResponseBytes(req, rawPacket.Bytes())
+		}
 	}
 	return rsp, nil
 }

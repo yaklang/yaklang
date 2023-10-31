@@ -257,10 +257,28 @@ const (
 	REQUEST_CONTEXT_KEY_MitmFrontendReadWriter       = "mitmFrontendReadWriter"
 	REQUEST_CONTEXT_KEY_MitmSkipFrontendFeedback     = "mitmSkipFrontendFeedback"
 	REQUEST_CONTEXT_KEY_ResponseFinishedCallback     = "responseFinishedCallback"
+	REQUEST_CONTEXT_KEY_ResponseTooLargeHeaderFile   = "ResponseTooLargeHeaderFile"
+	REQUEST_CONTEXT_KEY_ResponseTooLargeBodyFile     = "ResponseTooLargeBodyFile"
 
 	// matched mitm rules
 	REQUEST_CONTEXT_KEY_MatchedRules = "MatchedRules"
 )
+
+func SetResponseTooLargeHeaderFile(req *http.Request, b string) {
+	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseTooLargeHeaderFile, b)
+}
+
+func GetResponseTooLargeHeaderFile(req *http.Request) string {
+	return GetContextStringInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseTooLargeHeaderFile)
+}
+
+func GetResponseTooLargeBodyFile(req *http.Request) string {
+	return GetContextStringInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseTooLargeBodyFile)
+}
+
+func SetResponseTooLargeBodyFile(req *http.Request, b string) {
+	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseTooLargeBodyFile, b)
+}
 
 func SetResponseContentTypeFiltered(req *http.Request, matcher func(contentType string) bool) {
 	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseContentTypeFiltered, matcher)
