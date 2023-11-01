@@ -57,7 +57,7 @@ rsp, req = poc.HTTP(target, poc.noFixContentLength(true))~
 	t.Logf("Fetch RESPONSE COUNT: %v", len(rsps))
 }
 
-func TestGRPCMUSTPASS_Smuggle_Pipeline_Negative_Chunked(t *testing.T) {
+func TestGRPCMUSTPASS_Pipeline_Negative_Chunked(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	port := utils.GetRandomAvailableTCPPort()
 	target := `POST / HTTP/1.1
