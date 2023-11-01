@@ -271,6 +271,7 @@ func (o *GitHackObject) addIndexTask(ch chan string, r *git.Repository, repoPath
 	i, err := r.Storer.Index()
 	if err != nil {
 		log.Errorf("get git repo index error: %v", err)
+		return
 	}
 
 	// tree
@@ -703,7 +704,7 @@ func (o *GitHackObject) request(method, baseURL string, paths ...string) (*http.
 	if err != nil {
 		return nil, nil, utils.Wrap(err, "parse URL to raw http request error")
 	}
-	opts := make([]lowhttp.LowhttpOpt, len(o.httpOpts), len(o.httpOpts)+1)
+	opts := make([]lowhttp.LowhttpOpt, len(o.httpOpts), len(o.httpOpts)+2)
 	copy(opts, o.httpOpts)
 	opts = append(opts, lowhttp.WithPacketBytes(raw))
 
