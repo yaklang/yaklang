@@ -2,13 +2,14 @@ package yakgit
 
 import (
 	"context"
+	"os"
+
 	"github.com/go-git/go-git/v5"
 	gitClient "github.com/go-git/go-git/v5/plumbing/transport/client"
 	gitHttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
-	"os"
 )
 
 func init() {
@@ -43,7 +44,7 @@ func clone(u string, localPath string, opt ...Option) error {
 		Progress:          os.Stdout,
 	})
 	if err != nil {
-		return utils.Errorf("git clone: %v to %v failed: %s", u, localPath)
+		return utils.Wrapf(err, "git clone: %v to %v failed", u, localPath)
 	}
 	_ = respos
 	h, err := respos.Head()
