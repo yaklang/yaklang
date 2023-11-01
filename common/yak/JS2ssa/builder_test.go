@@ -3,7 +3,11 @@ package js2ssa
 import (
 	"fmt"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
+
+func none(*ssa.FunctionBuilder) {}
 
 func TestDemo1(m *testing.T) {
 	prog := ParseSSA(`
@@ -11,7 +15,7 @@ func TestDemo1(m *testing.T) {
 		return a + b;
 	}
 	sum = test(1,2);
-	`)
+	`, none)
 	prog.Show()
 	fmt.Println(prog.GetErrors())
 }
@@ -25,7 +29,7 @@ func TestDemo2(t *testing.T) {
 
 	}finally{
 		c = 3;
-	}`)
+	}`, none)
 	prog.Show()
 }
 
@@ -42,7 +46,7 @@ switch (fruit) {
   default:
     print("未知水果");
 }
-	`)
+	`, none)
 
 	prog.Show()
 }
@@ -82,7 +86,7 @@ function b(c) {
     c.location.href = "www.baidu.com"
 }
 b(a)
-	`)
+	`, none)
 	prog.Show()
 }
 
@@ -95,7 +99,7 @@ func TestBreak(t *testing.T) {
 		a = 1;
 		break label1;
 	}
-	`)
+	`, none)
 
 	prog.ShowWithSource()
 }
@@ -104,6 +108,6 @@ func TestMain(t *testing.T) {
 	prog := ParseSSA(`
 	var b = (()=>{return window.location.hostname + "/app/"})()
 	window.location.href = b + "/login.html?ts=";
-	`)
+	`, none)
 	prog.Show()
 }

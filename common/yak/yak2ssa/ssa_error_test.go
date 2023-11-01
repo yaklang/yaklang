@@ -20,16 +20,10 @@ type TestCase struct {
 }
 
 func CheckTestCase(t *testing.T, tc TestCase) {
-	opts := make([]Option, 0)
-	if tc.ExternValue != nil {
-		opts = append(opts, WithExternValue(tc.ExternValue))
-	}
-	if tc.ExternLib != nil {
-		for name, table := range tc.ExternLib {
-			opts = append(opts, WithExternLib(name, table))
-		}
-	}
-	prog := ParseSSA(tc.code, opts...)
+	prog := ParseSSA(tc.code, func(fb *ssa.FunctionBuilder) {
+		fb.WithExternValue(tc.ExternValue)
+		fb.WithExternLib(tc.ExternLib)
+	})
 	// prog.ShowWithSource()
 	// fmt.Println(prog.GetErrors().String())
 	errs := lo.Map(prog.GetErrors(), func(e *ssa.SSAError, _ int) string { return e.Message })
