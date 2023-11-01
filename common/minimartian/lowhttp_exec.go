@@ -38,11 +38,30 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 
 	var isHttps = httpctx.GetRequestHTTPS(req)
 
+	newUrl, err := lowhttp.ExtractURLFromHTTPRequest(req, isHttps)
+	if err != nil {
+		return nil, err
+	}
+
+	host, port, err := utils.ParseStringToHostPort(newUrl.String())
+	if err != nil {
+		return nil, err
+	}
+
+	cacheKey := utils.HostPort(host, port)
+
+	var isH2 bool
+
+	if cached, ok := p.h2Cache.Load(cacheKey); ok {
+		isH2 = cached.(bool)
+	}
+
 	var isGmTLS = p.gmTLS && isHttps
 
 	opts := append(
 		p.lowhttpConfig,
 		lowhttp.WithRequest(reqBytes),
+		lowhttp.WithHttp2(isH2),
 		lowhttp.WithHttps(isHttps),
 		lowhttp.WithGmTLS(isGmTLS),
 		lowhttp.WithConnPool(true),
