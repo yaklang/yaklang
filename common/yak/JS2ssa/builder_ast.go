@@ -610,6 +610,10 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 			return b.buildObjectLiteral(expr)
 		}
 	case *JS.ParenthesizedExpressionContext:
+		if expr, ok := s.ExpressionSequence().(*JS.ExpressionSequenceContext); ok {
+			exprs := b.buildExpressionSequence(expr)
+			return exprs[len(exprs)-1]
+		}
 	default:
 		log.Warnf("not support expression: %s", stmt.GetText())
 		return nil
@@ -1574,7 +1578,6 @@ func (b *astbuilder) buildLabelledStatement(stmt *JS.LabelledStatementContext) {
 
 	// unsealed block
 	block := b.NewBasicBlockUnSealed(text)
-	b.AddUnsealedBlock(block)
 	b.AddLabel(text, block)
 	// to block
 	b.EmitJump(block)
@@ -1583,6 +1586,7 @@ func (b *astbuilder) buildLabelledStatement(stmt *JS.LabelledStatementContext) {
 		b.buildStatement(s)
 	}
 	b.DeleteLabel(text)
+	block.Sealed()
 	// // to done
 	// done := b.NewBasicBlock("done")
 	// b.EmitJump(done)
