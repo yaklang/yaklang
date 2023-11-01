@@ -7,9 +7,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 )
 
-
-
-
 type astbuilder struct {
 	*ssa.FunctionBuilder
 }
@@ -18,7 +15,7 @@ type builder struct {
 	ast  *yak.ProgramContext
 	prog *ssa.Program
 	// symbolTable map[string]any
-	c *config
+	callback func(*ssa.FunctionBuilder)
 }
 
 // build implements ssa.builder.
@@ -27,8 +24,9 @@ func (b *builder) Build() {
 	b.prog.AddPackage(pkg)
 	main := pkg.NewFunction("yak-main")
 	funcBuilder := ssa.NewBuilder(main, nil)
-	funcBuilder.WithExternValue(b.c.externValue)
-	funcBuilder.WithExternLib(b.c.externLib)
+	if b.callback != nil {
+		b.callback(funcBuilder)
+	}
 
 	astbuilder := astbuilder{
 		FunctionBuilder: funcBuilder,
@@ -39,51 +37,7 @@ func (b *builder) Build() {
 
 var _ (ssa.Builder) = (*builder)(nil)
 
-type config struct {
-	analyzeOpt []ssa4analyze.Option
-	typeMethod map[string]any
-
-	externValue map[string]any
-	externLib   map[string]map[string]any
-}
-
-func defaultConfig() *config {
-	return &config{
-		analyzeOpt:  make([]ssa4analyze.Option, 0),
-		typeMethod:  nil,
-		externValue: nil,
-		externLib:   make(map[string]map[string]any),
-	}
-
-}
-
-type Option func(*config)
-
-func WithAnalyzeOpt(opt ...ssa4analyze.Option) Option {
-	return func(c *config) {
-		c.analyzeOpt = append(c.analyzeOpt, opt...)
-	}
-}
-
-func WithExternValue(table map[string]any) Option {
-	return func(c *config) {
-		c.externValue = table
-	}
-}
-
-func WithExternLib(libName string, table map[string]any) Option {
-	return func(c *config) {
-		c.externLib[libName] = table
-	}
-}
-
-func WithTypeMethod(table map[string]any) Option {
-	return func(c *config) {
-		c.typeMethod = table
-	}
-}
-
-func ParseSSA(src string, opt ...Option) (prog *ssa.Program) {
+func ParseSSA(src string, f func(*ssa.FunctionBuilder)) (prog *ssa.Program) {
 	defer func() {
 		if r := recover(); r != nil {
 			// fmt.Println("\n\n\n!!!!!!!\n\n!!!!!\n\nRecovered in parseSSA", r)
@@ -92,11 +46,6 @@ func ParseSSA(src string, opt ...Option) (prog *ssa.Program) {
 		}
 	}()
 
-	c := defaultConfig()
-	for _, f := range opt {
-		f(c)
-	}
-
 	inputStream := antlr.NewInputStream(src)
 	lex := yak.NewYaklangLexer(inputStream)
 	tokenStream := antlr.NewCommonTokenStream(lex, antlr.TokenDefaultChannel)
@@ -104,14 +53,13 @@ func ParseSSA(src string, opt ...Option) (prog *ssa.Program) {
 	// yak.NewProgramContext(ast, )
 	prog = ssa.NewProgram()
 	builder := &builder{
-		ast:  ast,
-		prog: prog,
-		c:    c,
+		ast:      ast,
+		prog:     prog,
+		callback: f,
 	}
 	prog.Build(builder)
 	ssa4analyze.NewAnalyzerGroup(
 		prog,
-		c.analyzeOpt...,
 	).Run()
 	return prog
 }
