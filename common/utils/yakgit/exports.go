@@ -26,4 +26,9 @@ var Exports = map[string]any{
 	"filterCommit":    WithFilterGitCommit,
 	"handleReference": WithHandleGitReference,
 	"filterReference": WithFilterGitReference,
+
+	// githack
+	"threads":               WithThreads,
+	"useLocalGitExecutable": WithUseLocalGitExecutable,
+	"httpOpts":              WithHTTPOptions,
 }
