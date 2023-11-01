@@ -1,6 +1,8 @@
 package ssa
 
-import "github.com/samber/lo"
+import (
+	"github.com/samber/lo"
+)
 
 type InspectVariableResult struct {
 	VariableName   string
@@ -65,4 +67,16 @@ func (f *Function) InspectVariable(varName string) *InspectVariableResult {
 	result.ProbablyTypes = probablyTypes
 	result.ProbablyValues = probablyValue
 	return result
+}
+
+func (f *Function) GetValuesByName(name string) []Node {
+	ret := make([]Node, 0)
+	if table, ok := f.symbolTable[name]; ok {
+		for _, v := range table {
+			for _, v := range v {
+				ret = append(ret, v)
+			}
+		}
+	}
+	return lo.Uniq(ret)
 }
