@@ -83,6 +83,8 @@ type Proxy struct {
 	lowhttpConfig []lowhttp.LowhttpOpt
 
 	maxContentLength int
+
+	h2Cache sync.Map
 }
 
 func (p *Proxy) saveCache(r *http.Request, ctx *Context) {

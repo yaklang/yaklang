@@ -402,23 +402,33 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, timer *time.Timer, con
 				proxyStr = p.proxyURL.String()
 			}
 
-			// TODO: should connect every connection?
-			netConn, _ := netx.DialX(
-				utils.HostPort(parsedConnectedToHost, parsedConnectedToPort),
-				netx.DialX_WithTimeout(10*time.Second),
-				netx.DialX_WithProxy(proxyStr),
-				netx.DialX_WithForceProxy(proxyStr != ""),
-				netx.DialX_WithTLSNextProto("h2"),
-				netx.DialX_WithTLS(true),
-			)
-			if netConn != nil {
-				switch ret := netConn.(type) {
-				case *tls.Conn:
-					if ret.ConnectionState().NegotiatedProtocol == "h2" {
-						serverUseH2 = true
+			// Check the cache first.
+			cacheKey := utils.HostPort(parsedConnectedToHost, parsedConnectedToPort)
+			if cached, ok := p.h2Cache.Load(cacheKey); ok {
+				log.Infof("use cached h2 %v", cacheKey)
+				serverUseH2 = cached.(bool)
+			} else {
+				// TODO: should connect every connection?
+				netConn, _ := netx.DialX(
+					cacheKey,
+					netx.DialX_WithTimeout(10*time.Second),
+					netx.DialX_WithProxy(proxyStr),
+					netx.DialX_WithForceProxy(proxyStr != ""),
+					netx.DialX_WithTLSNextProto("h2"),
+					netx.DialX_WithTLS(true),
+				)
+				if netConn != nil {
+					switch ret := netConn.(type) {
+					case *tls.Conn:
+						if ret.ConnectionState().NegotiatedProtocol == "h2" {
+							serverUseH2 = true
+						}
 					}
+					netConn.Close()
 				}
-				netConn.Close()
+
+				// Store the result in the cache.
+				p.h2Cache.Store(cacheKey, serverUseH2)
 			}
 		}
 
