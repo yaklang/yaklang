@@ -9,16 +9,18 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"github.com/pkg/errors"
 	"io"
 	"io/ioutil"
 	"log"
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 func PathExists(path string) (bool, error) {
@@ -133,6 +135,26 @@ func GetFirstExistedExecutablePath(paths ...string) string {
 	}
 
 	return r
+}
+
+func GetExecutableFromEnv(cmd string) (string, error) {
+	path, ok := os.LookupEnv("PATH")
+	if !ok {
+		return "", Errorf("PATH environment variable not found")
+	}
+	// windows 判断，补上.exe
+	if runtime.GOOS == "windows" {
+		cmd += ".exe"
+	}
+
+	for _, dir := range filepath.SplitList(path) {
+		exePath := filepath.Join(dir, cmd)
+		if _, err := os.Stat(exePath); err == nil {
+			return exePath, nil
+		}
+	}
+
+	return "", Errorf("command %s not found in PATH", cmd)
 }
 
 func SaveFile(raw interface{}, filePath string) error {

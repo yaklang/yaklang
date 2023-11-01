@@ -2,10 +2,12 @@ package yakgit
 
 import (
 	"context"
+
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	gitHttp "github.com/go-git/go-git/v5/plumbing/transport/http"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 )
 
 type config struct {
@@ -29,6 +31,11 @@ type config struct {
 	CheckoutCreate bool
 	CheckoutForce  bool
 	CheckoutKeep   bool
+
+	// GitHack
+	Threads               int
+	UseLocalGitExecutable bool
+	HTTPOptions           []yaklib.PocConfig
 
 	// handler
 	HandleGitReference func(r *plumbing.Reference) error
@@ -181,6 +188,27 @@ func WithUsernamePassword(username, password string) Option {
 	return func(c *config) error {
 		c.Username = username
 		c.Password = password
+		return nil
+	}
+}
+
+func WithThreads(threads int) Option {
+	return func(c *config) error {
+		c.Threads = threads
+		return nil
+	}
+}
+
+func WithUseLocalGitExecutable(b bool) Option {
+	return func(c *config) error {
+		c.UseLocalGitExecutable = b
+		return nil
+	}
+}
+
+func WithHTTPOptions(opts ...yaklib.PocConfig) Option {
+	return func(c *config) error {
+		c.HTTPOptions = opts
 		return nil
 	}
 }
