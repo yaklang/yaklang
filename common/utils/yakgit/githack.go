@@ -103,8 +103,6 @@ func GitHack(remoteRepoURL string, localPath string, opts ...Option) (finalErr e
 			return err
 		}
 	}
-	o := NewGitHackObject(c)
-
 	if !utils.IsHttpOrHttpsUrl(remoteRepoURL) {
 		return utils.Errorf("remoteRepoURL must be http or https url: %s", remoteRepoURL)
 	}
@@ -118,18 +116,28 @@ func GitHack(remoteRepoURL string, localPath string, opts ...Option) (finalErr e
 	if err != nil {
 		return utils.Wrap(err, "make temp dir error")
 	}
+	o := NewGitHackObject(remoteRepoURL, tempDirPath, c)
+	remoteRepoURL = o.remoteRepoURL
 
 	log.Debugf("download temp git repo to %s", tempDirPath)
 
-	headContent, err := o.checkGitHead(remoteRepoURL, tempDirPath)
+	// 检查.git/HEAD，由于后续使用其响应，所以我们先将其保存
+	headContent, err := o.checkGitHead()
 	if err != nil {
 		return utils.Wrap(err, "check git head error")
 	}
 
+	// 判断是否存在目录遍历漏洞
 	canDirectoryTraversal := true
-	if err := o.checkDirectoryTraversal(remoteRepoURL); err != nil {
+	if err := o.checkDirectoryTraversal(); err != nil {
 		log.Debugf("%v", err)
 		canDirectoryTraversal = false
+	}
+
+	fakeOKContent, err := o.checkFakeOK()
+	if len(fakeOKContent) > 0 {
+		o.isFakeOK = true
+		o.fakeOKContent = fakeOKContent
 	}
 
 	// 添加常用分支
@@ -138,16 +146,14 @@ func GitHack(remoteRepoURL string, localPath string, opts ...Option) (finalErr e
 	// 解析HEAD得到当前分支
 	branches = append(branches, o.parseHeadBranch(headContent)...)
 	// 解析logs/HEAD得到分支
-	logsHeadContent, err := o.checkGitLogHead(remoteRepoURL, tempDirPath)
+	logsHeadContent, err := o.checkGitLogHead()
 	if err == nil {
 		branches = append(branches, o.parseLogsHeadBranch(logsHeadContent)...)
 	}
-
 	branches = lo.Uniq(branches)
 	// 扩展默认的git文件路径
 	defaultGitFiles := make([]string, len(DEFAULT_GIT_FILES))
 	copy(defaultGitFiles, DEFAULT_GIT_FILES)
-
 	for _, expand := range EXPAND_BRANCH_NAME_PATH {
 		for _, branch := range branches {
 			fileURL, err := utils.UrlJoin(remoteRepoURL, expand, branch)
@@ -169,62 +175,62 @@ func GitHack(remoteRepoURL string, localPath string, opts ...Option) (finalErr e
 
 	for i := 0; i < c.Threads; i++ {
 		wg.Add(1)
-		go o.consumeTask(wg, taskwg, ch, tempDirPath, remoteRepoURL)
+		go o.consumeTask(wg, taskwg, ch)
 	}
 
 	if canDirectoryTraversal {
-		o.addTaskDir(ch, remoteRepoURL, ".git")
+		o.addTaskDir(ch, ".git")
 		close(ch)
 	} else {
 		// pack
 		log.Debugf("[githack] pack files")
-		packContent, err := o.checkGitPack(remoteRepoURL, tempDirPath)
+		packContent, err := o.checkGitPack()
 		if err == nil {
-			o.addPackTask(ch, taskwg, repo, packContent, tempDirPath, remoteRepoURL)
+			o.addPackTask(ch, taskwg, repo, packContent, tempDirPath)
 		}
 		// basic
 		log.Debugf("[githack] basic files")
-		o.addBasicTask(ch, remoteRepoURL, defaultGitFiles)
+		o.addBasicTask(ch, defaultGitFiles)
 		// HEAD
 		log.Debugf("[githack] head files")
-		o.addHeadTask(ch, headContent, tempDirPath, remoteRepoURL)
+		o.addHeadTask(ch, headContent)
 		// LOGS HEAD
 		log.Debugf("[githack] log head files")
-		o.addHashParsedTask(ch, headContent, remoteRepoURL)
+		o.addHashParsedTask(ch, headContent)
 		// index
 		log.Debugf("[githack] index files")
-		_, err = o.checkGitIndex(remoteRepoURL, tempDirPath)
+		_, err = o.checkGitIndex()
 		if err == nil {
-			o.addIndexTask(ch, repo, tempDirPath, remoteRepoURL)
+			o.addIndexTask(ch, repo)
 		}
 		// stash
 		log.Debugf("[githack] stash files")
-		stashContent, err := o.checkGitStash(remoteRepoURL, tempDirPath)
+		stashContent, err := o.checkGitStash()
 		if err == nil {
-			o.addHashParsedTask(ch, stashContent, remoteRepoURL)
+			o.addHashParsedTask(ch, stashContent)
 		}
 		// COMMIT
 		taskwg.Wait()
 		log.Debugf("[githack] commit")
-		o.addCommitTask(ch, repo, remoteRepoURL)
+		o.addCommitTask(ch, repo)
 		// tree
 		taskwg.Wait()
 		log.Debugf("[githack] tree")
-		o.addTreeTask(ch, repo, remoteRepoURL)
+		o.addTreeTask(ch, repo)
 		// fsck
 		if c.UseLocalGitExecutable {
 			taskwg.Wait() // wait until other task done
 			log.Debugf("[githack] fsck if have git executable")
 			command, err := utils.GetExecutableFromEnv("git")
 			if err == nil {
-				o.addFsckTask(ch, taskwg, command, tempDirPath, remoteRepoURL)
+				o.addFsckTask(ch, taskwg, command)
 			}
 		}
 		close(ch)
 	}
 
 	wg.Wait()
-	if err = o.checkoutLastCommit(repo, tempDirPath); err != nil {
+	if err = o.checkoutLastCommit(repo); err != nil {
 		return utils.Wrap(err, "checkout last commit error")
 	}
 
@@ -236,19 +242,39 @@ func GitHack(remoteRepoURL string, localPath string, opts ...Option) (finalErr e
 }
 
 type GitHackObject struct {
-	config   *config
-	cache    map[string]struct{} // URL cache
-	mutex    *sync.Mutex
-	httpOpts []lowhttp.LowhttpOpt
+	remoteRepoURL string // 存在漏洞的网址
+	tempDirPath   string // 临时目录
+
+	config   *config              // git config
+	cache    map[string]struct{}  // URL cache
+	mutex    *sync.Mutex          // cache mutex
+	httpOpts []lowhttp.LowhttpOpt // http config
+
+	isFakeOK      bool   // 网站是否存在虚假的200响应
+	fakeOKContent []byte // 虚假的200响应的内容
 }
 
-func NewGitHackObject(gitConfig *config) *GitHackObject {
+func NewGitHackObject(remoteRepoURL, tempDirPath string, gitConfig *config) *GitHackObject {
 	c := yaklib.NewDefaultPoCConfig()
 	for _, o := range gitConfig.HTTPOptions {
 		o(c)
 	}
 
-	return &GitHackObject{config: gitConfig, cache: make(map[string]struct{}), mutex: &sync.Mutex{}, httpOpts: c.ToLowhttpOptions()}
+	// 处理 URL 中包含 .git 或者.git/的情况
+	if strings.HasSuffix(remoteRepoURL, ".git") {
+		remoteRepoURL = remoteRepoURL[:len(remoteRepoURL)-4]
+	} else if strings.HasSuffix(remoteRepoURL, ".git/") {
+		remoteRepoURL = remoteRepoURL[:len(remoteRepoURL)-5]
+	}
+
+	return &GitHackObject{
+		remoteRepoURL: remoteRepoURL,
+		tempDirPath:   tempDirPath,
+		config:        gitConfig,
+		cache:         make(map[string]struct{}),
+		mutex:         &sync.Mutex{},
+		httpOpts:      c.ToLowhttpOptions(),
+	}
 }
 
 func (o *GitHackObject) addTask(ch chan string, taskURL ...string) {
@@ -266,7 +292,9 @@ func (o *GitHackObject) addTask(ch chan string, taskURL ...string) {
 	}
 }
 
-func (o *GitHackObject) addIndexTask(ch chan string, r *git.Repository, repoPath, remoteRepoURL string) {
+func (o *GitHackObject) addIndexTask(ch chan string, r *git.Repository) {
+	remoteRepoURL := o.remoteRepoURL
+
 	i, err := r.Storer.Index()
 	if err != nil {
 		log.Errorf("get git repo index error: %v", err)
@@ -290,7 +318,8 @@ func (o *GitHackObject) addIndexTask(ch chan string, r *git.Repository, repoPath
 	o.addTask(ch, taskURLs...)
 }
 
-func (o *GitHackObject) addPackTask(ch chan string, taskwg *sync.WaitGroup, r *git.Repository, packsContent []byte, repoPath, remoteRepoURL string) {
+func (o *GitHackObject) addPackTask(ch chan string, taskwg *sync.WaitGroup, r *git.Repository, packsContent []byte, repoPath string) {
+	remoteRepoURL := o.remoteRepoURL
 	packHashes := PACK_REGEX.FindAllString(utils.UnsafeBytesToString(packsContent), -1)
 	taskURLs := make([]string, 0, len(packHashes)*2)
 	for _, hash := range packHashes {
@@ -342,7 +371,8 @@ func (o *GitHackObject) addPackTask(ch chan string, taskwg *sync.WaitGroup, r *g
 
 }
 
-func (o *GitHackObject) addBasicTask(ch chan string, remoteRepoURL string, defaultGitFiles []string) {
+func (o *GitHackObject) addBasicTask(ch chan string, defaultGitFiles []string) {
+	remoteRepoURL := o.remoteRepoURL
 	// DEFAULT_GIT_FILES
 	taskURLs := lo.FilterMap(defaultGitFiles, func(taskURL string, _ int) (string, bool) {
 		taskURL, err := utils.UrlJoin(remoteRepoURL, taskURL)
@@ -364,13 +394,14 @@ func (o *GitHackObject) addBasicTask(ch chan string, remoteRepoURL string, defau
 	o.addTask(ch, taskURLs...)
 }
 
-func (o *GitHackObject) addHeadTask(ch chan string, content []byte, repoPath string, remoteRepoURL string) {
-	cOntentString := utils.UnsafeBytesToString(content)
-	for _, line := range strings.Split(strings.ReplaceAll(cOntentString, "\r", ""), "\n") {
+func (o *GitHackObject) addHeadTask(ch chan string, content []byte) {
+	tempDirPath := o.tempDirPath
+	contentString := utils.UnsafeBytesToString(content)
+	for _, line := range strings.Split(strings.ReplaceAll(contentString, "\r", ""), "\n") {
 		// 解析HEAD中每个ref
 		if strings.HasPrefix(line, "ref: ") {
 			refPath := strings.TrimSpace(strings.Split(line, "ref: ")[1])
-			fullRefPath := filepath.Join(repoPath, ".git", "logs", refPath)
+			fullRefPath := filepath.Join(tempDirPath, ".git", "logs", refPath)
 			// 文件不存在则跳过
 			if ok, err := utils.PathExists(fullRefPath); !ok || err != nil {
 				continue
@@ -379,13 +410,14 @@ func (o *GitHackObject) addHeadTask(ch chan string, content []byte, repoPath str
 				log.Debugf("read file[%s] error: %v", fullRefPath, err)
 				continue
 			} else {
-				o.addHashParsedTask(ch, content, remoteRepoURL)
+				o.addHashParsedTask(ch, content)
 			}
 		}
 	}
 }
 
-func (o *GitHackObject) addHashParsedTask(ch chan string, content []byte, remoteRepoURL string) int {
+func (o *GitHackObject) addHashParsedTask(ch chan string, content []byte) int {
+	remoteRepoURL := o.remoteRepoURL
 	hashes := HASH_REGEX.FindAllString(utils.UnsafeBytesToString(content), -1)
 	taskURLs := lo.FilterMap(hashes, func(hash string, _ int) (string, bool) {
 		taskURL, err := o.getHashTask(hash, remoteRepoURL)
@@ -398,19 +430,22 @@ func (o *GitHackObject) addHashParsedTask(ch chan string, content []byte, remote
 	return len(taskURLs)
 }
 
-func (o *GitHackObject) addFsckTask(ch chan string, taskwg *sync.WaitGroup, command string, repoPath string, remoteRepoURL string) {
+func (o *GitHackObject) addFsckTask(ch chan string, taskwg *sync.WaitGroup, command string) {
+
 	// run git fsck in repoPath until no error
 	taskNum, maxNum := 1, 10
 	for taskNum > 0 && maxNum > 0 {
 		cmd := exec.Command(command, "fsck", "--full")
-		cmd.Dir = repoPath
+		cmd.Dir = o.tempDirPath
 		output, _ := cmd.CombinedOutput()
-		taskNum = o.addHashParsedTask(ch, output, remoteRepoURL)
+		taskNum = o.addHashParsedTask(ch, output)
 		maxNum--
 	}
 }
 
-func (o *GitHackObject) addCommitTask(ch chan string, r *git.Repository, remoteRepoURL string) {
+func (o *GitHackObject) addCommitTask(ch chan string, r *git.Repository) {
+	remoteRepoURL := o.remoteRepoURL
+
 	refs, err := r.References()
 	if err != nil {
 		log.Errorf("get references failed: %s", err)
@@ -441,7 +476,9 @@ func (o *GitHackObject) addCommitTask(ch chan string, r *git.Repository, remoteR
 	})
 }
 
-func (o *GitHackObject) addTreeTask(ch chan string, r *git.Repository, remoteRepoURL string) {
+func (o *GitHackObject) addTreeTask(ch chan string, r *git.Repository) {
+	remoteRepoURL := o.remoteRepoURL
+
 	treeIter, err := r.TreeObjects()
 	if err != nil {
 		log.Errorf("get git repo trees failed: %s", err)
@@ -460,10 +497,11 @@ func (o *GitHackObject) addTreeTask(ch chan string, r *git.Repository, remoteRep
 	})
 }
 
-func (o *GitHackObject) addTaskDir(ch chan string, remoteRepoURL string, paths ...string) {
+func (o *GitHackObject) addTaskDir(ch chan string, paths ...string) {
 	var (
-		baseURL string = remoteRepoURL
-		err     error
+		remoteRepoURL string = o.remoteRepoURL
+		baseURL       string = o.remoteRepoURL
+		err           error
 	)
 
 	if len(paths) > 0 {
@@ -505,7 +543,9 @@ func (o *GitHackObject) addTaskDir(ch chan string, remoteRepoURL string, paths .
 	})
 }
 
-func (o *GitHackObject) consumeTask(wg, taskwg *sync.WaitGroup, ch chan string, tempDirPath, remoteRepoURL string) {
+func (o *GitHackObject) consumeTask(wg, taskwg *sync.WaitGroup, ch chan string) {
+	tempDirPath := o.tempDirPath
+
 	defer wg.Done()
 	for taskURL := range ch {
 		taskwg.Add(1)
@@ -524,21 +564,26 @@ func (o *GitHackObject) consumeTask(wg, taskwg *sync.WaitGroup, ch chan string, 
 			continue
 		}
 
-		if rsp.StatusCode != 200 {
+		if rsp.StatusCode != 200 || len(body) == 0 {
 			taskwg.Done()
 			continue
 		}
+		if o.isFakeOK && utils.CalcSimilarity(o.fakeOKContent, body) > 0.85 {
+			log.Debugf("met fake OK response, skip: %s", taskURL)
+			taskwg.Done()
+			continue
+		}
+
 		urlPath := u.Path
 		gitIndex := strings.Index(urlPath, ".git/")
 		if gitIndex >= 0 {
 			urlPath = urlPath[gitIndex:]
 		}
-
 		savePath := filepath.Join(tempDirPath, urlPath)
 		if err := saveToFile(savePath, body); err != nil {
 			log.Debugf("save file[%s] error: %v", savePath, err)
 		}
-		go o.addHashParsedTask(ch, body, remoteRepoURL)
+		go o.addHashParsedTask(ch, body)
 		taskwg.Done()
 	}
 }
@@ -589,7 +634,7 @@ func (o *GitHackObject) parseLogsHeadBranch(content []byte) []string {
 	return result
 }
 
-func (o *GitHackObject) checkoutLastCommit(r *git.Repository, RepoPath string) error {
+func (o *GitHackObject) checkoutLastCommit(r *git.Repository) error {
 	// 获取工作树
 	w, err := r.Worktree()
 	if err != nil {
@@ -620,7 +665,24 @@ func (o *GitHackObject) checkoutLastCommit(r *git.Repository, RepoPath string) e
 	return nil
 }
 
-func (o *GitHackObject) checkGitHead(remoteRepoURL, tempDirPath string) ([]byte, error) {
+func (o *GitHackObject) checkFakeOK() ([]byte, error) {
+	remoteRepoURL := o.remoteRepoURL
+
+	rsp, body, err := o.request("GET", remoteRepoURL, ".git/"+utils.RandStringBytes(16))
+	if err != nil {
+		return body, utils.Wrap(err, "request error")
+	}
+	if rsp.StatusCode == 200 {
+		return body, nil
+	}
+
+	return nil, nil
+}
+
+func (o *GitHackObject) checkGitHead() ([]byte, error) {
+	remoteRepoURL := o.remoteRepoURL
+	tempDirPath := o.tempDirPath
+
 	rsp, body, err := o.request("GET", remoteRepoURL, ".git/HEAD")
 	if err != nil {
 		return nil, utils.Wrapf(err, "target URL[%s] is not a git repository", remoteRepoURL)
@@ -634,7 +696,10 @@ func (o *GitHackObject) checkGitHead(remoteRepoURL, tempDirPath string) ([]byte,
 	return body, nil
 }
 
-func (o *GitHackObject) checkGitPack(remoteRepoURL string, tempDirPath string) ([]byte, error) {
+func (o *GitHackObject) checkGitPack() ([]byte, error) {
+	remoteRepoURL := o.remoteRepoURL
+	tempDirPath := o.tempDirPath
+
 	rsp, body, err := o.request("GET", remoteRepoURL, ".git/objects/info/packs")
 	if rsp.StatusCode != 200 && err == nil {
 		err = utils.Error("pack not found")
@@ -646,7 +711,10 @@ func (o *GitHackObject) checkGitPack(remoteRepoURL string, tempDirPath string) (
 	return body, err
 }
 
-func (o *GitHackObject) checkGitIndex(remoteRepoURL string, tempDirPath string) ([]byte, error) {
+func (o *GitHackObject) checkGitIndex() ([]byte, error) {
+	remoteRepoURL := o.remoteRepoURL
+	tempDirPath := o.tempDirPath
+
 	rsp, body, err := o.request("GET", remoteRepoURL, ".git/index")
 	if rsp.StatusCode != 200 && err == nil {
 		err = utils.Error("index not found")
@@ -658,7 +726,10 @@ func (o *GitHackObject) checkGitIndex(remoteRepoURL string, tempDirPath string) 
 	return body, err
 }
 
-func (o *GitHackObject) checkGitLogHead(remoteRepoURL, tempDirPath string) ([]byte, error) {
+func (o *GitHackObject) checkGitLogHead() ([]byte, error) {
+	remoteRepoURL := o.remoteRepoURL
+	tempDirPath := o.tempDirPath
+
 	rsp, body, err := o.request("GET", remoteRepoURL, ".git/logs/HEAD")
 	if rsp.StatusCode != 200 && err == nil {
 		err = utils.Error("logs HEAD not found")
@@ -670,7 +741,10 @@ func (o *GitHackObject) checkGitLogHead(remoteRepoURL, tempDirPath string) ([]by
 	return body, err
 }
 
-func (o *GitHackObject) checkGitStash(remoteRepoURL string, tempDirPath string) ([]byte, error) {
+func (o *GitHackObject) checkGitStash() ([]byte, error) {
+	remoteRepoURL := o.remoteRepoURL
+	tempDirPath := o.tempDirPath
+
 	rsp, body, err := o.request("GET", remoteRepoURL, ".git/refs/stash")
 	if rsp.StatusCode != 200 && err == nil {
 		err = utils.Error("stash not found")
@@ -682,7 +756,9 @@ func (o *GitHackObject) checkGitStash(remoteRepoURL string, tempDirPath string) 
 	return body, err
 }
 
-func (o *GitHackObject) checkDirectoryTraversal(remoteRepoURL string) error {
+func (o *GitHackObject) checkDirectoryTraversal() error {
+	remoteRepoURL := o.remoteRepoURL
+
 	rsp, body, err := o.request("GET", remoteRepoURL, ".git")
 	if err != nil {
 		return utils.Wrap(err, "directory traversal error")
@@ -714,6 +790,7 @@ func (o *GitHackObject) request(method, baseURL string, paths ...string) (*http.
 	opts := make([]lowhttp.LowhttpOpt, len(o.httpOpts), len(o.httpOpts)+1)
 	copy(opts, o.httpOpts)
 	opts = append(opts, lowhttp.WithPacketBytes(raw))
+	// opts = append(opts, lowhttp.WithNoFixContentLength(true), lowhttp.WithTimeoutFloat(1))
 
 	lowhttpRsp, err := lowhttp.HTTP(opts...)
 	if err != nil {
