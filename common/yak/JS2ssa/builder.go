@@ -1,8 +1,6 @@
 package js2ssa
 
 import (
-	"fmt"
-
 	"github.com/antlr4-go/antlr/v4"
 	JS "github.com/yaklang/yaklang/common/yak/antlr4JS/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -14,89 +12,37 @@ type astbuilder struct {
 }
 
 type builder struct {
-	ast  *JS.ProgramContext
-	prog *ssa.Program
-	c    *config
+	ast      *JS.ProgramContext
+	prog     *ssa.Program
+	callback func(*ssa.FunctionBuilder)
 }
 
 func (b *builder) Build() {
 	pkg := ssa.NewPackage("main")
 	b.prog.AddPackage(pkg)
 	main := pkg.NewFunction("yak-main")
-	funcbuilder := ssa.NewBuilder(main, nil)
-	funcbuilder.WithExternValue(b.c.externValue)
-	funcbuilder.WithExternLib(b.c.externLib)
+	funcBuilder := ssa.NewBuilder(main, nil)
+	if b.callback != nil {
+		b.callback(funcBuilder)
+	}
 
 	astbuilder := astbuilder{
-		FunctionBuilder: funcbuilder,
+		FunctionBuilder: funcBuilder,
 	}
 	astbuilder.build(b.ast)
 	astbuilder.Finish()
-
 }
 
 var _ (ssa.Builder) = (*builder)(nil)
 
-type config struct {
-	analyzeOpt []ssa4analyze.Option
-	typeMethod map[string]any
-
-	externValue map[string]any
-	externLib   map[string]map[string]any
-}
-
-func defaultConfig() *config {
-	return &config{
-		analyzeOpt:  make([]ssa4analyze.Option, 0),
-		typeMethod:  nil,
-		externValue: make(map[string]any),
-		externLib:   make(map[string]map[string]any),
-	}
-}
-
-type Option func(*config)
-
-func WithAnalyzeOpt(opt ...ssa4analyze.Option) Option {
-	return func(c *config) {
-		c.analyzeOpt = append(c.analyzeOpt, opt...)
-	}
-}
-
-func WithExternValue(table map[string]any) Option {
-	return func(c *config) {
-		for i := range table {
-			if _, ok := c.externValue[i]; !ok {
-				c.externValue[i] = table[i]
-			}
-		}
-	}
-}
-
-func WithExternLib(libName string, table map[string]any) Option {
-	return func(c *config) {
-		c.externLib[libName] = table
-	}
-}
-
-func WithTypeMethod(table map[string]any) Option {
-	return func(c *config) {
-		c.typeMethod = table
-	}
-}
-
-func ParseSSA(src string, opt ...Option) (prog *ssa.Program) {
+func ParseSSA(src string, f func(*ssa.FunctionBuilder)) (prog *ssa.Program) {
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Println("Recovered in parseSSA", r)
+			// fmt.Println("Recovered in parseSSA", r)
 			// debug.PrintStack()
 			prog = nil
 		}
 	}()
-
-	c := defaultConfig()
-	for _, f := range opt {
-		f(c)
-	}
 
 	inputStream := antlr.NewInputStream(src)
 	lex := JS.NewJavaScriptLexer(inputStream)
@@ -104,14 +50,11 @@ func ParseSSA(src string, opt ...Option) (prog *ssa.Program) {
 	ast := JS.NewJavaScriptParser(tokenStream).Program().(*JS.ProgramContext)
 	prog = ssa.NewProgram()
 	builder := &builder{
-		ast:  ast,
-		prog: prog,
-		c:    c,
+		ast:      ast,
+		prog:     prog,
+		callback: f,
 	}
 	prog.Build(builder)
-	ssa4analyze.NewAnalyzerGroup(
-		prog,
-		c.analyzeOpt...,
-	).Run()
+	ssa4analyze.NewAnalyzerGroup(prog).Run()
 	return prog
 }

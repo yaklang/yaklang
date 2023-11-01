@@ -265,6 +265,8 @@ func initYaklangLib() {
 	// binx
 	yaklang.Import("bin", binx.Exports)
 
+	// ssa
+	yaklang.Import("ssa", SSAExports)
 }
 
 type ScriptEngine struct {
