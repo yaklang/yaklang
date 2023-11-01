@@ -1,7 +1,6 @@
 package js2ssa
 
 import (
-	"fmt"
 	"math"
 	"strconv"
 	"strings"
@@ -44,11 +43,11 @@ func (b *astbuilder) buildLiteral(stmt *JS.LiteralContext) ssa.Value {
 	if stmt.StringLiteral() != nil {
 		s := stmt.StringLiteral()
 		return b.buildStringLiteral(s)
-	
+
 	} else if stmt.BooleanLiteral() != nil {
 		bo := stmt.GetText()
 		b.buildBooleanLiteral(bo)
-	
+
 	} else if stmt.NullLiteral() != nil {
 		return b.buildNullLiteral()
 	} else if stmt.RegularExpressionLiteral() != nil {
@@ -85,17 +84,17 @@ func (b *astbuilder) buildNumericLiteral(stmt *JS.NumericLiteralContext) ssa.Val
 		var intStr = strings.ToLower(originStr)
 		var resultInt64 int64
 
-		fmt.Println(originStr)
+		// fmt.Println(originStr)
 
-		if num := stmt.DecimalLiteral(); num != nil {	// 十进制
+		if num := stmt.DecimalLiteral(); num != nil { // 十进制
 			resultInt64, err = strconv.ParseInt(intStr, 10, 64)
-		} else if num := stmt.HexIntegerLiteral(); num != nil {	// 十六进制 
+		} else if num := stmt.HexIntegerLiteral(); num != nil { // 十六进制
 			resultInt64, err = strconv.ParseInt(intStr[2:], 16, 64)
 		} else if num := stmt.BinaryIntegerLiteral(); num != nil { // 二进制
 			resultInt64, err = strconv.ParseInt(intStr[2:], 2, 64)
-		} else if num := stmt.OctalIntegerLiteral(); num != nil {	// 八进制 017
+		} else if num := stmt.OctalIntegerLiteral(); num != nil { // 八进制 017
 			resultInt64, err = strconv.ParseInt(intStr[1:], 8, 64)
-		} else if num := stmt.OctalIntegerLiteral2(); num != nil {	// 八进制 0oxx
+		} else if num := stmt.OctalIntegerLiteral2(); num != nil { // 八进制 0oxx
 			resultInt64, err = strconv.ParseInt(intStr[2:], 8, 64)
 		} else {
 			b.NewError(ssa.Error, TAG, "cannot parse num for literal: %s", stmt.GetText())
@@ -128,18 +127,17 @@ func (b *astbuilder) buildStringLiteral(stmt antlr.TerminalNode) ssa.Value {
 		return ssa.NewConst(text)
 	}
 
-
 	switch text[0] {
 	case '"':
 		val, err := strconv.Unquote(text)
-		fmt.Println(val)
+		// fmt.Println(val)
 		if err != nil {
-			fmt.Printf("parse %v to string literal failed: %s", stmt.GetText(), err.Error())
+			b.NewError(ssa.Error, TAG, "cannot parse string literal: %s failed: %s", stmt.GetText(), err.Error())
 		}
 		return ssa.NewConstWithUnary(val, 0)
 	case '\'':
-		if lit := stmt.GetText(); len(lit) >= 2{
-			text = lit[1: len(lit)-1]
+		if lit := stmt.GetText(); len(lit) >= 2 {
+			text = lit[1 : len(lit)-1]
 		} else {
 			text = lit
 		}
@@ -147,11 +145,10 @@ func (b *astbuilder) buildStringLiteral(stmt antlr.TerminalNode) ssa.Value {
 		text = strings.Replace(text, `"`, `\"`, -1)
 		val, err := strconv.Unquote(`"` + text + `"`)
 		if err != nil {
-			fmt.Printf("pars %v to string literal field: %s", stmt.GetText(), err.Error())
+			b.NewError(ssa.Error, TAG, "cannot parse string literal: %s failed: %s", stmt.GetText(), err.Error())
 		}
 		return ssa.NewConstWithUnary(val, 0)
 	}
-	
 
 	return nil
 }

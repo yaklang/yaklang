@@ -1,8 +1,6 @@
 package js2ssa
 
 import (
-	"fmt"
-
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"golang.org/x/exp/slices"
@@ -278,8 +276,8 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 	getBinaryOp := func() (single getSingleExpr, Op ssa.BinaryOpcode, IsBinOp bool) {
 		single, Op, IsBinOp = nil, 0, false
 		for {
-			a := stmt
-			fmt.Println(a.GetText())
+			// a := stmt
+			// fmt.Println(a.GetText())
 
 			// +/-
 			if s, ok := stmt.(*JS.AdditiveExpressionContext); ok {
@@ -458,7 +456,7 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 			} else {
 				rValue := b.EmitBinOp(ssa.OpAdd, lValue.GetValue(b.FunctionBuilder), ssa.NewConst(1))
 				lValue.Assign(rValue, b.FunctionBuilder)
-				fmt.Println("++ result: ", lValue.GetValue(b.FunctionBuilder))
+				// fmt.Println("++ result: ", lValue.GetValue(b.FunctionBuilder))
 				return lValue.GetValue(b.FunctionBuilder)
 			}
 		}
@@ -486,7 +484,7 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 			} else {
 				rValue := b.EmitBinOp(ssa.OpAdd, lValue.GetValue(b.FunctionBuilder), ssa.NewConst(1))
 				lValue.Assign(rValue, b.FunctionBuilder)
-				fmt.Println("++ result: ", lValue.GetValue(b.FunctionBuilder))
+				// fmt.Println("++ result: ", lValue.GetValue(b.FunctionBuilder))
 				return lValue.GetValue(b.FunctionBuilder)
 			}
 		}
@@ -803,7 +801,7 @@ func (b *astbuilder) buildAssignmentOperatorContext(stmt *JS.AssignmentOperatorC
 	value := b.EmitBinOp(Op, lValue.GetValue(b.FunctionBuilder), rValue)
 	lValue.Assign(value, b.FunctionBuilder)
 
-	fmt.Println("test assignOpreator: ", lValue.GetValue(b.FunctionBuilder))
+	// fmt.Println("test assignOpreator: ", lValue.GetValue(b.FunctionBuilder))
 	return lValue.GetValue(b.FunctionBuilder)
 }
 
@@ -921,12 +919,12 @@ func (b *astbuilder) buildAssignmentExpression(stmt *JS.AssignmentExpressionCont
 	op2, _ := b.buildSingleExpression(stmt.SingleExpression(1), false)
 
 	if op1 != nil && op2 != nil {
-		text := stmt.SingleExpression(0).GetText()
+		// text := stmt.SingleExpression(0).GetText()
 		// lValue := ssa.NewIdentifierLV(text, b.CurrentPos)
 		op1.Assign(op2, b.FunctionBuilder)
-		fmt.Print(text)
-		fmt.Print("=")
-		fmt.Println(op1.GetValue(b.FunctionBuilder))
+		// fmt.Print(text)
+		// fmt.Print("=")
+		// fmt.Println(op1.GetValue(b.FunctionBuilder))
 	} else {
 		b.NewError(ssa.Error, TAG, "AssignmentExpression cannot get right assignable: %s", stmt.GetText())
 	}
@@ -1025,9 +1023,11 @@ func (b *astbuilder) buildObjectLiteral(stmt *JS.ObjectLiteralContext) ssa.Value
 			return newFunc
 
 		} else if pro, ok := p.(*JS.PropertyGetterContext); ok {
-			fmt.Println(pro)
+			_ = pro
+			// fmt.Println(pro)
 		} else if pro, ok := p.(*JS.PropertySetterContext); ok {
-			fmt.Println(pro)
+			_ = pro
+			// fmt.Println(pro)
 		} else if pro, ok := p.(*JS.PropertyShorthandContext); ok {
 			if s := pro.SingleExpression(); s != nil {
 				rv, _ = b.buildSingleExpression(s, false)
@@ -1258,7 +1258,7 @@ func (b *astbuilder) buildForStatement(stmt *JS.ForStatementContext) {
 
 	var cond JS.ISingleExpressionContext
 
-	fmt.Println("---------------------")
+	// fmt.Println("---------------------")
 	if first, ok := stmt.ForFirst().(*JS.ForFirstContext); ok {
 		if f, ok := first.VariableDeclarationList().(*JS.VariableDeclarationListContext); ok {
 			loop.BuildFirstExpr(func() []ssa.Value {
