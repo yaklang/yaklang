@@ -196,7 +196,7 @@ func GitHack(remoteRepoURL string, localPath string, opts ...Option) (finalErr e
 		o.addHeadTask(ch, headContent)
 		// LOGS HEAD
 		log.Debugf("[githack] log head files")
-		o.addHashParsedTask(ch, headContent)
+		o.addHashParsedTask(ch, "log-head", headContent)
 		// index
 		log.Debugf("[githack] index files")
 		_, err = o.checkGitIndex()
@@ -207,7 +207,7 @@ func GitHack(remoteRepoURL string, localPath string, opts ...Option) (finalErr e
 		log.Debugf("[githack] stash files")
 		stashContent, err := o.checkGitStash()
 		if err == nil {
-			o.addHashParsedTask(ch, stashContent)
+			o.addHashParsedTask(ch, "stash", stashContent)
 		}
 		// COMMIT
 		taskwg.Wait()
@@ -277,7 +277,8 @@ func NewGitHackObject(remoteRepoURL, tempDirPath string, gitConfig *config) *Git
 	}
 }
 
-func (o *GitHackObject) addTask(ch chan string, taskURL ...string) {
+func (o *GitHackObject) addTask(ch chan string, tag string, taskURL ...string) {
+	count := 0
 	for _, u := range taskURL {
 		// 缓存
 		o.mutex.Lock()
@@ -288,7 +289,11 @@ func (o *GitHackObject) addTask(ch chan string, taskURL ...string) {
 		o.cache[u] = struct{}{}
 		o.mutex.Unlock()
 
+		count++
 		ch <- u
+	}
+	if tag != "" {
+		log.Debugf("[%s] task count: %d", tag, count)
 	}
 }
 
@@ -307,7 +312,7 @@ func (o *GitHackObject) addIndexTask(ch chan string, r *git.Repository) {
 		taskURL, err := o.getHashTask(hash, remoteRepoURL)
 		return taskURL, err == nil
 	})
-	o.addTask(ch, taskURLs...)
+	o.addTask(ch, "index-cache", taskURLs...)
 
 	// objects
 	taskURLs = lo.FilterMap(i.Entries, func(entry *index.Entry, _ int) (string, bool) {
@@ -315,7 +320,7 @@ func (o *GitHackObject) addIndexTask(ch chan string, r *git.Repository) {
 		taskURL, err := o.getHashTask(hash, remoteRepoURL)
 		return taskURL, err == nil
 	})
-	o.addTask(ch, taskURLs...)
+	o.addTask(ch, "index", taskURLs...)
 }
 
 func (o *GitHackObject) addPackTask(ch chan string, taskwg *sync.WaitGroup, r *git.Repository, packsContent []byte, repoPath string) {
@@ -335,7 +340,7 @@ func (o *GitHackObject) addPackTask(ch chan string, taskwg *sync.WaitGroup, r *g
 		}
 		taskURLs = append(taskURLs, taskURL)
 	}
-	o.addTask(ch, taskURLs...)
+	o.addTask(ch, "pack-self", taskURLs...)
 	taskwg.Wait()
 
 	for _, taskURL := range taskURLs {
@@ -365,7 +370,7 @@ func (o *GitHackObject) addPackTask(ch chan string, taskwg *sync.WaitGroup, r *g
 				log.Errorf("get hash task error: %v", err)
 				continue
 			}
-			o.addTask(ch, taskURL)
+			o.addTask(ch, "pack-objects", taskURL)
 		}
 	}
 
@@ -381,7 +386,7 @@ func (o *GitHackObject) addBasicTask(ch chan string, defaultGitFiles []string) {
 		}
 		return taskURL, true
 	})
-	o.addTask(ch, taskURLs...)
+	o.addTask(ch, "basic-default", taskURLs...)
 
 	// DEFAULT_GIT_FILES_DANGEROUS
 	taskURLs = lo.FilterMap(DEFAULT_GIT_FILES_DANGEROUS, func(taskURL string, _ int) (string, bool) {
@@ -391,7 +396,7 @@ func (o *GitHackObject) addBasicTask(ch chan string, defaultGitFiles []string) {
 		}
 		return taskURL, true
 	})
-	o.addTask(ch, taskURLs...)
+	o.addTask(ch, "basic-dangerous", taskURLs...)
 }
 
 func (o *GitHackObject) addHeadTask(ch chan string, content []byte) {
@@ -410,22 +415,25 @@ func (o *GitHackObject) addHeadTask(ch chan string, content []byte) {
 				log.Debugf("read file[%s] error: %v", fullRefPath, err)
 				continue
 			} else {
-				o.addHashParsedTask(ch, content)
+				o.addHashParsedTask(ch, "head", content)
 			}
 		}
 	}
 }
 
-func (o *GitHackObject) addHashParsedTask(ch chan string, content []byte) int {
+func (o *GitHackObject) addHashParsedTask(ch chan string, tag string, content []byte) int {
 	remoteRepoURL := o.remoteRepoURL
 	hashes := HASH_REGEX.FindAllString(utils.UnsafeBytesToString(content), -1)
+	if len(hashes) == 0 {
+		return 0
+	}
 	taskURLs := lo.FilterMap(hashes, func(hash string, _ int) (string, bool) {
 		taskURL, err := o.getHashTask(hash, remoteRepoURL)
 		return taskURL, err == nil
 	})
 	taskURLs = lo.Uniq(taskURLs)
 	if len(taskURLs) > 0 {
-		o.addTask(ch, taskURLs...)
+		o.addTask(ch, tag, taskURLs...)
 	}
 	return len(taskURLs)
 }
@@ -438,7 +446,7 @@ func (o *GitHackObject) addFsckTask(ch chan string, taskwg *sync.WaitGroup, comm
 		cmd := exec.Command(command, "fsck", "--full")
 		cmd.Dir = o.tempDirPath
 		output, _ := cmd.CombinedOutput()
-		taskNum = o.addHashParsedTask(ch, output)
+		taskNum = o.addHashParsedTask(ch, "fsck", output)
 		maxNum--
 	}
 }
@@ -446,32 +454,26 @@ func (o *GitHackObject) addFsckTask(ch chan string, taskwg *sync.WaitGroup, comm
 func (o *GitHackObject) addCommitTask(ch chan string, r *git.Repository) {
 	remoteRepoURL := o.remoteRepoURL
 
-	refs, err := r.References()
+	commitIter, err := r.CommitObjects()
 	if err != nil {
 		log.Errorf("get references failed: %s", err)
 		return
 	}
-	refs.ForEach(func(ref *plumbing.Reference) error {
-		if ref.Hash().String() == "0000000000000000000000000000000000000000" {
-			return nil
+
+	commitIter.ForEach(func(commit *object.Commit) error {
+		treeHash := commit.TreeHash.String()
+		taskURL, err := o.getHashTask(treeHash, remoteRepoURL)
+		if err == nil {
+			o.addTask(ch, "commit-tree-hashes", taskURL)
+		} else {
+			log.Debugf("get hash task error: %v", err)
 		}
-		commitIter, err := r.Log(&git.LogOptions{
-			From: ref.Hash(),
-		})
-		if err != nil {
-			log.Errorf("fetch %v's logs failed: %s", ref.Hash(), err)
-			return nil
-		}
-		commitIter.ForEach(func(commit *object.Commit) error {
-			hash := commit.TreeHash
+		hashes := commit.ParentHashes
+		taskURLs := lo.FilterMap(hashes, func(hash plumbing.Hash, _ int) (string, bool) {
 			taskURL, err := o.getHashTask(hash.String(), remoteRepoURL)
-			if err != nil {
-				log.Errorf("get hash task error: %v", err)
-				return nil
-			}
-			o.addTask(ch, taskURL)
-			return nil
+			return taskURL, err == nil
 		})
+		o.addTask(ch, "commit-parent-hashes", taskURLs...)
 		return nil
 	})
 }
@@ -485,14 +487,12 @@ func (o *GitHackObject) addTreeTask(ch chan string, r *git.Repository) {
 		return
 	}
 	treeIter.ForEach(func(t *object.Tree) error {
-		for _, entry := range t.Entries {
-			taskURL, err := o.getHashTask(entry.Hash.String(), remoteRepoURL)
-			if err != nil {
-				log.Errorf("get hash task error: %v", err)
-				continue
-			}
-			o.addTask(ch, taskURL)
-		}
+		taskURLs := lo.FilterMap(t.Entries, func(entry object.TreeEntry, _ int) (string, bool) {
+			hash := entry.Hash.String()
+			taskURL, err := o.getHashTask(hash, remoteRepoURL)
+			return taskURL, err == nil
+		})
+		o.addTask(ch, "tree-entries", taskURLs...)
 		return nil
 	})
 }
@@ -583,7 +583,14 @@ func (o *GitHackObject) consumeTask(wg, taskwg *sync.WaitGroup, ch chan string) 
 		if err := saveToFile(savePath, body); err != nil {
 			log.Debugf("save file[%s] error: %v", savePath, err)
 		}
-		go o.addHashParsedTask(ch, body)
+
+		if strings.Contains(taskURL, ".git/objects/") {
+			decoded, err := utils.ZlibDeCompress(body)
+			if err == nil {
+				body = decoded
+			}
+		}
+		go o.addHashParsedTask(ch, "consume-regexp", body)
 		taskwg.Done()
 	}
 }
@@ -790,7 +797,7 @@ func (o *GitHackObject) request(method, baseURL string, paths ...string) (*http.
 	opts := make([]lowhttp.LowhttpOpt, len(o.httpOpts), len(o.httpOpts)+1)
 	copy(opts, o.httpOpts)
 	opts = append(opts, lowhttp.WithPacketBytes(raw))
-	// opts = append(opts, lowhttp.WithNoFixContentLength(true), lowhttp.WithTimeoutFloat(1))
+	opts = append(opts, lowhttp.WithNoFixContentLength(true), lowhttp.WithTimeoutFloat(1))
 
 	lowhttpRsp, err := lowhttp.HTTP(opts...)
 	if err != nil {
