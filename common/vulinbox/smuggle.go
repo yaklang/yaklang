@@ -227,6 +227,7 @@ Content-Type: text/html; charset=utf-8
 			writer.Flush()
 			if chunked {
 				var before []byte
+				_ = before
 				var ok bool
 				before, ret, ok = bytes.Cut(body, []byte("0\r\n\r\n"))
 				if ok {
@@ -261,6 +262,7 @@ Content-Type: text/html; charset=utf-8
 			fmt.Println(string(proxies))
 			spew.Dump(proxies)
 			handleRequest(proxies, bw)
+			utils.FlushWriter(bw)
 			println("=====================================")
 		}()
 	}
