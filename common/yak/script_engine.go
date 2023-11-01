@@ -35,7 +35,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/comparer"
 	"github.com/yaklang/yaklang/common/utils/htmlquery"
 	"github.com/yaklang/yaklang/common/xhtml"
-	js2ssa "github.com/yaklang/yaklang/common/yak/JS2ssa"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
@@ -266,8 +265,6 @@ func initYaklangLib() {
 	// binx
 	yaklang.Import("bin", binx.Exports)
 
-	// ssa
-	yaklang.Import("js2ssa", js2ssa.Exports)
 }
 
 type ScriptEngine struct {
