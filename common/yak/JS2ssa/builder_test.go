@@ -29,29 +29,6 @@ func TestDemo2(t *testing.T) {
 	prog.Show()
 }
 
-func TestBreak(t *testing.T) {
-	prog := ParseSSA(`
-	a = 1;
-	for (;;) {
-		a = 2;
-		break;
-	}
-
-	a = 3;
-
-	label1: {
-		// print(a)
-		for (;;) {
-			a = 4;
-			// print(a)
-			break label1;
-		}
-	}
-	`)
-	prog.Show()
-	fmt.Println(prog.GetErrors().String())
-}
-
 func TestSwitch(t *testing.T) {
 	prog := ParseSSA(`
 	const fruit = "apple";
@@ -105,6 +82,28 @@ function b(c) {
     c.location.href = "www.baidu.com"
 }
 b(a)
+	`)
+	prog.Show()
+}
+
+func TestBreak(t *testing.T) {
+	prog := ParseSSA(`
+	a = 2;
+	label1: 
+	{
+		print(a);
+		a = 1;
+		break label1;
+	}
+	`)
+
+	prog.ShowWithSource()
+}
+
+func TestMain(t *testing.T) {
+	prog := ParseSSA(`
+	var b = (()=>{return window.location.hostname + "/app/"})()
+	window.location.href = b + "/login.html?ts=";
 	`)
 	prog.Show()
 }
