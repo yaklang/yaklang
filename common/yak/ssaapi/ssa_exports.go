@@ -1,4 +1,4 @@
-package yak
+package ssaapi
 
 import (
 	js2ssa "github.com/yaklang/yaklang/common/yak/JS2ssa"
@@ -51,7 +51,7 @@ func WithExternValue(table map[string]any) Option {
 		c.externValue = table
 	}
 }
-func Parse(code string, opts ...Option) *ssa.Program {
+func Parse(code string, opts ...Option) *Program {
 	config := defaultConfig()
 	for _, opt := range opts {
 		opt(config)
@@ -69,10 +69,10 @@ func Parse(code string, opts ...Option) *ssa.Program {
 	case Yak:
 		ret = yak2ssa.ParseSSA(code, callback)
 	}
-	return ret
+	return NewProgram(ret)
 }
 
-var SSAExports = map[string]any{
+var Exports = map[string]any{
 	"Parse": Parse,
 
 	"withLanguage": WithLanguage,
