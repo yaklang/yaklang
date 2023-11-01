@@ -38,7 +38,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yak/yaklang/lib/builtin"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
@@ -267,7 +266,7 @@ func initYaklangLib() {
 	yaklang.Import("bin", binx.Exports)
 
 	// ssa
-	yaklang.Import("ssa", ssaapi.Exports)
+	yaklang.Import("ssa", SSAExports)
 }
 
 type ScriptEngine struct {

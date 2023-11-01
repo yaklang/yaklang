@@ -10,7 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakast"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
 
@@ -62,7 +61,7 @@ func AnalyzeStaticYaklangEx(r interface{}, strictMode bool) []*StaticAnalyzeResu
 		}
 	}
 
-	opts := make([]ssaapi.Option, 0)
+	opts := make([]Option, 0)
 	// yak function table
 	symbol := yaklang.New().GetFntable()
 	valueTable := make(map[string]interface{})
@@ -70,7 +69,7 @@ func AnalyzeStaticYaklangEx(r interface{}, strictMode bool) []*StaticAnalyzeResu
 	for name, item := range symbol {
 		itype := reflect.TypeOf(item)
 		if itype == reflect.TypeOf(make(map[string]interface{})) {
-			opts = append(opts, ssaapi.WithExternLib(name, item.(map[string]interface{})))
+			opts = append(opts, WithExternLib(name, item.(map[string]interface{})))
 		} else {
 			valueTable[name] = item
 		}
@@ -94,10 +93,10 @@ func AnalyzeStaticYaklangEx(r interface{}, strictMode bool) []*StaticAnalyzeResu
 	valueTable["MITM_PLUGIN"] = ""
 	valueTable["MITM_PARAMS"] = make(map[string]string)
 
-	opts = append(opts, ssaapi.WithExternValue(valueTable))
+	opts = append(opts, WithExternValue(valueTable))
 
 	// ssa
-	prog := ssaapi.Parse(code, opts...)
+	prog := Parse(code, opts...)
 	if prog == nil {
 		return results
 	}
