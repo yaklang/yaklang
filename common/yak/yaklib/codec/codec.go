@@ -365,9 +365,12 @@ func HTTPChunkedDecoderWithRestBytes(raw io.Reader) ([]byte, []byte, io.Reader, 
 }
 
 func HTTPChunkedDecode(raw []byte) ([]byte, error) {
-	if string(raw) == "" {
+	if ret := string(raw); ret == "" {
 		return nil, errors.New("empty input")
+	} else if ret == "0\r\n\r\n" {
+		return nil, nil
 	}
+
 	var results, _ = readHTTPChunkedData(raw)
 	if len(results) > 0 {
 		return results, nil

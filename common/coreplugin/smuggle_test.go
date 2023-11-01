@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/vulinbox"
@@ -15,7 +16,7 @@ import (
 	"time"
 )
 
-func TestGRPCMUSTPASS_Pipeline(t *testing.T) {
+func TestGRPCMUSTPASS_Smuggle_Negative_Pipeline(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	port := utils.GetRandomAvailableTCPPort()
 	target := `POST / HTTP/1.1
@@ -56,7 +57,7 @@ rsp, req = poc.HTTP(target, poc.noFixContentLength(true))~
 	t.Logf("Fetch RESPONSE COUNT: %v", len(rsps))
 }
 
-func TestGRPCMUSTPASS_Pipeline_Chunked(t *testing.T) {
+func TestGRPCMUSTPASS_Smuggle_Pipeline_Negative_Chunked(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	port := utils.GetRandomAvailableTCPPort()
 	target := `POST / HTTP/1.1
@@ -102,7 +103,7 @@ rsp, req = poc.HTTP(target, poc.noFixContentLength(true))~
 	t.Logf("Fetch RESPONSE COUNT: %v", len(rsps))
 }
 
-func TestGRPCMUSTPASS_Smuggle(t *testing.T) {
+func TestGRPCMUSTPASS_Smuggle_Positive(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	port := utils.GetRandomAvailableTCPPort()
 	target := `POST / HTTP/1.1
@@ -112,6 +113,8 @@ Content-Length: 48
 Transfer-Encoding: chunked
 
 0` + lowhttp.CRLF + lowhttp.CRLF + `GET /admin HTTP/1.1` + lowhttp.CRLF + `Host: 127.0.0.1:8080` + lowhttp.CRLF + lowhttp.CRLF
+
+	spew.Dump(target)
 	var rspBytes []byte
 	go func() {
 		time.Sleep(2 * time.Second)
