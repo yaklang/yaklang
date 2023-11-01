@@ -3,7 +3,6 @@ package yakgit
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -418,6 +417,9 @@ func (o *GitHackObject) addCommitTask(ch chan string, r *git.Repository, remoteR
 		return
 	}
 	refs.ForEach(func(ref *plumbing.Reference) error {
+		if ref.Hash().String() == "0000000000000000000000000000000000000000" {
+			return nil
+		}
 		commitIter, err := r.Log(&git.LogOptions{
 			From: ref.Hash(),
 		})
@@ -526,8 +528,13 @@ func (o *GitHackObject) consumeTask(wg, taskwg *sync.WaitGroup, ch chan string, 
 			taskwg.Done()
 			continue
 		}
+		urlPath := u.Path
+		gitIndex := strings.Index(urlPath, ".git/")
+		if gitIndex >= 0 {
+			urlPath = urlPath[gitIndex:]
+		}
 
-		savePath := filepath.Join(tempDirPath, u.Path)
+		savePath := filepath.Join(tempDirPath, urlPath)
 		if err := saveToFile(savePath, body); err != nil {
 			log.Debugf("save file[%s] error: %v", savePath, err)
 		}
@@ -704,7 +711,7 @@ func (o *GitHackObject) request(method, baseURL string, paths ...string) (*http.
 	if err != nil {
 		return nil, nil, utils.Wrap(err, "parse URL to raw http request error")
 	}
-	opts := make([]lowhttp.LowhttpOpt, len(o.httpOpts), len(o.httpOpts)+2)
+	opts := make([]lowhttp.LowhttpOpt, len(o.httpOpts), len(o.httpOpts)+1)
 	copy(opts, o.httpOpts)
 	opts = append(opts, lowhttp.WithPacketBytes(raw))
 
@@ -717,10 +724,8 @@ func (o *GitHackObject) request(method, baseURL string, paths ...string) (*http.
 	if err != nil {
 		return nil, nil, utils.Wrap(err, "parse http response error")
 	}
-	body, err := io.ReadAll(rsp.Body)
-	if err != nil {
-		return nil, nil, utils.Wrap(err, "read response body error")
-	}
+	_, body := lowhttp.SplitHTTPPacketFast(lowhttpRsp.RawPacket)
+
 	return rsp, body, nil
 }
 
