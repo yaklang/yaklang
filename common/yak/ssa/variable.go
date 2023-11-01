@@ -143,13 +143,14 @@ func (b *FunctionBuilder) readVariableByBlock(variable string, block *BasicBlock
 }
 
 func (b *FunctionBuilder) readVariableByBlockEx(variable string, block *BasicBlock, create bool) []Value {
-	if block.Skip {
-		return nil
-	}
 	if map2, ok := b.symbolTable[variable]; ok {
 		if vs, ok := map2[block]; ok && len(vs) > 0 {
 			return vs
 		}
+	}
+	
+	if block.Skip {
+		return nil
 	}
 
 	var v Value

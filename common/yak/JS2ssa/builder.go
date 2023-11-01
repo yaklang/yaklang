@@ -2,7 +2,6 @@ package js2ssa
 
 import (
 	"fmt"
-	"runtime/debug"
 
 	"github.com/antlr4-go/antlr/v4"
 	JS "github.com/yaklang/yaklang/common/yak/antlr4JS/parser"
@@ -66,7 +65,7 @@ func WithAnalyzeOpt(opt ...ssa4analyze.Option) Option {
 func WithExternValue(table map[string]any) Option {
 	return func(c *config) {
 		for i := range table {
-			if _, ok := c.externValue[i]; !ok{
+			if _, ok := c.externValue[i]; !ok {
 				c.externValue[i] = table[i]
 			}
 		}
@@ -89,7 +88,7 @@ func ParseSSA(src string, opt ...Option) (prog *ssa.Program) {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered in parseSSA", r)
-			debug.PrintStack()
+			// debug.PrintStack()
 			prog = nil
 		}
 	}()
