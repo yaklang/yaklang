@@ -443,6 +443,9 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	// 需要用于标识连接 https gmTLS
 	// configTLS
 	var dialopts []netx.DialXOption
+
+	dialopts = append(dialopts, netx.DialX_WithTLSNextProto(nextProto...))
+
 	if https {
 		if gmTLS {
 			dialopts = append(dialopts, netx.DialX_WithGMTLSConfig(&gmtls.Config{
