@@ -72,11 +72,15 @@ func ParseHTTPRequestLine(line string) (method, requestURI, proto string, ok boo
 }
 
 func ReadHTTPRequestFromBufioReader(reader *bufio.Reader) (*http.Request, error) {
-	return readHTTPRequestFromBufioReader(reader, false)
+	return readHTTPRequestFromBufioReader(reader, false, nil)
+}
+
+func ReadHTTPRequestFromBufioReaderOnFirstLine(reader *bufio.Reader, h func(string)) (*http.Request, error) {
+	return readHTTPRequestFromBufioReader(reader, false, h)
 }
 
 func ReadHTTPRequestFromBytes(raw []byte) (*http.Request, error) {
-	return readHTTPRequestFromBufioReader(bufio.NewReader(bytes.NewReader(raw)), true)
+	return readHTTPRequestFromBufioReader(bufio.NewReader(bytes.NewReader(raw)), true, nil)
 }
 
 const minIPInteger uint32 = 1 << 24
@@ -244,7 +248,7 @@ func generateConnectedToFromHTTPRequest(t *http.Request) (bool, string, int, err
 	}
 }
 
-func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool) (*http.Request, error) {
+func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool, onFirstLine func(string)) (*http.Request, error) {
 	var rawPacket = new(bytes.Buffer)
 
 	var req = &http.Request{
@@ -275,6 +279,9 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool)
 	firstLine, err := BufioReadLine(reader)
 	if err != nil {
 		return nil, Errorf(`Read Request FirstLine Failed: %s`, err)
+	}
+	if onFirstLine != nil {
+		onFirstLine(string(firstLine))
 	}
 	rawPacket.Write(firstLine)
 	rawPacket.WriteString(CRLF)

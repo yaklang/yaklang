@@ -79,7 +79,7 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 				return
 			default:
 				if currentConnCount > 0 && lastCurrentConnCount != currentConnCount {
-					log.Infof("active connections count: %v", currentConnCount)
+					log.Infof("mitm frontend active connections count: %v", currentConnCount)
 					lastCurrentConnCount = currentConnCount
 				}
 				time.Sleep(3 * time.Second)
@@ -281,21 +281,34 @@ func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, rootCtx context.Contex
 		return
 	}
 
+	timerInterval := time.Second * 10
+	var timer *time.Timer
 	for {
-		deadline := time.Now().Add(p.timeout)
-		conn.SetDeadline(deadline)
 
+		conn.SetDeadline(time.Time{})
 		log.Debugf("waiting conn: %v", conn.RemoteAddr())
-		err := p.handle(ctx, conn, brw)
-		if err != nil && isCloseable(err) {
-			log.Debugf("closing conn: %v", conn.RemoteAddr())
-			return
+		err := p.handle(ctx, timer, conn, brw)
+		if timer == nil {
+			timer = time.AfterFunc(timerInterval, func() {
+				conn.Close()
+			})
+		} else {
+			timer.Reset(timerInterval)
+		}
+
+		if err != nil {
+			if isCloseable(err) {
+				log.Debugf("closing conn(%v): %v", err, conn.RemoteAddr())
+				return
+			} else {
+				log.Infof("continue read conn: %v with err: %v", conn.RemoteAddr(), err)
+			}
 		}
 	}
 }
 
 // handleConnectionTunnel handles a CONNECT request.
-func (p *Proxy) handleConnectionTunnel(req *http.Request, conn net.Conn, ctx *Context, session *Session, brw *bufio.ReadWriter) error {
+func (p *Proxy) handleConnectionTunnel(req *http.Request, timer *time.Timer, conn net.Conn, ctx *Context, session *Session, brw *bufio.ReadWriter) error {
 	httpctx.SetRequestViaCONNECT(req, true)
 	connectedTo, err := utils.GetConnectedToHostPortFromHTTPRequest(req)
 	if err != nil {
@@ -429,15 +442,15 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, conn net.Conn, ctx *Co
 		brw.Writer.Reset(tlsconn)
 		brw.Reader.Reset(tlsconn)
 		// -> Client Connection <- is none HTTP2 HTTPS connection
-		return p.handle(ctx, tlsconn, brw)
+		return p.handle(ctx, timer, tlsconn, brw)
 	}
 	// -> Client Connection <- is plain HTTP connection
 	// Prepend the previously read data to be read again.
 	brw.Reader.Reset(io.MultiReader(bytes.NewReader(b), bytes.NewReader(buf), conn))
-	return p.handle(ctx, conn, brw)
+	return p.handle(ctx, timer, conn, brw)
 }
 
-func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error {
+func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufio.ReadWriter) error {
 	log.Debugf("mitm: waiting for request: %v", conn.RemoteAddr())
 	defer func() {
 		if err := recover(); err != nil {
@@ -450,10 +463,17 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	reqc := make(chan *http.Request, 1)
 	errc := make(chan error, 1)
 	go func() {
-		r, err := utils.ReadHTTPRequestFromBufioReader(brw.Reader)
+		r, err := utils.ReadHTTPRequestFromBufioReaderOnFirstLine(brw.Reader, func(s string) {
+			if timer != nil {
+				timer.Stop()
+			}
+		})
 		if err != nil {
 			errc <- err
 			return
+		}
+		if timer != nil {
+			timer.Stop()
 		}
 		reqc <- r
 	}()
@@ -574,7 +594,7 @@ func (p *Proxy) handle(ctx *Context, conn net.Conn, brw *bufio.ReadWriter) error
 	}
 
 	if req.Method == "CONNECT" {
-		return p.handleConnectionTunnel(req, conn, ctx, session, brw)
+		return p.handleConnectionTunnel(req, timer, conn, ctx, session, brw)
 	}
 
 	if err := p.reqmod.ModifyRequest(req); err != nil {
