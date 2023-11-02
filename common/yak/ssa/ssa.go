@@ -1,9 +1,10 @@
 package ssa
 
 import (
+	"slices"
 	"sync"
 
-	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type Position struct {
@@ -18,7 +19,7 @@ type ErrorLogger interface {
 }
 
 type LeftInstruction interface {
-	Instruction
+	// Instruction
 	// variable
 	GetLeftVariables() []string
 	AddLeftVariables(variable string)
@@ -36,6 +37,8 @@ type Instruction interface {
 	ErrorLogger
 
 	LineDisasm() string
+
+	GetOpcode() Opcode
 
 	// function
 	GetFunc() *Function
@@ -61,10 +64,11 @@ type Instruction interface {
 
 	// has left-value
 	HasLeftVariable() bool
-	GetLeftItem() LeftInstruction
+	// GetLeftItem() LeftInstruction
 }
 type Users []User
 type Values []Value
+type InstructionNodes []InstructionNode
 
 // data-flow
 type Node interface {
@@ -78,14 +82,20 @@ type Node interface {
 	GetValues() Values
 }
 type TypedNode interface {
-	Node
+	// Node
 	// type
 	GetType() Type
 	SetType(Type)
 }
 
+type InstructionNode interface {
+	Node
+	Instruction
+}
+
 // basic handle item (interface)
 type Value interface {
+	InstructionNode
 	LeftInstruction
 	TypedNode
 	AddUser(User)
@@ -96,8 +106,7 @@ type Value interface {
 }
 
 type User interface {
-	Instruction
-	Node
+	InstructionNode
 	ReplaceValue(Value, Value)
 }
 
@@ -169,30 +178,44 @@ func (a *anInstruction) AddLeftPositions(pos *Position) {
 	a.LeftPos = append(a.LeftPos, pos)
 }
 
+func (a *anInstruction) LineDisasm() string { return "" }
+
+// opcode
+func (a *anInstruction) GetOpcode() Opcode      { return OpUnknown } // cover by instruction
+func (a *anInstruction) GetOperands() Values    { return nil }       // cover by instruction
+func (a *anInstruction) GetOperand(i int) Value { return a.GetOperands()[i] }
+func (a *anInstruction) GetOperandNum() int     { return len(a.GetOperands()) }
+
 var _ Instruction = (*anInstruction)(nil)
 var _ LeftInstruction = (*anInstruction)(nil)
 
 type anValue struct {
-	typ  Type
-	user map[User]struct{}
+	typ      Type
+	userList Users
 }
 
 func NewValue() anValue {
 	return anValue{
-		typ:  BasicTypes[Any],
-		user: make(map[User]struct{}),
+		typ:      BasicTypes[Any],
+		userList: make(Users, 0),
 	}
 }
 
 func (n *anValue) String() string { return "" }
 
 // has/get user and value
-func (n *anValue) HasUsers() bool  { return len(n.user) != 0 }
-func (n *anValue) GetUsers() Users { return lo.Keys(n.user) }
+func (n *anValue) HasUsers() bool  { return len(n.userList) != 0 }
+func (n *anValue) GetUsers() Users { return n.userList }
 
 // for Value
-func (n *anValue) AddUser(u User)    { n.user[u] = struct{}{} }
-func (n *anValue) RemoveUser(u User) { delete(n.user, u) }
+func (n *anValue) AddUser(u User) {
+	if index := slices.Index(n.userList, u); index == -1 {
+		n.userList = append(n.userList, u)
+	}
+}
+func (n *anValue) RemoveUser(u User) {
+	n.userList = utils.RemoveSliceItem(n.userList, u)
+}
 
 // for Value : type
 func (n *anValue) GetType() Type    { return n.typ }
@@ -351,7 +374,8 @@ type ConstInst struct {
 	*Const
 	anInstruction
 	anValue
-	Unary int
+	Unary      int
+	isIdentify bool // field key
 }
 
 // ConstInst cont set Type
