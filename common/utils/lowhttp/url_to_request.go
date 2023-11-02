@@ -143,7 +143,7 @@ func UrlToHTTPRequest(text string) ([]byte, error) {
 		if u.RawFragment != "" {
 			r.RequestURI += "#" + u.RawFragment
 		} else {
-			r.RequestURI += "#" + u.Fragment
+			r.RequestURI += "#" + url.PathEscape(u.Fragment)
 		}
 	}
 
@@ -151,7 +151,7 @@ func UrlToHTTPRequest(text string) ([]byte, error) {
 		r.RequestURI += "#"
 	}
 
-	raw, err := utils.HttpDumpWithBody(r, true)
+	raw, err := utils.HttpDumpWithBody(r, false)
 	if err != nil {
 		return nil, err
 	}
