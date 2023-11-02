@@ -71,6 +71,11 @@ func (f *Function) ReturnValue() []Value {
 	return ret.Results
 }
 
+func (f *Function) IsMain() bool {
+	pkg := f.Package
+	return f == pkg.Funcs[0]
+}
+
 func (f *Function) GetSymbol() *Make {
 	return f.symbolObject
 }

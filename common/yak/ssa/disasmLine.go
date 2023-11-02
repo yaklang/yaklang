@@ -62,7 +62,7 @@ func (u *UnOp) LineDisasm() string {
 func (c *Call) LineDisasm() string {
 	arg := ""
 	if len(c.Args) != 0 {
-		arg = ", args(" + lineDisasm(c.Args) + ")"
+		arg = lineDisasm(c.Args)
 	}
 	binding := ""
 	if len(c.binding) != 0 {
