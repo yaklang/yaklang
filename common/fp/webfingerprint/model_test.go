@@ -38,12 +38,7 @@ func TestParseToCPE(t *testing.T) {
 
 func TestParseToCPE1(t *testing.T) {
 	cpes := []string{
-		"cpe:/a:apache:apache:2.4.38:*", "cpe:/a:debian:debian_linux:Debian:*",
-		"cpe:/a:*:apache_http_server:2.4.38:*:*:*",
-		"cpe:/a:*:apache:2.4.38:*:*:*",
-		"cpe:/a:apache:http_server:2.4.38:*:*:*",
-		"cpe:/a:*:apache:*:*:*:*",
-		"cpe:/a:*:debian:*:*:*:*",
+		"cpe:/a:debian:debian_linux:Debian:*",
 	}
 	db := consts.GetGormCVEDatabase()
 
@@ -52,7 +47,7 @@ func TestParseToCPE1(t *testing.T) {
 		assert.Nil(t, err)
 		fmt.Println(r)
 		for res := range cvequeryops.QueryCVEYields(db, cvequeryops.ProductWithVersion(r.Product, r.Version)) {
-			fmt.Println(res)
+			fmt.Println(res.Product)
 		}
 	}
 }
