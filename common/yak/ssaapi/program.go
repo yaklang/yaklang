@@ -15,12 +15,20 @@ func NewProgram(prog *ssa.Program) *Program {
 	}
 }
 
-func (p *Program) Ref(name string) *Values {
-	ret := make([]ssa.Node, 0)
+func (p *Program) Ref(name string) Values {
+	ret := make(Values, 0)
+	tmp := make(map[*Value]struct{})
 	lo.ForEach(p.Packages, func(pkg *ssa.Package, index int) {
 		lo.ForEach(pkg.Funcs, func(fun *ssa.Function, index int) {
-			ret = lo.Uniq(append(ret, fun.GetValuesByName(name)...))
+			for _, v := range fun.GetValuesByName(name) {
+				value := NewValue(v)
+				if _, ok := tmp[value]; !ok {
+					ret = append(ret, value)
+					tmp[value] = struct{}{}
+				}
+			}
+			// ret = lo.Uniq(append(ret, fun.GetValuesByName(name)...))
 		})
 	})
-	return NewValue(ret)
+	return ret
 }

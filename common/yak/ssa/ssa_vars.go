@@ -69,8 +69,8 @@ func (f *Function) InspectVariable(varName string) *InspectVariableResult {
 	return result
 }
 
-func (f *Function) GetValuesByName(name string) []Node {
-	ret := make([]Node, 0)
+func (f *Function) GetValuesByName(name string) InstructionNodes {
+	ret := make(InstructionNodes, 0)
 	if table, ok := f.symbolTable[name]; ok {
 		for _, v := range table {
 			for _, v := range v {
