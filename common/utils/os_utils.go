@@ -340,9 +340,12 @@ func GetDefaultGMTLSConfig(i float64) *gmtls.Config {
 	log.Error("fetch default tls config failed")
 	return nil
 }
-
 func DebugMockHTTPServerWithContext(ctx context.Context, https bool, h2 bool, gmtlsFlag bool, keepAlive bool, handle func([]byte) []byte) (string, int) {
 	addr := GetRandomLocalAddr()
+	return DebugMockHTTPServerWithContextWithAddress(ctx, addr, https, h2, gmtlsFlag, keepAlive, handle)
+
+}
+func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string, https bool, h2 bool, gmtlsFlag bool, keepAlive bool, handle func([]byte) []byte) (string, int) {
 	time.Sleep(300 * time.Millisecond)
 	var host, port, _ = ParseStringToHostPort(addr)
 	go func() {

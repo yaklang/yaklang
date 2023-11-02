@@ -1,0 +1,72 @@
+endian: big
+unit: byte
+Package:
+    TCP:
+        Source Port: uint16
+        Destination Port: uint16
+        Sequence Number: raw,4
+        Acknowledgement Number: raw,4
+        Header Length: uint8,4bit
+        Flags: raw,12bit
+        Window: raw,2
+        Checksum: raw,2
+        Urgent Pointer: raw,2
+        Options: # 字节数需要是4的倍数，不足补0
+            list: true
+            Option: Option
+            operator: |
+                this.SetMaxLength(getNodeResult("../Header Length").Value*4 - 20)
+                for {
+                    ele = this.NewElement()
+                    if ele.GetMaxLength() == 0{
+                        break
+                    }
+                    ele.Process()
+                    if ele.GetSubNode("Kind").Result().Value == 0 {
+                        break
+                    }
+                }
+                if this.Length() < this.GetMaxLength() {
+                    this.NewEmptyNode().Process()
+                }
+        Payload:
+            unpack: true
+            operator: |
+                typeNameList = ["TLS", "HTTP"]
+                for typeName in typeNameList{
+                    res,op = this.TryProcessByType(typeName)
+                    if op.OK {
+                        err = op.Save()
+                        if err != nil{
+                            panic(err)
+                        }
+                        return
+                    }else{
+                        err = op.Recovery()
+                        if err != nil{
+                            panic(err)
+                        }
+                        debug("parse node %s failed: %v", typeName, op.Message)
+                    }
+                }
+                # this.NewUnknownNode().Process()
+Option:
+    operator: |
+        n = this.ProcessSubNode("Kind").Value
+        switch n {
+        case 0:
+            break
+        case 1:
+            break
+        default:
+            this.ProcessSubNode("Length")
+            if this.GetSubNode("Data").GetRemainingSpace() != 0 {
+                this.ProcessSubNode("Data")
+            }    
+        }
+    length-from-field: Length
+    Kind: uint8
+    Length: uint8
+    Data: raw
+TLS: "import:application-layer/tls.yaml;node:Transport Layer Security"
+HTTP: "import:application-layer/http.yaml;node:HTTP"

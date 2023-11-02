@@ -1,0 +1,70 @@
+Package:
+  HTTP:
+    operator: |
+      res,op = this.TryProcessByType("FirstWorld")
+      op.Recovery()
+      if string(res.Value).HasPrefix("HTTP/") {
+        this.ProcessSubNode("HTTP Response")
+      }else{
+        this.ProcessSubNode("HTTP Request")
+      }
+    HTTP Request:
+      FirstLine:
+        unpack: true
+        Method: "del: ;type:string"
+        Path: "del: ;type:string"
+        Version: "del:\r\n;type:string"
+      Headers: Headers
+      Body: Body
+    HTTP Response:
+      FirstLine:
+        unpack: true
+        Version: "del: ;type:string"
+        Status: "del: ;type:string"
+        Message: "del:\r\n;type:string"
+      Headers: Headers
+      Body: Body
+FirstWorld: "del: ;type:string"
+Body:
+  operator: |
+    if getCtx("isChunked") {
+      this.ProcessSubNode("DataChunks")
+    }else{
+      this.GetSubNode("Data").SetCfg("length", getCtx("body_length"))
+      this.ProcessSubNode("Data")
+    }
+  Data: raw
+  DataChunks:
+    list: true
+    DataChunk:
+      operator: |
+        res = this.GetSubNode("DataChunkLength").Process().Value
+        length = int(res)
+        if length == 0 {
+          setCtx("inList",false)
+          return
+        }
+        this.GetSubNode("DataChunk").SetCfg("length", length*8)
+        this.GetSubNode("DataChunk").Process()
+        this.GetSubNode("DataChunkEnd").Process()
+      DataChunkLength: "type:string;del:\r\n"
+      DataChunk: raw
+      DataChunkEnd: "del:\r\n;type:string"
+Headers:
+  operator: |
+    for {
+      data := this.NewElement().Process().Value
+      if len(data) == 0 {
+        // this.SetChildren(this.GetChildren()[:-1])
+        return
+      }
+      if string(data).HasPrefix("Content-Length: ") {
+        l = int(string(data)[len("Content-Length: "):])
+        setCtx("body_length", l*8)
+      }
+      if string(data).HasPrefix("Transfer-Encoding: chunked") {
+        setCtx("isChunked", true)
+      }
+    }
+  list: true
+  Item: "del:\r\n;type:string"
