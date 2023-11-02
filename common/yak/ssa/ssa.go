@@ -1,10 +1,10 @@
 package ssa
 
 import (
-	"slices"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"golang.org/x/exp/slices"
 )
 
 type Position struct {
