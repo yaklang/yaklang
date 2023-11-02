@@ -97,16 +97,22 @@ var (
 )
 
 func GitHack(remoteRepoURL string, localPath string, opts ...Option) (finalErr error) {
-	c := &config{Remote: "origin", Threads: 8, UseLocalGitBinary: true}
+	c := &config{
+		Remote:            "origin",
+		Threads:           8,
+		UseLocalGitBinary: true,
+	}
 	for _, o := range opts {
 		if err := o(c); err != nil {
 			return err
 		}
 	}
+
 	if !utils.IsHttpOrHttpsUrl(remoteRepoURL) {
 		return utils.Errorf("remoteRepoURL must be http or https url: %s", remoteRepoURL)
 	}
 
+	// 创建临时文件夹
 	tempDirPath, err := os.MkdirTemp(os.TempDir(), "githack")
 	defer func() {
 		if finalErr != nil {
@@ -170,14 +176,17 @@ func GitHack(remoteRepoURL string, localPath string, opts ...Option) (finalErr e
 		return utils.Wrap(err, "open git repo error")
 	}
 
+	// wg 用于等待所有消费者关闭，taskwg用于等待当前所有任务完成
 	wg, taskwg := &sync.WaitGroup{}, &sync.WaitGroup{}
 	ch := make(chan string)
 
+	// 启动消费者
 	for i := 0; i < c.Threads; i++ {
 		wg.Add(1)
 		go o.consumeTask(wg, taskwg, ch)
 	}
 
+	// 如果可以目录遍历则直接递归添加任务
 	if canDirectoryTraversal {
 		o.addTaskDir(ch, ".git")
 		close(ch)
@@ -230,10 +239,12 @@ func GitHack(remoteRepoURL string, localPath string, opts ...Option) (finalErr e
 	}
 
 	wg.Wait()
+	// 强制checkout，恢复到最后一次提交
 	if err = o.checkoutLastCommit(repo); err != nil {
 		return utils.Wrap(err, "checkout last commit error")
 	}
 
+	// 移动临时目录到目标目录
 	if err = os.Rename(tempDirPath, localPath); err != nil {
 		return utils.Wrapf(err, "move temp git repo to %s error", localPath)
 	}
@@ -306,7 +317,7 @@ func (o *GitHackObject) addIndexTask(ch chan string, r *git.Repository) {
 		return
 	}
 
-	// tree
+	// cache objects
 	taskURLs := lo.FilterMap(i.Cache.Entries, func(entry index.TreeEntry, _ int) (string, bool) {
 		hash := entry.Hash.String()
 		taskURL, err := o.getHashTask(hash, remoteRepoURL)
@@ -327,6 +338,7 @@ func (o *GitHackObject) addPackTask(ch chan string, taskwg *sync.WaitGroup, r *g
 	remoteRepoURL := o.remoteRepoURL
 	packHashes := PACK_REGEX.FindAllString(utils.UnsafeBytesToString(packsContent), -1)
 	taskURLs := make([]string, 0, len(packHashes)*2)
+	// 下载pack和idx文件
 	for _, hash := range packHashes {
 		taskURL, err := utils.UrlJoin(remoteRepoURL, ".git", "objects", "pack", fmt.Sprintf("pack-%s.idx", hash))
 		if err != nil {
@@ -343,6 +355,7 @@ func (o *GitHackObject) addPackTask(ch chan string, taskwg *sync.WaitGroup, r *g
 	o.addTask(ch, "pack-self", taskURLs...)
 	taskwg.Wait()
 
+	// 解析pack文件
 	for _, taskURL := range taskURLs {
 		if !strings.HasSuffix(taskURL, ".pack") {
 			continue
@@ -439,8 +452,8 @@ func (o *GitHackObject) addHashParsedTask(ch chan string, tag string, content []
 }
 
 func (o *GitHackObject) addFsckTask(ch chan string, taskwg *sync.WaitGroup, command string) {
-
-	// run git fsck in repoPath until no error
+	// fsck用于最后的兜底
+	// 运行git fsck知道没有找到hash为止
 	taskNum, maxNum := 1, 10
 	for taskNum > 0 && maxNum > 0 {
 		cmd := exec.Command(command, "fsck", "--full")
