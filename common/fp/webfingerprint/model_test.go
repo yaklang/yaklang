@@ -1,7 +1,10 @@
 package webfingerprint
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/cve/cvequeryops"
 	"testing"
 )
 
@@ -30,5 +33,26 @@ func TestParseToCPE(t *testing.T) {
 
 		assert.Equal(t, r.String(), result.origin)
 		assert.Equal(t, r.LikeSearchString(), result.likeSearch)
+	}
+}
+
+func TestParseToCPE1(t *testing.T) {
+	cpes := []string{
+		"cpe:/a:apache:apache:2.4.38:*", "cpe:/a:debian:debian_linux:Debian:*",
+		"cpe:/a:*:apache_http_server:2.4.38:*:*:*",
+		"cpe:/a:*:apache:2.4.38:*:*:*",
+		"cpe:/a:apache:http_server:2.4.38:*:*:*",
+		"cpe:/a:*:apache:*:*:*:*",
+		"cpe:/a:*:debian:*:*:*:*",
+	}
+	db := consts.GetGormCVEDatabase()
+
+	for _, cpe := range cpes {
+		r, err := ParseToCPE(cpe)
+		assert.Nil(t, err)
+		fmt.Println(r)
+		for res := range cvequeryops.QueryCVEYields(db, cvequeryops.ProductWithVersion(r.Product, r.Version)) {
+			fmt.Println(res)
+		}
 	}
 }
