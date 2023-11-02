@@ -33,9 +33,9 @@ type config struct {
 	CheckoutKeep   bool
 
 	// GitHack
-	Threads               int
-	UseLocalGitExecutable bool
-	HTTPOptions           []yaklib.PocConfig
+	Threads           int
+	UseLocalGitBinary bool
+	HTTPOptions       []yaklib.PocConfig
 
 	// handler
 	HandleGitReference func(r *plumbing.Reference) error
@@ -199,9 +199,9 @@ func WithThreads(threads int) Option {
 	}
 }
 
-func WithUseLocalGitExecutable(b bool) Option {
+func WithUseLocalGitBinary(b bool) Option {
 	return func(c *config) error {
-		c.UseLocalGitExecutable = b
+		c.UseLocalGitBinary = b
 		return nil
 	}
 }
