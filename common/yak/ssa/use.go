@@ -13,6 +13,7 @@ func ReplaceValue(v Value, to Value) {
 }
 
 func ReplaceValueSkip(v Value, to Value, skip func(Instruction) bool) {
+	delete := make([]User, 0)
 	for _, user := range v.GetUsers() {
 		if skip(user) {
 			continue
@@ -20,6 +21,9 @@ func ReplaceValueSkip(v Value, to Value, skip func(Instruction) bool) {
 		user.ReplaceValue(v, to)
 		// user.InferenceType()
 		to.AddUser(user)
+		delete = append(delete, user)
+	}
+	for _, user := range delete {
 		v.RemoveUser(user)
 	}
 
