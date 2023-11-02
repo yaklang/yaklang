@@ -521,7 +521,7 @@ func ToReg(start, end string, startFlag, endFlag bool) []string {
 func VersionCompare(v1, v2 string) (int, float64) {
 	res, err := utils.VersionCompare(v1, v2)
 	if err != nil {
-		log.Errorf("[%s]-[%s]compare version error : %v", v1, v2, err)
+		log.Debugf("[%s]-[%s]compare version error : %v", v1, v2, err)
 		return -2, 0
 	}
 	return res, 1
