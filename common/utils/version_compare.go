@@ -178,7 +178,7 @@ func VersionCompare(v1, v2 string) (int, error) {
 
 	for i := 0; i < length; i++ {
 		if v1Tokens[i].Type != v2Tokens[i].Type {
-			return -2, errors.Errorf("compare version fail: %v", "Incomparable version")
+			return -2, errors.Errorf("[%s]-[%s]compare version fail: %v", v1, v2, "Incomparable version")
 		}
 
 		switch v1Tokens[i].Type {
