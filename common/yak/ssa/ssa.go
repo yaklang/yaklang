@@ -35,6 +35,8 @@ type LeftInstruction interface {
 type Instruction interface {
 	ErrorLogger
 
+	LineDisasm() string
+
 	// function
 	GetFunc() *Function
 	SetFunc(*Function)

@@ -129,6 +129,10 @@ func (b *FunctionBuilder) getFieldWithCreate(i, key Value, forceCreate bool) Val
 	if f := GetField(i, key); f != nil {
 		return f
 	}
+
+	if ci, ok := ToConst(key); ok {
+		ci.isIdentify = true
+	}
 	// if it, ok := ToObjectType(i.GetType()); ok {
 	// 	if t, _ := it.GetField(key); t != nil {
 	// 		fTyp = t
