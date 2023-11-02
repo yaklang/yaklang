@@ -1,6 +1,7 @@
 package lowhttp
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"io"
@@ -151,10 +152,31 @@ func UrlToHTTPRequest(text string) ([]byte, error) {
 		r.RequestURI += "#"
 	}
 
-	raw, err := utils.HttpDumpWithBody(r, false)
-	if err != nil {
-		return nil, err
-	}
+	raw := simpleDumpHTTPRequest(r)
+
 	raw = FixHTTPRequest(raw)
 	return raw, nil
+}
+
+func simpleDumpHTTPRequest(r *http.Request) []byte {
+	var buf bytes.Buffer
+	buf.WriteString(r.Method)
+	buf.WriteString(" ")
+	buf.WriteString(r.RequestURI)
+
+	buf.WriteString(" ")
+	r.Proto = fmt.Sprint("HTTP/", r.ProtoMajor, ".", r.ProtoMinor)
+	buf.WriteString(r.Proto)
+	buf.WriteString(CRLF)
+
+	// handle host
+	buf.WriteString("Host: ")
+	if r.Host != "" {
+		buf.WriteString(r.Host)
+	} else if r.URL.Host != "" {
+		buf.WriteString(r.URL.Host)
+	}
+
+	buf.WriteString(CRLF)
+	return buf.Bytes()
 }

@@ -335,7 +335,7 @@ func DumpHTTPRequest(req *http.Request, loadBody bool) ([]byte, error) {
 	var buf bytes.Buffer
 	buf.WriteString(req.Method)
 	buf.WriteString(" ")
-	if req.Method == "CONNECT" || req.RequestURI != "" {
+	if req.Method == "CONNECT" {
 		buf.WriteString(req.RequestURI)
 	} else {
 		uri := req.URL.RequestURI()
