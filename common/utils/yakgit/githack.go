@@ -97,7 +97,7 @@ var (
 )
 
 func GitHack(remoteRepoURL string, localPath string, opts ...Option) (finalErr error) {
-	c := &config{Remote: "origin", Threads: 8}
+	c := &config{Remote: "origin", Threads: 8, UseLocalGitBinary: true}
 	for _, o := range opts {
 		if err := o(c); err != nil {
 			return err
@@ -209,7 +209,7 @@ func GitHack(remoteRepoURL string, localPath string, opts ...Option) (finalErr e
 		if err == nil {
 			o.addHashParsedTask(ch, "stash", stashContent)
 		}
-		// COMMIT
+		// commit
 		taskwg.Wait()
 		log.Debugf("[githack] commit")
 		o.addCommitTask(ch, repo)
@@ -218,7 +218,7 @@ func GitHack(remoteRepoURL string, localPath string, opts ...Option) (finalErr e
 		log.Debugf("[githack] tree")
 		o.addTreeTask(ch, repo)
 		// fsck
-		if c.UseLocalGitExecutable {
+		if c.UseLocalGitBinary {
 			taskwg.Wait() // wait until other task done
 			log.Debugf("[githack] fsck if have git executable")
 			command, err := utils.GetExecutableFromEnv("git")
@@ -797,7 +797,7 @@ func (o *GitHackObject) request(method, baseURL string, paths ...string) (*http.
 	opts := make([]lowhttp.LowhttpOpt, len(o.httpOpts), len(o.httpOpts)+1)
 	copy(opts, o.httpOpts)
 	opts = append(opts, lowhttp.WithPacketBytes(raw))
-	opts = append(opts, lowhttp.WithNoFixContentLength(true), lowhttp.WithTimeoutFloat(1))
+	// opts = append(opts, lowhttp.WithNoFixContentLength(true), lowhttp.WithTimeoutFloat(1))
 
 	lowhttpRsp, err := lowhttp.HTTP(opts...)
 	if err != nil {
