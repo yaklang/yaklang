@@ -118,7 +118,23 @@ MM_reloadPage(true);
 <div id="siteInfo">  <a href="http://www.acunetix.com">About Us</a> | <a href="privacy.php">Privacy Policy</a> | <a href="mailto:wvs@acunetix.com">Contact Us</a> | <a href="/Mod_Rewrite_Shop/">Shop</a> | <a href="/hpp/">HTTP Parameter Pollution</a> | &copy;2019
   Acunetix Ltd 
 </div> 
-    
+
+<div>
+	<div>
+		<textarea class="xsss_in" name="message"></textarea>
+	</div>
+	<div>
+		<select name="id">
+			<option value="">---</option>
+			<option value="1">1</option>
+			<option value="2">2</option>
+			<option value="3">3</option>
+			<option value="4">4</option>
+			<option value="5">5</option>
+			<option value="6">6</option>
+		</select>
+	</div>
+</div>
     
 <br> 
 <div style="background-color:lightgray;width:100%;text-align:center;font-size:12px;padding:1px">
