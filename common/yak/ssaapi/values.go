@@ -84,3 +84,15 @@ func (v Values) ForEach(f func(*Value)) {
 		f(v)
 	}
 }
+
+func (v *Value) IsUpdate() bool {
+	return v.GetOpcode() == ssa.OpUpdate
+}
+
+func (v *Value) IsConst() bool {
+	return v.GetOpcode() == ssa.OpConst
+}
+
+func (v *Value) IsBinOp() bool {
+	return v.GetOpcode() == ssa.BinOpBegin
+}
