@@ -100,8 +100,18 @@ func (u *UnOp) ReplaceValue(v Value, to Value) {
 }
 
 // ----------- Call
-func (c *Call) HasValues() bool   { return true }
-func (c *Call) GetValues() Values { return append(c.Args, append(c.binding, c.Method)...) }
+func (c *Call) HasValues() bool { return true }
+func (c *Call) GetValues() Values {
+	ret := make(Values, 0, len(c.Args)+len(c.binding)+1)
+	ret = append(ret, c.Method)
+	for _, v := range c.Args {
+		ret = append(ret, v)
+	}
+	for _, v := range c.binding {
+		ret = append(ret, v)
+	}
+	return ret
+}
 func (c *Call) ReplaceValue(v Value, to Value) {
 	if c.Method == v {
 		c.Method = to

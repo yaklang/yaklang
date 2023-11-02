@@ -7,42 +7,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-type Value struct {
-	node ssa.InstructionNode
-}
-
-func NewValue(n ssa.InstructionNode) *Value {
-	return &Value{
-		node: n,
-	}
-}
-func (v *Value) String() string { return v.node.LineDisasm() }
-func (i *Value) Show()          { fmt.Println(i) }
-
-func (i *Value) GetOperands() Values {
-	return lo.Map(i.node.GetValues(), func(v ssa.Value, _ int) *Value { return NewValue(v) })
-}
-
-func (i *Value) GetOperand(index int) *Value {
-	return NewValue(i.node.GetValues()[index])
-}
-
-func (i *Value) GetRawUsers() ssa.Users {
-	return i.node.GetUsers()
-}
-
-func (i *Value) GetUsers() Values {
-	return lo.Map(i.GetRawUsers(), func(v ssa.User, _ int) *Value { return NewValue(v) })
-}
-
-func (i *Value) GetUser(index int) *Value {
-	return NewValue(i.node.GetUsers()[index])
-}
-
-func (value *Value) ShowUseDefChain() {
-	defaultUseDefChain(value).Show()
-}
-
 type Values []*Value
 
 func (value Values) Ref(name string) Values {
@@ -56,6 +20,16 @@ func (value Values) Ref(name string) Values {
 		})
 	}
 	return ret
+}
+
+func (v Values) Filter(f func(*Value) bool) Values {
+	var ret Values
+	for _, v := range v {
+		if f(v) {
+			ret = append(ret, v)
+		}
+	}
+	return v
 }
 
 // func (v Values) UseDefChain(f func(*Value, *UseDefChain)) {
@@ -85,6 +59,53 @@ func (v Values) ForEach(f func(*Value)) {
 	}
 }
 
+type Value struct {
+	node ssa.InstructionNode
+}
+
+func NewValue(n ssa.InstructionNode) *Value {
+	return &Value{
+		node: n,
+	}
+}
+func (v *Value) String() string { return v.node.LineDisasm() }
+func (i *Value) Show()          { fmt.Println(i) }
+func (i *Value) ShowWithSource() {
+	fmt.Printf("[%6s] %s\t%s\n", i.node.GetOpcode(), i.node.LineDisasm(), i.node.GetPosition())
+}
+
+func (i *Value) HasOperands() bool {
+	return i.node.HasValues()
+}
+
+func (i *Value) GetOperands() Values {
+	return lo.Map(i.node.GetValues(), func(v ssa.Value, _ int) *Value { return NewValue(v) })
+}
+
+func (i *Value) GetOperand(index int) *Value {
+	return NewValue(i.node.GetValues()[index])
+}
+
+func (i *Value) GetRawUsers() ssa.Users {
+	return i.node.GetUsers()
+}
+
+func (i *Value) HasUsers() bool {
+	return i.node.HasUsers()
+}
+
+func (i *Value) GetUsers() Values {
+	return lo.Map(i.GetRawUsers(), func(v ssa.User, _ int) *Value { return NewValue(v) })
+}
+
+func (i *Value) GetUser(index int) *Value {
+	return NewValue(i.node.GetUsers()[index])
+}
+
+func (value *Value) ShowUseDefChain() {
+	defaultUseDefChain(value).Show()
+}
+
 func (v *Value) IsUpdate() bool {
 	return v.node.GetOpcode() == ssa.OpUpdate
 }
@@ -95,6 +116,10 @@ func (v *Value) IsConst() bool {
 
 func (v *Value) IsBinOp() bool {
 	return v.node.GetOpcode() == ssa.OpBinOp
+}
+
+func (v *Value) IsCall() bool {
+	return v.node.GetOpcode() == ssa.OpCall
 }
 
 // for function
