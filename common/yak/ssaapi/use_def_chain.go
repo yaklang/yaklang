@@ -2,50 +2,8 @@ package ssaapi
 
 import (
 	"fmt"
-
-	"github.com/yaklang/yaklang/common/yak/ssa"
+	"strconv"
 )
-
-type Values struct {
-	ns []ssa.Node
-}
-
-func NewValue(n []ssa.Node) *Values {
-	return &Values{
-		ns: n,
-	}
-}
-
-func (value *Values) Ref(name string) *Values {
-	// return nil
-	var ret []ssa.Node
-	for _, v := range value.ns {
-		v.GetUsers().RunOnField(func(f *ssa.Field) {
-			if f.Key.String() == name {
-				ret = append(ret, f)
-			}
-		})
-	}
-	return NewValue(ret)
-}
-
-func (v *Values) UseDefChain(f func(*UseDefChain)) {
-	// ret := make(UseDefChains, 0, len(v.ns))
-	for _, v := range v.ns {
-		// ret = append(ret, defaultUseDefChain(v))
-		f(defaultUseDefChain(v))
-	}
-	// return ret
-}
-
-func (v *Values) Show() {
-	ret := ""
-	ret += fmt.Sprintf("Value: %d\n", len(v.ns))
-	for i, v := range v.ns {
-		ret += fmt.Sprintf("  %d: %s\n", i, v.String())
-	}
-	fmt.Println(ret)
-}
 
 type Direction int
 
@@ -56,11 +14,11 @@ const (
 )
 
 type UseDefChain struct {
-	direction Direction // 1 is up; -1 is down; 0 is both
-	v         ssa.Node
+	direction Direction
+	v         *Value
 }
 
-func defaultUseDefChain(v ssa.Node) *UseDefChain {
+func defaultUseDefChain(v *Value) *UseDefChain {
 	return &UseDefChain{
 		direction: Both,
 		v:         v,
@@ -68,43 +26,55 @@ func defaultUseDefChain(v ssa.Node) *UseDefChain {
 }
 
 func (u *UseDefChain) Show() {
-	ret := "use def chain\n"
+	u.ShowEx(0)
+}
+
+func (u *UseDefChain) ShowAll() {
+	u.ShowEx(1)
+}
+
+func (u *UseDefChain) ShowEx(flag int) {
 	v := u.v
-	for _, v := range v.GetValues() {
-		ret += fmt.Sprintf("\tUse  \t%s\n", v)
+	ret := fmt.Sprintf("use def chain [%s]:\n", v.GetOpcode())
+
+	show := func(prefix string, index int, v *Value) string {
+		indexStr := ""
+		if index >= 0 {
+			indexStr = strconv.FormatInt(int64(index), 10)
+		}
+		ret := ""
+		switch flag {
+		case 0:
+			ret += fmt.Sprintf("\t%s\t%s\t%s\n", prefix, indexStr, v)
+		case 1:
+			ret += fmt.Sprintf("\t%s\t%s\n\t\t%s\n\t\t%s\n\t\t%s\n", prefix, indexStr, v, v.InstructionNode, v.GetPosition())
+		default:
+		}
+		return ret
 	}
 
-	ret += fmt.Sprintf("\tSelf\t%s\n", v)
-	for _, u := range v.GetUsers() {
-		ret += fmt.Sprintf("\tUseBy\t%s\n", u)
+	for i, v := range v.GetOperands() {
+		ret += show("Operand", i, v)
 	}
 
+	ret += show("Self", -1, v)
+	for i, u := range v.GetUsers() {
+		ret += show("User", i, u)
+	}
 	fmt.Println(ret)
 }
 
-func (u *UseDefChain) SetDirectionUse() *UseDefChain {
-	u.direction = Use
-	return u
-}
-
-func (u *UseDefChain) SetSetDirectionUseBy() *UseDefChain {
-	u.direction = UseBy
-	return u
-}
-
-func (u *UseDefChain) Walk(f func(*Instruction)) {
+func (u *UseDefChain) WalkUser(f func(*Value)) {
+	// walk  users
 	v := u.v
-	if u.direction == Both || u.direction == Use {
-		// walk values
-		for _, v := range v.GetValues() {
-			f(NewInstruction(v))
-		}
+	for _, u := range v.GetUsers() {
+		f(u)
 	}
+}
 
-	if u.direction == Both || u.direction == UseBy {
-		// walk  users
-		for _, u := range v.GetUsers() {
-			f(NewInstruction(u))
-		}
+func (u *UseDefChain) WalkOperand(f func(*Value)) {
+	v := u.v
+	for _, v := range v.GetOperands() {
+		f(v)
 	}
 }
