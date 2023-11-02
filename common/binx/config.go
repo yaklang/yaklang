@@ -22,10 +22,10 @@ type PartDescriptor struct {
 	_byteOrder int
 
 	// size
-	size     uint64
-	sizeFrom string
-	typeFlag BinaryTypeVerbose
-
+	size      uint64
+	sizeFrom  string
+	typeFlag  BinaryTypeVerbose
+	ByteOrder ByteOrderEnum
 	// for net.Conn
 	timeout time.Duration
 }

@@ -1,0 +1,30 @@
+endian: big
+Ethernet:
+    Destination: 6,raw
+    Source: 6,raw
+    Type: 2,raw
+Internet:
+    endian: big
+    Version And Header Length:
+        endian: big
+        Data: 1,raw
+    Type of Service: 1,raw
+    Total Length: 2,raw
+    Identification: 2,raw
+    Flags And Fragment Offset : 2,raw
+    Time to Live: 1,raw
+    Protocol: 1,raw
+    Header Checksum: 2,raw
+    Source: 4,raw
+    Destination: 4,raw
+TCP:
+    Source Port: 2,raw
+    Destination Port: 2,raw
+    Sequence Number: 4,raw
+    Acknowledgement Number: 4,raw
+    Data Offset And Reserved: 1,raw
+    Flags: 1,raw
+    Window: 2,raw
+    Checksum: 2,raw
+    Urgent Pointer: 2,raw
+    Options: 24,raw
