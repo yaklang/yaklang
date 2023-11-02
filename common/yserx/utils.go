@@ -32,7 +32,7 @@ func marshalString(str string) []byte {
 }
 
 // utils method
-func ReadBytesLength(r *bufio.Reader, length uint64) ([]byte, error) {
+func ReadBytesLength(r io.Reader, length uint64) ([]byte, error) {
 	var buf = make([]byte, length)
 	n, err := io.ReadAtLeast(r, buf, int(length))
 	//n, err := r.Read(buf)
@@ -47,11 +47,11 @@ func ReadBytesLength(r *bufio.Reader, length uint64) ([]byte, error) {
 	return buf[:], nil
 }
 
-func ReadBytesLengthInt(r *bufio.Reader, length int) ([]byte, error) {
+func ReadBytesLengthInt(r io.Reader, length int) ([]byte, error) {
 	return ReadBytesLength(r, uint64(length))
 }
 
-func Read2ByteToInt(r *bufio.Reader) (int, error) {
+func Read2ByteToInt(r io.Reader) (int, error) {
 	raw, err := ReadBytesLength(r, 2)
 	if err != nil {
 		return 0, utils.Errorf("read bytes length failed: %s", err)
@@ -62,7 +62,7 @@ func Read2ByteToInt(r *bufio.Reader) (int, error) {
 	return int(i), nil
 }
 
-func ReadByteToInt(r *bufio.Reader) (int, error) {
+func ReadByteToInt(r io.Reader) (int, error) {
 	raw, err := ReadBytesLength(r, 1)
 	if err != nil {
 		return 0, utils.Errorf("read bytes length failed: %s", err)
@@ -73,15 +73,25 @@ func ReadByteToInt(r *bufio.Reader) (int, error) {
 	return int(i), nil
 }
 
-func Read4ByteToInt(r *bufio.Reader) (int, error) {
+func Read4ByteToInt(r io.Reader) (int, error) {
 	i, err := Read4ByteToUint64(r)
 	if err != nil {
 		return 0, err
 	}
 	return int(i), nil
 }
-
-func Read4ByteToUint64(r *bufio.Reader) (uint64, error) {
+func ReadByte(r io.Reader) ([]byte, error) {
+	raw := make([]byte, 1)
+	n, err := r.Read(raw)
+	if err != nil {
+		return nil, err
+	}
+	if n != 1 {
+		return nil, utils.Errorf("read class desc failed")
+	}
+	return raw, nil
+}
+func Read4ByteToUint64(r io.Reader) (uint64, error) {
 	raw, err := ReadBytesLength(r, 4)
 	if err != nil {
 		return 0, utils.Errorf("read bytes length failed: %s", err)
@@ -91,7 +101,7 @@ func Read4ByteToUint64(r *bufio.Reader) (uint64, error) {
 	return binary.BigEndian.Uint64(raw), nil
 }
 
-func Read8BytesToUint64(r *bufio.Reader) (uint64, error) {
+func Read8BytesToUint64(r io.Reader) (uint64, error) {
 	raw, err := ReadBytesLength(r, 8)
 	if err != nil {
 		return 0, utils.Errorf("read bytes length failed: %s", err)

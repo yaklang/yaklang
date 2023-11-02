@@ -1,0 +1,81 @@
+Package:
+  DNS:
+      Header:
+          operator: |
+              this.ForEachChild(func(node) { 
+                  res = node.Process()
+                  switch node.Name {
+                    case "Flags":
+                      flags = res.Value
+                      qr := (flags >> 15) & 0x1
+                      opcode := (flags >> 11) & 0xF
+                      aa := (flags >> 10) & 0x1
+                      tc := (flags >> 9) & 0x1
+                      rd := (flags >> 8) & 0x1
+                      ra := (flags >> 7) & 0x1
+                      z := (flags >> 4) & 0x7
+                      rcode := flags & 0xF
+                      node.AddInfo("QR", qr == 0 ? "Query" : "Response")
+                      node.AddInfo("Opcode", opcode)
+                      node.AddInfo("AA", aa)
+                      node.AddInfo("TC", tc)
+                      node.AddInfo("RD", rd)
+                      node.AddInfo("RA", ra)
+                      node.AddInfo("Z", z)
+                      node.AddInfo("RCODE", rcode)
+                      # dump(qr, opcode, aa, tc, rd, ra, z, rcode)
+                  }
+              })
+          ID: uint16
+          Flags: uint16
+          Questions: uint16
+          Answer RRs: uint16
+          Authority RRs: uint16
+          Additional RRs: uint16
+      Questions:
+          list: true
+          list-length-from-field: "../Header/Questions"
+          Question:
+            Name: String
+            Type: uint16
+            Class: uint16
+      Answers:
+          list: true
+          list-length-from-field: "../Header/Answer RRs"
+          Answer:
+            Name:
+              operator: |
+                  res,op = this.TryProcessSubNode("PointerFlag")
+                  if op.OK {
+                      res = res.Value
+                      if res == 3 {
+                          op.Save()
+                          this.ProcessSubNode("Pointer")
+                      }else{
+                          op.Recovery()
+                          this.ProcessSubNode("Data")
+                      }
+                  }else{
+                      panic(op.Message)
+                  }
+              PointerFlag: uint8,2bit
+              Pointer: uint16,14bit
+              Data: String
+            Type: uint16
+            Class: uint16
+            TTL: uint32
+            RDLength: uint16
+            RData: "type:raw;length-from-field:../RDLength"
+String:
+  list: true
+  Label:
+    operator: |
+      count = this.ProcessSubNode("Count").Value
+      if count == 0 {
+        setCtx("inList",false)
+        return
+      }
+      this.GetSubNode("Data").SetMaxLength(count)
+      this.ProcessSubNode("Data")
+    Count: uint8
+    Data: string

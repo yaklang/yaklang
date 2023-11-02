@@ -1,0 +1,31 @@
+Package:
+  Internet Protocol Version 6:
+    Version: uint8,4bit
+    Traffic Class: uint8,8bit
+    Flow Label: uint32,20bit
+    Payload Length: uint16
+    Next Header: uint8
+    Hop Limit: uint8
+    Source: raw,16
+    Destination: raw,16
+    Payload:
+      unpack: true
+      operator: |
+        protocol = getNodeResult("@Internet Protocol Version 6/Next Header").Value
+        var node 
+        switch protocol {
+          case 6:
+            node = this.NewSubNode("TCP")
+          case 17:
+            node = this.NewSubNode("UDP")
+          case 58:
+            node = this.NewSubNode("ICMPV6")
+          default:
+            node = this.NewUnknownNode()
+        }
+        node.SetMaxLength(getNodeResult("@Internet Protocol Version 6/Payload Length").Value)
+        node.Process()
+TCP: "import:transmission_control_protocol.yaml;node:TCP"
+UDP: "import:user_datagram_protocol.yaml;node:UDP"
+ICMPV6: "import:internet_control_message_protocol_v6.yaml;node:ICMPV6"
+Unknown: raw

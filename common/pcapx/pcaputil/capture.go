@@ -90,7 +90,11 @@ func Start(opt ...CaptureOption) error {
 			handlers = append(handlers, handler)
 		}
 	}
-
+	for _, handler := range handlers {
+		if err := handler.SetBPFFilter(conf.BPFFilter); err != nil {
+			return err
+		}
+	}
 	if conf.Context == nil {
 		conf.Context = context.Background()
 	}

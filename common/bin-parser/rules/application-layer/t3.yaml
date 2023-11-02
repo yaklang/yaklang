@@ -1,0 +1,69 @@
+Package:
+  operator: |
+    this.GetSubNode("Total Length").Process()
+    this.GetSubNode("Header").Process()
+    remotePeriodLength = this.GetSubNode("RemotePeriodLength").Process().Value
+    this.GetSubNode("PublicKeyLength").Process()
+    this.GetSubNode("PublicKey").Process()
+    offset = getNodeResult("Header.AbbrevOffset").Value
+    currentPosition = getCurrentPosition()
+    if offset != 0 {
+      this.GetSubNode("NoneStreamHeaderPeerInfo").SetCfg("length",(offset-currentPosition+1)*8)
+      this.GetSubNode("NoneStreamHeaderPeerInfo").Process()
+    }
+    this.GetSubNode("Abbrevs").Process()
+  Total Length: uint32
+  Header:
+    Cmd: uint8
+    Qos: uint8
+    Flags: uint8
+    ResponseId: int32
+    InvokableId: int32
+    AbbrevOffset: int32
+  RemotePeriodLength: int32
+  PublicKeyLength: int32
+  PublicKey: "type:raw;length-from-field:PublicKeyLength;length-from-field-multiply:8"
+  NoneStreamHeaderPeerInfo: raw
+  Abbrevs:
+    list: true
+    exception-plan: stopList # stopList, throw
+    endian: little
+    Abbrev:
+      operator: |
+        res = this.ProcessSubNode("Capacity").Value
+        abbrev = -1
+        switch len(res) {
+        case 1:
+          abbrev = res[0]
+        case 3:
+          abbrev = res[1] << 8 | res[2]
+        default:
+          panic("invalid abbrev")
+        }
+        cap = 255 // 应该从config取
+        if abbrev > cap{
+          typ = this.ProcessSubNode("ObjectType").Value
+          if typ == 0{
+            this.ProcessSubNode("Object") 
+          }
+          if typ == 1{
+            panic("not support string type")
+          }
+        }
+      Capacity:
+        operator: |
+          n = this.NewElement().Process().Value
+          if n < 0xfe { // 大于254
+              n = this.NewElement().Process().Value
+          } else {
+              n = this.NewElement().Process().Value
+              n = this.NewElement().Process().Value
+          }
+        list: true
+        Byte: uint8
+      ObjectType: uint8 # 0: Object, 1: string
+      Object:
+        parser: ser
+#  PeerInfo:
+#    Type: uint8
+#    Object: raw

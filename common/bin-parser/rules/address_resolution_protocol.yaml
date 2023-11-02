@@ -1,0 +1,11 @@
+Package:
+  Address Resolution Protocol:
+    Hardware type: uint16
+    Protocol type: uint16
+    Hardware size: uint8
+    Protocol size: uint8
+    Opcode: uint16 # 1/2
+    Sender MAC address: raw,6
+    Sender IP address: raw,4
+    Target MAC address: raw,6
+    Target IP address: raw,4

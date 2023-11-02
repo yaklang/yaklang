@@ -4,12 +4,47 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
+
+func MarshalIdempotent(v interface{}) ([]byte, error) {
+	var order func(v any) any
+	order = func(v any) any {
+		if v == nil {
+			return nil
+		}
+		refV := reflect.ValueOf(v)
+		if refV.Kind() == reflect.Ptr {
+			refV = refV.Elem()
+		}
+		switch refV.Kind() {
+		case reflect.Map:
+			res := [][2]any{}
+			keys := refV.MapKeys()
+			sort.Slice(keys, func(i, j int) bool {
+				return InterfaceToString(keys[i].Interface()) < InterfaceToString(keys[j].Interface())
+			})
+			for _, k := range keys {
+				res = append(res, [2]any{k.Interface(), order(refV.MapIndex(k).Interface())})
+			}
+			return res
+		case reflect.Slice, reflect.Array:
+			res := []any{}
+			for i := 0; i < refV.Len(); i++ {
+				res = append(res, order(refV.Index(i).Interface()))
+			}
+			return res
+		}
+		return v
+	}
+	// 执行JSON编码
+	return json.Marshal(order(v))
+}
 
 func MapGetStringOr(m map[string]interface{}, key string, value string) string {
 	if m == nil {

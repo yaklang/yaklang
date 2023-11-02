@@ -1,0 +1,106 @@
+Package:
+  BER Element:
+    operator: |
+      type = this.ProcessSubNode("Type").Value
+      l = this.ProcessSubNode("Length").Value
+      if l.Value == 0{
+        return
+      }
+      var nextNode
+      if type.Child("Constructed").Value {
+        this.GetSubNode("Children").SetMaxLength(l.Value)
+        this.ProcessSubNode("Children")
+      }else{
+        if type.Child("Tag").Value == 2 && type.Child("Class").Value == 0{
+            this.GetSubNode("Integer").SetMaxLength(l.Value)
+            this.ProcessSubNode("Integer")
+        }else{
+            this.GetSubNode("Value").SetMaxLength(l.Value)
+            this.ProcessSubNode("Value")
+        }
+      }
+      return
+    Type:
+      type: uint8
+      out: |
+          if data.Value == nil{
+            return
+          }
+          v = data.Value
+          className = v >> 6
+          constructed = v >> 5 & 0x1
+          tag = v & 0x1f
+          vs = []
+          vs.Append(newValue("Class",className))
+          vs.Append(newValue("Constructed",constructed))
+          vs.Append(newValue("Tag",tag))
+          return newStructValue(name,vs...)
+    Length:
+      list: true
+      Octet: uint8
+      out: |
+        data = data.Value
+        res = 0
+        isLong = false
+        isIndefinite = false
+        for index,n = range data{
+          n = n.Value
+          if index == 0{
+            if n>>7 == 1{
+              if n&0x7f == 0{
+                isIndefinite = true
+              } else {
+                isLong = true
+              }
+            }else{
+                res = n & 0x7f
+              }
+          }else{
+            if isLong{
+              res = res << 8 + n
+            }else if isIndefinite{
+              if n == 0{
+                break
+              }
+              res = res << 8 + n
+            }
+          }
+        }
+        return res
+      input: |
+
+      operator: |
+        n = this.NewElement().Process()
+        n = n.Value
+        shortForm = n>>7 == 0
+        longForm = n>>7 == 1
+        var indefiniteForm = false
+        if longForm {
+          indefiniteForm = n == 0x80
+          if indefiniteForm {
+            longForm = false
+          }
+        }
+        if shortForm {
+          debug("short form")
+        }else if longForm {
+          debug("long form")
+          for i = range n&0x7f {
+            n = this.NewElement().Process()
+          }
+        }else if indefiniteForm {
+          for {
+              n = this.NewElement().Process()
+              if n == 0 {
+                break
+              }
+          }
+        }
+    Value: raw
+    Integer: uint32
+    OCTET STRING: string
+    NULL: raw,0
+    OBJECT IDENTIFIER: string
+    Children:
+      list: true
+      Value: "ref-type:@BER Element"
