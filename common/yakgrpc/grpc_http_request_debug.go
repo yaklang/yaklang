@@ -53,13 +53,14 @@ func (s *Server) execScript(scriptName string, targetInput string, stream sender
 		debugType = scriptInstance.Type
 		isTemp    = scriptInstance.Ignored && strings.HasPrefix(scriptInstance.ScriptName, "tmp-")
 	)
-
+	isUrlParam := false
 	switch strings.ToLower(debugType) {
 	case "mitm":
 		fallthrough
 	case "port-scan":
 		fallthrough
 	case "nuclei":
+		isUrlParam = true
 		break
 	default:
 		return utils.Error("unsupported plugin type: " + debugType)
@@ -203,9 +204,10 @@ func (s *Server) execScript(scriptName string, targetInput string, stream sender
 		return nil
 	})
 	subEngine, err := engine.ExecuteExWithContext(stream.Context(), debugScript, map[string]any{
-		"REQUESTS":    reqs,
-		"CTX":         stream.Context(),
-		"PLUGIN_NAME": scriptName,
+		"REQUESTS":     reqs,
+		"CTX":          stream.Context(),
+		"PLUGIN_NAME":  scriptName,
+		"IS_URL_PARAM": isUrlParam,
 	})
 	if err != nil {
 		log.Warnf("execute debug script failed: %v", err)

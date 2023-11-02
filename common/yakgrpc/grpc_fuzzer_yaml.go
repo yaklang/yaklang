@@ -241,6 +241,9 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 			bulk.Paths = []string{url.Path}
 			bulk.Body = string(lowhttp.GetHTTPPacketBody(request.RequestRaw))
 			bulk.Headers = lowhttp.GetHTTPPacketHeaders(request.RequestRaw)
+			if _, ok := bulk.Headers["Host"]; ok {
+				delete(bulk.Headers, "Host")
+			}
 			req, err := lowhttp.ParseBytesToHttpRequest(request.RequestRaw)
 			if err != nil {
 				log.Error(err)
@@ -343,7 +346,7 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 		}
 		for i, path := range sequence.Paths {
 			rootPath := utils.ParseStringUrlToWebsiteRootPath(path)
-			sequence.Paths[i] = strings.Replace(path, rootPath, "{{RootUrl}}", 1)
+			sequence.Paths[i] = strings.Replace(path, rootPath, "{{RootURL}}", 1)
 		}
 	}
 	template.Sign = template.SignMainParams()

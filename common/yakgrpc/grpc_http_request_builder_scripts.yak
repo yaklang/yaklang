@@ -4,10 +4,12 @@ reqs = [{"RawHTTPRequest": b`GET / HTTP/1.1
 Host: www.example.com
 `, "IsHttps": true}]
 
+isUrlParam = false
 if getParams("REQUESTS") != undefined {
     reqs = getParams("REQUESTS")
     ctx = getParams("CTX")
     pluginName = getParams("PLUGIN_NAME")
+    isUrlParam = getParams("IS_URL_PARAM")
 }
 
 /*
@@ -38,23 +40,28 @@ for req in reqs {
     go fn {
         defer swg.Done()
         try {
-            rspIns, _ := poc.HTTPEx(req.RawHTTPRequest, poc.https(req.IsHttps))~
-            rsp = rspIns.RawPacket
-            firstRsp = rspIns.RedirectRawPackets[0].Response
-            firstReq = rspIns.RedirectRawPackets[0].Request
-            reqRaw = rspIns.RedirectRawPackets[-1].Request
-            if poc.GetHTTPPacketHeader(firstRsp, "Set-Cookie") == "" {
-                reqRaw = firstReq
-            }
-            println("---------------------")
-            println(string(reqRaw))
-            println(string(rsp))
-            println("---------------------")
-            isHttps = req.IsHttps
+            if isUrlParam {
+                u = str.ExtractURLFromHTTPRequestRaw(req.RawHTTPRequest, req.IsHttps /*type: bool*/)~
+                caller.MirrorHTTPFlow(req.IsHttps, u.String(), req.RawHTTPRequest, "", "")
+            } else {
+                rspIns, _ := poc.HTTPEx(req.RawHTTPRequest, poc.https(req.IsHttps))~
+                rsp = rspIns.RawPacket
+                firstRsp = rspIns.RedirectRawPackets[0].Response
+                firstReq = rspIns.RedirectRawPackets[0].Request
+                reqRaw = rspIns.RedirectRawPackets[-1].Request
+                if poc.GetHTTPPacketHeader(firstRsp, "Set-Cookie") == "" {
+                    reqRaw = firstReq
+                }
+                println("---------------------")
+                println(string(reqRaw))
+                println(string(rsp))
+                println("---------------------")
+                isHttps = req.IsHttps
 
-            u = str.ExtractURLFromHTTPRequestRaw(reqRaw, isHttps /*type: bool*/)~
-            header, body = poc.Split(rsp)~
-            caller.MirrorHTTPFlow(isHttps, u.String(), reqRaw, rsp, body)
+                u = str.ExtractURLFromHTTPRequestRaw(reqRaw, isHttps /*type: bool*/)~
+                header, body = poc.Split(rsp)~
+                caller.MirrorHTTPFlow(isHttps, u.String(), reqRaw, rsp, body)
+            }
         } catch err {
             println("===================packet=================== \n%v" % string(req.RawHTTPRequest))
             log.warn("exec request failed: %v", err)
