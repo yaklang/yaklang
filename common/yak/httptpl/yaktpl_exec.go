@@ -172,24 +172,37 @@ func (y *YakTemplate) ExecWithUrl(u string, config *Config, opts ...lowhttp.Lowh
 			swg.Add()
 			go func(ret *RequestBulk, payload map[string][]string) {
 				defer swg.Done()
-				rsps, result, extracted, reqCount := y.handleRequestSequences(config, ret.RequestConfig, ret.Requests, payload, func(reqRaw []byte, isHttps bool) (*lowhttp.LowhttpResponse, error) {
+				rsps, result, extracted, reqCount := y.handleRequestSequences(config, ret.RequestConfig, ret.Requests, payload, func(raw []byte, req *requestRaw) (*lowhttp.LowhttpResponse, error) {
 					if config.BeforeSendPackage != nil {
-						reqRaw = config.BeforeSendPackage(reqRaw, isHttps)
+						raw = config.BeforeSendPackage(raw, req.IsHttps)
 					}
-					var packetOpt []lowhttp.LowhttpOpt
+					packetOpt := opts
+					redictTimes := 0
+					if ret.RequestConfig.EnableRedirect {
+						redictTimes = ret.RequestConfig.MaxRedirects
+					}
 					packetOpt = append(
-						packetOpt, lowhttp.WithPacketBytes(reqRaw), lowhttp.WithHttps(isHttps),
-						lowhttp.WithSaveHTTPFlow(true), lowhttp.WithSource(y.Name), lowhttp.WithNoFixContentLength(ret.RequestConfig.NoFixContentLength),
+						packetOpt,
+						lowhttp.WithPacketBytes(raw),
+						lowhttp.WithHttps(req.IsHttps),
+						lowhttp.WithSaveHTTPFlow(true),
+						lowhttp.WithSource(y.Name),
+						lowhttp.WithNoFixContentLength(ret.RequestConfig.NoFixContentLength),
+						lowhttp.WithRedirectTimes(redictTimes),
+						lowhttp.WithTimeout(req.Timeout),
 					)
-					packetOpt = append(packetOpt, opts...)
+					if req.OverrideHost != "" {
+						packetOpt = append(packetOpt, lowhttp.WithHost(req.OverrideHost))
+					}
+
 					if config.Debug && config.DebugRequest {
 						fmt.Printf("--------------REQ---------------\n")
-						fmt.Println(reqRaw)
+						fmt.Println(raw)
 					}
 
 					utils.Debug(func() {
 						log.Info("nuclei lowhttp.Exec! ")
-						spew.Dump(reqRaw)
+						spew.Dump(raw)
 					})
 					rsp, err := lowhttp.HTTP(packetOpt...)
 					if err != nil {
@@ -269,7 +282,7 @@ func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts 
 }
 
 // handleRequestSequences 渲染、发包、匹配、提取
-func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakRequestBulkConfig, reqSeqs []*requestRaw, payload map[string][]string, sender func(raw []byte, isHttps bool) (*lowhttp.LowhttpResponse, error)) ([]*lowhttp.LowhttpResponse, bool, map[string]interface{}, int64) {
+func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakRequestBulkConfig, reqSeqs []*requestRaw, payload map[string][]string, sender func(raw []byte, req *requestRaw) (*lowhttp.LowhttpResponse, error)) ([]*lowhttp.LowhttpResponse, bool, map[string]interface{}, int64) {
 
 	defer func() {
 		if err := recover(); err != nil {
@@ -310,7 +323,7 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 		}
 		for _, reqRaw := range reqs {
 			atomic.AddInt64(&count, 1)
-			rsp, err := sender([]byte(reqRaw), req.IsHttps)
+			rsp, err := sender([]byte(reqRaw), req)
 			if err == nil {
 				responses = append(responses, rsp)
 			} else {
