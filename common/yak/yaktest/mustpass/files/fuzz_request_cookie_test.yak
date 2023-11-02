@@ -1,0 +1,14 @@
+freq := fuzz.HTTPRequest(`GET / HTTP/1.1
+Host: www.example.com
+Cookie: a=%7B%22a%22%3A%22cccccc%22%7D`)~
+
+jsonCookieChecked = false
+
+params = freq.GetCookieParams();
+for param in params {
+    if param.Position().Contains("cookie") && param.IsCookieParams() {
+        jsonCookieChecked = true
+    }
+    param.Fuzz("TTTTTT").Show()
+}
+assert jsonCookieChecked
