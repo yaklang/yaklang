@@ -126,10 +126,10 @@ func (p *FuzzHTTPRequestParam) IsGetValueJSON() bool {
 }
 
 func (p *FuzzHTTPRequestParam) IsCookieParams() bool {
-	if p.typePosition == posCookie {
+	switch p.typePosition {
+	case posCookie, posCookieJson, posCookieBase64, posCookieBase64Json:
 		return true
 	}
-
 	return false
 }
 
