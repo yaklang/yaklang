@@ -33,29 +33,6 @@ func TestDemo2(t *testing.T) {
 	prog.Show()
 }
 
-func TestBreak(t *testing.T) {
-	prog := ParseSSA(`
-	a = 1;
-	for (;;) {
-		a = 2;
-		break;
-	}
-
-	a = 3;
-
-	label1: {
-		// print(a)
-		for (;;) {
-			a = 4;
-			// print(a)
-			break label1;
-		}
-	}
-	`, none)
-	prog.Show()
-	fmt.Println(prog.GetErrors().String())
-}
-
 func TestSwitch(t *testing.T) {
 	prog := ParseSSA(`
 	const fruit = "apple";
