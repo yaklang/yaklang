@@ -34,8 +34,8 @@ const (
 )
 
 var BinaryOpcodeName = map[BinaryOpcode]string{
-	OpLogicAnd: `&&`,
-	OpLogicOr:  `||`,
+	OpLogicAnd: `LogicAnd`,
+	OpLogicOr:  `LogicOr`,
 
 	OpAnd:    `and`,
 	OpAndNot: `and-not`,
@@ -50,8 +50,8 @@ var BinaryOpcodeName = map[BinaryOpcode]string{
 	OpDiv:    `div`,
 	OpGt:     `gt`,
 	OpLt:     `lt`,
-	OpLtEq:   `lt-eq`,
-	OpGtEq:   `gt-eq`,
+	OpLtEq:   `ltEq`,
+	OpGtEq:   `gtEq`,
 	OpNotEq:  `neq`,
 	OpEq:     `eq`,
 	OpIn:     `in`,
