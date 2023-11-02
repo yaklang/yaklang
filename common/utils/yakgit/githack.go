@@ -152,7 +152,7 @@ func GitHack(remoteRepoURL string, localPath string, opts ...Option) (finalErr e
 	// 解析HEAD得到当前分支
 	branches = append(branches, o.parseHeadBranch(headContent)...)
 	// 解析logs/HEAD得到分支
-	logsHeadContent, err := o.checkGitLogHead()
+	logsHeadContent, err := o.downloadFile(".git/logs/HEAD")
 	if err == nil {
 		branches = append(branches, o.parseLogsHeadBranch(logsHeadContent)...)
 	}
@@ -193,7 +193,7 @@ func GitHack(remoteRepoURL string, localPath string, opts ...Option) (finalErr e
 	} else {
 		// pack
 		log.Debugf("[githack] pack files")
-		packContent, err := o.checkGitPack()
+		packContent, err := o.downloadFile(".git/objects/info/packs")
 		if err == nil {
 			o.addPackTask(ch, taskwg, repo, packContent, tempDirPath)
 		}
@@ -208,13 +208,13 @@ func GitHack(remoteRepoURL string, localPath string, opts ...Option) (finalErr e
 		o.addHashParsedTask(ch, "log-head", headContent)
 		// index
 		log.Debugf("[githack] index files")
-		_, err = o.checkGitIndex()
+		_, err = o.downloadFile(".git/index")
 		if err == nil {
 			o.addIndexTask(ch, repo)
 		}
 		// stash
 		log.Debugf("[githack] stash files")
-		stashContent, err := o.checkGitStash()
+		stashContent, err := o.downloadFile(".git/refs/stash")
 		if err == nil {
 			o.addHashParsedTask(ch, "stash", stashContent)
 		}
@@ -716,61 +716,18 @@ func (o *GitHackObject) checkGitHead() ([]byte, error) {
 	return body, nil
 }
 
-func (o *GitHackObject) checkGitPack() ([]byte, error) {
+func (o *GitHackObject) downloadFile(path string) ([]byte, error) {
 	remoteRepoURL := o.remoteRepoURL
 	tempDirPath := o.tempDirPath
 
-	rsp, body, err := o.request("GET", remoteRepoURL, ".git/objects/info/packs")
+	rsp, body, err := o.request("GET", remoteRepoURL, path)
 	if rsp.StatusCode != 200 && err == nil {
-		err = utils.Error("pack not found")
+		err = utils.Errorf("%s not found", path)
 	}
 	if err == nil {
-		savePath := filepath.Join(tempDirPath, ".git", "objects", "info", "packs")
-		saveToFile(savePath, body)
-	}
-	return body, err
-}
-
-func (o *GitHackObject) checkGitIndex() ([]byte, error) {
-	remoteRepoURL := o.remoteRepoURL
-	tempDirPath := o.tempDirPath
-
-	rsp, body, err := o.request("GET", remoteRepoURL, ".git/index")
-	if rsp.StatusCode != 200 && err == nil {
-		err = utils.Error("index not found")
-	}
-	if err == nil {
-		savePath := filepath.Join(tempDirPath, ".git", "index")
-		saveToFile(savePath, body)
-	}
-	return body, err
-}
-
-func (o *GitHackObject) checkGitLogHead() ([]byte, error) {
-	remoteRepoURL := o.remoteRepoURL
-	tempDirPath := o.tempDirPath
-
-	rsp, body, err := o.request("GET", remoteRepoURL, ".git/logs/HEAD")
-	if rsp.StatusCode != 200 && err == nil {
-		err = utils.Error("logs HEAD not found")
-	}
-	if err == nil {
-		savePath := filepath.Join(tempDirPath, ".git", "logs", "HEAD")
-		saveToFile(savePath, body)
-	}
-	return body, err
-}
-
-func (o *GitHackObject) checkGitStash() ([]byte, error) {
-	remoteRepoURL := o.remoteRepoURL
-	tempDirPath := o.tempDirPath
-
-	rsp, body, err := o.request("GET", remoteRepoURL, ".git/refs/stash")
-	if rsp.StatusCode != 200 && err == nil {
-		err = utils.Error("stash not found")
-	}
-	if err == nil {
-		savePath := filepath.Join(tempDirPath, ".git", "refs", "stash")
+		paths := strings.Split(path, "/")
+		paths = append([]string{tempDirPath}, paths...)
+		savePath := filepath.Join(paths...)
 		saveToFile(savePath, body)
 	}
 	return body, err
