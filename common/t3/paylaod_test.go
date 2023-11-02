@@ -15,7 +15,8 @@ func TestGenPyaload(t *testing.T) {
 }
 
 func TestParseT3(t *testing.T) {
-	content, err := ioutil.ReadFile("/Users/z3/Downloads/lookupReq.data")
+	data := "737200137765626c6f6769632e726a766d2e4a564d4944dc49c23ede121e2a0c00007870771f016e4ae3a517c12dae000c3139322e3136382e332e3232c148f3810000000078"
+	content, err := codec.DecodeHex(data)
 	if err != nil {
 		println("open file error")
 	}

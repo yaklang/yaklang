@@ -1,0 +1,103 @@
+Package:
+  Header:
+    operator: |
+      this.ForEachChild((node)=>{
+        node.Process()
+      })
+      typeId = this.GetSubNode("MessageType").Result().Value
+      setCtx("typeId",typeId)
+      messageSize = this.GetSubNode("MessageSize").Result().Value
+      setCtx("messageSize",messageSize)
+    Magic: raw,4
+    Version:
+      Major: uint8
+      Minor: uint8 # 0: object_key 1: target (仅支持2)
+    MessageFlags: uint8
+    MessageType: uint8
+    MessageSize: uint32
+  Request:
+    operator: |
+      typeId = getCtx("typeId")
+      messageSize = getCtx("messageSize")
+      this.SetCfg("length",messageSize*8)
+      switch typeId {
+      case 0: // Request
+        this.GetSubNode("RequestId").Process()
+        this.GetSubNode("ResponseFlags").Process()
+        this.GetSubNode("Reserved1").Process()
+        this.GetSubNode("Target").Process()
+        this.GetSubNode("ObjectKey").Process()
+        this.GetSubNode("Operation").Process()
+        this.GetSubNode("ServiceContextList").Process()
+        this.GetSubNode("Reserved2").Process()
+        this.GetSubNode("StubData").Process()
+      case 1: // Reply
+        this.GetSubNode("RequestId").Process()
+        this.GetSubNode("ReplyStatus").Process()
+        this.GetSubNode("ServiceContextList").Process()
+        this.GetSubNode("Other").Process()
+      case 2: // CancelRequest
+      case 3: // LocateRequest
+        this.GetSubNode("RequestId").Process()
+        // if Minor == 0 || Minor == 1 { object_key.Process() }
+        // if Minor == 2 :
+        this.GetSubNode("Target").Process()
+        this.GetSubNode("ObjectKey").Process()
+      case 4: // LocateReply
+        this.GetSubNode("RequestId").Process()
+        this.GetSubNode("LocateStatus").Process()
+        this.GetSubNode("IOR").Process()
+      case 5: // CloseConnection
+      default:
+        panic("invalid message type")
+      }
+
+    # LocateRequest、LocateReply
+    RequestId: uint32
+    Target: uint32
+    ObjectKey: LengthString
+    LocateStatus: uint32 # 2|3: IOR、4: SystemException、5: short int
+    IOR: raw
+    ReplyStatus: uint32
+    ResponseFlags: uint8 # 0: response_expected、1: response_unexpected
+    Reserved1: raw,3
+    Operation: String
+    ServiceContextList:
+      ListLength: uint32
+      ServiceContexts:
+        list: true
+        list-length-from-field: "@Request.ServiceContextList.ListLength"
+        exception-plan: stopList # stopList, throw
+        ServiceContext:
+          operator: |
+            this.GetSubNode("Id").Process()
+            n = this.GetSubNode("DataLength").Process().Value
+            this.GetSubNode("Endian").Process()
+            this.GetSubNode("Data").SetCfg("length",(n-1)*8)
+            this.GetSubNode("Data").Process()
+          Id: uint32
+          DataLength: uint32
+          Endian: uint8
+          Data: raw
+    Reserved2: raw,4
+    StubData:
+      Length: uint32
+      WNames:
+        list: true
+        list-length-from-field: "@Request.StubData.Length"
+        WName: LengthString
+      Others: raw
+    Other: raw
+IOR:
+  RepositoryId: uint32
+  Length: uint32
+  Profiles:
+    Flag: uint
+#    IopProfile:
+LengthString:
+    Length: uint32
+    Data: "type:raw;length-from-field:Length;length-from-field-multiply:8"
+String:
+  OperationLength: uint32
+  RequestOperation: "type:raw;length-from-field:OperationLength;length-from-field-multiply:8"
+  Octet: raw,1

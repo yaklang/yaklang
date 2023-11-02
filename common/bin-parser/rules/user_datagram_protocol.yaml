@@ -1,0 +1,31 @@
+Package:
+    UDP:
+        Source Port: uint16
+        Destination Port: uint16
+        Length: uint16
+        Checksum: uint16
+        Payload:
+            unpack: true
+            operator: |
+              typeNameList = ["DNS", "DHCP", "NTP", "SNMP"]
+              for typeName in typeNameList{
+                  res,op = this.TryProcessByType(typeName)
+                  if op.OK {
+                      err = op.Save()
+                      if err != nil{
+                          panic(err)
+                      }
+                      return
+                  }else{
+                      debug(op.Message)
+                      err = op.Recovery()
+                      if err != nil{
+                          panic(err)
+                      }
+                  }
+              }
+              this.NewUnknownNode().Process()
+DNS: "import:application-layer/dns.yaml;node:DNS"
+DHCP: "import:application-layer/dhcp.yaml;node:DHCP"
+NTP: "import:application-layer/ntp.yaml;node:NTP"
+SNMP: "import:application-layer/snmp.yaml;node:SNMP"

@@ -1,0 +1,27 @@
+endian: big
+Package:
+  Ethernet:
+    Destination: raw,6
+    Source: raw,6
+    Type: uint16
+    Payload:
+      unpack: true
+      operator: |
+        type = getNodeResult("@Ethernet/Type").Value
+        switch type {
+          case 0x0800:
+            this.ProcessByType("Internet Protocol")
+          case 0x86dd:
+            this.ProcessByType("Internet Protocol Version 6")
+          case 0x0806:
+            this.ProcessByType("Address Resolution Protocol")
+          case 0x888e:
+            this.ProcessByType("EAPOL")
+          default:
+            this.NewUnknownNode()
+        }
+Internet Protocol: "import:internet_protocol.yaml;node:Internet Protocol"
+Internet Protocol Version 6: "import:internet_protocol_version_6.yaml;node:Internet Protocol Version 6"
+Address Resolution Protocol: "import:address_resolution_protocol.yaml;node:Address Resolution Protocol"
+EAPOL: "import:eapol.yaml;node:EAPOL"
+Unknown: raw

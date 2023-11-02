@@ -312,7 +312,6 @@ func (s *Server) execScriptWithRequest(scriptName string, targetInput string, st
 		return stream.Send(result)
 	})
 	engine := yak.NewYakitVirtualClientScriptEngine(feedbackClient)
-
 	log.Infof("engine.ExecuteExWithContext(stream.Context(), debugScript ... \n")
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
 		engine.SetVar("RUNTIME_ID", runtimeId)

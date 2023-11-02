@@ -1,0 +1,77 @@
+Package:
+  Message: BER
+  LDAP:
+    parser: |
+      message = getNode("@Message")
+      data = getDataByNode(this)
+      this.SetValue(data)
+    generator: |
+      message = getNode("@Message")
+      data = getDataByNode(this)
+      message.SetValue(data)
+    MessageId: uint32
+    ProtocolOP:
+      BinRequest:
+        Version: uint32
+        Name: string
+        Auth: string
+      BinResponse:
+        BaseObject: string
+        Scope: uint32
+        DerefAliases: uint32
+        SizeLimit: uint32
+        TimeLimit: uint32
+        TypesOnly: bool
+        Filter: string
+        Attributes:
+          list: true
+          Attribute:
+            AttributeDescription: string
+            AttributeValue:
+              list: true
+              Value: string
+    Controls:
+      list: true
+      Control:
+        ControlType: uint32
+        Criticality: bool
+        ControlValue: string
+    out: |
+      check = (node,classId,tagId)=>{
+        assert node.Child("Class").Value == classId, "error class"
+        assert node.Child("Tag").Value == tagId, "error Tag"  
+      }
+      readString = (node) => {
+        if node == nil {
+          return ""
+        }
+        v = ""
+        l = node.Child("Length").Value
+        if l != 0{
+          if node.Child("Value") == nil{ return "" }
+          v = string(node.Child("Value").Value)
+        }
+        return v
+      }
+      message = data.Child("Message")
+      check(message.Child("Type"),0,16)
+      sequence = message.Child("Children").Children()
+      messageIdNode = sequence[0]
+      messageId = messageIdNode.Child("Integer").Value
+      protocolOpNode = sequence[1]
+      var opname = ""
+      switch protocolOpNode.Child("Tag"){
+      case 0:
+        opname = "BindRequest"
+      case 1:
+        opname = "BindResponse"
+      }
+      protocolOpNodeChildren = protocolOpNode.Child("Children").Children()
+      versionNode = protocolOpNodeChildren[0]
+      version = versionNode.Child("Integer").Value
+      nameNode = protocolOpNodeChildren[1]
+      name = readString(nameNode)
+      auth = readString(protocolOpNodeChildren[2])
+      
+      return data
+BER: "import:application-layer/ber.yaml;node:BER Element"
