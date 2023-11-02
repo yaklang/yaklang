@@ -179,6 +179,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		dnsHosts             = option.EtcHosts
 		connPool             = option.ConnPool
 		withConnPool         = option.WithConnPool
+		auth                 = option.LowhttpAuth
 	)
 
 	if option.WithConnPool && option.ConnPool == nil {
@@ -691,6 +692,7 @@ RECONNECT:
 		httpResponseReader := bufio.NewReaderSize(io.TeeReader(conn, &responseRaw), option.DefaultBufferSize)
 
 		// 服务器响应第一个字节
+	READ:
 		serverTimeStart := time.Now()
 		_ = conn.SetReadDeadline(serverTimeStart.Add(timeout))
 		_, err := httpResponseReader.Peek(1)
@@ -707,6 +709,19 @@ RECONNECT:
 		if err != nil {
 			log.Infof("[lowhttp] read response failed: %s", err)
 		}
+
+		if firstResponse.StatusCode == 401 && auth != nil {
+			authReq, err := auth.Authenticate(conn, requestPacket)
+			if err == nil {
+				_, err := conn.Write(authReq)
+				responseRaw.Reset() //发送认证请求成功，清空缓冲区
+				if err != nil {
+					return response, errors.Wrap(err, "write request failed")
+				}
+				goto READ
+			}
+		}
+
 		response.ResponseBodySize = httpctx.GetResponseBodySize(stashedRequest)
 		if firstResponse == nil {
 			if len(responseRaw.Bytes()) == 0 {
