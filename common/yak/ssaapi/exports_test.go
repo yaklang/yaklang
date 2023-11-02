@@ -34,11 +34,11 @@ window.location.href = "www"
 		//     User    1       update(window.location.href, "www")
 
 		// this `GetOperands` return Values, use foreach
-		window.GetOperands().ForEach(func(v *Value) {
-		})
-		window.GetOperand(0) // get href
-		window.GetUsers()    // get all users, return a Values
-		window.GetUser(0)    // get update(window.location.href, add(yak-main$1(), "/login.html?ts="))
+		// window.GetOperands().ForEach(func(v *Value) {
+		// })
+		// window.GetOperand(0) // get href
+		// window.GetUsers()    // get all users, return a Values
+		// window.GetUser(0)    // get update(window.location.href, add(yak-main$1(), "/login.html?ts="))
 
 		// get this function :
 		window.GetUsers().ForEach(func(v *Value) {
@@ -53,6 +53,20 @@ window.location.href = "www"
 					fun := call.GetOperand(0)
 					// fun.ShowUseDefChain()
 					_ = fun
+					if fun.IsFunction() {
+						ret := fun.GetReturn()
+						// ret.Show()
+						ret.ForEach(func(v *Value) {
+							// v.ShowUseDefChain()
+							v1 := v.GetOperand(0)
+							v1.ShowUseDefChain()
+							// use def chain [BinOp]:
+							//         Operand 0       window.location.hostname
+							//         Operand 1       "/app/"
+							//         Self            add(window.location.hostname, "/app/")
+							//         User    0       return(add(window.location.hostname, "/app/"))
+						})
+					}
 
 					// how do next ??
 					// fun.GetReturn()

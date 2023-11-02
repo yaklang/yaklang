@@ -27,7 +27,8 @@ func (b *BasicBlock) LineDisasm() string {
 }
 
 func (p *Parameter) LineDisasm() string {
-	return fmt.Sprintf("param(%s)", p.GetVariable())
+	// return fmt.Sprintf("param(%s)", p.GetVariable())
+	return fmt.Sprintf("%s", p.GetVariable())
 }
 
 func (p *Phi) LineDisasm() string {

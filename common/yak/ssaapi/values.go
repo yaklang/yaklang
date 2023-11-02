@@ -8,27 +8,27 @@ import (
 )
 
 type Value struct {
-	ssa.InstructionNode
+	node ssa.InstructionNode
 }
 
 func NewValue(n ssa.InstructionNode) *Value {
 	return &Value{
-		InstructionNode: n,
+		node: n,
 	}
 }
-func (v *Value) String() string { return v.LineDisasm() }
+func (v *Value) String() string { return v.node.LineDisasm() }
 func (i *Value) Show()          { fmt.Println(i) }
 
 func (i *Value) GetOperands() Values {
-	return lo.Map(i.GetValues(), func(v ssa.Value, _ int) *Value { return NewValue(v) })
+	return lo.Map(i.node.GetValues(), func(v ssa.Value, _ int) *Value { return NewValue(v) })
 }
 
 func (i *Value) GetOperand(index int) *Value {
-	return NewValue(i.GetValues()[index])
+	return NewValue(i.node.GetValues()[index])
 }
 
 func (i *Value) GetRawUsers() ssa.Users {
-	return i.InstructionNode.GetUsers()
+	return i.node.GetUsers()
 }
 
 func (i *Value) GetUsers() Values {
@@ -36,7 +36,7 @@ func (i *Value) GetUsers() Values {
 }
 
 func (i *Value) GetUser(index int) *Value {
-	return NewValue(i.InstructionNode.GetUsers()[index])
+	return NewValue(i.node.GetUsers()[index])
 }
 
 func (value *Value) ShowUseDefChain() {
@@ -68,7 +68,7 @@ func (v Values) String() string {
 	ret := ""
 	ret += fmt.Sprintf("Values: %d\n", len(v))
 	for i, v := range v {
-		ret += fmt.Sprintf("\t%d: %5s: %s\n", i, v.GetOpcode(), v)
+		ret += fmt.Sprintf("\t%d: %5s: %s\n", i, v.node.GetOpcode(), v)
 	}
 	return ret
 }
@@ -86,13 +86,38 @@ func (v Values) ForEach(f func(*Value)) {
 }
 
 func (v *Value) IsUpdate() bool {
-	return v.GetOpcode() == ssa.OpUpdate
+	return v.node.GetOpcode() == ssa.OpUpdate
 }
 
 func (v *Value) IsConst() bool {
-	return v.GetOpcode() == ssa.OpConst
+	return v.node.GetOpcode() == ssa.OpConst
 }
 
 func (v *Value) IsBinOp() bool {
-	return v.GetOpcode() == ssa.BinOpBegin
+	return v.node.GetOpcode() == ssa.OpBinOp
+}
+
+// for function
+func (v *Value) IsFunction() bool {
+	return v.node.GetOpcode() == ssa.OpFunction
+}
+
+func (v *Value) GetReturn() Values {
+	ret := make(Values, 0)
+	if f, ok := ssa.ToFunction(v.node); ok {
+		for _, r := range f.Return {
+			ret = append(ret, NewValue(r))
+		}
+	}
+	return ret
+}
+
+func (v *Value) GetParameter() Values {
+	ret := make(Values, 0)
+	if f, ok := ssa.ToFunction(v.node); ok {
+		for _, v := range f.Param {
+			ret = append(ret, NewValue(v))
+		}
+	}
+	return ret
 }
