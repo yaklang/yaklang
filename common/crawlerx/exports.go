@@ -3,7 +3,8 @@
 package crawlerx
 
 var CrawlerXExports = map[string]interface{}{
-	"StartCrawler": StartCrawler,
+	"StartCrawler":   StartCrawler,
+	"PageScreenShot": NewPageScreenShot,
 
 	"browserInfo":       WithBrowserInfo,
 	"saveToDB":          WithSaveToDB,
@@ -34,6 +35,7 @@ var CrawlerXExports = map[string]interface{}{
 	"evalJs":            WithEvalJs,
 	"jsResultSend":      WithJsResultSave,
 	"vue":               WithVue,
+	"response":          WithResponse,
 
 	"UnLimitRepeat":      unlimited,
 	"LowRepeatLevel":     lowLevel,

@@ -165,6 +165,20 @@ func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *Br
 }
 
 func (starter *BrowserStarter) startBrowser() error {
+	err := starter.baseBrowserStarter()
+	if err != nil {
+		return err
+	}
+	err = starter.createBrowserHijack(starter.browser)
+	if err != nil {
+		return utils.Errorf(`create browser error: %v`, err)
+	}
+	starter.pageActionGenerator()
+	starter.pageDetectEventGenerator()
+	return nil
+}
+
+func (starter *BrowserStarter) baseBrowserStarter() error {
 	starter.browser = rod.New()
 	if starter.browserConfig.wsAddress == "" {
 		launch := launcher.New()
@@ -204,12 +218,6 @@ func (starter *BrowserStarter) startBrowser() error {
 		return utils.Errorf(`browser connect error: %s`, err)
 	}
 	_ = starter.browser.IgnoreCertErrors(true)
-	err = starter.createBrowserHijack(starter.browser)
-	if err != nil {
-		return utils.Errorf(`create browser error: %v`, err)
-	}
-	starter.pageActionGenerator()
-	starter.pageDetectEventGenerator()
 	return nil
 }
 
