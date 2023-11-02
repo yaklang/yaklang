@@ -55,10 +55,7 @@ func (s *Server) execScript(scriptName string, targetInput string, stream sender
 	)
 	isUrlParam := false
 	switch strings.ToLower(debugType) {
-	case "mitm":
-		fallthrough
-	case "port-scan":
-		fallthrough
+	case "mitm", "port-scan":
 	case "nuclei":
 		isUrlParam = true
 		break
