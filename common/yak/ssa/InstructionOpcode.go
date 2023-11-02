@@ -14,20 +14,19 @@ const (
 	OpCall      = "Call"
 	OpUpdate    = "Update"
 	OpField     = "Field"
-
-	BinOpBegin = "BinOp"
-	BinOpEnd
-
-	UnOpBegin
-	UnOpEnd
+	OpBinOp     = "BinOp"
+	OpUnOp      = "UnOp"
+	OpReturn    = "Return"
 )
 
 func (f *Function) GetOpcode() Opcode { return OpFunction }
 func (p *Phi) GetOpcode() Opcode      { return OpPhi }
 
-func (b *BinOp) GetOpcode() Opcode { return BinOpBegin }
+func (p *Return) GetOpcode() Opcode { return OpReturn }
 
-func (u *UnOp) GetOpcode() Opcode { return UnOpBegin }
+func (b *BinOp) GetOpcode() Opcode { return OpBinOp }
+
+func (u *UnOp) GetOpcode() Opcode { return OpUnOp }
 
 func (c *Call) GetOpcode() Opcode   { return OpCall }
 func (c *Update) GetOpcode() Opcode { return OpUpdate }
