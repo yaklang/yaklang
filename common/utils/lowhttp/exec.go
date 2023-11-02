@@ -710,7 +710,7 @@ RECONNECT:
 			log.Infof("[lowhttp] read response failed: %s", err)
 		}
 
-		if firstResponse.StatusCode == 401 && auth != nil {
+		if firstResponse != nil && firstResponse.StatusCode == 401 && auth != nil {
 			authReq, err := auth.Authenticate(conn, requestPacket)
 			if err == nil {
 				_, err := conn.Write(authReq)
