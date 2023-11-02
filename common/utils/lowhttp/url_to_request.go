@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -154,6 +155,6 @@ func UrlToHTTPRequest(text string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	raw = FixHTTPRequestOut(raw)
+	raw = FixHTTPRequest(raw)
 	return raw, nil
 }
