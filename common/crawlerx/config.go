@@ -46,6 +46,7 @@ type BaseConfig struct {
 	evalJs            map[string][]string
 	jsResultSave      func(string)
 	vue               bool
+	response          map[string]string
 
 	targetUrl      string
 	ch             chan ReqInfo
@@ -97,6 +98,7 @@ func NewConfig() *Config {
 			saveToDB:          false,
 			evalJs:            make(map[string][]string),
 			vue:               false,
+			response:          make(map[string]string),
 		},
 	}
 }
@@ -388,5 +390,11 @@ func WithJsResultSave(storage func(s string)) ConfigOpt {
 func WithVue(vue bool) ConfigOpt {
 	return func(config *Config) {
 		config.baseConfig.vue = vue
+	}
+}
+
+func WithResponse(targetUrl string, response string) ConfigOpt {
+	return func(config *Config) {
+		config.baseConfig.response[targetUrl] = response
 	}
 }
