@@ -35,19 +35,19 @@ func (u *UseDefChain) ShowAll() {
 
 func (u *UseDefChain) ShowEx(flag int) {
 	v := u.v
-	ret := "use-def chain:\t|Type\t|index\t|Opcode\t|Value\n"
+	ret := "use-def: |Type\t|index\t|Opcode\t|Value\n"
 
 	show := func(prefix string, index int, v *Value) string {
 		indexStr := ""
 		if index >= 0 {
 			indexStr = strconv.FormatInt(int64(index), 10)
 		}
-		ret := ""
+		ret := fmt.Sprintf("%8s", "")
 		switch flag {
 		case 0:
-			ret += fmt.Sprintf("\t\t%-7s\t%s\t%s\t%s\n", prefix, indexStr, v.node.GetOpcode(), v)
+			ret += fmt.Sprintf("%-7s\t%s\t%s\t%s\n", prefix, indexStr, v.node.GetOpcode(), v)
 		case 1:
-			ret += fmt.Sprintf("\t\t%s\t%s\n\t\t%s\n\t\t%s\n\t\t%s\n", prefix, indexStr, v, v.node, v.node.GetPosition())
+			ret += fmt.Sprintf("%s\t%s\n\t\t%s\n\t\t%s\n\t\t%s\n", prefix, indexStr, v, v.node, v.node.GetPosition())
 		default:
 		}
 		return ret
