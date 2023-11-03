@@ -489,7 +489,20 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 		yakFileAbsPath = fmt.Sprint(yakAbsFile)
 	}
 	*e.logger = yaklib.CreateYakLogger(yakFileAbsPath)
-	engine.SetVar("log", *e.logger) // 设置 log 库
+	logger := *e.logger
+	engine.SetVar("log", map[string]interface{}{
+		"info":     logger.Infof,
+		"setLevel": logger.SetLevel,
+		"debug":    logger.Debugf,
+		"warn":     logger.Warnf,
+		"error":    logger.Errorf,
+
+		"Info":     logger.Infof,
+		"SetLevel": logger.SetLevel,
+		"Debug":    logger.Debugf,
+		"Warn":     logger.Warnf,
+		"Error":    logger.Errorf,
+	}) // 设置 log 库
 	(*e.logger).SetEngine(engine)
 	clientIns := *yaklib.GetYakitClientInstance()
 	client := &clientIns // 设置全局 client 的 log
