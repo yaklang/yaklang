@@ -1,0 +1,12 @@
+targetUrl = f`${VULINBOX}/git/website/`
+localReposDir = `/tmp/test_githack`
+assert !file.IsExisted(file.Join(localReposDir, `flag.txt`)), `flag.txt should not exist before githack`
+os.RemoveAll(localReposDir)
+time.sleep(1)
+err = git.GitHack(targetUrl, localReposDir, git.httpOpts(poc.https(true)))
+die(err)
+assert file.IsExisted(file.Join(localReposDir, `flag.txt`)), `flag.txt not found`
+rsp, req, err = poc.Get(targetUrl+"flag.txt", poc.https(true))
+die(err)
+_, code, _ = poc.GetHTTPPacketFirstLine(rsp.RawPacket)
+assert code != "200", `flag.txt should not be accessible`
