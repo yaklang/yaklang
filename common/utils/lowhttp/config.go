@@ -52,7 +52,8 @@ type LowhttpExecConfig struct {
 	WithConnPool                     bool
 	ConnPool                         *lowHttpConnPool
 	NativeHTTPRequestInstance        *http.Request
-	LowhttpAuth                      Authentication
+	Username                         string
+	Passwrod                         string
 
 	// DefaultBufferSize means unexpected situation's buffer size
 	DefaultBufferSize int
@@ -210,9 +211,15 @@ func WithNativeHTTPRequestInstance(req *http.Request) LowhttpOpt {
 	}
 }
 
-func WithLowhttpAuth(auth Authentication) LowhttpOpt {
+func WithUsername(username string) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
-		o.LowhttpAuth = auth
+		o.Username = username
+	}
+}
+
+func WithPassword(password string) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.Passwrod = password
 	}
 }
 

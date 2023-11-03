@@ -179,7 +179,9 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		dnsHosts             = option.EtcHosts
 		connPool             = option.ConnPool
 		withConnPool         = option.WithConnPool
-		auth                 = option.LowhttpAuth
+		username             = option.Username
+		password             = option.Passwrod
+		firstAuth            = true
 	)
 
 	if option.WithConnPool && option.ConnPool == nil {
@@ -710,15 +712,21 @@ RECONNECT:
 			log.Infof("[lowhttp] read response failed: %s", err)
 		}
 
-		if firstResponse != nil && firstResponse.StatusCode == 401 && auth != nil {
-			authReq, err := auth.Authenticate(conn, requestPacket)
-			if err == nil {
-				_, err := conn.Write(authReq)
-				responseRaw.Reset() //发送认证请求成功，清空缓冲区
-				if err != nil {
-					return response, errors.Wrap(err, "write request failed")
+		if firstAuth && firstResponse != nil && firstResponse.StatusCode == 401 {
+
+			if len(firstResponse.Header["WWW-Authenticate"]) > 0 {
+				if auth := GetAuth(firstResponse.Header["WWW-Authenticate"][0], username, password); auth != nil {
+					authReq, err := auth.Authenticate(conn, option)
+					if err == nil {
+						_, err := conn.Write(authReq)
+						responseRaw.Reset() //发送认证请求成功，清空缓冲区
+						if err != nil {
+							return response, errors.Wrap(err, "write request failed")
+						}
+						firstAuth = false
+						goto READ
+					}
 				}
-				goto READ
 			}
 		}
 
