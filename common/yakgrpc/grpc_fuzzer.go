@@ -361,6 +361,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				if len(oldIDs) == 0 { // 尝试修复
 					oldIDs = []uint{uint(historyID)}
 				}
+				var newHitColor = req.GetHitColor()
 				var httpTplMatcher = make([]*httptpl.YakMatcher, len(req.GetMatchers()))
 				var httpTplExtractor = make([]*httptpl.YakExtractor, len(req.GetExtractors()))
 				var haveHTTPTplMatcher = len(httpTplMatcher) > 0
@@ -441,6 +442,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 						}
 						if httpTPLmatchersResult {
 							respModel.MatchedByMatcher = true
+							respModel.HitColor = newHitColor
 							break
 						}
 					}
