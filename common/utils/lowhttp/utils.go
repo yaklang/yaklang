@@ -479,7 +479,7 @@ func RemoveZeroContentLengthHTTPHeader(raw []byte) []byte {
 	}, func(line string) {
 		if ret := strings.Split(line, ":"); len(ret) > 1 {
 			key, value := ret[0], strings.TrimSpace(ret[1])
-			if utils.AsciiEqualFold(key, "transfer-encoding") && strings.Contains(value, "chunked") {
+			if utils.AsciiEqualFold(key, "transfer-encoding") && utils.IContains(value, "chunked") {
 				chunk = true
 			}
 		}

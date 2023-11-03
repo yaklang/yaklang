@@ -93,7 +93,7 @@ func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 				}
 				return fmt.Sprintf(`%v: %v`, key, plrand)
 			}
-			if !haveChunkedHeader && keyLower == "transfer-encoding" && valLower == "chunked" {
+			if !haveChunkedHeader && keyLower == "transfer-encoding" && strings.Contains(valLower, "chunked") {
 				haveChunkedHeader = true
 			}
 			return line
@@ -196,7 +196,7 @@ func DeletePacketEncoding(raw []byte) []byte {
 		if ret == "content-encoding" {
 			encoding = v
 			return ""
-		} else if ret == "transfer-encoding" && strings.ToLower(v) == "chunked" {
+		} else if ret == "transfer-encoding" && utils.IContains(v, "chunked") {
 			isChunked = true
 			return ""
 		}
