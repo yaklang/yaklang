@@ -45,7 +45,6 @@ func TestParseToCPE1(t *testing.T) {
 	for _, cpe := range cpes {
 		r, err := ParseToCPE(cpe)
 		assert.Nil(t, err)
-		fmt.Println(r)
 		for res := range cvequeryops.QueryCVEYields(db, cvequeryops.ProductWithVersion(r.Product, r.Version)) {
 			fmt.Println(res.Product)
 		}
