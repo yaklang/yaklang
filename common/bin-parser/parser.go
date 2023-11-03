@@ -8,34 +8,22 @@ import (
 	"gopkg.in/yaml.v2"
 	"io"
 	"os"
-	"strconv"
-	"strings"
 )
 
 func NewDescriptorByRule(name string, rule any, opts []ConfigFunc) (*binx.PartDescriptor, error) {
-	config := NewConfig(opts)
 	switch ret := rule.(type) {
 	case string:
-		splits := strings.Split(ret, ",")
-		if len(splits) != 2 {
-			return nil, errors.New("rule `" + name + "` is invalid")
-		}
-		byteN, err := strconv.Atoi(splits[0])
+		opts1, err := parseTerminalNode(ret)
 		if err != nil {
 			return nil, fmt.Errorf("rule `%s` is invalid: %w", name, err)
 		}
-		desc := binx.NewBytes(name, byteN)
-		switch config.endian {
-		case "big":
-			desc.ByteOrder = binx.BigEndianByteOrder
-		case "little":
-			desc.ByteOrder = binx.LittleEndianByteOrder
-		default:
-			desc.ByteOrder = binx.BigEndianByteOrder
-		}
+		cfg := NewConfig(append(opts, opts1...))
+		desc := binx.NewPartDescriptor(cfg.dataType, cfg.length)
+		desc.Identifier = name
+		desc.ByteOrder = cfg.endian
 		return desc, nil
 	case yaml.MapItem:
-		return NewDescriptorByRule(name, ret.Value, config)
+		return NewDescriptorByRule(name, ret.Value, opts)
 	case yaml.MapSlice:
 		var desc = binx.NewListDescriptor()
 		desc.SetIdentifier(name)
@@ -52,7 +40,7 @@ func NewDescriptorByRule(name string, rule any, opts []ConfigFunc) (*binx.PartDe
 	case []string:
 		var desc = binx.NewListDescriptor()
 		for index, v := range ret {
-			subDesc, err := NewDescriptorByRule(fmt.Sprintf("%s_%d", name, index), v, config)
+			subDesc, err := NewDescriptorByRule(fmt.Sprintf("%s_%d", name, index), v, opts)
 			if err != nil {
 				return nil, err
 			}

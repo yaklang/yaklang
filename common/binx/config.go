@@ -198,7 +198,12 @@ func read(lastResults []ResultIf, p *PartDescriptor, reader io.Reader, startOffs
 
 	return nil, startOffset, lastResults, utils.Error("unknown error, size or size from is not valid")
 }
-
+func NewPartDescriptor(dataType BinaryTypeVerbose, size uint64) *PartDescriptor {
+	return &PartDescriptor{
+		typeFlag: dataType,
+		size:     size,
+	}
+}
 func NewListDescriptor(builder ...*PartDescriptor) *PartDescriptor {
 	var descriptor = NewDefaultNetworkPartDescriptor()
 	descriptor.SubPartLength = uint64(len(builder))

@@ -1,30 +1,28 @@
 endian: big
 Ethernet:
-    Destination: 6,raw
-    Source: 6,raw
-    Type: 2,raw
+    Destination: raw,6
+    Source: raw,6
+    Type: raw,2
 Internet:
     endian: big
-    Version And Header Length:
-        endian: big
-        Data: 1,raw
-    Type of Service: 1,raw
-    Total Length: 2,raw
-    Identification: 2,raw
-    Flags And Fragment Offset : 2,raw
-    Time to Live: 1,raw
-    Protocol: 1,raw
-    Header Checksum: 2,raw
-    Source: 4,raw
-    Destination: 4,raw
+    Version And Header Length: raw,1
+    Type of Service: raw,1
+    Total Length: uint16
+    Identification: raw,2
+    Flags And Fragment Offset : raw,2
+    Time to Live: raw,1
+    Protocol: raw,1
+    Header Checksum: raw,2
+    Source: raw,4
+    Destination: raw,4
 TCP:
-    Source Port: 2,raw
-    Destination Port: 2,raw
-    Sequence Number: 4,raw
-    Acknowledgement Number: 4,raw
-    Data Offset And Reserved: 1,raw
-    Flags: 1,raw
-    Window: 2,raw
-    Checksum: 2,raw
-    Urgent Pointer: 2,raw
-    Options: 24,raw
+    Source Port: uint16
+    Destination Port: uint16
+    Sequence Number: raw,4
+    Acknowledgement Number: raw,4
+    Data Offset And Reserved: raw,1
+    Flags: raw,1
+    Window: raw,2
+    Checksum: raw,2
+    Urgent Pointer: raw,2
+    Options: raw,24
