@@ -256,7 +256,7 @@ func DumpRequest(req *http.Request, body bool) ([]byte, error) {
 		}
 	}
 
-	chunked := len(req.TransferEncoding) > 0 && req.TransferEncoding[0] == "chunked"
+	chunked := len(req.TransferEncoding) > 0 && utils.IContains(strings.Join(req.TransferEncoding, ","), "chunked")
 	if len(req.TransferEncoding) > 0 {
 		fmt.Fprintf(&b, "Transfer-Encoding: %s\r\n", strings.Join(req.TransferEncoding, ","))
 	}

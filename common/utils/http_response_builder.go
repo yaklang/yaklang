@@ -155,7 +155,7 @@ func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bo
 			}
 		case "transfer-encoding":
 			rsp.TransferEncoding = []string{valStr}
-			if strings.EqualFold(valStr, "chunked") {
+			if IContains(valStr, "chunked") {
 				useTransferEncodingChunked = true
 			}
 		case "connection":

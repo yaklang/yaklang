@@ -218,7 +218,7 @@ Content-Type: text/html; charset=utf-8
 				return nil
 			}, nil, func(line string) string {
 				k, v := lowhttp.SplitHTTPHeader(line)
-				if strings.ToLower(k) == "transfer-encoding" && v == "chunked" {
+				if strings.ToLower(k) == "transfer-encoding" && utils.IContains(v, "chunked") {
 					chunked = true
 				}
 				return line

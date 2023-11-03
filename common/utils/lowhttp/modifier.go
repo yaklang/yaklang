@@ -33,15 +33,8 @@ func IsHeader(headerLine, wantHeader string) bool {
 }
 
 func IsChunkedHeaderLine(line string) bool {
-	line = strings.ToLower(line)
-	if strings.HasPrefix(line, "transfer-encoding: chunked") {
-		return true
-	}
-	if line == "chunked" {
-		return true
-	}
 	k, v := SplitHTTPHeader(line)
-	if k == "transfer-encoding" && v == "chunked" {
+	if utils.IContains(k, "transfer-encoding") && utils.IContains(v, "chunked") {
 		return true
 	}
 	return false

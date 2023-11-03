@@ -358,7 +358,7 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool,
 			isSingletonHeader = true
 		case `transfer-encoding`:
 			req.TransferEncoding = []string{valStr}
-			if strings.EqualFold(valStr, "chunked") {
+			if IContains(valStr, "chunked") {
 				useTransferEncodingChunked = true
 			}
 		case "connection":

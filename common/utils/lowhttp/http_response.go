@@ -191,7 +191,7 @@ func FixHTTPResponse(raw []byte) (rsp []byte, body []byte, _ error) {
 
 		// 判断内容
 		line = strings.ToLower(line)
-		if strings.HasPrefix(line, "transfer-encoding:") && strings.Contains(line, "chunked") {
+		if strings.HasPrefix(line, "transfer-encoding:") && utils.IContains(line, "chunked") {
 			isChunked = true
 		}
 		if strings.HasPrefix(line, "content-encoding:") {
@@ -358,7 +358,7 @@ func ReplaceHTTPPacketBodyEx(raw []byte, body []byte, chunk bool, forceCL bool) 
 
 		lineLower := strings.ToLower(line)
 		// 移除 chunked
-		if strings.HasPrefix(lineLower, "transfer-encoding:") && strings.Contains(line, "chunked") {
+		if strings.HasPrefix(lineLower, "transfer-encoding:") && utils.IContains(line, "chunked") {
 			continue
 		}
 
