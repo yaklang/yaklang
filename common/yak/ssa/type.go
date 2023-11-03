@@ -463,10 +463,12 @@ func (s *ObjectType) AddField(key Value, field Type) {
 }
 
 // return (field-type, key-type)
-func (s *ObjectType) GetField(key Value) (Type, Type) {
+func (s *ObjectType) GetField(key Value) Type {
 	switch s.Kind {
 	case Slice, Map:
-		return s.FieldType, s.KeyTyp
+		if key.GetType() == s.KeyTyp {
+			return s.FieldType
+		}
 	case Struct:
 		getField := func(o *ObjectType) Type {
 			if index := slices.IndexFunc(o.Key, func(v Value) bool { return v.String() == key.String() }); index != -1 {
@@ -476,15 +478,15 @@ func (s *ObjectType) GetField(key Value) (Type, Type) {
 			}
 		}
 		if t := getField(s); t != nil {
-			return t, key.GetType()
+			return t
 		}
 		for _, obj := range s.AnonymousField {
 			if t := getField(obj); t != nil {
-				return t, key.GetType()
+				return t
 			}
 		}
 	}
-	return nil, nil
+	return nil
 }
 
 // ===================== Finish simply

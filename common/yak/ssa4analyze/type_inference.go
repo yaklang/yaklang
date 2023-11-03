@@ -222,7 +222,7 @@ func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
 		switch t.GetTypeKind() {
 		case ssa.ObjectTypeKind:
 			interfaceTyp := f.Obj.GetType().(*ssa.ObjectType)
-			fTyp, _ := interfaceTyp.GetField(f.Key)
+			fTyp := interfaceTyp.GetField(f.Key)
 			if !utils.IsNil(fTyp) {
 				f.SetType(fTyp)
 				return
