@@ -17,6 +17,7 @@ const (
 	OpBinOp     = "BinOp"
 	OpUnOp      = "UnOp"
 	OpReturn    = "Return"
+	OpMake      = "Make"
 )
 
 func (f *Function) GetOpcode() Opcode { return OpFunction }
@@ -25,10 +26,11 @@ func (p *Phi) GetOpcode() Opcode      { return OpPhi }
 func (p *Return) GetOpcode() Opcode { return OpReturn }
 
 func (b *BinOp) GetOpcode() Opcode { return OpBinOp }
+func (u *UnOp) GetOpcode() Opcode  { return OpUnOp }
 
-func (u *UnOp) GetOpcode() Opcode { return OpUnOp }
+func (c *Call) GetOpcode() Opcode { return OpCall }
 
-func (c *Call) GetOpcode() Opcode   { return OpCall }
+func (c *Make) GetOpcode() Opcode   { return OpMake }
 func (c *Update) GetOpcode() Opcode { return OpUpdate }
 func (c *Field) GetOpcode() Opcode  { return OpField }
 
