@@ -486,7 +486,7 @@ func (m *mitmReplacer) hook(isRequest, isResponse bool, origin []byte, args ...a
 		key, value := lowhttp.SplitHTTPHeader(line)
 		switch strings.ToLower(key) {
 		case "transfer-encoding":
-			if value == "chunked" {
+			if utils.IContains(value, "chunked") {
 				chunkedHeader = key
 				chunked = true
 			}

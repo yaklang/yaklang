@@ -135,7 +135,7 @@ func DumpHTTPResponse(rsp *http.Response, loadBody bool, wr ...io.Writer) ([]byt
 	// handle transfer-encoding
 	if len(rsp.TransferEncoding) > 0 {
 		for _, v := range rsp.TransferEncoding {
-			if v == "chunked" {
+			if IContains(v, "chunked") {
 				transferEncodingChunked = true
 				break
 			}
@@ -143,7 +143,7 @@ func DumpHTTPResponse(rsp *http.Response, loadBody bool, wr ...io.Writer) ([]byt
 	}
 	if !transferEncodingChunked {
 		if ret := getHeaderValue(header, "transfer-encoding"); ret != "" {
-			if strings.Contains(ret, "chunked") {
+			if IContains(ret, "chunked") {
 				transferEncodingChunked = true
 			}
 		}
@@ -305,7 +305,7 @@ func DumpHTTPRequest(req *http.Request, loadBody bool) ([]byte, error) {
 	_ = contentLengthInt
 	if len(req.TransferEncoding) > 0 {
 		for _, v := range req.TransferEncoding {
-			if v == "chunked" {
+			if IContains(v, "chunked") {
 				transferEncodingChunked = true
 				break
 			}
@@ -313,7 +313,7 @@ func DumpHTTPRequest(req *http.Request, loadBody bool) ([]byte, error) {
 	}
 	if !transferEncodingChunked {
 		if ret := getHeaderValue(header, "transfer-encoding"); ret != "" {
-			if strings.Contains(ret, "chunked") {
+			if IContains(ret, "chunked") {
 				transferEncodingChunked = true
 			}
 		}
