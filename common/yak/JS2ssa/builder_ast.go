@@ -1048,7 +1048,7 @@ func (b *astbuilder) buildObjectLiteral(stmt *JS.ObjectLiteralContext) ssa.Value
 		keys = append(keys, key)
 	}
 
-	if keys[0] == nil {
+	if len(keys) == 0 {
 		return b.CreateInterfaceWithVs(nil, value)
 	}
 
