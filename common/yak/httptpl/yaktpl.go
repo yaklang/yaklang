@@ -146,14 +146,17 @@ func (y *YakTemplate) CheckTemplateRisks() error {
 		}
 	}
 	if !hasMatcherOrExtractor {
-		addErrorMsg("matcher and extractor are both empty, may be the script is invalid")
+		//addErrorMsg("matcher and extractor are both empty, may be the script is invalid")
+		addErrorMsg("匹配器和数据提取器都未配置，当前可能脚本是无效的")
 	}
 	if y.Sign != "" {
 		if y.Sign != y.SignMainParams() {
-			addErrorMsg("signature error, may be the script is invalid")
+			//addErrorMsg("signature error, may be the script is invalid")
+			addErrorMsg("签名错误，当前可能脚本是无效的")
 		}
 	} else {
-		addErrorMsg("lack of signature information, unable to verify script validity")
+		//addErrorMsg("lack of signature information, unable to verify script validity")
+		addErrorMsg("缺少签名信息，无法验证脚本有效性")
 	}
 	return errs
 }
