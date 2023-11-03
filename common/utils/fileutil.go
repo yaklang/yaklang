@@ -157,6 +157,65 @@ func GetExecutableFromEnv(cmd string) (string, error) {
 	return "", Errorf("command %s not found in PATH", cmd)
 }
 
+func Copy(source string, destination string) error {
+	return filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// 构建新路径
+		newPath := filepath.Join(destination, filepath.Base(path))
+
+		if info.IsDir() {
+			// 创建新的文件夹
+			err := os.MkdirAll(newPath, info.Mode())
+			if err != nil {
+				return err
+			}
+		} else {
+			// 复制文件
+			err := CopyFile(path, newPath)
+			if err != nil {
+				return err
+			}
+
+			// 删除源文件
+			err = os.Remove(path)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
+func CopyFile(source, destination string) error {
+	srcFile, err := os.Open(source)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+
+	destFile, err := os.Create(destination)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
+
+	_, err = io.Copy(destFile, srcFile) // first var shows number of bytes
+	if err != nil {
+		return err
+	}
+
+	err = destFile.Sync()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func SaveFile(raw interface{}, filePath string) error {
 	fp, err := os.Create(filePath)
 	switch v := raw.(type) {

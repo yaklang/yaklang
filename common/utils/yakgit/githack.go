@@ -244,9 +244,9 @@ func GitHack(remoteRepoURL string, localPath string, opts ...Option) (finalErr e
 		return utils.Wrap(err, "checkout last commit error")
 	}
 
-	// 移动临时目录到目标目录
-	if err = os.Rename(tempDirPath, localPath); err != nil {
-		return utils.Wrapf(err, "move temp git repo to %s error", localPath)
+	// 复制临时目录到目标目录
+	if err = utils.Copy(tempDirPath, localPath); err != nil {
+		return utils.Wrapf(err, "copy temp git repo to %s error", localPath)
 	}
 
 	return nil
