@@ -103,6 +103,8 @@ window.location.href = "www"
 		return ret
 	}
 
+	win.Show()
+	win.ShowWithSource()
 	win.ForEach(func(window *Value) {
 		window.ShowWithSource()
 		if !window.InMainFunction() {
@@ -119,15 +121,15 @@ window.location.href = "www"
 		}
 
 		// show use-def-chain
-		window.ShowUseDefChain()
-		// use-def chain:  |Type   |index  |Opcode |Value
-		// 					Operand 0       Field   window.location
-		// 					Operand 1       Const   href
-		// 					Self            Field   window.location.href
-		// 					User    0       Update  update(window.location.href, "6666")
-		// 					User    1       Update  update(window.location.href, "7777")
-		// 					User    2       Update  update(window.location.href, add(yak-main$5(, binding(window)), "/login.html?ts="))
-		// 					User    3       Update  update(window.location.href, "www")
+		// window.ShowUseDefChain()
+		// use-def:  |Type   |index  |Opcode |Value
+		// 			Operand 0       Field   window.location
+		// 			Operand 1       Const   href
+		// 			Self            Field   window.location.href
+		// 			User    0       Update  update(window.location.href, "6666")
+		// 			User    1       Update  update(window.location.href, "7777")
+		// 			User    2       Update  update(window.location.href, add(yak-main$5(, binding(window)), "/login.html?ts="))
+		// 			User    3       Update  update(window.location.href, "www")
 
 		// this `GetOperands` return Values, use foreach
 		// window.GetOperands().ForEach(func(v *Value) {
@@ -170,7 +172,7 @@ window.location.href = "www"
 				// fun.GetReturn()
 
 			}
-			if target.IsConst() {
+			if target.IsConstInst() {
 				// fmt.Println("windows.location.href set by: ", target)
 				result = append(result, target.String())
 			}
