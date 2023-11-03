@@ -3,16 +3,17 @@ package minimartian
 import (
 	"context"
 	"encoding/binary"
-	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"net"
 	"os"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type S5Config struct {
@@ -103,19 +104,7 @@ func (c *S5Config) handshakeHandler(conn net.Conn) error {
 	}
 
 	finishedAuth := len(methods) > 0
-	needpassword := false
-
-	for _, method := range methods {
-		switch method {
-		case authNone:
-			needpassword = false
-			break
-		case authWithUsernameAndPass:
-			needpassword = true
-		default:
-			continue
-		}
-	}
+	needpassword := c.ProxyPassword != "" || c.ProxyUsername != ""
 
 	if !finishedAuth {
 		conn.Write([]byte{socks5Version, authNoAcceptable})
