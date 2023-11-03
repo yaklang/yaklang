@@ -8,9 +8,8 @@ import (
 	"testing"
 )
 
-func TestNtlmV2(t *testing.T) {
-	auth := GetNTLMAuth("test", "test123", "")
-	rsp, err := HTTPWithoutRedirect(WithPacketBytes([]byte("GET / HTTP/1.1\r\nHost: 117.50.163.235\r\n\r\n")), WithLowhttpAuth(auth))
+func TestNtlmV2(t *testing.T) { // not ci
+	rsp, err := HTTPWithoutRedirect(WithPacketBytes([]byte("GET / HTTP/1.1\r\nHost: 117.50.163.235\r\n\r\n")), WithUsername("test"), WithPassword("test123"))
 	if err != nil {
 		t.Fatal(err)
 	}
