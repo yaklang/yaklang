@@ -389,6 +389,7 @@ func TestMemberCall(t *testing.T) {
 			`,
 			errs: []string{
 				ssa4analyze.ValueUndefined("UndefineKey"),
+				ssa4analyze.InvalidField("map[string]number", "$UndefineKey"),
 			},
 		})
 	})
@@ -468,6 +469,19 @@ func TestSliceCall(t *testing.T) {
 				c = b[0]
 			}
 			`,
+		})
+	})
+
+	t.Run("slice type check", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			a = make([]int, 0)
+			b = a[0]
+			b = a.bb
+			`,
+			errs: []string{
+				ssa4analyze.InvalidField("[]number", "bb"),
+			},
 		})
 	})
 }
