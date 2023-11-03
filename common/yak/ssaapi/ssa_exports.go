@@ -75,7 +75,9 @@ func Parse(code string, opts ...Option) *Program {
 var Exports = map[string]any{
 	"Parse": Parse,
 
-	"withLanguage": WithLanguage,
+	"withLanguage":    WithLanguage,
+	"withExternLib":   WithExternLib,
+	"withExternValue": WithExternValue,
 	// language:
 	"Javascript": JS,
 	"Yak":        Yak,
