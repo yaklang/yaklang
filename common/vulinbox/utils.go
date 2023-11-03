@@ -5,14 +5,15 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	grpcMetadata "google.golang.org/grpc/metadata"
-	"io"
-	"net/http"
-	"net/url"
 )
 
 type VirtualYakExecServer struct {
@@ -171,13 +172,13 @@ func Failed(writer http.ResponseWriter, r *http.Request, msg string, items ...an
 	if items != nil {
 		msg = fmt.Sprintf(msg, items...)
 	}
+	writer.WriteHeader(500)
 	writer.Header().Set("Content-Type", "text/plain")
 	var raw, _ = utils.HttpDumpWithBody(r, true)
 	writer.Write(raw)
 	writer.Write([]byte{'\r', '\n', '\r', '\n', '\r', '\n'})
 	writer.Write([]byte("-----------------------------------------------------\n Failed: "))
 	_, _ = writer.Write([]byte(msg))
-	writer.WriteHeader(500)
 }
 
 //go:embed html/template.html
