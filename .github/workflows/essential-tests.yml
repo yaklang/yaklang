@@ -90,7 +90,9 @@ jobs:
 #          - name: Test FingerPrint
 #            run: go test -timeout 20s -run TestMUSTPASS_FingerprintRule ./common/fp -v
           - name: Test SSA 
-            run: go test -timeout 20s ./common/yak/yak2ssa 
+            run: go test -timeout 20s ./common/yak/yak2ssa
+          - name: Test Yakit log
+            run: go test -timeout 20s -run TestMUSTPASS_YakitLog ./common/fp -v
 
     steps:
       - name: Check out code into the Go module directory

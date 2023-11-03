@@ -46,10 +46,6 @@ func _fixYakModName(name string) string {
 
 type YakLogger struct {
 	*log.Logger
-	Info     logFunc
-	Debug    logFunc
-	Warn     logFunc
-	Error    logFunc
 	SetLevel func(string) *golog.Logger
 }
 
@@ -71,10 +67,6 @@ func CreateYakLogger(yakFiles ...string) *YakLogger {
 	}
 
 	res := &YakLogger{Logger: logger}
-	res.Info = logger.Infof
-	res.Debug = logger.Debugf
-	res.Warn = logger.Warnf
-	res.Error = logger.Errorf
 	res.SetLevel = logger.SetLevel
 	return res
 }
