@@ -64,6 +64,8 @@ window.location.href = "www"
 	// Values: 1
 	//       0: Field: window.location.href
 
+	result := make([]string, 0)
+
 	// win.Get(0) // get windows.location.href
 	checkValueReachable := func(v *Value) bool {
 		reach := v.IsReachable()
@@ -117,13 +119,15 @@ window.location.href = "www"
 		}
 
 		// show use-def-chain
-		// window.ShowUseDefChain()
-		// use def chain [OpField]:
-		//     Operand 0       href
-		//     Operand 1       window.location
-		//     Self            window.location.href
-		//     User    0       update(window.location.href, add(yak-main$1(), "/login.html?ts="))
-		//     User    1       update(window.location.href, "www")
+		window.ShowUseDefChain()
+		// use-def chain:  |Type   |index  |Opcode |Value
+		// 					Operand 0       Field   window.location
+		// 					Operand 1       Const   href
+		// 					Self            Field   window.location.href
+		// 					User    0       Update  update(window.location.href, "6666")
+		// 					User    1       Update  update(window.location.href, "7777")
+		// 					User    2       Update  update(window.location.href, add(yak-main$5(, binding(window)), "/login.html?ts="))
+		// 					User    3       Update  update(window.location.href, "www")
 
 		// this `GetOperands` return Values, use foreach
 		// window.GetOperands().ForEach(func(v *Value) {
@@ -157,12 +161,8 @@ window.location.href = "www"
 						v1 := v.GetOperand(0)
 						// v1.ShowUseDefChain()
 						str := strings.Replace(target.String(), target.GetOperand(0).String(), v1.String(), -1)
-						fmt.Println("windows.location.href set by:", str)
-						// use def chain [BinOp]:
-						//         Operand 0       window.location.hostname
-						//         Operand 1       "/app/"
-						//         Self            add(window.location.hostname, "/app/")
-						//         User    0       return(add(window.location.hostname, "/app/"))
+						// fmt.Println("windows.location.href set by:", str)
+						result = append(result, str)
 					})
 				}
 
@@ -171,9 +171,13 @@ window.location.href = "www"
 
 			}
 			if target.IsConst() {
-				fmt.Println("windows.location.href set by: ", target)
+				// fmt.Println("windows.location.href set by: ", target)
+				result = append(result, target.String())
 			}
 		})
-
 	})
+
+	for _, res := range result {
+		fmt.Println("window.location.href = ", res)
+	}
 }

@@ -72,11 +72,11 @@ func (i *Value) HasOperands() bool {
 }
 
 func (i *Value) GetOperands() Values {
-	return lo.Map(i.node.GetValues(), func(v ssa.Value, _ int) *Value { return NewValue(v) })
+	return lo.Map(ssa.GetValues(i.node), func(v ssa.Value, _ int) *Value { return NewValue(v) })
 }
 
 func (i *Value) GetOperand(index int) *Value {
-	return NewValue(i.node.GetValues()[index])
+	return NewValue(ssa.GetValues(i.node)[index])
 }
 
 func (i *Value) GetRawUsers() ssa.Users {
