@@ -5,6 +5,9 @@ import (
 	"bytes"
 	"embed"
 	"errors"
+	"os"
+	"path/filepath"
+
 	"github.com/go-git/go-billy/v5/osfs"
 	"github.com/go-git/go-git/v5/plumbing/format/pktline"
 	"github.com/go-git/go-git/v5/plumbing/protocol/packp"
@@ -12,14 +15,13 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/ziputil"
-	"os"
-	"path/filepath"
 
-	gitServer "github.com/go-git/go-git/v5/plumbing/transport/server"
 	"io"
 	"net/http"
 	"path"
 	"strings"
+
+	gitServer "github.com/go-git/go-git/v5/plumbing/transport/server"
 )
 
 //go:embed sensitivefs
@@ -145,6 +147,9 @@ func (s *VulinServer) registerSensitive() {
 		if filePath == "website/" {
 			filePath = "website/index.html"
 		}
+		if strings.Contains(filePath, "flag.txt") {
+			Failed(writer, request, "Cannot found file(%v) in fake git website", request.URL.Path)
+		}
 
 		var fp, err = zipGitFS.Open(filePath)
 		if err != nil {
@@ -155,7 +160,7 @@ func (s *VulinServer) registerSensitive() {
 		raw, _ := io.ReadAll(fp)
 
 		if strings.Contains(filePath, ".git/") {
-			writer.Header().Set("Content-Type", `text/plain`)
+			writer.Header().Set("Content-Type", `application/octet-stream`)
 		} else {
 			writer.Header().Set("Content-Type", `text/html`)
 		}
@@ -204,7 +209,7 @@ func (s *VulinServer) registerSensitive() {
 		raw, _ := io.ReadAll(fp)
 
 		if strings.Contains(filePath, ".git/") {
-			writer.Header().Set("Content-Type", `text/plain`)
+			writer.Header().Set("Content-Type", `application/octet-stream`)
 		} else {
 			writer.Header().Set("Content-Type", `text/html`)
 		}
@@ -244,7 +249,7 @@ func (s *VulinServer) registerSensitive() {
 		raw, _ := io.ReadAll(fp)
 
 		if strings.Contains(filePath, ".git/") {
-			writer.Header().Set("Content-Type", `text/plain`)
+			writer.Header().Set("Content-Type", `application/octet-stream`)
 		} else {
 			writer.Header().Set("Content-Type", `text/html`)
 		}
