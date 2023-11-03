@@ -35,7 +35,7 @@ func (u *UseDefChain) ShowAll() {
 
 func (u *UseDefChain) ShowEx(flag int) {
 	v := u.v
-	ret := fmt.Sprintf("use def chain [%s]:\n", v.node.GetOpcode())
+	ret := "use-def chain:\t|Type\t|index\t|Opcode\t|Value\n"
 
 	show := func(prefix string, index int, v *Value) string {
 		indexStr := ""
@@ -45,9 +45,9 @@ func (u *UseDefChain) ShowEx(flag int) {
 		ret := ""
 		switch flag {
 		case 0:
-			ret += fmt.Sprintf("\t%s\t%s\t%s\n", prefix, indexStr, v)
+			ret += fmt.Sprintf("\t\t%-7s\t%s\t%s\t%s\n", prefix, indexStr, v.node.GetOpcode(), v)
 		case 1:
-			ret += fmt.Sprintf("\t%s\t%s\n\t\t%s\n\t\t%s\n\t\t%s\n", prefix, indexStr, v, v.node, v.node.GetPosition())
+			ret += fmt.Sprintf("\t\t%s\t%s\n\t\t%s\n\t\t%s\n\t\t%s\n", prefix, indexStr, v, v.node, v.node.GetPosition())
 		default:
 		}
 		return ret
