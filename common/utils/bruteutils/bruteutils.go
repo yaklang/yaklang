@@ -239,8 +239,8 @@ func (b *BruteUtil) run(ctx context.Context) error {
 	return nil
 }
 
-func (b *BruteUtil) startProcessingTarget(target string, ctx context.Context) error {
-	ctx, cancel := context.WithCancel(ctx)
+func (b *BruteUtil) startProcessingTarget(target string, parentCtx context.Context) error {
+	currCtx, cancel := context.WithCancel(parentCtx)
 	defer cancel()
 	defer func() {
 		go func() {
@@ -279,7 +279,7 @@ func (b *BruteUtil) startProcessingTarget(target string, ctx context.Context) er
 	}
 
 	for _, i := range process.Items {
-		if err := ctx.Err(); err != nil {
+		if err := currCtx.Err(); err != nil {
 			return errors.New("context canceled")
 		}
 
@@ -304,7 +304,7 @@ func (b *BruteUtil) startProcessingTarget(target string, ctx context.Context) er
 			}
 		}
 
-		err := process.Swg.AddWithContext(ctx)
+		err := process.Swg.AddWithContext(currCtx)
 		if err != nil {
 			return nil
 		}
@@ -317,7 +317,7 @@ func (b *BruteUtil) startProcessingTarget(target string, ctx context.Context) er
 			}()
 
 			// 检查 context 是否已经被取消
-			if err := ctx.Err(); err != nil {
+			if err := currCtx.Err(); err != nil {
 				return
 			}
 
