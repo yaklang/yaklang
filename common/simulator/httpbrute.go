@@ -119,6 +119,7 @@ func (bruteForce *HttpBruteForceCore) pageCreate() (err error) {
 		withLeakless(bruteForce.config.leakless),
 	}
 	starter := CreateNewStarter(opts...)
+	bruteForce.starter = starter
 	err = starter.Start()
 	if err != nil {
 		return
@@ -138,7 +139,6 @@ func (bruteForce *HttpBruteForceCore) pageCreate() (err error) {
 	if err != nil {
 		return
 	}
-	bruteForce.starter = starter
 	bruteForce.page = page
 	return
 }
@@ -498,6 +498,9 @@ func (bruteForce *HttpBruteForceCore) loginDetect() (bool, error) {
 func (bruteForce *HttpBruteForceCore) Start() error {
 	err := bruteForce.init()
 	defer func() {
+		if bruteForce.starter == nil {
+			return
+		}
 		err := bruteForce.starter.Close()
 		if err != nil {
 			log.Errorf(`browser close error: %v`, err.Error())
