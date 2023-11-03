@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/asaskevich/govalidator"
 	"github.com/yaklang/yaklang/common/go-funk"
-	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -92,22 +90,18 @@ type FuzzHTTPRequestParam struct {
 }
 
 func (p *FuzzHTTPRequestParam) IsPostParams() bool {
-	if p.typePosition == posPostJson {
+	switch p.typePosition {
+	case posPostJson, posPostQuery, posPostQueryBase64, posPostQueryJson, posPostQueryBase64Json:
 		return true
 	}
-
-	if p.typePosition == posPostQuery {
-		return true
-	}
-
 	return false
 }
 
 func (p *FuzzHTTPRequestParam) IsGetParams() bool {
-	if p.typePosition == posGetQuery {
+	switch p.typePosition {
+	case posGetQuery, posGetQueryBase64, posGetQueryJson, posGetQueryBase64Json:
 		return true
 	}
-
 	return false
 }
 
@@ -116,13 +110,11 @@ func (p *FuzzHTTPRequestParam) IsGetValueJSON() bool {
 		return false
 	}
 
-	if !p.IsGetParams() {
-		return false
+	switch p.typePosition {
+	case posGetQueryJson, posGetQueryBase64Json:
+		return true
 	}
-
-	valStr := utils.InterfaceToString(utils.InterfaceToString(p.Value()))
-	fixedJson := jsonextractor.FixJson([]byte(valStr))
-	return govalidator.IsJSON(string(fixedJson))
+	return false
 }
 
 func (p *FuzzHTTPRequestParam) IsCookieParams() bool {
