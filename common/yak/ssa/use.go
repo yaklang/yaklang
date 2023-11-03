@@ -162,7 +162,7 @@ func (i *Make) ReplaceValue(v, to Value) {
 
 // // ----------- Field
 func (f *Field) HasValues() bool   { return true }
-func (f *Field) GetValues() Values { return []Value{f.Key, f.Obj} }
+func (f *Field) GetValues() Values { return []Value{f.Obj, f.Key} }
 func (f *Field) ReplaceValue(v, to Value) {
 	if f.Key == v {
 		f.Key = to

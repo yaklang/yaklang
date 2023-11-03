@@ -13,23 +13,14 @@ func (value Values) Ref(name string) Values {
 	// return nil
 	var ret Values
 	for _, v := range value {
-		v.GetRawUsers().RunOnField(func(f *ssa.Field) {
-			if f.Key.String() == name {
-				ret = append(ret, NewValue(f))
+		v.GetUsers().ForEach(func(v *Value) {
+			// get value.Name or value["name"]
+			if v.IsField() && v.GetOperand(1).String() == name {
+				ret = append(ret, v)
 			}
 		})
 	}
-	return ret
-}
-
-func (v Values) Filter(f func(*Value) bool) Values {
-	var ret Values
-	for _, v := range v {
-		if f(v) {
-			ret = append(ret, v)
-		}
-	}
-	return v
+	return getValuesWithUpdate(ret)
 }
 
 // func (v Values) UseDefChain(f func(*Value, *UseDefChain)) {
@@ -74,6 +65,8 @@ func (i *Value) ShowWithSource() {
 	fmt.Printf("[%6s] %s\t%s\n", i.node.GetOpcode(), i.node.LineDisasm(), i.node.GetPosition())
 }
 
+func (v *Value) IsSame(other *Value) bool { return *v == *other }
+
 func (i *Value) HasOperands() bool {
 	return i.node.HasValues()
 }
@@ -106,21 +99,11 @@ func (value *Value) ShowUseDefChain() {
 	defaultUseDefChain(value).Show()
 }
 
-func (v *Value) IsUpdate() bool {
-	return v.node.GetOpcode() == ssa.OpUpdate
-}
-
-func (v *Value) IsConst() bool {
-	return v.node.GetOpcode() == ssa.OpConst
-}
-
-func (v *Value) IsBinOp() bool {
-	return v.node.GetOpcode() == ssa.OpBinOp
-}
-
-func (v *Value) IsCall() bool {
-	return v.node.GetOpcode() == ssa.OpCall
-}
+func (v *Value) IsUpdate() bool { return v.node.GetOpcode() == ssa.OpUpdate }
+func (v *Value) IsConst() bool  { return v.node.GetOpcode() == ssa.OpConst }
+func (v *Value) IsBinOp() bool  { return v.node.GetOpcode() == ssa.OpBinOp }
+func (v *Value) IsCall() bool   { return v.node.GetOpcode() == ssa.OpCall }
+func (v *Value) IsField() bool  { return v.node.GetOpcode() == ssa.OpField }
 
 // for function
 func (v *Value) IsFunction() bool {

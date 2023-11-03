@@ -7,6 +7,7 @@ import (
 )
 
 func TestA(t *testing.T) {
+
 	prog := Parse(
 		`
 () => {
@@ -26,6 +27,22 @@ if (checkFunc(a)) {
 setTimeout(() => {
 	window.location.href = "44"
 })
+
+a = {}
+a["b"] = window.location
+b = window.location
+a.b.href = "5555"
+window.location.href = "6666"
+b.href = "7777"
+
+a["c"] = window 
+a.c.location.href = "8888"
+a["d"] = a.c
+a.d.location.href = "9999"
+a["e"] = a.c.location
+a.e.href = "1010"
+
+
 var b = ()=>{return window.location.hostname + "/app/"}()
 window.location.href = b + "/login.html?ts=";
 window.location.href = "www"
@@ -33,10 +50,17 @@ window.location.href = "www"
 		WithLanguage(JS),
 	)
 
-	prog.Show()
+	// prog.Show()
 	// the `Ref` just a filter
+	// window := prog.Ref("window")
+	// window.Show()
+	// fmt.Println("windows : ")
+	// window.ForEach(func(v *Value) {
+	// 	v.ShowUseDefChain()
+	// })
+
 	win := prog.Ref("window").Ref("location").Ref("href")
-	win.Show()
+	// win.Show()
 	// Values: 1
 	//       0: Field: window.location.href
 
