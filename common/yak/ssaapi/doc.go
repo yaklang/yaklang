@@ -29,11 +29,29 @@ Values:
 
 
 	// instruction
-	GetOpcode() Opcode
 
-	IsUpdate() bool
-	IsCall()   bool
+	*BinOp: X Op Y
+		IsBinOp() bool
+		Op(0) X
+		Op(1) Y
+
+	*Update: update(address, value)
+		IsUpdate() bool
+		Op(0) Address
+		Op(1) Value
+
+	*Call: function(arg..., binding(..))
+		IsCall()   bool
+		Op(0) function
+		Op(1--len(arg)) Arg
+		op(len(arg) -- end) binding
+
 	IsConst()  bool
+
+	*Field: Object.Key
+		IsField()  bool
+		Op(0) Object
+		Op(1) Key
 	...
 
 
