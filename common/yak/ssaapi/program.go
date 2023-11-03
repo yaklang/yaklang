@@ -30,5 +30,29 @@ func (p *Program) Ref(name string) Values {
 			// ret = lo.Uniq(append(ret, fun.GetValuesByName(name)...))
 		})
 	})
+
+	return getValuesWithUpdate(ret)
+}
+
+func getValuesWithUpdateSingle(v *Value) Values {
+	ret := make(Values, 0)
+	ret = append(ret, v)
+	// check if: a[0] = value.Name; also append a[0]
+	v.GetUsers().ForEach(func(user *Value) {
+		if user.IsUpdate() && v.IsSame(user.GetOperand(1)) {
+			ret = append(ret, getValuesWithUpdateSingle(user.GetOperand(0))...)
+		}
+	})
+	return ret
+}
+
+func getValuesWithUpdate(vs Values) Values {
+	ret := make(Values, 0, len(vs))
+	// copy(ret, vs)
+
+	vs.ForEach(func(v *Value) {
+		ret = append(ret, getValuesWithUpdateSingle(v)...)
+	})
+
 	return ret
 }
