@@ -1,0 +1,101 @@
+host, port = tcp.MockTCPProtocol("aaaa")
+targets = []
+targets.Push(str.HostPort(host, port))
+
+host2, port2 = tcp.MockTCPProtocol("ccccc")
+targets.Push(str.HostPort(host2, port2))
+
+count = 0
+countLock = sync.NewLock()
+bruter, err := brute.New(
+    "ssh",
+    brute.concurrentTarget(256),
+    brute.debug(true),
+    brute.userList("root", "root123"),
+    brute.passList("admin123", "password"),
+    brute.okToStop(true),
+    brute.bruteHandler(fn(i) {
+        countLock.Lock()
+        count++
+        countLock.Unlock()
+        result = i.Result()
+
+        if result.Target.Contains(f"${port2}") {
+            dump(f"SKIP PORT2: ${port2}")
+            return result
+        }
+
+
+        if result.Username == "root123" && result.Password == "password" {
+            result.Ok = true
+            return result
+        }
+
+        return result
+    }),
+)
+die(err)
+
+res, err := bruter.Start(targets...)
+die(err)
+
+check = false
+for res := range res {
+    if res.Ok {
+        check = true
+    }
+
+    println(res.String())
+}
+
+dump(count)
+assert count == 8
+assert check
+
+
+failCount = 0
+failCountLock2 = sync.NewLock()
+failBruter, err := brute.New(
+    "ssh",
+    brute.concurrentTarget(256),
+    brute.debug(true),
+    brute.userList("root", "root123"),
+    brute.passList("admin123", "password"),
+    brute.okToStop(true),
+    brute.bruteHandler(fn(i) {
+        failCountLock2.Lock()
+        failCount ++
+        failCountLock2.Unlock()
+        result = i.Result()
+
+        if result.Target.Contains(f"${port2}") {
+            dump(f"SKIP PORT2: ${port2}")
+            return result
+        }
+
+
+        if result.Username == "xxxx" && result.Password == "xxxx" {
+            result.Ok = true
+            return result
+        }
+
+        return result
+    }),
+)
+die(err)
+
+failRes, err := failBruter.Start(targets...)
+die(err)
+
+failCheck = false
+for res := range failRes {
+    if res.Ok {
+        failCheck = true
+    }
+
+    println(res.String())
+}
+
+dump(failCount)
+assert failCount == 8
+assert !failCheck
