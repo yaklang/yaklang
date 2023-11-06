@@ -1081,14 +1081,9 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 	}
 
 	// | expression '<-' expression
-	if stmt.ChanIn() == nil {
+	if stmt.ChanIn() != nil {
 		op1, op2 := getValue(0), getValue(1)
-		if u, ok := op1.(ssa.Value); ok {
-			b.EmitUpdate(u, op2)
-		} else {
-			b.NewError(ssa.Error, TAG, "left of <- must be a chan variable")
-			return nil
-		}
+		b.EmitUpdate(op1, op2)
 	}
 
 	// | expression 'not'? 'in' expression
