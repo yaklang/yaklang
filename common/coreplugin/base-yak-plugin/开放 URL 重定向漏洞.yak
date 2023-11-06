@@ -308,7 +308,7 @@ open_redirect_Detect = func(url, req, rsp, param, ishttps) {
 }
 
 
-mirrorFilteredHTTPFlow = func(ishttps, url, req, rsp, body) {
+mirrorNewWebsitePathParams = func(ishttps, url, req, rsp, body) {
     dump(req)
     freq, err = fuzz.HTTPRequest(req, fuzz.https(ishttps))
     params =  freq.GetGetQueryParams()
