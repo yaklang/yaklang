@@ -85,9 +85,7 @@ func (s *Server) QueryHTTPFlows(ctx context.Context, req *ypb.QueryHTTPFlowReque
 		return nil, err
 	}
 
-	utils.Debug(func() {
-		log.Infof("start to convert httpflow: %s", time.Now())
-	})
+	start := time.Now()
 	var res []*ypb.HTTPFlow
 	for _, r := range data {
 		m, err := r.ToGRPCModel(req.Full)
@@ -96,9 +94,10 @@ func (s *Server) QueryHTTPFlows(ctx context.Context, req *ypb.QueryHTTPFlowReque
 		}
 		res = append(res, m)
 	}
-	utils.Debug(func() {
-		log.Infof("finished converting httpflow: %s", time.Now())
-	})
+	cost := time.Now().Sub(start)
+	if cost.Milliseconds() > 200 {
+		log.Infof("finished converting httpflow(%v) cost: %s", len(res), cost)
+	}
 
 	return &ypb.QueryHTTPFlowResponse{
 		Pagination: &ypb.Paging{
