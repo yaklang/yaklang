@@ -4,7 +4,17 @@ templatePacket = "GET / HTTP/1.1\r\n" +
 "Transfer-Encoding: chunked\r\n\r\n" +
 x`1{{hexd(0d0a)}}a{{hexd(0d0a)}}0{{hexd(0d0a)}}{{hexd(0d0a)}}`[0]
 
-vulInfo = `HTTP 请求走私（HTTP Request Smuggling, 简称 HRS）是一种利用 HTTP 协议设计缺陷或者服务器配置错误的攻击手段。此攻击手段主要是通过发送特制的 HTTP 请求，使得前端和后端服务器对 HTTP 请求边界的解析产生分歧，从而达到插入恶意 HTTP 请求的目的。
+vulInfo = `
+HTTP Pipeline 是一种技术，其中多个HTTP请求被发送到服务器而无需等待每个响应。这是通过将请求放入一个队列或“管道”中来实现的，这样就可以同时处理多个请求。
+
+本插件通过同时发送包含第二个请求的 Content-Length 和 Transfer-Encoding: chunked 来测试服务器（CDN）对畸形请求的兼容情况。
+
+1. 如果服务器以 Content-Length 为首选，将会把畸形请求理解为只有一个 HTTP 请求；
+2. 如果服务器以 Transfer-Encoding 为首选，将会把请求分割为两个请求；
+
+如果成功分割，用户将会看到两个响应信息，此时服务器发生了 Pipeline / Smuggle 疑似行为，虽不一定直接造成危害，但是可以进一步排查和检测
+
+HTTP 请求走私（HTTP Request Smuggling, 简称 HRS）是一种利用 HTTP 协议设计缺陷或者服务器配置错误的攻击手段。此攻击手段主要是通过发送特制的 HTTP 请求，使得前端和后端服务器对 HTTP 请求边界的解析产生分歧，从而达到插入恶意 HTTP 请求的目的。
 
 这种攻击方式可能会导致以下危害：
 
@@ -24,6 +34,7 @@ buildSmugglePacket = (host, newPacket) => {
     result = templatePacket.Replace(`REPLACEME_HOST`, host).Replace(`REPLACEME_PACKET_LENGTH`, f`${packetLen}`)
     return result + string(newPacket)
 }
+
 # mirrorNewWebsite 每新出现一个网站，这个网站的第一个请求，将会在这里被调用！
 mirrorNewWebsite = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
     host := "Host:" in req ? poc.GetHTTPPacketHeader(req, "Host") : poc.GetHTTPPacketHeader(req, "host")
@@ -33,13 +44,13 @@ mirrorNewWebsite = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*
     if rsp.MultiResponse {
         risk.NewRisk(
             url,
-            risk.title(f"HTTP Smuggle Detected: ${host}"),
-            risk.titleVerbose(f"HTTP 请求走私：${host}"),
+            risk.title(f"Maybe HTTP Request Smuggle/ErrPipeline Behavior Detected: ${host}"),
+            risk.titleVerbose(f"疑似HTTP请求走私或错误配置Pipeline：${host}"),
             risk.request(payload),
             risk.response(rsp.RawPacket),
-            risk.severity("middle"),
-            risk.type("http smuggle"),
-            risk.typeVerbose("HTTP请求走私"),
+            risk.severity("info"),
+            risk.type("http request smuggle/pipeline"),
+            risk.typeVerbose("HTTP请求走私或畸形解析"),
             risk.description(vulInfo),
         )
     }
