@@ -1,12 +1,18 @@
 package yakgit
 
 import (
+	"os"
+
 	"github.com/go-git/go-git/v5"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"os"
 )
 
+// Pull 用于指定一个本地仓库，并从其远程仓库中获取代码并合并到本地仓库中，这种行为称之为拉取(pull)，它还可以接收零个到多个选项函数，用于影响拉取行为
+// Example:
+// ```
+// git.Pull("C:/Users/xxx/Desktop/yaklang", git.verify(false), git.remote("origin"))
+// ```
 func pull(localPath string, opts ...Option) error {
 	c := &config{Remote: "origin"}
 	for _, o := range opts {

@@ -7,6 +7,12 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+// Checkout 用于指定一个本地仓库，切换其分支或者恢复工作树的文件，这种行为称之为检出(checkout)，它还可以接收零个到多个选项函数，用于影响检出行为
+// Example:
+// ```
+// git.Checkout("C:/Users/xxx/Desktop/yaklang", "feat/new-branch", git.checkoutCreate(true)) // 创建新分支
+// git.Checkout("C:/Users/xxx/Desktop/yaklang", "old-branch", git.checkoutForce(true)) // 强制切换
+// ```
 func checkout(localPath string, ref string, opts ...Option) error {
 	c := &config{Remote: "origin"}
 	for _, o := range opts {
