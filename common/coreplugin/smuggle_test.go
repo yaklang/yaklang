@@ -199,15 +199,21 @@ rsp, req = poc.HTTP(target, poc.noFixContentLength(true))~
 
 func TestGRPCMUSTPASS_Smuggle_Plugin_Positive(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	port := utils.GetRandomAvailableTCPPort()
-	vulinbox.Smuggle(ctx, port)
 	defer cancel()
+	port := utils.GetRandomAvailableTCPPort()
+	go func() {
+		vulinbox.Smuggle(ctx, port)
+	}()
+	err := utils.WaitConnect(utils.HostPort("127.0.0.1", port), 5)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	initDB.Do(func() {
 		yakit.InitialDatabase()
 	})
 
-	codeBytes := GetCorePluginData("HTTP请求走私.yak")
+	codeBytes := GetCorePluginData("HTTP请求走私")
 	if codeBytes == nil {
 		t.Errorf("无法从bindata获取%v", "HTTP请求走私.yak")
 		return
