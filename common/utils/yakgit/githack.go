@@ -96,6 +96,12 @@ var (
 	PACK_REGEX      = regexp.MustCompile("P pack-([a-z0-9]{40}).pack")
 )
 
+// GitHack 是一个用于利用 Git 源码泄露漏洞的函数
+// Git源码泄露漏洞是指：由于网站服务器的错误配置，可以通过 HTTP / HTTPS 直接访问到网站 .git 目录下的文件，从而导致源码泄露
+// Example:
+// ```
+// git.GitHack("http://127.0.0.1:8787/git/website", "C:/Users/xxx/Desktop/githack-test", git.threads(8))
+// ```
 func GitHack(remoteRepoURL string, localPath string, opts ...Option) (finalErr error) {
 	c := &config{
 		Remote:            "origin",
