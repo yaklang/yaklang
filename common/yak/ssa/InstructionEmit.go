@@ -147,6 +147,14 @@ func (f *FunctionBuilder) emit(i Instruction) {
 	})
 }
 
+func (f *FunctionBuilder) SetInstructionPosition(i Instruction) {
+	f.emitEx(i, func(i Instruction) {})
+}
+
+func (f *FunctionBuilder) EmitOnly(i Instruction) {
+	f.CurrentBlock.Insts = append(f.CurrentBlock.Insts, i)
+}
+
 func (f *FunctionBuilder) emitEx(i Instruction, insert func(Instruction)) {
 	if n, ok := ToNode(i); ok {
 		fixupUseChain(n)

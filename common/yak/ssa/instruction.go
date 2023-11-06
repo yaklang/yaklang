@@ -193,15 +193,15 @@ func (l *Loop) Finish(init, step []Value) {
 	}
 
 	if b, ok := l.Cond.(*BinOp); ok {
-		if b.Op < OpGt || b.Op > OpNotEq {
-			l.NewError(Error, SSATAG, "this condition not compare")
-		}
+		// if b.Op < OpGt || b.Op > OpNotEq {
+		// 	l.NewError(Error, SSATAG, "this condition not compare")
+		// }
 		if check(b.X) {
 			l.Key = b.X
 		} else if check(b.Y) {
 			l.Key = b.Y
-		} else {
-			l.NewError(Error, SSATAG, "this condition not change")
+			// } else {
+			// l.NewError(Error, SSATAG, "this condition not change")
 		}
 	}
 
