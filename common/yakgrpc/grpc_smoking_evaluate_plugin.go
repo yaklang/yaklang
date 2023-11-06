@@ -52,7 +52,6 @@ func (s *Server) SmokingEvaluatePlugin(ctx context.Context, req *ypb.SmokingEval
 	var (
 		pluginType = req.GetPluginType()
 		pluginCode = req.GetCode()
-		err        error
 	)
 	if pluginCode == "" {
 		ins, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), pluginName)
@@ -62,7 +61,10 @@ func (s *Server) SmokingEvaluatePlugin(ctx context.Context, req *ypb.SmokingEval
 		pluginCode = ins.Content
 		pluginType = ins.Type
 	}
+	return s.EvaluatePlugin(ctx, pluginCode, pluginType)
+}
 
+func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType string) (*ypb.SmokingEvaluatePluginResponse, error) {
 	var host string
 	var port int
 	var wg sync.WaitGroup
@@ -119,7 +121,7 @@ func (s *Server) SmokingEvaluatePlugin(ctx context.Context, req *ypb.SmokingEval
 	var score int
 	log.Info("start to echo debug script")
 	var fetchRisk bool
-	err = s.debugScript("http://"+utils.HostPort(host, port), pluginType, pluginCode, NewFakeStream(ctx, func(result *ypb.ExecResult) error {
+	err := s.debugScript("http://"+utils.HostPort(host, port), pluginType, pluginCode, NewFakeStream(ctx, func(result *ypb.ExecResult) error {
 		if result.IsMessage {
 			var m = make(map[string]any)
 			err := json.Unmarshal(result.Message, &m)
