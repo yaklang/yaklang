@@ -773,9 +773,7 @@ func DeleteHTTPFlow(db *gorm.DB, req *ypb.DeleteHTTPFlowRequest) error {
 			log.Errorf("update sqlite sequence failed: %s", db.Error)
 		}
 		db.AutoMigrate(&HTTPFlow{})
-		//if db := db.Model(&HTTPFlow{}).Where("true").Unscoped().Delete(&HTTPFlow{}); db.Error != nil {
-		//	return db.Error
-		//}
+		DeleteProjectKeyBareRequestAndResponse(db)
 		return nil
 	}
 

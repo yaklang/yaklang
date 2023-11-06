@@ -165,3 +165,14 @@ func GetProjectKeyByWhere(db *gorm.DB, key []string) ([]*ProjectGeneralStorage, 
 	}
 	return kv, nil
 }
+
+func DeleteProjectKeyBareRequestAndResponse(db *gorm.DB) error {
+	if db == nil {
+		return utils.Error("no set database")
+	}
+
+	if db := db.Debug().Where("key LIKE ? or key LIKE ?", `%_request"`, `%_response"`).Unscoped().Delete(&ProjectGeneralStorage{}); db.Error != nil {
+		return utils.Errorf("delete project storage kv bare request and bare response failed: %s", db.Error)
+	}
+	return nil
+}
