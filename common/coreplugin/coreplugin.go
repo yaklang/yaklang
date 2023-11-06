@@ -35,6 +35,9 @@ func withPluginAuthors(authors ...string) pluginOption {
 
 func registerBuildInPlugin(pluginType string, name string, opt ...pluginOption) {
 	var codes = string(GetCorePluginData(name))
+	if len(codes) <= 0 {
+		return
+	}
 
 	config := &pluginConfig{}
 	for _, o := range opt {
@@ -62,7 +65,7 @@ func init() {
 		log.Debug("start to load core plugin")
 		registerBuildInPlugin(
 			"mitm",
-			"HTTPSmuggle",
+			"HTTP请求走私",
 			withPluginAuthors("V1ll4n"),
 			withPluginHelp("HTTP请求走私漏洞检测，通过设置畸形的 Content-Length(CL) 和 Transfer-Encoding(TE) 来检测服务器是否会对畸形数据包产生不安全的反应。"),
 		)
