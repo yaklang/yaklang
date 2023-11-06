@@ -18,6 +18,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -157,7 +158,7 @@ func GetExecutableFromEnv(cmd string) (string, error) {
 	return "", Errorf("command %s not found in PATH", cmd)
 }
 
-func Copy(source string, destination string) error {
+func CopyDirectory(source string, destination string) error {
 	return filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -188,6 +189,51 @@ func Copy(source string, destination string) error {
 
 		return nil
 	})
+}
+
+type copyFileTask struct {
+	path    string
+	newPath string
+}
+
+func ConcurrentCopyDirectory(source string, destination string, threads int) error {
+	wg := &sync.WaitGroup{}
+	ch := make(chan copyFileTask)
+	for i := 0; i < threads; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for task := range ch {
+				CopyFile(task.path, task.newPath)
+				os.Remove(task.path)
+			}
+		}()
+	}
+
+	err := filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// 构建新路径
+		newPath := filepath.Join(destination, filepath.Base(path))
+
+		if info.IsDir() {
+			// 创建新的文件夹
+			err := os.MkdirAll(newPath, info.Mode())
+			if err != nil {
+				return err
+			}
+		} else {
+			ch <- copyFileTask{path: path, newPath: newPath}
+		}
+
+		return nil
+	})
+	close(ch)
+	wg.Wait()
+
+	return err
 }
 
 func CopyFile(source, destination string) error {

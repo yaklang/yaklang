@@ -245,7 +245,7 @@ func GitHack(remoteRepoURL string, localPath string, opts ...Option) (finalErr e
 	}
 
 	// 复制临时目录到目标目录
-	if err = utils.Copy(tempDirPath, localPath); err != nil {
+	if err = utils.ConcurrentCopyDirectory(tempDirPath, localPath, c.Threads); err != nil {
 		return utils.Wrapf(err, "copy temp git repo to %s error", localPath)
 	}
 
