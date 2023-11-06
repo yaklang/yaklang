@@ -15,7 +15,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: Test JSONExtractor / Codec / Cartesian / JsonPath / Domain Extractor / Fuzztag / TLS / CVE / SCA / NETX
+          - name: Test JSONExtractor / Codec / Cartesian / JsonPath / Domain Extractor / Fuzztag / TLS / CVE / SCA / NETX / SSA
             run: |
               # these tests are very quick
               go test -timeout 20s ./common/jsonextractor -v
@@ -30,6 +30,9 @@ jobs:
               go test -timeout 20s -run TestQueryCVEWithFixName ./common/cve -v
               go test -timeout 20s ./common/sca/... -v
               go test -timeout 20s ./common/netx/mustpass -v
+              go test -timeout 20s -run TestMUSTPASS_YakitLog ./common/fp -v
+              go test -timeout 20s ./common/yak/yak2ssa
+              go test -timeout 20s -run TestPingAutoConfig ./common/utils/pingutil -v
 
           - name: Test lowhttp
             run: go test -timeout 1m ./common/utils/lowhttp -v
@@ -44,7 +47,7 @@ jobs:
             run: go test -timeout 10m -run TestGRPCMUSTPASS ./common/yakgrpc -v
 
           - name: Test gRPC(LARGE)MUSTPASS
-            run: go test -timeout 10m -run TestLARGEGRPCMUSTPASS ./common/yakgrpc -v
+            run: go test -timeout 2m -run TestLARGEGRPCMUSTPASS ./common/yakgrpc -v
 
           - name: Test Vulinbox SQL Injection
             run: go test -timeout 4m -run TestGRPCMUSTPASS_SQL ./common/coreplugin -v
@@ -52,21 +55,17 @@ jobs:
           - name: Test Integration MITM
             run: go test -timeout 2m -run TestGRPCMUSTPASS_MITM ./common/coreplugin -v
 
-          - name: Test Vulinbox(XSS/Shiro/SSTI/SMUGGLE)
+          - name: Test Vulinbox(XSS/Shiro/SSTI/SMUGGLE/CSRF/OPEN_REDIRECT)
             run: |
               go test -timeout 2m -run TestGRPCMUSTPASS_XSS ./common/coreplugin -v
               go test -timeout 1m -run TestGRPCMUSTPASS_Shiro ./common/coreplugin -v
               go test -timeout 1m -run TestGRPCMUSTPASS_SSTI ./common/coreplugin -v
               go test -timeout 1m -run TestGRPCMUSTPASS_Smuggle ./common/coreplugin -v
-
-          - name: Test gRPC MUSTPASS-PLUGIN-CSRF
-            run: go test -timeout 1m -run TestGRPCMUSTPASS_CSRF ./common/coreplugin -v
+              go test -timeout 1m -run TestGRPCMUSTPASS_CSRF ./common/coreplugin -v
+              go test -timeout 1m -run TestGRPCMUSTPASS_OPEN_REDIRECT ./common/coreplugin -v
 
           - name: Test gRPC MUSTPASS-PLUGIN-Fastjson
             run: go test -timeout 3m -run TestGRPCMUSTPASS_Fastjson ./common/coreplugin -v
-
-          - name: Test gRPC TestGRPCMUSTPASS_OPEN_REDIRECT
-            run: go test -timeout 1m -run TestGRPCMUSTPASS_OPEN_REDIRECT ./common/coreplugin -v
 
           - name: Test Vulinbox agent client
             run: go test -timeout 1m -run TestMUSTPASS* ./common/vulinboxagentclient -v
@@ -76,9 +75,6 @@ jobs:
               go test -timeout 20s -run TestMUSTPASS* ./common/suricata/... -v
               go test -timeout 20s -run TestMUSTPASS* ./common/chaosmaker -v
 
-          - name: Test Ping
-            run: go test -timeout 20s -run TestPingAutoConfig ./common/utils/pingutil -v
-
           - name: crawlerx (chromium based crawler)
             run: go test -v --timeout 5m ./common/crawlerx
 
@@ -87,12 +83,6 @@ jobs:
               go test -timeout 20s -run TestSmoking_ICMP ./common/pcapx -v
               go test -timeout 20s -run TestSmoking_TCP ./common/pcapx -v
               go test -timeout 20s -run TestSmoking_UDP ./common/pcapx -v
-#          - name: Test FingerPrint
-#            run: go test -timeout 20s -run TestMUSTPASS_FingerprintRule ./common/fp -v
-          - name: Test SSA 
-            run: go test -timeout 20s ./common/yak/yak2ssa
-          - name: Test Yakit log
-            run: go test -timeout 20s -run TestMUSTPASS_YakitLog ./common/fp -v
 
     steps:
       - name: Check out code into the Go module directory
