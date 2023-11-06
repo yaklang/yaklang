@@ -6,12 +6,18 @@ import (
 	"context"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/vulinbox"
 	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yakgrpc"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 )
@@ -189,4 +195,61 @@ rsp, req = poc.HTTP(target, poc.noFixContentLength(true))~
 		t.Fatal("invalid rsp count")
 	}
 	t.Logf("Fetch RESPONSE COUNT: %v", len(rsps))
+}
+
+func TestGRPCMUSTPASS_Smuggle_Plugin_Positive(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	port := utils.GetRandomAvailableTCPPort()
+	vulinbox.Smuggle(ctx, port)
+	defer cancel()
+
+	initDB.Do(func() {
+		yakit.InitialDatabase()
+	})
+
+	codeBytes := GetCorePluginData("HTTP请求走私.yak")
+	if codeBytes == nil {
+		t.Errorf("无法从bindata获取%v", "HTTP请求走私.yak")
+		return
+	}
+	client, err := yakgrpc.NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream, err := client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
+		Code:       string(codeBytes),
+		PluginType: "mitm",
+		Input:      utils.HostPort("127.0.0.1", port),
+		HTTPRequestTemplate: &ypb.HTTPRequestBuilderParams{
+			IsRawHTTPRequest: false,
+			IsHttps:          false,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var runtimeId string
+	for {
+		exec, err := stream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			log.Warn(err)
+		}
+		if runtimeId == "" {
+			runtimeId = exec.RuntimeID
+		}
+	}
+
+	var checked = false
+	for r := range yakit.YieldRisksByRuntimeId(consts.GetGormProjectDatabase(), ctx, runtimeId) {
+		log.Infof("Risk: %v", r)
+		if r.Port == port && strings.Contains(r.Title, "Smuggle") {
+			checked = true
+		}
+	}
+	if !checked {
+		t.Fatal("risk not found")
+	}
 }
