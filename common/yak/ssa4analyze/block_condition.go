@@ -46,6 +46,9 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 
 	handleIfEdge := func(i *ssa.If) {
 		from := i.GetBlock()
+		if cond := i.Cond; cond.GetOpcode() == ssa.OpConstInst {
+			cond.NewError(ssa.Warn, BCTag, ConditionIsConst("if"))
+		}
 		newEdge(i.True, from, i.Cond)
 		newEdge(i.False, from, newUnOp(ssa.OpNot, i.Cond, i.GetBlock()))
 	}
@@ -86,6 +89,9 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 
 	handleSwitchEdge := func(sw *ssa.Switch) {
 		from := sw.GetBlock()
+		if cond := sw.Cond; cond.GetOpcode() == ssa.OpConstInst {
+			cond.NewError(ssa.Warn, BCTag, ConditionIsConst("switch"))
+		}
 		var defaultCond ssa.Value
 		for _, lab := range sw.Label {
 			cond := newBinOp(ssa.OpEq, sw.Cond, lab.Value, lab.Dest)
@@ -100,8 +106,46 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 		newEdge(sw.DefaultBlock, from, defaultCond)
 	}
 
+	fixupBlockPos := func(b *ssa.BasicBlock) *ssa.Position {
+		var start *ssa.Position
+		for _, inst := range b.Insts {
+			// inst.GetPosition == nil, this inst is edge
+			if ssa.IsControlInstruction(inst) && inst.GetPosition() != nil {
+				continue
+			}
+			start = inst.GetPosition()
+			break
+		}
+
+		if start == nil {
+			return nil
+		}
+
+		var end *ssa.Position
+		for i := len(b.Insts) - 1; i >= 0; i-- {
+			inst := b.Insts[i]
+			if ssa.IsControlInstruction(inst) && inst.GetPosition() != nil {
+				continue
+			}
+			end = inst.GetPosition()
+			break
+		}
+		if end == nil {
+			end = start
+		}
+		pos := &ssa.Position{}
+		pos.StartLine = start.StartLine
+		pos.StartColumn = start.StartColumn
+		pos.EndColumn = end.EndColumn
+		pos.EndLine = end.EndLine
+		return pos
+	}
+
 	// handler instruction
 	for _, b := range fun.Blocks {
+		// fix block position
+		b.SetPosition(fixupBlockPos(b))
+
 		for _, inst := range b.Insts {
 			switch inst := inst.(type) {
 			// call function
@@ -212,7 +256,6 @@ func newBinOp(op ssa.BinaryOpcode, x ssa.Value, y ssa.Value, block *ssa.BasicBlo
 	b := ssa.NewBinOp(op, x, y)
 	if b, ok := ssa.ToBinOp(b); ok {
 		block.EmitInst(b)
-		b.SetPosition(block.GetPosition())
 	}
 	return b
 }
@@ -221,7 +264,6 @@ func newUnOp(op ssa.UnaryOpcode, x ssa.Value, block *ssa.BasicBlock) ssa.Value {
 	u := ssa.NewUnOp(op, x)
 	if u, ok := ssa.ToUnOp(u); ok {
 		block.EmitInst(u)
-		u.SetPosition(block.GetPosition())
 	}
 	return u
 }

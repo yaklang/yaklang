@@ -110,9 +110,8 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 	}
 
 	for _, b := range f.Blocks {
-		ret += b.String() + "\n"
-
 		if flag&DisAsmWithSource == 0 {
+			ret += b.String() + "\n"
 			for _, p := range b.Phis {
 				ret += fmt.Sprintf("\t%s\n", p)
 			}
@@ -120,6 +119,11 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 				ret += fmt.Sprintf("\t%s\n", i)
 			}
 		} else {
+			ret += b.String()
+			if bPos := b.GetPosition(); bPos != nil {
+				ret += bPos.String()
+			}
+			ret += "\n"
 			insts := make([]string, 0, len(b.Insts)+len(b.Phis))
 			pos := make([]string, 0, len(b.Insts)+len(b.Phis))
 			for _, p := range b.Phis {
@@ -128,7 +132,11 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 			}
 			for _, i := range b.Insts {
 				insts = append(insts, fmt.Sprintf("\t%s", i))
-				pos = append(pos, i.GetPosition().String())
+				if p := i.GetPosition(); p != nil {
+					pos = append(pos, i.GetPosition().String())
+				} else {
+					pos = append(pos, "")
+				}
 			}
 			// get MaxLen
 			max := 0
