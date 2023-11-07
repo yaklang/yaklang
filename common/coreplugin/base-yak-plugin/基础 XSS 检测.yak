@@ -39,7 +39,7 @@ filterParams = func(params) {
     newParams = make([]var)
     for _, param = range params {
         // 对post中的submit参数进行过滤
-        if param.Name() == "submit" && str.HasPrefix(param.PositionVerbose(), "post") {
+        if str.MatchAllOfRegexp(param.Name(), `^(?i)submit$`) && str.HasPrefix(param.PositionVerbose(), "POST") {
             continue   
         }
         newParams = append(newParams, param)
@@ -153,7 +153,7 @@ Rawfuzz = func(param, fuzzPayload) {
     checkErr(err)
     reqBody, err = http.dump(rawReq)
     checkErr(err)
-    reqBody = string(reqBody)
+    reqBody = reqBody
     respChannel,err =  freq.Exec()
     checkErr(err)
     rsp = <-respChannel
@@ -353,7 +353,7 @@ paramFuzzTask = func(threads, url, param) {
     rspo = <-resp
     body, err = str.ExtractBodyFromHTTPResponseRaw(rspo.ResponseRaw)
     checkErr(err)
-    randStrFromIndex = string(body)
+    randStrFromIndex = body
 
     for {
         n, btChr = xhtml.MatchBetween(randStrFromIndex, randStr, randStr, 50)
