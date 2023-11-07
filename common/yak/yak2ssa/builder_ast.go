@@ -455,7 +455,7 @@ func (b *astbuilder) buildSwitchStmt(stmt *yak.SwitchStmtContext) {
 		}
 	}
 
-	Switchb.BuildHanlder(func() (int, []ssa.Value) {
+	Switchb.BuildHandler(func() (int, []ssa.Value) {
 		return len(allcase), exprs
 	})
 
@@ -479,7 +479,7 @@ func (b *astbuilder) buildSwitchStmt(stmt *yak.SwitchStmtContext) {
 		}
 	}
 
-	Switchb.Finsh()
+	Switchb.Finish()
 }
 
 // if stmt
