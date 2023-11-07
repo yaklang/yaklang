@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"net/http"
@@ -222,6 +223,62 @@ Host: www.baidu.com
 	}
 	if count != 1 {
 		t.Fatalf("expect 1, got %v", count)
+	}
+}
+
+func TestGRPCMUSTPASS_ExtractUrl(t *testing.T) {
+	c, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name       string
+		request    string
+		concurrent int
+		isHTTPS    bool
+		expected   string
+	}{
+		{
+			name: "HTTP Base64 Encoded",
+			request: `GET /{{base64(aaaaa)}} HTTP/1.1
+Host: www.baidu.com
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36
+Accept-Language: zh-CN,zh;q=0.9
+Connection: close
+
+`,
+			isHTTPS:  false,
+			expected: "http://www.baidu.com/" + base64.StdEncoding.EncodeToString([]byte("aaaaa")),
+		},
+		{
+			name: "HTTPS Base64 Encoded with Int",
+			request: `GET /{{base64(aaaaa)}}/{{int(1-10)}} HTTP/1.1
+Host: www.baidu.com
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36
+Accept-Language: zh-CN,zh;q=0.9
+Connection: close
+
+`,
+			isHTTPS:  true,
+			expected: "https://www.baidu.com/" + base64.StdEncoding.EncodeToString([]byte("aaaaa")) + "/1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, err := c.ExtractUrl(context.Background(), &ypb.FuzzerRequest{
+				Request: tt.request,
+				IsHTTPS: tt.isHTTPS,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if client.GetUrl() != tt.expected {
+				t.Fatalf("extract url failed, got %s, want %s", client.GetUrl(), tt.expected)
+			}
+		})
 	}
 }
 
