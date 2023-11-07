@@ -45,10 +45,27 @@ func Chardet(raw []byte) string {
 }
 
 func (s *Server) ExtractUrl(ctx context.Context, req *ypb.FuzzerRequest) (*ypb.ExtractedUrl, error) {
-	u, err := lowhttp.ExtractURLFromHTTPRequestRaw([]byte(req.Request), req.GetIsHTTPS())
+	res, err := mutate.FuzzTagExec(req.GetRequest(), mutate.Fuzz_WithEnableFiletag())
 	if err != nil {
 		return nil, err
 	}
+	var u *url.URL
+	if err != nil {
+		u, err = lowhttp.ExtractURLFromHTTPRequestRaw([]byte(req.Request), req.GetIsHTTPS())
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		render, err := lowhttp.ParseStringToHttpRequest(res[0])
+		if err != nil {
+			return nil, err
+		}
+		u, err = lowhttp.ExtractURLFromHTTPRequest(render, req.GetIsHTTPS())
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return &ypb.ExtractedUrl{Url: u.String()}, nil
 }
 
