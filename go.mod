@@ -111,11 +111,6 @@ require (
 	github.com/xiecat/wsm v0.1.3
 	github.com/ysmood/gson v0.7.3
 	go.mongodb.org/mongo-driver v1.12.1
-	golang.org/x/crypto v0.10.0
-	golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1
-	golang.org/x/net v0.11.0
-	golang.org/x/sys v0.9.0
-	golang.org/x/text v0.10.0
 	golang.org/x/crypto v0.14.0
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
 	golang.org/x/net v0.16.0
@@ -138,8 +133,6 @@ require (
 	github.com/ProtonMail/go-crypto v0.0.0-20210428141323-04723f9f07d7 // indirect
 	github.com/acomagu/bufpipe v1.0.3 // indirect
 	github.com/andybalholm/cascadia v1.1.0 // indirect
-	github.com/antlr/antlr4/runtime/Go/antlr v1.4.10 // indirect
-	github.com/antlr4-go/antlr v0.0.0-20230518091524-98b52378c522 // indirect
 	github.com/aquasecurity/go-pep440-version v0.0.0-20210121094942-22b2f8951d46 // indirect
 	github.com/aquasecurity/go-version v0.0.0-20210121072130-637058cfe492 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect

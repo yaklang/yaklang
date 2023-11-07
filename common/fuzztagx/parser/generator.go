@@ -18,6 +18,7 @@ type MethodContext struct {
 	methodTable    map[string]*TagMethod
 	labelTable     map[string]map[*TagExecNode]struct{}
 	tagToLabelsMap map[*TagExecNode][]string
+	dynTag         map[*TagExecNode]struct{}
 }
 
 // UpdateLabels 更新全局labelTable，先删除当前tag的所有label映射，再增加
@@ -34,6 +35,7 @@ func (m *MethodContext) UpdateLabels(tag *TagExecNode) {
 			tag.isRep = true
 		case "dyn":
 			tag.isDyn = true
+			m.dynTag[tag] = struct{}{}
 		default:
 			if _, ok := m.labelTable[label]; !ok {
 				m.labelTable[label] = map[*TagExecNode]struct{}{}
@@ -189,6 +191,7 @@ type Generator struct {
 	//index     int
 	data            []ExecNode
 	first           bool
+	methodCtx       *MethodContext
 	backpropagation func() error
 	AssertError     bool
 	Error           error
@@ -201,6 +204,7 @@ func newBackpropagationGenerator(f func() error, nodes []ExecNode, cfg *Generate
 		index := index
 		switch ret := d.(type) {
 		case *TagExecNode:
+			g.methodCtx = ret.methodCtx
 			ret.config = cfg
 			ret.submitResult = func(s *FuzzResult) {
 				g.container[index] = s
@@ -228,6 +232,7 @@ func newBackpropagationGenerator(f func() error, nodes []ExecNode, cfg *Generate
 func NewGenerator(nodes []Node, table map[string]*TagMethod) *Generator {
 	cfg := &GenerateConfig{}
 	methodCtx := &MethodContext{
+		dynTag:         map[*TagExecNode]struct{}{},
 		methodTable:    table,
 		labelTable:     map[string]map[*TagExecNode]struct{}{},
 		tagToLabelsMap: map[*TagExecNode][]string{},
@@ -331,19 +336,6 @@ func (g *Generator) generate() (bool, error) {
 				i := i
 				successCallBacks = append(successCallBacks, func() error {
 					if v, ok := g.data[i].(*TagExecNode); ok {
-						if v.isDyn { //重新执行当前和所有子节点
-							var execAllFirst func(t ExecNode)
-							execAllFirst = func(t ExecNode) {
-								if v1, ok := t.(*TagExecNode); ok {
-									for _, param := range v1.params {
-										execAllFirst(param)
-									}
-									v1.FirstExec(false, true, true) //在这个节点第一次执行时已经判断了err，这里不用判断了
-								}
-							}
-							execAllFirst(v)
-							return v.backpropagation()
-						}
 						return v.FirstExec(true, false, true)
 					}
 					return nil
@@ -354,6 +346,22 @@ func (g *Generator) generate() (bool, error) {
 				if err := back(); err != nil {
 					return true, err
 				}
+			}
+			for tag, _ := range g.methodCtx.dynTag {
+				if tag == g.data[i] {
+					continue
+				}
+				var execAllFirst func(t ExecNode)
+				execAllFirst = func(t ExecNode) {
+					if v1, ok := t.(*TagExecNode); ok {
+						for _, param := range v1.params {
+							execAllFirst(param)
+						}
+						v1.FirstExec(false, true, true) //在这个节点第一次执行时已经判断了err，这里不用判断了
+					}
+				}
+				execAllFirst(tag)
+				tag.backpropagation()
 			}
 			isOk = true
 			break

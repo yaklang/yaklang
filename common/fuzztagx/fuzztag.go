@@ -79,6 +79,9 @@ func (f *FuzzTag) Exec(raw *parser.FuzzResult, methods ...map[string]*parser.Tag
 		return []*parser.FuzzResult{parser.NewFuzzResultWithData("")}, nil
 		//return nil, utils.Errorf("fuzztag name %s not found", name)
 	}
+	if fun.IsDyn {
+		f.Labels = append(f.Labels, "dyn")
+	}
 	return fun.Fun(params)
 }
 
