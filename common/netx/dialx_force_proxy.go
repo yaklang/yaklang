@@ -113,7 +113,8 @@ func connectForceProxy(ctx context.Context, target string, proxy string, connect
 		}
 		if urlIns.User != nil && urlIns.User.String() != "" {
 			// 有密码
-			_, _ = conn.Write(generateHTTPProxyConnectWithCredential(target, urlIns.User.String()))
+			username, password := parseProxyCredential(proxy)
+			_, _ = conn.Write(generateHTTPProxyConnectWithCredential(target, username, password))
 		} else {
 			// 无密码
 			_, _ = conn.Write(generateHTTPProxyConnect(target))
@@ -163,7 +164,8 @@ func connectForceProxy(ctx context.Context, target string, proxy string, connect
 		}
 
 		if urlIns.User != nil && urlIns.User.String() != "" {
-			_, err = conn.Write(generateHTTPProxyConnectWithCredential(target, urlIns.User.String()))
+			username, password := parseProxyCredential(proxy)
+			_, err = conn.Write(generateHTTPProxyConnectWithCredential(target, username, password))
 		} else {
 			_, err = conn.Write(generateHTTPProxyConnect(target))
 		}
@@ -228,10 +230,10 @@ func generateHTTPProxyConnect(target string) []byte {
 	))
 }
 
-func generateHTTPProxyConnectWithCredential(target string, cred string) []byte {
+func generateHTTPProxyConnectWithCredential(target, username, password string) []byte {
 	return []byte(fmt.Sprintf(
 		"CONNECT %v HTTP/1.1\r\nHost: %v\r\nUser-Agent: %v\r\n"+
-			fmt.Sprintf("Proxy-Authorization: Basic %v\r\n", codec.EncodeBase64(cred))+
+			fmt.Sprintf("Proxy-Authorization: Basic %v\r\n", codec.EncodeBase64(fmt.Sprintf("%s:%s", username, password)))+
 			"Connection: keep-alive\r\nProxy-Connection: keep-alive\r\n\r\n",
 		target, target, DefaultUserAgent,
 	))
