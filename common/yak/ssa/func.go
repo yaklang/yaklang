@@ -76,6 +76,10 @@ func (f *Function) IsMain() bool {
 	return f == pkg.Funcs[0]
 }
 
+func (f *Function) GetDeferBlock() *BasicBlock {
+	return f.DeferBlock
+}
+
 func (f *Function) GetSymbol() *Make {
 	return f.symbolObject
 }

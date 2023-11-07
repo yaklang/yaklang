@@ -255,6 +255,7 @@ type Function struct {
 	Blocks     []*BasicBlock
 	EnterBlock *BasicBlock
 	ExitBlock  *BasicBlock
+	DeferBlock *BasicBlock
 
 	// anonymous function in this function
 	AnonFuncs []*Function
