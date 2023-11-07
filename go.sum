@@ -46,12 +46,8 @@ github.com/antchfx/xmlquery v1.3.1/go.mod h1:64w0Xesg2sTaawIdNqMB+7qaW/bSqkQm+ss
 github.com/antchfx/xpath v1.1.10/go.mod h1:Yee4kTMuNiPYJ7nSNorELQMr1J33uOpXDMByNYhvtNk=
 github.com/antchfx/xpath v1.2.1 h1:qhp4EW6aCOVr5XIkT+l6LJ9ck/JsUH/yyauNgTQkBF8=
 github.com/antchfx/xpath v1.2.1/go.mod h1:i54GszH55fYfBmoZXapTHN8T8tkcHfRgLyVwwqzXNcs=
-github.com/antlr/antlr4/runtime/Go/antlr v1.4.10 h1:yL7+Jz0jTC6yykIK/Wh74gnTJnrGr5AyrNMXuA0gves=
-github.com/antlr/antlr4/runtime/Go/antlr v1.4.10/go.mod h1:F7bn7fEU90QkQ3tnmaTx3LTKLEDqnwWODIYppRQ5hnY=
 github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20220911224424-aa1f1f12a846 h1:et5J11AOyUn9qwkIAF9kcxTxjTO8Z9oSmlOqH7MVSPo=
 github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20220911224424-aa1f1f12a846/go.mod h1:pSwJ0fSY5KhvocuWSx4fz3BA8OrA1bQn+K1Eli3BRwM=
-github.com/antlr4-go/antlr v0.0.0-20230518091524-98b52378c522 h1:o+W7GDFUwWtVkN28CW/nhh/aCmHn6OJddUs3+8vMMjs=
-github.com/antlr4-go/antlr v0.0.0-20230518091524-98b52378c522/go.mod h1:srLVvW4JLxy+tCG9Nn2l8al77mUIMCwAOLQocfLDU2w=
 github.com/antlr4-go/antlr/v4 v4.13.0 h1:lxCg3LAv+EUK6t1i0y1V6/SLeUi0eKEKdhQAlS8TVTI=
 github.com/antlr4-go/antlr/v4 v4.13.0/go.mod h1:pfChB/xh/Unjila75QW7+VU4TSnWnnk9UTnmpPaOR2g=
 github.com/aquasecurity/go-dep-parser v0.0.0-20230627073354-fb7eb3159bd5 h1:FA5XM/KP1l+PYH+QafFzzBjdsT+WxWTWsYGPzKrMeAQ=

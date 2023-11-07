@@ -40,6 +40,21 @@ func Fuzz_WithExtraFuzzTagHandler(tag string, handler func(string) []string) Fuz
 		config.AddFuzzTagHandler(tag, handler)
 	}
 }
+func Fuzz_WithExtraDynFuzzTagHandler(tag string, handler func(string) []string) FuzzConfigOpt {
+	return func(config *FuzzTagConfig) {
+		config.tagMethodMap[tag] = &parser.TagMethod{
+			Name:  tag,
+			IsDyn: true,
+			Fun: func(s string) ([]*parser.FuzzResult, error) {
+				var results []*parser.FuzzResult
+				for _, result := range handler(s) {
+					results = append(results, parser.NewFuzzResultWithData(result))
+				}
+				return results, nil
+			},
+		}
+	}
+}
 
 func Fuzz_WithExtraFuzzTagHandlerEx(tag string, handler func(string) []*fuzztag.FuzzExecResult) FuzzConfigOpt {
 	return func(config *FuzzTagConfig) {

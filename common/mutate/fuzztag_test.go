@@ -234,3 +234,46 @@ func TestFuzzTagExec(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestDynFuzzTag(t *testing.T) {
+	expect := []string{
+		"aa",
+		"ba",
+		"ca",
+	}
+	resi := 0
+	i1 := 0
+	i2 := 0
+	randstrList := []string{"a", "b", "c"}
+	_, err := FuzzTagExec("{{randstr1()}}{{randstr2()}}{{repeat(3)}}", Fuzz_WithExtraDynFuzzTagHandler("randstr1", func(s string) []string {
+		defer func() {
+			i1++
+		}()
+		return []string{randstrList[i1]}
+	}), Fuzz_WithExtraFuzzTagHandler("randstr2", func(s string) []string {
+		defer func() {
+			i2++
+		}()
+		return []string{randstrList[i2]}
+	}), Fuzz_WithExtraFuzzTagHandler("repeat", func(s string) []string {
+		n, err := strconv.Atoi(s)
+		if err != nil {
+			panic(err)
+		}
+		res := []string{}
+		for range make([]int, n) {
+			res = append(res, "")
+		}
+		return res
+	}), Fuzz_WithResultHandler(func(s string, i []string) bool {
+		if s != expect[resi] {
+			t.Fatal("test verbose info failed")
+		}
+		resi++
+		return true
+	}))
+	//res, err := FuzzTagExec("{{uuid(a)}}")
+	if err != nil {
+		t.Fatal(err)
+	}
+}
