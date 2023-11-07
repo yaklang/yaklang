@@ -27,6 +27,9 @@ func (b *astbuilder) build(ast *yak.ProgramContext) {
 	for _, ws := range ast.AllWs() {
 		b.handlerWs(ws.(*yak.WsContext))
 	}
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
+	b.Function.SetPosition(b.CurrentPos)
 	if stmt, ok := ast.StatementList().(*yak.StatementListContext); ok {
 		b.buildStatementList(stmt)
 	}
@@ -36,7 +39,6 @@ func (b *astbuilder) build(ast *yak.ProgramContext) {
 func (b *astbuilder) buildStatementList(stmtlist *yak.StatementListContext) {
 	recoverRange := b.SetRange(stmtlist.BaseParserRuleContext)
 	defer recoverRange()
-	b.Function.SetPosition(b.CurrentPos)
 	allstmt := stmtlist.AllStatement()
 	for _, stmt := range allstmt {
 		if stmt, ok := stmt.(*yak.StatementContext); ok {
