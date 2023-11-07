@@ -7,9 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"net/url"
-	"path"
-	"strings"
+	utils2 "github.com/yaklang/yaklang/common/yak/httptpl/utils"
 	"sync/atomic"
 	"time"
 )
@@ -29,50 +27,8 @@ type RequestBulk struct {
 	RequestConfig *YakRequestBulkConfig
 }
 
-func (y *YakTemplate) ExtractorVarsFromUrl(u string) map[string]string {
-	urlIns, err := url.Parse(u)
-	if err != nil {
-		log.Error(err)
-		return nil
-	}
-	baseUrl := urlIns.String()
-	var rootUrl string
-	if urlIns.Scheme == "https" {
-		if urlIns.Port() == "443" {
-			rootUrl = fmt.Sprintf("https://%v", urlIns.Host)
-		} else {
-			rootUrl = fmt.Sprintf("https://%v", utils.HostPort(urlIns.Host, urlIns.Port()))
-		}
-	} else {
-		if urlIns.Port() == "80" {
-			rootUrl = fmt.Sprintf("http://%v", urlIns.Host)
-		} else {
-			rootUrl = fmt.Sprintf("http://%v", utils.HostPort(urlIns.Host, urlIns.Port()))
-		}
-	}
-	var file string
-	pathRaw := urlIns.RequestURI()
-	if strings.Contains(pathRaw, "?") {
-		pathNoQuery := pathRaw[:strings.Index(pathRaw, "?")]
-		_, file = path.Split(pathNoQuery)
-	}
-	baseUrl = strings.TrimRight(baseUrl, "/")
-	rootUrl = strings.TrimRight(rootUrl, "/")
-	return map[string]string{
-		"URL":      urlIns.String(),
-		"Host":     urlIns.Hostname(),
-		"Port":     urlIns.Port(),
-		"Hostname": urlIns.Host,
-		"RootURL":  rootUrl,
-		"BaseURL":  baseUrl,
-		"Path":     urlIns.RequestURI(),
-		"File":     file,
-		"Schema":   urlIns.Scheme,
-	}
-
-}
 func (y *YakTemplate) GenerateRequestSequences(u string) []*RequestBulk {
-	vars := utils.InterfaceToMapInterface(y.ExtractorVarsFromUrl(u))
+	vars := utils.InterfaceToMapInterface(utils2.ExtractorVarsFromUrl(u))
 	result := []*RequestBulk{}
 	for _, sequenceCfg := range y.HTTPRequestSequences {
 		seq := &RequestBulk{
@@ -243,7 +199,7 @@ func (y *YakTemplate) ExecWithUrl(u string, config *Config, opts ...lowhttp.Lowh
 				for _, opt := range opts {
 					opt(lowhttpConfig)
 				}
-				renderVars := y.ExtractorVarsFromUrl(u)
+				renderVars := utils2.ExtractorVarsFromUrl(u)
 				err := tcpReq.Execute(config, p, renderVars, lowhttpConfig, func(response []*NucleiTcpResponse, matched bool, extractorResults map[string]any) {
 					atomic.AddInt64(&count, 1)
 					config.ExecuteTCPResultCallback(y, tcpReq, response, matched, extractorResults)
