@@ -1684,7 +1684,7 @@ func (b *astbuilder) buildCaseBlock(stmt *JS.CaseBlockContext, Switchb *ssa.Swit
 		}
 	}
 
-	Switchb.BuildHanlder(func() (int, []ssa.Value) {
+	Switchb.BuildHandler(func() (int, []ssa.Value) {
 		return caseNum, exprs
 	})
 
@@ -1702,6 +1702,6 @@ func (b *astbuilder) buildCaseBlock(stmt *JS.CaseBlockContext, Switchb *ssa.Swit
 		}
 	}
 
-	Switchb.Finsh()
+	Switchb.Finish()
 
 }
