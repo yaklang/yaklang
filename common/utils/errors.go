@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
@@ -16,15 +17,15 @@ type YakError struct {
 func Error(i interface{}) error {
 	switch t := i.(type) {
 	case string:
-		return YakError{msg: t, originalErrors: nil, stack: callers()}
+		return &YakError{msg: t, originalErrors: nil, stack: callers()}
 	default:
-		return YakError{msg: fmt.Sprint(i), originalErrors: nil, stack: callers()}
+		return &YakError{msg: fmt.Sprint(i), originalErrors: nil, stack: callers()}
 	}
 }
 
 func Errorf(format string, args ...interface{}) error {
 	oErr := fmt.Errorf(format, args...)
-	return YakError{
+	return &YakError{
 		msg:            oErr.Error(),
 		originalErrors: []error{oErr},
 		stack:          callers(),
@@ -49,7 +50,7 @@ func JoinErrors(errs ...error) error {
 		if i < lenOfErrors-1 {
 			msg += ": "
 		}
-		if yakError, ok := err.(YakError); ok {
+		if yakError, ok := err.(*YakError); ok {
 			newErrs = append(newErrs, yakError.originalErrors...)
 			if st == nil {
 				st = yakError.stack
@@ -67,7 +68,7 @@ func JoinErrors(errs ...error) error {
 		st = callers()
 	}
 
-	return YakError{
+	return &YakError{
 		msg:            msg,
 		originalErrors: errs,
 		stack:          st,
@@ -81,14 +82,14 @@ func Wrap(err error, msg string) error {
 	if msg != "" {
 		msg += ": "
 	}
-	if yakErr, ok := err.(YakError); ok {
+	if yakErr, ok := err.(*YakError); ok {
 		yakErr.msg = fmt.Sprintf("%s%s", msg, yakErr.Error())
 		yakErr.stack.appendCurrentFrame()
 		yakErr.originalErrors = append(yakErr.originalErrors, err)
 		return yakErr
 	}
 
-	return YakError{msg: fmt.Sprintf("%s%s", msg, err.Error()), originalErrors: []error{err}, stack: callers()}
+	return &YakError{msg: fmt.Sprintf("%s%s", msg, err.Error()), originalErrors: []error{err}, stack: callers()}
 }
 
 func Wrapf(err error, format string, args ...interface{}) error {
@@ -100,29 +101,44 @@ func Wrapf(err error, format string, args ...interface{}) error {
 		msg += ": "
 	}
 
-	if yakErr, ok := err.(YakError); ok {
+	if yakErr, ok := err.(*YakError); ok {
 		yakErr.msg = fmt.Sprintf("%s%s", msg, yakErr.Error())
 		yakErr.stack.appendCurrentFrame()
 		yakErr.originalErrors = append(yakErr.originalErrors, err)
 		return yakErr
 	}
 
-	return YakError{msg: fmt.Sprintf("%s%s", msg, err.Error()), originalErrors: []error{err}, stack: callers()}
+	return &YakError{msg: fmt.Sprintf("%s%s", msg, err.Error()), originalErrors: []error{err}, stack: callers()}
 }
 
-func (err YakError) Cause() []error {
+func (err *YakError) Cause() []error {
 	return err.originalErrors
 }
 
-func (err YakError) Error() string {
+func (err *YakError) Error() string {
 	return err.msg
 }
 
-func (err YakError) Unwrap() []error {
+func (err *YakError) Unwrap() []error {
 	return err.originalErrors
 }
 
-func (err YakError) Format(s fmt.State, verb rune) {
+func (e *YakError) Is(rerr error) bool {
+	if yakErr, ok := rerr.(*YakError); ok {
+		return e == yakErr
+	}
+
+	for _, oerr := range e.originalErrors {
+		if errors.Is(oerr, rerr) {
+			return true
+		}
+		return false
+	}
+
+	return false
+}
+
+func (err *YakError) Format(s fmt.State, verb rune) {
 	switch verb {
 	case 'v':
 		if s.Flag('#') {
