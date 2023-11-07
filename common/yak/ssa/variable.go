@@ -53,11 +53,8 @@ var _ LeftValue = (*Field)(nil)
 
 // --------------- `f.currentDef` handler, read && write
 func (f *FunctionBuilder) WriteVariable(variable string, value Value) {
-	f.WriteVariableWithBlockSymbol(variable, value, f.GetSymbolTable(), f.CurrentBlock)
-}
-func (f *Function) WriteVariableWithBlockSymbol(variable string, value Value, blockSymbol *blockSymbolTable, block *BasicBlock) {
-	variable = GetIdByBlockSymbolTable(variable, blockSymbol)
-	f.writeVariableByBlock(variable, value, block)
+	variable = GetIdByBlockSymbolTable(variable, f.blockSymbolTable)
+	f.writeVariableByBlock(variable, value, f.CurrentBlock)
 }
 
 func (b *Function) ReplaceVariable(variable string, v, to Value) {
@@ -148,7 +145,7 @@ func (b *FunctionBuilder) readVariableByBlockEx(variable string, block *BasicBlo
 			return vs
 		}
 	}
-	
+
 	if block.Skip {
 		return nil
 	}
