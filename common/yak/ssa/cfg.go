@@ -99,64 +99,68 @@ func (lb *LoopBuilder) BuildBody(f func()) {
 }
 
 func (lb *LoopBuilder) Finish() {
-	header := lb.b.NewBasicBlockUnSealed(LoopHeader)
-	body := lb.b.NewBasicBlock(LoopBody)
-	exit := lb.b.NewBasicBlock(LoopExit)
-	latch := lb.b.NewBasicBlock(LoopLatch)
+	builder := lb.b
+	header := builder.NewBasicBlockUnSealed(LoopHeader)
+	body := builder.NewBasicBlock(LoopBody)
+	exit := builder.NewBasicBlock(LoopExit)
+	latch := builder.NewBasicBlock(LoopLatch)
+	// loop is a scope
+	builder.PushBlockSymbolTable()
 	var loop *Loop
 	var init, step []Value
 	// build first
 	if lb.buildFirst != nil {
-		lb.b.CurrentBlock = lb.enter
+		builder.CurrentBlock = lb.enter
 		init = lb.buildFirst()
 	}
 
 	// enter -> header
-	lb.b.CurrentBlock = lb.enter
-	lb.b.EmitJump(header)
+	builder.CurrentBlock = lb.enter
+	builder.EmitJump(header)
 
 	// build condition
 	var condition Value
 	// if lb.buildCondition != nil {
 	// if in header end; to exit or body
-	lb.b.CurrentBlock = header
+	builder.CurrentBlock = header
 	condition = lb.buildCondition()
 	// } else {
 	// 	condition = NewConst(true)
 	// lb.b.NewError(Error, SSATAG, "this condition not set!")
 	// }
-	loop = lb.b.EmitLoop(body, exit, condition)
+	loop = builder.EmitLoop(body, exit, condition)
 
 	// build body
 	if lb.buildBody != nil {
-		lb.b.CurrentBlock = body
-		lb.b.PushTarget(exit, latch, nil)
+		builder.CurrentBlock = body
+		builder.PushTarget(exit, latch, nil)
 		lb.buildBody()
-		lb.b.PopTarget()
+		builder.PopTarget()
 	}
 
 	// body -> latch
-	lb.b.EmitJump(latch)
+	builder.EmitJump(latch)
 
 	if len(latch.Preds) != 0 {
-		lb.b.CurrentBlock = latch
+		builder.CurrentBlock = latch
 		// build latch
 		if lb.buildThird != nil {
 			step = lb.buildThird()
 		}
 		// latch -> header
-		lb.b.EmitJump(header)
+		builder.EmitJump(header)
 	}
 
 	// finish
 	header.Sealed()
 	loop.Finish(init, step)
 
-	rest := lb.b.NewBasicBlock("")
-	lb.b.CurrentBlock = exit
+	rest := builder.NewBasicBlock("")
+	builder.CurrentBlock = exit
 	// exit -> rest
-	lb.b.EmitJump(rest)
-	lb.b.CurrentBlock = rest
+	builder.EmitJump(rest)
+	builder.CurrentBlock = rest
+	builder.PopBlockSymbolTable()
 }
 
 // if builder
@@ -232,26 +236,27 @@ func (i *IfBuilder) BuildFalse(body func()) {
 }
 
 func (i *IfBuilder) Finish() {
+	builder := i.b
 	// if instruction
 	var doneBlock *BasicBlock
 	if i.parent == nil {
-		doneBlock = i.b.NewBasicBlock(IfDone)
+		doneBlock = builder.NewBasicBlock(IfDone)
 		i.done = doneBlock
 	} else {
 		i.done = i.parent.done
 		doneBlock = i.parent.done
 	}
-	trueBlock := i.b.NewBasicBlock(IfTrue)
+	trueBlock := builder.NewBasicBlock(IfTrue)
 
 	// build ifSSA
 	cond := i.ifCondition()
-	ifSSA := i.b.EmitIf(cond)
+	ifSSA := builder.EmitIf(cond)
 	ifSSA.AddTrue(trueBlock)
 	// build true block
-	i.b.CurrentBlock = trueBlock
+	builder.CurrentBlock = trueBlock
 	i.ifBody()
 	// true -> done
-	i.b.EmitJump(doneBlock)
+	builder.EmitJump(doneBlock)
 
 	prevIf := ifSSA
 	for index := range i.elifCondition {
@@ -259,46 +264,46 @@ func (i *IfBuilder) Finish() {
 		buildBody := i.elifBody[index]
 		// set block
 		if prevIf.False == nil {
-			prevIf.AddFalse(i.b.NewBasicBlock(IfElif))
+			prevIf.AddFalse(builder.NewBasicBlock(IfElif))
 		}
-		i.b.CurrentBlock = prevIf.False
+		builder.CurrentBlock = prevIf.False
 		// build condition
 		cond := buildCondition()
 		if cond == nil {
 			continue
 		}
 		// build if
-		ifSSA := i.b.EmitIf(cond)
-		ifSSA.AddTrue(i.b.NewBasicBlock(IfTrue))
+		ifSSA := builder.EmitIf(cond)
+		ifSSA.AddTrue(builder.NewBasicBlock(IfTrue))
 		// build if body
-		i.b.CurrentBlock = ifSSA.True
+		builder.CurrentBlock = ifSSA.True
 		buildBody()
 		// if -> done
-		i.b.EmitJump(doneBlock)
+		builder.EmitJump(doneBlock)
 		prevIf = ifSSA
 	}
 
 	if i.elseBody != nil {
 		// create false
-		prevIf.AddFalse(i.b.NewBasicBlock(IfFalse))
+		prevIf.AddFalse(builder.NewBasicBlock(IfFalse))
 		// build else body
-		i.b.CurrentBlock = prevIf.False
+		builder.CurrentBlock = prevIf.False
 		i.elseBody()
-		i.b.EmitJump(doneBlock)
+		builder.EmitJump(doneBlock)
 	} else if i.child != nil {
 		// create elif
-		prevIf.AddFalse(i.b.NewBasicBlock(IfElif))
-		i.b.CurrentBlock = prevIf.False
+		prevIf.AddFalse(builder.NewBasicBlock(IfElif))
+		builder.CurrentBlock = prevIf.False
 		i.child.Finish()
 	} else {
 		prevIf.AddFalse(doneBlock)
 	}
 
 	if i.parent == nil && len(doneBlock.Preds) != 0 {
-		i.b.CurrentBlock = doneBlock
-		rest := i.b.NewBasicBlock("")
-		i.b.EmitJump(rest)
-		i.b.CurrentBlock = rest
+		builder.CurrentBlock = doneBlock
+		rest := builder.NewBasicBlock("")
+		builder.EmitJump(rest)
+		builder.CurrentBlock = rest
 	}
 }
 
@@ -337,55 +342,56 @@ func (t *TryBuilder) BuildFinally(f func()) {
 func (t *TryBuilder) Finish() {
 	var final *BasicBlock
 	var id string
+	builder := t.b
 
-	t.b.CurrentBlock = t.enter
-	try := t.b.NewBasicBlock(TryStart)
-	catch := t.b.NewBasicBlock(TryCatch)
-	e := t.b.EmitErrorHandler(try, catch)
+	builder.CurrentBlock = t.enter
+	try := builder.NewBasicBlock(TryStart)
+	catch := builder.NewBasicBlock(TryCatch)
+	e := builder.EmitErrorHandler(try, catch)
 
-	// buildtry
-	t.b.CurrentBlock = try
+	// build try
+	builder.CurrentBlock = try
 	t.buildTry()
 
-	// buildcatch
-	t.b.CurrentBlock = catch
+	// build catch
+	builder.CurrentBlock = catch
 	id = t.buildCatch()
 	if id != "" {
-		p := NewParam(id, false, t.b.Function)
+		p := NewParam(id, false, builder.Function)
 		p.SetType(BasicTypes[Error])
-		t.b.WriteVariable(id, p)
+		builder.WriteVariable(id, p)
 	}
 
-	// buildfinally
+	// build finally
 	var target *BasicBlock
 	if t.buildFinally != nil {
-		t.b.CurrentBlock = t.enter
-		final = t.b.NewBasicBlock(TryFinally)
+		builder.CurrentBlock = t.enter
+		final = builder.NewBasicBlock(TryFinally)
 		e.AddFinal(final)
-		t.b.CurrentBlock = final
+		builder.CurrentBlock = final
 		t.buildFinally()
 
 		target = final
 	}
 
-	t.b.CurrentBlock = t.enter
-	done := t.b.NewBasicBlock("")
+	builder.CurrentBlock = t.enter
+	done := builder.NewBasicBlock("")
 	e.AddDone(done)
 
 	if target == nil {
 		target = done
 	}
 
-	t.b.CurrentBlock = try
-	t.b.EmitJump(target)
-	t.b.CurrentBlock = catch
-	t.b.EmitJump(target)
+	builder.CurrentBlock = try
+	builder.EmitJump(target)
+	builder.CurrentBlock = catch
+	builder.EmitJump(target)
 	if target != done {
-		t.b.CurrentBlock = target
-		t.b.EmitJump(done)
+		builder.CurrentBlock = target
+		builder.EmitJump(done)
 	}
 
-	t.b.CurrentBlock = done
+	builder.CurrentBlock = done
 }
 
 type SwitchBuilder struct {
@@ -395,7 +401,7 @@ type SwitchBuilder struct {
 	// block
 	enter          *BasicBlock
 	buildCondition func() Value
-	buildHanlder   func() (int, []Value)
+	buildHandler   func() (int, []Value)
 	buildBody      func(int)
 	buildDefault   func()
 
@@ -418,8 +424,8 @@ func (t *SwitchBuilder) BuildCondition(f func() Value) {
 	t.buildCondition = f
 }
 
-func (t *SwitchBuilder) BuildHanlder(f func() (int, []Value)) {
-	t.buildHanlder = f
+func (t *SwitchBuilder) BuildHandler(f func() (int, []Value)) {
+	t.buildHandler = f
 }
 
 func (t *SwitchBuilder) BuildBody(f func(int)) {
@@ -430,25 +436,26 @@ func (t *SwitchBuilder) BuildDefault(f func()) {
 	t.buildDefault = f
 }
 
-func (t *SwitchBuilder) Finsh() {
+func (t *SwitchBuilder) Finish() {
+	builder := t.b
 	var cond Value
 	if t.buildCondition != nil {
 		cond = t.buildCondition()
 	}
 
-	done := t.b.NewBasicBlock(SwitchDone)
-	defaultb := t.b.NewBasicBlock(SwitchDefault)
+	done := builder.NewBasicBlock(SwitchDone)
+	defaultb := builder.NewBasicBlock(SwitchDefault)
 	t.enter.AddSucc(defaultb)
 
 	// build handler and body
 	var exprs []Value
-	t.caseNum, exprs = t.buildHanlder()
+	t.caseNum, exprs = t.buildHandler()
 
 	handlers := make([]*BasicBlock, 0, t.caseNum)
-	slabel := make([]SwitchLabel, 0)
+	slabel := make([]SwitchLabel, 0, t.caseNum)
 	for i := 0; i < t.caseNum; i++ {
 		// build handler
-		handler := t.b.NewBasicBlock(SwitchHandler)
+		handler := builder.NewBasicBlock(SwitchHandler)
 		t.enter.AddSucc(handler)
 		handlers = append(handlers, handler)
 		slabel = append(slabel, NewSwitchLabel(exprs[i], handler))
@@ -474,32 +481,34 @@ func (t *SwitchBuilder) Finsh() {
 		} else {
 			_fallthrough = handlers[i+1]
 		}
-		t.b.PushTarget(done, nil, _fallthrough) // fallthrough just jump to next handler
+		builder.PushTarget(done, nil, _fallthrough) // fallthrough just jump to next handler
 		// build handlers block
-		t.b.CurrentBlock = handlers[i]
+		builder.CurrentBlock = handlers[i]
+		builder.PushBlockSymbolTable()
 		t.buildBody(i)
+		builder.PopBlockSymbolTable()
 		// jump handlers-block -> done
-		t.b.EmitJump(NextBlock(i))
-		t.b.PopTarget()
+		builder.EmitJump(NextBlock(i))
+		builder.PopTarget()
 
 	}
 
 	// build default
 	if t.buildDefault != nil {
 		// can't fallthrough
-		t.b.PushTarget(done, nil, nil)
+		builder.PushTarget(done, nil, nil)
 		// build default block
-		t.b.CurrentBlock = defaultb
+		builder.CurrentBlock = defaultb
 		t.buildDefault()
 		// jump default -> done
-		t.b.EmitJump(done)
-		t.b.PopTarget()
+		builder.EmitJump(done)
+		builder.PopTarget()
 	}
 
-	t.b.CurrentBlock = t.enter
-	t.b.EmitSwitch(cond, defaultb, slabel)
-	rest := t.b.NewBasicBlock("")
-	t.b.CurrentBlock = done
-	t.b.EmitJump(rest)
-	t.b.CurrentBlock = rest
+	builder.CurrentBlock = t.enter
+	builder.EmitSwitch(cond, defaultb, slabel)
+	rest := builder.NewBasicBlock("")
+	builder.CurrentBlock = done
+	builder.EmitJump(rest)
+	builder.CurrentBlock = rest
 }
