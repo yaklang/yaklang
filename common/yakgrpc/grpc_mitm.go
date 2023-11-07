@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/gorm"
@@ -196,10 +197,13 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			feedbackToUser(fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", downstreamProxy, "缺乏端口（Miss Port）"))
 			return utils.Errorf("proxy miss port. [%v]", proxyUrl.Host)
 		}
-		conn, err := netx.DialTimeoutWithoutProxy(5*time.Second, "tcp", utils.HostPort(host, port))
+		conn, err := netx.DialTimeout(5*time.Second, "tcp", utils.HostPort(host, port), downstreamProxy)
 		if err != nil {
 			feedbackToUser(fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", downstreamProxy, "代理不通（Proxy Cannot be connected）"))
-			return utils.Errorf("proxy cannot be connected: %v", proxyUrl.String())
+			if errors.Is(err, netx.ErrorProxyAuthFailed) {
+				return utils.Errorf("proxy auth failed: %v", downstreamProxy)
+			}
+			return utils.Errorf("proxy cannot be connected: %v", downstreamProxy)
 		}
 		conn.Close()
 	}
