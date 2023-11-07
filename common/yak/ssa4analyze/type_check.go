@@ -84,10 +84,7 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 		wantParaLen := len(funcTyp.Parameter)
 		var gotPara ssa.Types = lo.Map(c.Args, func(arg ssa.Value, _ int) ssa.Type { return arg.GetType() })
 		gotParaLen := len(c.Args)
-		// not match
-		if wantParaLen == gotParaLen {
-			return
-		}
+		// is function variadic
 		if funcTyp.IsVariadic {
 			// not match minimum length
 			if gotParaLen >= (wantParaLen - 1) {
@@ -98,16 +95,35 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 		if c.IsEllipsis {
 			return
 		}
-		str := ""
+
+		funName := ""
 		if f, ok := c.Method.(*ssa.Function); ok {
-			str = f.GetVariable()
+			funName = f.GetVariable()
 		} else if funcTyp.Name != "" {
-			str = funcTyp.Name
+			funName = funcTyp.Name
 		}
-		c.NewError(
-			ssa.Error, TypeCheckTAG,
-			NotEnoughArgument(str, gotPara.String(), funcTyp.GetParamString()),
-		)
+
+		// not match
+		if wantParaLen != gotParaLen {
+			c.NewError(
+				ssa.Error, TypeCheckTAG,
+				NotEnoughArgument(funName, gotPara.String(), funcTyp.GetParamString()),
+			)
+			return
+		}
+
+		for i := 0; i < wantParaLen; i++ {
+			if gotPara[i] != funcTyp.Parameter[i] {
+				// any just skip
+				if gotPara[i].GetTypeKind() == ssa.Any || funcTyp.Parameter[i].GetTypeKind() == ssa.Any {
+					continue
+				}
+				c.NewError(ssa.Error, TypeCheckTAG,
+					ArgumentTypeError(i+1, gotPara[i].String(), funcTyp.Parameter[i].String(), funName),
+				)
+				return
+			}
+		}
 	}()
 
 	if c.GetVariable() == "" {
