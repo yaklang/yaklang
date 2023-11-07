@@ -17,6 +17,7 @@ func TestErrorChainCompat(t *testing.T) {
 
 func TestIs(t *testing.T) {
 	err := Error("test")
+	err2 := Error("test2")
 
 	type args struct {
 		err    error
@@ -44,6 +45,14 @@ func TestIs(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "wrap-double",
+			args: args{
+				err:    Wrap(Wrap(err, "test"), "test"),
+				target: err,
+			},
+			want: true,
+		},
+		{
 			name: "with message format",
 			args: args{
 				err:    Wrapf(err, "%s", "test"),
@@ -58,6 +67,30 @@ func TestIs(t *testing.T) {
 				target: err,
 			},
 			want: true,
+		},
+		{
+			name: "join-errors-err1",
+			args: args{
+				err:    JoinErrors(err, err2),
+				target: err,
+			},
+			want: true,
+		},
+		{
+			name: "join-errors-err2",
+			args: args{
+				err:    JoinErrors(err, err2),
+				target: err2,
+			},
+			want: true,
+		},
+		{
+			name: "negative",
+			args: args{
+				err:    err,
+				target: err2,
+			},
+			want: false,
 		},
 	}
 	for _, tt := range tests {
