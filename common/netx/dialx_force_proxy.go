@@ -13,6 +13,8 @@ import (
 	"time"
 )
 
+var ErrorProxyAuthFailed = utils.Error("invalid proxy username or password")
+
 func DialTCPTimeoutForceProxy(timeout time.Duration, target string, proxy string) (net.Conn, error) {
 	return connectForceProxy(nil, target, proxy, timeout)
 }
@@ -97,12 +99,11 @@ func connectForceProxy(ctx context.Context, target string, proxy string, connect
 	}
 
 	proxyAddr := utils.HostPort(host, port)
+	username, password := parseProxyCredential(proxy)
+	credential := fmt.Sprintf("%s:%s", username, password)
+
 	switch true {
 	case utils.IHasPrefix(proxy, "https://"):
-		urlIns, err := url.Parse(proxy)
-		if err != nil {
-			return nil, utils.Errorf("parse proxy url failed: %s", err)
-		}
 		conn, err := DialX(
 			proxyAddr,
 			DialX_WithDisableProxy(true),
@@ -111,38 +112,38 @@ func connectForceProxy(ctx context.Context, target string, proxy string, connect
 		if err != nil {
 			return nil, err
 		}
-		if urlIns.User != nil && urlIns.User.String() != "" {
+		if username != "" {
 			// 有密码
-			_, _ = conn.Write(generateHTTPProxyConnectWithCredential(target, urlIns.User.String()))
+			_, _ = conn.Write(generateHTTPProxyConnectWithCredential(target, credential))
 		} else {
 			// 无密码
 			_, _ = conn.Write(generateHTTPProxyConnect(target))
 		}
-		if isHTTPConnectWork(conn) {
+		if err = isHTTPConnectWork(conn); err == nil {
 			return conn, nil
 		}
 		conn.Close()
+		if err != nil {
+			return nil, utils.Wrapf(err, "connect proxy(https) [%s] failed: %s", proxy)
+		}
 		return nil, utils.Errorf("connect proxy(https) [%s] failed", proxy)
 	case utils.IHasPrefix(proxy, "socks://"):
 		fallthrough
 	case utils.IHasPrefix(proxy, "socks5://"):
 		fallthrough
 	case utils.IHasPrefix(proxy, "s5://"):
-		username, password := parseProxyCredential(proxy)
 		conn, err := DialSocksProxy(SOCKS5, proxyAddr, username, password)("tcp", target)
 		if err != nil {
 			return nil, err
 		}
 		return conn, nil
 	case utils.IHasPrefix(proxy, "s4://") || utils.IHasPrefix(proxy, "socks4://"):
-		username, password := parseProxyCredential(proxy)
 		conn, err := DialSocksProxy(SOCKS4, proxyAddr, username, password)("tcp", target)
 		if err != nil {
 			return nil, err
 		}
 		return conn, nil
 	case utils.IHasPrefix(proxy, "s4a://") || utils.IHasPrefix(proxy, "socks4a://"):
-		username, password := parseProxyCredential(proxy)
 		conn, err := DialSocksProxy(SOCKS4A, proxyAddr, username, password)("tcp", target)
 		if err != nil {
 			return nil, err
@@ -151,10 +152,6 @@ func connectForceProxy(ctx context.Context, target string, proxy string, connect
 	case utils.IHasPrefix(proxy, "http://"):
 		fallthrough
 	default:
-		urlIns, err := url.Parse(proxy)
-		if err != nil {
-			return nil, utils.Errorf("parse proxy url failed: %s", err)
-		}
 
 		// conn, err := DialContextWithoutProxy(ctx, "tcp", proxyAddr)
 		conn, err := DialX(proxyAddr, DialX_WithTLS(false), DialX_WithDisableProxy(true))
@@ -162,17 +159,17 @@ func connectForceProxy(ctx context.Context, target string, proxy string, connect
 			return nil, err
 		}
 
-		if urlIns.User != nil && urlIns.User.String() != "" {
-			_, err = conn.Write(generateHTTPProxyConnectWithCredential(target, urlIns.User.String()))
+		if username != "" {
+			_, err = conn.Write(generateHTTPProxyConnectWithCredential(target, credential))
 		} else {
 			_, err = conn.Write(generateHTTPProxyConnect(target))
 		}
-		if isHTTPConnectWork(conn) {
+		if err = isHTTPConnectWork(conn); err == nil {
 			return conn, nil
 		}
 		conn.Close()
 		if err != nil {
-			return nil, utils.Errorf("connect proxy(http) [%s] failed: %s", proxy, err)
+			return nil, utils.Wrapf(err, "connect proxy(http) [%s] failed: %s", proxy)
 		}
 		return nil, utils.Errorf("connect proxy(http) [%s] failed", proxy)
 	}
@@ -188,19 +185,22 @@ func parseProxyCredential(proxyURL string) (string, string) {
 	return username, password
 }
 
-func isHTTPConnectWork(c net.Conn) bool {
+func isHTTPConnectWork(c net.Conn) error {
 	firstLine, err := utils.ReadConnUntil(c, 5*time.Second, '\n')
 	if err != nil {
-		return false
+		return err
 	}
 	_, code, _, _ := utils.ParseHTTPResponseLine(strings.TrimSpace(string(firstLine)))
 	if code < 200 || code > 400 {
-		return false
+		if code == 407 {
+			return ErrorProxyAuthFailed
+		}
+		return utils.Errorf("invalid statue code: %d", code)
 	}
 	for {
 		line, err := utils.ReadConnUntil(c, 5*time.Second, '\n')
 		if err != nil {
-			return false
+			return err
 		}
 		lineStr := string(line)
 		k, v, ok := strings.Cut(lineStr, ":")
@@ -208,17 +208,17 @@ func isHTTPConnectWork(c net.Conn) bool {
 			switch strings.ToLower(strings.TrimSpace(k)) {
 			case "content-length":
 				if codec.Atoi(strings.TrimSpace(v)) != 0 {
-					return false
+					return utils.Error("Content-Length should be 0")
 				}
 			case "transfer-encoding":
-				return false
+				return utils.Error("Transfer-Encoding response header should not exist")
 			}
 		}
 		if strings.TrimSuffix(lineStr, "\r\n") == "" || strings.TrimSuffix(lineStr, "\n") == "" {
 			break
 		}
 	}
-	return true
+	return nil
 }
 
 func generateHTTPProxyConnect(target string) []byte {
