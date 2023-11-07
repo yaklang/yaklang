@@ -613,7 +613,7 @@ func (b *astbuilder) AssignList(stmt assignlist) []ssa.Value {
 				// 可以通过是否存在variable确定是函数调用是否存在左值
 				c.SetVariable(uuid.NewString())
 				c.Unpack = true
-				if c.GetType().GetTypeKind() != ssa.ObjectTypeKind {
+				if !ssa.IsObjectType(c.GetType()) {
 					// b.NewError(ssa.Error, TAG, "assign right side is not interface function call")
 					// return nil
 					length = len(lvalues)
@@ -1230,7 +1230,7 @@ func (b *astbuilder) buildMakeExpression(stmt *yak.MakeExpressionContext) ssa.Va
 	switch typ := typ.(type) {
 	case *ssa.ObjectType:
 		switch typ.Kind {
-		case ssa.Slice:
+		case ssa.SliceTypeKind:
 			if len(exprs) == 0 {
 				return b.EmitMakeBuildWithType(typ, zero, zero)
 			} else if len(exprs) == 1 {
@@ -1240,9 +1240,9 @@ func (b *astbuilder) buildMakeExpression(stmt *yak.MakeExpressionContext) ssa.Va
 			} else {
 				b.NewError(ssa.Error, TAG, MakeSliceArgumentTooMuch())
 			}
-		case ssa.Map:
+		case ssa.MapTypeKind:
 			return b.EmitMakeBuildWithType(typ, zero, zero)
-		case ssa.Struct:
+		case ssa.StructTypeKind:
 		}
 	case *ssa.ChanType:
 		if len(exprs) == 0 {

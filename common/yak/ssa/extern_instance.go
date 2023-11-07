@@ -159,7 +159,7 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 			field := typ.Field(i)
 			fieldType := f.handlerType(field.Type, level)
 			structType.AddField(NewConst(field.Name), fieldType)
-			if field.Anonymous && fieldType.GetTypeKind() == ObjectTypeKind {
+			if field.Anonymous && IsObjectType(fieldType) {
 				structType.AnonymousField = append(structType.AnonymousField, fieldType.(*ObjectType))
 			}
 		}

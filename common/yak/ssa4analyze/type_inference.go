@@ -123,7 +123,7 @@ func (t *TypeInference) TypeInferenceNext(next *ssa.Next) {
 	typ.AddField(ssa.NewConst("ok"), ssa.BasicTypes[ssa.Boolean])
 	if it, ok := next.Iter.GetType().(*ssa.ObjectType); ok {
 		switch it.Kind {
-		case ssa.Slice:
+		case ssa.SliceTypeKind:
 			if next.InNext {
 				typ.AddField(ssa.NewConst("key"), it.FieldType)
 				typ.AddField(ssa.NewConst("field"), ssa.BasicTypes[ssa.Null])
@@ -131,10 +131,10 @@ func (t *TypeInference) TypeInferenceNext(next *ssa.Next) {
 				typ.AddField(ssa.NewConst("key"), it.KeyTyp)
 				typ.AddField(ssa.NewConst("field"), it.FieldType)
 			}
-		case ssa.Struct:
+		case ssa.StructTypeKind:
 			typ.AddField(ssa.NewConst("key"), ssa.BasicTypes[ssa.String])
 			typ.AddField(ssa.NewConst("field"), ssa.BasicTypes[ssa.Any])
-		case ssa.Map:
+		case ssa.MapTypeKind:
 			typ.AddField(ssa.NewConst("key"), it.KeyTyp)
 			typ.AddField(ssa.NewConst("field"), it.FieldType)
 		}
@@ -220,7 +220,7 @@ func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
 			t = ssa.BasicTypes[ssa.Null]
 		}
 		switch t.GetTypeKind() {
-		case ssa.ObjectTypeKind:
+		case ssa.ObjectTypeKind, ssa.SliceTypeKind, ssa.MapTypeKind, ssa.StructTypeKind:
 			interfaceTyp := f.Obj.GetType().(*ssa.ObjectType)
 			fTyp := interfaceTyp.GetField(f.Key)
 			if !utils.IsNil(fTyp) {
@@ -288,9 +288,7 @@ func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
 
 	// handler call method
 	if field, ok := c.Method.(*ssa.Field); ok && field.IsMethod {
-		if v, ok := field.Obj.(ssa.Value); ok {
-			c.Args = utils.InsertSliceItem(c.Args, v, 0)
-		}
+		c.Args = utils.InsertSliceItem(c.Args, field.Obj, 0)
 	}
 
 	// get function type

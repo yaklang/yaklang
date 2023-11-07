@@ -18,6 +18,14 @@ func init() {
 		false,
 	)
 }
+func IsObjectType(t Type) bool {
+	switch t.GetTypeKind() {
+	case ObjectTypeKind, SliceTypeKind, MapTypeKind, StructTypeKind:
+		return true
+	default:
+		return false
+	}
+}
 
 type Type interface {
 	String() string
@@ -101,7 +109,12 @@ const (
 	Any           // any type
 	ChanTypeKind
 	ErrorType
+
 	ObjectTypeKind
+	SliceTypeKind
+	MapTypeKind
+	StructTypeKind
+
 	InterfaceTypeKind
 	FunctionTypeKind
 )
@@ -308,18 +321,9 @@ func (c ChanType) RawString() string {
 }
 
 // ==================== interface type
-type ObjectKind int
-
-const (
-	None ObjectKind = iota
-	Slice
-	Map
-	Struct
-)
-
 type ObjectType struct {
 	Name       string
-	Kind       ObjectKind
+	Kind       TypeKind
 	Len        int
 	Key        []Value
 	keyTypes   []Type
@@ -337,7 +341,7 @@ type ObjectType struct {
 }
 
 func (i *ObjectType) GetTypeKind() TypeKind {
-	return ObjectTypeKind
+	return i.Kind
 }
 
 func (i *ObjectType) GetMethod(id string) *FunctionType {
@@ -364,7 +368,7 @@ func (i *ObjectType) SetName(name string) {
 
 func NewObjectType() *ObjectType {
 	return &ObjectType{
-		Kind:       None,
+		Kind:       ObjectTypeKind,
 		Key:        make([]Value, 0),
 		keyTypes:   make([]Type, 0),
 		FieldTypes: make([]Type, 0),
@@ -375,7 +379,7 @@ func NewObjectType() *ObjectType {
 // for slice build
 func NewSliceType(elem Type) *ObjectType {
 	i := NewObjectType()
-	i.Kind = Slice
+	i.Kind = SliceTypeKind
 	i.KeyTyp = BasicTypes[Number]
 	i.FieldType = elem
 	return i
@@ -385,13 +389,13 @@ func NewMapType(key, field Type) *ObjectType {
 	i := NewObjectType()
 	i.KeyTyp = key
 	i.FieldType = field
-	i.Kind = Map
+	i.Kind = MapTypeKind
 	return i
 }
 
 func NewStructType() *ObjectType {
 	i := NewObjectType()
-	i.Kind = Struct
+	i.Kind = StructTypeKind
 	return i
 }
 
@@ -414,14 +418,14 @@ func (itype ObjectType) String() string {
 func (itype ObjectType) RawString() string {
 	ret := ""
 	switch itype.Kind {
-	case Slice:
+	case SliceTypeKind:
 		// map[int]T
 		if itype.Len == 0 {
 			ret += fmt.Sprintf("[]%s", itype.FieldType.String())
 		} else {
 			ret += fmt.Sprintf("[%d]%s", itype.Len, itype.FieldType.String())
 		}
-	case Map:
+	case MapTypeKind:
 		// map[T]U
 		// if len(itype.keyType) == 1 && len(itype.Field) == 1 {
 		keyTyp := itype.KeyTyp
@@ -436,7 +440,7 @@ func (itype ObjectType) RawString() string {
 		// } else {
 		// 	panic("this interface type not map")
 		// }
-	case Struct:
+	case StructTypeKind:
 		// map[string](T/U/xx)
 		ret += fmt.Sprintf(
 			"struct {%s}",
@@ -445,7 +449,7 @@ func (itype ObjectType) RawString() string {
 				",",
 			),
 		)
-	case None:
+	case ObjectTypeKind:
 		ret += "object{}"
 	}
 	return ret
@@ -465,11 +469,11 @@ func (s *ObjectType) AddField(key Value, field Type) {
 // return (field-type, key-type)
 func (s *ObjectType) GetField(key Value) Type {
 	switch s.Kind {
-	case Slice, Map:
+	case SliceTypeKind, MapTypeKind:
 		if key.GetType() == s.KeyTyp {
 			return s.FieldType
 		}
-	case Struct:
+	case StructTypeKind:
 		getField := func(o *ObjectType) Type {
 			if index := slices.IndexFunc(o.Key, func(v Value) bool { return v.String() == key.String() }); index != -1 {
 				return o.FieldTypes[index]
@@ -491,7 +495,7 @@ func (s *ObjectType) GetField(key Value) Type {
 
 // ===================== Finish simply
 func (s *ObjectType) Finish() {
-	if s.Kind != None {
+	if s.Kind != ObjectTypeKind {
 		return
 	}
 	fieldTypes := lo.UniqBy(s.FieldTypes, func(t Type) TypeKind { return t.GetTypeKind() })
@@ -502,19 +506,19 @@ func (s *ObjectType) Finish() {
 			if keyTypes[0].GetTypeKind() == Number {
 				// map[number]T ==> []T slice
 				// TODO: check increasing
-				s.Kind = Slice
+				s.Kind = SliceTypeKind
 				s.KeyTyp = BasicTypes[Number]
 				s.FieldType = fieldTypes[0]
 			} else {
 				// Map
-				s.Kind = Map
+				s.Kind = MapTypeKind
 				s.KeyTyp = keyTypes[0]
 				s.FieldType = fieldTypes[0]
 			}
 			// s.keyType = keyType
 			// s.Field = field
 		} else if keyTypes[0].GetTypeKind() == String || keyTypes[0].GetTypeKind() == Number {
-			s.Kind = Map
+			s.Kind = MapTypeKind
 			s.KeyTyp = BasicTypes[String]
 			s.FieldType = BasicTypes[Any]
 		}
@@ -606,7 +610,7 @@ func (s *FunctionType) GetParamString() string {
 	for index, t := range s.Parameter {
 		if index == len(s.Parameter)-1 {
 			if s.IsVariadic {
-				if obj, ok := ToObjectType(t); ok && obj.Kind == Slice {
+				if obj, ok := ToObjectType(t); ok && obj.Kind == SliceTypeKind {
 					// last
 					ret += "..." + obj.FieldType.String()
 				}
