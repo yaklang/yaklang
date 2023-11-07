@@ -15,6 +15,13 @@ func ValueUndefined(v string) string {
 	return fmt.Sprintf("Value undefined:%s", v)
 }
 
+func ArgumentTypeError(index int, valueType, wantType, funName string) string {
+	return fmt.Sprintf(
+		`The No.%d argument (%s), cannot use as (%s) in call %s`,
+		index, valueType, wantType, funName,
+	)
+}
+
 func NotEnoughArgument(funName string, have, want string) string {
 	return fmt.Sprintf(
 		`Not enough arguments in call %s have (%s) want (%s)`,
