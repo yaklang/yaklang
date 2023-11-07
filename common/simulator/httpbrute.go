@@ -132,6 +132,7 @@ func (bruteForce *HttpBruteForceCore) pageCreate() (err error) {
 	if err != nil {
 		return
 	}
+	time.Sleep(3 * time.Second)
 	err = page.WaitLoad()
 	if bruteForce.config.extraWaitLoadTime != 0 {
 		time.Sleep(time.Duration(bruteForce.config.extraWaitLoadTime) * time.Millisecond)
@@ -374,6 +375,11 @@ func (bruteForce *HttpBruteForceCore) bruteForce() (err error) {
 
 func (bruteForce *HttpBruteForceCore) login(username, password string) (bool, error) {
 	err := bruteForce.page.Reload()
+	//err := bruteForce.page.Navigate(bruteForce.originUrl)
+	if err != nil {
+		return false, utils.Error(err)
+	}
+	err = bruteForce.page.WaitLoad()
 	if err != nil {
 		return false, utils.Error(err)
 	}
@@ -389,6 +395,9 @@ func (bruteForce *HttpBruteForceCore) login(username, password string) (bool, er
 		return false, utils.Error(err)
 	}
 	if bruteForce.CaptchaSelector != "" {
+		if bruteForce.captchaDetect == nil {
+			return false, utils.Error("captcha detect mode not load")
+		}
 		captchaWords, err := bruteForce.captchaDetect.Detect(bruteForce.page, bruteForce.CaptchaImgSelector)
 		if err != nil {
 			return false, utils.Error(err)
