@@ -116,6 +116,10 @@ func (v *BaseJavaScriptParserVisitor) VisitIfStatement(ctx *IfStatementContext) 
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseJavaScriptParserVisitor) VisitElseBlock(ctx *ElseBlockContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseJavaScriptParserVisitor) VisitForFirst(ctx *ForFirstContext) interface{} {
 	return v.VisitChildren(ctx)
 }

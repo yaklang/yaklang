@@ -46,7 +46,7 @@ func (b *astbuilder) buildLiteral(stmt *JS.LiteralContext) ssa.Value {
 
 	} else if stmt.BooleanLiteral() != nil {
 		bo := stmt.GetText()
-		b.buildBooleanLiteral(bo)
+		return b.buildBooleanLiteral(bo)
 
 	} else if stmt.NullLiteral() != nil {
 		return b.buildNullLiteral()

@@ -166,7 +166,11 @@ expressionStatement
     ;
 
 ifStatement
-    : If '(' singleExpression ')' statement (Else statement)?
+    : If '(' singleExpression ')' statement (Else If '(' singleExpression ')' statement)* elseBlock?
+    ;
+
+elseBlock
+    : Else statement
     ;
 
 forFirst

@@ -443,6 +443,7 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 	case *JS.MemberIndexExpressionContext:
 	case *JS.MemberDotExpressionContext:
 	case *JS.NewExpressionContext:
+		return b.EmitCall(b.buildArgumentsExpression(s))
 	case *JS.ArgumentsExpressionContext:
 		// function call
 		return b.EmitCall(b.buildArgumentsExpression(s))
@@ -593,7 +594,7 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 	case *JS.TemplateStringExpressionContext:
 	case *JS.YieldExpressionContext:
 	case *JS.ThisExpressionContext:
-
+		return ssa.NewParam("this", false, b.Function)
 	case *JS.IdentifierExpressionContext:
 	// identify是左值那边的
 	// 	rv, _ :=  b.buildIdentifierExpression(s.GetText(), false)
@@ -697,7 +698,10 @@ func (b *astbuilder) buildFunctionExpression(stmt *JS.FunctionExpressionContext)
 			current := b.CurrentBlock
 
 			buildFunc := func() {
-				b.PushFunction(newFunc, symbol, current)
+				recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
+				defer recoverRange()
+
+				b.FunctionBuilder = b.PushFunction(newFunc, symbol, current)
 
 				if f, ok := s.FormalParameterList().(*JS.FormalParameterListContext); ok {
 					b.buildFormalParameterList(f)
@@ -708,7 +712,7 @@ func (b *astbuilder) buildFunctionExpression(stmt *JS.FunctionExpressionContext)
 				}
 
 				b.Finish()
-				b.PopFunction()
+				b.FunctionBuilder = b.PopFunction()
 			}
 
 			b.AddSubFunction(buildFunc)
@@ -720,7 +724,12 @@ func (b *astbuilder) buildFunctionExpression(stmt *JS.FunctionExpressionContext)
 	return nil
 }
 
-func (b *astbuilder) buildArgumentsExpression(stmt *JS.ArgumentsExpressionContext) *ssa.Call {
+type funcCall interface {
+	SingleExpression() JS.ISingleExpressionContext
+	Arguments() JS.IArgumentsContext
+}
+
+func (b *astbuilder) buildArgumentsExpression(stmt funcCall) *ssa.Call {
 	Iscall := false
 	var args []ssa.Value
 	isEllipsis := false
@@ -1124,13 +1133,14 @@ func (b *astbuilder) buildIfStatementContext(stmt *JS.IfStatementContext) {
 		// if instruction condition
 		i.BuildCondition(
 			func() ssa.Value {
-				if s := stmt.SingleExpression(); s != nil {
+				if s := stmt.SingleExpression(0); s != nil {
 					value, _ := b.buildSingleExpression(s, false)
 					return value
 				}
 				return nil
 			})
 
+		// if true body
 		i.BuildTrue(
 			func() {
 				if s, ok := stmt.Statement(0).(*JS.StatementContext); ok {
@@ -1139,18 +1149,40 @@ func (b *astbuilder) buildIfStatementContext(stmt *JS.IfStatementContext) {
 			},
 		)
 
-		if s, ok := stmt.Statement(1).(*JS.StatementContext); ok {
-			if !ok {
-				return i
-			} else {
-				i.BuildFalse(
-					func() {
-						b.buildStatement(s)
-					},
-				)
+		// else if
+		for index := range stmt.AllElse() {
+			condstmt := stmt.SingleExpression(index + 1)
+			if condstmt == nil {
+				continue
 			}
+
+			i.BuildElif(
+				// condition
+				func() ssa.Value {
+					rv, _ := b.buildSingleExpression(condstmt, false)
+					return rv
+				},
+				// body
+				func() {
+					if s, ok := stmt.Statement(index + 1).(*JS.StatementContext); ok {
+						b.buildStatement(s)
+					}
+				},
+			)
 		}
 
+		elsestmt, ok := stmt.ElseBlock().(*JS.ElseBlockContext)
+		if !ok {
+			return i
+		}
+		if elseB, ok := elsestmt.Statement().(*JS.StatementContext); ok {
+			i.BuildFalse(
+				// create false block
+				func() {
+					b.buildStatement(elseB)
+				},
+			)
+		}
 		return i
 	}
 
@@ -1495,6 +1527,7 @@ func (b *astbuilder) buildFormalParameterArg(stmt *JS.FormalParameterArgContext)
 
 	if a == nil {
 		b.NewParam(stmt.GetText())
+		// p.SetDefault(ssa.NewUndefined(stmt.GetText()))
 	} else {
 		p := b.NewParam(stmt.Assignable().GetText())
 
@@ -1530,16 +1563,6 @@ func (b *astbuilder) buildReturnStatement(stmt *JS.ReturnStatementContext) {
 	}
 }
 
-func (b *astbuilder) buildImportStatement(stmt *JS.ImportStatementContext) {
-	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
-	defer recoverRange()
-
-	if s := stmt.ImportFromBlock(); s != nil {
-		if str := s.StringLiteral(); s != nil {
-			b.buildStringLiteral(str)
-		}
-	}
-}
 
 func (b *astbuilder) buildBreakStatement(stmt *JS.BreakStatementContext) {
 	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
