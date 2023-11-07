@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
 	"unsafe"
 )
@@ -275,6 +276,15 @@ func (g *Generator) Result() *FuzzResult {
 	return res
 }
 func (g *Generator) Next() bool {
+	defer func() {
+		if e := recover(); e != nil {
+			if err, ok := e.(error); ok {
+				g.Error = err
+			} else {
+				g.Error = utils.Error(e)
+			}
+		}
+	}()
 	ok, err := g.generate()
 	g.Error = err
 	return ok

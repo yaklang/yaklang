@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	utils2 "github.com/yaklang/yaklang/common/yak/httptpl/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
@@ -746,6 +747,13 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 							submitTask([]byte(s), i...)
 							return true
 						}),
+					}
+					vars := utils2.ExtractorVarsFromPacket(reqRaw, config.IsHttps)
+					for k, v := range vars {
+						v := v
+						opts = append(opts, Fuzz_WithExtraFuzzTagHandler(k, func(s string) []string {
+							return []string{v}
+						}))
 					}
 					if config.ForceFuzzfile {
 						opts = append(opts, FuzzFileOptions()...)
