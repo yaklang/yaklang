@@ -15,6 +15,11 @@ func ValueUndefined(v string) string {
 	return fmt.Sprintf("Value undefined:%s", v)
 }
 
+func ConditionIsConst(control string) string {
+	return fmt.Sprintf("The %s condition is constant", control)
+
+}
+
 func ArgumentTypeError(index int, valueType, wantType, funName string) string {
 	return fmt.Sprintf(
 		`The No.%d argument (%s), cannot use as (%s) in call %s`,

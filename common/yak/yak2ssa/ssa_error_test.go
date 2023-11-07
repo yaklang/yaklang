@@ -178,6 +178,8 @@ func TestBasicExpression(t *testing.T) {
 			`,
 			errs: []string{
 				ssa4analyze.ValueUndefined("a2"),
+				ssa4analyze.ConditionIsConst("if"),
+				ssa4analyze.ConditionIsConst("if"),
 			},
 		})
 	})
@@ -270,6 +272,9 @@ func TestFreeValue(t *testing.T) {
 				}
 			}
 			`,
+			errs: []string{
+				ssa4analyze.ConditionIsConst("if"),
+			},
 		})
 	})
 }
@@ -1025,8 +1030,9 @@ func TestSwitch(t *testing.T) {
         `,
 			errs: []string{
 				ssa4analyze.ValueUndefined("a"),
-				ssa4analyze.BlockUnreachable(),
-				ssa4analyze.BlockUnreachable(),
+				ssa4analyze.ConditionIsConst("switch"),
+				// ssa4analyze.BlockUnreachable(),
+				// ssa4analyze.BlockUnreachable(),
 			},
 		})
 	})

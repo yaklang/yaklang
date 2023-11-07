@@ -1,5 +1,7 @@
 package ssa
 
+import "golang.org/x/exp/slices"
+
 type Opcode string
 
 const (
@@ -54,3 +56,7 @@ func (i *Jump) GetOpcode() Opcode         { return OpJump }
 func (i *If) GetOpcode() Opcode           { return OpIf }
 func (i *Loop) GetOpcode() Opcode         { return OpLoop }
 func (i *Switch) GetOpcode() Opcode       { return OpSwitch }
+
+func IsControlInstruction(i Instruction) bool {
+	return slices.Index([]Opcode{OpErrorHandler, OpJump, OpIf, OpLoop, OpSwitch}, i.GetOpcode()) != -1
+}
