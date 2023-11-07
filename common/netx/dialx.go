@@ -103,6 +103,7 @@ RETRY:
 		return conn, nil
 	}
 
+	var errs error
 	for _, proxy := range config.Proxy {
 		conn, err := getConnForceProxy(target, proxy, config.Timeout)
 		if err != nil {
@@ -113,6 +114,7 @@ RETRY:
 					proxyHaveTimeoutError = true
 				}
 			}
+			errs = utils.JoinErrors(errs, err)
 			continue
 		}
 		return conn, nil
@@ -121,7 +123,7 @@ RETRY:
 		proxyHaveTimeoutError = false
 		goto RETRY
 	}
-	return nil, utils.Errorf("connect: %v failed: no proxy available (in %v)", target, config.Proxy)
+	return nil, errs
 }
 
 /*
