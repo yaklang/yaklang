@@ -89,6 +89,9 @@ type JavaScriptParserVisitor interface {
 	// Visit a parse tree produced by JavaScriptParser#ifStatement.
 	VisitIfStatement(ctx *IfStatementContext) interface{}
 
+	// Visit a parse tree produced by JavaScriptParser#elseBlock.
+	VisitElseBlock(ctx *ElseBlockContext) interface{}
+
 	// Visit a parse tree produced by JavaScriptParser#forFirst.
 	VisitForFirst(ctx *ForFirstContext) interface{}
 

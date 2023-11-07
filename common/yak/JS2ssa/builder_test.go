@@ -111,3 +111,70 @@ func TestMain(t *testing.T) {
 	`, none)
 	prog.Show()
 }
+
+func TestNew(t *testing.T) {
+	prog := ParseSSA(`
+	// 创建一个XMLHttpRequest对象
+	let xhr = new XMLHttpRequest()
+	// 调用open函数填写请求方式和url地址
+	xhr.open('GET', 'http://*****')
+	// 调用send函数发送请求
+	xhr.send()
+	// 监听load事件，响应请求后的结果
+	xhr.addEventListener('load', function (
+		console.log(this.response)
+	})
+	`, none)
+	prog.Show()
+}
+
+func TestFunc(t *testing.T) {
+	prog := ParseSSA(`
+	(function() {})
+
+	function myFunction(x, y=10) {
+		// y is 10 if not passed or undefined
+		return x + y;
+	}
+	 
+	a = myFunction(0, 2) // 输出 2
+	b = myFunction(5); // 输出 15, y 参数的默认值
+
+	`, none)
+	prog.Show()
+}
+
+func TestElseIf(t *testing.T) {
+	prog := ParseSSA(`
+	a = 2
+	if(a < 1){
+		a++;
+	}else if((a > 1) && (a < 3)){
+		print(a)
+	}else{
+		b = a
+	}
+	`, none)
+	prog.Show()
+}
+
+
+func TestTrueOrFalse(t *testing.T) {
+	prog := ParseSSA(`
+	function tof(a, b){
+	}
+
+	b = tof(true, false);
+	print(b)
+	`, none)
+	prog.Show()
+}
+
+func TestThis(t *testing.T) {
+	prog := ParseSSA(`
+	xhr.addEventListener("load", function() {
+        console.log(this.add);
+    })
+	`, none)
+	prog.Show()
+}
