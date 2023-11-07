@@ -141,7 +141,6 @@ func TestJoinErrors(t *testing.T) {
 			t.Errorf("expected nil but got %v", err)
 		}
 	})
-
 }
 
 func format1C() error {
@@ -172,7 +171,7 @@ func TestFormat(t *testing.T) {
 	t.Run("format1", func(t *testing.T) {
 		err := format1C()
 		_ = err
-		// t.Logf("%#v", err)
+		t.Logf("%#v", err)
 	})
 
 	t.Run("format2-join", func(t *testing.T) {
