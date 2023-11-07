@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"errors"
 	"fmt"
 	"io"
 
@@ -11,6 +10,7 @@ import (
 type YakError struct {
 	msg            string
 	originalErrors []error
+	typ            any
 	*stack
 }
 
@@ -41,31 +41,24 @@ func JoinErrors(errs ...error) error {
 	}
 
 	msg := ""
-	var st *stack = nil
+	var st *stack = &stack{st: make([]uintptr, 0, 1)}
+	st.appendCurrentFrame()
+
 	newErrs := make([]error, 0, len(errs))
 
 	lenOfErrors := len(errs)
 	for i, err := range errs {
 		msg += err.Error()
 		if i < lenOfErrors-1 {
-			msg += ": "
+			msg += " | "
 		}
 		if yakError, ok := err.(*YakError); ok {
 			newErrs = append(newErrs, yakError.originalErrors...)
-			if st == nil {
-				st = yakError.stack
-				st.appendCurrentFrame()
-			} else {
-				st.appendEmptyFrame()
-				st.appendStack(yakError.stack)
-			}
+			st.appendEmptyFrame()
+			st.appendStack(yakError.stack)
 		} else {
 			newErrs = append(newErrs, err)
 		}
-	}
-
-	if st == nil {
-		st = callers()
 	}
 
 	return &YakError{
@@ -82,14 +75,18 @@ func Wrap(err error, msg string) error {
 	if msg != "" {
 		msg += ": "
 	}
-	if yakErr, ok := err.(*YakError); ok {
-		yakErr.msg = fmt.Sprintf("%s%s", msg, yakErr.Error())
-		yakErr.stack.appendCurrentFrame()
-		yakErr.originalErrors = append(yakErr.originalErrors, err)
-		return yakErr
-	}
 
-	return &YakError{msg: fmt.Sprintf("%s%s", msg, err.Error()), originalErrors: []error{err}, stack: callers()}
+	var st *stack = nil
+
+	if yakErr, ok := err.(*YakError); ok {
+		st = &stack{st: make([]uintptr, len(yakErr.stack.st))}
+		copy(st.st, yakErr.stack.st)
+	} else {
+		st = &stack{st: make([]uintptr, 0)}
+	}
+	st.appendCurrentFrame()
+
+	return &YakError{msg: fmt.Sprintf("%s%s", msg, err.Error()), originalErrors: []error{err}, stack: st}
 }
 
 func Wrapf(err error, format string, args ...interface{}) error {
@@ -101,14 +98,17 @@ func Wrapf(err error, format string, args ...interface{}) error {
 		msg += ": "
 	}
 
-	if yakErr, ok := err.(*YakError); ok {
-		yakErr.msg = fmt.Sprintf("%s%s", msg, yakErr.Error())
-		yakErr.stack.appendCurrentFrame()
-		yakErr.originalErrors = append(yakErr.originalErrors, err)
-		return yakErr
-	}
+	var st *stack = nil
 
-	return &YakError{msg: fmt.Sprintf("%s%s", msg, err.Error()), originalErrors: []error{err}, stack: callers()}
+	if yakErr, ok := err.(*YakError); ok {
+		st = &stack{st: make([]uintptr, len(yakErr.stack.st))}
+		copy(st.st, yakErr.stack.st)
+	} else {
+		st = &stack{st: make([]uintptr, 0)}
+	}
+	st.appendCurrentFrame()
+
+	return &YakError{msg: fmt.Sprintf("%s%s", msg, err.Error()), originalErrors: []error{err}, stack: st}
 }
 
 func (err *YakError) Cause() []error {
@@ -126,13 +126,6 @@ func (err *YakError) Unwrap() []error {
 func (e *YakError) Is(rerr error) bool {
 	if yakErr, ok := rerr.(*YakError); ok {
 		return e == yakErr
-	}
-
-	for _, oerr := range e.originalErrors {
-		if errors.Is(oerr, rerr) {
-			return true
-		}
-		return false
 	}
 
 	return false

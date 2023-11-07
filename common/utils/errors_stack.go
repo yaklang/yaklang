@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"crypto/sha1"
 	"fmt"
 	"io"
 	"os"
@@ -158,8 +157,7 @@ func (st StackTrace) formatSlice(s fmt.State, verb rune) {
 
 // stack represents a stack of program counters.
 type stack struct {
-	st    []uintptr
-	hashs map[[20]byte]struct{}
+	st []uintptr
 }
 
 func (s *stack) Format(st fmt.State, verb rune) {
@@ -194,15 +192,15 @@ func callers() *stack {
 	var pcs [depth]uintptr
 	n := runtime.Callers(skipNum, pcs[:])
 	if n-skipBottomNum < 0 {
-		return &stack{hashs: make(map[[20]byte]struct{})}
+		return &stack{}
 	} else {
-		return &stack{st: pcs[0 : n-skipBottomNum], hashs: make(map[[20]byte]struct{})}
+		return &stack{st: pcs[0 : n-skipBottomNum]}
 	}
 }
 
 func (st *stack) appendCurrentFrame() {
-	pc, file, line, ok := runtime.Caller(skipNum - 1)
-	if ok && st.hash(file, line) {
+	pc, _, _, ok := runtime.Caller(skipNum - 1)
+	if ok {
 		st.st = append([]uintptr{pc}, st.st...)
 	}
 }
@@ -213,16 +211,6 @@ func (st *stack) appendEmptyFrame() {
 
 func (st *stack) appendStack(otherStack *stack) {
 	st.st = append(st.st, otherStack.st...)
-}
-
-func (st *stack) hash(file string, line int) bool {
-	var ok bool
-	s := fmt.Sprintf("%s:%d", file, line)
-	raw := sha1.Sum(UnsafeStringToBytes(s))
-	if _, ok = st.hashs[raw]; !ok {
-		st.hashs[raw] = struct{}{}
-	}
-	return ok
 }
 
 // SetSkipFrameNum set the number of frames to skip, default is 3
