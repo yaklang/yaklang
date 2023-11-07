@@ -141,6 +141,7 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 		return pos
 	}
 
+	deleteInst := make([]ssa.Instruction, 0)
 	// handler instruction
 	for _, b := range fun.Blocks {
 		// fix block position
@@ -158,6 +159,16 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 					// TODO: handler field if this field not OutCaptured
 					// ! easy: just replace value
 				}
+			case *ssa.BinOp:
+				if v := ssa.HandlerBinOp(inst); v != inst {
+					ssa.ReplaceValue(inst, v)
+					deleteInst = append(deleteInst, inst)
+				}
+			case *ssa.UnOp:
+				if v := ssa.HandlerUnOp(inst); v != inst {
+					ssa.ReplaceValue(inst, v)
+					deleteInst = append(deleteInst, inst)
+				}
 
 			// collect control flow
 			case *ssa.If:
@@ -169,6 +180,10 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 
 			}
 		}
+	}
+
+	for _, inst := range deleteInst {
+		ssa.DeleteInst(inst)
 	}
 
 	// handler
