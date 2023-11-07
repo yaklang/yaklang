@@ -114,9 +114,11 @@ func (b *FunctionBuilder) Finish() {
 		block.Sealed()
 	}
 	// set defer function
-	b.CurrentBlock = b.Blocks[len(b.Blocks)-1]
-	for i := len(b.deferExpr) - 1; i >= 0; i-- {
-		b.EmitOnly(b.deferExpr[i])
+	if len(b.deferExpr) > 0 {
+		b.CurrentBlock = b.NewBasicBlock("defer")
+		for _, call := range b.deferExpr {
+			b.EmitOnly(call)
+		}
 	}
 	// function finish
 	b.Function.Finish()
