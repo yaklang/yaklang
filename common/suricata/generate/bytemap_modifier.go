@@ -4,6 +4,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/suricata/bytemap"
 	"github.com/yaklang/yaklang/common/suricata/pcre"
+	"github.com/yaklang/yaklang/common/utils"
 	"math"
 	"math/rand"
 )
@@ -33,6 +34,10 @@ func (m *ContentModifier) Modify(payload *bytemap.ByteMap) error {
 	if m.Relative {
 		lastpos, lastlen := payload.Last()
 		begin += lastpos + lastlen
+	}
+
+	if payload.Size() == 0 {
+		return utils.Errorf("payload size zero")
 	}
 	begin = (begin + payload.Size()) % payload.Size()
 

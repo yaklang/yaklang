@@ -142,6 +142,10 @@ func (p *PortRule) GetAvailablePort() uint32 {
 		count++
 	}
 
+	if len(p.Rules) == 0 {
+		return uint32(getHighPort())
+	}
+
 	return p.Rules[rand.Intn(len(p.Rules))].GetAvailablePort()
 }
 

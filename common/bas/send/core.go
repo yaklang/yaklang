@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"regexp"
 	"runtime"
+	"time"
 )
 
 const (
@@ -111,7 +112,6 @@ func (sender *Sender) SendPack() error {
 	infoList := make([]RuleInfo, 0)
 	packets := make([][]byte, 0)
 	for ruleID, ruleInfo := range sender.rules {
-		log.Info(ruleID)
 		p, md5List, err := sender.generatePack(ruleInfo)
 		if err != nil {
 			msg := Message{Message: fmt.Sprintf("rule %v generate packet error: %v", ruleInfo, err), MessageType: infoMessage}
@@ -134,6 +134,7 @@ func (sender *Sender) SendPack() error {
 			infoList = infoList[:0]
 			packets = packets[:0]
 		}
+		time.Sleep(500 * time.Millisecond)
 	}
 	if len(packets) > 0 {
 		msg := Message{Message: infoList, MessageType: basMessage}

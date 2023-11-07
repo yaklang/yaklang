@@ -4,13 +4,16 @@ package send
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/bas/core"
+	basUtils "github.com/yaklang/yaklang/common/bas/utils"
 	"github.com/yaklang/yaklang/common/chaosmaker"
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx"
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
-	"packet/core"
-	"packet/utils"
-	"packet/utils/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+
 	"regexp"
 	"strconv"
 	"strings"
@@ -40,7 +43,7 @@ func TestRuleSplit(t *testing.T) {
 
 func TestReadRule(t *testing.T) {
 	rulePath := "/Users/chenyangbao/1.txt"
-	contentByte, err := utils.ReadFile(rulePath)
+	contentByte, err := basUtils.ReadFile(rulePath)
 	if err != nil {
 		log.Errorf("read rule by path error: %v", err)
 		return
@@ -116,7 +119,7 @@ func RuleParse() error {
 			continue
 		}
 		if len(result) != 0 {
-			log.Infof("%v", utils.Md5(result))
+			log.Infof("%v", codec.Md5(result))
 		}
 		pcapx.InjectRaw(traffic)
 	}

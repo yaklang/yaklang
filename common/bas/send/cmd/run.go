@@ -89,11 +89,11 @@ func readRule(rulePath string) ([]byte, error) {
 	if err != nil {
 		return nil, utils.Errorf("file %v read error: %v", rulePath, err)
 	}
-	//defer func() {
-	//	err := utils.RemoveFile(rulePath)
-	//	if err != nil {
-	//		log.Errorf("file %v remove error: %v", rulePath, err)
-	//	}
-	//}()
+	defer func() {
+		err := basUtils.RemoveFile(rulePath)
+		if err != nil {
+			log.Errorf("file %v remove error: %v", rulePath, err)
+		}
+	}()
 	return ruleContentBytes, nil
 }

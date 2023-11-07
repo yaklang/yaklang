@@ -107,6 +107,7 @@ func parse2ContentGen(rules []*rule.ContentRule, opts ...ContentGenOpt) *Content
 			generator, err := r.PCREParsed.Generator()
 			if err != nil {
 				log.Warnf("new regexp generator from rule failed:%v", err)
+				continue
 			}
 			mdf.Modifiers = append(mdf.Modifiers,
 				&RegexpModifier{generator},

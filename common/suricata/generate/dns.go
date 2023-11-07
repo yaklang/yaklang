@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
 	"github.com/yaklang/yaklang/common/suricata/rule"
+	"github.com/yaklang/yaklang/common/utils"
 	"math/rand"
 )
 
@@ -35,9 +36,11 @@ func newDNSGen(r *rule.Rule) (Generator, error) {
 			g.query = parse2ContentGen(rr, WithNoise(noiseDigitChar))
 		case modifier.Default:
 			// won't support
-			log.Warnf("default modifier won't support in dns")
+			//log.Warnf("default modifier won't support in dns")
+			return nil, utils.Error("default modifier won't support in dns")
 		default:
-			log.Warnf("not support modifier %v", mdf)
+			//log.Warnf("not support modifier %v", mdf)
+			return nil, utils.Errorf("not support modifier %v", mdf)
 		}
 	}
 

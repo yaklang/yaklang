@@ -148,6 +148,14 @@ func (m *ByteMap) Trim(trimleft bool, trimright bool, targetLen int) {
 	}
 
 	if rpos-lpos < targetLen {
+		if len(m.mp) < targetLen {
+			less := targetLen - len(m.mp)
+			for i := 0; i < less; i++ {
+				m.filled = append(m.filled, false)
+				m.mp = append(m.mp, 0)
+			}
+			return
+		}
 		remain := targetLen - (lpos - rpos)
 		lremain := lpos
 		rremain := len(m.mp) - rpos
