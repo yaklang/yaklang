@@ -12,7 +12,7 @@ func fixupUseChain(node Node) {
 		}
 	}
 }
-func DeleteInst(i Value) {
+func DeleteInst(i Instruction) {
 	b := i.GetBlock()
 	if phi, ok := ToPhi(i); ok {
 		b.Phis = utils.RemoveSliceItem(b.Phis, phi)
