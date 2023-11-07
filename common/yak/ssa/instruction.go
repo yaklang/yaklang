@@ -137,7 +137,7 @@ func NewNext(iter Value, isIn bool) *Next {
 	}
 	if NextType == nil {
 		NextType = NewObjectType()
-		NextType.Kind = Struct
+		NextType.Kind = StructTypeKind
 		NextType.AddField(NewConst("ok"), BasicTypes[Boolean])
 		NextType.AddField(NewConst("key"), BasicTypes[Any])
 		NextType.AddField(NewConst("field"), BasicTypes[Any])
