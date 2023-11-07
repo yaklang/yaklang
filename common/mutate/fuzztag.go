@@ -27,11 +27,13 @@ import (
 var fuzztagfallback = []string{""}
 
 type FuzzTagDescription struct {
-	TagName     string
-	Handler     func(string) []string
-	HandlerEx   func(string) []*fuzztag.FuzzExecResult
-	Alias       []string
-	Description string
+	TagName          string
+	Handler          func(string) []string
+	HandlerEx        func(string) []*fuzztag.FuzzExecResult
+	ErrorInfoHandler func(string) ([]string, error)
+	IsDyn            bool
+	Alias            []string
+	Description      string
 }
 
 func AddFuzzTagDescriptionToMap(methodMap map[string]*parser.TagMethod, f *FuzzTagDescription) {
@@ -40,17 +42,9 @@ func AddFuzzTagDescriptionToMap(methodMap map[string]*parser.TagMethod, f *FuzzT
 	}
 	name := f.TagName
 	alias := f.Alias
-	var handle any
-	if f.Handler != nil {
-		handle = f.Handler
-	} else if f.HandlerEx != nil {
-		handle = f.HandlerEx
-	} else {
-		return
-	}
 	methodMap[name] = &parser.TagMethod{
 		Name:  name,
-		IsDyn: false,
+		IsDyn: f.IsDyn,
 		Fun: func(s string) (result []*parser.FuzzResult, err error) {
 			defer func() {
 				if r := recover(); r != nil {
@@ -61,14 +55,12 @@ func AddFuzzTagDescriptionToMap(methodMap map[string]*parser.TagMethod, f *FuzzT
 					}
 				}
 			}()
-			switch f := handle.(type) {
-			case func(string2 string) []string:
-				for _, d := range f(s) {
+			if f.Handler != nil {
+				for _, d := range f.Handler(s) {
 					result = append(result, parser.NewFuzzResultWithData(d))
 				}
-
-			case func(string) []*fuzztag.FuzzExecResult:
-				for _, data := range f(s) {
+			} else if f.HandlerEx != nil {
+				for _, data := range f.HandlerEx(s) {
 					var verbose string
 					showInfo := data.ShowInfo()
 					if len(showInfo) != 0 {
@@ -76,6 +68,15 @@ func AddFuzzTagDescriptionToMap(methodMap map[string]*parser.TagMethod, f *FuzzT
 					}
 					result = append(result, parser.NewFuzzResultWithDataVerbose(data.Data(), verbose))
 				}
+			} else if f.ErrorInfoHandler != nil {
+				res, err := f.ErrorInfoHandler(s)
+				fuzzRes := []*parser.FuzzResult{}
+				for _, r := range res {
+					fuzzRes = append(fuzzRes, parser.NewFuzzResultWithData(r))
+				}
+				return fuzzRes, err
+			} else {
+				return nil, errors.New("no handler")
 			}
 			return
 		},
@@ -91,7 +92,6 @@ var tagMethodMap = map[string]*parser.TagMethod{}
 func AddFuzzTagToGlobal(f *FuzzTagDescription) {
 	AddFuzzTagDescriptionToMap(tagMethodMap, f)
 }
-
 func init() {
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "fuzz:password",
@@ -164,6 +164,7 @@ func init() {
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "timestamp",
+		IsDyn:   true,
 		Handler: func(s string) []string {
 			switch strings.ToLower(s) {
 			case "s", "sec", "seconds", "second":
@@ -570,6 +571,7 @@ func init() {
 	})
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "randint",
+		IsDyn:   true,
 		Handler: func(s string) []string {
 			var (
 				min, max, count uint
@@ -658,7 +660,8 @@ func init() {
 	})
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "randstr",
-		Handler: func(s string) []string {
+		IsDyn:   true,
+		ErrorInfoHandler: func(s string) ([]string, error) {
 			var (
 				min, max, count uint
 				err             error
@@ -671,7 +674,7 @@ func init() {
 			case 3:
 				count, err = parseUint(raw[2])
 				if err != nil {
-					return fuzztagfallback
+					return fuzztagfallback, err
 				}
 
 				if count <= 0 {
@@ -681,19 +684,23 @@ func init() {
 			case 2:
 				min, err = parseUint(raw[0])
 				if err != nil {
-					return fuzztagfallback
+					return fuzztagfallback, err
 				}
 				max, err = parseUint(raw[1])
 				if err != nil {
-					return fuzztagfallback
+					return fuzztagfallback, err
 				}
 				min = uint(utils.Min(int(min), int(max)))
 				max = uint(utils.Max(int(min), int(max)))
+				if max >= 1e8 {
+					max = 1e8
+					err = fmt.Errorf("max length is 100000000")
+				}
 				break
 			case 1:
 				max, err = parseUint(raw[0])
 				if err != nil {
-					return fuzztagfallback
+					return fuzztagfallback, err
 				}
 				min = max
 				if max <= 0 {
@@ -701,7 +708,7 @@ func init() {
 				}
 				break
 			default:
-				return fuzztagfallback
+				return fuzztagfallback, err
 			}
 
 			var r []string
@@ -719,7 +726,7 @@ func init() {
 				r = append(r, utils.RandStringBytes(int(c)))
 				return true
 			})
-			return r
+			return r, err
 		},
 		Alias:       []string{"rand:str", "rs", "rands"},
 		Description: "随机生成个字符串，定义为 {{randstr(10)}} 生成长度为 10 的随机字符串，{{randstr(1,30)}} 生成长度为 1-30 为随机字符串，{{randstr(1,30,10)}} 生成 10 个随机字符串，长度为 1-30",
