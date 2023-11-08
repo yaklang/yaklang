@@ -178,3 +178,16 @@ func TestThis(t *testing.T) {
 	`, none)
 	prog.Show()
 }
+
+func TestIdentifier(t *testing.T) {
+	prog := ParseSSA(`
+	$(document).ready(function(){
+		$("button").click(function(){
+		  $.get("/example/jquery/demo_test.asp",function(data,status){
+			alert("数据：" + data + "\n状态：" + status);
+		  });
+		});
+	  });
+	`, none)
+	prog.Show()
+}
