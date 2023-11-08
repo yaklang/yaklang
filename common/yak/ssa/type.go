@@ -103,6 +103,7 @@ type TypeKind int
 const (
 	Number TypeKind = iota
 	String
+	Bytes
 	Boolean
 	UndefinedType // undefined is nil in golang
 	Null          //
@@ -156,6 +157,7 @@ var _ Type = (*BasicType)(nil)
 var BasicTypes = []*BasicType{
 	Number:        {Number, "number", make(map[string]*FunctionType, 0)},
 	String:        {String, "string", make(map[string]*FunctionType, 0)},
+	Bytes:         {Bytes, "bytes", make(map[string]*FunctionType, 0)},
 	Boolean:       {Boolean, "boolean", make(map[string]*FunctionType, 0)},
 	UndefinedType: {UndefinedType, "undefined", make(map[string]*FunctionType, 0)},
 	Null:          {Null, "null", make(map[string]*FunctionType, 0)},
@@ -180,6 +182,8 @@ func GetTypeByStr(typ string) Type {
 		return BasicTypes[String]
 	case "bool":
 		return BasicTypes[Boolean]
+	case "bytes", "[]uint8", "[]byte":
+		return BasicTypes[Bytes]
 	case "interface {}", "var":
 		return BasicTypes[Any]
 	case "error":
