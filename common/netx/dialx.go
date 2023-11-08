@@ -123,7 +123,7 @@ RETRY:
 		proxyHaveTimeoutError = false
 		goto RETRY
 	}
-	return nil, errs
+	return nil, utils.Wrapf(errs, "connect: %v failed: no proxy available (in %v)", target, config.Proxy)
 }
 
 /*
