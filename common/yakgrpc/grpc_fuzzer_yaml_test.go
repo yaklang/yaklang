@@ -455,10 +455,10 @@ http:
 			t.Fatal(err)
 		}
 		err = tmp.CheckTemplateRisks()
-		if testCase.expect && err != nil && strings.Contains(err.Error(), "signature error") {
+		if testCase.expect && err != nil && strings.Contains(err.Error(), "签名错误") {
 			t.Fatal(fmt.Sprintf("expect no signature error, got: %s", err.Error()))
 		}
-		if !testCase.expect && (err == nil || !strings.Contains(err.Error(), "signature error")) {
+		if !testCase.expect && (err == nil || !strings.Contains(err.Error(), "签名错误")) {
 			t.Fatal(fmt.Sprintf("expect signature error: not nil, got: %s", err.Error()))
 		}
 	}
