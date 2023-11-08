@@ -133,6 +133,10 @@ func (b *astbuilder) buildTypeLiteral(stmt *yak.TypeLiteralContext) ssa.Type {
 func (b *astbuilder) buildSliceTypeLiteral(stmt *yak.SliceTypeLiteralContext) ssa.Type {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
+	// fmt.Println(stmt.GetText())
+	if stmt.GetText() == "[]byte" || stmt.GetText() == "[]uint8" {
+		return ssa.BasicTypes[ssa.Bytes]
+	}
 	if s, ok := stmt.TypeLiteral().(*yak.TypeLiteralContext); ok {
 		if eleTyp := b.buildTypeLiteral(s); eleTyp != nil {
 			return ssa.NewSliceType(eleTyp)
