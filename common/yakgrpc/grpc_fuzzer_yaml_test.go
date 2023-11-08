@@ -685,7 +685,7 @@ func TestGRPCMUSTPASS_WebFuzzerSequenceConvertYaml(t *testing.T) {
     POST /fuel/login/ HTTP/1.1
     Host: {{Hostname}}
     Content-Type: application/x-www-form-urlencoded
-    Referer: http://www.example.com:
+    Referer: http://www.example.com
     Content-Length: 65
 
     user_name={{username}}&password={{password}}&Login=Login&forward=
@@ -712,7 +712,7 @@ func TestGRPCMUSTPASS_WebFuzzerSequenceConvertYaml(t *testing.T) {
     GET /fuel/pages/items/?search_term=&published=&layout=&limit=50&view_type=list&offset=0&order=asc&col=location+AND+(SELECT+1340+FROM+(SELECT(SLEEP(6)))ULQV)&fuel_inline=0 HTTP/1.1
     Host: {{Hostname}}
     X-Requested-With: XMLHttpRequest
-    Referer: http://www.example.com:
+    Referer: http://www.example.com
 
 
   payloads:
