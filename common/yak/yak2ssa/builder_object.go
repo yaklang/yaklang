@@ -24,7 +24,10 @@ func (b *astbuilder) buildSliceFromExprList(stmt ExpressionListMultiline) ssa.Va
 		return nil
 	}
 	vs := b.buildExpressionListMultiline(s)
-	return b.CreateInterfaceWithVs(nil, vs)
+	obj := b.CreateInterfaceWithVs(nil, vs)
+	fieldTyp := obj.GetType().(*ssa.ObjectType).FieldType
+	obj.SetType(ssa.NewSliceType(fieldTyp))
+	return obj
 }
 
 // slice literal
@@ -78,7 +81,18 @@ func (b *astbuilder) buildMapFromMapPairs(stmt MapPairs) ssa.Value {
 		keys = append(keys, b.buildExpression(p.Expression(0).(*yak.ExpressionContext)))
 		values = append(values, b.buildExpression(p.Expression(1).(*yak.ExpressionContext)))
 	}
-	return b.CreateInterfaceWithVs(keys, values)
+	obj := b.CreateInterfaceWithVs(keys, values)
+	t := obj.GetType().(*ssa.ObjectType)
+	var fieldTyp ssa.Type = ssa.BasicTypes[ssa.Any]
+	var keyTyp ssa.Type = ssa.BasicTypes[ssa.Any]
+	if t.FieldType != nil {
+		fieldTyp = t.FieldType
+	}
+	if t.KeyTyp != nil {
+		keyTyp = t.KeyTyp
+	}
+	obj.SetType(ssa.NewMapType(keyTyp, fieldTyp))
+	return obj
 }
 
 // map literal
