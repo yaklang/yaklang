@@ -124,7 +124,7 @@ func connectForceProxy(ctx context.Context, target string, proxy string, connect
 		}
 		conn.Close()
 		if err != nil {
-			return nil, utils.Wrapf(err, "connect proxy(https) [%s] failed: %s", proxy)
+			return nil, utils.Wrapf(err, "connect proxy(https) [%s] failed", proxy)
 		}
 		return nil, utils.Errorf("connect proxy(https) [%s] failed", proxy)
 	case utils.IHasPrefix(proxy, "socks://"):
@@ -169,7 +169,7 @@ func connectForceProxy(ctx context.Context, target string, proxy string, connect
 		}
 		conn.Close()
 		if err != nil {
-			return nil, utils.Wrapf(err, "connect proxy(http) [%s] failed: %s", proxy)
+			return nil, utils.Wrapf(err, "connect proxy(http) [%s] failed:", proxy)
 		}
 		return nil, utils.Errorf("connect proxy(http) [%s] failed", proxy)
 	}
