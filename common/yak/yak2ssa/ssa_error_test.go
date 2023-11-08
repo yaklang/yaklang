@@ -603,6 +603,21 @@ func TestCallParamReturn(t *testing.T) {
 			},
 		})
 	})
+
+	t.Run("test function parameter", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			count = 0
+			tick1s(func() {
+				count++
+				return count <= 5
+			})
+			`,
+			ExternValue: map[string]any{
+				"tick1s": func(func() bool) {},
+			},
+		})
+	})
 }
 
 func TestClosureBinding(t *testing.T) {

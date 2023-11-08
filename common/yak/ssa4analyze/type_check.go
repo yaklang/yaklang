@@ -119,11 +119,8 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 		}
 
 		for i := 0; i < wantParaLen; i++ {
-			if gotPara[i] != funcTyp.Parameter[i] {
+			if !ssa.TypeCompare(gotPara[i], funcTyp.Parameter[i]) {
 				// any just skip
-				if gotPara[i].GetTypeKind() == ssa.Any || funcTyp.Parameter[i].GetTypeKind() == ssa.Any {
-					continue
-				}
 				index := i + 1
 				if isMethod {
 					index = i

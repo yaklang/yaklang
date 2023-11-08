@@ -19,6 +19,51 @@ func init() {
 	)
 }
 
+func TypeCompare(t1, t2 Type) bool {
+	t1kind := t1.GetTypeKind()
+	t2kind := t2.GetTypeKind()
+
+	if t1kind == Any || t2kind == Any {
+		return true
+	}
+
+	switch t1kind {
+	case FunctionTypeKind:
+		t1f := t1.(*FunctionType)
+		t2f := t2.(*FunctionType)
+		if len(t1f.Parameter) != len(t2f.Parameter) {
+			return false
+		}
+		for i := 0; i < len(t1f.Parameter); i++ {
+			if !TypeCompare(t1f.Parameter[i], t2f.Parameter[i]) {
+				return false
+			}
+		}
+		if !TypeCompare(t1f.ReturnType, t2f.ReturnType) {
+			return false
+		}
+		return true
+	case SliceTypeKind:
+		t1o := t1.(*ObjectType)
+		t2o := t2.(*ObjectType)
+		return TypeCompare(t1o.FieldType, t2o.FieldType)
+	case MapTypeKind:
+		t1o := t1.(*ObjectType)
+		t2o := t2.(*ObjectType)
+		return TypeCompare(t1o.FieldType, t2o.FieldType) && TypeCompare(t1o.KeyTyp, t2o.KeyTyp)
+	case StructTypeKind:
+		return true
+	case ObjectTypeKind:
+		return true
+	default:
+		if t1kind == t2kind {
+			return true
+		} else {
+			return false
+		}
+	}
+}
+
 type MethodBuilder interface {
 	Build(Type, string) *FunctionType
 	GetMethodNames(Type) []string
@@ -542,7 +587,7 @@ func (s *ObjectType) AddField(key Value, field Type) {
 func (s *ObjectType) GetField(key Value) Type {
 	switch s.Kind {
 	case SliceTypeKind, MapTypeKind:
-		if key.GetType() == s.KeyTyp {
+		if TypeCompare(key.GetType(), s.KeyTyp) {
 			return s.FieldType
 		}
 	case StructTypeKind, ObjectTypeKind:
