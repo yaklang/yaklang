@@ -2,10 +2,11 @@ package yaklib
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/go-funk"
-	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
 	"sort"
+
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func intersect(x interface{}, y interface{}) interface{} {
@@ -47,10 +48,10 @@ func intersect(x interface{}, y interface{}) interface{} {
 	return zSlice.Interface()
 }
 
-type funkGeneralFuncType func(i interface{}) interface{}
-type funkGeneralReduceFuncType func(interface{}, interface{}) interface{}
-
-var WaitConnect = utils.WaitConnect
+type (
+	funkGeneralFuncType       func(i interface{}) interface{}
+	funkGeneralReduceFuncType func(interface{}, interface{}) interface{}
+)
 
 var FunkExports = map[string]interface{}{
 	"WaitConnect": WaitConnect,
