@@ -1897,6 +1897,10 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 
 			switch callerTypeKind {
 			case reflect.Map:
+				// go内置成员方法
+				if findGolangBuiltinMemberMethod() {
+					return
+				}
 
 				// 先尝试获取 map 的成员
 				getMember := func() (v reflect.Value) {
@@ -1917,11 +1921,6 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 					value.CalleeRef = memberNameV
 					value.CallerRef = caller
 					v.push(value)
-					return
-				}
-
-				// go内置成员方法
-				if findGolangBuiltinMemberMethod() {
 					return
 				}
 
@@ -1974,6 +1973,10 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 					return
 				}
 			case reflect.Array, reflect.Slice:
+				// go内置成员方法
+				if findGolangBuiltinMemberMethod() {
+					return
+				}
 				prefix := "array"
 				targetBuildinMethod := arrayBuildinMethod
 
@@ -1989,12 +1992,13 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 					v.push(NewValue(literal, ret, literal))
 					return
 				}
+
+			case reflect.String:
 				// go内置成员方法
 				if findGolangBuiltinMemberMethod() {
 					return
 				}
 
-			case reflect.String:
 				//memberName = _title(memberName)
 				method, ok := stringBuildinMethod[memberName]
 
@@ -2003,11 +2007,6 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 					v.push(NewValue(literal, method.HandlerFactory(v, caller.Value), literal))
 					return
 				}
-				// go内置成员方法
-				if findGolangBuiltinMemberMethod() {
-					return
-				}
-
 			default:
 			}
 			panic(fmt.Sprintf("cannot find built-in method %s of %s type", memberName, callerTypeName))
