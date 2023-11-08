@@ -545,7 +545,7 @@ func (s *ObjectType) GetField(key Value) Type {
 		if key.GetType() == s.KeyTyp {
 			return s.FieldType
 		}
-	case StructTypeKind:
+	case StructTypeKind, ObjectTypeKind:
 		getField := func(o *ObjectType) Type {
 			if index := slices.IndexFunc(o.Key, func(v Value) bool { return v.String() == key.String() }); index != -1 {
 				return o.FieldTypes[index]
@@ -572,28 +572,15 @@ func (s *ObjectType) Finish() {
 	}
 	fieldTypes := lo.UniqBy(s.FieldTypes, func(t Type) TypeKind { return t.GetTypeKind() })
 	keyTypes := lo.UniqBy(s.keyTypes, func(t Type) TypeKind { return t.GetTypeKind() })
+	if len(fieldTypes) == 1 {
+		s.FieldType = fieldTypes[0]
+	} else {
+		s.FieldType = BasicTypes[Any]
+	}
 	if len(keyTypes) == 1 {
-		if len(fieldTypes) == 1 {
-			// map[T]U
-			if keyTypes[0].GetTypeKind() == Number {
-				// map[number]T ==> []T slice
-				// TODO: check increasing
-				s.Kind = SliceTypeKind
-				s.KeyTyp = BasicTypes[Number]
-				s.FieldType = fieldTypes[0]
-			} else {
-				// Map
-				s.Kind = MapTypeKind
-				s.KeyTyp = keyTypes[0]
-				s.FieldType = fieldTypes[0]
-			}
-			// s.keyType = keyType
-			// s.Field = field
-		} else if keyTypes[0].GetTypeKind() == String || keyTypes[0].GetTypeKind() == Number {
-			s.Kind = MapTypeKind
-			s.KeyTyp = BasicTypes[String]
-			s.FieldType = BasicTypes[Any]
-		}
+		s.KeyTyp = keyTypes[0]
+	} else {
+		s.KeyTyp = BasicTypes[Any]
 	}
 }
 
