@@ -3,14 +3,12 @@ package yak
 import (
 	"fmt"
 	"os"
-	"reflect"
 	"regexp"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakast"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
 
@@ -62,42 +60,7 @@ func AnalyzeStaticYaklangEx(r interface{}, strictMode bool) []*StaticAnalyzeResu
 		}
 	}
 
-	opts := make([]ssaapi.Option, 0)
-	// yak function table
-	symbol := yaklang.New().GetFntable()
-	valueTable := make(map[string]interface{})
-	// libTable := make(map[string]interface{})
-	for name, item := range symbol {
-		itype := reflect.TypeOf(item)
-		if itype == reflect.TypeOf(make(map[string]interface{})) {
-			opts = append(opts, ssaapi.WithExternLib(name, item.(map[string]interface{})))
-		} else {
-			valueTable[name] = item
-		}
-	}
-
-	//TODO:  this grpc later
-	// yak-main
-	valueTable["YAK_DIR"] = ""
-	valueTable["YAK_FILENAME"] = ""
-	valueTable["YAK_MAIN"] = false
-	valueTable["id"] = ""
-	// param
-	getParam := func(key string) interface{} {
-		return nil
-	}
-	valueTable["getParam"] = getParam
-	valueTable["getParams"] = getParam
-	valueTable["param"] = getParam
-
-	// mitm
-	valueTable["MITM_PLUGIN"] = ""
-	valueTable["MITM_PARAMS"] = make(map[string]string)
-
-	opts = append(opts, ssaapi.WithExternValue(valueTable))
-
-	// ssa
-	prog := ssaapi.Parse(code, opts...)
+	prog := Parse(code)
 	if prog == nil {
 		return results
 	}
@@ -123,10 +86,10 @@ func AnalyzeStaticYaklangEx(r interface{}, strictMode bool) []*StaticAnalyzeResu
 		})
 	}
 	// debug printf json
-	// prog.Show()
-	// for _, result := range results {
-	// 	fmt.Printf("%+v\n", result)
-	// }
+	prog.ShowWithSource()
+	for _, result := range results {
+		fmt.Printf("%+v\n", result)
+	}
 
 	return results
 }
