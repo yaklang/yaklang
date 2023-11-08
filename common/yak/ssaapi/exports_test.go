@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -182,4 +183,23 @@ window.location.href = "www"
 	for _, res := range result {
 		fmt.Println("window.location.href = ", res)
 	}
+}
+
+func TestB(t *testing.T) {
+	prog := Parse(`
+	$(document).ready(function(){
+		$("button").click(function(){
+		  $.get("/example/jquery/demo_test.asp",function(data,status){
+			alert("数据：" + data + "\n状态：" + status);
+		  });
+		});
+	  });
+	`, WithLanguage(JS))
+
+	values := prog.Ref("$")
+	values.Show()
+	u := values.GetUsers()
+	u.Show()
+	u2 := u.Filter(func(v *Value) bool { return v.IsCall() })
+	fmt.Println(reflect.TypeOf(u2))
 }

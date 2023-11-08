@@ -1,0 +1,184 @@
+prog := ssa.Parse(
+    `
+    // get
+	let xhr1 = new XMLHttpRequest()
+	xhr1.open('GET', 'http://*****')
+	xhr1.send()
+    xhr1.send("123")
+    xhr1.addEventListener('load', function () {
+        console.log(this.response)
+    })
+
+    // post
+     const data = {
+       name: 'job',
+       age: '12',
+    }
+    let xhr2 = new XMLHttpRequest()
+    xhr2.open('POST', 'http://XXXX')
+    const usp = new URLSearchParams(data)
+    const query = usp.toString()
+    xhr2.setRequestHeader('Content-type', 'application/x-www-form-urlencoded')
+    xhr2.send(query)
+    xhr2.addEventListener('load', function () {
+        console.log(this.response)
+    })
+
+`, 
+    ssa.withLanguage(ssa.Javascript), 
+)
+
+
+// xml1.Show()
+// xml1.ShowWithSource()
+
+func getCall(v){
+    var ret = []
+    v.GetUsers().ForEach(
+        v1 => {
+            if !v1.IsCall(){
+                return
+            }
+            // v1.ShowUseDefChain()
+            ret.Append(v1)
+        }
+    )
+    return ret  
+}
+
+func getRes(v) {
+    ret := []
+    retHas := []
+    v.GetUsers().ForEach(v => {
+        // v.ShowUseDefChain()
+        str_ := v.String()
+        if str_.Contains(`.open(`){
+            ret.Append(v.GetOperand(1).String())
+            ret.Append(v.GetOperand(2).String())
+            // println(ret)
+            retHas.Append("HasMethod")
+        } elif str_.Contains(`.send`){
+            send := str_.Split(`send(`)
+            if len(send[1]) > 1 {
+                send_ := "send(" + v.GetOperand(1).String() + ")"
+                ret.Append(send_)
+                retHas.Append("HasSendValue")
+            } else {
+                ret.Append("send()")
+                retHas.Append("HasSend")
+            }
+        } elif str_.Contains(`addEventListener`){
+            if v.GetOperand(1).String() == `"load"`{
+                ret.Append("load")
+            }
+            retHas.Append("HasListener")
+        } elif str_.Contains(`setRequestHeader`) {
+            ret.Append(v.GetOperand(1).String())
+            ret.Append(v.GetOperand(2).String())
+            retHas.Append("HasSetRequestHeader")
+        }
+    })
+    return ret, retHas
+}
+
+func getMethod(v){
+    ret := []
+    for _, i := range v {
+        
+        i.GetUsers().ForEach(u => {
+            if u.IsField(){
+                ret, retHas := getRes(u)
+                println(retHas+":"+ret)
+            }
+            // ret, retHas := getRes(u)
+            // println(retHas+":"+ret)
+            // u.ShowUseDefChain()
+        })
+        println("------------------------------")
+    }
+    return ret
+}
+
+// 拿到请求
+xml1 := prog.Ref("XMLHttpRequest")
+
+xml1.ForEach(v => {
+    
+    // v.ShowWithSource()
+    // print("\n")
+    // v.ShowUseDefChain()
+    calls := getCall(v)
+    // print(calls)
+    methods := getMethod(calls)
+    // println(methods)
+})
+
+
+
+//Function call
+prog2 := ssa.Parse(
+    `
+function ajax(url, type, data = '', success) {
+            // 创建一个XMLHttpRequest对象
+            const xhr = new XMLHttpRequest()
+            // 判断type请求方式
+            if (type === 'get') {
+                // 判断data的数据类型转换成字符串
+                if (typeof data === "object") {
+                    data = (new URLSearchParams(data)).toString()
+                }
+                // 设置请求方式和请求地址
+                xhr.open(type, url + '?' + data)
+                // 发送请求
+                xhr.send()
+            } else if (type === 'post') {
+                // 设置请求方式和请求地址
+                xhr.open(type, url)
+                // 判断数据是不是字符串
+                if (typeof data === "string") {
+                    // 设置对应的content-type
+                    xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded')
+                    xhr.send(data)
+                } else if (typeof data === "object") {
+                    if (data instanceof FormData) {
+                        xhr.send(data)
+                    }
+                } else {
+                    xhr.setRequestHeader('Content-type', 'application/json')
+                    const str = JSON.stringify(data);
+                    console.log(typeof str)
+                        xhr.send(str)
+                }
+            }
+}
+
+a = ajax("www.baidu.com", "get", "message", true)
+b = ajax("bilibili.com", "Post", "message2", false)
+`, 
+    ssa.withLanguage(ssa.Javascript), 
+)
+
+
+// 拿到请求
+xml2 := prog2.Ref("XMLHttpRequest")
+var func2
+if xml2 != nil {
+    func_ := xml2[0].GetFunction()
+    func2 = prog2.Ref(func_.String())
+}
+
+func2.ForEach(v => {
+    // v.ShowUseDefChain()
+    calls := getCall(v)
+    println("Show the call of function:")
+    for _, i := range calls{
+        println(i)
+    }
+    println("----------------------------")
+
+})
+
+xml2.ForEach(v => {
+    calls := getCall(v)
+    methods := getMethod(calls)
+})

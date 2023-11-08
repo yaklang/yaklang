@@ -48,6 +48,24 @@ func (v Values) ForEach(f func(*Value)) {
 	}
 }
 
+func (v Values) Filter(f func(*Value) bool) Values {
+	ret := make(Values, 0, len(v))
+	v.ForEach(func(v *Value) {
+		if f(v) {
+			ret = append(ret, v)
+		}
+	})
+	return ret
+}
+
+func (v Values) GetUsers() Values {
+	ret := make(Values, 0, len(v))
+	v.ForEach(func(v *Value) {
+		ret = append(ret, v.GetUsers()...)
+	})
+	return ret
+}
+
 type Value struct {
 	node ssa.InstructionNode
 }
@@ -117,6 +135,26 @@ func (v *Value) GetParameter() Values {
 			ret = append(ret, NewValue(v))
 		}
 	}
+	return ret
+}
+
+func (v *Value) GetCall() Values {
+	ret := make(Values, 0)
+	v.GetUsers().ForEach(func(u *Value) {
+		if u.IsCall() {
+			ret = append(ret, u)
+		}
+	})
+	return ret
+}
+
+func (v *Value) GetField() Values {
+	ret := make(Values, 0)
+	v.GetUsers().ForEach(func(u *Value) {
+		if u.IsField() {
+			ret = append(ret, u)
+		}
+	})
 	return ret
 }
 

@@ -1,0 +1,228 @@
+prog := ssa.Parse(
+    `
+// example1
+$(document).ready(function(){
+		$("button").click(function(){
+		  $.get("/example/jquery/demo_test.asp",function(data,status){
+			alert("数据：" + data + "\n状态：" + status);
+		  });
+		});
+	  });
+
+// example2   
+$(document).ready(function(){
+  $("button").click(function(){
+    $.post("/example/jquery/demo_test_post.asp",
+    {
+      name:"Donald Duck",
+      city:"Duckburg"
+    },
+    function(data,status){
+      alert("数据：" + data + "\n状态：" + status);
+    });
+  });
+});
+
+// example3
+$.get(
+    "submit.aspx",
+    {
+        id:     '123',
+        name:   '博客园',
+    },
+    function(data,state){
+        //这里显示从服务器返回的数据
+        alert(data);
+        //这里显示返回的状态
+        alert(state);
+    }
+)`, 
+    ssa.withLanguage(ssa.Javascript), 
+)
+
+func getUpdate(v) {
+    var ret
+    v.GetUsers().ForEach(v => {
+        if v.IsUpdate() {
+            index = v.GetOperand(0).String().Split(".")
+            op1 := v.GetOperand(1)
+            if op1.IsFunction() {
+                ret = index[1] + ": " + "Param: " + op1.GetParameter()
+            } else if op1.IsMake(){
+                make_ := handleMake(op1)
+                ret = index[1] + ": " + "make{" + make_ + "}"
+            } else {
+                ret = index[1] + ": " + v.GetOperand(1).String()
+            }
+        }
+        
+    })
+    return ret
+}
+
+// func getField(v) {
+//     ret := []
+//     v.GetUsers().ForEach(u => {
+//         if u.IsField() {
+//             ret.Append(u)
+//         }
+        
+//     })
+//     return ret
+// }
+
+// func getCall(v) {
+//     var ret = []
+//     v.GetUsers().ForEach(v1 => {
+//         if !v1.IsCall() {
+//             return
+//         }
+//         ret.Append(v1)
+//         // v1.ShowUseDefChain()
+//     })
+//     return ret
+// }
+
+func handleMake(v) {
+    var ret = []
+    for _, i := range v {
+        update := getUpdate(i)
+        ret.Append(update)
+    }
+    
+    return ret
+}
+
+
+// func handleFunction(v) {
+//     for _, i := range v {
+//         i.GetUsers().ForEach(v => {
+//             v.ShowUseDefChain()
+//         })
+//     }
+// }
+
+
+func getRes(v) {
+    for _, i := range v {
+        Method := []
+        i.GetOperands().ForEach(v => {
+            if v.IsFunction() {
+                // handleFunction(v.GetParameter())
+                println("Param: " + v.GetParameter())
+            } else if v.IsMake() {
+                make_ := []
+                ids := v.GetField()
+                make_ = handleMake(ids)
+                println("make{" + make_ + "}")
+            } else {
+                if v.String().Contains("$.") {
+                    method := v.String().Split(".")
+                    Method.Append(method[1])
+                } else {
+                    Method.Append(v.String())
+                }
+                
+            }
+            
+        })
+        println(Method)
+        println("--------------------------")
+    }
+    
+}
+
+doc := prog.Ref("$")
+// Users := doc.GetUsers()
+// u2 = Users.Filter(v => v.IsField())
+// println("Users::" , typeof(Users))
+// println("Users::" , typeof(doc))
+// println("Users::" , typeof(u2))
+// println("Users::" , typeof(Users.Filter))
+// print("-----------------------------")
+// calls := Users.GetUsers().Filter(v => v.IsCall())
+// calls.ForEach(v => {getRes(v)})
+doc.ForEach(v => {
+    Users := v.GetField()
+    // v.ShowUseDefChain()
+    // println("Users: " + Users)
+    // println("Methods:" + Method)
+    for _, i := range Users {
+        calls := i.GetCall()
+        getRes(calls)
+    }
+    
+})
+
+prog2 := ssa.Parse(
+    `
+$.ajax({
+        url: 'submit.aspx',
+        datatype: "json",
+        type: 'post',
+        success: function (e) {   //成功后回调
+            alert(e); 
+        },
+        error: function(e){    //失败后回调
+            alert(e);
+        },
+        beforeSend: function(){  //发送请求前调用，可以放一些"正在加载"之类额话
+            alert("正在加载");
+        }
+})
+`, 
+    ssa.withLanguage(ssa.Javascript), 
+)
+
+doc1 := prog2.Ref("$")
+doc1.ForEach(v => {
+    Users := v.GetField()
+    // v.ShowUseDefChain()
+    // println("Users: " + Users)
+    // println("Methods:" + Method)
+    for _, i := range Users {
+        calls := i.GetCall()
+        getRes(calls)
+    }
+    
+})
+
+
+
+prog3 := ssa.Parse(`
+$(document).ready(() => {
+  const $showData = $('#show-data');
+  const $raw = $('pre');
+
+  $('#get-data').on('click', (e) => {
+    e.preventDefault();
+
+    $showData.text('Loading the JSON file.');
+
+    $.getJSON('example.json', (data) => {
+      const markup = data.items.map(item =>  "<li>${item.key}: ${item.value}</li>").join('');
+
+      const list = $('<ul />').html(markup);
+
+      $showData.html(list);
+
+      $raw.text(JSON.stringify(data, undefined, 2));
+    });
+  });
+});
+`, ssa.withLanguage(ssa.Javascript))
+
+
+
+doc3 := prog3.Ref("$")
+doc3.ForEach(v => {
+    Users := v.GetField()
+    // v.ShowUseDefChain()
+    // println("Users: " + Users)
+    // println("Methods:" + Method)
+    for _, i := range Users {
+        calls := i.GetCall()
+        getRes(calls)
+    }
+    
+})
