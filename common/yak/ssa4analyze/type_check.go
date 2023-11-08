@@ -76,6 +76,12 @@ func (t *TypeCheck) TypeCheckUndefine(inst *ssa.Undefined) {
 
 func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 	funcTyp, ok := c.Method.GetType().(*ssa.FunctionType)
+	isMethod := false
+	if f, ok := ssa.ToField(c.Method); ok {
+		if f.IsMethod {
+			isMethod = true
+		}
+	}
 	if !ok {
 		return
 	}
@@ -118,8 +124,12 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 				if gotPara[i].GetTypeKind() == ssa.Any || funcTyp.Parameter[i].GetTypeKind() == ssa.Any {
 					continue
 				}
+				index := i + 1
+				if isMethod {
+					index = i
+				}
 				c.NewError(ssa.Error, TypeCheckTAG,
-					ArgumentTypeError(i+1, gotPara[i].String(), funcTyp.Parameter[i].String(), funName),
+					ArgumentTypeError(index, gotPara[i].String(), funcTyp.Parameter[i].String(), funName),
 				)
 				return
 			}
