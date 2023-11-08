@@ -21,6 +21,10 @@ func (b *FunctionBuilder) WithExternLib(lib map[string]map[string]any) {
 	b.ExternLib = lib
 }
 
+func (b *FunctionBuilder) WithExternMethod(builder MethodBuilder) {
+	ExternMethodBuilder = builder
+}
+
 func TryGetSimilarityKey(table []string, name string) string {
 	var score float64
 	var ret string
