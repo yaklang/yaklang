@@ -13,7 +13,7 @@ type config struct {
 	externLib   map[string]map[string]any
 	externValue map[string]any
 	// externType  map[string]any
-	// externMethod
+	externMethod ssa.MethodBuilder
 }
 
 func defaultConfig() *config {
@@ -51,6 +51,13 @@ func WithExternValue(table map[string]any) Option {
 		c.externValue = table
 	}
 }
+
+func WithExternMethod(b ssa.MethodBuilder) Option {
+	return func(c *config) {
+		c.externMethod = b
+	}
+}
+
 func Parse(code string, opts ...Option) *Program {
 	config := defaultConfig()
 	for _, opt := range opts {
@@ -60,6 +67,7 @@ func Parse(code string, opts ...Option) *Program {
 	callback := func(fb *ssa.FunctionBuilder) {
 		fb.WithExternLib(config.externLib)
 		fb.WithExternValue(config.externValue)
+		fb.WithExternMethod(config.externMethod)
 	}
 
 	var ret *ssa.Program

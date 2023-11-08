@@ -211,7 +211,7 @@ func (t *TypeInference) TypeInferenceMake(i *ssa.Make) {
 
 func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
 	if t := f.Obj.GetType(); t != nil {
-		if methodTyp := t.GetMethod(f.Key.String()); methodTyp != nil && f.GetType() != methodTyp {
+		if methodTyp := ssa.GetMethod(t, f.Key.String()); methodTyp != nil && f.GetType() != methodTyp {
 			f.SetType(methodTyp)
 			f.IsMethod = true
 			return
@@ -242,7 +242,7 @@ func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
 			text := ""
 			if ci, ok := ssa.ToConst(f.Key); ok {
 				text = ci.String()
-				want := ssa.TryGetSimilarityKey(t.GetAllKey(), text)
+				want := ssa.TryGetSimilarityKey(ssa.GetAllKey(t), text)
 				if want != "" {
 					f.NewError(ssa.Error, TITAG, ssa.ExternFieldError("Type", t.String(), text, want))
 					return

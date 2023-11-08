@@ -18,6 +18,56 @@ func init() {
 		false,
 	)
 }
+
+type MethodBuilder interface {
+	Build(Type, string) *FunctionType
+	GetMethodNames(Type) []string
+}
+
+var ExternMethodBuilder MethodBuilder
+
+func GetMethod(t Type, id string) *FunctionType {
+	var f *FunctionType
+	if fun, ok := t.GetMethod()[id]; ok {
+		f = fun
+	}
+
+	if f == nil && ExternMethodBuilder != nil {
+		f = ExternMethodBuilder.Build(t, id)
+		if f != nil {
+			t.AddMethod(id, f)
+		}
+	}
+	return f
+}
+
+func GetMethodsName(t Type) []string {
+	ret := make([]string, 0)
+	ret = append(ret, lo.Keys(t.GetMethod())...)
+	if ExternMethodBuilder != nil {
+		ret = append(ret, ExternMethodBuilder.GetMethodNames(t)...)
+	}
+	return ret
+}
+
+func GetAllKey(t Type) []string {
+	ret := make([]string, 0)
+	switch t.GetTypeKind() {
+	case FunctionTypeKind:
+	case ObjectTypeKind, SliceTypeKind, MapTypeKind, StructTypeKind:
+		ot, _ := ToObjectType(t)
+		ret = append(ret, lo.Map(ot.Key, func(v Value, _ int) string { return v.String() })...)
+		fallthrough
+	default:
+		ret = append(ret, GetMethodsName(t)...)
+	}
+	return ret
+}
+
+// func (b *ObjectType) GetAllKey() []string {
+// 	return append(lo.Keys(b.method), lo.Map(b.Key, func(v Value, _ int) string { return v.String() })...)
+// }
+
 func IsObjectType(t Type) bool {
 	switch t.GetTypeKind() {
 	case ObjectTypeKind, SliceTypeKind, MapTypeKind, StructTypeKind:
@@ -34,8 +84,9 @@ type Type interface {
 
 	// set/get method
 	SetMethod(map[string]*FunctionType)
-	GetMethod(id string) *FunctionType
-	GetAllKey() []string
+	AddMethod(string, *FunctionType)
+	GetMethod() map[string]*FunctionType
+	// GetAllKey() []string
 }
 type Types []Type // each value can have multiple type possible
 
@@ -138,19 +189,22 @@ func (b *BasicType) RawString() string {
 func (b *BasicType) GetTypeKind() TypeKind {
 	return b.Kind
 }
-func (b *BasicType) GetMethod(id string) *FunctionType {
-	if v, ok := b.method[id]; ok {
-		return v
-	} else {
-		return nil
-	}
+func (b *BasicType) GetMethod() map[string]*FunctionType {
+	return b.method
 }
 func (b *BasicType) SetMethod(method map[string]*FunctionType) {
 	b.method = method
 }
-func (b *BasicType) GetAllKey() []string {
-	return lo.Keys(b.method)
+func (b *BasicType) AddMethod(id string, f *FunctionType) {
+	if b.method == nil {
+		b.method = make(map[string]*FunctionType)
+	}
+	b.method[id] = f
 }
+
+// func (b *BasicType) GetAllKey() []string {
+// 	return lo.Keys(b.method)
+// }
 
 var _ Type = (*BasicType)(nil)
 
@@ -213,18 +267,20 @@ func NewAliasType(name string, elem Type) *AliasType {
 func (a *AliasType) SetMethod(m map[string]*FunctionType) {
 	a.method = m
 }
-
-func (a *AliasType) GetMethod(id string) *FunctionType {
-	if v, ok := a.method[id]; ok {
-		return v
-	} else {
-		return nil
+func (b *AliasType) AddMethod(id string, f *FunctionType) {
+	if b.method == nil {
+		b.method = make(map[string]*FunctionType)
 	}
+	b.method[id] = f
 }
 
-func (b *AliasType) GetAllKey() []string {
-	return lo.Keys(b.method)
+func (a *AliasType) GetMethod() map[string]*FunctionType {
+	return a.method
 }
+
+// func (b *AliasType) GetAllKey() []string {
+// 	return lo.Keys(b.method)
+// }
 
 func (a *AliasType) String() string {
 	if a.Name != "" {
@@ -260,17 +316,20 @@ var _ Type = (*InterfaceType)(nil)
 func (i *InterfaceType) SetMethod(m map[string]*FunctionType) {
 	i.method = m
 }
-
-func (i *InterfaceType) GetMethod(id string) *FunctionType {
-	if v, ok := i.method[id]; ok {
-		return v
-	} else {
-		return nil
+func (b *InterfaceType) AddMethod(id string, f *FunctionType) {
+	if b.method == nil {
+		b.method = make(map[string]*FunctionType)
 	}
+	b.method[id] = f
 }
-func (b *InterfaceType) GetAllKey() []string {
-	return lo.Keys(b.method)
+
+func (i *InterfaceType) GetMethod() map[string]*FunctionType {
+	return i.method
 }
+
+// func (b *InterfaceType) GetAllKey() []string {
+// 	return lo.Keys(b.method)
+// }
 
 func (i *InterfaceType) GetTypeKind() TypeKind {
 	return InterfaceTypeKind
@@ -299,12 +358,19 @@ var _ (Type) = (*ChanType)(nil)
 func (c *ChanType) SetMethod(m map[string]*FunctionType) {
 	c.method = m
 }
-func (c *ChanType) GetMethod(id string) *FunctionType {
-	return c.method[id]
+func (b *ChanType) AddMethod(id string, f *FunctionType) {
+	if b.method == nil {
+		b.method = make(map[string]*FunctionType)
+	}
+	b.method[id] = f
 }
-func (b *ChanType) GetAllKey() []string {
-	return lo.Keys(b.method)
+func (c *ChanType) GetMethod() map[string]*FunctionType {
+	return c.method
 }
+
+// func (b *ChanType) GetAllKey() []string {
+// 	return lo.Keys(b.method)
+// }
 
 func (c *ChanType) GetTypeKind() TypeKind {
 	return ChanTypeKind
@@ -348,21 +414,23 @@ func (i *ObjectType) GetTypeKind() TypeKind {
 	return i.Kind
 }
 
-func (i *ObjectType) GetMethod(id string) *FunctionType {
-	if v, ok := i.method[id]; ok {
-		return v
-	} else {
-		return nil
-	}
+func (i *ObjectType) GetMethod() map[string]*FunctionType {
+	return i.method
 }
 
 func (i *ObjectType) SetMethod(m map[string]*FunctionType) {
 	i.method = m
 }
-
-func (b *ObjectType) GetAllKey() []string {
-	return append(lo.Keys(b.method), lo.Map(b.Key, func(v Value, _ int) string { return v.String() })...)
+func (b *ObjectType) AddMethod(id string, f *FunctionType) {
+	if b.method == nil {
+		b.method = make(map[string]*FunctionType)
+	}
+	b.method[id] = f
 }
+
+// func (b *ObjectType) GetAllKey() []string {
+// 	return append(lo.Keys(b.method), lo.Map(b.Key, func(v Value, _ int) string { return v.String() })...)
+// }
 
 var _ (Type) = (*ObjectType)(nil)
 
@@ -535,19 +603,21 @@ type FunctionType struct {
 	Parameter  Types
 	FreeValue  map[string]bool
 	IsVariadic bool
+	// IsModifySelf bool // if this is method function
 }
 
 var _ Type = (*FunctionType)(nil)
 
-func (f *FunctionType) GetMethod(string) *FunctionType {
+func (f *FunctionType) GetMethod() map[string]*FunctionType {
 	return nil
 }
 
-func (f *FunctionType) SetMethod(m map[string]*FunctionType) {
-}
-func (b *FunctionType) GetAllKey() []string {
-	return []string{}
-}
+func (f *FunctionType) SetMethod(m map[string]*FunctionType) {}
+func (b *FunctionType) AddMethod(id string, f *FunctionType) {}
+
+// func (b *FunctionType) GetAllKey() []string {
+// 	return []string{}
+// }
 
 func CalculateType(ts []Type) Type {
 	if len(ts) == 0 {
