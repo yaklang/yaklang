@@ -206,7 +206,7 @@ func TestGRPCMUSTPASS_MITM_Proxy_MITMPluginInheritProxy(t *testing.T) {
 			passed = true
 			cancel()
 		}
-		return []byte("abc")
+		return []byte("HTTP/1.1 200 OK\r\n\r\n")
 	})
 	downstreamAddr := utils.HostPort("127.0.0.1", port)
 	downstreamUrl := `http://` + downstreamAddr
