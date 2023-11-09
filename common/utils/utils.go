@@ -357,3 +357,33 @@ func FixHTTPRequestForHTTPDoWithHttps(r *http.Request, isHttps bool) (*http.Requ
 	req.ProtoMinor = r.ProtoMinor
 	return req, nil
 }
+
+func CallWithCtx(ctx context.Context, cb func()) error {
+	sig := make(chan struct{})
+	go func() {
+		cb()
+		sig <- struct{}{}
+	}()
+	select {
+	case <-sig:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func CallWithTimeout(timeout float64, cb func()) error {
+	var ctx, cancel = context.WithCancel(TimeoutContextSeconds(timeout))
+	defer cancel()
+	sig := make(chan struct{})
+	go func() {
+		cb()
+		sig <- struct{}{}
+	}()
+	select {
+	case <-sig:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
