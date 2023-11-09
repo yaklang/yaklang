@@ -54,7 +54,7 @@ func BlockUnreachable() string {
 }
 
 func FunctionContReturnError() string {
-	return "This function con't return error"
+	return "This function cannot return error"
 }
 
 func ValueIsNull() string {
