@@ -180,7 +180,8 @@ func (b *Behinder) setHeaders() {
 		fallthrough
 		//b.Headers["Content-type"] = "application/x-www-form-urlencoded"
 	case ypb.ShellScript_ASPX.String():
-		b.Headers["Content-type"] = "application/octet-stream"
+		//b.Headers["Content-type"] = "application/octet-stream"
+		b.Headers["Content-type"] = "application/json"
 	case ypb.ShellScript_PHP.String():
 		b.Headers["Content-type"] = "application/x-www-form-urlencoded"
 	case ypb.ShellScript_ASP.String():
@@ -319,7 +320,13 @@ func (b *Behinder) String() string {
 func (b *Behinder) processParams(params map[string]string) {
 	value, _ := b.echoResultEncode([]byte(""))
 	if len(value) != 0 {
-		params["customEncoderFromClass"] = string(value)
+		if b.ShellScript == ypb.ShellScript_ASPX.String() {
+			params["decoderAssemblyBase64"] = string(value)
+		} else if b.ShellScript == ypb.ShellScript_JSP.String() || b.ShellScript == ypb.ShellScript_JSPX.String() {
+			params["customEncoderFromClass"] = string(value)
+		} else if b.ShellScript==ypb.ShellScript_PHP.String() {
+			params["customEncoderFromText"] = string(value)
+		}
 	}
 	if b.ShellScript == ypb.ShellScript_JSP.String() || b.ShellScript == ypb.ShellScript_JSPX.String() {
 		for key, value := range params {
