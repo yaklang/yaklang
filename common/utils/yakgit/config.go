@@ -82,7 +82,10 @@ type Option func(*config) error
 // handleReference 是一个选项函数，它接收一个回调函数，这个函数有一个参数，其为引用记录结构体(reference)，每次遍历到过滤后的引用时，就会调用这个回调函数
 // Example:
 // ```
-// git.IterateCommit("D:/coding/golang/src/yaklang", git.filterReference((ref) => {return !ref.Name().Contains("ci")}), git.handleReference((ref) => { println(ref.String()) })) // 遍历提交记录，过滤名字中包含ci的引用记录，打印剩余的每个引用记录
+// // 遍历提交记录，过滤名字中包含ci的引用记录，打印剩余的每个引用记录
+// git.IterateCommit("D:/coding/golang/src/yaklang",
+// git.filterReference((ref) => {return !ref.Name().Contains("ci")}),
+// git.handleReference((ref) => { println(ref.String()) }))
 // ```
 func WithHandleGitReference(f func(r *plumbing.Reference) error) Option {
 	return func(c *config) error {
@@ -94,7 +97,10 @@ func WithHandleGitReference(f func(r *plumbing.Reference) error) Option {
 // filterReference 是一个选项函数，它接收一个回调函数，这个函数有一个参数，其为引用记录结构体(reference)，每次遍历到引用时，就会调用这个回调函数，这个函数还有一个返回值，通过这个返回值来决定是否过滤掉这个引用
 // Example:
 // ```
-// git.IterateCommit("D:/coding/golang/src/yaklang", git.filterReference((ref) => {return !ref.Name().Contains("ci")}), git.handleReference((ref) => { println(ref.String()) })) // 遍历提交记录，过滤名字中包含ci的引用记录，打印剩余的每个引用记录
+// // 遍历提交记录，过滤名字中包含ci的引用记录，打印剩余的每个引用记录
+// git.IterateCommit("D:/coding/golang/src/yaklang",
+// git.filterReference((ref) => {return !ref.Name().Contains("ci")}),
+// git.handleReference((ref) => { println(ref.String()) }))
 // ```
 func WithFilterGitReference(f func(r *plumbing.Reference) bool) Option {
 	return func(c *config) error {
@@ -106,7 +112,8 @@ func WithFilterGitReference(f func(r *plumbing.Reference) bool) Option {
 // handleCommit 是一个选项函数，它接收一个回调函数，这个函数有一个参数，其为提交记录结构体(commit)，每次遍历到一个过滤后的提交记录时，就会调用这个回调函数
 // Example:
 // ```
-// git.IterateCommit("D:/coding/golang/src/yaklang", git.handleCommit((c) => { println(c.String()) })) // 遍历提交记录，打印每个提交记录
+// // 遍历提交记录，打印每个提交记录
+// git.IterateCommit("D:/coding/golang/src/yaklang", git.handleCommit((c) => { println(c.String()) }))
 // ```
 func WithHandleGitCommit(f func(r *object.Commit) error) Option {
 	return func(c *config) error {
@@ -118,7 +125,10 @@ func WithHandleGitCommit(f func(r *object.Commit) error) Option {
 // filterCommit 是一个选项函数，它接收一个回调函数，这个函数有一个参数，其为提交记录结构体(commit)，每次遍历到提交记录时，就会调用这个回调函数，这个函数还有一个返回值，通过这个返回值来决定是否过滤掉这个提交记录
 // Example:
 // ```
-// git.IterateCommit("D:/coding/golang/src/yaklang", git.filterCommit((c) => { return c.Author.Name != "xxx" }), git.handleCommit((c) => { println(c.String()) })) // 遍历提交记录，过滤作者名字为xxx的提交记录，打印剩余的每个提交记录
+// // 遍历提交记录，过滤作者名字为xxx的提交记录，打印剩余的每个提交记录
+// git.IterateCommit("D:/coding/golang/src/yaklang",
+// git.filterCommit((c) => { return c.Author.Name != "xxx" }),
+// git.handleCommit((c) => { println(c.String()) }))
 // ```
 func WithFilterGitCommit(f func(r *object.Commit) bool) Option {
 	return func(c *config) error {
