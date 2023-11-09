@@ -188,7 +188,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			feedbackToUser(fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", downstreamProxy, err))
 			return utils.Errorf("cannot use proxy[%v]", err)
 		}
-		host, port, err := utils.ParseStringToHostPort(proxyUrl.Host)
+		_, port, err := utils.ParseStringToHostPort(proxyUrl.Host)
 		if err != nil {
 			feedbackToUser(fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", downstreamProxy, "parse host to host:port failed "+err.Error()))
 			return utils.Errorf("parse proxy host failed: %s", proxyUrl.Host)
@@ -197,7 +197,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			feedbackToUser(fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", downstreamProxy, "缺乏端口（Miss Port）"))
 			return utils.Errorf("proxy miss port. [%v]", proxyUrl.Host)
 		}
-		conn, err := netx.DialTimeout(5*time.Second, "tcp", utils.HostPort(host, port), downstreamProxy)
+		conn, err := netx.ProxyCheck(downstreamProxy, 5*time.Second)
 		if err != nil {
 			feedbackToUser(fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", downstreamProxy, "代理不通（Proxy Cannot be connected）"))
 			if errors.Is(err, netx.ErrorProxyAuthFailed) {

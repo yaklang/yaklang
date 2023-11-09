@@ -87,6 +87,7 @@ type (
 		Host    string
 		Auth    *auth
 		Timeout time.Duration
+		Check   bool
 	}
 	auth struct {
 		Username string
@@ -201,6 +202,10 @@ RECON:
 		}
 	}
 
+	if cfg.Check { //s5 just auth ok
+		return conn, nil
+	}
+
 	// detail request
 	host, port, err := splitHostPort(targetAddr)
 	if err != nil {
@@ -242,6 +247,14 @@ func DialSocksProxy(socksType int, proxy string, username string, password strin
 	}
 }
 
+func DialSocksProxyCheck(socksType int, proxy string, username string, password string, check bool) func(string, string) (net.Conn, error) {
+	if username != "" {
+		return (&config{Proto: socksType, Host: proxy, Check: check, Auth: &auth{username, password}}).dialFunc()
+	} else {
+		return (&config{Proto: socksType, Host: proxy, Check: check}).dialFunc()
+	}
+}
+
 func (c *config) dialFunc() func(string, string) (net.Conn, error) {
 	switch c.Proto {
 	case SOCKS5:
@@ -268,6 +281,9 @@ func (cfg *config) dialSocks4(targetAddr string) (_ net.Conn, err error) {
 
 	// dial TCP
 	conn, err := DialTimeoutWithoutProxy(cfg.Timeout, "tcp", proxy)
+	if cfg.Check { // s4 just dial ok
+		return conn, nil
+	}
 	if err != nil {
 		return nil, err
 	}
