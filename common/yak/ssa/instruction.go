@@ -227,13 +227,10 @@ func (l *Loop) Finish(init, step []Value) {
 
 func (e *ErrorHandler) AddFinal(f *BasicBlock) {
 	e.final = f
-	e.GetBlock().AddSucc(f)
 	f.Handler = e
 }
 
 func (e *ErrorHandler) AddDone(d *BasicBlock) {
 	e.done = d
-	// just mark in instruction
-	// e.GetBlock().AddSucc(d)
 	d.Handler = e
 }
