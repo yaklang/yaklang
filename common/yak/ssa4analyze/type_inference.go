@@ -134,6 +134,9 @@ func (t *TypeInference) TypeInferenceNext(next *ssa.Next) {
 		case ssa.StructTypeKind:
 			typ.AddField(ssa.NewConst("key"), ssa.BasicTypes[ssa.String])
 			typ.AddField(ssa.NewConst("field"), ssa.BasicTypes[ssa.Any])
+		case ssa.ObjectTypeKind:
+			typ.AddField(ssa.NewConst("key"), ssa.BasicTypes[ssa.Any])
+			typ.AddField(ssa.NewConst("field"), ssa.BasicTypes[ssa.Any])
 		case ssa.MapTypeKind:
 			typ.AddField(ssa.NewConst("key"), it.KeyTyp)
 			typ.AddField(ssa.NewConst("field"), it.FieldType)

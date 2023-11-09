@@ -84,7 +84,7 @@ func (b *FunctionBuilder) NewFunc(name string) (*Function, *blockSymbolTable) {
 
 // function param
 func (b FunctionBuilder) HandlerEllipsis() {
-	b.Param[len(b.Param)-1].SetType(NewObjectType())
+	b.Param[len(b.Param)-1].SetType(NewSliceType(BasicTypes[Any]))
 	b.hasEllipsis = true
 }
 
