@@ -388,3 +388,21 @@ Host: www.baidu.com`))
 		t.Fatal("BUG: Packet to URL FAILED")
 	}
 }
+
+func TestLowhttp_HTTP_close_readBody(t *testing.T) {
+	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nConnection: close\r\n\r\nabc"))
+	var packet = `GET / HTTP/1.1
+Host: ` + utils.HostPort(host, port) + `
+`
+	rsp, err := HTTPWithoutRedirect(WithPacketBytes([]byte(packet)), WithTimeout(2*time.Second))
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Println(string(rsp.RawPacket))
+	fmt.Println("------------------------------")
+	fmt.Println(string(rsp.RawRequest))
+	if !bytes.Contains(rsp.RawPacket, []byte("abc")) {
+		t.Fatal("read Connection close resp error")
+	}
+}
