@@ -11,7 +11,11 @@ import (
 // IterateCommit 用于指定一个本地仓库，遍历其所有的提交记录(commit)，并对过滤后的每个提交记录执行指定的操作，它还可以接收零个到多个选项函数，用于配置回调函数
 // Example:
 // ```
-// git.IterateCommit("D:/coding/golang/src/yaklang", git.filterReference((ref) => {return !ref.Name().Contains("ci")}), git.filterCommit((c) => { return c.Author.Name != "xxx" }), git.handleCommit((c) => { println(c.String()) })) // 遍历提交记录，过滤名字中包含ci的引用记录，过滤作者名字为xxx的提交记录，打印剩余的每个提交记录
+// // 遍历提交记录，过滤名字中包含ci的引用记录，过滤作者名字为xxx的提交记录，打印剩余的每个提交记录
+// git.IterateCommit("D:/coding/golang/src/yaklang",
+// git.filterReference((ref) => {return !ref.Name().Contains("ci")}),
+// git.filterCommit((c) => { return c.Author.Name != "xxx" }),
+// git.handleCommit((c) => { println(c.String()) }))
 // ```
 func EveryCommit(localRepos string, opt ...Option) error {
 	c := NewConfig()
