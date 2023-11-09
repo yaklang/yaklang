@@ -52,9 +52,9 @@ func TypeCompare(t1, t2 Type) bool {
 		t2o := t2.(*ObjectType)
 		return TypeCompare(t1o.FieldType, t2o.FieldType) && TypeCompare(t1o.KeyTyp, t2o.KeyTyp)
 	case StructTypeKind:
-		return true
+		fallthrough
 	case ObjectTypeKind:
-		return true
+		fallthrough
 	default:
 		if t1kind == t2kind {
 			return true
