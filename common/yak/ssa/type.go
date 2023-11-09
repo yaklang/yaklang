@@ -630,12 +630,12 @@ func (s *ObjectType) Finish() {
 }
 
 type FunctionType struct {
-	Name       string
-	ReturnType Type
-	Parameter  Types
-	FreeValue  map[string]bool
-	IsVariadic bool
-	// IsModifySelf bool // if this is method function
+	Name         string
+	ReturnType   Type
+	Parameter    Types
+	FreeValue    map[string]bool
+	IsVariadic   bool
+	IsModifySelf bool // if this is method function
 }
 
 var _ Type = (*FunctionType)(nil)
@@ -646,6 +646,8 @@ func (f *FunctionType) GetMethod() map[string]*FunctionType {
 
 func (f *FunctionType) SetMethod(m map[string]*FunctionType) {}
 func (b *FunctionType) AddMethod(id string, f *FunctionType) {}
+
+func (f *FunctionType) SetModifySelf(b bool) { f.IsModifySelf = b }
 
 // func (b *FunctionType) GetAllKey() []string {
 // 	return []string{}
