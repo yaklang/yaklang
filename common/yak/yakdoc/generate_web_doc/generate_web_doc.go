@@ -36,15 +36,23 @@ func GenerateSingleFile(basepath string, lib *yakdoc.ScriptLib) {
 
 	for _, fun := range funcList {
 		document := fun.Document
-		// html escape
-		document = strings.ReplaceAll(document, "<", "&lt;")
-		document = strings.ReplaceAll(document, ">", "&gt;")
+		exampleIndex := strings.Index(document, "Example:")
+		if exampleIndex != -1 {
+			// Example 代码块不应该替换<和>
+			doc := document[:exampleIndex]
+			doc = strings.ReplaceAll(doc, "<", "&lt;")
+			doc = strings.ReplaceAll(doc, ">", "&gt;")
+			document = doc + document[exampleIndex:]
+		} else {
+			document = strings.ReplaceAll(document, "<", "&lt;")
+			document = strings.ReplaceAll(document, ">", "&gt;")
+		}
 
 		// 简略的描述，去除\r，替换\n，删除Example:后面的内容，转义|，截取150个字符
 		simpleDocument := document
 		simpleDocument = strings.ReplaceAll(simpleDocument, "\r", "")
 		simpleDocument = strings.ReplaceAll(simpleDocument, "\n", " ")
-		exampleIndex := strings.Index(simpleDocument, "Example:")
+		exampleIndex = strings.Index(simpleDocument, "Example:")
 		if exampleIndex != -1 {
 			simpleDocument = simpleDocument[:exampleIndex]
 		}
@@ -98,7 +106,7 @@ func main() {
 	}
 	basepath := os.Args[1]
 	if !utils.IsDir(basepath) {
-		if err := os.MkdirAll(basepath, 0777); err != nil {
+		if err := os.MkdirAll(basepath, 0o777); err != nil {
 			log.Errorf("create dir error: %v", err)
 			return
 		}
