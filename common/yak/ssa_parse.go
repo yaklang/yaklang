@@ -12,10 +12,11 @@ type builder struct{}
 
 func (b *builder) Build(t ssa.Type, s string) *ssa.FunctionType {
 	var (
-		arg        = []ssa.Type{t}
-		ret        = []ssa.Type{}
-		IsVariadic = false
-		name       = ""
+		arg          = []ssa.Type{t}
+		ret          = []ssa.Type{}
+		IsVariadic   = false
+		IsModifySelf = false
+		name         = ""
 	)
 
 	var (
@@ -52,10 +53,12 @@ func (b *builder) Build(t ssa.Type, s string) *ssa.FunctionType {
 		case "ForEach":
 			arg = append(arg, HandlerFunc([]ssa.Type{keyTyp, fieldTyp}, []ssa.Type{}, false))
 		case "Set":
+			IsModifySelf = true
 			arg = append(arg, keyTyp, fieldTyp)
 			//TODO: this return value always True
 			ret = append(ret, BoolTyp)
 		case "Remove", "Delete":
+			IsModifySelf = true
 			arg = append(arg, keyTyp)
 		case "Has", "IsExisted":
 			arg = append(arg, keyTyp)
@@ -71,11 +74,14 @@ func (b *builder) Build(t ssa.Type, s string) *ssa.FunctionType {
 		name = "slice." + s
 		switch s {
 		case "Append", "Push":
+			IsModifySelf = true
 			arg = append(arg, fieldTyp)
 			ret = append(ret, ot)
 		case "Pop":
+			IsModifySelf = true
 			ret = append(ret, fieldTyp)
 		case "Extend", "Merge":
+			IsModifySelf = true
 			arg = append(arg, ot)
 			ret = append(ret, ot)
 		case "Length", "Len":
@@ -87,8 +93,10 @@ func (b *builder) Build(t ssa.Type, s string) *ssa.FunctionType {
 		case "GeneralSlice":
 			ret = append(ret, SliceTyp(AnyTyp))
 		case "Shift":
+			IsModifySelf = true
 			ret = append(ret, fieldTyp)
 		case "Unshift":
+			IsModifySelf = true
 			arg = append(arg, fieldTyp)
 			ret = append(ret, ot)
 		case "Map":
@@ -98,17 +106,22 @@ func (b *builder) Build(t ssa.Type, s string) *ssa.FunctionType {
 			arg = append(arg, HandlerFunc([]ssa.Type{fieldTyp}, []ssa.Type{BoolTyp}, false))
 			ret = append(ret, ot)
 		case "Insert":
+			IsModifySelf = true
 			arg = append(arg, fieldTyp)
 			ret = append(ret, ot)
 		case "Remove":
+			IsModifySelf = true
 			arg = append(arg, fieldTyp)
 			ret = append(ret, ot)
 		case "Reverse":
+			IsModifySelf = true
 			ret = append(ret, ot)
 		case "Sort":
+			IsModifySelf = true
 			arg = append(arg, BoolTyp)
 			ret = append(ret, ot)
 		case "Clear":
+			IsModifySelf = true
 			ret = append(ret, ot)
 		case "Count":
 			arg = append(arg, fieldTyp)
@@ -238,9 +251,12 @@ func (b *builder) Build(t ssa.Type, s string) *ssa.FunctionType {
 		}
 	}
 	if name != "" {
-		return ssa.NewFunctionType(name, arg, ret, IsVariadic)
+		f := ssa.NewFunctionType(name, arg, ret, IsVariadic)
+		f.SetModifySelf(IsModifySelf)
+		return f
+	} else {
+		return nil
 	}
-	return nil
 }
 
 func (b *builder) GetMethodNames(t ssa.Type) []string {
