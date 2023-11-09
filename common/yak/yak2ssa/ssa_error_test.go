@@ -312,6 +312,22 @@ func TestPhi(t *testing.T) {
 	})
 }
 
+func TestForEach(t *testing.T) {
+	t.Run("for in variadic parameter", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			f = (first...) => {
+				for num in first {
+				}
+			}
+			`,
+			errs: []string{
+				"empty block",
+			},
+		})
+	})
+}
+
 func TestMemberCall(t *testing.T) {
 
 	t.Run("normal member call", func(t *testing.T) {
