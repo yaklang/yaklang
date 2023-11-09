@@ -2,36 +2,49 @@ package builtin
 
 import (
 	"fmt"
+	"io"
+	"reflect"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	yaklangspec "github.com/yaklang/yaklang/common/yak/yaklang/spec"
 	"github.com/yaklang/yaklang/common/yak/yaklang/spec/types"
-	"reflect"
-	"strings"
 
 	"github.com/davecgh/go-spew/spew"
 )
 
 // -----------------------------------------------------------------------------
 
-// Panic panics with v.
+// panic 崩溃并打印错误信息
+// Example:
+// ```
+// panic("something happened")
+// ```
 func Panic(v interface{}) {
 	panic(v)
 }
 
-// Panicf panics with sprintf(format, args...).
+// panicf 崩溃并根据格式化打印错误信息
+// Example:
+// ```
+// panicf("something happened: %v", err)
+// ```
 func Panicf(format string, args ...interface{}) {
 	panic(fmt.Sprintf(format, args...))
 }
 
 // -----------------------------------------------------------------------------
 
-var (
-	zeroVal reflect.Value
-)
+var zeroVal reflect.Value
 
-// Mkmap makes a new map object.
+// mkmap 创建指定类型的映射（map）
+// ! 已弃用，可以使用 make 语句代替
+// Example:
+// ```
+// m = mkmap("string:var") // map[string]any
+// ```
 func Mkmap(typ interface{}, n ...int) interface{} {
 	if len(n) > 0 {
 		return reflect.MakeMapWithSize(types.Reflect(typ), n[0]).Interface()
@@ -39,15 +52,23 @@ func Mkmap(typ interface{}, n ...int) interface{} {
 	return reflect.MakeMap(types.Reflect(typ)).Interface()
 }
 
-// MapOf makes a map type.
+// mapOf 返回指定类型的映射类型，可用于 mkmap 中
+// ! 已弃用，可以使用 make 语句代替
+// Example:
+// ```
+// m = mkmap(mapOf("string", "var")) // map[string]any
+// ```
 func MapOf(key, val interface{}) interface{} {
-
 	return reflect.MapOf(types.Reflect(key), types.Reflect(val))
 }
 
-// MapFrom creates a map from args.
+// mapFrom 根据传入的键值对初始化映射（map）
+// ! 已弃用，可以使用 map 初始化语句代替
+// Example:
+// ```
+// m = mapFrom("a", 1, "b", 2) // {"a": 1, "b": 2}
+// ```
 func MapFrom(args ...interface{}) interface{} {
-
 	n := len(args)
 	if (n & 1) != 0 {
 		panic("please use `mapFrom(key1, val1, key2, val2, ...)`")
@@ -126,7 +147,13 @@ func MapFrom(args ...interface{}) interface{} {
 	}
 }
 
-// Delete deletes a key from map object.
+// delete 从map中删除key
+// Example:
+// ```
+// m = {"a": 1, "b": 2}
+// delete(m, "b")
+// println(m) // {"a": 1}
+// ```
 func Delete(m interface{}, key interface{}) {
 	globalMapLock.Lock()
 	defer globalMapLock.Unlock()
@@ -139,9 +166,14 @@ func Delete(m interface{}, key interface{}) {
 	reflect.ValueOf(m).SetMapIndex(reflect.ValueOf(key), zeroVal)
 }
 
-// Set sets (index, value) pairs to an object. object can be a slice, an array, a map or a user-defined class.
+// set 设置一个对象的值，对象可以是数组(array)，切片(slice)，映射(map)或结构体(struct)或结构体引用(ptr)
+// ! 已弃用，可以使用初始化语句或赋值语句代替
+// Example:
+// ```
+// a = make([]int, 3)
+// set(a, 0, 100, 1, 200, 2, 300) // a = [100, 200, 300]
+// ```
 func Set(m interface{}, args ...interface{}) {
-
 	n := len(args)
 	if (n & 1) != 0 {
 		panic("call with invalid argument count: please use `set(obj, member1, val1, ...)")
@@ -164,7 +196,6 @@ func Set(m interface{}, args ...interface{}) {
 
 // SetIndex sets a (index, value) pair to an object. object can be a slice, an array, a map or a user-defined class.
 func SetIndex(m, key, v interface{}) {
-
 	o := reflect.ValueOf(m)
 	switch o.Kind() {
 	case reflect.Map:
@@ -193,7 +224,6 @@ type varSetter interface {
 }
 
 func setMember(m interface{}, args ...interface{}) {
-
 	if v, ok := m.(varSetter); ok {
 		for i := 0; i < len(args); i += 2 {
 			v.SetVar(args[i].(string), args[i+1])
@@ -213,7 +243,6 @@ func setMember(m interface{}, args ...interface{}) {
 }
 
 func setStructMember(o reflect.Value, args ...interface{}) {
-
 	for i := 0; i < len(args); i += 2 {
 		key := args[i].(string)
 		field := o.FieldByName(strings.Title(key))
@@ -242,7 +271,19 @@ func setMapMember(o reflect.Value, args ...interface{}) {
 	}
 }
 
-// close channel
+// close 用于关闭已经打开的通道(channel)，关闭一个已经关闭的通道会导致运行时崩溃
+// Example:
+// ```
+// ch = make(chan int)
+// go func() {
+// for i = range ch {
+// println(i)
+// }
+// }()
+// ch <- 1
+// ch <- 2
+// close(ch)
+// ```
 func CloseChan(v interface{}) {
 	t := reflect.TypeOf(v)
 	if t.Kind() != reflect.Chan {
@@ -251,7 +292,13 @@ func CloseChan(v interface{}) {
 	reflect.ValueOf(v).Close()
 }
 
-// Get gets a value from an object. object can be a slice, an array, a map or a user-defined class.
+// get 从map中获取键值，如果键不存在，则返回默认值
+// Example:
+// ```
+// m = {"a": 1, "b": 2}
+// get(m, "a") // 1
+// get(m, "c", "default") // "default"
+// ```
 func Get(m interface{}, key interface{}, defaultValues ...interface{}) (result interface{}) {
 	nilValue := yaklangspec.Undefined
 	if yaklang.IsNew() {
@@ -292,13 +339,16 @@ func Get(m interface{}, key interface{}, defaultValues ...interface{}) (result i
 
 // GetVar returns a member variable of an object. object can be a slice, an array, a map or a user-defined class.
 func GetVar(m interface{}, key interface{}) interface{} {
-
 	return &yaklangspec.DataIndex{Data: m, Index: key}
 }
 
-// Len returns length of a collection object. object can be a slice, an array, a map, a string or a chan.
+// len 返回集合对象的长度，对象可以是数组(array)，切片(slice)，映射(map)，字符串(string)或通道(channel)
+// Example:
+// ```
+// a = [1, 2, 3]
+// println(len(a)) // 3
+// ```
 func Len(a interface{}) int {
-
 	if a == nil {
 		return 0
 	}
@@ -308,9 +358,13 @@ func Len(a interface{}) int {
 	return reflect.ValueOf(a).Len()
 }
 
-// Cap returns capacity of a collection object. object can be a slice, an array or a chan.
+// cap 返回集合对象的容量，对象可以是数组(array)，切片(slice)或通道(channel)
+// Example:
+// ```
+// a = make([]int, 0, 3)
+// println(cap(a)) // 3
+// ```
 func Cap(a interface{}) int {
-
 	if a == nil {
 		return 0
 	}
@@ -320,10 +374,15 @@ func Cap(a interface{}) int {
 	return reflect.ValueOf(a).Cap()
 }
 
-// SubSlice returns a[i:j]. if i == nil it returns a[:j]. if j == nil it returns a[i:].
+// sub 返回数组或切片的子切片
+// ! 已弃用，可以使用切片语句代替
+// Example:
+// ```
+// a = [1, 2, 3, 4, 5]
+// b = sub(a, 1, 3) // [2, 3] 相当于 a[1:3]
+// ```
 func SubSlice(a, i, j interface{}) interface{} {
-
-	var va = reflect.ValueOf(a)
+	va := reflect.ValueOf(a)
 	var i1, j1 int
 	if i != nil {
 		i1 = asInt(i)
@@ -336,13 +395,25 @@ func SubSlice(a, i, j interface{}) interface{} {
 	return va.Slice(i1, j1).Interface()
 }
 
-// Copy does copy(a, b).
-func Copy(a, b interface{}) int {
-
-	return reflect.Copy(reflect.ValueOf(a), reflect.ValueOf(b))
+// copy 将 src 数组/切片复制到 dst 数组/切片中，并返回复制的元素个数
+// Example:
+// ```
+// a = [1, 2, 3]
+// b = make([]int, 3)
+// copy(b, a)
+// println(b) // [1 2 3]
+// ```
+func Copy(dst, src interface{}) int {
+	return reflect.Copy(reflect.ValueOf(dst), reflect.ValueOf(src))
 }
 
-// Append does append(a, vals...)
+// append 将元素追加到数组或切片中，并将结果返回
+// Example:
+// ```
+// a = [1, 2, 3]
+// a = append(a, 4, 5, 6)
+// println(a) // [1 2 3 4 5 6]
+// ```
 func Append(a interface{}, vals ...interface{}) (ret interface{}) {
 	defer func() {
 		if err := recover(); err != nil {
@@ -378,7 +449,6 @@ func Append(a interface{}, vals ...interface{}) (ret interface{}) {
 }
 
 func autoConvert(telem reflect.Type, v interface{}) reflect.Value {
-
 	if v == nil {
 		return reflect.Zero(telem)
 	}
@@ -391,7 +461,6 @@ func autoConvert(telem reflect.Type, v interface{}) reflect.Value {
 }
 
 func appendFloats(a []float64, vals ...interface{}) interface{} {
-
 	for _, v := range vals {
 		switch val := v.(type) {
 		case float64:
@@ -408,7 +477,6 @@ func appendFloats(a []float64, vals ...interface{}) interface{} {
 }
 
 func appendInts(a []int, vals ...interface{}) interface{} {
-
 	for _, v := range vals {
 		switch val := v.(type) {
 		case int:
@@ -421,7 +489,6 @@ func appendInts(a []int, vals ...interface{}) interface{} {
 }
 
 func appendBytes(a []byte, vals ...interface{}) interface{} {
-
 	for _, v := range vals {
 		switch val := v.(type) {
 		case byte:
@@ -436,7 +503,6 @@ func appendBytes(a []byte, vals ...interface{}) interface{} {
 }
 
 func appendStrings(a []string, vals ...interface{}) interface{} {
-
 	for _, v := range vals {
 		switch val := v.(type) {
 		case string:
@@ -448,9 +514,13 @@ func appendStrings(a []string, vals ...interface{}) interface{} {
 	return a
 }
 
-// Mkslice returns a new slice.
+// mkslice 创建指定类型的切片（slice）
+// ! 已弃用，可以使用 make 语句代替
+// Example:
+// ```
+// a = mkslice("var") // []any
+// ```
 func Mkslice(typ interface{}, args ...interface{}) interface{} {
-
 	n, cap := 0, 0
 	if len(args) == 1 {
 		if v, ok := args[0].(int); ok {
@@ -474,9 +544,13 @@ func Mkslice(typ interface{}, args ...interface{}) interface{} {
 	return reflect.MakeSlice(typSlice, n, cap).Interface()
 }
 
-// SliceFrom creates a slice from [a1, a2, ...].
+// sliceFrom 根据传入的键值对初始化切片（slice）
+// ! 已弃用，可以使用 slice 初始化语句代替
+// Example:
+// ```
+// a = sliceFrom(1, 2, 3) // [1, 2, 3]
+// ```
 func SliceFrom(args ...interface{}) interface{} {
-
 	n := len(args)
 	if n == 0 {
 		return []interface{}(nil)
@@ -498,7 +572,6 @@ func SliceFrom(args ...interface{}) interface{} {
 
 // SliceFromTy creates a slice from `[]T{a1, a2, ...}`.
 func SliceFromTy(args ...interface{}) interface{} {
-
 	got, ok := args[0].(yaklangspec.GoTyper)
 	if !ok {
 		panic(fmt.Sprintf("`%v` is not a yaklang type", args[0]))
@@ -509,15 +582,18 @@ func SliceFromTy(args ...interface{}) interface{} {
 	return Append(ret, args[1:]...)
 }
 
-// SliceOf makes a slice type.
+// sliceOf 返回指定类型的切片类型，可用于 mkslice 中
+// ! 已弃用，可以使用 make 语句代替
+// Example:
+// ```
+// m = mkslice(sliceOf("var")) // []any
+// ```
 func SliceOf(typ interface{}) interface{} {
-
 	return reflect.SliceOf(types.Reflect(typ))
 }
 
 // StructInit creates a struct object from `structInit(structType, member1, val1, ...)`.
 func StructInit(args ...interface{}) interface{} {
-
 	if (len(args) & 1) != 1 {
 		panic("call with invalid argument count: please use `structInit(structType, member1, val1, ...)")
 	}
@@ -537,7 +613,6 @@ func StructInit(args ...interface{}) interface{} {
 
 // MapInit creates a map object from `mapInit(mapType, member1, val1, ...)`.
 func MapInit(args ...interface{}) interface{} {
-
 	if (len(args) & 1) != 1 {
 		panic("call with invalid argument count: please use `mapInit(mapType, member1, val1, ...)")
 	}
@@ -553,6 +628,90 @@ func MapInit(args ...interface{}) interface{} {
 	ret := reflect.MakeMap(t)
 	setMapMember(ret, args[1:]...)
 	return ret.Interface()
+}
+
+// print 在标准输出中使用默认格式进行格式化并打印信息
+// Example:
+// ```
+// print("hello yak")
+// print("hello", 1, "2", [1, 2, 3])
+// ```
+func print(a ...any) (n int, err error) {
+	return fmt.Print(a...)
+}
+
+// printf 在标准输出中根据格式说明符进行格式化并打印信息
+// Example:
+// ```
+// printf("hello %s", "yak")
+// printf("value = %v", value)
+// ```
+func printf(format string, a ...any) (n int, err error) {
+	return fmt.Printf(format, a...)
+}
+
+// println 在标准输出中使用默认格式进行格式化并打印信息（包含换行）
+// Example:
+// ```
+// println("hello world")
+// println("hello yak")
+// ```
+func println(a ...any) (n int, err error) {
+	return fmt.Println(a...)
+}
+
+// sprint 使用默认格式进行格式化并返回字符串
+// Example:
+// ```
+// sprint({"a": 1, "b": 2}, 1, [1, 2, 3])
+// ```
+func sprint(a ...any) string {
+	return fmt.Sprint(a...)
+}
+
+// sprintf 根据格式说明符进行格式化任意个数的参数并返回字符串
+// Example:
+// ```
+// sprintf("%v %d %v", {"a": 1, "b": 2}, 1, [1, 2, 3])
+// ```
+func sprintf(format string, a ...any) string {
+	return fmt.Sprintf(format, a...)
+}
+
+// sprintln 使用默认格式进行格式化并返回字符串（包含换行）
+// Example:
+// ```
+// sprintln({"a": 1, "b": 2}, 1, [1, 2, 3])
+// ```
+func sprintln(a ...any) string {
+	return fmt.Sprintln(a...)
+}
+
+// fprint 使用默认格式进行格式化任意个数的参数并写入w
+// Example:
+// ```
+// fprint(os.Stderr, "error")
+// ```
+func fprint(w io.Writer, a ...any) (n int, err error) {
+	return fmt.Fprint(w, a...)
+}
+
+// fprintf 根据格式说明符进行格式化任意个数的参数并写入w
+// Example:
+// ```
+// fprintf(os.Stderr, "value = %v", value)
+// ```
+func fprintf(w io.Writer, format string, a ...any) (n int, err error) {
+	return fmt.Fprintf(w, format, a...)
+}
+
+// fprintln 使用默认格式进行格式化任意个数的参数并写入w（包含换行）
+// Example:
+// ```
+// fprintln(os.Stderr, "error")
+// ```
+func fprintln(w io.Writer, a ...any) (n int, err error) {
+	return fmt.Fprintln(w, a...)
 }
 
 // -----------------------------------------------------------------------------

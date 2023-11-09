@@ -1,7 +1,6 @@
 package builtin
 
 import (
-	"fmt"
 	yaklangspec "github.com/yaklang/yaklang/common/yak/yaklang/spec"
 )
 
@@ -17,21 +16,23 @@ var YaklangBaseLib = map[string]interface{}{
 	"mkmap":     Mkmap,
 	"mapFrom":   MapFrom,
 	"mapOf":     MapOf,
-	"panic":     Panic,
-	"panicf":    Panicf,
-	"print":     fmt.Print,
-	"printf":    fmt.Printf,
-	"println":   fmt.Println,
-	"sprint":    fmt.Sprint,
-	"sprintf":   fmt.Sprintf,
-	"sprintln":  fmt.Sprintln,
-	"fprintln":  fmt.Fprintln,
-	"set":       Set,
 	"mkslice":   Mkslice,
 	"slice":     Mkslice,
-	"sliceFrom": sliceFrom,
+	"sliceFrom": SliceFrom,
 	"sliceOf":   SliceOf,
 	"sub":       SubSlice,
+	"panic":     Panic,
+	"panicf":    Panicf,
+	"print":     print,
+	"printf":    printf,
+	"println":   println,
+	"sprint":    sprint,
+	"sprintf":   sprintf,
+	"sprintln":  sprintln,
+	"fprint":    fprint,
+	"fprintf":   fprintf,
+	"fprintln":  fprintln,
+	"set":       Set,
 	"make":      Make,
 	"close":     CloseChan,
 
@@ -52,7 +53,6 @@ var YaklangBaseLib = map[string]interface{}{
 	"string":  TyString,
 	"bool":    TyBool,
 	"var":     TyVar,
-	"type":    typeOf,
 
 	"max": Max,
 	"min": Min,
@@ -115,7 +115,7 @@ func init() {
 	yaklangspec.AndNot = AndNot
 	yaklangspec.Inc = Inc
 	yaklangspec.Dec = Dec
-	//yaklangspec.Import("", exports)
+	// yaklangspec.Import("", exports)
 }
 
 // -----------------------------------------------------------------------------
