@@ -391,12 +391,16 @@ func (pc *persistConn) readLoop() {
 			responseRaw.Write(respPacket)
 		}
 
-		if err != nil {
+		if err != nil || resp.Close {
 			if responseRaw.Len() >= len(respPacket) { // 如果 TeaReader内部还有数据证明,证明有响应数据,只是解析失败
 				// continue read 5 seconds, to receive rest data
 				// ignore error, treat as bad conn
-				restBytes, _ := utils.ReadUntilStable(pc.br, pc.Conn, 5*time.Second, 300*time.Millisecond)
-				pc.sawEOF = true
+				timeout := 5 * time.Second
+				if resp.Close {
+					timeout = 1 * time.Second //如果 http close 了 则只等待1秒
+				}
+				restBytes, _ := utils.ReadUntilStable(pc.br, pc.Conn, timeout, 300*time.Millisecond)
+				pc.sawEOF = true // 废弃连接
 				if len(restBytes) > 0 {
 					responseRaw.Write(restBytes)
 					respPacket = responseRaw.Bytes()
@@ -405,6 +409,7 @@ func (pc *persistConn) readLoop() {
 		}
 
 		if len(respPacket) > 0 {
+			httpctx.SetBareResponseBytesForce(stashRequest, respPacket) // 强制修改原始响应包
 			err = nil
 		}
 

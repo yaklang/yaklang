@@ -216,6 +216,10 @@ func SetBareResponseBytes(r *http.Request, bytes []byte) {
 	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponseBareBytes, string(bytes))
 }
 
+func SetBareResponseBytesForce(r *http.Request, bytes []byte) {
+	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponseBareBytes, string(bytes))
+}
+
 const REQUEST_CONTEXT_INFOMAP = "InfoMap"
 
 const (
