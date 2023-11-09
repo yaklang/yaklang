@@ -50,24 +50,24 @@ var Subcommands = []cli.Command{
 			return nil
 		},
 	},
-	{
-		Name:     "update-nuclei-poc",
-		Usage:    "更新 nulcei-templates 到本地 / update nuclei-template. (github.com/projectdiscovery/nuclei-templates)",
-		Category: catNuclei,
-		Action: func(c *cli.Context) error {
-			engine := NewScriptEngine(1)
-			err := engine.ExecuteMain(
-				`log.setLevel("info")
+	// 	{
+	// 		Name:     "update-nuclei-poc",
+	// 		Usage:    "更新 nulcei-templates 到本地 / update nuclei-template. (github.com/projectdiscovery/nuclei-templates)",
+	// 		Category: catNuclei,
+	// 		Action: func(c *cli.Context) error {
+	// 			engine := NewScriptEngine(1)
+	// 			err := engine.ExecuteMain(
+	// 				`log.setLevel("info")
 
-log.info("start to load from github resource...")
-die(nuclei.UpdatePoC())`, "main",
-			)
-			if err != nil {
-				log.Errorf("update poc from github resource failed: %s", err)
-			}
-			return nil
-		},
-	},
+	// log.info("start to load from github resource...")
+	// die(nuclei.UpdatePoC())`, "main",
+	// 			)
+	// 			if err != nil {
+	// 				log.Errorf("update poc from github resource failed: %s", err)
+	// 			}
+	// 			return nil
+	// 		},
+	// 	},
 	{
 		Name: "update-nuclei-database", Usage: "把本地的 nuclei-templates 更新到数据库 (yakit plugin database)",
 		Category: catNuclei,
@@ -241,8 +241,8 @@ die(nuclei.UpdateDatabase())`, "main")
 			}
 
 			log.Info("preparing for result collectors")
-			var fpLock = new(sync.Mutex)
-			var openPortLock = new(sync.Mutex)
+			fpLock := new(sync.Mutex)
+			openPortLock := new(sync.Mutex)
 
 			var fpResults []*fp.MatchResult
 			var openPortCount int
@@ -291,7 +291,7 @@ die(nuclei.UpdateDatabase())`, "main")
 					openResult = append(openResult, r)
 
 					if outputFile != nil {
-						//outputFile.Write([]byte(fmt.Sprintf("%v\n", r)))
+						// outputFile.Write([]byte(fmt.Sprintf("%v\n", r)))
 						outputFile.Write(
 							[]byte(fmt.Sprintf(
 								"%s%v\n",
@@ -517,118 +517,125 @@ die(nuclei.UpdateDatabase())`, "main")
 			return nil
 		},
 	},
-	{Name: "fuzz", Flags: []cli.Flag{cli.StringFlag{Name: "t,target", Usage: "想要测试的 Fuzz 字符串"}}, Action: func(c *cli.Context) {
-		for _, r := range mutate.MutateQuick(c.String("t")) {
-			println(r)
-		}
-	}},
-	upgradeCommand,
-}
-
-var upgradeCommand = cli.Command{
-	Name:  "upgrade",
-	Usage: "upgrade / reinstall newest yak.",
-	Flags: []cli.Flag{
-		cli.IntFlag{
-			Name:  "timeout",
-			Usage: "连接超时时间",
-			Value: 30,
+	{
+		Name: "fuzz",
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name:  "t,target",
+				Usage: "想要测试的 Fuzz 字符串",
+			},
+		},
+		Action: func(c *cli.Context) {
+			for _, r := range mutate.MutateQuick(c.String("t")) {
+				println(r)
+			}
 		},
 	},
-	Action: func(c *cli.Context) error {
-		destination, err := os.Executable()
-		if err != nil {
-			return utils.Errorf("cannot fetch os.Executable()...: %s", err)
-		}
-
-		binary := fmt.Sprintf(`https://yaklang.oss-accelerate.aliyuncs.com/yak/latest/yak_%v_%v`, runtime.GOOS, runtime.GOARCH)
-		if runtime.GOOS == "darwin" && runtime.GOARCH == "arm64" {
-			binary = fmt.Sprintf(`https://yaklang.oss-accelerate.aliyuncs.com/yak/latest/yak_%v_%v`, runtime.GOOS, "amd64")
-		} else if runtime.GOOS == "windows" {
-			binary = fmt.Sprintf(`https://yaklang.oss-accelerate.aliyuncs.com/yak/latest/yak_%v_%v.exe`, runtime.GOOS, "amd64")
-		}
-
-		versionUrl := `https://yaklang.oss-accelerate.aliyuncs.com/yak/latest/version.txt`
-
-		client := utils.NewDefaultHTTPClient()
-		client.Timeout = time.Duration(c.Int("timeout")) * time.Second
-
-		rsp, _ := client.Get(versionUrl)
-		if rsp != nil && rsp.Body != nil {
-			raw, _ := ioutil.ReadAll(rsp.Body)
-			if len(utils.ParseStringToLines(string(raw))) <= 3 {
-				log.Infof("当前 yak 核心引擎最新版本为 / current latest yak core engine version：%v", string(raw))
+	{
+		Name:  "upgrade",
+		Usage: "upgrade / reinstall newest yak.",
+		Flags: []cli.Flag{
+			cli.IntFlag{
+				Name:  "timeout",
+				Usage: "连接超时时间",
+				Value: 30,
+			},
+		},
+		Action: func(c *cli.Context) error {
+			destination, err := os.Executable()
+			if err != nil {
+				return utils.Errorf("cannot fetch os.Executable()...: %s", err)
 			}
-		}
 
-		log.Infof("start to download yak: %v", binary)
-		rsp, err = client.Get(binary)
-		if err != nil {
-			log.Errorf("下载 yak 引擎失败：download yak failed: %v", err)
-			return err
-		}
+			binary := fmt.Sprintf(`https://yaklang.oss-accelerate.aliyuncs.com/yak/latest/yak_%v_%v`, runtime.GOOS, runtime.GOARCH)
+			if runtime.GOOS == "darwin" && runtime.GOARCH == "arm64" {
+				binary = fmt.Sprintf(`https://yaklang.oss-accelerate.aliyuncs.com/yak/latest/yak_%v_%v`, runtime.GOOS, "amd64")
+			} else if runtime.GOOS == "windows" {
+				binary = fmt.Sprintf(`https://yaklang.oss-accelerate.aliyuncs.com/yak/latest/yak_%v_%v.exe`, runtime.GOOS, "amd64")
+			}
 
-		// 设置本地缓存
-		fd, err := ioutil.TempFile("", "yak-")
-		if err != nil {
-			log.Errorf("create temp file failed: %v", err)
-			return err
-		}
+			versionUrl := `https://yaklang.oss-accelerate.aliyuncs.com/yak/latest/version.txt`
 
-		tempFile := fd.Name()
-		defer func() {
-			os.RemoveAll(tempFile)
-			log.Infof("cleaning cache for %v", tempFile)
-		}()
+			client := utils.NewDefaultHTTPClient()
+			client.Timeout = time.Duration(c.Int("timeout")) * time.Second
 
-		log.Infof("downloading for yak binary to local")
-		_, err = io.Copy(fd, rsp.Body)
-		if err != nil && err != io.EOF {
-			log.Errorf("download failed... %v", err.Error())
-			return err
-		}
-		log.Infof("yak 核心引擎下载成功... / yak engine downloaded")
+			rsp, _ := client.Get(versionUrl)
+			if rsp != nil && rsp.Body != nil {
+				raw, _ := ioutil.ReadAll(rsp.Body)
+				if len(utils.ParseStringToLines(string(raw))) <= 3 {
+					log.Infof("当前 yak 核心引擎最新版本为 / current latest yak core engine version：%v", string(raw))
+				}
+			}
 
-		err = os.Chmod(tempFile, os.ModePerm)
-		if err != nil {
-			log.Errorf("chmod +x to[%v] failed: %s", tempFile, err)
-			return err
-		}
+			log.Infof("start to download yak: %v", binary)
+			rsp, err = client.Get(binary)
+			if err != nil {
+				log.Errorf("下载 yak 引擎失败：download yak failed: %v", err)
+				return err
+			}
 
-		destPath := destination
-		destDir, _ := filepath.Split(destPath)
-		oldPath := filepath.Join(destDir, fmt.Sprintf("yak_%s", consts.GetYakVersion()))
-		if runtime.GOOS == "windows" {
-			oldPath += ".exe"
-		}
-		log.Infof("backup yak old engine to %s", oldPath)
+			// 设置本地缓存
+			fd, err := ioutil.TempFile("", "yak-")
+			if err != nil {
+				log.Errorf("create temp file failed: %v", err)
+				return err
+			}
 
-		log.Infof("origin binary: %s", destination)
-		// 备份旧的
-		if err := os.Rename(destPath, oldPath); err != nil {
-			return utils.Errorf("backup old yak-engine failed: %s, retry re-Install with \n"+
-				"    `bash <(curl -sS -L http://oss.yaklang.io/install-latest-yak.sh)`\n\n", err)
-		}
+			tempFile := fd.Name()
+			defer func() {
+				os.RemoveAll(tempFile)
+				log.Infof("cleaning cache for %v", tempFile)
+			}()
 
-		localFile, err := os.OpenFile(destPath, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0766)
-		if err != nil {
-			return fmt.Errorf("open file error, %s", err)
-		}
-		defer localFile.Close()
+			log.Infof("downloading for yak binary to local")
+			_, err = io.Copy(fd, rsp.Body)
+			if err != nil && err != io.EOF {
+				log.Errorf("download failed... %v", err.Error())
+				return err
+			}
+			log.Infof("yak 核心引擎下载成功... / yak engine downloaded")
 
-		fd.Seek(0, 0)
-		_, err = io.Copy(localFile, fd)
-		if err != nil {
-			return utils.Errorf("install/copy latest yak failed: %s", err)
-		}
-		fd.Close()
+			err = os.Chmod(tempFile, os.ModePerm)
+			if err != nil {
+				log.Errorf("chmod +x to[%v] failed: %s", tempFile, err)
+				return err
+			}
 
-		//cmd := exec.Command(destPath, "version")
-		//raw, err := cmd.CombinedOutput()
-		//if err != nil {
-		//	return err
-		//}
-		//fmt.Println(string(raw))
-		return nil
+			destPath := destination
+			destDir, _ := filepath.Split(destPath)
+			oldPath := filepath.Join(destDir, fmt.Sprintf("yak_%s", consts.GetYakVersion()))
+			if runtime.GOOS == "windows" {
+				oldPath += ".exe"
+			}
+			log.Infof("backup yak old engine to %s", oldPath)
+
+			log.Infof("origin binary: %s", destination)
+			// 备份旧的
+			if err := os.Rename(destPath, oldPath); err != nil {
+				return utils.Errorf("backup old yak-engine failed: %s, retry re-Install with \n"+
+					"    `bash <(curl -sS -L http://oss.yaklang.io/install-latest-yak.sh)`\n\n", err)
+			}
+
+			localFile, err := os.OpenFile(destPath, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0o766)
+			if err != nil {
+				return fmt.Errorf("open file error, %s", err)
+			}
+			defer localFile.Close()
+
+			fd.Seek(0, 0)
+			_, err = io.Copy(localFile, fd)
+			if err != nil {
+				return utils.Errorf("install/copy latest yak failed: %s", err)
+			}
+			fd.Close()
+
+			//cmd := exec.Command(destPath, "version")
+			//raw, err := cmd.CombinedOutput()
+			//if err != nil {
+			//	return err
+			//}
+			//fmt.Println(string(raw))
+			return nil
+		},
 	},
 }
