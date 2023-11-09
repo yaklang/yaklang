@@ -19,13 +19,28 @@ func init() {
 	)
 }
 
+const MAXTypeCompareDepth = 10
+
 func TypeCompare(t1, t2 Type) bool {
+	return TypeCompareEx(t1, t2, 0)
+}
+func TypeCompareEx(t1, t2 Type, depth int) bool {
 	t1kind := t1.GetTypeKind()
 	t2kind := t2.GetTypeKind()
 
 	if t1kind == Any || t2kind == Any {
 		return true
 	}
+
+	// TODO: check InterfaceType, compare method function
+	if t1kind == InterfaceTypeKind || t2kind == InterfaceTypeKind {
+		return true
+	}
+
+	if depth == MAXTYPELEVEL {
+		return true
+	}
+	depth += 1
 
 	switch t1kind {
 	case FunctionTypeKind:
@@ -35,22 +50,22 @@ func TypeCompare(t1, t2 Type) bool {
 			return false
 		}
 		for i := 0; i < len(t1f.Parameter); i++ {
-			if !TypeCompare(t1f.Parameter[i], t2f.Parameter[i]) {
+			if !TypeCompareEx(t1f.Parameter[i], t2f.Parameter[i], depth) {
 				return false
 			}
 		}
-		if !TypeCompare(t1f.ReturnType, t2f.ReturnType) {
+		if !TypeCompareEx(t1f.ReturnType, t2f.ReturnType, depth) {
 			return false
 		}
 		return true
 	case SliceTypeKind:
 		t1o := t1.(*ObjectType)
 		t2o := t2.(*ObjectType)
-		return TypeCompare(t1o.FieldType, t2o.FieldType)
+		return TypeCompareEx(t1o.FieldType, t2o.FieldType, depth)
 	case MapTypeKind:
 		t1o := t1.(*ObjectType)
 		t2o := t2.(*ObjectType)
-		return TypeCompare(t1o.FieldType, t2o.FieldType) && TypeCompare(t1o.KeyTyp, t2o.KeyTyp)
+		return TypeCompareEx(t1o.FieldType, t2o.FieldType, depth) && TypeCompareEx(t1o.KeyTyp, t2o.KeyTyp, depth)
 	case StructTypeKind:
 		fallthrough
 	case ObjectTypeKind:
