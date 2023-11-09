@@ -3,18 +3,18 @@ package builtin
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/go-funk"
-	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
 	"strings"
 	"unicode"
+
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // -----------------------------------------------------------------------------
 
 // Inc returns a+1
 func Inc(a interface{}) interface{} {
-
 	switch v := a.(type) {
 	case int:
 		return v + 1
@@ -42,7 +42,6 @@ func Inc(a interface{}) interface{} {
 
 // Dec returns a-1
 func Dec(a interface{}) interface{} {
-
 	switch v := a.(type) {
 	case int:
 		return v - 1
@@ -70,7 +69,6 @@ func Dec(a interface{}) interface{} {
 
 // Neg returns -a
 func Neg(a interface{}) interface{} {
-
 	switch a1 := a.(type) {
 	case int:
 		return -a1
@@ -82,7 +80,6 @@ func Neg(a interface{}) interface{} {
 
 // Float64 returns float64(a)
 func Float64(a interface{}) float64 {
-
 	switch a1 := a.(type) {
 	case int:
 		return float64(a1)
@@ -95,7 +92,6 @@ func Float64(a interface{}) float64 {
 
 // Float32 returns float32(a)
 func Float32(a interface{}) float32 {
-
 	switch a1 := a.(type) {
 	case int:
 		return float32(a1)
@@ -108,7 +104,6 @@ func Float32(a interface{}) float32 {
 
 // Int returns int(a)
 func Int(a interface{}) int {
-
 	switch a1 := a.(type) {
 	case float64:
 		return int(a1)
@@ -121,7 +116,6 @@ func Int(a interface{}) int {
 
 // Int8 returns int8(a)
 func Int8(a interface{}) int8 {
-
 	switch a1 := a.(type) {
 	case float64:
 		return int8(a1)
@@ -134,7 +128,6 @@ func Int8(a interface{}) int8 {
 
 // Int16 returns int16(a)
 func Int16(a interface{}) int16 {
-
 	switch a1 := a.(type) {
 	case float64:
 		return int16(a1)
@@ -147,7 +140,6 @@ func Int16(a interface{}) int16 {
 
 // Int32 returns int32(a)
 func Int32(a interface{}) int32 {
-
 	switch a1 := a.(type) {
 	case float64:
 		return int32(a1)
@@ -160,7 +152,6 @@ func Int32(a interface{}) int32 {
 
 // Int64 returns int64(a)
 func Int64(a interface{}) int64 {
-
 	switch a1 := a.(type) {
 	case float64:
 		return int64(a1)
@@ -173,7 +164,6 @@ func Int64(a interface{}) int64 {
 
 // Uint16 returns uint16(a)
 func Uint16(a interface{}) uint16 {
-
 	switch a1 := a.(type) {
 	case float64:
 		return uint16(a1)
@@ -186,7 +176,6 @@ func Uint16(a interface{}) uint16 {
 
 // Uint32 returns uint32(a)
 func Uint32(a interface{}) uint32 {
-
 	switch a1 := a.(type) {
 	case float64:
 		return uint32(a1)
@@ -199,7 +188,6 @@ func Uint32(a interface{}) uint32 {
 
 // Uint64 returns uint64(a)
 func Uint64(a interface{}) uint64 {
-
 	switch a1 := a.(type) {
 	case float64:
 		return uint64(a1)
@@ -212,7 +200,6 @@ func Uint64(a interface{}) uint64 {
 
 // Uint returns uint(a)
 func Uint(a interface{}) uint {
-
 	switch a1 := a.(type) {
 	case float64:
 		return uint(a1)
@@ -225,7 +212,6 @@ func Uint(a interface{}) uint {
 
 // Uint8 returns uint8(a)
 func Uint8(a interface{}) byte {
-
 	switch a1 := a.(type) {
 	case int:
 		return byte(a1)
@@ -238,7 +224,6 @@ func Uint8(a interface{}) byte {
 
 // String returns string(a)
 func String(a interface{}) string {
-
 	switch a1 := a.(type) {
 	case []byte:
 		return string(a1)
@@ -249,12 +234,11 @@ func String(a interface{}) string {
 	default:
 		return utils.InterfaceToString(a)
 	}
-	//panicUnsupportedFn("string", a)
-	//return ""
+	// panicUnsupportedFn("string", a)
+	// return ""
 }
 
 func StringEx(a interface{}, verbose string) string {
-
 	switch a1 := a.(type) {
 	case []byte:
 		return string(a1)
@@ -265,13 +249,12 @@ func StringEx(a interface{}, verbose string) string {
 	default:
 		return utils.InterfaceToString(a)
 	}
-	//panicUnsupportedFn("string", a)
-	//return ""
+	// panicUnsupportedFn("string", a)
+	// return ""
 }
 
 // Bool returns bool(a)
 func Bool(a interface{}) bool {
-
 	switch a1 := a.(type) {
 	case bool:
 		return a1
@@ -282,7 +265,6 @@ func Bool(a interface{}) bool {
 
 // Mul returns a*b
 func Mul(a, b interface{}) interface{} {
-
 	switch a1 := a.(type) {
 	case int:
 		switch b1 := b.(type) {
@@ -319,7 +301,6 @@ func Mul(a, b interface{}) interface{} {
 
 // Quo returns a/b
 func Quo(a, b interface{}) interface{} {
-
 	switch a1 := a.(type) {
 	case int:
 		switch b1 := b.(type) {
@@ -341,7 +322,6 @@ func Quo(a, b interface{}) interface{} {
 
 // Mod returns a%b or return fmt.Sprintf(a,b...)
 func Mod(a, b interface{}) interface{} {
-
 	if a1, ok := a.(int); ok {
 		if b1, ok := b.(int); ok {
 			return a1 % b1
@@ -571,7 +551,6 @@ func Add(a, b interface{}) interface{} {
 
 // Sub returns a-b
 func Sub(a, b interface{}) interface{} {
-
 	switch a1 := a.(type) {
 	case int:
 		switch b1 := b.(type) {
@@ -636,9 +615,13 @@ func Sub(a, b interface{}) interface{} {
 	return panicUnsupportedOp2("-", a, b)
 }
 
-// Max returns max(a1, a2, ...)
+// max 返回多个值中的最大值，这只对数字类型有效
+// Example:
+// ```
+// max(1,2,3,4,5) // 5
+// max(1,1.1,2.2,3.3,4.4,5.5) // 5.5
+// ```
 func Max(args ...interface{}) (max interface{}) {
-
 	if len(args) == 0 {
 		return 0
 	}
@@ -652,9 +635,13 @@ func Max(args ...interface{}) (max interface{}) {
 	return panicUnsupportedFn("max", args)
 }
 
-// Min returns min(a1, a2, ...)
+// min 返回多个值中的最小值，这只对数字类型有效
+// Example:
+// ```
+// min(1,2,3,4,5) // 1
+// min(1,1.1,2.2,3.3,4.4,5.5) // 1
+// ```
 func Min(args ...interface{}) (min interface{}) {
-
 	if len(args) == 0 {
 		return 0
 	}
@@ -669,7 +656,6 @@ func Min(args ...interface{}) (min interface{}) {
 }
 
 func kindOfArgs(args []interface{}) reflect.Kind {
-
 	kind := kindOf(args[0])
 	for i := 1; i < len(args); i++ {
 		if t := kindOf(args[i]); t != kind {
@@ -689,7 +675,6 @@ func kindOfArgs(args []interface{}) reflect.Kind {
 }
 
 func kindOf2Args(args []interface{}, idx int) reflect.Kind {
-
 	kind := kindOf(args[idx])
 	for i := 2; i < len(args); i += 2 {
 		if t := kindOf(args[i+idx]); t != kind {
@@ -709,7 +694,6 @@ func kindOf2Args(args []interface{}, idx int) reflect.Kind {
 }
 
 func valueInterfaceOf2Args(args []interface{}, idx int) (reflect.Kind, reflect.Value) {
-
 	kind := kindOf(args[idx])
 	for i := 2; i < len(args); i += 2 {
 		current := args[i+idx]
@@ -730,7 +714,6 @@ func valueInterfaceOf2Args(args []interface{}, idx int) (reflect.Kind, reflect.V
 }
 
 func maxFloat(args []interface{}) (max float64) {
-
 	max = asFloat(args[0])
 	for i := 1; i < len(args); i++ {
 		if t := asFloat(args[i]); t > max {
@@ -741,7 +724,6 @@ func maxFloat(args []interface{}) (max float64) {
 }
 
 func minFloat(args []interface{}) (min float64) {
-
 	min = asFloat(args[0])
 	for i := 1; i < len(args); i++ {
 		if t := asFloat(args[i]); t < min {
@@ -752,7 +734,6 @@ func minFloat(args []interface{}) (min float64) {
 }
 
 func maxInt(args []interface{}) (max int) {
-
 	max = args[0].(int)
 	for i := 1; i < len(args); i++ {
 		if t := args[i].(int); t > max {
@@ -763,7 +744,6 @@ func maxInt(args []interface{}) (max int) {
 }
 
 func minInt(args []interface{}) (min int) {
-
 	min = args[0].(int)
 	for i := 1; i < len(args); i++ {
 		if t := args[i].(int); t < min {
@@ -774,7 +754,6 @@ func minInt(args []interface{}) (min int) {
 }
 
 func asFloat(a interface{}) float64 {
-
 	switch v := a.(type) {
 	case float64:
 		return v
@@ -785,7 +764,6 @@ func asFloat(a interface{}) float64 {
 }
 
 func asInt(a interface{}) int {
-
 	switch v := a.(type) {
 	case int:
 		return v
@@ -802,7 +780,6 @@ func valueOf(a interface{}) reflect.Value {
 }
 
 func panicUnsupportedFn(fn string, args ...interface{}) interface{} {
-
 	targs := make([]string, len(args))
 	for i, a := range args {
 		targs[i] = typeString(a)
@@ -811,20 +788,17 @@ func panicUnsupportedFn(fn string, args ...interface{}) interface{} {
 }
 
 func panicUnsupportedOp1(op string, a interface{}) interface{} {
-
 	ta := typeString(a)
 	panic("unsupported operator: " + op + ta)
 }
 
 func panicUnsupportedOp2(op string, a, b interface{}) interface{} {
-
 	ta := typeString(a)
 	tb := typeString(b)
 	panic("unsupported operator: " + ta + op + tb)
 }
 
 func typeString(a interface{}) string {
-
 	if a == nil {
 		return "nil"
 	}

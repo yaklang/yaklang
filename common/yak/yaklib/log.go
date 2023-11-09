@@ -2,17 +2,23 @@ package yaklib
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+
 	"github.com/kataras/golog"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
-	"os"
-	"path/filepath"
-
-	"strings"
-	"sync"
 )
 
+// loglevel 根据传入的字符串设置日志级别
+// disable: 禁用所有日志, fatal: 致命错误, error: 错误, warning: 警告, info: 信息, debug: 调试
+// Example:
+// ```
+// loglevel("fatal")
+// ```
 func setLogLevel(i interface{}) {
 	l, err := log.ParseLevel(fmt.Sprint(i))
 	if err != nil {
@@ -70,6 +76,7 @@ func CreateYakLogger(yakFiles ...string) *YakLogger {
 	res.SetLevel = logger.SetLevel
 	return res
 }
+
 func (y *YakLogger) SetEngine(engine *antlr4yak.Engine) {
 	y.Logger.SetVMRuntimeInfoGetter(func(infoType string) (res any, err error) {
 		defer func() {

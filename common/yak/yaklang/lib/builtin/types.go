@@ -38,13 +38,11 @@ var TyFloat = TyFloat64
 type tyVar int
 
 func (p tyVar) GoType() reflect.Type {
-
 	return gotyInterface
 }
 
 // NewInstance creates a new instance of a yaklang type. required by `yaklang type` spec.
 func (p tyVar) NewInstance(args ...interface{}) interface{} {
-
 	ret := new(interface{})
 	if len(args) > 0 {
 		*ret = args[0]
@@ -53,12 +51,10 @@ func (p tyVar) NewInstance(args ...interface{}) interface{} {
 }
 
 func (p tyVar) Call(a interface{}) interface{} {
-
 	return a
 }
 
 func (p tyVar) String() string {
-
 	return "var"
 }
 
@@ -67,34 +63,10 @@ var TyVar = tyVar(0)
 
 // -----------------------------------------------------------------------------
 
-type goSliceFrom int
-type goTypeOf int
-
-func (p goSliceFrom) Call(a ...interface{}) interface{} {
-	return SliceFrom(a...)
-}
-
-func (p goTypeOf) Call(a interface{}) reflect.Type {
-	return reflect.TypeOf(a)
-}
-
-var sliceFrom = goSliceFrom(0)
-var typeOf = goTypeOf(0)
-
-func init() {
-	t1 := reflect.TypeOf(TyVar)
-	t2 := reflect.TypeOf(typeOf)
-	t3 := reflect.TypeOf(sliceFrom)
-	yaksepc.SetDontTyNormalize(t1)
-	yaksepc.SetDontTyNormalize(t2)
-	yaksepc.SetDontTyNormalize(t3)
-}
-
 // -----------------------------------------------------------------------------
 
 // Elem returns *a
 func Elem(a interface{}) interface{} {
-
 	if t, ok := a.(yaksepc.GoTyper); ok {
 		return yaksepc.TyPtrTo(t.GoType())
 	}
@@ -103,7 +75,6 @@ func Elem(a interface{}) interface{} {
 
 // Slice returns []T
 func Slice(elem interface{}) interface{} {
-
 	if t, ok := elem.(yaksepc.GoTyper); ok {
 		return yaksepc.TySliceOf(t.GoType())
 	}
@@ -112,7 +83,6 @@ func Slice(elem interface{}) interface{} {
 
 // Map returns map[key]elem
 func Map(key, elem interface{}) interface{} {
-
 	tkey, ok := key.(yaksepc.GoTyper)
 	if !ok {
 		panic(fmt.Sprintf("invalid map[key]elem: key `%v` isn't a yaksepc type", key))
@@ -126,9 +96,9 @@ func Map(key, elem interface{}) interface{} {
 
 // -----------------------------------------------------------------------------
 
-// Make creates a instance of yaksepc builtin type (slice, map and chan)
+// make 创建切片（slice）, 映射（map）, 通道（chan）
+// ! 已弃用，可以使用 make 语句代替
 func Make(typ yaksepc.GoTyper, args ...int) interface{} {
-
 	t := typ.GoType()
 	switch t.Kind() {
 	case reflect.Slice:
