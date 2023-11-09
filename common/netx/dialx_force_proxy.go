@@ -104,29 +104,7 @@ func connectForceProxy(ctx context.Context, target string, proxy string, connect
 
 	switch true {
 	case utils.IHasPrefix(proxy, "https://"):
-		conn, err := DialX(
-			proxyAddr,
-			DialX_WithDisableProxy(true),
-			DialX_WithTLS(true),
-		)
-		if err != nil {
-			return nil, err
-		}
-		if username != "" {
-			// 有密码
-			_, _ = conn.Write(generateHTTPProxyConnectWithCredential(target, credential))
-		} else {
-			// 无密码
-			_, _ = conn.Write(generateHTTPProxyConnect(target))
-		}
-		if err = isHTTPConnectWork(conn); err == nil {
-			return conn, nil
-		}
-		conn.Close()
-		if err != nil {
-			return nil, utils.Wrapf(err, "connect proxy(https) [%s] failed", proxy)
-		}
-		return nil, utils.Errorf("connect proxy(https) [%s] failed", proxy)
+		return httpProxyDial(proxyAddr, username, credential, proxy, target, true)
 	case utils.IHasPrefix(proxy, "socks://"):
 		fallthrough
 	case utils.IHasPrefix(proxy, "socks5://"):
@@ -152,27 +130,38 @@ func connectForceProxy(ctx context.Context, target string, proxy string, connect
 	case utils.IHasPrefix(proxy, "http://"):
 		fallthrough
 	default:
-
-		// conn, err := DialContextWithoutProxy(ctx, "tcp", proxyAddr)
-		conn, err := DialX(proxyAddr, DialX_WithTLS(false), DialX_WithDisableProxy(true))
-		if err != nil {
-			return nil, err
-		}
-
-		if username != "" {
-			_, err = conn.Write(generateHTTPProxyConnectWithCredential(target, credential))
-		} else {
-			_, err = conn.Write(generateHTTPProxyConnect(target))
-		}
-		if err = isHTTPConnectWork(conn); err == nil {
-			return conn, nil
-		}
-		conn.Close()
-		if err != nil {
-			return nil, utils.Wrapf(err, "connect proxy(http) [%s] failed:", proxy)
-		}
-		return nil, utils.Errorf("connect proxy(http) [%s] failed", proxy)
+		return httpProxyDial(proxyAddr, username, credential, proxy, target, false)
 	}
+}
+
+func httpProxyDial(proxyAddr string, username string, credential string, proxy string, target string, https bool) (net.Conn, error) {
+	httpsString := "https"
+	if https {
+		httpsString = "http"
+	}
+	conn, err := DialX(
+		proxyAddr,
+		DialX_WithDisableProxy(true),
+		DialX_WithTLS(https),
+	)
+	if err != nil {
+		return nil, err
+	}
+	if username != "" {
+		// 有密码
+		_, _ = conn.Write(generateHTTPProxyConnectWithCredential(target, credential))
+	} else {
+		// 无密码
+		_, _ = conn.Write(generateHTTPProxyConnect(target))
+	}
+	if err = isHTTPConnectWork(conn); err == nil {
+		return conn, nil
+	}
+	conn.Close()
+	if err != nil {
+		return nil, utils.Wrapf(err, "connect proxy(%s) [%s] failed", httpsString, proxy)
+	}
+	return nil, utils.Errorf("connect proxy(%s) [%s] failed", httpsString, proxy)
 }
 
 func parseProxyCredential(proxyURL string) (string, string) {
@@ -238,3 +227,48 @@ func generateHTTPProxyConnectWithCredential(target string, cred string) []byte {
 }
 
 const DefaultUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Safari/537.36"
+
+func ProxyCheck(proxy string, connectTimeout time.Duration) (net.Conn, error) {
+	ctx := context.Background()
+	ctx, _ = context.WithTimeout(ctx, connectTimeout)
+
+	host, port, _ := utils.ParseStringToHostPort(proxy)
+	if host == "" || port <= 0 {
+		return nil, utils.Errorf("proxy need host:port... at least[%v]", proxy)
+	}
+
+	proxyAddr := utils.HostPort(host, port)
+	username, password := parseProxyCredential(proxy)
+	credential := fmt.Sprintf("%s:%s", username, password)
+
+	switch true {
+	case utils.IHasPrefix(proxy, "https://"):
+		return httpProxyDial(proxyAddr, username, credential, proxy, "", true)
+	case utils.IHasPrefix(proxy, "socks://"):
+		fallthrough
+	case utils.IHasPrefix(proxy, "socks5://"):
+		fallthrough
+	case utils.IHasPrefix(proxy, "s5://"):
+		conn, err := DialSocksProxyCheck(SOCKS5, proxyAddr, username, password, true)("tcp", "")
+		if err != nil {
+			return nil, err
+		}
+		return conn, nil
+	case utils.IHasPrefix(proxy, "s4://") || utils.IHasPrefix(proxy, "socks4://"):
+		conn, err := DialSocksProxyCheck(SOCKS4, proxyAddr, username, password, true)("tcp", "")
+		if err != nil {
+			return nil, err
+		}
+		return conn, nil
+	case utils.IHasPrefix(proxy, "s4a://") || utils.IHasPrefix(proxy, "socks4a://"):
+		conn, err := DialSocksProxyCheck(SOCKS4A, proxyAddr, username, password, true)("tcp", "")
+		if err != nil {
+			return nil, err
+		}
+		return conn, nil
+	case utils.IHasPrefix(proxy, "http://"):
+		fallthrough
+	default:
+		return httpProxyDial(proxyAddr, username, credential, proxy, "", false)
+	}
+}
