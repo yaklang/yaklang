@@ -185,7 +185,7 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 		ret = NewChanType(f.handlerType(typ.Elem(), level))
 	default:
 		if ret == nil {
-			fmt.Println("con't handler this type:" + typ.Kind().String())
+			fmt.Println("cannot handler this type:" + typ.Kind().String())
 			ret = NewObjectType()
 		}
 	}
