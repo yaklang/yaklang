@@ -384,19 +384,21 @@ func (pc *persistConn) readLoop() {
 		count++
 		var responseRaw bytes.Buffer
 		var respPacket []byte
+		var respClose bool
 		if resp != nil {
+			respClose = resp.Close
 			respPacket = httpctx.GetBareResponseBytes(stashRequest)
 		}
 		if len(respPacket) > 0 {
 			responseRaw.Write(respPacket)
 		}
 
-		if err != nil || resp.Close {
+		if err != nil || respClose {
 			if responseRaw.Len() >= len(respPacket) { // 如果 TeaReader内部还有数据证明,证明有响应数据,只是解析失败
 				// continue read 5 seconds, to receive rest data
 				// ignore error, treat as bad conn
 				timeout := 5 * time.Second
-				if resp.Close {
+				if respClose {
 					timeout = 1 * time.Second //如果 http close 了 则只等待1秒
 				}
 				restBytes, _ := utils.ReadUntilStable(pc.br, pc.Conn, timeout, 300*time.Millisecond)

@@ -728,12 +728,16 @@ RECONNECT:
 		}
 
 		response.ResponseBodySize = httpctx.GetResponseBodySize(stashedRequest)
-		if firstResponse == nil || firstResponse.Close {
+		respClose := false
+		if firstResponse != nil {
+			respClose = firstResponse.Close
+		}
+		if firstResponse == nil || respClose {
 			if len(responseRaw.Bytes()) == 0 {
 				return response, errors.Wrap(err, "empty result.")
 			} else { // peek 到了数据,但是无法解析,说明是畸形响应包
 				stableTimeout := timeout
-				if firstResponse.Close && timeout < 1*time.Second { // 取设置timeout与1s的较小值
+				if respClose && timeout < 1*time.Second { // 取设置timeout与1s的较小值
 					stableTimeout = 1 * time.Second
 				}
 				restBytes, _ := utils.ReadUntilStable(httpResponseReader, conn, stableTimeout, 300*time.Millisecond)
@@ -752,13 +756,17 @@ RECONNECT:
 			for noFixContentLength { // 尝试读取pipeline/smuggle响应包
 				// log.Infof("checking next(pipeline/smuggle) response...")
 				nextResponse, err := utils.ReadHTTPResponseFromBufioReaderConn(httpResponseReader, conn, nil)
-				if err != nil || nextResponse.Close {
+				var nextRespClose bool
+				if nextResponse != nil {
+					nextRespClose = nextResponse.Close
+				}
+				if err != nil || nextRespClose {
 					if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) { // 停止读取
 						break
 					}
 					// read second response rest in buffer
 					stableTimeout := timeout
-					if firstResponse.Close && timeout < 1*time.Second {
+					if nextRespClose && timeout < 1*time.Second {
 						stableTimeout = 1 * time.Second
 					}
 					restBytes, _ := utils.ReadUntilStable(httpResponseReader, conn, stableTimeout, 300*time.Millisecond)
