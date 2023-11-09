@@ -314,7 +314,8 @@ type TryBuilder struct {
 	// block
 	enter        *BasicBlock
 	buildTry     func()
-	buildCatch   func() string
+	buildError   func() string
+	buildCatch   func()
 	buildFinally func()
 }
 
@@ -331,7 +332,11 @@ func (t *TryBuilder) BuildTryBlock(f func()) {
 	t.buildTry = f
 }
 
-func (t *TryBuilder) BuildCatch(f func() string) {
+func (t *TryBuilder) BuildError(f func() string) {
+	t.buildError = f
+}
+
+func (t *TryBuilder) BuildCatch(f func()) {
 	t.buildCatch = f
 }
 
@@ -354,13 +359,17 @@ func (t *TryBuilder) Finish() {
 	t.buildTry()
 
 	// build catch
+	builder.PushBlockSymbolTable()
 	builder.CurrentBlock = catch
-	id = t.buildCatch()
+	id = t.buildError()
 	if id != "" {
 		p := NewParam(id, false, builder.Function)
-		p.SetType(BasicTypes[Error])
-		builder.WriteVariable(id, p)
+		p.SetType(BasicTypes[ErrorType])
+		builder.WriteVariable(builder.MapBlockSymbolTable(id), p)
+		// builder.WriteVariable(id, p)
 	}
+	t.buildCatch()
+	builder.PopBlockSymbolTable()
 
 	// build finally
 	var target *BasicBlock
@@ -368,9 +377,6 @@ func (t *TryBuilder) Finish() {
 		builder.CurrentBlock = t.enter
 		final = builder.NewBasicBlock(TryFinally)
 		e.AddFinal(final)
-		builder.CurrentBlock = final
-		t.buildFinally()
-
 		target = final
 	}
 
@@ -386,8 +392,11 @@ func (t *TryBuilder) Finish() {
 	builder.EmitJump(target)
 	builder.CurrentBlock = catch
 	builder.EmitJump(target)
-	if target != done {
-		builder.CurrentBlock = target
+
+	if t.buildFinally != nil {
+		// if target != done {
+		builder.CurrentBlock = final
+		t.buildFinally()
 		builder.EmitJump(done)
 	}
 

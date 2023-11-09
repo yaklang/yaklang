@@ -217,17 +217,18 @@ func (b *astbuilder) buildTryCatchStmt(stmt *yak.TryStmtContext) {
 		}
 	})
 
-	tryBuilder.BuildCatch(func() string {
+	tryBuilder.BuildError(func() string {
 		var id string
-
 		if i := stmt.Identifier(); i != nil {
 			id = i.GetText()
 		}
+		return id
+	})
 
+	tryBuilder.BuildCatch(func() {
 		if s, ok := stmt.Block(1).(*yak.BlockContext); ok {
 			b.buildBlock(s)
 		}
-		return id
 	})
 
 	if s, ok := stmt.Block(2).(*yak.BlockContext); ok {

@@ -1017,10 +1017,9 @@ func TestTryCatch(t *testing.T) {
 				a3 = 1
 			} catch err {
 				a2 = 2
-				a3 = 2
+				// a3 = 2 // undefine
 			} finally {
 				a2 = 3
-				// a3 = 3 // a3 undefined
 			}
 			b = a2
 			b = a3
@@ -1028,6 +1027,37 @@ func TestTryCatch(t *testing.T) {
 			errs: []string{
 				ssa4analyze.ValueUndefined("a1"),
 				ssa4analyze.ValueUndefined("a3"),
+			},
+		})
+	})
+
+	t.Run("catch block err variable ", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			try {
+			} catch err {
+				a = (err)
+			}finally {
+			}
+			`,
+			errs: []string{
+				"empty block",
+				"empty block",
+			},
+		})
+
+		CheckTestCase(t, TestCase{
+			code: `
+			try{
+			}catch err {
+			} finally{
+				a = err
+			}
+			`,
+			errs: []string{
+				"empty block",
+				"empty block",
+				ssa4analyze.ValueUndefined("err"),
 			},
 		})
 	})
