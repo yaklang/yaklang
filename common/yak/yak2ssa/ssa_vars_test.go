@@ -1,6 +1,8 @@
 package yak2ssa
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -52,5 +54,27 @@ func TestPosition(t *testing.T) {
 			t.Error("phi get_position err")
 		}
 	}
+}
 
+func TestClosureSideEffect(t *testing.T) {
+	code := `
+	b = 1 
+	f = () => {
+		b = 2
+	}
+	// b = 1
+	if c {
+		f()
+		// b = side-effect f()
+	}
+	println(b) // phi
+	`
+	prog := ParseSSA(code, func(fb *ssa.FunctionBuilder) {})
+	printlnFunc := prog.Packages[0].Funcs[0].GetValuesByName("println")[0]
+	final := printlnFunc.GetUsers()[0]
+	line := final.LineDisasm()
+	fmt.Println(line)
+	if !strings.Contains(line, "phi") {
+		t.Error("println: ", line)
+	}
 }

@@ -137,6 +137,14 @@ func (b *FunctionBuilder) ReadVariableEx(variable string, create bool, fun func(
 	fun(ret)
 }
 
+func (b *FunctionBuilder) deleteVariableByBlock(variable string, block *BasicBlock) {
+	if map2, ok := b.symbolTable[variable]; ok {
+		// if _, ok := map2[block]; ok {
+		delete(map2, block)
+		// }
+	}
+}
+
 func (b *FunctionBuilder) readVariableByBlock(variable string, block *BasicBlock, create bool) Value {
 	ret := b.readVariableByBlockEx(variable, block, create)
 	if len(ret) > 0 {
@@ -181,7 +189,12 @@ func (b *FunctionBuilder) readVariableByBlockEx(variable string, block *BasicBlo
 			v = nil
 		}
 	} else if len(block.Preds) == 1 {
-		return b.readVariableByBlockEx(variable, block.Preds[0], create)
+		vs := b.readVariableByBlockEx(variable, block.Preds[0], create)
+		if len(vs) > 0 {
+			v = vs[len(vs)-1]
+		} else {
+			v = nil
+		}
 	} else {
 		phi := NewPhi(block, variable, create)
 		phi.SetPosition(b.CurrentPos)
