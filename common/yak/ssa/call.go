@@ -42,6 +42,11 @@ func (c *Call) HandleFreeValue(fvs []string, sideEffect []string) {
 			continue
 		}
 		// handle side effect
+		sideEffect := NewSideEffect(name, c)
+		builder.EmitInstructionAfter(sideEffect, c)
+		sideEffect.SetPosition(c.GetPosition())
+		sideEffect.SetType(BasicTypes[Any])
+		builder.WriteVariable(name, sideEffect)
 	}
 
 }

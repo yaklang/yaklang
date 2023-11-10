@@ -16,6 +16,7 @@ const (
 	OpBinOp        = "BinOp"
 	OpUnOp         = "UnOp"
 	OpCall         = "Call"
+	OpSideEffect   = "SideEffect"
 	OpReturn       = "Return"
 	OpMake         = "Make"
 	OpField        = "Field"
@@ -41,6 +42,7 @@ func (i *Undefined) GetOpcode() Opcode    { return OpUndefined }
 func (i *BinOp) GetOpcode() Opcode        { return OpBinOp }
 func (i *UnOp) GetOpcode() Opcode         { return OpUnOp }
 func (i *Call) GetOpcode() Opcode         { return OpCall }
+func (i *SideEffect) GetOpcode() Opcode   { return OpSideEffect }
 func (i *Return) GetOpcode() Opcode       { return OpReturn }
 func (i *Make) GetOpcode() Opcode         { return OpMake }
 func (i *Field) GetOpcode() Opcode        { return OpField }

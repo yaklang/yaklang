@@ -75,6 +75,10 @@ func (c *Call) LineDisasm() string {
 	)
 }
 
+func (s *SideEffect) LineDisasm() string {
+	return fmt.Sprintf("side-effect(%s, %s)", s.target.LineDisasm(), s.GetVariable())
+}
+
 func (m *Make) LineDisasm() string {
 	return fmt.Sprintf("make(%s)", m.GetType())
 }

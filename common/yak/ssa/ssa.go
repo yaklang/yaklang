@@ -459,6 +459,18 @@ var _ Value = (*Call)(nil)
 var _ User = (*Call)(nil)
 var _ Instruction = (*Call)(nil)
 
+// ----------- SideEffect
+type SideEffect struct {
+	anInstruction
+	anValue
+	target Value // call instruction
+}
+
+var _ Node = (*SideEffect)(nil)
+var _ Value = (*SideEffect)(nil)
+var _ User = (*SideEffect)(nil)
+var _ Instruction = (*SideEffect)(nil)
+
 // ----------- Return
 // The Return instruction returns values and control back to the calling
 // function.
