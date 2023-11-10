@@ -30,6 +30,7 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		AnonFuncs:      make([]*Function, 0),
 		parent:         nil,
 		FreeValues:     make([]Value, 0),
+		SideEffects:    make(map[string]Value),
 		symbolObject:   &Make{anInstruction: anInstruction{}, anValue: NewValue()},
 		InstReg:        make(map[Instruction]string),
 		symbolTable:    make(map[string]map[*BasicBlock]Values),
@@ -64,6 +65,10 @@ func (f *Function) NewParam(name string) *Parameter {
 	f.Param = append(f.Param, p)
 	f.writeVariableByBlock(name, p, f.EnterBlock)
 	return p
+}
+
+func (f *Function) AddSideEffect(name string, v Value) {
+	f.SideEffects[name] = v
 }
 
 func (f *Function) ReturnValue() []Value {
@@ -147,16 +152,18 @@ func (f *Function) Finish() {
 	f.SetType(funType)
 	if len(f.FreeValues) != 0 {
 		funType.SetFreeValue(
-			lo.SliceToMap(f.FreeValues, func(v Value) (string, bool) {
+			lo.Map(f.FreeValues, func(v Value, _ int) string {
 				if p, ok := v.(*Parameter); ok {
-					return p.variable, false
-				}
-				if f, ok := ToField(v); ok {
-					return f.GetVariable(), true
+					return p.variable
 				}
 				// this unreachable: freeValue only Parameter
-				return v.String(), true
+				return v.String()
 			}),
+		)
+	}
+	if len(f.SideEffects) != 0 {
+		funType.SetSideEffect(
+			lo.MapToSlice(f.SideEffects, func(name string, _ Value) string { return name }),
 		)
 	}
 }

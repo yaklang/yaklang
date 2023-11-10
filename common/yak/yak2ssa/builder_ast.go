@@ -4,7 +4,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
-	"golang.org/x/exp/slices"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
@@ -803,33 +802,19 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 			return ssa.NewIdentifierLV("_", b.CurrentPos)
 		}
 		if forceAssign {
-			text = b.MapBlockSymbolTable(text)
-		} else if v := b.ReadVariable(text, false); v != nil {
-			// when v exist
-			switch value := v.(type) {
-			// case *ssa.Field:
-			// 	if value.OutCapture {
-			// 		return value
-			// 	}
-			case *ssa.Parameter:
-				if value.IsFreeValue {
-					field := b.NewCaptureField(text)
-					var tmp ssa.Value = field
-					ssa.ReplaceValue(v, tmp)
-					if index := slices.Index(b.FreeValues, v); index != -1 {
-						b.FreeValues[index] = tmp
-					}
-					b.SetReg(field)
-					b.ReplaceVariable(text, value, field)
-					return field
-				}
-			default:
-			}
+			return ssa.NewIdentifierLV(b.MapBlockSymbolTable(text), b.CurrentPos)
+		}
+
+		lv := ssa.NewIdentifierLV(text, b.CurrentPos)
+		if v := b.ReadVariable(text, false); v != nil {
 			if v.IsExtern() {
 				b.NewErrorWithPos(ssa.Warn, TAG, b.CurrentPos, ssa.ContAssignExtern(text))
 			}
 		}
-		return ssa.NewIdentifierLV(text, b.CurrentPos)
+		if b.CanBuildFreeValue(text) {
+			lv.SetIsSideEffect(true)
+		}
+		return lv
 	}
 	if s, ok := stmt.Expression().(*yak.ExpressionContext); ok {
 		var ret ssa.LeftValue

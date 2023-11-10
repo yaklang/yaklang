@@ -648,7 +648,8 @@ type FunctionType struct {
 	Name         string
 	ReturnType   Type
 	Parameter    Types
-	FreeValue    map[string]bool
+	FreeValue    []string
+	SideEffects  []string
 	IsVariadic   bool
 	IsModifySelf bool // if this is method function
 }
@@ -696,8 +697,11 @@ func NewFunctionType(name string, Parameter []Type, ReturnType []Type, IsVariadi
 	return f
 }
 
-func (s *FunctionType) SetFreeValue(fv map[string]bool) {
+func (s *FunctionType) SetFreeValue(fv []string) {
 	s.FreeValue = fv
+}
+func (s *FunctionType) SetSideEffect(se []string) {
+	s.SideEffects = se
 }
 
 func (s *FunctionType) SetName(name string) {
@@ -739,7 +743,6 @@ func (s *FunctionType) GetParamString() string {
 				}
 			} else {
 				ret += t.String()
-
 			}
 		} else {
 			ret += t.String() + ", "
