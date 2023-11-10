@@ -155,10 +155,3 @@ func (b *FunctionBuilder) getFieldWithCreate(i, key Value, forceCreate bool) Val
 	b.emit(field)
 	return field
 }
-
-func (b *FunctionBuilder) NewCaptureField(text string) *Field {
-	f := NewFieldOnly(NewConst(text), b.symbolObject, b.CurrentBlock)
-	f.SetVariable(text)
-	f.OutCapture = true
-	return f
-}

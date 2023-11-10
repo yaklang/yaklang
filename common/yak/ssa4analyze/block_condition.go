@@ -161,12 +161,12 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 				}
 			case *ssa.BinOp:
 				if v := ssa.HandlerBinOp(inst); v != inst {
-					ssa.ReplaceValue(inst, v)
+					ssa.ReplaceAllValue(inst, v)
 					deleteInst = append(deleteInst, inst)
 				}
 			case *ssa.UnOp:
 				if v := ssa.HandlerUnOp(inst); v != inst {
-					ssa.ReplaceValue(inst, v)
+					ssa.ReplaceAllValue(inst, v)
 					deleteInst = append(deleteInst, inst)
 				}
 

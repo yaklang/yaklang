@@ -3,31 +3,78 @@ package ssa
 import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/algorithm"
 	"golang.org/x/exp/slices"
 )
 
-func ReplaceValue(v Value, to Value) {
-	ReplaceValueSkip(v, to, func(inst Instruction) bool {
-		return false
-	})
+func ReplaceAllValue(v Value, to Value) {
+	ReplaceValue(v, to, func(i Instruction) bool { return false })
 }
-
-func ReplaceValueSkip(v Value, to Value, skip func(Instruction) bool) {
-	delete := make([]User, 0)
+func ReplaceValue(v Value, to Value, skip func(Instruction) bool) {
+	deleteInst := make([]User, 0)
 	for _, user := range v.GetUsers() {
 		if skip(user) {
 			continue
 		}
 		user.ReplaceValue(v, to)
-		// user.InferenceType()
 		to.AddUser(user)
-		delete = append(delete, user)
+		deleteInst = append(deleteInst, user)
 	}
-	for _, user := range delete {
+	for _, user := range deleteInst {
 		v.RemoveUser(user)
 	}
 
 	v.GetFunc().ReplaceVariable(v.GetVariable(), v, to)
+}
+
+func InsertValueReplaceOriginal(original Value, insert Value) {
+	block := insert.GetBlock()
+	fun := block.GetFunc()
+	builder := fun.builder
+	// builder := block.GetFunc().builder
+	variable := original.GetVariable()
+
+	replaceInBlock := func(v, to Value, block *BasicBlock, skip func(Instruction) bool) {
+		deleteUser := make([]User, 0)
+		for _, user := range v.GetUsers() {
+			if user.GetBlock() != block || skip(user) {
+				continue
+			}
+			user.ReplaceValue(v, to)
+			to.AddUser(user)
+			deleteUser = append(deleteUser, user)
+		}
+		for _, user := range deleteUser {
+			v.RemoveUser(user)
+		}
+	}
+
+	replaceInBlock(original, insert, block, func(inst Instruction) bool {
+		if inst.GetPosition() == nil {
+			return true
+		}
+		if inst.GetPosition().StartLine > insert.GetPosition().StartLine {
+			return false
+		} else {
+			return true
+		}
+
+	})
+
+	algorithm.BFS(block.Succs, func(block *BasicBlock) []*BasicBlock { return block.Succs }, func(item *BasicBlock) bool {
+		old := builder.readVariableByBlock(variable, item, false)
+		builder.deleteVariableByBlock(variable, item)
+		new := builder.readVariableByBlock(variable, item, false)
+		if old == new {
+			return false
+		} else {
+			replaceInBlock(old, new, item, func(i Instruction) bool {
+				return i == new
+			})
+			return true
+		}
+	})
+
 }
 
 func GetValues(n Node) Values {

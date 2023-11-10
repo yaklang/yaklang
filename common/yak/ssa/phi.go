@@ -26,7 +26,7 @@ func (b *BasicBlock) Sealed() {
 					})
 					hasUpdate := false
 					// replace but skip update
-					ReplaceValueSkip(f, v, func(i Instruction) bool {
+					ReplaceValue(f, v, func(i Instruction) bool {
 						// return false
 						_, ok := ToUpdate(i)
 						hasUpdate = hasUpdate || ok
@@ -111,7 +111,7 @@ func (phi *Phi) tryRemoveTrivialPhi() Value {
 }
 
 func (phi *Phi) Replace(to Value) {
-	ReplaceValue(phi, to)
+	ReplaceAllValue(phi, to)
 	for _, user := range phi.GetUsers() {
 		switch p := user.(type) {
 		case *Phi:

@@ -47,6 +47,7 @@ func (c *Call) HandleFreeValue(fvs []string, sideEffect []string) {
 		sideEffect.SetPosition(c.GetPosition())
 		sideEffect.SetType(BasicTypes[Any])
 		builder.WriteVariable(name, sideEffect)
+		InsertValueReplaceOriginal(v, sideEffect)
 	}
 
 }
