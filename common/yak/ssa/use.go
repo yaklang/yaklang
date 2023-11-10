@@ -124,6 +124,17 @@ func (c *Call) ReplaceValue(v Value, to Value) {
 	}
 }
 
+// ------------ SideEffect
+func (s *SideEffect) HasValues() bool   { return true }
+func (s *SideEffect) GetValues() Values { return []Value{s.target} }
+func (s *SideEffect) ReplaceValue(v Value, to Value) {
+	if s.target == v {
+		s.target = to
+	} else {
+		panic("SideEffect not use this value")
+	}
+}
+
 // ----------- Return
 func (r *Return) HasValues() bool   { return true }
 func (r *Return) GetValues() Values { return r.Results }

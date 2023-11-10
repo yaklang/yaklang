@@ -172,6 +172,16 @@ func NewParam(variable string, isFreeValue bool, fun *Function) *Parameter {
 	return p
 }
 
+func NewSideEffect(variable string, target Value) *SideEffect {
+	s := &SideEffect{
+		anInstruction: NewInstruction(),
+		anValue:       NewValue(),
+		target:        target,
+	}
+	s.SetVariable(variable)
+	return s
+}
+
 func (i *If) AddTrue(t *BasicBlock) {
 	i.True = t
 	i.GetBlock().AddSucc(t)
