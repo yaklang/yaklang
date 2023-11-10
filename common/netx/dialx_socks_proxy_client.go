@@ -247,11 +247,11 @@ func DialSocksProxy(socksType int, proxy string, username string, password strin
 	}
 }
 
-func DialSocksProxyCheck(socksType int, proxy string, username string, password string, check bool) func(string, string) (net.Conn, error) {
+func dialSocksProxyCheckConfig(socksType int, proxy string, username string, password string) *config {
 	if username != "" {
-		return (&config{Proto: socksType, Host: proxy, Check: check, Auth: &auth{username, password}}).dialFunc()
+		return &config{Proto: socksType, Host: proxy, Check: true, Auth: &auth{username, password}}
 	} else {
-		return (&config{Proto: socksType, Host: proxy, Check: check}).dialFunc()
+		return &config{Proto: socksType, Host: proxy, Check: true}
 	}
 }
 
