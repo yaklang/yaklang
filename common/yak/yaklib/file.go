@@ -4,24 +4,30 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/hpcloud/tail"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/mfreader"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/hpcloud/tail"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/mfreader"
 )
 
 type _yakFile struct {
 	file *os.File
 }
 
+// Save 将字符串或字节切片或字符串切片写入到文件中，如果文件不存在则创建，如果文件存在则覆盖，返回错误
+// Example:
+// ```
+// file.Save("/tmp/test.txt", "hello yak")
+// ```
 func _saveFile(fileName string, i interface{}) error {
 	file, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, os.ModePerm)
 	if err != nil {
@@ -48,6 +54,29 @@ func _saveFile(fileName string, i interface{}) error {
 		return utils.Errorf("not support type: %v", reflect.TypeOf(ret))
 	}
 	return nil
+}
+
+// SaveJson 将字符串或字节切片或字符串切片写入到文件中，如果文件不存在则创建，如果文件存在则覆盖，返回错误
+// 与 Save 不同的是，如果传入的参数是其他类型，会尝试将其序列化为 json 字符再写入到文件中
+// Example:
+// ```
+// file.SaveJson("/tmp/test.txt", "hello yak")
+// ```
+func _saveJson(name string, i interface{}) error {
+	switch ret := i.(type) {
+	case []byte:
+		return _saveFile(name, ret)
+	case string:
+		return _saveFile(name, ret)
+	case []string:
+		return _saveFile(name, ret)
+	default:
+		raw, err := json.Marshal(i)
+		if err != nil {
+			return utils.Errorf("marshal %v failed: %s", spew.Sdump(i), err)
+		}
+		return _saveFile(name, raw)
+	}
 }
 
 func (y *_yakFile) WriteLine(i interface{}) (int, error) {
@@ -144,6 +173,13 @@ func (y *_yakFile) ReadLines() []string {
 	return lines
 }
 
+// IsLink 判断文件是否是一个符号链接
+// Example:
+// ```
+// 假设 /usr/bin/bash 是一个符号链接，指向 /bin/bash
+// file.IsLink("/usr/bin/bash") // true
+// file.IsLink("/bin/bash") // false
+// ```
 func _fileIsLink(file string) bool {
 	if _, err := os.Readlink(file); err != nil {
 		return false
@@ -151,19 +187,16 @@ func _fileIsLink(file string) bool {
 	return true
 }
 
-func _fileIsDir(file string) bool {
-	if info, err := os.Stat(file); err != nil {
-		return false
-	} else {
-		if info.IsDir() {
-			return true
-		}
-		return false
-	}
-}
-
+// TempFile 创建一个临时文件，返回一个文件结构体引用与错误
+// Example:
+// ```
+// f, err = file.TempFile()
+// die(err)
+// defer f.Close()
+// f.WriteString("hello yak")
+// ```
 func _tempFile(dirPart ...string) (*_yakFile, error) {
-	var dir = consts.GetDefaultYakitBaseTempDir()
+	dir := consts.GetDefaultYakitBaseTempDir()
 	if len(dirPart) > 0 {
 		dir = filepath.Join(dirPart...)
 	}
@@ -174,7 +207,103 @@ func _tempFile(dirPart ...string) (*_yakFile, error) {
 	return &_yakFile{file: f}, nil
 }
 
-func readLines(i interface{}) []string {
+// TempFileName 创建一个临时文件，返回一个文件名与错误
+// Example:
+// ```
+// name, err = file.TempFileName()
+// die(err)
+// defer os.Remove(name)
+// file.Save(name, "hello yak")
+// ```
+func _tempFileName() (string, error) {
+	f, err := _tempFile()
+	if err != nil {
+		return "", err
+	}
+	f.Close()
+	return f.Name(), nil
+}
+
+// Mkdir 创建一个目录，返回错误
+// Example:
+// ```
+// err = file.Mkdir("/tmp/test")
+// ```
+func _mkdir(name string) error {
+	return os.Mkdir(name, os.ModePerm)
+}
+
+// MkdirAll 创建一个递归创建一个目录，返回错误
+// Example:
+// ```
+// // 假设存在 /tmp 目录，不存在 /tmp/test 目录
+// err = file.MkdirAll("/tmp/test/test2")
+// ```
+func _mkdirAll(name string) error {
+	return os.MkdirAll(name, os.ModePerm)
+}
+
+// Rename 重命名一个文件或文件夹，返回错误，这个函数也会移动文件或文件夹
+// ! 在 windows 下，无法将文件移动到不同的磁盘
+// Example:
+// ```
+// // 假设存在 /tmp/test.txt 文件
+// err = file.Rename("/tmp/test.txt", "/tmp/test2.txt")
+// ```
+func _rename(oldpath, newpath string) error {
+	return os.Rename(oldpath, newpath)
+}
+
+// Mv 重命名一个文件或文件夹，返回错误，这个函数也会移动文件或文件夹，它是 Rename 的别名
+// ! 在 windows 下，无法将文件移动到不同的磁盘
+// Example:
+// ```
+// // 假设存在 /tmp/test.txt 文件
+// err = file.Rename("/tmp/test.txt", "/tmp/test2.txt")
+// ```
+func _mv(oldpath, newpath string) error {
+	return os.Rename(oldpath, newpath)
+}
+
+// Remove 删除路径及其包含的所有子路径
+// Example:
+// ```
+// // 假设存在 /tmp/test/test.txt 文件和 /tmp/test/test2.txt 文件
+// err = file.Remove("/tmp/test")
+// ```
+func _remove(path string) error {
+	return os.RemoveAll(path)
+}
+
+// Rm 删除路径及其包含的所有子路径，它是 Remove 的别名
+// Example:
+// ```
+// // 假设存在 /tmp/test/test.txt 文件和 /tmp/test/test2.txt 文件
+// err = file.Remove("/tmp/test")
+// ```
+func _rm(path string) error {
+	return os.RemoveAll(path)
+}
+
+// Create 创建一个文件，返回一个文件结构体引用与错误
+// Example:
+// ```
+// f, err = file.Create("/tmp/test.txt")
+// ```
+func _create(name string) (*_yakFile, error) {
+	f, err := os.Create(name)
+	if err != nil {
+		return nil, err
+	}
+	return &_yakFile{file: f}, nil
+}
+
+// ReadLines 尝试读取一个文件中的所有行，返回一个字符串切片，会去除BOM头和空行
+// Example:
+// ```
+// lines = file.ReadLines("/tmp/test.txt")
+// ```
+func _fileReadLines(i interface{}) []string {
 	f := utils.InterfaceToString(i)
 	c, err := ioutil.ReadFile(f)
 	if err != nil {
@@ -183,29 +312,278 @@ func readLines(i interface{}) []string {
 	return utils.ParseStringToLines(string(c))
 }
 
-var FileExport = map[string]interface{}{
-	"ReadLines":  readLines,
-	"GetDirPath": filepath.Dir,
-	"Split":      filepath.Split,
-	"IsExisted": func(name string) bool {
-		ret, _ := utils.PathExists(name)
-		return ret
-	},
-	"IsFile": func(file string) bool {
-		if info, err := os.Stat(file); err != nil {
-			return false
-		} else {
-			if info.IsDir() {
-				return false
-			}
+// GetDirPath 返回路径中除最后一个元素之后的路径，这通常是原本路径的目录
+// Example:
+// ```
+// file.GetDirPath("/usr/bin/bash") // "/usr/bin"
+// ```
+func _fileGetDirPath(path string) string {
+	return filepath.Dir(path)
+}
 
-			return true
+// Split 以操作系统的默认路径分隔符分割路径，返回目录和文件名
+// Example:
+// ```
+// file.Split("/usr/bin/bash") // "/usr/bin", "bash"
+// ```
+func _filePathSplit(path string) (string, string) {
+	return filepath.Split(path)
+}
+
+// IsExisted 判断文件或目录是否存在
+// Example:
+// ```
+// file.IsExisted("/usr/bin/bash")
+// ```
+func _fileIsExisted(path string) bool {
+	ret, _ := utils.PathExists(path)
+	return ret
+}
+
+// IsFile 判断路径是否存在且是一个文件
+// Example:
+// ```
+// // 假设存在 /usr/bin/bash 文件
+// file.IsFile("/usr/bin/bash") // true
+// file.IsFile("/usr/bin") // false
+// ```
+func _fileIsFile(path string) bool {
+	return utils.IsFile(path)
+}
+
+// IsDir 判断路径是否存在且是一个目录
+// Example:
+// ```
+// // 假设存在 /usr/bin/bash 文件
+// file.IsDir("/usr/bin") // true
+// file.IsDir("/usr/bin/bash") // false
+// ```
+func _fileIsDir(path string) bool {
+	return utils.IsDir(path)
+}
+
+// IsAbs 判断路径是否是绝对路径
+// Example:
+// ```
+// file.IsAbs("/usr/bin/bash") // true
+// file.IsAbs("../../../usr/bin/bash") // false
+// ```
+func _fileIsAbs(path string) bool {
+	return filepath.IsAbs(path)
+}
+
+// Join 将任意数量的路径以默认路径分隔符链接在一起
+// Example:
+// ```
+// file.Join("/usr", "bin", "bash") // "/usr/bin/bash"
+// ```
+func _fileJoin(path ...string) string {
+	return filepath.Join(path...)
+}
+
+// ReadAll 从 Reader 读取直到出现错误或 EOF，然后返回字节切片与错误
+// Example:
+// ```
+// f, err = file.Open("/tmp/test.txt")
+// content, err = file.ReadAll(f)
+// ```
+func _fileReadAll(r io.Reader) ([]byte, error) {
+	return io.ReadAll(r)
+}
+
+// ReadFile 读取一个文件的所有内容，返回字节切片与错误
+// Example:
+// ```
+// content, err = file.ReadFile("/tmp/test.txt")
+// ```
+func _fileReadFile(filename string) ([]byte, error) {
+	return os.ReadFile(filename)
+}
+
+func _lsDirAll(i string) []*utils.FileInfo {
+	raw, err := utils.ReadDirsRecursively(i)
+	if err != nil {
+		log.Errorf("dir %v failed: %s", i, err)
+		return nil
+	}
+	return raw
+}
+
+// Cp 拷贝文件或目录，返回错误
+// Example:
+// ```
+// file.Cp("/tmp/test.txt", "/tmp/test2.txt")
+// file.Cp("/tmp/test", "/root/tmp/test")
+// ```
+func _fileCopy(src, dst string) error {
+	return utils.CopyDirectory(src, dst)
+}
+
+// Ls 列出一个目录下的所有文件和目录，返回一个文件信息切片
+// Example:
+// ```
+// for f in file.Ls("/tmp") {
+// println(f.Name)
+// }
+// ```
+func _ls(i string) []*utils.FileInfo {
+	raw, err := utils.ReadDir(i)
+	if err != nil {
+		log.Errorf("dir %v failed: %s", i, err)
+		return nil
+	}
+	return raw
+}
+
+// Dir 列出一个目录下的所有文件和目录，返回一个文件信息切片，它是 Ls 的别名
+// Example:
+// ```
+// for f in file.Ls("/tmp") {
+// println(f.Name)
+// }
+// ```
+func _dir(i string) []*utils.FileInfo {
+	raw, err := utils.ReadDir(i)
+	if err != nil {
+		log.Errorf("dir %v failed: %s", i, err)
+		return nil
+	}
+	return raw
+}
+
+// Open 打开一个文件，返回一个文件结构体引用与错误
+// Example:
+// ```
+// f, err = file.Open("/tmp/test.txt")
+// content, err = file.ReadAll(f)
+// ```
+func _fileOpen(name string) (*_yakFile, error) {
+	file, err := os.OpenFile(name, os.O_CREATE|os.O_RDWR, os.ModePerm)
+	if err != nil {
+		return nil, err
+	}
+	return &_yakFile{file: file}, nil
+}
+
+// Stat 返回一个文件的信息和错误
+// Example:
+// ```
+// info, err = file.Stat("/tmp/test.txt")
+// desc(info)
+// ```
+func _fileStat(name string) (os.FileInfo, error) {
+	return os.Stat(name)
+}
+
+// Lstat 返回一个文件的信息和错误，如果文件是一个符号链接，返回的是符号链接的信息
+// Example:
+// ```
+// info, err = file.Lstat("/tmp/test.txt")
+// desc(info)
+// ```
+func _fileLstat(name string) (os.FileInfo, error) {
+	return os.Lstat(name)
+}
+
+// Cat 模拟 unix 命令 cat，打印文件内容到标准输出
+// Example:
+// ```
+// file.Cat("/tmp/test.txt")
+// ```
+func _cat(i string) {
+	raw, err := ioutil.ReadFile(i)
+	_diewith(err)
+	fmt.Print(string(raw))
+}
+
+// TailF 模拟 unix 命令 tail -f，执行这个函数会一直阻塞，打印文件内容到标准输出，如果文件有变化，会自动打印新的内容
+// Example:
+// ```
+// file.TailF("/tmp/test.txt")
+// ```
+func _tailf(i string, line func(i string)) {
+	t, err := tail.TailFile(i, tail.Config{
+		MustExist: false,
+		Follow:    true,
+		Logger:    tail.DiscardingLogger,
+	})
+	if err != nil {
+		log.Errorf("tail failed: %s", err)
+		return
+	}
+	for {
+		select {
+		case l, ok := <-t.Lines:
+			if !ok {
+				return
+			}
+			if line != nil {
+				line(l.Text)
+			}
 		}
-	},
-	"IsAbs":  filepath.IsAbs,
-	"IsLink": _fileIsLink,
-	"IsDir":  _fileIsDir,
-	"Join":   filepath.Join,
+	}
+}
+
+// Abs 返回一个路径的绝对路径
+// Example:
+// ```
+// // 假设当前目录是 /tmp
+// file.Abs("./test.txt") // /tmp/test.txt
+// ```
+func _fileAbs(i string) string {
+	raw, err := filepath.Abs(i)
+	if err != nil {
+		log.Errorf("fetch abs path failed for[%v]: %s", i, raw)
+		return i
+	}
+	return raw
+}
+
+// ReadFileInfoInDirectory 读取一个目录下的所有文件信息，返回一个文件信息切片和错误
+// Example:
+// ```
+// for f in file.ReadFileInfoInDirectory("/tmp")~ {
+// println(f.Name)
+// }
+// ```
+func _readFileInfoInDirectory(path string) ([]*utils.FileInfo, error) {
+	return utils.ReadFilesRecursively(path)
+}
+
+// ReadDirInfoInDirectory 读取一个目录下的所有目录信息，返回一个文件信息切片和错误
+// Example:
+// ```
+// for d in file.ReadDirInfoInDirectory("/tmp")~ {
+// println(d.Name)
+// }
+func _readDirInfoInDirectory(path string) ([]*utils.FileInfo, error) {
+	return utils.ReadDirsRecursively(path)
+}
+
+// NewMultiFileLineReader 创建一个多文件读取器，返回一个多文件读取器结构体引用和错误
+// Example:
+// ```
+// // 假设存在 /tmp/test.txt 文件，内容为 123
+// // 假设存在 /tmp/test2.txt 文件，内容为 456
+// m, err = file.NewMultiFileLineReader("/tmp/test.txt", "/tmp/test2.txt")
+// for m.Next() {
+// println(m.Text())
+// }
+// ```
+func _newMultiFileLineReader(files ...string) (*mfreader.MultiFileLineReader, error) {
+	return mfreader.NewMultiFileLineReader(files...)
+}
+
+var FileExport = map[string]interface{}{
+	"ReadLines":  _fileReadLines,
+	"GetDirPath": _fileGetDirPath,
+	"Split":      _filePathSplit,
+	"IsExisted":  _fileIsExisted,
+	"IsFile":     _fileIsFile,
+	"IsDir":      _fileIsDir,
+	"IsAbs":      _fileIsAbs,
+	"IsLink":     _fileIsLink,
+	"Join":       _fileJoin,
 
 	// flags
 	"O_RDWR":   os.O_RDWR,
@@ -218,156 +596,36 @@ var FileExport = map[string]interface{}{
 	"O_WRONLY": os.O_WRONLY,
 
 	// 文件打开
-	"ReadAll":  ioutil.ReadAll,
-	"ReadFile": ioutil.ReadFile,
-	"TempFile": _tempFile,
-	"TempFileName": func() (string, error) {
-		f, err := _tempFile()
-		if err != nil {
-			return "", err
-		}
-		f.Close()
-		return f.Name(), nil
-	},
-	"Mkdir": func(name string) error {
-		return os.Mkdir(name, os.ModePerm)
-	},
-	"MkdirAll": func(name string) error {
-		return os.MkdirAll(name, os.ModePerm)
-	},
-	"Rename": os.Rename,
-	"Remove": os.RemoveAll,
-	"Create": func(name string) (*_yakFile, error) {
-		f, err := os.Create(name)
-		if err != nil {
-			return nil, err
-		}
-		return &_yakFile{file: f}, nil
-	},
+	"ReadAll":      _fileReadAll,
+	"ReadFile":     _fileReadFile,
+	"TempFile":     _tempFile,
+	"TempFileName": _tempFileName,
+	"Mkdir":        _mkdir,
+	"MkdirAll":     _mkdirAll,
+	"Rename":       _rename,
+	"Remove":       _remove,
+	"Create":       _create,
 
 	// 打开文件操作
-	"Open": func(name string) (*_yakFile, error) {
-		file, err := os.OpenFile(name, os.O_CREATE|os.O_RDWR, os.ModePerm)
-		if err != nil {
-			return nil, err
-		}
-		return &_yakFile{file: file}, nil
-	},
-	"OpenFile": func(name string, flag int, perm os.FileMode) (*_yakFile, error) {
-		f, err := os.OpenFile(name, flag, perm)
-		if err != nil {
-			return nil, err
-		}
-		return &_yakFile{file: f}, nil
-	},
-	"Stat":  os.Stat,
-	"Lstat": os.Lstat,
-	"Save":  _saveFile,
-	"SaveJson": func(name string, i interface{}) error {
-		switch ret := i.(type) {
-		case []byte:
-			return _saveFile(name, ret)
-		case string:
-			return _saveFile(name, ret)
-		case []string:
-			return _saveFile(name, ret)
-		default:
-			raw, err := json.Marshal(i)
-			if err != nil {
-				return utils.Errorf("marshal %v failed: %s", spew.Sdump(i), err)
-			}
-			return _saveFile(name, raw)
-		}
-	},
+	"Open":     _fileOpen,
+	"OpenFile": _fileOpen,
+	"Stat":     _fileStat,
+	"Lstat":    _fileLstat,
+	"Save":     _saveFile,
+	"SaveJson": _saveJson,
 
 	// 模仿 Linux 命令的一些函数
 	// 自定义的好用 API
-	"Cat": func(i string) {
-		raw, err := ioutil.ReadFile(i)
-		_diewith(err)
-		fmt.Print(string(raw))
-	},
-	"TailF": func(i string, line func(i string)) {
-		t, err := tail.TailFile(i, tail.Config{
-			MustExist: false,
-			Follow:    true,
-			Logger:    tail.DiscardingLogger,
-		})
-		if err != nil {
-			log.Errorf("tail failed: %s", err)
-			return
-		}
-		for {
-			select {
-			case l, ok := <-t.Lines:
-				if !ok {
-					return
-				}
-				if line != nil {
-					line(l.Text)
-				}
-			}
-		}
-	},
-	"Mv":  os.Rename,
-	"Rm":  os.RemoveAll,
-	"Cp":  _fileCopy,
-	"Dir": _lsDir,
-	"Ls":  _lsDir,
+	"Cat":   _cat,
+	"TailF": _tailf,
+	"Mv":    _mv,
+	"Rm":    _rm,
+	"Cp":    _fileCopy,
+	"Dir":   _ls,
+	"Ls":    _dir,
 	//"DeepLs": _lsDirAll,
-	"Abs": func(i string) string {
-		raw, err := filepath.Abs(i)
-		if err != nil {
-			log.Errorf("fetch abs path failed for[%v]: %s", i, raw)
-			return i
-		}
-		return raw
-	},
-	"ReadFileInfoInDirectory": utils.ReadFilesRecursively,
-	"ReadDirInfoInDirectory":  utils.ReadDirsRecursively,
-	"NewMultiFileLineReader":  mfreader.NewMultiFileLineReader,
-}
-
-func _lsDirAll(i string) []*utils.FileInfo {
-	raw, err := utils.ReadDirsRecursively(i)
-	if err != nil {
-		log.Errorf("dir %v failed: %s", i, err)
-		return nil
-	}
-	return raw
-}
-
-// Copy the src file to dst. Any existing file will be overwritten and will not
-// copy file attributes.
-func _fileCopy(src, dst string) error {
-	if _fileIsDir(src) {
-		return utils.Errorf("SRC:%v is a dir", src)
-	}
-
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, in)
-	if err != nil {
-		return err
-	}
-	return out.Close()
-}
-
-func _lsDir(i string) []*utils.FileInfo {
-	raw, err := utils.ReadDir(i)
-	if err != nil {
-		log.Errorf("dir %v failed: %s", i, err)
-		return nil
-	}
-	return raw
+	"Abs":                     _fileAbs,
+	"ReadFileInfoInDirectory": _readFileInfoInDirectory,
+	"ReadDirInfoInDirectory":  _readDirInfoInDirectory,
+	"NewMultiFileLineReader":  _newMultiFileLineReader,
 }
