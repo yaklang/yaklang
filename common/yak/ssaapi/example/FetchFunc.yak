@@ -1,0 +1,225 @@
+prog := ssa.Parse(
+    `
+ // example1
+  let url = "https://api.github.com/users/ruanyf";
+   try {
+    let response = await fetch(url);
+    return await response.json();
+  } catch (error) {
+    console.log('Request Failed', error);
+  }
+  
+// example4
+let res = await fetch(url);
+res.headers.forEach(
+  (value, key) => console.log(key, ':', value)
+);
+
+// let response.head = fetch(1);/
+
+  // example2
+  async function fetchText() {
+    let response = await fetch('/readme.txt');
+    if (response.status >= 200 && response.status < 300) {
+      return await response.text();
+    } else {
+      throw new Error(response.statusText);
+    }
+  }
+
+//   example3
+// Example POST method implementation:
+function postData(url = "", data = {}) {
+  // Default options are marked with *
+  const response = await fetch(url, {
+    method: "POST", // *GET, POST, PUT, DELETE, etc.
+    mode: "cors", // no-cors, *cors, same-origin
+    cache: "no-cache", // *default, no-cache, reload, force-cache, only-if-cached
+    credentials: "same-origin", // include, *same-origin, omit
+    headers: {
+      "Content-Type": "application/json",
+      // 'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    redirect: "follow", // manual, *follow, error
+    referrerPolicy: "no-referrer", // no-referrer, *no-referrer-when-downgrade, origin, origin-when-cross-origin, same-origin, strict-origin, strict-origin-when-cross-origin, unsafe-url
+    body: JSON.stringify(data), // body data type must match "Content-Type" header
+  });
+  return response.json(); // parses JSON response into native JavaScript objects
+}
+
+postData("https://example.com/answer", { answer: 42 }).then((data) => {
+  console.log(data); // JSON data parsed by "data.json()" call
+});
+
+
+`, 
+    ssa.withLanguage(ssa.Javascript), 
+)
+
+func getRes(v) {
+    v.ForEach(v => {
+      // v.ShowUseDefChain()
+        if v.IsField() {
+            println("Has Method Fetch: ")
+            v.GetOperand(0).GetOperands().ForEach(v => {
+                if v.IsMake() {
+                    update := getUpdate(v.GetUsers())
+                    println(update)
+                }
+                
+            })
+            println("URL=>" + v.GetOperand(0).String().Split("fetch")[1])
+            println("Method=>" + v.GetOperand(1).String())
+        } else if v.IsCall() {
+          println("Only Call Fetch: ")
+          println(handleUpdate(v))
+        }
+        // else if v.isUpdate() {
+        //     v.GetOperands().ForEach(v => {
+        //         if v.IsField() {
+        //             Method = []
+        //             v.GetUsers().ForEach(v => {
+        //                 if v.IsField() {
+        //                     Method.Append(v.String().Split(".")[-1])
+        //                 } else if v.IsUpdate() {
+        //                     up := v.GetOperand(1)
+        //                     update := handleUpdate(up)
+        //                     println(update)
+        //                 }
+                        
+        //             })
+        //             if len(Method) != 0 {
+        //                 println("Method=>" + Method)
+        //             }
+        //         }
+                
+        //     })
+        // }
+        println("-----------------------------")
+    })
+}
+
+func handleUpdate(v) {
+    r = ""
+    // v.ShowUseDefChain()
+    op0 := v.GetOperand(0).String()
+    index := ""
+    if op0.Contains("fetch("){
+      index = op0.Split("fetch")
+    } else {
+      index = op0.Split(".")
+    }
+
+    index = op0
+
+    length := len(v.GetOperands())
+    func handle(op1) {
+        var ret
+        if op1.IsFunction() {
+            ret = index + ": " + "Param: " + op1.GetParameter() + ""
+        } else if op1.IsMake() {
+            make_ := []
+            ids := op1.GetField()
+            make_ = handleMake(ids)
+            ret = index + ": " + "make{" + make_ + "}"
+        } else {
+            ret = index + ": " + v.GetOperand(1).String() + ""
+        }
+        return ret
+    }
+    for i := 1; i < length; i++ {
+        r += handle(v.GetOperand(i))
+    }
+    
+    return r
+}
+
+func getUpdate(v) {
+    rets = []
+    v.GetUsers().ForEach(v => {
+        var ret
+        if v.IsUpdate() {
+            ret = handleUpdate(v)
+            rets.Append(ret)
+        }
+        
+    })
+    return rets
+}
+
+func handleMake(v) {
+    var ret = []
+    for _, i := range v {
+        update := getUpdate(i)
+        ret.Append(update)
+    }
+    return ret
+}
+
+
+fetch := prog.Ref("fetch").GetUsers().Filter(v => v.IsCall())
+// prog.Ref("fetch").ForEach(v => {v.ShowUseDefChain()})
+// fetch := prog.Ref("fetch").GetUsers().Filter(v => v.IsCall())
+// fetch.ForEach(v => {v.ShowUseDefChain()})
+f := fetch.GetUsers().Filter(v => v.IsField())
+if len(f) != 0{
+  getRes(f)
+} else {
+  getRes(fetch)
+}
+// f.ForEach(v => {v.ShowUseDefChain()})
+// fetch.ForEach(v => { 
+//   fixup :=  v.FixUpdateValue()
+//   fixup.ForEach(v => {
+//     v.ShowUseDefChain()
+//     if v.IsCall(){
+//       println(handleUpdate(v))
+//     } 
+//   }) 
+//   println("=====================================")
+// })
+
+
+
+
+prog2 := ssa.Parse(`
+const input = document.querySelector('input[type="file"]');
+
+const data = new FormData();
+data.append('file', input.files[0]);
+data.append('user', 'foo');
+
+fetch('/avatars', {
+  method: 'POST',
+  body: data
+});
+
+const data = { username: "example" };
+
+fetch("https://example.com/profile", {
+  method: "POST", // or 'PUT'
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify(data),
+})
+  .then((response) => response.json())
+  .then((data) => {
+    console.log("Success:", data);
+  })
+  .catch((error) => {
+    console.error("Error:", error);
+  });
+
+`, ssa.withLanguage(ssa.Javascript))
+
+fetch2 := prog2.Ref("fetch").GetUsers().Filter(v => v.IsCall())
+f2 := fetch2.GetUsers().Filter(v => v.IsField())
+if len(f2) != 0{
+  getRes(f2)
+} else {
+  getRes(fetch2)
+}
+
+
+
