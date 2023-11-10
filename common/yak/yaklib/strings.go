@@ -530,7 +530,9 @@ var (
 		"ParamsGetOr":     ParamsGetOr,
 		"ToJsonIndentStr": toJsonIndentStr,
 
-		"NewFilter": filter.NewFilter,
+		"NewFilter":            filter.NewFilter,
+		"RemoveDuplicatePorts": filter.RemoveDuplicatePorts,
+		"FilterPorts":          filter.FilterPorts,
 
 		"RegexpMatch": strRegexpMatch,
 
