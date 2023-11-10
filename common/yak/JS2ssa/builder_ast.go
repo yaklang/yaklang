@@ -3,7 +3,6 @@ package js2ssa
 import (
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
-	"golang.org/x/exp/slices"
 
 	JS "github.com/yaklang/yaklang/common/yak/antlr4JS/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -841,28 +840,14 @@ func (b *astbuilder) buildIdentifierExpression(text string, IslValue bool, force
 			return nil, nil
 		}
 
-		// leftvalue
+		// leftValue
 		if forceAssign {
 			text = b.MapBlockSymbolTable(text)
-		} else if v := b.ReadVariable(text, false); v != nil {
-			switch value := v.(type) {
-			case *ssa.Parameter:
-				if value.IsFreeValue {
-					field := b.NewCaptureField(text)
-					var tmp ssa.Value = field
-					ssa.ReplaceValue(v, tmp)
-					if index := slices.Index(b.FreeValues, v); index != -1 {
-						b.FreeValues[index] = tmp
-					}
-					b.SetReg(field)
-					b.ReplaceVariable(text, value, field)
-					return nil, field
-				}
-			default:
-			}
 		}
-
 		lValue := ssa.NewIdentifierLV(text, b.CurrentPos)
+		if b.CanBuildFreeValue(text) {
+			lValue.SetIsSideEffect(true)
+		}
 		return nil, lValue
 	} else {
 		rValue := b.ReadVariable(text, true)

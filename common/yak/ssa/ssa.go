@@ -265,9 +265,10 @@ type Function struct {
 	AnonFuncs []*Function
 
 	// if this function is anonFunc
-	parent       *Function // parent function if anonymous function; nil if global function.
-	FreeValues   []Value   // the value, captured variable form parent-function,
-	symbolObject *Make     // for function symbol table
+	FreeValues   []Value          // the value, captured variable form parent-function,
+	SideEffects  map[string]Value // closure function side effects
+	parent       *Function        // parent function if anonymous function; nil if global function.
+	symbolObject *Make            // for function symbol table
 
 	// for instruction
 	InstReg     map[Instruction]string // instruction -> virtual register

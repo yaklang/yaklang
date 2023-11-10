@@ -24,6 +24,9 @@ func CheckTestCase(t *testing.T, tc TestCase) {
 		fb.WithExternValue(tc.ExternValue)
 		fb.WithExternLib(tc.ExternLib)
 	})
+	if prog == nil {
+		t.Fatal("failed to parse")
+	}
 	// prog.ShowWithSource()
 	// fmt.Println(prog.GetErrors().String())
 	errs := lo.Map(prog.GetErrors(), func(e *ssa.SSAError, _ int) string { return e.Message })
@@ -691,18 +694,16 @@ func TestClosureBinding(t *testing.T) {
 				b = 1
 				f = () => {
 					b = a
-				}
+				} // sideEffect: b
 				a = 2
 				print(b) // 1
 
 				f()
-				// b1 = field yam-main-symbol [b]
 				print(b) // b1
 			}
 			a = 3
 			print(b) // b1
 			f()
-			// b2 = field yam-main-symbol [b]
 			print(b) // b2
 			`,
 			ExternValue: map[string]any{
@@ -726,6 +727,18 @@ func TestClosureBinding(t *testing.T) {
 			ExternValue: map[string]any{
 				"print": func(any) {},
 			},
+		})
+	})
+
+	t.Run("closure side effect", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			f = () => {
+				a = 1
+			}
+			f()
+			a = 2
+			`,
 		})
 	})
 }
