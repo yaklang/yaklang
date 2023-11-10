@@ -21,7 +21,8 @@ type WebsiteNextPart struct {
 	Count        int
 }
 
-func trimOneSlash(path string) string {
+func trimPathWithOneSlash(path string) string {
+	path, _, _ = strings.Cut(path, "?")
 	if strings.HasPrefix(path, "/") {
 		path = path[1:]
 	}
@@ -33,7 +34,7 @@ func trimOneSlash(path string) string {
 
 func GetHTTPFlowNextPartPathByPathPrefix(db *gorm.DB, originPathPrefix string) []*WebsiteNextPart {
 	if originPathPrefix != "" {
-		pathPrefix := trimOneSlash(originPathPrefix)
+		pathPrefix := trimPathWithOneSlash(originPathPrefix)
 		db := FilterHTTPFlowPathPrefix(db, originPathPrefix)
 		db = db.Select(fmt.Sprintf(`DISTINCT SUBSTR(
    url,
@@ -89,7 +90,7 @@ func GetHTTPFlowNextPartPathByPathPrefix(db *gorm.DB, originPathPrefix string) [
 
 func FilterHTTPFlowPathPrefix(db *gorm.DB, pathPrefix string) *gorm.DB {
 	if pathPrefix != "" {
-		pathPrefix := trimOneSlash(pathPrefix)
+		pathPrefix := trimPathWithOneSlash(pathPrefix)
 		template := `SUBSTR(url,INSTR(url, '://') + 3 + INSTR(SUBSTR(url, INSTR(url, '://') + 3), '/'),CASE WHEN INSTR(SUBSTR(url, INSTR(url, '://') + 3), ?) > 0 THEN INSTR(SUBSTR(url, INSTR(url, '://') + 3), ?) - INSTR(SUBSTR(url, INSTR(url, '://') + 3), '/') - 1 ELSE LENGTH(url) END) LIKE ?`
 		db = db.Where(template, "?", "?", pathPrefix+"%")
 	}

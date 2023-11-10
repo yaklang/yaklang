@@ -27,6 +27,13 @@ func (s *Server) RequestYakURL(ctx context.Context, req *ypb.RequestYakURLParams
 		default:
 			return nil, utils.Errorf("not implemented method: %v", ret)
 		}
+	case "website":
+		switch ret := strings.ToUpper(req.GetMethod()); ret {
+		case "GET":
+			return yakurl.GetWebsiteViewerAction().Get(req)
+		default:
+			return nil, utils.Errorf("not implemented method: %v", ret)
+		}
 	default:
 		return nil, utils.Errorf("unsupported schema: %s", req.GetUrl().GetSchema())
 	}
