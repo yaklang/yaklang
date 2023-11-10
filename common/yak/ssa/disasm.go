@@ -105,6 +105,12 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 			// f.FreeValue,
 			", ") + "\n"
 	}
+	if len(f.SideEffects) > 0 {
+		ret += "sideEffects: " + strings.Join(
+			lo.MapToSlice(f.SideEffects, func(name string, v Value) string { return name }),
+			",",
+		) + "\n"
+	}
 	if f.GetType() != nil {
 		ret += "type: " + f.GetType().String() + "\n"
 	}
@@ -128,7 +134,12 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 			pos := make([]string, 0, len(b.Insts)+len(b.Phis))
 			for _, p := range b.Phis {
 				insts = append(insts, fmt.Sprintf("\t%s", p))
-				pos = append(pos, p.GetPosition().String())
+				position := p.GetPosition()
+				if position == nil {
+					pos = append(pos, "")
+				} else {
+					pos = append(pos, position.String())
+				}
 			}
 			for _, i := range b.Insts {
 				insts = append(insts, fmt.Sprintf("\t%s", i))

@@ -12,13 +12,17 @@ type LeftValue interface {
 // --------------- only point variable to value with `f.currentDef`
 // --------------- is SSA value
 type IdentifierLV struct {
-	variable string
-	pos      *Position
+	variable     string
+	pos          *Position
+	isSideEffect bool
 }
 
 func (i *IdentifierLV) Assign(v Value, f *FunctionBuilder) {
 	v.AddLeftPositions(i.GetPosition())
 	f.WriteVariable(i.variable, v)
+	if i.isSideEffect {
+		f.AddSideEffect(i.variable, v)
+	}
 }
 
 func (i *IdentifierLV) GetValue(f *FunctionBuilder) Value {
@@ -28,6 +32,9 @@ func (i *IdentifierLV) GetValue(f *FunctionBuilder) Value {
 
 func (i *IdentifierLV) GetPosition() *Position {
 	return i.pos
+}
+func (i *IdentifierLV) SetIsSideEffect(b bool) {
+	i.isSideEffect = b
 }
 
 func NewIdentifierLV(variable string, pos *Position) *IdentifierLV {
@@ -161,7 +168,7 @@ func (b *FunctionBuilder) readVariableByBlockEx(variable string, block *BasicBlo
 		}
 	} else if len(block.Preds) == 0 {
 		// v = nil
-		if b.CanBuildFreeValue(variable) {
+		if create && b.CanBuildFreeValue(variable) {
 			v = b.BuildFreeValue(variable)
 		} else if i := b.TryBuildExternValue(variable); i != nil {
 			v = i

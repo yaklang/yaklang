@@ -19,42 +19,29 @@ func (f *FunctionBuilder) NewCall(target Value, args []Value) *Call {
 	return NewCall(target, args, nil, f.CurrentBlock)
 }
 
-func (c *Call) HandleFreeValue(fvs map[string]bool) {
+func (c *Call) HandleFreeValue(fvs []string, sideEffect []string) {
 	builder := c.GetFunc().builder
 	recoverBuilder := builder.SetCurrent(c)
 	defer recoverBuilder()
 
 	// parent := builder.parentBuilder
 
-	for name, modify := range fvs {
-		_ = modify
+	for _, name := range fvs {
 		_ = name
 		if v := builder.ReadVariableBefore(name, false, c); v != nil {
-			if modify {
-				field := builder.NewCaptureField(name)
-				field.OutCapture = false
-				// EmitBefore(c, field)
-				builder.EmitInstructionAfter(field, c)
-				field.SetPosition(c.GetPosition())
-				field.SetType(BasicTypes[Any])
-				builder.WriteVariable(name, field)
-				ReplaceValueSkip(v, field, func(inst Instruction) bool {
-					if inst.GetPosition() == nil {
-						return true
-					}
-					if inst.GetPosition().StartLine > c.GetPosition().StartLine {
-						return false
-					} else {
-						return true
-					}
-				})
-				//TODO: modify this binding
-				c.binding = append(c.binding, v)
-			} else {
-				c.binding = append(c.binding, v)
-			}
+			c.binding = append(c.binding, v)
 		} else {
 			c.NewError(Error, SSATAG, BindingNotFound(name))
 		}
 	}
+
+	for _, name := range sideEffect {
+		v := builder.ReadVariableBefore(name, false, c)
+		if v == nil {
+			// if side effect not found, just skip
+			continue
+		}
+		// handle side effect
+	}
+
 }

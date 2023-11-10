@@ -313,8 +313,8 @@ func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
 	}
 
 	// handle FreeValue
-	if funcTyp.FreeValue != nil {
-		c.HandleFreeValue(funcTyp.FreeValue)
+	if len(funcTyp.FreeValue) != 0 || len(funcTyp.SideEffects) != 0 {
+		c.HandleFreeValue(funcTyp.FreeValue, funcTyp.SideEffects)
 	}
 
 	// handle ellipsis, unpack argument
