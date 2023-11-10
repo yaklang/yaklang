@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"net/http"
 	"strings"
 	"testing"
@@ -319,4 +320,14 @@ assert string(body) == token2, sprintf("get %s != %s", string(body), string(toke
 	if !strings.Contains(string(finalResponse), token2) {
 		t.Fatalf("not found replaced token, final response: %s", string(finalResponse))
 	}
+}
+
+func TestHTTPFlowTreeHelper(t *testing.T) {
+
+	//db := yakit.FilterHTTPFlowByDomain(consts.GetGormProjectDatabase(), "w.baidu.com").Debug()
+	//for result := range yakit.YieldHTTPFlows(db, context.Background()) {
+	//	fmt.Println(result.Url)
+	//}
+	var result = yakit.GetHTTPFlowNextPartPathByPathPrefix(consts.GetGormProjectDatabase(), "v1")
+	spew.Dump(result)
 }
