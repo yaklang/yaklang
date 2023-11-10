@@ -158,7 +158,6 @@ func TestElseIf(t *testing.T) {
 	prog.Show()
 }
 
-
 func TestTrueOrFalse(t *testing.T) {
 	prog := ParseSSA(`
 	function tof(a, b){
@@ -190,4 +189,27 @@ func TestIdentifier(t *testing.T) {
 	  });
 	`, none)
 	prog.Show()
+}
+
+func TestTry(t *testing.T) {
+	prog := ParseSSA(`
+  let url = "https://api.github.com/users/ruanyf";
+   try {
+    let response = await fetch(url);
+    return await response.json();
+  } catch (error) {
+    console.log('Request Failed', error);
+  }
+ 
+`, none)
+	prog.Show()
+}
+
+func TestLet(t *testing.T) {
+	prog2 := ParseSSA(`
+  	let response = await fetch(url);
+  
+`, none)
+
+	prog2.Show()
 }

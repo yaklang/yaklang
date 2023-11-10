@@ -58,6 +58,10 @@ func (v Values) Filter(f func(*Value) bool) Values {
 	return ret
 }
 
+func (v *Value) FixUpdateValue() Values {
+	return getValuesWithUpdateSingle(v)
+}
+
 func (v Values) GetUsers() Values {
 	ret := make(Values, 0, len(v))
 	v.ForEach(func(v *Value) {

@@ -44,15 +44,16 @@ func getUpdate(v) {
     var ret
     v.GetUsers().ForEach(v => {
         if v.IsUpdate() {
+            // println("op0: " + v.GetOperand(0).String())
             index = v.GetOperand(0).String().Split(".")
             op1 := v.GetOperand(1)
             if op1.IsFunction() {
-                ret = index[1] + ": " + "Param: " + op1.GetParameter()
+                ret = index[len(index)-1] + ": " + "Param: " + op1.GetParameter()
             } else if op1.IsMake(){
                 make_ := handleMake(op1)
-                ret = index[1] + ": " + "make{" + make_ + "}"
+                ret = index[len(index)-1] + ": " + "make{" + make_ + "}"
             } else {
-                ret = index[1] + ": " + v.GetOperand(1).String()
+                ret = index[len(index)-1] + ": " + v.GetOperand(1).String()
             }
         }
         
@@ -60,28 +61,6 @@ func getUpdate(v) {
     return ret
 }
 
-// func getField(v) {
-//     ret := []
-//     v.GetUsers().ForEach(u => {
-//         if u.IsField() {
-//             ret.Append(u)
-//         }
-        
-//     })
-//     return ret
-// }
-
-// func getCall(v) {
-//     var ret = []
-//     v.GetUsers().ForEach(v1 => {
-//         if !v1.IsCall() {
-//             return
-//         }
-//         ret.Append(v1)
-//         // v1.ShowUseDefChain()
-//     })
-//     return ret
-// }
 
 func handleMake(v) {
     var ret = []
@@ -93,14 +72,6 @@ func handleMake(v) {
     return ret
 }
 
-
-// func handleFunction(v) {
-//     for _, i := range v {
-//         i.GetUsers().ForEach(v => {
-//             v.ShowUseDefChain()
-//         })
-//     }
-// }
 
 
 func getRes(v) {
@@ -133,26 +104,20 @@ func getRes(v) {
 }
 
 doc := prog.Ref("$")
-// Users := doc.GetUsers()
-// u2 = Users.Filter(v => v.IsField())
-// println("Users::" , typeof(Users))
-// println("Users::" , typeof(doc))
-// println("Users::" , typeof(u2))
-// println("Users::" , typeof(Users.Filter))
-// print("-----------------------------")
-// calls := Users.GetUsers().Filter(v => v.IsCall())
-// calls.ForEach(v => {getRes(v)})
-doc.ForEach(v => {
-    Users := v.GetField()
-    // v.ShowUseDefChain()
-    // println("Users: " + Users)
-    // println("Methods:" + Method)
-    for _, i := range Users {
-        calls := i.GetCall()
-        getRes(calls)
-    }
+Users := doc.GetUsers().Filter(v => v.IsField())
+calls := Users.GetUsers().Filter(v => v.IsCall())
+getRes(calls)
+// doc.ForEach(v => {
+//     Users := v.GetField()
+//     // v.ShowUseDefChain()
+//     // println("Users: " + Users)
+//     // println("Methods:" + Method)
+//     for _, i := range Users {
+//         calls := i.GetCall()
+//         getRes(calls)
+//     }
     
-})
+// })
 
 prog2 := ssa.Parse(
     `
@@ -174,18 +139,11 @@ $.ajax({
     ssa.withLanguage(ssa.Javascript), 
 )
 
-doc1 := prog2.Ref("$")
-doc1.ForEach(v => {
-    Users := v.GetField()
-    // v.ShowUseDefChain()
-    // println("Users: " + Users)
-    // println("Methods:" + Method)
-    for _, i := range Users {
-        calls := i.GetCall()
-        getRes(calls)
-    }
-    
-})
+doc2 := prog2.Ref("$")
+Users2 := doc2.GetUsers().Filter(v => v.IsField())
+calls2 := Users2.GetUsers().Filter(v => v.IsCall())
+getRes(calls2)
+
 
 
 
@@ -215,14 +173,6 @@ $(document).ready(() => {
 
 
 doc3 := prog3.Ref("$")
-doc3.ForEach(v => {
-    Users := v.GetField()
-    // v.ShowUseDefChain()
-    // println("Users: " + Users)
-    // println("Methods:" + Method)
-    for _, i := range Users {
-        calls := i.GetCall()
-        getRes(calls)
-    }
-    
-})
+Users3 := doc3.GetUsers().Filter(v => v.IsField())
+calls3 := Users3.GetUsers().Filter(v => v.IsCall())
+getRes(calls3)
