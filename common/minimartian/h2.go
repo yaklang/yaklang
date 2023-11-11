@@ -76,5 +76,4 @@ func (p *Proxy) proxyH2(closing chan bool, cc *tls.Conn, url *url.URL) error {
 	proxyClientConfig := &lowhttp2.ServeConnOpts{Handler: handler}
 	proxyClient.ServeConn(cc, proxyClientConfig)
 	return nil
-
 }
