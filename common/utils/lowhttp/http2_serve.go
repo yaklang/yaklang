@@ -277,11 +277,11 @@ func serveH2(r io.Reader, conn net.Conn, opt ...h2Option) error {
 			}
 		case *http2.DataFrame:
 			// update window
-			err := frame.WriteWindowUpdate(0, defaultStreamReceiveWindowSize)
+			err := frame.WriteWindowUpdate(0, uint32(len(ret.Data())))
 			if err != nil {
 				return utils.Errorf("h2 server write window update error: %v", err)
 			}
-			err = frame.WriteWindowUpdate(ret.StreamID, defaultStreamReceiveWindowSize)
+			err = frame.WriteWindowUpdate(ret.StreamID, uint32(len(ret.Data())))
 			if err != nil {
 				return utils.Errorf("h2 server write window update error: %v", err)
 			}
@@ -315,7 +315,7 @@ func serveH2(r io.Reader, conn net.Conn, opt ...h2Option) error {
 			})
 			return nil
 		default:
-			log.Errorf("h2 server unknown frame type: %T", ret)
+			log.Warnf("h2 server unknown frame type: %T", ret)
 			log.Infof("unhandled frame: %v", ret)
 		}
 	}
