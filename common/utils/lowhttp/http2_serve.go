@@ -3,7 +3,6 @@ package lowhttp
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -16,109 +15,6 @@ import (
 	"sync"
 	"time"
 )
-
-type http2ConnectionConfig struct {
-	handler func(header []byte, body io.ReadCloser) ([]byte, io.ReadCloser, error)
-	frame   *http2.Framer
-
-	// writer
-	hencBuf   *bytes.Buffer
-	henc      *hpack.Encoder
-	hencMutex *sync.Mutex
-
-	wg *sync.WaitGroup
-}
-
-func (c *http2ConnectionConfig) writer(wrapper *h2RequestState, header []byte, body io.ReadCloser) error {
-	if c.frame == nil {
-		return utils.Error("h2 server frame config is nil")
-	}
-	streamId := wrapper.streamId
-	frame := c.frame
-	henc := c.henc
-	buf := c.hencBuf
-
-	c.hencMutex.Lock()
-	buf.Reset()
-	SplitHTTPPacket(header, nil, func(proto string, code int, codeMsg string) error {
-		henc.WriteField(hpack.HeaderField{Name: ":status", Value: fmt.Sprint(code)})
-		return nil
-	}, func(line string) string {
-		k, v := SplitHTTPHeader(line)
-		henc.WriteField(hpack.HeaderField{Name: strings.ToLower(k), Value: v})
-		return line
-	})
-	var hpackHeaderBytes = buf.Bytes()
-	buf.Reset()
-
-	//defer func() {
-	//	log.Infof("handle h2 stream(%v) done", streamId)
-	//}()
-	//log.Infof("start to write h2 response header stream-id: %v", streamId)
-	ret := funk.Chunk(hpackHeaderBytes, defaultMaxFrameSize).([][]byte)
-	first := true
-	for index, item := range ret {
-		if first {
-			first = false
-			err := frame.WriteHeaders(http2.HeadersFrameParam{
-				StreamID:      uint32(streamId),
-				BlockFragment: item,
-				EndStream:     false,
-				EndHeaders:    index == len(ret)-1,
-			})
-			if err != nil {
-				return utils.Wrapf(err, "h2framer write header(%v) for stream:%v failed", len(hpackHeaderBytes), streamId)
-			}
-		} else {
-			err := frame.WriteContinuation(uint32(streamId), index == len(ret)-1, item)
-			if err != nil {
-				return utils.Wrapf(err, "h2framer write header(%v)-continuation for stream:%v failed", len(hpackHeaderBytes), streamId)
-			}
-		}
-	}
-	c.hencMutex.Unlock()
-
-	results, err := io.ReadAll(body)
-	//log.Infof("start to write data{%v} to stream-id: %v", len(results), streamId)
-	if len(results) > 0 {
-		chunks := funk.Chunk(results, defaultMaxFrameSize).([][]byte)
-		first = true
-		for index, dataFrameBytes := range chunks {
-			dataFrameErr := frame.WriteData(uint32(streamId), index == len(chunks)-1, dataFrameBytes)
-			if dataFrameErr != nil {
-				return utils.Wrapf(dataFrameErr, "framer WriteData for stream{%v} failed", streamId)
-			}
-		}
-	} else {
-		dataFrameErr := frame.WriteData(uint32(streamId), true, nil)
-		if dataFrameErr != nil {
-			return utils.Wrapf(dataFrameErr, "framer WriteData for stream{%v} failed", streamId)
-		}
-	}
-	if err != nil {
-		return utils.Wrapf(err, "read body for stream{%v} failed", streamId)
-	}
-	return nil
-}
-
-type h2Option func(*http2ConnectionConfig)
-
-func withH2Handler(h func(header []byte, body io.ReadCloser) ([]byte, io.ReadCloser, error)) h2Option {
-	return func(c *http2ConnectionConfig) {
-		c.handler = h
-	}
-}
-
-func (c *http2ConnectionConfig) handleRequest(wrapper *h2RequestState, header []byte, body io.ReadCloser) error {
-	if c == nil || c.handler == nil {
-		return utils.Error("h2 server handler config is nil")
-	}
-	header, rc, err := c.handler(header, body)
-	if err != nil {
-		return utils.Errorf("waiting for userspace handling for h2 stream(%v) failed: %v", wrapper.streamId, err)
-	}
-	return c.writer(wrapper, header, rc)
-}
 
 type h2RequestState struct {
 	config *http2ConnectionConfig
@@ -229,6 +125,11 @@ func serveH2(r io.Reader, conn net.Conn, opt ...h2Option) error {
 		{SettingMaxHeaderListSize, sc.maxHeaderListSize()},
 		{SettingInitialWindowSize, uint32(sc.srv.initialStreamRecvWindowSize())},
 	*/
+	// init window
+	config.windowSize = defaultStreamReceiveWindowSize
+	config.windowMutex = new(sync.Mutex)
+	config.windowChanged = sync.NewCond(new(sync.Mutex))
+
 	err = frame.WriteSettings(
 		http2.Setting{ID: http2.SettingInitialWindowSize, Val: defaultStreamReceiveWindowSize},
 		http2.Setting{ID: http2.SettingMaxFrameSize, Val: defaultMaxFrameSize},
@@ -329,6 +230,8 @@ func serveH2(r io.Reader, conn net.Conn, opt ...h2Option) error {
 			}
 		case *http2.WindowUpdateFrame:
 			// update window
+			log.Infof("h2(WINDOW_UPDATE) client allow server to (inc) %v bytes", ret.Increment)
+			config.increaseWindowSize(int64(ret.Increment))
 		case *http2.HeadersFrame:
 			// build request
 			// log.Infof("h2 stream-id fetch header: %v", ret.StreamID)
@@ -374,11 +277,11 @@ func serveH2(r io.Reader, conn net.Conn, opt ...h2Option) error {
 			}
 		case *http2.DataFrame:
 			// update window
-			err := frame.WriteWindowUpdate(0, transportDefaultConnFlow)
+			err := frame.WriteWindowUpdate(0, defaultStreamReceiveWindowSize)
 			if err != nil {
 				return utils.Errorf("h2 server write window update error: %v", err)
 			}
-			err = frame.WriteWindowUpdate(ret.StreamID, transportDefaultConnFlow)
+			err = frame.WriteWindowUpdate(ret.StreamID, defaultStreamReceiveWindowSize)
 			if err != nil {
 				return utils.Errorf("h2 server write window update error: %v", err)
 			}
