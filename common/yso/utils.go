@@ -592,6 +592,7 @@ func ToBcel(i interface{}) (string, error) {
 		return "", utils.Errorf("cannot support %v to bcel string", reflect.TypeOf(ret))
 	}
 }
+
 func ToBytes(i interface{}) ([]byte, error) {
 	switch ret := i.(type) {
 	case *javaclassparser.ClassObject:
@@ -602,6 +603,7 @@ func ToBytes(i interface{}) ([]byte, error) {
 		return nil, utils.Errorf("cannot support %v to bytes", reflect.TypeOf(ret))
 	}
 }
+
 func ToJson(i interface{}) (string, error) {
 	switch ret := i.(type) {
 	case *javaclassparser.ClassObject:
