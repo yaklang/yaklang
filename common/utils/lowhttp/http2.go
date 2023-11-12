@@ -18,6 +18,11 @@ import (
 )
 
 const transportDefaultConnFlow = 1 << 30
+const defaultHeaderTableSize = 65536
+const defaultStreamReceiveWindowSize = 1 << 20
+const defaultMaxFrameSize = 1 << 14
+const defaultMaxConcurrentStreamSize = 250
+const defaultMaxHeaderListSize = 10 << 18
 
 // requires cc.wmu be held
 func h2FramerWriteHeaders(frame *http2.Framer, streamID uint32, endStream bool, maxFrameSize int, hdrs []byte) error {
@@ -205,7 +210,7 @@ func HTTPRequestToHTTP2(schema string, host string, conn net.Conn, raw []byte, n
 			break
 		}
 		if err != nil {
-			log.Warnf("yak.h2 frame read failed: %s", err)
+			log.Warnf("yak.h2(client) frame read failed: %s", err)
 			lastError = append(lastError, err)
 		}
 		if frameResponse == nil {
@@ -239,6 +244,8 @@ func HTTPRequestToHTTP2(schema string, host string, conn net.Conn, raw []byte, n
 			if ret.StreamEnded() {
 				endStream = true
 			}
+			frame.WriteWindowUpdate(0, transportDefaultConnFlow)
+			frame.WriteWindowUpdate(ret.StreamID, transportDefaultConnFlow)
 		case *http2.SettingsFrame:
 			if !ret.IsAck() {
 				frame.WriteSettingsAck()

@@ -578,7 +578,12 @@ RECONNECT:
 		if option.BeforeDoRequest != nil {
 			requestPacket = option.BeforeDoRequest(requestPacket)
 		}
-		rsp, err := HTTPRequestToHTTP2("https", utils.HostPort(host, port), conn, requestPacket, noFixContentLength)
+
+		scheme := "https"
+		if !https {
+			scheme = "http"
+		}
+		rsp, err := HTTPRequestToHTTP2(scheme, utils.HostPort(host, port), conn, requestPacket, noFixContentLength)
 		if err != nil {
 			return response, utils.Errorf("yak.http2 error: %s", err)
 		}

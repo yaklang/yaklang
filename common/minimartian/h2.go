@@ -1,67 +1,22 @@
 package minimartian
 
 import (
+	"bytes"
 	"crypto/tls"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian/proxyutil"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
-	"github.com/yaklang/yaklang/common/utils/lowhttp/lowhttp2"
 	"io"
-	"net/http"
 	"net/url"
 )
-
-type H2Handler struct {
-	reqmod     RequestModifier
-	resmod     ResponseModifier
-	proxy      *Proxy
-	serverHost string
-}
-
-func makeNewH2Handler(reqmod RequestModifier, resmod ResponseModifier, serverHost string, proxy *Proxy) *H2Handler {
-	return &H2Handler{reqmod: reqmod, resmod: resmod, serverHost: serverHost, proxy: proxy}
-}
-
-func (h *H2Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	if err := h.reqmod.ModifyRequest(req); err != nil {
-		log.Errorf("mitm: error modifying request: %v", err)
-		proxyutil.Warning(req.Header, err)
-		return
-	}
-	if httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_IsDropped) {
-		w.WriteHeader(200)
-		w.Write([]byte(proxyutil.GetErrorRspBody("请求被用户丢弃")))
-	} else {
-		rsp, err := h.proxy.execLowhttp(req)
-		if err != nil {
-			log.Errorf("mitm: error requesting to remote server: %v", err)
-			return
-		}
-		defer rsp.Body.Close()
-
-		if err := h.resmod.ModifyResponse(rsp); err != nil {
-			log.Errorf("mitm: error modifying response: %v", err)
-			proxyutil.Warning(req.Header, err)
-			return
-		}
-
-		for k, v := range rsp.Header {
-			w.Header().Set(k, v[0])
-		}
-		w.WriteHeader(rsp.StatusCode)
-		rspBody, _ := io.ReadAll(rsp.Body)
-		w.Write(rspBody)
-	}
-}
 
 // proxyH2 proxies HTTP/2 traffic between a client connection, `cc`, and the HTTP/2 `url` assuming
 // h2 is being used. Since no browsers use h2c, it's safe to assume all traffic uses TLS.
 // Revision this func from martian h2 package since it was not compatible with martian modifier style
 func (p *Proxy) proxyH2(closing chan bool, cc *tls.Conn, url *url.URL) error {
-	if p.mitm.H2Config().EnableDebugLogs {
-		log.Infof("\u001b[1;35mProxying %v with HTTP/2\u001b[0m", url)
-	}
-
+	log.Infof("Proxying %v with HTTP/2", url)
 	go func() {
 		select {
 		case <-closing:
@@ -69,11 +24,50 @@ func (p *Proxy) proxyH2(closing chan bool, cc *tls.Conn, url *url.URL) error {
 		cc.Close()
 	}()
 
-	proxyClient := lowhttp2.Server{
-		PermitProhibitedCipherSuites: true,
-	}
-	handler := makeNewH2Handler(p.reqmod, p.resmod, url.Host, p)
-	proxyClientConfig := &lowhttp2.ServeConnOpts{Handler: handler}
-	proxyClient.ServeConn(cc, proxyClientConfig)
-	return nil
+	return lowhttp.ServeHTTP2Connection(cc, func(header []byte, body io.ReadCloser) ([]byte, io.ReadCloser, error) {
+		var reqBytes = bytes.NewBuffer(header)
+		io.Copy(reqBytes, body)
+		req, err := utils.ReadHTTPRequestFromBytes(reqBytes.Bytes())
+		if err != nil {
+			return nil, nil, err
+		}
+		httpctx.SetRequestHTTPS(req, true)
+		if req.URL != nil {
+			req.URL.Scheme = "https"
+		}
+		if err := p.reqmod.ModifyRequest(req); err != nil {
+			log.Errorf("mitm: error modifying request: %v", err)
+			proxyutil.Warning(req.Header, err)
+			return nil, nil, err
+		}
+		if httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_IsDropped) {
+			return []byte(`HTTP/2 200 OK
+Content-Type: text/html
+`), io.NopCloser(bytes.NewBufferString(proxyutil.GetErrorRspBody("请求被用户丢弃"))), nil
+		} else {
+			rsp, err := p.execLowhttp(req)
+			if err != nil {
+				log.Errorf("mitm: error requesting to remote server: %v", err)
+				return nil, nil, err
+			}
+			defer func() {
+				if rsp != nil && rsp.Body != nil {
+					rsp.Body.Close()
+				}
+			}()
+
+			if err := p.resmod.ModifyResponse(rsp); err != nil {
+				log.Errorf("mitm: error modifying response: %v", err)
+				proxyutil.Warning(req.Header, err)
+				return nil, nil, err
+			}
+
+			rspBytes, err := utils.DumpHTTPResponse(rsp, true)
+			if err != nil {
+				return nil, nil, err
+			}
+			header, body := lowhttp.SplitHTTPPacketFast(rspBytes)
+			return []byte(header), io.NopCloser(bytes.NewBuffer(body)), nil
+		}
+	})
 }
