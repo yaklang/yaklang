@@ -523,10 +523,38 @@ func SetClassBytes(data []byte) GenClassOptionFun {
 	}
 }
 
+// LoadClassFromBytes 从字节数组中加载并返回一个javaclassparser.ClassObject对象。
+// 这个函数使用GenerateClassObjectFromBytes作为其实现，并允许通过可变参数`options`来配置生成的类对象。
+// 这些参数是GenClassOptionFun类型的函数，用于定制类对象的特定属性或行为。
+//
+// bytes：要从中加载类对象的字节数组。
+//
+// options：用于配置类对象的可变参数函数列表。
+//
+// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+//
+// Example:
+//
+// bytesCode,_ =codec.DecodeBase64("yv66vg...")
+//
+// classObject, _ := yso.LoadClassFromBytes(bytesCode) // 从字节中加载并配置类对象
 func LoadClassFromBytes(bytes []byte, options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
 	return GenerateClassObjectFromBytes(bytes, options...)
 }
 
+// LoadClassFromBase64 从base64编码的字符串中加载并返回一个javaclassparser.ClassObject对象。
+// 这个函数使用GenerateClassObjectFromBytes作为其实现，并允许通过可变参数`options`来配置生成的类对象。
+// 这些参数是GenClassOptionFun类型的函数，用于定制类对象的特定属性或行为。
+//
+// base64：要从中加载类对象的base64编码字符串。
+//
+// options：用于配置类对象的可变参数函数列表。
+//
+// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+//
+// Example:
+//
+// classObject, _ := yso.LoadClassFromBytes("yv66vg...") // 从字节中加载并配置类对象
 func LoadClassFromBase64(base64 string, options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
 	bytes, err := codec.DecodeBase64(base64)
 	if err != nil {
@@ -536,6 +564,22 @@ func LoadClassFromBase64(base64 string, options ...GenClassOptionFun) (*javaclas
 	return GenerateClassObjectFromBytes(bytes, options...)
 }
 
+// LoadClassFromBCEL 将BCEL（Byte Code Engineering Library）格式的Java类数据转换为字节数组，
+// 并从这些字节中加载并返回一个javaclassparser.ClassObject对象。
+// 这个函数首先使用javaclassparser.Bcel2bytes转换BCEL格式的数据，然后利用GenerateClassObjectFromBytes生成类对象。
+// 可通过可变参数`options`来定制类对象的特定属性或行为。
+//
+// data：BCEL格式的Java类数据。
+//
+// options：用于配置类对象的可变参数函数列表。
+//
+// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+//
+// Example:
+//
+// bcelData := "$$BECL$$..." // 假设的BCEL数据
+//
+// classObject, err := LoadClassFromBCEL(bcelData, option1, option2) // 从BCEL数据加载并配置类对象
 func LoadClassFromBCEL(data string, options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
 	bytes, err := javaclassparser.Bcel2bytes(data)
 	if err != nil {
@@ -554,12 +598,33 @@ func LoadClassFromJson(jsonData string, options ...GenClassOptionFun) (*javaclas
 	return GenerateClassObjectFromBytes(bytes, options...)
 }
 
+// GenerateClassObjectFromBytes 从字节数组中加载并返回一个javaclassparser.ClassObject对象。
+// LoadClassFromBytes、LoadClassFromBase64、LoadClassFromBCEL等函数都是基于这个函数实现的。
+// 参数是GenClassOptionFun类型的函数，用于定制类对象的特定属性或行为。
+//
+// bytes：要从中加载类对象的字节数组。
+//
+// options：用于配置类对象的可变参数函数列表。
+//
+// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+//
+// Example:
+//
+// bytesCode,_ =codec.DecodeBase64("yv66vg...")
+//
+// classObject, _ := yso.LoadClassFromBytes(bytesCode) // 从字节中加载并配置类对象
 func GenerateClassObjectFromBytes(bytes []byte, options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
 	config := NewClassConfig(append(options, SetClassBytes(bytes))...)
 	config.ClassType = BytesClass
 	return config.GenerateClassObject()
 }
 
+// SetExecCommand
+// command 请求参数选项函数，用于设置要执行的命令。需要配合SetClassRuntimeExecTemplate使用。
+//
+// Example:
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.SetExecCommand("whoami"),yso.useRuntimeExecTemplate())
 func SetExecCommand(cmd string) GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.Command = cmd
@@ -579,19 +644,51 @@ func SetMajorVersion(v uint16) GenClassOptionFun {
 	}
 }
 
-// RuntimeExec 参数
+
+// SetClassRuntimeExecTemplate
+//
+// useRuntimeExecTemplate 请求参数选项函数，用于设置生成RuntimeExec类的模板，需要配合SetExecCommand使用。
+//
+// Example:
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.useRuntimeExecTemplate(),yso.SetExecCommand("whoami")
 func SetClassRuntimeExecTemplate() GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.ClassType = RuntimeExecClass
 	}
 }
 
+// SetRuntimeExecEvilClass
+//
+// useRuntimeExecEvilClass 请求参数选项函数，设置生成RuntimeExec类的模板，同时设置要执行的命令。
+//
+// cmd：要执行的命令字符串。
+//
+// Example:
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.useRuntimeExecEvilClass("whoami"))
 func SetRuntimeExecEvilClass(cmd string) GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.ClassType = RuntimeExecClass
 		config.Command = cmd
 	}
 }
+
+// GenerateRuntimeExecEvilClassObject 生成一个使用RuntimeExec类模板的javaclassparser.ClassObject对象，
+// 并设置一个指定的命令来执行。这个函数结合使用SetClassRuntimeExecTemplate和SetExecCommand函数，
+// 以生成在反序列化时会执行特定命令的Java对象。
+//
+// cmd：要在生成的Java对象中执行的命令字符串。
+//
+// options：一组可选的GenClassOptionFun函数，用于进一步定制生成的Java对象。
+//
+// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+//
+// Example:
+//
+// command := "ls" // 假设的命令字符串
+//
+// classObject, err := yso.GenerateRuntimeExecEvilClassObject(command, additionalOptions...) // 生成并配置RuntimeExec Java对象
 func GenerateRuntimeExecEvilClassObject(cmd string, options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
 	config := NewClassConfig(append(options, SetClassRuntimeExecTemplate(), SetExecCommand(cmd))...)
 	config.ClassType = RuntimeExecClass
