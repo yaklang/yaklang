@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"io"
 	"net/url"
+	"time"
 )
 
 // proxyH2 proxies HTTP/2 traffic between a client connection, `cc`, and the HTTP/2 `url` assuming
@@ -22,6 +23,12 @@ func (p *Proxy) proxyH2(closing chan bool, cc *tls.Conn, url *url.URL) error {
 		case <-closing:
 		}
 		cc.Close()
+	}()
+
+	go func() {
+		time.AfterFunc(3*time.Second, func() {
+			cc.Close()
+		})
 	}()
 
 	return lowhttp.ServeHTTP2Connection(cc, func(header []byte, body io.ReadCloser) ([]byte, io.ReadCloser, error) {
