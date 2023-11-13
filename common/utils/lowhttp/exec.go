@@ -189,11 +189,6 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		connPool = DefaultLowHttpConnPool
 	}
 
-	reqSchema := "HTTP"
-	if forceHttp2 {
-		reqSchema = "HTTP2"
-	}
-
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -304,6 +299,8 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 			clInt = codec.Atoi(value)
 		}
 	})
+
+	connPool = DefaultLowHttpConnPool
 	if hostInPacket == "" && host == "" {
 		return response, utils.Errorf("host not found in packet and option (Check your `Host: ` header)")
 	}
@@ -437,8 +434,10 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 
 	// h2
 	var nextProto []string
+	reqSchema := H1
 	if enableHttp2 {
 		nextProto = []string{http2.NextProtoTLS}
+		reqSchema = H2
 	} else {
 		nextProto = []string{"http/1.1"}
 	}
@@ -516,13 +515,19 @@ RECONNECT:
 	if haveNativeHTTPRequestInstance {
 		httpctx.SetRequestHTTPS(option.NativeHTTPRequestInstance, https)
 	}
-	if withConnPool && !enableHttp2 {
+	if withConnPool || enableHttp2 {
 		conn, err = connPool.getIdleConn(cacheKey, dialopts...)
 	} else {
 		conn, err = netx.DialX(originAddr, dialopts...)
 	}
 	traceInfo.DNSTime = dnsEnd.Sub(dnsStart) // safe
 	response.Https = https
+
+	if https {
+		if conn.(*tls.Conn).ConnectionState().NegotiatedProtocol != H2 { //降级
+			enableHttp2 = false
+		}
+	}
 
 	// checking old proxy
 	oldVersionProxyChecking := false
@@ -575,20 +580,35 @@ RECONNECT:
 	if enableHttp2 {
 		//ddl, cancel := context.WithTimeout(context.Background(), timeout)
 		//defer cancel()
-		if option.BeforeDoRequest != nil {
-			requestPacket = option.BeforeDoRequest(requestPacket)
+		//if option.BeforeDoRequest != nil {
+		//	requestPacket = option.BeforeDoRequest(requestPacket)
+		//}
+		//
+		//scheme := "https"
+		//if !https {
+		//	scheme = "http"
+		//}
+		//rsp, err := HTTPRequestToHTTP2(scheme, utils.HostPort(host, port), conn, requestPacket, noFixContentLength)
+		//if err != nil {
+		//	return response, utils.Errorf("yak.http2 error: %s", err)
+		//}
+		//response.RawPacket = rsp
+		//return response, err
+		h2Conn := conn.(*persistConn).alt
+		if h2Conn == nil {
+			return nil, utils.Error("conn h2 Processor is nil")
 		}
 
-		scheme := "https"
-		if !https {
-			scheme = "http"
+		h2Stream := h2Conn.newStream(option.NativeHTTPRequestInstance, requestPacket)
+
+		if err := h2Stream.doRequest(); err != nil {
+			return nil, err
 		}
-		rsp, err := HTTPRequestToHTTP2(scheme, utils.HostPort(host, port), conn, requestPacket, noFixContentLength)
-		if err != nil {
-			return response, utils.Errorf("yak.http2 error: %s", err)
-		}
-		response.RawPacket = rsp
-		return response, err
+
+		_, responsePacket := h2Stream.waitResponse()
+		httpctx.SetBareResponseBytes(option.NativeHTTPRequestInstance, responsePacket)
+		response.RawPacket = responsePacket
+		return response, nil
 	}
 
 	var multiResponses []*http.Response

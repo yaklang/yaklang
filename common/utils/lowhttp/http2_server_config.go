@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/yaklang/yaklang/common/go-funk"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
@@ -24,33 +23,7 @@ type http2ConnectionConfig struct {
 
 	wg *sync.WaitGroup
 
-	windowMutex   *sync.Mutex
-	windowSize    int64
-	windowChanged *sync.Cond
-}
-
-func (c *http2ConnectionConfig) increaseWindowSize(i int64) {
-	c.windowMutex.Lock()
-	defer c.windowMutex.Unlock()
-
-	var notify = false
-	if c.windowSize <= 0 {
-		notify = true
-	}
-	c.windowSize += i
-	if c.windowSize > 0 && notify {
-		c.windowChanged.Broadcast()
-	}
-}
-
-func (c *http2ConnectionConfig) decreaseWindowSize(i int64) {
-	c.windowMutex.Lock()
-	c.windowSize -= i
-	defer c.windowMutex.Unlock()
-	if c.windowSize <= 0 {
-		log.Infof("window size is %v, waiting for window size changed", c.windowSize)
-		c.windowChanged.Wait()
-	}
+	*windowSizeControl
 }
 
 func (c *http2ConnectionConfig) writer(wrapper *h2RequestState, header []byte, body io.ReadCloser) error {
