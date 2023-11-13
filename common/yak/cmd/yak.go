@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/yak/cmd/yakcmds"
 	"io"
 	"io/ioutil"
@@ -1412,9 +1413,17 @@ func main() {
 			Name:  "cdebug",
 			Usage: "以命令行debug模式执行yak(仅限新引擎,对yakc文件无效)，进入cli debug",
 		},
+		cli.StringFlag{
+			Name:   "netx-proxy",
+			Usage:  "为底层Netx设置代理",
+			EnvVar: "NETX_PROXY",
+		},
 	}
 
 	app.Action = func(c *cli.Context) error {
+		if proxy := c.String("netx-proxy"); proxy != "" {
+			netx.SetDefaultDialXConfig(netx.DialX_WithProxy(proxy))
+		}
 		var (
 			err error
 			key []byte
