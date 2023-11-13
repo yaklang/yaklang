@@ -130,7 +130,7 @@ func (m *MITMFilterManager) IsMIMEPassed(ct string) bool {
 	if parsed != "" {
 		ct = parsed
 	}
-	return _checker(nil, m.ExcludeMIME, ct)
+	return _mimeChecker(nil, m.ExcludeMIME, ct)
 }
 
 // IsPassed return true if passed, false if filtered out
@@ -143,7 +143,7 @@ func (m *MITMFilterManager) IsPassed(method string, hostport, urlStr string, ext
 		return false
 	}
 
-	passed = _checker(m.IncludeSuffix, m.ExcludeSuffix, strings.ToLower(ext))
+	passed = _suffixChecker(m.IncludeSuffix, m.ExcludeSuffix, strings.ToLower(ext))
 	if !passed {
 		log.Debugf("url: %v is filtered via suffix(%v)", truncate(urlStr), ext)
 		return false
