@@ -1,0 +1,105 @@
+func getRes(v) {
+    v.ForEach(v => {
+        if v.IsField() {
+            v.GetOperand(0).GetOperands().ForEach(v => {
+                if v.IsMake() {
+                    update := getUpdate(v.GetUsers())
+                    println("make=>" + update)
+                    println("")
+                }
+            })
+            fv := v.FixUpdateValue()
+            getRes(fv.GetUsers())
+            // println("-----------------------------")
+        } else if v.IsCall() {
+            calls := handleUpdate(v)
+            println("")
+            println("Call=>" + calls)
+            println("-----------------------------")
+            getRes(v.GetUsers())
+        } else {
+            print(v.GetOperand(0).String() + ": ")
+            println(v.GetOperand(1).String())
+            // println("-----------------------------")
+        }
+    })
+}
+
+func handleUpdate(v) {
+    r = ""
+    op0 := v.GetOperand(0).String()
+    index := ""
+    index = op0.Split(".")
+
+    length := len(v.GetOperands())
+    func handle(op1) {
+        var ret
+        if op1.IsFunction() {
+            ret = op0 + ": " + "Param: " + op1.GetParameter() + ""
+        } else if op1.IsMake() {
+            make_ := []
+            ids := op1.GetField()
+            make_ = handleMake(ids)
+            ret = op0 + ": " + "make{" + make_ + "}"
+        } else {
+            ret = index[-1] + ": " + v.GetOperand(1).String() + ""
+        }
+        
+        return ret
+    }
+    for i := 1; i < length; i++ {
+        r += handle(v.GetOperand(i))
+    }
+    
+    if length == 1{
+        r = v.String()
+    }
+
+    return r
+}
+
+func getUpdate(v) {
+    rets = []
+    v.GetUsers().ForEach(v => {
+        var ret
+        if v.IsUpdate() {
+            ret = handleUpdate(v)
+            rets.Append(ret)
+        }
+        
+    })
+    return rets
+}
+
+func handleMake(v) {
+    var ret = []
+    for _, i := range v {
+        update := getUpdate(i)
+        ret.Append(update)
+    }
+    
+    return ret
+}
+
+
+
+prog := ssa.Parse(`
+var dlform = document.createElement('form');
+dlform.style = "display:none;";
+dlform.method = 'post';
+dlform.action = '../fileServlet';
+dlform.target = 'callBackTarget';
+var hdnFilePath = document.createElement('input');
+hdnFilePath.type = 'hidden';
+hdnFilePath.name = 'filePath';
+hdnFilePath.value = filePath;
+dlform.appendChild(hdnFilePath);
+document.body.appendChild(dlform);
+dlform.submit();
+document.body.removeChild(dlform);
+`, ssa.withLanguage(ssa.Javascript))
+
+
+doc1 :=  prog.Ref("document").Ref("createElement").GetUsers().Filter(v => v.IsCall())
+// doc1.ForEach(v => v.ShowUseDefChain())
+getRes(doc1)

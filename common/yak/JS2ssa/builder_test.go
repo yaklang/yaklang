@@ -213,3 +213,40 @@ func TestLet(t *testing.T) {
 
 	prog2.Show()
 }
+
+
+func TestFunction(t *testing.T){
+	prog := ParseSSA(`
+	function ajax(url, type, data, success) {
+		// 创建一个XMLHttpRequest对象
+		const xhr = new XMLHttpRequest()
+		// 判断type请求方式
+		if (type == 'get') {
+			// 判断data的数据类型转换成字符串
+			if (Typeof(data) == "object") {
+				// data = (new URLSearchParams(data)).toString()
+			}
+			// 设置请求方式和请求地址
+			xhr.open(type, url + '?' + data)
+			// 发送请求
+			xhr.send()
+		} else if (type == 'post') {
+			// 设置请求方式和请求地址
+			xhr.open(type, url)
+			// 判断数据是不是字符串
+			if (Typeof(data) == "string") {
+				// 设置对应的content-type
+				xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded')
+				xhr.send(data)
+			} else if (Typeof(data) == "object") {
+			} else {
+				xhr.setRequestHeader('Content-type', 'application/json')
+				const str = JSON.stringify(data);
+				console.log(Typeof(str))
+				xhr.send(str)
+			}
+		}
+	}
+	`, none)
+		prog.Show()
+}

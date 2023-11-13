@@ -482,6 +482,9 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 	case *JS.DeleteExpressionContext:
 	case *JS.VoidExpressionContext:
 	case *JS.TypeofExpressionContext:
+		if expr := s.SingleExpression(); expr != nil {
+			b.buildSingleExpression(expr, false)
+		}
 	case *JS.PreIncrementExpressionContext:
 		if expr := s.SingleExpression(); expr != nil {
 			_, lValue := b.buildSingleExpression(expr, true)
