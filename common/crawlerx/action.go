@@ -588,10 +588,13 @@ func (starter *BrowserStarter) extraInputElementsOperator(page *rod.Page) error 
 			continue
 		}
 		selectedOptionElement := options[optionsLength-1]
-		optionValue, _ := getAttribute(selectedOptionElement, "value")
-		err = selectElement.Select([]string{optionValue}, true, rod.SelectorTypeText)
+		selector, err := calculateSelector(selectedOptionElement)
 		if err != nil {
-			return utils.Errorf("%v select element %v error: %v", selectElement, optionValue, err)
+			return utils.Errorf("get option element selector error: %v", err)
+		}
+		err = selectElement.Select([]string{selector}, true, rod.SelectorTypeCSSSector)
+		if err != nil {
+			return utils.Errorf("%v select element %v error: %v", selectElement, selector, err)
 		}
 	}
 	return nil
