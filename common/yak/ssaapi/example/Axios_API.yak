@@ -1,0 +1,171 @@
+func getRes(v) {
+    v.ForEach(v => {
+        if v.IsField() {
+            v.GetOperand(0).GetOperands().ForEach(v => {
+                if v.IsMake() {
+                    update := getUpdate(v.GetUsers())
+                    println("make=>" + update)
+                    println("")
+                }
+            })
+            // println("Method=>" + v.GetOperand(0).String() + "." + v.GetOperand(1).String())
+            // println("")
+            // v.ShowUseDefChain()
+            fv := v.FixUpdateValue()
+            getRes(fv.GetUsers())
+        } else if v.IsCall() {
+            // v.ShowUseDefChain()
+            calls := handleUpdate(v)
+            println("Call=>" + calls)
+            println("")
+            // v.GetUsers().ForEach(v=> v.ShowUseDefChain())
+            getRes(v.GetUsers())
+        } else {
+            // v.ShowUseDefChain()
+            print(v.GetOperand(0).String() + ": ")
+            println(v.GetOperand(1).String())
+            println("-----------------------------")
+        }
+    })
+}
+
+func handleUpdate(v) {
+    r = ""
+    // v.ShowUseDefChain()
+    op0 := v.GetOperand(0).String()
+    index := ""
+    index = op0.Split(".")
+
+    length := len(v.GetOperands())
+    func handle(op1) {
+        var ret
+        if op1.IsFunction() {
+            ret = op0 + ": " + "Param: " + op1.GetParameter() + ""
+        } else if op1.IsMake() {
+            make_ := []
+            ids := op1.GetField()
+            make_ = handleMake(ids)
+            ret = op0 + ": " + "make{" + make_ + "}"
+        } else {
+            ret = index[-1] + ": " + v.GetOperand(1).String() + ""
+        }
+        
+        return ret
+    }
+    for i := 1; i < length; i++ {
+        r += handle(v.GetOperand(i))
+    }
+    
+    if length == 1{
+        r = v.String()
+    }
+
+    return r
+}
+
+func getUpdate(v) {
+    rets = []
+    v.GetUsers().ForEach(v => {
+        var ret
+        if v.IsUpdate() {
+            ret = handleUpdate(v)
+            rets.Append(ret)
+        }
+        
+    })
+    return rets
+}
+
+func handleMake(v) {
+    var ret = []
+    for _, i := range v {
+        update := getUpdate(i)
+        ret.Append(update)
+    }
+    
+    return ret
+}
+
+
+prog := ssa.Parse(
+    `
+var instance = axios.create({
+    baseURL:"https://some-domain.com/api/",
+    timeout:1000,
+    headers:{"X-Custom-Header":"foobar"}
+})      
+//创建实例时设置
+//实例创建后修改默认值（设置全局axios默认值）
+axios.defaults.baseURL = "https://api.example.com";
+axios.defaults.headers.common['Authorization'] = AUTH_TOKEN;
+axios.defaults.headers.post["Content-Type"] = "application/x-www-form-urlencoded";
+
+// 并发：axios.all(iterable)
+axios.all([
+    axios.get("https://api.github.com/xxx/1"),
+    axios.get("https://api.github.com/xxx/2")
+]).then(axios.spread(function(userResp,reposResp){
+    console.log("User",userResp.data);
+    console.log("Repositories",reposResp.data);
+}))
+`, 
+    ssa.withLanguage(ssa.Javascript), 
+)
+
+axios := prog.Ref("axios").GetUsers().Filter(v => v.IsField())
+getRes(axios)
+println("-----------------------------")
+// axios2.ForEach(v => {v.ShowUseDefChain()})
+
+
+prog1 := ssa.Parse(`
+axios({
+    method:"post",
+    url:"/user",
+    data:{
+        firstName:"nanhua",
+        lastName:"qiushui"
+    }
+});
+
+const service = axios.create({
+  baseURL: process.env.BASE_API,
+  timeout: 100000
+})
+
+axios.interceptors.request.use(function(config){
+        //发送请求之前做些什么
+        return config;
+    },function(error){
+        //请求错误之后做些什么
+        return Promise.reject(error);
+    })
+    //响应添加拦截器
+    axios.interceptors.response.use(function(config){
+        //发送请求之前做些什么
+        return config;
+    },function(error){
+        //请求错误之后做些什么
+        return Promise.reject(error);
+    })
+
+
+const s = axios.create.new({
+    test: "123"
+})
+
+s.show()
+`, 
+    ssa.withLanguage(ssa.Javascript), 
+)
+
+
+
+// u := prog1.Ref("axios").GetUsers().ForEach(v => v.ShowUseDefChain())
+
+axios1 := prog1.Ref("axios").GetUsers().Filter(v => v.IsField() || v.IsCall())
+// axiosCall := prog1.Ref("axios").GetUsers().Filter(v => v.IsCall())
+// getRes(axiosCall)
+// a1 := axios1.GetUsers()
+getRes(axios1)
+println("-----------------------------")

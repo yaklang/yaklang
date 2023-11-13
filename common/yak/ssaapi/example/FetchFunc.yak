@@ -56,47 +56,37 @@ postData("https://example.com/answer", { answer: 42 }).then((data) => {
     ssa.withLanguage(ssa.Javascript), 
 )
 
-func getRes(v) {
-    v.ForEach(v => {
-      // v.ShowUseDefChain()
+func getRes(values) {
+    for _, v := range values {
         if v.IsField() {
-            println("Has Method Fetch: ")
+            println("Has Method: ")
             v.GetOperand(0).GetOperands().ForEach(v => {
                 if v.IsMake() {
                     update := getUpdate(v.GetUsers())
                     println(update)
+                    // println("-----------------------------")
                 }
                 
             })
             println("URL=>" + v.GetOperand(0).String().Split("fetch")[1])
             println("Method=>" + v.GetOperand(1).String())
+            // println("-----------------------------")
+            // fv := v.FixUpdateValue()
+            // getRes(fv.GetUsers())
         } else if v.IsCall() {
-          println("Only Call Fetch: ")
-          println(handleUpdate(v))
+            // v.ShowUseDefChain()
+            println("Only Call: ")
+            println(handleUpdate(v))
+            // println("-----------------------------")
+            // getRes(v.GetUsers())
         }
-        // else if v.isUpdate() {
-        //     v.GetOperands().ForEach(v => {
-        //         if v.IsField() {
-        //             Method = []
-        //             v.GetUsers().ForEach(v => {
-        //                 if v.IsField() {
-        //                     Method.Append(v.String().Split(".")[-1])
-        //                 } else if v.IsUpdate() {
-        //                     up := v.GetOperand(1)
-        //                     update := handleUpdate(up)
-        //                     println(update)
-        //                 }
-                        
-        //             })
-        //             if len(Method) != 0 {
-        //                 println("Method=>" + Method)
-        //             }
-        //         }
-                
-        //     })
-        // }
+        
         println("-----------------------------")
-    })
+        // else {
+        //   println("-----------------------------")
+        // }
+    }
+    
 }
 
 func handleUpdate(v) {
@@ -104,33 +94,38 @@ func handleUpdate(v) {
     // v.ShowUseDefChain()
     op0 := v.GetOperand(0).String()
     index := ""
-    if op0.Contains("fetch("){
-      index = op0.Split("fetch")
+    if op0.Contains("fetch(") {
+        index = op0.Split("fetch")
     } else {
-      index = op0.Split(".")
+        index = op0.Split(".")
     }
-
-    index = op0
-
+    
     length := len(v.GetOperands())
     func handle(op1) {
         var ret
         if op1.IsFunction() {
-            ret = index + ": " + "Param: " + op1.GetParameter() + ""
+            ret = index[-1] + ": " + "Param: " + op1.GetParameter() + ""
         } else if op1.IsMake() {
             make_ := []
             ids := op1.GetField()
             make_ = handleMake(ids)
-            ret = index + ": " + "make{" + make_ + "}"
+            ret = index[-1] + ": " + "make{" + make_ + "}"
         } else {
-            ret = index + ": " + v.GetOperand(1).String() + ""
+            ret = index[-1] + ": " + v.GetOperand(1).String() + ""
         }
+        
         return ret
     }
     for i := 1; i < length; i++ {
         r += handle(v.GetOperand(i))
     }
     
+
+    if length == 1 {
+        r = v.String()
+    }
+    
+
     return r
 }
 
@@ -153,36 +148,39 @@ func handleMake(v) {
         update := getUpdate(i)
         ret.Append(update)
     }
+    
     return ret
 }
 
-
-fetch := prog.Ref("fetch").GetUsers().Filter(v => v.IsCall())
+fetch := prog.Ref("fetch").GetUsers().Filter(v => v.IsCall() || v => v.IsField())
 // prog.Ref("fetch").ForEach(v => {v.ShowUseDefChain()})
 // fetch := prog.Ref("fetch").GetUsers().Filter(v => v.IsCall())
 // fetch.ForEach(v => {v.ShowUseDefChain()})
 f := fetch.GetUsers().Filter(v => v.IsField())
-if len(f) != 0{
-  getRes(f)
-} else {
-  getRes(fetch)
-}
+var calls = []
+fetch.ForEach(v => {
+    if len(v.GetUsers()) == 0 {
+        calls.Append(v)
+    }
+    
+})
+getRes(f)
+getRes(calls)
+
 // f.ForEach(v => {v.ShowUseDefChain()})
-// fetch.ForEach(v => { 
+// fetch.ForEach(v => {
 //   fixup :=  v.FixUpdateValue()
 //   fixup.ForEach(v => {
 //     v.ShowUseDefChain()
 //     if v.IsCall(){
 //       println(handleUpdate(v))
-//     } 
-//   }) 
+//     }
+//   })
 //   println("=====================================")
 // })
 
-
-
-
-prog2 := ssa.Parse(`
+prog2 := ssa.Parse(
+    `
 const input = document.querySelector('input[type="file"]');
 
 const data = new FormData();
@@ -210,16 +208,18 @@ fetch("https://example.com/profile", {
   .catch((error) => {
     console.error("Error:", error);
   });
-
-`, ssa.withLanguage(ssa.Javascript))
+`, 
+    ssa.withLanguage(ssa.Javascript),
+)
 
 fetch2 := prog2.Ref("fetch").GetUsers().Filter(v => v.IsCall())
 f2 := fetch2.GetUsers().Filter(v => v.IsField())
-if len(f2) != 0{
-  getRes(f2)
-} else {
-  getRes(fetch2)
-}
-
-
-
+var calls1 = []
+fetch2.ForEach(v => {
+    if len(v.GetUsers()) == 0 {
+        calls1.Append(v)
+    }
+    
+})
+getRes(f2)
+getRes(calls1)

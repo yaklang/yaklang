@@ -2,7 +2,6 @@ package yak
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -19,10 +18,4 @@ a, b = abc("123", "a", 1235)`)
 		log.Error(err)
 		t.FailNow()
 	}
-}
-
-func TestA(t *testing.T) {
-	code, _ := os.ReadFile("./a.yak")
-	e := NewScriptEngine(10)
-	e.Execute(string(code))
 }
