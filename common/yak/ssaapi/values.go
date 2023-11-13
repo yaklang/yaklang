@@ -142,24 +142,13 @@ func (v *Value) GetParameter() Values {
 	return ret
 }
 
-func (v *Value) GetCall() Values {
-	ret := make(Values, 0)
-	v.GetUsers().ForEach(func(u *Value) {
-		if u.IsCall() {
-			ret = append(ret, u)
-		}
-	})
-	return ret
-}
-
-func (v *Value) GetField() Values {
-	ret := make(Values, 0)
-	v.GetUsers().ForEach(func(u *Value) {
-		if u.IsField() {
-			ret = append(ret, u)
-		}
-	})
-	return ret
+// for const instruction
+func (v *Value) GetConstValue() any {
+	if v.IsConstInst() {
+		return v.node.(*ssa.ConstInst).GetRawValue()
+	} else {
+		return nil
+	}
 }
 
 func (v *Value) IsFunction() bool     { return v.node.GetOpcode() == ssa.OpFunction }
