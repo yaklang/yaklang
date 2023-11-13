@@ -3,12 +3,13 @@ package main
 import (
 	"bytes"
 	"encoding/gob"
+	"io/ioutil"
+	"os"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
 	_ "github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
-	"io/ioutil"
-	"os"
 )
 
 func main() {
@@ -25,9 +26,8 @@ func main() {
 
 	if newBuf, err := utils.GzipCompress(buf.Bytes()); err != nil {
 		panic(err)
-	} else if err = ioutil.WriteFile(os.Args[1], newBuf, 0666); err != nil {
+	} else if err = ioutil.WriteFile(os.Args[1], newBuf, 0o666); err != nil {
 		panic(err)
 	} else {
 	}
-
 }

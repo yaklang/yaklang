@@ -6,11 +6,9 @@ import (
 )
 
 func ABC() {
-
 }
 
 func ABC2(i int, b interface{}) {
-
 }
 
 func ABC3(i int, b interface{}, c ...string) int {
@@ -18,7 +16,6 @@ func ABC3(i int, b interface{}, c ...string) int {
 }
 
 func ABC4(c ...string) {
-
 }
 
 func ABC5(c ...string) string {
@@ -38,7 +35,10 @@ func TestFuncToFuncDecl(t *testing.T) {
 		ABC, ABC2, ABC3, ABC4, ABC5,
 		ABC6, ABC7,
 	} {
-		f := FuncToFuncDecl("test", fmt.Sprintf("ABC%d", index+1), i)
+		f, err := FuncToFuncDecl(i, "test", fmt.Sprintf("ABC%d", index+1))
+		if err != nil {
+			t.Fatal(err)
+		}
 		fmt.Println(f.Decl)
 		fmt.Println(f.VSCodeSnippets)
 		println()
