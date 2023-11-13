@@ -517,8 +517,25 @@ func TestSliceCall(t *testing.T) {
 	})
 }
 
-func TestTypeMethod(t *testing.T) {
-	// TODO: handle map/slice/string method
+func TestType(t *testing.T) {
+	t.Run("check bytes", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			f1([]byte{1, 2})
+			f1([]uint8{1, 2})
+			f1([]int{1, 2})
+			f1([]byte([]int{1, 2}))
+			f1(string("aaaa"))
+			`,
+			errs: []string{
+				ssa4analyze.ArgumentTypeError(1, "[]number", "bytes", "f1"),
+			},
+			ExternValue: map[string]any{
+				"f1": func([]byte) {},
+			},
+		})
+	})
+
 }
 
 func TestCallParamReturn(t *testing.T) {
