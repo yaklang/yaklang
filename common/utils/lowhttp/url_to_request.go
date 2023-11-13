@@ -130,6 +130,10 @@ func UrlToHTTPRequest(text string) ([]byte, error) {
 		return nil, err
 	}
 
+	if u.RawPath == "" && u.Path == "" {
+		u.Path = "/"
+	}
+
 	if u.RawPath != "" {
 		r.RequestURI = u.RawPath
 	} else {
