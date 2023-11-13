@@ -78,5 +78,8 @@ func (f *Function) GetValuesByName(name string) InstructionNodes {
 			}
 		}
 	}
+	if v, ok := f.externInstance[name]; ok {
+		ret = append(ret, v)
+	}
 	return lo.Uniq(ret)
 }

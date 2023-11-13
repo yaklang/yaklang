@@ -12,6 +12,10 @@ type Const struct {
 	str string
 }
 
+func (c *Const) GetRawValue() any {
+	return c.value
+}
+
 // get type
 func (c *Const) GetType() Type {
 	t := c.typ
