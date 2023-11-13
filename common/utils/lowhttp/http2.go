@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -25,11 +26,11 @@ const defaultMaxConcurrentStreamSize = 250
 const defaultMaxHeaderListSize = 10 << 18
 
 // requires cc.wmu be held
-func h2FramerWriteHeaders(frame *http2.Framer, streamID uint32, endStream bool, maxFrameSize int, hdrs []byte) error {
+func h2FramerWriteHeaders(frame *http2.Framer, streamID uint32, endStream bool, maxFrameSize uint32, hdrs []byte) error {
 	first := true // first frame written (HEADERS is first, then CONTINUATION)
 	for len(hdrs) > 0 {
 		chunk := hdrs
-		if len(chunk) > maxFrameSize {
+		if len(chunk) > int(maxFrameSize) {
 			chunk = chunk[:maxFrameSize]
 		}
 		hdrs = hdrs[len(chunk):]
@@ -390,3 +391,41 @@ func HTTP2ResponseToHTTP(frame *http2.Frame) ([]byte, error) {
 //	}
 //	return nil
 //}
+
+type windowSizeControl struct {
+	windowMutex   *sync.Mutex
+	windowSize    int64
+	windowChanged *sync.Cond
+}
+
+func newControl(size int64) *windowSizeControl {
+	return &windowSizeControl{
+		windowMutex:   new(sync.Mutex),
+		windowSize:    size,
+		windowChanged: new(sync.Cond),
+	}
+}
+
+func (wc *windowSizeControl) increaseWindowSize(i int64) {
+	wc.windowMutex.Lock()
+	defer wc.windowMutex.Unlock()
+
+	var notify = false
+	if wc.windowSize <= 0 {
+		notify = true
+	}
+	wc.windowSize += i
+	if wc.windowSize > 0 && notify {
+		wc.windowChanged.Broadcast()
+	}
+}
+
+func (wc *windowSizeControl) decreaseWindowSize(i int64) {
+	wc.windowMutex.Lock()
+	wc.windowSize -= i
+	defer wc.windowMutex.Unlock()
+	if wc.windowSize <= 0 {
+		log.Infof("window size is %v, waiting for window size changed", wc.windowSize)
+		wc.windowChanged.Wait()
+	}
+}

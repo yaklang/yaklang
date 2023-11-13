@@ -4,17 +4,24 @@ import (
 	"bufio"
 	"bytes"
 	"container/list"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
+	"golang.org/x/net/http2"
 	"io"
 	"net"
 	"net/http"
 	"sync"
 	"time"
+)
+
+var (
+	H2 = "h2"
+	H1 = "http/1.1"
 )
 
 var (
@@ -65,28 +72,41 @@ func (l *lowHttpConnPool) getFromConn(key connectKey) (oldPc *persistConn, getCo
 		oldTime = time.Now().Add(-l.idleConnTimeout)
 	}
 
+	//从连接池中取出一个连接
 	if connList, ok := l.idleConn[key.hash()]; ok {
-		stop := false
-		for len(connList) > 0 && !stop {
-			oldPc = connList[len(connList)-1]
+		if key.scheme == H2 { // h2 连接 不用取出
+			for len(connList) > 0 {
+				oldPc = connList[len(connList)-1]
 
-			//检查获取的连接是否空闲超时，若超时再取下一个
-			tooOld := !oldTime.Before(oldPc.idleAt)
-			if tooOld {
-				oldPc.Conn.Close()
+				//检查获取的连接是否可用
+				canUse := !(oldPc.alt.readGoAway || oldPc.alt.closed || oldPc.alt.full)
+				if canUse {
+					getConn = true
+					break
+				}
 				connList = connList[:len(connList)-1]
-				continue
 			}
-
-			l.idleLRU.remove(oldPc)
-			connList = connList[:len(connList)-1]
-			getConn = true
-			stop = true
-		}
-		if len(connList) > 0 {
-			l.idleConn[key.hash()] = connList
 		} else {
-			delete(l.idleConn, key.hash())
+			for len(connList) > 0 {
+				oldPc = connList[len(connList)-1]
+
+				//检查获取的连接是否空闲超时，若超时再取下一个
+				tooOld := !oldTime.Before(oldPc.idleAt)
+				if !tooOld {
+					l.idleLRU.remove(oldPc)
+					connList = connList[:len(connList)-1]
+					getConn = true
+					break
+				}
+				oldPc.Conn.Close()
+				l.idleLRU.remove(oldPc)
+				connList = connList[:len(connList)-1]
+			}
+			if len(connList) > 0 {
+				l.idleConn[key.hash()] = connList
+			} else {
+				delete(l.idleConn, key.hash())
+			}
 		}
 	}
 	return
@@ -153,6 +173,7 @@ func (l *lowHttpConnPool) removeConnLocked(pConn *persistConn) error {
 
 // 长连接
 type persistConn struct {
+	alt      *http2ClientConn
 	net.Conn //conn本体
 	mu       sync.Mutex
 	p        *lowHttpConnPool //连接对应的连接池
@@ -291,6 +312,12 @@ func newPersistConn(key connectKey, pool *lowHttpConnPool, opt ...netx.DialXOpti
 	if err != nil {
 		return nil, err
 	}
+	if key.https && key.scheme == H2 {
+		if newConn.(*tls.Conn).ConnectionState().NegotiatedProtocol != H2 { //降级
+			key.scheme = H1
+		}
+	}
+
 	// 初始化连接
 	pc := &persistConn{
 		Conn:                 newConn,
@@ -311,6 +338,23 @@ func newPersistConn(key connectKey, pool *lowHttpConnPool, opt ...netx.DialXOpti
 		rPacket:              make([]packetInfo, 0),
 		numExpectedResponses: 0,
 	}
+
+	if key.scheme == H2 {
+		pc.h2Conn()
+		if err := pc.alt.preface(); err != nil {
+			return nil, err
+		}
+		if err := pc.alt.setting(); err != nil {
+			return nil, err
+		}
+		go pc.alt.readLoop()
+		err := pc.p.putIdleConn(pc)
+		if err != nil {
+			return nil, err
+		}
+		return pc, nil
+	}
+
 	pc.br = bufio.NewReader(pc)
 	pc.bw = bufio.NewWriter(persistConnWriter{pc})
 
@@ -318,6 +362,26 @@ func newPersistConn(key connectKey, pool *lowHttpConnPool, opt ...netx.DialXOpti
 	go pc.writeLoop()
 	go pc.readLoop()
 	return pc, nil
+}
+
+func (pc *persistConn) h2Conn() {
+	newH2Conn := &http2ClientConn{
+		conn:              pc.Conn,
+		mu:                new(sync.Mutex),
+		streams:           make(map[uint32]*http2ClientStream),
+		currentStreamID:   1,
+		idleTimeout:       pc.p.idleConnTimeout,
+		maxFrameSize:      defaultMaxFrameSize,
+		initialWindowSize: defaultStreamReceiveWindowSize,
+		connWindowControl: newControl(defaultStreamReceiveWindowSize),
+		br:                bufio.NewReader(pc.Conn),
+		fr:                http2.NewFramer(pc.Conn, bufio.NewReader(pc.Conn)),
+	}
+
+	newH2Conn.idleTimer = time.AfterFunc(pc.p.idleConnTimeout, func() {
+		newH2Conn.closed = true
+	})
+	pc.alt = newH2Conn
 }
 
 func (pc *persistConn) readLoop() {
