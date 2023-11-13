@@ -3,11 +3,12 @@ package main
 import (
 	"bytes"
 	"encoding/gob"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yakdoc"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
-	"testing"
 )
 
 func TestGetnerateDoc(t *testing.T) {
@@ -32,5 +33,4 @@ func TestGetnerateDoc(t *testing.T) {
 	if err := decoder.Decode(&newHelper); err != nil {
 		t.Fatalf("load embed yak document error: %v", err)
 	}
-
 }

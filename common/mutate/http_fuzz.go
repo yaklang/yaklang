@@ -48,7 +48,11 @@ func (r *FuzzHTTPRequest) DisableAutoEncode(b bool) FuzzHTTPRequestIf {
 }
 
 type FuzzHTTPRequestIf interface {
-	// 重复数据包
+	// Repeat 重复数据包
+	// Example:
+	// ```
+	//
+	// ```
 	Repeat(i int) FuzzHTTPRequestIf
 
 	// 模糊测试参数时不进行自动编码
@@ -257,7 +261,7 @@ func UrlsToHTTPRequests(target ...interface{}) (*FuzzHTTPRequestBatch, error) {
 	var reqIf []FuzzHTTPRequestIf
 	var firstReq *FuzzHTTPRequest
 	for _, req := range reqs {
-		var isHttps = false
+		isHttps := false
 		if req.URL.Scheme == "https" {
 			isHttps = true
 		}
@@ -401,7 +405,7 @@ func NewFuzzHTTPRequest(i interface{}, opts ...BuildFuzzHTTPRequestOption) (*Fuz
 		opt(config)
 	}
 
-	var req = &FuzzHTTPRequest{}
+	req := &FuzzHTTPRequest{}
 	req.originRequest = originHttpRequest
 	req.isHttps = config.IsHttps
 	req.source = config.Source
@@ -756,8 +760,8 @@ func (f *FuzzHTTPRequest) GetAllParams() []*FuzzHTTPRequestParam {
 }
 
 func (f *FuzzHTTPRequest) GetHeaderParams() []*FuzzHTTPRequestParam {
-	var keys = f.GetHeaderKeys()
-	var params = make([]*FuzzHTTPRequestParam, len(keys))
+	keys := f.GetHeaderKeys()
+	params := make([]*FuzzHTTPRequestParam, len(keys))
 	for i, k := range keys {
 		value := f.GetHeader(k)
 		params[i] = &FuzzHTTPRequestParam{
@@ -794,7 +798,7 @@ func (f *FuzzHTTPRequest) ParamsHash() (string, error) {
 }
 
 func (f *FuzzHTTPRequest) Exec(opts ...HttpPoolConfigOption) (chan *_httpResult, error) {
-	var originOpts = make([]HttpPoolConfigOption, 4, len(opts)+4)
+	originOpts := make([]HttpPoolConfigOption, 4, len(opts)+4)
 	originOpts[0] = WithPoolOpt_Https(f.isHttps)
 	originOpts[1] = WithPoolOpt_Source(f.source)
 	originOpts[2] = WithPoolOpt_RuntimeId(f.runtimeId)
