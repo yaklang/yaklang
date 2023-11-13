@@ -126,9 +126,7 @@ func serveH2(r io.Reader, conn net.Conn, opt ...h2Option) error {
 		{SettingInitialWindowSize, uint32(sc.srv.initialStreamRecvWindowSize())},
 	*/
 	// init window
-	config.windowSize = defaultStreamReceiveWindowSize
-	config.windowMutex = new(sync.Mutex)
-	config.windowChanged = sync.NewCond(new(sync.Mutex))
+	config.windowSizeControl = newControl(defaultStreamReceiveWindowSize)
 
 	err = frame.WriteSettings(
 		http2.Setting{ID: http2.SettingInitialWindowSize, Val: defaultStreamReceiveWindowSize},
