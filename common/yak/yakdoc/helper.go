@@ -3,20 +3,103 @@ package yakdoc
 import (
 	"bytes"
 	"fmt"
+	"go/ast"
+	"go/token"
+	"path/filepath"
 	"reflect"
+	"runtime"
 	"sort"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/log"
-
 	"github.com/davecgh/go-spew/spew"
 	"github.com/olekukonko/tablewriter"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
+var (
+	defaultHooks        = make([]func(h *DocumentHelper), 0)
+	projectPath  string = ""
+)
+
+func GetProjectPath() string {
+	if projectPath == "" {
+		_, filename, _, ok := runtime.Caller(1)
+		if ok {
+			projectPath, _ = filepath.Abs(filepath.Join(filename, "../../../../"))
+		}
+	}
+	return projectPath
+}
+
 type DocumentHelper struct {
-	Libs      map[string]*ScriptLib
-	Functions map[string]*FuncDecl
-	Instances map[string]*LibInstance
+	Libs          map[string]*ScriptLib
+	Functions     map[string]*FuncDecl
+	Instances     map[string]*LibInstance
+	StructMethods map[string]*ScriptLib // 结构体方法，名字 -> 所有结构体与结构体指针方法
+
+	hooks []func(h *DocumentHelper)
+}
+
+func RegisterHook(hook func(h *DocumentHelper)) {
+	defaultHooks = append(defaultHooks, hook)
+}
+
+func (h *DocumentHelper) Callback() {
+	for _, hook := range defaultHooks {
+		hook(h)
+	}
+
+	for _, hook := range h.hooks {
+		hook(h)
+	}
+}
+
+func (h *DocumentHelper) InjectInterfaceDocumentManually(interfacePath, sourceCodePath string) error {
+	lib, ok := h.StructMethods[interfacePath]
+	if !ok {
+		return utils.Errorf("interface not found in document helper: %v", interfacePath)
+	}
+	_ = lib
+	if !filepath.IsAbs(sourceCodePath) {
+		sourceCodePath, _ = filepath.Abs(filepath.Join(GetProjectPath(), sourceCodePath))
+	}
+
+	bundle, err := GetCacheAstBundle(sourceCodePath)
+	if err != nil {
+		return err
+	}
+	splited := strings.Split(interfacePath, ".")
+	interfaceName := splited[len(splited)-1]
+
+	for _, decl := range bundle.parsedFile.Decls {
+		genDecl, ok := decl.(*ast.GenDecl)
+		if !ok || genDecl.Tok != token.TYPE {
+			continue
+		}
+		for _, spec := range genDecl.Specs {
+			typeSpec, ok := spec.(*ast.TypeSpec)
+			if !ok || typeSpec.Name.Name != interfaceName {
+				continue
+			}
+			iface, ok := typeSpec.Type.(*ast.InterfaceType)
+			if !ok {
+				continue
+			}
+			for _, field := range iface.Methods.List {
+				if field.Doc == nil {
+					continue
+				}
+				methodName := field.Names[0].Name
+				f, ok := lib.Functions[methodName]
+				if !ok {
+					continue
+				}
+				f.Document = strings.TrimSpace(field.Doc.Text())
+			}
+		}
+	}
+
+	return nil
 }
 
 func (h *DocumentHelper) GetAllLibs() []string {
@@ -151,7 +234,6 @@ func (h *DocumentHelper) libFuncToStr(libName, funcName string, strType string) 
 		}
 		return fmt.Sprintf("%v  doc:%v", f.Decl, f.Document)
 	}
-
 }
 
 func (h *DocumentHelper) ShowLibFuncHelpInfo(libName, funcName string) {
@@ -196,8 +278,9 @@ func (l *ScriptLib) String() string {
 }
 
 type Field struct {
-	Name string
-	Type string
+	Name    string
+	Type    string
+	RefType reflect.Type
 }
 
 type FuncDecl struct {
@@ -223,18 +306,9 @@ func (f *FuncDecl) String() string {
 	return fmt.Sprintf("%s%s", decl, doc)
 }
 
-func FuncToFuncDecl(libName, methodName string, f interface{}) *FuncDecl {
-	funcDecl, err := funcDescriptionAndDeclaration(f, libName, methodName)
-	if err != nil {
-		log.Warnf("funcToFuncDecl error: %v", err)
-		return &FuncDecl{}
-	}
-	if funcDecl == nil {
-		return &FuncDecl{}
-	}
+// func FuncToFuncDecl(libName, methodName string, refType reflect.Type, f interface{}) *FuncDecl {
 
-	return funcDecl
-}
+// }
 
 func AnyTypeToLibInstance(libName, name string, typ reflect.Type, value interface{}) *LibInstance {
 	return &LibInstance{

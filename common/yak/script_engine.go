@@ -39,6 +39,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/yakdoc"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yak/yaklang/lib/builtin"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
@@ -67,6 +68,7 @@ func SetNaslExports(lib map[string]interface{}) {
 func init() {
 	initYaklangLib()
 }
+
 func InitYaklangLib() {
 	initYaklangLibOnce.Do(func() {
 		initYaklangLib()
@@ -84,7 +86,7 @@ func initYaklangLib() {
 	importGlobal(yaklib.GlobalExport)
 	importGlobal(builtin.YaklangBaseLib)
 	importGlobal(GlobalEvalExports)
-	//yaklang.Import("", yaklib.GlobalExport)
+	// yaklang.Import("", yaklib.GlobalExport)
 	yaklang.Import("yakit", yaklib.YakitExports)
 	// 基础库
 	yaklang.Import("str", yaklib.StringsExport)
@@ -95,20 +97,20 @@ func initYaklangLib() {
 	yaklang.Import("re2", yaklib.RegexpExport)
 	yaklang.Import("regen", yaklib.RegenExports)
 	yaklang.Import("env", yaklib.EnvExports)
-	//yaklang.Import("grok", yaklib.GrokExports)
+	// yaklang.Import("grok", yaklib.GrokExports)
 	yaklang.Import("sync", yaklib.SyncExport)
 	yaklang.Import("io", yaklib.IoExports)
 	yaklang.Import("bufio", yaklib.BufioExport)
 	yaklang.Import("context", yaklib.ContextExports)
 	yaklang.Import("time", yaklib.TimeExports)
 	yaklang.Import("timezone", yaklib.TimeZoneExports)
-	yaklang.Import("codec", yaklib.CodecExports) //编码解码
+	yaklang.Import("codec", yaklib.CodecExports) // 编码解码
 	yaklang.Import("log", yaklib.LogExports)
-	//yaklang.Import("net", yaklib.Ne)
+	// yaklang.Import("net", yaklib.Ne)
 	yaklang.Import("hids", hids.Exports)
 	yaklang.Import("systemd", systemd.Exports)
 
-	//yaklang.Import("geojson", yaklib.GeoJsonExports)
+	// yaklang.Import("geojson", yaklib.GeoJsonExports)
 	yaklang.Import("mmdb", yaklib.MmdbExports)
 
 	yaklang.Import("crawler", crawler.Exports)
@@ -170,7 +172,7 @@ func initYaklangLib() {
 	yaklang.Import("yaml", yaklib.YamlExports)
 
 	// eval
-	//yaklang.Import("", GlobalEvalExporst)
+	// yaklang.Import("", GlobalEvalExporst)
 	yaklang.Import("dyn", EvalExports)
 	// nuclei
 	yaklang.Import("nuclei", httptpl.Exports)
@@ -228,7 +230,7 @@ func initYaklangLib() {
 	// redis
 	yaklang.Import("redis", yaklib.RedisExports)
 
-	//common.rpa
+	// common.rpa
 	yaklang.Import("rpa", rpa.Exports)
 
 	// rdp
@@ -240,10 +242,10 @@ func initYaklangLib() {
 	// simulator
 	yaklang.Import("simulator", simulator.Exports)
 
-	//crawlerX
+	// crawlerX
 	yaklang.Import("crawlerx", crawlerx.CrawlerXExports)
 
-	//CVE
+	// CVE
 	yaklang.Import("cve", cve.CVEExports)
 	yaklang.Import("cwe", cve.CWEExports)
 
@@ -268,6 +270,12 @@ func initYaklangLib() {
 
 	// ssa
 	yaklang.Import("ssa", ssaapi.Exports)
+
+	// 为导出的接口注入注释
+	yakdoc.RegisterHook(func(h *yakdoc.DocumentHelper) {
+		h.InjectInterfaceDocumentManually("github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequestIf", "./common/mutate/http_fuzz.go")
+		h.InjectInterfaceDocumentManually("github.com/yaklang/yaklang/common/rpa/core.RequestIf", "./common/crawler/requestif.go")
+	})
 }
 
 type ScriptEngine struct {
@@ -437,7 +445,7 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 		}()
 	}()
 
-	//log.Infof("recv code: %v", code)
+	// log.Infof("recv code: %v", code)
 	engine := yaklang.New()
 
 	setCurrentCoreEngine(engine)
@@ -548,20 +556,23 @@ func (e *ScriptEngine) ExecuteWithTaskIDAndParams(ctx context.Context, taskId, c
 	_ = engine
 	return nil
 }
+
 func (e *ScriptEngine) ExecuteWithoutCache(code string, params map[string]interface{}) (*antlr4yak.Engine, error) {
-	var runtimeId = utils.MapGetStringByManyFields(params, "RUNTIME_ID", "RUNTIME_ID", "runtime_id")
+	runtimeId := utils.MapGetStringByManyFields(params, "RUNTIME_ID", "RUNTIME_ID", "runtime_id")
 	if runtimeId == "" {
 		runtimeId = uuid.New().String()
 	}
 	return e.exec(context.Background(), runtimeId, code, params, false)
 }
+
 func (e *ScriptEngine) ExecuteEx(code string, params map[string]interface{}) (*antlr4yak.Engine, error) {
-	var runtimeId = utils.MapGetStringByManyFields(params, "RUNTIME_ID", "RUNTIME_ID", "runtime_id")
+	runtimeId := utils.MapGetStringByManyFields(params, "RUNTIME_ID", "RUNTIME_ID", "runtime_id")
 	if runtimeId == "" {
 		runtimeId = uuid.New().String()
 	}
 	return e.exec(context.Background(), runtimeId, code, params, true)
 }
+
 func (e *ScriptEngine) ExecuteExWithContext(ctx context.Context, code string, params map[string]interface{}) (_ *antlr4yak.Engine, fErr error) {
 	defer func() {
 		if err := recover(); err != nil {
@@ -569,7 +580,7 @@ func (e *ScriptEngine) ExecuteExWithContext(ctx context.Context, code string, pa
 			fErr = utils.Errorf("final error: %v", err)
 		}
 	}()
-	var runtimeId = utils.MapGetStringByManyFields(params, "RUNTIME_ID", "RUNTIME_ID", "runtime_id")
+	runtimeId := utils.MapGetStringByManyFields(params, "RUNTIME_ID", "RUNTIME_ID", "runtime_id")
 	if runtimeId == "" {
 		runtimeId = uuid.New().String()
 	}
@@ -579,6 +590,7 @@ func (e *ScriptEngine) ExecuteExWithContext(ctx context.Context, code string, pa
 func (e *ScriptEngine) Execute(code string) error {
 	return e.ExecuteWithTaskID(uuid.New().String(), code)
 }
+
 func (e *ScriptEngine) ExecuteWithContext(ctx context.Context, code string) error {
 	return e.ExecuteWithTaskIDAndContext(ctx, uuid.New().String(), code)
 }
@@ -589,6 +601,7 @@ func (e *ScriptEngine) ExecuteMain(code string, AbsFile string) error {
 		"YAK_FILENAME": AbsFile,
 	})
 }
+
 func (e *ScriptEngine) ExecuteMainWithContext(ctx context.Context, code string, AbsFile string) error {
 	return e.ExecuteWithTaskIDAndParams(ctx, uuid.New().String(), code, map[string]interface{}{
 		"YAK_MAIN":     true,
@@ -625,7 +638,7 @@ func NewYakitVirtualClientScriptEngine(client *yaklib.YakitClient) *ScriptEngine
 }
 
 func Execute(code string, params ...map[string]any) (*antlr4yak.Engine, error) {
-	var mergedParams = make(map[string]any)
+	mergedParams := make(map[string]any)
 	if len(params) > 0 {
 		for _, param := range params {
 			for k, v := range param {
