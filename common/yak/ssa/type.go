@@ -44,8 +44,11 @@ func TypeCompareEx(t1, t2 Type, depth int) bool {
 
 	switch t1kind {
 	case FunctionTypeKind:
-		t1f := t1.(*FunctionType)
-		t2f := t2.(*FunctionType)
+		t2f, ok := ToFunctionType(t2)
+		if !ok {
+			break
+		}
+		t1f, _ := ToFunctionType(t1)
 		if len(t1f.Parameter) != len(t2f.Parameter) {
 			return false
 		}
@@ -59,24 +62,33 @@ func TypeCompareEx(t1, t2 Type, depth int) bool {
 		}
 		return true
 	case SliceTypeKind:
-		t1o := t1.(*ObjectType)
-		t2o := t2.(*ObjectType)
+		t2o, ok := ToObjectType(t2)
+		if !ok {
+			break
+		}
+		t1o, _ := ToObjectType(t1)
 		return TypeCompareEx(t1o.FieldType, t2o.FieldType, depth)
 	case MapTypeKind:
+		t2o, ok := t2.(*ObjectType)
+		if !ok {
+			break
+		}
 		t1o := t1.(*ObjectType)
-		t2o := t2.(*ObjectType)
 		return TypeCompareEx(t1o.FieldType, t2o.FieldType, depth) && TypeCompareEx(t1o.KeyTyp, t2o.KeyTyp, depth)
 	case StructTypeKind:
-		fallthrough
 	case ObjectTypeKind:
-		fallthrough
-	default:
-		if t1kind == t2kind {
+	case Bytes:
+		// string | []number
+		if t2kind == String {
 			return true
-		} else {
-			return false
 		}
+	case String:
+		if t2kind == Bytes {
+			return true
+		}
+	default:
 	}
+	return t1kind == t2kind
 }
 
 type MethodBuilder interface {
