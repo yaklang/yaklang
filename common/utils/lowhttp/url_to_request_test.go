@@ -128,6 +128,21 @@ func TestUrlToHTTPRequest(t *testing.T) {
 			args: args{text: "http://127.0.0.1:1231/#"},
 			want: []byte("GET /# HTTP/1.1\r\nHost: 127.0.0.1:1231\r\n\r\n"),
 		},
+		{
+			name: "test url",
+			args: args{text: "http://127.0.0.1:1231"},
+			want: []byte("GET / HTTP/1.1\r\nHost: 127.0.0.1:1231\r\n\r\n"),
+		},
+		{
+			name: "test url2",
+			args: args{text: "http://127.0.0.1:1231/"},
+			want: []byte("GET / HTTP/1.1\r\nHost: 127.0.0.1:1231\r\n\r\n"),
+		},
+		{
+			name: "test uri",
+			args: args{text: "127.0.0.1:1231"},
+			want: []byte("GET / HTTP/1.1\r\nHost: 127.0.0.1:1231\r\n\r\n"),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
