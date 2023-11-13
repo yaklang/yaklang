@@ -242,6 +242,8 @@ service Yak {
   rpc StaticAnalyzeError(StaticAnalyzeErrorRequest) returns (StaticAnalyzeErrorResponse);
   rpc YaklangCompileAndFormat(YaklangCompileAndFormatRequest) returns (YaklangCompileAndFormatResponse);
 
+  rpc YaklangInspectInformation(YaklangInspectInformationRequest) returns (YaklangInspectInformationResponse);
+
   // 端口扫描的封装
   rpc PortScan(PortScanRequest) returns (stream ExecResult);
   rpc ViewPortScanCode(Empty) returns (SimpleScript);
@@ -1570,6 +1572,30 @@ message ExecPacketScanRequest {
 
   // 设置代理
   string Proxy = 11;
+}
+
+message Position {
+  int64 Line = 1;
+  int64 Column = 2;
+}
+
+message YaklangInspectInformationRequest {
+  string YakScriptType = 1;
+  string YakScriptCode = 2; 
+  Position StartPos = 3;
+  Position EndPos = 4;
+}
+
+message YaklangInspectInformationResponse {
+  repeated string SuggestionMessage = 1;
+  string CliParameters = 2; //  json: []CliParameter
+  // struct CliParameter {
+  //   string Name 
+  //   string Type 
+  //   string Help
+  //   bool Required 
+  //   any  Default
+  // }
 }
 
 message StaticAnalyzeErrorRequest {
