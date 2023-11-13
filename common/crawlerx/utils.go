@@ -63,16 +63,24 @@ func getAllKeywords(element *rod.Element) string {
 	return keywords
 }
 
+func calculateSelector(element *rod.Element) (string, error) {
+	selectorObj, err := element.Eval(getSelector)
+	if err != nil {
+		return "", utils.Errorf("calculate selector error: %v", err)
+	}
+	return selectorObj.Value.Str(), nil
+}
+
 func getElementSelector(element *rod.Element) string {
 	if visible, _ := element.Visible(); !visible {
 		return ""
 	}
-	selectorObj, err := element.Eval(getSelector)
+	selector, err := calculateSelector(element)
 	if err != nil {
-		log.Errorf("element %s get selector error: %s", element, err)
+		log.Error(err)
 		return ""
 	}
-	return selectorObj.Value.Str()
+	return selector
 }
 
 func getElementsSelectors(elements rod.Elements) []string {
