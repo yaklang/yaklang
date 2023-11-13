@@ -223,18 +223,20 @@ func TestGRPCMUSTPASS_MITMFilter_ForExcludeSuffixAndContentType(t *testing.T) {
 		var packet []byte
 
 		mitmClient.Send(&ypb.MITMRequest{
-			ExcludeSuffix: []string{".aaac", ".zip"},
+			ExcludeSuffix: []string{".aaac", ".zip", ".js"},
 			UpdateFilter:  true,
 		})
 		time.Sleep(500 * time.Millisecond)
 		for _, ct := range [][]any{
 			{"/abc.png.zip?ab=1", 0},
 			{"/abc.a", 1},
-			{"/a/abc.js", 1},
 			{"/static/abc.ppt", 1},
 			{"/abc.aaac", 0},
 			{"/abc.jpg", 1},
 			{"/abc.png.zip", 0},
+			{"/static/abc.js", 0},
+			{"/abc.ajs", 1},
+			{"/abc.json", 1},
 		} {
 			path := utils.InterfaceToString(ct[0])
 			expectCount := codec.Atoi(utils.InterfaceToString(ct[1]))
@@ -261,7 +263,7 @@ sleep(0.3)
 		mitmClient.Send(&ypb.MITMRequest{
 			ExcludeSuffix:       []string{".aaac"},
 			ExcludeMethod:       []string{"NONONO"},
-			ExcludeContentTypes: []string{"bbbbbb", "*cc", "*oct", "abc"},
+			ExcludeContentTypes: []string{"bbbbbb", "*cc", "*oct", "abc", "text"},
 			ExcludeUri:          nil,
 			IncludeUri:          nil,
 			UpdateFilter:        true,
@@ -277,6 +279,9 @@ sleep(0.3)
 			{"cccc", 0},
 			{"ccc", 0},
 			{"cc", 0},
+			{"text/plain", 0},     //text 命中 前半部分
+			{"textplain/test", 1}, //text 无法命中
+			{"textplain/text", 0}, // text 命中 后半部分
 		} {
 			var path = "/"
 			var contentType = utils.InterfaceToString(ct[0])
@@ -296,7 +301,7 @@ sleep(0.5)
 			count := yakit.QuickSearchMITMHTTPFlowCount(token)
 			log.Infof("yakit.QuickSearchMITMHTTPFlowCount("+`[`+token+`]`+") == %v", count)
 			if count != expectCount {
-				t.Fatalf("search httpflow by token failed: yakit.QuickSearchMITMHTTPFlowCount(token)")
+				t.Fatalf("search httpflow by token failed: yakit.QuickSearchMITMHTTPFlowCount(token) mimetype:[%v]", ct[0])
 				cancel()
 			}
 		}
