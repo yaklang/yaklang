@@ -24,7 +24,7 @@ func TestBatch(t *testing.T) {
 		for _, c := range codes {
 			typ := c.typ
 			if typ == "" {
-				typ = "codec"
+				typ = "port-scan"
 			}
 			name, err := yakit.CreateTemporaryYakScript(typ, c.src)
 			if err != nil {
@@ -58,7 +58,7 @@ func TestBatch(t *testing.T) {
 yakit.AutoInitYakit()
 handle = result => {
 	yakit.Info("HELLO")
-	risk.NewRisk("http://baidu.com")
+	// risk.NewRisk("http://baidu.com")
 }
 			`,
 				typ: ``,
