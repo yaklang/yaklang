@@ -758,6 +758,20 @@ func TestClosureBinding(t *testing.T) {
 			`,
 		})
 	})
+
+	t.Run("function factor", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			getF = func(a) {
+				return func() {
+					a ++ 
+				}
+			}
+			f = getF(1)
+			f() 
+			`,
+		})
+	})
 }
 
 // for  "check alias type method"
