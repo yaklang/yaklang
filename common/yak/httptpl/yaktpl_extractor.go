@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/antchfx/htmlquery"
 	"github.com/antchfx/xmlquery"
-	"github.com/asaskevich/govalidator"
 	"github.com/gobwas/httphead"
 	"github.com/itchyny/gojq"
 	"github.com/tidwall/gjson"
@@ -295,7 +294,8 @@ func extractKVal(rsp []byte, shouldSplit bool) map[string]interface{} {
 		if depth > 3 {
 			return
 		}
-		if govalidator.IsJSON(jsonString) {
+		var ok bool
+		if jsonString, ok = utils.IsJSON(jsonString); ok {
 			result := gjson.Parse(jsonString)
 			result.ForEach(func(key, value gjson.Result) bool {
 				addResult(key.String(), value.String())
@@ -310,7 +310,8 @@ func extractKVal(rsp []byte, shouldSplit bool) map[string]interface{} {
 	var skipJson = false
 	for _, bodyRaw := range jsonextractor.ExtractStandardJSON(string(body)) {
 		skipJson = true
-		if govalidator.IsJSON(bodyRaw) {
+		var ok bool
+		if bodyRaw, ok = utils.IsJSON(bodyRaw); ok {
 			processJSON(bodyRaw, 1)
 		}
 	}

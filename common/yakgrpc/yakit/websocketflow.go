@@ -2,7 +2,6 @@ package yakit
 
 import (
 	"context"
-	"github.com/asaskevich/govalidator"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -33,9 +32,8 @@ type WebsocketFlowShare struct {
 	FromServer  bool
 	QuotedData  []byte
 	MessageType string
-	Hash string
+	Hash        string
 }
-
 
 func (i *WebsocketFlow) ToGRPCModel() *ypb.WebsocketFlow {
 	raw, _ := strconv.Unquote(i.QuotedData)
@@ -44,6 +42,7 @@ func (i *WebsocketFlow) ToGRPCModel() *ypb.WebsocketFlow {
 	}
 
 	length := len(raw)
+	_, isJson := utils.IsJSON(raw)
 	return &ypb.WebsocketFlow{
 		ID:                   int64(i.ID),
 		CreatedAt:            i.CreatedAt.Unix(),
@@ -55,7 +54,7 @@ func (i *WebsocketFlow) ToGRPCModel() *ypb.WebsocketFlow {
 		DataSizeVerbose:      utils.ByteSize(uint64(length)),
 		DataLength:           int64(length),
 		DataVerbose:          utils.DataVerbose(raw),
-		IsJson:               govalidator.IsJSON(raw),
+		IsJson:               isJson,
 		IsProtobuf:           utils.IsProtobuf([]byte(raw)),
 	}
 }

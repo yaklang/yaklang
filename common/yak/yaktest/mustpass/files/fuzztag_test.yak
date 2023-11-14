@@ -1,2 +1,9 @@
 assert x`{{trim(  aaa )}}`[0] == "aaa"
 assert x`{{substr(abcd|1,2)}}`[0] == "bc"
+dump(x`{{gb18030(你好)}}`[0], "\xc4\xe3\xba\xc3")
+dump(codec.DecodeHex("c4e3bac3")~)
+dump(codec.EncodeToHex(string(x`{{gb18030(你好)}}`[0])))
+assert codec.EncodeToHex(string(x`{{gb18030(你好)}}`[0])) == codec.EncodeToHex(codec.DecodeHex("c4e3bac3")~) // gb18030
+dump(x`你好`[0], "\xe4\xbd\xa0\xe5\xa5\xbd")
+assert x`你好`[0] == codec.DecodeHex("e4bda0e5a5bd")~      // utf8
+assert x`{{gb18030toUTF8({{hexd(c4e3bac3)}})}}`[0] == "你好"

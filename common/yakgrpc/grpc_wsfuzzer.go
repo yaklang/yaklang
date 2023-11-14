@@ -10,8 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-
-	"github.com/asaskevich/govalidator"
 )
 
 func (s *Server) CreateWebsocketFuzzer(stream ypb.Yak_CreateWebsocketFuzzerServer) error {
@@ -42,7 +40,7 @@ func (s *Server) CreateWebsocketFuzzer(stream ypb.Yak_CreateWebsocketFuzzerServe
 				encoded = append(encoded, "gzip")
 			}
 
-			isJson := govalidator.IsJSON(string(fromServer))
+			_, isJson := utils.IsJSON(string(fromServer))
 			var dataVerbose = utils.EscapeInvalidUTF8Byte(fromServer)
 			if isJson {
 				var buf bytes.Buffer
@@ -99,7 +97,7 @@ func (s *Server) CreateWebsocketFuzzer(stream ypb.Yak_CreateWebsocketFuzzerServe
 			toServerStr := string(req.GetToServer())
 			client.Write(req.GetToServer())
 
-			isJson := govalidator.IsJSON(string(req.GetToServer()))
+			_, isJson := utils.IsJSON(string(req.GetToServer()))
 			var dataVerbose = ""
 			if isJson {
 				var buf bytes.Buffer
