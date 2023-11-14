@@ -82,7 +82,7 @@ func Test_ForExcludeBadCase(t *testing.T) {
 			ExcludeSuffix: []string{".gif"},
 			UpdateFilter:  true,
 		})
-		defer yakit.DelKey(consts.GetGormProfileDatabase(), MITMFilterKeyRecords)
+		defer NewMITMFilterManager(consts.GetGormProfileDatabase()).Recover()
 		time.Sleep(500 * time.Millisecond)
 		for _, ct := range [][]any{
 			{"/abc.a", 0},
@@ -158,7 +158,7 @@ func TestGRPCMUSTPASS_MITMFilter_ForExcludeURI(t *testing.T) {
 			ExcludeUri:    []string{"abc"},
 			UpdateFilter:  true,
 		})
-		defer yakit.DelKey(consts.GetGormProfileDatabase(), MITMFilterKeyRecords)
+		defer NewMITMFilterManager(consts.GetGormProfileDatabase()).Recover()
 		time.Sleep(500 * time.Millisecond)
 		for _, ct := range [][]any{
 			{"/abc.a", 0},
@@ -229,7 +229,7 @@ func TestGRPCMUSTPASS_MITMFilter_ForExcludeSuffixAndContentType(t *testing.T) {
 			ExcludeSuffix: []string{".aaac", ".zip", ".js"},
 			UpdateFilter:  true,
 		})
-		defer yakit.DelKey(consts.GetGormProfileDatabase(), MITMFilterKeyRecords)
+		defer NewMITMFilterManager(consts.GetGormProfileDatabase()).Recover()
 		time.Sleep(500 * time.Millisecond)
 		for _, ct := range [][]any{
 			{"/abc.png.zip?ab=1", 0},
@@ -272,7 +272,8 @@ sleep(0.3)
 			IncludeUri:          nil,
 			UpdateFilter:        true,
 		})
-		defer yakit.DelKey(consts.GetGormProfileDatabase(), MITMFilterKeyRecords)
+		defer NewMITMFilterManager(consts.GetGormProfileDatabase()).Recover()
+
 		time.Sleep(500 * time.Millisecond)
 		for _, ct := range [][]any{
 			{"application/abc", 0},
