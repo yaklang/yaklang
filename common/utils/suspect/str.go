@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"io/ioutil"
 	"regexp"
@@ -124,14 +125,7 @@ func IsCaptchaKey(key string) bool {
 }
 
 func IsBase64(s string) bool {
-	if !maybeBase64Regex.MatchString(s) {
-		return false
-	}
-	if len(s)%4 != 0 {
-		return false
-	}
-
-	return true
+	return utils.IsBase64(s)
 }
 
 func IsBase64Password(s string) bool {
