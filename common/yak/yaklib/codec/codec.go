@@ -165,7 +165,7 @@ func DecodeBase64Url(i interface{}) ([]byte, error) {
 func DecodeBase64(i string) ([]byte, error) {
 	i = strings.TrimSpace(i)
 	if strings.Index(i, "%") >= 0 {
-		i = QueryEscape(i)
+		i = ForceQueryUnescape(i)
 	}
 
 	if strings.Contains(i, "-") {
