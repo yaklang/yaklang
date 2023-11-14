@@ -197,15 +197,17 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			feedbackToUser(fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", downstreamProxy, "缺乏端口（Miss Port）"))
 			return utils.Errorf("proxy miss port. [%v]", proxyUrl.Host)
 		}
-		conn, err := netx.ProxyCheck(downstreamProxy, 5*time.Second)
+		conn, err := netx.ProxyCheck(downstreamProxy, 5*time.Second) //代理检查只做log记录，不在阻止MITM启动
 		if err != nil {
-			feedbackToUser(fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", downstreamProxy, "代理不通（Proxy Cannot be connected）"))
+			errInfo := "代理不通（Proxy Cannot be connected）"
 			if errors.Is(err, netx.ErrorProxyAuthFailed) {
-				return utils.Errorf("proxy auth failed: %v", downstreamProxy)
+				errInfo = "认证失败（Proxy Auth Fail）"
 			}
-			return utils.Errorf("proxy cannot be connected: %v", downstreamProxy)
+			feedbackToUser(fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", downstreamProxy, errInfo))
 		}
-		conn.Close()
+		if conn != nil {
+			conn.Close()
+		}
 	}
 
 	if firstReq.GetHost() != "" {
