@@ -1,61 +1,93 @@
-<img src="imgs/yaklang-logo.png" style="width: 400px"/>
 
-# CDSL-Yaklang: Cybersecurity Domain-Specific Language
+<p align="center">
+  <a href="https://yaklang.io/"><img src="imgs/yaklang-logo.png" style="width: 400px"/></a> 
+ <h2 align="center">为网络安全而生的领域编程语言</h2>
+<p align="center">
+<img src="https://img.shields.io/github/issues-pr/yaklang/yaklang">
+<a href="https://github.com/yaklang/yaklang/releases"><img src="https://img.shields.io/github/downloads/yaklang/yaklang/total">
+<a href="https://github.com/yaklang/yaklang/graphs/contributors"><img src="https://img.shields.io/github/contributors-anon/yaklang/yaklang">
+<a href="https://github.com/yaklang/yaklang/releases/"><img src="https://img.shields.io/github/release/yaklang/yaklang">
+<a href="https://github.com/yaklang/yaklang/issues"><img src="https://img.shields.io/github/issues-raw/yaklang/yaklang">
+<a href="https://github.com/yaklang/yaklang/discussions"><img src="https://img.shields.io/github/stars/yaklang/yaklang">
+<a href="https://github.com/yaklang/yaklang/blob/main/LICENSE.md"><img src="https://img.shields.io/github/license/yaklang/yaklang">
+</p>
 
-为了加速安全产品和安全工具的工程化研发，我们创建了一门新的语言（Yaklang），并且同时实现了一个栈虚拟机（YakVM）。
+<p align="center">
+  <a href="#快速开始">快速开始</a> •
+  <a href="https://yaklang.io/docs/intro">官方文档</a> •
+  <a href="https://github.com/yaklang/yaklang/issues">问题反馈</a> •
+  <a href="https://yaklang.io/docs/api/global_buildin_ops/">接口手册</a> •
+  <a href="#贡献你的代码">贡献代码</a> •
+  <a href="#社区 ">加入社区</a> •
+  <a href="#项目架构">项目架构</a> 
+</p>
 
-In order to improve the development process of security products and hacking tools, we have created a new language (
-Yaklang) and implemented a stack-based virtual machine (YakVM) for this language.
+<p align="center">
+ :book:语言选择： <a href="https://github.com/yaklang/yaklang/blob/main/README_EN.md">English</a> • 
+  <a href="https://github.com/yaklang/yaklang/blob/main/README.md">中文</a> 
+</p>
 
-Yaklang 是一门图灵完备的编程语言，其语法由上下文无关文法定义。它运行在 YakVM 上。
+---
+# CDSL-Yakang 简介
 
-Yaklang is a Turing-complete procedural language defined by context-free grammar. It runs on YakVM.
+CDSL：Cybersecurity Domain Specific Language，全称网络安全领域编程语言。
 
-## 为什么要做 DSL? (Why DSL?)
+Yaklang 团队综合“领域限定语言”的思想，构建了CDSL的概念，并以此为核心构建了Yak(又称Yaklang)语言来构建基础设施和语言生态。
 
-1. 提高生产力。DSL 设计简洁高效,专注于解决特定问题,可以大大提高开发效率和生产力。
+Yak 是一门针对网络安全领域研发的易书写，易分发的高级计算机编程语言。Yak具备强类型、动态类型的经典类型特征，兼具编译字节码和解释执行的运行时特征。
 
-1. 改善抽象能力。DSL 可以帮助开发者利用高层抽象构建解决方案,不需要处理底层细节,提高开发效率。
+Yak语言的运行时环境只依赖于YakVM，可以实现“一次编写，处处运行”的特性，只要有YakVM部署的环境，都可以快速执行Yak语言程序。
 
-1. 可维护性好。DSL 语言简单明了,代码也更加清晰易读,这有利于代码的维护和扩展。
+<h3 align="center">
+  <img src="imgs/yaklang-cdsl.png" style="width: 800px" alt="yaklang-cdsl.png" ></a>
+</h3>
 
-1. 可靠性高。DSL 专注一定领域,语言和语义都更加精确,这有助于编写出更加可靠的程序。
+Yak语言起初只作为一个“嵌入式语言”在宿主程序中存在，后在电子科技大学网络空间安全学院学术指导下，由 Yaklang.io 研发团队进行长达两年的迭代与改造，实现了YakVM虚拟机让语言可以脱离“宿主语言”独立运行，并与2023年完全开源。 支持目前主流操作系统：macOS，Linux，Windows。
 
-1. 易于嵌入。DSL可以很容易地嵌入到一门宿主语言中,实现起来非常方便。
 
-### Translation:
+## Yaklang 的优势
 
-Improved productivity. DSL is designed to be concise and efficient, focusing on solving specific problems, which can greatly improve development efficiency and productivity.
+基于CDSL概念构建的网络安全领域编程语言Yak，具备了几乎DSL所有的优势，它被设计为针对安全能力研发领域的专用编程语言，实现了常见的大多数安全能力，可以让各种各样的安全能力彼此之间“互补，融合，进化”；提高安全从业人员的生产力。
 
-Improved abstraction. DSL can help developers build solutions using high-level abstractions without dealing with low-level details, improving development efficiency.
+CDSL在网络安全领域提供的能力具备很多优势：
+- 简洁性：使用CDSL构建的安全产品更能实现业务和能力的分离，并且解决方案更加直观；
 
-High maintainability. DSL languages are simple and clear, and the code is also more readable, which is beneficial for code maintenance and expansion.
+- 易用性：非专业的人员也可以使用CDSL构建安全产品，而避免安全产品工程化中的信息差；
 
-High reliability. DSL focuses on a certain field, the language and semantics are more precise, which helps to write more reliable programs.
+- 灵活性：CDSL一般被设计为单独使用和嵌入式使用均可，用户可以根据自己的需求去编写DSL脚本以实现特定的策略和检测规则，这往往更能把用户的思路展示出来，而不必受到冗杂知识的制约；
 
-Easy to embed. DSL can be easily embedded in a host language, which is very convenient to implement.
+除此之外，作为一门专门为网络安全研发设计的语言，Yak语言除了满足一些基础的语言本身需要具备的特性之外，还具有很多特殊功能，可以帮助用户快速构建网络安全应用：
 
-## 项目架构 / Project Architecture
+1. 中间人劫持库函数
+
+2. 复杂端口扫描和服务指纹识别
+
+3. 网络安全领域的加解密库
+
+4. 支持中国商用密码体系：支持SM2椭圆曲线公钥密码算法，SM4分组密码算法，SM3密码杂凑算法等
+
+<h3 align="center">
+  <img src="imgs/yaklang-fix.jpg" style="width: 800px" alt="yaklang-fix.jpg" ></a>
+</h3>
+
+## 项目架构
 
 ![yaklang-architecture](imgs/yaklang-arch.jpg)
 
-## 快速开始 / Quick Start
+## 快速开始
 
-### （推荐中文用户）通过 Yakit 来使用 Yaklang / Use Yaklang via Yakit
+- ### 通过 Yakit 来使用 Yaklang
 
 Yakit (https://github.com/yaklang/yakit) 是 Yaklang.io 团队官方出品的开源 Yaklang IDE，它可以帮助你快速上手 Yaklang 语言。
 
-Yakit (https://github.com/yaklang/yakit) is the official open source Yaklang IDE released by the Yaklang.io team. It can help you get started with the Yaklang language quickly.
-
 同时 Yakit 也能将绝大部分安全工程师需要的核心功能图形化。他是免费的，你可以通过 [下载安装 Yakit](https://www.yaklang.com/products/download_and_install)，来开始使用 Yaklang。
 
-At the same time, Yakit can also visualize most of the core functions needed by security engineers. It is free, you can start using Yaklang by [downloading and installing Yakit] (https://www.yaklang.com/products/download_and_install).
+关于Yakit的更多内容可移步：[Yakit官网文档](https://yaklang.io/products/intro/)查看
 
-### 通过命令行来安装使用
+
+- ### 通过命令行来安装使用
 
 通过命令行来安装使用 Yaklang 请遵循：**https://www.yaklang.com/** 或 **https://www.yaklang.io/** 的指引，或直接执行
-
-Install and use Yaklang via the command line, please follow: **https://www.yaklang.com/** or **https://www.yaklang.io/**, or directly execute
 
 #### MacOS / Linux
 
@@ -69,32 +101,26 @@ bash <(curl -sS -L http://oss.yaklang.io/install-latest-yak.sh)
 powershell (new-object System.Net.WebClient).DownloadFile('https://yaklang.oss-cn-beijing.aliyuncs.com/yak/latest/yak_windows_amd64.exe','yak_windows_amd64.exe') && yak_windows_amd64.exe install && del /f yak_windows_amd64.exe
 ```
 
-## 社区 / Community
+## 社区
 
-1. 你可以在 yaklang 或者 yakit 的 issues 中添加你想讨论的内容或者你想表达的东西，英文或中文均可，我们会尽快回复
-2. 国内用户可以使用 WeChat 加入群组
-3. 国际用户可以使用 Discord 加入社区
+1. 你可以在 Yaklang 或者Yakit 的 issues 中添加你想讨论的内容或者你想表达的东西，英文或中文均可，我们会尽快回复
+2. 国内用户可以添加运营 WeChat 加入群组
 
-### Translation
-1. You can add the topics you want to discuss or express in Yaklang or Yakit's issues, in either English or Chinese, and we will reply as soon as possible.
-2. Chinese users can join the group through WeChat.
-3. International users can join the community through Discord.
+<h3 align="center">
+  <img src="imgs/yaklang-wechat.jpg" style="width: 200px" alt="yaklang-wechat.jpg" ></a>
+</h3>
 
-## 贡献你的代码 / Contribute your code
+4. 国际用户可以使用 Discord 加入社区
+
+## 贡献你的代码
 
 这是一个高级话题，在贡献你的代码之前，确保你对 Yaklang 整个项目结构有所了解。
 
-This is an advanced topic. Before contributing your code, make sure you have an understanding of the entire Yaklang project structure.
-
 在贡献代码时，如果你希望修改 Yaklang 或 YakVM 本身的核心语法部分，最好与研发团队取得联系。
-
-When contributing code, if you want to modify the core syntax part of Yaklang or YakVM itself, it is best to contact the R&D team.
 
 如果您仅仅想要增加库的功能，或者修复一些库的 Bug，那么您可以直接提交 PR，当然 PR 中最好包含对应的单元测试，这很有助于提升我们的代码质量。
 
-If you just want to add functionality to the library, or fix some bugs in the library, then you can submit a PR directly. Of course, the PR should preferably include the corresponding unit test, which is very helpful to improve our code quality.
-
-## 项目成员 / Project Members
+## 项目成员
 
 ### Maintainer
 
@@ -109,8 +135,10 @@ If you just want to add functionality to the library, or fix some bugs in the li
 5. [bcy2007](https://github.com/bcy2007)
 6. [naiquan](https://github.com/naiquann)
 7. [Rookie-is](https://github.com/Rookie-is)
+8. [wlingze](https://github.com/wlingze)
 
-## 开源许可证 / Open Source LICENSE
+
+## 开源许可证
 
 本仓库代码版本使用 AGPL 开源协议，这是一个严格的开源协议，且具有传染性，如果您使用了本仓库的代码，那么您的代码也必须开源。
 
@@ -119,33 +147,32 @@ If you just want to add functionality to the library, or fix some bugs in the li
 
 本项目开源仓库仅应该作为个人开源和学习使用。
 
-
-The code version in this repository uses the AGPL open source license, which is a strict open source license and is infectious. If you use the code in this repository, your code must also be open source.
-
-1. Mandatory open source network services: Requires the source code of network services to be open source. Ensures the practice of open source philosophy in network environments.
-2. Other terms are the same as GPL: open source free, open source modification, derived open source, etc.
-
-This open source repository should only be used for personal open source and learning.
-
-## 鸣谢 / Acknowledgments
+## 鸣谢
 
 本项目经由[电子科技大学](https://www.uestc.edu.cn)张小松([网络空间安全学院](https://www.scse.uestc.edu.cn/))教授学术指导。
 
-This project is academically guided by Professor Zhang Xiaosong ([scse.uestc.edu.cn](https://www.scse.uestc.edu.cn/)), [University of Electronic Science and Technology of China](https://www.uestc.edu.cn).
+<h3 align="center">
+<img src="imgs/lab-logo.png" style="width: 400px"/>
+</h3>
 
-<img src="imgs/lab-logo.png" style="width: 180px"/>
-
-### 基础理论学科 / Basic theoretical disciplines
+### 基础理论学科
 
 1. Alonzo Church, "A set of postulates for the foundation of logic", Annals of Mathematics, 33(2), 346-366, 1932.
 2. Dana Scott, Christopher Strachey, "Toward a mathematical semantics for computer languages", Proceedings of the Symposium on Computers and Automata, Microwave Research Institute Symposia Series Vol. 21, New York, 1971.
 3. Henk Barendregt, Wil Dekkers, Richard Statman, lambda Calculus with Types, Perspectives in Logic. Cambridge University Press, 2013.
+4. Braun, M., Buchwald, S., Hack, S., Leißa, R., Mallon, C., Zwinkau, A. (2013). Simple and Efficient Construction of Static Single Assignment Form. In: Jhala, R., De Bosschere, K. (eds) Compiler Construction. CC 2013. Lecture Notes in Computer Science, vol 7791. Springer, Berlin, Heidelberg.
 
-### 工程技术 / Engineering Technology
+### 工程技术
 
-1. Terence Parr, "The Definitive ANTLR 4 Reference", Pragmatic Bookshelf, 2013. 
+1. Terence Parr, "The Definitive ANTLR 4 Reference", Pragmatic Bookshelf, 2013.
 2. Terence Parr, "Simplifying Complex Networks Using Temporal Pattern Mining: The Case of AT&T's Observed Data Network", Dissertation, 1995.
 3. Terence Parr, Russell Quong, "ANTLR: A Predicated-LL(k) Parser Generator", Journal of Software Practice and Experience, July 1995.
 4. Google Ins, "Protocol Buffers", https://developers.google.com/protocol-buffers, 2020.
 5. Google Ins, "gRPC", https://grpc.io/, 2020.
 6. Microsoft Ins, "Monaco Editor", https://microsoft.github.io/monaco-editor/, 2020.
+
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=yaklang/yaklang&type=Date)](https://star-history.com/#yaklang/yaklang&Date)
+
