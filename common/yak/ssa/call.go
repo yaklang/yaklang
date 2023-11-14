@@ -27,8 +27,13 @@ func (c *Call) HandleFreeValue(fvs []string, sideEffect []string) {
 	// parent := builder.parentBuilder
 
 	for _, name := range fvs {
-		_ = name
-		if v := builder.ReadVariableBefore(name, false, c); v != nil {
+		// get current function variable for call this closure
+		v := builder.ReadVariableBefore(name, false, c)
+		// if not get, try build freeValue in parent function.
+		if v == nil && builder.CanBuildFreeValue(name) {
+			v = builder.BuildFreeValue(name)
+		}
+		if v != nil {
 			c.binding = append(c.binding, v)
 		} else {
 			c.NewError(Error, SSATAG, BindingNotFound(name))
