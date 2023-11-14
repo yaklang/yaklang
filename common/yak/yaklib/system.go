@@ -1,6 +1,7 @@
 package yaklib
 
 import (
+	"net"
 	"os"
 	"runtime"
 
@@ -56,6 +57,9 @@ var SystemExports = map[string]interface{}{
 	"IsPrivileged":         IsPrivileged,
 	"GetDefaultDNSServers": GetDefaultDNSServers,
 	"WaitConnect":          WaitConnect,
+	"GetLocalAddress":      GetLocalAddress,
+	"GetLocalIPv4Address":  GetLocalIPv4Address,
+	"GetLocalIPv6Address":  GetLocalIPv6Address,
 }
 
 // LookupHost 通过DNS服务器，根据域名查找IP
@@ -448,3 +452,58 @@ var ARCH = runtime.GOARCH
 
 // IsPrivileged 当前是否是特权模式
 var IsPrivileged = privileged.GetIsPrivileged()
+
+// GetLocalAddress 获取本地IP地址
+// Example:
+// ```
+// os.GetLocalAddress() // ["192.168.1.103", "fe80::605a:5ff:fefb:5405"]
+// ```
+func GetLocalAddress() []string {
+	ret, err := net.InterfaceAddrs()
+	if err != nil {
+		return nil
+	}
+	var results = make([]string, len(ret))
+	for i, a := range ret {
+		if r, ok := a.(*net.IPNet); ok {
+			results[i] = r.IP.String()
+		}
+	}
+	return results
+}
+
+// GetLocalIPv4Address 获取本地IPv4地址
+// Example:
+// ```
+// os.GetLocalIPv4Address() // ["192.168.3.103"]
+// ```
+func GetLocalIPv4Address() []string {
+	var r []string
+	for _, result := range GetLocalAddress() {
+		if utils.IsLoopback(result) {
+			continue
+		}
+		if utils.IsIPv4(result) {
+			r = append(r, result)
+		}
+	}
+	return r
+}
+
+// GetLocalIPv6Address 获取本地IPv6地址
+// Example:
+// ```
+// os.GetLocalIPv6Address() // ["fe80::605a:5ff:fefb:5405"]
+// ```
+func GetLocalIPv6Address() []string {
+	var r []string
+	for _, result := range GetLocalAddress() {
+		if utils.IsLoopback(result) {
+			continue
+		}
+		if utils.IsIPv6(result) {
+			r = append(r, result)
+		}
+	}
+	return r
+}
