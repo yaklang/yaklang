@@ -654,6 +654,25 @@ func TestCallParamReturn(t *testing.T) {
 			},
 		})
 	})
+
+	t.Run("test go function call", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			f1 = ()=> {
+				// go func{
+				// 	f2()
+				// }
+				go f2
+			}
+			f2 = () => {
+			}
+			`,
+			errs: []string{
+				"empty block",
+			},
+		})
+	})
+
 }
 
 func TestClosureBinding(t *testing.T) {
