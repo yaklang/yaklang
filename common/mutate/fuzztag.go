@@ -94,6 +94,46 @@ func AddFuzzTagToGlobal(f *FuzzTagDescription) {
 }
 func init() {
 	AddFuzzTagToGlobal(&FuzzTagDescription{
+		TagName: "trim",
+		Handler: func(s string) []string {
+			return []string{strings.TrimSpace(s)}
+		},
+		Description: "移除前后多余的空格，例如：`{{trim( abc )}}`，结果为：`abc`",
+	})
+	AddFuzzTagToGlobal(&FuzzTagDescription{
+		TagName: "substr",
+		Handler: func(s string) []string {
+			index := strings.LastIndexByte(s, '|')
+			if index == -1 {
+				return []string{s}
+			}
+			before, after := s[:index], s[index+1:]
+			if strings.Contains(after, ",") {
+				start, length := sepToEnd(after, ",")
+				startInt := codec.Atoi(start)
+				lengthInt := codec.Atoi(length)
+				if lengthInt <= 0 {
+					lengthInt = len(before)
+				}
+				if startInt >= len(before) {
+					return []string{""}
+				}
+				if startInt+lengthInt >= len(before) {
+					return []string{before[startInt:]}
+				}
+				return []string{before[startInt : startInt+lengthInt]}
+			} else {
+				start := codec.Atoi(after)
+				if len(before) > start {
+					return []string{before[start:]}
+				}
+				return []string{""}
+			}
+		},
+		Description: "输出一个字符串的子符串，定义为 {{substr(abc|start,length)}}，例如：{{substr(abc|1)}}，结果为：bc，{{substr(abcddd|1,2)}}，结果为：bc",
+	})
+
+	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "fuzz:password",
 		Handler: func(s string) []string {
 			origin, level := sepToEnd(s, "|")
