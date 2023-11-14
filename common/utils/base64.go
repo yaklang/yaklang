@@ -5,6 +5,7 @@ import "github.com/yaklang/yaklang/common/yak/yaklib/codec"
 func IsBase64(s string) bool {
 	var ret []byte
 	var err error
+	s = codec.ForceQueryUnescape(s)
 	ret, err = codec.DecodeBase64(s)
 	if err != nil {
 		return false
