@@ -79,10 +79,10 @@ func TestClosureSideEffect(t *testing.T) {
 	}
 }
 
-type methodBuider struct {
+type methodBuilder struct {
 }
 
-func (b *methodBuider) Build(t ssa.Type, name string) *ssa.FunctionType {
+func (b *methodBuilder) Build(t ssa.Type, name string) *ssa.FunctionType {
 	strTyp := ssa.BasicTypes[ssa.String]
 	switch t.GetTypeKind() {
 	case ssa.String:
@@ -96,7 +96,7 @@ func (b *methodBuider) Build(t ssa.Type, name string) *ssa.FunctionType {
 	return nil
 }
 
-func (b *methodBuider) GetMethodNames(t ssa.Type) []string {
+func (b *methodBuilder) GetMethodNames(t ssa.Type) []string {
 	switch t.GetTypeKind() {
 	case ssa.String:
 		return []string{"join"}
@@ -104,7 +104,7 @@ func (b *methodBuider) GetMethodNames(t ssa.Type) []string {
 	return nil
 }
 
-var _ ssa.MethodBuilder = (*methodBuider)(nil)
+var _ ssa.MethodBuilder = (*methodBuilder)(nil)
 
 func TestSelfModifyFunction(t *testing.T) {
 	code := `
@@ -119,14 +119,14 @@ func TestSelfModifyFunction(t *testing.T) {
 	`
 
 	prog := ParseSSA(code, func(fb *ssa.FunctionBuilder) {
-		fb.WithExternMethod(&methodBuider{})
+		fb.WithExternMethod(&methodBuilder{})
 	})
-	// prog.ShowWithSource()
+	prog.ShowWithSource()
 
 	printlnFunc := prog.Packages[0].Funcs[0].GetValuesByName("println")[0]
 	for _, final := range printlnFunc.GetUsers() {
 		line := final.LineDisasm()
-		// fmt.Println(line)
+		fmt.Println(line)
 		if !strings.Contains(line, `"second line"`) {
 			t.Error("println: ", line)
 		}
