@@ -476,11 +476,13 @@ var _ Instruction = (*SideEffect)(nil)
 // function.
 type Return struct {
 	anInstruction
+	anValue
 	Results []Value
 }
 
 var _ Node = (*Return)(nil)
 var _ User = (*Return)(nil)
+var _ Value = (*Return)(nil)
 var _ Instruction = (*Return)(nil)
 
 // ================================= Memory Value

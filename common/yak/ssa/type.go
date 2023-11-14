@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	BasicTypes[ErrorType].method["Error"] = NewFunctionType(
+	BasicTypes[ErrorType].method["Error"] = NewFunctionTypeDefine(
 		"error.Error",
 		[]Type{BasicTypes[ErrorType]},
 		[]Type{BasicTypes[String]},
@@ -687,26 +687,30 @@ func CalculateType(ts []Type) Type {
 	} else if len(ts) == 1 {
 		return ts[0]
 	} else {
-		i := NewStructType()
+		i := NewObjectType()
 		for index, typ := range ts {
 			i.AddField(NewConst(index), typ)
 		}
 		i.Finish()
 		i.Combination = true
+		i.Kind = StructTypeKind
 		// i.SetLen(NewConst(len(ts)))
 		i.Len = len(ts)
 		return i
 	}
 }
 
-func NewFunctionType(name string, Parameter []Type, ReturnType []Type, IsVariadic bool) *FunctionType {
+func NewFunctionType(name string, Parameter []Type, ReturnType Type, IsVariadic bool) *FunctionType {
 	f := &FunctionType{
 		Name:       name,
 		Parameter:  Parameter,
 		IsVariadic: IsVariadic,
+		ReturnType: ReturnType,
 	}
-	f.ReturnType = CalculateType(ReturnType)
 	return f
+}
+func NewFunctionTypeDefine(name string, Parameter []Type, ReturnType []Type, IsVariadic bool) *FunctionType {
+	return NewFunctionType(name, Parameter, CalculateType(ReturnType), IsVariadic)
 }
 
 func (s *FunctionType) SetFreeValue(fv []string) {

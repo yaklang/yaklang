@@ -92,6 +92,7 @@ func NewSwitch(cond Value, defaultb *BasicBlock, label []SwitchLabel) *Switch {
 func NewReturn(vs []Value) *Return {
 	r := &Return{
 		anInstruction: NewInstruction(),
+		anValue:       NewValue(),
 		Results:       vs,
 	}
 	return r
@@ -243,4 +244,51 @@ func (e *ErrorHandler) AddFinal(f *BasicBlock) {
 func (e *ErrorHandler) AddDone(d *BasicBlock) {
 	e.done = d
 	d.Handler = e
+}
+
+func (r *Return) calcType(builder *FunctionBuilder) {
+	if len(r.Results) == 0 {
+		r.SetType(BasicTypes[Null])
+	}
+
+	handleType := func(t Type) Type {
+		if t.GetTypeKind() == FunctionTypeKind {
+			ft, _ := ToFunctionType(t)
+			if len(ft.FreeValue) == 0 {
+				return t
+			}
+			// return closure, remove freeValue that can get in this function
+			freeValue := make([]string, 0, len(ft.FreeValue))
+			for _, name := range ft.FreeValue {
+				if v := builder.ReadVariable(name, false); v == nil {
+					freeValue = append(freeValue, name)
+				}
+			}
+			sideEffect := make([]string, 0, len(ft.SideEffects))
+			for _, name := range ft.SideEffects {
+				if v := builder.ReadVariable(name, false); v == nil {
+					sideEffect = append(sideEffect, name)
+				}
+			}
+			new := NewFunctionType(ft.Name, ft.Parameter, ft.ReturnType, ft.IsVariadic)
+			new.SetFreeValue(freeValue)
+			new.SetSideEffect(sideEffect)
+			return new
+		} else {
+			return t
+		}
+	}
+	if len(r.Results) == 1 {
+		r.SetType(handleType(r.Results[0].GetType()))
+	}
+
+	if len(r.Results) > 1 {
+		newObjTyp := NewObjectType()
+		for _, v := range r.Results {
+			newObjTyp.AddField(NewConst(1), handleType(v.GetType()))
+		}
+		newObjTyp.Finish()
+		newObjTyp.Kind = SliceTypeKind
+		r.SetType(newObjTyp)
+	}
 }
