@@ -9,6 +9,7 @@ func TestIsBase64_Positive(t *testing.T) {
 		name string
 		args string
 	}{
+		{name: "urlencode base64", args: `eyJkZCI6MTI1fQ%3D%3D`},
 		{name: "basic base64(utf8 valid)", args: "YWJjZGRkZA=="},
 		{name: "basic base64(gzip)", args: "H4sIAAAAAAAA/0pMSgYAAAD//wEAAP//wkEkNQMAAAA="},
 		{name: "utf8(中文)", args: `5L2g5aW9`},

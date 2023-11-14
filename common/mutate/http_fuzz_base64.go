@@ -16,8 +16,8 @@ import (
 )
 
 func isBase64JSON(raw string) (string, bool) {
-	if utils.IsBase64(raw) {
-		return raw, true
+	if !utils.IsBase64(raw) {
+		return raw, false
 	}
 	decoded, err := codec.DecodeBase64Url(raw)
 	if err != nil {
@@ -27,8 +27,8 @@ func isBase64JSON(raw string) (string, bool) {
 }
 
 func isBase64(raw string) (string, bool) {
-	if utils.IsBase64(raw) {
-		return raw, true
+	if !utils.IsBase64(raw) {
+		return raw, false
 	}
 	decoded, err := codec.DecodeBase64Url(raw)
 	if err != nil {
