@@ -4,6 +4,8 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
+	"go/ast"
+	"go/token"
 	"reflect"
 	"sort"
 	"strings"
@@ -42,12 +44,53 @@ func ClearHelper(helper *yakdoc.DocumentHelper) {
 	clearFieldParamsType(helper.Functions)
 }
 
+func GetInterfaceDocumentFromAST(pkg *ast.Package, interfaceName string) map[string]string {
+	for _, file := range pkg.Files {
+		for _, decl := range file.Decls {
+			genDecl, ok := decl.(*ast.GenDecl)
+			if !ok || genDecl.Tok != token.TYPE {
+				continue
+			}
+			for _, spec := range genDecl.Specs {
+				typeSpec, ok := spec.(*ast.TypeSpec)
+				if !ok || typeSpec.Name.Name != interfaceName {
+					continue
+				}
+				iface, ok := typeSpec.Type.(*ast.InterfaceType)
+				if !ok {
+					continue
+				}
+				ret := make(map[string]string)
+				for _, field := range iface.Methods.List {
+					if len(field.Names) <= 0 {
+						continue
+					}
+					methodName := field.Names[0].Name
+					doc := ""
+					if field.Doc != nil {
+						doc = strings.TrimSpace(field.Doc.Text())
+					}
+					ret[methodName] = doc
+				}
+				return ret
+			}
+		}
+	}
+	return nil
+}
+
 func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.DocumentHelper {
 	helper := &yakdoc.DocumentHelper{
 		Libs:          make(map[string]*yakdoc.ScriptLib),
 		Functions:     make(map[string]*yakdoc.FuncDecl),
 		Instances:     make(map[string]*yakdoc.LibInstance),
 		StructMethods: make(map[string]*yakdoc.ScriptLib),
+	}
+	canAutoInjectInterface := true
+	pkgs, err := yakdoc.GetProjectAstPackages()
+	if err != nil {
+		canAutoInjectInterface = false
+		log.Warnf("failed to get project ast packages: %v", err)
 	}
 
 	var extLibs []*yakdoc.ScriptLib
@@ -178,9 +221,15 @@ func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.Doc
 		}
 		filter[typ] = struct{}{}
 
-		structName := ""
-		pkgPath := ""
-		isStruct := false
+		var (
+			structName string
+			pkgPath    string
+			documents  map[string]string
+			isStruct   bool
+
+			pkg *ast.Package
+			ok  bool
+		)
 
 		for {
 			typKind := typ.Kind()
@@ -209,128 +258,140 @@ func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.Doc
 			}
 		}
 
-		if structName != "" && isStruct {
-			//
-			if typKind == reflect.Interface {
-				log.Warnf("need inject interface document for: %s", structName)
-			}
-
-			structName = fmt.Sprintf("%s.%s", pkgPath, structName)
-			lib := &yakdoc.ScriptLib{
-				Name:      structName,
-				Functions: make(map[string]*yakdoc.FuncDecl),
-			}
-			for i := 0; i < typ.NumMethod(); i++ {
-				method := typ.Method(i)
-				methodName := method.Name
-				// 对于方法中的参数和返回值，需要递归再获取类型
-				for _, newTyp := range getTypeFromReflectFunctionType(method.Type, 0) {
-					pushBackWithoutNil(funcTypesList, newTyp)
-				}
-
-				// 为了处理 embed 字段，其组合了匿名结构体字段的方法
-				EmbedFieldAndMethodList := list.New()
-				EmbedFieldAndMethodList.PushBack(&EmbedFieldTypeAndMethod{
-					FieldType: typ,
-					Method:    method,
-				})
-				for item := EmbedFieldAndMethodList.Back(); item != nil; item = EmbedFieldAndMethodList.Back() {
-					EmbedFieldAndMethodList.Remove(item)
-
-					fieldTypeAndMethod := item.Value.(*EmbedFieldTypeAndMethod)
-					fieldType, method := fieldTypeAndMethod.FieldType, fieldTypeAndMethod.Method
-					// 如果是指针类型，那么需要获取其指向的类型，如果不是结构体类型，那么就不需要处理
-					if fieldType.Kind() == reflect.Ptr {
-						fieldType = fieldType.Elem()
-						if fieldType.Kind() != reflect.Struct {
-							continue
-						}
-					}
-
-					var (
-						err      error
-						funcDecl *yakdoc.FuncDecl
-					)
-
-					f := method.Func
-					if !f.IsValid() {
-						// ? 匿名字段是一个匿名接口，例如继承了 net.Conn 接口, fallback 处理
-						methodTyp := method.Type
-
-						funcDecl := &yakdoc.FuncDecl{
-							LibName:    structName,
-							MethodName: methodName,
-							Document:   "",
-							Decl:       strings.Replace(methodTyp.String(), "func(", methodName+"(", 1),
-							Params:     make([]*yakdoc.Field, 0, methodTyp.NumIn()),
-							Results:    make([]*yakdoc.Field, 0, methodTyp.NumOut()),
-						}
-						paramsStr := make([]string, 0, methodTyp.NumIn())
-						for i := 0; i < methodTyp.NumIn(); i++ {
-							paramTyp := methodTyp.In(i)
-							param := &yakdoc.Field{
-								Name:    paramTyp.Name(),
-								Type:    paramTyp.String(),
-								RefType: paramTyp,
-							}
-							funcDecl.Params = append(funcDecl.Params, param)
-
-							if strings.HasPrefix(param.Type, "...") {
-								paramsStr = append(paramsStr, fmt.Sprintf("${%v:%v...}", i+1, param.Name))
-							} else {
-								if param.Type == "any" || param.Type == "interface{}" {
-									paramsStr = append(paramsStr, fmt.Sprintf("${%v:%v}", i+1, param.Name))
-								} else {
-									paramsStr = append(paramsStr, fmt.Sprintf("${%v:%v /*type: %v*/}", i+1, param.Name, param.Type))
-								}
-							}
-						}
-						for i := 0; i < methodTyp.NumOut(); i++ {
-							resultTyp := methodTyp.Out(i)
-							result := &yakdoc.Field{
-								Name:    resultTyp.Name(),
-								Type:    resultTyp.String(),
-								RefType: resultTyp,
-							}
-							funcDecl.Results = append(funcDecl.Results, result)
-						}
-						// 生成 vscode 补全
-						funcDecl.VSCodeSnippets = fmt.Sprintf("%s(%s)", methodName, strings.Join(paramsStr, ", "))
-						lib.Functions[methodName] = funcDecl
-					} else {
-						funcDecl, err = yakdoc.FuncToFuncDecl(f.Interface(), structName, methodName)
-						if err == nil {
-							lib.Functions[methodName] = funcDecl
-							break
-						} else if errors.Is(err, yakdoc.ErrAutoGenerated) {
-							// 如果是自动生成的代码，那么就是匿名结构体字段
-							// 需要递归获取匿名结构体字段的方法
-							for j := 0; j < fieldType.NumField(); j++ {
-								field := fieldType.Field(j)
-
-								fieldTyp := field.Type
-
-								if !field.Anonymous {
-									continue
-								}
-								m, ok := fieldTyp.MethodByName(methodName)
-								if !ok {
-									continue
-								}
-								EmbedFieldAndMethodList.PushBack(&EmbedFieldTypeAndMethod{
-									FieldType: fieldTyp,
-									Method:    m,
-								})
-							}
-						} else {
-							log.Warnf("failed to get func decl from %s.%s: %v", structName, methodName, err)
-							break
-						}
-					}
-				}
-			}
-			helper.StructMethods[structName] = lib
+		if structName == "" || !isStruct {
+			continue
 		}
+
+		// 如果是接口类型，那么需要获取其对应的包，然后再获取其对应的文档
+		if typKind == reflect.Interface {
+			if canAutoInjectInterface {
+				pkg, ok = pkgs[pkgPath]
+				if ok {
+					documents = GetInterfaceDocumentFromAST(pkg, structName)
+				}
+			}
+			if !ok {
+				log.Warnf("need inject interface document for: %s.%s", pkgPath, structName)
+			}
+		}
+
+		structName = fmt.Sprintf("%s.%s", pkgPath, structName)
+		lib := &yakdoc.ScriptLib{
+			Name:      structName,
+			Functions: make(map[string]*yakdoc.FuncDecl),
+		}
+		for i := 0; i < typ.NumMethod(); i++ {
+			method := typ.Method(i)
+			methodName := method.Name
+			// 对于方法中的参数和返回值，需要递归再获取类型
+			for _, newTyp := range getTypeFromReflectFunctionType(method.Type, 0) {
+				pushBackWithoutNil(funcTypesList, newTyp)
+			}
+
+			// 为了处理 embed 字段，其组合了匿名结构体字段的方法
+			EmbedFieldAndMethodList := list.New()
+			EmbedFieldAndMethodList.PushBack(&EmbedFieldTypeAndMethod{
+				FieldType: typ,
+				Method:    method,
+			})
+			for item := EmbedFieldAndMethodList.Back(); item != nil; item = EmbedFieldAndMethodList.Back() {
+				EmbedFieldAndMethodList.Remove(item)
+
+				fieldTypeAndMethod := item.Value.(*EmbedFieldTypeAndMethod)
+				fieldType, method := fieldTypeAndMethod.FieldType, fieldTypeAndMethod.Method
+				// 如果是指针类型，那么需要获取其指向的类型，如果不是结构体类型，那么就不需要处理
+				if fieldType.Kind() == reflect.Ptr {
+					fieldType = fieldType.Elem()
+					if fieldType.Kind() != reflect.Struct {
+						continue
+					}
+				}
+
+				var (
+					err      error
+					funcDecl *yakdoc.FuncDecl
+				)
+
+				f := method.Func
+				if !f.IsValid() {
+					// ? 匿名字段是一个匿名接口，例如继承了 net.Conn 接口, fallback 处理
+					methodTyp := method.Type
+					// 尝试从文档中获取方法的注释
+					document, _ := documents[methodName]
+
+					funcDecl := &yakdoc.FuncDecl{
+						LibName:    structName,
+						MethodName: methodName,
+						Document:   document,
+						Decl:       strings.Replace(methodTyp.String(), "func(", methodName+"(", 1),
+						Params:     make([]*yakdoc.Field, 0, methodTyp.NumIn()),
+						Results:    make([]*yakdoc.Field, 0, methodTyp.NumOut()),
+					}
+					paramsStr := make([]string, 0, methodTyp.NumIn())
+					for i := 0; i < methodTyp.NumIn(); i++ {
+						paramTyp := methodTyp.In(i)
+						param := &yakdoc.Field{
+							Name:    paramTyp.Name(),
+							Type:    paramTyp.String(),
+							RefType: paramTyp,
+						}
+						funcDecl.Params = append(funcDecl.Params, param)
+
+						if strings.HasPrefix(param.Type, "...") {
+							paramsStr = append(paramsStr, fmt.Sprintf("${%v:%v...}", i+1, param.Name))
+						} else {
+							if param.Type == "any" || param.Type == "interface{}" {
+								paramsStr = append(paramsStr, fmt.Sprintf("${%v:%v}", i+1, param.Name))
+							} else {
+								paramsStr = append(paramsStr, fmt.Sprintf("${%v:%v /*type: %v*/}", i+1, param.Name, param.Type))
+							}
+						}
+					}
+					for i := 0; i < methodTyp.NumOut(); i++ {
+						resultTyp := methodTyp.Out(i)
+						result := &yakdoc.Field{
+							Name:    resultTyp.Name(),
+							Type:    resultTyp.String(),
+							RefType: resultTyp,
+						}
+						funcDecl.Results = append(funcDecl.Results, result)
+					}
+					// 生成 vscode 补全
+					funcDecl.VSCodeSnippets = fmt.Sprintf("%s(%s)", methodName, strings.Join(paramsStr, ", "))
+					lib.Functions[methodName] = funcDecl
+				} else {
+					funcDecl, err = yakdoc.FuncToFuncDecl(f.Interface(), structName, methodName)
+					if err == nil {
+						lib.Functions[methodName] = funcDecl
+						break
+					} else if errors.Is(err, yakdoc.ErrAutoGenerated) {
+						// 如果是自动生成的代码，那么就是匿名结构体字段
+						// 需要递归获取匿名结构体字段的方法
+						for j := 0; j < fieldType.NumField(); j++ {
+							field := fieldType.Field(j)
+
+							fieldTyp := field.Type
+
+							if !field.Anonymous {
+								continue
+							}
+							m, ok := fieldTyp.MethodByName(methodName)
+							if !ok {
+								continue
+							}
+							EmbedFieldAndMethodList.PushBack(&EmbedFieldTypeAndMethod{
+								FieldType: fieldTyp,
+								Method:    m,
+							})
+						}
+					} else {
+						log.Warnf("failed to get func decl from %s.%s: %v", structName, methodName, err)
+						break
+					}
+				}
+			}
+		}
+		helper.StructMethods[structName] = lib
 
 	}
 
