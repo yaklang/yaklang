@@ -229,6 +229,10 @@ conn.Close()
 		t.Fatal(err)
 	}
 
+	if len(data.GetData()) < 1 {
+		t.Fatalf("need more than 1 data,but got %d", len(data.GetData()))
+	}
+
 	request := string(data.GetData()[0].Request)
 	if utils.MatchAnyOfSubString(request, "Proxy-Connection: ", "GET http://", "GET https://") {
 		t.Fatalf("request should not contains proxy connection. request:\n%s", request)
