@@ -18,6 +18,7 @@ import (
 	"math/rand"
 	"net/http/httputil"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"unicode"
@@ -34,17 +35,39 @@ import (
 )
 
 func ForceQueryUnescape(s string) string {
-	var val, err = url.QueryUnescape(s)
+	var val, err = url.QueryUnescape(UrlUnicodeDecode(s))
 	if err != nil {
 		return s
 	}
 	return val
 }
 
-var QueryUnescape = url.QueryUnescape
+func QueryUnescape(s string) (string, error) {
+	return url.QueryUnescape(UrlUnicodeDecode(s))
+}
+
 var PathEscape = url.PathEscape
-var PathUnescape = url.PathUnescape
-var QueryEscape = url.QueryEscape
+
+func PathUnescape(s string) (string, error) {
+	return url.PathUnescape(UrlUnicodeDecode(s))
+}
+
+var urlUnicodeRegexp = regexp.MustCompile(`%u[0-9a-fA-F]{4}`)
+
+func UrlUnicodeDecode(s string) string {
+	return urlUnicodeRegexp.ReplaceAllStringFunc(s, func(s string) string {
+		raw, err := hex.DecodeString(s[2:])
+		if err != nil {
+			return s
+		}
+		return string(raw)
+	})
+}
+
+func QueryEscape(s string) string {
+	return url.QueryEscape(s)
+}
+
 var EscapeHtmlString = html.EscapeString
 var UnescapeHtmlString = html.UnescapeString
 var StrConvQuote = func(s string) string {
@@ -141,16 +164,16 @@ func DecodeBase64Url(i interface{}) ([]byte, error) {
 
 func DecodeBase64(i string) ([]byte, error) {
 	i = strings.TrimSpace(i)
+	if strings.Index(i, "%") >= 0 {
+		i = QueryEscape(i)
+	}
+
 	if strings.Contains(i, "-") {
 		i = strings.ReplaceAll(i, "-", "+")
 	}
 	if strings.Contains(i, "_") {
 		i = strings.ReplaceAll(i, "_", "/")
 	}
-	i = strings.ReplaceAll(i, "%3d", "=")
-	i = strings.ReplaceAll(i, "%3D", "=")
-	i = strings.ReplaceAll(i, "%u003D", "=")
-	i = strings.ReplaceAll(i, "%u003d", "=")
 
 	padding := 4 - len(i)%4
 	if padding <= 0 || padding == 4 {
