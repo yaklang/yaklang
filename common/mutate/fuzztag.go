@@ -164,6 +164,8 @@ func init() {
 				string(res),
 			}
 		},
+		Alias:       []string{"zlib:dec", "zlibdec", "zlibd"},
+		Description: "Zlib 解码，把标签内的内容进行 zlib 解码",
 	})
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{
