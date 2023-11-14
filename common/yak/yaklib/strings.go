@@ -552,6 +552,7 @@ var (
 		"VersionEqual":        utils.VersionEqual,
 		"VersionLessEqual":    utils.VersionLessEqual,
 		"VersionLess":         utils.VersionLess,
+		"VersionCompare":      utils.VersionCompare,
 	}
 )
 
