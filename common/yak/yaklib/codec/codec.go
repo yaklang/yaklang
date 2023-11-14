@@ -141,8 +141,16 @@ func DecodeBase64Url(i interface{}) ([]byte, error) {
 
 func DecodeBase64(i string) ([]byte, error) {
 	i = strings.TrimSpace(i)
+	if strings.Contains(i, "-") {
+		i = strings.ReplaceAll(i, "-", "+")
+	}
+	if strings.Contains(i, "_") {
+		i = strings.ReplaceAll(i, "_", "/")
+	}
 	i = strings.ReplaceAll(i, "%3d", "=")
 	i = strings.ReplaceAll(i, "%3D", "=")
+	i = strings.ReplaceAll(i, "%u003D", "=")
+	i = strings.ReplaceAll(i, "%u003d", "=")
 
 	padding := 4 - len(i)%4
 	if padding <= 0 || padding == 4 {

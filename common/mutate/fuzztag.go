@@ -145,6 +145,28 @@ func init() {
 	})
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{
+		TagName: "zlib:encode",
+		Handler: func(s string) []string {
+			res, _ := utils.ZlibCompress(s)
+			return []string{
+				string(res),
+			}
+		},
+		Alias:       []string{"zlib:enc", "zlibc", "zlib"},
+		Description: "Zlib 编码，把标签内容进行 zlib 压缩",
+	})
+
+	AddFuzzTagToGlobal(&FuzzTagDescription{
+		TagName: "zlib:decode",
+		Handler: func(s string) []string {
+			res, _ := utils.ZlibDeCompress([]byte(s))
+			return []string{
+				string(res),
+			}
+		},
+	})
+
+	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "gzip:encode",
 		Handler: func(s string) []string {
 			res, _ := utils.GzipCompress(s)
@@ -258,6 +280,29 @@ func init() {
 		},
 		Alias:       []string{"nullbyte"},
 		Description: "生成一个空字节，如果指定了数量，将生成指定数量的空字节 {{null(5)}} 表示生成 5 个空字节",
+	})
+
+	AddFuzzTagToGlobal(&FuzzTagDescription{
+		TagName: "gb18030",
+		Handler: func(s string) []string {
+			g, err := codec.Utf8ToGB18030([]byte(s))
+			if err != nil {
+				return []string{s}
+			}
+			return []string{string(g)}
+		},
+		Description: `将字符串转换为 GB18030 编码，例如：{{gb18030(你好)}}`,
+	})
+	AddFuzzTagToGlobal(&FuzzTagDescription{
+		TagName: "gb18030toUTF8",
+		Handler: func(s string) []string {
+			g, err := codec.GB18030ToUtf8([]byte(s))
+			if err != nil {
+				return []string{s}
+			}
+			return []string{string(g)}
+		},
+		Description: `将字符串转换为 UTF8 编码，例如：{{gb18030toUTF8({{hexd(c4e3bac3)}})}}`,
 	})
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{

@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"github.com/asaskevich/govalidator"
 	"strconv"
 	"strings"
 	"unicode"
@@ -126,7 +125,7 @@ func ToBytes(s string) (uint64, error) {
 
 func DataVerbose(i interface{}) string {
 	origin := InterfaceToBytes(i)
-	var isJson = govalidator.IsJSON(string(origin))
+	var _, isJson = IsJSON(string(origin))
 	var dataVerbose = EscapeInvalidUTF8Byte(origin[:])
 	if isJson {
 		var buf bytes.Buffer
