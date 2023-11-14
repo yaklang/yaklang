@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"go/ast"
+	"go/parser"
 	"go/token"
+	"os"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -17,18 +19,49 @@ import (
 )
 
 var (
-	defaultHooks        = make([]func(h *DocumentHelper), 0)
-	projectPath  string = ""
+	defaultPackageName        = "github.com/yaklang/yaklang"
+	defaultHooks              = make([]func(h *DocumentHelper), 0)
+	projectPath        string = ""
 )
 
 func GetProjectPath() string {
 	if projectPath == "" {
-		_, filename, _, ok := runtime.Caller(1)
+		_, filename, _, ok := runtime.Caller(0)
+		fmt.Printf("debug dump project path: %#v\n", filename)
 		if ok {
 			projectPath, _ = filepath.Abs(filepath.Join(filename, "../../../../"))
 		}
 	}
 	return projectPath
+}
+
+func GetProjectAstPackages() (map[string]*ast.Package, error) {
+	rootDir := GetProjectPath()
+	fset := token.NewFileSet()
+	packages := make(map[string]*ast.Package)
+
+	err := filepath.Walk(rootDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if info.IsDir() {
+			pkgs, err := parser.ParseDir(fset, path, nil, parser.ParseComments|parser.AllErrors)
+			if err != nil {
+				return err
+			}
+			for _, pkg := range pkgs {
+				path, _ = filepath.Rel(rootDir, path)
+				path = fmt.Sprintf("%s/%s", defaultPackageName, path)
+				path = strings.ReplaceAll(path, string(filepath.Separator), "/")
+				packages[path] = pkg
+			}
+		}
+
+		return nil
+	})
+
+	return packages, err
 }
 
 type DocumentHelper struct {
