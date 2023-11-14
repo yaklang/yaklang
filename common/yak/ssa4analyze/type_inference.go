@@ -10,7 +10,8 @@ import (
 const TITAG = "TypeInference"
 
 type TypeInference struct {
-	Finish map[ssa.Value]struct{}
+	Finish     map[ssa.Value]struct{}
+	DeleteInst []ssa.Instruction
 }
 
 func NewTypeInference(config) Analyzer {
@@ -28,10 +29,14 @@ func (t *TypeInference) Run(prog *ssa.Program) {
 }
 
 func (t *TypeInference) RunOnFunction(fun *ssa.Function) {
+	t.DeleteInst = make([]ssa.Instruction, 0)
 	for _, b := range fun.Blocks {
 		for _, inst := range b.Insts {
 			t.InferenceOnInstruction(inst)
 		}
+	}
+	for _, inst := range t.DeleteInst {
+		ssa.DeleteInst(inst)
 	}
 }
 
@@ -213,16 +218,21 @@ func (t *TypeInference) TypeInferenceMake(i *ssa.Make) {
 }
 
 func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
-	if t := f.Obj.GetType(); t != nil {
-		if methodTyp := ssa.GetMethod(t, f.Key.String()); methodTyp != nil && f.GetType() != methodTyp {
-			f.SetType(methodTyp)
-			f.IsMethod = true
+	if typ := f.Obj.GetType(); typ != nil {
+		if methodTyp := ssa.GetMethod(typ, f.Key.String()); methodTyp != nil && f.GetType() != methodTyp {
+			method := ssa.NewFunctionWithType(methodTyp.Name, methodTyp)
+			f.GetUsers().RunOnCall(func(c *ssa.Call) {
+				c.Args = utils.InsertSliceItem(c.Args, f.Obj, 0)
+				f.Obj.AddUser(c)
+			})
+			ssa.ReplaceAllValue(f, method)
+			t.DeleteInst = append(t.DeleteInst, f)
 			return
 		}
-		if utils.IsNil(t) {
-			t = ssa.BasicTypes[ssa.Null]
+		if utils.IsNil(typ) {
+			typ = ssa.BasicTypes[ssa.Null]
 		}
-		switch t.GetTypeKind() {
+		switch typ.GetTypeKind() {
 		case ssa.ObjectTypeKind, ssa.SliceTypeKind, ssa.MapTypeKind, ssa.StructTypeKind:
 			interfaceTyp := f.Obj.GetType().(*ssa.ObjectType)
 			fTyp := interfaceTyp.GetField(f.Key)
@@ -245,9 +255,9 @@ func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
 			text := ""
 			if ci, ok := ssa.ToConst(f.Key); ok {
 				text = ci.String()
-				want := ssa.TryGetSimilarityKey(ssa.GetAllKey(t), text)
+				want := ssa.TryGetSimilarityKey(ssa.GetAllKey(typ), text)
 				if want != "" {
-					f.NewError(ssa.Error, TITAG, ssa.ExternFieldError("Type", t.String(), text, want))
+					f.NewError(ssa.Error, TITAG, ssa.ExternFieldError("Type", typ.String(), text, want))
 					return
 				}
 			}
@@ -255,7 +265,7 @@ func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
 				list := strings.Split(f.GetPosition().SourceCode, ".")
 				text = list[len(list)-1]
 			}
-			f.Key.NewError(ssa.Error, TITAG, InvalidField(t.String(), text))
+			f.Key.NewError(ssa.Error, TITAG, InvalidField(typ.String(), text))
 		}
 	}
 	// use update
@@ -290,11 +300,10 @@ func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
 func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
 
 	// handler call method
-	if field, ok := c.Method.(*ssa.Field); ok && field.IsMethod {
-		c.Args = utils.InsertSliceItem(c.Args, field.Obj, 0)
-		// TODO: handle modify self function
-		if field.GetType().(*ssa.FunctionType).IsModifySelf {
-			ssa.InsertValueReplaceOriginal(field.Obj, c)
+	if ft, ok := ssa.ToFunctionType(c.Method.GetType()); ok && ft.IsMethod {
+		// handle modify self function
+		if ft.IsModifySelf {
+			ssa.InsertValueReplaceOriginal(c.Args[0], c)
 		}
 	}
 

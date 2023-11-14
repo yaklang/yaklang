@@ -110,6 +110,9 @@ func GetMethod(t Type, id string) *FunctionType {
 			t.AddMethod(id, f)
 		}
 	}
+	if f != nil {
+		f.IsMethod = true
+	}
 	return f
 }
 
@@ -663,6 +666,7 @@ type FunctionType struct {
 	FreeValue    []string
 	SideEffects  []string
 	IsVariadic   bool
+	IsMethod     bool
 	IsModifySelf bool // if this is method function
 }
 
