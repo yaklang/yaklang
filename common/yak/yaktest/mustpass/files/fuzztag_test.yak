@@ -1,0 +1,2 @@
+assert x`{{trim(  aaa )}}`[0] == "aaa"
+assert x`{{substr(abcd|1,2)}}`[0] == "bc"
