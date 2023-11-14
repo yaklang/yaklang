@@ -39,7 +39,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/yakdoc"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yak/yaklang/lib/builtin"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
@@ -271,11 +270,9 @@ func initYaklangLib() {
 	// ssa
 	yaklang.Import("ssa", ssaapi.Exports)
 
-	// 为导出的接口注入注释
-	yakdoc.RegisterHook(func(h *yakdoc.DocumentHelper) {
-		h.InjectInterfaceDocumentManually("github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequestIf", "./common/mutate/http_fuzz.go")
-		h.InjectInterfaceDocumentManually("github.com/yaklang/yaklang/common/rpa/core.RequestIf", "./common/crawler/requestif.go")
-	})
+	// 手动为一些缺失的导出的接口注入注释
+	// yakdoc.RegisterHook(func(h *yakdoc.DocumentHelper) {
+	// })
 }
 
 type ScriptEngine struct {
