@@ -249,19 +249,19 @@ func ProxyCheck(proxy string, connectTimeout time.Duration) (net.Conn, error) { 
 	case utils.IHasPrefix(proxy, "socks5://"):
 		fallthrough
 	case utils.IHasPrefix(proxy, "s5://"):
-		conn, err := dialSocksProxyCheckConfig(SOCKS5, proxyAddr, username, password).dialSocks5("")
+		conn, err := dialSocksProxyCheckConfig(SOCKS5, proxyAddr, connectTimeout, username, password).dialSocks5("")
 		if err != nil {
 			return nil, err
 		}
 		return conn, nil
 	case utils.IHasPrefix(proxy, "s4://") || utils.IHasPrefix(proxy, "socks4://"):
-		conn, err := dialSocksProxyCheckConfig(SOCKS4, proxyAddr, username, password).dialSocks4("")
+		conn, err := dialSocksProxyCheckConfig(SOCKS4, proxyAddr, connectTimeout, username, password).dialSocks4("")
 		if err != nil {
 			return nil, err
 		}
 		return conn, nil
 	case utils.IHasPrefix(proxy, "s4a://") || utils.IHasPrefix(proxy, "socks4a://"):
-		conn, err := dialSocksProxyCheckConfig(SOCKS4A, proxyAddr, username, password).dialSocks4("")
+		conn, err := dialSocksProxyCheckConfig(SOCKS4A, proxyAddr, connectTimeout, username, password).dialSocks4("")
 		if err != nil {
 			return nil, err
 		}

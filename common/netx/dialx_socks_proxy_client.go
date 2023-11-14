@@ -247,11 +247,11 @@ func DialSocksProxy(socksType int, proxy string, username string, password strin
 	}
 }
 
-func dialSocksProxyCheckConfig(socksType int, proxy string, username string, password string) *config {
+func dialSocksProxyCheckConfig(socksType int, proxy string, timeout time.Duration, username string, password string) *config {
 	if username != "" {
-		return &config{Proto: socksType, Host: proxy, Check: true, Auth: &auth{username, password}}
+		return &config{Proto: socksType, Host: proxy, Check: true, Timeout: timeout, Auth: &auth{username, password}}
 	} else {
-		return &config{Proto: socksType, Host: proxy, Check: true}
+		return &config{Proto: socksType, Host: proxy, Check: true, Timeout: timeout}
 	}
 }
 
@@ -281,11 +281,11 @@ func (cfg *config) dialSocks4(targetAddr string) (_ net.Conn, err error) {
 
 	// dial TCP
 	conn, err := DialTimeoutWithoutProxy(cfg.Timeout, "tcp", proxy)
-	if cfg.Check { // s4 just dial ok
-		return conn, nil
-	}
 	if err != nil {
 		return nil, err
+	}
+	if cfg.Check { // s4 just dial ok
+		return conn, nil
 	}
 	defer func() {
 		if err != nil {
