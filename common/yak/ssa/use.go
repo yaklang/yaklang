@@ -34,6 +34,7 @@ func InsertValueReplaceOriginal(original Value, insert Value) {
 	// builder := block.GetFunc().builder
 	variable := original.GetVariable()
 
+	// replace variable in block
 	replaceInBlock := func(v, to Value, block *BasicBlock, skip func(Instruction) bool) {
 		deleteUser := make([]User, 0)
 		for _, user := range v.GetUsers() {
@@ -49,6 +50,7 @@ func InsertValueReplaceOriginal(original Value, insert Value) {
 		}
 	}
 
+	// replace variable in insert block after insert instruction position
 	replaceInBlock(original, insert, block, func(inst Instruction) bool {
 		if inst.GetPosition() == nil {
 			return true
@@ -58,9 +60,13 @@ func InsertValueReplaceOriginal(original Value, insert Value) {
 		} else {
 			return true
 		}
-
 	})
+	// if this block current end variable is original, replace. !!! [if not, skip] !!!
+	if builder.readVariableByBlock(variable, block, false) == original {
+		builder.writeVariableByBlock(variable, insert, block)
+	}
 
+	// search all successor-block, and re-try builder phi
 	algorithm.BFS(block.Succs, func(block *BasicBlock) []*BasicBlock { return block.Succs }, func(item *BasicBlock) bool {
 		old := builder.readVariableByBlock(variable, item, false)
 		builder.deleteVariableByBlock(variable, item)
