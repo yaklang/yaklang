@@ -120,7 +120,7 @@ func (f *FunctionBuilder) CoverReflectFunctionType(itype reflect.Type, level int
 	for i := 0; i < itype.NumOut(); i++ {
 		returns = append(returns, f.handlerType(itype.Out(i), level))
 	}
-	return NewFunctionType(itype.String(), params, returns, isVariadic)
+	return NewFunctionTypeDefine(itype.String(), params, returns, isVariadic)
 }
 
 func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {

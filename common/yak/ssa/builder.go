@@ -120,6 +120,13 @@ func (b *FunctionBuilder) Finish() {
 			b.EmitOnly(call)
 		}
 	}
+	// re-calculate return type
+	for _, ret := range b.Return {
+		recoverRange := b.SetCurrent(ret)
+		ret.calcType(b)
+		recoverRange()
+	}
+
 	// function finish
 	b.Function.Finish()
 }

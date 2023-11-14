@@ -105,18 +105,11 @@ func NewFunctionWithType(name string, typ *FunctionType) *Function {
 }
 
 // calculate all return instruction in function, get return type
-func handlerReturnType(rs []*Return) []Type {
-	tmp := make(map[string][]Type, len(rs))
+func handlerReturnType(rs []*Return) Type {
+	tmp := make(map[string]Type, len(rs))
 	for _, r := range rs {
 		id := ""
-		typs := lo.Map(r.Results,
-			func(r Value, _ int) Type {
-				t := r.GetType()
-				//TODO: modify this id
-				id += t.RawString()
-				return t
-			},
-		)
+		typs := r.GetType()
 
 		if _, ok := tmp[id]; !ok {
 			tmp[id] = typs
@@ -125,11 +118,11 @@ func handlerReturnType(rs []*Return) []Type {
 
 	typs := lo.Values(tmp)
 	if len(typs) == 0 {
-		return []Type{BasicTypes[Null]}
+		return BasicTypes[Null]
 	} else if len(typs) == 1 {
 		return typs[0]
 	} else {
-		//TODO: how handler this?
+		//TODO: how handler this? multiple return with different type
 		// should set Warn!!
 		// and ?? Type ??
 		return nil

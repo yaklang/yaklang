@@ -26,7 +26,7 @@ func (b *builder) Build(t ssa.Type, s string) *ssa.FunctionType {
 		AnyTyp      = ssa.BasicTypes[ssa.Any]
 		BytesTyp    = ssa.BasicTypes[ssa.Bytes]
 		HandlerFunc = func(arg, ret []ssa.Type, isVar bool) ssa.Type {
-			return ssa.NewFunctionType("handler", arg, ret, isVar)
+			return ssa.NewFunctionTypeDefine("handler", arg, ret, isVar)
 		}
 		SliceTyp = func(t ssa.Type) ssa.Type {
 			return ssa.NewSliceType(t)
@@ -251,7 +251,7 @@ func (b *builder) Build(t ssa.Type, s string) *ssa.FunctionType {
 		}
 	}
 	if name != "" {
-		f := ssa.NewFunctionType(name, arg, ret, IsVariadic)
+		f := ssa.NewFunctionTypeDefine(name, arg, ret, IsVariadic)
 		f.SetModifySelf(IsModifySelf)
 		return f
 	} else {
