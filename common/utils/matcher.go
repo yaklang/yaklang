@@ -10,7 +10,7 @@ func interfaceToStr(i interface{}) string {
 	return InterfaceToString(i)
 }
 
-// MatchAllOfSubString 尝试将 i 转换为字符串，然后判断是否有任意子串 subStr 存在于 i 中，如果有其中一个子串存在于 i 中则返回 true，否则返回 false，此函数忽略大小写
+// MatchAnyOfSubString 尝试将 i 转换为字符串，然后判断是否有任意子串 subStr 存在于 i 中，如果有其中一个子串存在于 i 中则返回 true，否则返回 false，此函数忽略大小写
 // Example:
 // ```
 // str.MatchAnyOfSubString("abc", "a", "z", "x") // true
@@ -44,7 +44,7 @@ func MatchAllOfSubString(i interface{}, subStr ...string) bool {
 	return true
 }
 
-// MatchAllOfGlob 尝试将 i 转换为字符串，然后使用 glob 匹配模式匹配，如果任意一个glob模式匹配成功，则返回 true，否则返回 false
+// MatchAnyOfGlob 尝试将 i 转换为字符串，然后使用 glob 匹配模式匹配，如果任意一个glob模式匹配成功，则返回 true，否则返回 false
 // Example:
 // ```
 // str.MatchAnyOfGlob("abc", "a*", "??b", "[^a-z]?c") // true
@@ -80,7 +80,7 @@ func MatchAllOfGlob(
 	return true
 }
 
-// MatchAllOfRegexp 尝试将 i 转换为字符串，然后使用正则表达式匹配，如果任意一个正则表达式匹配成功，则返回 true，否则返回 false
+// MatchAnyOfRegexp 尝试将 i 转换为字符串，然后使用正则表达式匹配，如果任意一个正则表达式匹配成功，则返回 true，否则返回 false
 // Example:
 // ```
 // str.MatchAnyOfRegexp("abc", "a.+", "Ab.?", ".?bC") // true
