@@ -293,17 +293,9 @@ func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
 	if field, ok := c.Method.(*ssa.Field); ok && field.IsMethod {
 		c.Args = utils.InsertSliceItem(c.Args, field.Obj, 0)
 		// TODO: handle modify self function
-		// if field.GetType().(*ssa.FunctionType).IsModifySelf {
-		// 	obj := field.Obj
-		// 	ssa.ReplaceValueSkip(obj, c, func(i ssa.Instruction) bool {
-		// 		fun := field.GetFunc()
-		// 		if fun.InstReg[i] > fun.InstReg[c] {
-		// 			return true
-		// 		} else {
-		// 			return false
-		// 		}
-		// 	})
-		// }
+		if field.GetType().(*ssa.FunctionType).IsModifySelf {
+			ssa.InsertValueReplaceOriginal(field.Obj, c)
+		}
 	}
 
 	// get function type

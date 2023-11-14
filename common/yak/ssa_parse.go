@@ -10,6 +10,8 @@ import (
 
 type builder struct{}
 
+var _ (ssa.MethodBuilder) = (*builder)(nil)
+
 func (b *builder) Build(t ssa.Type, s string) *ssa.FunctionType {
 	var (
 		arg          = []ssa.Type{t}
