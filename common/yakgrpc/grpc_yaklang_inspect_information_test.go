@@ -92,3 +92,69 @@ func TestYaklangInspectInformation_Cli(t *testing.T) {
 			})
 	})
 }
+
+func TestYaklangInspectInformation_Risk(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	check := func(code string, risk []*ypb.RiskInfo) {
+		rsp := send(client, "", code, nil, nil)
+		if rsp == nil {
+			t.Fatal("response is nil")
+		}
+
+		if len(rsp.Risk) != len(risk) {
+			t.Fatalf("risk info length error: got(%d) vs want(%d)", len(rsp.Risk), len(risk))
+		}
+
+		for i := range rsp.Risk {
+			got := rsp.Risk[i]
+			want := risk[i]
+			if got.Cve != want.Cve {
+				t.Fatalf("risk info CVE error: got(%v) vs want(%v)", got, want)
+			}
+			if got.Type != want.Type {
+				t.Fatalf("risk info Type error: got(%v) vs want(%v)", got, want)
+			}
+			if got.TypeVerbose != want.TypeVerbose {
+				t.Fatalf("risk info TypeVerbose error: got(%v) vs want(%v)", got, want)
+			}
+			if got.Level != want.Level {
+				t.Fatalf("risk info Level error: got(%v) vs want(%v)", got, want)
+			}
+		}
+	}
+
+	t.Run("basic risk ", func(t *testing.T) {
+		check(
+			`
+			newRisk = (url) => {
+				risk.NewRisk(
+					url,
+					risk.title(sprintf("XSS for: %v", url)),
+					risk.titleVerbose(sprintf("检测到xss漏洞: %v", url)),
+					risk.details("report"),
+					risk.description("description info "),
+					risk.solution("solution info"),
+					risk.type("xss"),
+					risk.payload("payloadString"),
+					risk.request("reqRaw"), 
+					risk.response("respRaw"),
+					risk.severity("warning"),
+				)
+			}
+			`,
+			[]*ypb.RiskInfo{
+				{
+					Type:        "xss",
+					TypeVerbose: "XSS",
+					Level:       "warning",
+					Cve:         "",
+				},
+			},
+		)
+	})
+
+}
