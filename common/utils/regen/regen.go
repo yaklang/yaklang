@@ -102,7 +102,7 @@ func GenerateVisibleOne(pattern string) (string, error) {
 // regen.MustGenerate("[a-z]+") // a-z 单个字母，aa-zz 两个字母
 // ```
 func MustGenerate(pattern string) []string {
-	generator, err := NewGeneratorOne(pattern, &GeneratorArgs{
+	generator, err := NewGenerator(pattern, &GeneratorArgs{
 		Flags: syntax.Perl,
 	})
 	if err != nil {
@@ -118,7 +118,7 @@ func MustGenerate(pattern string) []string {
 // regen.MustGenerateOne("^(13[0-9]|14[57]|15[0-9]|18[0-9])\d{8}$") // 生成一个手机号
 // ```
 func MustGenerateOne(pattern string) string {
-	generator, err := NewGenerator(pattern, &GeneratorArgs{
+	generator, err := NewGeneratorOne(pattern, &GeneratorArgs{
 		Flags: syntax.Perl,
 	})
 	if err != nil {
