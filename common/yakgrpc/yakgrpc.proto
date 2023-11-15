@@ -1586,6 +1586,12 @@ message YaklangInspectInformationRequest {
   Position EndPos = 4;
 }
 
+message RiskInfo {
+  string Type = 1;
+  string TypeVerbose = 3;
+  string Level = 2;
+  string Cve = 4;
+}
 message YaklangInspectInformationResponse {
   repeated string SuggestionMessage = 1;
   string CliParameters = 2; //  json: []CliParameter
@@ -1596,6 +1602,7 @@ message YaklangInspectInformationResponse {
   //   bool Required 
   //   any  Default
   // }
+  repeated RiskInfo RiskInformations = 3;
 }
 
 message StaticAnalyzeErrorRequest {
