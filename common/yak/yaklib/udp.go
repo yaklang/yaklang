@@ -2,6 +2,8 @@ package yaklib
 
 import (
 	"context"
+	"fmt"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -47,11 +49,20 @@ func clientTimeout(target float64) udpClientOption {
 	}
 }
 
-func connectUdp(target string, opts ...udpClientOption) (*udpConn, error) {
+func connectUdp(target string, portRaw any, opts ...udpClientOption) (*udpConn, error) {
 	config := &udpClientConfig{timeoutSeconds: 10 * time.Second}
 	for _, opt := range opts {
 		opt(config)
 	}
+	host, portParsed, _ := utils.ParseStringToHostPort(target)
+	port := codec.Atoi(fmt.Sprint(portRaw))
+	if port <= 0 {
+		port = portParsed
+	}
+	if port <= 0 {
+		return nil, utils.Errorf("un-specific port: %v %v", target, portRaw)
+	}
+	target = utils.HostPort(host, port)
 
 	var conn net.Conn
 	remoteAddr, err := net.ResolveUDPAddr("udp", target)
