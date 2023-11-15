@@ -465,6 +465,19 @@ func _fileOpen(name string) (*_yakFile, error) {
 	return &_yakFile{file: file}, nil
 }
 
+// OpenFile 打开一个文件，使用 file.O_CREATE ... 和权限控制，返回一个文件结构体引用与错误
+// Example:
+// ```
+// f = file.OpenFile("/tmp/test.txt", file.O_CREATE|file.O_RDWR, 0o777)~; defer f.Close()
+// ```
+func _fileOpenWithPerm(name string, flags int, mode os.FileMode) (*_yakFile, error) {
+	file, err := os.OpenFile(name, flags, mode)
+	if err != nil {
+		return nil, err
+	}
+	return &_yakFile{file: file}, nil
+}
+
 // Stat 返回一个文件的信息和错误
 // Example:
 // ```
@@ -574,6 +587,11 @@ func _newMultiFileLineReader(files ...string) (*mfreader.MultiFileLineReader, er
 	return mfreader.NewMultiFileLineReader(files...)
 }
 
+// Walk 遍历一个目录下的所有文件和目录，返回错误
+func _walk(uPath string, i func(info *utils.FileInfo) bool) error {
+	return utils.ReadDirsRecursivelyCallback(uPath, i)
+}
+
 var FileExport = map[string]interface{}{
 	"ReadLines":  _fileReadLines,
 	"GetDirPath": _fileGetDirPath,
@@ -608,7 +626,7 @@ var FileExport = map[string]interface{}{
 
 	// 打开文件操作
 	"Open":     _fileOpen,
-	"OpenFile": _fileOpen,
+	"OpenFile": _fileOpenWithPerm,
 	"Stat":     _fileStat,
 	"Lstat":    _fileLstat,
 	"Save":     _saveFile,
@@ -628,4 +646,5 @@ var FileExport = map[string]interface{}{
 	"ReadFileInfoInDirectory": _readFileInfoInDirectory,
 	"ReadDirInfoInDirectory":  _readDirInfoInDirectory,
 	"NewMultiFileLineReader":  _newMultiFileLineReader,
+	"Walk":                    _walk,
 }
