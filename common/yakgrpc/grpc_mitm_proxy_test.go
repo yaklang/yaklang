@@ -350,3 +350,38 @@ go func{
 		panic("mitm plugin/hot patched status card not found")
 	}
 }
+func TestGenerateURL(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		scheme, host, username, password string
+		port                             int32
+		want                             string
+	}{
+		{"http", "www.example.com", "user#name", "pass#word", 80, "http://user%23name:pass%23word@www.example.com"},
+		{"http", "www.example.com", "", "", 80, "http://www.example.com"},
+		{"http", "www.example.com", "", "", 81, "http://www.example.com:81"},
+		{"http", "www.example.com", "", "", 443, "http://www.example.com:443"},
+		{"https", "www.example.com", "", "", 443, "https://www.example.com"},
+		{"https", "www.example.com", "", "", 80, "https://www.example.com:80"},
+		{"socks", "www.example.com", "", "", 81, "socks://www.example.com:81"},
+		{"socks5", "www.example.com", "", "", 81, "socks5://www.example.com:81"},
+	} {
+		res, err := client.GenerateURL(context.Background(), &ypb.GenerateURLRequest{
+			Scheme:   test.scheme,
+			Host:     test.host,
+			Port:     test.port,
+			Username: test.username,
+			Password: test.password,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if res.GetURL() != test.want {
+			t.Fatal("generate url failed")
+		}
+	}
+
+}
