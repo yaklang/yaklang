@@ -224,8 +224,7 @@ func (b *FunctionBuilder) CanBuildFreeValue(variable string) bool {
 	for parent != nil {
 		variable = GetIdByBlockSymbolTable(variable, symbol)
 		v := parent.readVariableByBlock(variable, block, false)
-		e := parent.externInstance[variable]
-		if v != nil && e != v {
+		if v != nil && !v.IsExtern() {
 			return true
 		}
 
