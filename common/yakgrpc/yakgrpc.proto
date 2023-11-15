@@ -381,6 +381,7 @@ service Yak {
   rpc ImportMITMReplacerRules(ImportMITMReplacerRulesRequest) returns (Empty);
   rpc GetCurrentRules(Empty) returns (MITMContentReplacers);
   rpc SetCurrentRules(MITMContentReplacers) returns (Empty);
+  rpc GenerateURL(GenerateURLRequest) returns (GenerateURLResponse);
 
   rpc ExtractDataToFile(stream ExtractDataToFileRequest) returns (stream ExtractDataToFileResult);
 
@@ -4048,4 +4049,15 @@ message SmokingEvaluatePluginBatchResponse {
   double Progress = 1;
   string Message = 2;
   string MessageType = 3;
+}
+
+message GenerateURLRequest{
+  string Scheme = 1;
+  string Host = 2;
+  int32 Port = 3;
+  string Username = 4;
+  string Password = 5;
+}
+message GenerateURLResponse{
+  string URL = 1;
 }
