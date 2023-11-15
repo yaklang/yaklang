@@ -13,17 +13,8 @@ type FileInfo struct {
 	IsDir   bool
 }
 
-func OsFileInfoToUtilsFileInfo(info os.FileInfo) *FileInfo {
-	return &FileInfo{
-		BuildIn: info,
-		Path:    info.Name(),
-		Name:    info.Name(),
-		IsDir:   info.IsDir(),
-	}
-}
-
 func ReadFilesRecursively(p string) ([]*FileInfo, error) {
-	return readFilesRecursively(p, p, -1)
+	return readFilesRecursively(p, p, -1, nil)
 }
 
 func ReadDir(p string) ([]*FileInfo, error) {

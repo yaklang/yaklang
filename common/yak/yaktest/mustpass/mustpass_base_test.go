@@ -50,7 +50,7 @@ func init() {
 }
 
 func TestMustPassDebug(t *testing.T) {
-	var debugName = "fuzztag_test.yak"
+	var debugName = "misc.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {

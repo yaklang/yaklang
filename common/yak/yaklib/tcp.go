@@ -64,6 +64,27 @@ func (t *tcpConnection) RecvLen(i int64) ([]byte, error) {
 	return ioutil.ReadAll(io.LimitReader(t, i))
 }
 
+func (t *tcpConnection) ReadFast(f ...float64) ([]byte, error) {
+	timeout := t.GetTimeout()
+	if len(f) > 0 && f[0] > 0 {
+		timeout = _floatSeconds(f[0])
+	}
+	data, err := utils.ReadUntilStableEx(t, false, t.Conn, timeout, 300*time.Millisecond)
+	if err != nil && err != io.EOF {
+		return nil, err
+	}
+	return data, nil
+}
+
+func (t *tcpConnection) ReadFastUntilByte(f byte) ([]byte, error) {
+	timeout := t.GetTimeout()
+	data, err := utils.ReadUntilStableEx(t, false, t.Conn, timeout, 300*time.Millisecond, f)
+	if err != nil && err != io.EOF {
+		return nil, err
+	}
+	return data, nil
+}
+
 func (t *tcpConnection) RecvString() (string, error) {
 	raw, err := t.Recv()
 	if err != nil {
@@ -161,7 +182,7 @@ var TcpExports = map[string]interface{}{
 	"clientTimeout": _tcpTimeout,
 	"clientLocal":   _tcpLocalAddr,
 	"clientTls":     _tcpClientTls,
-	"cliengProxy":   _tcpClientProxy,
+	"clientProxy":   _tcpClientProxy,
 
 	// 设置 tcp 服务器
 	"Serve":          tcpServe,
