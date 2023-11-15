@@ -41,7 +41,7 @@ func regMethodWithVerbose(name string, method func(s string, yield func(any, str
 	})
 }
 func newGenerate(code string) (*parser.Generator, error) {
-	nodes, err := ParseFuzztag(code)
+	nodes, err := ParseFuzztag(code,false)
 	if err != nil {
 		return nil, err
 	}

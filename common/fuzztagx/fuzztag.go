@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/fuzztagx/parser"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/cartesian"
 	"strings"
 )
 
@@ -85,6 +86,166 @@ func (f *FuzzTag) Exec(raw *parser.FuzzResult, methods ...map[string]*parser.Tag
 	return fun.Fun(params)
 }
 
+type SimpleFuzzTag struct {
+	parser.BaseTag
+}
+
+func (f *SimpleFuzzTag) Exec(raw *parser.FuzzResult, methods ...map[string]*parser.TagMethod) ([]*parser.FuzzResult, error) {
+	data := string(raw.GetData())
+	var method func() ([]*parser.FuzzResult, error)
+	isDyn := false
+	labels := []string{}
+	getFun := func(data string) *parser.TagMethod {
+		if isIdentifyString(data) {
+			name := data
+			splits := strings.Split(name, "::")
+			if len(splits) > 1 {
+				name = splits[0]
+				for _, label := range splits[1:] {
+					label = strings.TrimSpace(label)
+					if label == "" {
+						continue
+					}
+					labels = append(labels, label)
+				}
+			}
+			if f.Methods != nil {
+				methods = append(methods, *f.Methods)
+			}
+			for _, fMap := range methods {
+				if fun := fMap[name]; fun != nil {
+					if fun.IsDyn {
+						isDyn = true
+					}
+					return fun
+				}
+			}
+		}
+		return nil
+	}
+
+	compile := func() (err error) {
+		defer func() {
+			if e := recover(); e != nil {
+				err = utils.Error(e)
+			}
+		}()
+		matchedPos := parser.IndexAllSubstrings(data, MethodLeft, MethodRight)
+		if len(matchedPos) == 0 {
+			f := getFun(data)
+			if f == nil {
+				return fmt.Errorf("not found method: %s", data)
+			}
+			method = func() ([]*parser.FuzzResult, error) {
+				return f.Fun("")
+			}
+		} else {
+			pre := 0
+			methodStack := utils.NewStack[any]()
+			for _, pos := range matchedPos {
+				if pos[0] == 0 {
+					methodStack.Push(data[pre:pos[1]])
+					methodStack.Push(pos)
+					pre = pos[1] + 1
+				} else {
+
+					stop := false
+					params := []func() ([]*parser.FuzzResult, error){}
+					for {
+						if stop {
+							break
+						}
+						if methodStack.IsEmpty() {
+							return errors.New("match left brace failed")
+						}
+						item := methodStack.Pop()
+						switch ret := item.(type) {
+						case func() ([]*parser.FuzzResult, error):
+							params = append(params, ret)
+						case [2]int:
+							if methodStack.Size() < 1 {
+								return errors.New("match left brace failed")
+							}
+							item = methodStack.Pop()
+							if v, ok := item.(string); !ok {
+								return errors.New("match left brace failed")
+							} else {
+								f := getFun(v)
+								if f == nil {
+									return fmt.Errorf("not found method: %s", v)
+								}
+								if len(params) != 0 && pre != pos[1] {
+									return errors.New("error param")
+								}
+								if len(params) == 0 {
+									strParam := data[pre:pos[1]]
+									methodStack.Push(func() ([]*parser.FuzzResult, error) {
+										return f.Fun(strParam)
+									})
+								} else {
+									methodStack.Push(func() ([]*parser.FuzzResult, error) {
+										paramForFun := [][]*parser.FuzzResult{}
+										for _, param := range params {
+											res, err := param()
+											if err != nil {
+												return nil, fmt.Errorf("eval function %s error: %w", v, err)
+											}
+											paramForFun = append(paramForFun, res)
+										}
+										reverseParamForFun := [][]*parser.FuzzResult{}
+										for i := len(paramForFun) - 1; i >= 0; i-- {
+											reverseParamForFun = append(reverseParamForFun, paramForFun[i])
+										}
+										cartesianParams, err := cartesian.Product(reverseParamForFun)
+										if err != nil {
+											return nil, err
+										}
+										result := []*parser.FuzzResult{}
+										for _, params := range cartesianParams {
+											paramStr := ""
+											for _, param := range params {
+												paramStr += string(param.GetData())
+											}
+											res, err := f.Fun(paramStr)
+											if err != nil {
+												return nil, fmt.Errorf("eval function %s error: %w", v, err)
+											}
+											result = append(result, res...)
+										}
+										return result, nil
+									})
+								}
+
+							}
+							stop = true
+						}
+					}
+					pre = pos[1] + 1
+				}
+			}
+			if methodStack.Size() != 1 {
+				return errors.New("error method stack")
+			}
+			imethod := methodStack.Pop()
+			if v, ok := imethod.(func() ([]*parser.FuzzResult, error)); ok {
+				method = v
+			}
+		}
+		return nil
+	}
+	if isDyn {
+		labels = append(labels, "dyn")
+	}
+	if err := compile(); err != nil { // 对于编译错误，返回原文
+		escaper := parser.NewDefaultEscaper(`\`, "{{", "}}")
+		return []*parser.FuzzResult{parser.NewFuzzResultWithData(fmt.Sprintf("{{%s}}", escaper.Escape(data)))}, nil
+	}
+	set := utils.NewSet[string]()
+	set.AddList(labels)
+	f.Labels = set.List()
+	return method()
+}
+
 type RawTag struct {
 	parser.BaseTag
 }
@@ -93,14 +254,22 @@ func (r *RawTag) Exec(result *parser.FuzzResult, m ...map[string]*parser.TagMeth
 	return []*parser.FuzzResult{result}, nil
 }
 
-func ParseFuzztag(code string) ([]parser.Node, error) {
-	return parser.Parse(code,
-		parser.NewTagDefine("fuzztag", "{{", "}}", &FuzzTag{}),
-		parser.NewTagDefine("rawtag", "{{=", "=}}", &RawTag{}, true),
-	)
+func ParseFuzztag(code string, simple bool) ([]parser.Node, error) {
+	if simple {
+		return parser.Parse(code,
+			parser.NewTagDefine("fuzztag", "{{", "}}", &SimpleFuzzTag{}),
+			parser.NewTagDefine("rawtag", "{{=", "=}}", &RawTag{}, true),
+		)
+	} else {
+		return parser.Parse(code,
+			parser.NewTagDefine("fuzztag", "{{", "}}", &FuzzTag{}),
+			parser.NewTagDefine("rawtag", "{{=", "=}}", &RawTag{}, true),
+		)
+	}
+
 }
-func NewGenerator(code string, table map[string]*parser.TagMethod) (*parser.Generator, error) {
-	nodes, err := ParseFuzztag(code)
+func NewGenerator(code string, table map[string]*parser.TagMethod, isSimple bool) (*parser.Generator, error) {
+	nodes, err := ParseFuzztag(code, isSimple)
 	if err != nil {
 		return nil, err
 	}
