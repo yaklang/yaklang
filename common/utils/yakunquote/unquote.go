@@ -152,17 +152,24 @@ func Unquote(str string) (string, error) {
 }
 
 func UnquoteInner(str string, quote byte) (string, error) {
-	res := ""
+	buf := make([]byte, 0, 3*len(str)/2)
 	for {
 		if len(str) <= 0 {
 			break
 		}
-		c, _, rs, err := UnquoteChar(str, quote)
+		c, multibyte, rs, err := UnquoteChar(str, quote)
 		str = rs
 		if err != nil {
 			return "", err
 		}
-		res += string(c)
+
+		if c < utf8.RuneSelf || !multibyte {
+			buf = append(buf, byte(c))
+		} else {
+			var arr [utf8.UTFMax]byte
+			n := utf8.EncodeRune(arr[:], c)
+			buf = append(buf, arr[:n]...)
+		}
 	}
-	return res, nil
+	return string(buf), nil
 }
