@@ -3,17 +3,18 @@ package yaklib
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/yaklang/yaklang/common/fp"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/regen"
 	"io"
 	"io/ioutil"
 	"math/rand"
 	"net"
 	"reflect"
 	"time"
+
+	"github.com/yaklang/yaklang/common/fp"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/regen"
 )
 
 func _floatSeconds(f float64) time.Duration {
@@ -175,7 +176,7 @@ var TcpExports = map[string]interface{}{
 func DebugMockTCPProtocol(name string) (string, int) {
 	cfg := fp.NewConfig(fp.WithTransportProtos(fp.ParseStringToProto([]interface{}{"tcp"}...)...))
 	blocks := fp.GetRuleBlockByServiceName(name, cfg)
-	var generates []string
+	var generate string
 	var err error
 	responses := make(map[string][][]byte)
 	for _, block := range blocks {
@@ -184,11 +185,11 @@ func DebugMockTCPProtocol(name string) (string, int) {
 		for _, match := range block.Matched {
 			r := match.MatchRule.String()
 			log.Infof("ServiceName: [%s] , ProductVerbose: [%s]", match.ServiceName, match.ProductVerbose)
-			generates, err = regen.GenerateOne(r)
+			generate, err = regen.GenerateOne(r)
 			if err != nil {
 				continue
 			}
-			responses[payload] = append(responses[payload], convertToBytes(generates[0]))
+			responses[payload] = append(responses[payload], convertToBytes(generate))
 		}
 	}
 	return DebugMockTCPFromScan(30*time.Minute, responses)

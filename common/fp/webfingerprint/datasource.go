@@ -1,17 +1,18 @@
 package webfingerprint
 
 import (
+	"math/rand"
+	"path"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/regen"
 	"github.com/yaklang/yaklang/embed"
-	"math/rand"
-	"path"
-	"strconv"
-	"strings"
-	"time"
 )
 
 func LoadDefaultDataSource() ([]*WebRule, error) {
@@ -148,7 +149,7 @@ func MockWebFingerPrintByName(name string) (string, int) {
 	rules, _ := LoadDefaultDataSource()
 	headerStr := "HTTP/1.1 200 OK" + utils.CRLF
 	bodyStr := ""
-	var serverCount = 1
+	serverCount := 1
 	nameMap := make(map[string]struct{})
 	for _, name := range names {
 		nameMap[name] = struct{}{}
@@ -165,16 +166,16 @@ func MockWebFingerPrintByName(name string) (string, int) {
 						fakeBody := keyword.Regexp
 						log.Debugf("[%s] fakeBody: %s", keyword.Product, fakeBody)
 
-						generates, err := regen.GenerateVisibleOne(fakeBody)
+						generated, err := regen.GenerateVisibleOne(fakeBody)
 						if err != nil {
 							continue
 						}
-						log.Debugf("[%s] generates: %s", keyword.Product, generates)
+						log.Debugf("[%s] generates: %s", keyword.Product, generated)
 
 						if strings.HasSuffix(keyword.Regexp, " )") || strings.HasSuffix(keyword.Regexp, " ") {
-							bodyStr += utils.CRLF + generates[0] + "filling"
+							bodyStr += utils.CRLF + generated + "filling"
 						} else {
-							bodyStr += utils.CRLF + generates[0]
+							bodyStr += utils.CRLF + generated
 						}
 					}
 				}
@@ -193,25 +194,23 @@ func MockWebFingerPrintByName(name string) (string, int) {
 							fakeHeader := header.HeaderValue.Regexp
 							log.Debugf("[%s] fakeHeader: %s", header.HeaderValue.Product, fakeHeader)
 
-							generates, err := regen.GenerateVisibleOne(fakeHeader)
+							generated, err := regen.GenerateVisibleOne(fakeHeader)
 							if err != nil {
 								continue
 							}
-							log.Debugf("[%s] generates: %s", header.HeaderValue.Product, generates)
+							log.Debugf("[%s] generates: %s", header.HeaderValue.Product, generated)
 
-							if generates[0] == " " || generates[0] == "" {
-								generates[0] = "filling"
+							if generated == " " || generated == "" {
+								generated = "filling"
 							}
 
-							if strings.HasSuffix(header.HeaderValue.Regexp, " ") || strings.HasSuffix(generates[0], " ") {
-								headerStr += header.HeaderName + ": " + generates[0] + "filling" + utils.CRLF
+							if strings.HasSuffix(header.HeaderValue.Regexp, " ") || strings.HasSuffix(generated, " ") {
+								headerStr += header.HeaderName + ": " + generated + "filling" + utils.CRLF
 							} else {
-								headerStr += header.HeaderName + ": " + generates[0] + utils.CRLF
-
+								headerStr += header.HeaderName + ": " + generated + utils.CRLF
 							}
 						} else {
 							headerStr += header.HeaderName + ": EMPTY" + utils.CRLF
-
 						}
 					}
 				}
@@ -219,7 +218,7 @@ func MockWebFingerPrintByName(name string) (string, int) {
 		}
 	}
 	rsp := headerStr + utils.CRLF + bodyStr
-	//fmt.Println(rsp)
+	// fmt.Println(rsp)
 	response, _, err := lowhttp.FixHTTPResponse([]byte(rsp))
 	if err != nil {
 		return "", 0
@@ -250,7 +249,7 @@ func MockRandomWebFingerPrints() ([]string, string, int) {
 		randomRules[i] = rules[r.Intn(len(rules))]
 	}
 	// debug
-	//randomRules = rules
+	// randomRules = rules
 	var ruleNames []string
 	for _, rule := range randomRules {
 		for _, m := range rule.Methods {

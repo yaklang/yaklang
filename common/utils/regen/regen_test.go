@@ -2,9 +2,10 @@ package regen
 
 import (
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"regexp"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 func Test_ExampleGenerate(t *testing.T) {
@@ -16,10 +17,10 @@ func Test_ExampleGenerate(t *testing.T) {
 
 func Test_GenerateOne(t *testing.T) {
 	pattern := `(?:ATGPlatform/([\d.]+))?`
-	results, _ := GenerateOne(pattern)
-	spew.Dump(results)
-	results, _ = GenerateVisibleOne(pattern)
-	spew.Dump(results)
+	result, _ := GenerateOne(pattern)
+	spew.Dump(result)
+	result, _ = GenerateVisibleOne(pattern)
+	spew.Dump(result)
 }
 
 func BenchmarkGenerate(b *testing.B) {
@@ -125,11 +126,11 @@ func TestGenerateVisibleOne(t *testing.T) {
 			var err error
 			for _, pattern := range tt.args.patterns {
 				got, e := GenerateVisibleOne(pattern)
-				t.Logf("pattern: %s, got: [%s]", pattern, got[0])
+				t.Logf("pattern: %s, got: [%s]", pattern, got)
 				if e != nil {
 					err = e
 				}
-				gotAll = append(gotAll, got...)
+				gotAll = append(gotAll, got)
 			}
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GenerateVisibleOne() error = %v, wantErr %v", err, tt.wantErr)
