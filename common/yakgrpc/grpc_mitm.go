@@ -1667,3 +1667,20 @@ func truncate(u string) string {
 	}
 	return u
 }
+
+func (s *Server) GenerateURL(ctx context.Context, req *ypb.GenerateURLRequest) (*ypb.GenerateURLResponse, error) {
+	rsp := &ypb.GenerateURLResponse{}
+	var auth, port string
+	if req.GetUsername() != "" {
+		auth = fmt.Sprintf("%s:%s@", codec.QueryEscape(req.GetUsername()), codec.QueryEscape(req.GetPassword()))
+	}
+	if req.GetScheme() == "http" && req.GetPort() == 80 {
+		port = ""
+	} else if req.GetScheme() == "https" && req.GetPort() == 443 {
+		port = ""
+	} else {
+		port = fmt.Sprintf(":%d", req.GetPort())
+	}
+	rsp.URL = fmt.Sprintf("%s://%s%s%s", req.GetScheme(), auth, req.GetHost(), port)
+	return rsp, nil
+}
