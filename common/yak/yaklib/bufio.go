@@ -10,11 +10,11 @@ import (
 )
 
 // NewBuffer 创建一个新的 Buffer 结构体引用，其帮助我们处理字符串
-// Buffer 也实现了 Reader 接口，可以作为 Reader 使用
+// Buffer 也实现了 Reader 和 Writer 接口
 // 常用的 Buffer 方法有：Bytes, String, Read, Write, WriteString, WriteByte, Reset
 // Example:
 // ```
-// buffer = io.NewBuffer() // 或者你也可以使用 io.NewBuffer("hello yak") 来初始化一个 Buffer
+// buffer = bufio.NewBuffer() // 或者你也可以使用 io.NewBuffer("hello yak") 来初始化一个 Buffer
 // buffer.WriteString("hello yak")
 // data, err = io.ReadAll(buffer) // data = b"hello yak", err = nil
 // ```
@@ -26,6 +26,12 @@ func _newBuffer(b ...[]byte) *bytes.Buffer {
 	return buffer
 }
 
+// NewReader 根据传入的 Reader 创建一个新的 BufioReader 结构体引用
+// 常用的 BufioReader 方法有：Read, ReadByte, ReadBytes, ReadLine, ReadString, Reset
+// Example:
+// ```
+// reader = bufio.NewReader(os.Stdin)
+// ```
 func _newReader(i interface{}) (*bufio.Reader, error) {
 	if rd, ok := i.(io.Reader); ok {
 		return bufio.NewReader(rd), nil
@@ -34,6 +40,12 @@ func _newReader(i interface{}) (*bufio.Reader, error) {
 	}
 }
 
+// NewReaderSize 根据传入的 Reader 创建一个新的 BufioReader 结构体引用，其的缓存大小为 size
+// 常用的 BufioReader 方法有：Read, ReadByte, ReadBytes, ReadLine, ReadString, Reset
+// Example:
+// ```
+// reader = bufio.NewReaderSize(os.Stdin, 1024)
+// ```
 func _newReaderSize(i interface{}, size int) (*bufio.Reader, error) {
 	if rd, ok := i.(io.Reader); ok {
 		return bufio.NewReaderSize(rd, size), nil
@@ -42,6 +54,14 @@ func _newReaderSize(i interface{}, size int) (*bufio.Reader, error) {
 	}
 }
 
+// NewWriter 根据传入的 Writer 创建一个新的 BufioWriter 结构体引用
+// 常用的 BufioWriter 方法有：Write, WriteByte, WriteString, Reset, Flush
+// Example:
+// ```
+// writer, err = bufio.NewWriter(os.Stdout)
+// writer.WriteString("hello yak")
+// writer.Flush()
+// ```
 func _newWriter(i interface{}) (*bufio.Writer, error) {
 	if wd, ok := i.(io.Writer); ok {
 		return bufio.NewWriter(wd), nil
@@ -50,6 +70,14 @@ func _newWriter(i interface{}) (*bufio.Writer, error) {
 	}
 }
 
+// NewWriterSize 根据传入的 Writer 创建一个新的 BufioWriter 结构体引用，其的缓存大小为 size
+// 常用的 BufioWriter 方法有：Write, WriteByte, WriteString, Reset, Flush
+// Example:
+// ```
+// writer, err = bufio.NewWriterSize(os.Stdout, 1024)
+// writer.WriteString("hello yak")
+// writer.Flush()
+// ```
 func _newWriterSize(i interface{}, size int) (*bufio.Writer, error) {
 	if wd, ok := i.(io.Writer); ok {
 		return bufio.NewWriterSize(wd, size), nil
@@ -58,6 +86,12 @@ func _newWriterSize(i interface{}, size int) (*bufio.Writer, error) {
 	}
 }
 
+// NewReadWriter 根据传入的 Reader 和 Writer 创建一个新的 BufioReadWriter 结构体引用
+// BufioReadWriter 可以同时调用 BufioReader 和 BufioWriter 的方法
+// Example:
+// ```
+// rw, err = bufio.NewReadWriter(os.Stdin, os.Stdout)
+// ```
 func _newReadWriter(i, i2 interface{}) (*bufio.ReadWriter, error) {
 	var (
 		rd  *bufio.Reader
@@ -77,6 +111,16 @@ func _newReadWriter(i, i2 interface{}) (*bufio.ReadWriter, error) {
 	return bufio.NewReadWriter(rd, wd), nil
 }
 
+// NewScanner 根据传入的 Reader 创建一个新的 Scanner 结构体引用
+// 常用的 Scanner 方法有：Scan, Text, Err, Split, SplitFunc
+// Example:
+// ```
+// buf = bufio.NewBuffer("hello yak\nhello yakit")
+// scanner, err = bufio.NewScanner(buf)
+// for scanner.Scan() {
+// println(scanner.Text())
+// }
+// ```
 func _newScanner(i interface{}) (*bufio.Scanner, error) {
 	if rd, ok := i.(io.Reader); ok {
 		return bufio.NewScanner(rd), nil
