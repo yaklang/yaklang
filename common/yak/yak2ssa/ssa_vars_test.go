@@ -8,6 +8,22 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
+func check(t *testing.T, code string, want string) {
+	prog := ParseSSA(code, func(fb *ssa.FunctionBuilder) {
+		fb.WithExternMethod(&methodBuilder{})
+	})
+	prog.ShowWithSource()
+
+	printlnFunc := prog.Packages[0].Funcs[0].GetValuesByName("println")[0]
+	for _, final := range printlnFunc.GetUsers() {
+		line := final.LineDisasm()
+		fmt.Println(line)
+		if !strings.Contains(line, want) {
+			t.Fatal("println: ", line)
+		}
+	}
+}
+
 func TestCfgScope(t *testing.T) {
 	code := `
 a = 11
@@ -22,14 +38,8 @@ switch f() {
 }
 println("final:", a)
 	`
-	prog := ParseSSA(code, func(fb *ssa.FunctionBuilder) {})
-	// prog.Show()
-	printlnFunc := prog.Packages[0].Funcs[0].GetValuesByName("println")[0]
-	final := printlnFunc.GetUsers()[0]
-	line := final.LineDisasm()
-	if line != `println("final:",11)` {
-		t.Error("final:", line)
-	}
+
+	check(t, code, "11")
 }
 
 func TestPosition(t *testing.T) {
@@ -69,14 +79,8 @@ func TestClosureSideEffect(t *testing.T) {
 	}
 	println(b) // phi
 	`
-	prog := ParseSSA(code, func(fb *ssa.FunctionBuilder) {})
-	printlnFunc := prog.Packages[0].Funcs[0].GetValuesByName("println")[0]
-	final := printlnFunc.GetUsers()[0]
-	line := final.LineDisasm()
-	fmt.Println(line)
-	if !strings.Contains(line, "phi") {
-		t.Error("println: ", line)
-	}
+
+	check(t, code, "phi")
 }
 
 type methodBuilder struct {
@@ -118,17 +122,27 @@ func TestSelfModifyFunction(t *testing.T) {
 	println(a)
 	`
 
-	prog := ParseSSA(code, func(fb *ssa.FunctionBuilder) {
-		fb.WithExternMethod(&methodBuilder{})
-	})
-	prog.ShowWithSource()
+}
 
-	printlnFunc := prog.Packages[0].Funcs[0].GetValuesByName("println")[0]
-	for _, final := range printlnFunc.GetUsers() {
-		line := final.LineDisasm()
-		fmt.Println(line)
-		if !strings.Contains(line, `"second line"`) {
-			t.Error("println: ", line)
-		}
+func TestLineDisasm(t *testing.T) {
+	code := `
+	for i:=0; i<10; i++ {
+		println(i)
 	}
+	`
+	// i:
+	// 	t0 = 0
+	// 	t1 = phi[t0, t2]
+	// 	t2 = t1 + 1
+	// i : phi[0, (phi[0, (phi[0...] + 1)] + 1)]
+
+	// i : phi[0, (...) + 1]
+	// i : phi[0, (phi[0, (...)+1]) + 1]
+	// i : $ = phi[0, $+1]
+	// i : (lambda t0: (lambda t1: t1 + 1)(phi(t0, t0 + 1)))(0)
+	// i : t0=>(t1=>(t1+1)(phi[t0, t0+1]))(0)
+	// i : phi(i)[(init)0, (step)i+1]
+	// i : phi(i)[0, i+1]
+
+	check(t, code, "phi")
 }
