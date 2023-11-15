@@ -2,10 +2,29 @@ package yaklib
 
 import (
 	"bufio"
-	"github.com/yaklang/yaklang/common/utils"
+	"bytes"
 	"io"
 	"reflect"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
+
+// NewBuffer 创建一个新的 Buffer 结构体引用，其帮助我们处理字符串
+// Buffer 也实现了 Reader 接口，可以作为 Reader 使用
+// 常用的 Buffer 方法有：Bytes, String, Read, Write, WriteString, WriteByte, Reset
+// Example:
+// ```
+// buffer = io.NewBuffer() // 或者你也可以使用 io.NewBuffer("hello yak") 来初始化一个 Buffer
+// buffer.WriteString("hello yak")
+// data, err = io.ReadAll(buffer) // data = b"hello yak", err = nil
+// ```
+func _newBuffer(b ...[]byte) *bytes.Buffer {
+	buffer := &bytes.Buffer{}
+	if len(b) > 0 {
+		buffer.Write(b[0])
+	}
+	return buffer
+}
 
 func _newReader(i interface{}) (*bufio.Reader, error) {
 	if rd, ok := i.(io.Reader); ok {
@@ -67,6 +86,7 @@ func _newScanner(i interface{}) (*bufio.Scanner, error) {
 }
 
 var BufioExport = map[string]interface{}{
+	"NewBuffer":     _newBuffer,
 	"NewReader":     _newReader,
 	"NewReaderSize": _newReaderSize,
 	"NewWriter":     _newWriter,
