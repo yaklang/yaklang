@@ -2,11 +2,6 @@ package yaklib
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/fp"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/regen"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -14,6 +9,12 @@ import (
 	"reflect"
 	"strconv"
 	"time"
+
+	"github.com/yaklang/yaklang/common/fp"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/regen"
 )
 
 type udpConn struct {
@@ -169,7 +170,7 @@ func (t *udpConn) Send(i interface{}) error {
 
 func (t *udpConn) ReadFromAddr() ([]byte, net.Addr, error) {
 	var raw []byte
-	var buf = make([]byte, 4096)
+	buf := make([]byte, 4096)
 	for {
 		t.UDPConn.SetDeadline(time.Now().Add(t.timeoutSeconds))
 		n, addr, err := t.UDPConn.ReadFromUDP(buf)
@@ -274,7 +275,7 @@ func DebugMockUDP(rsp []byte) (string, int) {
 func DebugMockUDPProtocol(name string) (string, int) {
 	cfg := fp.NewConfig(fp.WithTransportProtos(fp.ParseStringToProto([]interface{}{"udp"}...)...))
 	blocks := fp.GetRuleBlockByServiceName(name, cfg)
-	var generates []string
+	var generate string
 	var err error
 	responses := make(map[string][][]byte)
 	for _, block := range blocks {
@@ -283,11 +284,11 @@ func DebugMockUDPProtocol(name string) (string, int) {
 			r := match.MatchRule.String()
 			log.Infof("ServiceName: [%s] , ProductVerbose: [%s]", match.ServiceName, match.ProductVerbose)
 			log.Infof("MatchRule: [%s]", r)
-			generates, err = regen.GenerateOne(r)
+			generate, err = regen.GenerateOne(r)
 			if err != nil {
 				continue
 			}
-			responses[payload] = append(responses[payload], convertToBytes(generates[0]))
+			responses[payload] = append(responses[payload], convertToBytes(generate))
 		}
 	}
 	return DebugMockUDPFromScan(3*time.Minute, responses)
