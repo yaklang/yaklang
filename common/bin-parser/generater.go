@@ -21,7 +21,7 @@ func Generate(data map[string]any, rule string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	opts, ruleMap1 := splitConfigAndNode(ruleMap)
+	opts, ruleMap1 := splitConfigAndData(ruleMap)
 	res, err := generate(data, ruleMap1, opts)
 	if err != nil {
 		return nil, err
@@ -36,7 +36,7 @@ func getValueFromMap(data any, k string) any {
 	return mapData[k]
 }
 func generate(data any, rule any, opts []ConfigFunc) (binx.ResultIf, error) {
-	opts1, node := splitConfigAndNode(rule)
+	opts1, node := splitConfigAndData(rule)
 	opts = append(opts, opts1...)
 	switch ret := node.(type) {
 	case yaml.MapSlice:
@@ -52,7 +52,7 @@ func generate(data any, rule any, opts []ConfigFunc) (binx.ResultIf, error) {
 		}
 		return listRes, nil
 	case yaml.MapItem:
-		opts1, node := splitConfigAndNode(ret.Value)
+		opts1, node := splitConfigAndData(ret.Value)
 		opts := append(opts, opts1...)
 		ret.Value = node
 		switch ret.Value.(type) {

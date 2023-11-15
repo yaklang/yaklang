@@ -65,6 +65,7 @@ require (
 	github.com/huin/asn1ber v0.0.0-20120622192748-af09f62e6358
 	github.com/icodeface/grdp v0.0.0-20200414055757-e0008b0b5cb2
 	github.com/icodeface/tls v0.0.0-20190904083142-17aec93c60e5
+	github.com/icza/bitio v1.1.0
 	github.com/itchyny/gojq v0.12.8
 	github.com/jinzhu/copier v0.0.0-20190625015134-976e0346caa8
 	github.com/jinzhu/gorm v1.9.2

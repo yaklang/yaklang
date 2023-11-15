@@ -2,32 +2,75 @@ package bin_parser
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/binx"
-	"strings"
+	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
+	"github.com/yaklang/yaklang/common/log"
+	"gopkg.in/yaml.v2"
+	"reflect"
 )
 
-func DumpBinResult(resultIf binx.ResultIf) {
-	println(sdumpBinResult(resultIf, 0))
+func DumpNode(node *base.NodeResult) {
+	println(nodeResultToYaml(node))
 }
-func SdumpBinResult(resultIf binx.ResultIf) string {
-	return sdumpBinResult(resultIf, 0)
+func SdumpNode(node *base.NodeResult) string {
+	return nodeResultToYaml(node)
 }
 
-func sdumpBinResult(resultIf binx.ResultIf, deep int) (result string) {
-	switch ret := resultIf.(type) {
-	case *binx.ListResult:
-		//result += fmt.Sprintf("%s%s: %d\n", strings.Repeat(" ", deep*2), ret.Identifier, ret.Length)
-		result += fmt.Sprintf("%s%s:\n", strings.Repeat(" ", deep*2), ret.Identifier)
-		for _, v := range ret.Result {
-			result += sdumpBinResult(v, deep+1)
+func nodeResultToYaml(node *base.NodeResult) (result string) {
+	var toMap func(node *base.NodeResult) any
+	toMap = func(node *base.NodeResult) any {
+		if node.IsTerminalData && len(node.Children) == 0 {
+			data := node.TerminalData
+			if v, ok := data.([]byte); ok {
+				data = fmt.Sprintf("%x", v)
+			}
+			return data
+		} else {
+			if !node.Struct.Cfg.GetBool("isList") {
+				res := yaml.MapSlice{}
+				for _, child := range node.Children {
+					res = append(res, yaml.MapItem{
+						Key:   child.Struct.Name,
+						Value: toMap(child),
+					})
+				}
+				return res
+			} else {
+				res := []any{}
+				for _, child := range node.Children {
+					res = append(res, toMap(child))
+				}
+				return res
+			}
+
 		}
-	case *binx.Result:
-		v := ret.Value()
-		if v1, ok := v.([]byte); ok {
-			v = fmt.Sprintf("\"%x\"", v1)
-		}
-		//v := codec.EncodeToHex(ret.GetBytes())
-		result += fmt.Sprintf("%s%s: %v\n", strings.Repeat(" ", deep*2), ret.Identifier, v)
 	}
-	return
+	res, err := yaml.Marshal(toMap(node))
+	if err != nil {
+		log.Errorf("error when marshal node to yaml: %v", err)
+	}
+	return string(res)
+}
+func ToUint64(d any) (uint64, error) {
+	switch ret := d.(type) {
+	case uint64:
+		return ret, nil
+	case uint32:
+		return uint64(ret), nil
+	case uint16:
+		return uint64(ret), nil
+	case uint8:
+		return uint64(ret), nil
+	case int64:
+		return uint64(ret), nil
+	case int32:
+		return uint64(ret), nil
+	case int16:
+		return uint64(ret), nil
+	case int8:
+		return uint64(ret), nil
+	case int:
+		return uint64(ret), nil
+	default:
+		return 0, fmt.Errorf("unexpected type: %v", reflect.TypeOf(d))
+	}
 }
