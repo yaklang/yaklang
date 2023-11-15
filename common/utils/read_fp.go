@@ -13,6 +13,15 @@ type FileInfo struct {
 	IsDir   bool
 }
 
+func OsFileInfoToUtilsFileInfo(info os.FileInfo) *FileInfo {
+	return &FileInfo{
+		BuildIn: info,
+		Path:    info.Name(),
+		Name:    info.Name(),
+		IsDir:   info.IsDir(),
+	}
+}
+
 func ReadFilesRecursively(p string) ([]*FileInfo, error) {
 	return readFilesRecursively(p, p, -1)
 }
@@ -61,7 +70,15 @@ func ReadDirWithLimit(p string, limit int) ([]*FileInfo, error) {
 }
 
 func ReadFilesRecursivelyWithLimit(p string, limit int) ([]*FileInfo, error) {
-	return readFilesRecursively(p, p, limit)
+	return readFilesRecursively(p, p, limit, nil)
+}
+
+func ReadDirsRecursivelyCallback(p string, i func(info *FileInfo) bool) error {
+	_, err := readFilesRecursively(p, p, -1, i)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func ReadDirsRecursively(p string) ([]*FileInfo, error) {
@@ -79,7 +96,7 @@ func ReadDirsRecursively(p string) ([]*FileInfo, error) {
 	return i, nil
 }
 
-func readFilesRecursively(p string, baseDir string, limit int) ([]*FileInfo, error) {
+func readFilesRecursively(p string, baseDir string, limit int, i func(*FileInfo) bool) ([]*FileInfo, error) {
 	var err error
 	if !filepath.IsAbs(p) {
 		p, err = filepath.Abs(p)
@@ -105,7 +122,7 @@ func readFilesRecursively(p string, baseDir string, limit int) ([]*FileInfo, err
 	var files []*FileInfo
 	for _, info := range infos {
 		if info.IsDir() {
-			fs, err := readFilesRecursively(filepath.Join(p, info.Name()), baseDir, limit)
+			fs, err := readFilesRecursively(filepath.Join(p, info.Name()), baseDir, limit, i)
 			if err != nil {
 				continue
 			}
@@ -115,12 +132,18 @@ func readFilesRecursively(p string, baseDir string, limit int) ([]*FileInfo, err
 
 		path := filepath.Join(p, info.Name())
 		name := info.Name()
-		files = append(files, &FileInfo{
+		uInfo := &FileInfo{
 			BuildIn: info,
 			IsDir:   info.IsDir(),
 			Path:    path,
 			Name:    name,
-		})
+		}
+		if i != nil {
+			if !i(uInfo) {
+				break
+			}
+		}
+		files = append(files, uInfo)
 
 		if limit <= 0 {
 			continue
