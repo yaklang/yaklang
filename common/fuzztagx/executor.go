@@ -7,7 +7,7 @@ import (
 )
 
 func ExecuteWithStringHandler(code string, funcMap map[string]func(string2 string) []string) ([]string, error) {
-	nodes, err := ParseFuzztag(code)
+	nodes, err := ParseFuzztag(code, false)
 	if err != nil {
 		return nil, err
 	}

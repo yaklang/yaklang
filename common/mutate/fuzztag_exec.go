@@ -12,6 +12,7 @@ import (
 type FuzzTagConfig struct {
 	resultHandler func(string, []string) bool
 	tagMethodMap  map[string]*parser.TagMethod
+	isSimple      bool
 }
 
 func NewFuzzTagConfig() *FuzzTagConfig {
@@ -35,6 +36,11 @@ func (f *FuzzTagConfig) AddFuzzTagHandlerEx(name string, handler func(string) []
 
 type FuzzConfigOpt func(config *FuzzTagConfig)
 
+func Fuzz_WithSimple(b bool) FuzzConfigOpt {
+	return func(config *FuzzTagConfig) {
+		config.isSimple = b
+	}
+}
 func Fuzz_WithExtraFuzzTagHandler(tag string, handler func(string) []string) FuzzConfigOpt {
 	return func(config *FuzzTagConfig) {
 		config.AddFuzzTagHandler(tag, handler)
@@ -110,7 +116,7 @@ func FuzzTagExec(input interface{}, opts ...FuzzConfigOpt) (_ []string, err erro
 			}
 		}
 	}()
-	generator, err := fuzztagx.NewGenerator(utils2.InterfaceToString(input), config.tagMethodMap)
+	generator, err := fuzztagx.NewGenerator(utils2.InterfaceToString(input), config.tagMethodMap, config.isSimple)
 	if err != nil {
 		return nil, err
 	}
