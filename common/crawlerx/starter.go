@@ -28,9 +28,10 @@ type BrowserStarter struct {
 	browserConfig *BrowserConfig
 	baseConfig    *BaseConfig
 
-	ctx       context.Context
-	cancel    context.CancelFunc
-	waitGroup *utils.SizedWaitGroup
+	ctx          context.Context
+	cancel       context.CancelFunc
+	waitGroup    *utils.SizedWaitGroup
+	subWaitGroup *utils.SizedWaitGroup
 
 	pageVisit  func(string) bool
 	resultSent func(string) bool
@@ -92,7 +93,8 @@ func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *Br
 		browserConfig: browserConfig,
 		baseConfig:    baseConfig,
 
-		waitGroup: baseConfig.waitGroup,
+		waitGroup:    baseConfig.waitGroup,
+		subWaitGroup: utils.NewSizedWaitGroup(20),
 
 		urlCheck: make(map[string]func(string) bool),
 		banList:  tools.NewCountFilter(),
@@ -361,6 +363,8 @@ func (starter *BrowserStarter) createBrowserHijack(browser *rod.Browser) error {
 		//if pageUrl == "" {
 		//	pageUrl = hijack.Request.URL().String()
 		//}
+		starter.subWaitGroup.Add()
+		defer starter.subWaitGroup.Done()
 		for _, header := range starter.headers {
 			hijack.Request.Req().Header.Set(header.Key, header.Value)
 		}
@@ -629,6 +633,7 @@ running:
 		case <-starter.ctx.Done():
 			if starter.running {
 				starter.running = false
+				starter.subWaitGroup.Wait()
 				starter.waitGroup.Done()
 			}
 			break running
