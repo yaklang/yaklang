@@ -6,6 +6,7 @@ import (
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/go-rod/rod/lib/utils"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/ysmood/gson"
 	"io"
@@ -57,6 +58,13 @@ func (router *CrawlerRouter) initEvents() *CrawlerRouter {
 	router.run = BrowserEachEvent(router.browser.Context(eventCtx), sessionID, func(e *proto.FetchRequestPaused) bool {
 		go func() {
 			hijack := router.new(eventCtx, e)
+			if hijack.Request.req == nil {
+				err := hijack.Response.fail.Call(router.client)
+				if err != nil {
+					hijack.OnError(err)
+				}
+				return
+			}
 			for _, h := range router.handlers {
 				if !h.regexp.MatchString(e.Request.URL) {
 					continue
@@ -97,7 +105,29 @@ func (router *CrawlerRouter) new(ctx context.Context, e *proto.FetchRequestPause
 	for k, v := range e.Request.Headers {
 		headers[k] = []string{v.String()}
 	}
-	req, _ := http.NewRequest(e.Request.Method, e.Request.URL, io.NopCloser(strings.NewReader(e.Request.PostData)))
+	req, err := http.NewRequest(e.Request.Method, e.Request.URL, io.NopCloser(strings.NewReader(e.Request.PostData)))
+	if err != nil {
+		log.Debugf("check request error: %v!", err)
+		return &CrawlerHijack{
+			Request: &CrawlerHijackRequest{
+				event: e,
+				req:   nil,
+			},
+			Response: &CrawlerHijackResponse{
+				payload: &proto.FetchFulfillRequest{
+					ResponseCode: 200,
+					RequestID:    e.RequestID,
+				},
+				fail: &proto.FetchFailRequest{
+					RequestID:   e.RequestID,
+					ErrorReason: proto.NetworkErrorReasonNameNotResolved,
+				},
+			},
+			OnError: func(err error) {},
+
+			browser: router.browser,
+		}
+	}
 	req.Header = headers
 	return &CrawlerHijack{
 		Request: &CrawlerHijackRequest{
