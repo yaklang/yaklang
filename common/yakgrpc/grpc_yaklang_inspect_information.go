@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -15,12 +16,14 @@ type YaklangInformationResponse struct {
 	prog         *ssaapi.Program
 	Suggestion   []string
 	CliParameter []*CliParameter `json:"cliParameter"`
+	Risk         []*ypb.RiskInfo
 }
 
 func newYaklangInformationResponse() *YaklangInformationResponse {
 	return &YaklangInformationResponse{
 		Suggestion:   make([]string, 0),
 		CliParameter: make([]*CliParameter, 0),
+		Risk:         make([]*ypb.RiskInfo, 0),
 	}
 }
 
@@ -32,12 +35,14 @@ func (rsp *YaklangInformationResponse) ToGrpcModule() (*ypb.YaklangInspectInform
 	return &ypb.YaklangInspectInformationResponse{
 		SuggestionMessage: rsp.Suggestion,
 		CliParameters:     utils.UnsafeBytesToString(bCP),
+		RiskInformations:  rsp.Risk,
 	}, nil
 }
 
 func fromGrpcModuleToYaklangInformationResponse(rsp *ypb.YaklangInspectInformationResponse) (*YaklangInformationResponse, error) {
 	r := newYaklangInformationResponse()
 	r.Suggestion = rsp.SuggestionMessage
+	r.Risk = rsp.RiskInformations
 	err := json.Unmarshal(utils.UnsafeStringToBytes(rsp.CliParameters), &r.CliParameter)
 	if err != nil {
 		return nil, err
@@ -46,12 +51,15 @@ func fromGrpcModuleToYaklangInformationResponse(rsp *ypb.YaklangInspectInformati
 }
 
 func (r *YaklangInformationResponse) addCliParameter(param *CliParameter) {
-	// fmt.Println("add: ", param)
 	r.CliParameter = append(r.CliParameter, param)
 }
 
 func (r *YaklangInformationResponse) addSuggestion(suggestion string) {
 	r.Suggestion = append(r.Suggestion, suggestion)
+}
+
+func (r *YaklangInformationResponse) addRisk(risk *ypb.RiskInfo) {
+	r.Risk = append(r.Risk, risk)
 }
 
 type CliParameter struct {
@@ -70,6 +78,10 @@ func newCliParameter(typ, name string) *CliParameter {
 		Required: false,
 		Default:  nil,
 	}
+}
+
+func newRiskInfo() *ypb.RiskInfo {
+	return &ypb.RiskInfo{}
 }
 
 func (r *YaklangInformationResponse) ParseCliParameter() {
@@ -148,6 +160,70 @@ func (r *YaklangInformationResponse) ParseCliParameter() {
 	parseCliFunction("cli.StringSlice", "string-slice")
 }
 
+func (r *YaklangInformationResponse) ParseRiskInfo() {
+	prog := r.prog
+
+	getConstString := func(v *ssaapi.Value) string {
+		if v.IsConstInst() {
+			if str, ok := v.GetConstValue().(string); ok {
+				return str
+			}
+		}
+		//TODO: handler value with other opcode
+		return ""
+	}
+
+	handleRiskLevel := func(level string) string {
+		switch level {
+		case "high":
+			return "high"
+		case "critical", "panic", "fatal":
+			return "critical"
+		case "warning", "warn", "middle", "medium":
+			return "warning"
+		case "info", "debug", "trace", "fingerprint", "note", "fp":
+			return "info"
+		case "low", "default":
+			return "low"
+		default:
+			return "low"
+		}
+	}
+
+	handleOption := func(riskInfo *ypb.RiskInfo, call *ssaapi.Value) {
+		if !call.IsCall() {
+			return
+		}
+		switch call.GetOperand(0).String() {
+		case "risk.severity", "risk.level":
+			riskInfo.Level = handleRiskLevel(getConstString(call.GetOperand(1)))
+		case "risk.cve":
+			riskInfo.Cve = call.GetOperand(1).String()
+		case "risk.type":
+			riskInfo.Type = getConstString(call.GetOperand(1))
+			riskInfo.TypeVerbose = yakit.RiskTypeToVerbose(riskInfo.Type)
+		case "risk.typeVerbose":
+			riskInfo.TypeVerbose = getConstString(call.GetOperand(1))
+		}
+	}
+
+	parseRiskFunction := func(name string, OptIndex int) {
+		prog.Ref(name).GetUsers().Filter(func(v *ssaapi.Value) bool {
+			return v.IsCall() && v.IsReachable() != -1
+		}).ForEach(func(v *ssaapi.Value) {
+			riskInfo := newRiskInfo()
+			optLen := len(v.GetOperands())
+			for i := OptIndex; i < optLen; i++ {
+				handleOption(riskInfo, v.GetOperand(i))
+			}
+			r.addRisk(riskInfo)
+		})
+	}
+
+	parseRiskFunction("risk.CreateRisk", 1)
+	parseRiskFunction("risk.NewRisk", 1)
+}
+
 func (s *Server) YaklangInspectInformation(ctx context.Context, req *ypb.YaklangInspectInformationRequest) (*ypb.YaklangInspectInformationResponse, error) {
 	rsp := newYaklangInformationResponse()
 	rsp.prog = yak.Parse(req.YakScriptCode)
@@ -158,6 +234,7 @@ func (s *Server) YaklangInspectInformation(ctx context.Context, req *ypb.Yaklang
 		// TODO: get suggestion
 	} else {
 		rsp.ParseCliParameter()
+		rsp.ParseRiskInfo()
 	}
 	return rsp.ToGrpcModule()
 }
