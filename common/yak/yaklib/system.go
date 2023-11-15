@@ -357,6 +357,7 @@ func ExpandEnv(s string) string {
 }
 
 // Pipe 创建一个管道，返回一个读取端和一个写入端以及错误
+// 它实际是 io.Pipe 的别名
 // Example:
 // ```
 // r, w, err = os.Pipe()
@@ -463,7 +464,7 @@ func GetLocalAddress() []string {
 	if err != nil {
 		return nil
 	}
-	var results = make([]string, len(ret))
+	results := make([]string, len(ret))
 	for i, a := range ret {
 		if r, ok := a.(*net.IPNet); ok {
 			results[i] = r.IP.String()
