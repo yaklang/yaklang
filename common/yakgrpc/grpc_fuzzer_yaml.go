@@ -147,10 +147,12 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 		inheritCookies := config.CookieInherit
 		//inheritVariables := sequence.InheritVariables
 
-		for _, fuzzerReq := range fuzzerReqs {
-			fuzzerReq.Extractors = extractors
-			fuzzerReq.Matchers = matchers
-			fuzzerReq.MatchersCondition = matchersCondition
+		for index, fuzzerReq := range fuzzerReqs {
+			if index == len(fuzzerReqs)-1 {
+				fuzzerReq.Extractors = extractors
+				fuzzerReq.Matchers = matchers
+				fuzzerReq.MatchersCondition = matchersCondition
+			}
 			fuzzerReq.NoFixContentLength = noFixContentLength
 			fuzzerReq.NoFollowRedirect = noFollowRedirect
 			fuzzerReq.RedirectTimes = redirectTimes
@@ -216,7 +218,11 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 		}).([]*httptpl.YakMatcher)
 	}
 	// 生成请求桶
-	requestBulks := []*httptpl.YakRequestBulkConfig{}
+	//requestBulks := []*httptpl.YakRequestBulkConfig{}
+	bulk := &httptpl.YakRequestBulkConfig{}
+	bulk.Matcher = &httptpl.YakMatcher{
+		SubMatcherCondition: "and",
+	}
 	for _, request := range seq.GetRequests() {
 		vars := httptpl.NewVars()
 		for _, param := range request.Params {
@@ -228,8 +234,6 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 		for _, pair := range request.EtcHosts {
 			etcHosts[pair.Key] = pair.Value
 		}
-		bulk := &httptpl.YakRequestBulkConfig{}
-		requestBulks = append(requestBulks, bulk)
 		switch templateType {
 		case "path":
 			url, err := lowhttp.ExtractURLFromHTTPRequestRaw(request.RequestRaw, false)
@@ -238,7 +242,7 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 			}
 			//rootPath := utils.ParseStringUrlToWebsiteRootPath(url.Path)
 			//path := strings.Replace(url.Path, rootPath, "{{RootUrl}}", 1)
-			bulk.Paths = []string{url.Path}
+			bulk.Paths = append(bulk.Paths, url.Path)
 			bulk.Body = string(lowhttp.GetHTTPPacketBody(request.RequestRaw))
 			bulk.Headers = lowhttp.GetHTTPPacketHeaders(request.RequestRaw)
 			if _, ok := bulk.Headers["Host"]; ok {
@@ -255,19 +259,17 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 			fallthrough
 		default:
 			//generalizedRequests := lowhttp.ReplaceHTTPPacketHeader(request.RequestRaw, "Host", "{{Hostname}}")
-			bulk.HTTPRequests = []*httptpl.YakHTTPRequestPacket{&httptpl.YakHTTPRequestPacket{
+			bulk.HTTPRequests = append(bulk.HTTPRequests, &httptpl.YakHTTPRequestPacket{
 				Request: string(request.RequestRaw),
 				Timeout: time.Duration(request.PerRequestTimeoutSeconds) * time.Second,
-			}}
+			})
 		}
 		matchers := HttpResponseMatchers2YakMatchers(request.Matchers)
 		if len(matchers) > 0 {
-			bulk.Matcher = &httptpl.YakMatcher{
-				SubMatchers:         matchers,
-				SubMatcherCondition: request.MatchersCondition,
-			}
+			bulk.Matcher.SubMatchers = append(bulk.Matcher.SubMatchers, matchers...)
+			bulk.Matcher.SubMatcherCondition = request.MatchersCondition
 		}
-		bulk.Extractor = funk.Map(request.Extractors, func(extractor *ypb.HTTPResponseExtractor) *httptpl.YakExtractor {
+		bulk.Extractor = append(bulk.Extractor, funk.Map(request.Extractors, func(extractor *ypb.HTTPResponseExtractor) *httptpl.YakExtractor {
 			typeName := ""
 			switch extractor.Type {
 			case "nuclei-dsl":
@@ -285,7 +287,7 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 				RegexpMatchGroup: funk.Map(extractor.RegexpMatchGroup, func(n int64) int { return int(n) }).([]int),
 				XPathAttribute:   extractor.XPathAttribute,
 			}
-		}).([]*httptpl.YakExtractor)
+		}).([]*httptpl.YakExtractor)...)
 
 		//bulk.IsHTTPS = request.IsHTTPS
 		//bulk.IsGmTLS = request.IsGmTLS
@@ -331,7 +333,7 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 	}
 	//
 	template := &httptpl.YakTemplate{}
-	template.HTTPRequestSequences = requestBulks
+	template.HTTPRequestSequences = []*httptpl.YakRequestBulkConfig{bulk}
 	// 补充info字段
 	randstr := utils.RandStringBytes(8)
 	template.Id = fmt.Sprintf("WebFuzzer-Template-%s", randstr)
@@ -345,8 +347,7 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 			request.Request = string(lowhttp.ReplaceHTTPPacketHeader([]byte(request.Request), "Host", "{{Hostname}}"))
 		}
 		for i, path := range sequence.Paths {
-			rootPath := utils.ParseStringUrlToWebsiteRootPath(path)
-			sequence.Paths[i] = strings.Replace(path, rootPath, "{{RootURL}}", 1)
+			sequence.Paths[i] = "{{RootURL}}" + path
 		}
 	}
 	template.Sign = template.SignMainParams()
