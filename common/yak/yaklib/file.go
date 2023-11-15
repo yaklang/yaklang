@@ -315,10 +315,18 @@ func _fileReadLines(i interface{}) []string {
 // GetDirPath 返回路径中除最后一个元素之后的路径，这通常是原本路径的目录
 // Example:
 // ```
-// file.GetDirPath("/usr/bin/bash") // "/usr/bin"
+// file.GetDirPath("/usr/bin/bash") // "/usr/bin/"
 // ```
 func _fileGetDirPath(path string) string {
-	return filepath.Dir(path)
+	dirPath := filepath.Dir(path)
+	if dirPath == "" {
+		return dirPath
+	}
+	if strings.HasSuffix(dirPath, "/") {
+		return dirPath
+	} else {
+		return dirPath + "/"
+	}
 }
 
 // Split 以操作系统的默认路径分隔符分割路径，返回目录和文件名
@@ -588,13 +596,47 @@ func _newMultiFileLineReader(files ...string) (*mfreader.MultiFileLineReader, er
 }
 
 // Walk 遍历一个目录下的所有文件和目录，返回错误
+// Example:
+// ```
+// file.Walk("/tmp", func(info) {println(info.Name); return true})~
+// ```
 func _walk(uPath string, i func(info *utils.FileInfo) bool) error {
 	return utils.ReadDirsRecursivelyCallback(uPath, i)
+}
+
+// GetExt 获取文件的扩展名
+// Example:
+// ```
+// file.GetExt("/tmp/test.txt") // ".txt"
+// ```
+func _ext(s string) string {
+	return filepath.Ext(s)
+}
+
+// GetBase 获取文件的基本名
+// Example:
+// ```
+// file.GetBase("/tmp/test.txt") // "test.txt"
+// ```
+func _getBase(s string) string {
+	return filepath.Base(s)
+}
+
+// Clean 清理路径中的多余的分隔符和 . 和 ..
+// Example:
+// ```
+// file.Clean("/tmp/../tmp/test.txt") // "/tmp/test.txt"
+// ```
+func _clean(s string) string {
+	return filepath.Clean(s)
 }
 
 var FileExport = map[string]interface{}{
 	"ReadLines":  _fileReadLines,
 	"GetDirPath": _fileGetDirPath,
+	"GetExt":     _ext,
+	"GetBase":    _getBase,
+	"Clean":      _clean,
 	"Split":      _filePathSplit,
 	"IsExisted":  _fileIsExisted,
 	"IsFile":     _fileIsFile,

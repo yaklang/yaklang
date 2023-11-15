@@ -1,0 +1,21 @@
+assert file.GetExt("file.txt") == ".txt"
+assert file.GetExt("/tmp/a.txt") == ".txt"
+
+dump(file.GetDirPath("file/aaa"))
+assert file.GetDirPath("file/aaa") == "file/"
+assert file.GetDirPath("/tmp/a.txt") == "/tmp/"
+assert file.GetBase("tmp/1.txt") == "1.txt"
+assert file.GetBase("/tmp/1.txt") == "1.txt"
+assert file.Clean("/tmp/1.txt") == "/tmp/1.txt"
+assert file.Clean("tmp/../tmp/1.txt") == "tmp/1.txt"
+
+// Split
+dump(file.Split("tmp/1.txt"))
+assert file.Split("tmp/1.txt")[0] == "tmp/" && file.Split("tmp/1.txt")[1] == "1.txt"
+assert file.Split("1.txt")[0] == "" && file.Split("1.txt")[1] == "1.txt"
+assert file.Split("/tmp/1.txt")[0] == "/tmp/" && file.Split("/tmp/1.txt")[1] == "1.txt"
+
+// Join
+assert file.Join("tmp", "1.txt") == "tmp/1.txt"
+assert file.Join("/tmp", "1.txt") == "/tmp/1.txt"
+assert file.Join("tmp", "a", "1.txt") == "tmp/a/1.txt"
