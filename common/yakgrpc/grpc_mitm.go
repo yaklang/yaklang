@@ -1782,18 +1782,29 @@ func truncate(u string) string {
 }
 
 func (s *Server) GenerateURL(ctx context.Context, req *ypb.GenerateURLRequest) (*ypb.GenerateURLResponse, error) {
-	rsp := &ypb.GenerateURLResponse{}
-	var auth, port string
+	var userInfo *url.Userinfo
+	var host string
 	if req.GetUsername() != "" {
-		auth = fmt.Sprintf("%s:%s@", codec.QueryEscape(req.GetUsername()), codec.QueryEscape(req.GetPassword()))
+		if req.GetPassword() != "" {
+			userInfo = url.UserPassword(req.GetUsername(), req.GetPassword())
+		} else {
+			userInfo = url.User(req.GetUsername())
+		}
 	}
 	if req.GetScheme() == "http" && req.GetPort() == 80 {
-		port = ""
+		host = req.GetHost()
 	} else if req.GetScheme() == "https" && req.GetPort() == 443 {
-		port = ""
+		host = req.GetHost()
 	} else {
-		port = fmt.Sprintf(":%d", req.GetPort())
+		host = fmt.Sprintf("%s:%d", req.GetHost(), req.GetPort())
 	}
-	rsp.URL = fmt.Sprintf("%s://%s%s%s", req.GetScheme(), auth, req.GetHost(), port)
-	return rsp, nil
+	u := url.URL{
+		Scheme: req.GetScheme(),
+		User:   userInfo,
+		Host:   host,
+	}
+
+	return &ypb.GenerateURLResponse{
+		URL: u.String(),
+	}, nil
 }
