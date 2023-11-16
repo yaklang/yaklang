@@ -102,8 +102,8 @@ func (lb *LoopBuilder) Finish() {
 	builder := lb.b
 	header := builder.NewBasicBlockUnSealed(LoopHeader)
 	body := builder.NewBasicBlock(LoopBody)
-	exit := builder.NewBasicBlock(LoopExit)
-	latch := builder.NewBasicBlock(LoopLatch)
+	exit := builder.NewBasicBlockNotAddBlocks(LoopExit)
+	latch := builder.NewBasicBlockNotAddBlocks(LoopLatch)
 	// loop is a scope
 	builder.PushBlockSymbolTable()
 	var loop *Loop
@@ -155,11 +155,13 @@ func (lb *LoopBuilder) Finish() {
 	header.Sealed()
 	loop.Finish(init, step)
 
-	rest := builder.NewBasicBlock("")
+	addToBlocks(latch)
+	addToBlocks(exit)
+	// rest := builder.NewBasicBlock("")
 	builder.CurrentBlock = exit
-	// exit -> rest
-	builder.EmitJump(rest)
-	builder.CurrentBlock = rest
+	// // exit -> rest
+	// builder.EmitJump(rest)
+	// builder.CurrentBlock = rest
 	builder.PopBlockSymbolTable()
 }
 
@@ -240,7 +242,7 @@ func (i *IfBuilder) Finish() {
 	// if instruction
 	var doneBlock *BasicBlock
 	if i.parent == nil {
-		doneBlock = builder.NewBasicBlock(IfDone)
+		doneBlock = builder.NewBasicBlockNotAddBlocks(IfDone)
 		i.done = doneBlock
 	} else {
 		i.done = i.parent.done
@@ -300,10 +302,8 @@ func (i *IfBuilder) Finish() {
 	}
 
 	if i.parent == nil && len(doneBlock.Preds) != 0 {
+		addToBlocks(doneBlock)
 		builder.CurrentBlock = doneBlock
-		rest := builder.NewBasicBlock("")
-		builder.EmitJump(rest)
-		builder.CurrentBlock = rest
 	}
 }
 
@@ -452,8 +452,8 @@ func (t *SwitchBuilder) Finish() {
 		cond = t.buildCondition()
 	}
 
-	done := builder.NewBasicBlock(SwitchDone)
-	defaultb := builder.NewBasicBlock(SwitchDefault)
+	done := builder.NewBasicBlockNotAddBlocks(SwitchDone)
+	defaultb := builder.NewBasicBlockNotAddBlocks(SwitchDefault)
 	t.enter.AddSucc(defaultb)
 
 	// build handler and body
@@ -516,8 +516,10 @@ func (t *SwitchBuilder) Finish() {
 
 	builder.CurrentBlock = t.enter
 	builder.EmitSwitch(cond, defaultb, slabel)
-	rest := builder.NewBasicBlock("")
-	builder.CurrentBlock = done
-	builder.EmitJump(rest)
-	builder.CurrentBlock = rest
+	addToBlocks(done)
+	addToBlocks(defaultb)
+	// rest := builder.NewBasicBlock("")
+	// builder.CurrentBlock = done
+	// builder.EmitJump(rest)
+	// builder.CurrentBlock = rest
 }

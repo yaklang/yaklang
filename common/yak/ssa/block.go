@@ -5,23 +5,23 @@ import (
 )
 
 func (f *Function) NewBasicBlock(name string) *BasicBlock {
-	return f.newBasicBlockWithSealed(name, true)
+	return f.newBasicBlockEx(name, true, false)
 }
 func (f *Function) NewBasicBlockUnSealed(name string) *BasicBlock {
-	return f.newBasicBlockWithSealed(name, false)
+	return f.newBasicBlockEx(name, false, false)
 }
 
-func (f *Function) newBasicBlockWithSealed(name string, isSealed bool) *BasicBlock {
-	index := len(f.Blocks)
-	if name != "" {
-		name = fmt.Sprintf("%s-%d", name, index)
-	} else {
-		name = fmt.Sprintf("b-%d", index)
-	}
+func (f *Function) NewBasicBlockNotAddBlocks(name string) *BasicBlock {
+	return f.newBasicBlockEx(name, true, true)
+}
+func (f *Function) NewBasicBlockNotAddUnSealed(name string) *BasicBlock {
+	return f.newBasicBlockEx(name, false, true)
+}
+
+func (f *Function) newBasicBlockEx(name string, isSealed bool, nodAddToBlocks bool) *BasicBlock {
 	b := &BasicBlock{
 		anInstruction: NewInstruction(),
 		anValue:       NewValue(),
-		Index:         index,
 		Preds:         make([]*BasicBlock, 0),
 		Succs:         make([]*BasicBlock, 0),
 		Condition:     nil,
@@ -36,8 +36,26 @@ func (f *Function) newBasicBlockWithSealed(name string, isSealed bool) *BasicBlo
 	b.SetVariable(name)
 	b.SetFunc(f)
 	b.SetBlock(b)
-	f.Blocks = append(f.Blocks, b)
+	if !nodAddToBlocks {
+		addToBlocks(b)
+	}
 	return b
+}
+
+func addToBlocks(block *BasicBlock) {
+	f := block.GetFunc()
+	index := len(f.Blocks)
+
+	name := block.GetVariable()
+	if name != "" {
+		name = fmt.Sprintf("%s-%d", name, index)
+	} else {
+		name = fmt.Sprintf("b-%d", index)
+	}
+	block.SetVariable(name)
+
+	block.Index = index
+	f.Blocks = append(f.Blocks, block)
 }
 
 /*
