@@ -72,6 +72,10 @@ func (v Values) GetUsers() Values {
 
 type Value struct {
 	node ssa.InstructionNode
+	// cache
+	line     string
+	users    Values
+	operands Values
 }
 
 func NewValue(n ssa.InstructionNode) *Value {
@@ -81,27 +85,30 @@ func NewValue(n ssa.InstructionNode) *Value {
 }
 func (v *Value) String() string { return v.node.LineDisasm() }
 func (i *Value) StringWithSource() string {
-	return fmt.Sprintf("[%-6s] %s\t%s", i.node.GetOpcode(), i.node.LineDisasm(), i.node.GetPosition())
+	if i.line == "" {
+		i.line = fmt.Sprintf("[%-6s] %s\t%s", i.node.GetOpcode(), i.node.LineDisasm(), i.node.GetPosition())
+	}
+	return i.line
 }
+
 func (i *Value) Show()           { fmt.Println(i) }
 func (i *Value) ShowWithSource() { fmt.Println(i.StringWithSource()) }
 
-func (v *Value) IsSame(other *Value) bool { return *v == *other }
+func (v *Value) IsSame(other *Value) bool { return v.node == other.node }
 
 func (i *Value) HasOperands() bool {
 	return i.node.HasValues()
 }
 
 func (i *Value) GetOperands() Values {
-	return lo.Map(ssa.GetValues(i.node), func(v ssa.Value, _ int) *Value { return NewValue(v) })
+	if i.operands == nil {
+		i.operands = lo.Map(ssa.GetValues(i.node), func(v ssa.Value, _ int) *Value { return NewValue(v) })
+	}
+	return i.operands
 }
 
 func (i *Value) GetOperand(index int) *Value {
-	return NewValue(ssa.GetValues(i.node)[index])
-}
-
-func (i *Value) GetRawUsers() ssa.Users {
-	return i.node.GetUsers()
+	return i.GetOperands()[index]
 }
 
 func (i *Value) HasUsers() bool {
@@ -109,11 +116,14 @@ func (i *Value) HasUsers() bool {
 }
 
 func (i *Value) GetUsers() Values {
-	return lo.Map(i.GetRawUsers(), func(v ssa.User, _ int) *Value { return NewValue(v) })
+	if i.users == nil {
+		i.users = lo.Map(i.node.GetUsers(), func(v ssa.User, _ int) *Value { return NewValue(v) })
+	}
+	return i.users
 }
 
 func (i *Value) GetUser(index int) *Value {
-	return NewValue(i.node.GetUsers()[index])
+	return i.GetUsers()[index]
 }
 
 func (value *Value) ShowUseDefChain() {
@@ -132,7 +142,15 @@ func (v *Value) GetReturn() Values {
 	return ret
 }
 
-func (v *Value) GetParameter() Values {
+func (v *Value) GetParameter(i int) *Value {
+	if f, ok := ssa.ToFunction(v.node); ok {
+		if i < len(f.Param) {
+			return NewValue(f.Param[i])
+		}
+	}
+	return nil
+}
+func (v *Value) GetParameters() Values {
 	ret := make(Values, 0)
 	if f, ok := ssa.ToFunction(v.node); ok {
 		for _, v := range f.Param {
