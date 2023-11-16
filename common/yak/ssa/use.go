@@ -3,12 +3,16 @@ package ssa
 import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/algorithm"
 	"golang.org/x/exp/slices"
 )
 
 func ReplaceAllValue(v Value, to Value) {
 	ReplaceValue(v, to, func(i Instruction) bool { return false })
+	ReplaceValueInSymbolTable(v, to)
+}
+
+func ReplaceValueInSymbolTable(v, to Value) {
+	v.GetFunc().ReplaceVariable(v.GetVariable(), v, to)
 }
 func ReplaceValue(v Value, to Value, skip func(Instruction) bool) {
 	deleteInst := make([]User, 0)
@@ -24,7 +28,6 @@ func ReplaceValue(v Value, to Value, skip func(Instruction) bool) {
 		v.RemoveUser(user)
 	}
 
-	v.GetFunc().ReplaceVariable(v.GetVariable(), v, to)
 }
 
 func InsertValueReplaceOriginal(original Value, insert Value) {
@@ -34,8 +37,11 @@ func InsertValueReplaceOriginal(original Value, insert Value) {
 	// builder := block.GetFunc().builder
 	variable := original.GetVariable()
 
+	deleteInst := make([]Instruction, 0)
+
 	// replace variable in block
 	replaceInBlock := func(v, to Value, block *BasicBlock, skip func(Instruction) bool) {
+		// fmt.Println("replace: ", v, to, " in block: ", block)
 		deleteUser := make([]User, 0)
 		for _, user := range v.GetUsers() {
 			if user.GetBlock() != block || skip(user) {
@@ -50,8 +56,7 @@ func InsertValueReplaceOriginal(original Value, insert Value) {
 		}
 	}
 
-	// replace variable in insert block after insert instruction position
-	replaceInBlock(original, insert, block, func(inst Instruction) bool {
+	afterInsert := func(inst Instruction) bool {
 		if inst.GetPosition() == nil {
 			return true
 		}
@@ -60,27 +65,77 @@ func InsertValueReplaceOriginal(original Value, insert Value) {
 		} else {
 			return true
 		}
-	})
+	}
+
+	// replace variable in insert block after insert instruction position
+	replaceInBlock(original, insert, block, afterInsert)
 	// if this block current end variable is original, replace. !!! [if not, skip] !!!
 	if builder.readVariableByBlock(variable, block, false) == original {
 		builder.writeVariableByBlock(variable, insert, block)
 	}
 
-	// search all successor-block, and re-try builder phi
-	algorithm.BFS(block.Succs, func(block *BasicBlock) []*BasicBlock { return block.Succs }, func(item *BasicBlock) bool {
+	handlerSuccBlock := func(item *BasicBlock) (Value, Value) {
 		old := builder.readVariableByBlock(variable, item, false)
 		builder.deleteVariableByBlock(variable, item)
 		new := builder.readVariableByBlock(variable, item, false)
-		if old == new {
-			return false
-		} else {
+		if old != new {
 			replaceInBlock(old, new, item, func(i Instruction) bool {
 				return i == new
 			})
-			return true
 		}
-	})
+		if len(old.GetUsers()) == 0 {
+			deleteInst = append(deleteInst, old)
+		}
+		return old, new
+	}
 
+	var loopHeader *BasicBlock
+	for i := block.Index + 1; i < len(fun.Blocks); i++ {
+		item := fun.Blocks[i]
+		old, new := handlerSuccBlock(item)
+		if old == new {
+			// if not change
+			flag := true
+			// and all succ block of this block only one prev block
+			lo.ForEach(item.Succs, func(item *BasicBlock, index int) {
+				if len(item.Preds) > 1 {
+					flag = false
+				}
+			})
+			// end loop
+			if flag {
+				break
+			}
+		}
+
+		if item.IsBlock(LoopLatch) {
+			loopHeader = item.Succs[0]
+			break
+		}
+	}
+
+	if loopHeader != nil {
+		old, new := handlerSuccBlock(loopHeader)
+		if old != new {
+			// replace variable loopCfG outside,  and must after loop enter block
+			ReplaceValue(old, new, func(i Instruction) bool {
+				if i == new {
+					return true
+				}
+				if i.GetBlock().Index <= loopHeader.Index {
+					return true
+				}
+				if i.GetBlock() == block {
+					return !afterInsert(i)
+				}
+				return false
+			})
+		}
+	}
+
+	for _, inst := range deleteInst {
+		DeleteInst(inst)
+	}
 }
 
 func GetValues(n Node) Values {
