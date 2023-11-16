@@ -658,7 +658,6 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 
 		httpPoolOpts = append(httpPoolOpts,
 			mutate.WithPoolOpt_FuzzParams(mergedParams),
-			mutate.WithPoolOpt_ForceFuzzfile(req.GetForceFuzz()),
 			mutate.WithPoolOpt_ExtraFuzzOptions(extraOpt...),
 			mutate.WithPoolOpt_Timeout(timeoutSeconds),
 			mutate.WithPoolOpt_Proxy(proxies...),
@@ -691,11 +690,31 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_NoSystemProxy(req.GetNoSystemProxy()),
 			mutate.WithPoolOpt_RequestCountLimiter(requestCount))
 
+		fuzzMode := req.GetFuzzTagMode() // ""/"close"/"stander"/"simple"
+		forceFuzz := req.GetForceFuzz()  // true/false
+		//syncRender := req.GetFuzzTagSyncIndex()
+		if fuzzMode == "" { // 以forceFuzz为准
+			if forceFuzz {
+				fuzzMode = "stander"
+			} else {
+				fuzzMode = "close"
+			}
+		}
+		mutate.WithPoolOpt_ForceFuzzfile(req.GetForceFuzz())
 		if isRetry {
 			// 重试的时候，不需要渲染fuzztag
+			fuzzMode = "close"
+		}
+		switch fuzzMode {
+		case "close":
 			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ForceFuzz(false))
-		} else {
-			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ForceFuzz(req.GetForceFuzz()))
+		case "stander":
+			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ForceFuzz(true))
+			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ForceFuzzfile(true))
+		case "simple":
+			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ForceFuzz(true))
+			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ForceFuzzfile(true))
+			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ExtraFuzzOptions(mutate.Fuzz_WithSimple(true)))
 		}
 		res, err := mutate.ExecPool(
 			iInput,
