@@ -2,13 +2,18 @@ package yak2ssa
 
 import (
 	"fmt"
-	"strings"
+	"regexp"
 	"testing"
 
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-func check(t *testing.T, code string, want string) {
+func check(t *testing.T, code string, regex string) {
+	re, err := regexp.Compile(".*" + regex + ".*")
+	if err != nil {
+		t.Fatal(err)
+	}
 	prog := ParseSSA(code, func(fb *ssa.FunctionBuilder) {
 		fb.WithExternMethod(&methodBuilder{})
 	})
@@ -18,8 +23,8 @@ func check(t *testing.T, code string, want string) {
 	for _, final := range printlnFunc.GetUsers() {
 		line := final.LineDisasm()
 		fmt.Println(line)
-		if !strings.Contains(line, want) {
-			t.Fatal("println: ", line)
+		if !re.Match(utils.UnsafeStringToBytes(line)) {
+			t.Fatal(line)
 		}
 	}
 }
@@ -111,17 +116,102 @@ func (b *methodBuilder) GetMethodNames(t ssa.Type) []string {
 var _ ssa.MethodBuilder = (*methodBuilder)(nil)
 
 func TestSelfModifyFunction(t *testing.T) {
-	code := `
+
+	t.Run("basic line code", func(t *testing.T) {
+		check(
+			t,
+			`
 	a = "first line"
 	a.join("second line")
 	println(a)
+		`,
+			"second line",
+		)
+	})
+
+	t.Run("basic line code2 multiple join", func(t *testing.T) {
+		check(t,
+			`
+	a = "first line"
+	a.join("second line")
+	a.join("third line")
+	println(a)
+		`,
+			`.*"second line".*"third line".*`)
+	})
+
+	t.Run("if cfg", func(t *testing.T) {
+		check(t, `
 	a = "first line" 
 	if b == 1 {
 		a.join("second line")
 	}
 	println(a)
-	`
+	`, "second line")
+	})
 
+	t.Run("loop cfg", func(t *testing.T) {
+		check(t, `
+	a = "first line" 
+	for item in list {
+		a.join("second line")
+	}
+	println(a)
+	`,
+			`second line`,
+		)
+	})
+
+	t.Run("loop cfg2 multiple join ", func(t *testing.T) {
+		check(t, `
+	a = "first line" 
+	for item in list {
+		a.join("second line")
+		a.join("third line")
+	}
+	println(a)
+	`, `"second line".*"third line"`)
+	})
+
+	t.Run("loop cfg with if", func(t *testing.T) {
+		check(t, `
+		a = "first line"
+		for i in list {
+			if i == "11" {
+				a.join("second line")
+			}
+		}
+		println(a)
+		`, "second line")
+	})
+
+	t.Run("loop cfg with if2 multiple join ", func(t *testing.T) {
+		check(t, `
+		a = "first line"
+		for i in list {
+			if i == "11" {
+				a.join("second line")
+			}
+			a.join("third line")
+		}
+		println(a)
+		`, "third line")
+	})
+	t.Run("loop cfg with multiple if", func(t *testing.T) {
+		check(t, `
+		a = "first line"
+		for i in list {
+			if i == "11" {
+				a.join("second line")
+				// continue
+			}
+			if i == "22" {
+				a.join("third line")
+			}
+		}
+		println(a)
+		`, `"second line".*"third line"`)
+	})
 }
 
 func TestLineDisasm(t *testing.T) {
