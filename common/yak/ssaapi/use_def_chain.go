@@ -5,36 +5,15 @@ import (
 	"strconv"
 )
 
-type Direction int
-
-const (
-	Both Direction = iota
-	Use
-	UseBy
-)
-
-type UseDefChain struct {
-	direction Direction
-	v         *Value
+func showUseDefChain(v *Value) {
+	showUserDefChainEx(0, v)
 }
 
-func defaultUseDefChain(v *Value) *UseDefChain {
-	return &UseDefChain{
-		direction: Both,
-		v:         v,
-	}
+func showAllUseDefChain(v *Value) {
+	showUserDefChainEx(1, v)
 }
 
-func (u *UseDefChain) Show() {
-	u.ShowEx(0)
-}
-
-func (u *UseDefChain) ShowAll() {
-	u.ShowEx(1)
-}
-
-func (u *UseDefChain) ShowEx(flag int) {
-	v := u.v
+func showUserDefChainEx(flag int, v *Value) {
 	ret := "use-def: |Type\t|index\t|Opcode\t|Value\n"
 
 	show := func(prefix string, index int, v *Value) string {
@@ -62,19 +41,4 @@ func (u *UseDefChain) ShowEx(flag int) {
 		ret += show("User", i, u)
 	}
 	fmt.Println(ret)
-}
-
-func (u *UseDefChain) WalkUser(f func(*Value)) {
-	// walk  users
-	v := u.v
-	for _, u := range v.GetUsers() {
-		f(u)
-	}
-}
-
-func (u *UseDefChain) WalkOperand(f func(*Value)) {
-	v := u.v
-	for _, v := range v.GetOperands() {
-		f(v)
-	}
 }
