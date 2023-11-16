@@ -1,0 +1,11 @@
+timeout, _ = time.ParseDuration("5s")
+port = os.GetRandomAvailableTCPPort()
+ctx, cancel = context.WithTimeout(context.New(), timeout)
+go func() {
+    err = tcp.Serve("127.0.0.1", port, tcp.serverCallback(func (conn) {
+    conn.Send("hello world")
+    conn.Close()
+}), tcp.serverContext(ctx))
+}()
+os.WaitConnect(f"127.0.0.1:${port}", 5)~
+waitAllAsyncCallFinish()
