@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"net/http"
 	"strings"
 	"testing"
@@ -745,6 +746,108 @@ func TestHTTPPacket_ToUnquoteFuzzTag(t *testing.T) {
 	for i := 0; i < len(logoPngBytes); i++ {
 		if results[0][i] != logoPngBytes[i] {
 			t.Fatalf("%d byte error: %v(got) != %v(wanted)", i, results[0][i], logoPngBytes[i])
+		}
+	}
+}
+
+func TestGRPCMUSTPASS_FuzzTag(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(""))
+	})
+	target := utils.HostPort(host, port)
+	for _, test := range []struct {
+		tag       string
+		expect    []string
+		fuzzMode  string
+		forceMode bool
+		syncMode  bool
+	}{
+		{ // 验证force
+			tag: "{{base64({{url(yak)}})}}",
+			expect: []string{
+				"JTc5JTYxJTZi", "%79%61%6b",
+			},
+			forceMode: true,
+		},
+		{
+			tag:       "{{base64({{url(yak)}})}}",
+			expect:    []string{},
+			forceMode: false,
+		},
+		{ // 验证fuzzMode close
+			tag:      "{{base64({{url(yak)}})}}",
+			expect:   []string{},
+			fuzzMode: "close",
+		},
+		{ // 验证fuzzMode stander
+			tag: "{{base64({{url(yak)}})}}",
+			expect: []string{
+				"JTc5JTYxJTZi", "%79%61%6b",
+			},
+			fuzzMode: "stander",
+		},
+		{
+			tag: "{{base64(url(yak))}}",
+			expect: []string{
+				"dXJsKHlhayk=", // url(yak)
+			},
+			fuzzMode: "stander",
+		},
+		{
+			tag: "{{base64({{url(yak)}})}}",
+			expect: []string{
+				"JTc5JTYxJTZi", "%79%61%6b",
+			},
+			fuzzMode: "stander",
+		},
+		{ // 验证fuzzMode simple
+			tag: "{{base64(url(yak))}}",
+			expect: []string{
+				"JTc5JTYxJTZi",
+			},
+			fuzzMode: "simple",
+		},
+		{
+			tag: "{{base64({{url(yak)}})}}",
+			expect: []string{
+				"JTc5JTYxJTZi", "%79%61%6b",
+			},
+			fuzzMode: "simple",
+		},
+		{ // 验证优先级
+			tag:       "{{base64({{url(yak)}})}}",
+			expect:    []string{},
+			forceMode: true,
+			fuzzMode:  "close",
+		},
+		{
+			tag: "{{base64({{url(yak)}})}}",
+			expect: []string{
+				"JTc5JTYxJTZi", "%79%61%6b",
+			},
+			forceMode: true,
+			fuzzMode:  "",
+		},
+	} {
+		req := &ypb.FuzzerRequest{
+			Request: "GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n" + test.tag,
+		}
+		req.ForceFuzz = test.forceMode
+		req.FuzzTagMode = test.fuzzMode
+		recv, err := client.HTTPFuzzer(utils.TimeoutContextSeconds(10), req)
+		rsp, err := recv.Recv()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rsp.Payloads) != len(test.expect) {
+			t.Fatalf("expect length %v, got %v", len(test.expect), len(rsp.Payloads))
+		}
+		for i, payload := range test.expect {
+			assert.Equal(t, rsp.Payloads[i], payload)
 		}
 	}
 }
