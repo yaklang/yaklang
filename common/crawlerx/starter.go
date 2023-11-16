@@ -677,6 +677,7 @@ running:
 			if starter.counter.LayDown() && starter.running {
 				log.Debug(`lay down. `)
 				starter.running = false
+				starter.subWaitGroup.Wait()
 				starter.waitGroup.Done()
 			}
 			time.Sleep(500 * time.Millisecond)
