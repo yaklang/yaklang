@@ -68,6 +68,7 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 	var host string
 	var port int
 	var wg sync.WaitGroup
+	// start each server
 	wg.Add(1)
 	go func() {
 		defer func() {
@@ -97,8 +98,11 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 		})
 	}
 
+	// static analyze
+	var score int
+
 	staticCheckingFailed := false
-	staticResults := yak.AnalyzeStaticYaklangEx(pluginCode, false)
+	staticResults := yak.AnalyzeStaticYaklangWithType(pluginCode, pluginType)
 	if len(staticResults) > 0 {
 		for _, sRes := range staticResults {
 			if sRes.Severity == "error" {
@@ -118,35 +122,35 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 		}, nil
 	}
 
-	var score int
-	log.Info("start to echo debug script")
-	var fetchRisk bool
-	err := s.debugScript("http://"+utils.HostPort(host, port), pluginType, pluginCode, NewFakeStream(ctx, func(result *ypb.ExecResult) error {
-		if result.IsMessage {
-			var m = make(map[string]any)
-			err := json.Unmarshal(result.Message, &m)
-			if err != nil {
-				return err
+	if pluginType == "mitm" || pluginType == "port-scan" { // echo debug script
+		log.Info("start to echo debug script")
+		var fetchRisk bool
+		err := s.debugScript("http://"+utils.HostPort(host, port), pluginType, pluginCode, NewFakeStream(ctx, func(result *ypb.ExecResult) error {
+			if result.IsMessage {
+				var m = make(map[string]any)
+				err := json.Unmarshal(result.Message, &m)
+				if err != nil {
+					return err
+				}
+				log.Info("debugScript recv: ", string(result.Message))
+				switch utils.MapGetString(utils.MapGetMapRaw(m, "content"), "level") {
+				case "json-risk":
+					fetchRisk = true
+				}
 			}
-			log.Info("debugScript recv: ", string(result.Message))
-			switch utils.MapGetString(utils.MapGetMapRaw(m, "content"), "level") {
-			case "json-risk":
-				fetchRisk = true
-			}
+			return nil
+		}))
+		if err != nil {
+			log.Errorf("debugScript failed: %v", err)
+			pushSuggestion("冒烟测试失败[Smoking Test]", `请检查插件异常处理是否完备？查看 Console 以处理调试错误: `+err.Error())
+		} else {
+			score += 40
 		}
-		return nil
-	}))
-	if err != nil {
-		log.Errorf("debugScript failed: %v", err)
-		pushSuggestion("冒烟测试失败[Smoking Test]", `请检查插件异常处理是否完备？查看 Console 以处理调试错误: `+err.Error())
-	} else {
-		score += 40
-	}
-
-	if !fetchRisk {
-		score += 20
-	} else {
-		pushSuggestion("误报[Negative Alarm]", `本插件的漏洞判定可能过于宽松，请检查漏洞判定逻辑`)
+		if !fetchRisk {
+			score += 20
+		} else {
+			pushSuggestion("误报[Negative Alarm]", `本插件的漏洞判定可能过于宽松，请检查漏洞判定逻辑`)
+		}
 	}
 
 	return &ypb.SmokingEvaluatePluginResponse{
