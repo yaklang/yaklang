@@ -1,0 +1,3 @@
+a = 1
+eval("a++")
+assert a == 2
