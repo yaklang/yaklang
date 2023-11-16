@@ -8,7 +8,14 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
-// eval
+// eval 执行任意 Yak 代码
+// 这个函数是存在副作用的，即能够获取和改变当前引擎中的上下文
+// Example:
+// ```
+// a = 1
+// eval("a++")
+// assert a == 2
+// ```
 func (e *Engine) YakBuiltinEval(code string) {
 	vm := e.vm
 	topFrame := vm.VMStack.Peek().(*yakvm.Frame)
@@ -26,7 +33,11 @@ func (e *Engine) YakBuiltinEval(code string) {
 	}
 }
 
-// yakfmt
+// yakfmt 格式化任意 Yak 代码，返回格式化后的代码
+// Example:
+// ```
+// yakfmt("for { println(`hello yak`) }")
+// ```
 func (e *Engine) YakBuiltinfmt(code string) string {
 	newCode, err := New().FormattedAndSyntaxChecking(code)
 	if err != nil {
@@ -36,16 +47,41 @@ func (e *Engine) YakBuiltinfmt(code string) string {
 	return newCode
 }
 
-// yakfmtWithError
+// yakfmtWithError 格式化任意 Yak 代码，返回格式化后的代码和错误
+// Example:
+// ```
+// yakfmtWithError("for { println(`hello yak`) }")
+// ```
 func (e *Engine) YakBuiltinfmtWithError(code string) (string, error) {
 	return New().FormattedAndSyntaxChecking(code)
 }
 
-// getScopeInspects
+// getScopeInspects 获取当前作用域中的所有变量，返回 ScopeValue 结构体引用切片
+// Example:
+// ```
+// a, b = 1, "yak"
+// values, err = getScopeInspects()
+// for v in values {
+// println(v.Value)
+// }
+// ```
 func (e *Engine) YakBuiltinGetScopeInspects() ([]*ScopeValue, error) {
 	return e.GetScopeInspects()
 }
 
+// waitAllAsyncCallFinish 等待直到所有异步调用完成
+// Example:
+// ```
+// a = 0
+// for i in 5 {
+// go func(i) {
+// time.sleep(i)
+// a++
+// }(i)
+// }
+// waitAllAsyncCallFinish()
+// assert a == 5
+// ```
 func (e *Engine) waitAllAsyncCallFinish() {
 	e.vm.AsyncWait()
 }
