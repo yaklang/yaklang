@@ -587,6 +587,35 @@ func AppendDefaultPort(raw string, port int) string {
 	return HostPort(raw, port)
 }
 
+func ParseStringToHttpsAndHostname(res string) (bool, string) {
+	host, port, _ := ParseStringToHostPort(res)
+	if host == "" {
+		return false, res
+	}
+
+	var urlHttps = strings.HasPrefix(res, "https://")
+	var isUrl = IsHttpOrHttpsUrl(res)
+
+	if port > 0 {
+		if port == 443 {
+			if isUrl && !urlHttps {
+				return false, HostPort(host, port)
+			}
+			return true, host
+		}
+
+		if port == 80 {
+			if isUrl && urlHttps {
+				return true, HostPort(host, port)
+			}
+			return false, host
+		}
+
+		return urlHttps, HostPort(host, port)
+	}
+	return urlHttps, host
+}
+
 // ParseStringToHostPort 尝试从字符串中解析出host和port，并与错误一起返回
 // Example:
 // ```
