@@ -32,7 +32,6 @@ func (v *Value) GetNativeCallFunctionName() string {
 }
 
 func (v *Value) nativeCall(asyncCall, wavy bool, vm *Frame, vs ...*Value) interface{} {
-
 	rets := reflect.ValueOf(v.Value)
 	funcType := rets.Type()
 	funcName := v.Literal
@@ -62,7 +61,7 @@ func (v *Value) nativeCall(asyncCall, wavy bool, vm *Frame, vs ...*Value) interf
 		}
 
 		// 取出元素类型
-		var variadicParamsType = funcType.In(numInMax - 1).Elem()
+		variadicParamsType := funcType.In(numInMax - 1).Elem()
 
 		for i := 0; i < len(args); i++ {
 			argVal := args[i]
@@ -109,12 +108,13 @@ func (v *Value) nativeCall(asyncCall, wavy bool, vm *Frame, vs ...*Value) interf
 	//}
 	if asyncCall {
 		go func() {
+			defer vm.vm.AsyncEnd()
 			rets.Call(args)
 		}()
 		return nil
 	}
 	returns := rets.Call(args)
-	var vals = make([]interface{}, len(returns))
+	vals := make([]interface{}, len(returns))
 	for i, ret := range returns {
 		// 证明是别名，例如time.Duration 是 int64 类型别名，但是有自己实现的方法，所以不应该转换
 		pkgPath := ret.Type().PkgPath()
