@@ -24,6 +24,7 @@ func (v *Frame) asyncCall(caller *Value, wavy bool, args []*Value) {
 		panic("runtime error: cannot call undefined(nil) as function")
 	}
 	if caller.Callable() {
+		v.vm.AsyncStart()
 		caller.AsyncCall(v, wavy, args...)
 		return
 	}
