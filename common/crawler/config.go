@@ -22,7 +22,7 @@ import (
 
 var (
 	ExcludedSuffix = []string{
-		".js", ".css",
+		".css",
 		".jpg", ".jpeg", ".png",
 		".mp3", ".mp4",
 		".flv", ".aac", ".ogg",
