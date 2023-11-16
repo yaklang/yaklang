@@ -29,3 +29,28 @@ println("final:", a)
 		t.Error("final:", line)
 	}
 }
+
+func TestPosition(t *testing.T) {
+	code :=
+		`
+		b = 1
+		for {
+			a = b
+		}
+	`
+	prog := ParseSSA(code, func(fb *ssa.FunctionBuilder) {})
+	want := ssa.Position{
+		SourceCode:  "1",
+		StartLine:   2,
+		StartColumn: 6,
+		EndLine:     2,
+		EndColumn:   7,
+	}
+	for _, v := range prog.InspectVariable("b").ProbablyValues {
+		a := v.GetPosition()
+		if *a != want {
+			t.Error("phi get_position err")
+		}
+	}
+
+}

@@ -136,8 +136,12 @@ func (a *anInstruction) SetBlock(block *BasicBlock) { a.block = block }
 func (a *anInstruction) GetBlock() *BasicBlock      { return a.block }
 
 // source code position
-func (c *anInstruction) GetPosition() *Position    { return c.Pos }
-func (c *anInstruction) SetPosition(pos *Position) { c.Pos = pos }
+func (c *anInstruction) GetPosition() *Position { return c.Pos }
+func (c *anInstruction) SetPosition(pos *Position) {
+	if c.Pos == nil {
+		c.Pos = pos
+	}
+}
 
 func (c *anInstruction) IsExtern() bool   { return c.isExtern }
 func (c *anInstruction) SetExtern(b bool) { c.isExtern = b }
