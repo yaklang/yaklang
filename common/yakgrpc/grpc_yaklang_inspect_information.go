@@ -6,7 +6,7 @@ import (
 	"errors"
 
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak"
+	pta "github.com/yaklang/yaklang/common/yak/plugin_type_analyzer"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -226,7 +226,7 @@ func (r *YaklangInformationResponse) ParseRiskInfo() {
 
 func (s *Server) YaklangInspectInformation(ctx context.Context, req *ypb.YaklangInspectInformationRequest) (*ypb.YaklangInspectInformationResponse, error) {
 	rsp := newYaklangInformationResponse()
-	rsp.prog = yak.Parse(req.YakScriptCode)
+	rsp.prog = ssaapi.Parse(req.YakScriptCode, pta.GetPluginSSAOpt(req.YakScriptType)...)
 	if rsp.prog == nil {
 		return nil, errors.New("ssa parse error")
 	}

@@ -1,4 +1,4 @@
-package yak
+package plugin_type_analyzer
 
 import (
 	"reflect"
@@ -7,6 +7,48 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
+
+type yakAnalyzer struct{}
+
+var _ PluginTypeAnalyzer = (*yakAnalyzer)(nil)
+
+func (y *yakAnalyzer) GetTypeSSAOpt() []ssaapi.Option {
+	opts := make([]ssaapi.Option, 0)
+	// yak function table
+	symbol := yaklang.New().GetFntable()
+	valueTable := make(map[string]interface{})
+	// libTable := make(map[string]interface{})
+	tmp := reflect.TypeOf(make(map[string]interface{}))
+	for name, item := range symbol {
+		itype := reflect.TypeOf(item)
+		if itype == tmp {
+			opts = append(opts, ssaapi.WithExternLib(name, item.(map[string]interface{})))
+		} else {
+			valueTable[name] = item
+		}
+	}
+
+	// yak-main
+	valueTable["YAK_DIR"] = ""
+	valueTable["YAK_FILENAME"] = ""
+	valueTable["YAK_MAIN"] = false
+	valueTable["id"] = ""
+	// param
+	getParam := func(key string) interface{} {
+		return nil
+	}
+	valueTable["getParam"] = getParam
+	valueTable["getParams"] = getParam
+	valueTable["param"] = getParam
+
+	opts = append(opts, ssaapi.WithExternValue(valueTable))
+	opts = append(opts, ssaapi.WithExternMethod(&builder{}))
+	return opts
+}
+
+func (y *yakAnalyzer) CheckRule(prog *ssaapi.Program) {
+
+}
 
 type builder struct{}
 
@@ -282,51 +324,4 @@ func (b *builder) GetMethodNames(t ssa.Type) []string {
 	default:
 		return []string{}
 	}
-}
-
-var _ ssa.MethodBuilder = (*builder)(nil)
-
-func getExternInstance() []ssaapi.Option {
-	opts := make([]ssaapi.Option, 0)
-	// yak function table
-	symbol := yaklang.New().GetFntable()
-	valueTable := make(map[string]interface{})
-	// libTable := make(map[string]interface{})
-	tmp := reflect.TypeOf(make(map[string]interface{}))
-	for name, item := range symbol {
-		itype := reflect.TypeOf(item)
-		if itype == tmp {
-			opts = append(opts, ssaapi.WithExternLib(name, item.(map[string]interface{})))
-		} else {
-			valueTable[name] = item
-		}
-	}
-
-	//TODO:  this grpc later
-	// yak-main
-	valueTable["YAK_DIR"] = ""
-	valueTable["YAK_FILENAME"] = ""
-	valueTable["YAK_MAIN"] = false
-	valueTable["id"] = ""
-	// param
-	getParam := func(key string) interface{} {
-		return nil
-	}
-	valueTable["getParam"] = getParam
-	valueTable["getParams"] = getParam
-	valueTable["param"] = getParam
-
-	// mitm
-	valueTable["MITM_PLUGIN"] = ""
-	valueTable["MITM_PARAMS"] = make(map[string]string)
-
-	opts = append(opts, ssaapi.WithExternValue(valueTable))
-	return opts
-}
-
-func Parse(code string) *ssaapi.Program {
-	opts := getExternInstance()
-	opts = append(opts, ssaapi.WithExternMethod(&builder{}))
-	prog := ssaapi.Parse(code, opts...)
-	return prog
 }

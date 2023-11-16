@@ -48,7 +48,14 @@ func WithExternLib(name string, table map[string]any) Option {
 
 func WithExternValue(table map[string]any) Option {
 	return func(c *config) {
-		c.externValue = table
+		// c.externValue = table
+		for name, value := range table {
+			// this value set again
+			// if _, ok := c.externValue[name]; !ok {
+			// 	// skip
+			// }
+			c.externValue[name] = value
+		}
 	}
 }
 
