@@ -126,8 +126,8 @@ func (i *Value) GetUser(index int) *Value {
 	return i.GetUsers()[index]
 }
 
-func (value *Value) ShowUseDefChain() {
-	defaultUseDefChain(value).Show()
+func (v *Value) ShowUseDefChain() {
+	showUseDefChain(v)
 }
 
 // for function
