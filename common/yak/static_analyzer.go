@@ -2,13 +2,13 @@ package yak
 
 import (
 	"fmt"
-	"os"
-	"regexp"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakast"
+	pta "github.com/yaklang/yaklang/common/yak/plugin_type_analyzer"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
 
@@ -23,17 +23,13 @@ type StaticAnalyzeResult struct {
 	From            string `json: "from"`
 }
 
-var (
-	extractLineFromSyntax = regexp.MustCompile(`(?i)^line (\d+): ((Syntax Error)|(runtime error:)|(Tokenize Error))`)
-)
+func AnalyzeStaticYaklang(i interface{}) []*StaticAnalyzeResult {
+	code := utils.UnsafeBytesToString(utils.InterfaceToBytes(i))
 
-func AnalyzeStaticYaklang(r interface{}) []*StaticAnalyzeResult {
-	_ = extractLineFromSyntax
-	return AnalyzeStaticYaklangEx(r, os.Getenv("STATIC_CHECK") == "strict")
+	return AnalyzeStaticYaklangWithType(code, "yak")
 }
 
-func AnalyzeStaticYaklangEx(r interface{}, strictMode bool) []*StaticAnalyzeResult {
-	code := string(utils.InterfaceToBytes(r))
+func AnalyzeStaticYaklangWithType(code, codeTyp string) []*StaticAnalyzeResult {
 	var results []*StaticAnalyzeResult
 
 	// compiler
@@ -60,10 +56,11 @@ func AnalyzeStaticYaklangEx(r interface{}, strictMode bool) []*StaticAnalyzeResu
 		}
 	}
 
-	prog := Parse(code)
+	prog := ssaapi.Parse(code, pta.GetPluginSSAOpt(codeTyp)...)
 	if prog == nil {
 		return results
 	}
+	pta.CheckPluginType(codeTyp, prog)
 
 	errs := prog.GetErrors()
 	for _, err := range errs {
