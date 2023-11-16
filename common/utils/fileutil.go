@@ -41,9 +41,7 @@ func GetFirstExistedFile(paths ...string) string {
 }
 
 func GetFirstExistedFileE(paths ...string) (string, error) {
-	var (
-		existedFile string
-	)
+	var existedFile string
 	for _, t := range paths {
 		r, err := PathExists(t)
 		if err != nil {
@@ -70,9 +68,7 @@ func GetFirstExistedFileE(paths ...string) (string, error) {
 }
 
 func GetFirstExistedPathE(paths ...string) (string, error) {
-	var (
-		existedFile string
-	)
+	var existedFile string
 	for _, t := range paths {
 		r, err := PathExists(t)
 		if err != nil {
@@ -131,7 +127,7 @@ func GetFirstExistedExecutablePath(paths ...string) string {
 		return ""
 	}
 
-	if stats.Mode()&0111 == 0 {
+	if stats.Mode()&0o111 == 0 {
 		return ""
 	}
 
@@ -163,9 +159,16 @@ func CopyDirectory(source string, destination string) error {
 		if err != nil {
 			return err
 		}
+		if source == path {
+			return nil
+		}
 
 		// 构建新路径
-		newPath := filepath.Join(destination, filepath.Base(path))
+		refPath, err := filepath.Rel(source, path)
+		if err != nil {
+			return err
+		}
+		newPath := filepath.Join(destination, refPath)
 
 		if info.IsDir() {
 			// 创建新的文件夹
@@ -216,7 +219,11 @@ func ConcurrentCopyDirectory(source string, destination string, threads int) err
 		}
 
 		// 构建新路径
-		newPath := filepath.Join(destination, filepath.Base(path))
+		refPath, err := filepath.Rel(source, path)
+		if err != nil {
+			return err
+		}
+		newPath := filepath.Join(destination, refPath)
 
 		if info.IsDir() {
 			// 创建新的文件夹
@@ -384,6 +391,7 @@ func GetFileAbsPath(filePath string) (string, error) {
 	absfilename = path.Join(absfilename, filepath.Base(filePath))
 	return absfilename, nil
 }
+
 func GetFileAbsDir(filePath string) (string, error) {
 	if filePath == "" {
 		return "", errors.Errorf(" empty file path")
