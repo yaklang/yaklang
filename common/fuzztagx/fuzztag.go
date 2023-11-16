@@ -92,10 +92,12 @@ type SimpleFuzzTag struct {
 
 func (f *SimpleFuzzTag) Exec(raw *parser.FuzzResult, methods ...map[string]*parser.TagMethod) ([]*parser.FuzzResult, error) {
 	data := string(raw.GetData())
+	data = strings.TrimSpace(data)
 	var method func() ([]*parser.FuzzResult, error)
 	isDyn := false
 	labels := []string{}
-	getFun := func(data string) *parser.TagMethod {
+	getFun := func(data string) (*parser.TagMethod, error) {
+		data = strings.TrimSpace(data)
 		if isIdentifyString(data) {
 			name := data
 			splits := strings.Split(name, "::")
@@ -117,11 +119,18 @@ func (f *SimpleFuzzTag) Exec(raw *parser.FuzzResult, methods ...map[string]*pars
 					if fun.IsDyn {
 						isDyn = true
 					}
-					return fun
+					return fun, nil
 				}
 			}
+		} else {
+			return nil, errors.New("invalid method name")
 		}
-		return nil
+		return &parser.TagMethod{
+			Name: "raw",
+			Fun: func(s string) ([]*parser.FuzzResult, error) {
+				return []*parser.FuzzResult{parser.NewFuzzResultWithData("")}, nil
+			},
+		}, nil
 	}
 
 	compile := func() (err error) {
@@ -132,23 +141,37 @@ func (f *SimpleFuzzTag) Exec(raw *parser.FuzzResult, methods ...map[string]*pars
 		}()
 		matchedPos := parser.IndexAllSubstrings(data, MethodLeft, MethodRight)
 		if len(matchedPos) == 0 {
-			f := getFun(data)
+			f, err := getFun(data)
+			if err != nil {
+				return err
+			}
 			if f == nil {
-				return fmt.Errorf("not found method: %s", data)
+				method = func() ([]*parser.FuzzResult, error) {
+					return []*parser.FuzzResult{parser.NewFuzzResultWithData("")}, nil
+				}
 			}
 			method = func() ([]*parser.FuzzResult, error) {
 				return f.Fun("")
 			}
 		} else {
+			escape := func(s string) string {
+				s = strings.ReplaceAll(s, `\(`, `(`)
+				s = strings.ReplaceAll(s, `\)`, `)`)
+				return s
+			}
 			pre := 0
 			methodStack := utils.NewStack[any]()
 			for _, pos := range matchedPos {
+				if pos[1]-1 > 0 {
+					if data[pos[1]-1] == '\\' {
+						continue
+					}
+				}
 				if pos[0] == 0 {
-					methodStack.Push(data[pre:pos[1]])
+					methodStack.Push(escape(data[pre:pos[1]]))
 					methodStack.Push(pos)
 					pre = pos[1] + 1
 				} else {
-
 					stop := false
 					params := []func() ([]*parser.FuzzResult, error){}
 					for {
@@ -170,58 +193,66 @@ func (f *SimpleFuzzTag) Exec(raw *parser.FuzzResult, methods ...map[string]*pars
 							if v, ok := item.(string); !ok {
 								return errors.New("match left brace failed")
 							} else {
-								f := getFun(v)
+								f, err := getFun(v)
+								if err != nil {
+									return err
+								}
 								if f == nil {
-									return fmt.Errorf("not found method: %s", v)
-								}
-								if len(params) != 0 && pre != pos[1] {
-									return errors.New("error param")
-								}
-								if len(params) == 0 {
-									strParam := data[pre:pos[1]]
 									methodStack.Push(func() ([]*parser.FuzzResult, error) {
-										return f.Fun(strParam)
+										return []*parser.FuzzResult{parser.NewFuzzResultWithData("")}, nil
 									})
 								} else {
-									methodStack.Push(func() ([]*parser.FuzzResult, error) {
-										paramForFun := [][]*parser.FuzzResult{}
-										for _, param := range params {
-											res, err := param()
-											if err != nil {
-												return nil, fmt.Errorf("eval function %s error: %w", v, err)
-											}
-											paramForFun = append(paramForFun, res)
-										}
-										reverseParamForFun := [][]*parser.FuzzResult{}
-										for i := len(paramForFun) - 1; i >= 0; i-- {
-											reverseParamForFun = append(reverseParamForFun, paramForFun[i])
-										}
-										cartesianParams, err := cartesian.Product(reverseParamForFun)
-										if err != nil {
-											return nil, err
-										}
-										result := []*parser.FuzzResult{}
-										for _, params := range cartesianParams {
-											paramStr := ""
+									if len(params) != 0 && pre != pos[1] {
+										return errors.New("error param")
+									}
+									if len(params) == 0 {
+										strParam := escape(data[pre:pos[1]])
+										methodStack.Push(func() ([]*parser.FuzzResult, error) {
+											return f.Fun(strParam)
+										})
+									} else {
+										methodStack.Push(func() ([]*parser.FuzzResult, error) {
+											paramForFun := [][]*parser.FuzzResult{}
 											for _, param := range params {
-												paramStr += string(param.GetData())
+												res, err := param()
+												if err != nil {
+													return nil, fmt.Errorf("eval function %s error: %w", v, err)
+												}
+												paramForFun = append(paramForFun, res)
 											}
-											res, err := f.Fun(paramStr)
+											reverseParamForFun := [][]*parser.FuzzResult{}
+											for i := len(paramForFun) - 1; i >= 0; i-- {
+												reverseParamForFun = append(reverseParamForFun, paramForFun[i])
+											}
+											cartesianParams, err := cartesian.Product(reverseParamForFun)
 											if err != nil {
-												return nil, fmt.Errorf("eval function %s error: %w", v, err)
+												return nil, err
 											}
-											result = append(result, res...)
-										}
-										return result, nil
-									})
+											result := []*parser.FuzzResult{}
+											for _, params := range cartesianParams {
+												paramStr := ""
+												for _, param := range params {
+													paramStr += string(param.GetData())
+												}
+												res, err := f.Fun(paramStr)
+												if err != nil {
+													return nil, fmt.Errorf("eval function %s error: %w", v, err)
+												}
+												result = append(result, res...)
+											}
+											return result, nil
+										})
+									}
 								}
-
 							}
 							stop = true
 						}
 					}
 					pre = pos[1] + 1
 				}
+			}
+			if len(matchedPos) > 0 && utils.GetLastElement[[2]int](matchedPos)[1]+1 != len(data) {
+				return errors.New(fmt.Sprintf("unresolved data: %s", escape(data[pre:])))
 			}
 			if methodStack.Size() != 1 {
 				return errors.New("error method stack")

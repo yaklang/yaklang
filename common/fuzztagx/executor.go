@@ -6,8 +6,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func ExecuteWithStringHandler(code string, funcMap map[string]func(string2 string) []string) ([]string, error) {
-	nodes, err := ParseFuzztag(code, false)
+func executeWithStringHandler(code string, funcMap map[string]func(string2 string) []string, isSimple bool) ([]string, error) {
+	nodes, err := ParseFuzztag(code, isSimple)
 	if err != nil {
 		return nil, err
 	}
@@ -44,4 +44,10 @@ func ExecuteWithStringHandler(code string, funcMap map[string]func(string2 strin
 		res = append(res, string(generator.Result().GetData()))
 	}
 	return res, nil
+}
+func ExecuteWithStringHandler(code string, funcMap map[string]func(string2 string) []string) ([]string, error) {
+	return executeWithStringHandler(code, funcMap, false)
+}
+func ExecuteSimpleTagWithStringHandler(code string, funcMap map[string]func(string2 string) []string) ([]string, error) {
+	return executeWithStringHandler(code, funcMap, true)
 }
