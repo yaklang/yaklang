@@ -1,0 +1,9 @@
+a = 0
+for i in 5 {
+    go func(i) {
+        time.sleep(i)
+        a++
+    }(i)
+}
+waitAllAsyncCallFinish()
+assert a == 5
