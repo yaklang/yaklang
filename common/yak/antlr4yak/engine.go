@@ -7,7 +7,6 @@ import (
 	"sort"
 
 	"github.com/yaklang/yaklang/common/go-funk"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakast"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
@@ -43,15 +42,16 @@ func New() *Engine {
 		rootSymbol: table,
 		vm:         vm,
 	}
-	evalFunc := func(ctx context.Context, code string) {
-		codes, err := engine.Compile(code)
-		if err != nil {
-			panic(err)
-		}
-		if err = vm.ExecYakCode(ctx, code, codes, yakvm.Inline); err != nil {
-			panic(err)
-		}
-	}
+	InjectContextBuiltinFunction(engine)
+	// evalFunc := func(ctx context.Context, code string) {
+	// 	codes, err := engine.Compile(code)
+	// 	if err != nil {
+	// 		panic(err)
+	// 	}
+	// 	if err = vm.ExecYakCode(ctx, code, codes, yakvm.Inline); err != nil {
+	// 		panic(err)
+	// 	}
+	// }
 	// runtimeLibs := map[string]interface{}{
 	// 	"Breakpoint": func() {
 	// 		if engine.debugMode {
@@ -63,43 +63,50 @@ func New() *Engine {
 	// 	},
 	// }
 
-	engine.ImportLibs(map[string]interface{}{
-		"eval": evalFunc,
-		"yakfmt": func(code string) string {
-			newCode, err := New().FormattedAndSyntaxChecking(code)
-			if err != nil {
-				log.Errorf("format and syntax checking met error: %s", err)
-				return code
-			}
-			return newCode
-		},
-		"yakfmtWithError": func(code string) (string, error) {
-			return New().FormattedAndSyntaxChecking(code)
-		},
-		"getScopeInspects": func() ([]*ScopeValue, error) {
-			return engine.GetScopeInspects()
-		},
-	})
+	// engine.ImportLibs(map[string]interface{}{
+	// 	"eval": evalFunc,
+	// 	"yakfmt": func(code string) string {
+	// 		newCode, err := New().FormattedAndSyntaxChecking(code)
+	// 		if err != nil {
+	// 			log.Errorf("format and syntax checking met error: %s", err)
+	// 			return code
+	// 		}
+	// 		return newCode
+	// 	},
+	// 	"yakfmtWithError": func(code string) (string, error) {
+	// 		return New().FormattedAndSyntaxChecking(code)
+	// 	},
+	// 	"getScopeInspects": func() ([]*ScopeValue, error) {
+	// 		return engine.GetScopeInspects()
+	// 	},
+	// })
 	return engine
 }
+
 func (n *Engine) SetSourceFilePath(path string) {
 	n.sourceFilePathPointer = &path
 }
+
 func (n *Engine) SetDebugInit(callback func(*yakvm.Debugger)) {
 	n.debugInit = callback
 }
+
 func (n *Engine) SetDebugCallback(callback func(*yakvm.Debugger)) {
 	n.debugCallBack = callback
 }
+
 func (n *Engine) SetDebugMode(debug bool) {
 	n.debugMode = debug
 }
+
 func (n *Engine) EnableStrictMode() {
 	n.strictMode = true
 }
+
 func (n *Engine) GetSymNames() []string {
 	return nil
 }
+
 func (n *Engine) CopyVars() map[string]interface{} {
 	return nil
 }
@@ -112,7 +119,7 @@ func (n *Engine) CallYakFunctionNative(ctx context.Context, function *yakvm.Func
 	if function == nil {
 		return nil, utils.Error("no function")
 	}
-	var paramsValue = make([]*yakvm.Value, len(params))
+	paramsValue := make([]*yakvm.Value, len(params))
 	for i, v := range params {
 		paramsValue[i] = yakvm.NewAutoValue(v)
 	}
@@ -169,6 +176,7 @@ func (n *Engine) LoadCode(ctx context.Context, code string, table map[string]int
 	n.vm.ImportLibs(table)
 	return n.vm.ExecYakCode(ctx, code, codes, yakvm.Trace)
 }
+
 func (n *Engine) GetFntable() map[string]interface{} {
 	return n.vm.GetGlobalVar()
 }
@@ -237,6 +245,7 @@ func (n *Engine) GetScopeInspects() ([]*ScopeValue, error) {
 	})
 	return vals, nil
 }
+
 func (n *Engine) ImportSubLibs(parent string, libs map[string]interface{}) {
 	var parentLib map[string]interface{}
 	if v, ok := n.vm.GetGlobalVar()[parent]; ok {
@@ -264,6 +273,7 @@ func (n *Engine) Var(name string) interface{} {
 func (n *Engine) GetVar(name string) (interface{}, bool) {
 	return n.vm.GetVar(name)
 }
+
 func (n *Engine) SetVar(k string, v interface{}) {
 	n.vm.SetVar(k, v)
 }
@@ -275,6 +285,7 @@ func (n *Engine) Compile(code string) ([]*yakvm.Code, error) {
 	}
 	return compiler.GetOpcodes(), err
 }
+
 func (n *Engine) MustCompile(code string) []*yakvm.Code {
 	compiler, err := n._compile(code)
 	if err != nil {
@@ -282,6 +293,7 @@ func (n *Engine) MustCompile(code string) []*yakvm.Code {
 	}
 	return compiler.GetOpcodes()
 }
+
 func (n *Engine) _compile(code string) (*yakast.YakCompiler, error) {
 	compiler := yakast.NewYakCompilerWithSymbolTable(n.rootSymbol)
 	compiler.SetStrictMode(n.strictMode)
@@ -298,6 +310,7 @@ func (n *Engine) _compile(code string) (*yakast.YakCompiler, error) {
 	}
 	return compiler, nil
 }
+
 func (n *Engine) EnableDebug() {
 	n.debug = true
 }
@@ -346,11 +359,12 @@ func (n *Engine) EvalWithInline(ctx context.Context, code string, inline bool) e
 	}
 	return nil
 }
+
 func (n *Engine) SafeEval(ctx context.Context, code string) (err error) {
 	defer func() {
 		if e := recover(); e != nil {
 			err = utils.Error(fmt.Sprint(e))
-			//log.Error(err)
+			// log.Error(err)
 		}
 	}()
 	err = n.Eval(ctx, code)
@@ -420,6 +434,7 @@ func (n *Engine) ExecuteAsExpression(expr string, dependencies map[string]interf
 	}
 	return val.Value, nil
 }
+
 func (n *Engine) SetExternalVarGetter(f func(name string) (any, bool)) {
 	n.vm.GetExternalVar = f
 }

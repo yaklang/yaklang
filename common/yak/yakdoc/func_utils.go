@@ -156,9 +156,9 @@ func handleResults(funcRefType reflect.Type, buf []byte, typ *ast.FuncType) (res
 
 func customHandleParamsAndResults(libName string, overideName string, params []*Field, results []*Field) ([]*Field, []*Field) {
 	// eval时丢掉第一个参数，因为第一个参数是context，是在执行时自动注入的
-	if libName == "__GLOBAL__" && overideName == "eval" {
-		params = params[1:]
-	}
+	// if libName == "__GLOBAL__" && overideName == "eval" {
+	// 	params = params[1:]
+	// }
 	return params, results
 }
 

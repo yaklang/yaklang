@@ -28,6 +28,7 @@ func (f *Function) GetActualName() string {
 	}
 	return f.name
 }
+
 func (f *Function) GetNumIn() int {
 	return len(f.paramSymbols)
 }
@@ -35,33 +36,43 @@ func (f *Function) GetNumIn() int {
 func (f *Function) GetUUID() string {
 	return f.uuid
 }
+
 func (f *Function) GetBindName() string {
 	return f.anonymousFunctionBindName
 }
+
 func (f *Function) GetCodes() []*Code {
 	return f.codes
 }
+
 func (f *Function) SetParamSymbols(i []int) {
 	f.paramSymbols = i
 }
+
 func (f *Function) SetName(name string) {
 	f.name = name
 }
+
 func (f *Function) SetSymbol(id int) {
 	f.id = id
 }
+
 func (f *Function) SetSourceCode(s string) {
 	f.sourceCode = s
 }
+
 func (f *Function) GetSymbolId() int {
 	return f.id
 }
+
 func (f *Function) GetName() string {
 	return f.name
 }
+
 func (f *Function) IsVariableParameter() bool {
 	return f.isVariableParameter
 }
+
 func (f *Function) SetIsVariableParameter(v bool) {
 	f.isVariableParameter = v
 }
@@ -112,12 +123,11 @@ func YakVMValuesToFunctionMap(f *Function, vs []*Value, argumentCheck bool) map[
 		stableArgumentsNumber = len(f.paramSymbols)
 		if argumentCheck {
 			if len(f.paramSymbols) != len(vs) {
-
 				panic(fmt.Sprintf("function %v params number not match, expect %v, got %v", funcName, len(f.paramSymbols), len(vs)))
 			}
 		}
 	}
-	//newVm := vm.CreateSubVirtualMachine(f.codes, f.symbolTable)
+	// newVm := vm.CreateSubVirtualMachine(f.codes, f.symbolTable)
 	params := make(map[int]*Value)
 	if argumentCheck {
 		if stableArgumentsNumber > len(vs) {
@@ -133,8 +143,8 @@ func YakVMValuesToFunctionMap(f *Function, vs []*Value, argumentCheck bool) map[
 		}
 	}
 	vs = otherVs
-	var i = 0
-	var t = 0
+	i := 0
+	t := 0
 	for ; t < stableArgumentsNumber; t++ {
 		if t >= len(f.paramSymbols) {
 			break
@@ -200,7 +210,7 @@ func LuaVMValuesToFunctionMap(f *Function, vs []*Value) map[int]*Value {
 			}
 		}
 	}
-	//newVm := vm.CreateSubVirtualMachine(f.codes, f.symbolTable)
+	// newVm := vm.CreateSubVirtualMachine(f.codes, f.symbolTable)
 	params := make(map[int]*Value)
 	if stableArgumentsNumber > len(vs) {
 		log.Warn(fmt.Sprintf("runtime error: function %s need at least %d params, got %d params", funcName, stableArgumentsNumber, len(vs)))
@@ -208,12 +218,12 @@ func LuaVMValuesToFunctionMap(f *Function, vs []*Value) map[int]*Value {
 			vs = append(vs, undefined)
 		}
 	}
-	var i = 0
+	i := 0
 	for ; i < stableArgumentsNumber; i++ {
 		symbolId := f.paramSymbols[i]
 		valueIns := vs[i]
 		params[symbolId] = valueIns
-		//newVm.CurrentScope().NewValueByID(symbolId, valueIns)
+		// newVm.CurrentScope().NewValueByID(symbolId, valueIns)
 	}
 
 	if f.IsVariableParameter() {
