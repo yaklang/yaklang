@@ -100,11 +100,11 @@ func (i *Value) ShowWithSource() { fmt.Println(i.StringWithSource()) }
 
 func (v *Value) Compare(other *Value) bool { return ValueCompare(v, other) }
 
-func (v *Value) GetType() ssa.Type {
+func (v *Value) GetType() *Type {
 	if n, ok := v.node.(ssa.TypedNode); ok {
-		return n.GetType()
+		return newType(n.GetType())
 	}
-	return ssa.BasicTypes[ssa.Any]
+	return Any
 }
 
 func (i *Value) HasOperands() bool {
