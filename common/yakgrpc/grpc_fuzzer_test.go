@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"net/http"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -935,17 +936,43 @@ func TestGRPCMUSTPASS_SyncFuzzTag(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, expectPayload := range test.expect {
-			rsp, err := recv.Recv()
-			if err != nil {
-				t.Fatal(err)
+		sortStringSlice := func(d []string) {
+			sort.Slice(d, func(i, j int) bool {
+				return d[i] < d[j]
+			})
+		}
+		if len(test.params) != 0 { // params 变量的渲染结果不是幂等的
+			expect := []string{}
+			for _, v := range test.expect {
+				sortStringSlice(v)
+				expect = append(expect, strings.Join(v, ""))
 			}
-			if len(rsp.Payloads) != len(expectPayload) {
-				t.Fatalf("expect length %v, got %v", len(test.expect), len(rsp.Payloads))
+			sortStringSlice(expect)
+			expectStr := strings.Join(expect, "")
+			payloads := []string{}
+			for i := 0; i < len(test.expect); i++ {
+				rsp, err := recv.Recv()
+				if err != nil {
+					t.Fatal(err)
+				}
+				sortStringSlice(rsp.Payloads)
+				payloads = append(payloads, strings.Join(rsp.Payloads, ""))
 			}
-			for i, payload := range expectPayload {
-				if rsp.Payloads[i] != payload {
-					t.Fatalf("expect %v, got %v", payload, rsp.Payloads[i])
+			sortStringSlice(payloads)
+			assert.Equal(t, expectStr, strings.Join(payloads, ""))
+		} else {
+			for _, expectPayload := range test.expect {
+				rsp, err := recv.Recv()
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(rsp.Payloads) != len(expectPayload) {
+					t.Fatalf("expect length %v, got %v", len(test.expect), len(rsp.Payloads))
+				}
+				for i, payload := range expectPayload {
+					if rsp.Payloads[i] != payload {
+						t.Fatalf("expect %v, got %v", payload, rsp.Payloads[i])
+					}
 				}
 			}
 		}
