@@ -213,7 +213,7 @@ func (cs *http2ClientStream) doRequest() error {
 	isHttps := httpctx.GetRequestHTTPS(cs.req)
 	schema := "https"
 	if !isHttps {
-		schema = "https"
+		schema = "http"
 	}
 
 	if connectedPort := httpctx.GetContextIntInfoFromRequest(cs.req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort); connectedPort > 0 {
@@ -270,8 +270,40 @@ func (cs *http2ClientStream) doRequest() error {
 		hPackEnc.WriteField(h)
 	}
 
+	h2HeaderWriter := func(frame *http2.Framer, streamID uint32, endStream bool, maxFrameSize uint32, hdrs []byte) error {
+		first := true // first frame written (HEADERS is first, then CONTINUATION)
+		for len(hdrs) > 0 {
+			chunk := hdrs
+			if len(chunk) > int(maxFrameSize) {
+				chunk = chunk[:maxFrameSize]
+			}
+			hdrs = hdrs[len(chunk):]
+			endHeaders := len(hdrs) == 0
+			if first {
+				endStream = endStream && endHeaders
+				err := frame.WriteHeaders(http2.HeadersFrameParam{
+					StreamID:      streamID,
+					BlockFragment: chunk,
+					EndStream:     endStream,
+					EndHeaders:    endHeaders,
+				})
+				first = false
+				if err != nil {
+					return err
+				}
+			} else {
+				err := frame.WriteContinuation(streamID, endHeaders, chunk)
+				if err != nil {
+					return err
+				}
+			}
+		}
+		cs.sentEndStream = endStream
+		return nil
+	}
+
 	endRequestStream := len(body) <= 0
-	err := h2FramerWriteHeaders(cs.h2Conn.fr, cs.ID, endRequestStream, cs.h2Conn.maxFrameSize, hPackBuf.Bytes())
+	err := h2HeaderWriter(cs.h2Conn.fr, cs.ID, endRequestStream, cs.h2Conn.maxFrameSize, hPackBuf.Bytes())
 	if err != nil {
 		return utils.Errorf("yak.h2 framer write headers failed: %s", err)
 	}
@@ -286,6 +318,13 @@ func (cs *http2ClientStream) doRequest() error {
 			cs.h2Conn.connWindowControl.decreaseWindowSize(int64(dataLen))
 
 			dataFrameErr := fr.WriteData(cs.ID, index == len(chunks)-1, dataFrameBytes)
+			if dataFrameErr != nil {
+				return utils.Wrapf(dataFrameErr, "framer WriteData for stream{%v} failed", cs.ID)
+			}
+		}
+	} else {
+		if !cs.sentEndStream {
+			dataFrameErr := fr.WriteData(cs.ID, true, nil)
 			if dataFrameErr != nil {
 				return utils.Wrapf(dataFrameErr, "framer WriteData for stream{%v} failed", cs.ID)
 			}
