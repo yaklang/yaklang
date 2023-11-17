@@ -71,7 +71,7 @@ func (t *tcpConnection) ReadFast(f ...float64) ([]byte, error) {
 	}
 	data, err := utils.ReadUntilStableEx(t, false, t.Conn, timeout, 300*time.Millisecond)
 	if err != nil && err != io.EOF {
-		return nil, err
+		return data, err
 	}
 	return data, nil
 }
@@ -80,7 +80,7 @@ func (t *tcpConnection) ReadFastUntilByte(f byte) ([]byte, error) {
 	timeout := t.GetTimeout()
 	data, err := utils.ReadUntilStableEx(t, false, t.Conn, timeout, 300*time.Millisecond, f)
 	if err != nil && err != io.EOF {
-		return nil, err
+		return data, err
 	}
 	return data, nil
 }

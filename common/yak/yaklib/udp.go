@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net"
 	"reflect"
@@ -19,9 +18,10 @@ import (
 	"github.com/yaklang/yaklang/common/utils/regen"
 )
 
-type udpConn struct {
+type udpConnection struct {
 	*net.UDPConn
 
+	remoteAddr     net.Addr
 	timeoutSeconds time.Duration
 }
 
@@ -49,8 +49,8 @@ func clientTimeout(target float64) udpClientOption {
 	}
 }
 
-func connectUdp(target string, portRaw any, opts ...udpClientOption) (*udpConn, error) {
-	config := &udpClientConfig{timeoutSeconds: 10 * time.Second}
+func connectUdp(target string, portRaw any, opts ...udpClientOption) (*udpConnection, error) {
+	config := &udpClientConfig{timeoutSeconds: 5 * time.Second}
 	for _, opt := range opts {
 		opt(config)
 	}
@@ -87,58 +87,72 @@ func connectUdp(target string, portRaw any, opts ...udpClientOption) (*udpConn, 
 		return nil, utils.Errorf("BUG: not a net.UDPConn instead of %v", reflect.TypeOf(conn))
 	}
 
-	return &udpConn{UDPConn: uc, timeoutSeconds: config.timeoutSeconds}, nil
+	return &udpConnection{UDPConn: uc, timeoutSeconds: config.timeoutSeconds, remoteAddr: remoteAddr}, nil
 }
 
-func (t *udpConn) SetTimeout(seconds float64) {
+func (t *udpConnection) SetTimeout(seconds float64) {
 	t.timeoutSeconds = utils.FloatSecondDuration(seconds)
 }
 
-func (t *udpConn) GetTimeout() time.Duration {
+func (t *udpConnection) GetTimeout() time.Duration {
 	if t.timeoutSeconds <= 0 {
-		t.timeoutSeconds = 10 * time.Second
-		return 10 * time.Second
+		t.timeoutSeconds = 5 * time.Second
+		return 5 * time.Second
 	}
 	return t.timeoutSeconds
 }
 
-func (t *udpConn) Recv() ([]byte, error) {
-	results, err := utils.ReadConnWithTimeout(t, t.GetTimeout())
-	if err != nil {
-		return nil, err
+func (t *udpConnection) Recv() ([]byte, error) {
+	t.SetReadDeadline(time.Now().Add(t.GetTimeout()))
+	raw, err := io.ReadAll(t)
+	t.SetReadDeadline(time.Time{})
+	if len(raw) > 0 {
+		return raw, nil
 	}
-	return results, nil
+	return raw, err
+	//results, err := utils.(t, t.GetTimeout())
+	//if err != nil {
+	//	return results, err
+	//}
+	//return results, nil
 }
 
-func (r *udpConn) RecvLen(i int64) ([]byte, error) {
-	return ioutil.ReadAll(io.LimitReader(r, i))
+func (r *udpConnection) RecvLen(i int64) ([]byte, error) {
+	return io.ReadAll(io.LimitReader(r, i))
 }
 
-func (t *udpConn) RecvString() (string, error) {
+func (t *udpConnection) RecvString() (string, error) {
 	raw, err := t.Recv()
 	if err != nil {
-		return "", err
+		return string(raw), err
 	}
 	return string(raw), nil
 }
 
-func (t *udpConn) RecvTimeout(seconds float64) ([]byte, error) {
-	results, err := utils.ReadConnWithTimeout(t, time.Duration(float64(time.Second)*seconds))
-	if err != nil {
-		return nil, err
+func (t *udpConnection) RecvTimeout(seconds float64) ([]byte, error) {
+	t.SetReadDeadline(time.Now().Add(utils.FloatSecondDuration(seconds)))
+	raw, err := io.ReadAll(t)
+	t.SetReadDeadline(time.Time{})
+	if len(raw) > 0 {
+		return raw, nil
 	}
-	return results, nil
+	return raw, err
+	//results, err := utils.ReadConnWithTimeout(t, time.Duration(float64(time.Second)*seconds))
+	//if err != nil {
+	//	return results, err
+	//}
+	//return results, nil
 }
 
-func (t *udpConn) RecvStringTimeout(seconds float64) (string, error) {
+func (t *udpConnection) RecvStringTimeout(seconds float64) (string, error) {
 	raw, err := t.RecvTimeout(seconds)
 	if err != nil {
-		return "", err
+		return string(raw), err
 	}
 	return string(raw), err
 }
 
-func (t *udpConn) SendTo(i interface{}, target string) error {
+func (t *udpConnection) SendTo(i interface{}, target string) error {
 	host, port, err := utils.ParseStringToHostPort(target)
 	if err != nil {
 		return err
@@ -166,25 +180,36 @@ func (t *udpConn) SendTo(i interface{}, target string) error {
 	return err
 }
 
-func (t *udpConn) Send(i interface{}) error {
+func (t *udpConnection) Send(i interface{}) error {
 	var err error
+
+	if t.UDPConn.RemoteAddr() != nil {
+		_, err := t.Write(utils.InterfaceToBytes(i))
+		return err
+	}
+
+	var n int
 	switch ret := i.(type) {
 	case []byte:
-		_, err = t.Write(ret)
+		n, err = t.WriteTo(ret, t.remoteAddr)
 	case string:
-		_, err = t.Write([]byte(ret))
+		n, err = t.WriteTo([]byte(ret), t.remoteAddr)
 	default:
 		return utils.Errorf("error param type:[%v] value:[%#v], need string/[]byte", reflect.TypeOf(i), i)
 	}
+	_ = n
 	return err
 }
 
-func (t *udpConn) ReadFromAddr() ([]byte, net.Addr, error) {
+func (t *udpConnection) ReadFromAddr() ([]byte, net.Addr, error) {
 	var raw []byte
 	buf := make([]byte, 4096)
 	for {
 		t.UDPConn.SetDeadline(time.Now().Add(t.timeoutSeconds))
 		n, addr, err := t.UDPConn.ReadFromUDP(buf)
+		if addr != nil && t.remoteAddr == nil {
+			t.remoteAddr = addr
+		}
 		raw = append(raw, buf[:n]...)
 		if n < len(buf) {
 			return raw, addr, err
@@ -192,13 +217,13 @@ func (t *udpConn) ReadFromAddr() ([]byte, net.Addr, error) {
 	}
 }
 
-func (t *udpConn) ReadStringFromAddr() (string, net.Addr, error) {
+func (t *udpConnection) ReadStringFromAddr() (string, net.Addr, error) {
 	raw, addr, err := t.ReadFromAddr()
 	return string(raw), addr, err
 }
 
 type udpServerConfig struct {
-	callback func(conn *udpConn, msg []byte, addr net.Addr)
+	callback func(conn *udpConnection, msg []byte)
 	ctx      context.Context
 	timeout  time.Duration
 }
@@ -206,7 +231,7 @@ type udpServerConfig struct {
 type udpServerOpt func(config *udpServerConfig)
 
 func udpServe(host string, port interface{}, opts ...udpServerOpt) error {
-	config := &udpServerConfig{timeout: 10 * time.Second}
+	config := &udpServerConfig{timeout: 5 * time.Second}
 	for _, opt := range opts {
 		opt(config)
 	}
@@ -226,13 +251,26 @@ func udpServe(host string, port interface{}, opts ...udpServerOpt) error {
 		return err
 	}
 	defer conn.Close()
-	log.Infof("finished listening on udp://%v", udpAddr)
 
-	wConn := &udpConn{
+	var done = utils.NewBool(false)
+	//log.Infof("finished listening on udp://%v", udpAddr)
+	go func() {
+		select {
+		case <-config.ctx.Done():
+			done.Set()
+			conn.Close()
+		}
+	}()
+
+	wConn := &udpConnection{
 		UDPConn:        conn,
 		timeoutSeconds: config.timeout,
 	}
 	for {
+
+		if done.IsSet() {
+			return config.ctx.Err()
+		}
 		//select {
 		//case <-config.ctx.Done():
 		//	return config.ctx.Err()
@@ -243,14 +281,18 @@ func udpServe(host string, port interface{}, opts ...udpServerOpt) error {
 		if err != nil && raw == nil {
 			continue
 		}
-		log.Infof("recv: %#v from: %v", raw, addr.String())
+		//log.Infof("recv: %#v from: %v", raw, addr.String())
 		go func() {
 			if config.callback == nil {
-				config.callback = func(conn *udpConn, msg []byte, addr net.Addr) {
-					log.Infof("udp://%v send %v local: %v", addr.String(), strconv.Quote(string(msg)), utils.HostPort(host, port))
+				config.callback = func(conn *udpConnection, msg []byte) {
+					log.Infof("udp://%v send %v local: %v", conn.remoteAddr.String(), strconv.Quote(string(msg)), utils.HostPort(host, port))
 				}
 			}
-			config.callback(wConn, raw, addr)
+			config.callback(&udpConnection{
+				UDPConn:        conn,
+				remoteAddr:     addr,
+				timeoutSeconds: 5 * time.Second,
+			}, raw)
 		}()
 	}
 }
@@ -272,7 +314,7 @@ var UDPExport = map[string]interface{}{
 			config.ctx = ctx
 		}
 	},
-	"serverCallback": func(cb func(*udpConn, []byte, net.Addr)) udpServerOpt {
+	"serverCallback": func(cb func(*udpConnection, []byte)) udpServerOpt {
 		return func(config *udpServerConfig) {
 			config.callback = cb
 		}
