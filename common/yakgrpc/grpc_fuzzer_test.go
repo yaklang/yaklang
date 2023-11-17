@@ -868,39 +868,39 @@ func TestGRPCMUSTPASS_SyncFuzzTag(t *testing.T) {
 		params    map[string]string
 		syncIndex bool
 	}{
-		//{ // 同步
-		//	tag: "{{array(1|2|3)}}{{array(1|2|3)}}",
-		//	expect: [][]string{
-		//		{
-		//			"1", "1",
-		//		},
-		//		{
-		//			"2", "2",
-		//		},
-		//		{
-		//			"3", "3",
-		//		},
-		//	},
-		//	syncIndex: true,
-		//},
-		//{ // 笛卡尔
-		//	tag: "{{array(1|2)}}{{array(1|2)}}",
-		//	expect: [][]string{
-		//		{
-		//			"1", "1",
-		//		},
-		//		{
-		//			"2", "1",
-		//		},
-		//		{
-		//			"1", "2",
-		//		},
-		//		{
-		//			"2", "2",
-		//		},
-		//	},
-		//	syncIndex: false,
-		//},
+		{ // 同步
+			tag: "{{array(1|2|3)}}{{array(1|2|3)}}",
+			expect: [][]string{
+				{
+					"1", "1",
+				},
+				{
+					"2", "2",
+				},
+				{
+					"3", "3",
+				},
+			},
+			syncIndex: true,
+		},
+		{ // 笛卡尔
+			tag: "{{array(1|2)}}{{array(1|2)}}",
+			expect: [][]string{
+				{
+					"1", "1",
+				},
+				{
+					"2", "1",
+				},
+				{
+					"1", "2",
+				},
+				{
+					"2", "2",
+				},
+			},
+			syncIndex: false,
+		},
 		{ // 设置变量
 			tag: "{{p(a)}}{{p(b)}}",
 			params: map[string]string{
