@@ -378,7 +378,7 @@ func (pc *persistConn) h2Conn() {
 		fr:                http2.NewFramer(pc.Conn, bufio.NewReader(pc.Conn)),
 	}
 
-	newH2Conn.idleTimer = time.AfterFunc(pc.p.idleConnTimeout, func() {
+	newH2Conn.idleTimer = time.AfterFunc(newH2Conn.idleTimeout, func() {
 		newH2Conn.closed = true
 	})
 	pc.alt = newH2Conn

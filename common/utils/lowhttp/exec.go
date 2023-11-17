@@ -523,12 +523,6 @@ RECONNECT:
 	traceInfo.DNSTime = dnsEnd.Sub(dnsStart) // safe
 	response.Https = https
 
-	if https {
-		if conn.(*tls.Conn).ConnectionState().NegotiatedProtocol != H2 { //降级
-			enableHttp2 = false
-		}
-	}
-
 	// checking old proxy
 	oldVersionProxyChecking := false
 	var tryOldVersionProxy []string
@@ -576,6 +570,12 @@ RECONNECT:
 		httpctx.SetRemoteAddr(option.NativeHTTPRequestInstance, response.RemoteAddr)
 	}
 	response.PortIsOpen = true
+
+	if enableHttp2 {
+		if conn.(*persistConn).cacheKey.scheme != H2 {
+			enableHttp2 = false
+		}
+	}
 
 	if enableHttp2 {
 		//ddl, cancel := context.WithTimeout(context.Background(), timeout)
