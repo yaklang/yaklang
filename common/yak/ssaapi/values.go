@@ -78,6 +78,10 @@ type Value struct {
 	operands Values
 }
 
+func ValueCompare(v1, v2 *Value) bool {
+	return v1.node == v2.node
+}
+
 func NewValue(n ssa.InstructionNode) *Value {
 	return &Value{
 		node: n,
@@ -94,7 +98,14 @@ func (i *Value) StringWithSource() string {
 func (i *Value) Show()           { fmt.Println(i) }
 func (i *Value) ShowWithSource() { fmt.Println(i.StringWithSource()) }
 
-func (v *Value) IsSame(other *Value) bool { return v.node == other.node }
+func (v *Value) Compare(other *Value) bool { return ValueCompare(v, other) }
+
+func (v *Value) GetType() ssa.Type {
+	if n, ok := v.node.(ssa.TypedNode); ok {
+		return n.GetType()
+	}
+	return ssa.BasicTypes[ssa.Any]
+}
 
 func (i *Value) HasOperands() bool {
 	return i.node.HasValues()
