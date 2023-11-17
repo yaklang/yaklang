@@ -64,8 +64,8 @@ func _withCancel(parent context.Context) (context.Context, context.CancelFunc) {
 // ctx, cancel := context.WithTimeout(context.Background(), dur)
 // defer cancel()
 // ```
-func _withTimeout(parent context.Context, d float64) (context.Context, context.CancelFunc) {
-	return context.WithTimeout(parent, utils.FloatSecondDuration(d))
+func _withTimeout(parent context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(parent, timeout)
 }
 
 // WithDeadline 返回继承自 parent 的 Context 接口（即上下文接口）和取消函数
