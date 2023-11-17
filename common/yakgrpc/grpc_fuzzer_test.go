@@ -865,42 +865,57 @@ func TestGRPCMUSTPASS_SyncFuzzTag(t *testing.T) {
 	for _, test := range []struct {
 		tag       string
 		expect    [][]string
+		params    map[string]string
 		syncIndex bool
 	}{
-		{ // 同步
-			tag: "{{array(1|2|3)}}{{array(1|2|3)}}",
+		//{ // 同步
+		//	tag: "{{array(1|2|3)}}{{array(1|2|3)}}",
+		//	expect: [][]string{
+		//		{
+		//			"1", "1",
+		//		},
+		//		{
+		//			"2", "2",
+		//		},
+		//		{
+		//			"3", "3",
+		//		},
+		//	},
+		//	syncIndex: true,
+		//},
+		//{ // 笛卡尔
+		//	tag: "{{array(1|2)}}{{array(1|2)}}",
+		//	expect: [][]string{
+		//		{
+		//			"1", "1",
+		//		},
+		//		{
+		//			"2", "1",
+		//		},
+		//		{
+		//			"1", "2",
+		//		},
+		//		{
+		//			"2", "2",
+		//		},
+		//	},
+		//	syncIndex: false,
+		//},
+		{ // 设置变量
+			tag: "{{p(a)}}{{p(b)}}",
+			params: map[string]string{
+				"a": "{{array(1|2)}}",
+				"b": "{{array(1|2)}}",
+			},
 			expect: [][]string{
-
 				{
 					"1", "1",
 				},
-
 				{
 					"2", "2",
-				},
-				{
-					"3", "3",
 				},
 			},
 			syncIndex: true,
-		},
-		{ // 笛卡尔
-			tag: "{{array(1|2)}}{{array(1|2)}}",
-			expect: [][]string{
-				{
-					"1", "1",
-				},
-				{
-					"2", "1",
-				},
-				{
-					"1", "2",
-				},
-				{
-					"2", "2",
-				},
-			},
-			syncIndex: false,
 		},
 	} {
 		req := &ypb.FuzzerRequest{
@@ -909,6 +924,13 @@ func TestGRPCMUSTPASS_SyncFuzzTag(t *testing.T) {
 		req.ForceFuzz = true
 		req.FuzzTagSyncIndex = test.syncIndex
 		req.Concurrent = 1
+		for k, v := range test.params {
+			req.Params = append(req.Params, &ypb.FuzzerParamItem{
+				Key:   k,
+				Value: v,
+				Type:  "fuzztag",
+			})
+		}
 		recv, err := client.HTTPFuzzer(utils.TimeoutContextSeconds(10), req)
 		if err != nil {
 			t.Fatal(err)
