@@ -764,7 +764,6 @@ func TestGRPCMUSTPASS_FuzzTag(t *testing.T) {
 		expect    []string
 		fuzzMode  string
 		forceMode bool
-		syncMode  bool
 	}{
 		{ // 验证force
 			tag: "{{base64({{url(yak)}})}}",
@@ -839,6 +838,9 @@ func TestGRPCMUSTPASS_FuzzTag(t *testing.T) {
 		req.ForceFuzz = test.forceMode
 		req.FuzzTagMode = test.fuzzMode
 		recv, err := client.HTTPFuzzer(utils.TimeoutContextSeconds(10), req)
+		if err != nil {
+			t.Fatal(err)
+		}
 		rsp, err := recv.Recv()
 		if err != nil {
 			t.Fatal(err)
@@ -849,5 +851,82 @@ func TestGRPCMUSTPASS_FuzzTag(t *testing.T) {
 		for i, payload := range test.expect {
 			assert.Equal(t, rsp.Payloads[i], payload)
 		}
+	}
+}
+func TestGRPCMUSTPASS_SyncFuzzTag(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(""))
+	})
+	target := utils.HostPort(host, port)
+	for _, test := range []struct {
+		tag       string
+		expect    [][]string
+		syncIndex bool
+	}{
+		{ // 同步
+			tag: "{{array(1|2|3)}}{{array(1|2|3)}}",
+			expect: [][]string{
+
+				{
+					"1", "1",
+				},
+
+				{
+					"2", "2",
+				},
+				{
+					"3", "3",
+				},
+			},
+			syncIndex: true,
+		},
+		{ // 笛卡尔
+			tag: "{{array(1|2)}}{{array(1|2)}}",
+			expect: [][]string{
+				{
+					"1", "1",
+				},
+				{
+					"2", "1",
+				},
+				{
+					"1", "2",
+				},
+				{
+					"2", "2",
+				},
+			},
+			syncIndex: false,
+		},
+	} {
+		req := &ypb.FuzzerRequest{
+			Request: "GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n" + test.tag,
+		}
+		req.ForceFuzz = true
+		req.FuzzTagSyncIndex = test.syncIndex
+		req.Concurrent = 1
+		recv, err := client.HTTPFuzzer(utils.TimeoutContextSeconds(10), req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, expectPayload := range test.expect {
+			rsp, err := recv.Recv()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(rsp.Payloads) != len(expectPayload) {
+				t.Fatalf("expect length %v, got %v", len(test.expect), len(rsp.Payloads))
+			}
+			for i, payload := range expectPayload {
+				if rsp.Payloads[i] != payload {
+					t.Fatalf("expect %v, got %v", payload, rsp.Payloads[i])
+				}
+			}
+		}
+
 	}
 }

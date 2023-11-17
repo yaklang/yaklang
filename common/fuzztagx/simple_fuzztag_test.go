@@ -107,7 +107,7 @@ func TestSimpleFuzzTag_Exec(t *testing.T) {
 					return []*parser.FuzzResult{parser.NewFuzzResultWithData(s + "2")}, nil
 				},
 			},
-		}, true)
+		}, true, false)
 		if err != nil {
 			t.Fatal(err)
 		}
