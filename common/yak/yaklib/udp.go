@@ -204,6 +204,9 @@ func (t *udpConnection) Send(i interface{}) error {
 func (t *udpConnection) ReadFromAddr() ([]byte, net.Addr, error) {
 	var raw []byte
 	buf := make([]byte, 4096)
+	defer func() {
+		t.SetReadDeadline(time.Time{})
+	}()
 	for {
 		t.UDPConn.SetDeadline(time.Now().Add(t.timeoutSeconds))
 		n, addr, err := t.UDPConn.ReadFromUDP(buf)
