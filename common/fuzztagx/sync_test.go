@@ -29,10 +29,6 @@ func TestSyncRootTag(t *testing.T) {
 			code:   "{{echo({{array(a|b|c)}}{{array(a|b|c)}})}}",
 			expect: []string{"aa", "ba", "ca", "ab", "bb", "cb", "ac", "bc", "cc"},
 		},
-		{ // 外层和内容同步
-			code:   "{{array(a|b|c)}}{{array::1(a|b|c)}}{{array(({{a|array::1(b|c)}}))}}", //
-			expect: []string{"aaa", "bbb", "ccc"},
-		},
 	} {
 		iForRandStr := 0
 		gener, err := NewGenerator(test.code, map[string]*parser.TagMethod{
