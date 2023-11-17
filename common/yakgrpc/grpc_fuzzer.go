@@ -426,7 +426,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 							}
 						}
 					}
-					for mergedParams := range s.PreRenderVariables(stream.Context(), req.GetParams(), req.GetIsHTTPS(), req.GetIsGmTLS()) {
+					for mergedParams := range s.PreRenderVariables(stream.Context(), req.GetParams(), req.GetIsHTTPS(), req.GetIsGmTLS(), false) {
 						existedParams := make(map[string]string) // 传入的参数
 						if mergedParams != nil {
 							for k, v := range utils.InterfaceToMap(mergedParams) {
@@ -692,8 +692,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 
 		fuzzMode := req.GetFuzzTagMode() // ""/"close"/"stander"/"simple"
 		forceFuzz := req.GetForceFuzz()  // true/false
-		//syncRender := req.GetFuzzTagSyncIndex()
-		if fuzzMode == "" { // 以forceFuzz为准
+		if fuzzMode == "" {              // 以forceFuzz为准
 			if forceFuzz {
 				fuzzMode = "stander"
 			} else {
@@ -715,6 +714,9 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ForceFuzz(true))
 			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ForceFuzzfile(true))
 			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ExtraFuzzOptions(mutate.Fuzz_WithSimple(true)))
+		}
+		if req.GetFuzzTagSyncIndex() {
+			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ExtraFuzzOptions(mutate.Fuzz_SyncTag(true)))
 		}
 		res, err := mutate.ExecPool(
 			iInput,
@@ -1077,7 +1079,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 	*/
 	wg := new(sync.WaitGroup)
 	var mergedErr = make(chan error)
-	for _param := range s.PreRenderVariables(stream.Context(), req.GetParams(), req.GetIsHTTPS(), req.GetIsGmTLS()) {
+	for _param := range s.PreRenderVariables(stream.Context(), req.GetParams(), req.GetIsHTTPS(), req.GetIsGmTLS(), req.GetFuzzTagSyncIndex()) {
 		mergedParams := _param
 		wg.Add(1)
 		go func() {
@@ -1498,7 +1500,7 @@ func (s *Server) RenderVariablesWithTypedKV(ctx context.Context, kvs []*ypb.Fuzz
 	return vars.ToMap()
 }
 
-func (s *Server) PreRenderVariables(ctx context.Context, params []*ypb.FuzzerParamItem, https, gmtls bool) chan map[string]any {
+func (s *Server) PreRenderVariables(ctx context.Context, params []*ypb.FuzzerParamItem, https, gmtls, syncTagIndex bool) chan map[string]any {
 	var resultsChan = make(chan map[string]any, 100)
 	if len(params) <= 0 {
 		resultsChan <- make(map[string]any)
@@ -1516,7 +1518,11 @@ func (s *Server) PreRenderVariables(ctx context.Context, params []*ypb.FuzzerPar
 		idToParam[index] = p
 
 		if typ == "fuzztag" {
-			rets, _ := mutate.FuzzTagExec(value, mutate.FuzzFileOptions()...)
+			opts := mutate.FuzzFileOptions()
+			if syncTagIndex {
+				opts = append(opts, mutate.Fuzz_SyncTag(true))
+			}
+			rets, _ := mutate.FuzzTagExec(value, opts...)
 			if len(rets) > 0 {
 				l[index] = rets
 				continue
