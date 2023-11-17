@@ -7,6 +7,7 @@ import (
 	"go/ast"
 	"go/token"
 	"reflect"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -18,9 +19,17 @@ import (
 	"github.com/yaklang/yaklang/common/yakdocument"
 )
 
+var globalBanner = "__GLOBAL__"
+
 type EmbedFieldTypeAndMethod struct {
 	FieldType reflect.Type
 	Method    reflect.Method
+}
+
+type InstanceMethodHandler struct {
+	f          any
+	libName    string
+	methodName string
 }
 
 func ClearHelper(helper *yakdoc.DocumentHelper) {
@@ -42,6 +51,23 @@ func ClearHelper(helper *yakdoc.DocumentHelper) {
 		clearFieldParamsType(lib.Functions)
 	}
 	clearFieldParamsType(helper.Functions)
+}
+
+// func getTypeName(expr ast.Expr) string {
+// 	switch t := expr.(type) {
+// 	case *ast.Ident:
+// 		return t.Name
+// 	case *ast.StarExpr:
+// 		return getTypeName(t.X)
+// 	case *ast.SelectorExpr:
+// 		return getTypeName(t.X) + "." + t.Sel.Name
+// 	default:
+// 		return fmt.Sprintf("%T", t)
+// 	}
+// }
+
+func IsSameTypeName(typName1, typName2 string) bool {
+	return typName1 == typName2 || "*"+typName1 == typName2 || typName1 == "*"+typName2
 }
 
 func GetInterfaceDocumentFromAST(pkg *ast.Package, interfaceName string) map[string]string {
@@ -79,6 +105,52 @@ func GetInterfaceDocumentFromAST(pkg *ast.Package, interfaceName string) map[str
 	return nil
 }
 
+func GetMethodFuncDeclFromAST(pkg *ast.Package, libName, structName, methodName, yakFuncName string) *yakdoc.FuncDecl {
+	if libName == "" {
+		libName = globalBanner
+	}
+	funcDecl := &yakdoc.FuncDecl{
+		LibName:    libName,
+		MethodName: methodName,
+	}
+	for _, file := range pkg.Files {
+		for _, decl := range file.Decls {
+			decl, ok := decl.(*ast.FuncDecl)
+			if !ok || decl.Name.Name != methodName {
+				continue
+			}
+			if decl.Recv != nil && len(decl.Recv.List) > 0 {
+				receiver := decl.Recv.List[0]
+				typName := yakdoc.GetTypeName(receiver.Type)
+				if !IsSameTypeName(typName, structName) {
+					continue
+				}
+			}
+
+			var params, results []*yakdoc.Field
+
+			if decl != nil && decl.Type != nil && decl.Type.Params != nil {
+				params = yakdoc.HandleParams(nil, decl.Type)
+			}
+
+			// 获取返回值
+			if decl != nil && decl.Type != nil && decl.Type.Results != nil {
+				results = yakdoc.HandleResults(nil, decl.Type)
+			}
+
+			if decl.Doc != nil {
+				funcDecl.Document = strings.TrimSpace(decl.Doc.Text())
+			}
+			funcDecl.Decl, funcDecl.VSCodeSnippets = yakdoc.GetDeclAndCompletion(yakFuncName, params, results)
+			funcDecl.Params = params
+			funcDecl.Results = results
+			break
+		}
+	}
+	// return nil
+	return funcDecl
+}
+
 func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.DocumentHelper {
 	helper := &yakdoc.DocumentHelper{
 		Libs:          make(map[string]*yakdoc.ScriptLib),
@@ -86,6 +158,7 @@ func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.Doc
 		Instances:     make(map[string]*yakdoc.LibInstance),
 		StructMethods: make(map[string]*yakdoc.ScriptLib),
 	}
+	instanceMethodHandlers := make([]*InstanceMethodHandler, 0)
 	canAutoInjectInterface := true
 	pkgs, err := yakdoc.GetProjectAstPackages()
 	if err != nil {
@@ -118,7 +191,14 @@ func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.Doc
 				switch methodType := reflect.TypeOf(value); methodType.Kind() {
 				case reflect.Func:
 					funcDecl, err := yakdoc.FuncToFuncDecl(value, name, elementName)
-					if err != nil {
+					if errors.Is(err, yakdoc.ErrIsInstanceMethod) {
+						instanceMethodHandlers = append(instanceMethodHandlers, &InstanceMethodHandler{
+							f:          value,
+							libName:    name,
+							methodName: elementName,
+						})
+						funcDecl = &yakdoc.FuncDecl{}
+					} else if err != nil {
 						log.Warnf("failed to get func decl from %s.%s: %v", name, elementName, err)
 						funcDecl = &yakdoc.FuncDecl{}
 					}
@@ -138,12 +218,19 @@ func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.Doc
 			if itemType == nil {
 				continue
 			}
-			globalBanner := "__GLOBAL__"
+
 			switch itemType.Kind() {
 			case reflect.Func:
 				if !strings.HasPrefix(name, "$") && !strings.HasPrefix(name, "_") {
 					funcDecl, err := yakdoc.FuncToFuncDecl(item, globalBanner, name)
-					if err != nil {
+					if errors.Is(err, yakdoc.ErrIsInstanceMethod) {
+						instanceMethodHandlers = append(instanceMethodHandlers, &InstanceMethodHandler{
+							f:          item,
+							libName:    "",
+							methodName: name,
+						})
+						funcDecl = &yakdoc.FuncDecl{}
+					} else if err != nil {
 						log.Warnf("failed to get func decl from %s.%s: %v", globalBanner, name, err)
 						funcDecl = &yakdoc.FuncDecl{}
 					}
@@ -393,6 +480,40 @@ func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.Doc
 		}
 		helper.StructMethods[structName] = lib
 
+	}
+	// 实例方法
+	for _, handler := range instanceMethodHandlers {
+		refValue := reflect.ValueOf(handler.f)
+		f := runtime.FuncForPC(refValue.Pointer())
+		funcName := f.Name()
+		splitedName := strings.Split(funcName, ".")
+		pkgPath, after, found := strings.Cut(funcName, "(")
+		pkgPath = strings.TrimRight(pkgPath, ".")
+		index := strings.Index(after, ")")
+		if index == -1 {
+			continue
+		}
+		structName := strings.Trim(after[:index], "(*)")
+		funcName = strings.TrimSuffix(splitedName[len(splitedName)-1], "-fm")
+		if !found {
+			continue
+		}
+		pkg, ok := pkgs[pkgPath]
+		if !ok {
+			continue
+		}
+		funcDecl := GetMethodFuncDeclFromAST(pkg, handler.libName, structName, funcName, handler.methodName)
+		if handler.libName == "" {
+			// 全局函数
+			helper.Functions[handler.methodName] = funcDecl
+		} else {
+			lib, ok := helper.Libs[handler.libName]
+			if !ok {
+				continue
+			}
+			lib.Functions[handler.methodName] = funcDecl
+		}
+		// _ = documents
 	}
 
 	// 调用回调，注入一些其他的函数注释
