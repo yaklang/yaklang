@@ -180,6 +180,9 @@ func FixHTTPResponse(raw []byte) (rsp []byte, body []byte, _ error) {
 	var contentEncoding string
 	var contentType string
 	headers, body := SplitHTTPHeadersAndBodyFromPacket(raw, func(line string) {
+		if strings.HasPrefix(strings.ToLower(line), "content-type:") {
+			_, contentType = SplitHTTPHeader(line)
+		}
 		// 判断内容
 		line = strings.ToLower(line)
 		if strings.HasPrefix(line, "transfer-encoding:") && utils.IContains(line, "chunked") {
