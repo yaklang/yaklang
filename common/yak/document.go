@@ -53,19 +53,6 @@ func ClearHelper(helper *yakdoc.DocumentHelper) {
 	clearFieldParamsType(helper.Functions)
 }
 
-// func getTypeName(expr ast.Expr) string {
-// 	switch t := expr.(type) {
-// 	case *ast.Ident:
-// 		return t.Name
-// 	case *ast.StarExpr:
-// 		return getTypeName(t.X)
-// 	case *ast.SelectorExpr:
-// 		return getTypeName(t.X) + "." + t.Sel.Name
-// 	default:
-// 		return fmt.Sprintf("%T", t)
-// 	}
-// }
-
 func IsSameTypeName(typName1, typName2 string) bool {
 	return typName1 == typName2 || "*"+typName1 == typName2 || typName1 == "*"+typName2
 }
