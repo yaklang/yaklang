@@ -28,9 +28,12 @@ func (s *Server) hybridScanNewTask(stream ypb.Yak_HybridScanServer, firstRequest
 	}
 	swg := utils.NewSizedWaitGroup(int(concurrent))
 
+	taskId := uuid.NewV4().String()
+
 	// read targets and plugin
 	var target *ypb.HybridScanInputTarget
 	var plugin *ypb.HybridScanPluginConfig
+	log.Infof("waiting for recv input and plugin config: %v", taskId)
 	for plugin == nil || target == nil {
 		rsp, err := stream.Recv()
 		if err != nil {
@@ -50,7 +53,6 @@ func (s *Server) hybridScanNewTask(stream ypb.Yak_HybridScanServer, firstRequest
 	}
 
 	cache := list.New()
-	taskId := uuid.NewV4().String()
 
 	/*
 		统计状态
