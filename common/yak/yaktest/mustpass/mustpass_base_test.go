@@ -50,7 +50,7 @@ func init() {
 }
 
 func TestMustPassDebug(t *testing.T) {
-	var debugName = "misc.yak"
+	var debugName = "nuclei-json-format.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {
