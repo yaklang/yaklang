@@ -127,39 +127,6 @@ Content-Length: 0
 	println(strconv.Quote(string(target)))
 }
 
-func TestFixHTTPResponse(t *testing.T) {
-	rap, _, err := FixHTTPResponse([]byte(`HTTP/1.1 200 OK
-Connection: close
-Bdpagetype: 3
-Bdqid: 0x9efbfb790011d570
-Cache-Control: private
-Ckpacknum: 2
-Ckrndstr: 90011d570
-Content-Encoding: gzip
-Content-Type: text/html;charset=utf-8
-Date: Sat, 27 Nov 2021 04:20:29 GMT
-P3p: CP=" OTI DSP COR IVA OUR IND COM "
-Server: BWS/1.1
-Set-Cookie: BDRCVFR[S4-dAuiWMmn]=I67x6TjHwwYf0; path=/; domain=.baidu.com
-Set-Cookie: delPer=0; path=/; domain=.baidu.com
-Set-Cookie: BD_CK_SAM=1;path=/
-Set-Cookie: PSINO=2; domain=.baidu.com; path=/
-Set-Cookie: BDSVRTM=12; path=/
-Set-Cookie: H_PS_PSSID=34445_35104_35239_34584_34517_35245_34606_35320_26350_35209_35312_35145; path=/; domain=.baidu.com
-Strict-Transport-Security: max-age=172800
-Traceid: 1637986829039139149811456026574257771888
-Vary: Accept-Encoding
-X-Frame-Options: sameorigin
-X-Ua-Compatible: IE=Edge,chrome=1
-Content-Length: 12
-
-aaaaaaaaaaaa` + "\r\n\r\n"))
-	if err != nil {
-		return
-	}
-	println(string(rap))
-}
-
 func TestConnectExtractedUrl(t *testing.T) {
 	var testcases = []struct {
 		url    string
