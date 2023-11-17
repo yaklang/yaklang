@@ -1,0 +1,40 @@
+// @ssa-ignore
+addr, port = tcp.MockServe(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{\"aaaa\":111,\"bbb\":[\"111\", \"111\"]}")
+
+addr = str.HostPort(addr, port)
+sleep(1)
+res = nuclei.Scan("http://" + addr, nuclei.debug(true), nuclei.rawTemplate(`
+id: TEST
+
+info:
+  name: TEST
+  author: aa
+  severity: critical
+  description: TEST.
+  reference:
+    - https://www.modb.pro/db/144475
+  classification:
+    cvss-metrics: CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H
+    cvss-score: 10.0
+    cwe-id: CWE-77
+  tags: cnvd,cnvd2020,sangfor,rce
+
+requests:
+  - method: GET
+    path:
+      - "{{BaseURL}}/toohp"
+
+    matchers:
+      - type: dsl
+        dsl:
+          - 'contains(body, "\"aaaa\":111,\"bbb\"")'
+          - 'status_code == 200'
+        condition: and
+`))~
+
+var haveResult = false
+for r in res {
+    haveResult = true
+}
+
+assert haveResult, "failed indent checking"
