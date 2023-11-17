@@ -39,7 +39,7 @@ func getValuesWithUpdateSingle(v *Value) Values {
 	ret = append(ret, v)
 	// check if: a[0] = value.Name; also append a[0]
 	v.GetUsers().ForEach(func(user *Value) {
-		if user.IsUpdate() && v.IsSame(user.GetOperand(1)) {
+		if user.IsUpdate() && v.Compare(user.GetOperand(1)) {
 			ret = append(ret, getValuesWithUpdateSingle(user.GetOperand(0))...)
 		}
 	})
