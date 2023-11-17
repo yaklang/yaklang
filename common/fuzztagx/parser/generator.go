@@ -97,6 +97,10 @@ func NewTagGenerator(tag TagNode, ctx *MethodContext) *TagExecNode {
 		methodCtx: ctx,
 	}
 }
+func (f *TagExecNode) FirstExecWithBackpropagation(bp, exec, all bool) error {
+	f.FirstExec(bp, exec, all)
+	return f.backpropagation()
+}
 
 // FirstExec 重置并执行
 func (f *TagExecNode) FirstExec(bp, exec, all bool) error {
@@ -190,13 +194,14 @@ type Generator struct {
 	*GenerateConfig
 	container []*FuzzResult
 	//index     int
-	data            []ExecNode
-	first           bool
-	methodCtx       *MethodContext
-	backpropagation func() error
-	AssertError     bool
-	Error           error
-	allowedLabels   bool
+	data                   []ExecNode
+	first                  bool
+	methodCtx              *MethodContext
+	backpropagation        func() error
+	AssertError            bool
+	Error                  error
+	allowedLabels          bool
+	renderTagWithSyncIndex bool
 }
 
 func newBackpropagationGenerator(f func() error, nodes []ExecNode, cfg *GenerateConfig) *Generator {
@@ -289,6 +294,9 @@ func (g *Generator) Next() bool {
 	g.Error = err
 	return ok
 }
+func (g *Generator) SetTagsSync(b bool) {
+	g.renderTagWithSyncIndex = b
+}
 func (g *Generator) generate() (bool, error) {
 	if g.first {
 		for _, d := range g.data {
@@ -323,20 +331,37 @@ func (g *Generator) generate() (bool, error) {
 		if err != nil {
 			return genOneOk, err
 		}
-		if v, ok := g.data[i].(*TagExecNode); ok && g.allowedLabels {
-			for _, label := range v.data.GetLabels() {
-				if ms, ok := v.methodCtx.labelTable[label]; ok {
-					for m := range ms {
-						uid1 := reflect.ValueOf(m).UnsafePointer()
-						if uid1 == uid {
-							continue
+		if g.renderTagWithSyncIndex {
+			if _, ok := g.data[i].(*TagExecNode); ok {
+				for _, m := range g.data {
+					uid1 := reflect.ValueOf(m).UnsafePointer()
+					if uid1 == uid {
+						continue
+					}
+					renderedNode[uid1] = struct{}{}
+					ok1, err := m.Exec()
+					if err != nil {
+						return ok1, err
+					}
+					genOneOk = genOneOk || ok1
+				}
+			}
+		} else {
+			if v, ok := g.data[i].(*TagExecNode); ok && g.allowedLabels {
+				for _, label := range v.data.GetLabels() {
+					if ms, ok := v.methodCtx.labelTable[label]; ok {
+						for m := range ms {
+							uid1 := reflect.ValueOf(m).UnsafePointer()
+							if uid1 == uid {
+								continue
+							}
+							renderedNode[uid1] = struct{}{}
+							ok1, err := m.Exec()
+							if err != nil {
+								return ok1, err
+							}
+							genOneOk = genOneOk || ok1
 						}
-						renderedNode[uid1] = struct{}{}
-						ok1, err := m.Exec()
-						if err != nil {
-							return ok1, err
-						}
-						genOneOk = genOneOk || ok1
 					}
 				}
 			}
@@ -346,7 +371,7 @@ func (g *Generator) generate() (bool, error) {
 				i := i
 				successCallBacks = append(successCallBacks, func() error {
 					if v, ok := g.data[i].(*TagExecNode); ok {
-						return v.FirstExec(true, false, true)
+						return v.FirstExecWithBackpropagation(true, false, true)
 					}
 					return nil
 				})

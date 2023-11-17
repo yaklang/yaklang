@@ -92,6 +92,7 @@ type SimpleFuzzTag struct {
 
 func (f *SimpleFuzzTag) Exec(raw *parser.FuzzResult, methods ...map[string]*parser.TagMethod) ([]*parser.FuzzResult, error) {
 	data := string(raw.GetData())
+	rawData := data
 	data = strings.TrimSpace(data)
 	var method func() ([]*parser.FuzzResult, error)
 	isDyn := false
@@ -269,7 +270,7 @@ func (f *SimpleFuzzTag) Exec(raw *parser.FuzzResult, methods ...map[string]*pars
 	}
 	if err := compile(); err != nil { // 对于编译错误，返回原文
 		escaper := parser.NewDefaultEscaper(`\`, "{{", "}}")
-		return []*parser.FuzzResult{parser.NewFuzzResultWithData(fmt.Sprintf("{{%s}}", escaper.Escape(data)))}, nil
+		return []*parser.FuzzResult{parser.NewFuzzResultWithData(fmt.Sprintf("{{%s}}", escaper.Escape(rawData)))}, nil
 	}
 	set := utils.NewSet[string]()
 	set.AddList(labels)
@@ -299,12 +300,14 @@ func ParseFuzztag(code string, simple bool) ([]parser.Node, error) {
 	}
 
 }
-func NewGenerator(code string, table map[string]*parser.TagMethod, isSimple bool) (*parser.Generator, error) {
+func NewGenerator(code string, table map[string]*parser.TagMethod, isSimple, syncTag bool) (*parser.Generator, error) {
 	nodes, err := ParseFuzztag(code, isSimple)
 	if err != nil {
 		return nil, err
 	}
-	return parser.NewGenerator(nodes, table), nil
+	gener := parser.NewGenerator(nodes, table)
+	gener.SetTagsSync(syncTag)
+	return gener, nil
 }
 func isIdentifyString(s string) bool {
 	return utils.MatchAllOfRegexp(s, "^[a-zA-Z_][a-zA-Z0-9_:-]*$")
