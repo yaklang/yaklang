@@ -1519,9 +1519,9 @@ func (s *Server) PreRenderVariables(ctx context.Context, params []*ypb.FuzzerPar
 
 		if typ == "fuzztag" {
 			opts := mutate.FuzzFileOptions()
-			if syncTagIndex {
-				opts = append(opts, mutate.Fuzz_SyncTag(true))
-			}
+			//if syncTagIndex {
+			//	opts = append(opts, mutate.Fuzz_SyncTag(true))
+			//}
 			rets, _ := mutate.FuzzTagExec(value, opts...)
 			if len(rets) > 0 {
 				l[index] = rets
@@ -1535,6 +1535,28 @@ func (s *Server) PreRenderVariables(ctx context.Context, params []*ypb.FuzzerPar
 	}
 
 	var count int64 = 0
+	handlePayload := func(payloads []string) error {
+		params := make([]*ypb.FuzzerParamItem, 0)
+		resultMap := make(map[string]any)
+		if hasNucleiTag {
+			for index, v := range payloads {
+				p := idToParam[index]
+				key := p.GetKey()
+				params = append(params, &ypb.FuzzerParamItem{Key: key, Value: v, Type: p.GetType()})
+			}
+			resultMap = s.RenderVariablesWithTypedKV(ctx, params)
+		} else {
+			for index, v := range payloads {
+				p := idToParam[index]
+				key := p.GetKey()
+				resultMap[key] = v
+			}
+		}
+
+		atomic.AddInt64(&count, 1)
+		resultsChan <- resultMap
+		return nil
+	}
 	go func() {
 		defer func() {
 			if count <= 0 {
@@ -1548,32 +1570,33 @@ func (s *Server) PreRenderVariables(ctx context.Context, params []*ypb.FuzzerPar
 				log.Errorf("cartesian to fuzztag vars failed: %v", err)
 			}
 		}()
-
-		err := cartesian.ProductExContext(ctx, l, func(payloads []string) error {
-			params := make([]*ypb.FuzzerParamItem, 0)
-			resultMap := make(map[string]any)
-			if hasNucleiTag {
-				for index, v := range payloads {
-					p := idToParam[index]
-					key := p.GetKey()
-					params = append(params, &ypb.FuzzerParamItem{Key: key, Value: v, Type: p.GetType()})
+		if syncTagIndex {
+			for i := 0; ; i++ {
+				ok := false
+				payload := []string{}
+				for _, group := range l {
+					if i >= len(group) {
+						payload = append(payload, "")
+						continue
+					}
+					ok = true
+					payload = append(payload, group[i])
 				}
-				resultMap = s.RenderVariablesWithTypedKV(ctx, params)
-			} else {
-				for index, v := range payloads {
-					p := idToParam[index]
-					key := p.GetKey()
-					resultMap[key] = v
+				if !ok {
+					break
+				}
+				err := handlePayload(payload)
+				if err != nil {
+					log.Errorf("handle payload failed: %s", err)
 				}
 			}
-
-			atomic.AddInt64(&count, 1)
-			resultsChan <- resultMap
-			return nil
-		})
-		if err != nil {
-			log.Errorf("cartesian product failed: %s", err)
+		} else {
+			err := cartesian.ProductExContext(ctx, l, handlePayload)
+			if err != nil {
+				log.Errorf("cartesian product failed: %s", err)
+			}
 		}
+
 	}()
 	return resultsChan
 }
