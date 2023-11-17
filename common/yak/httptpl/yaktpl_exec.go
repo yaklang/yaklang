@@ -153,7 +153,7 @@ func (y *YakTemplate) ExecWithUrl(u string, config *Config, opts ...lowhttp.Lowh
 
 					if config.Debug && config.DebugRequest {
 						fmt.Printf("--------------REQ---------------\n")
-						fmt.Println(raw)
+						fmt.Println(string(raw))
 					}
 
 					utils.Debug(func() {

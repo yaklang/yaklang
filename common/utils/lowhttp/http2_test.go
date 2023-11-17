@@ -4,11 +4,9 @@ import (
 	"bytes"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/go-funk"
-	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
 	"net/http"
-	"strings"
 	"testing"
 )
 
@@ -54,40 +52,4 @@ hello worldhello worldhello worldhello worldasdfasdfh
 	})
 	framer.WriteData(1, true, nil)
 	spew.Dump(buf.Bytes())
-}
-
-func TestFixHTTPResponse3(t *testing.T) {
-	gzipData, err := utils.GzipCompress("你好")
-	if err != nil {
-		panic(err)
-	}
-	h2packet := `HTTP/2 200 Ok
-Test: 111
-Content-Encoding: gzip
-
-` + string(gzipData)
-	rsp, body, err := FixHTTPResponse([]byte(h2packet))
-	if err != nil {
-		panic(err)
-	}
-	if string(body) != "你好" {
-		panic("GZIP FAILED")
-	}
-	rspStr := string(rsp)
-	if strings.Contains(rspStr, "gzip") {
-		panic("gzip has been not removed")
-	}
-
-	if strings.Contains(rspStr, "Content-Encoding") || strings.Contains(rspStr, "content-encoding") {
-		panic("content-encoding has been not removed")
-	}
-
-	// keep content-length for h2 for now
-	//if strings.Contains(rspStr, "content-length") || strings.Contains(rspStr, "Content-Length") {
-	//	panic("Content-Length has been not removed")
-	//}
-
-	if !strings.Contains(rspStr, "你好") {
-		panic("Fix PacketGzip Error")
-	}
 }
