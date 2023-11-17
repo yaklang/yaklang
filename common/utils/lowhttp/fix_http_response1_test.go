@@ -9,62 +9,6 @@ import (
 	"testing"
 )
 
-func TestFixHTTPResponse4(t *testing.T) {
-	rawResp, _ := codec.DecodeBase64(`SFRUUC8xLjEgMjAwIE9LDQpEYXRlOiBTdW4sIDI2IEZlYiAyMDIzIDAzOjQ0OjUzIEdNVA0KU2VydmVyOiBBcGFjaGUNClgtUG93ZXJlZC1CeTogUEhQLzUuMi4xNw0KRXhwaXJlczogVGh1LCAxOSBOb3YgMTk4MSAwODo1MjowMCBHTVQNCkNhY2hlLUNvbnRyb2w6IG5vLXN0b3JlLCBuby1jYWNoZSwgbXVzdC1yZXZhbGlkYXRlLCBwb3N0LWNoZWNrPTAsIHByZS1jaGVjaz0wDQpQcmFnbWE6IG5vLWNhY2hlDQpTZXQtQ29va2llOiBQSFBTRVNTSUQ9dmFsdWU7IGh0dHBPbmx5DQpWYXJ5OiBVc2VyLUFnZW50LEFjY2VwdC1FbmNvZGluZw0KVHJhbnNmZXItRW5jb2Rpbmc6IGNodW5rZWQNCkNvbnRlbnQtVHlwZTogdGV4dC9odG1sDQoNCjFmDQrE+rXEzOG9u7T409Cyu7rPt6iyzsr9LNC70Lu6z9f3DQowDQoNCg==`)
-	rsp, body, err := FixHTTPResponse(rawResp)
-	if err != nil {
-		panic(err)
-	}
-	if !strings.Contains(string(body), "提交带有不合法参数") {
-		t.FailNow()
-	}
-	println(string(rsp))
-}
-
-func TestFixHTTPResponse2(t *testing.T) {
-	var jsonChineseOrigin = `HTTP/1.1 200 OK
-Connection: keep-alive
-Content-Encoding: identity
-Content-Type: application/json; charset=utf-8
-Date: Mon, 21 Nov 2022 07:54:18 GMT
-Edocecart: 32581202071201156071176630638112115
-Server: BWS
-Traceid: 1669017258039822849010147292226863610359
-Vary: Accept-Encoding
-Content-Length: 1033
-
-{
-    "errno": 0,
-    "error": "\u6210\u529f",
-    "data": {
-        "requestParam": [],
-        "response": {
-            "cnt": {
-                "fansCnt": 182881,
-                "fansCntText": "18\u4e07\u7c89\u4e1d",
-                "videoCount": 11961,
-                "videoCntText": "1.2\u4e07\u4e2a\u89c6\u9891",
-                "totalPlaycnt": 0,
-                "totalPlaycntText": ""
-            },
-            "author": {
-                "vip": 1,
-                "author": "\u6293\u9a6c\u77ed\u661f\u95fb",
-                "author_icon": "https:\/\/gimg0.baidu.com\/gimg\/src=https%3A%2F%2Fgips0.baidu.com%2Fit%2Fu%3D2476551077%2C1418779011%26fm%3D3012%26app%3D3012%26autime%3D1667425861%26size%3Db200%2C200&refer=http%3A%2F%2Fwww.baidu.com&app=0&size=f68,68&n=0&g=0n&q=60?sec=0&t=d9946543ab888fe6d5d9c1fb9991428c&fmt=auto",
-                "mthid": "1680416484715223",
-                "authentication_content": "\u5a31\u4e50\u9886\u57df\u521b\u4f5c\u8005"
-            },
-            "is_subscribe": 0
-        }
-    }
-}`
-	_, body, _ := FixHTTPResponse([]byte(jsonChineseOrigin))
-	println(codec.JsonUnicodeDecode(string(body)))
-	if !strings.Contains(string(body), "抓马短星闻") {
-		panic(11)
-	}
-}
-
 func TestNewHTTPRequest(t *testing.T) {
 	var a = ConvertHTTPRequestToFuzzTag([]byte(`GET / HTTP/1.1
 Host: www.baidu.com

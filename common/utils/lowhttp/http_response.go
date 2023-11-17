@@ -3,7 +3,6 @@ package lowhttp
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"mime"
@@ -180,15 +179,7 @@ func FixHTTPResponse(raw []byte) (rsp []byte, body []byte, _ error) {
 	// 这两个用来处理编码特殊情况
 	var contentEncoding string
 	var contentType string
-	var isJson bool
-
 	headers, body := SplitHTTPHeadersAndBodyFromPacket(raw, func(line string) {
-		if strings.HasPrefix(strings.ToLower(line), "content-type:") {
-			_, contentType = SplitHTTPHeader(line)
-			contentTypeLower := strings.ToLower(strings.TrimSpace(contentType))
-			isJson = strings.Contains(contentTypeLower, "json") // Content-Type: json
-		}
-
 		// 判断内容
 		line = strings.ToLower(line)
 		if strings.HasPrefix(line, "transfer-encoding:") && utils.IContains(line, "chunked") {
@@ -281,14 +272,6 @@ func FixHTTPResponse(raw []byte) (rsp []byte, body []byte, _ error) {
 		} else {
 			log.Infof("replace content-type to: %s", overrideContentType)
 			headerBytes = ReplaceMIMEType(headerBytes, overrideContentType)
-		}
-	}
-
-	if isJson {
-		var buf bytes.Buffer
-		_ = json.Indent(&buf, []byte(codec.JsonUnicodeDecode(string(bodyRaw))), "", "    ")
-		if len(bodyRaw) > 0 && buf.Len() > 0 {
-			bodyRaw = buf.Bytes()
 		}
 	}
 
