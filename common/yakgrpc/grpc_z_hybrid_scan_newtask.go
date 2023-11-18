@@ -62,7 +62,7 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 			quickSave()
 			return
 		}
-		if taskRecorder.Status == "pause" {
+		if taskRecorder.Status == yakit.HYBRIDSCAN_PAUSED {
 			quickSave()
 			return
 		}
@@ -88,7 +88,7 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 		}
 	}
 
-	targetChan, err := s.TargetGenerator(stream.Context(), target)
+	targetChan, err := s.TargetGenerator(manager.Context(), target)
 	if err != nil {
 		taskRecorder.Reason = err.Error()
 		return utils.Errorf("TargetGenerator failed: %s", err)
@@ -116,7 +116,7 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 	var activeTarget int64
 	var taskCount int64
 
-	pluginChan, err := s.PluginGenerator(pluginCache, stream.Context(), plugin)
+	pluginChan, err := s.PluginGenerator(pluginCache, manager.Context(), plugin)
 	if err != nil {
 		taskRecorder.Reason = err.Error()
 		return utils.Errorf("load plugin generator failed: %s", err)
@@ -186,11 +186,12 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 		targetCached = append(targetCached, targetInput)
 	}
 
+	// start dispatch tasks
 	for _, __currentTarget := range targetCached {
 		addTargetCount()
 		atomic.AddInt64(&activeTarget, 1)
 
-		pluginChan, err := s.PluginGenerator(pluginCache, stream.Context(), plugin)
+		pluginChan, err := s.PluginGenerator(pluginCache, manager.Context(), plugin)
 		if err != nil {
 			return utils.Errorf("generate plugin queue failed: %s", err)
 		}
@@ -201,17 +202,17 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 		for __pluginInstance := range pluginChan {
 			targetRequestInstance := __currentTarget
 			pluginInstance := __pluginInstance
-			targetWg.Add(1)
-			if swgErr := swg.AddWithContext(stream.Context()); swgErr != nil {
-				return nil
+			if swgErr := swg.AddWithContext(manager.Context()); swgErr != nil {
+				continue
 			}
+			targetWg.Add(1)
 			atomic.AddInt64(&activeTask, 1)
 			taskIndex := atomic.AddInt64(&taskCount, 1)
 			feedbackStatus()
 
 			manager.Checkpoint(func() {
 				// 如果出现了暂停，立即保存进度
-				var vals = make([]int, concurrent)
+				var vals = make([]int, 0, concurrent)
 				activeTaskTable.Range(func(key, value any) bool {
 					if ret := codec.Atoi(fmt.Sprint(key)); ret > 0 {
 						vals = append(vals, ret)
@@ -228,6 +229,7 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 				taskRecorder.Status = yakit.HYBRIDSCAN_PAUSED
 				quickSave()
 			})
+
 			go func() {
 				defer swg.Done()
 
@@ -241,7 +243,23 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 				}()
 				updateActiveTasks(true, taskIndex, targetRequestInstance, pluginInstance)
 				activeTaskTable.Store(taskIndex, struct{}{})
-				err := s.ScanTargetWithPlugin(taskId, stream.Context(), targetRequestInstance, pluginInstance, func(result *ypb.ExecResult) {
+
+				// shrink context
+				select {
+				case <-manager.Context().Done():
+					log.Infof("skip task %d via canceled", taskIndex)
+					return
+				default:
+				}
+
+				err := s.ScanTargetWithPlugin(taskId, manager.Context(), targetRequestInstance, pluginInstance, func(result *ypb.ExecResult) {
+					// shrink context
+					select {
+					case <-manager.Context().Done():
+						return
+					default:
+					}
+
 					status := getStatus()
 					status.CurrentPluginName = pluginInstance.ScriptName
 					status.ExecResult = result
@@ -250,10 +268,24 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 				if err != nil {
 					log.Warnf("scan target failed: %s", err)
 				}
-				time.Sleep(time.Duration(200+rand.Int63n(800)) * time.Millisecond)
+				time.Sleep(time.Duration(300+rand.Int63n(700)) * time.Millisecond)
 			}()
 		}
+		// shrink context
+		select {
+		case <-manager.Context().Done():
+			return utils.Error("task manager cancled")
+		default:
+		}
+
 		go func() {
+			// shrink context
+			select {
+			case <-manager.Context().Done():
+				return
+			default:
+			}
+
 			targetWg.Wait()
 			atomic.AddInt64(&targetFinished, 1)
 			atomic.AddInt64(&activeTarget, -1)
@@ -262,7 +294,9 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 	}
 	swg.Wait()
 	feedbackStatus()
-	taskRecorder.Status = yakit.HYBRIDSCAN_DONE
+	if !manager.IsPaused() {
+		taskRecorder.Status = yakit.HYBRIDSCAN_DONE
+	}
 	return nil
 }
 

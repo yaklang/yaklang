@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
+	"time"
 )
 
 type HybridScanRequestStream interface {
@@ -57,10 +58,20 @@ func (s *Server) HybridScan(stream ypb.Yak_HybridScanServer) error {
 		return utils.Errorf("first request must be control request")
 	}
 
-	rootCtx := stream.Context()
-	taskCtx := rootCtx
+	streamCtx := stream.Context()
+	var taskCtx context.Context
 	if firstRequest.GetDetach() {
 		taskCtx = context.Background()
+	} else {
+		var taskCancel context.CancelFunc
+		taskCtx, taskCancel = context.WithCancel(context.Background())
+		go func() {
+			select {
+			case <-streamCtx.Done():
+				time.Sleep(3 * time.Second)
+				taskCancel()
+			}
+		}()
 	}
 
 	var taskStream = newWrapperHybridScanStream(taskCtx, stream)
@@ -91,7 +102,10 @@ func (s *Server) HybridScan(stream ypb.Yak_HybridScanServer) error {
 			if ok {
 				return err
 			}
-		case <-rootCtx.Done():
+		case <-streamCtx.Done():
+			taskManager.PauseEffect()
+			taskManager.Stop()
+			taskManager.Resume()
 			return utils.Error("client canceled")
 		}
 		return nil
