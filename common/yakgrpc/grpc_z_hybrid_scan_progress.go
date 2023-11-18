@@ -18,12 +18,20 @@ type HybridScanTaskManager struct {
 	resumeLock   *sync.Mutex
 }
 
+func (h *HybridScanTaskManager) IsPaused() bool {
+	return h.isPaused.IsSet()
+}
+
 func (h *HybridScanTaskManager) TaskId() string {
 	return h.taskId
 }
 
 func (h *HybridScanTaskManager) Stop() {
 	h.cancel()
+}
+
+func (h *HybridScanTaskManager) WaitCount() int64 {
+	return h.waitCount
 }
 
 func (h *HybridScanTaskManager) Checkpoint(hs ...func()) {
@@ -42,6 +50,21 @@ func (h *HybridScanTaskManager) Checkpoint(hs ...func()) {
 
 func (h *HybridScanTaskManager) Pause() {
 	h.isPaused.Set()
+}
+
+func (h *HybridScanTaskManager) PauseEffect() {
+	h.Pause()
+	for {
+		select {
+		case <-h.ctx.Done():
+			return
+		default:
+			if h.WaitCount() > 0 {
+				return
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
 }
 
 func (h *HybridScanTaskManager) Context() context.Context {
