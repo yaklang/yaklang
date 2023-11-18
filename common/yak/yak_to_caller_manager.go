@@ -725,7 +725,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 				if err != nil {
 					return nil, err
 				}
-				log.Infof("bind hook.NewMixPluginCaller to runtime: %v", runtimeId)
+				log.Debugf("bind hook.NewMixPluginCaller to runtime: %v", runtimeId)
 				manager.SetRuntimeId(runtimeId)
 				manager.SetProxy(proxy)
 				manager.SetFeedback(func(result *ypb.ExecResult) error { // 临时解决方案

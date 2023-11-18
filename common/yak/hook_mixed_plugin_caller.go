@@ -169,7 +169,7 @@ execNuclei = func(target) {
     
 	res, err = nuclei.Scan(
         target, nuclei.fuzzQueryTemplate(nucleiPoCName),
-        nuclei.retry(0), nuclei.stopAtFirstMatch(true), nuclei.timeout(10), 
+        nuclei.timeout(10), 
         nuclei.proxy(proxy...),
     )
 	if err != nil {
