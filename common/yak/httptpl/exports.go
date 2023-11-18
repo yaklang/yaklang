@@ -113,6 +113,11 @@ func ScanPacket(req []byte, opts ...interface{}) {
 			return
 		}
 		for tpl := range tplChan {
+			if tpl.SelfContained {
+				log.Infof("self-contained skipped: %v", tpl.Name)
+				continue
+			}
+
 			if tpl.ReverseConnectionNeed && !config.EnableReverseConnectionFeature {
 				log.Infof("skip template %s because of reverse connection feature is disabled", tpl.Name)
 				continue
@@ -121,7 +126,7 @@ func ScanPacket(req []byte, opts ...interface{}) {
 				log.Infof("skipped template %s because of OnTemplateLoaded", tpl.Name)
 				continue
 			}
-			log.Infof("start to using template %v", tpl.Name)
+			log.Debugf("start to using template %v", tpl.Name)
 
 			tpl := tpl
 			err := swg.AddWithContext(lowhttpConfig.Ctx)
@@ -152,9 +157,9 @@ func ScanPacket(req []byte, opts ...interface{}) {
 				}
 			}()
 		}
-		log.Infof("waiting for all templates finished [%v]", urlStr)
+		log.Debugf("waiting for all templates finished [%v]", urlStr)
 		swg.Wait()
-		log.Infof("all templates finished for url[%v]", urlStr)
+		log.Debugf("all templates finished for url[%v]", urlStr)
 
 		return
 	case "xray":
@@ -279,15 +284,15 @@ func _scanStream(ch chan any, opt ...interface{}) {
 		count++
 		handleData(data)
 	}
-	log.Infof("waiting for ScanStream total: %v(subtask: %v)", count, swg.WaitingEventCount)
+	log.Debugf("waiting for ScanStream total: %v(subtask: %v)", count, swg.WaitingEventCount)
 	swg.Wait()
-	log.Infof("finished ScanStream total: %v", count)
+	log.Debugf("finished ScanStream total: %v", count)
 }
 
 func nucleiOptionDummy(n string) func(i ...any) any {
 	return func(i ...any) any {
 		return ConfigOption(func(config *Config) {
-			log.Errorf("option: nuclei %s is not implemented or abandoned", n)
+			// log.Errorf("option: nuclei %s is not implemented or abandoned", n)
 		})
 	}
 }

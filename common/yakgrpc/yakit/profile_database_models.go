@@ -47,6 +47,9 @@ var ProjectTables = []interface{}{
 
 	// traffic
 	&TrafficSession{}, &TrafficPacket{}, &TrafficTCPReassembledFrame{},
+
+	// HybridScan
+	&HybridScanTask{},
 }
 
 func UserDataAndPluginDatabaseScope(db *gorm.DB) *gorm.DB {

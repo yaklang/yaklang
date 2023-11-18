@@ -13,6 +13,17 @@ func PrintCurrentGoroutineRuntimeStack() {
 	fmt.Printf("Current goroutine call stack:\n%s\n", buf[:n])
 }
 
+func TryWriteChannel[T any](c chan T, data T) (ret bool) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("write channel failed: %v", err)
+			ret = false
+		}
+	}()
+	c <- data
+	return true
+}
+
 func TryCloseChannel(i any) {
 	if i == nil {
 		return
