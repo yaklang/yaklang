@@ -1,6 +1,10 @@
 package yakit
 
-import "github.com/jinzhu/gorm"
+import (
+	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+)
 
 const (
 	HYBRIDSCAN_EXECUTING = "executing"
@@ -42,4 +46,17 @@ func GetHybridScanByTaskId(db *gorm.DB, taskId string) (*HybridScanTask, error) 
 
 func SaveHybridScanTask(db *gorm.DB, task *HybridScanTask) error {
 	return db.Save(task).Error
+}
+
+func QueryHybridScan(db *gorm.DB, query *ypb.QueryHybridScanTaskRequest) (*bizhelper.Paginator, []*HybridScanTask, error) {
+	db = db.Model(&HybridScanTask{})
+
+	db = bizhelper.ExactQueryString(db, "status", query.GetStatus())
+
+	var data []*HybridScanTask
+	p, db := bizhelper.PagingByPagination(db, query.GetPagination(), &data)
+	if db.Error != nil {
+		return nil, nil, db.Error
+	}
+	return p, data, nil
 }

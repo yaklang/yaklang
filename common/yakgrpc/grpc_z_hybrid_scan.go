@@ -2,9 +2,11 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/samber/lo"
 	uuid "github.com/satori/go.uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 	"time"
@@ -112,4 +114,48 @@ func (s *Server) HybridScan(stream ypb.Yak_HybridScanServer) error {
 	default:
 		return utils.Error("invalid hybrid scan mode")
 	}
+}
+
+func (s *Server) QueryHybridScanTask(ctx context.Context, request *ypb.QueryHybridScanTaskRequest) (*ypb.QueryHybridScanTaskResponse, error) {
+	p, tasks, err := yakit.QueryHybridScan(s.GetProjectDatabase(), request)
+	if err != nil {
+		return nil, err
+	}
+	var data []*ypb.HybridScanTask
+	data = lo.Map(tasks, func(item *yakit.HybridScanTask, index int) *ypb.HybridScanTask {
+		return &ypb.HybridScanTask{
+			Id:              int64(item.ID),
+			CreatedAt:       item.CreatedAt.Unix(),
+			UpdatedAt:       item.UpdatedAt.Unix(),
+			TaskId:          item.TaskId,
+			Status:          item.Status,
+			TotalTargets:    item.TotalTargets,
+			TotalPlugins:    item.TotalPlugins,
+			TotalTasks:      item.TotalTasks,
+			FinishedTasks:   item.FinishedTasks,
+			FinishedTargets: item.FinishedTargets,
+		}
+	})
+	return &ypb.QueryHybridScanTaskResponse{
+		Pagination: request.GetPagination(),
+		Data:       data,
+		Total:      int64(p.TotalRecord),
+	}, nil
+}
+
+func (s *Server) DeleteHybridScanTask(ctx context.Context, request *ypb.DeleteHybridScanTaskRequest) (*ypb.Empty, error) {
+	if request.GetDeleteAll() {
+		if err := s.GetProjectDatabase().Unscoped().Where("true").Delete(&yakit.HybridScanTask{}).Error; err != nil {
+			return nil, err
+		}
+		return &ypb.Empty{}, nil
+	}
+
+	if t := request.GetTaskId(); t != "" {
+		if err := s.GetProjectDatabase().Unscoped().Where("task_id = ?", t).Delete(&yakit.HybridScanTask{}).Error; err != nil {
+			return nil, err
+		}
+		return &ypb.Empty{}, nil
+	}
+	return &ypb.Empty{}, nil
 }
