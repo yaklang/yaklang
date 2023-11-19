@@ -53,6 +53,13 @@ func QueryHybridScan(db *gorm.DB, query *ypb.QueryHybridScanTaskRequest) (*bizhe
 
 	db = bizhelper.ExactQueryString(db, "status", query.GetStatus())
 
+	if query.GetFromId() > 0 {
+		db = db.Where("id > ?", query.GetFromId())
+	}
+	if query.GetUntilId() > 0 {
+		db = db.Where("id <= ?", query.GetUntilId())
+	}
+
 	var data []*HybridScanTask
 	p, db := bizhelper.PagingByPagination(db, query.GetPagination(), &data)
 	if db.Error != nil {
