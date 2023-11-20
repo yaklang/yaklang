@@ -15,22 +15,12 @@ import (
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"math/rand"
 	"sync"
-	"sync/atomic"
 	"time"
 )
-
-func fitStatusToHybridScanTaskRecord(status *ypb.HybridScanResponse, task *yakit.HybridScanTask) {
-	task.TotalTargets = status.TotalTargets
-	task.TotalPlugins = status.TotalPlugins
-	task.TotalTasks = status.TotalTasks
-	task.FinishedTargets = status.FinishedTargets
-	task.FinishedTasks = status.FinishedTasks
-}
 
 func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream HybridScanRequestStream, firstRequest *ypb.HybridScanRequest) error {
 	var (
@@ -99,22 +89,16 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 	/*
 		统计状态
 	*/
-	var totalTarget = int64(len(utils.ParseStringToLines(target.String())))
-	var targetCount int64 = 0
-	addTargetCount := func() {
-		if atomic.AddInt64(&targetCount, 1) > totalTarget {
-			atomic.AddInt64(&totalTarget, 1)
-		}
-	}
-	var targetFinished int64 = 0
-	var taskFinished int64 = 0
-	var totalPlugin int64 = 0
-	var getTotalTasks = func() int64 {
-		return totalTarget * totalPlugin
-	}
-	var activeTask int64
-	var activeTarget int64
-	var taskCount int64
+	//var totalTarget = int64(len(utils.ParseStringToLines(target.String())))
+	//var targetFinished int64 = 0
+	//var taskFinished int64 = 0
+	//var totalPlugin int64 = 0
+	//var getTotalTasks = func() int64 {
+	//	return totalTarget * totalPlugin
+	//}
+	//var activeTask int64
+	//var activeTarget int64
+	//var taskCount int64
 
 	pluginChan, err := s.PluginGenerator(pluginCache, manager.Context(), plugin)
 	if err != nil {
@@ -123,19 +107,27 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 	}
 	var pluginNames []string
 	for r := range pluginChan {
-		totalPlugin++
 		pluginNames = append(pluginNames, r.ScriptName)
 	}
-	if totalPlugin == 0 {
+	if len(pluginNames) == 0 {
 		taskRecorder.Reason = "no plugin loaded"
 		return utils.Error("no plugin loaded")
 	}
+
+	// targetChan 的大小如何估算？目标数量（百万为单位） * 目标大小字节数为 M 数
+	// 即，100w 个目标，每个目标占用大小为 100 字节，那么都在内存中，开销大约为 100M
+	// 这个开销在内存中处理绰绰有余，但是在网络传输中，这个开销就很大了
+	var targetCached []*HybridScanTarget
+	for targetInput := range targetChan {
+		targetCached = append(targetCached, targetInput)
+	}
+
+	statusManager := newHybridScanStatusManager(taskId, len(targetCached), len(pluginNames))
 
 	senderMutex := new(sync.Mutex)
 	sender := func(i *ypb.HybridScanResponse) {
 		senderMutex.Lock()
 		defer senderMutex.Unlock()
-
 		stream.Send(i)
 	}
 
@@ -143,22 +135,10 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 	getStatus := func() *ypb.HybridScanResponse {
 		statusMutex.Lock()
 		defer statusMutex.Unlock()
-		status := &ypb.HybridScanResponse{
-			TotalTargets:     totalTarget,
-			TotalPlugins:     totalPlugin,
-			TotalTasks:       getTotalTasks(),
-			FinishedTasks:    taskFinished,
-			FinishedTargets:  targetFinished,
-			ActiveTasks:      activeTask,
-			ActiveTargets:    activeTarget,
-			HybridScanTaskId: taskId,
-		}
-		fitStatusToHybridScanTaskRecord(status, taskRecorder)
-		return status
+		return statusManager.GetStatus(taskRecorder)
 	}
-
 	feedbackStatus := func() {
-		sender(getStatus())
+		statusManager.Feedback(stream)
 	}
 
 	updateActiveTasks := func(create bool, i int64, t *HybridScanTarget, p *yakit.YakScript) {
@@ -178,26 +158,16 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 		sender(rsp)
 	}
 
-	// targetChan 的大小如何估算？目标数量（百万为单位） * 目标大小字节数为 M 数
-	// 即，100w 个目标，每个目标占用大小为 100 字节，那么都在内存中，开销大约为 100M
-	// 这个开销在内存中处理绰绰有余，但是在网络传输中，这个开销就很大了
-	var targetCached []*HybridScanTarget
-	for targetInput := range targetChan {
-		targetCached = append(targetCached, targetInput)
-	}
-
 	// start dispatch tasks
 	for _, __currentTarget := range targetCached {
-		addTargetCount()
-		atomic.AddInt64(&activeTarget, 1)
+		// load targets
+		statusManager.DoActiveTarget()
 
 		pluginChan, err := s.PluginGenerator(pluginCache, manager.Context(), plugin)
 		if err != nil {
 			return utils.Errorf("generate plugin queue failed: %s", err)
 		}
 		targetWg := new(sync.WaitGroup)
-
-		var activeTaskTable = new(sync.Map) // record active index
 
 		for __pluginInstance := range pluginChan {
 			targetRequestInstance := __currentTarget
@@ -206,43 +176,31 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 				continue
 			}
 			targetWg.Add(1)
-			atomic.AddInt64(&activeTask, 1)
-			taskIndex := atomic.AddInt64(&taskCount, 1)
-			feedbackStatus()
 
 			manager.Checkpoint(func() {
 				// 如果出现了暂停，立即保存进度
-				var vals = make([]int, 0, concurrent)
-				activeTaskTable.Range(func(key, value any) bool {
-					if ret := codec.Atoi(fmt.Sprint(key)); ret > 0 {
-						vals = append(vals, ret)
-					}
-					return true
-				})
-				ports := utils.ConcatPorts(vals)
-				taskRecorder.SurvivalTaskIndexes = ports
+				taskRecorder.SurvivalTaskIndexes = utils.ConcatPorts(statusManager.GetCurrentActiveTaskIndexes())
 				names, _ := json.Marshal(pluginNames)
 				taskRecorder.Plugins = string(names)
 				targetBytes, _ := json.Marshal(targetCached)
 				taskRecorder.Targets = string(targetBytes)
-				getStatus()
+				feedbackStatus()
 				taskRecorder.Status = yakit.HYBRIDSCAN_PAUSED
 				quickSave()
 			})
+
+			taskIndex := statusManager.DoActiveTask()
+			feedbackStatus()
 
 			go func() {
 				defer swg.Done()
 
 				defer targetWg.Done()
 				defer func() {
-					atomic.AddInt64(&taskFinished, 1)
-					atomic.AddInt64(&activeTask, -1)
-					feedbackStatus()
+					statusManager.DoneTask(taskIndex)
 					updateActiveTasks(false, taskIndex, targetRequestInstance, pluginInstance)
-					activeTaskTable.Delete(taskIndex)
 				}()
 				updateActiveTasks(true, taskIndex, targetRequestInstance, pluginInstance)
-				activeTaskTable.Store(taskIndex, struct{}{})
 
 				// shrink context
 				select {
@@ -287,8 +245,7 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 			}
 
 			targetWg.Wait()
-			atomic.AddInt64(&targetFinished, 1)
-			atomic.AddInt64(&activeTarget, -1)
+			statusManager.DoneTarget()
 			feedbackStatus()
 		}()
 	}
