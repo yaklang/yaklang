@@ -13,7 +13,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -171,7 +170,7 @@ func (h2Conn *http2ClientConn) readLoop() {
 			gotSettings = true
 		}
 
-		log.Infof("h2 stream-id %v found frame: %v", f.Header().StreamID, reflect.TypeOf(f).String())
+		log.Infof("h2 stream-id %v found frame: %v", f.Header().StreamID, f)
 
 		switch f := f.(type) {
 		case *http2.HeadersFrame:
@@ -216,6 +215,7 @@ func (cs *http2ClientStream) doRequest() error {
 		schema = "http"
 	}
 
+	addH2Header(":authority", "") // 占位
 	if connectedPort := httpctx.GetContextIntInfoFromRequest(cs.req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort); connectedPort > 0 {
 		portValid := (connectedPort == 443 && isHttps) || (connectedPort == 80 && !isHttps)
 		if !portValid {
@@ -230,7 +230,6 @@ func (cs *http2ClientStream) doRequest() error {
 
 	var methodReq = http.MethodGet
 	_, body := SplitHTTPHeadersAndBodyFromPacketEx(cs.reqPacket, func(method string, requestUri string, proto string) error {
-
 		if method != "" {
 			methodReq = method
 		}
@@ -256,7 +255,6 @@ func (cs *http2ClientStream) doRequest() error {
 						break
 					}
 				}
-				addH2Header(":authority", value)
 
 			case "content-length", "connection", "proxy-connection", //todo cl问题是否处理
 				"transfer-encoding", "upgrade",
@@ -459,16 +457,12 @@ func (rl *http2ClientConnReadLoop) processData(f *http2.DataFrame) error {
 }
 
 func (rl *http2ClientConnReadLoop) processSettings(f *http2.SettingsFrame) error {
-	cs := rl.h2Conn.streamByID(f.StreamID) // get stream by id
-	if err := streamAliveCheck(cs, f.StreamID); err != nil {
-		return err
-	}
 	if f.IsAck() {
 		return nil
 	}
 
 	f.ForeachSetting(func(setting http2.Setting) error {
-		log.Infof("h2 stream found server setting: %v", setting.String())
+		//log.Infof("h2 stream found server setting: %v", setting.String())
 		switch setting.ID {
 		case http2.SettingMaxFrameSize:
 			rl.h2Conn.maxFrameSize = setting.Val
@@ -480,7 +474,7 @@ func (rl *http2ClientConnReadLoop) processSettings(f *http2.SettingsFrame) error
 		return nil
 	})
 	// write settings ack
-	err := cs.h2Conn.fr.WriteSettingsAck()
+	err := rl.h2Conn.fr.WriteSettingsAck()
 	if err != nil {
 		return utils.Wrapf(err, "h2 client write settings ack error")
 	}
