@@ -1,4 +1,4 @@
-// Code generated from ./JavaScriptParser.g4 by ANTLR 4.13.1. DO NOT EDIT.
+// Code generated from ./JavaScriptParser.g4 by ANTLR 4.13.0. DO NOT EDIT.
 
 package parser // JavaScriptParser
 
@@ -332,10 +332,10 @@ func javascriptparserParserInit() {
 		382, 1, 0, 0, 0, 380, 378, 1, 0, 0, 0, 380, 381, 1, 0, 0, 0, 381, 384,
 		1, 0, 0, 0, 382, 380, 1, 0, 0, 0, 383, 385, 3, 52, 26, 0, 384, 383, 1,
 		0, 0, 0, 384, 385, 1, 0, 0, 0, 385, 51, 1, 0, 0, 0, 386, 387, 5, 77, 0,
-		0, 387, 388, 3, 4, 2, 0, 388, 53, 1, 0, 0, 0, 389, 392, 3, 138, 69, 0,
+		0, 387, 388, 3, 4, 2, 0, 388, 53, 1, 0, 0, 0, 389, 392, 3, 136, 68, 0,
 		390, 392, 3, 42, 21, 0, 391, 389, 1, 0, 0, 0, 391, 390, 1, 0, 0, 0, 392,
 		55, 1, 0, 0, 0, 393, 394, 3, 138, 69, 0, 394, 57, 1, 0, 0, 0, 395, 396,
-		3, 138, 69, 0, 396, 59, 1, 0, 0, 0, 397, 398, 5, 73, 0, 0, 398, 399, 3,
+		3, 136, 68, 0, 396, 59, 1, 0, 0, 0, 397, 398, 5, 73, 0, 0, 398, 399, 3,
 		4, 2, 0, 399, 400, 5, 87, 0, 0, 400, 401, 5, 7, 0, 0, 401, 402, 3, 138,
 		69, 0, 402, 403, 5, 8, 0, 0, 403, 404, 3, 178, 89, 0, 404, 453, 1, 0, 0,
 		0, 405, 406, 5, 87, 0, 0, 406, 407, 5, 7, 0, 0, 407, 408, 3, 138, 69, 0,
@@ -5752,7 +5752,7 @@ type IForFirstContext interface {
 	GetParser() antlr.Parser
 
 	// Getter signatures
-	SingleExpression() ISingleExpressionContext
+	ExpressionSequence() IExpressionSequenceContext
 	VariableDeclarationList() IVariableDeclarationListContext
 
 	// IsForFirstContext differentiates from other interfaces.
@@ -5791,10 +5791,10 @@ func NewForFirstContext(parser antlr.Parser, parent antlr.ParserRuleContext, inv
 
 func (s *ForFirstContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *ForFirstContext) SingleExpression() ISingleExpressionContext {
+func (s *ForFirstContext) ExpressionSequence() IExpressionSequenceContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(ISingleExpressionContext); ok {
+		if _, ok := ctx.(IExpressionSequenceContext); ok {
 			t = ctx.(antlr.RuleContext)
 			break
 		}
@@ -5804,7 +5804,7 @@ func (s *ForFirstContext) SingleExpression() ISingleExpressionContext {
 		return nil
 	}
 
-	return t.(ISingleExpressionContext)
+	return t.(IExpressionSequenceContext)
 }
 
 func (s *ForFirstContext) VariableDeclarationList() IVariableDeclarationListContext {
@@ -5855,7 +5855,7 @@ func (p *JavaScriptParser) ForFirst() (localctx IForFirstContext) {
 		p.EnterOuterAlt(localctx, 1)
 		{
 			p.SetState(389)
-			p.singleExpression(0)
+			p.ExpressionSequence()
 		}
 
 	case 2:
@@ -5992,7 +5992,7 @@ type IForThirdContext interface {
 	GetParser() antlr.Parser
 
 	// Getter signatures
-	SingleExpression() ISingleExpressionContext
+	ExpressionSequence() IExpressionSequenceContext
 
 	// IsForThirdContext differentiates from other interfaces.
 	IsForThirdContext()
@@ -6030,10 +6030,10 @@ func NewForThirdContext(parser antlr.Parser, parent antlr.ParserRuleContext, inv
 
 func (s *ForThirdContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *ForThirdContext) SingleExpression() ISingleExpressionContext {
+func (s *ForThirdContext) ExpressionSequence() IExpressionSequenceContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(ISingleExpressionContext); ok {
+		if _, ok := ctx.(IExpressionSequenceContext); ok {
 			t = ctx.(antlr.RuleContext)
 			break
 		}
@@ -6043,7 +6043,7 @@ func (s *ForThirdContext) SingleExpression() ISingleExpressionContext {
 		return nil
 	}
 
-	return t.(ISingleExpressionContext)
+	return t.(IExpressionSequenceContext)
 }
 
 func (s *ForThirdContext) GetRuleContext() antlr.RuleContext {
@@ -6070,7 +6070,7 @@ func (p *JavaScriptParser) ForThird() (localctx IForThirdContext) {
 	p.EnterOuterAlt(localctx, 1)
 	{
 		p.SetState(395)
-		p.singleExpression(0)
+		p.ExpressionSequence()
 	}
 
 errorExit:

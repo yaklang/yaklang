@@ -174,7 +174,7 @@ elseBlock
     ;
 
 forFirst
-    : singleExpression | variableDeclarationList
+    : expressionSequence | variableDeclarationList
     ;
 
 forSecond
@@ -182,7 +182,7 @@ forSecond
     ;
 
 forThird
-    : singleExpression
+    : expressionSequence
     ;
 
 iterationStatement
