@@ -65,24 +65,11 @@ func (s *Server) SmokingEvaluatePlugin(ctx context.Context, req *ypb.SmokingEval
 }
 
 func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType string) (*ypb.SmokingEvaluatePluginResponse, error) {
-	var host string
-	var port int
-	var wg sync.WaitGroup
-	// start each server
-	wg.Add(1)
-	go func() {
-		defer func() {
-			defer wg.Done()
-			if err := recover(); err != nil {
-				log.Errorf("lowhttp.DebugEchoServer panic: %v", err)
-				utils.PrintCurrentGoroutineRuntimeStack()
-			}
-		}()
-		host, port = lowhttp.DebugEchoServerContext(ctx)
-	}()
-	wg.Wait()
-	if host == "" || port <= 0 {
-		return nil, utils.Error("debug echo server start failed")
+	if pluginType == "nuclei" {
+		return &ypb.SmokingEvaluatePluginResponse{
+			Score:   60,
+			Results: []*ypb.SmokingEvaluateResult{},
+		}, nil
 	}
 
 	var results []*ypb.SmokingEvaluateResult
@@ -123,6 +110,27 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 	}
 
 	if pluginType == "mitm" || pluginType == "port-scan" { // echo debug script
+
+		var host string
+		var port int
+		var wg sync.WaitGroup
+		// start each server
+		wg.Add(1)
+		go func() {
+			defer func() {
+				defer wg.Done()
+				if err := recover(); err != nil {
+					log.Errorf("lowhttp.DebugEchoServer panic: %v", err)
+					utils.PrintCurrentGoroutineRuntimeStack()
+				}
+			}()
+			host, port = lowhttp.DebugEchoServerContext(ctx)
+		}()
+		wg.Wait()
+		if host == "" || port <= 0 {
+			return nil, utils.Error("debug echo server start failed")
+		}
+
 		log.Info("start to echo debug script")
 		var fetchRisk bool
 		err := s.debugScript("http://"+utils.HostPort(host, port), pluginType, pluginCode, NewFakeStream(ctx, func(result *ypb.ExecResult) error {
