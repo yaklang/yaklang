@@ -239,7 +239,11 @@ func RuleCliCheck(prog *ssaapi.Program) {
 		})
 	}
 
-	if lastCallName != "cli.check" {
-		lastCallValue.NewError(ssa.Error, "please call cli.check as the last statement after all other cli standard library calls")
+	if lastCallName != "cli.check" && lastCallValue != nil {
+		lastCallValue.NewError(ssa.Error, NotCallCliCheck())
 	}
+}
+
+func NotCallCliCheck() string {
+	return "please call cli.check as the last statement after all other cli standard library calls"
 }
