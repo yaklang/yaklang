@@ -84,10 +84,28 @@ func (s *Server) HybridScan(stream ypb.Yak_HybridScanServer) error {
 		return true
 	}
 
+	errC := make(chan error)
+	var taskId string
+	var taskManager *HybridScanTaskManager
 	switch strings.ToLower(firstRequest.HybridScanMode) {
+	case "resume":
+		taskId = firstRequest.GetResumeTaskId()
+		if taskId == "" {
+			return utils.Error("resume task id is empty")
+		}
+		taskManager, err = CreateHybridTask(taskId, taskCtx)
+		if err != nil {
+			return err
+		}
+		go func() {
+			err := s.hybridScanResume(taskManager, taskStream)
+			if err != nil {
+				utils.TryWriteChannel(errC, err)
+			}
+		}()
 	case "new":
-		taskId := uuid.NewV4().String()
-		taskManager, err := CreateHybridTask(taskId, taskCtx)
+		taskId = uuid.NewV4().String()
+		taskManager, err = CreateHybridTask(taskId, taskCtx)
 		if err != nil {
 			return err
 		}
@@ -99,20 +117,23 @@ func (s *Server) HybridScan(stream ypb.Yak_HybridScanServer) error {
 				utils.TryWriteChannel(errC, err)
 			}
 		}()
-		select {
-		case err, ok := <-errC:
-			if ok {
-				return err
-			}
-		case <-streamCtx.Done():
-			taskManager.PauseEffect()
-			taskManager.Stop()
-			taskManager.Resume()
-			return utils.Error("client canceled")
-		}
-		return nil
 	default:
 		return utils.Error("invalid hybrid scan mode")
+	}
+
+	// wait result
+	select {
+	case err, ok := <-errC:
+		if ok {
+			return err
+		}
+		return nil
+	case <-streamCtx.Done():
+		taskManager.PauseEffect()
+		taskManager.Stop()
+		taskManager.Resume()
+		RemoveHybridTask(taskId)
+		return utils.Error("client canceled")
 	}
 }
 
