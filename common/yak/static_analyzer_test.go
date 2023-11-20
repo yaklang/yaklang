@@ -1,9 +1,11 @@
 package yak
 
 import (
+	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/plugin_type_analyzer/rules"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	yaklangspec "github.com/yaklang/yaklang/common/yak/yaklang/spec"
-	"testing"
 )
 
 func TestCounter(t *testing.T) {
@@ -27,4 +29,51 @@ func TestCounter(t *testing.T) {
 		}
 	}
 	println(count)
+}
+
+func check(t *testing.T, code string, want []string) {
+	got := AnalyzeStaticYaklang(code)
+	if len(got) != len(want) {
+		t.Fatalf("static analyzer error length error want(%d) vs got(%d)", len(want), len(got))
+	}
+
+	for i := range got {
+		if got[i].Message != want[i] {
+			t.Fatalf("static analyzer message error want(%s) vs got(%s)", want[i], got[i].Message)
+		}
+	}
+}
+
+func TestSSARuleMustPassYakCliParameter(t *testing.T) {
+
+	t.Run("cli with check", func(t *testing.T) {
+		check(t, `
+	cli.String("a")
+	cli.check()
+		`, []string{})
+	})
+
+	t.Run("cli not check", func(t *testing.T) {
+		check(t, `
+	cli.String("a")
+		`, []string{
+			rules.NotCallCliCheck(),
+		})
+	})
+
+	t.Run("cli not check in last", func(t *testing.T) {
+		check(t, `
+	cli.String("a")
+	cli.check()
+	cli.String("b")
+		`, []string{
+			rules.NotCallCliCheck(),
+		})
+	})
+
+	t.Run("not cli function", func(t *testing.T) {
+		check(t, `
+		println("aaaa")
+		`, []string{})
+	})
 }
