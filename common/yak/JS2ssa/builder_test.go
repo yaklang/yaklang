@@ -214,8 +214,7 @@ func TestLet(t *testing.T) {
 	prog2.Show()
 }
 
-
-func TestFunction(t *testing.T){
+func TestFunction(t *testing.T) {
 	prog := ParseSSA(`
 	function ajax(url, type, data, success) {
 		// 创建一个XMLHttpRequest对象
@@ -248,5 +247,14 @@ func TestFunction(t *testing.T){
 		}
 	}
 	`, none)
-		prog.Show()
+	prog.Show()
+}
+
+func TestExpr(t *testing.T) {
+	prog := ParseSSA(`
+	for(a=1,s=1;a<11&&s<20;a++,s++){
+		a+1,s+a;
+	}
+	`, none)
+	prog.Show()
 }
