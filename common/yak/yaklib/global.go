@@ -215,6 +215,7 @@ func _datetime() string {
 }
 
 // now 用于获取当前时间的时间结构体
+// 它实际上是 time.Now 的别名
 // Example:
 // ```
 // dur = time.ParseDuration("1m")~
