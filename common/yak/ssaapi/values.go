@@ -73,9 +73,9 @@ func (v Values) GetUsers() Values {
 type Value struct {
 	node ssa.InstructionNode
 	// cache
-	line     string
-	users    Values
-	operands Values
+	disasmLine string
+	users      Values
+	operands   Values
 }
 
 func ValueCompare(v1, v2 *Value) bool {
@@ -87,12 +87,17 @@ func NewValue(n ssa.InstructionNode) *Value {
 		node: n,
 	}
 }
+
+func (v *Value) NewError(tag ssa.ErrorKind, msg string) {
+	v.node.NewError(tag, "SSAAPI", msg)
+}
+
 func (v *Value) String() string { return v.node.LineDisasm() }
 func (i *Value) StringWithSource() string {
-	if i.line == "" {
-		i.line = fmt.Sprintf("[%-6s] %s\t%s", i.node.GetOpcode(), i.node.LineDisasm(), i.node.GetPosition())
+	if i.disasmLine == "" {
+		i.disasmLine = fmt.Sprintf("[%-6s] %s\t%s", i.node.GetOpcode(), i.node.LineDisasm(), i.node.GetPosition())
 	}
-	return i.line
+	return i.disasmLine
 }
 
 func (i *Value) Show()           { fmt.Println(i) }
@@ -105,6 +110,10 @@ func (v *Value) GetType() *Type {
 		return newType(n.GetType())
 	}
 	return Any
+}
+
+func (v *Value) GetPosition() *ssa.Position {
+	return v.node.GetPosition()
 }
 
 func (i *Value) HasOperands() bool {
@@ -161,6 +170,7 @@ func (v *Value) GetParameter(i int) *Value {
 	}
 	return nil
 }
+
 func (v *Value) GetParameters() Values {
 	ret := make(Values, 0)
 	if f, ok := ssa.ToFunction(v.node); ok {
@@ -175,6 +185,14 @@ func (v *Value) GetParameters() Values {
 func (v *Value) GetConstValue() any {
 	if v.IsConstInst() {
 		return v.node.(*ssa.ConstInst).GetRawValue()
+	} else {
+		return nil
+	}
+}
+
+func (v *Value) GetConst() *ssa.Const {
+	if v.IsConstInst() {
+		return v.node.(*ssa.ConstInst).Const
 	} else {
 		return nil
 	}
