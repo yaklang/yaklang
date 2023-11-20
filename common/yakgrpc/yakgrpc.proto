@@ -1586,23 +1586,28 @@ message YaklangInspectInformationRequest {
   Position EndPos = 4;
 }
 
-message RiskInfo {
-  string Type = 1;
-  string TypeVerbose = 3;
-  string Level = 2;
-  string Cve = 4;
+// message RiskInfo {
+//   string Type = 1;
+//   string TypeVerbose = 3;
+//   string Level = 2;
+//   string Cve = 4;
+// }
+
+
+message YaklangInformationKV {
+  string Key = 1;
+  bytes Value = 2; 
+  repeated YaklangInformationKV Extern = 3;
 }
+
+message YaklangInformation {
+  string Name = 1;
+  repeated YaklangInformationKV Data = 2;
+}
+
 message YaklangInspectInformationResponse {
-  repeated string SuggestionMessage = 1;
-  string CliParameters = 2; //  json: []CliParameter
-  // struct CliParameter {
-  //   string Name 
-  //   string Type 
-  //   string Help
-  //   bool Required 
-  //   any  Default
-  // }
-  repeated RiskInfo RiskInformations = 3;
+  repeated SuggestionDescription SuggestionMessage = 1;
+  repeated YaklangInformation Information = 2;
 }
 
 message StaticAnalyzeErrorRequest {

@@ -2,13 +2,21 @@ package yakgrpc
 
 import (
 	"context"
-	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func send(client ypb.YakClient, typ, code string, startPos, endPos *ypb.Position) *YaklangInformationResponse {
+// import (
+// 	"context"
+// 	"reflect"
+// 	"testing"
+
+// 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+// )
+
+func send(client ypb.YakClient, typ, code string, startPos, endPos *ypb.Position) *ypb.YaklangInspectInformationResponse {
 	rsp, err := client.YaklangInspectInformation(context.Background(), &ypb.YaklangInspectInformationRequest{
 		YakScriptType: typ,
 		YakScriptCode: code,
@@ -18,143 +26,87 @@ func send(client ypb.YakClient, typ, code string, startPos, endPos *ypb.Position
 	if err != nil {
 		return nil
 	}
-	// fmt.Println(rsp)
-	// from rsp to rspStruct
-	rspStruct, err := fromGrpcModuleToYaklangInformationResponse(rsp)
-	if err != nil {
-		return nil
-	} else {
-		return rspStruct
-	}
+	return rsp
 }
 
-func TestYaklangInspectInformation_Cli(t *testing.T) {
-	client, err := NewLocalClient()
+func CheckKV(t *testing.T, wants map[string]string, infos []*ypb.YaklangInformation) {
+	if len(wants) != len(infos) {
+		t.Fatal("length of kvs and infos not match")
+	}
+
+	compare := func(s1, s2 string) bool {
+		s1 = strings.ReplaceAll(s1, "\n", "")
+		s1 = strings.ReplaceAll(s1, " ", "")
+		s2 = strings.ReplaceAll(s2, "\n", "")
+		s2 = strings.ReplaceAll(s2, " ", "")
+		return s1 == s2
+	}
+	for _, info := range infos {
+		if want, ok := wants[info.Name]; ok {
+			if compare(want, info.String()) {
+				t.Fatalf("want (%s) vs got (%s)", want, info.String())
+			}
+		} else {
+			t.Fatalf("key %s in got, but not in want", info.Name)
+		}
+	}
+
+}
+
+func TestYakGetInfo(t *testing.T) {
+	local, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
 	}
-	check := func(code string, cliLs []*CliParameter) {
-		rsp := send(client, "", code, nil, nil)
-		if rsp == nil {
-			t.Fatal("local client error")
-		}
-		if len(rsp.CliParameter) != len(cliLs) {
-			t.Fatalf("cli parameter length error: got(%d) vs want(%d)", len(rsp.CliParameter), len(cliLs))
-		}
-
-		for i := 0; i < len(cliLs); i++ {
-			gotItem := rsp.CliParameter[i]
-			wantItem := cliLs[i]
-			rv := reflect.ValueOf(gotItem.Default)
-			rTyp := reflect.TypeOf(wantItem.Default)
-			if !rv.CanConvert(rTyp) {
-				t.Fatalf("cli parameter Default type error: got(%v) vs want(%v)", gotItem, wantItem)
-			}
-			gotDefault := rv.Convert(rTyp).Interface()
-			if gotDefault != wantItem.Default {
-				t.Fatalf("cli parameter Default value error: got(%v) vs want(%v)", gotItem, wantItem)
-			}
-			if gotItem.Help != wantItem.Help {
-				t.Fatalf("cli parameter Help error: got(%v) vs want(%v)", gotItem, wantItem)
-			}
-			if gotItem.Name != wantItem.Name {
-				t.Fatalf("cli parameter Name error: got(%v) vs want(%v)", gotItem, wantItem)
-			}
-			if gotItem.Required != wantItem.Required {
-				t.Fatalf("cli parameter Required error: got(%v) vs want(%v)", gotItem, wantItem)
-			}
-			if gotItem.Type != wantItem.Type {
-				t.Fatalf("cli parameter Type error: got(%v) vs want(%v)", gotItem, wantItem)
-			}
-		}
-	}
-
-	t.Run("basic cli", func(t *testing.T) {
-		check(
-			`
+	rsp := send(local, "yak",
+		`
 		cli.String("arg1", cli.setDefault("default variable"), cli.setHelp("help information"), cli.setRequired(true))
 		cli.Int("arg2", cli.setDefault(1), cli.setHelp("help information 2"))
-		`, []*CliParameter{
-				{
-					Name:     "arg1",
-					Type:     "string",
-					Help:     "help information",
-					Required: true,
-					Default:  "default variable",
-				},
-				{
-					Name:     "arg2",
-					Type:     "int",
-					Help:     "help information 2",
-					Required: false,
-					Default:  1,
-				},
-			})
-	})
-}
 
-func TestYaklangInspectInformation_Risk(t *testing.T) {
-	client, err := NewLocalClient()
-	if err != nil {
-		t.Fatal(err)
+		risk.NewRisk(
+				url,
+				risk.title(sprintf("XSS for: %v", url)),
+				risk.titleVerbose(sprintf("检测到xss漏洞: %v", url)),
+				risk.details("report"),
+				risk.description("description info "),
+				risk.solution("solution info"),
+				risk.type("xss"),
+				risk.payload("payloadString"),
+				risk.request("reqRaw"),
+				risk.response("respRaw"),
+				risk.severity("warning"),
+			)
+	`,
+		nil, nil)
+	if rsp == nil {
+		t.Fatal("no response")
 	}
 
-	check := func(code string, risk []*ypb.RiskInfo) {
-		rsp := send(client, "", code, nil, nil)
-		if rsp == nil {
-			t.Fatal("response is nil")
-		}
-
-		if len(rsp.Risk) != len(risk) {
-			t.Fatalf("risk info length error: got(%d) vs want(%d)", len(rsp.Risk), len(risk))
-		}
-
-		for i := range rsp.Risk {
-			got := rsp.Risk[i]
-			want := risk[i]
-			if got.Cve != want.Cve {
-				t.Fatalf("risk info CVE error: got(%v) vs want(%v)", got, want)
-			}
-			if got.Type != want.Type {
-				t.Fatalf("risk info Type error: got(%v) vs want(%v)", got, want)
-			}
-			if got.TypeVerbose != want.TypeVerbose {
-				t.Fatalf("risk info TypeVerbose error: got(%v) vs want(%v)", got, want)
-			}
-			if got.Level != want.Level {
-				t.Fatalf("risk info Level error: got(%v) vs want(%v)", got, want)
-			}
-		}
-	}
-
-	t.Run("basic risk ", func(t *testing.T) {
-		check(
-			`
-			newRisk = (url) => {
-				risk.NewRisk(
-					url,
-					risk.title(sprintf("XSS for: %v", url)),
-					risk.titleVerbose(sprintf("检测到xss漏洞: %v", url)),
-					risk.details("report"),
-					risk.description("description info "),
-					risk.solution("solution info"),
-					risk.type("xss"),
-					risk.payload("payloadString"),
-					risk.request("reqRaw"), 
-					risk.response("respRaw"),
-					risk.severity("warning"),
-				)
-			}
-			`,
-			[]*ypb.RiskInfo{
-				{
-					Type:        "xss",
-					TypeVerbose: "XSS",
-					Level:       "warning",
-					Cve:         "",
-				},
-			},
-		)
-	})
-
+	CheckKV(t, map[string]string{
+		"cli": `
+		Name:"cli" 
+				Data:{
+					Key:"Name" Value:"\"arg1\"" 
+					Extern:{Key:"Type" Value:"\"string\""} 
+					Extern:{Key:"Help" Value:"\"help information\""} 
+					Extern:{Key:"Required" Value:"false"} 
+					Extern:{Key:"Default" Value:"\"default variable\""}
+				} 
+				Data:{
+					Key:"Name" Value:"\"arg2\"" 
+					Extern:{Key:"Type" Value:"\"int\""} 
+					Extern:{Key:"Help" Value:"\"help information 2\""} 
+					Extern:{Key:"Required" Value:"false"} 
+					Extern:{Key:"Default" Value:"1"}
+				}`,
+		"risk": `
+		Name:"risk" 
+			Data:{
+				Key:"Name" Value:"\"risk\"" 
+				Extern:{Key:"Level" Value:"\"warning\""} 
+				Extern:{Key:"CVE" Value:"\"\""} 
+				Extern:{Key:"Type" Value:"\"xss\""} 
+				Extern:{Key:"TypeVerbose" Value:"\"XSS\""}
+			}`,
+	}, rsp.Information)
 }
