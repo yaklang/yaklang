@@ -1302,13 +1302,11 @@ func (b *astbuilder) buildForStatement(stmt *JS.ForStatementContext) {
 				defer recoverRange()
 				return b.buildAllVariableDeclaration(f)
 			})
-		} else if f := first.SingleExpression(); f != nil {
+		} else if f, ok := first.ExpressionSequence().(*JS.ExpressionSequenceContext); ok {
 			loop.BuildFirstExpr(func() []ssa.Value {
 				// recoverRange := b.SetRange(&f.BaseParserRuleContext)
 				// defer recoverRange()
-				var ret []ssa.Value
-				value, _ := b.buildSingleExpression(f, false)
-				ret = append(ret, value)
+				ret := b.buildExpressionSequence(f)
 				return ret
 			})
 		}
@@ -1321,14 +1319,13 @@ func (b *astbuilder) buildForStatement(stmt *JS.ForStatementContext) {
 	}
 
 	if third, ok := stmt.ForThird().(*JS.ForThirdContext); ok {
-		if t, ok := third.SingleExpression().(JS.ISingleExpressionContext); ok {
+		if t, ok := third.ExpressionSequence().(*JS.ExpressionSequenceContext); ok {
 			loop.BuildThird(func() []ssa.Value {
 				// build third expression in loop.latch
 				// recoverRange := b.SetRange(&t.BaseParserRuleContext)
 				// defer recoverRange()
 				var ret []ssa.Value
-				value, _ := b.buildSingleExpression(t, false)
-				ret = append(ret, value)
+				ret = b.buildExpressionSequence(t)
 				return ret
 			})
 		}
