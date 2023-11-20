@@ -258,3 +258,11 @@ func TestExpr(t *testing.T) {
 	`, none)
 	prog.Show()
 }
+
+func TestReturn(t *testing.T) {
+	prog := ParseSSA(`
+		f = () => {a = 1; b = 2; return a, b;}
+		console.log(f())
+	`,none)
+	prog.Show()
+}

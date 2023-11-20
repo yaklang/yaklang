@@ -1554,7 +1554,9 @@ func (b *astbuilder) buildReturnStatement(stmt *JS.ReturnStatementContext) {
 	defer recoverRange()
 	if s, ok := stmt.ExpressionSequence().(*JS.ExpressionSequenceContext); ok {
 		values := b.buildExpressionSequence(s)
-		b.EmitReturn(values)
+		var ret []ssa.Value
+		ret = append(ret, values[len(values)-1])
+		b.EmitReturn(ret)
 	} else {
 		b.EmitReturn(nil)
 	}
