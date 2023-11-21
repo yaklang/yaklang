@@ -2,12 +2,12 @@ package utils
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"net/url"
 	"path"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
 func ExtractorVarsFromPacket(packet []byte, isHttps bool) map[string]string {
@@ -18,6 +18,7 @@ func ExtractorVarsFromPacket(packet []byte, isHttps bool) map[string]string {
 	}
 	return ExtractorVarsFromUrl(urlIns.String())
 }
+
 func ExtractorVarsFromUrl(u string) map[string]string {
 	urlIns, err := url.Parse(u)
 	if err != nil {
@@ -25,22 +26,21 @@ func ExtractorVarsFromUrl(u string) map[string]string {
 		return nil
 	}
 	baseUrl := urlIns.String()
-	var rootUrl, port string
+	rootUrl := ""
+	hostname, port := urlIns.Hostname(), urlIns.Port()
 	if urlIns.Scheme == "https" {
-		if urlIns.Port() == "443" || urlIns.Port() == "" {
+		if port == "443" || port == "" {
 			port = "443"
-			rootUrl = fmt.Sprintf("https://%v", urlIns.Host)
+			rootUrl = fmt.Sprintf("https://%v", hostname)
 		} else {
-			port = urlIns.Port()
-			rootUrl = fmt.Sprintf("https://%v", utils.HostPort(urlIns.Host, urlIns.Port()))
+			rootUrl = fmt.Sprintf("https://%v", urlIns.Host)
 		}
 	} else {
-		if urlIns.Port() == "80" || urlIns.Port() == "" {
+		if port == "80" || port == "" {
 			port = "80"
-			rootUrl = fmt.Sprintf("http://%v", urlIns.Host)
+			rootUrl = fmt.Sprintf("http://%v", hostname)
 		} else {
-			port = urlIns.Port()
-			rootUrl = fmt.Sprintf("http://%v", utils.HostPort(urlIns.Host, urlIns.Port()))
+			rootUrl = fmt.Sprintf("http://%v", urlIns.Host)
 		}
 	}
 	var file string
@@ -52,7 +52,7 @@ func ExtractorVarsFromUrl(u string) map[string]string {
 	baseUrl = strings.TrimRight(baseUrl, "/")
 	rootUrl = strings.TrimRight(rootUrl, "/")
 	return map[string]string{
-		"Host":     urlIns.Hostname(),
+		"Host":     hostname,
 		"Port":     port,
 		"Hostname": urlIns.Host,
 		"RootURL":  rootUrl,
@@ -61,5 +61,4 @@ func ExtractorVarsFromUrl(u string) map[string]string {
 		"File":     file,
 		"Schema":   urlIns.Scheme,
 	}
-
 }
