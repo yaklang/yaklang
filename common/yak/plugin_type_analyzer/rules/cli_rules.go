@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"sort"
 	"strconv"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -18,6 +19,7 @@ func RuleCliDefault(prog *ssaapi.Program) {
 			return v.IsCall() && v.IsReachable() != -1
 		}).ForEach(func(v *ssaapi.Value) {
 			ops := v.GetOperands()
+
 			for i := 2; i < len(ops); i++ {
 				opt := ops[i]
 				optFuncName := opt.GetOperand(0).String()
@@ -73,11 +75,18 @@ func RuleCliDefault(prog *ssaapi.Program) {
 		if len(ports) == 0 {
 			return fmt.Sprintf("%s want valid port, but got %#v", funcName, consts.String()), false
 		}
-		for _, port := range ports {
-			if port <= 0 || port > 65535 {
-				return fmt.Sprintf("%s want valid port, but got %d", funcName, port), false
+		sort.Ints(ports)
+		if len(ports) > 0 {
+			p := ports[0]
+			if p <= 0 {
+				return fmt.Sprintf("%s want valid port, but got %d", funcName, p), false
+			}
+			p = ports[len(ports)-1]
+			if p > 65535 {
+				return fmt.Sprintf("%s want valid port, but got %d", funcName, p), false
 			}
 		}
+
 		return "", true
 	}
 
