@@ -40,14 +40,18 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 	}()
 
 	var hashMap = make(map[int64]struct{})
-	var minIndex int64 = 0
+	var minIndex int64 = -1
 	var maxIndex int64 = 0
 	// string to int
 	for _, val := range utils.ParseStringToPorts(task.SurvivalTaskIndexes) {
 		val := int64(val)
 		hashMap[val] = struct{}{}
-		if val < minIndex {
+		if minIndex == -1 {
 			minIndex = val
+		} else {
+			if val < minIndex {
+				minIndex = val
+			}
 		}
 		if val > maxIndex {
 			maxIndex = val
