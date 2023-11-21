@@ -1,14 +1,12 @@
 package yakit
 
 import (
-	"bufio"
 	"context"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"os"
 	"strconv"
 )
 
@@ -55,17 +53,14 @@ func CreateOrUpdatePayload(db *gorm.DB, hash string, i *Payload) error {
 }
 
 func SavePayloadByFilename(db *gorm.DB, group string, fileName string) error {
-	fp, err := os.Open(fileName)
+	ch, err := utils.FileLineReader(fileName)
 	if err != nil {
 		return err
 	}
-	scanner := bufio.NewScanner(fp)
-	scanner.Split(bufio.ScanLines)
-
-	for scanner.Scan() {
+	for line := range ch {
 		payload := &Payload{
 			Group:   group,
-			Content: strconv.Quote(scanner.Text()),
+			Content: strconv.Quote(string(line)),
 		}
 		payload.Hash = payload.CalcHash()
 		err := CreateOrUpdatePayload(db, payload.Hash, payload)

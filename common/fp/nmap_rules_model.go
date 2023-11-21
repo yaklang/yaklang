@@ -389,11 +389,7 @@ func parsePorts(line string) []int {
 func ParseNmapProbe(raw string) ([]*NmapProbe, error) {
 	probes := []*NmapProbe{}
 
-	scanner := bufio.NewScanner(bytes.NewBufferString(raw))
-	scanner.Split(bufio.ScanLines)
-
-	for scanner.Scan() {
-		line := scanner.Text()
+	for line := range utils.ParseLines(raw) {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
@@ -414,11 +410,7 @@ func ParseNmapProbe(raw string) ([]*NmapProbe, error) {
 func ParseNmapMatch(raw string) ([]*NmapMatch, error) {
 	probes := []*NmapMatch{}
 
-	scanner := bufio.NewScanner(bytes.NewBufferString(raw))
-	scanner.Split(bufio.ScanLines)
-
-	for scanner.Scan() {
-		line := scanner.Text()
+	for line := range utils.ParseLines(raw) {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue

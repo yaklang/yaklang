@@ -22,6 +22,16 @@ func TestRemoveUnprintableChars(t *testing.T) {
 	}
 }
 
+func TestParseStringToLines(t *testing.T) {
+	var a = ParseStringToLines(`abc
+ccc
+ddd`)
+	spew.Dump(a)
+	assert.Equal(t, a[0], "abc")
+	assert.Equal(t, a[1], "ccc")
+	assert.Equal(t, a[2], "ddd")
+}
+
 func TestMUSTPASS_UrlJoin(t *testing.T) {
 	cases := map[string][2]string{
 		"/abc":                          {"https://baidu.com/root", "https://baidu.com/abc"},

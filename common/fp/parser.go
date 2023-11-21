@@ -1,17 +1,13 @@
 package fp
 
 import (
-	"bufio"
-	"bytes"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 )
 
 func ParseNmapServiceProbeToRuleMap(raw []byte) (result map[*NmapProbe][]*NmapMatch, err error) {
 	result = map[*NmapProbe][]*NmapMatch{}
-
-	scanner := bufio.NewScanner(bytes.NewBuffer(raw))
-	scanner.Split(bufio.ScanLines)
 
 	var currentProbe = &NmapProbe{
 		Index:   0,
@@ -20,8 +16,8 @@ func ParseNmapServiceProbeToRuleMap(raw []byte) (result map[*NmapProbe][]*NmapMa
 		Payload: "",
 	}
 	currentIndex := 0
-	for scanner.Scan() {
-		line := scanner.Text()
+
+	for line := range utils.ParseLines(string(raw)) {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
@@ -83,11 +79,7 @@ func ParseNmapServiceProbesTxt(raw string) ([]*NmapProbe, []*NmapMatch, []string
 		failedRule []string
 	)
 
-	scanner := bufio.NewScanner(bytes.NewBufferString(raw))
-	scanner.Split(bufio.ScanLines)
-
-	for scanner.Scan() {
-		line := scanner.Text()
+	for line := range utils.ParseLines(raw) {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
