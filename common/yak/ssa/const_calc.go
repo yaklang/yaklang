@@ -262,6 +262,10 @@ func CalcConstUnary(x *ConstInst, op UnaryOpcode) *ConstInst {
 	switch op {
 	case OpNone:
 		return x
+	case OpBitwiseNot:
+		if x.IsNumber() {
+			return NewConst(^x.Number())
+		}
 	case OpNot:
 		if x.IsBoolean() {
 			return NewConst(!x.Boolean())
@@ -272,7 +276,7 @@ func CalcConstUnary(x *ConstInst, op UnaryOpcode) *ConstInst {
 		}
 	case OpNeg:
 		if x.IsNumber() {
-			return NewConst(-x.Number())
+			return NewConst(-(x.Number()))
 		}
 	case OpChan:
 	}

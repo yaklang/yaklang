@@ -166,7 +166,7 @@ expressionStatement
     ;
 
 ifStatement
-    : If '(' singleExpression ')' statement (Else If '(' singleExpression ')' statement)* elseBlock?
+    : If '(' expressionSequence ')' statement (Else If '(' expressionSequence ')' statement)* elseBlock?
     ;
 
 elseBlock
@@ -178,7 +178,7 @@ forFirst
     ;
 
 forSecond
-    : singleExpression
+    : expressionSequence
     ;
 
 forThird
@@ -186,12 +186,12 @@ forThird
     ;
 
 iterationStatement
-    : Do statement While '(' singleExpression ')' eos                                                                       # DoStatement
-    | While '(' singleExpression ')' statement                                                                              # WhileStatement
+    : Do statement While '(' expressionSequence ')' eos                                                                       # DoStatement
+    | While '(' expressionSequence ')' statement                                                                              # WhileStatement
     | For '(' forFirst? ';' forSecond? ';' forThird? ')' statement   # ForStatement
-    | For '(' (singleExpression | variableDeclaration) In singleExpression ')' statement                                # ForInStatement
+    | For '(' (singleExpression | variableDeclaration) In expressionSequence ')' statement                                # ForInStatement
     // strange, 'of' is an identifier. and p.p("of") not work in sometime.
-    | For Await? '(' (singleExpression | variableDeclaration) identifier{p.p("of")}? singleExpression ')' statement  # ForOfStatement
+    | For Await? '(' (singleExpression | variableDeclaration) identifier{p.p("of")}? expressionSequence ')' statement  # ForOfStatement
     ;
 
 varModifier  // let, const - ECMAScript 6
@@ -221,7 +221,7 @@ withStatement
     ;
 
 switchStatement
-    : Switch '(' singleExpression ')' caseBlock
+    : Switch '(' expressionSequence ')' caseBlock
     ;
 
 caseBlock
@@ -233,7 +233,7 @@ caseClauses
     ;
 
 caseClause
-    : Case singleExpression ':' statementList?
+    : Case expressionSequence ':' statementList?
     ;
 
 defaultClause
