@@ -1,8 +1,7 @@
 package screcorder
 
 import (
-	"bufio"
-	"bytes"
+	"github.com/yaklang/yaklang/common/utils"
 	"regexp"
 	"strings"
 )
@@ -26,13 +25,11 @@ var darwinAVFoundationStripper = regexp.MustCompile(`\[AVFoundation indev @ 0x[0
 var darwinAVFoundationScreenNameFetcher = regexp.MustCompile(`\[(\d+)]\s(.*)`)
 
 func parseDarwinAVFoundationListDevices(raw string) []*ScreenDevice {
-	scanner := bufio.NewScanner(bytes.NewBufferString(raw))
-	scanner.Split(bufio.ScanLines)
 	var picked []*ScreenDevice
 
 	var startToFetchScreen = false
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
+	for line := range utils.ParseLines(raw) {
+		line := strings.TrimSpace(line)
 		if strings.HasPrefix(line, "[AVFoundation indev @ 0x") {
 			line = strings.TrimSpace(darwinAVFoundationStripper.ReplaceAllString(line, ""))
 			if strings.Contains(strings.ToLower(line), "avfoundation video devices") {

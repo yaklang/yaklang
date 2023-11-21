@@ -145,15 +145,13 @@ func GetNginxDetail(c context.Context) []*NginxDetail {
 			continue
 		}
 
-		s := bufio.NewScanner(bytes.NewBuffer(raw))
-		s.Split(bufio.ScanLines)
-		for s.Scan() {
-			l := strings.ToLower(s.Text())
+		for line := range utils.ParseLines(string(raw)) {
+			l := strings.ToLower(line)
 			if strings.HasPrefix(l, "nginx version") {
-				detail.Version = yaklib.Grok(s.Text(), "nginx version: nginx/%{COMMONVERSION:version}").Get("version")
+				detail.Version = yaklib.Grok(line, "nginx version: nginx/%{COMMONVERSION:version}").Get("version")
 			} else if strings.HasPrefix(l, "built with openssl") {
 				r := yaklib.GrokWithMultiPattern(
-					s.Text(), `built with OpenSSL %{OPENSSLVERSION:version}`,
+					line, `built with OpenSSL %{OPENSSLVERSION:version}`,
 					map[string]string{
 						"OPENSSLVERSION": `%{COMMONVERSION}.*`,
 					},
@@ -162,10 +160,10 @@ func GetNginxDetail(c context.Context) []*NginxDetail {
 				detail.OpensslVersionFull = r.Get("version")
 			} else if strings.HasPrefix(l, "configure arguments") {
 				detail.Prefix = yaklib.Grok(
-					s.Text(), `--prefix=%{PATH:prefix}`,
+					line, `--prefix=%{PATH:prefix}`,
 				).Get("prefix")
 				detail.ConfigPath = yaklib.Grok(
-					s.Text(), `--conf-path=%{PATH:data}`,
+					line, `--conf-path=%{PATH:data}`,
 				).Get("data")
 			}
 		}
