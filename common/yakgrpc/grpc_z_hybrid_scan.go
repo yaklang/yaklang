@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -22,15 +23,19 @@ type wrapperHybridScanStream struct {
 	ctx            context.Context
 	root           ypb.Yak_HybridScanServer
 	RequestHandler func(request *ypb.HybridScanRequest) bool
+	sendMutex      *sync.Mutex
 }
 
 func newWrapperHybridScanStream(ctx context.Context, stream ypb.Yak_HybridScanServer) *wrapperHybridScanStream {
 	return &wrapperHybridScanStream{
 		root: stream, ctx: ctx,
+		sendMutex: new(sync.Mutex),
 	}
 }
 
 func (w *wrapperHybridScanStream) Send(r *ypb.HybridScanResponse) error {
+	w.sendMutex.Lock()
+	defer w.sendMutex.Unlock()
 	return w.root.Send(r)
 }
 
@@ -124,6 +129,7 @@ func (s *Server) HybridScan(stream ypb.Yak_HybridScanServer) error {
 	// wait result
 	select {
 	case err, ok := <-errC:
+		RemoveHybridTask(taskId)
 		if ok {
 			return err
 		}

@@ -39,13 +39,18 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 		quickSave()
 	}()
 
-	var hashMap = make(map[int]struct{})
-	var minIndex = 0
+	var hashMap = make(map[int64]struct{})
+	var minIndex int64 = 0
+	var maxIndex int64 = 0
 	// string to int
 	for _, val := range utils.ParseStringToPorts(task.SurvivalTaskIndexes) {
+		val := int64(val)
 		hashMap[val] = struct{}{}
 		if val < minIndex {
 			minIndex = val
+		}
+		if val > maxIndex {
+			maxIndex = val
 		}
 	}
 
@@ -61,6 +66,8 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 	}
 
 	statusManager := newHybridScanStatusManager(task.TaskId, len(targets), len(pluginName))
+	statusManager.SetCurrentTaskIndex(minIndex)
+
 	pluginCacheList := list.New()
 	feedbackStatus := func() {
 		statusManager.Feedback(stream)
@@ -78,6 +85,7 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 		if err != nil {
 			return utils.Wrapf(err, "PluginGenerator")
 		}
+
 		targetWg := new(sync.WaitGroup)
 		for __pluginInstance := range pluginChan {
 			targetRequestInstance := __currentTarget
@@ -96,6 +104,7 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 			})
 
 			taskIndex := statusManager.DoActiveTask()
+
 			feedbackStatus()
 
 			go func() {
@@ -105,6 +114,7 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 				defer func() {
 					statusManager.DoneTask(taskIndex)
 					feedbackStatus()
+					statusManager.RemoveActiveTask(taskIndex, targetRequestInstance, pluginInstance.ScriptName, stream)
 				}()
 
 				// shrink context
@@ -113,6 +123,21 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 					log.Infof("skip task %d via canceled", taskIndex)
 					return
 				default:
+				}
+
+				statusManager.PushActiveTask(taskIndex, targetRequestInstance, pluginInstance.ScriptName, stream)
+
+				// 过滤执行过的任务
+				// 小于最小索引的任务，直接跳过
+				// 大于最大索引的任务，直接执行
+				// 在最小索引和最大索引之间的任务，如果没有执行过，执行
+				if taskIndex < minIndex {
+					return
+				} else if taskIndex >= minIndex && taskIndex <= maxIndex {
+					_, ok := hashMap[taskIndex]
+					if !ok {
+						return
+					}
 				}
 
 				err := s.ScanTargetWithPlugin(task.TaskId, manager.Context(), targetRequestInstance, pluginInstance, func(result *ypb.ExecResult) {

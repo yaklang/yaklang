@@ -124,13 +124,6 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 
 	statusManager := newHybridScanStatusManager(taskId, len(targetCached), len(pluginNames))
 
-	senderMutex := new(sync.Mutex)
-	sender := func(i *ypb.HybridScanResponse) {
-		senderMutex.Lock()
-		defer senderMutex.Unlock()
-		stream.Send(i)
-	}
-
 	statusMutex := new(sync.Mutex)
 	getStatus := func() *ypb.HybridScanResponse {
 		statusMutex.Lock()
@@ -139,23 +132,6 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 	}
 	feedbackStatus := func() {
 		statusManager.Feedback(stream)
-	}
-
-	updateActiveTasks := func(create bool, i int64, t *HybridScanTarget, p *yakit.YakScript) {
-		rsp := getStatus()
-		op := "create"
-		if !create {
-			op = "remove"
-		}
-		rsp.UpdateActiveTask = &ypb.HybridScanUpdateActiveTaskTable{
-			Operator:    op,
-			Index:       fmt.Sprint(i),
-			IsHttps:     t.IsHttps,
-			HTTPRequest: t.Request,
-			PluginName:  p.ScriptName,
-			Url:         utils.EscapeInvalidUTF8Byte([]byte(t.Url)),
-		}
-		sender(rsp)
 	}
 
 	// start dispatch tasks
@@ -198,9 +174,10 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 				defer targetWg.Done()
 				defer func() {
 					statusManager.DoneTask(taskIndex)
-					updateActiveTasks(false, taskIndex, targetRequestInstance, pluginInstance)
+					statusManager.RemoveActiveTask(taskIndex, targetRequestInstance, pluginInstance.ScriptName, stream)
 				}()
-				updateActiveTasks(true, taskIndex, targetRequestInstance, pluginInstance)
+
+				statusManager.PushActiveTask(taskIndex, targetRequestInstance, pluginInstance.ScriptName, stream)
 
 				// shrink context
 				select {

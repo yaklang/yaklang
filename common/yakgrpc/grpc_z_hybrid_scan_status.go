@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -28,15 +29,21 @@ type HybridScanStatusManager struct {
 
 	// Task 计数器，作为索引
 	TaskCount int64
+
+	// 恢复任务的时候使用
+	minTaskCount int64
+}
+
+func (h *HybridScanStatusManager) SetCurrentTaskIndex(i int64) {
+	h.minTaskCount = i
 }
 
 func newHybridScanStatusManager(id string, targets int, plugins int) *HybridScanStatusManager {
 	return &HybridScanStatusManager{
-		TargetTotal:    int64(targets),
-		PluginTotal:    int64(plugins),
-		TotalTaskCount: int64(targets) * int64(plugins),
-		TaskId:         id,
-		ActiveTaskMap:  new(sync.Map),
+		TargetTotal:   int64(targets),
+		PluginTotal:   int64(plugins),
+		TaskId:        id,
+		ActiveTaskMap: new(sync.Map),
 	}
 }
 
@@ -52,12 +59,17 @@ func (h *HybridScanStatusManager) GetStatus(r ...*yakit.HybridScanTask) *ypb.Hyb
 	status := &ypb.HybridScanResponse{
 		TotalTargets:     h.TargetTotal,
 		TotalPlugins:     h.PluginTotal,
-		TotalTasks:       h.TotalTaskCount,
+		TotalTasks:       int64(h.TargetTotal) * int64(h.PluginTotal),
 		FinishedTasks:    h.TaskFinished,
 		FinishedTargets:  h.TargetFinished,
 		ActiveTasks:      h.ActiveTask,
 		ActiveTargets:    h.ActiveTarget,
 		HybridScanTaskId: h.TaskId,
+	}
+	if h.minTaskCount > 0 {
+		if status.FinishedTasks < h.minTaskCount {
+			status.FinishedTasks = h.minTaskCount
+		}
 	}
 	for _, data := range r {
 		fitStatusToHybridScanTaskRecord(status, data)
@@ -75,6 +87,32 @@ func (h *HybridScanStatusManager) DoActiveTask() int64 {
 	index := atomic.AddInt64(&h.TotalTaskCount, 1)
 	h.ActiveTaskMap.Store(index, struct{}{})
 	return index
+}
+
+func (h *HybridScanStatusManager) PushActiveTask(index int64, t *HybridScanTarget, pluginName string, stream HybridScanRequestStream) {
+	rsp := h.GetStatus()
+	rsp.UpdateActiveTask = &ypb.HybridScanUpdateActiveTaskTable{
+		Operator:    "create",
+		Index:       fmt.Sprint(index),
+		IsHttps:     t.IsHttps,
+		HTTPRequest: t.Request,
+		Url:         utils.EscapeInvalidUTF8Byte([]byte(t.Url)),
+		PluginName:  pluginName,
+	}
+	stream.Send(rsp)
+}
+
+func (h *HybridScanStatusManager) RemoveActiveTask(index int64, t *HybridScanTarget, pluginName string, stream HybridScanRequestStream) {
+	rsp := h.GetStatus()
+	rsp.UpdateActiveTask = &ypb.HybridScanUpdateActiveTaskTable{
+		Operator:    "remove",
+		Index:       fmt.Sprint(index),
+		IsHttps:     t.IsHttps,
+		HTTPRequest: t.Request,
+		Url:         utils.EscapeInvalidUTF8Byte([]byte(t.Url)),
+		PluginName:  pluginName,
+	}
+	stream.Send(rsp)
 }
 
 func (h *HybridScanStatusManager) DoneTask(index int64) {
