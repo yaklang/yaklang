@@ -7,12 +7,12 @@ import (
 	"strconv"
 
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
 // 检查 cli.setDefault 设置的默认值是否符合规范
 func RuleCliDefault(prog *ssaapi.Program) {
+	tag := "SSA-cli-setDefault"
 	checkCliDefault := func(funcName string, typ *ssaapi.Type, checkCallBack func(funcName string, v *ssaapi.Value) (string, bool)) {
 		prog.Ref(funcName).GetUsers().Filter(func(v *ssaapi.Value) bool {
 			return v.IsCall() && v.IsReachable() != -1
@@ -30,14 +30,14 @@ func RuleCliDefault(prog *ssaapi.Program) {
 				}
 				fieldTyp := field.GetType()
 				if !fieldTyp.Compare(typ) {
-					field.NewError(ssa.Error, fmt.Sprintf("%s want [%s] type, but got [%s] type", funcName, typ, fieldTyp))
+					field.NewError(tag, fmt.Sprintf("%s want [%s] type, but got [%s] type", funcName, typ, fieldTyp))
 					break
 				}
 
 				if checkCallBack != nil {
 					message, ok := checkCallBack(funcName, field)
 					if !ok {
-						field.NewError(ssa.Error, message)
+						field.NewError(tag, message)
 						break
 					}
 				}
@@ -153,6 +153,7 @@ func RuleCliDefault(prog *ssaapi.Program) {
 
 // 检查参数名是否重复和参数名是否符合规范
 func RuleCliParamName(prog *ssaapi.Program) {
+	tag := "SSA-cli-paramName"
 	cliFuncNames := []string{
 		"cli.String",
 		"cli.StringSlice",
@@ -192,10 +193,10 @@ func RuleCliParamName(prog *ssaapi.Program) {
 			if _, ok := paramLineMap[paramName]; !ok {
 				paramLineMap[paramName] = v.GetPosition().StartLine
 				if !utils.MatchAllOfRegexp(rawParamName, `^[a-zA-Z0-9]+$`) {
-					firstField.NewError(ssa.Error, fmt.Sprintf("parameter [%s] should be letters or numbers", rawParamName))
+					firstField.NewError(tag, fmt.Sprintf("parameter [%s] should be letters or numbers", rawParamName))
 				}
 			} else {
-				firstField.NewError(ssa.Error, fmt.Sprintf("parameter [%s] already defined at line %d", rawParamName, paramLineMap[paramName]))
+				firstField.NewError(tag, fmt.Sprintf("parameter [%s] already defined at line %d", rawParamName, paramLineMap[paramName]))
 			}
 		})
 	}
@@ -203,6 +204,7 @@ func RuleCliParamName(prog *ssaapi.Program) {
 
 // 检查是否在最后面调用了 cli.check
 func RuleCliCheck(prog *ssaapi.Program) {
+	tag := "SSA-cli-check"
 	cliFuncNames := []string{
 		"cli.String",
 		"cli.StringSlice",
@@ -246,7 +248,7 @@ func RuleCliCheck(prog *ssaapi.Program) {
 	}
 
 	if lastCallName != "cli.check" && lastCallValue != nil {
-		lastCallValue.NewError(ssa.Error, NotCallCliCheck())
+		lastCallValue.NewError(tag, NotCallCliCheck())
 	}
 }
 

@@ -88,8 +88,12 @@ func NewValue(n ssa.InstructionNode) *Value {
 	}
 }
 
-func (v *Value) NewError(tag ssa.ErrorKind, msg string) {
-	v.node.NewError(tag, "SSAAPI", msg)
+func (v *Value) NewError(tag, msg string) {
+	v.node.NewError(ssa.Error, ssa.ErrorTag(tag), msg)
+}
+
+func (v *Value) NewWarn(tag, msg string) {
+	v.node.NewError(ssa.Warn, ssa.ErrorTag(tag), msg)
 }
 
 func (v *Value) String() string { return v.node.LineDisasm() }
