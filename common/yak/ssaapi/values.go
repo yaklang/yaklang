@@ -128,7 +128,11 @@ func (i *Value) GetOperands() Values {
 }
 
 func (i *Value) GetOperand(index int) *Value {
-	return i.GetOperands()[index]
+	opts := i.GetOperands()
+	if index >= len(opts) {
+		return nil
+	}
+	return opts[index]
 }
 
 func (i *Value) HasUsers() bool {
@@ -143,7 +147,11 @@ func (i *Value) GetUsers() Values {
 }
 
 func (i *Value) GetUser(index int) *Value {
-	return i.GetUsers()[index]
+	users := i.GetUsers()
+	if index >= len(users) {
+		return nil
+	}
+	return users[index]
 }
 
 func (v *Value) ShowUseDefChain() {
