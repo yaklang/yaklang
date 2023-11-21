@@ -9,6 +9,7 @@ var Exports = map[string]interface{}{
 	// CPU 指标
 	"CPUPercent":            CPUPercent,
 	"MemoryPercent":         MemoryPercent,
+	"CPUAverage":            CPUAverage,
 	"CPUPercentCallback":    CPUPercentCallback,
 	"CPUAverageCallback":    CPUAverageCallback,
 	"MemoryPercentCallback": MemoryPercentCallback,
