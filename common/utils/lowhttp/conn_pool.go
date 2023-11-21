@@ -30,7 +30,7 @@ var (
 		maxIdleConnPerHost: 2,
 		connCount:          0,
 		idleConnTimeout:    90 * time.Second,
-		idleConn:           make(map[uint64][]*persistConn),
+		idleConn:           make(map[string][]*persistConn),
 		keepAliveTimeout:   30 * time.Second,
 	}
 	errServerClosedIdle = errors.New("conn pool: server closed idle connection")
@@ -41,7 +41,7 @@ type lowHttpConnPool struct {
 	maxIdleConn        int                       //最大总连接
 	maxIdleConnPerHost int                       //单host最大连接
 	connCount          int                       //已有连接计数器
-	idleConn           map[uint64][]*persistConn //空闲连接
+	idleConn           map[string][]*persistConn //空闲连接
 	idleConnTimeout    time.Duration             //连接过期时间
 	idleLRU            connLRU                   //连接池 LRU
 	keepAliveTimeout   time.Duration
@@ -89,6 +89,9 @@ func (l *lowHttpConnPool) getFromConn(key connectKey) (oldPc *persistConn, getCo
 		} else {
 			for len(connList) > 0 {
 				oldPc = connList[len(connList)-1]
+
+				log.Infof("old pc : %v", oldPc.cacheKey.hash())
+				log.Infof("want pc : %v", key.hash())
 
 				//检查获取的连接是否空闲超时，若超时再取下一个
 				tooOld := !oldTime.Before(oldPc.idleAt)
@@ -596,9 +599,8 @@ type connectKey struct {
 	gmTls        bool
 }
 
-func (c connectKey) hash() uint64 {
-	data := []byte(fmt.Sprintf("%#v|%s|%s|%v|%v", c.proxy, c.scheme, c.addr, c.https, c.gmTls))
-	return utils.SimHash(data)
+func (c connectKey) hash() string {
+	return utils.CalcSha1(c.proxy, c.scheme, c.addr, c.https, c.gmTls)
 }
 
 type connLRU struct {
