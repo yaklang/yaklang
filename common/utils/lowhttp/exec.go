@@ -605,7 +605,7 @@ RECONNECT:
 			return nil, err
 		}
 
-		_, responsePacket := h2Stream.waitResponse()
+		_, responsePacket := h2Stream.waitResponse(timeout)
 		httpctx.SetBareResponseBytes(option.NativeHTTPRequestInstance, responsePacket)
 		response.RawPacket = responsePacket
 		return response, nil
