@@ -1038,12 +1038,21 @@ func (b *astbuilder) buildObjectLiteral(stmt *JS.ObjectLiteralContext) ssa.Value
 
 	var value []ssa.Value
 	var keys []ssa.Value
-
-	for _, p := range stmt.AllPropertyAssignment() {
+	hasKey := false
+	for i, p := range stmt.AllPropertyAssignment() {
 		var rv ssa.Value
 		var key ssa.Value
 
 		if pro, ok := p.(*JS.PropertyExpressionAssignmentContext); ok {
+			if i == 0 {
+				hasKey = true
+			}
+
+			if !hasKey {
+				b.NewError(ssa.Error, TAG, `Uncaught SyntaxError: Unexpected token ':'`)
+				return nil
+			}
+
 			if s, ok := pro.PropertyName().(*JS.PropertyNameContext); ok {
 				key = b.buildPropertyName(s)
 			}
@@ -1051,7 +1060,17 @@ func (b *astbuilder) buildObjectLiteral(stmt *JS.ObjectLiteralContext) ssa.Value
 			if s := pro.SingleExpression(); s != nil {
 				rv, _ = b.buildSingleExpression(s, false)
 			}
+
 		} else if pro, ok := p.(*JS.ComputedPropertyExpressionAssignmentContext); ok {
+			if i == 0 {
+				hasKey = true
+			}
+
+			if !hasKey {
+				b.NewError(ssa.Error, TAG, `Uncaught SyntaxError: Unexpected token ':'`)
+				return nil
+			}
+
 			if s := pro.SingleExpression(0); s != nil {
 				key, _ = b.buildSingleExpression(s, false)
 			}
@@ -1059,6 +1078,11 @@ func (b *astbuilder) buildObjectLiteral(stmt *JS.ObjectLiteralContext) ssa.Value
 				rv, _ = b.buildSingleExpression(s, false)
 			}
 		} else if pro, ok := p.(*JS.FunctionPropertyContext); ok {
+			if hasKey {
+				b.NewError(ssa.Error, TAG, `Uncaught SyntaxError: Unexpected token ':'`)
+				return nil
+			}
+			
 			var funcName string
 			if s, ok := pro.PropertyName().(*JS.PropertyNameContext); ok {
 				funcName = s.GetText()
@@ -1097,6 +1121,11 @@ func (b *astbuilder) buildObjectLiteral(stmt *JS.ObjectLiteralContext) ssa.Value
 			_ = pro
 			// fmt.Println(pro)
 		} else if pro, ok := p.(*JS.PropertyShorthandContext); ok {
+			if hasKey {
+				b.NewError(ssa.Error, TAG, `Uncaught SyntaxError: Unexpected token ':'`)
+				return nil
+			}
+			
 			if s := pro.SingleExpression(); s != nil {
 				rv, _ = b.buildSingleExpression(s, false)
 			}
@@ -1109,7 +1138,9 @@ func (b *astbuilder) buildObjectLiteral(stmt *JS.ObjectLiteralContext) ssa.Value
 		}
 
 		value = append(value, rv)
-		keys = append(keys, key)
+		if hasKey{
+			keys = append(keys, key)
+		}
 	}
 
 	if len(keys) == 0 {
