@@ -66,6 +66,8 @@ type http2ClientStream struct {
 
 	readEndStream bool // peer send END_STREAM flag or RST_STREAM flag
 	readHeaderEnd bool
+
+	readEndStreamSignal chan struct{}
 }
 
 type http2ClientConnReadLoop struct {
@@ -332,13 +334,19 @@ func (cs *http2ClientStream) doRequest() error {
 	return nil
 }
 
-func (cs *http2ClientStream) waitResponse() (http.Response, []byte) {
-	for !cs.readEndStream {
-		time.Sleep(time.Millisecond * 200)
+func (cs *http2ClientStream) waitResponse(timeout time.Duration) (http.Response, []byte) {
+	select {
+	case <-time.After(timeout):
+	case <-cs.readEndStreamSignal:
 	}
 	cs.resp.Body = io.NopCloser(cs.bodyBuffer)
 	cs.respPacket, _ = utils.DumpHTTPResponse(cs.resp, len(cs.bodyBuffer.Bytes()) > 0)
 	return *cs.resp, cs.respPacket
+}
+
+func (cs *http2ClientStream) setEndStream() {
+	cs.readEndStream = true
+	cs.readEndStreamSignal <- struct{}{}
 }
 
 func streamAliveCheck(cs *http2ClientStream, id uint32) error {
@@ -384,7 +392,7 @@ func (rl *http2ClientConnReadLoop) processHeaders(f *http2.HeadersFrame) error {
 		}
 
 		if f.StreamEnded() {
-			cs.readEndStream = true
+
 		}
 		return nil
 	}
@@ -451,7 +459,7 @@ func (rl *http2ClientConnReadLoop) processData(f *http2.DataFrame) error {
 	}
 
 	if f.StreamEnded() { // end stream flag
-		cs.readEndStream = true
+		cs.setEndStream()
 	}
 	return nil
 }
@@ -509,7 +517,7 @@ func (rl *http2ClientConnReadLoop) processResetStream(f *http2.RSTStreamFrame) e
 	if cs == nil {
 		return utils.Errorf("unknown stream id: %v", f.StreamID)
 	}
-	cs.readEndStream = true
+	cs.setEndStream()
 	return nil
 }
 
