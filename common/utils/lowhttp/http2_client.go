@@ -124,6 +124,7 @@ func (h2Conn *http2ClientConn) newStream(req *http.Request, packet []byte) *http
 		sentHeaders:         false,
 		sentEndStream:       false,
 		readEndStream:       false,
+		readEndStreamSignal: make(chan struct{}, 1),
 		req:                 req,
 		reqPacket:           packet,
 	}
