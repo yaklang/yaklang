@@ -46,9 +46,9 @@ func ExtractorVarsFromUrl(u string) map[string]string {
 	var file string
 	pathRaw := urlIns.RequestURI()
 	if strings.Contains(pathRaw, "?") {
-		pathNoQuery := pathRaw[:strings.Index(pathRaw, "?")]
-		_, file = path.Split(pathNoQuery)
+		pathRaw = pathRaw[:strings.Index(pathRaw, "?")]
 	}
+	_, file = path.Split(pathRaw)
 	baseUrl = strings.TrimRight(baseUrl, "/")
 	rootUrl = strings.TrimRight(rootUrl, "/")
 	return map[string]string{
