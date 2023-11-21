@@ -11,8 +11,9 @@ type BitReader struct {
 }
 type BitWriter struct {
 	*bitio.Writer
-	preIsByte  bool
-	preByteLen uint8
+	PreIsByte  bool
+	PreByte    uint8
+	PreByteLen uint8
 }
 
 func (b *BitReader) ReadBits(n uint64) ([]byte, error) {
@@ -47,13 +48,13 @@ func (b *BitWriter) WriteBits(bs []byte, length uint64) (err error) {
 	}
 	bytesLen := length / 8
 	bitLen := length % 8
-	if b.preIsByte {
-		if b.preByteLen+uint8(bitLen) != 8 {
+	if b.PreIsByte {
+		if b.PreByteLen+uint8(bitLen) != 8 {
 			return errors.New("pre byte len not equal 8")
 		}
 		defer func() {
-			b.preIsByte = false
-			b.preByteLen = 0
+			b.PreIsByte = false
+			b.PreByteLen = 0
 		}()
 		if len(bs) == 0 {
 			return errors.New("empty bytes")
@@ -71,8 +72,9 @@ func (b *BitWriter) WriteBits(bs []byte, length uint64) (err error) {
 		}
 	} else {
 		if bitLen != 0 {
-			b.preIsByte = true
-			b.preByteLen = uint8(bitLen)
+			b.PreIsByte = true
+			b.PreByte = bs[bytesLen]
+			b.PreByteLen = uint8(bitLen)
 		}
 		if bytesLen > 0 {
 			_, err = b.Writer.Write(bs[:bytesLen])

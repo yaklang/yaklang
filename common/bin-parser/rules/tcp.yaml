@@ -1,23 +1,5 @@
 endian: big
 Package:
-    Ethernet:
-        Destination: raw,6
-        Source: raw,6
-        Type: raw,2
-    Internet:
-        length-from-field: Header Length
-        length-from-field-multiply: 32
-        Version: uint8,4bit
-        Header Length: uint8,4bit
-        Type of Service: raw,1
-        Total Length: uint16
-        Identification: raw,2
-        Flags And Fragment Offset : raw,2
-        Time to Live: raw,1
-        Protocol: raw,1
-        Header Checksum: raw,2
-        Source: raw,4
-        Destination: raw
     TCP:
         length-from-field: Header Length
         length-from-field-multiply: 32
@@ -36,7 +18,7 @@ Package:
 
 Option:
     operator: |
-        n = this.Kind.Process()
+        n = this.GetSubNode("Kind").Process()
         switch n {
             case 0:
                 setCtx("inList",false)
@@ -44,8 +26,8 @@ Option:
             case 1:
                 break
             default:
-                this.Length.Process() 
-                this.Data.Process()    
+                this.GetSubNode("Length").Process() 
+                this.GetSubNode("Data").Process()    
         }
     length-from-field: Length
     length-from-field-multiply: 8

@@ -426,30 +426,22 @@ func Parse(data io.Reader, rule string) (*Node, error) {
 	}
 	return packageNode, nil
 }
-func ParseBinary(data io.Reader, rule string) (*base.NodeResult, error) {
-	ruleContent, err := os.ReadFile("./rules/" + rule + ".yaml")
+func ParseBinary(data io.Reader, rule string) (*base.Node, error) {
+	rootNode, err := parser.ParseRule("./rules/" + rule + ".yaml")
 	if err != nil {
 		return nil, err
 	}
-	rootNode, err := parser.ParseRule(ruleContent)
+	err = rootNode.Parse(base.NewBitReader(data))
 	if err != nil {
 		return nil, err
 	}
-	result, err := rootNode.Parse(base.NewBitReader(data))
-	if err != nil {
-		return nil, err
-	}
-	return result, nil
+	return rootNode, nil
 }
 
-func GenerateBinary(data any, rule string) (*base.NodeResult, error) {
-	ruleContent, err := os.ReadFile("./rules/" + rule + ".yaml")
+func GenerateBinary(data any, rule string) (*base.Node, error) {
+	rootNode, err := parser.ParseRule("./rules/" + rule + ".yaml")
 	if err != nil {
 		return nil, err
 	}
-	rootNode, err := parser.ParseRule(ruleContent)
-	if err != nil {
-		return nil, err
-	}
-	return rootNode.Generate(data)
+	return rootNode, rootNode.Generate(data)
 }

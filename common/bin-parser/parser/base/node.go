@@ -1,12 +1,10 @@
 package base
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
 	"gopkg.in/yaml.v2"
-	"math"
 	"unicode"
 )
 
@@ -60,6 +58,13 @@ type Config struct {
 	BaseKV
 }
 
+func NewEmptyConfig() *Config {
+	return &Config{
+		BaseKV: BaseKV{
+			make(map[string]any),
+		},
+	}
+}
 func NewConfig(config *Config) *Config {
 	res := &Config{
 		BaseKV: BaseKV{
@@ -86,103 +91,48 @@ type Node struct {
 	Cfg      *Config
 	Ctx      *NodeContext
 }
-type NodeResult struct {
-	Length         uint64
-	IsTerminalData bool
-	TerminalData   any
-	Struct         *Node
-	Children       []*NodeResult
-	Buffer         *bytes.Buffer
-	writer         *BitWriter
-}
 
-func NewNodeResultByNode(node *Node) *NodeResult {
-	buf := bytes.NewBuffer(nil)
-	return &NodeResult{
-		Struct:         node,
-		Buffer:         buf,
-		IsTerminalData: node.Cfg.GetBool("isTerminal"),
-		writer:         NewBitWriter(buf),
-	}
-}
-func (n *NodeResult) Bytes() []byte {
-	res := n.Buffer.Bytes()
-	length := n.Struct.Cfg.GetUint64("length")
-	if len(res) < int(length/8) {
-		res = append(res, make([]byte, int(length/8)-len(res))...)
-	}
-	return res
-}
-func (n *NodeResult) AppendChildren(children ...*NodeResult) error {
-	for _, child := range children {
-		err := n.AppendChild(child)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-func (n *NodeResult) Write(data []byte, length uint64) error {
-	n1 := int(math.Ceil(float64(length) / 8))
-	if len(data) < n1 {
-		data = append(data, make([]byte, n1-len(data))...)
-	}
-	err := n.writer.WriteBits(data, length)
-	if err != nil {
-		return fmt.Errorf("append child error: %w", err)
-	}
-	return nil
-}
-func (n *NodeResult) AppendChild(child *NodeResult) error {
-	n.Children = append(n.Children, child)
-	n.Length += child.Length
-	err := n.Write(child.Bytes(), child.Length)
-	if err != nil {
-		return fmt.Errorf("append child error: %w", err)
-	}
-	return nil
-}
-func (n *Node) Generate(data any) (*NodeResult, error) {
+func (n *Node) Generate(data any) error {
 	parserName := n.Cfg.GetItem("parser")
 	if parserName == nil {
-		return nil, errors.New("not set parser")
+		return errors.New("not set parser")
 	}
 	parser, ok := parseMap[utils.InterfaceToString(parserName)]
 	if !ok {
-		return nil, fmt.Errorf("parser %s not found", parserName)
+		return fmt.Errorf("parser %s not found", parserName)
 	}
 	if n.Cfg.GetItem("isRoot") != nil {
 		err := parser.OnRoot(n)
 		if err != nil {
-			return nil, fmt.Errorf("on root error: %w", err)
+			return fmt.Errorf("on root error: %w", err)
 		}
 	}
-	res, err := parser.Generate(data, n)
+	err := parser.Generate(data, n)
 	if err != nil {
-		return nil, fmt.Errorf("parse node %s error: %w", n.Name, err)
+		return fmt.Errorf("parse node %s error: %w", n.Name, err)
 	}
-	return res, nil
+	return nil
 }
-func (n *Node) Parse(reader *BitReader) (*NodeResult, error) {
+func (n *Node) Parse(reader *BitReader) error {
 	parserName := n.Cfg.GetItem("parser")
 	if parserName == nil {
-		return nil, errors.New("not set parser")
+		return errors.New("not set parser")
 	}
 	parser, ok := parseMap[utils.InterfaceToString(parserName)]
 	if !ok {
-		return nil, fmt.Errorf("parser %s not found", parserName)
+		return fmt.Errorf("parser %s not found", parserName)
 	}
 	if n.Cfg.GetItem("isRoot") != nil {
 		err := parser.OnRoot(n)
 		if err != nil {
-			return nil, fmt.Errorf("on root error: %w", err)
+			return fmt.Errorf("on root error: %w", err)
 		}
 	}
-	res, err := parser.Parse(reader, n)
+	err := parser.Parse(reader, n)
 	if err != nil {
-		return nil, fmt.Errorf("parse node %s error: %w", n.Name, err)
+		return fmt.Errorf("parse node %s error: %w", n.Name, err)
 	}
-	return res, nil
+	return nil
 }
 
 // NewEmptyNode 默认初始化一个空节点
@@ -194,6 +144,29 @@ func NewEmptyNode(name string, d any, cfg *Config, ctx *NodeContext) *Node {
 		Ctx:    ctx,
 	}
 	return node
+}
+
+//	func (n *Node) SetParentResultWriterByNode(node *Node) {
+//		nodeRes := node.Cfg.GetItem("resultWriter").(*NodeResult)
+//		n.Cfg.SetItem("parentResultWriter", func(d []byte, length uint64) error {
+//			return nodeRes.Write(d, length)
+//		})
+//	}
+func (n *Node) AppendNode(node *Node) error {
+	newNode, err := newNodeTree(n.Cfg, node.Name, node.Origin, n.Ctx)
+	if err != nil {
+		return err
+	}
+	n.Children = append(n.Children, newNode)
+	var setParent func(parent, node *Node)
+	setParent = func(parent, node *Node) {
+		node.Cfg.SetItem(CfgParent, parent)
+		for _, child := range node.Children {
+			setParent(node, child)
+		}
+	}
+	setParent(n, newNode)
+	return nil
 }
 func NewNodeTree(d yaml.MapSlice) (*Node, error) {
 	defaultConfig := &Config{
@@ -215,6 +188,9 @@ func NewNodeTree(d yaml.MapSlice) (*Node, error) {
 	ctx.SetItem("root", root)
 	root.Cfg.SetItem("isRoot", true)
 	return root, nil
+}
+func NewNodeTreeWithConfig(parentCfg *Config, name string, data any, ctx *NodeContext) (*Node, error) {
+	return newNodeTree(parentCfg, name, data, ctx)
 }
 func newNodeTree(parentCfg *Config, name string, data any, ctx *NodeContext) (*Node, error) {
 	cfg := NewConfig(parentCfg)

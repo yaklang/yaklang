@@ -2,26 +2,11 @@ package parser
 
 import (
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
-	_default "github.com/yaklang/yaklang/common/bin-parser/parser/default"
-	"gopkg.in/yaml.v2"
+	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
 )
 
 func init() {
-	base.RegisterParser("default", &_default.DefParser{})
+	base.RegisterParser("default", &stream_parser.DefParser{})
 }
 
-func ParseRule(ruleContent []byte) (*base.Node, error) {
-	var ruleMap yaml.MapSlice
-	err := yaml.Unmarshal(ruleContent, &ruleMap)
-	if err != nil {
-		return nil, err
-	}
-	rootNode, err := base.NewNodeTree(ruleMap)
-	if err != nil {
-		return nil, err
-	}
-	if !rootNode.Cfg.Has("parser") {
-		rootNode.Cfg.SetItem("parser", "default")
-	}
-	return rootNode, nil
-}
+var ParseRule = stream_parser.ParseRule
