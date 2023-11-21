@@ -250,6 +250,10 @@ type getSingleExpr interface {
 	SingleExpression(i int) JS.ISingleExpressionContext
 }
 
+type getUnSingleExpr interface {
+	SingleExpression() JS.ISingleExpressionContext
+}
+
 func (b *astbuilder) buildSingleExpression(stmt JS.ISingleExpressionContext, IslValue bool) (ssa.Value, ssa.LeftValue) {
 	// TODO: singleExpressions unfinish
 
@@ -368,6 +372,41 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 			if s, ok := stmt.(*JS.BitOrExpressionContext); ok {
 				if op := s.BitOr(); op != nil {
 					single, Op, IsBinOp = s, ssa.OpOr, true
+				}
+			}
+
+			break
+		}
+
+		b.NewError(ssa.Error, TAG, "binary operator not support: %s", stmt.GetText())
+		return
+	}
+
+	getUnaryOp := func() (single getUnSingleExpr, Op ssa.UnaryOpcode, IsUnaryOp bool) {
+		single, Op, IsUnaryOp = nil, 0, false
+		for {
+			// +
+			if s, ok := stmt.(*JS.UnaryPlusExpressionContext); ok {
+				if op := s.Plus(); op != nil {
+					single, Op, IsUnaryOp = s, ssa.OpPlus, true
+				} else {
+					break
+				}
+			}
+
+			// -
+			if s, ok := stmt.(*JS.UnaryMinusExpressionContext); ok {
+				if op := s.Minus(); op != nil {
+					single, Op, IsUnaryOp = s, ssa.OpNeg, true
+				} else {
+					break
+				}
+			}
+
+			// ~
+			if s, ok := stmt.(*JS.BitNotExpressionContext); ok {
+				if op := s.BitNot(); op != nil {
+					single, Op, IsUnaryOp = s, ssa.OpBitwiseNot, true
 				} else {
 					break
 				}
@@ -375,8 +414,7 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 
 			return
 		}
-
-		b.NewError(ssa.Error, TAG, "binary operator not support: %s", stmt.GetText())
+		b.NewError(ssa.Error, TAG, "unary operator not support: %s", stmt.GetText())
 		return
 	}
 
@@ -400,6 +438,22 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 
 		// fallback is right?
 		b.NewError(ssa.Error, TAG, "error binary operator")
+		return nil
+	}
+
+	handlePrimaryUnaryOperation := func() ssa.Value {
+		// 比特运算
+		single, opcode, IsUnOp := getUnaryOp()
+		if IsUnOp {
+			op, _ := b.buildSingleExpression(single.SingleExpression(), false)
+			if op == nil {
+				b.NewError(ssa.Error, TAG, "in operator need expression")
+				return nil
+			}
+			return b.EmitUnOp(opcode, op)
+		}
+
+		b.NewError(ssa.Error, TAG, "error unary operator")
 		return nil
 	}
 
@@ -433,8 +487,6 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 		return b.ReadVariable(id, true)
 
 	}
-
-	// fmt.Println("the expression: ", stmt.GetText())
 
 	switch s := stmt.(type) {
 	case *JS.FunctionExpressionContext:
@@ -510,8 +562,11 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 			}
 		}
 	case *JS.UnaryPlusExpressionContext:
+		return handlePrimaryUnaryOperation()
 	case *JS.UnaryMinusExpressionContext:
+		return handlePrimaryUnaryOperation()
 	case *JS.BitNotExpressionContext:
+		return handlePrimaryUnaryOperation()
 	case *JS.NotExpressionContext:
 	case *JS.AwaitExpressionContext:
 		if expr := s.SingleExpression(); expr != nil {
@@ -625,7 +680,7 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 	case *JS.ParenthesizedExpressionContext:
 		if expr, ok := s.ExpressionSequence().(*JS.ExpressionSequenceContext); ok {
 			exprs := b.buildExpressionSequence(expr)
-			return exprs[len(exprs)-1]
+			return exprs
 		}
 	default:
 		log.Warnf("not support expression: %s", stmt.GetText())
@@ -1104,22 +1159,28 @@ func (b *astbuilder) buildIdentifierName(stmt *JS.IdentifierNameContext) ssa.Val
 	return nil
 }
 
-func (b *astbuilder) buildExpressionSequence(stmt *JS.ExpressionSequenceContext) []ssa.Value {
+// NOTE:
+//
+//	simgleExpr -> rightValue, leftValue
+//	seqExprs (expr1, expr2, expr3) -> expr3RightValue, expr3Left
+//
+//	expr -> rValue, lValue
+func (b *astbuilder) buildExpressionSequence(stmt *JS.ExpressionSequenceContext) ssa.Value {
 	// 需要修改改函数及引用，不存在if中存在多个singleExpression的情况
 	// compelte
 
 	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
-	var values []ssa.Value
+	var finalRvalue ssa.Value
 
 	for _, expr := range stmt.AllSingleExpression() {
 		if s := expr; s != nil {
-			rv, _ := b.buildSingleExpression(s, false)
-			values = append(values, rv)
+			finalRvalue, _ = b.buildSingleExpression(s, false)
+			// values = append(values, rv)
 		}
 	}
-	return values
+	return finalRvalue
 }
 
 func (b *astbuilder) buildIfStatementContext(stmt *JS.IfStatementContext) {
@@ -1133,8 +1194,8 @@ func (b *astbuilder) buildIfStatementContext(stmt *JS.IfStatementContext) {
 		// if instruction condition
 		i.BuildCondition(
 			func() ssa.Value {
-				if s := stmt.SingleExpression(0); s != nil {
-					value, _ := b.buildSingleExpression(s, false)
+				if s, ok := stmt.ExpressionSequence(0).(*JS.ExpressionSequenceContext); ok {
+					value := b.buildExpressionSequence(s)
 					return value
 				}
 				return nil
@@ -1151,15 +1212,15 @@ func (b *astbuilder) buildIfStatementContext(stmt *JS.IfStatementContext) {
 
 		// else if
 		for index := range stmt.AllElse() {
-			condstmt := stmt.SingleExpression(index + 1)
-			if condstmt == nil {
+			condstmt, ok := stmt.ExpressionSequence(index + 1).(*JS.ExpressionSequenceContext)
+			if !ok {
 				continue
 			}
 
 			i.BuildElif(
 				// condition
 				func() ssa.Value {
-					rv, _ := b.buildSingleExpression(condstmt, false)
+					rv := b.buildExpressionSequence(condstmt)
 					return rv
 				},
 				// body
@@ -1219,9 +1280,9 @@ func (b *astbuilder) buildDoStatement(stmt *JS.DoStatementContext) {
 	// 构建循环进行条件判断
 	loop := b.BuildLoop()
 
-	var cond JS.ISingleExpressionContext
+	var cond *JS.ExpressionSequenceContext
 
-	if s := stmt.SingleExpression(); s != nil {
+	if s, ok := stmt.ExpressionSequence().(*JS.ExpressionSequenceContext); ok {
 		cond = s
 	}
 
@@ -1230,7 +1291,7 @@ func (b *astbuilder) buildDoStatement(stmt *JS.DoStatementContext) {
 		if cond == nil {
 			condition = ssa.NewConst(true)
 		} else {
-			condition, _ = b.buildSingleExpression(cond, false)
+			condition = b.buildExpressionSequence(cond)
 			if condition == nil {
 				condition = ssa.NewConst(true)
 			}
@@ -1256,9 +1317,9 @@ func (b *astbuilder) buildwhileStatement(stmt *JS.WhileStatementContext) {
 	// 构建循环进行条件判断
 	loop := b.BuildLoop()
 
-	var cond JS.ISingleExpressionContext
+	var cond *JS.ExpressionSequenceContext
 
-	if s := stmt.SingleExpression(); s != nil {
+	if s, ok := stmt.ExpressionSequence().(*JS.ExpressionSequenceContext); ok {
 		cond = s
 	}
 
@@ -1267,7 +1328,7 @@ func (b *astbuilder) buildwhileStatement(stmt *JS.WhileStatementContext) {
 		if cond == nil {
 			condition = ssa.NewConst(true)
 		} else {
-			condition, _ = b.buildSingleExpression(cond, false)
+			condition = b.buildExpressionSequence(cond)
 			if condition == nil {
 				condition = ssa.NewConst(true)
 			}
@@ -1292,7 +1353,7 @@ func (b *astbuilder) buildForStatement(stmt *JS.ForStatementContext) {
 
 	loop := b.BuildLoop()
 
-	var cond JS.ISingleExpressionContext
+	var cond *JS.ExpressionSequenceContext
 
 	// fmt.Println("---------------------")
 	if first, ok := stmt.ForFirst().(*JS.ForFirstContext); ok {
@@ -1307,13 +1368,13 @@ func (b *astbuilder) buildForStatement(stmt *JS.ForStatementContext) {
 				// recoverRange := b.SetRange(&f.BaseParserRuleContext)
 				// defer recoverRange()
 				ret := b.buildExpressionSequence(f)
-				return ret
+				return []ssa.Value{ret}
 			})
 		}
 	}
 
 	if expr, ok := stmt.ForSecond().(*JS.ForSecondContext); ok {
-		if e, ok := expr.SingleExpression().(JS.ISingleExpressionContext); ok {
+		if e, ok := expr.ExpressionSequence().(*JS.ExpressionSequenceContext); ok {
 			cond = e
 		}
 	}
@@ -1324,9 +1385,9 @@ func (b *astbuilder) buildForStatement(stmt *JS.ForStatementContext) {
 				// build third expression in loop.latch
 				// recoverRange := b.SetRange(&t.BaseParserRuleContext)
 				// defer recoverRange()
-				var ret []ssa.Value
-				ret = b.buildExpressionSequence(t)
-				return ret
+				// var ret []ssa.Value
+				ret := b.buildExpressionSequence(t)
+				return []ssa.Value{ret}
 			})
 		}
 	}
@@ -1338,7 +1399,7 @@ func (b *astbuilder) buildForStatement(stmt *JS.ForStatementContext) {
 		if cond == nil {
 			condition = ssa.NewConst(true)
 		} else {
-			condition, _ = b.buildSingleExpression(cond, false)
+			condition = b.buildExpressionSequence(cond)
 			if condition == nil {
 				condition = ssa.NewConst(true)
 			}
@@ -1369,10 +1430,12 @@ func (b *astbuilder) buildForInStatement(stmt *JS.ForInStatementContext) {
 
 		if s, ok := stmt.VariableDeclaration().(*JS.VariableDeclarationContext); ok {
 			_, left = b.buildVariableDeclaration(s, "v")
-			value, _ = b.buildSingleExpression(stmt.SingleExpression(0), false)
 		} else {
-			_, left = b.buildSingleExpression(stmt.SingleExpression(0), true)
-			value, _ = b.buildSingleExpression(stmt.SingleExpression(1), false)
+			_, left = b.buildSingleExpression(stmt.SingleExpression(), true)
+		}
+
+		if s, ok := stmt.ExpressionSequence().(*JS.ExpressionSequenceContext); ok {
+			value = b.buildExpressionSequence(s)
 		}
 
 		key, _, ok := b.EmitNext(value, false)
@@ -1405,12 +1468,13 @@ func (b *astbuilder) buildForOfStatement(stmt *JS.ForOfStatementContext) {
 
 		if s, ok := stmt.VariableDeclaration().(*JS.VariableDeclarationContext); ok {
 			_, left = b.buildVariableDeclaration(s, "v")
-			value, _ = b.buildSingleExpression(stmt.SingleExpression(0), false)
 		} else {
-			_, left = b.buildSingleExpression(stmt.SingleExpression(0), true)
-			value, _ = b.buildSingleExpression(stmt.SingleExpression(1), false)
+			_, left = b.buildSingleExpression(stmt.SingleExpression(), true)
 		}
 
+		if s, ok := stmt.ExpressionSequence().(*JS.ExpressionSequenceContext); ok {
+			value = b.buildExpressionSequence(s)
+		}
 		_, field, ok := b.EmitNext(value, true)
 		left.Assign(field, b.FunctionBuilder)
 
@@ -1554,9 +1618,7 @@ func (b *astbuilder) buildReturnStatement(stmt *JS.ReturnStatementContext) {
 	defer recoverRange()
 	if s, ok := stmt.ExpressionSequence().(*JS.ExpressionSequenceContext); ok {
 		values := b.buildExpressionSequence(s)
-		var ret []ssa.Value
-		ret = append(ret, values[len(values)-1])
-		b.EmitReturn(ret)
+		b.EmitReturn([]ssa.Value{values})
 	} else {
 		b.EmitReturn(nil)
 	}
@@ -1666,9 +1728,9 @@ func (b *astbuilder) buildSwitchStatement(stmt *JS.SwitchStatementContext) {
 	Switchb := b.BuildSwitch()
 	Switchb.DefaultBreak = false
 
-	if s := stmt.SingleExpression(); s != nil {
+	if s, ok := stmt.ExpressionSequence().(*JS.ExpressionSequenceContext); ok {
 		Switchb.BuildCondition(func() ssa.Value {
-			rv, _ := b.buildSingleExpression(s, false)
+			rv := b.buildExpressionSequence(s)
 			return rv
 		})
 	} else {
@@ -1693,16 +1755,18 @@ func (b *astbuilder) buildCaseBlock(stmt *JS.CaseBlockContext, Switchb *ssa.Swit
 		if cs, ok := s.(*JS.CaseClausesContext); ok {
 			for _, i := range cs.AllCaseClause() {
 				if c, ok := i.(*JS.CaseClauseContext); ok {
-					rv, _ := b.buildSingleExpression(c.SingleExpression(), false)
-					exprs = append(exprs, rv)
+					if expr, ok := c.ExpressionSequence().(*JS.ExpressionSequenceContext); ok {
+						rv := b.buildExpressionSequence(expr)
+						exprs = append(exprs, rv)
 
-					if st, ok := c.StatementList().(*JS.StatementListContext); ok {
-						stList = append(stList, st)
-					} else {
-						stList = append(stList, nil)
+						if st, ok := c.StatementList().(*JS.StatementListContext); ok {
+							stList = append(stList, st)
+						} else {
+							stList = append(stList, nil)
+						}
+
+						caseNum += 1
 					}
-
-					caseNum += 1
 				}
 			}
 		}

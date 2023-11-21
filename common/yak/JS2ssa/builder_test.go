@@ -263,6 +263,22 @@ func TestReturn(t *testing.T) {
 	prog := ParseSSA(`
 		f = () => {a = 1; b = 2; return a, b;}
 		console.log(f())
-	`,none)
+	`, none)
+	prog.Show()
+}
+
+func TestLong(t *testing.T) {
+	prog := ParseSSA(`
+	(this["webpackJsonppalm-kit-desktop"]=this["webpackJsonppalm-kit-desktop"]||[]).push([[2],[function(e,t,n){"use strict";e.exports=n(785)},function(e,t,n){"use strict";n.d(t,"p",(function(){return g})),n.d(t,"G",(function(){return v})),n.d(t,"d",(function(){return m})),n.d(t,"I",(function(){return y})),n.d(t,"J",(function(){return A})),n.d(t,"m",(function(){return b})),n.d(t,"i",(function(){return _})),n.d(t,"r",(function(){return x})),n.d(t,"s",(function(){return w})),n.d(t,"K",(function(){return S})),n.d(t,"u",(function(){return E})),n.d(t,"k",(function(){return O})),n.d(t,"H",(function(){return C})),n.d(t,"N",(function(){return k})),n.d(t,"n",(function(){return M})),n.d(t,"o",(function(){return T})),n.d(t,"F",(function(){return j})),n.d(t,"c",(function(){return P})),n.d(t,"h",(function(){return I})),n.d(t,"t",(function(){return B})),n.d(t,"w",(function(){return N})),n.d(t,"C",(function(){return L})),n.d(t,"D",(function(){return D})),n.d(t,"z",(function(){return R})),n.d(t,"A",(function(){return F})),n.d(t,"E",(function(){return z})),n.d(t,"v",(function(){return H})),n.d(t,"x",(function(){return V})),n.d(t,"y",(function(){return G})),n.d(t,"B",(function(){return W})),n.d(t,"l",(function(){return q})),n.d(t,"O",(function(){return Q})),n.d(t,"P",(function(){return Y})),n.d(t,"Q",(function(){return K})),n.d(t,"S",(function(){return X})),n.d(t,"M",(function(){return Z})),n.d(t,"b",(function(){return $})),n.d(t,"T",(function(){return J})),n.d(t,"R",(function(){return ee})),n.d(t,"f",(function(){return oe})),n.d(t,"e",(function(){return ae})),n.d(t,"g",(function(){return se})),n.d(t,"j",(function(){return ue})),n.d(t,"q",(function(){return le})),n.d(t,"L",(function(){return ce})),n.d(t,"a",(function(){return fe}));var r=n(99),i=k(["Function","RegExp","Date","Error","CanvasGradient","CanvasPattern","Image","Canvas"])}]])	`, none)
+	prog.Show()
+}
+
+func TestBitNot(t *testing.T) {
+	prog := ParseSSA(`
+		a = ~0b1
+		b = -(-(1))
+		print(a)
+		print(b)
+	`, none)
 	prog.Show()
 }
