@@ -100,7 +100,7 @@ Content-Type: text/html; charset=utf-8
 
 	handleRequest := func(reader *bufio.Reader, writer *bufio.Writer) {
 		for {
-			req, err := http.ReadRequest(reader)
+			req, err := utils.ReadHTTPRequestFromBufioReader(reader)
 			if err != nil {
 				if err != io.EOF {
 					log.Error(err)
@@ -223,7 +223,13 @@ Content-Type: text/html; charset=utf-8
 				}
 				return line
 			})
-			writer.Write(ordinaryRequest)
+			_, pth, _ := lowhttp.GetHTTPPacketFirstLine(ret)
+			switch pth {
+			case "/":
+				writer.Write(ordinaryRequest)
+			default:
+				writer.WriteString("HTTP/1.1 404 Not Found\r\nContent-Length: 9\r\n\r\nnot found")
+			}
 			writer.Flush()
 			if chunked {
 				var before []byte

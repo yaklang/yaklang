@@ -4,6 +4,8 @@ templatePacket = "GET / HTTP/1.1\r\n" +
 "Transfer-Encoding: chunked\r\n\r\n" +
 x`1{{hexd(0d0a)}}a{{hexd(0d0a)}}0{{hexd(0d0a)}}{{hexd(0d0a)}}`[0]
 
+standardPacket = "GET / HTTP/1.1\r\nHost: REPLACEME_HOST\r\nTransfer-Encoding: chunked\r\n\r\n1\r\na\r\n0\r\n\r\n"
+
 vulInfo = `
 HTTP Pipeline 是一种技术，其中多个HTTP请求被发送到服务器而无需等待每个响应。这是通过将请求放入一个队列或“管道”中来实现的，这样就可以同时处理多个请求。
 
@@ -38,20 +40,48 @@ buildSmugglePacket = (host, newPacket) => {
 # mirrorNewWebsite 每新出现一个网站，这个网站的第一个请求，将会在这里被调用！
 mirrorNewWebsite = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
     host := "Host:" in req ? poc.GetHTTPPacketHeader(req, "Host") : poc.GetHTTPPacketHeader(req, "host")
+    token404path = str.RandStr(48)
+    req = poc.ReplaceHTTPPacketPath(req, token404path)
     payload = buildSmugglePacket(host, req)
     println(payload)
+
+    originResponse, req = poc.HTTP(standardPacket.Replace("REPLACEME_HOST", host), poc.https(isHttps))~
+    standardStatusCode = poc.GetStatusCodeFromResponse(originResponse)
+    if standardStatusCode <= 0 {
+        standardStatusCode = 200
+    }
+
     rsp, _ = poc.HTTPEx(payload, poc.https(isHttps), poc.noFixContentLength(true))~
     if rsp.MultiResponse {
-        risk.NewRisk(
-            url,
-            risk.title(f"Maybe HTTP Request Smuggle/ErrPipeline Behavior Detected: ${host}"),
-            risk.titleVerbose(f"疑似HTTP请求走私或错误配置Pipeline：${host}"),
-            risk.request(payload),
-            risk.response(rsp.RawPacket),
-            risk.severity("info"),
-            risk.type("http request smuggle/pipeline"),
-            risk.typeVerbose("HTTP请求走私或畸形解析"),
-            risk.description(vulInfo),
-        )
+        firstResponse = rsp.MultiResponseInstances[0]
+        if firstResponse.StatusCode == 400 {
+            // Bad Request is not right
+            return
+        }
+
+        firstPass = false
+        if firstResponse.StatusCode == standardStatusCode {
+            firstPass = true
+
+        }
+
+        if !firstPass {
+            return
+        }
+        secondResponse = rsp.MultiResponseInstances[1]
+        rawResp := http.dump(secondResponse)~
+        if secondResponse.StatusCode == 404 || str.MatchAnyOfSubString("404", "Not Found", "not found", "notfound", "不存在", "丢失"){
+            risk.NewRisk(
+                url,
+                risk.title(f"Maybe HTTP Request Smuggle/ErrPipeline Behavior Detected: ${host}"),
+                risk.titleVerbose(f"疑似HTTP请求走私或错误配置Pipeline：${host}"),
+                risk.request(payload),
+                risk.response(rsp.RawPacket),
+                risk.severity("info"),
+                risk.type("http request smuggle/pipeline"),
+                risk.typeVerbose("HTTP请求走私或畸形解析"),
+                risk.description(vulInfo),
+            )
+        }
     }
 }
