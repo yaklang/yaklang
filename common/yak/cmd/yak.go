@@ -85,6 +85,10 @@ func initializeDatabase(projectDatabase string, profileDBName string) error {
 	consts.GetGormProjectDatabase().AutoMigrate(yakit.ProjectTables...)
 	consts.GetGormProfileDatabase().AutoMigrate(yakit.ProfileTables...)
 
+	if isVersionCommand() {
+		return nil
+	}
+
 	// 调用一些数据库初始化的操作
 	err = yakit.CallPostInitDatabase()
 	if err != nil {
@@ -93,12 +97,10 @@ func initializeDatabase(projectDatabase string, profileDBName string) error {
 	return nil
 }
 
-func isVersionOrHelp() bool {
+func isVersionCommand() bool {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
-		case "version", "-v", "-version":
-			return true
-		case "help", "-h", "--help":
+		case "-v", "-version":
 			return true
 		default:
 			return false
@@ -159,8 +161,6 @@ func init() {
     %v %v
 
 `, consts.GetYakVersion(), "yaklang.io")
-	} else if isVersionOrHelp() {
-
 	} else {
 		err := initializeDatabase("", "")
 		if err != nil {
