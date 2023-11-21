@@ -93,6 +93,20 @@ func initializeDatabase(projectDatabase string, profileDBName string) error {
 	return nil
 }
 
+func isVersionOrHelp() bool {
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "version", "-v", "-version":
+			return true
+		case "help", "-h", "--help":
+			return true
+		default:
+			return false
+		}
+	}
+	return false
+}
+
 func init() {
 	// 取消掉 0022 的限制，让用户可以创建别人也能写的文件夹
 	umask.Umask(0)
@@ -145,6 +159,8 @@ func init() {
     %v %v
 
 `, consts.GetYakVersion(), "yaklang.io")
+	} else if isVersionOrHelp() {
+
 	} else {
 		err := initializeDatabase("", "")
 		if err != nil {
