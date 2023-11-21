@@ -27,6 +27,9 @@ func RuleCliDefault(prog *ssaapi.Program) {
 					continue
 				}
 				field := opt.GetOperand(1)
+				if field == nil {
+					break
+				}
 				fieldTyp := field.GetType()
 				if !fieldTyp.Compare(typ) {
 					field.NewError(ssa.Error, fmt.Sprintf("%s want [%s] type, but got [%s] type", funcName, typ, fieldTyp))
@@ -187,6 +190,9 @@ func RuleCliParamName(prog *ssaapi.Program) {
 			return v.IsCall() && v.IsReachable() != -1
 		}).ForEach(func(v *ssaapi.Value) {
 			firstField := v.GetOperand(1)
+			if firstField == nil {
+				return
+			}
 			paramName := firstField.String()
 			rawParamName := paramName
 			if unquoted, err := strconv.Unquote(paramName); err == nil {
