@@ -31,7 +31,7 @@ aaa`))
 			"Path", "/aa",
 		},
 		{
-			"File", "",
+			"File", "aa",
 		},
 		{
 			"Schema", "http",
@@ -76,7 +76,7 @@ aaa`))
 			"Path", "/aa",
 		},
 		{
-			"File", "",
+			"File", "aa",
 		},
 		{
 			"Schema", "https",
