@@ -131,8 +131,10 @@ func GetHybridTask(id string) (*HybridScanTaskManager, error) {
 
 func RemoveHybridTask(id string) {
 	r, err := GetHybridTask(id)
+	hybrisScanManager.Delete(id)
 	if err != nil {
 		return
 	}
 	r.Stop()
+	hybrisScanManager.Delete(id)
 }
