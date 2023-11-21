@@ -282,3 +282,11 @@ func TestBitNot(t *testing.T) {
 	`, none)
 	prog.Show()
 }
+
+func TestObject(t *testing.T) {
+	prog := ParseSSA(`
+	c = {2:_}
+	d = {1,2,3,4,5}
+	`, none)
+	prog.Show()
+}
