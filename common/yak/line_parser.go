@@ -1,13 +1,13 @@
 package yak
 
 import (
-	"bufio"
 	"context"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"io"
+	"strings"
 )
 
 type TextHandlingScript struct {
@@ -39,15 +39,17 @@ func NewTextParser() *TextParser {
 }
 
 func (t *TextParser) ParseLine(r io.Reader, handler func(line string, r map[string]string, data []map[string]string)) error {
-	lineScanner := bufio.NewScanner(r)
-	lineScanner.Split(bufio.ScanLines)
-
 	var (
 		matchedRule string
 	)
 
-	for lineScanner.Scan() {
-		line := lineScanner.Text()
+	for {
+		lineBytes, err := utils.ReadLine(r)
+		if err != nil {
+			break
+		}
+		line := strings.TrimSpace(string(lineBytes))
+
 		t.engine.SetVar("FILE_LINE", line)
 
 		// 自动选择合适的规则来解析
@@ -72,7 +74,7 @@ func (t *TextParser) ParseLine(r io.Reader, handler func(line string, r map[stri
 			return utils.Errorf("parse text failed: %v", "no proper rule")
 		}
 
-		err := t.engine.SafeEval(context.Background(), matchedRule)
+		err = t.engine.SafeEval(context.Background(), matchedRule)
 		if err != nil {
 			return utils.Errorf("rule[%s] failed for handling: %s", matchedRule, err)
 		}

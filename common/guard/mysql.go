@@ -1,7 +1,6 @@
 package guard
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"github.com/yaklang/yaklang/common/utils"
@@ -60,10 +59,8 @@ func GetMySQLServerDetails(c context.Context) []*MySQLServerDetail {
 			continue
 		}
 
-		s := bufio.NewScanner(bytes.NewBuffer(raw))
-		s.Split(bufio.ScanLines)
-		for s.Scan() {
-			bp := utils.NewBlockParser(bytes.NewBufferString(s.Text()))
+		for line := range utils.ParseLines(string(raw)) {
+			bp := utils.NewBlockParser(bytes.NewBufferString(line))
 			switch bp.NextStringBlock() {
 			case "datadir": // -h --datadir=
 				path := bp.NextStringBlock()
@@ -79,11 +76,11 @@ func GetMySQLServerDetails(c context.Context) []*MySQLServerDetail {
 				}
 			case "mysqld":
 				if detail.VersionFull == "" {
-					detail.VersionFull = yaklib.Grok(s.Text(), "mysqld[\\s]+Ver[\\s]+%{PROG:full}").Get("full")
+					detail.VersionFull = yaklib.Grok(line, "mysqld[\\s]+Ver[\\s]+%{PROG:full}").Get("full")
 				}
 
 				if detail.VersionShort == "" {
-					detail.VersionShort = yaklib.Grok(s.Text(), `mysqld[\s]+Ver[\s]+%{COMMONVERSION:short}`).Get("short")
+					detail.VersionShort = yaklib.Grok(line, `mysqld[\s]+Ver[\s]+%{COMMONVERSION:short}`).Get("short")
 				}
 			case "basedir":
 				path := bp.NextStringBlock()

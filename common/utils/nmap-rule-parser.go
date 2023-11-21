@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"github.com/yaklang/yaklang/common/log"
 	"regexp"
+	"strings"
 )
 
 type ProtoType string
@@ -27,24 +28,17 @@ type MatchedRule struct {
 }
 
 func ParseNmapServiceMatchedRule(raw []byte) []*MatchedRule {
-	scanner := bufio.NewScanner(bytes.NewBuffer(raw))
-	scanner.Split(bufio.ScanLines)
-
 	var rules []*MatchedRule
 
-	for scanner.Scan() {
-		line := scanner.Bytes()
-		line = bytes.TrimSpace(line)
+	for line := range ParseLines(string(raw)) {
+		line = strings.TrimSpace(line)
 
 		// skip comment
-		if bytes.HasPrefix(line, []byte("#")) || len(line) <= 0 {
+		if strings.HasPrefix(line, "#") || len(line) <= 0 {
 			continue
 		}
-
-		//log.Infof("line: %s", line)
-
-		if bytes.HasPrefix(bytes.ToLower(line), []byte("match")) {
-			for _, raw := range matchedRegex.FindAllSubmatch(line, 1) {
+		if strings.HasPrefix(strings.ToLower(line), "match") {
+			for _, raw := range matchedRegex.FindAllStringSubmatch(line, 1) {
 				r, err := regexp.Compile(string(raw[1]))
 				if err != nil {
 					log.Errorf("failed to compile rule[%s]: %s", line, err)
@@ -54,7 +48,7 @@ func ParseNmapServiceMatchedRule(raw []byte) []*MatchedRule {
 					Matched: r,
 				})
 			}
-		} else if bytes.HasPrefix(bytes.ToLower(line), []byte("probe")) {
+		} else if strings.HasPrefix(strings.ToLower(line), "probe") {
 			log.Error("failed to parse Probes(use ParseNmapServiceProbeRule)")
 		}
 	}

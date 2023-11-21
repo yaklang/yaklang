@@ -31,14 +31,18 @@ func FileLineReader(file string) (chan []byte, error) {
 		return nil, errors.Errorf("failed to read file: %s", err)
 	}
 
-	scanner := bufio.NewScanner(f)
-	scanner.Split(bufio.ScanLines)
+	reader := bufio.NewReader(f)
 	outC := make(chan []byte)
 	go func() {
+		defer f.Close()
 		defer close(outC)
 		bomHandled := NewBool(false)
-		for scanner.Scan() {
-			raw := bytes.TrimSpace(scanner.Bytes())
+		for {
+			lineRaw, err := BufioReadLine(reader)
+			if err != nil {
+				break
+			}
+			raw := bytes.TrimSpace(lineRaw)
 			if !bomHandled.IsSet() {
 				raw = RemoveBOM(raw)
 				bomHandled.Set()

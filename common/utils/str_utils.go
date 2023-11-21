@@ -1101,10 +1101,13 @@ func DumpFileWithTextAndFiles(raw string, divider string, files ...string) (stri
 func ParseStringToLines(raw string) []string {
 	var lines []string
 
-	scanner := bufio.NewScanner(bytes.NewBufferString(raw))
-	scanner.Split(bufio.ScanLines)
-	for scanner.Scan() {
-		if line := strings.TrimSpace(scanner.Text()); line == "" {
+	reader := bufio.NewReader(bytes.NewBufferString(raw))
+	for {
+		line, err := BufioReadLine(reader)
+		if err != nil {
+			break
+		}
+		if line := strings.TrimSpace(string(line)); line == "" {
 			continue
 		} else {
 			lines = append(lines, RemoveBOMForString(line))
