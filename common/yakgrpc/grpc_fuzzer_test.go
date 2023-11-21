@@ -783,40 +783,40 @@ func TestGRPCMUSTPASS_FuzzTag(t *testing.T) {
 			expect:   []string{},
 			fuzzMode: "close",
 		},
-		{ // 验证fuzzMode stander
+		{ // 验证fuzzMode standard
 			tag: "{{base64({{url(yak)}})}}",
 			expect: []string{
 				"JTc5JTYxJTZi", "%79%61%6b",
 			},
-			fuzzMode: "stander",
+			fuzzMode: "standard",
 		},
 		{
 			tag: "{{base64(url(yak))}}",
 			expect: []string{
 				"dXJsKHlhayk=", // url(yak)
 			},
-			fuzzMode: "stander",
+			fuzzMode: "standard",
 		},
 		{
 			tag: "{{base64({{url(yak)}})}}",
 			expect: []string{
 				"JTc5JTYxJTZi", "%79%61%6b",
 			},
-			fuzzMode: "stander",
+			fuzzMode: "standard",
 		},
-		{ // 验证fuzzMode simple
+		{ // 验证fuzzMode legacy
 			tag: "{{base64(url(yak))}}",
 			expect: []string{
 				"JTc5JTYxJTZi",
 			},
-			fuzzMode: "simple",
+			fuzzMode: "legacy",
 		},
 		{
 			tag: "{{base64({{url(yak)}})}}",
 			expect: []string{
 				"JTc5JTYxJTZi", "%79%61%6b",
 			},
-			fuzzMode: "simple",
+			fuzzMode: "legacy",
 		},
 		{ // 验证优先级
 			tag:       "{{base64({{url(yak)}})}}",

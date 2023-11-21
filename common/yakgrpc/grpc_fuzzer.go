@@ -690,11 +690,11 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_NoSystemProxy(req.GetNoSystemProxy()),
 			mutate.WithPoolOpt_RequestCountLimiter(requestCount))
 
-		fuzzMode := req.GetFuzzTagMode() // ""/"close"/"stander"/"simple"
+		fuzzMode := req.GetFuzzTagMode() // ""/"close"/"standard"/"legacy"
 		forceFuzz := req.GetForceFuzz()  // true/false
 		if fuzzMode == "" {              // 以forceFuzz为准
 			if forceFuzz {
-				fuzzMode = "stander"
+				fuzzMode = "standard"
 			} else {
 				fuzzMode = "close"
 			}
@@ -707,10 +707,10 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		switch fuzzMode {
 		case "close":
 			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ForceFuzz(false))
-		case "stander":
+		case "standard":
 			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ForceFuzz(true))
 			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ForceFuzzfile(true))
-		case "simple":
+		case "simple", "legacy":
 			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ForceFuzz(true))
 			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ForceFuzzfile(true))
 			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ExtraFuzzOptions(mutate.Fuzz_WithSimple(true)))
