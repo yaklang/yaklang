@@ -1,0 +1,23 @@
+host, port = "127.0.0.1", os.GetRandomAvailableUDPPort()
+
+clientToServer = false
+
+go func {
+    udp.Serve(host, port, udp.serverCallback((conn, data) => {
+        println(f`message from client: ${string(data)}`)
+        clientToServer = true
+        conn.Write("UDP Message From Server")~
+    }))
+}
+
+sleep(1)
+conn = udp.Connect(host, port)~
+conn.Send("UDP Message From Client")~
+time.sleep(0.5)
+data = conn.Recv()~
+conn.Close()
+println(f"message from server: ${string(data)}")
+
+assert data == "UDP Message From Server"
+assert clientToServer
+

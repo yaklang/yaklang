@@ -21,6 +21,7 @@ import (
 type udpConnection struct {
 	*net.UDPConn
 
+	isServer       bool
 	remoteAddr     net.Addr
 	timeoutSeconds time.Duration
 }
@@ -180,11 +181,24 @@ func (t *udpConnection) SendTo(i interface{}, target string) error {
 	return err
 }
 
+func (t *udpConnection) Write(i []byte) (int, error) {
+	if t.isServer {
+		return t.WriteTo(i, t.remoteAddr)
+	}
+
+	if t.UDPConn.RemoteAddr() != nil {
+		// pre-connect, use t.UDPConn.Write
+		return t.UDPConn.Write(utils.InterfaceToBytes(i))
+	}
+	return t.WriteTo(i, t.remoteAddr)
+}
+
 func (t *udpConnection) Send(i interface{}) error {
 	var err error
 
 	if t.UDPConn.RemoteAddr() != nil {
-		_, err := t.Write(utils.InterfaceToBytes(i))
+		// pre-connect, use t.UDPConn.Write
+		_, err := t.UDPConn.Write(utils.InterfaceToBytes(i))
 		return err
 	}
 
@@ -282,6 +296,12 @@ func udpServe(host string, port interface{}, opts ...udpServerOpt) error {
 
 		raw, addr, err := wConn.ReadFromAddr()
 		if err != nil && raw == nil {
+			if utils.IsErrorNetOpTimeout(err) {
+				continue
+			}
+			if err != nil {
+				log.Warnf("udp ReadFromAddr failed: %s", err)
+			}
 			continue
 		}
 		//log.Infof("recv: %#v from: %v", raw, addr.String())
@@ -292,6 +312,7 @@ func udpServe(host string, port interface{}, opts ...udpServerOpt) error {
 				}
 			}
 			config.callback(&udpConnection{
+				isServer:       true,
 				UDPConn:        conn,
 				remoteAddr:     addr,
 				timeoutSeconds: 5 * time.Second,
