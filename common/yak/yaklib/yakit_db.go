@@ -2,6 +2,11 @@ package yaklib
 
 import (
 	"context"
+	"net/http"
+	"reflect"
+	"strings"
+	"sync"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/fp"
@@ -11,10 +16,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/spacengine"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"net/http"
-	"reflect"
-	"strings"
-	"sync"
 )
 
 func queryDomainAssetByNetwork(network string) (chan *yakit.Domain, error) {
@@ -356,7 +357,7 @@ func savePayloadByFile(group string, fileName string) error {
 	return yakit.SavePayloadByFilename(consts.GetGormProfileDatabase(), group, fileName)
 }
 
-func deletePayload(group string) error {
+func deletePayloadByGroup(group string) error {
 	if consts.GetGormProfileDatabase() == nil {
 		return utils.Error("no database connections")
 	}
@@ -404,5 +405,5 @@ func init() {
 	//YakitExports["QueryPortAssetByKeyword"] = queryPortAssetByNetwork
 
 	// DeletePayload
-	YakitExports["DeletePayloadByGroup"] = deletePayload
+	YakitExports["DeletePayloadByGroup"] = deletePayloadByGroup
 }

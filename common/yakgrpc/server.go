@@ -3,6 +3,9 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"os"
+	"time"
+
 	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/yaklang/yaklang/common/consts"
@@ -12,8 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/tools/dicts"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"os"
-	"time"
 )
 
 type Server struct {
@@ -189,14 +190,14 @@ func (s *Server) initBasicData() error {
 		log.Infof("yaklang core engine version: %v, cache is working!", consts.GetYakVersion())
 	}
 
-	if yakit.GetPayloadCount(s.GetProfileDatabase(), `user_top10`) <= 0 {
+	if yakit.GetPayloadCountInGroup(s.GetProfileDatabase(), `user_top10`) <= 0 {
 		err = yakit.SavePayloadGroup(s.GetProfileDatabase(), "user_top10", dicts.UsernameTop10)
 		if err != nil {
 			return err
 		}
 	}
 
-	if yakit.GetPayloadCount(s.GetProfileDatabase(), `pass_top25`) <= 0 {
+	if yakit.GetPayloadCountInGroup(s.GetProfileDatabase(), `pass_top25`) <= 0 {
 		err = yakit.SavePayloadGroup(s.GetProfileDatabase(), "pass_top25", dicts.PasswordTop25)
 		if err != nil {
 			return err
