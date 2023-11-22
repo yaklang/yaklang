@@ -1,6 +1,51 @@
 package rules
 
-import "github.com/yaklang/yaklang/common/yak/ssa"
+import (
+	"reflect"
+
+	"github.com/yaklang/yaklang/common/yak/plugin_type_analyzer"
+	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/yaklang"
+)
+
+func init() {
+	plugin_type_analyzer.RegisterSSAOptCollector("yak", YakGetTypeSSAOpt)
+}
+
+func YakGetTypeSSAOpt() []ssaapi.Option {
+	opts := make([]ssaapi.Option, 0)
+	// yak function table
+	symbol := yaklang.New().GetFntable()
+	valueTable := make(map[string]interface{})
+	// libTable := make(map[string]interface{})
+	tmp := reflect.TypeOf(make(map[string]interface{}))
+	for name, item := range symbol {
+		itype := reflect.TypeOf(item)
+		if itype == tmp {
+			opts = append(opts, ssaapi.WithExternLib(name, item.(map[string]interface{})))
+		} else {
+			valueTable[name] = item
+		}
+	}
+
+	// yak-main
+	valueTable["YAK_DIR"] = ""
+	valueTable["YAK_FILENAME"] = ""
+	valueTable["YAK_MAIN"] = false
+	valueTable["id"] = ""
+	// param
+	getParam := func(key string) interface{} {
+		return nil
+	}
+	valueTable["getParam"] = getParam
+	valueTable["getParams"] = getParam
+	valueTable["param"] = getParam
+
+	opts = append(opts, ssaapi.WithExternValue(valueTable))
+	opts = append(opts, ssaapi.WithExternMethod(&Builder{}))
+	return opts
+}
 
 // for method Builder
 type Builder struct{}
