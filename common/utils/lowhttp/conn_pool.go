@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/hpack"
 	"io"
 	"net"
 	"net/http"
@@ -52,7 +53,6 @@ type lowHttpConnPool struct {
 func (l *lowHttpConnPool) getIdleConn(key connectKey, opts ...netx.DialXOption) (*persistConn, error) {
 	//尝试获取复用连接
 	if oldPc, ok := l.getFromConn(key); ok {
-		//log.Infof("use old conn")
 		return oldPc, nil
 	}
 	//没有复用连接则新建一个连接
@@ -89,10 +89,6 @@ func (l *lowHttpConnPool) getFromConn(key connectKey) (oldPc *persistConn, getCo
 		} else {
 			for len(connList) > 0 {
 				oldPc = connList[len(connList)-1]
-
-				log.Infof("old pc : %v", oldPc.cacheKey.hash())
-				log.Infof("want pc : %v", key.hash())
-
 				//检查获取的连接是否空闲超时，若超时再取下一个
 				tooOld := !oldTime.Before(oldPc.idleAt)
 				if !tooOld {
@@ -316,7 +312,7 @@ func newPersistConn(key connectKey, pool *lowHttpConnPool, opt ...netx.DialXOpti
 		return nil, err
 	}
 	if key.https && key.scheme == H2 {
-		if newConn.(*tls.Conn).ConnectionState().NegotiatedProtocol != H2 { //降级
+		if newConn.(*tls.Conn).ConnectionState().NegotiatedProtocol == H1 { //降级
 			key.scheme = H1
 		}
 	}
@@ -344,18 +340,21 @@ func newPersistConn(key connectKey, pool *lowHttpConnPool, opt ...netx.DialXOpti
 
 	if key.scheme == H2 {
 		pc.h2Conn()
-		if err := pc.alt.preface(); err != nil {
-			return nil, err
-		}
-		if err := pc.alt.setting(); err != nil {
-			return nil, err
-		}
 		go pc.alt.readLoop()
-		err := pc.p.putIdleConn(pc)
+		if err = pc.alt.preface(); err == nil {
+			err = pool.putIdleConn(pc)
+			if err != nil {
+				return nil, err
+			}
+			return pc, nil
+		}
+		newH1Conn, err := netx.DialX(key.addr, opt...) // 降级
 		if err != nil {
 			return nil, err
 		}
-		return pc, nil
+		pc.alt = nil
+		pc.Conn = newH1Conn
+		pc.cacheKey.scheme = H1
 	}
 
 	pc.br = bufio.NewReader(pc)
@@ -376,9 +375,20 @@ func (pc *persistConn) h2Conn() {
 		idleTimeout:       pc.p.idleConnTimeout,
 		maxFrameSize:      defaultMaxFrameSize,
 		initialWindowSize: defaultStreamReceiveWindowSize,
+		headerListMaxSize: defaultHeaderTableSize,
 		connWindowControl: newControl(defaultStreamReceiveWindowSize),
+		maxStreamsCount:   50,
 		br:                bufio.NewReader(pc.Conn),
 		fr:                http2.NewFramer(pc.Conn, bufio.NewReader(pc.Conn)),
+		hDec:              hpack.NewDecoder(defaultHeaderTableSize, nil),
+		closeCond:         sync.NewCond(new(sync.Mutex)),
+		preFaceCond:       sync.NewCond(new(sync.Mutex)),
+		wg:                new(sync.WaitGroup),
+		http2StreamPool: &sync.Pool{
+			New: func() interface{} {
+				return new(http2ClientStream)
+			},
+		},
 	}
 
 	newH2Conn.idleTimer = time.AfterFunc(newH2Conn.idleTimeout, func() {

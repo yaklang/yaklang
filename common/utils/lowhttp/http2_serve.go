@@ -214,7 +214,7 @@ func serveH2(r io.Reader, conn net.Conn, opt ...h2Option) error {
 			}
 
 			ret.ForeachSetting(func(setting http2.Setting) error {
-				log.Infof("h2 stream found client setting: %v", setting.String())
+				log.Debugf("h2 stream found client setting: %v", setting.String())
 				switch setting.ID {
 				case http2.SettingMaxFrameSize:
 				case http2.SettingMaxConcurrentStreams:
@@ -228,7 +228,7 @@ func serveH2(r io.Reader, conn net.Conn, opt ...h2Option) error {
 			}
 		case *http2.WindowUpdateFrame:
 			// update window
-			log.Infof("h2(WINDOW_UPDATE) client allow server to (inc) %v bytes", ret.Increment)
+			log.Debugf("h2(WINDOW_UPDATE) client allow server to (inc) %v bytes", ret.Increment)
 			config.increaseWindowSize(int64(ret.Increment))
 		case *http2.HeadersFrame:
 			// build request
