@@ -3,12 +3,13 @@ package yakdocument
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yak/yakdoc/doc"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"html/template"
 	"sort"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/yakdoc/doc"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func StructName(libName, pkgPath, name string) string {
@@ -70,8 +71,8 @@ func (m *MethodDoc) Hash() string {
 	sort.Strings(returnHash)
 	return codec.Sha512(fmt.Sprint(
 		m.Ptr, m.StructName, m.Name,
-		//strings.Join(paramsHash, "|"),
-		//strings.Join(returnHash, "|"),
+		// strings.Join(paramsHash, "|"),
+		// strings.Join(returnHash, "|"),
 	))
 }
 
@@ -252,12 +253,12 @@ func (e *ExportsFunctionDoc) Fragment() string {
 }
 
 func (e *ExportsFunctionDoc) DefinitionStr() string {
-	if def := doc.Document.LibFuncDefinitionStr(e.LibName, e.Name); def != "" {
+	if def := doc.DefaultDocumentHelper.LibFuncDefinitionStr(e.LibName, e.Name); def != "" {
 		return def
 	}
 
 	if strings.HasPrefix(e.Name, e.LibName+".") {
-		if ret := doc.Document.LibFuncDefinitionStr(e.LibName, e.Name[len(e.LibName+"."):]); ret != "" {
+		if ret := doc.DefaultDocumentHelper.LibFuncDefinitionStr(e.LibName, e.Name[len(e.LibName+"."):]); ret != "" {
 			return ret
 		}
 	}
@@ -312,12 +313,12 @@ func typeStrFix(raw string, isVariadic bool) string {
 }
 
 func (e *ExportsFunctionDoc) CompletionStr() string {
-	if ret := doc.Document.LibFuncAutoCompletion(e.LibName, e.Name); ret != "" {
+	if ret := doc.DefaultDocumentHelper.LibFuncAutoCompletion(e.LibName, e.Name); ret != "" {
 		return ret
 	}
 
 	if strings.HasPrefix(e.Name, e.LibName+".") {
-		if ret := doc.Document.LibFuncAutoCompletion(e.LibName, e.Name[len(e.LibName+"."):]); ret != "" {
+		if ret := doc.DefaultDocumentHelper.LibFuncAutoCompletion(e.LibName, e.Name[len(e.LibName+"."):]); ret != "" {
 			return ret
 		}
 	}
@@ -475,7 +476,7 @@ var yaklibMarkdownAPIDoc = fmt.Sprintf(`# {{ .Name }}
 	"`", "`", "`", "`", "`", "`", "`", "`", "`", "`", "`", "`", "`", "`")
 
 func (l *LibDoc) ToMarkdown() string {
-	var buffer = bytes.NewBuffer(nil)
+	buffer := bytes.NewBuffer(nil)
 	templateIns, err := template.New("yaklib-doc").Parse(yaklibMarkdownAPIDoc)
 	if err != nil {
 		log.Error(err)
