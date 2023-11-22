@@ -94,10 +94,21 @@ func Parse(raw string, tagTypes ...*TagDefine) ([]Node, error) {
 				result = append(result, tag)
 			}
 		}
-
 		return
 	}
-
+	// 过滤未闭合的标签
+	var filterValidTag1 func(rootTags []*fuzztagPos) (result []*fuzztagPos)
+	filterValidTag1 = func(rootTags []*fuzztagPos) (result []*fuzztagPos) {
+		for _, tag := range rootTags {
+			for _, sub := range filterValidTag1(tag.subs) {
+				if tag.start+len(tag.tagType.start) > sub.start || tag.end < sub.end+len(sub.tagType.end) {
+					*tag = *sub // 子标签谋权篡位
+				}
+			}
+			result = append(result, tag)
+		}
+		return
+	}
 	//escapersMap := map[*TagDefine]*Escaper{}
 	//for _, tagType := range tagTypes {
 	//	escapersMap[tagType] = NewDefaultEscaper(escapeSymbol, tagType.start, tagType.end)
@@ -149,5 +160,5 @@ func Parse(raw string, tagTypes ...*TagDefine) ([]Node, error) {
 		}
 		return res
 	}
-	return newDatasFromPos(0, len(raw), nil, filterValidTag(rootTags), 0), nil
+	return newDatasFromPos(0, len(raw), nil, filterValidTag1(filterValidTag(rootTags)), 0), nil
 }
