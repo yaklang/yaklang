@@ -1,9 +1,31 @@
 package rules
 
 import (
+	"github.com/yaklang/yaklang/common/yak/plugin_type_analyzer"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
+
+func init() {
+	plugin_type_analyzer.RegisterTypeInfoCollector("yak", CliTypeInfo)
+	plugin_type_analyzer.RegisterTypeInfoCollector("yak", RiskTypeInfo)
+}
+
+func CliTypeInfo(prog *ssaapi.Program) *plugin_type_analyzer.YaklangInfo {
+	ret := plugin_type_analyzer.NewYakLangInfo("cli")
+	for _, param := range ParseCliParameter(prog) {
+		ret.AddKV(CliParameterToInformation(param))
+	}
+	return ret
+}
+
+func RiskTypeInfo(prog *ssaapi.Program) *plugin_type_analyzer.YaklangInfo {
+	ret := plugin_type_analyzer.NewYakLangInfo("risk")
+	for _, risk := range ParseRiskInfo(prog) {
+		ret.AddKV(RiskInfoToInformation(risk))
+	}
+	return ret
+}
 
 type CliParameter struct {
 	Name     string
@@ -123,7 +145,7 @@ func ParseRiskInfo(prog *ssaapi.Program) []*RiskInfo {
 				return str
 			}
 		}
-		//TODO: handler value with other opcode
+		// TODO: handler value with other opcode
 		return ""
 	}
 
@@ -177,5 +199,23 @@ func ParseRiskInfo(prog *ssaapi.Program) []*RiskInfo {
 	parseRiskFunction("risk.CreateRisk", 1)
 	parseRiskFunction("risk.NewRisk", 1)
 
+	return ret
+}
+
+func CliParameterToInformation(c *CliParameter) *plugin_type_analyzer.YaklangInfoKV {
+	ret := plugin_type_analyzer.NewYaklangInfoKV("Name", c.Name)
+	ret.AddExtern("Type", c.Type)
+	ret.AddExtern("Help", c.Help)
+	ret.AddExtern("Required", c.Required)
+	ret.AddExtern("Default", c.Default)
+	return ret
+}
+
+func RiskInfoToInformation(r *RiskInfo) *plugin_type_analyzer.YaklangInfoKV {
+	ret := plugin_type_analyzer.NewYaklangInfoKV("Name", "risk")
+	ret.AddExtern("Level", r.Level)
+	ret.AddExtern("CVE", r.CVE)
+	ret.AddExtern("Type", r.Type)
+	ret.AddExtern("TypeVerbose", r.TypeVerbose)
 	return ret
 }
