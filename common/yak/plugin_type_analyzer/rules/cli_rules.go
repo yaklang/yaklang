@@ -8,8 +8,16 @@ import (
 	"strconv"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/plugin_type_analyzer"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
+
+func init() {
+	// cli
+	plugin_type_analyzer.RegisterCheckRuler("yak", RuleCliDefault)
+	plugin_type_analyzer.RegisterCheckRuler("yak", RuleCliParamName)
+	plugin_type_analyzer.RegisterCheckRuler("yak", RuleCliCheck)
+}
 
 // 检查 cli.setDefault 设置的默认值是否符合规范
 func RuleCliDefault(prog *ssaapi.Program) {
@@ -202,10 +210,10 @@ func RuleCliParamName(prog *ssaapi.Program) {
 			if _, ok := paramLineMap[paramName]; !ok {
 				paramLineMap[paramName] = v.GetPosition().StartLine
 				if !utils.MatchAllOfRegexp(rawParamName, `^[a-zA-Z0-9]+$`) {
-					firstField.NewError(tag, fmt.Sprintf("parameter [%s] should be letters or numbers", rawParamName))
+					firstField.NewError(tag, ErrorStrInvalidParamName(rawParamName))
 				}
 			} else {
-				firstField.NewError(tag, fmt.Sprintf("parameter [%s] already defined at line %d", rawParamName, paramLineMap[paramName]))
+				firstField.NewError(tag, ErrorStrSameParamName(rawParamName, paramLineMap[paramName]))
 			}
 		})
 	}
@@ -257,10 +265,18 @@ func RuleCliCheck(prog *ssaapi.Program) {
 	}
 
 	if lastCallName != "cli.check" && lastCallValue != nil {
-		lastCallValue.NewError(tag, NotCallCliCheck())
+		lastCallValue.NewError(tag, ErrorStrNotCallCliCheck())
 	}
 }
 
-func NotCallCliCheck() string {
+func ErrorStrNotCallCliCheck() string {
 	return "please call cli.check as the last statement after all other cli standard library calls"
+}
+
+func ErrorStrSameParamName(name string, line int) string {
+	return fmt.Sprintf("parameter [%s] already defined at line %d", name, line)
+}
+
+func ErrorStrInvalidParamName(name string) string {
+	return fmt.Sprintf("parameter [%s] should be letters or numbers", name)
 }
