@@ -1,31 +1,23 @@
 endian: big
 Package:
+  operator: |
+    this.ForEachChild(node => {
+      node.Process()
+    })
+    protocol = getNodeResult("@Internet.Protocol")
+    switch protocol {
+      case 6:
+        this.AppendNode(getRootNode("TCP"))
+        this.GetSubNode("TCP").Process()
+      case 17:
+        this.AppendNode(getRootNode("UDP"))
+        this.GetSubNode("TCP").Process()
+    }
   Ethernet:
     Destination: raw,6
     Source: raw,6
     Type: raw,2
   Internet:
-    operator: |
-      var protocol
-      var version
-      this.ForEachChild(node => {
-        res = node.Process()
-        switch node.Name {
-          case "Version":
-            version = res
-          case "Protocol":
-            protocol = res
-        }
-      })
-      parent = this.GetParent()
-      switch protocol {
-        case 6:
-          parent.AppendNode(getRootNode("TCP"))
-          parent.GetSubNode("TCP").Process()
-        case 17:
-          parent.AppendNode(getRootNode("UDP"))
-          parent.GetSubNode("TCP").Process()
-      }
     length-from-field: Header Length
     length-from-field-multiply: 32
     Version: uint8,4bit
@@ -39,6 +31,6 @@ Package:
     Header Checksum: raw,2
     Source: raw,4
     Destination: raw
-TCP: "import:tcp.yaml;node:@TCP"
-UDP: "import:udp.yaml;node:@UDP"
+TCP: "import:tcp.yaml;node:Package.TCP"
+UDP: "import:udp.yaml;node:Package.UDP"
 

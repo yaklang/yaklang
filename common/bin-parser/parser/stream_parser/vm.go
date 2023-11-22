@@ -10,14 +10,15 @@ import (
 )
 
 type YakNode struct {
-	origin       *base.Node
-	Process      func() any
-	Name         string
-	SetCfg       func(k string, v any)
-	AppendNode   func(d *YakNode)
-	ForEachChild func(f func(child *YakNode))
-	GetParent    func() *YakNode
-	GetSubNode   func(name string) *YakNode
+	origin            *base.Node
+	Process           func() any
+	Name              string
+	SetCfg            func(k string, v any)
+	AppendNode        func(d *YakNode)
+	ForEachChild      func(f func(child *YakNode))
+	GetParent         func() *YakNode
+	GetSubNode        func(name string) *YakNode
+	GetRemainingSpace func() uint64
 }
 
 func ConvertToYakNode(node *base.Node, operator func(node2 *base.Node) error) *YakNode {
@@ -42,7 +43,7 @@ func ConvertToYakNode(node *base.Node, operator func(node2 *base.Node) error) *Y
 		if err != nil {
 			panic(err)
 		}
-		res, err := GetNodeResult(node)
+		res, err := GetResultByNode(node)
 		if err != nil {
 			panic(fmt.Errorf("parse node %s error: %w", node.Name, err))
 		}
@@ -78,6 +79,13 @@ func ConvertToYakNode(node *base.Node, operator func(node2 *base.Node) error) *Y
 			panic(err)
 		}
 	}
+	yakNode.GetRemainingSpace = func() uint64 {
+		res, err := getNodeLength(yakNode.origin)
+		if err != nil {
+			panic(err)
+		}
+		return res
+	}
 	return yakNode
 }
 func ExecOperator(node *base.Node, code string, operator func(node2 *base.Node) error) error {
@@ -88,6 +96,17 @@ func ExecOperator(node *base.Node, code string, operator func(node2 *base.Node) 
 		"this": ConvertToYakNode(node, operator),
 		"len": func(i interface{}) int {
 			return reflect.ValueOf(i).Len()
+		},
+		"getNodeResult": func(key string) any {
+			targetNode := getNodeByPath(node, key)
+			if targetNode == nil {
+				panic("node not found")
+			}
+			res, err := GetResultByNode(targetNode)
+			if err != nil {
+				panic(err)
+			}
+			return res
 		},
 		"setCfg": func(key string, value any) {
 			targetNode, key := getNodeAttrByPath(node, key)

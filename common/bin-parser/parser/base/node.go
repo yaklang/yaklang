@@ -192,6 +192,9 @@ func NewNodeTree(d yaml.MapSlice) (*Node, error) {
 func NewNodeTreeWithConfig(parentCfg *Config, name string, data any, ctx *NodeContext) (*Node, error) {
 	return newNodeTree(parentCfg, name, data, ctx)
 }
+func NewChildNodeTree(parent *Node, name string, data any, ctx *NodeContext) (*Node, error) {
+	return newNodeTree(parent.Cfg, name, data, ctx)
+}
 func newNodeTree(parentCfg *Config, name string, data any, ctx *NodeContext) (*Node, error) {
 	cfg := NewConfig(parentCfg)
 	switch ret := data.(type) {

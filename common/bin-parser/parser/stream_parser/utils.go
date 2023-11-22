@@ -1,12 +1,11 @@
 package stream_parser
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
-	"github.com/yaklang/yaklang/common/binx"
 	"github.com/yaklang/yaklang/common/utils"
+	"gopkg.in/yaml.v2"
 	"strings"
 )
 
@@ -119,7 +118,7 @@ func getNodeLength(node *base.Node) (uint64, error) {
 			fieldName := parentNode.Cfg.GetString("length-from-field")
 			for _, child := range parentNode.Children {
 				if child.Name == fieldName {
-					res, err := GetNodeResult(child)
+					res, err := GetResultByNode(child)
 					if err != nil {
 						return 0, err
 					}
@@ -134,8 +133,8 @@ func getNodeLength(node *base.Node) (uint64, error) {
 						}
 						nodeRes := parentNode.Cfg.GetItem(CfgNodeResult).(*NodeResult)
 						var nowLength uint64
-						for _, result := range nodeRes.sub {
-							nowLength += (result.pos[1] - result.pos[0])
+						for _, result := range nodeRes.Sub {
+							nowLength += (result.Pos[1] - result.Pos[0])
 						}
 						if nowLength > total {
 							return 0, fmt.Errorf("now length %d greater than total %d", nowLength, total)
@@ -157,37 +156,32 @@ func getNodeLength(node *base.Node) (uint64, error) {
 	}
 	return length, nil
 }
-func GetNodeResult(node *base.Node) (any, error) {
-	var endian binx.ByteOrderEnum
-	iendian := node.Cfg.GetItem(CfgEndian)
-	if iendian == nil {
-		endian = binx.BigEndianByteOrder
-	}
-	switch utils.InterfaceToString(iendian) {
-	case "big":
-		endian = binx.BigEndianByteOrder
-	case "little":
-		endian = binx.LittleEndianByteOrder
-	default:
-		return nil, fmt.Errorf("endian type error: %v", iendian)
-	}
+
+func GetResultByNode(node *base.Node) (any, error) {
 	nodeRes := node.Cfg.GetItem(CfgNodeResult).(*NodeResult)
-	resPoint := nodeRes.pos
-	buffer := node.Ctx.GetItem("buffer").(*bytes.Buffer)
-	byts := buffer.Bytes()
-	writer := node.Ctx.GetItem("writer").(*base.BitWriter)
-	if writer.PreIsByte {
-		byts = append(byts, writer.PreByte<<(8-writer.PreByteLen))
+	return nodeRes.Result()
+}
+func getMapSliceElement(d yaml.MapSlice, path string) any {
+	var findChildByPath func(d any, path ...string) any
+	findChildByPath = func(d any, path ...string) any {
+		if len(path) == 0 {
+			return d
+		}
+		m, ok := d.(yaml.MapSlice)
+		if !ok {
+			return nil
+		}
+		var child1 any
+		for _, child := range m {
+			if child.Key == path[0] {
+				child1 = child
+			}
+		}
+		if child1 == nil {
+			return nil
+		}
+
+		return findChildByPath(child1, path[1:]...)
 	}
-	reader := base.NewBitReader(bytes.NewBuffer(byts))
-	reader.ReadBits(resPoint[0])
-	buf, err := reader.ReadBits(resPoint[1] - resPoint[0])
-	if err != nil {
-		return nil, fmt.Errorf("read bits error: %w", err)
-	}
-	res := binx.NewResult(buf)
-	res.Identifier = node.Name
-	res.ByteOrder = endian
-	res.Type = binx.BinaryTypeVerbose(node.Cfg.GetString(CfgType))
-	return res.Value(), nil
+	return findChildByPath(d, strings.Split(path, ".")...)
 }

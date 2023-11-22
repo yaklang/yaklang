@@ -26,8 +26,10 @@ Option:
             case 1:
                 break
             default:
-                this.GetSubNode("Length").Process() 
-                this.GetSubNode("Data").Process()    
+                this.GetSubNode("Length").Process()
+                if this.GetSubNode("Length").GetRemainingSpace() != 0 {
+                    this.GetSubNode("Data").Process()
+                }    
         }
     length-from-field: Length
     length-from-field-multiply: 8

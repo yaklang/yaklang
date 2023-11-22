@@ -435,7 +435,8 @@ func ParseBinary(data io.Reader, rule string) (*base.Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	return rootNode, nil
+
+	return rootNode.Children[0], nil
 }
 
 func GenerateBinary(data any, rule string) (*base.Node, error) {
