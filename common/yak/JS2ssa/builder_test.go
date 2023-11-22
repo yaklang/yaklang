@@ -2,6 +2,7 @@ package js2ssa
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -149,9 +150,9 @@ func TestElseIf(t *testing.T) {
 	a = 2
 	if(a < 1){
 		a++;
-	}else if((a > 1) && (a < 3)){
+	} else if ((a > 1) && (a < 3)){
 		print(a)
-	}else{
+	} else{
 		b = a
 	}
 	`, none)
@@ -287,6 +288,29 @@ func TestObject(t *testing.T) {
 	prog := ParseSSA(`
 	c = {2:_}
 	d = {1,2,3,4,5}
+	`, none)
+	prog.Show()
+}
+
+func TestJsReal(t *testing.T) {
+	// data, err := os.ReadFile("C:\\codefile\\a1.js")
+	// if err != nil {
+	// 	fmt.Println("读取文件时发生错误:", err)
+	// 	return
+	// }
+	data := `a = 1`
+	// 将文件内容转换为字符串
+	content := string(data)
+	prog := ParseSSA(content, none)
+	prog.Show()
+}
+
+func TestSome(t *testing.T) {
+	prog := ParseSSA(`
+	for(var a of {2,3,4}){
+		b = a
+		print(b)
+	}
 	`, none)
 	prog.Show()
 }

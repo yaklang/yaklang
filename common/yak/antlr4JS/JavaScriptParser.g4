@@ -189,9 +189,9 @@ iterationStatement
     : Do statement While '(' expressionSequence ')' eos                                                                       # DoStatement
     | While '(' expressionSequence ')' statement                                                                              # WhileStatement
     | For '(' forFirst? ';' forSecond? ';' forThird? ')' statement   # ForStatement
-    | For '(' (singleExpression | variableDeclaration) In expressionSequence ')' statement                                # ForInStatement
+    | For '(' (singleExpression | variableDeclarationList) In expressionSequence ')' statement                                # ForInStatement
     // strange, 'of' is an identifier. and p.p("of") not work in sometime.
-    | For Await? '(' (singleExpression | variableDeclaration) identifier{p.p("of")}? expressionSequence ')' statement  # ForOfStatement
+    | For Await? '(' (singleExpression | variableDeclarationList) identifier{p.p("of")}? expressionSequence ')' statement  # ForOfStatement
     ;
 
 varModifier  // let, const - ECMAScript 6
