@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
@@ -13,6 +14,10 @@ func NewProgram(prog *ssa.Program) *Program {
 	return &Program{
 		Program: prog,
 	}
+}
+
+func (p *Program) IsNil() bool {
+	return utils.IsNil(p.Program)
 }
 
 func (p *Program) Ref(name string) Values {
