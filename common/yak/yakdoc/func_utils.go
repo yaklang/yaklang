@@ -565,6 +565,14 @@ func FuncToFuncDecl(f interface{}, libName string, overideName string) (*FuncDec
 
 	declaration, completion = GetDeclAndCompletion(finalName, params, results)
 
+	// 特殊处理Document
+	if document != "" {
+		exampleIndex := strings.Index(document, "Example:")
+		if exampleIndex != -1 {
+			document = strings.ReplaceAll(document[:exampleIndex], "\n", "\n\n") + document[exampleIndex:]
+		}
+	}
+
 	return &FuncDecl{
 		LibName:        libName,
 		MethodName:     finalName,
