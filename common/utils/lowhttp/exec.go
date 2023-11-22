@@ -15,7 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"golang.org/x/net/http2"
 	"io"
 	"net"
 	"net/http"
@@ -436,10 +435,10 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	var nextProto []string
 	reqSchema := H1
 	if enableHttp2 {
-		nextProto = []string{http2.NextProtoTLS}
+		nextProto = []string{H2}
 		reqSchema = H2
 	} else {
-		nextProto = []string{"http/1.1"}
+		nextProto = []string{H1}
 	}
 
 	// 需要用于标识连接 https gmTLS
@@ -571,10 +570,10 @@ RECONNECT:
 	}
 	response.PortIsOpen = true
 
-	if enableHttp2 {
-		if conn.(*persistConn).cacheKey.scheme != H2 {
-			enableHttp2 = false
-		}
+	if enableHttp2 && conn.(*persistConn).cacheKey.scheme != H2 {
+		enableHttp2 = false
+		method, uri, _ := GetHTTPPacketFirstLine(requestPacket)
+		requestPacket = ReplaceHTTPPacketFirstLine(requestPacket, strings.Join([]string{method, uri, "HTTP/1.1"}, " "))
 	}
 
 	if enableHttp2 {
@@ -602,10 +601,15 @@ RECONNECT:
 		h2Stream := h2Conn.newStream(option.NativeHTTPRequestInstance, requestPacket)
 
 		if err := h2Stream.doRequest(); err != nil {
-			return nil, err
+			if h2Stream.ID == 1 { // first stream
+				return nil, err
+			} else {
+				h2Stream.h2Conn.setClose()
+				goto RECONNECT
+			}
 		}
-
-		_, responsePacket := h2Stream.waitResponse(timeout)
+		resp, responsePacket := h2Stream.waitResponse(timeout)
+		_ = resp
 		httpctx.SetBareResponseBytes(option.NativeHTTPRequestInstance, responsePacket)
 		response.RawPacket = responsePacket
 		return response, nil
