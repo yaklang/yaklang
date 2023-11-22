@@ -7,9 +7,9 @@ type Opcode string
 const (
 	OpUnknown Opcode = "unknown"
 
-	OpFunction   = "Function"
-	OpBasicBlock = "BasicBlock"
-
+	OpFunction     = "Function"
+	OpBasicBlock   = "BasicBlock"
+	OpParameter    = "Parameter"
 	OpPhi          = "Phi"
 	OpConstInst    = "ConstInst"
 	OpUndefined    = "Undefined"
@@ -36,6 +36,7 @@ const (
 
 func (i *Function) GetOpcode() Opcode     { return OpFunction }
 func (i *BasicBlock) GetOpcode() Opcode   { return OpBasicBlock }
+func (i *Parameter) GetOpcode() Opcode    { return OpParameter }
 func (i *Phi) GetOpcode() Opcode          { return OpPhi }
 func (i *ConstInst) GetOpcode() Opcode    { return OpConstInst }
 func (i *Undefined) GetOpcode() Opcode    { return OpUndefined }
