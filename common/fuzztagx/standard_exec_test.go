@@ -82,6 +82,7 @@ func TestSyncRender(t *testing.T) {
 // 畸形测试
 func TestDeformityTag(t *testing.T) {
 	for _, v := range [][]string{
+		{"{{echo(${<{{echo(a)}}})}}", "${<a}"},
 		{"{{echo({{{echo(a)}}})}}", "{a}"},
 		{"{{get1(1-29)}}", "1"},
 		{"{{i$$$$$nt(1-29)}}", "{{i$$$$$nt(1-29)}}"},
