@@ -42,7 +42,7 @@ func yaklangInfo2Grpc(infos []*pta.YaklangInfo) []*ypb.YaklangInformation {
 func (s *Server) YaklangInspectInformation(ctx context.Context, req *ypb.YaklangInspectInformationRequest) (*ypb.YaklangInspectInformationResponse, error) {
 	ret := &ypb.YaklangInspectInformationResponse{}
 	prog := ssaapi.Parse(req.YakScriptCode, pta.GetPluginSSAOpt(req.YakScriptType)...)
-	if prog == nil {
+	if prog.IsNil() {
 		return nil, errors.New("ssa parse error")
 	}
 	if req.StartPos != nil || req.EndPos != nil {
