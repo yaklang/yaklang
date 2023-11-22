@@ -16,9 +16,12 @@ func Parse(raw string, tagTypes ...*TagDefine) ([]Node, error) {
 	utagTypes := []*TagDefine{}
 	tagBoundaryMap := map[string]rune{} // 转义符映射
 	var tagBoundarys []string
+	tagBoundarysDirection := map[string]int{}
 	typeMap := map[string]struct{}{}
 	for _, tagType := range tagTypes {
 		if _, ok := typeMap[tagType.name]; !ok {
+			tagBoundarysDirection[tagType.start] = 0
+			tagBoundarysDirection[tagType.end] = 1
 			l := []string{tagType.start, tagType.end}
 			if tagType.start == tagType.end {
 				l = []string{tagType.start}
@@ -41,19 +44,48 @@ func Parse(raw string, tagTypes ...*TagDefine) ([]Node, error) {
 	for _, postion := range tagBoundaryPostions1 {
 		if pre[0] != -1 {
 			if pre[1] == postion[1] { // 当多个字符串之前存在包含关系时，只保留长的字符串
-				//tagBoundaryPostions = append(tagBoundaryPostions, postion)
+				tagBoundaryPostions = tagBoundaryPostions[:len(tagBoundaryPostions)-1]
+			}
+			if pre[0] == postion[0] {
 
-			} else {
-				tagBoundaryPostions = append(tagBoundaryPostions, pre)
+				switch tagBoundarysDirection[tagBoundarys[pre[0]]] {
+				case 0: // left
+					if pre[1]+len(tagBoundarys[pre[0]]) > postion[1] {
+						tagBoundaryPostions = tagBoundaryPostions[:len(tagBoundaryPostions)-1]
+						tagBoundaryPostions = append(tagBoundaryPostions, postion)
+						pre = postion
+						continue
+					}
+				case 1:
+					if pre[1]+len(tagBoundarys[pre[0]]) > postion[1] {
+						pre = postion
+						continue
+					}
+				}
 			}
 		}
 		pre = postion
+		tagBoundaryPostions = append(tagBoundaryPostions, postion)
 	}
-	tagBoundaryPostions = append(tagBoundaryPostions, pre)
 	escapeSymbol := `\`
 	stack := utils.NewStack[*fuzztagPos]()
 	rootTags := []*fuzztagPos{}
 	nextStart := 0
+
+	//var prePos [2]int
+	//first := false
+	//for _, pos := range tagBoundaryPostions {
+	//	if first {
+	//		prePos = pos
+	//		first = false
+	//	} else {
+	//		switch pos[0] {
+	//		case 0:
+	//		case :
+	//
+	//		}
+	//	}
+	//}
 	for _, pos := range tagBoundaryPostions {
 		if pos[1] < nextStart {
 			continue
@@ -93,19 +125,6 @@ func Parse(raw string, tagTypes ...*TagDefine) ([]Node, error) {
 			} else {
 				result = append(result, tag)
 			}
-		}
-		return
-	}
-	// 过滤未闭合的标签
-	var filterValidTag1 func(rootTags []*fuzztagPos) (result []*fuzztagPos)
-	filterValidTag1 = func(rootTags []*fuzztagPos) (result []*fuzztagPos) {
-		for _, tag := range rootTags {
-			for _, sub := range filterValidTag1(tag.subs) {
-				if tag.start+len(tag.tagType.start) > sub.start || tag.end < sub.end+len(sub.tagType.end) {
-					*tag = *sub // 子标签谋权篡位
-				}
-			}
-			result = append(result, tag)
 		}
 		return
 	}
@@ -160,5 +179,5 @@ func Parse(raw string, tagTypes ...*TagDefine) ([]Node, error) {
 		}
 		return res
 	}
-	return newDatasFromPos(0, len(raw), nil, filterValidTag1(filterValidTag(rootTags)), 0), nil
+	return newDatasFromPos(0, len(raw), nil, filterValidTag(rootTags), 0), nil
 }
