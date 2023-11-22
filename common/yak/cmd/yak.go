@@ -7,8 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/netx"
-	"github.com/yaklang/yaklang/common/yak/cmd/yakcmds"
 	"io"
 	"io/ioutil"
 	"net"
@@ -22,6 +20,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/yak/cmd/yakcmds"
 
 	systemLog "log"
 
@@ -381,7 +382,7 @@ func slowLogUnaryInterceptor(ctx context.Context, req interface{}, info *grpc.Un
 
 		log.Warnf(logMsg)
 		// 打开文件，如果文件不存在则创建，如果文件存在则在文件末尾追加
-		f, err := os.OpenFile("debug-slow.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		f, err := os.OpenFile("debug-slow.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 		if err != nil {
 			log.Println(err)
 		}
@@ -411,7 +412,7 @@ var startGRPCServerCommand = cli.Command{
 		},
 		cli.IntFlag{
 			Name: "port", Value: 8087,
-			//Name: "port", Value: 8080,
+			// Name: "port", Value: 8080,
 			Usage: "启动 GRPC 的端口",
 		},
 		cli.StringFlag{
@@ -474,7 +475,7 @@ var startGRPCServerCommand = cli.Command{
 			println("USE: go tool pprof -http=:18080 pprof file")
 			go startPProf(pprofSec)
 		}
-		//log.SetLevel(log.DebugLevel)
+		// log.SetLevel(log.DebugLevel)
 		log.Info("start to initialize database")
 		err := initializeDatabase(c.String("project-db"), c.String("profile-db"))
 		if err != nil {
@@ -484,8 +485,8 @@ var startGRPCServerCommand = cli.Command{
 
 		/* 初始化数据库后进行权限修复 */
 		base := consts.GetDefaultYakitBaseDir()
-		var projectDatabaseName = consts.GetDefaultYakitProjectDatabase(base)
-		var profileDatabaseName = consts.GetDefaultYakitPluginDatabase(base)
+		projectDatabaseName := consts.GetDefaultYakitProjectDatabase(base)
+		profileDatabaseName := consts.GetDefaultYakitPluginDatabase(base)
 		log.Infof("use project db: %s", projectDatabaseName)
 		log.Infof("use profile db: %s", profileDatabaseName)
 
@@ -495,7 +496,7 @@ var startGRPCServerCommand = cli.Command{
 		var caCertFile string = filepath.Join(certDir, "yakit-grpc-cert.pem")
 		var caKeyFile string = filepath.Join(certDir, "yakit-grpc-key.pem")
 		if certDir != "" {
-			err := os.MkdirAll(certDir, 0777)
+			err := os.MkdirAll(certDir, 0o777)
 			if err != nil {
 				log.Warnf("mkdir certdir[%s] failed: %s", certDir, err)
 			}
@@ -506,8 +507,8 @@ var startGRPCServerCommand = cli.Command{
 		}
 
 		secret := c.String("secret")
-		var streamInterceptors = []grpc.StreamServerInterceptor{grpc_recovery.StreamServerInterceptor()}
-		var unaryInterceptors = []grpc.UnaryServerInterceptor{grpc_recovery.UnaryServerInterceptor()}
+		streamInterceptors := []grpc.StreamServerInterceptor{grpc_recovery.StreamServerInterceptor()}
+		unaryInterceptors := []grpc.UnaryServerInterceptor{grpc_recovery.UnaryServerInterceptor()}
 		if secret != "" {
 			auth := func(ctx context.Context) (context.Context, error) {
 				userSecret, err := grpc_auth.AuthFromMD(ctx, "bearer")
@@ -563,11 +564,11 @@ var startGRPCServerCommand = cli.Command{
 				if err != nil {
 					return err
 				}
-				err = ioutil.WriteFile(caCertFile, cert, 0600)
+				err = ioutil.WriteFile(caCertFile, cert, 0o600)
 				if err != nil {
 					return utils.Errorf("generate caCert[%s] failed: %s", caCertFile, err)
 				}
-				err = ioutil.WriteFile(caKeyFile, key, 0600)
+				err = ioutil.WriteFile(caKeyFile, key, 0o600)
 				if err != nil {
 					return utils.Errorf("generate caKey[%s] failed: %s", caCertFile, err)
 				}
@@ -617,10 +618,10 @@ var startGRPCServerCommand = cli.Command{
 func startPProf(sec float64) {
 	day := time.Now().Format("20060102")
 	pprofCpuDir := path.Join(consts.GetDefaultYakitBaseTempDir(), "pprof", day, "cpu")
-	err := os.MkdirAll(pprofCpuDir, 0755)
+	err := os.MkdirAll(pprofCpuDir, 0o755)
 
 	pprofMemDir := path.Join(consts.GetDefaultYakitBaseTempDir(), "pprof", day, "mem")
-	err = os.MkdirAll(pprofMemDir, 0755)
+	err = os.MkdirAll(pprofMemDir, 0o755)
 	if err != nil {
 		log.Errorf("mkdir pprof dir failed: %s", err)
 		return
@@ -679,10 +680,10 @@ var cveCommand = cli.Command{
 	},
 	Action: func(c *cli.Context) error {
 		cvePath := filepath.Join(consts.GetDefaultYakitBaseTempDir(), "cve")
-		os.MkdirAll(cvePath, 0755)
+		os.MkdirAll(cvePath, 0o755)
 
 		/* 开始构建 */
-		var outputFile = c.String("output")
+		outputFile := c.String("output")
 		if outputFile == "" {
 			outputFile = consts.GetCVEDatabasePath()
 		}
@@ -697,7 +698,7 @@ var cveCommand = cli.Command{
 			}
 			log.Infof("start to zip... %v", outputFile)
 			zipFile := outputFile + ".gzip"
-			fp, err := os.OpenFile(zipFile, os.O_CREATE|os.O_RDWR, 0644)
+			fp, err := os.OpenFile(zipFile, os.O_CREATE|os.O_RDWR, 0o644)
 			if err != nil {
 				return err
 			}
@@ -774,7 +775,6 @@ var cveCommand = cli.Command{
 					return
 				}
 			}
-
 		}()
 		go func() {
 			defer wg.Done()
@@ -786,7 +786,7 @@ var cveCommand = cli.Command{
 				return
 			}
 			log.Info("start to handling cve description db")
-			var v = make(map[string]cveresources.CVEDesc)
+			v := make(map[string]cveresources.CVEDesc)
 			var count int
 			for i := range cve.YieldCVEDescriptions(db, context.Background()) {
 				count++
@@ -857,7 +857,7 @@ var translatingCommand = cli.Command{
 }
 
 func main() {
-	//log.SetLevel(log.WarnLevel)
+	// log.SetLevel(log.WarnLevel)
 	app := cli.NewApp()
 	app.Usage = "yaklang core engine"
 	app.Version = yakVersion
@@ -899,7 +899,7 @@ func main() {
 					return utils.Error("decode need output not empty")
 				}
 				log.Infof("start to d-gzip to %v", outFile)
-				targetFp, err := os.OpenFile(outFile, os.O_CREATE|os.O_RDWR, 0666)
+				targetFp, err := os.OpenFile(outFile, os.O_CREATE|os.O_RDWR, 0o666)
 				if err != nil {
 					return err
 				}
@@ -915,7 +915,7 @@ func main() {
 			}
 
 			gf := f + ".gzip"
-			fp, err := os.OpenFile(gf, os.O_CREATE|os.O_RDWR, 0666)
+			fp, err := os.OpenFile(gf, os.O_CREATE|os.O_RDWR, 0o666)
 			if err != nil {
 				return err
 			}
@@ -960,7 +960,8 @@ func main() {
 				println(d)
 			}
 		}},
-		{Name: "version",
+		{
+			Name: "version",
 			Flags: []cli.Flag{
 				cli.BoolFlag{
 					Name:  "json",
@@ -985,7 +986,8 @@ func main() {
 						fmt.Printf("    %v: %v\n", k, v)
 					}
 				}
-			}},
+			},
+		},
 		{
 			Name: "tunnel",
 			Flags: []cli.Flag{
@@ -1022,7 +1024,7 @@ func main() {
 				libs := yak.EngineToLibDocuments(yaklang.New())
 				baseDir := filepath.Join(".", c.String("dir"))
 
-				_ = os.MkdirAll(baseDir, 0777)
+				_ = os.MkdirAll(baseDir, 0o777)
 				for _, lib := range libs {
 					targetFile := filepath.Join(baseDir, fmt.Sprintf("%v.yakdoc.yaml", lib.Name))
 					existed := yakdocument.LibDoc{}
@@ -1039,7 +1041,7 @@ func main() {
 				for _, s := range yakdocument.LibsToRelativeStructs(libs...) {
 					targetFile := filepath.Join(baseDir, "structs", fmt.Sprintf("%v.struct.yakdoc.yaml", s.StructName))
 					dir, _ := filepath.Split(targetFile)
-					_ = os.MkdirAll(dir, 0777)
+					_ = os.MkdirAll(dir, 0o777)
 					existed := yakdocument.StructDocForYamlMarshal{}
 					if utils.GetFirstExistedPath(targetFile) != "" {
 						raw, err := ioutil.ReadFile(targetFile)
@@ -1140,7 +1142,7 @@ func main() {
 				},
 			},
 			Action: func(c *cli.Context) error {
-				helper := doc.Document
+				helper := doc.DefaultDocumentHelper
 
 				if c.Bool("all-lib") {
 					for _, libName := range helper.GetAllLibs() {
@@ -1240,20 +1242,21 @@ func main() {
 				if err != nil {
 					return err
 				}
-				err = ioutil.WriteFile(outputFileName, b, 0644)
+				err = ioutil.WriteFile(outputFileName, b, 0o644)
 				if err != nil {
 					return err
 				}
 				return nil
 			},
 		},
-		{Hidden: true, Name: "vscdoc", Action: func(c *cli.Context) error {
-			libs := yak.EngineToLibDocuments(
-				yaklang.New(),
-			)
-			_ = libs
-			return nil
-		},
+		{
+			Hidden: true, Name: "vscdoc", Action: func(c *cli.Context) error {
+				libs := yak.EngineToLibDocuments(
+					yaklang.New(),
+				)
+				_ = libs
+				return nil
+			},
 		},
 		{Name: "profile-export", Action: func(c *cli.Context) {
 			f := c.String("output")
@@ -1382,9 +1385,7 @@ func main() {
 				args := c.Args()
 				file := args[0]
 				if file != "" {
-					var (
-						err error
-					)
+					var err error
 					absFile := file
 					if !filepath.IsAbs(absFile) {
 						absFile, err = filepath.Abs(absFile)
@@ -1458,7 +1459,7 @@ func main() {
 			// args 被解析到了，说明后面跟着文件，去读文件出来吧
 			file := args[0]
 			if file != "" {
-				var absFile = file
+				absFile := file
 				if !filepath.IsAbs(absFile) {
 					absFile, err = filepath.Abs(absFile)
 					if err != nil {
@@ -1497,7 +1498,7 @@ func main() {
 
 		code := c.String("code")
 		if c.Bool("hex") {
-			var codeRaw, err = codec.DecodeHex(code)
+			codeRaw, err := codec.DecodeHex(code)
 			if err != nil {
 				spew.Dump(code)
 				return err
@@ -1506,7 +1507,7 @@ func main() {
 		}
 
 		if c.Bool("base64") {
-			var codeRaw, err = codec.DecodeBase64(code)
+			codeRaw, err := codec.DecodeBase64(code)
 			if err != nil {
 				spew.Dump(code)
 				return err
