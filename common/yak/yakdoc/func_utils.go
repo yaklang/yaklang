@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/doc"
+	"go/format"
 	"go/parser"
 	"go/token"
 	"os"
@@ -134,20 +135,33 @@ func ShrinkTypeVerboseName(i string) string {
 	return i
 }
 
-func GetTypeName(expr ast.Expr) string {
+func GetTypeName(expr ast.Expr, fset *token.FileSet) string {
 	switch t := expr.(type) {
 	case *ast.Ident:
 		return t.Name
 	case *ast.StarExpr:
-		return "*" + GetTypeName(t.X)
+		return "*" + GetTypeName(t.X, fset)
 	case *ast.SelectorExpr:
-		return GetTypeName(t.X) + "." + t.Sel.Name
+		return GetTypeName(t.X, fset) + "." + t.Sel.Name
+	case *ast.InterfaceType:
+		return "any"
+	case *ast.Ellipsis:
+		return "..." + GetTypeName(t.Elt, fset)
+	case *ast.ArrayType:
+		return "[]" + GetTypeName(t.Elt, fset)
+	case *ast.MapType:
+		return "map[" + GetTypeName(t.Key, fset) + "]" + GetTypeName(t.Value, fset)
 	default:
-		return fmt.Sprintf("%T", t)
+		var buf strings.Builder
+		err := format.Node(&buf, fset, expr)
+		if err != nil {
+			return ""
+		}
+		return buf.String()
 	}
 }
 
-func HandleParams(funcRefType reflect.Type, typ *ast.FuncType) (params []*Field) {
+func HandleParams(funcRefType reflect.Type, typ *ast.FuncType, fset *token.FileSet) (params []*Field) {
 	if typ.Params == nil {
 		return nil
 	}
@@ -160,7 +174,7 @@ func HandleParams(funcRefType reflect.Type, typ *ast.FuncType) (params []*Field)
 			fieldRefType = funcRefType.In(i)
 		}
 
-		typName := ShrinkTypeVerboseName(GetTypeName(field.Type))
+		typName := ShrinkTypeVerboseName(GetTypeName(field.Type, fset))
 		for _, name := range field.Names {
 			param := &Field{
 				Name: name.Name,
@@ -175,7 +189,7 @@ func HandleParams(funcRefType reflect.Type, typ *ast.FuncType) (params []*Field)
 	return params
 }
 
-func HandleResults(funcRefType reflect.Type, typ *ast.FuncType) (results []*Field) {
+func HandleResults(funcRefType reflect.Type, typ *ast.FuncType, fset *token.FileSet) (results []*Field) {
 	if typ.Results == nil {
 		return nil
 	}
@@ -188,7 +202,7 @@ func HandleResults(funcRefType reflect.Type, typ *ast.FuncType) (results []*Fiel
 			fieldRefType = funcRefType.Out(i)
 		}
 
-		typName := ShrinkTypeVerboseName(GetTypeName(field.Type))
+		typName := ShrinkTypeVerboseName(GetTypeName(field.Type, fset))
 
 		for _, name := range field.Names {
 			result := &Field{
@@ -301,12 +315,12 @@ func FuncToFuncDecl(f interface{}, libName string, overideName string) (*FuncDec
 
 		// 获取参数
 		if decl != nil && decl.Type != nil && decl.Type.Params != nil {
-			params = HandleParams(funcRefType, decl.Type)
+			params = HandleParams(funcRefType, decl.Type, fset)
 		}
 
 		// 获取返回值
 		if decl != nil && decl.Type != nil && decl.Type.Results != nil {
-			results = HandleResults(funcRefType, decl.Type)
+			results = HandleResults(funcRefType, decl.Type, fset)
 		}
 
 		break
@@ -370,8 +384,8 @@ func FuncToFuncDecl(f interface{}, libName string, overideName string) (*FuncDec
 						continue
 					}
 					if funcDecl, ok := decl.(*ast.FuncDecl); ok {
-						params = HandleParams(funcRefType, funcDecl.Type)
-						results = HandleResults(funcRefType, funcDecl.Type)
+						params = HandleParams(funcRefType, funcDecl.Type, fset)
+						results = HandleResults(funcRefType, funcDecl.Type, fset)
 						found = true
 						break
 					}
@@ -383,8 +397,8 @@ func FuncToFuncDecl(f interface{}, libName string, overideName string) (*FuncDec
 						}
 						funcLit, ok := specs.Values[0].(*ast.FuncLit)
 						if ok {
-							params = HandleParams(funcRefType, funcLit.Type)
-							results = HandleResults(funcRefType, funcLit.Type)
+							params = HandleParams(funcRefType, funcLit.Type, fset)
+							results = HandleResults(funcRefType, funcLit.Type, fset)
 							found = true
 							break
 						}
@@ -394,8 +408,8 @@ func FuncToFuncDecl(f interface{}, libName string, overideName string) (*FuncDec
 				// 处理 "asd" => 匿名函数的情况
 				funcLit, ok := kv.Value.(*ast.FuncLit)
 				if ok {
-					params = HandleParams(funcRefType, funcLit.Type)
-					results = HandleResults(funcRefType, funcLit.Type)
+					params = HandleParams(funcRefType, funcLit.Type, fset)
+					results = HandleResults(funcRefType, funcLit.Type, fset)
 					found = true
 					break
 				}
@@ -438,8 +452,8 @@ func FuncToFuncDecl(f interface{}, libName string, overideName string) (*FuncDec
 					if typ, ok = typExpr.(*ast.FuncType); !ok {
 						continue
 					}
-					params = HandleParams(funcRefType, typ)
-					results = HandleResults(funcRefType, typ)
+					params = HandleParams(funcRefType, typ, fset)
+					results = HandleResults(funcRefType, typ, fset)
 					found = true
 					break
 				}

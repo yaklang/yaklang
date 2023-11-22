@@ -92,7 +92,7 @@ func GetInterfaceDocumentFromAST(pkg *ast.Package, interfaceName string) map[str
 	return nil
 }
 
-func GetMethodFuncDeclFromAST(pkg *ast.Package, libName, structName, methodName, yakFuncName string) *yakdoc.FuncDecl {
+func GetMethodFuncDeclFromAST(pkg *ast.Package, libName, structName, methodName, yakFuncName string, fset *token.FileSet) *yakdoc.FuncDecl {
 	if libName == "" {
 		libName = globalBanner
 	}
@@ -108,7 +108,7 @@ func GetMethodFuncDeclFromAST(pkg *ast.Package, libName, structName, methodName,
 			}
 			if decl.Recv != nil && len(decl.Recv.List) > 0 {
 				receiver := decl.Recv.List[0]
-				typName := yakdoc.GetTypeName(receiver.Type)
+				typName := yakdoc.GetTypeName(receiver.Type, fset)
 				if !IsSameTypeName(typName, structName) {
 					continue
 				}
@@ -117,12 +117,12 @@ func GetMethodFuncDeclFromAST(pkg *ast.Package, libName, structName, methodName,
 			var params, results []*yakdoc.Field
 
 			if decl != nil && decl.Type != nil && decl.Type.Params != nil {
-				params = yakdoc.HandleParams(nil, decl.Type)
+				params = yakdoc.HandleParams(nil, decl.Type, fset)
 			}
 
 			// 获取返回值
 			if decl != nil && decl.Type != nil && decl.Type.Results != nil {
-				results = yakdoc.HandleResults(nil, decl.Type)
+				results = yakdoc.HandleResults(nil, decl.Type, fset)
 			}
 
 			if decl.Doc != nil {
@@ -147,7 +147,7 @@ func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.Doc
 	}
 	instanceMethodHandlers := make([]*InstanceMethodHandler, 0)
 	canAutoInjectInterface := true
-	pkgs, err := yakdoc.GetProjectAstPackages()
+	pkgs, fset, err := yakdoc.GetProjectAstPackages()
 	if err != nil {
 		canAutoInjectInterface = false
 		log.Warnf("failed to get project ast packages: %v", err)
@@ -489,7 +489,7 @@ func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.Doc
 		if !ok {
 			continue
 		}
-		funcDecl := GetMethodFuncDeclFromAST(pkg, handler.libName, structName, funcName, handler.methodName)
+		funcDecl := GetMethodFuncDeclFromAST(pkg, handler.libName, structName, funcName, handler.methodName, fset)
 		if handler.libName == "" {
 			// 全局函数
 			helper.Functions[handler.methodName] = funcDecl
