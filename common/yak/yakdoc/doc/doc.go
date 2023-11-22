@@ -4,6 +4,7 @@ import (
 	"bytes"
 	_ "embed"
 	"encoding/gob"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yakdoc"
@@ -12,7 +13,7 @@ import (
 //go:embed doc.gob.gzip
 var embedDocument []byte
 
-var Document *yakdoc.DocumentHelper
+var DefaultDocumentHelper *yakdoc.DocumentHelper
 
 func init() {
 	buf, err := utils.GzipDeCompress(embedDocument)
@@ -21,7 +22,7 @@ func init() {
 	}
 
 	decoder := gob.NewDecoder(bytes.NewReader(buf))
-	if err := decoder.Decode(&Document); err != nil {
+	if err := decoder.Decode(&DefaultDocumentHelper); err != nil {
 		log.Warnf("load embed yak document error: %v", err)
 	}
 }
