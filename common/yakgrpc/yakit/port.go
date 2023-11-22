@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"context"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -199,6 +200,11 @@ func FilterPort(db *gorm.DB, params *ypb.QueryPortsRequest) *gorm.DB {
 		db = db.Where("runtime_id is null OR (runtime_id = '')")
 	}
 	return db
+}
+
+type SimplePort struct {
+	Host string
+	Port int
 }
 
 func YieldSimplePorts(db *gorm.DB, ctx context.Context) chan *SimplePort {
