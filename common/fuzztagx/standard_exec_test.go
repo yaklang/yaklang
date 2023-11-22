@@ -84,6 +84,8 @@ func TestDeformityTag(t *testing.T) {
 	for _, v := range [][]string{
 		{"{{echo(${<{{echo(a)}}})}}", "${<a}"},
 		{"{{echo({{{echo(a)}}})}}", "{a}"},
+		{"{{echo({{{echo(a)}}}})}}", "{a}}"},
+		{`{{echo(\{{1{{echo(a)}}}})}}`, "{{1a}}"}, // why
 		{"{{get1(1-29)}}", "1"},
 		{"{{i$$$$$nt(1-29)}}", "{{i$$$$$nt(1-29)}}"},
 		{"{{xx12}}", ""},
