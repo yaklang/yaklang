@@ -27,7 +27,6 @@ var (
 func GetProjectPath() string {
 	if projectPath == "" {
 		_, filename, _, ok := runtime.Caller(0)
-		fmt.Printf("debug dump project path: %#v\n", filename)
 		if ok {
 			projectPath, _ = filepath.Abs(filepath.Join(filename, "../../../../"))
 		}
