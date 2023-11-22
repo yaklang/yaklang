@@ -17,7 +17,7 @@ import (
 // h2 is being used. Since no browsers use h2c, it's safe to assume all traffic uses TLS.
 // Revision this func from martian h2 package since it was not compatible with martian modifier style
 func (p *Proxy) proxyH2(closing chan bool, cc *tls.Conn, url *url.URL) error {
-	log.Infof("Proxying %v with HTTP/2", url)
+	log.Debugf("Proxying %v with HTTP/2", url)
 	go func() {
 		select {
 		case <-closing:
