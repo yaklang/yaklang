@@ -164,7 +164,7 @@ func (f *Matcher) matchByRule(r *HTTPResponseInfo, ruleToUse *WebRule, config *C
 	if config.ActiveMode && len(ruleToUse.Path) > 1 && !strings.HasSuffix(ruleToUse.Path, path) {
 		value, ok := faviconCache.Load(r.URL.Host)
 		if !ok {
-			log.Infof("sending active web-fingerprint request to: %s origin: %v", ruleToUse.Path, path)
+			log.Debugf("sending active web-fingerprint request to: %s origin: %v", ruleToUse.Path, path)
 			newUrl := lowhttp.MergeUrlFromHTTPRequest(r.RequestRaw, ruleToUse.Path, r.IsHttps)
 			request := lowhttp.UrlToGetRequestPacket(newUrl, r.RequestRaw, r.IsHttps, lowhttp.ExtractCookieJarFromHTTPResponse(
 				append(r.ResponseHeaderBytes(), r.Body...))...)

@@ -1,0 +1,64 @@
+target, port = tcp.MockTCPProtocol("rdp")
+
+_, port2 = tcp.MockTCPProtocol("mysql")
+
+_, port3 = tcp.MockTCPProtocol("ftp")
+
+tcpPorts = sprintf("%d,%d", port, port3)
+synPorts = sprintf("%d,%d", port2, port3)
+
+
+tcpWantCount = 0
+tcpCountLock = sync.NewLock()
+tcpScan = func(target) {
+    for result in servicescan.Scan(target, tcpPorts)~ {
+        if result.IsOpen() {
+            println("TCP GOT "+ result.String())
+            tcpCountLock.Lock()
+            tcpWantCount++
+            tcpCountLock.Unlock()
+        }
+
+    }
+
+}
+
+synWantCount = 0
+synCountLock = sync.NewLock()
+synScan = func(target) {
+    for result in servicescan.ScanFromSynResult(synscan.Scan(target, synPorts, synscan.excludePorts(tcpPorts))~)~ {
+        if result.IsOpen() {
+            println("SYN GOT "+ result.String())
+
+            synCountLock.Lock()
+            synWantCount++
+            synCountLock.Unlock()
+        }
+
+    }
+
+}
+
+wg = sync.NewWaitGroup()
+
+wg.Add(1)
+go func {
+    defer wg.Done()
+
+
+    synScan(target)
+}
+
+wg.Add(1)
+go func {
+    defer wg.Done()
+
+
+    tcpScan(target)
+}
+
+
+wg.Wait()
+
+assert synWantCount == 1
+assert tcpWantCount == 2
