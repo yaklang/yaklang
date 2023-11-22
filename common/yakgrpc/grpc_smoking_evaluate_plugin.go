@@ -85,9 +85,9 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 		})
 	}
 
-	// static analyze
-	var score int
+	score := 100
 
+	// static analyze
 	staticCheckingFailed := false
 	staticResults := yak.AnalyzeStaticYaklangWithType(pluginCode, pluginType)
 	if len(staticResults) > 0 {
@@ -97,6 +97,7 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 				pushSuggestion(`静态代码检测失败[`+sRes.Severity+`]`, sRes.Message, []byte(sRes.From))
 			} else {
 				pushSuggestion(`静态代码检测警告[`+sRes.Severity+`]`, sRes.Message, []byte(sRes.From))
+				score = 60
 			}
 		}
 		log.Error("static analyze failed")
@@ -149,14 +150,12 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 			return nil
 		}))
 		if err != nil {
+			score -= 40
 			log.Errorf("debugScript failed: %v", err)
 			pushSuggestion("冒烟测试失败[Smoking Test]", `请检查插件异常处理是否完备？查看 Console 以处理调试错误: `+err.Error())
-		} else {
-			score += 40
 		}
-		if !fetchRisk {
-			score += 20
-		} else {
+		if fetchRisk {
+			score -= 20
 			pushSuggestion("误报[Negative Alarm]", `本插件的漏洞判定可能过于宽松，请检查漏洞判定逻辑`)
 		}
 	}

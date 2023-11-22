@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -18,10 +19,11 @@ func TestGRPCMUSTPASS_SMOKING_EVALUATE_PLUGIN(t *testing.T) {
 	type testCase struct {
 		code      string
 		err       string
+		codeTyp   string
 		zeroScore bool // is score == 0 ?
 	}
 	TestSmokingEvaluatePlugin := func(tc testCase) {
-		name, err := yakit.CreateTemporaryYakScript("port-scan", tc.code)
+		name, err := yakit.CreateTemporaryYakScript(tc.codeTyp, tc.code)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -32,7 +34,7 @@ func TestGRPCMUSTPASS_SMOKING_EVALUATE_PLUGIN(t *testing.T) {
 			t.Fatal(err)
 		}
 		var checking = false
-		// spew.Dump("result: ", rsp)
+		fmt.Printf("result: %#v \n", rsp)
 		if tc.zeroScore && rsp.Score != 0 {
 			// want score == 0 but get !0
 			t.Fatal("this test should have score = 0")
@@ -41,13 +43,19 @@ func TestGRPCMUSTPASS_SMOKING_EVALUATE_PLUGIN(t *testing.T) {
 			// want score != 0 but get 0
 			t.Fatal("this test shouldn't have score = 0")
 		}
-		for _, r := range rsp.Results {
-			if strings.Contains(r.String(), tc.err) {
-				checking = true
+		if tc.err == "" {
+			if len(rsp.Results) != 0 {
+				t.Fatal("this test should have no result")
 			}
-		}
-		if !checking {
-			t.Fatalf("should have %s", tc.err)
+		} else {
+			for _, r := range rsp.Results {
+				if strings.Contains(r.String(), tc.err) {
+					checking = true
+				}
+			}
+			if !checking {
+				t.Fatalf("should have %s", tc.err)
+			}
 		}
 	}
 
@@ -60,6 +68,7 @@ handle = result => {
 	risk.NewRisk("http://baidu.com")
 }`,
 			err:       "[Negative Alarm]",
+			codeTyp:   "port-scan",
 			zeroScore: false,
 		})
 	})
@@ -72,6 +81,7 @@ handle = result => {
 	yakit.Info(bacd)
 	risk.NewRisk("http://baidu.com")
 }`,
+			codeTyp:   "port-scan",
 			err:       "Value undefine",
 			zeroScore: true,
 		})
@@ -84,7 +94,24 @@ yakit.AutoInitYakit()
 handle = result => {
 }`,
 			err:       "empty block",
+			codeTyp:   "port-scan",
 			zeroScore: false,
 		})
 	})
+
+	t.Run("test yak ", func(t *testing.T) {
+		TestSmokingEvaluatePlugin(testCase{
+			code: `
+yakit.AutoInitYakit()
+
+# Input your code!
+			`,
+
+			err:       "",
+			codeTyp:   "yak",
+			zeroScore: false,
+		})
+
+	})
+
 }
