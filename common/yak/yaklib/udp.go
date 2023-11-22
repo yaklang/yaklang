@@ -262,7 +262,7 @@ func udpServe(host string, port interface{}, opts ...udpServerOpt) error {
 		return utils.Errorf("resolve udp addr: %v", err)
 	}
 
-	log.Infof("start to listen udp://%v", udpAddr)
+	log.Debugf("start to listen udp://%v", udpAddr)
 	conn, err := net.ListenUDP("udp", udpAddr)
 	if err != nil {
 		return err
