@@ -40,7 +40,7 @@ func GetDeclAndCompletion(funcName string, params, results []*Field) (string, st
 		if p.Name == "" {
 			p.Name = fmt.Sprintf("v%d", i+1)
 		}
-		p.Type = shrinkTypeVerboseName(p.Type)
+		p.Type = ShrinkTypeVerboseName(p.Type)
 
 		/*
 			设置vscode AutoCompletion
@@ -62,7 +62,7 @@ func GetDeclAndCompletion(funcName string, params, results []*Field) (string, st
 		if r.Name == "" {
 			results[i].Name = fmt.Sprintf("r%d", i+1)
 		}
-		r.Type = shrinkTypeVerboseName(r.Type)
+		r.Type = ShrinkTypeVerboseName(r.Type)
 	}
 
 	// 生成declaration
@@ -126,7 +126,7 @@ func GetCacheAstBundle(fileName string) (*CacheAstBundle, error) {
 }
 
 // rename native type
-func shrinkTypeVerboseName(i string) string {
+func ShrinkTypeVerboseName(i string) string {
 	if InterfaceToAnyRegep.MatchString(i) {
 		return InterfaceToAnyRegep.ReplaceAllString(i, "any")
 	}
@@ -160,7 +160,7 @@ func HandleParams(funcRefType reflect.Type, typ *ast.FuncType) (params []*Field)
 			fieldRefType = funcRefType.In(i)
 		}
 
-		typName := shrinkTypeVerboseName(GetTypeName(field.Type))
+		typName := ShrinkTypeVerboseName(GetTypeName(field.Type))
 		for _, name := range field.Names {
 			param := &Field{
 				Name: name.Name,
@@ -188,7 +188,7 @@ func HandleResults(funcRefType reflect.Type, typ *ast.FuncType) (results []*Fiel
 			fieldRefType = funcRefType.Out(i)
 		}
 
-		typName := shrinkTypeVerboseName(GetTypeName(field.Type))
+		typName := ShrinkTypeVerboseName(GetTypeName(field.Type))
 
 		for _, name := range field.Names {
 			result := &Field{
@@ -277,6 +277,7 @@ func FuncToFuncDecl(f interface{}, libName string, overideName string) (*FuncDec
 	funcs := docPkg.Funcs
 	for _, theType := range docPkg.Types {
 		funcs = append(funcs, theType.Methods...)
+		funcs = append(funcs, theType.Funcs...)
 	}
 	lo.Uniq(funcs)
 
@@ -461,6 +462,7 @@ func FuncToFuncDecl(f interface{}, libName string, overideName string) (*FuncDec
 			return nil, fmt.Errorf("line out of range")
 		}
 		lineStr := lines[line-1]
+		lineStr = ShrinkTypeVerboseName(lineStr)
 		// 去除注释
 		if commentIndex := strings.Index(lineStr, "//"); commentIndex != -1 {
 			lineStr = lineStr[:commentIndex]
@@ -474,7 +476,7 @@ func FuncToFuncDecl(f interface{}, libName string, overideName string) (*FuncDec
 		// 去除空格
 		lineStr = strings.TrimSpace(lineStr)
 		// 去除左花括号
-		index := strings.Index(lineStr, "{")
+		index := strings.LastIndex(lineStr, "{")
 		if index != -1 {
 			lineStr = lineStr[:index]
 		}
