@@ -50,7 +50,7 @@ func init() {
 }
 
 func TestMustPassDebug(t *testing.T) {
-	var debugName = "udp2.yak"
+	var debugName = "udp3.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {
