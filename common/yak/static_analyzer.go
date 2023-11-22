@@ -57,7 +57,7 @@ func AnalyzeStaticYaklangWithType(code, codeTyp string) []*StaticAnalyzeResult {
 	}
 
 	prog := ssaapi.Parse(code, pta.GetPluginSSAOpt(codeTyp)...)
-	if prog == nil {
+	if prog.IsNil() {
 		return results
 	}
 	pta.CheckPluginType(codeTyp, prog)
@@ -82,11 +82,5 @@ func AnalyzeStaticYaklangWithType(code, codeTyp string) []*StaticAnalyzeResult {
 			From:            "SSA",
 		})
 	}
-	// debug printf json
-	// prog.ShowWithSource()
-	// for _, result := range results {
-	// 	fmt.Printf("%+v\n", result)
-	// }
-
 	return results
 }
