@@ -2,10 +2,11 @@ package yaklib
 
 import (
 	"context"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"strings"
 )
 
 const (
@@ -95,7 +96,7 @@ var DatabaseExports = map[string]interface{}{
 	"QueryDomainsByDomainKeyword": queryDomainAssetByDomainKeyword,
 	"QueryDomainsByTitle":         queryDomainAssetByHTMLTitle,
 	"QueryPayloadGroups":          getPayloadGroups,
-	"DeletePayloadByGroup":        deletePayload,
+	"DeletePayloadByGroup":        deletePayloadByGroup,
 
 	"GetProjectKey": func(k any) string {
 		return yakit.GetProjectKey(consts.GetGormProjectDatabase(), k)
