@@ -34,7 +34,7 @@ func GetProjectPath() string {
 	return projectPath
 }
 
-func GetProjectAstPackages() (map[string]*ast.Package, error) {
+func GetProjectAstPackages() (map[string]*ast.Package, *token.FileSet, error) {
 	rootDir := GetProjectPath()
 	fset := token.NewFileSet()
 	packages := make(map[string]*ast.Package)
@@ -60,7 +60,7 @@ func GetProjectAstPackages() (map[string]*ast.Package, error) {
 		return nil
 	})
 
-	return packages, err
+	return packages, fset, err
 }
 
 type DocumentHelper struct {
