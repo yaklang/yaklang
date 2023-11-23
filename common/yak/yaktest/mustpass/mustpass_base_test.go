@@ -50,7 +50,7 @@ func init() {
 }
 
 func TestMustPassDebug(t *testing.T) {
-	var debugName = "udp3.yak"
+	var debugName = "mock_syn_exclude_port.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {

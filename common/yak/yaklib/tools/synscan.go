@@ -359,8 +359,8 @@ func runScan(sampleTarget string, filteredTargetChan chan string, ports string, 
 		stringFilter.Insert(addr)
 
 		if !hostsFilter.Contains(addr) {
-			// 端口不在范围内
-			if !portsFilter.Contains(port) {
+			// 端口不在范围内,并且不在 host 、port exclude 中
+			if !portsFilter.Contains(port) || config.IsFiltered(ip.String(), port) {
 				return
 			}
 			if !hostsFilter.Contains(ip.String()) {
