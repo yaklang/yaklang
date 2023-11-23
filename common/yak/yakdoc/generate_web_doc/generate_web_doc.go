@@ -62,10 +62,10 @@ func GenerateSingleFile(basepath string, lib *yakdoc.ScriptLib) {
 			simpleDocument = strings.ReplaceAll(simpleDocument, "|", "\\|")
 		}
 
-		exampleIndex = strings.Index(document, "Example:")
-		if exampleIndex != -1 {
-			document = strings.ReplaceAll(document[:exampleIndex], "\n", "\n\n") + document[exampleIndex:]
-		}
+		// exampleIndex = strings.Index(document, "Example:")
+		// if exampleIndex != -1 {
+		// 	document = strings.ReplaceAll(document[:exampleIndex], "\n", "\n\n") + document[exampleIndex:]
+		// }
 		lowerMethodName := strings.ToLower(fun.MethodName)
 		file.WriteString(fmt.Sprintf("| [%s.%s](#%s) |%s|\n", fun.LibName, fun.MethodName, lowerMethodName, simpleDocument))
 		buf := strings.Builder{}
