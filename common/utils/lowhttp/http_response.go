@@ -199,9 +199,13 @@ func FixHTTPResponse(raw []byte) (rsp []byte, body []byte, _ error) {
 
 	bodyRaw := body
 	if bodyRaw != nil && isChunked {
-		unchunked, _ := codec.HTTPChunkedDecode(bodyRaw)
+		unchunked, chunkErr := codec.HTTPChunkedDecode(bodyRaw)
 		if unchunked != nil {
 			bodyRaw = unchunked
+		} else {
+			if chunkErr == nil {
+				bodyRaw = []byte{}
+			}
 		}
 	}
 	if contentEncoding != "" {
