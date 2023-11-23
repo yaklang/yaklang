@@ -202,7 +202,7 @@ func (h2Conn *http2ClientConn) readLoop() {
 	readIdleTimeout := h2Conn.idleTimeout
 	var t *time.Timer
 
-	for {
+	for !(h2Conn.readGoAway || h2Conn.closed) {
 		frame, err := h2Conn.fr.ReadFrame()
 		if t != nil {
 			t.Reset(readIdleTimeout)
@@ -232,7 +232,6 @@ func (h2Conn *http2ClientConn) readLoop() {
 			rl.processData(f)
 		case *http2.GoAwayFrame:
 			rl.processGoAway(f)
-			return
 		case *http2.RSTStreamFrame:
 			rl.processResetStream(f)
 		case *http2.SettingsFrame:
@@ -242,7 +241,7 @@ func (h2Conn *http2ClientConn) readLoop() {
 		case *http2.PingFrame:
 			rl.processPing(f)
 		default:
-			log.Warnf("Transport: unhandled response frame type %T", f)
+			//log.Debugf("Transport: unhandled response frame type %T", f)
 		}
 	}
 }
@@ -385,6 +384,7 @@ func (cs *http2ClientStream) doRequest() error {
 }
 
 func (cs *http2ClientStream) waitResponse(timeout time.Duration) (http.Response, []byte) {
+	flow := fmt.Sprintf("%v->%v", cs.h2Conn.conn.LocalAddr(), cs.h2Conn.conn.RemoteAddr())
 	closeFlag := make(chan struct{}, 1) // get read frame err
 	go func() {
 		cs.h2Conn.closeCond.L.Lock()
@@ -397,12 +397,16 @@ func (cs *http2ClientStream) waitResponse(timeout time.Duration) (http.Response,
 
 	select {
 	case <-time.After(timeout):
+		log.Errorf("h2 stream-id %v wait response timeout : %s", cs.ID, flow)
 	case <-cs.readEndStreamSignal:
 	case <-closeFlag:
+		log.Errorf("h2 stream-id %v wait response conn closed : %s", cs.ID, flow)
 	}
 	cs.resp.Body = io.NopCloser(cs.bodyBuffer)
 	cs.respPacket, _ = utils.DumpHTTPResponse(cs.resp, len(cs.bodyBuffer.Bytes()) > 0)
+	cs.h2Conn.mu.Lock()
 	cs.h2Conn.streams[cs.ID] = nil
+	cs.h2Conn.mu.Unlock()
 	cs.h2Conn.http2StreamPool.Put(cs) // gc
 	return *cs.resp, cs.respPacket
 }
@@ -426,11 +430,6 @@ func (rl *http2ClientConnReadLoop) processHeaders(f *http2.HeadersFrame) {
 	cs := rl.h2Conn.streamByID(f.StreamID) // get stream by id
 	if err := streamAliveCheck(cs, f.StreamID); err != nil {
 		log.Errorf("h2 stream-id %v processHeaders error: %v", f.StreamID, err)
-		return
-	}
-
-	if cs.readHeaderEnd {
-		log.Errorf("http2: received HEADERS for HEADERS_ENDED stream %d", f.StreamID)
 		return
 	}
 
@@ -555,7 +554,7 @@ func (rl *http2ClientConnReadLoop) processSettings(f *http2.SettingsFrame) {
 	// write settings ack
 	err := rl.h2Conn.fr.WriteSettingsAck()
 	if err != nil {
-		log.Errorf("h2 server write settings ack error: %v", err)
+		log.Errorf("h2 client write settings ack error: %v", err)
 		return
 	}
 	return
@@ -577,7 +576,6 @@ func (rl *http2ClientConnReadLoop) processWindowUpdate(f *http2.WindowUpdateFram
 }
 
 func (rl *http2ClientConnReadLoop) processPing(f *http2.PingFrame) {
-
 	err := rl.h2Conn.fr.WritePing(true, f.Data)
 	if err != nil {
 		log.Errorf("h2 server write ping ack error: %v", err)
