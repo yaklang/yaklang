@@ -86,6 +86,12 @@ func TypeCompareEx(t1, t2 Type, depth int) bool {
 		if t2kind == Bytes {
 			return true
 		}
+	case Null:
+		if t2kind == Number || t2kind == Boolean || t2kind == String {
+			return false
+		} else {
+			return true
+		}
 	default:
 	}
 	return t1kind == t2kind
