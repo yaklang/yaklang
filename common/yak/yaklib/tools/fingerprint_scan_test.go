@@ -69,8 +69,8 @@ func Test_scanFingerprint1(t *testing.T) {
 	}
 
 	synScan := func(addr string) {
-		//res, err := Scan(target, synPorts, _scanOptExcludePorts(tcpPorts))
-		res, err := Scan(target, synPorts, _scanOptOpenPortInitPortFilter("6379"))
+		res, err := Scan(target, synPorts, _scanOptExcludePorts(tcpPorts))
+		//res, err := Scan(target, synPorts, _scanOptOpenPortInitPortFilter("6379"))
 		//res, err := Scan(target, synPorts)
 		if err != nil {
 			t.FailNow()
