@@ -76,7 +76,7 @@ func CheckDocumentHelper(t *testing.T, helper *yakdoc.DocumentHelper) {
 	checkStructMethods("github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequestIf", "Repeat")
 }
 
-func TestGetnerateDoc(t *testing.T) {
+func TestGenerateDoc(t *testing.T) {
 	helper := yak.EngineToDocumentHelperWithVerboseInfo(yaklang.New())
 	var buf bytes.Buffer
 	encoder := gob.NewEncoder(&buf)

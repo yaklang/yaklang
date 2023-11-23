@@ -6,7 +6,7 @@ import (
 )
 
 func TestGetProjectAstPackages(t *testing.T) {
-	pkgs, err := GetProjectAstPackages()
+	pkgs, _, err := GetProjectAstPackages()
 	if err != nil {
 		t.Fatal(err)
 	}
