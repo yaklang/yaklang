@@ -390,6 +390,8 @@ func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.Doc
 				if !f.IsValid() {
 					// ? 匿名字段是一个匿名接口，例如继承了 net.Conn 接口, fallback 处理
 					methodTyp := method.Type
+					declStr := yakdoc.ShrinkTypeVerboseName(methodTyp.String())
+					declStr = strings.Replace(declStr, "func(", methodName+"(", 1)
 					// 尝试从文档中获取方法的注释
 					document, _ := documents[methodName]
 
@@ -397,7 +399,7 @@ func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.Doc
 						LibName:    structName,
 						MethodName: methodName,
 						Document:   document,
-						Decl:       strings.Replace(methodTyp.String(), "func(", methodName+"(", 1),
+						Decl:       declStr,
 						Params:     make([]*yakdoc.Field, 0, methodTyp.NumIn()),
 						Results:    make([]*yakdoc.Field, 0, methodTyp.NumOut()),
 					}
