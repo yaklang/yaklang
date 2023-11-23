@@ -536,6 +536,25 @@ func TestType(t *testing.T) {
 		})
 	})
 
+	t.Run("check nil", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			fint(nil)
+			fstring(nil)
+			fbytes(nil)
+			`,
+			errs: []string{
+				ssa4analyze.ArgumentTypeError(1, "null", "number", "fint"),
+				ssa4analyze.ArgumentTypeError(1, "null", "string", "fstring"),
+			},
+			ExternValue: map[string]any{
+				"fint":    func(int) {},
+				"fstring": func(string) {},
+				"fbytes":  func([]byte) {},
+			},
+		})
+	})
+
 }
 
 func TestCallParamReturn(t *testing.T) {
