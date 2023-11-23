@@ -668,15 +668,14 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	var wshashFrameIndex = make(map[string]int)
 	var requireWsFrameIndexByWSHash = func(i string) int {
 		/*这个函数目前用在 Hijack 里面，不太需要加锁，因为 mitmLock 已经一般生效了*/
-		result, ok := wshashFrameIndex[i]
 		wshashFrameIndexLock.Lock()
+		defer wshashFrameIndexLock.Unlock()
+		result, ok := wshashFrameIndex[i]
 		if !ok {
 			wshashFrameIndex[i] = 1
-			wshashFrameIndexLock.Unlock()
 			return 1
 		}
 		wshashFrameIndex[i] = result + 1
-		wshashFrameIndexLock.Unlock()
 		return wshashFrameIndex[i]
 	}
 	handleHijackWsResponse := func(raw []byte, req *http.Request, rsp *http.Response, ts int64) (finalResult []byte) {
