@@ -1391,6 +1391,8 @@ var PoCExports = map[string]interface{}{
 	"GetHTTPPacketBody":           lowhttp.GetHTTPPacketBody,
 	"GetHTTPPacketFirstLine":      lowhttp.GetHTTPPacketFirstLine,
 	"GetStatusCodeFromResponse":   lowhttp.GetStatusCodeFromResponse,
+	"GetHTTPRequestMethod":        lowhttp.GetHTTPRequestMethod,
+	"GetHTTPRequestPath":          lowhttp.GetHTTPRequestPath,
 
 	"CurlToHTTPRequest": curlToHTTPRequest,
 	"HTTPRequestToCurl": httpRequestToCurl,
