@@ -117,7 +117,9 @@ func serveH2(r io.Reader, conn net.Conn, opt ...h2Option) error {
 	}
 
 	frame := http2.NewFramer(conn, r)
+	frWriteMutex := new(sync.Mutex)
 	config.frame = frame
+	config.frWriteMutex = frWriteMutex
 	// send settings
 	/*
 		{SettingMaxFrameSize, sc.srv.maxReadFrameSize()},
@@ -128,12 +130,14 @@ func serveH2(r io.Reader, conn net.Conn, opt ...h2Option) error {
 	// init window
 	config.windowSizeControl = newControl(defaultStreamReceiveWindowSize)
 
+	frWriteMutex.Lock()
 	err = frame.WriteSettings(
 		http2.Setting{ID: http2.SettingInitialWindowSize, Val: defaultStreamReceiveWindowSize},
 		http2.Setting{ID: http2.SettingMaxFrameSize, Val: defaultMaxFrameSize},
 		http2.Setting{ID: http2.SettingMaxConcurrentStreams, Val: defaultMaxConcurrentStreamSize},
 		http2.Setting{ID: http2.SettingMaxHeaderListSize, Val: defaultMaxHeaderListSize},
 	)
+	frWriteMutex.Unlock()
 	if err != nil {
 		return utils.Errorf("h2 server write settings error: %v", err)
 	}
@@ -222,7 +226,9 @@ func serveH2(r io.Reader, conn net.Conn, opt ...h2Option) error {
 				return nil
 			})
 			// write settings ack
+			frWriteMutex.Lock()
 			err := frame.WriteSettingsAck()
+			frWriteMutex.Unlock()
 			if err != nil {
 				return utils.Errorf("h2 server write settings ack error: %v", err)
 			}
@@ -275,11 +281,15 @@ func serveH2(r io.Reader, conn net.Conn, opt ...h2Option) error {
 			}
 		case *http2.DataFrame:
 			// update window
+			frWriteMutex.Lock()
 			err := frame.WriteWindowUpdate(0, uint32(len(ret.Data())))
+			frWriteMutex.Unlock()
 			if err != nil {
 				return utils.Errorf("h2 server write window update error: %v", err)
 			}
+			frWriteMutex.Lock()
 			err = frame.WriteWindowUpdate(ret.StreamID, uint32(len(ret.Data())))
+			frWriteMutex.Unlock()
 			if err != nil {
 				return utils.Errorf("h2 server write window update error: %v", err)
 			}
@@ -292,7 +302,9 @@ func serveH2(r io.Reader, conn net.Conn, opt ...h2Option) error {
 				req.bodyBuf.Close()
 			}
 		case *http2.PingFrame:
+			frWriteMutex.Lock()
 			err := frame.WritePing(true, ret.Data)
+			frWriteMutex.Unlock()
 			if err != nil {
 				return utils.Errorf("h2 server write ping error: %v", err)
 			}
