@@ -1345,6 +1345,48 @@ func GetStatusCodeFromResponse(packet []byte) int {
 	return statusCode
 }
 
+// GetHTTPRequestPathWithoutQuery 是一个辅助函数，用于获取响应报文中的路径，返回值是 string，不包含 query
+// Example:
+// ```
+// poc.GetHTTPRequestPathWithoutQuery("GET /a/bc.html?a=1 HTTP/1.1\r\nHost: www.example.com\r\n\r\n") // /a/bc.html
+// ```
+func GetHTTPRequestPathWithoutQuery(packet []byte) string {
+	return strings.Split(GetHTTPRequestPath(packet), "?")[0]
+}
+
+// GetHTTPRequestPath 是一个辅助函数，用于获取响应报文中的路径，返回值是 string，包含 query
+// Example:
+// ```
+// poc.GetHTTPRequestPath("GET /a/bc.html?a=1 HTTP/1.1\r\nHost: www.example.com\r\n\r\n") // /a/bc.html?a=1
+// ```
+func GetHTTPRequestPath(packet []byte) string {
+	var pathStr string
+	SplitHTTPPacket(packet, func(method string, requestUri string, proto string) error {
+		pathStr = requestUri
+		return io.EOF
+	}, nil)
+	return pathStr
+}
+
+// GetHTTPRequestMethod 是一个辅助函数，用于获取请求报文中的请求方法，其返回值为string
+// Example:
+// ```
+// poc.GetHTTPRequestMethod(`GET /get HTTP/1.1
+// Content-Type: application/json
+// Cookie: a=b; a=c; c=d
+// Host: pie.dev
+//
+// `) // 获取请求方法，这里会返回"GET"
+// ```
+func GetHTTPRequestMethod(packet []byte) string {
+	var method string
+	SplitHTTPPacket(packet, func(m string, _ string, _ string) error {
+		method = m
+		return utils.Error("normal")
+	}, nil)
+	return method
+}
+
 // GetHTTPPacketFirstLine 是一个辅助函数，用于获取 HTTP 报文中第一行的值，其返回值为string，string，string
 // 在请求报文中，其三个返回值分别为：请求方法，请求URI，协议版本
 // 在响应报文中，其三个返回值分别为：协议版本，状态码，状态码描述

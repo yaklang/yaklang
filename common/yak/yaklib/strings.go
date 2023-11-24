@@ -552,6 +552,9 @@ var StringsExport = map[string]interface{}{
 	"VersionLessEqual":    utils.VersionLessEqual,
 	"VersionLess":         utils.VersionLess,
 	"VersionCompare":      utils.VersionCompare,
+	"Cut":                 strings.Cut,
+	"CutPrefix":           strings.CutPrefix,
+	"CutSuffix":           strings.CutSuffix,
 }
 
 func init() {
