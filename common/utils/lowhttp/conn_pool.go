@@ -187,6 +187,8 @@ type requestAndResponseCh struct {
 	reqPacket   []byte
 	ch          chan responseInfo
 	reqInstance *http.Request
+	option      *LowhttpExecConfig
+	writeErrCh  chan error
 	//respCh
 }
 
@@ -338,8 +340,11 @@ func (pc *persistConn) readLoop() {
 	eofc := make(chan struct{})
 	defer close(eofc) // unblock reader on errors
 
+	var rc requestAndResponseCh
+
 	count := 0
 	alive := true
+	firstAuth := true
 	for alive {
 		// if failed, handle it (re-conn / or abandoned)
 		_ = pc.Conn.SetReadDeadline(time.Time{})
@@ -356,7 +361,9 @@ func (pc *persistConn) readLoop() {
 		}
 		info := httpInfo{ServerTime: time.Since(pc.serverStartTime)}
 
-		rc := <-pc.reqCh
+		if firstAuth {
+			rc = <-pc.reqCh
+		}
 
 		if err != nil { //需要向主进程返回一个带标识的错误,主进程用于判断是否重试
 			if errors.Is(err, io.EOF) {
@@ -372,13 +379,29 @@ func (pc *persistConn) readLoop() {
 		if stashRequest == nil {
 			stashRequest = new(http.Request)
 		}
-
 		// peek is executed, so we can read without timeout
 		// for long time chunked supported
 		_ = pc.Conn.SetReadDeadline(time.Time{})
 		resp, err = utils.ReadHTTPResponseFromBufioReaderConn(pc.br, pc.Conn, stashRequest)
 		if resp != nil {
 			resp.Request = nil
+		}
+
+		if firstAuth && resp != nil && resp.StatusCode == 401 {
+			if len(resp.Header["WWW-Authenticate"]) > 0 {
+				if auth := GetAuth(resp.Header["WWW-Authenticate"][0], rc.option.Username, rc.option.Password); auth != nil {
+					authReq, err := auth.Authenticate(pc.Conn, rc.option)
+					if err == nil {
+						pc.writeCh <- writeRequest{reqPacket: authReq,
+							ch:          rc.writeErrCh,
+							reqInstance: rc.reqInstance,
+						}
+					}
+
+					firstAuth = false
+					continue
+				}
+			}
 		}
 
 		count++
@@ -420,6 +443,7 @@ func (pc *persistConn) readLoop() {
 		pc.mu.Unlock()
 
 		rc.ch <- responseInfo{resp: resp, respBytes: respPacket, info: info, err: err}
+		firstAuth = true
 		alive = alive &&
 			!pc.sawEOF &&
 			tryPutIdleConn()

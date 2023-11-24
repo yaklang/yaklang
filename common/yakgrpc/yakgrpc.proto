@@ -934,6 +934,10 @@ message GlobalNetworkConfig {
 
   // default skip save HTTPFlow
   bool SkipSaveHTTPFlow = 11;
+
+  // http auth info
+  string AuthUsername = 12;
+  string AuthPassword = 13;
 }
 
 message DiagnoseNetworkRequest {
