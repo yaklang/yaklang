@@ -27,7 +27,7 @@ jobs:
     - name: Generate docs
       run: |
         echo "Generating docs..."
-        go run -gcflags=all="-N -l" common/yak/yakdoc/generate_web_doc/generate_web_doc.go web_doc/
+        go run common/yak/yakdoc/generate_web_doc/generate_web_doc.go web_doc/
         echo "Generating docs finished"
         
     - name: Checkout yaklang.github.io repo
