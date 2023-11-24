@@ -165,6 +165,11 @@ func HandleParams(funcRefType reflect.Type, typ *ast.FuncType, fset *token.FileS
 	if typ.Params == nil {
 		return nil
 	}
+	defer func() {
+		if r := recover(); r != nil {
+			params = nil
+		}
+	}()
 	params = make([]*Field, 0, len(typ.Params.List))
 	canRef := !utils.IsNil(funcRefType)
 
@@ -193,6 +198,11 @@ func HandleResults(funcRefType reflect.Type, typ *ast.FuncType, fset *token.File
 	if typ.Results == nil {
 		return nil
 	}
+	defer func() {
+		if r := recover(); r != nil {
+			results = nil
+		}
+	}()
 	results = make([]*Field, 0, len(typ.Results.List))
 	canRef := !utils.IsNil(funcRefType)
 
@@ -498,34 +508,88 @@ func FuncToFuncDecl(f interface{}, libName string, overideName string) (*FuncDec
 		lineStr = strings.TrimPrefix(lineStr, "return ")
 		// 去除func
 		lineStr = strings.TrimPrefix(lineStr, "func")
+		// 去除空格
+		lineStr = strings.TrimSpace(lineStr)
 		// 去除左花括号
 		index := strings.Index(lineStr, "{")
 		if index != -1 {
 			lineStr = lineStr[:index]
 		}
-		// 去除空格
-		lineStr = strings.TrimSpace(lineStr)
+		// 获取参数
+		if paramsIndex := strings.Index(lineStr, "("); paramsIndex != -1 {
+			paramsStr := lineStr[paramsIndex+1:]
+			paramsEndIndex := strings.Index(paramsStr, ")")
+			if paramsEndIndex != -1 {
+				paramsStr = paramsStr[:paramsEndIndex]
+			}
 
-		// 添加临时函数名
-		if strings.HasPrefix(lineStr, "(") {
-			lineStr = "tempFunc" + lineStr
+			paramsStr = strings.TrimRight(paramsStr, ")")
+			paramsStr = strings.TrimSpace(paramsStr)
+			paramsStrs := strings.Split(paramsStr, ",")
+			for i, r := range paramsStrs {
+				r = strings.TrimSpace(r)
+				if r == "" {
+					continue
+				}
+				splited := strings.Split(r, " ")
+				if len(splited) < 2 {
+					params = append(params, &Field{
+						Name: fmt.Sprintf("v%d", i+1),
+						Type: splited[0],
+					})
+				} else {
+					params = append(params, &Field{
+						Name: splited[0],
+						Type: splited[len(splited)-1],
+					})
+				}
+			}
+			paramsEndIndex = strings.Index(lineStr, ")")
+			if paramsEndIndex != -1 {
+				if paramsEndIndex+2 < len(lineStr) {
+					lineStr = lineStr[paramsEndIndex+2:]
+				} else {
+					lineStr = ""
+				}
+			}
 		}
-
-		lineStr = "package main\nfunc " + lineStr + "{}"
-		fset := token.NewFileSet()
-		file, err := parser.ParseFile(fset, "", lineStr, parser.ParseComments|parser.AllErrors)
-		if err != nil {
-			return nil, err
+		// 获取返回值
+		if resultsIndex := strings.Index(lineStr, "("); resultsIndex != -1 {
+			// 多返回值
+			resultsStr := lineStr[resultsIndex+1:]
+			resultEndIndex := strings.Index(resultsStr, ")")
+			if resultEndIndex != -1 {
+				resultsStr = resultsStr[:resultEndIndex]
+			}
+			resultsStr = strings.TrimRight(resultsStr, ")")
+			resultsStr = strings.TrimSpace(resultsStr)
+			resultsStrs := strings.Split(resultsStr, ",")
+			for i, r := range resultsStrs {
+				r = strings.TrimSpace(r)
+				if r == "" {
+					continue
+				}
+				splited := strings.Split(r, " ")
+				if len(splited) < 2 {
+					results = append(results, &Field{
+						Name: fmt.Sprintf("r%d", i+1),
+						Type: splited[0],
+					})
+				} else {
+					results = append(results, &Field{
+						Name: splited[0],
+						Type: splited[len(splited)-1],
+					})
+				}
+			}
+		} else {
+			// 单返回值
+			resultsStr := strings.TrimSpace(lineStr)
+			results = append(results, &Field{
+				Name: "r1",
+				Type: resultsStr,
+			})
 		}
-		if len(file.Decls) == 0 {
-			return nil, utils.Errorf("no func decls for auto generate code")
-		}
-		decl, ok := file.Decls[0].(*ast.FuncDecl)
-		if !ok {
-			return nil, utils.Errorf("no func decls for auto generate code")
-		}
-		params = HandleParams(funcRefType, decl.Type, fset)
-		results = HandleResults(funcRefType, decl.Type, fset)
 	}
 
 	finalName := overideName
