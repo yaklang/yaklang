@@ -1026,6 +1026,26 @@ func GetHTTPPacketCookieFirst(packet []byte, key string) string {
 	return ""
 }
 
+// GetUrlFromHTTPRequest 是一个辅助函数，用于获取请求报文中的URL，其返回值为string
+// Example:
+// ```
+// poc.GetUrlFromHTTPRequest("https", `GET /get HTTP/1.1
+// Content-Type: application/json
+// Host: pie.dev
+//
+// `) // 获取URL，这里会返回"https://pie.dev/get"
+func GetUrlFromHTTPRequest(scheme string, packet []byte) string {
+	if scheme == "" {
+		scheme = "http"
+	}
+	u, err := ExtractURLFromHTTPRequestRaw(packet, strings.HasPrefix(strings.ToLower(scheme), "https"))
+	if err != nil {
+		return ""
+	}
+	u.Scheme = scheme
+	return u.String()
+}
+
 // GetHTTPPacketCookie 是一个辅助函数，用于获取请求报文中Cookie值，其返回值为string
 // Example:
 // ```
@@ -1192,11 +1212,24 @@ func GetHTTPPacketHeadersFull(packet []byte) map[string][]string {
 // `) // 获取Content-Type请求头，这里会返回"application/json"
 // ```
 func GetHTTPPacketHeader(packet []byte, key string) string {
-	raw, ok := GetHTTPPacketHeaders(packet)[key]
-	if !ok {
+	ret := GetHTTPPacketHeaders(packet)
+	if ret == nil {
 		return ""
 	}
-	return raw
+
+	var fuzzResult = make(map[string]string)
+	for headerKey, value := range ret {
+		if key == headerKey {
+			return value
+		}
+		if strings.ToLower(key) == strings.ToLower(headerKey) {
+			fuzzResult[key] = value
+		}
+	}
+	if len(fuzzResult) > 0 {
+		return fuzzResult[key]
+	}
+	return ""
 }
 
 // GetHTTPPacketQueryParam 是一个辅助函数，用于获取请求报文中指定的GET请求参数，其返回值为string
