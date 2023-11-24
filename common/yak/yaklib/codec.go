@@ -29,6 +29,7 @@ var CodecExports = map[string]interface{}{
 	"EscapePathUrl":     codec.PathEscape,
 	"UnescapePathUrl":   codec.PathUnescape,
 	"EscapeQueryUrl":    codec.QueryEscape,
+	"EscapeUrl":         codec.QueryEscape,
 	"UnescapeQueryUrl":  codec.QueryUnescape,
 	"DoubleEncodeUrl":   codec.DoubleEncodeUrl,
 	"DoubleDecodeUrl":   codec.DoubleDecodeUrl,
