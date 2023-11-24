@@ -151,8 +151,6 @@ func NewLowhttpOption() *LowhttpExecConfig {
 		RedirectHandler:      nil,
 		SaveHTTPFlow:         consts.GLOBAL_HTTP_FLOW_SAVE.IsSet(),
 		MaxContentLength:     10 * 1000 * 1000, // 10MB roughly
-		Username:             consts.GLOBAL_HTTP_AUTH_USERNAME.Load(),
-		Password:             consts.GLOBAL_HTTP_AUTH_PASSWORD.Load(),
 	}
 }
 
