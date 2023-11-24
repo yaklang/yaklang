@@ -1,7 +1,6 @@
 package lowhttp
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -44,14 +43,12 @@ type http2ClientConn struct {
 	preFaceCond *sync.Cond
 	prefaceOk   bool
 
-	wg *sync.WaitGroup
-
 	hDec *hpack.Decoder
 
 	http2StreamPool *sync.Pool
 
-	br *bufio.Reader
-	fr *http2.Framer
+	fr           *http2.Framer
+	frWriteMutex *sync.Mutex
 }
 
 type http2ClientStream struct {
@@ -96,17 +93,18 @@ func (h2Conn *http2ClientConn) streamByID(id uint32) *http2ClientStream {
 }
 
 func (h2Conn *http2ClientConn) preface() error {
-
 	_, err := h2Conn.conn.Write([]byte(http2.ClientPreface))
 	if err != nil {
 		return utils.Wrapf(err, "write h2 preface failed")
 	}
+	h2Conn.frWriteMutex.Lock()
 	err = h2Conn.fr.WriteSettings([]http2.Setting{
 		{ID: http2.SettingInitialWindowSize, Val: defaultStreamReceiveWindowSize},
 		{ID: http2.SettingMaxFrameSize, Val: defaultMaxFrameSize},
 		{ID: http2.SettingMaxConcurrentStreams, Val: defaultMaxConcurrentStreamSize},
 		{ID: http2.SettingMaxHeaderListSize, Val: defaultMaxHeaderListSize},
 	}...)
+	h2Conn.frWriteMutex.Unlock()
 	if err != nil {
 		return utils.Wrapf(err, "write h2 setting failed")
 	}
@@ -351,7 +349,9 @@ func (cs *http2ClientStream) doRequest() error {
 	}
 
 	endRequestStream := len(body) <= 0
-	err := h2HeaderWriter(cs.h2Conn.fr, cs.ID, endRequestStream, cs.h2Conn.maxFrameSize, hPackBuf.Bytes())
+	cs.h2Conn.frWriteMutex.Lock()
+	err := h2HeaderWriter(fr, cs.ID, endRequestStream, cs.h2Conn.maxFrameSize, hPackBuf.Bytes())
+	cs.h2Conn.frWriteMutex.Unlock()
 	if err != nil {
 		cs.h2Conn.setClose()
 		return utils.Errorf("yak.h2 framer write headers failed: %s", err)
@@ -365,15 +365,18 @@ func (cs *http2ClientStream) doRequest() error {
 			// control by window size
 			cs.streamWindowControl.decreaseWindowSize(int64(dataLen))
 			cs.h2Conn.connWindowControl.decreaseWindowSize(int64(dataLen))
-
+			cs.h2Conn.frWriteMutex.Lock()
 			dataFrameErr := fr.WriteData(cs.ID, index == len(chunks)-1, dataFrameBytes)
+			cs.h2Conn.frWriteMutex.Unlock()
 			if dataFrameErr != nil {
 				return utils.Wrapf(dataFrameErr, "framer WriteData for stream{%v} failed", cs.ID)
 			}
 		}
 	} else {
 		if !cs.sentEndStream {
+			cs.h2Conn.frWriteMutex.Lock()
 			dataFrameErr := fr.WriteData(cs.ID, true, nil)
+			cs.h2Conn.frWriteMutex.Unlock()
 			if dataFrameErr != nil {
 				return utils.Wrapf(dataFrameErr, "framer WriteData for stream{%v} failed", cs.ID)
 			}
@@ -519,12 +522,16 @@ func (rl *http2ClientConnReadLoop) processData(f *http2.DataFrame) {
 	fr := cs.h2Conn.fr
 
 	if dataLen := len(f.Data()); dataLen > 0 {
+		cs.h2Conn.frWriteMutex.Lock()
 		err := fr.WriteWindowUpdate(0, uint32(dataLen))
+		cs.h2Conn.frWriteMutex.Unlock()
 		if err != nil {
 			log.Errorf("h2 stream-id %v write window update(connect level) error: %v", f.StreamID, err)
 			return
 		}
+		cs.h2Conn.frWriteMutex.Lock()
 		err = fr.WriteWindowUpdate(f.StreamID, uint32(dataLen))
+		cs.h2Conn.frWriteMutex.Unlock()
 		if err != nil {
 			log.Errorf("h2 server write window update(stream level) error: %v", err)
 			return
@@ -552,7 +559,9 @@ func (rl *http2ClientConnReadLoop) processSettings(f *http2.SettingsFrame) {
 		return nil
 	})
 	// write settings ack
+	rl.h2Conn.frWriteMutex.Lock()
 	err := rl.h2Conn.fr.WriteSettingsAck()
+	rl.h2Conn.frWriteMutex.Unlock()
 	if err != nil {
 		log.Errorf("h2 client write settings ack error: %v", err)
 		return
@@ -576,7 +585,9 @@ func (rl *http2ClientConnReadLoop) processWindowUpdate(f *http2.WindowUpdateFram
 }
 
 func (rl *http2ClientConnReadLoop) processPing(f *http2.PingFrame) {
+	rl.h2Conn.frWriteMutex.Lock()
 	err := rl.h2Conn.fr.WritePing(true, f.Data)
+	rl.h2Conn.frWriteMutex.Unlock()
 	if err != nil {
 		log.Errorf("h2 server write ping ack error: %v", err)
 	}

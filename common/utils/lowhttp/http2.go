@@ -22,7 +22,7 @@ const transportDefaultConnFlow = 1 << 30
 const defaultHeaderTableSize = 65536
 const defaultStreamReceiveWindowSize = 1 << 20
 const defaultMaxFrameSize = 1 << 14
-const defaultMaxConcurrentStreamSize = 250
+const defaultMaxConcurrentStreamSize = 100
 const defaultMaxHeaderListSize = 10 << 18
 
 // requires cc.wmu be held
