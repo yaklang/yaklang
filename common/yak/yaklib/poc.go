@@ -1393,6 +1393,8 @@ var PoCExports = map[string]interface{}{
 	"GetStatusCodeFromResponse":   lowhttp.GetStatusCodeFromResponse,
 	"GetHTTPRequestMethod":        lowhttp.GetHTTPRequestMethod,
 	"GetHTTPRequestPath":          lowhttp.GetHTTPRequestPath,
+	// ext for path
+	"GetHTTPRequestPathWithoutQuery": lowhttp.GetHTTPRequestPathWithoutQuery,
 
 	"CurlToHTTPRequest": curlToHTTPRequest,
 	"HTTPRequestToCurl": httpRequestToCurl,
