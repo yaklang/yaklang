@@ -53,7 +53,7 @@ type LowhttpExecConfig struct {
 	ConnPool                         *lowHttpConnPool
 	NativeHTTPRequestInstance        *http.Request
 	Username                         string
-	Passwrod                         string
+	Password                         string
 
 	// DefaultBufferSize means unexpected situation's buffer size
 	DefaultBufferSize int
@@ -151,6 +151,8 @@ func NewLowhttpOption() *LowhttpExecConfig {
 		RedirectHandler:      nil,
 		SaveHTTPFlow:         consts.GLOBAL_HTTP_FLOW_SAVE.IsSet(),
 		MaxContentLength:     10 * 1000 * 1000, // 10MB roughly
+		Username:             consts.GLOBAL_HTTP_AUTH_USERNAME.Load(),
+		Password:             consts.GLOBAL_HTTP_AUTH_PASSWORD.Load(),
 	}
 }
 
@@ -219,7 +221,7 @@ func WithUsername(username string) LowhttpOpt {
 
 func WithPassword(password string) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
-		o.Passwrod = password
+		o.Password = password
 	}
 }
 

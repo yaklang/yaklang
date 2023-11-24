@@ -55,6 +55,8 @@ type _pocConfig struct {
 	Session              interface{} // session的标识符，可以用任意对象
 	SaveHTTPFlow         bool
 	Source               string
+	Username             string
+	Password             string
 
 	// packetHandler
 	PacketHandler []func([]byte) []byte
@@ -137,6 +139,8 @@ func (c *_pocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 	if c.Source != "" {
 		opts = append(opts, lowhttp.WithSource(c.Source))
 	}
+	opts = append(opts, lowhttp.WithUsername(c.Username))
+	opts = append(opts, lowhttp.WithPassword(c.Password))
 	return opts
 }
 
@@ -161,6 +165,8 @@ func NewDefaultPoCConfig() *_pocConfig {
 		RedirectHandler:        nil,
 		Session:                nil,
 		SaveHTTPFlow:           consts.GLOBAL_HTTP_FLOW_SAVE.IsSet(),
+		Username:               consts.GLOBAL_HTTP_AUTH_USERNAME.Load(),
+		Password:               consts.GLOBAL_HTTP_AUTH_PASSWORD.Load(),
 		Source:                 "",
 		Websocket:              false,
 		WebsocketHandler:       nil,
