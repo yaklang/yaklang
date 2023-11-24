@@ -377,13 +377,12 @@ func (pc *persistConn) h2Conn() {
 		initialWindowSize: defaultStreamReceiveWindowSize,
 		headerListMaxSize: defaultHeaderTableSize,
 		connWindowControl: newControl(defaultStreamReceiveWindowSize),
-		maxStreamsCount:   50,
-		br:                bufio.NewReader(pc.Conn),
+		maxStreamsCount:   defaultMaxConcurrentStreamSize,
 		fr:                http2.NewFramer(pc.Conn, bufio.NewReader(pc.Conn)),
+		frWriteMutex:      new(sync.Mutex),
 		hDec:              hpack.NewDecoder(defaultHeaderTableSize, nil),
 		closeCond:         sync.NewCond(new(sync.Mutex)),
 		preFaceCond:       sync.NewCond(new(sync.Mutex)),
-		wg:                new(sync.WaitGroup),
 		http2StreamPool: &sync.Pool{
 			New: func() interface{} {
 				return new(http2ClientStream)
