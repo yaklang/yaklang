@@ -936,8 +936,14 @@ message GlobalNetworkConfig {
   bool SkipSaveHTTPFlow = 11;
 
   // http auth info
-  string AuthUsername = 12;
-  string AuthPassword = 13;
+  repeated AuthInfo AuthInfos = 12;
+}
+
+message AuthInfo {
+  string AuthUsername = 1;
+  string AuthPassword = 2;
+  string AuthType = 3;
+  string Host = 4;
 }
 
 message DiagnoseNetworkRequest {
