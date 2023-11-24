@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/permutil"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"go.uber.org/atomic"
 	"io"
 	"io/ioutil"
@@ -16,6 +17,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -52,7 +54,48 @@ var (
 	GLOBAL_HTTP_FLOW_SAVE     = utils.NewBool(true)
 	GLOBAL_HTTP_AUTH_USERNAME = atomic.NewString("")
 	GLOBAL_HTTP_AUTH_PASSWORD = atomic.NewString("")
+
+	AuthInfoMutex         = new(sync.Mutex)
+	GLOBAL_HTTP_AUTH_INFO []*ypb.AuthInfo
 )
+
+func SetGlobalHTTPAuthInfo(info []*ypb.AuthInfo) {
+	AuthInfoMutex.Lock()
+	defer AuthInfoMutex.Unlock()
+	GLOBAL_HTTP_AUTH_INFO = info
+}
+
+func GetAuthTypeList(authType string) []string {
+	switch strings.ToLower(authType) {
+	case "negotiate":
+		return []string{"negotiate", "ntlm", "kerberos"}
+	default:
+		return []string{authType}
+	}
+}
+
+func GetGlobalHTTPAuthInfo(host, authType string) *ypb.AuthInfo {
+	AuthInfoMutex.Lock()
+	defer AuthInfoMutex.Unlock()
+	anyAuthInfo := new(ypb.AuthInfo)
+	gotAnyTypeAuth := false
+	for _, info := range GLOBAL_HTTP_AUTH_INFO {
+		if info.Host == host {
+			if utils.StringSliceContain(GetAuthTypeList(authType), info.AuthType) {
+				return info
+			}
+			if info.AuthType == "any" && !gotAnyTypeAuth { // if got any type auth, save it, just first
+				anyAuthInfo = info
+				anyAuthInfo.AuthType = authType
+				gotAnyTypeAuth = true
+			}
+		}
+	}
+	if gotAnyTypeAuth { // if got any type auth, return it
+		return anyAuthInfo
+	}
+	return nil
+}
 
 func GetCurrentYakitPluginID() string {
 	return utils.EscapeInvalidUTF8Byte([]byte(os.Getenv(YAKIT_PLUGIN_ID)))

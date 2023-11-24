@@ -63,6 +63,7 @@ func GetDefaultNetworkConfig() *ypb.GlobalNetworkConfig {
 		DNSFallbackDoH:   false,
 		CustomDoHServers: nil,
 		SkipSaveHTTPFlow: false,
+		AuthInfos:        make([]*ypb.AuthInfo, 0),
 	}
 	config := netx.NewBackupInitilizedReliableDNSConfig()
 	defaultConfig.CustomDoHServers = config.SpecificDoH
@@ -79,8 +80,7 @@ func ConfigureNetWork(c *ypb.GlobalNetworkConfig) {
 	}
 
 	consts.GLOBAL_HTTP_FLOW_SAVE.SetTo(!c.GetSkipSaveHTTPFlow())
-	consts.GLOBAL_HTTP_AUTH_USERNAME.Store(c.GetAuthUsername())
-	consts.GLOBAL_HTTP_AUTH_PASSWORD.Store(c.GetAuthPassword())
+	consts.SetGlobalHTTPAuthInfo(c.GetAuthInfos())
 
 	for _, r := range c.GetAppConfigs() {
 		consts.UpdateThirdPartyApplicationConfig(r)

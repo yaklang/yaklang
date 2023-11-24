@@ -277,3 +277,30 @@ func TestValidP12PassWord(t *testing.T) {
 	}
 
 }
+
+//func TestHTTPAuth(t *testing.T) {
+//	client, err := NewLocalClient()
+//
+//	_, _ = client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
+//	config, err := client.GetGlobalNetworkConfig(context.Background(), &ypb.GetGlobalNetworkConfigRequest{})
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	config.AuthInfos = []*ypb.AuthInfo{{
+//		AuthType:     "any",
+//		AuthUsername: "test",
+//		AuthPassword: "test",
+//		Host:         "47.120.44.219:8087",
+//	}}
+//	_, err = client.SetGlobalNetworkConfig(context.Background(), config)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	rsp, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes([]byte("GET / HTTP/1.1\r\nHost: 47.120.44.219:8087\r\n\r\n")))
+//	if err != nil {
+//		t.Fatal(err)
+//	}
+//	spew.Dump(rsp)
+//}
