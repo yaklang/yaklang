@@ -289,6 +289,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		proxyPassword = ""
 	}
 
+	// restriction for username
+	if strings.Contains(proxyUsername, ":") {
+		return utils.Errorf("proxy username cannot contains ':'")
+	}
+
 	// 容错处理一下代理
 	downstreamProxy = strings.Trim(downstreamProxy, `":`)
 	if downstreamProxy == "0" {
