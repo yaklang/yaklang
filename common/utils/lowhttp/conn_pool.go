@@ -463,9 +463,9 @@ func (pc *persistConn) readLoop() {
 			resp.Request = nil
 		}
 
-		if firstAuth && resp != nil && resp.StatusCode == 401 {
-			if len(resp.Header["WWW-Authenticate"]) > 0 {
-				if auth := GetAuth(resp.Header["WWW-Authenticate"][0], rc.option.Username, rc.option.Password); auth != nil {
+		if firstAuth && resp != nil && resp.StatusCode == http.StatusUnauthorized {
+			if authHeader := resp.Header["WWW-Authenticate"]; len(authHeader) > 0 {
+				if auth := GetHttpAuth(authHeader[0], rc.option); auth != nil {
 					authReq, err := auth.Authenticate(pc.Conn, rc.option)
 					if err == nil {
 						pc.writeCh <- writeRequest{reqPacket: authReq,
@@ -473,7 +473,6 @@ func (pc *persistConn) readLoop() {
 							reqInstance: rc.reqInstance,
 						}
 					}
-
 					firstAuth = false
 					continue
 				}
