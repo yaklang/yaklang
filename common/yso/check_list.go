@@ -24,36 +24,53 @@ const (
 	Groovy24x     = "groovy.lang.Tuple2"
 	Groovy244     = "org.codehaus.groovy.runtime.dgm$1170"
 	// Becl JDK<8u251
-	Becl    = "com.sun.org.apache.bcel.internal.util.ClassLoader"
-	Jdk7u21 = "com.sun.corba.se.impl.orbutil.ORBClassLoader"
+	Becl                = "com.sun.org.apache.bcel.internal.util.ClassLoader"
+	DefiningClassLoader = "org.mozilla.javascript.DefiningClassLoader"
+	Jdk7u21             = "com.sun.corba.se.impl.orbutil.ORBClassLoader"
 	// JRE8u20 7u25<=JDK<=8u20,虽然叫JRE8u20其实JDK8u20也可以,这个检测不完美,8u25版本以及JDK<=7u21会误报,可综合Jdk7u21来看
-	JRE8u20   = "javax.swing.plaf.metal.MetalFileChooserUI$DirectoryComboBoxModel$1"
+	JRE8u20 = "javax.swing.plaf.metal.MetalFileChooserUI$DirectoryComboBoxModel$1"
+	// ROME1000 Rome <= 1.11.1
+	ROME1000 = "com.sun.syndication.feed.impl.ToStringBean"
+	ROME1111 = "com.rometools.rome.feed.impl.ObjectBean"
+	// Fastjson fastjson<=1.2.48 存在一个链,全版本需要用hashMap绕过checkAutoType
+	// 此链依赖BadAttributeValueExpException,在JDK1.7中无法使用.此时需要用springAOP绕过
+	Fastjson = "com.alibaba.fastjson.JSONArray"
+	// Jackson jackson-databind>=2.10.0存在一个链
+	Jackson = "com.fasterxml.jackson.databind.node.NodeSerialization"
+	// SpringAOP fastjon/jackson两个链的变种都需要springAOP
+	SpringAOP = "org.springframework.aop.target.HotSwappableTargetSource.HotSwappableTargetSource"
 	LinuxOS   = "sun.awt.X11.AwtGraphicsConfigData"
 	WindowsOS = "sun.awt.windows.WButtonPeer"
 )
 
 var allGadgetsCheckList = map[string]string{
-	"CC31Or321":     CC31Or321,
-	"CC322":         CC322,
-	"CC40":          CC40,
-	"CC41":          CC41,
-	"CB17":          CB17,
-	"CB18x":         CB18x,
-	"CB19x":         CB19x,
-	"C3p092x":       C3p092x,
-	"C3p095x":       C3p095x,
-	"Ajw":           Ajw,
-	"Bsh20b4":       Bsh20b4,
-	"Bsh20b5":       Bsh20b5,
-	"Bsh20b6":       Bsh20b6,
-	"Groovy1702311": Groovy1702311,
-	"Groovy24x":     Groovy24x,
-	"Groovy244":     Groovy244,
-	"Becl":          Becl,
-	"Jdk7u21":       Jdk7u21,
-	"JRE8u20":       JRE8u20,
-	"Linux_OS":      LinuxOS,
-	"Windows_OS":    WindowsOS,
+	"CC31Or321":           CC31Or321,
+	"CC322":               CC322,
+	"CC40":                CC40,
+	"CC41":                CC41,
+	"CB17":                CB17,
+	"CB18x":               CB18x,
+	"CB19x":               CB19x,
+	"C3p092x":             C3p092x,
+	"C3p095x":             C3p095x,
+	"Ajw":                 Ajw,
+	"Bsh20b4":             Bsh20b4,
+	"Bsh20b5":             Bsh20b5,
+	"Bsh20b6":             Bsh20b6,
+	"Groovy1702311":       Groovy1702311,
+	"Groovy24x":           Groovy24x,
+	"Groovy244":           Groovy244,
+	"Becl":                Becl,
+	"DefiningClassLoader": DefiningClassLoader,
+	"Jdk7u21":             Jdk7u21,
+	"JRE8u20":             JRE8u20,
+	"ROME1000":            ROME1000,
+	"ROME1111":            ROME1111,
+	"Fastjson":            Fastjson,
+	"Jackson":             Jackson,
+	"SpringAOP":           SpringAOP,
+	"Linux_OS":            LinuxOS,
+	"Windows_OS":          WindowsOS,
 }
 
 func GetGadgetChecklist() map[string]string {
