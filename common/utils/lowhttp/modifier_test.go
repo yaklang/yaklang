@@ -757,6 +757,77 @@ Set-Cookie: a=123
 	}
 }
 
+func TestGetHTTPPacketHeader2(t *testing.T) {
+	if GetHTTPPacketHeader([]byte(`GET / HTTP/1.1
+Host: www.baidu.com`), "host") != "www.baidu.com" {
+		t.Fatal("GetHTTPPacketHeader failed(insensitive case test)")
+	}
+}
+
+func TestGetHTTPPacketURLFetcher(t *testing.T) {
+	for _, c := range [][]string{
+		{
+			`GET / HTTP/1.1
+Host: www.baidu.com`,
+			"http",
+			"http://www.baidu.com/",
+		},
+		{
+			`GET / HTTP/1.1
+Host: www.baidu.com`,
+			"https",
+			"https://www.baidu.com/",
+		},
+		{
+			`GET / HTTP/1.1
+Host: www.baidu.com`,
+			"mailto",
+			"mailto://www.baidu.com/",
+		},
+		{
+			`GET /?a=1 HTTP/1.1
+Host: www.baidu.com`,
+			"mailto",
+			"mailto://www.baidu.com/?a=1",
+		},
+		{
+			`GET ?a=1 HTTP/1.1
+Host: www.baidu.com`,
+			"mailto",
+			"mailto://www.baidu.com/?a=1",
+		},
+		{
+			`GET /aaaa?a=1 HTTP/1.1
+Host: www.baidu.com`,
+			"mailto",
+			"mailto://www.baidu.com/aaaa?a=1",
+		},
+		{
+			`GET aaaa?a=1 HTTP/1.1
+Host: www.baidu.com`,
+			"mailto",
+			"mailto://www.baidu.com/aaaa?a=1",
+		},
+		{
+			`GET aaaa?a=1 HTTP/1.1
+Host: www.baidu.com:80`,
+			"http",
+			"http://www.baidu.com:80/aaaa?a=1",
+		},
+		{
+			`GET aaaa?a=1 HTTP/1.1
+Host: www.baidu.com`,
+			"https",
+			"https://www.baidu.com/aaaa?a=1",
+		},
+	} {
+		if ret := GetUrlFromHTTPRequest(c[1], []byte(c[0])); ret != c[2] {
+			spew.Dump(ret)
+			t.Fatalf("GetHTTPPacketURLFetcher failed: %s", string(c[0]))
+		}
+	}
+}
+
 func TestGetHTTPPacketHeadersFull(t *testing.T) {
 	for _, c := range [][]any{
 		{[]byte(`GET / HTTP/1.1

@@ -1395,6 +1395,8 @@ var PoCExports = map[string]interface{}{
 	"GetHTTPRequestPath":          lowhttp.GetHTTPRequestPath,
 	// ext for path
 	"GetHTTPRequestPathWithoutQuery": lowhttp.GetHTTPRequestPathWithoutQuery,
+	// extract url
+	"GetUrlFromHTTPRequest": lowhttp.GetUrlFromHTTPRequest,
 
 	"CurlToHTTPRequest": curlToHTTPRequest,
 	"HTTPRequestToCurl": httpRequestToCurl,
