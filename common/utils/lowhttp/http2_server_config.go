@@ -13,8 +13,9 @@ import (
 )
 
 type http2ConnectionConfig struct {
-	handler func(header []byte, body io.ReadCloser) ([]byte, io.ReadCloser, error)
-	frame   *http2.Framer
+	handler      func(header []byte, body io.ReadCloser) ([]byte, io.ReadCloser, error)
+	frame        *http2.Framer
+	frWriteMutex *sync.Mutex
 
 	// writer
 	hencBuf   *bytes.Buffer
@@ -34,6 +35,7 @@ func (c *http2ConnectionConfig) writer(wrapper *h2RequestState, header []byte, b
 	frame := c.frame
 	henc := c.henc
 	buf := c.hencBuf
+	frWriteMutex := c.frWriteMutex
 
 	c.hencMutex.Lock()
 	buf.Reset()
@@ -57,17 +59,21 @@ func (c *http2ConnectionConfig) writer(wrapper *h2RequestState, header []byte, b
 	for index, item := range ret {
 		if first {
 			first = false
+			frWriteMutex.Lock()
 			err := frame.WriteHeaders(http2.HeadersFrameParam{
 				StreamID:      uint32(streamId),
 				BlockFragment: item,
 				EndStream:     false,
 				EndHeaders:    index == len(ret)-1,
 			})
+			frWriteMutex.Unlock()
 			if err != nil {
 				return utils.Wrapf(err, "h2framer write header(%v) for stream:%v failed", len(hpackHeaderBytes), streamId)
 			}
 		} else {
+			frWriteMutex.Lock()
 			err := frame.WriteContinuation(uint32(streamId), index == len(ret)-1, item)
+			frWriteMutex.Unlock()
 			if err != nil {
 				return utils.Wrapf(err, "h2framer write header(%v)-continuation for stream:%v failed", len(hpackHeaderBytes), streamId)
 			}
@@ -86,14 +92,17 @@ func (c *http2ConnectionConfig) writer(wrapper *h2RequestState, header []byte, b
 			// control by window size
 			c.decreaseWindowSize(int64(dataLen))
 			// log.Infof("window size decrease %v to %v", dataLen, c.windowSize)
-
+			frWriteMutex.Lock()
 			dataFrameErr := frame.WriteData(uint32(streamId), index == len(chunks)-1, dataFrameBytes)
+			frWriteMutex.Unlock()
 			if dataFrameErr != nil {
 				return utils.Wrapf(dataFrameErr, "framer WriteData for stream{%v} failed", streamId)
 			}
 		}
 	} else {
+		frWriteMutex.Lock()
 		dataFrameErr := frame.WriteData(uint32(streamId), true, nil)
+		frWriteMutex.Unlock()
 		if dataFrameErr != nil {
 			return utils.Wrapf(dataFrameErr, "framer WriteData for stream{%v} failed", streamId)
 		}
