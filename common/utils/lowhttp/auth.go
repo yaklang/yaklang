@@ -3,6 +3,7 @@ package lowhttp
 import (
 	"bufio"
 	"encoding/base64"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/protocol/nla"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -89,13 +90,36 @@ func (na *NtlmAuthentication) Authenticate(conn net.Conn, config *LowhttpExecCon
 	return authReq, nil
 }
 
+type CustomAuthClient struct {
+	handler func([]byte) ([]byte, error)
+}
+
+func (ca *CustomAuthClient) Authenticate(conn net.Conn, config *LowhttpExecConfig) ([]byte, error) {
+	return ca.handler(config.Packet)
+}
+
 func GetAuth(auth string, username string, password string) Authentication {
-	switch strings.ToLower(auth) {
-	case "ntlm":
+	authInfo := strings.SplitN(auth, " ", 2)
+	switch strings.ToLower(authInfo[0]) {
+	case "ntlm", "negotiate":
 		domain := ""
 		if strings.Contains(username, "\\") {
 			domainAndUsername := strings.SplitN(username, "\\", 2)
 			domain, username = domainAndUsername[0], domainAndUsername[1]
+		}
+		if len(authInfo) > 1 {
+			handler := func(packet []byte) ([]byte, error) {
+				ntv2 := nla.NewNTLMv2(domain, username, password)
+				challenge, err := codec.DecodeBase64(authInfo[1])
+				if err != nil {
+					log.Errorf("decode challenge failed")
+					return []byte{}, err
+				}
+				authMessage, _ := ntv2.GetAuthenticateMessage(challenge)
+				authReq := ReplaceHTTPPacketHeader(packet, "Authorization", "NTLM "+codec.EncodeBase64(authMessage.Serialize()))
+				return authReq, nil
+			}
+			return &CustomAuthClient{handler: handler}
 		}
 		return &NtlmAuthentication{username, password, domain}
 	case "basic":

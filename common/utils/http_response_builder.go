@@ -277,7 +277,7 @@ func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bo
 				httpctx.SetResponseTooLargeBodyFile(req, fp.Name())
 			}
 		} else {
-			httpctx.SetBareResponseBytes(req, rawPacket.Bytes())
+			httpctx.SetBareResponseBytesForce(req, rawPacket.Bytes())
 		}
 	}
 	return rsp, nil

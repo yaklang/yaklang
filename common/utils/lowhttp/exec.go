@@ -179,7 +179,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		connPool             = option.ConnPool
 		withConnPool         = option.WithConnPool
 		username             = option.Username
-		password             = option.Passwrod
+		password             = option.Password
 		firstAuth            = true
 	)
 
@@ -645,6 +645,8 @@ RECONNECT:
 			reqPacket:   requestPacket,
 			ch:          resc,
 			reqInstance: option.NativeHTTPRequestInstance,
+			option:      option,
+			writeErrCh:  writeErrCh,
 		}
 		pcClosed := pc.closeCh
 	LOOP:
