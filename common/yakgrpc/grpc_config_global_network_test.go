@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"os"
 	"strings"
@@ -14,6 +15,30 @@ import (
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+func TestGRPCMUSTPASS_THIRDPARTY_APP(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
+	config, err := client.GetGlobalNetworkConfig(context.Background(), &ypb.GetGlobalNetworkConfigRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	token := utils.RandSecret(100)
+	config.AppConfigs = []*ypb.ThirdPartyApplicationConfig{
+		{
+			Type:   "github",
+			APIKey: token,
+		},
+	}
+	client.SetGlobalNetworkConfig(context.Background(), config)
+	if consts.GetThirdPartyApplicationConfig("github").APIKey != token {
+		t.Fatal("set thirdparty app config failed")
+	}
+}
 
 func TestGRPCMUSTPASS_GLOBAL_NETWORK_DNS_CONFIG(t *testing.T) {
 	client, err := NewLocalClient()

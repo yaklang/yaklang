@@ -80,6 +80,10 @@ func ConfigureNetWork(c *ypb.GlobalNetworkConfig) {
 
 	consts.GLOBAL_HTTP_FLOW_SAVE.SetTo(!c.GetSkipSaveHTTPFlow())
 
+	for _, r := range c.GetAppConfigs() {
+		consts.UpdateThirdPartyApplicationConfig(r)
+	}
+
 	netx.SetDefaultDNSOptions(
 		netx.WithDNSFallbackDoH(c.DNSFallbackDoH),
 		netx.WithDNSFallbackTCP(c.DNSFallbackTCP),
