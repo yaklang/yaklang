@@ -553,6 +553,21 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 			return i
 		})
 	}
+	for _, mod := range []string{"db", "yakit"} {
+		nIns.GetVM().RegisterMapMemberCallHandler(mod, "SavePortFromResult", func(i interface{}) interface{} {
+			originFunc, ok := i.(func(u any, runtimeIds ...string) error)
+			if ok {
+				return func(u any, runtimeIds ...string) error {
+					if len(runtimeIds) > 0 {
+						runtimeIds = append(runtimeIds, runtimeId)
+						return originFunc(u, runtimeIds...)
+					}
+					return originFunc(u, runtimeId)
+				}
+			}
+			return i
+		})
+	}
 
 	nIns.GetVM().RegisterMapMemberCallHandler("http", "Request", func(i interface{}) interface{} {
 		if proxy == "" {

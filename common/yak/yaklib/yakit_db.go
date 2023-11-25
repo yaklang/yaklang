@@ -248,13 +248,12 @@ func savePortFromObj(t interface{}, taskNames ...string) error {
 		r = NewPortFromSynScanResult(ret)
 	case *spacengine.NetSpaceEngineResult:
 		r = NewPortFromSpaceEngineResult(ret)
-	}
-
-	if r == nil {
+	default:
 		return utils.Errorf("unsupported(%v): %#v", reflect.TypeOf(t), spew.Sdump(t))
 	}
 	if len(taskNames) > 0 {
 		r.TaskName = taskNames[0]
+		r.RuntimeId = taskNames[0]
 	}
 
 	return yakit.CreateOrUpdatePort(db, r.CalcHash(), r)
