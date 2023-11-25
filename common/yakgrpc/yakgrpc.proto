@@ -934,6 +934,20 @@ message GlobalNetworkConfig {
 
   // default skip save HTTPFlow
   bool SkipSaveHTTPFlow = 11;
+
+  // 第三方APIKey获取
+  repeated ThirdPartyApplicationConfig AppConfigs = 12;
+}
+
+message ThirdPartyApplicationConfig {
+  // zoomeye / hunter / shodan / fofa / github / token
+  string Type = 1;
+  string APIKey = 2;
+  string UserIdentifier = 3;
+  string UserSecret = 4;
+  string Namespace = 5;
+  string Domain = 6;
+  string WebhookURL = 7;
 }
 
 message DiagnoseNetworkRequest {
@@ -1688,7 +1702,7 @@ message Position {
 
 message YaklangInspectInformationRequest {
   string YakScriptType = 1;
-  string YakScriptCode = 2; 
+  string YakScriptCode = 2;
   Position StartPos = 3;
   Position EndPos = 4;
 }
@@ -1703,7 +1717,7 @@ message YaklangInspectInformationRequest {
 
 message YaklangInformationKV {
   string Key = 1;
-  bytes Value = 2; 
+  bytes Value = 2;
   repeated YaklangInformationKV Extern = 3;
 }
 
