@@ -383,6 +383,8 @@ type YakClient interface {
 	HybridScan(ctx context.Context, opts ...grpc.CallOption) (Yak_HybridScanClient, error)
 	QueryHybridScanTask(ctx context.Context, in *QueryHybridScanTaskRequest, opts ...grpc.CallOption) (*QueryHybridScanTaskResponse, error)
 	DeleteHybridScanTask(ctx context.Context, in *DeleteHybridScanTaskRequest, opts ...grpc.CallOption) (*Empty, error)
+	GetSpaceEngineStatus(ctx context.Context, in *GetSpaceEngineStatusRequest, opts ...grpc.CallOption) (*SpaceEngineStatus, error)
+	FetchPortAssetFromSpaceEngine(ctx context.Context, in *FetchPortAssetFromSpaceEngineRequest, opts ...grpc.CallOption) (Yak_FetchPortAssetFromSpaceEngineClient, error)
 }
 
 type yakClient struct {
@@ -4043,6 +4045,47 @@ func (c *yakClient) DeleteHybridScanTask(ctx context.Context, in *DeleteHybridSc
 	return out, nil
 }
 
+func (c *yakClient) GetSpaceEngineStatus(ctx context.Context, in *GetSpaceEngineStatusRequest, opts ...grpc.CallOption) (*SpaceEngineStatus, error) {
+	out := new(SpaceEngineStatus)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/GetSpaceEngineStatus", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) FetchPortAssetFromSpaceEngine(ctx context.Context, in *FetchPortAssetFromSpaceEngineRequest, opts ...grpc.CallOption) (Yak_FetchPortAssetFromSpaceEngineClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[46], "/ypb.Yak/FetchPortAssetFromSpaceEngine", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &yakFetchPortAssetFromSpaceEngineClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type Yak_FetchPortAssetFromSpaceEngineClient interface {
+	Recv() (*ExecResult, error)
+	grpc.ClientStream
+}
+
+type yakFetchPortAssetFromSpaceEngineClient struct {
+	grpc.ClientStream
+}
+
+func (x *yakFetchPortAssetFromSpaceEngineClient) Recv() (*ExecResult, error) {
+	m := new(ExecResult)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility
@@ -4412,6 +4455,8 @@ type YakServer interface {
 	HybridScan(Yak_HybridScanServer) error
 	QueryHybridScanTask(context.Context, *QueryHybridScanTaskRequest) (*QueryHybridScanTaskResponse, error)
 	DeleteHybridScanTask(context.Context, *DeleteHybridScanTaskRequest) (*Empty, error)
+	GetSpaceEngineStatus(context.Context, *GetSpaceEngineStatusRequest) (*SpaceEngineStatus, error)
+	FetchPortAssetFromSpaceEngine(*FetchPortAssetFromSpaceEngineRequest, Yak_FetchPortAssetFromSpaceEngineServer) error
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -5285,6 +5330,12 @@ func (UnimplementedYakServer) QueryHybridScanTask(context.Context, *QueryHybridS
 }
 func (UnimplementedYakServer) DeleteHybridScanTask(context.Context, *DeleteHybridScanTaskRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteHybridScanTask not implemented")
+}
+func (UnimplementedYakServer) GetSpaceEngineStatus(context.Context, *GetSpaceEngineStatusRequest) (*SpaceEngineStatus, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetSpaceEngineStatus not implemented")
+}
+func (UnimplementedYakServer) FetchPortAssetFromSpaceEngine(*FetchPortAssetFromSpaceEngineRequest, Yak_FetchPortAssetFromSpaceEngineServer) error {
+	return status.Errorf(codes.Unimplemented, "method FetchPortAssetFromSpaceEngine not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 
@@ -10684,6 +10735,45 @@ func _Yak_DeleteHybridScanTask_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_GetSpaceEngineStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSpaceEngineStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetSpaceEngineStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/GetSpaceEngineStatus",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetSpaceEngineStatus(ctx, req.(*GetSpaceEngineStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_FetchPortAssetFromSpaceEngine_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(FetchPortAssetFromSpaceEngineRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).FetchPortAssetFromSpaceEngine(m, &yakFetchPortAssetFromSpaceEngineServer{stream})
+}
+
+type Yak_FetchPortAssetFromSpaceEngineServer interface {
+	Send(*ExecResult) error
+	grpc.ServerStream
+}
+
+type yakFetchPortAssetFromSpaceEngineServer struct {
+	grpc.ServerStream
+}
+
+func (x *yakFetchPortAssetFromSpaceEngineServer) Send(m *ExecResult) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -11663,6 +11753,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "DeleteHybridScanTask",
 			Handler:    _Yak_DeleteHybridScanTask_Handler,
 		},
+		{
+			MethodName: "GetSpaceEngineStatus",
+			Handler:    _Yak_GetSpaceEngineStatus_Handler,
+		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
@@ -11903,6 +11997,11 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			Handler:       _Yak_HybridScan_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
+		},
+		{
+			StreamName:    "FetchPortAssetFromSpaceEngine",
+			Handler:       _Yak_FetchPortAssetFromSpaceEngine_Handler,
+			ServerStreams: true,
 		},
 	},
 	Metadata: "yakgrpc.proto",

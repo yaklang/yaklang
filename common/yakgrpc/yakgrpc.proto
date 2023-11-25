@@ -555,6 +555,33 @@ service Yak {
   rpc HybridScan(stream HybridScanRequest) returns (stream HybridScanResponse);
   rpc QueryHybridScanTask(QueryHybridScanTaskRequest) returns (QueryHybridScanTaskResponse);
   rpc DeleteHybridScanTask(DeleteHybridScanTaskRequest) returns (Empty);
+
+  rpc GetSpaceEngineStatus(GetSpaceEngineStatusRequest) returns(SpaceEngineStatus);
+  rpc FetchPortAssetFromSpaceEngine(FetchPortAssetFromSpaceEngineRequest) returns (stream ExecResult);
+}
+
+message GetSpaceEngineStatusRequest {
+  string Type = 1;
+}
+
+message SpaceEngineStatus {
+  string Type = 1;
+  string Status = 2;
+  string Info = 3;
+  bytes Raw = 4;
+  int64 Used = 5;
+  int64 Remain = 6;
+}
+
+message FetchPortAssetFromSpaceEngineRequest {
+  // zoomeye / hunter / fofa
+  string Type = 1;
+  string Filter = 2;
+  int64 MaxPage = 3;
+  int64 MaxRecord = 4;
+  // page limit
+  int64 PageSize = 5;
+  bool ScanBeforeSave = 6;
 }
 
 message DeleteHybridScanTaskRequest {
@@ -3023,6 +3050,7 @@ message QueryPortsRequest {
   bool  TitleEffective = 9;
   string ComplexSelect = 10;
   string Proto = 11;
+  string RuntimeId = 12;
 }
 
 message QueryPortsResponse {
