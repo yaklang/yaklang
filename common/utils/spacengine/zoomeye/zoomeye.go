@@ -2,15 +2,35 @@ package zoomeye
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
 var defaultHttpClient = utils.NewDefaultHTTPClient()
+
+func ZoomeyeUserProfile(key string) (*gjson.Result, error) {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return nil, utils.Error("empty api key")
+	}
+	packet := []byte(`GET /resources-info HTTP/1.1
+Host: api.zoomeye.org
+`)
+	packet = lowhttp.ReplaceHTTPPacketHeader(packet, "API-KEY", key)
+	rsp, err := lowhttp.HTTP(lowhttp.WithPacketBytes(packet), lowhttp.WithHttps(true))
+	if err != nil {
+		return nil, err
+	}
+	_, body := lowhttp.SplitHTTPPacketFast(rsp)
+	result := gjson.ParseBytes(body)
+	return &result, nil
+}
 
 func ZoomeyeQuery(key string, query string, page int) (*gjson.Result, error) {
 	values := make(url.Values)

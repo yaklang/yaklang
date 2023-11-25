@@ -26,6 +26,9 @@ type Port struct {
 	From        string `json:"from"`
 	Hash        string `json:"hash"`
 	TaskName    string `json:"task_name"`
+
+	// runtime id 运行时 ID
+	RuntimeId string `json:"runtime_id"`
 }
 
 type PortsTypeGroup struct {
@@ -82,7 +85,7 @@ type PortsTypeGroup struct {
 }
 
 func (p *Port) CalcHash() string {
-	return utils.CalcSha1(p.Host, p.Port, p.TaskName)
+	return utils.CalcSha1(p.Host, p.Port, p.TaskName, p.RuntimeId)
 }
 
 func (p *Port) BeforeSave() error {
@@ -177,6 +180,11 @@ func FilterPort(db *gorm.DB, params *ypb.QueryPortsRequest) *gorm.DB {
 		db = bizhelper.ExactQueryString(db, "state", "open")
 	} else {
 		db = bizhelper.ExactQueryString(db, "state", params.GetState())
+	}
+	if params.GetRuntimeId() != ""{
+		db = db.Where("runtime_id = ?", params.GetRuntimeId())
+	}else{
+		db = db.Where("runtime_id is null OR (runtime_id = '')")
 	}
 	return db
 }
@@ -275,7 +283,6 @@ func DeletePortsByID(db *gorm.DB, id int64) error {
 	return nil
 }
 
-
 func PortsServiceTypeGroup() ([]*PortsTypeGroup, error) {
 	var db = consts.GetGormProjectDatabase()
 	if db == nil {
@@ -345,4 +352,3 @@ func PortsServiceTypeGroup() ([]*PortsTypeGroup, error) {
 
 	return result, nil
 }
-
