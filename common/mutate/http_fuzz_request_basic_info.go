@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"mime"
 	"net/url"
+	"strings"
 )
 
 func (f *FuzzHTTPRequest) GetBytes() []byte {
@@ -73,6 +74,11 @@ func (f *FuzzHTTPRequest) GetPath() string {
 		return ""
 	}
 	return req.URL.Path
+}
+
+func (f *FuzzHTTPRequest) GetPathWithoutQuery() string {
+	var pathStr, _, _ = strings.Cut(f.GetPath(), "?")
+	return pathStr
 }
 
 func (f *FuzzHTTPRequest) GetQueryRaw() string {
