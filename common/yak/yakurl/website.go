@@ -19,6 +19,7 @@ func (f *websiteFromHttpFlow) Get(params *ypb.RequestYakURLParams) (*ypb.Request
 	u := params.GetUrl()
 
 	db := consts.GetGormProjectDatabase()
+	db = db.Model(&yakit.HTTPFlow{})
 	var query = make(url.Values)
 	for _, v := range u.GetQuery() {
 		query.Add(v.GetKey(), v.GetValue())
@@ -29,6 +30,8 @@ func (f *websiteFromHttpFlow) Get(params *ypb.RequestYakURLParams) (*ypb.Request
 		db = yakit.FilterHTTPFlowBySchema(db, ret)
 		websiteRoot = ret + "://" + websiteRoot
 	}
+	// 临时过滤一下 404、502
+	db = bizhelper.ExactQueryExcludeStringArrayOr(db, "status_code", utils.PrettifyListFromStringSplited("404,502", ","))
 
 	if filterType := query.Get("filter"); filterType != "" {
 		db = bizhelper.ExactQueryStringArrayOr(db, "source_type", utils.PrettifyListFromStringSplited(filterType, ","))
@@ -101,6 +104,9 @@ func (f *websiteFromHttpFlow) Get(params *ypb.RequestYakURLParams) (*ypb.Request
 				SizeVerbose:  fmt.Sprint(result.Count),
 				Path:         p,
 				Url:          newParam,
+			}
+			if !strings.Contains(websiteRoot, "://") {
+				websiteRoot = result.Schema + "://" + websiteRoot
 			}
 			suff := strings.TrimPrefix(p, "/")
 			if ret, err := utils.UrlJoin(websiteRoot, suff); err == nil {

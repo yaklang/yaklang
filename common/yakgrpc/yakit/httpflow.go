@@ -89,7 +89,7 @@ type HTTPFlow struct {
 	NoFixContentLength bool   `json:"no_fix_content_length"`
 	Hash               string `gorm:"unique_index"`
 	IsHTTPS            bool
-	Url                string
+	Url                string `gorm:"index"`
 	Path               string
 	Method             string
 	BodyLength         int64
