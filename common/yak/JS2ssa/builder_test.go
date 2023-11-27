@@ -1,14 +1,35 @@
 package js2ssa
 
 import (
+	_ "embed"
 	"fmt"
-	"os"
+	"regexp"
 	"testing"
 
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 func none(*ssa.FunctionBuilder) {}
+
+func check(t *testing.T, code string, funcs string, regex string) {
+	re, err := regexp.Compile(".*" + regex + ".*")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	prog := ParseSSA(code, none)
+	prog.ShowWithSource()
+
+	showFunc := prog.Packages[0].Funcs[0].GetValuesByName(funcs)[0]
+	for _, v := range showFunc.GetUsers() {
+		line := v.LineDisasm()
+		fmt.Println(line)
+		if !re.Match(utils.UnsafeStringToBytes(line)) {
+			t.Fatal(line)
+		}
+	}
+}
 
 func TestDemo1(m *testing.T) {
 	prog := ParseSSA(`
@@ -292,25 +313,161 @@ func TestObject(t *testing.T) {
 	prog.Show()
 }
 
-func TestJsReal(t *testing.T) {
-	// data, err := os.ReadFile("C:\\codefile\\a1.js")
-	// if err != nil {
-	// 	fmt.Println("读取文件时发生错误:", err)
-	// 	return
-	// }
-	data := `a = 1`
-	// 将文件内容转换为字符串
-	content := string(data)
-	prog := ParseSSA(content, none)
+//go:embed b.js
+var test string
+
+func TestJsReals(t *testing.T) {
+	prog := ParseSSA(test, none)
 	prog.Show()
 }
 
-func TestSome(t *testing.T) {
+func TestUse(t *testing.T) {
+	// var 多个值
+	code := `
+		o = function() {o = 1}
+		c = a && o()
+		print(c)
+	`
+	check(t, code, "print", "phi")
+}
+
+func TestNumber(t *testing.T) {
 	prog := ParseSSA(`
-	for(var a of {2,3,4}){
-		b = a
-		print(b)
-	}
+		a < 1e-6 ? 1 : 2
+	`, none)
+	prog.Show()
+}
+
+func TestPos(t *testing.T) {
+	prog := ParseSSA(`
+	 function b(e) {
+        a = null,
+        return "string" === typeof e && (e = function(e) {
+            if (0 === (e = e.trim().toLowerCase()).length) return ! 1;
+            var t = !1;
+            if (A[e]) e = A[e],
+            t = !0;
+            else if ("transparent" === e) return {
+                r: 0,
+                g: 0,
+                b: 0,
+                a: 0,
+                format: "name"
+            };
+            var n = S.rgb.exec(e);
+            if (n) return {
+                r: n[1],
+                g: n[2],
+                b: n[3]
+            };
+            if (n = S.rgba.exec(e)) return {
+                r: n[1],
+                g: n[2],
+                b: n[3],
+                a: n[4]
+            };
+            if (n = S.hsl.exec(e)) return {
+                h: n[1],
+                s: n[2],
+                l: n[3]
+            };
+            if (n = S.hsla.exec(e)) return {
+                h: n[1],
+                s: n[2],
+                l: n[3],
+                a: n[4]
+            };
+            if (n = S.hsv.exec(e)) return {
+                h: n[1],
+                s: n[2],
+                v: n[3]
+            };
+            if (n = S.hsva.exec(e)) return {
+                h: n[1],
+                s: n[2],
+                v: n[3],
+                a: n[4]
+            };
+            if (n = S.hex8.exec(e)) return {
+                r: y(n[1]),
+                g: y(n[2]),
+                b: y(n[3]),
+                a: m(n[4]),
+                format: t ? "name": "hex8"
+            };
+            if (n = S.hex6.exec(e)) return {
+                r: y(n[1]),
+                g: y(n[2]),
+                b: y(n[3]),
+                format: t ? "name": "hex"
+            };
+            if (n = S.hex4.exec(e)) return {
+                r: y(n[1] + n[1]),
+                g: y(n[2] + n[2]),
+                b: y(n[3] + n[3]),
+                a: m(n[4] + n[4]),
+                format: t ? "name": "hex8"
+            };
+            if (n = S.hex3.exec(e)) return {
+                r: y(n[1] + n[1]),
+                g: y(n[2] + n[2]),
+                b: y(n[3] + n[3]),
+                format: t ? "name": "hex"
+            };
+            return ! 1
+        } (e)),
+        "object" === typeof e && (E(e.r) && E(e.g) && E(e.b) ? (t = e.r, n = e.g, r = e.b, i = {
+            r: 255 * d(t, 255),
+            g: 255 * d(n, 255),
+            b: 255 * d(r, 255)
+        },
+        l = !0, c = "%" === String(e.r).substr( - 1) ? "prgb": "rgb") : E(e.h) && E(e.s) && E(e.v) ? (a = p(e.s), s = p(e.v), i = function(e, t, n) {
+            e = 6 * d(e, 360),
+            t = d(t, 100),
+            n = d(n, 100);
+            var r = Math.floor(e),
+            i = e - r,
+            o = n * (1 - t),
+            a = n * (1 - i * t),
+            s = n * (1 - (1 - i) * t),
+            u = r % 6;
+            return {
+                r: 255 * [n, a, o, o, s, n][u],
+                g: 255 * [s, n, n, a, o, o][u],
+                b: 255 * [o, o, s, n, n, a][u]
+            }
+        } (e.h, a, s), l = !0, c = "hsv") : E(e.h) && E(e.s) && E(e.l) && (a = p(e.s), u = p(e.l), i = function(e, t, n) {
+            var r, i, o;
+            if (e = d(e, 360), t = d(t, 100), n = d(n, 100), 0 === t) i = n,
+            o = n,
+            r = n;
+            else {
+                var a = n < .5 ? n * (1 + t) : n + t - n * t,
+                s = 2 * n - a;
+                r = v(s, a, e + 1 / 3),
+                i = v(s, a, e),
+                o = v(s, a, e - 1 / 3)
+            }
+            return {
+                r: 255 * r,
+                g: 255 * i,
+                b: 255 * o
+            }
+        } (e.h, a, u), l = !0, c = "hsl"), Object.prototype.hasOwnProperty.call(e, "a") && (o = e.a)),
+        o = function(e) {
+            return e = parseFloat(e),
+            (isNaN(e) || e < 0 || e > 1) && (e = 1),
+            e
+        } (o),
+        {
+            ok: l,
+            format: e.format || c,
+            r: Math.min(255, Math.max(i.r, 0)),
+            g: Math.min(255, Math.max(i.g, 0)),
+            b: Math.min(255, Math.max(i.b, 0)),
+            a: o
+        }
+    }
 	`, none)
 	prog.Show()
 }
