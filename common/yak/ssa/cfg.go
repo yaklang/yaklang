@@ -112,6 +112,7 @@ func (lb *LoopBuilder) Finish() {
 	if lb.buildFirst != nil {
 		builder.CurrentBlock = lb.enter
 		init = lb.buildFirst()
+		lb.enter = builder.CurrentBlock
 	}
 
 	// enter -> header
@@ -256,7 +257,7 @@ func (i *IfBuilder) Finish() {
 	ifSSA.AddTrue(trueBlock)
 	// build true block
 	builder.CurrentBlock = trueBlock
-	i.ifBody()
+	i.ifBody() //TODO:?????cfg跳转链断
 	// true -> done
 	builder.EmitJump(doneBlock)
 
@@ -518,8 +519,5 @@ func (t *SwitchBuilder) Finish() {
 	builder.EmitSwitch(cond, defaultb, slabel)
 	addToBlocks(done)
 	addToBlocks(defaultb)
-	// rest := builder.NewBasicBlock("")
-	// builder.CurrentBlock = done
-	// builder.EmitJump(rest)
-	// builder.CurrentBlock = rest
+	builder.CurrentBlock = done
 }
