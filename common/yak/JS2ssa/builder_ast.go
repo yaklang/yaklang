@@ -38,7 +38,6 @@ func (b *astbuilder) buildStatement(stmt *JS.StatementContext) {
 	// var
 	if s, ok := stmt.VariableStatement().(*JS.VariableStatementContext); ok {
 		b.buildVariableStatement(s)
-		return
 	}
 
 	// expr
@@ -128,8 +127,6 @@ func (b *astbuilder) buildAllVariableDeclaration(stmt *JS.VariableDeclarationLis
 	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 	// var ret []ssa.Value
-
-	// TODO: 如何去实现一个不可以被重复赋值的变量 complete
 
 	// checking varModifier - decorator (var / let / const)
 	// think `var a = 1`, `let a = 1`, `const a = 1`;
@@ -561,10 +558,9 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 			return ssa.NewUndefined(rv.String())
 		}
 	case *JS.TypeofExpressionContext:
-		// TODO:类型？
 		if expr := s.SingleExpression(); expr != nil {
 			rv, _ := b.buildSingleExpression(expr, false)
-			return rv
+			return b.EmitTypeValue(rv.GetType())
 		}
 	case *JS.PreIncrementExpressionContext:
 		if expr := s.SingleExpression(); expr != nil {
@@ -648,7 +644,8 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 				return v
 			},
 			func() ssa.Value {
-				return getValue(s, 1)
+				v := getValue(s, 1)
+				return v
 			},
 			nil,
 		)
@@ -693,6 +690,10 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 			return b.buildAssignmentOperatorContext(f, lValue, rValue)
 		}
 	case *JS.ImportExpressionContext:
+		if expr := s.SingleExpression(); expr != nil {
+			rv, _ := b.buildSingleExpression(expr, false)
+			return rv
+		}
 	case *JS.TemplateStringExpressionContext:
 	case *JS.YieldExpressionContext:
 	case *JS.ThisExpressionContext:
@@ -888,32 +889,35 @@ func (b *astbuilder) buildAssignmentOperatorContext(stmt *JS.AssignmentOperatorC
 
 	var Op ssa.BinaryOpcode
 	if op := stmt.PlusAssign(); op != nil {
-		Op = ssa.OpAdd
+		Op = ssa.OpAdd // +=
 	} else if op := stmt.MinusAssign(); op != nil {
-		Op = ssa.OpSub
+		Op = ssa.OpSub // -=
 	} else if op := stmt.DivideAssign(); op != nil {
-		Op = ssa.OpDiv
+		Op = ssa.OpDiv // /=
 	} else if op := stmt.ModulusAssign(); op != nil {
-		Op = ssa.OpMod
-	} else if op := stmt.DivideAssign(); op != nil {
-		Op = ssa.OpDiv
+		Op = ssa.OpMod // %=
 	} else if op := stmt.MultiplyAssign(); op != nil {
-		Op = ssa.OpMul
+		Op = ssa.OpMul // *=
 	} else if op := stmt.LeftShiftArithmeticAssign(); op != nil {
-		Op = ssa.OpShl
+		Op = ssa.OpShl // <<=
 	} else if op := stmt.RightShiftArithmeticAssign(); op != nil {
-		Op = ssa.OpShr
+		Op = ssa.OpShr // >>=
 	} else if op := stmt.BitOrAssign(); op != nil {
-		Op = ssa.OpOr
+		Op = ssa.OpOr // |=
 	} else if op := stmt.BitXorAssign(); op != nil {
-		Op = ssa.OpXor
+		Op = ssa.OpXor // ^=
 	} else if op := stmt.BitAndAssign(); op != nil {
-		Op = ssa.OpAnd
+		Op = ssa.OpAnd // &=
+	} else if op := stmt.RightShiftLogicalAssign(); op != nil {
+		// TODO:logical
+		Op = ssa.OpShr // >>>=
+	} else if op := stmt.PowerAssign(); op != nil {
+		// TODO:**=
+		Op = ssa.OpMul
 	}
 
-	// TODO:powerAssign **=, RightShiftLogicalAssign >>>=
-
 	value := b.EmitBinOp(Op, lValue.GetValue(b.FunctionBuilder), rValue)
+	// fmt.Println("value :", rValue)
 	lValue.Assign(value, b.FunctionBuilder)
 
 	// fmt.Println("test assignOpreator: ", lValue.GetValue(b.FunctionBuilder))
