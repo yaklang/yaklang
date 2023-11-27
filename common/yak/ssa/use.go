@@ -78,13 +78,15 @@ func InsertValueReplaceOriginal(original Value, insert Value) {
 		old := builder.readVariableByBlock(variable, item, false)
 		builder.deleteVariableByBlock(variable, item)
 		new := builder.readVariableByBlock(variable, item, false)
-		if old != new {
-			replaceInBlock(old, new, item, func(i Instruction) bool {
-				return i == new
-			})
-		}
-		if len(old.GetUsers()) == 0 {
-			deleteInst = append(deleteInst, old)
+		if !utils.IsNil(old) {
+			if old != new {
+				replaceInBlock(old, new, item, func(i Instruction) bool {
+					return i == new
+				})
+			}
+			if len(old.GetUsers()) == 0 {
+				deleteInst = append(deleteInst, old)
+			}
 		}
 		return old, new
 	}
@@ -93,7 +95,7 @@ func InsertValueReplaceOriginal(original Value, insert Value) {
 	for i := block.Index + 1; i < len(fun.Blocks); i++ {
 		item := fun.Blocks[i]
 		old, new := handlerSuccBlock(item)
-		if old == new {
+		if !utils.IsNil(old) && old == new {
 			// if not change
 			flag := true
 			// and all succ block of this block only one prev block
