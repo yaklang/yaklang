@@ -131,6 +131,9 @@ func ShrinkTypeVerboseName(i string) string {
 	if InterfaceToAnyRegep.MatchString(i) {
 		return InterfaceToAnyRegep.ReplaceAllString(i, "any")
 	}
+	if i == "[]uint8" {
+		return "[]byte"
+	}
 
 	return i
 }

@@ -408,7 +408,7 @@ func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.Doc
 						paramTyp := methodTyp.In(i)
 						param := &yakdoc.Field{
 							Name:    paramTyp.Name(),
-							Type:    paramTyp.String(),
+							Type:    yakdoc.ShrinkTypeVerboseName(paramTyp.String()),
 							RefType: paramTyp,
 						}
 						funcDecl.Params = append(funcDecl.Params, param)
@@ -427,7 +427,7 @@ func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.Doc
 						resultTyp := methodTyp.Out(i)
 						result := &yakdoc.Field{
 							Name:    resultTyp.Name(),
-							Type:    resultTyp.String(),
+							Type:    yakdoc.ShrinkTypeVerboseName(resultTyp.String()),
 							RefType: resultTyp,
 						}
 						funcDecl.Results = append(funcDecl.Results, result)
