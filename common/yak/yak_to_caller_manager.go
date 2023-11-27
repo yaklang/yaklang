@@ -1021,7 +1021,7 @@ func (y *YakToCallerManager) CallPluginKeyByNameExWithAsync(forceSync bool, plug
 
 		// 没有设置并发控制，就直接顺序执行
 		if y.swg == nil || forceSync {
-			log.Infof("Start Call Plugin: %v", verbose)
+			log.Debugf("Start Call Plugin: %v", verbose)
 			call(iRaw)
 			continue
 		}
@@ -1043,9 +1043,13 @@ func (y *YakToCallerManager) CallPluginKeyByNameExWithAsync(forceSync bool, plug
 						log.Errorf("panic from call[%v]: %v", verbose, err)
 					}
 				}()
-				log.Infof("Start to Call Async Verbose: %v", verbose)
+				if verbose != "" {
+					log.Debugf("Start to Call Async Verbose: %v", verbose)
+				}
 				call(i)
-				log.Infof("Finished Calling Async Verbose: %v", verbose)
+				if verbose != "" {
+					log.Debugf("Finished Calling Async Verbose: %v", verbose)
+				}
 			}()
 		}()
 	}
