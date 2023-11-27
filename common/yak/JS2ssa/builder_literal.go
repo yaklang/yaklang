@@ -87,6 +87,10 @@ func (b *astbuilder) buildNumericLiteral(stmt *JS.NumericLiteralContext) ssa.Val
 		// fmt.Println(originStr)
 
 		if num := stmt.DecimalLiteral(); num != nil { // 十进制
+			if strings.Contains(stmt.GetText(),"e") {
+				var f, _ = strconv.ParseFloat(intStr, 64)
+				return ssa.NewConst(f)
+			}
 			resultInt64, err = strconv.ParseInt(intStr, 10, 64)
 		} else if num := stmt.HexIntegerLiteral(); num != nil { // 十六进制
 			resultInt64, err = strconv.ParseInt(intStr[2:], 16, 64)
