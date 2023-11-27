@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/tls"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
@@ -117,7 +116,10 @@ func (c *YakitClient) SetYakLog(logger *YakLogger) {
 
 // 输入
 func (c *YakitClient) YakitLog(level string, tmp string, items ...interface{}) error {
-	data := fmt.Sprintf(tmp, items...)
+	var data = tmp
+	if len(items) > 0 {
+		data = fmt.Sprintf(tmp, items...)
+	}
 	logger := c.yakLogger.Info
 	switch level {
 	case "warn":
@@ -127,11 +129,11 @@ func (c *YakitClient) YakitLog(level string, tmp string, items ...interface{}) e
 	case "error":
 		logger = c.yakLogger.Error
 	}
-	formated := spew.Sprintf(tmp, items...)
-	if len(formated) > 256 {
-		formated = string([]rune(formated)[:100]) + "..."
+	shrinked := data
+	if len(shrinked) > 256 {
+		shrinked = string([]rune(shrinked)[:100]) + "..."
 	}
-	logger(formated)
+	logger(shrinked)
 	return c.send(&YakitLog{
 		Level:     level,
 		Data:      data,
