@@ -21,8 +21,8 @@ func (s *Server) GetSpaceEngineStatus(ctx context.Context, req *ypb.GetSpaceEngi
 		if err != nil {
 			return nil, err
 		}
-		res := result.Get(`resources`)
-		quota := res.Get("quota_info")
+		// res := result.Get(`resources`)
+		quota := result.Get("quota_info")
 		remain := quota.Get("remain_free_quota").Int() + quota.Get("remain_pay_quota").Int()
 		status := &ypb.SpaceEngineStatus{
 			Type:   SPACE_ENGINE_ZOOMEYE,

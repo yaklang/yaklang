@@ -27,7 +27,7 @@ Host: api.zoomeye.org
 	if err != nil {
 		return nil, err
 	}
-	_, body := lowhttp.SplitHTTPPacketFast(rsp)
+	_, body := lowhttp.SplitHTTPPacketFast(rsp.RawPacket)
 	result := gjson.ParseBytes(body)
 	return &result, nil
 }

@@ -606,7 +606,7 @@ func calcWebsitePathParamsHash(urlIns *url.URL, host, port interface{}, req []by
 	var fuzzParams = freq.GetCommonParams()
 	fuzzParams = append(fuzzParams, freq.GetPathParams()...)
 	for _, r := range fuzzParams {
-		params = append(params, utils.CalcMd5(r.String()))
+		params = append(params, utils.CalcMd5(r.Name()))
 	}
 	sort.Strings(params)
 	return utils.CalcSha1(urlIns.Scheme, host, port, strings.Join(params, ","), "path-params")
@@ -619,11 +619,6 @@ func calcWebsitePathHash(urlIns *url.URL, host, port interface{}, req []byte) st
 	}
 	var params []string
 	params = append(params, utils.CalcMd5(freq.GetMethod(), freq.GetPath()))
-	var fuzzParams = freq.GetPathParams()
-	for _, r := range fuzzParams {
-		params = append(params, utils.CalcMd5(r.String()))
-	}
-	sort.Strings(params)
 	return utils.CalcSha1(urlIns.Scheme, host, port, strings.Join(params, ","), "path")
 }
 
