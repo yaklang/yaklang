@@ -290,9 +290,20 @@ func TestValidP12PassWord(t *testing.T) {
 //	config.AuthInfos = []*ypb.AuthInfo{{
 //		AuthType:     "any",
 //		AuthUsername: "test",
+//		AuthPassword: "test123",
+//		Host:         "47.120.44.219:8087",
+//	}, {
+//		AuthType:     "negotiate",
+//		AuthUsername: "test",
 //		AuthPassword: "test",
 //		Host:         "47.120.44.219:8087",
-//	}}
+//	}, {
+//		AuthType:     "ntlm",
+//		AuthUsername: "test",
+//		AuthPassword: "testfasdf",
+//		Host:         "47.120.44.219:8087",
+//	},
+//	}
 //	_, err = client.SetGlobalNetworkConfig(context.Background(), config)
 //	if err != nil {
 //		panic(err)

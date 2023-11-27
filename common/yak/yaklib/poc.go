@@ -165,8 +165,6 @@ func NewDefaultPoCConfig() *_pocConfig {
 		RedirectHandler:        nil,
 		Session:                nil,
 		SaveHTTPFlow:           consts.GLOBAL_HTTP_FLOW_SAVE.IsSet(),
-		Username:               consts.GLOBAL_HTTP_AUTH_USERNAME.Load(),
-		Password:               consts.GLOBAL_HTTP_AUTH_PASSWORD.Load(),
 		Source:                 "",
 		Websocket:              false,
 		WebsocketHandler:       nil,
