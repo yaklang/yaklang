@@ -239,6 +239,40 @@ func HandleResults(funcRefType reflect.Type, typ *ast.FuncType, fset *token.File
 	return results
 }
 
+func HandleFieldsRaw(fieldStr string) []*Field {
+	fieldStrs := strings.Split(fieldStr, ",")
+	ret := make([]*Field, 0, len(fieldStr))
+	tempFields := make([]*Field, 0)
+	for _, r := range fieldStrs {
+		r = strings.TrimSpace(r)
+		if r == "" {
+			continue
+		}
+		splited := strings.Split(r, " ")
+		// 一般认为一定有变量名，所以splited出来的第一个一定是变量名
+		if len(splited) < 2 {
+			field := &Field{
+				Name: splited[0],
+			}
+			ret = append(ret, field)
+			tempFields = append(tempFields, field)
+		} else {
+			name, typ := splited[0], splited[1]
+			ret = append(ret, &Field{
+				Name: name,
+				Type: typ,
+			})
+			if len(tempFields) > 0 {
+				for _, field := range tempFields {
+					field.Type = typ
+				}
+				tempFields = make([]*Field, 0)
+			}
+		}
+	}
+	return ret
+}
+
 func customHandleParamsAndResults(libName string, overideName string, params []*Field, results []*Field) ([]*Field, []*Field) {
 	// eval时丢掉第一个参数，因为第一个参数是context，是在执行时自动注入的
 	// if libName == "__GLOBAL__" && overideName == "eval" {
@@ -491,6 +525,10 @@ func FuncToFuncDecl(f interface{}, libName string, overideName string) (*FuncDec
 		if commentIndex := strings.Index(lineStr, "//"); commentIndex != -1 {
 			lineStr = lineStr[:commentIndex]
 		}
+		// 去除func 前的字符串
+		if index := strings.Index(lineStr, "func "); index != -1 {
+			lineStr = lineStr[index:]
+		}
 		// 是结构体方法
 		if strings.HasPrefix(lineStr, "func (") {
 			lineStr = lineStr[strings.Index(lineStr, ")")+1:]
@@ -522,28 +560,10 @@ func FuncToFuncDecl(f interface{}, libName string, overideName string) (*FuncDec
 			if paramsEndIndex != -1 {
 				paramsStr = paramsStr[:paramsEndIndex]
 			}
-
 			paramsStr = strings.TrimRight(paramsStr, ")")
 			paramsStr = strings.TrimSpace(paramsStr)
-			paramsStrs := strings.Split(paramsStr, ",")
-			for i, r := range paramsStrs {
-				r = strings.TrimSpace(r)
-				if r == "" {
-					continue
-				}
-				splited := strings.Split(r, " ")
-				if len(splited) < 2 {
-					params = append(params, &Field{
-						Name: fmt.Sprintf("v%d", i+1),
-						Type: splited[0],
-					})
-				} else {
-					params = append(params, &Field{
-						Name: splited[0],
-						Type: splited[len(splited)-1],
-					})
-				}
-			}
+
+			params = HandleFieldsRaw(paramsStr)
 			paramsEndIndex = strings.Index(lineStr, ")")
 			if paramsEndIndex != -1 {
 				if paramsEndIndex+2 < len(lineStr) {
@@ -563,30 +583,13 @@ func FuncToFuncDecl(f interface{}, libName string, overideName string) (*FuncDec
 			}
 			resultsStr = strings.TrimRight(resultsStr, ")")
 			resultsStr = strings.TrimSpace(resultsStr)
-			resultsStrs := strings.Split(resultsStr, ",")
-			for i, r := range resultsStrs {
-				r = strings.TrimSpace(r)
-				if r == "" {
-					continue
-				}
-				splited := strings.Split(r, " ")
-				if len(splited) < 2 {
-					results = append(results, &Field{
-						Name: fmt.Sprintf("r%d", i+1),
-						Type: splited[0],
-					})
-				} else {
-					results = append(results, &Field{
-						Name: splited[0],
-						Type: splited[len(splited)-1],
-					})
-				}
-			}
+
+			results = HandleFieldsRaw(resultsStr)
 		} else {
 			// 单返回值
 			resultsStr := strings.TrimSpace(lineStr)
 			results = append(results, &Field{
-				Name: "r1",
+				Name: "",
 				Type: resultsStr,
 			})
 		}
