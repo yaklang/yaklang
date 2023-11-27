@@ -10,7 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/permutil"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"go.uber.org/atomic"
 	"io"
 	"io/ioutil"
 	"os"
@@ -51,9 +50,7 @@ var (
 	GLOBAL_NETWORK_CONFIG_INIT = "GLOBAL_NETWORK_CONFIG_INIT"
 
 	// default  http flow save config
-	GLOBAL_HTTP_FLOW_SAVE     = utils.NewBool(true)
-	GLOBAL_HTTP_AUTH_USERNAME = atomic.NewString("")
-	GLOBAL_HTTP_AUTH_PASSWORD = atomic.NewString("")
+	GLOBAL_HTTP_FLOW_SAVE = utils.NewBool(true)
 
 	AuthInfoMutex         = new(sync.Mutex)
 	GLOBAL_HTTP_AUTH_INFO []*ypb.AuthInfo
