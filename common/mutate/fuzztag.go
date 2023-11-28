@@ -4,19 +4,19 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/fuzztagx/parser"
-	"github.com/yaklang/yaklang/common/utils/bizhelper"
-	"github.com/yaklang/yaklang/common/utils/regen"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"github.com/yaklang/yaklang/common/yso"
 	"io/ioutil"
 	"math/rand"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/fuzztagx/parser"
+	"github.com/yaklang/yaklang/common/utils/regen"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yso"
 
 	"github.com/yaklang/yaklang/common/fuzztag"
 	"github.com/yaklang/yaklang/common/log"
@@ -454,13 +454,39 @@ func init() {
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "payload",
 		Handler: func(s string) []string {
+			fmt.Println("payload in fuzz: ", s)
+			// for _, s : = range utils.
 			var db = consts.GetGormProfileDatabase()
 			if db == nil {
 				return []string{s}
 			}
-			db = bizhelper.ExactQueryStringArrayOr(db, "`group`", utils.PrettifyListFromStringSplited(s, ","))
-			//_ = db
+			names := make([]string, 0)
+			elems := make([]any, 0)
+			for _, s := range utils.PrettifyListFromStringSplited(s, ", ") {
 
+				ss := strings.Split(s, "/")
+				if len(ss) == 1 {
+					// bizhelper.ExactOrQueryArrayOr()
+					// just group name
+					names = append(names, "(`group` = ?)")
+					elems = append(elems, ss[0])
+				}
+				if len(ss) == 2 {
+					if ss[1] == "*" {
+						// all group in folder
+						names = append(names, "(`folder` = ?)")
+						elems = append(elems, ss[0])
+					} else {
+						// just one group in folder
+						names = append(names, "(`group` = ?)")
+						elems = append(elems, ss[1])
+					}
+				}
+			}
+
+			db = db.Where(strings.Join(names, " OR "), elems...)
+			db = db.Where("content != ?", "")
+			// db = db.Debug()
 			var payloads []string
 			if rows, err := db.Table("payloads").Select("content").Rows(); err != nil {
 				return []string{s}
@@ -482,7 +508,7 @@ func init() {
 			}
 		},
 		Alias:       []string{"x"},
-		Description: "从数据库加载 Payload, `{{payload(pass_top25)}}`",
+		Description: "从数据库加载 Payload, 可以指定payload组或文件夹, `{{payload(groupName)}}`, `{{payload(folder/*)}}`",
 	})
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{
