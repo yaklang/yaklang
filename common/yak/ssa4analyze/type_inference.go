@@ -41,7 +41,6 @@ func (t *TypeInference) RunOnFunction(fun *ssa.Function) {
 }
 
 func (t *TypeInference) InferenceOnInstruction(inst ssa.Instruction) {
-
 	if iv, ok := inst.(ssa.Value); ok {
 		t := iv.GetType()
 		if utils.IsNil(t) {
@@ -114,7 +113,6 @@ func checkType(v ssa.Value, typ ssa.Type) bool {
 }
 
 func (t *TypeInference) TypeInferenceNext(next *ssa.Next) {
-
 	/*
 		next map[T]U
 
@@ -151,7 +149,6 @@ func (t *TypeInference) TypeInferenceNext(next *ssa.Next) {
 }
 
 func (t *TypeInference) TypeInferencePhi(phi *ssa.Phi) {
-
 	// check
 	// TODO: handler Acyclic graph
 	if t.checkValuesNotFinish(phi.Edge) {
@@ -244,7 +241,7 @@ func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
 			f.SetType(ssa.BasicTypes[ssa.Number])
 			return
 		case ssa.Any:
-			//pass
+			// pass
 			f.SetType(ssa.BasicTypes[ssa.Any])
 			return
 		default:
@@ -297,13 +294,14 @@ func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
 	// 	f.SetType(ssa.BasicTypes[ssa.Any])
 	// }
 }
-func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
 
+func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
 	// handler call method
 	if ft, ok := ssa.ToFunctionType(c.Method.GetType()); ok && ft.IsMethod {
 		// handle modify self function
 		if ft.IsModifySelf {
 			ssa.InsertValueReplaceOriginal(c.Args[0], c)
+			c.SetType(c.Args[0].GetType())
 		}
 	}
 
@@ -355,7 +353,7 @@ func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
 				} else {
 					ret := ssa.NewStructType()
 					ret.FieldTypes = t.FieldTypes[:len(t.FieldTypes)-1]
-					ret.Key = t.Key[:len(t.Key)-1]
+					ret.Keys = t.Keys[:len(t.Keys)-1]
 					ret.KeyTyp = t.KeyTyp
 					ret.Combination = true
 					c.SetType(ret)
