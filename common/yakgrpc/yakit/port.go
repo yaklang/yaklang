@@ -85,7 +85,7 @@ type PortsTypeGroup struct {
 }
 
 func (p *Port) CalcHash() string {
-	return utils.CalcSha1(p.Host, p.Port, p.TaskName, p.RuntimeId)
+	return utils.CalcSha1(p.Host, p.Port, p.Proto, p.TaskName, p.RuntimeId)
 }
 
 func (p *Port) BeforeSave() error {
@@ -100,10 +100,22 @@ func (p *Port) BeforeSave() error {
 func CreateOrUpdatePort(db *gorm.DB, hash string, i interface{}) error {
 	db = db.Model(&Port{})
 
+	switch ret := i.(type) {
+	case *Port:
+		var existed Port
+		db.Where("hash = ?", hash).First(&existed)
+		if existed.ID > 0 {
+			p := &existed
+			p.HtmlTitle = utils.PrettifyShrinkJoin("|", p.HtmlTitle, ret.HtmlTitle)
+			p.ServiceType = utils.PrettifyShrinkJoin("/", p.ServiceType, ret.ServiceType)
+			p.CPE = utils.PrettifyShrinkJoin("|", p.CPE, p.CPE)
+			p.State = ret.State
+			return db.Save(p).Error
+		}
+	}
 	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&Port{}); db.Error != nil {
 		return utils.Errorf("create/update Port failed: %s", db.Error)
 	}
-
 	return nil
 }
 
@@ -181,9 +193,9 @@ func FilterPort(db *gorm.DB, params *ypb.QueryPortsRequest) *gorm.DB {
 	} else {
 		db = bizhelper.ExactQueryString(db, "state", params.GetState())
 	}
-	if params.GetRuntimeId() != ""{
+	if params.GetRuntimeId() != "" {
 		db = db.Where("runtime_id = ?", params.GetRuntimeId())
-	}else{
+	} else {
 		db = db.Where("runtime_id is null OR (runtime_id = '')")
 	}
 	return db

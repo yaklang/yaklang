@@ -38,3 +38,14 @@ func TestPrettifyListFromStringSplit(t *testing.T) {
 	assert.Equal(t, []string{"a", "b", "c"}, PrettifyListFromStringSplitEx("abc", ""))
 	assert.Equal(t, []string{"a", "b", "c"}, PrettifyListFromStringSplitEx("a b c", " "))
 }
+
+func TestPrettifyJoin(t *testing.T) {
+	assert.Equal(t, "a,b,c,d,e,f,g", PrettifyJoin(",", "a", "b", "c", "d", "e", "f", "g"))
+	assert.Equal(t, "a,b,c,f,g", PrettifyJoin(",", "a", "b", "c", "", "", "f", "g"))
+	assert.Equal(t, "a,b,c,f", PrettifyJoin(",", "a", "b", "c", "", "", "f", ""))
+	assert.Equal(t, "b,c,f,g", PrettifyJoin(",", "", "b", "c", "", "", "f", "g"))
+	assert.Equal(t, "c,f,g", PrettifyJoin(",", "", "", "c", "", "", "f", "g"))
+	assert.Equal(t, "c,f", PrettifyJoin(",", "", "", "c", "", "", "f", ""))
+	assert.Equal(t, "c,f,c,f,c,f,c,f,c,f,c,f", PrettifyJoin(",", "", "", "c", "", "", "f", "", "c", "f", "c", "f", "c", "f", "c", "f", "c", "f"))
+	assert.Equal(t, "c,f", PrettifyShrinkJoin(",", "", "", "c", "", "", "f", "", "c", "f", "c", "f", "c", "f", "c", "f", "c", "f"))
+}

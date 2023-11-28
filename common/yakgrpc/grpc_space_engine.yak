@@ -1,0 +1,96 @@
+// @ssa-ignore
+filter = FILTER == undefined ? `` : FILTER
+if filter == "" {
+    die("filter empty")
+}
+
+// @ssa-ignore
+scan := SCAN_VERIFY == undefined ? false : SCAN_VERIFY
+// @ssa-ignore
+totalPage = TOTAL_PAGE == undefined ? 3 : TOTAL_PAGE
+if totalPage <= 0 { totalPage = 10 }
+
+// @ssa-ignore
+engineType = ENGINE_TYPE == undefined ? "" : ENGINE_TYPE
+if engineType == "" {
+    die("NO ENGINE TYPE SET")
+}
+
+// @ssa-ignore
+concurrent = CONCURRENT == undefined ? 20 : CONCURRENT
+if concurrent <= 0 { concurrent = 20 }
+
+total = 0
+scanTotal = 0
+activeTask = 0
+
+swg = sync.NewSizedWaitGroup(10)
+
+statusLock = sync.NewLock()
+deltaScanTotal = i => {
+    statusLock.Lock()
+    defer statusLock.Unlock()
+    scanTotal += i
+}
+deltaActiveTask = i => {
+    statusLock.Lock()
+    defer statusLock.Unlock()
+    activeTask += i
+}
+
+go func{
+    for {
+        yakit.StatusCard("获取数据", f`${total}`)
+        if scanTotal > 0 {
+            yakit.StatusCard("验证扫描", f`${scanTotal}`)
+        }
+        if activeTask > 0 {
+            yakit.StatusCard("正在扫描验证", f`${activeTask}`)
+        }
+        sleep(1)
+    }
+}
+
+tableName = "%v引擎结果" % engineType
+yakit.EnableTable(tableName, ["主机", "端口", "基础指纹", "网站标题"])
+feeddata = (result) => {
+    // handle spacengine
+    defer func{ err = recover(); if err != nil { log.error(err)} }
+
+    host, port = str.ParseStringToHostPort(result.Addr)~
+
+    yakit.TableData(tableName, {
+        "主机": host, "端口": port, "基础指纹": result.Fingerprints, "网站标题": result.HtmlTitle,
+    })
+}
+
+for result in spacengine.Query(filter, spacengine.engine(engineType))~ {
+    total ++
+    if !scan {
+        feeddata(result)
+        db.SavePortFromResult(result)
+        continue
+    }
+
+    swg.Add(1)
+    deltaScanTotal(1)
+    deltaActiveTask(1)
+    result := result
+    go func{
+        defer swg.Done()
+        defer deltaActiveTask(-1)
+        try {
+            host, port = str.ParseStringToHostPort(result.Addr)~
+            fpResult = servicescan.ScanOne(host, port)~
+            feeddata(result)
+            db.SavePortFromResult(result)
+        } catch err {
+            feeddata(result)
+            db.SavePortFromResult(result)
+            log.error("scan %v failed: %s", result.Addr, err)
+        }
+
+    }
+}
+
+swg.Wait()
