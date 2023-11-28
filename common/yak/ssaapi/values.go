@@ -111,7 +111,7 @@ func (v *Value) Compare(other *Value) bool { return ValueCompare(v, other) }
 
 func (v *Value) GetType() *Type {
 	if n, ok := v.node.(ssa.TypedNode); ok {
-		return newType(n.GetType())
+		return NewType(n.GetType())
 	}
 	return Any
 }
@@ -210,8 +210,29 @@ func (v *Value) GetConst() *ssa.Const {
 	}
 }
 
+func (v *Value) GetOpcode() ssa.Opcode {
+	return v.node.GetOpcode()
+}
+
+func (v *Value) IsModifySelf() bool {
+	if !v.IsCall() {
+		return false
+	}
+	ft, ok := ssa.ToFunctionType(GetBareType(v.GetOperand(0).GetType()))
+	return ok && ft.IsModifySelf
+}
+
+func (v *Value) GetSelf() *Value {
+	if v.IsModifySelf() {
+		return v.GetOperand(1)
+	}
+	return v
+}
+
+func (v *Value) IsExtern() bool       { return v.IsParameter() && v.node.IsExtern() }
 func (v *Value) IsFunction() bool     { return v.node.GetOpcode() == ssa.OpFunction }
 func (v *Value) IsBasicBlock() bool   { return v.node.GetOpcode() == ssa.OpBasicBlock }
+func (v *Value) IsParameter() bool    { return v.node.GetOpcode() == ssa.OpParameter }
 func (v *Value) IsPhi() bool          { return v.node.GetOpcode() == ssa.OpPhi }
 func (v *Value) IsConstInst() bool    { return v.node.GetOpcode() == ssa.OpConstInst }
 func (v *Value) IsUndefined() bool    { return v.node.GetOpcode() == ssa.OpUndefined }
@@ -233,3 +254,7 @@ func (v *Value) IsJump() bool         { return v.node.GetOpcode() == ssa.OpJump 
 func (v *Value) IsIf() bool           { return v.node.GetOpcode() == ssa.OpIf }
 func (v *Value) IsLoop() bool         { return v.node.GetOpcode() == ssa.OpLoop }
 func (v *Value) IsSwitch() bool       { return v.node.GetOpcode() == ssa.OpSwitch }
+
+func GetBareInstructionNode(v *Value) ssa.InstructionNode {
+	return v.node
+}

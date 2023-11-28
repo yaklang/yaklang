@@ -1,10 +1,16 @@
 package ssaapi
 
 import (
+	"time"
+
+	"github.com/ReneKroon/ttlcache"
+	"github.com/yaklang/yaklang/common/utils"
 	js2ssa "github.com/yaklang/yaklang/common/yak/JS2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/yak2ssa"
 )
+
+var ttlSSAParseCache = ttlcache.NewCache()
 
 type config struct {
 	language Language
@@ -70,6 +76,10 @@ func Parse(code string, opts ...Option) *Program {
 	for _, opt := range opts {
 		opt(config)
 	}
+	hash := utils.CalcSha1(code, config.language)
+	if prog, ok := ttlSSAParseCache.Get(hash); ok {
+		return prog.(*Program)
+	}
 
 	callback := func(fb *ssa.FunctionBuilder) {
 		fb.WithExternLib(config.externLib)
@@ -84,7 +94,9 @@ func Parse(code string, opts ...Option) *Program {
 	case Yak:
 		ret = yak2ssa.ParseSSA(code, callback)
 	}
-	return NewProgram(ret)
+	prog := NewProgram(ret)
+	ttlSSAParseCache.SetWithTTL(hash, prog, 30*time.Minute)
+	return prog
 }
 
 var Exports = map[string]any{
