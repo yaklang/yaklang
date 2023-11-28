@@ -3,11 +3,12 @@ package yakvm
 import (
 	"bytes"
 	"fmt"
+	"math/rand"
+	"unicode"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
-	"math/rand"
-	"unicode"
 )
 
 func NewBytesMethodFactory(f func([]byte) interface{}) MethodFactory {
@@ -51,7 +52,7 @@ var bytesBuildinMethod = map[string]*buildinMethod{
 		ParamTable: nil,
 		HandlerFactory: NewBytesMethodFactory(func(s []byte) interface{} {
 			return func() []byte {
-				var runes = []rune(string(s))
+				runes := []rune(string(s))
 				rand.Shuffle(len(runes), func(i, j int) {
 					runes[i] = runes[j]
 				})
@@ -474,8 +475,5 @@ func init() {
 }
 
 func aliasBytesBuildinMethod(origin string, target string) {
-	if i, ok := bytesBuildinMethod[origin]; ok {
-		bytesBuildinMethod[target] = i
-		i.Name = target
-	}
+	aliasBuildinMethod(bytesBuildinMethod, origin, target)
 }
