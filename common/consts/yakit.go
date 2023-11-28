@@ -2,14 +2,6 @@ package consts
 
 import (
 	"compress/gzip"
-	"github.com/jinzhu/gorm"
-	_ "github.com/mattn/go-sqlite3"
-	"github.com/yaklang/yaklang/common/cve/cveresources"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/permutil"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 	"io/ioutil"
 	"os"
@@ -19,6 +11,15 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/jinzhu/gorm"
+	_ "github.com/mattn/go-sqlite3"
+	"github.com/yaklang/yaklang/common/cve/cveresources"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/permutil"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 var (
@@ -258,6 +259,13 @@ func GetDefaultYakitBaseTempDir() string {
 func GetDefaultBaseHomeDir() string {
 	yHome := GetDefaultYakitBaseDir()
 	return filepath.Dir(yHome)
+}
+func GetDefaultYakitPayloadsDir() string {
+	pt := filepath.Join(GetDefaultYakitBaseDir(), "payloads")
+	if !utils.IsDir(pt) {
+		os.MkdirAll(pt, 0777)
+	}
+	return pt
 }
 
 func GetDefaultYakitProjectsDir() string {
