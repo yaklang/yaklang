@@ -2,6 +2,11 @@ package yakit
 
 import (
 	"context"
+	"os"
+	"strconv"
+	"sync"
+	"time"
+
 	"github.com/jinzhu/copier"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
@@ -9,10 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"os"
-	"strconv"
-	"sync"
-	"time"
 )
 
 func MigrateLegacyDatabase() error {
@@ -78,9 +79,9 @@ func MigrateLegacyDatabase() error {
 			log.Infof("start to migrate group: %v", group)
 			var payloads []string
 			for p := range YieldPayloads(projectDB.Where("`group` = ?", group).Model(&Payload{}), context.Background()) {
-				pStr, _ := strconv.Unquote(p.Content)
+				pStr, _ := strconv.Unquote(*p.Content)
 				if pStr == "" {
-					pStr = p.Content
+					pStr = *p.Content
 				}
 				payloads = append(payloads, pStr)
 			}
