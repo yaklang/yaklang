@@ -69,6 +69,24 @@ func (e *Engine) YakBuiltinGetScopeInspects() ([]*ScopeValue, error) {
 	return e.GetScopeInspects()
 }
 
+// getFromScope 获取当前作用域中的变量，返回变量值
+// Example:
+// ```
+// a, b = 1, "yak"
+// { assert getFromScope("a") == 1 }
+// { assert getFromScope("b") == "yak" }
+// ```
+func (e *Engine) YakBuiltinGetFromScope(v string, vals ...any) any {
+	val, ok := e.GetVar(v)
+	if ok {
+		return val
+	}
+	if len(vals) >= 1 {
+		return vals[0]
+	}
+	return nil
+}
+
 // waitAllAsyncCallFinish 等待直到所有异步调用完成
 // Example:
 // ```
@@ -92,6 +110,7 @@ func InjectContextBuiltinFunction(engine *Engine) {
 		"yakfmt":                 engine.YakBuiltinfmt,
 		"yakfmtWithError":        engine.YakBuiltinfmtWithError,
 		"getScopeInspects":       engine.YakBuiltinGetScopeInspects,
+		"getFromScope":           engine.YakBuiltinGetFromScope,
 		"waitAllAsyncCallFinish": engine.waitAllAsyncCallFinish,
 	})
 }
