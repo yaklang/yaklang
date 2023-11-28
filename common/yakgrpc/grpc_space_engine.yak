@@ -1,23 +1,19 @@
-// @ssa-ignore
-filter = FILTER == undefined ? `` : FILTER
+filter = getFromScope("FILTER", "")
 if filter == "" {
     die("filter empty")
 }
-
-// @ssa-ignore
-scan := SCAN_VERIFY == undefined ? false : SCAN_VERIFY
-// @ssa-ignore
-totalPage = TOTAL_PAGE == undefined ? 3 : TOTAL_PAGE
-if totalPage <= 0 { totalPage = 10 }
-
-// @ssa-ignore
-engineType = ENGINE_TYPE == undefined ? "" : ENGINE_TYPE
+engineType = getFromScope(`ENGINE_TYPE`, "zoomeye")
 if engineType == "" {
     die("NO ENGINE TYPE SET")
 }
 
-// @ssa-ignore
-concurrent = CONCURRENT == undefined ? 20 : CONCURRENT
+scan := getFromScope(`SCAN_VERIFY`, false)
+
+// handle default
+totalPage = getFromScope(`TOTAL_PAGE`, 10)
+if totalPage <= 0 { totalPage = 10 }
+
+concurrent = getFromScope(`CONCURRENT`, 20)
 if concurrent <= 0 { concurrent = 20 }
 
 total = 0
@@ -94,3 +90,4 @@ for result in spacengine.Query(filter, spacengine.engine(engineType))~ {
 }
 
 swg.Wait()
+sleep(2)
