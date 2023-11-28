@@ -24,6 +24,7 @@ const MAXTypeCompareDepth = 10
 func TypeCompare(t1, t2 Type) bool {
 	return TypeCompareEx(t1, t2, 0)
 }
+
 func TypeCompareEx(t1, t2 Type, depth int) bool {
 	t1kind := t1.GetTypeKind()
 	t2kind := t2.GetTypeKind()
@@ -137,7 +138,7 @@ func GetAllKey(t Type) []string {
 	case FunctionTypeKind:
 	case ObjectTypeKind, SliceTypeKind, MapTypeKind, StructTypeKind:
 		ot, _ := ToObjectType(t)
-		ret = append(ret, lo.Map(ot.Key, func(v Value, _ int) string { return v.String() })...)
+		ret = append(ret, lo.Map(ot.Keys, func(v Value, _ int) string { return v.String() })...)
 		fallthrough
 	default:
 		ret = append(ret, GetMethodsName(t)...)
@@ -270,12 +271,15 @@ func (b *BasicType) RawString() string {
 func (b *BasicType) GetTypeKind() TypeKind {
 	return b.Kind
 }
+
 func (b *BasicType) GetMethod() map[string]*FunctionType {
 	return b.method
 }
+
 func (b *BasicType) SetMethod(method map[string]*FunctionType) {
 	b.method = method
 }
+
 func (b *BasicType) AddMethod(id string, f *FunctionType) {
 	if b.method == nil {
 		b.method = make(map[string]*FunctionType)
@@ -307,6 +311,7 @@ func GetType(i any) Type {
 		panic("undefined type")
 	}
 }
+
 func GetTypeByStr(typ string) Type {
 	switch typ {
 	case "uint", "uint8", "byte", "uint16", "uint32", "uint64", "int", "int8", "int16", "int32", "int64", "uintptr":
@@ -348,6 +353,7 @@ func NewAliasType(name string, elem Type) *AliasType {
 func (a *AliasType) SetMethod(m map[string]*FunctionType) {
 	a.method = m
 }
+
 func (b *AliasType) AddMethod(id string, f *FunctionType) {
 	if b.method == nil {
 		b.method = make(map[string]*FunctionType)
@@ -397,6 +403,7 @@ var _ Type = (*InterfaceType)(nil)
 func (i *InterfaceType) SetMethod(m map[string]*FunctionType) {
 	i.method = m
 }
+
 func (b *InterfaceType) AddMethod(id string, f *FunctionType) {
 	if b.method == nil {
 		b.method = make(map[string]*FunctionType)
@@ -439,12 +446,14 @@ var _ (Type) = (*ChanType)(nil)
 func (c *ChanType) SetMethod(m map[string]*FunctionType) {
 	c.method = m
 }
+
 func (b *ChanType) AddMethod(id string, f *FunctionType) {
 	if b.method == nil {
 		b.method = make(map[string]*FunctionType)
 	}
 	b.method[id] = f
 }
+
 func (c *ChanType) GetMethod() map[string]*FunctionType {
 	return c.method
 }
@@ -476,7 +485,7 @@ type ObjectType struct {
 	Name       string
 	Kind       TypeKind
 	Len        int
-	Key        []Value
+	Keys       []Value
 	keyTypes   []Type
 	FieldTypes []Type
 
@@ -502,6 +511,7 @@ func (i *ObjectType) GetMethod() map[string]*FunctionType {
 func (i *ObjectType) SetMethod(m map[string]*FunctionType) {
 	i.method = m
 }
+
 func (b *ObjectType) AddMethod(id string, f *FunctionType) {
 	if b.method == nil {
 		b.method = make(map[string]*FunctionType)
@@ -522,7 +532,7 @@ func (i *ObjectType) SetName(name string) {
 func NewObjectType() *ObjectType {
 	return &ObjectType{
 		Kind:       ObjectTypeKind,
-		Key:        make([]Value, 0),
+		Keys:       make([]Value, 0),
 		keyTypes:   make([]Type, 0),
 		FieldTypes: make([]Type, 0),
 		method:     make(map[string]*FunctionType, 0),
@@ -610,7 +620,7 @@ func (itype ObjectType) RawString() string {
 
 // for struct build
 func (s *ObjectType) AddField(key Value, field Type) {
-	s.Key = append(s.Key, key)
+	s.Keys = append(s.Keys, key)
 	keyTyp := key.GetType()
 	s.keyTypes = append(s.keyTypes, keyTyp)
 	if field == nil {
@@ -628,7 +638,7 @@ func (s *ObjectType) GetField(key Value) Type {
 		}
 	case StructTypeKind, ObjectTypeKind:
 		getField := func(o *ObjectType) Type {
-			if index := slices.IndexFunc(o.Key, func(v Value) bool { return v.String() == key.String() }); index != -1 {
+			if index := slices.IndexFunc(o.Keys, func(v Value) bool { return v.String() == key.String() }); index != -1 {
 				return o.FieldTypes[index]
 			} else {
 				return nil
@@ -719,6 +729,7 @@ func NewFunctionType(name string, Parameter []Type, ReturnType Type, IsVariadic 
 	}
 	return f
 }
+
 func NewFunctionTypeDefine(name string, Parameter []Type, ReturnType []Type, IsVariadic bool) *FunctionType {
 	return NewFunctionType(name, Parameter, CalculateType(ReturnType), IsVariadic)
 }
@@ -726,6 +737,7 @@ func NewFunctionTypeDefine(name string, Parameter []Type, ReturnType []Type, IsV
 func (s *FunctionType) SetFreeValue(fv []string) {
 	s.FreeValue = fv
 }
+
 func (s *FunctionType) SetSideEffect(se []string) {
 	s.SideEffects = se
 }

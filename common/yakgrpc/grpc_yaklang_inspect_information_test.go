@@ -16,12 +16,11 @@ import (
 // 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 // )
 
-func send(client ypb.YakClient, typ, code string, startPos, endPos *ypb.Position) *ypb.YaklangInspectInformationResponse {
+func yaklangInspectInformationSend(client ypb.YakClient, inspectType, yakScriptType, code string, r *ypb.Range) *ypb.YaklangInspectInformationResponse {
 	rsp, err := client.YaklangInspectInformation(context.Background(), &ypb.YaklangInspectInformationRequest{
-		YakScriptType: typ,
+		YakScriptType: yakScriptType,
 		YakScriptCode: code,
-		StartPos:      startPos,
-		EndPos:        endPos,
+		Range:         r,
 	})
 	if err != nil {
 		return nil
@@ -50,7 +49,6 @@ func CheckKV(t *testing.T, wants map[string]string, infos []*ypb.YaklangInformat
 			t.Fatalf("key %s in got, but not in want", info.Name)
 		}
 	}
-
 }
 
 func TestYakGetInfo(t *testing.T) {
@@ -58,7 +56,7 @@ func TestYakGetInfo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rsp := send(local, "yak",
+	rsp := yaklangInspectInformationSend(local, "info", "yak",
 		`
 		cli.String("arg1", cli.setDefault("default variable"), cli.setHelp("help information"), cli.setRequired(true))
 		cli.Int("arg2", cli.setDefault(1), cli.setHelp("help information 2"))
@@ -77,7 +75,7 @@ func TestYakGetInfo(t *testing.T) {
 				risk.severity("warning"),
 			)
 	`,
-		nil, nil)
+		nil)
 	if rsp == nil {
 		t.Fatal("no response")
 	}
