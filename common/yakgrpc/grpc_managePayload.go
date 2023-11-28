@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -185,9 +186,9 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 		rest := float64((total-size)/OneMB) / (speed)
 		stream.Send(&ypb.SavePayloadProgress{
 			Progress:            progress,
-			Speed:               fmt.Sprintf("%f", speed),
-			CostDurationVerbose: d.String(),
-			RestDurationVerbose: fmt.Sprintf("%f", rest),
+			Speed:               fmt.Sprintf("%.2f", speed),
+			CostDurationVerbose: fmt.Sprintf("%.2fs", d.Seconds()),
+			RestDurationVerbose: fmt.Sprintf("%.2f", rest),
 			Message:             msg,
 		})
 	}
@@ -343,7 +344,7 @@ func (s *Server) SavePayloadToFileStream(req *ypb.SavePayloadRequest, stream ypb
 	handledSize = 0
 	total = int64(len(data))
 	// save to file
-	ProjectFolder := ""
+	ProjectFolder := consts.GetDefaultYakitPayloadsDir()
 	fileName := fmt.Sprintf("%s/%s_%s.txt", ProjectFolder, req.GetFolder(), req.GetGroup())
 	fd, err := os.OpenFile(fileName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
 	if err != nil {
