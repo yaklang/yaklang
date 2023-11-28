@@ -31,6 +31,50 @@ func PrettifyListFromStringSplited(Raw string, sep string) (targets []string) {
 	return
 }
 
+func PrettifyShrinkJoin(sep string, s ...string) string {
+	var buf bytes.Buffer
+	var count = 0
+	var existedHashMap = make(map[string]struct{})
+	for _, element := range s {
+		for _, i := range PrettifyListFromStringSplited(element, sep) {
+			if i == "" {
+				continue
+			}
+
+			_, ok := existedHashMap[i]
+			if ok {
+				continue
+			}
+			existedHashMap[i] = struct{}{}
+			if count == 0 {
+				buf.WriteString(i)
+			} else {
+				buf.WriteString(sep + i)
+			}
+			count++
+		}
+	}
+	return buf.String()
+}
+
+func PrettifyJoin(sep string, s ...string) string {
+	var buf bytes.Buffer
+	var count = 0
+	for _, i := range s {
+		if i == "" {
+			continue
+		}
+
+		if count == 0 {
+			buf.WriteString(i)
+		} else {
+			buf.WriteString(sep + i)
+		}
+		count++
+	}
+	return buf.String()
+}
+
 // PrettifyListFromStringSplitEx split string using given sep if no sep given sep = []string{",", "|"}
 func PrettifyListFromStringSplitEx(Raw string, sep ...string) (targets []string) {
 	if len(sep) <= 0 {

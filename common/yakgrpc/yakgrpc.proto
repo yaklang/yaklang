@@ -582,6 +582,8 @@ message FetchPortAssetFromSpaceEngineRequest {
   // page limit
   int64 PageSize = 5;
   bool ScanBeforeSave = 6;
+  string Proxy = 7;
+  string Concurrent = 8;
 }
 
 message DeleteHybridScanTaskRequest {
