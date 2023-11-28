@@ -7,13 +7,6 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-type Position struct {
-	SourceCode  string
-	StartLine   int
-	StartColumn int
-	EndLine     int
-	EndColumn   int
-}
 type ErrorLogger interface {
 	NewError(ErrorKind, ErrorTag, string)
 }
@@ -66,9 +59,11 @@ type Instruction interface {
 	HasLeftVariable() bool
 	// GetLeftItem() LeftInstruction
 }
-type Users []User
-type Values []Value
-type InstructionNodes []InstructionNode
+type (
+	Users            []User
+	Values           []Value
+	InstructionNodes []InstructionNode
+)
 
 // data-flow
 type Node interface {
@@ -137,6 +132,7 @@ func (a *anInstruction) GetBlock() *BasicBlock      { return a.block }
 
 // source code position
 func (c *anInstruction) GetPosition() *Position { return c.Pos }
+
 func (c *anInstruction) SetPosition(pos *Position) {
 	if c.Pos == nil {
 		c.Pos = pos
@@ -165,12 +161,14 @@ func (a *anInstruction) GetLeftItem() LeftInstruction { return LeftInstruction(a
 
 // left-instruction: variable
 func (a *anInstruction) GetLeftVariables() []string { return a.variables }
+
 func (a *anInstruction) AddLeftVariables(name string) {
 	a.variables = append(a.variables, name)
 }
 
 // left-instruction: left-position
 func (a *anInstruction) GetLeftPositions() []*Position { return a.LeftPos }
+
 func (a *anInstruction) GetLeftPosition() *Position {
 	if len(a.LeftPos) > 0 {
 		return a.LeftPos[len(a.LeftPos)-1]
@@ -178,6 +176,7 @@ func (a *anInstruction) GetLeftPosition() *Position {
 		return nil
 	}
 }
+
 func (a *anInstruction) AddLeftPositions(pos *Position) {
 	a.LeftPos = append(a.LeftPos, pos)
 }
@@ -190,8 +189,10 @@ func (a *anInstruction) GetOperands() Values    { return nil }       // cover by
 func (a *anInstruction) GetOperand(i int) Value { return a.GetOperands()[i] }
 func (a *anInstruction) GetOperandNum() int     { return len(a.GetOperands()) }
 
-var _ Instruction = (*anInstruction)(nil)
-var _ LeftInstruction = (*anInstruction)(nil)
+var (
+	_ Instruction     = (*anInstruction)(nil)
+	_ LeftInstruction = (*anInstruction)(nil)
+)
 
 type anValue struct {
 	typ      Type
@@ -217,6 +218,7 @@ func (n *anValue) AddUser(u User) {
 		n.userList = append(n.userList, u)
 	}
 }
+
 func (n *anValue) RemoveUser(u User) {
 	n.userList = utils.RemoveSliceItem(n.userList, u)
 }
@@ -286,8 +288,10 @@ type Function struct {
 	builder *FunctionBuilder
 }
 
-var _ Node = (*Function)(nil)
-var _ Value = (*Function)(nil)
+var (
+	_ Node  = (*Function)(nil)
+	_ Value = (*Function)(nil)
+)
 
 // implement Value
 type BasicBlock struct {
@@ -324,8 +328,10 @@ func (b *BasicBlock) GetType() Type {
 func (b *BasicBlock) SetType(ts Type) {
 }
 
-var _ Node = (*BasicBlock)(nil)
-var _ Value = (*BasicBlock)(nil)
+var (
+	_ Node  = (*BasicBlock)(nil)
+	_ Value = (*BasicBlock)(nil)
+)
 
 // =========================================  Value ===============================
 // ================================= Spec Value
@@ -343,10 +349,12 @@ type Phi struct {
 	wit1, wit2 Value // witness for trivial-phi
 }
 
-var _ Node = (*Phi)(nil)
-var _ Value = (*Phi)(nil)
-var _ User = (*Phi)(nil)
-var _ Instruction = (*Phi)(nil)
+var (
+	_ Node        = (*Phi)(nil)
+	_ Value       = (*Phi)(nil)
+	_ User        = (*Phi)(nil)
+	_ Instruction = (*Phi)(nil)
+)
 
 // ----------- Parameter
 type Parameter struct {
@@ -360,7 +368,7 @@ type Parameter struct {
 	// for extern lib
 	BuildField func(string) Value
 
-	//TODO: is modify , not cover
+	// TODO: is modify , not cover
 	IsModify     bool
 	defaultValue Value
 }
@@ -369,8 +377,10 @@ func (p *Parameter) SetDefault(v Value) {
 	p.defaultValue = v
 }
 
-var _ Node = (*Parameter)(nil)
-var _ Value = (*Parameter)(nil)
+var (
+	_ Node  = (*Parameter)(nil)
+	_ Value = (*Parameter)(nil)
+)
 
 // ================================= Normal Value
 
@@ -388,9 +398,11 @@ type ConstInst struct {
 func (c *ConstInst) GetType() Type   { return c.Const.GetType() }
 func (c *ConstInst) SetType(ts Type) {}
 
-var _ Node = (*ConstInst)(nil)
-var _ Value = (*ConstInst)(nil)
-var _ Instruction = (*ConstInst)(nil)
+var (
+	_ Node        = (*ConstInst)(nil)
+	_ Value       = (*ConstInst)(nil)
+	_ Instruction = (*ConstInst)(nil)
+)
 
 // ----------- Undefined
 type Undefined struct {
@@ -398,9 +410,11 @@ type Undefined struct {
 	anValue
 }
 
-var _ Node = (*Undefined)(nil)
-var _ Value = (*Undefined)(nil)
-var _ Instruction = (*Undefined)(nil)
+var (
+	_ Node        = (*Undefined)(nil)
+	_ Value       = (*Undefined)(nil)
+	_ Instruction = (*Undefined)(nil)
+)
 
 // ----------- BinOp
 type BinOp struct {
@@ -410,10 +424,12 @@ type BinOp struct {
 	X, Y Value
 }
 
-var _ Value = (*BinOp)(nil)
-var _ User = (*BinOp)(nil)
-var _ Node = (*BinOp)(nil)
-var _ Instruction = (*BinOp)(nil)
+var (
+	_ Value       = (*BinOp)(nil)
+	_ User        = (*BinOp)(nil)
+	_ Node        = (*BinOp)(nil)
+	_ Instruction = (*BinOp)(nil)
+)
 
 type UnOp struct {
 	anValue
@@ -424,10 +440,12 @@ type UnOp struct {
 	X  Value
 }
 
-var _ Value = (*UnOp)(nil)
-var _ User = (*UnOp)(nil)
-var _ Node = (*UnOp)(nil)
-var _ Instruction = (*UnOp)(nil)
+var (
+	_ Value       = (*UnOp)(nil)
+	_ User        = (*UnOp)(nil)
+	_ Node        = (*UnOp)(nil)
+	_ Instruction = (*UnOp)(nil)
+)
 
 // ================================= Function Call
 
@@ -454,10 +472,12 @@ type Call struct {
 	IsEllipsis  bool
 }
 
-var _ Node = (*Call)(nil)
-var _ Value = (*Call)(nil)
-var _ User = (*Call)(nil)
-var _ Instruction = (*Call)(nil)
+var (
+	_ Node        = (*Call)(nil)
+	_ Value       = (*Call)(nil)
+	_ User        = (*Call)(nil)
+	_ Instruction = (*Call)(nil)
+)
 
 // ----------- SideEffect
 type SideEffect struct {
@@ -466,10 +486,12 @@ type SideEffect struct {
 	target Value // call instruction
 }
 
-var _ Node = (*SideEffect)(nil)
-var _ Value = (*SideEffect)(nil)
-var _ User = (*SideEffect)(nil)
-var _ Instruction = (*SideEffect)(nil)
+var (
+	_ Node        = (*SideEffect)(nil)
+	_ Value       = (*SideEffect)(nil)
+	_ User        = (*SideEffect)(nil)
+	_ Instruction = (*SideEffect)(nil)
+)
 
 // ----------- Return
 // The Return instruction returns values and control back to the calling
@@ -480,10 +502,12 @@ type Return struct {
 	Results []Value
 }
 
-var _ Node = (*Return)(nil)
-var _ User = (*Return)(nil)
-var _ Value = (*Return)(nil)
-var _ Instruction = (*Return)(nil)
+var (
+	_ Node        = (*Return)(nil)
+	_ User        = (*Return)(nil)
+	_ Value       = (*Return)(nil)
+	_ Instruction = (*Return)(nil)
+)
 
 // ================================= Memory Value
 
@@ -501,10 +525,12 @@ type Make struct {
 	Len, Cap Value
 }
 
-var _ Node = (*Make)(nil)
-var _ Value = (*Make)(nil)
-var _ User = (*Make)(nil)
-var _ Instruction = (*Make)(nil)
+var (
+	_ Node        = (*Make)(nil)
+	_ Value       = (*Make)(nil)
+	_ User        = (*Make)(nil)
+	_ Instruction = (*Make)(nil)
+)
 
 // instruction
 // ----------- Field
@@ -526,10 +552,12 @@ type Field struct {
 	OutCapture bool
 }
 
-var _ Node = (*Field)(nil)
-var _ Value = (*Field)(nil)
-var _ User = (*Field)(nil)
-var _ Instruction = (*Field)(nil)
+var (
+	_ Node        = (*Field)(nil)
+	_ Value       = (*Field)(nil)
+	_ User        = (*Field)(nil)
+	_ Instruction = (*Field)(nil)
+)
 
 // ----------- Update
 type Update struct {
@@ -539,9 +567,11 @@ type Update struct {
 	Address Value // this point to field
 }
 
-var _ Node = (*Update)(nil)
-var _ User = (*Update)(nil)
-var _ Instruction = (*Update)(nil)
+var (
+	_ Node        = (*Update)(nil)
+	_ User        = (*Update)(nil)
+	_ Instruction = (*Update)(nil)
+)
 
 // ------------- Next
 type Next struct {
@@ -551,10 +581,12 @@ type Next struct {
 	InNext bool // "in" grammar
 }
 
-var _ Node = (*Next)(nil)
-var _ User = (*Next)(nil)
-var _ Value = (*Next)(nil)
-var _ Instruction = (*Next)(nil)
+var (
+	_ Node        = (*Next)(nil)
+	_ User        = (*Next)(nil)
+	_ Value       = (*Next)(nil)
+	_ Instruction = (*Next)(nil)
+)
 
 // ================================= Assert Value
 
@@ -567,9 +599,11 @@ type Assert struct {
 	MsgValue Value
 }
 
-var _ Node = (*Assert)(nil)
-var _ User = (*Assert)(nil)
-var _ Instruction = (*Assert)(nil)
+var (
+	_ Node        = (*Assert)(nil)
+	_ User        = (*Assert)(nil)
+	_ Instruction = (*Assert)(nil)
+)
 
 // ----------- Type-cast
 // cast value -> type
@@ -580,10 +614,12 @@ type TypeCast struct {
 	Value Value
 }
 
-var _ Node = (*TypeCast)(nil)
-var _ Value = (*TypeCast)(nil)
-var _ User = (*TypeCast)(nil)
-var _ Instruction = (*TypeCast)(nil)
+var (
+	_ Node        = (*TypeCast)(nil)
+	_ Value       = (*TypeCast)(nil)
+	_ User        = (*TypeCast)(nil)
+	_ Instruction = (*TypeCast)(nil)
+)
 
 // ------------- type value
 type TypeValue struct {
@@ -591,9 +627,11 @@ type TypeValue struct {
 	anValue
 }
 
-var _ Node = (*TypeValue)(nil)
-var _ Value = (*TypeValue)(nil)
-var _ Instruction = (*TypeValue)(nil)
+var (
+	_ Node        = (*TypeValue)(nil)
+	_ Value       = (*TypeValue)(nil)
+	_ Instruction = (*TypeValue)(nil)
+)
 
 // ================================= Error Handler
 
@@ -612,9 +650,11 @@ type Panic struct {
 	Info Value
 }
 
-var _ Node = (*Panic)(nil)
-var _ User = (*Panic)(nil)
-var _ Instruction = (*Panic)(nil)
+var (
+	_ Node        = (*Panic)(nil)
+	_ User        = (*Panic)(nil)
+	_ Instruction = (*Panic)(nil)
+)
 
 // --------------- RECOVER
 type Recover struct {
@@ -622,9 +662,11 @@ type Recover struct {
 	anValue
 }
 
-var _ Node = (*Recover)(nil)
-var _ Value = (*Recover)(nil)
-var _ Instruction = (*Recover)(nil)
+var (
+	_ Node        = (*Recover)(nil)
+	_ Value       = (*Recover)(nil)
+	_ Instruction = (*Recover)(nil)
+)
 
 // control-flow instructions  ----------------------------------------
 // jump / if / return / call / switch
@@ -653,9 +695,11 @@ type If struct {
 	False *BasicBlock
 }
 
-var _ Node = (*If)(nil)
-var _ User = (*If)(nil)
-var _ Instruction = (*If)(nil)
+var (
+	_ Node        = (*If)(nil)
+	_ User        = (*If)(nil)
+	_ Instruction = (*If)(nil)
+)
 
 // ----------- For
 // for loop
@@ -668,9 +712,11 @@ type Loop struct {
 	Key              Value
 }
 
-var _ Node = (*Loop)(nil)
-var _ User = (*Loop)(nil)
-var _ Instruction = (*Loop)(nil)
+var (
+	_ Node        = (*Loop)(nil)
+	_ User        = (*Loop)(nil)
+	_ Instruction = (*Loop)(nil)
+)
 
 // ----------- Switch
 type SwitchLabel struct {
@@ -694,6 +740,8 @@ type Switch struct {
 	Label []SwitchLabel
 }
 
-var _ Node = (*Switch)(nil)
-var _ User = (*Switch)(nil)
-var _ Instruction = (*Switch)(nil)
+var (
+	_ Node        = (*Switch)(nil)
+	_ User        = (*Switch)(nil)
+	_ Instruction = (*Switch)(nil)
+)

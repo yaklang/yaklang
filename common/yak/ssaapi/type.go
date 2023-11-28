@@ -13,7 +13,7 @@ func TypeCompare(t1, t2 *Type) bool {
 	return ssa.TypeCompare(t1.t, t2.t)
 }
 
-func newType(t ssa.Type) *Type {
+func NewType(t ssa.Type) *Type {
 	return &Type{t: t}
 }
 
@@ -26,29 +26,33 @@ func (t *Type) Compare(t2 *Type) bool {
 }
 
 var (
-	Number        = newType(ssa.BasicTypes[ssa.Number])
-	String        = newType(ssa.BasicTypes[ssa.String])
-	Bytes         = newType(ssa.BasicTypes[ssa.Bytes])
-	Boolean       = newType(ssa.BasicTypes[ssa.Boolean])
-	UndefinedType = newType(ssa.BasicTypes[ssa.UndefinedType])
-	Null          = newType(ssa.BasicTypes[ssa.Null])
-	Any           = newType(ssa.BasicTypes[ssa.Any])
-	ErrorType     = newType(ssa.BasicTypes[ssa.ErrorType])
+	Number        = NewType(ssa.BasicTypes[ssa.Number])
+	String        = NewType(ssa.BasicTypes[ssa.String])
+	Bytes         = NewType(ssa.BasicTypes[ssa.Bytes])
+	Boolean       = NewType(ssa.BasicTypes[ssa.Boolean])
+	UndefinedType = NewType(ssa.BasicTypes[ssa.UndefinedType])
+	Null          = NewType(ssa.BasicTypes[ssa.Null])
+	Any           = NewType(ssa.BasicTypes[ssa.Any])
+	ErrorType     = NewType(ssa.BasicTypes[ssa.ErrorType])
 )
 
 func SliceOf(t *Type) *Type {
-	return newType(ssa.NewSliceType(t.t))
+	return NewType(ssa.NewSliceType(t.t))
 }
 
 func MapOf(key, value *Type) *Type {
-	return newType(ssa.NewMapType(key.t, value.t))
+	return NewType(ssa.NewMapType(key.t, value.t))
 }
 
 func FuncOf(name string, args, ret []*Type, isVariadic bool) *Type {
-	return newType(
+	return NewType(
 		ssa.NewFunctionTypeDefine(name,
 			lo.Map(args, func(t *Type, _ int) ssa.Type { return t.t }),
 			lo.Map(ret, func(t *Type, _ int) ssa.Type { return t.t }),
 			isVariadic),
 	)
+}
+
+func GetBareType(typ *Type) ssa.Type {
+	return typ.t
 }

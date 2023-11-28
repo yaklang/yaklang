@@ -133,13 +133,21 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 	if typStr == "[]uint8" {
 		typStr = "bytes"
 	}
-	if hijackType, ok := f.externType[typStr]; ok {
-		return hijackType
-	}
 
 	// base type
 	if t := GetTypeByStr(typStr); t != nil {
 		return t
+	}
+
+	typKind := typ.Kind()
+	if typKind == reflect.Struct || typKind == reflect.Interface {
+		typStr = fmt.Sprintf("%s.%s", typ.PkgPath(), typ.Name())
+	} else if typKind == reflect.Ptr {
+		typStr = fmt.Sprintf("%s.%s", typ.Elem().PkgPath(), typ.Elem().Name())
+	}
+
+	if hijackType, ok := f.externType[typStr]; ok {
+		return hijackType
 	}
 
 	var ret Type
