@@ -95,7 +95,6 @@ func TestUndefine(t *testing.T) {
 			},
 		})
 	})
-
 }
 
 func TestErrorComment(t *testing.T) {
@@ -332,7 +331,6 @@ func TestForEach(t *testing.T) {
 }
 
 func TestMemberCall(t *testing.T) {
-
 	t.Run("normal member call", func(t *testing.T) {
 		CheckTestCase(t, TestCase{
 			code: `
@@ -369,7 +367,6 @@ func TestMemberCall(t *testing.T) {
 				ssa4analyze.ValueUndefined("b"),
 			},
 		})
-
 	})
 
 	// TODO: handle this case in type check rule
@@ -554,7 +551,6 @@ func TestType(t *testing.T) {
 			},
 		})
 	})
-
 }
 
 func TestCallParamReturn(t *testing.T) {
@@ -691,7 +687,6 @@ func TestCallParamReturn(t *testing.T) {
 			},
 		})
 	})
-
 }
 
 func TestClosureBinding(t *testing.T) {
@@ -741,7 +736,7 @@ func TestClosureBinding(t *testing.T) {
 		})
 	})
 
-	//TODO: more test in `ssa_var_test.go`
+	// TODO: more test in `ssa_var_test.go`
 	t.Run("modify free value", func(t *testing.T) {
 		CheckTestCase(t, TestCase{
 			code: `
@@ -908,8 +903,8 @@ func TestExternStruct(t *testing.T) {
 			a.GetA()
 			`,
 			errs: []string{
-				ssa.ExternFieldError("Type", "yak2ssa.AStruct", "GetA", "GetAStruct"),
-				ssa4analyze.InvalidField("yak2ssa.AStruct", "C"),
+				ssa.ExternFieldError("Type", "github.com/yaklang/yaklang/common/yak/yak2ssa.AStruct", "GetA", "GetAStruct"),
+				ssa4analyze.InvalidField("github.com/yaklang/yaklang/common/yak/yak2ssa.AStruct", "C"),
 			},
 			ExternValue: map[string]any{
 				"getA":  func() *AStruct { return &AStruct{} },
@@ -917,7 +912,6 @@ func TestExternStruct(t *testing.T) {
 			},
 		})
 	})
-
 }
 
 func TestExternInstance(t *testing.T) {
@@ -1093,7 +1087,6 @@ func TestErrorHandler(t *testing.T) {
 			},
 		})
 	})
-
 }
 
 func TestTryCatch(t *testing.T) {
@@ -1159,7 +1152,6 @@ func TestTryCatch(t *testing.T) {
 			},
 		})
 	})
-
 }
 
 func TestSwitch(t *testing.T) {
