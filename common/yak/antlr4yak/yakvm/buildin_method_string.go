@@ -2,12 +2,13 @@ package yakvm
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/mutate"
-	"github.com/yaklang/yaklang/common/utils"
 	"math/rand"
 	"strings"
 	"unicode"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func NewStringMethodFactory(f func(string) interface{}) MethodFactory {
@@ -24,6 +25,7 @@ var stringBuildinMethod = map[string]*buildinMethod{
 	"First": {
 		Name:       "First",
 		ParamTable: nil,
+
 		HandlerFactory: NewStringMethodFactory(func(c string) interface{} {
 			return func() rune {
 				return rune(c[0])
@@ -51,7 +53,7 @@ var stringBuildinMethod = map[string]*buildinMethod{
 		ParamTable: nil,
 		HandlerFactory: NewStringMethodFactory(func(s string) interface{} {
 			return func() string {
-				var raw = []rune(s)
+				raw := []rune(s)
 				rand.Shuffle(len(raw), func(i, j int) {
 					raw[i] = raw[j]
 				})
@@ -279,7 +281,6 @@ var stringBuildinMethod = map[string]*buildinMethod{
 				if width <= lenOfS {
 					return s
 				} else {
-
 					return s + strings.Repeat("0", width-lenOfS)
 				}
 			}
@@ -471,8 +472,5 @@ func init() {
 }
 
 func aliasStringBuildinMethod(origin string, target string) {
-	if i, ok := stringBuildinMethod[origin]; ok {
-		stringBuildinMethod[target] = i
-		i.Name = target
-	}
+	aliasBuildinMethod(stringBuildinMethod, origin, target)
 }
