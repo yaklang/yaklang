@@ -117,9 +117,11 @@ func (b *Builder) Build(t ssa.Type, s string) *ssa.FunctionType {
 		switch s {
 		case "Append", "Push":
 			IsModifySelf = true
+			IsVariadic = true
 			arg = append(arg, fieldTyp)
 			ret = append(ret, ot)
 		case "Pop":
+			IsVariadic = true
 			IsModifySelf = true
 			ret = append(ret, fieldTyp)
 		case "Extend", "Merge":
@@ -160,6 +162,7 @@ func (b *Builder) Build(t ssa.Type, s string) *ssa.FunctionType {
 			ret = append(ret, ot)
 		case "Sort":
 			IsModifySelf = true
+			IsVariadic = true
 			arg = append(arg, BoolTyp)
 			ret = append(ret, ot)
 		case "Clear":
@@ -242,7 +245,7 @@ func (b *Builder) Build(t ssa.Type, s string) *ssa.FunctionType {
 			ret = append(ret, NumberTyp)
 		case "Reverse", "Shuffle":
 			ret = append(ret, BytesTyp)
-		case "FUzz":
+		case "Fuzz":
 			arg = append(arg, MapTyp(StrTyp, AnyTyp))
 			ret = append(ret, SliceTyp(StrTyp))
 			IsVariadic = true
@@ -265,9 +268,9 @@ func (b *Builder) Build(t ssa.Type, s string) *ssa.FunctionType {
 			arg = append(arg, AnyTyp)
 			ret = append(ret, BytesTyp)
 		case "Trim", "TrimLeft", "TrimRight":
+			IsVariadic = true
 			arg = append(arg, BytesTyp)
 			ret = append(ret, BytesTyp)
-			IsVariadic = true
 		case "HasPrefix", "HasSuffix", "StartsWith", "EndsWith":
 			arg = append(arg, BytesTyp)
 			ret = append(ret, BoolTyp)
@@ -278,9 +281,9 @@ func (b *Builder) Build(t ssa.Type, s string) *ssa.FunctionType {
 			arg = append(arg, NumberTyp)
 			ret = append(ret, BytesTyp)
 		case "Ljust", "Rjust":
+			IsVariadic = true
 			arg = append(arg, NumberTyp, BytesTyp)
 			ret = append(ret, BytesTyp)
-			IsVariadic = true
 		case "Count", "Find", "Rfind", "IndexOf", "LastIndexOf":
 			arg = append(arg, BytesTyp)
 			ret = append(ret, NumberTyp)
