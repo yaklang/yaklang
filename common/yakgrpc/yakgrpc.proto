@@ -964,6 +964,30 @@ message GlobalNetworkConfig {
 
   // default skip save HTTPFlow
   bool SkipSaveHTTPFlow = 11;
+
+  // 第三方APIKey获取
+  repeated ThirdPartyApplicationConfig AppConfigs = 12;
+
+  // http auth info
+  repeated AuthInfo AuthInfos = 13;
+}
+
+message AuthInfo {
+    string AuthUsername = 1;
+    string AuthPassword = 2;
+    string AuthType = 3;
+    string Host = 4;
+  }
+
+message ThirdPartyApplicationConfig {
+    // zoomeye / hunter / shodan / fofa / github / token
+    string Type = 1;
+    string APIKey = 2;
+    string UserIdentifier = 3;
+    string UserSecret = 4;
+    string Namespace = 5;
+    string Domain = 6;
+    string WebhookURL = 7;
 }
 
 message DiagnoseNetworkRequest {
@@ -3052,6 +3076,7 @@ message QueryPortsRequest {
   bool  TitleEffective = 9;
   string ComplexSelect = 10;
   string Proto = 11;
+  string RuntimeId = 12;
 }
 
 message QueryPortsResponse {

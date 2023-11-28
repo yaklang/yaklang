@@ -309,6 +309,8 @@ const (
 	Yak_HybridScan_FullMethodName                                 = "/ypb.Yak/HybridScan"
 	Yak_QueryHybridScanTask_FullMethodName                        = "/ypb.Yak/QueryHybridScanTask"
 	Yak_DeleteHybridScanTask_FullMethodName                       = "/ypb.Yak/DeleteHybridScanTask"
+	Yak_GetSpaceEngineStatus_FullMethodName                       = "/ypb.Yak/GetSpaceEngineStatus"
+	Yak_FetchPortAssetFromSpaceEngine_FullMethodName              = "/ypb.Yak/FetchPortAssetFromSpaceEngine"
 )
 
 // YakClient is the client API for Yak service.
@@ -4353,7 +4355,7 @@ func (c *yakClient) DeleteHybridScanTask(ctx context.Context, in *DeleteHybridSc
 
 func (c *yakClient) GetSpaceEngineStatus(ctx context.Context, in *GetSpaceEngineStatusRequest, opts ...grpc.CallOption) (*SpaceEngineStatus, error) {
 	out := new(SpaceEngineStatus)
-	err := c.cc.Invoke(ctx, "/ypb.Yak/GetSpaceEngineStatus", in, out, opts...)
+	err := c.cc.Invoke(ctx, Yak_GetSpaceEngineStatus_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4361,7 +4363,7 @@ func (c *yakClient) GetSpaceEngineStatus(ctx context.Context, in *GetSpaceEngine
 }
 
 func (c *yakClient) FetchPortAssetFromSpaceEngine(ctx context.Context, in *FetchPortAssetFromSpaceEngineRequest, opts ...grpc.CallOption) (Yak_FetchPortAssetFromSpaceEngineClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[46], "/ypb.Yak/FetchPortAssetFromSpaceEngine", opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[46], Yak_FetchPortAssetFromSpaceEngine_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -11072,7 +11074,7 @@ func _Yak_GetSpaceEngineStatus_Handler(srv interface{}, ctx context.Context, dec
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/ypb.Yak/GetSpaceEngineStatus",
+		FullMethod: Yak_GetSpaceEngineStatus_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(YakServer).GetSpaceEngineStatus(ctx, req.(*GetSpaceEngineStatusRequest))
