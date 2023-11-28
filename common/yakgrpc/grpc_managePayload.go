@@ -28,27 +28,27 @@ func grpc2Paging(pag *ypb.Paging) *yakit.Paging {
 }
 
 func Payload2Grpc(r *yakit.Payload) *ypb.Payload {
-	raw, err := strconv.Unquote(r.Content)
+	raw, err := strconv.Unquote(*r.Content)
 	if err != nil {
-		raw = r.Content
+		raw = *r.Content
 	}
 	return &ypb.Payload{
 		Id:           int64(r.ID),
 		Group:        r.Group,
 		ContentBytes: []byte(raw),
 		Content:      utils.EscapeInvalidUTF8Byte([]byte(raw)),
-		Folder:       r.Folder,
-		HitCount:     r.HitCount,
-		IsFile:       r.IsFile,
+		Folder:       *r.Folder,
+		HitCount:     *r.HitCount,
+		IsFile:       *r.IsFile,
 	}
 }
 func grpc2Payload(p *ypb.Payload) *yakit.Payload {
 	payload := &yakit.Payload{
 		Group:    p.Group,
-		Content:  p.Content,
-		Folder:   p.Folder,
-		HitCount: p.HitCount,
-		IsFile:   p.IsFile,
+		Content:  &p.Content,
+		Folder:   &p.Folder,
+		HitCount: &p.HitCount,
+		IsFile:   &p.IsFile,
 	}
 	payload.Hash = payload.CalcHash()
 	return payload
@@ -177,7 +177,7 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 	_ = size
 	start := time.Now()
 	feedback := func(progress float64, msg string) {
-		if progress == 0 {
+		if progress == -1 {
 			progress = float64(size) / float64(total)
 		}
 		d := time.Since(start)
@@ -201,7 +201,7 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 			case <-ctx.Done():
 				return
 			default:
-				time.Sleep(time.Second)
+				time.Sleep(500 * time.Millisecond)
 				feedback(float64(size)/float64(total), "")
 			}
 		}
@@ -214,13 +214,15 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 		} else {
 			total += state.Size()
 		}
-		defer feedback(0, "文件 "+f+" 写入数据库成功")
-		feedback(0, "正在读取文件: "+f)
+		defer feedback(-1, "文件 "+f+" 写入数据库成功")
+		feedback(-1, "正在读取文件: "+f)
 		return yakit.SavePayloadByFilenameEx(s.GetProfileDatabase(), req.GetGroup(), f, func(data string, hitCount int64) error {
 			size += int64(len(data))
 			return yakit.CreateAndUpdatePayload(s.GetProfileDatabase(), data, req.GetGroup(), req.GetFolder(), hitCount)
 		})
 	}
+
+	defer feedback(1, "数据保存成功")
 
 	if req.IsFile {
 		for _, f := range req.FileName {
@@ -231,8 +233,8 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 			}
 		}
 	} else {
-		feedback(0, "正在读取数据 ")
 		total = int64(len(req.GetContent()))
+		feedback(-1, "正在读取数据 ")
 		if err := yakit.SavePayloadGroupByRawEx(s.GetProfileDatabase(), req.GetGroup(), req.GetContent(), func(data string) error {
 			size += int64(len(data))
 			return yakit.CreateAndUpdatePayload(s.GetProfileDatabase(), data, req.GetGroup(), req.GetFolder(), 0)
@@ -357,9 +359,11 @@ func (s *Server) SavePayloadToFileStream(req *ypb.SavePayloadRequest, stream ypb
 		return err
 	}
 	feedback(0, "写入文件完成")
+	folder := req.GetFolder()
+	f := true
 	payload := yakit.NewPayload(req.GetGroup(), fileName)
-	payload.Folder = req.GetFolder()
-	payload.IsFile = true
+	payload.Folder = &folder
+	payload.IsFile = &f
 	yakit.CreateOrUpdatePayload(s.GetProfileDatabase(), payload)
 	feedback(1, "导入完成")
 	return nil
@@ -437,7 +441,7 @@ func (s *Server) BackUpOrCopyPayloads(ctx context.Context, req *ypb.BackUpOrCopy
 
 	if groupFirstPayload, err := yakit.GetPayloadByGroupFirst(s.GetProfileDatabase(), req.GetGroup()); err != nil {
 		return nil, err
-	} else if groupFirstPayload.IsFile {
+	} else if groupFirstPayload.IsFile == nil && *groupFirstPayload.IsFile {
 		db := s.GetProfileDatabase().Model(&yakit.Payload{})
 		db = bizhelper.ExactQueryInt64ArrayOr(db, "id", req.GetIds())
 		var payloads []yakit.Payload
@@ -447,7 +451,7 @@ func (s *Server) BackUpOrCopyPayloads(ctx context.Context, req *ypb.BackUpOrCopy
 
 		for _, payload := range payloads {
 			// write to target file payload group
-			if err := appendDataToFileEnd(groupFirstPayload.Content, payload.Content); err != nil {
+			if err := appendDataToFileEnd(*groupFirstPayload.Content, *payload.Content); err != nil {
 				return nil, err
 			} else {
 				return &ypb.Empty{}, nil
@@ -509,7 +513,7 @@ func (s *Server) GetAllPayloadGroup(ctx context.Context, _ *ypb.Empty) (*ypb.Get
 	type result struct {
 		Group    string
 		NumGroup int64
-		Folder   string
+		Folder   *string
 		IsFile   *bool
 	}
 
@@ -561,8 +565,8 @@ func (s *Server) GetAllPayloadGroup(ctx context.Context, _ *ypb.Empty) (*ypb.Get
 			Number: r.NumGroup,
 			Nodes:  nil,
 		}
-		if r.Folder != "" {
-			if n := add2Folder(r.Folder, node); n != nil {
+		if r.Folder != nil && *r.Folder != "" {
+			if n := add2Folder(*r.Folder, node); n != nil {
 				nodes = append(nodes, n)
 			}
 		} else {

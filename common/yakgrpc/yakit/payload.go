@@ -20,18 +20,18 @@ type Payload struct {
 	Group string `json:"group" gorm:"index"`
 
 	// payload folder
-	Folder     string `json:"folder" gorm:"column:folder;default:''"`          // default empty string
-	GroupIndex int64  `json:"group_index" gorm:"column:group_index;default:0"` // default 0
+	Folder     *string `json:"folder" gorm:"column:folder;default:''"`          // default empty string
+	GroupIndex *int64  `json:"group_index" gorm:"column:group_index;default:0"` // default 0
 
 	// strconv Quoted
 	// Must: payload data
-	Content string `json:"content"`
+	Content *string `json:"content"`
 
 	// hit count
-	HitCount int64 `json:"hit_count" gorm:"column:hit_count;default:0"` // default 0
+	HitCount *int64 `json:"hit_count" gorm:"column:hit_count;default:0"` // default 0
 
 	// the group save in file only contain one payload, and this `payload.IsFile = true` `payload.Content` is filepath
-	IsFile bool `json:"is_file" gorm:"column:is_file;default:false"` // default false
+	IsFile *bool `json:"is_file" gorm:"column:is_file;default:false"` // default false
 
 	// Hash string
 	Hash string `json:"hash" gorm:"unique_index"`
@@ -56,12 +56,15 @@ func (i gormNoLog) Print(v ...interface{}) {
 
 // / payload
 func NewPayload(group string, content string) *Payload {
+	s := ""
+	var h int64 = 0
+	var f bool = false
 	p := &Payload{
 		Group:    group,
-		Content:  content,
-		Folder:   "",
-		HitCount: 0,
-		IsFile:   false,
+		Content:  &content,
+		Folder:   &s,
+		HitCount: &h,
+		IsFile:   &f,
 	}
 	p.Hash = p.CalcHash()
 	return p
@@ -83,7 +86,7 @@ func CreateOrUpdatePayload(db *gorm.DB, i *Payload) error {
 
 func CreateAndUpdatePayload(db *gorm.DB, content, group, folder string, hitCount int64) error {
 	payload := NewPayload(group, content)
-	payload.Folder = folder
+	payload.Folder = &folder
 	return CreateOrUpdatePayload(db, payload)
 }
 
@@ -220,8 +223,8 @@ func GetPayloadGroupFileName(db *gorm.DB, group string) (string, error) {
 	if payload, err := GetPayloadByGroupFirst(db, group); err != nil {
 		return "", err
 	} else {
-		if payload.IsFile {
-			return payload.Content, nil
+		if payload.IsFile != nil && *payload.IsFile {
+			return *payload.Content, nil
 		} else {
 			return "", utils.Errorf("this group %s save in database not in file", group)
 		}
@@ -305,7 +308,7 @@ func CopyPayloads(db *gorm.DB, ids []int64, group, folder string) error {
 		newPayload := payload
 		newPayload.ID = 0 // Ensure a new record will be created
 		newPayload.Group = group
-		newPayload.Folder = folder
+		newPayload.Folder = &folder
 		if err := CreateOrUpdatePayload(db, &newPayload); err != nil {
 			return utils.Wrap(err, "error creating new payload")
 		}
