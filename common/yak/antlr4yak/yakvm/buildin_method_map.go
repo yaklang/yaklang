@@ -2,15 +2,15 @@ package yakvm
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/go-funk"
 	"reflect"
+
+	"github.com/yaklang/yaklang/common/go-funk"
 )
 
 func aliasMapBuildinMethod(origin string, target string) {
-	if i, ok := mapBuildinMethod[origin]; ok {
-		mapBuildinMethod[target] = i
-	}
+	aliasBuildinMethod(mapBuildinMethod, origin, target)
 }
+
 func NewMapMethodFactory(f func(frame *Frame, v *Value) interface{}) MethodFactory {
 	return func(vm *Frame, i interface{}) interface{} {
 		mapV := i.(*Value)

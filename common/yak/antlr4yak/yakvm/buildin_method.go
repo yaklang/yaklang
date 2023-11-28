@@ -51,8 +51,8 @@ func (b *buildinMethod) VSCodeSnippets() (string, string) {
 	buf.WriteString("(")
 	bufVerbose.WriteString("(")
 
-	var params = make([]string, len(paramsList))
-	var paramVerbose = make([]string, len(paramsList))
+	params := make([]string, len(paramsList))
+	paramVerbose := make([]string, len(paramsList))
 	for index, name := range paramsList {
 		params[index] = fmt.Sprintf(`${%d:%v}`, index+1, name)
 		paramVerbose[index] = name
@@ -74,8 +74,7 @@ func (b *buildinMethod) VSCodeSnippets() (string, string) {
 
 type MethodFactory func(*Frame, interface{}) interface{}
 
-//var _title = http.CanonicalHeaderKey
-
+// var _title = http.CanonicalHeaderKey
 func GetStringBuildInMethod() map[string]*buildinMethod {
 	return stringBuildinMethod
 }
@@ -86,4 +85,19 @@ func GetSliceBuildInMethod() map[string]*buildinMethod {
 
 func GetMapBuildInMethod() map[string]*buildinMethod {
 	return mapBuildinMethod
+}
+
+func GetBytesBuildInMethod() map[string]*buildinMethod {
+	return bytesBuildinMethod
+}
+
+func aliasBuildinMethod(methods map[string]*buildinMethod, origin string, target string) {
+	if i, ok := methods[origin]; ok {
+		methods[target] = &buildinMethod{
+			Name:           target,
+			ParamTable:     i.ParamTable,
+			HandlerFactory: i.HandlerFactory,
+			Description:    i.Description,
+		}
+	}
 }

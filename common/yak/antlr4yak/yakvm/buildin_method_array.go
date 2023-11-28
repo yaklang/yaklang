@@ -2,9 +2,10 @@ package yakvm
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/go-funk"
 	"reflect"
 	"sort"
+
+	"github.com/yaklang/yaklang/common/go-funk"
 )
 
 var buildMethodsArray = map[string]interface{}{}
@@ -19,9 +20,7 @@ func NewArrayMethodFactory(f func(*Frame, *Value, interface{}) interface{}) Meth
 var arrayBuildinMethod map[string]*buildinMethod
 
 func aliasArrayBuildinMethod(origin string, target string) {
-	if i, ok := arrayBuildinMethod[origin]; ok {
-		arrayBuildinMethod[target] = i
-	}
+	aliasBuildinMethod(arrayBuildinMethod, origin, target)
 }
 
 func init() {
@@ -164,7 +163,7 @@ func init() {
 					}
 
 					vLen := rv.Len()
-					var result = make([]string, vLen)
+					result := make([]string, vLen)
 					for i := 0; i < vLen; i++ {
 						val := rv.Index(i)
 						if a, ok := val.Interface().([]byte); ok {
@@ -221,7 +220,7 @@ func init() {
 					rv := reflect.ValueOf(caller)
 					vLen := rv.Len()
 
-					var vals = make([]interface{}, vLen+1)
+					vals := make([]interface{}, vLen+1)
 					vals[0] = raw
 					for i := 0; i < vLen; i++ {
 						vals[i+1] = rv.Index(i).Interface()
