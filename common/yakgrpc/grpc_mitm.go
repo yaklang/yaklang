@@ -241,9 +241,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 	}()
 
-	var (
-		mitmLock = new(sync.Mutex)
-	)
+	//var (
+	//	mitmLock = new(sync.Mutex)
+	//)
 
 	feedbacker := yak.YakitCallerIf(func(result *ypb.ExecResult) error {
 		return stream.Send(&ypb.MITMResponse{Message: result, HaveMessage: true})
@@ -431,6 +431,63 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	}
 
 	var autoForward = utils.NewBool(true)
+	var autoForwardCond = sync.NewCond(new(sync.Mutex))
+
+	reqChan := make(chan struct{})
+	respChan := make(chan struct{})
+	shouldHijackRespChan := make(chan bool)
+
+	autoForwardCh := make(chan struct{}, 1)
+
+	waitForAutoForwardDisabled := func() {
+		autoForwardCond.L.Lock()
+		defer autoForwardCond.L.Unlock()
+		for autoForward.IsSet() {
+			autoForwardCond.Wait()
+		}
+	}
+
+	handleResponse := func() {
+		select {
+		case <-respChan: // 完成响应处理
+			log.Debugf("get resp")
+		case <-autoForwardCh: // 收到自动转发信号
+			log.Debugf("get auto forward when wait response")
+		}
+	}
+
+	handleRequest := func() {
+		log.Debugf("get request")
+		select {
+		case shouldHijackResp := <-shouldHijackRespChan:
+			log.Debugf("get should hijack resp:%v", shouldHijackResp)
+			if !shouldHijackResp {
+				return // 返回到主循环
+			}
+			handleResponse()
+		case <-autoForwardCh:
+			log.Debugf("get auto forward when wait should hijack response")
+		}
+	}
+
+	go func() {
+		defer func() {
+			close(reqChan)
+			close(respChan)
+			close(shouldHijackRespChan)
+			close(autoForwardCh)
+		}()
+		for {
+			waitForAutoForwardDisabled()
+			select {
+			case <-reqChan: // 劫持请求状态
+				handleRequest()
+			case <-autoForwardCh:
+				log.Debugf("get auto forward when wait request")
+				continue
+			}
+		}
+	}()
 
 	// 消息循环
 	messageChan := make(chan *ypb.MITMRequest, 10000)
@@ -560,7 +617,13 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			if reqInstance.GetSetAutoForward() {
 				clearPluginHTTPFlowCache()
 				log.Infof("mitm-auto-forward: %v", reqInstance.GetAutoForwardValue())
+				autoForwardCond.L.Lock()
 				autoForward.SetTo(reqInstance.GetAutoForwardValue())
+				autoForwardCond.L.Unlock()
+				autoForwardCond.Broadcast()
+				if autoForward.IsSet() {
+					autoForwardCh <- struct{}{}
+				}
 			}
 
 			// 设置中间人插件
@@ -690,10 +753,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				utils.PrintCurrentGoroutineRuntimeStack()
 			}
 		}()
-		//如果需要劫持响应则需要处理来自req的锁
-		if httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest) {
-			defer mitmLock.Unlock()
-		}
 
 		/* 这儿比单纯劫持响应要简单的多了 */
 		originRspRaw := raw[:]
@@ -729,6 +788,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			RemoteAddr:  httpctx.GetRemoteAddr(req),
 			IsWebsocket: true,
 		}
+		defer func() {
+			if !autoForward.IsSet() {
+				respChan <- struct{}{}
+			}
+		}()
 		err = send(feedbackRspIns)
 		if err != nil {
 			log.Errorf("send response failed: %s", err)
@@ -785,12 +849,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 		}()
 		// 如果劫持响应就需要释放来自req的锁
-		if httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest) {
-			defer mitmLock.Unlock()
-		}
-		/*
-		   这里是调用 hijackHTTPResponse 的问题
-		*/
 		originRspRaw := rsp[:]
 
 		plainResponse := httpctx.GetPlainResponseBytes(req)
@@ -914,6 +972,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			log.Errorf("fix http response packet failed: %s", err)
 			return originRspRaw
 		}
+
 		feedbackRspIns := &ypb.MITMResponse{
 			ForResponse: true,
 			Response:    rsp,
@@ -921,6 +980,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			ResponseId:  responseCounter,
 			RemoteAddr:  remoteAddr,
 		}
+		defer func() {
+			if !autoForward.IsSet() {
+				respChan <- struct{}{} // 响应处理完毕，可以继续处理下一个请求了
+			}
+		}()
 		err = send(feedbackRspIns)
 		if err != nil {
 			log.Errorf("send response failed: %s", err)
@@ -929,6 +993,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 		httpctx.SetResponseViewedByUser(req)
 		for {
+			if autoForward.IsSet() {
+				return rsp
+			}
 			reqInstance, ok := <-messageChan
 			if !ok {
 				return rsp
@@ -986,11 +1053,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	}
 	handleHijackWsRequest := func(raw []byte, req *http.Request, rsp *http.Response, ts int64) (finalResult []byte) {
 		var shouldHijackResponse bool
-		mitmLock.Lock()
+		var shouldSendSignal bool
 		defer func() {
 			// 根据是否劫持响应来判断是否释放锁
-			if !shouldHijackResponse {
-				mitmLock.Unlock()
+			if shouldSendSignal && !autoForward.IsSet() {
+				shouldHijackRespChan <- shouldHijackResponse
 			}
 		}()
 		defer func() {
@@ -1035,7 +1102,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			log.Warnf("save to websocket flow failed: %s", err)
 		}
 
-		// MITM 手动劫持放行
+		// MITM 自动转发
 		if autoForward.IsSet() {
 			return raw
 		}
@@ -1048,6 +1115,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		//	encode = append(encode, "protobuf")
 		//}
 
+		reqChan <- struct{}{}
+		shouldSendSignal = true
 		counter := time.Now().UnixNano()
 		select {
 		case hijackingStream <- counter:
@@ -1118,7 +1187,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 				if reqInstance.GetHijackResponse() {
 					// 设置需要劫持resp
-					shouldHijackResponse = true // 设置不释放锁
+					shouldHijackResponse = true
 					httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest, true)
 					log.Infof("the ws hash: %s's mitm ws response is waiting for hijack response", wshash)
 				}
@@ -1143,11 +1212,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		})
 
 		var shouldHijackResponse bool
-		mitmLock.Lock()
+		var shouldSendSignal bool
 		defer func() {
-			// 根据是否劫持响应来判断是否释放锁
-			if !shouldHijackResponse {
-				mitmLock.Unlock()
+			if shouldSendSignal && !autoForward.IsSet() {
+				shouldHijackRespChan <- shouldHijackResponse
 			}
 		}()
 		// 保证始终只有一个 Goroutine 在处理请求
@@ -1264,6 +1332,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			return req
 		}
 
+		reqChan <- struct{}{} // 申请劫持
+		shouldSendSignal = true
 		// 开始劫持
 		counter := time.Now().UnixNano()
 		select {
@@ -1328,7 +1398,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 				if reqInstance.GetHijackResponse() {
 					// 设置需要劫持resp
-					shouldHijackResponse = true // 设置不释放锁
+					shouldHijackResponse = true
 					httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest, true)
 					hijackedPtr := fmt.Sprintf("%p", originReqIns)
 					log.Infof("the ptr: %v's mitm request is waiting for hijack response", hijackedPtr)
