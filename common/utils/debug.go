@@ -1,4 +1,4 @@
-package dap
+package utils
 
 import (
 	"fmt"
@@ -6,9 +6,6 @@ import (
 	"sort"
 	"strings"
 	"unsafe"
-
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 func SafeReflectValue(refV reflect.Value) reflect.Value {
@@ -37,8 +34,6 @@ func AsDebugString(i interface{}, raws ...bool) string {
 }
 
 func asDebugString(i interface{}, raw bool, pointers map[uintptr]struct{}) (ret string) {
-	spew.Sdump()
-
 	refV := reflect.ValueOf(i)
 	if !refV.IsValid() {
 		return fmt.Sprintf("%#v", i)
@@ -78,7 +73,7 @@ func asDebugString(i interface{}, raw bool, pointers map[uintptr]struct{}) (ret 
 			content[i] = fmt.Sprintf("%s: %s", asDebugString(key.Interface(), raw, pointers), asDebugString(refV.MapIndex(key).Interface(), raw, pointers))
 		}
 		return fmt.Sprintf("%T{%s}", i, strings.Join(content, ", "))
-	} else if f, ok := i.(*yakvm.Function); ok {
+	} else if f, ok := i.(fmt.Stringer); ok {
 		return fmt.Sprintf("%s", f.String())
 	} else if kind == reflect.Ptr {
 		// fix circle call
