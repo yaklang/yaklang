@@ -1,7 +1,5 @@
 package ssa
 
-import "fmt"
-
 type Position struct {
 	SourceCode  string
 	StartLine   int
@@ -11,7 +9,6 @@ type Position struct {
 }
 
 func (p *Position) InPosition(p2 *Position) bool {
-	fmt.Printf("debug %s <=> %s\n", p, p2)
 	if p.StartLine < p2.StartLine {
 		return false
 	}

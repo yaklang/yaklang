@@ -116,6 +116,13 @@ func (v *Value) GetType() *Type {
 	return Any
 }
 
+func (v *Value) GetTypeKind() ssa.TypeKind {
+	if n, ok := v.node.(ssa.TypedNode); ok {
+		return n.GetType().GetTypeKind()
+	}
+	return ssa.Any
+}
+
 func (v *Value) GetPosition() *ssa.Position {
 	return v.node.GetPosition()
 }
@@ -255,6 +262,6 @@ func (v *Value) IsIf() bool           { return v.node.GetOpcode() == ssa.OpIf }
 func (v *Value) IsLoop() bool         { return v.node.GetOpcode() == ssa.OpLoop }
 func (v *Value) IsSwitch() bool       { return v.node.GetOpcode() == ssa.OpSwitch }
 
-func GetBareInstructionNode(v *Value) ssa.InstructionNode {
+func GetBareNode(v *Value) ssa.InstructionNode {
 	return v.node
 }
