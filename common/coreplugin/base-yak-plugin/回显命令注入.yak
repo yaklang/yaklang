@@ -29,12 +29,12 @@ mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte
 
         // 构造一个随机字符串命令注入；这样会造成第一个cmd错误，导致 false||cmd2，执行第二个命令
         negativeValue = f`a${randstr(20)}`.Lower()
-        if checkBashExpr(negativeValue, param, "||", "") || checkWindowsCmdExpr(negativeValue, param, "||", "") {
+        if checkBashExpr(negativeValue, param, "||", "") || checkWindowsCmdExpr(negativeValue, param, "||", "") || checkWindowsPowershellExpr(negativeValue, param, "||", "") {
             return
         }
 
         // 使用原值构造命令注入，会造成第一个请求是正常的，导致 true&&cmd2 执行第二个命令
-        if checkBashExpr(originValue, param, "&&", "") || checkWindowsCmdExpr(negativeValue, param, "||", "") {
+        if checkBashExpr(originValue, param, "&&", "") || checkWindowsCmdExpr(negativeValue, param, "||", "")  || checkWindowsPowershellExpr(negativeValue, param, "||", "") {
             return
         }
 
@@ -70,6 +70,34 @@ checkBashExpr = (prefix, param, boundrayPrefix, boundraySuffix) => {
     return false
 }
 
+checkWindowsPowershellExpr = (prefix, param, boundaryPrefix, boundarySuffix) => {
+    for boundary in [
+        [";", ""],                        // multi stmts
+        [boundaryPrefix, boundarySuffix], // powershell 7+ || && available
+    ] {
+        result = fuzz.FuzzCalcExprInt32Safe()
+        try {
+            payload := prefix + f"${boundary[0]} ${result.num1}-${result.num2} ${boundary[1]}"
+            rsp := param.Fuzz(payload).ExecFirst()~
+            rspRaw = string(rsp.ResponseRaw)
+            if result.result in rspRaw {
+                risk.NewRisk(
+                    rsp.Url,
+                    risk.title("Command Injection in %v (%v: %v)" % [rsp.Url, param.Position(), param.Name()]),
+                    risk.titleVerbose(f"命令注入：${rsp.Url} (${param.Position()}: ${param.Name()})"),
+                    risk.severity("critical"),
+                    risk.type("command-injection"), risk.typeVerbose("命令注入"),
+                    risk.request(rsp.RequestRaw), risk.response(rsp.ResponseRaw),
+                    risk.payload(f`PAYLOAD: ${payload} EXPECT: ${result.result}`), risk.parameter(param.String()),
+                )
+                return true
+            }
+        } catch err {
+            dump(err)
+        }
+    }
+    return false
+}
 
 checkWindowsCmdExpr = (prefix, param, boundrayPrefix, boundraySuffix) => {
     for boundary in [
