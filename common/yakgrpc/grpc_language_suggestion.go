@@ -32,8 +32,33 @@ var (
 	mapBuiltinMethodSuggestions      = make([]*ypb.SuggestionDescription, 0, len(mapBuiltinMethod))
 	sliceBuiltinMethodSuggestions    = make([]*ypb.SuggestionDescription, 0, len(sliceBuiltinMethod))
 
+	yakKeywords = []string{
+		"break", "case", "continue", "default", "defer", "else",
+		"for", "go", "if", "range", "return", "select", "switch",
+		"chan", "func", "fn", "def", "var", "nil", "undefined",
+		"map", "class", "include", "type", "bool", "true", "false",
+		"string", "try", "catch", "finally", "in",
+	}
+
 	standardLibrarySuggestions = make([]*ypb.SuggestionDescription, 0, len(doc.DefaultDocumentHelper.Libs))
+	yakKeywordSuggestions      = make([]*ypb.SuggestionDescription, 0)
 )
+
+func getLanguageKeywordSuggestions() []*ypb.SuggestionDescription {
+	// 懒加载
+	if len(yakKeywordSuggestions) == 0 {
+		for _, keyword := range yakKeywords {
+			yakKeywordSuggestions = append(yakKeywordSuggestions, &ypb.SuggestionDescription{
+				Label:       keyword,
+				InsertText:  keyword,
+				Description: "Language Keyword",
+				Kind:        "Keyword",
+			})
+		}
+	}
+
+	return yakKeywordSuggestions
+}
 
 func getStringBuiltinMethodSuggestions() []*ypb.SuggestionDescription {
 	// 懒加载
@@ -126,10 +151,26 @@ func getStandardLibrarySuggestions() []*ypb.SuggestionDescription {
 	return standardLibrarySuggestions
 }
 
-func getFuncDeclByFuncName(totalFuncName string) *yakdoc.FuncDecl {
-	libName, funcName := "", totalFuncName
-	if strings.Contains(totalFuncName, ".") {
-		splited := strings.Split(totalFuncName, ".")
+func getVscodeSnippetsBySSAValue(funcName string, v *ssaapi.Value) string {
+	snippet := funcName
+	fun, ok := ssa.ToFunction(ssaapi.GetBareNode(v))
+	if !ok {
+		return snippet
+	}
+	snippet += "("
+	snippet += strings.Join(
+		lo.Map(fun.Param, func(p *ssa.Parameter, i int) string { return fmt.Sprintf("${%d:%s}", i+1, p.GetType()) }),
+		", ",
+	)
+	snippet += ")"
+
+	return snippet
+}
+
+func getFuncDeclByName(name string) *yakdoc.FuncDecl {
+	libName, funcName := "", name
+	if strings.Contains(name, ".") {
+		splited := strings.Split(name, ".")
 		libName, funcName = splited[0], splited[1]
 	}
 
@@ -150,8 +191,36 @@ func getFuncDeclByFuncName(totalFuncName string) *yakdoc.FuncDecl {
 	return nil
 }
 
+func getInstanceByName(name string) *yakdoc.LibInstance {
+	libName, instanceName := "", name
+	if strings.Contains(name, ".") {
+		splited := strings.Split(name, ".")
+		libName, instanceName = splited[0], splited[1]
+	}
+
+	instances := doc.DefaultDocumentHelper.Instances
+
+	if libName != "" {
+		lib, ok := doc.DefaultDocumentHelper.Libs[libName]
+		if !ok {
+			return nil
+		}
+		instances = lib.Instances
+	}
+	instance, ok := instances[instanceName]
+	if ok {
+		return instance
+	}
+
+	return nil
+}
+
 func getGolangTypeStringBySSAType(typ ssa.Type) string {
 	typStr := typ.String()
+	return getGolangTypeStringByTypeStr(typStr)
+}
+
+func getGolangTypeStringByTypeStr(typStr string) string {
 	switch typStr {
 	case "boolean":
 		return "bool"
@@ -165,22 +234,38 @@ func shouldExport(key string) bool {
 	return (key[0] >= 'A' && key[0] <= 'Z')
 }
 
-func getFuncDescByFuncDecl(funcDecl *yakdoc.FuncDecl, typStr string) string {
+func getFuncDeclDesc(funcDecl *yakdoc.FuncDecl, typStr string) string {
 	desc := fmt.Sprintf("```go\nfunc %s\n```\n\n%s", funcDecl.Decl, funcDecl.Document)
 	desc = strings.Replace(desc, "func(", typStr+"(", 1)
 	desc = yakdoc.ShrinkTypeVerboseName(desc)
 	return desc
 }
 
-func getFuncDeclsByWord(word string, containPoint bool) map[string]*yakdoc.FuncDecl {
+func getInstanceDesc(instance *yakdoc.LibInstance) string {
+	desc := fmt.Sprintf("```go\nconst %s %s = %s\n```", instance.InstanceName, getGolangTypeStringByTypeStr(instance.Type), instance.ValueStr)
+	desc = yakdoc.ShrinkTypeVerboseName(desc)
+	return desc
+}
+
+func getFuncTypeDesc(funcTyp *ssa.FunctionType, funcName string) string {
+	if funcTyp.Name != "" {
+		funcName = funcTyp.Name
+	}
+	desc := fmt.Sprintf("```go\nfunc %s(%s) %s\n```", funcName, strings.Join(lo.Map(funcTyp.Parameter, func(t ssa.Type, i int) string { return fmt.Sprintf("r%d %s", i, t) }), ", "), funcTyp.ReturnType)
+	desc = yakdoc.ShrinkTypeVerboseName(desc)
+	return desc
+}
+
+func getInstancesAndFuncDecls(word string, containPoint bool) (map[string]*yakdoc.LibInstance, map[string]*yakdoc.FuncDecl) {
 	if containPoint {
-		lib, ok := doc.DefaultDocumentHelper.Libs[strings.Split(word, ".")[0]]
+		libName := strings.Split(word, ".")[0]
+		lib, ok := doc.DefaultDocumentHelper.Libs[libName]
 		if !ok {
-			return nil
+			return nil, nil
 		}
-		return lib.Functions
+		return lib.Instances, lib.Functions
 	} else {
-		return doc.DefaultDocumentHelper.Functions
+		return nil, doc.DefaultDocumentHelper.Functions
 	}
 }
 
@@ -252,10 +337,11 @@ func getBuiltinFuncDeclAndDoc(name string, bareTyp ssa.Type) (desc string, doc s
 
 func getFuncDeclAndDocBySSAValue(name string, v *ssaapi.Value) (desc string, document string) {
 	// 标准库函数
-	funcDecl := getFuncDeclByFuncName(name)
+	funcDecl := getFuncDeclByName(name)
 	if funcDecl != nil {
 		return yakdoc.ShrinkTypeVerboseName(funcDecl.Decl), funcDecl.Document
 	}
+
 	lastName := name
 	if strings.Contains(lastName, ".") {
 		lastName = lastName[strings.LastIndex(lastName, ".")+1:]
@@ -271,9 +357,24 @@ func getFuncDeclAndDocBySSAValue(name string, v *ssaapi.Value) (desc string, doc
 			return yakdoc.ShrinkTypeVerboseName(funcDecl.Decl), funcDecl.Document
 		}
 	}
+	// 用户自定义函数
+	if bareTyp.GetTypeKind() == ssa.FunctionTypeKind {
+		funcTyp, ok := ssa.ToFunctionType(bareTyp)
+		if ok {
+			desc = getFuncTypeDesc(funcTyp, lastName)
+			desc = strings.TrimLeft(desc, "```go ")
+			desc = strings.TrimRight(desc, "```")
+			return
+		}
+	}
 
 	// 内置方法
-	return getBuiltinFuncDeclAndDoc(lastName, bareTyp)
+	desc, document = getBuiltinFuncDeclAndDoc(lastName, bareTyp)
+	if desc != "" {
+		return
+	}
+
+	return
 }
 
 func getDescFromSSAValue(name string, v *ssaapi.Value) string {
@@ -289,10 +390,22 @@ func getDescFromSSAValue(name string, v *ssaapi.Value) string {
 	if !nameContainsPoint {
 		switch bareTyp.GetTypeKind() {
 		case ssa.FunctionTypeKind:
-			funcDecl := getFuncDeclByFuncName(name)
+			// 标准库函数
+			funcDecl := getFuncDeclByName(name)
 			if funcDecl != nil {
-				desc = getFuncDescByFuncDecl(funcDecl, typStr)
+				desc = getFuncDeclDesc(funcDecl, typStr)
 			}
+			// 用户自定义函数
+			funcTyp, ok := ssa.ToFunctionType(bareTyp)
+			if !ok {
+				break
+			}
+
+			lastName := name
+			if strings.Contains(lastName, ".") {
+				lastName = lastName[strings.LastIndex(lastName, ".")+1:]
+			}
+			desc = getFuncTypeDesc(funcTyp, lastName)
 		case ssa.StructTypeKind:
 			rTyp, ok := bareTyp.(*ssa.ObjectType)
 			if !ok {
@@ -341,9 +454,14 @@ func getDescFromSSAValue(name string, v *ssaapi.Value) string {
 		lastName := name[strings.LastIndex(name, ".")+1:]
 		if v.IsExtern() {
 			// 标准库函数
-			funcDecl := getFuncDeclByFuncName(name)
+			funcDecl := getFuncDeclByName(name)
 			if funcDecl != nil {
-				desc = getFuncDescByFuncDecl(funcDecl, lastName)
+				desc = getFuncDeclDesc(funcDecl, lastName)
+			}
+			// 标准库常量
+			instance := getInstanceByName(name)
+			if instance != nil {
+				desc = getInstanceDesc(instance)
 			}
 		} else {
 			// 结构体 / 接口方法
@@ -351,7 +469,7 @@ func getDescFromSSAValue(name string, v *ssaapi.Value) string {
 			if ok {
 				funcDecl, ok := lib.Functions[lastName]
 				if ok {
-					desc = getFuncDescByFuncDecl(funcDecl, lastName)
+					desc = getFuncDeclDesc(funcDecl, lastName)
 				}
 			} else {
 				// 内置方法
@@ -431,7 +549,6 @@ func trimSourceCode(sourceCode string) (string, bool) {
 	return sourceCode, containPoint
 }
 
-// todo: 存在如 freq.FuzzCookie 这种拿不到签名，这是因为 SSA 无法找到这个值
 func OnHover(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionRequest) (ret []*ypb.SuggestionDescription) {
 	ret = make([]*ypb.SuggestionDescription, 0)
 	position := GrpcRangeToPosition(req.GetRange())
@@ -452,12 +569,12 @@ func OnHover(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionRequest) (r
 	return ret
 }
 
-// todo: 存在如 freq.FuzzCookie 这种拿不到签名，这是因为 SSA 无法找到这个值
 func OnSignature(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionRequest) (ret []*ypb.SuggestionDescription) {
 	ret = make([]*ypb.SuggestionDescription, 0)
 	position := GrpcRangeToPosition(req.GetRange())
 	word, _ := trimSourceCode(position.SourceCode)
 	v := getSSAParentValueByPosition(prog, word, position)
+	// fallback
 	if v == nil {
 		v = getSSAValueByPosition(prog, word, position)
 		if v == nil {
@@ -479,15 +596,48 @@ func OnSignature(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionRequest
 func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionRequest) (ret []*ypb.SuggestionDescription) {
 	ret = make([]*ypb.SuggestionDescription, 0)
 	position := GrpcRangeToPosition(req.GetRange())
-
 	word, containPoint := trimSourceCode(position.SourceCode)
-	// 库补全
+	v := getSSAParentValueByPosition(prog, word, position)
 	if !containPoint {
+		// 库补全
 		ret = append(ret, getStandardLibrarySuggestions()...)
+		// 关键字补全
+		ret = append(ret, getLanguageKeywordSuggestions()...)
+		// 用户自定义变量补全
+		for id, values := range prog.GetALlSymbols() {
+			// todo: 需要更严谨的过滤
+			values = values.Filter(func(value *ssaapi.Value) bool {
+				line := value.GetPosition().StartLine
+				if line < position.StartLine {
+					return true
+				} else if line == position.StartLine {
+					return id != word
+				}
+				return false
+			})
+			if len(values) == 0 {
+				continue
+			}
+			// todo: 需要更严谨的处理
+			values = sortValuesByPosition(values, position)
+			v := values[0]
+			insertText := id
+			vKind := "Variable"
+			if v.IsFunction() {
+				vKind = "Function"
+				insertText = getVscodeSnippetsBySSAValue(id, v)
+			}
+			ret = append(ret, &ypb.SuggestionDescription{
+				Label:       id,
+				Description: "",
+				InsertText:  insertText,
+				Kind:        vKind,
+			})
+		}
 	}
 
 	// 库函数补全
-	funcDecls := getFuncDeclsByWord(word, containPoint)
+	instances, funcDecls := getInstancesAndFuncDecls(word, containPoint)
 	if funcDecls != nil {
 		for _, decl := range funcDecls {
 			ret = append(ret, &ypb.SuggestionDescription{
@@ -498,13 +648,23 @@ func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionReques
 			})
 		}
 	}
+	// 库常量补全
+	if len(instances) > 0 {
+		for _, instance := range instances {
+			ret = append(ret, &ypb.SuggestionDescription{
+				Label:       instance.InstanceName,
+				Description: "",
+				InsertText:  instance.InstanceName,
+				Kind:        "Constant",
+			})
+		}
+	}
 
 	// 结构体成员补全
 	if !containPoint {
 		return ret
 	}
 
-	v := getSSAParentValueByPosition(prog, word, position)
 	if v == nil {
 		return ret
 	}
@@ -581,6 +741,38 @@ func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionReques
 	case ssa.MapTypeKind:
 		// map 内置方法
 		ret = append(ret, getMapBuiltinMethodSuggestions()...)
+
+		// map 成员
+		filterMap := make(map[string]struct{})
+		v.GetUsers().Filter(func(u *ssaapi.Value) bool {
+			return u.IsField() && u.GetPosition().StartLine <= position.StartLine
+		}).ForEach(func(v *ssaapi.Value) {
+			key := v.GetOperand(1)
+			if _, ok := filterMap[key.String()]; ok {
+				return
+			}
+			ret = append(ret, &ypb.SuggestionDescription{
+				Label:       key.String(),
+				Description: "",
+				InsertText:  key.String(),
+				Kind:        "Field",
+			})
+			filterMap[key.String()] = struct{}{}
+		})
+
+		// mapTyp, ok := ssa.ToObjectType(bareTyp)
+		// if !ok {
+		// 	break
+		// }
+		// _ = mapTyp
+		// for _, key := range mapTyp.Keys {
+		// 	ret = append(ret, &ypb.SuggestionDescription{
+		// 		Label:       key.String(),
+		// 		Description: "",
+		// 		InsertText:  key.String(),
+		// 		Kind:        "Field",
+		// 	})
+		// }
 	case ssa.String:
 		// string 内置方法
 		ret = append(ret, getStringBuiltinMethodSuggestions()...)
@@ -605,6 +797,7 @@ func (s *Server) YaklangLanguageSuggestion(ctx context.Context, req *ypb.Yaklang
 	if prog == nil {
 		return nil, errors.New("ssa parse error")
 	}
+	// todo: 处理YakScriptType，不同语言的补全、提示可能有不同
 	switch req.InspectType {
 	case "completion":
 		ret.SuggestionMessage = OnCompletion(prog, req)

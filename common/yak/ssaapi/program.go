@@ -32,11 +32,24 @@ func (p *Program) Ref(name string) Values {
 					tmp[value] = struct{}{}
 				}
 			}
-			// ret = lo.Uniq(append(ret, fun.GetValuesByName(name)...))
 		})
 	})
 
 	return getValuesWithUpdate(ret)
+}
+
+func (p *Program) GetALlSymbols() map[string]Values {
+	ret := make(map[string]Values, 0)
+	for _, pkg := range p.Packages {
+		for _, fun := range pkg.Funcs {
+			for id, values := range fun.GetAllSymbols() {
+				for _, v := range values {
+					ret[id] = append(ret[id], NewValue(v))
+				}
+			}
+		}
+	}
+	return ret
 }
 
 func getValuesWithUpdateSingle(v *Value) Values {
