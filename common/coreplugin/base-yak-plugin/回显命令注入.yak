@@ -23,7 +23,7 @@ mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte
             originValue = sprint(param.Value())
         }
 
-        if originValue.Lower() in ["submit", "提交"] && "submit" == param.Name().Lower() {
+        if "submit" == param.Name().Lower() {
             continue
         }
 
