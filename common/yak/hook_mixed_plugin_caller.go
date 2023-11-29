@@ -608,7 +608,7 @@ func calcWebsitePathParamsHash(urlIns *url.URL, host, port interface{}, req []by
 		params = append(params, utils.CalcMd5(r.Position(), r.Name()))
 	}
 	sort.Strings(params)
-	return utils.CalcSha1(urlIns.Scheme, host, port, strings.Join(params, ","), "path-params")
+	return utils.CalcSha1(urlIns.Scheme, freq.GetMethod(), host, port, strings.Join(params, ","), "path-params")
 }
 
 func calcWebsitePathHash(urlIns *url.URL, host, port interface{}, req []byte) string {
@@ -616,7 +616,7 @@ func calcWebsitePathHash(urlIns *url.URL, host, port interface{}, req []byte) st
 	if err != nil {
 		return ""
 	}
-	return utils.CalcSha1(urlIns.Scheme, host, port, utils.CalcMd5(freq.GetMethod(), freq.GetPathWithoutQuery()), "path")
+	return utils.CalcSha1(urlIns.Scheme, freq.GetMethod(), host, port, utils.CalcMd5(freq.GetMethod(), freq.GetPathWithoutQuery()), "path")
 }
 
 var ttlHTTPRequestCache = ttlcache.NewCache()
@@ -643,10 +643,7 @@ func calcNewWebsiteHash(urlIns *url.URL, host, port interface{}, req []byte) str
 	if err != nil {
 		return ""
 	}
-	var params []string
-	params = append(params, utils.CalcMd5(freq.GetMethod()))
-	sort.Strings(params)
-	return utils.CalcSha1(urlIns.Scheme, host, port, strings.Join(params, ","), "new-website")
+	return utils.CalcSha1(urlIns.Scheme, host, port, freq.GetMethod(), "new-website")
 }
 
 func (m *MixPluginCaller) HandleServiceScanResult(r *fp.MatchResult) {
