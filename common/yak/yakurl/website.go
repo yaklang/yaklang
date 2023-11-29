@@ -1,10 +1,12 @@
 package yakurl
 
 import (
+	"encoding/json"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/url"
@@ -13,40 +15,67 @@ import (
 )
 
 type websiteFromHttpFlow struct {
+	yakit.HTTPFlow
+}
+
+func parseQueryToRequest(db *gorm.DB, query string) *gorm.DB {
+	var req ypb.QueryHTTPFlowRequest
+
+	if err := json.Unmarshal([]byte(query), &req); err != nil {
+		spew.Dump(req)
+		return yakit.BuildHTTPFlowQuery(db, &req)
+	}
+	return db
 }
 
 func (f *websiteFromHttpFlow) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	u := params.GetUrl()
 
-	db := consts.GetGormProjectDatabase()
-	db = db.Model(&yakit.HTTPFlow{})
 	var query = make(url.Values)
 	for _, v := range u.GetQuery() {
 		query.Add(v.GetKey(), v.GetValue())
 	}
 
 	var websiteRoot = u.GetLocation()
+
+	db := consts.GetGormProjectDatabase()
+	db = db.Model(&yakit.HTTPFlow{})
+
+	if ret := query.Get("params"); ret != "" {
+		db = parseQueryToRequest(db, ret)
+	}
+
 	if ret := query.Get("schema"); ret != "" {
 		db = yakit.FilterHTTPFlowBySchema(db, ret)
 		websiteRoot = ret + "://" + websiteRoot
 	}
-	// 临时过滤一下 404、502
-	db = bizhelper.ExactQueryExcludeStringArrayOr(db, "status_code", utils.PrettifyListFromStringSplited("404,502", ","))
-
-	if filterType := query.Get("filter"); filterType != "" {
-		db = bizhelper.ExactQueryStringArrayOr(db, "source_type", utils.PrettifyListFromStringSplited(filterType, ","))
+	isQuery := false
+	if ret := query.Get("query"); ret != "" {
+		isQuery = true
+		if u.GetLocation() != "" {
+			db = yakit.FilterHTTPFlowByDomain(db, u.GetLocation())
+		}
 	}
 
-	if u.GetLocation() == "" {
+	if u.GetLocation() == "" || isQuery {
 		var res []*ypb.YakURLResource
 		for _, result := range yakit.GetHTTPFlowDomainsByDomainSuffix(db, u.GetLocation()) {
+
+			var urlstr, location string
+			if strings.HasPrefix(result.NextPart, result.Schema) {
+				urlstr = result.NextPart
+				location = strings.TrimPrefix(result.NextPart, result.Schema+"://")
+			} else {
+				urlstr = fmt.Sprintf("%v://%v", result.Schema, result.NextPart)
+				location = result.NextPart
+			}
 			newParam := &ypb.YakURL{
 				Schema:   u.GetSchema(),
-				Location: result.NextPart,
+				Location: location,
 				Path:     "/",
 				Query:    []*ypb.KVPair{{Key: "schema", Value: result.Schema}},
 			}
-			urlstr := fmt.Sprintf("%v://%v", result.Schema, result.NextPart)
+
 			res = append(res, &ypb.YakURLResource{
 				ResourceType:      "dir",
 				VerboseType:       "filesystem-directory",
