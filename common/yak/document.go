@@ -170,6 +170,7 @@ func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.Doc
 			extLib := &yakdoc.ScriptLib{
 				Name:      name,
 				Functions: make(map[string]*yakdoc.FuncDecl),
+				Instances: make(map[string]*yakdoc.LibInstance),
 			}
 			extLibs = append(extLibs, extLib)
 			helper.Libs[extLib.Name] = extLib
@@ -196,7 +197,7 @@ func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.Doc
 						extLib.Name, elementName,
 						methodType, value,
 					)
-					extLib.LibsInstances = append(extLib.LibsInstances, item)
+					extLib.Instances[elementName] = item
 					extLib.ElementDocs = append(extLib.ElementDocs, item.String())
 				}
 			}

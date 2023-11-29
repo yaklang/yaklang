@@ -291,10 +291,10 @@ func (i *LibInstance) String() string {
 }
 
 type ScriptLib struct {
-	Name          string
-	LibsInstances []*LibInstance
-	Functions     map[string]*FuncDecl
-	ElementDocs   []string
+	Name        string
+	Instances   map[string]*LibInstance
+	Functions   map[string]*FuncDecl
+	ElementDocs []string
 }
 
 func (l *ScriptLib) String() string {
