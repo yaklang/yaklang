@@ -157,9 +157,21 @@ func getVscodeSnippetsBySSAValue(funcName string, v *ssaapi.Value) string {
 	if !ok {
 		return snippet
 	}
+	funTyp, ok := ssa.ToFunctionType(fun.GetType())
+	lenOfParams := len(funTyp.Parameter)
+	if !ok {
+		return snippet
+	}
 	snippet += "("
 	snippet += strings.Join(
-		lo.Map(fun.Param, func(p *ssa.Parameter, i int) string { return fmt.Sprintf("${%d:%s}", i+1, p.GetType()) }),
+		lo.Map(funTyp.Parameter, func(typ ssa.Type, i int) string {
+			if i == lenOfParams-1 && funTyp.IsVariadic {
+				typStr := typ.String()
+				typStr = strings.TrimLeft(typStr, "[]")
+				return fmt.Sprintf("${%d:...%s}", i+1, typStr)
+			}
+			return fmt.Sprintf("${%d:%s}", i+1, typ)
+		}),
 		", ",
 	)
 	snippet += ")"
@@ -251,7 +263,17 @@ func getFuncTypeDesc(funcTyp *ssa.FunctionType, funcName string) string {
 	if funcTyp.Name != "" {
 		funcName = funcTyp.Name
 	}
-	desc := fmt.Sprintf("```go\nfunc %s(%s) %s\n```", funcName, strings.Join(lo.Map(funcTyp.Parameter, func(t ssa.Type, i int) string { return fmt.Sprintf("r%d %s", i, t) }), ", "), funcTyp.ReturnType)
+	lenOfParams := len(funcTyp.Parameter)
+	desc := fmt.Sprintf("```go\nfunc %s(%s) %s\n```", funcName, strings.Join(lo.Map(
+		funcTyp.Parameter, func(typ ssa.Type, i int) string {
+			if i == lenOfParams-1 && funcTyp.IsVariadic {
+				typStr := typ.String()
+				typStr = strings.TrimLeft(typStr, "[]")
+				return fmt.Sprintf("r%d ...%s", i+1, typStr)
+			}
+			return fmt.Sprintf("r%d %s", i+1, typ)
+		}),
+		", "), funcTyp.ReturnType)
 	desc = yakdoc.ShrinkTypeVerboseName(desc)
 	return desc
 }
@@ -607,7 +629,11 @@ func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionReques
 		for id, values := range prog.GetALlSymbols() {
 			// todo: 需要更严谨的过滤
 			values = values.Filter(func(value *ssaapi.Value) bool {
-				line := value.GetPosition().StartLine
+				position2 := value.GetPosition()
+				if position2 == nil {
+					return false
+				}
+				line := position2.StartLine
 				if line < position.StartLine {
 					return true
 				} else if line == position.StartLine {
