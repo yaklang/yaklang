@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -357,4 +358,62 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
 	if !cPass {
 		panic("c should pass")
 	}
+}
+
+func TestFuzzPacket(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+	ctx := context.Background()
+	fuzz := func(targetUrl string, cfg *ypb.DebugPluginRequest) map[string]any {
+		stream, err := client.DebugPlugin(ctx, cfg)
+		if err != nil {
+			panic(err)
+		}
+		res := map[string]any{}
+		for {
+			rsp, err := stream.Recv()
+			if err != nil {
+				break
+			}
+			err = json.Unmarshal(rsp.Message, &res)
+			if err != nil {
+				panic(err)
+			}
+			res["a"] = rsp.Raw
+		}
+		return res
+	}
+
+	host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+
+	})
+
+	// 测试 https 覆盖
+	//for i, testCase := range []struct {
+	//	url    string
+	//	expect []string
+	//}{
+	//	{
+	//		url: "http://www.example.com/",
+	//	},
+	//} {
+	//
+	//}
+
+	var targetUrl = "http://" + utils.HostPort(host, port) + "/c?c=1"
+	res := fuzz(targetUrl, &ypb.DebugPluginRequest{
+		Code: `
+res = {}
+res["reqs"] = REQUESTS
+yakit.Output(res)
+`,
+		PluginType: "mitm",
+		HTTPRequestTemplate: &ypb.HTTPRequestBuilderParams{
+			Path: []string{"a?a=1", "b?b=1"},
+		},
+		Input: targetUrl,
+	})
+	spew.Dump(res)
 }
