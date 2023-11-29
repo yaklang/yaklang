@@ -119,6 +119,11 @@ func init() {
 			withPluginHelp("检测开放 URL 重定向漏洞，可检查 meta / js / location 中的内容"),
 			withPluginAuthors("Rookie"),
 		)
+		registerBuildInPlugin(
+			"mitm", "回显命令注入",
+			withPluginHelp("检测回显型命令注入漏洞（不检测 Cookie 中的命令注入）"),
+			withPluginAuthors("V1ll4n"),
+		)
 		return nil
 	})
 }
