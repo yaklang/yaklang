@@ -933,18 +933,13 @@ func QuickSearchMITMHTTPFlowCount(token string) int {
 	return count
 }
 
-func QueryHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) (paging *bizhelper.Paginator, ret []*HTTPFlow, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Error(r)
-			utils.PrintCurrentGoroutineRuntimeStack()
-		}
-	}()
+// BuildHTTPFlowQuery 构建带有过滤条件的查询
+func BuildHTTPFlowQuery(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
+	// 应用所有过滤条件
 	if params == nil {
 		params = &ypb.QueryHTTPFlowRequest{}
 	}
 
-	db = db.Model(&HTTPFlow{}) //.Debug()
 	if !params.GetFull() {
 		// 只查询部分字段，主要是为了处理大的 response 和 request 的情况，同时告诉用户
 		// max request size is 200K -> 200 * 1024 -> 204800
@@ -1020,19 +1015,31 @@ too_large_response_header_file, too_large_response_body_file
 
 	db = FilterHTTPFlow(db, params)
 
+	return db
+}
+
+func QueryHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) (paging *bizhelper.Paginator, ret []*HTTPFlow, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error(r)
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
+	queryDB := BuildHTTPFlowQuery(db.Model(&HTTPFlow{}), params)
+
 	var rets []*HTTPFlow
 
 	if params.OffsetId > 0 {
-		db1 := db
-		if p.Order == "desc" {
+		db1 := queryDB
+		if params.Pagination.Order == "desc" {
 			db1 = db.Where("id < ?", params.OffsetId)
 		} else {
 			db1 = db.Where("id > ?", params.OffsetId)
 		}
-		db1.Limit(int(p.Limit)).Offset(0).Scan(&ret)
-		paging, db = bizhelper.Paging(db, int(p.Page), int(p.Limit), &rets)
+		db1.Limit(int(params.Pagination.Limit)).Offset(0).Scan(&ret)
+		paging, db = bizhelper.Paging(queryDB, int(params.Pagination.Page), int(params.Pagination.Limit), &rets)
 	} else {
-		paging, db = bizhelper.Paging(db, int(p.Page), int(p.Limit), &ret)
+		paging, db = bizhelper.Paging(queryDB, int(params.Pagination.Page), int(params.Pagination.Limit), &ret)
 	}
 
 	if db.Error != nil {
