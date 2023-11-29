@@ -541,6 +541,15 @@ func init() {
 		Description: "使用正则生成所有可能的字符",
 	})
 	AddFuzzTagToGlobal(&FuzzTagDescription{
+		TagName: "regen:one",
+		Handler: func(s string) []string {
+			return []string{regen.MustGenerateOne(s)}
+		},
+		Alias:       []string{"re:one"},
+		Description: "使用正则生成所有可能的字符中的随机一个",
+		IsDyn:       true,
+	})
+	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "rangechar",
 		Handler: func(s string) []string {
 			var min byte = 0
