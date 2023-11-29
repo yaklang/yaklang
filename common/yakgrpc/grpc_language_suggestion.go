@@ -142,6 +142,7 @@ func getStandardLibrarySuggestions() []*ypb.SuggestionDescription {
 		for libName := range doc.DefaultDocumentHelper.Libs {
 			standardLibrarySuggestions = append(standardLibrarySuggestions, &ypb.SuggestionDescription{
 				Label:       libName,
+				InsertText:  libName,
 				Description: "Standard Library",
 				Kind:        "Module",
 			})
