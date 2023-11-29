@@ -78,6 +78,7 @@ func Parse(code string, opts ...Option) *Program {
 	}
 	hash := utils.CalcSha1(code, config.language)
 	if prog, ok := ttlSSAParseCache.Get(hash); ok {
+		ttlSSAParseCache.SetWithTTL(hash, prog, 30*time.Minute) // refresh
 		return prog.(*Program)
 	}
 
