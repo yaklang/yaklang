@@ -14,7 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"net/url"
+	netURL "net/url"
 	"strings"
 )
 
@@ -44,7 +44,12 @@ func (s *Server) execScript(scriptName string, targetInput string, stream sender
 			Path:   []string{"/"},
 		}
 	}
-
+	uIns, err := netURL.Parse(targetInput)
+	if err == nil {
+		if !utils.StringArrayContains(builderParams.Path, uIns.Path) {
+			builderParams.Path = append(builderParams.Path, uIns.Path)
+		}
+	}
 	scriptInstance, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), scriptName)
 	if err != nil {
 		return err
@@ -76,7 +81,7 @@ func (s *Server) execScript(scriptName string, targetInput string, stream sender
 		})
 	}
 	var results = builderResponse.GetResults()
-	if len(results) <= 0 {
+	if len(results) <= 0 { // 请求模板构造失败时直接用get请求目标
 		var templates = []byte("GET / HTTP/1.1\r\nHost: {{Hostname}}\r\n\r\n")
 		for _, res := range utils.PrettifyListFromStringSplitEx(targetInput, "\n", "|", ",") {
 			res = strings.TrimSpace(res)
@@ -125,35 +130,17 @@ func (s *Server) execScript(scriptName string, targetInput string, stream sender
 
 				var targetAddr string
 				https := i.GetIsHttps()
-				if port != 0 {
-					if https && port != 443 {
-						targetAddr = utils.HostPort(host, port)
-					} else if !https && port != 80 {
-						targetAddr = utils.HostPort(host, port)
-					}
+				if strings.HasPrefix(res, "http://") || strings.HasPrefix(res, "https://") { // 优先级高于模板packet
+					https = strings.HasPrefix(res, "https://")
+				}
+				if port != 0 && (https && port != 443 || !https && port != 80) {
+					targetAddr = utils.HostPort(host, port)
 				} else {
 					targetAddr = host
 				}
 
-				var handledRaw = bytes.ReplaceAll(i.HTTPRequest, []byte(`{{Hostname}}`), []byte(targetAddr))
-				if strings.HasPrefix(res, "http://") || strings.HasPrefix(res, "https://") {
-					https = strings.HasPrefix(res, "https://")
-					u, _ := url.Parse(res)
-					if u != nil && u.Path != "" && u.Path != "/" {
-						https, packet, err := lowhttp.ParseUrlToHttpRequestRaw("GET", res)
-						if err != nil {
-							log.Warnf("Parse %v to packet failed: %s", res, err)
-							continue
-						}
-						feed(packet, https)
-					}
-				}
-
-				if (https && port != 443) || (!https && port != 80) {
-					feed(handledRaw, https)
-					continue
-				}
-				feed(bytes.ReplaceAll(i.HTTPRequest, []byte(`{{Hostname}}`), []byte(host)), https)
+				packet := bytes.ReplaceAll(i.HTTPRequest, []byte(`{{Hostname}}`), []byte(targetAddr))
+				feed(packet, https)
 			}
 		})
 	}
