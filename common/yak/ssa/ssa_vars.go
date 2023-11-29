@@ -19,7 +19,7 @@ func (r *InspectVariableResult) Merge(other *InspectVariableResult) {
 }
 
 func (p *Program) InspectVariableLast(varName string) *InspectVariableResult {
-	var result = new(InspectVariableResult)
+	result := new(InspectVariableResult)
 	for _, pkg := range p.Packages {
 		for _, funcIns := range pkg.Funcs {
 			if res, ok := funcIns.symbolTable[varName]; ok {
@@ -35,7 +35,7 @@ func (p *Program) InspectVariableLast(varName string) *InspectVariableResult {
 }
 
 func (p *Program) InspectVariable(varName string) *InspectVariableResult {
-	var result = new(InspectVariableResult)
+	result := new(InspectVariableResult)
 	result.VariableName = varName
 
 	for _, pkg := range p.Packages {
@@ -47,7 +47,7 @@ func (p *Program) InspectVariable(varName string) *InspectVariableResult {
 }
 
 func (f *Function) InspectVariable(varName string) *InspectVariableResult {
-	var result = new(InspectVariableResult)
+	result := new(InspectVariableResult)
 	result.VariableName = varName
 
 	if f == nil || f.symbolTable == nil {
@@ -67,6 +67,17 @@ func (f *Function) InspectVariable(varName string) *InspectVariableResult {
 	result.ProbablyTypes = probablyTypes
 	result.ProbablyValues = probablyValue
 	return result
+}
+
+func (f *Function) GetAllSymbols() map[string]Values {
+	ret := make(map[string]Values, 0)
+	for id, table := range f.symbolTable {
+		ret[id] = make(Values, 0)
+		for _, values := range table {
+			ret[id] = append(ret[id], values...)
+		}
+	}
+	return ret
 }
 
 func (f *Function) GetValuesByName(name string) InstructionNodes {
