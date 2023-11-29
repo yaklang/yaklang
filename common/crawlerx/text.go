@@ -30,8 +30,8 @@ type jsLinkFinder struct {
 var urlChar = `a-zA-Z0-9\.\/\?\_\-\=\&\%\#`
 
 var jsLinkCompilers = []*jsLinkFinder{
-	&jsLinkFinder{fmt.Sprintf(`(?i:\.post\(\s*(\'[%s]+?\'|\"[%s]+?\")\,)`, urlChar, urlChar), 8, 2},
-	&jsLinkFinder{fmt.Sprintf(`(?i:\.get\(\s*(\'[%s]+?\'|\"[%s]+?\")\,)`, urlChar, urlChar), 7, 2},
+	&jsLinkFinder{fmt.Sprintf(`\.post\(\s*(\'[%s]+?\'|\"[%s]+?\")\,`, urlChar, urlChar), 8, 2},
+	&jsLinkFinder{fmt.Sprintf(`\.get\(\s*(\'[%s]+?\'|\"[%s]+?\")\,`, urlChar, urlChar), 7, 2},
 	&jsLinkFinder{fmt.Sprintf(`(?i:url:\s*(\"[%s]+?\"|\'[%s]+?\'))`, urlChar, urlChar), 5, 1},
 	&jsLinkFinder{fmt.Sprintf(`(?i:url\((\'[%s]+?\'|\"[%s]+?\")\,)`, urlChar, urlChar), 5, 2},
 	&jsLinkFinder{fmt.Sprintf(`(?i:url\s*\=\s*(\'[%s]+?\'|\"[%s]+?\"))`, urlChar, urlChar), 5, 1},
