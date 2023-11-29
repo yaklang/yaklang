@@ -13,7 +13,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/olekukonko/tablewriter"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -347,6 +346,6 @@ func AnyTypeToLibInstance(libName, name string, typ reflect.Type, value interfac
 		LibName:      libName,
 		InstanceName: name,
 		Type:         typ.String(),
-		ValueStr:     spew.Sdump(value),
+		ValueStr:     utils.AsDebugString(value),
 	}
 }

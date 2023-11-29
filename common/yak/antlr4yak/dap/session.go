@@ -16,6 +16,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
@@ -343,7 +344,6 @@ func (ds *DebugSession) onDisconnectRequest(request *dap.DisconnectRequest) {
 	}
 	// ? unset debugger
 	// ds.debugger = nil
-
 }
 
 func (ds *DebugSession) onTerminateRequest(request *dap.TerminateRequest) {
@@ -408,7 +408,6 @@ func (ds *DebugSession) onSetExceptionBreakpointsRequest(request *dap.SetExcepti
 }
 
 func (ds *DebugSession) onConfigurationDoneRequest(request *dap.ConfigurationDoneRequest) {
-
 	// 如果stopOnEntry,则在入口时回调
 	if ds.launchConfig.StopOnEntry {
 		e := &dap.StoppedEvent{
@@ -713,7 +712,6 @@ func (ds *DebugSession) onThreadsRequest(request *dap.ThreadsRequest) {
 	response.Response = *newResponse(request.Request)
 	response.Body = dap.ThreadsResponseBody{Threads: threads}
 	ds.send(response)
-
 }
 
 func (ds *DebugSession) onTerminateThreadsRequest(request *dap.TerminateThreadsRequest) {
@@ -749,7 +747,7 @@ func (ds *DebugSession) onEvaluateRequest(request *dap.EvaluateRequest) {
 			return
 		}
 
-		response.Body = dap.EvaluateResponseBody{Result: AsDebugString(value.Value), Type: value.TypeVerbose}
+		response.Body = dap.EvaluateResponseBody{Result: utils.AsDebugString(value.Value), Type: value.TypeVerbose}
 
 		ref := ds.ConvertVariable(value.Value)
 		response.Body.VariablesReference = ref
@@ -869,7 +867,8 @@ func (ds *DebugSession) logToConsole(msg string) {
 		Body: dap.OutputEventBody{
 			Output:   msg + "\n",
 			Category: "console",
-		}})
+		},
+	})
 }
 
 func newEvent(event string) *dap.Event {
@@ -923,13 +922,13 @@ func (ds *DebugSession) namedToDAPVariables(i interface{}, start int) []dap.Vari
 		children = make([]dap.Variable, length)
 		refT := refV.Type()
 		varname := ds.GetEvaluateName(i)
-		refV = SafeReflectValue(refV)
+		refV = utils.SafeReflectValue(refV)
 
 		for i := start; i < length; i++ {
 			fieldName := refT.Field(i).Name
 
 			value := refV.Field(i)
-			value = SafeReflectStructField(refV, value)
+			value = utils.SafeReflectStructField(refV, value)
 			iValue := value.Interface()
 			ref := -1
 			if iValue != nil {
@@ -940,7 +939,7 @@ func (ds *DebugSession) namedToDAPVariables(i interface{}, start int) []dap.Vari
 				Name:               fmt.Sprintf("%s", fieldName),
 				EvaluateName:       fmt.Sprintf("%s.%s", varname, fieldName),
 				Type:               value.Type().String(),
-				Value:              AsDebugString(iValue),
+				Value:              utils.AsDebugString(iValue),
 				VariablesReference: ref,
 				IndexedVariables:   yakvm.GetIndexedVariableCount(iValue),
 				NamedVariables:     yakvm.GetNamedVariableCount(iValue),
@@ -956,7 +955,7 @@ func (ds *DebugSession) namedToDAPVariables(i interface{}, start int) []dap.Vari
 	if yakvm.IsBytesOrRunes(i) {
 		children = append(children, dap.Variable{
 			Name:  "string()",
-			Value: AsDebugString(i),
+			Value: utils.AsDebugString(i),
 			Type:  "string",
 		})
 	}
@@ -979,9 +978,7 @@ func (ds *DebugSession) namedToDAPVariables(i interface{}, start int) []dap.Vari
 
 func (ds *DebugSession) childrenToDAPVariables(i interface{}, start int) []dap.Variable {
 	children := []dap.Variable{} // must return empty array, not null, if no children
-	var (
-		handleValue interface{} = nil
-	)
+	var handleValue interface{} = nil
 
 	switch v := i.(type) {
 	case *yakvm.Scope:
@@ -1011,7 +1008,7 @@ func (ds *DebugSession) childrenToDAPVariables(i interface{}, start int) []dap.V
 			vari := dap.Variable{
 				Name:               name,
 				EvaluateName:       name,
-				Value:              AsDebugString(value.Value),
+				Value:              utils.AsDebugString(value.Value),
 				Type:               typ,
 				VariablesReference: ref,
 				IndexedVariables:   indexed,
@@ -1040,7 +1037,7 @@ func (ds *DebugSession) childrenToDAPVariables(i interface{}, start int) []dap.V
 			keys := refV.MapKeys()
 			mapKeys := lo.Map(keys, func(item reflect.Value, index int) *MapKey {
 				iKey := item.Interface()
-				return &MapKey{item, iKey, AsDebugString(iKey)}
+				return &MapKey{item, iKey, utils.AsDebugString(iKey)}
 			})
 			// 排序保证顺序一致
 			sort.SliceStable(mapKeys, func(i, j int) bool {
@@ -1071,7 +1068,7 @@ func (ds *DebugSession) childrenToDAPVariables(i interface{}, start int) []dap.V
 				value := refV.MapIndex(key)
 				iValue := value.Interface()
 				valueRef := ds.ConvertVariable(iValue)
-				valueStr := AsDebugString(iValue)
+				valueStr := utils.AsDebugString(iValue)
 
 				valueVar := dap.Variable{
 					Name:               fmt.Sprintf("[value %d]", start+i),
@@ -1102,7 +1099,7 @@ func (ds *DebugSession) childrenToDAPVariables(i interface{}, start int) []dap.V
 					Name:               fmt.Sprintf("[%d]", idx),
 					EvaluateName:       fmt.Sprintf("%s[%d]", varname, idx),
 					Type:               value.Type().String(),
-					Value:              AsDebugString(iValue),
+					Value:              utils.AsDebugString(iValue),
 					VariablesReference: ref,
 					IndexedVariables:   yakvm.GetIndexedVariableCount(iValue),
 					NamedVariables:     yakvm.GetNamedVariableCount(iValue),
