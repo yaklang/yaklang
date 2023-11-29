@@ -1,0 +1,33 @@
+key = randstr(20)
+pluginName = randstr(20)
+
+code = `
+key="` + key + `";db.SetKey(key, 0)
+count=0
+mirrorNewWebsitePath = (tls, url, req, rsp, body) => {
+    count++
+    println(url)
+    db.SetKey(key, count)
+}
+`
+
+db.SaveYakitPlugin(pluginName, "mitm" /*type: string*/, code)~
+
+caller = hook.NewMixPluginCaller()~
+caller.LoadPlugin(pluginName, )
+
+for i in [
+    {"https": false, "request": "GET /a/b/c HTTP/1.1\r\nHost: www.example.com"}, //1
+    {"https": true, "request": "GET /a/b/c HTTP/1.1\r\nHost: www.example.com"},  //2
+    {"https": false, "request": "GET /a/b/c HTTP/1.1\r\nHost: www.example.com"}, //2
+    {"https": false, "request": "POST /a/b/c HTTP/1.1\r\nHost: www.example.com\r\n"}, //3
+    {"https": false, "request": "POST /a/b/ HTTP/1.1\r\nHost: www.example.com"}, //4
+    {"https": false, "request": "GET /a/b/ HTTP/1.1\r\nHost: www.example.com"}, //5
+    {"https": false, "request": "GET /a/b HTTP/1.1\r\nHost: www.example.com"}, //6
+] {
+    i.request = poc.FixHTTPRequest(i.request)
+    url = poc.GetUrlFromHTTPRequest(i.https?"https":"http", i.request)
+    caller.MirrorHTTPFlow(i.https, url, i.request, "", "")
+}
+
+assert parseInt(db.GetKey(key)) == 6
