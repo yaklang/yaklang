@@ -602,13 +602,12 @@ func calcWebsitePathParamsHash(urlIns *url.URL, host, port interface{}, req []by
 		return ""
 	}
 	var params []string
-	params = append(params, utils.CalcMd5(freq.GetMethod(), freq.GetPathWithoutQuery()))
 	var fuzzParams = freq.GetCommonParams()
 	for _, r := range fuzzParams {
 		params = append(params, utils.CalcMd5(r.Position(), r.Name()))
 	}
 	sort.Strings(params)
-	return utils.CalcSha1(urlIns.Scheme, freq.GetMethod(), host, port, strings.Join(params, ","), "path-params")
+	return utils.CalcSha1(urlIns.Scheme, freq.GetMethod(), host, port, freq.GetPathWithoutQuery(), strings.Join(params, ","), "path-params")
 }
 
 func calcWebsitePathHash(urlIns *url.URL, host, port interface{}, req []byte) string {
@@ -616,7 +615,7 @@ func calcWebsitePathHash(urlIns *url.URL, host, port interface{}, req []byte) st
 	if err != nil {
 		return ""
 	}
-	return utils.CalcSha1(urlIns.Scheme, freq.GetMethod(), host, port, utils.CalcMd5(freq.GetMethod(), freq.GetPathWithoutQuery()), "path")
+	return utils.CalcSha1(urlIns.Scheme, freq.GetMethod(), host, port, freq.GetPathWithoutQuery(), "path")
 }
 
 var ttlHTTPRequestCache = ttlcache.NewCache()
