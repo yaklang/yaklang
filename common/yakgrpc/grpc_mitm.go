@@ -453,6 +453,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			log.Debugf("get resp")
 		case <-autoForwardCh: // 收到自动转发信号
 			log.Debugf("get auto forward when wait response")
+		case <-ctx.Done():
+			log.Debugf("get ctx done when wait response")
+			return
 		}
 	}
 
@@ -467,6 +470,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			handleResponse()
 		case <-autoForwardCh:
 			log.Debugf("get auto forward when wait should hijack response")
+		case <-ctx.Done():
+			log.Debugf("get ctx done when wait request")
+			return
 		}
 	}
 
@@ -485,6 +491,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			case <-autoForwardCh:
 				log.Debugf("get auto forward when wait request")
 				continue
+			case <-ctx.Done():
+				return
 			}
 		}
 	}()
