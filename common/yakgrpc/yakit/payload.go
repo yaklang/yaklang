@@ -38,13 +38,23 @@ type Payload struct {
 }
 
 func (p *Payload) CalcHash() string {
-	return utils.CalcSha1(p.Group, p.Content, p.Folder)
+	content := ""
+	folder := ""
+	if p.Content != nil {
+		content = *p.Content
+	}
+	if p.Folder != nil {
+		folder = *p.Folder
+	}
+	return utils.CalcSha1(p.Group, content, folder)
 }
 
+func (p *Payload) BeforeUpdate() (err error) {
+	p.Hash = p.CalcHash()
+	return
+}
 func (p *Payload) BeforeSave() error {
-	if p.Hash == "" {
-		p.Hash = p.CalcHash()
-	}
+	p.Hash = p.CalcHash()
 	return nil
 }
 
@@ -87,6 +97,7 @@ func CreateOrUpdatePayload(db *gorm.DB, i *Payload) error {
 func CreateAndUpdatePayload(db *gorm.DB, content, group, folder string, hitCount int64) error {
 	payload := NewPayload(group, content)
 	payload.Folder = &folder
+	payload.HitCount = &hitCount
 	return CreateOrUpdatePayload(db, payload)
 }
 
@@ -104,12 +115,12 @@ func TrimWhitespaceExceptSpace(r rune) bool {
 
 // save payload from file
 func SavePayloadByFilename(db *gorm.DB, group string, fileName string) error {
-	return SavePayloadByFilenameEx(db, group, fileName, func(s string, hitCount int64) error {
+	return SavePayloadByFilenameEx(fileName, func(s string, hitCount int64) error {
 		return CreateAndUpdatePayload(db, s, group, "", hitCount)
 	})
 }
 
-func SavePayloadByFilenameEx(db *gorm.DB, group string, fileName string, handler func(string, int64) error) error {
+func SavePayloadByFilenameEx(fileName string, handler func(string, int64) error) error {
 	ch, err := utils.FileLineReader(fileName)
 	if err != nil {
 		return err
@@ -166,11 +177,11 @@ func SavePayloadGroup(db *gorm.DB, group string, lists []string) error {
 
 // save payload from raw-data
 func SavePayloadGroupByRaw(db *gorm.DB, group string, data string) error {
-	return SavePayloadGroupByRawEx(db, group, data, func(s string) error {
+	return SavePayloadGroupByRawEx(data, func(s string) error {
 		return CreateAndUpdatePayload(db, s, group, "", 0)
 	})
 }
-func SavePayloadGroupByRawEx(db *gorm.DB, group string, data string, handler func(string) error) error {
+func SavePayloadGroupByRawEx(data string, handler func(string) error) error {
 	//TODO: remove scanner
 	lineScanner := bufio.NewScanner(bytes.NewBufferString(data))
 	lineScanner.Split(bufio.ScanLines)
@@ -205,15 +216,27 @@ func GetPayloadsByGroup(db *gorm.DB, group string) ([]*Payload, error) {
 func GetPayloadsByFolder(db *gorm.DB, folder string) ([]*Payload, error) {
 	var reqs []*Payload
 	if db := db.Model(&Payload{}).Where("`folder` = ?", folder).Find(&reqs); db.Error != nil {
-		return nil, utils.Errorf("get Payload failed: %s", db.Error)
+		return nil, utils.Errorf("get Payload by folder failed: %s", db.Error)
 	}
 	return reqs, nil
+}
+
+func SetGroupInEnd(db *gorm.DB, group string) error {
+	var groups []string
+	if err := db.Model(&Payload{}).Select("`group`").Group("`group`").Pluck("`group`", &groups).Error; err != nil {
+		return err
+	}
+	// 更新group_index
+	if err := db.Model(&Payload{}).Where("`group` = ?", group).Update("group_index", len(groups)+1).Error; err != nil {
+		return err
+	}
+	return nil
 }
 
 func GetPayloadByGroupFirst(db *gorm.DB, group string) (*Payload, error) {
 	var req Payload
 	if db := db.Model(&Payload{}).Where("`group` = ?", group).First(&req); db.Error != nil {
-		return nil, utils.Wrap(db.Error, "get Payload failed")
+		return nil, utils.Wrapf(db.Error, "get Payload by group %s failed", group)
 	} else {
 		return &req, nil
 	}
@@ -283,7 +306,6 @@ func RenamePayloadFolder(db *gorm.DB, folder, newFolder string) error {
 		return utils.Errorf("update Payload failed: %s", db.Error)
 	}
 	return nil
-
 }
 
 func RenamePayloadGroup(db *gorm.DB, oldGroup, newGroup string) error {
@@ -298,7 +320,7 @@ func CopyPayloads(db *gorm.DB, ids []int64, group, folder string) error {
 	{
 		db := db.Model(&Payload{})
 		db = bizhelper.ExactQueryInt64ArrayOr(db, "id", ids)
-		db.Debug()
+		// db.Debug()
 		if err := db.Find(&payloads).Error; err != nil {
 			return utils.Wrap(err, "error finding payloads")
 		}
@@ -327,14 +349,29 @@ func MovePayloads(db *gorm.DB, ids []int64, group, folder string) error {
 	return nil
 }
 
-func SetIndexToFolder(db *gorm.DB, folder string, group_index int) error {
-	db = db.Model(&Payload{}).Where("`folder` = ?", folder).Update("group_index", group_index)
+func SetIndexToFolder(db *gorm.DB, folder, group string, group_index int64) error {
+	// 查找或创建一个新的记录
+	payload := Payload{
+		Folder:     &folder,
+		Group:      group,
+		GroupIndex: &group_index,
+	}
+	db = db.FirstOrCreate(&payload, Payload{Folder: &folder, Group: group})
+
+	// 如果创建失败，返回错误
+	if db.Error != nil {
+		return utils.Wrap(db.Error, "create or find payload failed")
+	}
+
+	// 更新group_index
+	db = db.Model(&Payload{}).Where("`folder` = ?", folder).Where("`group` = ?", group).Update("group_index", group_index)
 	if db.Error != nil {
 		return utils.Wrap(db.Error, "update folder index failed")
 	}
 	return nil
 }
-func UpdatePayloadGroup(db *gorm.DB, group, folder string, group_index int) error {
+
+func UpdatePayloadGroup(db *gorm.DB, group, folder string, group_index int64) error {
 	db = db.Model(&Payload{}).Where("`group` = ?", group).Update("group_index", group_index).Update("folder", folder)
 	if db.Error != nil {
 		return utils.Wrap(db.Error, "update group index failed")
