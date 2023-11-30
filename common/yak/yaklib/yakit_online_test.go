@@ -8,7 +8,7 @@ import (
 )
 
 func TestNewOnlineClient(t *testing.T) {
-	client := NewOnlineClient("http://www.yaklang.com")
+	client := NewOnlineClient("https://www.yaklang.com")
 	//for result := range client.DownloadYakitPluginAll(context.Background()).Chan {
 	//	spew.Dump(result)
 	//}
@@ -26,4 +26,19 @@ func TestNewOnlineClient(t *testing.T) {
 	spew.Dump(plugin)
 
 	client.Save(consts.GetGormProfileDatabase(), plugin)
+}
+
+func TestDownloadOnlinePlugins(t *testing.T) {
+	client := NewOnlineClient("https://www.yaklang.com")
+
+	stream := client.DownloadOnlinePluginsBatch(context.Background(), "", []bool{}, "", []string{}, []string{}, "", 0, "", []string{}, "mine", []int64{}, []string{}, []string{})
+	for result := range stream.Chan {
+		client.Save(consts.GetGormProfileDatabase(), result.Plugin)
+	}
+
+	plugins := client.DownloadOnlinePluginByPluginName(context.Background(), "", []string{})
+	for ret := range plugins.Chan {
+		client.Save(consts.GetGormProfileDatabase(), ret.Plugin)
+	}
+
 }

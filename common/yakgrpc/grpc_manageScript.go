@@ -8,6 +8,7 @@ import (
 	"github.com/jinzhu/copier"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -845,4 +846,144 @@ func (s *Server) QueryYakScriptByIsCore(ctx context.Context, req *ypb.QueryYakSc
 		ret.Data = append(ret.Data, y.ToGRPCModel())
 	}
 	return ret, nil
+}
+
+func (s *Server) QueryYakScriptRiskDetailByCWE(ctx context.Context, req *ypb.QueryYakScriptRiskDetailByCWERequest) (*ypb.QueryYakScriptRiskDetailByCWEResponse, error) {
+	ret := &ypb.QueryYakScriptRiskDetailByCWEResponse{}
+	if req.CWEId != "" {
+		db := consts.GetGormCVEDatabase()
+		if db == nil {
+			log.Error("cannot found database (cve db)")
+			return ret, nil
+		}
+		cwe, err := cveresources.GetCWE(db, req.CWEId)
+		if err != nil {
+			log.Errorf("get cwe failed: %s", err)
+			return ret, nil
+		}
+		return &ypb.QueryYakScriptRiskDetailByCWEResponse{
+			CWEId:       cwe.IdStr,
+			RiskType:    cwe.NameZh,
+			Description: cwe.Description,
+			CWESolution: cwe.CWESolution,
+		}, nil
+	}
+	return ret, nil
+}
+
+func (s *Server) YakScriptRiskTypeList(context.Context, *ypb.Empty) (*ypb.YakScriptRiskTypeListResponse, error) {
+	ret := &ypb.YakScriptRiskTypeListResponse{}
+	riskTypeList := map[string]string{
+		"SQL注入":      "89",
+		"XSS":        "79",
+		"命令执行/注入":    "77",
+		"代码执行/注入":    "94",
+		"CSRF":       "352",
+		"文件包含/读取/下载": "41",
+		"文件写入/上传":    "434",
+		"XML外部实体攻击":  "91",
+		"反序列化":       "502",
+		"未授权访问":      "552",
+		"路径遍历":       "22",
+		"敏感信息泄漏":     "200",
+		"身份验证错误":     "305",
+		"垂直/水平权限提升":  "271",
+		"逻辑漏洞":       "840",
+		"默认配置漏洞":     "1188",
+		"弱口令":        "1391",
+		"SSRF":       "918",
+		"其他漏洞检测":     "",
+		"合规检测":       "",
+	}
+	for k, v := range riskTypeList {
+		ret.Data = append(ret.Data, &ypb.RiskTypeLists{
+			RiskType: k,
+			CWEId:    v,
+		})
+	}
+	return ret, nil
+}
+
+func GRPCYakScriptToYakScript(script *ypb.SaveNewYakScriptRequest) map[string]interface{} {
+	if script.IsGeneralModule && script.GeneralModuleKey == "" {
+		script.GeneralModuleKey = script.ScriptName
+		script.GeneralModuleVerbose = script.ScriptName
+	}
+	Data := map[string]interface{}{
+		"script_name":            script.ScriptName,
+		"type":                   script.Type,
+		"content":                script.Content,
+		"level":                  script.Level,
+		"help":                   script.Help,
+		"tags":                   script.Tags,
+		"is_history":             script.IsHistory,
+		"is_general_module":      script.IsGeneralModule,
+		"general_module_key":     script.GeneralModuleKey,
+		"general_module_verbose": script.GeneralModuleVerbose,
+		"risk_type":              script.RiskType,
+		"risk_annotation":        script.RiskAnnotation,
+		"enable_plugin_selector": script.EnablePluginSelector,
+		"plugin_selector_types":  script.PluginSelectorTypes,
+	}
+	if script.Params != nil {
+		raw, _ := json.Marshal(script.Params)
+		Data["params"] = strconv.Quote(string(raw))
+	}
+	if script.RiskDetail != nil {
+		riskDetail, _ := json.Marshal(script.RiskDetail)
+		Data["risk_detail"] = string(riskDetail)
+	}
+	return Data
+}
+
+func (s *Server) SaveNewYakScript(ctx context.Context, script *ypb.SaveNewYakScriptRequest) (*ypb.YakScript, error) {
+	if script.Type == "nuclei" {
+		script.Params = buildinNucleiYakScriptParam
+	}
+
+	switch script.Type {
+	case "yak", "mitm", "port-scan":
+		_, err := antlr4yak.New().FormattedAndSyntaxChecking(script.GetContent())
+		if err != nil {
+			return nil, utils.Errorf("save plugin failed! content is invalid(潜在语法错误): %s", err)
+		}
+	}
+	script.ScriptName = strings.TrimSpace(script.ScriptName)
+
+	yakScript, _ := yakit.GetYakScriptByName(s.GetProfileDatabase(), script.ScriptName)
+
+	if script.Id > 0 {
+		if yakScript != nil && int64(yakScript.ID) != script.Id {
+			return nil, utils.Errorf("save plugin failed! 插件名重复")
+		}
+		yakScript, _ = yakit.GetYakScript(s.GetProfileDatabase(), script.Id)
+		if yakScript == nil {
+			return nil, utils.Errorf("更新插件不存在")
+		}
+		var err error
+		if (script.ScriptName != yakScript.ScriptName && len(yakScript.OnlineBaseUrl) <= 0) || yakScript.ScriptName == script.ScriptName {
+			// 更新
+			err = yakit.CreateOrUpdateYakScript(s.GetProfileDatabase(), script.Id, GRPCYakScriptToYakScript(script))
+		} else {
+			err = yakit.CreateOrUpdateYakScriptByName(s.GetProfileDatabase(), script.ScriptName, GRPCYakScriptToYakScript(script))
+		}
+		if err != nil {
+			return nil, utils.Errorf("update yakScript failed: %s", err.Error())
+		}
+	} else {
+		if yakScript != nil {
+			return nil, utils.Errorf("save plugin failed! 插件名重复")
+		}
+		err := yakit.CreateOrUpdateYakScriptByName(s.GetProfileDatabase(), script.ScriptName, GRPCYakScriptToYakScript(script))
+		if err != nil {
+			return nil, utils.Errorf("create or update yakScript failed: %s", err.Error())
+		}
+	}
+
+	res, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), script.ScriptName)
+	if err != nil {
+		return nil, utils.Errorf("query saved yak script failed: %s", err)
+	}
+
+	return res.ToGRPCModel(), nil
 }

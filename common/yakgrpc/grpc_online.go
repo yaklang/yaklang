@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -199,4 +200,193 @@ func QueryYakScriptByNames(db *gorm.DB, req []string) []*ypb.DownloadOnlinePlugi
 		})
 	}
 	return YakPlugin
+}
+
+/*
+ * new online
+ * 插件下载
+ */
+
+func (s *Server) DownloadOnlinePluginBatch(ctx context.Context, req *ypb.DownloadOnlinePluginsRequest) (*ypb.Empty, error) {
+	err := yaklib.DownloadOnlineAuthProxy(consts.GetOnlineBaseUrl())
+	if err != nil {
+		return nil, utils.Errorf("download failed: %s", err.Error())
+	}
+	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+	plugins := client.DownloadOnlinePluginsBatch(ctx, req.Token, req.IsPrivate, req.Keywords, req.PluginType, req.Tags, req.UserName, req.UserId,
+		req.TimeSearch, req.Group, req.ListType, req.Status, req.UUID, req.ScriptName)
+	for pluginIns := range plugins.Chan {
+		err := client.Save(s.GetProfileDatabase(), pluginIns.Plugin)
+		if err != nil {
+			log.Errorf("save err failed: %s", err)
+		}
+	}
+
+	return &ypb.Empty{}, nil
+}
+
+func (s *Server) DownloadOnlinePlugins(req *ypb.DownloadOnlinePluginsRequest, stream ypb.Yak_DownloadOnlinePluginsServer) error {
+	err := yaklib.DownloadOnlineAuthProxy(consts.GetOnlineBaseUrl())
+	if err != nil {
+		return utils.Errorf("download failed: %s", err.Error())
+	}
+	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+	var ch *yaklib.OnlineDownloadStream
+	ch = client.DownloadOnlinePluginsBatch(stream.Context(), req.Token, req.IsPrivate, req.Keywords, req.PluginType, req.Tags, req.UserName, req.UserId,
+		req.TimeSearch, req.Group, req.ListType, req.Status, req.UUID, req.ScriptName)
+
+	if ch == nil {
+		return utils.Error("BUG: download stream error: empty")
+	}
+
+	var progress float64
+	var count float64 = 0
+	stream.Send(&ypb.DownloadOnlinePluginProgress{
+		Progress: 0,
+		Log:      "initializing",
+	})
+	defer func() {
+		stream.Send(&ypb.DownloadOnlinePluginProgress{
+			Progress: 1,
+			Log:      "finished",
+		})
+	}()
+	for resultIns := range ch.Chan {
+		result := resultIns.Plugin
+		total := resultIns.Total
+		if total > 0 {
+			progress = count / float64(total)
+		}
+		count++
+		err = client.Save(s.GetProfileDatabase(), result)
+		if err != nil {
+			stream.Send(&ypb.DownloadOnlinePluginProgress{
+				Progress: progress,
+				Log:      fmt.Sprintf("save [%s] to local db failed: %s", result.ScriptName, err),
+			})
+		} else {
+			stream.Send(&ypb.DownloadOnlinePluginProgress{
+				Progress: progress,
+				Log:      fmt.Sprintf("save [%s] to local db finished", result.ScriptName),
+			})
+		}
+	}
+	return nil
+}
+
+func (s *Server) DownloadOnlinePluginByPluginName(ctx context.Context, req *ypb.DownloadOnlinePluginByScriptNamesRequest) (*ypb.DownloadOnlinePluginByScriptNamesResponse, error) {
+	err := yaklib.DownloadOnlineAuthProxy(consts.GetOnlineBaseUrl())
+	if err != nil {
+		return nil, utils.Errorf("download failed: %s", err.Error())
+	}
+	YakPlugin := QueryYakScriptByNames(s.GetProfileDatabase(), req.GetScriptNames())
+	var scriptNames []string
+	for _, v := range req.GetScriptNames() {
+		if !inContain(YakPlugin, v) {
+			scriptNames = append(scriptNames, v)
+		}
+	}
+	if scriptNames != nil {
+		client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+		plugins := client.DownloadOnlinePluginByPluginName(ctx, req.Token, req.ScriptNames)
+
+		for pluginIns := range plugins.Chan {
+			err := client.Save(s.GetProfileDatabase(), pluginIns.Plugin)
+			if err != nil {
+				log.Errorf("save err failed: %s", err)
+			}
+		}
+		YakPlugin = append(YakPlugin, QueryYakScriptByNames(s.GetProfileDatabase(), scriptNames)...)
+	}
+
+	return &ypb.DownloadOnlinePluginByScriptNamesResponse{Data: YakPlugin}, nil
+}
+
+func (s *Server) SaveYakScriptToOnline(req *ypb.SaveYakScriptToOnlineRequest, stream ypb.Yak_SaveYakScriptToOnlineServer) error {
+	if req.Token == "" {
+		return utils.Errorf("未登录,请登录")
+	}
+	db := consts.GetGormProfileDatabase()
+	if !req.GetAll() {
+		if len(req.ScriptNames) <= 0 {
+			return utils.Errorf("请选择上传插件")
+		}
+		db = bizhelper.ExactQueryStringArrayOr(db, "script_name", req.GetScriptNames())
+	}
+	ch := yakit.YieldYakScripts(db, context.Background())
+
+	var progress float64
+	var count float64 = 0
+	errorCount := 0
+	successCount := 0
+	var message string
+	messageType := "success"
+	stream.Send(&ypb.SaveYakScriptToOnlineResponse{
+		Progress:    0,
+		Message:     "initializing",
+		MessageType: "",
+	})
+	defer func() {
+		if errorCount > 0 {
+			message += fmt.Sprintf("执行失败: %v 个", errorCount)
+			messageType = "finalError"
+		}
+		if successCount > 0 {
+			message += fmt.Sprintf("执行成功: %v 个", successCount)
+		}
+		if message == "" {
+			message = "finished"
+		}
+		stream.Send(&ypb.SaveYakScriptToOnlineResponse{
+			Progress:    1,
+			Message:     message,
+			MessageType: messageType,
+		})
+	}()
+	for result := range ch {
+		total := len(req.ScriptNames)
+		if total > 0 {
+			progress = count / float64(total)
+		}
+		count++
+		err := yaklib.DownloadOnlineAuthProxy(consts.GetOnlineBaseUrl())
+		if err != nil {
+			return utils.Errorf("save to online failed: %s", err.Error())
+		}
+		/*if result.OnlineBaseUrl == consts.GetOnlineBaseUrl() {
+			errorCount++
+			stream.Send(&ypb.SaveYakScriptToOnlineResponse{
+				Progress:    progress,
+				Message:     fmt.Sprintf("save [%s] to online db failed: %s", result.ScriptName, "该插件名已被占用"),
+				MessageType: "error",
+			})
+		}*/
+		client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+		err = client.SaveToOnline(stream.Context(), req, result)
+		if err != nil {
+			errorCount++
+			stream.Send(&ypb.SaveYakScriptToOnlineResponse{
+				Progress:    progress,
+				Message:     fmt.Sprintf("save [%s] to online db failed: %s", result.ScriptName, err),
+				MessageType: "error",
+			})
+		} else {
+			successCount++
+			stream.Send(&ypb.SaveYakScriptToOnlineResponse{
+				Progress:    progress,
+				Message:     fmt.Sprintf("save [%s] to online db finished", result.ScriptName),
+				MessageType: "success",
+			})
+
+			plugins := client.DownloadOnlinePluginsBatch(context.Background(), req.Token, []bool{}, "", []string{}, []string{}, "", 0,
+				"", []string{}, "mine", []int64{}, []string{}, []string{result.ScriptName})
+			for pluginIns := range plugins.Chan {
+				err = client.Save(s.GetProfileDatabase(), pluginIns.Plugin)
+				if err != nil {
+					log.Errorf("save err failed: %s", err)
+				}
+			}
+		}
+	}
+	return nil
 }
