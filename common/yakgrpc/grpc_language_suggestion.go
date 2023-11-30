@@ -261,9 +261,6 @@ func getInstanceDesc(instance *yakdoc.LibInstance) string {
 }
 
 func getFuncTypeDesc(funcTyp *ssa.FunctionType, funcName string) string {
-	if funcTyp.Name != "" {
-		funcName = funcTyp.Name
-	}
 	lenOfParams := len(funcTyp.Parameter)
 	desc := fmt.Sprintf("```go\nfunc %s(%s) %s\n```", funcName, strings.Join(lo.Map(
 		funcTyp.Parameter, func(typ ssa.Type, i int) string {
