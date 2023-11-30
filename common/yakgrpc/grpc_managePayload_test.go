@@ -276,7 +276,7 @@ func TestGroupInDatabase(t *testing.T) {
 
 	t.Log("\n\n================= extern payload ")
 	// // 扩充字典
-	data2 := "zxcv\n123\n123"
+	data2 := "zxcv\n123\n123\narsoten"
 	save2database(local, t, group, data2)
 	want := data + "\nzxcv"
 	got, ids := getPayload(local, t, group)
@@ -356,11 +356,21 @@ func TestCoverPayloadInFile(t *testing.T) {
 	save2file(local, t, group, data)
 	defer deleteGroup(local, t, group)
 
+	orgNodes := getGroup(local, t)
 	// cover to database
 	coverToDatabase(local, t, group)
 
 	// all group
-	checkNode(getGroup(local, t), t, group, "DataBase")
+	nodes := getGroup(local, t)
+	checkNode(nodes, t, group, "DataBase")
+	if len(nodes) != len(orgNodes) {
+		t.Fatalf("nodes length error: got(%d) vs want(%d)", len(nodes), len(orgNodes))
+	}
+	for i := range nodes {
+		if nodes[i].Name != orgNodes[i].Name {
+			t.Fatalf("nodes length error: got(%v) vs want(%v)", nodes[i], orgNodes[i])
+		}
+	}
 	got, _ := getPayload(local, t, group)
 	comparePayload(got, data, t)
 }
