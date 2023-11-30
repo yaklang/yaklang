@@ -29,6 +29,8 @@ type WebsiteNextPart struct {
 	HaveChildren bool
 	Count        int
 	IsQuery      bool
+	RawQueryKey  string
+	RawNextPart  string
 	IsFile       bool
 }
 
@@ -88,120 +90,91 @@ func GetHTTPFlowDomainsByDomainSuffix(db *gorm.DB, domainSuffix string) []*Websi
 	}
 }
 
-func GetHTTPFlowNextPartPathByPathPrefixbak(db *gorm.DB, originPathPrefix string) []*WebsiteNextPart {
-	pathPrefix := trimPathWithOneSlash(originPathPrefix)
-	pathPrefix2 := "/" + pathPrefix
-	db = db.Select("url").Table("http_flows").Where("url LIKE ?", `%`+originPathPrefix+`%`).Limit(1000)
-	var urls []string
-	for u := range YieldHTTPUrl(db, context.Background()) {
-		up, _ := url.Parse(u.Url)
-		if strings.HasPrefix(up.Path, pathPrefix2) &&
-			(strings.HasPrefix(up.RequestURI()[len(pathPrefix2):], "/") ||
-				strings.HasPrefix(up.RequestURI()[len(pathPrefix2):], "?") ||
-				pathPrefix == "") || up.Path == originPathPrefix || up.Path == pathPrefix2 {
-			urls = append(urls, u.Url)
+func matchURL(u string, searchPath string) bool {
+	var err error
+	if strings.Contains(searchPath, "%") {
+		searchPath, err = url.PathUnescape(searchPath)
+		if err != nil {
+			return false
+		}
+	}
+	// 确保搜索路径以 "/" 开头
+	searchPath = "/" + strings.TrimLeft(searchPath, "/")
+	searchPath = strings.TrimRight(searchPath, "/")
+
+	// 解析 URL
+	parsedURL, _ := url.Parse(u)
+
+	normalizedPath := strings.Join(strings.FieldsFunc(parsedURL.Path, func(r rune) bool {
+		return r == '/'
+	}), "/")
+
+	// 获取路径并确保它以 "/" 开头
+	path := "/" + strings.TrimLeft(normalizedPath, "/")
+
+	// 分割搜索路径和 URL 路径
+	searchSegments := strings.Split(searchPath, "/")
+	pathSegments := strings.Split(path, "/")
+
+	// 检查路径是否以搜索路径的段开头
+	match := true
+	for i := 1; i < len(searchSegments); i++ {
+		if i >= len(pathSegments) || searchSegments[i] != pathSegments[i] {
+			match = false
+			break
 		}
 	}
 
-	// 初始化一个映射，用于存储网站结构
-	resultMap := make(map[string]*WebsiteNextPart)
+	return match
+}
 
-	// 假设 urls 是您的 URL 列表
-	for _, us := range urls {
-		u, _ := url.Parse(us)
-		if u.Path == "" {
+func getRawNextPart(path, target string) string {
+	parts := strings.Split(path, "/")
+	slashCount := 0
+	found := false
+	result := ""
+
+	for _, part := range parts {
+		if part == "" {
+			// 空字符串表示原始路径中有一个斜杠
+			slashCount++
 			continue
 		}
-		haveChildren := false
 
-		path := strings.ReplaceAll(u.Path, "//", "/")
-
-		suffix := strings.TrimPrefix(strings.TrimPrefix(path[1:], pathPrefix), "/")
-
-		nextSegment, after, splited := strings.Cut(suffix, "/")
-		if splited && after != "" {
-			haveChildren = true
+		// 如果目标字符串为空，返回第一个非空字符串及其前面的所有斜杠
+		if target == "" {
+			return strings.Repeat("/", slashCount) + part
 		}
 
-		if nextSegment == "" && u.RawQuery == "" {
-			continue
+		if part == target {
+			found = true
+			result += strings.Repeat("/", slashCount) + part
+			break
 		}
 
-		if nextSegment != "" {
-			// 检查根路径段是否已经在resultMap中
-			if _, ok := resultMap[nextSegment]; !ok {
-				if u.RawQuery != "" {
-					haveChildren = true
-				}
-				resultMap[nextSegment] = &WebsiteNextPart{
-					NextPart:     nextSegment,
-					HaveChildren: haveChildren, // 如果有多个路径段，说明有子节点
-					Count:        1,            // 初始化计数为1
-					Schema:       u.Scheme,
-				}
-				if strings.Contains(nextSegment, ".") {
-					resultMap[nextSegment].IsFile = true
-				}
-
-			} else {
-				// 如果已经存在，且不是文件，则增加计数
-				if !strings.Contains(nextSegment, ".") && haveChildren {
-					resultMap[nextSegment].Count++
-				}
-
-				if u.RawQuery != "" {
-					haveChildren = true
-				}
-				resultMap[nextSegment].HaveChildren = haveChildren
-			}
-		}
-
-		// 如果存在查询参数，将其添加到根路径段
-		if u.RawQuery != "" && (u.Path == originPathPrefix ||
-			u.Path == "/"+originPathPrefix || u.Path == "/"+originPathPrefix+"/" ||
-			u.Path == originPathPrefix+"/") {
-			for key := range u.Query() {
-				resultMap[key] = &WebsiteNextPart{
-					NextPart:     key,
-					HaveChildren: false, // 如果有多个路径段，说明有子节点
-					IsQuery:      true,
-					Schema:       u.Scheme,
-				}
-				resultMap[key].Count++
-
-				if strings.Contains(key, ".") {
-					resultMap[key].HaveChildren = true
-				}
-			}
-		}
+		// 遇到非空字符串时重置斜杠计数
+		slashCount = 1
 	}
 
-	// resultMap 现在包含了所有的路径和查询参数，以及它们的层级关系和计数
-	var data []*WebsiteNextPart
-	for _, r := range resultMap {
-		data = append(data, r)
+	if !found {
+		return ""
 	}
-	sort.SliceStable(data, func(i, j int) bool {
-		return data[i].NextPart > data[j].NextPart
-	})
-	return data
+	result = strings.TrimPrefix(path, "//"+target)
+	return result
 }
 
 func GetHTTPFlowNextPartPathByPathPrefix(db *gorm.DB, originPathPrefix string) []*WebsiteNextPart {
+	//pathPrefix := strings.Join(strings.FieldsFunc(originPathPrefix, func(r rune) bool {
+	//	return r == '/'
+	//}), "/")
 	pathPrefix := trimPathWithOneSlash(originPathPrefix)
-	pathPrefix2 := "/" + pathPrefix
-	db = db.Select("url").Table("http_flows").Where("url LIKE ?", `%`+originPathPrefix+`%`).Limit(1000)
+	db = db.Select("url").Table("http_flows").Where("url LIKE ?", `%`+pathPrefix+`%`).Limit(1000)
 	urlsMap := make(map[string]bool)
 	var urls []string
 	for u := range YieldHTTPUrl(db, context.Background()) {
-		up, _ := url.Parse(u.Url)
-		if strings.HasPrefix(up.Path, pathPrefix2) &&
-			(strings.HasPrefix(up.RequestURI()[len(pathPrefix2):], "/") ||
-				strings.HasPrefix(up.RequestURI()[len(pathPrefix2):], "?") ||
-				pathPrefix == "") || up.Path == originPathPrefix ||
-			up.Path == pathPrefix2 || strings.HasSuffix(url.PathEscape(up.Path), pathPrefix) {
-			if _, exists := urlsMap[u.Url]; !exists {
-				urlsMap[u.Url] = true
+		if _, exists := urlsMap[u.Url]; !exists {
+			urlsMap[u.Url] = true
+			if matchURL(u.Url, originPathPrefix) {
 				urls = append(urls, u.Url)
 			}
 		}
@@ -212,16 +185,27 @@ func GetHTTPFlowNextPartPathByPathPrefix(db *gorm.DB, originPathPrefix string) [
 
 	// 假设 urls 是您的 URL 列表
 	for _, us := range urls {
+		usC := us + "%2f"
+		uc, _ := url.Parse(usC)
 		u, _ := url.Parse(us)
-		if u.Path == "" {
+		if u.Path == "" || uc.RawPath == "" {
 			continue
 		}
+		// 寻找目标字符串，为了解决多个 / 的问题
+		rawNextPart := getRawNextPart(strings.TrimSuffix(uc.RawPath, "%2f"), pathPrefix)
+
 		// 去除URL路径中多余的斜线
 		normalizedPath := strings.Join(strings.FieldsFunc(u.Path, func(r rune) bool {
 			return r == '/'
 		}), "/")
 
 		path := strings.Trim(normalizedPath, "/")
+
+		pathPrefix, err := url.PathUnescape(pathPrefix)
+
+		if err != nil {
+			continue
+		}
 
 		suffix := strings.TrimPrefix(path, pathPrefix)
 
@@ -247,6 +231,7 @@ func GetHTTPFlowNextPartPathByPathPrefix(db *gorm.DB, originPathPrefix string) [
 					HaveChildren: haveChildren, // 如果有多个路径段，说明有子节点
 					Count:        1,            // 初始化计数为1
 					Schema:       u.Scheme,
+					RawNextPart:  rawNextPart,
 				}
 				if strings.Contains(nextSegment, ".") {
 					node.IsFile = true
@@ -277,6 +262,7 @@ func GetHTTPFlowNextPartPathByPathPrefix(db *gorm.DB, originPathPrefix string) [
 					queryNode = &WebsiteNextPart{
 						NextPart:     key,
 						HaveChildren: false, // 如果有多个路径段，说明有子节点
+						RawQueryKey:  key,
 						IsQuery:      true,
 						Schema:       u.Scheme,
 					}

@@ -6,7 +6,6 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/url"
@@ -22,7 +21,7 @@ func parseQueryToRequest(db *gorm.DB, query string) *gorm.DB {
 	var req ypb.QueryHTTPFlowRequest
 
 	if err := json.Unmarshal([]byte(query), &req); err != nil {
-		spew.Dump(req)
+		spew.Dump(&req)
 		return yakit.BuildHTTPFlowQuery(db, &req)
 	}
 	return db
@@ -49,15 +48,15 @@ func (f *websiteFromHttpFlow) Get(params *ypb.RequestYakURLParams) (*ypb.Request
 		db = yakit.FilterHTTPFlowBySchema(db, ret)
 		websiteRoot = ret + "://" + websiteRoot
 	}
-	isQuery := false
-	if ret := query.Get("query"); ret != "" {
-		isQuery = true
+	isSearch := false
+	if ret := query.Get("search"); ret != "" {
+		isSearch = true
 		if u.GetLocation() != "" {
 			db = yakit.FilterHTTPFlowByDomain(db, u.GetLocation())
 		}
 	}
 
-	if u.GetLocation() == "" || isQuery {
+	if u.GetLocation() == "" || isSearch {
 		var res []*ypb.YakURLResource
 		for _, result := range yakit.GetHTTPFlowDomainsByDomainSuffix(db, u.GetLocation()) {
 
@@ -107,13 +106,18 @@ func (f *websiteFromHttpFlow) Get(params *ypb.RequestYakURLParams) (*ypb.Request
 
 			var p string
 			if result.IsQuery {
-				p = u.GetPath()
+				p = u.GetPath() + "?" + result.RawQueryKey
 			} else {
-				p = path.Join(u.GetPath(), result.NextPart)
+				if len(result.RawNextPart) > 0 {
+					p = strings.TrimSuffix(u.GetPath(), "/") + result.RawNextPart
+				} else {
+					p = path.Join(u.GetPath(), result.NextPart)
+				}
 			}
 			if !strings.HasPrefix(p, "/") {
 				p = "/" + p
 			}
+
 			newParam := &ypb.YakURL{
 				Schema:   u.GetSchema(),
 				User:     u.GetUser(),
@@ -137,14 +141,8 @@ func (f *websiteFromHttpFlow) Get(params *ypb.RequestYakURLParams) (*ypb.Request
 			if !strings.Contains(websiteRoot, "://") {
 				websiteRoot = result.Schema + "://" + websiteRoot
 			}
-			suff := strings.TrimPrefix(p, "/")
-			if ret, err := utils.UrlJoin(websiteRoot, suff); err == nil {
-				if !strings.Contains(ret, "://") {
-					srcItem.Extra = append(srcItem.Extra, &ypb.KVPair{Key: "url", Value: result.Schema + "://" + ret})
-				} else {
-					srcItem.Extra = append(srcItem.Extra, &ypb.KVPair{Key: "url", Value: ret})
-				}
-			}
+			srcItem.Extra = append(srcItem.Extra, &ypb.KVPair{Key: "url", Value: websiteRoot + srcItem.Url.GetPath()})
+
 			if result.HaveChildren {
 				srcItem.ResourceType = "path"
 				srcItem.HaveChildrenNodes = true
