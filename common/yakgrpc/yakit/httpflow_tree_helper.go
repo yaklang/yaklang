@@ -167,7 +167,7 @@ func GetHTTPFlowNextPartPathByPathPrefix(db *gorm.DB, originPathPrefix string) [
 	//pathPrefix := strings.Join(strings.FieldsFunc(originPathPrefix, func(r rune) bool {
 	//	return r == '/'
 	//}), "/")
-	pathPrefix := trimPathWithOneSlash(originPathPrefix)
+	pathPrefix := strings.TrimLeft(originPathPrefix, "/")
 	db = db.Select("url").Table("http_flows").Where("url LIKE ?", `%`+pathPrefix+`%`).Limit(1000)
 	urlsMap := make(map[string]bool)
 	var urls []string
