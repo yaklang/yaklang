@@ -479,7 +479,7 @@ func (f *FuzzHTTPRequest) GetGetQueryParams() []*FuzzHTTPRequestParam {
 			}
 		}
 
-		if val, ok := isBase64(param[0]); ok && govalidator.IsPrintableASCII(val) {
+		if val, ok := isStrictBase64(param[0]); ok && govalidator.IsPrintableASCII(val) {
 			if val, ok := utils.IsJSON(val); ok {
 				for _, j := range jsonpath.RecursiveDeepJsonPath(val) {
 					params = append(params, &FuzzHTTPRequestParam{
@@ -592,7 +592,7 @@ func (f *FuzzHTTPRequest) GetPostParams() []*FuzzHTTPRequestParam {
 			}
 		}
 
-		if val, ok := isBase64(param[0]); ok && govalidator.IsPrintableASCII(val) {
+		if val, ok := isStrictBase64(param[0]); ok && govalidator.IsPrintableASCII(val) {
 			if val, ok := utils.IsJSON(val); ok {
 				for _, j := range jsonpath.RecursiveDeepJsonPath(val) {
 					params = append(params, &FuzzHTTPRequestParam{
@@ -648,7 +648,7 @@ func (f *FuzzHTTPRequest) GetCookieParams() []*FuzzHTTPRequestParam {
 			}
 		}
 
-		if val, ok := isBase64(k.Value); ok && govalidator.IsPrintableASCII(val) {
+		if val, ok := isStrictBase64(k.Value); ok && govalidator.IsPrintableASCII(val) {
 			if val, ok := utils.IsJSON(val); ok {
 				for _, j := range jsonpath.RecursiveDeepJsonPath(val) {
 					params = append(params, &FuzzHTTPRequestParam{

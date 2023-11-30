@@ -16,6 +16,9 @@ import (
 )
 
 func isBase64JSON(raw string) (string, bool) {
+	if raw == "" {
+		return raw, false
+	}
 	decoded, err := codec.DecodeBase64(raw)
 	if err != nil {
 		return raw, false
@@ -23,9 +26,45 @@ func isBase64JSON(raw string) (string, bool) {
 	return utils.IsJSON(string(decoded))
 }
 
-func isBase64(raw string) (string, bool) {
+func allPlain(i []byte) bool {
+	for _, v := range i {
+		if v >= 0x7f || v <= 0x20 {
+			return false
+		}
+	}
+	return true
+}
+
+func isStrictBase64(raw string) (string, bool) {
+	if raw == "" {
+		return raw, false
+	}
+
+	if len([]byte(raw))%4 != 0 {
+		return raw, false
+	}
+
 	decoded, err := codec.DecodeBase64(raw)
 	if err != nil {
+		return raw, false
+	}
+
+	if !allPlain(decoded) {
+		return raw, false
+	}
+	return string(decoded), true
+}
+
+func isBase64(raw string) (string, bool) {
+	if raw == "" {
+		return raw, false
+	}
+	decoded, err := codec.DecodeBase64(raw)
+	if err != nil {
+		return raw, false
+	}
+
+	if !allPlain(decoded) {
 		return raw, false
 	}
 	return string(decoded), true
