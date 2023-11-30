@@ -1,0 +1,33 @@
+aPass = false
+bPass = false
+cPass = false
+dBase64Pass = false
+dPass = false
+for param in fuzz.HTTPRequest(`GET /?a=&b=all&c=123&d=YXNkZmFzZGZhc2Rm
+Host: www.example.com`)~.GetCommonParams() {
+    if param.Name() == "a" && f`${param.Position()}` == "get-query" {
+        aPass = true
+    }
+
+    if param.Name() == "b" && f`${param.Position()}` == "get-query" {
+        bPass = true
+    }
+
+    if param.Name() == "c" && f`${param.Position()}` == "get-query" {
+        cPass = true
+    }
+
+    if param.Name() == "d" && f`${param.Position()}` == "get-query-base64" {
+        dBase64Pass = true
+    }
+
+    if param.Name() == "d" && f`${param.Position()}` == "get-query" {
+        dPass = true
+    }
+}
+
+assert aPass
+assert bPass
+assert cPass
+assert dBase64Pass
+assert dPass

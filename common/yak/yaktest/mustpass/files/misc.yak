@@ -1,7 +1,5 @@
 assert x"{{crlf}}"[0] == string("\r\n")
 
-
-
 yakit.AutoInitYakit()
 yakit.EnableTable("1", ["a", "1"])
 yakit.TableData("1", {
