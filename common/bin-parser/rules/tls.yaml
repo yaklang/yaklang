@@ -1,1 +1,35 @@
 Package:
+  TLS:
+    isList: true
+    exception-plan: stopList # stopList, throw
+    Record Layer:
+      length-from-field: Length
+      length-from-field-multiply: 8
+      length-for-field: Payload
+      operator: |
+        this.GetSubNode("ContentType").Process()
+        version = this.GetSubNode("Version").Process()
+        this.GetSubNode("Length").Process()
+        switch version{
+          case 0x0301:
+            this.AppendNode(getRootNode("Handshake Protocol"))
+            this.GetSubNode("Handshake Protocol").Process()
+          default:
+            this.AppendNode(getRootNode("Payload"))
+            this.GetSubNode("Payload").Process()
+        }
+      ContentType: uint8
+      Version: uint16
+      Length: uint16
+
+Payload: raw
+Handshake Protocol:
+  Handshake Type: uint8
+  Length: uint32,12bit
+  Version: uint16
+  Random: raw,32
+  Session ID Length: uint8
+  Cipher Suites: raw
+  Compression Methods: raw
+  Extensions Length: uint16
+  Extensions: raw

@@ -10,6 +10,7 @@ import (
 	"gopkg.in/yaml.v2"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -427,7 +428,11 @@ func Parse(data io.Reader, rule string) (*Node, error) {
 	return packageNode, nil
 }
 func ParseBinary(data io.Reader, rule string) (*base.Node, error) {
-	rootNode, err := parser.ParseRule("./rules/" + rule + ".yaml")
+	splits := strings.Split(rule, ".")
+	paths := []string{"./rules/"}
+	splits[len(splits)-1] = splits[len(splits)-1] + ".yaml"
+	p := filepath.Join(append(paths, splits...)...)
+	rootNode, err := parser.ParseRule(p)
 	if err != nil {
 		return nil, err
 	}
@@ -440,9 +445,13 @@ func ParseBinary(data io.Reader, rule string) (*base.Node, error) {
 }
 
 func GenerateBinary(data any, rule string) (*base.Node, error) {
-	rootNode, err := parser.ParseRule("./rules/" + rule + ".yaml")
+	splits := strings.Split(rule, ".")
+	paths := []string{"./rules/"}
+	splits[len(splits)-1] = splits[len(splits)-1] + ".yaml"
+	p := filepath.Join(append(paths, splits...)...)
+	rootNode, err := parser.ParseRule(p)
 	if err != nil {
 		return nil, err
 	}
-	return rootNode, rootNode.Generate(data)
+	return rootNode.Children[0], rootNode.Generate(data)
 }

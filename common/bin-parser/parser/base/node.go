@@ -5,7 +5,29 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
 	"gopkg.in/yaml.v2"
+	"strconv"
+	"strings"
 	"unicode"
+)
+
+const (
+	CfgIsTerminal = "isTerminal"
+	CfgIsList     = "isList"
+	CfgLength     = "length"
+	CfgType       = "type"
+	CfgGetResult  = "get result"
+	CfgRawResult  = "raw result"
+	CfgRootMap    = "rootNodeMap"
+	CfgEndian     = "endian"
+	CfgOperator   = "operator"
+	CfgInList     = "inList"
+	CfgParent     = "parent"
+	CfgDel        = "del"
+	CfgDelimiter  = "delimiter"
+	CfgImport     = "import"
+	CfgNodeResult = "node result"
+	CfgLastNode   = "last node"
+	CfgOptionFuns = "options functions"
 )
 
 type BaseKV struct {
@@ -15,6 +37,7 @@ type BaseKV struct {
 func (c *BaseKV) DeleteItem(k string) {
 	delete(c.data, k)
 }
+
 func (c *BaseKV) SetItem(k string, v any) {
 	c.data[k] = v
 }
@@ -65,6 +88,35 @@ func NewEmptyConfig() *Config {
 		},
 	}
 }
+func (c *Config) SetItem(k string, v any) {
+	c.BaseKV.SetItem(k, v)
+	if c.Has(CfgOptionFuns) {
+		newOptions := append(c.GetItem(CfgOptionFuns).([]NodeConfigFun), func(config *Config) {
+			config.SetItem(k, v)
+		})
+		c.data[CfgOptionFuns] = newOptions
+	} else {
+		c.data[CfgOptionFuns] = []NodeConfigFun{func(config *Config) {
+			config.SetItem(k, v)
+		}}
+	}
+}
+func AppendConfig(parent, config *Config) *Config {
+	res := CopyConfig(parent)
+	if config.Has(CfgOptionFuns) {
+		for _, opt := range config.GetItem(CfgOptionFuns).([]NodeConfigFun) {
+			opt(res)
+		}
+	}
+	return res
+}
+func CopyConfig(config *Config) *Config {
+	res := NewEmptyConfig()
+	for k, v := range config.data {
+		res.SetItem(k, v)
+	}
+	return res
+}
 func NewConfig(config *Config) *Config {
 	res := &Config{
 		BaseKV: BaseKV{
@@ -92,6 +144,20 @@ type Node struct {
 	Ctx      *NodeContext
 }
 
+func (n *Node) Copy() *Node {
+	res := &Node{
+		Name:     n.Name,
+		Origin:   n.Origin,
+		Children: make([]*Node, 0),
+		Cfg:      CopyConfig(n.Cfg),
+		Ctx:      n.Ctx,
+	}
+	for _, child := range n.Children {
+		child.Cfg.SetItem(CfgParent, res)
+		res.Children = append(res.Children, child.Copy())
+	}
+	return res
+}
 func (n *Node) Generate(data any) error {
 	parserName := n.Cfg.GetItem("parser")
 	if parserName == nil {
@@ -212,10 +278,65 @@ func newNodeTree(parentCfg *Config, name string, data any, ctx *NodeContext) (*N
 			}
 			node.Children = append(node.Children, childNode)
 		}
+		if len(node.Children) == 0 {
+			node.Cfg.SetItem(CfgIsTerminal, true)
+		}
 		return node, nil
 	case string:
 		node := NewEmptyNode(name, data, cfg, ctx)
 		node.Cfg = cfg
+		node.Cfg.SetItem(CfgIsTerminal, true)
+		nodeData := utils.InterfaceToString(node.Origin)
+		options := strings.Split(nodeData, ";")
+		for _, option := range options {
+			kvs := strings.Split(option, ":")
+			if len(kvs) == 1 {
+				splits := strings.Split(nodeData, ",")
+				var typeName string
+				if len(splits) == 0 {
+					return nil, utils.Errorf("terminal node %s has no type", node.Name)
+				} else if len(splits) == 1 {
+					typeName = splits[0]
+				} else if len(splits) >= 2 {
+					typeName = splits[0]
+					splits[1] = strings.Join(splits[1:], ",")
+					lstr := ""
+					isBit := false
+					if strings.HasSuffix(splits[1], "bit") {
+						lstr = splits[1][:len(splits[1])-3]
+						isBit = true
+					} else {
+						lstr = splits[1]
+					}
+					l, err := strconv.ParseUint(lstr, 10, 64)
+					if err != nil {
+						return nil, fmt.Errorf("terminal node %s parse length error: %w", node.Name, err)
+					}
+					if isBit {
+						node.Cfg.SetItem(CfgLength, l)
+					} else {
+						node.Cfg.SetItem(CfgLength, l*8)
+					}
+				}
+				cfgTypeName := ""
+				if strings.HasSuffix(typeName, "...") {
+					cfgTypeName = strings.TrimSuffix(typeName, "...")
+					node.Cfg.SetItem(CfgIsList, true)
+				} else {
+					cfgTypeName = typeName
+				}
+				node.Cfg.SetItem(CfgType, cfgTypeName)
+
+			} else {
+				kvs[1] = strings.Join(kvs[1:], ":")
+				switch kvs[0] {
+				case CfgDel:
+					node.Cfg.SetItem(CfgDelimiter, kvs[1])
+				default:
+					node.Cfg.SetItem(kvs[0], kvs[1])
+				}
+			}
+		}
 		return node, nil
 	default:
 		return nil, errors.New("invalid data")

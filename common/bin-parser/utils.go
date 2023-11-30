@@ -9,6 +9,37 @@ import (
 	"reflect"
 )
 
+func NodeToMap(node *base.Node) any {
+	if node.Cfg.Has(stream_parser.CfgNodeResult) {
+		return stream_parser.GetResultByNode(node)
+	}
+	if node.Cfg.GetBool(stream_parser.CfgIsList) {
+		res := []any{}
+		for _, sub := range node.Children {
+			d := NodeToMap(sub)
+			if d != nil {
+				res = append(res, d)
+			}
+		}
+		if len(res) == 0 {
+			return nil
+		}
+		return res
+	} else {
+		res := map[string]any{}
+		for _, sub := range node.Children {
+			d := NodeToMap(sub)
+			if d != nil {
+				res[sub.Name] = NodeToMap(sub)
+			}
+		}
+		if len(res) == 0 {
+			return nil
+		}
+		return res
+	}
+}
+
 func DumpNode(node *base.Node) {
 	println(nodeResultToYaml(node))
 }
@@ -17,53 +48,29 @@ func SdumpNode(node *base.Node) string {
 }
 
 func nodeResultToYaml(node *base.Node) (result string) {
-	var toMap func(nodeRes *stream_parser.NodeResult) any
+	var toMap func(nodeRes *base.Node) any
 	_ = toMap
-	toMap = func(nodeRes *stream_parser.NodeResult) any {
-		if node.Name == "Option" {
-			print()
-		}
-		if len(nodeRes.Sub) == 0 {
-			data, err := nodeRes.Result()
-			if err != nil {
-				log.Errorf("error when get node result: %v", err)
-				return nil
-			}
+
+	toMap = func(node *base.Node) any {
+		if stream_parser.NodeHasResult(node) {
+			data := stream_parser.GetResultByNode(node)
 			if v, ok := data.([]byte); ok {
 				data = fmt.Sprintf("%x", v)
 			}
 			return data
 		} else {
 			res := yaml.MapSlice{}
-			for _, subRes := range nodeRes.Sub {
+			for _, sub := range node.Children {
 				res = append(res, yaml.MapItem{
-					Key:   subRes.Node.Name,
-					Value: toMap(subRes),
+					Key:   sub.Name,
+					Value: toMap(sub),
 				})
 			}
 			return res
-			//if !node.Cfg.GetBool("isList") {
-			//	res := yaml.MapSlice{}
-			//	for _, child := range node.Children {
-			//		res = append(res, yaml.MapItem{
-			//			Key:   child.Name,
-			//			Value: toMap(child),
-			//		})
-			//	}
-			//	return res
-			//} else {
-			//	res := []any{}
-			//	for _, child := range node.Children {
-			//		res = append(res, toMap(child))
-			//	}
-			//	return res
-			//}
 		}
 	}
-	//	return ""
-	//}
-	nodeRes := node.Cfg.GetItem(stream_parser.CfgNodeResult).(*stream_parser.NodeResult)
-	res, err := yaml.Marshal(toMap(nodeRes))
+	//nodeRes := node.Cfg.GetItem(stream_parser.CfgNodeResult).(*stream_parser.NodeResult)
+	res, err := yaml.Marshal(toMap(node))
 	if err != nil {
 		log.Errorf("error when marshal node to yaml: %v", err)
 	}

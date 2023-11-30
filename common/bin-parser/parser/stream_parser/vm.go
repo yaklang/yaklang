@@ -5,49 +5,69 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"reflect"
 )
 
 type YakNode struct {
-	origin            *base.Node
-	Process           func() any
-	Name              string
-	SetCfg            func(k string, v any)
-	AppendNode        func(d *YakNode)
-	ForEachChild      func(f func(child *YakNode))
-	GetParent         func() *YakNode
-	GetSubNode        func(name string) *YakNode
-	GetRemainingSpace func() uint64
+	origin               *base.Node
+	Process              func() any
+	Name                 string
+	SetCfg               func(k string, v any)
+	AppendNode           func(d *YakNode)
+	ForEachChild         func(f func(child *YakNode))
+	GetParent            func() *YakNode
+	GetSubNode           func(name string) *YakNode
+	GetRemainingSpace    func() uint64
+	CalcNodeResultLength func() uint64
+	TryProcessNode       func(*YakNode) map[string]any
 }
 
 func ConvertToYakNode(node *base.Node, operator func(node2 *base.Node) error) *YakNode {
 	yakNode := &YakNode{}
 	yakNode.origin = node
-	yakNode.Process = func() any {
-		if node.Name == "TCP" {
-			print()
+	yakNode.TryProcessNode = func(yNode *YakNode) (response map[string]any) {
+		response = map[string]any{
+			"Ok":      false,
+			"Message": "",
+			"Save":    func() {},
 		}
-		//var err error
-		//switch mode {
-		//case "parse":
-		//	err = node.Parse(data)
-		//case "generate":
-		//	subData, ok := getSubData(mapData, node.Name)
-		//	if !ok {
-		//		panic(fmt.Sprintf("sub data %s not found", node.Name))
+		defer func() {
+			if e := recover(); e != nil {
+				response["Message"] = fmt.Sprintf("%v", e)
+			}
+		}()
+		copyNodeIns := *node
+		copyNode := &copyNodeIns
+		err := appendNode(copyNode, yNode.origin)
+		if err != nil {
+			response["Message"] = err.Error()
+			return
+		}
+		err = operator(utils.GetLastElement[*base.Node](copyNode.Children))
+		if err != nil {
+			response["Message"] = err.Error()
+			return
+		}
+		response["Ok"] = true
+		response["Save"] = func() {
+			*node = *copyNode
+		}
+		return
+	}
+	yakNode.Process = func() any {
+		//defer func() {
+		//	if e := recover(); e != nil {
+		//		utils.PrintCurrentGoroutineRuntimeStack()
 		//	}
-		//	err = node.Generate(subData)
-		//}
+		//}()
+
 		err := operator(node)
 		if err != nil {
 			panic(err)
 		}
-		res, err := GetResultByNode(node)
-		if err != nil {
-			panic(fmt.Errorf("parse node %s error: %w", node.Name, err))
-		}
-		return res
+		return GetResultByNode(node)
 	}
 	yakNode.ForEachChild = func(f func(child *YakNode)) {
 		for _, child := range node.Children {
@@ -80,11 +100,14 @@ func ConvertToYakNode(node *base.Node, operator func(node2 *base.Node) error) *Y
 		}
 	}
 	yakNode.GetRemainingSpace = func() uint64 {
-		res, err := getNodeLength(yakNode.origin)
+		res, err := getRemainingSpace(yakNode.origin)
 		if err != nil {
 			panic(err)
 		}
 		return res
+	}
+	yakNode.CalcNodeResultLength = func() uint64 {
+		return CalcNodeResultLength(yakNode.origin)
 	}
 	return yakNode
 }
@@ -102,11 +125,7 @@ func ExecOperator(node *base.Node, code string, operator func(node2 *base.Node) 
 			if targetNode == nil {
 				panic("node not found")
 			}
-			res, err := GetResultByNode(targetNode)
-			if err != nil {
-				panic(err)
-			}
-			return res
+			return GetResultByNode(targetNode)
 		},
 		"setCfg": func(key string, value any) {
 			targetNode, key := getNodeAttrByPath(node, key)

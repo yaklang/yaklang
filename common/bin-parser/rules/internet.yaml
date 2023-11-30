@@ -5,14 +5,27 @@ Package:
       node.Process()
     })
     protocol = getNodeResult("@Internet.Protocol")
+    total = getNodeResult("@Internet.Total Length")
     switch protocol {
       case 6:
         this.AppendNode(getRootNode("TCP"))
-        this.GetSubNode("TCP").Process()
       case 17:
         this.AppendNode(getRootNode("UDP"))
-        this.GetSubNode("TCP").Process()
+      default:
+        return
     }
+    this.GetSubNode("TCP").Process()
+    res = this.TryProcessNode(getRootNode("TLS"))
+    if res.Ok {
+        res.Save()
+    }else{
+        dump(res.Message)
+    }
+    n = getNodeResult("@Internet.Total Length")*8 - this.GetSubNode("TCP").CalcNodeResultLength() - this.GetSubNode("TLS").CalcNodeResultLength() - this.GetSubNode("Internet").CalcNodeResultLength()
+    this.AppendNode(getRootNode("Unknown"))
+    this.GetSubNode("Unknown").SetCfg("length", n)
+    this.GetSubNode("Unknown").Process()
+
   Ethernet:
     Destination: raw,6
     Source: raw,6
@@ -33,4 +46,5 @@ Package:
     Destination: raw
 TCP: "import:tcp.yaml;node:Package.TCP"
 UDP: "import:udp.yaml;node:Package.UDP"
-
+TLS: "import:tls.yaml;node:Package.TLS"
+Unknown: raw

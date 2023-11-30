@@ -1,10 +1,6 @@
 package base
 
-const (
-	CfgParent   = "parent"
-	CfgLastNode = "lastNode"
-	CfgRootMap  = "rootNodeMap"
-)
+type NodeConfigFun func(config *Config)
 
 var parseMap = make(map[string]Parser)
 
@@ -20,4 +16,3 @@ type Parser interface {
 type BaseParser struct {
 	root *Node
 }
-
