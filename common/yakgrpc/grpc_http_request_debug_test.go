@@ -4,11 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
+	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -366,54 +369,157 @@ func TestFuzzPacket(t *testing.T) {
 		panic(err)
 	}
 	ctx := context.Background()
-	fuzz := func(targetUrl string, cfg *ypb.DebugPluginRequest) map[string]any {
+	var getElement func(dict any, keys ...string) any
+	getElement = func(dict any, keys ...string) any {
+		if len(keys) <= 0 {
+			return dict
+		}
+		if dict == nil {
+			return nil
+		}
+		refV := reflect.ValueOf(dict)
+		if refV.Kind() == reflect.Map {
+			if refV.MapIndex(reflect.ValueOf(keys[0])).IsValid() {
+				return getElement(refV.MapIndex(reflect.ValueOf(keys[0])).Interface(), keys[1:]...)
+			}
+		}
+		return nil
+	}
+	fuzz := func(targetUrl string, cfg *ypb.DebugPluginRequest) []any {
 		stream, err := client.DebugPlugin(ctx, cfg)
 		if err != nil {
 			panic(err)
 		}
-		res := map[string]any{}
+		res := []any{}
 		for {
 			rsp, err := stream.Recv()
 			if err != nil {
 				break
 			}
-			err = json.Unmarshal(rsp.Message, &res)
+			dict := make(map[string]any)
+			err = json.Unmarshal(rsp.Message, &dict)
 			if err != nil {
 				panic(err)
 			}
-			res["a"] = rsp.Raw
+			data := getElement(dict, "content", "data")
+			if data == nil {
+				continue
+			}
+			dataJson := utils.InterfaceToString(data)
+			err = json.Unmarshal([]byte(dataJson), &dict)
+			if err != nil {
+				continue
+			}
+
+			if getElement(dict, "ok") != nil {
+				res = append(res, getElement(dict, "data"))
+			}
 		}
 		return res
 	}
 
 	host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
-
+		writer.Write([]byte("hello"))
 	})
-
-	// 测试 https 覆盖
-	//for i, testCase := range []struct {
-	//	url    string
-	//	expect []string
-	//}{
-	//	{
-	//		url: "http://www.example.com/",
-	//	},
-	//} {
-	//
-	//}
-
-	var targetUrl = "http://" + utils.HostPort(host, port) + "/c?c=1"
+	marshalResult := func(result []any) string {
+		newRes := []string{}
+		for _, r := range result {
+			m := r.(map[string]any)
+			newRes = append(newRes, spew.Sprintf("%v:%v", m["req"], m["https"]))
+		}
+		sort.Strings(newRes)
+		raw, err := json.Marshal(newRes)
+		if err != nil {
+			panic(err)
+		}
+		return string(raw)
+	}
+	// path 合并
+	var targetUrl = "http://" + utils.HostPort(host, port) + "/aa"
 	res := fuzz(targetUrl, &ypb.DebugPluginRequest{
 		Code: `
-res = {}
-res["reqs"] = REQUESTS
-yakit.Output(res)
+mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+	res = {}
+	res["ok"] = 1
+	res["data"] = {"req":string(req),"https":isHttps}
+	yakit.Output(res)
+}
 `,
 		PluginType: "mitm",
 		HTTPRequestTemplate: &ypb.HTTPRequestBuilderParams{
-			Path: []string{"a?a=1", "b?b=1"},
+			Path: []string{"bb"},
 		},
 		Input: targetUrl,
 	})
-	spew.Dump(res)
+	expect := []any{
+		map[string]any{
+			"https": false,
+			"req":   "GET /aa HTTP/1.1\r\nHost: " + utils.HostPort(host, port) + "\r\n\r\n",
+		},
+		map[string]any{
+			"https": false,
+			"req":   "GET /bb HTTP/1.1\r\nHost: " + utils.HostPort(host, port) + "\r\n\r\n",
+		},
+	}
+	assert.Equal(t, marshalResult(expect), marshalResult(res))
+
+	// https 优先级
+	targetUrl = "http://" + utils.HostPort(host, port) + "/aa"
+	res = fuzz(targetUrl, &ypb.DebugPluginRequest{
+		Code: `
+mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+	res = {}
+	res["ok"] = 1
+	res["data"] = {"req":string(req),"https":isHttps}
+	yakit.Output(res)
+}
+`,
+		PluginType: "mitm",
+		HTTPRequestTemplate: &ypb.HTTPRequestBuilderParams{
+			Path:    []string{"bb"},
+			IsHttps: true,
+		},
+		Input: targetUrl,
+	})
+	expect = []any{
+		map[string]any{
+			"https": false,
+			"req":   "GET /aa HTTP/1.1\r\nHost: " + utils.HostPort(host, port) + "\r\n\r\n",
+		},
+		map[string]any{
+			"https": false,
+			"req":   "GET /bb HTTP/1.1\r\nHost: " + utils.HostPort(host, port) + "\r\n\r\n",
+		},
+	}
+	assert.Equal(t, marshalResult(expect), marshalResult(res))
+	// https 优先级
+	targetUrl = "http://" + utils.HostPort(host, port) + "/aa"
+	res = fuzz(targetUrl, &ypb.DebugPluginRequest{
+		Code: `
+mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+	res = {}
+	res["ok"] = 1
+	res["data"] = {"req":string(req),"https":isHttps}
+	yakit.Output(res)
+}
+`,
+		PluginType: "mitm",
+		HTTPRequestTemplate: &ypb.HTTPRequestBuilderParams{
+			Path:    []string{"bb"},
+			Headers: []*ypb.KVPair{{Key: "Tag", Value: "123"}},
+			IsHttps: true,
+		},
+		Input: targetUrl,
+	})
+	expect = []any{
+		map[string]any{
+			"https": false,
+			"req":   "GET /aa HTTP/1.1\r\nHost: " + utils.HostPort(host, port) + "\r\nTag: 123\r\n\r\n",
+		},
+		map[string]any{
+			"https": false,
+			"req":   "GET /bb HTTP/1.1\r\nHost: " + utils.HostPort(host, port) + "\r\nTag: 123\r\n\r\n",
+		},
+	}
+	assert.Equal(t, marshalResult(expect), marshalResult(res))
 }
