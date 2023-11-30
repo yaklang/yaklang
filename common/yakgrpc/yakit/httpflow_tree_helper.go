@@ -98,9 +98,6 @@ func matchURL(u string, searchPath string) bool {
 			return false
 		}
 	}
-	// 确保搜索路径以 "/" 开头
-	searchPath = "/" + strings.TrimLeft(searchPath, "/")
-	searchPath = strings.TrimRight(searchPath, "/")
 
 	// 解析 URL
 	parsedURL, _ := url.Parse(u)
@@ -109,6 +106,13 @@ func matchURL(u string, searchPath string) bool {
 		return r == '/'
 	}), "/")
 
+	normalizedSearchPath := strings.Join(strings.FieldsFunc(searchPath, func(r rune) bool {
+		return r == '/'
+	}), "/")
+
+	// 确保搜索路径以 "/" 开头
+	searchPath = "/" + strings.TrimLeft(normalizedSearchPath, "/")
+	searchPath = strings.TrimRight(searchPath, "/")
 	// 获取路径并确保它以 "/" 开头
 	path := "/" + strings.TrimLeft(normalizedPath, "/")
 
@@ -128,39 +132,36 @@ func matchURL(u string, searchPath string) bool {
 	return match
 }
 
-func getRawNextPart(path, target string) string {
-	parts := strings.Split(path, "/")
-	slashCount := 0
-	found := false
-	result := ""
+// findNextPathSegment 返回 url 中紧随 target 之后的路径段，包含正确数量的斜杠
+func findNextPathSegment(url, target string) string {
+	// 分割 url 和 target
+	urlSegments := strings.Split(url, "/")
+	targetSegments := strings.Split(target, "/")
 
-	for _, part := range parts {
-		if part == "" {
-			// 空字符串表示原始路径中有一个斜杠
+	targetIndex, slashCount := 0, 0
+
+	// 遍历 urlSegments 查找 targetSegments
+	for _, segment := range urlSegments {
+		targetIndex++
+
+		if segment == "" {
 			slashCount++
 			continue
 		}
 
-		// 如果目标字符串为空，返回第一个非空字符串及其前面的所有斜杠
-		if target == "" {
-			return strings.Repeat("/", slashCount) + part
+		if targetIndex-1 < len(targetSegments) && segment == targetSegments[targetIndex-1] {
+			slashCount = 1 // 重置斜杠计数
+			continue
 		}
 
-		if part == target {
-			found = true
-			result += strings.Repeat("/", slashCount) + part
-			break
+		// 找到 target，返回下一个非空段，连同之前计算的斜杠
+		if segment != "" {
+			return strings.Repeat("/", slashCount) + segment
 		}
 
-		// 遇到非空字符串时重置斜杠计数
-		slashCount = 1
 	}
 
-	if !found {
-		return ""
-	}
-	result = strings.TrimPrefix(path, "//"+target)
-	return result
+	return ""
 }
 
 func GetHTTPFlowNextPartPathByPathPrefix(db *gorm.DB, originPathPrefix string) []*WebsiteNextPart {
@@ -185,23 +186,26 @@ func GetHTTPFlowNextPartPathByPathPrefix(db *gorm.DB, originPathPrefix string) [
 
 	// 假设 urls 是您的 URL 列表
 	for _, us := range urls {
-		usC := us + "%2f"
+		usC := strings.SplitN(us, "?", 2)[0] + "%2f"
 		uc, _ := url.Parse(usC)
 		u, _ := url.Parse(us)
 		if u.Path == "" || uc.RawPath == "" {
 			continue
 		}
 		// 寻找目标字符串，为了解决多个 / 的问题
-		rawNextPart := getRawNextPart(strings.TrimSuffix(uc.RawPath, "%2f"), pathPrefix)
-
+		rawNextPart := findNextPathSegment(strings.TrimSuffix(uc.RawPath, "%2f"), originPathPrefix)
 		// 去除URL路径中多余的斜线
 		normalizedPath := strings.Join(strings.FieldsFunc(u.Path, func(r rune) bool {
 			return r == '/'
 		}), "/")
 
+		normalizedOriginPathPrefix := strings.Join(strings.FieldsFunc(pathPrefix, func(r rune) bool {
+			return r == '/'
+		}), "/")
+
 		path := strings.Trim(normalizedPath, "/")
 
-		pathPrefix, err := url.PathUnescape(pathPrefix)
+		pathPrefix, err := url.PathUnescape(normalizedOriginPathPrefix)
 
 		if err != nil {
 			continue
@@ -212,6 +216,7 @@ func GetHTTPFlowNextPartPathByPathPrefix(db *gorm.DB, originPathPrefix string) [
 		suffix = strings.Trim(suffix, "/")
 
 		nextSegment, after, splited := strings.Cut(suffix, "/")
+
 		// 根据路径是否分割，决定是否有子路径
 		haveChildren := splited && after != ""
 
