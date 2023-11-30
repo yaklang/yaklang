@@ -113,7 +113,7 @@ func TestSimpleFuzzTag_Exec(t *testing.T) {
 		}
 		for i := 0; gener.Next(); i++ {
 			if string(gener.Result().GetData()) != test.expect[i] {
-				t.Fatal("error")
+				t.Fatal(fmt.Errorf("expect: %s, got: %s", test.expect[i], string(gener.Result().GetData())))
 			}
 		}
 	}
