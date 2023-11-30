@@ -78,7 +78,7 @@ func InsertValueReplaceOriginal(original Value, insert Value) {
 		old := builder.readVariableByBlock(variable, item, false)
 		builder.deleteVariableByBlock(variable, item)
 		new := builder.readVariableByBlock(variable, item, false)
-		if !utils.IsNil(old) {
+		if !utils.IsNil(old) && !utils.IsNil(new) {
 			if old != new {
 				replaceInBlock(old, new, item, func(i Instruction) bool {
 					return i == new
