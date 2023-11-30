@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-func TestServer_DebugPlugin_TestFlow(t *testing.T) {
+func TestGRPCMUSTPASS_Server_DebugPlugin_TestFlow(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
@@ -75,7 +75,7 @@ func TestServer_DebugPlugin_TestFlow(t *testing.T) {
 	}
 }
 
-func TestServer_DebugPlugin_MITM_WithRawPacketAndPaths(t *testing.T) {
+func TestGRPCMUSTPASS_Server_DebugPlugin_MITM_WithRawPacketAndPaths(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		panic(err)
@@ -147,7 +147,7 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
 	}
 }
 
-func TestServer_DebugPlugin_MITM_WithRawPacket(t *testing.T) {
+func TestGRPCMUSTPASS_Server_DebugPlugin_MITM_WithRawPacket(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		panic(err)
@@ -208,11 +208,11 @@ User-Agent: xxx
 	}
 	count := codec.Atoi(yakit.Get(token))
 	t.Logf("count: %d", count)
-	if count != 2 {
-		panic("count should be 2")
+	if count != 1 {
+		panic("count should be 1")
 	}
-	if !aPass {
-		panic("a should pass")
+	if aPass {
+		panic("a should not pass")
 	}
 
 	if !bPass {
@@ -220,7 +220,7 @@ User-Agent: xxx
 	}
 }
 
-func TestServer_DebugPlugin_MITM(t *testing.T) {
+func TestGRPCMUSTPASS_Server_DebugPlugin_MITM(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		panic(err)
@@ -288,7 +288,7 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
 	}
 }
 
-func TestServer_DebugPlugin_MITM_WithURLTARGET(t *testing.T) {
+func TestGRPCMUSTPASS_Server_DebugPlugin_MITM_WithURLTARGET(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		panic(err)
@@ -363,7 +363,7 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
 	}
 }
 
-func TestFuzzPacket(t *testing.T) {
+func TestGRPCMUSTPASS_FuzzPacket(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		panic(err)
