@@ -838,6 +838,19 @@ func (s *Server) CoverPayloadGroupToDatabase(req *ypb.NameRequest, stream ypb.Ya
 	if group.Content == nil || *group.Content == "" {
 		return utils.Error("this group filename  is empty")
 	}
+	folder := ""
+	if group.Folder != nil {
+		folder = *group.Folder
+	} else {
+		utils.Error("this folder is nil, please try agin.")
+	}
+	var groupindex int64 = 0
+	if group.GroupIndex != nil {
+		groupindex = *group.GroupIndex
+	} else {
+		return utils.Error("this group index is empty, please try again.")
+	}
+
 	filename := *group.Content
 	if state, err := os.Stat(filename); err != nil {
 		return err
@@ -858,8 +871,8 @@ func (s *Server) CoverPayloadGroupToDatabase(req *ypb.NameRequest, stream ypb.Ya
 	for lineB := range ch {
 		line := utils.UnsafeBytesToString(lineB)
 		size += int64(len(line))
-		yakit.CreateAndUpdatePayload(s.GetProfileDatabase(), line, group.Group, *group.Folder, 0)
+		yakit.CreateAndUpdatePayload(s.GetProfileDatabase(), line, group.Group, folder, 0)
 	}
-
+	yakit.UpdatePayloadGroup(s.GetProfileDatabase(), group.Group, folder, groupindex)
 	return nil
 }
