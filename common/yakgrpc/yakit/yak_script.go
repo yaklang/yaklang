@@ -76,8 +76,14 @@ type YakScript struct {
 	OnlineGroup    string      `json:"online_group"`
 	sourceScript   interface{} // 用于存储原始的 script(可能是由原类型是NaslScript)
 
-	IsCorePlugin bool `json:"is_core_plugin"` // 判断是否是核心插件
-
+	IsCorePlugin bool   `json:"is_core_plugin"` // 判断是否是核心插件
+	RiskType     string `json:"risk_type"`
+	// 漏洞详情 建议，描述，cwe
+	RiskDetail string `json:"risk_detail"`
+	// 漏洞类型-补充说明
+	RiskAnnotation string `json:"risk_annotation"`
+	// 协作者
+	CollaboratorInfo string `json:"collaborator_info"`
 }
 
 func (s *YakScript) BeforeSave() error {
@@ -120,6 +126,23 @@ func (s *YakScript) ToGRPCModel() *ypb.YakScript {
 			spew.Dump([]byte(r))
 		}
 	}
+	var riskDetail *ypb.QueryYakScriptRiskDetailByCWEResponse
+	if s.RiskDetail != "" && s.RiskDetail != `""` {
+		err := json.Unmarshal([]byte(s.RiskDetail), &riskDetail)
+		if err != nil {
+			log.Errorf("unmarshal riskDetail failed: %s", err)
+			spew.Dump([]byte(s.RiskDetail))
+		}
+	}
+	var collaboratorInfo []*ypb.Collaborator
+	if s.CollaboratorInfo != "" && s.CollaboratorInfo != `""` {
+		c, _ := strconv.Unquote(s.CollaboratorInfo)
+		err := json.Unmarshal([]byte(c), &collaboratorInfo)
+		if err != nil {
+			log.Errorf("unmarshal collaboratorInfo failed: %s", err)
+			spew.Dump([]byte(c))
+		}
+	}
 
 	script := &ypb.YakScript{
 		Id:                   int64(s.ID),
@@ -151,10 +174,16 @@ func (s *YakScript) ToGRPCModel() *ypb.YakScript {
 		BaseOnlineId:         s.BaseOnlineId,
 		OnlineOfficial:       s.OnlineOfficial,
 		OnlineGroup:          s.OnlineGroup,
+		UpdatedAt:            s.UpdatedAt.Unix(),
+		RiskAnnotation:       s.RiskAnnotation,
+		RiskType:             s.RiskType,
+		RiskDetail:           riskDetail,
+		CollaboratorInfo:     collaboratorInfo,
+		IsCorePlugin:         s.IsCorePlugin,
 	}
-	if s.Type == "mitm" {
+	/*if s.Type == "mitm" {
 		script.Params = mitmPluginDefaultPlugins
-	}
+	}*/
 	return script
 }
 
@@ -404,28 +433,25 @@ func DeleteYakScriptByWhere(db *gorm.DB, params *ypb.DeleteLocalPluginsByWhereRe
 	db = UserDataAndPluginDatabaseScope(db)
 
 	db = db.Model(&YakScript{}).Unscoped()
-	if params.GetType() == "" && params.GetKeywords() == "" {
+	/*if params.GetType() == "" && params.GetKeywords() == "" {
 		db = db.Where(
 			"true",
 		)
-	} else {
-		if params.GetType() != "" {
-			db = bizhelper.ExactQueryStringArrayOr(db, "type", utils.PrettifyListFromStringSplited(params.GetType(), ","))
-		}
-
-		if params.GetKeywords() != "" {
-			db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{
-				"script_name", "content", "help", "author", "tags",
-			}, strings.Split(params.GetKeywords(), ","), false)
-		}
-
-		if params.GetUserId() > 0 {
-			db = db.Where("user_id = ?", params.GetUserId())
-		}
-
-		if params.GetUserName() != "" {
-			db = db.Where("author like ?", "%"+params.GetUserName()+"%")
-		}
+	} else {*/
+	db = bizhelper.ExactQueryStringArrayOr(db, "type", utils.PrettifyListFromStringSplited(params.GetType(), ","))
+	db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{
+		"script_name", "content", "help", "author", "tags",
+	}, strings.Split(params.GetKeywords(), ","), false)
+	if params.GetUserId() > 0 {
+		db = db.Where("user_id = ?", params.GetUserId())
+	}
+	/*if params.GetUserName() != "" {
+		db = db.Where("author like ?", "%"+params.GetUserName()+"%")
+	}*/
+	db = bizhelper.FuzzQueryLike(db, "author", params.GetUserName())
+	db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{"tags"}, strings.Split(params.GetTags(), ","), false)
+	if len(params.Ids) > 0 {
+		db = db.Where("id in (?)", params.Ids)
 	}
 	if db = db.Delete(&YakScript{}); db.Error != nil {
 		return db.Error
@@ -532,7 +558,9 @@ func FilterYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) *gorm.DB {
 			db = bizhelper.ExactQueryStringArrayOr(db, "script_name", params.GetIncludedScriptNames())
 		}
 	}
-
+	if params.GetUUID() != "" {
+		db = db.Where("uuid = ?", params.GetUUID())
+	}
 	return db
 }
 
@@ -582,18 +610,10 @@ func QueryYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) (*bizhelper.
 		orderOrdinary = strings.TrimSpace(orderOrdinary)
 	}
 
-	if !params.GetIgnoreGeneralModuleOrder() {
-		if orderOrdinary != "" {
-			db = db.Order(`is_general_module desc, ` + orderOrdinary)
-		} else {
-			db = db.Order(`is_general_module desc, updated_at desc`)
-		}
+	if orderOrdinary != "" {
+		db = db.Order(orderOrdinary)
 	} else {
-		if orderOrdinary != "" {
-			db = db.Order(orderOrdinary)
-		} else {
-			db = db.Order("updated_at desc")
-		}
+		db = db.Order("updated_at desc")
 	}
 
 	db = FilterYakScript(db, params) // .LogMode(true).Debug()
