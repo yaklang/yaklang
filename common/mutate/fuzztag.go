@@ -32,6 +32,7 @@ type FuzzTagDescription struct {
 	HandlerEx        func(string) []*fuzztag.FuzzExecResult
 	ErrorInfoHandler func(string) ([]string, error)
 	IsDyn            bool
+	IsDynFun         func(name, params string) bool
 	Alias            []string
 	Description      string
 }
@@ -42,9 +43,16 @@ func AddFuzzTagDescriptionToMap(methodMap map[string]*parser.TagMethod, f *FuzzT
 	}
 	name := f.TagName
 	alias := f.Alias
+	var expand map[string]any
+	if f.IsDynFun != nil {
+		expand = map[string]any{
+			"IsDynFun": f.IsDynFun,
+		}
+	}
 	methodMap[name] = &parser.TagMethod{
-		Name:  name,
-		IsDyn: f.IsDyn,
+		Name:   name,
+		IsDyn:  f.IsDyn,
+		Expand: expand,
 		Fun: func(s string) (result []*parser.FuzzResult, err error) {
 			defer func() {
 				if r := recover(); r != nil {
@@ -667,7 +675,12 @@ func init() {
 	})
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "randint",
-		IsDyn:   true,
+		IsDynFun: func(name, params string) bool {
+			if len(utils.PrettifyListFromStringSplited(params, ",")) == 3 {
+				return false
+			}
+			return true
+		},
 		Handler: func(s string) []string {
 			var (
 				min, max, count uint
@@ -756,7 +769,12 @@ func init() {
 	})
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "randstr",
-		IsDyn:   true,
+		IsDynFun: func(name, params string) bool {
+			if len(utils.PrettifyListFromStringSplited(params, ",")) == 3 {
+				return false
+			}
+			return true
+		},
 		ErrorInfoHandler: func(s string) ([]string, error) {
 			var (
 				min, max, count uint
