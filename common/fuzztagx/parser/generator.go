@@ -97,6 +97,7 @@ func NewTagGenerator(tag TagNode, ctx *MethodContext) *TagExecNode {
 		methodCtx: ctx,
 	}
 }
+
 func (f *TagExecNode) FirstExecWithBackpropagation(bp, exec, all bool) error {
 	f.FirstExec(bp, exec, all)
 	return f.backpropagation()
@@ -149,6 +150,9 @@ func (f *TagExecNode) exec(s *FuzzResult) error {
 	return nil
 }
 func (f *TagExecNode) Exec() (bool, error) {
+	if f.isDyn && f.index >= 1 {
+		return false, nil
+	}
 	defer func() {
 		f.index++
 	}()
@@ -317,6 +321,7 @@ func (g *Generator) generate() (bool, error) {
 	i := 0
 	renderedNode := map[unsafe.Pointer]struct{}{}
 	successCallBacks := []func() error{}
+	failedTag := map[*TagExecNode]struct{}{}
 	for {
 		if len(g.data) == i {
 			break
@@ -367,14 +372,8 @@ func (g *Generator) generate() (bool, error) {
 			}
 		}
 		if !genOneOk {
-			if i < len(g.data)-1 { // 最后一个元素无法进位
-				i := i
-				successCallBacks = append(successCallBacks, func() error {
-					if v, ok := g.data[i].(*TagExecNode); ok {
-						return v.FirstExecWithBackpropagation(true, false, true)
-					}
-					return nil
-				})
+			if v, ok := g.data[i].(*TagExecNode); ok {
+				failedTag[v] = struct{}{}
 			}
 		} else {
 			for _, back := range successCallBacks {
@@ -382,19 +381,23 @@ func (g *Generator) generate() (bool, error) {
 					return true, err
 				}
 			}
-			for tag, _ := range g.methodCtx.dynTag {
-				if tag == g.data[i] {
-					continue
-				}
-				var execAllFirst func(t ExecNode)
-				execAllFirst = func(t ExecNode) {
-					if v1, ok := t.(*TagExecNode); ok {
-						for _, param := range v1.params {
-							execAllFirst(param)
-						}
-						v1.FirstExec(false, true, true) //在这个节点第一次执行时已经判断了err，这里不用判断了
+			var execAllFirst func(t ExecNode)
+			execAllFirst = func(t ExecNode) {
+				if v1, ok := t.(*TagExecNode); ok && v1.index >= len(*v1.cache) {
+					for _, param := range v1.params {
+						execAllFirst(param)
 					}
+					v1.FirstExec(false, true, true) //在这个节点第一次执行时已经判断了err，这里不用判断了
 				}
+			}
+			for tag, _ := range failedTag {
+				if _, ok := g.methodCtx.dynTag[tag]; ok {
+					continue
+				} else {
+					tag.FirstExecWithBackpropagation(true, false, true)
+				}
+			}
+			for tag, _ := range g.methodCtx.dynTag {
 				execAllFirst(tag)
 				tag.backpropagation()
 			}
