@@ -143,6 +143,11 @@ func (f *websiteFromHttpFlow) Get(params *ypb.RequestYakURLParams) (*ypb.Request
 			}
 			srcItem.Extra = append(srcItem.Extra, &ypb.KVPair{Key: "url", Value: websiteRoot + srcItem.Url.GetPath()})
 
+			if result.Count > 1 {
+				srcItem.VerboseName = fmt.Sprintf("%v/ [%v]", result.NextPart, srcItem.SizeVerbose)
+			} else {
+				srcItem.VerboseName = result.NextPart
+			}
 			if result.HaveChildren {
 				srcItem.ResourceType = "path"
 				srcItem.HaveChildrenNodes = true
@@ -151,15 +156,11 @@ func (f *websiteFromHttpFlow) Get(params *ypb.RequestYakURLParams) (*ypb.Request
 			if result.IsQuery {
 				srcItem.ResourceType = "query"
 				srcItem.VerboseType = "website-file-with-query"
+				srcItem.VerboseName = fmt.Sprintf("GET 参数: %v", result.NextPart)
 			}
 			if result.IsFile {
 				srcItem.ResourceType = "file"
 				srcItem.VerboseType = "website-file"
-			}
-			if result.Count > 1 {
-				srcItem.VerboseName = fmt.Sprintf("%v/ [%v]", result.NextPart, srcItem.SizeVerbose)
-			} else {
-				srcItem.VerboseName = result.NextPart
 			}
 
 			srcItem.YakURLVerbose = srcItem.Url.GetSchema() + "://" + srcItem.Url.GetLocation() + srcItem.Url.GetPath()
