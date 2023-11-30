@@ -293,6 +293,21 @@ func init() {
 	})
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{
+		TagName: "crlf",
+		Handler: func(s string) []string {
+			if ret := codec.Atoi(s); ret > 0 {
+				return []string{
+					strings.Repeat("\r\n", ret),
+				}
+			}
+			return []string{
+				"\r\n",
+			}
+		},
+		Description: "生成一个 CRLF，如果指定了数量，将生成指定数量的 CRLF {{crlf(5)}} 表示生成 5 个 CRLF",
+	})
+
+	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "gb18030",
 		Handler: func(s string) []string {
 			g, err := codec.Utf8ToGB18030([]byte(s))
