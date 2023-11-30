@@ -726,7 +726,7 @@ func SolutionAndDescriptionByCWE(FromYakScript, RiskTypeVerbose, TitleVerbose st
 		"未授权访问":  552,
 		"路径遍历":   22,
 		"敏感信息泄漏": 200,
-		"身份验证错误": 1211,
+		"身份验证错误": 305,
 		"权限提升":   271,
 		"业务逻辑漏洞": 840,
 		"默认配置漏洞": 1188,
