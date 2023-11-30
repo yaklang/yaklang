@@ -228,6 +228,72 @@ Host: www.baidu.com
 	}
 }
 
+func TestGRPCMUSTPASS_HTTPFuzzerWithLegacyTag(t *testing.T) {
+	var requestedCount int
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		requestedCount++
+		writer.Write([]byte("abc"))
+	})
+
+	c, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	client, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+		Request: string(lowhttp.ReplaceHTTPPacketHeader([]byte(`GET /{{rs(10,10,10)}} HTTP/1.1
+Host: www.baidu.com
+
+`), "Host", utils.HostPort(host, port))),
+		Concurrent:               10,
+		FuzzTagMode:              "legacy",
+		PerRequestTimeoutSeconds: 5,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var count int
+	for {
+		rsp, err := client.Recv()
+		if err != nil {
+			break
+		}
+		_ = rsp
+		count++
+	}
+	if count != 10 {
+		t.Fatalf("expect 10, got %v", count)
+	}
+
+	client, err = c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+		Request: string(lowhttp.ReplaceHTTPPacketHeader([]byte(`GET /{{rs(10,10,10)}} HTTP/1.1
+Host: www.baidu.com
+
+`), "Host", utils.HostPort(host, port))),
+		Concurrent:               10,
+		ForceFuzz:                true,
+		PerRequestTimeoutSeconds: 5,
+		ForceOnlyOneResponse:     true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count = 0
+	for {
+		rsp, err := client.Recv()
+		if err != nil {
+			break
+		}
+		_ = rsp
+		count++
+	}
+	if count != 1 {
+		t.Fatalf("expect 1, got %v", count)
+	}
+}
+
 func TestGRPCMUSTPASS_ExtractUrl(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {

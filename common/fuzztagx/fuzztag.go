@@ -80,7 +80,15 @@ func (f *FuzzTag) Exec(raw *parser.FuzzResult, methods ...map[string]*parser.Tag
 		return []*parser.FuzzResult{parser.NewFuzzResultWithData("")}, nil
 		//return nil, utils.Errorf("fuzztag name %s not found", name)
 	}
-	if fun.IsDyn {
+	var isDynFunRes bool
+	if fun.Expand != nil {
+		if isDynFun, ok := fun.Expand["IsDynFun"]; ok {
+			if v, ok := isDynFun.(func(name, params string) bool); ok {
+				isDynFunRes = v(name, params)
+			}
+		}
+	}
+	if fun.IsDyn || isDynFunRes {
 		f.Labels = append(f.Labels, "dyn")
 	}
 	return fun.Fun(params)
@@ -119,6 +127,22 @@ func (f *SimpleFuzzTag) Exec(raw *parser.FuzzResult, methods ...map[string]*pars
 				if fun := fMap[name]; fun != nil {
 					if fun.IsDyn {
 						isDyn = true
+					}
+					originF := fun.Fun
+					fun.Fun = func(s string) ([]*parser.FuzzResult, error) {
+						if fun.Expand != nil {
+							if isDynFun, ok := fun.Expand["IsDynFun"]; ok {
+								if v, ok := isDynFun.(func(name, params string) bool); ok {
+									if v(name, s) {
+										set := utils.NewSet[string]()
+										set.AddList(labels)
+										set.Add("dyn")
+										f.Labels = set.List()
+									}
+								}
+							}
+						}
+						return originF(s)
 					}
 					return fun, nil
 				}
