@@ -140,6 +140,14 @@ func (p *FuzzHTTPRequestParam) PositionVerbose() string {
 	return PositionTypeVerbose(p.typePosition)
 }
 
+func (p *FuzzHTTPRequestParam) GetFirstValue() string {
+	vals := utils.InterfaceToSliceInterface(p.Value())
+	if len(vals) > 0 {
+		return utils.InterfaceToString(vals[0])
+	}
+	return ""
+}
+
 func (p *FuzzHTTPRequestParam) Value() interface{} {
 	switch p.typePosition {
 	case posGetQueryBase64, posPostQueryBase64, posCookieBase64:

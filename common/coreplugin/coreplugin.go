@@ -115,6 +115,11 @@ func init() {
 			withPluginAuthors("WaY"),
 		)
 		registerBuildInPlugin(
+			"mitm", "文件包含",
+			withPluginHelp(`利用PHP伪协议特性和base64收敛特性测试文件包含`),
+			withPluginAuthors("V1ll4n"),
+		)
+		registerBuildInPlugin(
 			"mitm", "开放 URL 重定向漏洞",
 			withPluginHelp("检测开放 URL 重定向漏洞，可检查 meta / js / location 中的内容"),
 			withPluginAuthors("Rookie"),
