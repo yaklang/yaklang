@@ -15,9 +15,6 @@ func (b *astbuilder) buildLiteralExpression(stmt *JS.LiteralExpressionContext) s
 	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 
-	// s := stmt.Literal()
-	// fmt.Println(s)
-
 	if s, ok := stmt.Literal().(*JS.LiteralContext); ok {
 		return b.buildLiteral(s)
 	}
@@ -51,6 +48,7 @@ func (b *astbuilder) buildLiteral(stmt *JS.LiteralContext) ssa.Value {
 	} else if stmt.NullLiteral() != nil {
 		return b.buildNullLiteral()
 	} else if stmt.RegularExpressionLiteral() != nil {
+		return ssa.NewConst(stmt.GetText())
 		// TODO
 	}
 
@@ -87,7 +85,7 @@ func (b *astbuilder) buildNumericLiteral(stmt *JS.NumericLiteralContext) ssa.Val
 		// fmt.Println(originStr)
 
 		if num := stmt.DecimalLiteral(); num != nil { // 十进制
-			if strings.Contains(stmt.GetText(),"e") {
+			if strings.Contains(stmt.GetText(), "e") {
 				var f, _ = strconv.ParseFloat(intStr, 64)
 				return ssa.NewConst(f)
 			}
@@ -111,9 +109,9 @@ func (b *astbuilder) buildNumericLiteral(stmt *JS.NumericLiteralContext) ssa.Val
 		}
 
 		if resultInt64 > math.MaxInt {
-			return ssa.NewConst(int64(resultInt64))
+			return b.EmitConstInst(int64(resultInt64))
 		} else {
-			return ssa.NewConst(int(resultInt64))
+			return b.EmitConstInst(int64(resultInt64))
 		}
 	}
 }
@@ -166,5 +164,5 @@ func (b *astbuilder) buildBooleanLiteral(bo string) ssa.Value {
 }
 
 func (b *astbuilder) buildNullLiteral() ssa.Value {
-	return ssa.NewConst(nil)
+	return b.EmitConstInst(nil)
 }
