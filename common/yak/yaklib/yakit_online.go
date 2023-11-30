@@ -415,7 +415,7 @@ func (s *OnlineClient) Save(db *gorm.DB, plugins ...*OnlinePlugin) error {
 		paramsStr := strconv.Quote(string(raw))
 
 		existedYakScript, _ := yakit.GetYakScriptByName(db, i.ScriptName)
-		if existedYakScript != nil && existedYakScript.OnlineId <= 0 {
+		if existedYakScript != nil {
 			yakit.DeleteYakScriptByName(db, existedYakScript.ScriptName)
 		}
 		var scriptName = i.ScriptName
