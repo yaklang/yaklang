@@ -1,4 +1,4 @@
-// Code generated from ./JavaScriptParser.g4 by ANTLR 4.13.0. DO NOT EDIT.
+// Code generated from ./JavaScriptParser.g4 by ANTLR 4.13.1. DO NOT EDIT.
 
 package parser // JavaScriptParser
 
@@ -244,6 +244,12 @@ type JavaScriptParserVisitor interface {
 
 	// Visit a parse tree produced by JavaScriptParser#expressionSequence.
 	VisitExpressionSequence(ctx *ExpressionSequenceContext) interface{}
+
+	// Visit a parse tree produced by JavaScriptParser#specificExpression.
+	VisitSpecificExpression(ctx *SpecificExpressionContext) interface{}
+
+	// Visit a parse tree produced by JavaScriptParser#questionDot.
+	VisitQuestionDot(ctx *QuestionDotContext) interface{}
 
 	// Visit a parse tree produced by JavaScriptParser#TemplateStringExpression.
 	VisitTemplateStringExpression(ctx *TemplateStringExpressionContext) interface{}

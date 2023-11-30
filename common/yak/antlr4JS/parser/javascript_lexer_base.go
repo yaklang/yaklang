@@ -1,6 +1,8 @@
 package parser
 
-import "github.com/antlr4-go/antlr/v4"
+import (
+	"github.com/antlr4-go/antlr/v4"
+)
 
 // JavaScriptLexerBase state
 type JavaScriptLexerBase struct {
@@ -116,12 +118,12 @@ func (l *JavaScriptLexerBase) IsInTemplateString() bool {
 }
 
 func (l *JavaScriptLexerBase) Reset() {
-    l.scopeStrictModes = nil
-    l.stackLength = 0
-    l.stackIx = 0
-    l.lastToken = nil
-    l.useStrictDefault = false
-    l.useStrictCurrent = false
-    l.templateDepth = 0
+	l.scopeStrictModes = nil
+	l.stackLength = 0
+	l.stackIx = 0
+	l.lastToken = nil
+	l.useStrictDefault = false
+	l.useStrictCurrent = false
+	l.templateDepth = 0
 	l.BaseLexer.Reset()
 }

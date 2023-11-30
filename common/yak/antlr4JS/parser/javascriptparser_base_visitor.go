@@ -1,4 +1,4 @@
-// Code generated from ./JavaScriptParser.g4 by ANTLR 4.13.0. DO NOT EDIT.
+// Code generated from ./JavaScriptParser.g4 by ANTLR 4.13.1. DO NOT EDIT.
 
 package parser // JavaScriptParser
 
@@ -321,6 +321,14 @@ func (v *BaseJavaScriptParserVisitor) VisitArgument(ctx *ArgumentContext) interf
 }
 
 func (v *BaseJavaScriptParserVisitor) VisitExpressionSequence(ctx *ExpressionSequenceContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaScriptParserVisitor) VisitSpecificExpression(ctx *SpecificExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaScriptParserVisitor) VisitQuestionDot(ctx *QuestionDotContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
