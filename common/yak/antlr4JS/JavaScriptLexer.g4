@@ -52,7 +52,6 @@ SemiColon:                      ';';
 Comma:                          ',';
 Assign:                         '=';
 QuestionMark:                   '?';
-QuestionMarkDot:                '?.';
 Colon:                          ':';
 Ellipsis:                       '...';
 Dot:                            '.';

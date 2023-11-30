@@ -2,6 +2,7 @@ package parser
 
 import (
 	"strings"
+	"unicode"
 
 	"github.com/antlr4-go/antlr/v4"
 )
@@ -35,6 +36,37 @@ func (p *JavaScriptParserBase) notLineTerminator() bool {
 	return !p.here(JavaScriptParserLineTerminator)
 }
 
+func (p *JavaScriptParserBase) notMatchField() bool {
+	text := p.GetTokenStream().GetAllText()
+	if !strings.Contains(text, "?.") {
+		return true
+	} else {
+		_, after, ok := strings.Cut(text, "?")
+		if !ok {
+			return true
+		}
+
+		// '?' '.'
+		if len(after) < 2 {
+			return true
+		}
+		if after[0] == '.' {
+			if ret := strings.TrimLeftFunc(after[1:], unicode.IsSpace); len(ret) < 1 {
+				return true
+			} else {
+				switch ret[0] {
+				case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+					return false
+				default:
+					return true
+				}
+			}
+		}
+		
+		return true
+	}
+}
+
 func (p *JavaScriptParserBase) notOpenBraceAndNotFunction() bool {
 	nextTokenType := p.GetTokenStream().LT(1).GetTokenType()
 	return nextTokenType != JavaScriptParserOpenBrace && nextTokenType != JavaScriptParserFunction_
@@ -64,9 +96,9 @@ func (p *JavaScriptParserBase) here(_type int) bool {
 func (p *JavaScriptParserBase) lineTerminatorAhead() bool {
 	// Get the token ahead of the current index.
 	possibleIndexEosToken := p.GetCurrentToken().GetTokenIndex() - 1
-        if possibleIndexEosToken < 0 {
-            return false
-        }
+	if possibleIndexEosToken < 0 {
+		return false
+	}
 	ahead := p.GetTokenStream().Get(possibleIndexEosToken)
 
 	if ahead.GetChannel() != antlr.LexerHidden {

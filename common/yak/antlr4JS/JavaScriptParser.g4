@@ -363,11 +363,19 @@ expressionSequence
     : singleExpression (',' singleExpression)*
     ;
 
+specificExpression
+    : identifierName
+    | templateStringLiteral 
+    | arguments 
+    ;
+
+questionDot: '?' '.';
+
 singleExpression
     : anonymousFunction                                                     # FunctionExpression
     | Class identifier? classTail                                           # ClassExpression
-    | singleExpression '?.' singleExpression                                # OptionalChainExpression
-    | singleExpression '?.'? '[' singleExpression ']'                     # MemberIndexExpression
+    | singleExpression {p.notMatchField()}? questionDot specificExpression         # OptionalChainExpression
+    | singleExpression {p.notMatchField()}? questionDot? '[' singleExpression ']'  # MemberIndexExpression
     | singleExpression '?'? '.' '#'? identifierName                         # MemberDotExpression
     // Split to try `new Date()` first, then `new Date`.
     | New singleExpression arguments                                        # NewExpression
@@ -408,8 +416,8 @@ singleExpression
     | yieldStatement                                                        # YieldExpression // ECMAScript 6
     | This                                                                  # ThisExpression
     | identifier                                                            # IdentifierExpression
-    | Super                                                                 # SuperExpression
     | literal                                                               # LiteralExpression
+    | Super                                                                 # SuperExpression
     | arrayLiteral                                                          # ArrayLiteralExpression
     | objectLiteral                                                         # ObjectLiteralExpression
     | '(' expressionSequence ')'                                            # ParenthesizedExpression
@@ -432,7 +440,7 @@ objectLiteral
     ;
 
 anonymousFunction
-    : Async? Function_ '*'? '(' formalParameterList? ')' functionBody    # AnonymousFunctionDecl
+    : Async? Function_ '*'? identifier? '(' formalParameterList? ')' functionBody    # AnonymousFunctionDecl
     | Async? arrowFunctionParameters '=>' arrowFunctionBody                    # ArrowFunction
     ;
 
