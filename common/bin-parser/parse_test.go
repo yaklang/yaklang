@@ -289,11 +289,51 @@ func TestNegotiateMessage(t *testing.T) {
 		"NegotiateFlags":    897714272,
 		"DomainNameFields":  "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000",
 		"WorkstationFields": "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000",
-		"Version":           "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000",
 	}
 	res, err = GenerateBinary(mapData, "application-layer.ntlm", "NegotiateMessage")
 	if err != nil {
 		t.Fatal(err)
 	}
 	DumpNode(res)
+	assert.Equal(t, "4e544c4d53535000010000003582086000000000000000000000000000000000", codec.EncodeToHex(NodeToBytes(res)))
+}
+
+func TestNTLM(t *testing.T) {
+	//data := `TlRMTVNTUAABAAAAB4IIAAAAAAAgAAAAAAAAACAAAAA=`
+	//payload, err := codec.DecodeBase64(data)
+	//if err != nil {
+	//	t.Fatal(err)
+	//}
+	//reader := bytes.NewReader(payload)
+	//res, err := ParseBinary(reader, "application-layer.ntlm", "NegotiateMessage")
+	//if err != nil {
+	//	t.Fatal(err)
+	//}
+	//DumpNode(res)
+	//data := `TlRMTVNTUAACAAAAHgAeADgAAAAFgooC7IuMmq8CVtsAAAAAAAAAAJgAmABWAAAACgA5OAAAAA9pAFoANwB3ADQAbgAxAGkAbwB1AG0ANgA0ADUAWgACAB4AaQBaADcAdwA0AG4AMQBpAG8AdQBtADYANAA1AFoAAQAeAGkAWgA3AHcANABuADEAaQBvAHUAbQA2ADQANQBaAAQAHgBpAFoANwB3ADQAbgAxAGkAbwB1AG0ANgA0ADUAWgADAB4AaQBaADcAdwA0AG4AMQBpAG8AdQBtADYANAA1AFoABwAIAMVIWn0iJNoBAAAAAA==`
+	//payload, err := codec.DecodeBase64(data)
+	//if err != nil {
+	//	t.Fatal(err)
+	//}
+	//reader := bytes.NewReader(payload)
+	//res, err := ParseBinary(reader, "application-layer.ntlm", "ChallengeMessage")
+	//if err != nil {
+	//	t.Fatal(err)
+	//}
+	//DumpNode(res)
+	//byts := NodeToBytes(res)
+	//assert.Equal(t, "TlRMTVNTUAACAAAAHgAeADgAAAAFgooC7IuMmq8CVtsAAAAAAAAAAJgAmABWAAAACgA5OAAAAA8=", codec.EncodeBase64(byts))
+	data := `TlRMTVNTUAADAAAAGAAYAFgAAAAWARYBcAAAAAAAAACGAQAACAAIAIYBAAAyADIAjgEAAAAAAABYAAAABYIIAAAAAAAAAAAAqZz37sqK4x+vfueoTCWV7AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPECqzZKz5av1OJCyan6JsABAQAAAAAAAMVIWn0iJNoBNSvbAr/4/dAAAAAAAgAeAGkAWgA3AHcANABuADEAaQBvAHUAbQA2ADQANQBaAAEAHgBpAFoANwB3ADQAbgAxAGkAbwB1AG0ANgA0ADUAWgAEAB4AaQBaADcAdwA0AG4AMQBpAG8AdQBtADYANAA1AFoAAwAeAGkAWgA3AHcANABuADEAaQBvAHUAbQA2ADQANQBaAAcACADFSFp9IiTaAQYABAACAAAACgAQAAAAAAAAAAAAAAAAAAAAAAAJAC4ASABUAFQAUAAvADQANwAuADEAMgAwAC4ANAA0AC4AMgAxADkAOgA4ADAAOAA3AAAAAAAAAAAAdABlAHMAdAB6ADMAcgAwAG4AZQBkAGUATQBhAGMAQgBvAG8AawAtAFAAcgBvAC4AbABvAGMAYQBsAA==`
+	payload, err := codec.DecodeBase64(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader := bytes.NewReader(payload)
+	res, err := ParseBinary(reader, "application-layer.ntlm", "AuthenticationMessage")
+	if err != nil {
+		t.Fatal(err)
+	}
+	DumpNode(res)
+	byts := NodeToBytes(res)
+	assert.Equal(t, "TlRMTVNTUAADAAAAGAAYAFgAAAAWARYBcAAAAAAAAACGAQAACAAIAIYBAAAyADIAjgEAAAAAAABYAAAA", codec.EncodeBase64(byts))
 }

@@ -340,21 +340,18 @@ func walkNode(node *base.Node, handle func(node *base.Node) bool) {
 		walkNode(child, handle)
 	}
 }
+func GetBytesByNode(node *base.Node) []byte {
+	res, err := getNodeResult(node, true)
+	if err != nil {
+		log.Errorf("get node result error: %v", err)
+	}
+	return res.([]byte)
+}
 func GetResultByNode(node *base.Node) any {
 	if NodeHasResult(node) {
 		return GetNodeResult(node)
 	} else {
-		bytesRes := []byte{}
-		walkNode(node, func(node *base.Node) bool {
-			if node.Cfg.Has(CfgNodeResult) {
-				res := GetNodeResult(node)
-				if v, ok := res.([]byte); ok {
-					bytesRes = append(bytesRes, v...)
-				}
-			}
-			return true
-		})
-		return bytesRes
+		return GetBytesByNode(node)
 	}
 }
 func getMapSliceElement(d yaml.MapSlice, path string) any {
@@ -411,13 +408,14 @@ func GetNodeResultPos(node *base.Node) [2]uint64 {
 	return node.Cfg.GetItem(CfgNodeResult).([2]uint64)
 }
 func GetNodeResult(node *base.Node) any {
-	res, err := getNodeResult(node)
+	res, err := getNodeValue(node)
 	if err != nil {
 		log.Errorf("get node result error: %v", err)
 	}
 	return res
 }
-func getNodeResult(node *base.Node) (any, error) {
+
+func getNodeResult(node *base.Node, isByte bool) (any, error) {
 	var endian binx.ByteOrderEnum
 	iendian := node.Cfg.GetItem(CfgEndian)
 	if iendian == nil {
@@ -448,5 +446,12 @@ func getNodeResult(node *base.Node) (any, error) {
 	res.Identifier = node.Name
 	res.ByteOrder = endian
 	res.Type = binx.BinaryTypeVerbose(node.Cfg.GetString(CfgType))
-	return res.Value(), nil
+	if isByte {
+		return res.Bytes, nil
+	} else {
+		return res.Value(), nil
+	}
+}
+func getNodeValue(node *base.Node) (any, error) {
+	return getNodeResult(node, false)
 }

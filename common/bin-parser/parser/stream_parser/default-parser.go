@@ -12,25 +12,26 @@ import (
 )
 
 const (
-	CfgIsTerminal   = "isTerminal"
-	CfgIsList       = "isList"
-	CfgIsTempRoot   = "temp root"
-	CfgLength       = "length"
-	CfgType         = "type"
-	CfgGetResult    = "get result"
-	CfgRawResult    = "raw result"
-	CfgRootMap      = "rootNodeMap"
-	CfgEndian       = "endian"
-	CfgOperator     = "operator"
-	CfgInList       = "inList"
-	CfgParent       = "parent"
-	CfgDel          = "del"
-	CfgDelimiter    = "delimiter"
-	CfgImport       = "import"
-	CfgNodeResult   = "node result"
-	CfgLastNode     = "last node"
-	CfgElementIndex = "element index"
-	CtxGenReaders   = "readers in generator"
+	CfgIsTerminal    = "isTerminal"
+	CfgIsList        = "isList"
+	CfgIsTempRoot    = "temp root"
+	CfgLength        = "length"
+	CfgType          = "type"
+	CfgGetResult     = "get result"
+	CfgRawResult     = "raw result"
+	CfgRootMap       = "rootNodeMap"
+	CfgEndian        = "endian"
+	CfgOperator      = "operator"
+	CfgInList        = "inList"
+	CfgParent        = "parent"
+	CfgDel           = "del"
+	CfgDelimiter     = "delimiter"
+	CfgImport        = "import"
+	CfgNodeResult    = "node result"
+	CfgLastNode      = "last node"
+	CfgElementIndex  = "element index"
+	CfgExceptionPlan = "exception-plan"
+	CtxGenReaders    = "readers in generator"
 )
 
 var baseType = []string{"int", "uint", "int8", "uint8", "int16", "uint16", "int32", "uint32", "int64", "uint64", "string", "bool", "raw"}
@@ -73,6 +74,7 @@ func InitNode(node *base.Node) error {
 				return fmt.Errorf("type `%s` not found", typeName)
 			}
 			err := appendNode(node, v)
+			node.Cfg.SetItem("isRefType", true)
 			utils.GetLastElement[*base.Node](node.Children).Cfg.SetItem(CfgParent, node)
 			node.Cfg.SetItem(CfgIsTerminal, false)
 			if err != nil {
@@ -263,11 +265,26 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 				return err
 			}
 		}
+		err := operator.Backup()
+		if err != nil {
+			return fmt.Errorf("backup error: %w", err)
+		}
 		for _, child := range node.Children {
 			err := d.Operate(operator, child)
 			if err != nil {
+				if node.Cfg.GetString(CfgExceptionPlan) == "skip" {
+					err = operator.Recovery()
+					if err != nil {
+						return fmt.Errorf("pop backup error: %w", err)
+					}
+					return nil
+				}
 				return fmt.Errorf("parse child node error: %w", err)
 			}
+		}
+		err = operator.PopBackup()
+		if err != nil {
+			return fmt.Errorf("pop backup error: %w", err)
 		}
 		return nil
 	}
