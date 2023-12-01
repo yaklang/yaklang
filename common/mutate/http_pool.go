@@ -608,7 +608,16 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 					rspInstance, err := lowhttp.HTTP(lowhttpOptions...)
 					var rsp []byte
 					if rspInstance != nil {
+						// 多请求的话，要保留原样
 						rsp = rspInstance.RawPacket
+						if !rspInstance.MultiResponse {
+							if ret := lowhttp.GetHTTPPacketHeader(rspInstance.RawPacket, "Content-Encoding"); ret != "" {
+								var rspFixed, _, _ = lowhttp.FixHTTPResponse(rspInstance.RawPacket)
+								if len(rspFixed) > 0 {
+									rsp = rspFixed
+								}
+							}
+						}
 					}
 
 					if config.HookAfterRequest != nil {
