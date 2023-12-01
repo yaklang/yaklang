@@ -107,7 +107,7 @@ func TestGRPCMUSTPASS_HTTPFuzzerWithNoFixGZIP(t *testing.T) {
 	var token = utils.RandStringBytes(200)
 	body, _ := utils.GzipCompress(token)
 	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
-		"Content-Length: " + fmt.Sprint("11") + "\r\n" +
+		"Content-Length: " + fmt.Sprint(len(body)) + "\r\n" +
 		"Content-Encoding: gzip\r\n\r\n" + string(body)))
 	c, err := NewLocalClient()
 	if err != nil {
@@ -142,6 +142,48 @@ Host: %v
 
 	if !haveToken {
 		t.Fatal("NO TOKEN FOUND, PLUGIN is not executed!")
+	}
+}
+
+func TestGRPCMUSTPASS_HTTPFuzzerWithNoFixGZIP_Negative(t *testing.T) {
+	var token = utils.RandStringBytes(200)
+	body, _ := utils.GzipCompress(token)
+	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
+		"Content-Length: " + fmt.Sprint(len(body)) + "\r\n" +
+		"X: 1\r\n\r\n" + string(body)))
+	c, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	client, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+		Request: fmt.Sprintf(`GET /{{rs}} HTTP/1.1
+Host: %v 
+
+`, utils.HostPort(host, port)),
+		Concurrent:               10,
+		IsHTTPS:                  false,
+		ForceFuzz:                true,
+		PerRequestTimeoutSeconds: 5,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	noToken := true
+	for {
+		rsp, err := client.Recv()
+		if err != nil {
+			break
+		}
+		println(string(rsp.ResponseRaw))
+		if strings.Contains(string(rsp.ResponseRaw), token) {
+			noToken = false
+		}
+	}
+
+	if !noToken {
+		t.Fatal("TOKEN FOUND")
 	}
 }
 
