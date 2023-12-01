@@ -50,6 +50,9 @@ func GetNodePath(node *base.Node) string {
 		if node.Name == "Package" {
 			break
 		}
+		if node.Cfg.GetBool(CfgIsTempRoot) {
+			break
+		}
 		parent := node.Cfg.GetItem(CfgParent).(*base.Node)
 		if parent.Cfg.GetBool(CfgIsList) {
 			index := 0

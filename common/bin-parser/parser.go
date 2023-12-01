@@ -427,7 +427,7 @@ func Parse(data io.Reader, rule string) (*Node, error) {
 	}
 	return packageNode, nil
 }
-func ParseBinary(data io.Reader, rule string) (*base.Node, error) {
+func ParseBinary(data io.Reader, rule string, keys ...string) (*base.Node, error) {
 	splits := strings.Split(rule, ".")
 	paths := []string{"./rules/"}
 	splits[len(splits)-1] = splits[len(splits)-1] + ".yaml"
@@ -436,15 +436,22 @@ func ParseBinary(data io.Reader, rule string) (*base.Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = rootNode.Parse(base.NewBitReader(data))
-	if err != nil {
-		return nil, err
+	if len(keys) == 0 {
+		err = rootNode.Parse(base.NewBitReader(data))
+		if err != nil {
+			return nil, err
+		}
+		return rootNode, err
+	} else {
+		err = rootNode.ParseSubNode(base.NewBitReader(data), strings.Join(keys, "."))
+		if err != nil {
+			return nil, err
+		}
+		return base.GetNodeByPath(rootNode, "@"+strings.Join(keys, ".")), nil
 	}
-
-	return rootNode.Children[0], nil
 }
 
-func GenerateBinary(data any, rule string) (*base.Node, error) {
+func GenerateBinary(data any, rule string, keys ...string) (*base.Node, error) {
 	splits := strings.Split(rule, ".")
 	paths := []string{"./rules/"}
 	splits[len(splits)-1] = splits[len(splits)-1] + ".yaml"
@@ -453,5 +460,17 @@ func GenerateBinary(data any, rule string) (*base.Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	return rootNode.Children[0], rootNode.Generate(data)
+	if len(keys) == 0 {
+		err = rootNode.Generate(data)
+		if err != nil {
+			return nil, err
+		}
+		return rootNode, err
+	} else {
+		err = rootNode.GenerateSubNode(data, strings.Join(keys, "."))
+		if err != nil {
+			return nil, err
+		}
+		return base.GetNodeByPath(rootNode, "@"+strings.Join(keys, ".")), nil
+	}
 }

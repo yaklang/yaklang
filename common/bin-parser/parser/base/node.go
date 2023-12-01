@@ -158,6 +158,40 @@ func (n *Node) Copy() *Node {
 	}
 	return res
 }
+func (n *Node) GenerateSubNode(data any, path string) error {
+	parserName := n.Cfg.GetItem("parser")
+	if parserName == nil {
+		return errors.New("not set parser")
+	}
+	parser, ok := parseMap[utils.InterfaceToString(parserName)]
+	if !ok {
+		return fmt.Errorf("parser %s not found", parserName)
+	}
+	if n.Cfg.GetItem("isRoot") != nil {
+		err := parser.OnRoot(n)
+		if err != nil {
+			return fmt.Errorf("on root error: %w", err)
+		}
+	}
+	irootNodeMap := n.Ctx.GetItem(CfgRootMap)
+	if irootNodeMap == nil {
+		return errors.New("not set rootNodeMap")
+	}
+	rootNodeMap, ok := irootNodeMap.(map[string]*Node)
+	if !ok {
+		return errors.New("rootNodeMap type error")
+	}
+	if packageNode, ok := rootNodeMap["Package"]; !ok {
+		return errors.New("package node not found")
+	} else {
+		node := GetNodeByPath(packageNode, path)
+		if node == nil {
+			return fmt.Errorf("node %s not found", path)
+		}
+		node.Cfg.SetItem("temp root", true)
+		return node.Generate(data)
+	}
+}
 func (n *Node) Generate(data any) error {
 	parserName := n.Cfg.GetItem("parser")
 	if parserName == nil {
@@ -178,6 +212,42 @@ func (n *Node) Generate(data any) error {
 		return fmt.Errorf("parse node %s error: %w", n.Name, err)
 	}
 	return nil
+}
+func (n *Node) ParseSubNode(data *BitReader, path string) error {
+	parserName := n.Cfg.GetItem("parser")
+	if parserName == nil {
+		return errors.New("not set parser")
+	}
+	parser, ok := parseMap[utils.InterfaceToString(parserName)]
+	if !ok {
+		return fmt.Errorf("parser %s not found", parserName)
+	}
+	if n.Cfg.GetItem("isRoot") != nil {
+		err := parser.OnRoot(n)
+		if err != nil {
+			return fmt.Errorf("on root error: %w", err)
+		}
+	} else {
+		return errors.New("not root node")
+	}
+
+	irootNodeMap := n.Ctx.GetItem(CfgRootMap)
+	if irootNodeMap == nil {
+		return errors.New("not set rootNodeMap")
+	}
+	rootNodeMap, ok := irootNodeMap.(map[string]*Node)
+	if !ok {
+		return errors.New("rootNodeMap type error")
+	}
+	if packageNode, ok := rootNodeMap["Package"]; !ok {
+		return errors.New("package node not found")
+	} else {
+		node := GetNodeByPath(packageNode, path)
+		if node == nil {
+			return fmt.Errorf("node %s not found", path)
+		}
+		return node.Parse(data)
+	}
 }
 func (n *Node) Parse(reader *BitReader) error {
 	parserName := n.Cfg.GetItem("parser")

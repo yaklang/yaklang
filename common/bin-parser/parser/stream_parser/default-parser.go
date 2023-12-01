@@ -14,6 +14,7 @@ import (
 const (
 	CfgIsTerminal   = "isTerminal"
 	CfgIsList       = "isList"
+	CfgIsTempRoot   = "temp root"
 	CfgLength       = "length"
 	CfgType         = "type"
 	CfgGetResult    = "get result"
