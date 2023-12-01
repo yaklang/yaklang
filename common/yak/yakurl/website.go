@@ -3,7 +3,6 @@ package yakurl
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -20,11 +19,11 @@ type websiteFromHttpFlow struct {
 func parseQueryToRequest(db *gorm.DB, query string) *gorm.DB {
 	var req ypb.QueryHTTPFlowRequest
 
-	if err := json.Unmarshal([]byte(query), &req); err != nil {
-		spew.Dump(&req)
-		return yakit.BuildHTTPFlowQuery(db, &req)
+	err := json.Unmarshal([]byte(query), &req)
+	if err != nil {
+		return db
 	}
-	return db
+	return yakit.BuildHTTPFlowQuery(db, &req)
 }
 
 func (f *websiteFromHttpFlow) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {

@@ -2,7 +2,6 @@ package yakit
 
 import (
 	"context"
-	"fmt"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"net/url"
@@ -12,7 +11,7 @@ import (
 
 func FilterHTTPFlowBySchema(db *gorm.DB, schema string) *gorm.DB {
 	if schema != "" {
-		db = db.Where("url LIKE ?", schema+"://%").Debug()
+		db = db.Where("SUBSTR(url, 1, ?) = ?", len(schema+"://"), schema+"://") //.Debug()
 	}
 	return db
 }
@@ -50,7 +49,7 @@ func GetHTTPFlowDomainsByDomainSuffix(db *gorm.DB, domainSuffix string) []*Websi
 	db = db.Select(
 		"DISTINCT SUBSTR(url, INSTR(url, '://') + 3, INSTR(SUBSTR(url, INSTR(url, '://') + 3), '/') - 1) as next_part,\n" +
 			"SUBSTR(url, 0, INSTR(url, '://'))",
-	).Table("http_flows").Limit(1000).Debug()
+	).Table("http_flows").Limit(1000) //.Debug()
 	if rows, err := db.Rows(); err != nil {
 		log.Error("query nextPart for website tree failed: %s", err)
 		return nil
@@ -169,7 +168,7 @@ func GetHTTPFlowNextPartPathByPathPrefix(db *gorm.DB, originPathPrefix string) [
 	//	return r == '/'
 	//}), "/")
 	pathPrefix := strings.TrimLeft(originPathPrefix, "/")
-	db = db.Select("url").Table("http_flows").Where("url LIKE ?", `%`+pathPrefix+`%`).Limit(1000)
+	db = db.Select("url").Table("http_flows").Where("url LIKE ?", `%`+pathPrefix+`%`).Limit(1000) //.Debug()
 	urlsMap := make(map[string]bool)
 	var urls []string
 	for u := range YieldHTTPUrl(db, context.Background()) {
@@ -292,60 +291,6 @@ func GetHTTPFlowNextPartPathByPathPrefix(db *gorm.DB, originPathPrefix string) [
 		return data[i].NextPart > data[j].NextPart
 	})
 	return data
-}
-
-func GetHTTPFlowNextPartPathByPathPrefixb(db *gorm.DB, originPathPrefix string) []*WebsiteNextPart {
-	pathPrefix := trimPathWithOneSlash(originPathPrefix)
-	db = FilterHTTPFlowPathPrefix(db, originPathPrefix)
-	db = db.Select(fmt.Sprintf(
-		`DISTINCT SUBSTR(
-   url,
-   INSTR(url, '://') + 3 + INSTR(SUBSTR(url, INSTR(url, '://') + 3), '/') + %d,
-   CASE
-	   WHEN INSTR(SUBSTR(url, INSTR(url, '://') + 3), ?) > 0
-		   THEN
-			   INSTR(SUBSTR(url, INSTR(url, '://') + 3), ?) -
-			   INSTR(SUBSTR(url, INSTR(url, '://') + 3), '/') -
-			   1 - %d
-	   ELSE LENGTH(url)
-	   END
-) as next_part`, len(pathPrefix), len(pathPrefix)), "?", "?").Table("http_flows").Limit(1000) // .Debug()
-	if rows, err := db.Rows(); err != nil {
-		log.Error("query nextPart for website tree failed: %s", err)
-		return nil
-	} else {
-		var resultMap = make(map[string]*WebsiteNextPart)
-		for rows.Next() {
-			var nextPart string
-			rows.Scan(&nextPart)
-			if nextPart == "" {
-				continue
-			}
-			if nextPart[0] == '/' {
-				nextPart = nextPart[1:]
-			}
-			haveChildren := false
-			nextPartItem, after, splited := strings.Cut(nextPart, "/")
-			if splited && after != "" {
-				haveChildren = true
-			}
-			if result, ok := resultMap[nextPartItem]; ok {
-				result.Count++
-			} else {
-				resultMap[nextPartItem] = &WebsiteNextPart{
-					NextPart: nextPartItem, HaveChildren: haveChildren, Count: 1,
-				}
-			}
-		}
-		var data []*WebsiteNextPart
-		for _, r := range resultMap {
-			data = append(data, r)
-		}
-		sort.SliceStable(data, func(i, j int) bool {
-			return data[i].NextPart > data[j].NextPart
-		})
-		return data
-	}
 }
 
 func FilterHTTPFlowPathPrefix(db *gorm.DB, pathPrefix string) *gorm.DB {
