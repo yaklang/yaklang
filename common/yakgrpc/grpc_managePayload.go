@@ -427,6 +427,9 @@ func (s *Server) SavePayloadToFileStream(req *ypb.SavePayloadRequest, stream ypb
 	payload.IsFile = &f
 	yakit.CreateOrUpdatePayload(s.GetProfileDatabase(), payload)
 	yakit.SetGroupInEnd(s.GetProfileDatabase(), req.GetGroup())
+	if total == 0 {
+		return utils.Error("empty data no payload created")
+	}
 	feedback(1, "导入完成")
 	return nil
 }
