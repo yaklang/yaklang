@@ -45,23 +45,16 @@ func (s *Server) execScript(scriptName string, targetInput string, stream sender
 		}
 	}
 	uIns, err := netURL.Parse(targetInput)
-	var builderParamsForTarget *ypb.HTTPRequestBuilderParams
 	if err == nil {
 		if !utils.StringArrayContains(builderParams.Path, uIns.Path) {
 			builderParams.Path = append(builderParams.Path, uIns.Path)
 		}
-		queryMap := uIns.Query()
-		if len(queryMap) != 0 {
-			builderParamsForTargetIns := *builderParams
-			builderParamsForTarget = &builderParamsForTargetIns
-			builderParamsForTarget.GetParams = nil
-			for k, vlist := range queryMap {
-				for _, v := range vlist {
-					builderParamsForTarget.GetParams = append(builderParamsForTarget.GetParams, &ypb.KVPair{
-						Key:   k,
-						Value: v,
-					})
-				}
+		for k, vlist := range uIns.Query() {
+			for _, v := range vlist {
+				builderParams.GetParams = append(builderParams.GetParams, &ypb.KVPair{
+					Key:   k,
+					Value: v,
+				})
 			}
 		}
 	}
@@ -95,13 +88,6 @@ func (s *Server) execScript(scriptName string, targetInput string, stream sender
 		log.Errorf("failed to build http request: %v", err)
 	}
 	var results = builderResponse.GetResults()
-	if builderParamsForTarget != nil {
-		builderResponseForTarget, err := s.HTTPRequestBuilder(stream.Context(), builderParamsForTarget)
-		if err != nil {
-			log.Errorf("failed to build http request: %v", err)
-		}
-		results = append(results, builderResponseForTarget.GetResults()...)
-	}
 	if len(results) <= 0 { // 请求模板构造失败时直接用get请求目标
 		var templates = []byte("GET / HTTP/1.1\r\nHost: {{Hostname}}\r\n\r\n")
 		for _, res := range utils.PrettifyListFromStringSplitEx(targetInput, "\n", "|", ",") {
