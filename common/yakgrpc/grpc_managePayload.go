@@ -172,12 +172,12 @@ func (s *Server) DeletePayloadByFolder(ctx context.Context, req *ypb.NameRequest
 	return &ypb.Empty{}, nil
 }
 
-func (s *Server) DeletePayloadByGroup(ctx context.Context, req *ypb.NameRequest) (*ypb.Empty, error) {
-	if req.GetName() == "" {
+func (s *Server) DeletePayloadByGroup(ctx context.Context, req *ypb.DeletePayloadByGroupRequest) (*ypb.Empty, error) {
+	if req.GetGroup() == "" {
 		return nil, utils.Errorf("group name is empty ")
 	}
 	// if file, delete  file
-	if group, err := yakit.GetPayloadByGroupFirst(s.GetProfileDatabase(), req.GetName()); err != nil {
+	if group, err := yakit.GetPayloadByGroupFirst(s.GetProfileDatabase(), req.GetGroup()); err != nil {
 		return nil, err
 	} else {
 		if group.IsFile != nil && *group.IsFile {
@@ -188,7 +188,7 @@ func (s *Server) DeletePayloadByGroup(ctx context.Context, req *ypb.NameRequest)
 		}
 	}
 	// delete in database
-	if err := yakit.DeletePayloadByGroup(s.GetProfileDatabase(), req.GetName()); err != nil {
+	if err := yakit.DeletePayloadByGroup(s.GetProfileDatabase(), req.GetGroup()); err != nil {
 		return nil, err
 	}
 	return &ypb.Empty{}, nil
@@ -458,6 +458,12 @@ func (s *Server) RenamePayloadGroup(ctx context.Context, req *ypb.RenameRequest)
 }
 
 func (s *Server) UpdatePayload(ctx context.Context, req *ypb.UpdatePayloadRequest) (*ypb.Empty, error) {
+	// just for old version
+	if req.Group != "" || req.OldGroup != "" {
+		yakit.RenamePayloadGroup(s.GetProfileDatabase(), req.OldGroup, req.Group)
+		return &ypb.Empty{}, nil
+	}
+
 	if req.GetId() == 0 || req.GetData() == nil {
 		return nil, utils.Error("id or data can't be empty")
 	}
@@ -676,6 +682,7 @@ func (s *Server) GetAllPayloadGroup(ctx context.Context, _ *ypb.Empty) (*ypb.Get
 		res = append(res, r)
 	}
 
+	groups := make([]string, 0, len(res))
 	nodes := make([]*ypb.PayloadGroupNode, 0)
 	folders := make(map[string]*ypb.PayloadGroupNode)
 	add2Folder := func(folder string, node *ypb.PayloadGroupNode) (ret *ypb.PayloadGroupNode) {
@@ -698,6 +705,9 @@ func (s *Server) GetAllPayloadGroup(ctx context.Context, _ *ypb.Empty) (*ypb.Get
 		return
 	}
 	for _, r := range res {
+		if r.Folder != nil && r.Group != getEmptyFolderName(*r.Folder) {
+			groups = append(groups, r.Group)
+		}
 		typ := "DataBase"
 		if r.IsFile != nil && *r.IsFile {
 			typ = "File"
@@ -719,6 +729,7 @@ func (s *Server) GetAllPayloadGroup(ctx context.Context, _ *ypb.Empty) (*ypb.Get
 	}
 
 	return &ypb.GetAllPayloadGroupResponse{
+		Group: groups,
 		Nodes: nodes,
 	}, nil
 }
