@@ -908,7 +908,14 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 		db = bizhelper.FuzzQueryStringArrayOrLike(db, "path", suffixes)
 	}
 	if len(params.GetExcludeSuffix()) > 0 {
-		db = bizhelper.FuzzQueryStringArrayOrLikeExclude(db, "path", params.GetExcludeSuffix())
+		var suffixes []string
+		for _, suffix := range params.GetIncludeSuffix() {
+			if !strings.HasPrefix(suffix, ".") {
+				suffix = "." + suffix
+			}
+			suffixes = append(suffixes, suffix)
+		}
+		db = bizhelper.FuzzQueryStringArrayOrLikeExclude(db, "path", suffixes)
 	}
 	if len(params.GetExcludeContentType()) > 0 {
 		db = bizhelper.FuzzQueryStringArrayOrLikeExclude(db, "content_type", params.GetExcludeContentType())
