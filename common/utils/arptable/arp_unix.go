@@ -16,7 +16,7 @@ import (
 )
 
 func Table() ArpTable {
-	data, err := exec.Command("arpx", "-an").Output()
+	data, err := exec.Command("arp", "-an").Output()
 	if err != nil {
 		return nil
 	}

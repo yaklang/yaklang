@@ -63,7 +63,7 @@ func WithEthernet_NextLayerType(i any) EthernetOption {
 			config.EthernetType = layers.EthernetTypeIPv4
 		case "ipv6", "ip6":
 			config.EthernetType = layers.EthernetTypeIPv6
-		case "arpx":
+		case "arp":
 			config.EthernetType = layers.EthernetTypeARP
 		case "mpls":
 			config.EthernetType = layers.EthernetTypeMPLSUnicast
