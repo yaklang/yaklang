@@ -88,7 +88,7 @@ func TestGRPCMUSTPASS_Server_DebugPlugin_MITM_WithRawPacketAndPaths(t *testing.T
 		writer.Write([]byte("hello"))
 		var raw, _ = utils.HttpDumpWithBody(request, true)
 		spew.Dump(raw)
-		if strings.Contains(string(raw), "GET /a?a=1") {
+		if strings.Contains(string(raw), "POST /a?a=1") {
 			aPass = true
 		}
 		if strings.Contains(string(raw), "POST /b?b=1") && strings.Contains(string(raw), `Cookie: d=1`) {
@@ -135,8 +135,8 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
 	}
 	count := codec.Atoi(yakit.Get(token))
 	t.Logf("count: %d", count)
-	if count != 2 {
-		panic("count should be 2")
+	if count != 4 {
+		panic("count should be 4")
 	}
 	if !aPass {
 		panic("a should pass")
