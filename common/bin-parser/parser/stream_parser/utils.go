@@ -68,7 +68,10 @@ func GetNodePath(node *base.Node) string {
 		}
 		node = node.Cfg.GetItem(CfgParent).(*base.Node)
 	}
-	return p[:len(p)-1]
+	if len(p) > 0 {
+		p = p[:len(p)-1]
+	}
+	return p
 }
 func ConvertToVar(v []byte, length uint64, typeName string) any {
 	switch typeName {

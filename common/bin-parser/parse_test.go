@@ -283,44 +283,13 @@ func TestNegotiateMessage(t *testing.T) {
 		t.Fatal(err)
 	}
 	DumpNode(res)
-	//Signature: 4e544c4d53535000
-	//MessageType: 16777216
-	//NegotiateFlags: 897714272
-	//DomainNameFields:
-	//DomainNameLen: 0
-	//DomainNameMaxLen: 0
-	//DomainNameBufferOffset: 0
-	//WorkstationFields:
-	//WorkstationLen: 0
-	//WorkstationMaxLen: 0
-	//WorkstationBufferOffset: 0
-	//Version:
-	//ProductMajorVersion: 0
-	//ProductMinorVersion: 0
-	//ProductBuild: 0
-	//Reserved: "000000"
-	//NTLMRevisionCurrent: 0
 	mapData := map[string]any{
-		"Signature":      "NTLMSSP\x00",
-		"MessageType":    16777216,
-		"NegotiateFlags": 897714272,
-		"DomainNameFields": map[string]any{
-			"DomainNameLen":          0,
-			"DomainNameMaxLen":       0,
-			"DomainNameBufferOffset": 0,
-		},
-		"WorkstationFields": map[string]any{
-			"WorkstationLen":          0,
-			"WorkstationMaxLen":       0,
-			"WorkstationBufferOffset": 0,
-		},
-		"Version": map[string]any{
-			"ProductMajorVersion": 0,
-			"ProductMinorVersion": 0,
-			"ProductBuild":        0,
-			"Reserved":            "\u0000\u0000\u0000",
-			"NTLMRevisionCurrent": 0,
-		},
+		"Signature":         "NTLMSSP\x00",
+		"MessageType":       16777216,
+		"NegotiateFlags":    897714272,
+		"DomainNameFields":  "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000",
+		"WorkstationFields": "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000",
+		"Version":           "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000",
 	}
 	res, err = GenerateBinary(mapData, "application-layer.ntlm", "NegotiateMessage")
 	if err != nil {

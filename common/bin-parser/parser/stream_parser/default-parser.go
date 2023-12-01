@@ -30,6 +30,7 @@ const (
 	CfgNodeResult   = "node result"
 	CfgLastNode     = "last node"
 	CfgElementIndex = "element index"
+	CtxGenReaders   = "readers in generator"
 )
 
 var baseType = []string{"int", "uint", "int8", "uint8", "int16", "uint16", "int32", "uint32", "int64", "uint64", "string", "bool", "raw"}
@@ -46,8 +47,9 @@ type DefParser struct {
 	mode  string
 }
 type Operator struct {
+	ParseStruct   func(node *base.Node) (bool, error)
 	ParseTerminal func(node *base.Node) error
-	mode          string
+	Mode          string
 	Backup        func() error
 	Recovery      func() error
 	PopBackup     func() error
@@ -187,6 +189,12 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 		return nil
 	}
 	if node.Cfg.GetBool(CfgIsList) {
+		if operator.ParseStruct != nil {
+			ok, err := operator.ParseStruct(node)
+			if ok {
+				return err
+			}
+		}
 		node.Ctx.SetItem(CfgInList, true)
 		if len(node.Children) == 0 {
 			return errors.New("get node element type error")
@@ -249,6 +257,12 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 		}
 		return nil
 	} else {
+		if operator.ParseStruct != nil {
+			ok, err := operator.ParseStruct(node)
+			if ok {
+				return err
+			}
+		}
 		for _, child := range node.Children {
 			err := d.Operate(operator, child)
 			if err != nil {
@@ -263,6 +277,23 @@ func (d *DefParser) Generate(data any, node *base.Node) error {
 	rootData := data
 	var operator *Operator
 	operator = &Operator{
+		Mode: "generator",
+		ParseStruct: func(node *base.Node) (bool, error) {
+			if GetNodePath(node) == "" {
+				return false, nil
+			}
+			data, ok := getSubData(rootData, GetNodePath(node))
+			if ok {
+				switch ret := data.(type) {
+				case []byte, string:
+					err := d.Parse(base.NewBitReader(bytes.NewBuffer(utils.InterfaceToBytes(ret))), node)
+					return true, err
+				default:
+					return false, nil
+				}
+			}
+			return false, nil
+		},
 		ParseTerminal: func(node *base.Node) error {
 			if !NodeIsTerminal(node) {
 				return fmt.Errorf("node %s is not terminal", node.Name)
@@ -345,6 +376,7 @@ func (d *DefParser) Generate(data any, node *base.Node) error {
 func (d *DefParser) Parse(data *base.BitReader, node *base.Node) error {
 	var operator *Operator
 	operator = &Operator{
+		Mode: "parser",
 		ParseTerminal: func(node *base.Node) error {
 			if !NodeIsTerminal(node) {
 				return fmt.Errorf("node %s is not terminal", node.Name)
