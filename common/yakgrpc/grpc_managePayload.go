@@ -194,7 +194,7 @@ func (s *Server) DeletePayloadByGroup(ctx context.Context, req *ypb.DeletePayloa
 	return &ypb.Empty{}, nil
 }
 
-func (s *Server) DeletePayload(ctx context.Context, req *ypb.DeletePayloadByIdRequest) (*ypb.Empty, error) {
+func (s *Server) DeletePayload(ctx context.Context, req *ypb.DeletePayloadRequest) (*ypb.Empty, error) {
 	if req.GetId() > 0 {
 		if err := yakit.DeletePayloadByID(s.GetProfileDatabase(), req.GetId()); err != nil {
 			return nil, utils.Wrap(err, "delete single line failed")
@@ -732,8 +732,8 @@ func (s *Server) GetAllPayloadGroup(ctx context.Context, _ *ypb.Empty) (*ypb.Get
 	}
 
 	return &ypb.GetAllPayloadGroupResponse{
-		Group: groups,
-		Nodes: nodes,
+		Groups: groups,
+		Nodes:  nodes,
 	}, nil
 }
 
