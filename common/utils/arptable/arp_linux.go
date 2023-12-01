@@ -19,7 +19,7 @@ const (
 )
 
 func Table() ArpTable {
-	f, err := os.Open("/proc/net/arpx")
+	f, err := os.Open("/proc/net/arp")
 
 	if err != nil {
 		return nil

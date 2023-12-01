@@ -13,7 +13,7 @@ import (
 )
 
 func Table() ArpTable {
-	data, err := exec.Command("arpx", "-a").Output()
+	data, err := exec.Command("arp", "-a").Output()
 	if err != nil {
 		return nil
 	}
