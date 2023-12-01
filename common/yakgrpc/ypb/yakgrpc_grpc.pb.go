@@ -445,7 +445,7 @@ type YakClient interface {
 	// delete by [id/group/folder]
 	DeletePayloadByFolder(ctx context.Context, in *NameRequest, opts ...grpc.CallOption) (*Empty, error)
 	DeletePayloadByGroup(ctx context.Context, in *DeletePayloadByGroupRequest, opts ...grpc.CallOption) (*Empty, error)
-	DeletePayload(ctx context.Context, in *DeletePayloadByIdRequest, opts ...grpc.CallOption) (*Empty, error)
+	DeletePayload(ctx context.Context, in *DeletePayloadRequest, opts ...grpc.CallOption) (*Empty, error)
 	// save payload to database
 	SavePayload(ctx context.Context, in *SavePayloadRequest, opts ...grpc.CallOption) (*Empty, error)
 	SavePayloadStream(ctx context.Context, in *SavePayloadRequest, opts ...grpc.CallOption) (Yak_SavePayloadStreamClient, error)
@@ -1885,7 +1885,7 @@ func (c *yakClient) DeletePayloadByGroup(ctx context.Context, in *DeletePayloadB
 	return out, nil
 }
 
-func (c *yakClient) DeletePayload(ctx context.Context, in *DeletePayloadByIdRequest, opts ...grpc.CallOption) (*Empty, error) {
+func (c *yakClient) DeletePayload(ctx context.Context, in *DeletePayloadRequest, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
 	err := c.cc.Invoke(ctx, Yak_DeletePayload_FullMethodName, in, out, opts...)
 	if err != nil {
@@ -4865,7 +4865,7 @@ type YakServer interface {
 	// delete by [id/group/folder]
 	DeletePayloadByFolder(context.Context, *NameRequest) (*Empty, error)
 	DeletePayloadByGroup(context.Context, *DeletePayloadByGroupRequest) (*Empty, error)
-	DeletePayload(context.Context, *DeletePayloadByIdRequest) (*Empty, error)
+	DeletePayload(context.Context, *DeletePayloadRequest) (*Empty, error)
 	// save payload to database
 	SavePayload(context.Context, *SavePayloadRequest) (*Empty, error)
 	SavePayloadStream(*SavePayloadRequest, Yak_SavePayloadStreamServer) error
@@ -5427,7 +5427,7 @@ func (UnimplementedYakServer) DeletePayloadByFolder(context.Context, *NameReques
 func (UnimplementedYakServer) DeletePayloadByGroup(context.Context, *DeletePayloadByGroupRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeletePayloadByGroup not implemented")
 }
-func (UnimplementedYakServer) DeletePayload(context.Context, *DeletePayloadByIdRequest) (*Empty, error) {
+func (UnimplementedYakServer) DeletePayload(context.Context, *DeletePayloadRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeletePayload not implemented")
 }
 func (UnimplementedYakServer) SavePayload(context.Context, *SavePayloadRequest) (*Empty, error) {
@@ -7774,7 +7774,7 @@ func _Yak_DeletePayloadByGroup_Handler(srv interface{}, ctx context.Context, dec
 }
 
 func _Yak_DeletePayload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(DeletePayloadByIdRequest)
+	in := new(DeletePayloadRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -7786,7 +7786,7 @@ func _Yak_DeletePayload_Handler(srv interface{}, ctx context.Context, dec func(i
 		FullMethod: Yak_DeletePayload_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(YakServer).DeletePayload(ctx, req.(*DeletePayloadByIdRequest))
+		return srv.(YakServer).DeletePayload(ctx, req.(*DeletePayloadRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
