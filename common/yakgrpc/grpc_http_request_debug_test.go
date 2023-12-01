@@ -109,7 +109,10 @@ func TestGRPCMUSTPASS_Server_DebugPlugin_MITM_WithRawPacketAndPaths(t *testing.T
 	stream, err := client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
 		Code: `token = ` + strconv.Quote(token) + `;
 var count = 0;
+lock = sync.NewMutex()
 mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
+	lock.Lock()
+	defer lock.Unlock()
 	count++
 	db.SetKey(token, count)
 	dump(req)
@@ -181,7 +184,10 @@ func TestGRPCMUSTPASS_Server_DebugPlugin_MITM_WithRawPacket(t *testing.T) {
 	stream, err := client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
 		Code: `token = ` + strconv.Quote(token) + `;
 var count = 0;
+lock = sync.NewMutex()
 mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
+	lock.Lock()
+	defer lock.Unlock()	
 	count++
 	db.SetKey(token, count)
 	dump(req)
@@ -258,7 +264,10 @@ func TestGRPCMUSTPASS_Server_DebugPlugin_MITM(t *testing.T) {
 	stream, err := client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
 		Code: `token = ` + strconv.Quote(token) + `;
 var count = 0;
+lock = sync.NewMutex()
 mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
+	lock.Lock()
+	defer lock.Unlock()
 	count++
 	db.SetKey(token, count)
 	dump(url)
@@ -330,7 +339,10 @@ func TestGRPCMUSTPASS_Server_DebugPlugin_MITM_WithURLTARGET(t *testing.T) {
 	stream, err := client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
 		Code: `token = ` + strconv.Quote(token) + `;
 var count = 0;
+lock = sync.NewMutex()
 mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
+	lock.Lock()
+	defer lock.Unlock()
 	count++
 	db.SetKey(token, count)
 	dump(url)
