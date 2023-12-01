@@ -11,8 +11,8 @@ import (
 )
 
 func deleteGroup(local ypb.YakClient, t *testing.T, group string) {
-	_, err := local.DeletePayloadByGroup(context.Background(), &ypb.NameRequest{
-		Name: group,
+	_, err := local.DeletePayloadByGroup(context.Background(), &ypb.DeletePayloadByGroupRequest{
+		Group: group,
 	})
 	if err != nil {
 		t.Fatal(err)
