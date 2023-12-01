@@ -153,11 +153,13 @@ func FuzzQueryArrayOrLike(db *gorm.DB, field string, s []interface{}) *gorm.DB {
 	)
 
 	for _, sub := range s {
+		pattern := fmt.Sprintf("%%%v%%", sub)           // 将 'sub' 转换为类似于 '%sub%' 的形式
+		pattern = strings.ReplaceAll(pattern, "*", "%") // 将 '*' 替换为 SQL 通配符 '%'
 		querys = append(querys, fmt.Sprintf("( %v LIKE ? )", field))
-		items = append(items, fmt.Sprintf("%%%v%%", sub))
+		items = append(items, pattern)
 	}
 
-	return db.Where(strings.Join(querys, " OR "), items...)
+	return db.Where(strings.Join(querys, " OR "), items...) //.Debug()
 }
 
 // FuzzQueryArrayOrLike
