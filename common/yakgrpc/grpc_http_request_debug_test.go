@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
+	netURL "net/url"
 	"reflect"
 	"sort"
 	"strconv"
@@ -221,6 +222,10 @@ User-Agent: xxx
 }
 
 func TestGRPCMUSTPASS_Server_DebugPlugin_MITM(t *testing.T) {
+	urlIns, err := netURL.Parse("http://www.example.com")
+	urlIns.Path = "/a?a=1/b"
+	s := urlIns.String()
+	println(s)
 	client, err := NewLocalClient()
 	if err != nil {
 		panic(err)
@@ -276,8 +281,8 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
 	}
 	count := codec.Atoi(yakit.Get(token))
 	t.Logf("count: %d", count)
-	if count != 2 {
-		panic("count should be 2")
+	if count != 3 {
+		panic("count should be 3")
 	}
 	if !aPass {
 		panic("a should pass")
