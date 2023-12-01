@@ -887,11 +887,33 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 		db = bizhelper.FuzzQueryStringArrayOrLikeExclude(db, "ip_address", params.GetExcludeInIP())
 	}
 
-	db = bizhelper.FuzzQueryStringArrayOrLike(db, "path", params.IncludePath)
-	db = bizhelper.FuzzQueryStringArrayOrLikeExclude(db, "path", params.ExcludePath)
-	db = bizhelper.FuzzQueryStringArrayOrLike(db, "response", params.IncludeSuffix)
-	db = bizhelper.FuzzQueryStringArrayOrLikeExclude(db, "response", params.ExcludeSuffix)
-	db = bizhelper.FuzzQueryStringArrayOrLikeExclude(db, "content_type", params.ExcludeContentType)
+	if len(params.GetIncludePath()) > 0 {
+		db = bizhelper.FuzzQueryStringArrayOrLike(db, "path", params.GetIncludePath())
+
+	}
+
+	if len(params.GetExcludePath()) > 0 {
+		db = bizhelper.FuzzQueryStringArrayOrLikeExclude(db, "path", params.GetExcludePath())
+
+	}
+
+	if len(params.GetIncludeSuffix()) > 0 {
+		var suffixes []string
+		for _, suffix := range params.GetIncludeSuffix() {
+			if !strings.HasPrefix(suffix, ".") {
+				suffix = "." + suffix
+			}
+			suffixes = append(suffixes, suffix)
+		}
+		db = bizhelper.FuzzQueryStringArrayOrLike(db, "path", suffixes)
+	}
+	if len(params.GetExcludeSuffix()) > 0 {
+		db = bizhelper.FuzzQueryStringArrayOrLikeExclude(db, "path", params.GetExcludeSuffix())
+	}
+	if len(params.GetExcludeContentType()) > 0 {
+		db = bizhelper.FuzzQueryStringArrayOrLikeExclude(db, "content_type", params.GetExcludeContentType())
+
+	}
 
 	if len(params.GetExcludeId()) > 0 {
 		for _, id := range params.GetExcludeId() {
