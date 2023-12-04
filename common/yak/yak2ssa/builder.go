@@ -39,6 +39,33 @@ func (b *builder) Build() {
 
 var _ (ssa.Builder) = (*builder)(nil)
 
+// error listener for lexer and parser
+// type position struct {
+// 	line int
+// 	col  int
+// }
+
+//	type astErr struct {
+//		msg   string
+//		start position
+//		end   position
+//	}
+type ErrorListener struct {
+	err []string
+	*antlr.DefaultErrorListener
+}
+
+func (el *ErrorListener) SyntaxError(recognizer antlr.Recognizer, offendingSymbol interface{}, line, column int, msg string, e antlr.RecognitionException) {
+	el.err = append(el.err, msg)
+}
+
+func NewErrorListener() *ErrorListener {
+	return &ErrorListener{
+		err:                  make([]string, 0),
+		DefaultErrorListener: antlr.NewDefaultErrorListener(),
+	}
+}
+
 func ParseSSA(src string, f func(*ssa.FunctionBuilder)) (prog *ssa.Program) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -49,10 +76,19 @@ func ParseSSA(src string, f func(*ssa.FunctionBuilder)) (prog *ssa.Program) {
 		}
 	}()
 
-	inputStream := antlr.NewInputStream(src)
-	lex := yak.NewYaklangLexer(inputStream)
-	tokenStream := antlr.NewCommonTokenStream(lex, antlr.TokenDefaultChannel)
-	ast := yak.NewYaklangParser(tokenStream).Program().(*yak.ProgramContext)
+	errListener := NewErrorListener()
+	lexer := yak.NewYaklangLexer(antlr.NewInputStream(src))
+	lexer.RemoveErrorListeners()
+	lexer.AddErrorListener(errListener)
+	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
+	parser := yak.NewYaklangParser(tokenStream)
+	parser.RemoveErrorListeners()
+	parser.AddErrorListener(errListener)
+	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
+	ast := parser.Program().(*yak.ProgramContext)
+	if len(errListener.err) > 0 {
+		return nil
+	}
 	// yak.NewProgramContext(ast, )
 	prog = ssa.NewProgram()
 	builder := &builder{
