@@ -66,7 +66,74 @@ func (s *VulinServer) registerMiscResponse() {
 		Path: "/fetch/basic.action",
 	})
 
+	var crawlerRoutes = []*VulInfo{
+		{
+			Path: "/javascript-ssa-ir-basic/1.js",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				writer.Header().Set("Content-Type", "application/javascript")
+				writer.Write([]byte(`console.log('1.js'); var deepUrl = 'deep.js';`))
+			},
+		},
+		{
+			Path: "/javascript-ssa-ir-basic/2.js",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				writer.Header().Set("Content-Type", "application/javascript")
+				writer.Write([]byte(`console.log('2.js'); fetch(deepUrl, {
+	method: 'POST',
+	headers: { 'HackedJS': "AAA"},
+})`))
+			},
+		},
+		{
+			Path: "/javascript-ssa-ir-basic/deep.js",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				if request.Method == "POST" {
+					if request.Header.Get(`HackedJS`) == "AAA" {
+						writer.Write([]byte("SUCCESS IN DEEP!"))
+						return
+					}
+				}
+				writer.Write([]byte("BAD IN DEEP!"))
+			},
+		},
+		{
+			Path: "/javascript-ssa-ir-basic/3.js",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				writer.Header().Set("Content-Type", "application/javascript")
+				writer.Write([]byte(`// 创建一个新的 XMLHttpRequest 对象
+var xhr = new XMLHttpRequest();
+
+// 配置请求类型为 POST，以及目标 URL
+xhr.open('POST', 'deep.js', true);
+
+// 设置所需的 HTTP 请求头
+xhr.setRequestHeader('HackedJS', 'AAA');
+
+// 设置请求完成后的回调函数
+xhr.onreadystatechange = function() {
+  // 检查请求是否完成
+  if (xhr.readyState === XMLHttpRequest.DONE) {
+    // 检查请求是否成功
+    if (xhr.status === 200) {
+      // 请求成功，处理响应数据
+      console.log(xhr.responseText);
+    } else {
+      // 请求失败，打印状态码
+      console.error('Request failed with status:', xhr.status);
+    }
+  }
+};
+
+// 发送请求，可以在此处发送任何需要的数据
+xhr.send();`))
+			},
+		},
+	}
+	for _, route := range crawlerRoutes {
+		addRouteWithVulInfo(r, route)
+	}
 	addRouteWithVulInfo(r, &VulInfo{
+		Path: "/javascript-ssa-ir-basic/basic-fetch.html",
 		Handler: func(writer http.ResponseWriter, request *http.Request) {
 			writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 			writer.Write([]byte(`<body>
@@ -100,7 +167,6 @@ fetch('/misc/response/fetch/basic.action')
 </body>
 `))
 		},
-		Path:  "/javascript-ssa-ir-basic/basic-fetch.html",
 		Title: "测试普通爬虫的基础JS处理能力",
 	})
 }

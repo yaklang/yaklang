@@ -2,6 +2,7 @@ package crawler
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/javascript"
@@ -502,21 +503,13 @@ func (c *Crawler) handleReqResult(r *Req) {
 		c.submit(req)
 	}
 
+	var contents []*JavaScriptContent
+
 	err := PageInformationWalker(
 		lowhttp.GetHTTPPacketContentType([]byte(r.responseHeader)),
 		string(r.responseBody),
 		WithFetcher_JavaScript(func(content *JavaScriptContent) {
-			if content.IsCodeText {
-				log.Infof("JS Code Fetch: %v", content.String())
-				return
-			}
-			log.Infof("JS(URL) Fetch: %v", content.String())
-			reqHttps, reqBytes, err := NewHTTPRequest(r.IsHttps(), r.requestRaw, r.responseRaw, content.UrlPath)
-			if err != nil {
-				log.Errorf("build http request(js) failed: %s", content.UrlPath)
-				return
-			}
-			submit(reqHttps, reqBytes)
+			contents = append(contents, content)
 		}),
 		WithFetcher_HtmlTag(func(s string, node *html.Node) {
 			if s == "script" {
@@ -546,6 +539,51 @@ func (c *Crawler) handleReqResult(r *Req) {
 	)
 	if err != nil {
 		log.Errorf("page information walker error: %s", err.Error())
+	}
+
+	jsConcurrent := config.concurrent / 2
+	if jsConcurrent <= 0 {
+		jsConcurrent = 3
+	}
+	swg := utils.NewSizedWaitGroup(jsConcurrent)
+	for _, c := range contents {
+		if c.IsCodeText {
+			continue
+		}
+		swg.Add(1)
+		c := c
+		go func() {
+			defer swg.Done()
+
+			log.Infof("JS(URL) Fetch: %v", c.String())
+			reqHttps, reqBytes, err := NewHTTPRequest(r.IsHttps(), r.requestRaw, r.responseRaw, c.UrlPath)
+			if err != nil {
+				log.Errorf("build http request(js) failed: %s", c.UrlPath)
+				return
+			}
+			opts := config.GetLowhttpConfig()
+			opts = append(opts, lowhttp.WithHttps(reqHttps), lowhttp.WithRequest(reqBytes))
+			rsp, err := lowhttp.HTTP(opts...)
+			if err != nil {
+				return
+			}
+
+			if !utils.IContains(lowhttp.GetHTTPPacketContentType(rsp.RawPacket), "javascript") {
+				return
+			}
+
+			rspHeader, body := lowhttp.SplitHTTPPacketFast(rsp.RawPacket)
+			c.Code = string(body)
+			c.IsCodeText = true
+			_ = rspHeader
+		}()
+	}
+	swg.Wait()
+	for _, i := range contents {
+		if !i.IsCodeText {
+			continue
+		}
+		fmt.Println(i.String())
 	}
 	//handleReqResultEx(r, func(nReq *Req) bool {
 	//	c.submit(nReq)
