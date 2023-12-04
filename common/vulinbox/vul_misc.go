@@ -23,7 +23,7 @@ func (s *VulinServer) registerMiscRoute() {
 func (s *VulinServer) registerMiscResponse() {
 	var router = s.router
 
-	r := router.PathPrefix("/misc/response").Name("可以构造一些测试响应").Subrouter()
+	r := router.PathPrefix("/misc/response").Name("一些精心构造的畸形/异常/测试响应").Subrouter()
 	addRouteWithVulInfo(r, &VulInfo{
 		Handler: func(writer http.ResponseWriter, request *http.Request) {
 			defer func() {
@@ -57,5 +57,50 @@ func (s *VulinServer) registerMiscResponse() {
 		},
 		Path:  "/webpack-ssa-ir-test.html",
 		Title: "测试普通爬虫的 Webpack 处理能力",
+	})
+
+	addRouteWithVulInfo(r, &VulInfo{
+		Handler: func(writer http.ResponseWriter, request *http.Request) {
+			writer.Write([]byte(`Hello Fetch Request is Fetched`))
+		},
+		Path: "/fetch/basic.action",
+	})
+
+	addRouteWithVulInfo(r, &VulInfo{
+		Handler: func(writer http.ResponseWriter, request *http.Request) {
+			writer.Header().Set("Content-Type", "text/html; charset=utf-8")
+			writer.Write([]byte(`<body>
+	
+<a href="#">this is a ssa ir js test spa</a>
+
+<script src='1.js'></script>
+<script src='2.js'></script>
+<div id='app'></div>
+
+<script>
+
+fetch('/misc/response/fetch/basic.action')
+  .then(response => {
+    if (!response.ok) {
+      throw new Error('Network response was not ok ' + response.statusText);
+    }
+    return response.text();
+  })
+  .then(data => {
+    console.log(data); // 这里是你的页面内容
+  })
+  .catch(error => {
+    console.error('There has been a problem with your fetch operation:', error);
+  });
+
+
+</script>
+<script src='4.js' defer></script>
+<script src='3.js' defer></script>
+</body>
+`))
+		},
+		Path:  "/javascript-ssa-ir-basic/basic-fetch.html",
+		Title: "测试普通爬虫的基础JS处理能力",
 	})
 }

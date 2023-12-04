@@ -4,7 +4,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"net/http"
-	"strings"
 )
 
 type RequestIf interface {
@@ -18,6 +17,9 @@ type RequestIf interface {
 }
 
 func (r *Req) Url() string {
+	if r.url != "" {
+		return r.url
+	}
 	return r.request.URL.String()
 }
 
@@ -38,11 +40,11 @@ func (r *Req) ResponseRaw() []byte {
 }
 
 func (r *Req) ResponseBody() []byte {
-	return r.body
+	return r.responseBody
 }
 
 func (r *Req) IsHttps() bool {
-	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(r.Url())), "https://")
+	return r.https
 }
 
 func (r *Req) Response() (*http.Response, error) {

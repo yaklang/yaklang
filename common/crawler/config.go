@@ -2,11 +2,8 @@ package crawler
 
 import (
 	"bytes"
-	"crypto/tls"
-	"fmt"
 	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"io"
@@ -16,7 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync/atomic"
+	"sync"
 	"time"
 )
 
@@ -53,12 +50,6 @@ func (c *Config) init() {
 	c.concurrent = 20
 	c.maxRedirectTimes = 5
 	c.connectTimeout = 10 * time.Second
-	c.responseTimeout = 10 * time.Second
-	c.tlsConfig = &tls.Config{
-		InsecureSkipVerify: true,
-		MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-		MaxVersion:         tls.VersionTLS13,
-	}
 	c.userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Safari/537.36"
 	c.maxDepth = 5
 	c.maxBodySize = 10 * 1024 * 1024
@@ -88,8 +79,7 @@ type Config struct {
 	concurrent       int
 	maxRedirectTimes int
 	connectTimeout   time.Duration // 10s
-	responseTimeout  time.Duration // 30s
-	tlsConfig        *tls.Config
+	// tlsConfig        *tls.Config
 
 	// UA
 	userAgent string
@@ -129,12 +119,43 @@ type Config struct {
 	cookie  []*cookie
 
 	onRequest func(req *Req)
-	onLogin   func(req *Req, client *http.Client)
+	onLogin   func(req *Req)
 
 	extractionRules func(*Req) []interface{}
 	// appended links
 	extraPathForEveryPath     []string
 	extraPathForEveryRootPath []string
+
+	// cache, do not
+	_cachedOpts []lowhttp.LowhttpOpt
+}
+
+var configMutex = new(sync.Mutex)
+
+func (c *Config) GetLowhttpConfig() []lowhttp.LowhttpOpt {
+	configMutex.Lock()
+	defer configMutex.Unlock()
+
+	if len(c._cachedOpts) > 0 {
+		return c._cachedOpts
+	}
+
+	var opts []lowhttp.LowhttpOpt
+	opts = append(opts, lowhttp.WithProxy(c.proxies...))
+	if c.AuthUsername != "" || c.AuthPassword != "" {
+		opts = append(opts, lowhttp.WithUsername(c.AuthUsername), lowhttp.WithPassword(c.AuthPassword))
+	}
+	if c.maxRedirectTimes > 0 {
+		opts = append(opts, lowhttp.WithRedirectTimes(c.maxRedirectTimes))
+	}
+	if c.connectTimeout > 0 {
+		opts = append(opts, lowhttp.WithTimeout(c.connectTimeout))
+	}
+	if c.maxRetryTimes > 0 {
+		opts = append(opts, lowhttp.WithRetryTimes(c.maxRetryTimes))
+	}
+	c._cachedOpts = opts
+	return opts
 }
 
 func (c *Config) CheckShouldBeHandledURL(u *url.URL) bool {
@@ -203,80 +224,6 @@ func (c *Config) CheckShouldBeHandledURL(u *url.URL) bool {
 	}
 
 	return true
-}
-
-type roundRobinSwitcher struct {
-	proxyURLs []*url.URL
-	index     uint32
-}
-
-func (r *roundRobinSwitcher) GetProxy(pr *http.Request) (*url.URL, error) {
-	u := r.proxyURLs[r.index%uint32(len(r.proxyURLs))]
-	atomic.AddUint32(&r.index, 1)
-	return u, nil
-}
-
-// RoundRobinProxySwitcher creates a proxy switcher function which rotates
-// ProxyURLs on every request.
-// The proxy type is determined by the URL scheme. "http", "https"
-// and "socks5" are supported. If the scheme is empty,
-// "http" is assumed.
-func RoundRobinProxySwitcher(ProxyURLs ...string) (func(r *http.Request) (*url.URL, error), error) {
-	urls := make([]*url.URL, len(ProxyURLs))
-	for i, u := range ProxyURLs {
-		parsedU, err := url.Parse(u)
-		if err != nil {
-			return nil, err
-		}
-		urls[i] = parsedU
-	}
-	return (&roundRobinSwitcher{urls, 0}).GetProxy, nil
-}
-
-func (c *Config) CreateHTTPClient() *http.Client {
-	// 设置 Transport
-	httpTr := &http.Transport{
-		// 关闭 http keep-alive
-		DisableKeepAlives: true,
-		// 设置最大平行连接数
-		MaxConnsPerHost: c.concurrent,
-		// 设置超时
-		DialContext: netx.NewDialContextFunc(c.connectTimeout),
-		// 设置 HTTP 响应获取超时
-		ResponseHeaderTimeout: c.responseTimeout,
-		// 使用自定义的 tlsConfig 进行 TCP 连接
-		TLSClientConfig: c.tlsConfig,
-
-		// 不要用 gzip
-		DisableCompression: true,
-	}
-
-	// 设置代理
-	if len(c.proxies) > 0 {
-		proxySwitcher, err := RoundRobinProxySwitcher(c.proxies...)
-		if err != nil {
-			log.Errorf("create proxy switcher failed: %s", err)
-		}
-		if proxySwitcher != nil {
-			httpTr.Proxy = proxySwitcher
-		}
-	}
-
-	return &http.Client{
-		Transport: httpTr,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			redirectVector := ""
-			for _, r := range via {
-				redirectVector += fmt.Sprintf("%s => ", r.URL.String())
-			}
-			redirectVector += req.URL.String()
-			if len(via) > c.maxRedirectTimes {
-				return utils.Errorf("max redirect times reach: %v", redirectVector)
-			}
-			log.Debugf("redirect: %v", redirectVector)
-			return nil
-		},
-	}
 }
 
 type configOpt func(c *Config)
@@ -399,7 +346,7 @@ func WithConnectTimeout(f float64) configOpt {
 
 func WithResponseTimeout(f float64) configOpt {
 	return func(c *Config) {
-		c.responseTimeout = time.Duration(int64(f * float64(time.Second)))
+		// dummy, ignore it
 	}
 }
 
@@ -478,7 +425,7 @@ func WithOnRequest(f func(req *Req)) configOpt {
 
 func WithAutoLogin(username, password string, flags ...string) configOpt {
 	return func(c *Config) {
-		c.onLogin = func(req *Req, client *http.Client) {
+		c.onLogin = func(req *Req) {
 			if !utils.IContains(req.Request().Header.Get("Content-Type"), "application/x-www-form-urlencoded") {
 				return
 			}
@@ -502,26 +449,26 @@ func WithAutoLogin(username, password string, flags ...string) configOpt {
 			if c.maxRetryTimes <= 0 {
 				c.maxRetryTimes = 1
 			}
-			for range make([]int, c.maxRetryTimes) {
-				req.request.GetBody = func() (io.ReadCloser, error) {
-					req.request.ContentLength = int64(len(valueStr))
-					return ioutil.NopCloser(bytes.NewBufferString(valueStr)), nil
-				}
-				req.request.Body, _ = req.request.GetBody()
-				rsp, err := client.Do(req.request)
-				if err != nil {
-					log.Errorf("execute login form request failed: %s", err)
-					continue
-				}
-				for _, originCookie := range rsp.Cookies() {
-					c.cookie = append(c.cookie, &cookie{
-						cookie:        originCookie,
-						allowOverride: false,
-					})
-				}
-				req.response = rsp
-				break
+			req.request.GetBody = func() (io.ReadCloser, error) {
+				req.request.ContentLength = int64(len(valueStr))
+				return ioutil.NopCloser(bytes.NewBufferString(valueStr)), nil
 			}
+			req.request.Body, _ = req.request.GetBody()
+
+			opts := c.GetLowhttpConfig()
+			req.requestRaw, _ = utils.DumpHTTPRequest(req.request, true)
+			opts = append(opts, lowhttp.WithPacketBytes(req.requestRaw), lowhttp.WithHttps(req.IsHttps()))
+
+			rspIns, err := lowhttp.HTTP(opts...)
+			if err != nil {
+				req.err = err
+				return
+			}
+			for _, cookieItem := range lowhttp.ExtractCookieJarFromHTTPResponse(rspIns.RawPacket) {
+				c.cookie = append(c.cookie, &cookie{cookie: cookieItem, allowOverride: false})
+			}
+			req.responseRaw = rspIns.RawPacket
+			req.response, _ = utils.ReadHTTPResponseFromBytes(rspIns.RawPacket, req.request)
 		}
 	}
 }
