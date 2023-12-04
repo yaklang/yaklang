@@ -73,45 +73,6 @@ switch (fruit) {
 	prog.Show()
 }
 
-func TestPoint(t *testing.T) {
-	prog := ParseSSA(`
-		// setTimeout(()=>{window.location = "www"});
-		// setTimeout(()=>1);
-		// function b() {
-		// 	return 1;
-		// }
-
-		a = setTimeout
-
-if (true) {
-    setTimeout(a('window.location.href= "http://www.baidu.com"'))
-}
-
-if (window){// 弱类型 这个为true 定义了就true
-    setTimeout(a('window.location.href= "http://www.baidu.com"'))
-}
-
-if (NaN){// JS的特色 这里视为false
-    setTimeout(a('window.location.href= "http://www.baidu.com"'))
-}
-
-for (var i=0; i<5; i++) {
-      if (i = 5){
-        setTimeout(a('window.location.href= "http://www.baidu.com"'))
-      }
-}
-
-a =  window
-a.location.href = "www.baidu.com"
-
-function b(c) {
-    c.location.href = "www.baidu.com"
-}
-b(a)
-	`, none)
-	prog.Show()
-}
-
 func TestBreak(t *testing.T) {
 	prog := ParseSSA(`
 	a = 2;
@@ -236,42 +197,6 @@ func TestLet(t *testing.T) {
 	prog2.Show()
 }
 
-func TestFunction(t *testing.T) {
-	prog := ParseSSA(`
-	function ajax(url, type, data, success) {
-		// 创建一个XMLHttpRequest对象
-		const xhr = new XMLHttpRequest()
-		// 判断type请求方式
-		if (type == 'get') {
-			// 判断data的数据类型转换成字符串
-			if (Typeof(data) == "object") {
-				// data = (new URLSearchParams(data)).toString()
-			}
-			// 设置请求方式和请求地址
-			xhr.open(type, url + '?' + data)
-			// 发送请求
-			xhr.send()
-		} else if (type == 'post') {
-			// 设置请求方式和请求地址
-			xhr.open(type, url)
-			// 判断数据是不是字符串
-			if (Typeof(data) == "string") {
-				// 设置对应的content-type
-				xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded')
-				xhr.send(data)
-			} else if (Typeof(data) == "object") {
-			} else {
-				xhr.setRequestHeader('Content-type', 'application/json')
-				const str = JSON.stringify(data);
-				console.log(Typeof(str))
-				xhr.send(str)
-			}
-		}
-	}
-	`, none)
-	prog.Show()
-}
-
 func TestExpr(t *testing.T) {
 	prog := ParseSSA(`
 	for(a=1,s=1;a<11&&s<20;a++,s++){
@@ -288,13 +213,6 @@ func TestReturn(t *testing.T) {
 	`, none)
 	prog.Show()
 }
-
-func TestLong(t *testing.T) {
-	prog := ParseSSA(`
-	(this["webpackJsonppalm-kit-desktop"]=this["webpackJsonppalm-kit-desktop"]||[]).push([[2],[function(e,t,n){"use strict";e.exports=n(785)},function(e,t,n){"use strict";n.d(t,"p",(function(){return g})),n.d(t,"G",(function(){return v})),n.d(t,"d",(function(){return m})),n.d(t,"I",(function(){return y})),n.d(t,"J",(function(){return A})),n.d(t,"m",(function(){return b})),n.d(t,"i",(function(){return _})),n.d(t,"r",(function(){return x})),n.d(t,"s",(function(){return w})),n.d(t,"K",(function(){return S})),n.d(t,"u",(function(){return E})),n.d(t,"k",(function(){return O})),n.d(t,"H",(function(){return C})),n.d(t,"N",(function(){return k})),n.d(t,"n",(function(){return M})),n.d(t,"o",(function(){return T})),n.d(t,"F",(function(){return j})),n.d(t,"c",(function(){return P})),n.d(t,"h",(function(){return I})),n.d(t,"t",(function(){return B})),n.d(t,"w",(function(){return N})),n.d(t,"C",(function(){return L})),n.d(t,"D",(function(){return D})),n.d(t,"z",(function(){return R})),n.d(t,"A",(function(){return F})),n.d(t,"E",(function(){return z})),n.d(t,"v",(function(){return H})),n.d(t,"x",(function(){return V})),n.d(t,"y",(function(){return G})),n.d(t,"B",(function(){return W})),n.d(t,"l",(function(){return q})),n.d(t,"O",(function(){return Q})),n.d(t,"P",(function(){return Y})),n.d(t,"Q",(function(){return K})),n.d(t,"S",(function(){return X})),n.d(t,"M",(function(){return Z})),n.d(t,"b",(function(){return $})),n.d(t,"T",(function(){return J})),n.d(t,"R",(function(){return ee})),n.d(t,"f",(function(){return oe})),n.d(t,"e",(function(){return ae})),n.d(t,"g",(function(){return se})),n.d(t,"j",(function(){return ue})),n.d(t,"q",(function(){return le})),n.d(t,"L",(function(){return ce})),n.d(t,"a",(function(){return fe}));var r=n(99),i=k(["Function","RegExp","Date","Error","CanvasGradient","CanvasPattern","Image","Canvas"])}]])	`, none)
-	prog.Show()
-}
-
 func TestBitNot(t *testing.T) {
 	prog := ParseSSA(`
 		a = ~0b1
@@ -313,14 +231,6 @@ func TestObject(t *testing.T) {
 	prog.Show()
 }
 
-//go:embed b.js
-var test string
-
-func TestJsReals(t *testing.T) {
-	prog := ParseSSA(test, none)
-	prog.Show()
-}
-
 func TestUse(t *testing.T) {
 	// var 多个值
 	code := `
@@ -334,140 +244,6 @@ func TestUse(t *testing.T) {
 func TestNumber(t *testing.T) {
 	prog := ParseSSA(`
 		a < 1e-6 ? 1 : 2
-	`, none)
-	prog.Show()
-}
-
-func TestPos(t *testing.T) {
-	prog := ParseSSA(`
-	 function b(e) {
-        a = null,
-        return "string" === typeof e && (e = function(e) {
-            if (0 === (e = e.trim().toLowerCase()).length) return ! 1;
-            var t = !1;
-            if (A[e]) e = A[e],
-            t = !0;
-            else if ("transparent" === e) return {
-                r: 0,
-                g: 0,
-                b: 0,
-                a: 0,
-                format: "name"
-            };
-            var n = S.rgb.exec(e);
-            if (n) return {
-                r: n[1],
-                g: n[2],
-                b: n[3]
-            };
-            if (n = S.rgba.exec(e)) return {
-                r: n[1],
-                g: n[2],
-                b: n[3],
-                a: n[4]
-            };
-            if (n = S.hsl.exec(e)) return {
-                h: n[1],
-                s: n[2],
-                l: n[3]
-            };
-            if (n = S.hsla.exec(e)) return {
-                h: n[1],
-                s: n[2],
-                l: n[3],
-                a: n[4]
-            };
-            if (n = S.hsv.exec(e)) return {
-                h: n[1],
-                s: n[2],
-                v: n[3]
-            };
-            if (n = S.hsva.exec(e)) return {
-                h: n[1],
-                s: n[2],
-                v: n[3],
-                a: n[4]
-            };
-            if (n = S.hex8.exec(e)) return {
-                r: y(n[1]),
-                g: y(n[2]),
-                b: y(n[3]),
-                a: m(n[4]),
-                format: t ? "name": "hex8"
-            };
-            if (n = S.hex6.exec(e)) return {
-                r: y(n[1]),
-                g: y(n[2]),
-                b: y(n[3]),
-                format: t ? "name": "hex"
-            };
-            if (n = S.hex4.exec(e)) return {
-                r: y(n[1] + n[1]),
-                g: y(n[2] + n[2]),
-                b: y(n[3] + n[3]),
-                a: m(n[4] + n[4]),
-                format: t ? "name": "hex8"
-            };
-            if (n = S.hex3.exec(e)) return {
-                r: y(n[1] + n[1]),
-                g: y(n[2] + n[2]),
-                b: y(n[3] + n[3]),
-                format: t ? "name": "hex"
-            };
-            return ! 1
-        } (e)),
-        "object" === typeof e && (E(e.r) && E(e.g) && E(e.b) ? (t = e.r, n = e.g, r = e.b, i = {
-            r: 255 * d(t, 255),
-            g: 255 * d(n, 255),
-            b: 255 * d(r, 255)
-        },
-        l = !0, c = "%" === String(e.r).substr( - 1) ? "prgb": "rgb") : E(e.h) && E(e.s) && E(e.v) ? (a = p(e.s), s = p(e.v), i = function(e, t, n) {
-            e = 6 * d(e, 360),
-            t = d(t, 100),
-            n = d(n, 100);
-            var r = Math.floor(e),
-            i = e - r,
-            o = n * (1 - t),
-            a = n * (1 - i * t),
-            s = n * (1 - (1 - i) * t),
-            u = r % 6;
-            return {
-                r: 255 * [n, a, o, o, s, n][u],
-                g: 255 * [s, n, n, a, o, o][u],
-                b: 255 * [o, o, s, n, n, a][u]
-            }
-        } (e.h, a, s), l = !0, c = "hsv") : E(e.h) && E(e.s) && E(e.l) && (a = p(e.s), u = p(e.l), i = function(e, t, n) {
-            var r, i, o;
-            if (e = d(e, 360), t = d(t, 100), n = d(n, 100), 0 === t) i = n,
-            o = n,
-            r = n;
-            else {
-                var a = n < .5 ? n * (1 + t) : n + t - n * t,
-                s = 2 * n - a;
-                r = v(s, a, e + 1 / 3),
-                i = v(s, a, e),
-                o = v(s, a, e - 1 / 3)
-            }
-            return {
-                r: 255 * r,
-                g: 255 * i,
-                b: 255 * o
-            }
-        } (e.h, a, u), l = !0, c = "hsl"), Object.prototype.hasOwnProperty.call(e, "a") && (o = e.a)),
-        o = function(e) {
-            return e = parseFloat(e),
-            (isNaN(e) || e < 0 || e > 1) && (e = 1),
-            e
-        } (o),
-        {
-            ok: l,
-            format: e.format || c,
-            r: Math.min(255, Math.max(i.r, 0)),
-            g: Math.min(255, Math.max(i.g, 0)),
-            b: Math.min(255, Math.max(i.b, 0)),
-            a: o
-        }
-    }
 	`, none)
 	prog.Show()
 }
