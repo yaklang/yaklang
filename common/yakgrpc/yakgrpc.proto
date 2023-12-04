@@ -1008,7 +1008,8 @@ message AuthInfo {
     string AuthPassword = 2;
     string AuthType = 3;
     string Host = 4;
-  }
+    bool Forbidden = 5;
+}
 
 message ThirdPartyApplicationConfig {
     // zoomeye / hunter / shodan / fofa / github / token
