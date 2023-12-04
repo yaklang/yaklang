@@ -209,7 +209,7 @@ func RuleCliParamName(prog *ssaapi.Program) {
 			}
 			if _, ok := paramLineMap[paramName]; !ok {
 				paramLineMap[paramName] = v.GetPosition().StartLine
-				if !utils.MatchAllOfRegexp(rawParamName, `^[a-zA-Z0-9]+$`) {
+				if !utils.MatchAllOfRegexp(rawParamName, `^[a-zA-Z0-9_-]+$`) {
 					firstField.NewError(tag, ErrorStrInvalidParamName(rawParamName))
 				}
 			} else {
@@ -278,5 +278,5 @@ func ErrorStrSameParamName(name string, line int) string {
 }
 
 func ErrorStrInvalidParamName(name string) string {
-	return fmt.Sprintf("parameter [%s] should be letters or numbers", name)
+	return fmt.Sprintf("parameter [%s] should be letters or numbers or _ or -", name)
 }
