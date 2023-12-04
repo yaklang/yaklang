@@ -508,7 +508,11 @@ func getDescFromSSAValue(name string, v *ssaapi.Value) string {
 func sortValuesByPosition(values ssaapi.Values, position *ssa.Position) ssaapi.Values {
 	// todo: 需要修改SSA，需要真正的RefLocation
 	values = values.Filter(func(v *ssaapi.Value) bool {
-		if v.GetPosition().StartLine > position.StartLine {
+		position2 := v.GetPosition()
+		if position2 == nil {
+			return false
+		}
+		if position2.StartLine > position.StartLine {
 			return false
 		}
 		return true
@@ -527,7 +531,11 @@ func sortValuesByPosition(values ssaapi.Values, position *ssa.Position) ssaapi.V
 func getSSAParentValueByPosition(prog *ssaapi.Program, sourceCode string, position *ssa.Position) *ssaapi.Value {
 	word := strings.Split(sourceCode, ".")[0]
 	values := prog.Ref(word).Filter(func(v *ssaapi.Value) bool {
-		if v.GetPosition().StartLine > position.StartLine {
+		position2 := v.GetPosition()
+		if position2 == nil {
+			return false
+		}
+		if position2.StartLine > position.StartLine {
 			return false
 		}
 		return true
@@ -769,7 +777,11 @@ func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionReques
 		// map 成员
 		filterMap := make(map[string]struct{})
 		v.GetUsers().Filter(func(u *ssaapi.Value) bool {
-			return u.IsField() && u.GetPosition().StartLine <= position.StartLine
+			position2 := u.GetPosition()
+			if position2 == nil {
+				return false
+			}
+			return u.IsField() && position2.StartLine <= position.StartLine
 		}).ForEach(func(v *ssaapi.Value) {
 			key := v.GetOperand(1)
 			if _, ok := filterMap[key.String()]; ok {
@@ -818,7 +830,7 @@ func GrpcRangeToPosition(r *ypb.Range) *ssa.Position {
 func (s *Server) YaklangLanguageSuggestion(ctx context.Context, req *ypb.YaklangLanguageSuggestionRequest) (*ypb.YaklangLanguageSuggestionResponse, error) {
 	ret := &ypb.YaklangLanguageSuggestionResponse{}
 	prog := ssaapi.Parse(req.YakScriptCode, pta.GetPluginSSAOpt(req.YakScriptType)...)
-	if prog == nil {
+	if prog.Program == nil {
 		return nil, errors.New("ssa parse error")
 	}
 	// todo: 处理YakScriptType，不同语言的补全、提示可能有不同
