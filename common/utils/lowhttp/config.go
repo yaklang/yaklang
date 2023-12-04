@@ -50,7 +50,7 @@ type LowhttpExecConfig struct {
 	RuntimeId                        string
 	FromPlugin                       string
 	WithConnPool                     bool
-	ConnPool                         *lowHttpConnPool
+	ConnPool                         *LowHttpConnPool
 	NativeHTTPRequestInstance        *http.Request
 	Username                         string
 	Password                         string
@@ -400,7 +400,7 @@ func WithSession(session interface{}) LowhttpOpt {
 	}
 }
 
-func ConnPool(p *lowHttpConnPool) LowhttpOpt {
+func ConnPool(p *LowHttpConnPool) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.ConnPool = p
 	}

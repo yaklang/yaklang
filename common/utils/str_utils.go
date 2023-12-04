@@ -713,7 +713,7 @@ func UrlJoin(origin string, paths ...string) (newURL string, err error) {
 		// 不是 URL，并且 pathRaw 开头一定不是 /
 		// 那么就看 u.Path 结尾是不是 /
 		// r := path.Join(u.Path, pathRaw)
-		if !strings.HasSuffix(u.Path, "/") {
+		if !strings.HasSuffix(u.Path, "/") && path.Ext(u.Path) == "" {
 			u.Path += "/"
 		}
 
@@ -727,7 +727,7 @@ func UrlJoin(origin string, paths ...string) (newURL string, err error) {
 			case strings.HasPrefix(pathRaw, "../"):
 				pathRaw = pathRaw[3:]
 				u.Path = path.Join(u.Path, "..")
-				if !strings.HasSuffix(u.Path, "/") {
+				if !strings.HasSuffix(u.Path, "/") && path.Ext(u.Path) == "" {
 					u.Path += "/"
 				}
 				continue
@@ -736,7 +736,12 @@ func UrlJoin(origin string, paths ...string) (newURL string, err error) {
 			}
 		}
 
-		reqUri := u.Path + pathRaw
+		var reqUri string
+		if path.Ext(u.Path) == "" {
+			reqUri = u.Path + pathRaw
+		} else {
+			reqUri = path.Join(path.Dir(u.Path), pathRaw)
+		}
 		uri, err = url.ParseRequestURI(reqUri)
 		if err != nil {
 			u.Path = reqUri

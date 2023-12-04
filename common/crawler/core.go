@@ -8,8 +8,8 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"golang.org/x/net/html"
 	"io"
-	"io/ioutil"
 	"mime"
 	"net/http"
 	"net/url"
@@ -32,7 +32,6 @@ var (
 type Crawler struct {
 	originUrls []string
 	config     *Config
-	httpClient *http.Client
 
 	preRequestLock   *sync.Mutex
 	afterRequestLock *sync.Mutex
@@ -80,6 +79,8 @@ type Req struct {
 	// 当前请求所属深度
 	depth int
 
+	url         string
+	https       bool
 	request     *http.Request
 	requestRaw  []byte
 	response    *http.Response
@@ -91,8 +92,8 @@ type Req struct {
 	// 如果有的话，寻找 html/js 信息
 	htmlDocument     *goquery.Document
 	jsDocumentResult *javascript.ASTWalkerResult
-	body             []byte
-	header           []byte
+	responseBody     []byte
+	responseHeader   string
 
 	// 请求计数，请求过几次成功了
 	requestedCounter int
@@ -111,6 +112,9 @@ type Req struct {
 	// 私有，判断是否是 "同域"
 	// 这个 "域" 简单暴力，仅检测 host 部分是不是类似？*origin-domain* glob 语法
 	_selfDomainGlobs []glob.Glob
+
+	// default
+	disallowedMITMType bool
 }
 
 func HostToWildcardGlobs(host string) []glob.Glob {
@@ -224,6 +228,9 @@ func NewCrawler(urls string, opts ...configOpt) (*Crawler, error) {
 		opt(config)
 	}
 
+	if config.concurrent <= 0 {
+		config.concurrent = 20
+	}
 	var c = &Crawler{
 		originUrls:       urlList,
 		config:           config,
@@ -240,8 +247,6 @@ func NewCrawler(urls string, opts ...configOpt) (*Crawler, error) {
 		startUpSubmitTask: new(sync.WaitGroup),
 		loginOnce:         new(sync.Once),
 	}
-
-	c.httpClient = c.config.CreateHTTPClient()
 
 	return c, nil
 }
@@ -369,6 +374,9 @@ MAINLY:
 			}
 
 			// 检查是不是符合访问标准
+			if r.request.URL.Host == "" {
+				r.request, _ = utils.ReadHTTPRequestFromBytes(r.requestRaw)
+			}
 			if !config.CheckShouldBeHandledURL(r.request.URL) {
 				c.requestedHash.Store(r.Hash(), nil)
 				c.reqWaitGroup.Done()
@@ -400,13 +408,19 @@ MAINLY:
 
 func HandleRequestResult(isHttps bool, reqBytes, rspBytes []byte) ([][]byte, error) {
 	var err error
-	header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rspBytes)
+	header, body := lowhttp.SplitHTTPPacketFast(rspBytes)
+	urlIns, err := lowhttp.ExtractURLFromHTTPRequestRaw(reqBytes, isHttps)
+	if err != nil {
+		return nil, utils.Errorf("cannot extract url from request: %s", err)
+	}
 	var rootReq = &Req{
-		depth:       1,
-		requestRaw:  reqBytes,
-		responseRaw: rspBytes,
-		body:        body,
-		header:      []byte(header),
+		depth:          1,
+		https:          isHttps,
+		url:            urlIns.String(),
+		requestRaw:     reqBytes,
+		responseRaw:    rspBytes,
+		responseBody:   body,
+		responseHeader: header,
 	}
 	rootReq.request, err = lowhttp.ParseBytesToHttpRequest(reqBytes)
 	if err != nil {
@@ -436,7 +450,7 @@ func HandleRequestResult(isHttps bool, reqBytes, rspBytes []byte) ([][]byte, err
 
 	var subReqs []*Req
 	urlFilter := filter.NewFilter()
-	handleReqResult(rootReq, func(nReq *Req) bool {
+	handleReqResultEx(rootReq, func(nReq *Req) bool {
 		subReqs = append(subReqs, nReq)
 		return true
 	}, func(s string) bool {
@@ -452,7 +466,7 @@ func HandleRequestResult(isHttps bool, reqBytes, rspBytes []byte) ([][]byte, err
 		}
 		subReqs = append(subReqs, req)
 		return true
-	})
+	}, nil)
 
 	var result [][]byte
 	funk.ForEach(subReqs, func(i *Req) {
@@ -464,45 +478,110 @@ func HandleRequestResult(isHttps bool, reqBytes, rspBytes []byte) ([][]byte, err
 }
 
 func (c *Crawler) handleReqResult(r *Req) {
+	if r.err != nil {
+		log.Errorf("request error: %s", r.err.Error())
+		return
+	}
+
 	config := c.config
-	handleReqResultEx(r, func(nReq *Req) bool {
-		c.submit(nReq)
-		return true
-	}, func(targetUrl string) bool {
-		urlIns, err := url.Parse(targetUrl)
+	if r.disallowedMITMType {
+		return
+	}
+
+	submit := func(reqHttps bool, reqBytes []byte) {
+		req, err := c.createReqFromBytes(r, reqHttps, reqBytes)
 		if err != nil {
-			return true
+			log.Errorf("create request from bytes error: %s", err.Error())
+			return
 		}
-		_ = urlIns
-
-		// url 已经重复了，就不处理了
-		_, ok := c.foundUrls.Load(urlIns.String())
-		if ok {
-			return true
-		}
-		c.foundUrls.Store(urlIns.String(), nil)
-		if c.linkCounter > int64(c.config.maxCountOfLinks) {
-			return false
-		}
-		c.linkCounter++
-
-		// 检查 URL 是不是应该继续做？
-		if config.CheckShouldBeHandledURL(urlIns) {
-			// 增加深度，发送给下面的
-			newReq, err := c.createReqFromUrl(r, urlIns.String())
-			if err != nil {
-				return true
+		if ret, err := url.Parse(req.Url()); err != nil {
+			if !config.CheckShouldBeHandledURL(ret) {
+				return
 			}
-			newReq.depth = r.depth + 1
-			c.submit(newReq)
 		}
+		c.submit(req)
+	}
 
-		// 这里应该 targetUrl 纳入统计，并准备把后续的 URL 放在系统中爬结果
-		return true
-	}, c.config.extractionRules)
-}
-func handleReqResult(r *Req, reqHandler func(*Req) bool, urlHandler func(string) bool) {
-	handleReqResultEx(r, reqHandler, urlHandler, nil)
+	err := PageInformationWalker(
+		lowhttp.GetHTTPPacketContentType([]byte(r.responseHeader)),
+		string(r.responseBody),
+		WithFetcher_JavaScript(func(content *JavaScriptContent) {
+			if content.IsCodeText {
+				log.Infof("JS Code Fetch: %v", content.String())
+				return
+			}
+			log.Infof("JS(URL) Fetch: %v", content.String())
+			reqHttps, reqBytes, err := NewHTTPRequest(r.IsHttps(), r.requestRaw, r.responseRaw, content.UrlPath)
+			if err != nil {
+				log.Errorf("build http request(js) failed: %s", content.UrlPath)
+				return
+			}
+			submit(reqHttps, reqBytes)
+		}),
+		WithFetcher_HtmlTag(func(s string, node *html.Node) {
+			if s == "script" {
+				// skip js
+				return
+			}
+
+			// form
+			if s == "form" {
+				return
+			}
+
+			// meta
+			// [href] / [src]
+			for _, attr := range node.Attr {
+				switch strings.ToLower(attr.Key) {
+				case "href", "src":
+					reqHttps, reqBytes, err := NewHTTPRequest(r.IsHttps(), r.requestRaw, r.responseBody, attr.Val)
+					if err != nil {
+						log.Errorf("new request error: %s", err.Error())
+						continue
+					}
+					submit(reqHttps, reqBytes)
+				}
+			}
+		}),
+	)
+	if err != nil {
+		log.Errorf("page information walker error: %s", err.Error())
+	}
+	//handleReqResultEx(r, func(nReq *Req) bool {
+	//	c.submit(nReq)
+	//	return true
+	//}, func(targetUrl string) bool {
+	//	urlIns, err := url.Parse(targetUrl)
+	//	if err != nil {
+	//		return true
+	//	}
+	//	_ = urlIns
+	//
+	//	// url 已经重复了，就不处理了
+	//	_, ok := c.foundUrls.Load(urlIns.String())
+	//	if ok {
+	//		return true
+	//	}
+	//	c.foundUrls.Store(urlIns.String(), nil)
+	//	if c.linkCounter > int64(c.config.maxCountOfLinks) {
+	//		return false
+	//	}
+	//	c.linkCounter++
+	//
+	//	// 检查 URL 是不是应该继续做？
+	//	if config.CheckShouldBeHandledURL(urlIns) {
+	//		// 增加深度，发送给下面的
+	//		newReq, err := c.createReqFromUrl(r, urlIns.String())
+	//		if err != nil {
+	//			return true
+	//		}
+	//		newReq.depth = r.depth + 1
+	//		c.submit(newReq)
+	//	}
+	//
+	//	// 这里应该 targetUrl 纳入统计，并准备把后续的 URL 放在系统中爬结果
+	//	return true
+	//}, c.config.extractionRules)
 }
 
 var metaUrlExtractor = regexp.MustCompile(`(?i)url=\s*([^\s]+)`)
@@ -593,7 +672,6 @@ func handleReqResultEx(r *Req, reqHandler func(*Req) bool, urlHandler func(strin
 					lowerBody,
 					"pass", "word", "mima", "code", "secret", "key", "passwd", "pw", "pwd", "pd",
 				)
-
 				fReq.maybeUploadForm = utils.MatchAllOfRegexp(contentType, `application\/form-data`)
 				fReq.request.Header.Set("Content-Type", contentType)
 				fReq.depth = r.depth
@@ -682,6 +760,25 @@ func (c *Crawler) createReqFromUrl(preRequest *Req, u string) (*Req, error) {
 	return createReqFromUrlEx(preRequest, "GET", u, http.NoBody, c)
 }
 
+func (c *Crawler) createReqFromBytes(preRequest *Req, https bool, req []byte) (*Req, error) {
+	reqIns, err := utils.ReadHTTPRequestFromBytes(req)
+	if err != nil {
+		return nil, err
+	}
+	urlIns, err := lowhttp.ExtractURLFromHTTPRequestRaw(req, https)
+	if err != nil {
+		return nil, err
+	}
+	reqIns.URL = urlIns
+	return &Req{
+		depth:      preRequest.depth + 1,
+		https:      https,
+		url:        urlIns.String(),
+		request:    reqIns,
+		requestRaw: req,
+	}, nil
+}
+
 func createReqFromUrlEx(preqRequest *Req, method, u string, body io.Reader, c *Crawler) (*Req, error) {
 	r, err := http.NewRequest(method, u, body)
 	if err != nil {
@@ -722,101 +819,44 @@ func createReqFromUrlEx(preqRequest *Req, method, u string, body io.Reader, c *C
 }
 
 func (c *Crawler) execReq(r *Req) {
-
 	defer func() {
 		if err := recover(); err != nil {
 			log.Error(err)
 		}
 	}()
-
 	if r.request == nil {
 		return
 	}
 
-	retried := 0
-	var rsp *http.Response
-	var err error
-	for {
-		if retried >= c.config.maxRetryTimes {
-			break
-		}
-
-		// 如果登陆的话只执行一次
-		executed := utils.NewBool(false)
-		if c.config.onLogin != nil && r.IsLoginForm() && r.IsForm() {
-			c.loginOnce.Do(func() {
-				executed.Set()
-				c.config.onLogin(r, c.httpClient)
-			})
-			if executed.IsSet() && r.response != nil {
-				rsp = r.response
-				break
-			}
-		}
-
-		rsp, err = c.httpClient.Do(r.request)
-		if err != nil {
-			r.err = err
-			retried++
-			continue
-		}
-		break
+	// config opts
+	c.config.GetLowhttpConfig()
+	opts := c.config.GetLowhttpConfig()
+	opts = append(opts, lowhttp.WithHttps(r.IsHttps()), lowhttp.WithPacketBytes(r.requestRaw))
+	if c.config.onLogin != nil && r.IsLoginForm() && r.IsForm() {
+		c.loginOnce.Do(func() {
+			c.config.onLogin(r)
+		})
 	}
 
-	if rsp == nil {
-		if r.err == nil {
-			r.err = utils.Errorf("无返回结果，原因未知，重试看看？(empty response.. may retry failed)")
-		}
+	lowRspIns, err := lowhttp.HTTP(opts...)
+	if err != nil {
+		r.err = err
 		return
 	}
-
-	raw, err := utils.DumpHTTPResponse(rsp, false)
+	rsp, err := utils.ReadHTTPResponseFromBytes(lowRspIns.RawPacket, r.request)
 	if err != nil {
+		r.err = err
 		return
 	}
 	r.response = rsp
-	r.header = raw
-
+	r.responseRaw = lowRspIns.RawPacket
+	r.responseHeader, r.responseBody = lowhttp.SplitHTTPPacketFast(lowRspIns.RawPacket)
 	// 获取 MIME 类型
-	handleBody := true
 	mimeType, _, _ := mime.ParseMediaType(rsp.Header.Get("Content-Type"))
 	if mimeType != "" {
 		log.Debugf("checking url: %s for response mime type: %s", r.Url(), mimeType)
 		if utils.MatchAnyOfGlob(mimeType, c.config.disallowMIMEType...) {
-			handleBody = false
-			// 应该排除掉的 MIME
-			log.Debugf("skipped url: %s for response mime type: %s", r.Url(), mimeType)
-			r.responseRaw, _, _ = lowhttp.FixHTTPResponse(r.header)
-			if r.responseRaw == nil {
-				r.responseRaw = r.header
-			}
-		}
-	}
-
-	if !handleBody {
-		rsp.Body = ioutil.NopCloser(bytes.NewBufferString(""))
-	}
-	if rsp.Body != nil {
-		rsp.Body = ioutil.NopCloser(io.LimitReader(rsp.Body, int64(c.config.maxBodySize)))
-	}
-	var rawBody []byte
-	if rsp.Body != nil {
-		rawBody, _ = ioutil.ReadAll(rsp.Body)
-	}
-	if r.responseRaw == nil {
-		r.responseRaw = lowhttp.ReplaceHTTPPacketBody(r.header, rawBody, false)
-	}
-	r.body = rawBody
-
-	if utils.IContains(mimeType, "javascript") {
-		r.jsDocumentResult, err = javascript.BasicJavaScriptASTWalker(string(r.body))
-		if err != nil {
-			log.Errorf("javascript ast analysis failed: %s", err)
-		}
-	} else {
-		r.htmlDocument, err = goquery.NewDocumentFromReader(bytes.NewBuffer(rawBody))
-		if err != nil {
-			log.Errorf("create html document reader failed: %s", err)
+			r.disallowedMITMType = true
 		}
 	}
 	if c.config.onRequest != nil {

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/crawler"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -14,7 +13,6 @@ import (
 	"net/url"
 	"reflect"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -158,12 +156,9 @@ func YakHttpConfig_Proxy(values ...string) HttpOption {
 		if len(values) <= 0 {
 			return
 		}
-		swticher, err := crawler.RoundRobinProxySwitcher(values...)
-		if err != nil {
-			log.Errorf("set http proxy[%v] failed: %s", strings.Join(values, ","), err)
-			return
+		req.proxies = func(req *http.Request) (*url.URL, error) {
+			return url.Parse(values[0])
 		}
-		req.proxies = swticher
 	}
 }
 
