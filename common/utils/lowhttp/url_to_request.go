@@ -20,6 +20,16 @@ func NewRequestPacketFromMethod(method string, u string, originRequest []byte, o
 	}
 	parseReqOk := originReqIns != nil
 
+	if !utils.IsHttpOrHttpsUrl(u) {
+		urlIns, _ := ExtractURLFromHTTPRequest(originReqIns, originRequestHttps)
+		if urlIns != nil {
+			nu, _ := utils.UrlJoin(urlIns.String(), u)
+			if nu != "" {
+				u = nu
+			}
+		}
+	}
+
 	reqIns, err := http.NewRequest(method, u, http.NoBody)
 	if err != nil {
 		return nil
@@ -38,7 +48,10 @@ func NewRequestPacketFromMethod(method string, u string, originRequest []byte, o
 		}
 
 		jar.SetCookies(reqIns.URL, cookies)
-		reqIns.Header.Set("Cookie", CookiesToString(jar.Cookies(reqIns.URL)))
+		ret := CookiesToString(jar.Cookies(reqIns.URL))
+		if len(ret) > 0 {
+			reqIns.Header.Set("Cookie", ret)
+		}
 	}
 
 	reqRaw, err := utils.HttpDumpWithBody(reqIns, true)
@@ -102,7 +115,10 @@ func urlToRequestPacket(method string, u string, originRequest []byte, https boo
 				return nil
 			}
 			jar.SetCookies(originReqIns.URL, append(originReqIns.Cookies(), cookies...))
-			originReqIns.Header.Set("Cookie", CookiesToString(jar.Cookies(originReqIns.URL)))
+			res := CookiesToString(jar.Cookies(originReqIns.URL))
+			if len(res) > 0 {
+				originReqIns.Header.Set("Cookie", res)
+			}
 		}
 
 		raw, err := utils.HttpDumpWithBody(originReqIns, true)

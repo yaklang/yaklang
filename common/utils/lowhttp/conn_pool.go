@@ -26,7 +26,7 @@ var (
 )
 
 var (
-	DefaultLowHttpConnPool = &lowHttpConnPool{
+	DefaultLowHttpConnPool = &LowHttpConnPool{
 		maxIdleConn:        100,
 		maxIdleConnPerHost: 2,
 		connCount:          0,
@@ -37,7 +37,18 @@ var (
 	errServerClosedIdle = errors.New("conn pool: server closed idle connection")
 )
 
-type lowHttpConnPool struct {
+func NewDefaultHttpConnPool() *LowHttpConnPool {
+	return &LowHttpConnPool{
+		maxIdleConn:        100,
+		maxIdleConnPerHost: 2,
+		connCount:          0,
+		idleConnTimeout:    90 * time.Second,
+		idleConn:           make(map[string][]*persistConn),
+		keepAliveTimeout:   30 * time.Second,
+	}
+}
+
+type LowHttpConnPool struct {
 	idleConnMux        sync.RWMutex              //空闲连接访问锁
 	maxIdleConn        int                       //最大总连接
 	maxIdleConnPerHost int                       //单host最大连接
@@ -50,7 +61,7 @@ type lowHttpConnPool struct {
 
 // 取出一个空闲连接
 // want 检索一个可用的连接，并且把这个连接从连接池中取出来
-func (l *lowHttpConnPool) getIdleConn(key connectKey, opts ...netx.DialXOption) (*persistConn, error) {
+func (l *LowHttpConnPool) getIdleConn(key connectKey, opts ...netx.DialXOption) (*persistConn, error) {
 	//尝试获取复用连接
 	if oldPc, ok := l.getFromConn(key); ok {
 		return oldPc, nil
@@ -63,7 +74,7 @@ func (l *lowHttpConnPool) getIdleConn(key connectKey, opts ...netx.DialXOption) 
 	return pConn, nil
 }
 
-func (l *lowHttpConnPool) getFromConn(key connectKey) (oldPc *persistConn, getConn bool) {
+func (l *LowHttpConnPool) getFromConn(key connectKey) (oldPc *persistConn, getConn bool) {
 	l.idleConnMux.Lock()
 	defer l.idleConnMux.Unlock()
 	getConn = false
@@ -111,7 +122,7 @@ func (l *lowHttpConnPool) getFromConn(key connectKey) (oldPc *persistConn, getCo
 	return
 }
 
-func (l *lowHttpConnPool) putIdleConn(conn *persistConn) error {
+func (l *LowHttpConnPool) putIdleConn(conn *persistConn) error {
 	cacheKeyHash := conn.cacheKey.hash()
 	l.idleConnMux.Lock()
 	defer l.idleConnMux.Unlock()
@@ -143,7 +154,7 @@ func (l *lowHttpConnPool) putIdleConn(conn *persistConn) error {
 }
 
 // 在有写锁的环境中从池子里删除一个空闲连接
-func (l *lowHttpConnPool) removeConnLocked(pConn *persistConn) error {
+func (l *LowHttpConnPool) removeConnLocked(pConn *persistConn) error {
 	if pConn.closeTimer != nil {
 		pConn.closeTimer.Stop()
 	}
@@ -175,7 +186,7 @@ type persistConn struct {
 	alt      *http2ClientConn
 	net.Conn //conn本体
 	mu       sync.Mutex
-	p        *lowHttpConnPool //连接对应的连接池
+	p        *LowHttpConnPool //连接对应的连接池
 	cacheKey connectKey       //连接池缓存key
 	isProxy  bool             //是否使用代理
 	alive    bool             //存活判断
@@ -306,7 +317,7 @@ func (es *bodyEOFSignal) condfn(err error) error {
 	return err
 }
 
-func newPersistConn(key connectKey, pool *lowHttpConnPool, opt ...netx.DialXOption) (*persistConn, error) {
+func newPersistConn(key connectKey, pool *LowHttpConnPool, opt ...netx.DialXOption) (*persistConn, error) {
 	needProxy := len(key.proxy) > 0
 	opt = append(opt, netx.DialX_WithKeepAlive(pool.keepAliveTimeout))
 	newConn, err := netx.DialX(key.addr, opt...)

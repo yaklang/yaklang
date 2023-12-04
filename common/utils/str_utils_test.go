@@ -32,6 +32,14 @@ ddd`)
 	assert.Equal(t, a[2], "ddd")
 }
 
+func TestMUSTPASS_UrlJoin2(t *testing.T) {
+	u, err := UrlJoin("https://baidu.com/a/b.html", "c.html")
+	if err != nil {
+		panic(err)
+	}
+	assert.Equal(t, "https://baidu.com/a/c.html", u)
+}
+
 func TestMUSTPASS_UrlJoin(t *testing.T) {
 	cases := map[string][2]string{
 		"/abc":                          {"https://baidu.com/root", "https://baidu.com/abc"},

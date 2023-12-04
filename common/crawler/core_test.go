@@ -2,24 +2,8 @@ package crawler
 
 import (
 	"github.com/davecgh/go-spew/spew"
-	"github.com/stretchr/testify/assert"
 	"testing"
 )
-
-func TestCrawler_Run(t *testing.T) {
-	test := assert.New(t)
-	crawler, err := NewCrawler("http://159.65.125.15/theme/revolution/js")
-	if err != nil {
-		panic(err)
-		return
-	}
-
-	err = crawler.Run()
-	if err != nil {
-		test.FailNow(err.Error())
-		return
-	}
-}
 
 func TestHandleRequestResult(t *testing.T) {
 	req, err := HandleRequestResult(true, []byte(`GET /tools/test/ HTTP/1.1
