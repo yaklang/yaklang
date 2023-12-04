@@ -250,3 +250,48 @@ func TestPortsFilter(t *testing.T) {
 		assert.Equal(t, c.result, p.Contains(c.input), "input: %v exclude: %v", c.input, c.exclude)
 	}
 }
+
+func TestHostContains(t *testing.T) {
+	type hostContainsCase struct {
+		input  string
+		target string
+		result bool
+	}
+
+	cases := []hostContainsCase{
+		{
+			input:  "1.1.1.1:80",
+			target: "1.1.1.1:80",
+			result: true,
+		},
+		{
+			input:  "1.1.1.1",
+			target: "1.1.1.1:8080",
+			result: true,
+		},
+		{
+			input:  "2.2.2.2/24",
+			target: "2.2.2.1",
+			result: true,
+		},
+		{
+			input:  "*.baidu.com",
+			target: "www.baidu.com",
+			result: true,
+		},
+		{
+			input:  "*.baidu.com:80",
+			target: "www.baidu.com",
+			result: false,
+		},
+		{
+			input:  "3.3.3.3/24",
+			target: "4.4.4.4",
+			result: false,
+		},
+	}
+	for _, c := range cases {
+		res := HostContains(c.input, c.target)
+		assert.Equal(t, c.result, res, "input: %v,%v exclude: %v", c.input, c.target, c.result)
+	}
+}
