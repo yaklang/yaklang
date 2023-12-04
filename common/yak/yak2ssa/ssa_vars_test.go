@@ -236,3 +236,73 @@ func TestLineDisasm(t *testing.T) {
 
 	check(t, code, "phi")
 }
+
+func TestCfg(t *testing.T) {
+
+	t.Run("test multiple if", func(t *testing.T) {
+		code := `
+		if (a == 1) && (b == 1){
+		}else if a == 2{
+			if c == 1 {
+			}else {
+			}
+		}elif a == 3 {
+		}else {
+		}
+		`
+		prog := ParseSSA(code, func(fb *ssa.FunctionBuilder) {
+		})
+		if prog == nil {
+			t.Fatal("prog parse error")
+		}
+	})
+
+	t.Run("test cfg Loop", func(t *testing.T) {
+		code := `
+		for (a && b) {
+			if a == 1 {
+			}
+		}
+		`
+		prog := ParseSSA(code, func(fb *ssa.FunctionBuilder) {
+		})
+		if prog == nil {
+			t.Fatal("prog parse error")
+		}
+		prog.Show()
+	})
+
+	t.Run("test if within try-catch", func(t *testing.T) {
+		code := `
+	scriptNameFile = "aa"
+	try {
+		if false{}
+	} catch err {
+		if false {  }
+	}
+	println(scriptNameFile)
+	`
+		check(t, code, "aa")
+	})
+
+	t.Run("test switch", func(t *testing.T) {
+		code := `
+		switch (a) {
+			case 1 && 2:
+				println(1)
+			case 3:
+				println(3)
+			default:
+				println(4)
+		}
+		`
+		prog := ParseSSA(code, func(fb *ssa.FunctionBuilder) {
+		})
+		if prog == nil {
+			t.Fatal("prog parse error")
+		}
+		prog.Show()
+
+	})
+
+}

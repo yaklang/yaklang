@@ -101,7 +101,7 @@ func (lb *LoopBuilder) BuildBody(f func()) {
 func (lb *LoopBuilder) Finish() {
 	builder := lb.b
 	header := builder.NewBasicBlockUnSealed(LoopHeader)
-	body := builder.NewBasicBlock(LoopBody)
+	body := builder.NewBasicBlockNotAddBlocks(LoopBody)
 	exit := builder.NewBasicBlockNotAddBlocks(LoopExit)
 	latch := builder.NewBasicBlockNotAddBlocks(LoopLatch)
 	// loop is a scope
@@ -121,18 +121,13 @@ func (lb *LoopBuilder) Finish() {
 
 	// build condition
 	var condition Value
-	// if lb.buildCondition != nil {
-	// if in header end; to exit or body
 	builder.CurrentBlock = header
 	condition = lb.buildCondition()
-	// } else {
-	// 	condition = NewConst(true)
-	// lb.b.NewError(Error, SSATAG, "this condition not set!")
-	// }
 	loop = builder.EmitLoop(body, exit, condition)
 
 	// build body
 	if lb.buildBody != nil {
+		addToBlocks(body)
 		builder.CurrentBlock = body
 		builder.PushTarget(exit, latch, nil)
 		lb.buildBody()
@@ -242,6 +237,7 @@ func (i *IfBuilder) Finish() {
 	builder := i.b
 	// if instruction
 	var doneBlock *BasicBlock
+	// Set end BasicBlock
 	if i.parent == nil {
 		doneBlock = builder.NewBasicBlockNotAddBlocks(IfDone)
 		i.done = doneBlock
@@ -249,18 +245,44 @@ func (i *IfBuilder) Finish() {
 		i.done = i.parent.done
 		doneBlock = i.parent.done
 	}
-	trueBlock := builder.NewBasicBlock(IfTrue)
+	// TrueBlock
+	trueBlock := builder.NewBasicBlockNotAddBlocks(IfTrue)
 
 	// build ifSSA
+
+	// in Enter BasicBlock:
+	// enter:
+	//      // if stmt cond in here
+	// 		// here can be set multiple BasicBlock
+	//      If [cond] true -> if.true, false -> if.elif
+
+	// build Condition
+	builder.CurrentBlock = i.enter
+	// this function can build new cfg
 	cond := i.ifCondition()
+	// continue append this instruction
 	ifSSA := builder.EmitIf(cond)
 	ifSSA.AddTrue(trueBlock)
-	// build true block
+
+	// build TrueBlock and append this block to Function BasicBlock list.
+	// if.true: 					<- enter
+	//      // if-true-body block in here
+	//      jump if.done
+	addToBlocks(trueBlock)
 	builder.CurrentBlock = trueBlock
-	i.ifBody() //TODO:?????cfg跳转链断
-	// true -> done
+	// this function can build multiple BasicBlock
+	i.ifBody()
 	builder.EmitJump(doneBlock)
 
+	// if.elif: 					<- enter
+	//      // if-elif cond in here    (this build in "elif" and "else if")
+	//      If [cond] true -> if.elif_true, false -> if.false
+	// if.elif_true:				<- if.elif
+	//      // if-elif-true-body block in here
+	//      jump if.done
+	// if.false: 					<- if.elif
+	//      // if-elif-false-body block in here
+	//      jump if.done
 	prevIf := ifSSA
 	for index := range i.elifCondition {
 		buildCondition := i.elifCondition[index]
@@ -287,6 +309,7 @@ func (i *IfBuilder) Finish() {
 	}
 
 	if i.elseBody != nil {
+		// if has else stmt, build it and set in False
 		// create false
 		prevIf.AddFalse(builder.NewBasicBlock(IfFalse))
 		// build else body
@@ -296,7 +319,8 @@ func (i *IfBuilder) Finish() {
 	} else if i.child != nil {
 		// create elif
 		prevIf.AddFalse(builder.NewBasicBlock(IfElif))
-		builder.CurrentBlock = prevIf.False
+		// set IfBuilder enter
+		i.child.enter = prevIf.False
 		i.child.Finish()
 	} else {
 		prevIf.AddFalse(doneBlock)
@@ -358,6 +382,7 @@ func (t *TryBuilder) Finish() {
 	// build try
 	builder.CurrentBlock = try
 	t.buildTry()
+	try = builder.CurrentBlock
 
 	// build catch
 	builder.PushBlockSymbolTable()
@@ -370,6 +395,7 @@ func (t *TryBuilder) Finish() {
 		// builder.WriteVariable(id, p)
 	}
 	t.buildCatch()
+	catch = builder.CurrentBlock
 	builder.PopBlockSymbolTable()
 
 	// build finally
@@ -411,12 +437,10 @@ type SwitchBuilder struct {
 	// block
 	enter          *BasicBlock
 	buildCondition func() Value
-	buildHandler   func() (int, []Value)
-	buildBody      func(int)
-	buildDefault   func()
-
-	// case
-	caseNum int
+	// TODO: should't use this `func() (int, []Value)`, should have `getCaseSize()int` and `getExpress(int)Value`, just like `buildBody`
+	buildHandler func() (int, []Value)
+	buildBody    func(int)
+	buildDefault func()
 
 	DefaultBreak bool
 }
@@ -451,6 +475,7 @@ func (t *SwitchBuilder) Finish() {
 	var cond Value
 	if t.buildCondition != nil {
 		cond = t.buildCondition()
+		t.enter = builder.CurrentBlock
 	}
 
 	done := builder.NewBasicBlockNotAddBlocks(SwitchDone)
@@ -459,11 +484,11 @@ func (t *SwitchBuilder) Finish() {
 
 	// build handler and body
 	var exprs []Value
-	t.caseNum, exprs = t.buildHandler()
+	caseNum, exprs := t.buildHandler()
 
-	handlers := make([]*BasicBlock, 0, t.caseNum)
-	slabel := make([]SwitchLabel, 0, t.caseNum)
-	for i := 0; i < t.caseNum; i++ {
+	handlers := make([]*BasicBlock, 0, caseNum)
+	slabel := make([]SwitchLabel, 0, caseNum)
+	for i := 0; i < caseNum; i++ {
 		// build handler
 		handler := builder.NewBasicBlock(SwitchHandler)
 		t.enter.AddSucc(handler)
@@ -475,7 +500,7 @@ func (t *SwitchBuilder) Finish() {
 		if t.DefaultBreak {
 			return done
 		} else {
-			if i == t.caseNum-1 {
+			if i == caseNum-1 {
 				return defaultb
 			} else {
 				return handlers[i+1]
@@ -483,10 +508,10 @@ func (t *SwitchBuilder) Finish() {
 		}
 	}
 
-	for i := 0; i < t.caseNum; i++ {
+	for i := 0; i < caseNum; i++ {
 		// build body
 		var _fallthrough *BasicBlock
-		if i == t.caseNum-1 {
+		if i == caseNum-1 {
 			_fallthrough = defaultb
 		} else {
 			_fallthrough = handlers[i+1]
@@ -500,7 +525,6 @@ func (t *SwitchBuilder) Finish() {
 		// jump handlers-block -> done
 		builder.EmitJump(NextBlock(i))
 		builder.PopTarget()
-
 	}
 
 	// build default

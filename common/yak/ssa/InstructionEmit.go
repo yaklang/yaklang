@@ -1,6 +1,8 @@
 package ssa
 
 import (
+	"fmt"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/slices"
 )
@@ -142,6 +144,9 @@ func (f *FunctionBuilder) emitAroundInstruction(i, other Instruction, insert fun
 }
 
 func (f *FunctionBuilder) emit(i Instruction) {
+	if f.CurrentBlock.finish || utils.IsNil(i) {
+		panic(fmt.Sprintf("this block [%s] is finish, instruction[%s] can't insert!", f.CurrentBlock, i))
+	}
 	f.emitEx(i, func(i Instruction) {
 		f.CurrentBlock.Insts = append(f.CurrentBlock.Insts, i)
 	})
@@ -177,6 +182,9 @@ func (f *FunctionBuilder) EmitUndefine(name string) *Undefined {
 }
 
 func (f *FunctionBuilder) EmitUnOp(op UnaryOpcode, v Value) Value {
+	if f.CurrentBlock.finish {
+		return nil
+	}
 	u := NewUnOp(op, v)
 	f.emit(u)
 	return u
@@ -248,7 +256,7 @@ func (f *FunctionBuilder) EmitReturn(vs []Value) *Return {
 }
 
 func (f *FunctionBuilder) EmitCall(c *Call) *Call {
-	if f.CurrentBlock.finish || c == nil {
+	if f.CurrentBlock.finish {
 		return nil
 	}
 	f.emit(c)
@@ -265,6 +273,9 @@ func (f *FunctionBuilder) EmitAssert(cond, msgValue Value, msg string) *Assert {
 }
 
 func (f *FunctionBuilder) emitMake(parentI Value, typ Type, low, high, max, Len, Cap Value) *Make {
+	if f.CurrentBlock.finish {
+		return nil
+	}
 	i := NewMake(parentI, typ, low, high, max, Len, Cap)
 	f.emit(i)
 	return i
@@ -294,6 +305,9 @@ func (f *FunctionBuilder) EmitConstInstWithUnary(i any, un int) *ConstInst {
 }
 
 func (f *FunctionBuilder) EmitConstInst(i any) *ConstInst {
+	if f.CurrentBlock.finish {
+		return nil
+	}
 	ci := NewConst(i)
 	f.emitEx(ci, func(i Instruction) {
 		// pass
@@ -302,9 +316,15 @@ func (f *FunctionBuilder) EmitConstInst(i any) *ConstInst {
 }
 
 func (f *FunctionBuilder) EmitField(i, key Value) Value {
+	if f.CurrentBlock.finish {
+		return nil
+	}
 	return f.getFieldWithCreate(i, key, false)
 }
 func (f *FunctionBuilder) EmitFieldMust(i, key Value) *Field {
+	if f.CurrentBlock.finish {
+		return nil
+	}
 	if field, ok := ToField(f.getFieldWithCreate(i, key, true)); ok {
 		return field
 	}
@@ -312,6 +332,9 @@ func (f *FunctionBuilder) EmitFieldMust(i, key Value) *Field {
 }
 
 func (f *FunctionBuilder) EmitUpdate(address, v Value) *Update {
+	if f.CurrentBlock.finish {
+		return nil
+	}
 	// CheckUpdateType(address.GetType(), v.GetType())
 	s := NewUpdate(address, v)
 	f.emit(s)
@@ -319,24 +342,36 @@ func (f *FunctionBuilder) EmitUpdate(address, v Value) *Update {
 }
 
 func (f *FunctionBuilder) EmitTypeCast(v Value, typ Type) *TypeCast {
+	if f.CurrentBlock.finish {
+		return nil
+	}
 	t := NewTypeCast(typ, v)
 	f.emit(t)
 	return t
 }
 
 func (f *FunctionBuilder) EmitTypeValue(typ Type) *TypeValue {
+	if f.CurrentBlock.finish {
+		return nil
+	}
 	t := NewTypeValue(typ)
 	f.emit(t)
 	return t
 }
 
 func (f *FunctionBuilder) EmitNextOnly(iter Value, isIn bool) *Next {
+	if f.CurrentBlock.finish {
+		return nil
+	}
 	n := NewNext(iter, isIn)
 	f.emit(n)
 	return n
 }
 
 func (f *FunctionBuilder) EmitNext(iter Value, isIn bool) (key, field, ok Value) {
+	if f.CurrentBlock.finish {
+		return nil, nil, nil
+	}
 	n := f.EmitNextOnly(iter, isIn)
 	// n iter-type: map[T]U   n-type {key: T, field: U, ok: bool}
 	key = f.EmitField(n, NewConst("key"))
@@ -346,6 +381,9 @@ func (f *FunctionBuilder) EmitNext(iter Value, isIn bool) (key, field, ok Value)
 }
 
 func (f *FunctionBuilder) EmitErrorHandler(try, catch *BasicBlock) *ErrorHandler {
+	if f.CurrentBlock.finish {
+		return nil
+	}
 	e := NewErrorHandler(try, catch)
 	block := f.CurrentBlock
 	block.AddSucc(try)
@@ -356,6 +394,9 @@ func (f *FunctionBuilder) EmitErrorHandler(try, catch *BasicBlock) *ErrorHandler
 }
 
 func (f *FunctionBuilder) EmitPanic(info Value) *Panic {
+	if f.CurrentBlock.finish {
+		return nil
+	}
 	p := &Panic{
 		anInstruction: NewInstruction(),
 		anValue:       NewValue(),
@@ -366,6 +407,9 @@ func (f *FunctionBuilder) EmitPanic(info Value) *Panic {
 }
 
 func (f *FunctionBuilder) EmitRecover() *Recover {
+	if f.CurrentBlock.finish {
+		return nil
+	}
 	r := &Recover{
 		anInstruction: NewInstruction(),
 		anValue:       NewValue(),

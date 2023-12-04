@@ -1,6 +1,8 @@
 package yak2ssa
 
 import (
+	"fmt"
+
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -40,6 +42,7 @@ var _ (ssa.Builder) = (*builder)(nil)
 func ParseSSA(src string, f func(*ssa.FunctionBuilder)) (prog *ssa.Program) {
 	defer func() {
 		if r := recover(); r != nil {
+			fmt.Println("recover from yak2ssa.ParseSSA: ", r)
 			// fmt.Println("\n\n\n!!!!!!!\n\n!!!!!\n\nRecovered in parseSSA", r)
 			// debug.PrintStack()
 			prog = nil
