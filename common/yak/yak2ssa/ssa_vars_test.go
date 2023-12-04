@@ -306,3 +306,15 @@ func TestCfg(t *testing.T) {
 	})
 
 }
+
+func TestSyntaxError(t *testing.T) {
+	code := `
+	a...91234yuerinsmzxkbc,vmkoqawiuflp][1[;yai]
+	{ZXICv][ars]t[;]ar[setio][][][[][][]["""""""]]}]
+	`
+	prog := ParseSSA(code, func(fb *ssa.FunctionBuilder) {
+	})
+	if !utils.IsNil(prog) {
+		t.Fatal("prog parse should error")
+	}
+}

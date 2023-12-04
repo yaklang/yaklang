@@ -1,6 +1,8 @@
 package js2ssa
 
 import (
+	"fmt"
+
 	"github.com/antlr4-go/antlr/v4"
 	JS "github.com/yaklang/yaklang/common/yak/antlr4JS/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -35,19 +37,46 @@ func (b *builder) Build() {
 
 var _ (ssa.Builder) = (*builder)(nil)
 
+// error listener for lexer and parser
+type ErrorListener struct {
+	err []string
+	*antlr.DefaultErrorListener
+}
+
+func (el *ErrorListener) SyntaxError(recognizer antlr.Recognizer, offendingSymbol interface{}, line, column int, msg string, e antlr.RecognitionException) {
+	el.err = append(el.err, msg)
+}
+
+func NewErrorListener() *ErrorListener {
+	return &ErrorListener{
+		err:                  []string{},
+		DefaultErrorListener: antlr.NewDefaultErrorListener(),
+	}
+}
+
 func ParseSSA(src string, f func(*ssa.FunctionBuilder)) (prog *ssa.Program) {
 	defer func() {
 		if r := recover(); r != nil {
+			fmt.Println("recover from js2ssa.ParseSSA: ", r)
 			// fmt.Println("Recovered in parseSSA", r)
 			// debug.PrintStack()
 			prog = nil
 		}
 	}()
 
-	inputStream := antlr.NewInputStream(src)
-	lex := JS.NewJavaScriptLexer(inputStream)
-	tokenStream := antlr.NewCommonTokenStream(lex, antlr.TokenDefaultChannel)
-	ast := JS.NewJavaScriptParser(tokenStream).Program().(*JS.ProgramContext)
+	errListener := NewErrorListener()
+	lexer := JS.NewJavaScriptLexer(antlr.NewInputStream(src))
+	lexer.RemoveErrorListeners()
+	lexer.AddErrorListener(errListener)
+	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
+	parser := JS.NewJavaScriptParser(tokenStream)
+	parser.RemoveErrorListeners()
+	parser.AddErrorListener(errListener)
+	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
+	ast := parser.Program().(*JS.ProgramContext)
+	if len(errListener.err) > 0 {
+		return nil
+	}
 	prog = ssa.NewProgram()
 	builder := &builder{
 		ast:      ast,

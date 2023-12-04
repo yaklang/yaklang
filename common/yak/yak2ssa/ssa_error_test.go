@@ -674,10 +674,7 @@ func TestCallParamReturn(t *testing.T) {
 		CheckTestCase(t, TestCase{
 			code: `
 			f1 = ()=> {
-				// go func{
-				// 	f2()
-				// }
-				go f2
+				go f2()
 			}
 			f2 = () => {
 			}
