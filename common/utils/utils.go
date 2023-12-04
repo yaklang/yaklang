@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"github.com/gobwas/glob"
 	"io"
 	"io/ioutil"
 	"net"
@@ -386,4 +387,14 @@ func CallWithTimeout(timeout float64, cb func()) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+}
+
+func HostContains(rule string, target string) bool {
+	_, netBlock, err := net.ParseCIDR(rule)
+	if err == nil && netBlock != nil {
+		return netBlock.Contains(net.ParseIP(target))
+	}
+	ruleHost, rulePort, _ := ParseStringToHostPort(rule)
+	targetHost, targetPort, _ := ParseStringToHostPort(target)
+	return (rulePort == targetPort || rulePort == 0) && glob.MustCompile(ruleHost).Match(targetHost)
 }
