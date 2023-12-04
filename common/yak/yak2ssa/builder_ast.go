@@ -66,6 +66,9 @@ func (b *astbuilder) buildEmpty(stmt *yak.EmptyContext) {
 }
 
 func (b *astbuilder) buildStatement(stmt *yak.StatementContext) {
+	if b.IsBlockFinish() {
+		return
+	}
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 	if s, ok := stmt.LineCommentStmt().(*yak.LineCommentStmtContext); ok {
