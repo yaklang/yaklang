@@ -32,6 +32,9 @@ func (b *astbuilder) buildStatementList(stmtlist *JS.StatementListContext) {
 }
 
 func (b *astbuilder) buildStatement(stmt *JS.StatementContext) {
+	if b.IsBlockFinish() {
+		return
+	}
 	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
 

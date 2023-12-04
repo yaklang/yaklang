@@ -73,6 +73,11 @@ func NewBuilder(f *Function, parent *FunctionBuilder) *FunctionBuilder {
 	return b
 }
 
+// current block is finish?
+func (b *FunctionBuilder) IsBlockFinish() bool {
+	return b.CurrentBlock.finish
+}
+
 // new function
 func (b *FunctionBuilder) NewFunc(name string) (*Function, *blockSymbolTable) {
 	f := b.Package.NewFunctionWithParent(name, b.Function)
