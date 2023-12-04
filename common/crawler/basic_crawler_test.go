@@ -4,7 +4,7 @@ import "testing"
 
 func TestCrawler_Run(t *testing.T) {
 	crawler, err := NewCrawler(
-		"http://127.0.0.1:8787/",
+		"http://127.0.0.1:8787/misc/response/javascript-ssa-ir-basic/basic-fetch.html",
 		WithOnRequest(func(req *Req) {
 			println(req.Url())
 		}),
