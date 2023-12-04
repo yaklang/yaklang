@@ -1123,8 +1123,21 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		//	encode = append(encode, "protobuf")
 		//}
 
-		reqChan <- struct{}{}
-		shouldSendSignal = true
+		var autoForwardChanWsRequest = make(chan struct{}, 1)
+		go func() {
+			autoForwardCond.L.Lock()
+			defer autoForwardCond.L.Unlock()
+			for !autoForward.IsSet() {
+				autoForwardCond.Wait()
+			}
+			autoForwardChanWsRequest <- struct{}{}
+		}()
+
+		select {
+		case reqChan <- struct{}{}: // 申请劫持
+			shouldSendSignal = true
+		case <-autoForwardChanWsRequest: // 自动放行
+		}
 		counter := time.Now().UnixNano()
 		select {
 		case hijackingStream <- counter:
@@ -1339,9 +1352,22 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_AutoFoward, true)
 			return req
 		}
+		var autoForwardChanRequest = make(chan struct{}, 1)
+		go func() {
+			autoForwardCond.L.Lock()
+			defer autoForwardCond.L.Unlock()
+			for !autoForward.IsSet() {
+				autoForwardCond.Wait()
+			}
+			autoForwardChanRequest <- struct{}{}
+		}()
 
-		reqChan <- struct{}{} // 申请劫持
-		shouldSendSignal = true
+		select {
+		case reqChan <- struct{}{}: // 申请劫持
+			shouldSendSignal = true
+		case <-autoForwardChanRequest:
+		}
+
 		// 开始劫持
 		counter := time.Now().UnixNano()
 		select {
