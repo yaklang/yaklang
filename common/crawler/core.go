@@ -7,8 +7,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	js2ssa "github.com/yaklang/yaklang/common/yak/JS2ssa"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"golang.org/x/net/html"
 	"io"
 	"mime"
@@ -581,8 +579,6 @@ func (c *Crawler) handleReqResult(r *Req) {
 
 	var fullJSCode bytes.Buffer
 
-	prog := js2ssa.ParseSSA(fullJSCode.String(), nil)
-	js := ssaapi.NewProgram(prog)
 	for _, i := range contents {
 		if !i.IsCodeText {
 			continue
@@ -591,43 +587,9 @@ func (c *Crawler) handleReqResult(r *Req) {
 		fullJSCode.WriteByte(';')
 		fullJSCode.WriteByte('\n')
 	}
-	_ = js
-	println(string(fullJSCode.String()))
-	//handleReqResultEx(r, func(nReq *Req) bool {
-	//	c.submit(nReq)
-	//	return true
-	//}, func(targetUrl string) bool {
-	//	urlIns, err := url.Parse(targetUrl)
-	//	if err != nil {
-	//		return true
-	//	}
-	//	_ = urlIns
-	//
-	//	// url 已经重复了，就不处理了
-	//	_, ok := c.foundUrls.Load(urlIns.String())
-	//	if ok {
-	//		return true
-	//	}
-	//	c.foundUrls.Store(urlIns.String(), nil)
-	//	if c.linkCounter > int64(c.config.maxCountOfLinks) {
-	//		return false
-	//	}
-	//	c.linkCounter++
-	//
-	//	// 检查 URL 是不是应该继续做？
-	//	if config.CheckShouldBeHandledURL(urlIns) {
-	//		// 增加深度，发送给下面的
-	//		newReq, err := c.createReqFromUrl(r, urlIns.String())
-	//		if err != nil {
-	//			return true
-	//		}
-	//		newReq.depth = r.depth + 1
-	//		c.submit(newReq)
-	//	}
-	//
-	//	// 这里应该 targetUrl 纳入统计，并准备把后续的 URL 放在系统中爬结果
-	//	return true
-	//}, c.config.extractionRules)
+	HandleJS(r.https, r.requestRaw, fullJSCode.String(), func(b bool, i []byte) {
+		submit(b, i)
+	})
 }
 
 var metaUrlExtractor = regexp.MustCompile(`(?i)url=\s*([^\s]+)`)
