@@ -22,7 +22,7 @@ func init() {
 const MAXTypeCompareDepth = 10
 
 func TypeCompare(t1, t2 Type) bool {
-	return TypeCompareEx(t1, t2, 0)
+	return TypeCompareEx(t1, t2, 0) || TypeCompareEx(t2, t1, 0)
 }
 
 func TypeCompareEx(t1, t2 Type, depth int) bool {
