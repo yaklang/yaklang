@@ -2,13 +2,14 @@ package crawler
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/javascript"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	js2ssa "github.com/yaklang/yaklang/common/yak/JS2ssa"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"golang.org/x/net/html"
 	"io"
 	"mime"
@@ -555,13 +556,16 @@ func (c *Crawler) handleReqResult(r *Req) {
 		go func() {
 			defer swg.Done()
 
-			log.Infof("JS(URL) Fetch: %v", c.String())
 			reqHttps, reqBytes, err := NewHTTPRequest(r.IsHttps(), r.requestRaw, r.responseRaw, c.UrlPath)
 			if err != nil {
 				log.Errorf("build http request(js) failed: %s", c.UrlPath)
 				return
 			}
 			opts := config.GetLowhttpConfig()
+			urlIns, _ := lowhttp.ExtractURLFromHTTPRequestRaw(reqBytes, reqHttps)
+			if urlIns != nil {
+				log.Infof("Start to fetch JS(via URL): %v", urlIns.String())
+			}
 			opts = append(opts, lowhttp.WithHttps(reqHttps), lowhttp.WithRequest(reqBytes))
 			rsp, err := lowhttp.HTTP(opts...)
 			if err != nil {
@@ -579,12 +583,23 @@ func (c *Crawler) handleReqResult(r *Req) {
 		}()
 	}
 	swg.Wait()
+
+	var fullJSCode bytes.Buffer
+
 	for _, i := range contents {
 		if !i.IsCodeText {
 			continue
 		}
-		fmt.Println(i.String())
+		fullJSCode.WriteString(i.Code)
+		fullJSCode.WriteByte(';')
+		fullJSCode.WriteByte('\n')
 	}
+
+	prog := js2ssa.ParseSSA(fullJSCode.String(), nil)
+	js := ssaapi.NewProgram(prog)
+
+	_ = js
+	println(string(fullJSCode.String()))
 	//handleReqResultEx(r, func(nReq *Req) bool {
 	//	c.submit(nReq)
 	//	return true
