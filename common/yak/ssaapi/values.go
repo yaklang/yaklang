@@ -295,8 +295,10 @@ func (v *Value) GetCallArgs() Values {
 
 func (v *Value) GetMakeObjectFields() Values {
 	if f, ok := ssa.ToMake(v.node); ok {
-		return lo.Map(f.GetUsers(), func(item ssa.User, index int) *Value {
+		return lo.Filter(lo.Map(f.GetUsers(), func(item ssa.User, index int) *Value {
 			return NewValue(item)
+		}), func(item *Value, index int) bool {
+			return item.IsField()
 		})
 	}
 	return nil
