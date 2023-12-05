@@ -19,6 +19,17 @@ func HandleJS(isHttps bool, req []byte, code string) {
 			log.Infof("fetch value: %v", value.String())
 			args := value.GetCallArgs()
 			targetUrl := args.Get(0).GetConstValue()
+			if opt := args.Get(1); opt.IsMake() {
+				// args.GetMakeSliceArgs()
+				for _, field := range opt.GetMakeObjectFields() {
+					switch field.GetFieldName().GetConstValue() {
+					case "method":
+						log.Infof("fetch method: %v", field.GetLatestFieldValue().GetConstValue())
+					case "headers":
+						log.Infof("fetch headers: %v", field.GetFirstFieldValue().GetConstValue())
+					}
+				}
+			}
 			log.Infof("fetch targetUrl: %v", targetUrl)
 		}
 	})

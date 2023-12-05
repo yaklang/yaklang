@@ -2,21 +2,39 @@ package ssaapi
 
 import (
 	"fmt"
-
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 type Values []*Value
 
+func _walk(va Values, handler func(i *Value)) {
+	for _, v := range va {
+		handler(v)
+		_walk(v.GetUsers(), handler)
+	}
+}
+
+func (v Values) Walk(handler func(i *Value)) Values {
+	_walk(v, handler)
+	return v
+}
+
 func (value Values) Ref(name string) Values {
 	// return nil
 	var ret Values
 	for _, v := range value {
+		if v.IsField() {
+			if v.GetOperand(1).String() == name {
+				ret = append(ret, v)
+			}
+		}
 		v.GetUsers().ForEach(func(v *Value) {
 			// get value.Name or value["name"]
-			if v.IsField() && v.GetOperand(1).String() == name {
-				ret = append(ret, v)
+			if v.IsField() {
+				if v.GetOperand(1).String() == name {
+					ret = append(ret, v)
+				}
 			}
 		})
 	}
@@ -53,7 +71,12 @@ func (v Values) ShowWithSource(b ...bool) Values {
 	return v
 }
 
-func (v Values) Get(i int) *Value { return v[i] }
+func (v Values) Get(i int) *Value {
+	if i < len(v) {
+		return v[i]
+	}
+	return NewValue(ssa.NewUndefined(""))
+}
 
 func (v Values) ForEach(f func(*Value)) Values {
 	for _, v := range v {
@@ -172,6 +195,41 @@ func (i *Value) GetOperand(index int) *Value {
 	return opts[index]
 }
 
+func (i *Value) GetFieldName() *Value {
+	if p, ok := ssa.ToField(i.node); ok {
+		return NewValue(p.Key)
+	}
+	return nil
+}
+
+func (i *Value) GetFieldValues() Values {
+	if p, ok := ssa.ToField(i.node); ok {
+		return lo.Map(p.GetUsers(), func(item ssa.User, index int) *Value {
+			if p, ok := ssa.ToUpdate(item); ok {
+				return NewValue(p.Value)
+			}
+			return NewValue(item)
+		})
+	}
+	return nil
+}
+
+func (i *Value) GetFirstFieldValue() *Value {
+	vals := i.GetFieldValues()
+	if len(vals) > 0 {
+		return vals[0]
+	}
+	return nil
+}
+
+func (i *Value) GetLatestFieldValue() *Value {
+	vals := i.GetFieldValues()
+	if len(vals) > 0 {
+		return vals[len(vals)-1]
+	}
+	return nil
+}
+
 func (i *Value) HasUsers() bool {
 	return i.node.HasUsers()
 }
@@ -235,12 +293,24 @@ func (v *Value) GetCallArgs() Values {
 	return nil
 }
 
+func (v *Value) GetMakeObjectFields() Values {
+	if f, ok := ssa.ToMake(v.node); ok {
+		return lo.Map(f.GetUsers(), func(item ssa.User, index int) *Value {
+			return NewValue(item)
+		})
+	}
+	return nil
+}
+
 func (v *Value) GetCallReturns() Values {
 	return v.GetUsers()
 }
 
 // for const instruction
 func (v *Value) GetConstValue() any {
+	if v == nil {
+		return nil
+	}
 	if v.IsConstInst() {
 		return v.node.(*ssa.ConstInst).GetRawValue()
 	} else {
