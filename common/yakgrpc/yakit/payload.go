@@ -53,6 +53,7 @@ func (p *Payload) BeforeUpdate() (err error) {
 	p.Hash = p.CalcHash()
 	return
 }
+
 func (p *Payload) BeforeSave() error {
 	p.Hash = p.CalcHash()
 	return nil
@@ -61,7 +62,6 @@ func (p *Payload) BeforeSave() error {
 type gormNoLog int
 
 func (i gormNoLog) Print(v ...interface{}) {
-
 }
 
 // / payload
@@ -85,7 +85,6 @@ func CreateOrUpdatePayload(db *gorm.DB, i *Payload) error {
 	db.SetLogger(gormNoLog(1))
 	i.Hash = i.CalcHash()
 	if db := db.Save(i); db.Error != nil {
-
 	}
 	//if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&Payload{}); db.Error != nil {
 	//	return utils.Errorf("create/update Payload failed: %s", db.Error)
@@ -181,8 +180,9 @@ func SavePayloadGroupByRaw(db *gorm.DB, group string, data string) error {
 		return CreateAndUpdatePayload(db, s, group, "", 0)
 	})
 }
+
 func SavePayloadGroupByRawEx(data string, handler func(string) error) error {
-	//TODO: remove scanner
+	// TODO: remove scanner
 	lineScanner := bufio.NewScanner(bytes.NewBufferString(data))
 	lineScanner.Split(bufio.ScanLines)
 	for lineScanner.Scan() {
@@ -315,6 +315,7 @@ func RenamePayloadGroup(db *gorm.DB, oldGroup, newGroup string) error {
 	}
 	return nil
 }
+
 func CopyPayloads(db *gorm.DB, ids []int64, group, folder string) error {
 	var payloads []Payload
 	{
@@ -372,7 +373,7 @@ func SetIndexToFolder(db *gorm.DB, folder, group string, group_index int64) erro
 }
 
 func UpdatePayloadGroup(db *gorm.DB, group, folder string, group_index int64) error {
-	db = db.Model(&Payload{}).Where("`group` = ?", group).Update("group_index", group_index).Update("folder", folder)
+	db = db.Model(&Payload{}).Where("`group` = ?", group).Updates(map[string]any{"folder": folder, "group_index": group_index})
 	if db.Error != nil {
 		return utils.Wrap(db.Error, "update group index failed")
 	}
@@ -383,13 +384,7 @@ func UpdatePayload(db *gorm.DB, id int, payload *Payload) error {
 	payload.ID = uint(id)
 	// db = db.Model(&Payload{}).Where("`id` = ?", id).Update(payload)
 	db = db.Model(&Payload{}).Where("`id` = ?", id)
-	db = db.Update("group", payload.Group)
-	db = db.Update("folder", payload.Folder)
-	db = db.Update("group_index", payload.GroupIndex)
-	db = db.Update("content", payload.Content)
-	db = db.Update("hit_count", payload.HitCount)
-	db = db.Update("is_file", payload.IsFile)
-	db = db.Update("hash", payload.CalcHash())
+	db = db.Updates(map[string]any{"group": payload.Group, "folder": payload.Folder, "group_index": payload.GroupIndex, "content": payload.Content, "hit_count": payload.HitCount, "is_file": payload.IsFile, "hash": payload.CalcHash()})
 	if db.Error != nil {
 		return utils.Errorf("update Payload failed: %s", db.Error)
 	}
@@ -454,7 +449,7 @@ func YieldPayloads(db *gorm.DB, ctx context.Context) chan *Payload {
 	go func() {
 		defer close(outC)
 
-		var page = 1
+		page := 1
 		for {
 			var items []*Payload
 			if _, b := bizhelper.NewPagination(&bizhelper.Param{

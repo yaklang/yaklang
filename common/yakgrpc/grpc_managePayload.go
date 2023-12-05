@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -17,6 +19,13 @@ import (
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+)
+
+const (
+	OneKB   = 1 * 1024
+	EightKB = 8 * 1024
+	OneMB   = 1 * 1024 * 1024 // 1 MB in bytes
+	FiveMB  = 5 * 1024 * 1024 // 5 MB in bytes
 )
 
 func grpc2Paging(pag *ypb.Paging) *yakit.Paging {
@@ -55,6 +64,7 @@ func Payload2Grpc(r *yakit.Payload) *ypb.Payload {
 	}
 	return p
 }
+
 func grpc2Payload(p *ypb.Payload) *yakit.Payload {
 	payload := &yakit.Payload{
 		Group:    p.Group,
@@ -87,11 +97,6 @@ func (s *Server) QueryPayload(ctx context.Context, req *ypb.QueryPayloadRequest)
 		Data:       items,
 	}, nil
 }
-
-const (
-	FiveMB = 5 * 1024 * 1024 // 5 MB in bytes
-	OneKB  = 1 * 1024
-)
 
 func (s *Server) QueryPayloadFromFile(ctx context.Context, req *ypb.QueryPayloadFromFileRequest) (*ypb.QueryPayloadFromFileResponse, error) {
 	if req.GetGroup() == "" {
@@ -164,7 +169,7 @@ func (s *Server) QueryPayloadFromFile(ctx context.Context, req *ypb.QueryPayload
 
 func (s *Server) DeletePayloadByFolder(ctx context.Context, req *ypb.NameRequest) (*ypb.Empty, error) {
 	if req.GetName() == "" {
-		return nil, utils.Errorf("folder name is empty ")
+		return nil, utils.Errorf("folder name is empty")
 	}
 	if err := yakit.DeletePayloadByFolder(s.GetProfileDatabase(), req.GetName()); err != nil {
 		return nil, err
@@ -174,7 +179,7 @@ func (s *Server) DeletePayloadByFolder(ctx context.Context, req *ypb.NameRequest
 
 func (s *Server) DeletePayloadByGroup(ctx context.Context, req *ypb.DeletePayloadByGroupRequest) (*ypb.Empty, error) {
 	if req.GetGroup() == "" {
-		return nil, utils.Errorf("group name is empty ")
+		return nil, utils.Errorf("group name is empty")
 	}
 	// if file, delete  file
 	if group, err := yakit.GetPayloadByGroupFirst(s.GetProfileDatabase(), req.GetGroup()); err != nil {
@@ -210,10 +215,6 @@ func (s *Server) DeletePayload(ctx context.Context, req *ypb.DeletePayloadReques
 	return &ypb.Empty{}, nil
 }
 
-const (
-	OneMB = 1 * 1024 * 1024 // 5 MB in bytes
-)
-
 func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_SavePayloadStreamServer) (ret error) {
 	if (!req.IsFile && req.Content == "") || (req.IsFile && len(req.FileName) == 0) || (req.Group == "") {
 		return utils.Error("content or file name or Group is empty ")
@@ -230,13 +231,9 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 			progress = float64(size) / float64(total)
 		}
 		d := time.Since(start)
-		speed := float64((size)/OneMB) / (d.Seconds())
-		rest := float64((total-size)/OneMB) / (speed)
 		stream.Send(&ypb.SavePayloadProgress{
 			Progress:            progress,
-			Speed:               fmt.Sprintf("%.2f", speed),
-			CostDurationVerbose: fmt.Sprintf("%.2fs", d.Seconds()),
-			RestDurationVerbose: fmt.Sprintf("%.2f", rest),
+			CostDurationVerbose: d.String(),
 			Message:             msg,
 		})
 	}
@@ -377,13 +374,9 @@ func (s *Server) SavePayloadToFileStream(req *ypb.SavePayloadRequest, stream ypb
 			progress = float64(handledSize) / float64(total)
 		}
 		d := time.Since(start)
-		speed := float64((handledSize)/OneMB) / (d.Seconds())
-		rest := float64((total-handledSize)/OneMB) / (speed)
 		stream.Send(&ypb.SavePayloadProgress{
 			Progress:            progress,
-			Speed:               fmt.Sprintf("%f", speed),
 			CostDurationVerbose: d.String(),
-			RestDurationVerbose: fmt.Sprintf("%f", rest),
 			Message:             msg,
 		})
 	}
@@ -403,7 +396,7 @@ func (s *Server) SavePayloadToFileStream(req *ypb.SavePayloadRequest, stream ypb
 	// save to file
 	ProjectFolder := consts.GetDefaultYakitPayloadsDir()
 	fileName := fmt.Sprintf("%s/%s_%s.txt", ProjectFolder, req.GetFolder(), req.GetGroup())
-	fd, err := os.OpenFile(fileName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
+	fd, err := os.OpenFile(fileName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o666)
 	if err != nil {
 		return err
 	}
@@ -480,7 +473,7 @@ func (s *Server) UpdatePayload(ctx context.Context, req *ypb.UpdatePayloadReques
 func writeDataToFileEnd(filename, data string, flag int) error {
 	// Open the file in append mode.
 	// If the file doesn't exist, create it.
-	file, err := os.OpenFile(filename, flag, 0644)
+	file, err := os.OpenFile(filename, flag, 0o644)
 	if err != nil {
 		return err
 	}
@@ -568,7 +561,7 @@ func (s *Server) RemoveDuplicatePayloads(req *ypb.NameRequest, stream ypb.Yak_Re
 
 func (s *Server) UpdatePayloadToFile(ctx context.Context, req *ypb.UpdatePayloadToFileRequest) (*ypb.Empty, error) {
 	if req.GetGroupName() == "" {
-		return nil, utils.Error("group can't be empty")
+		return nil, utils.Error("group is empty")
 	}
 	if filename, err := yakit.GetPayloadGroupFileName(s.GetProfileDatabase(), req.GetGroupName()); err != nil {
 		return nil, err
@@ -588,7 +581,7 @@ func (s *Server) UpdatePayloadToFile(ctx context.Context, req *ypb.UpdatePayload
 
 func (s *Server) BackUpOrCopyPayloads(ctx context.Context, req *ypb.BackUpOrCopyPayloadsRequest) (*ypb.Empty, error) {
 	if len(req.GetIds()) == 0 || req.GetGroup() == "" {
-		return nil, utils.Error("id or group name can't be empty")
+		return nil, utils.Error("id or group name is empty")
 	}
 
 	if groupFirstPayload, err := yakit.GetPayloadByGroupFirst(s.GetProfileDatabase(), req.GetGroup()); err != nil {
@@ -737,65 +730,171 @@ func (s *Server) GetAllPayloadGroup(ctx context.Context, _ *ypb.Empty) (*ypb.Get
 	}, nil
 }
 
-func (s *Server) GetAllPayload(ctx context.Context, req *ypb.GetAllPayloadRequest) (*ypb.GetAllPayloadResponse, error) {
+// 导出payload到文件
+func (s *Server) GetAllPayload(req *ypb.GetAllPayloadRequest, stream ypb.Yak_GetAllPayloadServer) error {
 	if req.GetGroup() == "" {
-		return nil, utils.Errorf("group is empty")
+		return utils.Errorf("get all payload error: group is empty")
 	}
+	if req.GetSavePath() == "" {
+		return utils.Errorf("get all payload error: save path is empty")
+	}
+
+	// 生成payload
 	db := bizhelper.ExactQueryString(s.GetProfileDatabase(), "`group`", req.GetGroup())
 	db = bizhelper.ExactQueryString(db, "`folder`", req.GetFolder())
-
-	var payloads []*ypb.Payload
+	size, total, maxBuf := 0, 0, EightKB
 	gen := yakit.YieldPayloads(db, context.Background())
 
-	for p := range gen {
-		payloads = append(payloads, Payload2Grpc(p))
+	// 获取payload总长度
+	db = s.GetProfileDatabase().Model(&yakit.Payload{}).Select("SUM(LENGTH(content))").Where("`group` = ?", req.GetGroup()).Where("`folder` = ?", req.GetFolder())
+	row := db.Row()
+	row.Scan(&total)
+	if total == 0 {
+		return utils.Errorf("get all payload error: group not exist payload(s)")
 	}
 
-	return &ypb.GetAllPayloadResponse{
-		Data: payloads,
-	}, nil
+	// 打开文件
+	f, err := os.OpenFile(req.GetSavePath(), os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return utils.Wrapf(err, "get all payload error: open file[%s] error", req.GetSavePath())
+	}
+
+	bufWriter := bufio.NewWriterSize(f, EightKB)
+	defer func() {
+		bufWriter.Flush()
+		f.Close()
+		stream.Send(&ypb.GetAllPayloadResponse{
+			Progress: 1,
+		})
+	}()
+	bomHandled := false
+
+	for p := range gen {
+		if p.Content == nil {
+			continue
+		}
+		content := *p.Content
+		unquoted, err := strconv.Unquote(content)
+		if err == nil {
+			content = unquoted
+		}
+		content = strings.TrimSpace(content)
+		if content == "" {
+			continue
+		}
+		if !bomHandled {
+			content = utils.RemoveBOMForString(content)
+			bomHandled = true
+		} else {
+			n, _ := bufWriter.WriteRune('\n')
+			size += n
+		}
+		n, _ := bufWriter.WriteString(content)
+		size += n
+		if size < maxBuf {
+			continue
+		}
+		bufWriter.Flush()
+
+		err = stream.Send(&ypb.GetAllPayloadResponse{
+			Progress: float64(size) / float64(total),
+		})
+		if err != nil {
+			log.Errorf("get all payload error: send payload error: %v", err)
+		}
+		size -= maxBuf
+	}
+
+	return nil
 }
 
+// 导出payload，从数据库中的文件导出到另外一个文件
 func (s *Server) GetAllPayloadFromFile(req *ypb.GetAllPayloadRequest, stream ypb.Yak_GetAllPayloadFromFileServer) error {
 	if req.GetGroup() == "" {
-		return utils.Errorf("group is empty")
+		return utils.Errorf("get all payload from file error: group is empty")
 	}
-	if filename, err := yakit.GetPayloadGroupFileName(s.GetProfileDatabase(), req.GetGroup()); err != nil {
+	dst := req.GetSavePath()
+	if dst == "" {
+		return utils.Errorf("get all payload from file error: save path is empty")
+	}
+	src, err := yakit.GetPayloadGroupFileName(s.GetProfileDatabase(), req.GetGroup())
+	if err != nil {
 		return err
-	} else {
-
-		var size, total int64
-		if state, err := os.Stat(filename); err != nil {
-			return err
-		} else {
-			total += state.Size()
-		}
-
-		ch, err := utils.FileLineReader(filename)
-		if err != nil {
-			return utils.Wrap(err, "read file error")
-		}
-		defer stream.Send(&ypb.GetAllPayloadFromFileResponse{
-			Progress: 1,
-			Data:     []byte{},
-		})
-
-		for lineB := range ch {
-			line := utils.UnsafeBytesToString(lineB)
-			size += int64(len(line)) + 1
-			if s, err := strconv.Unquote(line); err == nil {
-				line = s
-			}
-			stream.Send(&ypb.GetAllPayloadFromFileResponse{
-				Progress: float64(size) / float64(total),
-				Data:     utils.UnsafeStringToBytes(line),
-			})
-		}
-		return nil
 	}
+
+	// 获取payload总长度
+	size, total, maxBuf := 0, 0, EightKB
+	state, err := os.Stat(src)
+	if err != nil {
+		return utils.Wrap(err, "get all payload from file error: get file state error")
+	}
+	total = int(state.Size())
+
+	// 打开源文件和目标文件
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return utils.Wrapf(err, "get all payload from file error: open src file[%s] error", src)
+	}
+	dstFile, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return utils.Wrapf(err, "get all payload from file error: open dst file[%s] error", dst)
+	}
+	defer func() {
+		srcFile.Close()
+		dstFile.Close()
+		stream.Send(&ypb.GetAllPayloadResponse{
+			Progress: 1,
+		})
+	}()
+	bomHandled := false
+	bufReader := bufio.NewReaderSize(srcFile, EightKB)
+
+	isEOF := false
+	for !isEOF {
+		line, err := utils.BufioReadLine(bufReader)
+		isEOF = errors.Is(err, io.EOF)
+		if err != nil && !isEOF {
+			return utils.Wrapf(err, "get all payload from file error: read file[%s] error", src)
+		}
+		content := utils.UnsafeBytesToString(line)
+		unquoted, err := strconv.Unquote(content)
+		if err == nil {
+			content = unquoted
+		}
+		content = strings.TrimSpace(content)
+		if content == "" {
+			continue
+		}
+		if !bomHandled {
+			content = utils.RemoveBOMForString(content)
+			bomHandled = true
+		} else {
+			n, _ := dstFile.WriteString("\n")
+			size += n
+		}
+
+		n, err := dstFile.WriteString(content)
+		if err != nil {
+			return utils.Wrapf(err, "get all payload from file error: write file[%s] error", dst)
+		}
+		size += n
+		if size < maxBuf {
+			continue
+		}
+
+		err = stream.Send(&ypb.GetAllPayloadResponse{
+			Progress: float64(size) / float64(total),
+		})
+		if err != nil {
+			log.Errorf("get all payload from file error: send payload error: %v", err)
+		}
+		size -= maxBuf
+	}
+
+	return nil
 }
 
-func (s *Server) CoverPayloadGroupToDatabase(req *ypb.NameRequest, stream ypb.Yak_CoverPayloadGroupToDatabaseServer) error {
+func (s *Server) ConvertPayloadGroupToDatabase(req *ypb.NameRequest, stream ypb.Yak_ConvertPayloadGroupToDatabaseServer) error {
 	if req.GetName() == "" {
 		return utils.Errorf("group is empty")
 	}
@@ -819,13 +918,9 @@ func (s *Server) CoverPayloadGroupToDatabase(req *ypb.NameRequest, stream ypb.Ya
 			progress = float64(size) / float64(total)
 		}
 		d := time.Since(start)
-		speed := float64((size)/OneMB) / (d.Seconds())
-		rest := float64((total-size)/OneMB) / (speed)
 		stream.Send(&ypb.SavePayloadProgress{
 			Progress:            progress,
-			Speed:               fmt.Sprintf("%.2f", speed),
-			CostDurationVerbose: fmt.Sprintf("%.2fs", d.Seconds()),
-			RestDurationVerbose: fmt.Sprintf("%.2f", rest),
+			CostDurationVerbose: d.String(),
 			Message:             msg,
 		})
 	}
@@ -850,7 +945,7 @@ func (s *Server) CoverPayloadGroupToDatabase(req *ypb.NameRequest, stream ypb.Ya
 		return err
 	}
 	if group.Content == nil || *group.Content == "" {
-		return utils.Error("this group filename  is empty")
+		return utils.Error("this group filename is empty")
 	}
 	folder := ""
 	if group.Folder != nil {
