@@ -99,11 +99,12 @@ func InsertValueReplaceOriginal(original Value, insert Value) {
 			// if not change
 			flag := true
 			// and all succ block of this block only one prev block
-			lo.ForEach(item.Succs, func(item *BasicBlock, index int) {
-				if len(item.Preds) > 1 {
+			for _, succ := range item.Succs {
+				if len(succ.Preds) > 1 {
 					flag = false
+					break
 				}
-			})
+			}
 			// end loop
 			if flag {
 				break
