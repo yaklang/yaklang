@@ -454,15 +454,13 @@ func init() {
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "payload",
 		Handler: func(s string) []string {
-			fmt.Println("payload in fuzz: ", s)
-			// for _, s : = range utils.
 			var db = consts.GetGormProfileDatabase()
 			if db == nil {
 				return []string{s}
 			}
 			names := make([]string, 0)
 			elems := make([]any, 0)
-			for _, s := range utils.PrettifyListFromStringSplited(s, ", ") {
+			for _, s := range utils.PrettifyListFromStringSplited(s, ",") {
 
 				ss := strings.Split(s, "/")
 				if len(ss) == 1 {
@@ -488,21 +486,40 @@ func init() {
 			db = db.Where("content != ?", "")
 			// db = db.Debug()
 			var payloads []string
-			if rows, err := db.Table("payloads").Select("content").Rows(); err != nil {
+			if rows, err := db.Table("payloads").Select("content, is_file").Rows(); err != nil {
 				return []string{s}
 			} else {
 				for rows.Next() {
 					var payloadRaw string
-					err := rows.Scan(&payloadRaw)
+					var isFile *bool
+					// var res Res
+					err := rows.Scan(&payloadRaw, &isFile)
 					if err != nil {
+						log.Errorf("sql scan error: %v", err)
 						return payloads
 					}
-					raw, err := strconv.Unquote(payloadRaw)
-					if err != nil {
-						payloads = append(payloads, payloadRaw)
-						continue
+					if isFile != nil && *isFile {
+						ch, err := utils.FileLineReader(payloadRaw)
+						if err != nil {
+							// skip
+							log.Errorf("FileLineReader err : %v", err)
+							continue
+						}
+						for lineB := range ch {
+							line := utils.UnsafeBytesToString(lineB)
+							raw, err := strconv.Unquote(line)
+							if err != nil {
+								raw = line
+							}
+							payloads = append(payloads, raw)
+						}
+					} else {
+						raw, err := strconv.Unquote(payloadRaw)
+						if err != nil {
+							raw = payloadRaw
+						}
+						payloads = append(payloads, raw)
 					}
-					payloads = append(payloads, raw)
 				}
 				return payloads
 			}
