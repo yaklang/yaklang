@@ -632,7 +632,7 @@ func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionReques
 		// 关键字补全
 		ret = append(ret, getLanguageKeywordSuggestions()...)
 		// 用户自定义变量补全
-		for id, values := range prog.GetALlSymbols() {
+		for id, values := range prog.GetAllSymbols() {
 			// todo: 需要更严谨的过滤
 			values = values.Filter(func(value *ssaapi.Value) bool {
 				position2 := value.GetPosition()

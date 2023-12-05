@@ -8,15 +8,34 @@ import (
 
 type Values []*Value
 
-func _walk(va Values, handler func(i *Value)) {
+func _walkUsers(va Values, handler func(i *Value)) {
+	if len(va) <= 0 {
+		return
+	}
+
 	for _, v := range va {
 		handler(v)
-		_walk(v.GetUsers(), handler)
+		_walkUsers(v.GetUsers(), handler)
+	}
+}
+
+func _walkDefs(va Values, handler func(i *Value)) {
+	if len(va) <= 0 {
+		return
+	}
+	for _, v := range va {
+		handler(v)
+		_walkDefs(v.GetOperands(), handler)
 	}
 }
 
 func (v Values) Walk(handler func(i *Value)) Values {
-	_walk(v, handler)
+	_walkUsers(v, handler)
+	return v
+}
+
+func (v Values) WalkDefs(handler func(i *Value)) Values {
+	_walkDefs(v, handler)
 	return v
 }
 
@@ -119,6 +138,29 @@ func (v Values) GetUsers() Values {
 	return ret
 }
 
+func (v Values) GetTopDefs() Values {
+	ret := make(Values, 0, len(v))
+	var m = make(map[*Value]struct{})
+	v.WalkDefs(func(i *Value) {
+		if !i.HasOperands() {
+			if _, ok := m[i]; ok {
+				return
+			}
+			m[i] = struct{}{}
+			ret = append(ret, i)
+		}
+	})
+	return ret
+}
+
+func (v Values) GetDefs() Values {
+	ret := make(Values, 0, len(v))
+	v.ForEach(func(v *Value) {
+		ret = append(ret, v.GetOperands()...)
+	})
+	return ret
+}
+
 type Value struct {
 	node ssa.InstructionNode
 	// cache
@@ -178,6 +220,10 @@ func (v *Value) GetPosition() *ssa.Position {
 
 func (i *Value) HasOperands() bool {
 	return i.node.HasValues()
+}
+
+func (i *Value) GetDefs() Values {
+	return i.GetCallReturns()
 }
 
 func (i *Value) GetOperands() Values {
