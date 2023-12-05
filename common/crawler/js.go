@@ -26,7 +26,7 @@ func HandleJS(isHttps bool, req []byte, code string) {
 					case "method":
 						log.Infof("fetch method: %v", field.GetLatestFieldValue().GetConstValue())
 					case "headers":
-						for _, header := range field.GetFirstFieldValue().GetMakeObjectFields() {
+						for _, header := range field.GetLatestFieldValue().GetMakeObjectFields() {
 							log.Infof("fetch headers: %v %v", header.GetFieldName().GetConstValue(), header.GetLatestFieldValue().GetConstValue())
 						}
 					}
