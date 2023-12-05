@@ -37,16 +37,41 @@ func (v Values) StringEx(flag int) string {
 	return ret
 }
 
-func (v Values) String() string  { return v.StringEx(0) }
-func (v Values) Show()           { fmt.Println(v.StringEx(0)) }
-func (v Values) ShowWithSource() { fmt.Println(v.StringEx(1)) }
+func (v Values) String() string { return v.StringEx(0) }
+func (v Values) Show(b ...bool) Values {
+	if len(b) > 0 && !b[0] {
+		return v
+	}
+	fmt.Println(v.StringEx(0))
+	return v
+}
+func (v Values) ShowWithSource(b ...bool) Values {
+	if len(b) > 0 && !b[0] {
+		return v
+	}
+	fmt.Println(v.StringEx(1))
+	return v
+}
 
 func (v Values) Get(i int) *Value { return v[i] }
 
-func (v Values) ForEach(f func(*Value)) {
+func (v Values) ForEach(f func(*Value)) Values {
 	for _, v := range v {
 		f(v)
 	}
+	return v
+}
+
+func (v Values) Flat(f func(*Value) Values) Values {
+	var newVals Values
+	for _, subValue := range v {
+		if ret := f(subValue); len(ret) > 0 {
+			newVals = append(newVals, ret...)
+		} else {
+			newVals = append(newVals, ret...)
+		}
+	}
+	return newVals
 }
 
 func (v Values) Filter(f func(*Value) bool) Values {
@@ -199,6 +224,19 @@ func (v *Value) GetParameters() Values {
 		}
 	}
 	return ret
+}
+
+func (v *Value) GetCallArgs() Values {
+	if f, ok := ssa.ToCall(v.node); ok {
+		return lo.Map(f.Args, func(item ssa.Value, index int) *Value {
+			return NewValue(item)
+		})
+	}
+	return nil
+}
+
+func (v *Value) GetCallReturns() Values {
+	return v.GetUsers()
 }
 
 // for const instruction
