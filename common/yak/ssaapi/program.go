@@ -38,7 +38,7 @@ func (p *Program) Ref(name string) Values {
 	return getValuesWithUpdate(ret)
 }
 
-func (p *Program) GetALlSymbols() map[string]Values {
+func (p *Program) GetAllSymbols() map[string]Values {
 	ret := make(map[string]Values, 0)
 	for _, pkg := range p.Packages {
 		for _, fun := range pkg.Funcs {
