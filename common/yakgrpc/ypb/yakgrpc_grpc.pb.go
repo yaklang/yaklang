@@ -591,7 +591,7 @@ type YakClient interface {
 	GenerateYsoBytes(ctx context.Context, in *YsoOptionsRequerstWithVerbose, opts ...grpc.CallOption) (*YsoBytesResponse, error)
 	YsoDump(ctx context.Context, in *YsoBytesObject, opts ...grpc.CallOption) (*YsoDumpResponse, error)
 	// WebShell
-	CreateWebShell(ctx context.Context, in *WebShell, opts ...grpc.CallOption) (*Empty, error)
+	CreateWebShell(ctx context.Context, in *WebShell, opts ...grpc.CallOption) (*WebShell, error)
 	DeleteWebShell(ctx context.Context, in *DeleteWebShellRequest, opts ...grpc.CallOption) (*Empty, error)
 	UpdateWebShell(ctx context.Context, in *WebShell, opts ...grpc.CallOption) (*WebShell, error)
 	QueryWebShells(ctx context.Context, in *QueryWebShellsRequest, opts ...grpc.CallOption) (*QueryWebShellsResponse, error)
@@ -3281,8 +3281,8 @@ func (c *yakClient) YsoDump(ctx context.Context, in *YsoBytesObject, opts ...grp
 	return out, nil
 }
 
-func (c *yakClient) CreateWebShell(ctx context.Context, in *WebShell, opts ...grpc.CallOption) (*Empty, error) {
-	out := new(Empty)
+func (c *yakClient) CreateWebShell(ctx context.Context, in *WebShell, opts ...grpc.CallOption) (*WebShell, error) {
+	out := new(WebShell)
 	err := c.cc.Invoke(ctx, "/ypb.Yak/CreateWebShell", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -5301,7 +5301,7 @@ type YakServer interface {
 	GenerateYsoBytes(context.Context, *YsoOptionsRequerstWithVerbose) (*YsoBytesResponse, error)
 	YsoDump(context.Context, *YsoBytesObject) (*YsoDumpResponse, error)
 	// WebShell
-	CreateWebShell(context.Context, *WebShell) (*Empty, error)
+	CreateWebShell(context.Context, *WebShell) (*WebShell, error)
 	DeleteWebShell(context.Context, *DeleteWebShellRequest) (*Empty, error)
 	UpdateWebShell(context.Context, *WebShell) (*WebShell, error)
 	QueryWebShells(context.Context, *QueryWebShellsRequest) (*QueryWebShellsResponse, error)
@@ -6074,7 +6074,7 @@ func (UnimplementedYakServer) GenerateYsoBytes(context.Context, *YsoOptionsReque
 func (UnimplementedYakServer) YsoDump(context.Context, *YsoBytesObject) (*YsoDumpResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method YsoDump not implemented")
 }
-func (UnimplementedYakServer) CreateWebShell(context.Context, *WebShell) (*Empty, error) {
+func (UnimplementedYakServer) CreateWebShell(context.Context, *WebShell) (*WebShell, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateWebShell not implemented")
 }
 func (UnimplementedYakServer) DeleteWebShell(context.Context, *DeleteWebShellRequest) (*Empty, error) {
