@@ -305,8 +305,18 @@ func TestHostContains(t *testing.T) {
 			result: false,
 		},
 		{
+			input:  "test.com:80i",
+			target: "test.com:80i",
+			result: true,
+		},
+		{
 			input:  "aaa",
 			target: "aaa",
+			result: true,
+		},
+		{
+			input:  "test.com:",
+			target: "test.com:80",
 			result: true,
 		},
 	}
