@@ -61,6 +61,8 @@ func (s *ActionService) CreateAction(schema string) Action {
 	switch schema {
 	case "file":
 		return &fileSystemAction{}
+	case "website":
+		return &websiteFromHttpFlow{}
 	case "behinder":
 		return &wsm.BehidnerFileSystemAction{}
 	case "godzilla":
