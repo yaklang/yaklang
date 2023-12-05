@@ -1063,6 +1063,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		var shouldHijackResponse bool
 		var shouldSendSignal bool
 		defer func() {
+			// 根据是否劫持响应来判断是否释放锁
 			if shouldSendSignal && !autoForward.IsSet() {
 				shouldHijackRespChan <- shouldHijackResponse
 			}
@@ -1075,7 +1076,15 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}()
 
 		isTls, urlStr := lowhttp.ExtractWebsocketURLFromHTTPRequest(req)
-		if !filterManager.IsPassed("", req.Host, urlStr, "", isTls) {
+		var extName string
+		u, _ := url.Parse(urlStr)
+		if ret := path.Ext(u.EscapedPath()); ret != "" {
+			extName = ret
+			if !strings.HasPrefix(extName, ".") {
+				extName = "." + extName
+			}
+		}
+		if !filterManager.IsPassed(req.Method, req.Host, urlStr, extName, isTls) {
 			httpctx.SetContextValueInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestIsFiltered, true)
 			return raw
 		}

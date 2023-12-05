@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"compress/flate"
 	"compress/zlib"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"math"
@@ -128,6 +127,10 @@ func ExtractURLFromHTTPRequest(r *http.Request, https bool) (*url.URL, error) {
 		return url.Parse(r.RequestURI)
 	}
 
+	if utils.IsWebsocketUrl(r.RequestURI) {
+		return url.Parse(r.RequestURI)
+	}
+
 	if strings.HasPrefix(r.RequestURI, "http://") || strings.HasPrefix(r.RequestURI, "https://") {
 		return url.Parse(r.RequestURI)
 	}
@@ -180,10 +183,14 @@ func ExtractURLFromHTTPRequest(r *http.Request, https bool) (*url.URL, error) {
 	}
 	noPath := raw
 	if r.RequestURI != "" {
-		if !strings.HasPrefix(r.RequestURI, "/") {
-			raw += "/"
+		if r.RequestURI != r.URL.String() {
+			if !strings.HasPrefix(r.RequestURI, "/") {
+				raw += "/"
+			}
+			raw += r.RequestURI
+		} else {
+			raw += r.URL.Path
 		}
-		raw += r.RequestURI
 	} else {
 		u := r.URL
 		if strings.HasPrefix(u.Path, "/") || u.RawQuery != "" {
@@ -530,14 +537,8 @@ func ExtractWebsocketURLFromHTTPRequest(req *http.Request) (bool, string) {
 		log.Errorf("extract url(ws) from req failed: %s", err)
 		return isTls, ""
 	}
-	var urlStr = urlRaw.String()
-	if strings.HasPrefix(urlStr, "https://") {
-		urlStr = fmt.Sprintf("wss://%v", urlStr[8:])
-	}
-	if strings.HasPrefix(urlStr, "http://") {
-		urlStr = fmt.Sprintf("ws://%v", urlStr[7:])
-	}
-	return isTls, urlStr
+
+	return isTls, urlRaw.String()
 }
 
 func ReadHTTPPacketBodySize(raw []byte) (cl int, chunked bool) {

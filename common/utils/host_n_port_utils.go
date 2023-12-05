@@ -418,6 +418,10 @@ func IsHttpOrHttpsUrl(raw string) bool {
 	return strings.HasPrefix(strings.TrimSpace(raw), "http://") || strings.HasPrefix(strings.TrimSpace(raw), "https://")
 }
 
+func IsWebsocketUrl(raw string) bool {
+	return strings.HasPrefix(strings.TrimSpace(raw), "ws://") || strings.HasPrefix(strings.TrimSpace(raw), "wss://")
+}
+
 func IsJSON(raw string) (string, bool) {
 	unescapeJson, err := codec.QueryUnescape(raw)
 	if err != nil {
