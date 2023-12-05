@@ -109,8 +109,6 @@ func (v Values) Flat(f func(*Value) Values) Values {
 	for _, subValue := range v {
 		if ret := f(subValue); len(ret) > 0 {
 			newVals = append(newVals, ret...)
-		} else {
-			newVals = append(newVals, ret...)
 		}
 	}
 	return newVals
@@ -421,4 +419,26 @@ func (v *Value) IsSwitch() bool       { return v.node.GetOpcode() == ssa.OpSwitc
 
 func GetBareNode(v *Value) ssa.InstructionNode {
 	return v.node
+}
+
+// IsCalled desc any of 'Users' is Call or Make
+func (v *Value) IsCalled() bool {
+	return len(v.GetUsers().Filter(func(value *Value) bool {
+		return v.IsCall() || v.IsMake()
+	})) > 0
+}
+
+// GetCalledBy desc all of 'Users' is Call or Make
+func (v *Value) GetCalledBy() Values {
+	return v.GetUsers().Filter(func(value *Value) bool {
+		return v.IsCall() || v.IsMake()
+	})
+}
+
+// GetCallee desc any of 'Users' is Call
+func (v *Value) GetCallee() *Value {
+	if v.IsCall() {
+		return v.GetOperand(0)
+	}
+	return nil
 }

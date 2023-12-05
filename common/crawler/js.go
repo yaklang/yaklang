@@ -10,10 +10,18 @@ func HandleJS(isHttps bool, req []byte, code string) {
 	prog := js2ssa.ParseSSA(code, nil)
 	js := ssaapi.NewProgram(prog)
 
+	js.Ref("XMLHttpRequest").Filter(func(value *ssaapi.Value) bool {
+		return value.IsCalled()
+	}).Flat(func(value *ssaapi.Value) ssaapi.Values {
+
+	}).ShowWithSource(true).Walk(func(i *ssaapi.Value) {
+		i.Show()
+	})
+
 	// handle fetch
 	js.Ref("fetch").GetUsers().Filter(func(value *ssaapi.Value) bool {
 		return value.IsCall() || value.IsField()
-	}).ShowWithSource(true).ForEach(func(value *ssaapi.Value) {
+	}).ShowWithSource(false).ForEach(func(value *ssaapi.Value) {
 		switch {
 		case value.IsCall():
 			log.Infof("fetch value: %v", value.String())
@@ -36,5 +44,4 @@ func HandleJS(isHttps bool, req []byte, code string) {
 		}
 	})
 
-	js.Ref("a").GetDefs()
 }

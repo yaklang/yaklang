@@ -27,7 +27,7 @@ fetch('/misc/response/fetch/basic.action')
 
 ;
 // 创建一个新的 XMLHttpRequest 对象
-var xhr = new XMLHttpRequest();
+var xhr = new XMLHttpRequest;
 
 // 配置请求类型为 POST，以及目标 URL
 xhr.open('POST', 'deep.js', true);
