@@ -1,13 +1,11 @@
 package yserx
 
 import (
-	"bufio"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
-	"io/ioutil"
 	"reflect"
 	"strconv"
 	"strings"
@@ -115,24 +113,6 @@ func tcToVerbose(n byte) string {
 	return fmt.Sprintf("TC_UNKNOWN(0x%02x)", n)
 }
 
-func fetchAndAssert(r *bufio.Reader, n byte) {
-	byteRaw, err := r.Peek(1)
-	if err != nil {
-		return
-	}
-	if byteRaw[0] != n {
-		raw := fmt.Sprintf("fetch %v(0x%02x) failed, expected: %v", tcToVerbose(byteRaw[0]), byteRaw[0], tcToVerbose(n))
-		rest, _ := ioutil.ReadAll(r)
-		if rest != nil {
-			raw += "\n"
-			raw += fmt.Sprintf("last bytes: %v", utils.EscapeInvalidUTF8Byte(rest))
-		}
-		panic(raw)
-	} else {
-		_, _ = r.ReadByte()
-	}
-}
-
 const (
 	JT_BYTE   byte = 'B'
 	JT_CHAR   byte = 'C'
@@ -182,8 +162,8 @@ func jtToVerbose(r byte) string {
  *	TC_NULL				(0x70)
  *	TC_REFERENCE		(0x71)
  ******************/
-func (p *JavaSerializationParser) readClassDesc(r *bufio.Reader) (JavaSerializable, error) {
-	raw, err := r.Peek(1)
+func (p *JavaSerializationParser) readClassDesc(r io.Reader) (JavaSerializable, error) {
+	raw, err := ReadByte(r)
 	if err != nil {
 		if err == io.EOF {
 			n := NewJavaNull()
@@ -192,12 +172,11 @@ func (p *JavaSerializationParser) readClassDesc(r *bufio.Reader) (JavaSerializab
 		}
 		return nil, err
 	}
-
 	switch raw[0] {
 	case TC_CLASSDESC:
-		fallthrough
+		return p.readTC_CLASSDESC(r)
 	case TC_PROXYCLASSDESC:
-		return p.readNewClassDesc(r)
+		return p.readTC_PROXYCLASSDESC(r)
 	case TC_NULL:
 		return p.readTC_NULL(r)
 	case TC_REFERENCE:
@@ -232,8 +211,8 @@ func (p *JavaSerializationParser) readClassDesc(r *bufio.Reader) (JavaSerializab
  *	TC_CLASSDESC		(0x72)
  *	TC_PROXYCLASSDESC	(0x7d)
  ******************/
-func (p *JavaSerializationParser) readNewClassDesc(r *bufio.Reader) (*JavaClassDesc, error) {
-	raw, err := r.Peek(1)
+func (p *JavaSerializationParser) readNewClassDesc(r io.Reader) (*JavaClassDesc, error) {
+	raw, err := ReadByte(r)
 	if err != nil {
 		return nil, err
 	}
@@ -252,27 +231,21 @@ func (p *JavaSerializationParser) readNewClassDesc(r *bufio.Reader) (*JavaClassD
  *
  * TC_PROXYCLASSDESC	newHandle	proxyClassDescInfo
  ******************/
-func (p *JavaSerializationParser) readTC_PROXYCLASSDESC(r *bufio.Reader) (*JavaClassDesc, error) {
+func (p *JavaSerializationParser) readTC_PROXYCLASSDESC(r io.Reader) (*JavaClassDesc, error) {
 	g := &JavaClassDesc{}
 	p.ClassDescriptions = append(p.ClassDescriptions, g)
 
 	c := newJavaClassDetails()
 	g.SetDetails(c)
-
-	pcsByte, err := r.ReadByte()
-	if err != nil {
-		return nil, err
-	}
 	c.DynamicProxyClass = true
 
-	p.debug("TC_PROXYCLASSDESC - %02x", pcsByte)
 	p.increaseIndent()
 	defer p.decreaseIndent()
 
 	c.Handle = p.newHandler("->", "TC_PROXYCLASSDESC")
 	p.ClassDetails[c.Handle] = c
 
-	err = p.readProxyClassDescInfo(r, g)
+	err := p.readProxyClassDescInfo(r, g)
 	if err != nil {
 		return nil, err
 	}
@@ -284,7 +257,7 @@ func (p *JavaSerializationParser) readTC_PROXYCLASSDESC(r *bufio.Reader) (*JavaC
  *
  * (int)count	(utf)proxyInterfaceName[count]	classAnnotation		superClassDesc
  ******************/
-func (p *JavaSerializationParser) readProxyClassDescInfo(r *bufio.Reader, c *JavaClassDesc) error {
+func (p *JavaSerializationParser) readProxyClassDescInfo(r io.Reader, c *JavaClassDesc) error {
 	ifCount, err := Read4ByteToInt(r)
 	if err != nil {
 		return err
@@ -348,7 +321,7 @@ func (p *JavaSerializationParser) readProxyClassDescInfo(r *bufio.Reader, c *Jav
  *
  * classDesc
  ******************/
-func (p *JavaSerializationParser) readSuperClassDesc(r *bufio.Reader) (JavaSerializable, error) {
+func (p *JavaSerializationParser) readSuperClassDesc(r io.Reader) (JavaSerializable, error) {
 	p.debug("superClassDesc")
 	p.increaseIndent()
 	defer p.decreaseIndent()
@@ -361,7 +334,7 @@ func (p *JavaSerializationParser) readSuperClassDesc(r *bufio.Reader) (JavaSeria
 	//return nil
 }
 
-func (p *JavaSerializationParser) readClassAnnotation(r *bufio.Reader, c *JavaClassDesc) error {
+func (p *JavaSerializationParser) readClassAnnotation(r io.Reader, c *JavaClassDesc) error {
 
 	p.debug("classAnnotations")
 	p.increaseIndent()
@@ -369,23 +342,16 @@ func (p *JavaSerializationParser) readClassAnnotation(r *bufio.Reader, c *JavaCl
 
 	var contents []JavaSerializable
 	for {
-		raw, err := r.Peek(1)
-		if err != nil {
-			return err
-		}
-		if raw[0] == TC_ENDBLOCKDATA {
-			p.debug("TC_ENDBLOCKDATA - 0x78")
-			break
-		}
-
 		data, err := p.readContentElement(r)
 		if err != nil {
 			return err
 		}
-
+		if _, ok := data.(*JavaEndBlockData); ok {
+			p.debug("TC_ENDBLOCKDATA - 0x78")
+			break
+		}
 		contents = append(contents, data)
 	}
-	_, _ = r.ReadByte()
 	if c.Detail.DynamicProxyClass {
 		c.Detail.DynamicProxyAnnotation = contents
 	} else {
@@ -399,11 +365,9 @@ func (p *JavaSerializationParser) readClassAnnotation(r *bufio.Reader, c *JavaCl
  *
  * TC_CLASSDESC		className	serialVersionUID	newHandle	classDescInfo
  ******************/
-func (p *JavaSerializationParser) readTC_CLASSDESC(r *bufio.Reader) (*JavaClassDesc, error) {
+func (p *JavaSerializationParser) readTC_CLASSDESC(r io.Reader) (*JavaClassDesc, error) {
 	groups := &JavaClassDesc{}
 	p.ClassDescriptions = append(p.ClassDescriptions, groups)
-
-	fetchAndAssert(r, TC_CLASSDESC)
 	p.debug("TC_CLASSDESC - 0x%02x", TC_CLASSDESC)
 	p.increaseIndent()
 	defer p.decreaseIndent()
@@ -445,7 +409,7 @@ func (p *JavaSerializationParser) readTC_CLASSDESC(r *bufio.Reader) (*JavaClassD
  *
  * classDescFlags	fields	classAnnotation	superClassDesc
  ******************/
-func (p *JavaSerializationParser) readClassDescInfo(r *bufio.Reader, c *JavaClassDesc) error {
+func (p *JavaSerializationParser) readClassDescInfo(r io.Reader, c *JavaClassDesc) error {
 	raw, err := ReadBytesLength(r, 1)
 	if err != nil {
 		return err
@@ -513,7 +477,7 @@ func (p *JavaSerializationParser) readClassDescInfo(r *bufio.Reader, c *JavaClas
  *
  * (short)count		fieldDesc[count]
  ******************/
-func (p *JavaSerializationParser) readFields(r *bufio.Reader, c *JavaClassDesc) error {
+func (p *JavaSerializationParser) readFields(r io.Reader, c *JavaClassDesc) error {
 	if c.Detail == nil {
 		return nil
 	}
@@ -549,7 +513,7 @@ func (p *JavaSerializationParser) readFields(r *bufio.Reader, c *JavaClassDesc) 
  *	prim_typecode	fieldName
  *	obj_typecode	fieldName	className1
  ******************/
-func (p *JavaSerializationParser) readFieldDesc(r *bufio.Reader, c *JavaClassDesc) error {
+func (p *JavaSerializationParser) readFieldDesc(r io.Reader, c *JavaClassDesc) error {
 	if c.Detail == nil {
 		return utils.Errorf("buffer class details failed")
 	}
@@ -630,9 +594,7 @@ func (p *JavaSerializationParser) readFieldDesc(r *bufio.Reader, c *JavaClassDes
  *
  * TC_ARRAY		classDesc	newHandle	(int)size	values[size]
  ******************/
-func (p *JavaSerializationParser) readTC_ARRAY(r *bufio.Reader) (*JavaArray, error) {
-	fetchAndAssert(r, TC_ARRAY)
-
+func (p *JavaSerializationParser) readTC_ARRAY(r io.Reader) (*JavaArray, error) {
 	p.debug("TC_ARRAY - 0x%02x", TC_ARRAY)
 	p.increaseIndent()
 	defer p.decreaseIndent()
@@ -711,7 +673,7 @@ RETRY:
  *
  * @param typeCode The field type code.
  ******************/
-func (p *JavaSerializationParser) readFieldValue(r *bufio.Reader, t byte) (*JavaFieldValue, error) {
+func (p *JavaSerializationParser) readFieldValue(r io.Reader, t byte) (*JavaFieldValue, error) {
 	v := &JavaFieldValue{
 		FieldType: t, FieldTypeVerbose: jtToVerbose(t),
 	}
@@ -789,22 +751,21 @@ func (p *JavaSerializationParser) readFieldValue(r *bufio.Reader, t byte) (*Java
 	return nil, utils.Errorf("failed for fieldtype %v", codec.EncodeToHex(t))
 }
 
-func (p *JavaSerializationParser) readTC_NULL(r *bufio.Reader) (*JavaNull, error) {
-	fetchAndAssert(r, TC_NULL)
+func (p *JavaSerializationParser) readTC_NULL(r io.Reader) (*JavaNull, error) {
 	p.debug("TC_NULL - 0x%02x", TC_NULL)
 	return &JavaNull{}, nil
 }
 
-func (p *JavaSerializationParser) readStringObject(r *bufio.Reader) (JavaSerializable, error) {
-	raw, err := r.Peek(1)
+func (p *JavaSerializationParser) readStringObject(r io.Reader) (JavaSerializable, error) {
+	raw, err := ReadByte(r)
 	if err != nil {
 		return nil, err
 	}
 	switch raw[0] {
 	case TC_STRING:
-		fallthrough
+		return p.readTC_STRING(r)
 	case TC_LONGSTRING:
-		return p.readNewString(r)
+		return p.readTC_LONGSTRING(r)
 	case TC_REFERENCE:
 		return p.readPrevObject(r)
 	default:
@@ -819,8 +780,8 @@ func (p *JavaSerializationParser) readStringObject(r *bufio.Reader) (JavaSeriali
  *	TC_STRING		(0x74)
  *	TC_LONGSTRING	(0x7c)
  ******************/
-func (p *JavaSerializationParser) readNewString(r *bufio.Reader) (*JavaString, error) {
-	raw, err := r.Peek(1)
+func (p *JavaSerializationParser) readNewString(r io.Reader) (*JavaString, error) {
+	raw, err := ReadByte(r)
 	if err != nil {
 		return nil, err
 	}
@@ -844,9 +805,7 @@ func (p *JavaSerializationParser) readNewString(r *bufio.Reader) (*JavaString, e
 }
 
 // TC_REF
-func (p *JavaSerializationParser) readPrevObject(r *bufio.Reader) (*JavaReference, error) {
-	fetchAndAssert(r, TC_REFERENCE)
-
+func (p *JavaSerializationParser) readPrevObject(r io.Reader) (*JavaReference, error) {
 	p.debug("TC_REFERENCE - 0x%02x", TC_REFERENCE)
 	p.increaseIndent()
 	defer p.decreaseIndent()
@@ -859,8 +818,7 @@ func (p *JavaSerializationParser) readPrevObject(r *bufio.Reader) (*JavaReferenc
 	return &JavaReference{Value: Uint64To4Bytes(handle), Handle: handle}, nil
 }
 
-func (p *JavaSerializationParser) readTC_STRING(r *bufio.Reader) (*JavaString, error) {
-	_, _ = r.ReadByte()
+func (p *JavaSerializationParser) readTC_STRING(r io.Reader) (*JavaString, error) {
 	p.debug("TC_STRING - 0x%02x", TC_STRING)
 	p.increaseIndent()
 	defer p.decreaseIndent()
@@ -880,8 +838,7 @@ func (p *JavaSerializationParser) readTC_STRING(r *bufio.Reader) (*JavaString, e
 	return obj, nil
 }
 
-func (p *JavaSerializationParser) readTC_LONGSTRING(r *bufio.Reader) (*JavaString, error) {
-	fetchAndAssert(r, TC_LONGSTRING)
+func (p *JavaSerializationParser) readTC_LONGSTRING(r io.Reader) (*JavaString, error) {
 	p.debug("TC_LONGSTRING - 0x%v", codec.EncodeToHex(TC_LONGSTRING))
 	p.increaseIndent()
 	p.decreaseIndent()
@@ -906,7 +863,7 @@ func (p *JavaSerializationParser) readTC_LONGSTRING(r *bufio.Reader) (*JavaStrin
  *
  * (short: 2 byte)length	contents
  ******************/
-func (p *JavaSerializationParser) readStringUTF(r *bufio.Reader) (string, error) {
+func (p *JavaSerializationParser) readStringUTF(r io.Reader) (string, error) {
 	stringLen, err := Read2ByteToInt(r)
 	if err != nil {
 		return "", err
@@ -922,7 +879,7 @@ func (p *JavaSerializationParser) readStringUTF(r *bufio.Reader) (string, error)
 	// https://github.com/NickstaDB/SerializationDumper/blob/49dbece69f0b8230aaed4a0c50ca56fecc9376c0/src/nb/deser/SerializationDumper.java#L1295
 	return string(raw), nil
 }
-func (p *JavaSerializationParser) readLongStringUTF(r *bufio.Reader) (string, error) {
+func (p *JavaSerializationParser) readLongStringUTF(r io.Reader) (string, error) {
 	stringLen, err := Read8BytesToUint64(r)
 	if err != nil {
 		return "", err
@@ -956,18 +913,18 @@ func (p *JavaSerializationParser) readLongStringUTF(r *bufio.Reader) (string, er
  *	TC_BLOCKDATA		(0x77)
  *	TC_BLOCKDATALONG	(0x7a)
  ******************/
-func (p *JavaSerializationParser) readContentElement(r *bufio.Reader) (JavaSerializable, error) {
-	raw, err := r.Peek(1)
+func (p *JavaSerializationParser) readContentElement(r io.Reader) (JavaSerializable, error) {
+	raw, err := ReadByte(r)
 	if err != nil {
 		return nil, err
 	}
 
 	//log.Infof("start to handle: %v", tcToVerbose(raw[0]))
 	switch raw[0] {
-	case TC_STRING: // done
-		fallthrough
-	case TC_LONGSTRING: // done
-		return p.readNewString(r)
+	case TC_STRING:
+		return p.readTC_STRING(r)
+	case TC_LONGSTRING:
+		return p.readTC_LONGSTRING(r)
 	case TC_NULL: // done
 		return p.readTC_NULL(r)
 	case TC_OBJECT:
@@ -978,10 +935,10 @@ func (p *JavaSerializationParser) readContentElement(r *bufio.Reader) (JavaSeria
 		return p.readTC_ARRAY(r)
 	case TC_ENUM:
 		return p.readTC_ENUM(r)
-	case TC_CLASSDESC: // done
-		fallthrough
-	case TC_PROXYCLASSDESC: // done
-		return p.readNewClassDesc(r)
+	case TC_CLASSDESC:
+		return p.readTC_CLASSDESC(r)
+	case TC_PROXYCLASSDESC:
+		return p.readTC_PROXYCLASSDESC(r)
 	case TC_REFERENCE: // done
 		return p.readPrevObject(r)
 	case TC_BLOCKDATA:
@@ -989,7 +946,6 @@ func (p *JavaSerializationParser) readContentElement(r *bufio.Reader) (JavaSeria
 	case TC_BLOCKDATALONG:
 		return p.readLongBlockData(r)
 	case TC_ENDBLOCKDATA:
-		fetchAndAssert(r, TC_ENDBLOCKDATA)
 		return &JavaEndBlockData{}, nil
 	}
 	return nil, utils.Errorf("error for read 0x%v", codec.EncodeToHex(raw))
@@ -1000,12 +956,7 @@ func (p *JavaSerializationParser) readContentElement(r *bufio.Reader) (JavaSeria
  *
  * TC_ENUM		classDesc	newHandle	enumConstantName
  ******************/
-func (p *JavaSerializationParser) readTC_ENUM(r *bufio.Reader) (*JavaEnumDesc, error) {
-	_, err := r.ReadByte()
-	if err != nil {
-		return nil, err
-	}
-
+func (p *JavaSerializationParser) readTC_ENUM(r io.Reader) (*JavaEnumDesc, error) {
 	d := &JavaEnumDesc{}
 	classDesc, err := p.readClassDesc(r)
 	if err != nil {
@@ -1027,9 +978,7 @@ func (p *JavaSerializationParser) readTC_ENUM(r *bufio.Reader) (*JavaEnumDesc, e
  *
  * TC_OBJECT	classDesc	newHandle	classdata[]
  ******************/
-func (p *JavaSerializationParser) readNewObject(r *bufio.Reader) (*JavaObject, error) {
-	fetchAndAssert(r, TC_OBJECT)
-
+func (p *JavaSerializationParser) readNewObject(r io.Reader) (*JavaObject, error) {
 	p.debug("TC_OBJECT - 0x%02x", TC_OBJECT)
 	p.increaseIndent()
 	defer p.decreaseIndent()
@@ -1080,18 +1029,18 @@ RETRY:
  * most super class first. The length and type of data depends on the
  * classDescFlags and field descriptions.
  ******************/
-func (p *JavaSerializationParser) readClassData(r *bufio.Reader, c *JavaClassDesc) ([]JavaSerializable, error) {
+func (p *JavaSerializationParser) readClassData(r io.Reader, c *JavaClassDesc) ([]JavaSerializable, error) {
 	p.debug("classdata")
 	p.increaseIndent()
 	defer p.decreaseIndent()
 
-	if c.Detail.Is_SC_EXTERNALIZABLE() {
-		p.debug("externalContents")
-		p.increaseIndent()
-		p.debug("Unable to parse externalContents as the format is specific to the implementation class.")
-		p.decreaseIndent()
-		panic("ERROR: unable to parse external content element")
-	}
+	//if c.Detail.Is_SC_EXTERNALIZABLE() {
+	//	p.debug("externalContents")
+	//	p.increaseIndent()
+	//	p.debug("Unable to parse externalContents as the format is specific to the implementation class.")
+	//	p.decreaseIndent()
+	//	panic("ERROR: unable to parse external content element")
+	//}
 
 	// 从 super class 开始
 	var classDataArray []JavaSerializable
@@ -1170,31 +1119,25 @@ func (p *JavaSerializationParser) readClassData(r *bufio.Reader, c *JavaClassDes
 
 			var isEmptyBlockData = false
 			for {
-				peekedRaw, err := r.Peek(1)
+				value, err := p.readContentElement(r)
 				if err != nil {
 					if err == io.EOF {
 						p.debug("TC_ENDBLOCKDATA - 0x%02x (EOF)", TC_ENDBLOCKDATA)
 						isEmptyBlockData = true
 						break
 					}
-					log.Errorf("peek failed: %s", err)
+					log.Errorf("read byte failed: %s", err)
 					return nil, err
 				}
 
-				if peekedRaw[0] == TC_ENDBLOCKDATA {
+				if _, ok := value.(*JavaEndBlockData); ok {
 					p.debug("TC_ENDBLOCKDATA - 0x%02x", TC_ENDBLOCKDATA)
 					break
-				}
-
-				value, err := p.readContentElement(r)
-				if err != nil {
-					return nil, err
 				}
 				arr.BlockData = append(arr.BlockData, value)
 				//data = append(data, value)
 				//haveBlockData = true
 			}
-			_, _ = r.ReadByte()
 			arr.BlockData = append(arr.BlockData, &JavaEndBlockData{IsEmpty: isEmptyBlockData})
 			p.decreaseIndent()
 		}
@@ -1205,7 +1148,7 @@ func (p *JavaSerializationParser) readClassData(r *bufio.Reader, c *JavaClassDes
 	return classDataArray, nil
 }
 
-func (p *JavaSerializationParser) readClassDataField(r *bufio.Reader, f *JavaClassField) (*JavaFieldValue, error) {
+func (p *JavaSerializationParser) readClassDataField(r io.Reader, f *JavaClassField) (*JavaFieldValue, error) {
 
 	p.debug(f.Name)
 	p.increaseIndent()
@@ -1213,12 +1156,7 @@ func (p *JavaSerializationParser) readClassDataField(r *bufio.Reader, f *JavaCla
 	return p.readFieldValue(r, f.FieldType)
 }
 
-func (p *JavaSerializationParser) readNewClass(r *bufio.Reader) (*JavaClass, error) {
-	_, err := r.ReadByte()
-	if err != nil {
-		return nil, err
-	}
-
+func (p *JavaSerializationParser) readNewClass(r io.Reader) (*JavaClass, error) {
 	p.debug("TC_CLASS - 0x%02x", TC_CLASS)
 	p.increaseIndent()
 
@@ -1242,12 +1180,7 @@ func (p *JavaSerializationParser) readNewClass(r *bufio.Reader) (*JavaClass, err
     *
   - TC_BLOCKDATA		(unsigned byte)size		contents
 */
-func (p *JavaSerializationParser) readBlockData(r *bufio.Reader) (*JavaBlockData, error) {
-	_, err := r.ReadByte()
-	if err != nil {
-		return nil, err
-	}
-
+func (p *JavaSerializationParser) readBlockData(r io.Reader) (*JavaBlockData, error) {
 	l, err := ReadByteToInt(r)
 	if err != nil {
 		return nil, err
@@ -1265,12 +1198,7 @@ func (p *JavaSerializationParser) readBlockData(r *bufio.Reader) (*JavaBlockData
  *
  * TC_BLOCKDATALONG		(int)size	contents
  ******************/
-func (p *JavaSerializationParser) readLongBlockData(r *bufio.Reader) (*JavaBlockData, error) {
-	_, err := r.ReadByte()
-	if err != nil {
-		return nil, err
-	}
-
+func (p *JavaSerializationParser) readLongBlockData(r io.Reader) (*JavaBlockData, error) {
 	l, err := Read4ByteToInt(r)
 	if err != nil {
 		return nil, err
@@ -1290,8 +1218,8 @@ func (p *JavaSerializationParser) readLongBlockData(r *bufio.Reader) (*JavaBlock
 /*******************
  * Read an array field.
  ******************/
-func (p *JavaSerializationParser) readArrayField(r *bufio.Reader) (JavaSerializable, error) {
-	raw, err := r.Peek(1)
+func (p *JavaSerializationParser) readArrayField(r io.Reader) (JavaSerializable, error) {
+	raw, err := ReadByte(r)
 	if err != nil {
 		return nil, err
 	}
@@ -1314,12 +1242,12 @@ func (p *JavaSerializationParser) readArrayField(r *bufio.Reader) (JavaSerializa
 /*******************
  * Read an object field.
  ******************/
-func (p *JavaSerializationParser) readObjectField(r *bufio.Reader) (JavaSerializable, error) {
+func (p *JavaSerializationParser) readObjectField(r io.Reader) (JavaSerializable, error) {
 	p.debug("(object)")
 	p.increaseIndent()
 	defer p.decreaseIndent()
 
-	raw, err := r.Peek(1)
+	raw, err := ReadByte(r)
 	if err != nil {
 		return nil, err
 	}

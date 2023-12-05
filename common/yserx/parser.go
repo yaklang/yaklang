@@ -77,10 +77,10 @@ func JavaSerializedDumper(raw []byte) string {
 }
 
 func ParseJavaSerializedFromReader(r io.Reader, callback ...func(serializable JavaSerializable)) ([]JavaSerializable, error) {
-	return ParseJavaSerializedEx(bufio.NewReader(r), ioutil.Discard, callback...)
+	return ParseJavaSerializedEx(r, ioutil.Discard, callback...)
 }
 
-func ParseJavaSerializedEx(r *bufio.Reader, writer io.Writer, callback ...func(j JavaSerializable)) ([]JavaSerializable, error) {
+func ParseJavaSerializedEx(r io.Reader, writer io.Writer, callback ...func(j JavaSerializable)) ([]JavaSerializable, error) {
 	magicBanner, err := ReadBytesLengthInt(r, 2)
 	if err != nil {
 		return nil, err

@@ -6,10 +6,8 @@ Package:
     if offset != 0 {
       this.GetSubNode("PeerInfo").SetCfg("length",(offset-18)*8)
       this.GetSubNode("PeerInfo").Process()
-    
-      this.GetSubNode("Abbrev").SetCfg("length",100)
-      this.GetSubNode("Abbrev").Process()
     }
+    this.GetSubNode("Abbrevs").Process()
   Total Length: uint32
   Header:
     Cmd: uint8
@@ -22,10 +20,12 @@ Package:
 #  PublicKeyLength: int32
 #  PublicKey: "type:raw;length-from-field:PublicKeyLength;length-from-field-multiply:8"
   PeerInfo: raw
-  Abbrev:
-    Type: raw,4
-    Object:
-      parser: ser
+  Abbrevs:
+    isList: true
+    Abbrev:
+      Type: raw,4
+      Object:
+        parser: ser
 #  PeerInfo:
 #    Type: uint8
 #    Object: raw

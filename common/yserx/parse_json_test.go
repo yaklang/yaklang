@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"strconv"
 	"testing"
 )
 
@@ -21,6 +21,7 @@ func TestParseJavaSerialized_1(t *testing.T) {
 
 	r, err = ParseJavaSerialized(payload)
 	if err != nil {
+		utils.PrintCurrentGoroutineRuntimeStack()
 		test.FailNow(err.Error())
 		return
 	}
@@ -37,11 +38,7 @@ func TestParseJavaSerialized_1(t *testing.T) {
 	}
 	_ = res
 
-	println(codec.Md5(s1))
-	println(codec.Md5(s2))
-
-	println(strconv.Quote(s1))
-	println(strconv.Quote(s2))
+	assert.Equal(t, s1, s2)
 
 	// \x00\x03[[B[\x00\x06_class
 	println(codec.EncodeToHex(payload[:]))
