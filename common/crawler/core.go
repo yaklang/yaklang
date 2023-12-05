@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/go-funk"
-	"github.com/yaklang/yaklang/common/javascript"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -22,9 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/PuerkitoBio/goquery"
 	"github.com/gobwas/glob"
-	uuid "github.com/satori/go.uuid"
 )
 
 var (
@@ -92,10 +89,8 @@ type Req struct {
 	err error
 
 	// 如果有的话，寻找 html/js 信息
-	htmlDocument     *goquery.Document
-	jsDocumentResult *javascript.ASTWalkerResult
-	responseBody     []byte
-	responseHeader   string
+	responseBody   []byte
+	responseHeader string
 
 	// 请求计数，请求过几次成功了
 	requestedCounter int
@@ -437,18 +432,20 @@ func HandleRequestResult(isHttps bool, reqBytes, rspBytes []byte) ([][]byte, err
 	if err != nil {
 		return nil, utils.Errorf("recover url from request failed: %s", err)
 	}
-	if utils.IContains(rootReq.request.Header.Get("Content-Type"), "javascript") {
-		log.Debugf("start to extract javascript info.. from body size: %v", len(string(body)))
-		rootReq.jsDocumentResult, err = javascript.BasicJavaScriptASTWalker(string(body))
-		if err != nil {
-			return nil, utils.Errorf("javascript ast analysis failed: %s", err)
-		}
-	} else {
-		rootReq.htmlDocument, err = goquery.NewDocumentFromReader(bytes.NewBuffer(body))
-		if err != nil {
-			return nil, utils.Errorf("create html document reader failed: %s", err)
-		}
-	}
+	//if utils.IContains(rootReq.request.Header.Get("Content-Type"), "javascript") {
+	//	log.Debugf("start to extract javascript info.. from body size: %v", len(string(body)))
+	//	rootReq.jsDocumentResult, err = javascript.BasicJavaScriptASTWalker(string(body))
+	//	if err != nil {
+	//		return nil, utils.Errorf("javascript ast analysis failed: %s", err)
+	//	}
+	//} else {
+	//	rootReq.htmlDocument, err = goquery.NewDocumentFromReader(bytes.NewBuffer(body))
+	//	if err != nil {
+	//		return nil, utils.Errorf("create html document reader failed: %s", err)
+	//	}
+	//}
+
+	utils.NewHostsFilter("....").Contains(...)
 
 	var subReqs []*Req
 	urlFilter := filter.NewFilter()
@@ -660,6 +657,7 @@ func handleReqResultEx(r *Req, reqHandler func(*Req) bool, urlHandler func(strin
 			foundPathOrUrls.Store(urlIns.String(), nil)
 		}
 	}
+	_ = handleFinalExtraUrls
 	if extractionRulesHandler != nil {
 
 		urls := extractionRulesHandler(r)
@@ -668,83 +666,83 @@ func handleReqResultEx(r *Req, reqHandler func(*Req) bool, urlHandler func(strin
 			foundPathOrUrls.Store(url, nil)
 		}
 	} else {
-		if r.htmlDocument != nil {
-			// meta redirect or ...
-			r.htmlDocument.Find("meta").Each(func(_ int, selection *goquery.Selection) {
-				t, _ := selection.Attr("content")
-				for _, results := range metaUrlExtractor.FindAllStringSubmatch(t, -1) {
-					if len(results) > 1 {
-						rawUrl := strings.TrimRight(results[1], `"';`)
-						var raw = r.AbsoluteURL(rawUrl)
-						foundPathOrUrls.Store(raw, nil)
-						handleFinalExtraUrls(raw)
-					}
-				}
-			})
-			r.htmlDocument.Find("[href]").Each(func(_ int, selection *goquery.Selection) {
-				raw, _ := selection.Attr("href")
-				raw = r.AbsoluteURL(raw)
-				if raw != "" {
-					foundPathOrUrls.Store(raw, nil)
-					handleFinalExtraUrls(raw)
-
-				}
-			})
-			r.htmlDocument.Find("[src]").Each(func(i int, selection *goquery.Selection) {
-				raw, _ := selection.Attr("src")
-				raw = r.AbsoluteURL(raw)
-				if raw != "" {
-					foundPathOrUrls.Store(raw, nil)
-					handleFinalExtraUrls(raw)
-				}
-			})
-			r.htmlDocument.Find("form").Each(func(i int, selection *goquery.Selection) {
-				var maybeUser, maybePass string
-				method, reqUrl, contentType, body, err := HandleElementForm(
-					selection, r.request.URL, func(user, pass string, extra map[string][]string) {
-						maybeUser = user
-						maybePass = pass
-					},
-				)
-				if err != nil {
-					log.Debugf("parse form error: %s", err)
-					return
-				}
-
-				fReq, err := createReqFromUrlEx(r, method, reqUrl, bytes.NewBufferString(body.String()), nil)
-				if err != nil {
-					log.Errorf("create Req from url (ex) failed: %s", err)
-					return
-				}
-				fReq.isForm = true
-				lowerBody := strings.ToLower(utils.InterfaceToString(body)) + strings.ToLower(reqUrl)
-				fReq.maybeLoginForm = utils.MatchAnyOfSubString(
-					lowerBody,
-					"user", "name", "mail", "id", "xingming", "phone", "unique",
-				) && utils.MatchAnyOfSubString(
-					lowerBody,
-					"pass", "word", "mima", "code", "secret", "key", "passwd", "pw", "pwd", "pd",
-				)
-				fReq.maybeUploadForm = utils.MatchAllOfRegexp(contentType, `application\/form-data`)
-				fReq.request.Header.Set("Content-Type", contentType)
-				fReq.depth = r.depth
-				fReq.maybeLoginUsername = maybeUser
-				fReq.maybeLoginPassword = maybePass
-				foundFormRequests.Store(uuid.NewV4().String(), fReq)
-			})
-		}
-
-		if r.jsDocumentResult != nil {
-			for _, stringLiteral := range r.jsDocumentResult.StringLiteral {
-				for _, url := range URLPattern.FindAllString(stringLiteral, -1) {
-					url = r.AbsoluteURL(url)
-					if url != "" {
-						foundPathOrUrls.Store(url, nil)
-						handleFinalExtraUrls(url)
-					}
-				}
-			}
-		}
+		//if r.htmlDocument != nil {
+		//	// meta redirect or ...
+		//	r.htmlDocument.Find("meta").Each(func(_ int, selection *goquery.Selection) {
+		//		t, _ := selection.Attr("content")
+		//		for _, results := range metaUrlExtractor.FindAllStringSubmatch(t, -1) {
+		//			if len(results) > 1 {
+		//				rawUrl := strings.TrimRight(results[1], `"';`)
+		//				var raw = r.AbsoluteURL(rawUrl)
+		//				foundPathOrUrls.Store(raw, nil)
+		//				handleFinalExtraUrls(raw)
+		//			}
+		//		}
+		//	})
+		//	r.htmlDocument.Find("[href]").Each(func(_ int, selection *goquery.Selection) {
+		//		raw, _ := selection.Attr("href")
+		//		raw = r.AbsoluteURL(raw)
+		//		if raw != "" {
+		//			foundPathOrUrls.Store(raw, nil)
+		//			handleFinalExtraUrls(raw)
+		//
+		//		}
+		//	})
+		//	r.htmlDocument.Find("[src]").Each(func(i int, selection *goquery.Selection) {
+		//		raw, _ := selection.Attr("src")
+		//		raw = r.AbsoluteURL(raw)
+		//		if raw != "" {
+		//			foundPathOrUrls.Store(raw, nil)
+		//			handleFinalExtraUrls(raw)
+		//		}
+		//	})
+		//	r.htmlDocument.Find("form").Each(func(i int, selection *goquery.Selection) {
+		//		var maybeUser, maybePass string
+		//		method, reqUrl, contentType, body, err := HandleElementForm(
+		//			selection, r.request.URL, func(user, pass string, extra map[string][]string) {
+		//				maybeUser = user
+		//				maybePass = pass
+		//			},
+		//		)
+		//		if err != nil {
+		//			log.Debugf("parse form error: %s", err)
+		//			return
+		//		}
+		//
+		//		fReq, err := createReqFromUrlEx(r, method, reqUrl, bytes.NewBufferString(body.String()), nil)
+		//		if err != nil {
+		//			log.Errorf("create Req from url (ex) failed: %s", err)
+		//			return
+		//		}
+		//		fReq.isForm = true
+		//		lowerBody := strings.ToLower(utils.InterfaceToString(body)) + strings.ToLower(reqUrl)
+		//		fReq.maybeLoginForm = utils.MatchAnyOfSubString(
+		//			lowerBody,
+		//			"user", "name", "mail", "id", "xingming", "phone", "unique",
+		//		) && utils.MatchAnyOfSubString(
+		//			lowerBody,
+		//			"pass", "word", "mima", "code", "secret", "key", "passwd", "pw", "pwd", "pd",
+		//		)
+		//		fReq.maybeUploadForm = utils.MatchAllOfRegexp(contentType, `application\/form-data`)
+		//		fReq.request.Header.Set("Content-Type", contentType)
+		//		fReq.depth = r.depth
+		//		fReq.maybeLoginUsername = maybeUser
+		//		fReq.maybeLoginPassword = maybePass
+		//		foundFormRequests.Store(uuid.NewV4().String(), fReq)
+		//	})
+		//}
+		//
+		//if r.jsDocumentResult != nil {
+		//	for _, stringLiteral := range r.jsDocumentResult.StringLiteral {
+		//		for _, url := range URLPattern.FindAllString(stringLiteral, -1) {
+		//			url = r.AbsoluteURL(url)
+		//			if url != "" {
+		//				foundPathOrUrls.Store(url, nil)
+		//				handleFinalExtraUrls(url)
+		//			}
+		//		}
+		//	}
+		//}
 	}
 
 	foundFormRequests.Range(func(key, value interface{}) bool {
