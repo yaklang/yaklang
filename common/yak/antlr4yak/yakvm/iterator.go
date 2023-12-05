@@ -197,6 +197,8 @@ func NewIterator(i interface{}) (IteratorInterface, error) {
 
 	kind := reflect.TypeOf(i).Kind()
 	switch kind {
+	case reflect.String:
+		return newSliceIterator([]byte(i.(string))), nil
 	case reflect.Slice, reflect.Array:
 		return newSliceIterator(i), nil
 	case reflect.Map:
