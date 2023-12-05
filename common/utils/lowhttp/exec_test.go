@@ -390,6 +390,28 @@ Host: www.baidu.com`))
 	}
 }
 
+func TestParsePacketTOURLCase6(t *testing.T) {
+	u, err := ExtractURLFromHTTPRequestRaw([]byte(`GET ws://82.157.123.54:9010/ajaxchattest HTTP/1.1
+Host: 82.157.123.54:9010
+Connection: Upgrade
+Pragma: no-cache
+Cache-Control: no-cache
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36
+Upgrade: websocket
+Origin: http://coolaf.com
+Sec-WebSocket-Version: 13
+Accept-Encoding: gzip, deflate
+Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7,ru;q=0.6
+Sec-WebSocket-Key: 6cXeWYUxVq5hawwy2Vhsrw==
+Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits`), false)
+	if err != nil {
+		panic(err)
+	}
+	if u.String() != "ws://82.157.123.54:9010/ajaxchattest" {
+		t.Fatal("BUG: Packet to URL FAILED")
+	}
+}
+
 func TestLowhttp_HTTP_close_readBody(t *testing.T) {
 	var ctx, cancel = context.WithCancel(utils.TimeoutContextSeconds(5))
 	defer cancel()
