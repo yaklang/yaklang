@@ -2,8 +2,11 @@ package yakgrpc
 
 import (
 	"context"
+	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
+	"net/http"
 	"os"
 	"strings"
 	"testing"
@@ -278,6 +281,126 @@ func TestValidP12PassWord(t *testing.T) {
 
 }
 
+func TestHTTPAuth(t *testing.T) {
+	username, passwd := "test", "test"
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		u, p, ok := request.BasicAuth()
+		if ok && u == username && p == passwd {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.Header().Set("WWW-Authenticate", `Basic realm="restricted", charset="UTF-8"`)
+		w.WriteHeader(http.StatusUnauthorized)
+	})
+
+	client, err := NewLocalClient()
+	_, _ = client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
+	config, err := client.GetGlobalNetworkConfig(context.Background(), &ypb.GetGlobalNetworkConfigRequest{})
+	if err != nil {
+		panic(err)
+	}
+	target := fmt.Sprintf("%s:%d", host, port)
+	config.AuthInfos = []*ypb.AuthInfo{{
+		AuthType:     "any",
+		AuthUsername: "test",
+		AuthPassword: "test",
+		Host:         target,
+		Forbidden:    false,
+	}, {
+		AuthType:     "negotiate",
+		AuthUsername: "test",
+		AuthPassword: "test",
+		Host:         target,
+		Forbidden:    false,
+	}, {
+		AuthType:     "ntlm",
+		AuthUsername: "test",
+		AuthPassword: "testfasdf",
+		Host:         target,
+		Forbidden:    false,
+	}}
+	_, err = client.SetGlobalNetworkConfig(context.Background(), config)
+	if err != nil {
+		panic(err)
+	}
+
+	rsp, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes([]byte("GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, statusCode, _ := lowhttp.GetHTTPPacketFirstLine(rsp.RawPacket)
+	if statusCode != "200" {
+		t.Fatalf("want 200 got %s", statusCode)
+	}
+
+	config.AuthInfos = []*ypb.AuthInfo{{
+		AuthType:     "any",
+		AuthUsername: "test",
+		AuthPassword: "test",
+		Host:         target,
+		Forbidden:    true,
+	}, {
+		AuthType:     "negotiate",
+		AuthUsername: "test",
+		AuthPassword: "test",
+		Host:         target,
+		Forbidden:    false,
+	}, {
+		AuthType:     "ntlm",
+		AuthUsername: "test",
+		AuthPassword: "testfasdf",
+		Host:         target,
+		Forbidden:    false,
+	}}
+	_, err = client.SetGlobalNetworkConfig(context.Background(), config)
+	if err != nil {
+		panic(err)
+	}
+
+	rsp, err = lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes([]byte("GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, statusCode, _ = lowhttp.GetHTTPPacketFirstLine(rsp.RawPacket)
+	if statusCode != "401" {
+		t.Fatalf("want 401 got %s", statusCode)
+	}
+
+	config.AuthInfos = []*ypb.AuthInfo{{
+		AuthType:     "any",
+		AuthUsername: "test",
+		AuthPassword: "test123",
+		Host:         target,
+		Forbidden:    false,
+	}, {
+		AuthType:     "basic",
+		AuthUsername: "test",
+		AuthPassword: "test",
+		Host:         target,
+		Forbidden:    false,
+	}, {
+		AuthType:     "ntlm",
+		AuthUsername: "test",
+		AuthPassword: "testfasdf",
+		Host:         target,
+		Forbidden:    false,
+	}}
+	_, err = client.SetGlobalNetworkConfig(context.Background(), config)
+	if err != nil {
+		panic(err)
+	}
+
+	rsp, err = lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes([]byte("GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, statusCode, _ = lowhttp.GetHTTPPacketFirstLine(rsp.RawPacket)
+	if statusCode != "200" {
+		t.Fatalf("want 200 got %s", statusCode)
+	}
+
+}
+
 //func TestHTTPAuth(t *testing.T) {
 //	client, err := NewLocalClient()
 //
@@ -286,7 +409,7 @@ func TestValidP12PassWord(t *testing.T) {
 //	if err != nil {
 //		panic(err)
 //	}
-//
+
 //	config.AuthInfos = []*ypb.AuthInfo{{
 //		AuthType:     "any",
 //		AuthUsername: "test",
