@@ -68,7 +68,7 @@ func GetAuthTypeList(authType string) []string {
 	case "negotiate":
 		return []string{"negotiate", "ntlm", "kerberos"}
 	default:
-		return []string{authType}
+		return []string{strings.ToLower(authType)}
 	}
 }
 

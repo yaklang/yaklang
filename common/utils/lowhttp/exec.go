@@ -741,8 +741,8 @@ RECONNECT:
 		}
 
 		if firstAuth && firstResponse != nil && firstResponse.StatusCode == http.StatusUnauthorized {
-			if authHeader := firstResponse.Header["WWW-Authenticate"]; len(authHeader) > 0 {
-				if auth := GetHttpAuth(authHeader[0], option); auth != nil {
+			if authHeader := firstResponse.Header.Get("WWW-Authenticate"); authHeader != "" {
+				if auth := GetHttpAuth(authHeader, option); auth != nil {
 					authReq, err := auth.Authenticate(conn, option)
 					if err == nil {
 						_, err := conn.Write(authReq)
