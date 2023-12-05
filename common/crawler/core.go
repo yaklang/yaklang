@@ -581,6 +581,8 @@ func (c *Crawler) handleReqResult(r *Req) {
 
 	var fullJSCode bytes.Buffer
 
+	prog := js2ssa.ParseSSA(fullJSCode.String(), nil)
+	js := ssaapi.NewProgram(prog)
 	for _, i := range contents {
 		if !i.IsCodeText {
 			continue
@@ -589,10 +591,6 @@ func (c *Crawler) handleReqResult(r *Req) {
 		fullJSCode.WriteByte(';')
 		fullJSCode.WriteByte('\n')
 	}
-
-	prog := js2ssa.ParseSSA(fullJSCode.String(), nil)
-	js := ssaapi.NewProgram(prog)
-
 	_ = js
 	println(string(fullJSCode.String()))
 	//handleReqResultEx(r, func(nReq *Req) bool {
