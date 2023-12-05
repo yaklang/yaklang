@@ -1063,7 +1063,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		var shouldHijackResponse bool
 		var shouldSendSignal bool
 		defer func() {
-			// 根据是否劫持响应来判断是否释放锁
 			if shouldSendSignal && !autoForward.IsSet() {
 				shouldHijackRespChan <- shouldHijackResponse
 			}
@@ -1076,6 +1075,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}()
 
 		isTls, urlStr := lowhttp.ExtractWebsocketURLFromHTTPRequest(req)
+		if !filterManager.IsPassed("", req.Host, urlStr, "", isTls) {
+			httpctx.SetContextValueInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestIsFiltered, true)
+			return raw
+		}
 		wshash := utils.CalcSha1(fmt.Sprintf("%p", req), fmt.Sprintf("%p", rsp), ts)
 		_, ok := websocketHashCache.Load(wshash)
 		if !ok {
