@@ -424,14 +424,14 @@ func GetBareNode(v *Value) ssa.InstructionNode {
 // IsCalled desc any of 'Users' is Call or Make
 func (v *Value) IsCalled() bool {
 	return len(v.GetUsers().Filter(func(value *Value) bool {
-		return v.IsCall() || v.IsMake()
+		return value.IsCall() || value.IsMake()
 	})) > 0
 }
 
 // GetCalledBy desc all of 'Users' is Call or Make
 func (v *Value) GetCalledBy() Values {
 	return v.GetUsers().Filter(func(value *Value) bool {
-		return v.IsCall() || v.IsMake()
+		return value.IsCall() || value.IsMake()
 	})
 }
 

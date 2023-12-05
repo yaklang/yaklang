@@ -35,6 +35,7 @@ jobs:
               go test -timeout 20s ./common/yak/yak2ssa
               go test -timeout 20s -run TestPingAutoConfig ./common/utils/pingutil -v
               go test -timeout 20s -run TestSSARuleMustPass* ./common/yak -v
+              go test -timeout 20s -run TestMUSTPASS ./common/crawler -v
 
           - name: Test lowhttp
             run: go test -timeout 1m ./common/utils/lowhttp -v
