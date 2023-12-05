@@ -25,30 +25,26 @@ func GetSystemDnsServers() ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		defer interfaceKey.Close()
-		dns, _, err := interfaceKey.GetStringValue("NameServer")
-		if err != nil {
-			continue
-		}
-		if dns == "" {
-			dhcpDns, _, err := interfaceKey.GetStringValue("DhcpNameServer")
-			if err != nil {
-				continue
+		func() {
+			defer interfaceKey.Close()
+			dns, _, err := interfaceKey.GetStringValue("NameServer")
+			if err != nil || dns == "" {
+				dhcpDns, _, err := interfaceKey.GetStringValue("DhcpNameServer")
+				if err == nil {
+					dns = dhcpDns
+				}
 			}
-			dns = dhcpDns
-		}
 
-		if dns != "" {
-			if strings.Contains(dns, ",") {
-				servers = append(servers, strings.Split(dns, ",")...)
-			} else if strings.Contains(dns, " ") {
-				servers = append(servers, strings.Split(dns, " ")...)
-			} else {
-				servers = append(servers, dns)
+			if dns != "" {
+				if strings.Contains(dns, ",") {
+					servers = append(servers, strings.Split(dns, ",")...)
+				} else if strings.Contains(dns, " ") {
+					servers = append(servers, strings.Split(dns, " ")...)
+				} else {
+					servers = append(servers, dns)
+				}
 			}
-		} else {
-			continue
-		}
+		}()
 	}
 	// 去重 servers
 	servers = RemoveRepeatStringSlice(servers)
