@@ -99,6 +99,27 @@ func init() {
 	})
 }
 
+func TestRangeString(t *testing.T) {
+	code := `
+for index, i := range "abc" {
+	if index == 0 { assert i == 'a' }
+if index == 1 { assert i == 'b' }
+if index == 2 { assert i == 'c' }
+}
+
+b = []
+for i in "abc" {
+	b.Push(i)
+}
+assert b[0] == 'a'
+assert b[1] == 'b'
+assert b[2] == 'c'
+`
+	if err := NewExecutor(code).VM.SafeExec(); err != nil {
+		panic(err)
+	}
+}
+
 func TestBuildinMethod(t *testing.T) {
 	code := `
 assert "abc".StartsWith("a"),"StartsWith error"
