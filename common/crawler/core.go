@@ -445,8 +445,6 @@ func HandleRequestResult(isHttps bool, reqBytes, rspBytes []byte) ([][]byte, err
 	//	}
 	//}
 
-	utils.NewHostsFilter("....").Contains(...)
-
 	var subReqs []*Req
 	urlFilter := filter.NewFilter()
 	handleReqResultEx(rootReq, func(nReq *Req) bool {
