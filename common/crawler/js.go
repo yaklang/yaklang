@@ -57,9 +57,9 @@ func HandleJS(isHttps bool, req []byte, code string, cb ...func(bool, []byte)) {
 		return value.IsCalled()
 	}).ForEach(func(value *ssaapi.Value) {
 		target := &requestNewTarget{Method: "GET", Path: ""}
-		value.GetCalledBy().ShowWithSource(false).Flat(func(value *ssaapi.Value) ssaapi.Values {
+		value.GetCalledBy().Flat(func(value *ssaapi.Value) ssaapi.Values {
 			return value.GetCallReturns()
-		}).ShowWithSource(false).Filter(func(value *ssaapi.Value) bool {
+		}).Filter(func(value *ssaapi.Value) bool {
 			if !value.IsField() {
 				return false
 			}
@@ -103,7 +103,7 @@ func HandleJS(isHttps bool, req []byte, code string, cb ...func(bool, []byte)) {
 	// handle fetch
 	js.Ref("fetch").GetUsers().Filter(func(value *ssaapi.Value) bool {
 		return value.IsCall() || value.IsField()
-	}).ShowWithSource(false).ForEach(func(value *ssaapi.Value) {
+	}).ForEach(func(value *ssaapi.Value) {
 		switch {
 		case value.IsCall():
 			target := &requestNewTarget{Method: "GET"}
