@@ -37,6 +37,7 @@ func (v Values) StringEx(flag int) string {
 	return ret
 }
 
+func (v Values) String() string  { return v.StringEx(0) }
 func (v Values) Show()           { fmt.Println(v.StringEx(0)) }
 func (v Values) ShowWithSource() { fmt.Println(v.StringEx(1)) }
 

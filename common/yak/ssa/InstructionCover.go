@@ -3,7 +3,7 @@ package ssa
 // for DataFlowNode cover
 func ToNode(a any) (Node, bool)    { u, ok := a.(Node); return u, ok }
 func ToValue(n Node) (Value, bool) { v, ok := n.(Value); return v, ok }
-func ToUser(n Node) (User, bool)   { u, ok := n.(User); return u, ok }
+func ToUser(n any) (User, bool)    { u, ok := n.(User); return u, ok }
 
 func ToFunction(n Node) (*Function, bool) { u, ok := n.(*Function); return u, ok }
 

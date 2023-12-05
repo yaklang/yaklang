@@ -21,6 +21,11 @@ func DeleteInst(i Instruction) {
 	} else {
 		b.Insts = utils.RemoveSliceItem(b.Insts, Instruction(i))
 	}
+	if user, ok := ToUser(i); ok {
+		for _, value := range user.GetValues() {
+			value.RemoveUser(user)
+		}
+	}
 	f := i.GetFunc()
 	delete(f.InstReg, i)
 	// if v, ok := i.(Value); ok {
