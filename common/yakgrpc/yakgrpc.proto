@@ -255,14 +255,14 @@ service Yak {
   rpc GetAllPayloadGroup(Empty) returns (GetAllPayloadGroupResponse);
   rpc UpdateAllPayloadGroup(UpdateAllPayloadGroupRequest) returns (Empty);
   // get payload 
-  rpc GetAllPayload(GetAllPayloadRequest) returns (GetAllPayloadResponse); // get payload by [group/folder]
-  rpc GetAllPayloadFromFile(GetAllPayloadRequest) returns (stream GetAllPayloadFromFileResponse); // get payload by [group/folder] from file
+  rpc GetAllPayload(GetAllPayloadRequest) returns (stream GetAllPayloadResponse); // get payload by [group/folder]
+  rpc GetAllPayloadFromFile(GetAllPayloadRequest) returns (stream GetAllPayloadResponse); // get payload by [group/folder] from file
   //  create folder
   rpc CreatePayloadFolder(NameRequest) returns (Empty);
   // 去重
   rpc RemoveDuplicatePayloads(NameRequest) returns (stream SavePayloadProgress);
   // 转换为数据库保存
-  rpc CoverPayloadGroupToDatabase(NameRequest) returns (stream SavePayloadProgress);
+  rpc ConvertPayloadGroupToDatabase(NameRequest) returns (stream SavePayloadProgress);
 
   // 自动生成补全
   rpc GetYakitCompletionRaw(Empty) returns (YakitCompletionRawResponse);
@@ -3315,16 +3315,12 @@ message Payload {
 message GetAllPayloadRequest {
   string Group = 1;
   string Folder = 2;
+  string savePath = 3;
 }
 
 message GetAllPayloadResponse {
-  repeated Payload Data = 1;
-}
-message GetAllPayloadFromFileResponse {
   double Progress = 1;
-  bytes Data = 2;
 }
-
 
 message QueryYakScriptRequest {
   Paging Pagination = 1;
