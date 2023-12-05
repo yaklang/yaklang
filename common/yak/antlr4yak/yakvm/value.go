@@ -396,7 +396,7 @@ func (v *Value) Rangeable() bool {
 		return false
 	}
 	rk := reflect.TypeOf(v.Value).Kind()
-	return rk == reflect.Slice || rk == reflect.Array || rk == reflect.Map || rk == reflect.Chan || v.IsInt64()
+	return rk == reflect.String || rk == reflect.Slice || rk == reflect.Array || rk == reflect.Map || rk == reflect.Chan || v.IsInt64()
 }
 
 func (v *Value) GetIndexedVariableCount() int {
