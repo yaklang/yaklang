@@ -245,7 +245,7 @@ func TestLARGEGRPCMUSTPASS_LARGE_RESPOSNE(t *testing.T) {
 			_, err := yak.Execute(
 				`rsp, req = poc.HTTP(packet, poc.proxy(mitmProxy), poc.save(false))~;
 cancel()
-assert len(rsp) > 1111100`,
+assert len(rsp) > 1111100, f"ResponseLength ${len(rsp)}"`,
 				map[string]any{
 					"packet": `GET /misc/response/content_length?cl=111110000&c=` + token + ` HTTP/1.1
 Host: ` + vulinboxAddr + "\r\n\r\n",

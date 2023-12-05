@@ -275,7 +275,9 @@ func addRouteWithVulInfo(router *mux.Router, info *VulInfo) {
 		log.Errorf("marshal vuln info failed: %v", err)
 		return
 	}
-	router.HandleFunc(info.Path, info.Handler).Name(string(infoStr))
+	pathWithQuery := info.Path
+	var pathRaw, _, _ = strings.Cut(pathWithQuery, "?")
+	router.HandleFunc(pathRaw, info.Handler).Name(string(infoStr))
 }
 
 func (s *VulinServer) GetGroupVulInfos(group string) []*VulInfo {
