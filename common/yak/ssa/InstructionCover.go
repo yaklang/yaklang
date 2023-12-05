@@ -17,6 +17,7 @@ func ToBinOp(v Instruction) (*BinOp, bool) { c, ok := v.(*BinOp); return c, ok }
 func ToUnOp(v Instruction) (*UnOp, bool)   { c, ok := v.(*UnOp); return c, ok }
 
 func ToCall(v Instruction) (*Call, bool) { p, ok := v.(*Call); return p, ok }
+func ToMake(v Instruction) (*Make, bool) { p, ok := v.(*Make); return p, ok }
 
 // memory
 func ToObject(v Instruction) (*Make, bool)   { o, ok := v.(*Make); return o, ok }
