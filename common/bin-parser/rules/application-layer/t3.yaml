@@ -1,0 +1,31 @@
+Package:
+  operator: |
+    this.GetSubNode("Total Length").Process()
+    this.GetSubNode("Header").Process()
+    offset = getNodeResult("Header.AbbrevOffset")
+    if offset != 0 {
+      this.GetSubNode("PeerInfo").SetCfg("length",(offset-18)*8)
+      this.GetSubNode("PeerInfo").Process()
+    
+      this.GetSubNode("Abbrev").SetCfg("length",100)
+      this.GetSubNode("Abbrev").Process()
+    }
+  Total Length: uint32
+  Header:
+    Cmd: uint8
+    Qos: uint8
+    Flags: uint8
+    ResponseId: int32
+    InvokableId: int32
+    AbbrevOffset: int32
+#  RemotePeriodLength: int32
+#  PublicKeyLength: int32
+#  PublicKey: "type:raw;length-from-field:PublicKeyLength;length-from-field-multiply:8"
+  PeerInfo: raw
+  Abbrev:
+    Type: raw,4
+    Object:
+      parser: ser
+#  PeerInfo:
+#    Type: uint8
+#    Object: raw

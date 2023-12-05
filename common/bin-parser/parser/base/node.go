@@ -57,6 +57,17 @@ func (c *BaseKV) Has(k string) bool {
 	_, ok := c.data[k]
 	return ok
 }
+func (c *BaseKV) ConvertUint64(k string) uint64 {
+	v, ok := c.data[k]
+	if ok {
+		v, err := strconv.ParseUint(utils.InterfaceToString(v), 10, 64)
+		if err != nil {
+			return 0
+		}
+		return v
+	}
+	return 0
+}
 func (c *BaseKV) GetUint64(k string) uint64 {
 	v, ok := c.data[k]
 	if ok {

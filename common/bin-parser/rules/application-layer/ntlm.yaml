@@ -1,15 +1,11 @@
 endian: little
 Package:
-
   NegotiateMessage:
     Signature: raw,8
     MessageType: uint32
     NegotiateFlags: uint32
     DomainNameFields: Field
-    WorkstationFields:
-      WorkstationLen: uint16
-      WorkstationMaxLen: uint16
-      WorkstationBufferOffset: uint32
+    WorkstationFields: Field
     Version:
       exception-plan: skip
       ProductMajorVersion: uint8

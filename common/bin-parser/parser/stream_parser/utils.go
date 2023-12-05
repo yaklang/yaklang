@@ -294,7 +294,7 @@ func getNodeLength(node *base.Node) (uint64, error) {
 	}
 	var length uint64
 	getLengthFaild := false
-	if !node.Cfg.Has(CfgLength) {
+	if !node.Cfg.Has(CfgLength) && !node.Cfg.Has("length-from-field") {
 		typeName := node.Cfg.GetString(CfgType)
 		switch typeName {
 		case "int":
@@ -321,7 +321,35 @@ func getNodeLength(node *base.Node) (uint64, error) {
 			getLengthFaild = true
 		}
 	} else {
-		length = node.Cfg.GetUint64("length")
+		if node.Cfg.Has("length") {
+			length = node.Cfg.GetUint64("length")
+		} else if node.Cfg.Has("length-from-field") {
+			fieldName := node.Cfg.GetString("length-from-field")
+			iparent := node.Cfg.GetItem("parent")
+			parent, ok := iparent.(*base.Node)
+			if !ok {
+				return 0, fmt.Errorf("get parent failed")
+			}
+			for _, child := range parent.Children {
+				if child.Name == fieldName {
+					if !child.Cfg.Has(CfgNodeResult) {
+						break
+					}
+					res := GetResultByNode(child)
+					if v, ok := base.InterfaceToUint64(res); ok {
+						var mul uint64 = 1
+						if node.Cfg.Has("length-from-field-multiply") {
+							mul = node.Cfg.ConvertUint64("length-from-field-multiply")
+						}
+						length = v * mul
+					} else {
+						return 0, fmt.Errorf("field %s type error", fieldName)
+					}
+					break
+				}
+			}
+		}
+
 	}
 	if !getLengthFaild {
 		if length > remainingLength {
@@ -428,6 +456,24 @@ func getNodeResult(node *base.Node, isByte bool) (any, error) {
 		endian = binx.LittleEndianByteOrder
 	default:
 		return nil, fmt.Errorf("endian type error: %v", iendian)
+	}
+	if !node.Cfg.Has(CfgNodeResult) {
+		var startPos, endPos [2]uint64
+		first := false
+		walkNode(node, func(n *base.Node) bool {
+			if NodeIsTerminal(n) {
+				if first {
+					first = false
+					startPos = GetNodeResultPos(n)
+				} else {
+					endPos = GetNodeResultPos(n)
+				}
+			}
+			return true
+		})
+		buffer := node.Ctx.GetItem("buffer").(*bytes.Buffer)
+		byts := buffer.Bytes()
+		return byts[startPos[0]/8 : endPos[1]/8], nil
 	}
 	resPoint := node.Cfg.GetItem(CfgNodeResult).([2]uint64)
 	buffer := node.Ctx.GetItem("buffer").(*bytes.Buffer)

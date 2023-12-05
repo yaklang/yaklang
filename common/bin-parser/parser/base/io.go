@@ -51,6 +51,9 @@ type BitWriter struct {
 	PreByteLen uint8
 }
 
+func (r *BitReader) Read(p []byte) (n int, err error) {
+	return r.Reader.Read(p)
+}
 func (b *BitReader) Backup() error {
 	var buf bytes.Buffer
 	writer := NewBitWriter(&buf)

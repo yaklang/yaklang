@@ -50,6 +50,7 @@ type DefParser struct {
 type Operator struct {
 	ParseStruct   func(node *base.Node) (bool, error)
 	ParseTerminal func(node *base.Node) error
+	NodeParse     func(node *base.Node) error
 	Mode          string
 	Backup        func() error
 	Recovery      func() error
@@ -140,7 +141,7 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 		if v, ok := rootNodeMap["Package"]; !ok {
 			return errors.New("package node not found")
 		} else {
-			return d.Operate(operator, v)
+			return operator.NodeParse(v)
 		}
 	}
 	if node.Cfg.Has(CfgImport) {
@@ -179,7 +180,7 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 		//rootNode.Cfg.SetItem(CfgNodeResult, nodeResult)
 		*node = *rootNode
 		//InitNode(node)
-		return d.Operate(operator, node)
+		return operator.NodeParse(node)
 	}
 	if v := node.Cfg.GetItem(CfgOperator); v != nil {
 		err := ExecOperator(node, utils.InterfaceToString(v), func(node *base.Node) error {
@@ -227,7 +228,7 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 				if !node.Ctx.GetBool(CfgInList) {
 					break
 				}
-				err = d.Operate(operator, element)
+				err = operator.NodeParse(element)
 				if err != nil {
 					switch node.Cfg.GetString("exception-plan") {
 					case "stopList":
@@ -270,7 +271,7 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 			return fmt.Errorf("backup error: %w", err)
 		}
 		for _, child := range node.Children {
-			err := d.Operate(operator, child)
+			err := operator.NodeParse(child)
 			if err != nil {
 				if node.Cfg.GetString(CfgExceptionPlan) == "skip" {
 					err = operator.Recovery()
@@ -295,6 +296,9 @@ func (d *DefParser) Generate(data any, node *base.Node) error {
 	var operator *Operator
 	operator = &Operator{
 		Mode: "generator",
+		NodeParse: func(n *base.Node) error {
+			return n.Generate(data)
+		},
 		ParseStruct: func(node *base.Node) (bool, error) {
 			if GetNodePath(node) == "" {
 				return false, nil
@@ -394,7 +398,13 @@ func (d *DefParser) Parse(data *base.BitReader, node *base.Node) error {
 	var operator *Operator
 	operator = &Operator{
 		Mode: "parser",
+		NodeParse: func(n *base.Node) error {
+			return n.Parse(data)
+		},
 		ParseTerminal: func(node *base.Node) error {
+			if node.Name == "PublicKey" {
+				println()
+			}
 			if !NodeIsTerminal(node) {
 				return fmt.Errorf("node %s is not terminal", node.Name)
 			}
