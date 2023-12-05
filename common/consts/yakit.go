@@ -78,7 +78,7 @@ func GetGlobalHTTPAuthInfo(host, authType string) *ypb.AuthInfo {
 	anyAuthInfo := new(ypb.AuthInfo)
 	gotAnyTypeAuth := false
 	for _, info := range GLOBAL_HTTP_AUTH_INFO {
-		if !info.Forbidden || utils.HostContains(info.Host, host) {
+		if !info.Forbidden && utils.HostContains(info.Host, host) {
 			if utils.StringSliceContain(GetAuthTypeList(authType), info.AuthType) {
 				return info
 			}
