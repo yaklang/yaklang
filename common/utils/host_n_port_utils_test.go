@@ -275,6 +275,11 @@ func TestHostContains(t *testing.T) {
 			result: true,
 		},
 		{
+			input:  "2.2.2.2/24",
+			target: "2.2.2.1:80",
+			result: true,
+		},
+		{
 			input:  "*.baidu.com",
 			target: "www.baidu.com",
 			result: true,
@@ -288,6 +293,21 @@ func TestHostContains(t *testing.T) {
 			input:  "3.3.3.3/24",
 			target: "4.4.4.4",
 			result: false,
+		},
+		{
+			input:  "test[",
+			target: "test.com",
+			result: false,
+		},
+		{
+			input:  "test.com:80i",
+			target: "test.com:80",
+			result: false,
+		},
+		{
+			input:  "aaa",
+			target: "aaa",
+			result: true,
 		},
 	}
 	for _, c := range cases {

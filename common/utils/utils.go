@@ -390,11 +390,38 @@ func CallWithTimeout(timeout float64, cb func()) error {
 }
 
 func HostContains(rule string, target string) bool {
+	ruleHost, rulePort := ParseHost(rule)
+	targetHost, targetPort := ParseHost(target)
 	_, netBlock, err := net.ParseCIDR(rule)
 	if err == nil && netBlock != nil {
-		return netBlock.Contains(net.ParseIP(target))
+		return netBlock.Contains(net.ParseIP(targetHost))
 	}
-	ruleHost, rulePort, _ := ParseStringToHostPort(rule)
-	targetHost, targetPort, _ := ParseStringToHostPort(target)
-	return (rulePort == targetPort || rulePort == 0) && glob.MustCompile(ruleHost).Match(targetHost)
+	if !(rulePort == targetPort || rulePort == 0) {
+		return false
+	}
+	globRuler, err := glob.Compile(ruleHost)
+	if err != nil {
+		return targetHost == ruleHost
+	}
+	return globRuler.Match(targetHost)
+}
+
+func ParseHost(raw string) (host string, port int) {
+	host = stripPort(raw)
+	portStr := portOnly(raw)
+	if len(portStr) <= 0 { // has not port , return 0
+		return host, 0
+	}
+
+	portStr = strings.TrimSpace(portStr)
+	if portStr == "" { // empty port ,return 0
+		return host, 0
+	}
+	portInt64, err := strconv.ParseInt(portStr, 10, 64)
+	if err != nil { // invalid port ,return -1
+		return raw, -1
+	}
+
+	port = int(portInt64)
+	return
 }
