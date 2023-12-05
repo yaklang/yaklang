@@ -35,4 +35,6 @@ func HandleJS(isHttps bool, req []byte, code string) {
 			log.Infof("fetch targetUrl: %v", targetUrl)
 		}
 	})
+
+	js.Ref("a").GetDefs()
 }
