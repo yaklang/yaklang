@@ -1,8 +1,12 @@
 package crawler
 
-import "testing"
+import (
+	"github.com/stretchr/testify/assert"
+	"testing"
+)
 
-func TestJSHandle(t *testing.T) {
+func TestMUSTPASS_JSHandle(t *testing.T) {
+	var count = 0
 	code := `console.log('1.js'); var deepUrl = 'deep.js';;
 console.log('2.js'); fetch(deepUrl, {
 	method: 'POST',
@@ -53,5 +57,11 @@ xhr.onreadystatechange = function() {
 // 发送请求，可以在此处发送任何需要的数据
 xhr.send();;
 `
-	HandleJS(false, nil, code)
+	HandleJS(false, []byte(`GET / HTTP/1.1
+Host: www.example.com
+
+`), code, func(b bool, bytes []byte) {
+		count++
+	})
+	assert.Equal(t, 3, count)
 }
