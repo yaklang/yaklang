@@ -116,6 +116,13 @@ func GetExtYakitLibByClient(client *YakitClient) map[string]interface{} {
 		"SetProgress":   client.YakitSetProgress,
 		"SetProgressEx": client.YakitSetProgressEx,
 	}
+	if os.Getenv("YAKIT_VERSION") == "yakit_se" {
+		YakitExports["Info"] = func(a string, b ...interface{}) {}
+		YakitExports["Warn"] = func(a string, b ...interface{}) {}
+		YakitExports["Debug"] = func(a string, b ...interface{}) {}
+		YakitExports["Error"] = func(a string, b ...interface{}) {}
+	}
+
 	exports := GetExtYakitLibByOutput(client.Output)
 	for k, v := range exports {
 		YakitExports[k] = v
