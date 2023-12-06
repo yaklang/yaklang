@@ -471,15 +471,12 @@ func (s *Server) UpdatePayload(ctx context.Context, req *ypb.UpdatePayloadReques
 }
 
 func writeDataToFileEnd(filename, data string, flag int) error {
-	// Open the file in append mode.
-	// If the file doesn't exist, create it.
 	file, err := os.OpenFile(filename, flag, 0o644)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	// Write the data to the file.
 	_, err = file.WriteString(data)
 	if err != nil {
 		return err
@@ -735,26 +732,38 @@ func (s *Server) GetAllPayload(req *ypb.GetAllPayloadRequest, stream ypb.Yak_Get
 	if req.GetGroup() == "" {
 		return utils.Errorf("get all payload error: group is empty")
 	}
-	if req.GetSavePath() == "" {
+	savePath := req.GetSavePath()
+	if savePath == "" {
 		return utils.Errorf("get all payload error: save path is empty")
 	}
+
+	isCSV := strings.HasSuffix(savePath, ".csv")
 
 	// 生成payload
 	db := bizhelper.ExactQueryString(s.GetProfileDatabase(), "`group`", req.GetGroup())
 	db = bizhelper.ExactQueryString(db, "`folder`", req.GetFolder())
 	size, total, maxBuf := 0, 0, EightKB
+	n, hitCount := 0, int64(0)
 	gen := yakit.YieldPayloads(db, context.Background())
 
 	// 获取payload总长度
-	db = s.GetProfileDatabase().Model(&yakit.Payload{}).Select("SUM(LENGTH(content))").Where("`group` = ?", req.GetGroup()).Where("`folder` = ?", req.GetFolder())
-	row := db.Row()
-	row.Scan(&total)
+	if isCSV {
+		contentSize, num, hitCountSize := 0, 0, 0
+		db = s.GetProfileDatabase().Model(&yakit.Payload{}).Select("SUM(LENGTH(content)),COUNT(id),SUM(LENGTH(hit_count))").Where("`group` = ?", req.GetGroup()).Where("`folder` = ?", req.GetFolder())
+		row := db.Row()
+		row.Scan(&contentSize, &num, &hitCountSize)
+		total = contentSize + num + hitCountSize
+	} else {
+		db = s.GetProfileDatabase().Model(&yakit.Payload{}).Select("SUM(LENGTH(content))").Where("`group` = ?", req.GetGroup()).Where("`folder` = ?", req.GetFolder())
+		row := db.Row()
+		row.Scan(&total)
+	}
 	if total == 0 {
 		return utils.Errorf("get all payload error: group not exist payload(s)")
 	}
 
 	// 打开文件
-	f, err := os.OpenFile(req.GetSavePath(), os.O_CREATE|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(req.GetSavePath(), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err != nil {
 		return utils.Wrapf(err, "get all payload error: open file[%s] error", req.GetSavePath())
 	}
@@ -768,6 +777,10 @@ func (s *Server) GetAllPayload(req *ypb.GetAllPayloadRequest, stream ypb.Yak_Get
 		})
 	}()
 	bomHandled := false
+	if isCSV {
+		// 写入csv文件头
+		bufWriter.WriteString("content,hit_count\n")
+	}
 
 	for p := range gen {
 		if p.Content == nil {
@@ -786,10 +799,18 @@ func (s *Server) GetAllPayload(req *ypb.GetAllPayloadRequest, stream ypb.Yak_Get
 			content = utils.RemoveBOMForString(content)
 			bomHandled = true
 		} else {
-			n, _ := bufWriter.WriteRune('\n')
-			size += n
+			bufWriter.WriteRune('\n')
 		}
-		n, _ := bufWriter.WriteString(content)
+		if p.HitCount == nil {
+			hitCount = 0
+		} else {
+			hitCount = *p.HitCount
+		}
+		if isCSV {
+			n, _ = bufWriter.WriteString(fmt.Sprintf("%s,%d", content, hitCount))
+		} else {
+			n, _ = bufWriter.WriteString(content)
+		}
 		size += n
 		if size < maxBuf {
 			continue
@@ -835,7 +856,7 @@ func (s *Server) GetAllPayloadFromFile(req *ypb.GetAllPayloadRequest, stream ypb
 	if err != nil {
 		return utils.Wrapf(err, "get all payload from file error: open src file[%s] error", src)
 	}
-	dstFile, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY, 0o644)
+	dstFile, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err != nil {
 		return utils.Wrapf(err, "get all payload from file error: open dst file[%s] error", dst)
 	}
