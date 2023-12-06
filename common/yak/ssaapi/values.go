@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"fmt"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -424,14 +425,14 @@ func GetBareNode(v *Value) ssa.InstructionNode {
 // IsCalled desc any of 'Users' is Call or Make
 func (v *Value) IsCalled() bool {
 	return len(v.GetUsers().Filter(func(value *Value) bool {
-		return value.IsCall() || value.IsMake()
+		return value.IsCall()
 	})) > 0
 }
 
 // GetCalledBy desc all of 'Users' is Call or Make
 func (v *Value) GetCalledBy() Values {
 	return v.GetUsers().Filter(func(value *Value) bool {
-		return value.IsCall() || value.IsMake()
+		return value.IsCall()
 	})
 }
 
