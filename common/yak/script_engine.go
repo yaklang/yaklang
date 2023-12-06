@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -81,6 +82,16 @@ func initYaklangLib() {
 		for k, v := range table {
 			yaklang.Import(k, v)
 		}
+	}
+	if os.Getenv("YAKIT_VERSION") == "yakit_se" {
+		yaklib.GlobalExport["dump"] = func(i ...any) {}
+		builtin.YaklangBaseLib["print"] = func(a ...any) {}
+		builtin.YaklangBaseLib["printf"] = func(a ...any) {}
+		builtin.YaklangBaseLib["println"] = func(a ...any) {}
+		yaklib.YakitExports["Info"] = func(a string, b ...interface{}) {}
+		yaklib.YakitExports["Warn"] = func(a string, b ...interface{}) {}
+		yaklib.YakitExports["Debug"] = func(a string, b ...interface{}) {}
+		yaklib.YakitExports["Error"] = func(a string, b ...interface{}) {}
 	}
 	importGlobal(yaklib.GlobalExport)
 	importGlobal(builtin.YaklangBaseLib)

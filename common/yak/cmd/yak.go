@@ -445,10 +445,17 @@ var startGRPCServerCommand = cli.Command{
 			Name:  "profile-db",
 			Usage: "Specific User-Data & Profile(Plugin) DB Name, eg yakit-profile-plugin.db",
 		},
+		cli.BoolFlag{
+			Name:  "se",
+			Usage: "",
+		},
 	},
 	Action: func(c *cli.Context) error {
 		if c.Bool("pprof") && c.IsSet("auto-pprof") {
 			return utils.Error("Parameters 'pprof' and 'auto-pprof' cannot be set at the same time")
+		}
+		if c.Bool("se") {
+			os.Setenv("YAKIT_VERSION", "yakit_se")
 		}
 		enableProfile := c.Bool("pprof")
 		if enableProfile {
