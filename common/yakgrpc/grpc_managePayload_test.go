@@ -725,4 +725,19 @@ func TestPayload(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("uniqueHash", func(t *testing.T) {
+		data := "123\n456\n"
+		group := uuid.NewString()
+		// save twice
+		save2database(local, t, group, "", data)
+		save2database(local, t, group, "", data)
+		defer deleteGroup(local, t, group) // delete group
+
+		// query payload
+		rsp := queryFromDatabase(local, t, group, "")
+		if len(rsp.Data) != 2 {
+			t.Fatalf("unique hash error, want 2 but got %d", len(rsp.Data))
+		}
+	})
 }

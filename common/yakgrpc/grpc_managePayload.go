@@ -945,6 +945,7 @@ func (s *Server) ConvertPayloadGroupToDatabase(req *ypb.NameRequest, stream ypb.
 			Message:             msg,
 		})
 	}
+	ticker := time.NewTicker(500 * time.Millisecond)
 	// _ = feedback
 	go func() {
 		defer func() {
@@ -954,8 +955,7 @@ func (s *Server) ConvertPayloadGroupToDatabase(req *ypb.NameRequest, stream ypb.
 			select {
 			case <-ctx.Done():
 				return
-			default:
-				time.Sleep(500 * time.Millisecond)
+			case <-ticker.C:
 				feedback(-1, "")
 			}
 		}
@@ -1004,5 +1004,67 @@ func (s *Server) ConvertPayloadGroupToDatabase(req *ypb.NameRequest, stream ypb.
 		yakit.CreateAndUpdatePayload(s.GetProfileDatabase(), line, group.Group, folder, 0)
 	}
 	yakit.UpdatePayloadGroup(s.GetProfileDatabase(), group.Group, folder, groupindex)
+	return nil
+}
+
+func (s *Server) MigratePayloads(req *ypb.Empty, stream ypb.Yak_MigratePayloadsServer) error {
+	ctx, cancel := context.WithCancel(stream.Context())
+	defer cancel()
+
+	size, total := int64(0), int64(0)
+	// 计算payload总数
+	db := s.GetProfileDatabase().Model(&yakit.Payload{}).Select("COUNT(id)")
+	row := db.Row()
+	row.Scan(&total)
+
+	feedback := func(progress float64) {
+		if progress == -1 {
+			progress = float64(size) / float64(total)
+		}
+		stream.Send(&ypb.SavePayloadProgress{
+			Progress: progress,
+			Message:  "正在迁移数据库...",
+		})
+	}
+	ticker := time.NewTicker(500 * time.Millisecond)
+	go func() {
+		defer func() {
+			size = total
+		}()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				feedback(-1)
+			}
+		}
+	}()
+
+	feedback(0)
+	gen := yakit.YieldPayloads(s.GetProfileDatabase().Model(&yakit.Payload{}), ctx)
+	for p := range gen {
+		size++
+		if p.Content == nil || (p.IsFile != nil && *p.IsFile) {
+			continue
+		}
+		content := *p.Content
+		content = strings.TrimSpace(content)
+		if content == "" {
+			continue
+		}
+		// 开始迁移
+		_, err := strconv.Unquote(content)
+		if err != nil { // 解码失败，可能是旧payload
+			content = strconv.Quote(content)
+			err := yakit.UpdatePayload(s.GetProfileDatabase(), int(p.ID), &yakit.Payload{Content: &content})
+			if err != nil {
+				log.Errorf("update payload error: %v", err)
+				continue
+			}
+		}
+	}
+
+	feedback(1)
 	return nil
 }
