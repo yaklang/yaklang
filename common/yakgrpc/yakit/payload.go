@@ -429,6 +429,26 @@ func NewPaging() *Paging {
 	}
 }
 
+func QueryPayloadWithoutPaging(db *gorm.DB, folder, group, keyword string) ([]*Payload, error) {
+	db = db.Model(&Payload{})
+	if group != "" {
+		db = db.Where("`group` = ?", group)
+	}
+	if folder != "" {
+		db = db.Where("`folder` = ?", folder)
+	}
+	if keyword != "" {
+		db = db.Where("`content` = ?", keyword)
+	}
+
+	var ret []*Payload
+	db = db.Find(&ret)
+	if db.Error != nil {
+		return nil, utils.Errorf("query payload failed: %s", db.Error)
+	}
+	return ret, nil
+}
+
 func QueryPayload(db *gorm.DB, folder, group, keyword string, paging *Paging) (*bizhelper.Paginator, []*Payload, error) {
 	db = db.Model(&Payload{}) // .Debug()
 	db = bizhelper.QueryOrder(db, paging.OrderBy, paging.Order)

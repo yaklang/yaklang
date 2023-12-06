@@ -2,9 +2,12 @@ package tools
 
 import (
 	"context"
+
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bruteutils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 var BruterExports = map[string]interface{}{
@@ -169,6 +172,46 @@ func (y *yakBruter) Start(targets ...string) (chan *bruteutils.BruteItemResult, 
 			}()
 			select {
 			case ch <- b:
+				if !b.Ok {
+					return
+				}
+				// 更新hit_count，+1
+				db := consts.GetGormProfileDatabase()
+				payloads, err := yakit.QueryPayloadWithoutPaging(db, "", "", b.Username)
+				if err != nil {
+					log.Errorf("brute failed: %v", err)
+					return
+				}
+				if len(payloads) > 0 {
+					var zero int64 = 0
+					for _, payload := range payloads {
+						if payload.HitCount == nil {
+							payload.HitCount = &zero
+						}
+						zero += 1
+						payload.HitCount = &zero
+						yakit.UpdatePayload(db, int(payload.ID), payload)
+					}
+				}
+
+				payloads, err = yakit.QueryPayloadWithoutPaging(db, "", "", b.Password)
+				if err != nil {
+					log.Errorf("brute failed: %v", err)
+					return
+				}
+				if len(payloads) > 0 {
+					var hitCount int64 = 0
+					for _, payload := range payloads {
+						if payload.HitCount == nil {
+							payload.HitCount = &hitCount
+						} else {
+							hitCount = *payload.HitCount
+						}
+						hitCount += 1
+						payload.HitCount = &hitCount
+						yakit.UpdatePayload(db, int(payload.ID), payload)
+					}
+				}
 			}
 		})
 		if err != nil {
