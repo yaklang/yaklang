@@ -1,6 +1,7 @@
 package php2ssa
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -29,7 +30,7 @@ func (y *builder) VisitParentheses(raw phpparser.IParenthesesContext) ssa.Value 
 	}
 
 	if i.Expression() != nil {
-		y.VisitExpression(i.Expression())
+		return y.VisitExpression(i.Expression())
 	} else if i.YieldExpression() != nil {
 		y.VisitYieldExpression(i.YieldExpression())
 	}
@@ -37,17 +38,13 @@ func (y *builder) VisitParentheses(raw phpparser.IParenthesesContext) ssa.Value 
 	return nil
 }
 
-func (y *builder) VisitExpression(raw phpparser.IExpressionContext) interface{} {
+func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
 
-	i, _ := raw.(*phpparser.ExpressionContext)
-	if i == nil {
-		return nil
-	}
-
-	switch i.(type) {
+	log.Infof("start to parse expr: %v", raw.GetText())
+	switch ret := raw.(type) {
 	case *phpparser.CloneExpressionContext:
 	case *phpparser.KeywordNewExpressionContext:
 	case *phpparser.IndexerExpressionContext:
@@ -63,6 +60,15 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) interface{} 
 	case *phpparser.ArrayCreationExpressionContext:
 	case *phpparser.ChainExpressionContext:
 	case *phpparser.ScalarExpressionContext: // constant / string / label
+		if ret.Constant() != nil {
+			return y.VisitConstant(ret.Constant())
+		} else if ret.String_() != nil {
+			return y.VisitString_(ret.String_())
+		} else if ret.Label() != nil {
+			// break
+		} else {
+			log.Warnf("PHP Scalar Expr Failed: %s", ret.GetText())
+		}
 	case *phpparser.BackQuoteStringExpressionContext:
 	case *phpparser.ParenthesisExpressionContext:
 	case *phpparser.SpecialWordExpressionContext:
@@ -78,6 +84,8 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) interface{} 
 	case *phpparser.ArrayDestructExpressionContext:
 	case *phpparser.AssignmentExpressionContext:
 	case *phpparser.LogicalExpressionContext:
+	default:
+		_ = ret
 	}
 
 	return nil
