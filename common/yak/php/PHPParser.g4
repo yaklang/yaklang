@@ -200,9 +200,10 @@ innerStatement
     ;
 
 // Statements
+labelStatement: identifier ':';
 
 statement
-    : identifier ':'
+    : labelStatement
     | blockStatement
     | ifStatement
     | whileStatement

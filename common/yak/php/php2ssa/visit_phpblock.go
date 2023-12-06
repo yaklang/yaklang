@@ -1,6 +1,8 @@
 package php2ssa
 
-import phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
+import (
+	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
+)
 
 func (y *builder) VisitPhpBlock(raw phpparser.IPhpBlockContext) interface{} {
 	if y == nil || raw == nil {
@@ -10,6 +12,15 @@ func (y *builder) VisitPhpBlock(raw phpparser.IPhpBlockContext) interface{} {
 	i, _ := raw.(*phpparser.PhpBlockContext)
 	if i == nil {
 		return nil
+	}
+
+	// import? what the fuck?
+	if len(i.AllImportStatement()) > 0 {
+		// handle ImportStmt
+	}
+
+	if len(i.AllTopStatement()) > 0 {
+
 	}
 
 	return nil

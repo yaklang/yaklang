@@ -119,6 +119,10 @@ func (v *BasePHPParserVisitor) VisitInnerStatement(ctx *InnerStatementContext) i
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitLabelStatement(ctx *LabelStatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitStatement(ctx *StatementContext) interface{} {
 	return v.VisitChildren(ctx)
 }

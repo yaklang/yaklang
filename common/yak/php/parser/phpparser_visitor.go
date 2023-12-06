@@ -91,6 +91,9 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#innerStatement.
 	VisitInnerStatement(ctx *InnerStatementContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#labelStatement.
+	VisitLabelStatement(ctx *LabelStatementContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#statement.
 	VisitStatement(ctx *StatementContext) interface{}
 
