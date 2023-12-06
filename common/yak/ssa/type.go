@@ -324,7 +324,7 @@ func GetTypeByStr(typ string) Type {
 		return BasicTypes[Boolean]
 	case "bytes", "[]uint8", "[]byte":
 		return BasicTypes[Bytes]
-	case "interface {}", "var":
+	case "interface {}", "var", "any":
 		return BasicTypes[Any]
 	case "error":
 		return BasicTypes[ErrorType]
