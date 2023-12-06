@@ -281,7 +281,7 @@ func TestValidP12PassWord(t *testing.T) {
 
 }
 
-func TestHTTPAuth(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPAuth(t *testing.T) {
 	username, passwd := "test", "test"
 	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, request *http.Request) {
 		u, p, ok := request.BasicAuth()
