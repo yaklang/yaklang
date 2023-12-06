@@ -1,6 +1,7 @@
 package stream_parser
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
@@ -21,12 +22,27 @@ type YakNode struct {
 	GetSubNode           func(name string) *YakNode
 	GetRemainingSpace    func() uint64
 	CalcNodeResultLength func() uint64
+	NewElement           func() *YakNode
 	TryProcessNode       func(*YakNode) map[string]any
 }
 
 func ConvertToYakNode(node *base.Node, operator func(node2 *base.Node) error) *YakNode {
 	yakNode := &YakNode{}
 	yakNode.origin = node
+	yakNode.NewElement = func() *YakNode {
+		if len(node.Children) == 0 {
+			panic("get node element error")
+		}
+		if !node.Cfg.Has("template") {
+			node.Cfg.SetItem("template", node.Children[0])
+			node.Children = nil
+		}
+		elementTemplate := node.Cfg.GetItem("template").(*base.Node)
+		element := elementTemplate.Copy()
+		element.Cfg.SetItem(CfgParent, node)
+		node.Children = append(node.Children, element)
+		return ConvertToYakNode(element, operator)
+	}
 	yakNode.TryProcessNode = func(yNode *YakNode) (response map[string]any) {
 		response = map[string]any{
 			"Ok":      false,
@@ -62,7 +78,6 @@ func ConvertToYakNode(node *base.Node, operator func(node2 *base.Node) error) *Y
 		//		utils.PrintCurrentGoroutineRuntimeStack()
 		//	}
 		//}()
-
 		err := operator(node)
 		if err != nil {
 			panic(err)
@@ -163,6 +178,10 @@ func ExecOperator(node *base.Node, code string, operator func(node2 *base.Node) 
 				return ConvertToYakNode(v, operator)
 			}
 			panic("not found root node " + key)
+		},
+		"getCurrentPosition": func() int {
+			buf := node.Ctx.GetItem("buffer").(*bytes.Buffer)
+			return len(buf.Bytes())
 		},
 		"dump": spew.Dump,
 	}

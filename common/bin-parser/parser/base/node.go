@@ -155,6 +155,14 @@ type Node struct {
 	Ctx      *NodeContext
 }
 
+func (n *Node) Result() (any, error) {
+	parser, err := n.getParser()
+	if err != nil {
+		return nil, err
+	}
+	return parser.Result(n)
+}
+
 func (n *Node) Copy() *Node {
 	res := &Node{
 		Name:     n.Name,
@@ -169,14 +177,22 @@ func (n *Node) Copy() *Node {
 	}
 	return res
 }
-func (n *Node) GenerateSubNode(data any, path string) error {
+
+func (n *Node) getParser() (Parser, error) {
 	parserName := n.Cfg.GetItem("parser")
 	if parserName == nil {
-		return errors.New("not set parser")
+		return nil, errors.New("not set parser")
 	}
 	parser, ok := parseMap[utils.InterfaceToString(parserName)]
 	if !ok {
-		return fmt.Errorf("parser %s not found", parserName)
+		return nil, fmt.Errorf("parser %s not found", parserName)
+	}
+	return parser, nil
+}
+func (n *Node) GenerateSubNode(data any, path string) error {
+	parser, err := n.getParser()
+	if err != nil {
+		return err
 	}
 	if n.Cfg.GetItem("isRoot") != nil {
 		err := parser.OnRoot(n)
@@ -204,13 +220,9 @@ func (n *Node) GenerateSubNode(data any, path string) error {
 	}
 }
 func (n *Node) Generate(data any) error {
-	parserName := n.Cfg.GetItem("parser")
-	if parserName == nil {
-		return errors.New("not set parser")
-	}
-	parser, ok := parseMap[utils.InterfaceToString(parserName)]
-	if !ok {
-		return fmt.Errorf("parser %s not found", parserName)
+	parser, err := n.getParser()
+	if err != nil {
+		return err
 	}
 	if n.Cfg.GetItem("isRoot") != nil {
 		err := parser.OnRoot(n)
@@ -218,20 +230,16 @@ func (n *Node) Generate(data any) error {
 			return fmt.Errorf("on root error: %w", err)
 		}
 	}
-	err := parser.Generate(data, n)
+	err = parser.Generate(data, n)
 	if err != nil {
 		return fmt.Errorf("parse node %s error: %w", n.Name, err)
 	}
 	return nil
 }
 func (n *Node) ParseSubNode(data *BitReader, path string) error {
-	parserName := n.Cfg.GetItem("parser")
-	if parserName == nil {
-		return errors.New("not set parser")
-	}
-	parser, ok := parseMap[utils.InterfaceToString(parserName)]
-	if !ok {
-		return fmt.Errorf("parser %s not found", parserName)
+	parser, err := n.getParser()
+	if err != nil {
+		return err
 	}
 	if n.Cfg.GetItem("isRoot") != nil {
 		err := parser.OnRoot(n)
@@ -261,13 +269,9 @@ func (n *Node) ParseSubNode(data *BitReader, path string) error {
 	}
 }
 func (n *Node) Parse(reader *BitReader) error {
-	parserName := n.Cfg.GetItem("parser")
-	if parserName == nil {
-		return errors.New("not set parser")
-	}
-	parser, ok := parseMap[utils.InterfaceToString(parserName)]
-	if !ok {
-		return fmt.Errorf("parser %s not found", parserName)
+	parser, err := n.getParser()
+	if err != nil {
+		return err
 	}
 	if n.Cfg.GetItem("isRoot") != nil {
 		err := parser.OnRoot(n)
@@ -275,7 +279,7 @@ func (n *Node) Parse(reader *BitReader) error {
 			return fmt.Errorf("on root error: %w", err)
 		}
 	}
-	err := parser.Parse(reader, n)
+	err = parser.Parse(reader, n)
 	if err != nil {
 		return fmt.Errorf("parse node %s error: %w", n.Name, err)
 	}

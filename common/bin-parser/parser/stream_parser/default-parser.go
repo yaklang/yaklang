@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"path"
 	"reflect"
@@ -122,6 +121,7 @@ func (d *DefParser) OnRoot(node *base.Node) error {
 			return [2]uint64{start, d.ctx.GetUint64("pointer")}, nil
 		}
 	}
+	node.Ctx.SetItem("def_writer", d.write)
 	err := InitNode(node)
 	if err != nil {
 		return err
@@ -184,7 +184,7 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 	}
 	if v := node.Cfg.GetItem(CfgOperator); v != nil {
 		err := ExecOperator(node, utils.InterfaceToString(v), func(node *base.Node) error {
-			return d.Operate(operator, node)
+			return operator.NodeParse(node)
 		})
 		if err != nil {
 			return fmt.Errorf("eval operator error: %w", err)
@@ -230,7 +230,7 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 				}
 				err = operator.NodeParse(element)
 				if err != nil {
-					switch node.Cfg.GetString("exception-plan") {
+					switch node.Cfg.GetString(CfgExceptionPlan) {
 					case "stopList":
 						node.Children = node.Children[:len(node.Children)-1]
 						err := operator.Recovery()
@@ -402,9 +402,6 @@ func (d *DefParser) Parse(data *base.BitReader, node *base.Node) error {
 			return n.Parse(data)
 		},
 		ParseTerminal: func(node *base.Node) error {
-			if node.Name == "PublicKey" {
-				println()
-			}
 			if !NodeIsTerminal(node) {
 				return fmt.Errorf("node %s is not terminal", node.Name)
 			}
@@ -485,229 +482,44 @@ func (d *DefParser) Parse(data *base.BitReader, node *base.Node) error {
 	}
 	return d.Operate(operator, node)
 }
-func (d *DefParser) _Parse(data *base.BitReader, node *base.Node) error {
-	log.Debugf("parse node %s", node.Name)
-	if node.Name == "root" {
-		irootNodeMap := node.Ctx.GetItem(CfgRootMap)
-		if irootNodeMap == nil {
-			return errors.New("not set rootNodeMap")
-		}
-		rootNodeMap, ok := irootNodeMap.(map[string]*base.Node)
-		if !ok {
-			return errors.New("rootNodeMap type error")
-		}
-		if v, ok := rootNodeMap["Package"]; !ok {
-			return errors.New("package node not found")
-		} else {
-			return v.Parse(data)
-		}
-	}
-	if node.Cfg.Has(CfgImport) {
-		ruleName := node.Cfg.GetString(CfgImport)
-		rulePath := path.Join(node.Ctx.GetString("path"), ruleName)
-		targetNode, err := ParseRule(rulePath)
-		if err != nil {
-			return err
-		}
-		rootChildMap := make(map[string]*base.Node)
-		targetNode.Ctx.SetItem(CfgRootMap, rootChildMap)
-		for _, child := range targetNode.Children {
-			rootChildMap[child.Name] = child
-		}
-		err = InitNode(targetNode)
-		if err != nil {
-			return fmt.Errorf("on root error: %w", err)
-		}
 
-		rootNode := getNodeByPath(targetNode, node.Cfg.GetString("node"))
-		if rootNode == nil {
-			return fmt.Errorf("not found node %s from rule: %s ", node.Cfg.GetString("node"), ruleName)
-		}
-		//rootNode, err = base.NewChildNodeTree(node, node.Name, rootNode.Origin, node.Ctx)
-		//if err != nil {
-		//	return err
-		//}
-		//*rootNode.Ctx = *node.Ctx
+var noResultError = errors.New("no result")
 
-		rootNode.Ctx.SetItem("writer", node.Ctx.GetItem("writer"))
-		rootNode.Ctx.SetItem("buffer", node.Ctx.GetItem("buffer"))
-		// 补充runtime cfg
-		rootNode.Cfg = base.AppendConfig(node.Cfg, rootNode.Cfg)
-		rootNode.Cfg.DeleteItem(CfgImport)
-		rootNode.Cfg.DeleteItem(CfgIsTerminal)
-		//rootNode.Cfg.SetItem(CfgNodeResult, nodeResult)
-		*node = *rootNode
-		//InitNode(node)
-		return node.Parse(data)
-		// 补充runtime cfg
-		//rootNode.Cfg.SetItem(CfgParent, node.Cfg.GetItem(CfgParent))
-		//if node.Cfg.Has(CfgLength) {
-		//	rootNode.Cfg.SetItem(CfgLength, node.Cfg.GetItem(CfgLength))
-		//}
-		//
-		//*node = *rootNode
-		//InitNode(node)
-		//return node.Parse(data)
-	}
-	if v := node.Cfg.GetItem(CfgOperator); v != nil {
-		//err := ExecOperator(data, nil, node, utils.InterfaceToString(v), "parse")
-		err := ExecOperator(node, utils.InterfaceToString(v), func(node *base.Node) error {
-			err := node.Parse(data)
-			if err != nil {
-				return err
-			}
-			//iparent := node.Cfg.GetItem(CfgParent)
-			//if iparent != nil {
-			//	parent := iparent.(*base.Node)
-			//	nodeRes := parent.Cfg.GetItem(CfgNodeResult).(*NodeResult)
-			//	nodeRes.Sub = append(nodeRes.Sub, node.Cfg.GetItem(CfgNodeResult).(*NodeResult))
-			//}
-			return nil
-		})
-		if err != nil {
-			return fmt.Errorf("eval operator error: %w", err)
-		}
-		return nil
+func (d *DefParser) Result(node *base.Node) (any, error) {
+	if NodeHasResult(node) {
+		return GetResultByNode(node), nil
 	}
 	if node.Cfg.GetBool(CfgIsList) {
-		node.Ctx.SetItem(CfgInList, true)
-		if len(node.Children) == 0 {
-			return errors.New("get node element type error")
-		}
-		elementTemplate := node.Children[0]
-		node.Children = nil
-		index := 0
-
-		err := func() error {
-			for {
-				err := data.Backup()
-				if err != nil {
-					return fmt.Errorf("backup error: %w", err)
+		res := []any{}
+		for _, sub := range node.Children {
+			d, err := sub.Result()
+			if err != nil {
+				if errors.Is(err, noResultError) {
+					continue
 				}
-				element := elementTemplate.Copy()
-				node.Children = append(node.Children, element)
-				//node.Cfg.GetItem("exception-plan")
-				l, err := getRemainingSpace(element)
-				if err != nil {
-					return fmt.Errorf("get remaining space error: %w", err)
-				}
-				if l == 0 {
-					break
-				}
-				//cfgDeleteItem(element, CfgNodeResult)
-				if !node.Ctx.GetBool(CfgInList) {
-					break
-				}
-				err = d.Parse(data, element)
-				if err != nil {
-					switch node.Cfg.GetString("exception-plan") {
-					case "stopList":
-						node.Children = node.Children[:len(node.Children)-1]
-						err := data.Recovery()
-						if err != nil {
-							return fmt.Errorf("recovery error: %w", err)
-						}
-						return nil
-					default:
-						return fmt.Errorf("parse list node index %d error: %w", index, err)
-					}
-				}
-				index++
+				return nil, err
 			}
-			return nil
-		}()
-		if err != nil {
-			return fmt.Errorf("parse list node error: %w", err)
+			res = append(res, d)
 		}
-		data.PopBackup()
-		node.Ctx.DeleteItem(CfgInList)
-		return nil
-	}
-	if node.Cfg.GetBool(CfgIsTerminal) {
-		err := d.ParseTerminal(data, node)
-		if err != nil {
-			return err
+		if len(res) == 0 {
+			return nil, noResultError
 		}
-		return nil
+		return res, nil
 	} else {
-		for _, child := range node.Children {
-			err := child.Parse(data)
+		res := map[string]any{}
+		for _, sub := range node.Children {
+			d, err := sub.Result()
 			if err != nil {
-				return fmt.Errorf("parse child node error: %w", err)
+				if errors.Is(err, noResultError) {
+					continue
+				}
+				return nil, err
 			}
+			res[sub.Name] = d
 		}
-		return nil
-	}
-}
-func (d *DefParser) ParseTerminal(data *base.BitReader, node *base.Node) (err error) {
-	defer func() {
-		if e := recover(); e != nil {
-			err = fmt.Errorf("parse terminal error: %v", e)
+		if len(res) == 0 {
+			return nil, noResultError
 		}
-	}()
-	isDelmiter := node.Cfg.Has(CfgDelimiter)
-	if !isDelmiter {
-		itypeName := node.Cfg.GetItem(CfgType)
-		if itypeName == nil {
-			return errors.New("not set type")
-		}
-		typeName := utils.InterfaceToString(itypeName)
-		if utils.StringArrayContains(baseType, typeName) {
-			length, err := getNodeLength(node)
-			if err != nil {
-				return fmt.Errorf("get node length error: %w", err)
-			}
-			if length == 0 {
-				return nil
-			}
-			switch typeName {
-			case "string":
-				typeName = "bytes"
-			case "bytes":
-				typeName = "raw"
-			}
-			buf, err := data.ReadBits(length)
-			if err != nil {
-				return fmt.Errorf("read bits error: %w", err)
-			}
-			rawRes, err := d.write(buf, length)
-			if err != nil {
-				return fmt.Errorf("write error: %w", err)
-			}
-			node.Cfg.SetItem(CfgNodeResult, rawRes)
-			return nil
-		} else {
-			return errors.New("not support type")
-		}
-	} else {
-		delimiter := utils.InterfaceToString(node.Cfg.GetItem(CfgDelimiter))
-		if len(delimiter) == 0 {
-			return errors.New("delimiter length must be greater than 0")
-		}
-		delimitern := 0
-		byts := []byte{}
-		// 循环读取数据，直到遇到delimiter结束
-		for {
-			b, err := data.ReadBits(8)
-			if err != nil {
-				return err
-			}
-			if delimiter[delimitern] == b[0] {
-				delimitern++
-			} else {
-				delimitern = 0
-			}
-			if delimitern == len(delimiter) {
-				byts = byts[:len(byts)+1-delimitern]
-				break
-			}
-			byts = append(byts, b...)
-		}
-		res, err := d.write(byts, uint64(len(byts)*8))
-		if err != nil {
-			return err
-		}
-		node.Cfg.SetItem(CfgNodeResult, res)
-		return nil
+		return res, nil
 	}
 }

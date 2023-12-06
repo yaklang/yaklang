@@ -12,7 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"gopkg.in/yaml.v2"
-	"math"
 	"testing"
 	"time"
 )
@@ -349,6 +348,12 @@ func TestT3(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	DumpNode(res)
-	println(math.MaxUint32)
+	r, err := res.Children[0].Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	//spew.Dump(r)
+	res, err = GenerateBinary(r, "application-layer.t3")
+	resHex := codec.EncodeToHex(NodeToBytes(res))
+	assert.Equal(t, data, resHex)
 }

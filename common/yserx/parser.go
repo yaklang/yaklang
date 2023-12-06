@@ -79,8 +79,10 @@ func JavaSerializedDumper(raw []byte) string {
 func ParseJavaSerializedFromReader(r io.Reader, callback ...func(serializable JavaSerializable)) ([]JavaSerializable, error) {
 	return ParseJavaSerializedEx(r, ioutil.Discard, callback...)
 }
-
-func ParseJavaSerializedEx(r io.Reader, writer io.Writer, callback ...func(j JavaSerializable)) ([]JavaSerializable, error) {
+func ParseSingleJavaSerializedFromReader(r io.Reader, callback ...func(serializable JavaSerializable)) ([]JavaSerializable, error) {
+	return ParseMultiJavaSerializedEx(r, ioutil.Discard, 1, callback...)
+}
+func ParseMultiJavaSerializedEx(r io.Reader, writer io.Writer, n int, callback ...func(j JavaSerializable)) ([]JavaSerializable, error) {
 	magicBanner, err := ReadBytesLengthInt(r, 2)
 	if err != nil {
 		return nil, err
@@ -112,7 +114,7 @@ func ParseJavaSerializedEx(r io.Reader, writer io.Writer, callback ...func(j Jav
 			data = append(data, result)
 		}
 	}
-	for {
+	for i := 0; i != n; i++ {
 		result, err := p.readContentElement(r)
 		if err == io.EOF {
 			handleResult(result)
@@ -125,8 +127,10 @@ func ParseJavaSerializedEx(r io.Reader, writer io.Writer, callback ...func(j Jav
 		}
 		handleResult(result)
 	}
-
 	return data, nil
+}
+func ParseJavaSerializedEx(r io.Reader, writer io.Writer, callback ...func(j JavaSerializable)) ([]JavaSerializable, error) {
+	return ParseMultiJavaSerializedEx(r, writer, -1, callback...)
 }
 
 func ParseHexJavaSerialized(raw string) ([]JavaSerializable, error) {

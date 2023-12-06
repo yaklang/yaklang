@@ -1,6 +1,7 @@
 package bin_parser
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
@@ -40,19 +41,21 @@ func NodeToMap(node *base.Node) any {
 	}
 }
 func NodeToBytes(node *base.Node) []byte {
-	res := []byte{}
-	var toBytes func(nodeRes *base.Node)
-	toBytes = func(node *base.Node) {
-		if stream_parser.NodeHasResult(node) {
-			res = append(res, stream_parser.GetBytesByNode(node)...)
-		} else {
-			for _, sub := range node.Children {
-				toBytes(sub)
-			}
-		}
-	}
-	toBytes(node)
-	return res
+	buffer := node.Ctx.GetItem("buffer").(*bytes.Buffer)
+	return buffer.Bytes()
+	//res := []byte{}
+	//var toBytes func(nodeRes *base.Node)
+	//toBytes = func(node *base.Node) {
+	//	if stream_parser.NodeHasResult(node) {
+	//		res = append(res, stream_parser.GetBytesByNode(node)...)
+	//	} else {
+	//		for _, sub := range node.Children {
+	//			toBytes(sub)
+	//		}
+	//	}
+	//}
+	//toBytes(node)
+	//return res
 }
 func DumpNode(node *base.Node) {
 	println(nodeResultToYaml(node))

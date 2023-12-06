@@ -2,10 +2,14 @@ Package:
   operator: |
     this.GetSubNode("Total Length").Process()
     this.GetSubNode("Header").Process()
+    remotePeriodLength = this.GetSubNode("RemotePeriodLength").Process()
+    this.GetSubNode("PublicKeyLength").Process()
+    this.GetSubNode("PublicKey").Process()
     offset = getNodeResult("Header.AbbrevOffset")
+    currentPosition = getCurrentPosition()
     if offset != 0 {
-      this.GetSubNode("PeerInfo").SetCfg("length",(offset-18)*8)
-      this.GetSubNode("PeerInfo").Process()
+      this.GetSubNode("NoneStreamHeaderPeerInfo").SetCfg("length",(offset-currentPosition+1)*8)
+      this.GetSubNode("NoneStreamHeaderPeerInfo").Process()
     }
     this.GetSubNode("Abbrevs").Process()
   Total Length: uint32
@@ -16,14 +20,48 @@ Package:
     ResponseId: int32
     InvokableId: int32
     AbbrevOffset: int32
-#  RemotePeriodLength: int32
-#  PublicKeyLength: int32
-#  PublicKey: "type:raw;length-from-field:PublicKeyLength;length-from-field-multiply:8"
-  PeerInfo: raw
+  RemotePeriodLength: int32
+  PublicKeyLength: int32
+  PublicKey: "type:raw;length-from-field:PublicKeyLength;length-from-field-multiply:8"
+  NoneStreamHeaderPeerInfo: raw
   Abbrevs:
     isList: true
+    exception-plan: stopList # stopList, throw
+    endian: little
     Abbrev:
-      Type: raw,4
+      operator: |
+        res = this.GetSubNode("Capacity").Process()
+        abbrev = -1
+        switch len(res) {
+        case 1:
+          abbrev = res[0]
+        case 3:
+          abbrev = res[1] << 8 | res[2]
+        default:
+          panic("invalid abbrev")
+        }
+        cap = 255 // 应该从config取
+        if abbrev > cap{
+          typ = this.GetSubNode("ObjectType").Process()
+          if typ == 0{
+            this.GetSubNode("Object").Process() 
+          }
+          if typ == 1{
+            panic("not support string type")
+          }
+        }
+      Capacity:
+        operator: |
+          n = this.NewElement().Process()
+          if n < 0xfe { // 大于254
+              n = this.NewElement().Process()
+          } else {
+              n = this.NewElement().Process()
+              n = this.NewElement().Process()
+          }
+        isList: true
+        Byte: uint8
+      ObjectType: uint8 # 0: Object, 1: string
       Object:
         parser: ser
 #  PeerInfo:

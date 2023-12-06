@@ -1,6 +1,7 @@
 package base
 
 import (
+	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -91,4 +92,37 @@ func GetNodeByPath(node *Node, key string) *Node {
 		return nil
 	}
 	return targetNode
+}
+func GetNodePath(node *Node) string {
+	p := ""
+	for {
+		if node.Name == "Package" {
+			break
+		}
+		if node.Cfg.GetBool("temp root") {
+			break
+		}
+		parent := node.Cfg.GetItem(CfgParent).(*Node)
+		if parent.Cfg.GetBool(CfgIsList) {
+			index := 0
+			for i, child := range parent.Children {
+				if child == node {
+					index = i
+					break
+				}
+			}
+			p = fmt.Sprintf("#%d.", index) + p
+		} else {
+			p = node.Name + "." + p
+		}
+		node = node.Cfg.GetItem(CfgParent).(*Node)
+	}
+	if len(p) > 0 {
+		p = p[:len(p)-1]
+	}
+	return p
+}
+func GetValueByNode(d any, node *Node) (any, bool) {
+	p := GetNodePath(node)
+	return GetSubData(d, p)
 }

@@ -458,22 +458,28 @@ func getNodeResult(node *base.Node, isByte bool) (any, error) {
 		return nil, fmt.Errorf("endian type error: %v", iendian)
 	}
 	if !node.Cfg.Has(CfgNodeResult) {
-		var startPos, endPos [2]uint64
-		first := false
+		var start, end uint64
+		first := true
 		walkNode(node, func(n *base.Node) bool {
-			if NodeIsTerminal(n) {
+			if NodeHasResult(n) {
 				if first {
 					first = false
-					startPos = GetNodeResultPos(n)
+					p := GetNodeResultPos(n)
+					start = p[0]
+					end = p[1]
 				} else {
-					endPos = GetNodeResultPos(n)
+					p := GetNodeResultPos(n)
+					end = p[1]
 				}
 			}
 			return true
 		})
 		buffer := node.Ctx.GetItem("buffer").(*bytes.Buffer)
 		byts := buffer.Bytes()
-		return byts[startPos[0]/8 : endPos[1]/8], nil
+		if start > end {
+			return nil, nil
+		}
+		return byts[start/8 : end/8], nil
 	}
 	resPoint := node.Cfg.GetItem(CfgNodeResult).([2]uint64)
 	buffer := node.Ctx.GetItem("buffer").(*bytes.Buffer)
