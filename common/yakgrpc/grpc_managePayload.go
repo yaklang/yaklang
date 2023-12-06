@@ -223,8 +223,7 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 	ctx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
 
-	var size, total int64
-	_ = size
+	size, total := int64(0), int64(0)
 	start := time.Now()
 	feedback := func(progress float64, msg string) {
 		if progress == -1 {
@@ -237,7 +236,7 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 			Message:             msg,
 		})
 	}
-	// _ = feedback
+	ticker := time.NewTicker(500 * time.Millisecond)
 	go func() {
 		defer func() {
 			size = total
@@ -246,9 +245,8 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 			select {
 			case <-ctx.Done():
 				return
-			default:
-				time.Sleep(500 * time.Millisecond)
-				feedback(float64(size)/float64(total), "")
+			case <-ticker.C:
+				feedback(-1, "")
 			}
 		}
 	}()
@@ -737,12 +735,15 @@ func (s *Server) GetAllPayload(req *ypb.GetAllPayloadRequest, stream ypb.Yak_Get
 		return utils.Errorf("get all payload error: save path is empty")
 	}
 
+	ctx, cancel := context.WithCancel(stream.Context())
+	defer cancel()
+
 	isCSV := strings.HasSuffix(savePath, ".csv")
 
 	// 生成payload
 	db := bizhelper.ExactQueryString(s.GetProfileDatabase(), "`group`", req.GetGroup())
 	db = bizhelper.ExactQueryString(db, "`folder`", req.GetFolder())
-	size, total, maxBuf := 0, 0, EightKB
+	size, total := 0, 0
 	n, hitCount := 0, int64(0)
 	gen := yakit.YieldPayloads(db, context.Background())
 
@@ -761,6 +762,26 @@ func (s *Server) GetAllPayload(req *ypb.GetAllPayloadRequest, stream ypb.Yak_Get
 	if total == 0 {
 		return utils.Errorf("get all payload error: group not exist payload(s)")
 	}
+	feedback := func(progress float64) {
+		if progress == -1 {
+			progress = float64(size) / float64(total)
+		}
+		stream.Send(&ypb.GetAllPayloadResponse{
+			Progress: progress,
+		})
+	}
+
+	ticker := time.NewTicker(500 * time.Millisecond)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				feedback(-1)
+			}
+		}
+	}()
 
 	// 打开文件
 	f, err := os.OpenFile(req.GetSavePath(), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
@@ -772,9 +793,7 @@ func (s *Server) GetAllPayload(req *ypb.GetAllPayloadRequest, stream ypb.Yak_Get
 	defer func() {
 		bufWriter.Flush()
 		f.Close()
-		stream.Send(&ypb.GetAllPayloadResponse{
-			Progress: 1,
-		})
+		feedback(1)
 	}()
 	bomHandled := false
 	if isCSV {
@@ -812,18 +831,6 @@ func (s *Server) GetAllPayload(req *ypb.GetAllPayloadRequest, stream ypb.Yak_Get
 			n, _ = bufWriter.WriteString(content)
 		}
 		size += n
-		if size < maxBuf {
-			continue
-		}
-		bufWriter.Flush()
-
-		err = stream.Send(&ypb.GetAllPayloadResponse{
-			Progress: float64(size) / float64(total),
-		})
-		if err != nil {
-			log.Errorf("get all payload error: send payload error: %v", err)
-		}
-		size -= maxBuf
 	}
 
 	return nil
@@ -843,13 +850,37 @@ func (s *Server) GetAllPayloadFromFile(req *ypb.GetAllPayloadRequest, stream ypb
 		return err
 	}
 
+	ctx, cancel := context.WithCancel(stream.Context())
+	defer cancel()
+
 	// 获取payload总长度
-	size, total, maxBuf := 0, 0, EightKB
+	size, total := 0, 0
 	state, err := os.Stat(src)
 	if err != nil {
 		return utils.Wrap(err, "get all payload from file error: get file state error")
 	}
 	total = int(state.Size())
+
+	feedback := func(progress float64) {
+		if progress == -1 {
+			progress = float64(size) / float64(total)
+		}
+		stream.Send(&ypb.GetAllPayloadResponse{
+			Progress: progress,
+		})
+	}
+
+	ticker := time.NewTicker(500 * time.Millisecond)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				feedback(-1)
+			}
+		}
+	}()
 
 	// 打开源文件和目标文件
 	srcFile, err := os.Open(src)
@@ -863,10 +894,9 @@ func (s *Server) GetAllPayloadFromFile(req *ypb.GetAllPayloadRequest, stream ypb
 	defer func() {
 		srcFile.Close()
 		dstFile.Close()
-		stream.Send(&ypb.GetAllPayloadResponse{
-			Progress: 1,
-		})
+		feedback(1)
 	}()
+
 	bomHandled := false
 	bufReader := bufio.NewReaderSize(srcFile, EightKB)
 
@@ -895,21 +925,10 @@ func (s *Server) GetAllPayloadFromFile(req *ypb.GetAllPayloadRequest, stream ypb
 		}
 
 		n, err := dstFile.WriteString(content)
+		size += n
 		if err != nil {
 			return utils.Wrapf(err, "get all payload from file error: write file[%s] error", dst)
 		}
-		size += n
-		if size < maxBuf {
-			continue
-		}
-
-		err = stream.Send(&ypb.GetAllPayloadResponse{
-			Progress: float64(size) / float64(total),
-		})
-		if err != nil {
-			log.Errorf("get all payload from file error: send payload error: %v", err)
-		}
-		size -= maxBuf
 	}
 
 	return nil
@@ -946,11 +965,7 @@ func (s *Server) ConvertPayloadGroupToDatabase(req *ypb.NameRequest, stream ypb.
 		})
 	}
 	ticker := time.NewTicker(500 * time.Millisecond)
-	// _ = feedback
 	go func() {
-		defer func() {
-			size = total
-		}()
 		for {
 			select {
 			case <-ctx.Done():
@@ -1028,9 +1043,6 @@ func (s *Server) MigratePayloads(req *ypb.Empty, stream ypb.Yak_MigratePayloadsS
 	}
 	ticker := time.NewTicker(500 * time.Millisecond)
 	go func() {
-		defer func() {
-			size = total
-		}()
 		for {
 			select {
 			case <-ctx.Done():
@@ -1064,7 +1076,6 @@ func (s *Server) MigratePayloads(req *ypb.Empty, stream ypb.Yak_MigratePayloadsS
 			}
 		}
 	}
-
 	feedback(1)
 	return nil
 }
