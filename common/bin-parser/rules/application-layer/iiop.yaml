@@ -1,0 +1,71 @@
+Package:
+  Header:
+    operator: |
+      this.ForEachChild((node)=>{
+        node.Process()
+      })
+      typeId = this.GetSubNode("MessageType").Result()
+      setCtx("typeId",typeId)
+    Magic: raw,4
+    Version:
+      Major: uint8
+      Minor: uint8
+    MessageFlags: uint8
+    MessageType: uint8
+    MessageSize: uint32
+  Request:
+    operator: |
+      typeId = getCtx("typeId")
+      switch typeId {
+      case 0: // Request
+        this.GetSubNode("RequestId").Process()
+        this.GetSubNode("ResponseFlags").Process()
+        this.GetSubNode("Reserved").Process()
+        this.GetSubNode("TargetAddress").Process()
+        this.GetSubNode("KeyLength").Process()
+        this.GetSubNode("KeyAddress").Process()
+        this.GetSubNode("OperationLength").Process()
+        res = this.GetSubNode("RequestOperation").Process()
+        dump(res)
+        this.GetSubNode("ServiceContextList").Process()
+        this.GetSubNode("StubData").Process()
+      case 1: // Reply
+      case 2: // CancelRequest
+      case 3: // LocateRequest
+        this.GetSubNode("RequestId").Process()
+        this.GetSubNode("TargetAddress").Process()
+        this.GetSubNode("KeyLength").Process()
+        this.GetSubNode("KeyAddress").Process()
+      case 4: // LocateReply
+      case 5: // CloseConnection
+      default:
+        panic("invalid message type")
+      }
+    RequestId: uint32
+    TargetAddress: uint32
+    KeyLength: uint32
+    KeyAddress: "type:raw;length-from-field:KeyLength;length-from-field-multiply:8"
+
+    ResponseFlags: uint8
+    Reserved: raw,3
+    OperationLength: uint32
+    RequestOperation: "type:raw;length-from-field:OperationLength;length-from-field-multiply:8"
+    ServiceContextList:
+      Empty: uint8
+      ListLength: uint32
+      ServiceContexts:
+        isList: true
+        list-length-from-field: "@Request.ServiceContextList.ListLength"
+        exception-plan: stopList # stopList, throw
+        ServiceContext:
+          operator: |
+            this.GetSubNode("Id").Process()
+            n = this.GetSubNode("DataLength").Process()
+            this.GetSubNode("Endian").Process()
+            this.GetSubNode("Data").SetCfg("length",(n-1)*8)
+            this.GetSubNode("Data").Process()
+          Id: uint32
+          DataLength: uint32
+          Endian: uint8
+          Data: raw
+    StubData: raw

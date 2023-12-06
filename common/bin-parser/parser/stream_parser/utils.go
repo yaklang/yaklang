@@ -111,6 +111,18 @@ func AnyToInt64(d any) int64 {
 		return 0
 	}
 }
+func IsNumber(d any) bool {
+	switch d.(type) {
+	case int, int8, int16, int32, int64:
+		return true
+	case uint, uint8, uint16, uint32, uint64:
+		return true
+	case float32, float64:
+		return true
+	default:
+		return false
+	}
+}
 func AnyToUint64(d any) uint64 {
 	switch ret := d.(type) {
 	case int, int8, int16, int32, int64:
@@ -288,6 +300,9 @@ func getRemainingSpace(node *base.Node) (uint64, error) {
 	}
 }
 func getNodeLength(node *base.Node) (uint64, error) {
+	if node.Name == "Data" {
+		println()
+	}
 	remainingLength, err := getRemainingSpace(node)
 	if err != nil {
 		return 0, err

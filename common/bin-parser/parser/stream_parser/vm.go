@@ -14,8 +14,10 @@ import (
 type YakNode struct {
 	origin               *base.Node
 	Process              func() any
+	Result               func() any
 	Name                 string
 	SetCfg               func(k string, v any)
+	GetCfg               func(k string) any
 	AppendNode           func(d *YakNode)
 	ForEachChild         func(f func(child *YakNode))
 	GetParent            func() *YakNode
@@ -29,6 +31,12 @@ type YakNode struct {
 func ConvertToYakNode(node *base.Node, operator func(node2 *base.Node) error) *YakNode {
 	yakNode := &YakNode{}
 	yakNode.origin = node
+	yakNode.GetCfg = func(k string) any {
+		return node.Cfg.GetItem(k)
+	}
+	yakNode.Result = func() any {
+		return GetResultByNode(node)
+	}
 	yakNode.NewElement = func() *YakNode {
 		if len(node.Children) == 0 {
 			panic("get node element error")
@@ -178,6 +186,10 @@ func ExecOperator(node *base.Node, code string, operator func(node2 *base.Node) 
 				return ConvertToYakNode(v, operator)
 			}
 			panic("not found root node " + key)
+		},
+		"getNode": func(key string) any {
+			n := base.GetNodeByPath(node, key)
+			return ConvertToYakNode(n, operator)
 		},
 		"getCurrentPosition": func() int {
 			buf := node.Ctx.GetItem("buffer").(*bytes.Buffer)

@@ -204,10 +204,27 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 		}
 		elementTemplate := node.Children[0]
 		node.Children = nil
-		index := 0
-
 		err := func() error {
+			var listLength uint64
+			hasLength := false
+			if node.Cfg.Has("list-length") {
+				listLength = node.Cfg.GetUint64("list-length")
+				hasLength = true
+			}
+			if node.Cfg.Has("list-length-from-field") {
+				field := node.Cfg.GetString("list-length-from-field")
+				fieldNode := base.GetNodeByPath(node, field)
+				res := GetNodeResult(fieldNode)
+				if IsNumber(res) {
+					listLength = AnyToUint64(res)
+				}
+				hasLength = true
+			}
+			index := 0
 			for {
+				if hasLength && uint64(index) >= listLength {
+					break
+				}
 				err := operator.Backup()
 				if err != nil {
 					return fmt.Errorf("backup error: %w", err)
