@@ -75,10 +75,6 @@ func (v *BasePHPParserVisitor) VisitInterfaceList(ctx *InterfaceListContext) int
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitTypeParameterListInBrackets(ctx *TypeParameterListInBracketsContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BasePHPParserVisitor) VisitTypeParameterList(ctx *TypeParameterListContext) interface{} {
 	return v.VisitChildren(ctx)
 }
