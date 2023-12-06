@@ -38,6 +38,23 @@ func (y *builder) VisitYieldExpression(raw phpparser.IYieldExpressionContext) in
 		return nil
 	}
 
+	if i.From() != nil {
+		// yield from expression
+		key := y.VisitExpression(i.Expression(0))
+		_ = key
+		return nil // NewIterator nil
+	}
+
+	key := y.VisitExpression(i.Expression(0))
+	if i.DoubleArrow() != nil {
+		// yield key => value
+		val := y.VisitExpression(i.Expression(1))
+		_ = key
+		_ = val
+		return nil
+	}
+
+	// yield key;
 	return nil
 }
 

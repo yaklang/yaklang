@@ -653,12 +653,13 @@ qualifiedNamespaceNameList
     ;
 
 arguments
-    : '(' (actualArgument (',' actualArgument)* | yieldExpression)? ','? ')'
+    : '(' actualArgument (',' actualArgument)*  ','? ')'
     ;
 
 actualArgument
     : argumentName? '...'? expression
     | '&' chain
+    | yieldExpression
     ;
 
 argumentName
