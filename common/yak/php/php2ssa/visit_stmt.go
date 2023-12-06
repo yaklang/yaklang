@@ -30,7 +30,7 @@ func (y *builder) VisitTopStatement(raw phpparser.ITopStatementContext) interfac
 	} else if ret := i.EnumDeclaration(); ret != nil {
 		y.VisitEnumDeclaration(ret)
 	} else {
-		log.Info("unknown top statement: %v", ret.GetText())
+		log.Infof("unknown top statement: %v", ret.GetText())
 	}
 
 	return nil
@@ -173,7 +173,7 @@ func (y *builder) VisitStatement(raw phpparser.IStatementContext) interface{} {
 	} else if i.InlineHtmlStatement() != nil {
 		y.VisitInlineHtmlStatement(i.InlineHtmlStatement())
 	} else {
-		log.Info("unknown statement: %v", i.GetText())
+		log.Infof("unknown statement: %v", i.GetText())
 	}
 
 	return nil
@@ -200,6 +200,48 @@ func (y *builder) VisitBlockStatement(raw phpparser.IBlockStatementContext) inte
 	i, _ := raw.(*phpparser.BlockStatementContext)
 	if i == nil {
 		return nil
+	}
+
+	y.VisitInnerStatementList(i.InnerStatementList())
+
+	return nil
+}
+
+func (y *builder) VisitInnerStatementList(raw phpparser.IInnerStatementListContext) interface{} {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*phpparser.InnerStatementListContext)
+	if i == nil {
+		return nil
+	}
+
+	for _, is := range i.AllInnerStatement() {
+		y.VisitInnerStatement(is)
+	}
+
+	return nil
+}
+
+func (y *builder) VisitInnerStatement(raw phpparser.IInnerStatementContext) interface{} {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*phpparser.InnerStatementContext)
+	if i == nil {
+		return nil
+	}
+
+	if i.Statement() != nil {
+		y.VisitStatement(i.Statement())
+	} else if i.FunctionDeclaration() != nil {
+		y.VisitFunctionDeclaration(i.FunctionDeclaration())
+	} else if i.ClassDeclaration() != nil {
+		y.VisitClassDeclaration(i.ClassDeclaration())
+	} else {
+		log.Infof("unknown inner statement: %v", i.GetText())
 	}
 
 	return nil
