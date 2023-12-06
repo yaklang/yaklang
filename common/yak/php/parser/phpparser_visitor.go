@@ -73,9 +73,6 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#typeParameterWithDefaultDecl.
 	VisitTypeParameterWithDefaultDecl(ctx *TypeParameterWithDefaultDeclContext) interface{}
 
-	// Visit a parse tree produced by PHPParser#genericDynamicArgs.
-	VisitGenericDynamicArgs(ctx *GenericDynamicArgsContext) interface{}
-
 	// Visit a parse tree produced by PHPParser#attributes.
 	VisitAttributes(ctx *AttributesContext) interface{}
 

@@ -173,9 +173,9 @@ typeParameterWithDefaultDecl
     : attributes? identifier Eq (qualifiedStaticTypeRef | primitiveType)
     ;
 
-genericDynamicArgs
-    : '<:' typeRef (',' typeRef)* ':>'
-    ;
+//genericDynamicArgs
+//    : '<:' typeRef (',' typeRef)* ':>'
+//    ;
 
 attributes
     : attributeGroup+
@@ -610,12 +610,12 @@ lambdaFunctionUseVar
     ;
 
 qualifiedStaticTypeRef
-    : qualifiedNamespaceName genericDynamicArgs?
+    : qualifiedNamespaceName // genericDynamicArgs?
     | Static
     ;
 
 typeRef
-    : (qualifiedNamespaceName | indirectTypeRef) genericDynamicArgs?
+    : (qualifiedNamespaceName | indirectTypeRef) // genericDynamicArgs?
     | primitiveType
     | Static
     | anonymousClass
@@ -752,7 +752,8 @@ functionCallName
     ;
 
 actualArguments
-    : genericDynamicArgs? arguments+ squareCurlyExpression*
+//    : genericDynamicArgs? arguments+ squareCurlyExpression*
+    : arguments+ squareCurlyExpression*
     ;
 
 chainBase
