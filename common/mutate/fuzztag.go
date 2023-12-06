@@ -94,12 +94,15 @@ func AddFuzzTagDescriptionToMap(methodMap map[string]*parser.TagMethod, f *FuzzT
 	}
 }
 
-var existedFuzztag []*FuzzTagDescription
-var tagMethodMap = map[string]*parser.TagMethod{}
+var (
+	existedFuzztag []*FuzzTagDescription
+	tagMethodMap   = map[string]*parser.TagMethod{}
+)
 
 func AddFuzzTagToGlobal(f *FuzzTagDescription) {
 	AddFuzzTagDescriptionToMap(tagMethodMap, f)
 }
+
 func init() {
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "trim",
@@ -145,7 +148,7 @@ func init() {
 		TagName: "fuzz:password",
 		Handler: func(s string) []string {
 			origin, level := sepToEnd(s, "|")
-			var levelInt = atoi(level)
+			levelInt := atoi(level)
 			return fuzzpass(origin, levelInt)
 		},
 		Alias:       []string{"fuzz:pass"},
@@ -204,7 +207,7 @@ func init() {
 		TagName: "fuzz:username",
 		Handler: func(s string) []string {
 			origin, level := sepToEnd(s, "|")
-			var levelInt = atoi(level)
+			levelInt := atoi(level)
 			return fuzzuser(origin, levelInt)
 		},
 		Alias:       []string{"fuzz:user"},
@@ -254,7 +257,7 @@ func init() {
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "uuid",
 		Handler: func(s string) []string {
-			var result = []string{}
+			result := []string{}
 			for i := 0; i < atoi(s); i++ {
 				result = append(result, uuid.New().String())
 			}
@@ -436,7 +439,7 @@ func init() {
 		Handler: func(s string) []string {
 			origin, times := sepToEnd(s, "|")
 			if ret := atoi(times); ret > 0 {
-				var results = make([]string, ret+1)
+				results := make([]string, ret+1)
 				for i := 0; i < ret+1; i++ {
 					if i == 0 {
 						results[i] = ""
@@ -454,7 +457,7 @@ func init() {
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "payload",
 		Handler: func(s string) []string {
-			var db = consts.GetGormProfileDatabase()
+			db := consts.GetGormProfileDatabase()
 			if db == nil {
 				return []string{s}
 			}
@@ -486,7 +489,7 @@ func init() {
 			db = db.Where("content != ?", "")
 			// db = db.Debug()
 			var payloads []string
-			if rows, err := db.Table("payloads").Select("content, is_file").Rows(); err != nil {
+			if rows, err := db.Table("payloads").Select("content, is_file").Order("hit_count desc").Rows(); err != nil {
 				return []string{s}
 			} else {
 				for rows.Next() {
@@ -669,10 +672,10 @@ func init() {
 				return []string{fmt.Sprint(rand.Intn(10))}
 			}
 
-			var enablePadding = false
-			var paddingLength = 4
-			var paddingRight = false
-			var step = 1
+			enablePadding := false
+			paddingLength := 4
+			paddingRight := false
+			step := 1
 
 			// 使用管道符号分割参数
 			parts := strings.Split(s, "|")
@@ -920,7 +923,7 @@ func init() {
 					log.Errorf("codec caller error: %s", err)
 					return []string{s}
 				}
-				//log.Errorf("fuzz.codec no plugin / param specific")
+				// log.Errorf("fuzz.codec no plugin / param specific")
 				return []string{script}
 			}
 			name, params := s[:lastDividerIndex], s[lastDividerIndex+1:]
@@ -1376,7 +1379,7 @@ func init() {
 			return []*fuzztag.FuzzExecResult{fuzztag.NewFuzzExecResult([]byte(s), []string{s})}
 		},
 	})
-	//这几个标签不稳定
+	// 这几个标签不稳定
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName:     "yso:headerecho",
 		Description: "尽力使用 header echo 生成多个链",
