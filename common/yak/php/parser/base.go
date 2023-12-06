@@ -4,6 +4,7 @@ import (
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"reflect"
 	"strings"
+	"unsafe"
 )
 
 type PHPLexerBase struct {
@@ -48,12 +49,7 @@ func reflectGetInt(i any, field string) (finalRet int) {
 	return finalRet
 }
 
-func reflectSetInt(i any, field string) (finalRet int) {
-	defer func() {
-		if err := recover(); err != nil {
-			finalRet = -1
-		}
-	}()
+func reflectSetInt(i any, field string, target int) {
 	v := reflect.ValueOf(i)
 	if ret := v.Type().Kind(); ret != reflect.Ptr && ret != reflect.Struct {
 		return
@@ -65,9 +61,10 @@ func reflectSetInt(i any, field string) (finalRet int) {
 
 	fieldR := v.FieldByName(field)
 	if fieldR.IsValid() {
-		finalRet = int(fieldR.Int())
+		ptr := unsafe.Pointer(fieldR.UnsafeAddr())
+		ptrInt := (*int)(ptr)
+		*ptrInt = target
 	}
-	return finalRet
 }
 
 func (p *PHPLexerBase) NextToken() antlr.Token {
@@ -87,7 +84,16 @@ func (p *PHPLexerBase) NextToken() antlr.Token {
 
 		if token.GetText() == "</script>" {
 			p._phpScript = false
-			token.GetTokenType()
+			reflectSetInt(token, "tokenType", PHPLexerHtmlScriptClose)
+		} else {
+			switch p._prevTokenType {
+			case PHPLexerSemiColon, PHPLexerColon, PHPLexerOpenCurlyBracket, PHPLexerCloseCurlyBracket:
+				token = p.BaseLexer.NextToken()
+				break
+			default:
+				reflectSetInt(token, "tokenType", PHPLexerSemiColon)
+				token.SetText(";")
+			}
 		}
 	case PHPLexerHtmlName:
 		p._htmlNameText = token.GetText()
@@ -105,7 +111,7 @@ func (p *PHPLexerBase) NextToken() antlr.Token {
 				var heredocIdentifier = p.GetHeredocEnd(token.GetText())
 				if strings.HasSuffix(strings.TrimSpace(token.GetText()), ";") {
 					var text = heredocIdentifier + ";\n"
-					token.SetTokenIndex(PHPLexerSemiColon)
+					reflectSetInt(token, "tokenType", PHPLexerSemiColon)
 					token.SetText(text)
 				} else {
 					token = p.BaseLexer.NextToken()

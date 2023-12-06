@@ -7,5 +7,14 @@ func TestParseSSA_Smoking(t *testing.T) {
 }
 
 func TestParseSSA_Smoking2(t *testing.T) {
-	ParseSSA(`<?php echo "Hello world"; // comment ?>`, nil)
+	ParseSSA(`<?php echo "Hello world"; // comment ?>
+`, nil)
+}
+
+func TestParseSSA_1(t *testing.T) {
+	ParseSSA(`<?php
+
+
+
+?>`, nil)
 }

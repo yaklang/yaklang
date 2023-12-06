@@ -54,3 +54,16 @@ func (y *builder) VisitInlineHtml(raw phpparser.IInlineHtmlContext) interface{} 
 
 	return nil
 }
+
+func (y *builder) VisitInlineHtmlStatement(raw phpparser.IInlineHtmlStatementContext) interface{} {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*phpparser.InlineHtmlStatementContext)
+	if i == nil {
+		return nil
+	}
+
+	return nil
+}
