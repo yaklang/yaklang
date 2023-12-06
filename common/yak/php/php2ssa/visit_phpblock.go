@@ -19,8 +19,8 @@ func (y *builder) VisitPhpBlock(raw phpparser.IPhpBlockContext) interface{} {
 		// handle ImportStmt
 	}
 
-	if len(i.AllTopStatement()) > 0 {
-
+	for _, stmt := range i.AllTopStatement() {
+		y.VisitTopStatement(stmt)
 	}
 
 	return nil

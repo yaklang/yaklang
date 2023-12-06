@@ -8,8 +8,9 @@ import (
 )
 
 type builder struct {
-	ast  *phpparser.HtmlDocumentContext
+	ast  phpparser.IHtmlDocumentContext
 	prog *ssa.Program
+	main *ssa.FunctionBuilder
 }
 
 func ParseSSA(src string, f func(builder *ssa.FunctionBuilder)) (prog *ssa.Program) {
@@ -18,9 +19,20 @@ func ParseSSA(src string, f func(builder *ssa.FunctionBuilder)) (prog *ssa.Progr
 	parser := phpparser.NewPHPParser(tokenStream)
 	parser.RemoveErrorListeners()
 	parser.AddErrorListener(antlr4util.NewLegacyErrorListener())
+	program := ssa.NewProgram()
 	builder := &builder{
-		prog: ssa.NewProgram(),
+		prog: program,
+		ast:  parser.HtmlDocument(),
 	}
-	builder.VisitHtmlDocument(parser.HtmlDocument())
+	builder.prog.Build(builder)
 	return builder.prog
+}
+
+func (y *builder) Build() {
+	pkg := ssa.NewPackage("main")
+	y.prog.AddPackage(pkg)
+	main := pkg.NewFunction("php-main")
+	y.main = ssa.NewBuilder(main, nil)
+	y.VisitHtmlDocument(y.ast)
+	y.main.Finish()
 }
