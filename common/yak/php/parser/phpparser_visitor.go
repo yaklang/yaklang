@@ -10,6 +10,9 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#htmlDocument.
 	VisitHtmlDocument(ctx *HtmlDocumentContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#htmlDocumentElement.
+	VisitHtmlDocumentElement(ctx *HtmlDocumentElementContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#inlineHtml.
 	VisitInlineHtml(ctx *InlineHtmlContext) interface{}
 
