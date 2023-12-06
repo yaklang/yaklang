@@ -36,7 +36,11 @@ options {
 // Also see here: https://github.com/antlr/grammars-v4/tree/master/html
 
 htmlDocument
-    : Shebang? (inlineHtml | phpBlock)* EOF
+    : Shebang? htmlDocumentElement* EOF
+    ;
+
+htmlDocumentElement
+    : inlineHtml | phpBlock
     ;
 
 inlineHtml

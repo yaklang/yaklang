@@ -11,6 +11,10 @@ func (v *BasePHPParserVisitor) VisitHtmlDocument(ctx *HtmlDocumentContext) inter
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitHtmlDocumentElement(ctx *HtmlDocumentElementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitInlineHtml(ctx *InlineHtmlContext) interface{} {
 	return v.VisitChildren(ctx)
 }

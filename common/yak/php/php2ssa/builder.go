@@ -13,12 +13,6 @@ type builder struct {
 }
 
 func ParseSSA(src string, f func(builder *ssa.FunctionBuilder)) (prog *ssa.Program) {
-	defer func() {
-		if r := recover(); r != nil {
-			// fmt.Println("recover from php2ssa.ParseSSA: ", r)
-		}
-	}()
-
 	lex := phpparser.NewPHPLexer(antlr.NewInputStream(src))
 	tokenStream := antlr.NewCommonTokenStream(lex, antlr.TokenDefaultChannel)
 	parser := phpparser.NewPHPParser(tokenStream)
