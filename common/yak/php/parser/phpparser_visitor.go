@@ -58,9 +58,6 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#interfaceList.
 	VisitInterfaceList(ctx *InterfaceListContext) interface{}
 
-	// Visit a parse tree produced by PHPParser#typeParameterListInBrackets.
-	VisitTypeParameterListInBrackets(ctx *TypeParameterListInBracketsContext) interface{}
-
 	// Visit a parse tree produced by PHPParser#typeParameterList.
 	VisitTypeParameterList(ctx *TypeParameterListContext) interface{}
 

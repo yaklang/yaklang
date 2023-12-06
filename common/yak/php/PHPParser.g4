@@ -128,17 +128,17 @@ namespaceStatement
     ;
 
 functionDeclaration
-    : attributes? Function_ '&'? identifier typeParameterListInBrackets? '(' formalParameterList ')' (
+    : attributes? Function_ '&'? identifier /*typeParameterListInBrackets?*/ '(' formalParameterList ')' (
         ':' QuestionMark? typeHint
     )? blockStatement
     ;
 
 classDeclaration
     : attributes? Private? modifier? Partial? (
-        classEntryType identifier typeParameterListInBrackets? (Extends qualifiedStaticTypeRef)? (
+        classEntryType identifier /*typeParameterListInBrackets?*/ (Extends qualifiedStaticTypeRef)? (
             Implements interfaceList
         )?
-        | Interface identifier typeParameterListInBrackets? (Extends interfaceList)?
+        | Interface identifier /*typeParameterListInBrackets?*/ (Extends interfaceList)?
     ) OpenCurlyBracket classStatement* CloseCurlyBracket
     ;
 
@@ -151,11 +151,11 @@ interfaceList
     : qualifiedStaticTypeRef (',' qualifiedStaticTypeRef)*
     ;
 
-typeParameterListInBrackets
-    : '<:' typeParameterList ':>'
-    | '<:' typeParameterWithDefaultsList ':>'
-    | '<:' typeParameterList ',' typeParameterWithDefaultsList ':>'
-    ;
+//typeParameterListInBrackets
+//    : '<:' typeParameterList ':>'
+//    | '<:' typeParameterWithDefaultsList ':>'
+//    | '<:' typeParameterList ',' typeParameterWithDefaultsList ':>'
+//    ;
 
 typeParameterList
     : typeParameterDecl (',' typeParameterDecl)*
@@ -396,7 +396,7 @@ classStatement
         propertyModifiers typeHint? variableInitializer (',' variableInitializer)* SemiColon
         | memberModifiers? (
             Const typeHint? identifierInitializer (',' identifierInitializer)* SemiColon
-            | Function_ '&'? identifier typeParameterListInBrackets? '(' formalParameterList ')' (
+            | Function_ '&'? identifier /*typeParameterListInBrackets?*/ '(' formalParameterList ')' (
                 baseCtorCall
                 | returnTypeDecl
             )? methodBody
@@ -623,10 +623,10 @@ typeRef
 
 anonymousClass
     : attributes? Private? modifier? Partial? (
-        classEntryType typeParameterListInBrackets? (Extends qualifiedStaticTypeRef)? (
+        classEntryType /*typeParameterListInBrackets?*/ (Extends qualifiedStaticTypeRef)? (
             Implements interfaceList
         )?
-        | Interface identifier typeParameterListInBrackets? (Extends interfaceList)?
+        | Interface identifier /*typeParameterListInBrackets?*/ (Extends interfaceList)?
     ) OpenCurlyBracket classStatement* CloseCurlyBracket
     ;
 
