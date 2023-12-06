@@ -257,12 +257,14 @@ service Yak {
   // get payload 
   rpc GetAllPayload(GetAllPayloadRequest) returns (stream GetAllPayloadResponse); // get payload by [group/folder]
   rpc GetAllPayloadFromFile(GetAllPayloadRequest) returns (stream GetAllPayloadResponse); // get payload by [group/folder] from file
-  //  create folder
+  // create folder
   rpc CreatePayloadFolder(NameRequest) returns (Empty);
   // 去重
   rpc RemoveDuplicatePayloads(NameRequest) returns (stream SavePayloadProgress);
   // 转换为数据库保存
   rpc ConvertPayloadGroupToDatabase(NameRequest) returns (stream SavePayloadProgress);
+  // 迁移旧的payload
+  rpc MigratePayloads(Empty) returns (stream SavePayloadProgress);
 
   // 自动生成补全
   rpc GetYakitCompletionRaw(Empty) returns (YakitCompletionRawResponse);
