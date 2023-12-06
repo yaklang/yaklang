@@ -246,8 +246,8 @@ File__      : '__file__';
 Dir__       : '__dir__';
 
 Spaceship        : '<=>';
-Lgeneric         : '<:';
-Rgeneric         : ':>';
+//Lgeneric         : '<:';
+//Rgeneric         : ':>';
 DoubleArrow      : '=>';
 Inc              : '++';
 Dec              : '--';
