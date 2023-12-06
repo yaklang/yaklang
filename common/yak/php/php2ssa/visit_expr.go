@@ -43,10 +43,12 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		return nil
 	}
 
-	log.Infof("start to parse expr: %v", raw.GetText())
 	switch ret := raw.(type) {
 	case *phpparser.CloneExpressionContext:
+		// 浅拷贝
+		// 如果类定义了 __clone，就执行 __clone
 	case *phpparser.KeywordNewExpressionContext:
+		return y.VisitNewExpr(ret.NewExpr())
 	case *phpparser.IndexerExpressionContext:
 	case *phpparser.CastExpressionContext:
 	case *phpparser.UnaryOperatorExpressionContext:

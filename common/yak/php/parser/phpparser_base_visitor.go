@@ -95,10 +95,6 @@ func (v *BasePHPParserVisitor) VisitTypeParameterWithDefaultDecl(ctx *TypeParame
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitGenericDynamicArgs(ctx *GenericDynamicArgsContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BasePHPParserVisitor) VisitAttributes(ctx *AttributesContext) interface{} {
 	return v.VisitChildren(ctx)
 }
