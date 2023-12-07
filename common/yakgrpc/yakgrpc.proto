@@ -1128,6 +1128,7 @@ message DebugPluginRequest {
 
   string Input = 3;
   HTTPRequestBuilderParams HTTPRequestTemplate = 4;
+  map<string, string> ExecParams = 5;
 }
 
 message HTTPRequestBuilderResult {
