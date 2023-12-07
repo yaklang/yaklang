@@ -13,3 +13,45 @@ if freq.LowhttpResponse.RedirectRawPackets.Length() == 4 {
 } else {
     die("redirectTimes failed")
 }
+
+freq = fuzz.HTTPRequest(f`GET / HTTP/1.1
+Host: ${str.HostPort(host, port)}
+
+`)~.ExecFirst()~
+
+if freq.LowhttpResponse.RedirectRawPackets.Length() == 0 {
+    dump("redirectTimes ")
+    for _, i := range freq.LowhttpResponse.RedirectRawPackets {
+        dump(i.RespRecord.Url)
+    }
+} else {
+    die("redirectTimes failed" + f`${freq.LowhttpResponse.RedirectRawPackets.Length()}`)
+}
+
+freq = fuzz.HTTPRequest(f`GET / HTTP/1.1
+Host: ${str.HostPort(host, port)}
+
+`)~.ExecFirst(httpool.redirectTimes(0))~
+
+if freq.LowhttpResponse.RedirectRawPackets.Length() == 0 {
+    dump("redirectTimes ")
+    for _, i := range freq.LowhttpResponse.RedirectRawPackets {
+        dump(i.RespRecord.Url)
+    }
+} else {
+    die("redirectTimes failed" + f`${freq.LowhttpResponse.RedirectRawPackets.Length()}`)
+}
+
+freq = fuzz.HTTPRequest(f`GET / HTTP/1.1
+Host: ${str.HostPort(host, port)}
+
+`)~.ExecFirst(httpool.redirectTimes(1))~
+
+if freq.LowhttpResponse.RedirectRawPackets.Length() == 2 {
+    dump("redirectTimes ")
+    for _, i := range freq.LowhttpResponse.RedirectRawPackets {
+        dump(i.RespRecord.Url)
+    }
+} else {
+    die("redirectTimes failed" + f`${freq.LowhttpResponse.RedirectRawPackets.Length()}`)
+}

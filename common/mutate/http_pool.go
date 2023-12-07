@@ -273,6 +273,7 @@ func _httpPool_noFixContentLength(f bool) HttpPoolConfigOption {
 func _httpPool_redirectTimes(f int) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.RedirectTimes = f
+		config.NoFollowRedirect = false
 	}
 }
 
@@ -386,8 +387,9 @@ func NewDefaultHttpPoolConfig(opts ...HttpPoolConfigOption) *httpPoolConfig {
 		PerRequestTimeout: 10 * time.Second,
 		IsHttps:           false,
 		IsGmTLS:           false,
+		NoFollowRedirect:  true,
 		UseRawMode:        true,
-		RedirectTimes:     5,
+		RedirectTimes:     0,
 		FollowJSRedirect:  false,
 		Ctx:               context.Background(),
 		ForceFuzz:         true,
@@ -573,11 +575,6 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 					var https = config.IsHttps
 					if overrideHttps {
 						https = true
-					}
-
-					if config.NoFollowRedirect {
-						config.FollowJSRedirect = false
-						config.RedirectTimes = 0
 					}
 
 					lowhttpOptions := []lowhttp.LowhttpOpt{lowhttp.WithHttps(https),
