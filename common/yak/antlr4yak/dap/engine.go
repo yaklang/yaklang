@@ -2,6 +2,7 @@ package dap
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/cli"
 	"os"
 	"path/filepath"
 
@@ -9,7 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
-	"github.com/yaklang/yaklang/common/yak/yaklib"
 )
 
 func (ds *DebugSession) RunProgramInDebugMode(request *dap.LaunchRequest, debug bool, program string, args []string) {
@@ -50,7 +50,7 @@ func (ds *DebugSession) RunProgramInDebugMode(request *dap.LaunchRequest, debug 
 	ds.LaunchWg.Done()
 
 	// inject args in cli
-	yaklib.InjectCliArgs(args)
+	cli.InjectCliArgs(args)
 
 	// inject extra libs
 	if len(ds.config.extraLibs) > 0 {

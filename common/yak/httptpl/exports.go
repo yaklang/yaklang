@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
@@ -180,12 +181,12 @@ func ScanUrl(u string, opt ...interface{}) {
 func toConfig(opts ...interface{}) (*Config, *lowhttp.LowhttpExecConfig, []lowhttp.LowhttpOpt) {
 	var configOpt []ConfigOption
 	var lowhttpOpt []lowhttp.LowhttpOpt
-	var pocOpt []yaklib.PocConfig
+	var pocOpt []poc.PocConfig
 	for _, opt := range opts {
 		switch ret := opt.(type) {
 		case lowhttp.LowhttpOpt:
 			lowhttpOpt = append(lowhttpOpt, ret)
-		case yaklib.PocConfig:
+		case poc.PocConfig:
 			pocOpt = append(pocOpt, ret)
 		case ConfigOption:
 			configOpt = append(configOpt, ret)
@@ -193,7 +194,7 @@ func toConfig(opts ...interface{}) (*Config, *lowhttp.LowhttpExecConfig, []lowht
 			log.Errorf("unknown option type: %T", ret)
 		}
 	}
-	pocConfig := yaklib.NewDefaultPoCConfig()
+	pocConfig := poc.NewDefaultPoCConfig()
 	for _, opt := range pocOpt {
 		opt(pocConfig)
 	}
