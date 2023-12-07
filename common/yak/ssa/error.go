@@ -90,11 +90,10 @@ func (b *FunctionBuilder) NewError(kind ErrorKind, tag ErrorTag, format string, 
 
 func (prog *Program) GetErrors() SSAErrors {
 	result := make(SSAErrors, 0)
-	for _, pkg := range prog.Packages {
-		for _, fun := range pkg.Funcs {
-			result = append(result, fun.err...)
-		}
-	}
+
+	prog.EachFunction(func(f *Function) {
+		result = append(result, f.err...)
+	})
 	return result
 }
 

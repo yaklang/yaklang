@@ -19,7 +19,7 @@ func check(t *testing.T, code string, regex string) {
 	})
 	prog.ShowWithSource()
 
-	printlnFunc := prog.Packages[0].Funcs[0].GetValuesByName("println")[0]
+	printlnFunc := prog.Packages["main"].Funcs["main"].GetValuesByName("println")[0]
 	for _, final := range printlnFunc.GetUsers() {
 		line := final.LineDisasm()
 		fmt.Println(line)

@@ -1,6 +1,8 @@
 package ssa4analyze
 
 import (
+	"fmt"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -31,11 +33,10 @@ func (t *TypeCheck) Run(prog *ssa.Program) {
 		}
 	}
 
-	for _, pkg := range prog.Packages {
-		for _, f := range pkg.Funcs {
-			analyzeOnFunction(f)
-		}
-	}
+	prog.EachFunction(func(f *ssa.Function) {
+		fmt.Println("name: ", f.GetVariable())
+		analyzeOnFunction(f)
+	})
 }
 
 func (t *TypeCheck) CheckOnInstruction(inst ssa.Instruction) {

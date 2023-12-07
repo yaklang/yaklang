@@ -25,11 +25,9 @@ func NewBlockCondition(config) Analyzer {
 type Edge map[*ssa.BasicBlock]map[*ssa.BasicBlock]ssa.Value
 
 func (s *BlockCondition) Run(prog *ssa.Program) {
-	for _, pkg := range prog.Packages {
-		for _, fun := range pkg.Funcs {
-			s.RunOnFunction(fun)
-		}
-	}
+	prog.EachFunction(func(f *ssa.Function) {
+		s.RunOnFunction(f)
+	})
 }
 
 func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
