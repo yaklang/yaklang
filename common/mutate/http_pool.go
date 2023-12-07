@@ -276,6 +276,12 @@ func _httpPool_redirectTimes(f int) HttpPoolConfigOption {
 	}
 }
 
+func _httpPool_noRedirects(i bool) HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.NoFollowRedirect = i
+	}
+}
+
 func _httpPool_Host(h string, isHttps bool) HttpPoolConfigOption {
 	return func(c *httpPoolConfig) {
 		var lower = strings.ToLower(h)
@@ -382,7 +388,6 @@ func NewDefaultHttpPoolConfig(opts ...HttpPoolConfigOption) *httpPoolConfig {
 		IsGmTLS:           false,
 		UseRawMode:        true,
 		RedirectTimes:     5,
-		NoFollowRedirect:  true,
 		FollowJSRedirect:  false,
 		Ctx:               context.Background(),
 		ForceFuzz:         true,
@@ -811,6 +816,7 @@ var HttpPoolExports = map[string]interface{}{
 	"perRequestTimeout":  _httpPool_PerRequestTimeout,
 	"rawMode":            _httpPool_RawMode,
 	"redirectTimes":      _httpPool_redirectTimes,
+	"noRedirect":         _httpPool_noRedirects,
 	"context":            _httpPool_SetContext,
 	"fuzz":               _httpPool_SetForceFuzz,
 	"fuzzParams":         _httpPool_SetFuzzParams,

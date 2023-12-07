@@ -1,0 +1,15 @@
+host, port = tcp.MockServe([]byte("HTTP/1.1 302 Redirect\r\nlocation: op2_admin.php\r\n\r\n"))
+
+freq = fuzz.HTTPRequest(f`GET / HTTP/1.1
+Host: ${str.HostPort(host, port)}
+
+`)~.ExecFirst(httpool.redirectTimes(3))~
+
+if freq.LowhttpResponse.RedirectRawPackets.Length() == 4 {
+    dump("redirectTimes ")
+    for _, i := range freq.LowhttpResponse.RedirectRawPackets {
+        dump(i.RespRecord.Url)
+    }
+} else {
+    die("redirectTimes failed")
+}
