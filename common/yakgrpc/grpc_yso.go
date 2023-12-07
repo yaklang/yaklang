@@ -41,6 +41,7 @@ const (
 	JavaClassGeneraterOption_IsObfuscation             JavaClassGeneraterOption = "isObfuscation"
 	JavaClassGeneraterOption_Bytes                     JavaClassGeneraterOption = "bytes"
 	JavaClassGeneraterOption_Command                   JavaClassGeneraterOption = "command"
+	JavaClassGeneraterOption_Version                   JavaClassGeneraterOption = "version"
 	JavaClassGeneraterOption_Domain                    JavaClassGeneraterOption = "domain"
 	JavaClassGeneraterOption_Host                      JavaClassGeneraterOption = "host"
 	JavaClassGeneraterOption_Port                      JavaClassGeneraterOption = "port"
@@ -137,11 +138,15 @@ func (s *Server) GetAllYsoClassOptions(ctx context.Context, req *ypb.YsoOptionsR
 	}, nil
 }
 func (s *Server) GetAllYsoClassGeneraterOptions(ctx context.Context, req *ypb.YsoOptionsRequerstWithVerbose) (*ypb.YsoClassOptionsResponseWithVerbose, error) {
+	versionOptions := []*ypb.YsoClassGeneraterOptionsWithVerbose{
+		{Key: string(JavaClassGeneraterOption_Version), Value: "52", Type: string(StringPort), KeyVerbose: "Java 版本", Help: "当前 Class 使用的Java 版本"},
+	}
 	commonOptions := []*ypb.YsoClassGeneraterOptionsWithVerbose{
 		{Key: string(JavaClassGeneraterOption_IsConstructer), Value: "false", Type: string(StringBool), KeyVerbose: "构造方法", Help: "开启则使用构造函数，否则使用静态代码块触发恶意代码"},
 		{Key: string(JavaClassGeneraterOption_IsObfuscation), Value: "true", Type: string(StringBool), KeyVerbose: "混淆", Help: "开启则混淆，否则不混淆"},
 		{Key: string(JavaClassGeneraterOption_ClassName), Value: utils.RandStringBytes(8), Type: string(String), KeyVerbose: "类名", Help: "类名"},
 	}
+	commonOptions = append(commonOptions, versionOptions...)
 	if checkGadgetIsTemplateSupported(req.Gadget) {
 		switch JavaBytesCodeType(req.Class) {
 		case JavaBytesCodeType_FromBytes:
@@ -206,9 +211,10 @@ func (s *Server) GetAllYsoClassGeneraterOptions(ctx context.Context, req *ypb.Ys
 		}
 	} else {
 		if JavaBytesCodeType(req.Class) == JavaBytesCodeType_RuntimeExec {
-			return &ypb.YsoClassOptionsResponseWithVerbose{Options: []*ypb.YsoClassGeneraterOptionsWithVerbose{
-				{Key: string(JavaClassGeneraterOption_Command), Value: "", Type: string(String), KeyVerbose: "命令", Help: "命令"},
-			}}, nil
+			versionOptions = append(versionOptions, &ypb.YsoClassGeneraterOptionsWithVerbose{
+				Key: string(JavaClassGeneraterOption_Command), Value: "", Type: string(String), KeyVerbose: "命令", Help: "命令",
+			})
+			return &ypb.YsoClassOptionsResponseWithVerbose{Options: versionOptions}, nil
 		} else if JavaBytesCodeType(req.Class) == JavaBytesCodeType_DNSlog {
 			return &ypb.YsoClassOptionsResponseWithVerbose{Options: []*ypb.YsoClassGeneraterOptionsWithVerbose{
 				{Key: string(JavaClassGeneraterOption_Domain), Value: "", Type: string(String), KeyVerbose: "DNSLog域名", Help: "填入DNSLog地址"},
@@ -256,6 +262,14 @@ func optionsToYaklangCode(options []*ypb.YsoClassGeneraterOptionsWithVerbose, is
 				preOptionsCode[option.Key] = option.Value
 				code := fmt.Sprintf("yso.%s(\"%s\")", "command", option.Value)
 				optionsCode = append(optionsCode, code)
+			}
+		case JavaClassGeneraterOption_Version:
+			if isClass {
+				v, err := strconv.Atoi(option.Value)
+				if err != nil {
+					v = 0
+				}
+				preOptionsCode[option.Key] = v
 			}
 		case JavaClassGeneraterOption_Domain:
 			if isClass {
@@ -380,6 +394,7 @@ if err {
 	log.error("%v",err)
 	return
 }
+classObj.MajorVersion = $version
 classBytes,err = yso.ToBytes(classObj)
 if err {
 	log.error("%v",err)
@@ -540,6 +555,9 @@ if err != nil {
 	default:
 		return "", nil, utils.Error("not support class")
 	}
+	version := preOptionsCode[string(JavaClassGeneraterOption_Version)]
+	code = utils.Format(code, map[string]string{"version": fmt.Sprint(version)})
+
 	if className != "" {
 		code = fmt.Sprintf("className = \"%s\"\n", className) + code
 	}
