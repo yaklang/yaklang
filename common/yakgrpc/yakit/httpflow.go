@@ -1299,3 +1299,20 @@ func QueryWebsocketFlowsByHTTPFlowHash(db *gorm.DB, req *ypb.DeleteHTTPFlowReque
 	}
 	return db
 }
+
+func ExportHTTPFlow(db *gorm.DB, params *ypb.ExportHTTPFlowsRequest) (paging *bizhelper.Paginator, ret []*HTTPFlow, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error(r)
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
+	db = BuildHTTPFlowQuery(db.Model(&HTTPFlow{}), params.ExportWhere)
+	db = db.Select(strings.Join(params.FieldName, " "))
+	paging, db = bizhelper.Paging(db.Debug(), int(params.ExportWhere.Pagination.Page), int(params.ExportWhere.Pagination.Limit), &ret)
+
+	if db.Error != nil {
+		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
+	}
+	return paging, ret, nil
+}

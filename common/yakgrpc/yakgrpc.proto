@@ -166,6 +166,8 @@ service Yak {
   rpc YakScriptRiskTypeList(Empty) returns (YakScriptRiskTypeListResponse);
   rpc SaveNewYakScript(SaveNewYakScriptRequest) returns (YakScript);
   rpc SaveYakScriptToOnline(SaveYakScriptToOnlineRequest) returns (stream SaveYakScriptToOnlineResponse);
+  rpc ExportLocalYakScript(ExportLocalYakScriptRequest) returns (ExportLocalYakScriptResponse);
+  rpc ImportYakScript(ImportYakScriptRequest) returns (stream ImportYakScriptResult);
 
   // HTTPFlow
   rpc GetHTTPFlowByHash(GetHTTPFlowByHashRequest) returns (HTTPFlow);
@@ -179,6 +181,7 @@ service Yak {
   rpc HTTPFlowsShare(HTTPFlowsShareRequest) returns (HTTPFlowsShareResponse);
   rpc HTTPFlowsExtract(HTTPFlowsExtractRequest) returns (Empty);
   rpc GetHTTPFlowBare(HTTPFlowBareRequest) returns (HTTPFlowBareResponse);
+  rpc ExportHTTPFlows(ExportHTTPFlowsRequest) returns(QueryHTTPFlowResponse);
 
   // 从一个 FuzzerRequest 中提取 Url
   rpc ExtractUrl(FuzzerRequest) returns (ExtractedUrl);
@@ -3463,6 +3466,31 @@ message ToOnlineResult {
   string ScriptName = 1;
 }
 
+message ExportLocalYakScriptRequest {
+  string OutputDir = 1;
+  string OutputPluginDir = 2;
+  repeated int64 YakScriptIds = 3;
+  string Keywords = 4;
+  string Type = 5;
+  string UserName = 6;
+  string Tags = 7;
+}
+
+message ExportLocalYakScriptResponse {
+  string OutputDir = 1;
+}
+
+message ImportYakScriptRequest {
+  repeated string Dirs = 1;
+}
+
+message ImportYakScriptResult {
+  // 进度
+  double Progress = 1;
+  string Message = 2;
+  string MessageType = 3;
+}
+
 message GetYakScriptTagsAndTypeResponse {
   repeated TagsAndType Type = 1;
   repeated TagsAndType Tag = 2;
@@ -3953,6 +3981,12 @@ message QueryHTTPFlowRequest {
   repeated string IncludeSuffix = 36;
   repeated string ExcludeSuffix = 37;
   repeated string ExcludeContentType = 38;
+}
+
+message ExportHTTPFlowsRequest {
+    QueryHTTPFlowRequest ExportWhere = 1;
+    repeated int64 Ids = 2;
+    repeated string FieldName = 3;
 }
 
 message DeleteHTTPFlowRequest {

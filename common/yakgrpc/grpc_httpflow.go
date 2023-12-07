@@ -499,3 +499,38 @@ func (s *Server) GetHTTPFlowBare(ctx context.Context, req *ypb.HTTPFlowBareReque
 		}, nil
 	}
 }
+
+func (s *Server) ExportHTTPFlows(ctx context.Context, req *ypb.ExportHTTPFlowsRequest) (*ypb.QueryHTTPFlowResponse, error) {
+	if req.FieldName == nil {
+		return nil, utils.Errorf("params is empty")
+	}
+	paging, data, err := yakit.ExportHTTPFlow(s.GetProjectDatabase(), req)
+	if err != nil {
+		return nil, err
+	}
+
+	start := time.Now()
+	var res []*ypb.HTTPFlow
+	for _, r := range data {
+		m, err := r.ToGRPCModel(req.ExportWhere.Full)
+		if err != nil {
+			return nil, utils.Errorf("cannot convert httpflow failed: %s", err)
+		}
+		res = append(res, m)
+	}
+	cost := time.Now().Sub(start)
+	if cost.Milliseconds() > 200 {
+		log.Infof("finished converting httpflow(%v) cost: %s", len(res), cost)
+	}
+
+	return &ypb.QueryHTTPFlowResponse{
+		Pagination: &ypb.Paging{
+			Page:    int64(paging.Page),
+			Limit:   int64(paging.Limit),
+			OrderBy: req.ExportWhere.GetPagination().GetOrderBy(),
+			Order:   req.ExportWhere.GetPagination().GetOrder(),
+		},
+		Total: int64(paging.TotalRecord),
+		Data:  res,
+	}, nil
+}

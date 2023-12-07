@@ -331,3 +331,19 @@ func TestHTTPFlowTreeHelper(t *testing.T) {
 	var result = yakit.GetHTTPFlowNextPartPathByPathPrefix(consts.GetGormProjectDatabase(), "v1")
 	spew.Dump(result)
 }
+
+func TestExportHTTPFlows(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := client.ExportHTTPFlows(context.Background(), &ypb.ExportHTTPFlowsRequest{
+		ExportWhere: nil,
+		Ids:         []int64{1, 2, 3, 4, 5},
+		FieldName:   []string{"url", "method", "status_code"},
+	})
+	if err != nil {
+		t.Fatalf("export httpFlows error: %v", err)
+	}
+	_ = response
+}
