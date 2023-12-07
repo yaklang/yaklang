@@ -1064,7 +1064,7 @@ func pochttp(packet []byte, config *_pocConfig) (*lowhttp.LowhttpResponse, error
 // rsp, req, err = poc.HTTPEx(`GET / HTTP/1.1\r\nHost: www.yaklang.com\r\n\r\n`, poc.https(true), poc.replaceHeader("AAA", "BBB")) // 向yaklang.com发送一个基于HTTPS协议的GET请求，并且添加一个请求头AAA，它的值为BBB
 // desc(rsp) // 查看响应结构体中的可用字段
 // ```
-func pocHTTPEx(i interface{}, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
+func HTTPEx(i interface{}, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
 	packet, config, err := handleRawPacketAndConfig(i, opts...)
 	if err != nil {
 		return nil, nil, err
@@ -1086,7 +1086,7 @@ func pocHTTPEx(i interface{}, opts ...PocConfig) (*lowhttp.LowhttpResponse, *htt
 // raw = poc.BuildRequest(poc.BasicRequest(), poc.https(true), poc.replaceHost("yaklang.com"), poc.replacePath("/docs/api/poc")) // 构建一个基础GET请求，修改其Host为yaklang.com，访问的URI路径为/docs/api/poc
 // // raw = b"GET /docs/api/poc HTTP/1.1\r\nHost: www.yaklang.com\r\n\r\n"
 // ```
-func buildRequest(i interface{}, opts ...PocConfig) []byte {
+func BuildRequest(i interface{}, opts ...PocConfig) []byte {
 	packet, _, err := handleRawPacketAndConfig(i, opts...)
 	if err != nil {
 		log.Errorf("build request error: %s", err)
@@ -1212,7 +1212,7 @@ func DoOPTIONS(urlStr string, opts ...PocConfig) (*lowhttp.LowhttpResponse, *htt
 // )
 // time.Sleep(100)
 // ```
-func doWebSocket(raw interface{}, opts ...PocConfig) ([]byte, []byte, error) {
+func DoWebSocket(raw interface{}, opts ...PocConfig) ([]byte, []byte, error) {
 	opts = append(opts, WithWebsocket(true))
 	return HTTP(raw, opts...)
 }
@@ -1280,9 +1280,9 @@ func httpRequestToCurl(https bool, i any) string {
 
 var PoCExports = map[string]interface{}{
 	"HTTP":         HTTP,
-	"HTTPEx":       pocHTTPEx,
+	"HTTPEx":       HTTPEx,
 	"BasicRequest": lowhttp.BasicRequest,
-	"BuildRequest": buildRequest,
+	"BuildRequest": BuildRequest,
 	"Get":          DoGET,
 	"Post":         DoPOST,
 	"Head":         DoHEAD,
@@ -1290,7 +1290,7 @@ var PoCExports = map[string]interface{}{
 	"Options":      DoOPTIONS,
 	"Do":           Do,
 	// websocket，可以直接复用 HTTP 参数
-	"Websocket": doWebSocket,
+	"Websocket": DoWebSocket,
 
 	// options
 	"host":                 WithHost,
