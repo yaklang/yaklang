@@ -83,7 +83,7 @@ func (p *Phi) LineDisasm() string {
 
 func (c *ConstInst) LineDisasm() string {
 	// return fmt.Sprintf("const(%s)", c.String())
-	if !c.isIdentify && reflect.TypeOf(c.Const.value).Kind() == reflect.String {
+	if c.Const.value != nil && !c.isIdentify && reflect.TypeOf(c.Const.value).Kind() == reflect.String {
 		return fmt.Sprintf("\"%s\"", c.String())
 	} else {
 		return fmt.Sprintf("%s", c.String())
