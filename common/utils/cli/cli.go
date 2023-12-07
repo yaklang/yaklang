@@ -20,6 +20,7 @@ type cliExtraParams struct {
 	defaultValue interface{}
 	helpInfo     string
 	required     bool
+	tempArgs     []string
 	_type        string
 }
 
@@ -61,6 +62,9 @@ func InjectCliArgs(args []string) {
 
 func (param *cliExtraParams) foundArgsIndex() int {
 	args := _getArgs()
+	if param.tempArgs != nil {
+		args = param.tempArgs
+	}
 	for _, opt := range param.params {
 		if ret := utils.StringArrayIndex(args, opt); ret < 0 {
 			continue
@@ -85,7 +89,7 @@ func (param *cliExtraParams) GetDefaultValue(i interface{}) interface{} {
 	return i
 }
 
-type setCliExtraParam func(c *cliExtraParams)
+type SetCliExtraParam func(c *cliExtraParams)
 
 func _help(w ...io.Writer) {
 	var writer io.Writer = os.Stdout
@@ -130,25 +134,31 @@ func _cliSetDocument(document string) {
 	cliDocument = document
 }
 
-func _cliSetDefaultValue(i interface{}) setCliExtraParam {
+func _cliSetDefaultValue(i interface{}) SetCliExtraParam {
 	return func(c *cliExtraParams) {
 		c.defaultValue = i
 	}
 }
 
-func _cliSetHelpInfo(i string) setCliExtraParam {
+func _cliSetHelpInfo(i string) SetCliExtraParam {
 	return func(c *cliExtraParams) {
 		c.helpInfo = i
 	}
 }
 
-func _cliSetRequired(t bool) setCliExtraParam {
+func SetTempArgs(args []string) SetCliExtraParam {
+	return func(c *cliExtraParams) {
+		c.tempArgs = args
+	}
+}
+
+func _cliSetRequired(t bool) SetCliExtraParam {
 	return func(c *cliExtraParams) {
 		c.required = t
 	}
 }
 
-func _getExtraParams(name string, opts ...setCliExtraParam) *cliExtraParams {
+func _getExtraParams(name string, opts ...SetCliExtraParam) *cliExtraParams {
 	optName := name
 	optShortName := ""
 	if strings.Contains(name, " ") {
@@ -196,13 +206,16 @@ func _getArgs() []string {
 	return Args
 }
 
-func _cliFromString(name string, opts ...setCliExtraParam) (string, *cliExtraParams) {
+func _cliFromString(name string, opts ...SetCliExtraParam) (string, *cliExtraParams) {
 	param := _getExtraParams(name, opts...)
 	index := param.foundArgsIndex()
 	if index < 0 {
 		return utils.InterfaceToString(param.GetDefaultValue("")), param
 	}
 	args := _getArgs()
+	if param.tempArgs != nil {
+		args = param.tempArgs
+	}
 	if index+1 >= len(args) {
 		// 防止数组越界
 		return utils.InterfaceToString(param.GetDefaultValue("")), param
@@ -210,7 +223,7 @@ func _cliFromString(name string, opts ...setCliExtraParam) (string, *cliExtraPar
 	return args[index+1], param
 }
 
-func _cliBool(name string, opts ...setCliExtraParam) bool {
+func _cliBool(name string, opts ...SetCliExtraParam) bool {
 	c := _getExtraParams(name, opts...)
 	c._type = "bool"
 	c.required = false
@@ -222,7 +235,7 @@ func _cliBool(name string, opts ...setCliExtraParam) bool {
 	return true
 }
 
-func CliString(name string, opts ...setCliExtraParam) string {
+func CliString(name string, opts ...SetCliExtraParam) string {
 	s, c := _cliFromString(name, opts...)
 	c._type = "string"
 	return s
@@ -236,7 +249,7 @@ func parseInt(s string) int {
 	return int(i)
 }
 
-func _cliInt(name string, opts ...setCliExtraParam) int {
+func _cliInt(name string, opts ...SetCliExtraParam) int {
 	s, c := _cliFromString(name, opts...)
 	c._type = "int"
 	if s == "" {
@@ -254,7 +267,7 @@ func parseFloat(s string) float64 {
 	return float64(i)
 }
 
-func _cliFloat(name string, opts ...setCliExtraParam) float64 {
+func _cliFloat(name string, opts ...SetCliExtraParam) float64 {
 	s, c := _cliFromString(name, opts...)
 	c._type = "float"
 	if s == "" {
@@ -263,7 +276,7 @@ func _cliFloat(name string, opts ...setCliExtraParam) float64 {
 	return parseFloat(s)
 }
 
-func _cliUrls(name string, opts ...setCliExtraParam) []string {
+func _cliUrls(name string, opts ...SetCliExtraParam) []string {
 	s, c := _cliFromString(name, opts...)
 	c._type = "urls"
 	ret := utils.ParseStringToUrlsWith3W(utils.ParseStringToHosts(s)...)
@@ -273,7 +286,7 @@ func _cliUrls(name string, opts ...setCliExtraParam) []string {
 	return ret
 }
 
-func _cliPort(name string, opts ...setCliExtraParam) []int {
+func _cliPort(name string, opts ...SetCliExtraParam) []int {
 	s, c := _cliFromString(name, opts...)
 	c._type = "port"
 	ret := utils.ParseStringToPorts(s)
@@ -283,7 +296,7 @@ func _cliPort(name string, opts ...setCliExtraParam) []int {
 	return ret
 }
 
-func _cliHosts(name string, opts ...setCliExtraParam) []string {
+func _cliHosts(name string, opts ...SetCliExtraParam) []string {
 	s, c := _cliFromString(name, opts...)
 	c._type = "hosts"
 	ret := utils.ParseStringToHosts(s)
@@ -295,7 +308,7 @@ func _cliHosts(name string, opts ...setCliExtraParam) []string {
 	return ret
 }
 
-func _cliFile(name string, opts ...setCliExtraParam) []byte {
+func _cliFile(name string, opts ...SetCliExtraParam) []byte {
 	s, c := _cliFromString(name, opts...)
 	c._type = "file"
 	c.required = true
@@ -319,7 +332,7 @@ func _cliFile(name string, opts ...setCliExtraParam) []byte {
 	return raw
 }
 
-func _cliFileOrContent(name string, opts ...setCliExtraParam) []byte {
+func _cliFileOrContent(name string, opts ...SetCliExtraParam) []byte {
 	s, c := _cliFromString(name, opts...)
 	c._type = "file_or_content"
 	ret := utils.StringAsFileParams(s)
@@ -331,7 +344,7 @@ func _cliFileOrContent(name string, opts ...setCliExtraParam) []byte {
 	return ret
 }
 
-func _cliLineDict(name string, opts ...setCliExtraParam) []string {
+func _cliLineDict(name string, opts ...SetCliExtraParam) []string {
 	bytes, c := _cliFromString(name, opts...)
 	c._type = "file-or-content"
 	raw := utils.StringAsFileParams(bytes)
