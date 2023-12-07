@@ -10,11 +10,29 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yak2ssa"
 )
 
-var ttlSSAParseCache = ttlcache.NewCache()
+type Language string
+
+const (
+	JS  Language = "js"
+	Yak Language = "yak"
+)
+
+type LanguageParser interface {
+	Parse(string, bool, func(*ssa.FunctionBuilder)) *ssa.Program
+}
+
+var (
+	LanguageParsers = map[Language]LanguageParser{
+		Yak: yak2ssa.NewParser(),
+		JS:  js2ssa.NewParser(),
+	}
+)
 
 type config struct {
 	language Language
-	code     string
+	Parser   LanguageParser
+	// code     string
+	ignoreSyntaxErr bool
 
 	externLib   map[string]map[string]any
 	externValue map[string]any
@@ -24,8 +42,9 @@ type config struct {
 
 func defaultConfig() *config {
 	return &config{
-		language:    Yak,
-		code:        "",
+		language: Yak,
+		Parser:   LanguageParsers[Yak],
+		// code:        "",
 		externLib:   make(map[string]map[string]any),
 		externValue: make(map[string]any),
 	}
@@ -33,16 +52,12 @@ func defaultConfig() *config {
 
 type Option func(*config)
 
-type Language string
-
-const (
-	JS  Language = "js"
-	Yak Language = "yak"
-)
-
 func WithLanguage(language Language) Option {
 	return func(c *config) {
 		c.language = language
+		if parser, ok := LanguageParsers[language]; ok {
+			c.Parser = parser
+		}
 	}
 }
 
@@ -71,10 +86,30 @@ func WithExternMethod(b ssa.MethodBuilder) Option {
 	}
 }
 
+func WithIgnoreSyntaxError(b ...bool) Option {
+	return func(c *config) {
+		if len(b) > 1 {
+			c.ignoreSyntaxErr = b[0]
+		} else {
+			c.ignoreSyntaxErr = true
+		}
+	}
+
+}
+
 func Parse(code string, opts ...Option) *Program {
+	return parse(code, opts...)
+}
+
+var ttlSSAParseCache = ttlcache.NewCache()
+
+func parse(code string, opts ...Option) *Program {
 	config := defaultConfig()
 	for _, opt := range opts {
 		opt(config)
+	}
+	if config.Parser == nil {
+		return nil
 	}
 	hash := utils.CalcSha1(code, config.language)
 	if prog, ok := ttlSSAParseCache.Get(hash); ok {
@@ -82,22 +117,19 @@ func Parse(code string, opts ...Option) *Program {
 		return prog.(*Program)
 	}
 
-	callback := func(fb *ssa.FunctionBuilder) {
-		fb.WithExternLib(config.externLib)
-		fb.WithExternValue(config.externValue)
-		fb.WithExternMethod(config.externMethod)
-	}
+	prog := NewProgram(parseWithConfig(code, config))
 
-	var ret *ssa.Program
-	switch config.language {
-	case JS:
-		ret = js2ssa.ParseSSA(code, callback)
-	case Yak:
-		ret = yak2ssa.ParseSSA(code, callback)
-	}
-	prog := NewProgram(ret)
 	ttlSSAParseCache.SetWithTTL(hash, prog, 30*time.Minute)
 	return prog
+}
+
+func parseWithConfig(code string, c *config) *ssa.Program {
+	callback := func(fb *ssa.FunctionBuilder) {
+		fb.WithExternLib(c.externLib)
+		fb.WithExternValue(c.externValue)
+		fb.WithExternMethod(c.externMethod)
+	}
+	return c.Parser.Parse(code, c.ignoreSyntaxErr, callback)
 }
 
 var Exports = map[string]any{

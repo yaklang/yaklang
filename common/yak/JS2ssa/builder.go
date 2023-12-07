@@ -9,33 +9,52 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 )
 
+type Parser struct {
+}
+
+func NewParser() *Parser {
+	return &Parser{}
+}
+
+func (p *Parser) Parse(src string, must bool, callBack func(*ssa.FunctionBuilder)) *ssa.Program {
+	return parseSSA(src, must, nil, callBack)
+}
+
 type astbuilder struct {
 	*ssa.FunctionBuilder
 }
 
-type builder struct {
-	ast      *JS.ProgramContext
-	prog     *ssa.Program
-	callback func(*ssa.FunctionBuilder)
+func parseSSA(src string, force bool, prog *ssa.Program, callback func(*ssa.FunctionBuilder)) (ret *ssa.Program) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("recover from js2ssa.parseSSA: ", r)
+			// fmt.Println("\n\n\n!!!!!!!\n\n!!!!!\n\nRecovered in parseSSA", r)
+			// debug.PrintStack()
+			ret = nil
+		}
+	}()
+
+	frontend(src, force, func(ast *JS.ProgramContext) {
+		if prog == nil {
+			prog = ssa.NewProgram()
+		}
+		funcBuilder := prog.GetAndCreateMainFunctionBuilder()
+		if funcBuilder == nil {
+			return
+		}
+		if callback != nil {
+			callback(funcBuilder)
+		}
+		astbuilder := astbuilder{
+			FunctionBuilder: funcBuilder,
+		}
+		astbuilder.build(ast)
+		astbuilder.Finish()
+	})
+
+	ssa4analyze.RunAnalyzer(prog)
+	return prog
 }
-
-func (b *builder) Build() {
-	pkg := ssa.NewPackage("main")
-	b.prog.AddPackage(pkg)
-	main := pkg.NewFunction("yak-main")
-	funcBuilder := ssa.NewBuilder(main, nil)
-	if b.callback != nil {
-		b.callback(funcBuilder)
-	}
-
-	astbuilder := astbuilder{
-		FunctionBuilder: funcBuilder,
-	}
-	astbuilder.build(b.ast)
-	astbuilder.Finish()
-}
-
-var _ (ssa.Builder) = (*builder)(nil)
 
 // error listener for lexer and parser
 type ErrorListener struct {
@@ -54,16 +73,7 @@ func NewErrorListener() *ErrorListener {
 	}
 }
 
-func ParseSSA(src string, f func(*ssa.FunctionBuilder)) (prog *ssa.Program) {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Println("recover from js2ssa.ParseSSA: ", r)
-			// fmt.Println("Recovered in parseSSA", r)
-			// debug.PrintStack()
-			prog = nil
-		}
-	}()
-
+func frontend(src string, must bool, handler func(*JS.ProgramContext)) {
 	errListener := NewErrorListener()
 	lexer := JS.NewJavaScriptLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()
@@ -74,16 +84,7 @@ func ParseSSA(src string, f func(*ssa.FunctionBuilder)) (prog *ssa.Program) {
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
 	ast := parser.Program().(*JS.ProgramContext)
-	if len(errListener.err) > 0 {
-		return nil
+	if must || len(errListener.err) == 0 {
+		handler(ast)
 	}
-	prog = ssa.NewProgram()
-	builder := &builder{
-		ast:      ast,
-		prog:     prog,
-		callback: f,
-	}
-	prog.Build(builder)
-	ssa4analyze.NewAnalyzerGroup(prog).Run()
-	return prog
 }
