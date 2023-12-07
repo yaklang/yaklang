@@ -291,7 +291,7 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 			if total < size {
 				total = size + 1
 			}
-			return yakit.CreateOrUpdatePayload(s.GetProfileDatabase(), data, req.GetGroup(), req.GetFolder(), hitCount)
+			return yakit.CreateOrUpdatePayload(s.GetProfileDatabase(), data, req.GetGroup(), req.GetFolder(), hitCount, false)
 		})
 	}
 
@@ -318,7 +318,7 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 			if total < size {
 				total = size + 1
 			}
-			return yakit.CreateOrUpdatePayload(s.GetProfileDatabase(), data, req.GetGroup(), req.GetFolder(), 0)
+			return yakit.CreateOrUpdatePayload(s.GetProfileDatabase(), data, req.GetGroup(), req.GetFolder(), 0, false)
 		}); err != nil {
 			log.Errorf("save payload group by content error: %s", err.Error())
 		}
@@ -463,7 +463,7 @@ func (s *Server) SavePayloadToFileStream(req *ypb.SavePayloadRequest, stream ypb
 	}
 	feedback(0.99, "写入文件完成")
 	folder := req.GetFolder()
-	yakit.CreateOrUpdatePayload(s.GetProfileDatabase(), fileName, req.GetGroup(), folder, 0)
+	yakit.CreateOrUpdatePayload(s.GetProfileDatabase(), fileName, req.GetGroup(), folder, 0, true)
 	yakit.SetGroupInEnd(s.GetProfileDatabase(), req.GetGroup())
 	if total == 0 {
 		return utils.Error("empty data no payload created")
@@ -687,7 +687,7 @@ func (s *Server) CreatePayloadFolder(ctx context.Context, req *ypb.NameRequest) 
 	if req.Name == "" {
 		return nil, utils.Errorf("name is Empty")
 	}
-	if err := yakit.CreateOrUpdatePayload(s.GetProfileDatabase(), "", getEmptyFolderName(req.Name), req.Name, 0); err != nil {
+	if err := yakit.CreateOrUpdatePayload(s.GetProfileDatabase(), "", getEmptyFolderName(req.Name), req.Name, 0, false); err != nil {
 		return nil, err
 	} else {
 		return &ypb.Empty{}, nil
@@ -1073,7 +1073,7 @@ func (s *Server) ConvertPayloadGroupToDatabase(req *ypb.NameRequest, stream ypb.
 	for lineB := range ch {
 		line := utils.UnsafeBytesToString(lineB)
 		size += int64(len(line))
-		yakit.CreateOrUpdatePayload(s.GetProfileDatabase(), line, group.Group, folder, 0)
+		yakit.CreateOrUpdatePayload(s.GetProfileDatabase(), line, group.Group, folder, 0, false)
 	}
 	yakit.UpdatePayloadGroup(s.GetProfileDatabase(), group.Group, folder, groupindex)
 	return nil
