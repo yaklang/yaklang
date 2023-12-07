@@ -11,6 +11,9 @@ func (p *Package) NewFunction(name string) *Function {
 }
 func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function {
 	index := len(p.Funcs)
+	if index == 0 {
+		name = "main"
+	}
 	if name == "" {
 		if parent != nil {
 			name = fmt.Sprintf("%s$%d", parent.GetVariable(), index)
@@ -37,14 +40,15 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		externInstance: make(map[string]Value),
 		externType:     make(map[string]Type),
 		err:            make(SSAErrors, 0),
-		builder:        &FunctionBuilder{},
+		builder:        nil,
 	}
 	f.SetVariable(name)
-	p.Funcs = append(p.Funcs, f)
 	if parent != nil {
 		parent.addAnonymous(f)
 		// Pos: parent.CurrentPos,
 		f.Pos = parent.builder.CurrentPos
+	} else {
+		p.Funcs[name] = f
 	}
 	f.EnterBlock = f.NewBasicBlock("entry")
 	f.symbolObject.SetFunc(f)
@@ -77,8 +81,7 @@ func (f *Function) ReturnValue() []Value {
 }
 
 func (f *Function) IsMain() bool {
-	pkg := f.Package
-	return f == pkg.Funcs[0]
+	return f.GetVariable() == "main"
 }
 
 func (f *Function) GetDeferBlock() *BasicBlock {

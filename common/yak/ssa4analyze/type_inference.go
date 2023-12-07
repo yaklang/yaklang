@@ -21,11 +21,9 @@ func NewTypeInference(config) Analyzer {
 }
 
 func (t *TypeInference) Run(prog *ssa.Program) {
-	for _, pkg := range prog.Packages {
-		for _, fun := range pkg.Funcs {
-			t.RunOnFunction(fun)
-		}
-	}
+	prog.EachFunction(func(f *ssa.Function) {
+		t.RunOnFunction(f)
+	})
 }
 
 func (t *TypeInference) RunOnFunction(fun *ssa.Function) {

@@ -21,7 +21,7 @@ func check(t *testing.T, code string, funcs string, regex string) {
 	prog := ParseSSA(code, none)
 	prog.ShowWithSource()
 
-	showFunc := prog.Packages[0].Funcs[0].GetValuesByName(funcs)[0]
+	showFunc := prog.Packages["main"].Funcs["main"].GetValuesByName(funcs)[0]
 	for _, v := range showFunc.GetUsers() {
 		line := v.LineDisasm()
 		fmt.Println(line)
