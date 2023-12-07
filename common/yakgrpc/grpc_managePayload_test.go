@@ -60,54 +60,6 @@ func backUpOrCopyPayloads(local ypb.YakClient, t *testing.T, ids []int64, group,
 	}
 }
 
-func getAllPayload(local ypb.YakClient, t *testing.T, group, folder, savePath string) string {
-	t.Helper()
-	client, err := local.GetAllPayload(context.Background(), &ypb.GetAllPayloadRequest{
-		Group:    group,
-		Folder:   folder,
-		SavePath: savePath,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	for {
-		_, err := client.Recv()
-		if err != nil {
-			t.Log(err)
-			break
-		}
-	}
-	content, err := os.ReadFile(savePath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return utils.UnsafeBytesToString(content)
-}
-
-func getAllPayloadFromFile(local ypb.YakClient, t *testing.T, group, folder, savePath string) string {
-	t.Helper()
-	client, err := local.GetAllPayloadFromFile(context.Background(), &ypb.GetAllPayloadRequest{
-		Group:    group,
-		Folder:   folder,
-		SavePath: savePath,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	for {
-		_, err := client.Recv()
-		if err != nil {
-			t.Log(err)
-			break
-		}
-	}
-	content, err := os.ReadFile(savePath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return utils.UnsafeBytesToString(content)
-}
-
 func getAllPayloadGroup(local ypb.YakClient, t *testing.T) []*ypb.PayloadGroupNode {
 	t.Helper()
 	rsp, err := local.GetAllPayloadGroup(context.Background(), &ypb.Empty{})
@@ -327,11 +279,11 @@ func queryFromFile(local ypb.YakClient, t *testing.T, group, folder string) *ypb
 	return rsp
 }
 
-func getPayloadFromFile(local ypb.YakClient, t *testing.T, group string, savePath string) string {
+func exportPayloadFromFile(local ypb.YakClient, t *testing.T, group, folder, savePath string) string {
 	t.Helper()
-	client, err := local.GetAllPayloadFromFile(context.Background(), &ypb.GetAllPayloadRequest{
+	client, err := local.ExportAllPayloadFromFile(context.Background(), &ypb.GetAllPayloadRequest{
 		Group:    group,
-		Folder:   "",
+		Folder:   folder,
 		SavePath: savePath,
 	})
 	if err != nil {
@@ -352,11 +304,11 @@ func getPayloadFromFile(local ypb.YakClient, t *testing.T, group string, savePat
 	return utils.UnsafeBytesToString(content)
 }
 
-func getPayload(local ypb.YakClient, t *testing.T, group string, savePath string) string {
+func exportPayload(local ypb.YakClient, t *testing.T, group, folder string, savePath string) string {
 	t.Helper()
-	client, err := local.GetAllPayload(context.Background(), &ypb.GetAllPayloadRequest{
+	client, err := local.ExportAllPayload(context.Background(), &ypb.GetAllPayloadRequest{
 		Group:    group,
-		Folder:   "",
+		Folder:   folder,
 		SavePath: savePath,
 	})
 	if err != nil {
@@ -699,8 +651,8 @@ func TestPayload(t *testing.T) {
 		}()
 
 		// export group1 payload
-		got1 := getAllPayload(local, t, group1, "", f.Name())
-		got2 := getAllPayloadFromFile(local, t, group2, "", f2.Name())
+		got1 := exportPayload(local, t, group1, "", f.Name())
+		got2 := exportPayloadFromFile(local, t, group2, "", f2.Name())
 
 		// compare payload
 		comparePayload(got1, data, t)
