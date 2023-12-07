@@ -11,6 +11,30 @@ func TestParseSSA_Smoking2(t *testing.T) {
 `, nil)
 }
 
+func TestParseCLS(t *testing.T) {
+	ParseSSA(`<?php
+
+class A {
+	private $num;
+
+	public function __construct($num) {
+		this.$num = $num;
+	}
+
+	public function getNum() {
+		return this.$num;
+	}
+}
+
+$a = new A(1);
+echo $a;
+
+/*
+	build a named struct as object template
+*/
+`, nil)
+}
+
 func TestParseSSA_1(t *testing.T) {
 	ParseSSA(`<?php
 

@@ -62,19 +62,6 @@ func (y *builder) VisitGlobalConstantDeclaration(raw phpparser.IGlobalConstantDe
 	return nil
 }
 
-func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) interface{} {
-	if y == nil || raw == nil {
-		return nil
-	}
-
-	i, _ := raw.(*phpparser.ClassDeclarationContext)
-	if i == nil {
-		return nil
-	}
-
-	return nil
-}
-
 func (y *builder) VisitFunctionDeclaration(raw phpparser.IFunctionDeclarationContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
@@ -242,6 +229,48 @@ func (y *builder) VisitInnerStatement(raw phpparser.IInnerStatementContext) inte
 		y.VisitClassDeclaration(i.ClassDeclaration())
 	} else {
 		log.Infof("unknown inner statement: %v", i.GetText())
+	}
+
+	return nil
+}
+
+func (y *builder) VisitTypeHint(raw phpparser.ITypeHintContext) interface{} {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*phpparser.TypeHintContext)
+	if i == nil {
+		return nil
+	}
+
+	if i.QualifiedStaticTypeRef() != nil {
+		y.VisitQualifiedStaticTypeRef(i.QualifiedStaticTypeRef())
+	} else if i.Callable() != nil {
+		_ = i.Callable().GetText()
+	} else if i.PrimitiveType() != nil {
+		y.VisitPrimitiveType(i.PrimitiveType())
+	} else if i.Pipe() != nil {
+
+	}
+
+	return nil
+}
+
+func (y *builder) VisitQualifiedStaticTypeRef(raw phpparser.IQualifiedStaticTypeRefContext) interface{} {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*phpparser.QualifiedStaticTypeRefContext)
+	if i == nil {
+		return nil
+	}
+
+	if i.Static() != nil {
+		return i.Static().GetText()
+	} else if i.QualifiedNamespaceName() != nil {
+		return y.VisitQualifiedNamespaceName(i.QualifiedNamespaceName())
 	}
 
 	return nil
