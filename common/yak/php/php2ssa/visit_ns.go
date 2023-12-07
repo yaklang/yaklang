@@ -5,6 +5,19 @@ import (
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 )
 
+func (y *builder) VisitQualifiedNamespaceNameList(raw phpparser.IQualifiedNamespaceNameListContext) interface{} {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*phpparser.QualifiedNamespaceNameListContext)
+	if i == nil {
+		return nil
+	}
+
+	return nil
+}
+
 func (y *builder) VisitQualifiedNamespaceName(raw phpparser.IQualifiedNamespaceNameContext) interface{} {
 	if y == nil || raw == nil {
 		return nil

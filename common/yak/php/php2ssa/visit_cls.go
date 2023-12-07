@@ -178,13 +178,252 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext) inte
 
 	var memberDecorationVerbose string
 	if i.PropertyModifiers() != nil {
+		// handle variable
 		memberDecorationVerbose = i.PropertyModifiers().GetText()
+		if i.TypeHint() != nil {
+			// handle type hint
+			y.VisitTypeHint(i.TypeHint())
+		}
+
+		// handle variable name
+		for _, va := range i.AllVariableInitializer() {
+			y.VisitVariableInitializer(va)
+		}
+
+		return nil
+	} else if i.MemberModifiers() != nil {
+		memberDecorationVerbose = i.MemberModifiers().GetText()
+		// const / function
+		if i.Const() != nil {
+			// handle const
+			if i.TypeHint() != nil {
+				varType := y.VisitTypeHint(i.TypeHint())
+				_ = varType
+			}
+			for _, c := range i.AllIdentifierInitializer() {
+				y.VisitIdentifierInitializer(c)
+			}
+		} else if i.Function_() != nil {
+			isFuncRef := i.Ampersand() != nil
+			var funcName = i.Identifier()
+			if i.FormalParameterList() != nil {
+				// handle formal parameter list
+				y.VisitFormalParameterList(i.FormalParameterList())
+			}
+			_, _ = isFuncRef, funcName
+
+			// baseCtorCall
+			if i.BaseCtorCall() != nil {
+				// handle base ctor call
+				y.VisitBaseCtorCall(i.BaseCtorCall())
+			} else if i.ReturnTypeDecl() != nil {
+				// handle return type decl
+				y.VisitReturnTypeDecl(i.ReturnTypeDecl())
+			}
+
+			y.VisitMethodBody(i.MethodBody())
+		}
+	} else if i.Use() != nil {
+		y.VisitQualifiedNamespaceNameList(i.QualifiedNamespaceNameList())
+		y.VisitTraitAdaptations(i.TraitAdaptations())
 	}
 	_ = memberDecorationVerbose
 
-	if i.TypeHint() != nil {
-		// handle type hint
+	return nil
+}
 
+func (y *builder) VisitTraitAdaptations(raw phpparser.ITraitAdaptationsContext) interface{} {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*phpparser.TraitAdaptationsContext)
+	if i == nil {
+		return nil
+	}
+
+	for _, t := range i.AllTraitAdaptationStatement() {
+		y.VisitTraitAdaptationStatement(t)
+	}
+
+	return nil
+}
+
+func (y *builder) VisitTraitAdaptationStatement(raw phpparser.ITraitAdaptationStatementContext) interface{} {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*phpparser.TraitAdaptationStatementContext)
+	if i == nil {
+		return nil
+	}
+
+	if i.TraitPrecedence() != nil {
+		y.VisitTraitPrecedence(i.TraitPrecedence())
+	} else if i.TraitAlias() != nil {
+		// trait alias
+		y.VisitTraitAlias(i.TraitAlias())
+	} else {
+		y.main.NewError(ssa.Warn, "trait.adaptation", "unknown trait adaptation statement")
+	}
+
+	return nil
+}
+
+func (y *builder) VisitTraitAlias(raw phpparser.ITraitAliasContext) interface{} {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*phpparser.TraitAliasContext)
+	if i == nil {
+		return nil
+	}
+
+	i.TraitMethodReference()
+	if i.Identifier() != nil {
+		// memberModifier
+		y.VisitIdentifier(i.Identifier())
+	} else {
+		idStr := i.MemberModifier().GetText()
+		_ = idStr
+	}
+
+	return nil
+}
+
+func (y *builder) VisitTraitPrecedence(raw phpparser.ITraitPrecedenceContext) interface{} {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*phpparser.TraitPrecedenceContext)
+	if i == nil {
+		return nil
+	}
+
+	y.VisitQualifiedNamespaceName(i.QualifiedNamespaceName())
+	y.VisitIdentifier(i.Identifier())
+	y.VisitQualifiedNamespaceNameList(i.QualifiedNamespaceNameList())
+
+	return nil
+}
+
+func (y *builder) VisitMethodBody(raw phpparser.IMethodBodyContext) interface{} {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*phpparser.MethodBodyContext)
+	if i == nil {
+		return nil
+	}
+
+	return nil
+}
+
+func (y *builder) VisitReturnTypeDecl(raw phpparser.IReturnTypeDeclContext) interface{} {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*phpparser.ReturnTypeDeclContext)
+	if i == nil {
+		return nil
+	}
+
+	allowNull := i.QuestionMark() != nil
+	t := y.VisitTypeHint(i.TypeHint())
+	_ = allowNull
+	// t.Union(Null)
+
+	return t
+}
+
+func (y *builder) VisitBaseCtorCall(raw phpparser.IBaseCtorCallContext) interface{} {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*phpparser.BaseCtorCallContext)
+	if i == nil {
+		return nil
+	}
+
+	return nil
+}
+
+func (y *builder) VisitFormalParameterList(raw phpparser.IFormalParameterListContext) interface{} {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*phpparser.FormalParameterListContext)
+	if i == nil {
+		return nil
+	}
+
+	for _, param := range i.AllFormalParameter() {
+		y.VisitFormalParameter(param)
+	}
+
+	return nil
+}
+
+func (y *builder) VisitFormalParameter(raw phpparser.IFormalParameterContext) interface{} {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*phpparser.FormalParameterContext)
+	if i == nil {
+		return nil
+	}
+
+	// PHP8 annotation
+	if i.Attributes() != nil {
+		_ = i.Attributes().GetText()
+	}
+
+	// member modifier cannot be used in function formal params
+	if len(i.AllMemberModifier()) > 0 {
+		// what the fuck?
+	}
+
+	allowNull := i.QuestionMark() != nil
+	_ = allowNull
+
+	typeHint := y.VisitTypeHint(i.TypeHint())
+	isRef := i.Ampersand() != nil
+	isVariadic := i.Ellipsis()
+	_, _, _ = typeHint, isRef, isVariadic
+	y.VisitVariableInitializer(i.VariableInitializer())
+
+	return nil
+}
+
+func (y *builder) VisitIdentifierInitializer(raw phpparser.IIdentifierInitializerContext) interface{} {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*phpparser.IdentifierInitializerContext)
+	if i == nil {
+		return nil
+	}
+
+	return nil
+}
+
+func (y *builder) VisitVariableInitializer(raw phpparser.IVariableInitializerContext) interface{} {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*phpparser.VariableInitializerContext)
+	if i == nil {
+		return nil
 	}
 
 	return nil
