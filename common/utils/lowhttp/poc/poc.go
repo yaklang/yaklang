@@ -672,6 +672,23 @@ func WithAppendHeader(key, value string) PocConfig {
 	}
 }
 
+// appendHeaders 是一个请求选项参数，用于改变请求报文，添加请求头
+// Example:
+// ```
+// poc.Post("https://pie.dev/post", poc.appendHeaders({"AAA": "BBB","CCC": "DDD"})) // 向 pie.dev 发起请求，添加AAA请求头的值为BBB
+// ```
+func WithAppendHeaders(headers map[string]string) PocConfig {
+	return func(c *_pocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			for key, value := range headers {
+				packet = lowhttp.AppendHTTPPacketHeader(packet, key, value)
+			}
+			return packet
+		},
+		)
+	}
+}
+
 // appendCookie 是一个请求选项参数，用于改变请求报文，添加Cookie请求头中的值
 // Example:
 // ```
@@ -1330,6 +1347,7 @@ var PoCExports = map[string]interface{}{
 	"replacePostParam":      WithReplaceHttpPacketPostParam,
 	"replacePath":           WithReplaceHttpPacketPath,
 	"appendHeader":          WithAppendHeader,
+	"appendHeaders":         WithAppendHeaders,
 	"appendCookie":          WithAppendCookie,
 	"appendQueryParam":      WithAppendQueryParam,
 	"appendPostParam":       WithAppendPostParam,
