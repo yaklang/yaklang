@@ -155,6 +155,8 @@ In:                             'in';
 Try:                            'try';
 As:                             'as';
 From:                           'from';
+Get: 'get';
+Set: 'set';
 
 /// Future Reserved Words
 
