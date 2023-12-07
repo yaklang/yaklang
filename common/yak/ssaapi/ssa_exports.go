@@ -19,6 +19,7 @@ const (
 
 type LanguageParser interface {
 	Parse(string, bool, func(*ssa.FunctionBuilder)) (*ssa.Program, error)
+	Feed(string, bool, *ssa.Program)
 }
 
 var (
@@ -32,6 +33,7 @@ type config struct {
 	language        Language
 	Parser          LanguageParser
 	code            string
+	feedCode        bool
 	ignoreSyntaxErr bool
 
 	externLib    map[string]map[string]any
@@ -117,6 +119,16 @@ func WithDefineFunc(table map[string]any) Option {
 	}
 }
 
+func WithFeedCode(b ...bool) Option {
+	return func(c *config) {
+		if len(b) > 1 {
+			c.feedCode = b[0]
+		} else {
+			c.feedCode = true
+		}
+	}
+}
+
 var ttlSSAParseCache = ttlcache.NewCache()
 
 func Parse(code string, opts ...Option) (*Program, error) {
@@ -137,6 +149,7 @@ func Parse(code string, opts ...Option) (*Program, error) {
 			return nil, utils.Wrapf(err, "parse error")
 		}
 		ret = NewProgram(prog)
+		ret.AddConfig(config)
 	}
 	ttlSSAParseCache.SetWithTTL(hash, ret, 30*time.Minute)
 	return ret, nil
@@ -150,6 +163,13 @@ func parseWithConfig(c *config) (*ssa.Program, error) {
 		fb.WithDefineFunction(c.defineFunc)
 	}
 	return c.Parser.Parse(c.code, c.ignoreSyntaxErr, callback)
+}
+
+func (p *Program) Feed(code string) {
+	if p.config == nil || !p.config.feedCode || p.config.Parser == nil {
+		return
+	}
+	p.config.Parser.Feed(code, p.config.ignoreSyntaxErr, p.Program)
 }
 
 var Exports = map[string]any{

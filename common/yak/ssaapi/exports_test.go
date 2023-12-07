@@ -208,3 +208,39 @@ func TestB(t *testing.T) {
 	u2 := u.Filter(func(v *Value) bool { return v.IsCall() })
 	fmt.Println(reflect.TypeOf(u2))
 }
+
+func TestFeedCode(t *testing.T) {
+
+	code1 := `
+	a = 1 
+	b = "first line" 
+	c = 1
+	`
+
+	code2 := `
+	if a == 1 {
+		b = "second line"
+	}
+
+	f = () => {
+		println(c) // FreeValue
+	}
+	`
+
+	code3 := `
+	send(b)
+	f()
+	`
+
+	prog, err := Parse(code1, WithFeedCode())
+	if err != nil {
+		t.Fatal(err)
+	}
+	prog.Feed(code2)
+	prog.Feed(code3)
+	// prog.Finish()
+	prog.Show()
+
+	prog.Ref("f").Show()
+
+}

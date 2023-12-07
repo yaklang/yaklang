@@ -20,6 +20,10 @@ func (p *Parser) Parse(src string, must bool, callBack func(*ssa.FunctionBuilder
 	return parseSSA(src, must, nil, callBack)
 }
 
+func (p *Parser) Feed(src string, must bool, prog *ssa.Program) {
+	parseSSA(src, must, prog, nil)
+}
+
 type astbuilder struct {
 	*ssa.FunctionBuilder
 }
