@@ -102,18 +102,30 @@ func init() {
 func TestRangeString(t *testing.T) {
 	code := `
 for index, i := range "abc" {
-	if index == 0 { assert i == 'a' }
-if index == 1 { assert i == 'b' }
-if index == 2 { assert i == 'c' }
+	if index == 0 { assert i == "a" }
+if index == 1 { assert i == "b" }
+if index == 2 { assert i == "c" }
 }
 
 b = []
 for i in "abc" {
+	dump(i)
 	b.Push(i)
 }
-assert b[0] == 'a'
-assert b[1] == 'b'
-assert b[2] == 'c'
+assert b[0] == "a"
+assert b[1] == "b"
+assert b[2] == "c"
+
+
+b = []
+for i in "你好ww" {
+	dump(i)
+	b.Push(i)
+}
+assert b[0] == "你"
+assert b[1] == "好"
+assert b[2] == "w"
+assert b[3] == "w"
 `
 	if err := NewExecutor(code).VM.SafeExec(); err != nil {
 		panic(err)

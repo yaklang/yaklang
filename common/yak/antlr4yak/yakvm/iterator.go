@@ -198,7 +198,12 @@ func NewIterator(i interface{}) (IteratorInterface, error) {
 	kind := reflect.TypeOf(i).Kind()
 	switch kind {
 	case reflect.String:
-		return newSliceIterator([]byte(i.(string))), nil
+		var runes = []rune(i.(string))
+		var strArr = make([]string, len(runes))
+		for i, r := range runes {
+			strArr[i] = string(r)
+		}
+		return newSliceIterator(strArr), nil
 	case reflect.Slice, reflect.Array:
 		return newSliceIterator(i), nil
 	case reflect.Map:
