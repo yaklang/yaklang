@@ -371,10 +371,12 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	if session != nil {
 		cookies := cookiejar.Cookies(urlIns)
 
-		// 复用session中的cookie
-		requestPacket, err = AddOrUpgradeCookie(requestPacket, CookiesToString(cookies))
-		if err != nil {
-			return response, err
+		if cookies != nil {
+			// 复用session中的cookie
+			requestPacket, err = AddOrUpgradeCookie(requestPacket, CookiesToString(cookies))
+			if err != nil {
+				return response, err
+			}
 		}
 	}
 
