@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/cli"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
@@ -94,10 +95,10 @@ func (s *Server) execScriptWithExecParam(scriptName string, input string, stream
 				funcValue := reflect.ValueOf(f)
 				funcType := funcValue.Type()
 				hookFunc := reflect.MakeFunc(funcType, func(args []reflect.Value) (results []reflect.Value) {
-					TempParams := []yaklib.SetCliExtraParam{yaklib.SetTempArgs(tempArgs)}
+					TempParams := []cli.SetCliExtraParam{cli.SetTempArgs(tempArgs)}
 					interfaceValue := args[1].Interface()
 					args = args[:1]
-					cliExtraParams, ok := interfaceValue.([]yaklib.SetCliExtraParam)
+					cliExtraParams, ok := interfaceValue.([]cli.SetCliExtraParam)
 					if ok {
 						TempParams = append(TempParams, cliExtraParams...)
 					}
@@ -109,25 +110,31 @@ func (s *Server) execScriptWithExecParam(scriptName string, input string, stream
 				})
 				return hookFunc.Interface()
 			}
-			engine.GetVM().RegisterMapMemberCallHandler("cli", "String", hook)
-			engine.GetVM().RegisterMapMemberCallHandler("cli", "Bool", hook)
-			engine.GetVM().RegisterMapMemberCallHandler("cli", "Have", hook)
-			engine.GetVM().RegisterMapMemberCallHandler("cli", "Int", hook)
-			engine.GetVM().RegisterMapMemberCallHandler("cli", "Integer", hook)
-			engine.GetVM().RegisterMapMemberCallHandler("cli", "Float", hook)
-			engine.GetVM().RegisterMapMemberCallHandler("cli", "Double", hook)
-			engine.GetVM().RegisterMapMemberCallHandler("cli", "YakitPlugin", hook)
-			engine.GetVM().RegisterMapMemberCallHandler("cli", "Urls", hook)
-			engine.GetVM().RegisterMapMemberCallHandler("cli", "Url", hook)
-			engine.GetVM().RegisterMapMemberCallHandler("cli", "Ports", hook)
-			engine.GetVM().RegisterMapMemberCallHandler("cli", "Port", hook)
-			engine.GetVM().RegisterMapMemberCallHandler("cli", "Hosts", hook)
-			engine.GetVM().RegisterMapMemberCallHandler("cli", "Host", hook)
-			engine.GetVM().RegisterMapMemberCallHandler("cli", "Network", hook)
-			engine.GetVM().RegisterMapMemberCallHandler("cli", "Net", hook)
-			engine.GetVM().RegisterMapMemberCallHandler("cli", "File", hook)
-			engine.GetVM().RegisterMapMemberCallHandler("cli", "FileOrContent", hook)
-			engine.GetVM().RegisterMapMemberCallHandler("cli", "LineDict", hook)
+
+			hookFuncList := []string{
+				"String",
+				"Bool",
+				"Have",
+				"Int",
+				"Integer",
+				"Float",
+				"Double",
+				"YakitPlugin",
+				"Urls",
+				"Url",
+				"Ports",
+				"Port",
+				"Hosts",
+				"Host",
+				"Network",
+				"Net",
+				"File",
+				"FileOrContent",
+				"LineDict",
+			}
+			for _, name := range hookFuncList {
+				engine.GetVM().RegisterMapMemberCallHandler("cli", name, hook)
+			}
 			return nil
 		})
 		_, err := engine.ExecuteExWithContext(stream.Context(), scriptInstance.Content, map[string]any{
