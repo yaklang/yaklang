@@ -90,10 +90,11 @@ func createOrUpdatePayload(db *gorm.DB, i *Payload) error {
 	return nil
 }
 
-func CreateOrUpdatePayload(db *gorm.DB, content, group, folder string, hitCount int64) error {
+func CreateOrUpdatePayload(db *gorm.DB, content, group, folder string, hitCount int64, isFile bool) error {
 	payload := NewPayload(group, content)
 	payload.Folder = &folder
 	payload.HitCount = &hitCount
+	payload.IsFile = &isFile
 	return createOrUpdatePayload(db, payload)
 }
 
@@ -120,7 +121,7 @@ func CheckExistGroup(db *gorm.DB, group, folder string) (bool, error) {
 // save payload from file
 func SavePayloadByFilename(db *gorm.DB, group string, fileName string) error {
 	return SavePayloadByFilenameEx(fileName, func(s string, hitCount int64) error {
-		return CreateOrUpdatePayload(db, s, group, "", hitCount)
+		return CreateOrUpdatePayload(db, s, group, "", hitCount, true)
 	})
 }
 
@@ -182,7 +183,7 @@ func SavePayloadGroup(db *gorm.DB, group string, lists []string) error {
 // save payload from raw-data
 func SavePayloadGroupByRaw(db *gorm.DB, group string, data string) error {
 	return SavePayloadGroupByRawEx(data, func(s string) error {
-		return CreateOrUpdatePayload(db, s, group, "", 0)
+		return CreateOrUpdatePayload(db, s, group, "", 0, false)
 	})
 }
 
