@@ -527,17 +527,17 @@ func (t *SwitchBuilder) Finish() {
 		builder.PopTarget()
 	}
 
+	// can't fallthrough
+	builder.PushTarget(done, nil, nil)
+	// build default block
+	builder.CurrentBlock = defaultb
 	// build default
 	if t.buildDefault != nil {
-		// can't fallthrough
-		builder.PushTarget(done, nil, nil)
-		// build default block
-		builder.CurrentBlock = defaultb
 		t.buildDefault()
-		// jump default -> done
-		builder.EmitJump(done)
-		builder.PopTarget()
 	}
+	// jump default -> done
+	builder.EmitJump(done)
+	builder.PopTarget()
 
 	builder.CurrentBlock = t.enter
 	builder.EmitSwitch(cond, defaultb, slabel)
