@@ -1,8 +1,10 @@
 package php2ssa
 
 import (
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 func (y *builder) VisitTopStatement(raw phpparser.ITopStatementContext) interface{} {
@@ -234,7 +236,7 @@ func (y *builder) VisitInnerStatement(raw phpparser.IInnerStatementContext) inte
 	return nil
 }
 
-func (y *builder) VisitTypeHint(raw phpparser.ITypeHintContext) interface{} {
+func (y *builder) VisitTypeHint(raw phpparser.ITypeHintContext) ssa.Type {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -249,9 +251,14 @@ func (y *builder) VisitTypeHint(raw phpparser.ITypeHintContext) interface{} {
 	} else if i.Callable() != nil {
 		_ = i.Callable().GetText()
 	} else if i.PrimitiveType() != nil {
-		y.VisitPrimitiveType(i.PrimitiveType())
+		return y.VisitPrimitiveType(i.PrimitiveType())
 	} else if i.Pipe() != nil {
-
+		types := lo.Map(i.AllTypeHint(), func(item phpparser.ITypeHintContext, index int) ssa.Type {
+			return y.VisitTypeHint(i)
+		})
+		_ = types
+		// need a
+		// return ssa.NewUnionType(types)
 	}
 
 	return nil
