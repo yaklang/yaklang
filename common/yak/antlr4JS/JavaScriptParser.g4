@@ -162,7 +162,8 @@ emptyStatement_
     ;
 
 expressionStatement
-    : {p.notOpenBraceAndNotFunction()}? expressionSequence eos
+    // : {p.notOpenBraceAndNotFunction()}? expressionSequence eos
+    : expressionSequence eos
     ;
 
 ifStatement
@@ -277,9 +278,9 @@ classTail
     ;
 
 classElement
-    : (Static | {p.n("static")}? identifier)? methodDefinition
-    | (Static | {p.n("static")}? identifier)? fieldDefinition
-    | (Static | {p.n("static")}? identifier) block
+    : Static? methodDefinition
+    | Static? fieldDefinition
+    | Static block
     | emptyStatement_
     ;
 
@@ -504,11 +505,11 @@ bigintLiteral
     ;
 
 getter
-    : {p.n("get")}? identifier classElementName
+    : Get classElementName
     ;
 
 setter
-    : {p.n("set")}? identifier classElementName
+    : Set classElementName
     ;
 
 identifierName
@@ -522,6 +523,9 @@ identifier
     | Async
     | As
     | From
+    | Get
+    | Set
+    | Static
     ;
 
 reservedWord
