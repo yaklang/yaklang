@@ -7,6 +7,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/cli"
 	"github.com/yaklang/yaklang/common/utils/privileged"
 )
 
@@ -42,7 +43,7 @@ var SystemExports = map[string]interface{}{
 	"Setenv":               Setenv,
 	"Getenv":               Getenv,
 	"Exit":                 Exit,
-	"Args":                 Args,
+	"Args":                 cli.Args,
 	"Stdout":               Stdout,
 	"Stdin":                Stdin,
 	"Stderr":               Stderr,

@@ -3,6 +3,7 @@ package yakgit
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -23,7 +24,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/yak/yaklib"
 )
 
 var (
@@ -272,7 +272,7 @@ type GitHackObject struct {
 }
 
 func NewGitHackObject(remoteRepoURL, tempDirPath string, gitConfig *config) *GitHackObject {
-	c := yaklib.NewDefaultPoCConfig()
+	c := poc.NewDefaultPoCConfig()
 	for _, o := range gitConfig.HTTPOptions {
 		o(c)
 	}

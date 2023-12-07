@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/synscan"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/cli"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/spacengine"
 	"github.com/yaklang/yaklang/common/yak/yaklib/yakhttp"
@@ -549,7 +550,7 @@ func AutoInitYakit() *YakitClient {
 	if yakitClientInstance != nil {
 		return nil
 	}
-	addr := _cliString("yakit-webhook")
+	addr := cli.CliString("yakit-webhook")
 	if addr != "" {
 		client := NewYakitClient(addr)
 		InitYakit(client)

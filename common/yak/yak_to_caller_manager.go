@@ -7,6 +7,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/fuzztag"
 	"github.com/yaklang/yaklang/common/fuzztagx/parser"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/yak/yaklib/yakhttp"
 	"net/http"
 	"strings"
@@ -598,14 +599,14 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 	})
 
 	nIns.GetVM().RegisterMapMemberCallHandler("poc", "HTTP", func(i interface{}) interface{} {
-		originFunc, ok := i.(func(interface{}, ...yaklib.PocConfig) ([]byte, []byte, error))
+		originFunc, ok := i.(func(interface{}, ...poc.PocConfig) ([]byte, []byte, error))
 		if ok {
-			return func(raw interface{}, opts ...yaklib.PocConfig) ([]byte, []byte, error) {
-				opts = append(opts, yaklib.PoCOptWithSource(pluginName))
-				opts = append(opts, yaklib.PoCOptWithFromPlugin(pluginName))
-				opts = append(opts, yaklib.PoCOptWithRuntimeId(runtimeId))
-				opts = append(opts, yaklib.PoCOptWithSaveHTTPFlow(true))
-				opts = append(opts, yaklib.PoCOptWithProxy(proxy))
+			return func(raw interface{}, opts ...poc.PocConfig) ([]byte, []byte, error) {
+				opts = append(opts, poc.PoCOptWithSource(pluginName))
+				opts = append(opts, poc.PoCOptWithFromPlugin(pluginName))
+				opts = append(opts, poc.PoCOptWithRuntimeId(runtimeId))
+				opts = append(opts, poc.PoCOptWithSaveHTTPFlow(true))
+				opts = append(opts, poc.PoCOptWithProxy(proxy))
 				return originFunc(raw, opts...)
 			}
 		}
@@ -613,14 +614,14 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		return i
 	})
 	nIns.GetVM().RegisterMapMemberCallHandler("poc", "HTTPEx", func(i interface{}) interface{} {
-		originFunc, ok := i.(func(interface{}, ...yaklib.PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error))
+		originFunc, ok := i.(func(interface{}, ...poc.PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error))
 		if ok {
-			return func(raw interface{}, opts ...yaklib.PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
-				opts = append(opts, yaklib.PoCOptWithSource(pluginName))
-				opts = append(opts, yaklib.PoCOptWithFromPlugin(pluginName))
-				opts = append(opts, yaklib.PoCOptWithRuntimeId(runtimeId))
-				opts = append(opts, yaklib.PoCOptWithSaveHTTPFlow(true))
-				opts = append(opts, yaklib.PoCOptWithProxy(proxy))
+			return func(raw interface{}, opts ...poc.PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
+				opts = append(opts, poc.PoCOptWithSource(pluginName))
+				opts = append(opts, poc.PoCOptWithFromPlugin(pluginName))
+				opts = append(opts, poc.PoCOptWithRuntimeId(runtimeId))
+				opts = append(opts, poc.PoCOptWithSaveHTTPFlow(true))
+				opts = append(opts, poc.PoCOptWithProxy(proxy))
 				return originFunc(raw, opts...)
 			}
 		}
@@ -630,30 +631,30 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 	for _, method := range []string{"Get", "Post", "Head", "Delete", "Options"} {
 		method := method
 		nIns.GetVM().RegisterMapMemberCallHandler("poc", method, func(i interface{}) interface{} {
-			origin, ok := i.(func(string, ...yaklib.PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error))
+			origin, ok := i.(func(string, ...poc.PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error))
 			if !ok {
 				log.Errorf("BUG: poc.%v 's signature is override", method)
 				return i
 			}
-			return func(u string, opts ...yaklib.PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
-				opts = append(opts, yaklib.PoCOptWithSource(pluginName))
-				opts = append(opts, yaklib.PoCOptWithFromPlugin(pluginName))
-				opts = append(opts, yaklib.PoCOptWithRuntimeId(runtimeId))
-				opts = append(opts, yaklib.PoCOptWithSaveHTTPFlow(true))
-				opts = append(opts, yaklib.PoCOptWithProxy(proxy))
+			return func(u string, opts ...poc.PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
+				opts = append(opts, poc.PoCOptWithSource(pluginName))
+				opts = append(opts, poc.PoCOptWithFromPlugin(pluginName))
+				opts = append(opts, poc.PoCOptWithRuntimeId(runtimeId))
+				opts = append(opts, poc.PoCOptWithSaveHTTPFlow(true))
+				opts = append(opts, poc.PoCOptWithProxy(proxy))
 				return origin(u, opts...)
 			}
 		})
 	}
 	nIns.GetVM().RegisterMapMemberCallHandler("poc", "Do", func(i interface{}) interface{} {
-		origin, ok := i.(func(method string, url string, opt ...yaklib.PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error))
+		origin, ok := i.(func(method string, url string, opt ...poc.PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error))
 		if ok {
-			return func(method string, url string, opts ...yaklib.PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
-				opts = append(opts, yaklib.PoCOptWithSource(pluginName))
-				opts = append(opts, yaklib.PoCOptWithFromPlugin(pluginName))
-				opts = append(opts, yaklib.PoCOptWithRuntimeId(runtimeId))
-				opts = append(opts, yaklib.PoCOptWithSaveHTTPFlow(true))
-				opts = append(opts, yaklib.PoCOptWithProxy(proxy))
+			return func(method string, url string, opts ...poc.PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
+				opts = append(opts, poc.PoCOptWithSource(pluginName))
+				opts = append(opts, poc.PoCOptWithFromPlugin(pluginName))
+				opts = append(opts, poc.PoCOptWithRuntimeId(runtimeId))
+				opts = append(opts, poc.PoCOptWithSaveHTTPFlow(true))
+				opts = append(opts, poc.PoCOptWithProxy(proxy))
 				return origin(method, url, opts...)
 			}
 		}
