@@ -305,6 +305,23 @@ func TestCfg(t *testing.T) {
 
 	})
 
+	t.Run("test switch with if", func(t *testing.T) {
+		code := `
+		if (1) o = 0;
+        else {
+            switch (r) {
+            case e:
+            }
+        }
+        return
+		`
+		prog := ParseSSA(code, func (fb *ssa.FunctionBuilder)  {})
+		if prog == nil {
+			t.Fatal("prog parse error")
+		}
+		prog.Show()
+	})
+
 }
 
 func TestSyntaxError(t *testing.T) {
