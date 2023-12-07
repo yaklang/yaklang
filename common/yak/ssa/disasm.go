@@ -90,7 +90,10 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 		ret += "type: " + f.GetType().String() + "\n"
 	}
 
-	for _, b := range f.Blocks {
+	ShowBlock := func(b *BasicBlock) {
+		if b == nil {
+			return
+		}
 		if flag&DisAsmWithSource == 0 {
 			ret += b.String() + "\n"
 			for _, p := range b.Phis {
@@ -137,6 +140,12 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 			}
 		}
 	}
+
+	for _, b := range f.Blocks {
+		ShowBlock(b)
+	}
+	ShowBlock(f.DeferBlock)
+
 	return ret
 }
 
