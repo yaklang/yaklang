@@ -120,8 +120,14 @@ func deleteGroup(local ypb.YakClient, t *testing.T, group string) {
 	}
 }
 
-func save2database(local ypb.YakClient, t *testing.T, group, folder, data string) {
+func save2database(local ypb.YakClient, t *testing.T, group, folder, data string, errorHandler ...func(*testing.T, error)) {
 	t.Helper()
+	var (
+		err    error
+		client ypb.Yak_SavePayloadStreamClient
+		ret    *ypb.SavePayloadProgress
+	)
+
 	rsp, err := local.SaveTextToTemporalFile(context.Background(), &ypb.SaveTextToTemporalFileRequest{
 		Text: []byte(data),
 	})
@@ -130,7 +136,7 @@ func save2database(local ypb.YakClient, t *testing.T, group, folder, data string
 	}
 	fileName := rsp.FileName
 
-	client, err := local.SavePayloadStream(context.Background(), &ypb.SavePayloadRequest{
+	client, err = local.SavePayloadStream(context.Background(), &ypb.SavePayloadRequest{
 		IsFile:  true,
 		Group:   group,
 		Folder:  folder,
@@ -139,22 +145,30 @@ func save2database(local ypb.YakClient, t *testing.T, group, folder, data string
 			fileName,
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	for {
-		re, err := client.Recv()
+		ret, err = client.Recv()
 		if err != nil {
 			t.Log(err)
 			break
 		}
-		t.Log(re)
+		t.Log(ret)
+	}
+	if len(errorHandler) > 0 {
+		errorHandler[0](t, err)
+	} else if err != nil {
+		t.Fatal(err)
 	}
 }
 
-func save2file(local ypb.YakClient, t *testing.T, group, folder, data string) {
+func save2file(local ypb.YakClient, t *testing.T, group, folder, data string, errorHandler ...func(*testing.T, error)) {
 	t.Helper()
+	var (
+		err    error
+		client ypb.Yak_SavePayloadToFileStreamClient
+		ret    *ypb.SavePayloadProgress
+	)
+
 	rsp, err := local.SaveTextToTemporalFile(context.Background(), &ypb.SaveTextToTemporalFileRequest{
 		Text: []byte(data),
 	})
@@ -163,7 +177,7 @@ func save2file(local ypb.YakClient, t *testing.T, group, folder, data string) {
 	}
 	fileName := rsp.FileName
 
-	client, err := local.SavePayloadToFileStream(context.Background(), &ypb.SavePayloadRequest{
+	client, err = local.SavePayloadToFileStream(context.Background(), &ypb.SavePayloadRequest{
 		IsFile:  true,
 		Group:   group,
 		Folder:  "",
@@ -172,16 +186,18 @@ func save2file(local ypb.YakClient, t *testing.T, group, folder, data string) {
 			fileName,
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	for {
-		re, err := client.Recv()
+		ret, err = client.Recv()
 		if err != nil {
 			break
 		}
-		t.Log(re)
+		t.Log(ret)
+	}
+	if len(errorHandler) > 0 {
+		errorHandler[0](t, err)
+	} else if err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -659,7 +675,7 @@ func TestPayload(t *testing.T) {
 		comparePayload(got2, data, t)
 	})
 
-	t.Run("CoverPayloadGroupToDatabase", func(t *testing.T) {
+	t.Run("ConvertPayloadGroupToDatabase", func(t *testing.T) {
 		data := "123\n456\n"
 		group := uuid.NewString()
 		// save file
@@ -678,7 +694,7 @@ func TestPayload(t *testing.T) {
 		}
 	})
 
-	t.Run("uniqueHash", func(t *testing.T) {
+	t.Run("UniqueHash", func(t *testing.T) {
 		data := "123\n456\n"
 		group := uuid.NewString()
 		// save twice
@@ -691,5 +707,24 @@ func TestPayload(t *testing.T) {
 		if len(rsp.Data) != 2 {
 			t.Fatalf("unique hash error, want 2 but got %d", len(rsp.Data))
 		}
+	})
+
+	t.Run("SaveEmptyFile", func(t *testing.T) {
+		group1, group2 := uuid.NewString(), uuid.NewString()
+		// save to database and file
+		save2database(local, t, group1, "", "", func(t *testing.T, err error) {
+			if err == nil {
+				t.Fatal("expect error but got nil")
+			} else {
+				t.Log(err)
+			}
+		})
+		save2file(local, t, group2, "", "", func(t *testing.T, err error) {
+			if err == nil {
+				t.Fatal("expect error but got nil")
+			} else {
+				t.Log(err)
+			}
+		})
 	})
 }
