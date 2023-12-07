@@ -540,3 +540,76 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 	}
 	assert.Equal(t, marshalResult(expect), marshalResult(res))
 }
+
+func TestGRPCMUSTPASS_CodecDebug(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	codecString := utils.RandStringBytes(10)
+	expected := codec.EncodeBase64(codecString)
+	stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
+		Code: `handle = func(a){
+return codec.EncodeBase64(a)
+}
+`,
+		PluginType: "codec",
+		Input:      codecString,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var checked = false
+	for {
+		exec, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		if string(exec.Message) != "" {
+			if strings.Contains(string(exec.Message), expected) {
+				checked = true
+			}
+		}
+	}
+	if !checked {
+		t.Fatal("plugin is not executed")
+	}
+}
+
+func TestGRPCMUSTPASS_YakDebug(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	codecString := utils.RandStringBytes(10)
+	expected := codec.EncodeBase64(codecString)
+	stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
+		Code: `s = cli.String("s")
+b = cli.Bool("b")
+cli.check()
+if b {
+yakit.Output(codec.EncodeBase64(s))
+}
+`,
+		PluginType: "yak",
+		ExecParams: map[string]string{"-s": codecString, "-b": "true"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var checked = false
+	for {
+		exec, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		if string(exec.Message) != "" {
+			if strings.Contains(string(exec.Message), expected) {
+				checked = true
+			}
+		}
+	}
+	if !checked {
+		t.Fatal("plugin is not executed")
+	}
+}
