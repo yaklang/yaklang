@@ -11,6 +11,7 @@ func init() {
 	YakitExports["EnableTable"] = yakitEnableFixedTable
 	YakitExports["TableData"] = yakitTableData
 	YakitExports["StatusCard"] = yakitStatusCard
+	YakitExports["TextTabData"] = yakitTextTabData
 }
 
 type YakitFeature struct {
@@ -56,6 +57,21 @@ func yakitTableData(tableName string, data any) *YakitFixedTableData {
 		yakitClientInstance.Output(tableData)
 	}
 	return nil
+}
+
+type YakitTextTabData struct {
+	TableName string `json:"table_name"`
+	Data      string `json:"data"`
+}
+
+func yakitTextTabData(tabName string, data string) {
+	tabData := &YakitTextTabData{
+		TableName: tabName,
+		Data:      data,
+	}
+	if yakitClientInstance != nil {
+		yakitClientInstance.Output(tabData)
+	}
 }
 
 type YakitStatusCard struct {

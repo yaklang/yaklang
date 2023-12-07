@@ -349,6 +349,8 @@ func MarshalYakitOutput(t interface{}) (string, string) {
 		return "json-httpflow-risk", string(raw)
 	case *YakitFixedTableData:
 		return "feature-table-data", string(raw)
+	case *YakitTextTabData:
+		return "feature-text-data", string(raw)
 	case *YakitStatusCard:
 		return "feature-status-card-data", string(raw)
 	case string:
