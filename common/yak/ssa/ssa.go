@@ -230,7 +230,7 @@ func (n *anValue) SetType(typ Type) { n.typ = typ }
 // both instruction and value
 type Program struct {
 	// package list
-	Packages []*Package
+	Packages map[string]*Package
 
 	// for build
 	buildOnce sync.Once
@@ -241,7 +241,7 @@ type Package struct {
 	// point to program
 	Prog *Program
 	// function list
-	Funcs []*Function
+	Funcs map[string]*Function
 }
 
 // implement Value

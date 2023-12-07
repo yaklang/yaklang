@@ -661,8 +661,9 @@ func (s *ObjectType) Finish() {
 	if s.Kind != ObjectTypeKind {
 		return
 	}
-	fieldTypes := lo.UniqBy(s.FieldTypes, func(t Type) TypeKind { return t.GetTypeKind() })
-	keyTypes := lo.UniqBy(s.keyTypes, func(t Type) TypeKind { return t.GetTypeKind() })
+	//TODO: handler this hash later
+	fieldTypes := lo.UniqBy(s.FieldTypes, func(t Type) string { return t.String() })
+	keyTypes := lo.UniqBy(s.keyTypes, func(t Type) string { return t.String() })
 	if len(fieldTypes) == 1 {
 		s.FieldType = fieldTypes[0]
 	} else {

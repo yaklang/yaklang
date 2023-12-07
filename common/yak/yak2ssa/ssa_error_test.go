@@ -95,6 +95,21 @@ func TestUndefine(t *testing.T) {
 			},
 		})
 	})
+
+	t.Run("undefine in closure", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			a = () => {
+				b = xxx
+			}
+			`,
+			errs: []string{
+				ssa4analyze.ValueUndefined("xxx"),
+			},
+			ExternValue: map[string]any{},
+			ExternLib:   map[string]map[string]any{},
+		})
+	})
 }
 
 func TestErrorComment(t *testing.T) {
