@@ -2,7 +2,6 @@ package yakit
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"strconv"
 	"strings"
@@ -80,24 +79,22 @@ func NewPayload(group string, content string) *Payload {
 	return p
 }
 
-func CreateOrUpdatePayload(db *gorm.DB, i *Payload) error {
+func createOrUpdatePayload(db *gorm.DB, i *Payload) error {
 	db = db.Model(&Payload{})
 	db.SetLogger(gormNoLog(1))
 	i.Hash = i.CalcHash()
 	if db := db.Save(i); db.Error != nil {
+		return db.Error
 	}
-	//if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&Payload{}); db.Error != nil {
-	//	return utils.Errorf("create/update Payload failed: %s", db.Error)
-	//}
 
 	return nil
 }
 
-func CreateAndUpdatePayload(db *gorm.DB, content, group, folder string, hitCount int64) error {
+func CreateOrUpdatePayload(db *gorm.DB, content, group, folder string, hitCount int64) error {
 	payload := NewPayload(group, content)
 	payload.Folder = &folder
 	payload.HitCount = &hitCount
-	return CreateOrUpdatePayload(db, payload)
+	return createOrUpdatePayload(db, payload)
 }
 
 // trim payload content
@@ -112,10 +109,18 @@ func TrimWhitespaceExceptSpace(r rune) bool {
 	return false
 }
 
+func CheckExistGroup(db *gorm.DB, group, folder string) (bool, error) {
+	var count int64
+	if db := db.Model(&Payload{}).Where("`group` = ?", group).Where("`folder` = ?", folder).Count(&count); db.Error != nil {
+		return false, db.Error
+	}
+	return count > 0, nil
+}
+
 // save payload from file
 func SavePayloadByFilename(db *gorm.DB, group string, fileName string) error {
 	return SavePayloadByFilenameEx(fileName, func(s string, hitCount int64) error {
-		return CreateAndUpdatePayload(db, s, group, "", hitCount)
+		return CreateOrUpdatePayload(db, s, group, "", hitCount)
 	})
 }
 
@@ -127,8 +132,8 @@ func SavePayloadByFilenameEx(fileName string, handler func(string, int64) error)
 
 	firstLine := true
 	isCSV := strings.HasSuffix(fileName, ".csv")
-	for bline := range ch {
-		line := utils.UnsafeBytesToString(bline)
+	for lineRaw := range ch {
+		line := utils.UnsafeBytesToString(lineRaw)
 		var hitCount int64 = 0
 		if isCSV {
 			if firstLine {
@@ -166,7 +171,7 @@ func SavePayloadByFilenameEx(fileName string, handler func(string, int64) error)
 func SavePayloadGroup(db *gorm.DB, group string, lists []string) error {
 	for _, i := range lists {
 		p := NewPayload(group, strconv.Quote(i))
-		err := CreateOrUpdatePayload(db, p)
+		err := createOrUpdatePayload(db, p)
 		if err != nil {
 			return err
 		}
@@ -177,17 +182,18 @@ func SavePayloadGroup(db *gorm.DB, group string, lists []string) error {
 // save payload from raw-data
 func SavePayloadGroupByRaw(db *gorm.DB, group string, data string) error {
 	return SavePayloadGroupByRawEx(data, func(s string) error {
-		return CreateAndUpdatePayload(db, s, group, "", 0)
+		return CreateOrUpdatePayload(db, s, group, "", 0)
 	})
 }
 
 func SavePayloadGroupByRawEx(data string, handler func(string) error) error {
-	// TODO: remove scanner
-	lineScanner := bufio.NewScanner(bytes.NewBufferString(data))
-	lineScanner.Split(bufio.ScanLines)
-	for lineScanner.Scan() {
-		line := lineScanner.Text()
-		line = strconv.Quote(strings.TrimRightFunc(line, TrimWhitespaceExceptSpace))
+	r := bufio.NewReader(strings.NewReader(data))
+	for {
+		lineRaw, err := utils.BufioReadLine(r)
+		if err != nil {
+			break
+		}
+		line := strconv.Quote(strings.TrimRightFunc(utils.UnsafeBytesToString(lineRaw), TrimWhitespaceExceptSpace))
 		if err := handler(line); err != nil {
 			log.Errorf("create or update payload error: %s", err.Error())
 			continue
@@ -332,7 +338,7 @@ func CopyPayloads(db *gorm.DB, ids []int64, group, folder string) error {
 		newPayload.ID = 0 // Ensure a new record will be created
 		newPayload.Group = group
 		newPayload.Folder = &folder
-		if err := CreateOrUpdatePayload(db, &newPayload); err != nil {
+		if err := createOrUpdatePayload(db, &newPayload); err != nil {
 			return utils.Wrap(err, "error creating new payload")
 		}
 	}
