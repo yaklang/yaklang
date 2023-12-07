@@ -2,6 +2,7 @@ package yak2ssa
 
 import (
 	"fmt"
+	"runtime/debug"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
@@ -9,47 +10,53 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 )
 
+type Parser struct {
+}
+
+func NewParser() *Parser {
+	return &Parser{}
+}
+
+func (p *Parser) Parse(code string, must bool, callBack func(*ssa.FunctionBuilder)) *ssa.Program {
+	return parseSSA(code, must, nil, callBack)
+}
+
 type astbuilder struct {
 	*ssa.FunctionBuilder
 }
 
-type builder struct {
-	ast  *yak.ProgramContext
-	prog *ssa.Program
-	// symbolTable map[string]any
-	callback func(*ssa.FunctionBuilder)
+func parseSSA(src string, force bool, prog *ssa.Program, callback func(*ssa.FunctionBuilder)) (ret *ssa.Program) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("recover from yak2ssa.parseSSA: ", r)
+			fmt.Println("\n\n\n!!!!!!!\n\n!!!!!\n\nRecovered in parseSSA", r)
+			debug.PrintStack()
+			ret = nil
+		}
+	}()
+
+	frontEnd(src, force, func(ast *yak.ProgramContext) {
+		if prog == nil {
+			prog = ssa.NewProgram()
+		}
+		builder := prog.GetAndCreateMainFunctionBuilder()
+		if callback != nil {
+			callback(builder)
+		}
+		astbuilder := astbuilder{
+			FunctionBuilder: builder,
+		}
+		astbuilder.build(ast)
+		astbuilder.Finish()
+	})
+
+	ssa4analyze.RunAnalyzer(prog)
+	return prog
 }
 
-// build implements ssa.builder.
-func (b *builder) Build() {
-	pkg := ssa.NewPackage("main")
-	b.prog.AddPackage(pkg)
-	main := pkg.NewFunction("yak-main")
-	funcBuilder := ssa.NewBuilder(main, nil)
-	if b.callback != nil {
-		b.callback(funcBuilder)
-	}
-
-	astbuilder := astbuilder{
-		FunctionBuilder: funcBuilder,
-	}
-	astbuilder.build(b.ast)
-	astbuilder.Finish()
-}
-
-var _ (ssa.Builder) = (*builder)(nil)
+// func middleEnd(code string, prog *ssa.Program)
 
 // error listener for lexer and parser
-// type position struct {
-// 	line int
-// 	col  int
-// }
-
-//	type astErr struct {
-//		msg   string
-//		start position
-//		end   position
-//	}
 type ErrorListener struct {
 	err []string
 	*antlr.DefaultErrorListener
@@ -66,16 +73,7 @@ func NewErrorListener() *ErrorListener {
 	}
 }
 
-func ParseSSA(src string, f func(*ssa.FunctionBuilder)) (prog *ssa.Program) {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Println("recover from yak2ssa.ParseSSA: ", r)
-			// fmt.Println("\n\n\n!!!!!!!\n\n!!!!!\n\nRecovered in parseSSA", r)
-			// debug.PrintStack()
-			prog = nil
-		}
-	}()
-
+func frontEnd(src string, must bool, callback func(ast *yak.ProgramContext)) {
 	errListener := NewErrorListener()
 	lexer := yak.NewYaklangLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()
@@ -86,19 +84,7 @@ func ParseSSA(src string, f func(*ssa.FunctionBuilder)) (prog *ssa.Program) {
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
 	ast := parser.Program().(*yak.ProgramContext)
-	if len(errListener.err) > 0 {
-		return nil
+	if must || len(errListener.err) == 0 {
+		callback(ast)
 	}
-	// yak.NewProgramContext(ast, )
-	prog = ssa.NewProgram()
-	builder := &builder{
-		ast:      ast,
-		prog:     prog,
-		callback: f,
-	}
-	prog.Build(builder)
-	ssa4analyze.NewAnalyzerGroup(
-		prog,
-	).Run()
-	return prog
 }

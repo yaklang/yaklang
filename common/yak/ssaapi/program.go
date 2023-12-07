@@ -16,7 +16,7 @@ func NewProgram(prog *ssa.Program) *Program {
 }
 
 func (p *Program) IsNil() bool {
-	return utils.IsNil(p.Program)
+	return utils.IsNil(p) || utils.IsNil(p.Program)
 }
 
 func (p *Program) Ref(name string) Values {

@@ -4,16 +4,6 @@ import (
 	"fmt"
 )
 
-type Builder interface {
-	Build()
-}
-
-// build enter pointer
-// front implement `Builder`
-func (prog *Program) Build(b Builder) {
-	prog.buildOnce.Do(b.Build)
-}
-
 // Function builder API
 type FunctionBuilder struct {
 	*Function
