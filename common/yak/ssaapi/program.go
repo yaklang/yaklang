@@ -9,6 +9,7 @@ import (
 
 type Program struct {
 	Program *ssa.Program
+	config  *config
 }
 
 func NewProgram(prog *ssa.Program) *Program {
@@ -20,6 +21,9 @@ func NewProgram(prog *ssa.Program) *Program {
 func (p *Program) Show() *Program {
 	p.Program.Show()
 	return p
+}
+func (p *Program) AddConfig(c *config) {
+	p.config = c
 }
 
 func (p *Program) IsNil() bool {
