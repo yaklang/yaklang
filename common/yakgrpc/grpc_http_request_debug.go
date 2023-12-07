@@ -15,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	netURL "net/url"
+	"reflect"
 	"strings"
 )
 
@@ -23,7 +24,127 @@ type sender interface {
 	Context() context.Context
 }
 
-func (s *Server) execScript(scriptName string, targetInput string, stream sender, params ...*ypb.HTTPRequestBuilderParams) error {
+func (s *Server) execScriptWithExecParam(scriptName string, input string, stream sender, params map[string]string) error {
+	scriptInstance, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), scriptName)
+	if err != nil {
+		return err
+	}
+	var (
+		debugType = scriptInstance.Type
+		isTemp    = scriptInstance.Ignored && strings.HasPrefix(scriptInstance.ScriptName, "tmp-")
+	)
+	runtimeId := uuid.New().String()
+	defer func() {
+		if err := recover(); err != nil {
+			log.Warn(err)
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+
+		if isTemp {
+			log.Infof("start to remove temp plugin: %v", scriptName)
+			err = yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), scriptName)
+			if err != nil {
+				log.Errorf("remove temp plugin failed: %v", err)
+			}
+		}
+	}()
+	var feedbackClient = yaklib.NewVirtualYakitClient(func(result *ypb.ExecResult) error {
+		result.RuntimeID = runtimeId
+		return stream.Send(result)
+	})
+	engine := yak.NewYakitVirtualClientScriptEngine(feedbackClient)
+	log.Infof("engine.ExecuteExWithContext(stream.Context(), debugScript ... \n")
+	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
+		engine.SetVar("RUNTIME_ID", runtimeId)
+		yak.BindYakitPluginContextToEngine(engine, &yak.YakitPluginContext{
+			PluginName: scriptName,
+			RuntimeId:  runtimeId,
+		})
+		return nil
+	})
+	switch strings.ToLower(debugType) {
+	case "codec":
+		subEngine, err := engine.ExecuteExWithContext(stream.Context(), scriptInstance.Content, map[string]any{
+			"CTX":         stream.Context(),
+			"PLUGIN_NAME": scriptName,
+		})
+		if err != nil {
+			return utils.Errorf("execute file %s code failed: %s", scriptName, err.Error())
+		}
+		result, err := subEngine.CallYakFunction(context.Background(), "handle", []interface{}{input})
+		if err != nil {
+			return utils.Errorf("import %v' s handle failed: %s", scriptName, err)
+		}
+		res := &yaklib.YakitLog{
+			Level: "feature-text-data",
+			Data:  utils.InterfaceToString(result),
+		}
+		raw, _ := yaklib.YakitMessageGenerator(res)
+		execResult := &ypb.ExecResult{
+			IsMessage: true,
+			Message:   raw,
+		}
+		execResult.RuntimeID = runtimeId
+		stream.Send(execResult)
+		return nil
+	case "yak":
+		tempArgs := makeArgs(params)
+		engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
+			hook := func(f interface{}) interface{} {
+				funcValue := reflect.ValueOf(f)
+				funcType := funcValue.Type()
+				hookFunc := reflect.MakeFunc(funcType, func(args []reflect.Value) (results []reflect.Value) {
+					TempParams := []yaklib.SetCliExtraParam{yaklib.SetTempArgs(tempArgs)}
+					interfaceValue := args[1].Interface()
+					args = args[:1]
+					cliExtraParams, ok := interfaceValue.([]yaklib.SetCliExtraParam)
+					if ok {
+						TempParams = append(TempParams, cliExtraParams...)
+					}
+					for _, p := range TempParams {
+						args = append(args, reflect.ValueOf(p))
+					}
+					res := funcValue.Call(args)
+					return res
+				})
+				return hookFunc.Interface()
+			}
+			engine.GetVM().RegisterMapMemberCallHandler("cli", "String", hook)
+			engine.GetVM().RegisterMapMemberCallHandler("cli", "Bool", hook)
+			engine.GetVM().RegisterMapMemberCallHandler("cli", "Have", hook)
+			engine.GetVM().RegisterMapMemberCallHandler("cli", "Int", hook)
+			engine.GetVM().RegisterMapMemberCallHandler("cli", "Integer", hook)
+			engine.GetVM().RegisterMapMemberCallHandler("cli", "Float", hook)
+			engine.GetVM().RegisterMapMemberCallHandler("cli", "Double", hook)
+			engine.GetVM().RegisterMapMemberCallHandler("cli", "YakitPlugin", hook)
+			engine.GetVM().RegisterMapMemberCallHandler("cli", "Urls", hook)
+			engine.GetVM().RegisterMapMemberCallHandler("cli", "Url", hook)
+			engine.GetVM().RegisterMapMemberCallHandler("cli", "Ports", hook)
+			engine.GetVM().RegisterMapMemberCallHandler("cli", "Port", hook)
+			engine.GetVM().RegisterMapMemberCallHandler("cli", "Hosts", hook)
+			engine.GetVM().RegisterMapMemberCallHandler("cli", "Host", hook)
+			engine.GetVM().RegisterMapMemberCallHandler("cli", "Network", hook)
+			engine.GetVM().RegisterMapMemberCallHandler("cli", "Net", hook)
+			engine.GetVM().RegisterMapMemberCallHandler("cli", "File", hook)
+			engine.GetVM().RegisterMapMemberCallHandler("cli", "FileOrContent", hook)
+			engine.GetVM().RegisterMapMemberCallHandler("cli", "LineDict", hook)
+			return nil
+		})
+		_, err := engine.ExecuteExWithContext(stream.Context(), scriptInstance.Content, map[string]any{
+			"CTX":         stream.Context(),
+			"PLUGIN_NAME": scriptName,
+		})
+		if err != nil {
+			log.Warnf("execute debug script failed: %v", err)
+			return err
+		}
+		return nil
+	default:
+		return utils.Error("unsupported plugin type: " + debugType)
+	}
+}
+
+func (s *Server) execScriptWithRequest(scriptName string, targetInput string, stream sender, params ...*ypb.HTTPRequestBuilderParams) error {
 	if targetInput == "" {
 		return utils.Error("input is empty")
 	}
@@ -210,14 +331,30 @@ func (s *Server) execScript(scriptName string, targetInput string, stream sender
 }
 
 func (s *Server) debugScript(
-	inputScanTarget string,
+	input string,
 	debugType string,
 	debugCode string,
 	stream sender,
+	execParams map[string]string,
 	params ...*ypb.HTTPRequestBuilderParams) error {
 	tempName, err := yakit.CreateTemporaryYakScript(debugType, debugCode)
 	if err != nil {
 		return err
 	}
-	return s.execScript(tempName, inputScanTarget, stream, params...)
+
+	switch debugType {
+	case "yak", "codec":
+		return s.execScriptWithExecParam(tempName, input, stream, execParams)
+	case "mitm", "nuclei", "port-scan":
+		return s.execScriptWithRequest(tempName, input, stream, params...)
+	}
+	return utils.Error("unsupported plugin type: " + debugType)
+}
+
+func makeArgs(execParams map[string]string) []string {
+	var args = []string{"yak"}
+	for k, v := range execParams {
+		args = append(args, k, v)
+	}
+	return args
 }
