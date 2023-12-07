@@ -215,6 +215,7 @@ func TestFeedCode(t *testing.T) {
 	a = 1 
 	b = "first line" 
 	c = 1
+	defer println("defer 1")
 	`
 
 	code2 := `
@@ -222,14 +223,17 @@ func TestFeedCode(t *testing.T) {
 		b = "second line"
 	}
 
-	f = () => {
+	defer println("defer 2")
+	f = (a) => {
 		println(c) // FreeValue
+		println(a)
 	}
 	`
 
 	code3 := `
 	send(b)
 	f()
+	defer println("defer 3")
 	`
 
 	prog, err := Parse(code1, WithFeedCode())

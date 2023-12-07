@@ -4,6 +4,7 @@ import (
 	"reflect"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // Function builder API
@@ -113,11 +114,24 @@ func (b *FunctionBuilder) Finish() {
 		block.Sealed()
 	}
 	// set defer function
-	if len(b.deferExpr) > 0 {
-		b.CurrentBlock = b.NewBasicBlock("defer")
-		for _, call := range b.deferExpr {
-			b.EmitOnly(call)
+	if deferLen := len(b.deferExpr); deferLen > 0 {
+		endBlock := b.CurrentBlock
+
+		deferBlock := b.GetDeferBlock()
+		b.CurrentBlock = deferBlock
+		for _, i := range b.deferExpr {
+			if len(deferBlock.Insts) == 0 {
+				deferBlock.Insts = append(deferBlock.Insts, i)
+			} else {
+				// b.EmitInstructionBefore()
+				deferBlock.Insts = utils.InsertSliceItem(deferBlock.Insts, Instruction(i), 0)
+			}
+			// b.EmitInstructionBefore(i, deferBlock.LastInst())
+			// b.EmitOnly(b.deferExpr[i])
 		}
+		b.deferExpr = []*Call{}
+
+		b.CurrentBlock = endBlock
 	}
 	// re-calculate return type
 	for _, ret := range b.Return {

@@ -82,10 +82,6 @@ func (f *Function) IsMain() bool {
 	return f.GetName() == "main"
 }
 
-func (f *Function) GetDeferBlock() *BasicBlock {
-	return f.DeferBlock
-}
-
 func (f *Function) GetParent() *Function {
 	return f.parent
 }
