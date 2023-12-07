@@ -4,6 +4,13 @@ import (
 	"fmt"
 )
 
+func (f *Function) GetDeferBlock() *BasicBlock {
+	if f.DeferBlock == nil {
+		f.DeferBlock = f.NewBasicBlockNotAddBlocks("defer")
+	}
+	return f.DeferBlock
+}
+
 func (f *Function) NewBasicBlock(name string) *BasicBlock {
 	return f.newBasicBlockEx(name, true, false)
 }
