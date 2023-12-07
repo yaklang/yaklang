@@ -726,7 +726,7 @@ func (s *Server) GetAllPayloadGroup(ctx context.Context, _ *ypb.Empty) (*ypb.Get
 }
 
 // 导出payload到文件
-func (s *Server) GetAllPayload(req *ypb.GetAllPayloadRequest, stream ypb.Yak_GetAllPayloadServer) error {
+func (s *Server) ExportAllPayload(req *ypb.GetAllPayloadRequest, stream ypb.Yak_ExportAllPayloadServer) error {
 	if req.GetGroup() == "" {
 		return utils.Errorf("get all payload error: group is empty")
 	}
@@ -837,7 +837,7 @@ func (s *Server) GetAllPayload(req *ypb.GetAllPayloadRequest, stream ypb.Yak_Get
 }
 
 // 导出payload，从数据库中的文件导出到另外一个文件
-func (s *Server) GetAllPayloadFromFile(req *ypb.GetAllPayloadRequest, stream ypb.Yak_GetAllPayloadFromFileServer) error {
+func (s *Server) ExportAllPayloadFromFile(req *ypb.GetAllPayloadRequest, stream ypb.Yak_ExportAllPayloadFromFileServer) error {
 	if req.GetGroup() == "" {
 		return utils.Errorf("get all payload from file error: group is empty")
 	}
