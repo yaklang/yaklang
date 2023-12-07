@@ -214,6 +214,12 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 			if node.Cfg.Has("list-length-from-field") {
 				field := node.Cfg.GetString("list-length-from-field")
 				fieldNode := base.GetNodeByPath(node, field)
+				if fieldNode == nil {
+					return fmt.Errorf("read field %s error: not found", field)
+				}
+				if !NodeHasResult(fieldNode) {
+					return fmt.Errorf("read field %s error: not set result", field)
+				}
 				res := GetNodeResult(fieldNode)
 				if IsNumber(res) {
 					listLength = AnyToUint64(res)

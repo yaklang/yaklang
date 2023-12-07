@@ -105,12 +105,15 @@ func ConvertToYakNode(node *base.Node, operator func(node2 *base.Node) error) *Y
 		return nil
 	}
 	yakNode.GetSubNode = func(name string) *YakNode {
+		if name == "Other" {
+			println()
+		}
 		for _, child := range node.Children {
 			if child.Name == name {
 				return ConvertToYakNode(child, operator)
 			}
 		}
-		return nil
+		panic(spew.Sprintf("node %s not found", name))
 	}
 	yakNode.Name = node.Name
 	yakNode.SetCfg = func(k string, v any) {

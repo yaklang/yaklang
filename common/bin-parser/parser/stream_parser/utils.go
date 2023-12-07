@@ -300,7 +300,7 @@ func getRemainingSpace(node *base.Node) (uint64, error) {
 	}
 }
 func getNodeLength(node *base.Node) (uint64, error) {
-	if node.Name == "Data" {
+	if node.Name == "StubData" {
 		println()
 	}
 	remainingLength, err := getRemainingSpace(node)
