@@ -570,13 +570,13 @@ func (s *Server) RemoveDuplicatePayloads(req *ypb.NameRequest, stream ypb.Yak_Re
 			Message:  msg,
 		})
 	}
+	ticker := time.NewTicker(500 * time.Millisecond)
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			default:
-				time.Sleep(time.Second)
+			case <-ticker.C:
 				feedback(-1, "")
 			}
 		}
@@ -592,6 +592,9 @@ func (s *Server) RemoveDuplicatePayloads(req *ypb.NameRequest, stream ypb.Yak_Re
 	for lineB := range outC {
 		line := utils.UnsafeBytesToString(lineB)
 		handledSize += int64(len(line))
+		if total < handledSize {
+			total = handledSize + 1
+		}
 		if !filter.Exist(line) {
 			filtered++
 			filter.Insert(line)
