@@ -29,6 +29,9 @@ func (ag *AnalyzerGroup) GetError() ssa.SSAErrors {
 }
 
 func (ag *AnalyzerGroup) Run() {
+	if ag.Ir == nil {
+		return
+	}
 	for _, builder := range analyzerBuilders {
 		builder(ag.config).Run(ag.Ir)
 	}
@@ -44,4 +47,7 @@ func NewAnalyzerGroup(prog *ssa.Program, opts ...Option) *AnalyzerGroup {
 		Ir:     prog,
 		config: config,
 	}
+}
+func RunAnalyzer(prog *ssa.Program, opts ...Option) {
+	NewAnalyzerGroup(prog, opts...).Run()
 }

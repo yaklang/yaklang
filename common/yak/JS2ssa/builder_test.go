@@ -12,13 +12,17 @@ import (
 
 func none(*ssa.FunctionBuilder) {}
 
+func ParseSSA(code string) *ssa.Program {
+	return parseSSA(code, false, nil, none)
+}
+
 func check(t *testing.T, code string, funcs string, regex string) {
 	re, err := regexp.Compile(".*" + regex + ".*")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	prog := ParseSSA(code, none)
+	prog := ParseSSA(code)
 	prog.ShowWithSource()
 
 	showFunc := prog.Packages["main"].Funcs["main"].GetValuesByName(funcs)[0]
@@ -37,7 +41,7 @@ func TestDemo1(m *testing.T) {
 		return a + b;
 	}
 	sum = test(1,2);
-	`, none)
+	`)
 	prog.Show()
 	fmt.Println(prog.GetErrors())
 }
@@ -51,7 +55,7 @@ func TestDemo2(t *testing.T) {
 
 	}finally{
 		c = 3;
-	}`, none)
+	}`)
 	prog.Show()
 }
 
@@ -68,7 +72,7 @@ switch (fruit) {
   default:
     print("未知水果");
 }
-	`, none)
+	`)
 
 	prog.Show()
 }
@@ -82,7 +86,7 @@ func TestBreak(t *testing.T) {
 		a = 1;
 		break label1;
 	}
-	`, none)
+	`)
 
 	prog.ShowWithSource()
 }
@@ -91,7 +95,7 @@ func TestMain(t *testing.T) {
 	prog := ParseSSA(`
 	var b = (()=>{return window.location.hostname + "/app/"})()
 	window.location.href = b + "/login.html?ts=";
-	`, none)
+	`)
 	prog.Show()
 }
 
@@ -107,7 +111,7 @@ func TestNew(t *testing.T) {
 	xhr.addEventListener('load', function (
 		console.log(this.response)
 	})
-	`, none)
+	`)
 	prog.Show()
 }
 
@@ -123,7 +127,7 @@ func TestFunc(t *testing.T) {
 	a = myFunction(0, 2) // 输出 2
 	b = myFunction(5); // 输出 15, y 参数的默认值
 
-	`, none)
+	`)
 	prog.Show()
 }
 
@@ -137,7 +141,7 @@ func TestElseIf(t *testing.T) {
 	} else{
 		b = a
 	}
-	`, none)
+	`)
 	prog.Show()
 }
 
@@ -148,7 +152,7 @@ func TestTrueOrFalse(t *testing.T) {
 
 	b = tof(true, false);
 	print(b)
-	`, none)
+	`)
 	prog.Show()
 }
 
@@ -157,7 +161,7 @@ func TestThis(t *testing.T) {
 	xhr.addEventListener("load", function() {
         console.log(this.add);
     })
-	`, none)
+	`)
 	prog.Show()
 }
 
@@ -170,7 +174,7 @@ func TestIdentifier(t *testing.T) {
 		  });
 		});
 	  });
-	`, none)
+	`)
 	prog.Show()
 }
 
@@ -184,7 +188,7 @@ func TestTry(t *testing.T) {
     console.log('Request Failed', error);
   }
  
-`, none)
+`)
 	prog.Show()
 }
 
@@ -192,7 +196,7 @@ func TestLet(t *testing.T) {
 	prog2 := ParseSSA(`
   	let response = await fetch(url);
   
-`, none)
+`)
 
 	prog2.Show()
 }
@@ -202,7 +206,7 @@ func TestExpr(t *testing.T) {
 	for(a=1,s=1;a<11&&s<20;a++,s++){
 		a+1,s+a;
 	}
-	`, none)
+	`)
 	prog.Show()
 }
 
@@ -210,7 +214,7 @@ func TestReturn(t *testing.T) {
 	prog := ParseSSA(`
 		f = () => {a = 1; b = 2; return a, b;}
 		console.log(f())
-	`, none)
+	`)
 	prog.Show()
 }
 func TestBitNot(t *testing.T) {
@@ -219,7 +223,7 @@ func TestBitNot(t *testing.T) {
 		b = -(-(1))
 		print(a)
 		print(b)
-	`, none)
+	`)
 	prog.Show()
 }
 
@@ -227,7 +231,7 @@ func TestObject(t *testing.T) {
 	prog := ParseSSA(`
 	c = {2:_}
 	d = {1,2,3,4,5}
-	`, none)
+	`)
 	prog.Show()
 }
 
@@ -244,6 +248,6 @@ func TestUse(t *testing.T) {
 func TestNumber(t *testing.T) {
 	prog := ParseSSA(`
 		a < 1e-6 ? 1 : 2
-	`, none)
+	`)
 	prog.Show()
 }

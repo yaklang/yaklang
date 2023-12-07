@@ -1,16 +1,16 @@
 package crawler
 
 import (
+	"strconv"
+	"strings"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
-	js2ssa "github.com/yaklang/yaklang/common/yak/JS2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strconv"
-	"strings"
 )
 
 type requestNewTarget struct {
@@ -20,8 +20,9 @@ type requestNewTarget struct {
 }
 
 func HandleJS(isHttps bool, req []byte, code string, cb ...func(bool, []byte)) {
-	prog := js2ssa.ParseSSA(code, nil)
-	js := ssaapi.NewProgram(prog)
+	// prog := js2ssa.ParseSSA(code, nil)
+	// js := ssaapi.NewProgram(prog)
+	js := ssaapi.Parse(code, ssaapi.WithLanguage(ssaapi.JS))
 
 	getOriginReq := func() []byte {
 		var result = make([]byte, len(req))

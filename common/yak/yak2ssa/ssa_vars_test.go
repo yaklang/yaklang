@@ -9,12 +9,15 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
+func ParseSSA(code string) *ssa.Program {
+	return parseSSA(code, false, nil, func(fb *ssa.FunctionBuilder) {})
+}
 func check(t *testing.T, code string, regex string) {
 	re, err := regexp.Compile(".*" + regex + ".*")
 	if err != nil {
 		t.Fatal(err)
 	}
-	prog := ParseSSA(code, func(fb *ssa.FunctionBuilder) {
+	prog := parseSSA(code, false, nil, func(fb *ssa.FunctionBuilder) {
 		fb.WithExternMethod(&methodBuilder{})
 	})
 	prog.ShowWithSource()
@@ -55,7 +58,7 @@ func TestPosition(t *testing.T) {
 			a = b
 		}
 	`
-	prog := ParseSSA(code, func(fb *ssa.FunctionBuilder) {})
+	prog := ParseSSA(code)
 	want := ssa.Position{
 		SourceCode:  "1",
 		StartLine:   2,
@@ -250,8 +253,7 @@ func TestCfg(t *testing.T) {
 		}else {
 		}
 		`
-		prog := ParseSSA(code, func(fb *ssa.FunctionBuilder) {
-		})
+		prog := ParseSSA(code)
 		if prog == nil {
 			t.Fatal("prog parse error")
 		}
@@ -264,8 +266,7 @@ func TestCfg(t *testing.T) {
 			}
 		}
 		`
-		prog := ParseSSA(code, func(fb *ssa.FunctionBuilder) {
-		})
+		prog := ParseSSA(code)
 		if prog == nil {
 			t.Fatal("prog parse error")
 		}
@@ -296,8 +297,7 @@ func TestCfg(t *testing.T) {
 				println(4)
 		}
 		`
-		prog := ParseSSA(code, func(fb *ssa.FunctionBuilder) {
-		})
+		prog := ParseSSA(code)
 		if prog == nil {
 			t.Fatal("prog parse error")
 		}
@@ -312,8 +312,10 @@ func TestSyntaxError(t *testing.T) {
 	a...91234yuerinsmzxkbc,vmkoqawiuflp][1[;yai]
 	{ZXICv][ars]t[;]ar[setio][][][[][][]["""""""]]}]
 	`
-	prog := ParseSSA(code, func(fb *ssa.FunctionBuilder) {
-	})
+	code = `
+	a.
+	`
+	prog := ParseSSA(code)
 	if !utils.IsNil(prog) {
 		t.Fatal("prog parse should error")
 	}
