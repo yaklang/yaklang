@@ -148,7 +148,7 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 				}
 			}
 			return nil
-		}))
+		}), nil)
 		if err != nil {
 			score -= 40
 			log.Errorf("debugScript failed: %v", err)
