@@ -829,7 +829,9 @@ func GrpcRangeToPosition(r *ypb.Range) *ssa.Position {
 
 func (s *Server) YaklangLanguageSuggestion(ctx context.Context, req *ypb.YaklangLanguageSuggestionRequest) (*ypb.YaklangLanguageSuggestionResponse, error) {
 	ret := &ypb.YaklangLanguageSuggestionResponse{}
-	prog := ssaapi.Parse(req.YakScriptCode, pta.GetPluginSSAOpt(req.YakScriptType)...)
+	opt := pta.GetPluginSSAOpt(req.YakScriptType)
+	opt = append(opt, ssaapi.WithIgnoreSyntaxError(true))
+	prog := ssaapi.Parse(req.YakScriptCode, opt...)
 	if prog.Program == nil {
 		return nil, errors.New("ssa parse error")
 	}
