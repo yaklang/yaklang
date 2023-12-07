@@ -39,7 +39,7 @@ func TestSaveNewYakScript(t *testing.T) {
 
 	s, err := client.SaveNewYakScript(context.Background(), &ypb.SaveNewYakScriptRequest{
 		Content:              "",
-		Type:                 "",
+		Type:                 "yak",
 		Params:               nil,
 		ScriptName:           "测试插件新增接口",
 		Help:                 "",
@@ -63,4 +63,32 @@ func TestSaveNewYakScript(t *testing.T) {
 	}
 
 	_ = s
+}
+
+func TestExportLocalYakScript(t *testing.T) {
+	test := assert.New(t)
+
+	client, err := NewLocalClient()
+	if err != nil {
+		test.FailNow(err.Error())
+	}
+	client.ExportLocalYakScript(context.Background(), &ypb.ExportLocalYakScriptRequest{
+		OutputDir:       "/Users/limin/Downloads/",
+		OutputPluginDir: "",
+		YakScriptIds:    nil,
+		Keywords:        "",
+		Type:            "",
+		UserName:        "",
+		Tags:            "",
+	})
+}
+
+func TestImportYakScript(t *testing.T) {
+	test := assert.New(t)
+
+	client, err := NewLocalClient()
+	if err != nil {
+		test.FailNow(err.Error())
+	}
+	client.ImportYakScript(context.Background(), &ypb.ImportYakScriptRequest{Dirs: []string{"/Users/limin/Downloads/yak_script"}})
 }

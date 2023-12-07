@@ -491,3 +491,40 @@ func LoadYakitThirdpartySourceScripts(
 
 	return nil
 }
+
+func YakScriptLocalTotal(dir []string) int {
+	var total int
+	for _, dirName := range dir {
+		typeStr := YakScriptLocalType(dirName)
+		if typeStr != "" {
+			//dirImport = append(dirImport, dirName)
+			modDir := filepath.Join(dirName)
+			fs, _ := utils.ReadDirsRecursively(modDir)
+			total += len(fs)
+		}
+	}
+	if total <= 0 {
+		total = len(dir)
+	}
+	return total
+}
+
+func YakScriptLocalType(dirName string) string {
+	var typeStr string
+	fileName := filepath.Base(dirName)
+	switch fileName {
+	case "yak_nuclei":
+		typeStr = "nuclei"
+	case "yak_mitm":
+		typeStr = "mitm"
+	case "yak_module":
+		typeStr = "yak"
+	case "yak_codec":
+		typeStr = "codec"
+	case "yak_portscan":
+		typeStr = "port-scan"
+	default:
+		return ""
+	}
+	return typeStr
+}
