@@ -1308,8 +1308,9 @@ func ExportHTTPFlow(db *gorm.DB, params *ypb.ExportHTTPFlowsRequest) (paging *bi
 		}
 	}()
 	db = BuildHTTPFlowQuery(db.Model(&HTTPFlow{}), params.ExportWhere)
-	db = db.Select(strings.Join(params.FieldName, " "))
-	paging, db = bizhelper.Paging(db.Debug(), int(params.ExportWhere.Pagination.Page), int(params.ExportWhere.Pagination.Limit), &ret)
+	db = db.Select(strings.Join(params.FieldName, ","))
+	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", params.Ids)
+	paging, db = bizhelper.Paging(db, int(params.ExportWhere.Pagination.Page), int(params.ExportWhere.Pagination.Limit), &ret)
 
 	if db.Error != nil {
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
