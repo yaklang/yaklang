@@ -90,6 +90,7 @@ var Exports = map[string]interface{}{
 	// runtime exec template
 	"useRuntimeExecTemplate":  SetClassRuntimeExecTemplate,
 	"command":                 SetExecCommand,
+	"majorVersion":            SetMajorVersion,
 	"useRuntimeExecEvilClass": SetRuntimeExecEvilClass,
 	// runtime exec template
 	"useProcessBuilderExecTemplate":  SetClassProcessBuilderExecTemplate,
