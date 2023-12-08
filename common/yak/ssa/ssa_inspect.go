@@ -16,7 +16,7 @@ func (p *Program) show(flag FunctionAsmFlag) {
 			fmt.Printf("%s: %s\n", name, v)
 		}
 
-		for _, f := range i.AnonFuncs {
+		for _, f := range i.ChildFuncs {
 			showFunc(f)
 		}
 	}

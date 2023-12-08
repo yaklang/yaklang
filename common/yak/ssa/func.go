@@ -30,11 +30,10 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		Blocks:         make([]*BasicBlock, 0),
 		EnterBlock:     nil,
 		ExitBlock:      nil,
-		AnonFuncs:      make([]*Function, 0),
+		ChildFuncs:     make([]*Function, 0),
 		parent:         nil,
-		FreeValues:     make([]Value, 0),
+		FreeValues:     make([]*Parameter, 0),
 		SideEffects:    make(map[string]Value),
-		symbolObject:   &Make{anInstruction: anInstruction{}, anValue: NewValue()},
 		InstReg:        make(map[Instruction]string),
 		symbolTable:    make(map[string]map[*BasicBlock]Values),
 		externInstance: make(map[string]Value),
@@ -51,16 +50,12 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		p.Funcs[name] = f
 	}
 	f.EnterBlock = f.NewBasicBlock("entry")
-	f.symbolObject.SetFunc(f)
-	f.symbolObject.SetBlock(f.EnterBlock)
-	// f.symbol.SetVariable(name + "-symbol")
 	return f
 }
 
 func (f *Function) addAnonymous(anon *Function) {
-	f.AnonFuncs = append(f.AnonFuncs, anon)
+	f.ChildFuncs = append(f.ChildFuncs, anon)
 	anon.parent = f
-	anon.symbolObject.parentI = f.symbolObject
 }
 
 func (f *Function) NewParam(name string) *Parameter {
@@ -86,10 +81,6 @@ func (f *Function) IsMain() bool {
 
 func (f *Function) GetDeferBlock() *BasicBlock {
 	return f.DeferBlock
-}
-
-func (f *Function) GetSymbol() *Make {
-	return f.symbolObject
 }
 
 func (f *Function) GetParent() *Function {
@@ -148,12 +139,8 @@ func (f *Function) Finish() {
 	f.SetType(funType)
 	if len(f.FreeValues) != 0 {
 		funType.SetFreeValue(
-			lo.Map(f.FreeValues, func(v Value, _ int) string {
-				if p, ok := v.(*Parameter); ok {
-					return p.variable
-				}
-				// this unreachable: freeValue only Parameter
-				return v.String()
+			lo.Map(f.FreeValues, func(v *Parameter, _ int) string {
+				return v.GetVariable()
 			}),
 		)
 	}
