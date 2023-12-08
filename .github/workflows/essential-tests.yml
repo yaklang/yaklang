@@ -86,6 +86,9 @@ jobs:
               go test -timeout 20s -run TestSmoking_ICMP ./common/pcapx -v
               go test -timeout 20s -run TestSmoking_TCP ./common/pcapx -v
               go test -timeout 20s -run TestSmoking_UDP ./common/pcapx -v
+          - name: Test yso
+            run: |
+              go test -timeout 20s -run TestMUSTPASS* ./common/yso -v
 
     steps:
       - name: Check out code into the Go module directory

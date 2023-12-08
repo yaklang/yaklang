@@ -567,10 +567,16 @@ func SetExecCommand(cmd string) GenClassOptionFun {
 }
 
 func SetMajorVersion(v uint16) GenClassOptionFun {
+	// 定义Java类文件格式的最小和最大major版本号 1.1 18
+	const minMajorVersion uint16 = 45 //
+	const maxMajorVersion uint16 = 62 //
+
 	return func(config *ClassConfig) {
+		if v < minMajorVersion || v > maxMajorVersion {
+			v = 52
+		}
 		config.MajorVersion = v
 	}
-
 }
 
 // RuntimeExec 参数
