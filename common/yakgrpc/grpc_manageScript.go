@@ -992,7 +992,7 @@ func (s *Server) SaveNewYakScript(ctx context.Context, script *ypb.SaveNewYakScr
 
 func (s *Server) ExportLocalYakScript(ctx context.Context, req *ypb.ExportLocalYakScriptRequest) (*ypb.ExportLocalYakScriptResponse, error) {
 	db := yakit.QueryExportYakScript(s.GetProfileDatabase(), req)
-	scripts := yakit.YieldYakScripts(db.Debug(), context.Background())
+	scripts := yakit.YieldYakScripts(db, context.Background())
 	dir := req.GetOutputDir()
 
 	for v := range scripts {
