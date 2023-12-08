@@ -44,13 +44,42 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		return nil
 	}
 
+	if raw.GetText() == "" {
+		return nil
+	}
+
 	switch ret := raw.(type) {
 	case *phpparser.CloneExpressionContext:
-		// 浅拷贝
+		// 浅拷贝，一个对象
 		// 如果类定义了 __clone，就执行 __clone
+		target := y.VisitExpression(ret.Expression())
+		checkCloneBuildin := y.ir.BuildIf()
+		checkCloneBuildin.BuildCondition(func() ssa.Value {
+			return y.ir.EmitBinOp(
+				ssa.OpNotEq,
+				y.ir.EmitField(target, y.ir.EmitConstInst("__clone")),
+				y.ir.EmitConstInstNil(),
+			)
+		})
+
+		checkCloneBuildin.BuildTrue(func() {
+			// have __clone
+			calling := y.ir.NewCall(
+				y.ir.EmitField(target, y.ir.EmitConstInst("__clone")),
+				nil,
+			)
+			y.ir.EmitCall(calling)
+		})
+
+		//
+		return nil
 	case *phpparser.KeywordNewExpressionContext:
 		return y.VisitNewExpr(ret.NewExpr())
 	case *phpparser.IndexerExpressionContext:
+		v1 := y.VisitStringConstant(ret.StringConstant())
+		indexKey := y.VisitExpression(ret.Expression())
+		_ = v1
+		_ = indexKey
 	case *phpparser.CastExpressionContext:
 	case *phpparser.UnaryOperatorExpressionContext:
 		/*
@@ -63,12 +92,13 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 	case *phpparser.ArrayCreationExpressionContext:
 	case *phpparser.ChainExpressionContext:
 	case *phpparser.ScalarExpressionContext: // constant / string / label
-		if ret.Constant() != nil {
-			return y.VisitConstant(ret.Constant())
-		} else if ret.String_() != nil {
-			return y.VisitString_(ret.String_())
+		if i := ret.Constant(); i != nil {
+			return y.VisitConstant(i)
+		} else if i := ret.String_(); i != nil {
+			return y.VisitString_(i)
 		} else if ret.Label() != nil {
 			// break
+
 		} else {
 			log.Warnf("PHP Scalar Expr Failed: %s", ret.GetText())
 		}
@@ -86,7 +116,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		case "**":
 			o = ssa.OpPow
 		case "+":
-			o = ssa.OpAnd
+			o = ssa.OpAdd
 		case "-":
 			o = ssa.OpSub
 		case "*":
@@ -96,14 +126,12 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		case "%":
 			o = ssa.OpMod
 		case ".":
-			// o = ssa.OpConcat
-			// concat string????
-			panic("NOT IMPL")
+			return y.ir.EmitFieldMust(op1, op2)
 		default:
 
 			return nil
 		}
-		return y.main.EmitBinOp(o, op1, op2)
+		return y.ir.EmitBinOp(o, op1, op2)
 	case *phpparser.InstanceOfExpressionContext:
 	case *phpparser.ComparisonExpressionContext:
 	case *phpparser.BitwiseExpressionContext:
@@ -148,6 +176,8 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 
 	case *phpparser.LogicalExpressionContext:
 	default:
+		log.Errorf("unhandled expression: %v(%T)", ret.GetText(), ret)
+		log.Errorf("-------------unhandled expression: %v(%T)", ret.GetText(), ret)
 		_ = ret
 	}
 
@@ -458,4 +488,17 @@ func (y *builder) VisitAttribute(raw phpparser.IAttributeContext) interface{} {
 	}
 
 	return nil
+}
+
+func (y *builder) VisitStringConstant(raw phpparser.IStringConstantContext) interface{} {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*phpparser.StringConstantContext)
+	if i == nil {
+		return nil
+	}
+
+	return y.ir.ReadVariable(i.GetText(), false)
 }

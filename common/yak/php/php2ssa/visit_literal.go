@@ -2,6 +2,7 @@ package php2ssa
 
 import (
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -21,12 +22,12 @@ func (y *builder) VisitConstant(raw phpparser.IConstantContext) ssa.Value {
 	}
 
 	if i.Null() != nil {
-		return y.main.EmitConstInst(nil)
+		return y.ir.EmitConstInst(nil)
 	} else if i.LiteralConstant() != nil {
 		return y.VisitLiteralConstant(i.LiteralConstant())
 	} else if i.MagicConstant() != nil {
 		// magic __dir__ / __file__
-		return y.main.EmitUndefine(i.MagicConstant().GetText())
+		return y.ir.EmitUndefine(i.MagicConstant().GetText())
 	} else if i.ClassConstant() != nil {
 		// class constant
 		log.Warnf("class constant not support yet: %s", i.ClassConstant().GetText())
@@ -84,19 +85,20 @@ func (y *builder) VisitLiteralConstant(raw phpparser.ILiteralConstantContext) ss
 			}
 			preFloat = exponentInt * preFloat
 		}
-		return y.main.EmitConstInst(preFloat)
+		return y.ir.EmitConstInst(preFloat)
 	} else if i.BooleanConstant() != nil {
 		switch strings.ToLower(i.BooleanConstant().GetText()) {
 		case `true`:
-			return y.main.EmitConstInst(true)
+			return y.ir.EmitConstInst(true)
 		default: // case `false`:
-			return y.main.EmitConstInst(false)
+			return y.ir.EmitConstInst(false)
 		}
 	} else if i.NumericConstant() != nil {
 		return y.VisitNumericConstant(i.NumericConstant())
 	} else if i.StringConstant() != nil {
+		// log.Infof("string constant: %s", i.GetText())
 		// magic! php string literal constant is not need any quote!
-		return y.main.EmitConstInst(i.GetText())
+		return y.ir.EmitConstInst(i.GetText())
 	}
 
 	return nil
@@ -134,7 +136,7 @@ func (y *builder) VisitNumericConstant(raw phpparser.INumericConstantContext) ss
 		return nil
 	}
 
-	return y.main.EmitConstInst(result)
+	return y.ir.EmitConstInst(result)
 }
 
 func (y *builder) VisitString_(raw phpparser.IStringContext) ssa.Value {
@@ -147,7 +149,12 @@ func (y *builder) VisitString_(raw phpparser.IStringContext) ssa.Value {
 		return nil
 	}
 
-	return nil
+	str, err := yakunquote.Unquote(raw.GetText())
+	if err != nil {
+		str = raw.GetText()
+	}
+
+	return y.ir.EmitConstInst(str)
 }
 
 func (y *builder) VisitIdentifier(raw phpparser.IIdentifierContext) string {

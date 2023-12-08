@@ -9,6 +9,11 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
+func TestParseSSA_Valid(t *testing.T) {
+	p := ParseSSA(`1+1`)
+	p.Show()
+}
+
 func ParseSSA(code string) *ssa.Program {
 	return parseSSA(code, false, nil, func(fb *ssa.FunctionBuilder) {})
 }

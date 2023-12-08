@@ -145,11 +145,11 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 	}
 
 	//// how to build a template?
-	//// y.main is a SSA.Function
-	//template := y.main.BuildObjectTemplate(objectTemplate)    // 注册一个对象模版（有构造和析构方法的对象）
+	//// y.ir is a SSA.Function
+	//template := y.ir.BuildObjectTemplate(objectTemplate)    // 注册一个对象模版（有构造和析构方法的对象）
 	//template.SetDecorationVerbose(...)                        // 记录一下修饰词
 	//for _, i := range mergedTemplate {
-	//	y.main.FindObjectTemplate(i).MergeTo(template)        // 合并模版（inherit / trait / extend 都一样）
+	//	y.ir.FindObjectTemplate(i).MergeTo(template)        // 合并模版（inherit / trait / extend 都一样）
 	//}
 	//template.BuildField(func() {                              // 编译字段
 	//	for _, field := range i.AllClassStatement() {
@@ -265,7 +265,7 @@ func (y *builder) VisitTraitAdaptationStatement(raw phpparser.ITraitAdaptationSt
 		// trait alias
 		y.VisitTraitAlias(i.TraitAlias())
 	} else {
-		y.main.NewError(ssa.Warn, "trait.adaptation", "unknown trait adaptation statement")
+		y.ir.NewError(ssa.Warn, "trait.adaptation", "unknown trait adaptation statement")
 	}
 
 	return nil
