@@ -236,10 +236,12 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 		return utils.Error("group is empty")
 	}
 
-	if ok, err := yakit.CheckExistGroup(s.GetProfileDatabase(), req.Group, req.Folder); err != nil {
-		return utils.Wrapf(err, "check group[%s/%s]", req.Folder, req.Group)
-	} else if ok {
-		return utils.Errorf("group[%s/%s] exist", req.Folder, req.Group)
+	if req.IsNew {
+		if ok, err := yakit.CheckExistGroup(s.GetProfileDatabase(), req.Group, req.Folder); err != nil {
+			return utils.Wrapf(err, "check group[%s/%s]", req.Folder, req.Group)
+		} else if ok {
+			return utils.Errorf("group[%s/%s] exist", req.Folder, req.Group)
+		}
 	}
 
 	ctx, cancel := context.WithCancel(stream.Context())
@@ -337,10 +339,12 @@ func (s *Server) SavePayloadToFileStream(req *ypb.SavePayloadRequest, stream ypb
 		return utils.Error("group is empty")
 	}
 
-	if ok, err := yakit.CheckExistGroup(s.GetProfileDatabase(), req.Group, req.Folder); err != nil {
-		return utils.Wrapf(err, "check group[%s/%s]", req.Folder, req.Group)
-	} else if ok {
-		return utils.Errorf("group[%s/%s] exist", req.Folder, req.Group)
+	if req.IsNew {
+		if ok, err := yakit.CheckExistGroup(s.GetProfileDatabase(), req.Group, req.Folder); err != nil {
+			return utils.Wrapf(err, "check group[%s/%s]", req.Folder, req.Group)
+		} else if ok {
+			return utils.Errorf("group[%s/%s] exist", req.Folder, req.Group)
+		}
 	}
 
 	ctx, cancel := context.WithCancel(stream.Context())
