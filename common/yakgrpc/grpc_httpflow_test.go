@@ -338,9 +338,15 @@ func TestExportHTTPFlows(t *testing.T) {
 		t.Fatal(err)
 	}
 	response, err := client.ExportHTTPFlows(context.Background(), &ypb.ExportHTTPFlowsRequest{
-		ExportWhere: nil,
-		Ids:         []int64{1, 2, 3, 4, 5},
-		FieldName:   []string{"url", "method", "status_code"},
+		ExportWhere: &ypb.QueryHTTPFlowRequest{
+			Pagination: &ypb.Paging{
+				Page:  1,
+				Limit: 20,
+			},
+			Full: true,
+		},
+		Ids:       []int64{1, 2, 3, 4, 5},
+		FieldName: []string{"url", "method", "status_code"},
 	})
 	if err != nil {
 		t.Fatalf("export httpFlows error: %v", err)
