@@ -11,9 +11,6 @@ import (
 type FunctionBuilder struct {
 	*Function
 
-	// build sub-function
-	subFuncBuild []func()
-
 	target *target // for break and continue
 	labels map[string]*BasicBlock
 	// defer function call
@@ -43,7 +40,6 @@ func NewBuilder(f *Function, parent *FunctionBuilder) *FunctionBuilder {
 		Function:      f,
 		target:        &target{},
 		labels:        make(map[string]*BasicBlock),
-		subFuncBuild:  make([]func(), 0),
 		deferExpr:     make([]*Call, 0),
 		CurrentBlock:  nil,
 		CurrentRange:  nil,
@@ -106,12 +102,11 @@ func (b *FunctionBuilder) Finish() {
 	// fmt.Println("finish func: ", b.Name)
 
 	// sub-function
-	for _, builder := range b.subFuncBuild {
-		builder()
-	}
 	b.SetDefineFunc()
+	//TODO: handler `goto` syntax and notice function reentrant for `Feed(code)`
 	for _, block := range b.unsealedBlock {
 		block.Sealed()
+		b.unsealedBlock = []*BasicBlock{}
 	}
 	// set defer function
 	if deferLen := len(b.deferExpr); deferLen > 0 {
@@ -182,11 +177,6 @@ func (b *FunctionBuilder) SetDefineFunc() {
 			}
 		}
 	}
-}
-
-// sub-function builder
-func (b *FunctionBuilder) AddSubFunction(builder func()) {
-	b.subFuncBuild = append(b.subFuncBuild, builder)
 }
 
 // function stack
