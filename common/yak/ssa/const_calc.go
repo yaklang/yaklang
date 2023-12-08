@@ -31,6 +31,7 @@ const (
 	OpIn    //  a in b
 
 	OpSend // <-
+	OpPow  // **
 )
 
 var BinaryOpcodeName = map[BinaryOpcode]string{
