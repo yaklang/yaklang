@@ -64,7 +64,7 @@ func (prog *Program) EachFunction(handler func(*Function)) {
 	var handFunc func(*Function)
 	handFunc = func(f *Function) {
 		handler(f)
-		for _, s := range f.AnonFuncs {
+		for _, s := range f.ChildFuncs {
 			handFunc(s)
 		}
 	}
