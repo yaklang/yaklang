@@ -242,6 +242,26 @@ func ReplaceClassNameInJavaSerilizable(objSer yserx.JavaSerializable, old string
 	return err
 }
 
+func FindJavaSerializableClassCode(obj interface{}) []string {
+	var bytesList []string
+	switch concreteVal := obj.(type) {
+	case map[string]interface{}:
+		if bytesCode, ok := concreteVal["bytescode"].(bool); ok && bytesCode {
+			if bytes, ok := concreteVal["bytes"].(string); ok {
+				bytesList = append(bytesList, bytes)
+			}
+		}
+		for _, value := range concreteVal {
+			bytesList = append(bytesList, FindJavaSerializableClassCode(value)...)
+		}
+	case []interface{}:
+		for _, item := range concreteVal {
+			bytesList = append(bytesList, FindJavaSerializableClassCode(item)...)
+		}
+	}
+	return bytesList
+}
+
 func WalkJavaSerializableObject(objSer yserx.JavaSerializable, handle WalkJavaSerializableObjectHandle) *JavaStruct {
 	handleTable := map[uint64]yserx.JavaSerializable{}
 	root := &JavaStruct{Name: "root"}
@@ -295,6 +315,7 @@ func _WalkJavaSerializableObject(objSer yserx.JavaSerializable, handleTable map[
 		for i, value := range ret.Values {
 			//if value.Object
 			v[i] = &JavaStruct{}
+			handle(nil, value)
 			_WalkJavaSerializableObject(value.Object, handleTable, handle, v[i], structHandleTable)
 		}
 		return

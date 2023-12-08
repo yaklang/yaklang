@@ -66,7 +66,8 @@ type ClassConfig struct {
 	IsObfuscation bool
 	IsConstruct   bool
 	//exec参数
-	Command string
+	Command      string
+	MajorVersion uint16
 	//dnslog参数
 	Domain string
 	//spring参数
@@ -104,6 +105,9 @@ func (cf *ClassConfig) AddError(err error) {
 	}
 }
 func (cf *ClassConfig) GenerateClassObject() (obj *javaclassparser.ClassObject, err error) {
+	//if cf.MajorVersion != 0 {
+	//	obj.MajorVersion = cf.MajorVersion
+	//}
 	if cf.ClassType == BytesClass {
 		obj, err = javaclassparser.Parse(cf.ClassBytes)
 		if err != nil {
@@ -560,6 +564,13 @@ func SetExecCommand(cmd string) GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.Command = cmd
 	}
+}
+
+func SetMajorVersion(v uint16) GenClassOptionFun {
+	return func(config *ClassConfig) {
+		config.MajorVersion = v
+	}
+
 }
 
 // RuntimeExec 参数
