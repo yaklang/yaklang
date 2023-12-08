@@ -1,8 +1,6 @@
 package ssa4analyze
 
 import (
-	"fmt"
-
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -34,7 +32,6 @@ func (t *TypeCheck) Run(prog *ssa.Program) {
 	}
 
 	prog.EachFunction(func(f *ssa.Function) {
-		fmt.Println("name: ", f.GetVariable())
 		analyzeOnFunction(f)
 	})
 }
