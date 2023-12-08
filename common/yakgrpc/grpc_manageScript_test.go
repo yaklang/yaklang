@@ -72,7 +72,7 @@ func TestExportLocalYakScript(t *testing.T) {
 	if err != nil {
 		test.FailNow(err.Error())
 	}
-	client.ExportLocalYakScript(context.Background(), &ypb.ExportLocalYakScriptRequest{
+	s, err := client.ExportLocalYakScript(context.Background(), &ypb.ExportLocalYakScriptRequest{
 		OutputDir:       "/Users/limin/Downloads/",
 		OutputPluginDir: "",
 		YakScriptIds:    nil,
@@ -81,6 +81,10 @@ func TestExportLocalYakScript(t *testing.T) {
 		UserName:        "",
 		Tags:            "",
 	})
+	if err != nil {
+		test.FailNow(err.Error())
+	}
+	_ = s
 }
 
 func TestImportYakScript(t *testing.T) {
@@ -90,5 +94,9 @@ func TestImportYakScript(t *testing.T) {
 	if err != nil {
 		test.FailNow(err.Error())
 	}
-	client.ImportYakScript(context.Background(), &ypb.ImportYakScriptRequest{Dirs: []string{"/Users/limin/Downloads/yak_script"}})
+	s, err := client.ImportYakScript(context.Background(), &ypb.ImportYakScriptRequest{Dirs: []string{"/Users/limin/Downloads/yak_script"}})
+	if err != nil {
+		test.FailNow(err.Error())
+	}
+	_ = s
 }
