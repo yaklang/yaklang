@@ -104,9 +104,10 @@ func TestUndefine(t *testing.T) {
 			a = () => {
 				b = xxx
 			}
+			a()
 			`,
 			errs: []string{
-				ssa4analyze.ValueUndefined("xxx"),
+				ssa.BindingNotFound("xxx", ssa.NewRange(ssa.NewPosition(0, 5, 3), ssa.NewPosition(0, 5, 6), "")),
 			},
 			ExternValue: map[string]any{},
 			ExternLib:   map[string]map[string]any{},
