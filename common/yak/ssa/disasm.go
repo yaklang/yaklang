@@ -175,8 +175,8 @@ func (b *BasicBlock) String() string {
 		}
 	}
 	if !utils.IsNil(b.Condition) {
-		// ret += " (" + getStrFlag(b.Condition, false) + ")"
-		ret += " (" + b.Condition.LineDisasm() + ")"
+		ret += " (" + getStrFlag(b.Condition, false) + ")"
+		// ret += " (" + b.Condition.LineDisasm() + ")"
 	}
 	return ret
 }

@@ -87,11 +87,14 @@ func DeleteInst(i Instruction) {
 func (f *FunctionBuilder) SetCurrent(i Instruction) func() {
 	currentBlock := f.CurrentBlock
 	blockSymbolTable := f.blockSymbolTable
+	currentPos := f.CurrentPos
 
 	f.blockSymbolTable = i.GetSymbolTable()
 	f.CurrentBlock = i.GetBlock()
+	f.CurrentPos = i.GetPosition()
 
 	return func() {
+		f.CurrentPos = currentPos
 		f.CurrentBlock = currentBlock
 		f.blockSymbolTable = blockSymbolTable
 	}
