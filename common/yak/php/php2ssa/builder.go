@@ -2,6 +2,7 @@ package php2ssa
 
 import (
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -25,6 +26,9 @@ func ParseSSA(src string, f func(builder *ssa.FunctionBuilder)) (prog *ssa.Progr
 		ast:  parser.HtmlDocument(),
 	}
 	builder.prog.Build(builder)
+	for _, r := range builder.prog.GetErrors() {
+		log.Errorf("ssa-ir program error: %v", r)
+	}
 	return builder.prog
 }
 
