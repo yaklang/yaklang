@@ -165,9 +165,6 @@ func ConfigJavaObject(templ []byte, name string, options ...GenClassOptionFun) (
 	if err != nil {
 		return nil, err
 	}
-	if config.MajorVersion != 0 {
-		classObj.MajorVersion = config.MajorVersion
-	}
 	objs, err := yserx.ParseJavaSerialized(templ)
 	if err != nil {
 		return nil, err
