@@ -3,7 +3,11 @@ package php2ssa
 import "testing"
 
 func TestParseSSA_Valid(t *testing.T) {
-	p := ParseSSA(`<?php $a = 1+1; ?>`, nil)
+	p := ParseSSA(`<?php 
+$b = "a"."b";
+$b = 1+1;
+
+`, nil)
 	p.Show()
 }
 
