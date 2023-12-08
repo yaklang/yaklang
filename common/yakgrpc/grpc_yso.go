@@ -263,17 +263,13 @@ func optionsToYaklangCode(options []*ypb.YsoClassGeneraterOptionsWithVerbose, is
 				optionsCode = append(optionsCode, code)
 			}
 		case JavaClassGeneraterOption_Version:
-			if isClass {
-				v, err := strconv.Atoi(option.Value)
-				if err != nil {
-					v = 0
-				}
-				preOptionsCode[option.Key] = v
-			} else {
-				preOptionsCode[option.Key] = option.Value
-				code := fmt.Sprintf("yso.%s(\"%s\")", "majorVersion", option.Value)
-				optionsCode = append(optionsCode, code)
+			v, err := strconv.Atoi(option.Value)
+			if err != nil {
+				v = 0
 			}
+			preOptionsCode[option.Key] = v
+			code := fmt.Sprintf("yso.%s(%s)", "majorVersion", JavaClassGeneraterOption_Version)
+			optionsCode = append(optionsCode, code)
 		case JavaClassGeneraterOption_Domain:
 			if isClass {
 				preOptionsCode[option.Key] = option.Value
@@ -396,7 +392,6 @@ if err {
 	log.error("%v",err)
 	return
 }
-classObj.MajorVersion = $version
 classBytes,err = yso.ToBytes(classObj)
 if err {
 	log.error("%v",err)
@@ -405,7 +400,7 @@ if err {
 
 // 16进制展示payload
 hexPayload = codec.EncodeToHex(classBytes)    
-println(hexPayload)
+//println(hexPayload)
 
 // // fastjson利用
 // // 参数
@@ -557,13 +552,10 @@ if err != nil {
 	default:
 		return "", nil, utils.Error("not support class")
 	}
-	version := string(JavaClassGeneraterOption_Version)
-	if gadget != "" {
-		optionsCode = "yso.majorVersion(" + version + ")," + optionsCode
-		code = utils.Format(gadgetCodeTmp, map[string]string{"gadgetFun": gadget, "options": optionsCode})
-	} else {
-		code = utils.Format(code, map[string]string{"version": version})
-	}
+	//if gadget != "" {
+	//	optionsCode = "yso.majorVersion(" + version + ")," + optionsCode
+	//	code = utils.Format(gadgetCodeTmp, map[string]string{"gadgetFun": gadget, "options": optionsCode})
+	//}
 
 	if className != "" {
 		code = fmt.Sprintf("className = \"%s\"\n", className) + code
