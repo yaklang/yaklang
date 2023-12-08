@@ -288,13 +288,38 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 
 		defer feedback(-1, "文件 "+f+" 写入数据库成功")
 		feedback(-1, "正在读取文件: "+f)
-		return yakit.SavePayloadByFilenameEx(f, func(data string, hitCount int64) error {
+		bufNum, bufSize := 0, 256
+		payloadContentBuf := make([]string, 0, bufSize)
+		payloadHitCountBuf := make([]int64, 0, bufSize)
+		err = yakit.SavePayloadByFilenameEx(f, func(data string, hitCount int64) error {
 			size += int64(len(data))
 			if total < size {
 				total = size + 1
 			}
+			// 大量插入做缓存
+			if req.IsNew {
+				bufNum++
+				payloadContentBuf = append(payloadContentBuf, data)
+				payloadHitCountBuf = append(payloadHitCountBuf, hitCount)
+				if bufNum < bufSize {
+					return nil
+				}
+				bufNum = 0
+				err := yakit.CreateMultiPayloads(s.GetProfileDatabase(), payloadContentBuf, req.GetGroup(), req.GetFolder(), payloadHitCountBuf, false)
+				payloadContentBuf = payloadContentBuf[:0]
+				payloadHitCountBuf = payloadHitCountBuf[:0]
+				return err
+			}
+
 			return yakit.CreateOrUpdatePayload(s.GetProfileDatabase(), data, req.GetGroup(), req.GetFolder(), hitCount, false)
 		})
+		if len(payloadContentBuf) > 0 {
+			err = yakit.CreateMultiPayloads(s.GetProfileDatabase(), payloadContentBuf, req.GetGroup(), req.GetFolder(), payloadHitCountBuf, false)
+			payloadContentBuf = payloadContentBuf[:0]
+			payloadHitCountBuf = payloadHitCountBuf[:0]
+		}
+
+		return err
 	}
 
 	defer func() {
@@ -313,6 +338,7 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 			}
 		}
 	} else {
+		// 旧接口
 		total = int64(len(req.GetContent()))
 		feedback(-1, "正在读取数据")
 		if err := yakit.SavePayloadGroupByRawEx(req.GetContent(), func(data string) error {
