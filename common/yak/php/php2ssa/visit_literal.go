@@ -35,7 +35,7 @@ func (y *builder) VisitConstant(raw phpparser.IConstantContext) ssa.Value {
 	} else {
 		log.Warnf("unknown constant: %s", i.GetText())
 	}
-	return y.main.EmitConstInst(nil)
+	return nil
 }
 
 func (y *builder) VisitLiteralConstant(raw phpparser.ILiteralConstantContext) ssa.Value {

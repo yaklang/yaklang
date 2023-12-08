@@ -2,6 +2,11 @@ package php2ssa
 
 import "testing"
 
+func TestParseSSA_Valid(t *testing.T) {
+	p := ParseSSA(`<?php $a = 1+1; ?>`, nil)
+	p.Show()
+}
+
 func TestParseSSA_Smoking(t *testing.T) {
 	ParseSSA(`<?php echo 111 ?>`, nil)
 }
