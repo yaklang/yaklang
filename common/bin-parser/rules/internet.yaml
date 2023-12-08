@@ -15,9 +15,10 @@ Package:
         return
     }
     this.GetSubNode("TCP").Process()
-    res = this.TryProcessNode(getRootNode("TLS"))
-    if res.Ok {
-        res.Save()
+    res,op = getRootNode("TLS").TryProcess()
+    if op.Ok {
+        op.Save()
+        this.AppendNode(op.GetNode())
     }else{
         dump(res.Message)
     }

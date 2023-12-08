@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"reflect"
 )
@@ -25,12 +24,26 @@ type YakNode struct {
 	GetRemainingSpace    func() uint64
 	CalcNodeResultLength func() uint64
 	NewElement           func() *YakNode
-	TryProcessNode       func(*YakNode) map[string]any
+	TryProcess           func() (any, map[string]any)
+	SetChildren          func([]*YakNode)
+	GetChildren          func() []*YakNode
 }
 
-func ConvertToYakNode(node *base.Node, operator func(node2 *base.Node) error) *YakNode {
+func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool), error)) *YakNode {
 	yakNode := &YakNode{}
 	yakNode.origin = node
+	yakNode.SetChildren = func(nodes []*YakNode) {
+		for _, node := range nodes {
+			yakNode.origin.Children = append(yakNode.origin.Children, node.origin)
+		}
+	}
+	yakNode.GetChildren = func() []*YakNode {
+		res := []*YakNode{}
+		for _, node := range yakNode.origin.Children {
+			res = append(res, ConvertToYakNode(node, operator))
+		}
+		return res
+	}
 	yakNode.GetCfg = func(k string) any {
 		return node.Cfg.GetItem(k)
 	}
@@ -51,7 +64,7 @@ func ConvertToYakNode(node *base.Node, operator func(node2 *base.Node) error) *Y
 		node.Children = append(node.Children, element)
 		return ConvertToYakNode(element, operator)
 	}
-	yakNode.TryProcessNode = func(yNode *YakNode) (response map[string]any) {
+	yakNode.TryProcess = func() (result any, response map[string]any) {
 		response = map[string]any{
 			"Ok":      false,
 			"Message": "",
@@ -62,23 +75,30 @@ func ConvertToYakNode(node *base.Node, operator func(node2 *base.Node) error) *Y
 				response["Message"] = fmt.Sprintf("%v", e)
 			}
 		}()
-		copyNodeIns := *node
-		copyNode := &copyNodeIns
-		err := appendNode(copyNode, yNode.origin)
-		if err != nil {
-			response["Message"] = err.Error()
-			return
-		}
-		err = operator(utils.GetLastElement[*base.Node](copyNode.Children))
+		copyNode := node.Copy()
+		copyYakNode := ConvertToYakNode(copyNode, operator)
+		//err := appendNode(copyNode, yakNode.origin)
+		//if err != nil {
+		//	response["Message"] = err.Error()
+		//	return
+		//}
+		deferFun, err := operator(copyNode)
 		if err != nil {
 			response["Message"] = err.Error()
 			return
 		}
 		response["Ok"] = true
 		response["Save"] = func() {
-			*node = *copyNode
+			deferFun(false)
 		}
-		return
+		response["GetNode"] = func() any {
+			return copyYakNode
+		}
+		response["Result"] = copyYakNode.Result()
+		response["Recovery"] = func() {
+			deferFun(true)
+		}
+		return copyYakNode.Result(), response
 	}
 	yakNode.Process = func() any {
 		//defer func() {
@@ -86,10 +106,11 @@ func ConvertToYakNode(node *base.Node, operator func(node2 *base.Node) error) *Y
 		//		utils.PrintCurrentGoroutineRuntimeStack()
 		//	}
 		//}()
-		err := operator(node)
+		deferFun, err := operator(node)
 		if err != nil {
 			panic(err)
 		}
+		deferFun(false)
 		return GetResultByNode(node)
 	}
 	yakNode.ForEachChild = func(f func(child *YakNode)) {
@@ -137,7 +158,7 @@ func ConvertToYakNode(node *base.Node, operator func(node2 *base.Node) error) *Y
 	}
 	return yakNode
 }
-func ExecOperator(node *base.Node, code string, operator func(node2 *base.Node) error) error {
+func ExecOperator(node *base.Node, code string, operator func(node *base.Node) (func(bool), error)) error {
 	//if mode != "parse" && mode != "generate" {
 	//	return errors.New("mode must be parse or generate")
 	//}

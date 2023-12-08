@@ -424,6 +424,6 @@ func newNodeTree(parentCfg *Config, name string, data any, ctx *NodeContext) (*N
 		}
 		return node, nil
 	default:
-		return nil, errors.New("invalid data")
+		return nil, fmt.Errorf("unknown type %T", data)
 	}
 }

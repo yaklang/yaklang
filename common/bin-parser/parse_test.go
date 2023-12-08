@@ -429,3 +429,59 @@ func TestIIOP1(t *testing.T) {
 	}
 	spew.Dump(r)
 }
+func TestHTTP(t *testing.T) {
+	var data string
+	var err error
+	var pyaload []byte
+	var reader *bytes.Reader
+	var res *base.Node
+	// Request
+	//data = "474554202f20485454502f312e310d0a486f73743a20666130323639386263652e69716979692e636f6d3a31343039310d0a557365722d4167656e743a206375726c2f372e31372e300d0a436f6e74656e742d4c656e6774683a2033320d0a436f6e6e656374696f6e3a20557067726164650d0a5365632d576562736f636b65742d4b65793a204349576a774c4f776d666756425561556c34446556773d3d0d0a557067726164653a20776562736f636b65740d0a0d0ab462f8eda760a02ae79c4781eed151b1d410661b7329303071efaa83f2b9fd5e"
+	//pyaload, err = codec.DecodeHex(data)
+	//if err != nil {
+	//	t.Fatal(err)
+	//}
+	//reader = bytes.NewReader(pyaload)
+	//res, err = ParseBinary(reader, "application-layer.http")
+	//if err != nil {
+	//	t.Fatal(err)
+	//}
+	//r, err := res.Children[0].Result()
+	//if err != nil {
+	//	t.Fatal(err)
+	//}
+	//spew.Dump(r)
+	// Response
+	//data = "485454502f312e3120323030204f4b0d0a436f6e6e656374696f6e3a20636c6f73650d0a436f6e74656e742d547970653a206170706c69636174696f6e2f6f637465742d73747265616d0d0a436f6e74656e742d4c656e6774683a203234380d0a0d0a16f104002e0000002a0204f100a80cc4b7dffc81d5a39eb1a8add09e7a88c3cd0a76cf2171db6530579dbb55767e000000010016f104003735fc81fdbb363b73b197be0a92b2c0c2a3313edb14ce8e8cf44449dc72d895b2f429d10965d4e4c93fd28665f81db92761fa54ae89397917f10400686c74728d8356d26d9cf1edbbf7185f1ab07ab0af28dd0df99118643d91d52a9f887545505ea32efcbad72650894b68f5353eafa8ec6cb6b23b80e6ceccf879cad7570e831b623ceb9280e7d59b665bbf8a907d4ef5f5f6211de2334a600ba7bdb2ffbc919c2ab13915f1040017919b39d0aa21828a9f734d5251a240bd4bb4597f6009b5"
+	//pyaload, err = codec.DecodeHex(data)
+	//if err != nil {
+	//	t.Fatal(err)
+	//}
+	//reader = bytes.NewReader(pyaload)
+	//res, err = ParseBinary(reader, "application-layer.http")
+	//if err != nil {
+	//	t.Fatal(err)
+	//}
+	//r, err := res.Children[0].Result()
+	//if err != nil {
+	//	t.Fatal(err)
+	//}
+	//spew.Dump(r)
+	// Chunked Request
+	data = "504f5354202f20485454502f312e310d0a436f6e74656e742d547970653a206170706c69636174696f6e2f6a736f6e0d0a486f73743a207777772e6578616d706c652e636f6d0d0a5472616e736665722d456e636f64696e673a206368756e6b65640d0a0d0a330d0a613d310d0a300d0a0d0a"
+	pyaload, err = codec.DecodeHex(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader = bytes.NewReader(pyaload)
+	res, err = ParseBinary(reader, "application-layer.http")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := res.Children[0].Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	spew.Dump(r)
+
+}

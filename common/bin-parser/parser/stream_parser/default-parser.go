@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"path"
 	"reflect"
@@ -183,8 +184,28 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 		return operator.NodeParse(node)
 	}
 	if v := node.Cfg.GetItem(CfgOperator); v != nil {
-		err := ExecOperator(node, utils.InterfaceToString(v), func(node *base.Node) error {
-			return operator.NodeParse(node)
+		err := ExecOperator(node, utils.InterfaceToString(v), func(node *base.Node) (func(bool), error) {
+			err := operator.Backup()
+			if err != nil {
+				return nil, err
+			}
+			err = operator.NodeParse(node)
+			if err != nil {
+				return nil, err
+			}
+			return func(recovery bool) {
+				if recovery {
+					err := operator.Recovery()
+					if err != nil {
+						log.Errorf("recovery error: %v", err)
+					}
+				} else {
+					err := operator.PopBackup()
+					if err != nil {
+						log.Errorf("pop backup error: %v", err)
+					}
+				}
+			}, nil
 		})
 		if err != nil {
 			return fmt.Errorf("eval operator error: %w", err)
@@ -490,6 +511,7 @@ func (d *DefParser) Parse(data *base.BitReader, node *base.Node) error {
 					return err
 				}
 				node.Cfg.SetItem(CfgNodeResult, res)
+
 				return nil
 			}
 		},

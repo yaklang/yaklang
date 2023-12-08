@@ -442,7 +442,7 @@ func NodeIsTerminal(node *base.Node) bool {
 	return node.Cfg.GetBool(CfgIsTerminal)
 }
 func NodeIsDelimiter(node *base.Node) bool {
-	return node.Cfg.GetBool(CfgDelimiter)
+	return node.Cfg.Has(CfgDelimiter) || node.Cfg.Has(CfgDel)
 }
 func NodeHasResult(node *base.Node) bool {
 	return node.Cfg.Has(CfgNodeResult)

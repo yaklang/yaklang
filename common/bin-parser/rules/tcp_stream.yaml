@@ -1,3 +1,0 @@
-Package:
-  isList: true
-  TCP: "import:tcp_raw.yaml;node:Package.TCP"
