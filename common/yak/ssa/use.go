@@ -27,7 +27,6 @@ func ReplaceValue(v Value, to Value, skip func(Instruction) bool) {
 	for _, user := range deleteInst {
 		v.RemoveUser(user)
 	}
-
 }
 
 func InsertValueReplaceOriginal(original Value, insert Value) {
@@ -41,19 +40,9 @@ func InsertValueReplaceOriginal(original Value, insert Value) {
 
 	// replace variable in block
 	replaceInBlock := func(v, to Value, block *BasicBlock, skip func(Instruction) bool) {
-		// fmt.Println("replace: ", v, to, " in block: ", block)
-		deleteUser := make([]User, 0)
-		for _, user := range v.GetUsers() {
-			if user.GetBlock() != block || skip(user) {
-				continue
-			}
-			user.ReplaceValue(v, to)
-			to.AddUser(user)
-			deleteUser = append(deleteUser, user)
-		}
-		for _, user := range deleteUser {
-			v.RemoveUser(user)
-		}
+		ReplaceValue(v, to, func(i Instruction) bool {
+			return i.GetBlock() != block || skip(i)
+		})
 	}
 
 	afterInsert := func(inst Instruction) bool {
