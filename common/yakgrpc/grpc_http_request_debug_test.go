@@ -592,7 +592,7 @@ yakit.Output(codec.EncodeBase64(s))
 }
 `,
 		PluginType: "yak",
-		ExecParams: map[string]string{"-s": codecString, "-b": "true"},
+		ExecParams: []*ypb.KVPair{{Key: "s", Value: codecString}, {Key: "b", Value: codecString}},
 	})
 	if err != nil {
 		t.Fatal(err)
