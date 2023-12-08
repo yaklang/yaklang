@@ -11,6 +11,19 @@ func TestParseSSA_Smoking2(t *testing.T) {
 `, nil)
 }
 
+func TestParse_BASIC_EXPR(t *testing.T) {
+	ParseSSA(`<?php
+
+1+1;
+"a"."cccc";
+
+$a = 1+1;
+$b = 1+1+$a;
+
+
+`, nil)
+}
+
 func TestParseCLS(t *testing.T) {
 	ParseSSA(`<?php
 
