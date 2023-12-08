@@ -288,6 +288,13 @@ type Function struct {
 	builder *FunctionBuilder
 }
 
+func (f *Function) FirstBlockInstruction() []Instruction {
+	if len(f.Blocks) > 0 {
+		return f.Blocks[0].Insts
+	}
+	return nil
+}
+
 var (
 	_ Node  = (*Function)(nil)
 	_ Value = (*Function)(nil)

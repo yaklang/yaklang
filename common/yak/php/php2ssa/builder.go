@@ -35,7 +35,7 @@ func ParseSSA(src string, f func(builder *ssa.FunctionBuilder)) (prog *ssa.Progr
 func (y *builder) Build() {
 	pkg := ssa.NewPackage("main")
 	y.prog.AddPackage(pkg)
-	main := pkg.NewFunction("php-main")
+	main := pkg.NewFunction("main")
 	y.ir = ssa.NewBuilder(main, nil)
 	y.VisitHtmlDocument(y.ast)
 	y.ir.Finish()
