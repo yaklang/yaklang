@@ -98,11 +98,12 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		case ".":
 			// o = ssa.OpConcat
 			// concat string????
+			panic("NOT IMPL")
 		default:
 
 			return nil
 		}
-		return ssa.NewBinOp(o, op1, op2)
+		return y.main.EmitBinOp(o, op1, op2)
 	case *phpparser.InstanceOfExpressionContext:
 	case *phpparser.ComparisonExpressionContext:
 	case *phpparser.BitwiseExpressionContext:
