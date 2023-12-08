@@ -249,31 +249,37 @@ type Function struct {
 	anInstruction
 	anValue
 
-	// package
+	// package, double link
 	Package *Package
 
+	// just function parameter and all return instruction
 	Param  []*Parameter
 	Return []*Return
 
-	hasEllipsis bool
-
 	// BasicBlock list
-	Blocks     []*BasicBlock
+	Blocks []*BasicBlock
+	// First and End block
 	EnterBlock *BasicBlock
 	ExitBlock  *BasicBlock
+	// For Defer  semantic
+	// this block will always execute when the function exits,
+	// regardless of whether the function returns normally or exits due to a panic.
 	DeferBlock *BasicBlock
 
-	// anonymous function in this function
-	AnonFuncs []*Function
-
-	// if this function is anonFunc
-	FreeValues   []Value          // the value, captured variable form parent-function,
-	SideEffects  map[string]Value // closure function side effects
-	parent       *Function        // parent function if anonymous function; nil if global function.
-	symbolObject *Make            // for function symbol table
+	// for closure function
+	FreeValues []*Parameter // store the captured variable form parent-function, just contain name, and type is Parameter
+	// closure function side effects
+	// TODO: currently, this value is not being used, but it should be utilized in the future.
+	SideEffects map[string]Value
+	// closure function double link. parentFunc <-> childFuncs
+	parent     *Function   // parent function;  can be nil if there is no parent function
+	ChildFuncs []*Function // child function within this function
 
 	// for instruction
-	InstReg     map[Instruction]string // instruction -> virtual register
+	// This `InstReg` is used to map instruction to their "virtual register", It is utilized by `Disasm`.
+	// TODO: This `InstReg` should be use to retrieve all instruction. We need refactor this code when we remove the `symbolTable`.
+	InstReg map[Instruction]string // instruction to their "virtual register"
+	// TODO: this `symbolTable` should be contained within `BasicBlock`, It field should be move to `BasicBlock` and be removed in `Function`
 	symbolTable map[string]map[*BasicBlock]Values
 
 	// extern lib
@@ -284,8 +290,11 @@ type Function struct {
 	err        SSAErrors
 	errComment ErrorComment
 
-	// for builder
+	// ================  for build
+	// builder
 	builder *FunctionBuilder
+	// this function is variadic parameter, for function type create
+	hasEllipsis bool
 }
 
 func (f *Function) FirstBlockInstruction() []Instruction {
@@ -350,7 +359,7 @@ type Phi struct {
 
 	Edge []Value // edge[i] from phi.Block.Preds[i]
 	//	what instruction create this control-flow merge?
-	branch *Instruction // loop or if :
+	// branch *Instruction // loop or if :
 	// for build
 	create     bool  // for ReadVariable method
 	wit1, wit2 Value // witness for trivial-phi
