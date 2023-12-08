@@ -633,6 +633,10 @@ func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionReques
 		ret = append(ret, getLanguageKeywordSuggestions()...)
 		// 用户自定义变量补全
 		for id, values := range prog.GetAllSymbols() {
+			// 不应该再补全标准库
+			if _, ok := doc.DefaultDocumentHelper.Libs[id]; ok {
+				continue
+			}
 			// todo: 需要更严谨的过滤
 			values = values.Filter(func(value *ssaapi.Value) bool {
 				position2 := value.GetPosition()
