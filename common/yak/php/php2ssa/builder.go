@@ -11,7 +11,7 @@ import (
 type builder struct {
 	ast  phpparser.IHtmlDocumentContext
 	prog *ssa.Program
-	main *ssa.FunctionBuilder
+	ir   *ssa.FunctionBuilder
 }
 
 func ParseSSA(src string, f func(builder *ssa.FunctionBuilder)) (prog *ssa.Program) {
@@ -25,7 +25,7 @@ func ParseSSA(src string, f func(builder *ssa.FunctionBuilder)) (prog *ssa.Progr
 		prog: program,
 		ast:  parser.HtmlDocument(),
 	}
-	builder.prog.Build(builder)
+	builder.Build()
 	for _, r := range builder.prog.GetErrors() {
 		log.Errorf("ssa-ir program error: %v", r)
 	}
@@ -36,7 +36,7 @@ func (y *builder) Build() {
 	pkg := ssa.NewPackage("main")
 	y.prog.AddPackage(pkg)
 	main := pkg.NewFunction("php-main")
-	y.main = ssa.NewBuilder(main, nil)
+	y.ir = ssa.NewBuilder(main, nil)
 	y.VisitHtmlDocument(y.ast)
-	y.main.Finish()
+	y.ir.Finish()
 }

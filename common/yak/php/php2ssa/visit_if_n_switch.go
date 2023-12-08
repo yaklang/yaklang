@@ -23,7 +23,7 @@ func (y *builder) VisitIfStatement(raw phpparser.IIfStatementContext) interface{
 			if (true) echo "abc"; else if true 1+1;
 			if (true) echo "abc"; else if true 1+1; else "abc"."ccc";
 		*/
-		i := y.main.BuildIf()
+		i := y.ir.BuildIf()
 		i.BuildCondition(func() ssa.Value {
 			return y.VisitParentheses(stmt.Parentheses())
 		})
@@ -46,7 +46,7 @@ func (y *builder) VisitIfStatement(raw phpparser.IIfStatementContext) interface{
 		i.Finish()
 	} else {
 		// tag if
-		i := y.main.BuildIf()
+		i := y.ir.BuildIf()
 		i.BuildCondition(func() ssa.Value {
 			return y.VisitParentheses(stmt.Parentheses())
 		})
@@ -82,7 +82,7 @@ func (y *builder) VisitSwitchStatement(raw phpparser.ISwitchStatementContext) in
 		return nil
 	}
 
-	ir := y.main.BuildSwitch()
+	ir := y.ir.BuildSwitch()
 	ir.DefaultBreak = false
 
 	var cond ssa.Value

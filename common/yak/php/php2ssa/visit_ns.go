@@ -34,7 +34,7 @@ func (y *builder) VisitQualifiedNamespaceName(raw phpparser.IQualifiedNamespaceN
 		if ret := list.NamespaceNameTail(); ret != nil {
 
 		}
-		return y.main.EmitConstInst(nil)
+		return y.ir.EmitConstInst(nil)
 	} else {
 
 	}
