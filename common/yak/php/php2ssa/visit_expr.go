@@ -90,6 +90,10 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 	case *phpparser.PostfixIncDecExpressionContext:
 	case *phpparser.PrintExpressionContext:
 	case *phpparser.ArrayCreationExpressionContext:
+		// arrayCreation
+		v := y.VisitArrayCreation(ret.ArrayCreation())
+		_ = v
+
 	case *phpparser.ChainExpressionContext:
 	case *phpparser.ScalarExpressionContext: // constant / string / label
 		if i := ret.Constant(); i != nil {
@@ -205,7 +209,7 @@ func (y *builder) VisitAssignable(raw phpparser.IAssignableContext) interface{} 
 	return nil
 }
 
-func (y *builder) VisitChain(raw phpparser.IChainContext) interface{} {
+func (y *builder) VisitChain(raw phpparser.IChainContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -381,16 +385,25 @@ func (y *builder) VisitArrayCreation(raw phpparser.IArrayCreationContext) interf
 		return nil
 	}
 
-	if i.ArrayItemList() != nil {
-		y.VisitArrayItemList(i.ArrayItemList())
+	mapIns := y.ir.EmitMakeBuildWithType(
+		ssa.NewMapType(
+			ssa.GetTypeByStr("any"),
+			ssa.GetTypeByStr("any"),
+		),
+		y.ir.EmitConstInst(0),
+		y.ir.EmitConstInst(0),
+	)
+	for _, kv := range y.VisitArrayItemList(i.ArrayItemList()) {
+		_ = kv
 	}
-
-	y.VisitExpression(i.Expression())
-
+	_ = mapIns
+	if i.Expression() != nil {
+		y.VisitExpression(i.Expression())
+	}
 	return nil
 }
 
-func (y *builder) VisitArrayItemList(raw phpparser.IArrayItemListContext) interface{} {
+func (y *builder) VisitArrayItemList(raw phpparser.IArrayItemListContext) [][2]ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -400,39 +413,46 @@ func (y *builder) VisitArrayItemList(raw phpparser.IArrayItemListContext) interf
 		return nil
 	}
 
+	countIndex := 0
+	var results [][2]ssa.Value
 	for _, a := range i.AllArrayItem() {
-		y.VisitArrayItem(a)
-	}
 
-	return nil
+		k, v := y.VisitArrayItem(a)
+		if k != nil {
+			k = y.ir.EmitConstInst(countIndex)
+			countIndex++
+		}
+		kv := [2]ssa.Value{k, v}
+		results = append(results, kv)
+	}
+	return results
 }
 
-func (y *builder) VisitArrayItem(raw phpparser.IArrayItemContext) interface{} {
+func (y *builder) VisitArrayItem(raw phpparser.IArrayItemContext) (ssa.Value, ssa.Value) {
 	if y == nil || raw == nil {
-		return nil
+		return nil, nil
 	}
 
 	i, _ := raw.(*phpparser.ArrayItemContext)
 	if i == nil {
-		return nil
+		return nil, nil
 	}
 
-	if i.Ampersand() != nil {
+	if i.Chain() != nil {
 		// (expression '=>')? '&' chain
-		var v any
+		var v ssa.Value
 		if i.Expression(0) != nil {
 			v = y.VisitExpression(i.Expression(0))
 		}
-		_ = v
-		return y.VisitChain(i.Chain())
+		return v, y.VisitChain(i.Chain())
 	} else {
 		// expression ('=>' expression)?
-		v := y.VisitExpression(i.Expression(0))
+		k := y.VisitExpression(i.Expression(0))
+		var v ssa.Value
 		if i.Expression(1) != nil {
 			v = y.VisitExpression(i.Expression(1))
 		}
-		_ = v
-		return v
+		return k, v
 	}
 }
 
