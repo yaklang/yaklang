@@ -105,9 +105,6 @@ func (cf *ClassConfig) AddError(err error) {
 	}
 }
 func (cf *ClassConfig) GenerateClassObject() (obj *javaclassparser.ClassObject, err error) {
-	//if cf.MajorVersion != 0 {
-	//	obj.MajorVersion = cf.MajorVersion
-	//}
 	if cf.ClassType == BytesClass {
 		obj, err = javaclassparser.Parse(cf.ClassBytes)
 		if err != nil {
@@ -122,6 +119,9 @@ func (cf *ClassConfig) GenerateClassObject() (obj *javaclassparser.ClassObject, 
 	obj, err = payload.Generator(cf)
 	if err != nil {
 		return nil, err
+	}
+	if obj.MajorVersion != 0 {
+		obj.MajorVersion = cf.MajorVersion
 	}
 	return obj, nil
 }

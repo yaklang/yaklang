@@ -104,6 +104,28 @@ func TestMUSTPASSSetMajorVersion(t *testing.T) {
 			if !found {
 				t.Errorf("Test case with version %d failed, expected major version was %d", tc.version, tc.wantVersion)
 			}
+
+			var found2 bool
+			got2, err := GenerateProcessBuilderExecEvilClassObject("whoami",
+				SetObfuscation(),
+				SetClassName(tc.className),
+				SetMajorVersion(tc.version),
+			)
+
+			if err != nil {
+				t.Errorf("GenerateProcessBuilderExecEvilClassObject() error = %v", err)
+				return
+			}
+			g2, _ := ToBytes(got2)
+
+			version := g2[7]
+			if uint16(version) == tc.wantVersion {
+				found2 = true
+			}
+			if !found2 {
+				t.Errorf("Test case with version %d failed, expected major version was %d", tc.version, tc.wantVersion)
+			}
+
 		})
 	}
 }
