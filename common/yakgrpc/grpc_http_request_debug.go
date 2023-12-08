@@ -25,7 +25,7 @@ type sender interface {
 	Context() context.Context
 }
 
-func (s *Server) execScriptWithExecParam(scriptName string, input string, stream sender, params map[string]string) error {
+func (s *Server) execScriptWithExecParam(scriptName string, input string, stream sender, params []*ypb.KVPair) error {
 	scriptInstance, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), scriptName)
 	if err != nil {
 		return err
@@ -342,7 +342,7 @@ func (s *Server) debugScript(
 	debugType string,
 	debugCode string,
 	stream sender,
-	execParams map[string]string,
+	execParams []*ypb.KVPair,
 	params ...*ypb.HTTPRequestBuilderParams) error {
 	tempName, err := yakit.CreateTemporaryYakScript(debugType, debugCode)
 	if err != nil {
@@ -358,10 +358,10 @@ func (s *Server) debugScript(
 	return utils.Error("unsupported plugin type: " + debugType)
 }
 
-func makeArgs(execParams map[string]string) []string {
+func makeArgs(execParams []*ypb.KVPair) []string {
 	var args = []string{"yak"}
-	for k, v := range execParams {
-		args = append(args, k, v)
+	for _, p := range execParams {
+		args = append(args, "-"+p.Key, p.Value)
 	}
 	return args
 }
