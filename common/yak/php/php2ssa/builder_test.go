@@ -1,6 +1,9 @@
 package php2ssa
 
-import "testing"
+import (
+	"github.com/yaklang/yaklang/common/yak/ssa"
+	"testing"
+)
 
 func TestParseSSA_Valid(t *testing.T) {
 	p := ParseSSA(`<?php 
@@ -9,6 +12,38 @@ $b = 1+1;
 
 `, nil)
 	p.Show()
+	ins := p.GetFunctionFast().FirstBlockInstruction()
+	_ = ins
+	if len(ins) != 2 {
+		t.Fatal("build ins failed: count")
+	}
+	if ins[1].(*ssa.ConstInst).Const.String() != "2" {
+		t.Fatal("build ins failed: 1+1")
+	}
+	t.Log("-")
+}
+
+func TestParseSSA_Valid1(t *testing.T) {
+	p := ParseSSA(`<?php 
+// 声明一个数组
+$array = array("apple", "banana", "cherry");
+
+// 访问数组中的元素
+echo $array[0]; // 输出 "apple"
+echo $array[1]; // 输出 "banana"
+echo $array[2]; // 输出 "cherry"
+
+`, nil)
+	p.Show()
+	ins := p.GetFunctionFast().FirstBlockInstruction()
+	_ = ins
+	//if len(ins) != 2 {
+	//	t.Fatal("build ins failed: count")
+	//}
+	//if ins[1].(*ssa.ConstInst).Const.String() != "2" {
+	//	t.Fatal("build ins failed: 1+1")
+	//}
+	t.Log("-")
 }
 
 func TestParseSSA_Smoking(t *testing.T) {

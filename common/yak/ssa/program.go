@@ -42,6 +42,24 @@ func (prog *Program) GetPackage(name string) *Package {
 	}
 }
 
+func (p *Program) GetFunctionFast(paths ...string) *Function {
+	if len(paths) > 1 {
+		pkg := p.GetPackage(paths[0])
+		if pkg != nil {
+			return pkg.GetFunction(paths[1])
+		}
+	} else if len(paths) == 1 {
+		if ret := p.GetPackage("main"); ret != nil {
+			return ret.GetFunction(paths[0])
+		}
+	} else {
+		if ret := p.GetPackage("main"); ret != nil {
+			return ret.GetFunction("main")
+		}
+	}
+	return nil
+}
+
 func (prog *Program) EachFunction(handler func(*Function)) {
 	var handFunc func(*Function)
 	handFunc = func(f *Function) {
