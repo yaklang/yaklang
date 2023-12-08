@@ -10,7 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
-	"github.com/yaklang/yaklang/common/utils/gormbulk"
 )
 
 type Payload struct {
@@ -84,11 +83,19 @@ func createOrUpdatePayload(db *gorm.DB, i *Payload) error {
 	db = db.Model(&Payload{})
 	db.SetLogger(gormNoLog(1))
 	i.Hash = i.CalcHash()
-	if db := db.Save(i); db.Error != nil {
-		return db.Error
+	var (
+		newPayload Payload
+		err        error
+	)
+	if db.Debug().Where("`hash` = ?", i.Hash).First(&newPayload); newPayload.ID != 0 {
+		// 存在则更新
+		err = db.Where("`hash` = ?", i.Hash).Update("hit_count", i.HitCount).Error
+	} else {
+		// 不存在则创建
+		err = db.Create(&i).Error
 	}
 
-	return nil
+	return err
 }
 
 func CreateOrUpdatePayload(db *gorm.DB, content, group, folder string, hitCount int64, isFile bool) error {
@@ -97,22 +104,6 @@ func CreateOrUpdatePayload(db *gorm.DB, content, group, folder string, hitCount 
 	payload.HitCount = &hitCount
 	payload.IsFile = &isFile
 	return createOrUpdatePayload(db, payload)
-}
-
-func CreateMultiPayloads(db *gorm.DB, contents []string, group, folder string, hitCounts []int64, isFile bool) error {
-	minIndex := len(contents)
-	if len(hitCounts) < minIndex {
-		minIndex = len(hitCounts)
-	}
-	payloads := make([]interface{}, minIndex)
-	for i := 0; i < minIndex; i++ {
-		payload := NewPayload(group, contents[i])
-		payload.Folder = &folder
-		payload.HitCount = &hitCounts[i]
-		payload.IsFile = &isFile
-		payloads[i] = payload
-	}
-	return gormbulk.BulkInsert(db, payloads, minIndex)
 }
 
 // trim payload content
@@ -170,15 +161,13 @@ func SavePayloadByFilenameEx(fileName string, handler func(string, int64) error)
 					}
 				}
 				if err := handler(p, hitCount); err != nil {
-					log.Errorf("create or update payload error: %s", err.Error())
-					continue
+					return err
 				}
 			}
 		} else {
 			line = strconv.Quote(strings.TrimRightFunc(line, TrimWhitespaceExceptSpace))
 			if err := handler(line, hitCount); err != nil {
-				log.Errorf("create or update payload error: %s", err.Error())
-				continue
+				return err
 			}
 		}
 	}
