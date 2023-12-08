@@ -1159,7 +1159,8 @@ func (s *Server) MigratePayloads(req *ypb.Empty, stream ypb.Yak_MigratePayloadsS
 		_, err := strconv.Unquote(content)
 		if err != nil { // 解码失败，可能是旧payload
 			content = strconv.Quote(content)
-			err := yakit.UpdatePayload(s.GetProfileDatabase(), int(p.ID), &yakit.Payload{Content: &content})
+			p.Content = &content
+			err := yakit.UpdatePayload(s.GetProfileDatabase(), int(p.ID), p)
 			if err != nil {
 				log.Errorf("update payload error: %v", err)
 				continue
