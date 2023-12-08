@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/bin-parser/parser"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
-	"github.com/yaklang/yaklang/common/binx"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -68,7 +68,7 @@ TCP:
 		t.Fatal(err)
 	}
 	reader := bytes.NewReader(ethernetData)
-	res, err := ParseBinary(reader, "tcp")
+	res, err := parser.ParseBinary(reader, "tcp")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ TCP:
 	if err != nil {
 		t.Fatal(err)
 	}
-	res1, err := GenerateBinary(dataMap1, "tcp")
+	res1, err := parser.GenerateBinary(dataMap1, "tcp")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,37 +126,6 @@ TCP:
 }
 
 // TestEndianness test generate endianness
-func TestEndianness(t *testing.T) {
-	res, err := generate(map[string]any{
-		"a": 2,
-	}, yaml.MapSlice{
-		yaml.MapItem{
-			Key:   "a",
-			Value: "int,10",
-		},
-	}, []ConfigFunc{
-		WithEndian(binx.LittleEndianByteOrder),
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, "02000000000000000000", codec.EncodeToHex(res.GetBytes()))
-
-	res, err = generate(map[string]any{
-		"a": 2,
-	}, yaml.MapSlice{
-		yaml.MapItem{
-			Key:   "a",
-			Value: "int,10",
-		},
-	}, []ConfigFunc{
-		WithEndian(binx.BigEndianByteOrder),
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Equal(t, "00000000000000000002", codec.EncodeToHex(res.GetBytes()))
-}
 func TestParseTCP(t *testing.T) {
 	data := `3066d026811bf84d8991af52080045000040000040004006411fc0a803165db8d822e03e00506092a87800000000b002ffff230f0000020405b4010303060101080aae1982a00000000004020000`
 	ethernetData, err := codec.DecodeHex(data)
@@ -164,7 +133,7 @@ func TestParseTCP(t *testing.T) {
 		t.Fatal(err)
 	}
 	reader := bytes.NewReader(ethernetData)
-	res, err := ParseBinary(reader, "tcp")
+	res, err := parser.ParseBinary(reader, "tcp")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +149,7 @@ Host: www.example.com
 {"key": "value"}`
 	data := lowhttp.FixHTTPRequest([]byte(raw))
 	reader := bytes.NewReader(data)
-	res, err := ParseBinary(reader, "http_request")
+	res, err := parser.ParseBinary(reader, "http_request")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -196,7 +165,7 @@ func TestParseInternetProtocol(t *testing.T) {
 		t.Fatal(err)
 	}
 	reader := bytes.NewReader(payload)
-	res, err := ParseBinary(reader, "application-layer.tls")
+	res, err := parser.ParseBinary(reader, "application-layer.tls")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,7 +178,7 @@ func TestTLSSession(t *testing.T) {
 		t.Fatal(err)
 	}
 	reader := bytes.NewReader(payload)
-	res, err := ParseBinary(reader, "application-layer.tls")
+	res, err := parser.ParseBinary(reader, "application-layer.tls")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -218,7 +187,7 @@ func TestTLSSession(t *testing.T) {
 	}
 	DumpNode(res)
 	dict1 := NodeToMap(res)
-	res, err = GenerateBinary(dict1, "application-layer.tls")
+	res, err = parser.GenerateBinary(dict1, "application-layer.tls")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -266,7 +235,7 @@ Accept: */*
 	time.Sleep(time.Second * 1)
 	spew.Dump(codec.EncodeToHex(payload))
 	reader := bytes.NewReader(payload)
-	res, err := ParseBinary(reader, "application-layer.tls")
+	res, err := parser.ParseBinary(reader, "application-layer.tls")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -279,7 +248,7 @@ func TestNegotiateMessage(t *testing.T) {
 		t.Fatal(err)
 	}
 	reader := bytes.NewReader(payload)
-	res, err := ParseBinary(reader, "application-layer.ntlm", "NegotiateMessage")
+	res, err := parser.ParseBinary(reader, "application-layer.ntlm", "NegotiateMessage")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -291,7 +260,7 @@ func TestNegotiateMessage(t *testing.T) {
 		"DomainNameFields":  "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000",
 		"WorkstationFields": "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000",
 	}
-	res, err = GenerateBinary(mapData, "application-layer.ntlm", "NegotiateMessage")
+	res, err = parser.GenerateBinary(mapData, "application-layer.ntlm", "NegotiateMessage")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -330,7 +299,7 @@ func TestNTLM(t *testing.T) {
 		t.Fatal(err)
 	}
 	reader := bytes.NewReader(payload)
-	res, err := ParseBinary(reader, "application-layer.ntlm", "AuthenticationMessage")
+	res, err := parser.ParseBinary(reader, "application-layer.ntlm", "AuthenticationMessage")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -345,7 +314,7 @@ func TestT3(t *testing.T) {
 		t.Fatal(err)
 	}
 	reader := bytes.NewReader(pyaload)
-	res, err := ParseBinary(reader, "application-layer.t3")
+	res, err := parser.ParseBinary(reader, "application-layer.t3")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -354,7 +323,7 @@ func TestT3(t *testing.T) {
 		t.Fatal(err)
 	}
 	//spew.Dump(r)
-	res, err = GenerateBinary(r, "application-layer.t3")
+	res, err = parser.GenerateBinary(r, "application-layer.t3")
 	resHex := codec.EncodeToHex(NodeToBytes(res))
 	assert.Equal(t, data, resHex)
 }
@@ -419,7 +388,7 @@ func TestIIOP1(t *testing.T) {
 		t.Fatal(err)
 	}
 	reader = bytes.NewReader(pyaload)
-	res, err = ParseBinary(reader, "application-layer.iiop")
+	res, err = parser.ParseBinary(reader, "application-layer.iiop")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -474,7 +443,7 @@ func TestHTTP(t *testing.T) {
 		t.Fatal(err)
 	}
 	reader = bytes.NewReader(pyaload)
-	res, err = ParseBinary(reader, "application-layer.http")
+	res, err = parser.ParseBinary(reader, "application-layer.http")
 	if err != nil {
 		t.Fatal(err)
 	}

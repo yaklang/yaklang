@@ -2,10 +2,12 @@ package bin_parser
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"gopkg.in/yaml.v2"
 	"reflect"
 )
@@ -116,4 +118,77 @@ func ToUint64(d any) (uint64, error) {
 	default:
 		return 0, fmt.Errorf("unexpected type: %v", reflect.TypeOf(d))
 	}
+}
+func ResultToJson(d any) (string, error) {
+	var toRawData func(d any) any
+	toRawData = func(d any) any {
+		refV := reflect.ValueOf(d)
+		switch ret := d.(type) {
+		case []uint8:
+			return map[string]any{
+				"__data__": ret,
+			}
+		}
+		if refV.Kind() == reflect.Slice || refV.Kind() == reflect.Array {
+			for i := 0; i < refV.Len(); i++ {
+				refV.Index(i).Set(reflect.ValueOf(toRawData(refV.Index(i).Interface())))
+			}
+			return refV.Interface()
+		} else if refV.Kind() == reflect.Map {
+			for _, k := range refV.MapKeys() {
+				refV.SetMapIndex(k, reflect.ValueOf(toRawData(refV.MapIndex(k).Interface())))
+			}
+			return refV.Interface()
+		} else {
+			return d
+		}
+	}
+	rawData := toRawData(d)
+	res, err := json.Marshal(rawData)
+	if err != nil {
+		return "", err
+	}
+	return string(res), nil
+}
+func JsonToResult(jsonStr string) (any, error) {
+	d := map[string]any{}
+	err := json.Unmarshal([]byte(jsonStr), &d)
+	if err != nil {
+		return nil, err
+	}
+	var toRawDataErr error
+	var toRawData func(d any) any
+	toRawData = func(d any) any {
+		refV := reflect.ValueOf(d)
+		if refV.Kind() == reflect.Slice || refV.Kind() == reflect.Array {
+			for i := 0; i < refV.Len(); i++ {
+				refV.Index(i).Set(reflect.ValueOf(toRawData(refV.Index(i).Interface())))
+			}
+			return refV.Interface()
+		} else if refV.Kind() == reflect.Map {
+			if len(refV.MapKeys()) == 1 {
+				refKey := refV.MapKeys()[0]
+				if v, ok := refKey.Interface().(string); ok && v == "__data__" {
+					if v, ok = refV.MapIndex(refKey).Interface().(string); ok {
+						res, err := codec.DecodeBase64(v)
+						if err != nil {
+							toRawDataErr = err
+						}
+						return res
+					}
+				}
+			}
+			for _, k := range refV.MapKeys() {
+				refV.SetMapIndex(k, reflect.ValueOf(toRawData(refV.MapIndex(k).Interface())))
+			}
+			return refV.Interface()
+		} else {
+			return d
+		}
+	}
+	rawData := toRawData(d)
+	if toRawDataErr != nil {
+		return nil, toRawDataErr
+	}
+	return rawData, nil
 }

@@ -1,15 +1,20 @@
 package yakgrpc
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcap"
 	"github.com/samber/lo"
+	bin_parser2 "github.com/yaklang/yaklang/common/bin-parser"
+	bin_parser "github.com/yaklang/yaklang/common/bin-parser/parser"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
@@ -139,4 +144,68 @@ func (s *Server) PcapX(stream ypb.Yak_PcapXServer) error {
 	}
 
 	return nil
+}
+func (s *Server) ParseTraffic(ctx context.Context, req *ypb.ParseTrafficRequest) (*ypb.ParseTrafficResponse, error) {
+	rsp := &ypb.ParseTrafficResponse{}
+	var payload []byte
+	pagination := &ypb.Paging{
+		Limit: 1,
+	}
+	switch req.GetType() {
+	case "session":
+		_, sessions, err := yakit.QueryTrafficSession(consts.GetGormProjectDatabase(), &ypb.QueryTrafficSessionRequest{
+			Pagination: pagination,
+			FromId:     req.GetId() - 1,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if len(sessions) != 1 {
+			return nil, utils.Error("invalid session id")
+		}
+		//payload = sessions[0].
+	case "packet":
+		_, sessions, err := yakit.QueryTrafficPacket(consts.GetGormProjectDatabase(), &ypb.QueryTrafficPacketRequest{
+			Pagination: pagination,
+			FromId:     req.GetId() - 1,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if len(sessions) != 1 {
+			return nil, utils.Error("invalid session id")
+		}
+	case "reassembled":
+		_, sessions, err := yakit.QueryTrafficTCPReassembled(consts.GetGormProjectDatabase(), &ypb.QueryTrafficTCPReassembledRequest{
+			Pagination: pagination,
+			FromId:     req.GetId() - 1,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if len(sessions) != 1 {
+			return nil, utils.Error("invalid session id")
+		}
+		payload = codec.StrConvUnquoteForce(sessions[0].QuotedData)
+		parseResult, err := bin_parser.ParseBinary(bytes.NewReader(payload), "application-layer.http")
+		if err != nil {
+			return nil, err
+		}
+		finalResult := map[string]any{}
+		res, err := parseResult.Result()
+		if err != nil {
+			return nil, err
+		}
+		finalResult["Raw"] = payload
+		finalResult["HTTP"] = res
+		resJson, err := bin_parser2.ResultToJson(finalResult)
+		if err != nil {
+			return nil, err
+		}
+		rsp.Ok = true
+		rsp.Result = string(resJson)
+		return rsp, nil
+	}
+	rsp.Ok = false
+	return rsp, errors.New("unknown type")
 }

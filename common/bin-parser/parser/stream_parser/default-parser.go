@@ -148,7 +148,7 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 	if node.Cfg.Has(CfgImport) {
 		ruleName := node.Cfg.GetString(CfgImport)
 		rulePath := path.Join(node.Ctx.GetString("path"), ruleName)
-		targetNode, err := ParseRule(rulePath)
+		targetNode, err := base.ParseRule(rulePath)
 		if err != nil {
 			return err
 		}
@@ -531,6 +531,12 @@ func (d *DefParser) Parse(data *base.BitReader, node *base.Node) error {
 var noResultError = errors.New("no result")
 
 func (d *DefParser) Result(node *base.Node) (any, error) {
+	isPackage := func(node *base.Node) bool {
+		if node.Name == "Package" && node.Cfg.GetItem(CfgParent) == node.Ctx.GetItem("root") {
+			return true
+		}
+		return false
+	}
 	if NodeHasResult(node) {
 		return GetResultByNode(node), nil
 	}
@@ -551,8 +557,22 @@ func (d *DefParser) Result(node *base.Node) (any, error) {
 		}
 		return res, nil
 	} else {
+		//res := map[string]any{}
 		res := map[string]any{}
-		for _, sub := range node.Children {
+		var getSubs func(node *base.Node) []*base.Node
+		getSubs = func(node *base.Node) []*base.Node {
+			children := []*base.Node{}
+			for _, sub := range node.Children {
+				if sub.Cfg.GetBool("isRefType") || sub.Cfg.GetBool("unpack") || isPackage(sub) {
+					children = append(children, getSubs(sub)...)
+				} else {
+					children = append(children, sub)
+				}
+			}
+			return children
+		}
+		children := getSubs(node)
+		for _, sub := range children {
 			d, err := sub.Result()
 			if err != nil {
 				if errors.Is(err, noResultError) {

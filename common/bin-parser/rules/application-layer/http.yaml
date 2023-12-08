@@ -3,18 +3,20 @@ Package:
     res,op = getRootNode("FirstWorld").TryProcess()
     op.Recovery()
     if string(res).HasPrefix("HTTP/") {
-      this.GetSubNode("Response").Process()
+      this.GetSubNode("HTTP Response").Process()
     }else{
-      this.GetSubNode("Request").Process()
+      this.GetSubNode("HTTP Request").Process()
     }
-  Request:
+  HTTP Request:
     FirstLine:
+      unpack: true
       Method: "del: "
       Path: "del: "
       Version: "del:\r\n"
     Headers: Headers
     Body: Body
-  Response:
+  HTTP Response:
+    unpack: true
     FirstLine:
       Version: "del: "
       Status: "del: "
@@ -49,7 +51,6 @@ Body:
       DataChunk: raw
       DataChunkEnd: "del:\r\n"
 Headers:
-  unpack: true
   operator: |
     for {
       data := this.NewElement().Process()
