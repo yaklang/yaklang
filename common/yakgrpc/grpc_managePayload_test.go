@@ -2,7 +2,9 @@ package yakgrpc
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strings"
@@ -121,7 +123,7 @@ func deleteGroup(local ypb.YakClient, t *testing.T, group string) {
 }
 
 func save2database(local ypb.YakClient, t *testing.T, group, folder, data string, errorHandler ...func(*testing.T, error)) {
-	t.Helper()
+	// t.Helper()
 	var (
 		err    error
 		client ypb.Yak_SavePayloadStreamClient
@@ -156,7 +158,7 @@ func save2database(local ypb.YakClient, t *testing.T, group, folder, data string
 	}
 	if len(errorHandler) > 0 {
 		errorHandler[0](t, err)
-	} else if err != nil {
+	} else if err != nil && !errors.Is(err, io.EOF) {
 		t.Fatal(err)
 	}
 }
@@ -196,7 +198,7 @@ func save2file(local ypb.YakClient, t *testing.T, group, folder, data string, er
 	}
 	if len(errorHandler) > 0 {
 		errorHandler[0](t, err)
-	} else if err != nil {
+	} else if err != nil && !errors.Is(err, io.EOF) {
 		t.Fatal(err)
 	}
 }
