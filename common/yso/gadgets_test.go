@@ -1,28 +1,18 @@
 package yso
 
 import (
-	"encoding/base64"
 	"fmt"
 	"github.com/yaklang/yaklang/common/javaclassparser"
 	"github.com/yaklang/yaklang/common/yserx"
 	"testing"
 )
 
-func TestSetMajorVersion(t *testing.T) {
-	version := 50
-	className := "TjftfYIA"
-	got, err := GetClick1JavaObject(SetRuntimeExecEvilClass("whoami"),
-		SetObfuscation(),
-		SetClassName(className),
-		SetMajorVersion(uint16(version)),
-	)
-
-	if err != nil {
-		t.Errorf("GetClick1JavaObject() error = %v", err)
-		return
+func TestMUSTPASSSetMajorVersion(t *testing.T) {
+	type testCase struct {
+		version     uint16
+		className   string
+		wantVersion uint16
 	}
-	g, _ := ToBytes(got)
-	javaSerializables, err := yserx.ParseFromBytes(g)
 	handleJavaValue := func(value *yserx.JavaFieldValue, handle func(desc1 *yserx.JavaClassDesc, objSer yserx.JavaSerializable)) {
 		if value.Type != yserx.X_FIELDVALUE {
 			return
@@ -69,20 +59,51 @@ func TestSetMajorVersion(t *testing.T) {
 			handleJavaClassData(o, handle)
 		}
 	}
-	WalkJavaSerializableObject(javaSerializables, func(desc1 *yserx.JavaClassDesc, objSer yserx.JavaSerializable) {
-		handleJavaSerializable(objSer, func(desc1 *yserx.JavaClassDesc, objSer yserx.JavaSerializable) {
-			fmt.Println(base64.StdEncoding.EncodeToString(objSer.(*yserx.JavaArray).Bytes))
-			javaClass, ok := objSer.(*yserx.JavaArray)
-			if ok {
-				obj, err := javaclassparser.Parse(javaClass.Bytes)
-				if err == nil {
-					if obj.MajorVersion != uint16(version) {
-						t.FailNow()
-					}
-				}
+
+	tests := []testCase{
+		{version: 50, className: "TjftfYIA", wantVersion: 50},
+		{version: 51, className: "TjftfYIA", wantVersion: 51},
+		{version: 133, className: "TjftfYIA", wantVersion: 52},
+		// Add more test cases as needed
+	}
+
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf("Version%d", tc.version), func(t *testing.T) {
+			got, err := GetClick1JavaObject(
+				SetRuntimeExecEvilClass("whoami"),
+				SetObfuscation(),
+				SetClassName(tc.className),
+				SetMajorVersion(tc.version),
+			)
+
+			if err != nil {
+				t.Errorf("GetClick1JavaObject() error = %v", err)
+				return
+			}
+			g, _ := ToBytes(got)
+			javaSerializables, err := yserx.ParseFromBytes(g)
+			if err != nil {
+				t.Errorf("ParseFromBytes() error = %v", err)
+				return
 			}
 
-		})
+			found := false
+			WalkJavaSerializableObject(javaSerializables, func(desc1 *yserx.JavaClassDesc, objSer yserx.JavaSerializable) {
+				// Assuming the WalkJavaSerializableObject and other functions are defined elsewhere
+				handleJavaSerializable(objSer, func(desc1 *yserx.JavaClassDesc, objSer yserx.JavaSerializable) {
+					javaClass, ok := objSer.(*yserx.JavaArray)
+					if ok {
+						obj, err := javaclassparser.Parse(javaClass.Bytes)
+						if err == nil && obj.MajorVersion == tc.wantVersion {
+							found = true
+						}
+					}
+				})
+			})
 
-	})
+			if !found {
+				t.Errorf("Test case with version %d failed, expected major version was %d", tc.version, tc.wantVersion)
+			}
+		})
+	}
 }
