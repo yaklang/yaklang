@@ -217,20 +217,24 @@ func (i *IfBuilder) BuildChild(child *IfBuilder) {
 	child.parent = i
 }
 
-func (i *IfBuilder) BuildCondition(condition func() Value) {
+func (i *IfBuilder) BuildCondition(condition func() Value) *IfBuilder {
 	i.ifCondition = condition
+	return i
 }
-func (i *IfBuilder) BuildTrue(body func()) {
+func (i *IfBuilder) BuildTrue(body func()) *IfBuilder {
 	i.ifBody = body
+	return i
 }
 
-func (i *IfBuilder) BuildElif(condition func() Value, body func()) {
+func (i *IfBuilder) BuildElif(condition func() Value, body func()) *IfBuilder {
 	i.elifCondition = append(i.elifCondition, condition)
 	i.elifBody = append(i.elifBody, body)
+	return i
 }
 
-func (i *IfBuilder) BuildFalse(body func()) {
+func (i *IfBuilder) BuildFalse(body func()) *IfBuilder {
 	i.elseBody = body
+	return i
 }
 
 func (i *IfBuilder) Finish() {

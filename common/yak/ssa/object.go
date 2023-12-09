@@ -65,6 +65,23 @@ func NewFieldOnly(key, obj Value, block *BasicBlock) *Field {
 	return f
 }
 
+func (b *FunctionBuilder) EmitInterfaceMake(f func(feed func(key Value, val Value))) *Make {
+	itf := b.EmitMakeWithoutType(NewConst(0), NewConst(0))
+	ityp := NewObjectType()
+	count := 0
+	f(func(key Value, val Value) {
+		field := b.EmitFieldMust(itf, key)
+		field.SetType(val.GetType())
+		b.EmitUpdate(field, val)
+		ityp.AddField(key, val.GetType())
+		count++
+	})
+	ityp.Finish()
+	ityp.Len = count
+	itf.SetType(ityp)
+	return itf
+}
+
 func (b *FunctionBuilder) CreateInterfaceWithVs(keys []Value, vs []Value) *Make {
 	hasKey := true
 	if len(keys) == 0 {

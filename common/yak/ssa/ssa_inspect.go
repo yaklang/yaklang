@@ -28,8 +28,9 @@ func (p *Program) show(flag FunctionAsmFlag) {
 	}
 }
 
-func (p *Program) Show() {
+func (p *Program) Show() *Program {
 	p.show(DisAsmDefault)
+	return p
 }
 
 func (p *Program) ShowWithSource() {

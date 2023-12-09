@@ -3,6 +3,7 @@ package php2ssa
 import (
 	"github.com/yaklang/yaklang/common/log"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 func (y *builder) VisitQualifiedNamespaceNameList(raw phpparser.IQualifiedNamespaceNameListContext) interface{} {
@@ -18,7 +19,7 @@ func (y *builder) VisitQualifiedNamespaceNameList(raw phpparser.IQualifiedNamesp
 	return nil
 }
 
-func (y *builder) VisitQualifiedNamespaceName(raw phpparser.IQualifiedNamespaceNameContext) interface{} {
+func (y *builder) VisitQualifiedNamespaceName(raw phpparser.IQualifiedNamespaceNameContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
