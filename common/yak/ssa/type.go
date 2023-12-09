@@ -304,6 +304,38 @@ var BasicTypes = []*BasicType{
 	ErrorType:     {ErrorType, "error", make(map[string]*FunctionType, 0)},
 }
 
+func GetNumberType() Type {
+	return BasicTypes[Number]
+}
+
+func GetStringType() Type {
+	return BasicTypes[String]
+}
+
+func GetBytesType() Type {
+	return BasicTypes[Bytes]
+}
+
+func GetBooleanType() Type {
+	return BasicTypes[Boolean]
+}
+
+func GetUndefinedType() Type {
+	return BasicTypes[UndefinedType]
+}
+
+func GetNullType() Type {
+	return BasicTypes[Null]
+}
+
+func GetAnyType() Type {
+	return BasicTypes[Any]
+}
+
+func GetErrorType() Type {
+	return BasicTypes[ErrorType]
+}
+
 func GetType(i any) Type {
 	if typ := GetTypeByStr(reflect.TypeOf(i).String()); typ != nil {
 		return typ
