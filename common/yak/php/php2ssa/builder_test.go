@@ -32,6 +32,50 @@ func TestParseSSA_SMOKING_1(t *testing.T) {
 ++$a;--$a;$b++;$c++;`)
 }
 
+func TestParseSSA_unpack(t *testing.T) {
+	smokingtest(`<?php
+[$a, $v] = array(1,2);
+`)
+}
+
+func TestParseSSA_Spaceship(t *testing.T) {
+	smokingtest(`<?php
+1 <=> 1;
+0 <=> 1;
+1 <=> 0;
+
+1|1;
+2^1;
+1&1;
+1&&1;
+2||2;
+
+a?b:c;
+1?:3;
+1??1;
+
+1<<1;
+1>>1;
+1>1;
+1<1;
+1==1;
+1>=1;
+2<=1;
+1===1;
+1!==1;
+1!=1;
+
+`)
+}
+
+func TestParseSSA_SMOKING_if(t *testing.T) {
+	smokingtest(`<?php 
+true and false;
+false or false;
+false xor true;
+`)
+}
+
 func TestParseSSA_SMOKING(t *testing.T) {
 	p := ParseSSA(`<?php
 abc[1]
