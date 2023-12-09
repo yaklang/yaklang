@@ -428,3 +428,18 @@ func (y *builder) VisitVariableInitializer(raw phpparser.IVariableInitializerCon
 
 	return nil
 }
+
+func (y *builder) VisitClassConstant(raw phpparser.IClassConstantContext) ssa.Value {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*phpparser.ClassConstantContext)
+	if i == nil {
+		return nil
+	}
+
+	panic("CLASS CONSTANT TODO")
+
+	return nil
+}
