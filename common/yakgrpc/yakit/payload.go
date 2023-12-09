@@ -84,10 +84,10 @@ func createOrUpdatePayload(db *gorm.DB, i *Payload) error {
 	db.SetLogger(gormNoLog(1))
 	i.Hash = i.CalcHash()
 	var (
-		newPayload Payload
-		err        error
+		count int64
+		err   error
 	)
-	if db.Debug().Where("`hash` = ?", i.Hash).First(&newPayload); newPayload.ID != 0 {
+	if db.Where("`hash` = ?", i.Hash).Count(&count); count > 0 {
 		// 存在则更新
 		err = db.Where("`hash` = ?", i.Hash).Update("hit_count", i.HitCount).Error
 	} else {
@@ -398,6 +398,14 @@ func UpdatePayload(db *gorm.DB, id int, payload *Payload) error {
 	// db = db.Model(&Payload{}).Where("`id` = ?", id).Update(payload)
 	db = db.Model(&Payload{}).Where("`id` = ?", id)
 	db = db.Updates(map[string]any{"group": payload.Group, "folder": payload.Folder, "group_index": payload.GroupIndex, "content": payload.Content, "hit_count": payload.HitCount, "is_file": payload.IsFile, "hash": payload.CalcHash()})
+	if db.Error != nil {
+		return utils.Errorf("update Payload failed: %s", db.Error)
+	}
+	return nil
+}
+
+func UpdatePayloadColumns(db *gorm.DB, id int, attrs ...any) error {
+	db = db.Model(&Payload{}).Where("`id` = ?", id).Update(attrs...)
 	if db.Error != nil {
 		return utils.Errorf("update Payload failed: %s", db.Error)
 	}

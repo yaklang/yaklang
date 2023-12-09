@@ -1106,9 +1106,7 @@ func (s *Server) MigratePayloads(req *ypb.Empty, stream ypb.Yak_MigratePayloadsS
 
 	size, total := int64(0), int64(0)
 	// 计算payload总数
-	db := s.GetProfileDatabase().Model(&yakit.Payload{}).Select("COUNT(id)")
-	row := db.Row()
-	row.Scan(&total)
+	s.GetProfileDatabase().Model(&yakit.Payload{}).Count(&total)
 
 	feedback := func(progress float64) {
 		if progress == -1 {
@@ -1133,6 +1131,8 @@ func (s *Server) MigratePayloads(req *ypb.Empty, stream ypb.Yak_MigratePayloadsS
 
 	feedback(0)
 	gen := yakit.YieldPayloads(s.GetProfileDatabase().Model(&yakit.Payload{}), ctx)
+	db := s.GetProfileDatabase()
+	db = db.Begin()
 	for p := range gen {
 		size++
 		if p.Content == nil || (p.IsFile != nil && *p.IsFile) {
@@ -1147,14 +1147,15 @@ func (s *Server) MigratePayloads(req *ypb.Empty, stream ypb.Yak_MigratePayloadsS
 		_, err := strconv.Unquote(content)
 		if err != nil { // 解码失败，可能是旧payload
 			content = strconv.Quote(content)
-			p.Content = &content
-			err := yakit.UpdatePayload(s.GetProfileDatabase(), int(p.ID), p)
+			err := yakit.UpdatePayloadColumns(db, int(p.ID), "content", content)
 			if err != nil {
 				log.Errorf("update payload error: %v", err)
 				continue
 			}
 		}
 	}
+	err := db.Commit().Error
+
 	feedback(1)
-	return nil
+	return err
 }
