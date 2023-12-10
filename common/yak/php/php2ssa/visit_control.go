@@ -1,6 +1,10 @@
 package php2ssa
 
-import phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
+import (
+	"github.com/yaklang/yaklang/common/log"
+	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
+	"github.com/yaklang/yaklang/common/yak/ssa"
+)
 
 func (y *builder) VisitBreakStatement(raw phpparser.IBreakStatementContext) interface{} {
 	if y == nil || raw == nil {
@@ -12,6 +16,10 @@ func (y *builder) VisitBreakStatement(raw phpparser.IBreakStatementContext) inte
 		return nil
 	}
 
+	if break_ := y.ir.GetBreak(); break_ != nil {
+		return y.ir.EmitJump(break_)
+	}
+	log.Errorf("break statement not in loop or switch: raw %v", i.GetText())
 	return nil
 }
 
@@ -25,7 +33,11 @@ func (y *builder) VisitReturnStatement(raw phpparser.IReturnStatementContext) in
 		return nil
 	}
 
-	return nil
+	if r := i.Expression(); r != nil {
+		return y.ir.EmitReturn([]ssa.Value{y.VisitExpression(r)})
+	}
+
+	return y.ir.EmitReturn([]ssa.Value{y.ir.EmitConstInstNil()})
 }
 
 func (y *builder) VisitYieldExpression(raw phpparser.IYieldExpressionContext) interface{} {

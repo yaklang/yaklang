@@ -398,8 +398,17 @@ func (y *builder) VisitFormalParameter(raw phpparser.IFormalParameterContext) in
 	isRef := i.Ampersand() != nil
 	isVariadic := i.Ellipsis()
 	_, _, _ = typeHint, isRef, isVariadic
-	y.VisitVariableInitializer(i.VariableInitializer())
-
+	formalParams, defaultValue := y.VisitVariableInitializer(i.VariableInitializer())
+	param := y.ir.NewParam(formalParams)
+	if defaultValue != nil {
+		param.SetDefault(defaultValue)
+		if t := defaultValue.GetType(); t != nil {
+			param.SetType(t)
+		}
+	}
+	if typeHint != nil {
+		param.SetType(typeHint)
+	}
 	return nil
 }
 
@@ -416,17 +425,20 @@ func (y *builder) VisitIdentifierInitializer(raw phpparser.IIdentifierInitialize
 	return nil
 }
 
-func (y *builder) VisitVariableInitializer(raw phpparser.IVariableInitializerContext) interface{} {
+// VisitVariableInitializer read ast and return varName and ssaValue
+func (y *builder) VisitVariableInitializer(raw phpparser.IVariableInitializerContext) (string, ssa.Value) {
 	if y == nil || raw == nil {
-		return nil
+		return "", nil
 	}
 
 	i, _ := raw.(*phpparser.VariableInitializerContext)
 	if i == nil {
-		return nil
+		return "", nil
 	}
 
-	return nil
+	val := y.VisitConstantInitializer(i.ConstantInitializer())
+
+	return i.VarName().GetText(), val
 }
 
 func (y *builder) VisitClassConstant(raw phpparser.IClassConstantContext) ssa.Value {

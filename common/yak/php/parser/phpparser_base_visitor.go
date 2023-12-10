@@ -547,6 +547,10 @@ func (v *BasePHPParserVisitor) VisitConstantInitializer(ctx *ConstantInitializer
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitConstantString(ctx *ConstantStringContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitConstant(ctx *ConstantContext) interface{} {
 	return v.VisitChildren(ctx)
 }
