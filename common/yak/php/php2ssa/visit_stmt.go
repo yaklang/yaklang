@@ -32,7 +32,7 @@ func (y *builder) VisitTopStatement(raw phpparser.ITopStatementContext) interfac
 	} else if ret := i.EnumDeclaration(); ret != nil {
 		y.VisitEnumDeclaration(ret)
 	} else {
-		log.Infof("unknown top statement: %v", ret.GetText())
+		log.Infof("unknown top statement: %v", i.GetText())
 	}
 
 	return nil
@@ -57,19 +57,6 @@ func (y *builder) VisitGlobalConstantDeclaration(raw phpparser.IGlobalConstantDe
 	}
 
 	i, _ := raw.(*phpparser.GlobalConstantDeclarationContext)
-	if i == nil {
-		return nil
-	}
-
-	return nil
-}
-
-func (y *builder) VisitFunctionDeclaration(raw phpparser.IFunctionDeclarationContext) interface{} {
-	if y == nil || raw == nil {
-		return nil
-	}
-
-	i, _ := raw.(*phpparser.FunctionDeclarationContext)
 	if i == nil {
 		return nil
 	}
@@ -113,26 +100,26 @@ func (y *builder) VisitStatement(raw phpparser.IStatementContext) interface{} {
 		return nil
 	}
 
-	if i.LabelStatement() != nil {
-		y.VisitLabelStatement(i.LabelStatement())
-	} else if i.BlockStatement() != nil {
-		y.VisitBlockStatement(i.BlockStatement())
-	} else if i.IfStatement() != nil {
-		y.VisitIfStatement(i.IfStatement())
-	} else if i.WhileStatement() != nil {
-		y.VisitWhileStatement(i.WhileStatement())
-	} else if i.DoWhileStatement() != nil {
-		y.VisitDoWhileStatement(i.DoWhileStatement())
+	if r := i.LabelStatement(); r != nil {
+		y.VisitLabelStatement(r)
+	} else if b := i.BlockStatement(); b != nil {
+		y.VisitBlockStatement(b)
+	} else if r := i.IfStatement(); r != nil {
+		y.VisitIfStatement(r)
+	} else if r := i.WhileStatement(); r != nil {
+		y.VisitWhileStatement(r)
+	} else if r := i.DoWhileStatement(); r != nil {
+		y.VisitDoWhileStatement(r)
 	} else if i.ForStatement() != nil {
 		y.VisitForStatement(i.ForStatement())
-	} else if i.SwitchStatement() != nil {
-		y.VisitSwitchStatement(i.SwitchStatement())
-	} else if i.BreakStatement() != nil {
-		y.VisitBreakStatement(i.BreakStatement())
-	} else if i.ContinueStatement() != nil {
-		y.VisitContinueStatement(i.ContinueStatement())
-	} else if i.ReturnStatement() != nil {
-		y.VisitReturnStatement(i.ReturnStatement())
+	} else if r := i.SwitchStatement(); r != nil {
+		y.VisitSwitchStatement(r)
+	} else if r := i.BreakStatement(); r != nil {
+		y.VisitBreakStatement(r)
+	} else if r := i.ContinueStatement(); r != nil {
+		y.VisitContinueStatement(r)
+	} else if r := i.ReturnStatement(); r != nil {
+		y.VisitReturnStatement(r)
 	} else if i.YieldExpression() != nil {
 		y.VisitYieldExpression(i.YieldExpression())
 	} else if i.GlobalStatement() != nil {
@@ -168,6 +155,7 @@ func (y *builder) VisitStatement(raw phpparser.IStatementContext) interface{} {
 	return nil
 }
 
+// VisitLabelStatement check id: as goto target
 func (y *builder) VisitLabelStatement(raw phpparser.ILabelStatementContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
@@ -246,8 +234,8 @@ func (y *builder) VisitTypeHint(raw phpparser.ITypeHintContext) ssa.Type {
 		return nil
 	}
 
-	if i.QualifiedStaticTypeRef() != nil {
-		y.VisitQualifiedStaticTypeRef(i.QualifiedStaticTypeRef())
+	if r := i.QualifiedStaticTypeRef(); r != nil {
+		_ = y.VisitQualifiedStaticTypeRef(r)
 	} else if i.Callable() != nil {
 		_ = i.Callable().GetText()
 	} else if i.PrimitiveType() != nil {
@@ -260,8 +248,7 @@ func (y *builder) VisitTypeHint(raw phpparser.ITypeHintContext) ssa.Type {
 		// need a
 		// return ssa.NewUnionType(types)
 	}
-
-	return nil
+	return ssa.GetAnyType()
 }
 
 func (y *builder) VisitQualifiedStaticTypeRef(raw phpparser.IQualifiedStaticTypeRefContext) interface{} {

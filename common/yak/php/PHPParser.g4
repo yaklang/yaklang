@@ -653,7 +653,7 @@ qualifiedNamespaceNameList
     ;
 
 arguments
-    : '(' actualArgument (',' actualArgument)*  ','? ')'
+    : '(' actualArgument? (',' actualArgument)*  ','? ')'
     ;
 
 actualArgument
@@ -667,13 +667,14 @@ argumentName
     ;
 
 constantInitializer
-    : constant
-    | string
+    : constantString ('.' constantString)*
     | Array '(' (arrayItemList ','?)? ')'
     | '[' (arrayItemList ','?)? ']'
     | ('+' | '-') constantInitializer
-    | (string | constant) ('.' (string | constant))*
     ;
+
+constantString: string | constant;
+
 
 constant
     : Null
@@ -750,6 +751,7 @@ functionCallName
     | classConstant
     | chainBase
     | parentheses
+    | Label
     ;
 
 actualArguments
