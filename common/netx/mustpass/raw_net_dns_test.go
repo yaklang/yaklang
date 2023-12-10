@@ -12,6 +12,38 @@ import (
 	"time"
 )
 
+func TestBASIC_SPECIFIC_DNS_2(t *testing.T) {
+	log.SetLevel(log.DebugLevel)
+	domain := strings.ToLower(utils.RandStringBytes(40) + "." + "com")
+	addr := facades.MockDNSServerDefault(domain, func(record string, domain string) string {
+		spew.Dump(record, domain)
+		return "1.2.3.5"
+	})
+
+	time.Sleep(time.Second)
+	var start = time.Now()
+	var result = netx.LookupFirst(domain+":80",
+		netx.WithDNSDisableSystemResolver(true),
+		netx.WithDNSServers(addr), netx.WithDNSFallbackTCP(false))
+	log.Infof("LookupFirst %s cost %s", domain, time.Since(start))
+	if time.Now().Sub(start).Milliseconds() > 300 {
+		t.Errorf("LookupFirst %s cost %s", domain, time.Since(start))
+		t.FailNow()
+	}
+	if result != "1.2.3.5" {
+		t.Log("LookupFirst failed")
+		t.FailNow()
+	}
+	spew.Dump(result)
+
+	if netx.LookupFirst("1.2.3.4") != "1.2.3.4" {
+		t.Fatal("LookupFirst ip failed")
+	}
+	if netx.LookupFirst("1.2.3.4:443") != "1.2.3.4" {
+		t.Fatal("LookupFirst ip failed")
+	}
+}
+
 func TestBASIC_SPECIFIC_DNS(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
 	domain := strings.ToLower(utils.RandStringBytes(40) + "." + "com")

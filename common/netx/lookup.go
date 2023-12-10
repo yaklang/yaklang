@@ -5,6 +5,7 @@ import (
 	"github.com/ReneKroon/ttlcache"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"strings"
 	"time"
 )
 
@@ -22,6 +23,10 @@ func reliableLookupHost(host string, opt ...DNSOption) error {
 			config.OnFinished()
 		}
 	}()
+
+	if strings.Contains(host, ":") {
+		host = utils.ExtractHost(host)
+	}
 
 	if config.DisabledDomain != nil {
 		if config.DisabledDomain.Contains(host) {
@@ -62,6 +67,11 @@ func reliableLookupHost(host string, opt ...DNSOption) error {
 				return nil
 			}
 		}
+	}
+
+	if utils.IsIPv4(host) || utils.IsIPv6(host) {
+		config.call("", host, host, "system", "system")
+		return nil
 	}
 
 	// handle system resolver
