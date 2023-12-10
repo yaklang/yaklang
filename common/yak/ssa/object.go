@@ -65,6 +65,7 @@ func NewFieldOnly(key, obj Value, block *BasicBlock) *Field {
 	return f
 }
 
+// EmitInterfaceMake quick build key=>value based object
 func (b *FunctionBuilder) EmitInterfaceMake(f func(feed func(key Value, val Value))) *Make {
 	itf := b.EmitMakeWithoutType(NewConst(0), NewConst(0))
 	ityp := NewObjectType()
