@@ -412,6 +412,9 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#constantInitializer.
 	VisitConstantInitializer(ctx *ConstantInitializerContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#constantString.
+	VisitConstantString(ctx *ConstantStringContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#constant.
 	VisitConstant(ctx *ConstantContext) interface{}
 

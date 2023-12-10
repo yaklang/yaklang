@@ -5,6 +5,100 @@ import (
 	"testing"
 )
 
+func TestParseSSA_FuncCall(t *testing.T) {
+	smokingtest(`<?php
+$b = 1+a()+1;
+`)
+}
+
+func TestParseSSA_DoWhileTag(t *testing.T) {
+	smokingtest(`<?php
+function funcName() {
+	echo "a called";
+	return 2;
+}
+do{ print 2; } while (funcName() == 1);
+
+`)
+}
+
+func TestParseSSA_WhileTag(t *testing.T) {
+	smokingtest(`
+<ul>
+<?php while ($i <= 5) : ?>
+    <li>Item <?php echo $i; ?></li>
+    <?php $i++; ?>
+<?php endwhile; ?>
+</ul>
+
+`)
+}
+
+func TestParseSSA_While(t *testing.T) {
+	smokingtest(`<?php
+while ($i < 5) {
+	echo 1;
+}
+
+while ($i < 5) {
+	if(true) {break};
+
+	if (false) {continue};
+}
+`)
+}
+
+func TestParseSSA_IF(t *testing.T) {
+	smokingtest(`<?php
+
+			if (true) echo "abc";
+			if (true) echo "abc"; else if (trye) 1+1;
+			if (true) echo "abc"; else if (true) 1+1; else "abc"."ccc";
+
+if ($a > 0) {
+echo "abc"
+}
+`)
+}
+
+func TestParseSSA_Function_1(t *testing.T) {
+	smokingtest(`<?php
+function testFunction2($a, $b='1', $c=array(1,2,3,), string $d) {
+	1&&1;
+	return 1;
+}
+
+function testFunction1($a, $b='1', $c=array(1,2,3,), string $d) {
+	1&&1;
+	return 1;
+}
+`)
+}
+
+func TestParseSSA_Function(t *testing.T) {
+	smokingtest(`<?php
+
+function testFunction() {
+	1&&1
+}
+`)
+}
+
+func TestParseSSA_YieldName(t *testing.T) {
+	smokingtest(`<?php
+function gen() {
+	forearch (range(1, 10) as $1) {
+		yield $1;
+	}
+}
+
+foreach (gen() as $val) {
+	echo $val;
+}
+
+`)
+}
+
 func TestParseSSA_Valid(t *testing.T) {
 	p := ParseSSA(`<?php 
 $b = "a"."b";

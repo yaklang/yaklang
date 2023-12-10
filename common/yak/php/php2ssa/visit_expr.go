@@ -158,7 +158,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		return y.VisitParentheses(ret.Parentheses())
 	case *phpparser.SpecialWordExpressionContext:
 		if i := ret.Yield(); i != nil {
-
+			return y.ir.EmitConstInstNil()
 		} else if i := ret.List(); i != nil {
 
 		} else if i := ret.IsSet(); i != nil {
@@ -182,6 +182,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		} else {
 			log.Errorf("unhandled special word: %v", ret.GetText())
 		}
+		return y.ir.EmitConstInstNil()
 	case *phpparser.LambdaFunctionExpressionContext:
 	case *phpparser.MatchExpressionContext:
 	case *phpparser.ArithmeticExpressionContext:
@@ -205,6 +206,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		case ".":
 			return y.ir.EmitFieldMust(op1, op2)
 		default:
+			log.Errorf("unhandled arithmetic expression: %v", ret.GetText())
 			return nil
 		}
 		return y.ir.EmitBinOp(o, op1, op2)
@@ -458,7 +460,8 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 			return nil
 		}
 	default:
-		log.Errorf("unhandled expression: %v(%T)", ret.GetText(), ret)
+		ret.GetText()
+		log.Errorf("unhandled expression: %v(T: %T)", ret.GetText(), ret)
 		log.Errorf("-------------unhandled expression: %v(%T)", ret.GetText(), ret)
 		_ = ret
 	}
@@ -690,6 +693,8 @@ func (y *builder) VisitFunctionCallName(raw phpparser.IFunctionCallNameContext) 
 		return y.VisitClassConstant(ret)
 	} else if ret := i.Parentheses(); ret != nil {
 		return y.VisitParentheses(ret)
+	} else if ret := i.Label(); ret != nil {
+		return y.ir.ReadVariable(i.Label().GetText(), true)
 	}
 	log.Errorf("BUG: unknown function call name: %v", i.GetText())
 	return nil
@@ -896,4 +901,59 @@ func (y *builder) VisitStringConstant(raw phpparser.IStringConstantContext) ssa.
 	}
 
 	return ret
+}
+
+func (y *builder) VisitConstantInitializer(raw phpparser.IConstantInitializerContext) ssa.Value {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*phpparser.ConstantInitializerContext)
+	if i == nil {
+		return nil
+	}
+
+	if ret := i.ArrayItemList(); ret != nil {
+		return y.ir.EmitInterfaceMake(func(feed func(key ssa.Value, val ssa.Value)) {
+			for _, kv := range y.VisitArrayItemList(ret) {
+				feed(kv[0], kv[1])
+			}
+		})
+	} else if ret := i.ConstantInitializer(); ret != nil {
+		val := y.VisitConstantInitializer(ret)
+		if i.Minus() != nil {
+			return y.ir.EmitUnOp(ssa.OpNeg, val)
+		}
+		return y.ir.EmitUnOp(ssa.OpPlus, val)
+	} else {
+		var initVal ssa.Value
+		for _, c := range i.AllConstantString() {
+			if initVal == nil {
+				initVal = y.VisitConstantString(c)
+				continue
+			}
+			initVal = y.ir.EmitField(initVal, y.VisitConstantString(c))
+		}
+		if initVal == nil {
+			log.Errorf("unhandled constant initializer: %v", i.GetText())
+			return y.ir.EmitConstInstNil()
+		}
+		return initVal
+	}
+}
+
+func (y *builder) VisitConstantString(raw phpparser.IConstantStringContext) ssa.Value {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*phpparser.ConstantStringContext)
+	if i == nil {
+		return nil
+	}
+
+	if r := i.String_(); r != nil {
+		return y.VisitString_(r)
+	}
+	return y.VisitConstant(i.Constant())
 }
