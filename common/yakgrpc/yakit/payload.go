@@ -297,18 +297,16 @@ func GetPayloadCountInGroup(db *gorm.DB, group string) int64 {
 }
 
 func DeletePayloadByID(db *gorm.DB, id int64) error {
-	if db := db.Where(
-		"id = ?", id,
-	).Unscoped().Delete(&Payload{}); db.Error != nil {
-		return db.Error
+	if err := db.Unscoped().Delete(&Payload{}, id).Error; err != nil {
+		return err
 	} else {
 		return nil
 	}
 }
 
-func DeletePayloadByIDs(db *gorm.DB, id []int64) error {
-	if db := bizhelper.ExactQueryInt64ArrayOr(db, "id", id).Unscoped().Delete(&Payload{}); db.Error != nil {
-		return db.Error
+func DeletePayloadByIDs(db *gorm.DB, ids []int64) error {
+	if err := db.Unscoped().Delete(&Payload{}, ids).Error; err != nil {
+		return err
 	} else {
 		return nil
 	}
