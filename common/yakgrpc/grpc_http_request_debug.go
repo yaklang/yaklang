@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -55,16 +56,19 @@ func (s *Server) execScriptWithExecParam(scriptName string, input string, stream
 	})
 	engine := yak.NewYakitVirtualClientScriptEngine(feedbackClient)
 	log.Infof("engine.ExecuteExWithContext(stream.Context(), debugScript ... \n")
-	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
-		engine.SetVar("RUNTIME_ID", runtimeId)
-		yak.BindYakitPluginContextToEngine(engine, &yak.YakitPluginContext{
-			PluginName: scriptName,
-			RuntimeId:  runtimeId,
-		})
-		return nil
-	})
+
+	sendLog := func(res interface{}) {
+		raw, _ := yaklib.YakitMessageGenerator(res)
+		execResult := &ypb.ExecResult{
+			IsMessage: true,
+			Message:   raw,
+		}
+		execResult.RuntimeID = runtimeId
+		stream.Send(execResult)
+	}
 	switch strings.ToLower(debugType) {
 	case "codec":
+		tabName := "Codec结果"
 		subEngine, err := engine.ExecuteExWithContext(stream.Context(), scriptInstance.Content, map[string]any{
 			"CTX":         stream.Context(),
 			"PLUGIN_NAME": scriptName,
@@ -76,17 +80,27 @@ func (s *Server) execScriptWithExecParam(scriptName string, input string, stream
 		if err != nil {
 			return utils.Errorf("import %v' s handle failed: %s", scriptName, err)
 		}
-		res := &yaklib.YakitLog{
+		newTabRaw, err := json.Marshal(&yaklib.YakitFeature{
+			Feature: "text",
+			Params: map[string]interface{}{
+				"tab_name": tabName,
+				"at_head":  true,
+			},
+		})
+		if err != nil {
+			return err
+		}
+		stream.Send(&ypb.ExecResult{IsMessage: true, Message: newTabRaw})
+
+		resData, err := json.Marshal(&yaklib.YakitTextTabData{
+			TableName: tabName,
+			Data:      utils.InterfaceToString(result),
+		})
+
+		sendLog(&yaklib.YakitLog{
 			Level: "feature-text-data",
-			Data:  utils.InterfaceToString(result),
-		}
-		raw, _ := yaklib.YakitMessageGenerator(res)
-		execResult := &ypb.ExecResult{
-			IsMessage: true,
-			Message:   raw,
-		}
-		execResult.RuntimeID = runtimeId
-		stream.Send(execResult)
+			Data:  string(resData),
+		})
 		return nil
 	case "yak":
 		tempArgs := makeArgs(params)
