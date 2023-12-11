@@ -1,5 +1,4 @@
 yakit.AutoInitYakit()
-yakit_output(MITM_PARAMS)
 
 isJavaScript = rsp => {
     if poc.GetHTTPPacketContentType(rsp).Contains("javascript") {
@@ -44,6 +43,8 @@ unionPayloads = func(checkType) {
     return results, token
 }
 
+
+
 sqlInjectionChecking = func(https, request) {
     freq = fuzz.HTTPRequest(request, fuzz.https(https))~
     params = freq.GetCommonParams()
@@ -68,16 +69,17 @@ sqlInjectionChecking = func(https, request) {
         prefix = []
         suffix = [" -- ", " # "]
         if pureInt {
-            prefix.Push(" ", "/**/")
             prefix.Push(sprint(paramValue) + " ")
-            prefix.Push(sprint(paramValue) + "/**/")
+            prefix.Push(sprint(paramValue) + ")")
+            prefix.Push(sprint(paramValue) + "))")
         } else {
             info("开始进行字符串检测")
-            prefix.Push("'", "')")
             prefix.Push(sprint(paramValue) + "'")
             prefix.Push(sprint(paramValue) + "')")
+            prefix.Push(sprint(paramValue) + "'))")
             prefix.Push(sprint(randstr(10)) + "'")
             prefix.Push(sprint(randstr(10)) + "')")
+            prefix.Push(sprint(randstr(10)) + "'))")
         }
 
         payloads, token = unionPayloads("md5")
@@ -122,50 +124,7 @@ sqlInjectionChecking = func(https, request) {
                             risk.details("通过 UNION SELECT 随机 Token 为测试手段，测出回显列数然后在响应结果中找到 Token"),
                         )
                         finished = true
-                    }
-                }
-            }
-        }
-
-        plainPayloads, token = unionPayloads("")
-        token = sprint(token)
-        info(f"Payload: ${len(payloads)} Prefix:${len(prefix)} Suffix:${len(suffix)} TOKEN 为 " + sprint(token))
-        for p in prefix {
-            for s in suffix {
-                if finished {
-                    info("Detected Finished")
-                    return
-                }
-
-                for payload in plainPayloads {
-                    finPayload = p + payload + s
-                    info(f"USE: prefix:${p} suffix:${s} payloads: ${sdump(payload)}")
-                    rsp, err := i.Fuzz(finPayload).ExecFirst()
-                    if err != nil {
-                        info("FAILED: %v" % err)
-                        continue
-                    }
-                    _, body = poc.Split(rsp.ResponseRaw)
-                    bodyStr = string(body)
-                    // println(bodyStr)
-                    if bodyStr.Contains(token) {
-                        info("Union Checking Token 生效了，Payload 为：" + finPayload)
-                        count = payload.Count(",") + 1
-                        risk.NewRisk(
-                            url,
-                            risk.title(f"UNION SQL Injection Columns(数值计算)[${count}] For: ${url}"),
-                            risk.title(f"SQL注入（UNION）列数(数值计算)[${count}] URL: ${url}"),
-                            risk.type("sqlinjection"),
-                            risk.severity("high"),
-                            risk.request(rsp.RequestRaw),
-                            risk.response(rsp.ResponseRaw),
-                            risk.payload(finPayload),
-                            risk.parameter(i.String()),
-                            risk.description("Union-Based SQL 注入是一种常见的 SQL 注入攻击技术，通过在应用程序的查询语句中使用 UNION 操作符来获取数据库中的敏感信息。攻击者利用 UNION 操作符将恶意的 SELECT 查询与正常的查询结果合并，从而泄露数据库的数据。本漏洞检测方式是，使用 UNION Select 表达式的数据计算结果作为检测依据。"),
-                            risk.solution("使用参数化查询,使用 ORM（对象关系映射）框架,进行输入验证和过滤,代码遵循最小权限原则"),
-                            risk.details("通过 UNION SELECT 随机 Token 为测试手段，测出回显列数然后在响应结果中找到 Token"),
-                        )
-                        finished = true
+                        return
                     }
                 }
             }
