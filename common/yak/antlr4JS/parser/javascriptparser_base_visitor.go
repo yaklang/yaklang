@@ -1,8 +1,7 @@
-// Code generated from ./JavaScriptParser.g4 by ANTLR 4.13.1. DO NOT EDIT.
+// Code generated from java-escape by ANTLR 4.11.1. DO NOT EDIT.
 
-package parser // JavaScriptParser
-
-import "github.com/antlr4-go/antlr/v4"
+package JS // JavaScriptParser
+import "github.com/antlr/antlr4/runtime/Go/antlr/v4"
 
 type BaseJavaScriptParserVisitor struct {
 	*antlr.BaseParseTreeVisitor
@@ -12,7 +11,7 @@ func (v *BaseJavaScriptParserVisitor) VisitProgram(ctx *ProgramContext) interfac
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaScriptParserVisitor) VisitSourceElement(ctx *SourceElementContext) interface{} {
+func (v *BaseJavaScriptParserVisitor) VisitStatements(ctx *StatementsContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -21,10 +20,6 @@ func (v *BaseJavaScriptParserVisitor) VisitStatement(ctx *StatementContext) inte
 }
 
 func (v *BaseJavaScriptParserVisitor) VisitBlock(ctx *BlockContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseJavaScriptParserVisitor) VisitStatementList(ctx *StatementListContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -108,10 +103,6 @@ func (v *BaseJavaScriptParserVisitor) VisitEmptyStatement_(ctx *EmptyStatement_C
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaScriptParserVisitor) VisitExpressionStatement(ctx *ExpressionStatementContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BaseJavaScriptParserVisitor) VisitIfStatement(ctx *IfStatementContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -149,10 +140,6 @@ func (v *BaseJavaScriptParserVisitor) VisitForInStatement(ctx *ForInStatementCon
 }
 
 func (v *BaseJavaScriptParserVisitor) VisitForOfStatement(ctx *ForOfStatementContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseJavaScriptParserVisitor) VisitVarModifier(ctx *VarModifierContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -268,10 +255,6 @@ func (v *BaseJavaScriptParserVisitor) VisitFunctionBody(ctx *FunctionBodyContext
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaScriptParserVisitor) VisitSourceElements(ctx *SourceElementsContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BaseJavaScriptParserVisitor) VisitArrayLiteral(ctx *ArrayLiteralContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -332,6 +315,22 @@ func (v *BaseJavaScriptParserVisitor) VisitQuestionDot(ctx *QuestionDotContext) 
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseJavaScriptParserVisitor) VisitImportExpression(ctx *ImportExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaScriptParserVisitor) VisitNewExpression(ctx *NewExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaScriptParserVisitor) VisitMetaExpression(ctx *MetaExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaScriptParserVisitor) VisitAwaitExpression(ctx *AwaitExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseJavaScriptParserVisitor) VisitTemplateStringExpression(ctx *TemplateStringExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -344,23 +343,15 @@ func (v *BaseJavaScriptParserVisitor) VisitLogicalAndExpression(ctx *LogicalAndE
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseJavaScriptParserVisitor) VisitChainExpression(ctx *ChainExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseJavaScriptParserVisitor) VisitPowerExpression(ctx *PowerExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaScriptParserVisitor) VisitPreIncrementExpression(ctx *PreIncrementExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BaseJavaScriptParserVisitor) VisitObjectLiteralExpression(ctx *ObjectLiteralExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseJavaScriptParserVisitor) VisitMetaExpression(ctx *MetaExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseJavaScriptParserVisitor) VisitInExpression(ctx *InExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -372,19 +363,7 @@ func (v *BaseJavaScriptParserVisitor) VisitOptionalChainExpression(ctx *Optional
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaScriptParserVisitor) VisitNotExpression(ctx *NotExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseJavaScriptParserVisitor) VisitPreDecreaseExpression(ctx *PreDecreaseExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BaseJavaScriptParserVisitor) VisitArgumentsExpression(ctx *ArgumentsExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseJavaScriptParserVisitor) VisitAwaitExpression(ctx *AwaitExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -393,46 +372,6 @@ func (v *BaseJavaScriptParserVisitor) VisitThisExpression(ctx *ThisExpressionCon
 }
 
 func (v *BaseJavaScriptParserVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseJavaScriptParserVisitor) VisitUnaryMinusExpression(ctx *UnaryMinusExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseJavaScriptParserVisitor) VisitAssignmentExpression(ctx *AssignmentExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseJavaScriptParserVisitor) VisitPostDecreaseExpression(ctx *PostDecreaseExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseJavaScriptParserVisitor) VisitTypeofExpression(ctx *TypeofExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseJavaScriptParserVisitor) VisitInstanceofExpression(ctx *InstanceofExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseJavaScriptParserVisitor) VisitUnaryPlusExpression(ctx *UnaryPlusExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseJavaScriptParserVisitor) VisitDeleteExpression(ctx *DeleteExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseJavaScriptParserVisitor) VisitImportExpression(ctx *ImportExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseJavaScriptParserVisitor) VisitEqualityExpression(ctx *EqualityExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseJavaScriptParserVisitor) VisitBitXOrExpression(ctx *BitXOrExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -460,19 +399,11 @@ func (v *BaseJavaScriptParserVisitor) VisitRelationalExpression(ctx *RelationalE
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaScriptParserVisitor) VisitPostIncrementExpression(ctx *PostIncrementExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BaseJavaScriptParserVisitor) VisitYieldExpression(ctx *YieldExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaScriptParserVisitor) VisitBitNotExpression(ctx *BitNotExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseJavaScriptParserVisitor) VisitNewExpression(ctx *NewExpressionContext) interface{} {
+func (v *BaseJavaScriptParserVisitor) VisitEqExpression(ctx *EqExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -484,11 +415,11 @@ func (v *BaseJavaScriptParserVisitor) VisitArrayLiteralExpression(ctx *ArrayLite
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaScriptParserVisitor) VisitMemberDotExpression(ctx *MemberDotExpressionContext) interface{} {
+func (v *BaseJavaScriptParserVisitor) VisitClassExpression(ctx *ClassExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaScriptParserVisitor) VisitClassExpression(ctx *ClassExpressionContext) interface{} {
+func (v *BaseJavaScriptParserVisitor) VisitKeywordExpression(ctx *KeywordExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -500,11 +431,15 @@ func (v *BaseJavaScriptParserVisitor) VisitIdentifierExpression(ctx *IdentifierE
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaScriptParserVisitor) VisitBitAndExpression(ctx *BitAndExpressionContext) interface{} {
+func (v *BaseJavaScriptParserVisitor) VisitPreUnaryExpression(ctx *PreUnaryExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaScriptParserVisitor) VisitBitOrExpression(ctx *BitOrExpressionContext) interface{} {
+func (v *BaseJavaScriptParserVisitor) VisitPostUnaryExpression(ctx *PostUnaryExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaScriptParserVisitor) VisitBitExpression(ctx *BitExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -512,11 +447,11 @@ func (v *BaseJavaScriptParserVisitor) VisitAssignmentOperatorExpression(ctx *Ass
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaScriptParserVisitor) VisitVoidExpression(ctx *VoidExpressionContext) interface{} {
+func (v *BaseJavaScriptParserVisitor) VisitCoalesceExpression(ctx *CoalesceExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaScriptParserVisitor) VisitCoalesceExpression(ctx *CoalesceExpressionContext) interface{} {
+func (v *BaseJavaScriptParserVisitor) VisitPreUnaryOperator(ctx *PreUnaryOperatorContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -588,15 +523,7 @@ func (v *BaseJavaScriptParserVisitor) VisitIdentifier(ctx *IdentifierContext) in
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaScriptParserVisitor) VisitReservedWord(ctx *ReservedWordContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseJavaScriptParserVisitor) VisitKeyword(ctx *KeywordContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseJavaScriptParserVisitor) VisitLet_(ctx *Let_Context) interface{} {
+func (v *BaseJavaScriptParserVisitor) VisitOptionalChainMember(ctx *OptionalChainMemberContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
