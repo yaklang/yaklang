@@ -562,9 +562,9 @@ func (b *astbuilder) buildBlock(stmt *yak.BlockContext) {
 	defer recoverRange()
 	b.CurrentBlock.SetPosition(b.CurrentPos)
 	if s, ok := stmt.StatementList().(*yak.StatementListContext); ok {
-		b.PushBlockSymbolTable()
+		b.ScopeStart()
 		b.buildStatementList(s)
-		b.PopBlockSymbolTable()
+		b.ScopeEnd()
 	} else {
 		b.NewError(ssa.Warn, TAG, "empty block")
 	}
@@ -805,7 +805,7 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 			return ssa.NewIdentifierLV("_", b.CurrentPos)
 		}
 		if forceAssign {
-			return ssa.NewIdentifierLV(b.MapBlockSymbolTable(text), b.CurrentPos)
+			return ssa.NewIdentifierLV(b.SetScopeLocalVariable(text), b.CurrentPos)
 		}
 
 		lv := ssa.NewIdentifierLV(text, b.CurrentPos)
