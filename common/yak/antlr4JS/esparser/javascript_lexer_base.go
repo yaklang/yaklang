@@ -1,7 +1,7 @@
-package parser
+package JS
 
 import (
-	"github.com/antlr4-go/antlr/v4"
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 )
 
 // JavaScriptLexerBase state
@@ -125,5 +125,5 @@ func (l *JavaScriptLexerBase) Reset() {
 	l.useStrictDefault = false
 	l.useStrictCurrent = false
 	l.templateDepth = 0
-	l.BaseLexer.Reset()
+	// l.BaseLexer.Reset()
 }

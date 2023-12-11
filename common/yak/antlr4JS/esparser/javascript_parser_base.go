@@ -1,9 +1,8 @@
-package parser
+package JS
 
 import (
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"strings"
-
-	"github.com/antlr4-go/antlr/v4"
 )
 
 // var AtomicNCost int64 = 0

@@ -2,9 +2,9 @@ package js2ssa
 
 import (
 	"fmt"
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 
-	"github.com/antlr4-go/antlr/v4"
-	JS "github.com/yaklang/yaklang/common/yak/antlr4JS/parser"
+	JS "github.com/yaklang/yaklang/common/yak/antlr4JS/esparser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 )
