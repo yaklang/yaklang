@@ -1,9 +1,9 @@
 package JS
 
 import (
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
-	"github.com/yaklang/yaklang/common/log"
 	"strings"
+
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 )
 
 // var AtomicNCost int64 = 0
@@ -28,12 +28,12 @@ func (p *JavaScriptParserBase) n(str string) bool {
 	return p.next(str)
 }
 
-var count int
+// var count int
 
-func (p *JavaScriptParserBase) log(i string) {
-	count++
-	log.Infof("match syntax log [%v]: %v", count, i)
-}
+// func (p *JavaScriptParserBase) log(i string) {
+// 	count++
+// 	log.Infof("match syntax log [%v]: %v", count, i)
+// }
 
 // Whether the next token value equals to str.
 func (p *JavaScriptParserBase) next(str string) bool {

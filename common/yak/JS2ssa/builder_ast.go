@@ -4,7 +4,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 
-	JS "github.com/yaklang/yaklang/common/yak/antlr4JS/esparser"
+	JS "github.com/yaklang/yaklang/common/yak/antlr4JS/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 

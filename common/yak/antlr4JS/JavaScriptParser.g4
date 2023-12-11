@@ -375,7 +375,7 @@ specificExpression
 questionDot: '?' '.';
 
 singleExpression
-    : {p.log("HERE")} anonymousFunction                                                     # FunctionExpression
+    : anonymousFunction                                                     # FunctionExpression
     | Class identifier? classTail                                           # ClassExpression
     | Import '(' singleExpression ')'                                       # ImportExpression
     | singleExpression templateStringLiteral                                # TemplateStringExpression  // ECMAScript 6

@@ -2,9 +2,11 @@ package js2ssa
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 
-	JS "github.com/yaklang/yaklang/common/yak/antlr4JS/esparser"
+	JS "github.com/yaklang/yaklang/common/yak/antlr4JS/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 )
@@ -64,6 +66,7 @@ func ParseSSA(src string, f func(*ssa.FunctionBuilder)) (prog *ssa.Program) {
 		}
 	}()
 
+	start := time.Now()
 	errListener := NewErrorListener()
 	lexer := JS.NewJavaScriptLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()
@@ -73,10 +76,12 @@ func ParseSSA(src string, f func(*ssa.FunctionBuilder)) (prog *ssa.Program) {
 	parser.RemoveErrorListeners()
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
+	fmt.Println("time since start to ast before: ", time.Since(start))
 	ast := parser.Program().(*JS.ProgramContext)
 	if len(errListener.err) > 0 {
 		return nil
 	}
+	fmt.Println("time since start to ast: ", time.Since(start))
 	prog = ssa.NewProgram()
 	builder := &builder{
 		ast:      ast,

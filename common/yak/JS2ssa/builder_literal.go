@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
-	JS "github.com/yaklang/yaklang/common/yak/antlr4JS/esparser"
+	JS "github.com/yaklang/yaklang/common/yak/antlr4JS/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	// "github.com/yaklang/yaklang/common/yak/ssa"
 )

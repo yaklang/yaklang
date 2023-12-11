@@ -3,8 +3,10 @@ package js2ssa
 import (
 	_ "embed"
 	"fmt"
+	_ "net/http/pprof"
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -246,4 +248,14 @@ func TestNumber(t *testing.T) {
 		a < 1e-6 ? 1 : 2
 	`, none)
 	prog.Show()
+}
+
+//go:embed test.js
+var large string
+
+func TestJs(t *testing.T) {
+	prog := ParseSSA(large, none)
+	prog.Show()
+
+	time.Sleep(time.Minute)
 }

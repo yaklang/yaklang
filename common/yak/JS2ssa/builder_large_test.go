@@ -4,7 +4,7 @@ import (
 	_ "embed"
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/log"
-	JS "github.com/yaklang/yaklang/common/yak/antlr4JS/esparser"
+	JS "github.com/yaklang/yaklang/common/yak/antlr4JS/parser"
 	"testing"
 	"time"
 )
@@ -15,10 +15,10 @@ var largeJS string
 //go:embed test-seq.js
 var largeExprSeqJS string
 
-func checkLarge(t *testing.T, code string) {
-	prog := ParseSSA(code, none)
-	prog.ShowWithSource()
-}
+// func checkLarge(t *testing.T, code string) {
+// 	prog := ParseSSA(code, none)
+// 	prog.ShowWithSource()
+// }
 
 func TestJS_MVP_ASTLargeText(t *testing.T) {
 	lexer := JS.NewJavaScriptLexer(antlr.NewInputStream(largeExprSeqJS))
