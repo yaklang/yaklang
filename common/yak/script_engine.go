@@ -83,7 +83,7 @@ func initYaklangLib() {
 			yaklang.Import(k, v)
 		}
 	}
-	if os.Getenv("YAKIT_VERSION") == "yakit_se" {
+	if os.Getenv("YAK_DISABLE") == "output" {
 		yaklib.GlobalExport["dump"] = func(i ...any) {}
 		builtin.YaklangBaseLib["print"] = func(a ...any) {}
 		builtin.YaklangBaseLib["printf"] = func(a ...any) {}
