@@ -56,23 +56,23 @@ func lineDisasms(vs Values) string {
 }
 
 func (f *Function) LineDisasm() string {
-	return fmt.Sprintf("%s", f.GetVariable())
+	return fmt.Sprintf("%s", f.GetName())
 	// return fmt.Sprintf("fun(%s)", f.GetVariable())
 }
 
 func (b *BasicBlock) LineDisasm() string {
 	// return fmt.Sprintf("block(%s)", b.GetVariable())
-	return fmt.Sprintf("%s", b.GetVariable())
+	return fmt.Sprintf("%s", b.GetName())
 }
 
 func (p *Parameter) LineDisasm() string {
 	// return fmt.Sprintf("param(%s)", p.GetVariable())
-	return fmt.Sprintf("%s", p.GetVariable())
+	return fmt.Sprintf("%s", p.GetName())
 }
 
 func (p *Phi) LineDisasm() string {
-	setSymbolVariable(p, p.GetVariable())
-	ret := fmt.Sprintf("phi(%s)[%s]", p.GetVariable(), lineDisasms(p.Edge))
+	setSymbolVariable(p, p.GetName())
+	ret := fmt.Sprintf("phi(%s)[%s]", p.GetName(), lineDisasms(p.Edge))
 	unsetSymbolVariable(p)
 	return ret
 	// ret := p.GetVariable()
@@ -92,7 +92,7 @@ func (c *ConstInst) LineDisasm() string {
 
 func (u *Undefined) LineDisasm() string {
 	// return fmt.Sprintf("undefined(%s)", u.GetVariable())
-	return fmt.Sprintf("%s", u.GetVariable())
+	return fmt.Sprintf("%s", u.GetName())
 }
 
 func (b *BinOp) LineDisasm() string {
@@ -120,7 +120,7 @@ func (c *Call) LineDisasm() string {
 }
 
 func (s *SideEffect) LineDisasm() string {
-	return fmt.Sprintf("side-effect(%s, %s)", lineDisasm(s.target), s.GetVariable())
+	return fmt.Sprintf("side-effect(%s, %s)", lineDisasm(s.target), s.GetName())
 }
 
 func (m *Make) LineDisasm() string {

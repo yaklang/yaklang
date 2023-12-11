@@ -40,8 +40,8 @@ type Instruction interface {
 	GetBlock() *BasicBlock
 	SetBlock(*BasicBlock)
 
-	GetVariable() string
-	SetVariable(variable string)
+	GetName() string
+	SetName(variable string)
 
 	// position
 	GetPosition() *Position
@@ -95,9 +95,6 @@ type Value interface {
 	TypedNode
 	AddUser(User)
 	RemoveUser(User)
-
-	SetType(Type)
-	GetType() Type
 }
 
 type User interface {
@@ -111,7 +108,7 @@ type anInstruction struct {
 	Pos   *Position
 	scope *Scope
 
-	variable string
+	name string
 
 	isExtern bool
 	// left
@@ -152,9 +149,8 @@ func (a *anInstruction) GetScope() *Scope  { return a.scope }
 func (a *anInstruction) SetScope(s *Scope) { a.scope = s }
 
 // variable
-func (a *anInstruction) SetVariable(v string) { a.variable = v }
-func (a *anInstruction) GetVariable() string  { return a.variable }
-
+func (a *anInstruction) SetName(v string) { a.name = v }
+func (a *anInstruction) GetName() string      { return a.name }
 // has left-instruction
 func (a *anInstruction) HasLeftVariable() bool        { return a.hasLeft }
 func (a *anInstruction) GetLeftItem() LeftInstruction { return LeftInstruction(a) }
@@ -377,15 +373,11 @@ type Parameter struct {
 	anValue
 	anInstruction
 
-	// pos *Position
-	variable    string
 	IsFreeValue bool
 
 	// for extern lib
 	BuildField func(string) Value
 
-	// TODO: is modify , not cover
-	IsModify     bool
 	defaultValue Value
 }
 

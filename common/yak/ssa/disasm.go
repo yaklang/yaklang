@@ -53,7 +53,7 @@ func getStrFlag(v Value, hasType bool) (op string) {
 		op += v.String()
 		return
 	case *Function:
-		op += v.GetVariable()
+		op += v.GetName()
 		return
 	case *Field:
 		if v.OutCapture {
@@ -83,14 +83,14 @@ func (f *Function) String() string {
 	return f.DisAsm(DisAsmDefault)
 }
 func (f *Function) DisAsm(flag FunctionAsmFlag) string {
-	ret := f.GetVariable() + " "
+	ret := f.GetName() + " "
 	ret += strings.Join(
-		lo.Map(f.Param, func(item *Parameter, _ int) string { return GetTypeStr(item) + item.variable }),
+		lo.Map(f.Param, func(item *Parameter, _ int) string { return GetTypeStr(item) + item.GetName() }),
 		", ")
 	ret += "\n"
 
 	if parent := f.parent; parent != nil {
-		ret += fmt.Sprintf("parent: %s\n", parent.GetVariable())
+		ret += fmt.Sprintf("parent: %s\n", parent.GetName())
 	}
 
 	if f.Pos != nil {
@@ -167,11 +167,11 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 
 // ----------- basic block
 func (b *BasicBlock) String() string {
-	ret := b.GetVariable() + ":"
+	ret := b.GetName() + ":"
 	if len(b.Preds) != 0 {
 		ret += " <- "
 		for _, pred := range b.Preds {
-			ret += pred.GetVariable() + " "
+			ret += pred.GetName() + " "
 		}
 	}
 	if !utils.IsNil(b.Condition) {
@@ -192,7 +192,7 @@ func (c *ConstInst) String() string {
 
 // ----------- undefined
 func (u *Undefined) String() string {
-	return fmt.Sprintf("%s = undefined-%s", getStr(u), u.GetVariable())
+	return fmt.Sprintf("%s = undefined-%s", getStr(u), u.GetName())
 }
 
 // ----------- Phi
@@ -204,30 +204,30 @@ func (p *Phi) String() string {
 		if utils.IsNil(v) {
 			continue
 		}
-		ret += fmt.Sprintf("[%s, %s] ", getStr(v), b.GetVariable())
+		ret += fmt.Sprintf("[%s, %s] ", getStr(v), b.GetName())
 	}
 	return ret
 }
 
 // ----------- Parameter
 func (p *Parameter) String() string {
-	return p.variable
+	return p.GetName()
 }
 
 // ----------- Jump
 func (j *Jump) String() string {
-	return fmt.Sprintf("jump -> %s", j.To.GetVariable())
+	return fmt.Sprintf("jump -> %s", j.To.GetName())
 }
 
 // ----------- IF
 func (i *If) String() string {
 	// return i.StringByFunc(DefaultValueString)
-	return fmt.Sprintf("If [%s] true -> %s, false -> %s", getStr(i.Cond), i.True.GetVariable(), i.False.GetVariable())
+	return fmt.Sprintf("If [%s] true -> %s, false -> %s", getStr(i.Cond), i.True.GetName(), i.False.GetName())
 }
 
 // ----------- Loop
 func (l *Loop) String() string {
-	return fmt.Sprintf("Loop [%s; %s; %s] body -> %s, exit -> %s", getStr(l.Init), getStr(l.Cond), getStr(l.Step), l.Body.GetVariable(), l.Exit.GetVariable())
+	return fmt.Sprintf("Loop [%s; %s; %s] body -> %s, exit -> %s", getStr(l.Init), getStr(l.Cond), getStr(l.Step), l.Body.GetName(), l.Exit.GetName())
 }
 
 // ----------- Return
@@ -274,7 +274,7 @@ func (c *Call) String() string {
 }
 
 func (s *SideEffect) String() string {
-	return fmt.Sprintf("%s = side-effect %s [%s]", getStr(s), getStr(s.target), s.GetVariable())
+	return fmt.Sprintf("%s = side-effect %s [%s]", getStr(s), getStr(s.target), s.GetName())
 }
 
 // ----------- Switch
@@ -282,10 +282,10 @@ func (sw *Switch) String() string {
 	return fmt.Sprintf(
 		"switch %s default:[%s] {%s}",
 		getStr(sw.Cond),
-		sw.DefaultBlock.GetVariable(),
+		sw.DefaultBlock.GetName(),
 		strings.Join(
 			lo.Map(sw.Label, func(label SwitchLabel, _ int) string {
-				return fmt.Sprintf("%s:%s", getStr(label.Value), label.Dest.GetVariable())
+				return fmt.Sprintf("%s:%s", getStr(label.Value), label.Dest.GetName())
 			}),
 			", ",
 		),
@@ -369,11 +369,11 @@ func (n *Next) String() string {
 func (e *ErrorHandler) String() string {
 	finalName := "nil"
 	if e.final != nil {
-		finalName = e.final.GetVariable()
+		finalName = e.final.GetName()
 	}
 	return fmt.Sprintf(
 		"try %s; catch %s; final %s; rest %s",
-		e.try.GetVariable(), e.catch.GetVariable(), finalName, e.done.GetVariable(),
+		e.try.GetName(), e.catch.GetName(), finalName, e.done.GetName(),
 	)
 }
 

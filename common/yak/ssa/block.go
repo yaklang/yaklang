@@ -33,7 +33,7 @@ func (f *Function) newBasicBlockEx(name string, isSealed bool, nodAddToBlocks bo
 		inCompletePhi: make([]*Phi, 0),
 		Skip:          false,
 	}
-	b.SetVariable(name)
+	b.SetName(name)
 	b.SetFunc(f)
 	b.SetBlock(b)
 	if !nodAddToBlocks {
@@ -46,13 +46,13 @@ func addToBlocks(block *BasicBlock) {
 	f := block.GetFunc()
 	index := len(f.Blocks)
 
-	name := block.GetVariable()
+	name := block.GetName()
 	if name != "" {
 		name = fmt.Sprintf("%s-%d", name, index)
 	} else {
 		name = fmt.Sprintf("b-%d", index)
 	}
-	block.SetVariable(name)
+	block.SetName(name)
 
 	block.Index = index
 	f.Blocks = append(f.Blocks, block)

@@ -40,7 +40,7 @@ func (t *TypeCheck) CheckOnInstruction(inst ssa.Instruction) {
 	if v, ok := inst.(ssa.Value); ok {
 		switch v.GetType().GetTypeKind() {
 		case ssa.ErrorType:
-			variable := v.GetVariable()
+			variable := v.GetName()
 			if len(v.GetUsers()) == 0 && variable != "_" && variable != "" {
 				if pos := v.GetLeftPosition(); pos != nil {
 					v.GetFunc().NewErrorWithPos(ssa.Error, TypeCheckTAG, v.GetLeftPosition(), ErrorUnhandled())
@@ -69,7 +69,7 @@ func (t *TypeCheck) CheckOnInstruction(inst ssa.Instruction) {
 }
 
 func (t *TypeCheck) TypeCheckUndefine(inst *ssa.Undefined) {
-	inst.NewError(ssa.Error, TypeCheckTAG, ValueUndefined(inst.GetVariable()))
+	inst.NewError(ssa.Error, TypeCheckTAG, ValueUndefined(inst.GetName()))
 }
 
 func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
@@ -102,7 +102,7 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 
 		funName := ""
 		if f, ok := c.Method.(*ssa.Function); ok {
-			funName = f.GetVariable()
+			funName = f.GetName()
 		} else if funcTyp.Name != "" {
 			funName = funcTyp.Name
 		}
@@ -131,7 +131,7 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 		}
 	}()
 
-	if c.GetVariable() == "" {
+	if c.GetName() == "" {
 		return
 	}
 
@@ -168,8 +168,8 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 						ErrorUnhandledWithType(c.GetType().String()),
 					)
 				} else {
-					if f.GetVariable() == "" {
-						f.SetVariable(c.GetVariable() + ".error")
+					if f.GetName() == "" {
+						f.SetName(c.GetName() + ".error")
 					}
 				}
 			}

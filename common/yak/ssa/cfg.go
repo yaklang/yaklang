@@ -30,7 +30,7 @@ const (
 )
 
 func (b *BasicBlock) IsBlock(name string) bool {
-	return strings.HasPrefix(b.GetVariable(), name)
+	return strings.HasPrefix(b.GetName(), name)
 }
 
 func (b *BasicBlock) GetBlockById(name string) *BasicBlock {
