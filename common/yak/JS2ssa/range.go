@@ -1,9 +1,9 @@
 package js2ssa
 
 import (
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"strings"
 
-	"github.com/antlr4-go/antlr/v4"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 

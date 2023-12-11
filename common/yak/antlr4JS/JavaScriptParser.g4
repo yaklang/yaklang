@@ -38,22 +38,18 @@ options {
 }
 
 program
-    : HashBangLine? sourceElements? EOF
+    : HashBangLine? statements? EOF
     ;
-
-sourceElement
-    : statement
-    ;
-
+statements: statement+;
 statement
     : block
     | variableStatement
     | importStatement
     | exportStatement
-    | emptyStatement_
+    | ';'
     | classDeclaration
     | functionDeclaration
-    | expressionStatement
+    | expressionSequence eos
     | ifStatement
     | iterationStatement
     | continueStatement
@@ -68,13 +64,7 @@ statement
     | debuggerStatement
     ;
 
-block
-    : '{' statementList? '}'
-    ;
-
-statementList
-    : statement+
-    ;
+block: '{' statements? '}';
 
 importStatement
     : Import importFromBlock
@@ -150,7 +140,7 @@ variableStatement
     ;
 
 variableDeclarationList
-    : varModifier variableDeclaration (',' variableDeclaration)*
+    : modifier = (Var | Const | NonStrictLet | StrictLet)  variableDeclaration (',' variableDeclaration)*
     ;
 
 variableDeclaration
@@ -159,11 +149,6 @@ variableDeclaration
 
 emptyStatement_
     : SemiColon
-    ;
-
-expressionStatement
-    // : {p.notOpenBraceAndNotFunction()}? expressionSequence eos
-    : expressionSequence eos
     ;
 
 ifStatement
@@ -193,12 +178,6 @@ iterationStatement
     | For '(' (singleExpression | variableDeclarationList) In expressionSequence ')' statement                                # ForInStatement
     // strange, 'of' is an identifier. and p.p("of") not work in sometime.
     | For Await? '(' (singleExpression | variableDeclarationList) identifier{p.p("of")}? expressionSequence ')' statement  # ForOfStatement
-    ;
-
-varModifier  // let, const - ECMAScript 6
-    : Var
-    | let_
-    | Const
     ;
 
 continueStatement
@@ -234,11 +213,11 @@ caseClauses
     ;
 
 caseClause
-    : Case expressionSequence ':' statementList?
+    : Case expressionSequence ':' statements?
     ;
 
 defaultClause
-    : Default ':' statementList?
+    : Default ':' statements?
     ;
 
 labelledStatement
@@ -281,7 +260,7 @@ classElement
     : Static? methodDefinition
     | Static? fieldDefinition
     | Static block
-    | emptyStatement_
+    | ';'
     ;
 
 methodDefinition
@@ -317,11 +296,7 @@ lastFormalParameterArg                        // ECMAScript 6: Rest Parameter
     ;
 
 functionBody
-    : '{' sourceElements? '}'
-    ;
-
-sourceElements
-    : sourceElement+
+    : '{' statements? '}'
     ;
 
 arrayLiteral
@@ -361,67 +336,75 @@ argument
     ;
 
 expressionSequence
-    : singleExpression (',' singleExpression)*
+//    : singleExpression  ({p.n(",")}? ',' expressionSequence)* // 1.59
+    // : singleExpression  (',' expressionSequence)*               // 2.16
+    : singleExpression  (',' singleExpression)*               // 0.12
     ;
 
 specificExpression
     : identifierName
-    | templateStringLiteral 
-    | arguments 
+    | templateStringLiteral
+    | arguments
     ;
 
 questionDot: '?' '.';
 
-singleExpression
-    : anonymousFunction                                                     # FunctionExpression
-    | Class identifier? classTail                                           # ClassExpression
-    | singleExpression {p.notMatchField()}? questionDot specificExpression         # OptionalChainExpression
-    | singleExpression {p.notMatchField()}? questionDot? '[' singleExpression ']'  # MemberIndexExpression
-    | singleExpression '?'? '.' '#'? identifierName                         # MemberDotExpression
-    // Split to try `new Date()` first, then `new Date`.
-    | New singleExpression arguments                                        # NewExpression
-    | New singleExpression                                                  # NewExpression
-    | singleExpression arguments                                            # ArgumentsExpression
+keywordSingleExpression
+    : Import '(' singleExpression ')'                                       # ImportExpression
+    | New singleExpression ('(' (argument (',' argument)* ',')? ')')?       # NewExpression
     | New '.' identifier                                                    # MetaExpression // new.target
-    | singleExpression {p.notLineTerminator()}? '++'                     # PostIncrementExpression
-    | singleExpression {p.notLineTerminator()}? '--'                     # PostDecreaseExpression
-    | Delete singleExpression                                               # DeleteExpression
-    | Void singleExpression                                                 # VoidExpression
-    | Typeof singleExpression                                               # TypeofExpression
-    | '++' singleExpression                                                 # PreIncrementExpression
-    | '--' singleExpression                                                 # PreDecreaseExpression
-    | '+' singleExpression                                                  # UnaryPlusExpression
-    | '-' singleExpression                                                  # UnaryMinusExpression
-    | '~' singleExpression                                                  # BitNotExpression
-    | '!' singleExpression                                                  # NotExpression
     | Await singleExpression                                                # AwaitExpression
-    | <assoc=right> singleExpression '**' singleExpression                  # PowerExpression
-    | singleExpression ('*' | '/' | '%') singleExpression                   # MultiplicativeExpression
-    | singleExpression ('+' | '-') singleExpression                         # AdditiveExpression
-    | singleExpression '??' singleExpression                                # CoalesceExpression
-    | singleExpression ('<<' | '>>' | '>>>') singleExpression               # BitShiftExpression
-    | singleExpression ('<' | '>' | '<=' | '>=') singleExpression           # RelationalExpression
-    | singleExpression Instanceof singleExpression                          # InstanceofExpression
-    | singleExpression In singleExpression                                  # InExpression
-    | singleExpression ('==' | '!=' | '===' | '!==') singleExpression       # EqualityExpression
-    | singleExpression '&' singleExpression                                 # BitAndExpression
-    | singleExpression '^' singleExpression                                 # BitXOrExpression
-    | singleExpression '|' singleExpression                                 # BitOrExpression
-    | singleExpression '&&' singleExpression                                # LogicalAndExpression
-    | singleExpression '||' singleExpression                                # LogicalOrExpression
-    | singleExpression '?' singleExpression ':' singleExpression            # TernaryExpression
-    | <assoc=right> singleExpression '=' singleExpression                   # AssignmentExpression
-    | <assoc=right> singleExpression assignmentOperator singleExpression    # AssignmentOperatorExpression
-    | Import '(' singleExpression ')'                                       # ImportExpression
+    ;
+
+singleExpression
+    : keywordSingleExpression                                               # KeywordExpression
+    | literal                                                               # LiteralExpression
+    | Class identifier? classTail                                           # ClassExpression
+    | anonymousFunction                                                     # FunctionExpression
     | singleExpression templateStringLiteral                                # TemplateStringExpression  // ECMAScript 6
     | yieldStatement                                                        # YieldExpression // ECMAScript 6
     | This                                                                  # ThisExpression
     | identifier                                                            # IdentifierExpression
-    | literal                                                               # LiteralExpression
     | Super                                                                 # SuperExpression
     | arrayLiteral                                                          # ArrayLiteralExpression
     | objectLiteral                                                         # ObjectLiteralExpression
     | '(' expressionSequence ')'                                            # ParenthesizedExpression
+    | singleExpression questionDot optionalChainMember         # OptionalChainExpression
+    | singleExpression '.' '#'? identifierName         # ChainExpression
+    | singleExpression '[' singleExpression ']'  # MemberIndexExpression
+    // | singleExpression '?'? '.' '#'? identifierName                         # MemberDotExpression
+    | singleExpression arguments                                            # ArgumentsExpression
+
+    // suffix self add dec
+    | singleExpression {p.notLineTerminator()}? op = ('++' | '--')          # PostUnaryExpression
+
+    // prefix unary
+    | preUnaryOperator singleExpression                                     # PreUnaryExpression
+
+    // 二元运算
+    | <assoc=right> singleExpression '**' singleExpression                                  # PowerExpression
+    | singleExpression op = ('*' | '/' | '%') singleExpression                              # MultiplicativeExpression
+    | singleExpression op = ('+' | '-') singleExpression                                    # AdditiveExpression
+    | singleExpression op = ('<<' | '>>' | '>>>') singleExpression                          # BitShiftExpression
+    | singleExpression op = ('<' | '>' | '<=' | '>=' | In | Instanceof) singleExpression    # RelationalExpression
+    | singleExpression op = ('==' | '!=' | '===' | '!==') singleExpression                  # EqExpression
+    | singleExpression ('&' | '^' | '|') singleExpression                                   # BitExpression
+    | singleExpression '&&' singleExpression                            # LogicalAndExpression
+    | singleExpression '||' singleExpression                            # LogicalOrExpression
+    | singleExpression '??' singleExpression                            # CoalesceExpression
+    | singleExpression '?' singleExpression ':' singleExpression        # TernaryExpression
+
+    // assign
+    | <assoc=right> singleExpression assignmentOperator singleExpression    # AssignmentOperatorExpression
+    ;
+
+
+preUnaryOperator
+    : ('++' | '--' )
+    | ('+' | '-' | '!' | '~')
+    | Typeof
+    | Void
+    | Delete
     ;
 
 initializer
@@ -456,7 +439,8 @@ arrowFunctionBody
     ;
 
 assignmentOperator
-    : '*='
+    : '='
+    | '*='
     | '/='
     | '%='
     | '+='
@@ -514,28 +498,9 @@ setter
 
 identifierName
     : identifier
-    | reservedWord
-    ;
-
-identifier
-    : Identifier
-    | NonStrictLet
-    | Async
-    | As
-    | From
-    | Get
-    | Set
-    | Static
-    ;
-
-reservedWord
-    : keyword
     | NullLiteral
     | BooleanLiteral
-    ;
-
-keyword
-    : Break
+    | Break
     | Do
     | Instanceof
     | Typeof
@@ -561,7 +526,6 @@ keyword
     | Delete
     | In
     | Try
-
     | Class
     | Enum
     | Extends
@@ -570,7 +534,8 @@ keyword
     | Export
     | Import
     | Implements
-    | let_
+    | NonStrictLet
+    | StrictLet
     | Private
     | Public
     | Interface
@@ -584,14 +549,24 @@ keyword
     | As
     ;
 
-let_
-    : NonStrictLet
-    | StrictLet
+identifier
+    : Identifier
+    | NonStrictLet
+    | Async
+    | As
+    | From
+    | Get
+    | Set
+    | Static
+    ;
+
+optionalChainMember
+    : '#'? identifierName
+    | '[' singleExpression ']'
     ;
 
 eos
     : SemiColon
+    | {p.isEOS()}?
     | EOF
-    | {p.lineTerminatorAhead()}?
-    | {p.closeBrace()}?
     ;

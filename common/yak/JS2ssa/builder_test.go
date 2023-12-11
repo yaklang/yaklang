@@ -3,8 +3,10 @@ package js2ssa
 import (
 	_ "embed"
 	"fmt"
+	_ "net/http/pprof"
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -91,7 +93,7 @@ func TestBreak(t *testing.T) {
 	prog.ShowWithSource()
 }
 
-func TestMain(t *testing.T) {
+func Test_Main(t *testing.T) {
 	prog := ParseSSA(`
 	var b = (()=>{return window.location.hostname + "/app/"})()
 	window.location.href = b + "/login.html?ts=";
@@ -250,4 +252,14 @@ func TestNumber(t *testing.T) {
 		a < 1e-6 ? 1 : 2
 	`)
 	prog.Show()
+}
+
+//go:embed test.js
+var large string
+
+func TestJs(t *testing.T) {
+	prog := ParseSSA(large, none)
+	prog.Show()
+
+	time.Sleep(time.Minute)
 }
