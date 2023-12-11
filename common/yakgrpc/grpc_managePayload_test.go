@@ -51,6 +51,7 @@ func convertPayloadGroupToDatabase(local ypb.YakClient, t *testing.T, group stri
 }
 
 func backUpOrCopyPayloads(local ypb.YakClient, t *testing.T, ids []int64, group, folder string, copy bool) {
+	t.Helper()
 	_, err := local.BackUpOrCopyPayloads(context.Background(), &ypb.BackUpOrCopyPayloadsRequest{
 		Ids:    ids,
 		Group:  group,
@@ -389,11 +390,19 @@ func checkNode(node []*ypb.PayloadGroupNode, t *testing.T, name, typ string) {
 	}
 }
 
+func comparePayloadByGroupFolder(local ypb.YakClient, group, folder string, want string, t *testing.T) {
+	t.Helper()
+	rsp := queryFromDatabase(local, t, group, folder)
+	got := _getPayloadFromYpbPayloads(rsp.Data)
+	comparePayload(got, want, t)
+}
+
 func comparePayload(got, want string, t *testing.T) {
 	t.Helper()
 	got = strings.TrimSpace(strings.ReplaceAll(got, "\r", ""))
 	want = strings.TrimSpace(strings.ReplaceAll(want, "\r", ""))
 	wantL := strings.Split(want, "\n")
+	wantL = lo.Filter(wantL, func(item string, index int) bool { return item != "" })
 	gotL := strings.Split(got, "\n")
 	gotL = lo.Filter(gotL, func(item string, index int) bool { return item != "" })
 
@@ -728,5 +737,39 @@ func TestPayload(t *testing.T) {
 				t.Log(err)
 			}
 		})
+	})
+
+	t.Run("FIX-BackupOrMovePayloads", func(t *testing.T) {
+		// FIX:
+		// same payload backup or move to same group will cause error
+
+		group1, group2 := uuid.NewString(), uuid.NewString()
+		want := "123\n456\n"
+		// save to database
+		save2database(local, t, group1, "", want)
+		save2database(local, t, group2, "", want)
+		defer func() {
+			deleteGroup(local, t, group1)
+			// deleteGroup(local, t, group2)
+		}()
+		rsp := queryFromDatabase(local, t, group2, "")
+
+		ids := lo.Map(rsp.Data, func(p *ypb.Payload, index int) int64 {
+			return p.Id
+		})
+
+		// copy
+		backUpOrCopyPayloads(local, t, ids, group1, "", true)
+		// group1 should still have 2 payload
+		comparePayloadByGroupFolder(local, group1, "", want, t)
+		// group2 should still have 2 payload
+		comparePayloadByGroupFolder(local, group2, "", want, t)
+
+		// move
+		backUpOrCopyPayloads(local, t, ids, group1, "", false)
+		// group1 should still have 2 payload
+		comparePayloadByGroupFolder(local, group1, "", want, t)
+		// group2 should be empty
+		comparePayloadByGroupFolder(local, group2, "", "", t)
 	})
 }
