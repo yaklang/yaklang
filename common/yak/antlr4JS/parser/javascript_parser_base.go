@@ -1,9 +1,8 @@
-package parser
+package JS
 
 import (
-	"strings"
-
-	"github.com/antlr4-go/antlr/v4"
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 // var AtomicNCost int64 = 0
@@ -11,6 +10,8 @@ import (
 // JavaScriptParserBase implementation.
 type JavaScriptParserBase struct {
 	*antlr.BaseParser
+
+	braceDepth int64
 }
 
 // Short for p.prev(str string)
@@ -28,6 +29,13 @@ func (p *JavaScriptParserBase) n(str string) bool {
 	return p.next(str)
 }
 
+// var count int
+
+// func (p *JavaScriptParserBase) log(i string) {
+// 	count++
+// 	log.Infof("match syntax log [%v]: %v", count, i)
+// }
+
 // Whether the next token value equals to str.
 func (p *JavaScriptParserBase) next(str string) bool {
 	return p.GetTokenStream().LT(1).GetText() == str
@@ -36,6 +44,14 @@ func (p *JavaScriptParserBase) next(str string) bool {
 func (p *JavaScriptParserBase) notLineTerminator() bool {
 	b := !p.here(JavaScriptParserLineTerminator)
 	return b
+}
+
+var count = 0
+
+func (p *JavaScriptParserBase) log(i any) bool {
+	count++
+	log.Infof("match syntax log[%v]: %v", count, i)
+	return true
 }
 
 func (p *JavaScriptParserBase) notMatchField() bool {
@@ -61,12 +77,16 @@ func (p *JavaScriptParserBase) notMatchField() bool {
 	return true
 }
 
+var EOSCOUNT = 0
+
 func (p *JavaScriptParserBase) notOpenBraceAndNotFunction() bool {
 	nextTokenType := p.GetTokenStream().LT(1).GetTokenType()
 	return nextTokenType != JavaScriptParserOpenBrace && nextTokenType != JavaScriptParserFunction_
 }
 
 func (p *JavaScriptParserBase) closeBrace() bool {
+	EOSCOUNT++
+	//log.Infof("closeBrace EOS: %v", EOSCOUNT)
 	return p.GetTokenStream().LT(1).GetTokenType() == JavaScriptParserCloseBrace
 }
 
@@ -87,35 +107,22 @@ func (p *JavaScriptParserBase) here(_type int) bool {
 // token stream a token exists on the Hidden channel which
 // either is a line terminator, or is a multi line comment that
 // contains a line terminator.
-func (p *JavaScriptParserBase) lineTerminatorAhead() bool {
-	// Get the token ahead of the current index.
+func (p *JavaScriptParserBase) isEOS() bool {
+	afterToken := p.GetTokenStream().LT(1)
+	if afterToken.GetTokenType() == JavaScriptParserCloseBrace {
+		return true
+	}
 	possibleIndexEosToken := p.GetCurrentToken().GetTokenIndex() - 1
 	if possibleIndexEosToken < 0 {
-		return false
+		return true
 	}
 	ahead := p.GetTokenStream().Get(possibleIndexEosToken)
-
-	if ahead.GetChannel() != antlr.LexerHidden {
-		// We're only interested in tokens on the HIDDEN channel.
+	switch ahead.GetTokenType() {
+	case JavaScriptParserMultiLineComment:
 		return true
-	}
-
-	if ahead.GetTokenType() == JavaScriptParserLineTerminator {
-		// There is definitely a line terminator ahead.
+	case JavaScriptLexerLineTerminator:
 		return true
+	default:
+		return false
 	}
-
-	if ahead.GetTokenType() == JavaScriptParserWhiteSpaces {
-		// Get the token ahead of the current whitespaces.
-		possibleIndexEosToken = p.GetCurrentToken().GetTokenIndex() - 2
-		ahead = p.GetTokenStream().Get(possibleIndexEosToken)
-	}
-
-	// Get the token's text and type.
-	text := ahead.GetText()
-	_type := ahead.GetTokenType()
-
-	// Check if the token is, or contains a line terminator.
-	return (_type == JavaScriptParserMultiLineComment && (strings.Contains(text, "\r") || strings.Contains(text, "\n"))) ||
-		(_type == JavaScriptParserLineTerminator)
 }

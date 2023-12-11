@@ -1,8 +1,7 @@
-// Code generated from ./JavaScriptParser.g4 by ANTLR 4.13.1. DO NOT EDIT.
+// Code generated from java-escape by ANTLR 4.11.1. DO NOT EDIT.
 
-package parser // JavaScriptParser
-
-import "github.com/antlr4-go/antlr/v4"
+package JS // JavaScriptParser
+import "github.com/antlr/antlr4/runtime/Go/antlr/v4"
 
 // A complete Visitor for a parse tree produced by JavaScriptParser.
 type JavaScriptParserVisitor interface {
@@ -11,17 +10,14 @@ type JavaScriptParserVisitor interface {
 	// Visit a parse tree produced by JavaScriptParser#program.
 	VisitProgram(ctx *ProgramContext) interface{}
 
-	// Visit a parse tree produced by JavaScriptParser#sourceElement.
-	VisitSourceElement(ctx *SourceElementContext) interface{}
+	// Visit a parse tree produced by JavaScriptParser#statements.
+	VisitStatements(ctx *StatementsContext) interface{}
 
 	// Visit a parse tree produced by JavaScriptParser#statement.
 	VisitStatement(ctx *StatementContext) interface{}
 
 	// Visit a parse tree produced by JavaScriptParser#block.
 	VisitBlock(ctx *BlockContext) interface{}
-
-	// Visit a parse tree produced by JavaScriptParser#statementList.
-	VisitStatementList(ctx *StatementListContext) interface{}
 
 	// Visit a parse tree produced by JavaScriptParser#importStatement.
 	VisitImportStatement(ctx *ImportStatementContext) interface{}
@@ -83,9 +79,6 @@ type JavaScriptParserVisitor interface {
 	// Visit a parse tree produced by JavaScriptParser#emptyStatement_.
 	VisitEmptyStatement_(ctx *EmptyStatement_Context) interface{}
 
-	// Visit a parse tree produced by JavaScriptParser#expressionStatement.
-	VisitExpressionStatement(ctx *ExpressionStatementContext) interface{}
-
 	// Visit a parse tree produced by JavaScriptParser#ifStatement.
 	VisitIfStatement(ctx *IfStatementContext) interface{}
 
@@ -115,9 +108,6 @@ type JavaScriptParserVisitor interface {
 
 	// Visit a parse tree produced by JavaScriptParser#ForOfStatement.
 	VisitForOfStatement(ctx *ForOfStatementContext) interface{}
-
-	// Visit a parse tree produced by JavaScriptParser#varModifier.
-	VisitVarModifier(ctx *VarModifierContext) interface{}
 
 	// Visit a parse tree produced by JavaScriptParser#continueStatement.
 	VisitContinueStatement(ctx *ContinueStatementContext) interface{}
@@ -203,9 +193,6 @@ type JavaScriptParserVisitor interface {
 	// Visit a parse tree produced by JavaScriptParser#functionBody.
 	VisitFunctionBody(ctx *FunctionBodyContext) interface{}
 
-	// Visit a parse tree produced by JavaScriptParser#sourceElements.
-	VisitSourceElements(ctx *SourceElementsContext) interface{}
-
 	// Visit a parse tree produced by JavaScriptParser#arrayLiteral.
 	VisitArrayLiteral(ctx *ArrayLiteralContext) interface{}
 
@@ -251,6 +238,18 @@ type JavaScriptParserVisitor interface {
 	// Visit a parse tree produced by JavaScriptParser#questionDot.
 	VisitQuestionDot(ctx *QuestionDotContext) interface{}
 
+	// Visit a parse tree produced by JavaScriptParser#ImportExpression.
+	VisitImportExpression(ctx *ImportExpressionContext) interface{}
+
+	// Visit a parse tree produced by JavaScriptParser#NewExpression.
+	VisitNewExpression(ctx *NewExpressionContext) interface{}
+
+	// Visit a parse tree produced by JavaScriptParser#MetaExpression.
+	VisitMetaExpression(ctx *MetaExpressionContext) interface{}
+
+	// Visit a parse tree produced by JavaScriptParser#AwaitExpression.
+	VisitAwaitExpression(ctx *AwaitExpressionContext) interface{}
+
 	// Visit a parse tree produced by JavaScriptParser#TemplateStringExpression.
 	VisitTemplateStringExpression(ctx *TemplateStringExpressionContext) interface{}
 
@@ -260,20 +259,14 @@ type JavaScriptParserVisitor interface {
 	// Visit a parse tree produced by JavaScriptParser#LogicalAndExpression.
 	VisitLogicalAndExpression(ctx *LogicalAndExpressionContext) interface{}
 
+	// Visit a parse tree produced by JavaScriptParser#ChainExpression.
+	VisitChainExpression(ctx *ChainExpressionContext) interface{}
+
 	// Visit a parse tree produced by JavaScriptParser#PowerExpression.
 	VisitPowerExpression(ctx *PowerExpressionContext) interface{}
 
-	// Visit a parse tree produced by JavaScriptParser#PreIncrementExpression.
-	VisitPreIncrementExpression(ctx *PreIncrementExpressionContext) interface{}
-
 	// Visit a parse tree produced by JavaScriptParser#ObjectLiteralExpression.
 	VisitObjectLiteralExpression(ctx *ObjectLiteralExpressionContext) interface{}
-
-	// Visit a parse tree produced by JavaScriptParser#MetaExpression.
-	VisitMetaExpression(ctx *MetaExpressionContext) interface{}
-
-	// Visit a parse tree produced by JavaScriptParser#InExpression.
-	VisitInExpression(ctx *InExpressionContext) interface{}
 
 	// Visit a parse tree produced by JavaScriptParser#LogicalOrExpression.
 	VisitLogicalOrExpression(ctx *LogicalOrExpressionContext) interface{}
@@ -281,53 +274,14 @@ type JavaScriptParserVisitor interface {
 	// Visit a parse tree produced by JavaScriptParser#OptionalChainExpression.
 	VisitOptionalChainExpression(ctx *OptionalChainExpressionContext) interface{}
 
-	// Visit a parse tree produced by JavaScriptParser#NotExpression.
-	VisitNotExpression(ctx *NotExpressionContext) interface{}
-
-	// Visit a parse tree produced by JavaScriptParser#PreDecreaseExpression.
-	VisitPreDecreaseExpression(ctx *PreDecreaseExpressionContext) interface{}
-
 	// Visit a parse tree produced by JavaScriptParser#ArgumentsExpression.
 	VisitArgumentsExpression(ctx *ArgumentsExpressionContext) interface{}
-
-	// Visit a parse tree produced by JavaScriptParser#AwaitExpression.
-	VisitAwaitExpression(ctx *AwaitExpressionContext) interface{}
 
 	// Visit a parse tree produced by JavaScriptParser#ThisExpression.
 	VisitThisExpression(ctx *ThisExpressionContext) interface{}
 
 	// Visit a parse tree produced by JavaScriptParser#FunctionExpression.
 	VisitFunctionExpression(ctx *FunctionExpressionContext) interface{}
-
-	// Visit a parse tree produced by JavaScriptParser#UnaryMinusExpression.
-	VisitUnaryMinusExpression(ctx *UnaryMinusExpressionContext) interface{}
-
-	// Visit a parse tree produced by JavaScriptParser#AssignmentExpression.
-	VisitAssignmentExpression(ctx *AssignmentExpressionContext) interface{}
-
-	// Visit a parse tree produced by JavaScriptParser#PostDecreaseExpression.
-	VisitPostDecreaseExpression(ctx *PostDecreaseExpressionContext) interface{}
-
-	// Visit a parse tree produced by JavaScriptParser#TypeofExpression.
-	VisitTypeofExpression(ctx *TypeofExpressionContext) interface{}
-
-	// Visit a parse tree produced by JavaScriptParser#InstanceofExpression.
-	VisitInstanceofExpression(ctx *InstanceofExpressionContext) interface{}
-
-	// Visit a parse tree produced by JavaScriptParser#UnaryPlusExpression.
-	VisitUnaryPlusExpression(ctx *UnaryPlusExpressionContext) interface{}
-
-	// Visit a parse tree produced by JavaScriptParser#DeleteExpression.
-	VisitDeleteExpression(ctx *DeleteExpressionContext) interface{}
-
-	// Visit a parse tree produced by JavaScriptParser#ImportExpression.
-	VisitImportExpression(ctx *ImportExpressionContext) interface{}
-
-	// Visit a parse tree produced by JavaScriptParser#EqualityExpression.
-	VisitEqualityExpression(ctx *EqualityExpressionContext) interface{}
-
-	// Visit a parse tree produced by JavaScriptParser#BitXOrExpression.
-	VisitBitXOrExpression(ctx *BitXOrExpressionContext) interface{}
 
 	// Visit a parse tree produced by JavaScriptParser#SuperExpression.
 	VisitSuperExpression(ctx *SuperExpressionContext) interface{}
@@ -347,17 +301,11 @@ type JavaScriptParserVisitor interface {
 	// Visit a parse tree produced by JavaScriptParser#RelationalExpression.
 	VisitRelationalExpression(ctx *RelationalExpressionContext) interface{}
 
-	// Visit a parse tree produced by JavaScriptParser#PostIncrementExpression.
-	VisitPostIncrementExpression(ctx *PostIncrementExpressionContext) interface{}
-
 	// Visit a parse tree produced by JavaScriptParser#YieldExpression.
 	VisitYieldExpression(ctx *YieldExpressionContext) interface{}
 
-	// Visit a parse tree produced by JavaScriptParser#BitNotExpression.
-	VisitBitNotExpression(ctx *BitNotExpressionContext) interface{}
-
-	// Visit a parse tree produced by JavaScriptParser#NewExpression.
-	VisitNewExpression(ctx *NewExpressionContext) interface{}
+	// Visit a parse tree produced by JavaScriptParser#EqExpression.
+	VisitEqExpression(ctx *EqExpressionContext) interface{}
 
 	// Visit a parse tree produced by JavaScriptParser#LiteralExpression.
 	VisitLiteralExpression(ctx *LiteralExpressionContext) interface{}
@@ -365,11 +313,11 @@ type JavaScriptParserVisitor interface {
 	// Visit a parse tree produced by JavaScriptParser#ArrayLiteralExpression.
 	VisitArrayLiteralExpression(ctx *ArrayLiteralExpressionContext) interface{}
 
-	// Visit a parse tree produced by JavaScriptParser#MemberDotExpression.
-	VisitMemberDotExpression(ctx *MemberDotExpressionContext) interface{}
-
 	// Visit a parse tree produced by JavaScriptParser#ClassExpression.
 	VisitClassExpression(ctx *ClassExpressionContext) interface{}
+
+	// Visit a parse tree produced by JavaScriptParser#KeywordExpression.
+	VisitKeywordExpression(ctx *KeywordExpressionContext) interface{}
 
 	// Visit a parse tree produced by JavaScriptParser#MemberIndexExpression.
 	VisitMemberIndexExpression(ctx *MemberIndexExpressionContext) interface{}
@@ -377,20 +325,23 @@ type JavaScriptParserVisitor interface {
 	// Visit a parse tree produced by JavaScriptParser#IdentifierExpression.
 	VisitIdentifierExpression(ctx *IdentifierExpressionContext) interface{}
 
-	// Visit a parse tree produced by JavaScriptParser#BitAndExpression.
-	VisitBitAndExpression(ctx *BitAndExpressionContext) interface{}
+	// Visit a parse tree produced by JavaScriptParser#PreUnaryExpression.
+	VisitPreUnaryExpression(ctx *PreUnaryExpressionContext) interface{}
 
-	// Visit a parse tree produced by JavaScriptParser#BitOrExpression.
-	VisitBitOrExpression(ctx *BitOrExpressionContext) interface{}
+	// Visit a parse tree produced by JavaScriptParser#PostUnaryExpression.
+	VisitPostUnaryExpression(ctx *PostUnaryExpressionContext) interface{}
+
+	// Visit a parse tree produced by JavaScriptParser#BitExpression.
+	VisitBitExpression(ctx *BitExpressionContext) interface{}
 
 	// Visit a parse tree produced by JavaScriptParser#AssignmentOperatorExpression.
 	VisitAssignmentOperatorExpression(ctx *AssignmentOperatorExpressionContext) interface{}
 
-	// Visit a parse tree produced by JavaScriptParser#VoidExpression.
-	VisitVoidExpression(ctx *VoidExpressionContext) interface{}
-
 	// Visit a parse tree produced by JavaScriptParser#CoalesceExpression.
 	VisitCoalesceExpression(ctx *CoalesceExpressionContext) interface{}
+
+	// Visit a parse tree produced by JavaScriptParser#preUnaryOperator.
+	VisitPreUnaryOperator(ctx *PreUnaryOperatorContext) interface{}
 
 	// Visit a parse tree produced by JavaScriptParser#initializer.
 	VisitInitializer(ctx *InitializerContext) interface{}
@@ -443,14 +394,8 @@ type JavaScriptParserVisitor interface {
 	// Visit a parse tree produced by JavaScriptParser#identifier.
 	VisitIdentifier(ctx *IdentifierContext) interface{}
 
-	// Visit a parse tree produced by JavaScriptParser#reservedWord.
-	VisitReservedWord(ctx *ReservedWordContext) interface{}
-
-	// Visit a parse tree produced by JavaScriptParser#keyword.
-	VisitKeyword(ctx *KeywordContext) interface{}
-
-	// Visit a parse tree produced by JavaScriptParser#let_.
-	VisitLet_(ctx *Let_Context) interface{}
+	// Visit a parse tree produced by JavaScriptParser#optionalChainMember.
+	VisitOptionalChainMember(ctx *OptionalChainMemberContext) interface{}
 
 	// Visit a parse tree produced by JavaScriptParser#eos.
 	VisitEos(ctx *EosContext) interface{}
