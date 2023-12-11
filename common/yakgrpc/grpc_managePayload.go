@@ -94,7 +94,7 @@ func (s *Server) QueryPayload(ctx context.Context, req *ypb.QueryPayloadRequest)
 	}
 	p, d, err := yakit.QueryPayload(s.GetProfileDatabase(), req.GetFolder(), req.GetGroup(), req.GetKeyword(), grpc2Paging(req.GetPagination()))
 	if err != nil {
-		return nil, err
+		return nil, utils.Wrap(err, "query payload error")
 	}
 
 	var items []*ypb.Payload
@@ -115,12 +115,12 @@ func (s *Server) QueryPayloadFromFile(ctx context.Context, req *ypb.QueryPayload
 	}
 	filename, err := yakit.GetPayloadGroupFileName(s.GetProfileDatabase(), req.GetGroup())
 	if err != nil {
-		return nil, err
+		return nil, utils.Wrap(err, "query payload from file error")
 	}
 	var size int64
 	{
 		if state, err := os.Stat(filename); err != nil {
-			return nil, err
+			return nil, utils.Wrap(err, "query payload from file error")
 		} else {
 			size += state.Size()
 		}
@@ -183,7 +183,7 @@ func (s *Server) DeletePayloadByFolder(ctx context.Context, req *ypb.NameRequest
 		return nil, utils.Errorf("folder name is empty")
 	}
 	if err := yakit.DeletePayloadByFolder(s.GetProfileDatabase(), req.GetName()); err != nil {
-		return nil, err
+		return nil, utils.Wrap(err, "delete payload by folder error")
 	}
 	return &ypb.Empty{}, nil
 }
@@ -194,18 +194,18 @@ func (s *Server) DeletePayloadByGroup(ctx context.Context, req *ypb.DeletePayloa
 	}
 	// if file, delete  file
 	if group, err := yakit.GetPayloadByGroupFirst(s.GetProfileDatabase(), req.GetGroup()); err != nil {
-		return nil, err
+		return nil, utils.Wrap(err, "delete payload by group error")
 	} else {
 		if group.IsFile != nil && *group.IsFile {
 			// delete file
 			if err := os.Remove(*group.Content); err != nil {
-				return nil, err
+				return nil, utils.Wrap(err, "delete payload by group error")
 			}
 		}
 	}
 	// delete in database
 	if err := yakit.DeletePayloadByGroup(s.GetProfileDatabase(), req.GetGroup()); err != nil {
-		return nil, err
+		return nil, utils.Wrap(err, "delete payload by group error")
 	}
 	return &ypb.Empty{}, nil
 }
@@ -330,7 +330,7 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 		// 旧接口
 		total = int64(len(req.GetContent()))
 		feedback(-1, "正在读取数据")
-		if err := yakit.SavePayloadGroupByRawEx(req.GetContent(), func(data string) error {
+		if err := yakit.HandleData(req.GetContent(), func(data string) error {
 			size += int64(len(data))
 			if total < size {
 				total = size + 1
@@ -429,7 +429,7 @@ func (s *Server) SavePayloadToFileStream(req *ypb.SavePayloadRequest, stream ypb
 	} else {
 		total += int64(len(req.GetContent()))
 		feedback(0, "开始解析数据")
-		yakit.SavePayloadGroupByRawEx(req.GetContent(), saveDataByFilterNoHitCount)
+		yakit.HandleData(req.GetContent(), saveDataByFilterNoHitCount)
 	}
 
 	feedback(1, fmt.Sprintf("检测到有%d项重复数据", duplicate))
@@ -492,29 +492,45 @@ func (s *Server) SavePayloadToFileStream(req *ypb.SavePayloadRequest, stream ypb
 }
 
 func (s *Server) RenamePayloadFolder(ctx context.Context, req *ypb.RenameRequest) (*ypb.Empty, error) {
-	if req.GetName() == "" || req.GetNewName() == "" {
-		return nil, utils.Error("old folder or folder can't be empty")
+	folder, newFolder := req.GetName(), req.GetNewName()
+	if folder == "" {
+		return nil, utils.Error("old folder is empty")
 	}
-	if err := yakit.RenamePayloadGroup(s.GetProfileDatabase(), getEmptyFolderName(req.GetName()), getEmptyFolderName(req.GetNewName())); err != nil {
-		return nil, err
+	if newFolder == "" {
+		return nil, utils.Error("new folder is empty")
 	}
-	if err := yakit.RenamePayloadFolder(s.GetProfileDatabase(), req.GetName(), req.GetNewName()); err != nil {
-		return nil, err
-	} else {
-		return &ypb.Empty{}, nil
+	var err error
+	db := s.GetProfileDatabase()
+	db = db.Begin()
+	if err = yakit.RenamePayloadGroup(db, getEmptyFolderName(folder), getEmptyFolderName(newFolder)); err != nil {
+		db.Rollback()
+		return nil, utils.Wrap(err, "rename payload folder error")
 	}
+	if err = yakit.RenamePayloadFolder(db, folder, newFolder); err != nil {
+		db.Rollback()
+		return nil, utils.Wrap(err, "rename payload folder error")
+	}
+	err = db.Commit().Error
+	return &ypb.Empty{}, err
 }
 
 func (s *Server) RenamePayloadGroup(ctx context.Context, req *ypb.RenameRequest) (*ypb.Empty, error) {
-	if req.GetName() == "" || req.GetNewName() == "" {
-		return nil, utils.Error("group name and new name can't be empty")
+	group, newGroup := req.GetName(), req.GetNewName()
+	if group == "" {
+		return nil, utils.Error("group name is empty")
 	}
-
-	if err := yakit.RenamePayloadGroup(s.GetProfileDatabase(), req.GetName(), req.GetNewName()); err != nil {
-		return nil, err
-	} else {
-		return &ypb.Empty{}, nil
+	if newGroup == "" {
+		return nil, utils.Error("new group name is empty")
 	}
+	var err error
+	db := s.GetProfileDatabase()
+	db = db.Begin()
+	if err = yakit.RenamePayloadGroup(db, req.GetName(), req.GetNewName()); err != nil {
+		db.Rollback()
+		return nil, utils.Wrap(err, "rename payload group error")
+	}
+	err = db.Commit().Error
+	return &ypb.Empty{}, err
 }
 
 func (s *Server) UpdatePayload(ctx context.Context, req *ypb.UpdatePayloadRequest) (*ypb.Empty, error) {
@@ -539,20 +555,17 @@ func (s *Server) UpdatePayload(ctx context.Context, req *ypb.UpdatePayloadReques
 	}
 
 	if id == 0 {
-		return nil, utils.Error("id can't be empty")
+		return nil, utils.Error("id is empty")
 	}
 	if data == nil {
-		return nil, utils.Error("data can't be empty")
+		return nil, utils.Error("data is empty")
 	}
 	if err := yakit.UpdatePayload(db, int(id), grpc2Payload(data)); err != nil {
 		db.Rollback()
 		return nil, err
 	}
 	err = db.Commit().Error
-	if err != nil {
-		return nil, err
-	}
-	return &ypb.Empty{}, nil
+	return &ypb.Empty{}, err
 }
 
 func writeDataToFileEnd(filename, data string, flag int) error {
@@ -584,11 +597,11 @@ func writeDataToFileEnd(filename, data string, flag int) error {
 // rpc RemoveDuplicatePayloads(RemoveDuplicatePayloadsRequest) returns (stream SavePayloadProgress);
 func (s *Server) RemoveDuplicatePayloads(req *ypb.NameRequest, stream ypb.Yak_RemoveDuplicatePayloadsServer) error {
 	if req.GetName() == "" {
-		return utils.Error("group can't be empty")
+		return utils.Error("group is empty")
 	}
 	filename, err := yakit.GetPayloadGroupFileName(s.GetProfileDatabase(), req.GetName())
 	if err != nil {
-		return utils.Wrapf(err, "this group not a file payload group")
+		return utils.Wrapf(err, "not a file payload group")
 	}
 
 	ctx, cancel := context.WithCancel(stream.Context())
@@ -650,30 +663,32 @@ func (s *Server) RemoveDuplicatePayloads(req *ypb.NameRequest, stream ypb.Yak_Re
 	feedback(0.99, "正在保存到文件")
 	defer feedback(1, "保存成功")
 	if err := writeDataToFileEnd(filename, strings.Join(data, "\r\n"), os.O_WRONLY|os.O_TRUNC); err != nil {
-		return err
-	} else {
-		return nil
+		return utils.Wrap(err, "write data to file error")
 	}
+	return nil
 }
 
 func (s *Server) UpdatePayloadToFile(ctx context.Context, req *ypb.UpdatePayloadToFileRequest) (*ypb.Empty, error) {
+	group := req.GetGroupName()
+	content := req.GetContent()
 	if req.GetGroupName() == "" {
 		return nil, utils.Error("group is empty")
 	}
-	if filename, err := yakit.GetPayloadGroupFileName(s.GetProfileDatabase(), req.GetGroupName()); err != nil {
-		return nil, err
-	} else {
-		data := make([]string, 0)
-		yakit.SavePayloadGroupByRawEx(req.GetContent(), func(s string) error {
-			data = append(data, s)
-			return nil
-		})
-		if err := writeDataToFileEnd(filename, strings.Join(data, "\r\n"), os.O_WRONLY|os.O_TRUNC); err != nil {
-			return nil, err
-		} else {
-			return &ypb.Empty{}, nil
-		}
+
+	filename, err := yakit.GetPayloadGroupFileName(s.GetProfileDatabase(), group)
+	if err != nil {
+		return nil, utils.Wrap(err, "get payload filename error")
 	}
+
+	data := make([]string, 0)
+	yakit.HandleData(content, func(s string) error {
+		data = append(data, s)
+		return nil
+	})
+	if err := writeDataToFileEnd(filename, strings.Join(data, "\n"), os.O_WRONLY|os.O_TRUNC); err != nil {
+		return nil, utils.Wrap(err, "write data to file error")
+	}
+	return &ypb.Empty{}, nil
 }
 
 func (s *Server) BackUpOrCopyPayloads(ctx context.Context, req *ypb.BackUpOrCopyPayloadsRequest) (*ypb.Empty, error) {
@@ -687,17 +702,16 @@ func (s *Server) BackUpOrCopyPayloads(ctx context.Context, req *ypb.BackUpOrCopy
 	if group == "" {
 		return nil, utils.Error("group is empty")
 	}
+	db := s.GetProfileDatabase()
 
-	groupFirstPayload, err := yakit.GetPayloadByGroupFirst(s.GetProfileDatabase(), req.GetGroup())
+	groupFirstPayload, err := yakit.GetPayloadByGroupFirst(db, group)
 	if err != nil {
 		return nil, err
 	}
 
 	var payloads []*yakit.Payload
-
-	db := s.GetProfileDatabase().Model(&yakit.Payload{})
-	ndb := bizhelper.ExactQueryInt64ArrayOr(db, "id", ids)
-	if err := ndb.Find(&payloads).Error; err != nil {
+	db = db.Model(&yakit.Payload{})
+	if err := bizhelper.ExactQueryInt64ArrayOr(db, "id", ids).Find(&payloads).Error; err != nil {
 		return nil, utils.Wrap(err, "error finding payloads")
 	}
 	db = db.Begin()
@@ -711,7 +725,7 @@ func (s *Server) BackUpOrCopyPayloads(ctx context.Context, req *ypb.BackUpOrCopy
 			err = yakit.DeletePayloadByIDs(db, ids)
 			if err != nil {
 				db.Rollback()
-				return nil, err
+				return nil, utils.Wrap(err, "delete payload error")
 			}
 		}
 		for _, payload := range payloads {
@@ -721,7 +735,7 @@ func (s *Server) BackUpOrCopyPayloads(ctx context.Context, req *ypb.BackUpOrCopy
 				continue
 			}
 			if err := writeDataToFileEnd(*groupFirstPayload.Content, content, os.O_RDWR|os.O_APPEND); err != nil {
-				return nil, err
+				return nil, utils.Wrap(err, "write data to file error")
 			}
 		}
 	} else {
@@ -751,31 +765,45 @@ func (s *Server) CreatePayloadFolder(ctx context.Context, req *ypb.NameRequest) 
 		return nil, utils.Errorf("name is Empty")
 	}
 	if err := yakit.CreateOrUpdatePayload(s.GetProfileDatabase(), "", getEmptyFolderName(req.Name), req.Name, 0, false); err != nil {
-		return nil, err
+		return nil, utils.Wrap(err, "create payload folder error")
 	} else {
 		return &ypb.Empty{}, nil
 	}
 }
 
 func (s *Server) UpdateAllPayloadGroup(ctx context.Context, req *ypb.UpdateAllPayloadGroupRequest) (*ypb.Empty, error) {
+	var (
+		index int64 = 0
+		err   error
+	)
 	nodes := req.Nodes
 	folder := ""
-	var index int64 = 0
+	db := s.GetProfileDatabase()
+	db = db.Begin()
 	for _, node := range nodes {
 		if node.Type == "Folder" {
-			yakit.SetIndexToFolder(s.GetProfileDatabase(), node.Name, getEmptyFolderName(node.Name), index)
+			yakit.SetIndexToFolder(db, node.Name, getEmptyFolderName(node.Name), index)
 			folder = node.Name
 			for _, child := range node.Nodes {
-				yakit.UpdatePayloadGroup(s.GetProfileDatabase(), child.Name, folder, index)
+				err = yakit.UpdatePayloadGroup(db, child.Name, folder, index)
+				if err != nil {
+					db.Rollback()
+					return nil, utils.Wrap(err, "update payload group error")
+				}
 				index++
 			}
 			folder = ""
 		} else {
-			yakit.UpdatePayloadGroup(s.GetProfileDatabase(), node.Name, folder, index)
+			err = yakit.UpdatePayloadGroup(db, node.Name, folder, index)
+			if err != nil {
+				db.Rollback()
+				return nil, utils.Wrap(err, "update payload group error")
+			}
 		}
 		index++
 	}
-	return &ypb.Empty{}, nil
+	err = db.Commit().Error
+	return &ypb.Empty{}, err
 }
 
 func (s *Server) GetAllPayloadGroup(ctx context.Context, _ *ypb.Empty) (*ypb.GetAllPayloadGroupResponse, error) {
@@ -790,13 +818,13 @@ func (s *Server) GetAllPayloadGroup(ctx context.Context, _ *ypb.Empty) (*ypb.Get
 
 	rows, err := s.GetProfileDatabase().Table("payloads").Select(`"group", COUNT("group") as num_group, folder, is_file`).Group(`"group"`).Order("group_index asc").Rows()
 	if err != nil {
-		return nil, err
+		return nil, utils.Wrap(err, "get all payload group error")
 	}
 
 	for rows.Next() {
 		var r result
 		if err := rows.Scan(&r.Group, &r.NumGroup, &r.Folder, &r.IsFile); err != nil {
-			return nil, err
+			return nil, utils.Wrap(err, "get all payload group error")
 		}
 		res = append(res, r)
 	}
@@ -1132,14 +1160,30 @@ func (s *Server) ConvertPayloadGroupToDatabase(req *ypb.NameRequest, stream ypb.
 	if err != nil {
 		return err
 	}
-
+	db := s.GetProfileDatabase()
+	db = db.Begin()
 	for lineB := range ch {
 		line := utils.UnsafeBytesToString(lineB)
 		size += int64(len(line))
-		yakit.CreateOrUpdatePayload(s.GetProfileDatabase(), line, group.Group, folder, 0, false)
+		err = yakit.CreateOrUpdatePayload(db, line, group.Group, folder, 0, false)
+		if err != nil {
+			db.Rollback()
+			return err
+		}
 	}
-	yakit.UpdatePayloadGroup(s.GetProfileDatabase(), group.Group, folder, groupindex)
-	return nil
+	err = db.Commit().Error
+	if err != nil {
+		return err
+	}
+
+	db = db.Begin()
+	err = yakit.UpdatePayloadGroup(db, group.Group, folder, groupindex)
+	if err != nil {
+		db.Rollback()
+		return err
+	}
+	err = db.Commit().Error
+	return err
 }
 
 func (s *Server) MigratePayloads(req *ypb.Empty, stream ypb.Yak_MigratePayloadsServer) error {
