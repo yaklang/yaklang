@@ -698,13 +698,15 @@ func TestPayload(t *testing.T) {
 
 		// query payload
 		rsp := queryFromDatabase(local, t, group, "")
+		if len(rsp.Data) != 2 {
+			t.Fatalf("convert file to database error, want 2 but got %d", len(rsp.Data))
+		}
 		for _, p := range rsp.Data {
 			if p.IsFile {
 				t.Fatal("convert file to database error")
 			}
 		}
 	})
-
 	t.Run("UniqueHash", func(t *testing.T) {
 		data := "123\n456\n"
 		group := uuid.NewString()
