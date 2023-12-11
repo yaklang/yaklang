@@ -33,7 +33,7 @@ func NewUndefined(name string) *Undefined {
 		anInstruction: NewInstruction(),
 		anValue:       NewValue(),
 	}
-	u.SetVariable(name)
+	u.SetName(name)
 	return u
 }
 
@@ -164,9 +164,9 @@ func NewParam(variable string, isFreeValue bool, fun *Function) *Parameter {
 	p := &Parameter{
 		anInstruction: NewInstruction(),
 		anValue:       NewValue(),
-		variable:      variable,
 		IsFreeValue:   isFreeValue,
 	}
+	p.SetName(variable)
 	p.SetFunc(fun)
 	p.SetBlock(fun.EnterBlock)
 	p.SetPosition(fun.GetPosition())
@@ -179,7 +179,7 @@ func NewSideEffect(variable string, target Value) *SideEffect {
 		anValue:       NewValue(),
 		target:        target,
 	}
-	s.SetVariable(variable)
+	s.SetName(variable)
 	return s
 }
 
@@ -260,13 +260,13 @@ func (r *Return) calcType(builder *FunctionBuilder) {
 			// return closure, remove freeValue that can get in this function
 			freeValue := make([]string, 0, len(ft.FreeValue))
 			for _, name := range ft.FreeValue {
-				if v := builder.ReadVariable(name, false); v == nil {
+				if v := builder.PeekVariable(name, false); v == nil {
 					freeValue = append(freeValue, name)
 				}
 			}
 			sideEffect := make([]string, 0, len(ft.SideEffects))
 			for _, name := range ft.SideEffects {
-				if v := builder.ReadVariable(name, false); v == nil {
+				if v := builder.PeekVariable(name, false); v == nil {
 					sideEffect = append(sideEffect, name)
 				}
 			}

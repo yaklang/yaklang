@@ -12,21 +12,21 @@ type LeftValue interface {
 // --------------- only point variable to value with `f.currentDef`
 // --------------- is SSA value
 type IdentifierLV struct {
-	variable     string
+	name         string
 	pos          *Position
 	isSideEffect bool
 }
 
 func (i *IdentifierLV) Assign(v Value, f *FunctionBuilder) {
 	v.AddLeftPositions(i.GetPosition())
-	f.WriteVariable(i.variable, v)
+	f.WriteVariable(i.name, v)
 	if i.isSideEffect {
-		f.AddSideEffect(i.variable, v)
+		f.AddSideEffect(i.name, v)
 	}
 }
 
 func (i *IdentifierLV) GetValue(f *FunctionBuilder) Value {
-	v := f.ReadVariable(i.variable, true)
+	v := f.ReadVariable(i.name, true)
 	return v
 }
 
@@ -39,8 +39,8 @@ func (i *IdentifierLV) SetIsSideEffect(b bool) {
 
 func NewIdentifierLV(variable string, pos *Position) *IdentifierLV {
 	return &IdentifierLV{
-		variable: variable,
-		pos:      pos,
+		name: variable,
+		pos:  pos,
 	}
 }
 
@@ -80,8 +80,8 @@ func (b *Function) writeVariableByBlock(variable string, value Value, block *Bas
 	if !ok {
 		vs = make(Values, 0)
 	}
-	if value.GetVariable() == "" {
-		value.SetVariable(variable)
+	if value.GetName() == "" {
+		value.SetName(variable)
 	} else {
 		value.AddLeftVariables(variable)
 	}

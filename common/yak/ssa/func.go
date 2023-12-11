@@ -16,7 +16,7 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 	}
 	if name == "" {
 		if parent != nil {
-			name = fmt.Sprintf("%s$%d", parent.GetVariable(), index)
+			name = fmt.Sprintf("%s$%d", parent.GetName(), index)
 		} else {
 			name = fmt.Sprintf("AnonymousFunc-%d", index)
 		}
@@ -41,7 +41,7 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		err:            make(SSAErrors, 0),
 		builder:        nil,
 	}
-	f.SetVariable(name)
+	f.SetName(name)
 	if parent != nil {
 		parent.addAnonymous(f)
 		// Pos: parent.CurrentPos,
@@ -76,7 +76,7 @@ func (f *Function) ReturnValue() []Value {
 }
 
 func (f *Function) IsMain() bool {
-	return f.GetVariable() == "main"
+	return f.GetName() == "main"
 }
 
 func (f *Function) GetDeferBlock() *BasicBlock {
@@ -94,7 +94,7 @@ func NewFunctionWithType(name string, typ *FunctionType) *Function {
 		anValue:       NewValue(),
 	}
 	f.SetType(typ)
-	f.SetVariable(name)
+	f.SetName(name)
 	return f
 }
 
@@ -140,7 +140,7 @@ func (f *Function) Finish() {
 	if len(f.FreeValues) != 0 {
 		funType.SetFreeValue(
 			lo.Map(f.FreeValues, func(v *Parameter, _ int) string {
-				return v.GetVariable()
+				return v.GetName()
 			}),
 		)
 	}
