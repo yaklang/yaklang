@@ -17,7 +17,8 @@ var debugScript string
 
 func (s *Server) DebugPlugin(req *ypb.DebugPluginRequest, stream ypb.Yak_DebugPluginServer) error {
 	var input = req.GetInput()
-	if input == "" && req.GetHTTPRequestTemplate() == nil && len(req.GetExecParams()) == 0 {
+	var pluginType = req.GetPluginType()
+	if pluginType != "yak" && input == "" && req.GetHTTPRequestTemplate() == nil {
 		return utils.Error("input / input packet is empty")
 	}
 
@@ -31,7 +32,7 @@ func (s *Server) DebugPlugin(req *ypb.DebugPluginRequest, stream ypb.Yak_DebugPl
 		}
 	}
 
-	if input == "" && len(req.GetExecParams()) == 0 {
+	if pluginType != "yak" && input == "" && len(req.GetExecParams()) == 0 {
 		return utils.Error("cannot find/extract debug target")
 	}
 

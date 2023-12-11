@@ -9,6 +9,7 @@ import (
 func init() {
 	YakitExports["EnableWebsiteTrees"] = yakitEnableCrawlerViewer
 	YakitExports["EnableTable"] = yakitEnableFixedTable
+	YakitExports["EnableText"] = yakitEnableText
 	YakitExports["TableData"] = yakitTableData
 	YakitExports["StatusCard"] = yakitStatusCard
 	YakitExports["TextTabData"] = yakitTextTabData
@@ -35,6 +36,15 @@ func yakitEnableFixedTable(tableName string, columns []string) {
 		Params: map[string]interface{}{
 			"table_name": tableName,
 			"columns":    columns,
+		},
+	})
+}
+
+func yakitEnableText(tabName string) {
+	yakitClientInstance.Output(&YakitFeature{
+		Feature: "text",
+		Params: map[string]interface{}{
+			"tab_name": tabName,
 		},
 	})
 }
