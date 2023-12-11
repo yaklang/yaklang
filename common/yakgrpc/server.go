@@ -41,12 +41,16 @@ func NewServerWithLogCache(b bool) (*Server, error) {
 
 	yakitBase := consts.GetDefaultYakitBaseDir()
 	_ = os.MkdirAll(yakitBase, 0777)
+	port, err := utils.GetRangeAvailableTCPPort(50000, 65535, 3)
+	if err != nil {
+		return nil, err
+	}
 	s := &Server{
 		cacheDir:      yakitBase,
-		reverseServer: facades.NewFacadeServer("0.0.0.0", utils.GetRandomAvailableTCPPort()),
+		reverseServer: facades.NewFacadeServer("0.0.0.0", port),
 	}
 
-	err := s.initDatabase()
+	err = s.initDatabase()
 	if err != nil {
 		return nil, err
 		//log.Warnf("cannot fetch database connection: %v", err)
@@ -161,7 +165,7 @@ func (s *Server) initFacadeServer() error {
 				}
 			}()
 
-			log.Infof("serve reverse(facade) server...")
+			log.Infof("start to listen reverse(facade) on: %s:%d", s.reverseServer.Host, s.reverseServer.Port)
 			err := s.reverseServer.ServeWithContext(context.Background())
 			if err != nil {
 				log.Error(err)

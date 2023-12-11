@@ -241,8 +241,12 @@ func (s *YakitServer) handleRaw(raw []byte) {
 }
 
 func NewYakitServer(port int, opts ...func(server *YakitServer)) *YakitServer {
+	var err error
 	if port <= 0 {
-		port = utils.GetRandomAvailableTCPPort()
+		port, err = utils.GetRangeAvailableTCPPort(50000, 65535, 3)
+		if err != nil {
+			port = utils.GetRandomAvailableTCPPort()
+		}
 	}
 
 	s := &YakitServer{
