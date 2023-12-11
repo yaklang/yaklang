@@ -79,23 +79,32 @@ func NewPayload(group string, content string) *Payload {
 	return p
 }
 
-func createOrUpdatePayload(db *gorm.DB, i *Payload) error {
+func createOrExistCallBackPayload(db *gorm.DB, i *Payload, callback func(*gorm.DB, *Payload) error) error {
 	db = db.Model(&Payload{})
-	db.SetLogger(gormNoLog(1))
 	i.Hash = i.CalcHash()
 	var (
 		count int64
 		err   error
 	)
 	if db.Where("`hash` = ?", i.Hash).Count(&count); count > 0 {
-		// 存在则更新
-		err = db.Where("`hash` = ?", i.Hash).Update("hit_count", i.HitCount).Error
+		err = callback(db, i)
 	} else {
-		// 不存在则创建
 		err = db.Create(&i).Error
 	}
 
 	return err
+}
+
+func createOrUpdatePayload(db *gorm.DB, i *Payload) error {
+	return createOrExistCallBackPayload(db, i, func(db *gorm.DB, i *Payload) error {
+		return db.Where("`hash` = ?", i.Hash).Update("hit_count", i.HitCount).Error
+	})
+}
+
+func movePayload(db *gorm.DB, i *Payload) error {
+	return createOrExistCallBackPayload(db, i, func(db *gorm.DB, i *Payload) error {
+		return DeletePayloadByID(db, int64(i.ID))
+	})
 }
 
 func CreateOrUpdatePayload(db *gorm.DB, content, group, folder string, hitCount int64, isFile bool) error {
@@ -329,36 +338,24 @@ func RenamePayloadGroup(db *gorm.DB, oldGroup, newGroup string) error {
 	return nil
 }
 
-func CopyPayloads(db *gorm.DB, ids []int64, group, folder string) error {
-	var payloads []Payload
-	{
-		db := db.Model(&Payload{})
-		db = bizhelper.ExactQueryInt64ArrayOr(db, "id", ids)
-		// db.Debug()
-		if err := db.Find(&payloads).Error; err != nil {
-			return utils.Wrap(err, "error finding payloads")
-		}
-	}
-
+func CopyPayloads(db *gorm.DB, payloads []*Payload, group, folder string) error {
 	for _, payload := range payloads {
-		newPayload := payload
-		newPayload.ID = 0 // Ensure a new record will be created
-		newPayload.Group = group
-		newPayload.Folder = &folder
-		if err := createOrUpdatePayload(db, &newPayload); err != nil {
+		payload.Group = group
+		payload.Folder = &folder
+		if err := createOrUpdatePayload(db, payload); err != nil {
 			return utils.Wrap(err, "error creating new payload")
 		}
 	}
 	return nil
 }
 
-func MovePayloads(db *gorm.DB, ids []int64, group, folder string) error {
-	db = db.Model(&Payload{})
-	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", ids)
-	db = db.Update("group", group)
-	db = db.Update("folder", folder)
-	if db.Error != nil {
-		return utils.Wrap(db.Error, "copy payload error")
+func MovePayloads(db *gorm.DB, payloads []*Payload, group, folder string) error {
+	for _, payload := range payloads {
+		payload.Group = group
+		payload.Folder = &folder
+		if err := movePayload(db, payload); err != nil {
+			return utils.Wrap(err, "error creating new payload")
+		}
 	}
 	return nil
 }
