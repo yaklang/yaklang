@@ -1161,28 +1161,28 @@ func (s *Server) ConvertPayloadGroupToDatabase(req *ypb.NameRequest, stream ypb.
 		return err
 	}
 	db := s.GetProfileDatabase()
-	db = db.Begin()
+	ndb := db.Begin()
 	for lineB := range ch {
 		line := utils.UnsafeBytesToString(lineB)
 		size += int64(len(line))
-		err = yakit.CreateOrUpdatePayload(db, line, group.Group, folder, 0, false)
+		err = yakit.CreateOrUpdatePayload(ndb, line, group.Group, folder, 0, false)
 		if err != nil {
 			db.Rollback()
 			return err
 		}
 	}
-	err = db.Commit().Error
+	err = ndb.Commit().Error
 	if err != nil {
 		return err
 	}
 
-	db = db.Begin()
-	err = yakit.UpdatePayloadGroup(db, group.Group, folder, groupindex)
+	ndb = db.Begin()
+	err = yakit.UpdatePayloadGroup(ndb, group.Group, folder, groupindex)
 	if err != nil {
-		db.Rollback()
+		ndb.Rollback()
 		return err
 	}
-	err = db.Commit().Error
+	err = ndb.Commit().Error
 	return err
 }
 
