@@ -19,6 +19,7 @@ import (
 	netURL "net/url"
 	"reflect"
 	"strings"
+	"time"
 )
 
 type sender interface {
@@ -98,8 +99,9 @@ func (s *Server) execScriptWithExecParam(scriptName string, input string, stream
 		})
 
 		sendLog(&yaklib.YakitLog{
-			Level: "feature-text-data",
-			Data:  string(resData),
+			Level:     "feature-text-data",
+			Data:      string(resData),
+			Timestamp: time.Now().Unix(),
 		})
 		return nil
 	case "yak":
