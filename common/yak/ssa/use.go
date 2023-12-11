@@ -12,7 +12,7 @@ func ReplaceAllValue(v Value, to Value) {
 }
 
 func ReplaceValueInSymbolTable(v, to Value) {
-	v.GetFunc().ReplaceVariable(v.GetVariable(), v, to)
+	v.GetFunc().ReplaceVariable(v.GetName(), v, to)
 }
 func ReplaceValue(v Value, to Value, skip func(Instruction) bool) {
 	deleteInst := make([]User, 0)
@@ -34,7 +34,7 @@ func InsertValueReplaceOriginal(original Value, insert Value) {
 	fun := block.GetFunc()
 	builder := fun.builder
 	// builder := block.GetFunc().builder
-	variable := original.GetVariable()
+	variable := original.GetName()
 
 	deleteInst := make([]Instruction, 0)
 

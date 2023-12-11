@@ -7,7 +7,7 @@ func NewPhi(block *BasicBlock, variable string, create bool) *Phi {
 		Edge:          make([]Value, 0, len(block.Preds)),
 		create:        create,
 	}
-	p.SetVariable(variable)
+	p.SetName(variable)
 	p.SetBlock(block)
 	p.SetFunc(block.GetFunc())
 	return p
@@ -22,7 +22,7 @@ func (b *BasicBlock) Sealed() {
 			pa.GetUsers().RunOnField(func(f *Field) {
 				if v := builder.getExternLibInstance(v, f.Key); v != nil {
 					f.GetUsers().RunOnUpdate(func(u *Update) {
-						u.NewError(Warn, SSATAG, ContAssignExtern(v.GetVariable()))
+						u.NewError(Warn, SSATAG, ContAssignExtern(v.GetName()))
 					})
 					hasUpdate := false
 					// replace but skip update
@@ -47,12 +47,12 @@ func (p *Phi) AddEdge(v Value) {
 	p.Edge = append(p.Edge, v)
 }
 
-func (phi *Phi) Name() string { return phi.GetVariable() }
+func (phi *Phi) Name() string { return phi.GetName() }
 
 func (phi *Phi) Build() Value {
 	phi.GetBlock().Skip = true
 	for _, predBlock := range phi.GetBlock().Preds {
-		v := phi.GetFunc().builder.readVariableByBlock(phi.GetVariable(), predBlock, phi.create)
+		v := phi.GetFunc().builder.readVariableByBlock(phi.GetName(), predBlock, phi.create)
 		phi.Edge = append(phi.Edge, v)
 	}
 	phi.GetBlock().Skip = false
