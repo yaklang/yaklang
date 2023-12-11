@@ -49,6 +49,26 @@ RESET:
 
 }
 
+func GetRangeAvailableTCPPort(startPort, endPort, maxRetries int) (int, error) {
+	if startPort > endPort {
+		return 0, Errorf("start port must be less than end port")
+	}
+	if endPort > 65535 {
+		endPort = 65535
+	}
+	src := rand.NewSource(time.Now().UnixNano())
+	r := rand.New(src)
+
+	for i := 0; i < maxRetries; i++ {
+		randPort := startPort + r.Intn(endPort-startPort+1)
+		if !IsTCPPortOpen("127.0.0.1", randPort) && IsTCPPortAvailable(randPort) {
+			return randPort, nil
+		}
+	}
+
+	return 0, Errorf("unable to find an available port after %d retries", maxRetries)
+}
+
 func GetRandomAvailableUDPPort() int {
 RESET:
 	randPort := 55000 + rand.Intn(10000)
