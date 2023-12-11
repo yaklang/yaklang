@@ -655,28 +655,42 @@ func (s *Server) UpdatePayloadToFile(ctx context.Context, req *ypb.UpdatePayload
 }
 
 func (s *Server) BackUpOrCopyPayloads(ctx context.Context, req *ypb.BackUpOrCopyPayloadsRequest) (*ypb.Empty, error) {
-	if len(req.GetIds()) == 0 || req.GetGroup() == "" {
-		return nil, utils.Error("id or group name is empty")
+	ids := req.GetIds()
+	group := req.GetGroup()
+	folder := req.GetFolder()
+
+	if len(ids) == 0 {
+		return nil, utils.Error("ids is empty")
 	}
+	if group == "" {
+		return nil, utils.Error("group is empty")
+	}
+
 	groupFirstPayload, err := yakit.GetPayloadByGroupFirst(s.GetProfileDatabase(), req.GetGroup())
 	if err != nil {
 		return nil, err
 	}
 
+	var payloads []*yakit.Payload
+
+	db := s.GetProfileDatabase().Model(&yakit.Payload{})
+	ndb := bizhelper.ExactQueryInt64ArrayOr(db, "id", ids)
+	if err := ndb.Find(&payloads).Error; err != nil {
+		return nil, utils.Wrap(err, "error finding payloads")
+	}
+	db = db.Begin()
 	if groupFirstPayload.IsFile != nil && *groupFirstPayload.IsFile {
 		if groupFirstPayload.Content == nil || *groupFirstPayload.Content == "" {
-			return nil, utils.Errorf("group [%s] is empty", req.GetGroup())
-		}
-		db := s.GetProfileDatabase().Model(&yakit.Payload{})
-		db = bizhelper.ExactQueryInt64ArrayOr(db, "id", req.GetIds())
-		var payloads []*yakit.Payload
-		if err := db.Find(&payloads).Error; err != nil {
-			return nil, utils.Wrap(err, "error finding payloads")
+			return nil, utils.Errorf("group [%s] is empty", group)
 		}
 		if !req.Copy {
 			// if move to target
 			// just delete original payload
-			yakit.DeletePayloadByIDs(s.GetProfileDatabase(), req.GetIds())
+			err = yakit.DeletePayloadByIDs(db, ids)
+			if err != nil {
+				db.Rollback()
+				return nil, err
+			}
 		}
 		for _, payload := range payloads {
 			// write to target file payload group
@@ -690,12 +704,18 @@ func (s *Server) BackUpOrCopyPayloads(ctx context.Context, req *ypb.BackUpOrCopy
 		}
 	} else {
 		if req.Copy {
-			// copy payloads to database
-			yakit.CopyPayloads(s.GetProfileDatabase(), req.GetIds(), req.GetGroup(), req.GetFolder())
+			err = yakit.CopyPayloads(db, payloads, group, folder)
 		} else {
-			// move payloads to database
-			yakit.MovePayloads(s.GetProfileDatabase(), req.GetIds(), req.GetGroup(), req.GetFolder())
+			err = yakit.MovePayloads(db, payloads, group, folder)
 		}
+		if err != nil {
+			db.Rollback()
+			return nil, err
+		}
+	}
+	err = db.Commit().Error
+	if err != nil {
+		return nil, err
 	}
 	return &ypb.Empty{}, nil
 }
