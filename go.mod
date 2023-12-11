@@ -16,7 +16,6 @@ require (
 	github.com/antchfx/xmlquery v1.3.1
 	github.com/antchfx/xpath v1.2.1
 	github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20220911224424-aa1f1f12a846
-	github.com/antlr4-go/antlr/v4 v4.13.0
 	github.com/aquasecurity/go-dep-parser v0.0.0-20230627073354-fb7eb3159bd5
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d
 	github.com/bcicen/jstream v0.0.0-20190220045926-16c1f8af81c2
