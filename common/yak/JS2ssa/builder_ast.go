@@ -17,7 +17,7 @@ func (b *astbuilder) build(ast *JS.ProgramContext) {
 
 // statement list
 func (b *astbuilder) buildStatementList(stmtlist *JS.StatementListContext) {
-	recoverRange := b.SetRange(&stmtlist.BaseParserRuleContext)
+	recoverRange := b.SetRange(stmtlist.BaseParserRuleContext)
 	defer recoverRange()
 	allstmt := stmtlist.AllStatement()
 	if len(allstmt) == 0 {
@@ -126,8 +126,7 @@ func (b *astbuilder) buildVariableStatement(stmt *JS.VariableStatementContext) {
 
 }
 
-func (b *astbuilder) buildAllVariableDeclaration(stmtI *JS.VariableDeclarationListContext, left bool) (ssa.Value, ssa.LeftValue) {
-
+func (b *astbuilder) buildAllVariableDeclaration(stmt *JS.VariableDeclarationListContext, left bool) (ssa.Value, ssa.LeftValue) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 	// var ret []ssa.Value
@@ -138,7 +137,8 @@ func (b *astbuilder) buildAllVariableDeclaration(stmtI *JS.VariableDeclarationLi
 	var fianlLvalue ssa.LeftValue
 	var finalRvalue ssa.Value
 	declare := ""
-	if m := stmt.VarModifier(); m != nil {
+	if mI := stmt.VarModifier(); mI != nil {
+		m := mI.(*JS.VarModifierContext)
 		if m.Const() != nil {
 			declare = "c"
 		} else if m.Var() != nil {
@@ -1102,7 +1102,8 @@ func (b *astbuilder) buildArrayLiteral(stmt *JS.ArrayLiteralContext) ssa.Value {
 	var value []ssa.Value
 
 	if s, ok := stmt.ElementList().(*JS.ElementListContext); ok {
-		for _, i := range s.AllArrayElement() {
+		for _, iIface := range s.AllArrayElement() {
+			i := iIface.(*JS.ArrayElementContext)
 			if e := i.Ellipsis(); e != nil {
 				b.HandlerEllipsis()
 			}
@@ -1261,7 +1262,8 @@ func (b *astbuilder) buildIdentifierName(stmt *JS.IdentifierNameContext) ssa.Val
 		text := s.GetText()
 		_, lv := b.buildIdentifierExpression(text, true, false)
 		return lv.GetValue(b.FunctionBuilder)
-	} else if s := stmt.ReservedWord(); s != nil {
+	} else if sIface := stmt.ReservedWord(); sIface != nil {
+		s := sIface.(*JS.ReservedWordContext)
 		if v := s.Keyword(); v != nil {
 			text := v.GetText()
 			return ssa.NewConst(text)
@@ -1476,7 +1478,7 @@ func (b *astbuilder) buildForStatement(stmt *JS.ForStatementContext) {
 	if first, ok := stmt.ForFirst().(*JS.ForFirstContext); ok {
 		if f, ok := first.VariableDeclarationList().(*JS.VariableDeclarationListContext); ok {
 			loop.BuildFirstExpr(func() []ssa.Value {
-				recoverRange := b.SetRange(&f.BaseParserRuleContext)
+				recoverRange := b.SetRange(f.BaseParserRuleContext)
 				defer recoverRange()
 				rv, _ := b.buildAllVariableDeclaration(f, false)
 				return []ssa.Value{rv}
@@ -1668,8 +1670,8 @@ func (b *astbuilder) buildSourceElements(stmt *JS.SourceElementsContext) {
 }
 
 func (b *astbuilder) buildSourceElement(stmt JS.ISourceElementContext) {
-	if s, ok := stmt.(*JS.StatementContext); ok {
-		b.buildStatement(s)
+	if s, ok := stmt.(*JS.SourceElementContext); ok {
+		b.buildStatement(s.Statement().(*JS.StatementContext))
 		return
 	}
 }

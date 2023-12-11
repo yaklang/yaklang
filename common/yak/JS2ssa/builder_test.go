@@ -87,7 +87,7 @@ func TestBreak(t *testing.T) {
 	prog.ShowWithSource()
 }
 
-func TestMain(t *testing.T) {
+func Test_Main(t *testing.T) {
 	prog := ParseSSA(`
 	var b = (()=>{return window.location.hostname + "/app/"})()
 	window.location.href = b + "/login.html?ts=";
