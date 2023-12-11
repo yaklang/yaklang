@@ -89,8 +89,13 @@ func init() {
 			withPluginHelp("检测参数中的 SSRF 漏洞"),
 		)
 		registerBuildInPlugin(
-			"mitm", "SQL注入-UNION注入",
-			withPluginHelp("朴实无华的 SQL 注入检测，检测依赖输出响应的特征 Token"),
+			"mitm", "SQL注入-UNION注入-MD5函数",
+			withPluginHelp("Union 注入，使用 md5 函数检测特征输出（mysql/postgres）"),
+			withPluginAuthors("V1ll4n"),
+		)
+		registerBuildInPlugin(
+			"mitm", "SQL注入-MySQL-ErrorBased",
+			withPluginHelp("MySQL 报错注入（使用 MySQL 十六进制字符串特征检测）"),
 			withPluginAuthors("V1ll4n"),
 		)
 		registerBuildInPlugin(

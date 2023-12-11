@@ -2,6 +2,7 @@ package yaklib
 
 import (
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/xhtml"
 	"path/filepath"
 	"strings"
 	"unicode"
@@ -469,6 +470,7 @@ var StringsExport = map[string]interface{}{
 
 	// 特有的
 	"RandStr":                utils.RandStringBytes,
+	"Random":                 xhtml.RandomUpperAndLower,
 	"f":                      _sfmt,
 	"SplitAndTrim":           utils.PrettifyListFromStringSplited,
 	"StringSliceContains":    utils.StringSliceContain,
