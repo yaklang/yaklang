@@ -361,7 +361,9 @@ argument
     ;
 
 expressionSequence
-    : singleExpression (',' expressionSequence)*
+//    : singleExpression  ({p.n(",")}? ',' expressionSequence)* // 1.59
+    // : singleExpression  (',' expressionSequence)*               // 2.16
+    : singleExpression  (',' singleExpression)*               // 0.12
     ;
 
 specificExpression
@@ -373,8 +375,18 @@ specificExpression
 questionDot: '?' '.';
 
 singleExpression
-    : anonymousFunction                                                     # FunctionExpression
+    : {p.log("HERE")} anonymousFunction                                                     # FunctionExpression
     | Class identifier? classTail                                           # ClassExpression
+    | Import '(' singleExpression ')'                                       # ImportExpression
+    | singleExpression templateStringLiteral                                # TemplateStringExpression  // ECMAScript 6
+    | yieldStatement                                                        # YieldExpression // ECMAScript 6
+    | This                                                                  # ThisExpression
+    | identifier                                                            # IdentifierExpression
+    | literal                                                               # LiteralExpression
+    | Super                                                                 # SuperExpression
+    | arrayLiteral                                                          # ArrayLiteralExpression
+    | objectLiteral                                                         # ObjectLiteralExpression
+    | '(' expressionSequence ')'                                            # ParenthesizedExpression
     | singleExpression {p.notMatchField()}? questionDot specificExpression         # OptionalChainExpression
     | singleExpression {p.notMatchField()}? questionDot? '[' singleExpression ']'  # MemberIndexExpression
     | singleExpression '?'? '.' '#'? identifierName                         # MemberDotExpression
@@ -412,16 +424,6 @@ singleExpression
     | singleExpression '?' singleExpression ':' singleExpression            # TernaryExpression
     | <assoc=right> singleExpression '=' singleExpression                   # AssignmentExpression
     | <assoc=right> singleExpression assignmentOperator singleExpression    # AssignmentOperatorExpression
-    | Import '(' singleExpression ')'                                       # ImportExpression
-    | singleExpression templateStringLiteral                                # TemplateStringExpression  // ECMAScript 6
-    | yieldStatement                                                        # YieldExpression // ECMAScript 6
-    | This                                                                  # ThisExpression
-    | identifier                                                            # IdentifierExpression
-    | literal                                                               # LiteralExpression
-    | Super                                                                 # SuperExpression
-    | arrayLiteral                                                          # ArrayLiteralExpression
-    | objectLiteral                                                         # ObjectLiteralExpression
-    | '(' expressionSequence ')'                                            # ParenthesizedExpression
     ;
 
 initializer
@@ -486,7 +488,7 @@ templateStringLiteral
 
 templateStringAtom
     : TemplateStringAtom
-    | TemplateStringStartExpression singleExpression TemplateCloseBrace
+    // | TemplateStringStartExpression singleExpression TemplateCloseBrace
     ;
 
 numericLiteral

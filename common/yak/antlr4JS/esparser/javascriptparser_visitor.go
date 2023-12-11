@@ -289,11 +289,11 @@ type JavaScriptParserVisitor interface {
 	// Visit a parse tree produced by JavaScriptParser#ArgumentsExpression.
 	VisitArgumentsExpression(ctx *ArgumentsExpressionContext) interface{}
 
-	// Visit a parse tree produced by JavaScriptParser#AwaitExpression.
-	VisitAwaitExpression(ctx *AwaitExpressionContext) interface{}
-
 	// Visit a parse tree produced by JavaScriptParser#ThisExpression.
 	VisitThisExpression(ctx *ThisExpressionContext) interface{}
+
+	// Visit a parse tree produced by JavaScriptParser#AwaitExpression.
+	VisitAwaitExpression(ctx *AwaitExpressionContext) interface{}
 
 	// Visit a parse tree produced by JavaScriptParser#FunctionExpression.
 	VisitFunctionExpression(ctx *FunctionExpressionContext) interface{}

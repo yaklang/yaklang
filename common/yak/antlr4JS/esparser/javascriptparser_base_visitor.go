@@ -383,11 +383,11 @@ func (v *BaseJavaScriptParserVisitor) VisitArgumentsExpression(ctx *ArgumentsExp
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaScriptParserVisitor) VisitAwaitExpression(ctx *AwaitExpressionContext) interface{} {
+func (v *BaseJavaScriptParserVisitor) VisitThisExpression(ctx *ThisExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaScriptParserVisitor) VisitThisExpression(ctx *ThisExpressionContext) interface{} {
+func (v *BaseJavaScriptParserVisitor) VisitAwaitExpression(ctx *AwaitExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

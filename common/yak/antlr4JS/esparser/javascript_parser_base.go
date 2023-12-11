@@ -2,6 +2,7 @@ package JS
 
 import (
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/yaklang/common/log"
 	"strings"
 )
 
@@ -25,6 +26,13 @@ func (p *JavaScriptParserBase) prev(str string) bool {
 // Short for p.next(str string)
 func (p *JavaScriptParserBase) n(str string) bool {
 	return p.next(str)
+}
+
+var count int
+
+func (p *JavaScriptParserBase) log(i string) {
+	count++
+	log.Infof("match syntax log [%v]: %v", count, i)
 }
 
 // Whether the next token value equals to str.

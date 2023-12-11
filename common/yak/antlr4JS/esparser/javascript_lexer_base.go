@@ -2,6 +2,7 @@ package JS
 
 import (
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/davecgh/go-spew/spew"
 )
 
 // JavaScriptLexerBase state
@@ -114,6 +115,7 @@ func (l *JavaScriptLexerBase) DecreaseTemplateDepth() {
 }
 
 func (l *JavaScriptLexerBase) IsInTemplateString() bool {
+	spew.Dump(1)
 	return l.templateDepth > 0
 }
 
