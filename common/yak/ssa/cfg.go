@@ -105,7 +105,7 @@ func (lb *LoopBuilder) Finish() {
 	exit := builder.NewBasicBlockNotAddBlocks(LoopExit)
 	latch := builder.NewBasicBlockNotAddBlocks(LoopLatch)
 	// loop is a scope
-	builder.PushBlockSymbolTable()
+	builder.ScopeStart()
 	var loop *Loop
 	var init, step []Value
 	// build first
@@ -158,7 +158,7 @@ func (lb *LoopBuilder) Finish() {
 	// // exit -> rest
 	// builder.EmitJump(rest)
 	// builder.CurrentBlock = rest
-	builder.PopBlockSymbolTable()
+	builder.ScopeEnd()
 }
 
 // if builder
@@ -389,18 +389,18 @@ func (t *TryBuilder) Finish() {
 	try = builder.CurrentBlock
 
 	// build catch
-	builder.PushBlockSymbolTable()
+	builder.ScopeStart()
 	builder.CurrentBlock = catch
 	id = t.buildError()
 	if id != "" {
 		p := NewParam(id, false, builder.Function)
 		p.SetType(BasicTypes[ErrorType])
-		builder.WriteVariable(builder.MapBlockSymbolTable(id), p)
+		builder.WriteVariable(builder.SetScopeLocalVariable(id), p)
 		// builder.WriteVariable(id, p)
 	}
 	t.buildCatch()
 	catch = builder.CurrentBlock
-	builder.PopBlockSymbolTable()
+	builder.ScopeEnd()
 
 	// build finally
 	var target *BasicBlock
@@ -523,9 +523,9 @@ func (t *SwitchBuilder) Finish() {
 		builder.PushTarget(done, nil, _fallthrough) // fallthrough just jump to next handler
 		// build handlers block
 		builder.CurrentBlock = handlers[i]
-		builder.PushBlockSymbolTable()
+		builder.ScopeStart()
 		t.buildBody(i)
-		builder.PopBlockSymbolTable()
+		builder.ScopeEnd()
 		// jump handlers-block -> done
 		builder.EmitJump(NextBlock(i))
 		builder.PopTarget()

@@ -60,7 +60,7 @@ var _ LeftValue = (*Field)(nil)
 
 // --------------- `f.currentDef` handler, read && write
 func (f *FunctionBuilder) WriteVariable(variable string, value Value) {
-	variable = GetIdByBlockSymbolTable(variable, f.blockSymbolTable)
+	variable = f.GetScopeLocalVariable(variable)
 	f.writeVariableByBlock(variable, value, f.CurrentBlock)
 }
 
@@ -127,7 +127,7 @@ func (b *FunctionBuilder) ReadVariableBefore(variable string, create bool, befor
 }
 
 func (b *FunctionBuilder) ReadVariableEx(variable string, create bool, fun func([]Value)) {
-	variable = b.GetIdByBlockSymbolTable(variable)
+	variable = b.GetScopeLocalVariable(variable)
 	var ret []Value
 	block := b.CurrentBlock
 	if block == nil {
@@ -219,17 +219,17 @@ func (b *FunctionBuilder) BuildFreeValue(variable string) Value {
 
 func (b *FunctionBuilder) CanBuildFreeValue(variable string) bool {
 	parent := b.parentBuilder
-	symbol := b.parentSymbolBlock
+	scope := b.parentScope
 	block := b.parentCurrentBlock
 	for parent != nil {
-		variable = GetIdByBlockSymbolTable(variable, symbol)
+		variable = scope.GetLocalVariable(variable)
 		v := parent.readVariableByBlock(variable, block, false)
 		if v != nil && !v.IsExtern() {
 			return true
 		}
 
 		// parent symbol and block
-		symbol = parent.parentSymbolBlock
+		scope = parent.parentScope
 		block = parent.parentCurrentBlock
 		// next parent
 		parent = parent.parentBuilder
