@@ -927,14 +927,10 @@ func GRPCYakScriptToYakScript(script *ypb.SaveNewYakScriptRequest) map[string]in
 		"enable_plugin_selector": script.EnablePluginSelector,
 		"plugin_selector_types":  script.PluginSelectorTypes,
 	}
-	if script.Params != nil {
-		raw, _ := json.Marshal(script.Params)
-		Data["params"] = strconv.Quote(string(raw))
-	}
-	if script.RiskDetail != nil {
-		riskDetail, _ := json.Marshal(script.RiskDetail)
-		Data["risk_detail"] = string(riskDetail)
-	}
+	raw, _ := json.Marshal(script.Params)
+	Data["params"] = strconv.Quote(string(raw))
+	riskDetail, _ := json.Marshal(script.RiskDetail)
+	Data["risk_detail"] = string(riskDetail)
 	return Data
 }
 
