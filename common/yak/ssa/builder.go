@@ -1,9 +1,5 @@
 package ssa
 
-import (
-	"fmt"
-)
-
 // Function builder API
 type FunctionBuilder struct {
 	*Function
@@ -19,12 +15,12 @@ type FunctionBuilder struct {
 	unsealedBlock []*BasicBlock
 
 	// for build
-	CurrentBlock       *BasicBlock       // current block to build
-	CurrentPos         *Position         // current position in source code
-	blockSymbolTable   *blockSymbolTable //  blockId -> variable -> variableId
-	blockId            int
-	parentSymbolBlock  *blockSymbolTable // parent symbol block for build FreeValue
-	parentCurrentBlock *BasicBlock       // parent build subFunction position
+	CurrentBlock       *BasicBlock // current block to build
+	CurrentPos         *Position   // current position in source code
+	CurrentScope       *Scope
+	scopeId            int
+	parentScope        *Scope      // parent symbol block for build FreeValue
+	parentCurrentBlock *BasicBlock // parent build subFunction position
 
 	ExternInstance map[string]any
 	ExternLib      map[string]map[string]any
@@ -36,18 +32,14 @@ type FunctionBuilder struct {
 
 func NewBuilder(f *Function, parent *FunctionBuilder) *FunctionBuilder {
 	b := &FunctionBuilder{
-		Function:     f,
-		target:       &target{},
-		labels:       make(map[string]*BasicBlock),
-		subFuncBuild: make([]func(), 0),
-		deferExpr:    make([]*Call, 0),
-		CurrentBlock: nil,
-		CurrentPos:   nil,
-		blockSymbolTable: &blockSymbolTable{
-			symbol:  nil,
-			blockId: "main",
-		},
-		blockId:       0,
+		Function:      f,
+		target:        &target{},
+		labels:        make(map[string]*BasicBlock),
+		subFuncBuild:  make([]func(), 0),
+		deferExpr:     make([]*Call, 0),
+		CurrentBlock:  nil,
+		CurrentPos:    nil,
+		scopeId:       0,
 		parentBuilder: parent,
 		cmap:          make(map[string]struct{}),
 		lmap:          make(map[string]struct{}),
@@ -57,7 +49,7 @@ func NewBuilder(f *Function, parent *FunctionBuilder) *FunctionBuilder {
 		b.ExternLib = parent.ExternLib
 	}
 
-	b.PushBlockSymbolTable()
+	b.CurrentScope = NewScope(b.NewScopeId(), b.CurrentPos, b.Function)
 	b.CurrentBlock = f.EnterBlock
 	f.builder = b
 	return b
@@ -69,10 +61,10 @@ func (b *FunctionBuilder) IsBlockFinish() bool {
 }
 
 // new function
-func (b *FunctionBuilder) NewFunc(name string) (*Function, *blockSymbolTable) {
+func (b *FunctionBuilder) NewFunc(name string) (*Function, *Scope) {
 	f := b.Package.NewFunctionWithParent(name, b.Function)
 	f.SetPosition(b.CurrentPos)
-	return f, b.blockSymbolTable
+	return f, b.CurrentScope
 }
 
 // handler current function
@@ -142,9 +134,9 @@ func (b *FunctionBuilder) AddSubFunction(builder func()) {
 }
 
 // function stack
-func (b *FunctionBuilder) PushFunction(newFunc *Function, symbol *blockSymbolTable, block *BasicBlock) *FunctionBuilder {
+func (b *FunctionBuilder) PushFunction(newFunc *Function, scope *Scope, block *BasicBlock) *FunctionBuilder {
 	build := NewBuilder(newFunc, b)
-	build.parentSymbolBlock = symbol
+	build.parentScope = scope
 	build.parentCurrentBlock = block
 	return build
 }
@@ -222,51 +214,6 @@ func (b *FunctionBuilder) GetFallthrough() *BasicBlock {
 		}
 	}
 	return nil
-}
-
-type blockSymbolTable struct {
-	symbol  map[string]string // variable -> variableId(variable-blockId)
-	blockId string
-	next    *blockSymbolTable
-}
-
-func (b *FunctionBuilder) NewBlockId() string {
-	ret := fmt.Sprintf("block%d", b.blockId)
-	b.blockId += 1
-	return ret
-}
-
-// block symbol-table stack
-func (b *FunctionBuilder) PushBlockSymbolTable() {
-	b.blockSymbolTable = &blockSymbolTable{
-		symbol:  make(map[string]string),
-		blockId: b.NewBlockId(),
-		next:    b.blockSymbolTable,
-	}
-}
-
-func (b *FunctionBuilder) PopBlockSymbolTable() {
-	b.blockSymbolTable = b.blockSymbolTable.next
-}
-
-// use block symbol table map variable -> variable+blockId
-func (b *FunctionBuilder) MapBlockSymbolTable(text string) string {
-	newText := text + b.blockSymbolTable.blockId
-	b.blockSymbolTable.symbol[text] = newText
-	return newText
-}
-
-func (b *FunctionBuilder) GetIdByBlockSymbolTable(id string) string {
-	return GetIdByBlockSymbolTable(id, b.blockSymbolTable)
-}
-
-func GetIdByBlockSymbolTable(id string, symbolEnter *blockSymbolTable) string {
-	for symbol := symbolEnter; symbol != nil && symbol.blockId != "main"; symbol = symbol.next {
-		if v, ok := symbol.symbol[id]; ok {
-			return v
-		}
-	}
-	return id
 }
 
 func (b *FunctionBuilder) AddToCmap(key string) {

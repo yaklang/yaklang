@@ -985,7 +985,7 @@ func (b *astbuilder) buildIdentifierExpression(text string, IslValue bool, force
 
 		// leftValue
 		if forceAssign {
-			text = b.MapBlockSymbolTable(text)
+			text = b.SetScopeLocalVariable(text)
 		}
 		lValue := ssa.NewIdentifierLV(text, b.CurrentPos)
 		if b.CanBuildFreeValue(text) {
@@ -1371,9 +1371,9 @@ func (b *astbuilder) buildBlock(stmt *JS.BlockContext) {
 	b.CurrentBlock.SetPosition(b.CurrentPos)
 
 	if s, ok := stmt.StatementList().(*JS.StatementListContext); ok {
-		b.PushBlockSymbolTable()
+		b.ScopeStart()
 		b.buildStatementList(s)
-		b.PopBlockSymbolTable()
+		b.ScopeEnd()
 	} else {
 		b.NewError(ssa.Warn, TAG, "empty block")
 	}

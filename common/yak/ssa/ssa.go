@@ -47,9 +47,9 @@ type Instruction interface {
 	GetPosition() *Position
 	SetPosition(*Position)
 
-	// symbol-table
-	SetSymbolTable(*blockSymbolTable)
-	GetSymbolTable() *blockSymbolTable
+	// Scope
+	SetScope(*Scope)
+	GetScope() *Scope
 
 	// extern
 	IsExtern() bool
@@ -106,10 +106,10 @@ type User interface {
 }
 
 type anInstruction struct {
-	fun    *Function
-	block  *BasicBlock
-	Pos    *Position
-	symbol *blockSymbolTable
+	fun   *Function
+	block *BasicBlock
+	Pos   *Position
+	scope *Scope
 
 	variable string
 
@@ -148,8 +148,8 @@ func (c *anInstruction) NewError(kind ErrorKind, tag ErrorTag, msg string) {
 }
 
 // symbol-table
-func (a *anInstruction) GetSymbolTable() *blockSymbolTable       { return a.symbol }
-func (a *anInstruction) SetSymbolTable(symbol *blockSymbolTable) { a.symbol = symbol }
+func (a *anInstruction) GetScope() *Scope  { return a.scope }
+func (a *anInstruction) SetScope(s *Scope) { a.scope = s }
 
 // variable
 func (a *anInstruction) SetVariable(v string) { a.variable = v }
