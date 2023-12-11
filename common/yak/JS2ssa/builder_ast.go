@@ -1291,17 +1291,24 @@ func (b *astbuilder) buildExpressionSequence(stmt *JS.ExpressionSequenceContext)
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 
-	val, _ := b.buildSingleExpression(stmt.SingleExpression().(*JS.SingleExpressionContext), false)
-	results := stmt.AllExpressionSequence()
-	if len(results) == 0 {
-		return val
-	}
+	var val ssa.Value
 
-	for _, subSeq := range stmt.AllExpressionSequence() {
-		if s := subSeq; s != nil {
-			val = b.buildExpressionSequence(subSeq.(*JS.ExpressionSequenceContext))
-			// values = append(values, rv)
-		}
+	// // -> singleExpression  (',' expressionSequence)*
+	//val, _ = b.buildSingleExpression(stmt.SingleExpression().(*JS.SingleExpressionContext), false)
+	//results := stmt.AllExpressionSequence()
+	//if len(results) == 0 {
+	//	return val
+	//}
+	//
+	//for _, subSeq := range stmt.AllExpressionSequence() {
+	//	if s := subSeq; s != nil {
+	//		val = b.buildExpressionSequence(subSeq.(*JS.ExpressionSequenceContext))
+	//		// values = append(values, rv)
+	//	}
+	//}
+
+	for _, s := range stmt.AllSingleExpression() {
+		val, _ = b.buildSingleExpression(s, false)
 	}
 	return val
 }
