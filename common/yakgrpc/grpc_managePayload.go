@@ -63,9 +63,10 @@ func Payload2Grpc(r *yakit.Payload) *ypb.Payload {
 }
 
 func grpc2Payload(p *ypb.Payload) *yakit.Payload {
+	content := strconv.Quote(p.Content)
 	payload := &yakit.Payload{
 		Group:    p.Group,
-		Content:  &p.Content,
+		Content:  &content,
 		Folder:   &p.Folder,
 		HitCount: &p.HitCount,
 		IsFile:   &p.IsFile,
@@ -517,20 +518,41 @@ func (s *Server) RenamePayloadGroup(ctx context.Context, req *ypb.RenameRequest)
 }
 
 func (s *Server) UpdatePayload(ctx context.Context, req *ypb.UpdatePayloadRequest) (*ypb.Empty, error) {
+	id := req.GetId()
+	data := req.GetData()
+	var err error
+
+	db := s.GetProfileDatabase()
+	db = db.Begin()
 	// just for old version
 	if req.Group != "" || req.OldGroup != "" {
-		yakit.RenamePayloadGroup(s.GetProfileDatabase(), req.OldGroup, req.Group)
+		err = yakit.RenamePayloadGroup(s.GetProfileDatabase(), req.OldGroup, req.Group)
+		if err != nil {
+			db.Rollback()
+			return nil, err
+		}
+		err = db.Commit().Error
+		if err != nil {
+			return nil, err
+		}
 		return &ypb.Empty{}, nil
 	}
 
-	if req.GetId() == 0 || req.GetData() == nil {
-		return nil, utils.Error("id or data can't be empty")
+	if id == 0 {
+		return nil, utils.Error("id can't be empty")
 	}
-	if err := yakit.UpdatePayload(s.GetProfileDatabase(), int(req.GetId()), grpc2Payload(req.GetData())); err != nil {
+	if data == nil {
+		return nil, utils.Error("data can't be empty")
+	}
+	if err := yakit.UpdatePayload(db, int(id), grpc2Payload(data)); err != nil {
+		db.Rollback()
 		return nil, err
-	} else {
-		return &ypb.Empty{}, nil
 	}
+	err = db.Commit().Error
+	if err != nil {
+		return nil, err
+	}
+	return &ypb.Empty{}, nil
 }
 
 func writeDataToFileEnd(filename, data string, flag int) error {
@@ -1167,7 +1189,7 @@ func (s *Server) MigratePayloads(req *ypb.Empty, stream ypb.Yak_MigratePayloadsS
 		_, err := strconv.Unquote(content)
 		if err != nil { // 解码失败，可能是旧payload
 			content = strconv.Quote(content)
-			err := yakit.UpdatePayloadColumns(db, int(p.ID), "content", content)
+			err = db.Model(&yakit.Payload{}).Where("`id` = ?", p.ID).Update("content", content).Error
 			if err != nil {
 				log.Errorf("update payload error: %v", err)
 				continue

@@ -331,9 +331,14 @@ func RenamePayloadFolder(db *gorm.DB, folder, newFolder string) error {
 }
 
 func RenamePayloadGroup(db *gorm.DB, oldGroup, newGroup string) error {
-	db = db.Model(&Payload{}).Where("`group` = ?", oldGroup).Update("group", newGroup)
-	if db.Error != nil {
-		return utils.Errorf("update Payload failed: %s", db.Error)
+	db = db.Model(&Payload{}).Where("`group` = ?", oldGroup)
+	gen := YieldPayloads(db, context.Background())
+	for payload := range gen {
+		payload.Group = newGroup
+		payload.Hash = payload.CalcHash()
+		if err := movePayload(db, payload); err != nil {
+			return utils.Wrap(err, "error creating new payload")
+		}
 	}
 	return nil
 }
@@ -392,17 +397,9 @@ func UpdatePayloadGroup(db *gorm.DB, group, folder string, group_index int64) er
 
 func UpdatePayload(db *gorm.DB, id int, payload *Payload) error {
 	payload.ID = uint(id)
-	// db = db.Model(&Payload{}).Where("`id` = ?", id).Update(payload)
-	db = db.Model(&Payload{}).Where("`id` = ?", id)
-	db = db.Updates(map[string]any{"group": payload.Group, "folder": payload.Folder, "group_index": payload.GroupIndex, "content": payload.Content, "hit_count": payload.HitCount, "is_file": payload.IsFile, "hash": payload.CalcHash()})
-	if db.Error != nil {
-		return utils.Errorf("update Payload failed: %s", db.Error)
-	}
-	return nil
-}
-
-func UpdatePayloadColumns(db *gorm.DB, id int, attrs ...any) error {
-	db = db.Model(&Payload{}).Where("`id` = ?", id).Update(attrs...)
+	payload.Hash = payload.CalcHash()
+	db = db.Debug().Model(&Payload{}).Where("`id` = ?", id)
+	db = db.Updates(map[string]any{"group": payload.Group, "folder": payload.Folder, "group_index": payload.GroupIndex, "content": payload.Content, "hit_count": payload.HitCount, "is_file": payload.IsFile, "hash": payload.Hash})
 	if db.Error != nil {
 		return utils.Errorf("update Payload failed: %s", db.Error)
 	}
