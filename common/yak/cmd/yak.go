@@ -446,16 +446,16 @@ var startGRPCServerCommand = cli.Command{
 			Usage: "Specific User-Data & Profile(Plugin) DB Name, eg yakit-profile-plugin.db",
 		},
 		cli.BoolFlag{
-			Name:  "se",
-			Usage: "",
+			Name:  "disable-output",
+			Usage: "禁止插件的一些输出",
 		},
 	},
 	Action: func(c *cli.Context) error {
 		if c.Bool("pprof") && c.IsSet("auto-pprof") {
 			return utils.Error("Parameters 'pprof' and 'auto-pprof' cannot be set at the same time")
 		}
-		if c.Bool("se") {
-			os.Setenv("YAKIT_VERSION", "yakit_se")
+		if c.Bool("disable-output") {
+			os.Setenv("YAK_DISABLE", "output")
 		}
 		enableProfile := c.Bool("pprof")
 		if enableProfile {
