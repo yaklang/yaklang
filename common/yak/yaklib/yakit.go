@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	uuid "github.com/satori/go.uuid"
+	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -360,6 +361,15 @@ func MarshalYakitOutput(t interface{}) (string, string) {
 		return "feature-text-data", string(raw)
 	case *YakitStatusCard:
 		return "feature-status-card-data", string(raw)
+	case *ypb.ExecResult:
+		execRes := t.(*ypb.ExecResult)
+		if execRes.IsMessage {
+			contentResult := gjson.Parse(string(execRes.Message)).Get("content")
+			level := contentResult.Get("level").String()
+			data := contentResult.Get("data").String()
+			return level, data
+		}
+		return "json", string(raw)
 	case string:
 		return "info", utils.EscapeInvalidUTF8Byte([]byte(ret))
 	case []byte:
