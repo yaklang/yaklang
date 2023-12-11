@@ -3,9 +3,10 @@
 package JS // JavaScriptParser
 import (
 	"fmt"
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"strconv"
 	"sync"
+
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 )
 
 // Suppress unused import errors
@@ -483,7 +484,7 @@ func javascriptparserParserInit() {
 		0, 0, 791, 793, 5, 17, 0, 0, 792, 791, 1, 0, 0, 0, 792, 793, 1, 0, 0, 0,
 		793, 796, 1, 0, 0, 0, 794, 797, 3, 142, 71, 0, 795, 797, 3, 174, 87, 0,
 		796, 794, 1, 0, 0, 0, 796, 795, 1, 0, 0, 0, 797, 135, 1, 0, 0, 0, 798,
-		803, 3, 142, 71, 0, 799, 800, 5, 13, 0, 0, 800, 802, 3, 142, 71, 0, 801,
+		803, 3, 142, 71, 0, 799, 800, 5, 13, 0, 0, 800, 802, 3, 136, 68, 0, 801,
 		799, 1, 0, 0, 0, 802, 805, 1, 0, 0, 0, 803, 801, 1, 0, 0, 0, 803, 804,
 		1, 0, 0, 0, 804, 137, 1, 0, 0, 0, 805, 803, 1, 0, 0, 0, 806, 810, 3, 172,
 		86, 0, 807, 810, 3, 160, 80, 0, 808, 810, 3, 132, 66, 0, 809, 806, 1, 0,
@@ -12860,37 +12861,12 @@ func NewExpressionSequenceContext(parser antlr.Parser, parent antlr.ParserRuleCo
 
 func (s *ExpressionSequenceContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *ExpressionSequenceContext) AllSingleExpression() []ISingleExpressionContext {
-	children := s.GetChildren()
-	len := 0
-	for _, ctx := range children {
-		if _, ok := ctx.(ISingleExpressionContext); ok {
-			len++
-		}
-	}
-
-	tst := make([]ISingleExpressionContext, len)
-	i := 0
-	for _, ctx := range children {
-		if t, ok := ctx.(ISingleExpressionContext); ok {
-			tst[i] = t.(ISingleExpressionContext)
-			i++
-		}
-	}
-
-	return tst
-}
-
-func (s *ExpressionSequenceContext) SingleExpression(i int) ISingleExpressionContext {
+func (s *ExpressionSequenceContext) SingleExpression() ISingleExpressionContext {
 	var t antlr.RuleContext
-	j := 0
 	for _, ctx := range s.GetChildren() {
 		if _, ok := ctx.(ISingleExpressionContext); ok {
-			if j == i {
-				t = ctx.(antlr.RuleContext)
-				break
-			}
-			j++
+			t = ctx.(antlr.RuleContext)
+			break
 		}
 	}
 
@@ -12907,6 +12883,47 @@ func (s *ExpressionSequenceContext) AllComma() []antlr.TerminalNode {
 
 func (s *ExpressionSequenceContext) Comma(i int) antlr.TerminalNode {
 	return s.GetToken(JavaScriptParserComma, i)
+}
+
+func (s *ExpressionSequenceContext) AllExpressionSequence() []IExpressionSequenceContext {
+	children := s.GetChildren()
+	len := 0
+	for _, ctx := range children {
+		if _, ok := ctx.(IExpressionSequenceContext); ok {
+			len++
+		}
+	}
+
+	tst := make([]IExpressionSequenceContext, len)
+	i := 0
+	for _, ctx := range children {
+		if t, ok := ctx.(IExpressionSequenceContext); ok {
+			tst[i] = t.(IExpressionSequenceContext)
+			i++
+		}
+	}
+
+	return tst
+}
+
+func (s *ExpressionSequenceContext) ExpressionSequence(i int) IExpressionSequenceContext {
+	var t antlr.RuleContext
+	j := 0
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IExpressionSequenceContext); ok {
+			if j == i {
+				t = ctx.(antlr.RuleContext)
+				break
+			}
+			j++
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IExpressionSequenceContext)
 }
 
 func (s *ExpressionSequenceContext) GetRuleContext() antlr.RuleContext {
@@ -12969,7 +12986,7 @@ func (p *JavaScriptParser) ExpressionSequence() (localctx IExpressionSequenceCon
 			}
 			{
 				p.SetState(800)
-				p.singleExpression(0)
+				p.ExpressionSequence()
 			}
 
 		}

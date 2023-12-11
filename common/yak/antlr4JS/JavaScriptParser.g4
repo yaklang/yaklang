@@ -361,7 +361,7 @@ argument
     ;
 
 expressionSequence
-    : singleExpression (',' singleExpression)*
+    : singleExpression (',' expressionSequence)*
     ;
 
 specificExpression

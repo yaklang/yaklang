@@ -1291,15 +1291,19 @@ func (b *astbuilder) buildExpressionSequence(stmt *JS.ExpressionSequenceContext)
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 
-	var finalRvalue ssa.Value
+	val, _ := b.buildSingleExpression(stmt.SingleExpression().(*JS.SingleExpressionContext), false)
+	results := stmt.AllExpressionSequence()
+	if len(results) == 0 {
+		return val
+	}
 
-	for _, expr := range stmt.AllSingleExpression() {
-		if s := expr; s != nil {
-			finalRvalue, _ = b.buildSingleExpression(s, false)
+	for _, subSeq := range stmt.AllExpressionSequence() {
+		if s := subSeq; s != nil {
+			val = b.buildExpressionSequence(subSeq.(*JS.ExpressionSequenceContext))
 			// values = append(values, rv)
 		}
 	}
-	return finalRvalue
+	return val
 }
 
 func (b *astbuilder) buildIfStatementContext(stmt *JS.IfStatementContext) {
