@@ -52,6 +52,7 @@ func TestJS_ASTLargeText(t *testing.T) {
 	lexer.RemoveErrorListeners()
 	tokenStream = antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	parser := JS.NewJavaScriptParser(tokenStream)
+	//parser.GetInterpreter().SetPredictionMode(antlr.PredictionModeSLL)
 	_ = parser.Program()
 	log.Infof("finish to build ast via parser")
 
