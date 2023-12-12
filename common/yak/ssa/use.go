@@ -29,12 +29,11 @@ func ReplaceValue(v Value, to Value, skip func(Instruction) bool) {
 	}
 }
 
-func InsertValueReplaceOriginal(original Value, insert Value) {
+func InsertValueReplaceOriginal(name string, original Value, insert Value) {
 	block := insert.GetBlock()
 	fun := block.GetFunc()
 	builder := fun.builder
 	// builder := block.GetFunc().builder
-	variable := original.GetName()
 
 	deleteInst := make([]Instruction, 0)
 
@@ -59,14 +58,14 @@ func InsertValueReplaceOriginal(original Value, insert Value) {
 	// replace variable in insert block after insert instruction position
 	replaceInBlock(original, insert, block, afterInsert)
 	// if this block current end variable is original, replace. !!! [if not, skip] !!!
-	if builder.readVariableByBlock(variable, block, false) == original {
-		builder.writeVariableByBlock(variable, insert, block)
+	if builder.readVariableByBlock(name, block, false) == original {
+		builder.writeVariableByBlock(name, insert, block)
 	}
 
 	handlerSuccBlock := func(item *BasicBlock) (Value, Value) {
-		old := builder.readVariableByBlock(variable, item, false)
-		builder.deleteVariableByBlock(variable, item)
-		new := builder.readVariableByBlock(variable, item, false)
+		old := builder.readVariableByBlock(name, item, false)
+		builder.deleteVariableByBlock(name, item)
+		new := builder.readVariableByBlock(name, item, false)
 		if !utils.IsNil(old) && !utils.IsNil(new) {
 			if old != new {
 				replaceInBlock(old, new, item, func(i Instruction) bool {
