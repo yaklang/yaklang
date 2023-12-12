@@ -236,10 +236,10 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 	}
 
 	if req.IsNew {
-		if ok, err := yakit.CheckExistGroup(s.GetProfileDatabase(), group, folder); err != nil {
-			return utils.Wrapf(err, "check group[%s/%s]", folder, group)
+		if ok, err := yakit.CheckExistGroup(s.GetProfileDatabase(), group); err != nil {
+			return utils.Wrapf(err, "check group[%s]", group)
 		} else if ok {
-			return utils.Errorf("group[%s/%s] exist", folder, group)
+			return utils.Errorf("group[%s] exist", group)
 		}
 	}
 
@@ -350,10 +350,10 @@ func (s *Server) SavePayloadToFileStream(req *ypb.SavePayloadRequest, stream ypb
 	}
 
 	if isNew {
-		if ok, err := yakit.CheckExistGroup(s.GetProfileDatabase(), group, folder); err != nil {
-			return utils.Wrapf(err, "check group[%s/%s]", folder, group)
+		if ok, err := yakit.CheckExistGroup(s.GetProfileDatabase(), group); err != nil {
+			return utils.Wrapf(err, "check group[%s]", group)
 		} else if ok {
-			return utils.Errorf("group[%s/%s] exist", folder, group)
+			return utils.Errorf("group[%s] exist", group)
 		}
 	}
 
