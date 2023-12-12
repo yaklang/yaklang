@@ -139,9 +139,9 @@ func TrimWhitespaceExceptSpace(r rune) bool {
 	return false
 }
 
-func CheckExistGroup(db *gorm.DB, group, folder string) (bool, error) {
+func CheckExistGroup(db *gorm.DB, group string) (bool, error) {
 	var count int64
-	if db := db.Model(&Payload{}).Where("`group` = ?", group).Where("`folder` = ?", folder).Count(&count); db.Error != nil {
+	if db := db.Model(&Payload{}).Where("`group` = ?", group).Count(&count); db.Error != nil {
 		return false, db.Error
 	}
 	return count > 0, nil
