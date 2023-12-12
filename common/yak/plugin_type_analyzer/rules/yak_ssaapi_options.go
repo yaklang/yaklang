@@ -44,6 +44,7 @@ func YakGetTypeSSAOpt() []ssaapi.Option {
 
 	opts = append(opts, ssaapi.WithExternValue(valueTable))
 	opts = append(opts, ssaapi.WithExternMethod(&Builder{}))
+	opts = append(opts, ssaapi.WithExternInfo("plugin-type:yak"))
 	return opts
 }
 
