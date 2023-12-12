@@ -1,13 +1,48 @@
 package ssa
 
-import "fmt"
+import (
+	"fmt"
 
-// TODO: implement Variable in scope
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+)
+
 type Variable struct {
-	Name       string
-	Range      *Position
-	RightRange []*Position
-	Value      *Value
+	Name  string
+	Range map[*Position]struct{}
+	V     Value
+}
+
+func NewVariable(name string, i Value) *Variable {
+	ret := &Variable{
+		Name:  name,
+		Range: make(map[*Position]struct{}),
+		V:     i,
+	}
+	i.AddVariable(ret)
+	return ret
+}
+func (v *Variable) String() string {
+	ret := ""
+	ret += fmt.Sprintln("Variable ", v.Name, v.V.LineDisasm())
+	return ret
+}
+
+func (v *Variable) AddRange(p *Position) {
+	// v.Range = append(v.Range, p)
+	// fmt.Println(v.Name, p.StartColumn)
+	v.Range[p] = struct{}{}
+}
+
+func (v *Variable) NewError(kind ErrorKind, tag ErrorTag, msg string) {
+	for R := range v.Range {
+		v.V.GetFunc().NewErrorWithPos(kind, tag, R, msg)
+	}
+}
+
+type item struct {
+	v *Variable
+	r *Position
 }
 
 type Scope struct {
@@ -41,6 +76,37 @@ func (s *Scope) AddChild(child *Scope) {
 	child.Parent = s
 }
 
+func (s *Scope) InsertByRange(v *Variable, Range *Position) {
+	i := 0
+	for ; i < len(s.Var); i++ {
+		if s.Var[i].r.CompareStart(Range) > 0 {
+			break
+		}
+	}
+	s.Var = utils.InsertSliceItem(s.Var, item{v, Range}, i)
+}
+
+func (s *Scope) AddVariable(v *Variable, Range *Position) {
+	if Range == nil {
+		log.Errorf("scope(%d) variable %s range is nil", s.Id, v.Name)
+	}
+	str, ok := s.SymbolTableReverse[v.Name]
+	if !ok {
+		str = v.Name
+	}
+	v.Name = str
+	{
+		varList, ok := s.VarMap[str]
+		if !ok {
+			varList = make([]*Variable, 0, 1)
+		}
+		varList = append(varList, v)
+		s.VarMap[str] = varList
+	}
+	v.AddRange(Range)
+	s.InsertByRange(v, Range)
+}
+
 func (s *Scope) SetLocalVariable(text string) string {
 	newText := fmt.Sprintf("%s-%d", text, s.Id)
 	s.SymbolTable[text] = newText
@@ -60,6 +126,14 @@ func (s *Scope) GetLocalVariable(text string) string {
 			ret = text
 		}
 	}
+	return ret
+}
+
+func (s *Scope) String() string {
+	ret := ""
+	ret += fmt.Sprintf("Scope %d\n", s.Id)
+	ret += fmt.Sprintf("symbolTable: %#v\n", s.SymbolTable)
+	ret += fmt.Sprintln("Variable: ", s.VarMap)
 	return ret
 }
 

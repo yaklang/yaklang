@@ -15,6 +15,11 @@ func ReplaceValueInSymbolTable(v, to Value) {
 	v.GetFunc().ReplaceVariable(v.GetName(), v, to)
 }
 func ReplaceValue(v Value, to Value, skip func(Instruction) bool) {
+	for _, variable := range v.GetAllVariables() {
+		variable.V = to
+		to.AddVariable(variable)
+	}
+
 	deleteInst := make([]User, 0)
 	for _, user := range v.GetUsers() {
 		if skip(user) {

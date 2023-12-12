@@ -28,11 +28,15 @@ type canStartStopToken interface {
 
 func (b *astbuilder) SetRange(token canStartStopToken) func() {
 	source := strings.Split(token.GetText(), "\n")[0]
-	endline, endcolumn := GetEndPosition(token.GetStop())
+	start := token.GetStart()
+	stop := token.GetStop()
+	endline, endcolumn := GetEndPosition(stop)
 	pos := &ssa.Position{
 		SourceCode:  source,
-		StartLine:   token.GetStart().GetLine(),
-		StartColumn: token.GetStart().GetColumn(),
+		StartOffset: int64(start.GetStart()),
+		StartLine:   start.GetLine(),
+		StartColumn: start.GetColumn(),
+		EndOffset:   int64(stop.GetStop()),
 		EndLine:     endline,
 		EndColumn:   endcolumn,
 	}
