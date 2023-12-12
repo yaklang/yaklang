@@ -100,6 +100,7 @@ func createOrUpdatePayload(db *gorm.DB, p *Payload) error {
 		db,
 		p,
 		func(db *gorm.DB, i *Payload) error {
+			i.Hash = i.CalcHash()
 			return db.Create(&i).Error
 		},
 		func(db *gorm.DB, i *Payload) error {
