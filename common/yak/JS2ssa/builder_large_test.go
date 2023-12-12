@@ -40,7 +40,6 @@ func TestJS_ASTLargeText(t *testing.T) {
 		count++
 		_ = t
 		if count%1000 == 0 {
-			log.Infof("get %v tokens cost: %v", count, time.Now().Sub(start))
 		}
 		if t.GetTokenType() == antlr.TokenEOF {
 			break
@@ -48,9 +47,12 @@ func TestJS_ASTLargeText(t *testing.T) {
 	}
 	log.Infof("get all tokens cost: %v", time.Now().Sub(start))
 
-	//lexer = JS.NewJavaScriptLexer(antlr.NewInputStream(largeJS))
-	//lexer.RemoveErrorListeners()
-	//tokenStream = antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
-	//parser := JS.NewJavaScriptParser(tokenStream)
-	//_ = parser.Program()
+	log.Infof("start to build ast via parser")
+	lexer = JS.NewJavaScriptLexer(antlr.NewInputStream(largeJS))
+	lexer.RemoveErrorListeners()
+	tokenStream = antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
+	parser := JS.NewJavaScriptParser(tokenStream)
+	_ = parser.Program()
+	log.Infof("finish to build ast via parser")
+
 }

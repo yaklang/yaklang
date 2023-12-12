@@ -374,15 +374,22 @@ specificExpression
 
 questionDot: '?' '.';
 
+keywordSingleExpression
+    : Import '(' singleExpression ')'                                       # ImportExpression
+    | New singleExpression ('(' (argument (',' argument)* ',')? ')')?       # NewExpression
+    | New '.' identifier                                                    # MetaExpression // new.target
+    | Await singleExpression                                                # AwaitExpression
+    ;
+
 singleExpression
-    : anonymousFunction                                                     # FunctionExpression
+    : keywordSingleExpression                                               # KeywordExpression
+    | literal                                                               # LiteralExpression
     | Class identifier? classTail                                           # ClassExpression
-    | Import '(' singleExpression ')'                                       # ImportExpression
+    | anonymousFunction                                                     # FunctionExpression
     | singleExpression templateStringLiteral                                # TemplateStringExpression  // ECMAScript 6
     | yieldStatement                                                        # YieldExpression // ECMAScript 6
     | This                                                                  # ThisExpression
     | identifier                                                            # IdentifierExpression
-    | literal                                                               # LiteralExpression
     | Super                                                                 # SuperExpression
     | arrayLiteral                                                          # ArrayLiteralExpression
     | objectLiteral                                                         # ObjectLiteralExpression
@@ -390,40 +397,48 @@ singleExpression
     | singleExpression {p.notMatchField()}? questionDot specificExpression         # OptionalChainExpression
     | singleExpression {p.notMatchField()}? questionDot? '[' singleExpression ']'  # MemberIndexExpression
     | singleExpression '?'? '.' '#'? identifierName                         # MemberDotExpression
-    // Split to try `new Date()` first, then `new Date`.
-    | New singleExpression arguments                                        # NewExpression
-    | New singleExpression                                                  # NewExpression
     | singleExpression arguments                                            # ArgumentsExpression
-    | New '.' identifier                                                    # MetaExpression // new.target
-    | singleExpression {p.notLineTerminator()}? '++'                     # PostIncrementExpression
-    | singleExpression {p.notLineTerminator()}? '--'                     # PostDecreaseExpression
-    | Delete singleExpression                                               # DeleteExpression
-    | Void singleExpression                                                 # VoidExpression
-    | Typeof singleExpression                                               # TypeofExpression
-    | '++' singleExpression                                                 # PreIncrementExpression
-    | '--' singleExpression                                                 # PreDecreaseExpression
-    | '+' singleExpression                                                  # UnaryPlusExpression
-    | '-' singleExpression                                                  # UnaryMinusExpression
-    | '~' singleExpression                                                  # BitNotExpression
-    | '!' singleExpression                                                  # NotExpression
-    | Await singleExpression                                                # AwaitExpression
-    | <assoc=right> singleExpression '**' singleExpression                  # PowerExpression
-    | singleExpression ('*' | '/' | '%') singleExpression                   # MultiplicativeExpression
-    | singleExpression ('+' | '-') singleExpression                         # AdditiveExpression
-    | singleExpression '??' singleExpression                                # CoalesceExpression
-    | singleExpression ('<<' | '>>' | '>>>') singleExpression               # BitShiftExpression
-    | singleExpression ('<' | '>' | '<=' | '>=') singleExpression           # RelationalExpression
-    | singleExpression Instanceof singleExpression                          # InstanceofExpression
-    | singleExpression In singleExpression                                  # InExpression
-    | singleExpression ('==' | '!=' | '===' | '!==') singleExpression       # EqualityExpression
-    | singleExpression '&' singleExpression                                 # BitAndExpression
-    | singleExpression '^' singleExpression                                 # BitXOrExpression
-    | singleExpression '|' singleExpression                                 # BitOrExpression
-    | singleExpression '&&' singleExpression                                # LogicalAndExpression
-    | singleExpression '||' singleExpression                                # LogicalOrExpression
-    | singleExpression '?' singleExpression ':' singleExpression            # TernaryExpression
-    | <assoc=right> singleExpression '=' singleExpression                   # AssignmentExpression
+
+    // suffix self add dec
+    | singleExpression {p.notLineTerminator()}? op = ('++' | '--')          # PostUnaryExpression
+
+    // prefix unary
+    | preUnaryOperator singleExpression                                     # PreUnaryExpression
+
+    // 二元运算
+    | binaryExpression                                                      # BinExpression
+
+    // advanced logic
+    | advancedLogicExpression                                               #LogicExpression
+
+    // assign
     | <assoc=right> singleExpression assignmentOperator singleExpression    # AssignmentOperatorExpression
+    ;
+
+advancedLogicExpression
+    : singleExpression '&&' singleExpression                            # LogicalAndExpression
+    | singleExpression '||' singleExpression                            # LogicalOrExpression
+    | singleExpression '??' singleExpression                            # CoalesceExpression
+    | singleExpression '?' singleExpression ':' singleExpression        # TernaryExpression
+    ;
+
+binaryExpression
+    : <assoc=right> singleExpression '**' singleExpression                                  # PowerExpression
+    | singleExpression op = ('*' | '/' | '%') singleExpression                              # MultiplicativeExpression
+    | singleExpression op = ('+' | '-') singleExpression                                    # AdditiveExpression
+    | singleExpression op = ('<<' | '>>' | '>>>') singleExpression                          # BitShiftExpression
+    | singleExpression op = ('<' | '>' | '<=' | '>=' | In | Instanceof) singleExpression    # RelationalExpression
+    | singleExpression op = ('==' | '!=' | '===' | '!==') singleExpression                  # EqExpression
+    | singleExpression ('&' | '^' | '|') singleExpression                                   # BitExpression
+    ;
+
+
+preUnaryOperator
+    : ('++' | '--' )
+    | ('+' | '-' | '!' | '~')
+    | TypeOf
+    | Void
+    | Delete
     ;
 
 initializer
@@ -458,7 +473,8 @@ arrowFunctionBody
     ;
 
 assignmentOperator
-    : '*='
+    : '='
+    | '*='
     | '/='
     | '%='
     | '+='
@@ -488,7 +504,7 @@ templateStringLiteral
 
 templateStringAtom
     : TemplateStringAtom
-    // | TemplateStringStartExpression singleExpression TemplateCloseBrace
+    | TemplateStringStartExpression singleExpression TemplateCloseBrace
     ;
 
 numericLiteral
