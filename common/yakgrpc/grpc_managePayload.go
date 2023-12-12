@@ -109,7 +109,7 @@ func (s *Server) QueryPayload(ctx context.Context, req *ypb.QueryPayloadRequest)
 	}
 
 	return &ypb.QueryPayloadResponse{
-		Pagination: req.Pagination,
+		Pagination: req.GetPagination(),
 		Total:      int64(p.TotalRecord),
 		Data:       items,
 	}, nil
@@ -223,6 +223,7 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 	content := req.GetContent()
 	group := req.GetGroup()
 	folder := req.GetFolder()
+	isNew := req.GetIsNew()
 	isFile := req.GetIsFile()
 	filename := req.GetFileName()
 	if !isFile && content == "" {
@@ -235,7 +236,7 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 		return utils.Error("group is empty")
 	}
 
-	if req.IsNew {
+	if isNew {
 		if ok, err := yakit.CheckExistGroup(s.GetProfileDatabase(), group); err != nil {
 			return utils.Wrapf(err, "check group[%s]", group)
 		} else if ok {
@@ -309,7 +310,7 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 			yakit.SetGroupInEnd(s.GetProfileDatabase(), group)
 		}
 	}()
-	if req.IsFile {
+	if isFile {
 		for _, f := range filename {
 			err := handleFile(f)
 			if err != nil {
@@ -663,6 +664,7 @@ func (s *Server) BackUpOrCopyPayloads(ctx context.Context, req *ypb.BackUpOrCopy
 	ids := req.GetIds()
 	group := req.GetGroup()
 	folder := req.GetFolder()
+	isCopy := req.GetCopy()
 
 	if len(ids) == 0 {
 		return nil, utils.Error("ids is empty")
@@ -691,7 +693,7 @@ func (s *Server) BackUpOrCopyPayloads(ctx context.Context, req *ypb.BackUpOrCopy
 				return utils.Errorf("group [%s] is empty", group)
 			}
 			filename := *groupFirstPayload.Content
-			if !req.Copy {
+			if !isCopy {
 				// if move to target
 				// just delete original payload
 				err = yakit.DeletePayloadByIDs(tx, ids)
@@ -715,7 +717,7 @@ func (s *Server) BackUpOrCopyPayloads(ctx context.Context, req *ypb.BackUpOrCopy
 				}
 			}
 		} else {
-			if req.Copy {
+			if isCopy {
 				err = yakit.CopyPayloads(tx, payloads, group, folder)
 			} else {
 				err = yakit.MovePayloads(tx, payloads, group, folder)
@@ -904,9 +906,9 @@ func (s *Server) ExportAllPayload(req *ypb.GetAllPayloadRequest, stream ypb.Yak_
 		}
 	}()
 
-	file, err := utils.NewFileLineWriter(req.GetSavePath(), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	file, err := utils.NewFileLineWriter(savePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err != nil {
-		return utils.Wrapf(err, "get all payload error: open file[%s] error", req.GetSavePath())
+		return utils.Wrapf(err, "get all payload error: open file[%s] error", savePath)
 	}
 	defer func() {
 		file.Close()
@@ -953,7 +955,7 @@ func (s *Server) ExportAllPayloadFromFile(req *ypb.GetAllPayloadRequest, stream 
 	if dst == "" {
 		return utils.Errorf("get all payload from file error: save path is empty")
 	}
-	src, err := yakit.GetPayloadGroupFileName(s.GetProfileDatabase(), req.GetGroup())
+	src, err := yakit.GetPayloadGroupFileName(s.GetProfileDatabase(), group)
 	if err != nil {
 		return err
 	}
