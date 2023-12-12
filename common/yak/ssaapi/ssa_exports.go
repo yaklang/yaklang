@@ -29,25 +29,31 @@ var (
 )
 
 type config struct {
-	language Language
-	Parser   LanguageParser
-	// code     string
+	language        Language
+	Parser          LanguageParser
+	code            string
 	ignoreSyntaxErr bool
 
 	externLib   map[string]map[string]any
 	externValue map[string]any
 	// externType  map[string]any
 	externMethod ssa.MethodBuilder
+	// for hash
+	externInfo string
 }
 
-func defaultConfig() *config {
+func defaultConfig(code string) *config {
 	return &config{
-		language: Yak,
-		Parser:   LanguageParsers[Yak],
-		// code:        "",
+		language:    Yak,
+		Parser:      LanguageParsers[Yak],
+		code:        code,
 		externLib:   make(map[string]map[string]any),
 		externValue: make(map[string]any),
 	}
+}
+
+func (c *config) CaclHash() string {
+	return utils.CalcSha1(c.code, c.language, c.ignoreSyntaxErr, c.externInfo)
 }
 
 type Option func(*config)
@@ -94,7 +100,12 @@ func WithIgnoreSyntaxError(b ...bool) Option {
 			c.ignoreSyntaxErr = true
 		}
 	}
+}
 
+func WithExternInfo(info string) Option {
+	return func(c *config) {
+		c.externInfo = info
+	}
 }
 
 func Parse(code string, opts ...Option) *Program {
@@ -104,32 +115,31 @@ func Parse(code string, opts ...Option) *Program {
 var ttlSSAParseCache = ttlcache.NewCache()
 
 func parse(code string, opts ...Option) *Program {
-	config := defaultConfig()
+	config := defaultConfig(code)
 	for _, opt := range opts {
 		opt(config)
 	}
 	if config.Parser == nil {
 		return nil
 	}
-	hash := utils.CalcSha1(code, config.language)
+	var ret *Program
+	hash := config.CaclHash()
 	if prog, ok := ttlSSAParseCache.Get(hash); ok {
-		ttlSSAParseCache.SetWithTTL(hash, prog, 30*time.Minute) // refresh
-		return prog.(*Program)
+		ret = prog.(*Program)
+	} else {
+		ret = NewProgram(parseWithConfig(config))
 	}
-
-	prog := NewProgram(parseWithConfig(code, config))
-
-	ttlSSAParseCache.SetWithTTL(hash, prog, 30*time.Minute)
-	return prog
+	ttlSSAParseCache.SetWithTTL(hash, ret, 30*time.Minute)
+	return ret
 }
 
-func parseWithConfig(code string, c *config) *ssa.Program {
+func parseWithConfig(c *config) *ssa.Program {
 	callback := func(fb *ssa.FunctionBuilder) {
 		fb.WithExternLib(c.externLib)
 		fb.WithExternValue(c.externValue)
 		fb.WithExternMethod(c.externMethod)
 	}
-	return c.Parser.Parse(code, c.ignoreSyntaxErr, callback)
+	return c.Parser.Parse(c.code, c.ignoreSyntaxErr, callback)
 }
 
 var Exports = map[string]any{
