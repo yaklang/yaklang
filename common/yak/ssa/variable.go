@@ -18,7 +18,7 @@ type IdentifierLV struct {
 }
 
 func (i *IdentifierLV) Assign(v Value, f *FunctionBuilder) {
-	v.AddLeftPositions(i.GetPosition())
+	f.CurrentScope.AddVariable(NewVariable(i.name, v), f.CurrentPos)
 	f.WriteVariable(i.name, v)
 	if i.isSideEffect {
 		f.AddSideEffect(i.name, v)
@@ -82,6 +82,21 @@ func (b *Function) writeVariableByBlock(variable string, value Value, block *Bas
 	block.symbolTable[variable] = vs
 }
 
+// just same like `ReadVariable` , but `PeekVariable` don't create `Variable`
+// if your syntax read variable, please use `ReadVariable`
+// if you just want see what Value this variable, just use `PeekVariable`
+func (b *FunctionBuilder) PeekVariable(variable string, create bool) Value {
+	var ret Value
+	b.ReadVariableEx(variable, create, func(vs []Value) {
+		if len(vs) > 0 {
+			ret = vs[len(vs)-1]
+		} else {
+			ret = nil
+		}
+	})
+
+	return ret
+}
 
 // get value by variable and block
 //
@@ -102,6 +117,16 @@ func (b *FunctionBuilder) ReadVariable(variable string, create bool) Value {
 			ret = nil
 		}
 	})
+
+	if ret != nil {
+		if v := ret.GetVariable(variable); v != nil {
+			v.AddRange(b.CurrentPos)
+			b.CurrentScope.InsertByRange(v, b.CurrentPos)
+		} else {
+			b.CurrentScope.AddVariable(NewVariable(variable, ret), b.CurrentPos)
+		}
+	}
+
 	return ret
 }
 
@@ -172,6 +197,7 @@ func (b *FunctionBuilder) readVariableByBlockEx(variable string, block *BasicBlo
 			un := NewUndefined(variable)
 			// b.emitInstructionBefore(un, block.LastInst())
 			b.EmitToBlock(un, block)
+			un.SetPosition(b.CurrentPos)
 			v = un
 		} else {
 			v = nil

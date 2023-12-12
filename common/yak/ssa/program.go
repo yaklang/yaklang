@@ -12,8 +12,7 @@ func NewProgram() *Program {
 	return prog
 }
 
-// create or get main function builder
-func (prog *Program) GetAndCreateMainFunctionBuilder() *FunctionBuilder {
+func (prog *Program) GetAndCreateMainFunction() *Function {
 	pkg := prog.GetPackage("main")
 	if pkg == nil {
 		pkg = NewPackage("main")
@@ -23,6 +22,12 @@ func (prog *Program) GetAndCreateMainFunctionBuilder() *FunctionBuilder {
 	if fun == nil {
 		fun = pkg.NewFunction("main")
 	}
+	return fun
+}
+
+// create or get main function builder
+func (prog *Program) GetAndCreateMainFunctionBuilder() *FunctionBuilder {
+	fun := prog.GetAndCreateMainFunction()
 	builder := fun.builder
 	if builder == nil {
 		builder = NewBuilder(fun, nil)

@@ -40,12 +40,18 @@ func (t *TypeCheck) CheckOnInstruction(inst ssa.Instruction) {
 	if v, ok := inst.(ssa.Value); ok {
 		switch v.GetType().GetTypeKind() {
 		case ssa.ErrorType:
-			variable := v.GetName()
-			if len(v.GetUsers()) == 0 && variable != "_" && variable != "" {
-				if pos := v.GetLeftPosition(); pos != nil {
-					v.GetFunc().NewErrorWithPos(ssa.Error, TypeCheckTAG, v.GetLeftPosition(), ErrorUnhandled())
-				} else {
+			if len(v.GetUsers()) == 0 {
+				vs := v.GetAllVariables()
+				if len(vs) == 0 && v.GetOpcode() != ssa.OpCall {
+					// if `a()//return err` just ignore,
+					// but `a()[1] //return int,err` add handler
 					v.NewError(ssa.Error, TypeCheckTAG, ErrorUnhandled())
+				}
+				for _, variable := range vs {
+					if variable.Name == "_" {
+						continue
+					}
+					variable.NewError(ssa.Error, TypeCheckTAG, ErrorUnhandled())
 				}
 			}
 		default:
@@ -130,8 +136,7 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 			}
 		}
 	}()
-
-	if c.GetName() == "" {
+	if len(c.GetAllVariables()) == 0 && len(c.GetUsers()) == 0 {
 		return
 	}
 
@@ -164,9 +169,12 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 				// a = func() (m * any, error)
 				f := ssa.GetField(c, ssa.NewConst(len(objType.FieldTypes)-1))
 				if f == nil {
-					c.GetFunc().NewErrorWithPos(ssa.Error, TypeCheckTAG, c.GetLeftPosition(),
-						ErrorUnhandledWithType(c.GetType().String()),
-					)
+					vs := c.GetAllVariables()
+					for _, variable := range vs {
+						variable.NewError(ssa.Error, TypeCheckTAG,
+							ErrorUnhandledWithType(c.GetType().String()),
+						)
+					}
 				} else {
 					if f.GetName() == "" {
 						f.SetName(c.GetName() + ".error")
@@ -179,7 +187,7 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 
 		if leftLen != rightLen {
 			if c.IsDropError {
-				c.NewError(ssa.Error, TypeCheckTAG,
+				c.NewError(ssa.Warn, TypeCheckTAG,
 					CallAssignmentMismatchDropError(leftLen, c.GetType().String()),
 				)
 

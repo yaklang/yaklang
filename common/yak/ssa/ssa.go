@@ -11,21 +11,6 @@ type ErrorLogger interface {
 	NewError(ErrorKind, ErrorTag, string)
 }
 
-type LeftInstruction interface {
-	// Instruction
-	// variable
-	GetLeftVariables() []string
-	AddLeftVariables(variable string)
-
-	// must
-	// left-value position
-	// get all left position
-	GetLeftPositions() []*Position
-	// get last left position
-	GetLeftPosition() *Position
-	AddLeftPositions(*Position) // add left position
-}
-
 type Instruction interface {
 	ErrorLogger
 
@@ -55,10 +40,11 @@ type Instruction interface {
 	IsExtern() bool
 	SetExtern(bool)
 
-	// has left-value
-	HasLeftVariable() bool
-	// GetLeftItem() LeftInstruction
+	GetVariable(string) *Variable
+	GetAllVariables() map[string]*Variable
+	AddVariable(*Variable)
 }
+
 type (
 	Users            []User
 	Values           []Value
@@ -91,7 +77,6 @@ type InstructionNode interface {
 // basic handle item (interface)
 type Value interface {
 	InstructionNode
-	LeftInstruction
 	TypedNode
 	AddUser(User)
 	RemoveUser(User)
@@ -110,15 +95,14 @@ type anInstruction struct {
 
 	name string
 
-	isExtern bool
-	// left
-	hasLeft   bool
-	variables []string
-	LeftPos   []*Position
+	isExtern  bool
+	variables map[string]*Variable
 }
 
 func NewInstruction() anInstruction {
-	return anInstruction{}
+	return anInstruction{
+		variables: make(map[string]*Variable),
+	}
 }
 
 // ssa function and block
@@ -131,9 +115,9 @@ func (a *anInstruction) GetBlock() *BasicBlock      { return a.block }
 func (c *anInstruction) GetPosition() *Position { return c.Pos }
 
 func (c *anInstruction) SetPosition(pos *Position) {
-	if c.Pos == nil {
-		c.Pos = pos
-	}
+	// if c.Pos == nil {
+	c.Pos = pos
+	// }
 }
 
 func (c *anInstruction) IsExtern() bool   { return c.isExtern }
@@ -150,32 +134,7 @@ func (a *anInstruction) SetScope(s *Scope) { a.scope = s }
 
 // variable
 func (a *anInstruction) SetName(v string) { a.name = v }
-func (a *anInstruction) GetName() string      { return a.name }
-// has left-instruction
-func (a *anInstruction) HasLeftVariable() bool        { return a.hasLeft }
-func (a *anInstruction) GetLeftItem() LeftInstruction { return LeftInstruction(a) }
-
-// left-instruction: variable
-func (a *anInstruction) GetLeftVariables() []string { return a.variables }
-
-func (a *anInstruction) AddLeftVariables(name string) {
-	a.variables = append(a.variables, name)
-}
-
-// left-instruction: left-position
-func (a *anInstruction) GetLeftPositions() []*Position { return a.LeftPos }
-
-func (a *anInstruction) GetLeftPosition() *Position {
-	if len(a.LeftPos) > 0 {
-		return a.LeftPos[len(a.LeftPos)-1]
-	} else {
-		return nil
-	}
-}
-
-func (a *anInstruction) AddLeftPositions(pos *Position) {
-	a.LeftPos = append(a.LeftPos, pos)
-}
+func (a *anInstruction) GetName() string  { return a.name }
 
 func (a *anInstruction) LineDisasm() string { return "" }
 
@@ -185,9 +144,21 @@ func (a *anInstruction) GetOperands() Values    { return nil }       // cover by
 func (a *anInstruction) GetOperand(i int) Value { return a.GetOperands()[i] }
 func (a *anInstruction) GetOperandNum() int     { return len(a.GetOperands()) }
 
+func (a *anInstruction) GetVariable(name string) *Variable {
+	if ret, ok := a.variables[name]; ok {
+		return ret
+	} else {
+		return nil
+	}
+}
+
+func (a *anInstruction) GetAllVariables() map[string]*Variable {
+	return a.variables
+}
+func (a *anInstruction) AddVariable(v *Variable) { a.variables[v.Name] = v }
+
 var (
-	_ Instruction     = (*anInstruction)(nil)
-	_ LeftInstruction = (*anInstruction)(nil)
+	_ Instruction = (*anInstruction)(nil)
 )
 
 type anValue struct {

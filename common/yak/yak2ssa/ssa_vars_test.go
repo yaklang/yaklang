@@ -27,7 +27,8 @@ func check(t *testing.T, code string, regex string) {
 	})
 	prog.ShowWithSource()
 
-	printlnFunc := prog.Packages["main"].Funcs["main"].GetValuesByName("println")[0]
+	printlnFuncs := prog.GetAndCreateMainFunction().GetValuesByName("println")
+	printlnFunc := printlnFuncs[0]
 	for _, final := range printlnFunc.GetUsers() {
 		line := final.LineDisasm()
 		fmt.Println(line)
@@ -71,11 +72,16 @@ func TestPosition(t *testing.T) {
 		EndLine:     2,
 		EndColumn:   7,
 	}
-	for _, v := range prog.InspectVariable("b").ProbablyValues {
-		a := v.GetPosition()
-		if *a != want {
-			t.Error("phi get_position err")
-		}
+	prog.ShowWithSource()
+	vs := prog.GetAndCreateMainFunction().GetValuesByName("b")
+	// for _, v := range vs {
+	if len(vs) != 1 {
+		t.Fatal("get Value b length error")
+	}
+	v := vs[0]
+	a := v.GetPosition()
+	if *a != want {
+		t.Error("phi get_position err: ", a)
 	}
 }
 
@@ -324,4 +330,91 @@ func TestSyntaxError(t *testing.T) {
 	if !utils.IsNil(prog) {
 		t.Fatal("prog parse should error")
 	}
+}
+
+func TestVariable(t *testing.T) {
+	t.Run("test variable basic: number and range", func(t *testing.T) {
+		prog := ParseSSA(`
+		a = 1
+		{
+			a := 2
+		}
+		a = 3
+		`)
+		vara := prog.GetAndCreateMainFunction().GetValuesByName("a")
+		if len(vara) != 3 {
+			t.Fatalf("error length: %s", vara)
+		}
+		// for _, v := range vara {
+
+		// }
+	})
+	t.Run("basic function call", func(t *testing.T) {
+		prog := ParseSSA(`println(a)`)
+		prog.ShowWithSource()
+		varA := prog.GetAndCreateMainFunction().GetValuesByName("a")
+		if len(varA) != 1 {
+			t.Fatal("value a length error: ", varA)
+		}
+		valueA := varA[0]
+		if valueA.GetPosition().StartOffset != 8 {
+			t.Fatal("value a offset error:", valueA.GetPosition())
+		}
+
+	})
+	t.Run("test variable left position", func(t *testing.T) {
+		prog := ParseSSA(`
+		a = 1 
+		b = a 
+		b = a + b
+		println(b)
+		c = a + 2
+		`)
+		main := prog.GetAndCreateMainFunction()
+		{
+			// check a
+			varAs := main.GetValuesByName("a")
+			if len(varAs) != 1 {
+				t.Fatal("value a length error: ", varAs)
+			}
+			ValueA := varAs[0]
+			variableA := ValueA.GetVariable("a")
+			if variableA == nil {
+				t.Fatal("variable a not exist !")
+			}
+			variableARange := variableA.Range
+			if len(variableARange) != 4 {
+				t.Fatal("variable range error", variableARange)
+			}
+
+			variableB := ValueA.GetVariable("b")
+			if variableB == nil {
+				t.Fatal("variable b not exist !")
+			}
+			variableBRange := variableB.Range
+			if len(variableBRange) != 2 {
+				t.Fatal("variable b range error", variableBRange)
+			}
+		}
+		{
+			varBs := main.GetValuesByName("b")
+			if len(varBs) != 2 {
+				t.Fatal("value b length error: ", varBs)
+			}
+			for _, value := range varBs {
+				if value.String() == "1" {
+					variableA := value.GetVariable("a")
+					if variableA == nil {
+						t.Fatal("variable a not exist! in valueB")
+					}
+					variableARange := variableA.Range
+					if len(variableARange) != 4 {
+						t.Fatal("variable a range error", variableARange)
+					}
+
+				}
+			}
+		}
+	})
+
 }
