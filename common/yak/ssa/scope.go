@@ -11,27 +11,28 @@ type Variable struct {
 }
 
 type Scope struct {
-	//TODO: save Variable not Value
-	Id          int // scope id in a function
-	VarMap      map[string]Value
-	Var         []Value           // sort by Position
-	SymbolTable map[string]string // variable -> variable-ID(variable-scopeID)
-	Range       *Position
-	Function    *Function
-	Parent      *Scope
-	Children    []*Scope
+	Id                 int // scope id in a function
+	VarMap             map[string][]*Variable
+	Var                []item            // sort by Position
+	SymbolTable        map[string]string // variable -> variable-ID(variable-scopeID)
+	SymbolTableReverse map[string]string // variable -> variable-ID(variable-scopeID)
+	Range              *Position
+	Function           *Function
+	Parent             *Scope
+	Children           []*Scope
 }
 
 func NewScope(id int, Range *Position, Func *Function) *Scope {
 	return &Scope{
-		Id:          id,
-		VarMap:      make(map[string]Value),
-		Var:         make([]Value, 0),
-		SymbolTable: make(map[string]string),
-		Range:       Range,
-		Function:    Func,
-		Parent:      nil,
-		Children:    make([]*Scope, 0),
+		Id:                 id,
+		VarMap:             make(map[string][]*Variable),
+		Var:                make([]item, 0),
+		SymbolTable:        make(map[string]string),
+		SymbolTableReverse: make(map[string]string),
+		Range:              Range,
+		Function:           Func,
+		Parent:             nil,
+		Children:           make([]*Scope, 0),
 	}
 }
 
@@ -43,7 +44,7 @@ func (s *Scope) AddChild(child *Scope) {
 func (s *Scope) SetLocalVariable(text string) string {
 	newText := fmt.Sprintf("%s-%d", text, s.Id)
 	s.SymbolTable[text] = newText
-	fmt.Printf("scope(%d) add local-variable: %s\n", s.Id, newText)
+	s.SymbolTableReverse[newText] = text
 	return newText
 }
 

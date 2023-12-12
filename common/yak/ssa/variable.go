@@ -64,30 +64,24 @@ func (f *FunctionBuilder) WriteVariable(variable string, value Value) {
 	f.writeVariableByBlock(variable, value, f.CurrentBlock)
 }
 
-func (b *Function) ReplaceVariable(variable string, v, to Value) {
-	if m, ok := b.symbolTable[variable]; ok {
-		for block, value := range m {
-			m[block] = utils.ReplaceSliceItem(value, v, to)
+func (f *Function) ReplaceVariable(variable string, v, to Value) {
+	for _, block := range f.Blocks {
+		if vs, ok := block.symbolTable[variable]; ok {
+			vs = utils.ReplaceSliceItem(vs, v, to)
+			block.symbolTable[variable] = vs
 		}
 	}
 }
 
 func (b *Function) writeVariableByBlock(variable string, value Value, block *BasicBlock) {
-	if _, ok := b.symbolTable[variable]; !ok {
-		b.symbolTable[variable] = make(map[*BasicBlock]Values)
-	}
-	vs, ok := b.symbolTable[variable][block]
+	vs, ok := block.symbolTable[variable]
 	if !ok {
 		vs = make(Values, 0)
 	}
-	if value.GetName() == "" {
-		value.SetName(variable)
-	} else {
-		value.AddLeftVariables(variable)
-	}
 	vs = append(vs, value)
-	b.symbolTable[variable][block] = vs
+	block.symbolTable[variable] = vs
 }
+
 
 // get value by variable and block
 //
@@ -138,11 +132,7 @@ func (b *FunctionBuilder) ReadVariableEx(variable string, create bool, fun func(
 }
 
 func (b *FunctionBuilder) deleteVariableByBlock(variable string, block *BasicBlock) {
-	if map2, ok := b.symbolTable[variable]; ok {
-		// if _, ok := map2[block]; ok {
-		delete(map2, block)
-		// }
-	}
+	delete(block.symbolTable, variable)
 }
 
 func (b *FunctionBuilder) readVariableByBlock(variable string, block *BasicBlock, create bool) Value {
@@ -155,10 +145,8 @@ func (b *FunctionBuilder) readVariableByBlock(variable string, block *BasicBlock
 }
 
 func (b *FunctionBuilder) readVariableByBlockEx(variable string, block *BasicBlock, create bool) []Value {
-	if map2, ok := b.symbolTable[variable]; ok {
-		if vs, ok := map2[block]; ok && len(vs) > 0 {
-			return vs
-		}
+	if vs, ok := block.symbolTable[variable]; ok && len(vs) > 0 {
+		return vs
 	}
 
 	if block.Skip {
