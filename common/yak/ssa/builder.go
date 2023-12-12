@@ -39,6 +39,7 @@ func NewBuilder(f *Function, parent *FunctionBuilder) *FunctionBuilder {
 		deferExpr:     make([]*Call, 0),
 		CurrentBlock:  nil,
 		CurrentPos:    nil,
+		CurrentScope:  NewScope(0, nil, f),
 		scopeId:       0,
 		parentBuilder: parent,
 		cmap:          make(map[string]struct{}),
@@ -49,7 +50,8 @@ func NewBuilder(f *Function, parent *FunctionBuilder) *FunctionBuilder {
 		b.ExternLib = parent.ExternLib
 	}
 
-	b.CurrentScope = NewScope(b.NewScopeId(), b.CurrentPos, b.Function)
+	b.ScopeStart()
+	b.Function.SetScope(b.CurrentScope)
 	b.CurrentBlock = f.EnterBlock
 	f.builder = b
 	return b
@@ -91,6 +93,7 @@ func (b *FunctionBuilder) AddUnsealedBlock(block *BasicBlock) {
 
 // finish current function builder
 func (b *FunctionBuilder) Finish() {
+	b.ScopeEnd()
 	// fmt.Println("finish func: ", b.Name)
 
 	// sub-function

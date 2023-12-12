@@ -1,96 +1,62 @@
 package ssa
 
-import (
-	"github.com/samber/lo"
-)
-
-type InspectVariableResult struct {
-	VariableName   string
-	ProbablyTypes  Types
-	ProbablyValues Values
-}
-
-func (r *InspectVariableResult) Merge(other *InspectVariableResult) {
-	if r.VariableName != other.VariableName {
-		return
-	}
-	r.ProbablyTypes = append(r.ProbablyTypes, other.ProbablyTypes...)
-	r.ProbablyValues = append(r.ProbablyValues, other.ProbablyValues...)
-}
-
-func (p *Program) InspectVariableLast(varName string) *InspectVariableResult {
-	result := new(InspectVariableResult)
-	for _, pkg := range p.Packages {
-		for _, funcIns := range pkg.Funcs {
-			if res, ok := funcIns.symbolTable[varName]; ok {
-				vs := res[funcIns.ExitBlock]
-				v := vs[len(vs)-1]
-				result.ProbablyValues = append(result.ProbablyValues, v)
-				result.ProbablyTypes = append(result.ProbablyTypes, v.GetType())
-			}
-		}
-	}
-	result.VariableName = varName
-	return result
-}
-
-func (p *Program) InspectVariable(varName string) *InspectVariableResult {
-	result := new(InspectVariableResult)
-	result.VariableName = varName
-
-	for _, pkg := range p.Packages {
-		for _, funcIns := range pkg.Funcs {
-			result.Merge(funcIns.InspectVariable(varName))
-		}
-	}
-	return result
-}
-
-func (f *Function) InspectVariable(varName string) *InspectVariableResult {
-	result := new(InspectVariableResult)
-	result.VariableName = varName
-
-	if f == nil || f.symbolTable == nil {
-		return result
-	}
-
-	res, ok := f.symbolTable[varName]
-	if !ok || res == nil {
-		return result
-	}
-	var probablyTypes Types
-	var probablyValue Values
-	for _, v := range res {
-		probablyValue = append(probablyValue, v...)
-		probablyTypes = append(probablyTypes, lo.Map(v, func(v Value, _ int) Type { return v.GetType() })...)
-	}
-	result.ProbablyTypes = probablyTypes
-	result.ProbablyValues = probablyValue
-	return result
-}
-
 func (f *Function) GetAllSymbols() map[string]Values {
 	ret := make(map[string]Values, 0)
-	for id, table := range f.symbolTable {
-		ret[id] = make(Values, 0)
-		for _, values := range table {
-			ret[id] = append(ret[id], values...)
+	tmp := make(map[string]map[Value]struct{})
+
+	f.EachScope(func(s *Scope) {
+		for name, variables := range s.VarMap {
+			retList, ok := ret[name]
+			if !ok {
+				retList = make(Values, 0, 1)
+			}
+			tmpList, ok := tmp[name]
+			if !ok {
+				tmpList = make(map[Value]struct{})
+			}
+			for _, variable := range variables {
+				if _, ok := tmpList[variable.V]; !ok {
+					retList = append(retList, variable.V)
+				}
+			}
+			ret[name] = retList
 		}
-	}
+	})
+
 	return ret
 }
 
 func (f *Function) GetValuesByName(name string) InstructionNodes {
-	ret := make(InstructionNodes, 0)
-	if table, ok := f.symbolTable[name]; ok {
-		for _, v := range table {
-			for _, v := range v {
-				ret = append(ret, v)
+	ret := make([]InstructionNode, 0)
+	tmp := make(map[Instruction]struct{})
+
+	f.EachScope(func(s *Scope) {
+		if vs, ok := s.VarMap[name]; ok {
+			for _, v := range vs {
+				if _, ok := tmp[v.V]; !ok {
+					tmp[v.V] = struct{}{}
+					ret = append(ret, v.V)
+				}
 			}
 		}
-	}
+	})
+
 	if v, ok := f.externInstance[name]; ok {
 		ret = append(ret, v)
 	}
-	return lo.Uniq(ret)
+	return ret
+}
+
+func (f *Function) EachScope(handler func(*Scope)) {
+	var handlerScope func(*Scope)
+	handlerScope = func(s *Scope) {
+		if s == nil {
+			return
+		}
+		handler(s)
+		for _, child := range s.Children {
+			handlerScope(child)
+		}
+	}
+	handlerScope(f.GetScope())
 }
