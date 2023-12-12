@@ -3,6 +3,8 @@ package ssa4analyze
 import (
 	"strings"
 
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -367,7 +369,9 @@ func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
 		} else if t, ok := funcTyp.ReturnType.(*ssa.BasicType); ok && t.Kind == ssa.ErrorType {
 			// pass
 			c.SetType(ssa.BasicTypes[ssa.Null])
-			c.GetFunc().NewErrorWithPos(ssa.Error, TITAG, c.GetLeftPosition(), ValueIsNull())
+			for _, variable := range c.GetAllVariables() {
+				variable.NewError(ssa.Error, TITAG, ValueIsNull())
+			}
 			return
 		}
 		c.NewError(ssa.Error, TITAG, FunctionContReturnError())

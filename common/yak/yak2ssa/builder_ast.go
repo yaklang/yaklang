@@ -809,7 +809,7 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 		}
 
 		lv := ssa.NewIdentifierLV(text, b.CurrentPos)
-		if v := b.ReadVariable(text, false); v != nil {
+		if v := b.PeekVariable(text, false); v != nil {
 			if v.IsExtern() {
 				b.NewErrorWithPos(ssa.Warn, TAG, b.CurrentPos, ssa.ContAssignExtern(text))
 			}
@@ -1355,8 +1355,8 @@ func (b *astbuilder) buildFunctionCallWarp(exprstmt *yak.ExpressionContext, stmt
 
 // function call
 func (b *astbuilder) buildFunctionCall(stmt *yak.FunctionCallContext, v ssa.Value) *ssa.Call {
-	// recoverRange := b.SetRange(stmt.BaseParserRuleContext)
-	// defer recoverRange()
+	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
+	defer recoverRange()
 	var args []ssa.Value
 	isEllipsis := false
 	if s, ok := stmt.OrdinaryArguments().(*yak.OrdinaryArgumentsContext); ok {
