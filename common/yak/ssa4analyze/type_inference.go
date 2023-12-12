@@ -215,10 +215,19 @@ func (t *TypeInference) TypeInferenceMake(i *ssa.Make) {
 func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
 	if typ := f.Obj.GetType(); typ != nil {
 		if methodTyp := ssa.GetMethod(typ, f.Key.String()); methodTyp != nil && f.GetType() != methodTyp {
+			obj := f.Obj
+			{
+				names := lo.Keys(obj.GetAllVariables())
+				if len(names) == 0 {
+					log.Errorf("method %s has no variable", obj.LineDisasm())
+				} else {
+					obj.SetName(names[0])
+				}
+			}
 			method := ssa.NewFunctionWithType(methodTyp.Name, methodTyp)
 			f.GetUsers().RunOnCall(func(c *ssa.Call) {
-				c.Args = utils.InsertSliceItem(c.Args, f.Obj, 0)
-				f.Obj.AddUser(c)
+				c.Args = utils.InsertSliceItem(c.Args, obj, 0)
+				obj.AddUser(c)
 			})
 			ssa.ReplaceAllValue(f, method)
 			t.DeleteInst = append(t.DeleteInst, f)
@@ -294,14 +303,6 @@ func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
 }
 
 func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
-	// handler call method
-	if ft, ok := ssa.ToFunctionType(c.Method.GetType()); ok && ft.IsMethod {
-		// handle modify self function
-		if ft.IsModifySelf {
-			ssa.InsertValueReplaceOriginal(c.Args[0], c)
-			c.SetType(c.Args[0].GetType())
-		}
-	}
 
 	// get function type
 	funcTyp, ok := ssa.ToFunctionType(c.Method.GetType())
@@ -309,9 +310,14 @@ func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
 		return
 	}
 
+	sideEffect := funcTyp.SideEffects
+	if funcTyp.IsMethod {
+		sideEffect = append(sideEffect, c.Args[0].GetName())
+	}
+
 	// handle FreeValue
-	if len(funcTyp.FreeValue) != 0 || len(funcTyp.SideEffects) != 0 {
-		c.HandleFreeValue(funcTyp.FreeValue, funcTyp.SideEffects)
+	if len(funcTyp.FreeValue) != 0 || len(sideEffect) != 0 {
+		c.HandleFreeValue(funcTyp.FreeValue, sideEffect)
 	}
 
 	// handle ellipsis, unpack argument
