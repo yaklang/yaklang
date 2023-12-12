@@ -17,6 +17,7 @@ func MitmGetTypeSSAOpt() []ssaapi.Option {
 	valueTable["MITM_PLUGIN"] = ""
 	valueTable["MITM_PARAMS"] = make(map[string]string)
 	ret = append(ret, ssaapi.WithExternValue(valueTable))
+	ret = append(ret, ssaapi.WithExternInfo("plugin-type:mitm"))
 
 	return ret
 }
