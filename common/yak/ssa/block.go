@@ -32,6 +32,7 @@ func (f *Function) newBasicBlockEx(name string, isSealed bool, nodAddToBlocks bo
 		isSealed:      isSealed,
 		inCompletePhi: make([]*Phi, 0),
 		Skip:          false,
+		symbolTable:   make(map[string]Values),
 	}
 	b.SetName(name)
 	b.SetFunc(f)

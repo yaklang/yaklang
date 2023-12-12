@@ -35,7 +35,6 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		FreeValues:     make([]*Parameter, 0),
 		SideEffects:    make(map[string]Value),
 		InstReg:        make(map[Instruction]string),
-		symbolTable:    make(map[string]map[*BasicBlock]Values),
 		externInstance: make(map[string]Value),
 		externType:     make(map[string]Type),
 		err:            make(SSAErrors, 0),

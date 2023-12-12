@@ -273,10 +273,7 @@ type Function struct {
 
 	// for instruction
 	// This `InstReg` is used to map instruction to their "virtual register", It is utilized by `Disasm`.
-	// TODO: This `InstReg` should be use to retrieve all instruction. We need refactor this code when we remove the `symbolTable`.
 	InstReg map[Instruction]string // instruction to their "virtual register"
-	// TODO: this `symbolTable` should be contained within `BasicBlock`, It field should be move to `BasicBlock` and be removed in `Function`
-	symbolTable map[string]map[*BasicBlock]Values
 
 	// extern lib
 	externInstance map[string]Value // lib and value
@@ -327,6 +324,7 @@ type BasicBlock struct {
 	Handler *ErrorHandler
 
 	// for build
+	symbolTable   map[string]Values
 	finish        bool // if emitJump finish!
 	isSealed      bool
 	inCompletePhi []*Phi // variable -> phi
