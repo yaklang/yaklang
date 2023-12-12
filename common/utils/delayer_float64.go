@@ -34,11 +34,20 @@ func NewFloatSecondsDelayWaiter(min, max float64) (*FloatSecondsDelayWaiter, err
 	if min > 0 && max <= 0 {
 		return nil, errors.Errorf("min: %v max: %v failed", min, max)
 	}
+	var nextDelay time.Duration
+	if absRange(max, min) > 0 {
+		randomFloat64 := rand.Float64() * (absRange(max, min))
+		nextDelay = time.Duration(int(1000*(randomFloat64+min)) * int(time.Millisecond))
+	} else {
+		nextDelay = time.Duration(int(1000*min) * int(time.Millisecond))
+	}
 
 	d := &FloatSecondsDelayWaiter{
-		min: min,
-		max: max,
+		min:       min,
+		max:       max,
+		nextDelay: nextDelay,
 	}
+
 	return d, nil
 }
 
