@@ -86,13 +86,16 @@ func DeleteInst(i Instruction) {
 
 func (f *FunctionBuilder) SetCurrent(i Instruction) func() {
 	currentBlock := f.CurrentBlock
+	position := f.CurrentPos
 	scope := f.CurrentScope
 
 	f.CurrentScope = i.GetScope()
+	f.CurrentPos = i.GetPosition()
 	f.CurrentBlock = i.GetBlock()
 
 	return func() {
 		f.CurrentBlock = currentBlock
+		f.CurrentPos = position
 		f.CurrentScope = scope
 	}
 }
