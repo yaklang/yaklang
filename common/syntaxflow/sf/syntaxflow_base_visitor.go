@@ -71,7 +71,31 @@ func (v *BaseSyntaxFlowVisitor) VisitFilterFieldMember(ctx *FilterFieldMemberCon
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitFilterExpression(ctx *FilterExpressionContext) interface{} {
+func (v *BaseSyntaxFlowVisitor) VisitFilterExpressionString(ctx *FilterExpressionStringContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitFilterExpressionBool(ctx *FilterExpressionBoolContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitFilterExpressionOr(ctx *FilterExpressionOrContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitFilterExpressionParen(ctx *FilterExpressionParenContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitFilterExpressionAnd(ctx *FilterExpressionAndContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitPrefixOperatorUnary(ctx *PrefixOperatorUnaryContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitFilterExpressionNumber(ctx *FilterExpressionNumberContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

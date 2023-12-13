@@ -159,8 +159,8 @@ func (y *SyntaxFlowVisitor) VisitChainFilter(raw sf.IChainFilterContext) interfa
 
 	switch ret := raw.(type) {
 	case *sf.FlatContext:
-		for _, filter := range ret.AllFilterExpression() {
-			y.VisitFilterExpression(filter)
+		for _, filter := range ret.AllConditionExpression() {
+			y.VisitConditionExpression(filter)
 		}
 	case *sf.BuildMapContext:
 		for i := 0; i < len(ret.AllColon()); i++ {
@@ -176,9 +176,35 @@ func (y *SyntaxFlowVisitor) VisitChainFilter(raw sf.IChainFilterContext) interfa
 	return nil
 }
 
-func (y *SyntaxFlowVisitor) VisitFilterExpression(raw sf.IFilterExpressionContext) interface{} {
+func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpressionContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
+	}
+
+	switch i := raw.(type) {
+	case *sf.FilterExpressionNumberContext:
+		y.VisitNumberLiteral(i.NumberLiteral())
+	case *sf.FilterExpressionStringContext:
+		y.VisitStringLiteral(i.StringLiteral())
+	case *sf.FilterExpressionBoolContext:
+		switch i.BoolLiteral().GetText() {
+		case "true":
+		case "false":
+		}
+	case *sf.FilterExpressionParenContext:
+		return y.VisitConditionExpression(i.ConditionExpression())
+	case *sf.PrefixOperatorUnaryContext:
+	case *sf.FilterExpressionAndContext:
+		for _, exp := range i.AllConditionExpression() {
+			y.VisitConditionExpression(exp)
+		}
+		// emit and
+
+	case *sf.FilterExpressionOrContext:
+		for _, exp := range i.AllConditionExpression() {
+			y.VisitConditionExpression(exp)
+		}
+		// emit or
 	}
 
 	return nil
@@ -190,6 +216,19 @@ func (y *SyntaxFlowVisitor) VisitFilterFieldMember(raw sf.IFilterFieldMemberCont
 	}
 
 	i, _ := raw.(*sf.FilterFieldMemberContext)
+	if i == nil {
+		return nil
+	}
+
+	return nil
+}
+
+func (y *SyntaxFlowVisitor) VisitStringLiteral(raw sf.IStringLiteralContext) interface{} {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*sf.StringLiteralContext)
 	if i == nil {
 		return nil
 	}
