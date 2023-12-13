@@ -432,6 +432,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 	var autoForward = utils.NewBool(true)
 	var autoForwardCond = sync.NewCond(new(sync.Mutex))
+	var wantResp = &http.Request{}
 
 	reqChan := make(chan struct{})
 	respChan := make(chan struct{})
@@ -453,6 +454,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			log.Debugf("get resp")
 		case <-autoForwardCh: // 收到自动转发信号
 			log.Debugf("get auto forward when wait response")
+			return
 		case <-ctx.Done():
 			log.Debugf("get ctx done when wait response")
 			return
@@ -484,6 +486,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			close(autoForwardCh)
 		}()
 		for {
+			wantResp = &http.Request{}
 			waitForAutoForwardDisabled()
 			select {
 			case <-reqChan: // 劫持请求状态
@@ -624,12 +627,13 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			// 设置自动转发
 			if reqInstance.GetSetAutoForward() {
 				clearPluginHTTPFlowCache()
+				beforeAuto := autoForward.IsSet()
 				log.Infof("mitm-auto-forward: %v", reqInstance.GetAutoForwardValue())
 				autoForwardCond.L.Lock()
 				autoForward.SetTo(reqInstance.GetAutoForwardValue())
 				autoForwardCond.L.Unlock()
 				autoForwardCond.Broadcast()
-				if autoForward.IsSet() {
+				if !beforeAuto && autoForward.IsSet() {
 					autoForwardCh <- struct{}{}
 				}
 			}
@@ -754,6 +758,20 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		wshashFrameIndex[i] = result + 1
 		return wshashFrameIndex[i]
 	}
+
+	getAutoForwardSignalChan := func() chan struct{} {
+		signalChan := make(chan struct{}, 1)
+		go func() {
+			autoForwardCond.L.Lock()
+			defer autoForwardCond.L.Unlock()
+			for !autoForward.IsSet() {
+				autoForwardCond.Wait()
+			}
+			signalChan <- struct{}{}
+		}()
+		return signalChan
+	}
+
 	handleHijackWsResponse := func(raw []byte, req *http.Request, rsp *http.Response, ts int64) (finalResult []byte) {
 		defer func() {
 			if err := recover(); err != nil {
@@ -783,9 +801,17 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 		//_, ok := hijackedResponseByRequestPTRMap.Load(wshash)
 		//if !ok {
-		//	return raw
+		// return raw
 		//}
-
+		if wantResp != req {
+			log.Debugf("not want resp, auto forward")
+			return raw
+		}
+		defer func() {
+			if !autoForward.IsSet() {
+				respChan <- struct{}{}
+			}
+		}()
 		_, urlStr := lowhttp.ExtractWebsocketURLFromHTTPRequest(req)
 		responseCounter := time.Now().UnixNano()
 		feedbackRspIns := &ypb.MITMResponse{
@@ -796,11 +822,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			RemoteAddr:  httpctx.GetRemoteAddr(req),
 			IsWebsocket: true,
 		}
-		defer func() {
-			if !autoForward.IsSet() {
-				respChan <- struct{}{}
-			}
-		}()
+
 		err = send(feedbackRspIns)
 		if err != nil {
 			log.Errorf("send response failed: %s", err)
@@ -856,9 +878,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				utils.PrintCurrentGoroutineRuntimeStack()
 			}
 		}()
-		// 如果劫持响应就需要释放来自req的锁
 		originRspRaw := rsp[:]
-
 		plainResponse := httpctx.GetPlainResponseBytes(req)
 		if len(plainResponse) <= 0 {
 			plainResponse = lowhttp.DeletePacketEncoding(httpctx.GetBareResponseBytes(req))
@@ -932,7 +952,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 
 		// 自动转发与否
-		if autoForward.IsSet() {
+		if autoForward.IsSet() { // 如果其请求是自动转发的，响应也不应该劫持
 			httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_AutoFoward, true)
 			/*
 				自动过滤下，不是所有 response 都应该替换
@@ -981,6 +1001,18 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			return originRspRaw
 		}
 
+		if wantResp != req {
+			log.Debugf("not want resp, auto forward")
+			return originRspRaw
+		}
+
+		defer func() {
+			autoForwardChanResp := getAutoForwardSignalChan()
+			select {
+			case respChan <- struct{}{}:
+			case <-autoForwardChanResp:
+			}
+		}()
 		feedbackRspIns := &ypb.MITMResponse{
 			ForResponse: true,
 			Response:    rsp,
@@ -988,11 +1020,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			ResponseId:  responseCounter,
 			RemoteAddr:  remoteAddr,
 		}
-		defer func() {
-			if !autoForward.IsSet() {
-				respChan <- struct{}{} // 响应处理完毕，可以继续处理下一个请求了
-			}
-		}()
 		err = send(feedbackRspIns)
 		if err != nil {
 			log.Errorf("send response failed: %s", err)
@@ -1063,9 +1090,12 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		var shouldHijackResponse bool
 		var shouldSendSignal bool
 		defer func() {
-			// 根据是否劫持响应来判断是否释放锁
-			if shouldSendSignal && !autoForward.IsSet() {
-				shouldHijackRespChan <- shouldHijackResponse
+			if shouldSendSignal {
+				autoForwardChanWsRequest := getAutoForwardSignalChan()
+				select {
+				case shouldHijackRespChan <- shouldHijackResponse:
+				case <-autoForwardChanWsRequest:
+				}
 			}
 		}()
 		defer func() {
@@ -1135,20 +1165,15 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		//	encode = append(encode, "protobuf")
 		//}
 
-		var autoForwardChanWsRequest = make(chan struct{}, 1)
-		go func() {
-			autoForwardCond.L.Lock()
-			defer autoForwardCond.L.Unlock()
-			for !autoForward.IsSet() {
-				autoForwardCond.Wait()
-			}
-			autoForwardChanWsRequest <- struct{}{}
-		}()
+		autoForwardChanWsRequest := getAutoForwardSignalChan()
 
 		select {
 		case reqChan <- struct{}{}: // 申请劫持
 			shouldSendSignal = true
+			wantResp = req //设置需要劫持的请求
 		case <-autoForwardChanWsRequest: // 自动放行
+			httpctx.SetContextValueInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_AutoFoward, true)
+			return raw
 		}
 		counter := time.Now().UnixNano()
 		select {
@@ -1215,6 +1240,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 				// 原封不动转发
 				if reqInstance.GetForward() {
+					shouldHijackResponse = false
+					httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest, false)
 					return originReqRaw
 				}
 
@@ -1223,12 +1250,14 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					shouldHijackResponse = true
 					httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest, true)
 					log.Infof("the ws hash: %s's mitm ws response is waiting for hijack response", wshash)
+					continue
 				}
 				if reqInstance.GetCancelhijackResponse() {
 					// 设置不需要劫持resp
 					shouldHijackResponse = false
 					httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest, false)
 					log.Infof("the ws hash: %s's mitm ws response cancel hijack response", wshash)
+					continue
 				}
 
 				// 把修改后的请求放回去
@@ -1247,8 +1276,12 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		var shouldHijackResponse bool
 		var shouldSendSignal bool
 		defer func() {
-			if shouldSendSignal && !autoForward.IsSet() {
-				shouldHijackRespChan <- shouldHijackResponse
+			if shouldSendSignal {
+				autoForwardChanRequest := getAutoForwardSignalChan()
+				select {
+				case shouldHijackRespChan <- shouldHijackResponse:
+				case <-autoForwardChanRequest:
+				}
 			}
 		}()
 		// 保证始终只有一个 Goroutine 在处理请求
@@ -1364,20 +1397,15 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_AutoFoward, true)
 			return req
 		}
-		var autoForwardChanRequest = make(chan struct{}, 1)
-		go func() {
-			autoForwardCond.L.Lock()
-			defer autoForwardCond.L.Unlock()
-			for !autoForward.IsSet() {
-				autoForwardCond.Wait()
-			}
-			autoForwardChanRequest <- struct{}{}
-		}()
+		autoForwardChanRequest := getAutoForwardSignalChan()
 
 		select {
 		case reqChan <- struct{}{}: // 申请劫持
 			shouldSendSignal = true
+			wantResp = originReqIns
 		case <-autoForwardChanRequest:
+			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_AutoFoward, true)
+			return req
 		}
 
 		// 开始劫持
@@ -1511,6 +1539,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 				// 原封不动转发
 				if reqInstance.GetForward() {
+					shouldHijackResponse = false // 直接转发也应该设置不需要劫持响应
+					httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest, false)
 					return originReqRaw
 				}
 
