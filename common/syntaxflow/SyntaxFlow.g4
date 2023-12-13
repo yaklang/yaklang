@@ -34,19 +34,23 @@ filterExpr
     ;
 
 chainFilter
-    : '[' ((filterExpression (',' filterExpression)*) | '...') ']'          # Flat
+    : '[' ((conditionExpression (',' conditionExpression)*) | '...') ']'          # Flat
     | '{' ((identifier ':') filters (';' (identifier ':') filters )*)? ';'? '}'  # BuildMap
     ;
 
 filterFieldMember: identifier | numberLiteral | typeCast;
-filterExpression
-    : numberLiteral
-
-    | stringLiteral
-    | boolLiteral
-    | op = ('>' | '<' | '=' | '==' | '>=' | '<=' | '~=' /*for string regex*/) filterExpression
-    | filterExpression '&&' filterExpression
-    | filterExpression '||' filterExpression
+conditionExpression
+    : numberLiteral                               # FilterExpressionNumber
+    | stringLiteral                               # FilterExpressionString
+    | boolLiteral                                 # FilterExpressionBool
+    | '(' conditionExpression ')'                    # FilterExpressionParen
+    | op = (
+        '>' | '<' | '=' |
+        '==' | '>=' | '<='
+        | '~=' /*for string regex*/)
+    (numberLiteral | stringLiteral | boolLiteral) # PrefixOperatorUnary
+    | conditionExpression '&&' conditionExpression      # FilterExpressionAnd
+    | conditionExpression '||' conditionExpression      # FilterExpressionOr
     ;
 
 numberLiteral: Number | OctalNumber | BinaryNumber | HexNumber;

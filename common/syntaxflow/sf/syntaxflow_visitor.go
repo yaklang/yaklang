@@ -55,8 +55,26 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#filterFieldMember.
 	VisitFilterFieldMember(ctx *FilterFieldMemberContext) interface{}
 
-	// Visit a parse tree produced by SyntaxFlowParser#filterExpression.
-	VisitFilterExpression(ctx *FilterExpressionContext) interface{}
+	// Visit a parse tree produced by SyntaxFlowParser#FilterExpressionString.
+	VisitFilterExpressionString(ctx *FilterExpressionStringContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#FilterExpressionBool.
+	VisitFilterExpressionBool(ctx *FilterExpressionBoolContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#FilterExpressionOr.
+	VisitFilterExpressionOr(ctx *FilterExpressionOrContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#FilterExpressionParen.
+	VisitFilterExpressionParen(ctx *FilterExpressionParenContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#FilterExpressionAnd.
+	VisitFilterExpressionAnd(ctx *FilterExpressionAndContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#PrefixOperatorUnary.
+	VisitPrefixOperatorUnary(ctx *PrefixOperatorUnaryContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#FilterExpressionNumber.
+	VisitFilterExpressionNumber(ctx *FilterExpressionNumberContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#numberLiteral.
 	VisitNumberLiteral(ctx *NumberLiteralContext) interface{}
