@@ -16,7 +16,7 @@ func (b *astbuilder) handlerWs(ws *yak.WsContext) {
 	for _, line := range ws.AllLINE_COMMENT() {
 		token := line.GetSymbol()
 		if err := b.AddErrorComment(line.GetText(), token.GetLine()); err != nil {
-			b.NewErrorWithPos(ssa.Warn, TAG, b.CurrentPos, err.Error())
+			b.NewErrorWithPos(ssa.Warn, TAG, b.CurrentRange, err.Error())
 		}
 	}
 }
@@ -28,7 +28,7 @@ func (b *astbuilder) build(ast *yak.ProgramContext) {
 	}
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
-	b.Function.SetPosition(b.CurrentPos)
+	b.Function.SetRange(b.CurrentRange)
 	if stmt, ok := ast.StatementList().(*yak.StatementListContext); ok {
 		b.buildStatementList(stmt)
 	}
@@ -51,7 +51,7 @@ func (b *astbuilder) buildLineComment(stmt *yak.LineCommentStmtContext) {
 	defer recoverRange()
 	if line := stmt.LINE_COMMENT(); line != nil {
 		if err := b.AddErrorComment(line.GetText(), line.GetSymbol().GetLine()); err != nil {
-			b.NewErrorWithPos(ssa.Warn, TAG, b.CurrentPos, err.Error())
+			b.NewErrorWithPos(ssa.Warn, TAG, b.CurrentRange, err.Error())
 		}
 	}
 }
@@ -560,7 +560,7 @@ func (b *astbuilder) buildIfStmt(stmt *yak.IfStmtContext) {
 func (b *astbuilder) buildBlock(stmt *yak.BlockContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
-	b.CurrentBlock.SetPosition(b.CurrentPos)
+	b.CurrentBlock.SetRange(b.CurrentRange)
 	if s, ok := stmt.StatementList().(*yak.StatementListContext); ok {
 		b.ScopeStart()
 		b.buildStatementList(s)
@@ -635,7 +635,7 @@ func (b *astbuilder) AssignList(stmt assignlist) []ssa.Value {
 					for i := range vs {
 
 						if inst, ok := vs[i].(ssa.Instruction); ok {
-							inst.SetPosition(lvalues[i].GetPosition())
+							inst.SetRange(lvalues[i].GetRange())
 						}
 
 						lvalues[i].Assign(vs[i], b.FunctionBuilder)
@@ -802,16 +802,16 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 	if s := stmt.Identifier(); s != nil {
 		text := s.GetText()
 		if text == "_" {
-			return ssa.NewIdentifierLV("_", b.CurrentPos)
+			return ssa.NewIdentifierLV("_", b.CurrentRange)
 		}
 		if forceAssign {
-			return ssa.NewIdentifierLV(b.SetScopeLocalVariable(text), b.CurrentPos)
+			return ssa.NewIdentifierLV(b.SetScopeLocalVariable(text), b.CurrentRange)
 		}
 
-		lv := ssa.NewIdentifierLV(text, b.CurrentPos)
+		lv := ssa.NewIdentifierLV(text, b.CurrentRange)
 		if v := b.PeekVariable(text, false); v != nil {
 			if v.IsExtern() {
-				b.NewErrorWithPos(ssa.Warn, TAG, b.CurrentPos, ssa.ContAssignExtern(text))
+				b.NewErrorWithPos(ssa.Warn, TAG, b.CurrentRange, ssa.ContAssignExtern(text))
 			}
 		}
 		if b.CanBuildFreeValue(text) {
@@ -834,7 +834,7 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 		if s, ok := stmt.LeftMemberCall().(*yak.LeftMemberCallContext); ok {
 			recoverRange := b.SetRange(s.BaseParserRuleContext)
 			if inter.IsExtern() {
-				b.NewErrorWithPos(ssa.Warn, TAG, b.CurrentPos, ssa.ContAssignExtern(stmt.GetText()))
+				b.NewErrorWithPos(ssa.Warn, TAG, b.CurrentRange, ssa.ContAssignExtern(stmt.GetText()))
 			}
 			if id := s.Identifier(); id != nil {
 				idText := id.GetText()

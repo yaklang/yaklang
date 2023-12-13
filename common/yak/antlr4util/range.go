@@ -1,19 +1,27 @@
-package js2ssa
+package antlr4util
 
 import (
 	"strings"
 
-	"github.com/antlr4-go/antlr/v4"
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
+type Token interface {
+	GetStart() int
+	GetStop() int
+	GetLine() int
+	GetColumn() int
+
+	GetText() string
+}
 type CanStartStopToken interface {
 	GetStop() antlr.Token
 	GetStart() antlr.Token
 	GetText() string
 }
 
-func GetEndPosition(t antlr.Token) (int, int) {
+func GetEndPosition(t Token) (int, int) {
 	var line, column int
 	str := strings.Split(t.GetText(), "\n")
 	if len(str) > 1 {
@@ -35,16 +43,4 @@ func GetRange(token CanStartStopToken) *ssa.Range {
 	end := ssa.NewPosition(int64(endToken.GetStop()), int64(endLine), int64(endColumn))
 
 	return ssa.NewRange(start, end, token.GetText())
-}
-
-func (b *astbuilder) SetRange(token CanStartStopToken) func() {
-
-	// TODO: use antlr4utils.GetRange, when new JS parser ready
-	r := GetRange(token)
-	backup := b.CurrentRange
-	b.CurrentRange = r
-
-	return func() {
-		b.CurrentRange = backup
-	}
 }

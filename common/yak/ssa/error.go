@@ -30,12 +30,12 @@ const (
 	SSANoCheck ErrorCommentId = "// @ssa-nocheck"
 )
 
-func (ec ErrorComment) Skip(pos *Position) bool {
+func (ec ErrorComment) Skip(pos *Range) bool {
 	if ec.noCheck {
 		return true
 	}
 	for _, line := range ec.ignorePos {
-		if pos.StartLine == line+1 {
+		if int(pos.Start.Line) == line+1 {
 			return true
 		}
 	}
@@ -61,7 +61,7 @@ func (f *Function) AddErrorComment(str string, line int) error {
 }
 
 type SSAError struct {
-	Pos     *Position
+	Pos     *Range
 	tag     ErrorTag
 	Message string
 	Kind    ErrorKind
@@ -69,7 +69,7 @@ type SSAError struct {
 
 type SSAErrors []*SSAError
 
-func (f *Function) NewErrorWithPos(kind ErrorKind, tag ErrorTag, Pos *Position, message string) {
+func (f *Function) NewErrorWithPos(kind ErrorKind, tag ErrorTag, Pos *Range, message string) {
 	if Pos == nil {
 		return
 	}
@@ -85,7 +85,7 @@ func (f *Function) NewErrorWithPos(kind ErrorKind, tag ErrorTag, Pos *Position, 
 	})
 }
 func (b *FunctionBuilder) NewError(kind ErrorKind, tag ErrorTag, format string, arg ...any) {
-	b.NewErrorWithPos(kind, tag, b.CurrentPos, format)
+	b.NewErrorWithPos(kind, tag, b.CurrentRange, format)
 }
 
 func (prog *Program) GetErrors() SSAErrors {

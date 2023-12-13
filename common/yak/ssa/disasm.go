@@ -21,15 +21,6 @@ func GetTypeStr(n Value) string {
 	)
 }
 
-func (p *Position) String() string {
-	return fmt.Sprintf(
-		"%3d:%-3d - %3d:%-3d: %s",
-		p.StartLine, p.StartColumn,
-		p.EndLine, p.EndColumn,
-		p.SourceCode,
-	)
-}
-
 func getStr(v Value) string {
 	return getStrFlag(v, true)
 }
@@ -93,8 +84,8 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 		ret += fmt.Sprintf("parent: %s\n", parent.GetName())
 	}
 
-	if f.Pos != nil {
-		ret += fmt.Sprintf("pos: %s\n", f.Pos)
+	if f.R != nil {
+		ret += fmt.Sprintf("pos: %s\n", f.R)
 	}
 
 	if len(f.FreeValues) > 0 {
@@ -126,7 +117,7 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 			}
 		} else {
 			ret += b.String()
-			if bPos := b.GetPosition(); bPos != nil {
+			if bPos := b.GetRange(); bPos != nil {
 				ret += bPos.String()
 			}
 			ret += "\n"
@@ -134,17 +125,17 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 			pos := make([]string, 0, len(b.Insts)+len(b.Phis))
 			for _, p := range b.Phis {
 				insts = append(insts, fmt.Sprintf("\t%s", p))
-				position := p.GetPosition()
-				if position == nil {
+				r := p.GetRange()
+				if r == nil {
 					pos = append(pos, "")
 				} else {
-					pos = append(pos, position.String())
+					pos = append(pos, r.String())
 				}
 			}
 			for _, i := range b.Insts {
 				insts = append(insts, fmt.Sprintf("\t%s", i))
-				if p := i.GetPosition(); p != nil {
-					pos = append(pos, i.GetPosition().String())
+				if p := i.GetRange(); p != nil {
+					pos = append(pos, i.GetRange().String())
 				} else {
 					pos = append(pos, "")
 				}

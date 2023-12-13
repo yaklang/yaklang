@@ -169,7 +169,7 @@ func NewParam(variable string, isFreeValue bool, fun *Function) *Parameter {
 	p.SetName(variable)
 	p.SetFunc(fun)
 	p.SetBlock(fun.EnterBlock)
-	p.SetPosition(fun.GetPosition())
+	p.SetRange(fun.GetRange())
 	return p
 }
 

@@ -26,7 +26,7 @@ func showUserDefChainEx(flag int, v *Value) {
 		case 0:
 			ret += fmt.Sprintf("%-7s\t%s\t%s\t%s\n", prefix, indexStr, v.node.GetOpcode(), v)
 		case 1:
-			ret += fmt.Sprintf("%s\t%s\n\t\t%s\n\t\t%s\n\t\t%s\n", prefix, indexStr, v, v.node, v.node.GetPosition())
+			ret += fmt.Sprintf("%s\t%s\n\t\t%s\n\t\t%s\n\t\t%s\n", prefix, indexStr, v, v.node, v.node.GetRange())
 		default:
 		}
 		return ret

@@ -44,7 +44,7 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 	if parent != nil {
 		parent.addAnonymous(f)
 		// Pos: parent.CurrentPos,
-		f.Pos = parent.builder.CurrentPos
+		f.SetRange(parent.builder.CurrentRange)
 	} else {
 		p.Funcs[name] = f
 	}

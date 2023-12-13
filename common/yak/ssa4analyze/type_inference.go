@@ -268,7 +268,7 @@ func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
 				}
 			}
 			if text == "" {
-				list := strings.Split(f.GetPosition().SourceCode, ".")
+				list := strings.Split(*f.GetRange().SourceCode, ".")
 				text = list[len(list)-1]
 			}
 			f.Key.NewError(ssa.Error, TITAG, InvalidField(typ.String(), text))

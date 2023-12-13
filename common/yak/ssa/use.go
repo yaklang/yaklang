@@ -50,10 +50,10 @@ func InsertValueReplaceOriginal(name string, original Value, insert Value) {
 	}
 
 	afterInsert := func(inst Instruction) bool {
-		if inst.GetPosition() == nil {
+		if inst.GetRange() == nil {
 			return true
 		}
-		if inst.GetPosition().StartLine > insert.GetPosition().StartLine {
+		if inst.GetRange().CompareStart(insert.GetRange()) > 0 {
 			return false
 		} else {
 			return true

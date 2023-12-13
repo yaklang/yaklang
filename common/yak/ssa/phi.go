@@ -17,8 +17,8 @@ func (b *BasicBlock) Sealed() {
 	builder := b.GetFunc().builder
 	for _, p := range b.inCompletePhi {
 		v := p.Build()
-		if v.GetPosition() == nil {
-			v.SetPosition(p.GetPosition())
+		if v.GetRange() == nil {
+			v.SetRange(p.GetRange())
 		}
 		if pa, ok := ToParameter(v); ok && pa.IsExtern() {
 			pa.GetUsers().RunOnField(func(f *Field) {
