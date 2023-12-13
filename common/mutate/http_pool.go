@@ -82,6 +82,14 @@ type httpPoolConfig struct {
 
 	EnableMaxContentLength bool
 	MaxContentLength       int64
+
+	DNSNoCache bool
+}
+
+func WithPoolOpt_DNSNoCache(b bool) HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.DNSNoCache = b
+	}
 }
 
 func WithPoolOpt_ExtraFuzzOptions(opts ...FuzzConfigOpt) HttpPoolConfigOption {
@@ -595,6 +603,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 						lowhttp.WithRetryWaitTime(utils.FloatSecondDuration(config.RetryWaitTime)),
 						lowhttp.WithRetryMaxWaitTime(utils.FloatSecondDuration(config.RetryMaxWaitTime)),
 						lowhttp.WithDNSServers(config.DNSServers),
+						lowhttp.WithDNSNoCache(config.DNSNoCache),
 						lowhttp.WithETCHosts(config.EtcHosts),
 						lowhttp.WithGmTLS(config.IsGmTLS),
 						lowhttp.WithConnPool(config.WithConnPool)}

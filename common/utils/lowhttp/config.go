@@ -65,6 +65,8 @@ type LowhttpExecConfig struct {
 	// ResponseBodyMirrorWriter will be not effected by MaxContentLength
 	// response body will be TeeReader to ResponseBodyMirrorWriter
 	ResponseBodyMirrorWriter io.Writer
+
+	DNSNoCache bool
 }
 
 type LowhttpResponse struct {
@@ -184,6 +186,12 @@ func WithVerifyCertificate(b bool) LowhttpOpt {
 func WithGmTLS(b bool) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.GmTLS = b
+	}
+}
+
+func WithDNSNoCache(b bool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.DNSNoCache = b
 	}
 }
 

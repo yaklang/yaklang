@@ -657,6 +657,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		}()
 
 		httpPoolOpts = append(httpPoolOpts,
+			mutate.WithPoolOpt_DNSNoCache(true),
 			mutate.WithPoolOpt_FuzzParams(mergedParams),
 			mutate.WithPoolOpt_ExtraFuzzOptions(extraOpt...),
 			mutate.WithPoolOpt_Timeout(timeoutSeconds),
