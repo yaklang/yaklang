@@ -337,6 +337,7 @@ const (
 	Yak_DeleteHybridScanTask_FullMethodName                       = "/ypb.Yak/DeleteHybridScanTask"
 	Yak_GetSpaceEngineStatus_FullMethodName                       = "/ypb.Yak/GetSpaceEngineStatus"
 	Yak_FetchPortAssetFromSpaceEngine_FullMethodName              = "/ypb.Yak/FetchPortAssetFromSpaceEngine"
+	Yak_YakVersionAtLeast_FullMethodName                          = "/ypb.Yak/YakVersionAtLeast"
 )
 
 // YakClient is the client API for Yak service.
@@ -749,6 +750,7 @@ type YakClient interface {
 	DeleteHybridScanTask(ctx context.Context, in *DeleteHybridScanTaskRequest, opts ...grpc.CallOption) (*Empty, error)
 	GetSpaceEngineStatus(ctx context.Context, in *GetSpaceEngineStatusRequest, opts ...grpc.CallOption) (*SpaceEngineStatus, error)
 	FetchPortAssetFromSpaceEngine(ctx context.Context, in *FetchPortAssetFromSpaceEngineRequest, opts ...grpc.CallOption) (Yak_FetchPortAssetFromSpaceEngineClient, error)
+	YakVersionAtLeast(ctx context.Context, in *YakVersionAtLeastRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
 }
 
 type yakClient struct {
@@ -4946,6 +4948,15 @@ func (x *yakFetchPortAssetFromSpaceEngineClient) Recv() (*ExecResult, error) {
 	return m, nil
 }
 
+func (c *yakClient) YakVersionAtLeast(ctx context.Context, in *YakVersionAtLeastRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
+	out := new(GeneralResponse)
+	err := c.cc.Invoke(ctx, Yak_YakVersionAtLeast_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility
@@ -5356,6 +5367,7 @@ type YakServer interface {
 	DeleteHybridScanTask(context.Context, *DeleteHybridScanTaskRequest) (*Empty, error)
 	GetSpaceEngineStatus(context.Context, *GetSpaceEngineStatusRequest) (*SpaceEngineStatus, error)
 	FetchPortAssetFromSpaceEngine(*FetchPortAssetFromSpaceEngineRequest, Yak_FetchPortAssetFromSpaceEngineServer) error
+	YakVersionAtLeast(context.Context, *YakVersionAtLeastRequest) (*GeneralResponse, error)
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -6316,6 +6328,9 @@ func (UnimplementedYakServer) GetSpaceEngineStatus(context.Context, *GetSpaceEng
 }
 func (UnimplementedYakServer) FetchPortAssetFromSpaceEngine(*FetchPortAssetFromSpaceEngineRequest, Yak_FetchPortAssetFromSpaceEngineServer) error {
 	return status.Errorf(codes.Unimplemented, "method FetchPortAssetFromSpaceEngine not implemented")
+}
+func (UnimplementedYakServer) YakVersionAtLeast(context.Context, *YakVersionAtLeastRequest) (*GeneralResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method YakVersionAtLeast not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 
@@ -12273,6 +12288,24 @@ func (x *yakFetchPortAssetFromSpaceEngineServer) Send(m *ExecResult) error {
 	return x.ServerStream.SendMsg(m)
 }
 
+func _Yak_YakVersionAtLeast_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(YakVersionAtLeastRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).YakVersionAtLeast(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_YakVersionAtLeast_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).YakVersionAtLeast(ctx, req.(*YakVersionAtLeastRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -13319,6 +13352,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetSpaceEngineStatus",
 			Handler:    _Yak_GetSpaceEngineStatus_Handler,
+		},
+		{
+			MethodName: "YakVersionAtLeast",
+			Handler:    _Yak_YakVersionAtLeast_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
