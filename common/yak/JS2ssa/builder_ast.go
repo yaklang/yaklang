@@ -987,7 +987,7 @@ func (b *astbuilder) buildIdentifierExpression(text string, IslValue bool, force
 		if forceAssign {
 			text = b.SetScopeLocalVariable(text)
 		}
-		lValue := ssa.NewIdentifierLV(text, b.CurrentPos)
+		lValue := ssa.NewIdentifierLV(text, b.CurrentRange)
 		if b.CanBuildFreeValue(text) {
 			lValue.SetIsSideEffect(true)
 		}
@@ -1368,7 +1368,7 @@ func (b *astbuilder) buildIfStatementContext(stmt *JS.IfStatementContext) {
 func (b *astbuilder) buildBlock(stmt *JS.BlockContext) {
 	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()
-	b.CurrentBlock.SetPosition(b.CurrentPos)
+	b.CurrentBlock.SetRange(b.CurrentRange)
 
 	if s, ok := stmt.StatementList().(*JS.StatementListContext); ok {
 		b.ScopeStart()

@@ -86,16 +86,16 @@ func DeleteInst(i Instruction) {
 
 func (f *FunctionBuilder) SetCurrent(i Instruction) func() {
 	currentBlock := f.CurrentBlock
-	position := f.CurrentPos
+	Range := f.CurrentRange
 	scope := f.CurrentScope
 
 	f.CurrentScope = i.GetScope()
-	f.CurrentPos = i.GetPosition()
+	f.CurrentRange = i.GetRange()
 	f.CurrentBlock = i.GetBlock()
 
 	return func() {
 		f.CurrentBlock = currentBlock
-		f.CurrentPos = position
+		f.CurrentRange = Range
 		f.CurrentScope = scope
 	}
 }
@@ -173,7 +173,7 @@ func (f *FunctionBuilder) emitEx(i Instruction, insert func(Instruction)) {
 		fixupUseChain(n)
 	}
 	i.SetScope(f.CurrentScope)
-	i.SetPosition(f.CurrentPos)
+	i.SetRange(f.CurrentRange)
 	i.SetBlock(f.CurrentBlock)
 	i.SetFunc(f.Function)
 	f.SetReg(i)

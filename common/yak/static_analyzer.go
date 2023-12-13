@@ -75,10 +75,10 @@ func AnalyzeStaticYaklangWithType(code, codeTyp string) []*StaticAnalyzeResult {
 		results = append(results, &StaticAnalyzeResult{
 			Message:         err.Message,
 			Severity:        severity,
-			StartLineNumber: err.Pos.StartLine,
-			StartColumn:     err.Pos.StartColumn + 1,
-			EndLineNumber:   err.Pos.EndLine,
-			EndColumn:       err.Pos.EndColumn + 2,
+			StartLineNumber: int(err.Pos.Start.Line),
+			StartColumn:     int(err.Pos.Start.Column + 1),
+			EndLineNumber:   int(err.Pos.End.Line),
+			EndColumn:       int(err.Pos.End.Column + 2),
 			RawMessage:      err.String(),
 			From:            "SSA",
 		})

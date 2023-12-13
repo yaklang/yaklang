@@ -65,13 +65,7 @@ func TestPosition(t *testing.T) {
 		}
 	`
 	prog := ParseSSA(code)
-	want := ssa.Position{
-		SourceCode:  "1",
-		StartLine:   2,
-		StartColumn: 6,
-		EndLine:     2,
-		EndColumn:   7,
-	}
+	want := ssa.NewRange(ssa.NewPosition(7, 2, 6), ssa.NewPosition(7, 2, 7), "1")
 	prog.ShowWithSource()
 	vs := prog.GetAndCreateMainFunction().GetValuesByName("b")
 	// for _, v := range vs {
@@ -79,9 +73,12 @@ func TestPosition(t *testing.T) {
 		t.Fatal("get Value b length error")
 	}
 	v := vs[0]
-	a := v.GetPosition()
-	if *a != want {
-		t.Error("phi get_position err: ", a)
+	a := v.GetRange()
+	if *a.Start != *want.Start {
+		t.Error("phi get_position start err: ", a)
+	}
+	if *a.End != *want.End {
+		t.Error("phi get_position end err: ", a)
 	}
 }
 
@@ -357,8 +354,8 @@ func TestVariable(t *testing.T) {
 			t.Fatal("value a length error: ", varA)
 		}
 		valueA := varA[0]
-		if valueA.GetPosition().StartOffset != 8 {
-			t.Fatal("value a offset error:", valueA.GetPosition())
+		if valueA.GetRange().Start.Offset != 8 {
+			t.Fatal("value a offset error:", valueA.GetRange())
 		}
 
 	})
@@ -416,5 +413,4 @@ func TestVariable(t *testing.T) {
 			}
 		}
 	})
-
 }
