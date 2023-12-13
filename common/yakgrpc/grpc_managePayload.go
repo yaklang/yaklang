@@ -847,6 +847,27 @@ func (s *Server) GetAllPayloadGroup(ctx context.Context, _ *ypb.Empty) (*ypb.Get
 	}, nil
 }
 
+// ! 已弃用
+// 导出payload到文件
+func (s *Server) GetAllPayload(ctx context.Context, req *ypb.GetAllPayloadRequest) (*ypb.GetAllPayloadResponse, error) {
+	if req.GetGroup() == "" {
+		return nil, utils.Errorf("group is empty")
+	}
+	db := bizhelper.ExactQueryString(s.GetProfileDatabase(), "`group`", req.GetGroup())
+	var payloads []*ypb.Payload
+	gen := yakit.YieldPayloads(db, context.Background())
+
+	for p := range gen {
+		payloads = append(payloads, &ypb.Payload{
+			Content: getPayloadContent(p),
+		})
+	}
+
+	return &ypb.GetAllPayloadResponse{
+		Data: payloads,
+	}, nil
+}
+
 // 导出payload到文件
 func (s *Server) ExportAllPayload(req *ypb.GetAllPayloadRequest, stream ypb.Yak_ExportAllPayloadServer) error {
 	group := req.GetGroup()
