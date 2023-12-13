@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/bin-parser/parser"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -158,14 +159,20 @@ Host: www.example.com
 	//assert.Equal(t, codec.EncodeToHex(data), codec.EncodeToHex(res.Bytes))
 }
 func TestParseInternetProtocol(t *testing.T) {
-	//log.SetLevel(log.DebugLevel)
-	data := `f84d8991af523066d026811b080045a0020157be400031067af13b6e757bc0a8031601bbc3fdd3ff495aa37ef941801800546e5500000101080a82afe3966446750475ce0aac1dd76b44acfe1bd4a69821093ea24b33baba4b12a86b57279dfa9480b4684c7760ffd7295a383dce2d4b08569f69cb7bd8e236f93769c5ce36971cba0d3f15b365a0ec7412bdb3ade8de9ea1ecd3bfa9e0a5916d835912562f13a67e7973a1a389d5e1a58cce2dac8acf621665cdd9eea8b64008b57c50f937827aa40b3466ece997571f8a673e81bc3b35d32a480c160303012c0c00012803001d2061031d69d77218abde65c791d03963d124ba399f72b6c6bf2168b3becde1326108040100976db7b321691aafe470d0dec2b20bc222e19507d96e58d52b8e757a0d35d0efdb25bc30207476f0d7600a55f046e6249a575cf20e4f924cbd876470dd54c8d241f2b4565228c3ec75e819c6a92744c5f6fd85a063f828f806f0dc001bb48250cff7a96a06a083ce1779d5dff9a3902a0979bbd175005046bd16e0d7fe014e562a0385c43dee8811ae3a3a381473beff51ce951215025a8c36a20463552887028cd94d6e6fdaaed02c3c44e05fe28e271e4045fcac82d8ef5c72f3283e778192421909a9a5c8e1e2345d4dc439837cafe18768a78846cdcbe5f09c1bd01c1cc67b9a88a195d3ab7991c3b96df45bf73cadcc32522207053b99f43d2ab845b4da16030300040e000000`
+	log.SetLevel(log.DebugLevel)
+	//data := `"0f\xd0&\x81\x1b\xf8M\x89\x91\xafR\b\x00E\x00\x00M\x00\x00@\x00@\x06\xee\xa0\xc0\xa8\x03\x16e[\"\xf1\xd9\xc1\x1f\x90l\x159\xad\x91&U+P\x18\x10\x00)\xa1\x00\x00\x17\xf1\x03\x00 \x8b\xff(\x84U\x82\xa1OĽ\xb7ƙ>g\x8f\xcb\vݔ,l\x7f\xb1\x97\n\xea\xcb?he\xc4"`
+	//payload, err := strconv.Unquote(data)
+	//if err != nil {
+	//	t.Fatal(err)
+	//}
+	data := "3066d026811bf84d8991af52080045000239000040004006c417c0a803163b6e757bc90a01bb8d6df741ef19c21280180808752000000101080a2e48539492bf9d401603010200010001fc0303e07508c7c9112d76637377e60abfb910a2a199ec118e48a7feeace72879198a620b0ebe44f3f58691c3ce06ea0cd6457bf4ec1cad1e9ce18c9f62f4c33189f4d7b0024130113021303c02fc02bc030c02ccca9cca8c009c013c00ac014009c009d002f0035000a0100018f00000028002600002379616b6c616e672e6f73732d636e2d6265696a696e672e616c6979756e63732e636f6d00170000ff01000100000a00080006001d00170018000b00020100002300e0774de993ba81ecbf0967c018076f3054c64c7fcadfc1f3f70db9c8e013220ce31ae8cb443f1f612349647c5c5510e3e8a2d95477dca2410c4e336bca7422834e38c53ca62618a804046ad8c0862daf447ddfcdc4f6c3dd683255dc87ab67437432fcef22cca9b08a45777984b46c9951e5fbdb9ad2727fecca757963cafcd90d4ba9e07e276f6637001351793ad66c0c925ed02bd3d4df497af3ba7b1beb05fb6d6f08c63778dcfee8de5af5c62a232bd8c68a0b1d7543c320cce2327ef29f2e3887b0b02534beef4c38f4c8dd5d5094cb91f0a268c63b0473e8d132d84e6f05000d00140012040308040401050308050501080606010201003300260024001d0020aa62c08ae0dda3fa5239371a85f692c64b4092db51f51594ce045844357b002b002d00020101002b000504030403030015000f000000000000000000000000000000"
+
 	payload, err := codec.DecodeHex(data)
 	if err != nil {
 		t.Fatal(err)
 	}
-	reader := bytes.NewReader(payload)
-	res, err := parser.ParseBinary(reader, "application-layer.tls")
+	reader := bytes.NewReader([]byte(payload))
+	res, err := parser.ParseBinary(reader, "data_link")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,7 +242,7 @@ Accept: */*
 	time.Sleep(time.Second * 1)
 	spew.Dump(codec.EncodeToHex(payload))
 	reader := bytes.NewReader(payload)
-	res, err := parser.ParseBinary(reader, "application-layer.tls")
+	res, err := parser.ParseBinary(reader, "data_link")
 	if err != nil {
 		t.Fatal(err)
 	}

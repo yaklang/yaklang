@@ -1,10 +1,13 @@
 package yakgrpc
 
 import (
+	"bytes"
 	"context"
 	"github.com/samber/lo"
+	bin_parser "github.com/yaklang/yaklang/common/bin-parser/parser"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -54,12 +57,63 @@ func (s *Server) QueryTrafficTCPReassembled(ctx context.Context, req *ypb.QueryT
 		return nil, err
 	}
 	rspData := lo.Map(data, func(item *yakit.TrafficTCPReassembledFrame, index int) *ypb.TrafficTCPReassembled {
+		var infoMap map[string]any
+		if item.SerializedResults == "" {
+			data := codec.StrConvUnquoteForce(item.QuotedData)
+			node, err := bin_parser.ParseBinary(bytes.NewReader(data), "application_layer.tcp")
+			if err != nil {
+				log.Errorf("parse binary failed: %s", err)
+			} else {
+				res, err := node.Result()
+				if err != nil {
+					log.Errorf("get result failed: %s", err)
+				} else {
+					r, ok := res.(map[string]any)
+					if ok {
+						infoMap = r
+					} else {
+						log.Errorf("result type error")
+					}
+				}
+			}
+		} else {
+			data, err := codec.DecodeBase64(item.SerializedResults)
+			if err != nil {
+				log.Errorf("decode base64 failed: %s", err)
+			} else {
+				node, err := bin_parser.ParseBinary(bytes.NewReader(data), "tcp_reassembled_parsed_result")
+				if err != nil {
+					log.Errorf("parse binary failed: %s", err)
+				} else {
+					res, err := node.Result()
+					if err != nil {
+						log.Errorf("get result failed: %s", err)
+					} else {
+						r, ok := res.(map[string]any)
+						if ok {
+							infoMap = r
+						} else {
+							log.Errorf("result type error")
+						}
+					}
+				}
+			}
+		}
+		if infoMap == nil {
+			log.Errorf("parser reassembled frame failed, id: %d", item.ID)
+		}
+		source := utils.InterfaceToString(infoMap["source"])
+		destination := utils.InterfaceToString(infoMap["destination"])
+		protocol := utils.InterfaceToString(infoMap["protocol"])
 		return &ypb.TrafficTCPReassembled{
 			Id:          int64(item.ID),
 			SessionUuid: item.SessionUuid,
 			Raw:         codec.StrConvUnquoteForce(item.QuotedData),
 			Seq:         int64(item.Seq),
 			Timestamp:   int64(item.Timestamp),
+			Source:      source,
+			Destination: destination,
+			Protocol:    protocol,
 		}
 	})
 	return &ypb.QueryTrafficTCPReassembledResponse{

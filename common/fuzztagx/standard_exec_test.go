@@ -327,3 +327,12 @@ func TestErrors(t *testing.T) {
 		t.Fatal("expect `ab`")
 	}
 }
+func TestName(t *testing.T) {
+	res, err := ExecuteWithStringHandler("{{{{echo(echo)}}(a)}}", testMap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res[0] != "ab" {
+		t.Fatal("expect `ab`")
+	}
+}

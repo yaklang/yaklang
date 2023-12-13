@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcap"
 	"github.com/samber/lo"
 	bin_parser2 "github.com/yaklang/yaklang/common/bin-parser"
 	bin_parser "github.com/yaklang/yaklang/common/bin-parser/parser"
+	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
+	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
@@ -17,6 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"strconv"
 	"strings"
 )
 
@@ -145,12 +149,14 @@ func (s *Server) PcapX(stream ypb.Yak_PcapXServer) error {
 
 	return nil
 }
+
 func (s *Server) ParseTraffic(ctx context.Context, req *ypb.ParseTrafficRequest) (*ypb.ParseTrafficResponse, error) {
 	rsp := &ypb.ParseTrafficResponse{}
 	var payload []byte
 	pagination := &ypb.Paging{
 		Limit: 1,
 	}
+	finalResult := map[string]any{}
 	switch req.GetType() {
 	case "session":
 		_, sessions, err := yakit.QueryTrafficSession(consts.GetGormProjectDatabase(), &ypb.QueryTrafficSessionRequest{
@@ -165,16 +171,116 @@ func (s *Server) ParseTraffic(ctx context.Context, req *ypb.ParseTrafficRequest)
 		}
 		//payload = sessions[0].
 	case "packet":
-		_, sessions, err := yakit.QueryTrafficPacket(consts.GetGormProjectDatabase(), &ypb.QueryTrafficPacketRequest{
+		_, packet, err := yakit.QueryTrafficPacket(consts.GetGormProjectDatabase(), &ypb.QueryTrafficPacketRequest{
 			Pagination: pagination,
 			FromId:     req.GetId() - 1,
 		})
 		if err != nil {
 			return nil, err
 		}
-		if len(sessions) != 1 {
-			return nil, utils.Error("invalid session id")
+		if len(packet) != 1 {
+			return nil, utils.Error("invalid packet id")
 		}
+		payloadBytes, _ := strconv.Unquote(packet[0].Payload)
+		raw, _ := strconv.Unquote(packet[0].QuotedRaw)
+		_ = payloadBytes
+		finalResult["RAW"] = raw
+		rsp.OK = true
+		noResultError := utils.Error("no result")
+		config := map[string]any{
+			"custom-formatter": func(node *base.Node) (any, error) {
+				isPackage := func(node *base.Node) bool {
+					if node.Name == "Package" && node.Cfg.GetItem("parent") == node.Ctx.GetItem("root") {
+						return true
+					}
+					return false
+				}
+				if stream_parser.NodeHasResult(node) {
+					res := map[string]any{}
+					res["leaf"] = true
+					v := stream_parser.GetResultByNode(node)
+					verbose := ""
+					switch ret := v.(type) {
+					case []byte:
+						verbose = "0x" + codec.EncodeToHex(ret)
+					default:
+						verbose = utils.InterfaceToString(ret)
+					}
+					res["verbose"] = verbose
+					if v, ok := node.Cfg.GetItem(stream_parser.CfgNodeResult).([2]uint64); ok {
+						res["scope"] = v
+					} else {
+						return nil, fmt.Errorf("invalid scope")
+					}
+					return res, nil
+				}
+				if node.Cfg.GetBool(stream_parser.CfgIsList) {
+					var res []any
+					for _, sub := range node.Children {
+						d, err := sub.Result()
+						if err != nil {
+							if errors.Is(err, noResultError) {
+								continue
+							}
+							return nil, err
+						}
+						res = append(res, d)
+					}
+					if len(res) == 0 {
+						return nil, noResultError
+					}
+					return res, nil
+				} else {
+					//res := map[string]any{}
+					res := map[string]any{}
+					var getSubs func(node *base.Node) []*base.Node
+					getSubs = func(node *base.Node) []*base.Node {
+						children := []*base.Node{}
+						for _, sub := range node.Children {
+							if sub.Cfg.GetBool("isRefType") || sub.Cfg.GetBool("unpack") || isPackage(sub) {
+								children = append(children, getSubs(sub)...)
+							} else {
+								children = append(children, sub)
+							}
+						}
+						return children
+					}
+					children := getSubs(node)
+					for _, sub := range children {
+						d, err := sub.Result()
+						if err != nil {
+							if errors.Is(err, noResultError) {
+								continue
+							}
+							return nil, err
+						}
+						res[sub.Name] = d
+					}
+					if len(res) == 0 {
+						return nil, noResultError
+					}
+					return res, nil
+				}
+			},
+		}
+		node, err := bin_parser.ParseBinaryWithConfig(bytes.NewReader([]byte(raw)), "data_link", config)
+		if err != nil {
+			resJson, err := bin_parser2.ResultToJson(finalResult)
+			if err != nil {
+				return nil, err
+			}
+			rsp.Result = string(resJson)
+			return rsp, nil
+		}
+		parseResult, err := node.Result()
+		if parseResult != nil {
+			if v, ok := parseResult.(map[string]any); ok {
+				finalResult["Result"] = v
+			}
+		}
+		resJson, err := bin_parser2.ResultToJson(finalResult)
+		rsp.Result = string(resJson)
+		return rsp, nil
 	case "reassembled":
 		_, sessions, err := yakit.QueryTrafficTCPReassembled(consts.GetGormProjectDatabase(), &ypb.QueryTrafficTCPReassembledRequest{
 			Pagination: pagination,
@@ -187,25 +293,30 @@ func (s *Server) ParseTraffic(ctx context.Context, req *ypb.ParseTrafficRequest)
 			return nil, utils.Error("invalid session id")
 		}
 		payload = codec.StrConvUnquoteForce(sessions[0].QuotedData)
+		finalResult["RAW"] = payload
 		parseResult, err := bin_parser.ParseBinary(bytes.NewReader(payload), "application-layer.http")
 		if err != nil {
-			return nil, err
+			resJson, err := bin_parser2.ResultToJson(finalResult)
+			if err != nil {
+				return nil, err
+			}
+			rsp.OK = true
+			rsp.Result = string(resJson)
+			return rsp, nil
 		}
-		finalResult := map[string]any{}
 		res, err := parseResult.Result()
 		if err != nil {
 			return nil, err
 		}
-		finalResult["Raw"] = payload
 		finalResult["HTTP"] = res
 		resJson, err := bin_parser2.ResultToJson(finalResult)
 		if err != nil {
 			return nil, err
 		}
-		rsp.Ok = true
+		rsp.OK = true
 		rsp.Result = string(resJson)
 		return rsp, nil
 	}
-	rsp.Ok = false
+	rsp.OK = false
 	return rsp, errors.New("unknown type")
 }

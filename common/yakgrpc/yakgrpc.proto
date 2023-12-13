@@ -851,6 +851,9 @@ message TrafficTCPReassembled {
   bytes Raw = 3;
   int64 Seq = 4;
   int64 Timestamp = 5;
+  string Source = 6;
+  string Destination = 7;
+  string Protocol = 8;
 }
 
 message QueryTrafficTCPReassembledResponse {
@@ -4523,7 +4526,7 @@ message ParseTrafficRequest{
   string Type = 2;
 }
 message ParseTrafficResponse{
-  bool ok = 1;
+    bool OK = 1;
   string Result = 2;
   string Message = 3;
 }

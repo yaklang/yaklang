@@ -125,9 +125,10 @@ func ResultToJson(d any) (string, error) {
 		refV := reflect.ValueOf(d)
 		switch ret := d.(type) {
 		case []uint8:
-			return map[string]any{
-				"__data__": ret,
-			}
+			return string(ret)
+		}
+		if !refV.CanAddr() {
+			return d
 		}
 		if refV.Kind() == reflect.Slice || refV.Kind() == reflect.Array {
 			for i := 0; i < refV.Len(); i++ {

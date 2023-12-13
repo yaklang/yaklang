@@ -27,11 +27,26 @@ type YakNode struct {
 	TryProcess           func() (any, map[string]any)
 	SetChildren          func([]*YakNode)
 	GetChildren          func() []*YakNode
+	SetLength            func(l uint64)
 }
 
 func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool), error)) *YakNode {
 	yakNode := &YakNode{}
 	yakNode.origin = node
+	yakNode.SetLength = func(l uint64) {
+		if !node.Cfg.Has(CfgUnit) {
+			panic("node not has unit")
+		}
+		unit := node.Cfg.GetString(CfgUnit)
+		switch unit {
+		case "byte":
+			node.Cfg.SetItem(CfgLength, l*8)
+		case "bit":
+			node.Cfg.SetItem(CfgLength, l)
+		default:
+			panic("unknown unit " + unit)
+		}
+	}
 	yakNode.SetChildren = func(nodes []*YakNode) {
 		for _, node := range nodes {
 			yakNode.origin.Children = append(yakNode.origin.Children, node.origin)
@@ -147,7 +162,7 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 		}
 	}
 	yakNode.GetRemainingSpace = func() uint64 {
-		res, err := getRemainingSpace(yakNode.origin)
+		res, err := getNodeLength(yakNode.origin)
 		if err != nil {
 			panic(err)
 		}

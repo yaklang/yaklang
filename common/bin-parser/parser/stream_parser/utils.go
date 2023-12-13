@@ -169,20 +169,24 @@ func appendNode(parent *base.Node, child *base.Node) error {
 	return InitNode(utils.GetLastElement(parent.Children))
 }
 func getNodeByPath(node *base.Node, key string) *base.Node {
-	splits := strings.Split(key, ".")
+	splits := strings.Split(key, "/")
 	var findChildByPath func(node *base.Node, path ...string) *base.Node
 	findChildByPath = func(node *base.Node, path ...string) *base.Node {
+		if node == nil {
+			return nil
+		}
 		if len(path) == 0 {
 			return node
 		}
 		var child1 *base.Node
-		for _, child := range node.Children {
-			if child.Name == path[0] {
-				child1 = child
+		if path[0] == ".." {
+			child1 = node.Cfg.GetItem(CfgParent).(*base.Node)
+		} else {
+			for _, child := range node.Children {
+				if child.Name == path[0] {
+					child1 = child
+				}
 			}
-		}
-		if child1 == nil {
-			return nil
 		}
 		return findChildByPath(child1, path[1:]...)
 	}
@@ -203,6 +207,118 @@ func getNodeAttrByPath(node *base.Node, key string) (*base.Node, string) {
 	splits := strings.Split(key, ".")
 	node = getNodeByPath(node, strings.Join(splits[:len(splits)-1], "."))
 	return node, splits[len(splits)-1]
+}
+func parseLengthByLengthConfig(node *base.Node) (uint64, bool, error) {
+	if node.Name == "root" {
+		return math.MaxUint64, false, nil
+	}
+	iparent := node.Cfg.GetItem(CfgParent)
+	if iparent == nil {
+		return 0, false, errors.New("not set parentCfg")
+	}
+	parentNode, ok := iparent.(*base.Node)
+	if !ok {
+		return 0, false, errors.New("get parent failed")
+	}
+	parentLength, parentLengthOK, err := parseLengthByLengthConfig(parentNode)
+	if err != nil {
+		return 0, false, fmt.Errorf("parse parent length error: %v", err)
+	}
+	//parentRemaininigLength := uint64(0)
+	var length uint64
+	getLengthOK := false
+	if node.Cfg.Has("length") {
+		length = node.Cfg.GetUint64("length")
+		getLengthOK = true
+	} else if node.Cfg.Has(CfgType) {
+		typeName := node.Cfg.GetString(CfgType)
+		ok := true
+		switch typeName {
+		case "int":
+			length = 32
+		case "uint":
+			length = 32
+		case "int8":
+			length = 8
+		case "uint8":
+			length = 8
+		case "int16":
+			length = 16
+		case "uint16":
+			length = 16
+		case "int32":
+			length = 32
+		case "uint32":
+			length = 32
+		case "int64":
+			length = 64
+		case "uint64":
+			length = 64
+		default:
+			ok = false
+		}
+		if ok {
+			getLengthOK = true
+		}
+	} else if node.Cfg.Has("length-from-field") {
+		// 从field 读取length
+		if node.Cfg.Has("length-from-field") {
+			fieldName := node.Cfg.GetString("length-from-field")
+			if node.Name != fieldName {
+				for _, child := range node.Children {
+					if child.Name == fieldName {
+						if !child.Cfg.Has(CfgNodeResult) {
+							break
+						}
+						res := GetResultByNode(child)
+						if v, ok := base.InterfaceToUint64(res); ok {
+							total := v
+							if node.Cfg.Has("length-from-field-multiply") {
+								mul, ok := base.InterfaceToUint64(node.Cfg.GetItem("length-from-field-multiply"))
+								if !ok {
+									return 0, false, fmt.Errorf("length-from-field-multiply type error")
+								}
+								total *= mul
+							}
+							length = total
+							getLengthOK = true
+							//if node.Cfg.Has("length-for-field") { // 当存在字段限制，且当前节点在限制范围内时，更新parentRemaininigLength
+							//	fieldsStr := node.Cfg.GetString("length-for-field")
+							//	fieldsInScope = strings.Split(fieldsStr, ",")
+							//	for _, field := range fieldsInScope {
+							//		if field == node.Name {
+							//			length = total
+							//			break
+							//		}
+							//	}
+							//} else {
+							//	length = total
+							//}
+						} else {
+							return 0, false, fmt.Errorf("field %s type error", fieldName)
+						}
+						break
+					}
+				}
+			}
+		}
+	}
+	var currentNodeLength uint64
+	for _, sub := range parentNode.Children {
+		if sub == node {
+			break
+		}
+		currentNodeLength += CalcNodeResultLength(sub)
+	}
+	remainingLength := parentLength - currentNodeLength
+	if getLengthOK {
+		if length > remainingLength {
+			return 0, false, fmt.Errorf("node type %s,length %d over max size %d", node.Cfg.GetString(CfgType), length, parentLength)
+		}
+		return length, true, nil
+	} else {
+		return remainingLength, parentLengthOK, nil
+	}
 }
 func getRemainingSpace(node *base.Node) (uint64, error) {
 	log.Debugf("get remaining space for node %s", node.Name)
@@ -225,50 +341,12 @@ func getRemainingSpace(node *base.Node) (uint64, error) {
 	var fieldsInScope []string
 	inScope := false
 
-	if parentNode.Cfg.Has("length-from-field") {
-		// 从field 读取length
-		if parentNode.Cfg.Has("length-from-field") {
-			fieldName := parentNode.Cfg.GetString("length-from-field")
-			if node.Name != fieldName {
-				for _, child := range parentNode.Children {
-					if child.Name == fieldName {
-						if !child.Cfg.Has(CfgNodeResult) {
-							break
-						}
-						res := GetResultByNode(child)
-						if v, ok := base.InterfaceToUint64(res); ok {
-							total := v
-							if parentNode.Cfg.Has("length-from-field-multiply") {
-								mul, ok := base.InterfaceToUint64(parentNode.Cfg.GetItem("length-from-field-multiply"))
-								if !ok {
-									return 0, fmt.Errorf("length-from-field-multiply type error")
-								}
-								total *= mul
-							}
-							if total > parentRemaininigLength {
-								return 0, fmt.Errorf("node %s length %d over max size %d", node.Name, total, parentRemaininigLength)
-							}
-							if parentNode.Cfg.Has("length-for-field") { // 当存在字段限制，且当前节点在限制范围内时，更新parentRemaininigLength
-								fieldsStr := parentNode.Cfg.GetString("length-for-field")
-								fieldsInScope = strings.Split(fieldsStr, ",")
-								for _, field := range fieldsInScope {
-									if field == node.Name {
-										inScope = true
-										parentRemaininigLength = total
-										break
-									}
-								}
-							} else {
-								parentRemaininigLength = total
-							}
-						} else {
-							return 0, fmt.Errorf("field %s type error", fieldName)
-						}
-						break
-					}
-				}
-			}
-		}
+	l, ok, err := parseLengthByLengthConfig(parentNode)
+	if err != nil {
+		log.Errorf("parse length by length config error: %v", err)
+	}
+	if ok {
+		parentRemaininigLength = l
 	}
 	// 从config 读取
 	if parentNode.Cfg.Has(CfgLength) {
@@ -300,80 +378,22 @@ func getRemainingSpace(node *base.Node) (uint64, error) {
 	}
 }
 func getNodeLength(node *base.Node) (uint64, error) {
-	if node.Name == "StubData" {
-		println()
+	//iparent := node.Cfg.GetItem(CfgParent)
+	//if iparent == nil {
+	//	return 0, errors.New("not set parentCfg")
+	//}
+	//parentNode, ok := iparent.(*base.Node)
+	//if !ok {
+	//	return 0, errors.New("get parent failed")
+	//}
+	remainingLength, ok, err := parseLengthByLengthConfig(node)
+	if !ok {
+		return 0, errors.New("parse length by length config error")
 	}
-	remainingLength, err := getRemainingSpace(node)
 	if err != nil {
 		return 0, err
 	}
-	var length uint64
-	getLengthFaild := false
-	if !node.Cfg.Has(CfgLength) && !node.Cfg.Has("length-from-field") {
-		typeName := node.Cfg.GetString(CfgType)
-		switch typeName {
-		case "int":
-			length = 32
-		case "uint":
-			length = 32
-		case "int8":
-			length = 8
-		case "uint8":
-			length = 8
-		case "int16":
-			length = 16
-		case "uint16":
-			length = 16
-		case "int32":
-			length = 32
-		case "uint32":
-			length = 32
-		case "int64":
-			length = 64
-		case "uint64":
-			length = 64
-		default:
-			getLengthFaild = true
-		}
-	} else {
-		if node.Cfg.Has("length") {
-			length = node.Cfg.GetUint64("length")
-		} else if node.Cfg.Has("length-from-field") {
-			fieldName := node.Cfg.GetString("length-from-field")
-			iparent := node.Cfg.GetItem("parent")
-			parent, ok := iparent.(*base.Node)
-			if !ok {
-				return 0, fmt.Errorf("get parent failed")
-			}
-			for _, child := range parent.Children {
-				if child.Name == fieldName {
-					if !child.Cfg.Has(CfgNodeResult) {
-						break
-					}
-					res := GetResultByNode(child)
-					if v, ok := base.InterfaceToUint64(res); ok {
-						var mul uint64 = 1
-						if node.Cfg.Has("length-from-field-multiply") {
-							mul = node.Cfg.ConvertUint64("length-from-field-multiply")
-						}
-						length = v * mul
-					} else {
-						return 0, fmt.Errorf("field %s type error", fieldName)
-					}
-					break
-				}
-			}
-		}
-
-	}
-	if !getLengthFaild {
-		if length > remainingLength {
-			return 0, fmt.Errorf("node type %s,length %d over max size %d", node.Cfg.GetString(CfgType), length, remainingLength)
-		}
-		return length, nil
-	} else {
-		return remainingLength, nil
-	}
+	return remainingLength, nil
 }
 func walkNode(node *base.Node, handle func(node *base.Node) bool) {
 	if !handle(node) {

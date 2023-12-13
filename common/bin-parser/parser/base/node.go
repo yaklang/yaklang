@@ -134,7 +134,7 @@ func NewConfig(config *Config) *Config {
 			make(map[string]any),
 		},
 	}
-	copeFields := []string{"endian", "parser"}
+	copeFields := []string{"endian", "parser", "unit"}
 	for _, field := range copeFields {
 		if config.Has(field) {
 			res.SetItem(field, config.GetItem(field))

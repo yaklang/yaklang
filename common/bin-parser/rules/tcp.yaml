@@ -1,8 +1,7 @@
 endian: big
+unit: byte
 Package:
     TCP:
-        length-from-field: Header Length
-        length-from-field-multiply: 32
         Source Port: uint16
         Destination Port: uint16
         Sequence Number: raw,4
@@ -13,27 +12,33 @@ Package:
         Checksum: raw,2
         Urgent Pointer: raw,2
         Options: # 字节数需要是4的倍数，不足补0
-            type: Option
             isList: true
+            type: Option
+            operator: |
+                this.SetLength(getNodeResult("../Header Length")*4 - 20)
+                for {
+                    ele = this.NewElement()
+                    if ele.GetRemainingSpace() == 0{
+                        return
+                    }
+                    ele.Process()
+                    if ele.GetSubNode("Kind").Result() == 0 {
+                        return
+                    }
+                }
+        Payload: raw
 
 Option:
     operator: |
-        if this.GetRemainingSpace() == 0{
-            setCtx("inList",false)
-            return
-        }
         n = this.GetSubNode("Kind").Process()
         switch n {
-            case 0:
-                setCtx("inList",false)
-                break
-            case 1:
-                break
-            default:
-                this.GetSubNode("Length").Process()
-                if this.GetSubNode("Data").GetRemainingSpace() != 0 {
-                    this.GetSubNode("Data").Process()
-                }    
+        case 1:
+            break
+        default:
+            this.GetSubNode("Length").Process()
+            if this.GetSubNode("Data").GetRemainingSpace() != 0 {
+                this.GetSubNode("Data").Process()
+            }    
         }
     length-from-field: Length
     length-from-field-multiply: 8

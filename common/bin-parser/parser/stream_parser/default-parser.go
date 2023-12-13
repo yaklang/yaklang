@@ -7,7 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"path"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"reflect"
 )
 
@@ -16,6 +16,7 @@ const (
 	CfgIsList        = "isList"
 	CfgIsTempRoot    = "temp root"
 	CfgLength        = "length"
+	CfgUnit          = "unit"
 	CfgType          = "type"
 	CfgGetResult     = "get result"
 	CfgRawResult     = "raw result"
@@ -46,6 +47,7 @@ type DefParser struct {
 	write func([]byte, uint64) ([2]uint64, error)
 	ctx   *base.NodeContext
 	mode  string
+	cfg   base.Config
 }
 type Operator struct {
 	ParseStruct   func(node *base.Node) (bool, error)
@@ -147,8 +149,7 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 	}
 	if node.Cfg.Has(CfgImport) {
 		ruleName := node.Cfg.GetString(CfgImport)
-		rulePath := path.Join(node.Ctx.GetString("path"), ruleName)
-		targetNode, err := base.ParseRule(rulePath)
+		targetNode, err := base.ParseRule(ruleName)
 		if err != nil {
 			return err
 		}
@@ -261,7 +262,7 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 				element.Cfg.SetItem(CfgParent, node)
 				node.Children = append(node.Children, element)
 				//node.Cfg.GetItem("exception-plan")
-				l, err := getRemainingSpace(element)
+				l, err := getNodeLength(element)
 				if err != nil {
 					return fmt.Errorf("get remaining space error: %w", err)
 				}
@@ -478,6 +479,7 @@ func (d *DefParser) Parse(data *base.BitReader, node *base.Node) error {
 						return fmt.Errorf("write error: %w", err)
 					}
 					node.Cfg.SetItem(CfgNodeResult, rawRes)
+					log.Debugf("node %s result: %v", node.Name, codec.EncodeToHex(buf))
 					return nil
 				} else {
 					return errors.New("not support type")
@@ -511,7 +513,7 @@ func (d *DefParser) Parse(data *base.BitReader, node *base.Node) error {
 					return err
 				}
 				node.Cfg.SetItem(CfgNodeResult, res)
-
+				log.Debugf("node %s result: %v", node.Name, codec.EncodeToHex(byts))
 				return nil
 			}
 		},
@@ -531,60 +533,23 @@ func (d *DefParser) Parse(data *base.BitReader, node *base.Node) error {
 var noResultError = errors.New("no result")
 
 func (d *DefParser) Result(node *base.Node) (any, error) {
-	isPackage := func(node *base.Node) bool {
-		if node.Name == "Package" && node.Cfg.GetItem(CfgParent) == node.Ctx.GetItem("root") {
-			return true
+	formatter := "default"
+	if d.ctx.Has("custom-formatter") {
+		iformatterFn := d.ctx.GetItem("custom-formatter")
+		formatterFn, ok := iformatterFn.(func(node *base.Node) (any, error))
+		if !ok {
+			return nil, fmt.Errorf("custom-formatter type error")
 		}
-		return false
+		return formatterFn(node)
 	}
-	if NodeHasResult(node) {
-		return GetResultByNode(node), nil
-	}
-	if node.Cfg.GetBool(CfgIsList) {
-		res := []any{}
-		for _, sub := range node.Children {
-			d, err := sub.Result()
-			if err != nil {
-				if errors.Is(err, noResultError) {
-					continue
-				}
-				return nil, err
-			}
-			res = append(res, d)
-		}
-		if len(res) == 0 {
-			return nil, noResultError
-		}
-		return res, nil
+	if d.ctx.Has("formatter") {
+		formatter = d.ctx.GetString("formatter")
 	} else {
-		//res := map[string]any{}
-		res := map[string]any{}
-		var getSubs func(node *base.Node) []*base.Node
-		getSubs = func(node *base.Node) []*base.Node {
-			children := []*base.Node{}
-			for _, sub := range node.Children {
-				if sub.Cfg.GetBool("isRefType") || sub.Cfg.GetBool("unpack") || isPackage(sub) {
-					children = append(children, getSubs(sub)...)
-				} else {
-					children = append(children, sub)
-				}
-			}
-			return children
-		}
-		children := getSubs(node)
-		for _, sub := range children {
-			d, err := sub.Result()
-			if err != nil {
-				if errors.Is(err, noResultError) {
-					continue
-				}
-				return nil, err
-			}
-			res[sub.Name] = d
-		}
-		if len(res) == 0 {
-			return nil, noResultError
-		}
-		return res, nil
+		formatter = "default"
+	}
+	if v, ok := formatters[formatter]; ok {
+		return v(node)
+	} else {
+		return nil, fmt.Errorf("formatter %s not found", formatter)
 	}
 }
