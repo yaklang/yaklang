@@ -189,7 +189,7 @@ func (v *Value) NewWarn(tag, msg string) {
 func (v *Value) String() string { return v.node.LineDisasm() }
 func (i *Value) StringWithSource() string {
 	if i.disasmLine == "" {
-		i.disasmLine = fmt.Sprintf("[%-6s] %s\t%s", i.node.GetOpcode(), i.node.LineDisasm(), i.node.GetPosition())
+		i.disasmLine = fmt.Sprintf("[%-6s] %s\t%s", i.node.GetOpcode(), i.node.LineDisasm(), i.node.GetRange())
 	}
 	return i.disasmLine
 }
@@ -213,8 +213,8 @@ func (v *Value) GetTypeKind() ssa.TypeKind {
 	return ssa.Any
 }
 
-func (v *Value) GetPosition() *ssa.Position {
-	return v.node.GetPosition()
+func (v *Value) GetPosition() *ssa.Range {
+	return v.node.GetRange()
 }
 
 func (i *Value) HasOperands() bool {

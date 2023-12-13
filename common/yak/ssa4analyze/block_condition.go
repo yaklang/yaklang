@@ -104,14 +104,16 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 		newEdge(sw.DefaultBlock, from, defaultCond)
 	}
 
-	fixupBlockPos := func(b *ssa.BasicBlock) *ssa.Position {
+	fixupBlockPos := func(b *ssa.BasicBlock) *ssa.Range {
 		var start *ssa.Position
 		for _, inst := range b.Insts {
 			// inst.GetPosition == nil, this inst is edge
-			if ssa.IsControlInstruction(inst) && inst.GetPosition() != nil {
+			if ssa.IsControlInstruction(inst) && inst.GetRange() != nil {
 				continue
 			}
-			start = inst.GetPosition()
+			if pos := inst.GetRange(); pos != nil {
+				start = pos.Start
+			}
 			break
 		}
 
@@ -122,28 +124,25 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 		var end *ssa.Position
 		for i := len(b.Insts) - 1; i >= 0; i-- {
 			inst := b.Insts[i]
-			if ssa.IsControlInstruction(inst) && inst.GetPosition() != nil {
+			if ssa.IsControlInstruction(inst) && inst.GetRange() != nil {
 				continue
 			}
-			end = inst.GetPosition()
+			if pos := inst.GetRange(); pos != nil {
+				end = pos.Start
+			}
 			break
 		}
 		if end == nil {
 			end = start
 		}
-		pos := &ssa.Position{}
-		pos.StartLine = start.StartLine
-		pos.StartColumn = start.StartColumn
-		pos.EndColumn = end.EndColumn
-		pos.EndLine = end.EndLine
-		return pos
+		return ssa.NewRange(start, end, "")
 	}
 
 	deleteInst := make([]ssa.Instruction, 0)
 	// handler instruction
 	for _, b := range fun.Blocks {
 		// fix block position
-		b.SetPosition(fixupBlockPos(b))
+		b.SetRange(fixupBlockPos(b))
 
 		for _, inst := range b.Insts {
 			switch inst := inst.(type) {

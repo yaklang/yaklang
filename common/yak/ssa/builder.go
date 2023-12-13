@@ -16,7 +16,7 @@ type FunctionBuilder struct {
 
 	// for build
 	CurrentBlock       *BasicBlock // current block to build
-	CurrentPos         *Position   // current position in source code
+	CurrentRange       *Range      // current position in source code
 	CurrentScope       *Scope
 	scopeId            int
 	parentScope        *Scope      // parent symbol block for build FreeValue
@@ -38,7 +38,7 @@ func NewBuilder(f *Function, parent *FunctionBuilder) *FunctionBuilder {
 		subFuncBuild:  make([]func(), 0),
 		deferExpr:     make([]*Call, 0),
 		CurrentBlock:  nil,
-		CurrentPos:    nil,
+		CurrentRange:  nil,
 		CurrentScope:  NewScope(0, nil, f),
 		scopeId:       0,
 		parentBuilder: parent,
@@ -65,7 +65,7 @@ func (b *FunctionBuilder) IsBlockFinish() bool {
 // new function
 func (b *FunctionBuilder) NewFunc(name string) (*Function, *Scope) {
 	f := b.Package.NewFunctionWithParent(name, b.Function)
-	f.SetPosition(b.CurrentPos)
+	f.SetRange(b.CurrentRange)
 	return f, b.CurrentScope
 }
 
@@ -119,16 +119,6 @@ func (b *FunctionBuilder) Finish() {
 
 	// function finish
 	b.Function.Finish()
-}
-
-// handler position: set new position and return original position for backup
-func (b *FunctionBuilder) SetPosition(pos *Position) *Position {
-	backup := b.CurrentPos
-	// if b.CurrentBlock.GetPosition() == nil {
-	// 	b.CurrentBlock.SetPosition(pos)
-	// }
-	b.CurrentPos = pos
-	return backup
 }
 
 // sub-function builder

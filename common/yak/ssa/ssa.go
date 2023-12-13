@@ -29,8 +29,8 @@ type Instruction interface {
 	SetName(variable string)
 
 	// position
-	GetPosition() *Position
-	SetPosition(*Position)
+	GetRange() *Range
+	SetRange(*Range)
 
 	// Scope
 	SetScope(*Scope)
@@ -90,7 +90,7 @@ type User interface {
 type anInstruction struct {
 	fun   *Function
 	block *BasicBlock
-	Pos   *Position
+	R     *Range
 	scope *Scope
 
 	name string
@@ -112,11 +112,11 @@ func (a *anInstruction) SetBlock(block *BasicBlock) { a.block = block }
 func (a *anInstruction) GetBlock() *BasicBlock      { return a.block }
 
 // source code position
-func (c *anInstruction) GetPosition() *Position { return c.Pos }
+func (c *anInstruction) GetRange() *Range { return c.R }
 
-func (c *anInstruction) SetPosition(pos *Position) {
+func (c *anInstruction) SetRange(pos *Range) {
 	// if c.Pos == nil {
-	c.Pos = pos
+	c.R = pos
 	// }
 }
 
@@ -125,7 +125,7 @@ func (c *anInstruction) SetExtern(b bool) { c.isExtern = b }
 
 // error logger
 func (c *anInstruction) NewError(kind ErrorKind, tag ErrorTag, msg string) {
-	c.GetFunc().NewErrorWithPos(kind, tag, c.GetPosition(), msg)
+	c.GetFunc().NewErrorWithPos(kind, tag, c.GetRange(), msg)
 }
 
 // symbol-table

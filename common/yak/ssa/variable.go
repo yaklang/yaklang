@@ -5,7 +5,7 @@ import "github.com/yaklang/yaklang/common/utils"
 // --------------- for assign
 type LeftValue interface {
 	Assign(Value, *FunctionBuilder)
-	GetPosition() *Position
+	GetRange() *Range
 	GetValue(*FunctionBuilder) Value
 }
 
@@ -13,12 +13,12 @@ type LeftValue interface {
 // --------------- is SSA value
 type IdentifierLV struct {
 	name         string
-	pos          *Position
+	pos          *Range
 	isSideEffect bool
 }
 
 func (i *IdentifierLV) Assign(v Value, f *FunctionBuilder) {
-	f.CurrentScope.AddVariable(NewVariable(i.name, v), f.CurrentPos)
+	f.CurrentScope.AddVariable(NewVariable(i.name, v), f.CurrentRange)
 	f.WriteVariable(i.name, v)
 	if i.isSideEffect {
 		f.AddSideEffect(i.name, v)
@@ -30,14 +30,14 @@ func (i *IdentifierLV) GetValue(f *FunctionBuilder) Value {
 	return v
 }
 
-func (i *IdentifierLV) GetPosition() *Position {
+func (i *IdentifierLV) GetRange() *Range {
 	return i.pos
 }
 func (i *IdentifierLV) SetIsSideEffect(b bool) {
 	i.isSideEffect = b
 }
 
-func NewIdentifierLV(variable string, pos *Position) *IdentifierLV {
+func NewIdentifierLV(variable string, pos *Range) *IdentifierLV {
 	return &IdentifierLV{
 		name: variable,
 		pos:  pos,
@@ -120,10 +120,10 @@ func (b *FunctionBuilder) ReadVariable(variable string, create bool) Value {
 
 	if ret != nil {
 		if v := ret.GetVariable(variable); v != nil {
-			v.AddRange(b.CurrentPos)
-			b.CurrentScope.InsertByRange(v, b.CurrentPos)
+			v.AddRange(b.CurrentRange)
+			b.CurrentScope.InsertByRange(v, b.CurrentRange)
 		} else {
-			b.CurrentScope.AddVariable(NewVariable(variable, ret), b.CurrentPos)
+			b.CurrentScope.AddVariable(NewVariable(variable, ret), b.CurrentRange)
 		}
 	}
 
@@ -134,9 +134,9 @@ func (b *FunctionBuilder) ReadVariableBefore(variable string, create bool, befor
 	var ret Value
 	b.ReadVariableEx(variable, create, func(vs []Value) {
 		for i := len(vs) - 1; i >= 0; i-- {
-			vpos := vs[i].GetPosition()
-			bpos := before.GetPosition()
-			if vpos.StartLine <= bpos.StartLine {
+			vpos := vs[i].GetRange()
+			bpos := before.GetRange()
+			if vpos.CompareStart(bpos) <= 0 {
 				ret = vs[i]
 				return
 			}
@@ -183,7 +183,7 @@ func (b *FunctionBuilder) readVariableByBlockEx(variable string, block *BasicBlo
 	if !block.isSealed {
 		if create {
 			phi := NewPhi(block, variable, create)
-			phi.SetPosition(b.CurrentPos)
+			phi.SetRange(b.CurrentRange)
 			block.inCompletePhi = append(block.inCompletePhi, phi)
 			v = phi
 		}
@@ -197,7 +197,7 @@ func (b *FunctionBuilder) readVariableByBlockEx(variable string, block *BasicBlo
 			un := NewUndefined(variable)
 			// b.emitInstructionBefore(un, block.LastInst())
 			b.EmitToBlock(un, block)
-			un.SetPosition(b.CurrentPos)
+			un.SetRange(b.CurrentRange)
 			v = un
 		} else {
 			v = nil
@@ -211,7 +211,7 @@ func (b *FunctionBuilder) readVariableByBlockEx(variable string, block *BasicBlo
 		}
 	} else {
 		phi := NewPhi(block, variable, create)
-		phi.SetPosition(b.CurrentPos)
+		phi.SetRange(b.CurrentRange)
 		v = phi.Build()
 	}
 	if v != nil {

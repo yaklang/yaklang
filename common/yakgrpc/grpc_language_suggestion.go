@@ -505,22 +505,22 @@ func getDescFromSSAValue(name string, v *ssaapi.Value) string {
 	return desc
 }
 
-func sortValuesByPosition(values ssaapi.Values, position *ssa.Position) ssaapi.Values {
+func sortValuesByPosition(values ssaapi.Values, position *ssa.Range) ssaapi.Values {
 	// todo: 需要修改SSA，需要真正的RefLocation
 	values = values.Filter(func(v *ssaapi.Value) bool {
 		position2 := v.GetPosition()
 		if position2 == nil {
 			return false
 		}
-		if position2.StartLine > position.StartLine {
+		if position2.Start.Line > position.Start.Line {
 			return false
 		}
 		return true
 	})
 	sort.SliceStable(values, func(i, j int) bool {
-		line1, line2 := values[i].GetPosition().StartLine, values[j].GetPosition().StartLine
+		line1, line2 := values[i].GetPosition().Start.Line, values[j].GetPosition().Start.Line
 		if line1 == line2 {
-			return values[i].GetPosition().StartColumn > values[j].GetPosition().StartColumn
+			return values[i].GetPosition().Start.Column > values[j].GetPosition().Start.Column
 		} else {
 			return line1 > line2
 		}
@@ -528,14 +528,14 @@ func sortValuesByPosition(values ssaapi.Values, position *ssa.Position) ssaapi.V
 	return values
 }
 
-func getSSAParentValueByPosition(prog *ssaapi.Program, sourceCode string, position *ssa.Position) *ssaapi.Value {
+func getSSAParentValueByPosition(prog *ssaapi.Program, sourceCode string, position *ssa.Range) *ssaapi.Value {
 	word := strings.Split(sourceCode, ".")[0]
 	values := prog.Ref(word).Filter(func(v *ssaapi.Value) bool {
 		position2 := v.GetPosition()
 		if position2 == nil {
 			return false
 		}
-		if position2.StartLine > position.StartLine {
+		if position2.Start.Line > position.Start.Line {
 			return false
 		}
 		return true
@@ -547,7 +547,7 @@ func getSSAParentValueByPosition(prog *ssaapi.Program, sourceCode string, positi
 	return values[0].GetSelf()
 }
 
-func getSSAValueByPosition(prog *ssaapi.Program, sourceCode string, position *ssa.Position) *ssaapi.Value {
+func getSSAValueByPosition(prog *ssaapi.Program, sourceCode string, position *ssa.Range) *ssaapi.Value {
 	var values ssaapi.Values
 	for i, word := range strings.Split(sourceCode, ".") {
 		if i == 0 {
@@ -580,7 +580,7 @@ func trimSourceCode(sourceCode string) (string, bool) {
 func OnHover(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionRequest) (ret []*ypb.SuggestionDescription) {
 	ret = make([]*ypb.SuggestionDescription, 0)
 	position := GrpcRangeToPosition(req.GetRange())
-	word, _ := trimSourceCode(position.SourceCode)
+	word, _ := trimSourceCode(*position.SourceCode)
 	v := getSSAParentValueByPosition(prog, word, position)
 	// fallback
 	if v == nil {
@@ -600,7 +600,7 @@ func OnHover(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionRequest) (r
 func OnSignature(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionRequest) (ret []*ypb.SuggestionDescription) {
 	ret = make([]*ypb.SuggestionDescription, 0)
 	position := GrpcRangeToPosition(req.GetRange())
-	word, _ := trimSourceCode(position.SourceCode)
+	word, _ := trimSourceCode(*position.SourceCode)
 	v := getSSAParentValueByPosition(prog, word, position)
 	// fallback
 	if v == nil {
@@ -624,7 +624,7 @@ func OnSignature(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionRequest
 func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionRequest) (ret []*ypb.SuggestionDescription) {
 	ret = make([]*ypb.SuggestionDescription, 0)
 	position := GrpcRangeToPosition(req.GetRange())
-	word, containPoint := trimSourceCode(position.SourceCode)
+	word, containPoint := trimSourceCode(*position.SourceCode)
 	v := getSSAParentValueByPosition(prog, word, position)
 	if !containPoint {
 		// 库补全
@@ -643,10 +643,10 @@ func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionReques
 				if position2 == nil {
 					return false
 				}
-				line := position2.StartLine
-				if line < position.StartLine {
+				line := position2.Start.Line
+				if line < position.Start.Line {
 					return true
-				} else if line == position.StartLine {
+				} else if line == position.Start.Line {
 					return id != word
 				}
 				return false
@@ -785,7 +785,7 @@ func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionReques
 			if position2 == nil {
 				return false
 			}
-			return u.IsField() && position2.StartLine <= position.StartLine
+			return u.IsField() && position2.Start.Line <= position.Start.Line
 		}).ForEach(func(v *ssaapi.Value) {
 			key := v.GetOperand(1)
 			if _, ok := filterMap[key.String()]; ok {
@@ -821,14 +821,13 @@ func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionReques
 	return ret
 }
 
-func GrpcRangeToPosition(r *ypb.Range) *ssa.Position {
-	return &ssa.Position{
-		SourceCode:  r.Code,
-		StartLine:   int(r.StartLine),
-		StartColumn: int(r.StartColumn - 1),
-		EndLine:     int(r.EndLine),
-		EndColumn:   int(r.EndColumn - 1),
-	}
+func GrpcRangeToPosition(r *ypb.Range) *ssa.Range {
+	// TODO: ypb.Range should have `Offset`
+	return ssa.NewRange(
+		ssa.NewPosition(0, r.StartLine, r.StartColumn-1),
+		ssa.NewPosition(0, r.EndLine, r.EndColumn-1),
+		r.Code,
+	)
 }
 
 func (s *Server) YaklangLanguageSuggestion(ctx context.Context, req *ypb.YaklangLanguageSuggestionRequest) (*ypb.YaklangLanguageSuggestionResponse, error) {
@@ -836,7 +835,7 @@ func (s *Server) YaklangLanguageSuggestion(ctx context.Context, req *ypb.Yaklang
 	opt := pta.GetPluginSSAOpt(req.YakScriptType)
 	opt = append(opt, ssaapi.WithIgnoreSyntaxError(true))
 	prog := ssaapi.Parse(req.YakScriptCode, opt...)
-	if prog.Program == nil {
+	if prog.IsNil() {
 		return nil, errors.New("ssa parse error")
 	}
 	// todo: 处理YakScriptType，不同语言的补全、提示可能有不同

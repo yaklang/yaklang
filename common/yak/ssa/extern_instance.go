@@ -97,7 +97,7 @@ func (b *FunctionBuilder) BuildValueFromAny(id string, v any) (value Value) {
 	switch itype.Kind() {
 	case reflect.Func:
 		f := NewFunctionWithType(str, b.CoverReflectFunctionType(itype, 0))
-		f.SetPosition(b.CurrentPos)
+		f.SetRange(b.CurrentRange)
 		value = f
 	default:
 		value = NewParam(str, false, b.Function)

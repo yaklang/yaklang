@@ -9,14 +9,14 @@ import (
 
 type Variable struct {
 	Name  string
-	Range map[*Position]struct{}
+	Range map[*Range]struct{}
 	V     Value
 }
 
 func NewVariable(name string, i Value) *Variable {
 	ret := &Variable{
 		Name:  name,
-		Range: make(map[*Position]struct{}),
+		Range: make(map[*Range]struct{}),
 		V:     i,
 	}
 	i.AddVariable(ret)
@@ -28,7 +28,7 @@ func (v *Variable) String() string {
 	return ret
 }
 
-func (v *Variable) AddRange(p *Position) {
+func (v *Variable) AddRange(p *Range) {
 	// v.Range = append(v.Range, p)
 	// fmt.Println(v.Name, p.StartColumn)
 	v.Range[p] = struct{}{}
@@ -42,7 +42,7 @@ func (v *Variable) NewError(kind ErrorKind, tag ErrorTag, msg string) {
 
 type item struct {
 	v *Variable
-	r *Position
+	r *Range
 }
 
 type Scope struct {
@@ -51,20 +51,20 @@ type Scope struct {
 	Var                []item            // sort by Position
 	SymbolTable        map[string]string // variable -> variable-ID(variable-scopeID)
 	SymbolTableReverse map[string]string // variable -> variable-ID(variable-scopeID)
-	Range              *Position
+	Range              *Range
 	Function           *Function
 	Parent             *Scope
 	Children           []*Scope
 }
 
-func NewScope(id int, Range *Position, Func *Function) *Scope {
+func NewScope(id int, R *Range, Func *Function) *Scope {
 	return &Scope{
 		Id:                 id,
 		VarMap:             make(map[string][]*Variable),
 		Var:                make([]item, 0),
 		SymbolTable:        make(map[string]string),
 		SymbolTableReverse: make(map[string]string),
-		Range:              Range,
+		Range:              R,
 		Function:           Func,
 		Parent:             nil,
 		Children:           make([]*Scope, 0),
@@ -76,18 +76,18 @@ func (s *Scope) AddChild(child *Scope) {
 	child.Parent = s
 }
 
-func (s *Scope) InsertByRange(v *Variable, Range *Position) {
+func (s *Scope) InsertByRange(v *Variable, R *Range) {
 	i := 0
 	for ; i < len(s.Var); i++ {
-		if s.Var[i].r.CompareStart(Range) > 0 {
+		if s.Var[i].r.CompareStart(R) > 0 {
 			break
 		}
 	}
-	s.Var = utils.InsertSliceItem(s.Var, item{v, Range}, i)
+	s.Var = utils.InsertSliceItem(s.Var, item{v, R}, i)
 }
 
-func (s *Scope) AddVariable(v *Variable, Range *Position) {
-	if Range == nil {
+func (s *Scope) AddVariable(v *Variable, R *Range) {
+	if R == nil {
 		log.Errorf("scope(%d) variable %s range is nil", s.Id, v.Name)
 	}
 	str, ok := s.SymbolTableReverse[v.Name]
@@ -103,8 +103,8 @@ func (s *Scope) AddVariable(v *Variable, Range *Position) {
 		varList = append(varList, v)
 		s.VarMap[str] = varList
 	}
-	v.AddRange(Range)
-	s.InsertByRange(v, Range)
+	v.AddRange(R)
+	s.InsertByRange(v, R)
 }
 
 func (s *Scope) SetLocalVariable(text string) string {
@@ -139,7 +139,7 @@ func (s *Scope) String() string {
 
 // block symbol-table stack
 func (b *FunctionBuilder) ScopeStart() {
-	newScope := NewScope(b.NewScopeId(), b.CurrentPos, b.Function)
+	newScope := NewScope(b.NewScopeId(), b.CurrentRange, b.Function)
 	b.CurrentScope.AddChild(newScope)
 	b.CurrentScope = newScope
 }
