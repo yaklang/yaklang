@@ -58,6 +58,11 @@ func (p *Payload) BeforeSave() error {
 	return nil
 }
 
+func (p *Payload) BeforeCreate() error {
+	p.Hash = p.CalcHash()
+	return nil
+}
+
 type gormNoLog int
 
 func (i gormNoLog) Print(v ...interface{}) {
@@ -469,7 +474,7 @@ func QueryPayloadWithoutPaging(db *gorm.DB, folder, group, keyword string) ([]*P
 }
 
 func QueryPayload(db *gorm.DB, folder, group, keyword string, paging *Paging) (*bizhelper.Paginator, []*Payload, error) {
-	db = db.Model(&Payload{}) // .Debug()
+	db = db.Model(&Payload{})
 	db = bizhelper.QueryOrder(db, paging.OrderBy, paging.Order)
 	db = bizhelper.ExactQueryString(db, "`folder`", folder)
 	db = bizhelper.ExactQueryString(db, "`group`", group)
