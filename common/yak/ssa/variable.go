@@ -1,6 +1,8 @@
 package ssa
 
-import "github.com/yaklang/yaklang/common/utils"
+import (
+	"github.com/yaklang/yaklang/common/utils"
+)
 
 // --------------- for assign
 type LeftValue interface {
@@ -78,7 +80,14 @@ func (b *Function) writeVariableByBlock(variable string, value Value, block *Bas
 	if !ok {
 		vs = make(Values, 0)
 	}
-	vs = append(vs, value)
+	if len(vs) != 0 && vs[len(vs)-1] == nil {
+		if value == nil {
+			return
+		}
+		vs[len(vs)-1] = value
+	} else {
+		vs = append(vs, value)
+	}
 	block.symbolTable[variable] = vs
 }
 
@@ -134,8 +143,14 @@ func (b *FunctionBuilder) ReadVariableBefore(variable string, create bool, befor
 	var ret Value
 	b.ReadVariableEx(variable, create, func(vs []Value) {
 		for i := len(vs) - 1; i >= 0; i-- {
+			if vs[i] == nil {
+				continue
+			}
 			vpos := vs[i].GetRange()
 			bpos := before.GetRange()
+			if vpos == nil || bpos == nil {
+				continue
+			}
 			if vpos.CompareStart(bpos) <= 0 {
 				ret = vs[i]
 				return
@@ -214,8 +229,8 @@ func (b *FunctionBuilder) readVariableByBlockEx(variable string, block *BasicBlo
 		phi.SetRange(b.CurrentRange)
 		v = phi.Build()
 	}
+	b.writeVariableByBlock(variable, v, block)
 	if v != nil {
-		b.writeVariableByBlock(variable, v, block)
 		return []Value{v}
 	} else {
 		return nil
