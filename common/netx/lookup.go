@@ -36,6 +36,7 @@ func reliableLookupHost(host string, opt ...DNSOption) error {
 
 	if config.Hosts != nil && len(config.Hosts) > 0 {
 		result, ok := config.Hosts[host]
+		config.etcHostNoCache = true
 		if ok && result != "" {
 			config.call("", host, result, "hosts", "hosts")
 			return nil

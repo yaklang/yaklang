@@ -84,7 +84,7 @@ RETRY:
 		conn, err = net.DialTimeout("tcp", utils.HostPort(ip, port), config.Timeout)
 		if err != nil {
 			if config.Debug {
-				log.Error("dial %s failed: %s", target, err)
+				log.Errorf("dial %s failed: %v", target, err)
 			}
 			lastError = err
 			var opError *net.OpError
