@@ -38,27 +38,34 @@ chainFilter
     | '{' ((identifier ':') filters (';' (identifier ':') filters )*)? ';'? '}'  # BuildMap
     ;
 
-filterFieldMember: identifier | numberLiteral | typeCast;
+filterFieldMember
+    : identifier | numberLiteral | typeCast
+    | ( '(' conditionExpression ')')
+    ;
 conditionExpression
     : numberLiteral                               # FilterExpressionNumber
     | stringLiteral                               # FilterExpressionString
-    | boolLiteral                                 # FilterExpressionBool
-    | '(' conditionExpression ')'                    # FilterExpressionParen
+    | regexpLiteral                               # FilterExpressionRegexp
+    | '(' conditionExpression ')'                 # FilterExpressionParen
+    | '!' conditionExpression                     # FilterExpressionNot
     | op = (
-        '>' | '<' | '=' |
-        '==' | '>=' | '<='
-        | '~=' /*for string regex*/)
-    (numberLiteral | stringLiteral | boolLiteral) # PrefixOperatorUnary
+        '>' | '<' | '=' | '==' | '>='
+         | '<=' | '!='
+        ) (
+            numberLiteral | identifier | boolLiteral
+        ) # FilterExpressionCompare
+    | op = ( '=~' | '!~') (stringLiteral | regexpLiteral) # FilterExpressionRegexpMatch
     | conditionExpression '&&' conditionExpression      # FilterExpressionAnd
     | conditionExpression '||' conditionExpression      # FilterExpressionOr
     ;
 
 numberLiteral: Number | OctalNumber | BinaryNumber | HexNumber;
 stringLiteral: identifier;
+regexpLiteral: RegexpLiteral;
 typeCast: '(' types ')';
 identifier: Identifier | types;
 types: StringType | NumberType | ListType | DictType | BoolType;
-boolLiteral: BoolType;
+boolLiteral: BoolLiteral;
 
 DeepFilter: '==>';
 Deep: '...';
@@ -71,9 +78,12 @@ DoubleLt: '<<';
 DoubleGt: '>>';
 Filter: '=>';
 EqEq: '==';
-RegexpMatch: '~=';
+RegexpMatch: '=~';
+NotRegexpMatch: '!~';
 And: '&&';
 Or: '||';
+NotEq: '!=';
+
 Gt: '>';
 Dot: '.';
 Lt: '<';
@@ -89,6 +99,8 @@ ListStart: '#';
 DollarOutput: '$';
 Colon: ':';
 Search: '%';
+Bang: '!';
+
 
 WhiteSpace: [ \r\n] -> skip;
 Number: Digit+;
@@ -100,7 +112,8 @@ StringType: 'str';
 ListType: 'list';
 DictType: 'dict';
 NumberType: 'int' | 'float';
-BoolType: 'true' | 'false';
+BoolType: 'bool';
+BoolLiteral: 'true' | 'false';
 
 Identifier: IdentifierCharStart IdentifierChar*;
 fragment IdentifierCharStart: '%' | '_' | [a-z] | [A-Z] | '%%';
@@ -108,3 +121,9 @@ fragment IdentifierChar: [0-9] | IdentifierCharStart;
 fragment HexDigit: [a-fA-F0-9];
 fragment Digit: [0-9];
 fragment OctalDigit: [0-7];
+
+RegexpLiteral: '/' RegexpLiteralChar+ '/';
+fragment RegexpLiteralChar
+    : '\\' '/'
+    | ~[/]
+    ;
