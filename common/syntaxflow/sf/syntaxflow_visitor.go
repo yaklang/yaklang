@@ -58,9 +58,6 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#FilterExpressionString.
 	VisitFilterExpressionString(ctx *FilterExpressionStringContext) interface{}
 
-	// Visit a parse tree produced by SyntaxFlowParser#FilterExpressionBool.
-	VisitFilterExpressionBool(ctx *FilterExpressionBoolContext) interface{}
-
 	// Visit a parse tree produced by SyntaxFlowParser#FilterExpressionOr.
 	VisitFilterExpressionOr(ctx *FilterExpressionOrContext) interface{}
 
@@ -70,17 +67,29 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#FilterExpressionAnd.
 	VisitFilterExpressionAnd(ctx *FilterExpressionAndContext) interface{}
 
-	// Visit a parse tree produced by SyntaxFlowParser#PrefixOperatorUnary.
-	VisitPrefixOperatorUnary(ctx *PrefixOperatorUnaryContext) interface{}
+	// Visit a parse tree produced by SyntaxFlowParser#FilterExpressionCompare.
+	VisitFilterExpressionCompare(ctx *FilterExpressionCompareContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#FilterExpressionRegexpMatch.
+	VisitFilterExpressionRegexpMatch(ctx *FilterExpressionRegexpMatchContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#FilterExpressionNumber.
 	VisitFilterExpressionNumber(ctx *FilterExpressionNumberContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#FilterExpressionRegexp.
+	VisitFilterExpressionRegexp(ctx *FilterExpressionRegexpContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#FilterExpressionNot.
+	VisitFilterExpressionNot(ctx *FilterExpressionNotContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#numberLiteral.
 	VisitNumberLiteral(ctx *NumberLiteralContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#stringLiteral.
 	VisitStringLiteral(ctx *StringLiteralContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#regexpLiteral.
+	VisitRegexpLiteral(ctx *RegexpLiteralContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#typeCast.
 	VisitTypeCast(ctx *TypeCastContext) interface{}

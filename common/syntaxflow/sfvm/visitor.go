@@ -2,18 +2,21 @@ package sfvm
 
 import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
+	"regexp"
 	"strings"
 )
 
-type SyntaxFlowVisitor struct {
+type SyntaxFlowVisitor[T comparable, V any] struct {
+	text  string
+	codes []*SFI[T, V]
 }
 
-func NewSyntaxFlowVisitor() *SyntaxFlowVisitor {
-	sfv := &SyntaxFlowVisitor{}
+func NewSyntaxFlowVisitor[T comparable, V any]() *SyntaxFlowVisitor[T, V] {
+	sfv := &SyntaxFlowVisitor[T, V]{}
 	return sfv
 }
 
-func (y *SyntaxFlowVisitor) VisitFlow(raw sf.IFlowContext) interface{} {
+func (y *SyntaxFlowVisitor[T, V]) VisitFlow(raw sf.IFlowContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -26,7 +29,7 @@ func (y *SyntaxFlowVisitor) VisitFlow(raw sf.IFlowContext) interface{} {
 	return y.VisitFilters(i.Filters())
 }
 
-func (y *SyntaxFlowVisitor) VisitFilters(raw sf.IFiltersContext) interface{} {
+func (y *SyntaxFlowVisitor[T, V]) VisitFilters(raw sf.IFiltersContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -43,7 +46,7 @@ func (y *SyntaxFlowVisitor) VisitFilters(raw sf.IFiltersContext) interface{} {
 	return nil
 }
 
-func (y *SyntaxFlowVisitor) VisitFilterStatement(raw sf.IFilterStatementContext) interface{} {
+func (y *SyntaxFlowVisitor[T, V]) VisitFilterStatement(raw sf.IFilterStatementContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -57,30 +60,29 @@ func (y *SyntaxFlowVisitor) VisitFilterStatement(raw sf.IFilterStatementContext)
 		y.VisitExistedRef(i.ExistedRef())
 	}
 
+	// 默认向右
 	if ret := i.GetDirection(); ret != nil {
 		if ret.GetText() == ">>" {
-			// >>
-			// y.EmitDirection("right")
+			y.EmitDirection(">>")
 		} else {
-			// <<
-			// y.EmitDirection("left")
+			y.EmitDirection("<<")
 		}
 	} else {
-		// <<
-		// y.EmitDirection("left")
+		y.EmitDirection(">>")
 	}
 
 	y.VisitFilterExpr(i.FilterExpr())
 
 	if i.Filter() != nil {
 		varName := y.VisitRefVariable(i.RefVariable()) // create symbol and pop stack
-		_ = varName
+		y.EmitNewRef(varName)
+		y.EmitUpdate(varName)
 	}
 
 	return nil
 }
 
-func (y *SyntaxFlowVisitor) VisitExistedRef(raw sf.IExistedRefContext) interface{} {
+func (y *SyntaxFlowVisitor[T, V]) VisitExistedRef(raw sf.IExistedRefContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -91,11 +93,11 @@ func (y *SyntaxFlowVisitor) VisitExistedRef(raw sf.IExistedRefContext) interface
 	}
 
 	var varName = y.VisitRefVariable(i.RefVariable())
-	_ = varName
+	y.EmitRef(varName)
 	return nil
 }
 
-func (y *SyntaxFlowVisitor) VisitRefVariable(raw sf.IRefVariableContext) string {
+func (y *SyntaxFlowVisitor[T, V]) VisitRefVariable(raw sf.IRefVariableContext) string {
 	if y == nil || raw == nil {
 		return ""
 	}
@@ -106,26 +108,23 @@ func (y *SyntaxFlowVisitor) VisitRefVariable(raw sf.IRefVariableContext) string 
 	return i.Identifier().GetText()
 }
 
-func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) interface{} {
+func (y *SyntaxFlowVisitor[T, V]) VisitFilterExpr(raw sf.IFilterExprContext) interface{} {
 	if y == nil || raw == nil {
-		return nil
-	}
-
-	i, _ := raw.(*sf.FilterExprContext)
-	if i == nil {
 		return nil
 	}
 
 	switch ret := raw.(type) {
 	case *sf.PrimaryFilterContext:
-		ret.Identifier().GetText() // emit field
+		filter := ret.Identifier().GetText() // emit field
+		y.EmitSearch(filter)
 	case *sf.NumberIndexFilterContext:
-		y.VisitNumberLiteral(ret.NumberLiteral()) // emit index number
+		index := y.VisitNumberLiteral(ret.NumberLiteral()) // emit index number
+		y.EmitIndex(index)
 	case *sf.DirectionFilterContext:
 		if ret.GetOp().GetText() == "<<" {
-
+			y.EmitDirection("<<")
 		} else {
-
+			y.EmitDirection(">>")
 		}
 		y.VisitFilterExpr(ret.FilterExpr())
 	case *sf.ParenFilterContext:
@@ -152,23 +151,30 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) interface
 	return nil
 }
 
-func (y *SyntaxFlowVisitor) VisitChainFilter(raw sf.IChainFilterContext) interface{} {
+func (y *SyntaxFlowVisitor[T, V]) VisitChainFilter(raw sf.IChainFilterContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
 
 	switch ret := raw.(type) {
 	case *sf.FlatContext:
+		var count int
 		for _, filter := range ret.AllConditionExpression() {
+			count++
 			y.VisitConditionExpression(filter)
 		}
+		y.EmitFlat(count)
 	case *sf.BuildMapContext:
+		var count int
 		for i := 0; i < len(ret.AllColon()); i++ {
 			key := ret.Identifier(i).GetText()
-			val := y.VisitFilters(ret.Filters(i))
-			_, _ = key, val
+			count++
+			y.EmitNewRef(key)
+			y.VisitFilters(ret.Filters(i))
+			y.EmitUpdate(key)
 			// pop val, create object and set key
 		}
+		y.EmitMapBuild(count)
 	default:
 		panic("Unexpected VisitChainFilter")
 	}
@@ -176,41 +182,102 @@ func (y *SyntaxFlowVisitor) VisitChainFilter(raw sf.IChainFilterContext) interfa
 	return nil
 }
 
-func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpressionContext) interface{} {
+func (y *SyntaxFlowVisitor[T, V]) VisitConditionExpression(raw sf.IConditionExpressionContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
 
 	switch i := raw.(type) {
 	case *sf.FilterExpressionNumberContext:
-		y.VisitNumberLiteral(i.NumberLiteral())
+		y.EmitPushLiteral(y.VisitNumberLiteral(i.NumberLiteral()))
+		y.EmitOperator("==")
 	case *sf.FilterExpressionStringContext:
-		y.VisitStringLiteral(i.StringLiteral())
-	case *sf.FilterExpressionBoolContext:
-		switch i.BoolLiteral().GetText() {
-		case "true":
-		case "false":
+		text, globMode := y.VisitStringLiteral(i.StringLiteral())
+		if !globMode {
+			y.EmitPushLiteral(text)
+			y.EmitOperator("==")
+		} else {
+			y.EmitPushGlob(text)
 		}
+	case *sf.FilterExpressionRegexpContext:
+		result := i.RegexpLiteral().GetText()
+		result = result[1 : len(result)-1]
+		result = strings.ReplaceAll(result, `\/`, `/`)
+		re, err := regexp.Compile(result)
+		if err != nil {
+			panic("golang regexp: regexp compile failed: " + err.Error())
+		}
+		y.EmitRegexpMatch(result)
+		return re
 	case *sf.FilterExpressionParenContext:
 		return y.VisitConditionExpression(i.ConditionExpression())
-	case *sf.PrefixOperatorUnaryContext:
+	case *sf.FilterExpressionNotContext:
+		y.VisitConditionExpression(i.ConditionExpression())
+		y.EmitOperator("!")
+	case *sf.FilterExpressionCompareContext:
+		if i.NumberLiteral() != nil {
+			n := y.VisitNumberLiteral(i.NumberLiteral())
+			y.EmitPushLiteral(n)
+		} else if i.Identifier() != nil {
+			y.EmitPushLiteral(i.Identifier().GetText())
+		} else {
+			if i.GetText() == "true" {
+				y.EmitPushLiteral(true)
+			} else {
+				y.EmitPushLiteral(false)
+			}
+		}
+		y.EmitOperator(i.GetOp().GetText())
+	case *sf.FilterExpressionRegexpMatchContext:
+		if i.StringLiteral() != nil {
+			r, glob := y.VisitStringLiteral(i.StringLiteral())
+			if glob {
+				y.EmitPushGlob(r)
+				if i.GetOp().GetTokenType() == sf.SyntaxFlowLexerNotRegexpMatch {
+					y.EmitOperator("!")
+				}
+				return nil
+			} else {
+				r, err := regexp.Compile(regexp.QuoteMeta(r))
+				if err != nil {
+					panic("golang regexp: regexp compile failed: " + err.Error())
+				}
+				y.EmitRegexpMatch(r.String())
+				return nil
+			}
+		}
+
+		if i.RegexpLiteral() != nil {
+			result := i.RegexpLiteral().GetText()
+			result = result[1 : len(result)-1]
+			result = strings.ReplaceAll(result, `\/`, `/`)
+			re, err := regexp.Compile(result)
+			if err != nil {
+				panic("golang regexp: regexp compile failed: " + err.Error())
+			}
+			y.EmitRegexpMatch(result)
+			if i.GetOp().GetTokenType() == sf.SyntaxFlowLexerNotRegexpMatch {
+				y.EmitOperator("!")
+			}
+			return re
+		}
+		panic("BUG: in regexp match")
 	case *sf.FilterExpressionAndContext:
 		for _, exp := range i.AllConditionExpression() {
 			y.VisitConditionExpression(exp)
 		}
-		// emit and
-
+		y.EmitOperator("&&")
 	case *sf.FilterExpressionOrContext:
 		for _, exp := range i.AllConditionExpression() {
 			y.VisitConditionExpression(exp)
 		}
-		// emit or
+		y.EmitOperator("||")
 	}
 
 	return nil
 }
 
-func (y *SyntaxFlowVisitor) VisitFilterFieldMember(raw sf.IFilterFieldMemberContext) interface{} {
+func (y *SyntaxFlowVisitor[T, V]) VisitFilterFieldMember(raw sf.IFilterFieldMemberContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -220,23 +287,45 @@ func (y *SyntaxFlowVisitor) VisitFilterFieldMember(raw sf.IFilterFieldMemberCont
 		return nil
 	}
 
+	if i.Identifier() != nil {
+		y.EmitField(i.Identifier().GetText())
+	} else if i.NumberLiteral() != nil {
+		y.EmitIndex(y.VisitNumberLiteral(i.NumberLiteral()))
+	} else if i.TypeCast() != nil {
+		y.EmitTypeCast(strings.Trim(i.TypeCast().GetText(), "()"))
+	} else {
+		y.VisitConditionExpression(i.ConditionExpression())
+	}
+
 	return nil
 }
 
-func (y *SyntaxFlowVisitor) VisitStringLiteral(raw sf.IStringLiteralContext) interface{} {
+const tmpPH = "__[[PLACEHOLDE]]__"
+
+func (y *SyntaxFlowVisitor[T, V]) VisitStringLiteral(raw sf.IStringLiteralContext) (string, bool) {
 	if y == nil || raw == nil {
-		return nil
+		return "", false
 	}
 
 	i, _ := raw.(*sf.StringLiteralContext)
 	if i == nil {
-		return nil
+		return "", false
 	}
 
-	return nil
+	var text = i.GetText()
+	if strings.Contains(text, "%%") {
+		text = strings.ReplaceAll(text, "%%", tmpPH)
+	}
+	text = strings.ReplaceAll(text, "*", "[*]")
+	isGlob := strings.Contains(text, "%")
+	if strings.Contains(text, "%") {
+		text = strings.ReplaceAll(text, "%", "*")
+	}
+	text = strings.ReplaceAll(text, tmpPH, "%")
+	return text, isGlob
 }
 
-func (y *SyntaxFlowVisitor) VisitNumberLiteral(raw sf.INumberLiteralContext) int {
+func (y *SyntaxFlowVisitor[T, V]) VisitNumberLiteral(raw sf.INumberLiteralContext) int {
 	if y == nil || raw == nil {
 		return -1
 	}

@@ -75,10 +75,6 @@ func (v *BaseSyntaxFlowVisitor) VisitFilterExpressionString(ctx *FilterExpressio
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitFilterExpressionBool(ctx *FilterExpressionBoolContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BaseSyntaxFlowVisitor) VisitFilterExpressionOr(ctx *FilterExpressionOrContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -91,11 +87,23 @@ func (v *BaseSyntaxFlowVisitor) VisitFilterExpressionAnd(ctx *FilterExpressionAn
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitPrefixOperatorUnary(ctx *PrefixOperatorUnaryContext) interface{} {
+func (v *BaseSyntaxFlowVisitor) VisitFilterExpressionCompare(ctx *FilterExpressionCompareContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitFilterExpressionRegexpMatch(ctx *FilterExpressionRegexpMatchContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
 func (v *BaseSyntaxFlowVisitor) VisitFilterExpressionNumber(ctx *FilterExpressionNumberContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitFilterExpressionRegexp(ctx *FilterExpressionRegexpContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitFilterExpressionNot(ctx *FilterExpressionNotContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -104,6 +112,10 @@ func (v *BaseSyntaxFlowVisitor) VisitNumberLiteral(ctx *NumberLiteralContext) in
 }
 
 func (v *BaseSyntaxFlowVisitor) VisitStringLiteral(ctx *StringLiteralContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitRegexpLiteral(ctx *RegexpLiteralContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
