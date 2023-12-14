@@ -809,10 +809,8 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 		}
 
 		lv := ssa.NewIdentifierLV(text, b.CurrentRange)
-		if v := b.PeekVariable(text, false); v != nil {
-			if v.IsExtern() {
-				b.NewErrorWithPos(ssa.Warn, TAG, b.CurrentRange, ssa.ContAssignExtern(text))
-			}
+		if i := b.TryBuildExternValue(text); i != nil {
+			b.NewErrorWithPos(ssa.Warn, TAG, b.CurrentRange, ssa.ContAssignExtern(text))
 		}
 		if b.CanBuildFreeValue(text) {
 			lv.SetIsSideEffect(true)
