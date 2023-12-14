@@ -432,7 +432,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 	var autoForward = utils.NewBool(true)
 	var autoForwardCond = sync.NewCond(new(sync.Mutex))
-	var wantResp = &http.Request{}
+	var hijackReq = &http.Request{}
 
 	reqChan := make(chan struct{})
 	respChan := make(chan struct{})
@@ -454,10 +454,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			log.Debugf("get resp")
 		case <-autoForwardCh: // 收到自动转发信号
 			log.Debugf("get auto forward when wait response")
-			return
 		case <-ctx.Done():
 			log.Debugf("get ctx done when wait response")
-			return
 		}
 	}
 
@@ -474,7 +472,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			log.Debugf("get auto forward when wait should hijack response")
 		case <-ctx.Done():
 			log.Debugf("get ctx done when wait request")
-			return
 		}
 	}
 
@@ -486,7 +483,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			close(autoForwardCh)
 		}()
 		for {
-			wantResp = &http.Request{}
+			hijackReq = &http.Request{}
 			waitForAutoForwardDisabled()
 			select {
 			case <-reqChan: // 劫持请求状态
@@ -627,13 +624,13 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			// 设置自动转发
 			if reqInstance.GetSetAutoForward() {
 				clearPluginHTTPFlowCache()
-				beforeAuto := autoForward.IsSet()
-				log.Infof("mitm-auto-forward: %v", reqInstance.GetAutoForwardValue())
+				beforeAuto := autoForward.IsSet() // 存当前状态
+				log.Debugf("mitm-auto-forward: %v", reqInstance.GetAutoForwardValue())
 				autoForwardCond.L.Lock()
 				autoForward.SetTo(reqInstance.GetAutoForwardValue())
 				autoForwardCond.L.Unlock()
 				autoForwardCond.Broadcast()
-				if !beforeAuto && autoForward.IsSet() {
+				if !beforeAuto && autoForward.IsSet() { // 当 f -> t 时发送信号
 					autoForwardCh <- struct{}{}
 				}
 			}
@@ -759,7 +756,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		return wshashFrameIndex[i]
 	}
 
-	getAutoForwardSignalChan := func() chan struct{} {
+	getAutoForwardSignalChan := func() chan struct{} { // 封装 cond 转信号函数
 		signalChan := make(chan struct{}, 1)
 		go func() {
 			autoForwardCond.L.Lock()
@@ -803,7 +800,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		//if !ok {
 		// return raw
 		//}
-		if wantResp != req {
+		if hijackReq != req {
 			log.Debugf("not want resp, auto forward")
 			return raw
 		}
@@ -1001,7 +998,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			return originRspRaw
 		}
 
-		if wantResp != req {
+		if hijackReq != req { //  只劫持当前请求对应的响应，避免超时请求导致的错误响应劫持
 			log.Debugf("not want resp, auto forward")
 			return originRspRaw
 		}
@@ -1170,7 +1167,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		select {
 		case reqChan <- struct{}{}: // 申请劫持
 			shouldSendSignal = true
-			wantResp = req //设置需要劫持的请求
+			hijackReq = req //设置需要劫持的请求
 		case <-autoForwardChanWsRequest: // 自动放行
 			httpctx.SetContextValueInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_AutoFoward, true)
 			return raw
@@ -1250,7 +1247,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					shouldHijackResponse = true
 					httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest, true)
 					log.Infof("the ws hash: %s's mitm ws response is waiting for hijack response", wshash)
-					continue
+					continue // 需要重新回到recv
 				}
 				if reqInstance.GetCancelhijackResponse() {
 					// 设置不需要劫持resp
@@ -1402,8 +1399,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		select {
 		case reqChan <- struct{}{}: // 申请劫持
 			shouldSendSignal = true
-			wantResp = originReqIns
-		case <-autoForwardChanRequest:
+			hijackReq = originReqIns
+		case <-autoForwardChanRequest: // 自动转发也应该设置
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_AutoFoward, true)
 			return req
 		}
