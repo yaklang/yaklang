@@ -75,7 +75,32 @@ func (t *TypeCheck) CheckOnInstruction(inst ssa.Instruction) {
 }
 
 func (t *TypeCheck) TypeCheckUndefine(inst *ssa.Undefined) {
-	inst.NewError(ssa.Error, TypeCheckTAG, ValueUndefined(inst.GetName()))
+	tmp := make(map[ssa.Value]struct{})
+	err := func(i ssa.Value) bool {
+		if variable := i.GetVariable(inst.GetName()); variable != nil {
+			variable.NewError(ssa.Error, TypeCheckTAG, ValueUndefined(inst.GetName()))
+			return true
+		} else {
+			return false
+		}
+	}
+	var mark func(i ssa.Value)
+	mark = func(i ssa.Value) {
+		if _, ok := tmp[i]; ok {
+			return
+		}
+		tmp[i] = struct{}{}
+		if err(i) {
+			return
+		}
+		for _, user := range i.GetUsers() {
+			if phi, ok := ssa.ToPhi(user); ok {
+				mark(phi)
+			}
+		}
+	}
+
+	mark(inst)
 }
 
 func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {

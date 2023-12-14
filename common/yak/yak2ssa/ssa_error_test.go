@@ -78,6 +78,8 @@ func TestUndefine(t *testing.T) {
 			`,
 			errs: []string{
 				ssa4analyze.ValueUndefined("c"),
+				ssa4analyze.ValueUndefined("c"),
+				ssa4analyze.ValueUndefined("undefinePkg"),
 				ssa4analyze.ValueUndefined("undefinePkg"),
 				ssa4analyze.ValueUndefined("undefineFunc2"),
 				ssa4analyze.ValueUndefined("undefineFuncInLoop"),
@@ -137,9 +139,13 @@ func TestErrorComment(t *testing.T) {
 			`,
 			errs: []string{
 				ssa4analyze.ValueUndefined("c"),
+				ssa4analyze.ValueUndefined("print"),
 				ssa4analyze.ValueUndefined("d"),
+				ssa4analyze.ValueUndefined("print"),
 				ssa4analyze.ValueUndefined("e"),
+				ssa4analyze.ValueUndefined("print"),
 				ssa4analyze.ValueUndefined("f"),
+				ssa4analyze.ValueUndefined("print"),
 				ssa.NoCheckMustInFirst(),
 			},
 		})
@@ -479,6 +485,7 @@ func TestSliceCall(t *testing.T) {
 			print(a[1])
 			`,
 			errs: []string{
+				ssa4analyze.ValueUndefined("a1"),
 				ssa4analyze.ValueUndefined("a1"),
 				ssa4analyze.InvalidField("number", "1"),
 				ssa4analyze.InvalidField("number", "1"),
