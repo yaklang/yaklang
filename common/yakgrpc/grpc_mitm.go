@@ -430,72 +430,124 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		})
 	}
 
-	var autoForward = utils.NewBool(true)
-	var autoForwardCond = sync.NewCond(new(sync.Mutex))
-	var hijackReq = &http.Request{}
+	controller := &hijackTaskController{
+		taskStatusMap:  make(map[*http.Request]*taskStatus),
+		canDequeueCond: sync.NewCond(&sync.Mutex{}),
+		queueMux:       &sync.Mutex{},
+		statusMapMux:   &sync.Mutex{},
+		currentTask:    nil,
+	}
 
-	reqChan := make(chan struct{})
-	respChan := make(chan struct{})
-	shouldHijackRespChan := make(chan bool)
-
-	autoForwardCh := make(chan struct{}, 1)
-
-	waitForAutoForwardDisabled := func() {
-		autoForwardCond.L.Lock()
-		defer autoForwardCond.L.Unlock()
-		for autoForward.IsSet() {
-			autoForwardCond.Wait()
+	waitNewHijackTask := func() { // 等待队列有可劫持任务
+		controller.canDequeueCond.L.Lock()
+		defer controller.canDequeueCond.L.Unlock()
+		for !controller.canDequeue.IsSet() {
+			controller.canDequeueCond.Wait()
 		}
 	}
 
-	handleResponse := func() {
-		select {
-		case <-respChan: // 完成响应处理
-			log.Debugf("get resp")
-		case <-autoForwardCh: // 收到自动转发信号
-			log.Debugf("get auto forward when wait response")
-		case <-ctx.Done():
-			log.Debugf("get ctx done when wait response")
+	waitHijackFinish := func(currentStatus *taskStatus) {
+		currentStatus.statusChangeCond.L.Lock()
+		defer currentStatus.statusChangeCond.L.Unlock()
+		for currentStatus.status < 1 { // 完成或者放行
+			currentStatus.statusChangeCond.Wait()
 		}
 	}
-
-	handleRequest := func() {
-		log.Debugf("get request")
-		select {
-		case shouldHijackResp := <-shouldHijackRespChan:
-			log.Debugf("get should hijack resp:%v", shouldHijackResp)
-			if !shouldHijackResp {
-				return // 返回到主循环
-			}
-			handleResponse()
-		case <-autoForwardCh:
-			log.Debugf("get auto forward when wait should hijack response")
-		case <-ctx.Done():
-			log.Debugf("get ctx done when wait request")
-		}
-	}
-
 	go func() {
-		defer func() {
-			close(reqChan)
-			close(respChan)
-			close(shouldHijackRespChan)
-			close(autoForwardCh)
-		}()
 		for {
-			hijackReq = &http.Request{}
-			waitForAutoForwardDisabled()
-			select {
-			case <-reqChan: // 劫持请求状态
-				handleRequest()
-			case <-autoForwardCh:
-				log.Debugf("get auto forward when wait request")
+			waitNewHijackTask()
+			controller.currentTask = controller.nextTask()
+			if controller.currentTask == nil {
 				continue
-			case <-ctx.Done():
-				return
 			}
+			currentStatus := controller.getStatus(controller.currentTask)
+			currentStatus.statusChangeCond.L.Lock()
+			currentStatus.status = hijack
+			currentStatus.statusChangeCond.Signal()
+			currentStatus.statusChangeCond.L.Unlock()
+			waitHijackFinish(currentStatus)
 		}
 	}()
+
+	var autoForward = utils.NewBool(true)
+	var autoForwardCond = sync.NewCond(new(sync.Mutex))
+	autoForwardCh := make(chan struct{}, 1)
+
+	go func() {
+		defer close(autoForwardCh)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-autoForwardCh:
+			}
+			controller.clear()
+		}
+	}()
+
+	//var hijackReq = &http.Request{}
+
+	//reqChan := make(chan struct{})
+	//respChan := make(chan struct{})
+	//shouldHijackRespChan := make(chan bool)
+
+	//
+	//waitForAutoForwardDisabled := func() {
+	//	autoForwardCond.L.Lock()
+	//	defer autoForwardCond.L.Unlock()
+	//	for autoForward.IsSet() {
+	//		autoForwardCond.Wait()
+	//	}
+	//}
+	//
+	//handleResponse := func() {
+	//	select {
+	//	case <-respChan: // 完成响应处理
+	//		log.Debugf("get resp")
+	//	case <-autoForwardCh: // 收到自动转发信号
+	//		log.Debugf("get auto forward when wait response")
+	//	case <-ctx.Done():
+	//		log.Debugf("get ctx done when wait response")
+	//	}
+	//}
+	//
+	//handleRequest := func() {
+	//	log.Debugf("get request")
+	//	select {
+	//	case shouldHijackResp := <-shouldHijackRespChan:
+	//		log.Debugf("get should hijack resp:%v", shouldHijackResp)
+	//		if !shouldHijackResp {
+	//			return // 返回到主循环
+	//		}
+	//		handleResponse()
+	//	case <-autoForwardCh:
+	//		log.Debugf("get auto forward when wait should hijack response")
+	//	case <-ctx.Done():
+	//		log.Debugf("get ctx done when wait request")
+	//	}
+	//}
+	//
+	//go func() {
+	//	defer func() {
+	//		close(reqChan)
+	//		close(respChan)
+	//		close(shouldHijackRespChan)
+	//		close(autoForwardCh)
+	//	}()
+	//	for {
+	//		hijackReq = &http.Request{}
+	//		waitForAutoForwardDisabled()
+	//		select {
+	//		case <-reqChan: // 劫持请求状态
+	//			handleRequest()
+	//		case <-autoForwardCh:
+	//			log.Debugf("get auto forward when wait request")
+	//			continue
+	//		case <-ctx.Done():
+	//			return
+	//		}
+	//	}
+	//}()
 
 	// 消息循环
 	messageChan := make(chan *ypb.MITMRequest, 10000)
@@ -756,19 +808,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		return wshashFrameIndex[i]
 	}
 
-	getAutoForwardSignalChan := func() chan struct{} { // 封装 cond 转信号函数
-		signalChan := make(chan struct{}, 1)
-		go func() {
-			autoForwardCond.L.Lock()
-			defer autoForwardCond.L.Unlock()
-			for !autoForward.IsSet() {
-				autoForwardCond.Wait()
-			}
-			signalChan <- struct{}{}
-		}()
-		return signalChan
-	}
-
 	handleHijackWsResponse := func(raw []byte, req *http.Request, rsp *http.Response, ts int64) (finalResult []byte) {
 		defer func() {
 			if err := recover(); err != nil {
@@ -800,14 +839,12 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		//if !ok {
 		// return raw
 		//}
-		if hijackReq != req {
+		if req != controller.currentTask {
 			log.Debugf("not want resp, auto forward")
 			return raw
 		}
 		defer func() {
-			if !autoForward.IsSet() {
-				respChan <- struct{}{}
-			}
+			controller.finishHijack(req)
 		}()
 		_, urlStr := lowhttp.ExtractWebsocketURLFromHTTPRequest(req)
 		responseCounter := time.Now().UnixNano()
@@ -998,17 +1035,13 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			return originRspRaw
 		}
 
-		if hijackReq != req { //  只劫持当前请求对应的响应，避免超时请求导致的错误响应劫持
+		if controller.currentTask != req { //  只劫持当前请求对应的响应，避免超时请求导致的错误响应劫持
 			log.Debugf("not want resp, auto forward")
 			return originRspRaw
 		}
 
 		defer func() {
-			autoForwardChanResp := getAutoForwardSignalChan()
-			select {
-			case respChan <- struct{}{}:
-			case <-autoForwardChanResp:
-			}
+			controller.finishHijack(req)
 		}()
 		feedbackRspIns := &ypb.MITMResponse{
 			ForResponse: true,
@@ -1084,17 +1117,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 	}
 	handleHijackWsRequest := func(raw []byte, req *http.Request, rsp *http.Response, ts int64) (finalResult []byte) {
-		var shouldHijackResponse bool
-		var shouldSendSignal bool
-		defer func() {
-			if shouldSendSignal {
-				autoForwardChanWsRequest := getAutoForwardSignalChan()
-				select {
-				case shouldHijackRespChan <- shouldHijackResponse:
-				case <-autoForwardChanWsRequest:
-				}
-			}
-		}()
 		defer func() {
 			if err := recover(); err != nil {
 				log.Warnf("hijack ws websocket failed: %s", err)
@@ -1162,16 +1184,17 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		//	encode = append(encode, "protobuf")
 		//}
 
-		autoForwardChanWsRequest := getAutoForwardSignalChan()
-
-		select {
-		case reqChan <- struct{}{}: // 申请劫持
-			shouldSendSignal = true
-			hijackReq = req //设置需要劫持的请求
-		case <-autoForwardChanWsRequest: // 自动放行
-			httpctx.SetContextValueInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_AutoFoward, true)
+		controller.Register(req)
+		if controller.waitHijack(req) == autoFoward { // 自动放行
 			return raw
 		}
+
+		defer func() {
+			if !httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest) { // 如果不需要劫持请求则可以直接设置此次hijack已完成
+				controller.finishHijack(req)
+			}
+		}()
+
 		counter := time.Now().UnixNano()
 		select {
 		case hijackingStream <- counter:
@@ -1231,27 +1254,23 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 				// 直接丢包
 				if reqInstance.GetDrop() {
-					shouldHijackResponse = false
 					return nil
 				}
 
 				// 原封不动转发
 				if reqInstance.GetForward() {
-					shouldHijackResponse = false
 					httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest, false)
 					return originReqRaw
 				}
 
 				if reqInstance.GetHijackResponse() {
 					// 设置需要劫持resp
-					shouldHijackResponse = true
 					httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest, true)
 					log.Infof("the ws hash: %s's mitm ws response is waiting for hijack response", wshash)
 					continue // 需要重新回到recv
 				}
 				if reqInstance.GetCancelhijackResponse() {
 					// 设置不需要劫持resp
-					shouldHijackResponse = false
 					httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest, false)
 					log.Infof("the ws hash: %s's mitm ws response cancel hijack response", wshash)
 					continue
@@ -1270,17 +1289,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			return ret
 		})
 
-		var shouldHijackResponse bool
-		var shouldSendSignal bool
-		defer func() {
-			if shouldSendSignal {
-				autoForwardChanRequest := getAutoForwardSignalChan()
-				select {
-				case shouldHijackRespChan <- shouldHijackResponse:
-				case <-autoForwardChanRequest:
-				}
-			}
-		}()
 		// 保证始终只有一个 Goroutine 在处理请求
 		defer func() {
 			if err := recover(); err != nil {
@@ -1394,16 +1402,18 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_AutoFoward, true)
 			return req
 		}
-		autoForwardChanRequest := getAutoForwardSignalChan()
+		//todo requestWait
 
-		select {
-		case reqChan <- struct{}{}: // 申请劫持
-			shouldSendSignal = true
-			hijackReq = originReqIns
-		case <-autoForwardChanRequest: // 自动转发也应该设置
-			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_AutoFoward, true)
+		controller.Register(originReqIns)
+		if controller.waitHijack(originReqIns) == autoFoward {
 			return req
 		}
+
+		defer func() {
+			if !httpctx.GetContextBoolInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest) { // 如果不需要劫持请求则可以直接设置此次hijack已完成
+				controller.finishHijack(originReqIns)
+			}
+		}()
 
 		// 开始劫持
 		counter := time.Now().UnixNano()
@@ -1469,14 +1479,12 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 				if reqInstance.GetHijackResponse() {
 					// 设置需要劫持resp
-					shouldHijackResponse = true
 					httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest, true)
 					hijackedPtr := fmt.Sprintf("%p", originReqIns)
 					log.Infof("the ptr: %v's mitm request is waiting for hijack response", hijackedPtr)
 					continue
 				}
 				if reqInstance.GetCancelhijackResponse() {
-					shouldHijackResponse = false
 					httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest, false)
 					hijackedPtr := fmt.Sprintf("%p", originReqIns)
 					log.Infof("the ptr: %v's mitm request cancel hijack response", hijackedPtr)
@@ -1490,8 +1498,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 				// 直接丢包
 				if reqInstance.GetDrop() {
-					shouldHijackResponse = false
 					log.Infof("MITM %v recv drop hijacked request[%v]", addr, reqInstance.GetId())
+					httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest, false) // 设置无需劫持resp
 					httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_IsDropped, true)
 					// 保存到数据库
 					log.Debugf("start to create httpflow from mitm[%v %v]", originReqIns.Method, truncate(originReqIns.URL.String()))
@@ -1536,8 +1544,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 				// 原封不动转发
 				if reqInstance.GetForward() {
-					shouldHijackResponse = false // 直接转发也应该设置不需要劫持响应
-					httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest, false)
 					return originReqRaw
 				}
 
@@ -1955,3 +1961,124 @@ func (s *Server) GenerateURL(ctx context.Context, req *ypb.GenerateURLRequest) (
 		URL: u.String(),
 	}, nil
 }
+
+type hijackTaskController struct {
+	taskQueue []*http.Request
+	queueMux  *sync.Mutex
+
+	taskStatusMap map[*http.Request]*taskStatus
+	statusMapMux  *sync.Mutex
+
+	currentTask *http.Request
+
+	canDequeue     utils.AtomicBool
+	canDequeueCond *sync.Cond
+}
+
+type taskStatus struct {
+	status           int
+	statusChangeCond *sync.Cond
+}
+
+func (h *hijackTaskController) Register(req *http.Request) {
+	h.enqueue(req)
+	if h.queueSize() == 1 {
+		h.canDequeueCond.L.Lock() // 第一个元素进入队列的时候，需要唤醒等待的线程
+		h.canDequeue.Set()
+		h.canDequeueCond.Broadcast()
+		h.canDequeueCond.L.Unlock()
+	}
+}
+
+func (h *hijackTaskController) waitHijack(r *http.Request) int { // mitm任务等待劫持
+	thisStatus := h.getStatus(r)
+	if thisStatus == nil { // 如果没有查到状态则自动放行
+		return autoFoward
+	}
+	thisStatus.statusChangeCond.L.Lock()
+	defer thisStatus.statusChangeCond.L.Unlock()
+	for thisStatus.status == waitHijack {
+		thisStatus.statusChangeCond.Wait()
+	}
+	return thisStatus.status
+}
+
+func (h *hijackTaskController) finishHijack(r *http.Request) { // mitm 任务结束
+	thisStatus := h.getStatus(r)
+	if thisStatus == nil { // 如果没有查到状态则自动放行
+		return
+	}
+	thisStatus.statusChangeCond.L.Lock()
+	defer thisStatus.statusChangeCond.L.Unlock()
+	thisStatus.status = finishHijack
+	thisStatus.statusChangeCond.Signal()
+}
+
+func (h *hijackTaskController) nextTask() *http.Request {
+	return h.dequeue()
+}
+
+func (h *hijackTaskController) clear() {
+	h.queueMux.Lock()
+	h.statusMapMux.Lock()
+	defer func() {
+		h.queueMux.Unlock()
+		h.statusMapMux.Unlock()
+	}()
+
+	currentStatus := h.taskStatusMap[h.currentTask]
+	if currentStatus != nil {
+		currentStatus.statusChangeCond.L.Lock()
+		currentStatus.status = autoFoward
+		currentStatus.statusChangeCond.Broadcast()
+		currentStatus.statusChangeCond.L.Unlock()
+	}
+	h.currentTask = nil
+	h.taskQueue = h.taskQueue[:0]
+	h.taskStatusMap = make(map[*http.Request]*taskStatus)
+	h.canDequeue.UnSet()
+}
+
+func (h *hijackTaskController) enqueue(r *http.Request) {
+	h.queueMux.Lock()
+	defer h.queueMux.Unlock()
+	h.taskQueue = append(h.taskQueue, r)
+	h.setStatus(r, &taskStatus{
+		status:           waitHijack,
+		statusChangeCond: sync.NewCond(&sync.Mutex{}),
+	})
+}
+
+func (h *hijackTaskController) dequeue() *http.Request {
+	h.queueMux.Lock()
+	defer h.queueMux.Unlock()
+	if len(h.taskQueue) == 0 {
+		return nil
+	}
+	item := h.taskQueue[0]
+	h.taskQueue = h.taskQueue[1:]
+	return item
+}
+
+func (h *hijackTaskController) queueSize() int {
+	return len(h.taskQueue)
+}
+
+func (h *hijackTaskController) getStatus(r *http.Request) *taskStatus {
+	h.statusMapMux.Lock()
+	defer h.statusMapMux.Unlock()
+	return h.taskStatusMap[r]
+}
+
+func (h *hijackTaskController) setStatus(r *http.Request, s *taskStatus) {
+	h.statusMapMux.Lock()
+	defer h.statusMapMux.Unlock()
+	h.taskStatusMap[r] = s
+}
+
+var (
+	waitHijack   = -1
+	hijack       = 0
+	finishHijack = 1
+	autoFoward   = 2
+)
