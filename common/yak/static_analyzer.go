@@ -78,7 +78,7 @@ func AnalyzeStaticYaklangWithType(code, codeTyp string) []*StaticAnalyzeResult {
 			StartLineNumber: int(err.Pos.Start.Line),
 			StartColumn:     int(err.Pos.Start.Column + 1),
 			EndLineNumber:   int(err.Pos.End.Line),
-			EndColumn:       int(err.Pos.End.Column + 2),
+			EndColumn:       int(err.Pos.End.Column + 1),
 			RawMessage:      err.String(),
 			From:            "SSA",
 		})
