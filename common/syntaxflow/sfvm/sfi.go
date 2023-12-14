@@ -24,6 +24,8 @@ const (
 	// OpNewRef can create new symbol reference
 	OpNewRef
 	OpUpdateRef
+
+	//
 	OpFetchField
 	OpFetchIndex
 	OpSetDirection

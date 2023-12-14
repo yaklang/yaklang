@@ -300,7 +300,7 @@ func (y *SyntaxFlowVisitor[T, V]) VisitFilterFieldMember(raw sf.IFilterFieldMemb
 	return nil
 }
 
-const tmpPH = "__[[PLACEHOLDE]]__"
+const tmpPH = "__[[PLACEHOLDER]]__"
 
 func (y *SyntaxFlowVisitor[T, V]) VisitStringLiteral(raw sf.IStringLiteralContext) (string, bool) {
 	if y == nil || raw == nil {
