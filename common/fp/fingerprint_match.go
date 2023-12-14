@@ -110,7 +110,7 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 				return nil, err
 			}
 
-			if result.State == CLOSED {
+			if result.State == OPEN {
 				return result, nil
 			}
 		}
