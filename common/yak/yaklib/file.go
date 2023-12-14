@@ -3,6 +3,7 @@ package yaklib
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -21,6 +22,7 @@ import (
 
 type _yakFile struct {
 	file *os.File
+	rw   *bufio.ReadWriter
 }
 
 // Save 将字符串或字节切片或字符串切片写入到文件中，如果文件不存在则创建，如果文件存在则覆盖，返回错误
@@ -162,13 +164,18 @@ func (y *_yakFile) ReadString() (string, error) {
 	return string(raw), nil
 }
 
-func (y *_yakFile) ReadLines() []string {
-	sc := bufio.NewScanner(y.file)
-	sc.Split(bufio.ScanLines)
+func (y *_yakFile) ReadLine() (string, error) {
+	return utils.BufioReadLineString(y.rw.Reader)
+}
 
-	var lines []string
-	for sc.Scan() {
-		lines = append(lines, sc.Text())
+func (y *_yakFile) ReadLines() []string {
+	lines := make([]string, 0)
+	for {
+		line, err := utils.BufioReadLineString(y.rw.Reader)
+		if err != nil {
+			break
+		}
+		lines = append(lines, line)
 	}
 	return lines
 }
@@ -310,6 +317,29 @@ func _fileReadLines(i interface{}) []string {
 		return make([]string, 0)
 	}
 	return utils.ParseStringToLines(string(c))
+}
+
+// ReadLinesWithCallback 尝试读取一个文件中的所有行，每读取一行，便会调用回调函数，返回错误
+// Example:
+// ```
+// err = file.ReadLinesWithCallback("/tmp/test.txt", func(line) { println(line) })
+// ```
+func _fileReadLinesWithCallback(i interface{}, callback func(string)) error {
+	filename := utils.InterfaceToString(i)
+	f, err := _fileOpenWithPerm(filename, os.O_RDONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	for {
+		line, err := f.ReadLine()
+		if errors.Is(err, io.EOF) {
+			break
+		} else if err != nil {
+			return err
+		}
+		callback(line)
+	}
+	return nil
 }
 
 // GetDirPath 返回路径中除最后一个元素之后的路径，这通常是原本路径的目录
@@ -470,7 +500,7 @@ func _fileOpen(name string) (*_yakFile, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &_yakFile{file: file}, nil
+	return &_yakFile{file: file, rw: bufio.NewReadWriter(bufio.NewReader(file), bufio.NewWriter(file))}, nil
 }
 
 // OpenFile 打开一个文件，使用 file.O_CREATE ... 和权限控制，返回一个文件结构体引用与错误
@@ -483,7 +513,7 @@ func _fileOpenWithPerm(name string, flags int, mode os.FileMode) (*_yakFile, err
 	if err != nil {
 		return nil, err
 	}
-	return &_yakFile{file: file}, nil
+	return &_yakFile{file: file, rw: bufio.NewReadWriter(bufio.NewReader(file), bufio.NewWriter(file))}, nil
 }
 
 // Stat 返回一个文件的信息和错误
@@ -632,18 +662,19 @@ func _clean(s string) string {
 }
 
 var FileExport = map[string]interface{}{
-	"ReadLines":  _fileReadLines,
-	"GetDirPath": _fileGetDirPath,
-	"GetExt":     _ext,
-	"GetBase":    _getBase,
-	"Clean":      _clean,
-	"Split":      _filePathSplit,
-	"IsExisted":  _fileIsExisted,
-	"IsFile":     _fileIsFile,
-	"IsDir":      _fileIsDir,
-	"IsAbs":      _fileIsAbs,
-	"IsLink":     _fileIsLink,
-	"Join":       _fileJoin,
+	"ReadLines":             _fileReadLines,
+	"ReadLinesWithCallback": _fileReadLinesWithCallback,
+	"GetDirPath":            _fileGetDirPath,
+	"GetExt":                _ext,
+	"GetBase":               _getBase,
+	"Clean":                 _clean,
+	"Split":                 _filePathSplit,
+	"IsExisted":             _fileIsExisted,
+	"IsFile":                _fileIsFile,
+	"IsDir":                 _fileIsDir,
+	"IsAbs":                 _fileIsAbs,
+	"IsLink":                _fileIsLink,
+	"Join":                  _fileJoin,
 
 	// flags
 	"O_RDWR":   os.O_RDWR,
