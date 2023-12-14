@@ -1,8 +1,7 @@
 package ssa
 
 import (
-	"fmt"
-
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/slices"
 )
@@ -153,7 +152,7 @@ func (f *FunctionBuilder) emitAroundInstruction(i, other Instruction, insert fun
 
 func (f *FunctionBuilder) emit(i Instruction) {
 	if f.CurrentBlock.finish || utils.IsNil(i) {
-		panic(fmt.Sprintf("this block [%s] is finish, instruction[%s] can't insert!", f.CurrentBlock, i))
+		log.Errorf("this block [%s] is finish, instruction[%s] can't insert!", f.CurrentBlock, i)
 	}
 	f.emitEx(i, func(i Instruction) {
 		f.CurrentBlock.Insts = append(f.CurrentBlock.Insts, i)
