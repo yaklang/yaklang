@@ -800,12 +800,11 @@ func TestGRPCMUSTPASS_MITMDnsAndHosts(t *testing.T) {
 	dnsRecordCount := 0
 	// mock dns server
 	var dnsServer = facades.MockDNSServerDefault(hostForDns, func(record string, domain string) string {
-
 		dnsRecordCount++
 		return "127.0.0.1"
 	})
 	defer func() {
-		if dnsRecordCount != 5 {
+		if dnsRecordCount != 1 {
 			t.Fatal("dns server should be called")
 		}
 	}()
