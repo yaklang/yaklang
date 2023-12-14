@@ -151,11 +151,6 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 				// TODO: config can set function return is a const
 				// !! medium: need a good interface for user config this
 
-			case *ssa.Field:
-				if !inst.OutCapture {
-					// TODO: handler field if this field not OutCaptured
-					// ! easy: just replace value
-				}
 			case *ssa.BinOp:
 				if v := ssa.HandlerBinOp(inst); v != inst {
 					ssa.ReplaceAllValue(inst, v)
@@ -266,16 +261,16 @@ func (s *BlockCondition) calcCondition(block *ssa.BasicBlock) ssa.Value {
 
 func newBinOp(op ssa.BinaryOpcode, x ssa.Value, y ssa.Value, block *ssa.BasicBlock) ssa.Value {
 	b := ssa.NewBinOp(op, x, y)
-	if b, ok := ssa.ToBinOp(b); ok {
-		block.EmitInst(b)
-	}
+	// if b, ok := ssa.ToBinOp(b); ok {
+	// 	block.EmitInst(b)
+	// }
 	return b
 }
 
 func newUnOp(op ssa.UnaryOpcode, x ssa.Value, block *ssa.BasicBlock) ssa.Value {
 	u := ssa.NewUnOp(op, x)
-	if u, ok := ssa.ToUnOp(u); ok {
-		block.EmitInst(u)
-	}
+	// if u, ok := ssa.ToUnOp(u); ok {
+	// 	block.EmitInst(u)
+	// }
 	return u
 }

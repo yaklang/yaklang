@@ -525,8 +525,6 @@ type Field struct {
 
 	// Method or Field
 	IsMethod bool
-	// capture by other function
-	OutCapture bool
 }
 
 var (

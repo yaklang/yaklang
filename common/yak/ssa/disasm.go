@@ -46,10 +46,6 @@ func getStrFlag(v Value, hasType bool) (op string) {
 	case *Function:
 		op += v.GetName()
 		return
-	case *Field:
-		if v.OutCapture {
-			return getStr(v.Key) + "(modify)"
-		}
 	}
 
 	if f := v.GetFunc(); f != nil {
@@ -82,10 +78,6 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 
 	if parent := f.parent; parent != nil {
 		ret += fmt.Sprintf("parent: %s\n", parent.GetName())
-	}
-
-	if f.R != nil {
-		ret += fmt.Sprintf("pos: %s\n", f.R)
 	}
 
 	if len(f.FreeValues) > 0 {
