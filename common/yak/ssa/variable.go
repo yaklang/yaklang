@@ -241,7 +241,7 @@ func (b *FunctionBuilder) readVariableByBlockEx(variable string, block *BasicBlo
 
 func (b *FunctionBuilder) BuildFreeValue(variable string) Value {
 	freeValue := NewParam(variable, true, b.Function)
-	b.FreeValues = append(b.FreeValues, freeValue)
+	b.FreeValues[variable] = freeValue
 	b.WriteVariable(variable, freeValue)
 	return freeValue
 }

@@ -2,6 +2,7 @@ package yak2ssa
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -27,8 +28,8 @@ func CheckTestCase(t *testing.T, tc TestCase) {
 	if prog == nil {
 		t.Fatal("failed to parse")
 	}
-	// prog.ShowWithSource()
-	// fmt.Println(prog.GetErrors().String())
+	prog.ShowWithSource()
+	fmt.Println(prog.GetErrors().String())
 	errs := lo.Map(prog.GetErrors(), func(e *ssa.SSAError, _ int) string { return e.Message })
 	slices.Sort(errs)
 	slices.Sort(tc.errs)
@@ -734,7 +735,7 @@ func TestClosureBinding(t *testing.T) {
 			f2()
 			`,
 			errs: []string{
-				ssa.BindingNotFound("a2"),
+				ssa.BindingNotFound("a2", ssa.NewRange(ssa.NewPosition(0, 18, 3), ssa.NewPosition(0, 18, 7), "")),
 			},
 		})
 	})

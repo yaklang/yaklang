@@ -234,7 +234,7 @@ type Function struct {
 	DeferBlock *BasicBlock
 
 	// for closure function
-	FreeValues []*Parameter // store the captured variable form parent-function, just contain name, and type is Parameter
+	FreeValues map[string]*Parameter // store the captured variable form parent-function, just contain name, and type is Parameter
 	// closure function side effects
 	// TODO: currently, this value is not being used, but it should be utilized in the future.
 	SideEffects map[string]Value
