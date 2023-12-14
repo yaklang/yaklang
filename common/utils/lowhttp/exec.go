@@ -176,7 +176,6 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		source               = option.RequestSource
 		dnsServers           = option.DNSServers
 		dnsHosts             = option.EtcHosts
-		dnsNoCache           = option.DNSNoCache
 		connPool             = option.ConnPool
 		withConnPool         = option.WithConnPool
 		firstAuth            = true
@@ -497,7 +496,6 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 			}),
 			netx.WithDNSServers(dnsServers...),
 			netx.WithTemporaryHosts(dnsHosts),
-			netx.WithDNSNoCache(dnsNoCache),
 		),
 		netx.DialX_WithSNI(host),
 	)

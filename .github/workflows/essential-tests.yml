@@ -89,6 +89,9 @@ jobs:
           - name: Test yso
             run: |
               go test -timeout 20s -run TestMUSTPASS* ./common/yso -v
+          - name: Test Dnsx
+            run: |
+              go test -timeout 20s -run TestLookupAll ./common/facades -v
 
     steps:
       - name: Check out code into the Go module directory
