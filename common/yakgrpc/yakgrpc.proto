@@ -581,6 +581,7 @@ service Yak {
   rpc ValidP12PassWord(ValidP12PassWordRequest) returns (ValidP12PassWordResponse);
 
   rpc RequestYakURL(RequestYakURLParams) returns (RequestYakURLResponse);
+  rpc RequestYakURLs(RequestYakURLsParams) returns (RequestYakURLResponse);
 
   // Wireshark
   rpc GetPcapMetadata(PcapMetadataRequest) returns (PcapMetadata);
@@ -906,6 +907,22 @@ message RequestYakURLParams {
   int64 Page = 3;
   int64 PageSize = 4;
 }
+
+message RequestYakURLsParams {
+
+    // files:
+    // GET: means fetch details
+    // POST: means update
+    // PUT: means create
+    // DELETE: means delete
+    // HEAD: means check
+    string Method = 1;
+  
+    repeated YakURL Urls = 2;
+  
+    int64 Page = 3;
+    int64 PageSize = 4;
+  }
 
 message YakURL {
   // YakURL is abstract general fs loader system
