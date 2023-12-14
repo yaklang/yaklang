@@ -1,6 +1,7 @@
 package omap
 
 import (
+	"reflect"
 	"sort"
 	"sync"
 )
@@ -145,4 +146,104 @@ func (o *OrderedMap[T, V]) Values() []V {
 		values[i] = o.m[k]
 	}
 	return values
+}
+
+func (o *OrderedMap[T, V]) Have(i any) bool {
+	o.lock.RLock()
+	defer o.lock.RUnlock()
+
+	switch i.(type) {
+	case T:
+		_, ok := o.m[i.(T)]
+		return ok
+	case V:
+		for _, v := range o.m {
+			if reflect.DeepEqual(i, v) {
+				return true
+			}
+		}
+		return false
+	default:
+		return false
+	}
+}
+
+func (o *OrderedMap[T, V]) Filter(f func(T, V) (bool, error)) *OrderedMap[T, V] {
+	o.lock.Lock()
+	defer o.lock.Unlock()
+
+	m := make(map[T]V)
+	k := make([]T, 0)
+	for _, key := range o.keyChain {
+		v, ok := o.m[key]
+		if !ok {
+			continue
+		}
+		ok, err := f(key, v)
+		if err != nil {
+			break
+		}
+		if ok {
+			m[key] = v
+			k = append(k, key)
+		}
+	}
+	return &OrderedMap[T, V]{
+		lock:     new(sync.RWMutex),
+		m:        m,
+		keyChain: k,
+	}
+}
+
+func (o *OrderedMap[T, V]) Map(f func(T, V) (T, V, error)) *OrderedMap[T, V] {
+	o.lock.Lock()
+	defer o.lock.Unlock()
+
+	m := make(map[T]V)
+	k := make([]T, 0)
+	for _, key := range o.keyChain {
+		v, ok := o.m[key]
+		if !ok {
+			continue
+		}
+		nk, nv, err := f(key, v)
+		if err != nil {
+			break
+		}
+		m[nk] = nv
+		k = append(k, nk)
+	}
+	return &OrderedMap[T, V]{
+		lock:     new(sync.RWMutex),
+		m:        m,
+		keyChain: k,
+	}
+}
+
+func (o *OrderedMap[T, V]) Flat(f func(T, V) (struct {
+	Key   T
+	Value V
+}, error)) *OrderedMap[T, V] {
+	o.lock.Lock()
+	defer o.lock.Unlock()
+
+	m := make(map[T]V)
+	k := make([]T, 0)
+	for _, key := range o.keyChain {
+		v, ok := o.m[key]
+		if !ok {
+			continue
+		}
+		n, err := f(key, v)
+		if err != nil {
+			break
+		}
+		m[n.Key] = n.Value
+		k = append(k, n.Key)
+	}
+	return &OrderedMap[T, V]{
+		lock:     new(sync.RWMutex),
+		m:        m,
+		keyChain: k,
+	}
 }
