@@ -2,8 +2,8 @@ package ssa
 
 import "fmt"
 
-func BindingNotFound(v string) string {
-	return fmt.Sprintf("call target closure binding variable not found: %s", v)
+func BindingNotFound(v string, r *Range) string {
+	return fmt.Sprintf("The closure function expects to capture variable [%s], but it was not found at the calling location [%s--%s].", v, r.Start, r.End)
 }
 
 func ExternFieldError(instance, name, key, want string) string {

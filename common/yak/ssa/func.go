@@ -32,7 +32,7 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		ExitBlock:      nil,
 		ChildFuncs:     make([]*Function, 0),
 		parent:         nil,
-		FreeValues:     make([]*Parameter, 0),
+		FreeValues:     make(map[string]*Parameter),
 		SideEffects:    make(map[string]Value),
 		InstReg:        make(map[Instruction]string),
 		externInstance: make(map[string]Value),
@@ -138,9 +138,7 @@ func (f *Function) Finish() {
 	f.SetType(funType)
 	if len(f.FreeValues) != 0 {
 		funType.SetFreeValue(
-			lo.Map(f.FreeValues, func(v *Parameter, _ int) string {
-				return v.GetName()
-			}),
+			lo.Keys(f.FreeValues),
 		)
 	}
 	if len(f.SideEffects) != 0 {

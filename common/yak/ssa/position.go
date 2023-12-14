@@ -52,7 +52,7 @@ func (p *Range) String() string {
 
 func (p *Position) String() string {
 	return fmt.Sprintf(
-		"%3d:%-3d(%3d)",
-		p.Line, p.Column, p.Offset,
+		"%d:%d",
+		p.Line, p.Column,
 	)
 }
