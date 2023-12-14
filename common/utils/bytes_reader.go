@@ -4,10 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"io/ioutil"
 	"net"
@@ -16,6 +12,11 @@ import (
 	"sync/atomic"
 	"time"
 	"unicode"
+
+	"github.com/pkg/errors"
+	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func ReadWithContextTickCallback(ctx context.Context, rc io.Reader, callback func([]byte) bool, interval time.Duration) {
@@ -71,14 +72,14 @@ func ReadConnUntil(conn net.Conn, timeout time.Duration, sep ...byte) ([]byte, e
 		return nil, Error("empty(nil) conn")
 	}
 
-	var buf = make([]byte, 1)
+	buf := make([]byte, 1)
 	var result bytes.Buffer
 	conn.SetReadDeadline(time.Now().Add(timeout))
 	defer func() {
 		conn.SetReadDeadline(time.Time{})
 	}()
 
-	var stopWord = make(map[byte]struct{})
+	stopWord := make(map[byte]struct{})
 	for _, stop := range sep {
 		stopWord[stop] = struct{}{}
 	}
@@ -114,7 +115,7 @@ func ReadUntilStable(reader io.Reader, conn net.Conn, timeout time.Duration, sta
 
 // ReadUntilStableEx allow skip timeout, read until stop word or timeout
 func ReadUntilStableEx(reader io.Reader, noTimeout bool, conn net.Conn, timeout time.Duration, stableTimeout time.Duration, sep ...byte) ([]byte, error) {
-	var buf = make([]byte, 1)
+	buf := make([]byte, 1)
 	var result bytes.Buffer
 
 	var ctx context.Context
@@ -126,7 +127,7 @@ func ReadUntilStableEx(reader io.Reader, noTimeout bool, conn net.Conn, timeout 
 	}
 	defer cancel()
 
-	var stopWord = make(map[byte]struct{})
+	stopWord := make(map[byte]struct{})
 	for _, stop := range sep {
 		stopWord[stop] = struct{}{}
 	}
@@ -193,13 +194,13 @@ func StableReaderEx(conn net.Conn, timeout time.Duration, maxSize int) []byte {
 	var n int
 	var err error
 	l := 0
-	var buffer = bytes.NewBuffer(nil)
+	buffer := bytes.NewBuffer(nil)
 	readTimeout := 1000 * time.Millisecond
 	readAsyncTimeout := 250 * time.Millisecond
 	readGapTimeout := 350 * time.Millisecond
 	defer conn.SetDeadline(time.Now().Add(3 * time.Minute))
 	ddlCtx, originCancel := context.WithTimeout(context.Background(), timeout)
-	var cancel = func() {
+	cancel := func() {
 		originCancel()
 	}
 	go func() {
@@ -209,7 +210,7 @@ func StableReaderEx(conn net.Conn, timeout time.Duration, maxSize int) []byte {
 			if n > 0 {
 				buffer.Write(ch)
 				if buffer.Len() == maxSize {
-					//cancel()
+					// cancel()
 					return
 				}
 			}
@@ -238,7 +239,7 @@ func StableReaderEx(conn net.Conn, timeout time.Duration, maxSize int) []byte {
 			}
 		}
 	}()
-	//wait := make(chan int)
+	// wait := make(chan int)
 	for {
 		time.Sleep(readTimeout)
 		if buffer.Len() == 0 || buffer.Len() == l {
@@ -295,7 +296,7 @@ TOKEN:
 }
 
 func ReadN(reader io.Reader, n int) ([]byte, error) {
-	var buf = make([]byte, n)
+	buf := make([]byte, n)
 	if n == 0 {
 		return buf, nil
 	}
@@ -357,6 +358,24 @@ func BufioReadLine(reader *bufio.Reader) ([]byte, error) {
 	}
 }
 
+func BufioReadLineString(reader *bufio.Reader) (string, error) {
+	if reader == nil {
+		return "", Error("empty reader(bufio)")
+	}
+
+	var buf bytes.Buffer
+	for {
+		tmp, isPrefix, err := reader.ReadLine()
+		if err != nil {
+			return "", err
+		}
+		buf.Write(tmp)
+		if !isPrefix {
+			return buf.String(), nil
+		}
+	}
+}
+
 func ReadLine(reader io.Reader) ([]byte, error) {
 	lineRaw, err := ReadUntilStableEx(reader, true, nil, 0, 0, '\n')
 	if err != nil {
@@ -367,7 +386,7 @@ func ReadLine(reader io.Reader) ([]byte, error) {
 
 func ReadLineEx(reader io.Reader) (string, int64, error) {
 	var count int64 = 0
-	var buf = make([]byte, 1)
+	buf := make([]byte, 1)
 	var res bytes.Buffer
 	for {
 		n, err := reader.Read(buf)
