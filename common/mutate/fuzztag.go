@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/fuzztagx/parser"
 	"github.com/yaklang/yaklang/common/utils/regen"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -461,71 +462,76 @@ func init() {
 			if db == nil {
 				return []string{s}
 			}
-			names := make([]string, 0)
-			elems := make([]any, 0)
 			for _, s := range utils.PrettifyListFromStringSplited(s, ",") {
-
+				group, folder := "", ""
 				ss := strings.Split(s, "/")
-				if len(ss) == 1 {
-					// bizhelper.ExactOrQueryArrayOr()
-					// just group name
-					names = append(names, "(`group` = ?)")
-					elems = append(elems, ss[0])
-				}
 				if len(ss) == 2 {
-					if ss[1] == "*" {
-						// all group in folder
-						names = append(names, "(`folder` = ?)")
-						elems = append(elems, ss[0])
-					} else {
-						// just one group in folder
-						names = append(names, "(`group` = ?)")
-						elems = append(elems, ss[1])
+					folder = ss[0]
+					group = ss[1]
+					if group == "*" {
+						group = ""
 					}
+				} else {
+					group = ss[0]
+				}
+
+				if group != "" && folder != "" {
+					db = db.Or("`group` = ? AND `folder` = ?", group, folder)
+				} else if group != "" {
+					db = db.Or("`group` = ?", group)
+				} else if folder != "" {
+					db = db.Or("`folder` = ?", folder)
 				}
 			}
 
-			db = db.Where(strings.Join(names, " OR "), elems...)
-			db = db.Where("content != ?", "")
-			// db = db.Debug()
 			var payloads []string
-			if rows, err := db.Table("payloads").Select("content, is_file").Order("hit_count desc").Rows(); err != nil {
+			rows, err := db.Table("payloads").Select("content, is_file").Order("hit_count desc").Rows()
+			if err != nil {
 				return []string{s}
-			} else {
-				for rows.Next() {
-					var payloadRaw string
-					var isFile *bool
-					// var res Res
-					err := rows.Scan(&payloadRaw, &isFile)
+			}
+			var (
+				payloadRaw string
+				isFile     bool
+			)
+			f := filter.NewFilter()
+			for rows.Next() {
+				err := rows.Scan(&payloadRaw, &isFile)
+				if err != nil {
+					log.Errorf("sql scan error: %v", err)
+					return payloads
+				}
+				unquoted, err := strconv.Unquote(payloadRaw)
+				if err == nil {
+					payloadRaw = unquoted
+				}
+
+				if isFile {
+					ch, err := utils.FileLineReader(payloadRaw)
 					if err != nil {
-						log.Errorf("sql scan error: %v", err)
-						return payloads
+						log.Errorf("read payload err: %v", err)
+						continue
 					}
-					if isFile != nil && *isFile {
-						ch, err := utils.FileLineReader(payloadRaw)
-						if err != nil {
-							// skip
-							log.Errorf("FileLineReader err : %v", err)
+					for line := range ch {
+						lineStr := utils.UnsafeBytesToString(line)
+						raw, err := strconv.Unquote(lineStr)
+						if err == nil {
+							lineStr = raw
+						}
+						if f.Exist(lineStr) {
 							continue
 						}
-						for lineB := range ch {
-							line := utils.UnsafeBytesToString(lineB)
-							raw, err := strconv.Unquote(line)
-							if err != nil {
-								raw = line
-							}
-							payloads = append(payloads, raw)
-						}
-					} else {
-						raw, err := strconv.Unquote(payloadRaw)
-						if err != nil {
-							raw = payloadRaw
-						}
-						payloads = append(payloads, raw)
+						f.Insert(lineStr)
+						payloads = append(payloads, lineStr)
 					}
+				} else {
+					if f.Exist(payloadRaw) {
+						continue
+					}
+					f.Insert(payloadRaw)
+					payloads = append(payloads, payloadRaw)
 				}
-				return payloads
 			}
+			return payloads
 		},
 		Alias:       []string{"x"},
 		Description: "从数据库加载 Payload, 可以指定payload组或文件夹, `{{payload(groupName)}}`, `{{payload(folder/*)}}`",
