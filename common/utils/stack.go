@@ -66,6 +66,20 @@ func (this *Stack[T]) Pop() T {
 	return n.value
 }
 
+// PopN the top item of the stack and return it
+func (this *Stack[T]) PopN(n int) []T {
+	if this.length == 0 {
+		return nil
+	}
+
+	var ret []T
+	for i := 0; i < n; i++ {
+		ret = append(ret, this.Pop())
+	}
+
+	return ret
+}
+
 // Push a value onto the top of the stack
 func (this *Stack[T]) Push(value T) {
 	n := &node[T]{value, this.top}
