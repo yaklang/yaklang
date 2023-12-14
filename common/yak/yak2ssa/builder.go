@@ -26,7 +26,7 @@ type astbuilder struct {
 func parseSSA(src string, force bool, prog *ssa.Program, callback func(*ssa.FunctionBuilder)) (ret *ssa.Program) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Errorf("recover from yak2ssa.parseSSA: ", r)
+			log.Error("recover from yak2ssa.parseSSA: ", r)
 			// fmt.Println("\n\n\n!!!!!!!\n\n!!!!!\n\nRecovered in parseSSA", r)
 			// debug.PrintStack()
 			ret = nil
