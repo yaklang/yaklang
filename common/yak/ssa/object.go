@@ -60,7 +60,6 @@ func NewFieldOnly(key, obj Value, block *BasicBlock) *Field {
 		Obj:           obj,
 		update:        make([]User, 0),
 		IsMethod:      false,
-		OutCapture:    false,
 	}
 	return f
 }
