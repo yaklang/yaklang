@@ -1,10 +1,8 @@
 package yak2ssa
 
 import (
-	"fmt"
-	"runtime/debug"
-
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/yaklang/common/log"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
@@ -28,9 +26,9 @@ type astbuilder struct {
 func parseSSA(src string, force bool, prog *ssa.Program, callback func(*ssa.FunctionBuilder)) (ret *ssa.Program) {
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Println("recover from yak2ssa.parseSSA: ", r)
-			fmt.Println("\n\n\n!!!!!!!\n\n!!!!!\n\nRecovered in parseSSA", r)
-			debug.PrintStack()
+			log.Errorf("recover from yak2ssa.parseSSA: ", r)
+			// fmt.Println("\n\n\n!!!!!!!\n\n!!!!!\n\nRecovered in parseSSA", r)
+			// debug.PrintStack()
 			ret = nil
 		}
 	}()
