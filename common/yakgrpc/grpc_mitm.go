@@ -461,10 +461,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				continue
 			}
 			currentStatus := controller.getStatus(controller.currentTask)
-			currentStatus.statusChangeCond.L.Lock()
-			currentStatus.status = hijack
-			currentStatus.statusChangeCond.Signal()
-			currentStatus.statusChangeCond.L.Unlock()
+			currentStatus.setStatus(hijack)
 			waitHijackFinish(currentStatus)
 		}
 	}()
@@ -1404,8 +1401,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 		//todo requestWait
 
-		controller.Register(originReqIns)
-		if controller.waitHijack(originReqIns) == autoFoward {
+		controller.Register(originReqIns)                      // 加入队列
+		if controller.waitHijack(originReqIns) == autoFoward { // 等待劫持
 			return req
 		}
 
@@ -1990,28 +1987,25 @@ func (h *hijackTaskController) Register(req *http.Request) {
 	}
 }
 
-func (h *hijackTaskController) waitHijack(r *http.Request) int { // mitm任务等待劫持
+func (h *hijackTaskController) waitHijack(r *http.Request) int { // mitm 任务等待劫持 任务调用
 	thisStatus := h.getStatus(r)
 	if thisStatus == nil { // 如果没有查到状态则自动放行
 		return autoFoward
 	}
 	thisStatus.statusChangeCond.L.Lock()
 	defer thisStatus.statusChangeCond.L.Unlock()
-	for thisStatus.status == waitHijack {
+	for thisStatus.status == waitHijack { // 状态不为等待即可放行
 		thisStatus.statusChangeCond.Wait()
 	}
 	return thisStatus.status
 }
 
-func (h *hijackTaskController) finishHijack(r *http.Request) { // mitm 任务结束
+func (h *hijackTaskController) finishHijack(r *http.Request) { // mitm 任务结束 任务调用
 	thisStatus := h.getStatus(r)
 	if thisStatus == nil { // 如果没有查到状态则自动放行
 		return
 	}
-	thisStatus.statusChangeCond.L.Lock()
-	defer thisStatus.statusChangeCond.L.Unlock()
-	thisStatus.status = finishHijack
-	thisStatus.statusChangeCond.Signal()
+	thisStatus.setStatus(finishHijack)
 }
 
 func (h *hijackTaskController) nextTask() *http.Request {
@@ -2026,12 +2020,8 @@ func (h *hijackTaskController) clear() {
 		h.statusMapMux.Unlock()
 	}()
 
-	currentStatus := h.taskStatusMap[h.currentTask]
-	if currentStatus != nil {
-		currentStatus.statusChangeCond.L.Lock()
-		currentStatus.status = autoFoward
-		currentStatus.statusChangeCond.Broadcast()
-		currentStatus.statusChangeCond.L.Unlock()
+	for _, t := range h.taskStatusMap {
+		t.setStatus(autoFoward)
 	}
 	h.currentTask = nil
 	h.taskQueue = h.taskQueue[:0]
@@ -2074,6 +2064,13 @@ func (h *hijackTaskController) setStatus(r *http.Request, s *taskStatus) {
 	h.statusMapMux.Lock()
 	defer h.statusMapMux.Unlock()
 	h.taskStatusMap[r] = s
+}
+
+func (t *taskStatus) setStatus(s int) {
+	t.statusChangeCond.L.Lock()
+	t.status = s
+	t.statusChangeCond.Broadcast()
+	t.statusChangeCond.L.Unlock()
 }
 
 var (
