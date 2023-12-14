@@ -258,7 +258,7 @@ func TestNumber(t *testing.T) {
 var large string
 
 func TestJs(t *testing.T) {
-	prog := ParseSSA(large, none)
+	prog := ParseSSA(large)
 	prog.Show()
 
 	time.Sleep(time.Minute)
