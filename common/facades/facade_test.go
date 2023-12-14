@@ -108,7 +108,7 @@ func TestLookupAll(t *testing.T) {
 		callback   callbackInfo // 添加字段用于存储回调信息
 	}{
 		{
-			name: "set hosts 不会缓存 10.10.10.10",
+			name: "set hosts 不会缓存 10.10.10.10(case A)",
 			args: args{
 				host: "abc.com",
 				opt: []netx.DNSOption{
@@ -121,7 +121,7 @@ func TestLookupAll(t *testing.T) {
 			want:       []string{"10.10.10.10"},
 		},
 		{
-			name: "cancel hosts 没有缓存所以结果是 fake 的ip，本次会进行缓存",
+			name: "cancel hosts 没有缓存所以结果是 fake 的ip，本次会进行缓存(case A)",
 			args: args{
 				host: "abc.com",
 				opt: []netx.DNSOption{
@@ -134,10 +134,23 @@ func TestLookupAll(t *testing.T) {
 		},
 
 		{
-			name: "test hosts cache",
+			name: "test hosts cache (case A)",
 			args: args{
 				host: "abc.com",
 				opt: []netx.DNSOption{
+					netx.WithDNSServers(fakeDnsServer),
+					netx.WithDNSDisableSystemResolver(true),
+				},
+			},
+			wantMethod: "cache",
+			want:       []string{"9.9.9.9"},
+		},
+		{
+			name: "设置 hosts 与 host 不相同会缓存 9.9.9.9 (case A)",
+			args: args{
+				host: "abc.com",
+				opt: []netx.DNSOption{
+					netx.WithTemporaryHosts(map[string]string{"bcd.com": "10.10.10.10"}),
 					netx.WithDNSServers(fakeDnsServer),
 					netx.WithDNSDisableSystemResolver(true),
 				},
