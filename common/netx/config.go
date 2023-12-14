@@ -68,6 +68,7 @@ type ReliableDNSConfig struct {
 	FallbackDoH bool // as backup
 	SpecificDoH []string
 
+	etcHostNoCache bool
 	// NoCache
 	NoCache bool
 
@@ -114,10 +115,12 @@ func (r *ReliableDNSConfig) call(dnsType, domain, ip, fromServer, method string,
 		ttlInt = 300
 	}
 
-	if isV6 {
-		ipv6DNSCache.SetWithTTL(domain, ip, time.Second*time.Duration(ttlInt))
-	} else {
-		ipv4DNSCache.SetWithTTL(domain, ip, time.Second*time.Duration(ttlInt))
+	if !r.etcHostNoCache {
+		if isV6 {
+			ipv6DNSCache.SetWithTTL(domain, ip, time.Second*time.Duration(ttlInt))
+		} else {
+			ipv4DNSCache.SetWithTTL(domain, ip, time.Second*time.Duration(ttlInt))
+		}
 	}
 
 	r.mutex.Lock()
@@ -232,7 +235,13 @@ func WithDNSFallbackSpecificDNS(b bool) DNSOption {
 
 func WithDNSCallback(cb func(dnsType, domain, ip, fromServer, method string)) DNSOption {
 	return func(config *ReliableDNSConfig) {
-		config.Callback = cb
+		origin := config.Callback
+		config.Callback = func(dnsType string, domain string, ip, fromServer, method string) {
+			if origin != nil {
+				origin(dnsType, domain, ip, fromServer, method)
+			}
+			cb(dnsType, domain, ip, fromServer, method)
+		}
 	}
 }
 
