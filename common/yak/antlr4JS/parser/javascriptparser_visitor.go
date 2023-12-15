@@ -391,6 +391,9 @@ type JavaScriptParserVisitor interface {
 	// Visit a parse tree produced by JavaScriptParser#identifierName.
 	VisitIdentifierName(ctx *IdentifierNameContext) interface{}
 
+	// Visit a parse tree produced by JavaScriptParser#word.
+	VisitWord(ctx *WordContext) interface{}
+
 	// Visit a parse tree produced by JavaScriptParser#identifier.
 	VisitIdentifier(ctx *IdentifierContext) interface{}
 
