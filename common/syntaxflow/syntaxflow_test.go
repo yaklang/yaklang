@@ -24,7 +24,7 @@ func check(c string) {
 }
 
 func TestSyntaxFlow_Basic(t *testing.T) {
-	check(`$abc >> fetch => [param] => {header: 2.(dict); path: 1.(str); } => $request`)
+	check(`$abc >> fetch => [param] => {path: 0.(str); header: 1.(dict); } => $request`)
 }
 
 func TestSyntaxFlow_Fetch(t *testing.T) {

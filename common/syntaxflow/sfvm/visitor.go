@@ -3,6 +3,7 @@ package sfvm
 import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -338,8 +339,33 @@ func (y *SyntaxFlowVisitor[V]) VisitNumberLiteral(raw sf.INumberLiteralContext) 
 	result := strings.ToLower(i.GetText())
 	switch {
 	case strings.HasPrefix(result, "0b"):
+		result, err := strconv.ParseInt(result[2:], 2, 64)
+		if err != nil {
+			panic(err)
+		}
+		return int(result)
 	case strings.HasSuffix(result, "0x"):
-	case strings.HasSuffix(result, "0b"):
+		result, err := strconv.ParseInt(result[:len(result)-1], 16, 64)
+		if err != nil {
+			panic(err)
+		}
+		return int(result)
+	case strings.HasSuffix(result, "0o"):
+		result, err := strconv.ParseInt(result[:len(result)-1], 8, 64)
+		if err != nil {
+			panic(err)
+		}
+		return int(result)
+	default:
+		if ret := strings.TrimLeft(result, "0"); ret != "" {
+			result, err := strconv.ParseInt(ret, 10, 64)
+			if err != nil {
+				panic(err)
+			}
+			return int(result)
+		} else {
+			return 0
+		}
 	}
 
 	return -1
