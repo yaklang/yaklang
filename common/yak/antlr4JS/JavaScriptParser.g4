@@ -351,7 +351,7 @@ questionDot: '?' '.';
 
 keywordSingleExpression
     : Import '(' singleExpression ')'                                       # ImportExpression
-    | New singleExpression ('(' (argument (',' argument)* ',')? ')')?       # NewExpression
+    | New singleExpression arguments?                                       # NewExpression
     | New '.' identifier                                                    # MetaExpression // new.target
     | Await singleExpression                                                # AwaitExpression
     ;
@@ -500,7 +500,11 @@ identifierName
     : identifier
     | NullLiteral
     | BooleanLiteral
-    | Break
+    | word
+    ;
+
+word
+    : Break
     | Do
     | Instanceof
     | Typeof

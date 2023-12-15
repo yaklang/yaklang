@@ -519,6 +519,10 @@ func (v *BaseJavaScriptParserVisitor) VisitIdentifierName(ctx *IdentifierNameCon
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseJavaScriptParserVisitor) VisitWord(ctx *WordContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseJavaScriptParserVisitor) VisitIdentifier(ctx *IdentifierContext) interface{} {
 	return v.VisitChildren(ctx)
 }
