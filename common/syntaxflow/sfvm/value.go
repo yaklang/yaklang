@@ -15,7 +15,7 @@ func NewValue[T comparable, V any](v any) *Value[T, V] {
 	case *omap.OrderedMap[T, V]:
 		return &Value[T, V]{v: "", data: v.(*omap.OrderedMap[T, V])}
 	}
-	return &Value[T, V]{v: v, data: omap.NewEmptyOrderedMap[T, V]()}
+	return &Value[T, V]{v: v, data: nil}
 }
 
 func (v *Value[T, V]) AsInt() int {
@@ -34,6 +34,6 @@ func (v *Value[T, V]) AsBool() bool {
 	return utils.InterfaceToBoolean(v.v)
 }
 
-func (v *Value[T, V]) Filter() *omap.OrderedMap[T, V] {
-	return v.data
+func (v *Value[T, V]) IsMap() bool {
+	return v.data != nil
 }

@@ -1,22 +1,26 @@
 package syntaxflow
 
 import (
-	"fmt"
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
-	"github.com/yaklang/yaklang/common/syntaxflow/sf"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"testing"
 )
 
 func check(c string) {
-	lexer := sf.NewSyntaxFlowLexer(antlr.NewInputStream(c))
-	astParser := sf.NewSyntaxFlowParser(antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel))
-	result := sfvm.NewSyntaxFlowVisitor[string, any]()
-	result.VisitFlow(astParser.Flow())
-
-	fmt.Println()
-	fmt.Println(c)
-	result.Show()
+	vm := sfvm.NewSyntaxFlowVirtualMachine[string, any]().Debug(true)
+	err := vm.Compile(c)
+	if err != nil {
+		panic(err)
+	}
+	m := omap.NewEmptyOrderedMap[string, any]()
+	m.Set("abc", "def")
+	m.Set("search", "def")
+	m.Set("fetch", map[string]any{
+		"param": []any{
+			"/abc",
+		},
+	})
+	vm.Feed(m)
 }
 
 func TestSyntaxFlow_Basic(t *testing.T) {
