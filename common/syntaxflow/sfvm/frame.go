@@ -3,6 +3,7 @@ package sfvm
 import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
@@ -78,7 +79,14 @@ func (s *SFFrame[V]) exec(input *omap.OrderedMap[string, V]) (ret error) {
 			s.stack.Push(NewValue[V](res))
 			s.debugSubLog("<< push")
 		case OpPushIndex:
-			panic("PushIndex not implemented")
+			s.debugSubLog("peek stack top index: [%v]", i.UnaryInt)
+			parent := s.stack.Peek().AsMap()
+			results, err := parent.SearchIndexKey(i.UnaryInt)
+			if err != nil {
+				return utils.Wrapf(err, "search index key failed")
+			}
+			s.stack.Push(NewValue[V](results))
+			s.debugSubLog("<< push")
 		case OpPushRef:
 			result, ok := s.symbolTable.Get(i.UnaryStr)
 			if !ok {
@@ -86,21 +94,31 @@ func (s *SFFrame[V]) exec(input *omap.OrderedMap[string, V]) (ret error) {
 			}
 			s.stack.Push(NewValue[V](result))
 		case OpNewRef:
-			val := s.stack.Peek()
-			s.symbolTable.Set(i.UnaryStr, val.AsMap())
+			s.debugSubLog("new$ref: %v", i.UnaryStr)
+			s.symbolTable.Set(i.UnaryStr, omap.NewEmptyOrderedMap[string, V]())
 		case OpUpdateRef:
+			s.debugSubLog("fetch$ref: %v", i.UnaryStr)
+			result, ok := s.symbolTable.Get(i.UnaryStr)
+			if !ok {
+				result = omap.NewEmptyOrderedMap[string, V]()
+				s.debugSubLog("auto new$ref: %v", i.UnaryStr)
+				s.symbolTable.Set(i.UnaryStr, result)
+			}
 			val := s.stack.Pop()
-			s.symbolTable.Set(i.UnaryStr, val.AsMap())
+			s.debugSubLog("update$ref: %v := %v", i.UnaryStr, val.VerboseString())
+			result.SetLiteralValue(val.Value())
 		case OpFetchField:
 			results := s.stack.Pop().AsMap().Map(func(string, V) (string, V, error) {
 				panic("FetchField not implemented")
 			})
 			s.stack.Push(NewValue[V](results))
 		case OpFetchIndex:
+			s.debugSubLog(">> peek stack top")
 			results := s.stack.Pop().AsMap().Map(func(string, V) (string, V, error) {
 				panic("FetchIndex not implemented")
 			})
 			s.stack.Push(NewValue[V](results))
+			s.debugSubLog("<< push map(len: %v)", results.Len())
 		case OpSetDirection:
 			s.toLeft = i.UnaryStr == "<<"
 		case OpFlat:
@@ -121,7 +139,22 @@ func (s *SFFrame[V]) exec(input *omap.OrderedMap[string, V]) (ret error) {
 		case OpMap:
 			panic("Map is not implemented")
 		case OpTypeCast:
-			panic("TypeCast is not implemented")
+			s.debugSubLog(">> pop -> (%v)", i.UnaryStr)
+			op1 := s.stack.Pop()
+			switch i.UnaryStr {
+			case "string", "str", "s":
+				s.stack.Push(NewValue[V](op1.AsString()))
+			case "int", "number", "float", "i":
+				s.stack.Push(NewValue[V](op1.AsInt()))
+			case "bool", "boolean", "b":
+				s.stack.Push(NewValue[V](op1.AsBool()))
+			case "dict":
+				s.stack.Push(NewValue[V](op1.AsMap()))
+			default:
+				log.Warnf("unknown type cast: %v", i.UnaryStr)
+				s.stack.Push(op1)
+			}
+			s.debugSubLog("<< push")
 		case OpEq:
 			op2 := s.stack.Pop()
 			op1 := s.stack.Pop()
