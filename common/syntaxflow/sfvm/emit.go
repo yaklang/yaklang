@@ -1,6 +1,9 @@
 package sfvm
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/yaklang/yaklang/common/utils/omap"
+)
 
 func (y *SyntaxFlowVisitor[T, V]) EmitMapBuild(i int) {
 	y.codes = append(y.codes, &SFI[T, V]{
@@ -155,4 +158,8 @@ func (v *SyntaxFlowVisitor[T, V]) Show() {
 	for _, c := range v.codes {
 		fmt.Println(c.String())
 	}
+}
+
+func (v *SyntaxFlowVisitor[T, V]) CreateFrame(vars *omap.OrderedMap[string, *omap.OrderedMap[T, V]]) *SFFrame[T, V] {
+	return NewSFFrame(vars, v.text, v.codes)
 }
