@@ -254,7 +254,7 @@ func (s *Server) SavePayloadStream(req *ypb.SavePayloadRequest, stream ypb.Yak_S
 		d := time.Since(start)
 		stream.Send(&ypb.SavePayloadProgress{
 			Progress:            progress,
-			CostDurationVerbose: d.String(),
+			CostDurationVerbose: d.Round(time.Second).String(),
 			Message:             msg,
 		})
 	}
@@ -425,7 +425,7 @@ func (s *Server) SavePayloadToFileStream(req *ypb.SavePayloadRequest, stream ypb
 		d := time.Since(start)
 		stream.Send(&ypb.SavePayloadProgress{
 			Progress:            progress,
-			CostDurationVerbose: d.String(),
+			CostDurationVerbose: d.Round(time.Second).String(),
 			Message:             msg,
 		})
 	}
@@ -1020,7 +1020,7 @@ func (s *Server) ConvertPayloadGroupToDatabase(req *ypb.NameRequest, stream ypb.
 		d := time.Since(start)
 		stream.Send(&ypb.SavePayloadProgress{
 			Progress:            progress,
-			CostDurationVerbose: d.String(),
+			CostDurationVerbose: d.Round(time.Second).String(),
 			Message:             msg,
 		})
 	}
