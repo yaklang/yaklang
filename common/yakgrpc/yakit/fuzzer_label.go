@@ -9,10 +9,11 @@ import (
 
 type WebFuzzerLabel struct {
 	gorm.Model
-	Label                  string `json:"label"`
-	DefaultDescription     string	 `json:"default_description"`
-	Description      string `json:"description"`
-	Hash             string `gorm:"unique_index"`
+	Label string `json:"label"`
+	// 模版数据唯一标识，用来兼容做对比
+	DefaultDescription string `json:"default_description"`
+	Description        string `json:"description"`
+	Hash               string `gorm:"unique_index"`
 }
 
 func init() {
@@ -25,11 +26,7 @@ func init() {
 }
 
 func (w *WebFuzzerLabel) CalcHash() string {
-	key := w.Label
-	if key == "" {
-		key = w.DefaultDescription
-	}
-	return utils.CalcSha1(key)
+	return utils.CalcSha1(w.DefaultDescription, w.Label)
 }
 
 func CreateOrUpdateWebFuzzerLabel(db *gorm.DB, hash string, i interface{}) error {
