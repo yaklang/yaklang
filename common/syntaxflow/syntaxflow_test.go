@@ -7,7 +7,7 @@ import (
 )
 
 func check(c string) {
-	vm := sfvm.NewSyntaxFlowVirtualMachine[string, any]().Debug(true)
+	vm := sfvm.NewSyntaxFlowVirtualMachine[any]().Debug(true)
 	err := vm.Compile(c)
 	if err != nil {
 		panic(err)

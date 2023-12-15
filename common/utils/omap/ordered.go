@@ -1,6 +1,7 @@
 package omap
 
 import (
+	"fmt"
 	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
@@ -15,6 +16,8 @@ type OrderedMap[T comparable, V any] struct {
 	m        map[T]V
 	indexMap map[T]int
 	keyChain []T
+
+	parent *OrderedMap[T, V]
 }
 
 func NewEmptyOrderedMap[T comparable, V any]() *OrderedMap[T, V] {
@@ -152,6 +155,44 @@ func (o *OrderedMap[T, V]) Values() []V {
 	return values
 }
 
+func (o *OrderedMap[T, V]) ValuesMap() *OrderedMap[string, V] {
+	o.lock.RLock()
+	defer o.lock.RUnlock()
+
+	result := NewEmptyOrderedMap[string, V]()
+	for _, v := range o.Values() {
+		vv := reflect.ValueOf(v)
+		vt := reflect.TypeOf(v)
+		switch vt.Kind() {
+		case reflect.Map:
+			for _, key := range vv.MapKeys() {
+				value := vv.MapIndex(key).Interface().(V)
+				result.Set(utils.InterfaceToString(key.Interface()), value)
+			}
+		case reflect.Array:
+			for i := 0; i < vv.Len(); i++ {
+				result.Set(fmt.Sprint(i), vv.Index(i).Interface().(V))
+			}
+		case reflect.Slice:
+			for i := 0; i < vv.Len(); i++ {
+				result.Set(fmt.Sprint(i), vv.Index(i).Interface().(V))
+			}
+		default:
+			key := utils.InterfaceToString(v)
+			var count = 0
+			var origin = key
+		RETRY:
+			if _, ok := result.Get(key); ok {
+				count++
+				key = origin + "_" + fmt.Sprint(count)
+				goto RETRY
+			}
+			result.Set(key, v)
+		}
+	}
+	return result
+}
+
 func (o *OrderedMap[T, V]) Have(i any) bool {
 	o.lock.RLock()
 	defer o.lock.RUnlock()
@@ -196,7 +237,19 @@ func (o *OrderedMap[T, V]) Filter(f func(T, V) (bool, error)) *OrderedMap[T, V] 
 		lock:     new(sync.RWMutex),
 		m:        m,
 		keyChain: k,
+		parent:   o,
 	}
+}
+
+func (o *OrderedMap[T, V]) GetParent() *OrderedMap[T, V] {
+	return o.parent
+}
+
+func (o *OrderedMap[T, V]) GetRoot() (*OrderedMap[T, V], bool) {
+	if o.parent == nil {
+		return o, true
+	}
+	return o.parent.GetRoot()
 }
 
 func (o *OrderedMap[T, V]) Map(f func(T, V) (T, V, error)) *OrderedMap[T, V] {
@@ -221,6 +274,7 @@ func (o *OrderedMap[T, V]) Map(f func(T, V) (T, V, error)) *OrderedMap[T, V] {
 		lock:     new(sync.RWMutex),
 		m:        m,
 		keyChain: k,
+		parent:   o,
 	}
 }
 
@@ -249,6 +303,7 @@ func (o *OrderedMap[T, V]) Flat(f func(T, V) (struct {
 		lock:     new(sync.RWMutex),
 		m:        m,
 		keyChain: k,
+		parent:   o,
 	}
 }
 
@@ -266,6 +321,7 @@ func (s *OrderedMap[T, V]) Copy() *OrderedMap[T, V] {
 		lock:     new(sync.RWMutex),
 		m:        m,
 		keyChain: ks,
+		parent:   s,
 	}
 }
 
@@ -292,6 +348,34 @@ func (s *OrderedMap[T, V]) SearchKey(i ...string) (*OrderedMap[T, V], error) {
 		lock:     new(sync.RWMutex),
 		m:        m,
 		keyChain: k,
+		parent:   s,
+	}, nil
+}
+
+func (s *OrderedMap[T, V]) SearchValue(i ...string) (*OrderedMap[T, V], error) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	m := make(map[T]V)
+	k := make([]T, 0)
+	for _, key := range s.keyChain {
+		v, ok := s.m[key]
+		if !ok {
+			continue
+		}
+		for _, j := range i {
+			if utils.InterfaceToString(key) == j {
+				m[key] = v
+				k = append(k, key)
+				break
+			}
+		}
+	}
+	return &OrderedMap[T, V]{
+		lock:     new(sync.RWMutex),
+		m:        m,
+		keyChain: k,
+		parent:   s,
 	}, nil
 }
 
@@ -319,6 +403,7 @@ func (s *OrderedMap[T, V]) SearchIndexKey(i ...int) (*OrderedMap[T, V], error) {
 	return &OrderedMap[T, V]{
 		lock:     new(sync.RWMutex),
 		m:        m,
+		parent:   s,
 		keyChain: k,
 	}, nil
 }
@@ -348,6 +433,7 @@ func (s *OrderedMap[T, V]) SearchRegexKey(i string) (*OrderedMap[T, V], error) {
 		lock:     new(sync.RWMutex),
 		m:        m,
 		keyChain: k,
+		parent:   s,
 	}, nil
 }
 
@@ -377,6 +463,7 @@ func (s *OrderedMap[T, V]) SearchGlobKey(i string, seps ...string) (*OrderedMap[
 		lock:     new(sync.RWMutex),
 		m:        m,
 		keyChain: k,
+		parent:   s,
 	}, nil
 }
 
@@ -403,5 +490,7 @@ func Merge[T comparable, V any](dicts ...*OrderedMap[T, V]) *OrderedMap[T, V] {
 func (s *OrderedMap[T, V]) Merge(i ...*OrderedMap[T, V]) *OrderedMap[T, V] {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
-	return Merge[T, V](append([]*OrderedMap[T, V]{s}, i...)...)
+	r := Merge[T, V](append([]*OrderedMap[T, V]{s}, i...)...)
+	r.parent = s
+	return r
 }

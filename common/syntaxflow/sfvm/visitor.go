@@ -6,17 +6,17 @@ import (
 	"strings"
 )
 
-type SyntaxFlowVisitor[T comparable, V any] struct {
+type SyntaxFlowVisitor[V any] struct {
 	text  string
-	codes []*SFI[T, V]
+	codes []*SFI[V]
 }
 
-func NewSyntaxFlowVisitor[T comparable, V any]() *SyntaxFlowVisitor[T, V] {
-	sfv := &SyntaxFlowVisitor[T, V]{}
+func NewSyntaxFlowVisitor[V any]() *SyntaxFlowVisitor[V] {
+	sfv := &SyntaxFlowVisitor[V]{}
 	return sfv
 }
 
-func (y *SyntaxFlowVisitor[T, V]) VisitFlow(raw sf.IFlowContext) interface{} {
+func (y *SyntaxFlowVisitor[V]) VisitFlow(raw sf.IFlowContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -29,7 +29,7 @@ func (y *SyntaxFlowVisitor[T, V]) VisitFlow(raw sf.IFlowContext) interface{} {
 	return y.VisitFilters(i.Filters())
 }
 
-func (y *SyntaxFlowVisitor[T, V]) VisitFilters(raw sf.IFiltersContext) interface{} {
+func (y *SyntaxFlowVisitor[V]) VisitFilters(raw sf.IFiltersContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -46,7 +46,7 @@ func (y *SyntaxFlowVisitor[T, V]) VisitFilters(raw sf.IFiltersContext) interface
 	return nil
 }
 
-func (y *SyntaxFlowVisitor[T, V]) VisitFilterStatement(raw sf.IFilterStatementContext) interface{} {
+func (y *SyntaxFlowVisitor[V]) VisitFilterStatement(raw sf.IFilterStatementContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -82,7 +82,7 @@ func (y *SyntaxFlowVisitor[T, V]) VisitFilterStatement(raw sf.IFilterStatementCo
 	return nil
 }
 
-func (y *SyntaxFlowVisitor[T, V]) VisitExistedRef(raw sf.IExistedRefContext) interface{} {
+func (y *SyntaxFlowVisitor[V]) VisitExistedRef(raw sf.IExistedRefContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -97,7 +97,7 @@ func (y *SyntaxFlowVisitor[T, V]) VisitExistedRef(raw sf.IExistedRefContext) int
 	return nil
 }
 
-func (y *SyntaxFlowVisitor[T, V]) VisitRefVariable(raw sf.IRefVariableContext) string {
+func (y *SyntaxFlowVisitor[V]) VisitRefVariable(raw sf.IRefVariableContext) string {
 	if y == nil || raw == nil {
 		return ""
 	}
@@ -108,7 +108,7 @@ func (y *SyntaxFlowVisitor[T, V]) VisitRefVariable(raw sf.IRefVariableContext) s
 	return i.Identifier().GetText()
 }
 
-func (y *SyntaxFlowVisitor[T, V]) VisitFilterExpr(raw sf.IFilterExprContext) interface{} {
+func (y *SyntaxFlowVisitor[V]) VisitFilterExpr(raw sf.IFilterExprContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -151,7 +151,7 @@ func (y *SyntaxFlowVisitor[T, V]) VisitFilterExpr(raw sf.IFilterExprContext) int
 	return nil
 }
 
-func (y *SyntaxFlowVisitor[T, V]) VisitChainFilter(raw sf.IChainFilterContext) interface{} {
+func (y *SyntaxFlowVisitor[V]) VisitChainFilter(raw sf.IChainFilterContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -182,7 +182,7 @@ func (y *SyntaxFlowVisitor[T, V]) VisitChainFilter(raw sf.IChainFilterContext) i
 	return nil
 }
 
-func (y *SyntaxFlowVisitor[T, V]) VisitConditionExpression(raw sf.IConditionExpressionContext) interface{} {
+func (y *SyntaxFlowVisitor[V]) VisitConditionExpression(raw sf.IConditionExpressionContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -277,7 +277,7 @@ func (y *SyntaxFlowVisitor[T, V]) VisitConditionExpression(raw sf.IConditionExpr
 	return nil
 }
 
-func (y *SyntaxFlowVisitor[T, V]) VisitFilterFieldMember(raw sf.IFilterFieldMemberContext) interface{} {
+func (y *SyntaxFlowVisitor[V]) VisitFilterFieldMember(raw sf.IFilterFieldMemberContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -302,7 +302,7 @@ func (y *SyntaxFlowVisitor[T, V]) VisitFilterFieldMember(raw sf.IFilterFieldMemb
 
 const tmpPH = "__[[PLACEHOLDER]]__"
 
-func (y *SyntaxFlowVisitor[T, V]) VisitStringLiteral(raw sf.IStringLiteralContext) (string, bool) {
+func (y *SyntaxFlowVisitor[V]) VisitStringLiteral(raw sf.IStringLiteralContext) (string, bool) {
 	if y == nil || raw == nil {
 		return "", false
 	}
@@ -325,7 +325,7 @@ func (y *SyntaxFlowVisitor[T, V]) VisitStringLiteral(raw sf.IStringLiteralContex
 	return text, isGlob
 }
 
-func (y *SyntaxFlowVisitor[T, V]) VisitNumberLiteral(raw sf.INumberLiteralContext) int {
+func (y *SyntaxFlowVisitor[V]) VisitNumberLiteral(raw sf.INumberLiteralContext) int {
 	if y == nil || raw == nil {
 		return -1
 	}
