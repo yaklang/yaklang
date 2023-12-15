@@ -368,6 +368,7 @@ func newPersistConn(key connectKey, pool *LowHttpConnPool, opt ...netx.DialXOpti
 		pc.alt = nil
 		pc.Conn = newH1Conn
 		pc.cacheKey.scheme = H1
+		return pc, nil // 降级之后应不使用连接池，因为是一个意外的请求做过一次兼容了，不再需要复用
 	}
 
 	pc.br = bufio.NewReader(pc)
