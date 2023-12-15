@@ -1,32 +1,7 @@
 package crawler
 
-import (
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-)
-
 var Exports = map[string]interface{}{
-	"Start": func(url string, opt ...configOpt) (chan *Req, error) {
-		ch := make(chan *Req)
-		opt = append(opt, WithOnRequest(func(req *Req) {
-			ch <- req
-		}))
-
-		crawler, err := NewCrawler(url, opt...)
-		if err != nil {
-			return nil, utils.Errorf("create crawler failed: %s", err)
-		}
-		go func() {
-			defer close(ch)
-
-			err := crawler.Run()
-			if err != nil {
-				log.Error(err)
-			}
-		}()
-		return ch, nil
-	},
-
+	"Start":               StartCrawler,
 	"basicAuth":           WithBasicAuth,
 	"bodySize":            WithBodySize,
 	"concurrent":          WithConcurrent,
