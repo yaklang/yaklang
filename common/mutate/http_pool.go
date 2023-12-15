@@ -603,7 +603,6 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 						lowhttp.WithRetryWaitTime(utils.FloatSecondDuration(config.RetryWaitTime)),
 						lowhttp.WithRetryMaxWaitTime(utils.FloatSecondDuration(config.RetryMaxWaitTime)),
 						lowhttp.WithDNSServers(config.DNSServers),
-						lowhttp.WithDNSNoCache(config.DNSNoCache),
 						lowhttp.WithETCHosts(config.EtcHosts),
 						lowhttp.WithGmTLS(config.IsGmTLS),
 						lowhttp.WithConnPool(config.WithConnPool)}
