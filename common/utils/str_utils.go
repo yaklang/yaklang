@@ -360,6 +360,9 @@ func InterfaceToBytes(i interface{}) (result []byte) {
 }
 
 func InterfaceToString(i interface{}) string {
+	if a, ok := i.(interface{ String() string }); ok {
+		return a.String()
+	}
 	return codec.AnyToString(i)
 }
 

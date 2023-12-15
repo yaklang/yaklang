@@ -1,8 +1,12 @@
 package omap
 
 import (
+	"github.com/gobwas/glob"
+	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
+	"regexp"
 	"sort"
+	"strings"
 	"sync"
 )
 
@@ -246,4 +250,158 @@ func (o *OrderedMap[T, V]) Flat(f func(T, V) (struct {
 		m:        m,
 		keyChain: k,
 	}
+}
+
+func (s *OrderedMap[T, V]) Copy() *OrderedMap[T, V] {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	m := make(map[T]V)
+	for k, v := range s.m {
+		m[k] = v
+	}
+	ks := make([]T, len(s.keyChain))
+	copy(ks, s.keyChain)
+	return &OrderedMap[T, V]{
+		lock:     new(sync.RWMutex),
+		m:        m,
+		keyChain: ks,
+	}
+}
+
+func (s *OrderedMap[T, V]) SearchKey(i ...string) (*OrderedMap[T, V], error) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	m := make(map[T]V)
+	k := make([]T, 0)
+	for _, key := range s.keyChain {
+		v, ok := s.m[key]
+		if !ok {
+			continue
+		}
+		for _, j := range i {
+			if utils.InterfaceToString(key) == j {
+				m[key] = v
+				k = append(k, key)
+				break
+			}
+		}
+	}
+	return &OrderedMap[T, V]{
+		lock:     new(sync.RWMutex),
+		m:        m,
+		keyChain: k,
+	}, nil
+}
+
+func (s *OrderedMap[T, V]) SearchIndexKey(i ...int) (*OrderedMap[T, V], error) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	m := make(map[T]V)
+	k := make([]T, 0)
+	var indexMap = make(map[int]struct{})
+	for _, idx := range i {
+		indexMap[idx] = struct{}{}
+	}
+
+	for index, key := range s.keyChain {
+		v, ok := s.m[key]
+		if !ok {
+			continue
+		}
+		if _, ok := indexMap[index]; ok {
+			m[key] = v
+			k = append(k, key)
+		}
+	}
+	return &OrderedMap[T, V]{
+		lock:     new(sync.RWMutex),
+		m:        m,
+		keyChain: k,
+	}, nil
+}
+
+func (s *OrderedMap[T, V]) SearchRegexKey(i string) (*OrderedMap[T, V], error) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	rule, err := regexp.Compile(i)
+	if err != nil {
+		return s, err
+	}
+
+	m := make(map[T]V)
+	k := make([]T, 0)
+	for _, key := range s.keyChain {
+		v, ok := s.m[key]
+		if !ok {
+			continue
+		}
+		if rule.MatchString(utils.InterfaceToString(key)) {
+			m[key] = v
+			k = append(k, key)
+		}
+	}
+	return &OrderedMap[T, V]{
+		lock:     new(sync.RWMutex),
+		m:        m,
+		keyChain: k,
+	}, nil
+}
+
+func (s *OrderedMap[T, V]) SearchGlobKey(i string, seps ...string) (*OrderedMap[T, V], error) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	var sepsChar = []rune(strings.Join(seps, ""))
+	rule, err := glob.Compile(i, sepsChar...)
+	if err != nil {
+		return s, err
+	}
+
+	m := make(map[T]V)
+	k := make([]T, 0)
+	for _, key := range s.keyChain {
+		v, ok := s.m[key]
+		if !ok {
+			continue
+		}
+		if rule.Match(utils.InterfaceToString(key)) {
+			m[key] = v
+			k = append(k, key)
+		}
+	}
+	return &OrderedMap[T, V]{
+		lock:     new(sync.RWMutex),
+		m:        m,
+		keyChain: k,
+	}, nil
+}
+
+func Merge[T comparable, V any](dicts ...*OrderedMap[T, V]) *OrderedMap[T, V] {
+	m := make(map[T]V)
+	k := make([]T, 0)
+	for _, d := range dicts {
+		for _, key := range d.keyChain {
+			v, ok := d.m[key]
+			if !ok {
+				continue
+			}
+			m[key] = v
+			k = append(k, key)
+		}
+	}
+	return &OrderedMap[T, V]{
+		lock:     new(sync.RWMutex),
+		m:        m,
+		keyChain: k,
+	}
+}
+
+func (s *OrderedMap[T, V]) Merge(i ...*OrderedMap[T, V]) *OrderedMap[T, V] {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	return Merge[T, V](append([]*OrderedMap[T, V]{s}, i...)...)
 }
