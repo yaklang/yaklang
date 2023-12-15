@@ -55,18 +55,38 @@ type Crawler struct {
 	loginOnce *sync.Once // := new(sync.Once)
 }
 
+// Hash 返回当前请求的哈希值，其值由请求的URL与请求方法组成
+// Example:
+// ```
+// req.Hash()
+// ```
 func (r *Req) Hash() string {
 	return utils.CalcSha1(r.request.URL.String(), r.request.Method)
 }
 
+// IsLoginForm 判断当前请求是否是一个登录表单
+// Example:
+// ```
+// req.IsLoginForm()
+// ```
 func (r *Req) IsLoginForm() bool {
 	return r.maybeLoginForm
 }
 
+// IsUploadForm 判断当前请求是否是一个上传表单
+// Example:
+// ```
+// req.IsUploadForm()
+// ```
 func (r *Req) IsUploadForm() bool {
 	return r.maybeUploadForm
 }
 
+// IsForm 判断当前请求是否是一个表单
+// Example:
+// ```
+// req.IsForm()
+// ```
 func (r *Req) IsForm() bool {
 	return r.isForm
 }
@@ -152,6 +172,11 @@ func HostToWildcardGlobs(host string) []glob.Glob {
 	return globsIns
 }
 
+// SameWildcardOrigin 判断当前请求与传入的请求是否是同域的
+// Example:
+// ```
+// req1.SameWildcardOrigin(req2)
+// ```
 func (r *Req) SameWildcardOrigin(s *Req) bool {
 	if s.baseURL == nil {
 		return false
@@ -176,6 +201,11 @@ func (r *Req) SameWildcardOrigin(s *Req) bool {
 	return false
 }
 
+// AbsoluteURL 根据当前请求的URL，将传入的相对路径转换为绝对路径
+// Example:
+// ```
+// req.AbsoluteURL("/a/b/c")
+// ```
 func (r *Req) AbsoluteURL(u string) string {
 	if u == "" {
 		return ""
@@ -201,7 +231,7 @@ func (r *Req) AbsoluteURL(u string) string {
 	return absURL.String()
 }
 
-// Start 根据选项启动爬虫爬取某个URL，它还可以接收零个到多个选项函数，用于影响爬取行为
+// Start 启动爬虫爬取某个URL，它还可以接收零个到多个选项函数，用于影响爬取行为
 // 返回一个Req结构体引用管道与错误
 // Example:
 // ```
