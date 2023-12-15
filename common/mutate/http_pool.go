@@ -86,9 +86,11 @@ type httpPoolConfig struct {
 	DNSNoCache bool
 }
 
+// WithPoolOpt_DNSNoCache is not effective
 func WithPoolOpt_DNSNoCache(b bool) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.DNSNoCache = b
+		log.Warn("DNSNoCache is not effective")
 	}
 }
 
