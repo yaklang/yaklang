@@ -34,6 +34,15 @@ import (
 	"time"
 )
 
+type hijackStatusCode int8
+
+var (
+	waitHijack   hijackStatusCode = -1
+	hijack       hijackStatusCode = 0
+	finishHijack hijackStatusCode = 1
+	autoFoward   hijackStatusCode = 2
+)
+
 func _exactChecker(includes, excludes []string, target string) bool {
 	excludes = utils.StringArrayFilterEmpty(excludes)
 	includes = utils.StringArrayFilterEmpty(includes)
@@ -1907,7 +1916,7 @@ type hijackTaskController struct {
 }
 
 type taskStatus struct {
-	status           int
+	status           hijackStatusCode
 	statusChangeCond *sync.Cond
 }
 
@@ -1921,7 +1930,7 @@ func (h *hijackTaskController) Register(taskID string) {
 	}
 }
 
-func (h *hijackTaskController) waitHijack(taskID string) int { // mitm 任务等待劫持 任务调用
+func (h *hijackTaskController) waitHijack(taskID string) hijackStatusCode { // mitm 任务等待劫持 任务调用
 	thisStatus := h.getStatus(taskID)
 	if thisStatus == nil { // 如果没有查到状态则自动放行
 		return autoFoward
@@ -1981,6 +1990,9 @@ func (h *hijackTaskController) dequeue() string {
 	}
 	item := h.taskQueue[0]
 	h.taskQueue = h.taskQueue[1:]
+	if len(h.taskQueue) == 0 { //队列空 则停止下次请求
+		h.canDequeue.UnSet()
+	}
 	return item
 }
 
@@ -2000,16 +2012,9 @@ func (h *hijackTaskController) setStatus(r string, s *taskStatus) {
 	h.taskStatusMap[r] = s
 }
 
-func (t *taskStatus) setStatus(s int) {
+func (t *taskStatus) setStatus(s hijackStatusCode) {
 	t.statusChangeCond.L.Lock()
 	t.status = s
 	t.statusChangeCond.Broadcast()
 	t.statusChangeCond.L.Unlock()
 }
-
-var (
-	waitHijack   = -1
-	hijack       = 0
-	finishHijack = 1
-	autoFoward   = 2
-)
