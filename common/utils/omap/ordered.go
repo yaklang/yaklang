@@ -14,10 +14,22 @@ import (
 type OrderedMap[T comparable, V any] struct {
 	lock     *sync.RWMutex
 	m        map[T]V
-	indexMap map[T]int
 	keyChain []T
 
-	parent *OrderedMap[T, V]
+	parent       *OrderedMap[T, V]
+	literalValue any
+}
+
+func (i *OrderedMap[T, V]) LiteralValue() any {
+	return i.literalValue
+}
+
+func (i *OrderedMap[T, V]) HaveLiteralValue() bool {
+	return i.literalValue != nil
+}
+
+func (i *OrderedMap[T, V]) SetLiteralValue(val any) {
+	i.literalValue = val
 }
 
 func NewEmptyOrderedMap[T comparable, V any]() *OrderedMap[T, V] {
@@ -26,6 +38,10 @@ func NewEmptyOrderedMap[T comparable, V any]() *OrderedMap[T, V] {
 		m:        make(map[T]V),
 		keyChain: make([]T, 0),
 	}
+}
+
+func NewGeneralOrderedMap() *OrderedMap[string, any] {
+	return NewEmptyOrderedMap[string, any]()
 }
 
 func NewOrderedMap[T comparable, V any](m map[T]V, initOrder ...func(int, int) bool) *OrderedMap[T, V] {
