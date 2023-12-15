@@ -431,11 +431,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	}
 
 	controller := &hijackTaskController{
-		taskStatusMap:  make(map[*http.Request]*taskStatus),
+		taskStatusMap:  make(map[string]*taskStatus),
 		canDequeueCond: sync.NewCond(&sync.Mutex{}),
 		queueMux:       &sync.Mutex{},
 		statusMapMux:   &sync.Mutex{},
-		currentTask:    nil,
+		currentTask:    "",
 	}
 
 	waitNewHijackTask := func() { // 等待队列有可劫持任务
@@ -457,7 +457,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		for {
 			waitNewHijackTask()
 			controller.currentTask = controller.nextTask()
-			if controller.currentTask == nil {
+			if controller.currentTask == "" {
 				continue
 			}
 			currentStatus := controller.getStatus(controller.currentTask)
@@ -836,12 +836,13 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		//if !ok {
 		// return raw
 		//}
-		if req != controller.currentTask {
-			log.Debugf("not want resp, auto forward")
+		taskID := utils.CalcSha1(fmt.Sprintf("ws:%p[%s]", req, time.Now().String())) // ws特殊处理 由于一对多的模式 所以不需要请求劫持响应一一对应 响应和请求同级
+		controller.Register(taskID)
+		if controller.waitHijack(taskID) == autoFoward {
 			return raw
 		}
 		defer func() {
-			controller.finishHijack(req)
+			controller.finishHijack(taskID)
 		}()
 		_, urlStr := lowhttp.ExtractWebsocketURLFromHTTPRequest(req)
 		responseCounter := time.Now().UnixNano()
@@ -1032,14 +1033,16 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			return originRspRaw
 		}
 
-		if controller.currentTask != req { //  只劫持当前请求对应的响应，避免超时请求导致的错误响应劫持
+		taskID := utils.CalcSha1(fmt.Sprintf("%p", req))
+		if taskID != controller.currentTask { //  只劫持当前请求对应的响应，避免超时请求导致的错误响应劫持
 			log.Debugf("not want resp, auto forward")
 			return originRspRaw
 		}
 
 		defer func() {
-			controller.finishHijack(req)
+			controller.finishHijack(taskID)
 		}()
+
 		feedbackRspIns := &ypb.MITMResponse{
 			ForResponse: true,
 			Response:    rsp,
@@ -1181,15 +1184,14 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		//	encode = append(encode, "protobuf")
 		//}
 
-		controller.Register(req)
-		if controller.waitHijack(req) == autoFoward { // 自动放行
+		taskID := utils.CalcSha1(fmt.Sprintf("ws:%p[%s]", req, time.Now().String())) // ws特殊处理 由于一对多的模式 所以不需要请求劫持响应一一对应。
+		controller.Register(taskID)
+		if controller.waitHijack(taskID) == autoFoward { // 自动放行
 			return raw
 		}
 
 		defer func() {
-			if !httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest) { // 如果不需要劫持请求则可以直接设置此次hijack已完成
-				controller.finishHijack(req)
-			}
+			controller.finishHijack(taskID)
 		}()
 
 		counter := time.Now().UnixNano()
@@ -1399,16 +1401,16 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_AutoFoward, true)
 			return req
 		}
-		//todo requestWait
 
-		controller.Register(originReqIns)                      // 加入队列
-		if controller.waitHijack(originReqIns) == autoFoward { // 等待劫持
+		taskID := utils.CalcSha1(fmt.Sprintf("%p", originReqIns))
+		controller.Register(taskID)                      // 加入队列
+		if controller.waitHijack(taskID) == autoFoward { // 等待劫持
 			return req
 		}
 
 		defer func() {
 			if !httpctx.GetContextBoolInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest) { // 如果不需要劫持请求则可以直接设置此次hijack已完成
-				controller.finishHijack(originReqIns)
+				controller.finishHijack(taskID)
 			}
 		}()
 
@@ -1960,13 +1962,13 @@ func (s *Server) GenerateURL(ctx context.Context, req *ypb.GenerateURLRequest) (
 }
 
 type hijackTaskController struct {
-	taskQueue []*http.Request
+	taskQueue []string
 	queueMux  *sync.Mutex
 
-	taskStatusMap map[*http.Request]*taskStatus
+	taskStatusMap map[string]*taskStatus
 	statusMapMux  *sync.Mutex
 
-	currentTask *http.Request
+	currentTask string
 
 	canDequeue     utils.AtomicBool
 	canDequeueCond *sync.Cond
@@ -1977,8 +1979,8 @@ type taskStatus struct {
 	statusChangeCond *sync.Cond
 }
 
-func (h *hijackTaskController) Register(req *http.Request) {
-	h.enqueue(req)
+func (h *hijackTaskController) Register(taskID string) {
+	h.enqueue(taskID)
 	if h.queueSize() == 1 {
 		h.canDequeueCond.L.Lock() // 第一个元素进入队列的时候，需要唤醒等待的线程
 		h.canDequeue.Set()
@@ -1987,8 +1989,8 @@ func (h *hijackTaskController) Register(req *http.Request) {
 	}
 }
 
-func (h *hijackTaskController) waitHijack(r *http.Request) int { // mitm 任务等待劫持 任务调用
-	thisStatus := h.getStatus(r)
+func (h *hijackTaskController) waitHijack(taskID string) int { // mitm 任务等待劫持 任务调用
+	thisStatus := h.getStatus(taskID)
 	if thisStatus == nil { // 如果没有查到状态则自动放行
 		return autoFoward
 	}
@@ -2000,15 +2002,15 @@ func (h *hijackTaskController) waitHijack(r *http.Request) int { // mitm 任务�
 	return thisStatus.status
 }
 
-func (h *hijackTaskController) finishHijack(r *http.Request) { // mitm 任务结束 任务调用
-	thisStatus := h.getStatus(r)
+func (h *hijackTaskController) finishHijack(taskID string) { // mitm 任务结束 任务调用
+	thisStatus := h.getStatus(taskID)
 	if thisStatus == nil { // 如果没有查到状态则自动放行
 		return
 	}
 	thisStatus.setStatus(finishHijack)
 }
 
-func (h *hijackTaskController) nextTask() *http.Request {
+func (h *hijackTaskController) nextTask() string {
 	return h.dequeue()
 }
 
@@ -2023,27 +2025,27 @@ func (h *hijackTaskController) clear() {
 	for _, t := range h.taskStatusMap {
 		t.setStatus(autoFoward)
 	}
-	h.currentTask = nil
+	h.currentTask = ""
 	h.taskQueue = h.taskQueue[:0]
-	h.taskStatusMap = make(map[*http.Request]*taskStatus)
+	h.taskStatusMap = make(map[string]*taskStatus)
 	h.canDequeue.UnSet()
 }
 
-func (h *hijackTaskController) enqueue(r *http.Request) {
+func (h *hijackTaskController) enqueue(s string) {
 	h.queueMux.Lock()
 	defer h.queueMux.Unlock()
-	h.taskQueue = append(h.taskQueue, r)
-	h.setStatus(r, &taskStatus{
+	h.taskQueue = append(h.taskQueue, s)
+	h.setStatus(s, &taskStatus{
 		status:           waitHijack,
 		statusChangeCond: sync.NewCond(&sync.Mutex{}),
 	})
 }
 
-func (h *hijackTaskController) dequeue() *http.Request {
+func (h *hijackTaskController) dequeue() string {
 	h.queueMux.Lock()
 	defer h.queueMux.Unlock()
 	if len(h.taskQueue) == 0 {
-		return nil
+		return ""
 	}
 	item := h.taskQueue[0]
 	h.taskQueue = h.taskQueue[1:]
@@ -2054,13 +2056,13 @@ func (h *hijackTaskController) queueSize() int {
 	return len(h.taskQueue)
 }
 
-func (h *hijackTaskController) getStatus(r *http.Request) *taskStatus {
+func (h *hijackTaskController) getStatus(s string) *taskStatus {
 	h.statusMapMux.Lock()
 	defer h.statusMapMux.Unlock()
-	return h.taskStatusMap[r]
+	return h.taskStatusMap[s]
 }
 
-func (h *hijackTaskController) setStatus(r *http.Request, s *taskStatus) {
+func (h *hijackTaskController) setStatus(r string, s *taskStatus) {
 	h.statusMapMux.Lock()
 	defer h.statusMapMux.Unlock()
 	h.taskStatusMap[r] = s
