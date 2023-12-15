@@ -2,10 +2,6 @@ package crawler
 
 import (
 	"bytes"
-	"github.com/gobwas/glob"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -15,6 +11,11 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/gobwas/glob"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
 var (
@@ -27,7 +28,8 @@ var (
 		".doc", "docx", ".pptx",
 		".ppt", ".pdf",
 	}
-	ExcludedMIME = []string{"image/*",
+	ExcludedMIME = []string{
+		"image/*",
 		"audio/*", "video/*", "*octet-stream*",
 		"application/ogg", "application/pdf", "application/msword",
 		"application/x-ppt", "video/avi", "application/x-ico",
@@ -159,7 +161,7 @@ func (c *Config) GetLowhttpConfig() []lowhttp.LowhttpOpt {
 }
 
 func (c *Config) CheckShouldBeHandledURL(u *url.URL) bool {
-	var pass = false
+	pass := false
 
 	// 只要有一个通过就通过
 	if len(c.allowDomains) > 0 {
@@ -228,6 +230,11 @@ func (c *Config) CheckShouldBeHandledURL(u *url.URL) bool {
 
 type configOpt func(c *Config)
 
+// disallowSuffix 是一个选项函数，用于指定爬虫时的后缀黑名单
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.disallowSuffix(".css", ".jpg", ".png")) // 爬虫时不会爬取css、jpg、png文件
+// ```
 func WithDisallowSuffix(d []string) configOpt {
 	return func(c *Config) {
 		c.disallowSuffix = d
@@ -240,6 +247,11 @@ func WithDisallowMIMEType(d []string) configOpt {
 	}
 }
 
+// basicAuth 是一个选项函数，用于指定爬虫时的自动该填写的基础认证用户名和密码
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.basicAuth("admin", "admin"))
+// ```
 func WithBasicAuth(user, pass string) configOpt {
 	return func(c *Config) {
 		c.BasicAuth = true
@@ -248,24 +260,45 @@ func WithBasicAuth(user, pass string) configOpt {
 	}
 }
 
+// proxy 是一个选项函数，用于指定爬虫时的代理
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.proxy("http://127.0.0.1:8080"))
+// ```
 func WithProxy(proxies ...string) configOpt {
 	return func(c *Config) {
 		c.proxies = proxies
 	}
 }
 
+// concurrent 是一个选项函数，用于指定爬虫时的并发数，默认为20
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.concurrent(10))
+// ```
 func WithConcurrent(concurrent int) configOpt {
 	return func(c *Config) {
 		c.concurrent = concurrent
 	}
 }
 
+// maxRedirect 是一个选项函数，用于指定爬虫时的最大重定向次数，默认为5
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.maxRedirect(10))
+// ```
 func WithMaxRedirectTimes(maxRedirectTimes int) configOpt {
 	return func(c *Config) {
 		c.maxRedirectTimes = maxRedirectTimes
 	}
 }
 
+// domainInclude 是一个选项函数，用于指定爬虫时的域名白名单
+// domain允许使用glob语法，例如*.example.com
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.domainInclude("*.example.com"))
+// ```
 func WithDomainWhiteList(domain string) configOpt {
 	var pattern string
 	if !strings.HasPrefix(domain, "*") {
@@ -289,6 +322,12 @@ func WithDomainWhiteList(domain string) configOpt {
 	}
 }
 
+// domainExclude 是一个选项函数，用于指定爬虫时的域名黑名单
+// domain允许使用glob语法，例如*.example.com
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.domainExclude("*.baidu.com"))
+// ```
 func WithDomainBlackList(domain string) configOpt {
 	var pattern string
 	if !strings.HasPrefix(domain, "*") {
@@ -316,6 +355,11 @@ func WithExtraSuffixForEveryRootPath(path ...string) configOpt {
 	}
 }
 
+// urlRegexpInclude 是一个选项函数，用于指定爬虫时的URL正则白名单
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.urlRegexpInclude(`\.html`))
+// ```
 func WithUrlRegexpWhiteList(re string) configOpt {
 	p, err := regexp.Compile(re)
 	if err != nil {
@@ -327,6 +371,11 @@ func WithUrlRegexpWhiteList(re string) configOpt {
 	}
 }
 
+// urlRegexpExclude 是一个选项函数，用于指定爬虫时的URL正则黑名单
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.urlRegexpExclude(`\.jpg`))
+// ```
 func WithUrlRegexpBlackList(re string) configOpt {
 	p, err := regexp.Compile(re)
 	if err != nil {
@@ -338,60 +387,112 @@ func WithUrlRegexpBlackList(re string) configOpt {
 	}
 }
 
+// connectTimeout 是一个选项函数，用于指定爬虫时的连接超时时间，默认为10s
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.connectTimeout(5))
+// ```
 func WithConnectTimeout(f float64) configOpt {
 	return func(c *Config) {
 		c.connectTimeout = time.Duration(int64(f * float64(time.Second)))
 	}
 }
 
+// responseTimeout 是一个选项函数，用于指定爬虫时的响应超时时间，默认为10s
+// ! 未实现
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.responseTimeout(5))
+// ```
 func WithResponseTimeout(f float64) configOpt {
 	return func(c *Config) {
 		// dummy, ignore it
 	}
 }
 
+// userAgent 是一个选项函数，用于指定爬虫时的User-Agent
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.userAgent("yaklang-crawler"))
+// ```
 func WithUserAgent(ua string) configOpt {
 	return func(c *Config) {
 		c.userAgent = ua
 	}
 }
 
+// maxDepth 是一个选项函数，用于指定爬虫时的最大深度，默认为5
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.maxDepth(10))
+// ```
 func WithMaxDepth(depth int) configOpt {
 	return func(c *Config) {
 		c.maxDepth = depth
 	}
 }
 
+// bodySize 是一个选项函数，用于指定爬虫时的最大响应体大小，默认为10MB
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.bodySize(1024 * 1024))
+// ```
 func WithBodySize(size int) configOpt {
 	return func(c *Config) {
 		c.maxBodySize = size
 	}
 }
 
+// maxRequest 是一个选项函数，用于指定爬虫时的最大请求数，默认为1000
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.maxRequest(10000))
+// ```
 func WithMaxRequestCount(limit int) configOpt {
 	return func(c *Config) {
 		c.maxCountOfRequest = limit
 	}
 }
 
+// maxUrls 是一个选项函数，用于指定爬虫时的最大链接数，默认为10000
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.maxUrls(20000))
+// ```
 func WithMaxUrlCount(limit int) configOpt {
 	return func(c *Config) {
 		c.maxCountOfLinks = limit
 	}
 }
 
+// maxRetry 是一个选项函数，用于指定爬虫时的最大重试次数，默认为3
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.maxRetry(10))
+// ```
 func WithMaxRetry(limit int) configOpt {
 	return func(c *Config) {
 		c.maxRetryTimes = limit
 	}
 }
 
+// forbiddenFromParent 是一个选项函数，用于指定爬虫时的是否禁止从根路径发起请求，默认为false
+// 对于一个起始URL，如果其并不是从根路径开始且没有禁止从根路径发起请求，那么爬虫会从其根路径开始爬取
+// Example:
+// ```
+// crawler.Start("https://example.com/a/b/c", crawler.forbiddenFromParent(false)) // 这会从 https://example.com/ 开始爬取
+// ```
 func WithForbiddenFromParent(b bool) configOpt {
 	return func(c *Config) {
 		c.startFromParentPath = !b
 	}
 }
 
+// header 是一个选项函数，用于指定爬虫时的请求头
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.header("User-Agent", "yaklang-crawler"))
+// ```
 func WithHeader(k, v string) configOpt {
 	return func(c *Config) {
 		c.headers = append(c.headers, &header{
@@ -400,11 +501,25 @@ func WithHeader(k, v string) configOpt {
 		})
 	}
 }
+
+// urlExtractor 是一个选项函数，它接收一个函数作为参数，用于为爬虫添加额外的链接提取规则
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.urlExtractor(func(req) {
+// 尝试编写自己的规则，从响应体(req.Response()或req.ResponseRaw())中提取额外的链接
+// })
+// ```
 func WithUrlExtractor(f func(*Req) []interface{}) configOpt {
 	return func(c *Config) {
 		c.extractionRules = f
 	}
 }
+
+// cookie 是一个选项函数，用于指定爬虫时的cookie
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.cookie("key", "value"))
+// ```
 func WithFixedCookie(k, v string) configOpt {
 	return func(c *Config) {
 		c.cookie = append(c.cookie, &cookie{
@@ -423,6 +538,11 @@ func WithOnRequest(f func(req *Req)) configOpt {
 	}
 }
 
+// autoLogin 是一个选项函数，用于指定爬虫时的自动填写可能存在的登录表单
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.autoLogin("admin", "admin"))
+// ```
 func WithAutoLogin(username, password string, flags ...string) configOpt {
 	return func(c *Config) {
 		c.onLogin = func(req *Req) {

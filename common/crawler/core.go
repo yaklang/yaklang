@@ -2,12 +2,6 @@ package crawler
 
 import (
 	"bytes"
-	"github.com/yaklang/yaklang/common/filter"
-	"github.com/yaklang/yaklang/common/go-funk"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"golang.org/x/net/html"
 	"io"
 	"mime"
 	"net/http"
@@ -19,12 +13,17 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/filter"
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"golang.org/x/net/html"
+
 	"github.com/gobwas/glob"
 )
 
-var (
-	URLPattern, _ = regexp.Compile(`(((?:[a-zA-Z]{1,10}://|//)[^"'/]{1,}\.[a-zA-Z]{2,}[^"']{0,})|((?:/|\.\./|\./)[^"'><,;|*()(%%$^/\\\[\]][^"'><,;|()]{1,})|([a-zA-Z0-9_\-/]{1,}/[a-zA-Z0-9_\-/]{1,}\.(?:[a-zA-Z]{1,4}|action)(?:[\?|/][^"|']{0,}|))|([a-zA-Z0-9_\-]{1,}\.(?:\.{1,10})(?:\?[^"|']{0,}|)))`)
-)
+var URLPattern, _ = regexp.Compile(`(((?:[a-zA-Z]{1,10}://|//)[^"'/]{1,}\.[a-zA-Z]{2,}[^"']{0,})|((?:/|\.\./|\./)[^"'><,;|*()(%%$^/\\\[\]][^"'><,;|()]{1,})|([a-zA-Z0-9_\-/]{1,}/[a-zA-Z0-9_\-/]{1,}\.(?:[a-zA-Z]{1,4}|action)(?:[\?|/][^"|']{0,}|))|([a-zA-Z0-9_\-]{1,}\.(?:\.{1,10})(?:\?[^"|']{0,}|)))`)
 
 type Crawler struct {
 	originUrls []string
@@ -202,6 +201,36 @@ func (r *Req) AbsoluteURL(u string) string {
 	return absURL.String()
 }
 
+// Start 根据选项启动爬虫爬取某个URL，它还可以接收零个到多个选项函数，用于影响爬取行为
+// 返回一个Req结构体引用管道与错误
+// Example:
+// ```
+// ch, err := crawler.Start("https://www.baidu.com", crawler.concurrent(10))
+// for req in ch {
+// println(req.Response()~)
+// }
+// ```
+func StartCrawler(url string, opt ...configOpt) (chan *Req, error) {
+	ch := make(chan *Req)
+	opt = append(opt, WithOnRequest(func(req *Req) {
+		ch <- req
+	}))
+
+	crawler, err := NewCrawler(url, opt...)
+	if err != nil {
+		return nil, utils.Errorf("create crawler failed: %s", err)
+	}
+	go func() {
+		defer close(ch)
+
+		err := crawler.Run()
+		if err != nil {
+			log.Error(err)
+		}
+	}()
+	return ch, nil
+}
+
 func NewCrawler(urls string, opts ...configOpt) (*Crawler, error) {
 	urlsRaw := utils.PrettifyListFromStringSplited(urls, ",")
 	urlList := utils.ParseStringToUrlsWith3W(urlsRaw...)
@@ -226,7 +255,7 @@ func NewCrawler(urls string, opts ...configOpt) (*Crawler, error) {
 	if config.concurrent <= 0 {
 		config.concurrent = 20
 	}
-	var c = &Crawler{
+	c := &Crawler{
 		originUrls:       urlList,
 		config:           config,
 		preRequestLock:   new(sync.Mutex),
@@ -401,6 +430,11 @@ MAINLY:
 	swg.Wait()
 }
 
+// RequestsFromFlow 尝试从一次请求与响应中爬取出所有可能的请求，返回所有可能请求的原始报文与错误
+// Example:
+// ```
+// reqs, err = crawler.RequestsFromFlow(false, reqBytes, rspBytes)
+// ```
 func HandleRequestResult(isHttps bool, reqBytes, rspBytes []byte) ([][]byte, error) {
 	var err error
 	header, body := lowhttp.SplitHTTPPacketFast(rspBytes)
@@ -408,7 +442,7 @@ func HandleRequestResult(isHttps bool, reqBytes, rspBytes []byte) ([][]byte, err
 	if err != nil {
 		return nil, utils.Errorf("cannot extract url from request: %s", err)
 	}
-	var rootReq = &Req{
+	rootReq := &Req{
 		depth:          1,
 		https:          isHttps,
 		url:            urlIns.String(),
@@ -595,17 +629,17 @@ func (c *Crawler) handleReqResult(r *Req) {
 var metaUrlExtractor = regexp.MustCompile(`(?i)url=\s*([^\s]+)`)
 
 func handleReqResultEx(r *Req, reqHandler func(*Req) bool, urlHandler func(string) bool, extractionRulesHandler func(*Req) []interface{}) {
-	var foundPathOrUrls = new(sync.Map)
-	var foundFormRequests = new(sync.Map)
+	foundPathOrUrls := new(sync.Map)
+	foundFormRequests := new(sync.Map)
 
-	var handleFinalExtraUrls = func(u string) {
+	handleFinalExtraUrls := func(u string) {
 		urlIns, err := url.Parse(u)
 		if err != nil {
 			return
 		}
 		pathRaw := urlIns.Path
 		for {
-			var dirName = path.Dir(pathRaw)
+			dirName := path.Dir(pathRaw)
 			if dirName == "" || dirName == "/" || pathRaw == dirName {
 				return
 			}
