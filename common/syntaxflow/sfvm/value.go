@@ -5,35 +5,35 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
-type Value[T comparable, V any] struct {
+type Value[V any] struct {
 	v    any
-	data *omap.OrderedMap[T, V]
+	data *omap.OrderedMap[string, V]
 }
 
-func NewValue[T comparable, V any](v any) *Value[T, V] {
+func NewValue[V any](v any) *Value[V] {
 	switch v.(type) {
-	case *omap.OrderedMap[T, V]:
-		return &Value[T, V]{v: "", data: v.(*omap.OrderedMap[T, V])}
+	case *omap.OrderedMap[string, V]:
+		return &Value[V]{v: "", data: v.(*omap.OrderedMap[string, V])}
 	}
-	return &Value[T, V]{v: v, data: nil}
+	return &Value[V]{v: v, data: nil}
 }
 
-func (v *Value[T, V]) AsInt() int {
+func (v *Value[V]) AsInt() int {
 	return utils.InterfaceToInt(v.v)
 }
 
-func (v *Value[T, V]) AsMap() *omap.OrderedMap[T, V] {
+func (v *Value[V]) AsMap() *omap.OrderedMap[string, V] {
 	return v.data
 }
 
-func (v *Value[T, V]) AsString() string {
+func (v *Value[V]) AsString() string {
 	return utils.InterfaceToString(v.v)
 }
 
-func (v *Value[T, V]) AsBool() bool {
+func (v *Value[V]) AsBool() bool {
 	return utils.InterfaceToBoolean(v.v)
 }
 
-func (v *Value[T, V]) IsMap() bool {
+func (v *Value[V]) IsMap() bool {
 	return v.data != nil
 }

@@ -54,17 +54,17 @@ const (
 	OpNot
 )
 
-type SFI[T comparable, V any] struct {
+type SFI[V any] struct {
 	OpCode   SFVMOpCode
 	UnaryInt int
 	UnaryStr string
 	Desc     string
-	Values   []map[T]V
+	Values   []map[string]V
 }
 
 const verboseLen = "%-12s"
 
-func (s *SFI[T, V]) String() string {
+func (s *SFI[V]) String() string {
 	switch s.OpCode {
 	case OpPass:
 		return "- pass -"
