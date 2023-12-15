@@ -467,7 +467,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	}()
 
 	var autoForward = utils.NewBool(true)
-	var autoForwardCond = sync.NewCond(new(sync.Mutex))
 	autoForwardCh := make(chan struct{}, 1)
 
 	go func() {
@@ -481,70 +480,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			controller.clear()
 		}
 	}()
-
-	//var hijackReq = &http.Request{}
-
-	//reqChan := make(chan struct{})
-	//respChan := make(chan struct{})
-	//shouldHijackRespChan := make(chan bool)
-
-	//
-	//waitForAutoForwardDisabled := func() {
-	//	autoForwardCond.L.Lock()
-	//	defer autoForwardCond.L.Unlock()
-	//	for autoForward.IsSet() {
-	//		autoForwardCond.Wait()
-	//	}
-	//}
-	//
-	//handleResponse := func() {
-	//	select {
-	//	case <-respChan: // 完成响应处理
-	//		log.Debugf("get resp")
-	//	case <-autoForwardCh: // 收到自动转发信号
-	//		log.Debugf("get auto forward when wait response")
-	//	case <-ctx.Done():
-	//		log.Debugf("get ctx done when wait response")
-	//	}
-	//}
-	//
-	//handleRequest := func() {
-	//	log.Debugf("get request")
-	//	select {
-	//	case shouldHijackResp := <-shouldHijackRespChan:
-	//		log.Debugf("get should hijack resp:%v", shouldHijackResp)
-	//		if !shouldHijackResp {
-	//			return // 返回到主循环
-	//		}
-	//		handleResponse()
-	//	case <-autoForwardCh:
-	//		log.Debugf("get auto forward when wait should hijack response")
-	//	case <-ctx.Done():
-	//		log.Debugf("get ctx done when wait request")
-	//	}
-	//}
-	//
-	//go func() {
-	//	defer func() {
-	//		close(reqChan)
-	//		close(respChan)
-	//		close(shouldHijackRespChan)
-	//		close(autoForwardCh)
-	//	}()
-	//	for {
-	//		hijackReq = &http.Request{}
-	//		waitForAutoForwardDisabled()
-	//		select {
-	//		case <-reqChan: // 劫持请求状态
-	//			handleRequest()
-	//		case <-autoForwardCh:
-	//			log.Debugf("get auto forward when wait request")
-	//			continue
-	//		case <-ctx.Done():
-	//			return
-	//		}
-	//	}
-	//}()
 
 	// 消息循环
 	messageChan := make(chan *ypb.MITMRequest, 10000)
@@ -675,10 +610,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				clearPluginHTTPFlowCache()
 				beforeAuto := autoForward.IsSet() // 存当前状态
 				log.Debugf("mitm-auto-forward: %v", reqInstance.GetAutoForwardValue())
-				autoForwardCond.L.Lock()
 				autoForward.SetTo(reqInstance.GetAutoForwardValue())
-				autoForwardCond.L.Unlock()
-				autoForwardCond.Broadcast()
 				if !beforeAuto && autoForward.IsSet() { // 当 f -> t 时发送信号
 					autoForwardCh <- struct{}{}
 				}
