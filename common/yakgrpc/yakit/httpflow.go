@@ -1157,14 +1157,7 @@ const (
 	HTTPFLOW_STATUSCODE = "HTTPFLOW_STATUSCODE"
 )
 
-func HTTPFlowStatusCode(refreshRequest bool) (req []*TagAndStatusCode, err error) {
-
-	/*db = db.Raw(`SELECT count(*) as count, status_code as value FROM http_flows GROUP BY status_code order by count desc;`)
-	db = db.Scan(&req)
-	if db.Error != nil {
-		return nil, utils.Errorf("status_code group rows failed: %s", db.Error)
-	}*/
-
+/*func HTTPFlowStatusCode(refreshRequest bool) (req []*TagAndStatusCode, err error) {
 	var db = consts.GetGormProjectDatabase()
 	if db == nil {
 		log.Error("cannot found database config")
@@ -1209,7 +1202,7 @@ func HTTPFlowStatusCode(refreshRequest bool) (req []*TagAndStatusCode, err error
 		SetKey(consts.GetGormProfileDatabase(), HTTPFLOW_STATUSCODE, string(raw))
 	}
 	return statusCode, nil
-}
+}*/
 
 func HTTPFlowTags(refreshRequest bool) ([]*TagAndStatusCode, error) {
 	var db = consts.GetGormProjectDatabase()
