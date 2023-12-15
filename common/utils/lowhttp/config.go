@@ -189,9 +189,11 @@ func WithGmTLS(b bool) LowhttpOpt {
 	}
 }
 
+// WithDNSNoCache is not effective
 func WithDNSNoCache(b bool) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.DNSNoCache = b
+		log.Warn("WithDNSNoCache is not effective")
 	}
 }
 
