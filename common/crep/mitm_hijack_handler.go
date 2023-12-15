@@ -44,6 +44,9 @@ func (m *MITMServer) setHijackHandler(rootCtx context.Context) {
 			m.requestHijackHandler(isHttps, req, hijackedRaw)
 			return nil
 		},
+		ResponseHijackCallback: func(req *http.Request, rsp *http.Response, rspRaw []byte) []byte {
+			return m.responseHijackHandler(httpctx.GetRequestHTTPS(req), req, rsp, rspRaw, httpctx.GetRemoteAddr(req))
+		},
 	}
 	if m.proxyUrl != nil {
 		wsModifier.ProxyStr = m.proxyUrl.String()

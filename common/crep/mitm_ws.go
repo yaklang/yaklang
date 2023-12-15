@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	logger "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian"
+	"github.com/yaklang/yaklang/common/minimartian/proxyutil"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -32,6 +33,7 @@ type WebSocketModifier struct {
 	wsCanonicalHeader              []string
 	ProxyGetter                    func() *minimartian.Proxy
 	RequestHijackCallback          func(req *http.Request) error
+	ResponseHijackCallback         func(req *http.Request, rsp *http.Response, rspRaw []byte) []byte
 }
 
 func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
@@ -146,21 +148,25 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 
 	rspIns, err := utils.ReadHTTPResponseFromBufioReader(remoteConnReader, req)
 	if err != nil {
+		rspIns = proxyutil.NewResponse(502, nil, req)
+		rspBytes, _ := utils.DumpHTTPResponse(rspIns, true)
+		w.ResponseHijackCallback(req, rspIns, rspBytes)
 		return errors.Wrap(err, "lowhttp.ReadHTTPResponseFromBufioReader")
 	}
 
 	rspBytes, err := utils.DumpHTTPResponse(rspIns, true)
 	if err != nil {
+		w.ResponseHijackCallback(req, rspIns, rspBytes)
 		return errors.Wrap(err, "lowhttp.DumpHTTPResponse")
 	}
-
+	fixRsp := w.ResponseHijackCallback(req, rspIns, rspBytes)
 	// 这里不校验，也没关系，反正本来就是为了更好兼容 "劫持部分"
 	//websocketAccept := rsp.Header.Get("Sec-WebSocket-Accept")
 	//checkSum := lowhttp.ComputeWebsocketAcceptKey(webSocketKey)
 	//if webSocketKey != "" && websocketAccept != checkSum {
 	//	return utils.Errorf("Sec-WebSocket-Accept header value invalid: %s != %s", websocketAccept, checkSum)
 	//}
-	rsp, err := lowhttp.ParseBytesToHTTPResponse(rspBytes)
+	rsp, err := lowhttp.ParseBytesToHTTPResponse(fixRsp)
 	if err != nil {
 		return utils.Errorf("parse 101 response bytes to http response failed; %s", err)
 	}
