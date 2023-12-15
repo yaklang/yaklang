@@ -81,17 +81,18 @@ func (s *Server) execScriptWithExecParam(scriptName string, input string, stream
 		if err != nil {
 			return utils.Errorf("import %v' s handle failed: %s", scriptName, err)
 		}
-		newTabRaw, err := json.Marshal(&yaklib.YakitFeature{
+
+		err = feedbackClient.Output(&yaklib.YakitFeature{
 			Feature: "text",
 			Params: map[string]interface{}{
 				"tab_name": tabName,
 				"at_head":  true,
 			},
 		})
+
 		if err != nil {
 			return err
 		}
-		stream.Send(&ypb.ExecResult{IsMessage: true, Message: newTabRaw})
 
 		resData, err := json.Marshal(&yaklib.YakitTextTabData{
 			TableName: tabName,
