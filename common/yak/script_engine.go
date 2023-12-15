@@ -88,7 +88,7 @@ func initYaklangLib() {
 		builtin.YaklangBaseLib["print"] = func(a ...any) {}
 		builtin.YaklangBaseLib["printf"] = func(a ...any) {}
 		builtin.YaklangBaseLib["println"] = func(a ...any) {}
-		yaklib.YakitExports["Info"] = func(a string, b ...interface{}) {}
+		//yaklib.YakitExports["Info"] = func(a string, b ...interface{}) {}
 		yaklib.YakitExports["Warn"] = func(a string, b ...interface{}) {}
 		yaklib.YakitExports["Debug"] = func(a string, b ...interface{}) {}
 		yaklib.YakitExports["Error"] = func(a string, b ...interface{}) {}

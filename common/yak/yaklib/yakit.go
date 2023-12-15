@@ -117,7 +117,7 @@ func GetExtYakitLibByClient(client *YakitClient) map[string]interface{} {
 		"SetProgressEx": client.YakitSetProgressEx,
 	}
 	if os.Getenv("YAK_DISABLE") == "output" {
-		YakitExports["Info"] = func(a string, b ...interface{}) {}
+		//YakitExports["Info"] = func(a string, b ...interface{}) {}
 		YakitExports["Warn"] = func(a string, b ...interface{}) {}
 		YakitExports["Debug"] = func(a string, b ...interface{}) {}
 		YakitExports["Error"] = func(a string, b ...interface{}) {}
