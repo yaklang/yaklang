@@ -6,27 +6,26 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
-	"reflect"
 	"sync"
 )
 
-type SyntaxFlowVirtualMachine[V any] struct {
-	vars *omap.OrderedMap[string, *omap.OrderedMap[string, V]]
+type SyntaxFlowVirtualMachine struct {
+	vars *omap.OrderedMap[string, any]
 
 	debug      bool
 	frameMutex *sync.Mutex
-	frames     []*SFFrame[V]
+	frames     []*SFFrame
 }
 
-func NewSyntaxFlowVirtualMachine[V any]() *SyntaxFlowVirtualMachine[V] {
-	sfv := &SyntaxFlowVirtualMachine[V]{
-		vars:       omap.NewEmptyOrderedMap[string, *omap.OrderedMap[string, V]](),
+func NewSyntaxFlowVirtualMachine() *SyntaxFlowVirtualMachine {
+	sfv := &SyntaxFlowVirtualMachine{
+		vars:       omap.NewEmptyOrderedMap[string, any](),
 		frameMutex: new(sync.Mutex),
 	}
 	return sfv
 }
 
-func (s *SyntaxFlowVirtualMachine[V]) Debug(i ...bool) *SyntaxFlowVirtualMachine[V] {
+func (s *SyntaxFlowVirtualMachine) Debug(i ...bool) *SyntaxFlowVirtualMachine {
 	if len(i) > 0 {
 		s.debug = i[0]
 	} else {
@@ -35,7 +34,7 @@ func (s *SyntaxFlowVirtualMachine[V]) Debug(i ...bool) *SyntaxFlowVirtualMachine
 	return s
 }
 
-func (s *SyntaxFlowVirtualMachine[V]) Compile(text string) (ret error) {
+func (s *SyntaxFlowVirtualMachine) Compile(text string) (ret error) {
 	defer func() {
 		if err := recover(); err != nil {
 			ret = utils.Wrapf(utils.Error(err), "Panic for SyntaxFlow compile")
@@ -43,7 +42,7 @@ func (s *SyntaxFlowVirtualMachine[V]) Compile(text string) (ret error) {
 	}()
 	lexer := sf.NewSyntaxFlowLexer(antlr.NewInputStream(text))
 	astParser := sf.NewSyntaxFlowParser(antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel))
-	result := NewSyntaxFlowVisitor[V]()
+	result := NewSyntaxFlowVisitor()
 	result.text = text
 	result.VisitFlow(astParser.Flow())
 	var frame = result.CreateFrame(s.vars)
@@ -51,7 +50,7 @@ func (s *SyntaxFlowVirtualMachine[V]) Compile(text string) (ret error) {
 	return nil
 }
 
-func (s *SyntaxFlowVirtualMachine[V]) Feed(i *omap.OrderedMap[string, V]) *omap.OrderedMap[string, any] {
+func (s *SyntaxFlowVirtualMachine) Feed(i *omap.OrderedMap[string, any]) *omap.OrderedMap[string, any] {
 	s.frameMutex.Lock()
 	defer s.frameMutex.Unlock()
 
@@ -64,12 +63,9 @@ func (s *SyntaxFlowVirtualMachine[V]) Feed(i *omap.OrderedMap[string, V]) *omap.
 		for i := 0; i < frame.stack.Size(); i++ {
 			v := frame.stack.Pop()
 			if v.IsMap() {
-				v.AsMap().Map(func(s string, v V) (string, V, error) {
-					err := result.Add(reflect.ValueOf(v).Interface())
-					if err != nil {
-						log.Errorf("pop frame result failed: %v", err)
-					}
-					return s, v, nil
+				v.AsMap().Map(func(s string, val any) (string, any, error) {
+					result.Set(s, val)
+					return s, val, nil
 				})
 			} else {
 				err := result.Add(v.Value())
