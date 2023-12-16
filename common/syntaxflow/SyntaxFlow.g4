@@ -28,6 +28,7 @@ filterExpr
     | op = ('>>' | '<<') filterExpr           # DirectionFilter
     | '(' filterExpr ')'                      # ParenFilter
     | '.' filterFieldMember                   # FieldFilter
+    | '[' numberLiteral ']'                   # ListIndexFilter
     | filterExpr '=>' chainFilter             # AheadChainFilter
     | filterExpr '==>' chainFilter            # DeepChainFilter
     | filterExpr '.' filterFieldMember        # FieldChainFilter

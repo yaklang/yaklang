@@ -40,6 +40,9 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#PrimaryFilter.
 	VisitPrimaryFilter(ctx *PrimaryFilterContext) interface{}
 
+	// Visit a parse tree produced by SyntaxFlowParser#ListIndexFilter.
+	VisitListIndexFilter(ctx *ListIndexFilterContext) interface{}
+
 	// Visit a parse tree produced by SyntaxFlowParser#NumberIndexFilter.
 	VisitNumberIndexFilter(ctx *NumberIndexFilterContext) interface{}
 
