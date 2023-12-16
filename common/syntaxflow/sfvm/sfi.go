@@ -53,9 +53,11 @@ const (
 	OpReMatch
 	OpGlobMatch
 	OpNot
+
+	OpRestoreContext
 )
 
-type SFI[V any] struct {
+type SFI struct {
 	OpCode   SFVMOpCode
 	UnaryInt int
 	UnaryStr string
@@ -65,7 +67,7 @@ type SFI[V any] struct {
 
 const verboseLen = "%-12s"
 
-func (s *SFI[V]) String() string {
+func (s *SFI) String() string {
 	switch s.OpCode {
 	case OpPass:
 		return "- pass -"
@@ -125,6 +127,8 @@ func (s *SFI[V]) String() string {
 		return fmt.Sprintf(verboseLen+" %v", "(operator) &&", s.UnaryStr)
 	case OpLogicOr:
 		return fmt.Sprintf(verboseLen+" %v", "(operator) ||", s.UnaryStr)
+	case OpRestoreContext:
+		return fmt.Sprintf(verboseLen+" %v", "restore ctx", s.UnaryStr)
 	}
 	return ""
 }
