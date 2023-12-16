@@ -8,47 +8,47 @@ import (
 	"strconv"
 )
 
-type Value[V any] struct {
+type Value struct {
 	v    any
-	data *omap.OrderedMap[string, V]
+	data *omap.OrderedMap[string, any]
 }
 
-func NewValue[V any](v any) *Value[V] {
+func NewValue(v any) *Value {
 	switch v.(type) {
-	case *omap.OrderedMap[string, V]:
-		return &Value[V]{v: "", data: v.(*omap.OrderedMap[string, V])}
+	case *omap.OrderedMap[string, any]:
+		return &Value{v: "", data: v.(*omap.OrderedMap[string, any])}
 	}
-	return &Value[V]{v: v, data: nil}
+	return &Value{v: v, data: nil}
 }
 
-func (v *Value[V]) AsInt() int {
+func (v *Value) AsInt() int {
 	return utils.InterfaceToInt(v.v)
 }
 
-func (v *Value[V]) AsMap() *omap.OrderedMap[string, V] {
+func (v *Value) AsMap() *omap.OrderedMap[string, any] {
 	return v.data
 }
 
-func (v *Value[V]) AsString() string {
+func (v *Value) AsString() string {
 	return utils.InterfaceToString(v.v)
 }
 
-func (v *Value[V]) AsBool() bool {
+func (v *Value) AsBool() bool {
 	return utils.InterfaceToBoolean(v.v)
 }
 
-func (v *Value[V]) IsMap() bool {
+func (v *Value) IsMap() bool {
 	return v.data != nil
 }
 
-func (v *Value[V]) Value() any {
+func (v *Value) Value() any {
 	if v.IsMap() {
 		return v.data
 	}
 	return v.v
 }
 
-func (v *Value[V]) VerboseString() string {
+func (v *Value) VerboseString() string {
 	if v.IsMap() {
 		return fmt.Sprintf("(len: %v) omap: {...}", v.data.Len())
 	}

@@ -4,6 +4,7 @@ type (
 	Stack[T any] struct {
 		top    *node[T]
 		length int
+		last   *node[T]
 	}
 	node[T any] struct {
 		value T
@@ -13,7 +14,7 @@ type (
 
 // Create a new stack
 func NewStack[T any]() *Stack[T] {
-	return &Stack[T]{nil, 0}
+	return &Stack[T]{nil, 0, nil}
 }
 
 // Return the number of items in the stack
@@ -63,7 +64,20 @@ func (this *Stack[T]) Pop() T {
 	n := this.top
 	this.top = n.prev
 	this.length--
+	this.last = n
 	return n.value
+}
+
+func (this *Stack[T]) HaveLastStackValue() bool {
+	return this.last != nil
+}
+
+func (this *Stack[T]) LastStackValue() T {
+	if this.last != nil {
+		return this.last.value
+	}
+	var z T
+	return z
 }
 
 // PopN the top item of the stack and return it

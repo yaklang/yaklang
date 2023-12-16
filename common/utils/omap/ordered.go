@@ -13,9 +13,18 @@ import (
 	"sync"
 )
 
+func tryGetParent[V any](v any) *OrderedMap[string, V] {
+	switch v.(type) {
+	case *OrderedMap[string, V]:
+		return v.(*OrderedMap[string, V])
+	}
+	return nil
+}
+
 type OrderedMap[T comparable, V any] struct {
 	lock     *sync.RWMutex
 	m        map[T]V
+	namedKey bool
 	keyChain []T
 
 	parent       *OrderedMap[T, V]
@@ -100,6 +109,7 @@ func (o *OrderedMap[T, V]) Set(key T, v V) {
 
 	// existed
 	o.m[key] = v
+	o.namedKey = true
 }
 
 func (o *OrderedMap[T, V]) Get(key T) (V, bool) {
@@ -123,6 +133,7 @@ func (o *OrderedMap[T, V]) Index(i int) *OrderedMap[string, V] {
 	if err != nil {
 		log.Errorf("BUG: why? general map type convert failed: %v", err)
 	}
+	result.parent = tryGetParent[V](o)
 	return result
 }
 
@@ -132,23 +143,14 @@ func (o *OrderedMap[T, V]) Field(key T) *OrderedMap[string, V] {
 		return NewEmptyOrderedMap[string, V]()
 	}
 	result := BuildGeneralMap[V](val)
-
-	conv := func(i any) *OrderedMap[string, V] {
-		switch i.(type) {
-		case *OrderedMap[string, V]:
-			return i.(*OrderedMap[string, V])
-		}
-		return nil
-	}
-	if ret := conv(o); ret != nil {
-		result.parent = ret
-	}
+	result.parent = tryGetParent[V](o)
 	return result
 }
 
 func BuildGeneralMap[V any](m any) *OrderedMap[string, V] {
 	if m == nil {
-		return NewEmptyOrderedMap[string, V]()
+		t := NewEmptyOrderedMap[string, V]()
+		return t
 	}
 
 	ty := reflect.TypeOf(m)
@@ -165,7 +167,7 @@ func BuildGeneralMap[V any](m any) *OrderedMap[string, V] {
 		vv := reflect.ValueOf(m)
 		result := NewEmptyOrderedMap[string, V]()
 		for i := 0; i < vv.Len(); i++ {
-			result.Set(fmt.Sprint(i), vv.Index(i).Interface().(V))
+			result.Add(vv.Index(i).Interface().(V))
 		}
 		return result
 	case reflect.Ptr:
@@ -287,11 +289,11 @@ func (o *OrderedMap[T, V]) ValuesMap() *OrderedMap[string, V] {
 			}
 		case reflect.Array:
 			for i := 0; i < vv.Len(); i++ {
-				result.Set(fmt.Sprint(i), vv.Index(i).Interface().(V))
+				result.Add(vv.Index(i).Interface().(V))
 			}
 		case reflect.Slice:
 			for i := 0; i < vv.Len(); i++ {
-				result.Set(fmt.Sprint(i), vv.Index(i).Interface().(V))
+				result.Add(vv.Index(i).Interface().(V))
 			}
 		default:
 			key := utils.InterfaceToString(v)
@@ -306,6 +308,7 @@ func (o *OrderedMap[T, V]) ValuesMap() *OrderedMap[string, V] {
 			result.Set(key, v)
 		}
 	}
+	result.parent = tryGetParent[V](o)
 	return result
 }
 
@@ -625,4 +628,15 @@ func (s *OrderedMap[T, V]) String() string {
 	}
 	builder.WriteString("}")
 	return builder.String()
+}
+
+func (s *OrderedMap[T, V]) UnsetParent() {
+	if s == nil {
+		return
+	}
+	s.parent = nil
+}
+
+func (s *OrderedMap[T, V]) CanAsList() bool {
+	return s.namedKey
 }
