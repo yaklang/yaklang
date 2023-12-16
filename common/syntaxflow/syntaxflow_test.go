@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func check(c string) {
+func check(c string) *omap.OrderedMap[string, any] {
 	vm := sfvm.NewSyntaxFlowVirtualMachine[any]().Debug(true)
 	err := vm.Compile(c)
 	if err != nil {
@@ -19,12 +19,29 @@ func check(c string) {
 		"param": []any{
 			"/abc",
 		},
+		"options": map[string]any{
+			"method": "GET",
+			"headers": map[string][]string{
+				"abc": []string{"ab", "c"},
+			},
+		},
 	})
-	vm.Feed(m)
+	return vm.Feed(m)
+}
+
+func TestSyntaxFlow_DotFilter(t *testing.T) {
+	result := check(`fetch.param[0]`)
+	target, ok := result.GetByIndex(0)
+	if !ok {
+		t.Error("fetch.param[0] not found")
+	}
+	if target != "/abc" {
+		t.Fatal("fetch.param[0] != /abc")
+	}
 }
 
 func TestSyntaxFlow_Basic(t *testing.T) {
-	check(`$abc >> fetch => [param] => {path: 0.(str); header: 1.(dict); } => $request`)
+	check(`$abc >> fetch => [param, options] => {path: 0.(str); header: 1.(dict); } => $request`)
 }
 
 func TestSyntaxFlow_Fetch(t *testing.T) {

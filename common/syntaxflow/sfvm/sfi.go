@@ -30,7 +30,8 @@ const (
 	OpFetchIndex
 	OpSetDirection
 	OpFlat
-	OpMap
+	OpMapStart
+	OpMapDone
 	OpTypeCast
 
 	/*
@@ -59,7 +60,7 @@ type SFI[V any] struct {
 	UnaryInt int
 	UnaryStr string
 	Desc     string
-	Values   []map[string]V
+	Values   []string
 }
 
 const verboseLen = "%-12s"
@@ -96,8 +97,10 @@ func (s *SFI[V]) String() string {
 		return fmt.Sprintf(verboseLen+" %v", "direction", s.UnaryStr)
 	case OpFlat:
 		return fmt.Sprintf(verboseLen+" (?len=%v) %v", "=>flat", s.UnaryInt, s.UnaryStr)
-	case OpMap:
-		return fmt.Sprintf(verboseLen+" %v", "=>cast-map", s.UnaryInt)
+	case OpMapStart:
+		return fmt.Sprintf(verboseLen+" %v", "=>start-map", s.UnaryStr)
+	case OpMapDone:
+		return fmt.Sprintf(verboseLen+" %v - %v", "=>build-map", s.UnaryInt, s.Values)
 	case OpTypeCast:
 		return fmt.Sprintf(verboseLen+" %v", "type-cast", s.UnaryStr)
 	case OpEq:

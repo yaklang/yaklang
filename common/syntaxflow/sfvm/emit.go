@@ -5,10 +5,17 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
-func (y *SyntaxFlowVisitor[V]) EmitMapBuild(i int) {
+func (y *SyntaxFlowVisitor[V]) EmitMapBuildDone(refs ...string) {
+	i := len(refs)
 	y.codes = append(y.codes, &SFI[V]{
-		OpCode:   OpMap,
-		UnaryInt: i,
+		OpCode: OpMapDone, UnaryInt: i,
+		Values: refs,
+	})
+}
+
+func (y *SyntaxFlowVisitor[V]) EmitMapBuildStart() {
+	y.codes = append(y.codes, &SFI[V]{
+		OpCode: OpMapStart,
 	})
 }
 
@@ -121,6 +128,13 @@ func (v *SyntaxFlowVisitor[V]) EmitField(i string) {
 	})
 }
 
+func (y *SyntaxFlowVisitor[V]) EmitFetchIndex(i int) {
+	y.codes = append(y.codes, &SFI[V]{
+		OpCode:   OpFetchIndex,
+		UnaryInt: i,
+	})
+}
+
 func (v *SyntaxFlowVisitor[V]) EmitTypeCast(i string) {
 	v.codes = append(v.codes, &SFI[V]{
 		OpCode:   OpTypeCast,
@@ -135,7 +149,7 @@ func (v *SyntaxFlowVisitor[V]) EmitSearch(i string) {
 	})
 }
 
-func (v *SyntaxFlowVisitor[V]) EmitIndex(i int) {
+func (v *SyntaxFlowVisitor[V]) EmitPushIndex(i int) {
 	v.codes = append(v.codes, &SFI[V]{
 		OpCode:   OpPushIndex,
 		UnaryInt: i,
