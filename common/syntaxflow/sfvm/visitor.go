@@ -120,7 +120,7 @@ func (y *SyntaxFlowVisitor[V]) VisitFilterExpr(raw sf.IFilterExprContext) interf
 		y.EmitSearch(filter)
 	case *sf.NumberIndexFilterContext:
 		index := y.VisitNumberLiteral(ret.NumberLiteral()) // emit index number
-		y.EmitIndex(index)
+		y.EmitPushIndex(index)
 	case *sf.DirectionFilterContext:
 		if ret.GetOp().GetText() == "<<" {
 			y.EmitDirection("<<")
@@ -132,6 +132,9 @@ func (y *SyntaxFlowVisitor[V]) VisitFilterExpr(raw sf.IFilterExprContext) interf
 		y.VisitFilterExpr(ret.FilterExpr())
 	case *sf.FieldFilterContext:
 		y.VisitFilterFieldMember(ret.FilterFieldMember()) // emit field or cast type
+	case *sf.ListIndexFilterContext:
+		index := y.VisitNumberLiteral(ret.NumberLiteral())
+		y.EmitFetchIndex(index)
 	case *sf.AheadChainFilterContext:
 		y.VisitFilterExpr(ret.FilterExpr())
 		y.VisitChainFilter(ret.ChainFilter())
@@ -167,15 +170,19 @@ func (y *SyntaxFlowVisitor[V]) VisitChainFilter(raw sf.IChainFilterContext) inte
 		y.EmitFlat(count)
 	case *sf.BuildMapContext:
 		var count int
-		for i := 0; i < len(ret.AllColon()); i++ {
+		y.EmitMapBuildStart()
+		l := len(ret.AllColon())
+		var vals []string = make([]string, l)
+		for i := 0; i < l; i++ {
 			key := ret.Identifier(i).GetText()
 			count++
 			y.EmitNewRef(key)
+			vals[i] = key
 			y.VisitFilters(ret.Filters(i))
 			y.EmitUpdate(key)
 			// pop val, create object and set key
 		}
-		y.EmitMapBuild(count)
+		y.EmitMapBuildDone(vals...)
 	default:
 		panic("Unexpected VisitChainFilter")
 	}
@@ -291,7 +298,7 @@ func (y *SyntaxFlowVisitor[V]) VisitFilterFieldMember(raw sf.IFilterFieldMemberC
 	if i.Identifier() != nil {
 		y.EmitField(i.Identifier().GetText())
 	} else if i.NumberLiteral() != nil {
-		y.EmitIndex(y.VisitNumberLiteral(i.NumberLiteral()))
+		y.EmitPushIndex(y.VisitNumberLiteral(i.NumberLiteral()))
 	} else if i.TypeCast() != nil {
 		y.EmitTypeCast(strings.Trim(i.TypeCast().GetText(), "()"))
 	} else {

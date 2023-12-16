@@ -51,6 +51,10 @@ func (v *BaseSyntaxFlowVisitor) VisitPrimaryFilter(ctx *PrimaryFilterContext) in
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseSyntaxFlowVisitor) VisitListIndexFilter(ctx *ListIndexFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseSyntaxFlowVisitor) VisitNumberIndexFilter(ctx *NumberIndexFilterContext) interface{} {
 	return v.VisitChildren(ctx)
 }

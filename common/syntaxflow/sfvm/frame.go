@@ -83,7 +83,7 @@ func (s *SFFrame[V]) exec(input *omap.OrderedMap[string, V]) (ret error) {
 			parent := s.stack.Peek().AsMap()
 			results, err := parent.SearchIndexKey(i.UnaryInt)
 			if err != nil {
-				return utils.Wrapf(err, "search index key failed")
+				return utils.Wrap(err, "search index key failed")
 			}
 			s.stack.Push(NewValue[V](results))
 			s.debugSubLog("<< push")
@@ -108,17 +108,19 @@ func (s *SFFrame[V]) exec(input *omap.OrderedMap[string, V]) (ret error) {
 			s.debugSubLog("update$ref: %v := %v", i.UnaryStr, val.VerboseString())
 			result.SetLiteralValue(val.Value())
 		case OpFetchField:
-			results := s.stack.Pop().AsMap().Map(func(string, V) (string, V, error) {
-				panic("FetchField not implemented")
-			})
-			s.stack.Push(NewValue[V](results))
+			results := s.stack.Pop().AsMap()
+			s.debugSubLog(">> (pop)")
+			r := results.Field(i.UnaryStr)
+			s.debugSubLog(".%v (len: %v)", i.UnaryStr, r.Len())
+			s.stack.Push(NewValue[V](r))
+			s.debugSubLog("<< push")
 		case OpFetchIndex:
-			s.debugSubLog(">> peek stack top")
-			results := s.stack.Pop().AsMap().Map(func(string, V) (string, V, error) {
-				panic("FetchIndex not implemented")
-			})
-			s.stack.Push(NewValue[V](results))
-			s.debugSubLog("<< push map(len: %v)", results.Len())
+			results := s.stack.Pop().AsMap()
+			s.debugSubLog(">> pop")
+			ret := results.Index(i.UnaryInt)
+			s.debugSubLog("[%v] (len: %v)", i.UnaryInt, ret.Len())
+			s.stack.Push(NewValue[V](ret))
+			s.debugSubLog("<< push")
 		case OpSetDirection:
 			s.toLeft = i.UnaryStr == "<<"
 		case OpFlat:
@@ -136,7 +138,13 @@ func (s *SFFrame[V]) exec(input *omap.OrderedMap[string, V]) (ret error) {
 			merged := omap.Merge(mergedMap...).ValuesMap()
 			s.debugSubLog("<< push map(len: %v)", merged.Len())
 			s.stack.Push(NewValue[V](merged))
-		case OpMap:
+		case OpMapStart:
+			v := s.stack.Peek()
+			if !v.IsMap() {
+				return utils.Errorf("map start failed: stack top is not map/dict/array")
+			}
+			s.debugSubLog("check stop stack is omap/array")
+		case OpMapDone:
 			panic("Map is not implemented")
 		case OpTypeCast:
 			s.debugSubLog(">> pop -> (%v)", i.UnaryStr)

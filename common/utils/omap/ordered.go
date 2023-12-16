@@ -3,6 +3,8 @@ package omap
 import (
 	"fmt"
 	"github.com/gobwas/glob"
+	"github.com/segmentio/ksuid"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
 	"regexp"
@@ -62,6 +64,29 @@ func NewOrderedMap[T comparable, V any](m map[T]V, initOrder ...func(int, int) b
 	}
 }
 
+func (o *OrderedMap[T, V]) Add(v V) error {
+	o.lock.Lock()
+	defer o.lock.Unlock()
+
+	conv := func(i any) (T, bool) {
+		res, ok := i.(T)
+		if ok {
+			return res, true
+		}
+		var z T
+		return z, false
+	}
+
+	k := ksuid.New().String()
+	val, ok := conv(k)
+	if !ok {
+		return utils.Errorf("convert failed:  cannot convert %v to %v", k, reflect.TypeOf(val))
+	}
+	o.m[val] = v
+	o.keyChain = append(o.keyChain, val)
+	return nil
+}
+
 func (o *OrderedMap[T, V]) Set(key T, v V) {
 	o.lock.Lock()
 	defer o.lock.Unlock()
@@ -83,6 +108,81 @@ func (o *OrderedMap[T, V]) Get(key T) (V, bool) {
 
 	v, ok := o.m[key]
 	return v, ok
+}
+
+func (o *OrderedMap[T, V]) Index(i int) *OrderedMap[string, V] {
+	o.lock.RLock()
+	defer o.lock.RUnlock()
+
+	if i < 0 || i >= len(o.keyChain) {
+		return NewEmptyOrderedMap[string, V]()
+	}
+
+	result := NewEmptyOrderedMap[string, V]()
+	err := result.Add(o.m[o.keyChain[i]])
+	if err != nil {
+		log.Errorf("BUG: why? general map type convert failed: %v", err)
+	}
+	return result
+}
+
+func (o *OrderedMap[T, V]) Field(key T) *OrderedMap[string, V] {
+	val, ok := o.Get(key)
+	if !ok {
+		return NewEmptyOrderedMap[string, V]()
+	}
+	result := BuildGeneralMap[V](val)
+
+	conv := func(i any) *OrderedMap[string, V] {
+		switch i.(type) {
+		case *OrderedMap[string, V]:
+			return i.(*OrderedMap[string, V])
+		}
+		return nil
+	}
+	if ret := conv(o); ret != nil {
+		result.parent = ret
+	}
+	return result
+}
+
+func BuildGeneralMap[V any](m any) *OrderedMap[string, V] {
+	if m == nil {
+		return NewEmptyOrderedMap[string, V]()
+	}
+
+	ty := reflect.TypeOf(m)
+	switch ty.Kind() {
+	case reflect.Map:
+		vv := reflect.ValueOf(m)
+		result := NewEmptyOrderedMap[string, V]()
+		for _, key := range vv.MapKeys() {
+			value := vv.MapIndex(key).Interface().(V)
+			result.Set(utils.InterfaceToString(key.Interface()), value)
+		}
+		return result
+	case reflect.Array, reflect.Slice:
+		vv := reflect.ValueOf(m)
+		result := NewEmptyOrderedMap[string, V]()
+		for i := 0; i < vv.Len(); i++ {
+			result.Set(fmt.Sprint(i), vv.Index(i).Interface().(V))
+		}
+		return result
+	case reflect.Ptr:
+		vv := reflect.ValueOf(m)
+		return BuildGeneralMap[V](vv.Elem().Interface())
+	case reflect.Struct:
+		vv := reflect.ValueOf(m)
+		result := NewEmptyOrderedMap[string, V]()
+		for i := 0; i < vv.NumField(); i++ {
+			result.Set(vv.Type().Field(i).Name, vv.Field(i).Interface().(V))
+		}
+		return result
+	default:
+		result := NewEmptyOrderedMap[string, V]()
+		result.Set(utils.InterfaceToString(m), m.(V))
+		return result
+	}
 }
 
 func (o *OrderedMap[T, V]) GetByIndex(index int) (V, bool) {
@@ -509,4 +609,20 @@ func (s *OrderedMap[T, V]) Merge(i ...*OrderedMap[T, V]) *OrderedMap[T, V] {
 	r := Merge[T, V](append([]*OrderedMap[T, V]{s}, i...)...)
 	r.parent = s
 	return r
+}
+
+func (s *OrderedMap[T, V]) String() string {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	var builder strings.Builder
+	builder.WriteString("{")
+	for i, k := range s.keyChain {
+		builder.WriteString(fmt.Sprintf("%v: %#v", k, s.m[k]))
+		if i != len(s.keyChain)-1 {
+			builder.WriteString(", ")
+		}
+	}
+	builder.WriteString("}")
+	return builder.String()
 }
