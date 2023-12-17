@@ -74,6 +74,8 @@ func NewOrderedMap[T comparable, V any](m map[T]V, initOrder ...func(int, int) b
 	}
 }
 
+var nonnamedkeyconst = `[[-non-named-key-]]`
+
 func (o *OrderedMap[T, V]) Add(v V) error {
 	o.lock.Lock()
 	defer o.lock.Unlock()
@@ -87,7 +89,7 @@ func (o *OrderedMap[T, V]) Add(v V) error {
 		return z, false
 	}
 
-	k := ksuid.New().String()
+	k := ksuid.New().String() + nonnamedkeyconst
 	val, ok := conv(k)
 	if !ok {
 		return utils.Errorf("convert failed:  cannot convert %v to %v", k, reflect.TypeOf(val))
@@ -356,7 +358,16 @@ func (o *OrderedMap[T, V]) Filter(f func(T, V) (bool, error)) *OrderedMap[T, V] 
 			break
 		}
 		if ok {
-			r.Set(key, v)
+			var k any = key
+			if sk, ok := k.(string); ok {
+				if strings.HasSuffix(sk, nonnamedkeyconst) {
+					r.Add(v)
+				} else {
+					r.Set(key, v)
+				}
+			} else {
+				r.Set(key, v)
+			}
 		}
 	}
 	r.parent = o
@@ -392,6 +403,21 @@ func (o *OrderedMap[T, V]) Map(f func(T, V) (T, V, error)) *OrderedMap[T, V] {
 	}
 	r.parent = o
 	return r
+}
+
+func (o *OrderedMap[T, V]) ForEach(handler func(i T, v V) bool) {
+	o.lock.RLock()
+	defer o.lock.RUnlock()
+
+	for _, key := range o.keyChain {
+		v, ok := o.m[key]
+		if !ok {
+			continue
+		}
+		if !handler(key, v) {
+			break
+		}
+	}
 }
 
 func (o *OrderedMap[T, V]) Flat(f func(T, V) (struct {
