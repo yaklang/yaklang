@@ -33,6 +33,12 @@ func (y *SyntaxFlowVisitor) EmitUpdate(i string) {
 	})
 }
 
+func (y *SyntaxFlowVisitor) EmitWithdraw() {
+	y.codes = append(y.codes, &SFI{
+		OpCode: OpWithdraw,
+	})
+}
+
 func (y *SyntaxFlowVisitor) EmitRestoreContext() {
 	y.codes = append(y.codes, &SFI{OpCode: OpRestoreContext})
 }
@@ -180,4 +186,10 @@ func (v *SyntaxFlowVisitor) Show() {
 
 func (v *SyntaxFlowVisitor) CreateFrame(vars *omap.OrderedMap[string, any]) *SFFrame {
 	return NewSFFrame(vars, v.text, v.codes)
+}
+
+func (y *SyntaxFlowVisitor) EmitPop() {
+	y.codes = append(y.codes, &SFI{
+		OpCode: OpPop,
+	})
 }

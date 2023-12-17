@@ -43,7 +43,7 @@ func (y *SyntaxFlowVisitor) VisitFilters(raw sf.IFiltersContext) interface{} {
 	for _, stmt := range i.AllFilterStatement() {
 		y.VisitFilterStatement(stmt)
 	}
-
+	y.EmitPop()
 	return nil
 }
 
@@ -116,7 +116,8 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) interface
 
 	switch ret := raw.(type) {
 	case *sf.PrimaryFilterContext:
-		filter := ret.Identifier().GetText() // emit field
+		filter, glob := y.FormatStringOrGlob(ret.Identifier().GetText()) // emit field
+		_ = glob
 		y.EmitSearch(filter)
 	case *sf.NumberIndexFilterContext:
 		index := y.VisitNumberLiteral(ret.NumberLiteral()) // emit index number
@@ -179,6 +180,7 @@ func (y *SyntaxFlowVisitor) VisitChainFilter(raw sf.IChainFilterContext) interfa
 			y.EmitNewRef(key)
 			vals[i] = key
 			y.VisitFilters(ret.Filters(i))
+			y.EmitWithdraw()
 			y.EmitUpdate(key)
 			y.EmitRestoreContext()
 			// pop val, create object and set key
@@ -322,6 +324,10 @@ func (y *SyntaxFlowVisitor) VisitStringLiteral(raw sf.IStringLiteralContext) (st
 	}
 
 	var text = i.GetText()
+	return y.FormatStringOrGlob(text)
+}
+
+func (y *SyntaxFlowVisitor) FormatStringOrGlob(text string) (string, bool) {
 	if strings.Contains(text, "%%") {
 		text = strings.ReplaceAll(text, "%%", tmpPH)
 	}

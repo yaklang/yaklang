@@ -13,6 +13,7 @@ type mapCtx struct {
 	Current     int
 	Index       int
 	Value       []*omap.OrderedMap[string, any]
+	Root        *Value
 }
 
 type SFFrame struct {
@@ -82,8 +83,9 @@ func (s *SFFrame) exec(input *omap.OrderedMap[string, any]) (ret error) {
 		case OpPushBool:
 			s.stack.Push(NewValue(i.UnaryInt))
 		case OpPushMatch:
-			s.debugSubLog("search: %v", i.UnaryStr)
-			res, err := s.stack.Pop().AsMap().SearchGlobKey(i.UnaryStr)
+			s.debugSubLog("<< pop search: %v", i.UnaryStr)
+			top := s.stack.Pop().AsMap()
+			res, err := top.WalkSearchGlobKey(i.UnaryStr)
 			if err != nil {
 				return utils.Wrapf(err, "search glob key failed")
 			}
@@ -115,15 +117,17 @@ func (s *SFFrame) exec(input *omap.OrderedMap[string, any]) (ret error) {
 			s.symbolTable.Set(i.UnaryStr, omap.NewEmptyOrderedMap[string, any]())
 		case OpUpdateRef:
 			s.debugSubLog("fetch$ref: %v", i.UnaryStr)
-			result, ok := s.symbolTable.Get(i.UnaryStr)
+			_, ok := s.symbolTable.Get(i.UnaryStr)
 			if !ok {
-				result = omap.NewEmptyOrderedMap[string, any]()
-				s.debugSubLog("auto new$ref: %v", i.UnaryStr)
-				s.symbolTable.Set(i.UnaryStr, result)
+				return utils.Errorf("update$ref failed: ref: %v not found", i.UnaryStr)
 			}
 			val := s.stack.Pop()
 			if val.IsMap() {
-				s.symbolTable.Set(i.UnaryStr, val.AsMap())
+				if ret := val.AsMap(); ret.CanAsList() {
+					s.symbolTable.Set(i.UnaryStr, ret.Values())
+				} else {
+					s.symbolTable.Set(i.UnaryStr, ret)
+				}
 			} else {
 				s.symbolTable.Set(i.UnaryStr, val.Value())
 			}
@@ -131,17 +135,34 @@ func (s *SFFrame) exec(input *omap.OrderedMap[string, any]) (ret error) {
 		case OpFetchField:
 			results := s.stack.Pop().AsMap()
 			s.debugSubLog(">> (pop)")
-			r := results.Field(i.UnaryStr)
-			s.debugSubLog(".%v (len: %v)", i.UnaryStr, r.Len())
-			s.stack.Push(NewValue(r))
-			s.debugSubLog("<< push")
+			r, ok := results.Get(i.UnaryStr)
+			if !ok {
+				s.debugSubLog(".%v empty", i.UnaryStr)
+				s.stack.Push(NewValue(omap.NewEmptyOrderedMap[string, any]()))
+			} else {
+				s.debugSubLog(".%v := %v", i.UnaryStr, r)
+				s.stack.Push(NewValue(r))
+				s.debugSubLog("<< push")
+			}
 		case OpFetchIndex:
-			results := s.stack.Pop().AsMap()
-			s.debugSubLog(">> pop")
-			ret := results.Index(i.UnaryInt)
-			s.debugSubLog("[%v] (len: %v)", i.UnaryInt, ret.Len())
-			s.stack.Push(NewValue(ret))
-			s.debugSubLog("<< push")
+			top := s.stack.Pop()
+			s.debugSubLog(">> pop %v", top.VerboseString())
+			var results *omap.OrderedMap[string, any]
+			if !top.IsMap() {
+				results = omap.BuildGeneralMap[any](top.Value())
+			} else {
+				results = top.AsMap()
+			}
+			ret, ok := results.GetByIndex(i.UnaryInt)
+			if ok {
+				s.debugSubLog("[%v]: (%T)", i.UnaryInt, ret)
+				s.stack.Push(NewValue(ret))
+				s.debugSubLog("<< push")
+			} else {
+				s.debugSubLog("[%v] any", i.UnaryInt)
+				s.stack.Push(NewValue(omap.NewGeneralOrderedMap()))
+				s.debugSubLog("<< push")
+			}
 		case OpSetDirection:
 			s.toLeft = i.UnaryStr == "<<"
 		case OpFlat:
@@ -171,11 +192,25 @@ func (s *SFFrame) exec(input *omap.OrderedMap[string, any]) (ret error) {
 			} else {
 				m.UnsetParent()
 				l = 1
+				buildMaterial := omap.NewGeneralOrderedMap()
+				ret := buildMaterial.Merge(m)
+				s.stack.Push(NewValue(ret))
+				s.mapStack.Push(&mapCtx{
+					Current: l, Index: idx, OriginDepth: l,
+					Root: NewValue(ret),
+				})
 			}
-			s.mapStack.Push(&mapCtx{
-				Current: l, Index: idx, OriginDepth: l,
-			})
 			s.debugSubLog("check top stack is omap/array: len(%v)", m.Len())
+		case OpRestoreContext:
+			s.stack.Push(s.mapStack.Peek().Root)
+			s.debugSubLog("peek checking from stack[len: %v]", s.stack.Len())
+			if s.stack.Len() == 0 {
+				return utils.Errorf("restore context failed: stack is empty")
+			}
+			top := s.stack.Peek()
+			if !top.IsMap() {
+				return utils.Errorf("restore context failed: stack top is not map")
+			}
 		case OpMapDone:
 			val := s.mapStack.Peek()
 			val.Current--
@@ -207,6 +242,8 @@ func (s *SFFrame) exec(input *omap.OrderedMap[string, any]) (ret error) {
 					var v any = result
 					nxt.Add(v)
 				}
+				s.debugSubLog(">> pop origin value")
+				s.stack.Pop()
 				s.debugSubLog("<< push (len: %v)", nxt.Len())
 				s.stack.Push(NewValue(nxt))
 			}
@@ -257,16 +294,10 @@ func (s *SFFrame) exec(input *omap.OrderedMap[string, any]) (ret error) {
 			op2 := i.UnaryStr
 			_ = op1
 			_ = op2
-		case OpRestoreContext:
-			s.debugSubLog("restore context")
-			if !s.stack.HaveLastStackValue() {
-				return utils.Errorf("restore context failed: stack is empty")
-			}
-			v, ok := s.stack.LastStackValue().AsMap().GetRoot()
-			if !ok {
-				return utils.Errorf("restore context failed: %v", "cannot find root node")
-			}
-			s.stack.Push(NewValue(v))
+		case OpPop:
+			s.stack.Pop()
+		case OpWithdraw:
+			s.stack.Push(s.stack.LastStackValue())
 		default:
 			panic(fmt.Sprintf("unhandled default case， undefined opcode: %v", spew.Sdump(i)))
 		}
