@@ -47,6 +47,10 @@ func (v *BaseSyntaxFlowVisitor) VisitDeepChainFilter(ctx *DeepChainFilterContext
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseSyntaxFlowVisitor) VisitOptionalFilter(ctx *OptionalFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseSyntaxFlowVisitor) VisitPrimaryFilter(ctx *PrimaryFilterContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -60,6 +64,10 @@ func (v *BaseSyntaxFlowVisitor) VisitNumberIndexFilter(ctx *NumberIndexFilterCon
 }
 
 func (v *BaseSyntaxFlowVisitor) VisitFieldChainFilter(ctx *FieldChainFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseSyntaxFlowVisitor) VisitOptionalRootFilter(ctx *OptionalRootFilterContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

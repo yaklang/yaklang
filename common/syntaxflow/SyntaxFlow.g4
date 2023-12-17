@@ -29,13 +29,15 @@ filterExpr
     | '(' filterExpr ')'                      # ParenFilter
     | '.' filterFieldMember                   # FieldFilter
     | '[' numberLiteral ']'                   # ListIndexFilter
+    | '?' conditionExpression                 # OptionalRootFilter
+    | filterExpr '?' conditionExpression      # OptionalFilter
     | filterExpr '=>' chainFilter             # AheadChainFilter
     | filterExpr '==>' chainFilter            # DeepChainFilter
     | filterExpr '.' filterFieldMember        # FieldChainFilter
     ;
 
 chainFilter
-    : '[' ((conditionExpression (',' conditionExpression)*) | '...') ']'          # Flat
+    : '[' ((filters (',' filters)*) | '...') ']'          # Flat
     | '{' ((identifier ':') filters (';' (identifier ':') filters )*)? ';'? '}'  # BuildMap
     ;
 
@@ -89,6 +91,7 @@ Gt: '>';
 Dot: '.';
 Lt: '<';
 Eq: '=';
+Question: '?';
 OpenParen: '(';
 Comma: ',';
 CloseParen: ')';

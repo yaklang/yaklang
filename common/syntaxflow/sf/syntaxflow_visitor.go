@@ -37,6 +37,9 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#DeepChainFilter.
 	VisitDeepChainFilter(ctx *DeepChainFilterContext) interface{}
 
+	// Visit a parse tree produced by SyntaxFlowParser#OptionalFilter.
+	VisitOptionalFilter(ctx *OptionalFilterContext) interface{}
+
 	// Visit a parse tree produced by SyntaxFlowParser#PrimaryFilter.
 	VisitPrimaryFilter(ctx *PrimaryFilterContext) interface{}
 
@@ -48,6 +51,9 @@ type SyntaxFlowVisitor interface {
 
 	// Visit a parse tree produced by SyntaxFlowParser#FieldChainFilter.
 	VisitFieldChainFilter(ctx *FieldChainFilterContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#OptionalRootFilter.
+	VisitOptionalRootFilter(ctx *OptionalRootFilterContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#Flat.
 	VisitFlat(ctx *FlatContext) interface{}

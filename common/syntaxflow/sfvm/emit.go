@@ -39,13 +39,24 @@ func (y *SyntaxFlowVisitor) EmitWithdraw() {
 	})
 }
 
-func (y *SyntaxFlowVisitor) EmitRestoreContext() {
-	y.codes = append(y.codes, &SFI{OpCode: OpRestoreContext})
+func (y *SyntaxFlowVisitor) EmitRestoreMapContext() {
+	y.codes = append(y.codes, &SFI{OpCode: OpRestoreMapContext})
 }
 
-func (y *SyntaxFlowVisitor) EmitFlat(i int) {
+func (y *SyntaxFlowVisitor) EmitRestoreFlatContext() {
+	y.codes = append(y.codes, &SFI{OpCode: OpRestoreFlatContext})
+}
+
+func (y *SyntaxFlowVisitor) EmitFlatDone(i int) {
 	y.codes = append(y.codes, &SFI{
-		OpCode:   OpFlat,
+		OpCode:   OpFlatDone,
+		UnaryInt: i,
+	})
+}
+
+func (y *SyntaxFlowVisitor) EmitFlatStart(i int) {
+	y.codes = append(y.codes, &SFI{
+		OpCode:   OpFlatStart,
 		UnaryInt: i,
 	})
 }

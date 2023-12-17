@@ -61,7 +61,28 @@ type checkCase struct {
 func TestJSONBuild_Flat(t *testing.T) {
 	c := checkCase{
 		Data: `{"abc": "def", "bbc": "ccc", "body": {"a1bc": "1111"}}`,
-		Rule: `%bc => [==ccc] => $ccc`,
+		Rule: `%bc => [?(!=ccc)] => $ccc`,
+	}
+	result := jsonCheck(c.Data, c.Rule)
+	resultMap := result.Field("ccc")
+	v1, _ := resultMap.GetByIndex(0)
+	v2, _ := resultMap.GetByIndex(1)
+	var generalResult = []any{v1, v2}
+	r := utils.InterfaceToStringSlice(generalResult)
+	sort.SliceStable(r, func(i, j int) bool {
+		return r[i] < r[j]
+	})
+	fmt.Println(r)
+	assert.NotEqual(t, []string{"ccc", "def"}, r)
+	assert.NotEqual(t, []string{"1111", "ccc", "def"}, r)
+	assert.Equal(t, []string{"1111", "def"}, r)
+	assert.Len(t, r, 2)
+}
+
+func TestJSONBuild_Filter(t *testing.T) {
+	c := checkCase{
+		Data: `{"abc": "def", "bbc": "ccc", "body": {"a1bc": "1111"}}`,
+		Rule: `%bc?(!=ccc) => $ccc`,
 	}
 	result := jsonCheck(c.Data, c.Rule)
 	r := utils.InterfaceToStringSlice(result.GetMust("ccc").([]any))
@@ -71,7 +92,8 @@ func TestJSONBuild_Flat(t *testing.T) {
 	fmt.Println(r)
 	assert.NotEqual(t, []string{"ccc", "def"}, r)
 	assert.NotEqual(t, []string{"1111", "ccc", "def"}, r)
-	assert.Len(t, r, 1)
+	assert.Equal(t, []string{"1111", "def"}, r)
+	assert.Len(t, r, 2)
 }
 
 func TestJSONBuild_1(t *testing.T) {
