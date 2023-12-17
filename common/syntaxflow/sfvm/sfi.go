@@ -14,6 +14,8 @@ const (
 	OpPushNumber
 	OpPushString
 	OpPushBool
+	OpPop
+	OpWithdraw
 
 	// OpPushMatch can push data from origin
 	OpPushMatch
@@ -129,6 +131,10 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v", "(operator) ||", s.UnaryStr)
 	case OpRestoreContext:
 		return fmt.Sprintf(verboseLen+" %v", "restore ctx", s.UnaryStr)
+	case OpPop:
+		return fmt.Sprintf(verboseLen+" %v", "pop", s.UnaryStr)
+	case OpWithdraw:
+		return fmt.Sprint("withdraw last stack value")
 	}
 	return ""
 }
