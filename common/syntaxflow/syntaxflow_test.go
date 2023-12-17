@@ -1,11 +1,15 @@
 package syntaxflow
 
 import (
+	"encoding/json"
+	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -30,31 +34,149 @@ func check(c string) *omap.OrderedMap[string, any] {
 				"abc": []string{"ab", "c"},
 			},
 		},
+		"body": map[string]any{},
 	})
 	return vm.Feed(m)
 }
 
-func TestBuildMap(t *testing.T) {
-	result := check(`fetch => {path: param[0];} => $result`)
+func jsonCheck(raw string, rule string) *omap.OrderedMap[string, any] {
+	var i any = nil
+	err := json.Unmarshal([]byte(raw), &i)
+	if err != nil {
+		panic(err)
+	}
+	vm := sfvm.NewSyntaxFlowVirtualMachine()
+	err = vm.Compile(rule)
+	if err != nil {
+		panic(err)
+	}
+	return vm.Debug(true).Feed(omap.BuildGeneralMap[any](i))
+}
+
+type checkCase struct {
+	Data string
+	Rule string
+}
+
+func TestJSONBuild_Flat(t *testing.T) {
+	c := checkCase{
+		Data: `{"abc": "def", "bbc": "ccc", "body": {"a1bc": "1111"}}`,
+		Rule: `%bc => [==ccc] => $ccc`,
+	}
+	result := jsonCheck(c.Data, c.Rule)
+	r := utils.InterfaceToStringSlice(result.GetMust("ccc").([]any))
+	sort.SliceStable(r, func(i, j int) bool {
+		return r[i] < r[j]
+	})
+	fmt.Println(r)
+	assert.NotEqual(t, []string{"ccc", "def"}, r)
+	assert.NotEqual(t, []string{"1111", "ccc", "def"}, r)
+	assert.Len(t, r, 1)
+}
+
+func TestJSONBuild_1(t *testing.T) {
+	c := checkCase{
+		Data: `{"abc": "def"}`,
+		Rule: `%bc => $ccc`,
+	}
+	result := jsonCheck(c.Data, c.Rule)
+	assert.Equal(t, "def", result.GetMust("ccc").([]any)[0])
+}
+
+func TestJSONBuild_3_Deep(t *testing.T) {
+	c := checkCase{
+		Data: `{"abc": "def", "bbc": "ccc", "body": {"a1bc": "1111"}}`,
+		Rule: `%bc => $ccc`,
+	}
+	result := jsonCheck(c.Data, c.Rule)
+	r := utils.InterfaceToStringSlice(result.GetMust("ccc").([]any))
+	sort.SliceStable(r, func(i, j int) bool {
+		return r[i] < r[j]
+	})
+	fmt.Println(result)
+	assert.NotEqual(t, []string{"ccc", "def"}, r)
+	assert.Equal(t, []string{"1111", "ccc", "def"}, r)
+}
+
+func TestJSONBuild_3_Deep2(t *testing.T) {
+	c := checkCase{
+		Data: `{"abc": "def", "bbc": "ccc", "body": {"abc": "1111"}}`,
+		Rule: `%bc => $ccc`,
+	}
+	result := jsonCheck(c.Data, c.Rule)
+	r := utils.InterfaceToStringSlice(result.GetMust("ccc").([]any))
+	sort.SliceStable(r, func(i, j int) bool {
+		return r[i] < r[j]
+	})
+	fmt.Println(r)
+	assert.NotEqual(t, []string{"ccc", "def"}, r)
+	assert.Equal(t, []string{"1111", "ccc", "def"}, r)
+}
+
+func TestJSONBuild_2(t *testing.T) {
+	c := checkCase{
+		Data: `{"abc": "def", "bbc": "ccc"}`,
+		Rule: `%bc => $ccc`,
+	}
+	result := jsonCheck(c.Data, c.Rule)
+	r := utils.InterfaceToStringSlice(result.GetMust("ccc").([]any))
+	sort.SliceStable(r, func(i, j int) bool {
+		return r[i] < r[j]
+	})
+	spew.Dump(r)
+	assert.Equal(t, []string{"ccc", "def"}, r)
+}
+
+func TestBuildMap_Basic2(t *testing.T) {
+	result := check(`fetch => {path: param[0]; method: options.method} => $reqs`)
 	_ = result
 	log.Info("finished")
-	e := result.Index(0)
-	p, ok := e.Get("path")
+	reqs := result.Field("reqs")
+	e, ok := reqs.GetByIndex(0)
+	if !ok {
+		t.Error("reqs[0] not found")
+		t.FailNow()
+	}
+	result = e.(*omap.OrderedMap[string, any])
+	p, ok := result.Get("path")
 	if !ok {
 		t.FailNow()
 	}
-	spew.Dump(p)
+	if p != "/abc" {
+		t.Fatal("path != /abc")
+	}
 
-	p, ok = e.Get("method")
+	p, ok = result.Get("method")
 	if !ok {
 		t.FailNow()
 	}
-	spew.Dump(p)
+	if p != "GET" {
+		t.Fatal("method failed")
+	}
+}
+
+func TestBuildMap_Basic(t *testing.T) {
+	result := check(`fetch => {path: param[0];} => $reqs`)
+	_ = result
+	log.Info("finished")
+	reqs := result.Field("reqs")
+	e, ok := reqs.GetByIndex(0)
+	if !ok {
+		t.Error("reqs[0] not found")
+		t.FailNow()
+	}
+	p, ok := e.(*omap.OrderedMap[string, any]).Get("path")
+	if !ok {
+		t.FailNow()
+	}
+	if p != "/abc" {
+		t.Fatal("path != /abc")
+	}
 }
 
 func TestField(t *testing.T) {
-	result := check(`fetch.value`)
-	if result, ok := result.GetByIndex(0); ok {
+	result := check(`fetch.value => $value`)
+	if result, ok := result.Field("value").GetByIndex(0); ok {
 		if result != "ccc" {
 			t.Fatal("fetch.value != ccc")
 		}
@@ -64,8 +186,8 @@ func TestField(t *testing.T) {
 }
 
 func TestSyntaxFlow_DotFilter(t *testing.T) {
-	result := check(`fetch.param[0]`)
-	target, ok := result.GetByIndex(0)
+	result := check(`fetch.param[0] => $path`)
+	target, ok := result.Field("path").GetByIndex(0)
 	if !ok {
 		t.Error("fetch.param[0] not found")
 	}
@@ -75,8 +197,8 @@ func TestSyntaxFlow_DotFilter(t *testing.T) {
 }
 
 func TestSyntaxFlow_Ref(t *testing.T) {
-	result := check(`fetch`)
-	res, ok := result.Get("param")
+	result := check(`fetch => $ref`)
+	res, ok := result.Field("ref").Get("param")
 	if !ok {
 		t.Error("fetch.param not found")
 		panic(1)

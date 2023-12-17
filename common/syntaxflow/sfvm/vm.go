@@ -60,20 +60,13 @@ func (s *SyntaxFlowVirtualMachine) Feed(i *omap.OrderedMap[string, any]) *omap.O
 		if err != nil {
 			log.Errorf("exec frame[%v]: %v\n\t\tCODE: %v", err, index, frame.Text)
 		}
-		for i := 0; i < frame.stack.Size(); i++ {
-			v := frame.stack.Pop()
-			if v.IsMap() {
-				v.AsMap().Map(func(s string, val any) (string, any, error) {
-					result.Set(s, val)
-					return s, val, nil
-				})
-			} else {
-				err := result.Add(v.Value())
-				if err != nil {
-					log.Warnf("pop frame result failed: %v", err)
-				}
-			}
+		if frame.stack.Len() > 1 {
+			log.Infof("stack unbalanced: %v", frame.stack.Len())
 		}
 	}
+	s.vars.Map(func(s string, a any) (string, any, error) {
+		result.Set(s, a)
+		return s, a, nil
+	})
 	return result
 }
