@@ -31,9 +31,12 @@ const (
 	OpFetchField
 	OpFetchIndex
 	OpSetDirection
-	OpFlat
+	OpFlatStart
+	OpFlatDone
+	OpRestoreFlatContext
 	OpMapStart
 	OpMapDone
+	OpRestoreMapContext
 	OpTypeCast
 
 	/*
@@ -55,8 +58,6 @@ const (
 	OpReMatch
 	OpGlobMatch
 	OpNot
-
-	OpRestoreContext
 )
 
 type SFI struct {
@@ -99,8 +100,10 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" [%v]", "?=index", s.UnaryInt)
 	case OpSetDirection:
 		return fmt.Sprintf(verboseLen+" %v", "direction", s.UnaryStr)
-	case OpFlat:
-		return fmt.Sprintf(verboseLen+" (?len=%v) %v", "=>flat", s.UnaryInt, s.UnaryStr)
+	case OpFlatStart:
+		return fmt.Sprintf(verboseLen+" (?len=%v) %v", "=>flat-start", s.UnaryInt, s.UnaryStr)
+	case OpFlatDone:
+		return fmt.Sprintf(verboseLen+" (?len=%v) %v", "=>flat-done", s.UnaryInt, s.UnaryStr)
 	case OpMapStart:
 		return fmt.Sprintf(verboseLen+" %v", "=>start-map", s.UnaryStr)
 	case OpMapDone:
@@ -129,8 +132,10 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v", "(operator) &&", s.UnaryStr)
 	case OpLogicOr:
 		return fmt.Sprintf(verboseLen+" %v", "(operator) ||", s.UnaryStr)
-	case OpRestoreContext:
-		return fmt.Sprintf(verboseLen+" %v", "restore ctx", s.UnaryStr)
+	case OpRestoreMapContext:
+		return fmt.Sprintf(verboseLen+" %v", "restore map ctx", s.UnaryStr)
+	case OpRestoreFlatContext:
+		return fmt.Sprintf(verboseLen+" %v", "restore flat ctx", s.UnaryStr)
 	case OpPop:
 		return fmt.Sprintf(verboseLen+" %v", "pop", s.UnaryStr)
 	case OpWithdraw:

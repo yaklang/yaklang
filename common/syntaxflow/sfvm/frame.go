@@ -16,10 +16,19 @@ type mapCtx struct {
 	Root        *Value
 }
 
+type flatCtx struct {
+	OriginDepth int
+	Current     int
+	Index       int
+	Value       *omap.OrderedMap[string, any]
+	Root        *Value
+}
+
 type SFFrame struct {
 	symbolTable *omap.OrderedMap[string, any]
 	stack       *utils.Stack[*Value]
 	mapStack    *utils.Stack[*mapCtx]
+	flatStack   *utils.Stack[*flatCtx]
 	Text        string
 	Codes       []*SFI
 	toLeft      bool
@@ -35,6 +44,7 @@ func NewSFFrame(vars *omap.OrderedMap[string, any], text string, codes []*SFI) *
 		symbolTable: v,
 		stack:       utils.NewStack[*Value](),
 		mapStack:    utils.NewStack[*mapCtx](),
+		flatStack:   utils.NewStack[*flatCtx](),
 		Text:        text,
 		Codes:       codes,
 	}
@@ -165,21 +175,67 @@ func (s *SFFrame) exec(input *omap.OrderedMap[string, any]) (ret error) {
 			}
 		case OpSetDirection:
 			s.toLeft = i.UnaryStr == "<<"
-		case OpFlat:
-			s.debugSubLog(">> pop %v then merge", i.UnaryInt)
-			result := s.stack.PopN(i.UnaryInt)
-			var mergedMap []*omap.OrderedMap[string, any]
-			for index, v := range result {
-				if v == nil {
-					s.debugSubLog("%2d: empty value", index)
-					continue
-				}
-				s.debugSubLog("%2d: merge-map %v", index, v.AsMap().Len())
-				mergedMap = append(mergedMap, v.AsMap())
+		case OpFlatStart:
+			// flat will create empty array
+			i := s.stack.Peek()
+			if !i.IsMap() {
+				return utils.Errorf("flat start failed: stack top is not map, (%v)", i.Value())
 			}
-			merged := omap.Merge(mergedMap...).ValuesMap()
-			s.debugSubLog("<< push map(len: %v)", merged.Len())
-			s.stack.Push(NewValue(merged))
+			om := i.AsMap()
+			if om.CanAsList() {
+				om.UnsetParent()
+				l := om.Len()
+				s.flatStack.Push(&flatCtx{
+					OriginDepth: l, Current: l,
+					Index: idx,
+					Root:  i,
+					Value: omap.NewGeneralOrderedMap(),
+				})
+				s.stack.Push(NewValue(om.Index(0)))
+			} else {
+				om.UnsetParent()
+				s.flatStack.Push(&flatCtx{
+					OriginDepth: 1,
+					Current:     1,
+					Index:       idx,
+					Value:       omap.NewGeneralOrderedMap(),
+					Root:        NewValue(om),
+				})
+			}
+		case OpRestoreFlatContext:
+			s.debugSubLog(">> restore flat ctx")
+			ctx := s.flatStack.Peek()
+			if ctx == nil {
+				return utils.Errorf("restore flat ctx failed: stack is empty")
+			}
+			if !s.stack.HaveLastStackValue() {
+				return utils.Errorf("restore flat ctx failed: stack is empty(last stack value empty)")
+			}
+			val := s.stack.LastStackValue()
+			ctx.Value = ctx.Value.Merge(val.AsMap())
+
+			root := ctx.Root.AsMap()
+			if ret := ctx.OriginDepth - ctx.Current + 1; ret >= root.Len() {
+				s.stack.Push(NewValue(omap.NewGeneralOrderedMap()))
+			} else {
+				s.stack.Push(NewValue(root.Index(ret)))
+			}
+		case OpFlatDone:
+			s.debugSubLog(">> flat done")
+			ctx := s.flatStack.Peek()
+			if ctx == nil {
+				return utils.Errorf("flat done failed: stack is empty")
+			}
+			ctx.Current--
+			if ctx.Current <= 0 {
+				// finished
+				s.flatStack.Pop()
+				s.debugSubLog(">> pop origin value")
+				s.stack.Push(NewValue(ctx.Value))
+			} else {
+				idx = ctx.Index
+				s.debugSubLog("<< restore index: %v", idx)
+			}
 		case OpMapStart:
 			v := s.stack.Peek()
 			if !v.IsMap() {
@@ -201,7 +257,7 @@ func (s *SFFrame) exec(input *omap.OrderedMap[string, any]) (ret error) {
 				})
 			}
 			s.debugSubLog("check top stack is omap/array: len(%v)", m.Len())
-		case OpRestoreContext:
+		case OpRestoreMapContext:
 			s.stack.Push(s.mapStack.Peek().Root)
 			s.debugSubLog("peek checking from stack[len: %v]", s.stack.Len())
 			if s.stack.Len() == 0 {
@@ -281,14 +337,14 @@ func (s *SFFrame) exec(input *omap.OrderedMap[string, any]) (ret error) {
 			var a = NewValue(result)
 			s.stack.Push(a)
 			s.debugSubLog("<< push map(len: %v)", result.Len())
-		case OpNotEq, OpGt, OpGtEq, OpLt, OpLtEq, OpLogicAnd, OpLogicOr:
-			vals := s.stack.PopN(2)
-			op1 := vals[0]
-			op2 := vals[1]
-			_ = op1
-			_ = op2
-		case OpNot:
-			s.stack.Push(NewValue(!s.stack.Pop().AsBool()))
+		case OpNotEq, OpGt, OpGtEq, OpLt, OpLtEq, OpLogicAnd, OpLogicOr, OpNot:
+			op2 := s.stack.Pop()
+			op1 := s.stack.Pop()
+			result, err := op1.Exec(i.OpCode, op2)
+			if err != nil {
+				return utils.Wrap(err, "exec failed")
+			}
+			s.stack.Push(result)
 		case OpReMatch, OpGlobMatch:
 			op1 := s.stack.Pop()
 			op2 := i.UnaryStr

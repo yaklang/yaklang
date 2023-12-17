@@ -136,6 +136,11 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) interface
 	case *sf.ListIndexFilterContext:
 		index := y.VisitNumberLiteral(ret.NumberLiteral())
 		y.EmitFetchIndex(index)
+	case *sf.OptionalRootFilterContext:
+		y.VisitConditionExpression(ret.ConditionExpression())
+	case *sf.OptionalFilterContext:
+		y.VisitFilterExpr(ret.FilterExpr())
+		y.VisitConditionExpression(ret.ConditionExpression())
 	case *sf.AheadChainFilterContext:
 		y.VisitFilterExpr(ret.FilterExpr())
 		y.VisitChainFilter(ret.ChainFilter())
@@ -164,11 +169,14 @@ func (y *SyntaxFlowVisitor) VisitChainFilter(raw sf.IChainFilterContext) interfa
 	switch ret := raw.(type) {
 	case *sf.FlatContext:
 		var count int
-		for _, filter := range ret.AllConditionExpression() {
+		l := len(ret.AllFilters())
+		y.EmitFlatStart(l)
+		for _, filter := range ret.AllFilters() {
 			count++
-			y.VisitConditionExpression(filter)
+			y.VisitFilters(filter)
+			y.EmitRestoreFlatContext()
 		}
-		y.EmitFlat(count)
+		y.EmitFlatDone(count)
 	case *sf.BuildMapContext:
 		var count int
 		y.EmitMapBuildStart()
@@ -182,7 +190,7 @@ func (y *SyntaxFlowVisitor) VisitChainFilter(raw sf.IChainFilterContext) interfa
 			y.VisitFilters(ret.Filters(i))
 			y.EmitWithdraw()
 			y.EmitUpdate(key)
-			y.EmitRestoreContext()
+			y.EmitRestoreMapContext()
 			// pop val, create object and set key
 		}
 		y.EmitMapBuildDone(vals...)
