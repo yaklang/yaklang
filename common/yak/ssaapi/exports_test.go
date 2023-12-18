@@ -2,10 +2,101 @@ package ssaapi
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"reflect"
 	"strings"
 	"testing"
 )
+
+func TestYakChanExplor_4(t *testing.T) {
+	prog := Parse(`
+originValue = 1
+var f = outter()
+a = e => {
+	return e
+}
+if (f) {
+	d = 3
+} else {
+	d = a(originValue)
+}
+g = d
+`)
+	lenCheck := false
+	valCheck := false
+	valCheck_eq3 := false
+	prog.Ref("g").ForEach(func(value *Value) {
+		defs := value.GetTopDefs()
+		if len(defs) == 1 {
+			lenCheck = true
+		}
+		if len(defs) > 0 {
+			for _, def := range defs {
+				log.Infof("found def: %v", def.String())
+				if def.GetConstValue() == 1 {
+					valCheck = true
+				}
+				if def.GetConstValue() == 3 {
+					valCheck_eq3 = true
+				}
+			}
+		}
+	})
+	if !lenCheck {
+		t.Error("len check failed")
+	}
+	if !valCheck {
+		t.Error("val check failed")
+	}
+	if !valCheck_eq3 {
+		t.Error("val eq 3 check failed")
+	}
+}
+
+func TestYakChanExplor_3(t *testing.T) {
+	prog := Parse(`
+originValue = 1
+var f = outter()
+a = e => {
+	return e
+}
+if (f) {
+	d = 3
+} else {
+	d = a(originValue)
+}
+g = d
+`)
+	lenCheck := false
+	valCheck := false
+	valCheck_eq3 := false
+	prog.Ref("d").ForEach(func(value *Value) {
+		defs := value.GetTopDefs()
+		if len(defs) == 1 {
+			lenCheck = true
+		}
+		if len(defs) > 0 {
+			for _, def := range defs {
+				log.Infof("found def: %v", def.String())
+				if def.GetConstValue() == 1 {
+					valCheck = true
+				}
+				if def.GetConstValue() == 3 {
+					valCheck_eq3 = true
+				}
+			}
+		}
+	})
+	if !lenCheck {
+		t.Error("len check failed")
+	}
+	if !valCheck {
+		t.Error("val check failed")
+	}
+	if !valCheck_eq3 {
+		t.Error("val eq 3 check failed")
+	}
+}
 
 func TestYakChanExplor_2(t *testing.T) {
 	prog := Parse(`
