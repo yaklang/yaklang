@@ -7,6 +7,61 @@ import (
 	"testing"
 )
 
+func TestYakChanExplor_2(t *testing.T) {
+	prog := Parse(`
+originValue = 1
+a = e => {
+	return e
+}
+d = a(originValue)
+`)
+	lenCheck := false
+	valCheck := false
+	prog.Ref("d").ForEach(func(value *Value) {
+		defs := value.GetTopDefs()
+		if len(defs) == 1 {
+			lenCheck = true
+		}
+		if defs[0].GetConstValue() == 1 {
+			valCheck = true
+		}
+	})
+	if !lenCheck {
+		t.Error("len check failed")
+	}
+	if !valCheck {
+		t.Error("val check failed")
+	}
+}
+
+func TestYakChanExplore(t *testing.T) {
+	prog := Parse(`
+a = () => {
+	var c = 1
+	return c
+}
+
+d = a()
+`)
+	lenCheck := false
+	valCheck := false
+	prog.Ref("d").ForEach(func(value *Value) {
+		defs := value.GetTopDefs()
+		if len(defs) == 1 {
+			lenCheck = true
+		}
+		if defs[0].GetConstValue() == 1 {
+			valCheck = true
+		}
+	})
+	if !lenCheck {
+		t.Error("len check failed")
+	}
+	if !valCheck {
+		t.Error("val check failed")
+	}
+}
+
 func TestA(t *testing.T) {
 
 	prog := Parse(

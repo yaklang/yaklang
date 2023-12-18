@@ -32,7 +32,7 @@ jobs:
               go test -timeout 20s ./common/sca/... -v
               go test -timeout 20s ./common/netx/mustpass -v
               go test -timeout 20s -run TestMUSTPASS_YakitLog ./common/fp -v
-              go test -timeout 20s ./common/yak/yak2ssa
+              go test -timeout 20s ./common/yak/yak2ssa ./common/yak/ssaapi -v
               go test -timeout 20s -run TestPingAutoConfig ./common/utils/pingutil -v
               go test -timeout 20s -run TestSSARuleMustPass* ./common/yak -v
               go test -timeout 20s -run TestMUSTPASS ./common/crawler -v
