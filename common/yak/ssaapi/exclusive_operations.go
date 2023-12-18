@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"sync"
@@ -41,8 +42,22 @@ func (v Values) GetTopDefs() Values {
 }
 
 func (i *Value) getTopDefs(visited *sync.Map) Values {
+	if i == nil {
+		return nil
+	}
+
 	if visited == nil {
+		// phi node will cause dead loop
+		// visited can prevent this
 		visited = new(sync.Map)
+	}
+	if ret, ok := i.node.(*ssa.Phi); ok {
+		log.Infof("visited phi: %v", ret.String())
+		if _, ok := visited.Load(ret); ok {
+			// visited phi
+			return nil
+		}
+		visited.Store(i.node, struct{}{})
 	}
 
 	switch ret := i.node.(type) {
@@ -99,6 +114,19 @@ func (i *Value) getTopDefs(visited *sync.Map) Values {
 			return Values{NewValue(ssa.NewUndefined("_")).SetParent(i)} // no return, use undefined
 		}
 		return vals
+	case *ssa.ConstInst:
+		return Values{i}
+	case *ssa.Phi:
+		log.Infof("handling phi")
+		var vars Values
+		for _, eg := range ret.Edge {
+			if ret := NewValue(eg).SetParent(i).GetTopDefs(); len(ret) > 0 {
+				vars = append(vars, ret...)
+			}
+		}
+		return vars
+	default:
+		spew.Dump(ret)
 	}
 	return nil
 }
