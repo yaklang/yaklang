@@ -218,7 +218,7 @@ func (s *SFFrame) exec(input *omap.OrderedMap[string, any]) (ret error) {
 			ctx.Value = ctx.Value.Merge(val.AsMap())
 
 			root := ctx.Root.AsMap()
-			if ret := ctx.OriginDepth - ctx.Current + 1; ret >= root.Len() {
+			if ret := ctx.OriginDepth - ctx.Current + 1; ret >= ctx.OriginDepth {
 				s.stack.Push(NewValue(omap.NewGeneralOrderedMap()))
 			} else {
 				s.stack.Push(NewValue(root.Index(ret)))
@@ -275,8 +275,8 @@ func (s *SFFrame) exec(input *omap.OrderedMap[string, any]) (ret error) {
 				return utils.Errorf("restore map ctx failed: stack is empty(last stack value empty)")
 			}
 			root := ctx.Root.AsMap()
-			if ret := ctx.OriginDepth - ctx.Current + 1; ret >= root.Len() {
-				s.stack.Push(NewValue(omap.NewGeneralOrderedMap()))
+			if ret := ctx.OriginDepth - ctx.Current + 1; ret >= ctx.OriginDepth {
+				s.stack.Push(NewValue(root))
 			} else {
 				s.stack.Push(NewValue(root.Index(ret)))
 			}
