@@ -587,6 +587,8 @@ func TestGRPCMUSTPASS_HTTP_YakDebug(t *testing.T) {
 		Code: `s = cli.String("s")
 b = cli.Bool("b")
 cli.check()
+yakit.EnableWebsiteTrees("sssss")
+poc.Get("http://www.baidu.com",poc.save(true))
 if b {
 yakit.Output(codec.EncodeBase64(s))
 }
