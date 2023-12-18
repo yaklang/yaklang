@@ -2,6 +2,8 @@ package yaklib
 
 import (
 	"fmt"
+	"os"
+
 	uuid "github.com/satori/go.uuid"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -26,6 +28,7 @@ func yakitEnableCrawlerViewer(targets string) {
 		Params: map[string]interface{}{
 			"targets":          targets,
 			"refresh_interval": 3,
+			"YAK_RUNTIME_ID":   os.Getenv("YAK_RUNTIME_ID"),
 		},
 	})
 }

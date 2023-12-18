@@ -3,13 +3,14 @@ package yakurl
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
+	"path"
+	"strings"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"net/url"
-	"path"
-	"strings"
 )
 
 type websiteFromHttpFlow struct {
@@ -29,12 +30,12 @@ func parseQueryToRequest(db *gorm.DB, query string) *gorm.DB {
 func (f *websiteFromHttpFlow) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	u := params.GetUrl()
 
-	var query = make(url.Values)
+	query := make(url.Values)
 	for _, v := range u.GetQuery() {
 		query.Add(v.GetKey(), v.GetValue())
 	}
 
-	var websiteRoot = u.GetLocation()
+	websiteRoot := u.GetLocation()
 
 	db := consts.GetGormProjectDatabase()
 	db = db.Model(&yakit.HTTPFlow{})
@@ -46,6 +47,9 @@ func (f *websiteFromHttpFlow) Get(params *ypb.RequestYakURLParams) (*ypb.Request
 	if ret := query.Get("schema"); ret != "" {
 		db = yakit.FilterHTTPFlowBySchema(db, ret)
 		websiteRoot = ret + "://" + websiteRoot
+	}
+	if ret := query.Get("runtime_id"); ret != "" {
+		db = yakit.FilterHTTPFlowByRuntimeID(db, ret)
 	}
 	isSearch := false
 	if ret := query.Get("search"); ret != "" {
@@ -175,27 +179,27 @@ func (f *websiteFromHttpFlow) Get(params *ypb.RequestYakURLParams) (*ypb.Request
 }
 
 func (f *websiteFromHttpFlow) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
 func (f *websiteFromHttpFlow) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
 func (f *websiteFromHttpFlow) Delete(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
 func (f *websiteFromHttpFlow) Head(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
 func (f *websiteFromHttpFlow) Do(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 

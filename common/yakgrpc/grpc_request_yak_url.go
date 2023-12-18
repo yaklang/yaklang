@@ -39,31 +39,3 @@ func (s *Server) RequestYakURL(ctx context.Context, req *ypb.RequestYakURLParams
 		return nil, utils.Errorf("unsupported schema: %s", req.GetUrl().GetSchema())
 	}
 }
-
-func (s *Server) RequestYakURLs(ctx context.Context, req *ypb.RequestYakURLsParams) (*ypb.RequestYakURLResponse, error) {
-	method := req.GetMethod()
-	page, pageSize := req.GetPage(), req.GetPageSize()
-
-	total := int64(0)
-	resources := make([]*ypb.YakURLResource, 0)
-	for _, url := range req.GetUrls() {
-		res, err := s.RequestYakURL(ctx, &ypb.RequestYakURLParams{
-			Url:      url,
-			Method:   method,
-			Page:     page,
-			PageSize: pageSize,
-		})
-		if err != nil {
-			return nil, utils.Error(err)
-		}
-		resources = append(resources, res.GetResources()...)
-		total += res.GetTotal()
-	}
-
-	return &ypb.RequestYakURLResponse{
-		Page:      1,
-		PageSize:  1000,
-		Resources: resources,
-		Total:     total,
-	}, nil
-}
