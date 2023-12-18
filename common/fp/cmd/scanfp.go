@@ -226,7 +226,7 @@ func main() {
 			fp.WithWebFingerprintRule(webRules),
 		)
 		options = append(
-			options, fp.WithForceEnableWebFingerprint(true),
+			options, fp.WithForceEnableAllFingerprint(true),
 		)
 
 		config := fp.NewConfig(options...)
@@ -271,7 +271,7 @@ func main() {
 				portSwg.Add()
 				go scanCore(
 					host, tcpPort,
-					fp.WithForceEnableWebFingerprint(true),
+					fp.WithForceEnableAllFingerprint(true),
 					fp.WithOnlyEnableWebFingerprint(c.Bool("web")),
 					fp.WithTransportProtos(fp.TCP),
 				)

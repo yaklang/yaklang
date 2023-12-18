@@ -727,9 +727,18 @@ RECONNECT:
 	READ:
 		serverTimeStart := time.Now()
 		_ = conn.SetReadDeadline(serverTimeStart.Add(timeout))
-		_, err := httpResponseReader.Peek(1)
+		firstByte, err := httpResponseReader.Peek(1)
 		if err != nil {
 			return response, err
+		}
+
+		// 检查是否是 TLS 握手错误的特定序列
+		if firstByte[0] == 0x15 {
+			// 尝试读取更多字节以确认是否是特定的 TLS 错误
+			tlsHeader, err := httpResponseReader.Peek(6)
+			if err == nil && bytes.Equal(tlsHeader, []byte("\x15\x03\x01\x00\x02\x02")) {
+				return response, utils.Errorf("tls record header error detected")
+			}
 		}
 
 		traceInfo.ServerTime = time.Since(serverTimeStart)

@@ -264,48 +264,53 @@ func DebugMockHTTP(rsp []byte) (string, int) {
 	return DebugMockHTTPWithTimeout(time.Minute, rsp)
 }
 func DebugMockHTTPS(rsp []byte) (string, int) {
-	return DebugMockHTTPServerWithContext(TimeoutContext(time.Minute), true, false, false, false, func(bytes []byte) []byte {
+	return DebugMockHTTPServerWithContext(TimeoutContext(time.Minute), true, false, false, false, false, func(bytes []byte) []byte {
 		return rsp
 	})
 }
 
 func DebugMockHTTPEx(handle func(req []byte) []byte) (string, int) {
-	return DebugMockHTTPServerWithContext(TimeoutContext(time.Minute*5), false, false, false, false, handle)
+	return DebugMockHTTPServerWithContext(TimeoutContext(time.Minute*5), false, false, false, false, false, handle)
 }
 
 func DebugMockHTTPExContext(ctx context.Context, handle func(req []byte) []byte) (string, int) {
-	return DebugMockHTTPServerWithContext(ctx, false, false, false, false, handle)
+	return DebugMockHTTPServerWithContext(ctx, false, false, false, false, false, handle)
 }
 
 func DebugMockHTTP2(ctx context.Context, handler func(req []byte) []byte) (string, int) {
-	return DebugMockHTTPServerWithContext(ctx, true, true, false, false, handler)
+	return DebugMockHTTPServerWithContext(ctx, true, true, false, false, false, handler)
 }
 
 func DebugMockGMHTTP(ctx context.Context, handler func(req []byte) []byte) (string, int) {
-	return DebugMockHTTPServerWithContext(ctx, true, false, false, false, handler)
+	return DebugMockHTTPServerWithContext(ctx, true, false, true, false, false, handler)
+}
+
+func DebugMockOnlyGMHTTP(ctx context.Context, handler func(req []byte) []byte) (string, int) {
+	return DebugMockHTTPServerWithContext(ctx, true, false, false, true, false, handler)
 }
 
 func DebugMockHTTPSEx(handle func(req []byte) []byte) (string, int) {
-	return DebugMockHTTPServerWithContext(TimeoutContext(time.Minute), true, false, false, false, handle)
+	return DebugMockHTTPServerWithContext(TimeoutContext(time.Minute), true, false, false, false, false, handle)
 }
 
 func DebugMockHTTPSKeepAliveEx(handle func(req []byte) []byte) (string, int) {
-	return DebugMockHTTPServerWithContext(TimeoutContext(time.Minute), true, false, false, true, handle)
+	return DebugMockHTTPServerWithContext(TimeoutContext(time.Minute), true, false, false, false, true, handle)
 }
 
 var (
-	tlsTestConfig    *tls.Config
-	mtlsTestConfig   *tls.Config
-	tlsTestOnce      sync.Once
-	gmtlsTestConfig  *gmtls.Config
-	mgmtlsTestConfig *gmtls.Config
-	clientCrt        []byte
-	clientKey        []byte
+	tlsTestConfig       *tls.Config
+	mtlsTestConfig      *tls.Config
+	tlsTestOnce         sync.Once
+	gmtlsTestConfig     *gmtls.Config
+	onlyGmtlsTestConfig *gmtls.Config
+	mgmtlsTestConfig    *gmtls.Config
+	clientCrt           []byte
+	clientKey           []byte
 )
 
-func RegisterDefaultTLSConfigGenerator(h func() (*tls.Config, *gmtls.Config, *tls.Config, *gmtls.Config, []byte, []byte)) {
+func RegisterDefaultTLSConfigGenerator(h func() (*tls.Config, *gmtls.Config, *gmtls.Config, *tls.Config, *gmtls.Config, []byte, []byte)) {
 	go tlsTestOnce.Do(func() {
-		tlsTestConfig, gmtlsTestConfig, mtlsTestConfig, mgmtlsTestConfig, clientCrt, clientKey = h()
+		tlsTestConfig, gmtlsTestConfig, onlyGmtlsTestConfig, mtlsTestConfig, mgmtlsTestConfig, clientCrt, clientKey = h()
 	})
 }
 
@@ -340,12 +345,29 @@ func GetDefaultGMTLSConfig(i float64) *gmtls.Config {
 	log.Error("fetch default tls config failed")
 	return nil
 }
-func DebugMockHTTPServerWithContext(ctx context.Context, https bool, h2 bool, gmtlsFlag bool, keepAlive bool, handle func([]byte) []byte) (string, int) {
-	addr := GetRandomLocalAddr()
-	return DebugMockHTTPServerWithContextWithAddress(ctx, addr, https, h2, gmtlsFlag, keepAlive, handle)
 
+func GetDefaultOnlyGMTLSConfig(i float64) *gmtls.Config {
+	expectedEnd := time.Now().Add(FloatSecondDuration(i))
+	for {
+		if tlsTestConfig != nil {
+			log.Infof("fetch default tls config finished: %p", tlsTestConfig)
+			return onlyGmtlsTestConfig
+		}
+		time.Sleep(50 * time.Millisecond)
+		if !expectedEnd.After(time.Now()) {
+			break
+		}
+	}
+	log.Error("fetch default tls config failed")
+	return nil
 }
-func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string, https bool, h2 bool, gmtlsFlag bool, keepAlive bool, handle func([]byte) []byte) (string, int) {
+
+func DebugMockHTTPServerWithContext(ctx context.Context, https, h2, gmtlsFlag, onlyGmtls, keepAlive bool, handle func([]byte) []byte) (string, int) {
+	addr := GetRandomLocalAddr()
+	return DebugMockHTTPServerWithContextWithAddress(ctx, addr, https, h2, gmtlsFlag, onlyGmtls, keepAlive, handle)
+}
+
+func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string, https, h2, gmtlsFlag, onlyGmtls, keepAlive bool, handle func([]byte) []byte) (string, int) {
 	time.Sleep(300 * time.Millisecond)
 	var host, port, _ = ParseStringToHostPort(addr)
 	go func() {
@@ -353,7 +375,7 @@ func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string,
 			lis net.Listener
 			err error
 		)
-		if https && !h2 && !gmtlsFlag {
+		if https && !h2 && !gmtlsFlag && !onlyGmtls {
 			tlsConfig := GetDefaultTLSConfig(5)
 			if tlsConfig == nil {
 				panic(1)
@@ -367,6 +389,9 @@ func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string,
 		} else if gmtlsFlag {
 			log.Infof("gmtlsFlag: %v", gmtlsFlag)
 			lis, err = gmtls.Listen("tcp", addr, GetDefaultGMTLSConfig(5))
+		} else if onlyGmtls {
+			log.Infof("onlyGmtlsFlag: %v", onlyGmtls)
+			lis, err = gmtls.Listen("tcp", addr, GetDefaultOnlyGMTLSConfig(5))
 		} else {
 			lis, err = net.Listen("tcp", addr)
 		}
@@ -411,7 +436,7 @@ func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string,
 			return
 		}
 
-		if gmtlsFlag {
+		if gmtlsFlag || onlyGmtls {
 			if !https {
 				log.Error("gmtls only support https")
 			}
