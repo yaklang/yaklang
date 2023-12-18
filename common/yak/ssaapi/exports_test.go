@@ -9,6 +9,68 @@ import (
 	"testing"
 )
 
+func TestYakChanExplor_Phi_For_Negative(t *testing.T) {
+	prog := Parse(`
+originValue = 1
+var f = outter()
+for i := 3; i < f; i++ {
+	var d = originValue + i
+	d += f
+}
+g = d 
+`)
+	// g not phi
+	prog.Ref("g").ForEach(func(value *Value) {
+		log.Infof("g value: %v", value.String()) // phi? why
+		// g value: phi(d)[d,add(add(1, phi(i-2)[3,add(i-2, 1)]), outter())]
+
+		defs := value.GetTopDefs()
+		spew.Dump(defs)
+	})
+}
+
+func TestYakChanExplor_Phi_For(t *testing.T) {
+	prog := Parse(`
+originValue = 1
+var f = outter()
+var d = 2
+for i := 3; i < f; i++ {
+	d = originValue + i
+	d += f
+}
+g = d // g deps-> 1 / 2 / 3
+`)
+	c1 := false
+	c2 := false
+	c3 := false
+	prog.Ref("g").ForEach(func(value *Value) {
+		defs := value.GetTopDefs()
+		for _, i := range defs {
+			if i.GetConstValue() == 1 {
+				c1 = true
+			}
+			if i.GetConstValue() == 2 {
+				c2 = true
+			}
+			if i.GetConstValue() == 3 {
+				c3 = true
+			}
+		}
+	})
+
+	if !c1 {
+		t.Error("c1 check failed")
+	}
+
+	if !c2 {
+		t.Error("c2 check failed")
+	}
+
+	if !c3 {
+		t.Error("c3 check failed")
+	}
+}
+
 func TestYakChanExplor_4(t *testing.T) {
 	prog := Parse(`
 originValue = 1
