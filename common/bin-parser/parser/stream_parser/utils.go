@@ -320,72 +320,7 @@ func parseLengthByLengthConfig(node *base.Node) (uint64, bool, error) {
 		return remainingLength, parentLengthOK, nil
 	}
 }
-func getRemainingSpace(node *base.Node) (uint64, error) {
-	log.Debugf("get remaining space for node %s", node.Name)
-	if node.Name == "root" {
-		return math.MaxUint64, nil
-	}
-	iparent := node.Cfg.GetItem(CfgParent)
-	if iparent == nil {
-		return 0, errors.New("not set parentCfg")
-	}
-	parentNode, ok := iparent.(*base.Node)
-	if !ok {
-		return 0, errors.New("get parent failed")
-	}
-	// 当前节点剩余长度 = 父节点剩余长度(或父节点配置的长度) - 当前节点之前的兄弟节点长度
-	parentRemaininigLength, err := getRemainingSpace(parentNode)
-	if err != nil {
-		return 0, err
-	}
-	var fieldsInScope []string
-	inScope := false
-
-	l, ok, err := parseLengthByLengthConfig(parentNode)
-	if err != nil {
-		log.Errorf("parse length by length config error: %v", err)
-	}
-	if ok {
-		parentRemaininigLength = l
-	}
-	// 从config 读取
-	if parentNode.Cfg.Has(CfgLength) {
-		l := parentNode.Cfg.GetUint64(CfgLength)
-		if l > parentRemaininigLength {
-			return 0, fmt.Errorf("node %s length %d over max size %d", node.Name, l, parentRemaininigLength)
-		}
-		parentRemaininigLength = l
-	}
-	var nowLength uint64
-	if inScope {
-		for _, sub := range parentNode.Children {
-			if sub == node {
-				break
-			}
-			if utils.StringArrayContains(fieldsInScope, sub.Name) {
-				nowLength += CalcNodeResultLength(sub)
-			}
-		}
-		return parentRemaininigLength - nowLength, nil
-	} else {
-		for _, sub := range parentNode.Children {
-			if sub == node {
-				break
-			}
-			nowLength += CalcNodeResultLength(sub)
-		}
-		return parentRemaininigLength - nowLength, nil
-	}
-}
 func getNodeLength(node *base.Node) (uint64, error) {
-	//iparent := node.Cfg.GetItem(CfgParent)
-	//if iparent == nil {
-	//	return 0, errors.New("not set parentCfg")
-	//}
-	//parentNode, ok := iparent.(*base.Node)
-	//if !ok {
-	//	return 0, errors.New("get parent failed")
-	//}
 	remainingLength, ok, err := parseLengthByLengthConfig(node)
 	if !ok {
 		return 0, errors.New("parse length by length config error")

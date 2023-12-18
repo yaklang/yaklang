@@ -30,7 +30,7 @@ Package:
     endian: little
     Abbrev:
       operator: |
-        res = this.GetSubNode("Capacity").Process()
+        res = this.ProcessSubNode("Capacity")
         abbrev = -1
         switch len(res) {
         case 1:
@@ -42,9 +42,9 @@ Package:
         }
         cap = 255 // 应该从config取
         if abbrev > cap{
-          typ = this.GetSubNode("ObjectType").Process()
+          typ = this.ProcessSubNode("ObjectType")
           if typ == 0{
-            this.GetSubNode("Object").Process() 
+            this.ProcessSubNode("Object") 
           }
           if typ == 1{
             panic("not support string type")

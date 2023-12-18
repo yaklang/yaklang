@@ -1,0 +1,41 @@
+endian: big
+Package:
+  Internet Protocol:
+    length-from-field: Header Length
+    length-from-field-multiply: 32
+    Version: uint8,4bit
+    Header Length: uint8,4bit
+    Type of Service: raw,1
+    Total Length: uint16
+    Identification: raw,2
+    Flags And Fragment Offset : raw,2
+    Time to Live: raw,1
+    Protocol: uint8
+    Header Checksum: raw,2
+    Source: raw,4
+    Destination: raw,4
+    Payload:
+      unpack: true
+      operator: |
+        protocol = getNodeResult("@Internet Protocol/Protocol")
+        total = getNodeResult("@Internet Protocol/Total Length")
+        l = total - getNode("@Internet Protocol").Length()
+        var node 
+        switch protocol {
+          case 6:
+            node = this.NewSubNode("TCP")
+          case 17:
+            node = this.NewSubNode("UDP")
+          case 1:
+            node = this.NewSubNode("ICMP")
+          default:
+            node = this.NewUnknownNode()
+        }
+        node.SetMaxLength(l)
+        node.Process()
+
+TCP: "import:transmission_control_protocol.yaml;node:Package/TCP"
+UDP: "import:udp.yaml;node:Package/UDP"
+TLS: "import:tls.yaml;node:Package/TLS"
+ICMP: "import:internet_control_message_protocol.yaml;node:Package/ICMP"
+Unknown: raw

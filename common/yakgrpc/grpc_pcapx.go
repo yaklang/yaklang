@@ -184,7 +184,7 @@ func (s *Server) ParseTraffic(ctx context.Context, req *ypb.ParseTrafficRequest)
 		payloadBytes, _ := strconv.Unquote(packet[0].Payload)
 		raw, _ := strconv.Unquote(packet[0].QuotedRaw)
 		_ = payloadBytes
-		finalResult["RAW"] = raw
+		finalResult["RAW"] = codec.EncodeBase64(raw)
 		rsp.OK = true
 		noResultError := utils.Error("no result")
 		config := map[string]any{
@@ -224,15 +224,17 @@ func (s *Server) ParseTraffic(ctx context.Context, req *ypb.ParseTrafficRequest)
 							}
 							return nil, err
 						}
-						res = append(res, d)
+						res = append(res, map[string]any{
+							"name":  sub.Name,
+							"value": d,
+						})
 					}
 					if len(res) == 0 {
 						return nil, noResultError
 					}
 					return res, nil
 				} else {
-					//res := map[string]any{}
-					res := map[string]any{}
+					var res []any
 					var getSubs func(node *base.Node) []*base.Node
 					getSubs = func(node *base.Node) []*base.Node {
 						children := []*base.Node{}
@@ -254,7 +256,10 @@ func (s *Server) ParseTraffic(ctx context.Context, req *ypb.ParseTrafficRequest)
 							}
 							return nil, err
 						}
-						res[sub.Name] = d
+						res = append(res, map[string]any{
+							"name":  sub.Name,
+							"value": d,
+						})
 					}
 					if len(res) == 0 {
 						return nil, noResultError
@@ -263,7 +268,7 @@ func (s *Server) ParseTraffic(ctx context.Context, req *ypb.ParseTrafficRequest)
 				}
 			},
 		}
-		node, err := bin_parser.ParseBinaryWithConfig(bytes.NewReader([]byte(raw)), "data_link", config)
+		node, err := bin_parser.ParseBinaryWithConfig(bytes.NewReader([]byte(raw)), "ethernet", config)
 		if err != nil {
 			resJson, err := bin_parser2.ResultToJson(finalResult)
 			if err != nil {
@@ -273,11 +278,7 @@ func (s *Server) ParseTraffic(ctx context.Context, req *ypb.ParseTrafficRequest)
 			return rsp, nil
 		}
 		parseResult, err := node.Result()
-		if parseResult != nil {
-			if v, ok := parseResult.(map[string]any); ok {
-				finalResult["Result"] = v
-			}
-		}
+		finalResult["Result"] = parseResult
 		resJson, err := bin_parser2.ResultToJson(finalResult)
 		rsp.Result = string(resJson)
 		return rsp, nil

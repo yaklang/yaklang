@@ -1,0 +1,67 @@
+endian: big
+unit: byte
+Package:
+    TCP:
+        Source Port: uint16
+        Destination Port: uint16
+        Sequence Number: raw,4
+        Acknowledgement Number: raw,4
+        Header Length: uint8,4bit
+        Flags: raw,12bit
+        Window: raw,2
+        Checksum: raw,2
+        Urgent Pointer: raw,2
+        Options: # 字节数需要是4的倍数，不足补0
+            isList: true
+            type: Option
+            operator: |
+                this.SetMaxLength(getNodeResult("../Header Length")*4 - 20)
+                for {
+                    ele = this.NewElement()
+                    if ele.GetMaxLength() == 0{
+                        return
+                    }
+                    ele.Process()
+                    if getNodeResult("Option/Kind") == 0 {
+                        return
+                    }
+                }
+        Payload:
+            unpack: true
+            operator: |
+                typeNameList = ["TLS", "HTTP"]
+                for typeName in typeNameList{
+                    res,op = this.TryProcessByType(typeName)
+                    if op.OK {
+                        err = op.Save()
+                        if err != nil{
+                            panic(err)
+                        }
+                        return
+                    }else{
+                        err = op.Recovery()
+                        if err != nil{
+                            panic(err)
+                        }
+                    }
+                }
+                this.NewUnknownNode().Process()
+Option:
+    operator: |
+        n = this.ProcessSubNode("Kind")
+        switch n {
+        case 1:
+            break
+        default:
+            this.ProcessSubNode("Length")
+            if this.GetSubNode("Data").GetRemainingSpace() != 0 {
+                this.ProcessSubNode("Data")
+            }    
+        }
+    length-from-field: Length
+    length-from-field-multiply: 8
+    Kind: uint8
+    Length: uint8
+    Data: raw
+TLS: "import:application-layer/tls.yaml;node:Package/Transport Layer Security"
+HTTP: "import:application-layer/http.yaml;node:Package/HTTP"

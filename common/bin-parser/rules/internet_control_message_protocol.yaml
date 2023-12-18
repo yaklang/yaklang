@@ -1,0 +1,25 @@
+Package:
+  ICMP:
+    Type: uint8
+    Code: uint8
+    Checksum: uint16
+    Payload:
+      unpack: true
+      operator: |
+        type = getNodeResult("@ICMP/Type")
+        switch type {
+          case 8:
+            this.ProcessByType("ICMP Echo")
+          case 0:
+            this.ProcessByType("ICMP Echo Reply")
+          default:
+            return
+        }
+ICMP Echo:
+  Identifier: uint16
+  Sequence Number: uint16
+  Data: raw
+ICMP Echo Reply:
+  Identifier: uint16
+  Sequence Number: uint16
+  Data: raw

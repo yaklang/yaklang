@@ -193,3 +193,35 @@ func JsonToResult(jsonStr string) (any, error) {
 	}
 	return rawData, nil
 }
+func ResultToYaml(d any) (string, error) {
+	var toRawData func(d any) any
+	toRawData = func(d any) any {
+		refV := reflect.ValueOf(d)
+		switch ret := d.(type) {
+		case []uint8:
+			return codec.EncodeToHex(ret)
+		}
+		//if !refV.CanAddr() {
+		//	return d
+		//}
+		if refV.Kind() == reflect.Slice || refV.Kind() == reflect.Array {
+			for i := 0; i < refV.Len(); i++ {
+				refV.Index(i).Set(reflect.ValueOf(toRawData(refV.Index(i).Interface())))
+			}
+			return refV.Interface()
+		} else if refV.Kind() == reflect.Map {
+			for _, k := range refV.MapKeys() {
+				refV.SetMapIndex(k, reflect.ValueOf(toRawData(refV.MapIndex(k).Interface())))
+			}
+			return refV.Interface()
+		} else {
+			return d
+		}
+	}
+	rawData := toRawData(d)
+	res, err := yaml.Marshal(rawData)
+	if err != nil {
+		return "", err
+	}
+	return string(res), nil
+}

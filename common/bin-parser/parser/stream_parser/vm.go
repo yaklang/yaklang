@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"reflect"
 )
@@ -24,15 +25,63 @@ type YakNode struct {
 	GetRemainingSpace    func() uint64
 	CalcNodeResultLength func() uint64
 	NewElement           func() *YakNode
-	TryProcess           func() (any, map[string]any)
-	SetChildren          func([]*YakNode)
-	GetChildren          func() []*YakNode
+	TryProcess           func(*YakNode) (any, map[string]any)
 	SetLength            func(l uint64)
+
+	SetChildren      func([]*YakNode)
+	GetChildren      func() []*YakNode
+	Length           func(uint ...string) uint64
+	SetMaxLength     func(l uint64, uint ...string)
+	GetMaxLength     func(uint ...string) uint64
+	NewSubNode       func(datas ...any) *YakNode
+	NewUnknownNode   func(name ...string) *YakNode
+	ProcessSubNode   func(name string) any
+	ProcessByType    func(datas ...any) any
+	TryProcessByType func(datas ...string) (any, map[string]any)
 }
 
 func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool), error)) *YakNode {
+	getRootNode := func(key string) *YakNode { // 需要处理mapData
+		rootMap := node.Ctx.GetItem(CfgRootMap).(map[string]*base.Node)
+		if v, ok := rootMap[key]; ok {
+			return ConvertToYakNode(v, operator)
+		}
+		panic("not found root node " + key)
+	}
 	yakNode := &YakNode{}
 	yakNode.origin = node
+	yakNode.ProcessSubNode = func(name string) any {
+		return yakNode.GetSubNode(name).Process()
+	}
+	yakNode.GetMaxLength = func(uints ...string) uint64 {
+		n := getDivisor(yakNode, uints)
+		l, err := getNodeLength(yakNode.origin)
+		if err != nil {
+			panic(err)
+		}
+		return l / n
+	}
+	yakNode.NewUnknownNode = func(datas ...string) *YakNode {
+		name := utils.InterfaceToString(utils.GetLastElement(datas))
+		unknownNode := ConvertToYakNode(&base.Node{
+			Name:   "Unknown",
+			Origin: "raw",
+			Cfg:    base.NewConfig(yakNode.origin.Cfg),
+			Ctx:    yakNode.origin.Ctx,
+		}, operator)
+		err := appendNode(node, unknownNode.origin)
+		if err != nil {
+			panic(err)
+		}
+		if name != "" {
+			utils.GetLastElement(node.Children).Name = name
+		}
+		return ConvertToYakNode(utils.GetLastElement(node.Children), operator)
+	}
+	yakNode.SetMaxLength = func(l uint64, uints ...string) {
+		n := getDivisor(yakNode, uints)
+		node.Cfg.SetItem(CfgLength, l*uint64(n))
+	}
 	yakNode.SetLength = func(l uint64) {
 		if !node.Cfg.Has(CfgUnit) {
 			panic("node not has unit")
@@ -46,6 +95,24 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 		default:
 			panic("unknown unit " + unit)
 		}
+	}
+	yakNode.ProcessByType = func(datas ...any) any {
+		var typeName, nodeName string
+		switch len(datas) {
+		case 1:
+			typeName = utils.InterfaceToString(datas[0])
+			nodeName = typeName
+		case 2:
+			typeName = utils.InterfaceToString(datas[0])
+			nodeName = utils.InterfaceToString(datas[2])
+		default:
+			panic("invalid args")
+		}
+		typeNode := getRootNode(typeName)
+		yakNode.AppendNode(typeNode)
+		target := utils.GetLastElement(yakNode.origin.Children)
+		target.Name = nodeName
+		return ConvertToYakNode(target, operator).Process()
 	}
 	yakNode.SetChildren = func(nodes []*YakNode) {
 		for _, node := range nodes {
@@ -79,9 +146,21 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 		node.Children = append(node.Children, element)
 		return ConvertToYakNode(element, operator)
 	}
-	yakNode.TryProcess = func() (result any, response map[string]any) {
+	yakNode.TryProcessByType = func(datas ...string) (result any, response map[string]any) {
+		var typeName, nodeName string
+		switch len(datas) {
+		case 1:
+			typeName = utils.InterfaceToString(datas[0])
+			nodeName = typeName
+		case 2:
+			typeName = utils.InterfaceToString(datas[0])
+			nodeName = utils.InterfaceToString(datas[2])
+		default:
+			panic("invalid args")
+		}
+		typeNode := getRootNode(typeName)
 		response = map[string]any{
-			"Ok":      false,
+			"OK":      false,
 			"Message": "",
 			"Save":    func() {},
 		}
@@ -90,7 +169,14 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 				response["Message"] = fmt.Sprintf("%v", e)
 			}
 		}()
-		copyNode := node.Copy()
+
+		//copyNode := node.origin.Copy()
+		//copyYakNode := ConvertToYakNode(copyNode, operator)
+		yakNode.AppendNode(typeNode)
+		copyNode := yakNode.origin.Children[len(yakNode.origin.Children)-1]
+		if nodeName != "" {
+			copyNode.Name = nodeName
+		}
 		copyYakNode := ConvertToYakNode(copyNode, operator)
 		//err := appendNode(copyNode, yakNode.origin)
 		//if err != nil {
@@ -100,9 +186,11 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 		deferFun, err := operator(copyNode)
 		if err != nil {
 			response["Message"] = err.Error()
-			return
+			response["OK"] = false
+		} else {
+			response["OK"] = true
 		}
-		response["Ok"] = true
+
 		response["Save"] = func() {
 			deferFun(false)
 		}
@@ -112,6 +200,7 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 		response["Result"] = copyYakNode.Result()
 		response["Recovery"] = func() {
 			deferFun(true)
+			yakNode.origin.Children = yakNode.origin.Children[:len(yakNode.origin.Children)-1]
 		}
 		return copyYakNode.Result(), response
 	}
@@ -155,6 +244,26 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 	yakNode.SetCfg = func(k string, v any) {
 		node.Cfg.SetItem(k, v)
 	}
+	yakNode.NewSubNode = func(datas ...any) *YakNode {
+		var typeName, nodeName string
+		switch len(datas) {
+		case 1:
+			typeName = utils.InterfaceToString(datas[0])
+			nodeName = typeName
+		case 2:
+			typeName = utils.InterfaceToString(datas[0])
+			nodeName = utils.InterfaceToString(datas[2])
+		default:
+			panic("invalid args")
+		}
+		typeNode := getRootNode(typeName)
+		err := appendNode(node, typeNode.origin)
+		if err != nil {
+			panic(err)
+		}
+		utils.GetLastElement(node.Children).Name = nodeName
+		return ConvertToYakNode(utils.GetLastElement(node.Children), operator)
+	}
 	yakNode.AppendNode = func(d *YakNode) {
 		err := appendNode(node, d.origin)
 		if err != nil {
@@ -168,8 +277,9 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 		}
 		return res
 	}
-	yakNode.CalcNodeResultLength = func() uint64 {
-		return CalcNodeResultLength(yakNode.origin)
+	yakNode.Length = func(uints ...string) uint64 {
+		n := getDivisor(yakNode, uints)
+		return CalcNodeResultLength(yakNode.origin) / uint64(n)
 	}
 	return yakNode
 }
@@ -241,4 +351,26 @@ func ExecOperator(node *base.Node, code string, operator func(node *base.Node) (
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	return engine.SafeEval(ctx, code)
+}
+func getDivisor(node *YakNode, uints []string) uint64 {
+	var uint string
+	if len(uints) > 0 {
+		uint = utils.InterfaceToString(utils.GetLastElement(uints))
+	}
+	if uint == "" && node.GetCfg(CfgUnit) != nil {
+		uint = node.GetCfg(CfgUnit).(string)
+	}
+	if uint == "" {
+		uint = "byte"
+	}
+	n := 0
+	switch uint {
+	case "byte":
+		n = 8
+	case "bit":
+		n = 1
+	default:
+		panic("unknown unit " + uint)
+	}
+	return uint64(n)
 }

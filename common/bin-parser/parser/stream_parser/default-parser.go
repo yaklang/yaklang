@@ -182,19 +182,12 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 		//rootNode.Cfg.SetItem(CfgNodeResult, nodeResult)
 		*node = *rootNode
 		//InitNode(node)
+		//node.Cfg.SetItem("unpack", true)
 		return operator.NodeParse(node)
 	}
 	if v := node.Cfg.GetItem(CfgOperator); v != nil {
 		err := ExecOperator(node, utils.InterfaceToString(v), func(node *base.Node) (func(bool), error) {
-			err := operator.Backup()
-			if err != nil {
-				return nil, err
-			}
-			err = operator.NodeParse(node)
-			if err != nil {
-				return nil, err
-			}
-			return func(recovery bool) {
+			op := func(recovery bool) {
 				if recovery {
 					err := operator.Recovery()
 					if err != nil {
@@ -206,7 +199,16 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 						log.Errorf("pop backup error: %v", err)
 					}
 				}
-			}, nil
+			}
+			err := operator.Backup()
+			if err != nil {
+				return op, err
+			}
+			err = operator.NodeParse(node)
+			if err != nil {
+				return op, err
+			}
+			return op, nil
 		})
 		if err != nil {
 			return fmt.Errorf("eval operator error: %w", err)
