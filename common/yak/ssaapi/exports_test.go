@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"reflect"
 	"strings"
@@ -27,7 +28,7 @@ g = d
 	valCheck_eq3 := false
 	prog.Ref("g").ForEach(func(value *Value) {
 		defs := value.GetTopDefs()
-		if len(defs) == 1 {
+		if len(defs) == 2 {
 			lenCheck = true
 		}
 		if len(defs) > 0 {
@@ -67,14 +68,13 @@ if (f) {
 }
 g = d
 `)
-	lenCheck := false
 	valCheck := false
 	valCheck_eq3 := false
+	var topDefsCount = 0
 	prog.Ref("d").ForEach(func(value *Value) {
 		defs := value.GetTopDefs()
-		if len(defs) == 1 {
-			lenCheck = true
-		}
+		spew.Dump(len(defs))
+		topDefsCount += len(defs)
 		if len(defs) > 0 {
 			for _, def := range defs {
 				log.Infof("found def: %v", def.String())
@@ -87,7 +87,7 @@ g = d
 			}
 		}
 	})
-	if !lenCheck {
+	if topDefsCount != 4 {
 		t.Error("len check failed")
 	}
 	if !valCheck {
