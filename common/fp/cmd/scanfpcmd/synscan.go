@@ -142,7 +142,7 @@ var SynScanCmd = cli.Command{
 			fp.WithWebFingerprintRule(webRules),
 
 			// 打开 Web 指纹识别
-			fp.WithForceEnableWebFingerprint(true),
+			fp.WithForceEnableAllFingerprint(true),
 
 			// 开启 TCP 扫描
 			fp.WithTransportProtos(fp.TCP),
