@@ -37,6 +37,9 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#DeepChainFilter.
 	VisitDeepChainFilter(ctx *DeepChainFilterContext) interface{}
 
+	// Visit a parse tree produced by SyntaxFlowParser#CurrentRootFilter.
+	VisitCurrentRootFilter(ctx *CurrentRootFilterContext) interface{}
+
 	// Visit a parse tree produced by SyntaxFlowParser#OptionalFilter.
 	VisitOptionalFilter(ctx *OptionalFilterContext) interface{}
 

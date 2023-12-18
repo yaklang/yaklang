@@ -23,7 +23,8 @@ refVariable
     :  '$' (identifier | ('(' identifier ')'));
 
 filterExpr
-    : identifier                              # PrimaryFilter
+    : '$'                                     # CurrentRootFilter
+    | identifier                              # PrimaryFilter
     | numberLiteral                           # NumberIndexFilter
     | op = ('>>' | '<<') filterExpr           # DirectionFilter
     | '(' filterExpr ')'                      # ParenFilter

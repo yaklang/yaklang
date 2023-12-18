@@ -204,3 +204,9 @@ func (y *SyntaxFlowVisitor) EmitPop() {
 		OpCode: OpPop,
 	})
 }
+
+func (y *SyntaxFlowVisitor) EmitCheckStackTop() {
+	y.codes = append(y.codes, &SFI{
+		OpCode: OpCheckStackTop,
+	})
+}
