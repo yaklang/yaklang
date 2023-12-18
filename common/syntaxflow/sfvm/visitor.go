@@ -115,6 +115,8 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) interface
 	}
 
 	switch ret := raw.(type) {
+	case *sf.CurrentRootFilterContext:
+		y.EmitCheckStackTop()
 	case *sf.PrimaryFilterContext:
 		filter, glob := y.FormatStringOrGlob(ret.Identifier().GetText()) // emit field
 		_ = glob

@@ -86,6 +86,10 @@ func (s *SFFrame) exec(input *omap.OrderedMap[string, any]) (ret error) {
 
 		s.debugLog(i.String())
 		switch i.OpCode {
+		case OpCheckStackTop:
+			if s.stack.Len() == 0 {
+				return utils.Errorf("stack top is empty")
+			}
 		case OpPushNumber:
 			s.stack.Push(NewValue(i.UnaryInt))
 		case OpPushString:
@@ -101,7 +105,6 @@ func (s *SFFrame) exec(input *omap.OrderedMap[string, any]) (ret error) {
 			}
 			if res.Len() == 0 {
 				s.debugSubLog("result: %v, not found", i.UnaryStr)
-				return nil
 			}
 			res = res.ValuesMap()
 			s.debugSubLog("result: (len: %v)", res.Len())
@@ -242,30 +245,40 @@ func (s *SFFrame) exec(input *omap.OrderedMap[string, any]) (ret error) {
 				return utils.Errorf("map start failed: stack top is not map/dict/array")
 			}
 			m := v.AsMap()
-			var l int
 			if m.CanAsList() {
-				panic("NOT IMPL ARRAY LIST")
-			} else {
 				m.UnsetParent()
-				l = 1
-				buildMaterial := omap.NewGeneralOrderedMap()
-				ret := buildMaterial.Merge(m)
-				s.stack.Push(NewValue(ret))
+				l := m.Len()
 				s.mapStack.Push(&mapCtx{
 					Current: l, Index: idx, OriginDepth: l,
-					Root: NewValue(ret),
+					Root: v,
 				})
+				s.stack.Push(NewValue(m.Index(0)))
+			} else {
+				m.UnsetParent()
+				buildMaterial := omap.NewGeneralOrderedMap()
+				ret := buildMaterial.Merge(m)
+				rootValue := NewValue(ret)
+				s.mapStack.Push(&mapCtx{
+					Current: 1, Index: idx, OriginDepth: 1,
+					Root: rootValue,
+				})
+				s.stack.Push(rootValue)
 			}
 			s.debugSubLog("check top stack is omap/array: len(%v)", m.Len())
 		case OpRestoreMapContext:
-			s.stack.Push(s.mapStack.Peek().Root)
-			s.debugSubLog("peek checking from stack[len: %v]", s.stack.Len())
-			if s.stack.Len() == 0 {
-				return utils.Errorf("restore context failed: stack is empty")
+			s.debugSubLog(">> restore map ctx")
+			ctx := s.mapStack.Peek()
+			if ctx == nil {
+				return utils.Errorf("restore map ctx failed: stack is empty")
 			}
-			top := s.stack.Peek()
-			if !top.IsMap() {
-				return utils.Errorf("restore context failed: stack top is not map")
+			if !s.stack.HaveLastStackValue() {
+				return utils.Errorf("restore map ctx failed: stack is empty(last stack value empty)")
+			}
+			root := ctx.Root.AsMap()
+			if ret := ctx.OriginDepth - ctx.Current + 1; ret >= root.Len() {
+				s.stack.Push(NewValue(omap.NewGeneralOrderedMap()))
+			} else {
+				s.stack.Push(NewValue(root.Index(ret)))
 			}
 		case OpMapDone:
 			val := s.mapStack.Peek()
@@ -302,6 +315,9 @@ func (s *SFFrame) exec(input *omap.OrderedMap[string, any]) (ret error) {
 				s.stack.Pop()
 				s.debugSubLog("<< push (len: %v)", nxt.Len())
 				s.stack.Push(NewValue(nxt))
+			} else {
+				idx = val.Index
+				s.debugSubLog("<< restore index: %v", idx)
 			}
 		case OpTypeCast:
 			s.debugSubLog(">> pop -> (%v)", i.UnaryStr)

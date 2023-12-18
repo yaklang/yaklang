@@ -219,6 +219,11 @@ func (o *OrderedMap[T, V]) GetByIndex(index int) (V, bool) {
 	return o.m[o.keyChain[index]], true
 }
 
+func (o *OrderedMap[T, V]) GetByIndexMust(index int) V {
+	var r, _ = o.GetByIndex(index)
+	return r
+}
+
 func (o *OrderedMap[T, V]) First() (T, V, bool) {
 	o.lock.RLock()
 	defer o.lock.RUnlock()
