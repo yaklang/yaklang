@@ -316,23 +316,11 @@ var FingerprintScanExports = map[string]interface{}{
 	"maxProbesConcurrent": fp.WithProbesConcurrentMax,
 
 	// 指定选择扫描目标协议：指开启 web 服务扫描
-	"web": func() fp.ConfigOption {
-		return func(config *fp.Config) {
-			config.OnlyEnableWebFingerprint = true
-		}
-	},
+	"web": fp.WithOnlyEnableWebFingerprint,
 
 	// 开启 nmap 规则库
-	"service": func() fp.ConfigOption {
-		return func(config *fp.Config) {
-			config.DisableWebFingerprint = true
-		}
-	},
+	"service": fp.WithDisableWebFingerprint,
 
 	// 全部服务扫描
-	"all": func() fp.ConfigOption {
-		return func(config *fp.Config) {
-			config.ForceEnableWebFingerprint = true
-		}
-	},
+	"all": fp.WithForceEnableAllFingerprint,
 }

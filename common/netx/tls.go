@@ -126,6 +126,10 @@ func LoadCertificatesConfig(i any) error {
 				return nil, utils.Errorf("all [%v] certificates are tested, no one is supported for %v", len(certs), info.Version)
 			}
 		} else {
+			// 服务端请求客户端证书时，如果客户端没有配置证书，是否能完成握手取决于服务器的配置
+			if len(presetClientCertificates) == 0 {
+				return nil
+			}
 			ret.GetClientCertificate = func(info *tls.CertificateRequestInfo) (*tls.Certificate, error) {
 				for _, cert := range presetClientCertificates {
 					err := info.SupportsCertificate(&cert)

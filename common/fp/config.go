@@ -51,11 +51,11 @@ type Config struct {
 	// Active Mode 这里的 ActiveMode 应该和当前配置保持一致，所以暂时不需要设置
 
 	//
-	// ForceEnableWebFingerprint 表示强制检测 Web 指纹
-	ForceEnableWebFingerprint bool
+	// ForceEnableAllFingerprint 表示强制检测 Web 指纹
+	ForceEnableAllFingerprint bool
 
 	// OnlyEnableWebFingerprint 表示值进行 Web 指纹识别
-	//    这个选项为 True 的时候，行为将会覆盖 ForceEnableWebFingerprint
+	//    这个选项为 True 的时候，行为将会覆盖 ForceEnableAllFingerprint
 	OnlyEnableWebFingerprint bool
 
 	// 禁用专门的 Web 指纹扫描
@@ -185,7 +185,7 @@ func (c *Config) init() {
 	c.ProbesConcurrentMax = 5
 	c.OnlyEnableWebFingerprint = false
 	c.DisableWebFingerprint = false
-	c.ForceEnableWebFingerprint = false
+	c.ForceEnableAllFingerprint = false
 	c.WebFingerprintUseAllRules = true
 	c.CrawlerMaxUrlCount = 5
 	c.PoolSize = 20
@@ -289,18 +289,15 @@ func WithProbeTimeoutHumanRead(f float64) ConfigOption {
 	}
 }
 
-func WithForceEnableWebFingerprint(b bool) ConfigOption {
+func WithForceEnableAllFingerprint(b bool) ConfigOption {
 	return func(config *Config) {
-		config.ForceEnableWebFingerprint = b
+		config.ForceEnableAllFingerprint = b
 	}
 }
 
 func WithOnlyEnableWebFingerprint(b bool) ConfigOption {
 	return func(config *Config) {
 		config.OnlyEnableWebFingerprint = b
-		if b {
-			config.ForceEnableWebFingerprint = true
-		}
 	}
 }
 

@@ -98,7 +98,7 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 		if !config.DisableWebFingerprint {
 			result, err = f.webDetector(result, ctx, config, host, ip, port)
 			// 禁用服务扫描
-			if config.OnlyEnableWebFingerprint {
+			if config.OnlyEnableWebFingerprint && !config.ForceEnableAllFingerprint {
 				return result, err
 			}
 
