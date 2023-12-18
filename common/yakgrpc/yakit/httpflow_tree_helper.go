@@ -2,11 +2,12 @@ package yakit
 
 import (
 	"context"
-	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/log"
 	"net/url"
 	"sort"
 	"strings"
+
+	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func FilterHTTPFlowBySchema(db *gorm.DB, schema string) *gorm.DB {
@@ -54,7 +55,7 @@ func GetHTTPFlowDomainsByDomainSuffix(db *gorm.DB, domainSuffix string) []*Websi
 		log.Error("query nextPart for website tree failed: %s", err)
 		return nil
 	} else {
-		var resultMap = make(map[string]*WebsiteNextPart)
+		resultMap := make(map[string]*WebsiteNextPart)
 		for rows.Next() {
 			var nextPart string
 			var schema string
@@ -205,7 +206,6 @@ func GetHTTPFlowNextPartPathByPathPrefix(db *gorm.DB, originPathPrefix string) [
 		path := strings.Trim(normalizedPath, "/")
 
 		pathPrefix, err := url.PathUnescape(normalizedOriginPathPrefix)
-
 		if err != nil {
 			continue
 		}
@@ -313,8 +313,12 @@ func FilterHTTPFlowByDomain(db *gorm.DB, domain string) *gorm.DB {
 
 	if domain != "" {
 		db = db.Where(`SUBSTR(url, INSTR(url, '://') + 3, INSTR(SUBSTR(url, INSTR(url, '://') + 3), '/') - 1) LIKE ?`, "%"+domain)
-		//db = db.Where(`SUBSTR(url, INSTR(url, '://') + 3, INSTR(SUBSTR(url, INSTR(url, '://') + 3), '/') - 1) = ?`, domain)
+		// db = db.Where(`SUBSTR(url, INSTR(url, '://') + 3, INSTR(SUBSTR(url, INSTR(url, '://') + 3), '/') - 1) = ?`, domain)
 
 	}
 	return db
+}
+
+func FilterHTTPFlowByRuntimeID(db *gorm.DB, runtimeID string) *gorm.DB {
+	return db.Where("runtime_id = ?", runtimeID)
 }
