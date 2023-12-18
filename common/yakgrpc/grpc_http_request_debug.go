@@ -57,7 +57,14 @@ func (s *Server) execScriptWithExecParam(scriptName string, input string, stream
 	})
 	engine := yak.NewYakitVirtualClientScriptEngine(feedbackClient)
 	log.Infof("engine.ExecuteExWithContext(stream.Context(), debugScript ... \n")
-
+	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
+		engine.SetVar("RUNTIME_ID", runtimeId)
+		yak.BindYakitPluginContextToEngine(engine, &yak.YakitPluginContext{
+			PluginName: scriptName,
+			RuntimeId:  runtimeId,
+		})
+		return nil
+	})
 	sendLog := func(res interface{}) {
 		raw, _ := yaklib.YakitMessageGenerator(res)
 		execResult := &ypb.ExecResult{
