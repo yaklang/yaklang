@@ -47,6 +47,10 @@ func (v *BaseSyntaxFlowVisitor) VisitDeepChainFilter(ctx *DeepChainFilterContext
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseSyntaxFlowVisitor) VisitCurrentRootFilter(ctx *CurrentRootFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseSyntaxFlowVisitor) VisitOptionalFilter(ctx *OptionalFilterContext) interface{} {
 	return v.VisitChildren(ctx)
 }

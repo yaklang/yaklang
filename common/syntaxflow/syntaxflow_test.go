@@ -58,6 +58,27 @@ type checkCase struct {
 	Rule string
 }
 
+func TestJSONBuild_Map(t *testing.T) {
+	c := checkCase{
+		Data: `{"abc": "def", "bbc": "ccc", "body": {"a1bc": "1111"}}`,
+		Rule: `%bc => {ddd: $} => $eee`,
+	}
+	result := jsonCheck(c.Data, c.Rule)
+	resultMap := result.Field("eee")
+	var v1 = resultMap.GetByIndexMust(0).(*omap.OrderedMap[string, any]).GetMust("ddd").([]any)[0]
+	var v2 = resultMap.GetByIndexMust(1).(*omap.OrderedMap[string, any]).GetMust("ddd").([]any)[0]
+	var v3 = resultMap.GetByIndexMust(2).(*omap.OrderedMap[string, any]).GetMust("ddd").([]any)[0]
+	var generalResult = []any{v1, v2, v3}
+	r := utils.InterfaceToStringSlice(generalResult)
+	sort.SliceStable(r, func(i, j int) bool {
+		return r[i] < r[j]
+	})
+	fmt.Println(r)
+	assert.NotEqual(t, []string{"ccc", "def"}, r)
+	assert.Equal(t, []string{"1111", "ccc", "def"}, r)
+	assert.Len(t, r, 3)
+}
+
 func TestJSONBuild_Flat(t *testing.T) {
 	c := checkCase{
 		Data: `{"abc": "def", "bbc": "ccc", "body": {"a1bc": "1111"}}`,

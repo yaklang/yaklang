@@ -58,6 +58,8 @@ const (
 	OpReMatch
 	OpGlobMatch
 	OpNot
+
+	OpCheckStackTop
 )
 
 type SFI struct {
@@ -140,6 +142,8 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v", "pop", s.UnaryStr)
 	case OpWithdraw:
 		return fmt.Sprint("withdraw last stack value")
+	case OpCheckStackTop:
+		return fmt.Sprint("check stack top")
 	}
 	return ""
 }
