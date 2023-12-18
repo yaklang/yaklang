@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/omap"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -137,21 +138,6 @@ func (v Values) GetUsers() Values {
 	return ret
 }
 
-func (v Values) GetTopDefs() Values {
-	ret := make(Values, 0, len(v))
-	var m = make(map[*Value]struct{})
-	v.WalkDefs(func(i *Value) {
-		if !i.HasOperands() {
-			if _, ok := m[i]; ok {
-				return
-			}
-			m[i] = struct{}{}
-			ret = append(ret, i)
-		}
-	})
-	return ret
-}
-
 func (v Values) GetDefs() Values {
 	ret := make(Values, 0, len(v))
 	v.ForEach(func(v *Value) {
@@ -161,6 +147,8 @@ func (v Values) GetDefs() Values {
 }
 
 type Value struct {
+	runtimeCtx *omap.OrderedMap[string, *Value]
+
 	node ssa.InstructionNode
 	// cache
 	disasmLine string
@@ -174,7 +162,8 @@ func ValueCompare(v1, v2 *Value) bool {
 
 func NewValue(n ssa.InstructionNode) *Value {
 	return &Value{
-		node: n,
+		runtimeCtx: omap.NewEmptyOrderedMap[string, *Value](),
+		node:       n,
 	}
 }
 
