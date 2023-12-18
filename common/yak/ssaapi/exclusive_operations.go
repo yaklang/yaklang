@@ -1,7 +1,6 @@
 package ssaapi
 
 import (
-	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"sync"
@@ -72,7 +71,7 @@ func (i *Value) getTopDefs(visited *sync.Map) Values {
 		log.Info("ssa.Function checking...")
 		var vals Values
 		for _, v := range ret.ReturnValue() {
-			if ret := NewValue(v).SetParent(i).GetTopDefs(); len(ret) > 0 {
+			if ret := NewValue(v).SetParent(i).getTopDefs(visited); len(ret) > 0 {
 				vals = append(vals, ret...)
 			}
 		}
@@ -104,7 +103,7 @@ func (i *Value) getTopDefs(visited *sync.Map) Values {
 		calledInstance := called.node.(*ssa.Call)
 		for _, i := range calledInstance.Args {
 			traced := NewValue(i).SetParent(called)
-			if ret := traced.GetTopDefs(); len(ret) > 0 {
+			if ret := traced.getTopDefs(visited); len(ret) > 0 {
 				vals = append(vals, ret...)
 			} else {
 				vals = append(vals, traced)
@@ -116,17 +115,27 @@ func (i *Value) getTopDefs(visited *sync.Map) Values {
 		return vals
 	case *ssa.ConstInst:
 		return Values{i}
+	case *ssa.Undefined:
+		return Values{i}
 	case *ssa.Phi:
 		log.Infof("handling phi")
 		var vars Values
 		for _, eg := range ret.Edge {
-			if ret := NewValue(eg).SetParent(i).GetTopDefs(); len(ret) > 0 {
+			if ret := NewValue(eg).SetParent(i).getTopDefs(visited); len(ret) > 0 {
 				vars = append(vars, ret...)
 			}
 		}
 		return vars
+	case *ssa.SideEffect:
+		panic("NOT IMPL Effect")
 	default:
-		spew.Dump(ret)
+		var vals Values
+		for _, val := range i.node.GetValues() {
+			if ret := NewValue(val).SetParent(i).getTopDefs(visited); len(ret) > 0 {
+				vals = append(vals, ret...)
+			}
+		}
+		return vals
 	}
 	return nil
 }
