@@ -37,7 +37,31 @@ func TestYakChanExplore_Phi_For_Negative(t *testing.T) {
 originValue = 1
 var f = outter()
 for i := 3; i < f; i++ {
-	var d = originValue + i
+	d := originValue + i
+	d += f
+}
+g = d 
+`)
+	// g not phi
+	prog.Ref("g").ForEach(func(value *Value) {
+		log.Infof("g value: %v", value.String()) // phi? why
+		if strings.Contains(value.String(), "phi(d)") {
+			t.Errorf("g should not be phi, but got %v", value.String())
+			t.Failed()
+		}
+		// g value: phi(d)[d,add(add(1, phi(i-2)[3,add(i-2, 1)]), outter())]
+
+		defs := value.GetTopDefs()
+		spew.Dump(defs)
+	})
+}
+
+func TestYakChanExplore_Phi_For_Negative_2(t *testing.T) {
+	prog := Parse(`
+originValue = 1
+var f = outter()
+for i := 3; i < f; i++ {
+	var d = originValue + i // var in yaklang will create new symbol
 	d += f
 }
 g = d 
