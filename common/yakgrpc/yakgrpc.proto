@@ -115,6 +115,7 @@ message GetYakScriptByOnlineIDRequest {
 service Yak {
   // version
   rpc Version(Empty) returns (VersionResponse);
+  rpc YakVersionAtLeast(YakVersionAtLeastRequest) returns (GeneralResponse);
 
   // echo 通常用于测试服务是否通畅
   rpc Echo(EchoRequest) returns(EchoResposne);
@@ -281,6 +282,7 @@ service Yak {
 
   rpc YaklangLanguageSuggestion(YaklangLanguageSuggestionRequest) returns (YaklangLanguageSuggestionResponse);
   rpc YaklangInspectInformation(YaklangInspectInformationRequest) returns (YaklangInspectInformationResponse);
+  rpc YaklangGetCliCodeFromDatabase(YaklangGetCliCodeFromDatabaseRequest) returns (YaklangGetCliCodeFromDatabaseResponse);
 
   // 端口扫描的封装
   rpc PortScan(PortScanRequest) returns (stream ExecResult);
@@ -568,6 +570,7 @@ service Yak {
   // rpc DeleteHTTPRequestBuilder(DeleteHTTPRequestBuilderRequest) returns (Empty);
   rpc DebugPlugin(DebugPluginRequest) returns (stream ExecResult);
   rpc SmokingEvaluatePlugin(SmokingEvaluatePluginRequest) returns (SmokingEvaluatePluginResponse);
+  rpc SmokingEvaluatePluginBatch(SmokingEvaluatePluginBatchRequest) returns (stream SmokingEvaluatePluginBatchResponse);
   rpc GetSystemDefaultDnsServers(Empty) returns (DefaultDnsServerResponse);
 
   // 诊断网络发生的问题
@@ -592,7 +595,6 @@ service Yak {
 
   rpc DuplexConnection(stream DuplexConnectionRequest) returns (stream DuplexConnectionResponse);
 
-  rpc SmokingEvaluatePluginBatch(SmokingEvaluatePluginBatchRequest) returns (stream SmokingEvaluatePluginBatchResponse);
 
   // 混合批量扫描
   rpc HybridScan(stream HybridScanRequest) returns (stream HybridScanResponse);
@@ -601,8 +603,7 @@ service Yak {
 
   rpc GetSpaceEngineStatus(GetSpaceEngineStatusRequest) returns(SpaceEngineStatus);
   rpc FetchPortAssetFromSpaceEngine(FetchPortAssetFromSpaceEngineRequest) returns (stream ExecResult);
-
-  rpc YakVersionAtLeast(YakVersionAtLeastRequest) returns (GeneralResponse);
+  
 }
 
 message GetSpaceEngineStatusRequest {
@@ -1833,6 +1834,15 @@ message YaklangLanguageSuggestionResponse {
 
 message YaklangInspectInformationResponse {
   repeated YaklangInformation Information = 1;
+  repeated YakScriptParam CliParameter  = 2;
+}
+message YaklangGetCliCodeFromDatabaseResponse {
+  string Code = 1;
+}
+
+message YaklangGetCliCodeFromDatabaseRequest {
+  string ScriptName = 1;
+
 }
 
 message StaticAnalyzeErrorRequest {
