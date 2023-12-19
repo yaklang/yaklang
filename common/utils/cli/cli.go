@@ -517,6 +517,9 @@ var CliExports = map[string]interface{}{
 	"Bool":        _cliBool,
 	"Have":        _cliBool,
 	"String":      CliString,
+	"HTTPPacket":  CliString,
+	"YakCode":     CliString,
+	"Text":        CliString,
 	"Int":         _cliInt,
 	"Integer":     _cliInt,
 	"Float":       _cliFloat,
@@ -547,6 +550,14 @@ var CliExports = map[string]interface{}{
 	"setHelp":     _cliSetHelpInfo,
 	"setDefault":  _cliSetDefaultValue,
 	"setRequired": _cliSetRequired,
+	// 设置中文名
+	"setVerboseName": func(string) {},
+	// 设置参数组名
+	"setCliGroup": func(string) {},
+	// 设置是否多选 (只支持`cli.StringSlice`)
+	"setMultipleSelect": func(bool) {},
+	// 设置下拉框选项 (只支持`cli.StringSlice`)
+	"setSelectOption": func(string, string) {},
 
 	// 设置cli属性
 	"SetCliName": _cliSetName,

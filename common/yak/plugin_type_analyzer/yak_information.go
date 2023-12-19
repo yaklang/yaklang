@@ -1,47 +1,33 @@
-package rules
+package plugin_type_analyzer
 
 import (
-	"github.com/yaklang/yaklang/common/yak/plugin_type_analyzer"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
-func init() {
-	plugin_type_analyzer.RegisterTypeInfoCollector("yak", CliTypeInfo)
-	plugin_type_analyzer.RegisterTypeInfoCollector("yak", RiskTypeInfo)
-}
-
-func CliTypeInfo(prog *ssaapi.Program) *plugin_type_analyzer.YaklangInfo {
-	ret := plugin_type_analyzer.NewYakLangInfo("cli")
-	for _, param := range ParseCliParameter(prog) {
-		ret.AddKV(CliParameterToInformation(param))
-	}
-	return ret
-}
-
-func RiskTypeInfo(prog *ssaapi.Program) *plugin_type_analyzer.YaklangInfo {
-	ret := plugin_type_analyzer.NewYakLangInfo("risk")
-	for _, risk := range ParseRiskInfo(prog) {
-		ret.AddKV(RiskInfoToInformation(risk))
-	}
-	return ret
-}
-
 type CliParameter struct {
-	Name     string
-	Type     string
-	Help     string
-	Required bool
-	Default  any
+	Name           string
+	NameVerbose    string
+	Required       bool
+	Type           string
+	Default        any
+	Help           string
+	Group          string
+	MultipleSelect bool
+	SelectOption   map[string]string
 }
 
 func newCliParameter(typ, name string) *CliParameter {
 	return &CliParameter{
-		Name:     name,
-		Type:     typ,
-		Help:     "",
-		Required: false,
-		Default:  nil,
+		Name:           name,
+		NameVerbose:    name,
+		Required:       false,
+		Type:           typ,
+		Default:        nil,
+		Help:           "",
+		Group:          "",
+		MultipleSelect: false,
+		SelectOption:   nil,
 	}
 }
 
@@ -55,6 +41,12 @@ func ParseCliParameter(prog *ssaapi.Program) []*CliParameter {
 		}
 		return ""
 	}
+	getConstBool := func(v *ssaapi.Value) bool {
+		if b, ok := v.GetConstValue().(bool); ok {
+			return b
+		}
+		return false
+	}
 
 	handleOption := func(cli *CliParameter, opt *ssaapi.Value) {
 		// opt.ShowUseDefChain()
@@ -62,15 +54,34 @@ func ParseCliParameter(prog *ssaapi.Program) []*CliParameter {
 			// skip no function call
 			return
 		}
+		arg1 := getConstString(opt.GetOperand(1))
+		arg2 := getConstString(opt.GetOperand(2))
 
 		// check option function, get information
 		switch opt.GetOperand(0).String() {
 		case "cli.setHelp":
-			cli.Help = getConstString(opt.GetOperand(1))
+			cli.Help = arg1
 		case "cli.setRequired":
-			cli.Required = getConstString(opt.GetOperand(1)) == "true"
+			cli.Required = getConstBool(opt.GetOperand(1))
 		case "cli.setDefault":
 			cli.Default = opt.GetOperand(1).GetConstValue()
+		case "cli.setCliGroup":
+			cli.Group = arg1
+		case "cli.setVerboseName":
+			cli.NameVerbose = arg1
+		case "cli.setMultipleSelect": // only for `cli.StringSlice`
+			if cli.Type != "select" {
+				break
+			}
+			cli.MultipleSelect = getConstBool(opt.GetOperand(1))
+		case "cli.setSelectOption": // only for `cli.StringSlice`
+			if cli.Type != "select" {
+				break
+			}
+			if cli.SelectOption == nil {
+				cli.SelectOption = make(map[string]string)
+			}
+			cli.SelectOption[arg1] = arg2
 		}
 	}
 
@@ -100,11 +111,19 @@ func ParseCliParameter(prog *ssaapi.Program) []*CliParameter {
 	}
 
 	parseCliFunction("cli.String", "string")
-	parseCliFunction("cli.Bool", "bool")
-	parseCliFunction("cli.Int", "int")
-	parseCliFunction("cli.Integer", "int")
+	parseCliFunction("cli.Bool", "boolean") // "bool"
+	parseCliFunction("cli.Int", "uint")     // "int"
+	parseCliFunction("cli.Integer", "uint") // "int"
 	parseCliFunction("cli.Double", "float")
 	parseCliFunction("cli.Float", "float")
+
+	parseCliFunction("cli.File", "upload-path")   // "file"
+	parseCliFunction("cli.StringSlice", "select") // "string-slice"
+	parseCliFunction("cli.YakCode", "yak")
+	parseCliFunction("cli.HTTPPacket", "http-packet")
+	parseCliFunction("cli.Text", "text")
+
+	// TODO: un-support  in front-end
 	parseCliFunction("cli.Url", "urls")
 	parseCliFunction("cli.Urls", "urls")
 	parseCliFunction("cli.Port", "port")
@@ -113,11 +132,8 @@ func ParseCliParameter(prog *ssaapi.Program) []*CliParameter {
 	parseCliFunction("cli.Network", "hosts")
 	parseCliFunction("cli.Host", "hosts")
 	parseCliFunction("cli.Hosts", "hosts")
-	parseCliFunction("cli.File", "file")
 	parseCliFunction("cli.FileOrContent", "file_or_content")
 	parseCliFunction("cli.LineDict", "file-or-content")
-	parseCliFunction("cli.YakitPlugin", "yakit-plugin")
-	parseCliFunction("cli.StringSlice", "string-slice")
 
 	return ret
 }
@@ -199,23 +215,5 @@ func ParseRiskInfo(prog *ssaapi.Program) []*RiskInfo {
 	parseRiskFunction("risk.CreateRisk", 1)
 	parseRiskFunction("risk.NewRisk", 1)
 
-	return ret
-}
-
-func CliParameterToInformation(c *CliParameter) *plugin_type_analyzer.YaklangInfoKV {
-	ret := plugin_type_analyzer.NewYaklangInfoKV("Name", c.Name)
-	ret.AddExtern("Type", c.Type)
-	ret.AddExtern("Help", c.Help)
-	ret.AddExtern("Required", c.Required)
-	ret.AddExtern("Default", c.Default)
-	return ret
-}
-
-func RiskInfoToInformation(r *RiskInfo) *plugin_type_analyzer.YaklangInfoKV {
-	ret := plugin_type_analyzer.NewYaklangInfoKV("Name", "risk")
-	ret.AddExtern("Level", r.Level)
-	ret.AddExtern("CVE", r.CVE)
-	ret.AddExtern("Type", r.Type)
-	ret.AddExtern("TypeVerbose", r.TypeVerbose)
 	return ret
 }
