@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/crawler"
 	"github.com/yaklang/yaklang/common/fuzztag"
 	"github.com/yaklang/yaklang/common/fuzztagx/parser"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
@@ -731,6 +732,18 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 				originFunc(target, opts...)
 			}
 		}
+		return i
+	})
+
+	nIns.GetVM().RegisterMapMemberCallHandler("crawler", "Start", func(i interface{}) interface{} {
+		originFunc, ok := i.(func(string, ...crawler.ConfigOpt) (chan *crawler.Req, error))
+		if ok {
+			return func(url string, opts ...crawler.ConfigOpt) (chan *crawler.Req, error) {
+				opts = append(opts, crawler.WithRuntimeID(runtimeId)) // add runtimeID for crawler
+				return originFunc(url, opts...)
+			}
+		}
+		log.Errorf("BUG: crawler.Start 's signature is override")
 		return i
 	})
 	nIns.GetVM().RegisterMapMemberCallHandler("hook", "NewMixPluginCaller", func(i interface{}) interface{} {
