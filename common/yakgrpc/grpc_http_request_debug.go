@@ -120,8 +120,9 @@ func (s *Server) execScriptWithExecParam(scriptName string, input string, stream
 				funcType := funcValue.Type()
 				hookFunc := reflect.MakeFunc(funcType, func(args []reflect.Value) (results []reflect.Value) {
 					TempParams := []cli.SetCliExtraParam{cli.SetTempArgs(tempArgs)}
-					interfaceValue := args[1].Interface()
-					args = args[:1]
+					index := len(args) - 1 //获取 option 参数的 index
+					interfaceValue := args[index].Interface()
+					args = args[:index]
 					cliExtraParams, ok := interfaceValue.([]cli.SetCliExtraParam)
 					if ok {
 						TempParams = append(TempParams, cliExtraParams...)
