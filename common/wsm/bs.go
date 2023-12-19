@@ -5,7 +5,7 @@ import (
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/wsm/payloads/behinder"
+	"github.com/yaklang/yaklang/common/wsm/payloads"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/url"
@@ -404,7 +404,7 @@ func (b *Behinder) showFile(path string) ([]byte, error) {
 		"path": path,
 	}
 	b.processParams(params)
-	return b.sendRequestAndGetResponse(behinder.FileOperationGo, params)
+	return b.sendRequestAndGetResponse(payloads.FileOperationGo, params)
 }
 
 func (b *Behinder) listFile(path string) ([]byte, error) {
@@ -413,7 +413,7 @@ func (b *Behinder) listFile(path string) ([]byte, error) {
 		"path": path,
 	}
 	b.processParams(params)
-	return b.sendRequestAndGetResponse(behinder.FileOperationGo, params)
+	return b.sendRequestAndGetResponse(payloads.FileOperationGo, params)
 }
 
 func (b *Behinder) checkFileHash(path, hash string) ([]byte, error) {
@@ -423,7 +423,7 @@ func (b *Behinder) checkFileHash(path, hash string) ([]byte, error) {
 		"hash": hash,
 	}
 	b.processParams(params)
-	return b.sendRequestAndGetResponse(behinder.FileOperationGo, params)
+	return b.sendRequestAndGetResponse(payloads.FileOperationGo, params)
 }
 
 func (b *Behinder) getTimeStamp(path string) ([]byte, error) {
@@ -432,7 +432,7 @@ func (b *Behinder) getTimeStamp(path string) ([]byte, error) {
 		"path": path,
 	}
 	b.processParams(params)
-	return b.sendRequestAndGetResponse(behinder.FileOperationGo, params)
+	return b.sendRequestAndGetResponse(payloads.FileOperationGo, params)
 }
 
 func (b *Behinder) updateTimeStamp(path, createTimeStamp, accessTimeStamp, modifyTimeStamp string) ([]byte, error) {
@@ -444,7 +444,7 @@ func (b *Behinder) updateTimeStamp(path, createTimeStamp, accessTimeStamp, modif
 		"modifyTimeStamp": modifyTimeStamp,
 	}
 	b.processParams(params)
-	return b.sendRequestAndGetResponse(behinder.FileOperationGo, params)
+	return b.sendRequestAndGetResponse(payloads.FileOperationGo, params)
 }
 
 func (b *Behinder) deleteFile(path string) ([]byte, error) {
@@ -453,7 +453,7 @@ func (b *Behinder) deleteFile(path string) ([]byte, error) {
 		"path": path,
 	}
 	b.processParams(params)
-	return b.sendRequestAndGetResponse(behinder.FileOperationGo, params)
+	return b.sendRequestAndGetResponse(payloads.FileOperationGo, params)
 }
 
 func (b *Behinder) compress(path string) ([]byte, error) {
@@ -462,7 +462,7 @@ func (b *Behinder) compress(path string) ([]byte, error) {
 		"path": path,
 	}
 	b.processParams(params)
-	return b.sendRequestAndGetResponse(behinder.FileOperationGo, params)
+	return b.sendRequestAndGetResponse(payloads.FileOperationGo, params)
 }
 
 func (b *Behinder) checkFileExist(path string) ([]byte, error) {
@@ -471,7 +471,7 @@ func (b *Behinder) checkFileExist(path string) ([]byte, error) {
 		"path": path,
 	}
 	b.processParams(params)
-	return b.sendRequestAndGetResponse(behinder.FileOperationGo, params)
+	return b.sendRequestAndGetResponse(payloads.FileOperationGo, params)
 }
 
 func (b *Behinder) renameFile(old, new string) ([]byte, error) {
@@ -485,7 +485,7 @@ func (b *Behinder) renameFile(old, new string) ([]byte, error) {
 		params["charset"] = ""
 	}
 	b.processParams(params)
-	return b.sendRequestAndGetResponse(behinder.FileOperationGo, params)
+	return b.sendRequestAndGetResponse(payloads.FileOperationGo, params)
 }
 
 func (b *Behinder) createFile(path string) ([]byte, error) {
@@ -494,7 +494,7 @@ func (b *Behinder) createFile(path string) ([]byte, error) {
 		"path": path,
 	}
 	b.processParams(params)
-	return b.sendRequestAndGetResponse(behinder.FileOperationGo, params)
+	return b.sendRequestAndGetResponse(payloads.FileOperationGo, params)
 }
 
 func (b *Behinder) createDirectory(path string) ([]byte, error) {
@@ -503,7 +503,7 @@ func (b *Behinder) createDirectory(path string) ([]byte, error) {
 		"path": path,
 	}
 	b.processParams(params)
-	return b.sendRequestAndGetResponse(behinder.FileOperationGo, params)
+	return b.sendRequestAndGetResponse(payloads.FileOperationGo, params)
 }
 
 func (b *Behinder) downloadFile(remote, local string) ([]byte, error) {
@@ -512,7 +512,7 @@ func (b *Behinder) downloadFile(remote, local string) ([]byte, error) {
 		"path": remote,
 	}
 	b.processParams(params)
-	payload, err := b.getPayload(behinder.FileOperationGo, params)
+	payload, err := b.getPayload(payloads.FileOperationGo, params)
 	if err != nil {
 		return nil, err
 	}
@@ -530,7 +530,7 @@ func (b *Behinder) uploadFile(remote string, fileContent []byte) ([]byte, error)
 		"content": base64.StdEncoding.EncodeToString(fileContent),
 	}
 	b.processParams(params)
-	payload, err := b.getPayload(behinder.FileOperationGo, params)
+	payload, err := b.getPayload(payloads.FileOperationGo, params)
 	if err != nil {
 		return nil, err
 	}
@@ -548,7 +548,7 @@ func (b *Behinder) appendFile(remote string, fileContent []byte) ([]byte, error)
 		"content": base64.StdEncoding.EncodeToString(fileContent),
 	}
 	b.processParams(params)
-	return b.sendRequestAndGetResponse(behinder.FileOperationGo, params)
+	return b.sendRequestAndGetResponse(payloads.FileOperationGo, params)
 }
 
 func (b *Behinder) uploadFilePart(remote string, fileContent []byte, blockIndex, blockSize uint64) ([]byte, error) {
@@ -560,7 +560,7 @@ func (b *Behinder) uploadFilePart(remote string, fileContent []byte, blockIndex,
 		"content":    base64.StdEncoding.EncodeToString(fileContent),
 	}
 	b.processParams(params)
-	return b.sendRequestAndGetResponse(behinder.FileOperationGo, params)
+	return b.sendRequestAndGetResponse(payloads.FileOperationGo, params)
 }
 
 func (b *Behinder) downFilePart(remote string, fileContent []byte, blockIndex, blockSize uint64) ([]byte, error) {
@@ -571,5 +571,5 @@ func (b *Behinder) downFilePart(remote string, fileContent []byte, blockIndex, b
 		"blockSize":  strconv.FormatUint(blockSize, 10),
 	}
 	b.processParams(params)
-	return b.sendRequestAndGetResponse(behinder.FileOperationGo, params)
+	return b.sendRequestAndGetResponse(payloads.FileOperationGo, params)
 }
