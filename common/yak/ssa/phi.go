@@ -63,7 +63,7 @@ func (phi *Phi) Build() Value {
 	if v == phi {
 		block := phi.GetBlock()
 		block.Phis = append(block.Phis, phi)
-		phi.GetFunc().SetReg(phi)
+		phi.GetProgram().SetVirtualRegister(phi)
 	}
 	if v != nil {
 		fixupUseChain(v)

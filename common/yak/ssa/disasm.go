@@ -8,13 +8,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func (f *Function) SetReg(i Instruction) {
-	if _, ok := f.InstReg[i]; !ok {
-		reg := fmt.Sprintf("t%d", len(f.InstReg))
-		f.InstReg[i] = reg
-	}
-}
-
 func GetTypeStr(n Value) string {
 	return fmt.Sprintf(
 		"<%s> ", n.GetType(),
@@ -48,10 +41,9 @@ func getStrFlag(v Value, hasType bool) (op string) {
 		return
 	}
 
-	if f := v.GetFunc(); f != nil {
-		if str, ok := f.InstReg[v]; ok {
-			op += str
-		}
+	// if f := v.GetFunc(); f != nil {
+	if id := v.GetId(); id != -1 {
+		op += fmt.Sprintf("t%d", v.GetId())
 	}
 	return op
 }
