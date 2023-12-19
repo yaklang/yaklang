@@ -7,19 +7,87 @@ import (
 	"testing"
 )
 
-func TestYakChanExplore_SideEffect(t *testing.T) {
+func TestYakChanExplore_ForPhi(t *testing.T) {
+	prog := Parse(`
+i = 0
+b = 3
+
+calc = i => i;
+
+for i < 10 {
+	if f() {
+		b = calc(i)	
+	}
+}
+c = b
+`)
+	prog.GetValueById(0).Show()
+	prog.GetValueById(1).Show()
+	prog.GetValueById(2).Show()
+	prog.Ref("c").ForEach(func(value *Value) {
+		log.Infof("%v: %v", value.GetId(), value.String())
+	})
+}
+func TestYakChanExplore_SideEffect_SelfAdd(t *testing.T) {
 	prog := Parse(`
 originValue = 4
 b = ()=>{
-	originValue ++
+	originValue++
 }
 b()
 g = originValue
 `)
+
+	/*
+		[INFO] 2023-12-19 17:23:47 [exclusive_op_test:22] g value: 4
+		(ssaapi.Values) (len=1 cap=1) Values: 1
+			0: ConstInst: 4
+
+	*/
+	prog.Ref("originValue").ForEach(func(value *Value) {
+		log.Infof("originValue value[%v]: %v", value.GetId(), value.String())
+	})
+
 	check5 := false
 	// g not phi
 	prog.Ref("g").ForEach(func(value *Value) {
-		log.Infof("g value: %v", value.String()) // phi? why
+		log.Infof("g value[%v]: %v", value.GetId(), value.String()) // phi? why
+		// g value: phi(d)[d,add(add(1, phi(i-2)[3,add(i-2, 1)]), outter())]
+		if value.GetConstValue() == 5 {
+			check5 = true
+		}
+		defs := value.GetTopDefs()
+		spew.Dump(defs)
+	})
+	if !check5 {
+		t.Error("check5 failed, side-effect failed")
+	}
+}
+
+func TestYakChanExplore_SideEffect(t *testing.T) {
+	prog := Parse(`
+originValue = 4
+b = ()=>{
+	originValue = 5
+}
+b()
+g = originValue
+`)
+
+	/*
+		[INFO] 2023-12-19 17:23:47 [exclusive_op_test:22] g value: 4
+		(ssaapi.Values) (len=1 cap=1) Values: 1
+			0: ConstInst: 4
+
+	*/
+	prog.Ref("originValue").ForEach(func(value *Value) {
+		log.Infof("originValue value[%v]: %v", value.GetId(), value.String())
+	})
+
+	check5 := false
+	// g not phi
+	prog.Ref("g").ForEach(func(value *Value) {
+		log.Infof("g value[%v]: %v", value.GetId(), value.String()) // phi? why
 		// g value: phi(d)[d,add(add(1, phi(i-2)[3,add(i-2, 1)]), outter())]
 		if value.GetConstValue() == 5 {
 			check5 = true
