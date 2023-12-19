@@ -90,18 +90,22 @@ func (s *Scope) AddVariable(v *Variable, R *Range) {
 	if R == nil {
 		log.Errorf("scope(%d) variable %s range is nil", s.Id, v.Name)
 	}
-	str, ok := s.SymbolTableReverse[v.Name]
+	name, ok := s.SymbolTableReverse[v.Name]
 	if !ok {
-		str = v.Name
+		name = v.Name
 	}
-	v.Name = str
+	v.Name = name
 	{
-		varList, ok := s.VarMap[str]
+		value := v.V
+		value.GetProgram().SetInstructionWithName(name, value)
+	}
+	{
+		varList, ok := s.VarMap[name]
 		if !ok {
 			varList = make([]*Variable, 0, 1)
 		}
 		varList = append(varList, v)
-		s.VarMap[str] = varList
+		s.VarMap[name] = varList
 	}
 	v.AddRange(R)
 	s.InsertByRange(v, R)

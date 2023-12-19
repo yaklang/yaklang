@@ -34,7 +34,6 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		parent:         nil,
 		FreeValues:     make(map[string]*Parameter),
 		SideEffects:    make(map[string]Value),
-		InstReg:        make(map[Instruction]string),
 		externInstance: make(map[string]Value),
 		externType:     make(map[string]Type),
 		err:            make(SSAErrors, 0),
@@ -50,6 +49,10 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 	}
 	f.EnterBlock = f.NewBasicBlock("entry")
 	return f
+}
+
+func (f *Function) GetProgram() *Program {
+	return f.Package.Prog
 }
 
 func (f *Function) addAnonymous(anon *Function) {

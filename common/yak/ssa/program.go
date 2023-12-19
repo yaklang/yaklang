@@ -2,12 +2,17 @@ package ssa
 
 import (
 	"sync"
+
+	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 func NewProgram() *Program {
 	prog := &Program{
-		Packages:  make(map[string]*Package),
-		buildOnce: sync.Once{},
+		Packages:           make(map[string]*Package),
+		ConstInstruction:   omap.NewEmptyOrderedMap[int, *ConstInst](),
+		NameToInstructions: omap.NewEmptyOrderedMap[string, []Instruction](),
+		IdToInstructionMap: omap.NewEmptyOrderedMap[int, Instruction](),
+		buildOnce:          sync.Once{},
 	}
 	return prog
 }

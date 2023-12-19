@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"golang.org/x/exp/slices"
 )
 
@@ -22,9 +23,14 @@ type Instruction interface {
 	// block
 	GetBlock() *BasicBlock
 	SetBlock(*BasicBlock)
+	// program
+	GetProgram() *Program
 
 	GetName() string
 	SetName(variable string)
+
+	GetId() int // for identify
+	SetId(int)
 
 	// position
 	GetRange() *Range
@@ -92,6 +98,7 @@ type anInstruction struct {
 	scope *Scope
 
 	name string
+	id   int
 
 	isExtern  bool
 	variables map[string]*Variable
@@ -100,12 +107,14 @@ type anInstruction struct {
 func NewInstruction() anInstruction {
 	return anInstruction{
 		variables: make(map[string]*Variable),
+		id:        -1,
 	}
 }
 
 // ssa function and block
 func (a *anInstruction) SetFunc(f *Function)        { a.fun = f }
 func (a *anInstruction) GetFunc() *Function         { return a.fun }
+func (a *anInstruction) GetProgram() *Program       { return a.fun.Package.Prog }
 func (a *anInstruction) SetBlock(block *BasicBlock) { a.block = block }
 func (a *anInstruction) GetBlock() *BasicBlock      { return a.block }
 
@@ -133,6 +142,10 @@ func (a *anInstruction) SetScope(s *Scope) { a.scope = s }
 // variable
 func (a *anInstruction) SetName(v string) { a.name = v }
 func (a *anInstruction) GetName() string  { return a.name }
+
+// id
+func (a *anInstruction) SetId(id int) { a.id = id }
+func (a *anInstruction) GetId() int   { return a.id }
 
 func (a *anInstruction) LineDisasm() string { return "" }
 
@@ -197,6 +210,10 @@ type Program struct {
 	// package list
 	Packages map[string]*Package
 
+	ConstInstruction   *omap.OrderedMap[int, *ConstInst]
+	NameToInstructions *omap.OrderedMap[string, []Instruction]
+	IdToInstructionMap *omap.OrderedMap[int, Instruction]
+
 	// for build
 	buildOnce sync.Once
 }
@@ -239,10 +256,6 @@ type Function struct {
 	// closure function double link. parentFunc <-> childFuncs
 	parent     *Function   // parent function;  can be nil if there is no parent function
 	ChildFuncs []*Function // child function within this function
-
-	// for instruction
-	// This `InstReg` is used to map instruction to their "virtual register", It is utilized by `Disasm`.
-	InstReg map[Instruction]string // instruction to their "virtual register"
 
 	// extern lib
 	externInstance map[string]Value // lib and value

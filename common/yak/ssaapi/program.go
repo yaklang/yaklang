@@ -1,12 +1,13 @@
 package ssaapi
 
 import (
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 type Program struct {
-	*ssa.Program
+	Program *ssa.Program
 }
 
 func NewProgram(prog *ssa.Program) *Program {
@@ -19,32 +20,42 @@ func (p *Program) IsNil() bool {
 	return utils.IsNil(p) || utils.IsNil(p.Program)
 }
 
+func (p *Program) GetErrors() ssa.SSAErrors {
+	return p.Program.GetErrors()
+}
+
+func (p *Program) GetValueById(id int) *Value {
+	return NewValue(p.Program.GetInstructionById(id).(ssa.InstructionNode))
+}
+
 func (p *Program) Ref(name string) Values {
-	ret := make(Values, 0)
-	tmp := make(map[*Value]struct{})
-	p.EachFunction(func(f *ssa.Function) {
-		for _, v := range f.GetValuesByName(name) {
-			value := NewValue(v)
-			if _, ok := tmp[value]; !ok {
-				ret = append(ret, value)
-				tmp[value] = struct{}{}
+	return lo.FilterMap(
+		p.Program.GetInstructionsByName(name),
+		func(i ssa.Instruction, _ int) (*Value, bool) {
+			if v, ok := i.(ssa.InstructionNode); ok {
+				return NewValue(v), true
+			} else {
+				return nil, false
 			}
-		}
-	})
-	return getValuesWithUpdate(ret)
+		},
+	)
 }
 
 func (p *Program) GetAllSymbols() map[string]Values {
 	ret := make(map[string]Values, 0)
-	for _, pkg := range p.Packages {
-		for _, fun := range pkg.Funcs {
-			for id, values := range fun.GetAllSymbols() {
-				for _, v := range values {
-					ret[id] = append(ret[id], NewValue(v))
+	p.Program.NameToInstructions.ForEach(func(name string, insts []ssa.Instruction) bool {
+		ret[name] = lo.FilterMap(
+			insts,
+			func(i ssa.Instruction, _ int) (*Value, bool) {
+				if v, ok := i.(ssa.InstructionNode); ok {
+					return NewValue(v), true
+				} else {
+					return nil, false
 				}
-			}
-		}
-	}
+			},
+		)
+		return true
+	})
 	return ret
 }
 
