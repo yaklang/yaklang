@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"github.com/yaklang/yaklang/common/wsm/payloads"
 	"github.com/yaklang/yaklang/common/wsm/payloads/behinder"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -181,10 +182,10 @@ func (b *Behinder) setContentType() {
 	}
 }
 
-func (b *Behinder) getPayload(binCode behinder.Payload, params map[string]string) ([]byte, error) {
+func (b *Behinder) getPayload(binCode payloads.Payload, params map[string]string) ([]byte, error) {
 	var rawPayload []byte
 	var err error
-	hexCode := behinder.HexPayload[b.ShellScript][binCode]
+	hexCode := payloads.HexPayload[b.ShellScript][binCode]
 	switch b.ShellScript {
 	case ypb.ShellScript_JSPX.String():
 		fallthrough
@@ -350,7 +351,7 @@ func (b *Behinder) processBase64JSON(input []byte) ([]byte, error) {
 	return decodedJSON, nil
 }
 
-func (b *Behinder) sendRequestAndGetResponse(payloadType behinder.Payload, params map[string]string) ([]byte, error) {
+func (b *Behinder) sendRequestAndGetResponse(payloadType payloads.Payload, params map[string]string) ([]byte, error) {
 	payload, err := b.getPayload(payloadType, params)
 	if err != nil {
 		return nil, err
@@ -373,7 +374,7 @@ func (b *Behinder) Ping(opts ...behinder.ExecParamsConfig) (bool, error) {
 	}
 	b.processParams(params)
 
-	payload, err := b.getPayload(behinder.EchoGo, params)
+	payload, err := b.getPayload(payloads.EchoGo, params)
 	if err != nil {
 		return false, err
 	}
@@ -392,7 +393,7 @@ func (b *Behinder) BasicInfo(opts ...behinder.ExecParamsConfig) ([]byte, error) 
 		"whatever": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
 	}
 	params = behinder.ProcessParams(params, opts...)
-	return b.sendRequestAndGetResponse(behinder.BasicInfoGo, params)
+	return b.sendRequestAndGetResponse(payloads.BasicInfoGo, params)
 }
 
 func (b *Behinder) CommandExec(cmd string, opts ...behinder.ExecParamsConfig) ([]byte, error) {
@@ -401,7 +402,7 @@ func (b *Behinder) CommandExec(cmd string, opts ...behinder.ExecParamsConfig) ([
 		"path": "/",
 	}
 	b.processParams(params)
-	return b.sendRequestAndGetResponse(behinder.CmdGo, params)
+	return b.sendRequestAndGetResponse(payloads.CmdGo, params)
 }
 
 func (b *Behinder) FileManagement() {

@@ -45,6 +45,12 @@ func TestNewWebJSPShell(t *testing.T) {
 		}
 		return decodedData, nil
 	})
+	//ping, err := bx.Ping()
+	//if err != nil {
+	//	t.Error(err)
+	//	return
+	//}
+	//t.Logf("%v", ping)
 	dir, err := bx.listFile("C:\\")
 	//ping, err := bx.showFile("C:\\Vuln\\apache-tomcat-8.5.84\\webapps\\S2-032")
 	if err != nil {
