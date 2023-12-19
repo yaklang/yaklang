@@ -1,9 +1,11 @@
 package plugin_type_analyzer
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
@@ -30,9 +32,13 @@ type YaklangInfoKV struct {
 }
 
 func NewYaklangInfoKV(key string, value any) *YaklangInfoKV {
+	valueJson, err := json.Marshal(value)
+	if err != nil {
+		log.Error("json.Marshal error: %v", err)
+	}
 	return &YaklangInfoKV{
 		Key:    key,
-		Value:  value,
+		Value:  valueJson,
 		Extern: make([]*YaklangInfoKV, 0),
 	}
 }
@@ -58,33 +64,33 @@ func (y *YaklangInfoKV) String() string {
 }
 
 type (
-	CheckRuler        func(*ssaapi.Program)
-	TypeInfoCollector func(*ssaapi.Program) *YaklangInfo
-	SSAOptCollector   func() []ssaapi.Option
+	CheckRuler func(*ssaapi.Program)
+	// TypeInfoCollector func(*ssaapi.Program) *YaklangInfo
+	SSAOptCollector func() []ssaapi.Option
 )
 
 type PluginTypeAnalyzer struct {
-	SSAOptCollectors   map[string]SSAOptCollector
-	TypeInfoCollectors map[string][]TypeInfoCollector
-	CheckRulers        map[string][]CheckRuler
+	SSAOptCollectors map[string]SSAOptCollector
+	// TypeInfoCollectors map[string][]TypeInfoCollector
+	CheckRulers map[string][]CheckRuler
 }
 
 var pluginTypeAnalyzer = &PluginTypeAnalyzer{
-	SSAOptCollectors:   make(map[string]SSAOptCollector),
-	TypeInfoCollectors: make(map[string][]TypeInfoCollector),
-	CheckRulers:        make(map[string][]CheckRuler),
+	SSAOptCollectors: make(map[string]SSAOptCollector),
+	// TypeInfoCollectors: make(map[string][]TypeInfoCollector),
+	CheckRulers: make(map[string][]CheckRuler),
 }
 
 func RegisterSSAOptCollector(pluginTyp string, f SSAOptCollector) {
 	pluginTypeAnalyzer.SSAOptCollectors[pluginTyp] = f
 }
 
-func RegisterTypeInfoCollector(pluginTyp string, f TypeInfoCollector) {
-	if _, ok := pluginTypeAnalyzer.TypeInfoCollectors[pluginTyp]; !ok {
-		pluginTypeAnalyzer.TypeInfoCollectors[pluginTyp] = make([]TypeInfoCollector, 0)
-	}
-	pluginTypeAnalyzer.TypeInfoCollectors[pluginTyp] = append(pluginTypeAnalyzer.TypeInfoCollectors[pluginTyp], f)
-}
+// func RegisterTypeInfoCollector(pluginTyp string, f TypeInfoCollector) {
+// 	if _, ok := pluginTypeAnalyzer.TypeInfoCollectors[pluginTyp]; !ok {
+// 		pluginTypeAnalyzer.TypeInfoCollectors[pluginTyp] = make([]TypeInfoCollector, 0)
+// 	}
+// 	pluginTypeAnalyzer.TypeInfoCollectors[pluginTyp] = append(pluginTypeAnalyzer.TypeInfoCollectors[pluginTyp], f)
+// }
 
 func RegisterCheckRuler(pluginTyp string, f CheckRuler) {
 	if _, ok := pluginTypeAnalyzer.CheckRulers[pluginTyp]; !ok {
@@ -110,27 +116,27 @@ func GetPluginSSAOpt(pluginType string) []ssaapi.Option {
 	return ret
 }
 
-func getPluginInfo(pluginType string, prog *ssaapi.Program) []*YaklangInfo {
-	ret := make([]*YaklangInfo, 0)
-	if funcs, ok := pluginTypeAnalyzer.TypeInfoCollectors[pluginType]; ok {
-		for _, f := range funcs {
-			func() {
-				defer recover()
-				ret = append(ret, f(prog))
-			}()
-		}
-	}
-	return ret
-}
+// func getPluginInfo(pluginType string, prog *ssaapi.Program) []*YaklangInfo {
+// 	ret := make([]*YaklangInfo, 0)
+// 	if funcs, ok := pluginTypeAnalyzer.TypeInfoCollectors[pluginType]; ok {
+// 		for _, f := range funcs {
+// 			func() {
+// 				defer recover()
+// 				ret = append(ret, f(prog))
+// 			}()
+// 		}
+// 	}
+// 	return ret
+// }
 
-func GetPluginInfo(pluginType string, prog *ssaapi.Program) []*YaklangInfo {
-	ret := make([]*YaklangInfo, 0)
-	ret = append(ret, getPluginInfo("yak", prog)...)
-	if pluginType != "yak" {
-		ret = append(ret, getPluginInfo(pluginType, prog)...)
-	}
-	return ret
-}
+// func GetPluginInfo(pluginType string, prog *ssaapi.Program) []*YaklangInfo {
+// 	ret := make([]*YaklangInfo, 0)
+// 	ret = append(ret, getPluginInfo("yak", prog)...)
+// 	if pluginType != "yak" {
+// 		ret = append(ret, getPluginInfo(pluginType, prog)...)
+// 	}
+// 	return ret
+// }
 
 func checkPluginType(pluginType string, prog *ssaapi.Program) {
 	if funcs, ok := pluginTypeAnalyzer.CheckRulers[pluginType]; ok {
