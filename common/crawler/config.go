@@ -130,6 +130,9 @@ type Config struct {
 
 	// cache, do not
 	_cachedOpts []lowhttp.LowhttpOpt
+
+	// runtime id
+	runtimeID string
 }
 
 var configMutex = new(sync.Mutex)
@@ -228,20 +231,20 @@ func (c *Config) CheckShouldBeHandledURL(u *url.URL) bool {
 	return true
 }
 
-type configOpt func(c *Config)
+type ConfigOpt func(c *Config)
 
 // disallowSuffix 是一个选项函数，用于指定爬虫时的后缀黑名单
 // Example:
 // ```
 // crawler.Start("https://example.com", crawler.disallowSuffix(".css", ".jpg", ".png")) // 爬虫时不会爬取css、jpg、png文件
 // ```
-func WithDisallowSuffix(d []string) configOpt {
+func WithDisallowSuffix(d []string) ConfigOpt {
 	return func(c *Config) {
 		c.disallowSuffix = d
 	}
 }
 
-func WithDisallowMIMEType(d []string) configOpt {
+func WithDisallowMIMEType(d []string) ConfigOpt {
 	return func(c *Config) {
 		c.disallowMIMEType = d
 	}
@@ -252,7 +255,7 @@ func WithDisallowMIMEType(d []string) configOpt {
 // ```
 // crawler.Start("https://example.com", crawler.basicAuth("admin", "admin"))
 // ```
-func WithBasicAuth(user, pass string) configOpt {
+func WithBasicAuth(user, pass string) ConfigOpt {
 	return func(c *Config) {
 		c.BasicAuth = true
 		c.AuthUsername = user
@@ -265,7 +268,7 @@ func WithBasicAuth(user, pass string) configOpt {
 // ```
 // crawler.Start("https://example.com", crawler.proxy("http://127.0.0.1:8080"))
 // ```
-func WithProxy(proxies ...string) configOpt {
+func WithProxy(proxies ...string) ConfigOpt {
 	return func(c *Config) {
 		c.proxies = proxies
 	}
@@ -276,7 +279,7 @@ func WithProxy(proxies ...string) configOpt {
 // ```
 // crawler.Start("https://example.com", crawler.concurrent(10))
 // ```
-func WithConcurrent(concurrent int) configOpt {
+func WithConcurrent(concurrent int) ConfigOpt {
 	return func(c *Config) {
 		c.concurrent = concurrent
 	}
@@ -287,7 +290,7 @@ func WithConcurrent(concurrent int) configOpt {
 // ```
 // crawler.Start("https://example.com", crawler.maxRedirect(10))
 // ```
-func WithMaxRedirectTimes(maxRedirectTimes int) configOpt {
+func WithMaxRedirectTimes(maxRedirectTimes int) ConfigOpt {
 	return func(c *Config) {
 		c.maxRedirectTimes = maxRedirectTimes
 	}
@@ -299,7 +302,7 @@ func WithMaxRedirectTimes(maxRedirectTimes int) configOpt {
 // ```
 // crawler.Start("https://example.com", crawler.domainInclude("*.example.com"))
 // ```
-func WithDomainWhiteList(domain string) configOpt {
+func WithDomainWhiteList(domain string) ConfigOpt {
 	var pattern string
 	if !strings.HasPrefix(domain, "*") {
 		pattern = "*" + domain
@@ -328,7 +331,7 @@ func WithDomainWhiteList(domain string) configOpt {
 // ```
 // crawler.Start("https://example.com", crawler.domainExclude("*.baidu.com"))
 // ```
-func WithDomainBlackList(domain string) configOpt {
+func WithDomainBlackList(domain string) ConfigOpt {
 	var pattern string
 	if !strings.HasPrefix(domain, "*") {
 		pattern = "*" + domain
@@ -343,13 +346,13 @@ func WithDomainBlackList(domain string) configOpt {
 	}
 }
 
-func WithExtraSuffixForEveryPath(path ...string) configOpt {
+func WithExtraSuffixForEveryPath(path ...string) ConfigOpt {
 	return func(c *Config) {
 		c.extraPathForEveryPath = path
 	}
 }
 
-func WithExtraSuffixForEveryRootPath(path ...string) configOpt {
+func WithExtraSuffixForEveryRootPath(path ...string) ConfigOpt {
 	return func(c *Config) {
 		c.extraPathForEveryPath = path
 	}
@@ -360,7 +363,7 @@ func WithExtraSuffixForEveryRootPath(path ...string) configOpt {
 // ```
 // crawler.Start("https://example.com", crawler.urlRegexpInclude(`\.html`))
 // ```
-func WithUrlRegexpWhiteList(re string) configOpt {
+func WithUrlRegexpWhiteList(re string) ConfigOpt {
 	p, err := regexp.Compile(re)
 	if err != nil {
 		log.Errorf("limit url regexp[%v] whitelist failed: %v", re, err)
@@ -376,7 +379,7 @@ func WithUrlRegexpWhiteList(re string) configOpt {
 // ```
 // crawler.Start("https://example.com", crawler.urlRegexpExclude(`\.jpg`))
 // ```
-func WithUrlRegexpBlackList(re string) configOpt {
+func WithUrlRegexpBlackList(re string) ConfigOpt {
 	p, err := regexp.Compile(re)
 	if err != nil {
 		log.Errorf("limit url regexp[%v] blacklist failed: %v", re, err)
@@ -392,7 +395,7 @@ func WithUrlRegexpBlackList(re string) configOpt {
 // ```
 // crawler.Start("https://example.com", crawler.connectTimeout(5))
 // ```
-func WithConnectTimeout(f float64) configOpt {
+func WithConnectTimeout(f float64) ConfigOpt {
 	return func(c *Config) {
 		c.connectTimeout = time.Duration(int64(f * float64(time.Second)))
 	}
@@ -404,7 +407,7 @@ func WithConnectTimeout(f float64) configOpt {
 // ```
 // crawler.Start("https://example.com", crawler.responseTimeout(5))
 // ```
-func WithResponseTimeout(f float64) configOpt {
+func WithResponseTimeout(f float64) ConfigOpt {
 	return func(c *Config) {
 		// dummy, ignore it
 	}
@@ -415,7 +418,7 @@ func WithResponseTimeout(f float64) configOpt {
 // ```
 // crawler.Start("https://example.com", crawler.userAgent("yaklang-crawler"))
 // ```
-func WithUserAgent(ua string) configOpt {
+func WithUserAgent(ua string) ConfigOpt {
 	return func(c *Config) {
 		c.userAgent = ua
 	}
@@ -426,7 +429,7 @@ func WithUserAgent(ua string) configOpt {
 // ```
 // crawler.Start("https://example.com", crawler.maxDepth(10))
 // ```
-func WithMaxDepth(depth int) configOpt {
+func WithMaxDepth(depth int) ConfigOpt {
 	return func(c *Config) {
 		c.maxDepth = depth
 	}
@@ -437,7 +440,7 @@ func WithMaxDepth(depth int) configOpt {
 // ```
 // crawler.Start("https://example.com", crawler.bodySize(1024 * 1024))
 // ```
-func WithBodySize(size int) configOpt {
+func WithBodySize(size int) ConfigOpt {
 	return func(c *Config) {
 		c.maxBodySize = size
 	}
@@ -448,7 +451,7 @@ func WithBodySize(size int) configOpt {
 // ```
 // crawler.Start("https://example.com", crawler.maxRequest(10000))
 // ```
-func WithMaxRequestCount(limit int) configOpt {
+func WithMaxRequestCount(limit int) ConfigOpt {
 	return func(c *Config) {
 		c.maxCountOfRequest = limit
 	}
@@ -459,7 +462,7 @@ func WithMaxRequestCount(limit int) configOpt {
 // ```
 // crawler.Start("https://example.com", crawler.maxUrls(20000))
 // ```
-func WithMaxUrlCount(limit int) configOpt {
+func WithMaxUrlCount(limit int) ConfigOpt {
 	return func(c *Config) {
 		c.maxCountOfLinks = limit
 	}
@@ -470,7 +473,7 @@ func WithMaxUrlCount(limit int) configOpt {
 // ```
 // crawler.Start("https://example.com", crawler.maxRetry(10))
 // ```
-func WithMaxRetry(limit int) configOpt {
+func WithMaxRetry(limit int) ConfigOpt {
 	return func(c *Config) {
 		c.maxRetryTimes = limit
 	}
@@ -482,7 +485,7 @@ func WithMaxRetry(limit int) configOpt {
 // ```
 // crawler.Start("https://example.com/a/b/c", crawler.forbiddenFromParent(false)) // 这会从 https://example.com/ 开始爬取
 // ```
-func WithForbiddenFromParent(b bool) configOpt {
+func WithForbiddenFromParent(b bool) ConfigOpt {
 	return func(c *Config) {
 		c.startFromParentPath = !b
 	}
@@ -493,7 +496,7 @@ func WithForbiddenFromParent(b bool) configOpt {
 // ```
 // crawler.Start("https://example.com", crawler.header("User-Agent", "yaklang-crawler"))
 // ```
-func WithHeader(k, v string) configOpt {
+func WithHeader(k, v string) ConfigOpt {
 	return func(c *Config) {
 		c.headers = append(c.headers, &header{
 			Key:   k,
@@ -509,7 +512,7 @@ func WithHeader(k, v string) configOpt {
 // 尝试编写自己的规则，从响应体(req.Response()或req.ResponseRaw())中提取额外的链接
 // })
 // ```
-func WithUrlExtractor(f func(*Req) []interface{}) configOpt {
+func WithUrlExtractor(f func(*Req) []interface{}) ConfigOpt {
 	return func(c *Config) {
 		c.extractionRules = f
 	}
@@ -520,7 +523,7 @@ func WithUrlExtractor(f func(*Req) []interface{}) configOpt {
 // ```
 // crawler.Start("https://example.com", crawler.cookie("key", "value"))
 // ```
-func WithFixedCookie(k, v string) configOpt {
+func WithFixedCookie(k, v string) ConfigOpt {
 	return func(c *Config) {
 		c.cookie = append(c.cookie, &cookie{
 			cookie: &http.Cookie{
@@ -532,7 +535,7 @@ func WithFixedCookie(k, v string) configOpt {
 	}
 }
 
-func WithOnRequest(f func(req *Req)) configOpt {
+func WithOnRequest(f func(req *Req)) ConfigOpt {
 	return func(c *Config) {
 		c.onRequest = f
 	}
@@ -543,7 +546,7 @@ func WithOnRequest(f func(req *Req)) configOpt {
 // ```
 // crawler.Start("https://example.com", crawler.autoLogin("admin", "admin"))
 // ```
-func WithAutoLogin(username, password string, flags ...string) configOpt {
+func WithAutoLogin(username, password string, flags ...string) ConfigOpt {
 	return func(c *Config) {
 		c.onLogin = func(req *Req) {
 			if !utils.IContains(req.Request().Header.Get("Content-Type"), "application/x-www-form-urlencoded") {
@@ -590,5 +593,11 @@ func WithAutoLogin(username, password string, flags ...string) configOpt {
 			req.responseRaw = rspIns.RawPacket
 			req.response, _ = utils.ReadHTTPResponseFromBytes(rspIns.RawPacket, req.request)
 		}
+	}
+}
+
+func WithRuntimeID(id string) ConfigOpt {
+	return func(c *Config) {
+		c.runtimeID = id
 	}
 }

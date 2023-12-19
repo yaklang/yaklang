@@ -244,7 +244,7 @@ func (r *Req) AbsoluteURL(u string) string {
 // println(req.Response()~)
 // }
 // ```
-func StartCrawler(url string, opt ...configOpt) (chan *Req, error) {
+func StartCrawler(url string, opt ...ConfigOpt) (chan *Req, error) {
 	ch := make(chan *Req)
 	opt = append(opt, WithOnRequest(func(req *Req) {
 		ch <- req
@@ -265,7 +265,7 @@ func StartCrawler(url string, opt ...configOpt) (chan *Req, error) {
 	return ch, nil
 }
 
-func NewCrawler(urls string, opts ...configOpt) (*Crawler, error) {
+func NewCrawler(urls string, opts ...ConfigOpt) (*Crawler, error) {
 	urlsRaw := utils.PrettifyListFromStringSplited(urls, ",")
 	urlList := utils.ParseStringToUrlsWith3W(urlsRaw...)
 	log.Debugf("actual url list: %v", urlList)
@@ -625,13 +625,13 @@ func (c *Crawler) handleReqResult(r *Req) {
 			continue
 		}
 		swg.Add(1)
-		c := c
+		content := content
 		go func() {
 			defer swg.Done()
 
-			reqHttps, reqBytes, err := NewHTTPRequest(r.IsHttps(), r.requestRaw, r.responseRaw, c.UrlPath)
+			reqHttps, reqBytes, err := NewHTTPRequest(r.IsHttps(), r.requestRaw, r.responseRaw, content.UrlPath)
 			if err != nil {
-				log.Errorf("build http request(js) failed: %s", c.UrlPath)
+				log.Errorf("build http request(js) failed: %s", content.UrlPath)
 				return
 			}
 			opts := config.GetLowhttpConfig()
@@ -639,7 +639,7 @@ func (c *Crawler) handleReqResult(r *Req) {
 			if urlIns != nil {
 				log.Infof("Start to fetch JS(via URL): %v", urlIns.String())
 			}
-			opts = append(opts, lowhttp.WithHttps(reqHttps), lowhttp.WithRequest(reqBytes))
+			opts = append(opts, lowhttp.WithHttps(reqHttps), lowhttp.WithRequest(reqBytes), lowhttp.WithRuntimeId(c.config.runtimeID))
 			rsp, err := lowhttp.HTTP(opts...)
 			if err != nil {
 				return
@@ -650,8 +650,8 @@ func (c *Crawler) handleReqResult(r *Req) {
 			}
 
 			rspHeader, body := lowhttp.SplitHTTPPacketFast(rsp.RawPacket)
-			c.Code = string(body)
-			c.IsCodeText = true
+			content.Code = string(body)
+			content.IsCodeText = true
 			_ = rspHeader
 		}()
 	}
@@ -921,7 +921,7 @@ func (c *Crawler) execReq(r *Req) {
 
 	// config opts
 	opts := c.config.GetLowhttpConfig()
-	opts = append(opts, lowhttp.WithHttps(r.IsHttps()), lowhttp.WithPacketBytes(r.requestRaw))
+	opts = append(opts, lowhttp.WithHttps(r.IsHttps()), lowhttp.WithPacketBytes(r.requestRaw), lowhttp.WithRuntimeId(c.config.runtimeID))
 	if c.config.onLogin != nil && r.IsLoginForm() && r.IsForm() {
 		c.loginOnce.Do(func() {
 			c.config.onLogin(r)
