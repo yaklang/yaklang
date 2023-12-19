@@ -73,7 +73,7 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 	}
 
 	var results []*ypb.SmokingEvaluateResult
-	var pushSuggestion = func(item string, suggestion string, i ...[]byte) {
+	var pushSuggestion = func(item string, suggestion string, R *ypb.Range, i ...[]byte) {
 		var buf bytes.Buffer
 		for _, d := range i {
 			buf.Write(d)
@@ -81,6 +81,7 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 		results = append(results, &ypb.SmokingEvaluateResult{
 			Item:       item,
 			Suggestion: suggestion,
+			Range:      R,
 			ExtraInfo:  buf.Bytes(),
 		})
 	}
@@ -92,11 +93,17 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 	staticResults := yak.AnalyzeStaticYaklangWithType(pluginCode, pluginType)
 	if len(staticResults) > 0 {
 		for _, sRes := range staticResults {
+			R := &ypb.Range{
+				StartLine:   int64(sRes.StartLineNumber),
+				StartColumn: int64(sRes.StartColumn),
+				EndLine:     int64(sRes.EndLineNumber),
+				EndColumn:   int64(sRes.EndColumn),
+			}
 			if sRes.Severity == "error" {
 				staticCheckingFailed = true
-				pushSuggestion(`静态代码检测失败[`+sRes.Severity+`]`, sRes.Message, []byte(sRes.From))
+				pushSuggestion(`静态代码检测失败[`+sRes.Severity+`]`, sRes.Message, R, []byte(sRes.From))
 			} else {
-				pushSuggestion(`静态代码检测警告[`+sRes.Severity+`]`, sRes.Message, []byte(sRes.From))
+				pushSuggestion(`静态代码检测警告[`+sRes.Severity+`]`, sRes.Message, R, []byte(sRes.From))
 				score = 60
 			}
 		}
@@ -152,11 +159,11 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 		if err != nil {
 			score -= 40
 			log.Errorf("debugScript failed: %v", err)
-			pushSuggestion("冒烟测试失败[Smoking Test]", `请检查插件异常处理是否完备？查看 Console 以处理调试错误: `+err.Error())
+			pushSuggestion("冒烟测试失败[Smoking Test]", `请检查插件异常处理是否完备？查看 Console 以处理调试错误: `+err.Error(), nil)
 		}
 		if fetchRisk {
 			score -= 20
-			pushSuggestion("误报[Negative Alarm]", `本插件的漏洞判定可能过于宽松，请检查漏洞判定逻辑`)
+			pushSuggestion("误报[Negative Alarm]", `本插件的漏洞判定可能过于宽松，请检查漏洞判定逻辑`, nil)
 		}
 	}
 
