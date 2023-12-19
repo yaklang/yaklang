@@ -1,10 +1,9 @@
 Package:
   isList: true
-  # exception-plan: stopList # stopList, throw
+  exception-plan: stopList # stopList, throw
   Transport Layer Security:
     Record Layer:
       length-from-field: Length
-      length-from-field-multiply: 8
       length-for-field: Payload
       operator: |
         this.ProcessSubNode("ContentType")

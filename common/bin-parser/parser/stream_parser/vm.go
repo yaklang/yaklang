@@ -28,16 +28,19 @@ type YakNode struct {
 	TryProcess           func(*YakNode) (any, map[string]any)
 	SetLength            func(l uint64)
 
-	SetChildren      func([]*YakNode)
-	GetChildren      func() []*YakNode
-	Length           func(uint ...string) uint64
-	SetMaxLength     func(l uint64, uint ...string)
-	GetMaxLength     func(uint ...string) uint64
-	NewSubNode       func(datas ...any) *YakNode
-	NewUnknownNode   func(name ...string) *YakNode
-	ProcessSubNode   func(name string) any
-	ProcessByType    func(datas ...any) any
-	TryProcessByType func(datas ...string) (any, map[string]any)
+	SetChildren       func([]*YakNode)
+	GetChildren       func() []*YakNode
+	Length            func(uint ...string) uint64
+	SetMaxLength      func(l uint64, uint ...string)
+	GetMaxLength      func(uint ...string) uint64
+	NewSubNode        func(datas ...any) *YakNode
+	NewUnknownNode    func(name ...string) *YakNode
+	ProcessSubNode    func(name string) any
+	TryProcessSubNode func(name string) (any, map[string]any)
+	ProcessByType     func(datas ...any) any
+	TryProcessByType  func(datas ...string) (any, map[string]any)
+	AddInfo           func(key string, v any)
+	GetInfo           func(key string) any
 }
 
 func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool), error)) *YakNode {
@@ -50,16 +53,76 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 	}
 	yakNode := &YakNode{}
 	yakNode.origin = node
+	yakNode.AddInfo = func(key string, v any) {
+		if node.Cfg.Has("additionInfo") {
+			additionInfo := node.Cfg.GetItem("additionInfo").(map[string]any)
+			additionInfo[key] = v
+		} else {
+			node.Cfg.SetItem("additionInfo", map[string]any{
+				key: v,
+			})
+		}
+	}
+	yakNode.GetInfo = func(key string) any {
+		if node.Cfg.Has("additionInfo") {
+			additionInfo := node.Cfg.GetItem("additionInfo").(map[string]any)
+			return additionInfo[key]
+		}
+		return nil
+	}
 	yakNode.ProcessSubNode = func(name string) any {
 		return yakNode.GetSubNode(name).Process()
 	}
+	yakNode.TryProcessSubNode = func(name string) (any, map[string]any) {
+		typeNode := yakNode.GetSubNode(name)
+		response := map[string]any{
+			"OK":      false,
+			"Message": "",
+			"Save":    func() {},
+		}
+		defer func() {
+			if e := recover(); e != nil {
+				response["Message"] = fmt.Sprintf("%v", e)
+			}
+		}()
+
+		//copyNode := node.origin.Copy()
+		//copyYakNode := ConvertToYakNode(copyNode, operator)
+		yakNode.AppendNode(typeNode)
+		copyNode := yakNode.origin.Children[len(yakNode.origin.Children)-1]
+		copyYakNode := ConvertToYakNode(copyNode, operator)
+		//err := appendNode(copyNode, yakNode.origin)
+		//if err != nil {
+		//	response["Message"] = err.Error()
+		//	return
+		//}
+		deferFun, err := operator(copyNode)
+		if err != nil {
+			response["Message"] = err.Error()
+			response["OK"] = false
+		} else {
+			response["OK"] = true
+		}
+
+		response["Save"] = func() {
+			deferFun(false)
+		}
+		response["GetNode"] = func() any {
+			return copyYakNode
+		}
+		response["Result"] = copyYakNode.Result()
+		response["Recovery"] = func() {
+			deferFun(true)
+			yakNode.origin.Children = yakNode.origin.Children[:len(yakNode.origin.Children)-1]
+		}
+		return copyYakNode.Result(), response
+	}
 	yakNode.GetMaxLength = func(uints ...string) uint64 {
-		n := getDivisor(yakNode, uints)
 		l, err := getNodeLength(yakNode.origin)
 		if err != nil {
 			panic(err)
 		}
-		return l / n
+		return l
 	}
 	yakNode.NewUnknownNode = func(datas ...string) *YakNode {
 		name := utils.InterfaceToString(utils.GetLastElement(datas))
@@ -79,7 +142,7 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 		return ConvertToYakNode(utils.GetLastElement(node.Children), operator)
 	}
 	yakNode.SetMaxLength = func(l uint64, uints ...string) {
-		n := getDivisor(yakNode, uints)
+		n := getMulti(yakNode.origin, uints...)
 		node.Cfg.SetItem(CfgLength, l*uint64(n))
 	}
 	yakNode.SetLength = func(l uint64) {
@@ -115,6 +178,7 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 		return ConvertToYakNode(target, operator).Process()
 	}
 	yakNode.SetChildren = func(nodes []*YakNode) {
+		yakNode.origin.Children = nil
 		for _, node := range nodes {
 			yakNode.origin.Children = append(yakNode.origin.Children, node.origin)
 		}
@@ -230,9 +294,6 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 		return nil
 	}
 	yakNode.GetSubNode = func(name string) *YakNode {
-		if name == "Other" {
-			println()
-		}
 		for _, child := range node.Children {
 			if child.Name == name {
 				return ConvertToYakNode(child, operator)
@@ -275,10 +336,10 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 		if err != nil {
 			panic(err)
 		}
-		return res
+		return res / getMulti(node)
 	}
 	yakNode.Length = func(uints ...string) uint64 {
-		n := getDivisor(yakNode, uints)
+		n := getMulti(yakNode.origin, uints...)
 		return CalcNodeResultLength(yakNode.origin) / uint64(n)
 	}
 	return yakNode
@@ -337,7 +398,7 @@ func ExecOperator(node *base.Node, code string, operator func(node *base.Node) (
 			panic("not found root node " + key)
 		},
 		"getNode": func(key string) any {
-			n := base.GetNodeByPath(node, key)
+			n := getNodeByPath(node, key)
 			return ConvertToYakNode(n, operator)
 		},
 		"getCurrentPosition": func() int {
@@ -352,13 +413,13 @@ func ExecOperator(node *base.Node, code string, operator func(node *base.Node) (
 	defer cancel()
 	return engine.SafeEval(ctx, code)
 }
-func getDivisor(node *YakNode, uints []string) uint64 {
+func getMulti(node *base.Node, uints ...string) uint64 {
 	var uint string
 	if len(uints) > 0 {
 		uint = utils.InterfaceToString(utils.GetLastElement(uints))
 	}
-	if uint == "" && node.GetCfg(CfgUnit) != nil {
-		uint = node.GetCfg(CfgUnit).(string)
+	if uint == "" && node.Cfg.GetItem(CfgUnit) != nil {
+		uint = node.Cfg.GetString(CfgUnit)
 	}
 	if uint == "" {
 		uint = "byte"
@@ -373,4 +434,22 @@ func getDivisor(node *YakNode, uints []string) uint64 {
 		panic("unknown unit " + uint)
 	}
 	return uint64(n)
+}
+
+func ExecVerboseFn(node *base.Node, code string) (any, error) {
+	engineLib := map[string]interface{}{
+		"this": ConvertToYakNode(node, func(node *base.Node) (func(bool), error) {
+			return nil, nil
+		}),
+	}
+	engine := antlr4yak.New()
+	engine.ImportLibs(engineLib)
+	//ctx, cancel := context.WithCancel(context.Background())
+	//defer cancel()
+	res, err := engine.ExecuteAsExpression(code, nil)
+	if err != nil {
+		return nil, err
+	}
+	//res := engine.GetVM().CurrentFM().GetLastStackValue()
+	return res, nil
 }

@@ -230,55 +230,67 @@ func parseLengthByLengthConfig(node *base.Node) (uint64, bool, error) {
 	if node.Cfg.Has("length") {
 		length = node.Cfg.GetUint64("length")
 		getLengthOK = true
-	} else if node.Cfg.Has(CfgType) {
-		typeName := node.Cfg.GetString(CfgType)
-		ok := true
-		switch typeName {
-		case "int":
-			length = 32
-		case "uint":
-			length = 32
-		case "int8":
-			length = 8
-		case "uint8":
-			length = 8
-		case "int16":
-			length = 16
-		case "uint16":
-			length = 16
-		case "int32":
-			length = 32
-		case "uint32":
-			length = 32
-		case "int64":
-			length = 64
-		case "uint64":
-			length = 64
-		default:
-			ok = false
+	} else {
+		if node.Cfg.Has(CfgType) {
+			typeName := node.Cfg.GetString(CfgType)
+			ok := true
+			switch typeName {
+			case "int":
+				length = 32
+			case "uint":
+				length = 32
+			case "int8":
+				length = 8
+			case "uint8":
+				length = 8
+			case "int16":
+				length = 16
+			case "uint16":
+				length = 16
+			case "int32":
+				length = 32
+			case "uint32":
+				length = 32
+			case "int64":
+				length = 64
+			case "uint64":
+				length = 64
+			default:
+				ok = false
+			}
+			if ok {
+				getLengthOK = true
+			}
 		}
-		if ok {
-			getLengthOK = true
-		}
-	} else if node.Cfg.Has("length-from-field") {
-		// 从field 读取length
-		if node.Cfg.Has("length-from-field") {
-			fieldName := node.Cfg.GetString("length-from-field")
-			if node.Name != fieldName {
-				for _, child := range node.Children {
-					if child.Name == fieldName {
-						if !child.Cfg.Has(CfgNodeResult) {
-							break
-						}
-						res := GetResultByNode(child)
+		if !getLengthOK {
+			if node.Cfg.Has("length-from-field") {
+				// 从field 读取length
+				if node.Cfg.Has("length-from-field") {
+					fieldName := node.Cfg.GetString("length-from-field")
+					target := getNodeByPath(node, fieldName)
+					if target.Cfg.Has(CfgNodeResult) {
+						res := GetResultByNode(target)
 						if v, ok := base.InterfaceToUint64(res); ok {
 							total := v
+							total = total * getMulti(node)
 							if node.Cfg.Has("length-from-field-multiply") {
-								mul, ok := base.InterfaceToUint64(node.Cfg.GetItem("length-from-field-multiply"))
-								if !ok {
-									return 0, false, fmt.Errorf("length-from-field-multiply type error")
+								imulti := node.Cfg.GetItem("length-from-field-multiply")
+								var multi uint64
+								switch imulti.(type) {
+								case string:
+									n, err := strconv.Atoi(imulti.(string))
+									if err != nil {
+										return 0, false, fmt.Errorf("length-from-field-multiply type error")
+									}
+									multi = uint64(n)
+								default:
+									mul, ok := base.InterfaceToUint64(node.Cfg.GetItem("length-from-field-multiply"))
+									if !ok {
+										return 0, false, fmt.Errorf("length-from-field-multiply type error")
+									}
+									multi = mul
 								}
-								total *= mul
+								total *= multi
 							}
 							length = total
 							getLengthOK = true
@@ -297,8 +309,8 @@ func parseLengthByLengthConfig(node *base.Node) (uint64, bool, error) {
 						} else {
 							return 0, false, fmt.Errorf("field %s type error", fieldName)
 						}
-						break
 					}
+
 				}
 			}
 		}
@@ -322,9 +334,10 @@ func parseLengthByLengthConfig(node *base.Node) (uint64, bool, error) {
 }
 func getNodeLength(node *base.Node) (uint64, error) {
 	remainingLength, ok, err := parseLengthByLengthConfig(node)
-	if !ok {
-		return 0, errors.New("parse length by length config error")
-	}
+	//if !ok {
+	//	return 0, errors.New("parse length by length config error")
+	//}
+	_ = ok
 	if err != nil {
 		return 0, err
 	}
@@ -471,6 +484,9 @@ func getNodeResult(node *base.Node, isByte bool) (any, error) {
 	if isByte {
 		return res.Bytes, nil
 	} else {
+		if node.Cfg.GetString(CfgType) == "string" {
+			return string(buf), nil
+		}
 		return res.Value(), nil
 	}
 }

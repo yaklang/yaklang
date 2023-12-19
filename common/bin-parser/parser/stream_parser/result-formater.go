@@ -11,6 +11,10 @@ func init() {
 	formatters["default"] = ToMap
 }
 func ToMap(node *base.Node) (any, error) {
+	if node.Cfg.Has("verboseFn") {
+		fnCode := node.Cfg.GetString("verboseFn")
+		return ExecVerboseFn(node, fnCode)
+	}
 	isPackage := func(node *base.Node) bool {
 		if node.Name == "Package" && node.Cfg.GetItem(CfgParent) == node.Ctx.GetItem("root") {
 			return true

@@ -39,6 +39,7 @@ Package:
                         }
                         return
                     }else{
+                        dump(op.Message)
                         err = op.Recovery()
                         if err != nil{
                             panic(err)
@@ -59,7 +60,6 @@ Option:
             }    
         }
     length-from-field: Length
-    length-from-field-multiply: 8
     Kind: uint8
     Length: uint8
     Data: raw

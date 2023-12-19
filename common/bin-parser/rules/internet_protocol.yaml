@@ -2,7 +2,7 @@ endian: big
 Package:
   Internet Protocol:
     length-from-field: Header Length
-    length-from-field-multiply: 32
+    length-from-field-multiply: 4
     Version: uint8,4bit
     Header Length: uint8,4bit
     Type of Service: raw,1
@@ -35,7 +35,6 @@ Package:
         node.Process()
 
 TCP: "import:transmission_control_protocol.yaml;node:Package/TCP"
-UDP: "import:udp.yaml;node:Package/UDP"
-TLS: "import:tls.yaml;node:Package/TLS"
+UDP: "import:user_datagram_protocol.yaml;node:Package/UDP"
 ICMP: "import:internet_control_message_protocol.yaml;node:Package/ICMP"
 Unknown: raw

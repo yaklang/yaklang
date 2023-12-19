@@ -124,6 +124,9 @@ func (b *BitReader) ReadBits(n uint64) ([]byte, error) {
 	}
 	if bitLen > 0 {
 		bit, err := b.Reader.ReadBits(uint8(bitLen))
+		if err != nil {
+			return nil, err
+		}
 		err = syncBak([]byte{byte(bit)}, bitLen)
 		if err != nil {
 			return nil, err
@@ -173,6 +176,7 @@ func (b *BitWriter) WriteBits(bs []byte, length uint64) (err error) {
 			b.PreIsBit = false
 		} else {
 			b.PreByte = bs[bytesLen]
+			b.PreIsBit = true
 		}
 	}
 	//if b.PreIsBit {

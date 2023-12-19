@@ -237,7 +237,7 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 			}
 			if node.Cfg.Has("list-length-from-field") {
 				field := node.Cfg.GetString("list-length-from-field")
-				fieldNode := base.GetNodeByPath(node, field)
+				fieldNode := getNodeByPath(node, field)
 				if fieldNode == nil {
 					return fmt.Errorf("read field %s error: not found", field)
 				}
@@ -320,12 +320,16 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 		for _, child := range node.Children {
 			err := operator.NodeParse(child)
 			if err != nil {
-				if node.Cfg.GetString(CfgExceptionPlan) == "skip" {
-					err = operator.Recovery()
-					if err != nil {
-						return fmt.Errorf("pop backup error: %w", err)
-					}
-					return nil
+				//if node.Cfg.GetString(CfgExceptionPlan) == "skip" {
+				//	err = operator.Recovery()
+				//	if err != nil {
+				//		return fmt.Errorf("pop backup error: %w", err)
+				//	}
+				//	return nil
+				//}
+				e := operator.Recovery()
+				if e != nil {
+					return fmt.Errorf("recovery backup error: %w", e)
 				}
 				return fmt.Errorf("parse child node error: %w", err)
 			}
@@ -489,7 +493,10 @@ func (d *DefParser) Parse(data *base.BitReader, node *base.Node) error {
 			} else {
 				delimiter := utils.InterfaceToString(node.Cfg.GetItem(CfgDelimiter))
 				if len(delimiter) == 0 {
-					return errors.New("delimiter length must be greater than 0")
+					delimiter = utils.InterfaceToString(node.Cfg.GetItem("del"))
+					if len(delimiter) == 0 {
+						return errors.New("delimiter length must be greater than 0")
+					}
 				}
 				delimitern := 0
 				byts := []byte{}

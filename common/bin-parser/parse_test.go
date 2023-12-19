@@ -21,6 +21,7 @@ import (
 )
 
 func TestParser(t *testing.T) {
+	log.SetLevel(log.DebugLevel)
 	type args struct {
 		data   string
 		rule   string
@@ -54,6 +55,30 @@ func TestParser(t *testing.T) {
 				expect: httpRequestExpect,
 			},
 		},
+		{
+			name: "tls",
+			args: args{
+				data:   `3066d026811bf84d8991af5208004500005c00004000400675ddc0a8031601000001c75f01bbc23157078c7aa68280180800ad6800000101080a858e40e3c784a921170303002339aa76173aee3468a1e8402150499a9585259f6f799c7895d7d40be6879f4b63cdec72`,
+				rule:   "ethernet",
+				expect: tlsExpect,
+			},
+		},
+		{
+			name: "dns request",
+			args: args{
+				data:   `3066d026811bf84d8991af52080045000055edc10000401134dec0a80316771d1d1dfa0d003500417b4514520100000100000000000011636f70696c6f742d74656c656d657472791167697468756275736572636f6e74656e7403636f6d0000010001`,
+				rule:   "ethernet",
+				expect: dnsExpect,
+			},
+		},
+		{
+			name: "dns response",
+			args: args{
+				data:   `f84d8991af523066d026811b0800450000b58c740000751110fbdf050505c0a803160035c4c100a1000014528180000100030000000011636f70696c6f742d74656c656d657472791167697468756275736572636f6e74656e7403636f6d0000010001c00c0005000100000010001c19636f70696c6f742d74656c656d657472792d73657276696365c01ec0450005000100000010001c12676c622d646235326332636638626535343406676974687562c030c06d000100010000001000048c527216`,
+				rule:   "ethernet",
+				expect: dnsResponseExpect,
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -70,13 +95,221 @@ func TestParser(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-
 			assert.Equal(t, tt.args.expect, string(resYaml))
 		})
 	}
 }
 
-var httpRequestExpect = ``
+var dnsResponseExpect = `Ethernet:
+  Destination: f84d8991af52
+  Source: 3066d026811b
+  Type: 2048
+  Internet Protocol:
+    Version: 4
+    Header Length: 5
+    Type of Service: "00"
+    Total Length: 181
+    Identification: 8c74
+    Flags And Fragment Offset: "0000"
+    Time to Live: "75"
+    Protocol: 17
+    Header Checksum: 10fb
+    Source: df050505
+    Destination: c0a80316
+    UDP:
+      Source Port: 53
+      Destination Port: 50369
+      Length: 161
+      Checksum: 0
+      DNS:
+        Header:
+          ID: 5202
+          Flags: 33152
+          Questions: 1
+          Answer RRs: 3
+          Authority RRs: 0
+          Additional RRs: 0
+        Questions:
+          Question:
+            String:
+              Label:
+                Count: 17
+                Data: copilot-telemetry
+              Label:
+                Count: 17
+                Data: githubusercontent
+              Label:
+                Count: 3
+                Data: com
+              Label:
+                Count: 0
+            Type: 1
+            Class: 1
+        Answers:
+          Answer:
+            Name:
+              Pointer: 12
+              PointerFlag: 3
+            Type: 5
+            Class: 1
+            TTL: 16
+            RDLength: 28
+            RData: 19636f70696c6f742d74656c656d657472792d73657276696365c01e
+          Answer:
+            Name:
+              Pointer: 261
+              PointerFlag: 3
+            Type: 5
+            Class: 1
+            TTL: 16
+            RDLength: 28
+            RData: 12676c622d646235326332636638626535343406676974687562c030
+          Answer:
+            Name:
+              Pointer: 301
+              PointerFlag: 3
+            Type: 1
+            Class: 1
+            TTL: 16
+            RDLength: 4
+            RData: 8c527216
+`
+var dnsExpect = `Ethernet:
+  Destination: 3066d026811b
+  Source: f84d8991af52
+  Type: 2048
+  Internet Protocol:
+    Version: 4
+    Header Length: 5
+    Type of Service: "00"
+    Total Length: 85
+    Identification: edc1
+    Flags And Fragment Offset: "0000"
+    Time to Live: "40"
+    Protocol: 17
+    Header Checksum: 34de
+    Source: c0a80316
+    Destination: 771d1d1d
+    UDP:
+      Source Port: 64013
+      Destination Port: 53
+      Length: 65
+      Checksum: 31557
+      DNS:
+        Header:
+          ID: 5202
+          Flags: 256
+          Questions: 1
+          Answer RRs: 0
+          Authority RRs: 0
+          Additional RRs: 0
+        Questions:
+          Question:
+            String:
+              Label:
+                Count: 17
+                Data: copilot-telemetry
+              Label:
+                Count: 17
+                Data: githubusercontent
+              Label:
+                Count: 3
+                Data: com
+              Label:
+                Count: 0
+            Type: 1
+            Class: 1
+`
+var tlsExpect = `Ethernet:
+  Destination: 3066d026811b
+  Source: f84d8991af52
+  Type: 2048
+  Internet Protocol:
+    Version: 4
+    Header Length: 5
+    Type of Service: "00"
+    Total Length: 92
+    Identification: "0000"
+    Flags And Fragment Offset: "4000"
+    Time to Live: "40"
+    Protocol: 6
+    Header Checksum: 75dd
+    Source: c0a80316
+    Destination: "01000001"
+    TCP:
+      Source Port: 51039
+      Destination Port: 443
+      Sequence Number: c2315707
+      Acknowledgement Number: 8c7aa682
+      Header Length: 8
+      Flags: "0108"
+      Window: "0800"
+      Checksum: ad68
+      Urgent Pointer: "0000"
+      Option:
+        Kind: 1
+      Option:
+        Kind: 1
+      Option:
+        Kind: 8
+        Length: 10
+        Data: 858e40e3c784a921
+      Transport Layer Security:
+        Record Layer:
+          ContentType: 23
+          Version: 771
+          Length: 35
+          Payload: 39aa76173aee3468a1e8402150499a9585259f6f799c7895d7d40be6879f
+`
+var httpRequestExpect = `Ethernet:
+  Destination: 3066d026811b
+  Source: f84d8991af52
+  Type: 2048
+  Internet Protocol:
+    Version: 4
+    Header Length: 5
+    Type of Service: "00"
+    Total Length: 267
+    Identification: "0000"
+    Flags And Fragment Offset: "4000"
+    Time to Live: "40"
+    Protocol: 6
+    Header Checksum: 62c6
+    Source: c0a80316
+    Destination: 77609c08
+    TCP:
+      Source Port: 52896
+      Destination Port: 14093
+      Sequence Number: b485ff92
+      Acknowledgement Number: 1c6fdee6
+      Header Length: 8
+      Flags: "0108"
+      Window: "0808"
+      Checksum: "2352"
+      Urgent Pointer: "0000"
+      Option:
+        Kind: 1
+      Option:
+        Kind: 1
+      Option:
+        Kind: 8
+        Length: 10
+        Data: 929a15075619e69f
+      HTTP:
+        HTTP Request:
+          Method: GET
+          Path: /
+          Version: HTTP/1.1
+          Headers:
+            Item: 'Host: 76dd1d83b7.iqiyi.com:14093'
+            Item: 'User-Agent: curl/7.48.0'
+            Item: 'Content-Length: 32'
+            Item: 'Connection: Upgrade'
+            Item: 'Sec-Websocket-Key: OEi-rNV2l4CuBd4zVzfLjg=='
+            Item: 'Upgrade: websocket'
+          Body:
+            Data: 2acc9cc819e51ccf44bdee6f4e26f45f63038a6cfddf86a550a6ff9b5d1f875b
+`
 var icmpExpect = `Ethernet:
   Destination: 3066d026811b
   Source: f84d8991af52
@@ -530,190 +763,9 @@ func testParse(data []byte, rule string) (*base.Node, error) {
 		},
 	}
 	reader := bytes.NewReader(data)
-	res, err := parser.ParseBinaryWithConfig(reader, "ethernet", config)
+	res, err := parser.ParseBinaryWithConfig(reader, rule, config)
 	if err != nil {
 		return nil, err
 	}
 	return res, nil
-}
-
-func TestDumpNode(t *testing.T) {
-	type args struct {
-		node *base.Node
-	}
-	tests := []struct {
-		name string
-		args args
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			DumpNode(tt.args.node)
-		})
-	}
-}
-
-func TestJsonToResult(t *testing.T) {
-	type args struct {
-		jsonStr string
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    any
-		wantErr assert.ErrorAssertionFunc
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := JsonToResult(tt.args.jsonStr)
-			if !tt.wantErr(t, err, fmt.Sprintf("JsonToResult(%v)", tt.args.jsonStr)) {
-				return
-			}
-			assert.Equalf(t, tt.want, got, "JsonToResult(%v)", tt.args.jsonStr)
-		})
-	}
-}
-
-func TestNodeToBytes(t *testing.T) {
-	type args struct {
-		node *base.Node
-	}
-	tests := []struct {
-		name string
-		args args
-		want []byte
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, NodeToBytes(tt.args.node), "NodeToBytes(%v)", tt.args.node)
-		})
-	}
-}
-
-func TestNodeToMap(t *testing.T) {
-	type args struct {
-		node *base.Node
-	}
-	tests := []struct {
-		name string
-		args args
-		want any
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, NodeToMap(tt.args.node), "NodeToMap(%v)", tt.args.node)
-		})
-	}
-}
-
-func TestResultToJson(t *testing.T) {
-	type args struct {
-		d any
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    string
-		wantErr assert.ErrorAssertionFunc
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := ResultToJson(tt.args.d)
-			if !tt.wantErr(t, err, fmt.Sprintf("ResultToJson(%v)", tt.args.d)) {
-				return
-			}
-			assert.Equalf(t, tt.want, got, "ResultToJson(%v)", tt.args.d)
-		})
-	}
-}
-
-func TestResultToYaml(t *testing.T) {
-	type args struct {
-		d any
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    string
-		wantErr assert.ErrorAssertionFunc
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := ResultToYaml(tt.args.d)
-			if !tt.wantErr(t, err, fmt.Sprintf("ResultToYaml(%v)", tt.args.d)) {
-				return
-			}
-			assert.Equalf(t, tt.want, got, "ResultToYaml(%v)", tt.args.d)
-		})
-	}
-}
-
-func TestSdumpNode(t *testing.T) {
-	type args struct {
-		node *base.Node
-	}
-	tests := []struct {
-		name string
-		args args
-		want string
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, SdumpNode(tt.args.node), "SdumpNode(%v)", tt.args.node)
-		})
-	}
-}
-
-func TestToUint64(t *testing.T) {
-	type args struct {
-		d any
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    uint64
-		wantErr assert.ErrorAssertionFunc
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := ToUint64(tt.args.d)
-			if !tt.wantErr(t, err, fmt.Sprintf("ToUint64(%v)", tt.args.d)) {
-				return
-			}
-			assert.Equalf(t, tt.want, got, "ToUint64(%v)", tt.args.d)
-		})
-	}
-}
-
-func Test_nodeResultToYaml(t *testing.T) {
-	type args struct {
-		node *base.Node
-	}
-	tests := []struct {
-		name       string
-		args       args
-		wantResult string
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.wantResult, nodeResultToYaml(tt.args.node), "nodeResultToYaml(%v)", tt.args.node)
-		})
-	}
 }
