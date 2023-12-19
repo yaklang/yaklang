@@ -8,22 +8,13 @@ on:
         required: true
         type: choice
         options:
-        - windows-amd64
-        - linux-amd64
-        - macos-amd64
+        - windows-latest
+        - macos-latest
+        - ubuntu-20.04
 
 jobs:
-  build_and_release:
-    strategy:
-      matrix:
-        include:
-          - os: windows-latest
-            build_os: windows-amd64
-          - os: macos-latest
-            build_os: macos-amd64
-          - os: ubuntu-20.04
-            build_os: linux-amd64
-    runs-on: ${{ matrix.os }}
+  build:
+    runs-on: "${{ inputs.os }}"
     steps:
       - name: Set up Go
         uses: actions/setup-go@v2
@@ -66,19 +57,19 @@ jobs:
         uses: actions/upload-artifact@v2
         if: runner.os == 'Windows'
         with:
-          name: yak_windows_amd64.exe
+          name: yak.exe
           path: ./yak_windows_amd64.exe
 
       - name: Upload Artifacts MacOS
         uses: actions/upload-artifact@v2
         if: runner.os == 'macOS'
         with:
-          name: yak_darwin_amd64
+          name: yak
           path: ./yak_darwin_amd64
 
       - name: Upload Artifacts Linux
         uses: actions/upload-artifact@v2
         if: runner.os == 'Linux'
         with:
-          name: yak_linux_amd64
+          name: yak
           path: ./yak_linux_amd64
