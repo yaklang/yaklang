@@ -165,7 +165,7 @@ func _yakit_save(items ...any) {
 }
 
 // yakit_status
-// !已弃用
+// ! 已弃用
 func _yakit_status(items ...any) {
 }
 
