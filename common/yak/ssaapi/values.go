@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/utils/omap"
 
 	"github.com/samber/lo"
@@ -165,6 +166,10 @@ func NewValue(n ssa.InstructionNode) *Value {
 		runtimeCtx: omap.NewEmptyOrderedMap[string, *Value](),
 		node:       n,
 	}
+}
+
+func (v *Value) GetId() int {
+	return v.node.GetId()
 }
 
 func (v *Value) NewError(tag, msg string) {

@@ -25,12 +25,7 @@ func DeleteInst(i Instruction) {
 			value.RemoveUser(user)
 		}
 	}
-	f := i.GetFunc()
-	delete(f.InstReg, i)
-	// if v, ok := i.(Value); ok {
-	// 	f := i.GetParent()
-	// 	f.symbolTable[v.GetVariable()] = remove(f.symbolTable[v.GetVariable()], v)
-	// }
+	i.GetProgram().DeleteInstruction(i)
 }
 
 // func EmitInst(i Instruction) {
@@ -175,7 +170,7 @@ func (f *FunctionBuilder) emitEx(i Instruction, insert func(Instruction)) {
 	i.SetRange(f.CurrentRange)
 	i.SetBlock(f.CurrentBlock)
 	i.SetFunc(f.Function)
-	f.SetReg(i)
+	f.GetProgram().SetVirtualRegister(i)
 	insert(i)
 }
 
