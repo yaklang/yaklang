@@ -26,7 +26,70 @@ import (
 func init() {
 	yakit.InitialDatabase()
 }
+func TestGRPCMUSTPASS_HTTPFuzzerWithNoFollowRedirect(t *testing.T) {
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.RequestURI != "/admin" {
+			http.Redirect(writer, request, "/admin", http.StatusMovedPermanently)
+			return
+		} else {
+			writer.Write([]byte(`ok`))
+			return
+		}
+	})
 
+	c, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	noFollowRedirect := true
+	for i := range make([]struct{}, 2) {
+		client, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+			Request: fmt.Sprintf(`GET / HTTP/1.1
+Host: %v
+`, utils.HostPort(host, port)),
+			IsHTTPS:                  false,
+			PerRequestTimeoutSeconds: 5,
+			NoFollowRedirect:         noFollowRedirect,
+			RedirectTimes:            3,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rsp, err := client.Recv()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if i == 0 {
+			if rsp.StatusCode != 301 {
+				t.Fatalf("expect 301, got %v", rsp.StatusCode)
+			}
+			noFollowRedirect = false
+			_, err := client.Recv()
+			if err.Error() != "EOF" {
+				t.Fatalf("expect EOF, got %v", err)
+			}
+		} else {
+			if rsp.StatusCode != 301 {
+				t.Fatalf("expect 301, got %v", rsp.StatusCode)
+			}
+			rsp, err := client.Recv()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if rsp.StatusCode != 200 {
+				t.Fatalf("expect 200, got %v", rsp.StatusCode)
+			}
+			if string(lowhttp.GetHTTPPacketBody(rsp.ResponseRaw)) != "ok" {
+				t.Fatal("expect response body is ok")
+			}
+			_, err = client.Recv()
+			if err.Error() != "EOF" {
+				t.Fatalf("expect EOF, got %v", err)
+			}
+		}
+	}
+}
 func TestGRPCMUSTPASS_HTTPFuzzerWITHPLUGIN(t *testing.T) {
 	var token string
 	name, err := httptpl.MockEchoPlugin(func(s string) {
