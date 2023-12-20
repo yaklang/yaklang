@@ -2,11 +2,12 @@ package poc
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/utils/cli"
 	"net/http"
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils/cli"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -1296,16 +1297,17 @@ func httpRequestToCurl(https bool, i any) string {
 }
 
 var PoCExports = map[string]interface{}{
-	"HTTP":         HTTP,
-	"HTTPEx":       HTTPEx,
-	"BasicRequest": lowhttp.BasicRequest,
-	"BuildRequest": BuildRequest,
-	"Get":          DoGET,
-	"Post":         DoPOST,
-	"Head":         DoHEAD,
-	"Delete":       DoDELETE,
-	"Options":      DoOPTIONS,
-	"Do":           Do,
+	"HTTP":          HTTP,
+	"HTTPEx":        HTTPEx,
+	"BasicRequest":  lowhttp.BasicRequest,
+	"BasicResponse": lowhttp.BasicResponse,
+	"BuildRequest":  BuildRequest,
+	"Get":           DoGET,
+	"Post":          DoPOST,
+	"Head":          DoHEAD,
+	"Delete":        DoDELETE,
+	"Options":       DoOPTIONS,
+	"Do":            Do,
 	// websocket，可以直接复用 HTTP 参数
 	"Websocket": DoWebSocket,
 
