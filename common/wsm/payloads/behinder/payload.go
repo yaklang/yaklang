@@ -52,7 +52,7 @@ func GetRawPHP(binPayload string, params map[string]string) ([]byte, error) {
 		code += v + "\r\n"
 	}
 	paramsList := getPhpParams(payloadBytes)
-	for _, paraName := range paramsList {
+	for i, paraName := range paramsList {
 		paraValue := ""
 		if v, ok := params[paraName]; ok {
 			paraValue = base64.StdEncoding.EncodeToString([]byte(v))
@@ -60,8 +60,9 @@ func GetRawPHP(binPayload string, params map[string]string) ([]byte, error) {
 		} else {
 			code += fmt.Sprintf("$%s=\"%s\";", paraName, "")
 		}
+		paramsList[i] = "$" + paraName
 	}
-	code += "\r\nmain(" + strings.Trim(strings.Join(paramsList, ",$"), ",") + ");"
+	code += "\r\nmain(" + strings.Trim(strings.Join(paramsList, ","), ",") + ");"
 	return []byte(code), nil
 }
 

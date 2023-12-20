@@ -983,6 +983,21 @@ func RandSample(n int, material ...string) string {
 	return string(b)
 }
 
+func RandSampleInRange(minLen, maxLen int, material ...string) string {
+	if minLen > maxLen {
+		// 如果最小长度大于最大长度，则交换它们
+		minLen, maxLen = maxLen, minLen
+	}
+
+	// 计算随机长度。rand.Intn(n) 生成 [0, n) 范围内的随机整数
+	// 因此，rand.Intn(maxLen - minLen + 1) 生成的是 [0, maxLen - minLen + 1) 范围内的随机数
+	// 加上 minLen 后，生成的随机长度就在 [minLen, maxLen] 范围内
+	randomLength := minLen + rand.Intn(maxLen-minLen+1)
+
+	// 调用 RandSample 生成并返回随机字符串
+	return RandSample(randomLength, material...)
+}
+
 func ExtractRawPath(target string) string {
 	var rawPath string
 	if noSchemaTarget := strings.TrimPrefix(

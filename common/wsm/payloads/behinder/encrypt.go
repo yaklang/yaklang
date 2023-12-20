@@ -18,6 +18,7 @@ func Encryption(binCode, key []byte, script string) ([]byte, error) {
 		}
 		result = []byte(base64.StdEncoding.EncodeToString(encCls))
 	case ypb.ShellScript_PHP.String():
+		// 冰蝎很烦的是不确定用 aes 还是 xor
 		encPhp, err := payloads.EncryptForPhp(binCode, key)
 		if err != nil {
 			return nil, err
