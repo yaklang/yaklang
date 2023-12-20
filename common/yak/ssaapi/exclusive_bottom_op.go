@@ -32,15 +32,22 @@ func (v *Value) getBottomUses(actx *AnalyzeContext) Values {
 		actx = NewAnalyzeContext()
 	}
 	switch ins := v.node.(type) {
+	case *ssa.Phi:
+		// enter function via phi
+		if !actx.ThePhiShouldBeVisited(v) {
+			// the phi is existed, visited in the same stack.
+			return Values{}
+		}
+		actx.VisitPhi(v)
+		return v.visitUserFallback(actx)
 	case *ssa.Return:
 		// enter function via return
-		if actx.CallStack.Len() > 0 {
-			val := actx.CallStack.Pop()
-			call, ok := val.node.(*ssa.Call)
-			if !ok {
-				log.Warnf("BUG: (callStack is not clean!) unknown call: %v", v.String())
+		if actx._callStack.Len() > 0 {
+			val := actx.GetCurrentCall()
+			if val == nil {
 				return Values{v}
 			}
+			call := val.node.(*ssa.Call)
 			fun, ok := call.Method.(*ssa.Function)
 			if !ok {
 				log.Warnf("BUG: (call's fun is not clean!) unknown function: %v", v.String())
@@ -86,7 +93,11 @@ func (v *Value) getBottomUses(actx *AnalyzeContext) Values {
 			return NewValue(val).SetParent(v).getBottomUses(actx)
 		}
 	case *ssa.Call:
-		_ = ins
+		if !actx.TheCallShouldBeVisited(v) {
+			// call existed
+			return v.visitUserFallback(actx)
+		}
+
 		parent, ok := v.GetParent()
 		if !ok {
 			log.Warnf("BUG: unknown parent for call: %v", v.String())
@@ -110,7 +121,12 @@ func (v *Value) getBottomUses(actx *AnalyzeContext) Values {
 			nv := NewValue(ins.Method)
 			nv.SetContextValue(SSA_BOTTOM_USES_targetActualParam, parent)
 			nv.SetContextValue(SSA_BOTTOM_USES_targetActualParamIndex, NewValue(ssa.NewConst(targetIndex)))
-			actx.CallStack.Push(v)
+			err := actx.PushCall(v)
+			if err != nil {
+				log.Warnf("BUG: (callStack is not clean!) push callStack failed: %T", v.node)
+				return v.visitUserFallback(actx)
+			}
+			defer actx.PopCall()
 			return nv.getBottomUses(actx)
 		}
 		return v.visitUserFallback(actx)
