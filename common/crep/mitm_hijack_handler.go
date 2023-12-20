@@ -3,18 +3,21 @@ package crep
 import (
 	"bytes"
 	"context"
-	"github.com/yaklang/yaklang/common/go-funk"
-	"github.com/yaklang/yaklang/common/log"
-	martian "github.com/yaklang/yaklang/common/minimartian"
-	"github.com/yaklang/yaklang/common/minimartian/fifo"
-	"github.com/yaklang/yaklang/common/minimartian/header"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"io"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/minimartian"
+	martian "github.com/yaklang/yaklang/common/minimartian"
+	"github.com/yaklang/yaklang/common/minimartian/fifo"
+	"github.com/yaklang/yaklang/common/minimartian/header"
+	"github.com/yaklang/yaklang/common/minimartian/proxyutil"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 )
 
 func (m *MITMServer) setHijackHandler(rootCtx context.Context) {
@@ -122,9 +125,7 @@ func (m *MITMServer) hijackRequestHandler(rootCtx context.Context, wsModifier *W
 	}
 	httpctx.SetRequestHTTPS(req, isHttps)
 
-	var (
-		isDropped = utils.NewBool(false)
-	)
+	isDropped := utils.NewBool(false)
 	if m.requestHijackHandler != nil {
 		hijackedRaw := httpctx.GetBareRequestBytes(req)
 		if hijackedRaw == nil || len(hijackedRaw) == 0 {
@@ -207,7 +208,7 @@ func (m *MITMServer) hijackResponseHandler(rsp *http.Response) error {
 		}
 	}()
 
-	var requestOrigin = rsp.Request
+	requestOrigin := rsp.Request
 	rsp.TLS = requestOrigin.TLS
 
 	if requestOrigin.Method == "CONNECT" {
@@ -241,10 +242,11 @@ func (m *MITMServer) hijackResponseHandler(rsp *http.Response) error {
 			httpctx.SetBareResponseBytes(requestOrigin, responseBytes)
 		}
 
-		var isHttps = httpctx.GetRequestHTTPS(rsp.Request)
+		isHttps := httpctx.GetRequestHTTPS(rsp.Request)
 		result := m.responseHijackHandler(isHttps, requestOrigin, rsp, responseBytes, httpctx.GetRemoteAddr(requestOrigin))
 		if result == nil {
 			dropped.Set()
+			rsp = proxyutil.NewResponse(200, strings.NewReader(proxyutil.GetErrorRspBody("响应被用户丢弃")), requestOrigin)
 		} else {
 			responseBytes = make([]byte, len(result))
 			copy(responseBytes, result)
@@ -260,14 +262,6 @@ func (m *MITMServer) hijackResponseHandler(rsp *http.Response) error {
 		}
 	}
 
-	// fetch proxy context
-	defer func() {
-		if dropped.IsSet() {
-			log.Info("drop response cause sleep in httpflow")
-			time.Sleep(3 * time.Minute)
-		}
-	}()
-
 	if m.httpFlowMirror != nil {
 		if len(responseBytes) <= 0 {
 			var err error
@@ -281,9 +275,9 @@ func (m *MITMServer) hijackResponseHandler(rsp *http.Response) error {
 
 		reqRawBytes := httpctx.GetRequestBytes(requestOrigin)
 		if reqRawBytes != nil {
-			var start = time.Now()
+			start := time.Now()
 			m.httpFlowMirror(httpctx.GetRequestHTTPS(requestOrigin), requestOrigin, rsp, start.Unix())
-			var end = time.Now()
+			end := time.Now()
 			cost := end.Sub(start)
 			if cost.Milliseconds() > 600 {
 				log.Infof(`m.httpFlowMirror cost: %v`, cost)
@@ -291,7 +285,9 @@ func (m *MITMServer) hijackResponseHandler(rsp *http.Response) error {
 		} else {
 			log.Errorf("request raw bytes is nil")
 		}
-		return nil
+	}
+	if dropped.IsSet() {
+		return minimartian.IsDroppedError
 	}
 	return nil
 }
