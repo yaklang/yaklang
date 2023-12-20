@@ -11,6 +11,11 @@ func (v *Value) GetContextValue(i string) (*Value, bool) {
 	return v.runtimeCtx.Get(i)
 }
 
+func (v *Value) SetContextValue(i string, values *Value) *Value {
+	v.runtimeCtx.Set(i, values)
+	return v
+}
+
 func (v *Value) GetParent() (*Value, bool) {
 	return v.GetContextValue("parent")
 }
