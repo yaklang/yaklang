@@ -16,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"gopkg.in/yaml.v2"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -352,17 +353,23 @@ var arpExpect = `Ethernet:
 `
 
 func TestICMP(t *testing.T) {
-	data := `3066d026811bf84d8991af52080045000040000040004006411fc0a803165db8d822e03e00506092a87800000000b002ffff230f0000020405b4010303060101080aae1982a00000000004020000`
-	ethernetData, err := codec.DecodeHex(data)
+	log.SetLevel(log.DebugLevel)
+	data := `"0f\xd0&\x81\x1b\xf8M\x89\x91\xafR\b\x00E\x00\x00@\x00\x00@\x00@\x06f\xea\xc0\xa8\x03\x16\b\b\b\bÞ\x01\xbb\x97k\xf4\xec\x00\x00\x00\x00\xb0\x02\xff\xffy\xeb\x00\x00\x02\x04\x05\xb4\x01\x03\x03\x06\x01\x01\b\nWy@\x17\x00\x00\x00\x00\x04\x02\x00\x00"`
+	ethernetData, err := strconv.Unquote(data)
 	if err != nil {
 		t.Fatal(err)
 	}
-	reader := bytes.NewReader(ethernetData)
-	res, err := parser.ParseBinary(reader, "tcp")
+	ret, err := testParse([]byte(ethernetData), "ethernet")
 	if err != nil {
 		t.Fatal(err)
 	}
-	_ = res
+	resMap, err := ret.Result()
+	resYaml, err := ResultToYaml(resMap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	println(resYaml)
+
 	//spew.Dump(codec.EncodeToHex(res.Bytes()))
 	//assert.Equal(t, codec.EncodeToHex(ethernetData), codec.EncodeToHex(res.Bytes()))
 }

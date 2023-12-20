@@ -35,6 +35,7 @@ type YakNode struct {
 	GetMaxLength      func(uint ...string) uint64
 	NewSubNode        func(datas ...any) *YakNode
 	NewUnknownNode    func(name ...string) *YakNode
+	NewEmptyNode      func(name ...string) *YakNode
 	ProcessSubNode    func(name string) any
 	TryProcessSubNode func(name string) (any, map[string]any)
 	ProcessByType     func(datas ...any) any
@@ -118,16 +119,34 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 		return copyYakNode.Result(), response
 	}
 	yakNode.GetMaxLength = func(uints ...string) uint64 {
+		n := getMulti(yakNode.origin, uints...)
 		l, err := getNodeLength(yakNode.origin)
 		if err != nil {
 			panic(err)
 		}
-		return l
+		return l / n
 	}
 	yakNode.NewUnknownNode = func(datas ...string) *YakNode {
 		name := utils.InterfaceToString(utils.GetLastElement(datas))
 		unknownNode := ConvertToYakNode(&base.Node{
 			Name:   "Unknown",
+			Origin: "raw",
+			Cfg:    base.NewConfig(yakNode.origin.Cfg),
+			Ctx:    yakNode.origin.Ctx,
+		}, operator)
+		err := appendNode(node, unknownNode.origin)
+		if err != nil {
+			panic(err)
+		}
+		if name != "" {
+			utils.GetLastElement(node.Children).Name = name
+		}
+		return ConvertToYakNode(utils.GetLastElement(node.Children), operator)
+	}
+	yakNode.NewEmptyNode = func(datas ...string) *YakNode {
+		name := utils.InterfaceToString(utils.GetLastElement(datas))
+		unknownNode := ConvertToYakNode(&base.Node{
+			Name:   "Empty",
 			Origin: "raw",
 			Cfg:    base.NewConfig(yakNode.origin.Cfg),
 			Ctx:    yakNode.origin.Ctx,

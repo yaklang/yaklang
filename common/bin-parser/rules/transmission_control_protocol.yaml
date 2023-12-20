@@ -19,12 +19,15 @@ Package:
                 for {
                     ele = this.NewElement()
                     if ele.GetMaxLength() == 0{
-                        return
+                        break
                     }
                     ele.Process()
                     if getNodeResult("Option/Kind") == 0 {
-                        return
+                        break
                     }
+                }
+                if this.Length() < this.GetMaxLength() {
+                    this.NewEmptyNode().Process()
                 }
         Payload:
             unpack: true
@@ -51,6 +54,8 @@ Option:
     operator: |
         n = this.ProcessSubNode("Kind")
         switch n {
+        case 0:
+            break
         case 1:
             break
         default:
