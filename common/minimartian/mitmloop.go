@@ -8,6 +8,15 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"net/url"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
@@ -18,15 +27,9 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
-	"io"
-	"net"
-	"net/http"
-	"net/url"
-	"strings"
-	"sync"
-	"sync/atomic"
-	"time"
 )
+
+var IsDroppedError = utils.Error("dropped")
 
 // Serve accepts connections from the listener and handles the requests.
 func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
@@ -54,7 +57,7 @@ func (p *Proxy) Serve(l net.Listener, ctx context.Context) error {
 
 	var currentConnCount int64 = 0
 	// 设置缓存并清除
-	var connsCached = new(sync.Map)
+	connsCached := new(sync.Map)
 	cacheConns := func(uid string, c net.Conn) {
 		connsCached.Store(uid, c)
 		atomic.AddInt64(&currentConnCount, 1)
@@ -638,9 +641,14 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 	}()
 
 	if !httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_IsDropped) {
-		if err := p.resmod.ModifyResponse(res); err != nil {
-			log.Errorf("mitm: error modifying response: %v", err)
-			proxyutil.Warning(res.Header, err)
+		err := p.resmod.ModifyResponse(res)
+		if err != nil {
+			if errors.Is(err, IsDroppedError) {
+				res = proxyutil.NewResponse(200, strings.NewReader(proxyutil.GetErrorRspBody("响应被用户丢弃")), req)
+			} else {
+				log.Errorf("mitm: error modifying response: %v", err)
+				proxyutil.Warning(res.Header, err)
+			}
 		}
 	}
 
@@ -678,8 +686,8 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 		log.Errorf("handle ordinary request: got error while writing response back to client: %v", err)
 	}
 
-	//Handle proxy getting stuck when upstream stops responding midway
-	//see https://github.com/google/martian/pull/349
+	// Handle proxy getting stuck when upstream stops responding midway
+	// see https://github.com/google/martian/pull/349
 	if errors.Is(err, io.ErrUnexpectedEOF) {
 		closing = errClose
 	}
@@ -724,7 +732,7 @@ func (p *Proxy) handshakeWithTarget(req *http.Request) (net.Conn, error) {
 	var rawConn net.Conn
 	var err error
 	var proxyUrl string
-	var gmConfig = &gmtls.Config{
+	gmConfig := &gmtls.Config{
 		InsecureSkipVerify: true,
 		GMSupport:          &gmtls.GMSupport{},
 		ServerName:         utils.ExtractHost(req.URL.Host),
