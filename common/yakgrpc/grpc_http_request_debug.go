@@ -37,6 +37,7 @@ func (s *Server) execScriptWithExecParam(scriptName string, input string, stream
 		isTemp    = scriptInstance.Ignored && strings.HasPrefix(scriptInstance.ScriptName, "tmp-")
 	)
 	runtimeId := uuid.New().String()
+	stream.Send(&ypb.ExecResult{IsMessage: false, RuntimeID: runtimeId}) // 触发前端切换结果页面
 	defer func() {
 		if err := recover(); err != nil {
 			log.Warn(err)
@@ -89,6 +90,7 @@ func (s *Server) execScriptWithExecParam(scriptName string, input string, stream
 			return utils.Errorf("import %v' s handle failed: %s", scriptName, err)
 		}
 
+		feedbackClient.SetYakLog(yaklib.CreateYakLogger()) // 重置log避免获取不到行号的问题
 		err = feedbackClient.Output(&yaklib.YakitFeature{
 			Feature: "text",
 			Params: map[string]interface{}{
@@ -186,6 +188,7 @@ func (s *Server) execScriptWithRequest(scriptName string, targetInput string, st
 	}
 
 	runtimeId := uuid.New().String()
+	stream.Send(&ypb.ExecResult{IsMessage: false, RuntimeID: runtimeId}) // 触发前端切换结果页面
 	var builderParams *ypb.HTTPRequestBuilderParams
 	if len(params) > 0 {
 		builderParams = params[0]
@@ -384,8 +387,39 @@ func (s *Server) debugScript(
 
 func makeArgs(execParams []*ypb.KVPair) []string {
 	var args = []string{"yak"}
+	canFilter := true
 	for _, p := range execParams {
-		args = append(args, "-"+p.Key, p.Value)
+		switch p.Key {
+		case "__yakit_plugin_names__": // 直接查询插件名
+			tempName, err := utils.SaveTempFile(p.Value, "yakit-plugin-selector-*.txt")
+			if err != nil {
+				log.Errorf("save temp file failed: %v", err)
+				return nil
+			}
+			args = append(args, "--yakit-plugin-file", tempName)
+			canFilter = false
+		case "__yakit_plugin_filter__": // 筛选情况
+			if !canFilter {
+				continue
+			}
+			var pluginFilter *ypb.QueryYakScriptRequest
+			var pluginName []string
+			err := json.Unmarshal([]byte(p.Value), pluginFilter)
+			if err != nil {
+				log.Errorf("unmarshal plugin filter failed: %v", err)
+				continue
+			}
+			yakit.FilterYakScript(consts.GetGormProfileDatabase(), pluginFilter).Pluck("script_name", pluginName)
+			tempName, err := utils.SaveTempFile(strings.Join(pluginName, "|"), "yakit-plugin-selector-*.txt")
+			if err != nil {
+				log.Errorf("save temp file failed: %v", err)
+				continue
+			}
+			args = append(args, "--yakit-plugin-file", tempName)
+		default:
+			args = append(args, "-"+p.Key, p.Value)
+		}
+
 	}
 	return args
 }

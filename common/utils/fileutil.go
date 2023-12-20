@@ -426,3 +426,14 @@ func ConvertTextFileToYakFuzztagByPath(file_bin_path string) (string, error) {
 	ret = fmt.Sprintf("{{array(%s)}}", fuzztagContent)
 	return ret, nil
 }
+
+func SaveTempFile(content interface{}, pattern string) (string, error) {
+	contentString := InterfaceToString(content)
+	var fp, err = os.CreateTemp(os.TempDir(), pattern)
+	if err != nil {
+		return "", err
+	}
+	fp.WriteString(contentString)
+	fp.Close()
+	return fp.Name(), nil
+}
