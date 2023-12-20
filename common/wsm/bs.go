@@ -159,6 +159,9 @@ func (b *BehidnerFileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.Re
 	for _, v := range u.GetQuery() {
 		query.Add(v.GetKey(), v.GetValue())
 	}
+	if query.Get("op") == "cmd" {
+		return b.Do(params)
+	}
 	id := query.Get("id")
 	manager, err := b.newBehinderFormId(id)
 	if err != nil {
@@ -386,8 +389,44 @@ func (b *BehidnerFileSystemAction) Head(params *ypb.RequestYakURLParams) (*ypb.R
 }
 
 func (b *BehidnerFileSystemAction) Do(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	u := params.GetUrl()
+	path := u.GetPath()
+
+	var query = make(url.Values)
+	for _, v := range u.GetQuery() {
+		query.Add(v.GetKey(), v.GetValue())
+	}
+
+	cmd := path + query.Get("cmd")
+	id := query.Get("id")
+	manager, err := b.newBehinderFormId(id)
+	if err != nil {
+		return nil, err
+	}
+
+	raw, err := manager.CommandExec(cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	content := gjson.GetBytes(raw, "msg").String()
+
+	var res []*ypb.YakURLResource
+	extra := []*ypb.KVPair{
+		// TODO
+		{Key: "content", Value: content},
+	}
+	var resource = &ypb.YakURLResource{
+		Path:  path,
+		Extra: extra,
+	}
+	res = append(res, resource)
+	return &ypb.RequestYakURLResponse{
+		Page:      1,
+		PageSize:  100,
+		Total:     int64(len(res)),
+		Resources: res,
+	}, nil
 }
 
 type ListFiles struct{}
