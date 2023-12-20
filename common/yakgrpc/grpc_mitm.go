@@ -1462,24 +1462,21 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					startCreateFlow = time.Now()
 
 					// HOOK 存储过程
-					if flow != nil {
-						flow.Hash = flow.CalcHash()
-						flow := flow
-						flow.StatusCode = 200 // 这里先设置成200
-						// log.Infof("start to do sth with tag")
-						for i := 0; i < 3; i++ {
-							startCreateFlow = time.Now()
-							// 用户丢弃请求后，这个flow表现在http history中应该是不包含响应的
-							flow.Response = ""
-							err = yakit.InsertHTTPFlow(s.GetProjectDatabase(), flow)
-							log.Debugf("insert http flow %v cost: %s", truncate(originReqIns.URL.String()), time.Now().Sub(startCreateFlow))
-							if err != nil {
-								log.Errorf("create / save httpflow from mirror error: %s", err)
-								time.Sleep(time.Duration(rand.Intn(300)) * time.Millisecond)
-								continue
-							}
-							break
+					flow.Hash = flow.CalcHash()
+					flow.StatusCode = 200 // 这里先设置成200
+					flow.Response = ""
+					// log.Infof("start to do sth with tag")
+					for i := 0; i < 3; i++ {
+						startCreateFlow = time.Now()
+						// 用户丢弃请求后，这个flow表现在http history中应该是不包含响应的
+						err = yakit.InsertHTTPFlow(s.GetProjectDatabase(), flow)
+						log.Debugf("insert http flow %v cost: %s", truncate(originReqIns.URL.String()), time.Now().Sub(startCreateFlow))
+						if err != nil {
+							log.Errorf("create / save httpflow from mirror error: %s", err)
+							time.Sleep(time.Duration(rand.Intn(300)) * time.Millisecond)
+							continue
 						}
+						break
 					}
 					return nil
 				}
@@ -1512,9 +1509,12 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		// 不符合劫持条件就不劫持
 		isFilteredByResponse := httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ResponseIsFiltered)
 		isFilteredByRequest := httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestIsFiltered)
+		isRequestModified := httpctx.GetRequestIsModified(req)
+		isResponseModified := httpctx.GetResponseIsModified(req)
+		isResponseDropped := httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_IsDropped)
 		isFiltered := isFilteredByResponse || isFilteredByRequest
-		modified := httpctx.GetRequestIsModified(req) || httpctx.GetResponseIsModified(req)
-		viewed := httpctx.GetRequestViewedByUser(req) || httpctx.GetResponseViewedByUser(req)
+		isViewed := httpctx.GetRequestViewedByUser(req) || httpctx.GetResponseViewedByUser(req)
+		isModified := isRequestModified || isResponseModified
 
 		var plainRequest []byte
 		if httpctx.GetRequestIsModified(req) {
@@ -1576,8 +1576,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		// Hidden Index 用来标注 MITM 劫持的顺序
 		flow.HiddenIndex = getPacketIndex()
 		flow.Hash = flow.CalcHash()
-		if viewed {
-			if modified {
+		if isViewed {
+			if isModified {
 				flow.AddTagToFirst("[手动修改]")
 				flow.Red()
 			} else {
@@ -1585,9 +1585,13 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				flow.Orange()
 			}
 		}
+		if isResponseDropped {
+			flow.AddTagToFirst("[响应被丢弃]")
+			flow.Purple()
+		}
 
 		hijackedFlowMutex := new(sync.Mutex)
-		dropped := utils.NewBool(false)
+		isDroppedSaveFlow := utils.NewBool(false)
 		mitmPluginCaller.HijackSaveHTTPFlow(
 			flow,
 			func(replaced *yakit.HTTPFlow) {
@@ -1600,13 +1604,13 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				*flow = *replaced
 			},
 			func() {
-				dropped.IsSet()
+				isDroppedSaveFlow.IsSet()
 			},
 		)
 		log.Debugf("mitmPluginCaller.HijackSaveHTTPFlow for %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
 
 		// storage
-		if flow != nil && !dropped.IsSet() {
+		if flow != nil && !isDroppedSaveFlow.IsSet() {
 			flow.Hash = flow.CalcHash()
 			flow := flow
 			startCreateFlow = time.Now()
@@ -1708,7 +1712,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			if len(bareReq) == 0 {
 				bareReq = httpctx.GetBareRequestBytes(req)
 			}
-			log.Debugf("[KV] save bare Response(%d)", flow.ID)
+			log.Debugf("[KV] save bare Request(%d)", flow.ID)
 
 			if len(bareReq) > 0 && flow.ID > 0 {
 				keyStr := strconv.FormatUint(uint64(flow.ID), 10) + "_request"
@@ -1716,7 +1720,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 		}
 
-		if httpctx.GetResponseIsModified(req) || httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_IsDropped) {
+		if httpctx.GetResponseIsModified(req) || isResponseDropped {
 			bareRsp := httpctx.GetPlainResponseBytes(req)
 			if len(bareRsp) == 0 {
 				bareRsp = httpctx.GetBareResponseBytes(req)
