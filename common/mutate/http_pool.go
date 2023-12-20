@@ -586,13 +586,16 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 					if overrideHttps {
 						https = true
 					}
-
+					redictTimes := config.RedirectTimes
+					if config.NoFollowRedirect {
+						redictTimes = 0
+					}
 					lowhttpOptions := []lowhttp.LowhttpOpt{lowhttp.WithHttps(https),
 						lowhttp.WithRuntimeId(config.RuntimeId),
 						lowhttp.WithHost(host), lowhttp.WithPort(port),
 						lowhttp.WithPacketBytes(targetRequest),
 						lowhttp.WithTimeout(config.PerRequestTimeout),
-						lowhttp.WithRedirectTimes(config.RedirectTimes),
+						lowhttp.WithRedirectTimes(redictTimes),
 						lowhttp.WithJsRedirect(config.FollowJSRedirect),
 						lowhttp.WithContext(config.Ctx),
 						lowhttp.WithNoFixContentLength(config.NoFixContentLength),
