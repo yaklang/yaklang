@@ -40,8 +40,56 @@ sink(e)
 	}
 }
 
-func TestYaklangExplore_BottomUses_1(t *testing.T) {
+func TestYaklangExplore_BottomUses_Bad_ConstCollapsed(t *testing.T) {
 	prog := Parse(`var c = 1
+var a = 55 + c
+myFunctionName(a)`)
+
+	refName := "c"
+
+	var foundMyFunctionName bool = false
+
+	prog.Ref(refName).ForEach(func(value *Value) {
+		log.Infof("%v: %s", refName, value.String())
+		value.GetBottomUses().ForEach(func(value *Value) {
+			log.Infof("%v Bottom Uses: %s", refName, value.String())
+			if strings.Contains(value.String(), "myFunctionName(") {
+				foundMyFunctionName = true
+			}
+		})
+	})
+	prog.Program.Show()
+	if !foundMyFunctionName {
+		t.Error("foundMyFunctionName check failed")
+	}
+}
+
+func TestYaklangExplore_BottomUses_Assign(t *testing.T) {
+	prog := Parse(`var c = bbb
+var a = 55 + c
+myFunctionName(a)`)
+
+	refName := "c"
+
+	var foundMyFunctionName bool = false
+
+	prog.Ref(refName).ForEach(func(value *Value) {
+		log.Infof("%v: %s", refName, value.String())
+		value.GetBottomUses().ForEach(func(value *Value) {
+			log.Infof("%v Bottom Uses: %s", refName, value.String())
+			if strings.Contains(value.String(), "myFunctionName(") {
+				foundMyFunctionName = true
+			}
+		})
+	})
+	prog.Program.Show()
+	if !foundMyFunctionName {
+		t.Error("foundMyFunctionName check failed")
+	}
+}
+
+func TestYaklangExplore_BottomUses_1(t *testing.T) {
+	prog := Parse(`var c
 var a = 1
 if cond {
 	a = c + 2
@@ -60,7 +108,7 @@ myFunctionName(d)`)
 		log.Infof("%v: %s", refName, value.String())
 		value.GetBottomUses().ForEach(func(value *Value) {
 			log.Infof("%v Bottom Uses: %s", refName, value.String())
-			if value.node.GetName() == "myFunctionName" {
+			if strings.Contains(value.String(), "myFunctionName(") {
 				foundMyFunctionName = true
 			}
 		})
