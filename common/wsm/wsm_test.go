@@ -52,15 +52,15 @@ func TestNewWebJSPShell(t *testing.T) {
 	//}
 	//t.Logf("%v", ping)
 
-	info, _ := bx.BasicInfo()
-	t.Logf("%v", string(info))
+	//info, _ := bx.BasicInfo()
+	//t.Logf("%v", string(info))
 
-	//cmd, err := bx.CommandExec("whoami")
-	//if err != nil {
-	//	t.Error(err)
-	//	return
-	//}
-	//t.Logf("%s", string(cmd))
+	cmd, err := bx.CommandExec("whoami")
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	t.Logf("%s", string(cmd))
 
 	//dir, err := bx.listFile("C:\\")
 	////ping, err := bx.showFile("C:\\Vuln\\apache-tomcat-8.5.84\\webapps\\S2-032")
