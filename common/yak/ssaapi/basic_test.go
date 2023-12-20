@@ -8,6 +8,65 @@ import (
 	"testing"
 )
 
+func TestYaklangBasic_RecursivePhi_1(t *testing.T) {
+	const code = `
+count = 100
+
+b = 1
+a = (ffff) => {
+	b ++
+	if b > 100 {
+		return
+	}
+	for i = 0; i < b; i ++ {
+		dump(b)
+	}
+	c = () => { d = a(b); sink(d) }
+	c()
+}
+e = a(1)
+`
+	prog := Parse(code).Show()
+	prog.Ref("a")
+}
+
+func TestYaklangBasic_RecursivePhi_2(t *testing.T) {
+	const code = `
+count = 100
+
+a = (b) => {
+	b ++
+	if b > 100 {
+		return
+	}
+	for i = 0; i < b; i ++ {
+		b := virtual(i, b)
+		dump(b)
+	}
+	a(b)
+}
+e = a(1)          // e
+f = a(v2(e))      // f
+`
+	prog := Parse(code).Show()
+	prog.Ref("a")
+}
+
+func TestYaklangBasic_DoublePhi(t *testing.T) {
+	const code = `var a = 1; for i:=0; i<n; i ++ { a += i }; println(a)`
+	prog := Parse(code).Show()
+	prog.Ref("a")
+}
+
+func TestYaklangBasic_SinglePhi(t *testing.T) {
+	const code = `for i:=0; i<n; i ++ { dump(i) }`
+	prog := Parse(code).Show()
+	phi, ok := prog.GetValueById(9).node.(*ssa.Phi)
+	if ok {
+		log.Infof("phi: %v", phi.String())
+	}
+}
+
 func TestYaklangBasic_Used(t *testing.T) {
 	token := utils.RandStringBytes(10)
 	prog := Parse(`var a, b

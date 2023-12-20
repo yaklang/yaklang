@@ -17,9 +17,6 @@ func NewCall(target Value, args, binding []Value, block *BasicBlock) *Call {
 
 func (f *FunctionBuilder) NewCall(target Value, args []Value) *Call {
 	call := NewCall(target, args, nil, f.CurrentBlock)
-	for _, arg := range args {
-		arg.AddUser(call)
-	}
 	return call
 }
 
