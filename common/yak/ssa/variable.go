@@ -76,18 +76,11 @@ func (f *Function) ReplaceVariable(variable string, v, to Value) {
 }
 
 func (b *Function) writeVariableByBlock(variable string, value Value, block *BasicBlock) {
-	vs, ok := block.symbolTable[variable]
-	if !ok {
-		vs = make(Values, 0)
+	vs := block.GetValuesByVariable(variable)
+	if vs == nil {
+		vs = make([]Value, 0, 1)
 	}
-	if len(vs) != 0 && vs[len(vs)-1] == nil {
-		if value == nil {
-			return
-		}
-		vs[len(vs)-1] = value
-	} else {
-		vs = append(vs, value)
-	}
+	vs = append(vs, value)
 	block.symbolTable[variable] = vs
 }
 
@@ -184,8 +177,15 @@ func (b *FunctionBuilder) readVariableByBlock(variable string, block *BasicBlock
 	}
 }
 
+func (block *BasicBlock) GetValuesByVariable(name string) []Value {
+	if vs, ok := block.symbolTable[name]; ok && (len(vs) > 0 && vs[0] != nil) {
+		return vs
+	}
+	return nil
+}
+
 func (b *FunctionBuilder) readVariableByBlockEx(variable string, block *BasicBlock, create bool) []Value {
-	if vs, ok := block.symbolTable[variable]; ok && len(vs) > 0 {
+	if vs := block.GetValuesByVariable(variable); vs != nil {
 		return vs
 	}
 
