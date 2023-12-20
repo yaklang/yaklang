@@ -6,6 +6,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
+	"net/http"
+	"net/url"
+	"path"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gobwas/glob"
 	"github.com/jinzhu/gorm"
@@ -24,14 +33,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"math/rand"
-	"net/http"
-	"net/url"
-	"path"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
 )
 
 type hijackStatusCode int8
@@ -109,6 +110,7 @@ func _suffixChecker(includes, excludes []string, target string) bool {
 	}
 	return false
 }
+
 func mimeCheckGlobRule(rule string, target string) bool {
 	if strings.Contains(rule, "/") && strings.Contains(target, "/") { // 如果两个都包含/，则进行分割匹配
 		ruleType := strings.SplitN(rule, "/", 2)
@@ -117,11 +119,11 @@ func mimeCheckGlobRule(rule string, target string) bool {
 			if strings.Contains(ruleType[i], "*") {
 				rule, err := glob.Compile(ruleType[i])
 				if err != nil || !rule.Match(targetType[i]) {
-					return false //任意部分匹配失败则 false,包括glob编译失败
+					return false // 任意部分匹配失败则 false,包括glob编译失败
 				}
 			} else {
 				if ruleType[i] != targetType[i] {
-					return false //任意部分匹配失败则 false
+					return false // 任意部分匹配失败则 false
 				}
 			}
 		}
@@ -151,11 +153,11 @@ func mimeCheckGlobRule(rule string, target string) bool {
 					continue
 				}
 				if rule.Match(targetType[i]) {
-					return true //任意部分匹配成功 则true
+					return true // 任意部分匹配成功 则true
 				}
 			} else {
 				if rule == targetType[i] {
-					return true //任意部分匹配成功 则true
+					return true // 任意部分匹配成功 则true
 				}
 			}
 		}
@@ -172,7 +174,7 @@ func _mimeChecker(includes, excludes []string, target string) bool {
 	if includes == nil {
 		for _, rule := range excludes {
 			if mimeCheckGlobRule(rule, target) {
-				return false //如果命中 excludes 则 false 即过滤
+				return false // 如果命中 excludes 则 false 即过滤
 			}
 		}
 		return true
@@ -180,13 +182,13 @@ func _mimeChecker(includes, excludes []string, target string) bool {
 
 	for _, rule := range excludes {
 		if mimeCheckGlobRule(rule, target) {
-			return false //如果命中 excludes 则 false 即过滤
+			return false // 如果命中 excludes 则 false 即过滤
 		}
 	}
 
 	for _, rule := range includes {
 		if mimeCheckGlobRule(rule, target) {
-			return true //如果命中 includes 则 true 即放行
+			return true // 如果命中 includes 则 true 即放行
 		}
 	}
 	return false
@@ -240,8 +242,10 @@ var constClujore = func(i interface{}) func() interface{} {
 	}
 }
 
-const MITMReplacerKeyRecords = "R1oHf8xca6CobwVg2_MITMReplacerKeyRecords"
-const MITMFilterKeyRecords = "uWokegBnCQdnxezJtMVo_MITMFilterKeyRecords"
+const (
+	MITMReplacerKeyRecords = "R1oHf8xca6CobwVg2_MITMReplacerKeyRecords"
+	MITMFilterKeyRecords   = "uWokegBnCQdnxezJtMVo_MITMFilterKeyRecords"
+)
 
 func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	defer func() {
@@ -324,7 +328,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			feedbackToUser(fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", downstreamProxy, "缺乏端口（Miss Port）"))
 			return utils.Errorf("proxy miss port. [%v]", proxyUrl.Host)
 		}
-		conn, err := netx.ProxyCheck(downstreamProxy, 5*time.Second) //代理检查只做log记录，不在阻止MITM启动
+		conn, err := netx.ProxyCheck(downstreamProxy, 5*time.Second) // 代理检查只做log记录，不在阻止MITM启动
 		if err != nil {
 			errInfo := "代理不通（Proxy Cannot be connected）"
 			if errors.Is(err, netx.ErrorProxyAuthFailed) {
@@ -362,18 +366,18 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 	// 设置过滤器
 	// 10M - 10 * 1000 * 1000
-	var packetLimit = 8 * 10 * 1000 * 1000 // 80M
+	packetLimit := 8 * 10 * 1000 * 1000 // 80M
 
 	/*
 		设置过滤器
 	*/
-	var filterManager = NewMITMFilterManager(s.GetProfileDatabase())
+	filterManager := NewMITMFilterManager(s.GetProfileDatabase())
 
 	/*
 		设置内容替换模块，通过正则驱动
 	*/
-	var replacer = NewMITMReplacer(func() []*ypb.MITMContentReplacer {
-		var result = yakit.GetKey(s.GetProfileDatabase(), MITMReplacerKeyRecords)
+	replacer := NewMITMReplacer(func() []*ypb.MITMContentReplacer {
+		result := yakit.GetKey(s.GetProfileDatabase(), MITMReplacerKeyRecords)
 		if result != "" {
 			var rules []*ypb.MITMContentReplacer
 			_ = json.Unmarshal([]byte(result), &rules)
@@ -395,7 +399,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		yakit.SetKey(s.GetProfileDatabase(), MITMReplacerKeyRecords, string(raw))
 	})
 
-	var recoverSend = func() {
+	recoverSend := func() {
 		send(&ypb.MITMResponse{
 			JustFilter:          true,
 			IncludeHostname:     filterManager.IncludeHostnames,
@@ -414,9 +418,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	feedbackToUser("初始化过滤器... / initializing filters")
 
 	// 开始准备劫持
-	//var hijackedResponseByRequestPTRMap = new(sync.Map)
+	// var hijackedResponseByRequestPTRMap = new(sync.Map)
 
-	//callers := yak.NewYakToCallerManager()
+	// callers := yak.NewYakToCallerManager()
 	mitmPluginCaller, err := yak.NewMixPluginCaller()
 	if err != nil {
 		return utils.Errorf("create mitm plugin manager failed: %s", err)
@@ -475,7 +479,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 	}()
 
-	var autoForward = utils.NewBool(true)
+	autoForward := utils.NewBool(true)
 	autoForwardCh := make(chan struct{}, 1)
 
 	go func() {
@@ -631,7 +635,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				script, _ := yakit.GetYakScript(s.GetProfileDatabase(), reqInstance.GetYakScriptID())
 				if script != nil && (script.Type == "mitm" || script.Type == "port-scan") {
 					log.Infof("start to load yakScript[%v]: %v 's capabilities", script.ID, script.ScriptName)
-					//appendCallers(script.Content, script.ScriptName, reqInstance.YakScriptParams)
+					// appendCallers(script.Content, script.ScriptName, reqInstance.YakScriptParams)
 					ctx := stream.Context()
 					err = mitmPluginCaller.LoadPluginByName(ctx, script.ScriptName, nil, script.Content)
 					if err != nil {
@@ -708,9 +712,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	/*
 		设置数据包计数器
 	*/
-	var offset = time.Now().UnixNano()
-	var count = 0
-	var packetCountLock = new(sync.Mutex)
+	offset := time.Now().UnixNano()
+	count := 0
+	packetCountLock := new(sync.Mutex)
 	addCounter := func() {
 		packetCountLock.Lock()
 		defer packetCountLock.Unlock()
@@ -731,9 +735,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	*/
 	var wshashFrameIndexLock sync.Mutex
 	var mServer *crep.MITMServer
-	var websocketHashCache = new(sync.Map)
-	var wshashFrameIndex = make(map[string]int)
-	var requireWsFrameIndexByWSHash = func(i string) int {
+	websocketHashCache := new(sync.Map)
+	wshashFrameIndex := make(map[string]int)
+	requireWsFrameIndexByWSHash := func(i string) int {
 		/*这个函数目前用在 Hijack 里面，不太需要加锁，因为 mitmLock 已经一般生效了*/
 		wshashFrameIndexLock.Lock()
 		defer wshashFrameIndexLock.Unlock()
@@ -859,7 +863,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 		rsp = plainResponse
 
-		var urlStr = httpctx.GetRequestURL(req)
+		urlStr := httpctx.GetRequestURL(req)
 
 		// use handled request
 		var plainRequest []byte
@@ -882,7 +886,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			return false
 		}
 
-		var dropped = utils.NewBool(false)
+		dropped := utils.NewBool(false)
 		mitmPluginCaller.CallHijackResponseEx(isHttps, urlStr, func() interface{} {
 			return plainRequest
 		}, func() interface{} {
@@ -913,11 +917,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}), constClujore(func() {
 				dropped.Set()
 			}))
+		}
 
-			if dropped.IsSet() {
-				httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_IsDropped, true)
-				return nil
-			}
+		if dropped.IsSet() {
+			httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_IsDropped, true)
+			return nil
 		}
 
 		if httpctx.GetResponseIsModified(req) {
@@ -1238,10 +1242,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}()
 
 		httpctx.SetMatchedRule(originReqIns, make([]*ypb.MITMContentReplacer, 0))
-		var originReqRaw = req[:]
-		var (
-			method = originReqIns.Method
-		)
+		originReqRaw := req[:]
+		method := originReqIns.Method
 
 		// make it plain
 		plainRequest := httpctx.GetPlainRequestBytes(originReqIns)
@@ -1251,7 +1253,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 
 		// handle rules
-		var originRequestHash = codec.Sha256(plainRequest)
+		originRequestHash := codec.Sha256(plainRequest)
 
 		rules, req1, shouldBeDropped := replacer.hook(true, false, req, isHttps)
 		if shouldBeDropped {
@@ -1265,7 +1267,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		handleRequestModified := func(newReqBytes []byte) bool {
 			return codec.Sha256(newReqBytes) != originRequestHash
 		}
-		var modifiedByRule = false
+		modifiedByRule := false
 		if handleRequestModified(req1) {
 			req = req1
 			modifiedByRule = true
@@ -1392,7 +1394,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					RemoteAddr:          httpctx.GetRemoteAddr(originReqIns),
 				}
 
-				var isMultipartData = lowhttp.IsMultipartFormDataRequest(req)
+				isMultipartData := lowhttp.IsMultipartFormDataRequest(req)
 				if isMultipartData {
 					feedbackOrigin.Request = lowhttp.ConvertHTTPRequestToFuzzTag(req)
 				}
@@ -1443,7 +1445,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_IsDropped, true)
 					// 保存到数据库
 					log.Debugf("start to create httpflow from mitm[%v %v]", originReqIns.Method, truncate(originReqIns.URL.String()))
-					var startCreateFlow = time.Now()
+					startCreateFlow := time.Now()
 					flow, err := yakit.CreateHTTPFlowFromHTTPWithNoRspSaved(isHttps, originReqIns, "mitm", originReqIns.URL.String(), remoteAddr)
 					if err != nil {
 						log.Errorf("save http flow[%v %v] from mitm failed: %s", originReqIns.Method, originReqIns.URL.String(), err)
@@ -1464,7 +1466,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 						flow.Hash = flow.CalcHash()
 						flow := flow
 						flow.StatusCode = 200 // 这里先设置成200
-						//log.Infof("start to do sth with tag")
+						// log.Infof("start to do sth with tag")
 						for i := 0; i < 3; i++ {
 							startCreateFlow = time.Now()
 							// 用户丢弃请求后，这个flow表现在http history中应该是不包含响应的
@@ -1508,11 +1510,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		addCounter()
 
 		// 不符合劫持条件就不劫持
-		var isFilteredByResponse = httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ResponseIsFiltered)
-		var isFilteredByRequest = httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestIsFiltered)
-		var isFiltered = isFilteredByResponse || isFilteredByRequest
-		var modified = httpctx.GetRequestIsModified(req) || httpctx.GetResponseIsModified(req)
-		var viewed = httpctx.GetRequestViewedByUser(req) || httpctx.GetResponseViewedByUser(req)
+		isFilteredByResponse := httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ResponseIsFiltered)
+		isFilteredByRequest := httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_RequestIsFiltered)
+		isFiltered := isFilteredByResponse || isFilteredByRequest
+		modified := httpctx.GetRequestIsModified(req) || httpctx.GetResponseIsModified(req)
+		viewed := httpctx.GetRequestViewedByUser(req) || httpctx.GetResponseViewedByUser(req)
 
 		var plainRequest []byte
 		if httpctx.GetRequestIsModified(req) {
@@ -1524,7 +1526,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 		}
 
-		var responseOverSize = false
+		responseOverSize := false
 		var plainResponse []byte
 		if httpctx.GetResponseIsModified(req) {
 			plainResponse = httpctx.GetHijackedResponseBytes(req)
@@ -1554,11 +1556,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 		// 保存到数据库
 		log.Debugf("start to create httpflow from mitm[%v %v]", req.Method, truncate(reqUrl))
-		var startCreateFlow = time.Now()
+		startCreateFlow := time.Now()
 		var flow *yakit.HTTPFlow
 		if httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_NOLOG) {
 			flow, err = yakit.CreateHTTPFlowFromHTTPWithNoRspSaved(isHttps, req, "mitm", reqUrl, remoteAddr)
-			flow.StatusCode = 200 //先设置成200
+			flow.StatusCode = 200 // 先设置成200
 		} else {
 			flow, err = yakit.CreateHTTPFlowFromHTTPWithBodySaved(isHttps, req, rsp, "mitm", reqUrl, remoteAddr) // , !responseOverSize)
 		}
@@ -1584,8 +1586,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 		}
 
-		var hijackedFlowMutex = new(sync.Mutex)
-		var dropped = utils.NewBool(false)
+		hijackedFlowMutex := new(sync.Mutex)
+		dropped := utils.NewBool(false)
 		mitmPluginCaller.HijackSaveHTTPFlow(
 			flow,
 			func(replaced *yakit.HTTPFlow) {
@@ -1609,7 +1611,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			flow := flow
 			startCreateFlow = time.Now()
 
-			var colorOK = make(chan struct{})
+			colorOK := make(chan struct{})
 			var extracted []*yakit.ExtractedData
 
 			if replacer != nil {
@@ -1714,7 +1716,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 		}
 
-		if httpctx.GetResponseIsModified(req) {
+		if httpctx.GetResponseIsModified(req) || httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_IsDropped) {
 			bareRsp := httpctx.GetPlainResponseBytes(req)
 			if len(bareRsp) == 0 {
 				bareRsp = httpctx.GetBareResponseBytes(req)
@@ -1726,7 +1728,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				yakit.SetProjectKeyWithGroup(s.GetProjectDatabase(), keyStr, bareRsp, yakit.BARE_RESPONSE_GROUP)
 			}
 		}
-
 	}
 	// 核心 MITM 服务器
 	var opts []crep.MITMConfig
@@ -1765,7 +1766,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 	feedbackToUser("MITM 服务器已启动 / starting mitm server")
 	log.Infof("start serve mitm server for %s", addr)
-	//err = mServer.Run(ctx)
+	// err = mServer.Run(ctx)
 	err = mServer.Serve(ctx, utils.HostPort(host, port))
 	if err != nil {
 		log.Errorf("close mitm server for %s, reason: %v", addr, err)
@@ -1861,7 +1862,7 @@ func (s *Server) SetCurrentRules(c context.Context, req *ypb.MITMContentReplacer
 }
 
 func (s *Server) GetCurrentRules(c context.Context, req *ypb.Empty) (*ypb.MITMContentReplacers, error) {
-	var result = yakit.GetKey(s.GetProfileDatabase(), MITMReplacerKeyRecords)
+	result := yakit.GetKey(s.GetProfileDatabase(), MITMReplacerKeyRecords)
 	var rules []*ypb.MITMContentReplacer
 	_ = json.Unmarshal([]byte(result), &rules)
 	return &ypb.MITMContentReplacers{Rules: rules}, nil
@@ -1990,7 +1991,7 @@ func (h *hijackTaskController) dequeue() string {
 	}
 	item := h.taskQueue[0]
 	h.taskQueue = h.taskQueue[1:]
-	if len(h.taskQueue) == 0 { //队列空 则停止下次请求
+	if len(h.taskQueue) == 0 { // 队列空 则停止下次请求
 		h.canDequeue.UnSet()
 	}
 	return item
