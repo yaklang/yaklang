@@ -16,6 +16,11 @@ func NewProgram(prog *ssa.Program) *Program {
 	}
 }
 
+func (p *Program) Show() *Program {
+	p.Program.Show()
+	return p
+}
+
 func (p *Program) IsNil() bool {
 	return utils.IsNil(p) || utils.IsNil(p.Program)
 }
