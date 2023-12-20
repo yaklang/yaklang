@@ -36,9 +36,13 @@ func GetEndPosition(t Token) (int, int) {
 
 func GetRange(token CanStartStopToken) *ssa.Range {
 	startToken := token.GetStart()
+	endToken := token.GetStop()
+	if startToken == nil || endToken == nil {
+		return nil
+	}
+
 	start := ssa.NewPosition(int64(startToken.GetStart()), int64(startToken.GetLine()), int64(startToken.GetColumn()))
 
-	endToken := token.GetStop()
 	endLine, endColumn := GetEndPosition(endToken)
 	end := ssa.NewPosition(int64(endToken.GetStop()), int64(endLine), int64(endColumn))
 
