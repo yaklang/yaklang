@@ -397,7 +397,7 @@ func (b *BehidnerFileSystemAction) Do(params *ypb.RequestYakURLParams) (*ypb.Req
 		query.Add(v.GetKey(), v.GetValue())
 	}
 
-	cmd := path + query.Get("cmd")
+	cmd := query.Get("cmd")
 	id := query.Get("id")
 	manager, err := b.newBehinderFormId(id)
 	if err != nil {
@@ -413,7 +413,6 @@ func (b *BehidnerFileSystemAction) Do(params *ypb.RequestYakURLParams) (*ypb.Req
 
 	var res []*ypb.YakURLResource
 	extra := []*ypb.KVPair{
-		// TODO
 		{Key: "content", Value: content},
 	}
 	var resource = &ypb.YakURLResource{
