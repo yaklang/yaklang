@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/kataras/golog"
+	"github.com/prometheus/common/log"
 	"io"
 	"io/ioutil"
 	"os"
@@ -116,7 +117,7 @@ func GetLogger(name string) *Logger {
 				if err == nil {
 					line = l.(int)
 				} else {
-					fmt.Println(err)
+					log.Error(err)
 				}
 			}
 			return formatter(l, name, line)
