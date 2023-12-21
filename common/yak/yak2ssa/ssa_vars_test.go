@@ -30,7 +30,7 @@ func check(t *testing.T, code string, regex string) {
 	printlnFuncs := prog.GetAndCreateMainFunction().GetValuesByName("println")
 	printlnFunc := printlnFuncs[0]
 	for _, final := range printlnFunc.GetUsers() {
-		line := final.LineDisasm()
+		line := ssa.LineDisasm(final)
 		fmt.Println(line)
 		if !re.Match(utils.UnsafeStringToBytes(line)) {
 			t.Fatal(line)

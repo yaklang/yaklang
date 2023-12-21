@@ -186,10 +186,10 @@ func (v *Value) NewWarn(tag, msg string) {
 	v.node.NewError(ssa.Warn, ssa.ErrorTag(tag), msg)
 }
 
-func (v *Value) String() string { return v.node.LineDisasm() }
+func (v *Value) String() string { return ssa.LineDisasm(v.node) }
 func (i *Value) StringWithSource() string {
 	if i.disasmLine == "" {
-		i.disasmLine = fmt.Sprintf("[%-6s] %s\t%s", i.node.GetOpcode(), i.node.LineDisasm(), i.node.GetRange())
+		i.disasmLine = fmt.Sprintf("[%-6s] %s\t%s", i.node.GetOpcode(), ssa.LineDisasm(i.node), i.node.GetRange())
 	}
 	return i.disasmLine
 }
