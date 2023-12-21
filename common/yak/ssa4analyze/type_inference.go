@@ -328,7 +328,7 @@ func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
 	}
 
 	sideEffect := funcTyp.SideEffects
-	if funcTyp.IsMethod {
+	if funcTyp.IsMethod && funcTyp.IsModifySelf {
 		sideEffect = append(sideEffect, c.Args[0].GetName())
 	}
 
