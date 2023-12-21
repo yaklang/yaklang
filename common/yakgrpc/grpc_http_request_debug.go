@@ -417,7 +417,7 @@ func makeArgs(execParams []*ypb.KVPair) []string {
 			}
 			args = append(args, "--yakit-plugin-file", tempName)
 		default:
-			args = append(args, "-"+p.Key, p.Value)
+			args = append(args, "--"+p.Key, p.Value)
 		}
 
 	}
