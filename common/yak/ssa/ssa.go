@@ -380,6 +380,7 @@ type ConstInst struct {
 	anValue
 	Unary      int
 	isIdentify bool // field key
+	Origin     User
 }
 
 // ConstInst cont set Type
@@ -389,6 +390,7 @@ func (c *ConstInst) SetType(ts Type) {}
 var (
 	_ Node        = (*ConstInst)(nil)
 	_ Value       = (*ConstInst)(nil)
+	_ User        = (*ConstInst)(nil)
 	_ Instruction = (*ConstInst)(nil)
 )
 

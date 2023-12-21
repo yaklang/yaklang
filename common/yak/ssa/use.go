@@ -170,8 +170,23 @@ func (p *Parameter) HasValues() bool   { return false }
 func (p *Parameter) GetValues() Values { return nil }
 
 // ----------- ConstInst
-func (c *ConstInst) HasValues() bool   { return false }
-func (c *ConstInst) GetValues() Values { return nil }
+func (c *ConstInst) HasValues() bool {
+	return c.Origin != nil
+}
+
+func (c *ConstInst) GetValues() Values {
+	if c.Origin != nil {
+		return c.Origin.GetValues()
+	} else {
+		return nil
+	}
+}
+
+func (c *ConstInst) ReplaceValue(v Value, to Value) {
+	if c.Origin != nil {
+		c.Origin.ReplaceValue(v, to)
+	}
+}
 
 // ----------- undefined
 func (u *Undefined) HasValues() bool   { return false }
