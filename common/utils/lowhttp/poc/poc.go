@@ -1082,7 +1082,7 @@ func pochttp(packet []byte, config *_pocConfig) (*lowhttp.LowhttpResponse, error
 // rsp, req, err = poc.HTTPEx(`GET / HTTP/1.1\r\nHost: www.yaklang.com\r\n\r\n`, poc.https(true), poc.replaceHeader("AAA", "BBB")) // 向yaklang.com发送一个基于HTTPS协议的GET请求，并且添加一个请求头AAA，它的值为BBB
 // desc(rsp) // 查看响应结构体中的可用字段
 // ```
-func HTTPEx(i interface{}, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
+func HTTPEx(i interface{}, opts ...PocConfig) (rspInst *lowhttp.LowhttpResponse, reqInst *http.Request, err error) {
 	packet, config, err := handleRawPacketAndConfig(i, opts...)
 	if err != nil {
 		return nil, nil, err
@@ -1117,7 +1117,7 @@ func BuildRequest(i interface{}, opts ...PocConfig) []byte {
 // ```
 // poc.HTTP("GET / HTTP/1.1\r\nHost: www.yaklang.com\r\n\r\n", poc.https(true), poc.replaceHeader("AAA", "BBB")) // yaklang.com发送一个基于HTTPS协议的GET请求，并且添加一个请求头AAA，它的值为BBB
 // ```
-func HTTP(i interface{}, opts ...PocConfig) ([]byte, []byte, error) {
+func HTTP(i interface{}, opts ...PocConfig) (rsp []byte, req []byte, err error) {
 	packet, config, err := handleRawPacketAndConfig(i, opts...)
 	if err != nil {
 		return nil, nil, err
@@ -1134,7 +1134,7 @@ func HTTP(i interface{}, opts ...PocConfig) ([]byte, []byte, error) {
 // poc.Do("GET","https://yaklang.com", poc.https(true)) // 向yaklang.com发送一个基于HTTPS协议的GET请求
 // desc(rsp) // 查看响应结构体中的可用字段
 // ```
-func Do(method string, urlStr string, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
+func Do(method string, urlStr string, opts ...PocConfig) (rspInst *lowhttp.LowhttpResponse, reqInst *http.Request, err error) {
 	config, err := handleUrlAndConfig(urlStr, opts...)
 	if err != nil {
 		return nil, nil, err
@@ -1161,7 +1161,7 @@ func Do(method string, urlStr string, opts ...PocConfig) (*lowhttp.LowhttpRespon
 // poc.Get("https://yaklang.com", poc.https(true)) // 向yaklang.com发送一个基于HTTPS协议的GET请求
 // desc(rsp) // 查看响应结构体中的可用字段
 // ```
-func DoGET(urlStr string, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
+func DoGET(urlStr string, opts ...PocConfig) (rspInst *lowhttp.LowhttpResponse, reqInst *http.Request, err error) {
 	return Do("GET", urlStr, opts...)
 }
 
@@ -1172,7 +1172,7 @@ func DoGET(urlStr string, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Re
 // poc.Post("https://yaklang.com", poc.https(true)) // 向yaklang.com发送一个基于HTTPS协议的POST请求
 // desc(rsp) // 查看响应结构体中的可用字段
 // ```
-func DoPOST(urlStr string, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
+func DoPOST(urlStr string, opts ...PocConfig) (rspInst *lowhttp.LowhttpResponse, reqInst *http.Request, err error) {
 	return Do("POST", urlStr, opts...)
 }
 
@@ -1183,7 +1183,7 @@ func DoPOST(urlStr string, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.R
 // poc.Head("https://yaklang.com", poc.https(true)) // 向yaklang.com发送一个基于HTTPS协议的HEAD请求
 // desc(rsp) // 查看响应结构体中的可用字段
 // ```
-func DoHEAD(urlStr string, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
+func DoHEAD(urlStr string, opts ...PocConfig) (rspInst *lowhttp.LowhttpResponse, reqInst *http.Request, err error) {
 	return Do("HEAD", urlStr, opts...)
 }
 
@@ -1194,7 +1194,7 @@ func DoHEAD(urlStr string, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.R
 // poc.Delete("https://yaklang.com", poc.https(true)) // 向yaklang.com发送一个基于HTTPS协议的DELETE请求
 // desc(rsp) // 查看响应结构体中的可用字段
 // ```
-func DoDELETE(urlStr string, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
+func DoDELETE(urlStr string, opts ...PocConfig) (rspInst *lowhttp.LowhttpResponse, reqInst *http.Request, err error) {
 	return Do("DELETE", urlStr, opts...)
 }
 
@@ -1205,7 +1205,7 @@ func DoDELETE(urlStr string, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http
 // poc.Options("https://yaklang.com", poc.https(true)) // 向yaklang.com发送一个基于HTTPS协议的Options请求
 // desc(rsp) // 查看响应结构体中的可用字段
 // ```
-func DoOPTIONS(urlStr string, opts ...PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
+func DoOPTIONS(urlStr string, opts ...PocConfig) (rspInst *lowhttp.LowhttpResponse, reqInst *http.Request, err error) {
 	return Do("OPTIONS", urlStr, opts...)
 }
 
@@ -1230,7 +1230,7 @@ func DoOPTIONS(urlStr string, opts ...PocConfig) (*lowhttp.LowhttpResponse, *htt
 // )
 // time.Sleep(100)
 // ```
-func DoWebSocket(raw interface{}, opts ...PocConfig) ([]byte, []byte, error) {
+func DoWebSocket(raw interface{}, opts ...PocConfig) (rsp []byte, req []byte, err error) {
 	opts = append(opts, WithWebsocket(true))
 	return HTTP(raw, opts...)
 }
@@ -1274,7 +1274,7 @@ func fixHTTPResponse(r []byte) []byte {
 // ```
 // poc.CurlToHTTPRequest("curl -X POST -d 'a=b&c=d' http://example.com")
 // ```
-func curlToHTTPRequest(command string) []byte {
+func curlToHTTPRequest(command string) (req []byte) {
 	raw, err := lowhttp.CurlToHTTPRequest(command)
 	if err != nil {
 		log.Errorf(`CurlToHTTPRequest failed: %s`, err)
@@ -1287,8 +1287,8 @@ func curlToHTTPRequest(command string) []byte {
 // ```
 // poc.HTTPRequestToCurl(true, "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
 // ```
-func httpRequestToCurl(https bool, i any) string {
-	cmd, err := lowhttp.GetCurlCommand(https, utils.InterfaceToBytes(i))
+func httpRequestToCurl(https bool, raw any) (curlCommand string) {
+	cmd, err := lowhttp.GetCurlCommand(https, utils.InterfaceToBytes(raw))
 	if err != nil {
 		log.Errorf(`http2curl.GetCurlCommand(req): %v`, err)
 		return ""

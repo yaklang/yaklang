@@ -30,11 +30,9 @@ const (
 	DoubleCRLF = "\r\n\r\n"
 )
 
-var (
-	// Add four bytes as specified in RFC
-	// Add final block to squelch unexpected EOF error from flate reader
-	TAIL = []byte{0, 0, 0xff, 0xff, 0x01, 0x00, 0x00, 0xff, 0xff}
-)
+// Add four bytes as specified in RFC
+// Add final block to squelch unexpected EOF error from flate reader
+var TAIL = []byte{0, 0, 0xff, 0xff, 0x01, 0x00, 0x00, 0xff, 0xff}
 
 // ExtractURLFromHTTPRequestRaw 从原始 HTTP 请求报文中提取 URL，返回URL结构体与错误
 // Example:
@@ -108,7 +106,7 @@ func TrimRightHTTPPacket(raw []byte) []byte {
 }
 
 func TrimSpaceHTTPPacket(raw []byte) []byte {
-	//return bytes.Trim(raw, "\t \n\v\f\n\b\r")
+	// return bytes.Trim(raw, "\t \n\v\f\n\b\r")
 	return bytes.TrimFunc(raw, unicode.IsSpace)
 }
 
@@ -326,7 +324,7 @@ func readCookies(h http.Header, filter string) []*http.Cookie {
 }
 
 func ParseCookie(i string) []*http.Cookie {
-	var header = http.Header{}
+	header := http.Header{}
 	header.Add("Cookie", i)
 	return readCookies(header, "")
 }
@@ -380,7 +378,8 @@ func SplitHTTPPacket(
 	raw []byte,
 	reqFirstLine func(method string, requestUri string, proto string) error,
 	rspFirstLine func(proto string, code int, codeMsg string) error,
-	hook ...func(line string) string) (string, []byte) {
+	hook ...func(line string) string,
+) (string, []byte) {
 	raw = TrimLeftHTTPPacket(raw)
 	reader := bufio.NewReader(bytes.NewBuffer(raw))
 	var err error
@@ -414,9 +413,9 @@ func SplitHTTPPacket(
 		}
 	}
 
-	var haveCl = false
+	haveCl := false
 	for {
-		//lineBytes, _, err := reader.ReadLine()
+		// lineBytes, _, err := reader.ReadLine()
 		lineBytes, err := utils.BufioReadLine(reader)
 		if err != nil && err != io.EOF {
 			break
@@ -425,7 +424,7 @@ func SplitHTTPPacket(
 			break
 		}
 
-		var skipHeader = false
+		skipHeader := false
 		for _, h := range hook {
 			hooked := h(string(lineBytes))
 			if hooked == "" {
@@ -528,7 +527,7 @@ func ShouldSendReqContentLength(method string, contentLength int64) bool {
 }
 
 func ExtractWebsocketURLFromHTTPRequest(req *http.Request) (bool, string) {
-	var isTls = false
+	isTls := false
 	if req != nil && req.URL != nil && strings.ToLower(req.URL.Scheme) == "https" {
 		isTls = true
 	}
@@ -542,7 +541,7 @@ func ExtractWebsocketURLFromHTTPRequest(req *http.Request) (bool, string) {
 }
 
 func ReadHTTPPacketBodySize(raw []byte) (cl int, chunked bool) {
-	var haveCL = false
+	haveCL := false
 	SplitHTTPHeadersAndBodyFromPacket(raw, func(line string) {
 		line = strings.ToLower(strings.TrimSpace(line))
 		if !haveCL && strings.HasPrefix(line, "content-type:") {
@@ -563,13 +562,15 @@ func ReadHTTPPacketBodySize(raw []byte) (cl int, chunked bool) {
 }
 
 func newRnd() *rand.Rand {
-	var seed = time.Now().UnixNano()
-	var src = rand.NewSource(seed)
+	seed := time.Now().UnixNano()
+	src := rand.NewSource(seed)
 	return rand.New(src)
 }
 
-var rnd = newRnd()
-var rndMu sync.Mutex
+var (
+	rnd   = newRnd()
+	rndMu sync.Mutex
+)
 
 // Return capped exponential backoff with jitter
 // http://www.awsarchitectureblog.com/2015/03/backoff.html
@@ -592,11 +593,11 @@ func randDuration(center time.Duration) time.Duration {
 	rndMu.Lock()
 	defer rndMu.Unlock()
 
-	var ri = int64(center)
+	ri := int64(center)
 	if ri <= 0 {
 		return 0
 	}
-	var jitter = rnd.Int63n(ri)
+	jitter := rnd.Int63n(ri)
 	return time.Duration(math.Abs(float64(ri + jitter)))
 }
 
@@ -678,7 +679,6 @@ func inflate(data []byte) ([]byte, error) {
 }
 
 func IsPermessageDeflate(headers http.Header) bool {
-
 	isDeflate := false
 	websocketExtensions, ok := headers["Sec-WebSocket-Extensions"]
 	if !ok {
@@ -735,9 +735,8 @@ func FixRequestHostAndPort(r *http.Request) {
 // ```
 // poc.IsResp(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok") // true
 // ```
-func IsResp(i any) bool {
-
-	switch data := i.(type) {
+func IsResp(raw any) (isHTTPResponse bool) {
+	switch data := raw.(type) {
 	case []byte:
 		_, err := ParseBytesToHTTPResponse(data)
 		return err == nil
