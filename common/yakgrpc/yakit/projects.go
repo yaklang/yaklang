@@ -2,12 +2,14 @@ package yakit
 
 import (
 	"context"
+	"fmt"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"os"
 )
 
 const INIT_DATABASE_RECORD_NAME = "[default]"
@@ -15,6 +17,7 @@ const FolderID = 0
 const ChildFolderID = 0
 const TypeProject = "project"
 const TypeFile = "file"
+const TEMPORARY_PROJECT_NAME = "[temporary]"
 
 func InitializingProjectDatabase() error {
 	db := consts.GetGormProfileDatabase()
@@ -82,6 +85,13 @@ func (p *Project) ToGRPCModel() *ypb.ProjectDescription {
 			childFolderName = childFolder.ProjectName
 		}
 	}
+	var fileSize string
+	fileInfo, err := os.Stat(p.DatabasePath)
+	if err != nil {
+		fileSize = formatFileSize(0)
+	}
+	// 获取文件大小
+	fileSize = formatFileSize(fileInfo.Size())
 	return &ypb.ProjectDescription{
 		ProjectName:     p.ProjectName,
 		Description:     p.Description,
@@ -94,6 +104,28 @@ func (p *Project) ToGRPCModel() *ypb.ProjectDescription {
 		UpdateAt:        p.UpdatedAt.Unix(),
 		FolderName:      folderName,
 		ChildFolderName: childFolderName,
+		FileSize:        fileSize,
+	}
+}
+
+func formatFileSize(size int64) string {
+	const (
+		kb = 1 << 10
+		mb = 1 << 20
+		gb = 1 << 30
+		tb = 1 << 40
+	)
+	switch {
+	case size < kb:
+		return fmt.Sprintf("%d B", size)
+	case size < mb:
+		return fmt.Sprintf("%.2f KB", float64(size)/float64(kb))
+	case size < gb:
+		return fmt.Sprintf("%.2f MB", float64(size)/float64(mb))
+	case size < tb:
+		return fmt.Sprintf("%.2f GB", float64(size)/float64(gb))
+	default:
+		return fmt.Sprintf("%.2f TB", float64(size)/float64(tb))
 	}
 }
 
@@ -201,12 +233,13 @@ func QueryProject(db *gorm.DB, params *ypb.GetProjectsRequest) (*bizhelper.Pagin
 			db = db.Where("child_folder_id IS NULL or child_folder_id = false")
 		}
 	}
-	if params.Type == TypeFile {
+	switch params.Type {
+	case TypeFile:
 		db = db.Where("type = ?", params.Type)
-	}
-	if params.Type == TypeProject {
+	case TypeProject:
 		db = db.Where("type IS NULL or type = ?", params.Type)
 	}
+	db = db.Where("(project_name <> ? and folder_id = false and child_folder_id = false and type = 'project')", TEMPORARY_PROJECT_NAME)
 	db = bizhelper.QueryOrder(db, p.OrderBy, p.Order)
 
 	var ret []*Project
@@ -284,6 +317,7 @@ func QueryProjectTotal(db *gorm.DB, req *ypb.GetProjectsRequest) (*bizhelper.Pag
 	}
 	params := req.Pagination
 	db = db.Where("type IS NULL or type = ? ", TypeProject)
+	db = db.Where("(project_name <> ? and folder_id = false and child_folder_id = false and type = 'project')", TEMPORARY_PROJECT_NAME)
 	var ret []*Project
 	paging, db := bizhelper.Paging(db, int(params.Page), int(params.Limit), &ret)
 	if db.Error != nil {
