@@ -24,7 +24,7 @@ func NewVariable(name string, i Value) *Variable {
 }
 func (v *Variable) String() string {
 	ret := ""
-	ret += fmt.Sprintln("Variable ", v.Name, v.V.LineDisasm())
+	ret += fmt.Sprintln("Variable ", v.Name, LineDisasm(v.V))
 	return ret
 }
 

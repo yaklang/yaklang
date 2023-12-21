@@ -221,7 +221,7 @@ func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
 			{
 				names := lo.Keys(obj.GetAllVariables())
 				if len(names) == 0 {
-					log.Errorf("method %s has no variable", obj.LineDisasm())
+					log.Errorf("method %s has no variable", ssa.LineDisasm(obj))
 				} else {
 					obj.SetName(names[0])
 				}

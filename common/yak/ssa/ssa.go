@@ -14,8 +14,6 @@ type ErrorLogger interface {
 type Instruction interface {
 	ErrorLogger
 
-	LineDisasm() string
-
 	GetOpcode() Opcode
 
 	// function
