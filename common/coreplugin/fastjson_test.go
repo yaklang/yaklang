@@ -3,6 +3,10 @@ package coreplugin
 import (
 	"context"
 	"errors"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -11,9 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
@@ -76,7 +77,7 @@ func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
 		//	defer wg.Done()
 		//	Must(TestCoreMitmPlug(pluginName, server, vulInfo, client, t), msg...)
 		//}()
-		Must(TestCoreMitmPlug(pluginName, server, vulInfo, client, t), msg...)
+		Must(CoreMitmPlugTest(pluginName, server, vulInfo, client, t), msg...)
 	}
 	//defer wg.Wait()
 	vulInGet := VulInfo{
@@ -215,5 +216,5 @@ func TestFastjson(t *testing.T) {
 		},
 		StrictMode: true,
 	}
-	Must(TestCoreMitmPlug(pluginName, server, vulInGet, client, t), "Fastjson 综合检测插件检测结果不符合预期")
+	Must(CoreMitmPlugTest(pluginName, server, vulInGet, client, t), "Fastjson 综合检测插件检测结果不符合预期")
 }

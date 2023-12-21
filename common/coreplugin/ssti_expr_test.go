@@ -3,9 +3,10 @@ package coreplugin
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/vulinbox"
 	"github.com/yaklang/yaklang/common/yakgrpc"
-	"testing"
 )
 
 func TestGRPCMUSTPASS_SSTI(t *testing.T) {
@@ -34,5 +35,5 @@ func TestGRPCMUSTPASS_SSTI(t *testing.T) {
 		StrictMode: false,
 	}
 
-	Must(TestCoreMitmPlug(pluginName, server, vul, client, t), "SSTI插件对于注入检测结果不符合预期")
+	Must(CoreMitmPlugTest(pluginName, server, vul, client, t), "SSTI插件对于注入检测结果不符合预期")
 }
