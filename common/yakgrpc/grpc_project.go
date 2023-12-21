@@ -124,16 +124,17 @@ func (s *Server) NewProject(ctx context.Context, req *ypb.NewProjectRequest) (*y
 		FolderID:      req.FolderId,
 		ChildFolderID: req.ChildFolderId,
 	}
+	pro, _ := yakit.GetProjectByWhere(s.GetProfileDatabase(), req.GetProjectName(), req.GetFolderId(), req.GetChildFolderId(), req.GetType(), req.GetId())
+	if pro != nil {
+		return nil, utils.Errorf("同级目录下项目或文件名不能重复")
+	}
+
 	if req.GetId() > 0 {
 		oldPro, err := yakit.GetProjectByID(s.GetProfileDatabase(), req.GetId())
 		if err != nil {
 			return nil, utils.Errorf("update project not exist %v", err.Error())
 		}
 
-		pro, _ := yakit.GetProjectByWhere(s.GetProfileDatabase(), req.GetProjectName(), req.GetFolderId(), req.GetChildFolderId(), req.GetType(), req.GetId())
-		if pro != nil {
-			return nil, utils.Errorf("同级目录下项目或文件名不能重复")
-		}
 		err = os.Rename(oldPro.DatabasePath, pathName)
 		if err != nil {
 			return nil, errors.Errorf(" oldfile=%v rename newname=%v fail=%v", oldPro.DatabasePath, pathName, err)
@@ -151,10 +152,10 @@ func (s *Server) NewProject(ctx context.Context, req *ypb.NewProjectRequest) (*y
 		}
 	}
 
-	pro, _ := yakit.GetProjectByWhere(s.GetProfileDatabase(), req.GetProjectName(), req.FolderId, req.ChildFolderId, req.Type, 0)
+	/*pro, _ := yakit.GetProjectByWhere(s.GetProfileDatabase(), req.GetProjectName(), req.FolderId, req.ChildFolderId, req.Type, 0)
 	if pro != nil {
 		return nil, utils.Errorf("同级目录下文件/文件夹名不能重复")
-	}
+	}*/
 	db := s.GetProfileDatabase()
 	if db = db.Create(&projectData); db.Error != nil {
 		return nil, db.Error
@@ -170,7 +171,7 @@ func (s *Server) NewProject(ctx context.Context, req *ypb.NewProjectRequest) (*y
 	return &ypb.NewProjectResponse{Id: int64(projectData.ID), ProjectName: req.GetProjectName()}, nil
 }
 
-func (s *Server) RemoveProject(ctx context.Context, req *ypb.RemoveProjectRequest) (*ypb.Empty, error) {
+/*func (s *Server) RemoveProject(ctx context.Context, req *ypb.RemoveProjectRequest) (*ypb.Empty, error) {
 	if req.GetProjectName() == yakit.INIT_DATABASE_RECORD_NAME {
 		return nil, utils.Error("[default] cannot be deleted")
 	}
@@ -180,7 +181,7 @@ func (s *Server) RemoveProject(ctx context.Context, req *ypb.RemoveProjectReques
 		return nil, err
 	}
 	return &ypb.Empty{}, nil
-}
+}*/
 
 func (s *Server) IsProjectNameValid(ctx context.Context, req *ypb.IsProjectNameValidRequest) (*ypb.Empty, error) {
 	if req.GetType() == "" {
@@ -481,12 +482,22 @@ func (s *Server) DeleteProject(ctx context.Context, req *ypb.DeleteProjectReques
 		if projects == nil {
 			return nil, utils.Error("删除项目不存在")
 		}
+		proj, err := yakit.GetDefaultProject(s.GetProfileDatabase())
+		if err != nil {
+			return nil, utils.Errorf("open project database failed: %s", err)
+		}
+		err = yakit.SetCurrentProjectById(s.GetProfileDatabase(), int64(proj.ID))
+		if err != nil {
+			return nil, utils.Errorf("open project database failed: %s", err)
+		}
+
 		for k := range projects {
 			if CheckDefault(k.ProjectName, k.Type, k.FolderID, k.ChildFolderID) != nil {
 				log.Info("[default] cannot be deleted")
 				break
 			}
 			if req.IsDeleteLocal {
+				consts.GetGormProjectDatabase().Close()
 				err := os.RemoveAll(k.DatabasePath)
 				if err != nil {
 					os.Chmod(k.DatabasePath, 0777)
@@ -494,7 +505,15 @@ func (s *Server) DeleteProject(ctx context.Context, req *ypb.DeleteProjectReques
 					log.Error("删除本地数据库失败：" + err.Error())
 				}
 			}
-			err := yakit.DeleteProjectById(s.GetProfileDatabase(), int64(k.ID))
+			defaultDb, err := gorm.Open("sqlite3", proj.DatabasePath)
+			if err != nil {
+				log.Errorf("切换默认数据库失败%s", err)
+			}
+			defaultDb.AutoMigrate(yakit.ProjectTables...)
+			consts.SetDefaultYakitProjectDatabaseName(proj.DatabasePath)
+			consts.SetGormProjectDatabase(defaultDb)
+
+			err = yakit.DeleteProjectById(s.GetProfileDatabase(), int64(k.ID))
 			if err != nil {
 				log.Error("删除项目失败：" + err.Error())
 			}
