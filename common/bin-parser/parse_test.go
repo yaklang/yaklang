@@ -80,6 +80,14 @@ func TestParser(t *testing.T) {
 				expect: dnsResponseExpect,
 			},
 		},
+		{
+			name: "icmp v6",
+			args: args{
+				data:   `3333ffa35b78f84d8991af5286dd6000000000203afffe8000000000000000237c9bf9dd7b2dff0200000000000000000001ffa35b7887000c5200000000fe8000000000000014ae6f6a11a35b780101f84d8991af52`,
+				rule:   "ethernet",
+				expect: icmpV6Expect,
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -101,6 +109,25 @@ func TestParser(t *testing.T) {
 	}
 }
 
+var icmpV6Expect = `Ethernet:
+  Destination: 3333ffa35b78
+  Source: f84d8991af52
+  Type: 34525
+  Internet Protocol Version 6:
+    Version: 6
+    Traffic Class: 0
+    Flow Label: 0
+    Payload Length: 32
+    Next Header: 58
+    Hop Limit: 255
+    Source: fe8000000000000000237c9bf9dd7b2d
+    Destination: ff0200000000000000000001ffa35b78
+    ICMPV6:
+      Type: 135
+      Code: 0
+      Checksum: 3154
+      Payload: 00000000fe8000000000000014ae6f6a11a35b780101f84d8991af52
+`
 var dnsResponseExpect = `Ethernet:
   Destination: f84d8991af52
   Source: 3066d026811b

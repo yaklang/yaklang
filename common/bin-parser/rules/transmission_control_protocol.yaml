@@ -12,7 +12,7 @@ Package:
         Checksum: raw,2
         Urgent Pointer: raw,2
         Options: # 字节数需要是4的倍数，不足补0
-            isList: true
+            list: true
             type: Option
             operator: |
                 this.SetMaxLength(getNodeResult("../Header Length")*4 - 20)
@@ -42,7 +42,6 @@ Package:
                         }
                         return
                     }else{
-                        dump(op.Message)
                         err = op.Recovery()
                         if err != nil{
                             panic(err)

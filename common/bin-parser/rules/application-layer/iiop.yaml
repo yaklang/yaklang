@@ -65,7 +65,7 @@ Package:
     ServiceContextList:
       ListLength: uint32
       ServiceContexts:
-        isList: true
+        list: true
         list-length-from-field: "@Request.ServiceContextList.ListLength"
         exception-plan: stopList # stopList, throw
         ServiceContext:
@@ -83,7 +83,7 @@ Package:
     StubData:
       Length: uint32
       WNames:
-        isList: true
+        list: true
         list-length-from-field: "@Request.StubData.Length"
         WName: LengthString
       Others: raw

@@ -362,6 +362,9 @@ func newNodeTree(parentCfg *Config, name string, data any, ctx *NodeContext) (*N
 				return nil, err
 			}
 			node.Children = append(node.Children, childNode)
+			if name == "Package" {
+				childNode.Cfg.SetItem("package-child", true)
+			}
 		}
 		if len(node.Children) == 0 {
 			node.Cfg.SetItem(CfgIsTerminal, true)

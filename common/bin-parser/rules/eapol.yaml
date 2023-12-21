@@ -1,0 +1,50 @@
+endian: big
+Package:
+  EAPOL:
+    Protocol Version: uint8
+    Packet Type: uint8
+    Body Length: uint16
+    Body:
+      unpack: true
+      operator: |
+        packetType = getNodeResult("@EAPOL/Packet Type")
+        bodyLength = getNodeResult("@EAPOL/Body Length")
+        switch packetType {
+          case 0x00: // EAP-Packet
+            node = this.NewSubNode("EAP-Packet")
+          case 0x01: // EAPOL-Start
+            node = this.NewEmptyNode()
+          case 0x02: // EAPOL-Logoff
+            node = this.NewEmptyNode()
+          case 0x03: // EAPOL-Key
+            node = this.NewSubNode("EAPOL-Key")
+          case 0x04: // EAPOL-Encapsulated-ASF-Alert
+            node = this.NewSubNode("EAPOL-Encapsulated-ASF-Alert")
+          default:
+            node = this.NewUnknownNode()
+        }
+        node.SetMaxLength(bodyLength)
+        node.Process()
+
+  EAP-Packet:
+    Code: uint8
+    Identifier: uint8
+    Length: uint16
+    Data: raw
+
+  EAPOL-Key:
+    Descriptor Type: uint8
+    Key Information: uint16
+    Key Length: uint16
+    Replay Counter: raw,8
+    Key Nonce: raw,32
+    Key IV: raw,16
+    Key RSC: raw,8
+    Key ID: raw,8
+    Key MIC: raw,16
+    Key Data Length: uint16
+    Key Data: raw
+
+  EAPOL-Encapsulated-ASF-Alert:
+    # Assume this is a raw data type, specific parsing rules would depend on the ASF specification
+    Data: raw

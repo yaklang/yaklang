@@ -1,0 +1,36 @@
+Package:
+  ICMPV6:
+    Type: uint8
+    Code: uint8
+    Checksum: uint16
+    Payload: raw
+Echo Request:
+    Identifier: uint16
+    Sequence Number: uint16
+    Data: raw
+Echo Reply:
+    Identifier: uint16
+    Sequence Number: uint16
+    Data: raw
+Destination Unreachable:
+    Code: uint8
+    Checksum: uint16
+    Unused: uint32
+    Payload:
+      unpack: true
+      operator: |
+        code = getNodeResult("@Destination Unreachable/Code")
+        switch code {
+          case 1:
+            this.ProcessByType("No Route to Destination")
+          case 2:
+            this.ProcessByType("Communication with Destination Administratively Prohibited")
+          case 3:
+            this.ProcessByType("Beyond Scope of Source Address")
+          case 4:
+            this.ProcessByType("Address Unreachable")
+          case 5:
+            this.ProcessByType("Port Unreachable")
+          default:
+            return
+        }

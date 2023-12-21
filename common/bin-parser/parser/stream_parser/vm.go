@@ -25,8 +25,6 @@ type YakNode struct {
 	GetRemainingSpace    func() uint64
 	CalcNodeResultLength func() uint64
 	NewElement           func() *YakNode
-	TryProcess           func(*YakNode) (any, map[string]any)
-	SetLength            func(l uint64)
 
 	SetChildren       func([]*YakNode)
 	GetChildren       func() []*YakNode
@@ -163,20 +161,6 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 	yakNode.SetMaxLength = func(l uint64, uints ...string) {
 		n := getMulti(yakNode.origin, uints...)
 		node.Cfg.SetItem(CfgLength, l*uint64(n))
-	}
-	yakNode.SetLength = func(l uint64) {
-		if !node.Cfg.Has(CfgUnit) {
-			panic("node not has unit")
-		}
-		unit := node.Cfg.GetString(CfgUnit)
-		switch unit {
-		case "byte":
-			node.Cfg.SetItem(CfgLength, l*8)
-		case "bit":
-			node.Cfg.SetItem(CfgLength, l)
-		default:
-			panic("unknown unit " + unit)
-		}
 	}
 	yakNode.ProcessByType = func(datas ...any) any {
 		var typeName, nodeName string

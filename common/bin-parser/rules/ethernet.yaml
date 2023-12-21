@@ -18,8 +18,10 @@ Package:
           case 0x888e:
             this.ProcessByType("EAPOL")
           default:
-            return
+            this.NewUnknownNode()
         }
 Internet Protocol: "import:internet_protocol.yaml;node:Package/Internet Protocol"
 Internet Protocol Version 6: "import:internet_protocol_version_6.yaml;node:Package/Internet Protocol Version 6"
 Address Resolution Protocol: "import:address_resolution_protocol.yaml;node:Package/Address Resolution Protocol"
+EAPOL: "import:eapol.yaml;node:Package/EAPOL"
+Unknown: raw

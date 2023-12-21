@@ -35,7 +35,7 @@ Body:
     }
   Data: raw
   DataChunks:
-    isList: true
+    list: true
     DataChunk:
       operator: |
         res = this.GetSubNode("DataChunkLength").Process()
@@ -66,5 +66,5 @@ Headers:
         setCtx("isChunked", true)
       }
     }
-  isList: true
+  list: true
   Item: "del:\r\n;type:string"

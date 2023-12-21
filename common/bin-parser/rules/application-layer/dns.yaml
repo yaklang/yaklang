@@ -33,14 +33,14 @@ Package:
           Authority RRs: uint16
           Additional RRs: uint16
       Questions:
-          isList: true
+          list: true
           list-length-from-field: "../Header/Questions"
           Question:
             Name: String
             Type: uint16
             Class: uint16
       Answers:
-          isList: true
+          list: true
           list-length-from-field: "../Header/Answer RRs"
           Answer:
             Name:
@@ -66,7 +66,7 @@ Package:
             RDLength: uint16
             RData: "type:raw;length-from-field:../RDLength"
 String:
-  isList: true
+  list: true
   Label:
     operator: |
       count = this.ProcessSubNode("Count")

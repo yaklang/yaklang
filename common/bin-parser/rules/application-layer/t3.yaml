@@ -25,7 +25,7 @@ Package:
   PublicKey: "type:raw;length-from-field:PublicKeyLength;length-from-field-multiply:8"
   NoneStreamHeaderPeerInfo: raw
   Abbrevs:
-    isList: true
+    list: true
     exception-plan: stopList # stopList, throw
     endian: little
     Abbrev:
@@ -59,7 +59,7 @@ Package:
               n = this.NewElement().Process()
               n = this.NewElement().Process()
           }
-        isList: true
+        list: true
         Byte: uint8
       ObjectType: uint8 # 0: Object, 1: string
       Object:

@@ -187,6 +187,7 @@ func (s *Server) ParseTraffic(ctx context.Context, req *ypb.ParseTrafficRequest)
 		finalResult["RAW"] = codec.EncodeBase64(raw)
 		rsp.OK = true
 		noResultError := utils.Error("no result")
+		var packageRootNodes []any
 		config := map[string]any{
 			"custom-formatter": func(node *base.Node) (any, error) {
 				isPackage := func(node *base.Node) bool {
@@ -239,7 +240,7 @@ func (s *Server) ParseTraffic(ctx context.Context, req *ypb.ParseTrafficRequest)
 					getSubs = func(node *base.Node) []*base.Node {
 						children := []*base.Node{}
 						for _, sub := range node.Children {
-							if sub.Cfg.GetBool("isRefType") || sub.Cfg.GetBool("unpack") || isPackage(sub) {
+							if sub.Cfg.GetBool("unpack") || isPackage(sub) {
 								children = append(children, getSubs(sub)...)
 							} else {
 								children = append(children, sub)
@@ -256,10 +257,17 @@ func (s *Server) ParseTraffic(ctx context.Context, req *ypb.ParseTrafficRequest)
 							}
 							return nil, err
 						}
-						res = append(res, map[string]any{
-							"name":  sub.Name,
-							"value": d,
-						})
+						if sub.Cfg.GetBool("package-child") {
+							packageRootNodes = append(packageRootNodes, map[string]any{
+								"name":  sub.Name,
+								"value": d,
+							})
+						} else {
+							res = append(res, map[string]any{
+								"name":  sub.Name,
+								"value": d,
+							})
+						}
 					}
 					if len(res) == 0 {
 						return nil, noResultError
@@ -277,8 +285,11 @@ func (s *Server) ParseTraffic(ctx context.Context, req *ypb.ParseTrafficRequest)
 			rsp.Result = string(resJson)
 			return rsp, nil
 		}
-		parseResult, err := node.Result()
-		finalResult["Result"] = parseResult
+		node.Result()
+		for i, j := 0, len(packageRootNodes)-1; i < j; i, j = i+1, j-1 {
+			packageRootNodes[i], packageRootNodes[j] = packageRootNodes[j], packageRootNodes[i]
+		}
+		finalResult["Result"] = packageRootNodes
 		resJson, err := bin_parser2.ResultToJson(finalResult)
 		rsp.Result = string(resJson)
 		return rsp, nil

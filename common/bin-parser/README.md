@@ -16,7 +16,7 @@ Package:
 ```yaml
 Package:
   endian: big
-  isList: true
+  list: true
   Rule1: xxx
 ```
 其中endian、isList为Package的属性，Rule1为Package的子节点。
@@ -31,7 +31,7 @@ operator是一个特殊的属性，可以编写yak代码，控制解析流程
 ```yaml
 Package:
   endian: big
-  isList: true
+  list: true
   length: 10
   operator: |
     d = this.Rule1.Process()
@@ -46,7 +46,7 @@ operator可以使用context传输上下文数据，如
 ```yaml
 Package:
   endian: big
-  isList: true
+  list: true
   length: 10
   operator: |
     this.SetCtx("rule1-length", 1)

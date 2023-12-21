@@ -1,5 +1,5 @@
 Package:
-  isList: true
+  list: true
   exception-plan: stopList # stopList, throw
   Transport Layer Security:
     Record Layer:

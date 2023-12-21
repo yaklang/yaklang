@@ -13,7 +13,7 @@ import (
 
 const (
 	CfgIsTerminal    = "isTerminal"
-	CfgIsList        = "isList"
+	CfgIsList        = "list"
 	CfgIsTempRoot    = "temp root"
 	CfgLength        = "length"
 	CfgUnit          = "unit"
@@ -144,6 +144,7 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 		if v, ok := rootNodeMap["Package"]; !ok {
 			return errors.New("package node not found")
 		} else {
+
 			return operator.NodeParse(v)
 		}
 	}
