@@ -24,6 +24,15 @@ type StaticAnalyzeResult struct {
 	From            string `json: "from"`
 }
 
+func (e *StaticAnalyzeResult) String() string {
+	return fmt.Sprintf("[%s]: %s in [%d:%d -- %d:%d] from %s\n",
+		e.Severity, e.Message,
+		e.StartLineNumber, e.StartColumn,
+		e.EndLineNumber, e.EndColumn,
+		e.From,
+	)
+}
+
 func AnalyzeStaticYaklang(i interface{}) []*StaticAnalyzeResult {
 	code := utils.UnsafeBytesToString(utils.InterfaceToBytes(i))
 
@@ -80,7 +89,7 @@ func AnalyzeStaticYaklangWithType(code, codeTyp string) []*StaticAnalyzeResult {
 			EndLineNumber:   int(err.Pos.End.Line),
 			EndColumn:       int(err.Pos.End.Column + 1),
 			RawMessage:      err.String(),
-			From:            "SSA",
+			From:            "SSA:" + string(err.Tag),
 		})
 	}
 	return results
