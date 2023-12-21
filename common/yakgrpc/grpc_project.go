@@ -500,8 +500,6 @@ func (s *Server) DeleteProject(ctx context.Context, req *ypb.DeleteProjectReques
 				consts.GetGormProjectDatabase().Close()
 				err := os.RemoveAll(k.DatabasePath)
 				if err != nil {
-					os.Chmod(k.DatabasePath, 0777)
-					err = os.RemoveAll(k.DatabasePath)
 					log.Error("删除本地数据库失败：" + err.Error())
 				}
 			}

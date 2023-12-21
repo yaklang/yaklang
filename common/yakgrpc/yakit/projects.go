@@ -86,12 +86,12 @@ func (p *Project) ToGRPCModel() *ypb.ProjectDescription {
 		}
 	}
 	var fileSize string
-	fileInfo, err := os.Stat(p.DatabasePath)
-	if err != nil {
+	fileInfo, _ := os.Stat(p.DatabasePath)
+	if fileInfo == nil {
 		fileSize = formatFileSize(0)
+	} else {
+		fileSize = formatFileSize(fileInfo.Size())
 	}
-	// 获取文件大小
-	fileSize = formatFileSize(fileInfo.Size())
 	return &ypb.ProjectDescription{
 		ProjectName:     p.ProjectName,
 		Description:     p.Description,
