@@ -153,7 +153,7 @@ corsCheck = func(ishttps,req,rsp,url){
     domain = str.RandStr(5)+".example.com"
     lowHttp,_,err = poc.HTTPEx(req, poc.replaceHeader("Origin", domain))
     checkErr(err)
-    newHeaders = poc.GetHTTPPacketHeaders(lowHttp.RedirectRawPackets.Response[0])
+    newHeaders = poc.GetHTTPPacketHeaders(lowHttp.RedirectRawPackets[0].Response)
     if newHeaders["Access-Control-Allow-Origin"] != nil{
         if str.Contains(newHeaders["Access-Control-Allow-Origin"] ,domain){
             corsLog(newResult(url,req,rsp))
