@@ -79,7 +79,13 @@ var UnaryOpcodeName = map[UnaryOpcode]string{
 	OpBitwiseNot: `bitwise-not`,
 }
 
-func HandlerBinOp(b *BinOp) Value {
+func HandlerBinOp(b *BinOp) (ret Value) {
+	defer func() {
+		if c, ok := ToConst(ret); ok {
+			c.Origin = b
+		}
+	}()
+
 	if cX, ok := ToConst(b.X); ok {
 		if cY, ok := ToConst(b.Y); ok {
 			// both const
@@ -106,7 +112,13 @@ func HandlerBinOp(b *BinOp) Value {
 	return CalcBinary(b)
 }
 
-func HandlerUnOp(u *UnOp) Value {
+func HandlerUnOp(u *UnOp) (ret Value) {
+	defer func() {
+		if c, ok := ToConst(ret); ok {
+			c.Origin = u
+		}
+	}()
+
 	if c, ok := ToConst(u.X); ok {
 		if v := CalcConstUnary(c, u.Op); v != nil {
 			return v

@@ -1,12 +1,29 @@
 package ssaapi
 
 import (
+	"strings"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"strings"
-	"testing"
 )
+
+func TestYaklangBasic_Const(t *testing.T) {
+	code := `
+	a = 1
+	b = a + 1 
+	println(b)
+	`
+
+	prog := Parse(code)
+	// prog.Ref("a").Show()
+	prog.Ref("b").Show().ForEach(func(v *Value) {
+		if len(v.GetOperands().Show()) != 2 {
+			t.Fatalf("const 2 should have 2 operands")
+		}
+	})
+}
 
 func TestYaklangBasic_RecursivePhi_1(t *testing.T) {
 	const code = `
