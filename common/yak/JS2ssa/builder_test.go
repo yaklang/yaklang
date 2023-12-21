@@ -29,7 +29,7 @@ func check(t *testing.T, code string, funcs string, regex string) {
 
 	showFunc := prog.Packages["main"].Funcs["main"].GetValuesByName(funcs)[0]
 	for _, v := range showFunc.GetUsers() {
-		line := v.LineDisasm()
+		line := ssa.LineDisasm(v)
 		fmt.Println(line)
 		if !re.Match(utils.UnsafeStringToBytes(line)) {
 			t.Fatal(line)
