@@ -186,6 +186,21 @@ func (s *Server) GetBasicInfo(ctx context.Context, req *ypb.WebShellRequest) (*y
 	if err != nil {
 		return nil, err
 	}
+	if shell.GetPacketCodecName() != "" {
+		script, err := yakit.GetYakScriptByName(db, shell.GetPacketCodecName())
+		if err != nil {
+			return nil, err
+		}
+
+		w.SetPacketScriptContent(script.Content)
+	}
+	if shell.GetPayloadCodecName() != "" {
+		script, err := yakit.GetYakScriptByName(db, shell.GetPayloadCodecName())
+		if err != nil {
+			return nil, err
+		}
+		w.SetPayloadScriptContent(script.Content)
+	}
 	g, ok := w.(*wsm.Godzilla)
 	if ok {
 		err := g.InjectPayload()

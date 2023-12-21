@@ -67,7 +67,9 @@ func NewBehinder(ys *ypb.WebShell) (*Behinder, error) {
 func (b *Behinder) echoResultEncode(raw []byte) ([]byte, error) {
 	// 如果没有自定义的数据包编码器，也没有自定义的回显解码器，就代表使用的是冰蝎3 的版本
 	if (b.customPacketEncoder == nil && b.customEchoDecoder == nil) && len(b.PayloadScriptContent) == 0 {
-		b.customEchoEncoder = defaultPHPEchoEncoder
+		if b.ShellScript == ypb.ShellScript_PHP.String() {
+			b.customEchoEncoder = defaultPHPEchoEncoder
+		}
 	}
 	if b.customEchoEncoder != nil {
 		return b.customEchoEncoder(raw)
