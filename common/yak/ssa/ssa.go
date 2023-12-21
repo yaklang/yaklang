@@ -82,8 +82,15 @@ type InstructionNode interface {
 type Value interface {
 	InstructionNode
 	TypedNode
+	Maskable
 	AddUser(User)
 	RemoveUser(User)
+}
+
+type Maskable interface {
+	AddMask(Value)
+	GetMask() []Value
+	Masked() bool
 }
 
 type User interface {
@@ -102,12 +109,29 @@ type anInstruction struct {
 
 	isExtern  bool
 	variables map[string]*Variable
+
+	// mask is a map, key is variable name, value is variable value
+	// it record the variable is masked by closure function or some scope changed
+	mask *omap.OrderedMap[string, Value]
+}
+
+func (i *anInstruction) AddMask(v Value) {
+	i.mask.Add(v)
+}
+
+func (i *anInstruction) GetMask() []Value {
+	return i.mask.Values()
+}
+
+func (i *anInstruction) Masked() bool {
+	return i.mask.Len() != 0
 }
 
 func NewInstruction() anInstruction {
 	return anInstruction{
 		variables: make(map[string]*Variable),
 		id:        -1,
+		mask:      omap.NewEmptyOrderedMap[string, Value](),
 	}
 }
 

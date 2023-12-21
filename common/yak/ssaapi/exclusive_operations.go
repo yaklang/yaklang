@@ -28,6 +28,7 @@ func (v *Value) SetParent(value *Value) *Value {
 func (v *Value) SetSideEffect(e *Value) *Value {
 	if e == nil {
 		v.runtimeCtx.Delete("isSizeEffect")
+		return v
 	}
 	v.runtimeCtx.Set("isSizeEffect", e)
 	return v
