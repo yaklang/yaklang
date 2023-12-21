@@ -62,7 +62,8 @@ paramFilter = func (params){
             res.Append(param)
             continue
         }
-        value = codec.DecodeUrl(param.Value()[0])
+        value, err = codec.DecodeUrl(param.Value()[0])
+        die(err)
         if len(re.ExtractURL(value)) > 0 ||  len(re.ExtractPath(value)) > 0{
             res.Append(param)
         }
@@ -174,6 +175,7 @@ outputPosition  = func(rsp,sig_string){
     if str.Contains(headers["Content-Type"],"html"){
 
         html, err = xpath.LoadHTMLDocument(body)
+        die(err)
         meta = xpath.Find(html, "//meta")
         scripts = xpath.Find(html, "//script")
 
@@ -239,6 +241,7 @@ metaTask = func(req,param,ishttps){
         respRaw = Rawfuzz(param,data.payload)
         body = poc.GetHTTPPacketBody(respRaw)
         html, err = xpath.LoadHTMLDocument(body)
+        die(err)
         meta = xpath.Find(html, "//meta")
         for m in meta {
             if str.EqualFold(xpath.SelectAttr(m, "http-equiv"), "refresh") {
@@ -264,11 +267,13 @@ scriptTask = func(req,param,ishttps){
         respRaw = Rawfuzz(param,data.payload)
         body = poc.GetHTTPPacketBody(respRaw)
         html, err = xpath.LoadHTMLDocument(body)
+        die(err)
         scripts = xpath.Find(html, "//script")
 
         for s in scripts {
             code = xpath.InnerText(s)
             ast,err =  js.Parse(code)
+            die(err)
             if jsAstCheck(ast.Body,data.expect){
                 return data.payload
             }
@@ -311,6 +316,7 @@ open_redirect_Detect = func(url, req, rsp, param, ishttps) {
 mirrorNewWebsitePathParams = func(ishttps, url, req, rsp, body) {
     dump(req)
     freq, err = fuzz.HTTPRequest(req, fuzz.https(ishttps))
+    die(err)
     params =  freq.GetGetQueryParams()
     params = append(params, freq.GetPostParams()...)
     params = paramFilter(params)

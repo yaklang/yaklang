@@ -425,6 +425,7 @@ mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rs
                     rsp,err = param.delayFuzz(poc)
                     if checkDns{
                         res,err = risk.CheckDNSLogByToken(token, dnslogTimeout)
+                        die(err)
                         if len(res)>0{
                             globalInfo.Store("outNet",1)
                             newRisk("目标 fastjson 框架存在 dnslog 回显",poc,param,0)
