@@ -389,7 +389,7 @@ func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
 			}
 			return
 		}
-		c.NewError(ssa.Error, TITAG, FunctionContReturnError())
+		c.NewError(ssa.Warn, TITAG, FunctionContReturnError())
 	} else {
 		c.SetType(funcTyp.ReturnType)
 	}
