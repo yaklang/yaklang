@@ -62,7 +62,7 @@ func (f *Function) AddErrorComment(str string, line int) error {
 
 type SSAError struct {
 	Pos     *Range
-	tag     ErrorTag
+	Tag     ErrorTag
 	Message string
 	Kind    ErrorKind
 }
@@ -79,7 +79,7 @@ func (f *Function) NewErrorWithPos(kind ErrorKind, tag ErrorTag, Pos *Range, mes
 
 	f.err = append(f.err, &SSAError{
 		Pos:     Pos,
-		tag:     tag,
+		Tag:     tag,
 		Message: message,
 		Kind:    kind,
 	})
@@ -114,5 +114,5 @@ func (err SSAError) String() string {
 		kind = "error"
 	}
 
-	return fmt.Sprintf("[%5s]\t(%s):\t%s", kind, string(err.tag), err.Message)
+	return fmt.Sprintf("[%5s]\t(%s):\t%s", kind, string(err.Tag), err.Message)
 }
