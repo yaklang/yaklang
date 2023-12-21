@@ -1205,63 +1205,22 @@ const (
 }*/
 
 func HTTPFlowTags(refreshRequest bool) ([]*TagAndStatusCode, error) {
-	var db = consts.GetGormProjectDatabase()
-	if db == nil {
-		log.Error("cannot found database config")
-		return nil, utils.Error("empty database")
-	}
-	if !refreshRequest {
-		value := GetKey(db, HTTPFLOW_TAG)
-		if value != "" {
-			var tags []*TagAndStatusCode
-			_ = json.Unmarshal([]byte(value), &tags)
-			if len(tags) > 0 {
-				return tags, nil
+	data := globalHTTPFlowCache
+	tagCounts := make(map[string]int)
+	for _, v := range data {
+		for _, tag := range strings.Split(v.Tags, "|") {
+			tag = strings.TrimSpace(tag)
+			if tag != "" {
+				tagCounts[tag]++
 			}
 		}
 	}
-
-	// log.Info("start to execute updating tags")
-	db = db.Raw(`SELECT value, count(t.id) as count
-from (WITH RECURSIVE split(value, str) AS (
-    SELECT null, tags || '|'
-    from http_flows WHERE (tags LIKE '%')
-    UNION ALL
-    SELECT substr(str, 0, instr(str, '|')),
-           substr(str, instr(str, '|') + 1)
-    FROM split
-    WHERE str != ''
-)
-      SELECT DISTINCT value
-      FROM split
-      WHERE value is not NULL
-        and value != '')
-         join http_flows t on ( tags LIKE '%' || value || '%' and value not like 'YAKIT_COLOR_%')
-group by value order by count desc;`)
-	rows, err := db.Rows()
-	if err != nil {
-		return nil, utils.Errorf("rows failed: %s", err)
-	}
-
 	var tags = make([]*TagAndStatusCode, 0)
-	for rows.Next() {
-		var tagName string
-		var count int
-		err = rows.Scan(&tagName, &count)
-		if err != nil {
-			log.Errorf("scan tag stats failed: %s", err)
-			continue
-		}
+	for k, v := range tagCounts {
 		tags = append(tags, &TagAndStatusCode{
-			Value: tagName,
-			Count: count,
+			Value: k,
+			Count: v,
 		})
-	}
-
-	raw, _ := json.Marshal(tags)
-	if len(raw) > 0 {
-		//log.Infof("start to cache tags[%v]", len(raw))
-		SetKey(consts.GetGormProfileDatabase(), HTTPFLOW_TAG, string(raw))
 	}
 	return tags, nil
 }
@@ -1309,4 +1268,14 @@ func ExportHTTPFlow(db *gorm.DB, params *ypb.ExportHTTPFlowsRequest) (paging *bi
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
 	}
 	return paging, ret, nil
+}
+
+func SaveHTTPFlow(db *gorm.DB, flow *HTTPFlow) error {
+	db = db.Model(&HTTPFlow{})
+	if db = db.Save(flow); db.Error != nil {
+		return db.Error
+	}
+	m, _ := flow.ToGRPCModel(true)
+	flow.setCacheGRPCModel(false, m)
+	return nil
 }

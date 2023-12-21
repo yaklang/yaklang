@@ -88,7 +88,7 @@ func (s *Server) QueryHTTPFlows(ctx context.Context, req *ypb.QueryHTTPFlowReque
 	start := time.Now()
 	var res []*ypb.HTTPFlow
 	for _, r := range data {
-		m, err := r.ToGRPCModelFull()
+		m, err := r.ToGRPCModel(req.Full)
 		if err != nil {
 			return nil, utils.Errorf("cannot convert httpflow failed: %s", err)
 		}
@@ -153,8 +153,9 @@ func (s *Server) SaveSetTagForHTTPFlow(id int64, hash string, tags []string) err
 		}
 	}
 	flow.Tags = strings.Join(utils.RemoveRepeatStringSlice(tagsData), "|")
-	if db := s.GetProjectDatabase().Save(flow); db.Error != nil {
-		return db.Error
+	err = yakit.SaveHTTPFlow(s.GetProjectDatabase(), flow)
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -505,7 +506,7 @@ func (s *Server) ExportHTTPFlows(ctx context.Context, req *ypb.ExportHTTPFlowsRe
 	start := time.Now()
 	var res []*ypb.HTTPFlow
 	for _, r := range data {
-		m, err := r.ToGRPCModelFull()
+		m, err := r.ToGRPCModel(req.ExportWhere.Full)
 		if err != nil {
 			return nil, utils.Errorf("cannot convert httpflow failed: %s", err)
 		}
