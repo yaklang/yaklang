@@ -14,8 +14,19 @@ import (
 	"time"
 )
 
-type BehidnerFileSystemAction struct {
+type BehidnerResourceSystemAction struct {
 	behinderCache map[string]*Behinder
+	dbParams      *dbParams
+}
+
+type dbParams struct {
+	Type     string `json:"type"`
+	Host     string `json:"host"`
+	Port     int    `json:"port,string"`
+	User     string `json:"user"`
+	Pass     string `json:"pass"`
+	Database string `json:"database"`
+	Sql      string `json:"sql"`
 }
 
 func behidnerResultToYakURLResource(originParam *ypb.YakURL, result []byte) ([]*ypb.YakURLResource, error) {
@@ -112,7 +123,7 @@ func behidnerResultToYakURLResource(originParam *ypb.YakURL, result []byte) ([]*
 	return resErr.resources, nil
 }
 
-func (b *BehidnerFileSystemAction) newBehinderFormId(id string) (*Behinder, error) {
+func (b *BehidnerResourceSystemAction) newBehinderFormId(id string) (*Behinder, error) {
 	if b.behinderCache == nil {
 		b.behinderCache = make(map[string]*Behinder)
 	}
@@ -151,81 +162,75 @@ func (b *BehidnerFileSystemAction) newBehinderFormId(id string) (*Behinder, erro
 	return manager, nil
 }
 
-func (b *BehidnerFileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+func (b *BehidnerResourceSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	u := params.GetUrl()
-	path := u.GetPath()
-
 	var query = make(url.Values)
 	for _, v := range u.GetQuery() {
 		query.Add(v.GetKey(), v.GetValue())
 	}
-	if query.Get("op") == "cmd" {
+	if query.Get("id") == "" {
+		return nil, utils.Error("webshell id cannot be empty")
+	}
+	switch query.Get("op") {
+	case "cmd":
+		fallthrough
+	case "db":
 		return b.Do(params)
-	}
-	id := query.Get("id")
-	manager, err := b.newBehinderFormId(id)
-	if err != nil {
-		return nil, err
-	}
-	var res []*ypb.YakURLResource
-	switch query.Get("mode") {
-	case "list":
-		list, err := manager.listFile(path)
+	case "file":
+		path := u.GetPath()
+		id := query.Get("id")
+		manager, err := b.newBehinderFormId(id)
 		if err != nil {
 			return nil, err
 		}
-		res, err = behidnerResultToYakURLResource(u, list)
-		if err != nil {
-			return nil, err
-		}
-	case "show":
-		show, er := manager.showFile(path)
-		if er != nil {
-			return nil, er
-		}
-		res, err = behidnerResultToYakURLResource(u, show)
-		if err != nil {
-			return nil, err
-		}
-	case "check":
-		check, er := manager.checkFileHash(path, "")
-		if er != nil {
-			return nil, er
-		}
-		res, err = behidnerResultToYakURLResource(u, check)
-		if err != nil {
-			return nil, err
-		}
-	case "checkExist":
-		check, er := manager.checkFileExist(path)
-		if er != nil {
-			return nil, er
-		}
-		res, err = behidnerResultToYakURLResource(u, check)
-		if err != nil {
-			return nil, err
+		var res []*ypb.YakURLResource
+		mode := query.Get("mode")
+
+		funcMap := map[string]func() ([]byte, error){
+			"list": func() ([]byte, error) {
+				return manager.listFile(path)
+			},
+			"show": func() ([]byte, error) {
+				return manager.showFile(path)
+			},
+			"check": func() ([]byte, error) {
+				return manager.checkFileHash(path, "")
+			},
+			"checkExist": func() ([]byte, error) {
+				return manager.checkFileExist(path)
+			},
+			"getTimeStamp": func() ([]byte, error) {
+				return manager.getTimeStamp(path)
+			},
 		}
 
-	case "getTimeStamp":
-		check, er := manager.getTimeStamp(path)
-		if er != nil {
-			return nil, er
+		// Call the function based on the mode
+		if fn, ok := funcMap[mode]; ok {
+			list, err := fn()
+			if err != nil {
+				return nil, err
+			}
+			res, err = behidnerResultToYakURLResource(u, list)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, utils.Errorf("unsupported mode %s", mode)
 		}
-		res, err = behidnerResultToYakURLResource(u, check)
-		if err != nil {
-			return nil, err
-		}
-	}
 
-	return &ypb.RequestYakURLResponse{
-		Page:      1,
-		PageSize:  100,
-		Total:     int64(len(res)),
-		Resources: res,
-	}, nil
+		return &ypb.RequestYakURLResponse{
+			Page:      1,
+			PageSize:  100,
+			Total:     int64(len(res)),
+			Resources: res,
+		}, nil
+	default:
+		return nil, utils.Errorf("unsupported op %s", query.Get("op"))
+
+	}
 }
 
-func (b *BehidnerFileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+func (b *BehidnerResourceSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	u := params.GetUrl()
 	path := u.GetPath()
 	_ = path
@@ -233,51 +238,68 @@ func (b *BehidnerFileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.R
 	for _, v := range u.GetQuery() {
 		query.Add(v.GetKey(), v.GetValue())
 	}
-	id := query.Get("id")
-	manager, err := b.newBehinderFormId(id)
-	if err != nil {
-		return nil, err
+	if query.Get("id") == "" {
+		return nil, utils.Error("webshell id cannot be empty")
 	}
+
 	var res []*ypb.YakURLResource
-	switch query.Get("mode") {
 
-	case "updateTimeStamp":
-		cts := query.Get("createTimeStamp")
-		ats := query.Get("accessTimeStamp")
-		mts := query.Get("modifyTimeStamp")
-		if cts == "" && ats == "" && mts == "" {
-			return nil, utils.Errorf("createTimeStamp, accessTimeStamp, modifyTimeStamp cannot be empty at the same time")
-		}
-		updateTimeStamp, err := manager.updateTimeStamp(path, cts, ats, mts)
-		if err != nil {
-			return nil, err
-		}
-		res, err = behidnerResultToYakURLResource(u, updateTimeStamp)
-		if err != nil {
-			return nil, err
-		}
-	case "rename":
-		newPath := query.Get("")
-		rename, err := manager.renameFile(path, newPath)
-		if err != nil {
-			return nil, err
-		}
-		res, err = behidnerResultToYakURLResource(u, rename)
+	switch query.Get("op") {
+	case "cmd":
+		fallthrough
+	case "db":
+		return b.Do(params)
+	case "file":
+		id := query.Get("id")
+		manager, err := b.newBehinderFormId(id)
 		if err != nil {
 			return nil, err
 		}
 
+		mode := query.Get("mode")
+
+		funcMap := map[string]func() ([]byte, error){
+			"updateTimeStamp": func() ([]byte, error) {
+				cts := query.Get("createTimeStamp")
+				ats := query.Get("accessTimeStamp")
+				mts := query.Get("modifyTimeStamp")
+				if cts == "" && ats == "" && mts == "" {
+					return nil, utils.Errorf("createTimeStamp, accessTimeStamp, modifyTimeStamp cannot be empty at the same time")
+				}
+				return manager.updateTimeStamp(path, cts, ats, mts)
+			},
+			"rename": func() ([]byte, error) {
+				newPath := query.Get("")
+				return manager.renameFile(path, newPath)
+			},
+		}
+
+		// Call the function based on the mode
+		if fn, ok := funcMap[mode]; ok {
+			list, err := fn()
+			if err != nil {
+				return nil, err
+			}
+			res, err = behidnerResultToYakURLResource(u, list)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, utils.Errorf("unsupported mode %s", mode)
+		}
+
+		return &ypb.RequestYakURLResponse{
+			Page:      1,
+			PageSize:  100,
+			Total:     int64(len(res)),
+			Resources: res,
+		}, nil
+	default:
+		return nil, utils.Errorf("unsupported op %s", query.Get("op"))
 	}
-
-	return &ypb.RequestYakURLResponse{
-		Page:      1,
-		PageSize:  100,
-		Total:     int64(len(res)),
-		Resources: res,
-	}, nil
 }
 
-func (b *BehidnerFileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+func (b *BehidnerResourceSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	u := params.GetUrl()
 	path := u.GetPath()
 
@@ -349,7 +371,7 @@ func (b *BehidnerFileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.Re
 	}, nil
 }
 
-func (b *BehidnerFileSystemAction) Delete(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+func (b *BehidnerResourceSystemAction) Delete(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	u := params.GetUrl()
 	path := u.GetPath()
 	_ = path
@@ -383,57 +405,55 @@ func (b *BehidnerFileSystemAction) Delete(params *ypb.RequestYakURLParams) (*ypb
 	}, nil
 }
 
-func (b *BehidnerFileSystemAction) Head(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+func (b *BehidnerResourceSystemAction) Head(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (b *BehidnerFileSystemAction) Do(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
+func (b *BehidnerResourceSystemAction) Do(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	u := params.GetUrl()
-	path := u.GetPath()
 
 	var query = make(url.Values)
 	for _, v := range u.GetQuery() {
 		query.Add(v.GetKey(), v.GetValue())
 	}
-
-	cmd := query.Get("cmd")
+	var res []*ypb.YakURLResource
 	id := query.Get("id")
 	manager, err := b.newBehinderFormId(id)
 	if err != nil {
 		return nil, err
 	}
+	switch query.Get("op") {
+	case "cmd":
+		command := query.Get("cmd")
+		path := query.Get("path")
+		// TODO cd
 
-	raw, err := manager.CommandExec(cmd)
-	if err != nil {
-		return nil, err
+		raw, err := manager.CommandExec(command)
+		if err != nil {
+			return nil, err
+		}
+
+		content := gjson.GetBytes(raw, "msg").String()
+
+		extra := []*ypb.KVPair{
+			{Key: "content", Value: content},
+		}
+		var resource = &ypb.YakURLResource{
+			Path:  path,
+			Extra: extra,
+		}
+		res = append(res, resource)
+	case "db":
+
 	}
 
-	content := gjson.GetBytes(raw, "msg").String()
-
-	var res []*ypb.YakURLResource
-	extra := []*ypb.KVPair{
-		{Key: "content", Value: content},
-	}
-	var resource = &ypb.YakURLResource{
-		Path:  path,
-		Extra: extra,
-	}
-	res = append(res, resource)
 	return &ypb.RequestYakURLResponse{
 		Page:      1,
 		PageSize:  100,
 		Total:     int64(len(res)),
 		Resources: res,
 	}, nil
-}
-
-type ListFiles struct{}
-
-func (l *ListFiles) Execute(base BaseShellManager) ([]byte, error) {
-	// code to list files
-	//base.
-	return nil, nil
 }
 
 func (b *Behinder) showFile(path string) ([]byte, error) {
