@@ -21,9 +21,8 @@ for i < 10 {
 }
 c = b
 `)
-	prog.GetValueById(0).Show()
-	prog.GetValueById(1).Show()
-	prog.GetValueById(2).Show()
+	prog.GetValueByIdMust(0).Show()
+	prog.GetValueByIdMust(1).Show()
 	prog.Ref("c").ForEach(func(value *Value) {
 		log.Infof("%v: %v", value.GetId(), value.String())
 	})
@@ -72,7 +71,7 @@ b = ()=>{
 }
 b()
 g = originValue
-`)
+`).Show()
 
 	/*
 		[INFO] 2023-12-19 17:23:47 [exclusive_op_test:22] g value: 4
@@ -129,7 +128,7 @@ func TestYakChanExplore_Phi_For_Negative_2(t *testing.T) {
 originValue = 1
 var f = outter()
 for i := 3; i < f; i++ {
-	var d = originValue + i // var in yaklang will create new symbol
+	d := originValue + i // var in yaklang will create new symbol
 	d += f
 }
 g = d 

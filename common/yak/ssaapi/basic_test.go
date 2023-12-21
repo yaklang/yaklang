@@ -78,7 +78,7 @@ func TestYaklangBasic_DoublePhi(t *testing.T) {
 func TestYaklangBasic_SinglePhi(t *testing.T) {
 	const code = `for i:=0; i<n; i ++ { dump(i) }`
 	prog := Parse(code).Show()
-	phi, ok := prog.GetValueById(9).node.(*ssa.Phi)
+	phi, ok := prog.GetValueByIdMust(9).node.(*ssa.Phi)
 	if ok {
 		log.Infof("phi: %v", phi.String())
 	}
