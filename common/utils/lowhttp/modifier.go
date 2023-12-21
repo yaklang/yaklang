@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"github.com/samber/lo"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -15,6 +14,8 @@ import (
 	"sort"
 	"strings"
 	"unsafe"
+
+	"github.com/samber/lo"
 
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/jsonpath"
@@ -43,9 +44,7 @@ func IsChunkedHeaderLine(line string) bool {
 func SetHTTPPacketUrl(packet []byte, rawURL string) []byte {
 	var buf bytes.Buffer
 	var header []string
-	var (
-		isChunked = false
-	)
+	isChunked := false
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
 		return packet
@@ -86,7 +85,7 @@ func SetHTTPPacketUrl(packet []byte, rawURL string) []byte {
 // ```
 func ReplaceHTTPPacketFirstLine(packet []byte, firstLine string) []byte {
 	var isChunked bool
-	var header = []string{firstLine}
+	header := []string{firstLine}
 	_, body := SplitHTTPPacket(packet, nil, nil, func(line string) string {
 		if !isChunked {
 			isChunked = IsChunkedHeaderLine(line)
@@ -284,8 +283,8 @@ func handleHTTPPacketQueryParam(packet []byte, noAutoEncode bool, callback func(
 func ReplaceAllHTTPPacketQueryParams(packet []byte, values map[string]string) []byte {
 	return handleHTTPPacketQueryParam(packet, false, func(q *QueryParams) {
 		// clear all values
-		var shouldRemove = make(map[string]struct{})
-		var shouldReplace = make(map[string]string)
+		shouldRemove := make(map[string]struct{})
+		shouldReplace := make(map[string]string)
 		for _, item := range q.Items {
 			_, ok := values[item.Key]
 			if !ok {
@@ -446,7 +445,7 @@ func ReplaceHTTPPacketHeader(packet []byte, headerKey string, headerValue any) [
 	var firstLine string
 	var header []string
 	var handled bool
-	var isChunked = IsChunkedHeaderLine(headerKey + ": " + utils.InterfaceToString(headerValue))
+	isChunked := IsChunkedHeaderLine(headerKey + ": " + utils.InterfaceToString(headerValue))
 	_, body := SplitHTTPPacket(packet, func(method string, requestUri string, proto string) error {
 		firstLine = method + " " + requestUri + " " + proto
 		return nil
@@ -586,7 +585,7 @@ func DeleteHTTPPacketHeader(packet []byte, headerKey string) []byte {
 func ReplaceHTTPPacketCookie(packet []byte, key string, value any) []byte {
 	var isReq bool
 	var isRsp bool
-	var handled = false
+	handled := false
 	var isChunked bool
 	header, body := SplitHTTPPacket(packet, func(method string, requestUri string, proto string) error {
 		isReq = true
@@ -609,7 +608,7 @@ func ReplaceHTTPPacketCookie(packet []byte, key string, value any) []byte {
 			if len(existed) <= 0 {
 				return line
 			}
-			var cookie = make([]*http.Cookie, len(existed))
+			cookie := make([]*http.Cookie, len(existed))
 			for index, c := range existed {
 				if c.Name == key {
 					handled = true
@@ -621,7 +620,7 @@ func ReplaceHTTPPacketCookie(packet []byte, key string, value any) []byte {
 		}
 		return line
 	})
-	var data = ReplaceHTTPPacketBody([]byte(header), body, isChunked)
+	data := ReplaceHTTPPacketBody([]byte(header), body, isChunked)
 	if handled {
 		return data
 	}
@@ -832,7 +831,6 @@ func AppendHTTPPacketFormEncoded(packet []byte, key, value string) []byte {
 					break
 				}
 				partWriter, err := multipartWriter.CreatePart(part.Header)
-
 				if err != nil {
 					break
 				}
@@ -868,7 +866,6 @@ func AppendHTTPPacketUploadFile(packet []byte, fieldName, fileName string, fileC
 					break
 				}
 				partWriter, err := multipartWriter.CreatePart(part.Header)
-
 				if err != nil {
 					break
 				}
@@ -957,7 +954,6 @@ func DeleteHTTPPacketForm(packet []byte, key string) []byte {
 				}
 
 				partWriter, err := multipartWriter.CreatePart(part.Header)
-
 				if err != nil {
 					break
 				}
@@ -982,7 +978,7 @@ func DeleteHTTPPacketForm(packet []byte, key string) []byte {
 //
 // `, "a") // 获取键名为a的Cookie值，这里会返回["b", "c"]
 // ```
-func GetHTTPPacketCookieValues(packet []byte, key string) []string {
+func GetHTTPPacketCookieValues(packet []byte, key string) (cookieValues []string) {
 	var val []string
 	SplitHTTPPacket(packet, nil, nil, func(line string) string {
 		if k, cookieRaw := SplitHTTPHeader(line); k == "Cookie" || k == "cookie" {
@@ -1018,7 +1014,7 @@ func GetHTTPPacketCookieValues(packet []byte, key string) []string {
 //
 // `, "a") // 获取键名为a的Cookie值，这里会返回"b"
 // ```
-func GetHTTPPacketCookieFirst(packet []byte, key string) string {
+func GetHTTPPacketCookieFirst(packet []byte, key string) (cookieValue string) {
 	ret := GetHTTPPacketCookieValues(packet, key)
 	if len(ret) > 0 {
 		return ret[0]
@@ -1034,7 +1030,7 @@ func GetHTTPPacketCookieFirst(packet []byte, key string) string {
 // Host: pie.dev
 //
 // `) // 获取URL，这里会返回"https://pie.dev/get"
-func GetUrlFromHTTPRequest(scheme string, packet []byte) string {
+func GetUrlFromHTTPRequest(scheme string, packet []byte) (url string) {
 	if scheme == "" {
 		scheme = "http"
 	}
@@ -1056,7 +1052,7 @@ func GetUrlFromHTTPRequest(scheme string, packet []byte) string {
 //
 // `, "a") // 获取键名为a的Cookie值，这里会返回"b"
 // ```
-func GetHTTPPacketCookie(packet []byte, key string) string {
+func GetHTTPPacketCookie(packet []byte, key string) (cookieValue string) {
 	return GetHTTPPacketCookieFirst(packet, key)
 }
 
@@ -1070,9 +1066,9 @@ func GetHTTPPacketCookie(packet []byte, key string) string {
 //
 // a=b&c=d`) // 获取Content-Type请求头
 // ```
-func GetHTTPPacketContentType(packet []byte) string {
+func GetHTTPPacketContentType(packet []byte) (contentType string) {
 	var val string
-	var fetched = false
+	fetched := false
 	SplitHTTPPacket(packet, nil, nil, func(line string) string {
 		if fetched {
 			return line
@@ -1096,8 +1092,8 @@ func GetHTTPPacketContentType(packet []byte) string {
 //
 // `) // 获取所有Cookie值，这里会返回{"a":"b", "c":"d"}
 // ```
-func GetHTTPPacketCookies(packet []byte) map[string]string {
-	var val = make(map[string]string)
+func GetHTTPPacketCookies(packet []byte) (cookies map[string]string) {
+	val := make(map[string]string)
 	SplitHTTPPacket(packet, nil, nil, func(line string) string {
 		if k, cookieRaw := SplitHTTPHeader(line); k == "Cookie" || k == "cookie" {
 			existed := ParseCookie(cookieRaw)
@@ -1128,8 +1124,8 @@ func GetHTTPPacketCookies(packet []byte) map[string]string {
 //
 // `) // 获取所有Cookie值，这里会返回{"a":["b", "c"], "c":["d"]}
 // ```
-func GetHTTPPacketCookiesFull(packet []byte) map[string][]string {
-	var val = make(map[string][]string)
+func GetHTTPPacketCookiesFull(packet []byte) (cookies map[string][]string) {
+	val := make(map[string][]string)
 	SplitHTTPPacket(packet, nil, nil, func(line string) string {
 		if k, cookieRaw := SplitHTTPHeader(line); k == "Cookie" || k == "cookie" {
 			existed := ParseCookie(cookieRaw)
@@ -1165,8 +1161,8 @@ func GetHTTPPacketCookiesFull(packet []byte) map[string][]string {
 //
 // `) // 获取所有请求头，这里会返回{"Content-Type": "application/json", "Cookie": "a=b; a=c; c=d", "Host": "pie.dev"}
 // ```
-func GetHTTPPacketHeaders(packet []byte) map[string]string {
-	var val = make(map[string]string)
+func GetHTTPPacketHeaders(packet []byte) (headers map[string]string) {
+	val := make(map[string]string)
 	SplitHTTPPacket(packet, nil, nil, func(line string) string {
 		if k, v := SplitHTTPHeader(line); k != "" {
 			val[k] = v
@@ -1187,8 +1183,8 @@ func GetHTTPPacketHeaders(packet []byte) map[string]string {
 //
 // `) // 获取所有请求头，这里会返回{"Content-Type": ["application/json"], "Cookie": []"a=b; a=c; c=d", "e=f"], "Host": ["pie.dev"]}
 // ```
-func GetHTTPPacketHeadersFull(packet []byte) map[string][]string {
-	var val = make(map[string][]string)
+func GetHTTPPacketHeadersFull(packet []byte) (headers map[string][]string) {
+	val := make(map[string][]string)
 	SplitHTTPPacket(packet, nil, nil, func(line string) string {
 		if k, v := SplitHTTPHeader(line); k != "" {
 			if _, ok := val[k]; !ok {
@@ -1211,13 +1207,13 @@ func GetHTTPPacketHeadersFull(packet []byte) map[string][]string {
 //
 // `) // 获取Content-Type请求头，这里会返回"application/json"
 // ```
-func GetHTTPPacketHeader(packet []byte, key string) string {
+func GetHTTPPacketHeader(packet []byte, key string) (header string) {
 	ret := GetHTTPPacketHeaders(packet)
 	if ret == nil {
 		return ""
 	}
 
-	var fuzzResult = make(map[string]string)
+	fuzzResult := make(map[string]string)
 	for headerKey, value := range ret {
 		if key == headerKey {
 			return value
@@ -1241,7 +1237,7 @@ func GetHTTPPacketHeader(packet []byte, key string) string {
 //
 // `, "a") // 获取GET请求参数a的值
 // ```
-func GetHTTPRequestQueryParam(packet []byte, key string) string {
+func GetHTTPRequestQueryParam(packet []byte, key string) (paramValue string) {
 	vals := GetHTTPRequestQueryParamFull(packet, key)
 	if len(vals) > 0 {
 		return vals[0]
@@ -1259,8 +1255,8 @@ func GetHTTPRequestQueryParam(packet []byte, key string) string {
 //
 // a=b&c=d`) // 获取请求头，这里为b"a=b&c=d"
 // ```
-func GetHTTPPacketBody(packet []byte) []byte {
-	_, body := SplitHTTPHeadersAndBodyFromPacket(packet)
+func GetHTTPPacketBody(packet []byte) (body []byte) {
+	_, body = SplitHTTPHeadersAndBodyFromPacket(packet)
 	return body
 }
 
@@ -1274,7 +1270,7 @@ func GetHTTPPacketBody(packet []byte) []byte {
 //
 // a=b&c=d`, "a") // 获取POST请求参数a的值
 // ```
-func GetHTTPRequestPostParam(packet []byte, key string) string {
+func GetHTTPRequestPostParam(packet []byte, key string) (paramValue string) {
 	vals := GetHTTPRequestPostParamFull(packet, key)
 	if len(vals) > 0 {
 		return vals[0]
@@ -1326,7 +1322,7 @@ func GetHTTPRequestQueryParamFull(packet []byte, key string) []string {
 //
 // a=b&c=d`) // 获取所有POST请求参数
 // ```
-func GetAllHTTPRequestPostParams(packet []byte) map[string]string {
+func GetAllHTTPRequestPostParams(packet []byte) (params map[string]string) {
 	body := GetHTTPPacketBody(packet)
 	vals, err := url.ParseQuery(string(body))
 	if err != nil {
@@ -1348,7 +1344,7 @@ func GetAllHTTPRequestPostParams(packet []byte) map[string]string {
 //
 // `) // 获取所有GET请求参数
 // ```
-func GetAllHTTPRequestQueryParams(packet []byte) map[string]string {
+func GetAllHTTPRequestQueryParams(packet []byte) (params map[string]string) {
 	u, err := ExtractURLFromHTTPRequestRaw(packet, false)
 	if err != nil {
 		return nil
@@ -1369,8 +1365,7 @@ func GetAllHTTPRequestQueryParams(packet []byte) map[string]string {
 //
 // hello`) // 获取响应报文中的状态码，这里会返回200
 // ```
-func GetStatusCodeFromResponse(packet []byte) int {
-	var statusCode int
+func GetStatusCodeFromResponse(packet []byte) (statusCode int) {
 	SplitHTTPPacket(packet, nil, func(proto string, code int, codeMsg string) error {
 		statusCode = code
 		return nil
@@ -1383,7 +1378,7 @@ func GetStatusCodeFromResponse(packet []byte) int {
 // ```
 // poc.GetHTTPRequestPathWithoutQuery("GET /a/bc.html?a=1 HTTP/1.1\r\nHost: www.example.com\r\n\r\n") // /a/bc.html
 // ```
-func GetHTTPRequestPathWithoutQuery(packet []byte) string {
+func GetHTTPRequestPathWithoutQuery(packet []byte) (path string) {
 	return strings.Split(GetHTTPRequestPath(packet), "?")[0]
 }
 
@@ -1392,13 +1387,12 @@ func GetHTTPRequestPathWithoutQuery(packet []byte) string {
 // ```
 // poc.GetHTTPRequestPath("GET /a/bc.html?a=1 HTTP/1.1\r\nHost: www.example.com\r\n\r\n") // /a/bc.html?a=1
 // ```
-func GetHTTPRequestPath(packet []byte) string {
-	var pathStr string
+func GetHTTPRequestPath(packet []byte) (path string) {
 	SplitHTTPPacket(packet, func(method string, requestUri string, proto string) error {
-		pathStr = requestUri
+		path = requestUri
 		return io.EOF
 	}, nil)
-	return pathStr
+	return path
 }
 
 // GetHTTPRequestMethod 是一个辅助函数，用于获取请求报文中的请求方法，其返回值为string
@@ -1411,8 +1405,7 @@ func GetHTTPRequestPath(packet []byte) string {
 //
 // `) // 获取请求方法，这里会返回"GET"
 // ```
-func GetHTTPRequestMethod(packet []byte) string {
-	var method string
+func GetHTTPRequestMethod(packet []byte) (method string) {
 	SplitHTTPPacket(packet, func(m string, _ string, _ string) error {
 		method = m
 		return utils.Error("normal")

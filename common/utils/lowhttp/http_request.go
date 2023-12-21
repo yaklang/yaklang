@@ -20,9 +20,11 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
-var _contentLengthRE = regexp.MustCompile(`(?i)Content-Length:(\s+)?(\d+)?\r?\n?`)
-var _transferEncodingRE = regexp.MustCompile(`(?i)Transfer-Encoding:(\s+)?.*?(chunked).*?\r?\n?`)
-var fetchBoundaryRegexp = regexp.MustCompile(`boundary\s?=\s?([^;]+)`)
+var (
+	_contentLengthRE    = regexp.MustCompile(`(?i)Content-Length:(\s+)?(\d+)?\r?\n?`)
+	_transferEncodingRE = regexp.MustCompile(`(?i)Transfer-Encoding:(\s+)?.*?(chunked).*?\r?\n?`)
+	fetchBoundaryRegexp = regexp.MustCompile(`boundary\s?=\s?([^;]+)`)
+)
 
 // HTTPPacketForceChunked 将一个HTTP报文的body强制转换为chunked编码
 // Example:
@@ -66,8 +68,8 @@ func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 	var isResponse bool
 	var contentLengthIsNotRecommanded bool
 
-	var plrand = fmt.Sprintf("[[REPLACE_CONTENT_LENGTH:%v]]", utils.RandStringBytes(20))
-	var plrandHandled = false
+	plrand := fmt.Sprintf("[[REPLACE_CONTENT_LENGTH:%v]]", utils.RandStringBytes(20))
+	plrandHandled := false
 	header, body := SplitHTTPPacket(
 		raw,
 		func(m, u, proto string) error {
@@ -81,8 +83,8 @@ func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 		},
 		func(line string) string {
 			key, value := SplitHTTPHeader(line)
-			var keyLower = strings.ToLower(key)
-			var valLower = strings.ToLower(value)
+			keyLower := strings.ToLower(key)
+			valLower := strings.ToLower(value)
 			if !isMultipart && keyLower == "content-type" && strings.HasPrefix(valLower, "multipart/form-data") {
 				isMultipart = true
 			}
@@ -101,7 +103,7 @@ func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 	)
 
 	// cl te existed at the same time, handle smuggle!
-	var smuggleCase = isRequest && haveContentLength && haveChunkedHeader
+	smuggleCase := isRequest && haveContentLength && haveChunkedHeader
 	_ = smuggleCase
 
 	// applying patch to restore CRLF at body
@@ -221,7 +223,7 @@ func DeletePacketEncoding(raw []byte) []byte {
 
 func ConvertHTTPRequestToFuzzTag(i []byte) []byte {
 	var boundary string // 如果是上传数据包的话，boundary 就不会为空
-	var header, body = SplitHTTPHeadersAndBodyFromPacket(i, func(line string) {
+	header, body := SplitHTTPHeadersAndBodyFromPacket(i, func(line string) {
 		k, v := SplitHTTPHeader(strings.TrimSpace(line))
 		switch strings.ToLower(k) {
 		case "content-type":
@@ -238,7 +240,7 @@ func ConvertHTTPRequestToFuzzTag(i []byte) []byte {
 
 		// 修复数据包
 		var buf bytes.Buffer
-		var fixedBody = multipart.NewWriter(&buf)
+		fixedBody := multipart.NewWriter(&buf)
 		fixedBody.SetBoundary(boundary)
 		for {
 			part, err := reader.NextRawPart()
@@ -273,15 +275,17 @@ func ConvertHTTPRequestToFuzzTag(i []byte) []byte {
 	return ReplaceHTTPPacketBody([]byte(header), body, false)
 }
 
-const printableMin = 32
-const printableMax = 126
+const (
+	printableMin = 32
+	printableMax = 126
+)
 
 func ToUnquoteFuzzTag(i []byte) string {
 	if utf8.Valid(i) {
 		return string(i)
 	}
 
-	var buf = bytes.NewBufferString(`{{unquote("`)
+	buf := bytes.NewBufferString(`{{unquote("`)
 	for _, b := range i {
 		if b >= printableMin && b <= printableMax {
 			switch b {
@@ -401,22 +405,24 @@ func ParseStringToHttpRequest(raw string) (*http.Request, error) {
 	return ParseBytesToHttpRequest([]byte(raw))
 }
 
-var contentTypeChineseCharset = regexp.MustCompile(`(?i)charset\s*=\s*['"]?(.*?)(gb[^'^"^\s]+)['"]?`)          // 2 gkxxxx
-var charsetInMeta = regexp.MustCompile(`(?i)<\s*meta.*?(charset|content)\s*=\s*['"]?(.*?)(gb[^'^"^\s]+)['"]?`) // 3 gbxxx
+var (
+	contentTypeChineseCharset = regexp.MustCompile(`(?i)charset\s*=\s*['"]?(.*?)(gb[^'^"^\s]+)['"]?`)                      // 2 gkxxxx
+	charsetInMeta             = regexp.MustCompile(`(?i)<\s*meta.*?(charset|content)\s*=\s*['"]?(.*?)(gb[^'^"^\s]+)['"]?`) // 3 gbxxx
+)
 
 // ParseUrlToHTTPRequestRaw 将URL解析为原始 HTTP 请求报文，返回是否为 HTTPS，原始请求报文与错误
 // Example:
 // ```
 // ishttps, raw, err = poc.ParseUrlToHTTPRequestRaw("GET", "https://yaklang.com")
 // ```
-func ParseUrlToHttpRequestRaw(method string, i interface{}) (bool, []byte, error) {
+func ParseUrlToHttpRequestRaw(method string, i interface{}) (isHttps bool, req []byte, err error) {
 	urlStr := utils.InterfaceToString(i)
-	req, err := http.NewRequest(strings.ToUpper(method), urlStr, http.NoBody)
+	reqInst, err := http.NewRequest(strings.ToUpper(method), urlStr, http.NoBody)
 	if err != nil {
 		return false, nil, err
 	}
-	req.Header.Set("User-Agent", consts.DefaultUserAgent)
-	bytes, err := utils.HttpDumpWithBody(req, true)
+	reqInst.Header.Set("User-Agent", consts.DefaultUserAgent)
+	bytes, err := utils.HttpDumpWithBody(reqInst, true)
 	return strings.HasPrefix(strings.ToLower(urlStr), "https://"), bytes, err
 }
 
@@ -443,7 +449,7 @@ func CopyRequest(r *http.Request) *http.Request {
 // ```
 // req, err := str.ParseBytesToHTTPRequest(b"GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
 // ```
-func ParseBytesToHttpRequest(raw []byte) (*http.Request, error) {
+func ParseBytesToHttpRequest(raw []byte) (reqInst *http.Request, err error) {
 	fixed := FixHTTPPacketCRLF(raw, false)
 	if fixed == nil {
 		return nil, io.EOF
@@ -473,10 +479,12 @@ func ExtractBoundaryFromBody(raw interface{}) string {
 	return ""
 }
 
-var ReadHTTPRequestFromBytes = utils.ReadHTTPRequestFromBytes
-var ReadHTTPRequestFromBufioReader = utils.ReadHTTPRequestFromBufioReader
-var ReadHTTPResponseFromBytes = utils.ReadHTTPResponseFromBytes
-var ReadHTTPResponseFromBufioReader = utils.ReadHTTPResponseFromBufioReader
+var (
+	ReadHTTPRequestFromBytes        = utils.ReadHTTPRequestFromBytes
+	ReadHTTPRequestFromBufioReader  = utils.ReadHTTPRequestFromBufioReader
+	ReadHTTPResponseFromBytes       = utils.ReadHTTPResponseFromBytes
+	ReadHTTPResponseFromBufioReader = utils.ReadHTTPResponseFromBufioReader
+)
 
 func ExtractStatusCodeFromResponse(raw []byte) int {
 	var statusCode int

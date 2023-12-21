@@ -19,22 +19,23 @@ import (
 	"golang.org/x/text/encoding"
 )
 
-var charsetRegexp = regexp.MustCompile(`(?i)charset\s*=\s*"?\s*([^\s;\n\r"]+)`)
-var metaCharsetRegexp = regexp.MustCompile(`(?i)meta[^<>]*?charset\s*=\s*['"]?\s*([^\s;\n\r'"]+)`)
-var mimeCharsetRegexp = regexp.MustCompile(`(?i)content-type:\s*[^\n]*charset\s*=\s*['"]?\s*([^\s;\n\r'"]+)`)
-var contentTypeRegexp = regexp.MustCompile(`(?i)content-type:\s*([^\r\n]*)`)
-var contentEncodingRegexp = regexp.MustCompile(`(?i)content-encoding:\s*\w*\r?\n`)
+var (
+	charsetRegexp         = regexp.MustCompile(`(?i)charset\s*=\s*"?\s*([^\s;\n\r"]+)`)
+	metaCharsetRegexp     = regexp.MustCompile(`(?i)meta[^<>]*?charset\s*=\s*['"]?\s*([^\s;\n\r'"]+)`)
+	mimeCharsetRegexp     = regexp.MustCompile(`(?i)content-type:\s*[^\n]*charset\s*=\s*['"]?\s*([^\s;\n\r'"]+)`)
+	contentTypeRegexp     = regexp.MustCompile(`(?i)content-type:\s*([^\r\n]*)`)
+	contentEncodingRegexp = regexp.MustCompile(`(?i)content-encoding:\s*\w*\r?\n`)
+)
 
-//var contentLengthRegexpCase = regexp.MustCompile(`(?i)(content-length:\s*\w*\d+\r?\n)`)
-
+// var contentLengthRegexpCase = regexp.MustCompile(`(?i)(content-length:\s*\w*\d+\r?\n)`)
 func metaCharsetChanger(raw []byte) []byte {
 	if len(raw) <= 0 {
 		return raw
 	}
 	// 这里很关键，需要移除匹配到的内容
-	var buf = bytes.NewBuffer(nil)
+	buf := bytes.NewBuffer(nil)
 	var slash [][2]int
-	var lastEnd = 0
+	lastEnd := 0
 	for _, va := range metaCharsetRegexp.FindAllSubmatchIndex(raw, -1) {
 		if len(va) > 3 {
 			slash = append(slash, [2]int{lastEnd, va[2]})
@@ -74,7 +75,7 @@ func CharsetToUTF8(bodyRaw []byte, mimeType string, originCharset string) ([]byt
 	}
 
 	var handledChineseEncoding bool
-	var parseFromMIME = func() ([]byte, error) {
+	parseFromMIME := func() ([]byte, error) {
 		if kv != nil && len(kv) > 0 {
 			if charsetStr, ok := kv["charset"]; ok && !handledChineseEncoding {
 				encodingIns, name := charset.Lookup(strings.ToLower(charsetStr))
@@ -175,7 +176,7 @@ func GetOverrideContentType(bodyPrescan []byte, contentType string) (overrideCon
 func FixHTTPResponse(raw []byte) (rsp []byte, body []byte, _ error) {
 	// log.Infof("response raw: \n%v", codec.EncodeBase64(raw))
 
-	var isChunked = false
+	isChunked := false
 	// 这两个用来处理编码特殊情况
 	var contentEncoding string
 	var contentType string
@@ -218,7 +219,7 @@ func FixHTTPResponse(raw []byte) (rsp []byte, body []byte, _ error) {
 	}
 
 	// 如果 bodyRaw 是图片的话，则不处理，如何判断是图片？
-	var skipped = false
+	skipped := false
 	if len(bodyRaw) > 0 {
 		if utils.IsImage(bodyRaw) {
 			skipped = true
@@ -232,7 +233,7 @@ func FixHTTPResponse(raw []byte) (rsp []byte, body []byte, _ error) {
 	} else {
 		bodyPrescan = bodyRaw[:]
 	}
-	var overrideContentType, originCharset = GetOverrideContentType(bodyPrescan, contentType)
+	overrideContentType, originCharset := GetOverrideContentType(bodyPrescan, contentType)
 	/*originCharset is lower!!!*/
 	_ = originCharset
 
@@ -240,7 +241,7 @@ func FixHTTPResponse(raw []byte) (rsp []byte, body []byte, _ error) {
 	if bodyRaw != nil && !skipped {
 		var mimeType string
 		_, params, _ := mime.ParseMediaType(contentType)
-		var ctUTF8 = false
+		ctUTF8 := false
 		if raw, ok := params["charset"]; ok {
 			raw = strings.ToLower(raw)
 			ctUTF8 = raw == "utf-8" || raw == "utf8"
@@ -274,7 +275,6 @@ func FixHTTPResponse(raw []byte) (rsp []byte, body []byte, _ error) {
 						}
 					}
 				}
-
 			}
 		} else {
 			log.Infof("replace content-type to: %s", overrideContentType)
@@ -290,7 +290,7 @@ func ReplaceMIMEType(headerBytes []byte, mimeType string) []byte {
 		return headerBytes
 	}
 
-	var idxs = contentTypeRegexp.FindSubmatchIndex(headerBytes)
+	idxs := contentTypeRegexp.FindSubmatchIndex(headerBytes)
 	if len(idxs) > 3 {
 		buf := bytes.NewBuffer(nil)
 		buf.Write(headerBytes[:idxs[2]])
@@ -328,7 +328,7 @@ func ReplaceHTTPPacketBodyEx(raw []byte, body []byte, chunk bool, forceCL bool) 
 		return raw
 	}
 
-	var headers = []string{
+	headers := []string{
 		string(firstLineBytes),
 	}
 
@@ -387,7 +387,7 @@ func ReplaceHTTPPacketBodyEx(raw []byte, body []byte, chunk bool, forceCL bool) 
 	if len(body) > 0 || forceCL {
 		headers = append(headers, fmt.Sprintf("Content-Length: %d", len(body)))
 	}
-	var buf = new(bytes.Buffer)
+	buf := new(bytes.Buffer)
 	for _, header := range headers {
 		buf.WriteString(header)
 		buf.WriteString(CRLF)
@@ -402,7 +402,7 @@ func ReplaceHTTPPacketBodyEx(raw []byte, body []byte, chunk bool, forceCL bool) 
 // ```
 // res, err := str.ParseBytesToHTTPResponse(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")
 // ```
-func ParseBytesToHTTPResponse(res []byte) (*http.Response, error) {
+func ParseBytesToHTTPResponse(res []byte) (rspInst *http.Response, err error) {
 	if len(res) <= 0 {
 		return nil, utils.Errorf("empty http response")
 	}
