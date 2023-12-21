@@ -64,7 +64,7 @@ func (s *ActionService) CreateAction(schema string) Action {
 	case "website":
 		return &websiteFromHttpFlow{}
 	case "behinder":
-		return &wsm.BehidnerFileSystemAction{}
+		return &wsm.BehidnerResourceSystemAction{}
 	case "godzilla":
 		return &wsm.GodzillaFileSystemAction{}
 	default:
