@@ -952,6 +952,18 @@ func TestExternStruct(t *testing.T) {
 			},
 		})
 	})
+
+	t.Run("extern function return type map", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			a = getA()
+			a = a.E
+			`,
+			ExternValue: map[string]any{
+				"getA": func() map[string]string { return nil },
+			},
+		})
+	})
 }
 
 func TestExternInstance(t *testing.T) {

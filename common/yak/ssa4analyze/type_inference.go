@@ -255,24 +255,39 @@ func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
 			return
 		default:
 		}
-		if c, ok := ssa.ToCall(f.Obj); ok && c.Unpack {
-			// pass
-		} else {
-			text := ""
-			if ci, ok := ssa.ToConst(f.Key); ok {
-				text = ci.String()
-				want := ssa.TryGetSimilarityKey(ssa.GetAllKey(typ), text)
-				if want != "" {
-					f.NewError(ssa.Error, TITAG, ssa.ExternFieldError("Type", typ.String(), text, want))
+		// if object is call, just skip, because call will return map or slice, we don't know what in this map or slice
+		c, ok := ssa.ToCall(f.Obj)
+		if ok {
+			if c.Unpack {
+				return
+			}
+			funTyp, ok := ssa.ToFunctionType(c.Method.GetType())
+			if ok {
+				// if ssa.IsObjectType(funTyp.ReturnType) {
+				if kind := funTyp.ReturnType.GetTypeKind(); kind == ssa.SliceTypeKind || kind == ssa.MapTypeKind {
 					return
 				}
+			} else {
+				return
 			}
-			if text == "" {
-				list := strings.Split(*f.GetRange().SourceCode, ".")
-				text = list[len(list)-1]
-			}
-			f.Key.NewError(ssa.Error, TITAG, InvalidField(typ.String(), text))
 		}
+		// if c, ok := ssa.ToCall(f.Obj); ok
+		// } else {
+		text := ""
+		if ci, ok := ssa.ToConst(f.Key); ok {
+			text = ci.String()
+			want := ssa.TryGetSimilarityKey(ssa.GetAllKey(typ), text)
+			if want != "" {
+				f.NewError(ssa.Error, TITAG, ssa.ExternFieldError("Type", typ.String(), text, want))
+				return
+			}
+		}
+		if text == "" {
+			list := strings.Split(*f.GetRange().SourceCode, ".")
+			text = list[len(list)-1]
+		}
+		f.Key.NewError(ssa.Error, TITAG, InvalidField(typ.String(), text))
+		// }
 	}
 	// use update
 	// vs := lo.FilterMap(f.GetValues(), func(v ssa.Value, i int) (ssa.Value, bool) {
