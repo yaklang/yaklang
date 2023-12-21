@@ -88,7 +88,7 @@ func (s *Server) QueryHTTPFlows(ctx context.Context, req *ypb.QueryHTTPFlowReque
 	start := time.Now()
 	var res []*ypb.HTTPFlow
 	for _, r := range data {
-		m, err := r.ToGRPCModel(req.Full)
+		m, err := r.ToGRPCModelFull()
 		if err != nil {
 			return nil, utils.Errorf("cannot convert httpflow failed: %s", err)
 		}
@@ -505,7 +505,7 @@ func (s *Server) ExportHTTPFlows(ctx context.Context, req *ypb.ExportHTTPFlowsRe
 	start := time.Now()
 	var res []*ypb.HTTPFlow
 	for _, r := range data {
-		m, err := r.ToGRPCModel(req.ExportWhere.Full)
+		m, err := r.ToGRPCModelFull()
 		if err != nil {
 			return nil, utils.Errorf("cannot convert httpflow failed: %s", err)
 		}

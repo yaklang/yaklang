@@ -1532,6 +1532,7 @@ message ProjectDescription {
   int64 UpdateAt = 9;
   string FolderName = 10;
   string ChildFolderName = 11;
+  string FileSize = 12;
 }
 
 message GetProjectsResponse {
