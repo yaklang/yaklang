@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -29,8 +30,28 @@ func (p *Program) GetErrors() ssa.SSAErrors {
 	return p.Program.GetErrors()
 }
 
-func (p *Program) GetValueById(id int) *Value {
-	return NewValue(p.Program.GetInstructionById(id).(ssa.InstructionNode))
+func (p *Program) GetValueById(id int) (*Value, error) {
+	val, ok := p.Program.GetInstructionById(id).(ssa.InstructionNode)
+	if val == nil {
+		return nil, utils.Errorf("instruction not found: %d", id)
+	}
+	if !ok {
+		return nil, utils.Errorf("[%T] not an instruction node", val)
+	}
+
+	return NewValue(val), nil
+}
+
+func (p *Program) GetValueByIdMust(id int) *Value {
+	v, err := p.GetValueById(id)
+	if err != nil {
+		log.Errorf("GetValueByIdMust: %v", err)
+	}
+	return v
+}
+
+func (p *Program) GetInstructionById(id int) ssa.Instruction {
+	return p.Program.GetInstructionById(id)
 }
 
 func (p *Program) Ref(name string) Values {
