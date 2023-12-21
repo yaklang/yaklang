@@ -3,9 +3,10 @@ package coreplugin
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/vulinbox"
 	"github.com/yaklang/yaklang/common/yakgrpc"
-	"testing"
 )
 
 func TestGRPCMUSTPASS_XSS(t *testing.T) {
@@ -60,6 +61,6 @@ func TestGRPCMUSTPASS_XSS(t *testing.T) {
 		StrictMode: false,
 	}
 
-	Must(TestCoreMitmPlug(pluginName, server, vul, client, t), " ")
+	Must(CoreMitmPlugTest(pluginName, server, vul, client, t), " ")
 
 }

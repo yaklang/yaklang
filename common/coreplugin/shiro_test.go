@@ -2,9 +2,10 @@ package coreplugin
 
 import (
 	"context"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/vulinbox"
 	"github.com/yaklang/yaklang/common/yakgrpc"
-	"testing"
 )
 
 func TestGRPCMUSTPASS_Shiro(t *testing.T) {
@@ -42,6 +43,6 @@ func TestGRPCMUSTPASS_Shiro(t *testing.T) {
 		StrictMode: false,
 	}
 
-	Must(TestCoreMitmPlug(pluginName, server, vul1, client, t), "Shiro插件对于低版本shiro检测结果不符合预期")
-	Must(TestCoreMitmPlug(pluginName, server, vul2, client, t), "Shiro插件对于高版本shiro检测结果不符合预期")
+	Must(CoreMitmPlugTest(pluginName, server, vul1, client, t), "Shiro插件对于低版本shiro检测结果不符合预期")
+	Must(CoreMitmPlugTest(pluginName, server, vul2, client, t), "Shiro插件对于高版本shiro检测结果不符合预期")
 }

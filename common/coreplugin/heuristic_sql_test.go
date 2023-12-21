@@ -2,10 +2,11 @@ package coreplugin
 
 import (
 	"context"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/vulinbox"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"testing"
 )
 
 func TestGRPCMUSTPASS_SQL(t *testing.T) {
@@ -61,5 +62,5 @@ func TestGRPCMUSTPASS_SQL(t *testing.T) {
 	//	Path:           "/user/name/like/b64?nameb64=%59%51%3d%3d",
 	//	ExpectedResult: map[string]int{"疑似SQL注入：【参数：字符串[name] like注入( %' )】": 3},
 	//}
-	Must(TestCoreMitmPlug(pluginName, server, vul, client, t), "SQL插件对于SQL注入检测结果不符合预期")
+	Must(CoreMitmPlugTest(pluginName, server, vul, client, t), "SQL插件对于SQL注入检测结果不符合预期")
 }
