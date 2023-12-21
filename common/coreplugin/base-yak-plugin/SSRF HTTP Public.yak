@@ -62,6 +62,7 @@ NewThreadPool = func(size){
 
 # mirrorNewWebsitePathParams 每新出现一个网站路径且带有一些参数，参数通过常见位置和参数名去重，去重的第一个 HTTPFlow 在这里被调用
 mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+    paramName = ""
     pool = NewThreadPool(10)
     pool.consumer((id,data)=>{
         param = data

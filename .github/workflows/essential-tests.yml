@@ -15,7 +15,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: Test JSONExtractor / Codec / Cartesian / JsonPath / Domain Extractor / Fuzztag / TLS / CVE / SCA / NETX / SSA / SSARule
+          - name: Test JSONExtractor / Codec / Cartesian / JsonPath / Domain Extractor / Fuzztag / TLS / CVE / SCA / NETX / SSA / SSARule / StaticAnalyze
             run: |
               # these tests are very quick
               go test -timeout 20s ./common/jsonextractor -v
@@ -36,6 +36,7 @@ jobs:
               go test -timeout 20s -run TestPingAutoConfig ./common/utils/pingutil -v
               go test -timeout 20s -run TestSSARuleMustPass* ./common/yak -v
               go test -timeout 20s -run TestMUSTPASS ./common/crawler -v
+              go test -timeout 2m -run TestAnalyzeMustPASS* ./common/coreplugin -v
 
           - name: Test lowhttp
             run: go test -timeout 1m ./common/utils/lowhttp -v
