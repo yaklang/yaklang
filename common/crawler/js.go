@@ -23,6 +23,9 @@ func HandleJS(isHttps bool, req []byte, code string, cb ...func(bool, []byte)) {
 	// prog := js2ssa.ParseSSA(code, nil)
 	// js := ssaapi.NewProgram(prog)
 	js := ssaapi.Parse(code, ssaapi.WithLanguage(ssaapi.JS))
+	if js.IsNil() {
+		return
+	}
 
 	getOriginReq := func() []byte {
 		var result = make([]byte, len(req))
