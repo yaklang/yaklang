@@ -6,7 +6,6 @@ import (
 	_ "net/http/pprof"
 	"regexp"
 	"testing"
-	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -110,7 +109,7 @@ func TestNew(t *testing.T) {
 	// 调用send函数发送请求
 	xhr.send()
 	// 监听load事件，响应请求后的结果
-	xhr.addEventListener('load', function (
+	xhr.addEventListener('load', function a() {
 		console.log(this.response)
 	})
 	`)
@@ -252,14 +251,4 @@ func TestNumber(t *testing.T) {
 		a < 1e-6 ? 1 : 2
 	`)
 	prog.Show()
-}
-
-//go:embed test.js
-var large string
-
-func TestJs(t *testing.T) {
-	prog := ParseSSA(large)
-	prog.Show()
-
-	time.Sleep(time.Minute)
 }

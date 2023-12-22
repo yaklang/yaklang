@@ -37,22 +37,24 @@ func (p *JavaScriptParserBase) n(str string) bool {
 // }
 
 // Whether the next token value equals to str.
+var count = 0
+
 func (p *JavaScriptParserBase) next(str string) bool {
 	return p.GetTokenStream().LT(1).GetText() == str
 }
 
 func (p *JavaScriptParserBase) notLineTerminator() bool {
+	count++
+	log.Info(count)
 	b := !p.here(JavaScriptParserLineTerminator)
 	return b
 }
 
-var count = 0
-
-func (p *JavaScriptParserBase) log(i any) bool {
-	count++
-	log.Infof("match syntax log[%v]: %v", count, i)
-	return true
-}
+// func (p *JavaScriptParserBase) log(i any) bool {
+// 	count++
+// 	log.Infof("match syntax log[%v]: %v", count, i)
+// 	return true
+// }
 
 func (p *JavaScriptParserBase) notMatchField() bool {
 	// start := time.Now()
@@ -117,8 +119,12 @@ func (p *JavaScriptParserBase) isEOS() bool {
 		return true
 	}
 	ahead := p.GetTokenStream().Get(possibleIndexEosToken)
+	p1 := p.GetTokenStream()
+	_ = p1
 	switch ahead.GetTokenType() {
 	case JavaScriptParserMultiLineComment:
+		return true
+	case JavaScriptLexerLineTerminatorNoHide:
 		return true
 	case JavaScriptLexerLineTerminator:
 		return true

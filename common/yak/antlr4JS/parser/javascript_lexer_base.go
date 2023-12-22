@@ -16,6 +16,11 @@ type JavaScriptLexerBase struct {
 	useStrictDefault bool
 	useStrictCurrent bool
 	templateDepth    int
+	// waitForCloseBrace antlr.Token
+
+	BeforeWords     [2]antlr.Token
+	keyWordsMap     map[int]bool
+	handlePlusMinus antlr.Token
 }
 
 func (l *JavaScriptLexerBase) IsStartOfFile() bool {
@@ -46,7 +51,66 @@ func (l *JavaScriptLexerBase) IsStrictMode() bool {
 
 // NextToken from the character stream.
 func (l *JavaScriptLexerBase) NextToken() antlr.Token {
+	// if l.waitForCloseBrace != nil {
+	// 	token := l.waitForCloseBrace
+	// 	l.waitForCloseBrace = nil
+	// 	return token
+	// }
+
+
+	if l.handlePlusMinus != nil {
+		token := l.handlePlusMinus
+		l.handlePlusMinus = nil
+		return token
+	}
+
+	if l.keyWordsMap == nil {
+		m := make(map[int]bool, 6)
+		m[JavaScriptLexerReturn] = true
+		m[JavaScriptLexerBreak] = true
+		m[JavaScriptLexerContinue] = true
+		m[JavaScriptLexerThrow] = true
+		m[JavaScriptLexerYield] = true
+		m[JavaScriptLexerAsync] = true
+		l.keyWordsMap = m
+	}
+
 	next := l.BaseLexer.NextToken() // Get next token
+
+	if next.GetTokenType() > 0 {
+		l.BeforeWords[0] = l.BeforeWords[1]
+		l.BeforeWords[1] = next
+	}
+
+	// 预读一位处理++
+	if next.GetTokenType() == JavaScriptLexerLineTerminator {
+		Next := l.BaseLexer.NextToken() // Get next next token
+		// 是++则加一个;
+		if Next != nil && (Next.GetTokenType() == JavaScriptLexerPlusPlus || Next.GetTokenType() == JavaScriptLexerMinusMinus) {
+			semit := l.GetTokenFactory().Create(
+				l.GetTokenSourceCharStreamPair(), JavaScriptLexerSemiColon, ";", antlr.TokenDefaultChannel,
+				next.GetStart(), next.GetStop(),
+				next.GetLine(), next.GetColumn(),
+			)
+			// 存预读位
+			l.handlePlusMinus = Next
+			next = semit
+			l.lastToken = next
+			return semit
+		}
+		l.handlePlusMinus = Next
+	}
+
+	// if next.GetTokenType() == JavaScriptLexerCloseBrace {
+	// 	semit := l.GetTokenFactory().Create(
+	// 		l.GetTokenSourceCharStreamPair(), JavaScriptLexerLineTerminator, "\n", next.GetChannel(),
+	// 		next.GetStart(), next.GetStop()-1,
+	// 		next.GetLine(), next.GetColumn(),
+	// 	)
+	// 	l.waitForCloseBrace = next
+	// 	next = semit
+	// }
+
 	if next.GetChannel() == antlr.TokenDefaultChannel {
 		// Keep track of the last token on default channel
 		l.lastToken = next
@@ -126,4 +190,22 @@ func (l *JavaScriptLexerBase) Reset() {
 	l.useStrictCurrent = false
 	l.templateDepth = 0
 	// l.BaseLexer.Reset()
+}
+
+func (l *JavaScriptLexerBase) afterKeyword() bool {
+	var token, dot int
+	if l.BeforeWords[1] == nil {
+		token = 0
+	} else {
+		token = l.BeforeWords[1].GetTokenType()
+	}
+
+	if l.BeforeWords[0] == nil {
+		dot = 0
+	} else {
+		dot = l.BeforeWords[0].GetTokenType()
+	}
+
+	_, ok := l.keyWordsMap[token]
+	return ok && (dot != JavaScriptLexerDot)
 }

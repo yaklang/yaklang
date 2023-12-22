@@ -5,6 +5,7 @@ import (
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 
+	"github.com/yaklang/yaklang/common/log"
 	JS "github.com/yaklang/yaklang/common/yak/antlr4JS/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
@@ -76,16 +77,21 @@ func NewErrorListener() *ErrorListener {
 
 func frontend(src string, must bool, handler func(*JS.ProgramContext)) {
 	errListener := NewErrorListener()
+	// start := time.Now()
 	lexer := JS.NewJavaScriptLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()
 	lexer.AddErrorListener(errListener)
 	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	parser := JS.NewJavaScriptParser(tokenStream)
+	// log.Info(time.Since(start))
 	parser.RemoveErrorListeners()
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
 	ast := parser.Program().(*JS.ProgramContext)
+	// log.Info("ast time ", time.Since(start))
 	if must || len(errListener.err) == 0 {
 		handler(ast)
+	} else {
+		log.Info(errListener.err)
 	}
 }

@@ -152,11 +152,11 @@ emptyStatement_
     ;
 
 ifStatement
-    : If '(' expressionSequence ')' statement (Else If '(' expressionSequence ')' statement)* elseBlock?
+    : If '(' expressionSequence ')' statement (Else  If '(' expressionSequence ')' statement)* elseBlock?
     ;
 
 elseBlock
-    : Else statement
+    : Else  statement
     ;
 
 forFirst
@@ -172,7 +172,7 @@ forThird
     ;
 
 iterationStatement
-    : Do statement While '(' expressionSequence ')' eos                                                                       # DoStatement
+    : Do  statement While '(' expressionSequence ')' eos                                                                       # DoStatement
     | While '(' expressionSequence ')' statement                                                                              # WhileStatement
     | For '(' forFirst? ';' forSecond? ';' forThird? ')' statement   # ForStatement
     | For '(' (singleExpression | variableDeclarationList) In expressionSequence ')' statement                                # ForInStatement
@@ -181,19 +181,19 @@ iterationStatement
     ;
 
 continueStatement
-    : Continue ({p.notLineTerminator()}? identifier)? eos
+    : Continue identifier? LineTerminatorNoHide* eos
     ;
 
 breakStatement
-    : Break ({p.notLineTerminator()}? identifier)? eos
+    : Break identifier? LineTerminatorNoHide* eos
     ;
 
-returnStatement
-    : Return ({p.notLineTerminator()}? expressionSequence)? eos
+returnStatement                                                                                    
+    : Return expressionSequence? LineTerminatorNoHide* eos
     ;
 
 yieldStatement
-    : Yield ({p.notLineTerminator()}? expressionSequence)? eos
+    : Yield expressionSequence? LineTerminatorNoHide* eos
     ;
 
 withStatement
@@ -213,7 +213,7 @@ caseClauses
     ;
 
 caseClause
-    : Case expressionSequence ':' statements?
+    : Case  expressionSequence ':' statements?
     ;
 
 defaultClause
@@ -225,7 +225,7 @@ labelledStatement
     ;
 
 throwStatement
-    : Throw {p.notLineTerminator()}? expressionSequence eos
+    : Throw LineTerminatorNoHide* expressionSequence eos
     ;
 
 tryStatement
@@ -264,7 +264,7 @@ classElement
     ;
 
 methodDefinition
-    : (Async {p.notLineTerminator()}?)? '*'? classElementName '(' formalParameterList? ')' functionBody
+    : Async? LineTerminatorNoHide* '*'? classElementName '(' formalParameterList? ')' functionBody
     | '*'? getter '(' ')' functionBody
     | '*'? setter '(' formalParameterList? ')' functionBody
     ;
@@ -300,7 +300,7 @@ functionBody
     ;
 
 arrayLiteral
-    : ('[' elementList ']')
+    : ('[' elementList ']'  )
     ;
 
 elementList
@@ -313,7 +313,7 @@ arrayElement
 
 propertyAssignment
     : propertyName ':' singleExpression                                             # PropertyExpressionAssignment
-    | '[' singleExpression ']' ':' singleExpression                                 # ComputedPropertyExpressionAssignment
+    | '[' singleExpression ']'  ':' singleExpression                                 # ComputedPropertyExpressionAssignment
     | Async? '*'? propertyName '(' formalParameterList?  ')'  functionBody  # FunctionProperty
     | getter '(' ')' functionBody                                           # PropertyGetter
     | setter '(' formalParameterArg ')' functionBody                        # PropertySetter
@@ -324,7 +324,7 @@ propertyName
     : identifierName
     | StringLiteral
     | numericLiteral
-    | '[' singleExpression ']'
+    | '[' singleExpression ']' 
     ;
 
 arguments
@@ -342,7 +342,7 @@ expressionSequence
     ;
 
 specificExpression
-    : identifierName
+    : identifierName 
     | templateStringLiteral
     | arguments
     ;
@@ -357,7 +357,7 @@ keywordSingleExpression
     ;
 
 singleExpression
-    : keywordSingleExpression                                               # KeywordExpression
+    : keywordSingleExpression                                               # KeywordExpression 
     | literal                                                               # LiteralExpression
     | Class identifier? classTail                                           # ClassExpression
     | anonymousFunction                                                     # FunctionExpression
@@ -369,24 +369,23 @@ singleExpression
     | arrayLiteral                                                          # ArrayLiteralExpression
     | objectLiteral                                                         # ObjectLiteralExpression
     | '(' expressionSequence ')'                                            # ParenthesizedExpression
-    | singleExpression questionDot optionalChainMember         # OptionalChainExpression
+    | singleExpression questionDot optionalChainMember    # OptionalChainExpression
     | singleExpression '.' '#'? identifierName         # ChainExpression
-    | singleExpression '[' singleExpression ']'  # MemberIndexExpression
+    | singleExpression '[' singleExpression ']'        # MemberIndexExpression
     // | singleExpression '?'? '.' '#'? identifierName                         # MemberDotExpression
     | singleExpression arguments                                            # ArgumentsExpression
-
-    // suffix self add dec
-    | singleExpression {p.notLineTerminator()}? op = ('++' | '--')          # PostUnaryExpression
+    // suffix self add dec   
+    | singleExpression op = ('++' | '--')          # PostUnaryExpression
 
     // prefix unary
-    | preUnaryOperator singleExpression                                     # PreUnaryExpression
+    | preUnaryOperator singleExpression                                     # PreUnaryExpression              
 
     // 二元运算
     | <assoc=right> singleExpression '**' singleExpression                                  # PowerExpression
     | singleExpression op = ('*' | '/' | '%') singleExpression                              # MultiplicativeExpression
     | singleExpression op = ('+' | '-') singleExpression                                    # AdditiveExpression
     | singleExpression op = ('<<' | '>>' | '>>>') singleExpression                          # BitShiftExpression
-    | singleExpression op = ('<' | '>' | '<=' | '>=' | In | Instanceof) singleExpression    # RelationalExpression
+    | singleExpression op = ('<' | '>' | '<=' | '>=' | In | Instanceof)  singleExpression    # RelationalExpression
     | singleExpression op = ('==' | '!=' | '===' | '!==') singleExpression                  # EqExpression
     | singleExpression ('&' | '^' | '|') singleExpression                                   # BitExpression
     | singleExpression '&&' singleExpression                            # LogicalAndExpression
@@ -402,7 +401,7 @@ singleExpression
 preUnaryOperator
     : ('++' | '--' )
     | ('+' | '-' | '!' | '~')
-    | Typeof
+    | Typeof 
     | Void
     | Delete
     ;
@@ -455,8 +454,8 @@ assignmentOperator
     ;
 
 literal
-    : NullLiteral
-    | BooleanLiteral
+    : NullLiteral 
+    | BooleanLiteral 
     | StringLiteral
     | templateStringLiteral
     | RegularExpressionLiteral
