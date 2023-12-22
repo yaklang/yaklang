@@ -8,14 +8,12 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/wsm/payloads"
 	"github.com/yaklang/yaklang/common/wsm/payloads/behinder"
 	"github.com/yaklang/yaklang/common/wsm/payloads/godzilla"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"golang.org/x/net/publicsuffix"
 	"net/http"
-	"net/http/cookiejar"
-	"net/url"
 	"strings"
 )
 
@@ -31,7 +29,6 @@ type Godzilla struct {
 	// 加密模式
 	EncMode string
 	Proxy   string
-	Client  *http.Client
 	// 自定义 header 头
 	Headers map[string]string
 	// request 开头的干扰字符
@@ -39,15 +36,13 @@ type Godzilla struct {
 	// request 结尾的干扰字符
 	ReqRight string
 
+	req             *http.Request
 	dynamicFuncName map[string]string
 
 	CustomEncoder codecFunc
 }
 
 func NewGodzilla(ys *ypb.WebShell) (*Godzilla, error) {
-	client := utils.NewDefaultHTTPClient()
-	jar, _ := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
-	client.Jar = jar
 	gs := &Godzilla{
 		Url:             ys.GetUrl(),
 		Pass:            ys.GetPass(),
@@ -55,7 +50,6 @@ func NewGodzilla(ys *ypb.WebShell) (*Godzilla, error) {
 		ShellScript:     ys.GetShellScript(),
 		EncMode:         ys.GetEncMode(),
 		Proxy:           ys.Proxy,
-		Client:          client,
 		Headers:         make(map[string]string, 2),
 		dynamicFuncName: make(map[string]string, 2),
 	}
@@ -66,8 +60,10 @@ func NewGodzilla(ys *ypb.WebShell) (*Godzilla, error) {
 		}
 		return enPayload, nil
 	}
-	gs.setHeaders()
-	gs.setProxy()
+	gs.setContentType()
+	//if ys.GetHeaders() != nil {
+	//	gs.Headers = ys.GetHeaders()
+	//}
 	return gs, nil
 }
 
@@ -109,24 +105,13 @@ func (g *Godzilla) setDefaultParams() map[string]string {
 	return g.dynamicFuncName
 }
 
-func (g *Godzilla) setHeaders() {
+func (g *Godzilla) setContentType() {
 	switch g.EncMode {
 	case ypb.EncMode_Base64.String():
 		g.Headers["Content-type"] = "application/x-www-form-urlencoded"
 	case ypb.EncMode_Raw.String():
 	default:
 		panic("shell script type error [JSP/JSPX/ASP/ASPX/PHP]")
-	}
-}
-
-func (g *Godzilla) setProxy() {
-	if g.Proxy == "" {
-		return
-	}
-	g.Client.Transport = &http.Transport{
-		Proxy: func(r *http.Request) (*url.URL, error) {
-			return url.Parse(g.Proxy)
-		},
 	}
 }
 
@@ -210,24 +195,23 @@ func (g *Godzilla) deCryption(raw []byte) ([]byte, error) {
 }
 
 func (g *Godzilla) post(data []byte) ([]byte, error) {
-	request, err := http.NewRequest(http.MethodPost, g.Url, bytes.NewReader(data))
-	if err != nil {
-		return nil, err
-	}
-	for k, v := range g.Headers {
-		request.Header.Set(k, v)
-	}
-	resp, err := g.Client.Do(request)
+	resp, req, err := poc.DoPOST(
+		g.Url,
+		poc.WithProxy(g.Proxy),
+		poc.WithAppendHeaders(g.Headers),
+		poc.WithReplaceHttpPacketBody(data, false),
+		poc.WithSession("godzilla"),
+	)
 	if err != nil {
 		return nil, utils.Errorf("http request error: %v", err)
 	}
 
-	respBs, err := utils.HttpDumpWithBody(resp, true)
-	if err != nil {
-		return nil, utils.Errorf("http DumpWithBody error: %v", err)
-	}
+	_, raw, err := lowhttp.FixHTTPResponse(resp.RawPacket)
 
-	raw := lowhttp.GetHTTPPacketBody(respBs)
+	if len(raw) == 0 && g.req != nil {
+		return nil, utils.Errorf("empty response")
+	}
+	g.req = req
 	raw = bytes.TrimRight(raw, "\r\n\r\n")
 	return raw, nil
 }
@@ -355,8 +339,7 @@ func (g *Godzilla) InjectPayload() error {
 }
 
 func (g *Godzilla) InjectPayloadIfNoCookie() error {
-	u, _ := url.Parse(g.Url)
-	if len(g.Client.Jar.Cookies(u)) == 0 {
+	if g.req == nil {
 		err := g.InjectPayload()
 		if err != nil {
 			return err
@@ -365,7 +348,7 @@ func (g *Godzilla) InjectPayloadIfNoCookie() error {
 	return nil
 }
 
-// 销毁一个会话中的全部数据,这样做的效果有，清除目标服务器上的 sess_PHPSESSID 文件
+// 销毁一个会话中的全部数据,可以清除缓存文件夹中的 sess_PHPSESSID 文件
 func (g *Godzilla) close() (bool, error) {
 	parameter := newParameter()
 	res, err := g.EvalFunc("", "close", parameter)

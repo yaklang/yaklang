@@ -94,6 +94,28 @@ func CreateOrUpdateWebShell(db *gorm.DB, hash string, i interface{}) (*WebShell,
 	return shell, nil
 }
 
+func UpdateWebShellStateById(db *gorm.DB, id int64, state bool) (*WebShell, error) {
+	db = db.Model(&WebShell{}).Debug()
+	shell := &WebShell{}
+
+	// First, try to find the record
+	if err := db.Where("id = ?", id).First(shell).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// If the record is not found, return an error
+			return nil, utils.Errorf("WebShell not found: %s", err)
+		} else {
+			// Some other error occurred
+			return nil, utils.Errorf("retrieve WebShell failed: %s", err)
+		}
+	}
+	// If the record is found, update it
+	if err := db.Model(shell).Update("status", state).Error; err != nil {
+		return nil, utils.Errorf("update WebShell failed: %s", err)
+	}
+
+	return shell, nil
+}
+
 func UpdateWebShellById(db *gorm.DB, id int64, i interface{}) (*WebShell, error) {
 	db = db.Model(&WebShell{}).Debug()
 	shell := &WebShell{}

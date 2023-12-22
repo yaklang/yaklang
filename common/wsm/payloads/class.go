@@ -464,10 +464,5 @@ func EncryptForJava(code []byte, key []byte) ([]byte, error) {
 
 // DecryptForJava TODO 解密前判断下长度，不然可能会 panic
 func DecryptForJava(code []byte, key []byte) ([]byte, error) {
-	// 冰蝎4 的 AES 加密结果套了一层 base64
-	deCode, err := base64.StdEncoding.DecodeString(string(code))
-	if err != nil {
-		return nil, err
-	}
-	return codec.AESECBDecrypt(key, deCode, nil)
+	return codec.AESECBDecrypt(key, code, nil)
 }
