@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -20,15 +21,25 @@ type IdentifierLV struct {
 }
 
 func (i *IdentifierLV) Assign(v Value, f *FunctionBuilder) {
-	f.CurrentScope.AddVariable(NewVariable(i.name, v), f.CurrentRange)
-	if i.isSideEffect {
-		// BUG here
-		//if freeValue := f.PeekVariable(i.name, false); freeValue != nil {
-		//	freeValue.AddMask(v)
-		//}
-		//f.AddSideEffect(i.name, v)
+	beforeSSAValue := f.PeekLexicalVariableByName(i.name)
+	if beforeSSAValue != nil {
+		if freeParam, ok := beforeSSAValue.(*Parameter); ok && freeParam.IsFreeValue {
+			// freevalue shoule connect to parent lexical name!
+			if f.parentBuilder != nil {
+				beforeSSAValue = f.parentBuilder.PeekLexicalVariableByName(i.name)
+			}
+		}
 	}
+	f.CurrentScope.AddVariable(NewVariable(i.name, v), f.CurrentRange)
 	f.WriteVariable(i.name, v)
+	if i.isSideEffect {
+		if beforeSSAValue != nil {
+			beforeSSAValue.AddMask(v)
+		} else {
+			log.Warn("freeValueParameter is nil, conflict, side effect cannot find the relative freevalue! maybe a **BUG**")
+		}
+		f.AddSideEffect(i.name, v)
+	}
 }
 
 func (i *IdentifierLV) GetValue(f *FunctionBuilder) Value {
@@ -102,6 +113,21 @@ func (b *FunctionBuilder) PeekVariable(variable string, create bool) Value {
 	})
 
 	return ret
+}
+
+// PeekLexicalVariableByName find the static variable in lexical scope
+func (b *FunctionBuilder) PeekLexicalVariableByName(variable string) Value {
+	i := b.PeekVariable(variable, false)
+	if i != nil {
+		return i
+	}
+	if b.parentBuilder != nil {
+		i := b.parentBuilder.PeekVariable(variable, false)
+		if i != nil {
+			return i
+		}
+	}
+	return nil
 }
 
 // get value by variable and block

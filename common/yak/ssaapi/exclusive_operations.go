@@ -52,6 +52,9 @@ func (i *Value) visitedDefsDefault(actx *AnalyzeContext) Values {
 		}
 	}
 
+	if len(vals) <= 0 {
+		vals = append(vals, i)
+	}
 	if maskable, ok := i.node.(ssa.Maskable); ok {
 		for _, def := range maskable.GetMask() {
 			if ret := NewValue(def).SetParent(i).getTopDefs(actx); len(ret) > 0 {
@@ -59,10 +62,7 @@ func (i *Value) visitedDefsDefault(actx *AnalyzeContext) Values {
 			}
 		}
 	}
-	if len(vals) > 0 {
-		return vals
-	}
-	return Values{i}
+	return vals
 }
 
 func (i *Value) getTopDefs(actx *AnalyzeContext) Values {
