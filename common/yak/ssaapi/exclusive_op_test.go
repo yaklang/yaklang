@@ -85,11 +85,12 @@ for i := 3; i < f; i++ {
 	d = originValue + i
 	d += f
 }
-g = d // g deps-> 1 / 2 / 3
+g = d
 `)
 	c1 := false
 	c2 := false
 	c3 := false
+	prog.Ref("d").Show()
 	prog.Ref("g").ForEach(func(value *Value) {
 		defs := value.GetTopDefs()
 		for _, i := range defs {
