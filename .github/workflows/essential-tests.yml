@@ -2,15 +2,54 @@ name: Essential Tests
 
 on:
   pull_request:
-    branches: [ main ]
-    types: [ opened, synchronize, reopened, closed ]
+    branches: [main]
+    types: [opened, synchronize, reopened, closed]
     paths:
-      - 'common/**'
-      - '.github/workflows/essential-tests.yml'
+      - "common/**"
+      - ".github/workflows/essential-tests.yml"
 
 jobs:
+  setup:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Cache YakLang Project
+        uses: actions/cache@v3
+        id: cache-project
+        with:
+          path: |
+            ~/yakit-projects
+            ${{ github.workspace }}
+          key: go-${{ github.sha }}
+
+      - name: Check out code into the Go module directory
+        if: steps.cache-project.outputs.cache-hit != 'true'
+        uses: actions/checkout@v3
+
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: "./go.mod"
+        id: go
+
+      - name: Dependence
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libpcap-dev
+          version: 1.9.1-3
+
+      - name: Init Module
+        run: |
+          go mod tidy
+
+      - name: Init Project
+        if: steps.cache-project.outputs.cache-hit != 'true'
+        run: |
+          go build common/yak/cmd/yak.go 
+          ./yak --help
+
   test:
     name: ${{ matrix.name }}
+    needs: setup
     runs-on: ubuntu-20.04
     strategy:
       matrix:
@@ -99,24 +138,34 @@ jobs:
             run: go test -timeout 20s ./common/syntaxflow -v
 
     steps:
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v3
+      - name: Cache YakLang Project
+        uses: actions/cache/restore@v3
+        id: cache-project
+        with:
+          path: |
+            ~/yakit-projects
+            ${{ github.workspace }}
+          key: go-${{ github.sha }}
 
       - name: Set up Go 1.x
         uses: actions/setup-go@v4
         with:
-          go-version-file: './go.mod'
+          go-version-file: "./go.mod"
         id: go
 
       - name: Dependence
-        run: |
-          sudo apt-get update
-          sudo apt-get install libpcap-dev=1.9.1-3
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libpcap-dev
+          version: 1.9.1-3
 
-      - name: Init
+      - name: GRPC
         run: |
-          go mod tidy && go run common/yak/cmd/yak.go --help
+          nohup ./yak grpc & 
+          sleep 1
 
       - name: ${{ matrix.name }}
         run: |
+          export YAKLANG_GRPCTEST_GITHUBACTION=true
+          export YAK_DISABLE=output
           ${{ matrix.run }}

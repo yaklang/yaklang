@@ -4,6 +4,15 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"net"
+	"os"
+	"reflect"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/consts"
 	log "github.com/yaklang/yaklang/common/log"
@@ -14,14 +23,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/grpc"
 	"gopkg.in/yaml.v2"
-	"io"
-	"io/ioutil"
-	"net"
-	"os"
-	"reflect"
-	"strconv"
-	"strings"
-	"time"
 )
 
 // OpenPortServerStreamerHelperRWC
@@ -129,37 +130,49 @@ func appendPluginNamesEx(key string, splitStr string, params []*ypb.ExecParamIte
 	}
 	return params, callback, nil
 }
-func NewLocalClient() (ypb.YakClient, error) {
+
+func NewLocalClient(locals ...bool) (ypb.YakClient, error) {
+	var port int
+	var addr string
 	netx.UnsetProxyFromEnv()
 
-	consts.InitilizeDatabase("", "")
-	yakit.InitializeDefaultDatabaseSchema()
+	local := false
+	if len(locals) > 0 {
+		local = locals[0]
+	}
 
-	port := utils.GetRandomAvailableTCPPort()
-	addr := utils.HostPort("127.0.0.1", port)
-	grpcTrans := grpc.NewServer(
-		grpc.MaxRecvMsgSize(100*1024*1024),
-		grpc.MaxSendMsgSize(100*1024*1024),
-	)
-	s, err := NewServerWithLogCache(false)
-	if err != nil {
-		log.Errorf("build yakit server failed: %s", err)
-		return nil, err
-	}
-	ypb.RegisterYakServer(grpcTrans, s)
-	var lis net.Listener
-	lis, err = net.Listen("tcp", addr)
-	if err != nil {
-		return nil, err
-	}
-	go func() {
-		err = grpcTrans.Serve(lis)
+	if local || !utils.CheckGithubAction() {
+		consts.InitilizeDatabase("", "")
+		yakit.InitializeDefaultDatabaseSchema()
+
+		port = utils.GetRandomAvailableTCPPort()
+		addr = utils.HostPort("127.0.0.1", port)
+		grpcTrans := grpc.NewServer(
+			grpc.MaxRecvMsgSize(100*1024*1024),
+			grpc.MaxSendMsgSize(100*1024*1024),
+		)
+		s, err := NewServerWithLogCache(false)
 		if err != nil {
-			log.Error(err)
+			log.Errorf("build yakit server failed: %s", err)
+			return nil, err
 		}
-	}()
-
-	time.Sleep(1 * time.Second)
+		ypb.RegisterYakServer(grpcTrans, s)
+		var lis net.Listener
+		lis, err = net.Listen("tcp", addr)
+		if err != nil {
+			return nil, err
+		}
+		go func() {
+			err = grpcTrans.Serve(lis)
+			if err != nil {
+				log.Error(err)
+			}
+		}()
+		time.Sleep(1 * time.Second)
+	} else {
+		port = 8087
+		addr = utils.HostPort("127.0.0.1", port)
+	}
 
 	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithDefaultCallOptions(
 		grpc.MaxCallRecvMsgSize(100*1024*1045),

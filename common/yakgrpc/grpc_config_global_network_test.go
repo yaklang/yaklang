@@ -3,13 +3,14 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"net/http"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/tlsutils"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
@@ -20,7 +21,7 @@ import (
 )
 
 func TestGRPCMUSTPASS_THIRDPARTY_APP(t *testing.T) {
-	client, err := NewLocalClient()
+	client, err := NewLocalClient(true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +45,7 @@ func TestGRPCMUSTPASS_THIRDPARTY_APP(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_GLOBAL_NETWORK_DNS_CONFIG(t *testing.T) {
-	client, err := NewLocalClient()
+	client, err := NewLocalClient(true)
 	if err != nil {
 		panic(err)
 	}
@@ -87,7 +88,7 @@ func TestGRPCMUSTPASS_GLOBAL_NETWORK_DNS_CONFIG(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_RPOXY_FROM_ENV(t *testing.T) {
-	client, err := NewLocalClient()
+	client, err := NewLocalClient(true)
 	if err != nil {
 		panic(err)
 	}
@@ -150,7 +151,7 @@ try {
 }
 
 func TestGRPCMUSTPASS_GLOBAL_RPOXY(t *testing.T) {
-	client, err := NewLocalClient()
+	client, err := NewLocalClient(true)
 	if err != nil {
 		panic(err)
 	}
@@ -210,7 +211,7 @@ try {
 }
 
 func TestGRPCMUSTPASS_DISALLOW_ADDRESS(t *testing.T) {
-	client, err := NewLocalClient()
+	client, err := NewLocalClient(true)
 	if err != nil {
 		panic(err)
 	}
@@ -293,7 +294,7 @@ func TestGRPCMUSTPASS_HTTPAuth(t *testing.T) {
 		w.WriteHeader(http.StatusUnauthorized)
 	})
 
-	client, err := NewLocalClient()
+	client, err := NewLocalClient(true)
 	_, _ = client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
 	config, err := client.GetGlobalNetworkConfig(context.Background(), &ypb.GetGlobalNetworkConfigRequest{})
 	if err != nil {
