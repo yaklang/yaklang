@@ -204,6 +204,7 @@ func DeleteProjectByUid(db *gorm.DB, id string) error {
 
 func QueryProject(db *gorm.DB, params *ypb.GetProjectsRequest) (*bizhelper.Paginator, []*Project, error) {
 	db = db.Model(&Project{})
+	db = db.Where("deleted_at = '' or deleted_at IS NULL ")
 	if params.Pagination == nil {
 		params.Pagination = &ypb.Paging{
 			Page:    1,
@@ -239,9 +240,9 @@ func QueryProject(db *gorm.DB, params *ypb.GetProjectsRequest) (*bizhelper.Pagin
 	case TypeProject:
 		db = db.Where("type IS NULL or type = ?", params.Type)
 	}
-	db = db.Where("(project_name <> ? and folder_id = false and child_folder_id = false and type = 'project')", TEMPORARY_PROJECT_NAME)
+	db = db.Where("project_name <> ? or folder_id <> false or child_folder_id <> false and type = 'project' ", TEMPORARY_PROJECT_NAME)
 	db = bizhelper.QueryOrder(db, p.OrderBy, p.Order)
-
+	db = db.Unscoped()
 	var ret []*Project
 	paging, db := bizhelper.Paging(db, int(p.Page), int(p.Limit), &ret)
 	if db.Error != nil {
@@ -307,6 +308,8 @@ func GetProject(db *gorm.DB, params *ypb.IsProjectNameValidRequest) (*Project, e
 
 func QueryProjectTotal(db *gorm.DB, req *ypb.GetProjectsRequest) (*bizhelper.Paginator, error) {
 	db = db.Model(&Project{})
+	db = db.Where("deleted_at = '' or deleted_at IS NULL ")
+	db = db.Unscoped()
 	if req.Pagination == nil {
 		req.Pagination = &ypb.Paging{
 			Page:    1,
@@ -317,7 +320,7 @@ func QueryProjectTotal(db *gorm.DB, req *ypb.GetProjectsRequest) (*bizhelper.Pag
 	}
 	params := req.Pagination
 	db = db.Where("type IS NULL or type = ? ", TypeProject)
-	db = db.Where("(project_name <> ? and folder_id = false and child_folder_id = false and type = 'project')", TEMPORARY_PROJECT_NAME)
+	db = db.Where("project_name <> ? or folder_id <> false or child_folder_id <> false and type = 'project' ", TEMPORARY_PROJECT_NAME)
 	var ret []*Project
 	paging, db := bizhelper.Paging(db, int(params.Page), int(params.Limit), &ret)
 	if db.Error != nil {
