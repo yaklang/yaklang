@@ -3,7 +3,6 @@ package ssaapi
 import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"sync"
 )
 
 // GetContextValue can handle context
@@ -23,19 +22,6 @@ func (v *Value) GetParent() (*Value, bool) {
 func (v *Value) SetParent(value *Value) *Value {
 	v.runtimeCtx.Set("parent", value)
 	return v
-}
-
-func (v *Value) SetSideEffect(e *Value) *Value {
-	if e == nil {
-		v.runtimeCtx.Delete("isSizeEffect")
-		return v
-	}
-	v.runtimeCtx.Set("isSizeEffect", e)
-	return v
-}
-
-func (v *Value) GetSideEffect() (*Value, bool) {
-	return v.runtimeCtx.Get(`isSizeEffect`)
 }
 
 // GetTopDefs desc all of 'Defs' is not used by any other value
@@ -58,56 +44,66 @@ func (v Values) GetTopDefs() Values {
 	return ret
 }
 
-func (i *Value) getTopDefs(visited *sync.Map) Values {
+func (i *Value) visitedDefsDefault(actx *AnalyzeContext) Values {
+	var vals Values
+	for _, def := range i.node.GetValues() {
+		if ret := NewValue(def).SetParent(i).getTopDefs(actx); len(ret) > 0 {
+			vals = append(vals, ret...)
+		}
+	}
+
+	if maskable, ok := i.node.(ssa.Maskable); ok {
+		for _, def := range maskable.GetMask() {
+			if ret := NewValue(def).SetParent(i).getTopDefs(actx); len(ret) > 0 {
+				vals = append(vals, ret...)
+			}
+		}
+	}
+	if len(vals) > 0 {
+		return vals
+	}
+	return Values{i}
+}
+
+func (i *Value) getTopDefs(actx *AnalyzeContext) Values {
 	if i == nil {
 		return nil
 	}
 
-	if visited == nil {
-		// phi node will cause dead loop
-		// visited can prevent this
-		visited = new(sync.Map)
-	}
-	if ret, ok := i.node.(*ssa.Phi); ok {
-		log.Infof("visited phi: %v", ret.String())
-		if _, ok := visited.Load(ret); ok {
-			// visited phi
-			return nil
-		}
-		visited.Store(i.node, struct{}{})
+	if actx == nil {
+		actx = NewAnalyzeContext()
 	}
 
 	switch ret := i.node.(type) {
+	case *ssa.Phi:
+		if !actx.ThePhiShouldBeVisited(i) {
+			// phi is visited...
+			return Values{}
+		}
+		actx.VisitPhi(i)
+		return i.visitedDefsDefault(actx)
 	case *ssa.Call:
-		log.Info("ssa.Call checking...")
 		caller := ret.Method
 		if caller == nil {
 			return Values{i} // return self
 		}
-		r, _ := i.GetSideEffect()
-		return NewValue(caller).SetParent(i).SetSideEffect(r).getTopDefs(visited)
+
+		err := actx.PushCall(i)
+		if err != nil {
+			log.Errorf("push call error: %v", err)
+			return Values{i}
+		}
+
+		// TODO: trace the specific return-values
+		return NewValue(caller).SetParent(i).getTopDefs(actx)
 	case *ssa.Function:
 		log.Info("ssa.Function checking...")
 		var vals Values
-		val, ok := i.GetSideEffect()
-		if ok {
-			// side effect
-			varName := val.node.GetName()
-			log.Infof("side-effect val: %v", varName)
-			effect, ok := ret.SideEffects[varName]
-			if !ok {
-				return Values{i}
-			}
-			if ret := NewValue(effect).SetParent(i).getTopDefs(visited); len(ret) > 0 {
-				vals = append(vals, ret...)
-			}
-		} else {
-			// handle return
-			for _, r := range ret.Return {
-				for _, subVal := range r.GetValues() {
-					if ret := NewValue(subVal).SetParent(i).getTopDefs(visited); len(ret) > 0 {
-						vals = append(vals, ret...)
-					}
+		// handle return
+		for _, r := range ret.Return {
+			for _, subVal := range r.GetValues() {
+				if ret := NewValue(subVal).SetParent(i).getTopDefs(actx); len(ret) > 0 {
+					vals = append(vals, ret...)
 				}
 			}
 		}
@@ -136,7 +132,7 @@ func (i *Value) getTopDefs(visited *sync.Map) Values {
 			calledInstance := called.node.(*ssa.Call)
 			for _, i := range calledInstance.Args {
 				traced := NewValue(i).SetParent(called)
-				if ret := traced.getTopDefs(visited); len(ret) > 0 {
+				if ret := traced.getTopDefs(actx); len(ret) > 0 {
 					vals = append(vals, ret...)
 				} else {
 					vals = append(vals, traced)
@@ -158,7 +154,7 @@ func (i *Value) getTopDefs(visited *sync.Map) Values {
 						continue
 					}
 
-					if ret := NewValue(va).SetParent(i).getTopDefs(visited); len(ret) > 0 {
+					if ret := NewValue(va).SetParent(i).getTopDefs(actx); len(ret) > 0 {
 						vals = append(vals, ret...)
 					}
 				}
@@ -169,35 +165,6 @@ func (i *Value) getTopDefs(visited *sync.Map) Values {
 			return vals
 		}
 		return Values{i}
-	case *ssa.ConstInst:
-		return Values{i}
-	case *ssa.Undefined:
-		return Values{i}
-	case *ssa.Phi:
-		log.Infof("handling phi")
-		var vars Values
-		for _, eg := range ret.Edge {
-			if ret := NewValue(eg).SetParent(i).getTopDefs(visited); len(ret) > 0 {
-				vars = append(vars, ret...)
-			}
-		}
-		return vars
-	case *ssa.SideEffect:
-		var vals Values
-		for _, subVal := range ret.GetValues() {
-			if ret := NewValue(subVal).SetParent(i).SetSideEffect(i).getTopDefs(visited); len(ret) > 0 {
-				vals = append(vals, ret...)
-			}
-		}
-		return vals
-	default:
-		var vals Values
-		for _, val := range i.node.GetValues() {
-			if ret := NewValue(val).SetParent(i).getTopDefs(visited); len(ret) > 0 {
-				vals = append(vals, ret...)
-			}
-		}
-		return vals
 	}
-	return nil
+	return i.visitedDefsDefault(actx)
 }

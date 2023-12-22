@@ -21,10 +21,14 @@ type IdentifierLV struct {
 
 func (i *IdentifierLV) Assign(v Value, f *FunctionBuilder) {
 	f.CurrentScope.AddVariable(NewVariable(i.name, v), f.CurrentRange)
-	f.WriteVariable(i.name, v)
 	if i.isSideEffect {
-		f.AddSideEffect(i.name, v)
+		// BUG here
+		//if freeValue := f.PeekVariable(i.name, false); freeValue != nil {
+		//	freeValue.AddMask(v)
+		//}
+		//f.AddSideEffect(i.name, v)
 	}
+	f.WriteVariable(i.name, v)
 }
 
 func (i *IdentifierLV) GetValue(f *FunctionBuilder) Value {
@@ -84,7 +88,7 @@ func (b *Function) writeVariableByBlock(variable string, value Value, block *Bas
 	block.symbolTable[variable] = vs
 }
 
-// just same like `ReadVariable` , but `PeekVariable` don't create `Variable`
+// PeekVariable just same like `ReadVariable` , but `PeekVariable` don't create `Variable`
 // if your syntax read variable, please use `ReadVariable`
 // if you just want see what Value this variable, just use `PeekVariable`
 func (b *FunctionBuilder) PeekVariable(variable string, create bool) Value {
@@ -229,7 +233,7 @@ func (b *FunctionBuilder) readVariableByBlockEx(variable string, block *BasicBlo
 		phi.SetRange(b.CurrentRange)
 		v = phi.Build()
 	}
-	b.writeVariableByBlock(variable, v, block)
+	b.writeVariableByBlock(variable, v, block) // NOTE: why write when the v is nil?
 	if v != nil {
 		return []Value{v}
 	} else {
