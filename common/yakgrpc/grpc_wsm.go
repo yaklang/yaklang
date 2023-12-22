@@ -12,6 +12,44 @@ import (
 	"strings"
 )
 
+// TODO 何时清理缓存
+// 创建一个全局的 map 来存储 WebShellManager 实例
+var webShellManagerCache = make(map[int64]wsm.BaseShellManager)
+
+func (s *Server) getWebShellManager(id int64) (wsm.BaseShellManager, error) {
+	if m, ok := webShellManagerCache[id]; ok {
+		return m, nil
+	}
+	var err error
+	shell, err := yakit.GetWebShell(s.GetProjectDatabase(), id)
+	if err != nil {
+		return nil, err
+	}
+	manager, err := wsm.NewWebShellManager(shell)
+	if err != nil {
+		return nil, err
+	}
+	if shell.GetPacketCodecName() != "" {
+		script, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), shell.GetPacketCodecName())
+		if err != nil {
+			return nil, err
+		}
+
+		manager.SetPacketScriptContent(script.Content)
+	}
+	if shell.GetPayloadCodecName() != "" {
+		script, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), shell.GetPayloadCodecName())
+		if err != nil {
+			return nil, err
+		}
+		manager.SetPayloadScriptContent(script.Content)
+	}
+
+	webShellManagerCache[id] = manager
+
+	return manager, nil
+}
+
 func (s *Server) CreateWebShell(ctx context.Context, req *ypb.WebShell) (*ypb.WebShell, error) {
 	db := consts.GetGormProjectDatabase()
 	if db == nil {
@@ -128,90 +166,27 @@ func (s *Server) QueryWebShells(ctx context.Context, req *ypb.QueryWebShellsRequ
 }
 
 func (s *Server) Ping(ctx context.Context, req *ypb.WebShellRequest) (*ypb.WebShellResponse, error) {
-	db := consts.GetGormProjectDatabase()
-	if db == nil {
-		log.Error("empty database")
-		return nil, utils.Errorf("no database connection")
-	}
-	var err error
-	shell, err := yakit.GetWebShell(db, req.GetId())
-	if err != nil {
-		return nil, err
-	}
-	w, err := wsm.NewWebShellManager(shell)
-	if err != nil {
-		return nil, err
-	}
-	if shell.GetPacketCodecName() != "" {
-		script, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), shell.GetPacketCodecName())
-		if err != nil {
-			return nil, err
-		}
-
-		w.SetPacketScriptContent(script.Content)
-	}
-	if shell.GetPayloadCodecName() != "" {
-		script, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), shell.GetPayloadCodecName())
-		if err != nil {
-			return nil, err
-		}
-		w.SetPayloadScriptContent(script.Content)
-	}
+	w, err := s.getWebShellManager(req.GetId())
 	ping, err := w.Ping()
 	if err != nil {
 		return nil, err
 	}
-	shell.Status = ping
 
-	_, err = yakit.UpdateWebShellById(db, req.GetId(), shell)
+	_, err = yakit.UpdateWebShellStateById(s.GetProjectDatabase(), req.GetId(), ping)
 	if err != nil {
 		log.Error(err)
 		return nil, err
 	}
-	data := &ypb.WebShellResponse{State: ping}
-	return data, nil
+	return &ypb.WebShellResponse{State: ping}, nil
 }
 
 func (s *Server) GetBasicInfo(ctx context.Context, req *ypb.WebShellRequest) (*ypb.WebShellResponse, error) {
-	db := consts.GetGormProjectDatabase()
-	if db == nil {
-		log.Error("empty database")
-		return nil, utils.Errorf("no database connection")
-	}
-	shell, err := yakit.GetWebShell(db, req.GetId())
-	if err != nil {
-		return nil, err
-	}
-	w, err := wsm.NewWebShellManager(shell)
-	if err != nil {
-		return nil, err
-	}
-	if shell.GetPacketCodecName() != "" {
-		script, err := yakit.GetYakScriptByName(db, shell.GetPacketCodecName())
-		if err != nil {
-			return nil, err
-		}
-
-		w.SetPacketScriptContent(script.Content)
-	}
-	if shell.GetPayloadCodecName() != "" {
-		script, err := yakit.GetYakScriptByName(db, shell.GetPayloadCodecName())
-		if err != nil {
-			return nil, err
-		}
-		w.SetPayloadScriptContent(script.Content)
-	}
-	g, ok := w.(*wsm.Godzilla)
-	if ok {
-		err := g.InjectPayload()
-		if err != nil {
-			return nil, err
-		}
-	}
+	w, err := s.getWebShellManager(req.GetId())
 	info, err := w.BasicInfo()
 	if err != nil {
 		return nil, err
 	}
+
 	return &ypb.WebShellResponse{State: true, Data: info}, nil
 }
 

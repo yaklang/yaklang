@@ -4,7 +4,6 @@ import (
 	"errors"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/wsm/payloads/godzilla/plugin"
-	"net/url"
 	"strings"
 )
 
@@ -57,8 +56,7 @@ func (g *Godzilla) LoadScanWebappComponentInfoPlugin(className string) ([]byte, 
 		return nil, err
 	}
 
-	u, _ := url.Parse(g.Url)
-	if len(g.Client.Jar.Cookies(u)) == 0 {
+	if g.req == nil {
 		err := g.InjectPayload()
 		if err != nil {
 			return nil, err

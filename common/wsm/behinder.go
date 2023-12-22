@@ -257,7 +257,7 @@ func (b *Behinder) sendHttpRequest(data []byte) ([]byte, error) {
 		poc.WithProxy(b.Proxy),
 		poc.WithReplaceHttpPacketBody(data, false),
 		poc.WithAppendHeaders(b.Headers),
-		poc.WithSession("go0p"),
+		poc.WithSession("behinder"),
 	)
 
 	//resp, err := b.Client.Do(request)
