@@ -202,6 +202,7 @@ BackTick:                       '`' {l.IncreaseTemplateDepth();} -> pushMode(TEM
 CR:                             '\r' -> skip;
 WS:                             [\t\u000B\u000C\u0020\u00A0]+ -> skip;
 
+LineTerminatorNoHide:           [\n\u2028\u2029]{this.afterKeyword()}?;
 LineTerminator:                 [\n\u2028\u2029] -> channel(HIDDEN);
 
 /// Comments
