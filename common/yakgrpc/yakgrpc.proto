@@ -250,6 +250,7 @@ service Yak {
   // 编码解码
   rpc Codec(CodecRequest) returns (CodecResponse);
   rpc NewCodec(CodecRequestFlow) returns (CodecResponse);
+  rpc GetAllCodecMethods(Empty) returns(CodecMethods);
   rpc PacketPrettifyHelper(PacketPrettifyHelperRequest) returns (PacketPrettifyHelperResponse);
 
   // Payload 相关接口
@@ -3764,6 +3765,26 @@ message CodecRequestFlow{
 
 message CodecResponse {
   string Result = 1;
+}
+
+message CodecMethods {
+  repeated CodecMethod Methods = 1;
+}
+
+message CodecMethod {
+  string Tag = 1; // Codec 分类
+  string CodecName = 2; //  Codec name
+  string CodecMethod = 3; // Codec Method
+  repeated CodecParam Params = 4; // Codec Param 用于构建样式
+}
+
+message CodecParam {
+  string Name = 1;
+  string Type = 2; // input | select
+  repeated string Options = 3; // 可选值
+  bool  Required = 4; // 就算是false也需要传
+  string Desc = 5; // 描述
+  string Regex = 6; //正则
 }
 
 // Yak Invoker
