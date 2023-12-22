@@ -1,6 +1,9 @@
 package codec
 
-import "crypto/aes"
+import (
+	"crypto/aes"
+	"github.com/yaklang/yaklang/common/log"
+)
 
 func _AESECBEncryptWithPadding(key []byte, i interface{}, iv []byte, padding func(i []byte) []byte) ([]byte, error) {
 	data := interfaceToBytes(i)
@@ -36,6 +39,8 @@ func AESECBEncryptWithZeroPadding(key []byte, i interface{}, iv []byte) ([]byte,
 }
 
 func _AESECBDecryptWithPadding(key []byte, i interface{}, iv []byte, padding func([]byte) []byte) ([]byte, error) {
+	log.Infof("key: %s", string(key))
+	log.Infof("EncodeBase64: %s", EncodeBase64(key))
 	crypted := interfaceToBytes(i)
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -51,6 +56,13 @@ func _AESECBDecryptWithPadding(key []byte, i interface{}, iv []byte, padding fun
 		iv = padding(iv)
 	} else if len(iv) > size {
 		iv = iv[:size]
+	}
+
+	if len(crypted)%block.BlockSize() != 0 {
+		panic("crypto/cipher: input not full blocks")
+	}
+	if len(decrypted) < len(crypted) {
+		panic("crypto/cipher: output smaller than input")
 	}
 
 	for bs, be := 0, size; bs < len(crypted); bs, be = bs+size, be+size {

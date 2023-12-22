@@ -63,6 +63,17 @@ func NewBehinderManager(url string, opts ...ShellConfig) (*Behinder, error) {
 	return NewBehinder(info)
 }
 
+func NewGodzillaManager(url string, opts ...ShellConfig) (*Godzilla, error) {
+	info := &ypb.WebShell{
+		Url: url,
+	}
+	opts = append(opts, SetGodzillaTool())
+	for _, opt := range opts {
+		opt(info)
+	}
+	return NewGodzilla(info)
+}
+
 func SaveShell(manager BaseShellManager) {
 
 }

@@ -43,7 +43,12 @@ func Decryption(body, key []byte, script string) ([]byte, error) {
 	case ypb.ShellScript_JSPX.String():
 		fallthrough
 	case ypb.ShellScript_JSP.String():
-		result, err = payloads.DecryptForJava(body, key)
+		// 冰蝎4 的 AES 加密结果套了一层 base64
+		deCode, err := base64.StdEncoding.DecodeString(string(body))
+		if err != nil {
+			return nil, err
+		}
+		result, err = payloads.DecryptForJava(deCode, key)
 
 	case ypb.ShellScript_PHP.String():
 		result, err = payloads.DecryptForPhp(body, key)
