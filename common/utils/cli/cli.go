@@ -2,8 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"io/ioutil"
 	"os"
@@ -11,6 +9,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type cliExtraParams struct {
@@ -91,6 +92,11 @@ func (param *cliExtraParams) GetDefaultValue(i interface{}) interface{} {
 
 type SetCliExtraParam func(c *cliExtraParams)
 
+// help 用于输出命令行程序的帮助信息
+// Example:
+// ```
+// cli.help()
+// ```
 func _help(w ...io.Writer) {
 	var writer io.Writer = os.Stdout
 
@@ -126,20 +132,63 @@ func _help(w ...io.Writer) {
 	}
 }
 
+// check 用于检查命令行参数是否合法，这主要检查必要参数是否传入与传入值是否合法
+// Example:
+// ```
+// target = cli.String("target", cli.SetRequired(true))
+// cli.check()
+// ```
+func _cliCheck() {
+	if helpParam.foundArgsIndex() != -1 {
+		_help()
+		os.Exit(1)
+	} else if cliParamInvalid.IsSet() {
+		errorMsg = strings.TrimSpace(errorMsg)
+		if len(errorMsg) > 0 {
+			fmt.Printf("Error:\n  %s\n\n", errorMsg)
+		}
+		_help()
+
+	}
+}
+
+// SetCliName 设置此命令行程序的名称
+// 这会在命令行输入 --help 或执行`cli.check()`后参数非法时显示
+// Example:
+// ```
+// cli.SetCliName("example-tools")
+// ```
 func _cliSetName(name string) {
 	cliName = name
 }
 
+// SetDoc 设置此命令行程序的文档
+// 这会在命令行输入 --help 或执行`cli.check()`后参数非法时显示
+// Example:
+// ```
+// cli.SetDoc("example-tools is a tool for example")
+// ```
 func _cliSetDocument(document string) {
 	cliDocument = document
 }
 
+// setDefaultValue 是一个选项函数，设置参数的默认值
+// Example:
+// ```
+// cli.String("target", cli.SetDefaultValue("yaklang.com"))
+// ```
 func _cliSetDefaultValue(i interface{}) SetCliExtraParam {
 	return func(c *cliExtraParams) {
 		c.defaultValue = i
 	}
 }
 
+// setHelp 是一个选项函数，设置参数的帮助信息
+// 这会在命令行输入 --help 或执行`cli.check()`后参数非法时显示
+// Example:
+// ```
+// cli.String("target", cli.SetHelp("target host or ip"))
+// ```
 func _cliSetHelpInfo(i string) SetCliExtraParam {
 	return func(c *cliExtraParams) {
 		c.helpInfo = i
@@ -152,6 +201,11 @@ func SetTempArgs(args []string) SetCliExtraParam {
 	}
 }
 
+// setRequired 是一个选项函数，设置参数是否必须
+// Example:
+// ```
+// cli.String("target", cli.SetRequired(true))
+// ```
 func _cliSetRequired(t bool) SetCliExtraParam {
 	return func(c *cliExtraParams) {
 		c.required = t
@@ -202,6 +256,11 @@ func _getAvailableParams(optName, optShortName string) []string {
 	return []string{fmt.Sprintf("-%v", optShortName), fmt.Sprintf("--%v", optName)}
 }
 
+// Args 获取命令行参数
+// Example:
+// ```
+// Args = cli.Args()
+// ```
 func _getArgs() []string {
 	return Args
 }
@@ -223,6 +282,11 @@ func _cliFromString(name string, opts ...SetCliExtraParam) (string, *cliExtraPar
 	return args[index+1], param
 }
 
+// Bool 获取对应名称的命令行参数，并将其转换为 bool 类型返回
+// Example:
+// ```
+// verbose = cli.Bool("verbose") // --verbose 则为true
+// ```
 func _cliBool(name string, opts ...SetCliExtraParam) bool {
 	c := _getExtraParams(name, opts...)
 	c._type = "bool"
@@ -235,11 +299,17 @@ func _cliBool(name string, opts ...SetCliExtraParam) bool {
 	return true
 }
 
+// String 获取对应名称的命令行参数，并将其转换为 string 类型返回
+// Example:
+// ```
+// target = cli.String("target") // --target yaklang.com 则 target 为 yaklang.com
+// ```
 func CliString(name string, opts ...SetCliExtraParam) string {
 	s, c := _cliFromString(name, opts...)
 	c._type = "string"
 	return s
 }
+
 func parseInt(s string) int {
 	i, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
@@ -249,6 +319,11 @@ func parseInt(s string) int {
 	return int(i)
 }
 
+// Int 获取对应名称的命令行参数，并将其转换为 int 类型返回
+// Example:
+// ```
+// port = cli.Int("port") // --port 80 则 port 为 80
+// ```
 func _cliInt(name string, opts ...SetCliExtraParam) int {
 	s, c := _cliFromString(name, opts...)
 	c._type = "int"
@@ -267,6 +342,10 @@ func parseFloat(s string) float64 {
 	return float64(i)
 }
 
+// Float 获取对应名称的命令行参数，并将其转换为 float 类型返回
+// Example:
+// ```
+// percent = cli.Float("percent") // --percent 0.5 则 percent 为 0.5
 func _cliFloat(name string, opts ...SetCliExtraParam) float64 {
 	s, c := _cliFromString(name, opts...)
 	c._type = "float"
@@ -276,6 +355,12 @@ func _cliFloat(name string, opts ...SetCliExtraParam) float64 {
 	return parseFloat(s)
 }
 
+// Urls 获取对应名称的命令行参数，根据","切割并尝试将其转换为符合URL格式并返回 []string 类型
+// Example:
+// ```
+// urls = cli.Urls("urls")
+// // --urls yaklang.com:443,google.com:443 则 urls 为 ["https://yaklang.com", "https://google.com"]
+// ```
 func _cliUrls(name string, opts ...SetCliExtraParam) []string {
 	s, c := _cliFromString(name, opts...)
 	c._type = "urls"
@@ -296,6 +381,11 @@ func _cliPort(name string, opts ...SetCliExtraParam) []int {
 	return ret
 }
 
+// Hosts 获取对应名称的命令行参数，根据","切割并尝试解析CIDR网段并返回 []string 类型
+// Example:
+// ```
+// hosts = cli.Hosts("hosts")
+// // --hosts 192.168.0.0/24,172.17.0.1 则 hosts 为 192.168.0.0/24对应的所有IP和172.17.0.1
 func _cliHosts(name string, opts ...SetCliExtraParam) []string {
 	s, c := _cliFromString(name, opts...)
 	c._type = "hosts"
@@ -308,6 +398,12 @@ func _cliHosts(name string, opts ...SetCliExtraParam) []string {
 	return ret
 }
 
+// File 获取对应名称的命令行参数，根据其传入的值读取其对应文件内容并返回 []byte 类型
+// Example:
+// ```
+// file = cli.File("file")
+// // --file /etc/passwd 则 file 为 /etc/passwd 文件中的内容
+// ```
 func _cliFile(name string, opts ...SetCliExtraParam) []byte {
 	s, c := _cliFromString(name, opts...)
 	c._type = "file"
@@ -332,6 +428,14 @@ func _cliFile(name string, opts ...SetCliExtraParam) []byte {
 	return raw
 }
 
+// FileOrContent 获取对应名称的命令行参数
+// 根据其传入的值尝试读取其对应文件内容，如果无法读取则直接返回，最后返回 []byte 类型
+// Example:
+// ```
+// foc = cli.FileOrContent("foc")
+// // --foc /etc/passwd 则 foc 为 /etc/passwd 文件中的内容
+// // --file "asd" 则 file 为 "asd"
+// ```
 func _cliFileOrContent(name string, opts ...SetCliExtraParam) []byte {
 	s, c := _cliFromString(name, opts...)
 	c._type = "file_or_content"
@@ -344,19 +448,34 @@ func _cliFileOrContent(name string, opts ...SetCliExtraParam) []byte {
 	return ret
 }
 
+// LineDict 获取对应名称的命令行参数
+// 根据其传入的值尝试读取其对应文件内容，如果无法读取则作为字符串，最后根据换行符切割，返回 []string 类型
+// Example:
+// ```
+// dict = cli.LineDict("dict")
+// // --dict /etc/passwd 则 dict 为 /etc/passwd 文件中的逐行的内容
+// // --dict "asd" 则 dict 为 ["asd"]
+// ```
 func _cliLineDict(name string, opts ...SetCliExtraParam) []string {
-	bytes, c := _cliFromString(name, opts...)
+	s, c := _cliFromString(name, opts...)
 	c._type = "file-or-content"
-	raw := utils.StringAsFileParams(bytes)
+	raw := utils.StringAsFileParams(s)
 	if raw == nil {
 		cliParamInvalid.Set()
-		errorMsg += fmt.Sprintf("\n  Parameter [%s] error: Empty file or content: %s", c.optName, bytes)
+		errorMsg += fmt.Sprintf("\n  Parameter [%s] error: Empty file or content: %s", c.optName, s)
 		return []string{}
 	}
 
 	return utils.ParseStringToLines(string(raw))
 }
 
+// YakitPlugin 获取名称为 yakit-plugin-file 的命令行参数
+// 根据其传入的值读取其对应文件内容并根据"|"切割并返回 []string 类型，表示各个插件名
+// Example:
+// ```
+// plugins = cli.YakitPlugin()
+// // --yakit-plugin-file plugins.txt 则 plugins 为 plugins.txt 文件中的各个插件名
+// ```
 func _cliYakitPluginFiles() []string {
 	paramName := "yakit-plugin-file"
 	filename, c := _cliFromString(paramName, _cliSetDefaultValue(""))
@@ -376,6 +495,12 @@ func _cliYakitPluginFiles() []string {
 	return utils.PrettifyListFromStringSplited(string(raw), "|")
 }
 
+// StringSlice 获取对应名称的命令行参数，将其字符串根据","切割返回 []string 类型
+// Example:
+// ```
+// targets = cli.StringSlice("targets")
+// // --targets yaklang.com,google.com 则 targets 为 ["yaklang.com", "google.com"]
+// ```
 func CliStringSlice(name string) []string {
 	rawStr, c := _cliFromString(name, _cliSetDefaultValue(""))
 	c._type = "string-slice"
@@ -428,18 +553,6 @@ var CliExports = map[string]interface{}{
 	"SetDoc":     _cliSetDocument,
 
 	// 通用函数
-	"help": _help,
-	"check": func() {
-		if helpParam.foundArgsIndex() != -1 {
-			_help()
-			os.Exit(1)
-		} else if cliParamInvalid.IsSet() {
-			errorMsg = strings.TrimSpace(errorMsg)
-			if len(errorMsg) > 0 {
-				fmt.Printf("Error:\n  %s\n\n", errorMsg)
-			}
-			_help()
-
-		}
-	},
+	"help":  _help,
+	"check": _cliCheck,
 }
