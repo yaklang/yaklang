@@ -61,7 +61,7 @@ func (a *AnalyzeContext) ThePhiShouldBeVisited(i *Value) bool {
 	}
 
 	visited, ok := a._callTable.Get(a._callStack.Peek().GetId())
-	if ok {
+	if !ok {
 		log.Warnf("peeked call[%v] not bind visited map", a._callStack.Peek().GetId())
 		return true
 	}
@@ -77,7 +77,7 @@ func (a *AnalyzeContext) VisitPhi(i *Value) {
 		return
 	}
 	visited, ok := a._callTable.Get(a._callStack.Peek().GetId())
-	if ok {
+	if !ok {
 		log.Warnf("peeked call[%v] not bind visited map", a._callStack.Peek().GetId())
 		return
 	}

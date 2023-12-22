@@ -86,6 +86,17 @@ func (s *Scope) InsertByRange(v *Variable, R *Range) {
 	s.Var = utils.InsertSliceItem(s.Var, item{v, R}, i)
 }
 
+func (s *Scope) PeekLexicalVariableByName(i string) (*Variable, error) {
+	vals, _ := s.VarMap[i]
+	if len(vals) > 0 {
+		return vals[len(vals)-1], nil
+	}
+	if s.Parent == nil {
+		return nil, fmt.Errorf("can't find variable %s", i)
+	}
+	return s.Parent.PeekLexicalVariableByName(i)
+}
+
 func (s *Scope) AddVariable(v *Variable, R *Range) {
 	if R == nil {
 		log.Errorf("scope(%d) variable %s range is nil", s.Id, v.Name)

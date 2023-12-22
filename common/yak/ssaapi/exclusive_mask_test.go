@@ -1,7 +1,6 @@
 package ssaapi
 
 import (
-	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"testing"
 )
@@ -45,19 +44,26 @@ g = originValue
 		log.Infof("originValue value[%v]: %v", value.GetId(), value.String())
 	})
 
-	check5 := false
+	check1 := false
+	check4 := false
 	// g not phi
 	prog.Ref("g").ForEach(func(value *Value) {
 		log.Infof("g value[%v]: %v", value.GetId(), value.String()) // phi? why
 		// g value: phi(d)[d,add(add(1, phi(i-2)[3,add(i-2, 1)]), outter())]
-		if value.GetConstValue() == 5 {
-			check5 = true
-		}
-		defs := value.GetTopDefs()
-		spew.Dump(defs)
+		value.GetTopDefs().ForEach(func(value *Value) {
+			if value.GetConstValue() == 1 {
+				check1 = true
+			}
+			if value.GetConstValue() == 4 {
+				check4 = true
+			}
+		})
 	})
-	if !check5 {
-		t.Error("check5 failed, side-effect failed")
+	if !check1 {
+		t.Error("check1 failed, side-effect failed")
+	}
+	if !check4 {
+		t.Error("check4 failed, side-effect failed")
 	}
 }
 
@@ -78,17 +84,24 @@ g = originValue
 
 	*/
 	check5 := false
+	check4 := false
+
 	// g not phi
 	prog.Ref("g").ForEach(func(value *Value) {
 		log.Infof("g value[%v]: %v", value.GetId(), value.String()) // phi? why
-		// g value: phi(d)[d,add(add(1, phi(i-2)[3,add(i-2, 1)]), outter())]
-		if value.GetConstValue() == 5 {
-			check5 = true
-		}
-		defs := value.GetTopDefs()
-		spew.Dump(defs)
+		value.GetTopDefs().ForEach(func(value *Value) {
+			if value.GetConstValue() == 4 {
+				check4 = true
+			}
+			if value.GetConstValue() == 5 {
+				check5 = true
+			}
+		})
 	})
 	if !check5 {
 		t.Error("check5 failed, side-effect failed")
+	}
+	if !check4 {
+		t.Error("check4 failed, side-effect failed")
 	}
 }
