@@ -180,6 +180,10 @@ func GetMethodFuncDeclFromAST(pkg *ast.Package, libName, structName, methodName,
 }
 
 func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.DocumentHelper {
+	return DocumentHelperWithVerboseInfo(engine.GetFntable())
+}
+
+func DocumentHelperWithVerboseInfo(funcMap map[string]interface{}) *yakdoc.DocumentHelper {
 	helper := &yakdoc.DocumentHelper{
 		Libs:          make(map[string]*yakdoc.ScriptLib),
 		Functions:     make(map[string]*yakdoc.FuncDecl),
@@ -196,7 +200,7 @@ func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.Doc
 
 	var extLibs []*yakdoc.ScriptLib
 	// 标准库导出的函数
-	for name, item := range engine.GetFntable() {
+	for name, item := range funcMap {
 		itemType := reflect.TypeOf(item)
 		itemValue := reflect.ValueOf(item)
 		_, _ = itemType, itemValue
