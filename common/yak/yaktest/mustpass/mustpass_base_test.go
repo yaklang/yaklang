@@ -47,6 +47,7 @@ func init() {
 	if err != nil {
 		panic("VULINBOX START ERROR")
 	}
+
 }
 
 func TestMustPassDebug(t *testing.T) {
