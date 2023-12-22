@@ -3,20 +3,20 @@ package main
 import (
 	"bytes"
 	"encoding/gob"
-	"io/ioutil"
-	"os"
-
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
-	"github.com/yaklang/yaklang/common/yak/yaklang"
+	"github.com/yaklang/yaklang/common/yakgrpc/codecutils"
+	"io/ioutil"
+	"os"
 )
 
 func main() {
 	if len(os.Args) < 2 {
 		return
 	}
-
-	helper := yak.EngineToDocumentHelperWithVerboseInfo(yaklang.New())
+	helper := yak.DocumentHelperWithVerboseInfo(map[string]interface{}{
+		"newCodecFlow": codecutils.NewCodecExecFlow,
+	})
 	var buf bytes.Buffer
 	encoder := gob.NewEncoder(&buf)
 	if err := encoder.Encode(&helper); err != nil {
