@@ -58,12 +58,12 @@ func _AESECBDecryptWithPadding(key []byte, i interface{}, iv []byte, padding fun
 		iv = iv[:size]
 	}
 
-	if len(crypted)%block.BlockSize() != 0 {
-		panic("crypto/cipher: input not full blocks")
-	}
-	if len(decrypted) < len(crypted) {
-		panic("crypto/cipher: output smaller than input")
-	}
+	//if len(crypted)%block.BlockSize() != 0 {
+	//	panic("crypto/cipher: input not full blocks")
+	//}
+	//if len(decrypted) < len(crypted) {
+	//	panic("crypto/cipher: output smaller than input")
+	//}
 
 	for bs, be := 0, size; bs < len(crypted); bs, be = bs+size, be+size {
 		block.Decrypt(decrypted[bs:be], crypted[bs:be])

@@ -206,13 +206,13 @@ func (g *Godzilla) post(data []byte) ([]byte, error) {
 		return nil, utils.Errorf("http request error: %v", err)
 	}
 
-	_, raw, err := lowhttp.FixHTTPResponse(resp.RawPacket)
+	_, raw := lowhttp.SplitHTTPHeadersAndBodyFromPacket(resp.RawPacket)
 
 	if len(raw) == 0 && g.req != nil {
 		return nil, utils.Errorf("empty response")
 	}
 	g.req = req
-	raw = bytes.TrimRight(raw, "\r\n\r\n")
+	raw = bytes.TrimSuffix(raw, []byte("\r\n\r\n"))
 	return raw, nil
 }
 
@@ -411,7 +411,7 @@ func (g *Godzilla) BasicInfo(opts ...behinder.ExecParamsConfig) ([]byte, error) 
 	if err != nil {
 		return nil, err
 	}
-	return basicsInfo, nil
+	return parseBaseInfoToJson(basicsInfo), nil
 }
 
 func (g *Godzilla) CommandExec(cmd string, opts ...behinder.ExecParamsConfig) ([]byte, error) {
