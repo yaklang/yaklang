@@ -97,6 +97,26 @@ func godzillaResultToYakURLResource(originParam *ypb.YakURL, result []byte) ([]*
 	return resources, nil
 }
 
+func parseBaseInfoToJson(data []byte) []byte {
+	dataDict := make(map[string]interface{})
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+
+	for _, r := range lines {
+		if len(r) == 0 {
+			continue
+		}
+		rL := strings.SplitN(r, " : ", 2)
+		key := rL[0]
+		value := ""
+		if len(rL) == 2 {
+			value = rL[1]
+		}
+		dataDict[key] = value
+	}
+	jsonStr := utils.Jsonify(dataDict)
+	return jsonStr
+}
+
 func (g *GodzillaFileSystemAction) newGodzillaFormId(id string) (*Godzilla, error) {
 	if g.godzillaCache == nil {
 		g.godzillaCache = make(map[string]*Godzilla)
