@@ -5,7 +5,7 @@ import (
 	"encoding/gob"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
-	"github.com/yaklang/yaklang/common/yakgrpc/codecutils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec/codegrpc"
 	"io/ioutil"
 	"os"
 )
@@ -15,7 +15,7 @@ func main() {
 		return
 	}
 	helper := yak.DocumentHelperWithVerboseInfo(map[string]interface{}{
-		"newCodecFlow": codecutils.NewCodecExecFlow,
+		"newCodecFlow": codegrpc.NewCodecExecFlow,
 	})
 	var buf bytes.Buffer
 	encoder := gob.NewEncoder(&buf)

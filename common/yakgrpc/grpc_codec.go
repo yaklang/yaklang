@@ -15,7 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yakdoc"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"github.com/yaklang/yaklang/common/yakgrpc/codecutils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec/codegrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"github.com/yaklang/yaklang/common/yserx"
@@ -1060,7 +1060,7 @@ func (s *Server) NewCodec(ctx context.Context, req *ypb.CodecRequestFlow) (*ypb.
 	}()
 
 	getParamsInfo := func(funcName string) []*yakdoc.Field {
-		return codecutils.CodecLibs.Functions[funcName].Params
+		return codegrpc.CodecLibs.Functions[funcName].Params
 	}
 
 	covertParamType := func(param string, fieldType reflect.Type) (any, error) {
@@ -1083,7 +1083,7 @@ func (s *Server) NewCodec(ctx context.Context, req *ypb.CodecRequestFlow) (*ypb.
 		return nil, utils.Errorf("not support type %v", fieldType.Kind())
 	}
 
-	codecFlow := codecutils.NewCodecExecFlow([]byte(req.GetText()), req.GetWorkFlow())
+	codecFlow := codegrpc.NewCodecExecFlow([]byte(req.GetText()), req.GetWorkFlow())
 	flowValue := reflect.ValueOf(codecFlow)
 	for _, work := range codecFlow.Flow {
 		methodValue := flowValue.MethodByName(work.CodecType)
