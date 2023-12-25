@@ -1,11 +1,9 @@
 package coreplugin
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/vulinbox"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 )
 
@@ -15,17 +13,7 @@ func TestGRPCMUSTPASS_CSRF(t *testing.T) {
 		panic(err)
 	}
 
-	vulAddr, err := vulinbox.NewVulinServer(context.Background())
-	if err != nil {
-		panic(err)
-	}
-
 	pluginName := "CSRF 表单保护与 CORS 配置不当检测"
-	server := VulServerInfo{
-		VulServerAddr: vulAddr,
-		IsHttps:       true,
-	}
-
 	vul := VulInfo{
 		Path: []string{
 			"/csrf/unsafe",

@@ -1,7 +1,6 @@
 package coreplugin
 
 import (
-	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -59,17 +58,9 @@ func TestGRPCMUSTPASS_Fastjson(t *testing.T) {
 		panic(err)
 	}
 
-	vulAddr, err := vulinbox.NewVulinServer(context.Background())
-	if err != nil {
-		panic(err)
-	}
 	log.Infof("vulAddr: %v", vulAddr)
 	//time.Sleep(5 * time.Hour)
 	pluginName := "Fastjson 综合检测"
-	server := VulServerInfo{
-		VulServerAddr: vulAddr,
-		IsHttps:       true,
-	}
 	//wg := sync.WaitGroup{}
 	addFastjsonTestCase := func(vulInfo VulInfo, msg ...string) {
 		//wg.Add(1)
@@ -195,17 +186,9 @@ func TestFastjson(t *testing.T) {
 		panic(err)
 	}
 
-	vulAddr, err := vulinbox.NewVulinServer(context.Background())
-	if err != nil {
-		panic(err)
-	}
 	log.Infof("vulAddr: %v", vulAddr)
 	//time.Sleep(5 * time.Hour)
 	pluginName := "Fastjson 综合检测"
-	server := VulServerInfo{
-		VulServerAddr: vulAddr,
-		IsHttps:       true,
-	}
 	vulInGet := VulInfo{
 		Method: "GET",
 		Path: []string{

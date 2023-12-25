@@ -1,11 +1,9 @@
 package coreplugin
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/vulinbox"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 )
 
@@ -15,16 +13,7 @@ func TestGRPCMUSTPASS_SwaggerJson(t *testing.T) {
 		panic(err)
 	}
 
-	vulAddr, err := vulinbox.NewVulinServer(context.Background())
-	if err != nil {
-		panic(err)
-	}
-
 	pluginName := "Swagger JSON 泄漏"
-	server := VulServerInfo{
-		VulServerAddr: vulAddr,
-		IsHttps:       true,
-	}
 	vul := VulInfo{
 		Path: []string{"/", "/sensitive"},
 		ExpectedResult: map[string]int{
