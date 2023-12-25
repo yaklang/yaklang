@@ -54,7 +54,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: Test JSONExtractor / Codec / Cartesian / JsonPath / Domain Extractor / Fuzztag / TLS / CVE / SCA / NETX / SSA / SSARule / StaticAnalyze
+          - name: Test JSONExtractor / Codec / Cartesian / JsonPath / Domain Extractor / Fuzztag / TLS / CVE / SCA / NETX
             run: |
               # these tests are very quick
               go test -timeout 20s ./common/jsonextractor -v
@@ -71,10 +71,13 @@ jobs:
               go test -timeout 20s ./common/sca/... -v
               go test -timeout 20s ./common/netx/mustpass -v
               go test -timeout 20s -run TestMUSTPASS_YakitLog ./common/fp -v
-              go test -timeout 20s ./common/yak/yak2ssa ./common/yak/ssaapi -v
               go test -timeout 20s -run TestPingAutoConfig ./common/utils/pingutil -v
-              go test -timeout 20s -run TestSSARuleMustPass* ./common/yak -v
               go test -timeout 20s -run TestMUSTPASS ./common/crawler -v
+
+          - name: Test SSA / SSARule / StaticAnalyze
+            run: |
+              go test -timeout 20s ./common/yak/yak2ssa ./common/yak/ssaapi -v
+              go test -timeout 20s -run TestSSARuleMustPass* ./common/yak -v
               go test -timeout 2m -run TestAnalyzeMustPASS* ./common/coreplugin -v
 
           - name: Test lowhttp
@@ -100,12 +103,7 @@ jobs:
 
           - name: Test Vulinbox(XSS/Shiro/SSTI/SMUGGLE/CSRF/OPEN_REDIRECT)
             run: |
-              go test -timeout 2m -run TestGRPCMUSTPASS_XSS ./common/coreplugin -v
-              go test -timeout 1m -run TestGRPCMUSTPASS_Shiro ./common/coreplugin -v
-              go test -timeout 1m -run TestGRPCMUSTPASS_SSTI ./common/coreplugin -v
-              go test -timeout 1m -run TestGRPCMUSTPASS_Smuggle ./common/coreplugin -v
-              go test -timeout 1m -run TestGRPCMUSTPASS_CSRF ./common/coreplugin -v
-              go test -timeout 1m -run TestGRPCMUSTPASS_OPEN_REDIRECT ./common/coreplugin -v
+              go test -timeout 2m -run "^(TestGRPCMUSTPASS_XSS|TestGRPCMUSTPASS_Shiro|TestGRPCMUSTPASS_SSTI|TestGRPCMUSTPASS_Smuggle|TestGRPCMUSTPASS_CSRF|TestGRPCMUSTPASS_OPEN_REDIRECT)$" ./common/coreplugin -v
 
           - name: Test gRPC MUSTPASS-PLUGIN-Fastjson
             run: go test -timeout 3m -run TestGRPCMUSTPASS_Fastjson ./common/coreplugin -v
