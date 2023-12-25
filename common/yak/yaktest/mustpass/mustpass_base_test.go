@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/vulinbox"
 	"github.com/yaklang/yaklang/common/yak"
 )
@@ -82,20 +85,11 @@ func TestMustPassDebug(t *testing.T) {
 }
 
 func TestMustPass(t *testing.T) {
-	var debugName = "plugin_inherit_proxy.yak"
-	var debugCases [][]string
 	var cases [][]string
 	for k, v := range files {
-		if k == debugName {
-			debugCases = append(debugCases, []string{k, v})
-		} else {
-			cases = append(cases, []string{k, v})
-		}
+		cases = append(cases, []string{k, v})
 	}
 
-	sort.SliceStable(debugCases, func(i, j int) bool {
-		return debugCases[i][0] < debugCases[j][0]
-	})
 	sort.SliceStable(cases, func(i, j int) bool {
 		return cases[i][0] < cases[j][0]
 	})
@@ -104,27 +98,26 @@ func TestMustPass(t *testing.T) {
 		panic("VULINBOX START ERROR")
 	}
 
-	totalTest := t
-	for _, i := range debugCases {
-		t.Run(i[0], func(t *testing.T) {
-			_, err := yak.NewScriptEngine(1).ExecuteEx(i[1], map[string]any{
+	var totalErr error
+	var wg sync.WaitGroup
+	for _, i := range cases {
+		wg.Add(1)
+		go func(caseName string, caseContent string) {
+			defer wg.Done()
+			_, err := yak.Execute(caseContent, map[string]interface{}{
 				"VULINBOX": vulinboxAddr,
 			})
 			if err != nil {
-				t.Fatalf("[%v] error: %v", i[0], err)
-				totalTest.FailNow()
+				err := utils.Errorf("run script: %s : %v", caseName, err)
+				log.Error(err)
+				totalErr = utils.JoinErrors(totalErr)
 			}
-		})
+		}(i[0], i[1])
 	}
 
-	for _, i := range cases {
-		t.Run(i[0], func(t *testing.T) {
-			_, err := yak.Execute(i[1], map[string]any{
-				"VULINBOX": vulinboxAddr,
-			})
-			if err != nil {
-				t.Fatalf("[%v] error: %v", i[0], err)
-			}
-		})
+	wg.Wait()
+
+	if totalErr != nil {
+		t.Fatalf("total error: %v", totalErr.Error())
 	}
 }
