@@ -16,8 +16,8 @@ type JavaScriptLexerBase struct {
 	useStrictDefault bool
 	useStrictCurrent bool
 	templateDepth    int
-	// waitForCloseBrace antlr.Token
 
+	waitForCloseBrace antlr.Token
 	BeforeWords     [2]antlr.Token
 	keyWordsMap     map[int]bool
 	handlePlusMinus antlr.Token
@@ -51,11 +51,11 @@ func (l *JavaScriptLexerBase) IsStrictMode() bool {
 
 // NextToken from the character stream.
 func (l *JavaScriptLexerBase) NextToken() antlr.Token {
-	// if l.waitForCloseBrace != nil {
-	// 	token := l.waitForCloseBrace
-	// 	l.waitForCloseBrace = nil
-	// 	return token
-	// }
+	if l.waitForCloseBrace != nil {
+		token := l.waitForCloseBrace
+		l.waitForCloseBrace = nil
+		return token
+	}
 
 
 	if l.handlePlusMinus != nil {
@@ -64,6 +64,7 @@ func (l *JavaScriptLexerBase) NextToken() antlr.Token {
 		return token
 	}
 
+	
 	if l.keyWordsMap == nil {
 		m := make(map[int]bool, 6)
 		m[JavaScriptLexerReturn] = true
@@ -80,6 +81,11 @@ func (l *JavaScriptLexerBase) NextToken() antlr.Token {
 	if next.GetTokenType() > 0 {
 		l.BeforeWords[0] = l.BeforeWords[1]
 		l.BeforeWords[1] = next
+	}
+
+	if next.GetChannel() == antlr.TokenDefaultChannel {
+		// Keep track of the last token on default channel
+		l.lastToken = next
 	}
 
 	// 预读一位处理++
@@ -101,20 +107,17 @@ func (l *JavaScriptLexerBase) NextToken() antlr.Token {
 		l.handlePlusMinus = Next
 	}
 
-	// if next.GetTokenType() == JavaScriptLexerCloseBrace {
-	// 	semit := l.GetTokenFactory().Create(
-	// 		l.GetTokenSourceCharStreamPair(), JavaScriptLexerLineTerminator, "\n", next.GetChannel(),
-	// 		next.GetStart(), next.GetStop()-1,
-	// 		next.GetLine(), next.GetColumn(),
-	// 	)
-	// 	l.waitForCloseBrace = next
-	// 	next = semit
-	// }
-
-	if next.GetChannel() == antlr.TokenDefaultChannel {
-		// Keep track of the last token on default channel
-		l.lastToken = next
+	// 判断是否是},对其进行加;优化
+	if next.GetTokenType() == JavaScriptLexerCloseBrace {
+		semit := l.GetTokenFactory().Create(
+			l.GetTokenSourceCharStreamPair(), JavaScriptLexerSemiColon, ";", next.GetChannel(),
+			next.GetStart(), next.GetStop()-1,
+			next.GetLine(), next.GetColumn(),
+		)
+		l.waitForCloseBrace = next
+		next = semit
 	}
+
 	return next
 }
 
