@@ -5,6 +5,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"net/http"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -15,11 +21,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io"
-	"net/http"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TestGRPCMUSTPASS_Smuggle_Negative_Pipeline(t *testing.T) {

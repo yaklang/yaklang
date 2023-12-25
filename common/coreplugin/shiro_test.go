@@ -1,10 +1,8 @@
 package coreplugin
 
 import (
-	"context"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/vulinbox"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 )
 
@@ -13,17 +11,7 @@ func TestGRPCMUSTPASS_Shiro(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-
-	vulAddr, err := vulinbox.NewVulinServer(context.Background())
-	if err != nil {
-		panic(err)
-	}
-
 	pluginName := "Shiro 指纹识别 + 弱密码检测"
-	server := VulServerInfo{
-		VulServerAddr: vulAddr,
-		IsHttps:       true,
-	}
 	vul1 := VulInfo{
 		Path: []string{"/shiro/cbc"},
 		ExpectedResult: map[string]int{
