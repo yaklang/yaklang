@@ -1,4 +1,4 @@
-package codecutils
+package codegrpc
 
 import (
 	"bytes"
@@ -12,7 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-//go:embed codecDoc.gob.gzip
+//go:embed codec.gob.gzip
 var codecDoc []byte
 
 var CodecLibs *yakdoc.ScriptLib
@@ -333,12 +333,16 @@ func (flow *CodecExecFlow) TripleDESDecrypt(hexKey string, hexIV string, mode st
 	return err
 }
 
-//func (flow *CodecExecFlow) JavaUnserialize(inputMod string) {
+//func (flow *CodecExecFlow) JavaUnserialize(input string) error {
 //	var data []byte
 //	var err error
-//	switch inputMod {
+//	switch input {
 //	case "raw":
+//
 //	case "hex":
+//
 //	case "base64":
+//	default:
+//		return utils.Error("JavaUnserialize: unknown input mod")
 //	}
 //}
