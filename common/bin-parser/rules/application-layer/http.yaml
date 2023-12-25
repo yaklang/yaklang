@@ -55,7 +55,7 @@ Headers:
     for {
       data := this.NewElement().Process()
       if len(data) == 0 {
-        this.SetChildren(this.GetChildren()[:-1])
+        // this.SetChildren(this.GetChildren()[:-1])
         return
       }
       if string(data).HasPrefix("Content-Length: ") {

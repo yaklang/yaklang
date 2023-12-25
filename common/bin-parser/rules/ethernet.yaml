@@ -20,8 +20,8 @@ Package:
           default:
             this.NewUnknownNode()
         }
-Internet Protocol: "import:internet_protocol.yaml;node:Package/Internet Protocol"
-Internet Protocol Version 6: "import:internet_protocol_version_6.yaml;node:Package/Internet Protocol Version 6"
-Address Resolution Protocol: "import:address_resolution_protocol.yaml;node:Package/Address Resolution Protocol"
-EAPOL: "import:eapol.yaml;node:Package/EAPOL"
+Internet Protocol: "import:internet_protocol.yaml;node:Internet Protocol"
+Internet Protocol Version 6: "import:internet_protocol_version_6.yaml;node:Internet Protocol Version 6"
+Address Resolution Protocol: "import:address_resolution_protocol.yaml;node:Address Resolution Protocol"
+EAPOL: "import:eapol.yaml;node:EAPOL"
 Unknown: raw

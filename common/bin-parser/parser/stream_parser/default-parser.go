@@ -178,10 +178,12 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 		rootNode.Ctx.SetItem("buffer", node.Ctx.GetItem("buffer"))
 		// 补充runtime cfg
 		rootNode.Cfg = base.AppendConfig(node.Cfg, rootNode.Cfg)
+		rootNode.Cfg.SetItem(CfgParent, node.Cfg.GetItem(CfgParent))
 		rootNode.Cfg.DeleteItem(CfgImport)
 		rootNode.Cfg.DeleteItem(CfgIsTerminal)
 		//rootNode.Cfg.SetItem(CfgNodeResult, nodeResult)
 		*node = *rootNode
+
 		//InitNode(node)
 		//node.Cfg.SetItem("unpack", true)
 		return operator.NodeParse(node)
@@ -374,6 +376,14 @@ func (d *DefParser) Generate(data any, node *base.Node) error {
 			p := GetNodePath(node)
 			data, ok := getSubData(rootData, p)
 			if !ok {
+				//return nil
+				length, err := getNodeLength(node)
+				if err != nil {
+					return fmt.Errorf("get node length error: %w", err)
+				}
+				if length == 0 {
+					return nil
+				}
 				return fmt.Errorf("data %s not found", p)
 			}
 			if node.Cfg.Has(CfgElementIndex) {
@@ -426,7 +436,8 @@ func (d *DefParser) Generate(data any, node *base.Node) error {
 					raw = ret
 				}
 				raw = append(raw, node.Cfg.GetString(CfgDelimiter)...)
-				rawRes, err := d.write(raw, uint64(len(raw)))
+				rawRes, err := d.write(raw, uint64(len(raw)*8))
+				rawRes[1] = rawRes[1] - uint64(len(node.Cfg.GetString(CfgDelimiter))*8)
 				if err != nil {
 					return fmt.Errorf("write error: %w", err)
 				}

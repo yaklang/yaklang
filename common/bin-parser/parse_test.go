@@ -16,10 +16,81 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"gopkg.in/yaml.v2"
+	"net"
 	"strconv"
 	"testing"
 	"time"
 )
+
+func TestTOA(t *testing.T) {
+	remoteAddr := "59.56.179.46"
+	//iptables -A OUTPUT -p tcp -d 93.184.216.34 --tcp-flags RST RST -j DROP
+	raddr, err := net.ResolveIPAddr("ip", remoteAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ipConn, err := net.DialIP("ip:6", nil, raddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dataHex := "3066d026811bf84d8991af5208004500010b00004000400662c6c0a8031677609c08cea0370db485ff921c6fdee680180808235200000101080a929a15075619e69f474554202f20485454502f312e310d0a486f73743a20373664643164383362372e69716979692e636f6d3a31343039330d0a557365722d4167656e743a206375726c2f372e34382e300d0a436f6e74656e742d4c656e6774683a2033320d0a436f6e6e656374696f6e3a20557067726164650d0a5365632d576562736f636b65742d4b65793a204f45692d724e56326c3443754264347a567a664c6a673d3d0d0a557067726164653a20776562736f636b65740d0a0d0a2acc9cc819e51ccf44bdee6f4e26f45f63038a6cfddf86a550a6ff9b5d1f875b"
+	data, err := codec.DecodeHex(dataHex)
+	if err != nil {
+		t.Fatal(err)
+	}
+	node, err := parser.ParseBinary(bytes.NewReader(data), "ethernet")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resMap, err := node.Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	modifyBytes := func(f func(d map[string]any)) []byte {
+		itcpMap, ok := getSubData(resMap, "Ethernet/Internet Protocol/TCP")
+		if !ok {
+			t.Fatal("get tcp failed")
+		}
+		tcpMap := itcpMap.(map[string]any)
+		f(tcpMap)
+		node, err = parser.GenerateBinary(resMap, "ethernet")
+		if err != nil {
+			t.Fatal(err)
+		}
+		tcpNode := GetSubNode(node, "Ethernet/Internet Protocol/TCP")
+		data = stream_parser.GetBytesByNode(tcpNode)
+		return data
+	}
+	iipMap, ok := getSubData(resMap, "Ethernet/Internet Protocol")
+	if !ok {
+		t.Fatal("get ip failed")
+	}
+	ipMap := iipMap.(map[string]any)
+
+	getPayload := func(f func(map[string]any)) []byte {
+		data := modifyBytes(func(d map[string]any) {
+			f(d)
+			d["Checksum"] = 0
+		})
+		return modifyBytes(func(d map[string]any) {
+			f(d)
+			d["Checksum"] = Checksum("192.168.3.22", remoteAddr, data)
+		})
+	}
+	port := utils.GetRandomAvailableTCPPort()
+	_ = port
+	data = getPayload(func(tcpMap map[string]any) {
+		tcpMap["Source Port"] = 64893
+		tcpMap["Destination Port"] = 80
+		tcpMap["Flags"] = 4
+		tcpMap["Header Length"] = 5
+		//tcpMap["Acknowledgement Number"] = 0
+		delete(tcpMap, "Options")
+		delete(tcpMap, "HTTP")
+		ipMap["Total Length"] = 40
+	})
+	ipConn.Write(data)
+}
 
 func TestParser(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
@@ -75,7 +146,7 @@ func TestParser(t *testing.T) {
 		{
 			name: "dns response",
 			args: args{
-				data:   `f84d8991af523066d026811b0800450000b58c740000751110fbdf050505c0a803160035c4c100a1000014528180000100030000000011636f70696c6f742d74656c656d657472791167697468756275736572636f6e74656e7403636f6d0000010001c00c0005000100000010001c19636f70696c6f742d74656c656d657472792d73657276696365c01ec0450005000100000010001c12676c622d646235326332636638626535343406676974687562c030c06d000100010000001000048c527216`,
+				data:   `f84d8991af523066d026811b080045000067b95000007511e46cdf050505c0a803160035d28b00530000bc35818000010002000000000b636c6f7564636f6e666967096a6574627261696e7303636f6d0000010001c00c000100010000001300043412ec15c00c00010001000000130004364dbb13`,
 				rule:   "ethernet",
 				expect: dnsResponseExpect,
 			},
@@ -136,36 +207,36 @@ var dnsResponseExpect = `Ethernet:
     Version: 4
     Header Length: 5
     Type of Service: "00"
-    Total Length: 181
-    Identification: 8c74
+    Total Length: 103
+    Identification: b950
     Flags And Fragment Offset: "0000"
     Time to Live: "75"
     Protocol: 17
-    Header Checksum: 10fb
+    Header Checksum: e46c
     Source: df050505
     Destination: c0a80316
     UDP:
       Source Port: 53
-      Destination Port: 50369
-      Length: 161
+      Destination Port: 53899
+      Length: 83
       Checksum: 0
       DNS:
         Header:
-          ID: 5202
+          ID: 48181
           Flags: 33152
           Questions: 1
-          Answer RRs: 3
+          Answer RRs: 2
           Authority RRs: 0
           Additional RRs: 0
         Questions:
           Question:
             String:
               Label:
-                Count: 17
-                Data: copilot-telemetry
+                Count: 11
+                Data: cloudconfig
               Label:
-                Count: 17
-                Data: githubusercontent
+                Count: 9
+                Data: jetbrains
               Label:
                 Count: 3
                 Data: com
@@ -178,29 +249,20 @@ var dnsResponseExpect = `Ethernet:
             Name:
               Pointer: 12
               PointerFlag: 3
-            Type: 5
+            Type: 1
             Class: 1
-            TTL: 16
-            RDLength: 28
-            RData: 19636f70696c6f742d74656c656d657472792d73657276696365c01e
+            TTL: 19
+            RDLength: 4
+            RData: 3412ec15
           Answer:
             Name:
-              Pointer: 261
-              PointerFlag: 3
-            Type: 5
-            Class: 1
-            TTL: 16
-            RDLength: 28
-            RData: 12676c622d646235326332636638626535343406676974687562c030
-          Answer:
-            Name:
-              Pointer: 301
+              Pointer: 12
               PointerFlag: 3
             Type: 1
             Class: 1
-            TTL: 16
+            TTL: 19
             RDLength: 4
-            RData: 8c527216
+            RData: 364dbb13
 `
 var dnsExpect = `Ethernet:
   Destination: 3066d026811b
@@ -274,14 +336,15 @@ var tlsExpect = `Ethernet:
       Window: "0800"
       Checksum: ad68
       Urgent Pointer: "0000"
-      Option:
-        Kind: 1
-      Option:
-        Kind: 1
-      Option:
-        Kind: 8
-        Length: 10
-        Data: 858e40e3c784a921
+      Options:
+        Option:
+          Kind: 1
+        Option:
+          Kind: 1
+        Option:
+          Kind: 8
+          Length: 10
+          Data: 858e40e3c784a921
       Transport Layer Security:
         Record Layer:
           ContentType: 23
@@ -315,14 +378,15 @@ var httpRequestExpect = `Ethernet:
       Window: "0808"
       Checksum: "2352"
       Urgent Pointer: "0000"
-      Option:
-        Kind: 1
-      Option:
-        Kind: 1
-      Option:
-        Kind: 8
-        Length: 10
-        Data: 929a15075619e69f
+      Options:
+        Option:
+          Kind: 1
+        Option:
+          Kind: 1
+        Option:
+          Kind: 8
+          Length: 10
+          Data: 929a15075619e69f
       HTTP:
         HTTP Request:
           Method: GET
@@ -335,6 +399,7 @@ var httpRequestExpect = `Ethernet:
             Item: 'Connection: Upgrade'
             Item: 'Sec-Websocket-Key: OEi-rNV2l4CuBd4zVzfLjg=='
             Item: 'Upgrade: websocket'
+            Item: ""
           Body:
             Data: 2acc9cc819e51ccf44bdee6f4e26f45f63038a6cfddf86a550a6ff9b5d1f875b
 `
@@ -733,6 +798,18 @@ func testParse(data []byte, rule string) (*base.Node, error) {
 				}
 				return false
 			}
+			var getSubs func(node *base.Node) []*base.Node
+			getSubs = func(node *base.Node) []*base.Node {
+				children := []*base.Node{}
+				for _, sub := range node.Children {
+					if sub.Cfg.GetBool("isRefType") || sub.Cfg.GetBool("unpack") || isPackage(sub) {
+						children = append(children, getSubs(sub)...)
+					} else {
+						children = append(children, sub)
+					}
+				}
+				return children
+			}
 			if stream_parser.NodeHasResult(node) {
 				v := stream_parser.GetResultByNode(node)
 				switch ret := v.(type) {
@@ -744,7 +821,7 @@ func testParse(data []byte, rule string) (*base.Node, error) {
 			}
 			if node.Cfg.GetBool(stream_parser.CfgIsList) {
 				var res yaml.MapSlice
-				for _, sub := range node.Children {
+				for _, sub := range getSubs(node) {
 					d, err := sub.Result()
 					if err != nil {
 						if errors.Is(err, noResultError) {
@@ -763,18 +840,6 @@ func testParse(data []byte, rule string) (*base.Node, error) {
 				return res, nil
 			} else {
 				var res yaml.MapSlice
-				var getSubs func(node *base.Node) []*base.Node
-				getSubs = func(node *base.Node) []*base.Node {
-					children := []*base.Node{}
-					for _, sub := range node.Children {
-						if sub.Cfg.GetBool("isRefType") || sub.Cfg.GetBool("unpack") || isPackage(sub) {
-							children = append(children, getSubs(sub)...)
-						} else {
-							children = append(children, sub)
-						}
-					}
-					return children
-				}
 				children := getSubs(node)
 				for _, sub := range children {
 					d, err := sub.Result()

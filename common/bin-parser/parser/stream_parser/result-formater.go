@@ -3,6 +3,7 @@ package stream_parser
 import (
 	"errors"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
+	"golang.org/x/exp/maps"
 )
 
 var formatters = map[string]func(node *base.Node) (any, error){}
@@ -34,7 +35,11 @@ func ToMap(node *base.Node) (any, error) {
 				}
 				return nil, err
 			}
-			res = append(res, d)
+			if v, ok := d.(map[string]any); ok {
+				res = append(res, v[maps.Keys(v)[0]])
+			} else {
+				res = append(res, d)
+			}
 		}
 		if len(res) == 0 {
 			return nil, noResultError

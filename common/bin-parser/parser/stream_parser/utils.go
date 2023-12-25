@@ -53,10 +53,13 @@ func GetNodePath(node *base.Node) string {
 		if node.Cfg.GetBool(CfgIsTempRoot) {
 			break
 		}
-		parent := node.Cfg.GetItem(CfgParent).(*base.Node)
+		parent := GetParentNode(node)
+		if parent == nil {
+			break
+		}
 		if parent.Cfg.GetBool(CfgIsList) {
 			index := 0
-			for i, child := range parent.Children {
+			for i, child := range GetSubNodes(parent) {
 				if child == node {
 					index = i
 					break
@@ -66,7 +69,7 @@ func GetNodePath(node *base.Node) string {
 		} else {
 			p = node.Name + "." + p
 		}
-		node = node.Cfg.GetItem(CfgParent).(*base.Node)
+		node = parent
 	}
 	if len(p) > 0 {
 		p = p[:len(p)-1]
@@ -168,6 +171,54 @@ func appendNode(parent *base.Node, child *base.Node) error {
 	}
 	return InitNode(utils.GetLastElement(parent.Children))
 }
+func GetParentNode(node *base.Node) *base.Node {
+	isPackage := func(node *base.Node) bool {
+		if node.Name == "Package" && node.Cfg.GetItem("parent") == node.Ctx.GetItem("root") {
+			return true
+		}
+		return false
+	}
+	var getParent func(node *base.Node) *base.Node
+	getParent = func(node *base.Node) *base.Node {
+		var parent *base.Node
+		iparent := node.Cfg.GetItem(CfgParent)
+		if iparent == nil {
+			return nil
+		}
+		parentNode, ok := iparent.(*base.Node)
+		if !ok {
+			return nil
+		}
+		if parentNode.Cfg.GetBool("isRefType") || parentNode.Cfg.GetBool("unpack") || isPackage(parentNode) {
+			parent = getParent(parentNode)
+		} else {
+			parent = parentNode
+		}
+		return parent
+	}
+	return getParent(node)
+}
+func GetSubNodes(node *base.Node) []*base.Node {
+	isPackage := func(node *base.Node) bool {
+		if node.Name == "Package" && node.Cfg.GetItem("parent") == node.Ctx.GetItem("root") {
+			return true
+		}
+		return false
+	}
+	var getSubs func(node *base.Node) []*base.Node
+	getSubs = func(node *base.Node) []*base.Node {
+		children := []*base.Node{}
+		for _, sub := range node.Children {
+			if sub.Cfg.GetBool("isRefType") || sub.Cfg.GetBool("unpack") || isPackage(sub) {
+				children = append(children, getSubs(sub)...)
+			} else {
+				children = append(children, sub)
+			}
+		}
+		return children
+	}
+	return getSubs(node)
+}
 func getNodeByPath(node *base.Node, key string) *base.Node {
 	splits := strings.Split(key, "/")
 	var findChildByPath func(node *base.Node, path ...string) *base.Node
@@ -182,7 +233,7 @@ func getNodeByPath(node *base.Node, key string) *base.Node {
 		if path[0] == ".." {
 			child1 = node.Cfg.GetItem(CfgParent).(*base.Node)
 		} else {
-			for _, child := range node.Children {
+			for _, child := range GetSubNodes(node) {
 				if child.Name == path[0] {
 					child1 = child
 				}
@@ -193,7 +244,7 @@ func getNodeByPath(node *base.Node, key string) *base.Node {
 	var targetNode *base.Node
 	if strings.HasPrefix(splits[0], "@") {
 		splits[0] = splits[0][1:]
-		targetNode = findChildByPath(node.Ctx.GetItem("root").(*base.Node), append([]string{"Package"}, splits...)...)
+		targetNode = findChildByPath(node.Ctx.GetItem("root").(*base.Node), splits...)
 	} else {
 		targetNode = findChildByPath(node, splits...)
 	}

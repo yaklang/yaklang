@@ -13,7 +13,7 @@ Package:
         Urgent Pointer: raw,2
         Options: # 字节数需要是4的倍数，不足补0
             list: true
-            type: Option
+            Option: Option
             operator: |
                 this.SetMaxLength(getNodeResult("../Header Length")*4 - 20)
                 for {
@@ -67,5 +67,5 @@ Option:
     Kind: uint8
     Length: uint8
     Data: raw
-TLS: "import:application-layer/tls.yaml;node:Package/Transport Layer Security"
-HTTP: "import:application-layer/http.yaml;node:Package/HTTP"
+TLS: "import:application-layer/tls.yaml;node:Transport Layer Security"
+HTTP: "import:application-layer/http.yaml;node:HTTP"

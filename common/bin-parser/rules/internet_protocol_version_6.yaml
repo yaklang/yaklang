@@ -25,7 +25,7 @@ Package:
         }
         node.SetMaxLength(getNodeResult("@Internet Protocol Version 6/Payload Length"))
         node.Process()
-TCP: "import:transmission_control_protocol.yaml;node:Package/TCP"
-UDP: "import:user_datagram_protocol.yaml;node:Package/UDP"
-ICMPV6: "import:internet_control_message_protocol_v6.yaml;node:Package/ICMPV6"
+TCP: "import:transmission_control_protocol.yaml;node:TCP"
+UDP: "import:user_datagram_protocol.yaml;node:UDP"
+ICMPV6: "import:internet_control_message_protocol_v6.yaml;node:ICMPV6"
 Unknown: raw

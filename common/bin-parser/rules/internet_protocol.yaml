@@ -1,7 +1,7 @@
 endian: big
 Package:
   Internet Protocol:
-    length-from-field: Header Length
+    length-from-field: Total Length
     length-from-field-multiply: 4
     Version: uint8,4bit
     Header Length: uint8,4bit
@@ -34,7 +34,7 @@ Package:
         node.SetMaxLength(l)
         node.Process()
 
-TCP: "import:transmission_control_protocol.yaml;node:Package/TCP"
-UDP: "import:user_datagram_protocol.yaml;node:Package/UDP"
-ICMP: "import:internet_control_message_protocol.yaml;node:Package/ICMP"
+TCP: "import:transmission_control_protocol.yaml;node:TCP"
+UDP: "import:user_datagram_protocol.yaml;node:UDP"
+ICMP: "import:internet_control_message_protocol.yaml;node:ICMP"
 Unknown: raw

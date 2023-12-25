@@ -25,7 +25,7 @@ Package:
                   }
               }
               this.NewUnknownNode().Process()
-DNS: "import:application-layer/dns.yaml;node:Package/DNS"
-DHCP: "import:application-layer/dhcp.yaml;node:Package/DHCP"
-NTP: "import:application-layer/ntp.yaml;node:Package/NTP"
-SNMP: "import:application-layer/snmp.yaml;node:Package/SNMP"
+DNS: "import:application-layer/dns.yaml;node:DNS"
+DHCP: "import:application-layer/dhcp.yaml;node:DHCP"
+NTP: "import:application-layer/ntp.yaml;node:NTP"
+SNMP: "import:application-layer/snmp.yaml;node:SNMP"
