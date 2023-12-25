@@ -23,6 +23,10 @@ import (
 	"github.com/gobwas/glob"
 )
 
+const (
+	twoMB = 2 * 1024 * 1024
+)
+
 var URLPattern, _ = regexp.Compile(`(((?:[a-zA-Z]{1,10}://|//)[^"'/]{1,}\.[a-zA-Z]{2,}[^"']{0,})|((?:/|\.\./|\./)[^"'><,;|*()(%%$^/\\\[\]][^"'><,;|()]{1,})|([a-zA-Z0-9_\-/]{1,}/[a-zA-Z0-9_\-/]{1,}\.(?:[a-zA-Z]{1,4}|action)(?:[\?|/][^"|']{0,}|))|([a-zA-Z0-9_\-]{1,}\.(?:\.{1,10})(?:\?[^"|']{0,}|)))`)
 
 type Crawler struct {
@@ -561,13 +565,25 @@ func (c *Crawler) handleReqResult(r *Req) {
 		c.submit(req)
 	}
 
-	var contents []*JavaScriptContent
+	var jsContents []*JavaScriptContent
 
 	err := PageInformationWalker(
 		lowhttp.GetHTTPPacketContentType([]byte(r.responseHeader)),
 		string(r.responseBody),
 		WithFetcher_JavaScript(func(content *JavaScriptContent) {
-			contents = append(contents, content)
+			// skip min.js
+			if strings.HasSuffix(content.UrlPath, ".min.js") {
+				return
+			}
+			if isPopularJSLibrary(content.UrlPath) {
+				return
+			}
+			// skip max than 2MB js
+			if len(content.Code) > twoMB {
+				return
+			}
+
+			jsContents = append(jsContents, content)
 		}),
 		WithFetcher_HtmlTag(func(s string, node *html.Node) {
 			if s == "script" {
@@ -604,7 +620,7 @@ func (c *Crawler) handleReqResult(r *Req) {
 		jsConcurrent = 3
 	}
 	swg := utils.NewSizedWaitGroup(jsConcurrent)
-	for _, c := range contents {
+	for _, c := range jsContents {
 		if c.IsCodeText {
 			continue
 		}
@@ -643,7 +659,7 @@ func (c *Crawler) handleReqResult(r *Req) {
 
 	var fullJSCode bytes.Buffer
 
-	for _, i := range contents {
+	for _, i := range jsContents {
 		if !i.IsCodeText {
 			continue
 		}
@@ -651,8 +667,10 @@ func (c *Crawler) handleReqResult(r *Req) {
 		fullJSCode.WriteByte(';')
 		fullJSCode.WriteByte('\n')
 	}
-	HandleJS(r.https, r.requestRaw, fullJSCode.String(), func(b bool, i []byte) {
-		submit(b, i)
+	utils.CallWithTimeout(30, func() {
+		HandleJS(r.https, r.requestRaw, fullJSCode.String(), func(b bool, i []byte) {
+			submit(b, i)
+		})
 	})
 }
 
@@ -902,7 +920,6 @@ func (c *Crawler) execReq(r *Req) {
 	}
 
 	// config opts
-	c.config.GetLowhttpConfig()
 	opts := c.config.GetLowhttpConfig()
 	opts = append(opts, lowhttp.WithHttps(r.IsHttps()), lowhttp.WithPacketBytes(r.requestRaw))
 	if c.config.onLogin != nil && r.IsLoginForm() && r.IsForm() {
