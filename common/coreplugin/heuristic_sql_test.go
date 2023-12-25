@@ -1,10 +1,8 @@
 package coreplugin
 
 import (
-	"context"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/vulinbox"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -15,16 +13,7 @@ func TestGRPCMUSTPASS_SQL(t *testing.T) {
 		panic(err)
 	}
 
-	vulAddr, err := vulinbox.NewVulinServer(context.Background())
-	if err != nil {
-		panic(err)
-	}
-
 	pluginName := "启发式SQL注入检测"
-	server := VulServerInfo{
-		VulServerAddr: vulAddr,
-		IsHttps:       true,
-	}
 	vul := VulInfo{
 		Path: []string{
 			"/user/by-id-safe?id=1",

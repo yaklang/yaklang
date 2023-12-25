@@ -1,11 +1,9 @@
 package coreplugin
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/vulinbox"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 )
 
@@ -15,16 +13,7 @@ func TestGRPCMUSTPASS_XSS(t *testing.T) {
 		panic(err)
 	}
 
-	vulAddr, err := vulinbox.NewVulinServer(context.Background())
-	if err != nil {
-		panic(err)
-	}
-
 	pluginName := "基础 XSS 检测"
-	server := VulServerInfo{
-		VulServerAddr: vulAddr,
-		IsHttps:       true,
-	}
 
 	vul := VulInfo{
 		Path: []string{

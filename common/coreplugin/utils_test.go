@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/vulinbox"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -29,6 +30,21 @@ type VulInfo struct {
 	StrictMode     bool
 	RawHTTPRequest []byte
 	Id             string
+}
+
+var vulAddr string
+var server VulServerInfo
+
+func init() {
+	var err error
+	vulAddr, err = vulinbox.NewVulinServer(context.Background())
+	if err != nil {
+		panic("VULINBOX START ERROR")
+	}
+	server = VulServerInfo{
+		VulServerAddr: vulAddr,
+		IsHttps:       true,
+	}
 }
 
 func CoreMitmPlugTest(pluginName string, vulServer VulServerInfo, vulInfo VulInfo, client ypb.YakClient, t *testing.T) bool {
