@@ -289,14 +289,14 @@ func StringArrayMerge(t ...[]string) []string {
 	}
 
 	var n []string
-	for k, _ := range m {
+	for k := range m {
 		n = append(n, k)
 	}
 	return n
 }
 
 func StringSplitAndStrip(raw string, sep string) []string {
-	var l = []string{}
+	l := []string{}
 
 	for _, v := range strings.Split(raw, sep) {
 		s := strings.TrimSpace(v)
@@ -395,7 +395,7 @@ func InterfaceToQuotedString(i interface{}) string {
 }
 
 func Int64SliceToIntSlice(i []int64) []int {
-	var result = make([]int, 0)
+	result := make([]int, 0)
 	for _, v := range i {
 		result = append(result, int(v))
 	}
@@ -403,7 +403,7 @@ func Int64SliceToIntSlice(i []int64) []int {
 }
 
 func IntSliceToInt64Slice(i []int) []int64 {
-	var result = make([]int64, len(i))
+	result := make([]int64, len(i))
 	for _, v := range i {
 		result = append(result, int64(v))
 	}
@@ -509,8 +509,8 @@ func InterfaceToInt(i any) int {
 }
 
 func InterfaceToMap(i interface{}) map[string][]string {
-	var finalResult = make(map[string][]string)
-	var res = make(map[string]interface{})
+	finalResult := make(map[string][]string)
+	res := make(map[string]interface{})
 	switch ret := i.(type) {
 	case map[string]interface{}:
 		res = ret
@@ -596,8 +596,8 @@ func ParseStringToHttpsAndHostname(res string) (bool, string) {
 		return false, res
 	}
 
-	var urlHttps = strings.HasPrefix(res, "https://")
-	var isUrl = IsHttpOrHttpsUrl(res)
+	urlHttps := strings.HasPrefix(res, "https://")
+	isUrl := IsHttpOrHttpsUrl(res)
 
 	if port > 0 {
 		if port == 443 {
@@ -683,6 +683,10 @@ func UrlJoin(origin string, paths ...string) (newURL string, err error) {
 	u, err := url.Parse(origin)
 	if err != nil {
 		return "", errors.Errorf("origin:[%s] is not a valid url: %s", origin, err)
+	}
+	if len(paths) == 1 && strings.HasPrefix(paths[0], "//") {
+		// 处理 //baidu.com 这种情况
+		paths[0] = fmt.Sprintf("%s:%s", u.Scheme, paths[0])
 	}
 
 	var pathBuf bytes.Buffer
@@ -831,9 +835,7 @@ func InitialCapitalizationEachWords(str string) string {
 }
 
 func SliceGroup(origin []string, groupSize int) [][]string {
-	var (
-		result [][]string
-	)
+	var result [][]string
 
 	var count int
 	var buffer []string
@@ -907,9 +909,7 @@ const (
 	NumberChar           = "1234567890"
 )
 
-var (
-	passwordBase = passwordSepcialChars + LittleChar + BigChar + NumberChar
-)
+var passwordBase = passwordSepcialChars + LittleChar + BigChar + NumberChar
 
 // IsStrongPassword 判断字符串是否为强密码，强密码的定义为：长度大于8，同时包含特殊字符、小写字母、大写字母、数字
 // Example:
@@ -973,7 +973,7 @@ func RandSecret(n int) string {
 func RandSample(n int, material ...string) string {
 	b := make([]rune, n)
 
-	var base = LittleChar + BigChar + NumberChar
+	base := LittleChar + BigChar + NumberChar
 	if ret := strings.Join(material, ""); ret != "" {
 		base = ret
 	}
@@ -999,7 +999,6 @@ func ExtractRawPath(target string) string {
 // str.ParseStringToUrls("yaklang.com:443", "https://yaklang.io") // [https://yaklang.com, https://yaklang.io]
 // ```
 func ParseStringToUrls(targets ...string) []string {
-
 	var urls []string
 	for _, target := range targets {
 		target = strings.TrimSpace(target)
@@ -1016,7 +1015,7 @@ func ParseStringToUrls(targets ...string) []string {
 			continue
 		}
 
-		var rawPath = ExtractRawPath(target)
+		rawPath := ExtractRawPath(target)
 
 		if port == 80 {
 			urls = append(urls, fmt.Sprintf("http://%v", rawHost)+rawPath)
