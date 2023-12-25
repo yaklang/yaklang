@@ -52,7 +52,7 @@ func ToMap(node *base.Node) (any, error) {
 		getSubs = func(node *base.Node) []*base.Node {
 			children := []*base.Node{}
 			for _, sub := range node.Children {
-				if sub.Cfg.GetBool("isRefType") || sub.Cfg.GetBool("unpack") || isPackage(sub) {
+				if sub.Cfg.GetBool(CfgIsRefType) || sub.Cfg.GetBool("unpack") || isPackage(sub) {
 					children = append(children, getSubs(sub)...)
 				} else {
 					children = append(children, sub)

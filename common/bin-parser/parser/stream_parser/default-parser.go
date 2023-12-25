@@ -33,6 +33,8 @@ const (
 	CfgElementIndex  = "element index"
 	CfgExceptionPlan = "exception-plan"
 	CtxGenReaders    = "readers in generator"
+	CfgIsRefType     = "is ref type"
+	CfgRefType       = "ref type"
 )
 
 var baseType = []string{"int", "uint", "int8", "uint8", "int16", "uint16", "int32", "uint32", "int64", "uint64", "string", "bool", "raw"}
@@ -64,27 +66,13 @@ func InitNode(node *base.Node) error {
 	walkNode = func(node *base.Node) error {
 		typeName := node.Cfg.GetString(CfgType)
 		if node.Cfg.GetBool(CfgIsTerminal) && typeName != "" && !utils.StringArrayContains(baseType, typeName) {
-			irootNodeMap := node.Ctx.GetItem(CfgRootMap)
-			if irootNodeMap == nil {
-				return errors.New("not set rootNodeMap")
-			}
-			rootNodeMap, ok := irootNodeMap.(map[string]*base.Node)
-			if !ok {
-				return errors.New("rootNodeMap type error")
-			}
-			v, ok := rootNodeMap[typeName]
-			if !ok {
-				return fmt.Errorf("type `%s` not found", typeName)
-			}
-			err := appendNode(node, v)
-			node.Cfg.SetItem("isRefType", true)
-			utils.GetLastElement[*base.Node](node.Children).Cfg.SetItem(CfgParent, node)
+			//node.Cfg.SetItem(CfgIsRefType, true)
+			node.Cfg.SetItem(CfgRefType, typeName)
+			//utils.GetLastElement[*base.Node](node.Children).Cfg.SetItem(CfgParent, node)
 			node.Cfg.SetItem(CfgIsTerminal, false)
-			if err != nil {
-				return err
-			}
 		}
 		for i, child := range node.Children {
+			child.Cfg.SetItem(CfgParent, node)
 			err := walkNode(child)
 			if err != nil {
 				return err
@@ -92,7 +80,6 @@ func InitNode(node *base.Node) error {
 			if i == len(node.Children)-1 {
 				child.Cfg.SetItem(CfgLastNode, true)
 			}
-			child.Cfg.SetItem(CfgParent, node)
 		}
 
 		return nil
@@ -132,6 +119,14 @@ func (d *DefParser) OnRoot(node *base.Node) error {
 	return nil
 }
 func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
+	if node.Cfg.Has(CfgRefType) {
+		typeNode, err := ParseRefNode(node)
+		if err != nil {
+			return fmt.Errorf("new node by type error: %w", err)
+		}
+		*node = *typeNode
+		return d.Operate(operator, node)
+	}
 	if node.Name == "root" {
 		irootNodeMap := node.Ctx.GetItem(CfgRootMap)
 		if irootNodeMap == nil {

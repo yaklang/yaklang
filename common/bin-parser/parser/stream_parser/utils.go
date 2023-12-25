@@ -15,6 +15,60 @@ import (
 	"strings"
 )
 
+func ListNodeNewElement(node *base.Node) (*base.Node, error) {
+	if !node.Cfg.GetBool(CfgIsList) {
+		return nil, errors.New("not list node")
+	}
+	if len(node.Children) == 0 {
+		panic("not set template node")
+	}
+	if !node.Cfg.Has("template") {
+		templateNode, err := ParseRefNode(node.Children[0])
+		if err != nil {
+			panic(fmt.Errorf("new node by type error: %w", err))
+		}
+		node.Cfg.SetItem("template", templateNode)
+		node.Children = nil
+	}
+	elementTemplate := node.Cfg.GetItem("template").(*base.Node)
+	element := elementTemplate.Copy()
+	element.Cfg.SetItem(CfgParent, node)
+	node.Children = append(node.Children, element)
+	return element, nil
+}
+func ParseRefNode(node *base.Node) (*base.Node, error) {
+	if !node.Cfg.Has(CfgRefType) {
+		return node, nil
+	}
+	typeNode, err := NewNodeByType(node, node.Cfg.GetString(CfgRefType))
+	if err != nil {
+		return nil, fmt.Errorf("new node by type error: %w", err)
+	}
+	parentCfg := base.CopyConfig(node.Cfg)
+	parentCfg.DeleteItem(CfgRefType)
+	typeNode.Cfg = base.AppendConfig(parentCfg, typeNode.Cfg)
+	typeNode.Name = node.Name
+	return typeNode, nil
+}
+func NewNodeByType(node *base.Node, typeName string) (*base.Node, error) {
+	irootNodeMap := node.Ctx.GetItem(CfgRootMap)
+	if irootNodeMap == nil {
+		return nil, errors.New("not set rootNodeMap")
+	}
+	rootNodeMap, ok := irootNodeMap.(map[string]*base.Node)
+	if !ok {
+		return nil, errors.New("rootNodeMap type error")
+	}
+	v, ok := rootNodeMap[typeName]
+	if !ok {
+		v = getNodeByPath(node, typeName)
+		if v == nil {
+			return nil, fmt.Errorf("type `%s` not found", typeName)
+		}
+	}
+	return v.Copy(), nil
+}
+
 func getSubData(d any, key string) (any, bool) {
 	p := strings.Split(key, ".")
 	for _, ele := range p {
@@ -189,7 +243,7 @@ func GetParentNode(node *base.Node) *base.Node {
 		if !ok {
 			return nil
 		}
-		if parentNode.Cfg.GetBool("isRefType") || parentNode.Cfg.GetBool("unpack") || isPackage(parentNode) {
+		if parentNode.Cfg.GetBool(CfgIsRefType) || parentNode.Cfg.GetBool("unpack") || isPackage(parentNode) {
 			parent = getParent(parentNode)
 		} else {
 			parent = parentNode
@@ -209,7 +263,7 @@ func GetSubNodes(node *base.Node) []*base.Node {
 	getSubs = func(node *base.Node) []*base.Node {
 		children := []*base.Node{}
 		for _, sub := range node.Children {
-			if sub.Cfg.GetBool("isRefType") || sub.Cfg.GetBool("unpack") || isPackage(sub) {
+			if sub.Cfg.GetBool(CfgIsRefType) || sub.Cfg.GetBool("unpack") || isPackage(sub) {
 				children = append(children, getSubs(sub)...)
 			} else {
 				children = append(children, sub)

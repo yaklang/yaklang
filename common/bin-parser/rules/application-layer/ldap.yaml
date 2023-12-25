@@ -1,0 +1,35 @@
+Package:
+  parser: ber-parser
+  LDAP:
+    Message ID: uint32
+    Protocol Op: uint8
+BER Element:
+  operator: |
+    type = this.ProcessSubNode("Type")
+    length = this.ProcessSubNode("Length")
+  Type: uint8
+  Length: uint8
+  Value: raw
+  SEQUENCE:
+    list: true
+    Value: BER Element
+parsers:
+  ber-parser:
+    source-data: |
+      node = getNode("BER Element")
+      node.Process()
+      return node
+    parser: |
+      onTerminal(func(node){
+        
+      })
+      onStruct(func(){
+      
+      })
+    generator: |
+      onTerminal(func(node){
+      
+      })
+      onStruct(func(){
+      
+      })

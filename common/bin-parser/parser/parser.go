@@ -14,6 +14,9 @@ func ParseBinaryWithConfig(data io.Reader, rule string, config map[string]any, k
 	}
 	p := filepath.Join(splits...)
 	rootNode, err := base.ParseRule(p)
+	if err != nil {
+		return nil, err
+	}
 	for k, v := range config {
 		rootNode.Ctx.SetItem(k, v)
 	}

@@ -22,7 +22,7 @@ Package:
                         break
                     }
                     ele.Process()
-                    if getNodeResult("Option/Kind") == 0 {
+                    if ele.GetSubNode("Kind").Result() == 0 {
                         break
                     }
                 }
@@ -46,6 +46,7 @@ Package:
                         if err != nil{
                             panic(err)
                         }
+                        debug("parse node %s failed: %v", typeName, op.Message)
                     }
                 }
                 this.NewUnknownNode().Process()

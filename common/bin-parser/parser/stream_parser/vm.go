@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"reflect"
@@ -200,17 +201,10 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 		return GetResultByNode(node)
 	}
 	yakNode.NewElement = func() *YakNode {
-		if len(node.Children) == 0 {
-			panic("get node element error")
+		element, err := ListNodeNewElement(node)
+		if err != nil {
+			panic(err)
 		}
-		if !node.Cfg.Has("template") {
-			node.Cfg.SetItem("template", node.Children[0])
-			node.Children = nil
-		}
-		elementTemplate := node.Cfg.GetItem("template").(*base.Node)
-		element := elementTemplate.Copy()
-		element.Cfg.SetItem(CfgParent, node)
-		node.Children = append(node.Children, element)
 		return ConvertToYakNode(element, operator)
 	}
 	yakNode.TryProcessByType = func(datas ...string) (result any, response map[string]any) {
@@ -408,7 +402,8 @@ func ExecOperator(node *base.Node, code string, operator func(node *base.Node) (
 			buf := node.Ctx.GetItem("buffer").(*bytes.Buffer)
 			return len(buf.Bytes())
 		},
-		"dump": spew.Dump,
+		"dump":  spew.Dump,
+		"debug": log.Debugf,
 	}
 	engine := antlr4yak.New()
 	engine.ImportLibs(engineLib)

@@ -1,0 +1,34 @@
+Package:
+  BER Element:
+    operator: |
+      type = this.ProcessSubNode("Type")
+      length = this.ProcessSubNode("Length")
+      switch type {
+        case 0x02:
+          this.ProcessSubNode("INTEGER")
+        case 0x04:
+          this.ProcessSubNode("OCTET STRING")
+        case 0x05:
+            this.ProcessSubNode("NULL")
+        case 0x06:
+            this.ProcessSubNode("OBJECT IDENTIFIER")
+        case 0x30:
+            this.ProcessSubNode("SEQUENCE")
+        case 0x31:
+            this.ProcessSubNode("SET")
+        default:
+            panic("unknown type")
+      }
+    Type: uint8
+    Length: uint8
+    Value: raw
+    INTEGER: uint32
+    OCTET STRING: string
+    NULL: raw
+    OBJECT IDENTIFIER: string
+    SEQUENCE:
+      list: true
+      Value: "ref-type:@BER Element"
+    SET:
+      list: true
+      Value: "ref-type:@BER Element"
