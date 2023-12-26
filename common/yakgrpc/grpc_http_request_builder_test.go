@@ -14,7 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func TestGRPCMUSTPASS_DebugPlugin_SmockingWithEmptyInput(t *testing.T) {
+func TestGRPCMUSTPASS_HTTP_DebugPlugin_SmockingWithEmptyInput(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
@@ -50,7 +50,7 @@ Host: ` + target + `
 	}
 }
 
-func TestGRPCMUSTPASS_BuildHTTPRequest_Results(t *testing.T) {
+func TestGRPCMUSTPASS_HTTP_BuildHTTPRequest_Results(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
@@ -300,7 +300,7 @@ Host: baidu.com
 	}
 }
 
-func TestGRPCMUSTPASS_HTTPRequestBuilderWithDebug(t *testing.T) {
+func TestGRPCMUSTPASS_HTTP_HTTPRequestBuilderWithDebug(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
@@ -386,7 +386,7 @@ aaabbbaaabbb`))
 	}
 }
 
-func TestGRPCMUSTPASS_HTTPRequestBuilderWithDebug2(t *testing.T) {
+func TestGRPCMUSTPASS_HTTP_HTTPRequestBuilderWithDebug2(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
@@ -430,7 +430,7 @@ aaacccaaabbb`))
 	}
 }
 
-func TestGRPCMUSTPASS_HTTPRequestBuilderWithDebug3(t *testing.T) {
+func TestGRPCMUSTPASS_HTTP_HTTPRequestBuilderWithDebug3(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)

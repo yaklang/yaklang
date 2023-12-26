@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-func TestGRPCMUSTPASS_Server_DebugPlugin_TestFlow(t *testing.T) {
+func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_TestFlow(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
@@ -76,7 +76,7 @@ func TestGRPCMUSTPASS_Server_DebugPlugin_TestFlow(t *testing.T) {
 	}
 }
 
-func TestGRPCMUSTPASS_Server_DebugPlugin_MITM_WithRawPacketAndPaths(t *testing.T) {
+func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_MITM_WithRawPacketAndPaths(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		panic(err)
@@ -151,7 +151,7 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
 	}
 }
 
-func TestGRPCMUSTPASS_Server_DebugPlugin_MITM_WithRawPacket(t *testing.T) {
+func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_MITM_WithRawPacket(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		panic(err)
@@ -227,7 +227,7 @@ User-Agent: xxx
 	}
 }
 
-func TestGRPCMUSTPASS_Server_DebugPlugin_MITM(t *testing.T) {
+func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_MITM(t *testing.T) {
 	urlIns, err := netURL.Parse("http://www.example.com")
 	urlIns.Path = "/a?a=1/b"
 	s := urlIns.String()
@@ -302,7 +302,7 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
 	}
 }
 
-func TestGRPCMUSTPASS_Server_DebugPlugin_MITM_WithURLTARGET(t *testing.T) {
+func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_MITM_WithURLTARGET(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		panic(err)
@@ -380,7 +380,7 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
 	}
 }
 
-func TestGRPCMUSTPASS_FuzzPacket(t *testing.T) {
+func TestGRPCMUSTPASS_HTTP_FuzzPacket(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		panic(err)
@@ -541,7 +541,7 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 	assert.Equal(t, marshalResult(expect), marshalResult(res))
 }
 
-func TestGRPCMUSTPASS_CodecDebug(t *testing.T) {
+func TestGRPCMUSTPASS_HTTP_CodecDebug(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
@@ -576,7 +576,7 @@ return codec.EncodeBase64(a)
 	}
 }
 
-func TestGRPCMUSTPASS_YakDebug(t *testing.T) {
+func TestGRPCMUSTPASS_HTTP_YakDebug(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)

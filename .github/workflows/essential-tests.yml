@@ -89,8 +89,20 @@ jobs:
           - name: Test MustPass - full yak scripts
             run: go test -timeout 3m ./common/yak/yaktest/mustpass -v
 
-          - name: Test gRPC MUSTPASS
-            run: go test -timeout 10m -run TestGRPCMUSTPASS ./common/yakgrpc -v
+          - name: Test gRPC MUSTPASS HTTP
+            run: go test -timeout 10m -run TestGRPCMUSTPASS_HTTP_* ./common/yakgrpc -v
+
+          - name: Test gRPC MUSTPASS MITM
+            run: go test -timeout 10m -run TestGRPCMUSTPASS_MITM_* ./common/yakgrpc -v
+
+          - name: Test gRPC MUSTPASS Fuzzer
+            run: go test -timeout 10m -run TestGRPCMUSTPASS_HTTPFuzzer* ./common/yakgrpc -v
+
+          - name: Test gRPC MUSTPASS Language
+            run: go test -timeout 10m -run TestGRPCMUSTPASS_LANGUAGE* ./common/yakgrpc -v
+
+          - name: Test gRPC MUSTPASS COMMON
+            run: go test -timeout 10m -run TestGRPCMUSTPASS_COMMON* ./common/yakgrpc -v
 
           - name: Test gRPC(LARGE)MUSTPASS
             run: go test -timeout 2m -run TestLARGEGRPCMUSTPASS ./common/yakgrpc -v

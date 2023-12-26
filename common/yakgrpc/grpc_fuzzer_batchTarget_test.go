@@ -13,7 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func TestGRPCMUSTPASS_BatchTarget(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFUZZER_BatchTarget(t *testing.T) {
 	var newTarget []string
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()

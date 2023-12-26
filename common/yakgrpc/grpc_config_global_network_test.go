@@ -20,7 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func TestGRPCMUSTPASS_THIRDPARTY_APP(t *testing.T) {
+func TestGRPCMUSTPASS_COMMON_THIRDPARTY_APP(t *testing.T) {
 	client, err := NewLocalClient(true)
 	if err != nil {
 		t.Fatal(err)
@@ -44,7 +44,7 @@ func TestGRPCMUSTPASS_THIRDPARTY_APP(t *testing.T) {
 	}
 }
 
-func TestGRPCMUSTPASS_GLOBAL_NETWORK_DNS_CONFIG(t *testing.T) {
+func TestGRPCMUSTPASS_COMMON_GLOBAL_NETWORK_DNS_CONFIG(t *testing.T) {
 	client, err := NewLocalClient(true)
 	if err != nil {
 		panic(err)
@@ -87,7 +87,7 @@ func TestGRPCMUSTPASS_GLOBAL_NETWORK_DNS_CONFIG(t *testing.T) {
 	}
 }
 
-func TestGRPCMUSTPASS_RPOXY_FROM_ENV(t *testing.T) {
+func TestGRPCMUSTPASS_COMMON_RPOXY_FROM_ENV(t *testing.T) {
 	client, err := NewLocalClient(true)
 	if err != nil {
 		panic(err)
@@ -150,7 +150,7 @@ try {
 	_, _ = client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
 }
 
-func TestGRPCMUSTPASS_GLOBAL_RPOXY(t *testing.T) {
+func TestGRPCMUSTPASS_COMMON_GLOBAL_RPOXY(t *testing.T) {
 	client, err := NewLocalClient(true)
 	if err != nil {
 		panic(err)
@@ -210,7 +210,7 @@ try {
 	}
 }
 
-func TestGRPCMUSTPASS_DISALLOW_ADDRESS(t *testing.T) {
+func TestGRPCMUSTPASS_COMMON_DISALLOW_ADDRESS(t *testing.T) {
 	client, err := NewLocalClient(true)
 	if err != nil {
 		panic(err)
@@ -282,7 +282,7 @@ func TestValidP12PassWord(t *testing.T) {
 
 }
 
-func TestGRPCMUSTPASS_HTTPAuth(t *testing.T) {
+func TestGRPCMUSTPASS_COMMON_HTTPAuth(t *testing.T) {
 	username, passwd := "test", "test"
 	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, request *http.Request) {
 		u, p, ok := request.BasicAuth()

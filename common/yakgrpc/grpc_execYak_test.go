@@ -3,13 +3,14 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func TestGRPCMUSTPASS_YakitLog(t *testing.T) {
+func TestGRPCMUSTPASS_LANGUAGE_YakitLog(t *testing.T) {
 	testCase1 := [][]string{
 		{"yakit.Info(\"yakit_info\")", "yakit_info"},
 		{"yakit.Info(\"yakit_%v\",\"info\")", "yakit_info"},

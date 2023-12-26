@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-func TestGRPCMUSTPASS_ReMatcher(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFuzzer_ReMatcher(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
 	var mu sync.Mutex
@@ -89,7 +89,7 @@ func TestGRPCMUSTPASS_ReMatcher(t *testing.T) {
 	}
 }
 
-func TestGRPCMUSTPASS_ReMatcherWithParams(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFuzzer_ReMatcherWithParams(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
 	var mu sync.Mutex

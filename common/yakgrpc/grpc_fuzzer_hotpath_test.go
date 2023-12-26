@@ -324,7 +324,7 @@ handle1 = s => {die("expected panic")}
 		t.Fatalf("expect 3, got %v", count)
 	}
 }
-func TestGRPCMUSTPASS_FuzzWithHotPatch(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFuzzer_FuzzWithHotPatch(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)

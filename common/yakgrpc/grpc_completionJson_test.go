@@ -10,7 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func TestGRPCMUSTPASS_GetYakitCompletionRaw(t *testing.T) {
+func TestGRPCMUSTPASS_LANGUAGE_GetYakitCompletionRaw(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
