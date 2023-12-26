@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
+	"sync/atomic"
 	"time"
 )
 
@@ -52,17 +53,22 @@ func RawHandlerToExecOutput(h func(any) error) func(result *ypb.ExecResult) erro
 }
 
 type YakitClient struct {
-	addr      string
-	client    *http.Client
-	yakLogger *YakLogger
-	send      func(i interface{}) error
+	addr        string
+	client      *http.Client
+	yakLogger   *YakLogger
+	send        func(i interface{}) error
+	riskCounter atomic.Uint32
+}
+
+func (c *YakitClient) addCounter() uint32 {
+	c.riskCounter.Add(1)
+	return c.riskCounter.Load()
 }
 
 func NewYakitClient(addr string) *YakitClient {
 	logger := CreateYakLogger()
 	client := &YakitClient{
-		addr:      addr,
-		yakLogger: logger,
+		addr: addr,
 		client: &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{
@@ -81,6 +87,7 @@ func NewYakitClient(addr string) *YakitClient {
 			},
 			Timeout: 15 * time.Second,
 		},
+		yakLogger: logger,
 	}
 
 	client.send = func(i interface{}) error {

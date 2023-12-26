@@ -9,18 +9,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils/bot"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"sync"
 )
 
-var riskCounter int
-var _riskCounterLock = new(sync.Mutex)
-
-func addCounter() int {
-	_riskCounterLock.Lock()
-	defer _riskCounterLock.Unlock()
-	riskCounter++
-	return riskCounter
-}
 func YakitNewRiskBuilder(client *YakitClient) func(target string, opts ...yakit.RiskParamsOpt) {
 	return func(target string, opts ...yakit.RiskParamsOpt) {
 		risk, _ := yakit.NewRisk(target, opts...)
@@ -47,7 +37,7 @@ func YakitNewRiskBuilder(client *YakitClient) func(target string, opts ...yakit.
 `, title, risk.IP))
 			}
 			client.Output(&YakitStatusCard{
-				Id: "漏洞/风险/指纹", Data: fmt.Sprint(fmt.Sprint(addCounter())), Tags: nil,
+				Id: "漏洞/风险/指纹", Data: fmt.Sprint(fmt.Sprint(client.addCounter())), Tags: nil,
 			})
 			client.Output(risk)
 		}
