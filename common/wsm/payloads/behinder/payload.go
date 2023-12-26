@@ -1,11 +1,11 @@
 package behinder
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"github.com/yaklang/yaklang/common/javaclassparser"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/wsm/payloads"
 	"regexp"
@@ -24,7 +24,6 @@ func GetRawClass(binPayload string, params map[string]string) ([]byte, error) {
 	}
 	for k, v := range params {
 		fields := clsObj.FindConstStringFromPool(k)
-		log.Info(fields)
 		fields.Value = v
 	}
 	// 随机更换类名 原始类名是这样的 net/behinder/payload/java/xxx
@@ -114,6 +113,11 @@ func GetRawASP(binPayload string, params map[string]string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if v, ok := params["customEncoderFromText"]; ok {
+		payloadBytes = bytes.Replace(payloadBytes, []byte("__Encrypt__"), []byte(v), 1)
+		delete(params, "customEncoderFromText")
+	}
 	var code strings.Builder
 	code.WriteString(string(payloadBytes))
 	paraList := ""
@@ -122,9 +126,7 @@ func GetRawASP(binPayload string, params map[string]string) ([]byte, error) {
 		for _, paramValue := range params {
 			var paraValueEncoded string
 			for _, v := range paramValue {
-				//fmt.Println(v)
 				paraValueEncoded = paraValueEncoded + "chrw(" + strconv.Itoa(int(v)) + ")&"
-				//fmt.Println(paraValueEncoded)
 			}
 			paraValueEncoded = strings.TrimRight(paraValueEncoded, "&")
 			paraList = paraList + "," + paraValueEncoded

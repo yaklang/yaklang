@@ -178,7 +178,7 @@ func (b *BehidnerResourceSystemAction) Get(params *ypb.RequestYakURLParams) (*yp
 	case "db":
 		return b.Do(params)
 	case "file":
-		path := u.GetPath()
+		path := query.Get("path")
 		id := query.Get("id")
 		manager, err := b.newBehinderFormId(id)
 		if err != nil {
