@@ -48,7 +48,8 @@ func (b *astbuilder) buildLiteral(stmt *JS.LiteralContext) ssa.Value {
 	} else if stmt.NullLiteral() != nil {
 		return b.buildNullLiteral()
 	} else if stmt.RegularExpressionLiteral() != nil {
-		return ssa.NewConst(stmt.GetText())
+		// return ssa.emitconst(stmt.GetText())
+		return b.EmitConstInst(stmt.GetText())
 		// TODO
 	}
 
@@ -61,8 +62,7 @@ func (b *astbuilder) buildTemplateStringLiteral(stmt *JS.TemplateStringLiteralCo
 
 	//TODO:unfinshed
 
-	value := ssa.NewConst(1)
-	return value
+	return b.EmitConstInst(1)
 }
 
 func (b *astbuilder) buildNumericLiteral(stmt *JS.NumericLiteralContext) ssa.Value {
@@ -73,7 +73,7 @@ func (b *astbuilder) buildNumericLiteral(stmt *JS.NumericLiteralContext) ssa.Val
 	// fmt.Println(lit)
 	if find := strings.Contains(lit, "."); find {
 		var f, _ = strconv.ParseFloat(lit, 64)
-		return ssa.NewConst(f)
+		return b.EmitConstInst(f)
 
 	} else {
 
@@ -87,7 +87,7 @@ func (b *astbuilder) buildNumericLiteral(stmt *JS.NumericLiteralContext) ssa.Val
 		if num := stmt.DecimalLiteral(); num != nil { // 十进制
 			if strings.Contains(stmt.GetText(), "e") {
 				var f, _ = strconv.ParseFloat(intStr, 64)
-				return ssa.NewConst(f)
+				return b.EmitConstInst(f)
 			}
 			resultInt64, err = strconv.ParseInt(intStr, 10, 64)
 		} else if num := stmt.HexIntegerLiteral(); num != nil { // 十六进制
@@ -126,7 +126,7 @@ func (b *astbuilder) buildStringLiteral(stmt antlr.TerminalNode) ssa.Value {
 
 	var text = stmt.GetText()
 	if text == "" {
-		return ssa.NewConst(text)
+		return b.EmitConstInst(text)
 	}
 
 	switch text[0] {
@@ -136,7 +136,7 @@ func (b *astbuilder) buildStringLiteral(stmt antlr.TerminalNode) ssa.Value {
 		if err != nil {
 			b.NewError(ssa.Error, TAG, "cannot parse string literal: %s failed: %s", stmt.GetText(), err.Error())
 		}
-		return ssa.NewConstWithUnary(val, 0)
+		return b.EmitConstInstWithUnary(val, 0)
 	case '\'':
 		if lit := stmt.GetText(); len(lit) >= 2 {
 			text = lit[1 : len(lit)-1]
@@ -149,7 +149,7 @@ func (b *astbuilder) buildStringLiteral(stmt antlr.TerminalNode) ssa.Value {
 		if err != nil {
 			b.NewError(ssa.Error, TAG, "cannot parse string literal: %s failed: %s", stmt.GetText(), err.Error())
 		}
-		return ssa.NewConstWithUnary(val, 0)
+		return b.EmitConstInstWithUnary(val, 0)
 	}
 
 	return nil
@@ -160,7 +160,7 @@ func (b *astbuilder) buildBooleanLiteral(bo string) ssa.Value {
 	if err != nil {
 		b.NewError(ssa.Error, TAG, "Unhandled bool literal")
 	}
-	return ssa.NewConst(boolLit)
+	return b.EmitConstInst(boolLit)
 }
 
 func (b *astbuilder) buildNullLiteral() ssa.Value {

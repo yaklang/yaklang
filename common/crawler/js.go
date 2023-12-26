@@ -24,6 +24,7 @@ func HandleJS(isHttps bool, req []byte, code string, cb ...func(bool, []byte)) {
 	// js := ssaapi.NewProgram(prog)
 	js := ssaapi.Parse(code, ssaapi.WithLanguage(ssaapi.JS))
 	if js.IsNil() {
+		log.Error("parse js failed")
 		return
 	}
 
