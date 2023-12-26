@@ -54,98 +54,111 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: Test JSONExtractor / Codec / Cartesian / JsonPath / Domain Extractor / Fuzztag / TLS / CVE / SCA / NETX
+          - name: Test JSONExtractor / Codec / Cartesian / JsonPath / Domain Extractor / TLS / CVE / SCA
             run: |
               # these tests are very quick
-              go test -timeout 20s ./common/jsonextractor -v
-              go test -timeout 20s ./common/yak/yaklib/codec -v
-              go test -timeout 20s ./common/yak/cartesian -v
-              go test -timeout 20s ./common/jsonpath -v
-              go test -timeout 20s ./common/domainextractor -v
-              go test -timeout 20s ./common/mutate_tests ./common/fuzztag -v
-              go test -timeout 20s ./common/fuzztagx -v
+              go test -timeout 20s ./common/jsonextractor  
+              go test -timeout 20s ./common/yak/yaklib/codec 
+              go test -timeout 20s ./common/yak/cartesian  
+              go test -timeout 20s ./common/jsonpath  
+              go test -timeout 20s ./common/domainextractor  
+              go test -timeout 1m ./common/utils
+              go test -timeout 20s ./common/utils/tlsutils/... 
+              go test -timeout 20s -run TestQueryCVEWithFixName ./common/cve
+              go test -timeout 20s ./common/sca/...
+              go test -timeout 20s -run TestMUSTPASS_YakitLog ./common/yak/yaklib
+
+          - name: Test NetX
+            run: |
+              go test -timeout 20s ./common/netx/mustpass
+              go test -timeout 20s -run TestPingAutoConfig ./common/utils/pingutil
+
+          - name: Test FuzzTag
+            run: |
+              go test -timeout 20s ./common/mutate_tests ./common/fuzztag  
+              go test -timeout 20s ./common/fuzztagx 
               go test -timeout 10s -run TestFuzzNucleiVar ./common/mutate
-              go test -timeout 1m ./common/utils -v
-              go test -timeout 20s ./common/utils/tlsutils/...
-              go test -timeout 20s -run TestQueryCVEWithFixName ./common/cve -v
-              go test -timeout 20s ./common/sca/... -v
-              go test -timeout 20s ./common/netx/mustpass -v
-              go test -timeout 20s -run TestMUSTPASS_YakitLog ./common/fp -v
-              go test -timeout 20s -run TestPingAutoConfig ./common/utils/pingutil -v
-              go test -timeout 20s -run TestMUSTPASS ./common/crawler -v
 
           - name: Test SSA / SSARule / StaticAnalyze
             run: |
-              go test -timeout 20s ./common/yak/yak2ssa ./common/yak/ssaapi -v
-              go test -timeout 20s -run TestSSARuleMustPass* ./common/yak -v
-              go test -timeout 2m -run TestAnalyzeMustPASS* ./common/coreplugin -v
+              # SSA
+              go test -timeout 20s ./common/yak/yak2ssa ./common/yak/ssaapi 
+              # SSA Rule
+              go test -timeout 20s -run TestSSARuleMustPass* ./common/yak
+              # StaticAnalyze
+              go test -timeout 20s -run TestAnalyzeMustPASS* ./common/coreplugin
 
-          - name: Test lowhttp
-            run: go test -timeout 1m ./common/utils/lowhttp -v
+          - name: Test lowhttp / DNSX
+            run: |
+              # lowhttp
+              go test -timeout 1m ./common/utils/lowhttp
+              # DNSX
+              go test -timeout 20s -run TestLookupAll ./common/facades
 
           - name: Test HttpTpl(YakTemplate)
-            run: go test -timeout 1m ./common/yak/httptpl -v
+            run: go test -timeout 1m ./common/yak/httptpl
 
           - name: Test MustPass - full yak scripts
-            run: go test -timeout 3m ./common/yak/yaktest/mustpass -v
+            run: go test -timeout 3m ./common/yak/yaktest/mustpass
 
           - name: Test gRPC MUSTPASS HTTP
-            run: go test -timeout 10m -run TestGRPCMUSTPASS_HTTP_* ./common/yakgrpc -v
+            run: go test -timeout 10m -run TestGRPCMUSTPASS_HTTP_* ./common/yakgrpc
 
           - name: Test gRPC MUSTPASS MITM
-            run: go test -timeout 10m -run TestGRPCMUSTPASS_MITM_* ./common/yakgrpc -v
+            run: go test -timeout 10m -run TestGRPCMUSTPASS_MITM_* ./common/yakgrpc
 
           - name: Test gRPC MUSTPASS Fuzzer
-            run: go test -timeout 10m -run TestGRPCMUSTPASS_HTTPFuzzer* ./common/yakgrpc -v
+            run: go test -timeout 10m -run TestGRPCMUSTPASS_HTTPFuzzer* ./common/yakgrpc
 
           - name: Test gRPC MUSTPASS Language
-            run: go test -timeout 10m -run TestGRPCMUSTPASS_LANGUAGE* ./common/yakgrpc -v
+            run: go test -timeout 10m -run TestGRPCMUSTPASS_LANGUAGE* ./common/yakgrpc
 
           - name: Test gRPC MUSTPASS COMMON
-            run: go test -timeout 10m -run TestGRPCMUSTPASS_COMMON* ./common/yakgrpc -v
+            run: go test -timeout 10m -run TestGRPCMUSTPASS_COMMON* ./common/yakgrpc
 
           - name: Test gRPC(LARGE)MUSTPASS
-            run: go test -timeout 2m -run TestLARGEGRPCMUSTPASS ./common/yakgrpc -v
+            run: go test -timeout 2m -run TestLARGEGRPCMUSTPASS ./common/yakgrpc
 
           - name: Test Vulinbox SQL Injection
-            run: go test -timeout 4m -run TestGRPCMUSTPASS_SQL ./common/coreplugin -v
+            run: go test -timeout 4m -run TestGRPCMUSTPASS_SQL ./common/coreplugin
 
-          - name: Test Integration MITM
-            run: go test -timeout 2m -run TestGRPCMUSTPASS_MITM ./common/coreplugin -v
+          - name: Test Integration MITM / SyntaxFlow
+            run: |
+              #  integration MITM
+              go test -timeout 2m -run TestGRPCMUSTPASS_MITM ./common/coreplugin
+              # SyntaxFlow
+              go test -timeout 20s ./common/syntaxflow
 
           - name: Test Vulinbox(XSS/Shiro/SSTI/SMUGGLE/CSRF/OPEN_REDIRECT)
             run: |
-              go test -timeout 2m -run "^(TestGRPCMUSTPASS_XSS|TestGRPCMUSTPASS_Shiro|TestGRPCMUSTPASS_SSTI|TestGRPCMUSTPASS_Smuggle|TestGRPCMUSTPASS_CSRF|TestGRPCMUSTPASS_OPEN_REDIRECT)$" ./common/coreplugin -v
+              go test -timeout 2m -run "^(TestGRPCMUSTPASS_XSS|TestGRPCMUSTPASS_Shiro|TestGRPCMUSTPASS_SSTI|TestGRPCMUSTPASS_Smuggle|TestGRPCMUSTPASS_CSRF|TestGRPCMUSTPASS_OPEN_REDIRECT)$" ./common/coreplugin
 
           - name: Test gRPC MUSTPASS-PLUGIN-Fastjson
-            run: go test -timeout 3m -run TestGRPCMUSTPASS_Fastjson ./common/coreplugin -v
+            run: go test -timeout 3m -run TestGRPCMUSTPASS_Fastjson ./common/coreplugin
 
-          - name: Test Vulinbox agent client
-            run: go test -timeout 1m -run TestMUSTPASS* ./common/vulinboxagentclient -v
-
-          - name: Test Suricata Generate && Match
+          - name: Test Vulinbox agent client / yso
             run: |
-              go test -timeout 20s -run TestMUSTPASS* ./common/suricata/... -v
-              go test -timeout 20s -run TestMUSTPASS* ./common/chaosmaker -v
+              # vulinbox agent client
+              go test -timeout 1m -run TestMUSTPASS* ./common/vulinboxagentclient
+              # yso
+              go test -timeout 20s -run TestMUSTPASS* ./common/yso
 
-          - name: crawlerx (chromium based crawler)
-            run: go test -v --timeout 5m ./common/crawlerx
-
-          - name: Test pcapx
+          - name: Test Suricata Generate && Match / pcapx
             run: |
-              go test -timeout 20s -run TestSmoking_ICMP ./common/pcapx -v
-              go test -timeout 20s -run TestSmoking_TCP ./common/pcapx -v
-              go test -timeout 20s -run TestSmoking_UDP ./common/pcapx -v
+              # suricate generate && match
+              go test -timeout 20s -run TestMUSTPASS* ./common/suricata/...
+              go test -timeout 20s -run TestMUSTPASS* ./common/chaosmaker
+              # pcapx
+              go test -timeout 20s -run TestSmoking_ICMP ./common/pcapx
+              go test -timeout 20s -run TestSmoking_TCP ./common/pcapx
+              go test -timeout 20s -run TestSmoking_UDP ./common/pcapx
 
-          - name: Test yso
+          - name: Test Crawler / Crawlerx (chromium based crawler)
             run: |
-              go test -timeout 20s -run TestMUSTPASS* ./common/yso -v
-          - name: Test Dnsx
-            run: |
-              go test -timeout 20s -run TestLookupAll ./common/facades -v
-
-          - name: Test SyntaxFlow
-            run: go test -timeout 20s ./common/syntaxflow -v
+              # crawlerx
+              go test --timeout 5m ./common/crawlerx
+              # crawler
+              go test -timeout 20s -run TestMUSTPASS ./common/crawler
 
     steps:
       - name: Cache YakLang Project
