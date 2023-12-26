@@ -280,7 +280,7 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 
 	// fmt.Println("build single expression: ", stmt.GetText())
 
-  	getValue := func(single getSingleExpr, i int) ssa.Value {
+	getValue := func(single getSingleExpr, i int) ssa.Value {
 		if s := single.SingleExpression(i); s != nil {
 			v, _ := b.buildSingleExpression(s, false)
 			return v
@@ -396,7 +396,7 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 				case "-":
 					single, Op, IsUnaryOp = s, ssa.OpNeg, true
 				case "~":
-					single, Op, IsUnaryOp = s, ssa.OpNot, true
+					single, Op, IsUnaryOp = s, ssa.OpBitwiseNot, true
 				case "!":
 					single, Op, IsUnaryOp = s, ssa.OpNot, true
 				case "++":
