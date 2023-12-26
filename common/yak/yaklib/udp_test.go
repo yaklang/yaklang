@@ -2,10 +2,11 @@ package yaklib
 
 import (
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/log"
 	"testing"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func TestUdpConn_Send(t *testing.T) {
@@ -17,7 +18,7 @@ func TestUdpConn_Send(t *testing.T) {
 	}()
 
 	time.Sleep(1 * time.Second)
-	conn, err := connectUdp("127.0.0.1:55433")
+	conn, err := connectUdp("127.0.0.1:55433", "55433")
 	if err != nil {
 		spew.Dump(err)
 		return
