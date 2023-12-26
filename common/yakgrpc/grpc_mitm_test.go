@@ -108,7 +108,7 @@ assert rsp.Contains(token), "gzip + chunk failed"
 	}
 }
 
-func TestGRPCMUSTPASS_MITM(t *testing.T) {
+func TestGRPCMUSTPASS_MITM_ALL(t *testing.T) {
 	client, err := NewLocalClient() // 新建一个 yakit client
 	if err != nil {
 		t.Fatal(err)
@@ -775,7 +775,7 @@ a, b, _ = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.https(true)
 	}
 }
 
-func TestGRPCMUSTPASS_MITMDnsAndHosts(t *testing.T) {
+func TestGRPCMUSTPASS_MITM_DnsAndHosts(t *testing.T) {
 	client, err := NewLocalClient() // 新建一个 yakit client
 	if err != nil {
 		t.Fatal(err)
@@ -1063,7 +1063,7 @@ Host: ` + addr
 	}
 }
 
-func TestGRPCMUSTPASS_MITMCancelHijackResponse(t *testing.T) {
+func TestGRPCMUSTPASS_MITM_CancelHijackResponse(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)

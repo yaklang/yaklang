@@ -19,7 +19,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func TestGRPCMUSTPASS_QueryHTTPFlow_Oversize(t *testing.T) {
+func TestGRPCMUSTPASS_HTTP_QueryHTTPFlow_Oversize(t *testing.T) {
 	var client, err = NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
@@ -103,7 +103,7 @@ Host: www.example.com
 	}
 }
 
-func TestGRPCMUSTPASS_HijackedFlow_Request(t *testing.T) {
+func TestGRPCMUSTPASS_HTTP_HijackedFlow_Request(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
@@ -203,7 +203,7 @@ assert string(poc.Split(rsp)[1]) == token2
 	}
 }
 
-func TestGRPCMUSTPASS_HijackedFlow_Response(t *testing.T) {
+func TestGRPCMUSTPASS_HTTP_HijackedFlow_Response(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)

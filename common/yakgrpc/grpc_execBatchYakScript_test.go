@@ -18,7 +18,7 @@ func init() {
 	consts.GetGormProjectDatabase()
 }
 
-func TestGRPCMUSTPASS_EXEC_YAK_SCRIPT(t *testing.T) {
+func TestGRPCMUSTPASS_LANGUAGE_EXEC_YAK_SCRIPT(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		panic(err)
@@ -106,7 +106,7 @@ func TestNewServer(t *testing.T) {
 	}
 }
 
-func TestGRPCMUSTPASS_NesureProxyValidInExecBatchYakScript(t *testing.T) {
+func TestGRPCMUSTPASS_LANGUAGE_NesureProxyValidInExecBatchYakScript(t *testing.T) {
 
 	client, err := NewLocalClient()
 	if err != nil {

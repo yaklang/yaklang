@@ -5,20 +5,11 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func init() {
-	if InGithubAction() {
-		log.Info("disable stdout and level")
-		log.SetLevel(log.ErrorLevel)
-		// os.Stdout, _ = os.Open(os.DevNull)
-	}
-}
-
-func TestGRPCMUSTPASS_DiagnoseNetwork(t *testing.T) {
+func TestGRPCMUSTPASS_COMMON_DiagnoseNetwork(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
@@ -50,7 +41,7 @@ func TestGRPCMUSTPASS_DiagnoseNetwork(t *testing.T) {
 	}
 }
 
-func TestGRPCMUSTPASS_DIAGNOSE_DNS(t *testing.T) {
+func TestGRPCMUSTPASS_COMMON_DIAGNOSE_DNS(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)

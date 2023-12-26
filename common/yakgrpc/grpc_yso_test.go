@@ -12,7 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/yso"
 )
 
-func TestGRPCMUSTPASS_yso(t *testing.T) {
+func TestGRPCMUSTPASS_COMMON_yso(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)

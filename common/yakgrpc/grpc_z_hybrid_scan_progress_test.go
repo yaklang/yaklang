@@ -2,14 +2,15 @@ package yakgrpc
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	uuid "github.com/satori/go.uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"testing"
-	"time"
 )
 
-func TestGRPCMUSTPASS_ChannelControlTest(t *testing.T) {
+func TestGRPCMUSTPASS_COMMON_ChannelControlTest(t *testing.T) {
 	errC := make(chan error, 1)
 	close(errC)
 
@@ -18,7 +19,7 @@ func TestGRPCMUSTPASS_ChannelControlTest(t *testing.T) {
 	}
 }
 
-func TestGRPCMUSTPASS_HybridScan_PROGRESS(t *testing.T) {
+func TestGRPCMUSTPASS_COMMON_HybridScan_PROGRESS(t *testing.T) {
 	id := uuid.NewV4()
 	manager, err := CreateHybridTask(id.String(), context.Background())
 	if err != nil {

@@ -26,7 +26,7 @@ import (
 func init() {
 	yakit.InitialDatabase()
 }
-func TestGRPCMUSTPASS_HTTPFuzzerWithNoFollowRedirect(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFuzzer_WithNoFollowRedirect(t *testing.T) {
 	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.RequestURI != "/admin" {
 			http.Redirect(writer, request, "/admin", http.StatusMovedPermanently)
@@ -90,7 +90,7 @@ Host: %v
 		}
 	}
 }
-func TestGRPCMUSTPASS_HTTPFuzzerWITHPLUGIN(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFuzzer_WITHPLUGIN(t *testing.T) {
 	var token string
 	name, err := httptpl.MockEchoPlugin(func(s string) {
 		token = s
@@ -166,7 +166,7 @@ Host: %v
 	}
 }
 
-func TestGRPCMUSTPASS_HTTPFuzzerWithNoFixGZIP(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFuzzer_WithNoFixGZIP(t *testing.T) {
 	var token = utils.RandStringBytes(200)
 	body, _ := utils.GzipCompress(token)
 	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
@@ -208,7 +208,7 @@ Host: %v
 	}
 }
 
-func TestGRPCMUSTPASS_HTTPFuzzerWithNoFixGZIP_Negative(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFuzzer_WithNoFixGZIP_Negative(t *testing.T) {
 	var token = utils.RandStringBytes(200)
 	body, _ := utils.GzipCompress(token)
 	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
@@ -250,7 +250,7 @@ Host: %v
 	}
 }
 
-func TestGRPCMUSTPASS_HTTPFuzzerBIG(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFuzzer_BIG(t *testing.T) {
 	host, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
 Content-Length: 12
 
@@ -309,7 +309,7 @@ Host: %v
 	}
 }
 
-func TestGRPCMUSTPASS_HTTPFuzzer(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFuzzer_ALL(t *testing.T) {
 	var requestedCount int
 	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		requestedCount++
@@ -375,7 +375,7 @@ Host: www.baidu.com
 	}
 }
 
-func TestGRPCMUSTPASS_HTTPFuzzerWithLegacyTag(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFuzzer_WithLegacyTag(t *testing.T) {
 	var requestedCount int
 	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		requestedCount++
@@ -441,7 +441,7 @@ Host: www.baidu.com
 	}
 }
 
-func TestGRPCMUSTPASS_ExtractUrl(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFuzzer_ExtractUrl(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
@@ -964,7 +964,7 @@ func TestHTTPPacket_ToUnquoteFuzzTag(t *testing.T) {
 	}
 }
 
-func TestGRPCMUSTPASS_FuzzTag(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFuzzer_FuzzTag(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
@@ -1067,7 +1067,7 @@ func TestGRPCMUSTPASS_FuzzTag(t *testing.T) {
 		}
 	}
 }
-func TestGRPCMUSTPASS_SyncFuzzTag(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFuzzer_SyncFuzzTag(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)

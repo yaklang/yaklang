@@ -51,7 +51,7 @@ func CheckKV(t *testing.T, wants map[string]string, infos []*ypb.YaklangInformat
 	}
 }
 
-func TestYakGetInfo(t *testing.T) {
+func TestGRPCMUSTPASS_LANGUAGE_InspectInformation(t *testing.T) {
 	local, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
