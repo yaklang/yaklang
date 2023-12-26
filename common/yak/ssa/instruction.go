@@ -170,6 +170,8 @@ func NewParam(variable string, isFreeValue bool, fun *Function) *Parameter {
 	p.SetFunc(fun)
 	p.SetBlock(fun.EnterBlock)
 	p.SetRange(fun.GetRange())
+	p.GetProgram().SetVirtualRegister(p)
+	p.GetProgram().SetInstructionWithName(variable, p)
 	return p
 }
 

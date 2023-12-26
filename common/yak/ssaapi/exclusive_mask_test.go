@@ -1,8 +1,9 @@
 package ssaapi
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func TestYaklangMask(t *testing.T) {

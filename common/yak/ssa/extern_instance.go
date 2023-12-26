@@ -105,6 +105,7 @@ func (b *FunctionBuilder) BuildValueFromAny(id string, v any) (value Value) {
 	}
 	value.SetExtern(true)
 	b.externInstance[str] = value
+	b.GetProgram().SetInstructionWithName(str, value)
 	return
 }
 
