@@ -1,26 +1,40 @@
 package lowhttp
 
-//import (
-//	"fmt"
-//	"github.com/davecgh/go-spew/spew"
-//	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/protocol/nla"
-//	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-//	"testing"
-//)
-//
-//func TestNtlmV2(t *testing.T) { // not ci
-//	rsp, err := HTTPWithoutRedirect(WithPacketBytes([]byte("GET / HTTP/1.1\r\nHost: 117.50.163.235\r\n\r\n")), WithUsername("test"), WithPassword("test123"))
-//	if err != nil {
-//		t.Fatal(err)
-//	}
-//	spew.Dump(rsp)
-//}
-//
-//func TestResp(t *testing.T) {
-//	auth := nla.NewNTLMv2("", "test", "test123")
-//	auth.GetNegotiateMessage()
-//	challenge, _ := codec.DecodeBase64("TlRMTVNTUAACAAAAHgAeADgAAAAFAoqibpP+q8pzH8cAAAAAAAAAAJAAkABWAAAACgBjRQAAAA9XAEkATgAtADAANgAxAEUAVgBJAEgASwBEADgANgACAB4AVwBJAE4ALQAwADYAMQBFAFYASQBIAEsARAA4ADYAAQAeAFcASQBOAC0AMAA2ADEARQBWAEkASABLAEQAOAA2AAQAGgAxADAALQA2ADAALQAxADQAOQAtADEANQAxAAMAGgAxADAALQA2ADAALQAxADQAOQAtADEANQAxAAcACACHI0ZLqw3aAQAAAAA=")
-//	authMessage, _ := auth.GetAuthenticateMessage(challenge)
-//	authstring := authMessage.Serialize()
-//	fmt.Println(codec.EncodeBase64(authstring))
-//}
+import (
+	"github.com/yaklang/yaklang/common/utils"
+	"net/http"
+	"testing"
+)
+
+func TestHTTPAuth(t *testing.T) {
+
+	authHeader := []string{
+		"WWW-Authenticate",
+		"Www-Authenticate", // go fix
+		"www-authenticate",
+		"WWW-AUTHENTICATE",
+	}
+	count := 0
+	username, passwd := "test", "test"
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		u, p, ok := request.BasicAuth()
+		if ok && u == username && p == passwd {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.Header()[authHeader[count]] = []string{`Basic realm="restricted", charset="UTF-8"`}
+		w.WriteHeader(http.StatusUnauthorized)
+		count++
+	})
+
+	target := utils.HostPort(host, port)
+	for i := 0; i < len(authHeader); i++ {
+		rsp, err := HTTPWithoutRedirect(WithPacketBytes([]byte("GET / HTTP/1.1\r\nHost: "+target+"\r\n\r\n")), WithUsername(username), WithPassword(passwd))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, code, _ := GetHTTPPacketFirstLine(rsp.RawPacket); code != "200" {
+			t.Fatalf("auth error want 200 get %v", code)
+		}
+	}
+}
