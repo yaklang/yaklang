@@ -1,6 +1,7 @@
 package test
 
 import (
+	"sort"
 	"strings"
 	"testing"
 
@@ -28,6 +29,8 @@ func check(t *testing.T, tc TestCase) {
 	}
 
 	// fmt.Println(ret)
+	sort.Strings(ret)
+	sort.Strings(tc.target)
 
 	if len(tc.target) != len(ret) {
 		t.Fatal("check " + tc.ref + " Count Number err")
@@ -36,13 +39,13 @@ func check(t *testing.T, tc TestCase) {
 	if tc.fuzz {
 		for i, v := range tc.target {
 			if !strings.Contains(ret[i], v) {
-				t.Fatal("check " + tc.ref + " Test err")
+				t.Fatalf("check %s Test err, expect %s, got %s", tc.ref, v, ret[i])
 			}
 		}
 	} else {
 		for i, v := range tc.target {
 			if v != ret[i] {
-				t.Fatal("check " + tc.ref + " Test err")
+				t.Fatalf("check %s Test err, expect %s, got %s", tc.ref, v, ret[i])
 			}
 		}
 	}

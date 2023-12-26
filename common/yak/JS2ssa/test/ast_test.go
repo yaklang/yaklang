@@ -14,5 +14,8 @@ var str string
 func TestRealJs(t *testing.T) {
 	fmt.Println(len(str))
 	prog := ssaapi.Parse(str, ssaapi.WithLanguage(ssaapi.JS))
+	if prog.IsNil() {
+		t.Fatal("parse js err")
+	}
 	prog.Show()
 }
