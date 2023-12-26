@@ -96,6 +96,7 @@ func ParseStringToUrl(s string) *url.URL {
 	// baidu.com
 	// 192.168.1.1:
 	// 0x01000000
+	// http://baidu.com?a=1
 	var u = new(url.URL)
 
 	// handle #
@@ -163,7 +164,7 @@ RETRY:
 			var queryOk bool
 			var result string
 			result, u.RawQuery, queryOk = strings.Cut(s, "?")
-			if !queryOk && haveSchemaSplit {
+			if u.Host == "" || (!queryOk && haveSchemaSplit) {
 				u.Host = result
 			} else {
 				u.Path = result
