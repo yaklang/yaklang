@@ -2,6 +2,7 @@ package wsm
 
 import (
 	"fmt"
+	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -159,45 +160,114 @@ func (g *GodzillaFileSystemAction) newGodzillaFormId(id string) (*Godzilla, erro
 }
 
 func (g *GodzillaFileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
-	u := params.GetUrl()
-	path := u.GetPath()
+	//u := params.GetUrl()
+	//path := u.GetPath()
+	//
+	//var query = make(url.Values)
+	//for _, v := range u.GetQuery() {
+	//	query.Add(v.GetKey(), v.GetValue())
+	//}
+	//id := query.Get("id")
+	//manager, err := g.newGodzillaFormId(id)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//var res []*ypb.YakURLResource
+	//switch query.Get("mode") {
+	//case "list":
+	//	//TODO implement me
+	//	list, err := manager.getFile(path)
+	//	if err != nil {
+	//		return nil, err
+	//	}
+	//	res, err = godzillaResultToYakURLResource(u, list)
+	//	if err != nil {
+	//		return nil, err
+	//	}
+	//case "show":
+	//
+	//case "check":
+	//case "checkExist":
+	//
+	//case "getTimeStamp":
+	//
+	//}
 
+	//return &ypb.RequestYakURLResponse{
+	//	Page:      1,
+	//	PageSize:  100,
+	//	Total:     int64(len(res)),
+	//	Resources: res,
+	//}, nil
+
+	u := params.GetUrl()
 	var query = make(url.Values)
 	for _, v := range u.GetQuery() {
 		query.Add(v.GetKey(), v.GetValue())
 	}
-	id := query.Get("id")
-	manager, err := g.newGodzillaFormId(id)
-	if err != nil {
-		return nil, err
+	if query.Get("id") == "" {
+		return nil, utils.Error("webshell id cannot be empty")
 	}
-	var res []*ypb.YakURLResource
-	switch query.Get("mode") {
-	case "list":
-		//TODO implement me
-		list, err := manager.getFile(path)
+	switch query.Get("op") {
+	case "cmd":
+		fallthrough
+	case "db":
+		return g.Do(params)
+	case "file":
+		//path := u.Path
+		//if path == "" || path == "/" {
+		path := query.Get("path")
+		//}
+		id := query.Get("id")
+		manager, err := g.newGodzillaFormId(id)
 		if err != nil {
 			return nil, err
 		}
-		res, err = godzillaResultToYakURLResource(u, list)
-		if err != nil {
-			return nil, err
+		var res []*ypb.YakURLResource
+		mode := query.Get("mode")
+
+		funcMap := map[string]func() ([]byte, error){
+			"list": func() ([]byte, error) {
+				return manager.getFile(path)
+			},
+			//"show": func() ([]byte, error) {
+			//	return manager.showFile(path)
+			//},
+			//"check": func() ([]byte, error) {
+			//	return manager.checkFileHash(path, "")
+			//},
+			//"checkExist": func() ([]byte, error) {
+			//	return manager.checkFileExist(path)
+			//},
+			//"getTimeStamp": func() ([]byte, error) {
+			//	return manager.getTimeStamp(path)
+			//},
 		}
-	case "show":
 
-	case "check":
-	case "checkExist":
+		// Call the function based on the mode
+		if fn, ok := funcMap[mode]; ok {
+			list, err := fn()
+			if err != nil {
+				return nil, err
+			}
+			res, err = godzillaResultToYakURLResource(u, list)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, utils.Errorf("unsupported mode %s", mode)
+		}
 
-	case "getTimeStamp":
+		return &ypb.RequestYakURLResponse{
+			Page:      1,
+			PageSize:  100,
+			Total:     int64(len(res)),
+			Resources: res,
+		}, nil
+	default:
+		return nil, utils.Errorf("unsupported op %s", query.Get("op"))
 
 	}
-
-	return &ypb.RequestYakURLResponse{
-		Page:      1,
-		PageSize:  100,
-		Total:     int64(len(res)),
-		Resources: res,
-	}, nil
 }
 
 func (g *GodzillaFileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
@@ -221,8 +291,62 @@ func (g *GodzillaFileSystemAction) Head(params *ypb.RequestYakURLParams) (*ypb.R
 }
 
 func (g *GodzillaFileSystemAction) Do(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	u := params.GetUrl()
+
+	var query = make(url.Values)
+	for _, v := range u.GetQuery() {
+		query.Add(v.GetKey(), v.GetValue())
+	}
+	var res []*ypb.YakURLResource
+	id := query.Get("id")
+	manager, err := g.newGodzillaFormId(id)
+	if err != nil {
+		return nil, err
+	}
+	switch query.Get("op") {
+	case "cmd":
+		command := query.Get("cmd")
+		path := query.Get("path")
+		var resource = &ypb.YakURLResource{}
+		if strings.HasPrefix(command, "cd ") {
+			path, err = calculateNewPath(path, strings.TrimPrefix(command, "cd "))
+			if err != nil {
+				return nil, err
+			}
+			extra := []*ypb.KVPair{
+				{Key: "content", Value: ""},
+			}
+			resource.Path = path
+			resource.Extra = extra
+		} else {
+			// Todo 特征还是比较明显的
+			fullCommand := "cd " + path + " && " + command
+			raw, err := manager.CommandExec(fullCommand)
+			if err != nil {
+				return nil, err
+			}
+			content := gjson.GetBytes(raw, "msg").String()
+
+			extra := []*ypb.KVPair{
+				{Key: "content", Value: content},
+			}
+			resource.Path = path
+			resource.Extra = extra
+		}
+		res = append(res, resource)
+
+	case "db":
+
+	default:
+		return nil, utils.Errorf("unsupported op %s", query.Get("op"))
+	}
+
+	return &ypb.RequestYakURLResponse{
+		Page:      1,
+		PageSize:  100,
+		Total:     int64(len(res)),
+		Resources: res,
+	}, nil
 }
 
 func (g *Godzilla) getFile(filePath string) ([]byte, error) {

