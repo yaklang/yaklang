@@ -240,7 +240,7 @@ func QueryProject(db *gorm.DB, params *ypb.GetProjectsRequest) (*bizhelper.Pagin
 	case TypeProject:
 		db = db.Where("type IS NULL or type = ?", params.Type)
 	}
-	db = db.Where("project_name <> ? or folder_id <> false or child_folder_id <> false and type = 'project' ", TEMPORARY_PROJECT_NAME)
+	db = db.Where(" NOT (project_name = ? AND folder_id = false AND child_folder_id = false AND type = 'project' )", TEMPORARY_PROJECT_NAME)
 	db = bizhelper.QueryOrder(db, p.OrderBy, p.Order)
 	db = db.Unscoped()
 	var ret []*Project
@@ -320,7 +320,7 @@ func QueryProjectTotal(db *gorm.DB, req *ypb.GetProjectsRequest) (*bizhelper.Pag
 	}
 	params := req.Pagination
 	db = db.Where("type IS NULL or type = ? ", TypeProject)
-	db = db.Where("project_name <> ? or folder_id <> false or child_folder_id <> false and type = 'project' ", TEMPORARY_PROJECT_NAME)
+	db = db.Where(" NOT (project_name = ? AND folder_id = false AND child_folder_id = false AND type = 'project' )", TEMPORARY_PROJECT_NAME)
 	var ret []*Project
 	paging, db := bizhelper.Paging(db, int(params.Page), int(params.Limit), &ret)
 	if db.Error != nil {
@@ -462,4 +462,18 @@ func UpdateProject(db *gorm.DB, id int64, i Project) error {
 		return utils.Errorf("update project: %s", db.Error)
 	}
 	return nil
+}
+
+func GetTemporaryProject(db *gorm.DB) (*Project, error) {
+	var req Project
+	db = db.Model(&Project{})
+	db = db.Where("folder_id = ? or folder_id IS NULL", 0)
+	db = db.Where("child_folder_id = ? or child_folder_id IS NULL", 0)
+	db = db.Where("type IS NULL or type = ?", TypeProject).Where("project_name = ?", TEMPORARY_PROJECT_NAME)
+	db = db.First(&req)
+	if db.Error != nil {
+		return nil, utils.Errorf("get temporary Project failed: %s", db.Error)
+	}
+
+	return &req, nil
 }
