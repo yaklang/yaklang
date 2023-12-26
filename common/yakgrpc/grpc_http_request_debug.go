@@ -10,13 +10,11 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/cli"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	netURL "net/url"
 	"reflect"
 	"strings"
 	"time"
@@ -178,6 +176,13 @@ func (s *Server) execScriptWithExecParam(scriptName string, input string, stream
 	}
 }
 
+type urlTarget struct {
+	host             string
+	path             string
+	isHttps          bool
+	needSendOriginal bool
+}
+
 func (s *Server) execScriptWithRequest(scriptName string, targetInput string, stream sender, params ...*ypb.HTTPRequestBuilderParams) error {
 	if targetInput == "" {
 		return utils.Error("input is empty")
@@ -200,19 +205,50 @@ func (s *Server) execScriptWithRequest(scriptName string, targetInput string, st
 			Path:   []string{"/"},
 		}
 	}
-	uIns, err := netURL.Parse(targetInput)
-	if err == nil {
-		if !utils.StringArrayContains(builderParams.Path, uIns.Path) {
-			builderParams.Path = append(builderParams.Path, uIns.Path)
+
+	var targets []*urlTarget // build request targets
+	for _, target := range utils.PrettifyListFromStringSplitEx(targetInput, "\n", "|", ",") {
+		target = strings.TrimSpace(target)
+		if target == "" {
+			continue
 		}
-		for k, vlist := range uIns.Query() {
-			for _, v := range vlist {
-				builderParams.GetParams = append(builderParams.GetParams, &ypb.KVPair{
-					Key:   k,
-					Value: v,
-				})
+		if utils.IsValidHost(target) { // 处理没有单独一个host情况 不含port
+			targets = append(targets, &urlTarget{
+				host:             target,
+				needSendOriginal: false,
+			})
+		}
+		urlIns := utils.ParseStringToUrl(target)
+		if urlIns.Host == "" {
+			continue
+		}
+
+		ishttps := urlIns.Scheme == "https"
+		host, port, _ := utils.ParseStringToHostPort(urlIns.Host) // 处理包含 port 的情况
+
+		//todo 是否需要支持hosts?
+		if !utils.IsValidHost(host) { // host不合规情况 比如 a:80
+			continue
+		}
+
+		if port > 0 && urlIns.Scheme == "" { // fix https
+			if port == 443 {
+				ishttps = true
 			}
 		}
+
+		if urlIns.RawQuery != "" {
+			urlIns.Path += "?" + urlIns.RawQuery
+		}
+
+		targets = append(targets, &urlTarget{
+			host:    urlIns.Host,
+			isHttps: ishttps,
+			path:    urlIns.Path,
+			//当请求和模板的path或者https配置不同时需要补充发包
+			needSendOriginal: ishttps != builderParams.IsHttps || (urlIns.Path != "" && !utils.StringArrayContains(builderParams.Path, urlIns.Path)),
+		})
+
 	}
 	scriptInstance, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), scriptName)
 	if err != nil {
@@ -244,69 +280,31 @@ func (s *Server) execScriptWithRequest(scriptName string, targetInput string, st
 		log.Errorf("failed to build http request: %v", err)
 	}
 	var results = builderResponse.GetResults()
-	if len(results) <= 0 { // 请求模板构造失败时直接用get请求目标
-		var templates = []byte("GET / HTTP/1.1\r\nHost: {{Hostname}}\r\n\r\n")
-		for _, res := range utils.PrettifyListFromStringSplitEx(targetInput, "\n", "|", ",") {
-			res = strings.TrimSpace(res)
-			if strings.HasPrefix(res, "http://") || strings.HasPrefix(res, "https://") {
-				isHttps, raw, err := lowhttp.ParseUrlToHttpRequestRaw("GET", res)
-				if err == nil {
-					feed(raw, isHttps)
-				}
-				continue
-			}
-
-			host, port, _ := utils.ParseStringToHostPort(res)
-			if host == "" {
-				host = res
-			}
-			if host == "" {
-				continue
-			}
-			if port > 0 {
-				if port == 443 {
-					feed(bytes.ReplaceAll(templates, []byte(`{{Hostname}}`), []byte(host)), true)
-					continue
-				}
-
-				if port == 80 {
-					feed(bytes.ReplaceAll(templates, []byte(`{{Hostname}}`), []byte(host)), false)
-					continue
-				}
-
-				feed(bytes.ReplaceAll(templates, []byte(`{{Hostname}}`), []byte(utils.HostPort(host, port))), strings.HasPrefix(res, "https://"))
-			} else {
-				feed(bytes.ReplaceAll(templates, []byte(`{{Hostname}}`), []byte(host)), strings.HasPrefix(res, "https://"))
-			}
+	var baseTemplates = []byte("GET {{Path}} HTTP/1.1\r\nHost: {{Hostname}}\r\n\r\n")
+	if len(results) <= 0 { // 请求模板构造失败时直接用http get请求目标
+		for _, target := range targets {
+			packet := bytes.ReplaceAll(baseTemplates, []byte(`{{Hostname}}`), []byte(target.host))
+			packet = bytes.ReplaceAll(packet, []byte(`{{Path}}`), []byte(target.path))
+			feed(packet, target.isHttps)
 		}
 	} else {
 		funk.ForEach(results, func(i *ypb.HTTPRequestBuilderResult) {
-			for _, res := range utils.PrettifyListFromStringSplitEx(targetInput, "\n", "|", ",") {
-				res = strings.TrimSpace(res)
-				host, port, _ := utils.ParseStringToHostPort(res)
-				if host == "" {
-					host = res
-				}
-				if host == "" {
-					continue
-				}
-
-				var targetAddr string
-				https := i.GetIsHttps()
-				if strings.HasPrefix(res, "http://") || strings.HasPrefix(res, "https://") { // 优先级高于模板packet
-					https = strings.HasPrefix(res, "https://")
-				}
-				if port != 0 && (https && port != 443 || !https && port != 80) {
-					targetAddr = utils.HostPort(host, port)
-				} else {
-					targetAddr = host
-				}
-
-				packet := bytes.ReplaceAll(i.HTTPRequest, []byte(`{{Hostname}}`), []byte(targetAddr))
-				feed(packet, https)
+			for _, target := range targets {
+				packet := bytes.ReplaceAll(i.HTTPRequest, []byte(`{{Hostname}}`), []byte(target.host))
+				feed(packet, i.IsHttps)
 			}
 		})
 	}
+
+	for _, target := range targets { // 发送补充请求
+		if !target.needSendOriginal {
+			continue
+		}
+		packet := bytes.ReplaceAll(baseTemplates, []byte(`{{Hostname}}`), []byte(target.host))
+		packet = bytes.ReplaceAll(packet, []byte(`{{Path}}`), []byte(target.path))
+		feed(packet, target.isHttps)
+	}
+
 	if len(reqs) <= 0 {
 		return utils.Error("build http request failed: no results")
 	}
