@@ -158,6 +158,7 @@ execNasl = (target)=>{
     }
 }
 `
+
 const nucleiCodeExecTemplate = `
 nucleiPoCName = MITM_PARAMS["CURRENT_NUCLEI_PLUGIN_NAME"]
 proxy = cli.StringSlice("proxy")
@@ -230,6 +231,7 @@ func (m *MixPluginCaller) SetDividedContext(b bool) {
 	}
 	m.callers.SetDividedContext(b)
 }
+
 func NewMixPluginCaller() (*MixPluginCaller, error) {
 	resetFilterLock.Lock()
 	defer resetFilterLock.Unlock()
@@ -256,6 +258,7 @@ func NewMixPluginCaller() (*MixPluginCaller, error) {
 func (c *MixPluginCaller) SetLoadPluginTimeout(i float64) {
 	c.callers.timeout = time.Duration(i * float64(time.Second))
 }
+
 func (c *MixPluginCaller) SetConcurrent(i int) error {
 	return c.GetNativeCaller().SetConcurrent(i)
 }
@@ -296,7 +299,6 @@ func (c *MixPluginCaller) FeedbackOrdinary(i interface{}) {
 	if c.ordinaryFeedback != nil {
 		c.ordinaryFeedback(i)
 	}
-
 }
 
 func (c *MixPluginCaller) LoadHotPatch(ctx context.Context, code string) error {
@@ -316,8 +318,8 @@ func (m *MixPluginCaller) LoadPlugin(scriptName string, params ...*ypb.ExecParam
 
 // LoadPluginByName 基于脚本名加载插件，如果没有指定代码，则从数据库中加载，如果指定了代码，则默认视为mitm插件执行
 func (m *MixPluginCaller) LoadPluginByName(ctx context.Context, name string, params []*ypb.ExecParamItem, codes ...string) error {
-	//loadTemplateLock.Lock()
-	//defer loadTemplateLock.Unlock()
+	// loadTemplateLock.Lock()
+	// defer loadTemplateLock.Unlock()
 	ctx = context.WithValue(ctx, "ctx_info", map[string]interface{}{})
 	m.FeedbackOrdinary(fmt.Sprintf("Initializing MITM Plugin: %v", name))
 	var code string
@@ -579,7 +581,6 @@ func (m *MixPluginCaller) CallHijackResponse(
 			func() interface{} { return u }, getResponse, reject, drop,
 		)
 	}
-
 }
 
 func (m *MixPluginCaller) CallHijackResponseEx(
@@ -602,7 +603,7 @@ func calcWebsitePathParamsHash(urlIns *url.URL, host, port interface{}, req []by
 		return ""
 	}
 	var params []string
-	var fuzzParams = freq.GetCommonParams()
+	fuzzParams := freq.GetCommonParams()
 	for _, r := range fuzzParams {
 		params = append(params, utils.CalcMd5(r.Position(), r.Name()))
 	}
@@ -624,7 +625,7 @@ func getFuzzHTTPRequestByCache(req []byte) (*mutate.FuzzHTTPRequest, error) {
 	hash := utils.CalcSha1(req)
 	data, ok := ttlHTTPRequestCache.Get(hash)
 	if ok && data != nil {
-		var reqIns, _ = data.(*mutate.FuzzHTTPRequest)
+		reqIns, _ := data.(*mutate.FuzzHTTPRequest)
 		if reqIns != nil {
 			return reqIns, nil
 		}
@@ -694,14 +695,16 @@ func (m *MixPluginCaller) HandleServiceScanResult(r *fp.MatchResult) {
 
 func (m *MixPluginCaller) MirrorHTTPFlow(
 	isHttps bool, u string, req, rsp, body []byte,
-	filters ...bool) {
+	filters ...bool,
+) {
 	m.MirrorHTTPFlowEx(true, isHttps, u, req, rsp, body, filters...)
 }
 
 func (m *MixPluginCaller) MirrorHTTPFlowEx(
 	scanPort bool,
 	isHttps bool, u string, req, rsp, body []byte,
-	filters ...bool) {
+	filters ...bool,
+) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("panic from mirror httpflow ex: %s", err)
@@ -739,22 +742,28 @@ func (m *MixPluginCaller) MirrorHTTPFlowEx(
 				callers.CallByName(HOOK_MirrorNewWebsite, isHttps, u, req, rsp, body)
 			}
 
-			if scanPort && callers.ShouldCallByName(HOOK_PortScanHandle) {
+			if callers.ShouldCallByName(HOOK_PortScanHandle) {
+				var (
+					matchResult *fp.MatchResult
+					err         error
+				)
 				host, port, _ = utils.ParseStringToHostPort(u)
 				if host != "" && port > 0 {
 					m.swg.Add()
 					go func() {
 						defer m.swg.Done()
-						addr := utils.HostPort(host, port)
-						log.Debugf("(port/mitm) start to match %v", addr)
-						matchResult, err := m.fingerprintMatcher.Match(
-							host, port, fp.WithCache(m.cache), fp.WithDatabaseCache(true),
-							fp.WithProxy(m.proxy),
-						)
-						if err != nil {
-							return
+						if scanPort {
+							addr := utils.HostPort(host, port)
+							log.Debugf("(port/mitm) start to match %v", addr)
+							matchResult, err = m.fingerprintMatcher.Match(
+								host, port, fp.WithCache(m.cache), fp.WithDatabaseCache(true),
+								fp.WithProxy(m.proxy),
+							)
+							if err != nil {
+								return
+							}
+							log.Debugf("%v", matchResult.String())
 						}
-						log.Debugf("%v", matchResult.String())
 						callers.CallByName(HOOK_PortScanHandle, matchResult)
 					}()
 				}
