@@ -22,7 +22,7 @@ func TestExtractHost(t *testing.T) {
 }
 
 func TestParseStringToUrl(t *testing.T) {
-	if ret := ParseStringToUrl(`example.com?c=1`); !(ret.Path == "example.com" && ret.RawQuery == "c=1") {
+	if ret := ParseStringToUrl(`example.com?c=1`); !(ret.Host == "example.com" && ret.RawQuery == "c=1") {
 		t.Fatal(ret)
 		t.FailNow()
 	}
@@ -34,6 +34,7 @@ func TestParseStringToUrl(t *testing.T) {
 		"example.com:",
 		"example.com:",
 		"http://example.com",
+		"http://example.com?a=1",
 		"https://example.com",
 		"https://example.com:",
 		"http://example.com:",
