@@ -544,7 +544,7 @@ func (s *Server) QueryProjectDetail(ctx context.Context, req *ypb.QueryProjectDe
 func (s *Server) GetTemporaryProject(ctx context.Context, req *ypb.Empty) (*ypb.ProjectDescription, error) {
 	proj, err := yakit.GetTemporaryProject(s.GetProfileDatabase())
 	if err != nil {
-		return nil, utils.Errorf("cannot fetch temporary project", err)
+		return nil, utils.Errorf("cannot fetch temporary project")
 	}
 	return proj.ToGRPCModel(), nil
 }
