@@ -351,6 +351,7 @@ type YakClient interface {
 	DeleteProject(ctx context.Context, in *DeleteProjectRequest, opts ...grpc.CallOption) (*Empty, error)
 	GetDefaultProject(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ProjectDescription, error)
 	QueryProjectDetail(ctx context.Context, in *QueryProjectDetailRequest, opts ...grpc.CallOption) (*ProjectDescription, error)
+	GetTemporaryProject(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ProjectDescription, error)
 	// 导入导出项目，带密码，带进度
 	ExportProject(ctx context.Context, in *ExportProjectRequest, opts ...grpc.CallOption) (Yak_ExportProjectClient, error)
 	ImportProject(ctx context.Context, in *ImportProjectRequest, opts ...grpc.CallOption) (Yak_ImportProjectClient, error)
@@ -3703,6 +3704,15 @@ func (c *yakClient) QueryProjectDetail(ctx context.Context, in *QueryProjectDeta
 	return out, nil
 }
 
+func (c *yakClient) GetTemporaryProject(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ProjectDescription, error) {
+	out := new(ProjectDescription)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/GetTemporaryProject", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) ExportProject(ctx context.Context, in *ExportProjectRequest, opts ...grpc.CallOption) (Yak_ExportProjectClient, error) {
 	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[39], "/ypb.Yak/ExportProject", opts...)
 	if err != nil {
@@ -4969,6 +4979,7 @@ type YakServer interface {
 	DeleteProject(context.Context, *DeleteProjectRequest) (*Empty, error)
 	GetDefaultProject(context.Context, *Empty) (*ProjectDescription, error)
 	QueryProjectDetail(context.Context, *QueryProjectDetailRequest) (*ProjectDescription, error)
+	GetTemporaryProject(context.Context, *Empty) (*ProjectDescription, error)
 	// 导入导出项目，带密码，带进度
 	ExportProject(*ExportProjectRequest, Yak_ExportProjectServer) error
 	ImportProject(*ImportProjectRequest, Yak_ImportProjectServer) error
@@ -5842,6 +5853,9 @@ func (UnimplementedYakServer) GetDefaultProject(context.Context, *Empty) (*Proje
 }
 func (UnimplementedYakServer) QueryProjectDetail(context.Context, *QueryProjectDetailRequest) (*ProjectDescription, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryProjectDetail not implemented")
+}
+func (UnimplementedYakServer) GetTemporaryProject(context.Context, *Empty) (*ProjectDescription, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetTemporaryProject not implemented")
 }
 func (UnimplementedYakServer) ExportProject(*ExportProjectRequest, Yak_ExportProjectServer) error {
 	return status.Errorf(codes.Unimplemented, "method ExportProject not implemented")
@@ -10920,6 +10934,24 @@ func _Yak_QueryProjectDetail_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_GetTemporaryProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetTemporaryProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/GetTemporaryProject",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetTemporaryProject(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_ExportProject_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(ExportProjectRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -12888,6 +12920,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "QueryProjectDetail",
 			Handler:    _Yak_QueryProjectDetail_Handler,
+		},
+		{
+			MethodName: "GetTemporaryProject",
+			Handler:    _Yak_GetTemporaryProject_Handler,
 		},
 		{
 			MethodName: "MigrateLegacyDatabase",
