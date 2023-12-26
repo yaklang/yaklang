@@ -150,15 +150,20 @@ func (b *FunctionBuilder) ReadVariable(variable string, create bool) Value {
 		}
 	})
 
-	if ret != nil {
-		if v := ret.GetVariable(variable); v != nil {
-			v.AddRange(b.CurrentRange)
-			b.CurrentScope.InsertByRange(v, b.CurrentRange)
-		} else {
-			b.CurrentScope.AddVariable(NewVariable(variable, ret), b.CurrentRange)
-		}
+	if ret == nil {
+		return ret
 	}
 
+	if ret.IsExtern() {
+		return ret
+	}
+
+	if v := ret.GetVariable(variable); v != nil {
+		v.AddRange(b.CurrentRange)
+		b.CurrentScope.InsertByRange(v, b.CurrentRange)
+	} else {
+		b.CurrentScope.AddVariable(NewVariable(variable, ret), b.CurrentRange)
+	}
 	return ret
 }
 

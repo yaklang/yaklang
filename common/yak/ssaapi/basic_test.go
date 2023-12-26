@@ -9,6 +9,15 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
+func TestYaklangBasic_variable(t *testing.T) {
+	prog := Parse(`
+	a = 1
+	f = (a) => {
+	}
+	`)
+	prog.Ref("a").ShowWithSource()
+}
+
 func TestYaklangBasic_Const(t *testing.T) {
 	code := `
 	a = 1
