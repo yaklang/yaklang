@@ -2,14 +2,15 @@ package yakgrpc
 
 import (
 	"context"
+	"strings"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
-	"testing"
 )
 
-func TestGRPCMUSTPASS_CODEC_AUTODECODE(t *testing.T) {
+func TestGRPCMUSTPASS_COMMON_CODEC_AUTODECODE(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		panic(err)
@@ -29,7 +30,7 @@ func TestGRPCMUSTPASS_CODEC_AUTODECODE(t *testing.T) {
 	}
 }
 
-func TestGRPCMUSTPASS_CODEC_Filetag(t *testing.T) {
+func TestGRPCMUSTPASS_COMMON_CODEC_Filetag(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)

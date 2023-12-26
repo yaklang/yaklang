@@ -18,7 +18,7 @@ func init() {
 	_ = yakit.CallPostInitDatabase()
 }
 
-func TestGRPCMUSTPASS_EXEC_YAK_SCRIPT_TRACEFLOW(t *testing.T) {
+func TestGRPCMUSTPASS_LANGUAGE_EXEC_YAK_SCRIPT_TRACEFLOW(t *testing.T) {
 	/*
 		trace traffic http flow:
 			via runtime id

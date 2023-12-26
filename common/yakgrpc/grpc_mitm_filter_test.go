@@ -2,11 +2,12 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/consts"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/segmentio/ksuid"
@@ -126,7 +127,7 @@ sleep(0.3)
 	})
 }
 
-func TestGRPCMUSTPASS_MITMFilter_ForExcludeURI(t *testing.T) {
+func TestGRPCMUSTPASS_MITM_Filter_ForExcludeURI(t *testing.T) {
 	_, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
 		ct := lowhttp.GetHTTPRequestQueryParam(req, "ct")
 		rsp, _, _ := lowhttp.FixHTTPResponse([]byte("HTTP/1.1 200 OK\r\nD: 1\r\n\r\n" + time.Now().String()))
@@ -198,7 +199,7 @@ sleep(0.3)
 	})
 }
 
-func TestGRPCMUSTPASS_MITMFilter_ForExcludeSuffixAndContentType(t *testing.T) {
+func TestGRPCMUSTPASS_MITM_Filter_ForExcludeSuffixAndContentType(t *testing.T) {
 	_, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
 		ct := lowhttp.GetHTTPRequestQueryParam(req, "ct")
 		rsp, _, _ := lowhttp.FixHTTPResponse([]byte("HTTP/1.1 200 OK\r\nD: 1\r\n\r\n" + time.Now().String()))

@@ -22,7 +22,7 @@ func GetSuggestion(local ypb.YakClient, typ string, t *testing.T, code string, R
 	return ret
 }
 
-func TestGRPCMUSTPASSLanguageSuggestionCompletion(t *testing.T) {
+func TestGRPCMUSTPASS_LANGUAGE_SuggestionCompletion(t *testing.T) {
 	local, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)

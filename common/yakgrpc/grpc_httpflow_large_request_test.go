@@ -14,7 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func TestGRPCMUSTPASS_QueryHTTPFlow_Oversize_Request(t *testing.T) {
+func TestGRPCMUSTPASS_HTTP_QueryHTTPFlow_Oversize_Request(t *testing.T) {
 	var client, err = NewLocalClient()
 	if err != nil {
 		t.Fatal(err)

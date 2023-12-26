@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"gopkg.in/yaml.v2"
-	"strings"
-	"testing"
 )
 
 func CompareNucleiYaml(yaml1, yaml2 string) error {
@@ -72,7 +73,7 @@ func CompareNucleiYaml(yaml1, yaml2 string) error {
 	}
 	return nil
 }
-func TestGRPCMUSTPASS_CompareNucleiYamlFunc(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFuzzer_CompareNucleiYamlFunc(t *testing.T) {
 	testCases := []struct {
 		content string
 		expect  string
@@ -302,7 +303,7 @@ func TestGRPCMUSTPASS_CompareNucleiYamlFunc(t *testing.T) {
 		}
 	}
 }
-func TestGRPCMUSTPASS_CheckSignParam(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFuzzer_CheckSignParam(t *testing.T) {
 	template := `http:
 - raw:
   - |-
@@ -374,7 +375,7 @@ func TestGRPCMUSTPASS_CheckSignParam(t *testing.T) {
 		signMap[sign] = struct{}{}
 	}
 }
-func TestGRPCMUSTPASS_SignProtectCheck(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFuzzer_SignProtectCheck(t *testing.T) {
 	testCases := []struct {
 		content string
 		expect  bool
@@ -463,7 +464,7 @@ http:
 		}
 	}
 }
-func TestGRPCMUSTPASS_WebFuzzerSequenceConvertYaml(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFuzzer_WebFuzzerSequenceConvertYaml(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)

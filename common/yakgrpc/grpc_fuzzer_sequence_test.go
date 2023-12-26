@@ -14,7 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func TestGRPCMUSTPASS_FuzzerSequence(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFuzzer_FuzzerSequence(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
 		panic(err)
@@ -103,7 +103,7 @@ abc`), "Host", utils.HostPort(host, port))),
 	}
 }
 
-func TestGRPCMUSTPASS_FuzzerSequence_InheritKey(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFuzzer_FuzzerSequence_InheritKey(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
@@ -176,7 +176,7 @@ Authorization: Bearer {{params(test)}}
 	}
 }
 
-func TestGRPCMUSTPASS_FuzzerSequence_FuzzerWithTag(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFuzzer_FuzzerSequence_FuzzerWithTag(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
@@ -242,7 +242,7 @@ abc`), "Host", utils.HostPort(host, port))),
 	}
 }
 
-func TestGRPCMUSTPASS_FuzzerSequence_FuzzerWithTag2(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFuzzer_FuzzerSequence_FuzzerWithTag2(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
@@ -339,7 +339,7 @@ abc`), "Host", utils.HostPort(host, port))),
 	}
 }
 
-func TestGRPCMUSTPASS_FuzzerSequence_FuzzerWithTag3(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFuzzer_FuzzerSequence_FuzzerWithTag3(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
 		panic(err)
@@ -418,7 +418,7 @@ abc`), "Host", utils.HostPort(host, port))),
 	}
 }
 
-func TestGRPCMUSTPASS_FuzzerSequence_FuzzerTagWithConcurrent(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFuzzer_FuzzerSequence_FuzzerTagWithConcurrent(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
@@ -490,7 +490,7 @@ abc`), "Host", utils.HostPort(host, port))),
 	}
 }
 
-func TestGRPCMUSTPASS_FuzzerSequence_InheritCookie(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFuzzer_FuzzerSequence_InheritCookie(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
