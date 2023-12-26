@@ -469,6 +469,13 @@ func _cliLineDict(name string, opts ...SetCliExtraParam) []string {
 	return utils.ParseStringToLines(string(raw))
 }
 
+// YakitPlugin 获取名称为 yakit-plugin-file 的命令行参数
+// 根据其传入的值读取其对应文件内容并根据"|"切割并返回 []string 类型，表示各个插件名
+// Example:
+// ```
+// plugins = cli.YakitPlugin()
+// // --yakit-plugin-file plugins.txt 则 plugins 为 plugins.txt 文件中的各个插件名
+// ```
 func _cliYakitPluginFiles(options ...SetCliExtraParam) []string {
 	paramName := "yakit-plugin-file"
 	filename, c := _cliFromString(paramName, options...)
@@ -488,6 +495,12 @@ func _cliYakitPluginFiles(options ...SetCliExtraParam) []string {
 	return utils.PrettifyListFromStringSplited(string(raw), "|")
 }
 
+// StringSlice 获取对应名称的命令行参数，将其字符串根据","切割返回 []string 类型
+// Example:
+// ```
+// targets = cli.StringSlice("targets")
+// // --targets yaklang.com,google.com 则 targets 为 ["yaklang.com", "google.com"]
+// ```
 func CliStringSlice(name string, options ...SetCliExtraParam) []string {
 	rawStr, c := _cliFromString(name, options...)
 	c._type = "string-slice"

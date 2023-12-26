@@ -70,3 +70,7 @@ func IsValidFloat(raw string) bool {
 	_, err := strconv.ParseFloat(raw, 64)
 	return err == nil && strings.Contains(strings.Trim(raw, "."), ".")
 }
+
+func IsValidHost(raw string) bool {
+	return IsValidDomain(raw) || IsIPv4(raw) || IsIPv6(raw)
+}
