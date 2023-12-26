@@ -105,19 +105,17 @@ func (s *Scope) AddVariable(v *Variable, R *Range) {
 	if !ok {
 		name = v.Name
 	}
-	v.Name = name
 	{
 		value := v.V
 		value.GetProgram().SetInstructionWithName(name, value)
 	}
-	{
-		varList, ok := s.VarMap[name]
-		if !ok {
-			varList = make([]*Variable, 0, 1)
-		}
-		varList = append(varList, v)
-		s.VarMap[name] = varList
+	v.Name = name
+	varList, ok := s.VarMap[name]
+	if !ok {
+		varList = make([]*Variable, 0, 1)
 	}
+	varList = append(varList, v)
+	s.VarMap[name] = varList
 	v.AddRange(R)
 	s.InsertByRange(v, R)
 }
