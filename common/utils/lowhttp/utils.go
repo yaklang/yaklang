@@ -748,3 +748,39 @@ func IsResp(raw any) (isHTTPResponse bool) {
 	}
 	return false
 }
+
+func IGetHeader(packet interface{}, headerKey string) []string {
+	var headers map[string][]string
+	switch data := packet.(type) {
+	case []byte:
+		headers = GetHTTPPacketHeadersFull(data)
+	case string:
+		headers = GetHTTPPacketHeadersFull(utils.UnsafeStringToBytes(data))
+	case http.Response:
+		return IGetHTTPInsHeader(data.Header, headerKey)
+	case *http.Response:
+		return IGetHTTPInsHeader(data.Header, headerKey)
+	case http.Request:
+		return IGetHTTPInsHeader(data.Header, headerKey)
+	case *http.Request:
+		return IGetHTTPInsHeader(data.Header, headerKey)
+	}
+
+	var headerValue []string
+	for k, v := range headers {
+		if strings.ToLower(k) == strings.ToLower(headerKey) {
+			headerValue = append(headerValue, v...)
+		}
+	}
+	return nil
+}
+
+func IGetHTTPInsHeader(headers http.Header, headerKey string) []string {
+	var headerValue []string
+	for k, v := range headers {
+		if strings.ToLower(k) == strings.ToLower(headerKey) {
+			headerValue = append(headerValue, v...)
+		}
+	}
+	return headerValue
+}
