@@ -743,20 +743,17 @@ RECONNECT:
 		}
 
 		if firstAuth && firstResponse != nil && firstResponse.StatusCode == http.StatusUnauthorized {
-			for k, v := range firstResponse.Header {
-				if strings.ToLower(k) == "www-authenticate" {
-					if auth := GetHttpAuth(v[0], option); auth != nil {
-						authReq, err := auth.Authenticate(conn, option)
-						if err == nil {
-							_, err := conn.Write(authReq)
-							responseRaw.Reset() //发送认证请求成功，清空缓冲区
-							if err != nil {
-								return response, errors.Wrap(err, "write request failed")
-							}
-							firstAuth = false
-							goto READ
+			if authHeader := IGetHeader(firstResponse, "WWW-Authenticate"); len(authHeader) > 0 {
+				if auth := GetHttpAuth(authHeader[0], option); auth != nil {
+					authReq, err := auth.Authenticate(conn, option)
+					if err == nil {
+						_, err := conn.Write(authReq)
+						responseRaw.Reset() //发送认证请求成功，清空缓冲区
+						if err != nil {
+							return response, errors.Wrap(err, "write request failed")
 						}
-						break
+						firstAuth = false
+						goto READ
 					}
 				}
 			}
