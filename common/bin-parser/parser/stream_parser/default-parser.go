@@ -462,6 +462,14 @@ func (d *DefParser) Parse(data *base.BitReader, node *base.Node) error {
 			return n.Parse(data)
 		},
 		ParseTerminal: func(node *base.Node) error {
+			if node.Cfg.Has("parser") {
+				secondValue, err := ExecOut(node)
+				if err != nil {
+					return fmt.Errorf("exec parser error: %w", err)
+				}
+				node.Cfg.SetItem("secondValue", secondValue)
+				return nil
+			}
 			if !NodeIsTerminal(node) {
 				return fmt.Errorf("node %s is not terminal", node.Name)
 			}

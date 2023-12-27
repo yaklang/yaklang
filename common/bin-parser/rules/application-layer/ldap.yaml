@@ -3,9 +3,7 @@ Package:
 
   LDAP:
     parser: |
-      OnTerminal((node)=>{
-        node.Cfg.SetValue()
-      })
+
     generator: |
     MessageId: uint32
     ProtocolOP:
