@@ -476,7 +476,7 @@ func (pc *persistConn) readLoop() {
 		}
 
 		if firstAuth && resp != nil && resp.StatusCode == http.StatusUnauthorized {
-			if authHeader := resp.Header["WWW-Authenticate"]; len(authHeader) > 0 {
+			if authHeader := IGetHeader(resp, "WWW-Authenticate"); len(authHeader) > 0 {
 				if auth := GetHttpAuth(authHeader[0], rc.option); auth != nil {
 					authReq, err := auth.Authenticate(pc.Conn, rc.option)
 					if err == nil {

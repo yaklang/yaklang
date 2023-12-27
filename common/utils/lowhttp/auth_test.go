@@ -6,14 +6,42 @@ import (
 	"testing"
 )
 
-func TestHTTPAuth(t *testing.T) {
+type authCase struct {
+	key        string
+	value      string
+	expectCode string
+}
 
-	authHeader := []string{
-		"WWW-Authenticate",
-		"Www-Authenticate", // go fix
-		"www-authenticate",
-		"WWW-AUTHENTICATE",
+func TestHTTPAuth(t *testing.T) {
+	basicAuth := `Basic realm="restricted", charset="UTF-8"`
+	authCases := []authCase{
+		{
+			key:        "WWW-Authenticate",
+			value:      basicAuth,
+			expectCode: "200",
+		},
+		{
+			key:        "Www-Authenticate",
+			value:      basicAuth,
+			expectCode: "200",
+		},
+		{
+			key:        "www-authenticate",
+			value:      basicAuth,
+			expectCode: "200",
+		},
+		{
+			key:        "WWW-AUTHENTICATE",
+			value:      basicAuth,
+			expectCode: "200",
+		},
+		{
+			key:        "WWW-AUTHENTICATE",
+			value:      "",
+			expectCode: "401",
+		},
 	}
+
 	count := 0
 	username, passwd := "test", "test"
 	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, request *http.Request) {
@@ -22,19 +50,19 @@ func TestHTTPAuth(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
-		w.Header()[authHeader[count]] = []string{`Basic realm="restricted", charset="UTF-8"`}
+		w.Header()[authCases[count].key] = []string{authCases[count].value}
 		w.WriteHeader(http.StatusUnauthorized)
 		count++
 	})
 
 	target := utils.HostPort(host, port)
-	for i := 0; i < len(authHeader); i++ {
+	for i := 0; i < len(authCases); i++ {
 		rsp, err := HTTPWithoutRedirect(WithPacketBytes([]byte("GET / HTTP/1.1\r\nHost: "+target+"\r\n\r\n")), WithUsername(username), WithPassword(passwd))
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, code, _ := GetHTTPPacketFirstLine(rsp.RawPacket); code != "200" {
-			t.Fatalf("auth error want 200 get %v", code)
+		if _, code, _ := GetHTTPPacketFirstLine(rsp.RawPacket); code != authCases[i].expectCode {
+			t.Fatalf("auth error want %v get %v", authCases[i].expectCode, code)
 		}
 	}
 }
