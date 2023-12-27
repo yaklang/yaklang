@@ -30,6 +30,39 @@ const (
 	CfgOptionFuns = "options functions"
 )
 
+type NodeValue struct {
+	Name      string
+	Value     any
+	ListValue bool
+	AppendSub func(value *NodeValue) error
+}
+
+func (n *NodeValue) IsList() bool {
+	return n.ListValue
+}
+func (n *NodeValue) IsStruct() bool {
+	_, ok := n.Value.([]*NodeValue)
+	return !n.ListValue && ok
+}
+func (n *NodeValue) IsValue() bool {
+	return !n.ListValue && !n.IsStruct()
+}
+func (n *NodeValue) Child(name string) *NodeValue {
+	for _, child := range n.Children() {
+		if child.Name == name {
+			return child
+		}
+	}
+	return nil
+}
+func (n *NodeValue) Children() []*NodeValue {
+	v, ok := n.Value.([]*NodeValue)
+	if ok {
+		return v
+	}
+	return nil
+}
+
 type BaseKV struct {
 	data map[string]any
 }
@@ -155,7 +188,7 @@ type Node struct {
 	Ctx      *NodeContext
 }
 
-func (n *Node) Result() (any, error) {
+func (n *Node) Result() (*NodeValue, error) {
 	parser, err := n.getParser()
 	if err != nil {
 		return nil, err

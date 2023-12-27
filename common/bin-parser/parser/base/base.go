@@ -18,7 +18,7 @@ type Parser interface {
 	Parse(data *BitReader, node *Node) error
 	Generate(data any, node *Node) error
 	OnRoot(node *Node) error
-	Result(node *Node) (any, error)
+	Result(node *Node) (*NodeValue, error)
 }
 type BaseParser struct {
 	root *Node

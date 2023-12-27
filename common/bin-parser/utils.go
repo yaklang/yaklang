@@ -246,27 +246,57 @@ func JsonToResult(jsonStr string) (any, error) {
 	}
 	return rawData, nil
 }
+func DumpNodeValueYaml(d *base.NodeValue) (string, error) {
+	var toRawData func(d any) any
+	toRawData = func(d any) any {
+		switch d.(type) {
+		case []byte:
+			return codec.EncodeToHex(d)
+		case []*base.NodeValue:
+			nodeValue := d.([]*base.NodeValue)
+			res := yaml.MapSlice{}
+			for i := 0; i < len(nodeValue); i++ {
+				d := nodeValue[i]
+				res = append(res, toRawData(d).(yaml.MapItem))
+			}
+			return res
+		case *base.NodeValue:
+			d := d.(*base.NodeValue)
+			name := d.Name
+			return yaml.MapItem{
+				Key:   name,
+				Value: toRawData(d.Value),
+			}
+		default:
+			return d
+		}
+	}
+	rawData := toRawData(d)
+	res, err := yaml.Marshal(rawData)
+	if err != nil {
+		return "", err
+	}
+	return string(res), nil
+}
 func ResultToYaml(d any) (string, error) {
 	var toRawData func(d any) any
 	toRawData = func(d any) any {
-		refV := reflect.ValueOf(d)
-		switch ret := d.(type) {
-		case []uint8:
-			return codec.EncodeToHex(ret)
+		if v, ok := d.([]byte); ok {
+			return codec.EncodeToHex(v)
 		}
-		//if !refV.CanAddr() {
-		//	return d
-		//}
+		refV := reflect.ValueOf(d)
 		if refV.Kind() == reflect.Slice || refV.Kind() == reflect.Array {
+			res := yaml.MapSlice{}
 			for i := 0; i < refV.Len(); i++ {
-				refV.Index(i).Set(reflect.ValueOf(toRawData(refV.Index(i).Interface())))
+				d := refV.Index(i).Interface().(map[string]any)
+				name := d["name"]
+				val := d["value"]
+				res = append(res, yaml.MapItem{
+					Key:   name,
+					Value: toRawData(val),
+				})
 			}
-			return refV.Interface()
-		} else if refV.Kind() == reflect.Map {
-			for _, k := range refV.MapKeys() {
-				refV.SetMapIndex(k, reflect.ValueOf(toRawData(refV.MapIndex(k).Interface())))
-			}
-			return refV.Interface()
+			return res
 		} else {
 			return d
 		}

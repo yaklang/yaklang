@@ -48,8 +48,11 @@ func (s *SerParser) Generate(data any, node *base.Node) error {
 	_, err := write(byts, length)
 	return err
 }
-func (s *SerParser) Result(node *base.Node) (any, error) {
-	return node.Cfg.GetItem("ser_res"), nil
+func (s *SerParser) Result(node *base.Node) (*base.NodeValue, error) {
+	return &base.NodeValue{
+		Name:  node.Name,
+		Value: node.Cfg.GetItem("ser_res"),
+	}, nil
 }
 func (s *SerParser) OnRoot(node *base.Node) error {
 	return nil

@@ -34,7 +34,7 @@ const (
 	CfgExceptionPlan = "exception-plan"
 	CtxGenReaders    = "readers in generator"
 	CfgIsRefType     = "is ref type"
-	CfgRefType       = "ref type"
+	CfgRefType       = "ref-type"
 )
 
 var baseType = []string{"int", "uint", "int8", "uint8", "int16", "uint16", "int32", "uint32", "int64", "uint64", "string", "bool", "raw"}
@@ -176,9 +176,10 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 		rootNode.Cfg.SetItem(CfgParent, node.Cfg.GetItem(CfgParent))
 		rootNode.Cfg.DeleteItem(CfgImport)
 		rootNode.Cfg.DeleteItem(CfgIsTerminal)
+		name := node.Name
 		//rootNode.Cfg.SetItem(CfgNodeResult, nodeResult)
 		*node = *rootNode
-
+		node.Name = name
 		//InitNode(node)
 		//node.Cfg.SetItem("unpack", true)
 		return operator.NodeParse(node)
@@ -224,8 +225,6 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 		if len(node.Children) == 0 {
 			return errors.New("get node element type error")
 		}
-		elementTemplate := node.Children[0]
-		node.Children = nil
 		err := func() error {
 			var listLength uint64
 			hasLength := false
@@ -257,10 +256,13 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 				if err != nil {
 					return fmt.Errorf("backup error: %w", err)
 				}
-				element := elementTemplate.Copy()
+				element, err := ListNodeNewElement(node)
+				if err != nil {
+					return fmt.Errorf("new list element error: %w", err)
+				}
 				element.Cfg.SetItem(CfgElementIndex, index)
 				element.Cfg.SetItem(CfgParent, node)
-				node.Children = append(node.Children, element)
+				//node.Children = append(node.Children, element)
 				//node.Cfg.GetItem("exception-plan")
 				l, err := getNodeLength(element)
 				if err != nil {
@@ -548,15 +550,10 @@ func (d *DefParser) Parse(data *base.BitReader, node *base.Node) error {
 
 var noResultError = errors.New("no result")
 
-func (d *DefParser) Result(node *base.Node) (any, error) {
+func (d *DefParser) Result(node *base.Node) (*base.NodeValue, error) {
 	formatter := "default"
-	if d.ctx.Has("custom-formatter") {
-		iformatterFn := d.ctx.GetItem("custom-formatter")
-		formatterFn, ok := iformatterFn.(func(node *base.Node) (any, error))
-		if !ok {
-			return nil, fmt.Errorf("custom-formatter type error")
-		}
-		return formatterFn(node)
+	if node.Cfg.Has("out") {
+		return ExecOut(node)
 	}
 	if d.ctx.Has("formatter") {
 		formatter = d.ctx.GetString("formatter")

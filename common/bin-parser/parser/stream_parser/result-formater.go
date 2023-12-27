@@ -3,19 +3,14 @@ package stream_parser
 import (
 	"errors"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
-	"golang.org/x/exp/maps"
 )
 
-var formatters = map[string]func(node *base.Node) (any, error){}
+var formatters = map[string]func(node *base.Node) (*base.NodeValue, error){}
 
 func init() {
 	formatters["default"] = ToMap
 }
-func ToMap(node *base.Node) (any, error) {
-	if node.Cfg.Has("verboseFn") {
-		fnCode := node.Cfg.GetString("verboseFn")
-		return ExecVerboseFn(node, fnCode)
-	}
+func ToMap(node *base.Node) (*base.NodeValue, error) {
 	isPackage := func(node *base.Node) bool {
 		if node.Name == "Package" && node.Cfg.GetItem(CfgParent) == node.Ctx.GetItem("root") {
 			return true
@@ -23,10 +18,10 @@ func ToMap(node *base.Node) (any, error) {
 		return false
 	}
 	if NodeHasResult(node) {
-		return GetResultByNode(node), nil
+		return newNodeValue(node.Name, GetResultByNode(node)), nil
 	}
 	if node.Cfg.GetBool(CfgIsList) {
-		var res []any
+		res := newListNodeValue(node.Name)
 		for _, sub := range node.Children {
 			d, err := sub.Result()
 			if err != nil {
@@ -35,19 +30,15 @@ func ToMap(node *base.Node) (any, error) {
 				}
 				return nil, err
 			}
-			if v, ok := d.(map[string]any); ok {
-				res = append(res, v[maps.Keys(v)[0]])
-			} else {
-				res = append(res, d)
-			}
+			res.AppendSub(d)
 		}
-		if len(res) == 0 {
+		if len(res.Children()) == 0 {
 			return nil, noResultError
 		}
 		return res, nil
 	} else {
+		res := newStructNodeValue(node.Name)
 		//res := map[string]any{}
-		res := map[string]any{}
 		var getSubs func(node *base.Node) []*base.Node
 		getSubs = func(node *base.Node) []*base.Node {
 			children := []*base.Node{}
@@ -69,9 +60,10 @@ func ToMap(node *base.Node) (any, error) {
 				}
 				return nil, err
 			}
-			res[sub.Name] = d
+			res.AppendSub(d)
+			//res[sub.Name] = d
 		}
-		if len(res) == 0 {
+		if len(res.Children()) == 0 {
 			return nil, noResultError
 		}
 		return res, nil

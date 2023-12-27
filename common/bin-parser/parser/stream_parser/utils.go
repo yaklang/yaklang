@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
-	"github.com/yaklang/yaklang/common/binx"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"gopkg.in/yaml.v2"
@@ -15,6 +15,54 @@ import (
 	"strings"
 )
 
+func newListNodeValue(name string, children ...*base.NodeValue) *base.NodeValue {
+	var v *base.NodeValue
+	v = &base.NodeValue{
+		Name:      name,
+		ListValue: true,
+		Value:     children,
+		AppendSub: func(value *base.NodeValue) error {
+			val, ok := v.Value.([]*base.NodeValue)
+			if !ok {
+				return errors.New("current node is complex node")
+			}
+			v.Value = append(val, value)
+			return nil
+		},
+	}
+	return v
+}
+func newStructNodeValue(name string, children ...*base.NodeValue) *base.NodeValue {
+	var v *base.NodeValue
+	v = &base.NodeValue{
+		Name:      name,
+		ListValue: false,
+		Value:     children,
+		AppendSub: func(value *base.NodeValue) error {
+			val, ok := v.Value.([]*base.NodeValue)
+			if !ok {
+				return errors.New("current node is complex node")
+			}
+			v.Value = append(val, value)
+			return nil
+		},
+	}
+	return v
+}
+
+func newNodeValue(name string, v any) *base.NodeValue {
+	if v == (*[]*base.NodeValue)(nil) {
+		println()
+	}
+	return &base.NodeValue{
+		Name:      name,
+		Value:     v,
+		ListValue: false,
+		AppendSub: func(value *base.NodeValue) error {
+			return errors.New("current node is complex node")
+		},
+	}
+}
 func ListNodeNewElement(node *base.Node) (*base.Node, error) {
 	if !node.Cfg.GetBool(CfgIsList) {
 		return nil, errors.New("not list node")
@@ -66,7 +114,8 @@ func NewNodeByType(node *base.Node, typeName string) (*base.Node, error) {
 			return nil, fmt.Errorf("type `%s` not found", typeName)
 		}
 	}
-	return v.Copy(), nil
+	return base.NewNodeTreeWithConfig(node.Cfg, node.Name, v.Origin, node.Ctx)
+	//return v.Copy(), nil
 }
 
 func getSubData(d any, key string) (any, bool) {
@@ -130,28 +179,53 @@ func GetNodePath(node *base.Node) string {
 	}
 	return p
 }
-func ConvertToVar(v []byte, length uint64, typeName string) any {
-	switch typeName {
-	case "int", "int8", "int16", "int32", "int64":
-		var n int64
-		for i := 0; i < int(length); i++ {
-			n <<= 8
-			n += int64(v[i])
+func ConvertToVar(v []byte, length uint64, endian, typeName string) any {
+	if endian == "big" {
+		switch typeName {
+		case "int", "int8", "int16", "int32", "int64":
+			var n int64
+			for i := 0; i < int(length); i++ {
+				n <<= 8
+				n += int64(v[i])
+			}
+			return n
+		case "uint", "uint8", "uint16", "uint32", "uint64":
+			var n uint64
+			for i := 0; i < int(length); i++ {
+				n <<= 8
+				n += uint64(v[i])
+			}
+			return n
+		case "bytes":
+			return string(v)
+		case "raw":
+			return v
+		default:
+			return v
 		}
-		return n
-	case "uint", "uint8", "uint16", "uint32", "uint64":
-		var n uint64
-		for i := 0; i < int(length); i++ {
-			n <<= 8
-			n += uint64(v[i])
+	} else {
+		switch typeName {
+		case "int", "int8", "int16", "int32", "int64":
+			var n int64
+			for i := 0; i < int(length); i++ {
+				n <<= 8
+				n += int64(v[int(length)-1-i])
+			}
+			return n
+		case "uint", "uint8", "uint16", "uint32", "uint64":
+			var n uint64
+			for i := 0; i < int(length); i++ {
+				n <<= 8
+				n += uint64(v[int(length)-1-i])
+			}
+			return n
+		case "bytes":
+			return string(v)
+		case "raw":
+			return v
+		default:
+			return v
 		}
-		return n
-	case "bytes":
-		return string(v)
-	case "raw":
-		return v
-	default:
-		return v
 	}
 }
 func AnyToInt64(d any) int64 {
@@ -430,7 +504,8 @@ func parseLengthByLengthConfig(node *base.Node) (uint64, bool, error) {
 	remainingLength := parentLength - currentNodeLength
 	if getLengthOK {
 		if length > remainingLength {
-			return 0, false, fmt.Errorf("node type %s,length %d over max size %d", node.Cfg.GetString(CfgType), length, parentLength)
+			spew.Dump(GetNodePath(node))
+			return 0, false, fmt.Errorf("node type %s,length %d over max size %d", node.Cfg.GetString(CfgType), length, remainingLength)
 		}
 		return length, true, nil
 	} else {
@@ -532,18 +607,9 @@ func GetNodeResult(node *base.Node) any {
 }
 
 func getNodeResult(node *base.Node, isByte bool) (any, error) {
-	var endian binx.ByteOrderEnum
-	iendian := node.Cfg.GetItem(CfgEndian)
-	if iendian == nil {
-		endian = binx.BigEndianByteOrder
-	}
-	switch utils.InterfaceToString(iendian) {
-	case "big":
-		endian = binx.BigEndianByteOrder
-	case "little":
-		endian = binx.LittleEndianByteOrder
-	default:
-		return nil, fmt.Errorf("endian type error: %v", iendian)
+	endian := node.Cfg.GetString(CfgEndian)
+	if endian != "little" {
+		endian = "big"
 	}
 	if !node.Cfg.Has(CfgNodeResult) {
 		var start, end uint64
@@ -582,17 +648,14 @@ func getNodeResult(node *base.Node, isByte bool) (any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read bits error: %w", err)
 	}
-	res := binx.NewResult(buf)
-	res.Identifier = node.Name
-	res.ByteOrder = endian
-	res.Type = binx.BinaryTypeVerbose(node.Cfg.GetString(CfgType))
 	if isByte {
-		return res.Bytes, nil
+		return buf, nil
 	} else {
 		if node.Cfg.GetString(CfgType) == "string" {
 			return string(buf), nil
 		}
-		return res.Value(), nil
+		_ = endian
+		return ConvertToVar(buf, uint64(len(buf)), endian, node.Cfg.GetString(CfgType)), nil
 	}
 }
 func getNodeValue(node *base.Node) (any, error) {
