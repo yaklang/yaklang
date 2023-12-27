@@ -341,11 +341,33 @@ func (f *FuncDecl) String() string {
 
 // }
 
+func CustomHandleTypeName(typName string) string {
+	// 这里需要手动处理context
+	if strings.Contains(typName, "context") {
+		return "context.Context"
+	}
+
+	return typName
+}
+
 func AnyTypeToLibInstance(libName, name string, typ reflect.Type, value interface{}) *LibInstance {
+	var (
+		typKind          = typ.Kind()
+		pkgPath, typName string
+	)
+	if typKind == reflect.Struct || typKind == reflect.Interface {
+		pkgPath = typ.PkgPath()
+		typName = typ.Name()
+	} else if typKind == reflect.Ptr {
+		pkgPath = typ.Elem().PkgPath()
+		typName = typ.Elem().Name()
+	}
+	typName = fmt.Sprintf("%s.%s", pkgPath, typName)
+
 	return &LibInstance{
 		LibName:      libName,
 		InstanceName: name,
-		Type:         typ.String(),
+		Type:         CustomHandleTypeName(typName),
 		ValueStr:     utils.AsDebugString(value),
 	}
 }

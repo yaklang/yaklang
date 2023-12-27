@@ -72,8 +72,8 @@ func (s *Server) ExtractUrl(ctx context.Context, req *ypb.FuzzerRequest) (*ypb.E
 func (s *Server) StringFuzzer(rootCtx context.Context, req *ypb.StringFuzzerRequest) (*ypb.StringFuzzerResponse, error) {
 	max := req.GetLimit()
 	timeoutSeconds := req.GetTimeoutSeconds()
-	var ctx = rootCtx
-	var cancel = func() {}
+	ctx := rootCtx
+	cancel := func() {}
 	if timeoutSeconds > 0 {
 		ctx, cancel = context.WithTimeout(rootCtx, time.Duration(timeoutSeconds)*time.Second)
 	}
@@ -96,7 +96,7 @@ func (s *Server) StringFuzzer(rootCtx context.Context, req *ypb.StringFuzzerRequ
 			res = append(res, []byte(origin))
 			return true
 		}),
-		yak.Fuzz_WithHotPatch(rootCtx, req.GetHotPatchCode()),
+		yak.Fuzz_WithHotPatch(rootCtx, req.GetHotPatchCode(), utils.UnsafeBytesToString(lowhttp.BasicRequest())),
 		mutate.Fuzz_WithEnableFiletag(),
 	)
 	return &ypb.StringFuzzerResponse{Results: res}, nil
@@ -165,7 +165,7 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 			SubMatcherCondition: cond,
 			SubMatchers:         httpTplMatcher,
 		}
-		var mergedParams = make(map[string]interface{})
+		mergedParams := make(map[string]interface{})
 		renderedParams, err := s.RenderVariables(ctx, &ypb.RenderVariablesRequest{
 			Params: funk.Map(req.GetParams(), func(i *ypb.FuzzerParamItem) *ypb.KVPair {
 				return &ypb.KVPair{Key: i.GetKey(), Value: i.GetValue()}
@@ -187,7 +187,7 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 		}
 	}
 
-	var rsp = &ypb.FuzzerResponse{
+	rsp := &ypb.FuzzerResponse{
 		Method:                "GET",
 		ResponseRaw:           rspRaw,
 		GuessResponseEncoding: Chardet(rspRaw),
@@ -264,10 +264,23 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 	// retry
 	isRetry := req.RetryTaskID > 0
 
+	// check if empty request
+	if !isRetry && req.GetRequest() == "" && len(req.GetRequestRaw()) <= 0 {
+		return utils.Errorf("empty request is not allowed")
+	}
+	var rawRequest []byte
+	if !isRetry {
+		if len(req.GetRequestRaw()) > 0 {
+			rawRequest = req.GetRequestRaw()
+		} else {
+			rawRequest = utils.UnsafeStringToBytes(req.GetRequest())
+		}
+	}
+
 	// hot code
 	var extraOpt []mutate.FuzzConfigOpt
 	if strings.TrimSpace(req.GetHotPatchCode()) != "" {
-		extraOpt = append(extraOpt, yak.Fuzz_WithHotPatch(stream.Context(), req.GetHotPatchCode()))
+		extraOpt = append(extraOpt, yak.Fuzz_WithHotPatch(stream.Context(), req.GetHotPatchCode(), utils.UnsafeBytesToString(rawRequest)))
 	}
 
 	/*
@@ -304,13 +317,13 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		batchTarget = string(req.GetBatchTarget())
 	}
 
-	var swg = utils.NewSizedWaitGroup(int(req.GetConcurrent()))
+	swg := utils.NewSizedWaitGroup(int(req.GetConcurrent()))
 	defer swg.Wait()
-	var feedbackWg = new(sync.WaitGroup)
+	feedbackWg := new(sync.WaitGroup)
 	defer func() {
 		feedbackWg.Wait()
 	}()
-	var feedbackResponse = func(rsp *ypb.FuzzerResponse, skipPoC bool) error {
+	feedbackResponse := func(rsp *ypb.FuzzerResponse, skipPoC bool) error {
 		err := stream.Send(rsp)
 		if err != nil {
 			return err
@@ -378,11 +391,11 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				if len(oldIDs) == 0 { // 尝试修复
 					oldIDs = []uint{uint(historyID)}
 				}
-				var newHitColor = req.GetHitColor()
-				var httpTplMatcher = make([]*httptpl.YakMatcher, len(req.GetMatchers()))
-				var httpTplExtractor = make([]*httptpl.YakExtractor, len(req.GetExtractors()))
-				var haveHTTPTplMatcher = len(httpTplMatcher) > 0
-				var haveHTTPTplExtractor = len(httpTplExtractor) > 0
+				newHitColor := req.GetHitColor()
+				httpTplMatcher := make([]*httptpl.YakMatcher, len(req.GetMatchers()))
+				httpTplExtractor := make([]*httptpl.YakExtractor, len(req.GetExtractors()))
+				haveHTTPTplMatcher := len(httpTplMatcher) > 0
+				haveHTTPTplExtractor := len(httpTplExtractor) > 0
 
 				if haveHTTPTplExtractor {
 					for i, e := range req.GetExtractors() {
@@ -413,7 +426,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					respModel, _ := resp.ToGRPCModel()
 
 					if haveHTTPTplExtractor { // 提取器提取参数
-						var params = make(map[string]any)
+						params := make(map[string]any)
 						for _, extractor := range httpTplExtractor {
 							vars, err := extractor.Execute(respModel.ResponseRaw, params)
 							if err != nil {
@@ -452,7 +465,6 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 								},
 							},
 							matcherParams)
-
 						if err != nil {
 							log.Errorf("convert web fuzzer response to grpc model failed: %s", err)
 							continue
@@ -490,16 +502,13 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		}
 		return nil
 	}
-	if !isRetry && req.GetRequest() == "" && len(req.GetRequestRaw()) <= 0 {
-		return utils.Errorf("empty request is not allowed")
-	}
 
-	var proxies = utils.StringArrayFilterEmpty(utils.PrettifyListFromStringSplited(req.GetProxy(), ","))
-	var concurrent = req.GetConcurrent()
+	proxies := utils.StringArrayFilterEmpty(utils.PrettifyListFromStringSplited(req.GetProxy(), ","))
+	concurrent := req.GetConcurrent()
 	if concurrent <= 0 {
 		concurrent = 20
 	}
-	var timeoutSeconds = req.GetPerRequestTimeoutSeconds()
+	timeoutSeconds := req.GetPerRequestTimeoutSeconds()
 	if timeoutSeconds <= 0 {
 		timeoutSeconds = 10
 	}
@@ -542,15 +551,6 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		maxBody = filter.GetMaxBodySize()
 	}
 
-	var rawRequest []byte
-	if !isRetry {
-		if len(req.GetRequestRaw()) > 0 {
-			rawRequest = req.GetRequestRaw()
-		} else {
-			rawRequest = []byte(req.GetRequest())
-		}
-	}
-
 	// 保存 request 中 host/port
 	defer func() {
 		if req.GetActualAddr() != "" {
@@ -567,13 +567,13 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		_, task.Port, _ = utils.ParseStringToHostPort(task.Host)
 	}()
 
-	var inStatusCode = utils.ParseStringToPorts(req.GetRetryInStatusCode())
-	var notInStatusCode = utils.ParseStringToPorts(req.GetRetryNotInStatusCode())
+	inStatusCode := utils.ParseStringToPorts(req.GetRetryInStatusCode())
+	notInStatusCode := utils.ParseStringToPorts(req.GetRetryNotInStatusCode())
 
-	var httpTplMatcher = make([]*httptpl.YakMatcher, len(req.GetMatchers()))
-	var httpTplExtractor = make([]*httptpl.YakExtractor, len(req.GetExtractors()))
-	var haveHTTPTplMatcher = len(httpTplMatcher) > 0
-	var haveHTTPTplExtractor = len(httpTplExtractor) > 0
+	httpTplMatcher := make([]*httptpl.YakMatcher, len(req.GetMatchers()))
+	httpTplExtractor := make([]*httptpl.YakExtractor, len(req.GetExtractors()))
+	haveHTTPTplMatcher := len(httpTplMatcher) > 0
+	haveHTTPTplExtractor := len(httpTplExtractor) > 0
 	if haveHTTPTplExtractor {
 		for i, e := range req.GetExtractors() {
 			httpTplExtractor[i] = httptpl.NewExtractorFromGRPCModel(e)
@@ -635,12 +635,12 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		})
 	}
 
-	var requestCount = 0
+	requestCount := 0
 	if req.GetForceOnlyOneResponse() {
 		requestCount = 1
 	}
 
-	var maxBodySize = 5 * 1024 * 1024
+	maxBodySize := 5 * 1024 * 1024
 	if req.GetMaxBodySize() > 1024 {
 		maxBodySize = int(req.GetMaxBodySize())
 	}
@@ -662,7 +662,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_Timeout(timeoutSeconds),
 			mutate.WithPoolOpt_Proxy(proxies...),
 			mutate.WithPoolOpt_BatchTarget(batchTarget),
-			//mutate.WithPoolOpt_Concurrent(int(concurrent)),
+			// mutate.WithPoolOpt_Concurrent(int(concurrent)),
 			mutate.WithPoolOpt_SizedWaitGroup(fuzzerRequestSwg),
 			mutate.WithPoolOpt_Addr(req.GetActualAddr(), req.GetIsHTTPS()),
 			mutate.WithPoolOpt_RawMode(true),
@@ -673,8 +673,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_RedirectTimes(int(req.GetRedirectTimes())),
 			mutate.WithPoolOpt_NoFollowRedirect(req.GetNoFollowRedirect()),
 			mutate.WithPoolOpt_noFixContentLength(req.GetNoFixContentLength()),
-			//mutate.WithPoolOpt_ExtraMutateConditionGetter(yak.MutateWithParamsGetter(req.GetHotPatchCodeWithParamGetter())),
-			//mutate.WithPoolOpt_ExtraMutateCondition(yak.MutateWithYaklang(req.GetHotPatchCode())),
+			// mutate.WithPoolOpt_ExtraMutateConditionGetter(yak.MutateWithParamsGetter(req.GetHotPatchCodeWithParamGetter())),
+			// mutate.WithPoolOpt_ExtraMutateCondition(yak.MutateWithYaklang(req.GetHotPatchCode())),
 			mutate.WithPoolOpt_DelayMinSeconds(req.GetDelayMinSeconds()),
 			mutate.WithPoolOPt_DelayMaxSeconds(req.GetDelayMaxSeconds()),
 			mutate.WithPoolOpt_HookCodeCaller(yak.MutateHookCaller(req.GetHotPatchCode())),
@@ -777,7 +777,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			}
 
 			if haveHTTPTplExtractor {
-				var params = make(map[string]any)
+				params := make(map[string]any)
 				for _, extractor := range httpTplExtractor {
 					vars, err := extractor.Execute(result.ResponseRaw, params)
 					if err != nil {
@@ -793,7 +793,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			extractorResultsOrigin := extractorResults
 			for k, v := range mergedParams {
 				extractorResults = append(extractorResults, &ypb.KVPair{
-					Key: k, Value: utils.EscapeInvalidUTF8Byte(codec.AnyToBytes(v))},
+					Key: k, Value: utils.EscapeInvalidUTF8Byte(codec.AnyToBytes(v)),
+				},
 				)
 			}
 
@@ -864,7 +865,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			}
 
 			task.HTTPFlowSuccessCount++
-			var rsp = &ypb.FuzzerResponse{
+			rsp := &ypb.FuzzerResponse{
 				Url:                        utils.EscapeInvalidUTF8Byte([]byte(result.Url)),
 				Method:                     utils.EscapeInvalidUTF8Byte([]byte(result.Request.Method)),
 				ResponseRaw:                result.ResponseRaw,
@@ -982,7 +983,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				for i := 0; i < len(redirectPacket)-1; i++ {
 					redirectRes := redirectPacket[i].RespRecord
 					method, _, _ := lowhttp.GetHTTPPacketFirstLine(redirectRes.RawRequest)
-					var redirectRsp = &ypb.FuzzerResponse{
+					redirectRsp := &ypb.FuzzerResponse{
 						Url:                   utils.EscapeInvalidUTF8Byte([]byte(redirectRes.Url)),
 						Method:                utils.EscapeInvalidUTF8Byte([]byte(method)),
 						ResponseRaw:           redirectRes.RawPacket,
@@ -1058,7 +1059,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 						continue
 					}
 				}
-				//如果重定向了,修正最后一个req
+				// 如果重定向了,修正最后一个req
 				if len(redirectPacket) > 0 {
 					rsp.RequestRaw = redirectPacket[len(redirectPacket)-1].Request
 				}
@@ -1078,7 +1079,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		handle vars
 	*/
 	wg := new(sync.WaitGroup)
-	var mergedErr = make(chan error)
+	mergedErr := make(chan error)
 	for _param := range s.PreRenderVariables(stream.Context(), req.GetParams(), req.GetIsHTTPS(), req.GetIsGmTLS(), req.GetFuzzTagSyncIndex()) {
 		mergedParams := _param
 		wg.Add(1)
@@ -1201,7 +1202,7 @@ func (s *Server) HTTPRequestMutate(ctx context.Context, req *ypb.HTTPRequestMuta
 		u, _ := lowhttp.ExtractURLFromHTTPRequestRaw(req.GetRequest(), true)
 		_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(req.GetRequest())
 		if u != nil {
-			var params = make(url.Values)
+			params := make(url.Values)
 			values, _ := url.ParseQuery(u.RawQuery)
 			if values != nil {
 				for k, v := range values {
@@ -1378,7 +1379,7 @@ func (s *Server) ExtractHTTPResponse(ctx context.Context, req *ypb.ExtractHTTPRe
 		return httptpl.NewExtractorFromGRPCModel(i)
 	}).([]*httptpl.YakExtractor)
 
-	var params = make(map[string]interface{})
+	params := make(map[string]interface{})
 	for _, i := range extractors {
 		p, err := i.Execute([]byte(req.GetHTTPResponse()), params)
 		if err != nil {
@@ -1460,7 +1461,7 @@ func (s *Server) RenderVariables(ctx context.Context, req *ypb.RenderVariablesRe
 	for _, kv := range req.GetParams() {
 		vars.AutoSet(kv.GetKey(), kv.GetValue())
 	}
-	var results = vars.ToMap()
+	results := vars.ToMap()
 	var finalResults []*ypb.KVPair
 	for _, kv := range req.GetParams() {
 		value, ok := results[kv.GetKey()]
@@ -1501,7 +1502,7 @@ func (s *Server) RenderVariablesWithTypedKV(ctx context.Context, kvs []*ypb.Fuzz
 }
 
 func (s *Server) PreRenderVariables(ctx context.Context, params []*ypb.FuzzerParamItem, https, gmtls, syncTagIndex bool) chan map[string]any {
-	var resultsChan = make(chan map[string]any, 100)
+	resultsChan := make(chan map[string]any, 100)
 	if len(params) <= 0 {
 		resultsChan <- make(map[string]any)
 		close(resultsChan)
@@ -1596,10 +1597,10 @@ func (s *Server) PreRenderVariables(ctx context.Context, params []*ypb.FuzzerPar
 				log.Errorf("cartesian product failed: %s", err)
 			}
 		}
-
 	}()
 	return resultsChan
 }
+
 func (s *Server) GetSystemDefaultDnsServers(ctx context.Context, req *ypb.Empty) (*ypb.DefaultDnsServerResponse, error) {
 	servers, err := utils.GetSystemDnsServers()
 	return &ypb.DefaultDnsServerResponse{DefaultDnsServer: servers}, err

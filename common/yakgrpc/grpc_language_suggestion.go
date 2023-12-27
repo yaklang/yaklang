@@ -229,8 +229,7 @@ func getInstanceByName(name string) *yakdoc.LibInstance {
 }
 
 func getGolangTypeStringBySSAType(typ ssa.Type) string {
-	typStr := typ.String()
-	return getGolangTypeStringByTypeStr(typStr)
+	return getGolangTypeStringByTypeStr(typ.String())
 }
 
 func getGolangTypeStringByTypeStr(typStr string) string {
@@ -240,7 +239,8 @@ func getGolangTypeStringByTypeStr(typStr string) string {
 	case "bytes":
 		return "[]byte"
 	}
-	return typStr
+
+	return yakdoc.CustomHandleTypeName(typStr)
 }
 
 func shouldExport(key string) bool {

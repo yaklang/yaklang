@@ -542,4 +542,5 @@ var GlobalExport = map[string]interface{}{
 	"ord":     ord,
 	"type":    typeof,
 	"typeof":  typeof,
+	"CTX":     context.Background(),
 }
