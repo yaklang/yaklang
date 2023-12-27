@@ -46,6 +46,9 @@ func (v Values) GetTopDefs() Values {
 
 func (i *Value) visitedDefsDefault(actx *AnalyzeContext) Values {
 	var vals Values
+	if i.node == nil {
+		return vals
+	}
 	for _, def := range i.node.GetValues() {
 		if ret := NewValue(def).SetParent(i).getTopDefs(actx); len(ret) > 0 {
 			vals = append(vals, ret...)
