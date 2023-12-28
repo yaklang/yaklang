@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestXMLloadsAndDumps(t *testing.T) {
@@ -20,7 +21,7 @@ func TestXMLloadsAndDumps(t *testing.T) {
 	</b>
 </a>
 `
-	v := _xmlloads(s)
+	v := utils.XmlLoads(s)
 	spew.Dump(v)
-	fmt.Println(string(_xmldumps(v)))
+	fmt.Println(string(utils.XmlDumps(v)))
 }
