@@ -10,11 +10,13 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/cli"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"net/url"
 	"reflect"
 	"strings"
 	"time"
@@ -177,8 +179,7 @@ func (s *Server) execScriptWithExecParam(scriptName string, input string, stream
 }
 
 type urlTarget struct {
-	host             string
-	path             string
+	urlIns           *url.URL
 	isHttps          bool
 	needSendOriginal bool
 }
@@ -214,7 +215,7 @@ func (s *Server) execScriptWithRequest(scriptName string, targetInput string, st
 		}
 		if utils.IsValidHost(target) { // 处理没有单独一个host情况 不含port
 			targets = append(targets, &urlTarget{
-				host:             target,
+				urlIns:           &url.URL{Host: target},
 				needSendOriginal: false,
 			})
 		}
@@ -225,9 +226,7 @@ func (s *Server) execScriptWithRequest(scriptName string, targetInput string, st
 
 		ishttps := urlIns.Scheme == "https"
 		host, port, _ := utils.ParseStringToHostPort(urlIns.Host) // 处理包含 port 的情况
-
-		//todo 是否需要支持hosts?
-		if !utils.IsValidHost(host) { // host不合规情况 比如 a:80
+		if !utils.IsValidHost(host) {                             // host不合规情况 比如 a:80
 			continue
 		}
 
@@ -237,14 +236,9 @@ func (s *Server) execScriptWithRequest(scriptName string, targetInput string, st
 			}
 		}
 
-		if urlIns.RawQuery != "" {
-			urlIns.Path += "?" + urlIns.RawQuery
-		}
-
 		targets = append(targets, &urlTarget{
-			host:    urlIns.Host,
+			urlIns:  urlIns,
 			isHttps: ishttps,
-			path:    urlIns.Path,
 			//当请求和模板的path或者https配置不同时需要补充发包
 			needSendOriginal: ishttps != builderParams.IsHttps || (urlIns.Path != "" && !utils.StringArrayContains(builderParams.Path, urlIns.Path)),
 		})
@@ -283,26 +277,36 @@ func (s *Server) execScriptWithRequest(scriptName string, targetInput string, st
 	var baseTemplates = []byte("GET {{Path}} HTTP/1.1\r\nHost: {{Hostname}}\r\n\r\n")
 	if len(results) <= 0 { // 请求模板构造失败时直接用http get请求目标
 		for _, target := range targets {
-			packet := bytes.ReplaceAll(baseTemplates, []byte(`{{Hostname}}`), []byte(target.host))
-			packet = bytes.ReplaceAll(packet, []byte(`{{Path}}`), []byte(target.path))
+			packet := bytes.ReplaceAll(baseTemplates, []byte(`{{Hostname}}`), []byte(target.urlIns.Host))
+			path := target.urlIns.Path
+			if path == "" {
+				path = "/"
+			}
+			packet = bytes.ReplaceAll(packet, []byte(`{{Path}}`), []byte(path))
+			for key, values := range target.urlIns.Query() {
+				for _, value := range values {
+					if value == "" {
+						continue
+					}
+					packet = lowhttp.AppendHTTPPacketQueryParam(packet, key, value)
+				}
+			}
 			feed(packet, target.isHttps)
 		}
 	} else {
 		funk.ForEach(results, func(i *ypb.HTTPRequestBuilderResult) {
 			for _, target := range targets {
-				packet := bytes.ReplaceAll(i.HTTPRequest, []byte(`{{Hostname}}`), []byte(target.host))
-				feed(packet, i.IsHttps)
+				isHttps := i.IsHttps || target.isHttps // 参数配置或者url信息里有一个是https就是https
+				template := bytes.ReplaceAll(i.HTTPRequest, []byte(`{{Hostname}}`), []byte(target.urlIns.Host))
+				packets := [][]byte{template}
+				if target.urlIns.Path != "" && target.urlIns.Path != lowhttp.GetHTTPRequestPath(i.HTTPRequest) { // 路径不一需要多发一个包
+					packets = append(packets, lowhttp.ReplaceHTTPPacketPath(template, target.urlIns.Path))
+				}
+				for index := 0; index < len(packets); index++ {
+					feed(lowhttp.AppendAllHTTPPacketQueryParam(packets[index], target.urlIns.Query()), isHttps)
+				}
 			}
 		})
-	}
-
-	for _, target := range targets { // 发送补充请求
-		if !target.needSendOriginal {
-			continue
-		}
-		packet := bytes.ReplaceAll(baseTemplates, []byte(`{{Hostname}}`), []byte(target.host))
-		packet = bytes.ReplaceAll(packet, []byte(`{{Path}}`), []byte(target.path))
-		feed(packet, target.isHttps)
 	}
 
 	if len(reqs) <= 0 {

@@ -383,6 +383,20 @@ func AppendHTTPPacketQueryParam(packet []byte, key, value string) []byte {
 	})
 }
 
+func AppendAllHTTPPacketQueryParam(packet []byte, Params map[string][]string) []byte {
+	for key, values := range Params {
+		for _, value := range values {
+			if value == "" {
+				continue
+			}
+			packet = handleHTTPPacketQueryParam(packet, false, func(q *QueryParams) {
+				q.Add(key, value)
+			})
+		}
+	}
+	return packet
+}
+
 // DeleteHTTPPacketQueryParam 是一个辅助函数，用于改变请求报文，删除GET请求参数
 // Example:
 // ```
