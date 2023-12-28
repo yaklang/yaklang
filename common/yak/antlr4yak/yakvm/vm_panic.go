@@ -141,7 +141,7 @@ func (v *Frame) panic(i *VMPanic) {
 	sourceCodeP := code.SourceCodePointer
 	codeReview := v.getCodeReview(sourceCodeP, code, i)
 	i.contextInfos.Push(newPanicInfo(code, codeReview))
-	v.vm.panic(i)
+	v.coroutine.lastPanic = i
 }
 
 func (v *VMPanic) Error() string {
@@ -184,19 +184,21 @@ func (v *VMPanic) Error() string {
 }
 
 func (v *Frame) recover() *VMPanic {
-	return v.vm.recover()
+	lastPanic := v.coroutine.lastPanic
+	v.coroutine.lastPanic = nil
+	return lastPanic
 }
 
-func (v *Frame) SetPanicInfo(ps ...*VMPanic) {
-	if v == nil {
-		return
-	}
-	vm := v
-	for vm.parent != nil {
-		vm = vm.parent
-	}
-	vm.panics = append(vm.panics, ps...)
-}
+//func (v *Frame) SetPanicInfo(ps ...*VMPanic) {
+//	if v == nil {
+//		return
+//	}
+//	vm := v
+//	for vm.parent != nil {
+//		vm = vm.parent
+//	}
+//	vm.panics = append(vm.panics, ps...)
+//}
 
 //func (v *Frame) HandlePanic() {
 //	if v == nil {

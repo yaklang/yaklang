@@ -17,6 +17,7 @@ const (
 	Trace                       // 执行后不出站
 	Sub                         // 使用栈顶的数据继续执行
 	Inline                      // 使用上一次执行的Trace继续执行
+	Asnyc                       // 异步执行
 )
 
 func GetFlag(flags ...ExecFlag) ExecFlag {
@@ -34,7 +35,6 @@ type (
 		// globalVar 是当前引擎的全局变量，属于引擎
 		globalVar map[string]interface{}
 		VMStack   *vmstack.Stack
-		lastPanic *VMPanic
 		rootScope *Scope
 
 		// asyncWaitGroup
@@ -95,16 +95,6 @@ func (v *VirtualMachine) SetDebugMode(debug bool, sourceCode string, codes []*Co
 
 func (v *VirtualMachine) SetSymboltable(table *SymbolTable) {
 	v.rootScope = NewScope(table)
-}
-
-func (v *VirtualMachine) panic(i *VMPanic) {
-	v.lastPanic = i
-}
-
-func (v *VirtualMachine) recover() *VMPanic {
-	lastPanic := v.lastPanic
-	v.lastPanic = nil
-	return lastPanic
 }
 
 func (v *VirtualMachine) AsyncStart() {
@@ -260,7 +250,7 @@ func (v *VirtualMachine) ExecAsyncYakFunction(ctx context.Context, f *Function, 
 			frame.Exec(f.codes)
 			frame.ExitScope()
 		}()
-	}, Sub)
+	}, Sub, Asnyc)
 }
 
 func (v *VirtualMachine) ExecYakCode(ctx context.Context, sourceCode string, codes []*Code, flags ...ExecFlag) error {
@@ -320,6 +310,10 @@ func (v *VirtualMachine) Exec(ctx context.Context, f func(frame *Frame), flags .
 		}
 	}
 
+	if flag&Asnyc == Asnyc {
+		frame.coroutine = NewCoroutine()
+	}
+
 	vmstackLock.Lock()
 	v.VMStack.Push(frame)
 	vmstackLock.Unlock()
@@ -339,7 +333,7 @@ func (v *VirtualMachine) Exec(ctx context.Context, f func(frame *Frame), flags .
 		v.VMStack.Pop()
 		vmstackLock.Unlock()
 	}
-	if lastPanic := v.recover(); lastPanic != nil {
+	if lastPanic := frame.recover(); lastPanic != nil {
 		lastPanic.contextInfos.Peek().(*PanicInfo).SetPositionVerbose(frame.GetVerbose())
 		if exitValue, ok := lastPanic.data.(*VMPanicSignal); ok {
 			panic(exitValue)
