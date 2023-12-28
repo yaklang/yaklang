@@ -6,7 +6,9 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"strings"
 
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/plugin_type_analyzer"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -22,7 +24,7 @@ func init() {
 // 检查 cli.setDefault 设置的默认值是否符合规范
 func RuleCliDefault(prog *ssaapi.Program) {
 	tag := "SSA-cli-setDefault"
-	checkCliDefault := func(funcName string, typ *ssaapi.Type, checkCallBack func(funcName string, v *ssaapi.Value) (string, bool)) {
+	checkCliDefault := func(funcName string, typs []*ssaapi.Type, checkCallBack func(funcName string, v *ssaapi.Value) (string, bool)) {
 		prog.Ref(funcName).GetUsers().Filter(func(v *ssaapi.Value) bool {
 			return v.IsCall() && v.IsReachable() != -1
 		}).ForEach(func(v *ssaapi.Value) {
@@ -38,9 +40,23 @@ func RuleCliDefault(prog *ssaapi.Program) {
 				if field == nil {
 					break
 				}
+				if !field.IsConstInst() {
+					field.NewWarn(tag, fmt.Sprintf("%s want const value, but not", funcName))
+					break
+				}
+
 				fieldTyp := field.GetType()
-				if !fieldTyp.Compare(typ) {
-					field.NewError(tag, fmt.Sprintf("%s want [%s] type, but got [%s] type", funcName, typ, fieldTyp))
+				pass := false
+				for _, typ := range typs {
+					if fieldTyp.Compare(typ) {
+						pass = true
+						break
+					}
+				}
+				if !pass {
+					field.NewError(tag, fmt.Sprintf("%s want [%s] type, but got [%s] type", funcName,
+						strings.Join(lo.Map(typs, func(typ *ssaapi.Type, _ int) string { return typ.String() }), "|"),
+						fieldTyp))
 					break
 				}
 
@@ -146,26 +162,44 @@ func RuleCliDefault(prog *ssaapi.Program) {
 
 		return "", true
 	}
+	intCallback := func(funcName string, v *ssaapi.Value) (string, bool) {
+		consts := v.GetConst()
+		raw := consts.String()
+		_, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil {
+			return fmt.Sprintf("%s want valid int, but got %s", funcName, raw), false
+		}
+		return "", true
+	}
+	floatCallback := func(funcName string, v *ssaapi.Value) (string, bool) {
+		consts := v.GetConst()
+		raw := consts.String()
+		_, err := strconv.ParseFloat(raw, 64)
+		if err != nil {
+			return fmt.Sprintf("%s want valid float, but got %s", funcName, raw), false
+		}
+		return "", true
+	}
 
-	checkCliDefault("cli.String", ssaapi.String, nil)
-	checkCliDefault("cli.StringSlice", ssaapi.String, nil)
-	checkCliDefault("cli.Bool", ssaapi.Boolean, nil)
-	checkCliDefault("cli.Int", ssaapi.Number, nil)
-	checkCliDefault("cli.Integer", ssaapi.Number, nil)
-	checkCliDefault("cli.Double", ssaapi.Number, nil) // 需要区分 int 和 double
-	checkCliDefault("cli.Float", ssaapi.Number, nil)  // 需要区分 int 和 double
-	checkCliDefault("cli.Url", ssaapi.Any, urlsCallback)
-	checkCliDefault("cli.Urls", ssaapi.Any, urlsCallback)
-	checkCliDefault("cli.Port", ssaapi.Any, portsCallback)
-	checkCliDefault("cli.Ports", ssaapi.Any, portsCallback)
-	checkCliDefault("cli.Net", ssaapi.Any, hostCallback)
-	checkCliDefault("cli.Network", ssaapi.Any, hostCallback)
-	checkCliDefault("cli.Host", ssaapi.Any, hostCallback)
-	checkCliDefault("cli.Hosts", ssaapi.Any, hostCallback)
-	checkCliDefault("cli.File", ssaapi.String, fileCallback)
-	checkCliDefault("cli.FileOrContent", ssaapi.String, fileOrContentCallback)
-	checkCliDefault("cli.LineDict", ssaapi.String, fileOrContentCallback)
-	checkCliDefault("cli.YakitPlugin", ssaapi.String, fileCallback)
+	checkCliDefault("cli.String", []*ssaapi.Type{ssaapi.String}, nil)
+	checkCliDefault("cli.StringSlice", []*ssaapi.Type{ssaapi.String}, nil)
+	checkCliDefault("cli.Bool", []*ssaapi.Type{ssaapi.Boolean}, nil)
+	checkCliDefault("cli.Int", []*ssaapi.Type{ssaapi.Number, ssaapi.String}, intCallback)
+	checkCliDefault("cli.Integer", []*ssaapi.Type{ssaapi.Number, ssaapi.String}, intCallback)
+	checkCliDefault("cli.Double", []*ssaapi.Type{ssaapi.Number, ssaapi.String}, floatCallback) // 需要区分 int 和 double
+	checkCliDefault("cli.Float", []*ssaapi.Type{ssaapi.Number, ssaapi.String}, floatCallback)  // 需要区分 int 和 double
+	checkCliDefault("cli.Url", []*ssaapi.Type{ssaapi.Any}, urlsCallback)
+	checkCliDefault("cli.Urls", []*ssaapi.Type{ssaapi.Any}, urlsCallback)
+	checkCliDefault("cli.Port", []*ssaapi.Type{ssaapi.Any}, portsCallback)
+	checkCliDefault("cli.Ports", []*ssaapi.Type{ssaapi.Any}, portsCallback)
+	checkCliDefault("cli.Net", []*ssaapi.Type{ssaapi.Any}, hostCallback)
+	checkCliDefault("cli.Network", []*ssaapi.Type{ssaapi.Any}, hostCallback)
+	checkCliDefault("cli.Host", []*ssaapi.Type{ssaapi.Any}, hostCallback)
+	checkCliDefault("cli.Hosts", []*ssaapi.Type{ssaapi.Any}, hostCallback)
+	checkCliDefault("cli.File", []*ssaapi.Type{ssaapi.String}, fileCallback)
+	checkCliDefault("cli.FileOrContent", []*ssaapi.Type{ssaapi.String}, fileOrContentCallback)
+	checkCliDefault("cli.LineDict", []*ssaapi.Type{ssaapi.String}, fileOrContentCallback)
+	checkCliDefault("cli.YakitPlugin", []*ssaapi.Type{ssaapi.String}, fileCallback)
 }
 
 // 检查参数名是否重复和参数名是否符合规范
