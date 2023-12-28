@@ -264,10 +264,6 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 	// retry
 	isRetry := req.RetryTaskID > 0
 
-	// check if empty request
-	if !isRetry && req.GetRequest() == "" && len(req.GetRequestRaw()) <= 0 {
-		return utils.Errorf("empty request is not allowed")
-	}
 	var rawRequest []byte
 	if !isRetry {
 		if len(req.GetRequestRaw()) > 0 {
@@ -549,6 +545,11 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		keywords = filter.GetKeywords()
 		minBody = filter.GetMinBodySize()
 		maxBody = filter.GetMaxBodySize()
+	}
+
+	// check if empty request
+	if !isRetry && req.GetRequest() == "" && len(req.GetRequestRaw()) <= 0 {
+		return utils.Errorf("empty request is not allowed")
 	}
 
 	// 保存 request 中 host/port
