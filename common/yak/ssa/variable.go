@@ -30,7 +30,9 @@ func (i *IdentifierLV) Assign(v Value, f *FunctionBuilder) {
 			}
 		}
 	}
-	f.CurrentScope.AddVariable(NewVariable(i.name, v), f.CurrentRange)
+	if !v.IsExtern() {
+		f.CurrentScope.AddVariable(NewVariable(i.name, v), f.CurrentRange)
+	}
 	f.WriteVariable(i.name, v)
 	if i.isSideEffect {
 		if beforeSSAValue != nil {
