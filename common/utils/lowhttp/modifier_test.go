@@ -631,7 +631,7 @@ Content-Type: abc/abcd
 `, "abc/abcd",
 		},
 	} {
-		var packet = utils.InterfaceToBytes(c[0])
+		packet := utils.InterfaceToBytes(c[0])
 		if ret := GetHTTPPacketContentType(packet); ret != c[1] {
 			t.Fatalf("GetHTTPPacketContentType failed: %s", string(packet))
 		} else {
@@ -678,7 +678,7 @@ Content-Type: text/html; charset=utf-8
 Set-Cookie: b=1; a=1;
 `), [2]string{"ddddd", ""}},
 	} {
-		var results = GetHTTPPacketCookies(c[0].([]byte))
+		results := GetHTTPPacketCookies(c[0].([]byte))
 		ret := c[1].([2]string)
 		key, value := ret[0], ret[1]
 		if key == "" {
@@ -742,7 +742,7 @@ Set-Cookie: b=1; a=1;
 Set-Cookie: a=123
 `), [2]string{"a", "1,123"}},
 	} {
-		var results = GetHTTPPacketCookiesFull(c[0].([]byte))
+		results := GetHTTPPacketCookiesFull(c[0].([]byte))
 		ret := c[1].([2]string)
 		key, value := ret[0], ret[1]
 		if key == "" {
@@ -844,7 +844,7 @@ Content-Type: www.baidu.cn`), [2]string{
 			"Content-Type", "www.baidu.cn",
 		}},
 	} {
-		var results = GetHTTPPacketHeadersFull(c[0].([]byte))
+		results := GetHTTPPacketHeadersFull(c[0].([]byte))
 		ret := c[1].([2]string)
 		key, value := ret[0], ret[1]
 		if key == "" {
@@ -1477,7 +1477,6 @@ func TestAppendHTTPPacketFormEncoded(t *testing.T) {
 		if err != nil {
 			if !errors.Is(err, io.EOF) {
 				t.Fatal(err)
-
 			}
 			return
 		}
@@ -1576,7 +1575,6 @@ func TestAppendHTTPPacketUploadFile(t *testing.T) {
 		if err != nil {
 			if !errors.Is(err, io.EOF) {
 				t.Fatal(err)
-
 			}
 			return
 		}
@@ -1782,6 +1780,107 @@ Content-Disposition: form-data; name="b"
 		expected := FixHTTPPacketCRLF([]byte(testcase.expected), true)
 		if bytes.Compare(actual, expected) != 0 {
 			t.Fatalf("DeleteHTTPPacketFormEncoded failed: \n%s", string(actual))
+		}
+	}
+}
+
+func TestGetParamsFromBody(t *testing.T) {
+	type Excepted struct {
+		params map[string]string
+		useRaw bool
+		err    error
+	}
+	mapEqual := func(m1, m2 map[string]string) bool {
+		if len(m1) != len(m2) {
+			return false
+		}
+
+		for key, aValue := range m1 {
+			bValue, exists := m2[key]
+			if !exists || aValue != bValue {
+				return false
+			}
+		}
+
+		return true
+	}
+
+	testcases := []struct {
+		name        string
+		contentType string
+		body        string
+		expected    *Excepted
+	}{
+		{
+			name:        "form-urlencoded",
+			contentType: "application/x-www-form-urlencoded",
+			body:        "a=1&b=2",
+			expected: &Excepted{
+				params: map[string]string{"a": "1", "b": "2"},
+				useRaw: false,
+				err:    nil,
+			},
+		},
+		{
+			name:        "form-data",
+			contentType: "multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW",
+			body: `------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="a"
+
+1
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="b"
+
+2
+------WebKitFormBoundary7MA4YWxkTrZu0gW--`,
+			expected: &Excepted{
+				params: map[string]string{"a": "1", "b": "2"},
+				useRaw: false,
+				err:    nil,
+			},
+		},
+		{
+			name:        "json",
+			contentType: "application/json",
+			body:        `{"a":1,"b":2}`,
+			expected: &Excepted{
+				params: map[string]string{"a": "1", "b": "2"},
+				useRaw: false,
+				err:    nil,
+			},
+		},
+		{
+			name:        "complex-json",
+			contentType: "application/json",
+			body:        `{"a":[1, 2],"b":{"c": "d","q":"w"}}`,
+			expected: &Excepted{
+				params: map[string]string{"a": "2", "b[c]": "d", "b[q]": "w"},
+				useRaw: false,
+				err:    nil,
+			},
+		},
+		{
+			name:        "xml",
+			contentType: "application/xml",
+			body:        `<COM><a>1</a><b>2</b></COM>`,
+			expected: &Excepted{
+				params: map[string]string{"COM[a]": "1", "COM[b]": "2"},
+				useRaw: false,
+				err:    nil,
+			},
+		},
+	}
+	for _, testcase := range testcases {
+		actualParams, actualUseRaw, actualError := GetParamsFromBody(testcase.contentType, []byte(testcase.body))
+
+		if !mapEqual(testcase.expected.params, actualParams) {
+			t.Fatalf("[%s] GetParamsFromBody failed: %v != %v", testcase.name, actualParams, testcase.expected.params)
+		}
+		if actualUseRaw != testcase.expected.useRaw {
+			t.Fatalf("[%s] GetParamsFromBody failed: %v != %v", testcase.name, actualUseRaw, testcase.expected.useRaw)
+		}
+		if !errors.Is(actualError, testcase.expected.err) {
+			t.Fatalf("[%s] GetParamsFromBody failed: %v != %v", testcase.name, actualError, testcase.expected.err)
 		}
 	}
 }
