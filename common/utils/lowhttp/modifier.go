@@ -1107,6 +1107,44 @@ func GetParamsFromBody(contentType string, body []byte) (params map[string]strin
 	return
 }
 
+func AppendHTTPPacketHeaderIfNotExist(packet []byte, headerKey string, headerValue any) []byte {
+	var firstLine string
+	var header []string
+	var exist bool
+	isChunked := IsChunkedHeaderLine(headerKey + ": " + utils.InterfaceToString(headerValue))
+	_, body := SplitHTTPPacket(packet, func(method string, requestUri string, proto string) error {
+		firstLine = method + " " + requestUri + " " + proto
+		return nil
+	}, func(proto string, code int, codeMsg string) error {
+		if codeMsg == "" {
+			firstLine = proto + " " + fmt.Sprint(code)
+		} else {
+			firstLine = proto + " " + fmt.Sprint(code) + " " + codeMsg
+		}
+		return nil
+	}, func(line string) string {
+		if !isChunked {
+			isChunked = IsChunkedHeaderLine(line)
+		}
+		if k, _ := SplitHTTPHeader(line); k == headerKey {
+			exist = true
+		}
+		header = append(header, line)
+		return line
+	})
+	if !exist {
+		header = append(header, headerKey+": "+utils.InterfaceToString(headerValue))
+	}
+	var buf bytes.Buffer
+	buf.WriteString(firstLine)
+	buf.WriteString(CRLF)
+	for _, line := range header {
+		buf.WriteString(line)
+		buf.WriteString(CRLF)
+	}
+	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
+}
+
 // GetHTTPPacketCookieValues 是一个辅助函数，用于获取请求报文中Cookie值，其返回值为[]string，这是因为Cookie可能存在多个相同键名的值
 // Example:
 // ```

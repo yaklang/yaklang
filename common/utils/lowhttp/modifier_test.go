@@ -135,6 +135,30 @@ DDDD: 11`,
 	}
 }
 
+func TestAppendHTTPPacketHeaderIfNotExist(t *testing.T) {
+	for _, c := range [][4]string{
+		{
+			`GET / HTTP/1.1
+Host: www.baidu.com`,
+			"CCC", "ddd",
+			"CCC: ddd",
+		},
+		{
+			`GET / HTTP/1.1
+Host: www.baidu.com
+CCC: aaa`,
+			"CCC", "ddd",
+			"CCC: aaa",
+		},
+	} {
+		byteResult := AppendHTTPPacketHeaderIfNotExist([]byte(c[0]), c[1], c[2])
+		spew.Dump(byteResult)
+		if !bytes.Contains(byteResult, []byte(c[3])) {
+			t.Fatalf("ReplaceHTTPPacketHeader failed: %s", string(byteResult))
+		}
+	}
+}
+
 func TestReplaceHTTPPacketHeader(t *testing.T) {
 	for _, c := range [][]string{
 		{
