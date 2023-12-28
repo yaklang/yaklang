@@ -7,9 +7,15 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yak/plugin_type_analyzer"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
 func Check(code string, t *testing.T) {
+	prog := ssaapi.Parse(code, plugin_type_analyzer.GetPluginSSAOpt("mitm")...)
+	if prog.IsNil() {
+		t.Fatal("Failed to parse code")
+	}
 	if res := yak.AnalyzeStaticYaklangWithType(string(code), "yak"); len(lo.Filter(res, func(item *yak.StaticAnalyzeResult, index int) bool {
 		return item.Severity == "error"
 	})) != 0 {
