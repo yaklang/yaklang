@@ -1170,16 +1170,18 @@ var requestToMutateResult = func(reqs []*http.Request, chunked bool) (*ypb.Mutat
 }
 
 func (s *Server) HTTPRequestMutate(ctx context.Context, req *ypb.HTTPRequestMutateParams) (*ypb.MutateResult, error) {
+	rawRequest := req.GetRequest()
+	method := strings.ToUpper(strings.Join(req.FuzzMethods, ""))
 	switch strings.Join(req.FuzzMethods, "") {
 	case "POST":
-		u, _ := lowhttp.ExtractURLFromHTTPRequestRaw(req.GetRequest(), true)
+		u, _ := lowhttp.ExtractURLFromHTTPRequestRaw(rawRequest, true)
 		if u != nil {
-			result := poc.BuildRequest(lowhttp.TrimLeftHTTPPacket(req.Request),
+			result := poc.BuildRequest(lowhttp.TrimLeftHTTPPacket(rawRequest),
 				poc.WithReplaceHttpPacketMethod("POST"),
 				poc.WithReplaceHttpPacketQueryParamRaw(""),
 				poc.WithReplaceHttpPacketHeader("Content-Type", "application/x-www-form-urlencoded"),
 				poc.WithDeleteHeader("Transfer-Encoding"),
-				poc.WithReplaceHttpPacketHeader("User-Agent", consts.DefaultUserAgent),
+				poc.WithAppendHeaderIfNotExist("User-Agent", consts.DefaultUserAgent),
 				poc.WithReplaceHttpPacketBody(utils.UnsafeStringToBytes(u.RawQuery), false),
 			)
 			return &ypb.MutateResult{
@@ -1189,27 +1191,34 @@ func (s *Server) HTTPRequestMutate(ctx context.Context, req *ypb.HTTPRequestMuta
 	case "HEAD":
 		fallthrough
 	case "GET":
-		method := strings.ToUpper(strings.Join(req.FuzzMethods, ""))
-		u, _ := lowhttp.ExtractURLFromHTTPRequestRaw(req.GetRequest(), true)
-		_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(req.GetRequest())
+		u, _ := lowhttp.ExtractURLFromHTTPRequestRaw(rawRequest, true)
+		_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rawRequest)
 		if u != nil {
-			contentType := lowhttp.GetHTTPPacketHeader(req.GetRequest(), "Content-Type")
+			contentType := lowhttp.GetHTTPPacketHeader(rawRequest, "Content-Type")
 			queryRaw := ""
-			params, useRaw, err := lowhttp.GetParamsFromBody(contentType, body)
+			postParams, useRaw, err := lowhttp.GetParamsFromBody(contentType, body)
 			if err != nil {
 				return nil, err
 			}
 			if useRaw {
 				queryRaw = utils.UnsafeBytesToString(body)
 			} else {
-				queryRaw = strings.Join(lo.MapToSlice(params, func(key string, value string) string { return fmt.Sprintf("%s=%s", key, value) }), "&")
+				queryRaw = strings.Join(lo.MapToSlice(postParams, func(key string, value string) string { return fmt.Sprintf("%s=%s", key, value) }), "&")
 			}
-			result := poc.BuildRequest(lowhttp.TrimLeftHTTPPacket(req.Request),
+			if len(u.RawQuery) > 0 {
+				if len(queryRaw) > 0 {
+					queryRaw = fmt.Sprintf("%s&%s", queryRaw, u.RawQuery)
+				} else {
+					queryRaw = u.RawQuery
+				}
+			}
+			result := poc.BuildRequest(lowhttp.TrimLeftHTTPPacket(rawRequest),
 				poc.WithReplaceHttpPacketMethod(method),
 				poc.WithReplaceHttpPacketQueryParamRaw(queryRaw),
 				poc.WithReplaceHttpPacketHeader("Content-Type", "application/x-www-form-urlencoded"),
 				poc.WithDeleteHeader("Transfer-Encoding"),
-				poc.WithReplaceHttpPacketHeader("User-Agent", consts.DefaultUserAgent),
+				poc.WithDeleteHeader("Content-Type"),
+				poc.WithAppendHeaderIfNotExist("User-Agent", consts.DefaultUserAgent),
 				poc.WithReplaceHttpPacketBody([]byte{}, false),
 			)
 			return &ypb.MutateResult{
@@ -1219,8 +1228,8 @@ func (s *Server) HTTPRequestMutate(ctx context.Context, req *ypb.HTTPRequestMuta
 	}
 
 	if len(req.FuzzMethods) > 0 {
-		result := poc.BuildRequest(lowhttp.TrimLeftHTTPPacket(req.Request),
-			poc.WithReplaceHttpPacketMethod(req.FuzzMethods[0]))
+		result := poc.BuildRequest(lowhttp.TrimLeftHTTPPacket(rawRequest),
+			poc.WithReplaceHttpPacketMethod(method))
 		return &ypb.MutateResult{
 			Result: result,
 		}, nil
@@ -1228,15 +1237,15 @@ func (s *Server) HTTPRequestMutate(ctx context.Context, req *ypb.HTTPRequestMuta
 
 	// chunk编码
 	if req.ChunkEncode {
-		_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(req.GetRequest())
-		reqRaw := lowhttp.ReplaceHTTPPacketBody(req.GetRequest(), body, true)
-		return &ypb.MutateResult{Result: reqRaw}, nil
+		_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rawRequest)
+		rawRequest = lowhttp.ReplaceHTTPPacketBody(rawRequest, body, true)
+		return &ypb.MutateResult{Result: rawRequest}, nil
 	}
 
 	// 上传数据包
 	if req.UploadEncode {
-		params := lowhttp.GetAllHTTPRequestQueryParams(req.Request)
-		for k, v := range lowhttp.GetAllHTTPRequestPostParams(req.Request) {
+		params := lowhttp.GetAllHTTPRequestQueryParams(rawRequest)
+		for k, v := range lowhttp.GetAllHTTPRequestPostParams(rawRequest) {
 			params[k] = v
 		}
 		opts := make([]poc.PocConfig, 0)
@@ -1253,7 +1262,7 @@ func (s *Server) HTTPRequestMutate(ctx context.Context, req *ypb.HTTPRequestMuta
 	}
 
 	return &ypb.MutateResult{
-		Result:       req.Request,
+		Result:       rawRequest,
 		ExtraResults: nil,
 	}, nil
 }
