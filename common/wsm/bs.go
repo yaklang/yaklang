@@ -2,14 +2,17 @@ package wsm
 
 import (
 	"encoding/base64"
+	"fmt"
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/wsm/payloads"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/url"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -28,6 +31,16 @@ type dbParams struct {
 	Pass     string `json:"pass"`
 	Database string `json:"database"`
 	Sql      string `json:"sql"`
+}
+
+// addLeadingZeroes adds leading zeros to day and month in the date string if they are missing.
+func addLeadingZeroes(dateStr string) string {
+	re := regexp.MustCompile(`(\d{4})/(\d{1,2})/(\d{1,2})`)
+	return re.ReplaceAllStringFunc(dateStr, func(m string) string {
+		matches := re.FindStringSubmatch(m)
+		// Pad the month and day with leading zeros
+		return fmt.Sprintf("%s/%02s/%02s", matches[1], matches[2], matches[3])
+	})
 }
 
 func behidnerResultToYakURLResource(originParam *ypb.YakURL, result []byte) ([]*ypb.YakURLResource, error) {
@@ -78,6 +91,7 @@ func behidnerResultToYakURLResource(originParam *ypb.YakURL, result []byte) ([]*
 			size := v.Get("size").Int()
 			typ := v.Get("type").String()
 			lastModified := v.Get("lastModified").String()
+			lastModified = addLeadingZeroes(lastModified)
 			perm := v.Get("perm").String()
 
 			if len(perm) > 0 {
@@ -106,7 +120,10 @@ func behidnerResultToYakURLResource(originParam *ypb.YakURL, result []byte) ([]*
 				resource.VerboseType = "behinder-file"
 				resource.HaveChildrenNodes = false
 			}
-			loc, _ := time.LoadLocation("Asia/Shanghai")
+			loc, err := time.LoadLocation("Asia/Shanghai")
+			if err != nil {
+				log.Errorf("cannot load location Asia/Shanghai: %s", err)
+			}
 
 			// Parse the "lastModified" string to a Unix timestamp
 			t, err := time.ParseInLocation("2006/01/02 15:04:05", lastModified, loc)

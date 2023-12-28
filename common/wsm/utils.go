@@ -1,6 +1,7 @@
 package wsm
 
 import (
+	"bytes"
 	"crypto/md5"
 	"encoding/base64"
 	"encoding/hex"
@@ -27,6 +28,8 @@ func decodeBase64Values(i interface{}) (interface{}, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode base64 value: %w", err)
 		}
+		// 修复冰蝎返回的错误 json
+		decoded = bytes.Replace(decoded, []byte(",]"), []byte("]"), 1)
 		var j interface{}
 		err = json.Unmarshal(decoded, &j)
 		if err != nil {
