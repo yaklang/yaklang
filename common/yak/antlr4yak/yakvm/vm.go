@@ -45,7 +45,7 @@ type Frame struct {
 	indebuggerEval bool // 在debugger中执行代码
 	ThreadID       int  // 当前线程的ID
 	// panic
-	panics   []*VMPanic
+	//panics   []*VMPanic
 	tryStack *vmstack.Stack
 	exitCode ExitCodeType
 
@@ -53,6 +53,16 @@ type Frame struct {
 	hijackMapMemberCallHandlers sync.Map
 	ctx                         context.Context
 	contextData                 map[string]interface{} // 用于引擎执行时函数栈之间的数据传递
+
+	coroutine *Coroutine
+}
+
+type Coroutine struct {
+	lastPanic *VMPanic
+}
+
+func NewCoroutine() *Coroutine {
+	return &Coroutine{lastPanic: nil}
 }
 
 func (v *Frame) SetOriginCode(s string) {
@@ -121,6 +131,7 @@ func NewSubFrame(parent *Frame) *Frame {
 		exitCode:      NoneExit,
 		ctx:           parent.ctx,
 		contextData:   parent.contextData,
+		coroutine:     parent.coroutine,
 	}
 	parent.hijackMapMemberCallHandlers.Range(func(key, value any) bool {
 		frame.hijackMapMemberCallHandlers.Store(key, value)
@@ -130,7 +141,6 @@ func NewSubFrame(parent *Frame) *Frame {
 }
 
 func NewFrame(vm *VirtualMachine) *Frame {
-
 	frame := &Frame{
 		vm:                  vm,
 		codePointer:         0,
@@ -145,6 +155,7 @@ func NewFrame(vm *VirtualMachine) *Frame {
 		debug:         false,
 		exitCode:      NoneExit,
 		contextData:   make(map[string]interface{}),
+		coroutine:     NewCoroutine(),
 	}
 	if v1, ok := buildinBinaryOperatorHandler[vm.config.vmMode]; ok {
 		for k, v := range v1 {
