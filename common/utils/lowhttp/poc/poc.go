@@ -603,6 +603,15 @@ func WithReplaceHttpPacketPath(path string) PocConfig {
 	}
 }
 
+func WithReplaceHttpPacketQueryParamRaw(rawQuery string) PocConfig {
+	return func(c *_pocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.ReplaceHTTPPacketQueryParamRaw(packet, rawQuery)
+		},
+		)
+	}
+}
+
 // replaceQueryParam 是一个请求选项参数，用于改变请求报文，修改GET请求参数，如果不存在则会增加
 // Example:
 // ```
