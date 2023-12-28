@@ -36,7 +36,7 @@ func GetRawClass(binPayload string, params map[string]string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	// 修改为Jdk 1.5 冰蝎原版是 50(1.6),测了几下发现 49(1.5) 也行,不知道有没有 bug
+	// 修改为Jdk 1.5 冰蝎原版是 50(1.6),测了几下发现 49(1.5) 也行
 	clsObj.MajorVersion = 49
 	return clsObj.Bytes(), nil
 }
