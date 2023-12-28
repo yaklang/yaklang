@@ -6,7 +6,7 @@ Package:
     Payload:
       unpack: true
       operator: |
-        type = getNodeResult("@ICMP/Type")
+        type = getNodeResult("@ICMP/Type").Value
         switch type {
           case 8:
             this.ProcessByType("ICMP Echo")

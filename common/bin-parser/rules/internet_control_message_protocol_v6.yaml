@@ -19,7 +19,7 @@ Destination Unreachable:
     Payload:
       unpack: true
       operator: |
-        code = getNodeResult("@Destination Unreachable/Code")
+        code = getNodeResult("@Destination Unreachable/Code").Value
         switch code {
           case 1:
             this.ProcessByType("No Route to Destination")

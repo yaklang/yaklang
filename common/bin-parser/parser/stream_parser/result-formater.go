@@ -18,10 +18,10 @@ func ToMap(node *base.Node) (*base.NodeValue, error) {
 		return false
 	}
 	if NodeHasResult(node) {
-		return newNodeValue(node.Name, GetResultByNode(node)), nil
+		return newNodeValue(node, GetResultByNode(node)), nil
 	}
 	if node.Cfg.GetBool(CfgIsList) {
-		res := newListNodeValue(node.Name)
+		res := newListNodeValue(node)
 		for _, sub := range node.Children {
 			d, err := sub.Result()
 			if err != nil {
@@ -37,7 +37,7 @@ func ToMap(node *base.Node) (*base.NodeValue, error) {
 		}
 		return res, nil
 	} else {
-		res := newStructNodeValue(node.Name)
+		res := newStructNodeValue(node)
 		//res := map[string]any{}
 		var getSubs func(node *base.Node) []*base.Node
 		getSubs = func(node *base.Node) []*base.Node {

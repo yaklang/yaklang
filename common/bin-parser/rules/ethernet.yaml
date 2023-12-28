@@ -7,7 +7,7 @@ Package:
     Payload:
       unpack: true
       operator: |
-        type = getNodeResult("@Ethernet/Type")
+        type = getNodeResult("@Ethernet/Type").Value
         switch type {
           case 0x0800:
             this.ProcessByType("Internet Protocol")

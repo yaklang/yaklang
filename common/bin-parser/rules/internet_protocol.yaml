@@ -17,8 +17,8 @@ Package:
     Payload:
       unpack: true
       operator: |
-        protocol = getNodeResult("@Internet Protocol/Protocol")
-        total = getNodeResult("@Internet Protocol/Total Length")
+        protocol = getNodeResult("@Internet Protocol/Protocol").Value
+        total = getNodeResult("@Internet Protocol/Total Length").Value
         l = total - getNode("@Internet Protocol").Length()
         var node 
         switch protocol {

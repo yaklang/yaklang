@@ -7,7 +7,7 @@ Package:
       length-for-field: Payload
       operator: |
         this.ProcessSubNode("ContentType")
-        version = this.ProcessSubNode("Version")
+        version = this.ProcessSubNode("Version").Value
         this.ProcessSubNode("Length")
         switch version{
           default:

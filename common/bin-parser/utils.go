@@ -271,8 +271,10 @@ func DumpNodeValueYaml(d *base.NodeValue) (string, error) {
 			return d
 		}
 	}
+
 	rawData := toRawData(d)
-	res, err := yaml.Marshal(rawData)
+	item := rawData.(yaml.MapItem)
+	res, err := yaml.Marshal(item.Value)
 	if err != nil {
 		return "", err
 	}

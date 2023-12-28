@@ -2,10 +2,10 @@ Package:
   operator: |
     this.GetSubNode("Total Length").Process()
     this.GetSubNode("Header").Process()
-    remotePeriodLength = this.GetSubNode("RemotePeriodLength").Process()
+    remotePeriodLength = this.GetSubNode("RemotePeriodLength").Process().Value
     this.GetSubNode("PublicKeyLength").Process()
     this.GetSubNode("PublicKey").Process()
-    offset = getNodeResult("Header.AbbrevOffset")
+    offset = getNodeResult("Header.AbbrevOffset").Value
     currentPosition = getCurrentPosition()
     if offset != 0 {
       this.GetSubNode("NoneStreamHeaderPeerInfo").SetCfg("length",(offset-currentPosition+1)*8)
@@ -30,7 +30,7 @@ Package:
     endian: little
     Abbrev:
       operator: |
-        res = this.ProcessSubNode("Capacity")
+        res = this.ProcessSubNode("Capacity").Value
         abbrev = -1
         switch len(res) {
         case 1:
@@ -42,7 +42,7 @@ Package:
         }
         cap = 255 // 应该从config取
         if abbrev > cap{
-          typ = this.ProcessSubNode("ObjectType")
+          typ = this.ProcessSubNode("ObjectType").Value
           if typ == 0{
             this.ProcessSubNode("Object") 
           }
@@ -52,12 +52,12 @@ Package:
         }
       Capacity:
         operator: |
-          n = this.NewElement().Process()
+          n = this.NewElement().Process().Value
           if n < 0xfe { // 大于254
-              n = this.NewElement().Process()
+              n = this.NewElement().Process().Value
           } else {
-              n = this.NewElement().Process()
-              n = this.NewElement().Process()
+              n = this.NewElement().Process().Value
+              n = this.NewElement().Process().Value
           }
         list: true
         Byte: uint8

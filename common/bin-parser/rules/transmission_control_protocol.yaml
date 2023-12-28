@@ -15,14 +15,14 @@ Package:
             list: true
             Option: Option
             operator: |
-                this.SetMaxLength(getNodeResult("../Header Length")*4 - 20)
+                this.SetMaxLength(getNodeResult("../Header Length").Value*4 - 20)
                 for {
                     ele = this.NewElement()
                     if ele.GetMaxLength() == 0{
                         break
                     }
                     ele.Process()
-                    if ele.GetSubNode("Kind").Result() == 0 {
+                    if ele.GetSubNode("Kind").Result().Value == 0 {
                         break
                     }
                 }
@@ -49,10 +49,10 @@ Package:
                         debug("parse node %s failed: %v", typeName, op.Message)
                     }
                 }
-                this.NewUnknownNode().Process()
+                # this.NewUnknownNode().Process()
 Option:
     operator: |
-        n = this.ProcessSubNode("Kind")
+        n = this.ProcessSubNode("Kind").Value
         switch n {
         case 0:
             break

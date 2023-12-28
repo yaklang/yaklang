@@ -172,7 +172,7 @@ func TestParser(t *testing.T) {
 				t.Fatal(err)
 			}
 			resMap, err := ret.Result()
-			resYaml, err := ResultToYaml(resMap)
+			resYaml, err := DumpNodeValueYaml(resMap)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -392,7 +392,7 @@ var tlsExpect = `Ethernet:
           Kind: 8
           Length: 10
           Data: 858e40e3c784a921
-      Transport Layer Security:
+      TLS:
         Record Layer:
           ContentType: 23
           Version: 771

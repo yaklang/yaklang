@@ -68,12 +68,13 @@ func (s *Server) QueryTrafficTCPReassembled(ctx context.Context, req *ypb.QueryT
 				if err != nil {
 					log.Errorf("get result failed: %s", err)
 				} else {
-					r, ok := res.(map[string]any)
-					if ok {
-						infoMap = r
-					} else {
-						log.Errorf("result type error")
-					}
+					_ = res
+					//r, ok := res。
+					//if ok {
+					//	infoMap = r
+					//} else {
+					//	log.Errorf("result type error")
+					//}
 				}
 			}
 		} else {
@@ -89,12 +90,13 @@ func (s *Server) QueryTrafficTCPReassembled(ctx context.Context, req *ypb.QueryT
 					if err != nil {
 						log.Errorf("get result failed: %s", err)
 					} else {
-						r, ok := res.(map[string]any)
-						if ok {
-							infoMap = r
-						} else {
-							log.Errorf("result type error")
-						}
+						_ = res
+						//r, ok := res.(map[string]any)
+						//if ok {
+						//	infoMap = r
+						//} else {
+						//	log.Errorf("result type error")
+						//}
 					}
 				}
 			}

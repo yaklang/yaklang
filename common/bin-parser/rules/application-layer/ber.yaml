@@ -1,8 +1,8 @@
 Package:
   BER Element:
     operator: |
-      type = this.ProcessSubNode("Type")
-      l = this.ProcessSubNode("Length")
+      type = this.ProcessSubNode("Type").Value
+      l = this.ProcessSubNode("Length").Value
       if l.Value == 0{
         return
       }

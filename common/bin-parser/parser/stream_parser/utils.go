@@ -15,10 +15,11 @@ import (
 	"strings"
 )
 
-func newListNodeValue(name string, children ...*base.NodeValue) *base.NodeValue {
+func newListNodeValue(node *base.Node, children ...*base.NodeValue) *base.NodeValue {
 	var v *base.NodeValue
 	v = &base.NodeValue{
-		Name:      name,
+		Origin:    node,
+		Name:      node.Name,
 		ListValue: true,
 		Value:     children,
 		AppendSub: func(value *base.NodeValue) error {
@@ -32,10 +33,11 @@ func newListNodeValue(name string, children ...*base.NodeValue) *base.NodeValue 
 	}
 	return v
 }
-func newStructNodeValue(name string, children ...*base.NodeValue) *base.NodeValue {
+func newStructNodeValue(node *base.Node, children ...*base.NodeValue) *base.NodeValue {
 	var v *base.NodeValue
 	v = &base.NodeValue{
-		Name:      name,
+		Origin:    node,
+		Name:      node.Name,
 		ListValue: false,
 		Value:     children,
 		AppendSub: func(value *base.NodeValue) error {
@@ -50,12 +52,13 @@ func newStructNodeValue(name string, children ...*base.NodeValue) *base.NodeValu
 	return v
 }
 
-func newNodeValue(name string, v any) *base.NodeValue {
+func newNodeValue(node *base.Node, v any) *base.NodeValue {
 	if v == (*[]*base.NodeValue)(nil) {
 		println()
 	}
 	return &base.NodeValue{
-		Name:      name,
+		Origin:    node,
+		Name:      node.Name,
 		Value:     v,
 		ListValue: false,
 		AppendSub: func(value *base.NodeValue) error {
@@ -114,8 +117,12 @@ func NewNodeByType(node *base.Node, typeName string) (*base.Node, error) {
 			return nil, fmt.Errorf("type `%s` not found", typeName)
 		}
 	}
-	return base.NewNodeTreeWithConfig(node.Cfg, node.Name, v.Origin, node.Ctx)
-	//return v.Copy(), nil
+	newNode, err := base.NewNodeTreeWithConfig(node.Cfg, node.Name, v.Origin, node.Ctx)
+	if err != nil {
+		return nil, err
+	}
+	newNode.Cfg.SetItem(CfgParent, node.Cfg.GetItem(CfgParent))
+	return newNode.Copy(), nil
 }
 
 func getSubData(d any, key string) (any, bool) {

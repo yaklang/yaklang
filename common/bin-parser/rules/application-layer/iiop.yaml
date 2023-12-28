@@ -4,9 +4,9 @@ Package:
       this.ForEachChild((node)=>{
         node.Process()
       })
-      typeId = this.GetSubNode("MessageType").Result()
+      typeId = this.GetSubNode("MessageType").Result().Value
       setCtx("typeId",typeId)
-      messageSize = this.GetSubNode("MessageSize").Result()
+      messageSize = this.GetSubNode("MessageSize").Result().Value
       setCtx("messageSize",messageSize)
     Magic: raw,4
     Version:
@@ -71,7 +71,7 @@ Package:
         ServiceContext:
           operator: |
             this.GetSubNode("Id").Process()
-            n = this.GetSubNode("DataLength").Process()
+            n = this.GetSubNode("DataLength").Process().Value
             this.GetSubNode("Endian").Process()
             this.GetSubNode("Data").SetCfg("length",(n-1)*8)
             this.GetSubNode("Data").Process()

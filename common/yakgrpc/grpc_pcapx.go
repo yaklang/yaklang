@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcap"
 	"github.com/samber/lo"
@@ -20,6 +19,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"gopkg.in/yaml.v2"
 	"strconv"
 	"strings"
 )
@@ -149,7 +149,40 @@ func (s *Server) PcapX(stream ypb.Yak_PcapXServer) error {
 
 	return nil
 }
+func DumpNodeValueYaml(d *base.NodeValue) (string, error) {
+	var toRawData func(d any) any
+	toRawData = func(d any) any {
+		switch d.(type) {
+		case []byte:
+			return codec.EncodeToHex(d)
+		case []*base.NodeValue:
+			nodeValue := d.([]*base.NodeValue)
+			res := yaml.MapSlice{}
+			for i := 0; i < len(nodeValue); i++ {
+				d := nodeValue[i]
+				res = append(res, toRawData(d).(yaml.MapItem))
+			}
+			return res
+		case *base.NodeValue:
+			d := d.(*base.NodeValue)
+			name := d.Name
+			return yaml.MapItem{
+				Key:   name,
+				Value: toRawData(d.Value),
+			}
+		default:
+			return d
+		}
+	}
 
+	rawData := toRawData(d)
+	item := rawData.(yaml.MapItem)
+	res, err := yaml.Marshal(item.Value)
+	if err != nil {
+		return "", err
+	}
+	return string(res), nil
+}
 func (s *Server) ParseTraffic(ctx context.Context, req *ypb.ParseTrafficRequest) (*ypb.ParseTrafficResponse, error) {
 	rsp := &ypb.ParseTrafficResponse{}
 	var payload []byte
@@ -186,97 +219,8 @@ func (s *Server) ParseTraffic(ctx context.Context, req *ypb.ParseTrafficRequest)
 		_ = payloadBytes
 		finalResult["RAW"] = codec.EncodeBase64(raw)
 		rsp.OK = true
-		noResultError := utils.Error("no result")
 		var packageRootNodes []any
-		config := map[string]any{
-			"custom-formatter": func(node *base.Node) (any, error) {
-				isPackage := func(node *base.Node) bool {
-					if node.Name == "Package" && node.Cfg.GetItem("parent") == node.Ctx.GetItem("root") {
-						return true
-					}
-					return false
-				}
-				if stream_parser.NodeHasResult(node) {
-					res := map[string]any{}
-					res["leaf"] = true
-					v := stream_parser.GetResultByNode(node)
-					verbose := ""
-					switch ret := v.(type) {
-					case []byte:
-						verbose = "0x" + codec.EncodeToHex(ret)
-					default:
-						verbose = utils.InterfaceToString(ret)
-					}
-					res["verbose"] = verbose
-					if v, ok := node.Cfg.GetItem(stream_parser.CfgNodeResult).([2]uint64); ok {
-						res["scope"] = v
-					} else {
-						return nil, fmt.Errorf("invalid scope")
-					}
-					return res, nil
-				}
-				if node.Cfg.GetBool(stream_parser.CfgIsList) {
-					var res []any
-					for _, sub := range node.Children {
-						d, err := sub.Result()
-						if err != nil {
-							if errors.Is(err, noResultError) {
-								continue
-							}
-							return nil, err
-						}
-						res = append(res, map[string]any{
-							"name":  sub.Name,
-							"value": d,
-						})
-					}
-					if len(res) == 0 {
-						return nil, noResultError
-					}
-					return res, nil
-				} else {
-					var res []any
-					var getSubs func(node *base.Node) []*base.Node
-					getSubs = func(node *base.Node) []*base.Node {
-						children := []*base.Node{}
-						for _, sub := range node.Children {
-							if sub.Cfg.GetBool("unpack") || isPackage(sub) {
-								children = append(children, getSubs(sub)...)
-							} else {
-								children = append(children, sub)
-							}
-						}
-						return children
-					}
-					children := getSubs(node)
-					for _, sub := range children {
-						d, err := sub.Result()
-						if err != nil {
-							if errors.Is(err, noResultError) {
-								continue
-							}
-							return nil, err
-						}
-						if sub.Cfg.GetBool("package-child") {
-							packageRootNodes = append(packageRootNodes, map[string]any{
-								"name":  sub.Name,
-								"value": d,
-							})
-						} else {
-							res = append(res, map[string]any{
-								"name":  sub.Name,
-								"value": d,
-							})
-						}
-					}
-					if len(res) == 0 {
-						return nil, noResultError
-					}
-					return res, nil
-				}
-			},
-		}
-		node, err := bin_parser.ParseBinaryWithConfig(bytes.NewReader([]byte(raw)), "ethernet", config)
+		node, err := bin_parser.ParseBinary(bytes.NewReader([]byte(raw)), "ethernet")
 		if err != nil {
 			resJson, err := bin_parser2.ResultToJson(finalResult)
 			if err != nil {
@@ -285,7 +229,65 @@ func (s *Server) ParseTraffic(ctx context.Context, req *ypb.ParseTrafficRequest)
 			rsp.Result = string(resJson)
 			return rsp, nil
 		}
-		node.Result()
+		standardResult, err := node.Result()
+		if err != nil {
+			return nil, err
+		}
+		var toTreeData func(d any) any
+		toTreeData = func(d any) any {
+			switch ret := d.(type) {
+			case []byte:
+				return codec.EncodeToHex(d)
+			case []*base.NodeValue:
+				nodeValue := ret
+				res := []any{}
+				for i := 0; i < len(nodeValue); i++ {
+					nodeRes := toTreeData(nodeValue[i])
+					if nodeRes == nil {
+						continue
+					}
+					res = append(res, nodeRes)
+				}
+				return res
+			case *base.NodeValue:
+				var result any
+				if ret.IsValue() {
+					res := map[string]any{}
+					res["leaf"] = true
+					verbose := ""
+					switch ret := ret.Value.(type) {
+					case []byte:
+						verbose = "0x" + codec.EncodeToHex(ret)
+					default:
+						verbose = utils.InterfaceToString(ret)
+					}
+					res["verbose"] = verbose
+					if v, ok := ret.Origin.Cfg.GetItem(stream_parser.CfgNodeResult).([2]uint64); ok {
+						res["scope"] = v
+					} else {
+						res["scope"] = [2]uint64{0, 0}
+					}
+					result = map[string]any{
+						"name":  ret.Name,
+						"value": res,
+					}
+				} else {
+					result = map[string]any{
+						"name":  ret.Name,
+						"value": toTreeData(ret.Value),
+					}
+				}
+				if ret.Origin.Cfg.GetBool("package-child") {
+					packageRootNodes = append(packageRootNodes, result)
+					return nil
+				}
+				return result
+			default:
+				return d
+			}
+		}
+		res := toTreeData(standardResult)
+		_ = res
 		for i, j := 0, len(packageRootNodes)-1; i < j; i, j = i+1, j-1 {
 			packageRootNodes[i], packageRootNodes[j] = packageRootNodes[j], packageRootNodes[i]
 		}

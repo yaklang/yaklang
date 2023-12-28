@@ -3,7 +3,7 @@ Package:
     operator: |
       res,op = this.TryProcessByType("FirstWorld")
       op.Recovery()
-      if string(res).HasPrefix("HTTP/") {
+      if string(res.Value).HasPrefix("HTTP/") {
         this.ProcessSubNode("HTTP Response")
       }else{
         this.ProcessSubNode("HTTP Request")
@@ -38,7 +38,7 @@ Body:
     list: true
     DataChunk:
       operator: |
-        res = this.GetSubNode("DataChunkLength").Process()
+        res = this.GetSubNode("DataChunkLength").Process().Value
         length = int(res)
         if length == 0 {
           setCtx("inList",false)
@@ -53,7 +53,7 @@ Body:
 Headers:
   operator: |
     for {
-      data := this.NewElement().Process()
+      data := this.NewElement().Process().Value
       if len(data) == 0 {
         // this.SetChildren(this.GetChildren()[:-1])
         return

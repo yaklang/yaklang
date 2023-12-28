@@ -1,10 +1,14 @@
 Package:
   Message: BER
-
   LDAP:
     parser: |
-
+      message = getNode("@Message")
+      data = getDataByNode(this)
+      this.SetValue(data)
     generator: |
+      message = getNode("@Message")
+      data = getDataByNode(this)
+      message.SetValue(data)
     MessageId: uint32
     ProtocolOP:
       BinRequest:

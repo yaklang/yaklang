@@ -7,8 +7,8 @@ Package:
     Body:
       unpack: true
       operator: |
-        packetType = getNodeResult("@EAPOL/Packet Type")
-        bodyLength = getNodeResult("@EAPOL/Body Length")
+        packetType = getNodeResult("@EAPOL/Packet Type").Value
+        bodyLength = getNodeResult("@EAPOL/Body Length").Value
         switch packetType {
           case 0x00: // EAP-Packet
             node = this.NewSubNode("EAP-Packet")

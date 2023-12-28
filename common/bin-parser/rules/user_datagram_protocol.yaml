@@ -17,7 +17,7 @@ Package:
                       }
                       return
                   }else{
-                      dump(op.Message)
+                      debug(op.Message)
                       err = op.Recovery()
                       if err != nil{
                           panic(err)

@@ -11,7 +11,7 @@ Package:
     Payload:
       unpack: true
       operator: |
-        protocol = getNodeResult("@Internet Protocol Version 6/Next Header")
+        protocol = getNodeResult("@Internet Protocol Version 6/Next Header").Value
         var node 
         switch protocol {
           case 6:
@@ -23,7 +23,7 @@ Package:
           default:
             node = this.NewUnknownNode()
         }
-        node.SetMaxLength(getNodeResult("@Internet Protocol Version 6/Payload Length"))
+        node.SetMaxLength(getNodeResult("@Internet Protocol Version 6/Payload Length").Value)
         node.Process()
 TCP: "import:transmission_control_protocol.yaml;node:TCP"
 UDP: "import:user_datagram_protocol.yaml;node:UDP"

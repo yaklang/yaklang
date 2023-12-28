@@ -28,8 +28,8 @@ func TestParseTraffic(t *testing.T) {
 		panic(err)
 	}
 	parseRes, err := client.ParseTraffic(context.Background(), &ypb.ParseTrafficRequest{
-		Id:   9,
-		Type: "reassembled",
+		Id:   12,
+		Type: "packet",
 	})
 	if err != nil {
 		t.Fatal(err)

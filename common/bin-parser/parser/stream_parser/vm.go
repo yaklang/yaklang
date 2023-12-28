@@ -76,9 +76,10 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 	yakNode.TryProcessSubNode = func(name string) (any, map[string]any) {
 		typeNode := yakNode.GetSubNode(name)
 		response := map[string]any{
-			"OK":      false,
-			"Message": "",
-			"Save":    func() {},
+			"OK":       false,
+			"Message":  "",
+			"Save":     func() {},
+			"Recovery": func() {},
 		}
 		defer func() {
 			if e := recover(); e != nil {
@@ -225,9 +226,10 @@ func ConvertToYakNode(node *base.Node, operator func(node *base.Node) (func(bool
 		}
 		typeNode := getRootNode(typeName)
 		response = map[string]any{
-			"OK":      false,
-			"Message": "",
-			"Save":    func() {},
+			"OK":       false,
+			"Message":  "",
+			"Save":     func() {},
+			"Recovery": func() {},
 		}
 		defer func() {
 			if e := recover(); e != nil {
@@ -359,7 +361,11 @@ func ExecOperator(node *base.Node, code string, operator func(node *base.Node) (
 			if targetNode == nil {
 				panic("node not found")
 			}
-			return GetResultByNode(targetNode)
+			res, err := targetNode.Result()
+			if err != nil {
+				panic(err)
+			}
+			return res
 		},
 		"setCfg": func(key string, value any) {
 			targetNode, key := getNodeAttrByPath(node, key)
@@ -437,8 +443,36 @@ func getMulti(node *base.Node, uints ...string) uint64 {
 	}
 	return uint64(n)
 }
-func ExecWithLib(node *base.Node, lib map[string]any) (res any, err error) {
-
+func ExecParser(node *base.Node) (res any, err error) {
+	defer func() {
+		if e := recover(); e != nil {
+			err = fmt.Errorf("%v", e)
+		}
+	}()
+	code := node.Cfg.GetString("out")
+	node.Cfg.DeleteItem("out")
+	defer func() {
+		node.Cfg.SetItem("out", code)
+	}()
+	res, err = node.Result()
+	if err != nil {
+		return nil, err
+	}
+	engineLib := map[string]interface{}{
+		"dump": func(d any) {
+			spew.Dump(d)
+		},
+		"len": func(i interface{}) int {
+			return reflect.ValueOf(i).Len()
+		},
+	}
+	engine := antlr4yak.New()
+	engine.ImportLibs(engineLib)
+	returnV, err := engine.ExecuteAsExpression(code, nil)
+	if err != nil {
+		return nil, err
+	}
+	return returnV, nil
 }
 func ExecOut(node *base.Node) (res *base.NodeValue, err error) {
 	defer func() {
@@ -476,7 +510,7 @@ func ExecOut(node *base.Node) (res *base.NodeValue, err error) {
 	}
 	v, ok := returnV.(*base.NodeValue)
 	if !ok {
-		return newNodeValue(node.Name, returnV), nil
+		return newNodeValue(node, returnV), nil
 	}
 	return v, nil
 }
@@ -506,44 +540,4 @@ func ExecInput(node *base.Node) (res any, err error) {
 		return nil, err
 	}
 	return res, nil
-}
-func ExecParser(node *base.Node) (res any, err error) {
-	defer func() {
-		if e := recover(); e != nil {
-			err = fmt.Errorf("%v", e)
-		}
-	}()
-	code := node.Cfg.GetString("out")
-	node.Cfg.DeleteItem("out")
-	defer func() {
-		node.Cfg.SetItem("out", code)
-	}()
-	res, err = node.Result()
-	if err != nil {
-		return nil, err
-	}
-	engineLib := map[string]interface{}{
-		"name": node.Name,
-		"dump": func(d any) {
-			spew.Dump(d)
-		},
-		"len": func(i interface{}) int {
-			return reflect.ValueOf(i).Len()
-		},
-		"data":           res,
-		"newStructValue": newStructNodeValue,
-		"newListValue":   newListNodeValue,
-		"newValue":       newNodeValue,
-	}
-	engine := antlr4yak.New()
-	engine.ImportLibs(engineLib)
-	returnV, err := engine.ExecuteAsExpression(code, nil)
-	if err != nil {
-		return nil, err
-	}
-	v, ok := returnV.(*base.NodeValue)
-	if !ok {
-		return newNodeValue(node.Name, returnV), nil
-	}
-	return v, nil
 }

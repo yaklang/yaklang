@@ -31,6 +31,7 @@ const (
 )
 
 type NodeValue struct {
+	Origin *Node
 	Name      string
 	Value     any
 	ListValue bool

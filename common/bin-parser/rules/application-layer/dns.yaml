@@ -6,7 +6,7 @@ Package:
                   res = node.Process()
                   switch node.Name {
                     case "Flags":
-                      flags = res
+                      flags = res.Value
                       qr := (flags >> 15) & 0x1
                       opcode := (flags >> 11) & 0xF
                       aa := (flags >> 10) & 0x1
@@ -47,6 +47,7 @@ Package:
               operator: |
                   res,op = this.TryProcessSubNode("PointerFlag")
                   if op.OK {
+                      res = res.Value
                       if res == 3 {
                           op.Save()
                           this.ProcessSubNode("Pointer")
@@ -69,7 +70,7 @@ String:
   list: true
   Label:
     operator: |
-      count = this.ProcessSubNode("Count")
+      count = this.ProcessSubNode("Count").Value
       if count == 0 {
         setCtx("inList",false)
         return
