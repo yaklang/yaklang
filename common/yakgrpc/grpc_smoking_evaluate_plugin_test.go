@@ -65,7 +65,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SMOKING_EVALUATE_PLUGIN(t *testing.T) {
 yakit.AutoInitYakit()
 handle = result => {
 	yakit.Info("HELLO")
-	risk.NewRisk("http://baidu.com")
+	risk.NewRisk("http://baidu.com", risk.cve(""))
 }`,
 			err:       "[Negative Alarm]",
 			codeTyp:   "port-scan",
@@ -79,7 +79,7 @@ handle = result => {
 yakit.AutoInitYakit()
 handle = result => {
 	yakit.Info(bacd)
-	risk.NewRisk("http://baidu.com")
+	risk.NewRisk("http://baidu.com", risk.cve(""))
 }`,
 			codeTyp:   "port-scan",
 			err:       "Value undefine",

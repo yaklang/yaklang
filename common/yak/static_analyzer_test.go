@@ -110,3 +110,63 @@ func TestBuildInMethod(t *testing.T) {
 		t.Fatal("user length error : ", users.String())
 	}
 }
+
+func TestSSARuleMustPassRisk(t *testing.T) {
+	t.Run("risk with nothing", func(t *testing.T) {
+		check(t, `
+		risk.NewRisk(
+			"abc"
+		)
+			`, []string{
+			rules.ErrorRiskCheck(),
+		})
+	})
+	t.Run("risk with cve", func(t *testing.T) {
+		check(t, `
+	risk.NewRisk(
+		"abc", 
+		risk.cve("abc")
+	)
+		`, []string{})
+	})
+	t.Run("risk with description and solution", func(t *testing.T) {
+		check(t, `
+		risk.NewRisk(
+			"abc", 
+			risk.solution("abc"),
+			risk.description("abc")
+		)
+		`, []string{})
+	})
+	t.Run("risk with description", func(t *testing.T) {
+		check(t, `
+		risk.NewRisk(
+			"abc", 
+			risk.description("abc")
+		)
+			`, []string{
+			rules.ErrorRiskCheck(),
+		})
+	})
+	t.Run("risk with solution", func(t *testing.T) {
+		check(t, `
+		risk.NewRisk(
+			"abc", 
+			risk.solution("abc")
+		)
+			`, []string{
+			rules.ErrorRiskCheck(),
+		})
+	})
+	t.Run("risk with all", func(t *testing.T) {
+		check(t, `
+		risk.NewRisk(
+			"abc", 
+			risk.solution("abc"),
+			risk.description("abc"),
+			risk.cve("abc")
+		)
+			`, []string{})
+	})
+
+}
