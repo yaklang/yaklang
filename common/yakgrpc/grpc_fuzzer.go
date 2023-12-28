@@ -25,6 +25,7 @@ import (
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/cartesian"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
@@ -72,8 +73,8 @@ func (s *Server) ExtractUrl(ctx context.Context, req *ypb.FuzzerRequest) (*ypb.E
 func (s *Server) StringFuzzer(rootCtx context.Context, req *ypb.StringFuzzerRequest) (*ypb.StringFuzzerResponse, error) {
 	max := req.GetLimit()
 	timeoutSeconds := req.GetTimeoutSeconds()
-	var ctx = rootCtx
-	var cancel = func() {}
+	ctx := rootCtx
+	cancel := func() {}
 	if timeoutSeconds > 0 {
 		ctx, cancel = context.WithTimeout(rootCtx, time.Duration(timeoutSeconds)*time.Second)
 	}
@@ -165,7 +166,7 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 			SubMatcherCondition: cond,
 			SubMatchers:         httpTplMatcher,
 		}
-		var mergedParams = make(map[string]interface{})
+		mergedParams := make(map[string]interface{})
 		renderedParams, err := s.RenderVariables(ctx, &ypb.RenderVariablesRequest{
 			Params: funk.Map(req.GetParams(), func(i *ypb.FuzzerParamItem) *ypb.KVPair {
 				return &ypb.KVPair{Key: i.GetKey(), Value: i.GetValue()}
@@ -187,7 +188,7 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 		}
 	}
 
-	var rsp = &ypb.FuzzerResponse{
+	rsp := &ypb.FuzzerResponse{
 		Method:                "GET",
 		ResponseRaw:           rspRaw,
 		GuessResponseEncoding: Chardet(rspRaw),
@@ -304,13 +305,13 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		batchTarget = string(req.GetBatchTarget())
 	}
 
-	var swg = utils.NewSizedWaitGroup(int(req.GetConcurrent()))
+	swg := utils.NewSizedWaitGroup(int(req.GetConcurrent()))
 	defer swg.Wait()
-	var feedbackWg = new(sync.WaitGroup)
+	feedbackWg := new(sync.WaitGroup)
 	defer func() {
 		feedbackWg.Wait()
 	}()
-	var feedbackResponse = func(rsp *ypb.FuzzerResponse, skipPoC bool) error {
+	feedbackResponse := func(rsp *ypb.FuzzerResponse, skipPoC bool) error {
 		err := stream.Send(rsp)
 		if err != nil {
 			return err
@@ -378,11 +379,11 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				if len(oldIDs) == 0 { // 尝试修复
 					oldIDs = []uint{uint(historyID)}
 				}
-				var newHitColor = req.GetHitColor()
-				var httpTplMatcher = make([]*httptpl.YakMatcher, len(req.GetMatchers()))
-				var httpTplExtractor = make([]*httptpl.YakExtractor, len(req.GetExtractors()))
-				var haveHTTPTplMatcher = len(httpTplMatcher) > 0
-				var haveHTTPTplExtractor = len(httpTplExtractor) > 0
+				newHitColor := req.GetHitColor()
+				httpTplMatcher := make([]*httptpl.YakMatcher, len(req.GetMatchers()))
+				httpTplExtractor := make([]*httptpl.YakExtractor, len(req.GetExtractors()))
+				haveHTTPTplMatcher := len(httpTplMatcher) > 0
+				haveHTTPTplExtractor := len(httpTplExtractor) > 0
 
 				if haveHTTPTplExtractor {
 					for i, e := range req.GetExtractors() {
@@ -413,7 +414,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					respModel, _ := resp.ToGRPCModel()
 
 					if haveHTTPTplExtractor { // 提取器提取参数
-						var params = make(map[string]any)
+						params := make(map[string]any)
 						for _, extractor := range httpTplExtractor {
 							vars, err := extractor.Execute(respModel.ResponseRaw, params)
 							if err != nil {
@@ -452,7 +453,6 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 								},
 							},
 							matcherParams)
-
 						if err != nil {
 							log.Errorf("convert web fuzzer response to grpc model failed: %s", err)
 							continue
@@ -494,12 +494,12 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		return utils.Errorf("empty request is not allowed")
 	}
 
-	var proxies = utils.StringArrayFilterEmpty(utils.PrettifyListFromStringSplited(req.GetProxy(), ","))
-	var concurrent = req.GetConcurrent()
+	proxies := utils.StringArrayFilterEmpty(utils.PrettifyListFromStringSplited(req.GetProxy(), ","))
+	concurrent := req.GetConcurrent()
 	if concurrent <= 0 {
 		concurrent = 20
 	}
-	var timeoutSeconds = req.GetPerRequestTimeoutSeconds()
+	timeoutSeconds := req.GetPerRequestTimeoutSeconds()
 	if timeoutSeconds <= 0 {
 		timeoutSeconds = 10
 	}
@@ -567,13 +567,13 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		_, task.Port, _ = utils.ParseStringToHostPort(task.Host)
 	}()
 
-	var inStatusCode = utils.ParseStringToPorts(req.GetRetryInStatusCode())
-	var notInStatusCode = utils.ParseStringToPorts(req.GetRetryNotInStatusCode())
+	inStatusCode := utils.ParseStringToPorts(req.GetRetryInStatusCode())
+	notInStatusCode := utils.ParseStringToPorts(req.GetRetryNotInStatusCode())
 
-	var httpTplMatcher = make([]*httptpl.YakMatcher, len(req.GetMatchers()))
-	var httpTplExtractor = make([]*httptpl.YakExtractor, len(req.GetExtractors()))
-	var haveHTTPTplMatcher = len(httpTplMatcher) > 0
-	var haveHTTPTplExtractor = len(httpTplExtractor) > 0
+	httpTplMatcher := make([]*httptpl.YakMatcher, len(req.GetMatchers()))
+	httpTplExtractor := make([]*httptpl.YakExtractor, len(req.GetExtractors()))
+	haveHTTPTplMatcher := len(httpTplMatcher) > 0
+	haveHTTPTplExtractor := len(httpTplExtractor) > 0
 	if haveHTTPTplExtractor {
 		for i, e := range req.GetExtractors() {
 			httpTplExtractor[i] = httptpl.NewExtractorFromGRPCModel(e)
@@ -635,12 +635,12 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		})
 	}
 
-	var requestCount = 0
+	requestCount := 0
 	if req.GetForceOnlyOneResponse() {
 		requestCount = 1
 	}
 
-	var maxBodySize = 5 * 1024 * 1024
+	maxBodySize := 5 * 1024 * 1024
 	if req.GetMaxBodySize() > 1024 {
 		maxBodySize = int(req.GetMaxBodySize())
 	}
@@ -662,7 +662,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_Timeout(timeoutSeconds),
 			mutate.WithPoolOpt_Proxy(proxies...),
 			mutate.WithPoolOpt_BatchTarget(batchTarget),
-			//mutate.WithPoolOpt_Concurrent(int(concurrent)),
+			// mutate.WithPoolOpt_Concurrent(int(concurrent)),
 			mutate.WithPoolOpt_SizedWaitGroup(fuzzerRequestSwg),
 			mutate.WithPoolOpt_Addr(req.GetActualAddr(), req.GetIsHTTPS()),
 			mutate.WithPoolOpt_RawMode(true),
@@ -673,8 +673,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_RedirectTimes(int(req.GetRedirectTimes())),
 			mutate.WithPoolOpt_NoFollowRedirect(req.GetNoFollowRedirect()),
 			mutate.WithPoolOpt_noFixContentLength(req.GetNoFixContentLength()),
-			//mutate.WithPoolOpt_ExtraMutateConditionGetter(yak.MutateWithParamsGetter(req.GetHotPatchCodeWithParamGetter())),
-			//mutate.WithPoolOpt_ExtraMutateCondition(yak.MutateWithYaklang(req.GetHotPatchCode())),
+			// mutate.WithPoolOpt_ExtraMutateConditionGetter(yak.MutateWithParamsGetter(req.GetHotPatchCodeWithParamGetter())),
+			// mutate.WithPoolOpt_ExtraMutateCondition(yak.MutateWithYaklang(req.GetHotPatchCode())),
 			mutate.WithPoolOpt_DelayMinSeconds(req.GetDelayMinSeconds()),
 			mutate.WithPoolOPt_DelayMaxSeconds(req.GetDelayMaxSeconds()),
 			mutate.WithPoolOpt_HookCodeCaller(yak.MutateHookCaller(req.GetHotPatchCode())),
@@ -777,7 +777,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			}
 
 			if haveHTTPTplExtractor {
-				var params = make(map[string]any)
+				params := make(map[string]any)
 				for _, extractor := range httpTplExtractor {
 					vars, err := extractor.Execute(result.ResponseRaw, params)
 					if err != nil {
@@ -793,7 +793,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			extractorResultsOrigin := extractorResults
 			for k, v := range mergedParams {
 				extractorResults = append(extractorResults, &ypb.KVPair{
-					Key: k, Value: utils.EscapeInvalidUTF8Byte(codec.AnyToBytes(v))},
+					Key: k, Value: utils.EscapeInvalidUTF8Byte(codec.AnyToBytes(v)),
+				},
 				)
 			}
 
@@ -864,7 +865,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			}
 
 			task.HTTPFlowSuccessCount++
-			var rsp = &ypb.FuzzerResponse{
+			rsp := &ypb.FuzzerResponse{
 				Url:                        utils.EscapeInvalidUTF8Byte([]byte(result.Url)),
 				Method:                     utils.EscapeInvalidUTF8Byte([]byte(result.Request.Method)),
 				ResponseRaw:                result.ResponseRaw,
@@ -982,7 +983,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				for i := 0; i < len(redirectPacket)-1; i++ {
 					redirectRes := redirectPacket[i].RespRecord
 					method, _, _ := lowhttp.GetHTTPPacketFirstLine(redirectRes.RawRequest)
-					var redirectRsp = &ypb.FuzzerResponse{
+					redirectRsp := &ypb.FuzzerResponse{
 						Url:                   utils.EscapeInvalidUTF8Byte([]byte(redirectRes.Url)),
 						Method:                utils.EscapeInvalidUTF8Byte([]byte(method)),
 						ResponseRaw:           redirectRes.RawPacket,
@@ -1058,7 +1059,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 						continue
 					}
 				}
-				//如果重定向了,修正最后一个req
+				// 如果重定向了,修正最后一个req
 				if len(redirectPacket) > 0 {
 					rsp.RequestRaw = redirectPacket[len(redirectPacket)-1].Request
 				}
@@ -1078,7 +1079,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		handle vars
 	*/
 	wg := new(sync.WaitGroup)
-	var mergedErr = make(chan error)
+	mergedErr := make(chan error)
 	for _param := range s.PreRenderVariables(stream.Context(), req.GetParams(), req.GetIsHTTPS(), req.GetIsGmTLS(), req.GetFuzzTagSyncIndex()) {
 		mergedParams := _param
 		wg.Add(1)
@@ -1169,124 +1170,90 @@ var requestToMutateResult = func(reqs []*http.Request, chunked bool) (*ypb.Mutat
 }
 
 func (s *Server) HTTPRequestMutate(ctx context.Context, req *ypb.HTTPRequestMutateParams) (*ypb.MutateResult, error) {
-	freq, err := mutate.NewFuzzHTTPRequest(lowhttp.TrimLeftHTTPPacket(req.Request))
-	if err != nil {
-		return nil, utils.Errorf("build fuzzer request failed: %s", err)
-	}
-
 	switch strings.Join(req.FuzzMethods, "") {
 	case "POST":
 		u, _ := lowhttp.ExtractURLFromHTTPRequestRaw(req.GetRequest(), true)
 		if u != nil {
-			reqs, _ := freq.FuzzMethod(
-				"POST",
-			).FuzzGetParamsRaw(
-				"",
-			).FuzzHTTPHeader(
-				"Content-Type", "application/x-www-form-urlencoded",
-			).FuzzHTTPHeader(
-				"Transfer-Encoding", "",
-			).FuzzHTTPHeader(
-				"User-Agent", consts.DefaultUserAgent,
-			).FuzzPostRaw(
-				u.RawQuery,
-			).Results()
-			if len(reqs) > 0 {
-				return requestToMutateResult(reqs, false)
-			}
+			result := poc.BuildRequest(lowhttp.TrimLeftHTTPPacket(req.Request),
+				poc.WithReplaceHttpPacketMethod("POST"),
+				poc.WithReplaceHttpPacketQueryParamRaw(""),
+				poc.WithReplaceHttpPacketHeader("Content-Type", "application/x-www-form-urlencoded"),
+				poc.WithDeleteHeader("Transfer-Encoding"),
+				poc.WithReplaceHttpPacketHeader("User-Agent", consts.DefaultUserAgent),
+				poc.WithReplaceHttpPacketBody(utils.UnsafeStringToBytes(u.RawQuery), false),
+			)
+			return &ypb.MutateResult{
+				Result: result,
+			}, nil
 		}
 	case "HEAD":
 		fallthrough
 	case "GET":
+		method := strings.ToUpper(strings.Join(req.FuzzMethods, ""))
 		u, _ := lowhttp.ExtractURLFromHTTPRequestRaw(req.GetRequest(), true)
 		_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(req.GetRequest())
 		if u != nil {
-			var params = make(url.Values)
-			values, _ := url.ParseQuery(u.RawQuery)
-			if values != nil {
-				for k, v := range values {
-					params[k] = v
-				}
+			contentType := lowhttp.GetHTTPPacketHeader(req.GetRequest(), "Content-Type")
+			queryRaw := ""
+			params, useRaw, err := lowhttp.GetParamsFromBody(contentType, body)
+			if err != nil {
+				return nil, err
 			}
-			postValue, _ := url.ParseQuery(strings.TrimSpace(string(body)))
-			if postValue != nil {
-				for k, v := range postValue {
-					params[k] = v
-				}
+			if useRaw {
+				queryRaw = utils.UnsafeBytesToString(body)
+			} else {
+				queryRaw = strings.Join(lo.MapToSlice(params, func(key string, value string) string { return fmt.Sprintf("%s=%s", key, value) }), "&")
 			}
-
-			reqs, _ := freq.FuzzMethod(
-				strings.ToUpper(strings.Join(req.GetFuzzMethods(), "")),
-			).FuzzPath(
-				u.Path,
-			).FuzzHTTPHeader(
-				"Content-Type", "",
-			).FuzzHTTPHeader(
-				"Transfer-Encoding", "",
-			).FuzzGetParamsRaw(params.Encode()).FuzzHTTPHeader(
-				"User-Agent", consts.DefaultUserAgent,
-			).FuzzPostRaw("").Results()
-			if len(reqs) > 0 {
-				return requestToMutateResult(reqs, false)
-			}
+			result := poc.BuildRequest(lowhttp.TrimLeftHTTPPacket(req.Request),
+				poc.WithReplaceHttpPacketMethod(method),
+				poc.WithReplaceHttpPacketQueryParamRaw(queryRaw),
+				poc.WithReplaceHttpPacketHeader("Content-Type", "application/x-www-form-urlencoded"),
+				poc.WithDeleteHeader("Transfer-Encoding"),
+				poc.WithReplaceHttpPacketHeader("User-Agent", consts.DefaultUserAgent),
+				poc.WithReplaceHttpPacketBody([]byte{}, false),
+			)
+			return &ypb.MutateResult{
+				Result: result,
+			}, nil
 		}
 	}
 
 	if len(req.FuzzMethods) > 0 {
-		reqs, err := freq.FuzzMethod(req.FuzzMethods...).Results()
-		if err != nil {
-			return nil, err
-		}
-		return requestToMutateResult(reqs, false)
+		result := poc.BuildRequest(lowhttp.TrimLeftHTTPPacket(req.Request),
+			poc.WithReplaceHttpPacketMethod(req.FuzzMethods[0]))
+		return &ypb.MutateResult{
+			Result: result,
+		}, nil
 	}
 
-	// 获取 body
-	reqInstance, err := freq.GetOriginHTTPRequest()
-	if err != nil {
-		return nil, err
-	}
-	bodyRaw, err := ioutil.ReadAll(reqInstance.Body)
-	if err != nil {
-		return nil, err
-	}
-	if bodyRaw == nil {
-		return nil, utils.Errorf("empty body")
-	}
-
-	// 获取 chunk encode
+	// chunk编码
 	if req.ChunkEncode {
 		_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(req.GetRequest())
 		reqRaw := lowhttp.ReplaceHTTPPacketBody(req.GetRequest(), body, true)
 		return &ypb.MutateResult{Result: reqRaw}, nil
 	}
 
+	// 上传数据包
 	if req.UploadEncode {
-		freq, err := mutate.NewFuzzHTTPRequest(lowhttp.TrimLeftHTTPPacket(req.Request))
-		if err != nil {
-			return nil, utils.Errorf("build fuzz.HTTPRequest failed: %s", err)
+		params := lowhttp.GetAllHTTPRequestQueryParams(req.Request)
+		for k, v := range lowhttp.GetAllHTTPRequestPostParams(req.Request) {
+			params[k] = v
 		}
-		kv := make(map[string]interface{})
-		for _, getParam := range freq.GetGetQueryParams() {
-			kv[getParam.Name()] = getParam.Value()
+		opts := make([]poc.PocConfig, 0)
+		opts = append(opts, poc.WithReplaceHttpPacketBody([]byte{}, false))
+		opts = append(opts, poc.WithReplaceHttpPacketQueryParamRaw(""))
+		for k, v := range params {
+			opts = append(opts, poc.WithAppendHttpPacketUploadFile(k, "", v, ""))
 		}
-
-		for _, postRawParam := range freq.GetPostParams() {
-			kv[postRawParam.Name()] = postRawParam.Value()
-		}
-
-		currentPair := freq.FuzzMethod("POST")
-		for k, v := range kv {
-			currentPair = currentPair.FuzzUploadKVPair(k, v)
-		}
-		reqs, err := currentPair.Results()
-		if err != nil {
-			return nil, err
-		}
-		return requestToMutateResult(reqs, false)
+		result := poc.BuildRequest(lowhttp.TrimLeftHTTPPacket(rawRequest),
+			opts...)
+		return &ypb.MutateResult{
+			Result: result,
+		}, nil
 	}
 
 	return &ypb.MutateResult{
-		Result:       []byte(req.Request),
+		Result:       req.Request,
 		ExtraResults: nil,
 	}, nil
 }
@@ -1378,7 +1345,7 @@ func (s *Server) ExtractHTTPResponse(ctx context.Context, req *ypb.ExtractHTTPRe
 		return httptpl.NewExtractorFromGRPCModel(i)
 	}).([]*httptpl.YakExtractor)
 
-	var params = make(map[string]interface{})
+	params := make(map[string]interface{})
 	for _, i := range extractors {
 		p, err := i.Execute([]byte(req.GetHTTPResponse()), params)
 		if err != nil {
@@ -1460,7 +1427,7 @@ func (s *Server) RenderVariables(ctx context.Context, req *ypb.RenderVariablesRe
 	for _, kv := range req.GetParams() {
 		vars.AutoSet(kv.GetKey(), kv.GetValue())
 	}
-	var results = vars.ToMap()
+	results := vars.ToMap()
 	var finalResults []*ypb.KVPair
 	for _, kv := range req.GetParams() {
 		value, ok := results[kv.GetKey()]
@@ -1501,7 +1468,7 @@ func (s *Server) RenderVariablesWithTypedKV(ctx context.Context, kvs []*ypb.Fuzz
 }
 
 func (s *Server) PreRenderVariables(ctx context.Context, params []*ypb.FuzzerParamItem, https, gmtls, syncTagIndex bool) chan map[string]any {
-	var resultsChan = make(chan map[string]any, 100)
+	resultsChan := make(chan map[string]any, 100)
 	if len(params) <= 0 {
 		resultsChan <- make(map[string]any)
 		close(resultsChan)
@@ -1596,10 +1563,10 @@ func (s *Server) PreRenderVariables(ctx context.Context, params []*ypb.FuzzerPar
 				log.Errorf("cartesian product failed: %s", err)
 			}
 		}
-
 	}()
 	return resultsChan
 }
+
 func (s *Server) GetSystemDefaultDnsServers(ctx context.Context, req *ypb.Empty) (*ypb.DefaultDnsServerResponse, error) {
 	servers, err := utils.GetSystemDnsServers()
 	return &ypb.DefaultDnsServerResponse{DefaultDnsServer: servers}, err

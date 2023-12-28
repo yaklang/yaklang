@@ -3,6 +3,7 @@ package lowhttp
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"mime"
@@ -11,6 +12,7 @@ import (
 	"net/textproto"
 	"net/url"
 	"path"
+	"reflect"
 	"sort"
 	"strings"
 	"unsafe"
@@ -334,6 +336,40 @@ func ReplaceHTTPPacketQueryParamWithoutEncoding(packet []byte, key, value string
 	return handleHTTPPacketQueryParam(packet, true, func(q *QueryParams) {
 		q.Set(key, value)
 	})
+}
+
+func ReplaceHTTPPacketQueryParamRaw(packet []byte, rawQuery string) []byte {
+	var isChunked bool
+	var buf bytes.Buffer
+	var header []string
+
+	_, body := SplitHTTPPacket(packet,
+		func(method string, requestUri string, proto string) error {
+			defer func() {
+				buf.WriteString(method + " " + requestUri + " " + proto)
+				buf.WriteString(CRLF)
+			}()
+
+			urlIns := ForceStringToUrl(requestUri)
+			urlIns.RawQuery = rawQuery
+			requestUri = urlIns.String()
+			return nil
+		},
+		nil,
+		func(line string) string {
+			if !isChunked {
+				isChunked = IsChunkedHeaderLine(line)
+			}
+			header = append(header, line)
+			return line
+		},
+	)
+
+	for _, line := range header {
+		buf.WriteString(line)
+		buf.WriteString(CRLF)
+	}
+	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
 }
 
 // AppendHTTPPacketQueryParam 是一个辅助函数，用于改变请求报文，添加GET请求参数
@@ -879,9 +915,11 @@ func AppendHTTPPacketUploadFile(packet []byte, fieldName, fileName string, fileC
 		if multipartWriter != nil {
 			var content []byte
 			h := make(textproto.MIMEHeader)
-			h.Set("Content-Disposition",
-				fmt.Sprintf(`form-data; name="%s"; filename="%s"`,
-					escapeQuotes(fieldName), escapeQuotes(fileName)))
+			contentDisposition := fmt.Sprintf(`form-data; name="%s"`, escapeQuotes(fieldName))
+			if fileName != "" {
+				contentDisposition += fmt.Sprintf(`;filename="%s"`, escapeQuotes(fileName))
+			}
+			h.Set("Content-Disposition", contentDisposition)
 
 			guessContentType := "application/octet-stream"
 			if hasContentType {
@@ -891,21 +929,18 @@ func AppendHTTPPacketUploadFile(packet []byte, fieldName, fileName string, fileC
 			switch r := fileContent.(type) {
 			case string:
 				content = unsafe.Slice(unsafe.StringData(r), len(r))
-				if !hasContentType {
-					guessContentType = http.DetectContentType(content)
-				}
 			case []byte:
 				content = r
-				if !hasContentType {
-					guessContentType = http.DetectContentType(r)
-				}
 			case io.Reader:
 				r.Read(content)
-				if !hasContentType {
-					guessContentType = http.DetectContentType(content)
-				}
 			}
-			h.Set("Content-Type", guessContentType)
+			if !hasContentType {
+				guessContentType = http.DetectContentType(content)
+			}
+
+			if guessContentType != "" {
+				h.Set("Content-Type", guessContentType)
+			}
 
 			partWriter, err := multipartWriter.CreatePart(h)
 			if err == nil {
@@ -966,6 +1001,110 @@ func DeleteHTTPPacketForm(packet []byte, key string) []byte {
 		}
 		return false
 	})
+}
+
+func GetParamsFromBody(contentType string, body []byte) (params map[string]string, useRaw bool, err error) {
+	var (
+		mediaType         string
+		contentTYpeParams map[string]string
+	)
+	params = make(map[string]string)
+	// 这是为了处理复杂json/xml的情况
+	handleUnmarshalValues := func(v any) ([]string, []string) {
+		var keys, values []string
+		ref := reflect.ValueOf(v)
+		switch ref.Kind() {
+		case reflect.Array, reflect.Slice:
+			arrayLen := ref.Len()
+			if arrayLen > 0 {
+				return []string{""}, []string{utils.InterfaceToString(ref.Index(arrayLen - 1).Interface())}
+			}
+		case reflect.Map:
+			refKeys := ref.MapKeys()
+			if len(refKeys) > 0 {
+				for _, refKeys := range refKeys {
+					keys = append(keys, utils.InterfaceToString(refKeys.Interface()))
+					values = append(values, utils.InterfaceToString(ref.MapIndex(refKeys).Interface()))
+				}
+				return keys, values
+			}
+		case reflect.Float32, reflect.Float64:
+			floatV, ok := v.(float64)
+			if ok && floatV == float64(int(floatV)) {
+				v = int(floatV)
+			}
+		}
+		return []string{""}, []string{utils.InterfaceToString(v)}
+	}
+	handleUnmarshalResults := func(tempMap map[string]any) map[string]string {
+		params := make(map[string]string, len(tempMap))
+		for k, v := range tempMap {
+			extraKeys, extraValues := handleUnmarshalValues(v)
+			for i, key := range extraKeys {
+				if key == "" {
+					params[k] = extraValues[i]
+					continue
+				}
+				params[fmt.Sprintf("%s[%s]", k, key)] = extraValues[i]
+			}
+		}
+		return params
+	}
+
+	mediaType, contentTYpeParams, err = mime.ParseMediaType(contentType)
+	if err != nil {
+		return
+	}
+	if mediaType == "application/x-www-form-urlencoded" {
+		var values url.Values
+		values, err = url.ParseQuery(utils.UnsafeBytesToString(body))
+		if err == nil {
+			for k, v := range values {
+				params[k] = v[0]
+			}
+		}
+	} else if mediaType == "multipart/form-data" {
+		boundary, ok := contentTYpeParams["boundary"]
+		if !ok {
+			err = utils.Error("boundary not found")
+			return
+		}
+		mr := multipart.NewReader(bytes.NewReader(body), boundary)
+		for {
+			part, err := mr.NextPart()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				return nil, false, err
+			}
+
+			// 检查part是否为表单字段
+			if part.FormName() != "" {
+				content, err := io.ReadAll(part)
+				if err != nil && err != io.EOF {
+					return nil, false, err
+				}
+				params[part.FormName()] = utils.UnsafeBytesToString(content)
+			}
+		}
+	} else if strings.HasPrefix(strings.ToLower(contentType), "application/json") {
+		var tempMap map[string]any
+		err = json.Unmarshal(body, &tempMap)
+		if err == nil {
+			params = handleUnmarshalResults(tempMap)
+		}
+	} else if strings.HasPrefix(strings.ToLower(contentType), "application/xml") {
+		tempMap := utils.XmlLoads(body)
+		if err == nil {
+			params = handleUnmarshalResults(tempMap)
+		}
+	} else {
+		// 这个flag位用于标记是否调用者直接使用原始的body, 这用于默认情况
+		useRaw = true
+	}
+
+	return
 }
 
 // GetHTTPPacketCookieValues 是一个辅助函数，用于获取请求报文中Cookie值，其返回值为[]string，这是因为Cookie可能存在多个相同键名的值
