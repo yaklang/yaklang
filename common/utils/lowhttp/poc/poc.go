@@ -682,6 +682,15 @@ func WithAppendHeader(key, value string) PocConfig {
 	}
 }
 
+func WithAppendHeaderIfNotExist(key, value string) PocConfig {
+	return func(c *_pocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.AppendHTTPPacketHeaderIfNotExist(packet, key, value)
+		},
+		)
+	}
+}
+
 // appendHeaders 是一个请求选项参数，用于改变请求报文，添加请求头
 // Example:
 // ```
