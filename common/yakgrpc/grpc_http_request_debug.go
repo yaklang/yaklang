@@ -420,30 +420,43 @@ func makeArgs(execParams []*ypb.KVPair) []string {
 }
 
 func mergeBuildParams(params *ypb.HTTPRequestBuilderParams, t *url.URL) *ypb.HTTPRequestBuilderParams { // 根据单个目标和总体配置生成针对单个目标的build参数
+	var res *ypb.HTTPRequestBuilderParams
+
+	buffer, err := json.Marshal(params)
+	if err != nil {
+		log.Errorf("json marshal err")
+		return nil
+	}
+	err = json.Unmarshal(buffer, &res)
+	if err != nil {
+		log.Errorf("json unmarshal err")
+		return nil
+	}
+
 	pathFlag := true
-	for _, p := range params.Path {
+	for _, p := range res.Path {
 		if normalizeString(p) == normalizeString(t.Path) {
 			pathFlag = false
 			break
 		}
 	}
 	if pathFlag {
-		params.Path = append(params.Path, t.Path)
+		res.Path = append(res.Path, t.Path)
 	}
 
 	for key, values := range t.Query() { // 插入所有的 get 参数
 		for _, value := range values {
-			params.GetParams = append(params.GetParams, &ypb.KVPair{
+			res.GetParams = append(res.GetParams, &ypb.KVPair{
 				Key: key, Value: value,
 			})
 		}
 	}
 
 	if t.Scheme != "" { // 目标标识优先级更高
-		params.IsHttps = t.Scheme == "https"
+		res.IsHttps = t.Scheme == "https"
 	}
 
-	return params
+	return res
 }
 
 func normalizeString(s string) string {
