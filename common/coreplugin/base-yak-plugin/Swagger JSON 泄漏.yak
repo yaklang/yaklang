@@ -11,6 +11,15 @@ wagger是一个用于设计、构建、记录和使用RESTful Web服务的工具
 
 因此，通常来说，你应该在生产环境中禁用Swagger接口，或者至少应该添加适当的访问控制以防止未授权访问。
 `
+solution = `
+1. 禁用生产环境中的Swagger：在生产环境中，应禁用Swagger，以防止敏感信息公开和未经授权的API访问。Swagger主要用于开发和测试环境，以帮助开发人员理解和使用API。
+
+2. 实施访问控制：如果必须在生产环境中启用Swagger，应实施严格的访问控制，以确保只有授权的人员可以访问Swagger接口。这可以通过网络防火墙、IP白名单、身份验证和授权等方法实现。
+
+3. 限制API的使用：为防止API的滥用，应实施API使用限制，例如限制每个用户在一定时间内可以调用API的次数。
+
+4. 使用HTTPS：所有的API调用都应通过HTTPS进行，以防止数据在传输过程中被窃取或篡改。
+`
 
 filter := str.NewFilter()
 check = result => {
@@ -32,6 +41,7 @@ check = result => {
             risk.title("Swagger(OpenAPI 2) on: %v" % result.Url),
             risk.severity("low"),
             risk.description(swaggerDESC),
+            risk.solution(solution),
             risk.type("sensitive-disclosure"),
             risk.typeVerbose("敏感信息泄漏"),
             risk.request(result.RequestRaw),
@@ -45,6 +55,7 @@ check = result => {
             risk.title("Swagger(OpenAPI 3) on: %v" % result.Url),
             risk.severity("low"),
             risk.description(swaggerDESC),
+            risk.solution(solution),
             risk.type("sensitive-disclosure"),
             risk.typeVerbose("敏感信息泄漏"),
             risk.request(result.RequestRaw),
