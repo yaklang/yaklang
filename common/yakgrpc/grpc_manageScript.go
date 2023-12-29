@@ -4,6 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/copier"
 	"github.com/jinzhu/gorm"
@@ -19,18 +27,9 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"sort"
-	"strconv"
-	"strings"
-	"time"
 )
 
-var (
-	nucleiLoaderCD = utils.NewCoolDown(10 * time.Second)
-)
+var nucleiLoaderCD = utils.NewCoolDown(10 * time.Second)
 
 var buildinNucleiYakScriptParam = tools.BuildinNucleiYakScriptParam
 
@@ -326,7 +325,7 @@ func ConvertYakScriptToExecRequest(req *ypb.ExecRequest, script *yakit.YakScript
 		if batchMode {
 			params = append(params, &ypb.ExecParamItem{Key: "--plugin", Value: script.ScriptName})
 		} else {
-			var pocName = script.ScriptName //= script.LocalPath
+			pocName := script.ScriptName //= script.LocalPath
 			params = append(params, &ypb.ExecParamItem{
 				Key:   "pocName",
 				Value: pocName,
@@ -435,7 +434,7 @@ func (s *Server) ExecYakScript(req *ypb.ExecRequest, stream ypb.Yak_ExecYakScrip
 				target = paramItem.Value
 			}
 		}
-		return s.execScriptWithRequest(script.ScriptName, target, stream)
+		return s.execScriptWithRequest(script.ScriptName, target, stream, nil)
 	case "port-scan":
 		params, code, err := s.generatePortScanParams(script.ScriptName, req.GetParams())
 		if err != nil {
@@ -535,7 +534,6 @@ func (s *Server) ExportYakScript(ctx context.Context, req *ypb.ExportYakScriptRe
 }
 
 func (s *Server) ExportYakPluginBatch(script *yakit.YakScript, dir, OutputPluginDir string) (string, error) {
-
 	if dir == "" {
 		dir = filepath.Join(consts.GetDefaultYakitBaseDir(), "user-plugins", script.Type)
 		os.MkdirAll(dir, os.ModePerm)
@@ -568,7 +566,7 @@ func (s *Server) ExportYakPluginBatch(script *yakit.YakScript, dir, OutputPlugin
 	}
 
 	_ = script
-	var meta = yakit.YakModuleMeta{
+	meta := yakit.YakModuleMeta{
 		ModuleName:           scriptName,
 		Tags:                 strings.Split(script.Tags, ","),
 		Help:                 script.Help,
@@ -614,13 +612,13 @@ func (s *Server) ExportYakPluginBatch(script *yakit.YakScript, dir, OutputPlugin
 		return "", utils.Errorf("marshal meta.json failed: %s", err)
 	}
 	os.RemoveAll(metaPath)
-	err = ioutil.WriteFile(metaPath, metaRaw, 0666)
+	err = ioutil.WriteFile(metaPath, metaRaw, 0o666)
 	if err != nil {
 		return "", utils.Errorf("write meta.json failed: %s", err)
 	}
 
 	// 保存文档
-	var documentRaw = []byte(fmt.Sprintf(
+	documentRaw := []byte(fmt.Sprintf(
 		defaultMarkdownDocument,
 		script.Type, scriptName, script.Author,
 	))
@@ -630,7 +628,7 @@ func (s *Server) ExportYakPluginBatch(script *yakit.YakScript, dir, OutputPlugin
 	}
 
 	os.RemoveAll(docPath)
-	err = ioutil.WriteFile(docPath, documentRaw, 0666)
+	err = ioutil.WriteFile(docPath, documentRaw, 0o666)
 	if err != nil {
 		return "", utils.Errorf("write document failed: %s", err)
 	}
@@ -641,7 +639,7 @@ func (s *Server) ExportYakPluginBatch(script *yakit.YakScript, dir, OutputPlugin
 		scriptStr = script.Content
 	}
 	os.RemoveAll(modPath)
-	err = ioutil.WriteFile(modPath, []byte(scriptStr), 0666)
+	err = ioutil.WriteFile(modPath, []byte(scriptStr), 0o666)
 	if err != nil {
 		return "", utils.Errorf("write script failed: %s", err)
 	}
@@ -700,7 +698,7 @@ func (s *Server) DeleteYakScriptExecResult(ctx context.Context, req *ypb.DeleteY
 
 func (s *Server) GetYakScriptTagsAndType(ctx context.Context, req *ypb.Empty) (*ypb.GetYakScriptTagsAndTypeResponse, error) {
 	var tagsAndType ypb.GetYakScriptTagsAndTypeResponse
-	//onlineTags, err := yakit.YakScriptTags(s.GetProfileDatabase(), "", "HAVING count > 1 ")
+	// onlineTags, err := yakit.YakScriptTags(s.GetProfileDatabase(), "", "HAVING count > 1 ")
 	onlineType, _ := yakit.YakScriptType(s.GetProfileDatabase())
 	db := consts.GetGormProfileDatabase()
 	onlineTags := s.QueryYakScriptTagsGroup(db)
@@ -728,7 +726,6 @@ func (s *Server) GetYakScriptTagsAndType(ctx context.Context, req *ypb.Empty) (*
 }
 
 func (s *Server) DeleteYakScriptExec(ctx context.Context, req *ypb.Empty) (*ypb.Empty, error) {
-
 	err := yakit.DeleteExecResult(s.GetProjectDatabase())
 	if err != nil {
 		return nil, err
@@ -1037,11 +1034,11 @@ func (s *Server) ImportYakScript(req *ypb.ImportYakScriptRequest, stream ypb.Yak
 	}()
 	for _, dir := range req.Dirs {
 		total := yakit.YakScriptLocalTotal(req.Dirs)
-		//count++
+		// count++
 		typeStr := yakit.YakScriptLocalType(dir)
 		if typeStr == "" {
 			stream.Send(&ypb.ImportYakScriptResult{
-				//Progress:    ,
+				// Progress:    ,
 				Message:     fmt.Sprintf("import [%s] yakScript  failed: %s", dir, "文件名不符合上传"),
 				MessageType: "error",
 			})
@@ -1051,7 +1048,7 @@ func (s *Server) ImportYakScript(req *ypb.ImportYakScriptRequest, stream ypb.Yak
 		if err != nil {
 			log.Infof("load yakit resource[%s] failed: %s", modDir, err)
 			stream.Send(&ypb.ImportYakScriptResult{
-				//Progress:    0.1,
+				// Progress:    0.1,
 				Message:     fmt.Sprintf("import [%s] yakScript  failed: %s", dir, err),
 				MessageType: "error",
 			})
