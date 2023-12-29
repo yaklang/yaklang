@@ -58,10 +58,9 @@ type Host struct {
 	CountryCode string   `json:"country_code"`
 	Org         string   `json:"org"`
 	Data        []struct {
-		Product string `json:"product"`
-		Title   string `json:"title"`
-		Opts    struct {
-		} `json:"opts"`
+		Product   string   `json:"product"`
+		Title     string   `json:"title"`
+		Opts      struct{} `json:"opts"`
 		Timestamp string   `json:"timestamp"`
 		Isp       string   `json:"isp"`
 		Cpe       []string `json:"cpe"`
@@ -131,6 +130,22 @@ type HostSearch struct {
 			CountryCode  string      `json:"country_code"`
 			Latitude     float64     `json:"latitude"`
 		} `json:"location"`
+		HTTP struct {
+			RobotsHash      interface{}            `json:"robots_hash"`
+			Redirects       []interface{}          `json:"redirects"`
+			Securitytxt     interface{}            `json:"securitytxt"`
+			Title           string                 `json:"title"`
+			SitemapHash     interface{}            `json:"sitemap_hash"`
+			Robots          interface{}            `json:"robots"`
+			Server          string                 `json:"server"`
+			Host            string                 `json:"host"`
+			HTML            string                 `json:"html"`
+			Location        string                 `json:"location"`
+			Components      map[string]interface{} `json:"components"`
+			SecuritytxtHash interface{}            `json:"securitytxt_hash"`
+			Sitemap         interface{}            `json:"sitemap"`
+			HTMLHash        int                    `json:"html_hash"`
+		}
 		IP      int64         `json:"ip"`
 		Domains []interface{} `json:"domains"`
 		Data    string        `json:"data"`
