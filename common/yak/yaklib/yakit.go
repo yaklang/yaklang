@@ -92,7 +92,9 @@ func GetExtYakitLibByOutput(Output func(d any) error) map[string]interface{} {
 		if tableData.Data == nil {
 			tableData.Data = map[string]interface{}{}
 		}
-		tableData.Data["uuid"] = uuid.NewV4().String()
+		if tableData.Data["uuid"] == nil {
+			tableData.Data["uuid"] = uuid.NewV4().String()
+		}
 		Output(tableData)
 		return nil
 	}
