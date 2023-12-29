@@ -265,6 +265,9 @@ func (s *Server) execScriptWithRequest(scriptName string, targetInput string, st
 
 		for _, target := range targets {
 			builderParams := mergeBuildParams(baseBuilderParams, target)
+			if builderParams == nil {
+				continue
+			}
 			builderResponse, err := s.HTTPRequestBuilder(stream.Context(), builderParams)
 			if err != nil {
 				log.Errorf("failed to build http request: %v", err)
