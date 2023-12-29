@@ -30,7 +30,6 @@ func parseSSA(src string, force bool, prog *ssa.Program, callback func(*ssa.Func
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("recover from js2ssa.parseSSA: ", r)
-			// fmt.Println("\n\n\n!!!!!!!\n\n!!!!!\n\nRecovered in parseSSA", r)
 			// debug.PrintStack()
 			ret = nil
 		}

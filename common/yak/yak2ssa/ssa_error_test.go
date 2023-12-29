@@ -1065,40 +1065,89 @@ func TestExternInstance(t *testing.T) {
 }
 
 func TestErrorHandler(t *testing.T) {
-	t.Run("error handler check", func(t *testing.T) {
+	t.Run("error handler check - getError1", func(t *testing.T) {
 		CheckTestCase(t, TestCase{
 			code: ` 
-		// this ok
-		getError1()
-		getError2()
+			// this ok
+			getError1()
+			`,
+			errs:        []string{},
+			ExternValue: map[string]any{"getError1": func() error { return errors.New("err") }},
+		})
+	})
 
-		err = getError1() 
-		die(err)
-		a, err = getError2()
-		if err {
-			panic(err)
-		}
+	t.Run("error handler check - getError2", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: ` 
+			// this ok
+			getError2()
+			`,
+			errs:        []string{},
+			ExternValue: map[string]any{"getError2": func() (int, error) { return 1, errors.New("err") }},
+		})
+	})
 
-		// // not handle error
-		err = getError1()     // error 
-		a, err = getError2()  // error
+	t.Run("error handler check - die", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: ` 
+			err = getError1() 
+			die(err)
+			`,
+			errs:        []string{},
+			ExternValue: map[string]any{"getError1": func() error { return errors.New("err") }, "die": func(error) {}},
+		})
+	})
 
-		// // (1) = (n contain error) 
-		all = getError2() // this has error !!
-		all2 = getError2()
-		all2[1] // err 
-		`,
+	t.Run("error handler check - panic", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: ` 
+			a, err = getError2()
+			if err {
+				panic(err)
+			}
+			`,
+			errs:        []string{},
+			ExternValue: map[string]any{"getError2": func() (int, error) { return 1, errors.New("err") }},
+		})
+	})
+
+	t.Run("ignore handle error", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: ` 
+			_ = getError1()     // error 
+			a, _ = getError2()  // error
+			`,
+			errs:        []string{},
+			ExternValue: map[string]any{"getError1": func() error { return errors.New("err") }, "getError2": func() (int, error) { return 1, errors.New("err") }},
+		})
+	})
+
+	t.Run("not handle error", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: ` 
+			err = getError1()     // error 
+			a, err = getError2()  // error
+			`,
 			errs: []string{
 				ssa4analyze.ErrorUnhandled(),
 				ssa4analyze.ErrorUnhandled(),
+			},
+			ExternValue: map[string]any{"getError1": func() error { return errors.New("err") }, "getError2": func() (int, error) { return 1, errors.New("err") }},
+		})
+	})
+
+	t.Run("error handler check - all", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: ` 
+			all = getError2() // this has error !!
+			all2 = getError2()
+			all2[1] // err 
+			`,
+			errs: []string{
 				ssa4analyze.ErrorUnhandledWithType("number, error"),
 				ssa4analyze.ErrorUnhandled(),
 			},
-			ExternValue: map[string]any{
-				"getError1": func() error { return errors.New("err") },
-				"getError2": func() (int, error) { return 1, errors.New("err") },
-				"die":       func(error) {},
-			},
+			ExternValue: map[string]any{"getError2": func() (int, error) { return 1, errors.New("err") }},
 		})
 	})
 
