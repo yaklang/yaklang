@@ -2,10 +2,11 @@ package spacengine
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/spacengine/go-shodan"
-	"strings"
 )
 
 func interfaceArrayToString(rets []interface{}) string {
@@ -53,7 +54,7 @@ func ShodanQuery(key string, filter string, maxPage, maxRecord int) (chan *NetSp
 
 		var nextFinished bool
 		var count int
-		var page = 0
+		page := 0
 		for range make([]int, maxPage) {
 			page++
 			if nextFinished {
@@ -104,7 +105,7 @@ func ShodanQuery(key string, filter string, maxPage, maxRecord int) (chan *NetSp
 					utils.HostPort(ip.String(), port),
 				)
 
-				var serviceProvider = ""
+				serviceProvider := ""
 				if d.Isp == d.Org {
 					serviceProvider = d.Isp
 				} else {
@@ -122,7 +123,7 @@ func ShodanQuery(key string, filter string, maxPage, maxRecord int) (chan *NetSp
 					FromEngine:      "shodan",
 					Latitude:        d.Location.Latitude,
 					Longitude:       d.Location.Longitude,
-					HtmlTitle:       "",
+					HtmlTitle:       d.HTTP.Title,
 					Domains:         interfaceArrayToString(d.Domains),
 					ConfirmHttps:    false,
 					Host:            interfaceArrayToString(d.Hostnames),
