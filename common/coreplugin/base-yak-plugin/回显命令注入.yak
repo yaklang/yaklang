@@ -41,6 +41,26 @@ mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte
     }
 }
 
+description = `命令注入（Command Injection）是一种常见的安全攻击方式，它发生在应用程序未能正确地验证用户输入的情况下。攻击者通过这种漏洞，可以在服务器上执行任意的系统命令，从而控制服务器或访问敏感信息。
+
+攻击方式：命令注入通常发生在应用程序直接使用用户输入来构造系统命令的情况下。攻击者可以通过输入特殊字符或命令，使得原本的命令被改变，从而执行攻击者想要的操作。
+
+潜在风险：命令注入的风险极高，因为它可以让攻击者执行任意命令，包括读取、修改、删除数据，甚至控制整个系统。这种攻击方式对系统的安全性和稳定性构成极大威胁。
+
+防护措施：防止命令注入的主要方法是对用户输入进行严格的验证和过滤。任何用于构造系统命令的输入都应该被视为潜在的安全风险。此外，应用程序还应该限制其执行系统命令的能力，例如，运行在低权限的用户账户下，或者使用安全的API来代替直接执行系统命令。
+`
+solution = `
+1. 输入验证：对所有用户输入进行严格的验证和过滤，特别是那些可能会用于构造系统命令的输入。可以使用白名单或者正则表达式等方法来验证输入的合法性。
+
+2. 最小权限原则：应用程序应该以最小的权限运行，这样即使出现命令注入，攻击者也无法执行一些高权限的系统命令。
+
+3. 使用安全的API：尽量避免直接执行系统命令，而是使用那些能够进行必要安全检查的安全API。
+
+4. 参数化命令：在构造系统命令时，应尽量使用参数化命令，而不是字符串拼接，这样可以避免命令注入。
+
+5. 错误处理：不应该向用户显示详细的错误信息，以防止攻击者利用这些信息进行攻击。
+`
+
 checkBashExpr = (prefix, param, boundrayPrefix, boundraySuffix) => {
     for boundary in [
         [boundrayPrefix, boundraySuffix],
@@ -60,6 +80,8 @@ checkBashExpr = (prefix, param, boundrayPrefix, boundraySuffix) => {
                     risk.type("command-injection"), risk.typeVerbose("命令注入"),
                     risk.request(rsp.RequestRaw), risk.response(rsp.ResponseRaw),
                     risk.payload(f`PAYLOAD: ${payload} EXPECT: ${result.result}`), risk.parameter(param.String()),
+                    risk.description(description),
+                    risk.solution(solution),
                 )
                 return true
             }
@@ -89,6 +111,8 @@ checkWindowsPowershellExpr = (prefix, param, boundaryPrefix, boundarySuffix) => 
                     risk.type("command-injection"), risk.typeVerbose("命令注入"),
                     risk.request(rsp.RequestRaw), risk.response(rsp.ResponseRaw),
                     risk.payload(f`PAYLOAD: ${payload} EXPECT: ${result.result}`), risk.parameter(param.String()),
+                    risk.description(description),
+                    risk.solution(solution),
                 )
                 return true
             }
@@ -118,6 +142,8 @@ checkWindowsCmdExpr = (prefix, param, boundrayPrefix, boundraySuffix) => {
                     risk.type("command-injection"), risk.typeVerbose("命令注入"),
                     risk.request(rsp.RequestRaw), risk.response(rsp.ResponseRaw),
                     risk.payload(f`PAYLOAD: ${payload} EXPECT: ${result.result}`), risk.parameter(param.String()),
+                    risk.description(description),
+                    risk.solution(solution),
                 )
                 return true
             }

@@ -10,11 +10,26 @@ checkErr = func(err) {
     }
 }
 
+description = `
+跨站请求伪造（Cross-Site Request Forgery，简称CSRF）是一种网络攻击手段，攻击者通过诱导用户点击链接、访问网站或者加载图片等方式，使得用户在不知情的情况下发送了一个预设的请求。这个请求通常对应一些具有一定副作用的操作，例如更改密码、购买商品等。
+
+风险说明：“此页面可能包含一个没有CSRF保护的表单”，这句话的含义是，该页面的某个表单可能存在CSRF漏洞。如果攻击者利用这个漏洞，他们可以构造特定的请求，当用户访问某个链接或者页面时，这个请求就会被发送出去，从而执行了攻击者预设的操作。
+
+潜在风险：如果一个表单没有适当的CSRF保护，那么攻击者就可以利用这个漏洞进行攻击。这可能导致用户的账户被恶意操作，例如更改账户设置、进行非法交易、甚至窃取用户的账户。
+
+防护措施：为了防止CSRF攻击，开发者需要在表单中加入CSRF令牌。当用户提交表单时，服务器会验证这个令牌，如果令牌不匹配，那么请求就会被拒绝。此外，还可以使用同源策略（Same-Origin Policy）和内容安全策略（Content Security Policy）等技术防止CSRF攻击。
+    `
 csrfLog = func(result){
     url = result.url
     reqRaw = result.reqRaw
     respRaw = result.respRaw
     msg = "This page may contain a form without CSRF protection."
+    solution = `
+1. 使用CSRF令牌：在每个表单提交时，服务器应生成一个唯一的、随机的CSRF令牌，并将其嵌入到表单中。当表单被提交时，服务器应验证提交的令牌是否与之前生成的令牌匹配。如果令牌不匹配，则请求应被视为非法并被拒绝。
+
+2. 验证Referer头：服务器可以验证HTTP Referer头以确保请求是从信任的源发送的。如果Referer头与预期的源不匹配，服务器应拒绝请求。
+
+3. 使用SameSite Cookies：SameSite cookie属性可以防止CSRF攻击，因为它们只允许在同一站点的上下文中发送cookie，阻止了跨站请求。`
 
     report = {"message": msg, url:url}
     yakit.Output(report)
@@ -22,6 +37,8 @@ csrfLog = func(result){
             url,
             risk.title(sprintf("csrf for: %v", url)),
             risk.details(report),
+            risk.solution(solution),
+            risk.description(description),
             risk.type("csrf"),
             risk.request(reqRaw),
             risk.response(respRaw),
@@ -34,6 +51,16 @@ corsLog = func(result){
     reqRaw = result.reqRaw
     respRaw = result.respRaw
     msg = "CORS configuration insecure"
+    description = `
+`
+    solution = `
+1. 限制允许的源：CORS策略应明确指定允许哪些源进行跨源请求，而不是简单地允许所有源。这可以通过设置Access-Control-Allow-Origin头来实现。
+
+2. 限制允许的HTTP方法：应限制允许跨源请求的HTTP方法。例如，可能只允许GET和POST请求。
+
+3. 使用预检请求：对于可能对服务器数据产生副作用的HTTP请求方法（例如，PUT，DELETE），应使用CORS预检请求来确保服务器接受请求。预检请求通过发送一个带有Access-Control-Request-Method和Access-Control-Request-Headers头的OPTIONS请求来实现。
+
+4. 避免信任cookie：对于跨源请求，不应信任或依赖cookie。因为cookie可以被第三方网站操纵，所以它们不应被用作身份验证或会话管理。`
 
     report = {"message": msg, url:url}
     yakit.Output(report)
@@ -41,6 +68,8 @@ corsLog = func(result){
             url,
             risk.title(sprintf("cors unsafe for: %v", url)),
             risk.details(report),
+            risk.description(description),
+            risk.solution(solution),
             risk.type("cors"),
             risk.request(reqRaw),
             risk.response(respRaw),
