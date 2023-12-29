@@ -333,6 +333,7 @@ func (s *Server) execScriptWithRequest(scriptName string, targetInput string, st
 		"CTX":          stream.Context(),
 		"PLUGIN_NAME":  scriptName,
 		"IS_URL_PARAM": isUrlParam,
+		"PLUGIN_TYPE":  strings.ToLower(debugType),
 	})
 	if err != nil {
 		log.Warnf("execute debug script failed: %v", err)
