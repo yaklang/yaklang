@@ -214,8 +214,6 @@ func stringForSettingColor(s string, extraTag []string, flow *yakit.HTTPFlow) {
 		flow.Cyan()
 	case "grey":
 		flow.Grey()
-	default:
-		flow.Red()
 	}
 	return
 }
