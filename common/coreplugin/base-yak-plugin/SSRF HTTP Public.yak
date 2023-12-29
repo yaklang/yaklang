@@ -60,6 +60,27 @@ NewThreadPool = func(size){
     return threadPool
 }
 
+description = `
+服务器端请求伪造（Server Side Request Forgery，简称SSRF）是一种网络安全漏洞，由攻击者构造并促使服务器端发起请求。这种漏洞的存在可能使攻击者能够控制服务器以发起网络请求，从而实现对未经授权资源的访问。
+
+漏洞利用：在存在SSRF漏洞的环境中，攻击者可以在服务器的上下文中进行网络交互。这种交互可能会导致攻击者访问到后端的系统，进而获取敏感信息，或者执行其他可能造成损害的操作。
+
+潜在风险：SSRF漏洞的存在不仅可能导致未经授权的资源访问，还可能使攻击者能够进行端口扫描，读取本地文件，甚至执行命令等行为。这些行为都可能对服务器的安全性和稳定性构成威胁。
+
+防护措施：为预防SSRF漏洞，需要采取一系列的安全措施，例如限制服务器对外部网络的访问，对用户输入进行严格的验证和过滤，以及及时更新和修复已知的安全漏洞等。
+`
+solution = `
+1. 尽量避免服务器端发起不必要的外部HTTP请求：如果不需要，尽量避免从服务器端发起外部HTTP请求。如果必须要发起，那么需要进行严格的输入验证和管理。
+
+2. 限制出站请求：可以在服务器级别限制出站请求的目标和端口，禁止对内网或者敏感端口的访问。
+
+3. 使用安全的编程实践：对于所有用户生成的输入，都应进行严格的验证和清理。特别是那些可能会用于网络请求的输入，更应该进行严格的白名单验证。
+
+4. 升级和打补丁：定期升级和打补丁可以修复已知的SSRF漏洞，防止攻击者利用这些漏洞进行攻击。
+
+5. 使用Web应用防火墙（WAF）：WAF可以帮助识别和阻止SSRF攻击，增加了一个额外的防御层。
+`
+
 # mirrorNewWebsitePathParams 每新出现一个网站路径且带有一些参数，参数通过常见位置和参数名去重，去重的第一个 HTTPFlow 在这里被调用
 mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
     paramName = ""
@@ -121,6 +142,8 @@ mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte
                         risk.payload(payload),
                         risk.parameter(paramName),
                         risk.token(token),
+                        risk.description(description), 
+                        risk.solution(solution),
                     )
                 }else{
                     risk.NewRisk(
@@ -136,6 +159,8 @@ mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte
                         risk.payload(payload),
                         risk.parameter(paramName),
                         risk.token(token),
+                        risk.description(description), 
+                        risk.solution(solution), 
                     )
                 }
             }
