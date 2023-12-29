@@ -64,6 +64,7 @@ func (s *Server) SmokingEvaluatePlugin(ctx context.Context, req *ypb.SmokingEval
 	return s.EvaluatePlugin(ctx, pluginCode, pluginType)
 }
 
+// 只在评分中使用
 func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType string) (*ypb.SmokingEvaluatePluginResponse, error) {
 	if pluginType == "nuclei" {
 		return &ypb.SmokingEvaluatePluginResponse{
@@ -73,7 +74,7 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 	}
 
 	var results []*ypb.SmokingEvaluateResult
-	var pushSuggestion = func(item string, suggestion string, R *ypb.Range, i ...[]byte) {
+	pushSuggestion := func(item string, suggestion string, R *ypb.Range, i ...[]byte) {
 		var buf bytes.Buffer
 		for _, d := range i {
 			buf.Write(d)
@@ -143,7 +144,7 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 		var fetchRisk bool
 		err := s.debugScript("http://"+utils.HostPort(host, port), pluginType, pluginCode, NewFakeStream(ctx, func(result *ypb.ExecResult) error {
 			if result.IsMessage {
-				var m = make(map[string]any)
+				m := make(map[string]any)
 				err := json.Unmarshal(result.Message, &m)
 				if err != nil {
 					return err
@@ -155,7 +156,7 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 				}
 			}
 			return nil
-		}), nil)
+		}), []*ypb.KVPair{{Key: "State", Value: "Smoking"}})
 		if err != nil {
 			score -= 40
 			log.Errorf("debugScript failed: %v", err)
