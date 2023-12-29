@@ -111,7 +111,7 @@ func TestBuildInMethod(t *testing.T) {
 	}
 }
 
-func TestSSARuleMustPassRisk(t *testing.T) {
+func TestSSARuleMustPassRiskOption(t *testing.T) {
 	t.Run("risk with nothing", func(t *testing.T) {
 		check(t, `
 		risk.NewRisk(
@@ -166,6 +166,53 @@ func TestSSARuleMustPassRisk(t *testing.T) {
 			risk.description("abc"),
 			risk.cve("abc")
 		)
+			`, []string{})
+	})
+
+}
+
+func TestSSARuleMustPassRiskCreate(t *testing.T) {
+	t.Run("risk create not use", func(t *testing.T) {
+		check(t, `
+		risk.CreateRisk(
+			"abc", 
+			risk.cve("abc")
+		)
+			`, []string{
+			rules.ErrorRiskCreateNotSave(),
+		})
+	})
+
+	t.Run("risk create used but not saved", func(t *testing.T) {
+		check(t, `
+		r = risk.CreateRisk(
+			"abc", 
+			risk.cve("abc")
+		)
+		println(r)
+			`, []string{
+			rules.ErrorRiskCreateNotSave(),
+		})
+	})
+
+	t.Run("risk create saved", func(t *testing.T) {
+		check(t, `
+		r = risk.CreateRisk(
+			"abc", 
+			risk.cve("abc")
+		)
+		risk.Save(r)
+			`, []string{})
+	})
+
+	t.Run("risk create saved and used", func(t *testing.T) {
+		check(t, `
+		r = risk.CreateRisk(
+			"abc",
+			risk.cve("abc")
+		)
+		println(r)
+		risk.Save(r)
 			`, []string{})
 	})
 
