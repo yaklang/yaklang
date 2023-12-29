@@ -744,7 +744,7 @@ func (m *MixPluginCaller) MirrorHTTPFlowEx(
 
 			if callers.ShouldCallByName(HOOK_PortScanHandle) {
 				var (
-					matchResult *fp.MatchResult
+					matchResult *fp.MatchResult = &fp.MatchResult{State: fp.OPEN}
 					err         error
 				)
 				host, port, _ = utils.ParseStringToHostPort(u)
