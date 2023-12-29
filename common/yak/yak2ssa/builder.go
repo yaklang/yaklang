@@ -6,7 +6,6 @@ import (
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
-	"runtime/debug"
 )
 
 type Parser struct {
@@ -28,7 +27,7 @@ func parseSSA(src string, force bool, prog *ssa.Program, callback func(*ssa.Func
 	defer func() {
 		if r := recover(); r != nil {
 			log.Error("recover from yak2ssa.parseSSA: ", r)
-			debug.PrintStack()
+			// debug.PrintStack()
 			ret = nil
 		}
 	}()
