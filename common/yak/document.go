@@ -229,8 +229,8 @@ func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.Doc
 			}
 		}
 	}
-	// 标准库可能会返回的结构体的方法
-	funcTypes := make([]reflect.Type, 0)
+	// 标准库函数可能会返回结构体，我们也需要将其结构体的方法签名与文档拿到
+	handleTypes := make([]reflect.Type, 0)
 
 	var getTypeFromReflectFunctionType func(typ reflect.Type, level int) []reflect.Type
 
@@ -269,25 +269,31 @@ func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.Doc
 		}
 	}
 
+	// 全局变量
+	for _, instance := range helper.Instances {
+		handleTypes = append(handleTypes, reflect.TypeOf(instance))
+	}
+	// 标准库函数
 	for _, lib := range extLibs {
 		for _, funcDecl := range lib.Functions {
-			funcTypes = append(funcTypes, getFuncTypesFromFuncDecl(funcDecl)...)
+			handleTypes = append(handleTypes, getFuncTypesFromFuncDecl(funcDecl)...)
 		}
 	}
+	// 全局函数
 	for _, funcDecl := range helper.Functions {
-		funcTypes = append(funcTypes, getFuncTypesFromFuncDecl(funcDecl)...)
+		handleTypes = append(handleTypes, getFuncTypesFromFuncDecl(funcDecl)...)
 	}
 
-	funcTypes = lo.Uniq(funcTypes)
+	handleTypes = lo.Uniq(handleTypes)
 	filter := make(map[reflect.Type]struct{}, 0)
 
-	funcTypesList := list.New()
-	for _, typ := range funcTypes {
-		pushBackWithoutNil(funcTypesList, typ)
+	handleTypesList := list.New()
+	for _, typ := range handleTypes {
+		pushBackWithoutNil(handleTypesList, typ)
 	}
 
-	for iTyp := funcTypesList.Back(); iTyp != nil; iTyp = funcTypesList.Back() {
-		funcTypesList.Remove(iTyp)
+	for iTyp := handleTypesList.Back(); iTyp != nil; iTyp = handleTypesList.Back() {
+		handleTypesList.Remove(iTyp)
 
 		typ := iTyp.Value.(reflect.Type)
 
@@ -322,14 +328,14 @@ func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.Doc
 			structName = typ.Name()
 
 		} else if typKind == reflect.Ptr {
-			isStruct = typ.Elem().Kind() == reflect.Struct
+			isStruct = typ.Elem().Kind() == reflect.Struct || typ.Elem().Kind() == reflect.Interface
 			pkgPath = typ.Elem().PkgPath()
 			structName = typ.Elem().Name()
 		} else if typKind == reflect.Func {
 			// 形如 (s *Struct) MethodName() (callback func(*Struct2)) {}
 			// 需要递归再获取类型
 			for _, newTyp := range getTypeFromReflectFunctionType(typ, 0) {
-				pushBackWithoutNil(funcTypesList, newTyp)
+				pushBackWithoutNil(handleTypesList, newTyp)
 			}
 		}
 
@@ -345,7 +351,7 @@ func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.Doc
 					documents = GetInterfaceDocumentFromAST(pkg, structName)
 				}
 			}
-			if !ok {
+			if !ok && strings.HasPrefix(pkgPath, "github.com/yaklang/yaklang") {
 				log.Warnf("need inject interface document for: %s.%s", pkgPath, structName)
 			}
 		}
@@ -360,7 +366,7 @@ func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.Doc
 			methodName := method.Name
 			// 对于方法中的参数和返回值，需要递归再获取类型
 			for _, newTyp := range getTypeFromReflectFunctionType(method.Type, 0) {
-				pushBackWithoutNil(funcTypesList, newTyp)
+				pushBackWithoutNil(handleTypesList, newTyp)
 			}
 
 			// 为了处理 embed 字段，其组合了匿名结构体字段的方法
