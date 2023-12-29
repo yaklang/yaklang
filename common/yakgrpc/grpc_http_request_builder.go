@@ -22,17 +22,8 @@ func (s *Server) DebugPlugin(req *ypb.DebugPluginRequest, stream ypb.Yak_DebugPl
 		return utils.Error("input / input packet is empty")
 	}
 
-	if input == "" {
-		if req.GetHTTPRequestTemplate().GetIsRawHTTPRequest() {
-			urlIns, err := lowhttp.ExtractURLFromHTTPRequestRaw(req.GetHTTPRequestTemplate().GetRawHTTPRequest(), req.GetHTTPRequestTemplate().GetIsHttps())
-			if err != nil {
-				return utils.Errorf("extract (target) url from raw http request failed: %v", err)
-			}
-			input = urlIns.String()
-		}
-	}
-
-	if pluginType != "yak" && input == "" && len(req.GetExecParams()) == 0 {
+	invalidRequest := pluginType != "yak" && input == "" && !req.GetHTTPRequestTemplate().GetIsRawHTTPRequest() // 非 yak 插件没有 input 也没有 http request
+	if invalidRequest {
 		return utils.Error("cannot find/extract debug target")
 	}
 
@@ -44,58 +35,7 @@ func (s *Server) HTTPRequestBuilder(ctx context.Context, req *ypb.HTTPRequestBui
 	const tempTag = "[[__REPLACE_ME__]]"
 
 	if req.GetIsRawHTTPRequest() {
-		var reqStr = string(req.GetRawHTTPRequest())
-
-		freq, err := mutate.NewFuzzHTTPRequest(reqStr)
-		if err != nil {
-			return nil, err
-		}
-
-		results, err := freq.FuzzHTTPHeader("Host", tempTag).Results()
-		if err != nil {
-			return nil, err
-		}
-		var firstReqStr string
-		var handledRequest [][]byte
-		for _, result := range results {
-			raw, err := utils.HttpDumpWithBody(result, true)
-			if err != nil {
-				continue
-			}
-			raw = bytes.ReplaceAll(raw, []byte(tempTag), []byte("{{Hostname}}"))
-			raw = bytes.ReplaceAll(raw, []byte(lowhttp.CRLF), []byte{'\n'})
-			if firstReqStr == "" {
-				firstReqStr = string(raw)
-			}
-			handledRequest = append(handledRequest, raw)
-		}
-
-		var buf bytes.Buffer
-		encoder := yaml.NewEncoder(&buf)
-		encoder.SetIndent(2)
-		err = encoder.Encode(map[string]any{
-			"requests": map[string]any{
-				"raw": []string{
-					firstReqStr,
-				},
-			},
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		var reqs []*ypb.HTTPRequestBuilderResult
-		for _, r := range handledRequest {
-			reqs = append(reqs, &ypb.HTTPRequestBuilderResult{
-				IsHttps:     isHttps,
-				HTTPRequest: r,
-			})
-		}
-		templates := utils.EscapeInvalidUTF8Byte(buf.Bytes())
-		return &ypb.HTTPRequestBuilderResponse{
-			Results:   reqs,
-			Templates: templates,
-		}, nil
+		return nil, utils.Error("RawHTTPRequest is not supported build")
 	}
 	_ = isHttps
 

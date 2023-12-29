@@ -620,8 +620,8 @@ func (c *Crawler) handleReqResult(r *Req) {
 		jsConcurrent = 3
 	}
 	swg := utils.NewSizedWaitGroup(jsConcurrent)
-	for _, c := range jsContents {
-		if c.IsCodeText {
+	for _, content := range jsContents {
+		if content.IsCodeText {
 			continue
 		}
 		swg.Add(1)
