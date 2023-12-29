@@ -47,4 +47,4 @@ jobs:
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
         yarn --version
-        git add . && (git commit -m "Update api docs" && yarn version --minor && git push --tags)
+        git add . && (git commit -m "Update api docs" && yarn version --minor && git push && git push --tags)
