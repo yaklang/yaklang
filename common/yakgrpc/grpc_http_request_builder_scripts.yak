@@ -5,11 +5,13 @@ Host: www.example.com
 `, "IsHttps": true}]
 
 isUrlParam = false
+pluginType = "mitm"
 if getParams("REQUESTS") != undefined {
     reqs = getParams("REQUESTS")
     ctx = getParams("CTX")
     pluginName = getParams("PLUGIN_NAME")
     isUrlParam = getParams("IS_URL_PARAM")
+    pluginType = getParams("PLUGIN_TYPE")
 }
 
 /*
@@ -60,7 +62,7 @@ for req in reqs {
 
                 u = str.ExtractURLFromHTTPRequestRaw(reqRaw, isHttps /*type: bool*/)~
                 header, body = poc.Split(rsp)~
-                caller.MirrorHTTPFlowEx(false, isHttps, u.String(), reqRaw, rsp, body)
+                caller.MirrorHTTPFlowEx(pluginType == "port-scan", isHttps, u.String(), reqRaw, rsp, body)
             }
         } catch err {
             println("===================packet=================== \n%v" % string(req.RawHTTPRequest))
