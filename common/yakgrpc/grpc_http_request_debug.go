@@ -4,6 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"net/url"
+	"reflect"
+	"strings"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -15,10 +20,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"net/url"
-	"reflect"
-	"strings"
-	"time"
 )
 
 type sender interface {
@@ -51,7 +52,7 @@ func (s *Server) execScriptWithExecParam(scriptName string, input string, stream
 			}
 		}
 	}()
-	var feedbackClient = yaklib.NewVirtualYakitClient(func(result *ypb.ExecResult) error {
+	feedbackClient := yaklib.NewVirtualYakitClient(func(result *ypb.ExecResult) error {
 		result.RuntimeID = runtimeId
 		return stream.Send(result)
 	})
@@ -121,7 +122,7 @@ func (s *Server) execScriptWithExecParam(scriptName string, input string, stream
 				funcType := funcValue.Type()
 				hookFunc := reflect.MakeFunc(funcType, func(args []reflect.Value) (results []reflect.Value) {
 					TempParams := []cli.SetCliExtraParam{cli.SetTempArgs(tempArgs)}
-					index := len(args) - 1 //获取 option 参数的 index
+					index := len(args) - 1 // 获取 option 参数的 index
 					interfaceValue := args[index].Interface()
 					args = args[:index]
 					cliExtraParams, ok := interfaceValue.([]cli.SetCliExtraParam)
@@ -177,7 +178,7 @@ func (s *Server) execScriptWithExecParam(scriptName string, input string, stream
 	}
 }
 
-func (s *Server) execScriptWithRequest(scriptName string, targetInput string, stream sender, params ...*ypb.HTTPRequestBuilderParams) error {
+func (s *Server) execScriptWithRequest(scriptName string, targetInput string, stream sender, execParams []*ypb.KVPair, params ...*ypb.HTTPRequestBuilderParams) error {
 	if scriptName == "" {
 		return utils.Error("code N scriptName is empty")
 	}
@@ -260,8 +261,8 @@ func (s *Server) execScriptWithRequest(scriptName string, targetInput string, st
 
 	if len(targets) != 0 { // 调试目标分支
 
-		//var results = builderResponse.GetResults()
-		var baseTemplates = []byte("GET {{Path}} HTTP/1.1\r\nHost: {{Hostname}}\r\n\r\n")
+		// var results = builderResponse.GetResults()
+		baseTemplates := []byte("GET {{Path}} HTTP/1.1\r\nHost: {{Hostname}}\r\n\r\n")
 
 		for _, target := range targets {
 			builderParams := mergeBuildParams(baseBuilderParams, target)
@@ -269,7 +270,7 @@ func (s *Server) execScriptWithRequest(scriptName string, targetInput string, st
 			if err != nil {
 				log.Errorf("failed to build http request: %v", err)
 			}
-			var results = builderResponse.GetResults()
+			results := builderResponse.GetResults()
 			if len(results) <= 0 {
 				packet := bytes.ReplaceAll(baseTemplates, []byte(`{{Hostname}}`), []byte(target.Host))
 				packet = bytes.ReplaceAll(packet, []byte(`{{Path}}`), []byte(target.Path))
@@ -314,7 +315,20 @@ func (s *Server) execScriptWithRequest(scriptName string, targetInput string, st
 		return utils.Error("unsupported plugin type: " + debugType)
 	}
 
-	var feedbackClient = yaklib.NewVirtualYakitClient(func(result *ypb.ExecResult) error {
+	// smoking
+	isSmoking := false
+	if len(execParams) > 0 {
+		for _, p := range execParams {
+			if p.Key != "State" {
+				continue
+			}
+			if p.Value == "Smoking" {
+				isSmoking = true
+			}
+		}
+	}
+
+	feedbackClient := yaklib.NewVirtualYakitClient(func(result *ypb.ExecResult) error {
 		result.RuntimeID = runtimeId
 		return stream.Send(result)
 	})
@@ -334,6 +348,7 @@ func (s *Server) execScriptWithRequest(scriptName string, targetInput string, st
 		"PLUGIN_NAME":  scriptName,
 		"IS_URL_PARAM": isUrlParam,
 		"PLUGIN_TYPE":  strings.ToLower(debugType),
+		"IS_SMOKING":   isSmoking,
 	})
 	if err != nil {
 		log.Warnf("execute debug script failed: %v", err)
@@ -350,7 +365,8 @@ func (s *Server) debugScript(
 	debugCode string,
 	stream sender,
 	execParams []*ypb.KVPair,
-	params ...*ypb.HTTPRequestBuilderParams) error {
+	params ...*ypb.HTTPRequestBuilderParams,
+) error {
 	tempName, err := yakit.CreateTemporaryYakScript(debugType, debugCode)
 	if err != nil {
 		return err
@@ -360,13 +376,13 @@ func (s *Server) debugScript(
 	case "yak", "codec":
 		return s.execScriptWithExecParam(tempName, input, stream, execParams)
 	case "mitm", "nuclei", "port-scan":
-		return s.execScriptWithRequest(tempName, input, stream, params...)
+		return s.execScriptWithRequest(tempName, input, stream, execParams, params...)
 	}
 	return utils.Error("unsupported plugin type: " + debugType)
 }
 
 func makeArgs(execParams []*ypb.KVPair) []string {
-	var args = []string{"yak"}
+	args := []string{"yak"}
 	canFilter := true
 	for _, p := range execParams {
 		switch p.Key {
@@ -399,7 +415,6 @@ func makeArgs(execParams []*ypb.KVPair) []string {
 		default:
 			args = append(args, "--"+p.Key, p.Value)
 		}
-
 	}
 	return args
 }
