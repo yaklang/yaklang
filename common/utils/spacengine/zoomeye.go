@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/samber/lo"
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -14,7 +15,7 @@ import (
 func zoomeyeResultToSpacengineList(filter string, result *gjson.Result) []*NetSpaceEngineResult {
 	rData := result.Get("matches").Array()
 
-	var results = make([]*NetSpaceEngineResult, len(rData))
+	results := make([]*NetSpaceEngineResult, len(rData))
 	for index, d := range rData {
 		dataMap := d.Map()
 		rGeoInfo := dataMap["geoinfo"]
@@ -28,8 +29,10 @@ func zoomeyeResultToSpacengineList(filter string, result *gjson.Result) []*NetSp
 		continent, country, city := rGeoInfo.Get("continent.names.zh-CN").String(), rGeoInfo.Get("country.names.zh-CN").String(), rGeoInfo.Get("city.names.zh-CN").String()
 		os := rPortInfo.Get("os").String()
 		app, version := rPortInfo.Get("app").String(), rPortInfo.Get("version").String()
+
 		latitule, longitude := rGeoInfo.Get("location.lat").Float(), rGeoInfo.Get("location.lon").Float()
 		banner := rPortInfo.Get("banner").String()
+		title := strings.Join(lo.Map(rPortInfo.Get("title").Array(), func(item gjson.Result, _ int) string { return item.String() }), " | ")
 
 		if rProtocol.Exists() {
 			protocol = dataMap["protocol"].Str
@@ -76,6 +79,7 @@ func zoomeyeResultToSpacengineList(filter string, result *gjson.Result) []*NetSp
 			FromFilter:      filter,
 			Fingerprints:    strings.Join(fps, "/"),
 			Banner:          utils.ParseStringToVisible(banner),
+			HtmlTitle:       title,
 		}
 	}
 
