@@ -33,6 +33,17 @@ c = a.b
 	})
 }
 
+func TestObjectTest_Basic_Phi_1(t *testing.T) {
+	// a.b can be as "phi and masked"
+	prog := Parse(`a = {}; if f {a.b = 2;}; e = a.b
+`).Show()
+	prog.Ref("c").ForEach(func(value *Value) {
+		value.GetTopDefs().ForEach(func(value *Value) {
+			value.ShowBacktrack()
+		})
+	})
+}
+
 func TestObjectTest_Basic_Phi2(t *testing.T) {
 	// a.b can be as "phi and masked"
 	prog := Parse(`a = {"b": 1}
