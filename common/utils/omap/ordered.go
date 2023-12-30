@@ -695,3 +695,18 @@ func (s *OrderedMap[T, V]) UnsetParent() {
 func (s *OrderedMap[T, V]) CanAsList() bool {
 	return !s.namedKey
 }
+
+func (s *OrderedMap[T, V]) Push(a V) error {
+	return s.Add(a)
+}
+
+func (s *OrderedMap[T, V]) Pop() V {
+	key, v, ok := s.Last()
+	if ok {
+		s.Delete(key)
+		return v
+	}
+	var ret V
+	log.Errorf("pop failed: %v", s)
+	return ret
+}
