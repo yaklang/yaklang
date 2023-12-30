@@ -78,6 +78,8 @@ func (i *Value) getTopDefs(actx *AnalyzeContext) Values {
 	}
 
 	switch ret := i.node.(type) {
+	case *ssa.Field:
+		return i.visitedDefsDefault(actx)
 	case *ssa.Phi:
 		if !actx.ThePhiShouldBeVisited(i) {
 			// phi is visited...
@@ -96,7 +98,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext) Values {
 			log.Errorf("push call error: %v", err)
 			return Values{i}
 		}
-
+		defer actx.PopCall()
 		// TODO: trace the specific return-values
 		return NewValue(caller).SetParent(i).getTopDefs(actx)
 	case *ssa.Function:
