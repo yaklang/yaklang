@@ -798,7 +798,7 @@ func (b *astbuilder) buildLeftExpressionList(forceAssign bool, stmt *yak.LeftExp
 	return values
 }
 
-// left  expression
+// buildLeftExpression build left expression
 func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpressionContext) ssa.LeftValue {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
