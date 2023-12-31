@@ -1,8 +1,6 @@
 package ssa
 
 import (
-	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/slices"
 )
@@ -149,37 +147,6 @@ func (b *FunctionBuilder) getFieldWithCreate(i, key Value, forceCreate bool) Val
 		// handler extern lib
 		if v := b.getExternLibInstance(i, key); v != nil {
 			return v
-		}
-	}
-
-	// static member?
-	// the key is const/literal
-	var staticName string
-	switch ret := key.(type) {
-	case *ConstInst:
-		switch ret.GetRawValue().(type) {
-		case string:
-			staticName = ret.GetRawValue().(string)
-		default:
-			staticName = fmt.Sprintf("[%v]", key.String())
-		}
-	}
-
-	// check phi?
-	block := b.CurrentBlock
-	if block != nil {
-		if !block.isSealed {
-			if forceCreate {
-				NewPhi(block, staticName, true)
-				block.inCompletePhi = append(block.inCompletePhi)
-			}
-		} else if len(block.Preds) == 1 {
-			log.Infof("preds len 1: %s", block.String())
-		} else if len(block.Preds) == 0 {
-			log.Infof("preds len 0: %s", block.String())
-		} else {
-			// create phi
-			NewPhi(block, staticName, true)
 		}
 	}
 

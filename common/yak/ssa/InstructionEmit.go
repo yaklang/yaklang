@@ -321,6 +321,13 @@ func (f *FunctionBuilder) EmitField(i, key Value) Value {
 	if f.CurrentBlock.finish {
 		return nil
 	}
+
+	handlePhi := len(f.CurrentBlock.Preds) > 1 || !f.CurrentBlock.isSealed
+	if handlePhi {
+		// produce phi
+		panic("TODO")
+	}
+
 	return f.getFieldWithCreate(i, key, false)
 }
 func (f *FunctionBuilder) EmitFieldMust(i, key Value) *Field {

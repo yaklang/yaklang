@@ -2,6 +2,58 @@ package ssaapi
 
 import "testing"
 
+/*
+OOP MVP
+
+# trace a.b
+a = {}; a.b = 1; a.c = 3; d = a.c; // trace d -> {} & 3
+
+# trace a.b in phi
+a = {}; a.b = 1; if f { a.b = 2 }; c = a.b; // trace c -> phi{1,2} & {}
+
+# trace dynamic member
+a = {}; b = d ? "d" : e; a[b]=1; c = a[b]; // trace c -> 1
+a = {}; b = d ? "d" : e; c = a[b]; // trace c -> a & "d" & e & d
+
+# deep in closure
+a = () => {return {"b": 1}}; d = a(); c = d.b; // trace c -> 1
+
+# mask
+a = {};
+b = () => {a.b = 1};
+c = () => {a.b = 2}
+d ? b() : c();
+e = a.b // mask trace e -> 1 & 2
+
+*/
+
+func TestBasic_Phi(t *testing.T) {
+	prog := Parse(`a = 0; if b {a = 1;} else if e {a = 2} else {a=4}; c = a`).Show()
+	prog.Ref("d").ForEach(func(value *Value) {
+		value.GetTopDefs().ForEach(func(value *Value) {
+			t.Log(value.String())
+		})
+	})
+}
+
+func TestOOP_Basic_Phi(t *testing.T) {
+	prog := Parse(`a = {}; if b {aa = a; aa.b = 1;} else {a.b = 2}; c = a.b`).Show()
+	prog.Ref("d").ForEach(func(value *Value) {
+		value.GetTopDefs().ForEach(func(value *Value) {
+			t.Log(value.String())
+		})
+	})
+}
+
+func TestOOP_Basic_DotTrace(t *testing.T) {
+	prog := Parse(`a = {}; a.b = 1; a.c = h ? 3 : 2; d := a.c`).Show()
+	prog.Ref("d").ForEach(func(value *Value) {
+		value.GetTopDefs().ForEach(func(value *Value) {
+			t.Log(value.String())
+		})
+	})
+}
+
 func TestObjectTest_Basic_Phi(t *testing.T) {
 	// a.b can be as "phi and masked"
 	prog := Parse(`a = {"b": 1}
@@ -33,10 +85,9 @@ c = a.b
 	})
 }
 
-func TestObjectTest_Basic_Phi_1(t *testing.T) {
+func TestObjectTest_Basic_LeftValue(t *testing.T) {
 	// a.b can be as "phi and masked"
-	prog := Parse(`a = {}; if f {a.b = 2;}; e = a.b
-`).Show()
+	prog := Parse(`a = {}; if f {a.b = 2;}; e = a.b`).Show()
 	prog.Ref("c").ForEach(func(value *Value) {
 		value.GetTopDefs().ForEach(func(value *Value) {
 			value.ShowBacktrack()
