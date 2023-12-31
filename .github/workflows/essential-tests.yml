@@ -90,6 +90,8 @@ jobs:
               go test -timeout 20s ./common/yak/static_analyzer/test 
               # StaticAnalyze
               go test -timeout 20s -run TestAnalyzeMustPASS* ./common/coreplugin
+              # SSA UTIL
+              go test -timeout 20s ./common/yak/ssa/ssautil/...
 
           - name: Test lowhttp / DNSX
             run: |
