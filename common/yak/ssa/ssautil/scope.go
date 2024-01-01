@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"reflect"
 	"sync"
 )
 
@@ -58,6 +59,21 @@ func (v *ScopedVersionedTable[T]) IsRoot() bool {
 	return v.parent == nil
 }
 
+func isZeroValue(i any) bool {
+	if i == nil {
+		return true
+	}
+
+	if reflect.ValueOf(i).IsValid() {
+		return true
+	}
+
+	if reflect.ValueOf(i).IsNil() {
+		return true
+	}
+	return reflect.ValueOf(i).IsZero()
+}
+
 // CreateLexicalVariable create a root lexical variable
 // the next versions will be named as "1", "2", "3"...
 // the version index is auto set by the order of creation
@@ -81,7 +97,7 @@ func (v *ScopedVersionedTable[T]) CreateLexicalVariable(name string, value T) *V
 		if !v.IsRoot() && v.IsCapturedByCurrentScope(name) {
 			v.registerCapturedVariable(name, verVar)
 		}
-		if value == nil {
+		if !isZeroValue(value) {
 			err := verVar.Assign(value)
 			if err != nil {
 				log.Errorf("assign failed: %v", err)
@@ -103,7 +119,7 @@ func (v *ScopedVersionedTable[T]) CreateSymbolicVariable(value T) *Versioned[T] 
 	table := omap.NewOrderedMap[string, *Versioned[T]](map[string]*Versioned[T]{})
 	table.Add(verVar)
 	v.values.Set(key, table)
-	if value != nil {
+	if !isZeroValue(value) {
 		err := verVar.Assign(value)
 		if err != nil {
 			log.Errorf("assign failed: %s", err)

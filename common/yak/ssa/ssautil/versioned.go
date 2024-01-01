@@ -62,8 +62,8 @@ func (v *Versioned[T]) Assign(val T) error {
 		return utils.Error("ssautil.VersionedVar should be assigned once")
 	}
 
-	if val == nil {
-		log.Warnf("ssa: #%v is trying to be assigned by nil")
+	if isZeroValue(val) {
+		log.Warnf("ssa: #%v is trying to be assigned by nil", v.GetId())
 	}
 	v.isAssigned.Set()
 	v.Value = val
