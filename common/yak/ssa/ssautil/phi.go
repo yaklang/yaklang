@@ -13,7 +13,7 @@ func (p *PhiContext[T]) AddPhi(i *Versioned[T]) {
 // ProducePhi produce the phi for the captured variable
 // note: this function will be called after the block sealed
 func ProducePhi[T any](
-	factory func(...any) any,
+	factory func(...T) T,
 	scopes ...*ScopedVersionedTable[T]) {
 	var ctxs = map[*ScopedVersionedTable[T]]map[string]*PhiContext[T]{}
 	for _, v := range scopes {
@@ -46,7 +46,7 @@ func ProducePhi[T any](
 
 	for _, vars := range ctxs {
 		for _, ctx := range vars {
-			var vals = make([]any, 0, len(ctx.phi))
+			var vals = make([]T, 0, len(ctx.phi))
 			for _, v := range ctx.phi {
 				vals = append(vals, v.Value)
 			}
