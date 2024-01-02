@@ -3,7 +3,6 @@ package minimartian
 import (
 	"io"
 	"net/http"
-	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian/proxyutil"
@@ -20,7 +19,7 @@ func (p *Proxy) doHTTPRequest(ctx *Context, req *http.Request) (*http.Response, 
 	}
 	if httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_IsDropped) {
 		log.Debugf("mitm: skipping round trip due to user manually drop")
-		return proxyutil.NewResponse(200, strings.NewReader(proxyutil.GetPrettyErrorRsp("请求被用户丢弃")), req), nil
+		return proxyutil.NewResponse(200, nil, req), nil
 	}
 
 	httpctx.SetRequestHTTPS(req, ctx.GetSessionBoolValue(httpctx.REQUEST_CONTEXT_KEY_IsHttps))
