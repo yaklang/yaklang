@@ -160,6 +160,20 @@ func NewErrorHandler(try, catch *BasicBlock) *ErrorHandler {
 	return e
 }
 
+func NewExternLib(variable string, fun *Function) *ExternLib {
+	e := &ExternLib{
+		anInstruction: NewInstruction(),
+		anValue:       NewValue(),
+	}
+	e.SetName(variable)
+	e.SetFunc(fun)
+	e.SetBlock(fun.EnterBlock)
+	e.SetRange(fun.GetRange())
+	e.GetProgram().SetVirtualRegister(e)
+	e.GetProgram().SetInstructionWithName(variable, e)
+	return e
+}
+
 func NewParam(variable string, isFreeValue bool, fun *Function) *Parameter {
 	p := &Parameter{
 		anInstruction: NewInstruction(),

@@ -113,9 +113,14 @@ func (b *FunctionBuilder) CreateInterfaceWithVs(keys []Value, vs []Value) *Make 
 
 // func (b *FunctionBuilder) getExternLibInstanceForLeft(pa *Parameter, ci ConstInst) LeftValue {
 // }
-func (b *FunctionBuilder) getExternLibInstance(i, key Value) Value {
-	pa, ok := ToParameter(i)
+func (b *FunctionBuilder) getExternLibInstance(i, key Value) (ret Value) {
+	pa, ok := ToExternLib(i)
 	ci, ok2 := ToConst(key)
+	defer func() {
+		if ret != nil {
+			pa.Member = append(pa.Member, ret)
+		}
+	}()
 	if ok && ok2 && pa.BuildField != nil {
 		if v := pa.BuildField(ci.String()); v != nil {
 			return v
