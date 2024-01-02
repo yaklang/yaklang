@@ -22,14 +22,28 @@ func TestServer_PcapX(t *testing.T) {
 	}
 	spew.Dump(rsp)
 }
+func TestQueryTrafficTCPReassembled(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+	rsp, err := client.QueryTrafficTCPReassembled(context.Background(), &ypb.QueryTrafficTCPReassembledRequest{
+		FromId:  1,
+		UntilId: 2,
+	})
+	if err != nil {
+		panic(err)
+	}
+	spew.Dump(rsp)
+}
 func TestParseTraffic(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		panic(err)
 	}
 	parseRes, err := client.ParseTraffic(context.Background(), &ypb.ParseTrafficRequest{
-		Id:   12,
-		Type: "packet",
+		Id:   746,
+		Type: "reassembled",
 	})
 	if err != nil {
 		t.Fatal(err)

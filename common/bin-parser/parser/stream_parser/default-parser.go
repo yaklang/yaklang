@@ -50,6 +50,7 @@ type DefParser struct {
 	ctx   *base.NodeContext
 	mode  string
 	cfg   base.Config
+	bpPos []uint64
 }
 type Operator struct {
 	ParseStruct   func(node *base.Node) (bool, error)
@@ -542,17 +543,27 @@ func (d *DefParser) Parse(data *base.BitReader, node *base.Node) error {
 					return err
 				}
 				node.Cfg.SetItem(CfgNodeResult, res)
+				res, err = d.write([]byte(delimiter), uint64(len(delimiter)*8))
+				if err != nil {
+					return err
+				}
 				log.Debugf("node %s result: %v", node.Name, codec.EncodeToHex(byts))
 				return nil
 			}
 		},
 		Backup: func() error {
+			d.bpPos = append(d.bpPos, d.ctx.GetUint64("pointer"))
 			return data.Backup()
 		},
 		Recovery: func() error {
+			d.ctx.SetItem("pointer", d.bpPos[len(d.bpPos)-1])
+			buffer := node.Ctx.GetItem("buffer").(*bytes.Buffer)
+			buffer.Truncate(int(d.bpPos[len(d.bpPos)-1]) / 8)
+			d.bpPos = d.bpPos[:len(d.bpPos)-1]
 			return data.Recovery()
 		},
 		PopBackup: func() error {
+			d.bpPos = d.bpPos[:len(d.bpPos)-1]
 			return data.PopBackup()
 		},
 	}
