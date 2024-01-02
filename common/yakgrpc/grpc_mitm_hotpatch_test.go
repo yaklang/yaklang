@@ -57,8 +57,7 @@ Host: ` + utils.HostPort(mockHost, mockPort) + `
 			packetBytes := lowhttp.FixHTTPRequest([]byte(packet))
 			_, err := yak.Execute(`
 rsp, req, err = poc.HTTPEx(packet, poc.proxy(mitmProxy))
-dump(rsp.RawPacket)
-assert rsp.ResponseBodySize == 0
+assert rsp.RawPacket.Contains("响应被用户丢弃")
 `, map[string]any{
 				"packet":    string(packetBytes),
 				"mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort),

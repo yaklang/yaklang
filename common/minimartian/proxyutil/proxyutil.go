@@ -34,6 +34,16 @@ import (
 //go:embed template.html
 var templateBody string
 
+func NewResponseFromOldResponse(code int, body io.Reader, req *http.Request, oldRsp *http.Response) *http.Response {
+	// If Content-Type is not text, we will not provide body
+	// This is to prevent parsing errors in some js/css responses
+	if !strings.Contains(oldRsp.Header.Get("Content-Type"), "text") {
+		body = nil
+	}
+
+	return NewResponse(code, body, req)
+}
+
 // NewResponse builds new HTTP responses.
 // If body is nil, an empty byte.Buffer will be provided to be consistent with
 // the guarantees provided by http.Transport and http.Client.
@@ -41,7 +51,6 @@ func NewResponse(code int, body io.Reader, req *http.Request) *http.Response {
 	if body == nil {
 		body = &bytes.Buffer{}
 	}
-
 	rc, ok := body.(io.ReadCloser)
 	if !ok {
 		rc = ioutil.NopCloser(body)

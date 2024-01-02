@@ -644,7 +644,7 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 		err := p.resmod.ModifyResponse(res)
 		if err != nil {
 			if errors.Is(err, IsDroppedError) {
-				res = proxyutil.NewResponse(200, strings.NewReader(proxyutil.GetPrettyErrorRsp("请求被用户丢弃")), req)
+				res = proxyutil.NewResponseFromOldResponse(200, strings.NewReader(proxyutil.GetPrettyErrorRsp("响应被用户丢弃")), req, res)
 			} else {
 				log.Errorf("mitm: error modifying response: %v", err)
 				proxyutil.Warning(res.Header, err)

@@ -1,5 +1,6 @@
 host, port = tcp.MockServe(`HTTP/1.1 200 OK
 Content-Length: 1
+Content-Type: text/html; charset=utf-8
 
 a`)
 
@@ -29,11 +30,11 @@ if rsp.ResponseBodySize != 1 {
 }
 // 被丢弃的请求
 rsp, req = poc.Get(f"http://${str.HostPort(host, port)}/?drop_req=true", poc.proxy("http://127.0.0.1:" + string(mitmPort)))~
-if !str.Contains(rsp.RawPacket, "请求被用户丢弃") {
+if rsp.ResponseBodySize != 0 {
     die("request should be dropped")
 }
 // 被丢弃的响应
 rsp, req = poc.Get(f"http://${str.HostPort(host, port)}/?drop_rsp=true", poc.proxy("http://127.0.0.1:" + string(mitmPort)))~
-if rsp.ResponseBodySize == 0 {
+if !str.Contains(rsp.RawPacket, "响应被用户丢弃") {
     die("response should be dropped")
 }
