@@ -17,7 +17,7 @@ func TestGRPCMUSTPASS_MITM_HotPatch_Drop(t *testing.T) {
 	defer cancel()
 
 	mockHost, mockPort := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
-		writer.WriteHeader(500)
+		writer.Write([]byte("Hello"))
 	})
 
 	mitmPort := utils.GetRandomAvailableTCPPort()
@@ -57,7 +57,8 @@ Host: ` + utils.HostPort(mockHost, mockPort) + `
 			packetBytes := lowhttp.FixHTTPRequest([]byte(packet))
 			_, err := yak.Execute(`
 rsp, req, err = poc.HTTPEx(packet, poc.proxy(mitmProxy))
-assert err.Error() == "EOF"
+dump(rsp.RawPacket)
+assert rsp.ResponseBodySize == 0
 `, map[string]any{
 				"packet":    string(packetBytes),
 				"mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort),
