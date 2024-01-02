@@ -189,6 +189,10 @@ func (p *Parameter) String() string {
 	return p.GetName()
 }
 
+func (e *ExternLib) String() string {
+	return e.GetName()
+}
+
 // ----------- Jump
 func (j *Jump) String() string {
 	return fmt.Sprintf("jump -> %s", j.To.GetName())

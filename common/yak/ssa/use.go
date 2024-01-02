@@ -165,6 +165,17 @@ func (p *Phi) ReplaceValue(v Value, to Value) {
 	}
 }
 
+// / ---- extern lib
+func (e *ExternLib) HasValues() bool   { return true }
+func (e *ExternLib) GetValues() Values { return e.Member }
+func (e *ExternLib) ReplaceValue(v Value, to Value) {
+	if index := slices.Index(e.Member, v); index != -1 {
+		e.Member[index] = to
+	} else {
+		panic("extern lib not use this value")
+	}
+}
+
 // // ----------- param
 func (p *Parameter) HasValues() bool   { return false }
 func (p *Parameter) GetValues() Values { return nil }

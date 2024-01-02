@@ -73,7 +73,7 @@ func lineDisasm(v Instruction, liner *DisasmLiner) (ret string) {
 	}()
 
 	switch v := v.(type) {
-	case *Function, *BasicBlock, *Parameter, *Undefined:
+	case *Function, *BasicBlock, *Parameter, *ExternLib, *Undefined:
 		return fmt.Sprintf("%s", v.GetName())
 	case *Phi:
 		liner.symbol[v] = v.GetName()
