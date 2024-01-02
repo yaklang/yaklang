@@ -245,7 +245,7 @@ func (m *MITMServer) hijackResponseHandler(rsp *http.Response) error {
 		result := m.responseHijackHandler(isHttps, requestOrigin, rsp, responseBytes, httpctx.GetRemoteAddr(requestOrigin))
 		if result == nil {
 			dropped.Set()
-			rsp = proxyutil.NewResponse(200, strings.NewReader("响应被用户丢弃"), requestOrigin)
+			rsp = proxyutil.NewResponseFromOldResponse(200, strings.NewReader("响应被用户丢弃"), requestOrigin, rsp)
 		} else {
 			responseBytes = make([]byte, len(result))
 			copy(responseBytes, result)
