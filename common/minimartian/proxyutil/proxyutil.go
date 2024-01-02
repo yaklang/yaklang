@@ -46,6 +46,8 @@ func NewResponse(code int, body io.Reader, req *http.Request) *http.Response {
 	if !ok {
 		rc = ioutil.NopCloser(body)
 	}
+	headers := http.Header{}
+	headers["Content-Type"] = []string{"text/html;charset=utf-8"}
 
 	res := &http.Response{
 		StatusCode: code,
@@ -53,7 +55,7 @@ func NewResponse(code int, body io.Reader, req *http.Request) *http.Response {
 		Proto:      "HTTP/1.1",
 		ProtoMajor: 1,
 		ProtoMinor: 1,
-		Header:     http.Header{},
+		Header:     headers,
 		Body:       rc,
 		Request:    req,
 	}
