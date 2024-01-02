@@ -1,15 +1,16 @@
 package minimartian
 
 import (
+	"io"
+	"net/http"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian/proxyutil"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"io"
-	"net/http"
-	"strings"
 )
 
 func (p *Proxy) doHTTPRequest(ctx *Context, req *http.Request) (*http.Response, error) {
@@ -19,7 +20,7 @@ func (p *Proxy) doHTTPRequest(ctx *Context, req *http.Request) (*http.Response, 
 	}
 	if httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_IsDropped) {
 		log.Debugf("mitm: skipping round trip due to user manually drop")
-		return proxyutil.NewResponse(200, strings.NewReader(proxyutil.GetErrorRspBody("请求被用户丢弃")), req), nil
+		return proxyutil.NewResponse(200, strings.NewReader(proxyutil.GetPrettyErrorRsp("请求被用户丢弃")), req), nil
 	}
 
 	httpctx.SetRequestHTTPS(req, ctx.GetSessionBoolValue(httpctx.REQUEST_CONTEXT_KEY_IsHttps))
@@ -36,7 +37,7 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 	bareBytes := httpctx.GetRequestBytes(req)
 	reqBytes := lowhttp.FixHTTPRequest(bareBytes)
 
-	var isHttps = httpctx.GetRequestHTTPS(req)
+	isHttps := httpctx.GetRequestHTTPS(req)
 
 	newUrl, err := lowhttp.ExtractURLFromHTTPRequest(req, isHttps)
 	if err != nil {
@@ -56,7 +57,7 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 		isH2 = cached.(bool)
 	}
 
-	var isGmTLS = p.gmTLS && isHttps
+	isGmTLS := p.gmTLS && isHttps
 
 	opts := append(
 		p.lowhttpConfig,
@@ -72,7 +73,7 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 	if connectedPort := httpctx.GetContextIntInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort); connectedPort > 0 {
 		portValid := (connectedPort == 443 && isHttps) || (connectedPort == 80 && !isHttps)
 		if !portValid {
-			//修复host和port
+			// 修复host和port
 			if host := httpctx.GetContextStringInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost); host != "" {
 				opts = append(opts, lowhttp.WithHost(host))
 			}

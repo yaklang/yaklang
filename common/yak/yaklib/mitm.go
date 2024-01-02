@@ -414,7 +414,7 @@ func startBridge(
 				config.hijackResponse(isHttps, urlStrIns.String(), fixedResp, func(bytes []byte) {
 					after = bytes
 				}, func() {
-					isDropped.IsSet()
+					isDropped.Set()
 				})
 			}
 
@@ -429,8 +429,11 @@ func startBridge(
 				config.hijackResponseEx(isHttps, urlStrIns.String(), reqRaw, fixedResp, func(bytes []byte) {
 					after = bytes
 				}, func() {
-					isDropped.IsSet()
+					isDropped.Set()
 				})
+			}
+			if isDropped.IsSet() {
+				return nil
 			}
 
 			return after

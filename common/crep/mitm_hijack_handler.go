@@ -125,7 +125,6 @@ func (m *MITMServer) hijackRequestHandler(rootCtx context.Context, wsModifier *W
 	}
 	httpctx.SetRequestHTTPS(req, isHttps)
 
-	isDropped := utils.NewBool(false)
 	if m.requestHijackHandler != nil {
 		hijackedRaw := httpctx.GetBareRequestBytes(req)
 		if hijackedRaw == nil || len(hijackedRaw) == 0 {
@@ -160,7 +159,7 @@ func (m *MITMServer) hijackRequestHandler(rootCtx context.Context, wsModifier *W
 		default:
 		}
 		if hijackedRequestRaw == nil {
-			isDropped.Set()
+			httpctx.SetContextValueInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_IsDropped, true)
 		} else {
 			hijackedRaw = hijackedRequestRaw
 			hijackedReq, err := lowhttp.ParseBytesToHttpRequest(hijackedRequestRaw)
