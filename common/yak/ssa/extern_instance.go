@@ -64,16 +64,17 @@ func (b *FunctionBuilder) TryBuildExternValue(id string) Value {
 	}
 	if b.ExternLib != nil {
 		if table, ok := b.ExternLib[id]; ok {
-			pa := NewParam(id, false, b.Function)
-			pa.SetExtern(true)
-			pa.BuildField = func(key string) Value {
+			ex := NewExternLib(id, b.Function)
+			ex.SetExtern(true)
+			ex.BuildField = func(key string) Value {
 				if v, ok := table[key]; ok {
-					return b.BuildValueFromAny(id+"."+key, v)
+					v := b.BuildValueFromAny(id+"."+key, v)
+					return v
 				} else {
 					return nil
 				}
 			}
-			return pa
+			return ex
 		}
 	}
 	return nil

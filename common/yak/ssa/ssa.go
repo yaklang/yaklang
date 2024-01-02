@@ -372,15 +372,26 @@ var (
 	_ Instruction = (*Phi)(nil)
 )
 
+// ----------- externLib
+type ExternLib struct {
+	anInstruction
+	anValue
+
+	BuildField func(string) Value
+
+	Member []Value
+}
+
+var _ Node = (*ExternLib)(nil)
+var _ Value = (*ExternLib)(nil)
+var _ User = (*ExternLib)(nil)
+
 // ----------- Parameter
 type Parameter struct {
 	anValue
 	anInstruction
 
 	IsFreeValue bool
-
-	// for extern lib
-	BuildField func(string) Value
 
 	defaultValue Value
 }

@@ -20,7 +20,7 @@ func (b *BasicBlock) Sealed() {
 		if v.GetRange() == nil {
 			v.SetRange(p.GetRange())
 		}
-		if pa, ok := ToParameter(v); ok && pa.IsExtern() {
+		if pa, ok := ToExternLib(v); ok && pa.IsExtern() {
 			pa.GetUsers().RunOnField(func(f *Field) {
 				if v := builder.getExternLibInstance(v, f.Key); v != nil {
 					f.GetUsers().RunOnUpdate(func(u *Update) {

@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -431,4 +432,40 @@ func TestVariable(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestExternLib(t *testing.T) {
+	prog := parseSSA(`
+	test.test()
+	test.AAA()
+	`, false, nil, func(fb *ssa.FunctionBuilder) {
+		fb.ExternLib = map[string]map[string]any{
+			"test": map[string]any{
+				"test": func() {
+					println("test")
+				},
+			},
+		}
+	})
+
+	vs := prog.GetInstructionsByName("test")
+	if len(vs) != 1 {
+		t.Fatal("get test length error")
+	}
+	v, ok := ssa.ToUser(vs[0])
+	if !ok {
+		t.Fatal("get test value error")
+	}
+	values := v.GetValues()
+	if len(values) != 2 {
+		t.Fatal("get test value length error")
+	}
+	log.Info(values)
+	want := []string{"test.test", "test.AAA"}
+	// compare values and want
+	for i := range values {
+		if values[i].GetName() != want[i] {
+			t.Fatal("get test value error want:", want[i], " vs got:", values[i].String())
+		}
+	}
 }

@@ -10,6 +10,7 @@ const (
 	OpFunction     = "Function"
 	OpBasicBlock   = "BasicBlock"
 	OpParameter    = "Parameter"
+	OpExternLib    = "ExternLib"
 	OpPhi          = "Phi"
 	OpConstInst    = "ConstInst"
 	OpUndefined    = "Undefined"
@@ -37,6 +38,7 @@ const (
 func (i *Function) GetOpcode() Opcode     { return OpFunction }
 func (i *BasicBlock) GetOpcode() Opcode   { return OpBasicBlock }
 func (i *Parameter) GetOpcode() Opcode    { return OpParameter }
+func (i *ExternLib) GetOpcode() Opcode    { return OpExternLib }
 func (i *Phi) GetOpcode() Opcode          { return OpPhi }
 func (i *ConstInst) GetOpcode() Opcode    { return OpConstInst }
 func (i *Undefined) GetOpcode() Opcode    { return OpUndefined }
