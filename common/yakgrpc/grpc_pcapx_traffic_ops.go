@@ -1,10 +1,9 @@
 package yakgrpc
 
 import (
-	"bytes"
 	"context"
+	"fmt"
 	"github.com/samber/lo"
-	bin_parser "github.com/yaklang/yaklang/common/bin-parser/parser"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -23,7 +22,21 @@ func (s *Server) QueryTrafficPacket(ctx context.Context, req *ypb.QueryTrafficPa
 	rspData := lo.Map(data, func(item *yakit.TrafficPacket, index int) *ypb.TrafficPacket {
 		payloadBytes, _ := strconv.Unquote(item.Payload)
 		raw, _ := strconv.Unquote(item.QuotedRaw)
+		info, err := ParseTraffic([]byte(raw), "ethernet")
+		if err != nil {
+			log.Errorf("parse traffic failed: %s", err)
+		}
+		protocol := ""
+		if info != nil {
+			lastProtocolInfo := utils.GetLastElement(info)
+			v, ok := lastProtocolInfo.(map[string]any)
+			if ok {
+				protocol = utils.InterfaceToString(v["name"])
+			}
+		}
 		return &ypb.TrafficPacket{
+			Protocol:                        protocol,
+			Info:                            "",
 			LinkLayerType:                   item.LinkLayerType,
 			NetworkLayerType:                item.NetworkLayerType,
 			TransportLayerType:              item.TransportLayerType,
@@ -56,57 +69,37 @@ func (s *Server) QueryTrafficTCPReassembled(ctx context.Context, req *ypb.QueryT
 		log.Infof("query traffic tcp reassembled failed: %s", err)
 		return nil, err
 	}
+
 	rspData := lo.Map(data, func(item *yakit.TrafficTCPReassembledFrame, index int) *ypb.TrafficTCPReassembled {
-		var infoMap map[string]any
-		if item.SerializedResults == "" {
-			data := codec.StrConvUnquoteForce(item.QuotedData)
-			node, err := bin_parser.ParseBinary(bytes.NewReader(data), "application_layer.tcp")
+		protocol := ""
+		source := ""
+		destination := ""
+		parseTraffice := func() error {
+			session, err := yakit.QueryTrafficSessionByUUID(consts.GetGormProjectDatabase(), item.SessionUuid)
 			if err != nil {
-				log.Errorf("parse binary failed: %s", err)
+				return fmt.Errorf("query traffic session failed: %s", err)
 			} else {
-				res, err := node.Result()
-				if err != nil {
-					log.Errorf("get result failed: %s", err)
-				} else {
-					_ = res
-					//r, ok := res。
-					//if ok {
-					//	infoMap = r
-					//} else {
-					//	log.Errorf("result type error")
-					//}
+				source = fmt.Sprintf("%s:%d", session.NetworkSrcIP, session.TransportLayerSrcPort)
+				destination = fmt.Sprintf("%s:%d", session.NetworkDstIP, session.TransportLayerDstPort)
+			}
+			raw, _ := strconv.Unquote(item.QuotedData)
+			trafficInfo, err := ParseReassembledTraffic([]byte(raw))
+			if err != nil {
+				return fmt.Errorf("parse traffic failed: %s", err)
+			}
+			if trafficInfo != nil {
+				lastProtocolInfo := utils.GetLastElement(trafficInfo)
+				v, ok := lastProtocolInfo.(map[string]any)
+				if ok {
+					protocol = utils.InterfaceToString(v["name"])
 				}
 			}
-		} else {
-			data, err := codec.DecodeBase64(item.SerializedResults)
-			if err != nil {
-				log.Errorf("decode base64 failed: %s", err)
-			} else {
-				node, err := bin_parser.ParseBinary(bytes.NewReader(data), "tcp_reassembled_parsed_result")
-				if err != nil {
-					log.Errorf("parse binary failed: %s", err)
-				} else {
-					res, err := node.Result()
-					if err != nil {
-						log.Errorf("get result failed: %s", err)
-					} else {
-						_ = res
-						//r, ok := res.(map[string]any)
-						//if ok {
-						//	infoMap = r
-						//} else {
-						//	log.Errorf("result type error")
-						//}
-					}
-				}
-			}
+			return nil
 		}
-		if infoMap == nil {
-			log.Errorf("parser reassembled frame failed, id: %d", item.ID)
-		}
-		source := utils.InterfaceToString(infoMap["source"])
-		destination := utils.InterfaceToString(infoMap["destination"])
-		protocol := utils.InterfaceToString(infoMap["protocol"])
+		parseTraffice()
+		//if parseTraffice() != nil {
+		//	log.Errorf("parse traffic failed: %s", err)
+		//}
 		return &ypb.TrafficTCPReassembled{
 			Id:          int64(item.ID),
 			SessionUuid: item.SessionUuid,

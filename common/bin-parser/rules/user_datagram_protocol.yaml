@@ -24,7 +24,7 @@ Package:
                       }
                   }
               }
-              this.NewUnknownNode().Process()
+              # this.NewUnknownNode().Process()
 DNS: "import:application-layer/dns.yaml;node:DNS"
 DHCP: "import:application-layer/dhcp.yaml;node:DHCP"
 NTP: "import:application-layer/ntp.yaml;node:NTP"

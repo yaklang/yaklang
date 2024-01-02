@@ -30,7 +30,7 @@ Body:
     if getCtx("isChunked") {
       this.ProcessSubNode("DataChunks")
     }else{
-      this.GetSubNode("Data").SetCfg("length", getCtx("body_length"))
+      this.GetSubNode("Data").SetMaxLength(getCtx("body_length"))
       this.ProcessSubNode("Data")
     }
   Data: raw
@@ -54,13 +54,13 @@ Headers:
   operator: |
     for {
       data := this.NewElement().Process().Value
-      if len(data) == 0 {
+      if data == nil || len(data) == 0 {
         // this.SetChildren(this.GetChildren()[:-1])
         return
       }
       if string(data).HasPrefix("Content-Length: ") {
         l = int(string(data)[len("Content-Length: "):])
-        setCtx("body_length", l*8)
+        setCtx("body_length", l)
       }
       if string(data).HasPrefix("Transfer-Encoding: chunked") {
         setCtx("isChunked", true)

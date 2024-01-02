@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -53,9 +52,6 @@ func newStructNodeValue(node *base.Node, children ...*base.NodeValue) *base.Node
 }
 
 func newNodeValue(node *base.Node, v any) *base.NodeValue {
-	if v == (*[]*base.NodeValue)(nil) {
-		println()
-	}
 	return &base.NodeValue{
 		Origin:    node,
 		Name:      node.Name,
@@ -511,7 +507,6 @@ func parseLengthByLengthConfig(node *base.Node) (uint64, bool, error) {
 	remainingLength := parentLength - currentNodeLength
 	if getLengthOK {
 		if length > remainingLength {
-			spew.Dump(GetNodePath(node))
 			return 0, false, fmt.Errorf("node type %s,length %d over max size %d", node.Cfg.GetString(CfgType), length, remainingLength)
 		}
 		return length, true, nil
