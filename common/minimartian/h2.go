@@ -3,13 +3,14 @@ package minimartian
 import (
 	"bytes"
 	"crypto/tls"
+	"io"
+	"net/url"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian/proxyutil"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
-	"io"
-	"net/url"
 )
 
 // proxyH2 proxies HTTP/2 traffic between a client connection, `cc`, and the HTTP/2 `url` assuming
@@ -25,7 +26,7 @@ func (p *Proxy) proxyH2(closing chan bool, cc *tls.Conn, url *url.URL) error {
 	}()
 
 	return lowhttp.ServeHTTP2Connection(cc, func(header []byte, body io.ReadCloser) ([]byte, io.ReadCloser, error) {
-		var reqBytes = bytes.NewBuffer(header)
+		reqBytes := bytes.NewBuffer(header)
 
 		io.Copy(reqBytes, body) //
 		req, err := utils.ReadHTTPRequestFromBytes(reqBytes.Bytes())
@@ -44,7 +45,7 @@ func (p *Proxy) proxyH2(closing chan bool, cc *tls.Conn, url *url.URL) error {
 		if httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_IsDropped) {
 			return []byte(`HTTP/2 200 OK
 Content-Type: text/html
-`), io.NopCloser(bytes.NewBufferString(proxyutil.GetErrorRspBody("请求被用户丢弃"))), nil
+`), io.NopCloser(bytes.NewBufferString(proxyutil.GetPrettyErrorRsp("请求被用户丢弃"))), nil
 		} else {
 			rsp, err := p.execLowhttp(req)
 			if err != nil {

@@ -623,7 +623,7 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 	if (err != nil && err != io.EOF) || res == nil {
 		if strings.Contains(err.Error(), "no such host") {
 			httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_NOLOG, true)
-			res = proxyutil.NewResponse(200, strings.NewReader(proxyutil.GetErrorRspBody(fmt.Sprintf("Unknown host: %s", req.Host))), req)
+			res = proxyutil.NewResponse(200, strings.NewReader(proxyutil.GetPrettyErrorRsp(fmt.Sprintf("Unknown host: %s", req.Host))), req)
 		} else {
 			log.Debugf("mitm: failed to round trip: %v", err)
 			res = proxyutil.NewResponse(502, nil, req)
@@ -644,8 +644,7 @@ func (p *Proxy) handle(ctx *Context, timer *time.Timer, conn net.Conn, brw *bufi
 		err := p.resmod.ModifyResponse(res)
 		if err != nil {
 			if errors.Is(err, IsDroppedError) {
-				res = proxyutil.NewResponse(200, nil, req)
-				return utils.Error("mitm: response dropped by user")
+				res = proxyutil.NewResponse(200, strings.NewReader(proxyutil.GetPrettyErrorRsp("请求被用户丢弃")), req)
 			} else {
 				log.Errorf("mitm: error modifying response: %v", err)
 				proxyutil.Warning(res.Header, err)
