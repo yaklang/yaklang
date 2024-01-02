@@ -1,0 +1,39 @@
+host, port = tcp.MockServe(`HTTP/1.1 200 OK
+Content-Length: 1
+
+a`)
+
+ctx, cancel = context.WithCancel(context.New())
+mitmPort = os.GetRandomAvailableTCPPort()
+
+go func {
+    mitm.Start(mitmPort, mitm.hijackHTTPResponse((isHttps, url, rsp, forward, drop) => {
+    if url.Contains("drop_rsp") {
+        drop()
+    }
+}), mitm.context(ctx), mitm.hijackHTTPRequest((isHttps, url, req, forward, drop) => {
+    if url.Contains("drop_req") {
+        drop()
+    }
+}))
+}
+
+defer cancel()
+sleep(1)
+// 正常请求响应
+rsp, req = poc.Get(f"http://${str.HostPort(host, port)}/", poc.proxy("http://127.0.0.1:" + string(mitmPort)))~
+if rsp.ResponseBodySize != 1 {
+    die("response body size should be 1")
+} else if poc.GetHTTPPacketBody(rsp.RawPacket) != b"a" {
+    die(`response should be "a"`)
+}
+// 被丢弃的请求
+rsp, req = poc.Get(f"http://${str.HostPort(host, port)}/?drop_req=true", poc.proxy("http://127.0.0.1:" + string(mitmPort)))~
+if !str.Contains(rsp.RawPacket, "请求被用户丢弃") {
+    die("request should be dropped")
+}
+// 被丢弃的响应
+rsp, req = poc.Get(f"http://${str.HostPort(host, port)}/?drop_rsp=true", poc.proxy("http://127.0.0.1:" + string(mitmPort)))~
+if rsp.ResponseBodySize == 0 {
+    die("response should be dropped")
+}
