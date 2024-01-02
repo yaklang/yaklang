@@ -231,7 +231,7 @@ var icmpV6Expect = `Ethernet:
   Destination: 3333ffa35b78
   Source: f84d8991af52
   Type: 34525
-  Internet Protocol Version 6:
+  IPv6:
     Version: 6
     Traffic Class: 0
     Flow Label: 0
@@ -240,7 +240,7 @@ var icmpV6Expect = `Ethernet:
     Hop Limit: 255
     Source: fe8000000000000000237c9bf9dd7b2d
     Destination: ff0200000000000000000001ffa35b78
-    ICMPV6:
+    ICMPv6:
       Type: 135
       Code: 0
       Checksum: 3154
@@ -250,7 +250,7 @@ var dnsResponseExpect = `Ethernet:
   Destination: f84d8991af52
   Source: 3066d026811b
   Type: 2048
-  Internet Protocol:
+  IP:
     Version: 4
     Header Length: 5
     Type of Service: "00"
@@ -315,7 +315,7 @@ var dnsExpect = `Ethernet:
   Destination: 3066d026811b
   Source: f84d8991af52
   Type: 2048
-  Internet Protocol:
+  IP:
     Version: 4
     Header Length: 5
     Type of Service: "00"
@@ -361,7 +361,7 @@ var tlsExpect = `Ethernet:
   Destination: 3066d026811b
   Source: f84d8991af52
   Type: 2048
-  Internet Protocol:
+  IP:
     Version: 4
     Header Length: 5
     Type of Service: "00"
@@ -403,7 +403,7 @@ var httpRequestExpect = `Ethernet:
   Destination: 3066d026811b
   Source: f84d8991af52
   Type: 2048
-  Internet Protocol:
+  IP:
     Version: 4
     Header Length: 5
     Type of Service: "00"
@@ -454,7 +454,7 @@ var icmpExpect = `Ethernet:
   Destination: 3066d026811b
   Source: f84d8991af52
   Type: 2048
-  Internet Protocol:
+  IP:
     Version: 4
     Header Length: 5
     Type of Service: "00"
@@ -479,7 +479,7 @@ var arpExpect = `Ethernet:
   Destination: ffffffffffff
   Source: 3066d0268abb
   Type: 2054
-  Address Resolution Protocol:
+  ARP:
     Hardware type: 1
     Protocol type: 2048
     Hardware size: 6

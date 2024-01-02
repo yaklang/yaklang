@@ -68,13 +68,12 @@ type TrafficSession struct {
 type TrafficTCPReassembledFrame struct {
 	gorm.Model
 
-	SessionUuid       string `gorm:"index"`
-	QuotedData        string
-	Seq               int64
-	Timestamp         int64
-	Source            string
-	Destination       string
-	SerializedResults string
+	SessionUuid string `gorm:"index"`
+	QuotedData  string
+	Seq         int64
+	Timestamp   int64
+	Source      string
+	Destination string
 }
 
 type TrafficPacket struct {
@@ -132,6 +131,17 @@ func QueryTrafficTCPReassembled(db *gorm.DB, request *ypb.QueryTrafficTCPReassem
 		return nil, nil, db.Error
 	}
 	return p, data, nil
+}
+
+func QueryTrafficSessionByUUID(db *gorm.DB, uuid string) (*TrafficSession, error) {
+	db = db.Model(&TrafficSession{})
+	db = db.Where("uuid = ?", uuid)
+	var data TrafficSession
+	db = db.Find(&data)
+	if db.Error != nil {
+		return nil, db.Error
+	}
+	return &data, nil
 }
 
 func QueryTrafficSession(db *gorm.DB, request *ypb.QueryTrafficSessionRequest) (*bizhelper.Paginator, []*TrafficSession, error) {

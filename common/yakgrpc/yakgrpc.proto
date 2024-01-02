@@ -838,6 +838,8 @@ message TrafficPacket {
 
   string SessionId = 15;
   int64 Id = 16;
+  string Protocol = 17;
+  string Info = 18;
 }
 
 message QueryTrafficPacketResponse {
