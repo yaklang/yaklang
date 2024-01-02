@@ -217,3 +217,79 @@ func TestSSARuleMustPassRiskCreate(t *testing.T) {
 	})
 
 }
+
+func checkWithType(t *testing.T, code, typ string, want []string) {
+	got := AnalyzeStaticYaklangWithType(code, typ)
+	if len(got) != len(want) {
+		t.Fatalf("static analyzer error length error want(%d) vs got(%d)", len(want), len(got))
+	}
+
+	for i := range got {
+		if got[i].Message != want[i] {
+			t.Fatalf("static analyzer message error want(%s) vs got(%s)", want[i], got[i].Message)
+		}
+	}
+}
+
+func TestSSARuleMustPassCliDisable(t *testing.T) {
+	t.Run("cli disable in mitm", func(t *testing.T) {
+		checkWithType(t, `
+		domains = cli.String("domains")
+		cli.check()
+			`,
+			"mitm",
+			[]string{rules.ErrorDisableTypeCLi(), rules.ErrorDisableTypeCLi()})
+	})
+
+	t.Run("cli disable in yak", func(t *testing.T) {
+		checkWithType(t, `
+		domains = cli.String("domains")
+		cli.check()
+			`,
+			"yak",
+			[]string{})
+	})
+}
+
+func TestSSARuleMustPassMitmDisable(t *testing.T) {
+	t.Run("test pack in mitm main", func(t *testing.T) {
+		checkWithType(t, `
+		r = risk.CreateRisk(
+			"abc",
+			risk.cve("abc")
+		)
+		println(r)
+		risk.Save(r)
+			`,
+			"mitm",
+			[]string{rules.ErrorDisableMitmPacks(), rules.ErrorDisableMitmPacks(), rules.ErrorDisableMitmPacks()})
+	})
+
+	t.Run("test in mitm func", func(t *testing.T) {
+		checkWithType(t, `
+		() => {
+			r = risk.CreateRisk(
+				"abc",
+				risk.cve("abc")
+			)
+			println(r)
+			risk.Save(r)
+		}
+			`,
+			"mitm",
+			[]string{})
+	})
+
+	t.Run("test in other plugin type", func(t *testing.T) {
+		checkWithType(t, `
+		r = risk.CreateRisk(
+			"abc",
+			risk.cve("abc")
+		)
+		println(r)
+		risk.Save(r)
+			`,
+			"yak",
+			[]string{})
+	})
+}
