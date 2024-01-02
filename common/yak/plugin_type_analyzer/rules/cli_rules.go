@@ -200,6 +200,10 @@ func RuleCliDefault(prog *ssaapi.Program) {
 	checkCliDefault("cli.FileOrContent", []*ssaapi.Type{ssaapi.String}, fileOrContentCallback)
 	checkCliDefault("cli.LineDict", []*ssaapi.Type{ssaapi.String}, fileOrContentCallback)
 	checkCliDefault("cli.YakitPlugin", []*ssaapi.Type{ssaapi.String}, fileCallback)
+	checkCliDefault("cli.Have", []*ssaapi.Type{ssaapi.String}, nil)
+	checkCliDefault("cli.HTTPPacket", []*ssaapi.Type{ssaapi.String}, nil)
+	checkCliDefault("cli.YakCode", []*ssaapi.Type{ssaapi.String}, nil)
+	checkCliDefault("cli.Text", []*ssaapi.Type{ssaapi.String}, nil)
 }
 
 // 检查参数名是否重复和参数名是否符合规范
@@ -225,6 +229,10 @@ func RuleCliParamName(prog *ssaapi.Program) {
 		"cli.FileOrContent",
 		"cli.LineDict",
 		"cli.YakitPlugin",
+		"cli.HTTPPacket",
+		"cli.Have",
+		"cli.YakCode",
+		"cli.Text",
 	}
 
 	paramLineMap := make(map[string]int)
@@ -277,6 +285,10 @@ func RuleCliCheck(prog *ssaapi.Program) {
 		"cli.LineDict",
 		"cli.YakitPlugin",
 		"cli.check",
+		"cli.HTTPPacket",
+		"cli.Have",
+		"cli.YakCode",
+		"cli.Text",
 	}
 
 	var (
