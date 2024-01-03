@@ -27,7 +27,7 @@ func DisableCli(prog *ssaapi.Program) {
 }
 
 func ErrorDisableCLi() string {
-	return "CLI does not support this type"
+	return "This PluginType does not support CLI package"
 }
 
 func DisableMitmExternLib(prog *ssaapi.Program) {
