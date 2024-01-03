@@ -17,7 +17,10 @@ type TestCase struct {
 }
 
 func check(t *testing.T, tc TestCase) {
-	prog := ssaapi.Parse(tc.code, ssaapi.WithLanguage(ssaapi.JS))
+	prog, err := ssaapi.Parse(tc.code, ssaapi.WithLanguage(ssaapi.JS))
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
 	// prog.Show()
 	value := prog.Ref(tc.ref)
 	var ret []string

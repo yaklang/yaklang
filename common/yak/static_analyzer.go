@@ -66,8 +66,9 @@ func AnalyzeStaticYaklangWithType(code, codeTyp string) []*StaticAnalyzeResult {
 		}
 	}
 
-	prog := ssaapi.Parse(code, pta.GetPluginSSAOpt(codeTyp)...)
-	if prog.IsNil() {
+	prog, err := ssaapi.Parse(code, pta.GetPluginSSAOpt(codeTyp)...)
+	if err != nil {
+		log.Error("SSA 解析失败：", err)
 		return results
 	}
 	pta.CheckPluginType(codeTyp, prog)

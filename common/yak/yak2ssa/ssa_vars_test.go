@@ -10,12 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-func TestParseSSA_Valid(t *testing.T) {
-	p := ParseSSA(`1+1`)
-	p.Show()
-}
-
-func ParseSSA(code string) *ssa.Program {
+func ParseSSA(code string) (*ssa.Program, error) {
 	return parseSSA(code, false, nil, func(fb *ssa.FunctionBuilder) {})
 }
 func check(t *testing.T, code string, regex string) {
@@ -23,9 +18,13 @@ func check(t *testing.T, code string, regex string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	prog := parseSSA(code, false, nil, func(fb *ssa.FunctionBuilder) {
+	prog, err := parseSSA(code, false, nil, func(fb *ssa.FunctionBuilder) {
 		fb.WithExternMethod(&methodBuilder{})
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	prog.ShowWithSource()
 
 	printlnFuncs := prog.GetAndCreateMainFunction().GetValuesByName("println")
@@ -65,7 +64,10 @@ func TestPosition(t *testing.T) {
 			a = b
 		}
 	`
-	prog := ParseSSA(code)
+	prog, err := ParseSSA(code)
+	if err != nil {
+		t.Fatal(err)
+	}
 	want := ssa.NewRange(ssa.NewPosition(7, 2, 6), ssa.NewPosition(7, 2, 7), "1")
 	prog.ShowWithSource()
 	vs := prog.GetAndCreateMainFunction().GetValuesByName("b")
@@ -262,10 +264,11 @@ func TestCfg(t *testing.T) {
 		}else {
 		}
 		`
-		prog := ParseSSA(code)
-		if prog == nil {
+		prog, err := ParseSSA(code)
+		if err != nil {
 			t.Fatal("prog parse error")
 		}
+		_ = prog
 	})
 
 	t.Run("test cfg Loop", func(t *testing.T) {
@@ -275,8 +278,8 @@ func TestCfg(t *testing.T) {
 			}
 		}
 		`
-		prog := ParseSSA(code)
-		if prog == nil {
+		prog, err := ParseSSA(code)
+		if err != nil {
 			t.Fatal("prog parse error")
 		}
 		prog.Show()
@@ -306,8 +309,8 @@ func TestCfg(t *testing.T) {
 				println(4)
 		}
 		`
-		prog := ParseSSA(code)
-		if prog == nil {
+		prog, err := ParseSSA(code)
+		if err != nil {
 			t.Fatal("prog parse error")
 		}
 		prog.Show()
@@ -325,8 +328,8 @@ func TestCfg(t *testing.T) {
         }
         return
 		`
-		prog := ParseSSA(code)
-		if prog == nil {
+		prog, err := ParseSSA(code)
+		if err != nil {
 			t.Fatal("prog parse error")
 		}
 		prog.Show()
@@ -342,21 +345,25 @@ func TestSyntaxError(t *testing.T) {
 	code = `
 	a.
 	`
-	prog := ParseSSA(code)
-	if !utils.IsNil(prog) {
+	prog, err := ParseSSA(code)
+	if err == nil {
 		t.Fatal("prog parse should error")
 	}
+	_ = prog
 }
 
 func TestVariable(t *testing.T) {
 	t.Run("test variable basic: number and range", func(t *testing.T) {
-		prog := ParseSSA(`
+		prog, err := ParseSSA(`
 		a = 1
 		{
 			a := 2
 		}
 		a = 3
 		`)
+		if err != nil {
+			t.Fatal("prog parse error", err)
+		}
 		vara := prog.GetAndCreateMainFunction().GetValuesByName("a")
 		if len(vara) != 3 {
 			t.Fatalf("error length: %s", vara)
@@ -366,7 +373,10 @@ func TestVariable(t *testing.T) {
 		// }
 	})
 	t.Run("basic function call", func(t *testing.T) {
-		prog := ParseSSA(`println(a)`)
+		prog, err := ParseSSA(`println(a)`)
+		if err != nil {
+			t.Fatal("prog parse error", err)
+		}
 		prog.ShowWithSource()
 		varA := prog.GetAndCreateMainFunction().GetValuesByName("a")
 		if len(varA) != 1 {
@@ -379,13 +389,16 @@ func TestVariable(t *testing.T) {
 
 	})
 	t.Run("test variable left position", func(t *testing.T) {
-		prog := ParseSSA(`
+		prog, err := ParseSSA(`
 		a = 1 
 		b = a 
 		b = a + b
 		println(b)
 		c = a + 2
 		`)
+		if err != nil {
+			t.Fatal("prog parse error", err)
+		}
 		main := prog.GetAndCreateMainFunction()
 		{
 			// check a
@@ -435,7 +448,7 @@ func TestVariable(t *testing.T) {
 }
 
 func TestExternLib(t *testing.T) {
-	prog := parseSSA(`
+	prog, err := parseSSA(`
 	test.test()
 	test.AAA()
 	`, false, nil, func(fb *ssa.FunctionBuilder) {
@@ -447,6 +460,9 @@ func TestExternLib(t *testing.T) {
 			},
 		}
 	})
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
 
 	vs := prog.GetInstructionsByName("test")
 	if len(vs) != 1 {

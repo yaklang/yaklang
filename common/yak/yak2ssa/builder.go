@@ -2,7 +2,8 @@ package yak2ssa
 
 import (
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
-	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
@@ -15,7 +16,7 @@ func NewParser() *Parser {
 	return &Parser{}
 }
 
-func (p *Parser) Parse(code string, must bool, callBack func(*ssa.FunctionBuilder)) *ssa.Program {
+func (p *Parser) Parse(code string, must bool, callBack func(*ssa.FunctionBuilder)) (*ssa.Program, error) {
 	return parseSSA(code, must, nil, callBack)
 }
 
@@ -23,16 +24,16 @@ type astbuilder struct {
 	*ssa.FunctionBuilder
 }
 
-func parseSSA(src string, force bool, prog *ssa.Program, callback func(*ssa.FunctionBuilder)) (ret *ssa.Program) {
+func parseSSA(src string, force bool, prog *ssa.Program, callback func(*ssa.FunctionBuilder)) (ret *ssa.Program, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Error("recover from yak2ssa.parseSSA: ", r)
 			// debug.PrintStack()
 			ret = nil
+			err = utils.Errorf("parse error with panic : %v", r)
 		}
 	}()
 
-	frontEnd(src, force, func(ast *yak.ProgramContext) {
+	if err := frontEnd(src, force, func(ast *yak.ProgramContext) {
 		if prog == nil {
 			prog = ssa.NewProgram()
 		}
@@ -45,33 +46,16 @@ func parseSSA(src string, force bool, prog *ssa.Program, callback func(*ssa.Func
 		}
 		astbuilder.build(ast)
 		astbuilder.Finish()
-	})
+	}); err != nil {
+		return nil, err
+	}
 
 	ssa4analyze.RunAnalyzer(prog)
-	return prog
+	return prog, nil
 }
 
-// func middleEnd(code string, prog *ssa.Program)
-
-// error listener for lexer and parser
-type ErrorListener struct {
-	err []string
-	*antlr.DefaultErrorListener
-}
-
-func (el *ErrorListener) SyntaxError(recognizer antlr.Recognizer, offendingSymbol interface{}, line, column int, msg string, e antlr.RecognitionException) {
-	el.err = append(el.err, msg)
-}
-
-func NewErrorListener() *ErrorListener {
-	return &ErrorListener{
-		err:                  make([]string, 0),
-		DefaultErrorListener: antlr.NewDefaultErrorListener(),
-	}
-}
-
-func frontEnd(src string, must bool, callback func(ast *yak.ProgramContext)) {
-	errListener := NewErrorListener()
+func frontEnd(src string, must bool, callback func(ast *yak.ProgramContext)) error {
+	errListener := antlr4util.NewErrorListener()
 	lexer := yak.NewYaklangLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()
 	lexer.AddErrorListener(errListener)
@@ -81,7 +65,10 @@ func frontEnd(src string, must bool, callback func(ast *yak.ProgramContext)) {
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
 	ast := parser.Program().(*yak.ProgramContext)
-	if must || len(errListener.err) == 0 {
+	if must || len(errListener.GetErrors()) == 0 {
 		callback(ast)
+		return nil
+	} else {
+		return utils.Errorf("parse AST FrontEnd error : %v", errListener.GetErrors())
 	}
 }

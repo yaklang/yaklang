@@ -18,7 +18,7 @@ const (
 )
 
 type LanguageParser interface {
-	Parse(string, bool, func(*ssa.FunctionBuilder)) *ssa.Program
+	Parse(string, bool, func(*ssa.FunctionBuilder)) (*ssa.Program, error)
 }
 
 var (
@@ -108,32 +108,32 @@ func WithExternInfo(info string) Option {
 	}
 }
 
-func Parse(code string, opts ...Option) *Program {
-	return parse(code, opts...)
-}
-
 var ttlSSAParseCache = ttlcache.NewCache()
 
-func parse(code string, opts ...Option) *Program {
+func Parse(code string, opts ...Option) (*Program, error) {
 	config := defaultConfig(code)
 	for _, opt := range opts {
 		opt(config)
 	}
 	if config.Parser == nil {
-		return nil
+		return nil, utils.Errorf("not support language %s", config.language)
 	}
 	var ret *Program
 	hash := config.CaclHash()
 	if prog, ok := ttlSSAParseCache.Get(hash); ok {
 		ret = prog.(*Program)
 	} else {
-		ret = NewProgram(parseWithConfig(config))
+		prog, err := parseWithConfig(config)
+		if err != nil {
+			return nil, utils.Wrapf(err, "parse error")
+		}
+		ret = NewProgram(prog)
 	}
 	ttlSSAParseCache.SetWithTTL(hash, ret, 30*time.Minute)
-	return ret
+	return ret, nil
 }
 
-func parseWithConfig(c *config) *ssa.Program {
+func parseWithConfig(c *config) (*ssa.Program, error) {
 	callback := func(fb *ssa.FunctionBuilder) {
 		fb.WithExternLib(c.externLib)
 		fb.WithExternValue(c.externValue)

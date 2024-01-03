@@ -1,11 +1,9 @@
 package js2ssa
 
 import (
-	"fmt"
-
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 
-	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	JS "github.com/yaklang/yaklang/common/yak/antlr4JS/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
@@ -18,7 +16,7 @@ func NewParser() *Parser {
 	return &Parser{}
 }
 
-func (p *Parser) Parse(src string, must bool, callBack func(*ssa.FunctionBuilder)) *ssa.Program {
+func (p *Parser) Parse(src string, must bool, callBack func(*ssa.FunctionBuilder)) (*ssa.Program, error) {
 	return parseSSA(src, must, nil, callBack)
 }
 
@@ -26,16 +24,16 @@ type astbuilder struct {
 	*ssa.FunctionBuilder
 }
 
-func parseSSA(src string, force bool, prog *ssa.Program, callback func(*ssa.FunctionBuilder)) (ret *ssa.Program) {
+func parseSSA(src string, force bool, prog *ssa.Program, callback func(*ssa.FunctionBuilder)) (ret *ssa.Program, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Println("recover from js2ssa.parseSSA: ", r)
 			// debug.PrintStack()
 			ret = nil
+			err = utils.Errorf("parse error with panic : %v", r)
 		}
 	}()
 
-	frontend(src, force, func(ast *JS.ProgramContext) {
+	if err := frontend(src, force, func(ast *JS.ProgramContext) {
 		if prog == nil {
 			prog = ssa.NewProgram()
 		}
@@ -51,10 +49,12 @@ func parseSSA(src string, force bool, prog *ssa.Program, callback func(*ssa.Func
 		}
 		astbuilder.build(ast)
 		astbuilder.Finish()
-	})
+	}); err != nil {
+		return nil, err
+	}
 
 	ssa4analyze.RunAnalyzer(prog)
-	return prog
+	return prog, nil
 }
 
 // error listener for lexer and parser
@@ -74,7 +74,7 @@ func NewErrorListener() *ErrorListener {
 	}
 }
 
-func frontend(src string, must bool, handler func(*JS.ProgramContext)) {
+func frontend(src string, must bool, handler func(*JS.ProgramContext)) error {
 	errListener := NewErrorListener()
 	// start := time.Now()
 	lexer := JS.NewJavaScriptLexer(antlr.NewInputStream(src))
@@ -90,7 +90,8 @@ func frontend(src string, must bool, handler func(*JS.ProgramContext)) {
 	// log.Info("ast time ", time.Since(start))
 	if must || len(errListener.err) == 0 {
 		handler(ast)
+		return nil
 	} else {
-		log.Info(errListener.err)
+		return utils.Errorf("parse AST FrontEnd error : %v", errListener.err)
 	}
 }

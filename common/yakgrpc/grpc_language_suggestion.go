@@ -834,8 +834,8 @@ func (s *Server) YaklangLanguageSuggestion(ctx context.Context, req *ypb.Yaklang
 	ret := &ypb.YaklangLanguageSuggestionResponse{}
 	opt := pta.GetPluginSSAOpt(req.YakScriptType)
 	opt = append(opt, ssaapi.WithIgnoreSyntaxError(true))
-	prog := ssaapi.Parse(req.YakScriptCode, opt...)
-	if prog.IsNil() {
+	prog, err := ssaapi.Parse(req.YakScriptCode, opt...)
+	if err != nil {
 		return nil, errors.New("ssa parse error")
 	}
 	// todo: 处理YakScriptType，不同语言的补全、提示可能有不同

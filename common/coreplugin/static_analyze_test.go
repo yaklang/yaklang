@@ -12,9 +12,9 @@ import (
 )
 
 func Check(code string, t *testing.T) {
-	prog := ssaapi.Parse(code, plugin_type_analyzer.GetPluginSSAOpt("mitm")...)
-	if prog.IsNil() {
-		t.Fatal("Failed to parse code")
+	_, err := ssaapi.Parse(code, plugin_type_analyzer.GetPluginSSAOpt("mitm")...)
+	if err != nil {
+		t.Fatal("Failed to parse code: ", err)
 	}
 	if res := yak.AnalyzeStaticYaklangWithType(string(code), "mitm"); len(lo.Filter(res, func(item *yak.StaticAnalyzeResult, index int) bool {
 		return item.Severity == "error"
