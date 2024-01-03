@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/log"
@@ -67,14 +68,14 @@ func cliParam2grpc(params []*pta.CliParameter) []*ypb.YakScriptParam {
 	return ret
 }
 
-func riskInfo2grpc(info []*pta.RiskInfo) []*ypb.YakRiskInfo {
+func riskInfo2grpc(info []*pta.RiskInfo, db *gorm.DB) []*ypb.YakRiskInfo {
 	ret := make([]*ypb.YakRiskInfo, 0, len(info))
 	for _, i := range info {
 		description := i.Description
 		solution := i.Solution
 
 		if (description == "" || solution == "") && i.CVE != "" {
-			if db := consts.GetGormCVEDatabase(); db != nil {
+			if db != nil {
 				cve, err := cveresources.GetCVE(db, i.CVE)
 				if err == nil {
 					if description == "" {
@@ -108,7 +109,7 @@ func (s *Server) YaklangInspectInformation(ctx context.Context, req *ypb.Yaklang
 		return nil, errors.New("ssa parse error")
 	}
 	ret.CliParameter = cliParam2grpc(pta.ParseCliParameter(prog))
-	ret.RiskInfo = riskInfo2grpc(pta.ParseRiskInfo(prog))
+	ret.RiskInfo = riskInfo2grpc(pta.ParseRiskInfo(prog), consts.GetGormCVEDatabase())
 	return ret, nil
 }
 
