@@ -252,6 +252,28 @@ func TestSSARuleMustPassCliDisable(t *testing.T) {
 }
 
 func TestSSARuleMustPassMitmDisable(t *testing.T) {
+
+	t.Run("test pack in mitm main with multiple same error", func(t *testing.T) {
+		checkWithType(t, `
+		r = risk.CreateRisk(
+			"abc",
+			risk.cve("abc")
+		)
+		risk.cve("abc")
+		risk.cve("abc")
+		println(r)
+		risk.Save(r)
+			`,
+			"mitm",
+			[]string{
+				rules.MITMNotSupport("risk.CreateRisk"),
+				rules.MITMNotSupport("risk.cve"),
+				rules.MITMNotSupport("risk.cve"),
+				rules.MITMNotSupport("risk.cve"),
+				rules.MITMNotSupport("risk.Save"),
+			})
+	})
+
 	t.Run("test pack in mitm main", func(t *testing.T) {
 		checkWithType(t, `
 		r = risk.CreateRisk(
