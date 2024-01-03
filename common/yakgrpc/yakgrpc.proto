@@ -281,7 +281,9 @@ service Yak {
   rpc YaklangCompileAndFormat(YaklangCompileAndFormatRequest) returns (YaklangCompileAndFormatResponse);
 
   rpc YaklangLanguageSuggestion(YaklangLanguageSuggestionRequest) returns (YaklangLanguageSuggestionResponse);
+  // 从代码中提取yaklang数据
   rpc YaklangInspectInformation(YaklangInspectInformationRequest) returns (YaklangInspectInformationResponse);
+  // 进行数据迁移使用 
   rpc YaklangGetCliCodeFromDatabase(YaklangGetCliCodeFromDatabaseRequest) returns (YaklangGetCliCodeFromDatabaseResponse);
 
   // 端口扫描的封装
@@ -1837,9 +1839,21 @@ message YaklangLanguageSuggestionResponse {
 message YaklangInspectInformationResponse {
   repeated YaklangInformation Information = 1;
   repeated YakScriptParam CliParameter  = 2;
+  repeated YakRiskInfo RiskInfo = 3;
 }
+
+message YakRiskInfo {
+  string Level = 1;
+  string TypeVerbose = 2;
+  string CVE = 3;
+  string Description = 4; 
+  string Solution = 5;
+}
+
+
 message YaklangGetCliCodeFromDatabaseResponse {
   string Code = 1;
+  bool NeedHandle = 2;
 }
 
 message YaklangGetCliCodeFromDatabaseRequest {
