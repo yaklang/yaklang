@@ -50,6 +50,9 @@ window.location.href = "www"
 	`,
 		WithLanguage(JS),
 	)
+	if prog.IsNil() {
+		t.Fatal("parse error")
+	}
 
 	// prog.Show()
 	// the `Ref` just a filter

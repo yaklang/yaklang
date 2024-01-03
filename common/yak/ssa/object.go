@@ -116,13 +116,15 @@ func (b *FunctionBuilder) CreateInterfaceWithVs(keys []Value, vs []Value) *Make 
 func (b *FunctionBuilder) getExternLibInstance(i, key Value) (ret Value) {
 	pa, ok := ToExternLib(i)
 	ci, ok2 := ToConst(key)
-	defer func() {
-		if _, ok := pa.MemberMap[ci.String()]; !ok {
-			pa.MemberMap[ci.String()] = ret
-			pa.Member = append(pa.Member, ret)
-		}
-	}()
 	if ok && ok2 && pa.BuildField != nil {
+
+		defer func() {
+			if _, ok := pa.MemberMap[ci.String()]; !ok {
+				pa.MemberMap[ci.String()] = ret
+				pa.Member = append(pa.Member, ret)
+			}
+		}()
+
 		if v := pa.BuildField(ci.String()); v != nil {
 			return v
 		} else {
