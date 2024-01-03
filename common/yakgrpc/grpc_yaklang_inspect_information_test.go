@@ -3,14 +3,15 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"sort"
 	"strconv"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	pta "github.com/yaklang/yaklang/common/yak/plugin_type_analyzer"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -501,13 +502,7 @@ func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_Risk(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	check := func(code string, want []*ypb.YakRiskInfo, t *testing.T) {
-		req := yaklangInspectInformationSend(local, "yak", code, nil)
-		if req == nil {
-			t.Fatal("no response")
-		}
-
-		got := req.RiskInfo
+	compareRisks := func(got, want []*ypb.YakRiskInfo, t *testing.T) {
 		// compare got and want
 		if len(got) != len(want) {
 			t.Errorf("risk info length not match")
@@ -531,6 +526,16 @@ func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_Risk(t *testing.T) {
 				t.Errorf("risk info %d solution not match", i)
 			}
 		}
+	}
+
+	check := func(code string, want []*ypb.YakRiskInfo, t *testing.T) {
+		req := yaklangInspectInformationSend(local, "yak", code, nil)
+		if req == nil {
+			t.Fatal("no response")
+		}
+
+		got := req.RiskInfo
+		compareRisks(got, want, t)
 	}
 
 	t.Run("simple risk info", func(t *testing.T) {
@@ -582,7 +587,17 @@ func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_Risk(t *testing.T) {
 	})
 
 	t.Run("risk info with cve", func(t *testing.T) {
-		db := consts.GetGormCVEDatabase()
+		tempFp, err := os.CreateTemp("", "Date.db")
+		if err != nil {
+			log.Errorf("%v", err)
+		}
+		defer tempFp.Close()
+
+		M := cveresources.GetManager(tempFp.Name())
+		db := M.DB
+		if db == nil {
+			t.Fatal("no database")
+		}
 		cve := "CVE-9090-1234"
 		// create cve
 		cveresources.CreateOrUpdateCVE(db, cve, &cveresources.CVE{
@@ -592,24 +607,19 @@ func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_Risk(t *testing.T) {
 			Solution:          "solution",
 			Severity:          "high",
 		})
-
-		defer func() {
-			if db.Debug().Delete(&cveresources.CVE{}, "cve = ?", cve).Error != nil {
-				t.Fatal(err)
-			}
-		}()
-
-		check(`
-		risk.NewRisk("a",
-			risk.cve("`+cve+`"),
-		)
-			`, []*ypb.YakRiskInfo{
+		got := riskInfo2grpc([]*pta.RiskInfo{
+			{
+				CVE: cve,
+			},
+		}, db)
+		want := []*ypb.YakRiskInfo{
 			{
 				Level:       "high",
 				CVE:         cve,
 				Description: "中文描述",
 				Solution:    "solution",
 			},
-		}, t)
+		}
+		compareRisks(got, want, t)
 	})
 }
