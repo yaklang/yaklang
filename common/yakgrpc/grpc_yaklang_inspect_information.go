@@ -65,8 +65,8 @@ func cliParam2grpc(params []*pta.CliParameter) []*ypb.YakScriptParam {
 
 func (s *Server) YaklangInspectInformation(ctx context.Context, req *ypb.YaklangInspectInformationRequest) (*ypb.YaklangInspectInformationResponse, error) {
 	ret := &ypb.YaklangInspectInformationResponse{}
-	prog := ssaapi.Parse(req.YakScriptCode, pta.GetPluginSSAOpt(req.YakScriptType)...)
-	if prog.IsNil() {
+	prog, err := ssaapi.Parse(req.YakScriptCode, pta.GetPluginSSAOpt(req.YakScriptType)...)
+	if err != nil {
 		return nil, errors.New("ssa parse error")
 	}
 	ret.CliParameter = cliParam2grpc(pta.ParseCliParameter(prog))

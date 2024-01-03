@@ -7,7 +7,7 @@ import (
 )
 
 func TestYaklangMask(t *testing.T) {
-	p := Parse(`
+	p, err := Parse(`
 var a = 3
 b = () => {
 	a ++
@@ -17,6 +17,10 @@ if c {
 }
 e = a
 `) // .Show()
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
+
 	p.Ref("e").ForEach(func(value *Value) {
 		value.GetTopDefs().ForEach(func(value *Value) {
 			t.Log(value.String())
@@ -26,7 +30,7 @@ e = a
 }
 
 func TestYakChanExplore_SideEffect_SelfAdd(t *testing.T) {
-	prog := Parse(`
+	prog, err := Parse(`
 originValue = 4
 b = ()=>{
 	originValue++
@@ -34,6 +38,9 @@ b = ()=>{
 b()
 g = originValue
 `)
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
 
 	/*
 		[INFO] 2023-12-19 17:23:47 [exclusive_op_test:22] g value: 4
@@ -69,7 +76,7 @@ g = originValue
 }
 
 func TestYakChanExplore_SideEffect(t *testing.T) {
-	prog := Parse(`
+	prog, err := Parse(`
 originValue = 4
 b = ()=>{
 	originValue = 5
@@ -77,6 +84,9 @@ b = ()=>{
 b()
 g = originValue
 `) // .Show()
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
 
 	/*
 		[INFO] 2023-12-19 17:23:47 [exclusive_op_test:22] g value: 4

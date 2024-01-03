@@ -13,7 +13,7 @@ import (
 
 func none(*ssa.FunctionBuilder) {}
 
-func ParseSSA(code string) *ssa.Program {
+func ParseSSA(code string) (*ssa.Program, error) {
 	return parseSSA(code, false, nil, none)
 }
 
@@ -23,7 +23,11 @@ func check(t *testing.T, code string, funcs string, regex string) {
 		t.Fatal(err)
 	}
 
-	prog := ParseSSA(code)
+	prog, err := ParseSSA(code)
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
+
 	prog.ShowWithSource()
 
 	showFunc := prog.Packages["main"].Funcs["main"].GetValuesByName(funcs)[0]
@@ -36,19 +40,22 @@ func check(t *testing.T, code string, funcs string, regex string) {
 	}
 }
 
-func TestDemo1(m *testing.T) {
-	prog := ParseSSA(`
+func TestDemo1(t *testing.T) {
+	prog, err := ParseSSA(`
 	function test(a, b){
 		return a + b;
 	}
 	sum = test(1,2);
 	`)
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
 	prog.Show()
 	fmt.Println(prog.GetErrors())
 }
 
 func TestDemo2(t *testing.T) {
-	prog := ParseSSA(`
+	prog, err := ParseSSA(`
 	try{
 		a = 1;
 		b = 2;
@@ -57,11 +64,14 @@ func TestDemo2(t *testing.T) {
 	}finally{
 		c = 3;
 	}`)
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
 	prog.Show()
 }
 
 func TestSwitch(t *testing.T) {
-	prog := ParseSSA(`
+	prog, err := ParseSSA(`
 	const fruit = "apple";
 
 switch (fruit) {
@@ -74,12 +84,14 @@ switch (fruit) {
     print("未知水果");
 }
 	`)
-
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
 	prog.Show()
 }
 
 func TestBreak(t *testing.T) {
-	prog := ParseSSA(`
+	prog, err := ParseSSA(`
 	a = 2;
 	label1: 
 	{
@@ -88,20 +100,25 @@ func TestBreak(t *testing.T) {
 		break label1;
 	}
 	`)
-
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
 	prog.ShowWithSource()
 }
 
 func Test_Main(t *testing.T) {
-	prog := ParseSSA(`
+	prog, err := ParseSSA(`
 	var b = (()=>{return window.location.hostname + "/app/"})()
 	window.location.href = b + "/login.html?ts=";
 	`)
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
 	prog.Show()
 }
 
 func TestNew(t *testing.T) {
-	prog := ParseSSA(`
+	prog, err := ParseSSA(`
 	// 创建一个XMLHttpRequest对象
 	let xhr = new XMLHttpRequest()
 	// 调用open函数填写请求方式和url地址
@@ -113,11 +130,14 @@ func TestNew(t *testing.T) {
 		console.log(this.response)
 	})
 	`)
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
 	prog.Show()
 }
 
 func TestFunc(t *testing.T) {
-	prog := ParseSSA(`
+	prog, err := ParseSSA(`
 	(function() {})
 
 	function myFunction(x, y=10) {
@@ -129,11 +149,14 @@ func TestFunc(t *testing.T) {
 	b = myFunction(5); // 输出 15, y 参数的默认值
 
 	`)
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
 	prog.Show()
 }
 
 func TestElseIf(t *testing.T) {
-	prog := ParseSSA(`
+	prog, err := ParseSSA(`
 	a = 2
 	if(a < 1){
 		a++;
@@ -143,31 +166,40 @@ func TestElseIf(t *testing.T) {
 		b = a
 	}
 	`)
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
 	prog.Show()
 }
 
 func TestTrueOrFalse(t *testing.T) {
-	prog := ParseSSA(`
+	prog, err := ParseSSA(`
 	function tof(a, b){
 	}
 
 	b = tof(true, false);
 	print(b)
 	`)
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
 	prog.Show()
 }
 
 func TestThis(t *testing.T) {
-	prog := ParseSSA(`
+	prog, err := ParseSSA(`
 	xhr.addEventListener("load", function() {
         console.log(this.add);
     })
 	`)
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
 	prog.Show()
 }
 
 func TestIdentifier(t *testing.T) {
-	prog := ParseSSA(`
+	prog, err := ParseSSA(`
 	$(document).ready(function(){
 		$("button").click(function(){
 		  $.get("/example/jquery/demo_test.asp",function(data,status){
@@ -176,11 +208,14 @@ func TestIdentifier(t *testing.T) {
 		});
 	  });
 	`)
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
 	prog.Show()
 }
 
 func TestTry(t *testing.T) {
-	prog := ParseSSA(`
+	prog, err := ParseSSA(`
   let url = "https://api.github.com/users/ruanyf";
    try {
     let response = await fetch(url);
@@ -190,49 +225,66 @@ func TestTry(t *testing.T) {
   }
  
 `)
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
 	prog.Show()
 }
 
 func TestLet(t *testing.T) {
-	prog2 := ParseSSA(`
+	prog2, err := ParseSSA(`
   	let response = await fetch(url);
   
 `)
-
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
 	prog2.Show()
 }
 
 func TestExpr(t *testing.T) {
-	prog := ParseSSA(`
+	prog, err := ParseSSA(`
 	for(a=1,s=1;a<11&&s<20;a++,s++){
 		a+1,s+a;
 	}
 	`)
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
 	prog.Show()
 }
 
 func TestReturn(t *testing.T) {
-	prog := ParseSSA(`
+	prog, err := ParseSSA(`
 		f = () => {a = 1; b = 2; return a, b;}
 		console.log(f())
 	`)
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
 	prog.Show()
 }
 func TestBitNot(t *testing.T) {
-	prog := ParseSSA(`
+	prog, err := ParseSSA(`
 		a = ~0b1
 		b = -(-(1))
 		print(a)
 		print(b)
 	`)
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
 	prog.Show()
 }
 
 func TestObject(t *testing.T) {
-	prog := ParseSSA(`
+	prog, err := ParseSSA(`
 	c = {2:_}
 	d = {1,2,3,4,5}
 	`)
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
 	prog.Show()
 }
 
@@ -247,8 +299,11 @@ func TestUse(t *testing.T) {
 }
 
 func TestNumber(t *testing.T) {
-	prog := ParseSSA(`
+	prog, err := ParseSSA(`
 		a < 1e-6 ? 1 : 2
 	`)
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
 	prog.Show()
 }
