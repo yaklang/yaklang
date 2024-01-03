@@ -142,14 +142,18 @@ type RiskInfo struct {
 	Level             string
 	CVE               string
 	Type, TypeVerbose string
+	Description       string
+	Solution          string
 }
 
 func newRiskInfo() *RiskInfo {
 	return &RiskInfo{
 		Level:       "",
 		CVE:         "",
-		Type:        "",
+		Type:        "", // ignore
 		TypeVerbose: "",
+		Description: "",
+		Solution:    "",
 	}
 }
 
@@ -186,16 +190,22 @@ func ParseRiskInfo(prog *ssaapi.Program) []*RiskInfo {
 		if !call.IsCall() {
 			return
 		}
+		arg1 := getConstString(call.GetOperand(1))
 		switch call.GetOperand(0).String() {
 		case "risk.severity", "risk.level":
-			riskInfo.Level = handleRiskLevel(getConstString(call.GetOperand(1)))
+			riskInfo.Level = handleRiskLevel(arg1)
 		case "risk.cve":
-			riskInfo.CVE = call.GetOperand(1).String()
+			riskInfo.CVE = arg1
+		// TODO: handler this type and typeVerbose
 		case "risk.type":
-			riskInfo.Type = getConstString(call.GetOperand(1))
+			riskInfo.Type = arg1
 			riskInfo.TypeVerbose = yakit.RiskTypeToVerbose(riskInfo.Type)
 		case "risk.typeVerbose":
-			riskInfo.TypeVerbose = getConstString(call.GetOperand(1))
+			riskInfo.TypeVerbose = arg1
+		case "risk.description":
+			riskInfo.Description = arg1
+		case "risk.solution":
+			riskInfo.Solution = arg1
 		}
 	}
 

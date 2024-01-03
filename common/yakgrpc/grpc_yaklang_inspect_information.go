@@ -5,9 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/cve/cveresources"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	pta "github.com/yaklang/yaklang/common/yak/plugin_type_analyzer"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -63,6 +67,40 @@ func cliParam2grpc(params []*pta.CliParameter) []*ypb.YakScriptParam {
 	return ret
 }
 
+func riskInfo2grpc(info []*pta.RiskInfo) []*ypb.YakRiskInfo {
+	ret := make([]*ypb.YakRiskInfo, 0, len(info))
+	for _, i := range info {
+		description := i.Description
+		solution := i.Solution
+
+		if (description == "" || solution == "") && i.CVE != "" {
+			if db := consts.GetGormCVEDatabase(); db != nil {
+				cve, err := cveresources.GetCVE(db, i.CVE)
+				if err == nil {
+					if description == "" {
+						description = cve.DescriptionMainZh
+					}
+					if solution == "" {
+						solution = cve.Solution
+					}
+					if i.Level == "" {
+						i.Level = cve.Severity
+					}
+				}
+			}
+		}
+
+		ret = append(ret, &ypb.YakRiskInfo{
+			Level:       i.Level,
+			TypeVerbose: i.TypeVerbose,
+			CVE:         i.CVE,
+			Description: description,
+			Solution:    solution,
+		})
+	}
+	return ret
+}
+
 func (s *Server) YaklangInspectInformation(ctx context.Context, req *ypb.YaklangInspectInformationRequest) (*ypb.YaklangInspectInformationResponse, error) {
 	ret := &ypb.YaklangInspectInformationResponse{}
 	prog, err := ssaapi.Parse(req.YakScriptCode, pta.GetPluginSSAOpt(req.YakScriptType)...)
@@ -70,7 +108,7 @@ func (s *Server) YaklangInspectInformation(ctx context.Context, req *ypb.Yaklang
 		return nil, errors.New("ssa parse error")
 	}
 	ret.CliParameter = cliParam2grpc(pta.ParseCliParameter(prog))
-
+	ret.RiskInfo = riskInfo2grpc(pta.ParseRiskInfo(prog))
 	return ret, nil
 }
 
