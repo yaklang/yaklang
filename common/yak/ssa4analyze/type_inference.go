@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -220,9 +219,9 @@ func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
 			obj := f.Obj
 			{
 				names := lo.Keys(obj.GetAllVariables())
-				if len(names) == 0 {
-					log.Errorf("method %s has no variable", ssa.LineDisasm(obj))
-				} else {
+				if len(names) != 0 {
+					// log.Errorf("method %s has no variable", ssa.LineDisasm(obj))
+					// } else {
 					obj.SetName(names[0])
 				}
 			}
@@ -232,6 +231,7 @@ func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
 				obj.AddUser(c)
 			})
 			ssa.ReplaceAllValue(f, method)
+			f.GetProgram().SetInstructionWithName(method.GetName(), method)
 			t.DeleteInst = append(t.DeleteInst, f)
 			return
 		}

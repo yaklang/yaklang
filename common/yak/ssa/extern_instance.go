@@ -141,11 +141,17 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 		return t
 	}
 
+	var pkgPath string
+	var name string
 	typKind := typ.Kind()
 	if typKind == reflect.Struct || typKind == reflect.Interface {
-		typStr = fmt.Sprintf("%s.%s", typ.PkgPath(), typ.Name())
+		pkgPath = typ.PkgPath()
+		name = typ.Name()
+		typStr = fmt.Sprintf("%s.%s", pkgPath, name)
 	} else if typKind == reflect.Ptr {
-		typStr = fmt.Sprintf("%s.%s", typ.Elem().PkgPath(), typ.Elem().Name())
+		pkgPath = typ.Elem().PkgPath()
+		name = typ.Elem().Name()
+		typStr = fmt.Sprintf("%s.%s", pkgPath, name)
 	}
 
 	if hijackType, ok := f.externType[typStr]; ok {
@@ -217,7 +223,7 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 			if isInterface {
 				funTyp.Parameter = utils.InsertSliceItem(funTyp.Parameter, ret, 0)
 			}
-			funTyp.SetName(method.Name)
+			funTyp.SetName(fmt.Sprintf("%s/%s.%s", pkgPath, name, method.Name))
 			Methods[method.Name] = funTyp
 		}
 	}
