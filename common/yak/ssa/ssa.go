@@ -379,7 +379,8 @@ type ExternLib struct {
 
 	BuildField func(string) Value
 
-	Member []Value
+	MemberMap map[string]Value
+	Member    []Value
 }
 
 var _ Node = (*ExternLib)(nil)

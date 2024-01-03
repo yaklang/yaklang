@@ -117,7 +117,8 @@ func (b *FunctionBuilder) getExternLibInstance(i, key Value) (ret Value) {
 	pa, ok := ToExternLib(i)
 	ci, ok2 := ToConst(key)
 	defer func() {
-		if ret != nil {
+		if _, ok := pa.MemberMap[ci.String()]; !ok {
+			pa.MemberMap[ci.String()] = ret
 			pa.Member = append(pa.Member, ret)
 		}
 	}()
