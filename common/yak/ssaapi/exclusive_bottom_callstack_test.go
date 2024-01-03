@@ -8,7 +8,7 @@ import (
 )
 
 func TestYaklangExplore_BottomUses_BasicCallStack(t *testing.T) {
-	prog := Parse(`var a = 1;
+	prog, err := Parse(`var a = 1;
 
 b = i => i+1
 
@@ -21,6 +21,9 @@ sink = i => {
 
 sink(e)
 `)
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
 
 	refName := "a"
 
@@ -43,9 +46,12 @@ sink(e)
 }
 
 func TestYaklangExplore_BottomUses_Bad_ConstCollapsed(t *testing.T) {
-	prog := Parse(`var c = 1
+	prog, err := Parse(`var c = 1
 var a = 55 + c
 myFunctionName(a)`)
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
 
 	refName := "c"
 
@@ -67,9 +73,12 @@ myFunctionName(a)`)
 }
 
 func TestYaklangExplore_BottomUses_Assign(t *testing.T) {
-	prog := Parse(`var c = bbb
+	prog, err := Parse(`var c = bbb
 var a = 55 + c
 myFunctionName(a)`)
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
 
 	refName := "c"
 
@@ -91,7 +100,7 @@ myFunctionName(a)`)
 }
 
 func TestYaklangExplore_BottomUses_1(t *testing.T) {
-	prog := Parse(`var c
+	prog, err := Parse(`var c
 var a = 1
 if cond {
 	a = c + 2
@@ -101,6 +110,9 @@ if cond {
 
 d = a;
 myFunctionName(d)`)
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
 
 	refName := "c"
 

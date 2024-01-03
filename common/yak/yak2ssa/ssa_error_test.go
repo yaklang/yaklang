@@ -20,11 +20,11 @@ type TestCase struct {
 }
 
 func CheckTestCase(t *testing.T, tc TestCase) {
-	prog := parseSSA(tc.code, false, ssa.NewProgram(), func(fb *ssa.FunctionBuilder) {
+	prog, err := parseSSA(tc.code, false, ssa.NewProgram(), func(fb *ssa.FunctionBuilder) {
 		fb.WithExternValue(tc.ExternValue)
 		fb.WithExternLib(tc.ExternLib)
 	})
-	if prog == nil {
+	if err != nil {
 		t.Fatal("failed to parse")
 	}
 	// prog.Show()

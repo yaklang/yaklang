@@ -9,7 +9,7 @@ import (
 
 func TestA(t *testing.T) {
 
-	prog := Parse(
+	prog, err := Parse(
 		`
 () => {
 	window.location.href = "11"
@@ -50,10 +50,9 @@ window.location.href = "www"
 	`,
 		WithLanguage(JS),
 	)
-	if prog.IsNil() {
-		t.Fatal("parse error")
+	if err != nil {
+		t.Fatal("prog parse error", err)
 	}
-
 	// prog.Show()
 	// the `Ref` just a filter
 	// window := prog.Ref("window")
@@ -189,7 +188,7 @@ window.location.href = "www"
 }
 
 func TestB(t *testing.T) {
-	prog := Parse(`
+	prog, err := Parse(`
 	$(document).ready(function(){
 		$("button").click(function(){
 		  $.get("/example/jquery/demo_test.asp",function(data,status){
@@ -198,6 +197,9 @@ func TestB(t *testing.T) {
 		});
 	  });
 	`, WithLanguage(JS))
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
 
 	values := prog.Ref("$")
 	values.Show()
