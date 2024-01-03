@@ -1,6 +1,8 @@
 package rules
 
 import (
+	"fmt"
+
 	"github.com/yaklang/yaklang/common/yak/plugin_type_analyzer"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
@@ -20,11 +22,11 @@ func DisableCli(prog *ssaapi.Program) {
 	prog.Ref("cli").GetDefs().GetUsers().Filter(func(v *ssaapi.Value) bool {
 		return v.IsCall() && v.IsReachable() != -1
 	}).ForEach(func(v *ssaapi.Value) {
-		v.NewError(tag, "CLI does not support this type")
+		v.NewError(tag, ErrorDisableCLi())
 	})
 }
 
-func ErrorDisableTypeCLi() string {
+func ErrorDisableCLi() string {
 	return "CLI does not support this type"
 }
 
@@ -37,30 +39,32 @@ func DisableMitmExternLib(prog *ssaapi.Program) {
 		"http",
 		"tcp",
 		"udp"}
-	check := func(v *ssaapi.Value) {
-		if v.InMainFunction() {
-			v.NewError(tag, "MITM does not support these packs")
-		}
-	}
 
-	for _, v := range DisablePack {
-		prog.Ref(v).GetDefs().GetUsers().Filter(func(v *ssaapi.Value) bool {
-			return v.IsCall() && v.IsReachable() != -1
-		}).ForEach(check)
+	for _, pkgName := range DisablePack {
+		prog.Ref(pkgName).GetDefs().ForEach(func(Func *ssaapi.Value) {
+
+			Func.GetUsers().Filter(func(v *ssaapi.Value) bool {
+				return v.IsCall() && v.IsReachable() != -1
+			}).ForEach(func(v *ssaapi.Value) {
+				if v.InMainFunction() {
+					v.NewError(tag, MITMNotSupport(Func.GetName()))
+				}
+			})
+		})
 	}
 
 	DisableFunction := []string{"fuzz.Exec", "fuzz.ExecFirst"}
-	for _, v := range DisableFunction {
-		prog.Ref(v).GetUsers().Filter(func(v *ssaapi.Value) bool {
+	for _, funName := range DisableFunction {
+		prog.Ref(funName).GetUsers().Filter(func(v *ssaapi.Value) bool {
 			return v.IsCall() && v.IsReachable() != -1
-		}).ForEach(check)
+		}).ForEach(func(v *ssaapi.Value) {
+			if v.InMainFunction() {
+				v.NewError(tag, MITMNotSupport(funName))
+			}
+		})
 	}
 }
 
-func ErrorDisableMitmPacks() string {
-	return "MITM does not support these packs"
-}
-
-func ErrorDisableMitmFunctions() string {
-	return "MITM does not support these functions"
+func MITMNotSupport(pkg string) string {
+	return fmt.Sprintf("MITM does not support %s in main function", pkg)
 }
