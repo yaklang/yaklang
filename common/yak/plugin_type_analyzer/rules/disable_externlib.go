@@ -52,13 +52,25 @@ func DisableMitmExternLib(prog *ssaapi.Program) {
 		})
 	}
 
-	DisableFunction := []string{"fuzz.Exec", "fuzz.ExecFirst"}
+	DisableFunction := []string{
+		// for "fuzz.Exec"
+		// interface
+		"github.com/yaklang/yaklang/common/mutate/FuzzHTTPRequestIf.Exec",
+		// implement
+		"github.com/yaklang/yaklang/common/mutate/FuzzHTTPRequest.Exec",
+		"github.com/yaklang/yaklang/common/mutate/FuzzHTTPRequestBatch.Exec",
+		//  for "fuzz.ExecFirst"
+		"github.com/yaklang/yaklang/common/mutate/FuzzHTTPRequestIf.ExecFirst",
+		// implement
+		"github.com/yaklang/yaklang/common/mutate/FuzzHTTPRequest.ExecFirst",
+		"github.com/yaklang/yaklang/common/mutate/FuzzHTTPRequestBatch.ExecFirst",
+	}
 	for _, funName := range DisableFunction {
 		prog.Ref(funName).GetUsers().Filter(func(v *ssaapi.Value) bool {
 			return v.IsCall() && v.IsReachable() != -1
 		}).ForEach(func(v *ssaapi.Value) {
 			if v.InMainFunction() {
-				v.NewError(tag, MITMNotSupport(funName))
+				v.NewError(tag, MITMNotSupport("fuzz.Exec or fuzz.ExecFirst"))
 			}
 		})
 	}
