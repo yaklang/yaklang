@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/utils/omap"
 
 	"github.com/samber/lo"
@@ -186,6 +187,8 @@ func (i *Value) StringWithSource() string {
 	}
 	return i.disasmLine
 }
+
+func (i *Value) GetName() string { return i.node.GetName() }
 
 func (i *Value) Show()           { fmt.Println(i) }
 func (i *Value) ShowWithSource() { fmt.Println(i.StringWithSource()) }

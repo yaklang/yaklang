@@ -238,7 +238,7 @@ func TestSSARuleMustPassCliDisable(t *testing.T) {
 		cli.check()
 			`,
 			"mitm",
-			[]string{rules.ErrorDisableTypeCLi(), rules.ErrorDisableTypeCLi()})
+			[]string{rules.ErrorDisableCLi(), rules.ErrorDisableCLi()})
 	})
 
 	t.Run("cli disable in yak", func(t *testing.T) {
@@ -262,7 +262,11 @@ func TestSSARuleMustPassMitmDisable(t *testing.T) {
 		risk.Save(r)
 			`,
 			"mitm",
-			[]string{rules.ErrorDisableMitmPacks(), rules.ErrorDisableMitmPacks(), rules.ErrorDisableMitmPacks()})
+			[]string{
+				rules.MITMNotSupport("risk.CreateRisk"),
+				rules.MITMNotSupport("risk.cve"),
+				rules.MITMNotSupport("risk.Save"),
+			})
 	})
 
 	t.Run("test in mitm func", func(t *testing.T) {
