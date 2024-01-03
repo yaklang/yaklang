@@ -496,7 +496,9 @@ type YakClient interface {
 	StaticAnalyzeError(ctx context.Context, in *StaticAnalyzeErrorRequest, opts ...grpc.CallOption) (*StaticAnalyzeErrorResponse, error)
 	YaklangCompileAndFormat(ctx context.Context, in *YaklangCompileAndFormatRequest, opts ...grpc.CallOption) (*YaklangCompileAndFormatResponse, error)
 	YaklangLanguageSuggestion(ctx context.Context, in *YaklangLanguageSuggestionRequest, opts ...grpc.CallOption) (*YaklangLanguageSuggestionResponse, error)
+	// 从代码中提取yaklang数据
 	YaklangInspectInformation(ctx context.Context, in *YaklangInspectInformationRequest, opts ...grpc.CallOption) (*YaklangInspectInformationResponse, error)
+	// 进行数据迁移使用
 	YaklangGetCliCodeFromDatabase(ctx context.Context, in *YaklangGetCliCodeFromDatabaseRequest, opts ...grpc.CallOption) (*YaklangGetCliCodeFromDatabaseResponse, error)
 	// 端口扫描的封装
 	PortScan(ctx context.Context, in *PortScanRequest, opts ...grpc.CallOption) (Yak_PortScanClient, error)
@@ -5143,7 +5145,9 @@ type YakServer interface {
 	StaticAnalyzeError(context.Context, *StaticAnalyzeErrorRequest) (*StaticAnalyzeErrorResponse, error)
 	YaklangCompileAndFormat(context.Context, *YaklangCompileAndFormatRequest) (*YaklangCompileAndFormatResponse, error)
 	YaklangLanguageSuggestion(context.Context, *YaklangLanguageSuggestionRequest) (*YaklangLanguageSuggestionResponse, error)
+	// 从代码中提取yaklang数据
 	YaklangInspectInformation(context.Context, *YaklangInspectInformationRequest) (*YaklangInspectInformationResponse, error)
+	// 进行数据迁移使用
 	YaklangGetCliCodeFromDatabase(context.Context, *YaklangGetCliCodeFromDatabaseRequest) (*YaklangGetCliCodeFromDatabaseResponse, error)
 	// 端口扫描的封装
 	PortScan(*PortScanRequest, Yak_PortScanServer) error
