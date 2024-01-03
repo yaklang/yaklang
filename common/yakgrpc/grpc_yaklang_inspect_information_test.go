@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -493,3 +495,121 @@ func TestGRPCMUSTPASS_LANGUAGE_GetCliGRPC(t *testing.T) {
 	}
 }
 
+func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_Risk(t *testing.T) {
+	local, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	check := func(code string, want []*ypb.YakRiskInfo, t *testing.T) {
+		req := yaklangInspectInformationSend(local, "yak", code, nil)
+		if req == nil {
+			t.Fatal("no response")
+		}
+
+		got := req.RiskInfo
+		// compare got and want
+		if len(got) != len(want) {
+			t.Errorf("risk info length not match")
+		}
+		log.Info("got: \n", got)
+		log.Info("want: \n", want)
+		for i := range want {
+			if got[i].Level != want[i].Level {
+				t.Errorf("risk info %d level not match", i)
+			}
+			if got[i].TypeVerbose != want[i].TypeVerbose {
+				t.Errorf("risk info %d type verbose not match", i)
+			}
+			if got[i].CVE != want[i].CVE {
+				t.Errorf("risk info %d CVE not match", i)
+			}
+			if got[i].Description != want[i].Description {
+				t.Errorf("risk info %d description not match", i)
+			}
+			if got[i].Solution != want[i].Solution {
+				t.Errorf("risk info %d solution not match", i)
+			}
+		}
+	}
+
+	t.Run("simple risk info", func(t *testing.T) {
+		check(
+			`
+		risk.NewRisk("a",
+			risk.severity("high"),
+			risk.cve("CVE-2020-1234"),
+			risk.description("description"),
+			risk.typeVerbose("typeVerbose"),
+			risk.solution("solution"),
+		)
+		`,
+			[]*ypb.YakRiskInfo{
+				{
+					Level:       "high",
+					TypeVerbose: "typeVerbose",
+					CVE:         "CVE-2020-1234",
+					Description: "description",
+					Solution:    "solution",
+				},
+			},
+			t,
+		)
+	})
+
+	t.Run("risk info with risk.type", func(t *testing.T) {
+		check(
+			`
+		risk.NewRisk("a",
+			risk.severity("high"),
+			risk.cve("CVE-2020-1234"),
+			risk.description("description"),
+			risk.type("type"),
+			risk.solution("solution"),
+		)
+		`,
+			[]*ypb.YakRiskInfo{
+				{
+					Level:       "high",
+					TypeVerbose: "TYPE",
+					CVE:         "CVE-2020-1234",
+					Description: "description",
+					Solution:    "solution",
+				},
+			},
+			t,
+		)
+	})
+
+	t.Run("risk info with cve", func(t *testing.T) {
+		db := consts.GetGormCVEDatabase()
+		cve := "CVE-9090-1234"
+		// create cve
+		cveresources.CreateOrUpdateCVE(db, cve, &cveresources.CVE{
+			CVE:               "CVE-9090-1234",
+			DescriptionMain:   "description",
+			DescriptionMainZh: "中文描述",
+			Solution:          "solution",
+			Severity:          "high",
+		})
+
+		defer func() {
+			if db.Debug().Delete(&cveresources.CVE{}, "cve = ?", cve).Error != nil {
+				t.Fatal(err)
+			}
+		}()
+
+		check(`
+		risk.NewRisk("a",
+			risk.cve("`+cve+`"),
+		)
+			`, []*ypb.YakRiskInfo{
+			{
+				Level:       "high",
+				CVE:         cve,
+				Description: "中文描述",
+				Solution:    "solution",
+			},
+		}, t)
+	})
+}
