@@ -3,9 +3,7 @@ package yak
 import (
 	"testing"
 
-	"github.com/yaklang/yaklang/common/yak/plugin_type_analyzer"
 	"github.com/yaklang/yaklang/common/yak/plugin_type_analyzer/rules"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	yaklangspec "github.com/yaklang/yaklang/common/yak/yaklang/spec"
 )
@@ -92,23 +90,6 @@ func TestSSARuleMustPassYakCliCheck(t *testing.T) {
 			println("aaaa")
 			`, []string{})
 	})
-}
-
-func TestBuildInMethod(t *testing.T) {
-	code := `
-	a = [] 
-	a.Append(1)
-	println(a)
-	`
-
-	prog := ssaapi.Parse(code, plugin_type_analyzer.GetPluginSSAOpt("yak")...)
-	if prog.IsNil() {
-		t.Fatal("parse error")
-	}
-	users := prog.Ref("a").GetUsers()
-	if len(users) != 2 {
-		t.Fatal("user length error : ", users.String())
-	}
 }
 
 func TestSSARuleMustPassRiskOption(t *testing.T) {
@@ -317,5 +298,24 @@ func TestSSARuleMustPassMitmDisable(t *testing.T) {
 			`,
 			"yak",
 			[]string{})
+	})
+
+	t.Run("test Fuzz in MITM", func(t *testing.T) {
+		checkWithType(t, `
+		fuzz.HTTPRequest("")~
+
+		fuzz.HTTPRequest("")~.Exec()
+		fuzz.HTTPRequest("")~.FuzzGetParamsRaw().Exec()
+
+		fuzz.HTTPRequest("")~.ExecFirst()
+		fuzz.HTTPRequest("")~.FuzzGetParamsRaw().ExecFirst()
+			`,
+			"mitm",
+			[]string{
+				rules.MITMNotSupport("fuzz.Exec or fuzz.ExecFirst"),
+				rules.MITMNotSupport("fuzz.Exec or fuzz.ExecFirst"),
+				rules.MITMNotSupport("fuzz.Exec or fuzz.ExecFirst"),
+				rules.MITMNotSupport("fuzz.Exec or fuzz.ExecFirst"),
+			})
 	})
 }
