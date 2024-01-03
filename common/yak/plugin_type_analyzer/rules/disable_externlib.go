@@ -42,7 +42,6 @@ func DisableMitmExternLib(prog *ssaapi.Program) {
 
 	for _, pkgName := range DisablePack {
 		prog.Ref(pkgName).GetDefs().ForEach(func(Func *ssaapi.Value) {
-
 			Func.GetUsers().Filter(func(v *ssaapi.Value) bool {
 				return v.IsCall() && v.IsReachable() != -1
 			}).ForEach(func(v *ssaapi.Value) {

@@ -164,6 +164,8 @@ func NewExternLib(variable string, fun *Function) *ExternLib {
 	e := &ExternLib{
 		anInstruction: NewInstruction(),
 		anValue:       NewValue(),
+		MemberMap:     make(map[string]Value),
+		Member:        make([]Value, 0),
 	}
 	e.SetName(variable)
 	e.SetFunc(fun)

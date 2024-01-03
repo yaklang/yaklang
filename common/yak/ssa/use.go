@@ -171,6 +171,7 @@ func (e *ExternLib) GetValues() Values { return e.Member }
 func (e *ExternLib) ReplaceValue(v Value, to Value) {
 	if index := slices.Index(e.Member, v); index != -1 {
 		e.Member[index] = to
+		e.MemberMap[v.GetName()] = to
 	} else {
 		panic("extern lib not use this value")
 	}
