@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/openapi/jsonpointer"
 	"math"
 	"math/big"
 	"reflect"
@@ -390,104 +391,104 @@ func (schema *Schema) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-//// JSONLookup implements https://pkg.go.dev/github.com/go-openapi/jsonpointer#JSONPointable
-//func (schema Schema) JSONLookup(token string) (interface{}, error) {
-//	switch token {
-//	case "additionalProperties":
-//		if addProps := schema.AdditionalProperties.Has; addProps != nil {
-//			return *addProps, nil
-//		}
-//		if addProps := schema.AdditionalProperties.Schema; addProps != nil {
-//			if addProps.Ref != "" {
-//				return &Ref{Ref: addProps.Ref}, nil
-//			}
-//			return addProps.Value, nil
-//		}
-//	case "not":
-//		if schema.Not != nil {
-//			if schema.Not.Ref != "" {
-//				return &Ref{Ref: schema.Not.Ref}, nil
-//			}
-//			return schema.Not.Value, nil
-//		}
-//	case "items":
-//		if schema.Items != nil {
-//			if schema.Items.Ref != "" {
-//				return &Ref{Ref: schema.Items.Ref}, nil
-//			}
-//			return schema.Items.Value, nil
-//		}
-//	case "oneOf":
-//		return schema.OneOf, nil
-//	case "anyOf":
-//		return schema.AnyOf, nil
-//	case "allOf":
-//		return schema.AllOf, nil
-//	case "type":
-//		return schema.Type, nil
-//	case "title":
-//		return schema.Title, nil
-//	case "format":
-//		return schema.Format, nil
-//	case "description":
-//		return schema.Description, nil
-//	case "enum":
-//		return schema.Enum, nil
-//	case "default":
-//		return schema.Default, nil
-//	case "example":
-//		return schema.Example, nil
-//	case "externalDocs":
-//		return schema.ExternalDocs, nil
-//	case "uniqueItems":
-//		return schema.UniqueItems, nil
-//	case "exclusiveMin":
-//		return schema.ExclusiveMin, nil
-//	case "exclusiveMax":
-//		return schema.ExclusiveMax, nil
-//	case "nullable":
-//		return schema.Nullable, nil
-//	case "readOnly":
-//		return schema.ReadOnly, nil
-//	case "writeOnly":
-//		return schema.WriteOnly, nil
-//	case "allowEmptyValue":
-//		return schema.AllowEmptyValue, nil
-//	case "xml":
-//		return schema.XML, nil
-//	case "deprecated":
-//		return schema.Deprecated, nil
-//	case "min":
-//		return schema.Min, nil
-//	case "max":
-//		return schema.Max, nil
-//	case "multipleOf":
-//		return schema.MultipleOf, nil
-//	case "minLength":
-//		return schema.MinLength, nil
-//	case "maxLength":
-//		return schema.MaxLength, nil
-//	case "pattern":
-//		return schema.Pattern, nil
-//	case "minItems":
-//		return schema.MinItems, nil
-//	case "maxItems":
-//		return schema.MaxItems, nil
-//	case "required":
-//		return schema.Required, nil
-//	case "properties":
-//		return schema.Properties, nil
-//	case "minProps":
-//		return schema.MinProps, nil
-//	case "maxProps":
-//		return schema.MaxProps, nil
-//	case "discriminator":
-//		return schema.Discriminator, nil
-//	}
-//
-//	v, _, err := jsonpointer.GetForToken(schema.Extensions, token)
-//	return v, err
-//}
+// JSONLookup implements https://pkg.go.dev/github.com/go-openapi/jsonpointer#JSONPointable
+func (schema Schema) JSONLookup(token string) (interface{}, error) {
+	switch token {
+	case "additionalProperties":
+		if addProps := schema.AdditionalProperties.Has; addProps != nil {
+			return *addProps, nil
+		}
+		if addProps := schema.AdditionalProperties.Schema; addProps != nil {
+			if addProps.Ref != "" {
+				return &Ref{Ref: addProps.Ref}, nil
+			}
+			return addProps.Value, nil
+		}
+	case "not":
+		if schema.Not != nil {
+			if schema.Not.Ref != "" {
+				return &Ref{Ref: schema.Not.Ref}, nil
+			}
+			return schema.Not.Value, nil
+		}
+	case "items":
+		if schema.Items != nil {
+			if schema.Items.Ref != "" {
+				return &Ref{Ref: schema.Items.Ref}, nil
+			}
+			return schema.Items.Value, nil
+		}
+	case "oneOf":
+		return schema.OneOf, nil
+	case "anyOf":
+		return schema.AnyOf, nil
+	case "allOf":
+		return schema.AllOf, nil
+	case "type":
+		return schema.Type, nil
+	case "title":
+		return schema.Title, nil
+	case "format":
+		return schema.Format, nil
+	case "description":
+		return schema.Description, nil
+	case "enum":
+		return schema.Enum, nil
+	case "default":
+		return schema.Default, nil
+	case "example":
+		return schema.Example, nil
+	case "externalDocs":
+		return schema.ExternalDocs, nil
+	case "uniqueItems":
+		return schema.UniqueItems, nil
+	case "exclusiveMin":
+		return schema.ExclusiveMin, nil
+	case "exclusiveMax":
+		return schema.ExclusiveMax, nil
+	case "nullable":
+		return schema.Nullable, nil
+	case "readOnly":
+		return schema.ReadOnly, nil
+	case "writeOnly":
+		return schema.WriteOnly, nil
+	case "allowEmptyValue":
+		return schema.AllowEmptyValue, nil
+	case "xml":
+		return schema.XML, nil
+	case "deprecated":
+		return schema.Deprecated, nil
+	case "min":
+		return schema.Min, nil
+	case "max":
+		return schema.Max, nil
+	case "multipleOf":
+		return schema.MultipleOf, nil
+	case "minLength":
+		return schema.MinLength, nil
+	case "maxLength":
+		return schema.MaxLength, nil
+	case "pattern":
+		return schema.Pattern, nil
+	case "minItems":
+		return schema.MinItems, nil
+	case "maxItems":
+		return schema.MaxItems, nil
+	case "required":
+		return schema.Required, nil
+	case "properties":
+		return schema.Properties, nil
+	case "minProps":
+		return schema.MinProps, nil
+	case "maxProps":
+		return schema.MaxProps, nil
+	case "discriminator":
+		return schema.Discriminator, nil
+	}
+
+	v, _, err := jsonpointer.GetForToken(schema.Extensions, token)
+	return v, err
+}
 
 func (schema *Schema) NewRef() *SchemaRef {
 	return &SchemaRef{

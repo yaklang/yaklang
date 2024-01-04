@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/kataras/golog"
-	"github.com/prometheus/common/log"
 	"io"
 	"io/ioutil"
 	"os"
@@ -114,11 +113,10 @@ func GetLogger(name string) *Logger {
 			line := -1
 			if logger.vmRuntimeInfoGetter != nil {
 				l, err := logger.vmRuntimeInfoGetter("line")
-				if err == nil {
-					line = l.(int)
-				} else {
-					log.Error(err)
+				if err != nil {
+					return false
 				}
+				line = l.(int)
 			}
 			return formatter(l, name, line)
 		})
