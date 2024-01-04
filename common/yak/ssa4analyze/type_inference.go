@@ -145,6 +145,19 @@ func (t *TypeInference) TypeInferenceNext(next *ssa.Next) {
 		}
 		next.SetType(typ)
 	}
+	if it, ok := next.Iter.GetType().(*ssa.ChanType); ok {
+		typ.AddField(ssa.NewConst("key"), it.Elem)
+		typ.AddField(ssa.NewConst("field"), ssa.BasicTypes[ssa.Null])
+		next.SetType(typ)
+		next.GetUsers().RunOnField(func(f *ssa.Field) {
+			if f.Key.String() == "field" && len(f.GetAllVariables()) != 0 {
+				// checkType(f, it.Elem)
+				for _, variable := range f.GetAllVariables() {
+					variable.NewError(ssa.Error, TITAG, InvalidChanType(it.Elem.String()))
+				}
+			}
+		})
+	}
 }
 
 func (t *TypeInference) TypeInferencePhi(phi *ssa.Phi) {

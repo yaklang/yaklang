@@ -64,3 +64,8 @@ func ValueIsNull() string {
 func InvalidField(typ, key string) string {
 	return fmt.Sprintf("Invalid operation: unable to access the member or index of variable of type {%s} with name or index {%s}.", typ, key)
 }
+
+func InvalidChanType(typ string) string {
+	return fmt.Sprintf("iteration (variable of type chan %s) permits only one right variable", typ)
+
+}
