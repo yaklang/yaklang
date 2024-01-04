@@ -805,7 +805,8 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 			return ssa.NewIdentifierLV("_", b.CurrentRange)
 		}
 		if forceAssign {
-			return ssa.NewIdentifierLV(b.SetScopeLocalVariable(text), b.CurrentRange)
+			b.SetScopeLocalVariable(text)
+			return ssa.NewIdentifierLV(text, b.CurrentRange)
 		}
 
 		lv := ssa.NewIdentifierLV(text, b.CurrentRange)
