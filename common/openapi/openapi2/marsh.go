@@ -1,7 +1,9 @@
 package openapi2
 
 import (
+	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/openapi/openapiyaml"
 	"strings"
 )
 
@@ -12,13 +14,11 @@ func unmarshalError(jsonUnmarshalErr error) error {
 	}
 	return jsonUnmarshalErr
 }
-
-//
-//func unmarshal(data []byte, v interface{}) error {
-//	// See https://github.com/getkin/kin-openapi/issues/680
-//	if err := json.Unmarshal(data, v); err != nil {
-//		// UnmarshalStrict(data, v) TODO: investigate how ymlv3 handles duplicate map keys
-//		return yaml.Unmarshal(data, v)
-//	}
-//	return nil
-//}
+func unmarshal(data []byte, v interface{}) error {
+	// See https://github.com/getkin/kin-openapi/issues/680
+	if err := json.Unmarshal(data, v); err != nil {
+		// UnmarshalStrict(data, v) TODO: investigate how ymlv3 handles duplicate map keys
+		return openapiyaml.Unmarshal(data, v)
+	}
+	return nil
+}
