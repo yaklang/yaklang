@@ -349,6 +349,25 @@ func TestForEach(t *testing.T) {
 			},
 		})
 	})
+
+	t.Run("for in with chan", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			ch = make(chan int)
+
+			for i in ch { // ok
+				_ = i 
+			}
+
+			for i, v in ch { // error
+				_ = i 
+			}
+			`,
+			errs: []string{
+				ssa4analyze.InvalidChanType("number"),
+			},
+		})
+	})
 }
 
 func TestMemberCall(t *testing.T) {

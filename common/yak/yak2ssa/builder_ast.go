@@ -414,6 +414,7 @@ func (b *astbuilder) buildForRangeStmt(stmt *yak.ForRangeStmtContext) {
 		key, field, ok := b.EmitNext(value, stmt.In() != nil)
 		if len(lefts) == 1 {
 			lefts[0].Assign(key, b.FunctionBuilder)
+			ssa.DeleteInst(field)
 		} else if len(lefts) >= 2 {
 			lefts[0].Assign(key, b.FunctionBuilder)
 			lefts[1].Assign(field, b.FunctionBuilder)

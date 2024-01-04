@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -165,4 +166,36 @@ println(a)
 	if !traceToCall_via_if {
 		t.Error("trace failed: var cannot trace to call actual arguments")
 	}
+}
+
+func MustParse(code string, t *testing.T) *Program {
+	prog, err := Parse(code)
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
+	return prog
+}
+
+func TestYaklangBasic_Foreach(t *testing.T) {
+	t.Run("for each with chan", func(t *testing.T) {
+		test := assert.New(t)
+		prog := MustParse(`
+		ch = make(chan int)
+
+		for i in ch { 
+			_ = i 
+		}
+		`, t)
+		prog.Show()
+
+		vs := prog.Ref("i")
+		test.Equal(1, len(vs))
+
+		v := vs[0]
+		test.NotNil(v)
+
+		kind := v.GetTypeKind()
+		log.Info("type kind", kind)
+		test.Equal(kind, ssa.Number)
+	})
 }

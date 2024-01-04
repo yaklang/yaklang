@@ -469,7 +469,7 @@ func (i *InterfaceType) RawString() string {
 
 // ====================== chan type
 type ChanType struct {
-	elem   Type
+	Elem   Type
 	method map[string]*FunctionType
 }
 
@@ -500,12 +500,12 @@ func (c *ChanType) GetTypeKind() TypeKind {
 
 func NewChanType(elem Type) *ChanType {
 	return &ChanType{
-		elem: elem,
+		Elem: elem,
 	}
 }
 
 func (c ChanType) String() string {
-	return fmt.Sprintf("chan %s", c.elem)
+	return fmt.Sprintf("chan %s", c.Elem)
 }
 
 func (c ChanType) RawString() string {
