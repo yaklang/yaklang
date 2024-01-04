@@ -28,10 +28,12 @@ func (v *Variable) String() string {
 	return ret
 }
 
-func (v *Variable) AddRange(p *Range) {
-	// v.Range = append(v.Range, p)
-	// fmt.Println(v.Name, p.StartColumn)
-	v.Range[p] = struct{}{}
+func (v *Variable) AddRange(p *Range, force bool) {
+	if force || len(*p.SourceCode) == len(v.Name) {
+		// v.Range = append(v.Range, p)
+		// fmt.Println(v.Name, p.StartColumn)
+		v.Range[p] = struct{}{}
+	}
 }
 
 func (v *Variable) NewError(kind ErrorKind, tag ErrorTag, msg string) {
@@ -116,7 +118,7 @@ func (s *Scope) AddVariable(v *Variable, R *Range) {
 	}
 	varList = append(varList, v)
 	s.VarMap[name] = varList
-	v.AddRange(R)
+	v.AddRange(R, true)
 	s.InsertByRange(v, R)
 }
 

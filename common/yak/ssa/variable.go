@@ -31,7 +31,7 @@ func (i *IdentifierLV) Assign(v Value, f *FunctionBuilder) {
 		}
 	}
 	if !v.IsExtern() {
-		f.CurrentScope.AddVariable(NewVariable(i.name, v), f.CurrentRange)
+		f.CurrentScope.AddVariable(NewVariable(i.name, v), i.GetRange())
 	}
 	f.WriteVariable(i.name, v)
 	if i.isSideEffect {
@@ -161,7 +161,7 @@ func (b *FunctionBuilder) ReadVariable(variable string, create bool) Value {
 	}
 
 	if v := ret.GetVariable(variable); v != nil {
-		v.AddRange(b.CurrentRange)
+		v.AddRange(b.CurrentRange, false)
 		b.CurrentScope.InsertByRange(v, b.CurrentRange)
 	} else {
 		b.CurrentScope.AddVariable(NewVariable(variable, ret), b.CurrentRange)
