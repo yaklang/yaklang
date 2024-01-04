@@ -12,6 +12,12 @@ import (
 //go:embed behinder/static/*
 var behinderPayloads embed.FS
 
+//go:embed godzilla/static/payload_test.dll
+var CshrapPayload []byte
+
+//go:embed godzilla/static/plugin/*.dll
+var CshrapPluginPayload embed.FS
+
 type Payload string
 
 var (

