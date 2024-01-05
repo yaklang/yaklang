@@ -998,9 +998,6 @@ func (s *Server) ExportLocalYakScript(ctx context.Context, req *ypb.ExportLocalY
 
 	for v := range scripts {
 		outputPluginDir := v.ScriptName
-		if len(req.GetYakScriptIds()) == 1 {
-			outputPluginDir = req.GetOutputPluginDir()
-		}
 		dirRet, err := s.ExportYakPluginBatch(v, req.GetOutputDir(), ReplaceString(outputPluginDir))
 		if len(req.GetYakScriptIds()) == 1 {
 			dir = dirRet
