@@ -1419,6 +1419,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					continue
 				}
 
+				tags := reqInstance.GetTags()
+				if len(tags) > 0 {
+					httpctx.SetFlowTags(originReqIns, tags)
+				}
+
 				if reqInstance.GetHijackResponse() {
 					// 设置需要劫持resp
 					httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest, true)
@@ -1588,6 +1593,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		if isResponseDropped {
 			flow.AddTagToFirst("[响应被丢弃]")
 			flow.Purple()
+		}
+		// 额外添加用户手动设置的标签
+		tags := httpctx.GetFlowTags(req)
+		if len(tags) > 0 {
+			flow.AddTag(tags...)
 		}
 
 		hijackedFlowMutex := new(sync.Mutex)

@@ -2,15 +2,16 @@ package httpctx
 
 import (
 	"context"
-	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func GetContextInfoMap(r *http.Request) *sync.Map {
@@ -37,7 +38,7 @@ func _getContextInfoMap(r *http.Request) *sync.Map {
 	var uid string
 	if value == nil {
 		uid = uuid.New().String()
-		var ret = new(sync.Map)
+		ret := new(sync.Map)
 		ret.Store("uuid", uid)
 		*r = *r.WithContext(context.WithValue(r.Context(), REQUEST_CONTEXT_INFOMAP, ret))
 		value = ret
@@ -50,7 +51,7 @@ func _getContextInfoMap(r *http.Request) *sync.Map {
 		}
 	}
 	if uid == "" {
-		var uidRaw, ok = infoMap.Load("uuid")
+		uidRaw, ok := infoMap.Load("uuid")
 		if ok {
 			uid = uidRaw.(string)
 		}
@@ -59,7 +60,7 @@ func _getContextInfoMap(r *http.Request) *sync.Map {
 }
 
 func GetContextStringInfoFromRequest(r *http.Request, key string) string {
-	var infoMap = GetContextInfoMap(r)
+	infoMap := GetContextInfoMap(r)
 	v, ok := infoMap.Load(key)
 	if !ok {
 		return ""
@@ -93,7 +94,7 @@ func SetRequestHTTPS(r *http.Request, b bool) {
 }
 
 func GetContextBoolInfoFromRequest(r *http.Request, key string) bool {
-	var infoMap = GetContextInfoMap(r)
+	infoMap := GetContextInfoMap(r)
 	v, ok := infoMap.Load(key)
 	if !ok {
 		return false
@@ -111,7 +112,7 @@ func GetContextBoolInfoFromRequest(r *http.Request, key string) bool {
 }
 
 func GetContextAnyFromRequest(r *http.Request, key string) any {
-	var infoMap = GetContextInfoMap(r)
+	infoMap := GetContextInfoMap(r)
 	v, ok := infoMap.Load(key)
 	if !ok {
 		return nil
@@ -120,7 +121,7 @@ func GetContextAnyFromRequest(r *http.Request, key string) any {
 }
 
 func GetContextIntInfoFromRequest(r *http.Request, key string) int {
-	var infoMap = GetContextInfoMap(r)
+	infoMap := GetContextInfoMap(r)
 	v, ok := infoMap.Load(key)
 	if !ok {
 		return 0
@@ -145,7 +146,7 @@ func GetContextIntInfoFromRequest(r *http.Request, key string) int {
 }
 
 func SetContextValueInfoFromRequest(r *http.Request, key string, value any) {
-	var infoMap = GetContextInfoMap(r)
+	infoMap := GetContextInfoMap(r)
 	infoMap.Store(key, value)
 }
 
@@ -230,6 +231,7 @@ const (
 	REQUEST_CONTEXT_KEY_AutoFoward                   = "isRequestAutoForward"
 	RESPONSE_CONTEXT_KEY_AutoFoward                  = "isResponseAutoForward"
 	REQUEST_CONTEXT_KEY_Url                          = "url"
+	REQUEST_CONTEXT_KEY_Tags                         = "flowTags"
 	REQUEST_CONTEXT_KEY_RequestIsModified            = "requestIsModified"
 	REQUEST_CONTEXT_KEY_ResponseIsModified           = "responseIsModified"
 	REQUEST_CONTEXT_KEY_RequestModifiedBy            = "requestIsModifiedBy"
@@ -549,4 +551,17 @@ func GetRequestViaCONNECT(req *http.Request) bool {
 
 func SetRequestViaCONNECT(req *http.Request, b bool) {
 	SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_ViaConnect, b)
+}
+
+func GetFlowTags(r *http.Request) []string {
+	v := GetContextAnyFromRequest(r, REQUEST_CONTEXT_KEY_Tags)
+	switch ret := v.(type) {
+	case []string:
+		return ret
+	}
+	return []string{}
+}
+
+func SetFlowTags(r *http.Request, tags []string) {
+	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_Tags, tags)
 }
