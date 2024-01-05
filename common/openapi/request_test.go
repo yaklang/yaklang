@@ -2,8 +2,8 @@ package openapi
 
 import (
 	_ "embed"
+	"encoding/json"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/openapi/openapi2"
@@ -46,6 +46,10 @@ Host: www.example.com
 				originPath = pr
 			}
 
+			if len(ins.Consumes) > 0 {
+				methodRoot = methodRoot.FuzzHTTPHeader("Content-Type", ins.Consumes[0])
+			}
+
 			for _, parameter := range ins.Parameters {
 				switch parameter.In {
 				case "path":
@@ -62,6 +66,12 @@ Host: www.example.com
 					methodRoot = methodRoot.FuzzGetParams(parameter.Name, OpenAPITypeToMockDataLiteral(parameter.Type, parameter.Default))
 				case "header":
 					methodRoot = methodRoot.FuzzHTTPHeader(parameter.Name, OpenAPITypeToMockDataLiteral(parameter.Type, parameter.Default))
+				case "formData":
+					if parameter.Type != "file" {
+						methodRoot = methodRoot.FuzzFormEncoded(parameter.Name, OpenAPITypeToMockDataLiteral(parameter.Type, parameter.Default))
+					} else {
+						methodRoot = methodRoot.FuzzUploadFile(parameter.Name, "filename.txt", []byte(`[[file-placeholder]]`))
+					}
 				case "body":
 					if ret := parameter.Schema; ret == nil {
 						methodRoot = methodRoot.FuzzPostParams(parameter.Name, OpenAPITypeToMockDataLiteral(parameter.Type, parameter.Default))
@@ -70,16 +80,22 @@ Host: www.example.com
 							methodRoot = methodRoot.FuzzPostRaw("{}")
 							continue
 						} else if ret.Ref != "" {
-							raw := OpenAPI2RefToObject(data, ret.Ref)
-							spew.Dump(raw)
-							continue
+							rawObj := OpenAPI2RefToObject(data, ret.Ref)
+							raw, err := json.Marshal(rawObj)
+							if err != nil {
+								log.Errorf("openapi2.0 body(ref) marshal failed: %s", err)
+								raw = []byte("{}")
+							}
+							methodRoot = methodRoot.FuzzPostRaw(string(raw))
 						} else if ret.Value != nil {
 							ret.Value.AllowEmptyValue = true
-							raw, err := ret.Value.MarshalJSON()
+							val := schemaValue(data, ret.Value)
+							raw, err := json.Marshal(val)
 							if err != nil {
-								log.Error(err)
+								log.Errorf("openapi2.0 body marshal failed: %s", err)
+								raw = []byte("{}")
 							}
-							spew.Dump(raw)
+							methodRoot = methodRoot.FuzzPostRaw(string(raw))
 						}
 					}
 				default:
