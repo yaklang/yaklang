@@ -57,7 +57,20 @@ func behidnerResultToYakURLResource(originParam *ypb.YakURL, result []byte) ([]*
 			User:     originParam.GetUser(),
 			Pass:     originParam.GetPass(),
 			Location: originParam.GetLocation(),
-			Query:    originParam.GetQuery(),
+		}
+		query := originParam.GetQuery()
+		for _, v := range query {
+			if v.GetKey() == "path" {
+				newParam.Query = append(newParam.Query, &ypb.KVPair{
+					Key:   v.GetKey(),
+					Value: originParam.GetPath(),
+				})
+			} else {
+				newParam.Query = append(newParam.Query, &ypb.KVPair{
+					Key:   v.GetKey(),
+					Value: v.GetValue(),
+				})
+			}
 		}
 		if v.Type == gjson.String {
 			name := filepath.Base(originParam.GetPath())
