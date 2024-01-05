@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -20,7 +21,7 @@ import (
 )
 
 func TestGRPCMUSTPASS_HTTP_QueryHTTPFlow_Oversize(t *testing.T) {
-	var client, err = NewLocalClient()
+	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -295,7 +296,6 @@ assert string(body) == token2, sprintf("get %s != %s", string(body), string(toke
 		Keyword:    token2,
 		Full:       true,
 	})
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -323,12 +323,11 @@ assert string(body) == token2, sprintf("get %s != %s", string(body), string(toke
 }
 
 func TestHTTPFlowTreeHelper(t *testing.T) {
-
 	//db := yakit.FilterHTTPFlowByDomain(consts.GetGormProjectDatabase(), "w.baidu.com").Debug()
 	//for result := range yakit.YieldHTTPFlows(db, context.Background()) {
 	//	fmt.Println(result.Url)
 	//}
-	var result = yakit.GetHTTPFlowNextPartPathByPathPrefix(consts.GetGormProjectDatabase(), "v1")
+	result := yakit.GetHTTPFlowNextPartPathByPathPrefix(consts.GetGormProjectDatabase(), "v1")
 	spew.Dump(result)
 }
 
@@ -352,4 +351,84 @@ func TestExportHTTPFlows(t *testing.T) {
 		t.Fatalf("export httpFlows error: %v", err)
 	}
 	_ = response
+}
+
+func TestGRPCMUSTPASS_MITM_PreSetTags(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	token1 := utils.RandStringBytes(20)
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Write([]byte("hello"))
+	})
+	target := utils.HostPort(host, port)
+
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(1000))
+	defer cancel()
+	stream, err := client.MITM(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	stream.Send(&ypb.MITMRequest{
+		Host: "127.0.0.1",
+		Port: uint32(mitmPort),
+	})
+	stream.Send(&ypb.MITMRequest{SetAutoForward: true, AutoForwardValue: false})
+	for {
+		rcpResponse, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		rspMsg := string(rcpResponse.GetMessage().GetMessage())
+		if rcpResponse.GetHaveMessage() {
+		} else if len(rcpResponse.GetRequest()) > 0 {
+			req := bytes.ReplaceAll(rcpResponse.GetRequest(), []byte("aaaaa"), []byte(token1))
+			stream.Send(&ypb.MITMRequest{
+				Request:    req,
+				Id:         rcpResponse.GetId(),
+				ResponseId: rcpResponse.GetResponseId(),
+				Tags:       []string{"YAKIT_COLOR_RED"},
+			})
+		}
+		if strings.Contains(rspMsg, `starting mitm serve`) {
+			go func() {
+				time.Sleep(time.Second)
+				packet := `GET / HTTP/1.1
+Host: ` + target
+				_, err := yak.Execute(`
+rsp, req = poc.HTTP(packet, poc.proxy(mitmProxy))~
+`, map[string]any{
+					"packet":    []byte(lowhttp.ReplaceHTTPPacketHeader([]byte(packet), "Token", "aaaaa")),
+					"mitmProxy": "http://" + utils.HostPort("127.0.0.1", mitmPort),
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				cancel()
+			}()
+		}
+	}
+
+	rpcResponse, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
+		Pagination: &ypb.Paging{
+			Page:  1,
+			Limit: 100,
+		},
+		SourceType: "mitm",
+		Keyword:    token1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rpcResponse.GetTotal() <= 0 {
+		t.Fatal("no flow")
+	}
+	flow := rpcResponse.GetData()[0]
+	if !strings.Contains(flow.Tags, "YAKIT_COLOR_RED") {
+		t.Fatal("flow preset tag failed")
+	}
 }
