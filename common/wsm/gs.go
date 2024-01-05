@@ -2,9 +2,10 @@ package wsm
 
 import (
 	"fmt"
-	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/wsm/payloads/godzilla"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/url"
@@ -271,8 +272,34 @@ func (g *GodzillaFileSystemAction) Get(params *ypb.RequestYakURLParams) (*ypb.Re
 }
 
 func (g *GodzillaFileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	u := params.GetUrl()
+	path := u.GetPath()
+	_ = path
+	var query = make(url.Values)
+	for _, v := range u.GetQuery() {
+		query.Add(v.GetKey(), v.GetValue())
+	}
+	if query.Get("id") == "" {
+		return nil, utils.Error("webshell id cannot be empty")
+	}
+
+	var res []*ypb.YakURLResource
+
+	switch query.Get("op") {
+	case "cmd":
+		fallthrough
+	case "db":
+		return g.Do(params)
+	case "file":
+		return &ypb.RequestYakURLResponse{
+			Page:      1,
+			PageSize:  100,
+			Total:     int64(len(res)),
+			Resources: res,
+		}, nil
+	default:
+		return nil, utils.Errorf("unsupported op %s", query.Get("op"))
+	}
 }
 
 func (g *GodzillaFileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
@@ -288,6 +315,16 @@ func (g *GodzillaFileSystemAction) Delete(params *ypb.RequestYakURLParams) (*ypb
 func (g *GodzillaFileSystemAction) Head(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	//TODO implement me
 	panic("implement me")
+}
+
+func (g *GodzillaFileSystemAction) execCommandTemp(command string, isWin bool) string {
+	var temp string
+	if isWin {
+		temp = "cmd /c \"{command}\" 2>&1"
+	} else {
+		temp = "sh -c \"{command}\" 2>&1"
+	}
+	return strings.Replace(temp, "{command}", command, -1)
 }
 
 func (g *GodzillaFileSystemAction) Do(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
@@ -308,27 +345,56 @@ func (g *GodzillaFileSystemAction) Do(params *ypb.RequestYakURLParams) (*ypb.Req
 		command := query.Get("cmd")
 		path := query.Get("path")
 		var resource = &ypb.YakURLResource{}
-		if strings.HasPrefix(command, "cd ") {
-			path, err = calculateNewPath(path, strings.TrimPrefix(command, "cd "))
+
+		commands := godzilla.SplitArgs(command)
+		fileName := commands[0]
+		start := utils.RandSampleInRange(3, 8)
+		end := utils.RandSampleInRange(3, 8)
+		var realCommand string
+		isWin := godzilla.IsWindowsPathByDriveLetter(path)
+		if strings.EqualFold(fileName, "cd") && len(commands) > 0 {
+			realCommand = strings.Replace(commands[1], "\\", "/", -1)
+			if isWin { // 假设 isWindows 是一个函数，用来判断是否是Windows系统
+				realCommand = fmt.Sprintf("cd /d \"%s\"&cd /d \"%s\"&&echo %s&&cd&&echo %s", path, realCommand, start, end)
+			} else {
+				realCommand = fmt.Sprintf("cd \"%s\";cd \"%s\"&&echo %s&&pwd&&echo %s", path, realCommand, start, end)
+			}
+			raw, err := manager.CommandExec(g.execCommandTemp(realCommand, isWin))
 			if err != nil {
 				return nil, err
 			}
-			extra := []*ypb.KVPair{
-				{Key: "content", Value: ""},
+			resultDir := strings.TrimSpace(string(raw))
+
+			if strings.HasPrefix(resultDir, start) {
+				resultDir = strings.TrimSpace(resultDir[len(start):])
+				if strings.HasSuffix(resultDir, end) {
+					resultDir = strings.TrimSpace(resultDir[:len(resultDir)-len(end)])
+					extra := []*ypb.KVPair{
+						{Key: "content", Value: ""},
+					}
+					resource.Path = resultDir
+					resource.Extra = extra
+				} else {
+					log.Errorf("resultDir: %s", resultDir)
+				}
+			} else {
+				log.Errorf("resultDir: %s", resultDir)
 			}
-			resource.Path = path
-			resource.Extra = extra
 		} else {
-			// Todo 特征还是比较明显的
-			fullCommand := "cd " + path + " && " + command
-			raw, err := manager.CommandExec(fullCommand)
+			realCommand = ""
+			if isWin {
+				realCommand = fmt.Sprintf("cd /d \"%s\"&%s", path, command)
+			} else {
+				realCommand = fmt.Sprintf("cd \"%s\";%s", path, command)
+			}
+
+			raw, err := manager.CommandExec(g.execCommandTemp(realCommand, isWin))
 			if err != nil {
 				return nil, err
 			}
-			content := gjson.GetBytes(raw, "msg").String()
 
 			extra := []*ypb.KVPair{
-				{Key: "content", Value: content},
+				{Key: "content", Value: utils.EscapeInvalidUTF8Byte(raw)},
 			}
 			resource.Path = path
 			resource.Extra = extra

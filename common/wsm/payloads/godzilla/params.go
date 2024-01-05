@@ -3,6 +3,7 @@ package godzilla
 import (
 	"bytes"
 	"encoding/binary"
+	"regexp"
 	"strings"
 )
 
@@ -62,7 +63,17 @@ func intToBytes(n int) []byte {
 //	return par
 //}
 
-func SplitArgs(input string, maxParts int, removeAllEscapeSequences bool) []string {
+func IsWindowsPathByDriveLetter(path string) bool {
+	// 创建一个正则表达式，用于匹配类似于 "C:\" 的盘符
+	re := regexp.MustCompile(`^[a-zA-Z]:\\`)
+	return re.MatchString(path)
+}
+
+func SplitArgs(input string) []string {
+	return SplitArgsEx(input, int(^uint(0)>>1), false)
+}
+
+func SplitArgsEx(input string, maxParts int, removeAllEscapeSequences bool) []string {
 	r := []rune(strings.Trim(input, " "))
 	var i, parts, nextFragmentStart int
 	var inBounds bool
@@ -100,7 +111,7 @@ func deleteIndex(r []rune, i int) []rune {
 
 func addFragment(fragments []string, r []rune, start, end int) []string {
 	if end <= start && end >= 0 {
-		return []string{}
+		return fragments
 	}
 	if end < 0 {
 		end = len(r)
