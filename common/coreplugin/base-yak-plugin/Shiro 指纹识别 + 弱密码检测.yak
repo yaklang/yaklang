@@ -180,10 +180,15 @@ mirrorNewWebsite = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*
 
     risk.NewRisk(
         url,
-        risk.title(sprintf("Shiro(Cookie) Detected: %v", url)),
-        risk.titleVerbose("检测到 Shiro(Cookie) 框架使用"),
-        risk.type("info"), risk.typeVerbose("敏感框架使用"),
-        risk.description("Apache Shiro <= 1.2.4 版本中，加密的用户信息序列化后存储在Cookie的rememberMe字段中，攻击者可以使用Shiro的AES加密算法的默认密钥来构造恶意的Cookie rememberMe值，发送到Shiro服务端之后会先后进行Base64解码、AES解密、readObject()反序列化，从而触发Java原生反序列化漏洞，进而实现RCE。该漏洞的根源在于硬编码Key。"),
+        risk.title(sprintf("(Maybe) Shiro(Cookie) Detected: %v", url)),
+        risk.titleVerbose("疑似检测到 Shiro(Cookie) 框架使用"),
+        risk.type("info"), risk.typeVerbose("疑似敏感框架使用"),
+        risk.description(`本条记录是检测疑似 Shiro 框架行为，通过测试 rememberMe / remeberMe 等 Cookie 行为进行判断，并不能准确判断 Shiro 框架，可能存在误报。
+
+如果确认使用了 Shiro 框架，后续测试会使用 Shiro 框架的默认密钥组进行爆破，如果爆破成功，可以进一步检测是否存在 Shiro 反序列化漏洞。
+
+Apache Shiro <= 1.2.4 版本中，加密的用户信息序列化后存储在Cookie的rememberMe字段中，攻击者可以使用Shiro的AES加密算法的默认密钥来构造恶意的Cookie rememberMe值，发送到Shiro服务端之后会先后进行Base64解码、AES解密、readObject()反序列化，从而触发Java原生反序列化漏洞，进而实现RCE。该漏洞的根源在于硬编码Key。
+        `),
         risk.solution("升级到Apache Shiro 1.2.5或更高版本，并配置 'rememberMe' 功能的密钥。"),
         risk.severity("low"),
         risk.request(rsp.RequestRaw),
