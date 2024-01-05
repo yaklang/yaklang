@@ -331,7 +331,7 @@ func (g *Godzilla) sendPayload(data []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Infof("默认解密后: %s", string(deBody))
+	log.Debugf("默认解密后: %s", string(deBody))
 	return g.echoResultDecode(deBody)
 }
 
