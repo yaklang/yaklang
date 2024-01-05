@@ -291,6 +291,23 @@ c={"abc":{"c":{"d":true}}}&&d=1234444
 			},
 		},
 		{
+			InputPacket: `POST / HTTP/1.1
+Host: www.example.com
+Content-Type: multipart/form-data; boundary=------------------------mElesrxgGfeRzfHJlyONsWWKKiqXIiVGVuaxYhpG
+Content-Length: 245
+
+--------------------------mElesrxgGfeRzfHJlyONsWWKKiqXIiVGVuaxYhpG
+Content-Disposition: form-data; name="a"; filename="a.php"
+Content-Type: application/octet-stream
+
+
+--------------------------mElesrxgGfeRzfHJlyONsWWKKiqXIiVGVuaxYhpG--`,
+			Code: ".FuzzUploadFileName(\"a\",\"abc{{i(1-2)}}.php\")",
+			ExpectKeywordInOutputPacket: []string{
+				"name=\"a\"; filename=\"abc1.php\"",
+			},
+		},
+		{
 			InputPacket: `GET /acc.t1?a=ab HTTP/1.1
 Host: www.baidu.com
 Cookie: abc={"ccc":2311}
