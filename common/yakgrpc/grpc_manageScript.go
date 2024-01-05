@@ -1003,7 +1003,7 @@ func (s *Server) ExportLocalYakScript(ctx context.Context, req *ypb.ExportLocalY
 			dir = dirRet
 		}
 		if err != nil {
-			return nil, utils.Errorf(v.ScriptName + err.Error())
+			log.Errorf("export [%s] failed: %s", v.ScriptName, err.Error())
 		}
 	}
 
