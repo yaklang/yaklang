@@ -264,8 +264,8 @@ func getParameterFromParamJson(j string) ([]*ypb.YakScriptParam, error) {
 }
 
 func getNeedReturn(script *yakit.YakScript) ([]*ypb.YakScriptParam, error) {
-	prog := ssaapi.Parse(script.Content, pta.GetPluginSSAOpt("yak")...)
-	if prog.IsNil() {
+	prog, err := ssaapi.Parse(script.Content, pta.GetPluginSSAOpt("yak")...)
+	if err != nil {
 		return nil, errors.New("ssa parse error")
 	}
 	codeParameter := cliParam2grpc(pta.ParseCliParameter(prog))
