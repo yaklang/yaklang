@@ -289,11 +289,17 @@ func TestNewGodzillaBase64Jsp(t *testing.T) {
 	}
 	fmt.Println(ping)
 
-	//info, err := gs.BasicInfo()
-	//if err != nil {
-	//	panic(err)
-	//}
-	//fmt.Println(string(info))
+	info, err := gs.BasicInfo()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(string(info))
+
+	res, err := gs.CommandExec("whoami")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(string(res))
 }
 
 func TestNewGodzillaBase64Jsp_Plugin(t *testing.T) {

