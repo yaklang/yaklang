@@ -44,6 +44,15 @@ func (d *multipartData) ReplaceFile(fieldName, fileName string, fileContent []by
 }
 
 func (d *multipartData) ReplaceFileName(fieldName, fileName string) {
+	header := map[string][]string{
+		"Content-Disposition": {
+			fmt.Sprintf(`form-data; name=%v; filename=%v`,
+				strconv.Quote(fieldName),
+				strconv.Quote(fileName),
+			),
+		},
+		"Content-Type": {"application/octet-stream"},
+	}
 	raw := d.Files[fieldName]
 	if raw == nil {
 		d.Files[fieldName] = []*formItem{
@@ -52,20 +61,13 @@ func (d *multipartData) ReplaceFileName(fieldName, fileName string) {
 				IsFile:      true,
 				FileContent: nil,
 				FileName:    fieldName,
-				Header: map[string][]string{
-					"Content-Disposition": {
-						fmt.Sprintf(`form-data; name=%v; filename=%v`,
-							strconv.Quote(fieldName),
-							strconv.Quote(fileName),
-						),
-					},
-					"Content-Type": {"application/octet-stream"},
-				},
+				Header:      header,
 			},
 		}
 		return
 	}
-	raw[0].FileName = codec.EncodeUrlCode(fieldName)
+	raw[0].FileName = codec.EncodeUrlCode(fileName)
+	raw[0].Header = header
 }
 
 func (d *multipartData) Write(w *multipart.Writer) error {
