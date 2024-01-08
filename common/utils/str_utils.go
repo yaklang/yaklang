@@ -998,6 +998,13 @@ func RandSampleInRange(minLen, maxLen int, material ...string) string {
 	return RandSample(randomLength, material...)
 }
 
+func RandChoice(a ...string) string {
+	if len(a) > 0 {
+		return a[rand.Intn(len(a))]
+	}
+	return ""
+}
+
 func ExtractRawPath(target string) string {
 	var rawPath string
 	if noSchemaTarget := strings.TrimPrefix(
