@@ -331,6 +331,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		feedbackWg.Wait()
 	}()
 	feedbackResponse := func(rsp *ypb.FuzzerResponse, skipPoC bool) error {
+		sw.WaitUntilOpen()
+
 		err := stream.Send(rsp)
 		if err != nil {
 			return err

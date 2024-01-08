@@ -35,30 +35,36 @@ func TestGRPCMUSTPASS_HTTPFuzzer_Pause(t *testing.T) {
 	wg.Add(1)
 	var finalErr error
 
-	startTime := time.Now()
 	go func(t *testing.T) {
 		defer wg.Done()
-
+		inPause := false
 		for {
 			rsp, err := stream.Recv()
 			if err != nil {
 				finalErr = err
 				return
+			} else if inPause {
+				finalErr = utils.Error("should not receive any response when in pause")
+				return
 			}
 			taskID = rsp.TaskId
 			count++
 			if count == 2 {
-				log.Info("start pause")
 				client.HTTPFuzzer(utils.TimeoutContextSeconds(10), &ypb.FuzzerRequest{
 					PauseTaskID: taskID,
 					IsPause:     true,
 				})
-				time.Sleep(1 * time.Second)
-				client.HTTPFuzzer(utils.TimeoutContextSeconds(10), &ypb.FuzzerRequest{
-					PauseTaskID: taskID,
-					IsPause:     false,
-				})
-				log.Info("start continue")
+				log.Info("start pause")
+				inPause = true
+				go func() {
+					time.Sleep(1 * time.Second)
+					client.HTTPFuzzer(utils.TimeoutContextSeconds(10), &ypb.FuzzerRequest{
+						PauseTaskID: taskID,
+						IsPause:     false,
+					})
+					log.Info("start continue")
+					inPause = false
+				}()
 			} else if count == 10 {
 				return
 			}
@@ -71,9 +77,5 @@ func TestGRPCMUSTPASS_HTTPFuzzer_Pause(t *testing.T) {
 	}
 	if count != 10 {
 		t.Fatalf("expected 10 times, got %d", count)
-	}
-	dur := time.Since(startTime)
-	if dur < 1600*time.Millisecond || dur > 2*time.Second {
-		t.Fatalf("expected 1.6~2 second, got %s", dur)
 	}
 }
