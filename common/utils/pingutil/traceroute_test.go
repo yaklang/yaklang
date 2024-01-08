@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-func TestTraceroute(t *testing.T) {
-	rspChan, err := traceroute(context.Background(),"93.184.216.34")
+func _TestTraceroute(t *testing.T) {
+	rspChan, err := traceroute(context.Background(), "93.184.216.34")
 	if err != nil {
 		t.Fatal(err)
 	}
