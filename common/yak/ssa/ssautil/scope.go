@@ -64,11 +64,8 @@ func isZeroValue(i any) bool {
 		return true
 	}
 
-	if reflect.ValueOf(i).IsValid() {
-		return true
-	}
-
-	if reflect.ValueOf(i).IsNil() {
+	rv := reflect.ValueOf(i)
+	if !rv.IsValid() {
 		return true
 	}
 	return reflect.ValueOf(i).IsZero()
