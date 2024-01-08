@@ -47,10 +47,39 @@ func ExtractURLFromHTTPRequestRaw(req []byte, isHttps bool) (*url.URL, error) {
 	return ExtractURLFromHTTPRequest(r, isHttps)
 }
 
+// ExtractURLStringFromHTTPRequestRaw parse url string
+func ExtractURLStringFromHTTPRequest(req any, isHttps bool) (string, error) {
+	var r *http.Request
+	var err error
+	switch ret := req.(type) {
+	case []byte:
+		r, err = ParseBytesToHttpRequest(ret)
+		if err != nil {
+			return "", err
+		}
+	case string:
+		r, err = ParseBytesToHttpRequest([]byte(ret))
+		if err != nil {
+			return "", err
+		}
+	case *http.Request:
+		r = ret
+	case http.Request:
+		r = &ret
+	default:
+		return "", utils.Errorf("not support type: %T", req)
+	}
+
+	u, err := ExtractURLFromHTTPRequest(r, isHttps)
+	if err != nil {
+		return "", err
+	}
+	return u.String(), nil
+}
+
 var (
 	contentLengthRegexp = regexp.MustCompile(`(Content-Length: \d+\r?\n)`)
 	hostRegexp          = regexp.MustCompile(`(Host: .*?\r?\n)`)
-	connectionClosed    = regexp.MustCompile(`(Connection: .*?\r?\n)`)
 )
 
 func fixInvalidHTTPHeaders(raw []byte) []byte {
