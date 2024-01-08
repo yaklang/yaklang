@@ -2,11 +2,49 @@ package openapi
 
 import (
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/openapi/openapi3"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strings"
 )
+
+func v3_schemaToValue(t openapi3.T, p any) (*openapi3.Schema, error) {
+	switch param := p.(type) {
+	case *openapi3.SchemaRef:
+		if param.Ref != "" {
+			var ret = strings.TrimPrefix(param.Ref, "#/components/schemas/")
+			return v3_schemaToValue(t, t.Components.Schemas[ret])
+		}
+		return param.Value, nil
+	case *openapi3.Schema:
+		return param, nil
+	case string:
+		param = strings.TrimPrefix(param, "#/components/schemas/")
+		return v3_schemaToValue(t, t.Components.Schemas[param])
+	default:
+		return nil, utils.Errorf("unsupported parameter type: %T", p)
+	}
+}
+
+func v3_parameterToValue(t openapi3.T, p any) (*openapi3.Parameter, error) {
+	switch param := p.(type) {
+	case *openapi3.ParameterRef:
+		if param.Ref != "" {
+			var ret = strings.TrimPrefix(param.Ref, "#/components/parameters/")
+			return v3_parameterToValue(t, t.Components.Parameters[ret])
+		}
+		return param.Value, nil
+	case *openapi3.Parameter:
+		return param, nil
+	case string:
+		param = strings.TrimPrefix(param, "#/components/parameters/")
+		return v3_parameterToValue(t, t.Components.Parameters[param])
+	default:
+		return nil, utils.Errorf("unsupported parameter type: %T", p)
+	}
+}
 
 func v3_SchemeRefToObject(t openapi3.T, target any, fields ...string) any {
 	if target == nil {
@@ -37,14 +75,35 @@ func v3_SchemeRefToObject(t openapi3.T, target any, fields ...string) any {
 		}
 	case *openapi3.Schema:
 		return v3_schemaValue(t, target.(*openapi3.Schema), field)
+	case *openapi3.ParameterRef:
+		result, ok := target.(*openapi3.ParameterRef)
+		if !ok {
+			return nil
+		}
+		if result == nil {
+			return nil
+		}
+		ref = result.Ref
+		if ref == "" {
+			return v3_parametersValue(t, result.Value, field)
+		}
 	default:
 		log.Warnf("unsupported ref type: %T", target)
 		return "{}"
 	}
 	ref = strings.TrimSpace(ref)
 
-	trimDef := strings.TrimPrefix(ref, "#/definitions/")
-	_ = trimDef
+	switch {
+	case strings.HasPrefix(ref, `#/components/parameters/`):
+		name := strings.TrimPrefix(ref, `#/components/parameters/`)
+		return v3_SchemeRefToObject(t, t.Components.Parameters[name], field)
+	case strings.HasPrefix(ref, `#/components/schemas/`):
+		name := strings.TrimPrefix(ref, `#/components/schemas/`)
+		return v3_SchemeRefToObject(t, t.Components.Schemas[name], field)
+	}
+	log.Infof("met ref: %v", ref)
+	//trimDef := strings.TrimPrefix(ref, "#/definitions/")
+	//_ = trimDef
 	//obj, ok := t.Definitions[trimDef]
 	//if !ok {
 	//	return nil

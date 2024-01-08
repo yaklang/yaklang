@@ -50,23 +50,26 @@ Host: www.example.com
 			}
 
 			for _, parameter := range ins.Parameters {
-				if parameter.Ref != "" {
-					log.Infof("not support ref: %v", parameter.Ref)
-					panic("not support ref")
-				}
-				if parameter.Value.In != openapi3.ParameterInPath {
+				param, err := v3_parameterToValue(data, parameter)
+				if err != nil {
+					log.Errorf("v3_parameterToValue [%v] failed: %v", param.Name, err)
 					continue
 				}
-				//switch parameter.In {
-				//case openapi3.ParameterInQuery:
-				//	methodRoot = methodRoot.FuzzQuery(parameter.Name, "1")
-				//case openapi3.ParameterInHeader:
-				//	methodRoot = methodRoot.FuzzHTTPHeader(parameter.Name, "1")
-				//case openapi3.ParameterInPath:
-				//	methodRoot = methodRoot.FuzzPathAppend(fmt.Sprintf("/{%s}", parameter.Name))
-				//case openapi3.ParameterInCookie:
-				//	methodRoot = methodRoot.FuzzCookie(parameter.Name, "1")
-				//}
+				scheme, err := v3_schemaToValue(data, param.Schema)
+				if err != nil {
+					log.Errorf("v3_schemaToValue [%v] failed: %v", param.Name, err)
+					continue
+				}
+				switch param.In {
+				case openapi3.ParameterInQuery:
+					methodRoot = methodRoot.FuzzGetParams(param.Name, ValueViaField(param.Name, scheme.Type))
+				case openapi3.ParameterInHeader:
+					methodRoot = methodRoot.FuzzHTTPHeader(param.Name, ValueViaField(param.Name, scheme.Type))
+				case openapi3.ParameterInPath:
+					methodRoot = methodRoot.FuzzPath
+				case openapi3.ParameterInCookie:
+					methodRoot = methodRoot.FuzzCookie(param.Name, ValueViaField(param.Name, scheme.Type))
+				}
 			}
 		}
 	}
