@@ -37,6 +37,8 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
+var _FuzzerTaskSwitchMap = new(sync.Map)
+
 func Chardet(raw []byte) string {
 	res, err := chardet.NewTextDetector().DetectBest(raw)
 	if err != nil {
@@ -263,7 +265,24 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		}
 	}()
 	// retry
-	isRetry := req.RetryTaskID > 0
+	isRetry := req.GetRetryTaskID() > 0
+	// pause
+	pauseTaskID := req.GetPauseTaskID()
+	isPause := pauseTaskID > 0
+	// 暂停任务
+	var sw *utils.Switch
+	if !isPause {
+		sw = utils.NewSwitch(true)
+	} else {
+		i, ok := _FuzzerTaskSwitchMap.Load(uint(pauseTaskID))
+		if ok {
+			sw = i.(*utils.Switch)
+			sw.SwitchTo(!req.GetIsPause())
+			return nil
+		} else {
+			return utils.Errorf("pause task[%d] not found", pauseTaskID)
+		}
+	}
 
 	// hot code
 	var extraOpt []mutate.FuzzConfigOpt
@@ -508,8 +527,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 	if err != nil {
 		return utils.Errorf("save to web fuzzer to database failed: %s", err)
 	}
+	// 重试任务
 	var retryRootID uint
-
 	taskID := task.ID
 	task.FuzzerIndex = req.GetFuzzerIndex()
 	task.FuzzerTabIndex = req.GetFuzzerTabIndex()
@@ -522,6 +541,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		}
 		task.RetryRootID = retryRootID
 	}
+	// 存储重试任务的开关
+	_FuzzerTaskSwitchMap.Store(task.ID, sw)
 
 	defer func() {
 		if db := s.GetProjectDatabase().Save(task); db.Error != nil {
@@ -717,6 +738,9 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		}
 		if req.GetFuzzTagSyncIndex() {
 			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ExtraFuzzOptions(mutate.Fuzz_SyncTag(true)))
+		}
+		if !isPause {
+			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ExternSwitch(sw))
 		}
 		res, err := mutate.ExecPool(
 			iInput,
