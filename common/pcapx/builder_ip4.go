@@ -216,13 +216,14 @@ func WithIPv4_NextProtocol(i any) IPv4Option {
 			pv4.Protocol = layers.IPProtocolUDPLite
 		case "mplsinip":
 			pv4.Protocol = layers.IPProtocolMPLSInIP
+		default:
+			if utils.MatchAllOfRegexp(i, `\d+`) {
+				pv4.Protocol = layers.IPProtocol(utils.InterfaceToInt(i))
+				return nil
+			}
+			return utils.Errorf("unknown parse ip_protocol: %v", i)
 		}
-
-		if utils.MatchAllOfRegexp(i, `\d+`) {
-			pv4.Protocol = layers.IPProtocol(utils.InterfaceToInt(i))
-			return nil
-		}
-		return utils.Errorf("unknown parse ip_protocol: %v", i)
+		return nil
 	}
 }
 
