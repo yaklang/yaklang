@@ -5,6 +5,34 @@ import (
 	"testing"
 )
 
+func TestForkedScope(t *testing.T) {
+	table := NewRootVersionedTable[any]()
+	table.CreateLexicalVariable("a", 1)
+
+	// if true
+	sub1_1 := table.CreateSubScope()
+	sub1_1.CreateLexicalVariable("a", 2)
+
+	// if false
+	sub1_2 := table.CreateSubScope()
+	sub1_2.CreateLexicalVariable("a", 3)
+
+	test := assert.New(t)
+	test.Equal(1, len(table.GetVersions("a")))
+	test.Equal(2, len(sub1_2.GetVersions("a")))
+	test.Equal(2, len(sub1_1.GetVersions("a")))
+
+	test.Equal(1, table.GetLatestVersion("a").Value)
+	test.Equal(2, sub1_1.GetLatestVersion("a").Value)
+	test.Equal(3, sub1_2.GetLatestVersion("a").Value)
+
+	// endif
+	ProducePhi(func(a ...any) any {
+		return 4
+	}, sub1_1, sub1_2)
+	test.Equal(4, table.GetLatestVersion("a").Value)
+}
+
 func TestMemberTrace(t *testing.T) {
 	test := assert.New(t)
 
