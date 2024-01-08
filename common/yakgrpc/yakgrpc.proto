@@ -3923,6 +3923,9 @@ message FuzzerRequest {
   // default 5M?
   // packet is too large (> MaxBodySize)
   int64 MaxBodySize = 49;
+
+  int64 PauseTaskID = 52;
+  bool IsPause = 53;
 }
 
 message KVPair {
