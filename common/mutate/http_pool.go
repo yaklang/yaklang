@@ -4,17 +4,18 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"net/http"
+	"reflect"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	utils2 "github.com/yaklang/yaklang/common/yak/httptpl/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"net/http"
-	"reflect"
-	"strings"
-	"sync"
-	"time"
 )
 
 var poolingList sync.Map
@@ -77,13 +78,16 @@ type httpPoolConfig struct {
 	// batch
 	BatchTarget string
 
-	//with conn_pool
+	// with conn_pool
 	WithConnPool bool
 
 	EnableMaxContentLength bool
 	MaxContentLength       int64
 
 	DNSNoCache bool
+
+	// 外部开关，用于控制暂停与继续
+	ExternSwitch *utils.Switch
 }
 
 // WithPoolOpt_DNSNoCache is not effective
@@ -295,7 +299,7 @@ func _httpPool_noRedirects(i bool) HttpPoolConfigOption {
 
 func _httpPool_Host(h string, isHttps bool) HttpPoolConfigOption {
 	return func(c *httpPoolConfig) {
-		var lower = strings.ToLower(h)
+		lower := strings.ToLower(h)
 		if strings.HasPrefix(lower, "https://") || strings.HasPrefix(lower, "http://") {
 			c.Host, c.Port, _ = utils.ParseStringToHostPort(lower)
 		} else {
@@ -368,6 +372,12 @@ func _httpPool_withConnPool(b bool) HttpPoolConfigOption {
 	}
 }
 
+func _httpPool_ExternSwitch(sw *utils.Switch) HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.ExternSwitch = sw
+	}
+}
+
 type HttpPoolConfigOption func(config *httpPoolConfig)
 
 type _httpResult struct {
@@ -416,13 +426,14 @@ func NewDefaultHttpPoolConfig(opts ...HttpPoolConfigOption) *httpPoolConfig {
 
 func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, error) {
 	config := NewDefaultHttpPoolConfig(opts...)
+	externSwitch := config.ExternSwitch
 	//if len(config.Proxies) <= 0 && netx.GetProxyFromEnv() != "" && !config.NoSystemProxy {
 	//	WithPoolOpt_Proxy(netx.GetProxyFromEnv())(config)
 	//}
 
 	switch ret := i.(type) {
 	case []*MutateResult:
-		var payloadsTable = new(sync.Map) // map[string][]string
+		payloadsTable := new(sync.Map) // map[string][]string
 		var results [][]byte
 		for _, e := range ret {
 			res := []byte(e.Result)
@@ -436,7 +447,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 			return nil, utils.Errorf("empty target requests: %v", ret)
 		}
 
-		if config.Ctx.Value("invoker") != nil { //caller set NamingContext
+		if config.Ctx.Value("invoker") != nil { // caller set NamingContext
 			group := utils.NewSizedWaitGroup(config.Size)
 			wg, _ := poolingList.LoadOrStore(config.Ctx.Value("invoker"), group)
 			wg.(*utils.SizedWaitGroup).Add()
@@ -506,7 +517,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 			}()
 			delayer, _ := utils.NewFloatSecondsDelayWaiter(config.DelayMinSeconds, config.DelayMaxSeconds)
 
-			var maxSubmit = config.RequestCountLimiter
+			maxSubmit := config.RequestCountLimiter
 			var requestCounter int
 			swg := utils.NewSizedWaitGroup(config.Size)
 			if config.SizedWaitGroupInstance != nil {
@@ -516,6 +527,10 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 			execSubmitTaskWithoutBatchTarget := func(overrideHttps bool, overrideHost string, targetRequest []byte, payloads ...string) {
 				if maxSubmit > 0 && requestCounter >= maxSubmit {
 					return
+				}
+
+				if externSwitch != nil {
+					externSwitch.WaitUntilOpen()
 				}
 
 				swg.Add()
@@ -543,9 +558,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 						}
 					}
 
-					var (
-						urlStr string
-					)
+					var urlStr string
 					_urlInsRaw, _ := lowhttp.ExtractURLFromHTTPRequestRaw(targetRequest, config.IsHttps)
 					if _urlInsRaw != nil {
 						urlStr = _urlInsRaw.String()
@@ -564,7 +577,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 						return
 					}
 
-					//log.Infof("start to send to %v(%v) (packet mode)", urlStr, utils.HostPort(config.Host, config.Port))
+					// log.Infof("start to send to %v(%v) (packet mode)", urlStr, utils.HostPort(config.Host, config.Port))
 
 					var host string
 					var port int
@@ -582,7 +595,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 						host, port = "", 0
 					}
 
-					var https = config.IsHttps
+					https := config.IsHttps
 					if overrideHttps {
 						https = true
 					}
@@ -590,7 +603,8 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 					if config.NoFollowRedirect {
 						redictTimes = 0
 					}
-					lowhttpOptions := []lowhttp.LowhttpOpt{lowhttp.WithHttps(https),
+					lowhttpOptions := []lowhttp.LowhttpOpt{
+						lowhttp.WithHttps(https),
 						lowhttp.WithRuntimeId(config.RuntimeId),
 						lowhttp.WithHost(host), lowhttp.WithPort(port),
 						lowhttp.WithPacketBytes(targetRequest),
@@ -610,7 +624,8 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 						lowhttp.WithDNSServers(config.DNSServers),
 						lowhttp.WithETCHosts(config.EtcHosts),
 						lowhttp.WithGmTLS(config.IsGmTLS),
-						lowhttp.WithConnPool(config.WithConnPool)}
+						lowhttp.WithConnPool(config.WithConnPool),
+					}
 
 					if config.OverrideEnableSystemProxyEnv {
 						lowhttpOptions = append(lowhttpOptions, lowhttp.WithEnableSystemProxyFromEnv(!config.NoSystemProxy))
@@ -627,7 +642,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 						rsp = rspInstance.RawPacket
 						if !rspInstance.MultiResponse {
 							if ret := lowhttp.GetHTTPPacketHeader(rspInstance.RawPacket, "Content-Encoding"); ret != "" {
-								var rspFixed, _, _ = lowhttp.FixHTTPResponse(rspInstance.RawPacket)
+								rspFixed, _, _ := lowhttp.FixHTTPResponse(rspInstance.RawPacket)
 								if len(rspFixed) > 0 {
 									rsp = rspFixed
 								}
@@ -649,7 +664,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 						}
 					}
 
-					var extra = make(map[string]string)
+					extra := make(map[string]string)
 					if config.MirrorHTTPFlow != nil {
 						if ret := config.MirrorHTTPFlow(targetRequest, rsp, existedParams); ret != nil {
 							for k, v := range ret {
@@ -718,7 +733,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 				if config.BatchTarget != "" {
 					targetsReplaced := utils.PrettifyListFromStringSplitEx(config.BatchTarget, "\n", ",", "|")
 					for _, newTarget := range targetsReplaced {
-						var overrideHttps = config.IsHttps
+						overrideHttps := config.IsHttps
 						var overrideHost string
 						if strings.HasPrefix(strings.ToLower(newTarget), "https://") {
 							overrideHttps = true
@@ -758,7 +773,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 						paramsGetterHandler := config.ExtraRegexpMutateConditionGetter()
 						conds = append(conds, paramsGetterHandler)
 					}
-					var opts = []FuzzConfigOpt{
+					opts := []FuzzConfigOpt{
 						Fuzz_WithResultHandler(func(s string, i []string) bool {
 							select {
 							case <-config.Ctx.Done():
@@ -833,40 +848,43 @@ var HttpPoolExports = map[string]interface{}{
 	"noFixContentLength": _httpPool_noFixContentLength,
 }
 
-var WithPoolOpt_noFixContentLength = _httpPool_noFixContentLength
-var WithPoolOpt_Proxy = _httpPool_proxies
-var WithPoolOpt_Timeout = _httpPool_PerRequestTimeout
-var WithPoolOpt_Concurrent = _httpPool_SetSize
-var WithPoolOpt_SizedWaitGroup = _httpPool_SetSizedWaitGroup
-var WithPoolOpt_Addr = _httpPool_Host
-var WithPoolOpt_RedirectTimes = _httpPool_redirectTimes
-var WithPoolOpt_RawMode = _httpPool_RawMode
-var ExecPool = _httpPool
-var WithPoolOpt_Https = _httpPool_IsHttps
-var WithPoolOpt_RuntimeId = _httpPool_runtimeId
-var WithPoolOpt_GmTLS = _httpPool_IsGmTLS
-var WithPoolOpt_NoFollowRedirect = _httpPool_SetNoFollowRedirect
-var WithPoolOpt_FollowJSRedirect = _httpPool_SetFollowJSRedirect
-var WithPoolOpt_Context = _httpPool_SetContext
-var WithPoolOpt_ForceFuzz = _httpPool_SetForceFuzz
-var WithPoolOpt_ForceFuzzfile = _httpPool_SetForceFuzzfile
-var WithPoolOpt_FuzzParams = _httpPool_SetFuzzParams
-var WithPoolOpt_ExtraMutateCondition = _httpPool_extraMutateCondition
-var WithPoolOpt_ExtraMutateConditionGetter = _httpPool_extraMutateConditionGetter
-var WithPoolOpt_DelayMinSeconds = _httpPool_DelayMinSeconds
-var WithPoolOPt_DelayMaxSeconds = _httpPool_DelayMaxSeconds
-var WithPoolOPt_DelaySeconds = _httpPool_DelaySeconds
-var WithPoolOpt_HookCodeCaller = _hoopPool_SetHookCaller
-var WithPoolOpt_Source = _httpPool_Source
-var WithPoolOpt_NamingContext = _httpPool_namingContext
-var WithPoolOpt_RetryTimes = _httpPool_Retry
-var WithPoolOpt_MaxContentLength = _httpPool_MaxContentLength
-var WithPoolOpt_RetryInStatusCode = _httpPool_RetryInStatusCode
-var WithPoolOpt_RetryNotInStatusCode = _httpPool_RetryNotInStatusCode
-var WithPoolOpt_RetryWaitTime = _httpPool_RetryWaitTime
-var WithPoolOpt_RetryMaxWaitTime = _httpPool_RetryMaxWaitTime
-var WithPoolOpt_DNSServers = _httpPool_DNSServers
-var WithPoolOpt_EtcHosts = _httpPool_EtcHosts
-var WithPoolOpt_NoSystemProxy = _httpPool_NoSystemProxy
-var WithPoolOpt_RequestCountLimiter = _httpPool_RequestCountLimiter
-var WithConnPool = _httpPool_withConnPool
+var (
+	WithPoolOpt_noFixContentLength         = _httpPool_noFixContentLength
+	WithPoolOpt_Proxy                      = _httpPool_proxies
+	WithPoolOpt_Timeout                    = _httpPool_PerRequestTimeout
+	WithPoolOpt_Concurrent                 = _httpPool_SetSize
+	WithPoolOpt_SizedWaitGroup             = _httpPool_SetSizedWaitGroup
+	WithPoolOpt_Addr                       = _httpPool_Host
+	WithPoolOpt_RedirectTimes              = _httpPool_redirectTimes
+	WithPoolOpt_RawMode                    = _httpPool_RawMode
+	ExecPool                               = _httpPool
+	WithPoolOpt_Https                      = _httpPool_IsHttps
+	WithPoolOpt_RuntimeId                  = _httpPool_runtimeId
+	WithPoolOpt_GmTLS                      = _httpPool_IsGmTLS
+	WithPoolOpt_NoFollowRedirect           = _httpPool_SetNoFollowRedirect
+	WithPoolOpt_FollowJSRedirect           = _httpPool_SetFollowJSRedirect
+	WithPoolOpt_Context                    = _httpPool_SetContext
+	WithPoolOpt_ForceFuzz                  = _httpPool_SetForceFuzz
+	WithPoolOpt_ForceFuzzfile              = _httpPool_SetForceFuzzfile
+	WithPoolOpt_FuzzParams                 = _httpPool_SetFuzzParams
+	WithPoolOpt_ExtraMutateCondition       = _httpPool_extraMutateCondition
+	WithPoolOpt_ExtraMutateConditionGetter = _httpPool_extraMutateConditionGetter
+	WithPoolOpt_DelayMinSeconds            = _httpPool_DelayMinSeconds
+	WithPoolOPt_DelayMaxSeconds            = _httpPool_DelayMaxSeconds
+	WithPoolOPt_DelaySeconds               = _httpPool_DelaySeconds
+	WithPoolOpt_HookCodeCaller             = _hoopPool_SetHookCaller
+	WithPoolOpt_Source                     = _httpPool_Source
+	WithPoolOpt_NamingContext              = _httpPool_namingContext
+	WithPoolOpt_RetryTimes                 = _httpPool_Retry
+	WithPoolOpt_MaxContentLength           = _httpPool_MaxContentLength
+	WithPoolOpt_RetryInStatusCode          = _httpPool_RetryInStatusCode
+	WithPoolOpt_RetryNotInStatusCode       = _httpPool_RetryNotInStatusCode
+	WithPoolOpt_RetryWaitTime              = _httpPool_RetryWaitTime
+	WithPoolOpt_RetryMaxWaitTime           = _httpPool_RetryMaxWaitTime
+	WithPoolOpt_DNSServers                 = _httpPool_DNSServers
+	WithPoolOpt_EtcHosts                   = _httpPool_EtcHosts
+	WithPoolOpt_NoSystemProxy              = _httpPool_NoSystemProxy
+	WithPoolOpt_RequestCountLimiter        = _httpPool_RequestCountLimiter
+	WithConnPool                           = _httpPool_withConnPool
+	WithPoolOpt_ExternSwitch               = _httpPool_ExternSwitch
+)
