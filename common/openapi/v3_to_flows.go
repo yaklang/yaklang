@@ -143,7 +143,7 @@ Host: www.example.com
 						log.Errorf("v3_schemaToValue [%v] failed: %v", scheme.Schema, err)
 						continue
 					}
-					bytes := v3_mockSchemaValue(data, sIns)
+					bytes := v3_mockSchemaJson(data, sIns)
 					if len(bytes) > 0 {
 						bodyRoot = bodyRoot.FuzzPostRaw(string(bytes))
 					}
@@ -197,7 +197,7 @@ Content-Type: application/json
 							responses = append(responses, fakeResponse)
 							continue
 						}
-						bytes := v3_mockSchemaValue(data, scheme)
+						bytes := v3_mockSchemaJson(data, scheme)
 						if len(bytes) > 0 {
 							fakeResponse = lowhttp.ReplaceHTTPPacketHeader(fakeResponse, "Content-Type", contentType)
 							fakeResponse = lowhttp.ReplaceHTTPPacketBodyFast(fakeResponse, bytes)
