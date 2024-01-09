@@ -2,7 +2,6 @@ package openapi
 
 import (
 	_ "embed"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"testing"
 )
@@ -15,7 +14,7 @@ func TestRequest_V2(t *testing.T) {
 	err := Generate(openapi2demo, WithFlowHandler(func(flow *yakit.HTTPFlow) {
 		count++
 		flow.SourceType = "mitm"
-		yakit.SaveHTTPFlow(consts.GetGormProjectDatabase(), flow)
+		//yakit.SaveHTTPFlow(consts.GetGormProjectDatabase(), flow)
 	}))
 	if err != nil {
 		t.Fatal(err)
@@ -33,7 +32,7 @@ func TestRequest_V3(t *testing.T) {
 	err := Generate(openapi3demo, WithFlowHandler(func(flow *yakit.HTTPFlow) {
 		count++
 		flow.SourceType = "mitm"
-		yakit.SaveHTTPFlow(consts.GetGormProjectDatabase(), flow)
+		//yakit.SaveHTTPFlow(consts.GetGormProjectDatabase(), flow)
 	}))
 	if err != nil {
 		t.Fatal(err)

@@ -54,7 +54,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: Test JSONExtractor / Codec / Cartesian / JsonPath / Domain Extractor / TLS / CVE / SCA
+          - name: Test JSONExtractor / Codec / Cartesian / JsonPath / Domain Extractor / TLS / CVE / SCA / OpenAPI
             run: |
               # these tests are very quick
               go test -timeout 20s ./common/jsonextractor  
@@ -67,6 +67,7 @@ jobs:
               go test -timeout 20s -run TestQueryCVEWithFixName ./common/cve
               go test -timeout 20s ./common/sca/...
               go test -timeout 20s -run TestMUSTPASS_YakitLog ./common/yak/yaklib
+              go test -timeout 30s ./common/openapi/...
 
           - name: Test NetX
             run: |
