@@ -7,6 +7,14 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+func (v *OrderedMap[T, V]) Jsonify() []byte {
+	raw, err := json.Marshal(v)
+	if err != nil {
+		return nil
+	}
+	return raw
+}
+
 func (v *OrderedMap[T, V]) MarshalJSON() ([]byte, error) {
 	if v.HaveLiteralValue() {
 		raw, err := json.Marshal(v.LiteralValue())
