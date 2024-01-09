@@ -184,7 +184,7 @@ mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte
                 log.Error(err)
                 continue
             }
-            if str.MatchAllOfRegexp(originValue,"^\\w+://")  || str.StringSliceContains(availableSSRFParamNames, str.ToLower(paramName)) {
+            if str.MatchAllOfRegexp(originValue,"^\\w+://")  || str.StringSliceContains(availableSSRFParamNames, str.ToLower(param.Name())) {
                 c<-param
             }
         }
