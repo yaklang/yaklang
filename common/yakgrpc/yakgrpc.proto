@@ -3775,16 +3775,18 @@ message CodecMethod {
   string Tag = 1; // Codec 分类
   string CodecName = 2; //  Codec name
   string CodecMethod = 3; // Codec Method
-  repeated CodecParam Params = 4; // Codec Param 用于构建样式
+  string Desc = 4; // 描述
+  repeated CodecParam Params = 5; // Codec Param 用于构建样式
 }
 
 message CodecParam {
   string Name = 1;
-  string Type = 2; // input | select
+  string Type = 2; // input | select | checkbox
   repeated string Options = 3; // 可选值
   bool  Required = 4; // 就算是false也需要传
   string Desc = 5; // 描述
-  string Regex = 6; //正则
+  string Regex = 6; // 正则
+  string Label = 7; // 参数文本标签
 }
 
 // Yak Invoker

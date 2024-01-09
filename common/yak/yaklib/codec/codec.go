@@ -12,6 +12,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"github.com/samber/lo"
 	"html"
 	"io"
 	"io/ioutil"
@@ -287,6 +288,68 @@ func EncodeHtmlEntityHex(i interface{}) string {
 		buf += fmt.Sprintf("&#x%x;", scanner.Bytes()[0])
 	}
 	return buf
+}
+
+var namedHtmlEntity = strings.NewReplacer(
+	`&`, "&amp;",
+	`'`, "&apos;",
+	`<`, "&lt;",
+	`>`, "&gt;",
+	`"`, "&quot;",
+)
+
+var decHtmlEntity = strings.NewReplacer(
+	`&`, "&#38;",
+	`'`, "&#39;",
+	`<`, "&#60;",
+	`>`, "&#62;",
+	`"`, "&#34;",
+)
+
+var hexHtmlEntity = strings.NewReplacer(
+	`&`, "&#x26;",
+	`'`, "&#x27;",
+	`<`, "&#x3c;",
+	`>`, "&#x3e;",
+	`"`, "&#x22;",
+)
+
+// todo replace HtmlEntityEncode
+func EncodeHtmlEntityEx(i interface{}, encodeType string, fullEncode bool) string {
+	raw := AnyToString(i)
+	if !fullEncode {
+		var res string
+		switch encodeType {
+		case "dec":
+			res = decHtmlEntity.Replace(raw)
+		case "hex":
+			res = hexHtmlEntity.Replace(raw)
+		case "named":
+			res = namedHtmlEntity.Replace(raw)
+		default:
+			res = namedHtmlEntity.Replace(raw) // 默认使用 named
+		}
+		return res
+	}
+
+	var namedChar = []string{`&`, `'`, `<`, `>`, `"`}
+	var formatString = "&#%d;"
+	if encodeType == "hex" {
+		formatString = "&#x%x;"
+	}
+
+	var res string
+	for _, char := range raw {
+		if encodeType == "named" {
+			if lo.Contains(namedChar, string(char)) {
+				res += namedHtmlEntity.Replace(string(char))
+				continue
+			}
+
+		}
+		res += fmt.Sprintf(formatString, char)
+	}
+	return res
 }
 
 func EncodeHtmlEntity(i interface{}) string {
