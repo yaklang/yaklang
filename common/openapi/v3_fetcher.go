@@ -107,7 +107,7 @@ func v3_parameterToValue(t openapi3.T, p any) (*openapi3.Parameter, error) {
 	}
 }
 
-func v3_mockSchemaValue(data openapi3.T, i *openapi3.Schema, fieldName ...string) []byte {
+func v3_mockSchemaValue(data openapi3.T, i *openapi3.Schema, fieldName ...string) *omap.OrderedMap[string, any] {
 	if i == nil {
 		return nil
 	}
@@ -127,10 +127,10 @@ func v3_mockSchemaValue(data openapi3.T, i *openapi3.Schema, fieldName ...string
 				return nil
 			}
 			m.Add(v3_mockSchemaValue(data, scheme, field))
-			return m.Jsonify()
+			return m
 		}
 		m.Add(v3_mockSchemaValue(data, i.Items.Value, field))
-		return m.Jsonify()
+		return m
 	case "object":
 		m := omap.NewGeneralOrderedMap()
 		for field, pt := range i.Properties {
@@ -145,10 +145,14 @@ func v3_mockSchemaValue(data openapi3.T, i *openapi3.Schema, fieldName ...string
 				m.Set(field, v3_mockSchemaValue(data, pt.Value, field))
 			}
 		}
-		return m.Jsonify()
+		return m
 	default:
 		m := omap.NewGeneralOrderedMap()
 		m.SetLiteralValue(ValueViaField(field, i.Type, i.Default))
-		return m.Jsonify()
+		return m
 	}
+}
+
+func v3_mockSchemaJson(data openapi3.T, i *openapi3.Schema, fieldName ...string) []byte {
+	return v3_mockSchemaValue(data, i, fieldName...).Jsonify()
 }
