@@ -2,16 +2,17 @@ package ssautil
 
 import (
 	"fmt"
+	"reflect"
+	"sync"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
-	"reflect"
-	"sync"
 )
 
 type GlobalIndexFetcher func() int
 
-type ScopedVersionedTable[T any] struct {
+type ScopedVersionedTable[T comparable] struct {
 	offsetFetcher GlobalIndexFetcher // fetch the next global index
 
 	// record the lexical variable
@@ -20,14 +21,34 @@ type ScopedVersionedTable[T any] struct {
 	// for closure function or block scope
 	captured *omap.OrderedMap[string, *Versioned[T]]
 
+	incomingPhi *omap.OrderedMap[string, *Versioned[T]]
+
 	// global id to versioned variable
 	table map[int]*Versioned[T]
 
+	spin           bool
+	CreateEmptyPhi func() T
+
 	// relations
-	parent *ScopedVersionedTable[T]
+	parent      *ScopedVersionedTable[T]
+	finishChild []*ScopedVersionedTable[T]
+	child       []*ScopedVersionedTable[T]
 }
 
-func NewRootVersionedTable[T any](fetcher ...func() int) *ScopedVersionedTable[T] {
+func NewScope[T comparable](fetcher func() int, table map[int]*Versioned[T], parent *ScopedVersionedTable[T]) *ScopedVersionedTable[T] {
+	return &ScopedVersionedTable[T]{
+		offsetFetcher: fetcher,
+		values:        omap.NewOrderedMap[string, *omap.OrderedMap[string, *Versioned[T]]](map[string]*omap.OrderedMap[string, *Versioned[T]]{}),
+		captured:      omap.NewOrderedMap[string, *Versioned[T]](map[string]*Versioned[T]{}),
+		incomingPhi:   omap.NewOrderedMap[string, *Versioned[T]](map[string]*Versioned[T]{}),
+		table:         table,
+		parent:        parent,
+		finishChild:   make([]*ScopedVersionedTable[T], 0),
+		child:         make([]*ScopedVersionedTable[T], 0),
+	}
+}
+
+func NewRootVersionedTable[T comparable](fetcher ...func() int) *ScopedVersionedTable[T] {
 	var finalFetcher GlobalIndexFetcher
 	for _, f := range fetcher {
 		if f != nil {
@@ -47,12 +68,7 @@ func NewRootVersionedTable[T any](fetcher ...func() int) *ScopedVersionedTable[T
 		}
 	}
 
-	return &ScopedVersionedTable[T]{
-		offsetFetcher: finalFetcher,
-		values:        omap.NewOrderedMap[string, *omap.OrderedMap[string, *Versioned[T]]](map[string]*omap.OrderedMap[string, *Versioned[T]]{}),
-		captured:      omap.NewOrderedMap[string, *Versioned[T]](map[string]*Versioned[T]{}),
-		table:         map[int]*Versioned[T]{},
-	}
+	return NewScope[T](finalFetcher, map[int]*Versioned[T]{}, nil)
 }
 
 func (v *ScopedVersionedTable[T]) IsRoot() bool {
@@ -71,6 +87,10 @@ func isZeroValue(i any) bool {
 	return reflect.ValueOf(i).IsZero()
 }
 
+func (v *ScopedVersionedTable[T]) CreateLexicalLocalVariable(name string, value T) *Versioned[T] {
+	return v.createLexicalVariableEx(name, value, true)
+}
+
 // CreateLexicalVariable create a root lexical variable
 // the next versions will be named as "1", "2", "3"...
 // the version index is auto set by the order of creation
@@ -83,15 +103,19 @@ func isZeroValue(i any) bool {
 //
 //	x = 1; x1 = 2
 func (v *ScopedVersionedTable[T]) CreateLexicalVariable(name string, value T) *Versioned[T] {
+	return v.createLexicalVariableEx(name, value, false)
+}
+
+func (v *ScopedVersionedTable[T]) createLexicalVariableEx(name string, value T, local bool) *Versioned[T] {
 	if ret, ok := v.values.Get(name); !ok {
 		v.values.Set(name, omap.NewOrderedMap[string, *Versioned[T]](map[string]*Versioned[T]{}))
-		return v.CreateLexicalVariable(name, value)
+		return v.createLexicalVariableEx(name, value, local)
 	} else {
 		verIndex := ret.Len()
 		verVar := v.newVar(name, verIndex)
 		ret.Add(verVar)
 		// register captured variable
-		if !v.IsRoot() && v.IsCapturedByCurrentScope(name) {
+		if !local && !v.IsRoot() && v.IsCapturedByCurrentScope(name) {
 			v.registerCapturedVariable(name, verVar)
 		}
 		if !isZeroValue(value) {
@@ -185,13 +209,9 @@ func (v *ScopedVersionedTable[T]) CreateDynamicMemberCallVariable(obj int, membe
 }
 
 func (v *ScopedVersionedTable[T]) CreateSubScope() *ScopedVersionedTable[T] {
-	return &ScopedVersionedTable[T]{
-		offsetFetcher: v.offsetFetcher,
-		values:        omap.NewOrderedMap[string, *omap.OrderedMap[string, *Versioned[T]]](map[string]*omap.OrderedMap[string, *Versioned[T]]{}),
-		captured:      omap.NewOrderedMap[string, *Versioned[T]](map[string]*Versioned[T]{}),
-		table:         v.table,
-		parent:        v,
-	}
+	sub := NewScope[T](v.offsetFetcher, v.table, v)
+	v.child = append(v.child, sub)
+	return sub
 }
 
 // InCurrentLexicalScope check if the variable is in current lexical scope
@@ -212,17 +232,39 @@ func (v *ScopedVersionedTable[T]) GetLatestVersionInCurrentLexicalScope(name str
 		return ver
 	}
 }
-
-func (v *ScopedVersionedTable[T]) GetLatestVersion(name string) *Versioned[T] {
-	var parent = v
-	for parent != nil {
-		result := parent.GetLatestVersionInCurrentLexicalScope(name)
-		if result != nil {
-			return result
+func (v *ScopedVersionedTable[T]) GetLatestVersionVersioned(name string) *Versioned[T] {
+	// var parent = v
+	// for parent != nil {
+	var ret *Versioned[T]
+	if result := v.GetLatestVersionInCurrentLexicalScope(name); result != nil {
+		ret = result
+	} else {
+		if v.parent != nil {
+			ret = v.parent.GetLatestVersionVersioned(name)
+		} else {
+			ret = nil
 		}
-		parent = parent.parent
 	}
-	return nil
+	if ret != nil && ret.scope != v && v.spin {
+		t := v.CreateLexicalVariable(name, v.CreateEmptyPhi())
+		t.isPhi = true
+		t.origin = ret
+		v.incomingPhi.Set(name, t)
+
+		ret = t
+	}
+	return ret
+	// parent = parent.parent
+	// }
+	// return nil
+}
+
+func (v *ScopedVersionedTable[T]) GetLatestVersion(name string) (t T) {
+	if ret := v.GetLatestVersionVersioned(name); ret != nil {
+		return ret.Value
+	} else {
+		return
+	}
 }
 
 // GetVersions get all versions of the variable
@@ -247,7 +289,7 @@ func (v *ScopedVersionedTable[T]) IsCapturedByCurrentScope(name string) bool {
 		log.Warn("root scope can't capture any variable")
 		return false
 	}
-	return v.parent.GetLatestVersion(name) != nil
+	return v.parent.GetLatestVersionVersioned(name) != nil
 }
 
 // GetAllCapturedVariableNames get the captured variable
@@ -290,3 +332,14 @@ func (v *ScopedVersionedTable[T]) ConvertDynamicMemberCallToLexicalName(obj, mem
 	var suffix = fmt.Sprintf("#%v", rootRight.GetId())
 	return fmt.Sprintf("#%v.$(%s)", rootLeft.GetId(), suffix), nil
 }
+
+// func (s *ScopedVersionedTable[T]) Merge(sub ...*ScopedVersionedTable[T]) {
+// 	if len(sub) == 1 {
+// 		// cover origin value
+// 		sub[0].captured.ForEach(func(name string, ver *Versioned[T]) bool {
+// 			return true
+// 		})
+// 	} else {
+// 		// merge, generate phi
+// 	}
+// }

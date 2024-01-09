@@ -2,11 +2,12 @@ package ssautil
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-type Versioned[T any] struct {
+type Versioned[T comparable] struct {
 	// origin desc the variable's last or renamed version
 	origin       *Versioned[T]
 	versionIndex int
