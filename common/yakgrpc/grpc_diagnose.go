@@ -328,19 +328,17 @@ func (s *Server) DiagnoseNetworkDNS(req *ypb.DiagnoseNetworkDNSRequest, server y
 }
 
 func (s *Server) TraceRoute(req *ypb.TraceRouteRequest, server ypb.Yak_TraceRouteServer) error {
-	res, err := pingutil.Traceroute(server.Context(), req.GetHost())
+	res, err := pingutil.Traceroute(req.GetHost(), pingutil.WithCtx(server.Context()))
 	if err != nil {
 		return err
 	}
-	for rsps := range res {
-		for _, rsp := range rsps {
-			server.Send(&ypb.TraceRouteResponse{
-				Hop:    int64(rsp.Hop),
-				Ip:     rsp.IP,
-				Rtt:    rsp.RTT,
-				Reason: rsp.Reason,
-			})
-		}
+	for rsp := range res {
+		server.Send(&ypb.TraceRouteResponse{
+			Hop:    int64(rsp.Hop),
+			Ip:     rsp.IP,
+			Rtt:    rsp.RTT,
+			Reason: rsp.Reason,
+		})
 	}
 	return nil
 }
