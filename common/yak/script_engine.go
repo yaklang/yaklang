@@ -173,6 +173,9 @@ func initYaklangLib() {
 	// ping
 	yaklang.Import("ping", yaklib.PingExports)
 
+	// traceroute
+	yaklang.Import("traceroute", yaklib.TracerouteExports)
+
 	// shodan / quake / fofa 库
 	yaklang.Import("spacengine", yaklib.SpaceEngineExports)
 
