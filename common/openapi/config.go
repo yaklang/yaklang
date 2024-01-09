@@ -13,7 +13,6 @@ type OpenAPIConfig struct {
 
 func NewDefaultOpenAPIConfig() *OpenAPIConfig {
 	return &OpenAPIConfig{
-		Domain: "www.example.com",
 		FlowHandler: func(flow *yakit.HTTPFlow) {
 			log.Infof("openapi generator create: %v", flow.Url)
 		},
@@ -23,18 +22,21 @@ func NewDefaultOpenAPIConfig() *OpenAPIConfig {
 
 type Option func(config *OpenAPIConfig)
 
+// WithHttps means use https
 func WithHttps(b bool) Option {
 	return func(config *OpenAPIConfig) {
 		config.IsHttps = b
 	}
 }
 
+// WithDomain means use this domain
 func WithDomain(domain string) Option {
 	return func(config *OpenAPIConfig) {
 		config.Domain = domain
 	}
 }
 
+// WithFlowHandler means use this handler
 func WithFlowHandler(handler func(flow *yakit.HTTPFlow)) Option {
 	return func(config *OpenAPIConfig) {
 		config.FlowHandler = handler

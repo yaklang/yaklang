@@ -5,10 +5,38 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/openapi/openapi2"
 	"github.com/yaklang/yaklang/common/openapi/openapi3"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strings"
 )
+
+func v2_parameterToValue(t openapi2.T, target any) (*openapi2.Parameter, error) {
+	if target == nil {
+		return nil, nil
+	}
+
+	switch param := target.(type) {
+	//case *openapi2.ParameterRef:
+	//	if param == nil {
+	//		return nil, nil
+	//	}
+	//	if param.Ref != "" {
+	//		ret := strings.TrimPrefix(param.Ref, "#/parameters/")
+	//		ret = strings.TrimPrefix(ret, "#/components/parameters/")
+	//		return v2_parameterToValue(t, t.Parameters[ret])
+	//	}
+	//	return param.Value, nil
+	case *openapi2.Parameter:
+		return param, nil
+	case string:
+		param = strings.TrimPrefix(param, "#/components/parameters/")
+		param = strings.TrimPrefix(param, "#/parameters/")
+		return v2_parameterToValue(t, t.Parameters[param])
+	default:
+		return nil, utils.Errorf("unsupported parameter type: %T", target)
+	}
+}
 
 func v2_SchemeRefToBytes(t openapi2.T, target any) []byte {
 	raw, err := json.Marshal(v2_SchemeRefToObject(t, target))
