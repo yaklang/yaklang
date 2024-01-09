@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -59,26 +60,19 @@ func TestGRPCMUSTPASS_COMMON_CODEC_Filetag(t *testing.T) {
 func TestGRPCNewCodec(t *testing.T) {
 	workFlow := []*ypb.CodecWork{
 		{
-			CodecType:  "base64",
+			CodecType:  "HtmlEncode",
 			Script:     "",
 			PluginName: "",
-			Params:     nil,
-		},
-		{
-			CodecType:  "base64-decode",
-			Script:     "",
-			PluginName: "",
-			Params:     nil,
-		},
-		{
-			CodecType: "custom-script",
-			Script: `
-handle = func(origin) {
-    return origin + "test"
-}
-`,
-			PluginName: "",
-			Params:     nil,
+			Params: []*ypb.ExecParamItem{
+				{
+					Key:   "entityRef",
+					Value: "named",
+				},
+				{
+					Key:   "fullEncode",
+					Value: "false",
+				},
+			},
 		},
 	}
 	client, err := NewLocalClient()
@@ -87,7 +81,7 @@ handle = func(origin) {
 	}
 	rsp, err := client.NewCodec(utils.TimeoutContextSeconds(1),
 		&ypb.CodecRequestFlow{
-			Text:       "test",
+			Text:       "<a>",
 			Auto:       false,
 			WorkFlow:   workFlow,
 			InputBytes: nil,
@@ -96,7 +90,8 @@ handle = func(origin) {
 	if err != nil {
 		panic(err)
 	}
-	if !(rsp.GetResult() == "testtest") {
+	fmt.Println(rsp.GetResult())
+	if rsp.GetResult() != "&lt;a&gt;" {
 		t.Fatal("workflow codec fail")
 	}
 }
