@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/openapi"
 	"os"
 	"path/filepath"
 	"sync"
@@ -280,6 +281,9 @@ func initYaklangLib() {
 
 	// ssa
 	yaklang.Import("ssa", ssaapi.Exports)
+
+	// openapi
+	yaklang.Import("openapi", openapi.Exports)
 
 	// 手动为一些缺失的导出的接口注入注释
 	// yakdoc.RegisterHook(func(h *yakdoc.DocumentHelper) {

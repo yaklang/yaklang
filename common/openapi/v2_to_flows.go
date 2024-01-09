@@ -30,6 +30,22 @@ func v2Generator(t string, config *OpenAPIConfig) error {
 		config = NewDefaultOpenAPIConfig()
 	}
 
+	if !strings.HasPrefix(data.Swagger, "2") {
+		return utils.Errorf("swagger is not v2, got (%v)", data.Swagger)
+	}
+
+	if strings.Contains(strings.Join(data.Schemes, ","), "https") {
+		config.IsHttps = true
+	}
+
+	if config.Domain == "" {
+		host, _, err := utils.ParseStringToHostPort(data.Host)
+		if err != nil {
+			host = data.Host
+		}
+		config.Domain = host
+	}
+
 	var root mutate.FuzzHTTPRequestIf
 	root, err = mutate.NewFuzzHTTPRequest(`GET / HTTP/1.1
 Host: www.example.com
@@ -37,6 +53,12 @@ Host: www.example.com
 	if err != nil {
 		return utils.Wrapf(err, "create http request failed")
 	}
+
+	if config.Domain == "" {
+		config.Domain = "www.example.com"
+	}
+	root = root.FuzzHTTPHeader("Host", config.Domain)
+
 	if data.BasePath != "" {
 		basePath := strings.TrimRight(data.BasePath, "/")
 		root = root.FuzzPath(basePath)
@@ -57,6 +79,13 @@ Host: www.example.com
 			}
 
 			for _, parameter := range ins.Parameters {
+				if parameter.Ref != "" {
+					parameter, err = v2_parameterToValue(data, parameter.Ref)
+					if err != nil {
+						log.Errorf("v2_parameterToValue [%v] failed: %v", parameter.Ref, err)
+						continue
+					}
+				}
 				switch parameter.In {
 				case "path":
 					r, err := regexp.Compile(`\{\s*(` + regexp.QuoteMeta(parameter.Name) + `)\s*\}`)
@@ -105,7 +134,8 @@ Host: www.example.com
 						}
 					}
 				default:
-					log.Errorf("unknown parameter type: %s", parameter.In)
+					raw, _ := parameter.MarshalJSON()
+					log.Errorf("unknown parameter type: %s", string(raw))
 				}
 			}
 			results, err := methodRoot.Results()
