@@ -120,9 +120,7 @@ func _suffixChecker(includes, excludes []string, target string) bool {
 	includes = utils.StringArrayFilterEmpty(includes)
 
 	for _, exclude := range excludes {
-		if match, err := regexp.MatchString(exclude, target); err == nil && match {
-			return false
-		} else if strings.HasSuffix(target, fixSuffix(exclude)) {
+		if strings.HasSuffix(target, fixSuffix(exclude)) {
 			return false
 		} else if exclude == target {
 			return false
@@ -134,9 +132,7 @@ func _suffixChecker(includes, excludes []string, target string) bool {
 	}
 
 	for _, include := range includes {
-		if match, err := regexp.MatchString(include, target); err == nil && match {
-			return true
-		} else if strings.HasSuffix(target, fixSuffix(include)) {
+		if strings.HasSuffix(target, fixSuffix(include)) {
 			return true
 		} else if include == target {
 			return true
