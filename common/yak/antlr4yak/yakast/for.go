@@ -88,7 +88,7 @@ func (y *YakCompiler) VisitForStmt(raw yak.IForStmtContext) interface{} {
 	var conditionSymbol int
 	if e := i.Expression(); e != nil {
 		y.VisitExpression(e)
-		var toEnd = y.pushJmpIfFalse()
+		toEnd := y.pushJmpIfFalse()
 		toEnds = append(toEnds, toEnd)
 	} else if cond := i.ForStmtCond(); cond != nil {
 		condIns := cond.(*yak.ForStmtCondContext)
@@ -105,7 +105,7 @@ func (y *YakCompiler) VisitForStmt(raw yak.IForStmtContext) interface{} {
 			// 为了后面可以根据条件判断是否执行第三条语句，我们需要把结果缓存到中间符号中
 			y.pushOperator(yakvm.OpFastAssign)
 			// 条件应该是 forEnd 不是 blockEnd
-			var toEnd = y.pushJmpIfFalse()
+			toEnd := y.pushJmpIfFalse()
 			toEnds = append(toEnds, toEnd)
 		}
 		y.writeString("; ")
@@ -126,7 +126,7 @@ func (y *YakCompiler) VisitForStmt(raw yak.IForStmtContext) interface{} {
 	if endThirdExpr != nil {
 		if conditionSymbol > 0 {
 			y.pushRef(conditionSymbol)
-			var toEnd = y.pushJmpIfFalse()
+			toEnd := y.pushJmpIfFalse()
 			toEnds = append(toEnds, toEnd)
 		}
 		y.VisitForThirdExpr(endThirdExpr)
@@ -134,7 +134,7 @@ func (y *YakCompiler) VisitForStmt(raw yak.IForStmtContext) interface{} {
 	}
 	y.writeString(buf)
 	y.pushJmp().Unary = startIndex
-	var forEnd = y.GetNextCodeIndex()
+	forEnd := y.GetNextCodeIndex()
 
 	f()
 	// 设置解析的 block 中没有设置过的 break
@@ -172,7 +172,7 @@ func (y *YakCompiler) VisitForRangeStmt(raw yak.IForRangeStmtContext) interface{
 	recoverSymtbl := y.SwitchSymbolTableInNewScope("for", uuid.NewV4().String())
 	defer recoverSymtbl()
 
-	var defaultValueSymbol, err = y.currentSymtbl.NewSymbolWithReturn("_")
+	defaultValueSymbol, err := y.currentSymtbl.NewSymbolWithReturn("_")
 	if err != nil {
 		y.panicCompilerError(compileError, "cannot create `_` variable, reason: "+err.Error())
 	}
@@ -180,13 +180,13 @@ func (y *YakCompiler) VisitForRangeStmt(raw yak.IForRangeStmtContext) interface{
 	/*
 		for range: range 后表达式计算后符号化
 	*/
-	// 为 for range 表达式创建一个新符号，这个然后赋值给这个表达式
-	expressionResultID := y.currentSymtbl.NewSymbolWithoutName()
-	y.pushLeftRef(expressionResultID)
+	// ! 不应该为迭代的对象创建一个新的符号，这样会导致自修改出现问题，且在迭代后右值所指向的左值被修改，所有后续的自修改失效
+	// expressionResultID := y.currentSymtbl.NewSymbolWithoutName()
+	// y.pushLeftRef(expressionResultID)
 	// enter for-range
 	y.VisitExpression(expr)
 	buf := recoverFormatBufferFunc()
-	y.pushOperator(yakvm.OpFastAssign)
+	// y.pushOperator(yakvm.OpFastAssign)
 	defer y.pushOpPop()
 
 	// OpEnterFR 会从栈上pop出来右值创建迭代器，这个值其实不必要被 pop 出，每次 Peek 足够了
@@ -197,7 +197,7 @@ func (y *YakCompiler) VisitForRangeStmt(raw yak.IForRangeStmtContext) interface{
 	y.enterForRangeContext(startIndex)
 
 	// 计算出 range 左值的数量
-	var n = 0
+	n := 0
 	if l := i.LeftExpressionList(); l != nil { // 访问左值
 		n = len(l.(*yak.LeftExpressionListContext).AllLeftExpression())
 		// 一般来说左值有两个，有一个和两个的情况赋值不一样，这个要看具体实现
@@ -209,7 +209,7 @@ func (y *YakCompiler) VisitForRangeStmt(raw yak.IForRangeStmtContext) interface{
 
 	// peek ExpressionResultID 使用 RangeNext 或者 InNext 进行迭代计算
 	// 迭代计算之后，应该是一个 list，可以作为赋值的右值
-	var rightAtLeast = 1
+	rightAtLeast := 1
 	if n > 1 {
 		rightAtLeast = n
 	}
