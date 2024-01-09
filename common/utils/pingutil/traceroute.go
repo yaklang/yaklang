@@ -87,7 +87,7 @@ func WithFirstTTL(ttl int) TracerouteConfigOption {
 func NewTracerouteConfig(opts ...TracerouteConfigOption) *TracerouteConfig {
 	cfg := &TracerouteConfig{
 		MaxHops:      30,
-		Protocol:     "udp",
+		Protocol:     "icmp",
 		WriteTimeOut: time.Second * 3,
 		ReadTimeOut:  time.Second * 3,
 		LocalAddr:    "0.0.0.0",
