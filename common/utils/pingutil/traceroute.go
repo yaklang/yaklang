@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 	"net"
@@ -19,6 +20,7 @@ type TracerouteResponse struct {
 	Hop    int
 }
 type TracerouteConfig struct {
+	Ctx          context.Context
 	MaxHops      int
 	Protocol     string
 	WriteTimeOut time.Duration
@@ -28,8 +30,82 @@ type TracerouteConfig struct {
 	UdpPort      int
 	FirstTTL     int
 }
+type TracerouteConfigOption func(*TracerouteConfig)
 
-func TracerouteWithConfig(ctx context.Context, host string, config *TracerouteConfig) (chan []*TracerouteResponse, error) {
+func WithCtx(ctx context.Context) TracerouteConfigOption {
+	return func(cfg *TracerouteConfig) {
+		cfg.Ctx = ctx
+	}
+}
+func WithMaxHops(hops int) TracerouteConfigOption {
+	return func(cfg *TracerouteConfig) {
+		cfg.MaxHops = hops
+	}
+}
+
+func WithProtocol(protocol string) TracerouteConfigOption {
+	return func(cfg *TracerouteConfig) {
+		cfg.Protocol = protocol
+	}
+}
+
+func WithWriteTimeout(timeout float64) TracerouteConfigOption {
+	return func(cfg *TracerouteConfig) {
+		cfg.WriteTimeOut = utils.FloatSecondDuration(timeout)
+	}
+}
+
+func WithReadTimeout(timeout float64) TracerouteConfigOption {
+	return func(cfg *TracerouteConfig) {
+		cfg.ReadTimeOut = utils.FloatSecondDuration(timeout)
+	}
+}
+
+func WithLocalAddr(addr string) TracerouteConfigOption {
+	return func(cfg *TracerouteConfig) {
+		cfg.LocalAddr = addr
+	}
+}
+
+func WithRetryTimes(times int) TracerouteConfigOption {
+	return func(cfg *TracerouteConfig) {
+		cfg.RetryTimes = times
+	}
+}
+
+func WithUdpPort(port int) TracerouteConfigOption {
+	return func(cfg *TracerouteConfig) {
+		cfg.UdpPort = port
+	}
+}
+
+func WithFirstTTL(ttl int) TracerouteConfigOption {
+	return func(cfg *TracerouteConfig) {
+		cfg.FirstTTL = ttl
+	}
+}
+func NewTracerouteConfig(opts ...TracerouteConfigOption) *TracerouteConfig {
+	cfg := &TracerouteConfig{
+		MaxHops:      30,
+		Protocol:     "udp",
+		WriteTimeOut: time.Second * 3,
+		ReadTimeOut:  time.Second * 3,
+		LocalAddr:    "0.0.0.0",
+		RetryTimes:   3,
+		UdpPort:      33434,
+		FirstTTL:     1,
+	}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+	return cfg
+}
+func Traceroute(host string, opts ...TracerouteConfigOption) (chan *TracerouteResponse, error) {
+	config := NewTracerouteConfig(opts...)
+	var ctx = config.Ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	var maxHops = config.MaxHops
 	var protocol = config.Protocol
 	var writeTimeOut = config.WriteTimeOut
@@ -40,14 +116,14 @@ func TracerouteWithConfig(ctx context.Context, host string, config *TracerouteCo
 	var firstTTL = config.FirstTTL
 	ip := netx.LookupFirst(host)
 	dstIp := net.ParseIP(ip)
-	rsp := make(chan []*TracerouteResponse, 0)
+	rsp := make(chan *TracerouteResponse, 0)
 	go func() {
 		defer func() {
 			close(rsp)
 		}()
 		for i := firstTTL - 1; i < maxHops; i++ {
 			hop := i + 1
-			rsps := []*TracerouteResponse{}
+			//rsps := *TracerouteResponse{}
 			for j := 0; j < retryTimes; j++ {
 				select {
 				case <-ctx.Done():
@@ -139,35 +215,20 @@ func TracerouteWithConfig(ctx context.Context, host string, config *TracerouteCo
 					}
 				}()
 				if err != nil {
-					rsps = append(rsps, &TracerouteResponse{
+					rsp <- &TracerouteResponse{
 						IP:     "",
 						RTT:    0,
 						Hop:    hop,
 						Reason: err.Error(),
-					})
+					}
 				} else {
-					rsps = append(rsps, res)
-				}
-			}
-			rsp <- rsps
-			for _, rsp := range rsps {
-				if rsp.IP == ip {
-					return
+					rsp <- res
+					if res.IP == ip {
+						return
+					}
 				}
 			}
 		}
 	}()
 	return rsp, nil
-}
-func Traceroute(ctx context.Context, host string) (chan []*TracerouteResponse, error) {
-	return TracerouteWithConfig(ctx, host, &TracerouteConfig{
-		MaxHops:      30,
-		Protocol:     "udp",
-		WriteTimeOut: time.Second * 3,
-		ReadTimeOut:  time.Second * 3,
-		LocalAddr:    "0.0.0.0",
-		RetryTimes:   3,
-		UdpPort:      33434,
-		FirstTTL:     1,
-	})
 }
