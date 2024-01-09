@@ -1,0 +1,207 @@
+@media only screen and (min-width: 992px) and (max-width: 1280px) { 
+div.cart-collaterals ul.products li.product {
+  float: left;
+  margin-left: 30px;
+  position: relative;
+  width: 160px;
+}
+.coupon input[type="text"] {
+  width: 100px;
+}  
+input[type="submit"], button[type="submit"] {
+  padding: 11px 15px;
+} 
+.col-1, .col-2 {
+  width: 293px;
+}    
+    
+    
+}
+
+/* Tablet Layout: 768px. */
+@media only screen and (min-width: 768px) and (max-width: 991px) { 
+.user-menu, .header-right ul.list-inline {
+  text-align: center;
+}
+.mainmenu-area ul.navbar-nav li a {
+  font-size: 14px;
+  padding: 15px 10px;
+}  
+.single-promo {margin-bottom: 30px}    
+.single-product-widget, .footer-about-us, .footer-menu {
+  margin-bottom: 60px;
+}
+    
+    
+.product-widget-area .zigzag-bottom {
+  bottom: -50px;
+  height: 100px;
+}
+.product-widget-area {
+  padding-bottom: 90px;
+}   
+    
+.footer-top-area .zigzag-bottom {
+  bottom: -153px;
+  height: 200px;
+}    
+.footer-top-area {
+  padding: 35px 0 125px;
+}  
+div.cart-collaterals ul.products li.product {
+  width: 190px;
+}  
+    
+.col-1, .col-2 {
+  width: 345px;
+}    
+    
+}
+/* Mobile Layout: 320px. */
+@media only screen and (max-width: 767px) { 
+    
+.user-menu, .header-right ul.list-inline {
+  text-align: center;
+}  
+.logo h1 {
+  font-size: 30px;
+  margin: 20px 0;
+  text-align: center;
+} 
+.shopping-item {
+  float: none;
+  margin-bottom: 20px;
+  margin-top: 5px;
+  text-align: center;
+}  
+.navbar-header {
+  text-align: center;
+}    
+    
+.navbar-toggle {
+    border-color: #fff;
+    float: none;
+    margin: 10px auto;
+}
+.navbar-toggle .icon-bar { background: none repeat scroll 0 0 #333 }  
+.navbar-collapse.collapse.in {
+  background: none repeat scroll 0 0 #f4f4f4;
+  position: relative;
+  z-index: 99;
+} 
+.mainmenu-area ul.navbar-nav li a {
+  padding: 15px;
+}  
+.mainmenu-area {position: relative !important}
+.slide-text {
+  font-size: 16px;
+}  
+.slide-text h2 {
+  font-size: 30px;
+}  
+.readmore {
+  font-size: 16px;
+  padding: 8px 20px;
+}    
+.single-promo {
+  margin-bottom: 30px;
+} 
+.section-title {
+  font-size: 35px;
+}  
+    
+    
+.product-widget-area .zigzag-bottom {
+  bottom: -50px;
+  height: 100px;
+}
+.product-widget-area {
+  padding-bottom: 90px;
+}   
+    
+.footer-top-area .zigzag-bottom {
+  bottom: -153px;
+  height: 200px;
+}    
+.footer-top-area {
+  padding: 35px 0 125px;
+} 
+    
+.single-product-widget, .footer-about-us, .footer-menu {
+  margin-bottom: 60px;
+}  
+    
+.product-wid-title {
+  font-size: 25px;
+}  
+    
+.related-products-wrapper .owl-nav {
+  left: -15px;
+  position: relative;
+  right: inherit;
+  top: 15px;
+}  
+div.cart-collaterals ul.products {
+  margin: 0;
+}  
+div.cart-collaterals ul.products li.product {
+  margin-bottom: 30px;
+  margin-left: 0;
+  width: 100%;
+}  
+div.cart-collaterals ul.products li.product img {width: 100%}  
+    
+.product-bit-title h2 {
+  font-size: 35px;
+  padding: 40px 0;
+}  
+.col2-set {
+  margin-left: 0;
+}    
+.col-1, .col-2 {
+  float: none;
+  margin-left: 0;
+  width: inherit;
+}    
+    
+    
+/* Special */    
+    
+table.shop_table th, table.shop_table td {
+  font-size: 12px;
+  padding: 5px;
+}    
+td.product-thumbnail img {
+  width: 30px;
+} 
+    
+div.quantity input.plus, div.quantity input.minus {
+  display: none;
+}   
+table.shop_table th {
+  font-size: 12px;
+}    
+div.coupon input[type="text"] {
+  width: 100px;
+} 
+.coupon {margin-bottom: 10px}      
+.cross-sells {
+  float: none;
+  margin-bottom: 30px;
+  margin-right: 0;
+  width: 100%;
+}  
+.cart_totals, .cart-collaterals .shipping_calculator {
+  float: none;
+  margin-bottom: 40px;
+  width: 100%;
+}  
+    
+    
+}
+/* Wide Mobile Layout: 480px. */
+@media only screen and (min-width: 480px) and (max-width: 767px) { 
+    
+  
+    
+}

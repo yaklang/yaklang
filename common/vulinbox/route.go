@@ -132,6 +132,11 @@ func (s *VulinServer) init() {
 	// 业务型
 	s.registerUserRoute()
 
+	//逻辑场景-购物商城
+	s.mallIndexRoute() //商城首页
+	s.mallUserRoute()  //登陆注册
+	s.mallCartRoute()  //购物车
+
 	// 验证码
 	subVerificationRouter, vuls := verificationcode.Register(router)
 	for _, v := range vuls {
