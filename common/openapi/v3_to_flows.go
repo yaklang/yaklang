@@ -56,13 +56,39 @@ func v3Generator(t string, config *OpenAPIConfig) error {
 		config = NewDefaultOpenAPIConfig()
 	}
 
+	if !strings.HasPrefix(data.OpenAPI, "3") && !strings.HasPrefix(data.OpenAPI, "v3") {
+		return utils.Errorf("openapi is not v3, got (%v)", data.OpenAPI)
+	}
+
+	for _, server := range data.Servers {
+		var originHttps = strings.HasPrefix(strings.ToLower(server.URL), "https://")
+		urlStr := utils.ExtractHostPort(server.URL)
+		domian, _, err := utils.ParseStringToHostPort(urlStr)
+		if err != nil {
+			domian = urlStr
+		}
+		if config.Domain == "" {
+			config.Domain = domian
+		}
+		if !config.IsHttps {
+			config.IsHttps = originHttps
+		}
+	}
+
+	if config.Domain == "" {
+		config.Domain = "www.example.com"
+	}
+
 	var root mutate.FuzzHTTPRequestIf
 	root, err = mutate.NewFuzzHTTPRequest(`GET / HTTP/1.1
 Host: www.example.com
-`)
+`, mutate.OptHTTPS(config.IsHttps))
 	if err != nil {
 		return utils.Wrapf(err, "create http request failed")
 	}
+
+	root = root.FuzzHTTPHeader("Host", config.Domain)
+
 	baseUrl, _ := data.Servers.BasePath()
 	if baseUrl != "" {
 		baseUrl = strings.TrimRight(baseUrl, "/")
@@ -71,10 +97,10 @@ Host: www.example.com
 
 	for _, pathStr := range data.Paths.InMatchingOrder() {
 		pathIns := data.Paths.Value(pathStr)
-		log.Infof("path: %v, ops: %v", pathStr, len(pathIns.Operations()))
+		log.Debugf("path: %v, ops: %v", pathStr, len(pathIns.Operations()))
 
 		if strings.Contains(pathStr, `/whitelabel/links/{link_id}/subuser`) {
-			log.Infof("path: %v, ops: %v", pathStr, len(pathIns.Operations()))
+			log.Debugf("path: %v, ops: %v", pathStr, len(pathIns.Operations()))
 		}
 
 		pathRoot := root.FuzzPathAppend(pathStr)
