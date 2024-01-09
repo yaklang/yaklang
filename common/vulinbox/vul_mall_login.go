@@ -3,38 +3,37 @@ package vulinbox
 import (
 	_ "embed"
 	"encoding/json"
-	"io/ioutil"
+	"github.com/yaklang/yaklang/common/log"
 	"net/http"
 	"strconv"
 	"strings"
 	"text/template"
 	"time"
-
-	"github.com/yaklang/yaklang/common/log"
 )
 
-//go:embed html/vul_user_register.html
-var registerPage []byte
+//go:embed html/mall/vul_mall_register.html
+var mallRegisterPage []byte
 
-//go:embed html/vul_user_login.html
-var loginPage []byte
+//go:embed html/mall/vul_mall_login.html
+var mallLoginPage []byte
 
-//go:embed html/vul_user_profile.html
-var profilePage []byte
+//go:embed html/mall/vul_mall_userProfile.html
+var mallUserProfilePage []byte
 
-func (s *VulinServer) registerUserRoute() {
-	var router = s.router
-	logicGroup := router.PathPrefix("/logic").Name("逻辑场景").Subrouter()
-	logicRoutes := []*VulInfo{
+func (s *VulinServer) mallUserRoute() {
+	// var router = s.router
+	// malloginGroup := router.PathPrefix("/mall").Name("购物商城").Subrouter()
+	mallloginRoutes := []*VulInfo{
+		//登陆功能
 		{
 			DefaultQuery: "",
 			Path:         "/user/login",
-			Title:        "Web 后台",
+			// Title:        "商城登陆",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				if request.Method == http.MethodGet {
 					// 返回登录页面
 					writer.Header().Set("Content-Type", "text/html")
-					writer.Write(loginPage)
+					writer.Write(mallLoginPage)
 					return
 				}
 
@@ -80,13 +79,14 @@ func (s *VulinServer) registerUserRoute() {
 					Success: true,
 					Message: "Login successful",
 				}
-				session, err := user.CreateSession(s.database)
+				var sessionID = "fixedSessionID"
+				// session, err := user.CreateSession(s.database)
 				if err != nil {
 					return
 				}
 				http.SetCookie(writer, &http.Cookie{
-					Name:    "_cookie",
-					Value:   session.Uuid,
+					Name:    "sessionID",
+					Value:   sessionID,
 					Path:    "/",
 					Expires: time.Now().Add(15 * time.Minute),
 
@@ -104,6 +104,7 @@ func (s *VulinServer) registerUserRoute() {
 			},
 			RiskDetected: true,
 		},
+		//注册功能
 		{
 			DefaultQuery: "",
 			Path:         "/user/register",
@@ -111,7 +112,7 @@ func (s *VulinServer) registerUserRoute() {
 				if request.Method == http.MethodGet {
 					// 返回登录页面
 					writer.Header().Set("Content-Type", "text/html")
-					writer.Write(registerPage)
+					writer.Write(mallRegisterPage)
 					return
 				} else if request.Method == http.MethodPost {
 					// 解析请求体中的 JSON 数据
@@ -169,11 +170,12 @@ func (s *VulinServer) registerUserRoute() {
 				}
 			},
 		},
+		//用户信息
 		{
 			DefaultQuery: "",
 			Path:         "/user/profile",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
-				realUser, err := s.database.Authenticate(writer, request)
+				realUser, err := s.database.mallAuthenticate(writer, request)
 				if err != nil {
 					return
 				}
@@ -200,92 +202,35 @@ func (s *VulinServer) registerUserRoute() {
 					return
 				}
 
+				// 返回用户个人页面
 				writer.Header().Set("Content-Type", "text/html")
+				tmpl, err := template.New("userProfile").Parse(string(mallUserProfilePage))
 
-				tmpl, err := template.New("Profile").Parse(string(profilePage)) // 请将文件名替换为你保存的 HTML 文件名
-				err = tmpl.Execute(writer, userInfo)
+				//获取购物车商品数量
+				Cartsum, err := s.database.GetUserCartCount(int(userInfo.ID))
+				//个人信息页面显示购物车商品数量
+				type UserProfile struct {
+					ID       int
+					Username string
+					Cartsum  int
+				}
+				profile := UserProfile{
+					ID:       int(userInfo.ID),
+					Username: userInfo.Username,
+					Cartsum:  int(Cartsum),
+				}
+
+				err = tmpl.Execute(writer, profile)
+
 				if err != nil {
 					writer.WriteHeader(http.StatusInternalServerError)
+					log.Println("执行模板失败:", err)
 					writer.Write([]byte("Internal error, cannot render user profile"))
 					return
 				}
 			},
 		},
-		{
-			DefaultQuery: "",
-			Path:         "/user/update",
-			Handler: func(writer http.ResponseWriter, request *http.Request) {
-				realUser, err := s.database.Authenticate(writer, request)
-				if err != nil {
-					return
-				}
-				// 读取请求体数据
-				body, err := ioutil.ReadAll(request.Body)
-				if err != nil {
-					writer.Write([]byte(err.Error()))
-					writer.WriteHeader(http.StatusBadRequest)
-					return
-				}
-
-				// 过滤请求体内容
-				lowerBody := strings.ToLower(string(body))
-				filteredBody := strings.ReplaceAll(lowerBody, "<", "")
-				filteredBody = strings.ReplaceAll(filteredBody, ">", "")
-				filteredBody = strings.ReplaceAll(filteredBody, "script", "")
-
-				// 解析过滤后的 JSON 数据
-				var oldUser VulinUser
-				err = json.Unmarshal([]byte(filteredBody), &oldUser)
-				if err != nil {
-					writer.Write([]byte(err.Error()))
-					writer.WriteHeader(http.StatusBadRequest)
-					return
-				}
-
-				// 正常逻辑先解析再过滤
-				//var oldUser VulinUser
-				//err := json.NewDecoder(request.Body).Decode(&oldUser)
-				//if err != nil {
-				//	writer.Write([]byte(err.Error()))
-				//	writer.WriteHeader(http.StatusBadRequest)
-				//	return
-				//}
-
-				userInfo, err := s.database.GetUserById(int(oldUser.ID))
-				if err != nil {
-					writer.Write([]byte(err.Error()))
-					writer.WriteHeader(http.StatusBadRequest)
-					return
-				}
-				//remake := strings.ToLower(oldUser.Remake)
-				//filterRemake := strings.ReplaceAll(remake, "<", "")
-				//filterRemake = strings.ReplaceAll(filterRemake, ">", "")
-				//filterRemake = strings.ReplaceAll(filterRemake, "script", "")
-				//userInfo.Remake = filterRemake
-
-				userInfo.Remake = oldUser.Remake
-
-				if realUser.Role != "admin" && realUser.Role != userInfo.Role {
-					log.Warnf("user %s is trying to update user %s", realUser.Username, userInfo.Username)
-				}
-
-				err = s.database.UpdateUser(userInfo)
-				if err != nil {
-					writer.Write([]byte(err.Error()))
-					writer.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-				writer.Header().Set("Content-Type", "text/html")
-
-				tmpl, err := template.New("profile").Parse(string(profilePage)) // 请将文件名替换为你保存的 HTML 文件名
-				err = tmpl.Execute(writer, userInfo)
-				if err != nil {
-					writer.WriteHeader(http.StatusInternalServerError)
-					writer.Write([]byte("Internal error, cannot render user profile"))
-					return
-				}
-			},
-		},
+		//退出登陆
 		{
 			DefaultQuery: "",
 			Path:         "/user/logout",
@@ -309,7 +254,8 @@ func (s *VulinServer) registerUserRoute() {
 		},
 	}
 
-	for _, v := range logicRoutes {
-		addRouteWithVulInfo(logicGroup, v)
+	for _, v := range mallloginRoutes {
+		addRouteWithVulInfo(MallGroup, v)
 	}
+
 }

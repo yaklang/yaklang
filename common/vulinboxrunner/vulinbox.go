@@ -3,10 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/urfave/cli"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/vulinbox"
 	"net"
 	"os"
 	"os/signal"
@@ -14,6 +10,11 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/urfave/cli"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/vulinbox"
 )
 
 var (
@@ -45,7 +46,7 @@ func main() {
 	app.Flags = []cli.Flag{
 		cli.IntFlag{
 			Name:  "port,p",
-			Value: 8787,
+			Value: 8080,
 		},
 		cli.BoolFlag{
 			Name: "safe",
