@@ -29,8 +29,17 @@ type TracerouteConfig struct {
 	RetryTimes   int
 	UdpPort      int
 	FirstTTL     int
+	Sender       func(host string, hop int) (*TracerouteResponse, error)
 }
 type TracerouteConfigOption func(*TracerouteConfig)
+
+func WithSender(f func(config *TracerouteConfig, host string, hop int) (*TracerouteResponse, error)) TracerouteConfigOption {
+	return func(cfg *TracerouteConfig) {
+		cfg.Sender = func(host string, hop int) (*TracerouteResponse, error) {
+			return f(cfg, host, hop)
+		}
+	}
+}
 
 func WithCtx(ctx context.Context) TracerouteConfigOption {
 	return func(cfg *TracerouteConfig) {
@@ -85,6 +94,96 @@ func WithFirstTTL(ttl int) TracerouteConfigOption {
 	}
 }
 func NewTracerouteConfig(opts ...TracerouteConfigOption) *TracerouteConfig {
+	opts = append([]TracerouteConfigOption{WithSender(func(config *TracerouteConfig, host string, hop int) (*TracerouteResponse, error) {
+		var protocol = config.Protocol
+		var writeTimeOut = config.WriteTimeOut
+		var readTimeOut = config.ReadTimeOut
+		var localAddr = config.LocalAddr
+		var udpPort = config.UdpPort
+		ip := netx.LookupFirst(host)
+		dstIp := net.ParseIP(ip)
+		switch protocol {
+		case "udp":
+			conn, err := net.ListenPacket("ip4:icmp", localAddr)
+			if err != nil {
+				return nil, err
+			}
+			defer conn.Close()
+
+			udpCon, err := net.ListenPacket("udp4", fmt.Sprintf("%v:%v", localAddr, 0))
+			if err != nil {
+				return nil, err
+			}
+			defer udpCon.Close()
+			ipConn := ipv4.NewPacketConn(udpCon)
+			ipConn.SetWriteDeadline(time.Now().Add(writeTimeOut))
+			ipConn.SetTTL(hop)
+
+			start := time.Now()
+			dst, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%v:%v", ip, udpPort))
+			if err != nil {
+				return nil, err
+			}
+			_, err = ipConn.WriteTo(bytes.Repeat([]byte{0}, 24), nil, dst)
+			if err != nil {
+				return nil, err
+			}
+			buff := make([]byte, 512)
+			conn.SetReadDeadline(time.Now().Add(readTimeOut))
+			_, addr, err := conn.ReadFrom(buff)
+			if err != nil {
+				return nil, err
+			}
+			rtt := time.Since(start).Milliseconds()
+			return &TracerouteResponse{
+				IP:  addr.String(),
+				RTT: rtt,
+				Hop: hop,
+			}, nil
+		default:
+			icmpMessage := icmp.Message{
+				Type: ipv4.ICMPTypeEcho, Code: 0,
+				Body: &icmp.Echo{
+					ID:   os.Getpid() & 0xffff,
+					Data: []byte("HELLO-R-U-THERE"),
+				},
+			}
+			icmpMessage.Body.(*icmp.Echo).Seq = hop
+			mb, err := icmpMessage.Marshal(nil)
+			if err != nil {
+				return nil, err
+			}
+			conn, err := icmp.ListenPacket("ip4:icmp", localAddr)
+			if err != nil {
+				return nil, err
+			}
+			defer conn.Close()
+			start := time.Now()
+			conn.SetWriteDeadline(time.Now().Add(writeTimeOut))
+			conn.IPv4PacketConn().SetTTL(hop)
+			if _, err := conn.WriteTo(mb, &net.IPAddr{
+				IP: dstIp,
+			}); err != nil {
+				return nil, err
+			}
+			conn.SetReadDeadline(time.Now().Add(readTimeOut))
+			rb := make([]byte, 512)
+			n, addr, err := conn.ReadFrom(rb)
+			if err != nil {
+				return nil, err
+			}
+			_, err = icmp.ParseMessage(1, rb[:n])
+			if err != nil {
+				return nil, err
+			}
+			rtt := time.Since(start).Milliseconds()
+			return &TracerouteResponse{
+				IP:  addr.String(),
+				RTT: rtt,
+				Hop: hop,
+			}, nil
+		}
+	})}, opts...)
 	cfg := &TracerouteConfig{
 		MaxHops:      30,
 		Protocol:     "icmp",
@@ -100,6 +199,7 @@ func NewTracerouteConfig(opts ...TracerouteConfigOption) *TracerouteConfig {
 	}
 	return cfg
 }
+
 func Traceroute(host string, opts ...TracerouteConfigOption) (chan *TracerouteResponse, error) {
 	config := NewTracerouteConfig(opts...)
 	var ctx = config.Ctx
@@ -107,15 +207,10 @@ func Traceroute(host string, opts ...TracerouteConfigOption) (chan *TracerouteRe
 		ctx = context.Background()
 	}
 	var maxHops = config.MaxHops
-	var protocol = config.Protocol
-	var writeTimeOut = config.WriteTimeOut
-	var readTimeOut = config.ReadTimeOut
-	var localAddr = config.LocalAddr
 	var retryTimes = config.RetryTimes
 	var udpPort = config.UdpPort
 	var firstTTL = config.FirstTTL
 	ip := netx.LookupFirst(host)
-	dstIp := net.ParseIP(ip)
 	rsp := make(chan *TracerouteResponse, 0)
 	go func() {
 		defer func() {
@@ -131,89 +226,7 @@ func Traceroute(host string, opts ...TracerouteConfigOption) (chan *TracerouteRe
 				default:
 				}
 				udpPort++
-				res, err := func() (*TracerouteResponse, error) {
-					switch protocol {
-					case "udp":
-						conn, err := net.ListenPacket("ip4:icmp", localAddr)
-						if err != nil {
-							return nil, err
-						}
-						defer conn.Close()
-
-						udpCon, err := net.ListenPacket("udp4", fmt.Sprintf("%v:%v", localAddr, 0))
-						if err != nil {
-							return nil, err
-						}
-						defer udpCon.Close()
-						ipConn := ipv4.NewPacketConn(udpCon)
-						ipConn.SetWriteDeadline(time.Now().Add(writeTimeOut))
-						ipConn.SetTTL(hop)
-
-						start := time.Now()
-						dst, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%v:%v", ip, udpPort))
-						if err != nil {
-							return nil, err
-						}
-						_, err = ipConn.WriteTo(bytes.Repeat([]byte{0}, 24), nil, dst)
-						if err != nil {
-							return nil, err
-						}
-						buff := make([]byte, 512)
-						conn.SetReadDeadline(time.Now().Add(readTimeOut))
-						_, addr, err := conn.ReadFrom(buff)
-						if err != nil {
-							return nil, err
-						}
-						rtt := time.Since(start).Milliseconds()
-						return &TracerouteResponse{
-							IP:  addr.String(),
-							RTT: rtt,
-							Hop: hop,
-						}, nil
-					default:
-						icmpMessage := icmp.Message{
-							Type: ipv4.ICMPTypeEcho, Code: 0,
-							Body: &icmp.Echo{
-								ID:   os.Getpid() & 0xffff,
-								Data: []byte("HELLO-R-U-THERE"),
-							},
-						}
-						icmpMessage.Body.(*icmp.Echo).Seq = i
-						mb, err := icmpMessage.Marshal(nil)
-						if err != nil {
-							return nil, err
-						}
-						conn, err := icmp.ListenPacket("ip4:icmp", localAddr)
-						if err != nil {
-							return nil, err
-						}
-						defer conn.Close()
-						start := time.Now()
-						conn.SetWriteDeadline(time.Now().Add(writeTimeOut))
-						conn.IPv4PacketConn().SetTTL(hop)
-						if _, err := conn.WriteTo(mb, &net.IPAddr{
-							IP: dstIp,
-						}); err != nil {
-							return nil, err
-						}
-						conn.SetReadDeadline(time.Now().Add(readTimeOut))
-						rb := make([]byte, 512)
-						n, addr, err := conn.ReadFrom(rb)
-						if err != nil {
-							return nil, err
-						}
-						_, err = icmp.ParseMessage(1, rb[:n])
-						if err != nil {
-							return nil, err
-						}
-						rtt := time.Since(start).Milliseconds()
-						return &TracerouteResponse{
-							IP:  addr.String(),
-							RTT: rtt,
-							Hop: hop,
-						}, nil
-					}
-				}()
+				res, err := config.Sender(ip, hop)
 				if err != nil {
 					rsp <- &TracerouteResponse{
 						IP:     "",
