@@ -224,6 +224,10 @@ func (c *_pingConfig) IsFiltered(host string) bool {
 var PingExports = map[string]interface{}{
 	"Scan": _pingScan,
 	"Ping": _ping,
+	"Traceroute": func(host string,) (chan []*pingutil.TracerouteResponse,error) {
+		return pingutil.TracerouteWithConfig(context.Background(), "",nil)
+
+	},
 
 	"excludeHosts": _pingConfigOpt_excludeHosts,
 	"onResult":     _pingConfigOpt_onResult,

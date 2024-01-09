@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
+	"github.com/yaklang/yaklang/common/utils/pingutil"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/url"
 	"strings"
@@ -323,5 +324,23 @@ func (s *Server) DiagnoseNetworkDNS(req *ypb.DiagnoseNetworkDNSRequest, server y
 		return nil
 	}
 
+	return nil
+}
+
+func (s *Server) TraceRoute(req *ypb.TraceRouteRequest, server ypb.Yak_TraceRouteServer) error {
+	res, err := pingutil.Traceroute(server.Context(), req.GetHost())
+	if err != nil {
+		return err
+	}
+	for rsps := range res {
+		for _, rsp := range rsps {
+			server.Send(&ypb.TraceRouteResponse{
+				Hop:    int64(rsp.Hop),
+				Ip:     rsp.IP,
+				Rtt:    rsp.RTT,
+				Reason: rsp.Reason,
+			})
+		}
+	}
 	return nil
 }

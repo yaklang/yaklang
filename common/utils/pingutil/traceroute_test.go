@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-func _TestTraceroute(t *testing.T) {
-	rspChan, err := traceroute(context.Background(), "93.184.216.34")
+func TestTraceroute(t *testing.T) {
+	rspChan, err := Traceroute(context.Background(), "93.184.216.34")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -17,7 +17,7 @@ func _TestTraceroute(t *testing.T) {
 		}
 		fmt.Printf("hop: %d\n", rsp[0].Hop)
 		for _, response := range rsp {
-			fmt.Printf("ip: %s, rtt: %dms, reason: %s\n", response.IPs, response.RTT, response.Reason)
+			fmt.Printf("ip: %s, rtt: %dms, reason: %s\n", response.IP, response.RTT, response.Reason)
 		}
 	}
 }
