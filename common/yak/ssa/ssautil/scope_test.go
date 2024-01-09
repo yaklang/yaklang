@@ -1,131 +1,351 @@
 package ssautil
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
-func TestForkedScope(t *testing.T) {
-	table := NewRootVersionedTable[any]()
-	table.CreateLexicalVariable("a", 1)
-
-	// if true
-	sub1_1 := table.CreateSubScope()
-	sub1_1.CreateLexicalVariable("a", 2)
-
-	// if false
-	sub1_2 := table.CreateSubScope()
-	sub1_2.CreateLexicalVariable("a", 3)
-
+func TestSyntaxBlock(t *testing.T) {
 	test := assert.New(t)
-	test.Equal(1, len(table.GetVersions("a")))
-	test.Equal(2, len(sub1_2.GetVersions("a")))
-	test.Equal(2, len(sub1_1.GetVersions("a")))
 
-	test.Equal(1, table.GetLatestVersion("a").Value)
-	test.Equal(2, sub1_1.GetLatestVersion("a").Value)
-	test.Equal(3, sub1_2.GetLatestVersion("a").Value)
+	/*
+		a = 1
+		b = 1
+		{
+			a = 2
+			b := 2
+		}
+		a // 2
+		b // 1
+	*/
 
-	// endif
-	ProducePhi(func(a ...any) any {
-		return 4
-	}, sub1_1, sub1_2)
-	test.Equal(4, table.GetLatestVersion("a").Value)
+	table := NewRootVersionedTable[value]()
+	table.CreateLexicalVariable("a", NewConsts("1"))
+	table.CreateLexicalVariable("b", NewConsts("1"))
+	test.Equal("const(1)", table.GetLatestVersion("a").String())
+
+	BuildSyntaxBlock(table, func(sub *ScopedVersionedTable[value]) {
+		sub.CreateLexicalVariable("a", NewConsts("2"))
+		sub.CreateLexicalLocalVariable("b", NewConsts("2"))
+	})
+
+	test.Equal("const(2)", table.GetLatestVersion("a").String())
+	test.Equal("const(1)", table.GetLatestVersion("b").String())
 }
 
-func TestMemberTrace(t *testing.T) {
+func TestIfScope_If(t *testing.T) {
+	/*
+		a = 1
+		b = 1
+		if {
+			a = 2
+		}
+
+		a// phi(1, 2)
+		b// 1
+	*/
+	table := NewRootVersionedTable[value]()
+	table.CreateLexicalVariable("a", NewConsts("1"))
+	table.CreateLexicalVariable("b", NewConsts("1"))
+
+	build := NewIfStmt(table)
+	build.BuildItem(
+		func(sub *ScopedVersionedTable[value]) {},
+		func(sub *ScopedVersionedTable[value]) {
+			sub.CreateLexicalVariable("a", NewConsts("2"))
+		},
+	)
+	build.BuildFinish(GeneratePhi)
+
 	test := assert.New(t)
-
-	table := NewRootVersionedTable[any]()
-	var a = table.CreateLexicalVariable("a", nil)
-	var b = table.CreateLexicalVariable("b", nil)
-	err := table.RenameAssociated(b.GetId(), a.GetId())
-	test.Nil(err)
-
-	name1, err := table.ConvertStaticMemberCallToLexicalName(b.GetId(), "c")
-	test.Nil(err)
-	name2, err := table.ConvertStaticMemberCallToLexicalName(a.GetId(), "c")
-	test.Nil(err)
-	t.Log(name1, name2)
-	test.Equal(name1, name2)
-
-	table.CreateStaticMemberCallVariable(a.GetId(), "c", nil)
-	table.CreateStaticMemberCallVariable(b.GetId(), "c", nil)
-
-	test.Equal(2, len(table.GetVersions(name2)))
-	test.Equal(2, len(table.GetVersions(name1)))
-
-	sub := table.CreateSubScope()
-	e := sub.CreateLexicalVariable("e", nil)
-	err = sub.RenameAssociated(e.GetId(), a.GetId())
-	test.Nil(err)
-
-	eV, err := sub.CreateStaticMemberCallVariable(e.GetId(), "c", nil)
-	test.Nil(err)
-
-	t.Log(eV.String())
-
-	test.Equal(3, len(sub.GetVersions(name2)))
-	test.Equal(2, len(table.GetVersions(name2)))
-	sub2 := table.CreateSubScope()
-	test.Equal(2, len(sub2.GetVersions(name2)))
-	sub2.CreateStaticMemberCallVariable(b.GetId(), "c", nil)
-	test.Equal(3, len(sub2.GetVersions(name2)))
-	sub2.CreateStaticMemberCallVariable(b.GetId(), "c", nil)
-	test.Equal(4, len(sub2.GetVersions(name2)))
-
-	ProducePhi(func(a ...any) any {
-		return nil
-	}, sub, sub2)
-
-	l := table.GetLatestVersion(name2)
-	t.Log(l.String())
-	test.True(l.IsPhi())
-	test.Equal(3, len(table.GetVersions(name1)))
+	test.Equal("phi[const(1) const(2)]", table.GetLatestVersion("a").String())
+	test.Equal("const(1)", table.GetLatestVersion("b").String())
 }
 
-func TestScopeAndPhi(t *testing.T) {
+func TestIfScope_IfELse(t *testing.T) {
+	/*
+		a = 1
+		b = 1
+		c = 1
+		if {
+			a = 2
+			b = 2
+			c := 2
+		}else {
+			a = 3
+		}
+
+		a// phi(2, 3)
+		b// phi(2, 1)
+		c// 1
+	*/
+	table := NewRootVersionedTable[value]()
+	table.CreateLexicalVariable("a", NewConsts("1"))
+	table.CreateLexicalVariable("b", NewConsts("1"))
+	table.CreateLexicalVariable("c", NewConsts("1"))
+
+	build := NewIfStmt(table)
+	build.BuildItem(
+		func(sub *ScopedVersionedTable[value]) {},
+		func(sub *ScopedVersionedTable[value]) {
+			sub.CreateLexicalVariable("a", NewConsts("2"))
+			sub.CreateLexicalVariable("b", NewConsts("2"))
+			sub.CreateLexicalLocalVariable("c", NewConsts("2"))
+		},
+	)
+	build.BuildElse(func(sub *ScopedVersionedTable[value]) {
+		sub.CreateLexicalVariable("a", NewConsts("3"))
+	})
+	build.BuildFinish(GeneratePhi)
+
+	test := assert.New(t)
+	test.Equal("phi[const(2) const(3)]", table.GetLatestVersion("a").String())
+	test.Equal("phi[const(1) const(2)]", table.GetLatestVersion("b").String())
+	test.Equal("const(1)", table.GetLatestVersion("c").String())
+}
+
+func TestIfScope_IfELseIf(t *testing.T) {
+	/*
+		a = 1
+		if c {
+			a = 2
+		}else if {
+			a = 3
+		}
+
+		a // phi(1, 2, 3)
+	*/
+
+	global := NewRootVersionedTable[value]()
+	global.CreateLexicalVariable("a", NewConsts("1"))
+
+	build := NewIfStmt(global)
+	build.BuildItem(
+		func(svt *ScopedVersionedTable[value]) {},
+		func(svt *ScopedVersionedTable[value]) {
+			svt.CreateLexicalVariable("a", NewConsts("2"))
+		},
+	)
+	build.BuildItem(
+		func(svt *ScopedVersionedTable[value]) {},
+		func(svt *ScopedVersionedTable[value]) {
+			svt.CreateLexicalVariable("a", NewConsts("3"))
+		},
+	)
+	build.BuildFinish(GeneratePhi)
+
+	globalVariable := global.GetLatestVersion("a")
+	test := assert.New(t)
+	test.Equal("phi[const(1) const(2) const(3)]", globalVariable.String())
+}
+
+func TestIfScope_If_condition_assign(t *testing.T) {
+	/*
+		// this not yaklang syntax, this golang if-condition-assign syntax
+			if a = 1; a == 1 {
+				a = 2
+			}else if a == 2 {
+				a = 3
+			}
+			a // nil undefine
+	*/
+
+	global := NewRootVersionedTable[value]()
+	one := NewConsts("1")
+	two := NewConsts("2")
+	// global.CreateLexicalVariable("a", one)
+
+	var conditionVariable1, conditionVariable2 value
+	build := NewIfStmt(global)
+	build.BuildItem(
+		func(condition *ScopedVersionedTable[value]) {
+			condition.CreateLexicalVariable("a", one)
+			conditionVariable1 = condition.GetLatestVersion("a")
+		},
+		func(svt *ScopedVersionedTable[value]) {
+			svt.CreateLexicalVariable("a", two)
+		},
+	)
+	build.BuildItem(
+		func(condition *ScopedVersionedTable[value]) {
+			conditionVariable2 = condition.GetLatestVersion("a")
+		},
+		func(svt *ScopedVersionedTable[value]) {
+			svt.CreateLexicalVariable("a", NewConsts("3"))
+		},
+	)
+	build.BuildFinish(GeneratePhi)
+
+	globalVariable := global.GetLatestVersion("a")
+
+	test := assert.New(t)
+	test.Nil(globalVariable)
+	test.Equal("const(1)", conditionVariable1.String())
+	test.Equal("const(1)", conditionVariable2.String())
+}
+
+func TestLoopScope(t *testing.T) {
+	/*
+		{
+			i = 1
+			for i < 10 { // phi(1, 2)
+				i = 2 // phi
+			}
+			i // phi
+		}
+	*/
 	test := assert.New(t)
 
-	table := NewRootVersionedTable[any]()
-	table.CreateLexicalVariable("a", nil)
-	table.CreateLexicalVariable("a", nil)
-	table.CreateLexicalVariable("ccc", nil)
-	table.CreateLexicalVariable("a", nil)
-	table.CreateLexicalVariable("a", nil)
-	table.CreateLexicalVariable("a", nil)
-	test.Equal(len(table.GetVersions("a")), 5)
-	test.Equal(len(table.GetVersions("ccc")), 1)
-	test.Equal(len(table.GetVersions("ddd")), 0)
+	global := NewRootVersionedTable[value]()
 
-	sub1 := table.CreateSubScope()
-	test.Equal(len(sub1.GetVersions("a")), 5)
-	v1 := sub1.CreateLexicalVariable("a", nil)
-	_ = v1
-	t.Log(v1.String())
-	test.Equal(len(sub1.GetVersions("a")), 6)
-	test.NotNil(sub1.GetLatestVersionInCurrentLexicalScope("a"))
-	sub2 := sub1.CreateSubScope()
-	test.Nil(sub2.GetLatestVersionInCurrentLexicalScope("a"))
+	global.CreateLexicalVariable("i", NewConsts("1"))
+	var conditionVariableI, bodyVariableI value
+	NewLoopStmt(global, NewPhiValue).
+		SetCondition(func(sub *ScopedVersionedTable[value]) {
+			conditionVariableI = sub.GetLatestVersion("i")
+		}).
+		SetBody(func(sub *ScopedVersionedTable[value]) {
+			bodyVariableI = sub.GetLatestVersion("i")
+			sub.CreateLexicalVariable("i", NewConsts("2"))
+		}).
+		Build(SpinHandler)
+	test.Equal("phi[const(1) const(2)]", conditionVariableI.String())
+	test.Equal("phi[const(1) const(2)]", bodyVariableI.String())
+	test.Equal("phi[const(1) const(2)]", global.GetLatestVersion("i").String())
+}
 
-	sub1_2 := table.CreateSubScope()
-	test.Equal(5, len(sub1_2.GetVersions("a")))
-	sub1_2.CreateLexicalVariable("a", nil)
-	test.Equal(6, len(sub1_2.GetVersions("a")))
+func TestLoopScope_Spin(t *testing.T) {
+	/*
+		i = 0
+		for i < 10 { // t2
+			i = i + 1
+			// t2 = phi(t1, 0)
+			// t1 = t2 + 1
+		}
+		i // t2
+	*/
 
-	sub1.CreateLexicalVariable("ccc", nil)
-	test.Equal(2, len(sub1.GetAllCapturedVariableNames()))
-	test.Equal(1, len(sub1_2.GetAllCapturedVariableNames()))
+	test := assert.New(t)
 
-	test.Equal(sub1_2.GetAllCapturedVariableNames()[0], "a")
-	test.Equal(sub1.GetAllCapturedVariableNames()[0], "a")
-	test.Equal(sub1.GetAllCapturedVariableNames()[1], "ccc")
+	global := NewRootVersionedTable[value]()
+	zero := NewConsts("0")
+	one := NewConsts("1")
+	global.CreateLexicalVariable("i", zero)
 
-	ProducePhi(func(a ...any) any {
-		return nil
-	}, sub1, sub1_2)
-	test.Equal(6, len(table.GetVersions("a")))
-	var a = table.GetLatestVersion("a")
-	t.Log(a.String())
-	test.True(a.IsPhi())
+	var conditionVariablePhi, bodyVariablePhi, bodyVariableBinary value
+	NewLoopStmt(global, NewPhiValue).
+		SetCondition(func(sub *ScopedVersionedTable[value]) {
+			conditionVariablePhi = sub.GetLatestVersion("i")
+		}).
+		SetBody(func(body *ScopedVersionedTable[value]) {
+			bodyVariablePhi = body.GetLatestVersion("i")
+			test.Equal("phi[]", bodyVariablePhi.String())
+
+			bin := NewBinary(bodyVariablePhi, one)
+			test.Equal("binary(phi[], const(1))", bin.String())
+			body.CreateLexicalVariable("i", bin)
+
+			bodyVariableBinary = body.GetLatestVersion("i")
+			test.Equal("binary(phi[], const(1))", bodyVariableBinary.String())
+		}).
+		Build(SpinHandler)
+
+	test.Equal(*NewPhi(zero, bodyVariableBinary), *bodyVariablePhi.(*phi))
+	test.Equal(bodyVariablePhi, conditionVariablePhi)
+	test.Equal(*NewBinary(bodyVariablePhi, one), *bodyVariableBinary.(*binary))
+}
+
+func TestLoopScope_Spin_First(t *testing.T) {
+	/*
+		for i=1; i<10; i++ {
+			i // phi[1, i+1]
+		}
+		i // undefine
+	*/
+	global := NewRootVersionedTable[value]()
+	one := NewConsts("1")
+
+	var thirdVariable, thirdVariableBinary, conditionVariable, bodyVariable value
+
+	NewLoopStmt(global, NewPhiValue).
+		SetFirst(func(sub *ScopedVersionedTable[value]) {
+			sub.CreateLexicalVariable("i", one)
+		}).
+		SetCondition(func(sub *ScopedVersionedTable[value]) {
+			conditionVariable = sub.GetLatestVersion("i")
+		}).
+		SetThird(func(sub *ScopedVersionedTable[value]) {
+			thirdVariable = sub.GetLatestVersion("i")
+			thirdVariableBinary = NewBinary(thirdVariable, one)
+			sub.CreateLexicalVariable("i", thirdVariableBinary)
+		}).
+		SetBody(func(sub *ScopedVersionedTable[value]) {
+			bodyVariable = sub.GetLatestVersion("i")
+		}).
+		Build(SpinHandler)
+
+	globalVariable := global.GetLatestVersion("i")
+	test := assert.New(t)
+
+	test.Equal(*NewPhi(one, thirdVariableBinary), *bodyVariable.(*phi))
+	test.Nil(globalVariable)
+	test.Equal(*NewBinary(thirdVariable, one), *thirdVariableBinary.(*binary))
+	test.Equal(conditionVariable, thirdVariable)
+	test.Equal(bodyVariable, thirdVariable)
+
+}
+
+func TestIfLoopScope_Basic(t *testing.T) {
+	/*
+		i = 0
+		for i < 10 { //  phi[0, phi[i+1, i+2]]
+			if i == 0 {
+				i = i + 1
+			}else {
+				i = i + 2
+			}
+			i // phi[i+1, i+2]
+		}
+		i // phi[0, phi[i+1, i+2]]
+	*/
+
+	test := assert.New(t)
+
+	global := NewRootVersionedTable[value]()
+	zero := NewConsts("0")
+	one := NewConsts("1")
+	two := NewConsts("2")
+	global.CreateLexicalVariable("i", zero)
+
+	var conditionVariable, bodyVariablePhi, trueVariableBinary, falseVariableBinary, globalVariablePhi value
+	NewLoopStmt(global, NewPhiValue).
+		SetCondition(func(sub *ScopedVersionedTable[value]) {
+			conditionVariable = sub.GetLatestVersion("i")
+		}).
+		SetBody(func(body *ScopedVersionedTable[value]) {
+			build := NewIfStmt(body)
+			build.BuildItem(
+				func(*ScopedVersionedTable[value]) {},
+				func(body *ScopedVersionedTable[value]) {
+					trueVariablePhi := body.GetLatestVersion("i")
+					body.CreateLexicalVariable("i", NewBinary(trueVariablePhi, one))
+					trueVariableBinary = body.GetLatestVersion("i")
+				},
+			)
+			build.BuildElse(func(body *ScopedVersionedTable[value]) {
+				falseVariablePhi := body.GetLatestVersion("i")
+				body.CreateLexicalVariable("i", NewBinary(falseVariablePhi, two))
+				falseVariableBinary = body.GetLatestVersion("i")
+			})
+			build.BuildFinish(GeneratePhi)
+			bodyVariablePhi = body.GetLatestVersion("i")
+		}).
+		Build(SpinHandler)
+
+	globalVariablePhi = global.GetLatestVersion("i")
+
+	test.Equal(*NewPhi(trueVariableBinary, falseVariableBinary), *bodyVariablePhi.(*phi))
+	test.Equal(*NewPhi(zero, bodyVariablePhi), *globalVariablePhi.(*phi))
+	test.Equal(conditionVariable, globalVariablePhi)
 }
