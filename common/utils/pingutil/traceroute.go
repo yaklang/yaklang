@@ -5,47 +5,56 @@ import (
 	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/netx"
-	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 	"net"
 	"os"
-	"syscall"
 	"time"
 )
 
 type TracerouteResponse struct {
-	IPs    []string
+	IP     string
 	RTT    int64
 	Reason string
 	Hop    int
 }
+type TracerouteConfig struct {
+	MaxHops      int
+	Protocol     string
+	WriteTimeOut time.Duration
+	ReadTimeOut  time.Duration
+	LocalAddr    string
+	RetryTimes   int
+	UdpPort      int
+	FirstTTL     int
+}
 
-func traceroute(ctx context.Context, host string) (chan []*TracerouteResponse, error) {
-	const maxHops = 30
-	const protocol = "icmp"
-	const writeTimeOut = time.Second * 3
-	const readTimeOut = time.Second * 3
-	const localAddr = "0.0.0.0"
+func TracerouteWithConfig(ctx context.Context, host string, config *TracerouteConfig) (chan []*TracerouteResponse, error) {
+	var maxHops = config.MaxHops
+	var protocol = config.Protocol
+	var writeTimeOut = config.WriteTimeOut
+	var readTimeOut = config.ReadTimeOut
+	var localAddr = config.LocalAddr
+	var retryTimes = config.RetryTimes
+	var udpPort = config.UdpPort
+	var firstTTL = config.FirstTTL
 	ip := netx.LookupFirst(host)
 	dstIp := net.ParseIP(ip)
 	rsp := make(chan []*TracerouteResponse, 0)
-	//randDstPort := rand.Intn(10000) + 40000 // 40000-50000
-	randDstPort := 33434
 	go func() {
 		defer func() {
 			close(rsp)
 		}()
-		for i := 0; i < maxHops; i++ {
+		for i := firstTTL - 1; i < maxHops; i++ {
 			hop := i + 1
 			rsps := []*TracerouteResponse{}
-			for j := 0; j < 3; j++ {
+			for j := 0; j < retryTimes; j++ {
 				select {
 				case <-ctx.Done():
 					return
 				default:
 				}
-				randDstPort++
+				udpPort++
 				res, err := func() (*TracerouteResponse, error) {
 					switch protocol {
 					case "udp":
@@ -54,26 +63,22 @@ func traceroute(ctx context.Context, host string) (chan []*TracerouteResponse, e
 							return nil, err
 						}
 						defer conn.Close()
-						dialer := net.Dialer{
-							Timeout: time.Second,
-							Control: func(network, address string, c syscall.RawConn) error {
-								return c.Control(func(fd uintptr) {
-									syscall.SetsockoptInt(int(fd), syscall.IPPROTO_IP, syscall.IP_TTL, hop)
-								})
-							},
-						}
 
-						udpCon, err := dialer.Dial("udp", fmt.Sprintf("%s:%d", ip, randDstPort))
+						udpCon, err := net.ListenPacket("udp4", fmt.Sprintf("%v:%v", localAddr, 0))
 						if err != nil {
 							return nil, err
 						}
 						defer udpCon.Close()
+						ipConn := ipv4.NewPacketConn(udpCon)
+						ipConn.SetWriteDeadline(time.Now().Add(writeTimeOut))
+						ipConn.SetTTL(hop)
+
 						start := time.Now()
-						err = udpCon.SetReadDeadline(time.Now().Add(writeTimeOut))
+						dst, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%v:%v", ip, udpPort))
 						if err != nil {
 							return nil, err
 						}
-						_, err = udpCon.Write(bytes.Repeat([]byte{0}, 24))
+						_, err = ipConn.WriteTo(bytes.Repeat([]byte{0}, 24), nil, dst)
 						if err != nil {
 							return nil, err
 						}
@@ -85,7 +90,7 @@ func traceroute(ctx context.Context, host string) (chan []*TracerouteResponse, e
 						}
 						rtt := time.Since(start).Milliseconds()
 						return &TracerouteResponse{
-							IPs: []string{addr.String()},
+							IP:  addr.String(),
 							RTT: rtt,
 							Hop: hop,
 						}, nil
@@ -127,7 +132,7 @@ func traceroute(ctx context.Context, host string) (chan []*TracerouteResponse, e
 						}
 						rtt := time.Since(start).Milliseconds()
 						return &TracerouteResponse{
-							IPs: []string{addr.String()},
+							IP:  addr.String(),
 							RTT: rtt,
 							Hop: hop,
 						}, nil
@@ -135,7 +140,7 @@ func traceroute(ctx context.Context, host string) (chan []*TracerouteResponse, e
 				}()
 				if err != nil {
 					rsps = append(rsps, &TracerouteResponse{
-						IPs:    []string{},
+						IP:     "",
 						RTT:    0,
 						Hop:    hop,
 						Reason: err.Error(),
@@ -146,11 +151,23 @@ func traceroute(ctx context.Context, host string) (chan []*TracerouteResponse, e
 			}
 			rsp <- rsps
 			for _, rsp := range rsps {
-				if utils.StringArrayContains(rsp.IPs, ip) {
+				if rsp.IP == ip {
 					return
 				}
 			}
 		}
 	}()
 	return rsp, nil
+}
+func Traceroute(ctx context.Context, host string) (chan []*TracerouteResponse, error) {
+	return TracerouteWithConfig(ctx, host, &TracerouteConfig{
+		MaxHops:      30,
+		Protocol:     "udp",
+		WriteTimeOut: time.Second * 3,
+		ReadTimeOut:  time.Second * 3,
+		LocalAddr:    "0.0.0.0",
+		RetryTimes:   3,
+		UdpPort:      33434,
+		FirstTTL:     1,
+	})
 }
