@@ -136,7 +136,7 @@ Content-Type: application/json
 					if len(body) > 0 {
 						fakeResponse = lowhttp.ReplaceHTTPPacketBody(fakeResponse, body, false)
 					}
-					record, err := yakit.CreateHTTPFlowFromHTTPWithBodySavedFromRaw(config.IsHttps, reqBytes, fakeResponse, "openapi-2.0", urlStr, "127.0.0.1:80")
+					record, err := yakit.CreateHTTPFlowFromHTTPWithBodySavedFromRaw(config.IsHttps, reqBytes, fakeResponse, "openapi", urlStr, "127.0.0.1:80")
 					if err != nil {
 						continue
 					}
