@@ -248,7 +248,7 @@ func (s *Server) Codec(ctx context.Context, req *ypb.CodecRequest) (*ypb.CodecRe
 	case "urlunescape-path":
 		result, err = codec.PathUnescape(text)
 	case "htmlencode":
-		result = codec.EncodeHtmlEntity(text)
+		//result = codec.EncodeHtmlEntity(text)
 	case "htmlencode-hex":
 		result = codec.EncodeHtmlEntityHex(text)
 	case "htmlescape":
