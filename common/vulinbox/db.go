@@ -60,6 +60,42 @@ func newDBM() (*dbm, error) {
 
 	db.AutoMigrate(&VulinUser{})
 	db.AutoMigrate(&Session{})
+	db.Save(&Session{
+		Uuid:     "fixedSessionID",
+		Username: "admin",
+		Role:     "admin",
+	})
+
+	// 初始化数据库
+	db.AutoMigrate(&UserCart{})
+	db.Save(&UserCart{
+		UserID:          1,
+		ProductName:     "商品2",
+		Description:     "这是商品2的描述信息。",
+		ProductPrice:    200,
+		ProductQuantity: 2,
+	})
+	db.Save(&UserCart{
+		UserID:          1,
+		ProductName:     "商品1",
+		Description:     "这是商品1的描述信息。",
+		ProductPrice:    100,
+		ProductQuantity: 3,
+	})
+	db.Save(&UserCart{
+		UserID:          2,
+		ProductName:     "商品5",
+		Description:     "这是商品5的描述信息。",
+		ProductPrice:    500,
+		ProductQuantity: 3,
+	})
+	db.Save(&UserCart{
+		UserID:          3,
+		ProductName:     "商品4",
+		Description:     "这是商品4的描述信息。",
+		ProductPrice:    400,
+		ProductQuantity: 5,
+	})
 	db.Save(&VulinUser{
 		Username: "admin",
 		Password: "admin",

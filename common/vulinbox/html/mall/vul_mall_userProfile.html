@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>首页- 购物商城</title>
+
+    <!-- Google Fonts -->
+    <link href='https://fonts.googleapis.com/css?family=Titillium+Web:400,200,300,700,600' rel='stylesheet'
+        type='text/css'>
+    <link href='https://fonts.googleapis.com/css?family=Roboto+Condensed:400,700,300' rel='stylesheet' type='text/css'>
+    <link href='https://fonts.googleapis.com/css?family=Raleway:400,100' rel='stylesheet' type='text/css'>
+
+    <!-- Bootstrap -->
+    <link rel="stylesheet" href="/static/css/mall/bootstrap.min.css">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="/static/css/mall/font-awesome.min.css">
+
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/mall/owl.carousel.css">
+    <link rel="stylesheet" href="/static/css/mall/style.css">
+    <link rel="stylesheet" href="/static/css/mall/responsive.css">
+</head>
+
+<body>
+
+    <div class="header-area">
+        <div class="container">
+            <!-- <div class="navbar-brand">hi，欢迎{{.Username}}</div> -->
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="user-menu">
+                        <ul>
+                            <li>hi，欢迎<span style="color: red;">{{.Username}}</span></li>
+                            <!-- <li><a href="#" onclick=''><i class="fa fa-user"></i> My Account</a></li> -->
+                            <li><a href="#" onclick='redirectToCart(event)'><i class="fa fa-shopping-cart"></i> My
+                                    Cart</a></li>
+                            <li><a href="#" id="logoutButton"><i class="fa fa-sign-out"></i> Sign out</a></li>
+
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="header-right">
+                        <ul class="list-unstyled list-inline">
+                            <li class="dropdown dropdown-small">
+                                <a data-toggle="dropdown" data-hover="dropdown" class="dropdown-toggle" href="#"><span
+                                        class="key">currency :</span><span class="value">USD </span><b
+                                        class="caret"></b></a>
+                                <ul class="dropdown-menu">
+                                    <li><a href="#">USD</a></li>
+                                    <li><a href="#">INR</a></li>
+                                    <li><a href="#">GBP</a></li>
+                                </ul>
+                            </li>
+
+                            <li class="dropdown dropdown-small">
+                                <a data-toggle="dropdown" data-hover="dropdown" class="dropdown-toggle" href="#"><span
+                                        class="key">language :</span><span class="value">English </span><b
+                                        class="caret"></b></a>
+                                <ul class="dropdown-menu">
+                                    <li><a href="#">English</a></li>
+                                    <li><a href="#">French</a></li>
+                                    <li><a href="#">German</a></li>
+                                </ul>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div> <!-- End header area -->
+
+    <!-- <div class="site-branding-area">
+        <div class="container">
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="logo">
+                        <h1><a href="#"><img src="/static/logo.png" width="176" height="64"></a></h1>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="shopping-item">
+                        <a href="cart.html">Cart -<i
+                                class="fa fa-shopping-cart"></i> <span class="product-count"
+                                id="cartSum">{{.Cartsum}}</span></a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div> End site branding area -->
+
+    <div class="mainmenu-area">
+        <div class="container">
+            <div class="row">
+                <div class="navbar-header">
+                    <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+                        <span class="sr-only">Toggle navigation</span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </button>
+                </div>
+                <div class="navbar-collapse collapse">
+                    <ul class="nav navbar-nav">
+                        <li><a><img src="/static/logo.png" width="176" height="50" style="vertical-align: middle;"></a>
+                        </li>
+                        <li class="active" style="vertical-align: middle;"><a>Home</a></li>
+                        <li style="vertical-align: middle;"><a onclick='redirectToCart(event)'>购物车</a></li>
+                    </ul>
+                    <!-- <ul class="nav navbar-nav navbar-right">
+                        <li style="vertical-align: middle;">
+                            <div style="margin-bottom: 0;">
+                                <a href="cart.html">Cart-<i class="fa fa-shopping-cart"></i> <span class="product-count"
+                                        id="cartSum">{{.Cartsum}}</span></a>
+                            </div>
+                        </li>
+                    </ul> -->
+                    <div class="shopping-item navbar-right">
+                        <a onclick='redirectToCart(event)'>Cart - <span class="cart-amunt"></span> <i class="fa fa-shopping-cart"></i> <span
+                                class="product-count">{{.Cartsum}}</span></a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div> <!-- End mainmenu area -->
+
+    <div class="product-big-title-area" style="background-color: rgb(252, 109, 9);">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="product-bit-title text-center">
+                        <h2>Yak Shop</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <div class="single-product-area">
+        <div class="zigzag-bottom"></div>
+        <div class="container" style="margin-top: -40px;">
+            <div class="row">
+                <div class="col-md-3 col-sm-6">
+                    <div class="single-shop-product">
+                        <div class="product-upper">
+                            <img src="/static/img/product-2.jpg" alt="">
+                        </div>
+                        <h2><a href="">Apple new mac book 2015 March :P</a></h2>
+                        <div class="product-carousel-price">
+                            <ins>$899.00</ins> <del>$999.00</del>
+                        </div>
+
+                        <div class="product-option-shop">
+                            <button onclick="addToCart('商品1',899,'商品1的描述')" class="add_to_cart_button" data-quantity="1"
+                                data-product_sku="" data-product_id="70" rel="nofollow">加入购物车</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="single-shop-product">
+                        <div class="product-upper">
+                            <img src="/static/img/product-1.jpg" alt="">
+                        </div>
+                        <h2><a href="">Apple new mac book 2015 March :P</a></h2>
+                        <div class="product-carousel-price">
+                            <ins>$899.00</ins> <del>$999.00</del>
+                        </div>
+
+                        <div class="product-option-shop">
+                            <button onclick="addToCart('商品2',899,'商品2的描述')" class="add_to_cart_button" data-quantity="1"
+                                data-product_sku="" data-product_id="70" rel="nofollow">加入购物车</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="single-shop-product">
+                        <div class="product-upper">
+                            <img src="/static/img/product-3.jpg" alt="">
+                        </div>
+                        <h2><a href="">Apple new mac book 2015 March :P</a></h2>
+                        <div class="product-carousel-price">
+                            <ins>$899.00</ins> <del>$999.00</del>
+                        </div>
+
+                        <div class="product-option-shop">
+                            <button onclick="addToCart('商品3',899,'商品3的描述')" class="add_to_cart_button" data-quantity="1"
+                                data-product_sku="" data-product_id="70" rel="nofollow">加入购物车</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="single-shop-product">
+                        <div class="product-upper">
+                            <img src="/static/img/product-4.jpg" alt="">
+                        </div>
+                        <h2><a href="">Apple new mac book 2015 March :P</a></h2>
+                        <div class="product-carousel-price">
+                            <ins>$899.00</ins> <del>$999.00</del>
+                        </div>
+
+                        <div class="product-option-shop">
+                            <button onclick="addToCart('商品4',899,'商品4的描述')" class="add_to_cart_button" data-quantity="1"
+                                data-product_sku="" data-product_id="70" rel="nofollow">加入购物车</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="single-shop-product">
+                        <div class="product-upper">
+                            <img src="/static/img/product-2.jpg" alt="">
+                        </div>
+                        <h2><a href="">Apple new mac book 2015 March :P</a></h2>
+                        <div class="product-carousel-price">
+                            <ins>$899.00</ins> <del>$999.00</del>
+                        </div>
+
+                        <div class="product-option-shop">
+                            <button onclick="addToCart('商品5',899,'商品5的描述')" class="add_to_cart_button" data-quantity="1"
+                                data-product_sku="" data-product_id="70" rel="nofollow">加入购物车</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="single-shop-product">
+                        <div class="product-upper">
+                            <img src="/static/img/product-1.jpg" alt="">
+                        </div>
+                        <h2><a href="">Apple new mac book 2015 March :P</a></h2>
+                        <div class="product-carousel-price">
+                            <ins>$899.00</ins> <del>$999.00</del>
+                        </div>
+
+                        <div class="product-option-shop">
+                            <button onclick="addToCart('商品6',899,'商品6的描述')" class="add_to_cart_button" data-quantity="1"
+                                data-product_sku="" data-product_id="70" rel="nofollow">加入购物车</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="single-shop-product">
+                        <div class="product-upper">
+                            <img src="/static/img/product-3.jpg" alt="">
+                        </div>
+                        <h2><a href="">Apple new mac book 2015 March :P</a></h2>
+                        <div class="product-carousel-price">
+                            <ins>$899.00</ins> <del>$999.00</del>
+                        </div>
+
+                        <div class="product-option-shop">
+                            <button onclick="addToCart('商品7',899,'商品7的描述')" class="add_to_cart_button" data-quantity="1"
+                                data-product_sku="" data-product_id="70" rel="nofollow">加入购物车</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="single-shop-product">
+                        <div class="product-upper">
+                            <img src="/static/img/product-4.jpg" alt="">
+                        </div>
+                        <h2><a href="">Apple new mac book 2015 March :P</a></h2>
+                        <div class="product-carousel-price">
+                            <ins>$899.00</ins> <del>$999.00</del>
+                        </div>
+
+                        <div class="product-option-shop">
+                            <button onclick="addToCart('商品8',899,'商品8的描述')" class="add_to_cart_button" data-quantity="1"
+                                data-product_sku="" data-product_id="70" rel="nofollow">加入购物车</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="single-shop-product">
+                        <div class="product-upper">
+                            <img src="/static/img/product-2.jpg" alt="">
+                        </div>
+                        <h2><a href="">Apple new mac book 2015 March :P</a></h2>
+                        <div class="product-carousel-price">
+                            <ins>$899.00</ins> <del>$999.00</del>
+                        </div>
+
+                        <div class="product-option-shop">
+                            <button onclick="addToCart('商品9',899,'商品9的描述')" class="add_to_cart_button" data-quantity="1"
+                                data-product_sku="" data-product_id="70" rel="nofollow">加入购物车</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="single-shop-product">
+                        <div class="product-upper">
+                            <img src="/static/img/product-1.jpg" alt="">
+                        </div>
+                        <h2><a href="">Apple new mac book 2015 March :P</a></h2>
+                        <div class="product-carousel-price">
+                            <ins>$899.00</ins> <del>$999.00</del>
+                        </div>
+
+                        <div class="product-option-shop">
+                            <button onclick="addToCart('商品10',899,'商品10的描述')" class="add_to_cart_button"
+                                data-quantity="1" data-product_sku="" data-product_id="70" rel="nofollow">加入购物车</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="single-shop-product">
+                        <div class="product-upper">
+                            <img src="/static/img/product-3.jpg" alt="">
+                        </div>
+                        <h2><a href="">Apple new mac book 2015 March :P</a></h2>
+                        <div class="product-carousel-price">
+                            <ins>$899.00</ins> <del>$999.00</del>
+                        </div>
+
+                        <div class="product-option-shop">
+                            <button onclick="addToCart('商品11',899,'商品11的描述')" class="add_to_cart_button"
+                                data-quantity="1" data-product_sku="" data-product_id="70" rel="nofollow">加入购物车</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="single-shop-product">
+                        <div class="product-upper">
+                            <img src="/static/img/product-4.jpg" alt="">
+                        </div>
+                        <h2><a href="">Apple new mac book 2015 March :P</a></h2>
+                        <div class="product-carousel-price">
+                            <ins>$899.00</ins> <del>$999.00</del>
+                        </div>
+
+                        <div class="product-option-shop">
+                            <button onclick="addToCart('商品12',899,'商品12的描述')" class="add_to_cart_button"
+                                data-quantity="1" data-product_sku="" data-product_id="70" rel="nofollow">加入购物车</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <div class="footer-top-area">
+        <div class="zigzag-bottom"></div>
+        <div class="container">
+            <div class="row">
+                <div class="col-md-3 col-sm-6">
+                    <div class="footer-about-us">
+                        <h2>u<span>Stora</span></h2>
+                        <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit. Perferendis sunt id doloribus vero
+                            quam laborum quas alias dolores blanditiis iusto consequatur, modi aliquid eveniet eligendi
+                            iure eaque ipsam iste, pariatur omnis sint! Suscipit, debitis, quisquam. Laborum commodi
+                            veritatis magni at?</p>
+                        <div class="footer-social">
+                            <a href="#" target="_blank"><i class="fa fa-facebook"></i></a>
+                            <a href="#" target="_blank"><i class="fa fa-twitter"></i></a>
+                            <a href="#" target="_blank"><i class="fa fa-youtube"></i></a>
+                            <a href="#" target="_blank"><i class="fa fa-linkedin"></i></a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-3 col-sm-6">
+                    <div class="footer-menu">
+                        <h2 class="footer-wid-title">User Navigation </h2>
+                        <ul>
+                            <li><a href="">My account</a></li>
+                            <li><a href="">Order history</a></li>
+                            <li><a href="">Wishlist</a></li>
+                            <li><a href="">Vendor contact</a></li>
+                            <li><a href="">Front page</a></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="col-md-3 col-sm-6">
+                    <div class="footer-menu">
+                        <h2 class="footer-wid-title">Categories</h2>
+                        <ul>
+                            <li><a href="">Mobile Phone</a></li>
+                            <li><a href="">Home accesseries</a></li>
+                            <li><a href="">LED TV</a></li>
+                            <li><a href="">Computer</a></li>
+                            <li><a href="">Gadets</a></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="col-md-3 col-sm-6">
+                    <div class="footer-newsletter">
+                        <h2 class="footer-wid-title">Newsletter</h2>
+                        <p>Sign up to our newsletter and get exclusive deals you wont find anywhere else straight to
+                            your inbox!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="footer-bottom-area">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="copyright">
+                        <p>Copyright &copy; 2024.Company name All rights reserved.</p>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="footer-card-icon">
+                        <i class="fa fa-cc-discover"></i>
+                        <i class="fa fa-cc-mastercard"></i>
+                        <i class="fa fa-cc-paypal"></i>
+                        <i class="fa fa-cc-visa"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Latest jQuery form server -->
+    <script src="https://code.jquery.com/jquery.min.js"></script>
+
+    <!-- Bootstrap JS form CDN -->
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+
+    <!-- jQuery sticky menu -->
+    <script src="/static/js/mall/owl.carousel.min.js"></script>
+    <script src="/static/js/mall/jquery.sticky.js"></script>
+
+    <!-- jQuery easing -->
+    <script src="/static/js/mall/jquery.easing.1.3.min.js"></script>
+
+    <!-- Main Script -->
+    <script src="/static/js/mall/main.js"></script>
+    <script>
+        //显示通知消息
+        function showNotification(message) {
+            alert(message);
+        }
+
+        //获取购物车商品数量
+        function getCartSum(userId) {
+            // var userId = parseInt(document.getElementById('userId').textContent, 10);
+            return new Promise((resolve, reject) => {
+                var xhr = new XMLHttpRequest();
+                xhr.open("POST", "/mall/cart/count", true);
+                xhr.setRequestHeader("Content-Type", "application/json");
+                xhr.onreadystatechange = function () {
+                    if (xhr.readyState === 4 && xhr.status === 200) {
+                        resolve(xhr.responseText);
+                    }
+                }
+                xhr.send(JSON.stringify({ userID: userId }));
+            });
+        }
+
+        //检查购物车是否存在
+        function checkCart(userId, productName, callback) {
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "/mall/cart/check", true);
+            xhr.setRequestHeader("Content-Type", "application/json");
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState === 4 && xhr.status === 200) {
+                    var response = JSON.parse(xhr.responseText);
+                    callback(response);
+                }
+            }
+            xhr.send(JSON.stringify({ userID: userId, productName: productName }));
+        }
+        //增加单个商品数量
+        function increaseQuantity(productName) {
+            //获取当前url中id
+            var url = window.location.href;
+            var userId = url.split("?")[1].split("=")[1];
+            //检查是否存在'#'字符
+            if (userId.includes('#')) {
+                userId = userId.split('#')[0];
+            }
+            // 将 userId 转换为整数
+            // userId = parseInt(userId, 10);
+            var xhr = new XMLHttpRequest();
+            // 创建一个对象并转换为JSON字符串
+            var data = JSON.stringify({
+                userID: userId,
+                productName: productName,
+            });
+            // 设置POST请求的目标URL
+            xhr.open('POST', '/mall/cart/addOne', true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        //添加商品到购物车的请求完成后再发送获取购物车数量的请求
+                        userId = parseInt(userId, 10);
+                        getCartSum(userId).then(sum => {
+                            // 更新页面上的购物车商品数量
+                            document.getElementById('cartSum').textContent = sum;
+                        });
+                        showNotification("加入购物车成功");
+                    } else {
+                        window.location.reload();
+                    }
+                }
+            };
+            // 发送请求
+            xhr.send(data);
+        }
+
+
+        //加入购物车事件
+        function addToCart(productName, price, description) {
+
+            //获取当前url中id
+            var url = window.location.href;
+            var userId = parseInt(url.split("?")[1].split("=")[1]);
+            //检查购物车是否存在
+
+            checkCart(userId, productName, function (response) {
+                if (response) {
+                    // 购物车已经存在该商品
+                    //单次加入购物车代码
+                    // alert("购物车已经存在该商品");//测试代码
+                    increaseQuantity(productName);
+                    // return;
+                } else {
+                    // 购物车中还没有这个商品
+                    // var userId = parseInt(document.getElementById('userId').textContent, 10);
+
+                    // 创建一个对象并转换为JSON字符串
+                    var data = JSON.stringify({
+                        userId: userId,
+                        productName: productName,
+                        description: description,
+                        ProductPrice: price,
+
+                    });
+                    // 发送请求到后端，加入购物车
+                    var xhr = new XMLHttpRequest();
+                    // 设置POST请求的目标URL
+                    xhr.open('POST', '/mall/cart/add', true);
+                    xhr.setRequestHeader('Content-Type', 'application/json');
+                    xhr.onreadystatechange = function () {
+                        if (xhr.readyState === 4) {
+                            if (xhr.status === 200) {
+                                // 加入购物车成功，显示成功消息
+                                showNotification("加入购物车成功");
+                                // 异步获取购物车商品数量
+                                //添加商品到购物车的请求完成后再发送获取购物车数量的请求
+                                getCartSum(userId).then(sum => {
+                                    // 更新页面上的购物车商品数量
+                                    document.getElementById('cartSum').textContent = sum;
+                                });
+                            } else {
+                                // 加入购物车失败，显示错误消息
+                                showNotification("加入购物车失败: " + xhr.responseText);
+                            }
+                        }
+                    };
+                    // 发送请求
+                    xhr.send(data);
+                }
+            });
+        }
+
+        //跳转到购物车页面
+        function redirectToCart(event) {
+            event.preventDefault(); // 阻止默认表单提交行为
+            //获取当前url中id
+            var url = window.location.href;
+            var userId = url.split("?")[1].split("=")[1];
+            // var userId = parseInt(document.getElementById('userId').textContent, 10);
+            console.log("userId:", userId);
+            window.location.href = "/mall/user/cart?id=" + userId;
+        }
+
+        //登出事件
+        document.getElementById("logoutButton").addEventListener("click", function (e) {
+            e.preventDefault();
+            // 发送登出请求
+            // 清除浏览器中的Cookie
+            document.cookie = "_cookie=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", "/mall/user/logout", true);
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        // 登出成功，重定向到登录页面
+                        window.location.href = "/mall/shop/index";
+                    } else {
+                        // 登出失败，显示错误消息
+                        showNotification("Logout failed: " + xhr.responseText);
+                    }
+                }
+            };
+            xhr.send();
+        })
+    </script>
+</body>
+
+</html>
