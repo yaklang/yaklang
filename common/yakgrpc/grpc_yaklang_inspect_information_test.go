@@ -11,7 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	pta "github.com/yaklang/yaklang/common/yak/plugin_type_analyzer"
+	"github.com/yaklang/yaklang/common/yak/plugin_type_analyzer/information.go"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -607,7 +607,7 @@ func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_Risk(t *testing.T) {
 			Solution:          "solution",
 			Severity:          "high",
 		})
-		got := riskInfo2grpc([]*pta.RiskInfo{
+		got := riskInfo2grpc([]*information.RiskInfo{
 			{
 				CVE: cve,
 			},

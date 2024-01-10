@@ -1,16 +1,16 @@
-package rules
+package ssa_option
 
 import (
 	"reflect"
 
-	"github.com/yaklang/yaklang/common/yak/plugin_type_analyzer"
+	"github.com/yaklang/yaklang/common/yak/plugin_type_analyzer/plugin_type"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
 
 func init() {
-	plugin_type_analyzer.RegisterSSAOptCollector("yak", YakGetTypeSSAOpt)
+	plugin_type.RegisterSSAOptCollector(plugin_type.PluginTypeYak, YakGetTypeSSAOpt)
 }
 
 func YakGetTypeSSAOpt() []ssaapi.Option {

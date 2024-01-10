@@ -15,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	pta "github.com/yaklang/yaklang/common/yak/plugin_type_analyzer"
+	"github.com/yaklang/yaklang/common/yak/plugin_type_analyzer/information.go"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -30,7 +31,7 @@ type PluginParamSelectData struct {
 	Value string `json:"value"`
 }
 
-func cliParam2grpc(params []*pta.CliParameter) []*ypb.YakScriptParam {
+func cliParam2grpc(params []*information.CliParameter) []*ypb.YakScriptParam {
 	ret := make([]*ypb.YakScriptParam, 0, len(params))
 
 	for _, param := range params {
@@ -68,7 +69,7 @@ func cliParam2grpc(params []*pta.CliParameter) []*ypb.YakScriptParam {
 	return ret
 }
 
-func riskInfo2grpc(info []*pta.RiskInfo, db *gorm.DB) []*ypb.YakRiskInfo {
+func riskInfo2grpc(info []*information.RiskInfo, db *gorm.DB) []*ypb.YakRiskInfo {
 	ret := make([]*ypb.YakRiskInfo, 0, len(info))
 	for _, i := range info {
 		description := i.Description
@@ -108,8 +109,8 @@ func (s *Server) YaklangInspectInformation(ctx context.Context, req *ypb.Yaklang
 	if err != nil {
 		return nil, errors.New("ssa parse error")
 	}
-	ret.CliParameter = cliParam2grpc(pta.ParseCliParameter(prog))
-	ret.RiskInfo = riskInfo2grpc(pta.ParseRiskInfo(prog), consts.GetGormCVEDatabase())
+	ret.CliParameter = cliParam2grpc(information.ParseCliParameter(prog))
+	ret.RiskInfo = riskInfo2grpc(information.ParseRiskInfo(prog), consts.GetGormCVEDatabase())
 	return ret, nil
 }
 
@@ -268,7 +269,7 @@ func getNeedReturn(script *yakit.YakScript) ([]*ypb.YakScriptParam, error) {
 	if err != nil {
 		return nil, errors.New("ssa parse error")
 	}
-	codeParameter := cliParam2grpc(pta.ParseCliParameter(prog))
+	codeParameter := cliParam2grpc(information.ParseCliParameter(prog))
 	databaseParameter, err := getParameterFromParamJson(script.Params)
 	if err != nil {
 		return nil, utils.Wrapf(err, "get cli code from param json error")
