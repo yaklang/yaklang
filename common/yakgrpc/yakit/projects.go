@@ -23,7 +23,8 @@ func InitializingProjectDatabase() error {
 	db := consts.GetGormProfileDatabase()
 	db.Model(&Project{}).RemoveIndex("uix_projects_project_name")
 	proj, _ := GetDefaultProject(db)
-	if proj == nil {
+
+	if proj == nil || proj.DatabasePath != consts.GetDefaultYakitProjectDatabase(consts.GetDefaultYakitBaseDir()) {
 		projectData := &Project{
 			ProjectName:   INIT_DATABASE_RECORD_NAME,
 			Description:   "默认数据库(~/yakit-projects/***.db): Default Database!",
