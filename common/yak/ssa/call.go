@@ -49,6 +49,9 @@ func (c *Call) HandleFreeValue(fvs []string, sideEffect []string) {
 			}
 			if variable := freeValue.GetVariable(name); variable != nil {
 				variable.NewError(Error, SSATAG, BindingNotFound(name, c.GetRange()))
+				if len(fun.GetAllVariables()) != 0 {
+					c.NewError(Error, SSATAG, BindingNotFoundInCall(name))
+				}
 			}
 		}
 	}
