@@ -1,7 +1,6 @@
 package ssa
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -37,8 +36,8 @@ func (i *IdentifierLV) Assign(v Value, f *FunctionBuilder) {
 	if i.isSideEffect {
 		if beforeSSAValue != nil {
 			beforeSSAValue.AddMask(v)
-		} else {
-			log.Warn("freeValueParameter is nil, conflict, side effect cannot find the relative freevalue! maybe a **BUG**")
+			// } else {
+			// 	log.Warn("freeValueParameter is nil, conflict, side effect cannot find the relative freevalue! maybe a **BUG**")
 		}
 		f.AddSideEffect(i.name, v)
 	}
