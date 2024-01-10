@@ -108,6 +108,7 @@ func TestUndefine(t *testing.T) {
 			`,
 			errs: []string{
 				ssa.BindingNotFound("xxx", ssa.NewRange(ssa.NewPosition(0, 5, 3), ssa.NewPosition(0, 5, 6), "")),
+				ssa.BindingNotFoundInCall("xxx"),
 			},
 			ExternValue: map[string]any{},
 			ExternLib:   map[string]map[string]any{},
@@ -755,6 +756,27 @@ func TestClosureBinding(t *testing.T) {
 			`,
 			errs: []string{
 				ssa.BindingNotFound("a2", ssa.NewRange(ssa.NewPosition(0, 18, 3), ssa.NewPosition(0, 18, 7), "")),
+				ssa.BindingNotFoundInCall("a2"),
+			},
+		})
+	})
+
+	t.Run("use free value with instance function", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			fn {
+				b = a1
+			}
+
+			f = () => {
+				b = a2
+			}
+			f()
+			`,
+			errs: []string{
+				ssa.BindingNotFound("a1", ssa.NewRange(ssa.NewPosition(0, 2, 3), ssa.NewPosition(0, 4, 4), "")),
+				ssa.BindingNotFound("a2", ssa.NewRange(ssa.NewPosition(0, 9, 3), ssa.NewPosition(0, 9, 6), "")),
+				ssa.BindingNotFoundInCall("a2"),
 			},
 		})
 	})
