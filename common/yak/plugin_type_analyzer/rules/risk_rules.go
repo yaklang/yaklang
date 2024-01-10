@@ -1,12 +1,12 @@
 package rules
 
 import (
-	"github.com/yaklang/yaklang/common/yak/plugin_type_analyzer"
+	"github.com/yaklang/yaklang/common/yak/plugin_type_analyzer/plugin_type"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
 func init() {
-	plugin_type_analyzer.RegisterCheckRuler("yak", RuleRisk)
+	plugin_type.RegisterCheckRuler(plugin_type.PluginTypeYak, RuleRisk)
 }
 
 // 检查 cli.risk 是否符合规范

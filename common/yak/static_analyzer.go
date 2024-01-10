@@ -7,7 +7,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakast"
 	pta "github.com/yaklang/yaklang/common/yak/plugin_type_analyzer"
-	_ "github.com/yaklang/yaklang/common/yak/plugin_type_analyzer/rules"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
