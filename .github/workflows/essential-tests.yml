@@ -83,8 +83,8 @@ jobs:
             run: |
               # SSA
               go test -timeout 20s ./common/yak/yak2ssa ./common/yak/ssaapi 
-              # SSA Rule
-              go test -timeout 20s -run TestSSARuleMustPass* ./common/yak
+              # SSA plugin rule/option
+              go test -timeout 20s ./common/yak/plugin_type_analyzer/test 
               # StaticAnalyze
               go test -timeout 20s -run TestAnalyzeMustPASS* ./common/coreplugin
 
