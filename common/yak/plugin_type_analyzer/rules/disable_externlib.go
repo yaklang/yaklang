@@ -3,18 +3,16 @@ package rules
 import (
 	"fmt"
 
-	"github.com/yaklang/yaklang/common/yak/plugin_type_analyzer"
+	"github.com/yaklang/yaklang/common/yak/plugin_type_analyzer/plugin_type"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
 func init() {
-	// disable
-	// plugin type : "yak" "mitm" "port-scan" "codec"
-	plugin_type_analyzer.RegisterCheckRuler("mitm", DisableCli)
-	plugin_type_analyzer.RegisterCheckRuler("port-scan", DisableCli)
-	plugin_type_analyzer.RegisterCheckRuler("codec", DisableCli)
+	plugin_type.RegisterCheckRuler(plugin_type.PluginTypeMitm, DisableCli)
+	plugin_type.RegisterCheckRuler(plugin_type.PluginTypePortScan, DisableCli)
+	plugin_type.RegisterCheckRuler(plugin_type.PluginTypeCodec, DisableCli)
 
-	plugin_type_analyzer.RegisterCheckRuler("mitm", DisableMitmExternLib)
+	plugin_type.RegisterCheckRuler(plugin_type.PluginTypeMitm, DisableMitmExternLib)
 }
 
 func DisableCli(prog *ssaapi.Program) {

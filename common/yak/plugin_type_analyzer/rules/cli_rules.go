@@ -10,15 +10,15 @@ import (
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/plugin_type_analyzer"
+	"github.com/yaklang/yaklang/common/yak/plugin_type_analyzer/plugin_type"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
 func init() {
 	// cli
-	plugin_type_analyzer.RegisterCheckRuler("yak", RuleCliDefault)
-	plugin_type_analyzer.RegisterCheckRuler("yak", RuleCliParamName)
-	plugin_type_analyzer.RegisterCheckRuler("yak", RuleCliCheck)
+	plugin_type.RegisterCheckRuler(plugin_type.PluginTypeYak, RuleCliDefault)
+	plugin_type.RegisterCheckRuler(plugin_type.PluginTypeYak, RuleCliParamName)
+	plugin_type.RegisterCheckRuler(plugin_type.PluginTypeYak, RuleCliCheck)
 }
 
 // 检查 cli.setDefault 设置的默认值是否符合规范
