@@ -7,21 +7,21 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-type Token interface {
-	GetStart() int
-	GetStop() int
-	GetLine() int
-	GetColumn() int
+// type Token interface {
+// 	GetStart() int
+// 	GetStop() int
+// 	GetLine() int
+// 	GetColumn() int
 
-	GetText() string
-}
+//		GetText() string
+//	}
 type CanStartStopToken interface {
 	GetStop() antlr.Token
 	GetStart() antlr.Token
 	GetText() string
 }
 
-func GetEndPosition(t Token) (int, int) {
+func GetEndPosition(t antlr.Token) (int, int) {
 	var line, column int
 	str := strings.Split(t.GetText(), "\n")
 	if len(str) > 1 {
@@ -48,3 +48,29 @@ func GetRange(token CanStartStopToken) *ssa.Range {
 
 	return ssa.NewRange(start, end, token.GetText())
 }
+
+type Token struct {
+	start antlr.Token
+	end   antlr.Token
+	text  string
+}
+
+func NewToken(node antlr.TerminalNode) *Token {
+	return &Token{
+		start: node.GetSymbol(),
+		end:   node.GetSymbol(),
+		text:  node.GetText(),
+	}
+}
+
+func (t *Token) GetStart() antlr.Token {
+	return t.start
+}
+func (t *Token) GetStop() antlr.Token {
+	return t.end
+}
+func (t *Token) GetText() string {
+	return t.text
+}
+
+var _ CanStartStopToken = (*Token)(nil)

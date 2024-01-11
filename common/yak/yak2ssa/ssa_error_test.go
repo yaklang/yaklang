@@ -794,6 +794,21 @@ func TestClosureBinding(t *testing.T) {
 			},
 		})
 	})
+	t.Run("use parameter value 2", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			a = f =>{
+				fun = () =>{
+					println(f)
+				}
+				fun() 
+			}
+			`,
+			ExternValue: map[string]any{
+				"println": func(a any) {},
+			},
+		})
+	})
 
 	// TODO: more test in `ssa_var_test.go`
 	t.Run("modify free value", func(t *testing.T) {

@@ -768,8 +768,10 @@ func (b *astbuilder) buildDeclareVariableOnly(stmt *yak.DeclareVariableOnlyConte
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 	for _, idstmt := range stmt.AllIdentifier() {
+		recoverRange := b.SetRangeFromTerminalNode(idstmt)
 		id := idstmt.GetText()
 		b.WriteVariable(id, b.EmitConstInstAny())
+		recoverRange()
 	}
 }
 
@@ -1294,7 +1296,10 @@ func (b *astbuilder) buildAnonymousFunctionDecl(stmt *yak.AnonymousFunctionDeclC
 				}
 			} else {
 				// only this param
-				b.NewParam(stmt.Identifier().GetText())
+				id := stmt.Identifier()
+				recoverRange := b.SetRangeFromTerminalNode(id)
+				b.NewParam(id.GetText())
+				recoverRange()
 			}
 			if block, ok := stmt.Block().(*yak.BlockContext); ok {
 				// build block
@@ -1334,7 +1339,9 @@ func (b *astbuilder) buildFunctionParamDecl(stmt *yak.FunctionParamDeclContext) 
 	ids := stmt.AllIdentifier()
 
 	for _, id := range ids {
+		recoverRange := b.SetRangeFromTerminalNode(id)
 		b.NewParam(id.GetText())
+		recoverRange()
 	}
 	if ellipsis != nil {
 		// handler "..." to array
