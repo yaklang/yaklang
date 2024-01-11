@@ -3,6 +3,7 @@ package yakit
 import (
 	"context"
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
@@ -121,6 +122,16 @@ func GetWebsocketFlow(db *gorm.DB, id int64) (*WebsocketFlow, error) {
 	}
 
 	return &req, nil
+}
+
+func SearchWebsocketFlow(keyword string) int {
+	db := consts.GetGormProjectDatabase()
+	var count int
+	db.Model(&WebsocketFlow{}).Where(
+		"quoted_data like ?",
+		"%"+keyword+"%",
+	).Count(&count)
+	return count
 }
 
 func QueryWebsocketFlowByWebsocketHash(db *gorm.DB, hash string, page int, limit int) (*bizhelper.Paginator, []*WebsocketFlow, error) {
