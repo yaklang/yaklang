@@ -64,7 +64,7 @@ import (
 // 	//Calls error if the value of its argument v is false (i.e., nil or false);
 // 	//otherwise, returns all its arguments. In case of error, message is the
 // 	//error object; when absent, it defaults to "assertion failed!"
-	
+
 // 	//todo
 // 	//https://www.lua.org/pil/8.3.html
 // 	Import("assert", func(condition ...interface{}) {
@@ -262,7 +262,6 @@ import (
 // 	})
 
 // }
-
 
 func TestMultilineComment(t *testing.T) {
 	code := `--[[

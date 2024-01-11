@@ -13,10 +13,10 @@ func (s *Server) SaveFuzzerLabel(ctx context.Context, req *ypb.SaveFuzzerLabelRe
 		return nil, utils.Error("empty params")
 	}
 	var errLabel []string
-	for _, v := range req.Data{
+	for _, v := range req.Data {
 		item := &yakit.WebFuzzerLabel{
-			Label:       v.Label,
-			Description: v.Description,
+			Label:              v.Label,
+			Description:        v.Description,
 			DefaultDescription: v.DefaultDescription,
 		}
 		item.Hash = item.CalcHash()
@@ -35,25 +35,25 @@ func (s *Server) SaveFuzzerLabel(ctx context.Context, req *ypb.SaveFuzzerLabelRe
 	return &ypb.Empty{}, nil
 }
 
-func (s *Server) QueryFuzzerLabel(ctx context.Context, req *ypb.Empty) (*ypb.QueryFuzzerLabelResponse, error)  {
+func (s *Server) QueryFuzzerLabel(ctx context.Context, req *ypb.Empty) (*ypb.QueryFuzzerLabelResponse, error) {
 	var res []*ypb.FuzzerLabel
 	fuzzerLabel, err := yakit.QueryWebFuzzerLabel(s.GetProfileDatabase())
 	if err != nil {
 		return nil, utils.Errorf("empty result")
 	}
-	for _, v := range fuzzerLabel{
+	for _, v := range fuzzerLabel {
 		res = append(res, &ypb.FuzzerLabel{
-			Id:          int64(v.ID),
-			Label:       v.Label,
-			Description: v.Description,
+			Id:                 int64(v.ID),
+			Label:              v.Label,
+			Description:        v.Description,
 			DefaultDescription: v.DefaultDescription,
-			Hash: v.Hash,
+			Hash:               v.Hash,
 		})
 	}
 	return &ypb.QueryFuzzerLabelResponse{Data: res}, nil
 }
 
-func (s *Server) DeleteFuzzerLabel(ctx context.Context, req *ypb.DeleteFuzzerLabelRequest) (*ypb.Empty, error)  {
+func (s *Server) DeleteFuzzerLabel(ctx context.Context, req *ypb.DeleteFuzzerLabelRequest) (*ypb.Empty, error) {
 	var hash string
 	if req != nil {
 		hash = req.Hash

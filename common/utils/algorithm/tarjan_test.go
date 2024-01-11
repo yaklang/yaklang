@@ -67,8 +67,8 @@ func TestTarjan(t *testing.T) {
 
 	var r SccResult = result
 
-    scc1 := r.GetScc(thrNode)
-	if (scc1.InNodes(rootNode) || scc1.InNodes(seNode)) {
+	scc1 := r.GetScc(thrNode)
+	if scc1.InNodes(rootNode) || scc1.InNodes(seNode) {
 		t.Error("scc count err")
 	}
 
@@ -77,12 +77,8 @@ func TestTarjan(t *testing.T) {
 	}
 
 	scc2 := r.GetScc(rootNode)
-    if !(scc2.InNodes(rootNode) && scc2.InNodes(seNode)) {
+	if !(scc2.InNodes(rootNode) && scc2.InNodes(seNode)) {
 		t.Error("scc count err")
 	}
-
-
-
-	
 
 }

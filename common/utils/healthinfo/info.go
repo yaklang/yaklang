@@ -247,7 +247,8 @@ func healthInfoFromGopsutil() (*health.HealthInfo, error) {
 }
 
 // NewHealthInfo 获取系统健康信息
-//    2023.5.10: TODO: disk rate is waiting for fixing;
+//
+//	2023.5.10: TODO: disk rate is waiting for fixing;
 func NewHealthInfo(ctx context.Context) (*health.HealthInfo, error) {
 	// 硬盘读写暂时有点问题
 	info, err := healthInfoFromGopsutil()
