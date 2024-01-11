@@ -3,6 +3,7 @@ package test
 import (
 	"testing"
 
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 )
 
@@ -24,7 +25,7 @@ func TestMitmPluginOptionValue(t *testing.T) {
 		println(MITM_PLUGIN)
 		`,
 			[]string{
-				ssa4analyze.ValueUndefined("MITM_PLUGIN"),
+				ssa.ValueUndefined("MITM_PLUGIN"),
 			},
 			"yak",
 		)
