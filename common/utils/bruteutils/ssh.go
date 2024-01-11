@@ -41,26 +41,7 @@ var sshAuth = &DefaultServiceAuthInfo{
 	},
 	DefaultPasswords: []string{
 		"root", "admin123", "root@123", "123456", "admin", "admin@123", "Admin@huawei.com",
-		"Changeme_@123", "huawei@123", "h3c@123", "admin@123456", "ruijie", "ruijie@123",
-	},
-	UnAuthVerify: func(i *BruteItem) *BruteItemResult {
-		i.Target = appendDefaultPort(i.Target, 22)
-		result := i.Result()
-
-		config := &ssh.ClientConfig{
-			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-			Timeout:         10 * time.Second,
-		}
-		client, err := ssh.Dial("tcp", i.Target, config)
-		if err != nil {
-			log.Errorf("ssh: %v conn failed: %s", i.Target, err)
-			handleSSHError(result, i.Target, err)
-			return result
-		}
-		defer client.Close()
-
-		result.Ok = true
-		return result
+		"Changeme_@123", "huawei@123", "h3c@123", "admin@123456", "ruijie", "ruijie@123", "",
 	},
 	BrutePass: func(i *BruteItem) *BruteItemResult {
 		log.Infof("ssh client start to handle: %s", i.String())
