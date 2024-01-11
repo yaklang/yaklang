@@ -18,9 +18,9 @@ type JavaScriptLexerBase struct {
 	templateDepth    int
 
 	waitForCloseBrace antlr.Token
-	BeforeWords     [2]antlr.Token
-	keyWordsMap     map[int]bool
-	handlePlusMinus antlr.Token
+	BeforeWords       [2]antlr.Token
+	keyWordsMap       map[int]bool
+	handlePlusMinus   antlr.Token
 }
 
 func (l *JavaScriptLexerBase) IsStartOfFile() bool {
@@ -57,14 +57,12 @@ func (l *JavaScriptLexerBase) NextToken() antlr.Token {
 		return token
 	}
 
-
 	if l.handlePlusMinus != nil {
 		token := l.handlePlusMinus
 		l.handlePlusMinus = nil
 		return token
 	}
 
-	
 	if l.keyWordsMap == nil {
 		m := make(map[int]bool, 6)
 		m[JavaScriptLexerReturn] = true

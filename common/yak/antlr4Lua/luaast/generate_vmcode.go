@@ -264,8 +264,8 @@ func (l *LuaTranslator) pushValue(i *yakvm.Value) {
 func (l *LuaTranslator) pushValueWithCopy(i *yakvm.Value) {
 	l._pushOpcodeWithCurrentCodeContext(&yakvm.Code{
 		Opcode: yakvm.OpPush,
-		Unary: 1,
-		Op1: i,
+		Unary:  1,
+		Op1:    i,
 	})
 }
 

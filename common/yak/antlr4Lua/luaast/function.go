@@ -68,7 +68,7 @@ func (l *LuaTranslator) VisitFuncNameAndBody(name lua.IFuncnameContext, body lua
 	}
 
 	function := yakvm.NewFunction(l.codes, l.currentSymtbl)
-	
+
 	// 设置函数名，创建新符号，并且把新符号告诉函数，以便后续处理
 	function.SetName(funcName)
 	function.SetSymbol(funcSymbolId)
@@ -87,7 +87,7 @@ func (l *LuaTranslator) VisitFuncNameAndBody(name lua.IFuncnameContext, body lua
 		TypeVerbose: "anonymous-function",
 		Value:       function,
 	}
-	
+
 	if funcName != "" {
 		// 如果有函数名的话，进行快速赋值
 		funcVal.TypeVerbose = "named-function"
@@ -201,7 +201,7 @@ func (l *LuaTranslator) VisitLocalFuncNameAndBody(name string, body lua.IFuncbod
 		TypeVerbose: "anonymous-function",
 		Value:       function,
 	}
-	
+
 	if funcName != "" {
 		// 如果有函数名的话，进行快速赋值
 		funcVal.TypeVerbose = "named-function"

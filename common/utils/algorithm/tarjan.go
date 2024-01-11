@@ -9,7 +9,6 @@ type Node interface {
 	Handler(*Node) any
 }
 
-
 type TrSCC struct {
 	dfn       map[Node]int
 	low       map[Node]int
