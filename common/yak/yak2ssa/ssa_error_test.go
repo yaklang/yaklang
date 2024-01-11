@@ -56,10 +56,10 @@ func TestUndefine(t *testing.T) {
 			}
 			`,
 			errs: []string{
-				ssa4analyze.ValueUndefined("i"),
-				ssa4analyze.ValueUndefined("j"),
-				ssa4analyze.ValueUndefined("a"),
-				ssa4analyze.ValueUndefined("b"),
+				ssa.ValueUndefined("i"),
+				ssa.ValueUndefined("j"),
+				ssa.ValueUndefined("a"),
+				ssa.ValueUndefined("b"),
 			},
 		})
 	})
@@ -77,12 +77,12 @@ func TestUndefine(t *testing.T) {
 			}
 			`,
 			errs: []string{
-				ssa4analyze.ValueUndefined("c"),
-				ssa4analyze.ValueUndefined("c"),
-				ssa4analyze.ValueUndefined("undefinePkg"),
-				ssa4analyze.ValueUndefined("undefinePkg"),
-				ssa4analyze.ValueUndefined("undefineFunc2"),
-				ssa4analyze.ValueUndefined("undefineFuncInLoop"),
+				ssa.ValueUndefined("c"),
+				ssa.ValueUndefined("c"),
+				ssa.ValueUndefined("undefinePkg"),
+				ssa.ValueUndefined("undefinePkg"),
+				ssa.ValueUndefined("undefineFunc2"),
+				ssa.ValueUndefined("undefineFuncInLoop"),
 			},
 		})
 	})
@@ -93,7 +93,7 @@ func TestUndefine(t *testing.T) {
 			a = f"${undefined_var}"
 			`,
 			errs: []string{
-				ssa4analyze.ValueUndefined("undefined_var"),
+				ssa.ValueUndefined("undefined_var"),
 			},
 		})
 	})
@@ -140,14 +140,14 @@ func TestErrorComment(t *testing.T) {
 			print(f)
 			`,
 			errs: []string{
-				ssa4analyze.ValueUndefined("c"),
-				ssa4analyze.ValueUndefined("print"),
-				ssa4analyze.ValueUndefined("d"),
-				ssa4analyze.ValueUndefined("print"),
-				ssa4analyze.ValueUndefined("e"),
-				ssa4analyze.ValueUndefined("print"),
-				ssa4analyze.ValueUndefined("f"),
-				ssa4analyze.ValueUndefined("print"),
+				ssa.ValueUndefined("c"),
+				ssa.ValueUndefined("print"),
+				ssa.ValueUndefined("d"),
+				ssa.ValueUndefined("print"),
+				ssa.ValueUndefined("e"),
+				ssa.ValueUndefined("print"),
+				ssa.ValueUndefined("f"),
+				ssa.ValueUndefined("print"),
 				ssa.NoCheckMustInFirst(),
 			},
 		})
@@ -181,7 +181,7 @@ func TestBasicExpression(t *testing.T) {
 				b = a2 // undefined
 				`,
 			errs: []string{
-				ssa4analyze.ValueUndefined("a2"),
+				ssa.ValueUndefined("a2"),
 			},
 		})
 	})
@@ -202,7 +202,7 @@ func TestBasicExpression(t *testing.T) {
 			c = a2
 			`,
 			errs: []string{
-				ssa4analyze.ValueUndefined("a2"),
+				ssa.ValueUndefined("a2"),
 				ssa4analyze.ConditionIsConst("if"),
 				ssa4analyze.ConditionIsConst("if"),
 			},
@@ -226,7 +226,7 @@ func TestBasicExpression(t *testing.T) {
 			a == undefined
 			`,
 			errs: []string{
-				ssa4analyze.ValueUndefined("a"),
+				ssa.ValueUndefined("a"),
 			},
 		})
 	})
@@ -406,7 +406,7 @@ func TestMemberCall(t *testing.T) {
 			b.E = 1
 			`,
 			errs: []string{
-				ssa4analyze.ValueUndefined("b"),
+				ssa.ValueUndefined("b"),
 			},
 		})
 	})
@@ -451,7 +451,7 @@ func TestMemberCall(t *testing.T) {
 			a.$UndefineKey = 5 // this err in yakast
 			`,
 			errs: []string{
-				ssa4analyze.ValueUndefined("UndefineKey"),
+				ssa.ValueUndefined("UndefineKey"),
 			},
 		})
 	})
@@ -506,8 +506,8 @@ func TestSliceCall(t *testing.T) {
 			print(a[1])
 			`,
 			errs: []string{
-				ssa4analyze.ValueUndefined("a1"),
-				ssa4analyze.ValueUndefined("a1"),
+				ssa.ValueUndefined("a1"),
+				ssa.ValueUndefined("a1"),
 				ssa4analyze.InvalidField("number", "1"),
 				ssa4analyze.InvalidField("number", "1"),
 			},
@@ -1292,8 +1292,8 @@ func TestTryCatch(t *testing.T) {
 			b = a3
 			`,
 			errs: []string{
-				ssa4analyze.ValueUndefined("a1"),
-				ssa4analyze.ValueUndefined("a3"),
+				ssa.ValueUndefined("a1"),
+				ssa.ValueUndefined("a3"),
 			},
 		})
 	})
@@ -1324,7 +1324,7 @@ func TestTryCatch(t *testing.T) {
 			errs: []string{
 				"empty block",
 				"empty block",
-				ssa4analyze.ValueUndefined("err"),
+				ssa.ValueUndefined("err"),
 			},
 		})
 	})
@@ -1347,7 +1347,7 @@ func TestSwitch(t *testing.T) {
 			}
         `,
 			errs: []string{
-				ssa4analyze.ValueUndefined("a"),
+				ssa.ValueUndefined("a"),
 				ssa4analyze.ConditionIsConst("switch"),
 				// ssa4analyze.BlockUnreachable(),
 				// ssa4analyze.BlockUnreachable(),

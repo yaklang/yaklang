@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/plugin_type_analyzer/rules"
-	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 func TestRulesDefineFunction(t *testing.T) {
@@ -95,7 +95,7 @@ func TestRuleDefineFunctionWithFreeValue(t *testing.T) {
 	}
 		`,
 			[]string{
-				ssa4analyze.ValueUndefined("a"),
+				ssa.ValueUndefined("a"),
 			},
 			"codec",
 		)

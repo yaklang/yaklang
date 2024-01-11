@@ -11,10 +11,6 @@ func ErrorUnhandledWithType(typ string) string {
 	return fmt.Sprintf("The value is (%s) type, has unhandled error", typ)
 }
 
-func ValueUndefined(v string) string {
-	return fmt.Sprintf("Value undefined:%s", v)
-}
-
 func ConditionIsConst(control string) string {
 	return fmt.Sprintf("The %s condition is constant", control)
 

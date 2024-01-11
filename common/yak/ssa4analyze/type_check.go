@@ -80,7 +80,7 @@ func (t *TypeCheck) TypeCheckUndefine(inst *ssa.Undefined) {
 	tmp := make(map[ssa.Value]struct{})
 	err := func(i ssa.Value) bool {
 		if variable := i.GetVariable(inst.GetName()); variable != nil {
-			variable.NewError(ssa.Error, TypeCheckTAG, ValueUndefined(inst.GetName()))
+			variable.NewError(ssa.Error, TypeCheckTAG, ssa.ValueUndefined(inst.GetName()))
 			return true
 		} else {
 			return false
