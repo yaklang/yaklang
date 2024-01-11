@@ -34,9 +34,9 @@ type config struct {
 	code            string
 	ignoreSyntaxErr bool
 
-	externLib   map[string]map[string]any
-	externValue map[string]any
-	// externType  map[string]any
+	externLib    map[string]map[string]any
+	externValue  map[string]any
+	defineFunc   map[string]any
 	externMethod ssa.MethodBuilder
 	// for hash
 	externInfo string
@@ -49,6 +49,7 @@ func defaultConfig(code string) *config {
 		code:        code,
 		externLib:   make(map[string]map[string]any),
 		externValue: make(map[string]any),
+		defineFunc:  make(map[string]any),
 	}
 }
 
@@ -108,6 +109,14 @@ func WithExternInfo(info string) Option {
 	}
 }
 
+func WithDefineFunc(table map[string]any) Option {
+	return func(c *config) {
+		for name, t := range table {
+			c.defineFunc[name] = t
+		}
+	}
+}
+
 var ttlSSAParseCache = ttlcache.NewCache()
 
 func Parse(code string, opts ...Option) (*Program, error) {
@@ -138,6 +147,7 @@ func parseWithConfig(c *config) (*ssa.Program, error) {
 		fb.WithExternLib(c.externLib)
 		fb.WithExternValue(c.externValue)
 		fb.WithExternMethod(c.externMethod)
+		fb.WithDefineFunction(c.defineFunc)
 	}
 	return c.Parser.Parse(c.code, c.ignoreSyntaxErr, callback)
 }
