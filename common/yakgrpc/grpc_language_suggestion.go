@@ -514,7 +514,7 @@ func getDescFromSSAValue(name string, v *ssaapi.Value) string {
 func sortValuesByPosition(values ssaapi.Values, position *ssa.Range) ssaapi.Values {
 	// todo: 需要修改SSA，需要真正的RefLocation
 	values = values.Filter(func(v *ssaapi.Value) bool {
-		position2 := v.GetPosition()
+		position2 := v.GetRange()
 		if position2 == nil {
 			return false
 		}
@@ -524,9 +524,9 @@ func sortValuesByPosition(values ssaapi.Values, position *ssa.Range) ssaapi.Valu
 		return true
 	})
 	sort.SliceStable(values, func(i, j int) bool {
-		line1, line2 := values[i].GetPosition().Start.Line, values[j].GetPosition().Start.Line
+		line1, line2 := values[i].GetRange().Start.Line, values[j].GetRange().Start.Line
 		if line1 == line2 {
-			return values[i].GetPosition().Start.Column > values[j].GetPosition().Start.Column
+			return values[i].GetRange().Start.Column > values[j].GetRange().Start.Column
 		} else {
 			return line1 > line2
 		}
@@ -537,7 +537,7 @@ func sortValuesByPosition(values ssaapi.Values, position *ssa.Range) ssaapi.Valu
 func getSSAParentValueByPosition(prog *ssaapi.Program, sourceCode string, position *ssa.Range) *ssaapi.Value {
 	word := strings.Split(sourceCode, ".")[0]
 	values := prog.Ref(word).Filter(func(v *ssaapi.Value) bool {
-		position2 := v.GetPosition()
+		position2 := v.GetRange()
 		if position2 == nil {
 			return false
 		}
@@ -645,7 +645,7 @@ func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionReques
 			}
 			// todo: 需要更严谨的过滤
 			values = values.Filter(func(value *ssaapi.Value) bool {
-				position2 := value.GetPosition()
+				position2 := value.GetRange()
 				if position2 == nil {
 					return false
 				}
@@ -787,7 +787,7 @@ func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionReques
 		// map 成员
 		filterMap := make(map[string]struct{})
 		v.GetUsers().Filter(func(u *ssaapi.Value) bool {
-			position2 := u.GetPosition()
+			position2 := u.GetRange()
 			if position2 == nil {
 				return false
 			}
