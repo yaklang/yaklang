@@ -10,6 +10,9 @@ func TestMitmPluginOptionValue(t *testing.T) {
 	t.Run("test MITM_PLUGIN in mitm ", func(t *testing.T) {
 		check(t, `
 		println(MITM_PLUGIN)
+		hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
+			a = 1
+		}
 		`,
 			[]string{},
 			"mitm",
