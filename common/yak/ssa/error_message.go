@@ -19,3 +19,7 @@ func ContAssignExtern(name string) string {
 func NoCheckMustInFirst() string {
 	return "@ssa-nocheck must be the first line in the file"
 }
+
+func ValueUndefined(v string) string {
+	return fmt.Sprintf("Value undefined:%s", v)
+}

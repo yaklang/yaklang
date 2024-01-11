@@ -98,9 +98,6 @@ func (b *FunctionBuilder) AddUnsealedBlock(block *BasicBlock) {
 
 // finish current function builder
 func (b *FunctionBuilder) Finish() {
-	b.ScopeEnd()
-	// fmt.Println("finish func: ", b.Name)
-
 	// sub-function
 	b.SetDefineFunc()
 	//TODO: handler `goto` syntax and notice function reentrant for `Feed(code)`
@@ -135,6 +132,7 @@ func (b *FunctionBuilder) Finish() {
 		recoverRange()
 	}
 
+	b.ScopeEnd()
 	// function finish
 	b.Function.Finish()
 }
@@ -160,6 +158,11 @@ func (b *FunctionBuilder) SetDefineFunc() {
 				return false
 			}
 			f.Param[index].SetType(typ)
+		}
+		for name, fv := range f.FreeValues {
+			if v := b.ReadVariable(name, false); v == nil {
+				fv.NewError(Error, SSATAG, ValueUndefined(name))
+			}
 		}
 		_ = funTyp
 		return true

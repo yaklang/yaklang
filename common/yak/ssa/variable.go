@@ -151,7 +151,7 @@ func (b *FunctionBuilder) ReadVariable(variable string, create bool) Value {
 		}
 	})
 
-	if ret == nil {
+	if ret == nil || b.CurrentRange == nil {
 		return ret
 	}
 
