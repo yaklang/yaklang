@@ -209,7 +209,7 @@ func (v *Value) GetTypeKind() ssa.TypeKind {
 	return ssa.Any
 }
 
-func (v *Value) GetPosition() *ssa.Range {
+func (v *Value) GetRange() *ssa.Range {
 	return v.node.GetRange()
 }
 
