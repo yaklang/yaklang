@@ -36,7 +36,6 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		SideEffects:    make(map[string]Value),
 		externInstance: make(map[string]Value),
 		externType:     make(map[string]Type),
-		err:            make(SSAErrors, 0),
 		builder:        nil,
 	}
 	f.SetName(name)

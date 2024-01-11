@@ -238,6 +238,8 @@ type Program struct {
 	NameToInstructions *omap.OrderedMap[string, []Instruction]
 	IdToInstructionMap *omap.OrderedMap[int, Instruction]
 
+	errors SSAErrors
+
 	// for build
 	buildOnce sync.Once
 }
@@ -286,7 +288,6 @@ type Function struct {
 	externType     map[string]Type
 
 	// ssa error
-	err        SSAErrors
 	errComment ErrorComment
 
 	// ================  for build
