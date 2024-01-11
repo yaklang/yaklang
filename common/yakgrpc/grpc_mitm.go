@@ -333,6 +333,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	autoForward := utils.NewBool(true)
 	autoForwardCh := make(chan struct{}, 1)
 
+	filterWebSocket := utils.NewBool(false)
+
 	go func() {
 		defer close(autoForwardCh)
 		for {
@@ -551,6 +553,13 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				})
 				continue
 			}
+
+			// 是否过滤ws
+			if reqInstance.GetFilterWebsocket() {
+				filterWebSocket.SetTo(reqInstance.GetFilterWebsocket())
+				continue
+			}
+
 			//defer func() {
 			//	recover()
 			//}()
@@ -612,6 +621,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		/* 这儿比单纯劫持响应要简单的多了 */
 		originRspRaw := raw[:]
 		finalResult = originRspRaw
+
+		if filterWebSocket.IsSet() {
+			return originRspRaw
+		}
 
 		// 保存到数据库
 		wshash := utils.CalcSha1(fmt.Sprintf("%p", req), fmt.Sprintf("%p", rsp), ts)
@@ -919,6 +932,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				return
 			}
 		}()
+
+		if filterWebSocket.IsSet() {
+			return raw
+		}
 
 		isTls, urlStr := lowhttp.ExtractWebsocketURLFromHTTPRequest(req)
 		var extName string
