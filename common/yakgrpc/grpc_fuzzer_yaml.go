@@ -565,7 +565,14 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 			case "regex":
 				extractorItem.Set("type", "regex")
 				extractorItem.Set("regex", extractor.Groups)
-				extractorItem.Set("group", extractor.RegexpMatchGroup)
+				extractorItem.SetDefaultField(map[string]any{
+					"group": 0,
+				})
+				groupNumber := 0
+				if len(extractor.RegexpMatchGroup) > 0 {
+					groupNumber = extractor.RegexpMatchGroup[0]
+				}
+				extractorItem.Set("group", groupNumber)
 			case "key-value":
 				extractorItem.Set("type", "kval")
 				extractorItem.Set("kval", extractor.Groups)
