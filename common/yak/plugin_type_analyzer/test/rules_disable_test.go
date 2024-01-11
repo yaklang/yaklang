@@ -11,6 +11,10 @@ func TestSSARuleMustPassCliDisable(t *testing.T) {
 		check(t, `
 		domains = cli.String("domains")
 		cli.check()
+
+		hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
+			a = 1
+		}
 			`,
 			[]string{rules.ErrorDisableCLi(), rules.ErrorDisableCLi()},
 			"mitm",
@@ -40,6 +44,10 @@ func TestSSARuleMustPassMitmDisable(t *testing.T) {
 		risk.cve("abc")
 		println(r)
 		risk.Save(r)
+
+		hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
+			a = 1
+		}
 			`,
 			[]string{
 				rules.MITMNotSupport("risk.CreateRisk"),
@@ -60,6 +68,10 @@ func TestSSARuleMustPassMitmDisable(t *testing.T) {
 		)
 		println(r)
 		risk.Save(r)
+
+		hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
+			a = 1
+		}
 			`,
 			[]string{
 				rules.MITMNotSupport("risk.CreateRisk"),
@@ -79,6 +91,10 @@ func TestSSARuleMustPassMitmDisable(t *testing.T) {
 			)
 			println(r)
 			risk.Save(r)
+		}
+
+		hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
+			a = 1
 		}
 			`,
 			[]string{},
@@ -109,6 +125,10 @@ func TestSSARuleMustPassMitmDisable(t *testing.T) {
 
 		fuzz.HTTPRequest("")~.ExecFirst()
 		fuzz.HTTPRequest("")~.FuzzGetParamsRaw().ExecFirst()
+
+		hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
+			a = 1
+		}
 			`,
 			[]string{
 				rules.MITMNotSupport("fuzz.Exec or fuzz.ExecFirst"),
