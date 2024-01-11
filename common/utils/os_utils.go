@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"golang.org/x/net/websocket"
 	"math/rand"
 	"net"
 	"net/http"
@@ -256,6 +257,26 @@ func DebugMockTCP(rsp []byte) (string, int) {
 	)
 }
 
+func DebugMockWs(handler func(conn *websocket.Conn)) (string, int) {
+	addr := GetRandomLocalAddr()
+
+	go func() {
+
+		server := &websocket.Server{
+			Handler: websocket.Handler(handler),
+			Handshake: func(config *websocket.Config, req *http.Request) error {
+				// 不执行任何 Origin 检查
+				return nil
+			},
+		}
+		if err := http.ListenAndServe(addr, server); err != nil {
+			log.Fatal("ListenAndServe:", err)
+		}
+	}()
+
+	host, port, _ := ParseStringToHostPort(addr)
+	return host, port
+}
 func DebugMockTCPEx(handleFunc handleTCPFunc) (string, int) {
 	return DebugMockTCPHandlerFuncContext(TimeoutContext(time.Minute*5), handleFunc)
 }

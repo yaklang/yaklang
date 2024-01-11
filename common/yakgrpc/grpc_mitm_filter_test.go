@@ -2,6 +2,8 @@ package yakgrpc
 
 import (
 	"context"
+	"fmt"
+	"golang.org/x/net/websocket"
 	"strings"
 	"sync"
 	"testing"
@@ -360,4 +362,109 @@ func TestMITMFilterManager_Filter(t *testing.T) {
 		assert.Equal(t, c.Count, count)
 	}
 
+}
+
+func TestGRPCMUSTPASS_WebSocket_Filter_RSP(t *testing.T) {
+	token := utils.RandStringBytes(10)
+	sendCompleteCh := make(chan struct{})
+	host, port := utils.DebugMockWs(func(ws *websocket.Conn) {
+		for i := 0; i < 10; i++ {
+			ws.Write([]byte(token))
+			time.Sleep(50 * time.Millisecond)
+		}
+		close(sendCompleteCh)
+	})
+
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mitmPort = utils.GetRandomAvailableTCPPort()
+	var proxy = "http://" + utils.HostPort("127.0.0.1", mitmPort)
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
+	defer cancel()
+
+	RunMITMTestServer(client, ctx, &ypb.MITMRequest{
+		Port: uint32(mitmPort),
+		Host: "127.0.0.1",
+	}, func(mitmClient ypb.Yak_MITMClient) {
+
+		mitmClient.Send(&ypb.MITMRequest{
+			FilterWebsocket: true,
+		})
+		defer NewMITMFilterManager(consts.GetGormProfileDatabase()).Recover()
+		_, err = lowhttp.NewWebsocketClient([]byte(fmt.Sprintf(`GET /?%s HTTP/1.1
+Host: %s
+Connection: Upgrade
+Upgrade: websocket
+Sec-WebSocket-Version: 13
+Sec-WebSocket-Key: w4v7O6xFTi36lq3RNcgctw==
+`, token, utils.HostPort(host, port))), lowhttp.WithWebsocketProxy(proxy))
+		if err != nil {
+			t.Fatalf("send websocket request err: %v", err)
+		}
+		select {
+		case <-sendCompleteCh:
+		}
+		count := yakit.SearchWebsocketFlow(token)
+		//fmt.Println(count)
+		if count != 0 {
+			t.Fatalf("search httpflow by token failed: yakit.QuickSearchMITMHTTPFlowCount(token)")
+		}
+		cancel()
+	})
+}
+
+func TestGRPCMUSTPASS_WebSocket_Filter_REQ(t *testing.T) {
+	token := utils.RandStringBytes(10)
+	sendOKCh := make(chan struct{})
+	host, port := utils.DebugMockWs(func(ws *websocket.Conn) {
+		var res []byte
+		for i := 0; i < 10; i++ {
+			ws.Read(res)
+			time.Sleep(50 * time.Millisecond)
+		}
+		close(sendOKCh)
+	})
+
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mitmPort = utils.GetRandomAvailableTCPPort()
+	var proxy = "http://" + utils.HostPort("127.0.0.1", mitmPort)
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
+	defer cancel()
+
+	RunMITMTestServer(client, ctx, &ypb.MITMRequest{
+		Port: uint32(mitmPort),
+		Host: "127.0.0.1",
+	}, func(mitmClient ypb.Yak_MITMClient) {
+		mitmClient.Send(&ypb.MITMRequest{
+			FilterWebsocket: true,
+		})
+		defer NewMITMFilterManager(consts.GetGormProfileDatabase()).Recover()
+		wsClient, err := lowhttp.NewWebsocketClient([]byte(fmt.Sprintf(`GET /?%s HTTP/1.1
+Host: %s
+Connection: Upgrade
+Upgrade: websocket
+Sec-WebSocket-Version: 13
+Sec-WebSocket-Key: w4v7O6xFTi36lq3RNcgctw==
+`, token, utils.HostPort(host, port))), lowhttp.WithWebsocketProxy(proxy))
+		if err != nil {
+			t.Fatalf("send websocket request err: %v", err)
+		}
+		for i := 0; i < 10; i++ {
+			wsClient.Write([]byte(token))
+		}
+		select {
+		case <-sendOKCh:
+		}
+		count := yakit.SearchWebsocketFlow(token)
+		fmt.Println(count)
+		if count != 0 {
+			t.Errorf("search httpflow by token failed: yakit.QuickSearchMITMHTTPFlowCount(token)")
+		}
+		cancel()
+	})
 }
