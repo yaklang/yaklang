@@ -6,7 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 )
 
-func TestMitmPluginOption(t *testing.T) {
+func TestMitmPluginOptionValue(t *testing.T) {
 	t.Run("test MITM_PLUGIN in mitm ", func(t *testing.T) {
 		check(t, `
 		println(MITM_PLUGIN)
@@ -24,6 +24,22 @@ func TestMitmPluginOption(t *testing.T) {
 				ssa4analyze.ValueUndefined("MITM_PLUGIN"),
 			},
 			"yak",
+		)
+	})
+}
+
+func TestPluginOptionDefineFunc(t *testing.T) {
+	t.Run("test define func in mitm ", func(t *testing.T) {
+		check(t, `
+		hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
+			responseBytes, _ = codec.StrconvUnquote(flow.Response)
+			a = flow.BeforeSave() //error
+		}
+		`,
+			[]string{
+				ssa4analyze.ErrorUnhandled(), // if this exist, it means the flow has correct type
+			},
+			"mitm",
 		)
 	})
 }
