@@ -5,14 +5,13 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>购物车 - 购物商城</title>
+    <title>订单页面 - 购物商城</title>
 
     <!-- Google Fonts -->
-    <link href='https://fonts.googleapis.com/css?family=Titillium+Web:400,200,300,700,600&display=swap' rel='stylesheet'
+    <link href='https://fonts.googleapis.com/css?family=Titillium+Web:400,200,300,700,600' rel='stylesheet'
         type='text/css'>
-    <link href='https://fonts.googleapis.com/css?family=Roboto+Condensed:400,700,300&display=swap' rel='stylesheet'
-        type='text/css'>
-    <link href='https://fonts.googleapis.com/css?family=Raleway:400,100&display=swap' rel='stylesheet' type='text/css'>
+    <link href='https://fonts.googleapis.com/css?family=Roboto+Condensed:400,700,300' rel='stylesheet' type='text/css'>
+    <link href='https://fonts.googleapis.com/css?family=Raleway:400,100' rel='stylesheet' type='text/css'>
 
     <!-- Bootstrap -->
     <link rel="stylesheet" href="/static/css/mall/bootstrap.min.css">
@@ -75,30 +74,6 @@
         </div>
     </div> <!-- End header area -->
 
-    <!-- <div class="site-branding-area">
-        <div class="container">
-            <div class="row">
-                <div class="col-sm-6">
-                    <div class="logo">
-                        <h1><a href="./"><img src="/static/logo.png" width="176" height="64"></a></h1>
-                    </div>
-                </div>
-                <div class="navbar-collapse collapse">
-                    <ul class="nav navbar-nav">
-                        <li><a onclick="redirectToShop(event)">Home</a></li>
-                        <li class="active"><a>购物车</a></li>
-                    </ul>
-                </div>
-                <div class="col-sm-6">
-                    <div class="shopping-item">
-                        <a href="cart.html">Cart - <span class="cart-amunt">$800</span> <i
-                                class="fa fa-shopping-cart"></i> <span class="product-count">5</span></a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div> End site branding area -->
-
     <div class="mainmenu-area">
         <div class="container">
             <div class="row">
@@ -116,6 +91,7 @@
                         </li>
                         <li><a onclick="redirectToShop(event)">Home</a></li>
                         <li class="active"><a>购物车</a></li>
+                        <li><a onclick="redirectToOrder(event)">我的订单</a></li>
                     </ul>
                 </div>
             </div>
@@ -127,7 +103,7 @@
             <div class="row">
                 <div class="col-md-12">
                     <div class="product-bit-title text-center">
-                        <h2>Shopping Cart</h2>
+                        <h2>Shopping Order</h2>
                     </div>
                 </div>
             </div>
@@ -192,11 +168,11 @@
                                         <tr>
                                             <th class="product-remove">&nbsp;</th>
                                             <th class="product-thumbnail">&nbsp;</th>
-                                            <th class="product-name">Product</th>
-                                            <th class="product-price">Description</th>
-                                            <th class="product-price">Price</th>
-                                            <th class="product-quantity">Quantity</th>
-                                            <th class="product-subtotal">Total</th>
+                                            <th class="product-name">商品名称</th>
+                                            <th class="product-price">数量</th>
+                                            <th class="product-price">价格</th>
+                                            <th class="product-quantity">发货状态</th>
+                                            <th class="product-subtotal">操作</th>
                                         </tr>
                                     </thead>
 
@@ -220,52 +196,31 @@
                                             </td>
 
                                             <td class="product-description">
-                                                <span class="amount">{{.Description}}</span>
+                                                <span class="amount">{{.ProductQuantity}}</span>
                                             </td>
                                             <td class="product-price">
-                                                <span class="amount">${{.ProductPrice}}</span>
+                                                <span class="amount">${{.TotalPrice}}</span>
                                             </td>
 
                                             <td class="product-quantity">
                                                 <div class="quantity buttons_added">
-                                                    <button type="button" class="minus"
-                                                        onclick="decreaseQuantity(this,event)"
-                                                        data-product-name="{{.ProductName}}">-</button>
-                                                    {{.ProductQuantity}}
-                                                    <button type="button" class="plus"
-                                                        onclick="increaseQuantity(this,event)"
-                                                        data-product-name="{{.ProductName}}">+</button>
+                                                    {{ .deliveryStatus}}
                                                 </div>
                                             </td>
 
                                             <td class="product-subtotal">
-                                                <span class="amount">${{.TotalPrice}}</span>
+                                                <span class="amount">${{.action}}</span>
                                             </td>
                                         </tr>
                                         {{end}}
                                         {{else}}
                                         <div class="text-center mt-5">
-                                            <h3>购物车为空</h3>
+                                            <h3>订单页面为空</h3>
+                                            <p>你还没有购买任何商品</p>
                                             <button onclick="redirectToShop(event)"
                                                 class="btn btn-primary mt-3">返回商城</button>
                                         </div>
                                         {{end}}
-
-                                        <tr>
-                                            <td class="actions" colspan="6">
-                                                <div class="coupon">
-                                                    <label for="coupon_code">优惠券:</label>
-                                                    <input type="text" placeholder="Coupon code" value=""
-                                                        id="coupon_code" class="input-text" name="coupon_code">
-                                                    <input type="submit" value="核销优惠券" name="apply_coupon"
-                                                        class="button">
-                                                </div>
-                                                <input type="submit" value="Update Cart" name="update_cart"
-                                                    class="button">
-                                                <input type="submit" value="Checkout" name="proceed"
-                                                    class="checkout-button button alt wc-forward">
-                                            </td>
-                                        </tr>
                                     </tbody>
                                 </table>
                             </form>
@@ -440,100 +395,12 @@
             var userID = url.split("?")[1].split("=")[1];
             window.location.href = "/mall/user/profile?id=" + userID;
         }
-
-        //减少商品数量
-        function decreaseQuantity(btn, event) {
+        function redirectToOrder(event) {
             event.preventDefault(); // 阻止默认表单提交行为
-            var { userID, productName } = getQueryString(btn);
-            //发送请求到服务器，告诉服务器需要减少商品的数量
-            var xhr = new XMLHttpRequest();
-            // 创建一个对象并转换为JSON字符串
-            var data = JSON.stringify({
-                userID: userID,
-                productName: productName,
-
-            });
-            // 设置POST请求的目标URL
-            xhr.open('POST', '/mall/cart/subOne', true);
-            xhr.setRequestHeader('Content-Type', 'application/json');
-            xhr.onreadystatechange = function () {
-                if (xhr.readyState === 4) {
-                    if (xhr.status === 200) {
-                        //刷新页面
-                        window.location.reload();
-
-                    } else {
-                        window.location.reload();
-                    }
-                }
-            };
-            // 发送请求
-            xhr.send(data);
-        }
-        //增加商品数量
-        function increaseQuantity(btn, event) {
-            event.preventDefault(); // 阻止默认表单提交行为
-            var { userID, productName } = getQueryString(btn);
-            //发送请求到服务器，告诉服务器需要增加商品的数量
-            var xhr = new XMLHttpRequest();
-            // 创建一个对象并转换为JSON字符串
-            var data = JSON.stringify({
-                userID: userID,
-                productName: productName,
-
-            });
-            // 设置POST请求的目标URL
-            xhr.open('POST', '/mall/cart/addOne', true);
-            xhr.setRequestHeader('Content-Type', 'application/json');
-            xhr.onreadystatechange = function () {
-                if (xhr.readyState === 4) {
-                    if (xhr.status === 200) {
-                        //刷新页面
-                        window.location.reload();
-
-                    } else {
-                        window.location.reload();
-                    }
-                }
-            };
-            // 发送请求
-            xhr.send(data);
-
-        }
-
-        //删除商品
-        function deleteProduct(btn, event) {
-            event.preventDefault(); // 阻止默认表单提交行为
-            var { userID, productName } = getQueryString(btn);
-            console.log(userID, productName);
-            //发送请求到服务器，告诉服务器需要删除商品
-            var xhr = new XMLHttpRequest();
-            // 创建一个对象并转换为JSON字符串
-            var data = JSON.stringify({
-                userID: userID,
-                productName: productName,
-            });
-            // 设置POST请求的目标URL
-            xhr.open('POST', '/mall/cart/delete', true);
-            xhr.setRequestHeader('Content-Type', 'application/json');
-            xhr.onreadystatechange = function () {
-                if (xhr.readyState === 4) {
-                    if (xhr.status === 200) {
-                        showNotification(xhr.responseText, event);
-                        //刷新页面
-                        window.location.reload();
-                    } else if (xhr.status === 0) {
-                        // 请求被取消
-                        console.log('Request was aborted');
-                    } else {
-                        // 删除购物车失败，显示错误消息
-                        showNotification("删除购物车失败: " + xhr.responseText, event);
-                        window.location.reload();
-                    }
-                }
-            };
-            // 发送请求
-            xhr.send(data);
+            //获取当前url中id
+            var url = window.location.href;
+            var userID = url.split("?")[1].split("=")[1];
+            window.location.href = "/mall/user/oeder?id=" + userID;
         }
 
         //登出事件
