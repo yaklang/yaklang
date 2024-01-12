@@ -9,8 +9,11 @@ import (
 	"github.com/yaklang/yaklang/common/fuzztag"
 	"github.com/yaklang/yaklang/common/fuzztagx/parser"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"github.com/yaklang/yaklang/common/utils/pingutil"
+	"github.com/yaklang/yaklang/common/utils/yakgit"
 	"github.com/yaklang/yaklang/common/yak/yaklib/yakhttp"
 	"net/http"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -121,6 +124,7 @@ func FetchFunctionFromSourceCode(ctx context.Context, pluginContext *YakitPlugin
 			pluginContext.PluginName = id
 		}
 		BindYakitPluginContextToEngine(engine, pluginContext)
+		HookEngineContext(engine, ctx)
 		return nil
 	})
 	engine.HookOsExit()
@@ -777,6 +781,161 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		}
 		return i
 	})
+}
+
+func HookEngineContext(engine *antlr4yak.Engine, streamContext context.Context) {
+	engine.GetVM().RegisterMapMemberCallHandler("context", "Seconds", func(f interface{}) interface{} {
+		funcValue := reflect.ValueOf(f)
+		funcType := funcValue.Type()
+		hookFunc := reflect.MakeFunc(funcType, func(args []reflect.Value) (results []reflect.Value) {
+			ctx, err := context.WithTimeout(streamContext, time.Duration(args[0].Float())*time.Second)
+			if err != nil {
+				log.Errorf("hook context Seconds failed: %v", err)
+			}
+			return []reflect.Value{reflect.ValueOf(ctx)}
+		})
+		return hookFunc.Interface()
+	})
+
+	// hook new background context
+	newContextHook := func(f interface{}) interface{} {
+		return func() context.Context {
+			return streamContext
+		}
+	}
+	engine.GetVM().RegisterMapMemberCallHandler("context", "New", newContextHook)
+	engine.GetVM().RegisterMapMemberCallHandler("context", "Background", newContextHook)
+
+	// hook httpserver context
+	engine.GetVM().RegisterMapMemberCallHandler("httpserver", "Serve", func(f interface{}) interface{} {
+		originFunc, ok := f.(func(host string, port int, opts ...yaklib.HttpServerConfigOpt) error)
+		if ok {
+			return func(host string, port int, opts ...yaklib.HttpServerConfigOpt) error {
+				opts = append([]yaklib.HttpServerConfigOpt{yaklib.HTTPServer_ServeOpt_Context(streamContext)}, opts...)
+				return originFunc(host, port, opts...)
+			}
+		}
+		return f
+	})
+
+	// hook traceroute context
+	engine.GetVM().RegisterMapMemberCallHandler("traceroute", "Diagnostic", func(f interface{}) interface{} {
+		originFunc, ok := f.(func(host string, opts ...pingutil.TracerouteConfigOption) (chan *pingutil.TracerouteResponse, error))
+		if ok {
+			return func(host string, opts ...pingutil.TracerouteConfigOption) (chan *pingutil.TracerouteResponse, error) {
+				opts = append([]pingutil.TracerouteConfigOption{pingutil.WithCtx(streamContext)}, opts...)
+				return originFunc(host, opts...)
+			}
+		}
+		return f
+	})
+
+	// hook udp context
+	engine.GetVM().RegisterMapMemberCallHandler("udp", "Serve", func(f interface{}) interface{} {
+		originFunc, ok := f.(func(host string, port interface{}, opts ...yaklib.UdpServerOpt) error)
+		if ok {
+			return func(host string, port interface{}, opts ...yaklib.UdpServerOpt) error {
+				opts = append([]yaklib.UdpServerOpt{yaklib.UdpWithContext(streamContext)}, opts...)
+				return originFunc(host, port, opts...)
+			}
+		}
+		return f
+	})
+
+	// hook tcp context
+	engine.GetVM().RegisterMapMemberCallHandler("tcp", "Serve", func(f interface{}) interface{} {
+		originFunc, ok := f.(func(host interface{}, port int, opts ...yaklib.TcpServerConfigOpt) error)
+		if ok {
+			return func(host interface{}, port int, opts ...yaklib.TcpServerConfigOpt) error {
+				opts = append([]yaklib.TcpServerConfigOpt{yaklib.Tcp_Server_Context(streamContext)}, opts...)
+				return originFunc(host, port, opts...)
+			}
+		}
+		return f
+	})
+
+	// hook mitm start context
+	engine.GetVM().RegisterMapMemberCallHandler("mitm", "Start", func(f interface{}) interface{} {
+		originFunc, ok := f.(func(port int, opts ...yaklib.MitmConfigOpt) error)
+		if ok {
+			return func(port int, opts ...yaklib.MitmConfigOpt) error {
+				opts = append([]yaklib.MitmConfigOpt{yaklib.MitmConfigContext(streamContext)}, opts...)
+				return originFunc(port, opts...)
+			}
+		}
+		return f
+	})
+	engine.GetVM().RegisterMapMemberCallHandler("mitm", "Bridge", func(f interface{}) interface{} {
+		originFunc, ok := f.(func(port interface{}, downstreamProxy string, opts ...yaklib.MitmConfigOpt) error)
+		if ok {
+			return func(port interface{}, downstreamProxy string, opts ...yaklib.MitmConfigOpt) error {
+				opts = append([]yaklib.MitmConfigOpt{yaklib.MitmConfigContext(streamContext)}, opts...)
+				return originFunc(port, downstreamProxy, opts...)
+			}
+		}
+		return f
+	})
+
+	// hook git context
+	hookGitFunc := func(f interface{}) interface{} {
+		funcValue := reflect.ValueOf(f)
+		funcType := funcValue.Type()
+		hookFunc := reflect.MakeFunc(funcType, func(args []reflect.Value) (results []reflect.Value) {
+			gitContextOpt := []yakgit.Option{yakgit.WithContext(streamContext)}
+			index := len(args) - 1 // 获取 option 参数的 index
+			interfaceValue := args[index].Interface()
+			args = args[:index]
+			gitExtraOpts, ok := interfaceValue.([]yakgit.Option)
+			if ok {
+				gitExtraOpts = append(gitContextOpt, gitExtraOpts...)
+			}
+			for _, p := range gitExtraOpts {
+				args = append(args, reflect.ValueOf(p))
+			}
+			res := funcValue.Call(args)
+			return res
+		})
+		return hookFunc.Interface()
+	}
+	gitFuncList := []string{"GitHack", "Clone", "Pull", "Fetch", "Checkout", "IterateCommit"}
+	for _, funcName := range gitFuncList {
+		engine.GetVM().RegisterMapMemberCallHandler("git", funcName, hookGitFunc)
+	}
+
+	//hook fuzz context
+	engine.GetVM().RegisterMapMemberCallHandler("fuzz", "HTTPRequest", func(f interface{}) interface{} {
+		originFunc, ok := f.(func(i interface{}, opts ...mutate.BuildFuzzHTTPRequestOption) (*mutate.FuzzHTTPRequest, error))
+		if ok {
+			return func(i interface{}, opts ...mutate.BuildFuzzHTTPRequestOption) (*mutate.FuzzHTTPRequest, error) {
+				opts = append([]mutate.BuildFuzzHTTPRequestOption{mutate.OptContext(streamContext)}, opts...)
+				return originFunc(i, opts...)
+			}
+		}
+		return f
+	})
+	engine.GetVM().RegisterMapMemberCallHandler("fuzz", "MustHTTPRequest", func(f interface{}) interface{} {
+		originFunc, ok := f.(func(i interface{}, opts ...mutate.BuildFuzzHTTPRequestOption) *mutate.FuzzHTTPRequest)
+		if ok {
+			return func(i interface{}, opts ...mutate.BuildFuzzHTTPRequestOption) *mutate.FuzzHTTPRequest {
+				opts = append([]mutate.BuildFuzzHTTPRequestOption{mutate.OptContext(streamContext)}, opts...)
+				return originFunc(i, opts...)
+			}
+		}
+		return f
+	})
+
+	// hook http_pool context
+	engine.GetVM().RegisterMapMemberCallHandler("httpool", "Pool", func(f interface{}) interface{} {
+		originFunc, ok := f.(func(i interface{}, opts ...mutate.HttpPoolConfigOption) (chan *mutate.HttpResult, error))
+		if ok {
+			return func(i interface{}, opts ...mutate.HttpPoolConfigOption) (chan *mutate.HttpResult, error) {
+				opts = append([]mutate.HttpPoolConfigOption{mutate.WithPoolOpt_Context(streamContext)}, opts...)
+				return originFunc(i, opts...)
+			}
+		}
+		return f
+	})
+
 }
 
 func (y *YakToCallerManager) AddForYakit(

@@ -960,14 +960,14 @@ func (f *FuzzHTTPRequest) Show() FuzzHTTPRequestIf {
 	return f
 }
 
-func (f *FuzzHTTPRequest) ExecFirst(opts ...HttpPoolConfigOption) (*_httpResult, error) {
+func (f *FuzzHTTPRequest) ExecFirst(opts ...HttpPoolConfigOption) (*HttpResult, error) {
 	opts = append(opts, WithPoolOpt_RequestCountLimiter(1))
 	resultCh, err := f.Exec(opts...)
 	if err != nil {
 		return nil, err
 	}
 
-	var result *_httpResult
+	var result *HttpResult
 	for i := range resultCh {
 		result = i
 	}

@@ -365,14 +365,14 @@ func (f *FuzzHTTPRequestBatch) Results() ([]*http.Request, error) {
 	return reqs, nil
 }
 
-func (f *FuzzHTTPRequestBatch) ExecFirst(opts ...HttpPoolConfigOption) (*_httpResult, error) {
+func (f *FuzzHTTPRequestBatch) ExecFirst(opts ...HttpPoolConfigOption) (*HttpResult, error) {
 	opts = append(opts, WithPoolOpt_RequestCountLimiter(1))
 	resultCh, err := f.Exec(opts...)
 	if err != nil {
 		return nil, err
 	}
 
-	var result *_httpResult
+	var result *HttpResult
 	for i := range resultCh {
 		result = i
 	}

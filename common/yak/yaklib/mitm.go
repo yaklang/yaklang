@@ -37,7 +37,7 @@ var MitmExports = map[string]interface{}{
 // ```
 func startMitm(
 	port int,
-	opts ...mitmConfigOpt,
+	opts ...MitmConfigOpt,
 ) error {
 	return startBridge(port, "", opts...)
 }
@@ -60,7 +60,7 @@ type mitmConfig struct {
 	hijackResponseEx         func(isHttps bool, urlStr string, req, rsp []byte, forward func([]byte), reject func())
 }
 
-type mitmConfigOpt func(config *mitmConfig)
+type MitmConfigOpt func(config *mitmConfig)
 
 // isTransparent 是一个选项函数，用于指定中间人代理服务器是否开启透明劫持模式，默认为false
 // 在开启透明模式下，所有流量都会被默认转发，所有的回调函数都会被忽略
@@ -68,18 +68,20 @@ type mitmConfigOpt func(config *mitmConfig)
 // ```
 // mitm.Start(8080, mitm.isTransparent(true))
 // ```
-func mitmConfigIsTransparent(b bool) mitmConfigOpt {
+func mitmConfigIsTransparent(b bool) MitmConfigOpt {
 	return func(config *mitmConfig) {
 		config.isTransparent = b
 	}
 }
+
+var MitmConfigContext = mitmConfigContext
 
 // context 是一个选项函数，用于指定中间人代理服务器的上下文
 // Example:
 // ```
 // mitm.Start(8080, mitm.context(context.Background()))
 // ```
-func mitmConfigContext(ctx context.Context) mitmConfigOpt {
+func mitmConfigContext(ctx context.Context) MitmConfigOpt {
 	return func(config *mitmConfig) {
 		config.ctx = ctx
 	}
@@ -91,7 +93,7 @@ func mitmConfigContext(ctx context.Context) mitmConfigOpt {
 // ```
 // mitm.Start(8080, mitm.useDefaultCA(true))
 // ```
-func mitmConfigUseDefault(t bool) mitmConfigOpt {
+func mitmConfigUseDefault(t bool) MitmConfigOpt {
 	return func(config *mitmConfig) {
 		config.useDefaultMitmCert = t
 	}
@@ -102,7 +104,7 @@ func mitmConfigUseDefault(t bool) mitmConfigOpt {
 // ```
 // mitm.Start(8080, mitm.host("127.0.0.1"))
 // ```
-func mitmConfigHost(host string) mitmConfigOpt {
+func mitmConfigHost(host string) MitmConfigOpt {
 	return func(config *mitmConfig) {
 		config.host = host
 	}
@@ -113,7 +115,7 @@ func mitmConfigHost(host string) mitmConfigOpt {
 // ```
 // mitm.Start(8080, mitm.callback(func(isHttps, urlStr, req, rsp) { http.dump(req); http.dump(rsp)  }))
 // ```
-func mitmConfigCallback(f func(bool, string, *http.Request, *http.Response)) mitmConfigOpt {
+func mitmConfigCallback(f func(bool, string, *http.Request, *http.Response)) MitmConfigOpt {
 	return func(config *mitmConfig) {
 		config.callback = f
 	}
@@ -130,7 +132,7 @@ func mitmConfigCallback(f func(bool, string, *http.Request, *http.Response)) mit
 // }
 // ))
 // ```
-func mitmConfigHijackHTTPRequest(h func(isHttps bool, u string, req []byte, modified func([]byte), dropped func())) mitmConfigOpt {
+func mitmConfigHijackHTTPRequest(h func(isHttps bool, u string, req []byte, modified func([]byte), dropped func())) MitmConfigOpt {
 	return func(config *mitmConfig) {
 		config.hijackRequest = h
 	}
@@ -147,7 +149,7 @@ func mitmConfigHijackHTTPRequest(h func(isHttps bool, u string, req []byte, modi
 // }
 // ))
 // ```
-func mitmConfigHijackHTTPResponse(h func(isHttps bool, u string, rsp []byte, modified func([]byte), dropped func())) mitmConfigOpt {
+func mitmConfigHijackHTTPResponse(h func(isHttps bool, u string, rsp []byte, modified func([]byte), dropped func())) MitmConfigOpt {
 	return func(config *mitmConfig) {
 		config.hijackResponse = h
 	}
@@ -165,7 +167,7 @@ func mitmConfigHijackHTTPResponse(h func(isHttps bool, u string, rsp []byte, mod
 // }
 // ))
 // ```
-func mitmConfigHijackHTTPResponseEx(h func(bool, string, []byte, []byte, func([]byte), func())) mitmConfigOpt {
+func mitmConfigHijackHTTPResponseEx(h func(bool, string, []byte, []byte, func([]byte), func())) MitmConfigOpt {
 	return func(config *mitmConfig) {
 		config.hijackResponseEx = h
 	}
@@ -177,7 +179,7 @@ func mitmConfigHijackHTTPResponseEx(h func(bool, string, []byte, []byte, func([]
 // ```
 // mitm.Start(8080, mitm.wsforcetext(true))
 // ```
-func mitmConfigWSForceTextFrame(b bool) mitmConfigOpt {
+func mitmConfigWSForceTextFrame(b bool) MitmConfigOpt {
 	return func(config *mitmConfig) {
 		config.wsForceTextFrame = b
 	}
@@ -191,7 +193,7 @@ func mitmConfigWSForceTextFrame(b bool) mitmConfigOpt {
 // ```
 // mitm.Start(8080, mitm.wscallback(func(data, isRequest) { println(data); return data }))
 // ```
-func mitmConfigWSCallback(f func([]byte, bool) interface{}) mitmConfigOpt {
+func mitmConfigWSCallback(f func([]byte, bool) interface{}) MitmConfigOpt {
 	return func(config *mitmConfig) {
 		config.wscallback = f
 	}
@@ -202,7 +204,7 @@ func mitmConfigWSCallback(f func([]byte, bool) interface{}) mitmConfigOpt {
 // ```
 // mitm.Start(8080, mitm.rootCA(cert, key))
 // ```
-func mitmConfigCertAndKey(cert, key []byte) mitmConfigOpt {
+func mitmConfigCertAndKey(cert, key []byte) MitmConfigOpt {
 	return func(config *mitmConfig) {
 		config.mitmCert = cert
 		config.mitmPkey = key
@@ -214,7 +216,7 @@ func mitmConfigCertAndKey(cert, key []byte) mitmConfigOpt {
 // ```
 // mitm.Start(8080, mitm.maxContentLength(100 * 1000 * 1000))
 // ```
-func mitmMaxContentLength(i int) mitmConfigOpt {
+func mitmMaxContentLength(i int) MitmConfigOpt {
 	return func(config *mitmConfig) {
 		config.maxContentLength = i
 	}
@@ -230,7 +232,7 @@ func mitmMaxContentLength(i int) mitmConfigOpt {
 func startBridge(
 	port interface{},
 	downstreamProxy string,
-	opts ...mitmConfigOpt,
+	opts ...MitmConfigOpt,
 ) error {
 	config := &mitmConfig{
 		ctx:                context.Background(),

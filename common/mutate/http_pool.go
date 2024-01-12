@@ -380,7 +380,7 @@ func _httpPool_ExternSwitch(sw *utils.Switch) HttpPoolConfigOption {
 
 type HttpPoolConfigOption func(config *httpPoolConfig)
 
-type _httpResult struct {
+type HttpResult struct {
 	Url         string
 	Request     *http.Request
 	Error       error
@@ -424,7 +424,7 @@ func NewDefaultHttpPoolConfig(opts ...HttpPoolConfigOption) *httpPoolConfig {
 	return base
 }
 
-func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, error) {
+func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, error) {
 	config := NewDefaultHttpPoolConfig(opts...)
 	externSwitch := config.ExternSwitch
 	//if len(config.Proxies) <= 0 && netx.GetProxyFromEnv() != "" && !config.NoSystemProxy {
@@ -505,7 +505,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 			config.Size = 50
 		}
 
-		results := make(chan *_httpResult, len(ret))
+		results := make(chan *HttpResult, len(ret))
 
 		go func() {
 			defer close(results)
@@ -565,7 +565,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 					}
 					reqIns, err := lowhttp.ParseBytesToHttpRequest(targetRequest)
 					if err != nil {
-						failedResult := &_httpResult{
+						failedResult := &HttpResult{
 							Url:        urlStr,
 							Error:      err,
 							RequestRaw: targetRequest,
@@ -675,7 +675,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 
 					if err != nil {
 						log.Errorf("exec packet raw failed: %s", err)
-						failedResult := &_httpResult{
+						failedResult := &HttpResult{
 							Url:             urlStr,
 							Request:         reqIns,
 							Error:           err,
@@ -691,7 +691,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *_httpResult, 
 						results <- failedResult
 						return
 					}
-					ret := &_httpResult{
+					ret := &HttpResult{
 						Url:              urlStr,
 						Request:          reqIns,
 						Error:            err,

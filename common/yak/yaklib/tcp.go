@@ -194,6 +194,10 @@ var TcpExports = map[string]interface{}{
 	"Forward": _tcpPortForward,
 }
 
+var Tcp_Server_Callback = _tcpServeCallback
+var Tcp_Server_Context = _tcpServeContext
+var Tcp_Server_Tls = _tcpServerTls
+
 func DebugMockTCPProtocol(name string) (string, int) {
 	cfg := fp.NewConfig(fp.WithTransportProtos(fp.ParseStringToProto([]interface{}{"tcp"}...)...))
 	blocks := fp.GetRuleBlockByServiceName(name, cfg)
