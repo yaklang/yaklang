@@ -100,3 +100,25 @@ func TestImportYakScript(t *testing.T) {
 	}
 	_ = s
 }
+
+func TestExportYakScriptLocal(t *testing.T) {
+	test := assert.New(t)
+
+	client, err := NewLocalClient()
+	if err != nil {
+		test.FailNow(err.Error())
+	}
+	s, err := client.ExportYakScriptLocal(context.Background(), &ypb.ExportLocalYakScriptRequest{
+		OutputDir:       "/Users/limin/Downloads/",
+		OutputPluginDir: "",
+		YakScriptIds:    nil,
+		Keywords:        "",
+		Type:            "",
+		UserName:        "",
+		Tags:            "",
+	})
+	if err != nil {
+		test.FailNow(err.Error())
+	}
+	_ = s
+}
