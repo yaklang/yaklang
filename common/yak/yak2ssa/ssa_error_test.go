@@ -977,8 +977,8 @@ func TestExternStruct(t *testing.T) {
 			a.GetA()
 			`,
 			errs: []string{
-				ssa.ExternFieldError("Type", "github.com/yaklang/yaklang/common/yak/yak2ssa.AStruct", "GetA", "GetAStruct"),
-				ssa4analyze.InvalidField("github.com/yaklang/yaklang/common/yak/yak2ssa.AStruct", "C"),
+				ssa.ExternFieldError("Type", "yak2ssa.AStruct", "GetA", "GetAStruct"),
+				ssa4analyze.InvalidField("yak2ssa.AStruct", "C"),
 			},
 			ExternValue: map[string]any{
 				"getA":  func() *AStruct { return &AStruct{} },
