@@ -698,7 +698,6 @@ func (s *Server) DeleteYakScriptExecResult(ctx context.Context, req *ypb.DeleteY
 
 func (s *Server) GetYakScriptTagsAndType(ctx context.Context, req *ypb.Empty) (*ypb.GetYakScriptTagsAndTypeResponse, error) {
 	var tagsAndType ypb.GetYakScriptTagsAndTypeResponse
-	// onlineTags, err := yakit.YakScriptTags(s.GetProfileDatabase(), "", "HAVING count > 1 ")
 	onlineType, _ := yakit.YakScriptType(s.GetProfileDatabase())
 	db := consts.GetGormProfileDatabase()
 	onlineTags := s.QueryYakScriptTagsGroup(db)
@@ -991,31 +990,87 @@ func (s *Server) SaveNewYakScript(ctx context.Context, script *ypb.SaveNewYakScr
 	return res.ToGRPCModel(), nil
 }
 
-func (s *Server) ExportLocalYakScript(ctx context.Context, req *ypb.ExportLocalYakScriptRequest) (*ypb.ExportLocalYakScriptResponse, error) {
+func (s *Server) ExportLocalYakScript(req *ypb.ExportLocalYakScriptRequest, stream ypb.Yak_ExportLocalYakScriptServer) error {
+	var (
+		progress                 float64
+		count                    int
+		total                    int
+		message                  string
+		errorCount, successCount int
+	)
 	db := yakit.QueryExportYakScript(s.GetProfileDatabase(), req)
 	scripts := yakit.YieldYakScripts(db, context.Background())
+	db.Count(&total)
+
 	dir := req.GetOutputDir()
+	messageType := "success"
+	stream.Send(&ypb.ExportLocalYakScriptResponse{
+		Progress:    0,
+		Message:     "initializing",
+		MessageType: "",
+	})
+	defer func() {
+		if errorCount > 0 {
+			message += fmt.Sprintf("执行失败: %v 个", errorCount)
+			messageType = "finalError"
+		}
+		if successCount > 0 {
+			message += fmt.Sprintf("执行成功: %v 个", successCount)
+		}
+		if message == "" {
+			message = "finished"
+		}
+		stream.Send(&ypb.ExportLocalYakScriptResponse{
+			Progress:    1,
+			Message:     message,
+			MessageType: messageType,
+			OutputDir:   dir,
+		})
+	}()
 
 	for v := range scripts {
+		if total > 0 {
+			progress = float64(count) / float64(total)
+		}
+		count++
 		outputPluginDir := v.ScriptName
 		dirRet, err := s.ExportYakPluginBatch(v, req.GetOutputDir(), ReplaceString(outputPluginDir))
 		if len(req.GetYakScriptIds()) == 1 {
 			dir = dirRet
 		}
+		if count%100 == 0 {
+			time.Sleep(1 * time.Second)
+		}
 		if err != nil {
-			log.Errorf("export [%s] failed: %s", v.ScriptName, err.Error())
+			stream.Send(&ypb.ExportLocalYakScriptResponse{
+				Progress:    progress,
+				Message:     fmt.Sprintf("export [%s] failed: %s", v.ScriptName, err.Error()),
+				MessageType: "error",
+			})
+			errorCount++
+		} else {
+			stream.Send(&ypb.ExportLocalYakScriptResponse{
+				Progress:    progress,
+				Message:     fmt.Sprintf("export [%s] success", v.ScriptName),
+				MessageType: "success",
+			})
+			successCount++
 		}
 	}
 
-	return &ypb.ExportLocalYakScriptResponse{OutputDir: dir}, nil
+	return nil
 }
 
 func (s *Server) ImportYakScript(req *ypb.ImportYakScriptRequest, stream ypb.Yak_ImportYakScriptServer) error {
 	if len(req.Dirs) <= 0 {
 		return utils.Errorf("params is empty")
 	}
-	var progress float64
-	var count float64 = 0
+	var (
+		progress                 float64
+		count                    int
+		message                  string
+		errorCount, successCount int
+	)
 	messageType := "success"
 	stream.Send(&ypb.ImportYakScriptResult{
 		Progress:    0,
@@ -1023,32 +1078,41 @@ func (s *Server) ImportYakScript(req *ypb.ImportYakScriptRequest, stream ypb.Yak
 		MessageType: "",
 	})
 	defer func() {
+		if errorCount > 0 {
+			message += fmt.Sprintf("执行失败: %v 个", errorCount)
+			messageType = "finalError"
+		}
+		if successCount > 0 {
+			message += fmt.Sprintf("执行成功: %v 个", successCount)
+		}
+		if message == "" {
+			message = "finished"
+		}
+
 		stream.Send(&ypb.ImportYakScriptResult{
 			Progress:    1,
-			Message:     "finished",
+			Message:     message,
 			MessageType: messageType,
 		})
 	}()
 	for _, dir := range req.Dirs {
-		total := yakit.YakScriptLocalTotal(req.Dirs)
-		// count++
 		typeStr := yakit.YakScriptLocalType(dir)
 		if typeStr == "" {
 			stream.Send(&ypb.ImportYakScriptResult{
-				// Progress:    ,
 				Message:     fmt.Sprintf("import [%s] yakScript  failed: %s", dir, "文件名不符合上传"),
 				MessageType: "error",
 			})
+			continue
 		}
+		total := yakit.YakScriptLocalTotal(req.Dirs)
 		modDir := filepath.Join(dir)
 		fs, err := utils.ReadDirsRecursively(modDir)
 		if err != nil {
-			log.Infof("load yakit resource[%s] failed: %s", modDir, err)
 			stream.Send(&ypb.ImportYakScriptResult{
-				// Progress:    0.1,
 				Message:     fmt.Sprintf("import [%s] yakScript  failed: %s", dir, err),
 				MessageType: "error",
 			})
+			continue
 		}
 
 		db := consts.GetGormProfileDatabase()
@@ -1058,54 +1122,65 @@ func (s *Server) ImportYakScript(req *ypb.ImportYakScriptRequest, stream ypb.Yak
 
 		for _, f := range fs {
 			if total > 0 {
-				progress = count / float64(total)
+				progress = float64(count) / float64(total)
 			}
 			count++
-
+			if count%100 == 0 {
+				time.Sleep(1 * time.Second)
+			}
 			if !f.IsDir {
-				log.Infof("skipped: %s", f.Path)
+				errorCount++
 				stream.Send(&ypb.ImportYakScriptResult{
 					Progress:    progress,
-					Message:     fmt.Sprintf("import [%s] yakScript  failed: %s", dir, filepath.Base(f.Path)),
+					Message:     fmt.Sprintf("import [%s] yakScript failed ", dir),
 					MessageType: "error",
 				})
 			}
 			script, markdown, err := yakit.LoadPackage(typeStr, f.Path)
 			if err != nil {
-				log.Warnf("load package failed for %s", err)
+				errorCount++
 				stream.Send(&ypb.ImportYakScriptResult{
 					Progress:    progress,
-					Message:     fmt.Sprintf("import [%s] yakScript  failed: %s", dir, filepath.Base(f.Path)),
+					Message:     fmt.Sprintf("import [%s] yakScript  failed: %s", dir, err.Error()),
 					MessageType: "error",
 				})
 			}
-			if script != nil {
+			if script != nil && script.Type != "" {
 				err = yakit.CreateOrUpdateYakScriptByName(db, script.ScriptName, script)
 				if err != nil {
-					log.Errorf("save [%v] failed: %v", script.ScriptName, script)
+					errorCount++
 					stream.Send(&ypb.ImportYakScriptResult{
 						Progress:    progress,
 						Message:     fmt.Sprintf("import [%s] yakScript  failed: %s", dir, filepath.Base(f.Path)),
 						MessageType: "error",
+					})
+				} else {
+					successCount++
+					stream.Send(&ypb.ImportYakScriptResult{
+						Progress:    progress,
+						Message:     fmt.Sprintf("import [%s] yakScript  success: %s", dir, filepath.Base(f.Path)),
+						MessageType: "success",
 					})
 				}
 			}
 			if markdown != nil {
 				err = yakit.CreateOrUpdateMarkdownDoc(db, 0, markdown.YakScriptName, markdown)
 				if err != nil {
-					log.Errorf("save markdown[%v] failed: %v", markdown.YakScriptName, err)
+					errorCount++
 					stream.Send(&ypb.ImportYakScriptResult{
 						Progress:    progress,
 						Message:     fmt.Sprintf("import [%s] yakScript  failed: %s", dir, filepath.Base(f.Path)),
 						MessageType: "error",
 					})
+				} else {
+					successCount++
+					stream.Send(&ypb.ImportYakScriptResult{
+						Progress:    progress,
+						Message:     fmt.Sprintf("import [%s] yakScript  success: %s", dir, filepath.Base(f.Path)),
+						MessageType: "success",
+					})
 				}
 			}
-			stream.Send(&ypb.ImportYakScriptResult{
-				Progress:    progress,
-				Message:     fmt.Sprintf("import [%s] yakScript  success: %s", dir, filepath.Base(f.Path)),
-				MessageType: "success",
-			})
 		}
 
 	}
