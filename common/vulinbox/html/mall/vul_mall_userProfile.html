@@ -8,10 +8,11 @@
     <title>首页- 购物商城</title>
 
     <!-- Google Fonts -->
-    <link href='https://fonts.googleapis.com/css?family=Titillium+Web:400,200,300,700,600' rel='stylesheet'
+    <link href='https://fonts.googleapis.com/css?family=Titillium+Web:400,200,300,700,600&display=swap' rel='stylesheet'
         type='text/css'>
-    <link href='https://fonts.googleapis.com/css?family=Roboto+Condensed:400,700,300' rel='stylesheet' type='text/css'>
-    <link href='https://fonts.googleapis.com/css?family=Raleway:400,100' rel='stylesheet' type='text/css'>
+    <link href='https://fonts.googleapis.com/css?family=Roboto+Condensed:400,700,300&display=swap' rel='stylesheet'
+        type='text/css'>
+    <link href='https://fonts.googleapis.com/css?family=Raleway:400,100&display=swap' rel='stylesheet' type='text/css'>
 
     <!-- Bootstrap -->
     <link rel="stylesheet" href="/static/css/mall/bootstrap.min.css">
@@ -122,8 +123,9 @@
                         </li>
                     </ul> -->
                     <div class="shopping-item navbar-right">
-                        <a onclick='redirectToCart(event)'>Cart - <span class="cart-amunt"></span> <i class="fa fa-shopping-cart"></i> <span
-                                class="product-count">{{.Cartsum}}</span></a>
+                        <a onclick='redirectToCart(event)'>Cart - <span class="cart-amunt"></span> <i
+                                class="fa fa-shopping-cart"></i> <span class="product-count" id="cartSum" rgb(252, 109,
+                                9)>{{.Cartsum}}</span></a>
                     </div>
                 </div>
             </div>
@@ -422,10 +424,10 @@
     </div>
 
     <!-- Latest jQuery form server -->
-    <script src="https://code.jquery.com/jquery.min.js"></script>
+    <script src="/static/js/mall/jquery.min.js"></script>
 
     <!-- Bootstrap JS form CDN -->
-    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+    <script src="/static/js/mall/bootstrap.min.js"></script>
 
     <!-- jQuery sticky menu -->
     <script src="/static/js/mall/owl.carousel.min.js"></script>
