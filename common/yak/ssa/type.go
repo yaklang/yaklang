@@ -160,7 +160,8 @@ func IsObjectType(t Type) bool {
 }
 
 type Type interface {
-	String() string
+	String() string  // only string
+	PkgPath() string // package path string
 	RawString() string
 	GetTypeKind() TypeKind
 
@@ -254,14 +255,29 @@ const (
 )
 
 type BasicType struct {
-	Kind TypeKind
-	name string
+	Kind    TypeKind
+	name    string
+	pkgPath string
 
 	method map[string]*FunctionType
 }
 
+func NewBasicType(kind TypeKind, name string) *BasicType {
+	return &BasicType{
+		Kind:    kind,
+		name:    name,
+		pkgPath: name,
+		method:  map[string]*FunctionType{},
+	}
+
+}
+
 func (b *BasicType) String() string {
 	return b.name
+}
+
+func (b *BasicType) PkgPath() string {
+	return b.pkgPath
 }
 
 func (b *BasicType) RawString() string {
@@ -294,14 +310,14 @@ func (b *BasicType) AddMethod(id string, f *FunctionType) {
 var _ Type = (*BasicType)(nil)
 
 var BasicTypes = []*BasicType{
-	Number:        {Number, "number", make(map[string]*FunctionType, 0)},
-	String:        {String, "string", make(map[string]*FunctionType, 0)},
-	Bytes:         {Bytes, "bytes", make(map[string]*FunctionType, 0)},
-	Boolean:       {Boolean, "boolean", make(map[string]*FunctionType, 0)},
-	UndefinedType: {UndefinedType, "undefined", make(map[string]*FunctionType, 0)},
-	Null:          {Null, "null", make(map[string]*FunctionType, 0)},
-	Any:           {Any, "any", make(map[string]*FunctionType, 0)},
-	ErrorType:     {ErrorType, "error", make(map[string]*FunctionType, 0)},
+	Number:        NewBasicType(Number, "number"),
+	String:        NewBasicType(String, "string"),
+	Bytes:         NewBasicType(Bytes, "bytes"),
+	Boolean:       NewBasicType(Boolean, "boolean"),
+	UndefinedType: NewBasicType(UndefinedType, "undefined"),
+	Null:          NewBasicType(Null, "null"),
+	Any:           NewBasicType(Any, "any"),
+	ErrorType:     NewBasicType(ErrorType, "error"),
 }
 
 func GetNumberType() Type {
@@ -367,18 +383,20 @@ func GetTypeByStr(typ string) Type {
 
 // ====================== alias type
 type AliasType struct {
-	elem   Type
-	method map[string]*FunctionType
-	Name   string
+	elem    Type
+	method  map[string]*FunctionType
+	Name    string
+	pkgPath string
 }
 
 var _ Type = (*AliasType)(nil)
 
-func NewAliasType(name string, elem Type) *AliasType {
+func NewAliasType(name, pkg string, elem Type) *AliasType {
 	return &AliasType{
-		elem:   elem,
-		method: make(map[string]*FunctionType),
-		Name:   name,
+		elem:    elem,
+		method:  make(map[string]*FunctionType),
+		Name:    name,
+		pkgPath: pkg,
 	}
 }
 
@@ -409,6 +427,10 @@ func (a *AliasType) String() string {
 	}
 }
 
+func (b *AliasType) PkgPath() string {
+	return b.pkgPath
+}
+
 func (a *AliasType) RawString() string {
 	return fmt.Sprintf("type %s (%s)", a.Name, a.elem)
 }
@@ -419,14 +441,16 @@ func (a *AliasType) GetTypeKind() TypeKind {
 
 // ====================== interface type
 type InterfaceType struct {
-	method map[string]*FunctionType
-	name   string
+	method  map[string]*FunctionType
+	name    string
+	pkgPath string
 }
 
-func NewInterfaceType(name string) *InterfaceType {
+func NewInterfaceType(name, pkgPath string) *InterfaceType {
 	return &InterfaceType{
-		method: make(map[string]*FunctionType),
-		name:   name,
+		method:  make(map[string]*FunctionType),
+		name:    name,
+		pkgPath: pkgPath,
 	}
 }
 
@@ -461,6 +485,10 @@ func (i *InterfaceType) String() string {
 	} else {
 		return i.RawString()
 	}
+}
+
+func (i *InterfaceType) PkgPath() string {
+	return i.pkgPath
 }
 
 func (i *InterfaceType) RawString() string {
@@ -508,6 +536,10 @@ func (c ChanType) String() string {
 	return fmt.Sprintf("chan %s", c.Elem)
 }
 
+func (c ChanType) PkgPath() string {
+	return c.Elem.PkgPath()
+}
+
 func (c ChanType) RawString() string {
 	return c.String()
 }
@@ -515,6 +547,7 @@ func (c ChanType) RawString() string {
 // ==================== interface type
 type ObjectType struct {
 	Name       string
+	pkgPath    string
 	Kind       TypeKind
 	Len        int
 	Keys       []Value
@@ -608,6 +641,10 @@ func (itype ObjectType) String() string {
 		return itype.Name
 	}
 	return itype.RawString()
+}
+
+func (i ObjectType) PkgPath() string {
+	return i.pkgPath
 }
 
 func (itype ObjectType) RawString() string {
@@ -710,6 +747,7 @@ func (s *ObjectType) Finish() {
 
 type FunctionType struct {
 	Name         string
+	pkgPath      string
 	ReturnType   Type
 	Parameter    Types
 	FreeValue    []string
@@ -779,6 +817,9 @@ func (s *FunctionType) SetName(name string) {
 	s.Name = name
 }
 
+func (s *FunctionType) PkgPath() string {
+	return s.pkgPath
+}
 func (s *FunctionType) String() string {
 	if s.Name != "" {
 		return s.Name

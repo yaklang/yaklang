@@ -135,30 +135,29 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 	} else {
 		level += 1
 	}
-	typStr := typ.String()
-	if typStr == "[]uint8" {
-		typStr = "bytes"
+	Name := typ.String()
+	if Name == "[]uint8" {
+		Name = "bytes"
 	}
 
 	// base type
-	if t := GetTypeByStr(typStr); t != nil {
+	if t := GetTypeByStr(Name); t != nil {
 		return t
 	}
 
-	var pkgPath string
-	var name string
+	var PkgPath string
 	typKind := typ.Kind()
 	if typKind == reflect.Struct || typKind == reflect.Interface {
-		pkgPath = typ.PkgPath()
-		name = typ.Name()
-		typStr = fmt.Sprintf("%s.%s", pkgPath, name)
+		pkg := typ.PkgPath()
+		name := typ.Name()
+		PkgPath = fmt.Sprintf("%s.%s", pkg, name)
 	} else if typKind == reflect.Ptr {
-		pkgPath = typ.Elem().PkgPath()
-		name = typ.Elem().Name()
-		typStr = fmt.Sprintf("%s.%s", pkgPath, name)
+		pkg := typ.Elem().PkgPath()
+		name := typ.Elem().Name()
+		PkgPath = fmt.Sprintf("%s.%s", pkg, name)
 	}
 
-	if hijackType, ok := f.externType[typStr]; ok {
+	if hijackType, ok := f.externType[Name]; ok {
 		return hijackType
 	}
 
@@ -166,7 +165,7 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 
 	// alias type
 	if t := GetTypeByStr(typ.Kind().String()); t != nil {
-		ret = NewAliasType(typStr, t)
+		ret = NewAliasType(Name, PkgPath, t)
 	}
 
 	isInterface := false
@@ -178,7 +177,9 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 		ret = NewMapType(f.handlerType(typ.Key(), level), f.handlerType(typ.Elem(), level))
 	case reflect.Struct:
 		structType := NewStructType()
-		f.externType[typStr] = structType
+		structType.Name = Name
+		structType.pkgPath = PkgPath
+		f.externType[Name] = structType
 		for i := 0; i < typ.NumField(); i++ {
 			field := typ.Field(i)
 			fieldType := f.handlerType(field.Type, level)
@@ -196,11 +197,11 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 		return ret
 	case reflect.UnsafePointer:
 		obj := NewObjectType()
-		obj.SetName(typStr)
+		obj.SetName(Name)
 		ret = obj
 	case reflect.Interface:
 		isInterface = true
-		ret = NewInterfaceType(typStr)
+		ret = NewInterfaceType(Name, PkgPath)
 	case reflect.Chan:
 		ret = NewChanType(f.handlerType(typ.Elem(), level))
 	default:
@@ -211,9 +212,9 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 	}
 
 	if ret != nil {
-		f.externType[typStr] = ret
+		f.externType[Name] = ret
 		if ityp, ok := ret.(*ObjectType); ok {
-			ityp.SetName(typStr)
+			ityp.SetName(Name)
 		}
 	}
 
@@ -227,7 +228,8 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 			if isInterface {
 				funTyp.Parameter = utils.InsertSliceItem(funTyp.Parameter, ret, 0)
 			}
-			funTyp.SetName(fmt.Sprintf("%s/%s.%s", pkgPath, name, method.Name))
+			funTyp.SetName(fmt.Sprintf("%s.%s", PkgPath, method.Name))
+			// funTyp.SetName(PkgPath)
 			Methods[method.Name] = funTyp
 		}
 	}

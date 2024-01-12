@@ -4,8 +4,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -17,6 +19,7 @@ func GetSuggestion(local ypb.YakClient, typ, pluginType string, t *testing.T, co
 		YakScriptCode: code,
 		Range:         Range,
 	})
+	log.Info(ret)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,14 +41,35 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionCompletion(t *testing.T) {
 		res := getCompletion(t, `
 cli.
 	`, &ypb.Range{
-			Code:        "flow",
+			Code:        "",
 			StartLine:   2,
-			StartColumn: 28,
+			StartColumn: 4,
 			EndLine:     2,
-			EndColumn:   32,
+			EndColumn:   4,
 		})
 		if len(res.SuggestionMessage) == 0 {
 			t.Fatal("code `cli.` should get completion but not")
+		}
+	})
+
+	t.Run("check extern struct completion", func(t *testing.T) {
+		res := getCompletion(t, `
+prog = ssa.Parse("")~
+prog.
+		`, &ypb.Range{
+			Code:        "prog.",
+			StartLine:   3,
+			StartColumn: 0,
+			EndLine:     3,
+			EndColumn:   6,
+		})
+		got := lo.Map(res.SuggestionMessage, func(item *ypb.SuggestionDescription, _ int) string {
+			return item.Label
+		})
+		log.Info("got: ", got)
+		want := []string{"Programe", "Ref"}
+		if !utils.StringSliceContainsAll(got, want...) {
+			t.Fatalf("want %v, but got %v", want, got)
 		}
 	})
 }
