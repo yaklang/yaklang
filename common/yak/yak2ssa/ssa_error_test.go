@@ -33,7 +33,7 @@ func CheckTestCase(t *testing.T, tc TestCase) {
 	slices.Sort(errs)
 	slices.Sort(tc.errs)
 	if len(errs) != len(tc.errs) {
-		t.Fatalf("error len not match %d vs %d", len(errs), len(tc.errs))
+		t.Fatalf("error len not match %d vs %d : %s", len(errs), len(tc.errs), errs)
 	}
 	for i := 0; i < len(errs); i++ {
 		for errs[i] != tc.errs[i] {
@@ -1093,6 +1093,24 @@ func TestExternInstance(t *testing.T) {
 			ExternValue: map[string]any{
 				"fun":  func([]byte, bool) {},
 				"fun1": func(...byte) {},
+			},
+		})
+	})
+
+	t.Run("use extern instance free value", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			p = print // print
+			f = () => { // p
+				p("sub")
+			}
+
+			f2 = () => { // print
+				print("sub")
+			}
+			`,
+			ExternValue: map[string]any{
+				"print": func(any) {},
 			},
 		})
 	})

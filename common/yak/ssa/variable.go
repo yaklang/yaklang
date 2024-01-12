@@ -284,15 +284,19 @@ func (b *FunctionBuilder) BuildFreeValue(variable string) Value {
 	return freeValue
 }
 
-func (b *FunctionBuilder) CanBuildFreeValue(variable string) bool {
+func (b *FunctionBuilder) CanBuildFreeValue(name string) bool {
 	parent := b.parentBuilder
 	scope := b.parentScope
 	block := b.parentCurrentBlock
 	for parent != nil {
-		variable = scope.GetLocalVariable(variable)
-		v := parent.readVariableByBlock(variable, block, false)
-		if v != nil && !v.IsExtern() {
-			return true
+		name = scope.GetLocalVariable(name)
+		v := parent.readVariableByBlock(name, block, false)
+		if v != nil {
+			// if v not extern instance
+			// or value assign by extern instance (extern instance but name not equal)
+			if (!v.IsExtern()) || (v.IsExtern() && v.GetName() != name) {
+				return true
+			}
 		}
 
 		// parent symbol and block
