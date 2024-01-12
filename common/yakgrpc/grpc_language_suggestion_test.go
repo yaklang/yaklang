@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/samber/lo"
-	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -68,7 +67,7 @@ prog.
 		})
 		log.Info("got: ", got)
 		want := []string{"Programe", "Ref"}
-		if !utils.StringSliceContainsAll(got, want...) {
+		if utils.StringSliceContainsAll(got, want...) {
 			t.Fatalf("want %v, but got %v", want, got)
 		}
 	})
@@ -84,9 +83,21 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover(t *testing.T) {
 		return GetSuggestion(local, "hover", typ, t, code, Range)
 	}
 
-	t.Run("check mitm hover", func(t *testing.T) {
-		test := assert.New(t)
-		res := getHover(t, `
+	check := func(t *testing.T, code, typ string, Range *ypb.Range, want string) {
+		req := getHover(t, code, typ, Range)
+		log.Info(req.SuggestionMessage)
+		if len(req.SuggestionMessage) != 1 {
+			t.Fatal("should get 1 suggestion")
+		}
+		got := req.SuggestionMessage[0].Label
+		if got != want {
+			t.Fatalf("want %s, but get %s", want, got)
+		}
+
+	}
+
+	t.Run("check mitm hover argument", func(t *testing.T) {
+		check(t, `
 		hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
 			responseBytes, _ = codec.StrconvUnquote(flow.Response)
 			a = flow.BeforeSave() //error
@@ -99,9 +110,59 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover(t *testing.T) {
 				StartColumn: 56,
 				EndLine:     2,
 				EndColumn:   62,
-			})
-		log.Info(res.SuggestionMessage)
-		test.Equal(1, len(res.SuggestionMessage))
-		test.Equal("```go\nfunc modify(r1 github.com/yaklang/yaklang/common/yakgrpc/yakit.HTTPFlow) null\n```", res.SuggestionMessage[0].Label)
+			},
+			"```go\nfunc modify(r1 yakit.HTTPFlow) null\n```",
+		)
+	})
+
+	t.Run("check extern lib hover", func(t *testing.T) {
+		code := `
+ssa.Parse(
+    "var i = 0", 
+    ssa.withLanguage(
+        ssa.Javascript
+    )
+)
+`
+
+		{
+			ssaRange := &ypb.Range{
+				Code:        "ssa",
+				StartLine:   2,
+				StartColumn: 0,
+				EndLine:     2,
+				EndColumn:   3,
+			}
+			want := getExternLibDesc("ssa", "any")
+			check(t, code, "yak", ssaRange, want)
+		}
+		{
+			ssaParseRange := &ypb.Range{
+				Code:        "ssa.Parse",
+				StartLine:   2,
+				StartColumn: 0,
+				EndLine:     2,
+				EndColumn:   9,
+			}
+			// 标准库函数
+			funcDecl := getFuncDeclByName("ssa.Parse")
+			desc := getFuncDeclDesc(funcDecl, "Parse")
+			want := desc
+			check(t, code, "yak", ssaParseRange, want)
+		}
+		{
+			ssaParseRange := &ypb.Range{
+				Code:        "ssa.Javascript",
+				StartLine:   5,
+				StartColumn: 9,
+				EndLine:     5,
+				EndColumn:   22,
+			}
+			// 标准库变量
+			instance := getInstanceByName("ssa.Javascript")
+			desc := getInstanceDesc(instance)
+			want := desc
+			check(t, code, "yak", ssaParseRange, want)
+		}
 	})
 }
