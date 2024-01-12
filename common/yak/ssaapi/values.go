@@ -388,7 +388,7 @@ func (v *Value) GetSelf() *Value {
 	return v
 }
 
-func (v *Value) IsExtern() bool       { return v.IsParameter() && v.node.IsExtern() }
+func (v *Value) IsExtern() bool       { return v.node.GetOpcode() == ssa.OpExternLib }
 func (v *Value) IsFunction() bool     { return v.node.GetOpcode() == ssa.OpFunction }
 func (v *Value) IsBasicBlock() bool   { return v.node.GetOpcode() == ssa.OpBasicBlock }
 func (v *Value) IsParameter() bool    { return v.node.GetOpcode() == ssa.OpParameter }
