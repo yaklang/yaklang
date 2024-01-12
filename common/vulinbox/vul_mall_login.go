@@ -215,7 +215,7 @@ func (s *VulinServer) mallUserRoute() {
 					Cartsum  int
 				}
 				profile := UserProfile{
-					ID:       int(userInfo.ID),
+					// ID:       int(userInfo.ID),
 					Username: userInfo.Username,
 					Cartsum:  int(Cartsum),
 				}

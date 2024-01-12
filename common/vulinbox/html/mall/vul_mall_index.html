@@ -8,10 +8,11 @@
     <title>首页- 购物商城</title>
 
     <!-- Google Fonts -->
-    <link href='https://fonts.googleapis.com/css?family=Titillium+Web:400,200,300,700,600' rel='stylesheet'
+    <link href='https://fonts.googleapis.com/css?family=Titillium+Web:400,200,300,700,600&display=swap' rel='stylesheet'
         type='text/css'>
-    <link href='https://fonts.googleapis.com/css?family=Roboto+Condensed:400,700,300' rel='stylesheet' type='text/css'>
-    <link href='https://fonts.googleapis.com/css?family=Raleway:400,100' rel='stylesheet' type='text/css'>
+    <link href='https://fonts.googleapis.com/css?family=Roboto+Condensed:400,700,300&display=swap' rel='stylesheet'
+        type='text/css'>
+    <link href='https://fonts.googleapis.com/css?family=Raleway:400,100&display=swap' rel='stylesheet' type='text/css'>
 
     <!-- Bootstrap -->
     <link rel="stylesheet" href="/static/css/mall/bootstrap.min.css">
@@ -24,6 +25,11 @@
     <link rel="stylesheet" href="/static/css/mall/owl.carousel.css">
     <link rel="stylesheet" href="/static/css/mall/style.css">
     <link rel="stylesheet" href="/static/css/mall/responsive.css">
+    <style>
+        .hover-color-change a:hover {
+            color: rgb(252, 109, 9);
+        }
+    </style>
 </head>
 
 <body>
@@ -34,10 +40,11 @@
                 <div class="col-md-8">
                     <div class="user-menu">
                         <ul>
-                            <li><a href="#" onclick='checkLogin()'><i class="fa fa-user"></i> My Account</a></li>
-                            <li><a href="#" onclick='checkLogin()'><i class="fa fa-shopping-cart"></i> My Cart</a></li>
+                            <!-- <li><a href="#" onclick='checkLogin()''><i class="fa fa-user"></i> My Account</a></li> -->
+                            <li><a href="#" onclick='checkLogin()'><i class="fa fa-shopping-cart"></i> My Cart</a>
+                            </li>
                             <li><a href="/mall/user/login"><i class="fa fa-sign-in"></i> Login</a></li>
-                            <li><a href="/mall/user/register"><i class="fa fa-user-plus"></i> Register</a></li>
+                            <li><a href="/mall/user/register"><i class="fa fa-user"></i> Register</a></li>
                         </ul>
                     </div>
                 </div>
@@ -101,8 +108,8 @@
 
                         <!-- <li><a href="index.html">Home</a></li> -->
                         <li><a><img src="/static/logo.png" width="176" height="64"></a></li>
-                        <li class="active"><a href="shop.html">Home</a></li>
-                        <li><a href="#" onclick='checkLogin()'>购物车</a></li>
+                        <li class="active hover-color-change"><a>Home</a></li>
+                        <li class="hover-color-change"><a onclick='checkLogin()'>购物车</a></li>
                     </ul>
                 </div>
             </div>
@@ -131,14 +138,14 @@
                         <div class="product-upper">
                             <img src="/static/img/product-2.jpg" alt="">
                         </div>
-                        <h2><a href="">Apple new mac book 2015 March :P</a></h2>
+                        <h2><a>Apple new mac book 2015 March :P</a></h2>
                         <div class="product-carousel-price">
                             <ins>$899.00</ins> <del>$999.00</del>
                         </div>
 
                         <div class="product-option-shop">
                             <a class="add_to_cart_button" data-quantity="1" data-product_sku="" data-product_id="70"
-                                rel="nofollow" href="/canvas/shop/?add-to-cart=70">Add to cart</a>
+                                rel="nofollow" onclick='checkLogin()'>加入购物车</a>
                         </div>
                     </div>
                 </div>
@@ -147,14 +154,14 @@
                         <div class="product-upper">
                             <img src="/static/img/product-1.jpg" alt="">
                         </div>
-                        <h2><a href="">Apple new mac book 2015 March :P</a></h2>
+                        <h2><a>Apple new mac book 2015 March :P</a></h2>
                         <div class="product-carousel-price">
                             <ins>$899.00</ins> <del>$999.00</del>
                         </div>
 
                         <div class="product-option-shop">
                             <a class="add_to_cart_button" data-quantity="1" data-product_sku="" data-product_id="70"
-                                rel="nofollow" href="/canvas/shop/?add-to-cart=70">Add to cart</a>
+                                rel="nofollow" onclick='checkLogin()'>加入购物车</a>
                         </div>
                     </div>
                 </div>
@@ -163,14 +170,14 @@
                         <div class="product-upper">
                             <img src="/static/img/product-3.jpg" alt="">
                         </div>
-                        <h2><a href="">Apple new mac book 2015 March :P</a></h2>
+                        <h2><a>Apple new mac book 2015 March :P</a></h2>
                         <div class="product-carousel-price">
                             <ins>$899.00</ins> <del>$999.00</del>
                         </div>
 
                         <div class="product-option-shop">
                             <a class="add_to_cart_button" data-quantity="1" data-product_sku="" data-product_id="70"
-                                rel="nofollow" href="/canvas/shop/?add-to-cart=70">Add to cart</a>
+                                rel="nofollow" onclick='checkLogin()'>加入购物车</a>
                         </div>
                     </div>
                 </div>
@@ -179,14 +186,14 @@
                         <div class="product-upper">
                             <img src="/static/img/product-4.jpg" alt="">
                         </div>
-                        <h2><a href="">Apple new mac book 2015 March :P</a></h2>
+                        <h2><a>Apple new mac book 2015 March :P</a></h2>
                         <div class="product-carousel-price">
                             <ins>$899.00</ins> <del>$999.00</del>
                         </div>
 
                         <div class="product-option-shop">
                             <a class="add_to_cart_button" data-quantity="1" data-product_sku="" data-product_id="70"
-                                rel="nofollow" href="/canvas/shop/?add-to-cart=70">Add to cart</a>
+                                rel="nofollow" onclick='checkLogin()'>加入购物车</a>
                         </div>
                     </div>
                 </div>
@@ -195,14 +202,14 @@
                         <div class="product-upper">
                             <img src="/static/img/product-2.jpg" alt="">
                         </div>
-                        <h2><a href="">Apple new mac book 2015 March :P</a></h2>
+                        <h2><a>Apple new mac book 2015 March :P</a></h2>
                         <div class="product-carousel-price">
                             <ins>$899.00</ins> <del>$999.00</del>
                         </div>
 
                         <div class="product-option-shop">
                             <a class="add_to_cart_button" data-quantity="1" data-product_sku="" data-product_id="70"
-                                rel="nofollow" href="/canvas/shop/?add-to-cart=70">Add to cart</a>
+                                rel="nofollow" onclick='checkLogin()'>加入购物车</a>
                         </div>
                     </div>
                 </div>
@@ -211,14 +218,14 @@
                         <div class="product-upper">
                             <img src="/static/img/product-1.jpg" alt="">
                         </div>
-                        <h2><a href="">Apple new mac book 2015 March :P</a></h2>
+                        <h2><a>Apple new mac book 2015 March :P</a></h2>
                         <div class="product-carousel-price">
                             <ins>$899.00</ins> <del>$999.00</del>
                         </div>
 
                         <div class="product-option-shop">
                             <a class="add_to_cart_button" data-quantity="1" data-product_sku="" data-product_id="70"
-                                rel="nofollow" href="/canvas/shop/?add-to-cart=70">Add to cart</a>
+                                rel="nofollow" onclick='checkLogin()'>加入购物车</a>
                         </div>
                     </div>
                 </div>
@@ -227,14 +234,14 @@
                         <div class="product-upper">
                             <img src="/static/img/product-3.jpg" alt="">
                         </div>
-                        <h2><a href="">Apple new mac book 2015 March :P</a></h2>
+                        <h2><a>Apple new mac book 2015 March :P</a></h2>
                         <div class="product-carousel-price">
                             <ins>$899.00</ins> <del>$999.00</del>
                         </div>
 
                         <div class="product-option-shop">
                             <a class="add_to_cart_button" data-quantity="1" data-product_sku="" data-product_id="70"
-                                rel="nofollow" href="/canvas/shop/?add-to-cart=70">Add to cart</a>
+                                rel="nofollow" onclick='checkLogin()'>加入购物车</a>
                         </div>
                     </div>
                 </div>
@@ -243,14 +250,14 @@
                         <div class="product-upper">
                             <img src="/static/img/product-4.jpg" alt="">
                         </div>
-                        <h2><a href="">Apple new mac book 2015 March :P</a></h2>
+                        <h2><a>Apple new mac book 2015 March :P</a></h2>
                         <div class="product-carousel-price">
                             <ins>$899.00</ins> <del>$999.00</del>
                         </div>
 
                         <div class="product-option-shop">
                             <a class="add_to_cart_button" data-quantity="1" data-product_sku="" data-product_id="70"
-                                rel="nofollow" href="/canvas/shop/?add-to-cart=70">Add to cart</a>
+                                rel="nofollow" onclick='checkLogin()'>加入购物车</a>
                         </div>
                     </div>
                 </div>
@@ -259,14 +266,14 @@
                         <div class="product-upper">
                             <img src="/static/img/product-2.jpg" alt="">
                         </div>
-                        <h2><a href="">Apple new mac book 2015 March :P</a></h2>
+                        <h2><a>Apple new mac book 2015 March :P</a></h2>
                         <div class="product-carousel-price">
                             <ins>$899.00</ins> <del>$999.00</del>
                         </div>
 
                         <div class="product-option-shop">
                             <a class="add_to_cart_button" data-quantity="1" data-product_sku="" data-product_id="70"
-                                rel="nofollow" href="/canvas/shop/?add-to-cart=70">Add to cart</a>
+                                rel="nofollow" onclick='checkLogin()'>加入购物车</a>
                         </div>
                     </div>
                 </div>
@@ -275,14 +282,14 @@
                         <div class="product-upper">
                             <img src="/static/img/product-1.jpg" alt="">
                         </div>
-                        <h2><a href="">Apple new mac book 2015 March :P</a></h2>
+                        <h2><a>Apple new mac book 2015 March :P</a></h2>
                         <div class="product-carousel-price">
                             <ins>$899.00</ins> <del>$999.00</del>
                         </div>
 
                         <div class="product-option-shop">
                             <a class="add_to_cart_button" data-quantity="1" data-product_sku="" data-product_id="70"
-                                rel="nofollow" href="/canvas/shop/?add-to-cart=70">Add to cart</a>
+                                rel="nofollow" onclick='checkLogin()'>加入购物车</a>
                         </div>
                     </div>
                 </div>
@@ -291,14 +298,14 @@
                         <div class="product-upper">
                             <img src="/static/img/product-3.jpg" alt="">
                         </div>
-                        <h2><a href="">Apple new mac book 2015 March :P</a></h2>
+                        <h2><a>Apple new mac book 2015 March :P</a></h2>
                         <div class="product-carousel-price">
                             <ins>$899.00</ins> <del>$999.00</del>
                         </div>
 
                         <div class="product-option-shop">
                             <a class="add_to_cart_button" data-quantity="1" data-product_sku="" data-product_id="70"
-                                rel="nofollow" href="/canvas/shop/?add-to-cart=70">Add to cart</a>
+                                rel="nofollow" onclick='checkLogin()'>加入购物车</a>
                         </div>
                     </div>
                 </div>
@@ -307,14 +314,14 @@
                         <div class="product-upper">
                             <img src="/static/img/product-4.jpg" alt="">
                         </div>
-                        <h2><a href="">Apple new mac book 2015 March :P</a></h2>
+                        <h2><a>Apple new mac book 2015 March :P</a></h2>
                         <div class="product-carousel-price">
                             <ins>$899.00</ins> <del>$999.00</del>
                         </div>
 
                         <div class="product-option-shop">
                             <a class="add_to_cart_button" data-quantity="1" data-product_sku="" data-product_id="70"
-                                rel="nofollow" href="/canvas/shop/?add-to-cart=70">Add to cart</a>
+                                rel="nofollow" onclick='checkLogin()'>加入购物车</a>
                         </div>
                     </div>
                 </div>
@@ -347,11 +354,11 @@
                     <div class="footer-menu">
                         <h2 class="footer-wid-title">User Navigation </h2>
                         <ul>
-                            <li><a href="">My account</a></li>
-                            <li><a href="">Order history</a></li>
-                            <li><a href="">Wishlist</a></li>
-                            <li><a href="">Vendor contact</a></li>
-                            <li><a href="">Front page</a></li>
+                            <li><a>My account</a></li>
+                            <li><a>Order history</a></li>
+                            <li><a>Wishlist</a></li>
+                            <li><a>Vendor contact</a></li>
+                            <li><a>Front page</a></li>
                         </ul>
                     </div>
                 </div>
@@ -360,11 +367,11 @@
                     <div class="footer-menu">
                         <h2 class="footer-wid-title">Categories</h2>
                         <ul>
-                            <li><a href="">Mobile Phone</a></li>
-                            <li><a href="">Home accesseries</a></li>
-                            <li><a href="">LED TV</a></li>
-                            <li><a href="">Computer</a></li>
-                            <li><a href="">Gadets</a></li>
+                            <li><a>Mobile Phone</a></li>
+                            <li><a>Home accesseries</a></li>
+                            <li><a>LED TV</a></li>
+                            <li><a>Computer</a></li>
+                            <li><a>Gadets</a></li>
                         </ul>
                     </div>
                 </div>
@@ -401,10 +408,10 @@
     </div>
 
     <!-- Latest jQuery form server -->
-    <script src="https://code.jquery.com/jquery.min.js"></script>
+    <script src="/static/js/mall/jquery.min.js"></script>
 
     <!-- Bootstrap JS form CDN -->
-    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+    <script src="/static/js/mall/bootstrap.min.js"></script>
 
     <!-- jQuery sticky menu -->
     <script src="/static/js/mall/owl.carousel.min.js"></script>
@@ -420,7 +427,6 @@
             // 检查用户是否登陆
             var isLoggedIn = false; // 可以替换为登录检查逻辑
             if (!isLoggedIn) {
-
                 alert("请先登录");
             }
         }
