@@ -36,7 +36,6 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		SideEffects:    make(map[string]Value),
 		externInstance: make(map[string]Value),
 		externType:     make(map[string]Type),
-		err:            make(SSAErrors, 0),
 		builder:        nil,
 	}
 	f.SetName(name)
@@ -60,8 +59,9 @@ func (f *Function) addAnonymous(anon *Function) {
 	anon.parent = f
 }
 
-func (f *Function) NewParam(name string) *Parameter {
-	p := NewParam(name, false, f)
+func (f *FunctionBuilder) NewParam(name string) *Parameter {
+	p := NewParam(name, false, f.Function)
+	p.SetRange(f.CurrentRange)
 	// p.typs = append(p.typs, BasicTypesKind[Any])
 	f.Param = append(f.Param, p)
 	f.writeVariableByBlock(name, p, f.EnterBlock)

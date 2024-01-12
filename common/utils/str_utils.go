@@ -215,28 +215,28 @@ func StringSubStringArrayContains(array []string, element string) bool {
 	return false
 }
 
+func StringGlobContains(pattern string, element string, seps ...rune) bool {
+	if !strings.Contains(pattern, "*") && IContains(element, pattern) {
+		return true
+	}
+	if !strings.HasSuffix(pattern, "*") {
+		pattern += "*"
+	}
+	if !strings.HasPrefix(pattern, "*") {
+		pattern = "*" + pattern
+	}
+	rule, err := glob.Compile(pattern, seps...)
+	if err != nil {
+		return false
+	}
+	return rule.Match(element)
+}
+
 func StringGlobArrayContains(array []string, element string, seps ...rune) bool {
 	for _, r := range array {
-		if !strings.Contains(r, "*") {
-			if IContains(element, r) {
-				return true
-			}
-			continue
-		}
-		if !strings.HasSuffix(r, "*") {
-			r += "*"
-		}
-		if !strings.HasPrefix(r, "*") {
-			r = "*" + r
-		}
-		rule, err := glob.Compile(r, seps...)
-		if err != nil {
-			continue
-		}
-		if rule.Match(element) {
+		if StringGlobContains(r, element, seps...) {
 			return true
 		}
-		continue
 	}
 	return false
 }
@@ -996,6 +996,13 @@ func RandSampleInRange(minLen, maxLen int, material ...string) string {
 
 	// 调用 RandSample 生成并返回随机字符串
 	return RandSample(randomLength, material...)
+}
+
+func RandChoice(a ...string) string {
+	if len(a) > 0 {
+		return a[rand.Intn(len(a))]
+	}
+	return ""
 }
 
 func ExtractRawPath(target string) string {

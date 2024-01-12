@@ -77,24 +77,27 @@ func (f *Function) NewErrorWithPos(kind ErrorKind, tag ErrorTag, Pos *Range, mes
 		return
 	}
 
-	f.err = append(f.err, &SSAError{
+	prog := f.GetProgram()
+	prog.AddError(&SSAError{
 		Pos:     Pos,
 		Tag:     tag,
 		Message: message,
 		Kind:    kind,
 	})
 }
-func (b *FunctionBuilder) NewError(kind ErrorKind, tag ErrorTag, format string, arg ...any) {
-	b.NewErrorWithPos(kind, tag, b.CurrentRange, format)
+func (b *FunctionBuilder) NewError(kind ErrorKind, tag ErrorTag, massage string, arg ...interface{}) {
+	b.NewErrorWithPos(kind, tag, b.CurrentRange, massage)
 }
 
-func (prog *Program) GetErrors() SSAErrors {
-	result := make(SSAErrors, 0)
+func (f *Function) NewError(kind ErrorKind, tag ErrorTag, format string) {
+	f.NewErrorWithPos(kind, tag, f.GetRange(), format)
+}
 
-	prog.EachFunction(func(f *Function) {
-		result = append(result, f.err...)
-	})
-	return result
+func (prog *Program) AddError(err *SSAError) {
+	prog.errors = append(prog.errors, err)
+}
+func (prog *Program) GetErrors() SSAErrors {
+	return prog.errors
 }
 
 func (errs SSAErrors) String() string {

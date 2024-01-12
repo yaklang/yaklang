@@ -260,7 +260,7 @@ sleep(0.3)
 			count := yakit.QuickSearchMITMHTTPFlowCount(token)
 			log.Infof("yakit.QuickSearchMITMHTTPFlowCount("+`[`+token+`]`+") == %v", count)
 			if count != expectCount {
-				t.Fatalf("search httpflow by token failed: yakit.QuickSearchMITMHTTPFlowCount(token)")
+				t.Fatalf("exclude suffix [.aaac, .zip, .js] failed, [%s] except %d but got %d", path, expectCount, count)
 				cancel()
 			}
 		}

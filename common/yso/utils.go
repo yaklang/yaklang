@@ -193,7 +193,6 @@ func SetTemplateObjectClass(object *yserx.JavaObject, classBytes []byte) error {
 //					}
 //				}
 //			}
-//
 //		}
 //	} else {
 //		return nil, utils.Error("not a java object")
@@ -592,6 +591,13 @@ func ToBcel(i interface{}) (string, error) {
 		return "", utils.Errorf("cannot support %v to bcel string", reflect.TypeOf(ret))
 	}
 }
+
+// ToBytes 将 Java 或反序列化对象转换为字节码
+// Example:
+// ```
+// gadgetObj,_ = yso.GetCommonsBeanutils1JavaObject(yso.useBytesEvilClass(bytesCode),yso.obfuscationClassConstantPool(),yso.evilClassName(className),yso.majorVersion(version))
+// gadgetBytes,_ = yso.ToBytes(gadgetObj)
+// ```
 func ToBytes(i interface{}) ([]byte, error) {
 	switch ret := i.(type) {
 	case *javaclassparser.ClassObject:
@@ -602,6 +608,13 @@ func ToBytes(i interface{}) ([]byte, error) {
 		return nil, utils.Errorf("cannot support %v to bytes", reflect.TypeOf(ret))
 	}
 }
+
+// ToJson 将 Java 或反序列化对象转换为 json 字符串
+// Example:
+// ```
+// gadgetObj,_ = yso.GetCommonsBeanutils1JavaObject(yso.useBytesEvilClass(bytesCode),yso.obfuscationClassConstantPool(),yso.evilClassName(className),yso.majorVersion(version))
+// gadgetJson,_ = yso.ToJson(gadgetObj)
+// ```
 func ToJson(i interface{}) (string, error) {
 	switch ret := i.(type) {
 	case *javaclassparser.ClassObject:
@@ -616,6 +629,14 @@ func ToJson(i interface{}) (string, error) {
 		return "", utils.Errorf("cannot support %v to json string", reflect.TypeOf(ret))
 	}
 }
+
+// Dump
+// dump 将Java 对象转换为类 Java 代码
+// Example:
+// ```
+// gadgetObj,_ = yso.GetCommonsBeanutils1JavaObject(yso.useBytesEvilClass(bytesCode),yso.obfuscationClassConstantPool(),yso.evilClassName(className),yso.majorVersion(version))
+// gadgetDump,_ = yso.dump(gadgetObj)
+// ```
 func Dump(i interface{}) (string, error) {
 	switch ret := i.(type) {
 	case *javaclassparser.ClassObject:

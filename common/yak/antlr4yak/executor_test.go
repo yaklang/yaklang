@@ -192,6 +192,7 @@ assert a("continue")==16,"continue error"
 `
 	NewExecutor(code).VM.Exec()
 }
+
 func TestCheckBreakAndContinue(t *testing.T) {
 	code := `
 for{
@@ -206,6 +207,7 @@ continue
 		panic(" failed to check break and continue at compiler time")
 	}
 }
+
 func TestNewExecutor_MemberCallInTemplateString(t *testing.T) {
 	NewExecutor(`
 a = {"a":1}
@@ -217,12 +219,14 @@ assert d.$e == 23
 assert f"${d.$e}" == "23"
 `).VM.Exec()
 }
+
 func TestNewExecutor_MultiQuote(t *testing.T) {
 	code := `dump(123)))`
 	if err := NewExecutor(code).VM.SafeExec(); !strings.Contains(err.Error(), "mismatched input ')'") {
 		panic(err)
 	}
 }
+
 func TestNewExecutor_LoopAssign(t *testing.T) {
 	code := `
 a = [[1, 2]]
@@ -334,7 +338,6 @@ a(1, 2, 3)
 `
 	_marshallerTest(code)
 	_formattest(code)
-
 }
 
 func TestNewExecutor_YakWrappedFunctionUnpack(t *testing.T) {
@@ -345,8 +348,8 @@ m.v("aaa", {})
 `
 	_marshallerTest(code)
 	_formattest(code)
-
 }
+
 func TestNewExecutor_YakWrappedFunctionAssign(t *testing.T) {
 	code := `
 a = {"risk":()=>{}}
@@ -357,7 +360,6 @@ a.risk = () => {
 `
 	_marshallerTest(code)
 	_formattest(code)
-
 }
 
 func TestNewExecutor(t *testing.T) {
@@ -386,6 +388,7 @@ a = 1
 	_marshallerTest(code)
 	_formattest(code)
 }
+
 func TestNewExecutor_DeferFix(t *testing.T) {
 	code := `
 b = 1
@@ -405,7 +408,6 @@ assert a == nil
 `
 	_marshallerTest(code)
 	_formattest(code)
-
 }
 
 func TestNewExecutor_Goroutine(t *testing.T) {
@@ -431,6 +433,7 @@ sleep(5)
 	_marshallerTest(code)
 	_formattest(code)
 }
+
 func TestNewExecutor_Priority(t *testing.T) {
 	code := `
 a =fn(){
@@ -441,6 +444,7 @@ assert !a(), "非运算优先级测试失败"
 	_marshallerTest(code)
 	_formattest(code)
 }
+
 func TestNewExecutor_Continue(t *testing.T) {
 	code := `
 
@@ -498,7 +502,6 @@ assert a == 3
 `
 	_marshallerTest(code)
 	_formattest(code)
-
 }
 
 func TestNewExecutor_FixMemberCall(t *testing.T) {
@@ -569,7 +572,6 @@ assert count == 10
 `
 	_marshallerTest(code)
 	_formattest(code)
-
 }
 
 func TestNewExecutor_ForRange_Break(t *testing.T) {
@@ -580,7 +582,6 @@ for range 10{
 `
 	_marshallerTest(code)
 	_formattest(code)
-
 }
 
 func TestNewExecutor_EmptyForRange(t *testing.T) {
@@ -651,7 +652,6 @@ fn {
 `
 	_marshallerTest(code)
 	_formattest(code)
-
 }
 
 func TestNewExecutor_CommentAnywhere(t *testing.T) {
@@ -670,6 +670,7 @@ f = 1111 + 1111
 `
 	NewExecutor(code).VM.DebugExec()
 }
+
 func TestNewExecutor_TryCatchFinally(t *testing.T) {
 	code := `
 // test panic
@@ -884,7 +885,6 @@ func _marshallerTest(i string) {
 	if err != nil {
 		panic(err)
 	}
-
 }
 
 func _formattest(i string) []*yakvm.Code {
@@ -942,7 +942,6 @@ func TestNewExecutor_YakFuncCallPanic(t *testing.T) {
 			}
 		}()
 		_marshallerTest(code)
-
 	}
 
 	test2 := func() {
@@ -1647,7 +1646,6 @@ b = 1 + 1`,
 			t.Errorf("input:\n%s\n-------------\ngot:\n%#v\n-------------\nexpected:\n%#v", testcase, vt.GetFormattedCode(), expected)
 		}
 	}
-
 }
 
 //func TestNewExecutor_SyntaxError(t *testing.T) {
@@ -1710,6 +1708,7 @@ func TestNewExecutor_StructPtr(t *testing.T) {
 	_marshallerTest(code)
 	_formattest(code)
 }
+
 func TestNewExecutor_SlicePush(t *testing.T) {
 	code := `
 a = [1,2,3]
@@ -2008,6 +2007,7 @@ assert "abc1 \xff".IsPrintable() == false`
 	_marshallerTest(code)
 	_formattest(code)
 }
+
 func TestNewExecutor_Bytes_Bin_Op(t *testing.T) {
 	code := `
 assert b"qwe" + b"asd" == b"qweasd"
@@ -2556,6 +2556,7 @@ assert d == undefined, "d is out!!!!! 定义域失败！"
 	_marshallerTest(code)
 	_formattest(code)
 }
+
 func TestNewExecutor_ForRange(t *testing.T) {
 	code := `
 for range 1 {}
@@ -2861,6 +2862,7 @@ assert(j == 1)
 	_marshallerTest(code)
 	_formattest(code)
 }
+
 func TestNewExecutor_AssignShouldPanic(t *testing.T) {
 	code := `
 a, b = 1
@@ -2873,7 +2875,6 @@ a, b = 1
 			}
 		}()
 		_marshallerTest(code)
-
 	}
 
 	test2 := func() {
@@ -3290,6 +3291,7 @@ assert len(a) == 30
 	_marshallerTest(code)
 	_formattest(code)
 }
+
 func TestNewExecutor_TemplateStringFix2(t *testing.T) {
 	code := `
 assert f"\'" == "'"
@@ -3301,6 +3303,7 @@ assert '\'a' == "'a"
 	_marshallerTest(code)
 	_formattest(code)
 }
+
 func TestNewExecutor_TemplateStringFix(t *testing.T) {
 	code := `
 name = "张三"
@@ -3328,6 +3331,7 @@ assert ` + "`" + `姓名1: \$${name}\\1
 	_marshallerTest(code)
 	_formattest(code)
 }
+
 func TestNewExecutor_TemplateString(t *testing.T) {
 	code := "abc = f`abc${1+1}`; assert abc == `abc2`"
 	_marshallerTest(code)
@@ -3374,6 +3378,7 @@ assert a == "\x12\x34"
 	_marshallerTest(code)
 	_formattest(code)
 }
+
 func TestNewExecutor_Func(t *testing.T) {
 	code := `
 out = 1
@@ -3389,6 +3394,7 @@ assert name == undefined
 	_marshallerTest(code)
 	_formattest(code)
 }
+
 func TestNewExecutor_VariableFunctionParamFix(t *testing.T) {
 	code := `
 e = (c, a...) => c+1+a[0]+a[1]+a[2]
@@ -3397,6 +3403,7 @@ assert e(5, [1,2,3]...) == 6 + 3 + 1 + 2, e(5, [1,2,3]...)
 	_marshallerTest(code)
 	_formattest(code)
 }
+
 func TestNewExecutor_VariableFunctionParam(t *testing.T) {
 	code := `
 names = ["张三","李四","王五","赵六","田七","周八","吴九","郑十"]
@@ -3507,7 +3514,6 @@ func TestForAtFirstLineWithContinue(t *testing.T) {
     continue
 }
 print("Done")`)
-
 }
 
 func TestForAtFirstLineWithBreak(t *testing.T) {
@@ -3542,7 +3548,6 @@ assert keys == [1, 2, 3, 4, 5], keys
 }
 
 func TestExecutor_TryCatch(t *testing.T) {
-
 	code := `
 try{}catch e{}finally{}
 
@@ -3639,8 +3644,8 @@ dump(ab, "" + 99 + 99)
 }
 
 func TestHijackVMFrameMapMemberCaller(t *testing.T) {
-	var executedHook = false
-	var hijackedFuncHooked = false
+	executedHook := false
+	hijackedFuncHooked := false
 	codes := compiler(`test.dump(111)`).GetOpcodes()
 	ins := yakvm.New()
 	ins.ImportLibs(buildinLib)
@@ -3673,6 +3678,7 @@ func TestHijackVMFrameMapMemberCaller(t *testing.T) {
 		panic("EXEC HOOK")
 	}
 }
+
 func TestExecWithContext(t *testing.T) {
 	code := `
 print("start")
@@ -3715,11 +3721,11 @@ assert getStringSliceArgumentType([]) == "[]string", "auto convert [] to []strin
 	engine.ImportLibs(map[string]interface{}{
 		"getStringSliceArgumentType": func(s []string) string {
 			return reflect.TypeOf(s).String()
-		}})
+		},
+	})
 	if err := engine.Eval(context.Background(), code); err != nil {
 		t.Fatal(err)
 	}
-
 }
 
 /*
@@ -3915,5 +3921,19 @@ include "%s"
 	if !strings.Contains(vt.GetCompileErrors()[0].Message, "include cycle not allowed") {
 		t.Fatalf("expect inclue cycle error, but get %v", vt.GetCompileErrors()[0].Message)
 	}
+}
 
+func TestFixForFastAssign(t *testing.T) {
+	code := `
+a = [4, 5, 6, 7]
+count = 0
+for line in a {
+	a.Insert(3, 100)
+	count++
+	assert a.Count(100) == count
+}
+a.Insert(3, 100)
+assert a.Count(100) == count +1
+`
+	_marshallerTest(code)
 }

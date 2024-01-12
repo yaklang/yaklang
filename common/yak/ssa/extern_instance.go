@@ -25,6 +25,10 @@ func (b *FunctionBuilder) WithExternMethod(builder MethodBuilder) {
 	ExternMethodBuilder = builder
 }
 
+func (b *FunctionBuilder) WithDefineFunction(defineFunc map[string]any) {
+	b.DefineFunc = defineFunc
+}
+
 func TryGetSimilarityKey(table []string, name string) string {
 	var score float64
 	var ret string

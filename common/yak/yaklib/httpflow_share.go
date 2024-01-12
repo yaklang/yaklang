@@ -11,17 +11,17 @@ import (
 )
 
 type HttpFlowShareRequest struct {
-	ExpiredTime           int64     `json:"expired_time"`
-	Module        		  string    `json:"module"`
-	ShareContent          string    `json:"share_content"`
-	Pwd       			  bool    `json:"pwd"`
-	LimitNum              int64     `json:"limit_num"`
-	Token            	  string    `json:"token"`
+	ExpiredTime  int64  `json:"expired_time"`
+	Module       string `json:"module"`
+	ShareContent string `json:"share_content"`
+	Pwd          bool   `json:"pwd"`
+	LimitNum     int64  `json:"limit_num"`
+	Token        string `json:"token"`
 }
 
 type HttpFlowShare struct {
-	ShareId string        	`json:"share_id"`
-	ExtractCode string		`json:"extract_code"`
+	ShareId     string `json:"share_id"`
+	ExtractCode string `json:"extract_code"`
 }
 
 func (s *OnlineClient) HttpFlowShareWithToken(ctx context.Context, token string, expiredTime int64, module string, shareContent string, pwd bool, limitNum int64) (*HttpFlowShare, error) {
@@ -69,7 +69,7 @@ func (s *OnlineClient) HttpFlowShare(ctx context.Context,
 	}
 
 	type HttpFlowShareResponse struct {
-		Data     *HttpFlowShare `json:"data"`
+		Data *HttpFlowShare `json:"data"`
 	}
 	var _container HttpFlowShareResponse
 	var responseData map[string]interface{}
@@ -78,9 +78,9 @@ func (s *OnlineClient) HttpFlowShare(ctx context.Context,
 		return nil, utils.Errorf("unmarshal plugin response failed: %s", err)
 	}
 	if utils.MapGetString(responseData, "reason") != "" {
-		return nil, utils.Errorf("httpFlow share failed: %s", utils.MapGetString(responseData, "reason") )
+		return nil, utils.Errorf("httpFlow share failed: %s", utils.MapGetString(responseData, "reason"))
 	}
 	err = json.Unmarshal(rawResponse, &_container.Data)
-	return _container.Data,  nil
+	return _container.Data, nil
 
 }

@@ -13,13 +13,13 @@ type ScreenRecorder struct {
 	gorm.Model
 
 	// 保存到本地的路径
-	Filename string
-	NoteInfo string
-	Project  string
-	Hash string `json:"hash" gorm:"unique_index"`
+	Filename  string
+	NoteInfo  string
+	Project   string
+	Hash      string `json:"hash" gorm:"unique_index"`
 	VideoName string
-	Cover string `gorm:"type:longtext"`
-	Duration string
+	Cover     string `gorm:"type:longtext"`
+	Duration  string
 }
 
 func (s *ScreenRecorder) CalcHash() string {
@@ -82,7 +82,6 @@ func QueryScreenRecorder(db *gorm.DB, req *ypb.QueryScreenRecorderRequest) (*biz
 	return paging, ret, nil
 }
 
-
 /*func DeleteScreenRecorder(db *gorm.DB, req *ypb.QueryScreenRecorderRequest) error {
 	db = db.Model(&ScreenRecorder{})
 	db = bizhelper.ExactQueryString(db, "project", req.GetProject())
@@ -135,7 +134,6 @@ func BatchScreenRecorder(db *gorm.DB, ctx context.Context) chan *ScreenRecorder 
 	return outC
 }
 
-
 func GetOneScreenRecorder(db *gorm.DB, req *ypb.GetOneScreenRecorderRequest) (*ScreenRecorder, error) {
 	db = db.Model(&ScreenRecorder{})
 	if req.Order == "desc" { // 上一条
@@ -148,7 +146,7 @@ func GetOneScreenRecorder(db *gorm.DB, req *ypb.GetOneScreenRecorderRequest) (*S
 	if db.Error != nil {
 		return nil, utils.Errorf("GetOneScreenRecorder failed: %s", db.Error)
 	}
-	return  &ret, nil
+	return &ret, nil
 }
 
 func IsExitScreenRecorder(db *gorm.DB, id int64, order string) (*ScreenRecorder, error) {
@@ -163,7 +161,7 @@ func IsExitScreenRecorder(db *gorm.DB, id int64, order string) (*ScreenRecorder,
 	if db.Error != nil {
 		return nil, utils.Errorf("IsExitScreenRecorder failed: %s", db.Error)
 	}
-	return  &ret, nil
+	return &ret, nil
 }
 
 func DeleteScreenRecorder(db *gorm.DB, id int64) error {

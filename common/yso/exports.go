@@ -110,6 +110,8 @@ var Exports = map[string]interface{}{
 	// header echo template
 	"useHeaderEchoTemplate":  SetClassHeaderEchoTemplate,
 	"useHeaderEchoEvilClass": SetHeaderEchoEvilClass,
+	"useEchoBody":            SetEchoBody,
+	"useParam":               SetParam,
 	"useHeaderParam":         SetHeader,
 	// sleep template
 	"useSleepTemplate":  SetClassSleepTemplate,

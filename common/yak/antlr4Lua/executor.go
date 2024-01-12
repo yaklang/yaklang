@@ -4,14 +4,13 @@ import (
 	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/yak/antlr4Lua/luaast"
-	"os"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"math"
+	"os"
 	"reflect"
 	"sort"
 	"strconv"
 )
-
 
 func init() {
 	//os.Setenv("LUA_DEBUG", "1")
@@ -63,7 +62,7 @@ func init() {
 	//Calls error if the value of its argument v is false (i.e., nil or false);
 	//otherwise, returns all its arguments. In case of error, message is the
 	//error object; when absent, it defaults to "assertion failed!"
-	
+
 	//todo
 	//https://www.lua.org/pil/8.3.html
 	Import("assert", func(condition ...interface{}) {
@@ -71,7 +70,7 @@ func init() {
 			panic("assert nil")
 		}
 		if len(condition) == 2 {
-			Assert := func(condition interface{}, message string){
+			Assert := func(condition interface{}, message string) {
 				if condition == nil {
 					panic(message)
 				}
@@ -130,10 +129,10 @@ func init() {
 		}
 		base, ok1 := interfaceToFloat64(x)
 		index, ok2 := interfaceToFloat64(y)
-		if ok1 && ok2 && (index != 0){
+		if ok1 && ok2 && (index != 0) {
 			res := base / index
 			return math.Floor(res)
-		} else if (index == 0) &&  ok1 && ok2{
+		} else if (index == 0) && ok1 && ok2 {
 			panic("dividend can't be zero!")
 		} else {
 			panic("attempt to floor a '" + reflect.TypeOf(base).String() + "' with a '" + reflect.TypeOf(index).String() + "'")
@@ -260,10 +259,7 @@ func init() {
 		panic(x)
 	})
 
-
-
 }
-
 
 var buildinLib = make(map[string]interface{})
 

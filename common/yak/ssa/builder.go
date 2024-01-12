@@ -1,5 +1,11 @@
 package ssa
 
+import (
+	"reflect"
+
+	"github.com/yaklang/yaklang/common/log"
+)
+
 // Function builder API
 type FunctionBuilder struct {
 	*Function
@@ -24,6 +30,7 @@ type FunctionBuilder struct {
 
 	ExternInstance map[string]any
 	ExternLib      map[string]map[string]any
+	DefineFunc     map[string]any
 
 	parentBuilder *FunctionBuilder
 	cmap          map[string]struct{}
@@ -48,6 +55,7 @@ func NewBuilder(f *Function, parent *FunctionBuilder) *FunctionBuilder {
 	if parent != nil {
 		b.ExternInstance = parent.ExternInstance
 		b.ExternLib = parent.ExternLib
+		b.DefineFunc = parent.DefineFunc
 	}
 
 	b.ScopeStart()
@@ -100,6 +108,7 @@ func (b *FunctionBuilder) Finish() {
 	for _, builder := range b.subFuncBuild {
 		builder()
 	}
+	b.SetDefineFunc()
 	for _, block := range b.unsealedBlock {
 		block.Sealed()
 	}
@@ -119,6 +128,46 @@ func (b *FunctionBuilder) Finish() {
 
 	// function finish
 	b.Function.Finish()
+}
+
+func (b *FunctionBuilder) SetDefineFunc() {
+	// check all sub-function is DefineFunction ?
+	check := func(name string, f *Function) bool {
+		i, ok := b.DefineFunc[name]
+		if !ok {
+			return false
+		}
+		// fun := b.BuildValueFromAny()
+		typ := reflect.TypeOf(i)
+		if typ.Kind() != reflect.Func {
+			log.Errorf("config define function %s is not function", name)
+			return false
+		}
+		funTyp := b.CoverReflectFunctionType(typ, 0)
+		f.SetType(funTyp)
+		for index, typ := range funTyp.Parameter {
+			if index >= len(f.Param) {
+				log.Errorf("config define function %s parameter count is not match define(%d) vs function(%d)", name, len(funTyp.Parameter), len(f.Param))
+				return false
+			}
+			f.Param[index].SetType(typ)
+		}
+		_ = funTyp
+		return true
+	}
+
+	// check by name and variable, if hit once, just next sub-function
+	for _, sub := range b.ChildFuncs {
+		if check(sub.GetName(), sub) {
+			continue
+		}
+		for name := range sub.GetAllVariables() {
+			// log.Infof("sub function: %s", name)
+			if check(name, sub) {
+				break
+			}
+		}
+	}
 }
 
 // sub-function builder

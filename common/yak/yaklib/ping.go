@@ -222,9 +222,8 @@ func (c *_pingConfig) IsFiltered(host string) bool {
 }
 
 var PingExports = map[string]interface{}{
-	"Scan": _pingScan,
-	"Ping": _ping,
-
+	"Scan":         _pingScan,
+	"Ping":         _ping,
 	"excludeHosts": _pingConfigOpt_excludeHosts,
 	"onResult":     _pingConfigOpt_onResult,
 	"dnsTimeout":   _pingConfigOpt_withDNSTimeout,
