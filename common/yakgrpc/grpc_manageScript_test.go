@@ -101,14 +101,14 @@ func TestImportYakScript(t *testing.T) {
 	_ = s
 }
 
-func TestExportYakScriptLocal(t *testing.T) {
+func TestExportLocalYakScriptStream(t *testing.T) {
 	test := assert.New(t)
 
 	client, err := NewLocalClient()
 	if err != nil {
 		test.FailNow(err.Error())
 	}
-	s, err := client.ExportYakScriptLocal(context.Background(), &ypb.ExportLocalYakScriptRequest{
+	s, err := client.ExportLocalYakScriptStream(context.Background(), &ypb.ExportLocalYakScriptRequest{
 		OutputDir:       "/Users/limin/Downloads/",
 		OutputPluginDir: "",
 		YakScriptIds:    nil,

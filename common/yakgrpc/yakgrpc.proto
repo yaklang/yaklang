@@ -168,9 +168,11 @@ service Yak {
   rpc SaveNewYakScript(SaveNewYakScriptRequest) returns (YakScript);
   rpc SaveYakScriptToOnline(SaveYakScriptToOnlineRequest) returns (stream SaveYakScriptToOnlineResponse);
 
-  rpc ExportLocalYakScript(ExportLocalYakScriptRequest) returns (ExportLocalYakScriptResponse);   // 结构变化,接口废弃
+  // 结构变化,接口废弃
+  rpc ExportLocalYakScript(ExportLocalYakScriptRequest) returns (ExportLocalYakScriptResponse);
+  rpc ExportLocalYakScriptStream(ExportLocalYakScriptRequest) returns (stream ExportYakScriptLocalResponse);
+
   rpc ImportYakScript(ImportYakScriptRequest) returns (stream ImportYakScriptResult);
-  rpc ExportYakScriptLocal(ExportLocalYakScriptRequest) returns (stream ExportYakScriptLocalResponse);
 
   // HTTPFlow
   rpc GetHTTPFlowByHash(GetHTTPFlowByHashRequest) returns (HTTPFlow);
