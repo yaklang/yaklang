@@ -1136,7 +1136,7 @@ func (s *Server) ImportYakScript(req *ypb.ImportYakScriptRequest, stream ypb.Yak
 	return nil
 }
 
-func (s *Server) ExportYakScriptLocal(req *ypb.ExportLocalYakScriptRequest, stream ypb.Yak_ExportYakScriptLocalServer) error {
+func (s *Server) ExportLocalYakScriptStream(req *ypb.ExportLocalYakScriptRequest, stream ypb.Yak_ExportLocalYakScriptStreamServer) error {
 	var (
 		progress                 float64
 		count                    int
