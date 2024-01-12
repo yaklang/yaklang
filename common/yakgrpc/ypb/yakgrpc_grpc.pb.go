@@ -66,8 +66,9 @@ type YakClient interface {
 	YakScriptRiskTypeList(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*YakScriptRiskTypeListResponse, error)
 	SaveNewYakScript(ctx context.Context, in *SaveNewYakScriptRequest, opts ...grpc.CallOption) (*YakScript, error)
 	SaveYakScriptToOnline(ctx context.Context, in *SaveYakScriptToOnlineRequest, opts ...grpc.CallOption) (Yak_SaveYakScriptToOnlineClient, error)
-	ExportLocalYakScript(ctx context.Context, in *ExportLocalYakScriptRequest, opts ...grpc.CallOption) (Yak_ExportLocalYakScriptClient, error)
+	ExportLocalYakScript(ctx context.Context, in *ExportLocalYakScriptRequest, opts ...grpc.CallOption) (*ExportLocalYakScriptResponse, error)
 	ImportYakScript(ctx context.Context, in *ImportYakScriptRequest, opts ...grpc.CallOption) (Yak_ImportYakScriptClient, error)
+	ExportYakScriptLocal(ctx context.Context, in *ExportLocalYakScriptRequest, opts ...grpc.CallOption) (Yak_ExportYakScriptLocalClient, error)
 	// HTTPFlow
 	GetHTTPFlowByHash(ctx context.Context, in *GetHTTPFlowByHashRequest, opts ...grpc.CallOption) (*HTTPFlow, error)
 	GetHTTPFlowById(ctx context.Context, in *GetHTTPFlowByIdRequest, opts ...grpc.CallOption) (*HTTPFlow, error)
@@ -1069,40 +1070,17 @@ func (x *yakSaveYakScriptToOnlineClient) Recv() (*SaveYakScriptToOnlineResponse,
 	return m, nil
 }
 
-func (c *yakClient) ExportLocalYakScript(ctx context.Context, in *ExportLocalYakScriptRequest, opts ...grpc.CallOption) (Yak_ExportLocalYakScriptClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[11], "/ypb.Yak/ExportLocalYakScript", opts...)
+func (c *yakClient) ExportLocalYakScript(ctx context.Context, in *ExportLocalYakScriptRequest, opts ...grpc.CallOption) (*ExportLocalYakScriptResponse, error) {
+	out := new(ExportLocalYakScriptResponse)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/ExportLocalYakScript", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &yakExportLocalYakScriptClient{stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
-}
-
-type Yak_ExportLocalYakScriptClient interface {
-	Recv() (*ExportLocalYakScriptResponse, error)
-	grpc.ClientStream
-}
-
-type yakExportLocalYakScriptClient struct {
-	grpc.ClientStream
-}
-
-func (x *yakExportLocalYakScriptClient) Recv() (*ExportLocalYakScriptResponse, error) {
-	m := new(ExportLocalYakScriptResponse)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
+	return out, nil
 }
 
 func (c *yakClient) ImportYakScript(ctx context.Context, in *ImportYakScriptRequest, opts ...grpc.CallOption) (Yak_ImportYakScriptClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[12], "/ypb.Yak/ImportYakScript", opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[11], "/ypb.Yak/ImportYakScript", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1127,6 +1105,38 @@ type yakImportYakScriptClient struct {
 
 func (x *yakImportYakScriptClient) Recv() (*ImportYakScriptResult, error) {
 	m := new(ImportYakScriptResult)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (c *yakClient) ExportYakScriptLocal(ctx context.Context, in *ExportLocalYakScriptRequest, opts ...grpc.CallOption) (Yak_ExportYakScriptLocalClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[12], "/ypb.Yak/ExportYakScriptLocal", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &yakExportYakScriptLocalClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type Yak_ExportYakScriptLocalClient interface {
+	Recv() (*ExportYakScriptLocalResponse, error)
+	grpc.ClientStream
+}
+
+type yakExportYakScriptLocalClient struct {
+	grpc.ClientStream
+}
+
+func (x *yakExportYakScriptLocalClient) Recv() (*ExportYakScriptLocalResponse, error) {
+	m := new(ExportYakScriptLocalResponse)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -4833,8 +4843,9 @@ type YakServer interface {
 	YakScriptRiskTypeList(context.Context, *Empty) (*YakScriptRiskTypeListResponse, error)
 	SaveNewYakScript(context.Context, *SaveNewYakScriptRequest) (*YakScript, error)
 	SaveYakScriptToOnline(*SaveYakScriptToOnlineRequest, Yak_SaveYakScriptToOnlineServer) error
-	ExportLocalYakScript(*ExportLocalYakScriptRequest, Yak_ExportLocalYakScriptServer) error
+	ExportLocalYakScript(context.Context, *ExportLocalYakScriptRequest) (*ExportLocalYakScriptResponse, error)
 	ImportYakScript(*ImportYakScriptRequest, Yak_ImportYakScriptServer) error
+	ExportYakScriptLocal(*ExportLocalYakScriptRequest, Yak_ExportYakScriptLocalServer) error
 	// HTTPFlow
 	GetHTTPFlowByHash(context.Context, *GetHTTPFlowByHashRequest) (*HTTPFlow, error)
 	GetHTTPFlowById(context.Context, *GetHTTPFlowByIdRequest) (*HTTPFlow, error)
@@ -5336,11 +5347,14 @@ func (UnimplementedYakServer) SaveNewYakScript(context.Context, *SaveNewYakScrip
 func (UnimplementedYakServer) SaveYakScriptToOnline(*SaveYakScriptToOnlineRequest, Yak_SaveYakScriptToOnlineServer) error {
 	return status.Errorf(codes.Unimplemented, "method SaveYakScriptToOnline not implemented")
 }
-func (UnimplementedYakServer) ExportLocalYakScript(*ExportLocalYakScriptRequest, Yak_ExportLocalYakScriptServer) error {
-	return status.Errorf(codes.Unimplemented, "method ExportLocalYakScript not implemented")
+func (UnimplementedYakServer) ExportLocalYakScript(context.Context, *ExportLocalYakScriptRequest) (*ExportLocalYakScriptResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ExportLocalYakScript not implemented")
 }
 func (UnimplementedYakServer) ImportYakScript(*ImportYakScriptRequest, Yak_ImportYakScriptServer) error {
 	return status.Errorf(codes.Unimplemented, "method ImportYakScript not implemented")
+}
+func (UnimplementedYakServer) ExportYakScriptLocal(*ExportLocalYakScriptRequest, Yak_ExportYakScriptLocalServer) error {
+	return status.Errorf(codes.Unimplemented, "method ExportYakScriptLocal not implemented")
 }
 func (UnimplementedYakServer) GetHTTPFlowByHash(context.Context, *GetHTTPFlowByHashRequest) (*HTTPFlow, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetHTTPFlowByHash not implemented")
@@ -6994,25 +7008,22 @@ func (x *yakSaveYakScriptToOnlineServer) Send(m *SaveYakScriptToOnlineResponse) 
 	return x.ServerStream.SendMsg(m)
 }
 
-func _Yak_ExportLocalYakScript_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(ExportLocalYakScriptRequest)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
+func _Yak_ExportLocalYakScript_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ExportLocalYakScriptRequest)
+	if err := dec(in); err != nil {
+		return nil, err
 	}
-	return srv.(YakServer).ExportLocalYakScript(m, &yakExportLocalYakScriptServer{stream})
-}
-
-type Yak_ExportLocalYakScriptServer interface {
-	Send(*ExportLocalYakScriptResponse) error
-	grpc.ServerStream
-}
-
-type yakExportLocalYakScriptServer struct {
-	grpc.ServerStream
-}
-
-func (x *yakExportLocalYakScriptServer) Send(m *ExportLocalYakScriptResponse) error {
-	return x.ServerStream.SendMsg(m)
+	if interceptor == nil {
+		return srv.(YakServer).ExportLocalYakScript(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/ExportLocalYakScript",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).ExportLocalYakScript(ctx, req.(*ExportLocalYakScriptRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _Yak_ImportYakScript_Handler(srv interface{}, stream grpc.ServerStream) error {
@@ -7033,6 +7044,27 @@ type yakImportYakScriptServer struct {
 }
 
 func (x *yakImportYakScriptServer) Send(m *ImportYakScriptResult) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func _Yak_ExportYakScriptLocal_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ExportLocalYakScriptRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).ExportYakScriptLocal(m, &yakExportYakScriptLocalServer{stream})
+}
+
+type Yak_ExportYakScriptLocalServer interface {
+	Send(*ExportYakScriptLocalResponse) error
+	grpc.ServerStream
+}
+
+type yakExportYakScriptLocalServer struct {
+	grpc.ServerStream
+}
+
+func (x *yakExportYakScriptLocalServer) Send(m *ExportYakScriptLocalResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -12488,6 +12520,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Yak_SaveNewYakScript_Handler,
 		},
 		{
+			MethodName: "ExportLocalYakScript",
+			Handler:    _Yak_ExportLocalYakScript_Handler,
+		},
+		{
 			MethodName: "GetHTTPFlowByHash",
 			Handler:    _Yak_GetHTTPFlowByHash_Handler,
 		},
@@ -13503,13 +13539,13 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 		{
-			StreamName:    "ExportLocalYakScript",
-			Handler:       _Yak_ExportLocalYakScript_Handler,
+			StreamName:    "ImportYakScript",
+			Handler:       _Yak_ImportYakScript_Handler,
 			ServerStreams: true,
 		},
 		{
-			StreamName:    "ImportYakScript",
-			Handler:       _Yak_ImportYakScript_Handler,
+			StreamName:    "ExportYakScriptLocal",
+			Handler:       _Yak_ExportYakScriptLocal_Handler,
 			ServerStreams: true,
 		},
 		{

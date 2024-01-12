@@ -990,75 +990,23 @@ func (s *Server) SaveNewYakScript(ctx context.Context, script *ypb.SaveNewYakScr
 	return res.ToGRPCModel(), nil
 }
 
-func (s *Server) ExportLocalYakScript(req *ypb.ExportLocalYakScriptRequest, stream ypb.Yak_ExportLocalYakScriptServer) error {
-	var (
-		progress                 float64
-		count                    int
-		total                    int
-		message                  string
-		errorCount, successCount int
-	)
+func (s *Server) ExportLocalYakScript(ctx context.Context, req *ypb.ExportLocalYakScriptRequest) (*ypb.ExportLocalYakScriptResponse, error) {
 	db := yakit.QueryExportYakScript(s.GetProfileDatabase(), req)
 	scripts := yakit.YieldYakScripts(db, context.Background())
-	db.Count(&total)
-
 	dir := req.GetOutputDir()
-	messageType := "success"
-	stream.Send(&ypb.ExportLocalYakScriptResponse{
-		Progress:    0,
-		Message:     "initializing",
-		MessageType: "",
-	})
-	defer func() {
-		if errorCount > 0 {
-			message += fmt.Sprintf("执行失败: %v 个", errorCount)
-			messageType = "finalError"
-		}
-		if successCount > 0 {
-			message += fmt.Sprintf("执行成功: %v 个", successCount)
-		}
-		if message == "" {
-			message = "finished"
-		}
-		stream.Send(&ypb.ExportLocalYakScriptResponse{
-			Progress:    1,
-			Message:     message,
-			MessageType: messageType,
-			OutputDir:   dir,
-		})
-	}()
 
 	for v := range scripts {
-		if total > 0 {
-			progress = float64(count) / float64(total)
-		}
-		count++
 		outputPluginDir := v.ScriptName
 		dirRet, err := s.ExportYakPluginBatch(v, req.GetOutputDir(), ReplaceString(outputPluginDir))
 		if len(req.GetYakScriptIds()) == 1 {
 			dir = dirRet
 		}
-		if count%100 == 0 {
-			time.Sleep(1 * time.Second)
-		}
 		if err != nil {
-			stream.Send(&ypb.ExportLocalYakScriptResponse{
-				Progress:    progress,
-				Message:     fmt.Sprintf("export [%s] failed: %s", v.ScriptName, err.Error()),
-				MessageType: "error",
-			})
-			errorCount++
-		} else {
-			stream.Send(&ypb.ExportLocalYakScriptResponse{
-				Progress:    progress,
-				Message:     fmt.Sprintf("export [%s] success", v.ScriptName),
-				MessageType: "success",
-			})
-			successCount++
+			log.Errorf("export [%s] failed: %s", v.ScriptName, err.Error())
 		}
 	}
 
-	return nil
+	return &ypb.ExportLocalYakScriptResponse{OutputDir: dir}, nil
 }
 
 func (s *Server) ImportYakScript(req *ypb.ImportYakScriptRequest, stream ypb.Yak_ImportYakScriptServer) error {
@@ -1183,6 +1131,77 @@ func (s *Server) ImportYakScript(req *ypb.ImportYakScriptRequest, stream ypb.Yak
 			}
 		}
 
+	}
+
+	return nil
+}
+
+func (s *Server) ExportYakScriptLocal(req *ypb.ExportLocalYakScriptRequest, stream ypb.Yak_ExportYakScriptLocalServer) error {
+	var (
+		progress                 float64
+		count                    int
+		total                    int
+		message                  string
+		errorCount, successCount int
+	)
+	db := yakit.QueryExportYakScript(s.GetProfileDatabase(), req)
+	scripts := yakit.YieldYakScripts(db, context.Background())
+	db.Count(&total)
+
+	dir := req.GetOutputDir()
+	messageType := "success"
+	stream.Send(&ypb.ExportYakScriptLocalResponse{
+		Progress:    0,
+		Message:     "initializing",
+		MessageType: "",
+	})
+	defer func() {
+		if errorCount > 0 {
+			message += fmt.Sprintf("执行失败: %v 个", errorCount)
+			messageType = "finalError"
+		}
+		if successCount > 0 {
+			message += fmt.Sprintf("执行成功: %v 个", successCount)
+		}
+		if message == "" {
+			message = "finished"
+		}
+		stream.Send(&ypb.ExportYakScriptLocalResponse{
+			Progress:    1,
+			Message:     message,
+			MessageType: messageType,
+			OutputDir:   dir,
+		})
+	}()
+
+	for v := range scripts {
+		if total > 0 {
+			progress = float64(count) / float64(total)
+		}
+		count++
+		outputPluginDir := v.ScriptName
+		dirRet, err := s.ExportYakPluginBatch(v, req.GetOutputDir(), ReplaceString(outputPluginDir))
+		if len(req.GetYakScriptIds()) == 1 {
+			dir = dirRet
+		}
+		if count%100 == 0 {
+			time.Sleep(1 * time.Second)
+		}
+		if err != nil {
+			stream.Send(&ypb.ExportYakScriptLocalResponse{
+				Progress:    progress,
+				Message:     fmt.Sprintf("export [%s] failed: %s", v.ScriptName, err.Error()),
+				MessageType: "error",
+			})
+			errorCount++
+		} else {
+			stream.Send(&ypb.ExportYakScriptLocalResponse{
+				Progress:    progress,
+				Message:     fmt.Sprintf("export [%s] success", v.ScriptName),
+				MessageType: "success",
+			})
+			successCount++
+		}
 	}
 
 	return nil
