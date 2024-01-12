@@ -1,7 +1,10 @@
 package yakgit
 
 var Exports = map[string]any{
-	"SetProxy":      SetProxy,
+	"SetProxy": SetProxy,
+
+	// githack
+	"GitHack":       GitHack,
 	"Clone":         clone,
 	"Pull":          pull,
 	"Fetch":         fetch,
@@ -27,8 +30,6 @@ var Exports = map[string]any{
 	"handleReference": WithHandleGitReference,
 	"filterReference": WithFilterGitReference,
 
-	// githack
-	"GitHack":           GitHack,
 	"threads":           WithThreads,
 	"useLocalGitBinary": WithUseLocalGitBinary,
 	"httpOpts":          WithHTTPOptions,

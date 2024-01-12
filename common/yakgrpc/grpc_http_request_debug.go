@@ -64,6 +64,7 @@ func (s *Server) execScriptWithExecParam(scriptName string, input string, stream
 			PluginName: scriptName,
 			RuntimeId:  runtimeId,
 		})
+		yak.HookEngineContext(engine, stream.Context())
 		return nil
 	})
 	sendLog := func(res interface{}) {
@@ -85,7 +86,7 @@ func (s *Server) execScriptWithExecParam(scriptName string, input string, stream
 		if err != nil {
 			return utils.Errorf("execute file %s code failed: %s", scriptName, err.Error())
 		}
-		result, err := subEngine.CallYakFunction(context.Background(), "handle", []interface{}{input})
+		result, err := subEngine.CallYakFunction(stream.Context(), "handle", []interface{}{input})
 		if err != nil {
 			return utils.Errorf("import %v' s handle failed: %s", scriptName, err)
 		}
@@ -343,6 +344,7 @@ func (s *Server) execScriptWithRequest(scriptName string, targetInput string, st
 			PluginName: scriptName,
 			RuntimeId:  runtimeId,
 		})
+		yak.HookEngineContext(engine, stream.Context())
 		return nil
 	})
 	subEngine, err := engine.ExecuteExWithContext(stream.Context(), debugScript, map[string]any{

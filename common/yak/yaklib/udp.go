@@ -245,9 +245,9 @@ type udpServerConfig struct {
 	timeout  time.Duration
 }
 
-type udpServerOpt func(config *udpServerConfig)
+type UdpServerOpt func(config *udpServerConfig)
 
-func udpServe(host string, port interface{}, opts ...udpServerOpt) error {
+func udpServe(host string, port interface{}, opts ...UdpServerOpt) error {
 	config := &udpServerConfig{timeout: 5 * time.Second}
 	for _, opt := range opts {
 		opt(config)
@@ -327,22 +327,28 @@ var UDPExport = map[string]interface{}{
 	"clientTimeout":   clientTimeout,
 	"clientLocalAddr": clientLocalAddr,
 
-	"Serve": udpServe,
-	"serverTimeout": func(f float64) udpServerOpt {
-		return func(config *udpServerConfig) {
-			config.timeout = utils.FloatSecondDuration(f)
-		}
-	},
-	"serverContext": func(ctx context.Context) udpServerOpt {
-		return func(config *udpServerConfig) {
-			config.ctx = ctx
-		}
-	},
-	"serverCallback": func(cb func(*udpConnection, []byte)) udpServerOpt {
-		return func(config *udpServerConfig) {
-			config.callback = cb
-		}
-	},
+	"Serve":          udpServe,
+	"serverTimeout":  UdpWithTimeout,
+	"serverContext":  UdpWithContext,
+	"serverCallback": UdpWithCallback,
+}
+
+func UdpWithCallback(cb func(*udpConnection, []byte)) UdpServerOpt {
+	return func(config *udpServerConfig) {
+		config.callback = cb
+	}
+}
+
+func UdpWithTimeout(f float64) UdpServerOpt {
+	return func(config *udpServerConfig) {
+		config.timeout = utils.FloatSecondDuration(f)
+	}
+}
+
+func UdpWithContext(ctx context.Context) UdpServerOpt {
+	return func(config *udpServerConfig) {
+		config.ctx = ctx
+	}
 }
 
 func DebugMockUDP(rsp []byte) (string, int) {

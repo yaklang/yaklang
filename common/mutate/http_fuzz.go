@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/net/context"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -31,6 +32,7 @@ type FuzzHTTPRequest struct {
 	originRequest          []byte
 	_originRequestInstance *http.Request
 	chunked                bool
+	cxt                    context.Context
 }
 
 func (r *FuzzHTTPRequest) NoAutoEncode() bool {
@@ -131,11 +133,11 @@ type FuzzHTTPRequestIf interface {
 
 	Results() ([]*http.Request, error)
 
-	Exec(...HttpPoolConfigOption) (chan *_httpResult, error)
+	Exec(...HttpPoolConfigOption) (chan *HttpResult, error)
 
 	Show() FuzzHTTPRequestIf
 
-	ExecFirst(...HttpPoolConfigOption) (*_httpResult, error)
+	ExecFirst(...HttpPoolConfigOption) (*HttpResult, error)
 
 	FirstFuzzHTTPRequest() *FuzzHTTPRequest
 	FirstHTTPRequestBytes() []byte
@@ -211,6 +213,7 @@ type buildFuzzHTTPRequestConfig struct {
 	RuntimeId    string
 	NoAutoEncode bool
 	Proxy        string
+	Ctx          context.Context
 }
 
 type BuildFuzzHTTPRequestOption func(config *buildFuzzHTTPRequestConfig)
@@ -242,6 +245,12 @@ func OptRuntimeId(r string) BuildFuzzHTTPRequestOption {
 func OptSource(i string) BuildFuzzHTTPRequestOption {
 	return func(config *buildFuzzHTTPRequestConfig) {
 		config.Source = i
+	}
+}
+
+func OptContext(ctx context.Context) BuildFuzzHTTPRequestOption {
+	return func(config *buildFuzzHTTPRequestConfig) {
+		config.Ctx = ctx
 	}
 }
 
@@ -412,6 +421,7 @@ func NewFuzzHTTPRequest(i interface{}, opts ...BuildFuzzHTTPRequestOption) (*Fuz
 	req.runtimeId = config.RuntimeId
 	req.proxy = config.Proxy
 	req.noAutoEncode = config.NoAutoEncode
+	req.cxt = config.Ctx
 	req.opts = opts
 	return req, nil
 }
@@ -797,17 +807,18 @@ func (f *FuzzHTTPRequest) ParamsHash() (string, error) {
 	return codec.Sha256(strings.Join(commonHashElement, "|")), nil
 }
 
-func (f *FuzzHTTPRequest) Exec(opts ...HttpPoolConfigOption) (chan *_httpResult, error) {
+func (f *FuzzHTTPRequest) Exec(opts ...HttpPoolConfigOption) (chan *HttpResult, error) {
 	originOpts := make([]HttpPoolConfigOption, 4, len(opts)+4)
 	originOpts[0] = WithPoolOpt_Https(f.isHttps)
 	originOpts[1] = WithPoolOpt_Source(f.source)
 	originOpts[2] = WithPoolOpt_RuntimeId(f.runtimeId)
 	originOpts[3] = WithPoolOpt_Proxy(f.proxy)
+	originOpts[4] = WithPoolOpt_Context(f.cxt)
 	originOpts = append(originOpts, opts...)
 	return _httpPool(f, originOpts...)
 }
 
-func (f *FuzzHTTPRequestBatch) Exec(opts ...HttpPoolConfigOption) (chan *_httpResult, error) {
+func (f *FuzzHTTPRequestBatch) Exec(opts ...HttpPoolConfigOption) (chan *HttpResult, error) {
 	req := f.GetOriginRequest()
 	if req == nil {
 		return _httpPool(f, opts...)

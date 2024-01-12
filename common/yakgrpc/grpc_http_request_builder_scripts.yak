@@ -25,7 +25,7 @@ yakit.Info("RuntimeID: %v", RUNTIME_ID)
 
 caller, err := hook.NewMixPluginCaller()
 if err != nil { die(err) }
-err = caller.LoadPlugin(pluginName)
+err = caller.LoadPluginByName(ctx,pluginName,[])
 if err != nil { die(err) }
 caller.SetCache(false)
 caller.SetConcurrent(len(reqs))

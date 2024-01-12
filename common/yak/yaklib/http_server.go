@@ -28,7 +28,7 @@ type _httpServerConfig struct {
 	callback  http.HandlerFunc
 }
 
-type _httpServerConfigOpt func(c *_httpServerConfig)
+type HttpServerConfigOpt func(c *_httpServerConfig)
 
 func BuildTlsConfig(crt, key interface{}, cas ...interface{}) *tls.Config {
 	crtRaw := utils.StringAsFileParams(crt)
@@ -46,20 +46,20 @@ func BuildTlsConfig(crt, key interface{}, cas ...interface{}) *tls.Config {
 	return tlsConfig
 }
 
-func _httpServerOptCaAndKey(crt, key interface{}, cas ...interface{}) _httpServerConfigOpt {
+func _httpServerOptCaAndKey(crt, key interface{}, cas ...interface{}) HttpServerConfigOpt {
 	config := BuildTlsConfig(crt, key, cas...)
 	return func(c *_httpServerConfig) {
 		c.tlsConfig = config
 	}
 }
 
-func _httpServerOptContext(ctx context.Context) _httpServerConfigOpt {
+func _httpServerOptContext(ctx context.Context) HttpServerConfigOpt {
 	return func(c *_httpServerConfig) {
 		c.ctx = ctx
 	}
 }
 
-func _httpServerOptCallback(cb func(rsp http.ResponseWriter, req *http.Request)) _httpServerConfigOpt {
+func _httpServerOptCallback(cb func(rsp http.ResponseWriter, req *http.Request)) HttpServerConfigOpt {
 	return func(c *_httpServerConfig) {
 		c.callback = cb
 	}
@@ -72,7 +72,7 @@ func _localFileSystemHandler(prefix, dir string) http.Handler {
 	return http.FileServer(http.Dir(dir))
 }
 
-func _listen(host string, port int, opts ..._httpServerConfigOpt) (lis net.Listener, config *_httpServerConfig, err error) {
+func _listen(host string, port int, opts ...HttpServerConfigOpt) (lis net.Listener, config *_httpServerConfig, err error) {
 	config = &_httpServerConfig{}
 	for _, opt := range opts {
 		opt(config)
@@ -94,7 +94,7 @@ func _listen(host string, port int, opts ..._httpServerConfigOpt) (lis net.Liste
 	return lis, config, nil
 }
 
-func _httpServe(host string, port int, opts ..._httpServerConfigOpt) error {
+func _httpServe(host string, port int, opts ...HttpServerConfigOpt) error {
 	lis, config, err := _listen(host, port, opts...)
 	if err != nil {
 		return err
@@ -117,7 +117,7 @@ func _httpServe(host string, port int, opts ..._httpServerConfigOpt) error {
 	}))
 }
 
-func _localFileSystemServe(host string, port int, prefix, localPath string, opts ..._httpServerConfigOpt) error {
+func _localFileSystemServe(host string, port int, prefix, localPath string, opts ...HttpServerConfigOpt) error {
 	lis, config, err := _listen(host, port, opts...)
 	if err != nil {
 		return err

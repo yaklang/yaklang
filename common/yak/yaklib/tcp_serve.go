@@ -17,28 +17,28 @@ type tcpServerConfig struct {
 	tlsConfig *tls.Config
 }
 
-type tcpServerConfigOpt func(c *tcpServerConfig)
+type TcpServerConfigOpt func(c *tcpServerConfig)
 
-func _tcpServerTls(crt, key interface{}, cas ...interface{}) tcpServerConfigOpt {
+func _tcpServerTls(crt, key interface{}, cas ...interface{}) TcpServerConfigOpt {
 	tlsConfig := BuildTlsConfig(crt, key, cas...)
 	return func(c *tcpServerConfig) {
 		c.tlsConfig = tlsConfig
 	}
 }
 
-func _tcpServeContext(ctx context.Context) tcpServerConfigOpt {
+func _tcpServeContext(ctx context.Context) TcpServerConfigOpt {
 	return func(c *tcpServerConfig) {
 		c.ctx = ctx
 	}
 }
 
-func _tcpServeCallback(cb func(connection *tcpConnection)) tcpServerConfigOpt {
+func _tcpServeCallback(cb func(connection *tcpConnection)) TcpServerConfigOpt {
 	return func(c *tcpServerConfig) {
 		c.callback = cb
 	}
 }
 
-func tcpServe(host interface{}, port int, opts ...tcpServerConfigOpt) error {
+func tcpServe(host interface{}, port int, opts ...TcpServerConfigOpt) error {
 	config := &tcpServerConfig{ctx: context.Background()}
 
 	for _, opt := range opts {
