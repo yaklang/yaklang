@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/plugin_type_analyzer/rules"
+	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 )
 
 func TestRulesDefineFunction(t *testing.T) {
@@ -80,6 +81,62 @@ func TestRulesDefineFunction(t *testing.T) {
 				rules.DuplicateFunction("hijackSaveHTTPFlow"),
 			},
 			"mitm")
+	})
+
+}
+
+func TestRuleDefineFunctionWithFreeValue(t *testing.T) {
+	t.Run("can't find FreeValue", func(t *testing.T) {
+		prog := check(t,
+			`
+	handle = result => {
+		println(a)
+		return result
+	}
+		`,
+			[]string{
+				ssa4analyze.ValueUndefined("a"),
+			},
+			"codec",
+		)
+
+		_ = prog
+		// check FreeValue range
+		fvs := prog.Ref("a").ShowWithSource()
+		if len(fvs) != 1 {
+			t.Fatal("free value count is not 1")
+		}
+
+		fv := fvs[0]
+		if *fv.GetRange().SourceCode != "a" {
+			t.Fatal("free value range is not a")
+		}
+	})
+
+	t.Run("can find FreeValue", func(t *testing.T) {
+		check(
+			t, `
+filter = 1
+handle = r => {
+	println(filter)
+	return ""
+}
+			`,
+			[]string{}, "codec",
+		)
+	})
+
+	t.Run("can find FreeValue with local variable", func(t *testing.T) {
+		check(
+			t, `
+filter := 1
+handle = r => {
+	println(filter)
+	return ""
+}
+			`,
+			[]string{}, "codec",
+		)
 	})
 
 }

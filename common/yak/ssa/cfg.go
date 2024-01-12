@@ -393,7 +393,7 @@ func (t *TryBuilder) Finish() {
 	builder.CurrentBlock = catch
 	id = t.buildError()
 	if id != "" {
-		p := NewParam(id, false, builder.Function)
+		p := NewParam(id, false, builder)
 		p.SetType(BasicTypes[ErrorType])
 		builder.WriteVariable(builder.SetScopeLocalVariable(id), p)
 		// builder.WriteVariable(id, p)

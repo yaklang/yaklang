@@ -60,8 +60,9 @@ func (f *Function) addAnonymous(anon *Function) {
 }
 
 func (f *FunctionBuilder) NewParam(name string) *Parameter {
-	p := NewParam(name, false, f.Function)
+	p := NewParam(name, false, f)
 	p.SetRange(f.CurrentRange)
+	f.CurrentScope.AddVariable(NewVariable(name, p), f.CurrentRange)
 	// p.typs = append(p.typs, BasicTypesKind[Any])
 	f.Param = append(f.Param, p)
 	f.writeVariableByBlock(name, p, f.EnterBlock)
