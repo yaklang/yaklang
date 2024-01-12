@@ -648,7 +648,7 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 	case *JS.TemplateStringExpressionContext:
 	case *JS.YieldExpressionContext:
 	case *JS.ThisExpressionContext:
-		return ssa.NewParam("this", false, b.Function)
+		return ssa.NewParam("this", false, b.FunctionBuilder)
 	case *JS.IdentifierExpressionContext:
 	// identify是左值那边的
 	// 	rv, _ :=  b.buildIdentifierExpression(s.GetText(), false)
