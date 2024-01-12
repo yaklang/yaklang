@@ -397,6 +397,21 @@ func getFuncDeclAndDocBySSAValue(name string, v *ssaapi.Value) (desc string, doc
 	return
 }
 
+func getExternLibDesc(name, typName string) string {
+	// 标准库
+	lib, ok := doc.DefaultDocumentHelper.Libs[name]
+	if !ok {
+		// break
+		return ""
+	}
+	desc := fmt.Sprintf("```go\ntype %s library {\n", name)
+	methodDescriptions := getFuncDescByDecls(lib.Functions, typName, false, true)
+	desc += methodDescriptions
+	desc += "}"
+	desc += "\n```"
+	return desc
+}
+
 func getDescFromSSAValue(name string, v *ssaapi.Value) string {
 	bareTyp := ssaapi.GetBareType(v.GetType())
 	typStr := getGolangTypeStringBySSAType(bareTyp)
@@ -458,16 +473,7 @@ func getDescFromSSAValue(name string, v *ssaapi.Value) string {
 			desc += "}"
 			desc += "\n```"
 		case ssa.Any:
-			// 标准库
-			lib, ok := doc.DefaultDocumentHelper.Libs[name]
-			if !ok {
-				break
-			}
-			desc = fmt.Sprintf("```go\ntype %s library {\n", name)
-			methodDescriptions := getFuncDescByDecls(lib.Functions, typName, false, true)
-			desc += methodDescriptions
-			desc += "}"
-			desc += "\n```"
+			desc = getExternLibDesc(name, typName)
 		}
 	} else {
 		// ! 这里可能存在value实际上是parent 而不是其本身
