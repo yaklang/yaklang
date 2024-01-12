@@ -199,3 +199,41 @@ func TestYaklangBasic_Foreach(t *testing.T) {
 		test.Equal(kind, ssa.Number)
 	})
 }
+
+func TestYaklangParameter(t *testing.T) {
+	t.Run("test parameter used", func(t *testing.T) {
+		test := assert.New(t)
+		prog := MustParse(`
+		f = (a) => {
+			return a
+		}
+		`, t)
+		as := prog.Ref("a").ShowWithSource()
+		test.Equal(1, len(as))
+		test.Equal("a", *as[0].GetRange().SourceCode)
+	})
+
+	t.Run("test parameter not used", func(t *testing.T) {
+		test := assert.New(t)
+		prog := MustParse(`
+		f = (a) => {
+			return 1
+		}
+		`, t)
+		as := prog.Ref("a").ShowWithSource()
+		test.Equal(1, len(as))
+		test.Equal("a", *as[0].GetRange().SourceCode)
+	})
+
+	t.Run("test free value used", func(t *testing.T) {
+		test := assert.New(t)
+		prog := MustParse(`
+		f = () => {
+			return a
+		}
+		`, t)
+		as := prog.Ref("a").ShowWithSource()
+		test.Equal(1, len(as))
+		test.Equal("a", *as[0].GetRange().SourceCode)
+	})
+}

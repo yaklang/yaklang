@@ -131,7 +131,7 @@ func (b *FunctionBuilder) getExternLibInstance(i, key Value) (ret Value) {
 			// handler
 			want := b.TryGetSimilarityKey(pa.GetName(), ci.String())
 			b.NewErrorWithPos(Error, SSATAG, b.CurrentRange, ExternFieldError("Lib", pa.GetName(), ci.String(), want))
-			p := NewParam(pa.GetName()+"."+ci.String(), false, b.Function)
+			p := NewParam(pa.GetName()+"."+ci.String(), false, b)
 			p.SetExtern(true)
 			return p
 		}

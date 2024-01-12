@@ -68,7 +68,7 @@ func (b *FunctionBuilder) TryBuildExternValue(id string) Value {
 	}
 	if b.ExternLib != nil {
 		if table, ok := b.ExternLib[id]; ok {
-			ex := NewExternLib(id, b.Function)
+			ex := NewExternLib(id, b)
 			ex.SetExtern(true)
 			ex.BuildField = func(key string) Value {
 				if v, ok := table[key]; ok {
@@ -105,7 +105,7 @@ func (b *FunctionBuilder) BuildValueFromAny(id string, v any) (value Value) {
 		f.SetRange(b.CurrentRange)
 		value = f
 	default:
-		value = NewParam(str, false, b.Function)
+		value = NewParam(str, false, b)
 		value.SetType(b.handlerType(itype, 0))
 	}
 	value.SetExtern(true)

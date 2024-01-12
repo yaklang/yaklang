@@ -160,7 +160,7 @@ func NewErrorHandler(try, catch *BasicBlock) *ErrorHandler {
 	return e
 }
 
-func NewExternLib(variable string, fun *Function) *ExternLib {
+func NewExternLib(variable string, builder *FunctionBuilder) *ExternLib {
 	e := &ExternLib{
 		anInstruction: NewInstruction(),
 		anValue:       NewValue(),
@@ -168,26 +168,26 @@ func NewExternLib(variable string, fun *Function) *ExternLib {
 		Member:        make([]Value, 0),
 	}
 	e.SetName(variable)
-	e.SetFunc(fun)
-	e.SetBlock(fun.EnterBlock)
-	e.SetRange(fun.GetRange())
+	e.SetFunc(builder.Function)
+	e.SetBlock(builder.EnterBlock)
+	e.SetRange(builder.CurrentRange)
 	e.GetProgram().SetVirtualRegister(e)
 	e.GetProgram().SetInstructionWithName(variable, e)
 	return e
 }
 
-func NewParam(variable string, isFreeValue bool, fun *Function) *Parameter {
+func NewParam(variable string, isFreeValue bool, fun *FunctionBuilder) *Parameter {
 	p := &Parameter{
 		anInstruction: NewInstruction(),
 		anValue:       NewValue(),
 		IsFreeValue:   isFreeValue,
 	}
 	p.SetName(variable)
-	p.SetFunc(fun)
+	p.SetFunc(fun.Function)
 	p.SetBlock(fun.EnterBlock)
 	p.SetRange(fun.GetRange())
 	p.GetProgram().SetVirtualRegister(p)
-	p.GetProgram().SetInstructionWithName(variable, p)
+	// p.GetProgram().SetInstructionWithName(variable, p)
 	return p
 }
 
