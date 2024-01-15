@@ -153,17 +153,19 @@ func _cliCheck() {
 	}
 }
 
-func CliCheckWithContext(cancel context.CancelFunc) {
-	if helpParam.foundArgsIndex() != -1 {
-		_help()
-		cancel()
-	} else if cliParamInvalid.IsSet() {
-		errorMsg = strings.TrimSpace(errorMsg)
-		if len(errorMsg) > 0 {
-			fmt.Printf("Error:\n  %s\n\n", errorMsg)
-		}
-		_help()
+func CliCheckWithContext(cancel context.CancelFunc) func() {
+	return func() {
+		if helpParam.foundArgsIndex() != -1 {
+			_help()
+			cancel()
+		} else if cliParamInvalid.IsSet() {
+			errorMsg = strings.TrimSpace(errorMsg)
+			if len(errorMsg) > 0 {
+				fmt.Printf("Error:\n  %s\n\n", errorMsg)
+			}
+			_help()
 
+		}
 	}
 }
 
