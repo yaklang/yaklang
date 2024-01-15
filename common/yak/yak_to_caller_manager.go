@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/crawler"
 	"github.com/yaklang/yaklang/common/fuzztag"
 	"github.com/yaklang/yaklang/common/fuzztagx/parser"
+	"github.com/yaklang/yaklang/common/utils/cli"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/utils/pingutil"
 	"github.com/yaklang/yaklang/common/utils/yakgit"
@@ -784,6 +785,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 }
 
 func HookEngineContext(engine *antlr4yak.Engine, streamContext context.Context) {
+	streamContext, cancel := context.WithCancel(streamContext)
 	engine.GetVM().RegisterMapMemberCallHandler("context", "Seconds", func(f interface{}) interface{} {
 		funcValue := reflect.ValueOf(f)
 		funcType := funcValue.Type()
@@ -934,6 +936,18 @@ func HookEngineContext(engine *antlr4yak.Engine, streamContext context.Context) 
 			}
 		}
 		return f
+	})
+
+	// os.
+	engine.GetVM().RegisterMapMemberCallHandler("os", "Exit", func(f interface{}) interface{} {
+		return func(code int) {
+			cancel()
+		}
+	})
+
+	// hook cli os.exit
+	engine.GetVM().RegisterMapMemberCallHandler("cli", "check", func(f interface{}) interface{} {
+		return cli.CliCheckWithContext
 	})
 
 }
