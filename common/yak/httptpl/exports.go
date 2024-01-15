@@ -4,6 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
+	"math/rand"
+	"strings"
+	"sync/atomic"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -16,10 +22,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"math"
-	"math/rand"
-	"strings"
-	"time"
 )
 
 func init() {
@@ -81,11 +83,11 @@ func FuzzCalcExpr() map[string]any {
 	vars.AutoSet("day", day)
 	vars.AutoSet("expr", `{{year}}-{{month}}-{{day}}`)
 	vars.AutoSet("result", fmt.Sprint(result))
-	var a = vars.ToMap()
+	a := vars.ToMap()
 	return a
 }
 
-func ScanPacket(req []byte, opts ...interface{}) {
+func ScanPacket(req []byte, opts ...interface{}) (count uint64) {
 	config, lowhttpConfig, lowhttpOpts := toConfig(opts...)
 	baseContext, cancel := context.WithCancel(context.Background())
 	_ = cancel
@@ -127,6 +129,7 @@ func ScanPacket(req []byte, opts ...interface{}) {
 				log.Infof("skipped template %s because of OnTemplateLoaded", tpl.Name)
 				continue
 			}
+			count++
 			log.Debugf("start to using template %v", tpl.Name)
 
 			tpl := tpl
@@ -169,13 +172,13 @@ func ScanPacket(req []byte, opts ...interface{}) {
 	return
 }
 
-func ScanUrl(u string, opt ...interface{}) {
+func ScanUrl(u string, opt ...interface{}) (count uint64) {
 	https, raw, err := lowhttp.ParseUrlToHttpRequestRaw("GET", u)
 	if err != nil {
 		return
 	}
 	opt = append(opt, lowhttp.WithHttps(https))
-	ScanPacket(raw, opt...)
+	return ScanPacket(raw, opt...)
 }
 
 func toConfig(opts ...interface{}) (*Config, *lowhttp.LowhttpExecConfig, []lowhttp.LowhttpOpt) {
@@ -229,6 +232,7 @@ func ScanAuto(items any, opt ...interface{}) {
 func _scanStream(ch chan any, opt ...interface{}) {
 	config, _, _ := toConfig(opt...)
 
+	var tplCount uint64
 	swg := utils.NewSizedWaitGroup(config.ConcurrentTarget)
 	handleData := func(data any) {
 		defer func() {
@@ -247,7 +251,7 @@ func _scanStream(ch chan any, opt ...interface{}) {
 					defer func() {
 						swg.Done()
 					}()
-					ScanPacket([]byte(rawStr), opt...)
+					atomic.AddUint64(&tplCount, ScanPacket([]byte(rawStr), opt...))
 				}()
 				return
 			}
@@ -259,7 +263,7 @@ func _scanStream(ch chan any, opt ...interface{}) {
 				defer func() {
 					swg.Done()
 				}()
-				ScanUrl(rawStr, opt...)
+				atomic.AddUint64(&tplCount, ScanUrl(rawStr, opt...))
 			}()
 			return
 		}
@@ -275,7 +279,7 @@ func _scanStream(ch chan any, opt ...interface{}) {
 				defer func() {
 					swg.Done()
 				}()
-				ScanUrl(u, opt...)
+				atomic.AddUint64(&tplCount, ScanUrl(u, opt...))
 			}()
 		}
 	}
@@ -288,6 +292,11 @@ func _scanStream(ch chan any, opt ...interface{}) {
 	log.Debugf("waiting for ScanStream total: %v(subtask: %v)", count, swg.WaitingEventCount)
 	swg.Wait()
 	log.Debugf("finished ScanStream total: %v", count)
+
+	if tplCount == 0 {
+		log.Warn(`no template executed, use nuclei.PullTemplates or Yakit to pull templates into local directory,
+and set nuclei.all(true) / nuclei.rawTemplate("template string") / nuclei.fuzzQueryTemplate("keyword") / nuclei.templates("template name1", "template name2") to select template`)
+	}
 }
 
 func nucleiOptionDummy(n string) func(i ...any) any {
@@ -311,7 +320,7 @@ func httpPayloadsToString(payloads *YakPayloads) (string, error) {
 }
 
 func WithOnRisk(target string, onRisk func(i *yakit.Risk)) ConfigOption {
-	var vCh = make(chan *tools.PocVul)
+	vCh := make(chan *tools.PocVul)
 	filterVul := filter.NewFilter()
 	i := processVulnerability(target, filterVul, vCh, onRisk)
 	return func(config *Config) {
@@ -400,7 +409,7 @@ func processVulnerability(target any, filterVul *filter.StringFilter, vCh chan *
 }
 
 func ScanLegacy(target any, opt ...interface{}) (chan *tools.PocVul, error) {
-	var vCh = make(chan *tools.PocVul)
+	vCh := make(chan *tools.PocVul)
 	filterVul := filter.NewFilter()
 	i := processVulnerability(target, filterVul, vCh)
 	opt = append(opt, _callback(i))
