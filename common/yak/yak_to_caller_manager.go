@@ -947,7 +947,7 @@ func HookEngineContext(engine *antlr4yak.Engine, streamContext context.Context) 
 
 	// hook cli os.exit
 	engine.GetVM().RegisterMapMemberCallHandler("cli", "check", func(f interface{}) interface{} {
-		return cli.CliCheckWithContext
+		return cli.CliCheckWithContext(cancel)
 	})
 
 }
