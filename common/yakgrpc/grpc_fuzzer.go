@@ -543,8 +543,13 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		}
 		task.RetryRootID = retryRootID
 	}
-	// 存储重试任务的开关
-	_FuzzerTaskSwitchMap.Store(task.ID, sw)
+	// 存储暂停任务的开关
+	if _, ok := _FuzzerTaskSwitchMap.Load(task.ID); !ok {
+		_FuzzerTaskSwitchMap.Store(task.ID, sw)
+		stream.Send(&ypb.FuzzerResponse{
+			TaskId: int64(task.ID),
+		})
+	}
 
 	defer func() {
 		if db := s.GetProjectDatabase().Save(task); db.Error != nil {

@@ -48,6 +48,9 @@ func TestGRPCMUSTPASS_HTTPFuzzer_Pause(t *testing.T) {
 				return
 			}
 			taskID = rsp.TaskId
+			if len(rsp.GetResponseRaw()) == 0 {
+				continue
+			}
 			count++
 			if count == 2 {
 				client.HTTPFuzzer(utils.TimeoutContextSeconds(10), &ypb.FuzzerRequest{
