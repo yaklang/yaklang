@@ -813,7 +813,9 @@ func (f *FuzzHTTPRequest) Exec(opts ...HttpPoolConfigOption) (chan *HttpResult, 
 	originOpts[1] = WithPoolOpt_Source(f.source)
 	originOpts[2] = WithPoolOpt_RuntimeId(f.runtimeId)
 	originOpts[3] = WithPoolOpt_Proxy(f.proxy)
-	originOpts[4] = WithPoolOpt_Context(f.cxt)
+	if f.cxt != nil {
+		originOpts = append(originOpts, WithPoolOpt_Context(f.cxt))
+	}
 	originOpts = append(originOpts, opts...)
 	return _httpPool(f, originOpts...)
 }
