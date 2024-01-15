@@ -241,9 +241,9 @@ func (v *VirtualMachine) ExecAsyncYakFunction(ctx context.Context, f *Function, 
 		go func() {
 			defer func() {
 				v.AsyncEnd()
-				if err := recover(); err != nil {
+				if err := frame.recover(); err != nil {
 					log.Errorf("yakvm async function panic: %v", err)
-					utils.PrintCurrentGoroutineRuntimeStack()
+					//utils.PrintCurrentGoroutineRuntimeStack()
 				}
 			}()
 
@@ -333,14 +333,17 @@ func (v *VirtualMachine) Exec(ctx context.Context, f func(frame *Frame), flags .
 		v.VMStack.Pop()
 		vmstackLock.Unlock()
 	}
-	if lastPanic := frame.recover(); lastPanic != nil {
-		lastPanic.contextInfos.Peek().(*PanicInfo).SetPositionVerbose(frame.GetVerbose())
-		if exitValue, ok := lastPanic.data.(*VMPanicSignal); ok {
-			panic(exitValue)
-		} else {
-			panic(lastPanic)
+	if flag&Asnyc != Asnyc {
+		if lastPanic := frame.recover(); lastPanic != nil {
+			lastPanic.contextInfos.Peek().(*PanicInfo).SetPositionVerbose(frame.GetVerbose())
+			if exitValue, ok := lastPanic.data.(*VMPanicSignal); ok {
+				panic(exitValue)
+			} else {
+				panic(lastPanic)
+			}
 		}
 	}
+
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
