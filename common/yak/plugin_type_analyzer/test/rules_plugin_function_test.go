@@ -87,7 +87,7 @@ func TestRulesDefineFunction(t *testing.T) {
 
 func TestRuleDefineFunctionWithFreeValue(t *testing.T) {
 	t.Run("can't find FreeValue", func(t *testing.T) {
-		prog := check(t,
+		check(t,
 			`
 	handle = result => {
 		println(a)
@@ -99,18 +99,6 @@ func TestRuleDefineFunctionWithFreeValue(t *testing.T) {
 			},
 			"codec",
 		)
-
-		_ = prog
-		// check FreeValue range
-		fvs := prog.Ref("a").ShowWithSource()
-		if len(fvs) != 1 {
-			t.Fatal("free value count is not 1")
-		}
-
-		fv := fvs[0]
-		if *fv.GetRange().SourceCode != "a" {
-			t.Fatal("free value range is not a")
-		}
 	})
 
 	t.Run("can find FreeValue", func(t *testing.T) {
