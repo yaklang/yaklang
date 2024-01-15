@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils"
@@ -616,5 +617,115 @@ yakit.Output(codec.EncodeBase64(s))
 	}
 	if !checked {
 		t.Fatal("plugin is not executed")
+	}
+}
+
+func TestGRPCMUSTPASS_Yak_Debug_Context(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	serverPort := utils.GetRandomAvailableTCPPort()
+	ctx, cancel := context.WithCancel(context.Background())
+	_, err = client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
+		Code:       fmt.Sprintf(`httpserver.Serve("127.0.0.1",%d)`, serverPort),
+		PluginType: "yak",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	flag := false
+	for i := 0; i < 10; i++ {
+		time.Sleep(500 * time.Millisecond)
+		if !utils.IsTCPPortAvailable(serverPort) { // 不可用即开
+			flag = true
+			break
+		}
+	}
+	if flag {
+		cancel()
+		time.Sleep(2 * time.Second)
+		if !utils.IsTCPPortAvailable(serverPort) {
+			t.Fatal("context close server port failed")
+		}
+	} else {
+		cancel()
+		t.Fatal("start server port failed")
+	}
+}
+
+func TestGRPCMUSTPASS_Codec_Debug_Context(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	serverPort := utils.GetRandomAvailableTCPPort()
+	ctx, cancel := context.WithCancel(context.Background())
+	_, err = client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
+		Code: fmt.Sprintf(`handle = func(i){
+httpserver.Serve("127.0.0.1",%d)}`, serverPort),
+		PluginType: "codec",
+		Input:      "aaa",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	flag := false
+	for i := 0; i < 10; i++ {
+		time.Sleep(500 * time.Millisecond)
+		if !utils.IsTCPPortAvailable(serverPort) { // 不可用即开
+			flag = true
+			break
+		}
+	}
+	if flag {
+		cancel()
+		time.Sleep(2 * time.Second)
+		if !utils.IsTCPPortAvailable(serverPort) {
+			t.Fatal("context close server port failed")
+		}
+	} else {
+		cancel()
+		t.Fatal("start server port failed")
+	}
+}
+
+func TestGRPCMUSTPASS_MITM_Debug_Context(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	serverPort := utils.GetRandomAvailableTCPPort()
+	host, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+Content-Length: 0
+
+`))
+	ctx, cancel := context.WithCancel(context.Background())
+	_, err = client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
+		Code: fmt.Sprintf(`mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+httpserver.Serve("127.0.0.1",%d)}`, serverPort),
+		PluginType: "mitm",
+		Input:      utils.HostPort(host, port),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	flag := false
+	for i := 0; i < 10; i++ {
+		time.Sleep(500 * time.Millisecond)
+		if !utils.IsTCPPortAvailable(serverPort) { // 不可用即开
+			flag = true
+			break
+		}
+	}
+	if flag {
+		cancel()
+		time.Sleep(2 * time.Second)
+		if !utils.IsTCPPortAvailable(serverPort) {
+			t.Fatal("context close server port failed")
+		}
+	} else {
+		cancel()
+		t.Fatal("start server port failed")
 	}
 }
