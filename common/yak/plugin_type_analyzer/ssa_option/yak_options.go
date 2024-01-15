@@ -152,8 +152,7 @@ func (b *Builder) Build(t ssa.Type, s string) *ssa.FunctionType {
 			ret = append(ret, ot)
 		case "Insert":
 			IsModifySelf = true
-			arg = append(arg, fieldTyp)
-			ret = append(ret, ot)
+			arg = append(arg, NumberTyp, fieldTyp)
 		case "Remove":
 			IsModifySelf = true
 			arg = append(arg, fieldTyp)
