@@ -132,6 +132,7 @@ type FuzzHTTPRequestIf interface {
 	FuzzPostBase64JsonPath(any, string, any) FuzzHTTPRequestIf
 
 	Results() ([]*http.Request, error)
+	RequestMap(func([]byte)) FuzzHTTPRequestIf
 
 	Exec(...HttpPoolConfigOption) (chan *HttpResult, error)
 
@@ -836,6 +837,31 @@ func (f *FuzzHTTPRequestBatch) Exec(opts ...HttpPoolConfigOption) (chan *HttpRes
 
 func (f *FuzzHTTPRequest) FirstHTTPRequestBytes() []byte {
 	return f.GetBytes()[:]
+}
+
+func RequestMap(f FuzzHTTPRequestIf, h func([]byte)) FuzzHTTPRequestIf {
+	results, err := f.Results()
+	if err != nil {
+		log.Errorf("cannot get request bytes: %s", err)
+		return f
+	}
+	for _, req := range results {
+		raw, err := utils.DumpHTTPRequest(req, true)
+		if err != nil {
+			log.Warnf("RequestMap ... utils.DumpHTTPRequest failed: %s", err)
+			continue
+		}
+		h(raw)
+	}
+	return f
+}
+
+func (f *FuzzHTTPRequest) RequestMap(h func([]byte)) FuzzHTTPRequestIf {
+	return RequestMap(f, h)
+}
+
+func (f *FuzzHTTPRequestBatch) RequestMap(h func([]byte)) FuzzHTTPRequestIf {
+	return RequestMap(f, h)
 }
 
 func (f *FuzzHTTPRequestBatch) FirstHTTPRequestBytes() []byte {

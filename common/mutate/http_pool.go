@@ -54,6 +54,7 @@ type httpPoolConfig struct {
 	HookBeforeRequest func([]byte) []byte
 	HookAfterRequest  func([]byte) []byte
 	MirrorHTTPFlow    func([]byte, []byte, map[string]string) map[string]string
+	MutateHook        func([]byte) [][]byte
 
 	// 请求来源
 	Source string
@@ -182,6 +183,12 @@ func _hoopPool_SetHookCaller(before func([]byte) []byte, after func([]byte) []by
 		config.HookBeforeRequest = before
 		config.HookAfterRequest = after
 		config.MirrorHTTPFlow = extractor
+	}
+}
+
+func _httpPool_MutateHook(hook func([]byte) [][]byte) HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.MutateHook = hook
 	}
 }
 
@@ -524,7 +531,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 				swg = config.SizedWaitGroupInstance
 			}
 
-			execSubmitTaskWithoutBatchTarget := func(overrideHttps bool, overrideHost string, targetRequest []byte, payloads ...string) {
+			execSubmitTaskWithoutBatchTarget := func(overrideHttps bool, overrideHost string, originRequestRaw []byte, payloads ...string) {
 				if maxSubmit > 0 && requestCounter >= maxSubmit {
 					return
 				}
@@ -533,192 +540,208 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 					externSwitch.WaitUntilOpen()
 				}
 
-				swg.Add()
-				requestCounter++
-				go func() {
-					defer func() {
-						if delayer != nil {
-							delayer.Wait()
+				execRequestInstance := func(targetRequest []byte) {
+					swg.Add()
+					requestCounter++
+					go func() {
+						defer func() {
+							if delayer != nil {
+								delayer.Wait()
+							}
+							swg.Done()
+						}()
+
+						// 处理异常
+						defer func() {
+							if err := recover(); err != nil {
+								log.Errorf("submit fuzzer task failed: %s", err)
+								utils.PrintCurrentGoroutineRuntimeStack()
+							}
+						}()
+
+						if config.HookBeforeRequest != nil {
+							newRequest := config.HookBeforeRequest(targetRequest)
+							if len(newRequest) > 0 {
+								targetRequest = newRequest
+							}
 						}
-						swg.Done()
-					}()
 
-					// 处理异常
-					defer func() {
-						if err := recover(); err != nil {
-							log.Errorf("submit fuzzer task failed: %s", err)
-							utils.PrintCurrentGoroutineRuntimeStack()
+						var urlStr string
+						_urlInsRaw, _ := lowhttp.ExtractURLFromHTTPRequestRaw(targetRequest, config.IsHttps)
+						if _urlInsRaw != nil {
+							urlStr = _urlInsRaw.String()
 						}
-					}()
-
-					if config.HookBeforeRequest != nil {
-						newRequest := config.HookBeforeRequest(targetRequest)
-						if len(newRequest) > 0 {
-							targetRequest = newRequest
+						reqIns, err := lowhttp.ParseBytesToHttpRequest(targetRequest)
+						if err != nil {
+							failedResult := &HttpResult{
+								Url:        urlStr,
+								Error:      err,
+								RequestRaw: targetRequest,
+								Timestamp:  time.Now().Unix(),
+								Payloads:   payloads,
+								Source:     config.Source,
+							}
+							results <- failedResult
+							return
 						}
-					}
 
-					var urlStr string
-					_urlInsRaw, _ := lowhttp.ExtractURLFromHTTPRequestRaw(targetRequest, config.IsHttps)
-					if _urlInsRaw != nil {
-						urlStr = _urlInsRaw.String()
-					}
-					reqIns, err := lowhttp.ParseBytesToHttpRequest(targetRequest)
-					if err != nil {
-						failedResult := &HttpResult{
-							Url:        urlStr,
-							Error:      err,
-							RequestRaw: targetRequest,
-							Timestamp:  time.Now().Unix(),
-							Payloads:   payloads,
-							Source:     config.Source,
+						// log.Infof("start to send to %v(%v) (packet mode)", urlStr, utils.HostPort(config.Host, config.Port))
+						var host string
+						var port int
+						if config.Host == "" || config.Port <= 0 {
+							hostInUrl, portInUrl, _ := utils.ParseStringToHostPort(urlStr)
+							host = hostInUrl
+							port = portInUrl
+						} else {
+							host = config.Host
+							port = config.Port
 						}
-						results <- failedResult
-						return
-					}
 
-					// log.Infof("start to send to %v(%v) (packet mode)", urlStr, utils.HostPort(config.Host, config.Port))
+						// 如果 host 被强制覆盖，那么... 替换空
+						if overrideHost != "" {
+							host, port = "", 0
+						}
 
-					var host string
-					var port int
-					if config.Host == "" || config.Port <= 0 {
-						hostInUrl, portInUrl, _ := utils.ParseStringToHostPort(urlStr)
-						host = hostInUrl
-						port = portInUrl
-					} else {
-						host = config.Host
-						port = config.Port
-					}
+						https := config.IsHttps
+						if overrideHttps {
+							https = true
+						}
+						redictTimes := config.RedirectTimes
+						if config.NoFollowRedirect {
+							redictTimes = 0
+						}
+						lowhttpOptions := []lowhttp.LowhttpOpt{
+							lowhttp.WithHttps(https),
+							lowhttp.WithRuntimeId(config.RuntimeId),
+							lowhttp.WithHost(host), lowhttp.WithPort(port),
+							lowhttp.WithPacketBytes(targetRequest),
+							lowhttp.WithTimeout(config.PerRequestTimeout),
+							lowhttp.WithRedirectTimes(redictTimes),
+							lowhttp.WithJsRedirect(config.FollowJSRedirect),
+							lowhttp.WithContext(config.Ctx),
+							lowhttp.WithNoFixContentLength(config.NoFixContentLength),
+							lowhttp.WithHttp2(config.ForceHttp2),
+							lowhttp.WithSource(config.Source),
+							lowhttp.WithProxy(config.Proxies...),
+							lowhttp.WithRetryTimes(config.RetryTimes),
+							lowhttp.WithRetryInStatusCode(config.RetryInStatusCode),
+							lowhttp.WithRetryNotInStatusCode(config.RetryNotInStatusCode),
+							lowhttp.WithRetryWaitTime(utils.FloatSecondDuration(config.RetryWaitTime)),
+							lowhttp.WithRetryMaxWaitTime(utils.FloatSecondDuration(config.RetryMaxWaitTime)),
+							lowhttp.WithDNSServers(config.DNSServers),
+							lowhttp.WithETCHosts(config.EtcHosts),
+							lowhttp.WithGmTLS(config.IsGmTLS),
+							lowhttp.WithConnPool(config.WithConnPool),
+						}
 
-					// 如果 host 被强制覆盖，那么... 替换空
-					if overrideHost != "" {
-						host, port = "", 0
-					}
+						if config.OverrideEnableSystemProxyEnv {
+							lowhttpOptions = append(lowhttpOptions, lowhttp.WithEnableSystemProxyFromEnv(!config.NoSystemProxy))
+						}
 
-					https := config.IsHttps
-					if overrideHttps {
-						https = true
-					}
-					redictTimes := config.RedirectTimes
-					if config.NoFollowRedirect {
-						redictTimes = 0
-					}
-					lowhttpOptions := []lowhttp.LowhttpOpt{
-						lowhttp.WithHttps(https),
-						lowhttp.WithRuntimeId(config.RuntimeId),
-						lowhttp.WithHost(host), lowhttp.WithPort(port),
-						lowhttp.WithPacketBytes(targetRequest),
-						lowhttp.WithTimeout(config.PerRequestTimeout),
-						lowhttp.WithRedirectTimes(redictTimes),
-						lowhttp.WithJsRedirect(config.FollowJSRedirect),
-						lowhttp.WithContext(config.Ctx),
-						lowhttp.WithNoFixContentLength(config.NoFixContentLength),
-						lowhttp.WithHttp2(config.ForceHttp2),
-						lowhttp.WithSource(config.Source),
-						lowhttp.WithProxy(config.Proxies...),
-						lowhttp.WithRetryTimes(config.RetryTimes),
-						lowhttp.WithRetryInStatusCode(config.RetryInStatusCode),
-						lowhttp.WithRetryNotInStatusCode(config.RetryNotInStatusCode),
-						lowhttp.WithRetryWaitTime(utils.FloatSecondDuration(config.RetryWaitTime)),
-						lowhttp.WithRetryMaxWaitTime(utils.FloatSecondDuration(config.RetryMaxWaitTime)),
-						lowhttp.WithDNSServers(config.DNSServers),
-						lowhttp.WithETCHosts(config.EtcHosts),
-						lowhttp.WithGmTLS(config.IsGmTLS),
-						lowhttp.WithConnPool(config.WithConnPool),
-					}
+						if config.EnableMaxContentLength {
+							lowhttpOptions = append(lowhttpOptions, lowhttp.WithMaxContentLength(int(config.MaxContentLength)))
+						}
 
-					if config.OverrideEnableSystemProxyEnv {
-						lowhttpOptions = append(lowhttpOptions, lowhttp.WithEnableSystemProxyFromEnv(!config.NoSystemProxy))
-					}
-
-					if config.EnableMaxContentLength {
-						lowhttpOptions = append(lowhttpOptions, lowhttp.WithMaxContentLength(int(config.MaxContentLength)))
-					}
-
-					rspInstance, err := lowhttp.HTTP(lowhttpOptions...)
-					var rsp []byte
-					if rspInstance != nil {
-						// 多请求的话，要保留原样
-						rsp = rspInstance.RawPacket
-						if !rspInstance.MultiResponse {
-							if ret := lowhttp.GetHTTPPacketHeader(rspInstance.RawPacket, "Content-Encoding"); ret != "" {
-								rspFixed, _, _ := lowhttp.FixHTTPResponse(rspInstance.RawPacket)
-								if len(rspFixed) > 0 {
-									rsp = rspFixed
+						rspInstance, err := lowhttp.HTTP(lowhttpOptions...)
+						var rsp []byte
+						if rspInstance != nil {
+							// 多请求的话，要保留原样
+							rsp = rspInstance.RawPacket
+							if !rspInstance.MultiResponse {
+								if ret := lowhttp.GetHTTPPacketHeader(rspInstance.RawPacket, "Content-Encoding"); ret != "" {
+									rspFixed, _, _ := lowhttp.FixHTTPResponse(rspInstance.RawPacket)
+									if len(rspFixed) > 0 {
+										rsp = rspFixed
+									}
 								}
 							}
 						}
-					}
 
-					if config.HookAfterRequest != nil {
-						newRsp := config.HookAfterRequest(rsp)
-						if len(newRsp) > 0 {
-							rsp = newRsp
-						}
-					}
-
-					existedParams := make(map[string]string)
-					if config.FuzzParams != nil {
-						for k, v := range config.FuzzParams {
-							existedParams[k] = strings.Join(v, ",")
-						}
-					}
-
-					extra := make(map[string]string)
-					if config.MirrorHTTPFlow != nil {
-						if ret := config.MirrorHTTPFlow(targetRequest, rsp, existedParams); ret != nil {
-							for k, v := range ret {
-								extra[k] = v
+						if config.HookAfterRequest != nil {
+							newRsp := config.HookAfterRequest(rsp)
+							if len(newRsp) > 0 {
+								rsp = newRsp
 							}
 						}
-					}
 
-					if err != nil {
-						log.Errorf("exec packet raw failed: %s", err)
-						failedResult := &HttpResult{
-							Url:             urlStr,
-							Request:         reqIns,
-							Error:           err,
-							RequestRaw:      targetRequest,
-							ResponseRaw:     nil,
-							DurationMs:      rspInstance.TraceInfo.GetServerDurationMS(),
-							Timestamp:       time.Now().Unix(),
-							Payloads:        payloads,
-							Source:          config.Source,
-							LowhttpResponse: rspInstance,
-							ExtraInfo:       extra,
+						existedParams := make(map[string]string)
+						if config.FuzzParams != nil {
+							for k, v := range config.FuzzParams {
+								existedParams[k] = strings.Join(v, ",")
+							}
 						}
-						results <- failedResult
+
+						extra := make(map[string]string)
+						if config.MirrorHTTPFlow != nil {
+							if ret := config.MirrorHTTPFlow(targetRequest, rsp, existedParams); ret != nil {
+								for k, v := range ret {
+									extra[k] = v
+								}
+							}
+						}
+
+						if err != nil {
+							log.Errorf("exec packet raw failed: %s", err)
+							failedResult := &HttpResult{
+								Url:             urlStr,
+								Request:         reqIns,
+								Error:           err,
+								RequestRaw:      targetRequest,
+								ResponseRaw:     nil,
+								DurationMs:      rspInstance.TraceInfo.GetServerDurationMS(),
+								Timestamp:       time.Now().Unix(),
+								Payloads:        payloads,
+								Source:          config.Source,
+								LowhttpResponse: rspInstance,
+								ExtraInfo:       extra,
+							}
+							results <- failedResult
+							return
+						}
+						ret := &HttpResult{
+							Url:              urlStr,
+							Request:          reqIns,
+							Error:            err,
+							ExtraInfo:        extra,
+							RequestRaw:       targetRequest,
+							ResponseRaw:      rsp,
+							DurationMs:       rspInstance.TraceInfo.GetServerDurationMS(),
+							ServerDurationMs: rspInstance.TraceInfo.GetServerDurationMS(),
+							Timestamp:        time.Now().Unix(),
+							Payloads:         payloads,
+							Source:           config.Source,
+							LowhttpResponse:  rspInstance,
+						}
+						utils.Debug(func() {
+							println(string(rsp))
+						})
+						if len(rsp) <= 0 {
+							ret.Error = utils.Error("服务端没有任何返回数据: empty response (timeout empty)")
+						}
+						if ret.Response == nil && rsp != nil && !config.NoFixContentLength {
+							ret.Response, err = http.ReadResponse(bufio.NewReader(bytes.NewBuffer(rsp)), reqIns)
+							if err != nil {
+								log.Errorf("parse bytes to response failed: %s", err)
+							}
+						}
+						results <- ret
+					}()
+				}
+
+				// MutateHook
+				// change the final request
+				// if config, return the new requests
+				// used for auth / param / post data / etc.
+				if config.MutateHook != nil {
+					results := config.MutateHook(originRequestRaw)
+					if len(results) > 0 {
+						for _, r := range results {
+							execRequestInstance(r)
+						}
 						return
 					}
-					ret := &HttpResult{
-						Url:              urlStr,
-						Request:          reqIns,
-						Error:            err,
-						ExtraInfo:        extra,
-						RequestRaw:       targetRequest,
-						ResponseRaw:      rsp,
-						DurationMs:       rspInstance.TraceInfo.GetServerDurationMS(),
-						ServerDurationMs: rspInstance.TraceInfo.GetServerDurationMS(),
-						Timestamp:        time.Now().Unix(),
-						Payloads:         payloads,
-						Source:           config.Source,
-						LowhttpResponse:  rspInstance,
-					}
-					utils.Debug(func() {
-						println(string(rsp))
-					})
-					if len(rsp) <= 0 {
-						ret.Error = utils.Error("服务端没有任何返回数据: empty response (timeout empty)")
-					}
-					if ret.Response == nil && rsp != nil && !config.NoFixContentLength {
-						ret.Response, err = http.ReadResponse(bufio.NewReader(bytes.NewBuffer(rsp)), reqIns)
-						if err != nil {
-							log.Errorf("parse bytes to response failed: %s", err)
-						}
-					}
-					results <- ret
-				}()
+				}
+				execRequestInstance(originRequestRaw)
 			}
 
 			submitTask := func(targetRequest []byte, payloads ...string) {
@@ -873,6 +896,7 @@ var (
 	WithPoolOPt_DelayMaxSeconds            = _httpPool_DelayMaxSeconds
 	WithPoolOPt_DelaySeconds               = _httpPool_DelaySeconds
 	WithPoolOpt_HookCodeCaller             = _hoopPool_SetHookCaller
+	WithPoolOpt_MutateHook                 = _httpPool_MutateHook
 	WithPoolOpt_Source                     = _httpPool_Source
 	WithPoolOpt_NamingContext              = _httpPool_namingContext
 	WithPoolOpt_RetryTimes                 = _httpPool_Retry
