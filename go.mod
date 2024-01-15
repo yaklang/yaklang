@@ -110,7 +110,6 @@ require (
 	github.com/urfave/cli v1.22.12
 	github.com/valyala/bytebufferpool v1.0.0
 	github.com/vjeantet/grok v1.0.0
-	github.com/xiecat/wsm v0.1.3
 	github.com/ysmood/gson v0.7.3
 	go.mongodb.org/mongo-driver v1.12.1
 	golang.org/x/crypto v0.16.0
