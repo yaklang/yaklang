@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -142,6 +143,20 @@ func _cliCheck() {
 	if helpParam.foundArgsIndex() != -1 {
 		_help()
 		os.Exit(1)
+	} else if cliParamInvalid.IsSet() {
+		errorMsg = strings.TrimSpace(errorMsg)
+		if len(errorMsg) > 0 {
+			fmt.Printf("Error:\n  %s\n\n", errorMsg)
+		}
+		_help()
+
+	}
+}
+
+func CliCheckWithContext(cancel context.CancelFunc) {
+	if helpParam.foundArgsIndex() != -1 {
+		_help()
+		cancel()
 	} else if cliParamInvalid.IsSet() {
 		errorMsg = strings.TrimSpace(errorMsg)
 		if len(errorMsg) > 0 {

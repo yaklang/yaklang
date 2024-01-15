@@ -582,21 +582,25 @@ return codec.EncodeBase64(a)
 
 func TestGRPCMUSTPASS_HTTP_YakDebug(t *testing.T) {
 	client, err := NewLocalClient()
+	host, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+Content-Length: 0
+
+`))
 	if err != nil {
 		t.Fatal(err)
 	}
 	codecString := utils.RandStringBytes(10)
 	expected := codec.EncodeBase64(codecString)
 	stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
-		Code: `s = cli.String("s")
+		Code: fmt.Sprintf(`s = cli.String("s")
 b = cli.Bool("b")
 cli.check()
 yakit.EnableWebsiteTrees("sssss")
-poc.Get("http://www.baidu.com",poc.save(true))
+poc.Get("%s",poc.save(true))
 if b {
 yakit.Output(codec.EncodeBase64(s))
 }
-`,
+`, utils.HostPort(host, port)),
 		PluginType: "yak",
 		ExecParams: []*ypb.KVPair{{Key: "s", Value: codecString}, {Key: "b", Value: codecString}},
 	})
