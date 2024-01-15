@@ -273,6 +273,12 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 	var sw *utils.Switch
 	if !isPause {
 		sw = utils.NewSwitch(true)
+		go func() {
+			select {
+			case <-stream.Context().Done():
+				sw.SwitchTo(true)
+			}
+		}()
 	} else {
 		i, ok := _FuzzerTaskSwitchMap.Load(uint(pauseTaskID))
 		if ok {
