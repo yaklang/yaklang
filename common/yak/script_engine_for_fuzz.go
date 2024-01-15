@@ -60,9 +60,13 @@ func MutateHookCaller(raw string) (func([]byte) []byte, func([]byte) []byte, fun
 				if err != nil {
 					log.Infof("eval beforeRequest hook failed: %s", err)
 				}
-				requestRawNew, typeOk := resultRequest.([]byte)
-				if typeOk {
-					return requestRawNew
+				switch ret := resultRequest.(type) {
+				case string:
+					return []byte(ret)
+				case []byte:
+					return ret
+				case []rune:
+					return []byte(string(ret))
 				}
 			}
 			return bytes
@@ -85,9 +89,13 @@ func MutateHookCaller(raw string) (func([]byte) []byte, func([]byte) []byte, fun
 				if err != nil {
 					log.Infof("eval afterRequest hook failed: %s", err)
 				}
-				responseNew, typeOk := resultResponse.([]byte)
-				if typeOk {
-					return responseNew
+				switch ret := resultResponse.(type) {
+				case string:
+					return []byte(ret)
+				case []byte:
+					return ret
+				case []rune:
+					return []byte(string(ret))
 				}
 			}
 			return bytes

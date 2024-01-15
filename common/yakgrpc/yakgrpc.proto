@@ -618,7 +618,7 @@ service Yak {
 
   rpc GetSpaceEngineStatus(GetSpaceEngineStatusRequest) returns(SpaceEngineStatus);
   rpc FetchPortAssetFromSpaceEngine(FetchPortAssetFromSpaceEngineRequest) returns (stream ExecResult);
-  
+
 }
 
 message GetSpaceEngineStatusRequest {
@@ -1041,22 +1041,22 @@ message GlobalNetworkConfig {
 }
 
 message AuthInfo {
-    string AuthUsername = 1;
-    string AuthPassword = 2;
-    string AuthType = 3;
-    string Host = 4;
-    bool Forbidden = 5;
+  string AuthUsername = 1;
+  string AuthPassword = 2;
+  string AuthType = 3;
+  string Host = 4;
+  bool Forbidden = 5;
 }
 
 message ThirdPartyApplicationConfig {
-    // zoomeye / hunter / shodan / fofa / github / token
-    string Type = 1;
-    string APIKey = 2;
-    string UserIdentifier = 3;
-    string UserSecret = 4;
-    string Namespace = 5;
-    string Domain = 6;
-    string WebhookURL = 7;
+  // zoomeye / hunter / shodan / fofa / github / token
+  string Type = 1;
+  string APIKey = 2;
+  string UserIdentifier = 3;
+  string UserSecret = 4;
+  string Namespace = 5;
+  string Domain = 6;
+  string WebhookURL = 7;
 }
 
 message DiagnoseNetworkRequest {
@@ -1816,16 +1816,16 @@ message Range {
 }
 
 message YaklangInspectInformationRequest {
-    string YakScriptType = 1;
-    string YakScriptCode = 2;
-    Range Range = 3;
+  string YakScriptType = 1;
+  string YakScriptCode = 2;
+  Range Range = 3;
 }
 
 message YaklangLanguageSuggestionRequest {
-    string InspectType = 1;// completion(补全) / hover(提示) / signature(签名)
-    string YakScriptType = 2;
-    string YakScriptCode = 3;
-    Range Range = 4;
+  string InspectType = 1;// completion(补全) / hover(提示) / signature(签名)
+  string YakScriptType = 2;
+  string YakScriptCode = 3;
+  Range Range = 4;
 }
 
 
@@ -1849,12 +1849,12 @@ message YaklangInformation {
 }
 
 message YaklangLanguageSuggestionResponse {
-    repeated SuggestionDescription SuggestionMessage = 1;
+  repeated SuggestionDescription SuggestionMessage = 1;
 }
 
 message YaklangInspectInformationResponse {
   repeated YaklangInformation Information = 1;
-  repeated YakScriptParam CliParameter  = 2;
+  repeated YakScriptParam CliParameter = 2;
   repeated YakRiskInfo RiskInfo = 3;
 }
 
@@ -1862,7 +1862,7 @@ message YakRiskInfo {
   string Level = 1;
   string TypeVerbose = 2;
   string CVE = 3;
-  string Description = 4; 
+  string Description = 4;
   string Solution = 5;
 }
 
@@ -1917,7 +1917,7 @@ message SavePayloadProgress {
 
   string CostDurationVerbose = 7; // 耗时
   string Speed = 8;// 速度
-  string RestDurationVerbose  =9;// 剩余时间
+  string RestDurationVerbose = 9;// 剩余时间
   string Message = 10;
 }
 
@@ -1968,19 +1968,19 @@ message DownloadOnlinePluginByIdsRequest {
 }
 
 message DownloadOnlinePluginsRequest {
-    string Token = 1;
-    repeated bool IsPrivate = 2;
-    string  Keywords = 3;
-    repeated string PluginType = 4;
-    repeated string  Tags = 5;
-    string   UserName = 6;
-    int64  UserId = 7;
-    string TimeSearch = 8;
-    repeated string Group = 9;
-    string   ListType = 10;
-    repeated int64 Status = 11;
-    repeated string UUID = 12;
-    repeated string ScriptName = 13;
+  string Token = 1;
+  repeated bool IsPrivate = 2;
+  string  Keywords = 3;
+  repeated string PluginType = 4;
+  repeated string  Tags = 5;
+  string   UserName = 6;
+  int64  UserId = 7;
+  string TimeSearch = 8;
+  repeated string Group = 9;
+  string   ListType = 10;
+  repeated int64 Status = 11;
+  repeated string UUID = 12;
+  repeated string ScriptName = 13;
 }
 
 message DownloadOnlinePluginByScriptNamesRequest {
@@ -2518,7 +2518,7 @@ message WebShell {
   //    Proxy
   string Proxy = 11;
   map<string, string> Headers = 12;
-  string Remark =13;
+  string Remark = 13;
   int64 CreatedAt = 14;
   int64 UpdatedAt = 15;
   string PacketCodecName = 16;
@@ -3365,8 +3365,8 @@ message NameRequest {
 }
 
 message PayloadGroupNode {
-  string Type =1; // "File" / "DataBase" / "Folder"
-  string Name  = 2;
+  string Type = 1; // "File" / "DataBase" / "Folder"
+  string Name = 2;
   int64 Number = 3;
   repeated PayloadGroupNode Nodes = 4; // for Type "Folder"
 }
@@ -3465,9 +3465,9 @@ message GetAllPayloadResponse {
 }
 
 message GetAllPayloadFromFileResponse {
-    double Progress = 1;
-    bytes Data = 2;
-  }
+  double Progress = 1;
+  bytes Data = 2;
+}
 
 message QueryYakScriptRequest {
   Paging Pagination = 1;
@@ -3939,6 +3939,13 @@ message FuzzerRequest {
 
   int64 PauseTaskID = 52;
   bool IsPause = 53;
+
+  repeated MutateMethod MutateMethods = 54;
+}
+
+message MutateMethod {
+  string Type = 1;
+  repeated KVPair Value = 2;
 }
 
 message KVPair {
@@ -4127,9 +4134,9 @@ message QueryHTTPFlowRequest {
 }
 
 message ExportHTTPFlowsRequest {
-    QueryHTTPFlowRequest ExportWhere = 1;
-    repeated int64 Ids = 2;
-    repeated string FieldName = 3;
+  QueryHTTPFlowRequest ExportWhere = 1;
+  repeated int64 Ids = 2;
+  repeated string FieldName = 3;
 }
 
 message DeleteHTTPFlowRequest {
@@ -4653,15 +4660,15 @@ message GenerateURLResponse{
 }
 
 message YakVersionAtLeastRequest{
- string AtLeastVersion = 1;
- string YakVersion = 2;
+  string AtLeastVersion = 1;
+  string YakVersion = 2;
 }
 message ParseTrafficRequest{
   int64 Id = 1;
   string Type = 2;
 }
 message ParseTrafficResponse{
-    bool OK = 1;
+  bool OK = 1;
   string Result = 2;
   string Message = 3;
 }
