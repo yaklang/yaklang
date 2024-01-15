@@ -12,7 +12,7 @@ type ExpressionListMultiline interface {
 func (b *astbuilder) buildSliceFromExprList(stmt ExpressionListMultiline) ssa.Value {
 	_s := stmt.ExpressionListMultiline()
 	if _s == nil {
-		b.NewError(ssa.Warn, TAG, "slice literal not have expression")
+		// b.NewError(ssa.Warn, TAG, "slice literal not have expression")
 		return b.EmitMakeBuildWithType(
 			ssa.NewSliceType(ssa.BasicTypes[ssa.Any]),
 			b.EmitConstInst(0), b.EmitConstInst(0),
@@ -20,7 +20,7 @@ func (b *astbuilder) buildSliceFromExprList(stmt ExpressionListMultiline) ssa.Va
 	}
 	s, ok := _s.(*yak.ExpressionListMultilineContext)
 	if !ok {
-		b.NewError(ssa.Error, TAG, "slice literal expression parse error")
+		// b.NewError(ssa.Error, TAG, "slice literal expression parse error")
 		return nil
 	}
 	vs := b.buildExpressionListMultiline(s)
