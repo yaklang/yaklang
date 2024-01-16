@@ -3,10 +3,12 @@ package yaktest
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
-	"testing"
 
 	_ "github.com/yaklang/yaklang/common/yak"
 )
@@ -20,8 +22,8 @@ func exec(raw string) error {
 	return yaklang.New().SafeEval(context.Background(), raw)
 }
 
-func analyze(raw string) []*yak.StaticAnalyzeResult {
-	return yak.AnalyzeStaticYaklang(raw)
+func analyze(raw string) []*static_analyzer.StaticAnalyzeResult {
+	return yak.StaticAnalyzeYaklang(raw)
 }
 
 func Run(verbose string, t *testing.T, cases ...YakTestCase) {

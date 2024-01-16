@@ -1,96 +1,11 @@
 package yak
 
-import (
-	"fmt"
+import "github.com/yaklang/yaklang/common/yak/static_analyzer"
 
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakast"
-	pta "github.com/yaklang/yaklang/common/yak/plugin_type_analyzer"
-	"github.com/yaklang/yaklang/common/yak/ssa"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/yaklang"
-)
-
-type StaticAnalyzeResult struct {
-	Message         string `json:"message"`
-	Severity        string `json:"severity"` // Error / Warning
-	StartLineNumber int    `json:"startLineNumber"`
-	StartColumn     int    `json:"startColumn"`
-	EndLineNumber   int    `json:"endLineNumber"`
-	EndColumn       int    `json:"endColumn"`
-	RawMessage      string `json:"rawMessage"`
-	From            string `json: "from"`
-}
-
-func (e *StaticAnalyzeResult) String() string {
-	return fmt.Sprintf("[%s]: %s in [%d:%d -- %d:%d] from %s\n",
-		e.Severity, e.Message,
-		e.StartLineNumber, e.StartColumn,
-		e.EndLineNumber, e.EndColumn,
-		e.From,
-	)
-}
-
-func AnalyzeStaticYaklang(i interface{}) []*StaticAnalyzeResult {
-	code := utils.UnsafeBytesToString(utils.InterfaceToBytes(i))
-
-	return AnalyzeStaticYaklangWithType(code, "yak")
-}
-
-func AnalyzeStaticYaklangWithType(code, codeTyp string) []*StaticAnalyzeResult {
-	var results []*StaticAnalyzeResult
-
-	// compiler
-	newEngine := yaklang.New()
-	newEngine.SetStrictMode(false)
-	_, err := newEngine.Compile(code)
-	if err != nil {
-		switch ret := err.(type) {
-		case yakast.YakMergeError:
-			for _, e := range ret {
-				results = append(results, &StaticAnalyzeResult{
-					Message:         fmt.Sprintf("基础语法错误（Syntax Error）：%v", e.Message),
-					Severity:        "error",
-					StartLineNumber: e.StartPos.LineNumber,
-					StartColumn:     e.StartPos.ColumnNumber + 1,
-					EndLineNumber:   e.EndPos.LineNumber,
-					EndColumn:       e.EndPos.ColumnNumber + 2,
-					RawMessage:      e.Error(),
-					From:            "compiler",
-				})
-			}
-		default:
-			log.Error("静态分析失败：Yaklang 返回错误不标准")
-		}
+func StaticAnalyzeYaklang(code string, typs ...string) []*static_analyzer.StaticAnalyzeResult {
+	pluginType := "yak"
+	if len(typs) > 0 {
+		pluginType = typs[0]
 	}
-
-	prog, err := ssaapi.Parse(code, pta.GetPluginSSAOpt(codeTyp)...)
-	if err != nil {
-		log.Error("SSA 解析失败：", err)
-		return results
-	}
-	pta.CheckPluginType(codeTyp, prog)
-
-	errs := prog.GetErrors()
-	for _, err := range errs {
-		var severity string
-		switch err.Kind {
-		case ssa.Warn:
-			severity = "warning"
-		case ssa.Error:
-			severity = "error"
-		}
-		results = append(results, &StaticAnalyzeResult{
-			Message:         err.Message,
-			Severity:        severity,
-			StartLineNumber: int(err.Pos.Start.Line),
-			StartColumn:     int(err.Pos.Start.Column + 1),
-			EndLineNumber:   int(err.Pos.End.Line),
-			EndColumn:       int(err.Pos.End.Column + 1),
-			RawMessage:      err.String(),
-			From:            "SSA:" + string(err.Tag),
-		})
-	}
-	return results
+	return static_analyzer.StaticAnalyzeYaklang(code, pluginType)
 }

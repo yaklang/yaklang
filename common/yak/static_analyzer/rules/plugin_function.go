@@ -3,8 +3,8 @@ package rules
 import (
 	"fmt"
 
-	"github.com/yaklang/yaklang/common/yak/plugin_type_analyzer/plugin_type"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/plugin_type"
 )
 
 func init() {
