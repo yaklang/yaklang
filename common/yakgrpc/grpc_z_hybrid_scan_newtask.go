@@ -18,6 +18,8 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"math/rand"
+	"net/url"
+	"strings"
 	"sync"
 	"time"
 )
@@ -195,6 +197,7 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 					default:
 					}
 
+					result.RuntimeID = taskId
 					status := getStatus()
 					status.CurrentPluginName = pluginInstance.ScriptName
 					status.ExecResult = result
@@ -317,6 +320,8 @@ type HybridScanTarget struct {
 
 func (s *Server) TargetGenerator(ctx context.Context, targetConfig *ypb.HybridScanInputTarget) (chan *HybridScanTarget, error) {
 	// handle target
+	baseBuilderParams := targetConfig.GetHTTPRequestTemplate()
+	baseTemplates := []byte("GET {{Path}} HTTP/1.1\r\nHost: {{Hostname}}\r\n\r\n")
 	requestTemplates, err := s.HTTPRequestBuilder(ctx, targetConfig.GetHTTPRequestTemplate())
 	if err != nil {
 		log.Warn(err)
@@ -361,25 +366,87 @@ func (s *Server) TargetGenerator(ctx context.Context, targetConfig *ypb.HybridSc
 			close(outTarget)
 		}()
 		for target := range outC {
-			for _, template := range templates {
-				https, hostname := utils.ParseStringToHttpsAndHostname(target)
-				if hostname == "" {
-					log.Infof("skip invalid target: %v", target)
+			target = strings.TrimSpace(target)
+			if target == "" {
+				continue
+			}
+			var urlIns *url.URL
+			if utils.IsValidHost(target) { // 处理没有单独一个host情况 不含port
+				urlIns = &url.URL{Host: target, Path: "/"}
+			} else {
+				urlIns = utils.ParseStringToUrl(target)
+				if urlIns.Host == "" {
 					continue
 				}
-				reqBytes := bytes.ReplaceAll(template.GetHTTPRequest(), []byte("{{Hostname}}"), []byte(hostname))
-				uIns, _ := lowhttp.ExtractURLFromHTTPRequestRaw(reqBytes, https)
-				var uStr = target
-				if uIns != nil {
-					uStr = uIns.String()
+
+				host, port, _ := utils.ParseStringToHostPort(urlIns.Host) // 处理包含 port 的情况
+				if !utils.IsValidHost(host) {                             // host不合规情况 比如 a:80
+					continue
 				}
+
+				if port > 0 && urlIns.Scheme == "" { // fix https
+					if port == 443 {
+						urlIns.Scheme = "https"
+					}
+				}
+				if urlIns.Path == "" {
+					urlIns.Path = "/"
+				}
+			}
+			builderParams := mergeBuildParams(baseBuilderParams, urlIns)
+			if builderParams == nil {
+				continue
+			}
+			builderResponse, err := s.HTTPRequestBuilder(ctx, builderParams)
+			if err != nil {
+				log.Errorf("failed to build http request: %v", err)
+			}
+			results := builderResponse.GetResults()
+			if len(results) <= 0 {
+				packet := bytes.ReplaceAll(baseTemplates, []byte(`{{Hostname}}`), []byte(urlIns.Host))
+				packet = bytes.ReplaceAll(packet, []byte(`{{Path}}`), []byte(urlIns.Path))
 				outTarget <- &HybridScanTarget{
-					IsHttps: https,
-					Request: reqBytes,
-					Url:     uStr,
+					IsHttps: urlIns.Scheme == "https",
+					Request: packet,
+					Url:     urlIns.String(),
+				}
+			} else {
+				for _, result := range results {
+					packet := bytes.ReplaceAll(result.HTTPRequest, []byte(`{{Hostname}}`), []byte(urlIns.Host))
+					tUrl, _ := lowhttp.ExtractURLFromHTTPRequestRaw(packet, result.IsHttps)
+					var uStr = urlIns.String()
+					if tUrl != nil {
+						uStr = tUrl.String()
+					}
+					outTarget <- &HybridScanTarget{
+						IsHttps: result.IsHttps,
+						Request: packet,
+						Url:     uStr,
+					}
 				}
 			}
 		}
+
+		//for target := range outC {
+		//	for _, template := range templates {
+		//		https, hostname := utils.ParseStringToHttpsAndHostname(target)
+		//		if hostname == "" {
+		//			log.Infof("skip invalid target: %v", target)
+		//			continue
+		//		}
+		//		reqBytes := bytes.ReplaceAll(template.GetHTTPRequest(), []byte("{{Hostname}}"), []byte(hostname))
+		//		uIns, _ := lowhttp.ExtractURLFromHTTPRequestRaw(reqBytes, https)
+		//		var uStr = target
+		//		if uIns != nil {
+		//			uStr = uIns.String()
+		//		}
+		//		outTarget <- &HybridScanTarget{
+		//			IsHttps: https,
+		//			Request: reqBytes,
+		//			Url:     uStr,
+		//		}
+		//	}
+		//}
 	}()
 	return outTarget, nil
 }

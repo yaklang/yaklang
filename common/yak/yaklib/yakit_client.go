@@ -60,7 +60,7 @@ type YakitClient struct {
 	riskCounter atomic.Uint32
 }
 
-func (c *YakitClient) addCounter() uint32 {
+func (c *YakitClient) AddCounter() uint32 {
 	c.riskCounter.Add(1)
 	return c.riskCounter.Load()
 }
