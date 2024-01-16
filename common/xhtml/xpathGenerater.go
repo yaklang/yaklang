@@ -2,14 +2,15 @@ package xhtml
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/go-funk"
 	"golang.org/x/net/html"
-	"strings"
 )
 
 func _genXPATHForSimpleNode(origin *html.Node) string {
-	var siblingN = 0
-	var psibling = origin
+	siblingN := 0
+	psibling := origin
 	for {
 		psibling = psibling.PrevSibling
 		if psibling == nil {
@@ -37,6 +38,13 @@ func _genXPATHForSimpleNode(origin *html.Node) string {
 	}
 }
 
+// GenerateXPath 根据节点引用生成一个节点的 XPath 路径
+// Example:
+// ```
+// xhtml.Walker("<html><body><div>hello</div></body></html>", func(node) {
+// println(xhtml.GenerateXPath(node))
+// })
+// ```
 func GenerateXPath(node *html.Node) string {
 	var xpath string
 	switch node.Type {

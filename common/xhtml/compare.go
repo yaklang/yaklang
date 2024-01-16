@@ -3,9 +3,10 @@ package xhtml
 import (
 	"bytes"
 	"fmt"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/net/html"
-	"strings"
 )
 
 type OutputPosType string
@@ -46,8 +47,14 @@ func node2str(node *html.Node) string {
 	_ = html.Render(&rendered, node)
 	return rendered.String()
 }
+
+// CompareHtml 比较两段 HTML 代码的差异，返回差异的节点信息结构体引用切片与错误
+// Example:
+// ```
+// diff, err = xhtml.CompareHtml(html1, html2)
+// ```
 func CompareHtml(htmlRaw1 interface{}, htmlRaw2 interface{}) ([]*DiffInfo, error) {
-	//diff := []([]*html.Node){}
+	// diff := []([]*html.Node){}
 	diff := []*DiffInfo{}
 	htmlRaw1s := utils.InterfaceToString(htmlRaw1)
 	htmlRaw2s := utils.InterfaceToString(htmlRaw2)
@@ -59,7 +66,7 @@ func CompareHtml(htmlRaw1 interface{}, htmlRaw2 interface{}) ([]*DiffInfo, error
 	if err != nil {
 		return nil, err
 	}
-	//广度
+	// 广度
 	checkEnd := func(cnode1 **html.Node, cnode2 **html.Node) bool {
 		cnode1x := *cnode1
 		cnode2x := *cnode2
@@ -98,7 +105,7 @@ func CompareHtml(htmlRaw1 interface{}, htmlRaw2 interface{}) ([]*DiffInfo, error
 				diff = append(diff, &DiffInfo{XpathPos: GenerateXPath(cnode2x.Parent) + "/text()", Reason: reason, Type: Text, OriginRaw: node2str(cnode1x), FuzzRaw: node2str(cnode2x)})
 			}
 
-			//diff = append(diff, []*html.Node{node1w, node2w})
+			// diff = append(diff, []*html.Node{node1w, node2w})
 			*cnode1 = cnode2x.NextSibling
 			*cnode2 = cnode2x.NextSibling
 			return true
