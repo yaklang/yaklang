@@ -22,7 +22,7 @@ func IsTLSService(addr string, proxies ...string) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	conn, err := DialTCPTimeout(15*time.Second, addr, proxies...)
+	conn, err := DialTCPTimeout(5*time.Second, addr, proxies...)
 	if err == nil {
 		defer conn.Close()
 		host, _, _ := utils.ParseStringToHostPort(addr)
