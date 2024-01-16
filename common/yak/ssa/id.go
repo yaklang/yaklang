@@ -56,6 +56,14 @@ func (p *Program) SetInstructionWithName(name string, i Instruction) {
 	p.NameToInstructions.Set(name, insts)
 }
 
+func (p *Program) RemoveInstructionWithName(name string, i Instruction) {
+	insts, ok := p.NameToInstructions.Get(name)
+	if ok {
+		insts = utils.RemoveSliceItem(insts, i)
+		p.NameToInstructions.Set(name, insts)
+	}
+}
+
 func (p *Program) GetInstructionsByName(name string) []Instruction {
 	insts, ok := p.NameToInstructions.Get(name)
 	if !ok {

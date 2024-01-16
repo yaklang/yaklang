@@ -20,6 +20,9 @@ func (b *BasicBlock) Sealed() {
 		if v.GetRange() == nil {
 			v.SetRange(p.GetRange())
 		}
+		if v != p {
+			p.GetProgram().RemoveInstructionWithName(p.GetName(), p)
+		}
 		if pa, ok := ToExternLib(v); ok && pa.IsExtern() {
 			pa.GetUsers().RunOnField(func(f *Field) {
 				if v := builder.getExternLibInstance(v, f.Key); v != nil {
