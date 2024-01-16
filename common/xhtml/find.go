@@ -3,9 +3,10 @@ package xhtml
 import (
 	"bytes"
 	"fmt"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/net/html"
-	"strings"
 )
 
 type MatchType string
@@ -55,18 +56,23 @@ func Node2Raw(node *html.Node) string {
 	return string(rendered.Bytes())
 }
 
+// Find 解析并遍历一段 HTML 代码的每一个节点并找到匹配字符串的节点，返回匹配字符串的节点信息的引用切片
+// Example:
+// ```
+// matchInfoRes = xhtml.Find("<html><body><div>hello</div></body></html>", "hello")
+// ```
 func FindNodeFromHtml(htmlRaw interface{}, matchStr string) []*MatchNodeInfo {
 	matchInfoRes := []*MatchNodeInfo{}
-	//htmlRawStr := utils.InterfaceToString(htmlRaw)
+	// htmlRawStr := utils.InterfaceToString(htmlRaw)
 	Walker(htmlRaw, func(node *html.Node) {
 		if utils.MatchAllOfGlob(node.Data, fmt.Sprintf("*%s*", matchStr)) {
 			if node.Type == html.TextNode {
 				matchInfo := &MatchNodeInfo{TagName: node.Parent.Data, MatchNode: node.Parent, MatchText: node.Data, Xpath: GenerateXPath(node.Parent) + "/text()", matchType: TEXT}
-				//matchInfo.Raw = Node2Raw(matchInfo.MatchNode)
+				// matchInfo.Raw = Node2Raw(matchInfo.MatchNode)
 				matchInfoRes = append(matchInfoRes, matchInfo)
 			} else if node.Type == html.CommentNode {
 				matchInfo := &MatchNodeInfo{TagName: node.Parent.Data, MatchNode: node.Parent, MatchText: node.Data, Xpath: GenerateXPath(node.Parent) + "/comment()", matchType: COMMENT}
-				//matchInfo.Raw = Node2Raw(matchInfo.MatchNode)
+				// matchInfo.Raw = Node2Raw(matchInfo.MatchNode)
 				matchInfoRes = append(matchInfoRes, matchInfo)
 			}
 		} else if node.Type == html.ElementNode {
@@ -75,13 +81,13 @@ func FindNodeFromHtml(htmlRaw interface{}, matchStr string) []*MatchNodeInfo {
 					matchInfo := &MatchNodeInfo{TagName: node.Data, MatchNode: node, MatchText: attr.Val, Xpath: GenerateXPath(node) + "/@" + attr.Key, matchType: ATTR}
 					matchInfo.Key = attr.Key
 					matchInfo.Val = attr.Val
-					//pattern := ""
+					// pattern := ""
 					xpathSplits := strings.Split(matchInfo.Xpath, "/")
 					for _, xpathSplit := range xpathSplits {
 						println(xpathSplit)
 					}
-					//pattern
-					//matchInfo.Raw = Node2Raw(matchInfo.MatchNode)
+					// pattern
+					// matchInfo.Raw = Node2Raw(matchInfo.MatchNode)
 					matchInfoRes = append(matchInfoRes, matchInfo)
 				}
 			}

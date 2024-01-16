@@ -10,14 +10,21 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-var fillings = []string{"%09", "%0a", "%0d", "/+/"}
-var eventHandlers = map[string][]string{"ontoggle": {"details"}, "onpointerenter": {"d3v", "details", "html", "a"},
-	"onmouseover": {"a", "html", "d3v"}}
-var functions = []string{"[8].find(confirm)", "confirm()", "(confirm)()", "co\u006efir\u006d()", "(prompt)``", "a=prompt,a()"}
-var eFillings = []string{"%09", "%0a", "%0d", "+"}
-var lFillings = []string{"", "%0dx"}
-var tags = []string{"html", "d3v", "a", "details"}
-var jFillings = []string{";"}
+var (
+	fillings      = []string{"%09", "%0a", "%0d", "/+/"}
+	eventHandlers = map[string][]string{
+		"ontoggle": {"details"}, "onpointerenter": {"d3v", "details", "html", "a"},
+		"onmouseover": {"a", "html", "d3v"},
+	}
+)
+
+var (
+	functions = []string{"[8].find(confirm)", "confirm()", "(confirm)()", "co\u006efir\u006d()", "(prompt)``", "a=prompt,a()"}
+	eFillings = []string{"%09", "%0a", "%0d", "+"}
+	lFillings = []string{"", "%0dx"}
+	tags      = []string{"html", "d3v", "a", "details"}
+	jFillings = []string{";"}
+)
 
 func RandSafeString(n int) string {
 	return RandStrFromCharSet("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890", n)
@@ -31,8 +38,8 @@ func RandStrFromCharSet(charSet string, n int) string {
 		letterIdMask = 1<<letterIdBits - 1
 		letterIdMax  = 63 / letterIdBits
 	)
-	//const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
-	var src = rand.NewSource(time.Now().UnixNano())
+	// const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
+	src := rand.NewSource(time.Now().UnixNano())
 	b := make([]byte, n)
 	// A rand.Int63() generates 63 random bits, enough for letterIdMax letters!
 	for i, cache, remain := n-1, src.Int63(), letterIdMax; i >= 0; {
@@ -48,6 +55,7 @@ func RandStrFromCharSet(charSet string, n int) string {
 	}
 	return *(*string)(unsafe.Pointer(&b))
 }
+
 func IsEscaped(s string) bool {
 	re, _ := regexp.Compile("\\*")
 
@@ -70,22 +78,28 @@ func AddElement2Set(arr *[]string, e string) {
 	}
 }
 
-func MatchBetween(srcBody interface{}, start string, end string, max int) (int, string) {
+// MatchBetween 从字符串中匹配两个字符串之间的内容，最多匹配 n 个字符，n 为 -1 时不限制
+// 返回匹配到的内容的起始位置与匹配到的内容
+// Example:
+// ```
+// xhtml.MatchBetween("123456789", "2", "6", -1) // 2, "345"
+// ```
+func MatchBetween(srcBody interface{}, start string, end string, n int) (int, string) {
 	src := utils.InterfaceToString(srcBody)
 	srcFIndex := src
-	n1 := strings.Index(srcFIndex, start)
-	if n1 == -1 {
+	i1 := strings.Index(srcFIndex, start)
+	if i1 == -1 {
 		return -1, ""
 	}
-	n1 += len(start)
-	n2 := strings.Index(srcFIndex[n1:], end)
-	if n2 == -1 {
+	i1 += len(start)
+	i2 := strings.Index(srcFIndex[i1:], end)
+	if i2 == -1 {
 		return -1, ""
 	}
-	n2 += n1
+	i2 += i1
 
-	if n2-n1-1 <= max {
-		return n1, src[n1:n2]
+	if (n > 0 && i2-i1-1 <= n) || n <= 0 {
+		return i1, src[i1:i2]
 	} else {
 		return -1, ""
 	}
@@ -94,7 +108,7 @@ func MatchBetween(srcBody interface{}, start string, end string, max int) (int, 
 // RandomUpperAndLower 返回一个随机大小写的字符串
 // Example:
 // ```
-// str.RandomUpperAndLower("target“) // TArGeT
+// xhtml.RandomUpperAndLower("target") // TArGeT
 // ```
 func RandomUpperAndLower(s string) string {
 	last := _RandomUpperAndLower(s)
@@ -105,6 +119,7 @@ func RandomUpperAndLower(s string) string {
 	}
 	return last
 }
+
 func _RandomUpperAndLower(s string) string {
 	bs := []byte(s)
 	for i := 0; i < len(bs); i++ {

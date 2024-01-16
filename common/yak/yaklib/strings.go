@@ -2,10 +2,11 @@ package yaklib
 
 import (
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/xhtml"
 	"path/filepath"
 	"strings"
 	"unicode"
+
+	"github.com/yaklang/yaklang/common/xhtml"
 
 	"github.com/yaklang/yaklang/common/domainextractor"
 	"github.com/yaklang/yaklang/common/filter"
@@ -426,6 +427,15 @@ func toJsonIndentStr(d interface{}) string {
 	return string(raw)
 }
 
+// RandomUpperAndLower 返回一个随机大小写的字符串
+// Example:
+// ```
+// str.RandomUpperAndLower("target") // TArGeT
+// ```
+func randomUpperAndLower(s string) string {
+	return xhtml.RandomUpperAndLower(s)
+}
+
 var StringsExport = map[string]interface{}{
 	// 基础字符串工具
 	"IndexAny":       IndexAny,
@@ -470,7 +480,7 @@ var StringsExport = map[string]interface{}{
 
 	// 特有的
 	"RandStr":                utils.RandStringBytes,
-	"Random":                 xhtml.RandomUpperAndLower,
+	"Random":                 randomUpperAndLower,
 	"f":                      _sfmt,
 	"SplitAndTrim":           utils.PrettifyListFromStringSplited,
 	"StringSliceContains":    utils.StringSliceContain,
