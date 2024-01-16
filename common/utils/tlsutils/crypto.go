@@ -9,11 +9,12 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
+	"reflect"
+	"strings"
+
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"reflect"
-	"strings"
 )
 
 func Encrypt(raw []byte, pemBytes []byte) (string, error) {
@@ -128,6 +129,11 @@ func GeneratePrivateAndPublicKeyPEMWithPrivateFormatterWithSize(t string, size i
 	return priBuffer.Bytes(), pubBuffer.Bytes(), nil
 }
 
+// EncryptWithPkcs1v15 将PEM格式的公钥与数据进行PKCS1v15加密，返回密文与错误
+// Example:
+// ```
+// enc, err := tls.EncryptWithPkcs1v15(pemBytes, "hello")
+// ```
 func PemPkcs1v15Encrypt(pemBytes []byte, data interface{}) ([]byte, error) {
 	dataBytes := utils.InterfaceToBytes(data)
 	block, _ := pem.Decode(pemBytes)
@@ -206,6 +212,11 @@ func PemPkcsOAEPDecrypt(pemPriBytes []byte, data interface{}) ([]byte, error) {
 	return results, err
 }
 
+// DecryptWithPkcs1v15 将PEM格式的私钥与密文进行PKCS1v15解密，返回明文与错误
+// Example:
+// ```
+// dec, err := tls.DecryptWithPkcs1v15(pemBytes, enc)
+// ```
 func PemPkcs1v15Decrypt(pemPriBytes []byte, data interface{}) ([]byte, error) {
 	dataBytes := utils.InterfaceToBytes(data)
 	b, _ := pem.Decode(pemPriBytes)
