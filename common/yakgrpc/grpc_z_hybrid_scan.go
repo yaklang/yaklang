@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/samber/lo"
 	uuid "github.com/satori/go.uuid"
 	"github.com/yaklang/yaklang/common/log"
@@ -108,6 +109,22 @@ func (s *Server) HybridScan(stream ypb.Yak_HybridScanServer) error {
 		if err != nil {
 			return err
 		}
+		var inputTarget ypb.HybridScanInputTarget
+		var pluginConfig ypb.HybridScanPluginConfig
+		json.Unmarshal(t.InputTarget, &inputTarget)
+		json.Unmarshal(t.PluginConfig, &pluginConfig)
+
+		stream.Send(&ypb.HybridScanResponse{
+			TotalTargets:     t.TotalTargets,
+			TotalPlugins:     t.TotalPlugins,
+			TotalTasks:       t.TotalTargets * t.TotalPlugins,
+			FinishedTasks:    t.FinishedTasks,
+			FinishedTargets:  t.FinishedTargets,
+			HybridScanTaskId: t.TaskId,
+			InputTarget:      &inputTarget,
+			PluginConfig:     &pluginConfig,
+		})
+
 		client := yaklib.NewVirtualYakitClient(func(result *ypb.ExecResult) error {
 			result.RuntimeID = taskId
 			return stream.Send(&ypb.HybridScanResponse{
@@ -121,21 +138,20 @@ func (s *Server) HybridScan(stream ypb.Yak_HybridScanServer) error {
 			})
 		})
 
-		client.Output(&yaklib.YakitStatusCard{ // card
+		err = client.Output(&yaklib.YakitStatusCard{ // card
 			Id: "漏洞/风险/指纹", Data: strconv.Itoa(len(risks)), Tags: nil,
 		})
+		if err != nil {
+			return err
+		}
 
 		for _, riskInfo := range risks { // risks table
-			client.Output(riskInfo)
+			err := client.Output(riskInfo)
+			if err != nil {
+				return err
+			}
 		}
-		return stream.Send(&ypb.HybridScanResponse{
-			TotalTargets:     t.TotalTargets,
-			TotalPlugins:     t.TotalPlugins,
-			TotalTasks:       t.TotalTargets * t.TotalPlugins,
-			FinishedTasks:    t.FinishedTasks,
-			FinishedTargets:  t.FinishedTargets,
-			HybridScanTaskId: t.TaskId,
-		})
+		return nil
 	case "resume":
 		taskId = firstRequest.GetResumeTaskId()
 		if taskId == "" {
