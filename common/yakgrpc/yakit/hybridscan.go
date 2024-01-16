@@ -33,6 +33,9 @@ type HybridScanTask struct {
 	TotalTasks      int64
 	FinishedTasks   int64
 	FinishedTargets int64
+
+	InputTarget  []byte
+	PluginConfig []byte
 }
 
 func GetHybridScanByTaskId(db *gorm.DB, taskId string) (*HybridScanTask, error) {
