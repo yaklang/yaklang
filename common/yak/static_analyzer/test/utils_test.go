@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak"
-	"github.com/yaklang/yaklang/common/yak/plugin_type_analyzer"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 )
 
 func check(t *testing.T, code string, want []string, typ ...string) *ssaapi.Program {
@@ -19,11 +19,11 @@ func check(t *testing.T, code string, want []string, typ ...string) *ssaapi.Prog
 	}
 	test := assert.New(t)
 
-	prog, err := ssaapi.Parse(code, plugin_type_analyzer.GetPluginSSAOpt(pluginType)...)
+	prog, err := ssaapi.Parse(code, static_analyzer.GetPluginSSAOpt(pluginType)...)
 	test.Nil(err)
 	prog.Show()
-	gotErr := yak.AnalyzeStaticYaklangWithType(code, pluginType)
-	got := lo.Map(gotErr, func(res *yak.StaticAnalyzeResult, _ int) string {
+	gotErr := yak.StaticAnalyzeYaklang(code, pluginType)
+	got := lo.Map(gotErr, func(res *static_analyzer.StaticAnalyzeResult, _ int) string {
 		return res.Message
 	})
 

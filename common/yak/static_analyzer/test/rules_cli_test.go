@@ -3,7 +3,7 @@ package test
 import (
 	"testing"
 
-	"github.com/yaklang/yaklang/common/yak/plugin_type_analyzer/rules"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/rules"
 )
 
 func TestSSARuleMustPassYakCliParamName(t *testing.T) {

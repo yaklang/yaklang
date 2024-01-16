@@ -2,8 +2,8 @@ package ssa_option
 
 import (
 	"github.com/yaklang/yaklang/common/fp"
-	"github.com/yaklang/yaklang/common/yak/plugin_type_analyzer/plugin_type"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/plugin_type"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 

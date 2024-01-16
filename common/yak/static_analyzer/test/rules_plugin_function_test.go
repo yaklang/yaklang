@@ -3,8 +3,8 @@ package test
 import (
 	"testing"
 
-	"github.com/yaklang/yaklang/common/yak/plugin_type_analyzer/rules"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/rules"
 )
 
 func TestRulesDefineFunction(t *testing.T) {

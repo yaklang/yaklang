@@ -1,10 +1,11 @@
 package yaktest
 
 import (
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/yak"
 	"os"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/yak"
 )
 
 /*
@@ -671,7 +672,7 @@ freq, err := fuzz.HTTPRequest(req)
 die(err)
 
 freq.Show()`
-	result := yak.AnalyzeStaticYaklang(src)
+	result := yak.StaticAnalyzeYaklang(src)
 	if len(result) <= 0 {
 		panic("parse params failed")
 	}
@@ -694,7 +695,7 @@ freq, err := fuzz.HTTPRequest(req)
 die(err)
 
 freq.Show()`
-	result := yak.AnalyzeStaticYaklang(src)
+	result := yak.StaticAnalyzeYaklang(src)
 	if len(result) <= 0 {
 		panic("parse params failed")
 	}
@@ -711,7 +712,7 @@ func TestMisc_ParseError2(t *testing.T) {
 a = {"123": 1, 
 "1111111":}
 `
-	result := yak.AnalyzeStaticYaklang(src)
+	result := yak.StaticAnalyzeYaklang(src)
 	if len(result) <= 0 {
 		panic("parse params failed")
 	}
@@ -730,7 +731,7 @@ a = {"123": 1,
 
 }
 `
-	result := yak.AnalyzeStaticYaklang(src)
+	result := yak.StaticAnalyzeYaklang(src)
 	if len(result) <= 0 {
 		panic("parse params failed")
 	}
@@ -749,7 +750,7 @@ a = {"123": 1,
 
 }
 `
-	result := yak.AnalyzeStaticYaklang(src)
+	result := yak.StaticAnalyzeYaklang(src)
 	if len(result) <= 0 {
 		panic("无法检测到错误！")
 	}
@@ -771,7 +772,7 @@ a = {"123": 1,
 
 }
 `
-	result := yak.AnalyzeStaticYaklang(src)
+	result := yak.StaticAnalyzeYaklang(src)
 	if len(result) <= 0 {
 		panic("无法检测到错误！")
 	}
@@ -796,7 +797,7 @@ a = {"123": 1,
 
 }
 `
-	result := yak.AnalyzeStaticYaklang(src)
+	result := yak.StaticAnalyzeYaklang(src)
 	if len(result) <= 0 {
 		panic("无法检测到错误！")
 	}

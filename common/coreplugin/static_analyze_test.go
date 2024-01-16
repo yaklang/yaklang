@@ -7,16 +7,16 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak"
-	"github.com/yaklang/yaklang/common/yak/plugin_type_analyzer"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 )
 
 func Check(code string, t *testing.T) {
-	_, err := ssaapi.Parse(code, plugin_type_analyzer.GetPluginSSAOpt("mitm")...)
+	_, err := ssaapi.Parse(code, static_analyzer.GetPluginSSAOpt("mitm")...)
 	if err != nil {
 		t.Fatal("Failed to parse code: ", err)
 	}
-	if res := yak.AnalyzeStaticYaklangWithType(string(code), "mitm"); len(lo.Filter(res, func(item *yak.StaticAnalyzeResult, index int) bool {
+	if res := yak.StaticAnalyzeYaklang(string(code), "mitm"); len(lo.Filter(res, func(item *static_analyzer.StaticAnalyzeResult, index int) bool {
 		return item.Severity == "error"
 	})) != 0 {
 		t.Fatalf("plugin : static analyzer failed: \n%s", res)
