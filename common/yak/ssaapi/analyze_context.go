@@ -11,13 +11,19 @@ type AnalyzeContext struct {
 	_callStack  *utils.Stack[*Value]
 	_callTable  *omap.OrderedMap[int, *omap.OrderedMap[int, *Value]]
 	_visitedPhi *omap.OrderedMap[int, *Value]
+
+	config *OperationConfig
+
+	depth int
 }
 
-func NewAnalyzeContext() *AnalyzeContext {
+func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
 	return &AnalyzeContext{
 		_callStack:  utils.NewStack[*Value](),
 		_callTable:  omap.NewOrderedMap[int, *omap.OrderedMap[int, *Value]](map[int]*omap.OrderedMap[int, *Value]{}),
 		_visitedPhi: omap.NewOrderedMap[int, *Value](map[int]*Value{}),
+		config:      NewOperations(opt...),
+		depth:       -1,
 	}
 }
 

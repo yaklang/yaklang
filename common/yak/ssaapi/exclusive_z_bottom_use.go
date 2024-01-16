@@ -17,7 +17,7 @@ const (
 func (v *Value) visitUserFallback(actx *AnalyzeContext) Values {
 	var vals Values
 	for _, user := range v.node.GetUsers() {
-		if ret := NewValue(user).SetParent(v).getBottomUses(actx); len(ret) > 0 {
+		if ret := NewValue(user).AppendEffectOn(v).getBottomUses(actx); len(ret) > 0 {
 			vals = append(vals, ret...)
 		}
 	}
@@ -56,7 +56,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext) Values {
 			_ = fun //TODO: fun can tell u, which return value is the target
 			var vals Values
 			for _, u := range call.GetUsers() {
-				if ret := NewValue(u).SetParent(v).getBottomUses(actx); len(ret) > 0 {
+				if ret := NewValue(u).AppendEffectOn(v).getBottomUses(actx); len(ret) > 0 {
 					vals = append(vals, ret...)
 				}
 			}
@@ -90,7 +90,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext) Values {
 				return Values{v}
 			}
 			val := ins.Param[shouldHandleTarget]
-			return NewValue(val).SetParent(v).getBottomUses(actx)
+			return NewValue(val).AppendEffectOn(v).getBottomUses(actx)
 		}
 	case *ssa.Call:
 		if !actx.TheCallShouldBeVisited(v) {
@@ -98,38 +98,41 @@ func (v *Value) getBottomUses(actx *AnalyzeContext) Values {
 			return v.visitUserFallback(actx)
 		}
 
-		parent, ok := v.GetParent()
-		if !ok {
-			log.Warnf("BUG: unknown parent for call: %v", v.String())
-			return Values{v}
-		}
-		if ins.Method != nil {
-			if _, undefinedVar := ins.Method.(*ssa.Undefined); undefinedVar {
-				return Values{v}
-			}
-			var targetIndex = -1
-			for index, value := range ins.Args {
-				if parent.GetId() == value.GetId() {
-					targetIndex = index
-					break
-				}
-			}
-			if targetIndex == -1 {
-				log.Warnf("Wired: the actual param(t%v) is not in call's params list: %v", parent.GetId(), v.String())
-				return Values{v}
-			}
-			nv := NewValue(ins.Method)
-			nv.SetContextValue(SSA_BOTTOM_USES_targetActualParam, parent)
-			nv.SetContextValue(SSA_BOTTOM_USES_targetActualParamIndex, NewValue(ssa.NewConst(targetIndex)))
-			err := actx.PushCall(v)
-			if err != nil {
-				log.Warnf("BUG: (callStack is not clean!) push callStack failed: %T", v.node)
-				return v.visitUserFallback(actx)
-			}
-			defer actx.PopCall()
-			return nv.getBottomUses(actx)
-		}
+		log.Errorf("BUG: (callStack is not clean!) unknown call: %v", v.String())
 		return v.visitUserFallback(actx)
+		//
+		//parent, ok := v.GetParent()
+		//if !ok {
+		//	log.Warnf("BUG: unknown parent for call: %v", v.String())
+		//	return Values{v}
+		//}
+		//if ins.Method != nil {
+		//	if _, undefinedVar := ins.Method.(*ssa.Undefined); undefinedVar {
+		//		return Values{v}
+		//	}
+		//	var targetIndex = -1
+		//	for index, value := range ins.Args {
+		//		if parent.GetId() == value.GetId() {
+		//			targetIndex = index
+		//			break
+		//		}
+		//	}
+		//	if targetIndex == -1 {
+		//		log.Warnf("Wired: the actual param(t%v) is not in call's params list: %v", parent.GetId(), v.String())
+		//		return Values{v}
+		//	}
+		//	nv := NewValue(ins.Method)
+		//	nv.SetContextValue(SSA_BOTTOM_USES_targetActualParam, parent)
+		//	nv.SetContextValue(SSA_BOTTOM_USES_targetActualParamIndex, NewValue(ssa.NewConst(targetIndex)))
+		//	err := actx.PushCall(v)
+		//	if err != nil {
+		//		log.Warnf("BUG: (callStack is not clean!) push callStack failed: %T", v.node)
+		//		return v.visitUserFallback(actx)
+		//	}
+		//	defer actx.PopCall()
+		//	return nv.getBottomUses(actx)
+		//}
+		//return v.visitUserFallback(actx)
 	}
 	return v.visitUserFallback(actx)
 }

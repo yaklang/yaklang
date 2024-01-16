@@ -149,6 +149,8 @@ func (v Values) GetDefs() Values {
 
 type Value struct {
 	runtimeCtx *omap.OrderedMap[string, *Value]
+	EffectOn   Values
+	DependOn   Values
 
 	node ssa.InstructionNode
 	// cache
