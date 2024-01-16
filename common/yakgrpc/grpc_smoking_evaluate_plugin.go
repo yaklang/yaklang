@@ -91,7 +91,7 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 
 	// static analyze
 	staticCheckingFailed := false
-	staticResults := yak.AnalyzeStaticYaklangWithType(pluginCode, pluginType)
+	staticResults := yak.StaticAnalyzeYaklang(pluginCode, pluginType)
 	if len(staticResults) > 0 {
 		for _, sRes := range staticResults {
 			R := &ypb.Range{
