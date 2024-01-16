@@ -2,9 +2,9 @@ package mutate
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
-	"golang.org/x/net/context"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -32,7 +32,7 @@ type FuzzHTTPRequest struct {
 	originRequest          []byte
 	_originRequestInstance *http.Request
 	chunked                bool
-	cxt                    context.Context
+	ctx                    context.Context
 }
 
 func (r *FuzzHTTPRequest) NoAutoEncode() bool {
@@ -421,7 +421,7 @@ func NewFuzzHTTPRequest(i interface{}, opts ...BuildFuzzHTTPRequestOption) (*Fuz
 	req.runtimeId = config.RuntimeId
 	req.proxy = config.Proxy
 	req.noAutoEncode = config.NoAutoEncode
-	req.cxt = config.Ctx
+	req.ctx = config.Ctx
 	req.opts = opts
 	return req, nil
 }
@@ -813,8 +813,8 @@ func (f *FuzzHTTPRequest) Exec(opts ...HttpPoolConfigOption) (chan *HttpResult, 
 	originOpts[1] = WithPoolOpt_Source(f.source)
 	originOpts[2] = WithPoolOpt_RuntimeId(f.runtimeId)
 	originOpts[3] = WithPoolOpt_Proxy(f.proxy)
-	if f.cxt != nil {
-		originOpts = append(originOpts, WithPoolOpt_Context(f.cxt))
+	if f.ctx != nil {
+		originOpts = append(originOpts, WithPoolOpt_Context(f.ctx))
 	}
 	originOpts = append(originOpts, opts...)
 	return _httpPool(f, originOpts...)
