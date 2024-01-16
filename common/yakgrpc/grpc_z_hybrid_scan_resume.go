@@ -152,6 +152,7 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 					default:
 					}
 
+					result.RuntimeID = task.TaskId
 					status := statusManager.GetStatus()
 					status.CurrentPluginName = pluginInstance.ScriptName
 					status.ExecResult = result

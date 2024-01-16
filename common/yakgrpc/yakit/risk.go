@@ -198,6 +198,14 @@ func GetRisk(db *gorm.DB, id int64) (*Risk, error) {
 	return &r, nil
 }
 
+func GetRisksByRuntimeId(db *gorm.DB, runtimeId string) ([]*Risk, error) {
+	var r []*Risk
+	if db := db.Model(&Risk{}).Where("runtime_id = ?", runtimeId).Find(&r); db.Error != nil {
+		return nil, utils.Errorf("get Risks failed: %s", db.Error)
+	}
+	return r, nil
+}
+
 func GetRiskByHash(db *gorm.DB, hash string) (*Risk, error) {
 	var r Risk
 	if db := db.Model(&Risk{}).Where("hash = ?", hash).First(&r); db.Error != nil {

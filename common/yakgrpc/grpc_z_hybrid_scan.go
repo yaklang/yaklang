@@ -6,8 +6,10 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -93,6 +95,47 @@ func (s *Server) HybridScan(stream ypb.Yak_HybridScanServer) error {
 	var taskId string
 	var taskManager *HybridScanTaskManager
 	switch strings.ToLower(firstRequest.HybridScanMode) {
+	case "status": // 查询任务状态
+		taskId = firstRequest.GetResumeTaskId()
+		if taskId == "" {
+			return utils.Error("resume task id is empty")
+		}
+		t, err := yakit.GetHybridScanByTaskId(s.GetProjectDatabase(), taskId)
+		if err != nil {
+			return err
+		}
+		risks, err := yakit.GetRisksByRuntimeId(s.GetProfileDatabase(), taskId)
+		if err != nil {
+			return err
+		}
+		client := yaklib.NewVirtualYakitClient(func(result *ypb.ExecResult) error {
+			result.RuntimeID = taskId
+			return stream.Send(&ypb.HybridScanResponse{
+				TotalTargets:     t.TotalTargets,
+				TotalPlugins:     t.TotalPlugins,
+				TotalTasks:       t.TotalTargets * t.TotalPlugins,
+				FinishedTasks:    t.FinishedTasks,
+				FinishedTargets:  t.FinishedTargets,
+				HybridScanTaskId: t.TaskId,
+				ExecResult:       result,
+			})
+		})
+
+		client.Output(&yaklib.YakitStatusCard{ // card
+			Id: "漏洞/风险/指纹", Data: strconv.Itoa(len(risks)), Tags: nil,
+		})
+
+		for _, riskInfo := range risks { // risks table
+			client.Output(riskInfo)
+		}
+		return stream.Send(&ypb.HybridScanResponse{
+			TotalTargets:     t.TotalTargets,
+			TotalPlugins:     t.TotalPlugins,
+			TotalTasks:       t.TotalTargets * t.TotalPlugins,
+			FinishedTasks:    t.FinishedTasks,
+			FinishedTargets:  t.FinishedTargets,
+			HybridScanTaskId: t.TaskId,
+		})
 	case "resume":
 		taskId = firstRequest.GetResumeTaskId()
 		if taskId == "" {
@@ -115,12 +158,12 @@ func (s *Server) HybridScan(stream ypb.Yak_HybridScanServer) error {
 			return err
 		}
 		log.Info("start to create new hybrid scan task")
-		errC := make(chan error)
 		go func() {
 			err := s.hybridScanNewTask(taskManager, taskStream, firstRequest)
 			if err != nil {
 				utils.TryWriteChannel(errC, err)
 			}
+			close(errC)
 		}()
 	default:
 		return utils.Error("invalid hybrid scan mode")
