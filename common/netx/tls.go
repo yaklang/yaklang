@@ -114,7 +114,7 @@ func LoadCertificatesConfig(i any) error {
 			certs := make([]tls.Certificate, len(ret.Certificates), len(ret.Certificates)+len(presetClientCertificates))
 			copy(certs, ret.Certificates)
 			certs = append(certs, presetClientCertificates...)
-			ret.Certificates = make([]tls.Certificate, 0)
+			ret.Certificates = certs
 			ret.GetClientCertificate = func(info *tls.CertificateRequestInfo) (*tls.Certificate, error) {
 				for _, cert := range certs {
 					err := info.SupportsCertificate(&cert)
@@ -131,6 +131,14 @@ func LoadCertificatesConfig(i any) error {
 				return nil
 			}
 			ret.GetClientCertificate = func(info *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+				// 服务端请求客户端证书时，如果客户端没有配置证书，是否能完成握手取决于服务器的配置
+				//if len(presetClientCertificates) == 0 {
+				//	log.Warn("server request client certificate, but no client certificate configured")
+				//	// sendClientCertificate 不允许发送 nil，否则会 panic 所以尝试发送一个空的证书
+				//	// 这个解决方案可能会导致服务器拒绝握手，因为它可能会试图验证一个空的证书。
+				//	// 如果服务器配置为VerifyClientCertIfGiven，并且它期望如果客户端提供了证书就必须是有效的，那么这个方法可能会失败。
+				//	return &tls.Certificate{}, nil
+				//}
 				for _, cert := range presetClientCertificates {
 					err := info.SupportsCertificate(&cert)
 					if err != nil {

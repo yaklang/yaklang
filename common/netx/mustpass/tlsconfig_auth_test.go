@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"io"
 	"net"
+	"strings"
 	"testing"
 	"time"
 )
@@ -163,7 +164,20 @@ func TestTLSConfigAuth2(t *testing.T) {
 	}()
 	time.Sleep(time.Second)
 	conn, err := netx.DialX(addr, netx.DialX_WithTLS(true))
-	if err == nil {
+	if err != nil {
+		t.Fatal("cannot connect without cert")
+	}
+
+	tlsConn := tls.Client(conn, &tls.Config{
+		//Renegotiation:      tls.RenegotiateFreelyAsClient,
+		InsecureSkipVerify: true,
+		MinVersion:         tls.VersionSSL30,
+		MaxVersion:         tls.VersionTLS13,
+		ServerName:         "127.0.0.1",
+	})
+
+	err = tlsConn.Handshake()
+	if !strings.Contains(err.Error(), "tls: bad certificate") {
 		t.Fatal("cannot connect without cert")
 	}
 
