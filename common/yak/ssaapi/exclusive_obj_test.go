@@ -28,7 +28,11 @@ e = a.b // mask trace e -> 1 & 2
 */
 
 func TestBasic_Phi(t *testing.T) {
-	prog := Parse(`a = 0; if b {a = 1;} else if e {a = 2} else {a=4}; c = a`).Show()
+	prog, err := Parse(`a = 0; if b {a = 1;} else if e {a = 2} else {a=4}; c = a`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prog.Show()
 	prog.Ref("d").ForEach(func(value *Value) {
 		value.GetTopDefs().ForEach(func(value *Value) {
 			t.Log(value.String())
@@ -37,7 +41,11 @@ func TestBasic_Phi(t *testing.T) {
 }
 
 func TestOOP_Basic_Phi(t *testing.T) {
-	prog := Parse(`a = {}; if b {aa = a; aa.b = 1;} else {a.b = 2}; c = a.b`).Show()
+	prog, err := Parse(`a = {}; if b {aa = a; aa.b = 1;} else {a.b = 2}; c = a.b`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prog.Show()
 	prog.Ref("d").ForEach(func(value *Value) {
 		value.GetTopDefs().ForEach(func(value *Value) {
 			t.Log(value.String())
@@ -46,7 +54,11 @@ func TestOOP_Basic_Phi(t *testing.T) {
 }
 
 func TestOOP_Basic_DotTrace(t *testing.T) {
-	prog := Parse(`a = {}; a.b = 1; a.c = h ? 3 : 2; d := a.c`).Show()
+	prog, err := Parse(`a = {}; a.b = 1; a.c = h ? 3 : 2; d := a.c`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prog.Show()
 	prog.Ref("d").ForEach(func(value *Value) {
 		value.GetTopDefs().ForEach(func(value *Value) {
 			t.Log(value.String())
@@ -56,12 +68,17 @@ func TestOOP_Basic_DotTrace(t *testing.T) {
 
 func TestObjectTest_Basic_Phi(t *testing.T) {
 	// a.b can be as "phi and masked"
-	prog := Parse(`a = {"b": 1}
+	prog, err := Parse(`a = {"b": 1}
 if f {
 	a.b = 2
 }
 c = a.b
-`).Show()
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	prog.Show()
 
 	/*
 		===================== Backtrack from [t-1]`1` =====================:
@@ -87,7 +104,11 @@ c = a.b
 
 func TestObjectTest_Basic_LeftValue(t *testing.T) {
 	// a.b can be as "phi and masked"
-	prog := Parse(`a = {}; if f {a.b = 2;}; e = a.b`).Show()
+	prog, err := Parse(`a = {}; if f {a.b = 2;}; e = a.b`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prog.Show()
 	prog.Ref("c").ForEach(func(value *Value) {
 		value.GetTopDefs().ForEach(func(value *Value) {
 			value.ShowBacktrack()
@@ -97,7 +118,7 @@ func TestObjectTest_Basic_LeftValue(t *testing.T) {
 
 func TestObjectTest_Basic_Phi2(t *testing.T) {
 	// a.b can be as "phi and masked"
-	prog := Parse(`a = {"b": 1}
+	prog, err := Parse(`a = {"b": 1}
 c = e ? "b" : j
 if f {
 	a[c] = 2
@@ -105,7 +126,11 @@ if f {
 g = a[c]
 h = a.c
 i = a.b
-`).Show()
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prog.Show()
 
 	/*
 		===================== Backtrack from [t-1]`1` =====================:
@@ -141,7 +166,7 @@ i = a.b
 
 func TestObjectTest(t *testing.T) {
 	// a.b can be as "phi and masked"
-	prog := Parse(`a = {}
+	prog, err := Parse(`a = {}
 a.b = 2;
 if f(3) {
 a.b = a.b + 1;
@@ -156,8 +181,11 @@ if (f(4)) {
 }
 c = a.b
 dump("DONE")
-`).Show()
-
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prog.Show()
 	prog.Ref("c").ForEach(func(value *Value) {
 		value.GetTopDefs().ForEach(func(value *Value) {
 			t.Log(value.String())
@@ -167,7 +195,7 @@ dump("DONE")
 
 func TestObjectTest_2(t *testing.T) {
 	// a.b can be as "phi and masked"
-	prog := Parse(`a = {}
+	prog, err := Parse(`a = {}
 a.b = 2;
 if f(3) {
 a.b = a.b + 1;
@@ -185,8 +213,12 @@ g = i => i.b
 c = g()
 
 dump("DONE")
-`).Show()
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
 
+	prog.Show()
 	prog.Ref("c").ForEach(func(value *Value) {
 		value.GetTopDefs().ForEach(func(value *Value) {
 			t.Log(value.String())
