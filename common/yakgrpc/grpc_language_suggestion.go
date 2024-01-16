@@ -289,7 +289,7 @@ func getInstancesAndFuncDecls(word string, containPoint bool) (map[string]*yakdo
 	}
 }
 
-func getFuncDescByDecls(funcDecls map[string]*yakdoc.FuncDecl, typName string, isStruct bool, tab bool) string {
+func getFuncDescByDecls(funcDecls map[string]*yakdoc.FuncDecl, callback func(decl *yakdoc.FuncDecl) string) string {
 	desc := ""
 	methodNames := lo.MapToSlice(funcDecls, func(methodName string, _ *yakdoc.FuncDecl) string {
 		return methodName
@@ -297,29 +297,31 @@ func getFuncDescByDecls(funcDecls map[string]*yakdoc.FuncDecl, typName string, i
 	sort.Strings(methodNames)
 
 	for _, methodName := range methodNames {
-		funcDecl := funcDecls[methodName]
-		funcDesc := ""
-		if isStruct {
-			funcDesc = fmt.Sprintf("func (%s) %s\n", typName, strings.TrimPrefix(funcDecl.Decl, "func"))
-		} else {
-			funcDesc = funcDecl.Decl + "\n"
-		}
-		if tab {
-			funcDesc = "    " + funcDesc
-		}
-		desc += funcDesc
+		decl := funcDecls[methodName]
+		desc += callback(decl)
 	}
 
 	return desc
 }
 
-func getFuncDescBytypeStr(typStr string, typName string, isStruct bool, tab bool) string {
+func getFuncDescBytypeStr(typStr string, typName string, isStruct, tab bool) string {
 	lib, ok := doc.DefaultDocumentHelper.StructMethods[typStr]
 	if !ok {
 		return ""
 	}
 
-	return getFuncDescByDecls(lib.Functions, typName, isStruct, tab)
+	return getFuncDescByDecls(lib.Functions, func(decl *yakdoc.FuncDecl) string {
+		funcDesc := ""
+		if isStruct {
+			funcDesc = fmt.Sprintf("func (%s) %s\n", typName, strings.TrimPrefix(decl.Decl, "func"))
+		} else {
+			funcDesc = decl.Decl + "\n"
+		}
+		if tab {
+			funcDesc = "    " + funcDesc
+		}
+		return funcDesc
+	})
 }
 
 func getBuiltinFuncDeclAndDoc(name string, bareTyp ssa.Type) (desc string, doc string) {
@@ -404,12 +406,21 @@ func getExternLibDesc(name, typName string) string {
 		// break
 		return ""
 	}
-	desc := fmt.Sprintf("```go\ntype %s library {\n", name)
-	methodDescriptions := getFuncDescByDecls(lib.Functions, typName, false, true)
-	desc += methodDescriptions
-	desc += "}"
-	desc += "\n```"
-	return desc
+
+	var builder strings.Builder
+	// desc :=
+	// desc = yakdoc.ShrinkTypeVerboseName(desc)
+
+	builder.WriteString(fmt.Sprintf("```go\npackage %s\n\n", name))
+	for _, instance := range lib.Instances {
+		builder.WriteString(yakdoc.ShrinkTypeVerboseName(fmt.Sprintf("const %s %s = %s\n", instance.InstanceName, getGolangTypeStringByTypeStr(instance.Type), instance.ValueStr)))
+	}
+	builder.WriteRune('\n')
+	builder.WriteString(getFuncDescByDecls(lib.Functions, func(decl *yakdoc.FuncDecl) string {
+		return yakdoc.ShrinkTypeVerboseName(fmt.Sprintf("func %s\n", decl.Decl))
+	}))
+	builder.WriteString("\n```")
+	return builder.String()
 }
 
 func getDescFromSSAValue(name string, v *ssaapi.Value) string {
