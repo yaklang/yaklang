@@ -371,6 +371,12 @@ func _cliUrls(name string, opts ...SetCliExtraParam) []string {
 	return ret
 }
 
+// Ports 获取对应名称的命令行参数，根据","与"-"切割并尝试解析端口并返回 []int 类型
+// Example:
+// ```
+// ports = cli.Ports("ports")
+// // --ports 10086-10088,23333 则 ports 为 [10086, 10087, 10088, 23333]
+// ```
 func _cliPort(name string, opts ...SetCliExtraParam) []int {
 	s, c := _cliFromString(name, opts...)
 	c._type = "port"
@@ -512,6 +518,43 @@ func CliStringSlice(name string, options ...SetCliExtraParam) []string {
 	return utils.PrettifyListFromStringSplited(rawStr, ",")
 }
 
+// setVerboseName 是一个选项函数，设置参数的中文名
+// Example:
+// ```
+// cli.String("target", cli.setVerboseName("目标"))
+// ```
+func _cliSetVerboseName(verboseName string) {
+}
+
+// setGroup 是一个选项函数，设置参数的分组
+// Example:
+// ```
+// cli.String("target", cli.setGroup("common"))
+// cli.Int("port", cli.setGroup("common"))
+// cli.Int("threads", cli.setGroup("request"))
+// cli.Int("retryTimes", cli.setGroup("request"))
+// ```
+func _cliSetGroup(group string) {
+}
+
+// setMultiSelect 是一个选项函数，设置参数是否可以多选
+// 此选项仅在`cli.StringSlice`中生效
+// Example:
+// ```
+// cli.StringSlice("targets", cli.setMultiSelect(true))
+// ```
+func _cliSetMultiSelect(multiSelect bool) {
+}
+
+// setSelectOption 是一个选项函数，设置参数的下拉框选项
+// 此选项仅在`cli.StringSlice`中生效
+// Example:
+// ```
+// cli.StringSlice("targets", cli.setSelectOption("下拉框选项", "下拉框值"))
+// ```
+func _cliSetSelectOption(name, value string) {
+}
+
 var CliExports = map[string]interface{}{
 	"Args":        _getArgs,
 	"Bool":        _cliBool,
@@ -551,13 +594,13 @@ var CliExports = map[string]interface{}{
 	"setDefault":  _cliSetDefaultValue,
 	"setRequired": _cliSetRequired,
 	// 设置中文名
-	"setVerboseName": func(string) {},
+	"setVerboseName": _cliSetVerboseName,
 	// 设置参数组名
-	"setCliGroup": func(string) {},
+	"setCliGroup": _cliSetGroup,
 	// 设置是否多选 (只支持`cli.StringSlice`)
-	"setMultipleSelect": func(bool) {},
+	"setMultipleSelect": _cliSetMultiSelect,
 	// 设置下拉框选项 (只支持`cli.StringSlice`)
-	"setSelectOption": func(string, string) {},
+	"setSelectOption": _cliSetSelectOption,
 
 	// 设置cli属性
 	"SetCliName": _cliSetName,
