@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
-	js2ssa "github.com/yaklang/yaklang/common/yak/JS2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/yak2ssa"
 )
@@ -21,10 +20,12 @@ type LanguageParser interface {
 	Feed(string, bool, *ssa.Program)
 }
 
-var LanguageParsers = map[Language]LanguageParser{
-	Yak: yak2ssa.NewParser(),
-	JS:  js2ssa.NewParser(),
-}
+var (
+	LanguageParsers = map[Language]LanguageParser{
+		Yak: yak2ssa.NewParser(),
+		// JS:  js2ssa.NewParser(),
+	}
+)
 
 type config struct {
 	language        Language

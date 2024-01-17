@@ -2,6 +2,8 @@ package ssa
 
 import (
 	"fmt"
+
+	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
 func (f *Function) GetDeferBlock() *BasicBlock {
@@ -37,6 +39,7 @@ func (f *Function) newBasicBlockEx(name string, isSealed bool, nodAddToBlocks bo
 		Handler:       nil,
 		finish:        false,
 		isSealed:      isSealed,
+		ScopeTable:    ssautil.NewRootVersionedTable[*Variable](),
 		inCompletePhi: make([]*Phi, 0),
 		Skip:          false,
 		symbolTable:   make(map[string]Values),

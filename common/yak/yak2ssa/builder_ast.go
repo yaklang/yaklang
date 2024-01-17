@@ -1264,10 +1264,10 @@ func (b *astbuilder) buildInstanceCode(stmt *yak.InstanceCodeContext) *ssa.Call 
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 
-	newFunc, symbol := b.NewFunc("")
+	newFunc := b.NewFunc("")
 	current := b.CurrentBlock
 	{
-		b.FunctionBuilder = b.PushFunction(newFunc, symbol, current)
+		b.FunctionBuilder = b.PushFunction(newFunc, current)
 
 		if block, ok := stmt.Block().(*yak.BlockContext); ok {
 			b.buildBlock(block)
@@ -1288,12 +1288,12 @@ func (b *astbuilder) buildAnonymousFunctionDecl(stmt *yak.AnonymousFunctionDeclC
 	if name := stmt.FunctionNameDecl(); name != nil {
 		funcName = name.GetText()
 	}
-	newFunc, symbol := b.NewFunc(funcName)
+	newFunc := b.NewFunc(funcName)
 	current := b.CurrentBlock
 	{
 		recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 
-		b.FunctionBuilder = b.PushFunction(newFunc, symbol, current)
+		b.FunctionBuilder = b.PushFunction(newFunc, current)
 
 		if stmt.EqGt() != nil {
 			if stmt.LParen() != nil && stmt.RParen() != nil {
