@@ -2,6 +2,8 @@ package ssa
 
 import (
 	"strings"
+
+	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
 const (
@@ -40,6 +42,32 @@ func (b *BasicBlock) GetBlockById(name string) *BasicBlock {
 		}
 	}
 	return nil
+}
+
+// for syntaxBlock
+
+func (b *FunctionBuilder) BuildSyntaxBlock(builder func()) {
+	Enter := b.CurrentBlock
+	Scope := Enter.ScopeTable
+
+	SubBlock := b.NewBasicBlock("")
+	b.EmitJump(SubBlock)
+	b.CurrentBlock = SubBlock
+
+	endScope := ssautil.BuildSyntaxBlock(Scope, func(sub *ssautil.ScopedVersionedTable[*Variable]) bool {
+		b.CurrentBlock.ScopeTable = sub
+		builder()
+		return b.CurrentBlock.finish
+	})
+
+	EndBlock := b.NewBasicBlock("")
+	EndBlock.ScopeTable = endScope
+
+	b.EmitJump(EndBlock)
+	if len(EndBlock.Preds) == 0 {
+		EndBlock.finish = true
+	}
+	b.CurrentBlock = EndBlock
 }
 
 // for build loop

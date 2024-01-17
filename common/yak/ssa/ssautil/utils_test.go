@@ -75,19 +75,6 @@ func (b *binary) String() string {
 
 // ======== builder
 
-// ssa.cfg like this build function
-
-func buildSyntaxBlock(scope *ScopedVersionedTable[value], buildBody func(*ScopedVersionedTable[value])) {
-	/*
-		scope [a=1; b=1]
-			sub [a=2; b:=2]
-		- cover
-	*/
-	sub := scope.CreateSubScope()
-	buildBody(sub)
-	scope.CoverByChild()
-}
-
 func GeneratePhi(name string, t []value) value {
 	slices.SortFunc(t, func(i, j value) int {
 		return strings.Compare(i.String(), j.String())
