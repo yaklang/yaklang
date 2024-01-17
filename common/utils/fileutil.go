@@ -429,11 +429,32 @@ func ConvertTextFileToYakFuzztagByPath(file_bin_path string) (string, error) {
 
 func SaveTempFile(content interface{}, pattern string) (string, error) {
 	contentString := InterfaceToString(content)
-	var fp, err = os.CreateTemp(os.TempDir(), pattern)
+	fp, err := os.CreateTemp(os.TempDir(), pattern)
 	if err != nil {
 		return "", err
 	}
 	fp.WriteString(contentString)
 	fp.Close()
 	return fp.Name(), nil
+}
+
+func IsSubPath(sub, parent string) bool {
+	up := ".." + string(os.PathSeparator)
+	parent, err := filepath.Abs(parent)
+	if err != nil {
+		return false
+	}
+	sub, err = filepath.Abs(sub)
+	if err != nil {
+		return false
+	}
+	// path-comparisons using filepath.Abs don't work reliably according to docs (no unique representation).
+	rel, err := filepath.Rel(parent, sub)
+	if err != nil {
+		return false
+	}
+	if !strings.HasPrefix(rel, up) && rel != ".." {
+		return true
+	}
+	return false
 }
