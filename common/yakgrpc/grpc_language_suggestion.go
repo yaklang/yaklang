@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	pta "github.com/yaklang/yaklang/common/yak/plugin_type_analyzer"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -291,14 +292,10 @@ func getInstancesAndFuncDecls(word string, containPoint bool) (map[string]*yakdo
 
 func getFuncDescByDecls(funcDecls map[string]*yakdoc.FuncDecl, callback func(decl *yakdoc.FuncDecl) string) string {
 	desc := ""
-	methodNames := lo.MapToSlice(funcDecls, func(methodName string, _ *yakdoc.FuncDecl) string {
-		return methodName
-	})
-	sort.Strings(methodNames)
+	methodNames := utils.GetSortedMapKeys(funcDecls)
 
 	for _, methodName := range methodNames {
-		decl := funcDecls[methodName]
-		desc += callback(decl)
+		desc += callback(funcDecls[methodName])
 	}
 
 	return desc
@@ -412,7 +409,9 @@ func getExternLibDesc(name, typName string) string {
 	// desc = yakdoc.ShrinkTypeVerboseName(desc)
 
 	builder.WriteString(fmt.Sprintf("```go\npackage %s\n\n", name))
-	for _, instance := range lib.Instances {
+	instanceKeys := utils.GetSortedMapKeys(lib.Instances)
+	for _, key := range instanceKeys {
+		instance := lib.Instances[key]
 		builder.WriteString(yakdoc.ShrinkTypeVerboseName(fmt.Sprintf("const %s %s = %s\n", instance.InstanceName, getGolangTypeStringByTypeStr(instance.Type), instance.ValueStr)))
 	}
 	builder.WriteRune('\n')
