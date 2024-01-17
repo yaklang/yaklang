@@ -21,9 +21,6 @@ type FunctionBuilder struct {
 	// for build
 	CurrentBlock       *BasicBlock // current block to build
 	CurrentRange       *Range      // current position in source code
-	CurrentScope       *Scope
-	scopeId            int
-	parentScope        *Scope      // parent symbol block for build FreeValue
 	parentCurrentBlock *BasicBlock // parent build subFunction position
 
 	ExternInstance map[string]any
@@ -43,8 +40,6 @@ func NewBuilder(f *Function, parent *FunctionBuilder) *FunctionBuilder {
 		deferExpr:     make([]*Call, 0),
 		CurrentBlock:  nil,
 		CurrentRange:  nil,
-		CurrentScope:  NewScope(0, nil, f),
-		scopeId:       0,
 		parentBuilder: parent,
 		cmap:          make(map[string]struct{}),
 		lmap:          make(map[string]struct{}),
@@ -55,8 +50,8 @@ func NewBuilder(f *Function, parent *FunctionBuilder) *FunctionBuilder {
 		b.DefineFunc = parent.DefineFunc
 	}
 
-	b.ScopeStart()
-	b.Function.SetScope(b.CurrentScope)
+	// b.ScopeStart()
+	// b.Function.SetScope(b.CurrentScope)
 	b.CurrentBlock = f.EnterBlock
 	f.builder = b
 	return b
@@ -68,10 +63,10 @@ func (b *FunctionBuilder) IsBlockFinish() bool {
 }
 
 // new function
-func (b *FunctionBuilder) NewFunc(name string) (*Function, *Scope) {
+func (b *FunctionBuilder) NewFunc(name string) *Function {
 	f := b.Package.NewFunctionWithParent(name, b.Function)
 	f.SetRange(b.CurrentRange)
-	return f, b.CurrentScope
+	return f
 }
 
 // handler current function
@@ -132,7 +127,6 @@ func (b *FunctionBuilder) Finish() {
 		recoverRange()
 	}
 
-	b.ScopeEnd()
 	// function finish
 	b.Function.Finish()
 }
@@ -183,9 +177,9 @@ func (b *FunctionBuilder) SetDefineFunc() {
 }
 
 // function stack
-func (b *FunctionBuilder) PushFunction(newFunc *Function, scope *Scope, block *BasicBlock) *FunctionBuilder {
+func (b *FunctionBuilder) PushFunction(newFunc *Function, block *BasicBlock) *FunctionBuilder {
 	build := NewBuilder(newFunc, b)
-	build.parentScope = scope
+	// build.parentScope = scope
 	build.parentCurrentBlock = block
 	return build
 }
