@@ -188,6 +188,10 @@ func NewParam(variable string, isFreeValue bool, builder *FunctionBuilder) *Para
 	p.SetRange(builder.CurrentRange)
 	p.GetProgram().SetVirtualRegister(p)
 	// p.GetProgram().SetInstructionWithName(variable, p)
+	p.Function = builder.Function
+	p.FormalParameterIndex = len(builder.Param)
+	p.FormalParameterVariadic = builder.hasEllipsis
+	p.FormalParameterName = variable
 	return p
 }
 

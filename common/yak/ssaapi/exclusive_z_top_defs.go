@@ -148,6 +148,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			return Values{i}
 		}
 		defer actx.PopCall()
+
 		// TODO: trace the specific return-values
 		callerValue := NewValue(caller)
 		callerValue.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY, i)
@@ -181,7 +182,16 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 		var vals Values
 		calledInstance := called.node.(*ssa.Call)
-		for _, i := range calledInstance.Args {
+		for idx, i := range calledInstance.Args {
+			if ret.IsFreeValue {
+				log.Warn("TODO: Free ssa.Parameters is need to be handled.")
+				continue
+			}
+
+			if idx != ret.FormalParameterIndex {
+				continue
+			}
+
 			traced := NewValue(i).AppendEffectOn(called)
 			if ret := traced.getTopDefs(actx); len(ret) > 0 {
 				vals = append(vals, ret...)
