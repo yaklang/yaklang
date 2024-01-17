@@ -54,15 +54,18 @@ func TestIfScope_If(t *testing.T) {
 	build := NewIfStmt(table)
 	build.BuildItem(
 		func(sub *ScopedVersionedTable[value]) {},
-		func(sub *ScopedVersionedTable[value]) {
-			sub.CreateLexicalVariable("a", NewConsts("2"))
+		func(sub *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+			return BuildSyntaxBlock(sub, func(sub *ScopedVersionedTable[value]) bool {
+				sub.CreateLexicalVariable("a", NewConsts("2"))
+				return false
+			})
 		},
 	)
-	build.BuildFinish(GeneratePhi)
+	end := build.BuildFinish(GeneratePhi)
 
 	test := assert.New(t)
-	test.Equal("phi[const(1) const(2)]", table.GetLatestVersion("a").String())
-	test.Equal("const(1)", table.GetLatestVersion("b").String())
+	test.Equal("phi[const(2) const(1)]", end.GetLatestVersion("a").String())
+	test.Equal("const(1)", end.GetLatestVersion("b").String())
 }
 
 func TestIfScope_IfELse(t *testing.T) {
@@ -90,21 +93,27 @@ func TestIfScope_IfELse(t *testing.T) {
 	build := NewIfStmt(table)
 	build.BuildItem(
 		func(sub *ScopedVersionedTable[value]) {},
-		func(sub *ScopedVersionedTable[value]) {
-			sub.CreateLexicalVariable("a", NewConsts("2"))
-			sub.CreateLexicalVariable("b", NewConsts("2"))
-			sub.CreateLexicalLocalVariable("c", NewConsts("2"))
+		func(sub *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+			return BuildSyntaxBlock(sub, func(sub *ScopedVersionedTable[value]) bool {
+				sub.CreateLexicalVariable("a", NewConsts("2"))
+				sub.CreateLexicalVariable("b", NewConsts("2"))
+				sub.CreateLexicalLocalVariable("c", NewConsts("2"))
+				return false
+			})
 		},
 	)
-	build.BuildElse(func(sub *ScopedVersionedTable[value]) {
-		sub.CreateLexicalVariable("a", NewConsts("3"))
+	build.BuildElse(func(sub *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+		return BuildSyntaxBlock(sub, func(sub *ScopedVersionedTable[value]) bool {
+			sub.CreateLexicalVariable("a", NewConsts("3"))
+			return false
+		})
 	})
-	build.BuildFinish(GeneratePhi)
+	end := build.BuildFinish(GeneratePhi)
 
 	test := assert.New(t)
-	test.Equal("phi[const(2) const(3)]", table.GetLatestVersion("a").String())
-	test.Equal("phi[const(1) const(2)]", table.GetLatestVersion("b").String())
-	test.Equal("const(1)", table.GetLatestVersion("c").String())
+	test.Equal("phi[const(2) const(3)]", end.GetLatestVersion("a").String())
+	test.Equal("phi[const(2) const(1)]", end.GetLatestVersion("b").String())
+	test.Equal("const(1)", end.GetLatestVersion("c").String())
 }
 
 func TestIfScope_IfELseIf(t *testing.T) {
@@ -125,21 +134,29 @@ func TestIfScope_IfELseIf(t *testing.T) {
 	build := NewIfStmt(global)
 	build.BuildItem(
 		func(svt *ScopedVersionedTable[value]) {},
-		func(svt *ScopedVersionedTable[value]) {
-			svt.CreateLexicalVariable("a", NewConsts("2"))
+		func(svt *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+			end := BuildSyntaxBlock(svt, func(svt *ScopedVersionedTable[value]) bool {
+				svt.CreateLexicalVariable("a", NewConsts("2"))
+				return false
+			})
+			return end
 		},
 	)
 	build.BuildItem(
 		func(svt *ScopedVersionedTable[value]) {},
-		func(svt *ScopedVersionedTable[value]) {
-			svt.CreateLexicalVariable("a", NewConsts("3"))
+		func(svt *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+			end := BuildSyntaxBlock(svt, func(svt *ScopedVersionedTable[value]) bool {
+				svt.CreateLexicalVariable("a", NewConsts("3"))
+				return false
+			})
+			return end
 		},
 	)
-	build.BuildFinish(GeneratePhi)
+	end := build.BuildFinish(GeneratePhi)
 
-	globalVariable := global.GetLatestVersion("a")
+	globalVariable := end.GetLatestVersion("a")
 	test := assert.New(t)
-	test.Equal("phi[const(1) const(2) const(3)]", globalVariable.String())
+	test.Equal("phi[const(2) const(3) const(1)]", globalVariable.String())
 }
 
 func TestIfScope_If_condition_assign(t *testing.T) {
@@ -165,21 +182,27 @@ func TestIfScope_If_condition_assign(t *testing.T) {
 			condition.CreateLexicalVariable("a", one)
 			conditionVariable1 = condition.GetLatestVersion("a")
 		},
-		func(svt *ScopedVersionedTable[value]) {
-			svt.CreateLexicalVariable("a", two)
+		func(svt *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+			return BuildSyntaxBlock(svt, func(svt *ScopedVersionedTable[value]) bool {
+				svt.CreateLexicalVariable("a", two)
+				return false
+			})
 		},
 	)
 	build.BuildItem(
 		func(condition *ScopedVersionedTable[value]) {
 			conditionVariable2 = condition.GetLatestVersion("a")
 		},
-		func(svt *ScopedVersionedTable[value]) {
-			svt.CreateLexicalVariable("a", NewConsts("3"))
+		func(svt *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+			return BuildSyntaxBlock(svt, func(svt *ScopedVersionedTable[value]) bool {
+				svt.CreateLexicalVariable("a", NewConsts("3"))
+				return false
+			})
 		},
 	)
-	build.BuildFinish(GeneratePhi)
+	end := build.BuildFinish(GeneratePhi)
 
-	globalVariable := global.GetLatestVersion("a")
+	globalVariable := end.GetLatestVersion("a")
 
 	test := assert.New(t)
 	test.Nil(globalVariable)

@@ -29,70 +29,92 @@ func BuildSyntaxBlock[T comparable](
 	return end
 }
 
-// IfStmtItem represents an item in an IfStmt.
-type IfStmtItem[T comparable] struct {
-	Condition func(*ScopedVersionedTable[T])
-	Body      func(*ScopedVersionedTable[T])
-}
-
-// NewIfStmtItem creates a new IfStmtItem with the given condition and body functions.
-func NewIfStmtItem[T comparable](c func(*ScopedVersionedTable[T]), b func(*ScopedVersionedTable[T])) *IfStmtItem[T] {
-	return &IfStmtItem[T]{
-		Condition: c,
-		Body:      b,
-	}
-}
-
 // IfStmt represents an if statement.
 type IfStmt[T comparable] struct {
-	global         *ScopedVersionedTable[T]
-	conditionScope *ScopedVersionedTable[T]
-	hasElse        bool
+	global             *ScopedVersionedTable[T]
+	lastConditionScope *ScopedVersionedTable[T]
+	BodyScopes         []*ScopedVersionedTable[T]
+	hasElse            bool
 }
 
 // NewIfStmt creates a new IfStmt with the given global scope.
+/*
+	IfStmt will handle if-stmt scope.
+	API:
+		* BuildItem(condition fun(scope), body func(scope)):
+			build if item using the provided Condition and Body functions.
+		* BuildElse(elseBody func(scope)):
+			set the else function for the IfStmt.
+		* BuildFinish(mergeHandler func(name string, t []T) T):
+			build the IfStmt finish, using the provided mergeHandler function create Phi.
+	IfStmt will build this scope when this method call
+*/
 func NewIfStmt[T comparable](global *ScopedVersionedTable[T]) *IfStmt[T] {
-	condition := global.CreateSubScope()
+	// condition := global.CreateSubScope()
 	return &IfStmt[T]{
-		global:         global,
-		conditionScope: condition,
-		hasElse:        false,
+		global:             global,
+		lastConditionScope: global,
+		BodyScopes:         make([]*ScopedVersionedTable[T], 0),
+		hasElse:            false,
 	}
 }
 
-// AddItem adds an item to the IfStmt.
-func (i *IfStmt[T]) BuildItem(Condition func(*ScopedVersionedTable[T]), Body func(*ScopedVersionedTable[T])) {
+// BuildItem build the if item using the provided Condition and Body functions.
+func (i *IfStmt[T]) BuildItem(Condition func(*ScopedVersionedTable[T]), Body func(*ScopedVersionedTable[T]) *ScopedVersionedTable[T]) {
 	if i.hasElse {
 		panic("cannot add item after else")
 	}
-	Condition(i.conditionScope)
-	sub := i.conditionScope.CreateSubScope()
-	Body(sub)
+
+	// create new condition and body scope
+	i.lastConditionScope = i.lastConditionScope.CreateSubScope()
+	Condition(i.lastConditionScope)
+
+	bodyScope := i.lastConditionScope.CreateSubScope()
+	end := Body(bodyScope)
+	if end != nil {
+		i.BodyScopes = append(i.BodyScopes, end)
+	}
 }
 
 // SetElse sets the else function for the IfStmt.
-func (i *IfStmt[T]) BuildElse(elseBody func(*ScopedVersionedTable[T])) {
-	sub := i.conditionScope.CreateSubScope()
-	elseBody(sub)
+func (i *IfStmt[T]) BuildElse(elseBody func(*ScopedVersionedTable[T]) *ScopedVersionedTable[T]) {
+	elseScope := i.lastConditionScope.CreateSubScope()
+	end := elseBody(elseScope)
+	if end != nil {
+		i.BodyScopes = append(i.BodyScopes, end)
+	}
 	i.hasElse = true
 }
 
 // Build builds the IfStmt using the provided mergeHandler function.
 func (i *IfStmt[T]) BuildFinish(
 	mergeHandler func(name string, t []T) T,
-) {
+) *ScopedVersionedTable[T] {
 	/*
-		scope
-			condition
-				item-0
-				item-1
-				...
-			- merge
-		- cover
+		global
+			condition1 // condition
+				body1 // body
+				condition2 // condition
+					body2 // body
+					...
+					else // else // same level with last body
+		end // end scope
+		// [phi] from all body and else
 	*/
 
-	i.conditionScope.Merge(!i.hasElse, mergeHandler)
-	i.global.CoverByChild()
+	endScope := i.global.CreateSubScope()
+
+	Merge(
+		i.global,   // base
+		!i.hasElse, // has base
+		func(name string, t []T) {
+			ret := mergeHandler(name, t)
+			endScope.CreateLexicalVariable(name, ret)
+		},
+		i.BodyScopes...,
+	)
+
+	return endScope
 }
 
 // LoopStmt represents a loop statement.
