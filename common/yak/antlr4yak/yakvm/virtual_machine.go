@@ -245,6 +245,10 @@ func (v *VirtualMachine) ExecAsyncYakFunction(ctx context.Context, f *Function, 
 					log.Errorf("yakvm async function panic: %v", err)
 					//utils.PrintCurrentGoroutineRuntimeStack()
 				}
+				if err := recover(); err != nil {
+					log.Errorf("yakvm async function panic: %v", err)
+					utils.PrintCurrentGoroutineRuntimeStack()
+				}
 			}()
 
 			frame.Exec(f.codes)
