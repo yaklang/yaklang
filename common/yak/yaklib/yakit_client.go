@@ -46,6 +46,12 @@ func NewVirtualYakitClient(h func(i *ypb.ExecResult) error) *YakitClient {
 	return remoteClient
 }
 
+func NewVirtualYakitClientWithRiskCount(h func(i *ypb.ExecResult) error, riskCounter *uint32) *YakitClient {
+	yakitClient := NewVirtualYakitClient(h)
+	yakitClient.riskCounter = riskCounter
+	return yakitClient
+}
+
 func RawHandlerToExecOutput(h func(any) error) func(result *ypb.ExecResult) error {
 	return func(result *ypb.ExecResult) error {
 		return h(result)
@@ -57,16 +63,17 @@ type YakitClient struct {
 	client      *http.Client
 	yakLogger   *YakLogger
 	send        func(i interface{}) error
-	riskCounter atomic.Uint32
+	riskCounter *uint32
 }
 
 func (c *YakitClient) AddCounter() uint32 {
-	c.riskCounter.Add(1)
-	return c.riskCounter.Load()
+	atomic.AddUint32(c.riskCounter, 1)
+	return atomic.LoadUint32(c.riskCounter)
 }
 
 func NewYakitClient(addr string) *YakitClient {
 	logger := CreateYakLogger()
+	var riskCounter uint32 = 0
 	client := &YakitClient{
 		addr: addr,
 		client: &http.Client{
@@ -87,7 +94,8 @@ func NewYakitClient(addr string) *YakitClient {
 			},
 			Timeout: 15 * time.Second,
 		},
-		yakLogger: logger,
+		yakLogger:   logger,
+		riskCounter: &riskCounter,
 	}
 
 	client.send = func(i interface{}) error {
