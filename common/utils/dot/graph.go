@@ -39,6 +39,25 @@ func (g *Graph) AddNode(label string) int {
 	return nod.id
 }
 
+// GetOrCreateNode returns the id of the node with the given label if it
+func (g *Graph) GetOrCreateNode(label string) int {
+	id, ok := g.NodeExisted(label)
+	if ok {
+		return id
+	}
+	return g.AddNode(label)
+}
+
+// NodeExisted returns the id of the node with the given label if it
+func (g *Graph) NodeExisted(label string) (int, bool) {
+	for _, node := range g.nodes {
+		if node.label == label {
+			return node.id, true
+		}
+	}
+	return -1, false
+}
+
 // MakeSameRank causes the specified nodes to be drawn on the same rank.
 // Only effective when using the dot tool.
 func (g *Graph) MakeSameRank(node1, node2 int, others ...int) {

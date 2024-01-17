@@ -29,32 +29,48 @@ func (v *Value) GetDepth() int {
 }
 
 func (v *Value) AppendDependOn(i *Value) *Value {
+	var existed bool
 	for _, node := range v.DependOn {
 		if node.GetId() == i.GetId() {
+			existed = true
 			break
 		}
+	}
+	if !existed {
 		v.DependOn = append(v.DependOn, i)
 	}
+	existed = false
 	for _, node := range i.EffectOn {
 		if node.GetId() == v.GetId() {
+			existed = true
 			break
 		}
+	}
+	if !existed {
 		i.EffectOn = append(i.EffectOn, v)
 	}
 	return v
 }
 
 func (v *Value) AppendEffectOn(i *Value) *Value {
+	var existed bool
 	for _, node := range v.EffectOn {
 		if node.GetId() == i.GetId() {
+			existed = true
 			break
 		}
+	}
+	if !existed {
 		v.EffectOn = append(v.EffectOn, i)
 	}
+	existed = false
 	for _, node := range i.DependOn {
 		if node.GetId() == v.GetId() {
+			existed = true
 			break
 		}
+	}
+	if !existed {
 		i.DependOn = append(i.DependOn, v)
 	}
 	return v
@@ -80,6 +96,13 @@ func (v Values) GetTopDefs() Values {
 	return ret
 }
 
+func (i Values) AppendEffectOn(v *Value) Values {
+	for _, node := range i {
+		node.AppendEffectOn(v)
+	}
+	return i
+}
+
 func (i *Value) visitedDefsDefault(actx *AnalyzeContext) Values {
 	var vals Values
 	if i.node == nil {
@@ -101,7 +124,7 @@ func (i *Value) visitedDefsDefault(actx *AnalyzeContext) Values {
 			}
 		}
 	}
-	return vals
+	return vals.AppendEffectOn(i)
 }
 
 var (
@@ -152,7 +175,8 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		// TODO: trace the specific return-values
 		callerValue := NewValue(caller)
 		callerValue.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY, i)
-		return callerValue.AppendEffectOn(i).getTopDefs(actx)
+		callerValue.AppendEffectOn(i)
+		return callerValue.getTopDefs(actx).AppendEffectOn(callerValue)
 	case *ssa.Function:
 		log.Info("ssa.Function checking...")
 		var vals Values
@@ -167,7 +191,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		if len(vals) == 0 {
 			return Values{i} // no return, use undefined
 		}
-		return vals
+		return vals.AppendEffectOn(i)
 	case *ssa.Parameter:
 		log.Infof("checking ssa.Parameters...: %v", ret.String())
 
@@ -202,7 +226,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		if len(vals) == 0 {
 			return Values{NewValue(ssa.NewUndefined("_")).AppendEffectOn(i)} // no return, use undefined
 		}
-		return vals
+		return vals.AppendEffectOn(i)
 	}
 	return i.visitedDefsDefault(actx)
 }

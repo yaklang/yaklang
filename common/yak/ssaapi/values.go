@@ -192,6 +192,13 @@ func (i *Value) StringWithSource() string {
 
 func (i *Value) GetName() string { return i.node.GetName() }
 
+func (i *Value) GetVerboseName() string {
+	if i.node.GetName() != "" {
+		return i.node.GetName()
+	}
+	return fmt.Sprintf(`t%d: %v`, i.GetId(), i.String())
+}
+
 func (i *Value) Show()           { fmt.Println(i) }
 func (i *Value) ShowWithSource() { fmt.Println(i.StringWithSource()) }
 

@@ -70,6 +70,9 @@ f = b(2,3,4)
 	noCheck4 := true
 	prog.Ref("f").Show().ForEach(func(value *Value) {
 		value.GetTopDefs().ForEach(func(value *Value) {
+			d := value.Dot()
+			_ = d
+			value.ShowDot()
 			if value.IsConstInst() {
 				if value.GetConstValue() == 2 {
 					check2 = true
