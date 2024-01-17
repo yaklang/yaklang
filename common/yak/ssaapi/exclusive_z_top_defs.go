@@ -31,15 +31,15 @@ func (v *Value) GetDepth() int {
 func (v *Value) AppendDependOn(i *Value) *Value {
 	for _, node := range v.DependOn {
 		if node.GetId() == i.GetId() {
-			return v
+			break
 		}
 		v.DependOn = append(v.DependOn, i)
 	}
-	for _, node := range v.EffectOn {
-		if node.GetId() == i.GetId() {
-			return v
+	for _, node := range i.EffectOn {
+		if node.GetId() == v.GetId() {
+			break
 		}
-		v.EffectOn = append(v.EffectOn, i)
+		i.EffectOn = append(i.EffectOn, v)
 	}
 	return v
 }
@@ -47,15 +47,15 @@ func (v *Value) AppendDependOn(i *Value) *Value {
 func (v *Value) AppendEffectOn(i *Value) *Value {
 	for _, node := range v.EffectOn {
 		if node.GetId() == i.GetId() {
-			return v
+			break
 		}
 		v.EffectOn = append(v.EffectOn, i)
 	}
-	for _, node := range v.DependOn {
-		if node.GetId() == i.GetId() {
-			return v
+	for _, node := range i.DependOn {
+		if node.GetId() == v.GetId() {
+			break
 		}
-		v.DependOn = append(v.DependOn, i)
+		i.DependOn = append(i.DependOn, v)
 	}
 	return v
 }
