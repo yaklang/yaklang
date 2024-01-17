@@ -1,18 +1,32 @@
 package ssautil
 
 // BuildSyntaxBlock builds a syntax block using the provided scope and buildBody function.
+/*
+if this scope finish this program
+
+* BuildBody should return true
+
+* this function will return true
+*/
 func BuildSyntaxBlock[T comparable](
-	scope *ScopedVersionedTable[T],
-	buildBody func(*ScopedVersionedTable[T]),
-) {
+	global *ScopedVersionedTable[T],
+	buildBody func(*ScopedVersionedTable[T]) bool,
+) *ScopedVersionedTable[T] {
 	/*
-		scope [a=1; b=1]
-			sub [a=2; b:=2]
-		- cover
+		scope
+			sub // build body
+			end // cover by sub
 	*/
-	sub := scope.CreateSubScope()
-	buildBody(sub)
-	scope.CoverByChild()
+
+	sub := global.CreateSubScope()
+	if buildBody(sub) {
+		// this program finish in this sub-scope
+		return nil
+	}
+
+	end := global.CreateSubScope()
+	end.CoverBy(sub)
+	return end
 }
 
 // IfStmtItem represents an item in an IfStmt.

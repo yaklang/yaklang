@@ -1,9 +1,11 @@
 package ssaapi
 
 import (
+	"sort"
 	"strings"
 	"testing"
 
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -222,6 +224,7 @@ func TestYaklangParameter(t *testing.T) {
 		`, t)
 		as := prog.Ref("a").ShowWithSource()
 		test.Equal(1, len(as))
+		test.NotNil(as[0].GetRange())
 		test.Equal("a", *as[0].GetRange().SourceCode)
 	})
 
@@ -257,4 +260,94 @@ func TestExternLibInClosure(t *testing.T) {
 
 	test.False(libVariable.IsParameter())
 	test.True(libVariable.IsExternLib())
+}
+
+func check(code string, want []string, t *testing.T) *Program {
+	test := assert.New(t)
+
+	prog, err := Parse(code)
+
+	test.Nil(err)
+
+	prog.Show()
+
+	println := prog.Ref("println")
+	test.Equal(1, len(println), "println should only 1")
+	got := lo.Map(
+		println.GetUsers().Flat(func(v *Value) Values {
+			return Values{v.GetOperand(1)}
+		}),
+		func(v *Value, _ int) string {
+			return v.String()
+		},
+	)
+	sort.Strings(got)
+	log.Info("got :", got)
+	sort.Strings(want)
+	log.Info("want :", want)
+	test.Equal(want, got)
+
+	return prog
+}
+
+func TestYaklangBasic_Variable_InBlock(t *testing.T) {
+	t.Run("test simple assign", func(t *testing.T) {
+		check(`
+		a = 1
+		println(a)
+		a = 2
+		println(a)
+		`, []string{
+			"1",
+			"2",
+		}, t)
+	})
+
+	t.Run("test sub-scope capture parent scope in basic block", func(t *testing.T) {
+		check(`
+		a = 1
+		println(a)
+		{
+			a = 2
+			println(a)
+		}
+		println(a)
+		`, []string{
+			"1",
+			"2",
+			"2",
+		}, t)
+	})
+
+	t.Run("test sub-scope local variable in basic block", func(t *testing.T) {
+		check(`
+		a = 1
+		println(a)
+		{
+			a := 2
+			println(a)
+		}
+		println(a)
+		`, []string{
+			"1",
+			"2",
+			"1",
+		}, t)
+	})
+
+	t.Run("test sub-scope and return", func(t *testing.T) {
+		check(`
+		a = 1
+		println(a) // 1
+		{
+			a  = 2 
+			println(a) // 2
+			return 
+		}
+		println(a) // 1
+		`,
+			[]string{
+				"1", "2",
+			}, t)
+	})
 }

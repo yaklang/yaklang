@@ -567,9 +567,9 @@ func (b *astbuilder) buildBlock(stmt *yak.BlockContext) {
 	defer recoverRange()
 	b.CurrentBlock.SetRange(b.CurrentRange)
 	if s, ok := stmt.StatementList().(*yak.StatementListContext); ok {
-		b.ScopeStart()
-		b.buildStatementList(s)
-		b.ScopeEnd()
+		b.BuildSyntaxBlock(func() {
+			b.buildStatementList(s)
+		})
 	} else {
 		b.NewError(ssa.Warn, TAG, "empty block")
 	}

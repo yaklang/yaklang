@@ -10,13 +10,13 @@ func TestSyntaxBlock(t *testing.T) {
 	test := assert.New(t)
 
 	/*
-		a = 1
+		a = 1 // scope 1
 		b = 1
 		{
-			a = 2
+			a = 2  // sub-scope 1
 			b := 2
 		}
-		a // 2
+		a // 2 // scope 2
 		b // 1
 	*/
 
@@ -25,13 +25,15 @@ func TestSyntaxBlock(t *testing.T) {
 	table.CreateLexicalVariable("b", NewConsts("1"))
 	test.Equal("const(1)", table.GetLatestVersion("a").String())
 
-	BuildSyntaxBlock(table, func(sub *ScopedVersionedTable[value]) {
+	end := BuildSyntaxBlock(table, func(sub *ScopedVersionedTable[value]) bool {
 		sub.CreateLexicalVariable("a", NewConsts("2"))
 		sub.CreateLexicalLocalVariable("b", NewConsts("2"))
+		return false
 	})
 
-	test.Equal("const(2)", table.GetLatestVersion("a").String())
-	test.Equal("const(1)", table.GetLatestVersion("b").String())
+	test.NotNil(end)
+	test.Equal("const(2)", end.GetLatestVersion("a").String())
+	test.Equal("const(1)", end.GetLatestVersion("b").String())
 }
 
 func TestIfScope_If(t *testing.T) {

@@ -61,23 +61,16 @@ func (p *PhiContext[T]) AddPhi(i *Versioned[T]) {
 // }
 // }
 
-func (s *ScopedVersionedTable[T]) CoverByChild() {
-	// cover origin value
-	subs := s.child
-	if len(subs) != 1 {
-		log.Error("only support one child")
-		panic("only support one child")
+func (s *ScopedVersionedTable[T]) CoverBy(scope *ScopedVersionedTable[T]) {
+	if scope == nil {
+		panic("cover scope is nil")
 	}
 
-	sub := subs[0]
-	sub.captured.ForEach(func(name string, ver *Versioned[T]) bool {
+	scope.captured.ForEach(func(name string, ver *Versioned[T]) bool {
 		log.Infof("cover %s by %s", name, ver.String())
 		s.CreateLexicalVariable(name, ver.Value)
 		return true
 	})
-
-	s.finishChild = append(s.finishChild, sub)
-	s.child = make([]*ScopedVersionedTable[T], 0)
 }
 
 func (s *ScopedVersionedTable[T]) Merge(hasSelf bool, handler func(name string, t []T) T) {
