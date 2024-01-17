@@ -409,19 +409,19 @@ func (b *astbuilder) buildForRangeStmt(stmt *yak.ForRangeStmtContext) {
 	loop := b.BuildLoop()
 
 	loop.BuildCondition(func() ssa.Value {
-		var lefts []ssa.LeftValue
+		var variables []*ssa.Variable
 		if leftList, ok := stmt.LeftExpressionList().(*yak.LeftExpressionListContext); ok {
-			lefts = b.buildLeftExpressionList(true, leftList)
+			variables = b.buildLeftExpressionList(true, leftList)
 			// } else {
 		}
 		value := b.buildExpression(stmt.Expression().(*yak.ExpressionContext))
 		key, field, ok := b.EmitNext(value, stmt.In() != nil)
-		if len(lefts) == 1 {
-			lefts[0].Assign(key, b.FunctionBuilder)
+		if len(variables) == 1 {
+			b.AssignVariable(variables[0], key)
 			ssa.DeleteInst(field)
-		} else if len(lefts) >= 2 {
-			lefts[0].Assign(key, b.FunctionBuilder)
-			lefts[1].Assign(field, b.FunctionBuilder)
+		} else if len(variables) >= 2 {
+			b.AssignVariable(variables[0], key)
+			b.AssignVariable(variables[1], field)
 		}
 		return ok
 	})
@@ -586,39 +586,39 @@ func (b *astbuilder) AssignList(stmt assignlist) []ssa.Value {
 	// Colon Assign Means: ... create symbol to recv value force
 	if op, op2 := stmt.AssignEq(), stmt.ColonAssignEq(); op != nil || op2 != nil {
 		// right value
-		var rvalues []ssa.Value
+		var values []ssa.Value
 		if ri, ok := stmt.ExpressionList().(*yak.ExpressionListContext); ok {
-			rvalues = b.buildExpressionList(ri)
+			values = b.buildExpressionList(ri)
 		}
 
 		// left
-		var lvalues []ssa.LeftValue
+		var variables []*ssa.Variable
 		if li, ok := stmt.LeftExpressionList().(*yak.LeftExpressionListContext); ok {
-			lvalues = b.buildLeftExpressionList(op2 != nil, li)
+			variables = b.buildLeftExpressionList(op2 != nil, li)
 		}
 
 		// assign
 		// (n) = (n), just assign
-		if len(rvalues) == len(lvalues) {
-			for i := range rvalues {
+		if len(values) == len(variables) {
+			for i := range values {
 				// if inst, ok := rvalues[i].(ssa.va); ok {
 				// 	inst.SetLeftPosition(lvalues[i].GetPosition())
 				// }
-				lvalues[i].Assign(rvalues[i], b.FunctionBuilder)
+				b.AssignVariable(variables[i], values[i])
 			}
-		} else if len(rvalues) == 1 {
-			if len(lvalues) == 0 {
+		} else if len(values) == 1 {
+			if len(variables) == 0 {
 				// (0) = (1)
 				b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
 				return nil
 			}
 
 			// (n) = (1)
-			inter, ok := rvalues[0].(ssa.Value)
+			inter, ok := values[0].(ssa.Value)
 			if !ok {
 				return nil
 			}
-			if c, ok := rvalues[0].(*ssa.Call); ok {
+			if c, ok := values[0].(*ssa.Call); ok {
 				var length int
 				// 可以通过是否存在variable确定是函数调用是否存在左值
 				c.SetName(uuid.NewString())
@@ -626,7 +626,7 @@ func (b *astbuilder) AssignList(stmt assignlist) []ssa.Value {
 				if !ssa.IsObjectType(c.GetType()) {
 					// b.NewError(ssa.Error, TAG, "assign right side is not interface function call")
 					// return nil
-					length = len(lvalues)
+					length = len(variables)
 				} else {
 					it := c.GetType().(*ssa.ObjectType)
 					length = it.Len
@@ -636,45 +636,46 @@ func (b *astbuilder) AssignList(stmt assignlist) []ssa.Value {
 					field := b.EmitField(c, b.EmitConstInst(i))
 					vs = append(vs, field)
 				}
-				if len(vs) == len(lvalues) {
+				if len(vs) == len(variables) {
 					for i := range vs {
 
-						if inst, ok := vs[i].(ssa.Instruction); ok {
-							inst.SetRange(lvalues[i].GetRange())
-						}
+						// if inst, ok := vs[i].(ssa.Instruction); ok {
+						// 	inst.SetRange(lvalues[i].GetRange())
+						// }
 
-						lvalues[i].Assign(vs[i], b.FunctionBuilder)
+						b.AssignVariable(variables[i], vs[i])
 					}
 				} else {
-					b.NewError(ssa.Error, TAG, MultipleAssignFailed(len(lvalues), len(rvalues)))
+					b.NewError(ssa.Error, TAG, MultipleAssignFailed(len(variables), len(values)))
 				}
 				return nil
 			}
 
 			// (n) = field(1, #index)
-			for i, lv := range lvalues {
+			for i, variable := range variables {
 				field := b.EmitField(inter, b.EmitConstInst(i))
 				// if inst, ok := field.(ssa.Instruction); ok {
 				// 	inst.SetPosition(lv.GetPosition())
 				// }
-				lv.Assign(field, b.FunctionBuilder)
+				b.AssignVariable(variable, field)
 			}
-		} else if len(lvalues) == 1 {
-			if len(rvalues) == 0 {
+		} else if len(variables) == 1 {
+			if len(values) == 0 {
 				// (1) = (0) undefined
 				b.NewError(ssa.Error, TAG, AssignRightSideEmpty())
 				return nil
 			}
 			// (1) = (n)
 			// (1) = interface(n)
-			_interface := b.CreateInterfaceWithVs(nil, rvalues)
-			lvalues[0].Assign(_interface, b.FunctionBuilder)
+			_interface := b.CreateInterfaceWithVs(nil, values)
+			// lvalues[0].Assign(_interface)
+			b.AssignVariable(variables[0], _interface)
 		} else {
 			// (n) = (m) && n!=m
-			b.NewError(ssa.Error, TAG, MultipleAssignFailed(len(lvalues), len(rvalues)))
+			b.NewError(ssa.Error, TAG, MultipleAssignFailed(len(variables), len(values)))
 			return nil
 		}
-		return lo.Map(lvalues, func(lv ssa.LeftValue, _ int) ssa.Value { return lv.GetValue(b.FunctionBuilder) })
+		return lo.Map(variables, func(lv *ssa.Variable, _ int) ssa.Value { return b.ReadValueByVariable(lv) })
 	}
 	return nil
 }
@@ -689,32 +690,32 @@ func (b *astbuilder) buildAssignExpression(stmt *yak.AssignExpressionContext) []
 	}
 
 	if stmt.PlusPlus() != nil { // ++
-		lvalue := b.buildLeftExpression(false, stmt.LeftExpression().(*yak.LeftExpressionContext))
-		if lvalue == nil {
+		variable := b.buildLeftExpression(false, stmt.LeftExpression().(*yak.LeftExpressionContext))
+		if variable == nil {
 			b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
 			return nil
 		}
-		rvalue := b.EmitBinOp(ssa.OpAdd, lvalue.GetValue(b.FunctionBuilder), b.EmitConstInst(1))
-		lvalue.Assign(rvalue, b.FunctionBuilder)
-		return []ssa.Value{lvalue.GetValue(b.FunctionBuilder)}
+		value := b.EmitBinOp(ssa.OpAdd, b.ReadValueByVariable(variable), b.EmitConstInst(1))
+		b.AssignVariable(variable, value)
+		return []ssa.Value{value}
 	} else if stmt.SubSub() != nil { // --
-		lvalue := b.buildLeftExpression(false, stmt.LeftExpression().(*yak.LeftExpressionContext))
-		if lvalue == nil {
+		variable := b.buildLeftExpression(false, stmt.LeftExpression().(*yak.LeftExpressionContext))
+		if variable == nil {
 			b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
 			return nil
 		}
-		rvalue := b.EmitBinOp(ssa.OpSub, lvalue.GetValue(b.FunctionBuilder), b.EmitConstInst(1))
-		lvalue.Assign(rvalue, b.FunctionBuilder)
-		return []ssa.Value{lvalue.GetValue(b.FunctionBuilder)}
+		value := b.EmitBinOp(ssa.OpSub, b.ReadValueByVariable(variable), b.EmitConstInst(1))
+		b.AssignVariable(variable, value)
+		return []ssa.Value{b.ReadValueByVariable(variable)}
 	}
 
 	if op, ok := stmt.InplaceAssignOperator().(*yak.InplaceAssignOperatorContext); ok {
-		lvalue := b.buildLeftExpression(false, stmt.LeftExpression().(*yak.LeftExpressionContext))
-		if lvalue == nil {
+		variable := b.buildLeftExpression(false, stmt.LeftExpression().(*yak.LeftExpressionContext))
+		if variable == nil {
 			b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
 			return nil
 		}
-		rvalue := b.buildExpression(stmt.Expression().(*yak.ExpressionContext))
+		rightValue := b.buildExpression(stmt.Expression().(*yak.ExpressionContext))
 		var opcode ssa.BinaryOpcode
 		switch op.GetText() {
 		case "+=":
@@ -740,9 +741,9 @@ func (b *astbuilder) buildAssignExpression(stmt *yak.AssignExpressionContext) []
 		case "^=":
 			opcode = ssa.OpXor
 		}
-		rvalue = b.EmitBinOp(opcode, lvalue.GetValue(b.FunctionBuilder), rvalue)
-		lvalue.Assign(rvalue, b.FunctionBuilder)
-		return []ssa.Value{lvalue.GetValue(b.FunctionBuilder)}
+		value := b.EmitBinOp(opcode, b.ReadValueByVariable(variable), rightValue)
+		b.AssignVariable(variable, value)
+		return []ssa.Value{value}
 	}
 	return nil
 }
@@ -786,12 +787,12 @@ func (b *astbuilder) buildDeclareAndAssignExpression(stmt *yak.DeclareAndAssignE
 }
 
 // left expression list
-func (b *astbuilder) buildLeftExpressionList(forceAssign bool, stmt *yak.LeftExpressionListContext) []ssa.LeftValue {
+func (b *astbuilder) buildLeftExpressionList(forceAssign bool, stmt *yak.LeftExpressionListContext) []*ssa.Variable {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 	exprs := stmt.AllLeftExpression()
 	valueLen := len(exprs)
-	values := make([]ssa.LeftValue, 0, valueLen)
+	values := make([]*ssa.Variable, 0, valueLen)
 	for _, e := range exprs {
 		if e, ok := e.(*yak.LeftExpressionContext); ok {
 			if v := b.buildLeftExpression(forceAssign, e); !utils.IsNil(v) {
@@ -803,56 +804,60 @@ func (b *astbuilder) buildLeftExpressionList(forceAssign bool, stmt *yak.LeftExp
 }
 
 // buildLeftExpression build left expression
-func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpressionContext) ssa.LeftValue {
+func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpressionContext) *ssa.Variable {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 	if s := stmt.Identifier(); s != nil {
 		text := s.GetText()
 		if text == "_" {
-			return ssa.NewIdentifierLV("_", b.CurrentRange)
+			// return ssa.NewIdentifierLV("_", b.CurrentRange)
 		}
 		if forceAssign {
-			b.SetScopeLocalVariable(text)
-			return ssa.NewIdentifierLV(text, b.CurrentRange)
+			// b.SetScopeLocalVariable(text)
+			// return ssa.NewIdentifierLV(text, b.CurrentRange)
+			return b.CreateLocalVariable(text)
+		} else {
+			return b.CreateVariable(text)
 		}
 
-		lv := ssa.NewIdentifierLV(text, b.CurrentRange)
-		if i := b.TryBuildExternValue(text); i != nil {
-			b.NewErrorWithPos(ssa.Warn, TAG, b.CurrentRange, ssa.ContAssignExtern(text))
-		}
-		if b.CanCaptureParentValue(text) {
-			lv.SetIsSideEffect(true)
-		}
-		return lv
+		// lv := ssa.NewIdentifierLV(text, b.CurrentRange)
+		// if i := b.TryBuildExternValue(text); i != nil {
+		// 	b.NewErrorWithPos(ssa.Warn, TAG, b.CurrentRange, ssa.ContAssignExtern(text))
+		// }
+		// if b.CanCaptureParentValue(text) {
+		// 	lv.SetIsSideEffect(true)
+		// }
+		// return lv
 	}
-	if s, ok := stmt.Expression().(*yak.ExpressionContext); ok {
-		var ret ssa.LeftValue
-		inter := b.buildExpression(s)
-		if s, ok := stmt.LeftSliceCall().(*yak.LeftSliceCallContext); ok {
-			recoverRange := b.SetRange(s.BaseParserRuleContext)
-			if s, ok := s.Expression().(*yak.ExpressionContext); ok {
-				index := b.buildExpression(s)
-				ret = b.EmitFieldMust(inter, index)
-			}
-			recoverRange()
-		}
+	// TODO: this is member call
+	// if s, ok := stmt.Expression().(*yak.ExpressionContext); ok {
+	// 	var ret *ssa.Variable
+	// 	inter := b.buildExpression(s)
+	// 	if s, ok := stmt.LeftSliceCall().(*yak.LeftSliceCallContext); ok {
+	// 		recoverRange := b.SetRange(s.BaseParserRuleContext)
+	// 		if s, ok := s.Expression().(*yak.ExpressionContext); ok {
+	// 			index := b.buildExpression(s)
+	// 			ret = b.EmitFieldMust(inter, index)
+	// 		}
+	// 		recoverRange()
+	// 	}
 
-		if s, ok := stmt.LeftMemberCall().(*yak.LeftMemberCallContext); ok {
-			recoverRange := b.SetRange(s.BaseParserRuleContext)
-			if inter.IsExtern() {
-				b.NewErrorWithPos(ssa.Warn, TAG, b.CurrentRange, ssa.ContAssignExtern(stmt.GetText()))
-			}
-			if id := s.Identifier(); id != nil {
-				idText := id.GetText()
-				ret = b.EmitFieldMust(inter, b.EmitConstInst(idText))
-			} else if id := s.IdentifierWithDollar(); id != nil {
-				key := b.ReadVariable(id.GetText()[1:], true)
-				ret = b.EmitFieldMust(inter, key)
-			}
-			recoverRange()
-		}
-		return ret
-	}
+	// 	if s, ok := stmt.LeftMemberCall().(*yak.LeftMemberCallContext); ok {
+	// 		recoverRange := b.SetRange(s.BaseParserRuleContext)
+	// 		if inter.IsExtern() {
+	// 			b.NewErrorWithPos(ssa.Warn, TAG, b.CurrentRange, ssa.ContAssignExtern(stmt.GetText()))
+	// 		}
+	// 		if id := s.Identifier(); id != nil {
+	// 			idText := id.GetText()
+	// 			ret = b.EmitFieldMust(inter, b.EmitConstInst(idText))
+	// 		} else if id := s.IdentifierWithDollar(); id != nil {
+	// 			key := b.ReadValue(id.GetText()[1:])
+	// 			ret = b.EmitFieldMust(inter, key)
+	// 		}
+	// 		recoverRange()
+	// 	}
+	// 	return ret
+	// }
 	return nil
 }
 
@@ -908,7 +913,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 			b.NewError(ssa.Warn, TAG, "cannot use _ as value")
 			// return nil
 		}
-		v := b.ReadVariable(text, true)
+		v := b.ReadValue(text)
 		return v
 	}
 	// member call
@@ -922,7 +927,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 			idText := id.GetText()
 			return b.EmitField(inter, b.EmitConstInst(idText))
 		} else if id := s.IdentifierWithDollar(); id != nil {
-			key := b.ReadVariable(id.GetText()[1:], true)
+			key := b.ReadValue(id.GetText()[1:])
 			if key == nil {
 				b.NewError(ssa.Error, TAG, ExpressionNotVariable(id.GetText()))
 				return nil
@@ -1153,7 +1158,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		}
 		ifb.Finish()
 		// generator phi instruction
-		return b.ReadVariable(id, true)
+		return b.ReadValue(id)
 	}
 
 	// | expression '&&' ws* expression
