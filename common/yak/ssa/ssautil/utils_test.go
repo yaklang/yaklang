@@ -76,9 +76,6 @@ func (b *binary) String() string {
 // ======== builder
 
 func GeneratePhi(name string, t []value) value {
-	slices.SortFunc(t, func(i, j value) int {
-		return strings.Compare(i.String(), j.String())
-	})
 	return NewPhi(t...)
 }
 

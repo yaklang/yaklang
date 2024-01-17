@@ -71,10 +71,9 @@ func NewUnOp(op UnaryOpcode, x Value) Value {
 	return b
 }
 
-func NewIf(cond Value) *If {
+func NewIf() *If {
 	ifSSA := &If{
 		anInstruction: NewInstruction(),
-		Cond:          cond,
 	}
 	return ifSSA
 }
@@ -203,6 +202,10 @@ func NewSideEffect(variable string, target Value) *SideEffect {
 	}
 	s.SetName(variable)
 	return s
+}
+
+func (i *If) SetCondition(t Value) {
+	i.Cond = t
 }
 
 func (i *If) AddTrue(t *BasicBlock) {

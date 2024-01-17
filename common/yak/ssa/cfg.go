@@ -3,6 +3,7 @@ package ssa
 import (
 	"strings"
 
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
@@ -191,176 +192,120 @@ func (lb *LoopBuilder) Finish() {
 
 // if builder
 
-// enter:
-//      // if stmt cond in here
-//      If [cond] true -> if.true, false -> if.elif
-// if.true: 					<- enter
-//      // if-true-body block in here
-//      jump if.done
-// if.elif: 					<- enter
-//      // if-elif cond in here    (this build in "elif" and "else if")
-//      If [cond] true -> if.elif_true, false -> if.false
-// if.elif_true:				<- if.elif
-//      // if-elif-true-body block in here
-//      jump if.done
-// if.false: 					<- if.elif
-//      // if-elif-false-body block in here
-//      jump if.done
-// if.done:				        <- if.elif_true,if.true,if.false  (target of all if block)
-//      jump rest
-// rest:
-//      ...rest.code....
+// IfBuilderItem is pair of condition and body, if condition is true, then run body
+type IfBuilderItem struct {
+	Condition func() Value
+	Body      func()
+}
 
+// IfBuilder is a builder for if statement
+// ssa control flow: if builder
 type IfBuilder struct {
-	b *FunctionBuilder
+	builder *FunctionBuilder
 	// enter block
-	enter, done *BasicBlock
-	// child ifBuilder
-	child  *IfBuilder
-	parent *IfBuilder
+	enter *BasicBlock
 
-	// if branch
-	ifCondition func() Value
-	ifBody      func()
+	// branch
+	items []IfBuilderItem
 
-	// elif branch
-	elifCondition []func() Value
-	elifBody      []func()
-
-	// else branch
 	elseBody func()
 }
 
-func (b *FunctionBuilder) BuildIf() *IfBuilder {
+// CreateIfBuilder Create IfBuilder
+func (b *FunctionBuilder) CreateIfBuilder() *IfBuilder {
 	return &IfBuilder{
-		b:             b,
-		enter:         b.CurrentBlock,
-		elifCondition: make([]func() Value, 0),
-		elifBody:      make([]func(), 0),
+		builder: b,
+		enter:   b.CurrentBlock,
+		items:   make([]IfBuilderItem, 0),
 	}
 }
 
-func (i *IfBuilder) BuildChild(child *IfBuilder) {
-	i.child = child
-	child.parent = i
-}
-
-func (i *IfBuilder) BuildCondition(condition func() Value) *IfBuilder {
-	i.ifCondition = condition
-	return i
-}
-func (i *IfBuilder) BuildTrue(body func()) *IfBuilder {
-	i.ifBody = body
+// AppendItem append IfBuilderItem to IfBuilder
+func (i *IfBuilder) AppendItem(item IfBuilderItem) *IfBuilder {
+	i.items = append(i.items, item)
 	return i
 }
 
-func (i *IfBuilder) BuildElif(condition func() Value, body func()) *IfBuilder {
-	i.elifCondition = append(i.elifCondition, condition)
-	i.elifBody = append(i.elifBody, body)
-	return i
-}
-
-func (i *IfBuilder) BuildFalse(body func()) *IfBuilder {
+// SetElse build else  body
+func (i *IfBuilder) SetElse(body func()) *IfBuilder {
 	i.elseBody = body
 	return i
 }
 
-func (i *IfBuilder) Finish() {
-	builder := i.b
-	// if instruction
-	var doneBlock *BasicBlock
-	// Set end BasicBlock
-	if i.parent == nil {
-		doneBlock = builder.NewBasicBlockNotAddBlocks(IfDone)
-		i.done = doneBlock
-	} else {
-		i.done = i.parent.done
-		doneBlock = i.parent.done
+// build phi
+func generalPhi(builder *FunctionBuilder) func(name string, t []*Variable) *Variable {
+	scope := builder.CurrentBlock.ScopeTable
+	return func(name string, t []*Variable) *Variable {
+		values := lo.Map(t, func(v *Variable, _ int) Value { return v.value })
+		// log.Infof("generalPhi: %s %v", name, values)
+		phi := builder.EmitPhi(name, values)
+		if phi == nil {
+			return nil
+		}
+		v := NewVariable(name, builder.CurrentRange, scope)
+		builder.AssignVariable(v, phi)
+		return v
 	}
-	// TrueBlock
-	trueBlock := builder.NewBasicBlockNotAddBlocks(IfTrue)
+}
 
-	// build ifSSA
+// Build if statement
+func (i *IfBuilder) Build() {
+	// just use ssautil scope cfg ScopeBuilder
+	SSABuilder := i.builder
+	Scope := i.enter.ScopeTable
+	ScopeBuilder := ssautil.NewIfStmt(Scope)
+	// done block
+	DoneBlock := SSABuilder.NewBasicBlockNotAddBlocks(IfDone)
+	// DoneBlock.ScopeTable = Scope
 
-	// in Enter BasicBlock:
-	// enter:
-	//      // if stmt cond in here
-	// 		// here can be set multiple BasicBlock
-	//      If [cond] true -> if.true, false -> if.elif
+	conditionBlock := SSABuilder.NewBasicBlock("if-condition")
+	SSABuilder.EmitJump(conditionBlock)
+	SSABuilder.CurrentBlock = conditionBlock
 
-	// build Condition
-	builder.CurrentBlock = i.enter
-	// this function can build new cfg
-	cond := i.ifCondition()
-	// continue append this instruction
-	ifSSA := builder.EmitIf(cond)
-	ifSSA.AddTrue(trueBlock)
+	CurrentBlock := conditionBlock
+	for _, item := range i.items {
+		trueBlock := SSABuilder.NewBasicBlock(IfTrue)
+		var condition Value
+		ScopeBuilder.BuildItem(
+			// ifStmt := builder
+			func(conditionScope *ssautil.ScopedVersionedTable[*Variable]) {
+				SSABuilder.CurrentBlock = CurrentBlock
+				SSABuilder.CurrentBlock.ScopeTable = conditionScope
+				condition = item.Condition()
+			},
+			func(bodyScope *ssautil.ScopedVersionedTable[*Variable]) *ssautil.ScopedVersionedTable[*Variable] {
+				SSABuilder.CurrentBlock = trueBlock
+				SSABuilder.CurrentBlock.ScopeTable = bodyScope
+				item.Body()
+				SSABuilder.EmitJump(DoneBlock)
+				return SSABuilder.CurrentBlock.ScopeTable
+			},
+		)
+		falseBlock := SSABuilder.NewBasicBlock(IfFalse)
+		SSABuilder.CurrentBlock = CurrentBlock
+		ifStmt := SSABuilder.EmitIf()
+		ifStmt.AddTrue(trueBlock)
+		ifStmt.SetCondition(condition)
+		ifStmt.AddFalse(falseBlock)
 
-	// build TrueBlock and append this block to Function BasicBlock list.
-	// if.true: 					<- enter
-	//      // if-true-body block in here
-	//      jump if.done
-	addToBlocks(trueBlock)
-	builder.CurrentBlock = trueBlock
-	// this function can build multiple BasicBlock
-	i.ifBody()
-	builder.EmitJump(doneBlock)
-
-	// if.elif: 					<- enter
-	//      // if-elif cond in here    (this build in "elif" and "else if")
-	//      If [cond] true -> if.elif_true, false -> if.false
-	// if.elif_true:				<- if.elif
-	//      // if-elif-true-body block in here
-	//      jump if.done
-	// if.false: 					<- if.elif
-	//      // if-elif-false-body block in here
-	//      jump if.done
-	prevIf := ifSSA
-	for index := range i.elifCondition {
-		buildCondition := i.elifCondition[index]
-		buildBody := i.elifBody[index]
-		// set block
-		if prevIf.False == nil {
-			prevIf.AddFalse(builder.NewBasicBlock(IfElif))
-		}
-		builder.CurrentBlock = prevIf.False
-		// build condition
-		cond := buildCondition()
-		if cond == nil {
-			continue
-		}
-		// build if
-		ifSSA := builder.EmitIf(cond)
-		ifSSA.AddTrue(builder.NewBasicBlock(IfTrue))
-		// build if body
-		builder.CurrentBlock = ifSSA.True
-		buildBody()
-		// if -> done
-		builder.EmitJump(doneBlock)
-		prevIf = ifSSA
+		SSABuilder.CurrentBlock = falseBlock
+		CurrentBlock = falseBlock
 	}
 
 	if i.elseBody != nil {
-		// if has else stmt, build it and set in False
-		// create false
-		prevIf.AddFalse(builder.NewBasicBlock(IfFalse))
-		// build else body
-		builder.CurrentBlock = prevIf.False
-		i.elseBody()
-		builder.EmitJump(doneBlock)
-	} else if i.child != nil {
-		// create elif
-		prevIf.AddFalse(builder.NewBasicBlock(IfElif))
-		// set IfBuilder enter
-		i.child.enter = prevIf.False
-		i.child.Finish()
-	} else {
-		prevIf.AddFalse(doneBlock)
+		ScopeBuilder.BuildElse(func(sub *ssautil.ScopedVersionedTable[*Variable]) *ssautil.ScopedVersionedTable[*Variable] {
+			SSABuilder.CurrentBlock.ScopeTable = sub
+			i.elseBody()
+			return SSABuilder.CurrentBlock.ScopeTable
+		})
 	}
+	SSABuilder.EmitJump(DoneBlock)
 
-	if i.parent == nil && len(doneBlock.Preds) != 0 {
-		addToBlocks(doneBlock)
-		builder.CurrentBlock = doneBlock
+	if len(DoneBlock.Preds) != 0 {
+		addToBlocks(DoneBlock)
+		SSABuilder.CurrentBlock = DoneBlock
+		end := ScopeBuilder.BuildFinish(generalPhi(i.builder))
+		DoneBlock.ScopeTable = end
 	}
 }
 

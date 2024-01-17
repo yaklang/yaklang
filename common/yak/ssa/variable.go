@@ -382,7 +382,7 @@ func (v *Variable) readValue() Value {
 
 // --------------- Read
 
-// ReadVariable get value by name
+// ReadValue get value by name
 func (b *FunctionBuilder) ReadValue(name string) Value {
 	scope := b.CurrentBlock.ScopeTable
 	if v := scope.GetLatestVersion(name); v != nil {
@@ -397,6 +397,7 @@ func (b *FunctionBuilder) ReadValue(name string) Value {
 	return undefine
 }
 
+// ReadValueByVariable get value by variable
 func (b *FunctionBuilder) ReadValueByVariable(v *Variable) Value {
 	return v.readValue()
 }
