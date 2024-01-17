@@ -1,86 +1,87 @@
 package ssa
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// --------------- for assign
-type LeftValue interface {
-	Assign(Value, *FunctionBuilder)
-	GetRange() *Range
-	GetValue(*FunctionBuilder) Value
-}
+// // --------------- for assign
+// type LeftValue interface {
+// 	Assign(Value, *FunctionBuilder)
+// 	GetRange() *Range
+// 	GetValue(*FunctionBuilder) Value
+// }
 
-// --------------- only point variable to value with `f.currentDef`
-// --------------- is SSA value
-type IdentifierLV struct {
-	name         string
-	pos          *Range
-	isSideEffect bool
-}
+// // --------------- only point variable to value with `f.currentDef`
+// // --------------- is SSA value
+// type IdentifierLV struct {
+// 	name         string
+// 	pos          *Range
+// 	isSideEffect bool
+// }
 
-func (i *IdentifierLV) Assign(v Value, f *FunctionBuilder) {
-	beforeSSAValue := f.PeekLexicalVariableByName(i.name)
-	if beforeSSAValue != nil {
-		if freeParam, ok := beforeSSAValue.(*Parameter); ok && freeParam.IsFreeValue {
-			// freevalue shoule connect to parent lexical name!
-			if f.parentBuilder != nil {
-				beforeSSAValue = f.parentBuilder.PeekLexicalVariableByName(i.name)
-			}
-		}
-	}
-	if !v.IsExtern() {
-		f.CurrentScope.AddVariable(NewVariable(i.name, v), i.GetRange())
-	}
-	f.WriteVariable(i.name, v)
-	if i.isSideEffect {
-		if beforeSSAValue != nil {
-			beforeSSAValue.AddMask(v)
-			// } else {
-			// 	log.Warn("freeValueParameter is nil, conflict, side effect cannot find the relative freevalue! maybe a **BUG**")
-		}
-		f.AddSideEffect(i.name, v)
-	}
-}
+// func (i *IdentifierLV) Assign(v Value, f *FunctionBuilder) {
+// 	beforeSSAValue := f.PeekLexicalVariableByName(i.name)
+// 	if beforeSSAValue != nil {
+// 		if freeParam, ok := beforeSSAValue.(*Parameter); ok && freeParam.IsFreeValue {
+// 			// freevalue shoule connect to parent lexical name!
+// 			if f.parentBuilder != nil {
+// 				beforeSSAValue = f.parentBuilder.PeekLexicalVariableByName(i.name)
+// 			}
+// 		}
+// 	}
+// 	// if !v.IsExtern() {
+// 	// f.CurrentScope.AddVariable(NewVariable(i.name, v), i.GetRange())
+// 	// }
+// 	f.WriteVariable(i.name, v)
+// 	if i.isSideEffect {
+// 		if beforeSSAValue != nil {
+// 			beforeSSAValue.AddMask(v)
+// 		} else {
+// 			log.Warn("freeValueParameter is nil, conflict, side effect cannot find the relative freevalue! maybe a **BUG**")
+// 		}
+// 		f.AddSideEffect(i.name, v)
+// 	}
+// }
 
-func (i *IdentifierLV) GetValue(f *FunctionBuilder) Value {
-	v := f.ReadVariable(i.name, true)
-	return v
-}
+// func (i *IdentifierLV) GetValue(f *FunctionBuilder) Value {
+// 	v := f.ReadVariable(i.name)
+// 	return v
+// }
 
-func (i *IdentifierLV) GetRange() *Range {
-	return i.pos
-}
-func (i *IdentifierLV) SetIsSideEffect(b bool) {
-	i.isSideEffect = b
-}
+// func (i *IdentifierLV) GetRange() *Range {
+// 	return i.pos
+// }
+// func (i *IdentifierLV) SetIsSideEffect(b bool) {
+// 	i.isSideEffect = b
+// }
 
-func NewIdentifierLV(variable string, pos *Range) *IdentifierLV {
-	return &IdentifierLV{
-		name: variable,
-		pos:  pos,
-	}
-}
+// func NewIdentifierLV(variable string, pos *Range) *IdentifierLV {
+// 	return &IdentifierLV{
+// 		name: variable,
+// 		pos:  pos,
+// 	}
+// }
 
-var _ LeftValue = (*IdentifierLV)(nil)
+// var _ LeftValue = (*IdentifierLV)(nil)
 
-// --------------- point variable to value `f.symbol[variable]value`
-// --------------- it's memory address, not SSA value
-func (field *Field) Assign(v Value, f *FunctionBuilder) {
-	f.EmitUpdate(field, v)
-}
+// // --------------- point variable to value `f.symbol[variable]value`
+// // --------------- it's memory address, not SSA value
+// func (field *Field) Assign(v Value, f *FunctionBuilder) {
+// 	f.EmitUpdate(field, v)
+// }
 
-func (f *Field) GetValue(_ *FunctionBuilder) Value {
-	return f
-}
+// func (f *Field) GetValue(_ *FunctionBuilder) Value {
+// 	return f
+// }
 
-var _ LeftValue = (*Field)(nil)
+// var _ LeftValue = (*Field)(nil)
 
 // --------------- `f.currentDef` handler, read && write
-func (f *FunctionBuilder) WriteVariable(variable string, value Value) {
-	variable = f.GetScopeLocalVariable(variable)
-	f.writeVariableByBlock(variable, value, f.CurrentBlock)
-}
+// func (f *FunctionBuilder) WriteVariable(variable string, value Value) {
+// 	variable = f.GetScopeLocalVariable(variable)
+// 	f.writeVariableByBlock(variable, value, f.CurrentBlock)
+// }
 
 func (f *Function) ReplaceVariable(variable string, v, to Value) {
 	for _, block := range f.Blocks {
@@ -141,32 +142,32 @@ func (b *FunctionBuilder) PeekLexicalVariableByName(variable string) Value {
 // * if len(block.preds) == 0: undefined
 // * if len(block.preds) == 1: just recursive
 // * if len(block.preds) >  1: create phi and builder
-func (b *FunctionBuilder) ReadVariable(variable string, create bool) Value {
-	var ret Value
-	b.ReadVariableEx(variable, create, func(vs []Value) {
-		if len(vs) > 0 {
-			ret = vs[len(vs)-1]
-		} else {
-			ret = nil
-		}
-	})
+// func (b *FunctionBuilder) ReadVariable(variable string, create bool) Value {
+// 	var ret Value
+// 	b.ReadVariableEx(variable, create, func(vs []Value) {
+// 		if len(vs) > 0 {
+// 			ret = vs[len(vs)-1]
+// 		} else {
+// 			ret = nil
+// 		}
+// 	})
 
-	if ret == nil || b.CurrentRange == nil {
-		return ret
-	}
+// 	if ret == nil {
+// 		return ret
+// 	}
 
-	if ret.IsExtern() {
-		return ret
-	}
+// 	if ret.IsExtern() {
+// 		return ret
+// 	}
 
-	if v := ret.GetVariable(variable); v != nil {
-		v.AddRange(b.CurrentRange, false)
-		b.CurrentScope.InsertByRange(v, b.CurrentRange)
-	} else {
-		b.CurrentScope.AddVariable(NewVariable(variable, ret), b.CurrentRange)
-	}
-	return ret
-}
+// 	if v := ret.GetVariable(variable); v != nil {
+// 		v.AddRange(b.CurrentRange, false)
+// 		b.CurrentScope.InsertByRange(v, b.CurrentRange)
+// 	} else {
+// 		b.CurrentScope.AddVariable(NewVariable(variable, ret), b.CurrentRange)
+// 	}
+// 	return ret
+// }
 
 func (b *FunctionBuilder) ReadVariableBefore(variable string, create bool, before Instruction) Value {
 	var ret Value
@@ -190,7 +191,7 @@ func (b *FunctionBuilder) ReadVariableBefore(variable string, create bool, befor
 }
 
 func (b *FunctionBuilder) ReadVariableEx(variable string, create bool, fun func([]Value)) {
-	variable = b.GetScopeLocalVariable(variable)
+	// variable = b.GetScopeLocalVariable(variable)
 	var ret []Value
 	block := b.CurrentBlock
 	if block == nil {
@@ -311,36 +312,135 @@ func (b *FunctionBuilder) readVariableByBlockEx(name string, block *BasicBlock, 
 func (b *FunctionBuilder) BuildFreeValue(variable string) Value {
 	freeValue := NewParam(variable, true, b)
 	b.FreeValues[variable] = freeValue
-	b.CurrentScope.AddVariable(NewVariable(variable, freeValue), b.CurrentRange)
+	// b.CurrentScope.AddVariable(NewVariable(variable, freeValue), b.CurrentRange)
 	b.WriteVariable(variable, freeValue)
 	return freeValue
 }
 
 func (b *FunctionBuilder) CaptureParentValue(name string) (Value, bool) {
-	parent := b.parentBuilder
-	scope := b.parentScope
-	block := b.parentCurrentBlock
-	for parent != nil {
-		name = scope.GetLocalVariable(name)
-		v := parent.readVariableByBlock(name, block, false)
-		if v != nil {
-			// if v not extern instance
-			// or value assign by extern instance (extern instance but name not equal)
-			if (!v.IsExtern()) || (v.IsExtern() && v.GetName() != name) {
-				return v, true
-			}
-		}
+	// parent := b.parentBuilder
+	// scope := b.parentScope
+	// block := b.parentCurrentBlock
+	// for parent != nil {
+	// 	name = scope.GetLocalVariable(name)
+	// 	v := parent.readVariableByBlock(name, block, false)
+	// 	if v != nil {
+	// 		// if v not extern instance
+	// 		// or value assign by extern instance (extern instance but name not equal)
+	// 		if (!v.IsExtern()) || (v.IsExtern() && v.GetName() != name) {
+	// 			return v, true
+	// 		}
+	// 	}
 
-		// parent symbol and block
-		scope = parent.parentScope
-		block = parent.parentCurrentBlock
-		// next parent
-		parent = parent.parentBuilder
-	}
+	// 	// parent symbol and block
+	// 	scope = parent.parentScope
+	// 	block = parent.parentCurrentBlock
+	// 	// next parent
+	// 	parent = parent.parentBuilder
+	// }
 	return nil, false
 }
 
 func (b *FunctionBuilder) CanCaptureParentValue(name string) bool {
 	_, ok := b.CaptureParentValue(name)
 	return ok
+}
+func (b *FunctionBuilder) CanBuildFreeValue(variable string) bool {
+	// parent := b.parentBuilder
+	// scope := b.parentScope
+	// block := b.parentCurrentBlock
+	// for parent != nil {
+	// 	variable = scope.GetLocalVariable(variable)
+	// 	v := parent.readVariableByBlock(variable, block, false)
+	// 	if v != nil && !v.IsExtern() {
+	// 		return true
+	// 	}
+
+	// 	// parent symbol and block
+	// 	scope = parent.parentScope
+	// 	block = parent.parentCurrentBlock
+	// 	// next parent
+	// 	parent = parent.parentBuilder
+	// }
+	return false
+}
+
+func (v *Variable) assign(value Value) {
+	if v.value != nil {
+		log.Errorf("variable %s already assigned", v.Name)
+		panic("variable already assigned")
+	}
+
+	value.GetProgram().SetInstructionWithName(v.Name, value)
+	v.value = value
+	value.AddVariable(v)
+}
+
+func (v *Variable) readValue() Value {
+	return v.value
+}
+
+// --------------- Read
+
+// ReadVariable get value by name
+func (b *FunctionBuilder) ReadValue(name string) Value {
+	scope := b.CurrentBlock.ScopeTable
+	if v := scope.GetLatestVersion(name); v != nil {
+		ret := v.Value
+		ret.AddRange(b.CurrentRange, false)
+		if ret.value != nil {
+			return ret.value
+		}
+	}
+	undefine := b.EmitUndefine(name)
+	b.WriteVariable(name, undefine)
+	return undefine
+}
+
+func (b *FunctionBuilder) ReadValueByVariable(v *Variable) Value {
+	return v.readValue()
+}
+
+// ----------------- Write
+
+// WriteVariable write value to variable
+// will create Variable  and assign value
+func (b *FunctionBuilder) WriteVariable(name string, value Value) {
+	v := b.CreateVariable(name)
+	v.assign(value)
+}
+
+// WriteLocalVariable write value to local variable
+func (b *FunctionBuilder) WriteLocalVariable(name string, value Value) {
+	v := b.CreateLocalVariable(name)
+	v.assign(value)
+}
+
+// ------------------- Assign
+
+// AssignVariable  assign value to variable
+func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
+	variable.assign(value)
+}
+
+// ------------------- Create
+
+// CreateVariable create variable
+func (b *FunctionBuilder) CreateVariable(name string) *Variable {
+	return b.createVariableEx(name, false)
+}
+
+// CreateLocalVariable create local variable
+func (b *FunctionBuilder) CreateLocalVariable(name string) *Variable {
+	return b.createVariableEx(name, true)
+}
+func (b *FunctionBuilder) createVariableEx(name string, local bool) *Variable {
+	scope := b.CurrentBlock.ScopeTable
+	v := NewVariable(name, b.CurrentRange, scope)
+	if local {
+		scope.CreateLexicalLocalVariable(name, v)
+	} else {
+		scope.CreateLexicalVariable(name, v)
+	}
+	return v
 }

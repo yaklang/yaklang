@@ -154,7 +154,7 @@ func (b *FunctionBuilder) SetDefineFunc() {
 			f.Param[index].SetType(typ)
 		}
 		for name, fv := range f.FreeValues {
-			if v := b.ReadVariable(name, false); v == nil {
+			if v := b.ReadValue(name); v == nil {
 				fv.NewError(Error, SSATAG, ValueUndefined(name))
 			}
 		}
