@@ -73,17 +73,30 @@ func (s *ScopedVersionedTable[T]) CoverBy(scope *ScopedVersionedTable[T]) {
 	})
 }
 
-func (s *ScopedVersionedTable[T]) Merge(hasSelf bool, handler func(name string, t []T) T) {
+// Merge merge the sub-scope to current scope,
+// if hasSelf is true: the current scope will be merged to the result
+func Merge[T comparable](
+	base *ScopedVersionedTable[T],
+	hasSelf bool,
+	handler func(name string, t []T),
+	subScopes ...*ScopedVersionedTable[T],
+) {
 	var zero T
-	subScopes := s.child
+	// subScopes := s.child
 	// handler []T must sort same with sub-scope
 	length := len(subScopes)
 	if hasSelf {
-		length += 1
+		length++
 	}
 	tmp := make(map[string][]T)
 	for index, sub := range subScopes {
 		sub.captured.ForEach(func(name string, ver *Versioned[T]) bool {
+			if base.GetLatestVersion(name) == zero {
+				// not exist in base scope, this variable just set in sub-scope,
+				// just skip, not need generate phi
+				return true
+			}
+
 			m, ok := tmp[name]
 			if !ok {
 				m = make([]T, length)
@@ -95,7 +108,7 @@ func (s *ScopedVersionedTable[T]) Merge(hasSelf bool, handler func(name string, 
 	}
 
 	for name, m := range tmp {
-		origin := s.GetLatestVersion(name)
+		origin := base.GetLatestVersion(name)
 		// fill the missing value
 		// if len(m) != length {
 		if hasSelf {
@@ -108,13 +121,8 @@ func (s *ScopedVersionedTable[T]) Merge(hasSelf bool, handler func(name string, 
 				m[index] = origin
 			}
 		}
-		// }
-		res := handler(name, m)
-		s.CreateLexicalVariable(name, res)
+		handler(name, m)
 	}
-
-	s.finishChild = append(s.finishChild, subScopes...)
-	s.child = make([]*ScopedVersionedTable[T], 0)
 }
 
 // this handler merge [origin, last] to phi

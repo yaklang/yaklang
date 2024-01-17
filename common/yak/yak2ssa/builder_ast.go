@@ -492,73 +492,51 @@ func (b *astbuilder) buildSwitchStmt(stmt *yak.SwitchStmtContext) {
 
 // if stmt
 func (b *astbuilder) buildIfStmt(stmt *yak.IfStmtContext) {
-	var buildIf func(stmt *yak.IfStmtContext) *ssa.IfBuilder
-	buildIf = func(stmt *yak.IfStmtContext) *ssa.IfBuilder {
-		recoverRange := b.SetRange(stmt.BaseParserRuleContext)
-		defer recoverRange()
 
-		i := b.BuildIf()
+	var build func(stmt *yak.IfStmtContext) ([]ssa.IfBuilderItem, func())
+	build = func(stmt *yak.IfStmtContext) ([]ssa.IfBuilderItem, func()) {
+		ret := make([]ssa.IfBuilderItem, 0)
 
-		// if instruction condition
-		i.BuildCondition(
-			func() ssa.Value {
-				return b.buildExpression(stmt.Expression(0).(*yak.ExpressionContext))
+		// for index := range stmt.AllElif() {
+		// }
+		// for index :=0; index < len(stmt.AllExpression())
+		for index, expression := range stmt.AllExpression() {
+			ret = append(ret, ssa.IfBuilderItem{
+				Condition: func() ssa.Value {
+					return b.buildExpression(expression.(*yak.ExpressionContext))
+				},
+				Body: func() {
+					b.buildBlock(stmt.Block(index).(*yak.BlockContext))
+				},
 			})
-		// build true body
-		i.BuildTrue(
-			func() {
-				if blockstmt, ok := stmt.Block(0).(*yak.BlockContext); ok {
-					b.buildBlock(blockstmt)
-				}
-			},
-		)
-		// add elif block to prev-if false
-		for index := range stmt.AllElif() {
-			// build condition
-			condstmt, ok := stmt.Expression(index + 1).(*yak.ExpressionContext)
-			if !ok {
-				continue
-			}
-			i.BuildElif(
-				// condition
-				func() ssa.Value {
-					recoverRange := b.SetRange(condstmt.BaseParserRuleContext)
-					defer recoverRange()
-					return b.buildExpression(condstmt)
-				},
-				// body
-				func() {
-					recoverRange := b.SetRange(condstmt.BaseParserRuleContext)
-					defer recoverRange()
-					if blockstmt, ok := stmt.Block(index + 1).(*yak.BlockContext); ok {
-						b.buildBlock(blockstmt)
-					}
-				},
-			)
 		}
 
-		// handle "else" and "else if "
 		elseStmt, ok := stmt.ElseBlock().(*yak.ElseBlockContext)
 		if !ok {
-			return i
+			return ret, nil
 		}
-		if elseblock, ok := elseStmt.Block().(*yak.BlockContext); ok {
-			i.BuildFalse(
-				// create false block
-				func() {
-					b.buildBlock(elseblock)
-				},
-			)
+		if elseBlock, ok := elseStmt.Block().(*yak.BlockContext); ok {
+			return ret, func() {
+				b.buildBlock(elseBlock)
+			}
 		} else if elifstmt, ok := elseStmt.IfStmt().(*yak.IfStmtContext); ok {
 			// "else if"
 			// create elif block
-			i.BuildChild(buildIf(elifstmt))
+			sub, build := build(elifstmt)
+			ret = append(ret, sub...)
+			return ret, build
+		} else {
+			return ret, nil
 		}
-		return i
 	}
 
-	i := buildIf(stmt)
-	i.Finish()
+	builder := b.CreateIfBuilder()
+	ret, elseBlock := build(stmt)
+	for _, item := range ret {
+		builder.AppendItem(item)
+	}
+	builder.SetElse(elseBlock)
+	builder.Build()
 }
 
 // block
@@ -1138,25 +1116,24 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		// 为了聚合产生Phi指令
 		id := uuid.NewString()
 		// 只需要使用b.WriteValue设置value到此ID，并最后调用b.ReadValue可聚合产生Phi指令，完成语句预期行为
-		ifb := b.BuildIf()
-		ifb.BuildCondition(
-			func() ssa.Value {
+		ifb := b.CreateIfBuilder()
+		ifb.AppendItem(ssa.IfBuilderItem{
+			Condition: func() ssa.Value {
 				// 在上层函数中决定是否设置id, 在三元运算符时不会将condition加入结果中
 				return cond(id)
-			})
-		ifb.BuildTrue(
-			func() {
+			},
+			Body: func() {
 				v := trueExpr()
 				b.WriteVariable(id, v)
 			},
-		)
+		})
 		if falseExpr != nil {
-			ifb.BuildFalse(func() {
+			ifb.SetElse(func() {
 				v := falseExpr()
 				b.WriteVariable(id, v)
 			})
 		}
-		ifb.Finish()
+		ifb.Build()
 		// generator phi instruction
 		return b.ReadValue(id)
 	}

@@ -201,11 +201,11 @@ func (f *FunctionBuilder) EmitBinOp(op BinaryOpcode, x, y Value) Value {
 	return v
 }
 
-func (f *FunctionBuilder) EmitIf(cond Value) *If {
+func (f *FunctionBuilder) EmitIf() *If {
 	if f.CurrentBlock.finish {
 		return nil
 	}
-	ifSSA := NewIf(cond)
+	ifSSA := NewIf()
 	f.emit(ifSSA)
 	f.CurrentBlock.finish = true
 	return ifSSA
@@ -419,4 +419,22 @@ func (f *FunctionBuilder) EmitRecover() *Recover {
 	r.SetType(BasicTypes[Any])
 	f.emit(r)
 	return r
+}
+
+func (f *FunctionBuilder) EmitPhi(name string, vs []Value) *Phi {
+	if f.CurrentBlock.finish {
+		return nil
+	}
+	// p := NewPhi(f.CurrentBlock,)
+	p := &Phi{
+		anInstruction: NewInstruction(),
+		anValue:       NewValue(),
+		Edge:          vs,
+		create:        false,
+		wit1:          nil,
+		wit2:          nil,
+	}
+	p.SetName(name)
+	f.emit(p)
+	return p
 }

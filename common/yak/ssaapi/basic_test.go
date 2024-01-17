@@ -1,7 +1,6 @@
 package ssaapi
 
 import (
-	"sort"
 	"strings"
 	"testing"
 
@@ -274,16 +273,16 @@ func check(code string, want []string, t *testing.T) *Program {
 	println := prog.Ref("println")
 	test.Equal(1, len(println), "println should only 1")
 	got := lo.Map(
-		println.GetUsers().Flat(func(v *Value) Values {
+		println.GetUsers().ShowWithSource().Flat(func(v *Value) Values {
 			return Values{v.GetOperand(1)}
 		}),
 		func(v *Value, _ int) string {
 			return v.String()
 		},
 	)
-	sort.Strings(got)
+	// sort.Strings(got)
 	log.Info("got :", got)
-	sort.Strings(want)
+	// sort.Strings(want)
 	log.Info("want :", want)
 	test.Equal(want, got)
 
@@ -349,5 +348,146 @@ func TestYaklangBasic_Variable_InBlock(t *testing.T) {
 			[]string{
 				"1", "2",
 			}, t)
+	})
+}
+
+func TestYaklangBasic_Variable_InIf(t *testing.T) {
+	t.Run("test simple if", func(t *testing.T) {
+		check(`
+		a = 1
+		println(a)
+		if c {
+			a = 2
+			println(a)
+		}
+		println(a)
+		`, []string{
+			"1",
+			"2",
+			"phi(a)[2,1]",
+		}, t)
+	})
+	t.Run("test simple if with local vairable", func(t *testing.T) {
+		check(`
+		a = 1
+		println(a)
+		if c {
+			a := 2
+			println(a)
+		}
+		println(a) // 1
+		`, []string{
+			"1",
+			"2",
+			"1",
+		}, t)
+	})
+
+	t.Run("test multiple phi if", func(t *testing.T) {
+		prog := check(`
+		a = 1
+		if c {
+			a = 2
+		}
+		println(a)
+		println(a)
+		println(a)
+		`, []string{
+			"phi(a)[2,1]",
+			"phi(a)[2,1]",
+			"phi(a)[2,1]",
+		}, t)
+
+		phi := prog.Ref("a").Filter(func(v *Value) bool {
+			return v.IsPhi()
+		}).Show()
+
+		if len(phi) != 1 {
+			t.Fatalf("got %v, want %v", phi, 1)
+		}
+	})
+
+	t.Run("test simple if else", func(t *testing.T) {
+		check(`
+		a = 1
+		println(a)
+		if c {
+			a = 2
+			println(a)
+		} else {
+			a = 3
+			println(a)
+		}
+		println(a)
+		`, []string{
+			"1",
+			"2",
+			"3",
+			"phi(a)[2,3]",
+		}, t)
+	})
+
+	t.Run("test simple if else with origin branch", func(t *testing.T) {
+		check(`
+		a = 1
+		println(a)
+		if c {
+			// a = 1
+		} else {
+			a = 3
+			println(a)
+		}
+		println(a) // phi(a)[1, 3]
+		`, []string{
+			"1",
+			"3",
+			"phi(a)[1,3]",
+		}, t)
+	})
+
+	t.Run("test if-elseif", func(t *testing.T) {
+		check(`
+		a = 1
+		println(a)
+		if c {
+			a = 2
+			println(a)
+		}else if c == 2{
+			a = 3 
+			println(a)
+		}
+		println(a)
+		`,
+			[]string{
+				"1",
+				"2",
+				"3",
+				"phi(a)[2,3,1]",
+			}, t)
+	})
+
+	t.Run("test with return, no DoneBlock", func(t *testing.T) {
+		check(`
+		a = 1
+		println(a) // 1
+		if c {
+			if b {
+				a = 2
+				println(a) // 2
+				return 
+			}else {
+				a = 3
+				println(a) // 3
+				return 
+			}
+			println(a) // unreachable // phi[2, 3]
+		}
+		println(a) // 1
+		`, []string{
+			"1",
+			"2",
+			"3",
+			"1",
+		}, t)
 	})
 }
