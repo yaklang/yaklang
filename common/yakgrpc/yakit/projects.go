@@ -3,32 +3,60 @@ package yakit
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"os"
 )
 
-const INIT_DATABASE_RECORD_NAME = "[default]"
-const FolderID = 0
-const ChildFolderID = 0
-const TypeProject = "project"
-const TypeFile = "file"
-const TEMPORARY_PROJECT_NAME = "[temporary]"
+const (
+	INIT_DATABASE_RECORD_NAME = "[default]"
+	FolderID                  = 0
+	ChildFolderID             = 0
+	TypeProject               = "project"
+	TypeFile                  = "file"
+	TEMPORARY_PROJECT_NAME    = "[temporary]"
+)
 
 func InitializingProjectDatabase() error {
 	db := consts.GetGormProfileDatabase()
 	db.Model(&Project{}).RemoveIndex("uix_projects_project_name")
-	proj, _ := GetDefaultProject(db)
+	defaultProj, _ := GetDefaultProject(db)
 
-	if proj == nil || proj.DatabasePath != consts.GetDefaultYakitProjectDatabase(consts.GetDefaultYakitBaseDir()) {
+	defaultYakitPath := consts.GetDefaultYakitBaseDir()
+	log.Infof("Yakit base directory: %s", defaultYakitPath)
+	homeYakitPath := filepath.Join(utils.GetHomeDirDefault("."), "yakit-projects")
+	defaultDBPath := consts.GetDefaultYakitProjectDatabase(defaultYakitPath)
+	// 需要迁移所有yakit-projects/projects
+	if defaultYakitPath != homeYakitPath {
+		log.Infof("migrate project database path from %s to %s", homeYakitPath, defaultYakitPath)
+		projCh := YieldProject(db, context.Background())
+		for proj := range projCh {
+			if proj.ProjectName == "[default]" || !utils.IsSubPath(proj.DatabasePath, homeYakitPath) {
+				continue
+			}
+			filename := filepath.Base(proj.DatabasePath)
+			err := UpdateProjectDatabasePath(db, int64(proj.ID), filepath.Join(defaultYakitPath, "projects", filename))
+			if err != nil {
+				log.Errorf("migrate project %s failed: %s", proj.ProjectName, err)
+			}
+		}
+	}
+
+	// 迁移默认数据库
+	if defaultProj == nil || defaultProj.DatabasePath != defaultDBPath {
+		if defaultProj != nil {
+			log.Infof("migrate default database path from %s to %s", defaultProj.DatabasePath, defaultDBPath)
+		}
 		projectData := &Project{
 			ProjectName:   INIT_DATABASE_RECORD_NAME,
 			Description:   "默认数据库(~/yakit-projects/***.db): Default Database!",
-			DatabasePath:  consts.GetDefaultYakitProjectDatabase(consts.GetDefaultYakitBaseDir()),
+			DatabasePath:  defaultDBPath,
 			FolderID:      FolderID,
 			ChildFolderID: ChildFolderID,
 			Type:          TypeProject,
@@ -62,7 +90,7 @@ type Project struct {
 	FolderID         int64
 	ChildFolderID    int64
 	Type             string
-	//Hash string `gorm:"unique_index"`
+	// Hash string `gorm:"unique_index"`
 }
 
 type BackProject struct {
@@ -72,7 +100,7 @@ type BackProject struct {
 }
 
 func (p *Project) ToGRPCModel() *ypb.ProjectDescription {
-	var db = consts.GetGormProfileDatabase()
+	db := consts.GetGormProfileDatabase()
 	var folderName, childFolderName string
 	if p.FolderID > 0 {
 		folder, _ := GetProjectById(db, p.FolderID, TypeFile)
@@ -328,7 +356,6 @@ func QueryProjectTotal(db *gorm.DB, req *ypb.GetProjectsRequest) (*bizhelper.Pag
 		return nil, utils.Errorf("paging failed: %s", db.Error)
 	}
 	return paging, nil
-
 }
 
 func GetProjectById(db *gorm.DB, id int64, Type string) (*Project, error) {
@@ -352,7 +379,7 @@ func YieldProject(db *gorm.DB, ctx context.Context) chan *Project {
 	go func() {
 		defer close(outC)
 
-		var page = 1
+		page := 1
 		for {
 			var items []*Project
 			if _, b := bizhelper.NewPagination(&bizhelper.Param{
@@ -459,6 +486,14 @@ func GetProjectByWhere(db *gorm.DB, name string, folderID, childFolderID int64, 
 
 func UpdateProject(db *gorm.DB, id int64, i Project) error {
 	db = db.Model(&Project{}).Where("id = ?", id).Update(i)
+	if db.Error != nil {
+		return utils.Errorf("update project: %s", db.Error)
+	}
+	return nil
+}
+
+func UpdateProjectDatabasePath(db *gorm.DB, id int64, databasePath string) error {
+	db = db.Model(&Project{}).Where("id = ?", id).Update("database_path", databasePath)
 	if db.Error != nil {
 		return utils.Errorf("update project: %s", db.Error)
 	}
