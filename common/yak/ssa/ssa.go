@@ -395,7 +395,11 @@ type Parameter struct {
 
 	IsFreeValue bool
 
-	defaultValue Value
+	defaultValue            Value
+	Function                *Function
+	FormalParameterIndex    int
+	FormalParameterName     string
+	FormalParameterVariadic bool
 }
 
 func (p *Parameter) SetDefault(v Value) {
