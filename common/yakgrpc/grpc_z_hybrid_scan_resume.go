@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"math/rand"
@@ -78,6 +79,7 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 	}
 
 	swg := utils.NewSizedWaitGroup(20)
+	riskCount, _ := yakit.CountRiskByRuntimeId(s.GetProfileDatabase(), task.TaskId)
 
 	// dispatch
 	for _, __currentTarget := range targets {
@@ -144,20 +146,22 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 					}
 				}
 
-				err := s.ScanTargetWithPlugin(task.TaskId, manager.Context(), targetRequestInstance, pluginInstance, func(result *ypb.ExecResult) {
+				feedbackClient := yaklib.NewVirtualYakitClientWithRiskCount(func(result *ypb.ExecResult) error {
 					// shrink context
 					select {
 					case <-manager.Context().Done():
-						return
+						return nil
 					default:
 					}
 
 					result.RuntimeID = task.TaskId
-					status := statusManager.GetStatus()
-					status.CurrentPluginName = pluginInstance.ScriptName
-					status.ExecResult = result
-					stream.Send(status)
-				})
+					currentStatus := statusManager.GetStatus()
+					currentStatus.CurrentPluginName = pluginInstance.ScriptName
+					currentStatus.ExecResult = result
+					return stream.Send(currentStatus)
+				}, &riskCount)
+
+				err := s.ScanTargetWithPlugin(task.TaskId, manager.Context(), targetRequestInstance, pluginInstance, feedbackClient)
 				if err != nil {
 					log.Warnf("scan target failed: %s", err)
 				}

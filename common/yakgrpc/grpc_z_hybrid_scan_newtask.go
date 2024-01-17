@@ -140,6 +140,8 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 		statusManager.Feedback(stream)
 	}
 
+	var riskCount uint32 = 0
+
 	// start dispatch tasks
 	for _, __currentTarget := range targetCached {
 		// load targets
@@ -192,21 +194,19 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 					return
 				default:
 				}
-
-				err := s.ScanTargetWithPlugin(taskId, manager.Context(), targetRequestInstance, pluginInstance, func(result *ypb.ExecResult) {
-					// shrink context
+				feedbackClient := yaklib.NewVirtualYakitClientWithRiskCount(func(result *ypb.ExecResult) error {
 					select {
 					case <-manager.Context().Done():
-						return
+						return nil
 					default:
 					}
-
 					result.RuntimeID = taskId
-					status := getStatus()
-					status.CurrentPluginName = pluginInstance.ScriptName
-					status.ExecResult = result
-					stream.Send(status)
-				})
+					currentStatus := getStatus()
+					currentStatus.CurrentPluginName = pluginInstance.ScriptName
+					currentStatus.ExecResult = result
+					return stream.Send(currentStatus)
+				}, &riskCount)
+				err := s.ScanTargetWithPlugin(taskId, manager.Context(), targetRequestInstance, pluginInstance, feedbackClient)
 				if err != nil {
 					log.Warnf("scan target failed: %s", err)
 				}
@@ -245,12 +245,8 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 var execTargetWithPluginScript string
 
 func (s *Server) ScanTargetWithPlugin(
-	taskId string, ctx context.Context, target *HybridScanTarget, plugin *yakit.YakScript, callback func(result *ypb.ExecResult),
+	taskId string, ctx context.Context, target *HybridScanTarget, plugin *yakit.YakScript, feedbackClient *yaklib.YakitClient,
 ) error {
-	feedbackClient := yaklib.NewVirtualYakitClient(func(i *ypb.ExecResult) error {
-		callback(i)
-		return nil
-	})
 	engine := yak.NewYakitVirtualClientScriptEngine(feedbackClient)
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
 		engine.SetVar("RUNTIME_ID", taskId)
@@ -259,6 +255,7 @@ func (s *Server) ScanTargetWithPlugin(
 			RuntimeId:  taskId,
 			Proxy:      "",
 		})
+		yak.HookEngineContext(engine, ctx)
 		engine.SetVar("REQUEST", target.Request)
 		engine.SetVar("HTTPS", target.IsHttps)
 		engine.SetVar("PLUGIN", plugin)
@@ -307,7 +304,7 @@ func (s *Server) PluginGenerator(l *list.List, ctx context.Context, plugin *ypb.
 			for pluginInstance := range yakit.YieldYakScripts(yakit.FilterYakScript(
 				s.GetProfileDatabase().Model(&yakit.YakScript{}), plugin.GetFilter(),
 			), ctx) {
-				l.InsertAfter(pluginInstance, l.Back())
+				l.PushBack(pluginInstance)
 				outC <- pluginInstance
 			}
 		}
@@ -454,3 +451,27 @@ func (s *Server) TargetGenerator(ctx context.Context, targetConfig *ypb.HybridSc
 	}()
 	return outTarget, nil
 }
+
+//func fixRiskCount(result *ypb.ExecResult, riskCount *atomic.Uint32) {
+//	if result.IsMessage {
+//		var message yaklib.YakitMessage
+//		err := json.Unmarshal(result.Message, &message)
+//		if err == nil && strings.ToLower(message.Type) == "log" { // log message
+//			var logMessage yaklib.YakitLog
+//			err := json.Unmarshal(message.Content, &logMessage)
+//			if err == nil && logMessage.Level == "feature-status-card-data" { // risk
+//				data, _ := json.Marshal(&yaklib.YakitStatusCard{
+//					Id: "漏洞/风险/指纹", Data: fmt.Sprint(addRiskCount(riskCount)), Tags: nil,
+//				})
+//				logMessage.Data = string(data)
+//				message.Content, _ = json.Marshal(logMessage)
+//				result.Message, _ = json.Marshal(message)
+//			}
+//		}
+//	}
+//}
+//
+//func addRiskCount(riskCount *atomic.Uint32) uint32 {
+//	riskCount.Add(1)
+//	return riskCount.Load()
+//}
