@@ -4,9 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -15,6 +12,10 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 
 	"github.com/corpix/uarand"
 	"github.com/davecgh/go-spew/spew"
@@ -37,10 +38,26 @@ func GetClient(session interface{}) *http.Client {
 	return client
 }
 
+// dump 获取指定请求结构体引用或响应结构体引用的原始报文，返回原始报文与错误
+// Example:
+// ```
+// req, err = http.NewRequest("GET", "http://www.yaklang.com", http.timeout(10))
+// reqRaw, err = http.dump(req)
+// rsp, err = http.Do(req)
+// rspRaw, err = http.dump(rsp)
+// ```
 func dump(i interface{}) ([]byte, error) {
 	return dumpWithBody(i, true)
 }
 
+// dumphead 获取指定请求结构体引用或响应结构体引用的原始报文头部，返回原始报文头部与错误
+// Example:
+// ```
+// req, err = http.NewRequest("GET", "http://www.yaklang.com", http.timeout(10))
+// reqHeadRaw, err = http.dumphead(req)
+// rsp, err = http.Do(req)
+// rspHeadRaw, err = http.dumphead(rsp)
+// ```
 func dumphead(i interface{}) ([]byte, error) {
 	return dumpWithBody(i, false)
 }
@@ -97,8 +114,33 @@ func _dumpWithBody(i interface{}, body bool) (isReq bool, _ []byte, _ error) {
 	}
 }
 
+// show 获取指定请求结构体引用或响应结构体引用的原始报文并输出在标准输出
+// Example:
+// ```
+// req, err = http.NewRequest("GET", "http://www.yaklang.com", http.timeout(10))
+// http.show(req)
+// rsp, err = http.Do(req)
+// http.show(rsp)
+// ```
 func httpShow(i interface{}) {
 	rsp, err := dumpWithBody(i, true)
+	if err != nil {
+		log.Errorf("show failed: %s", err)
+		return
+	}
+	fmt.Println(string(rsp))
+}
+
+// showhead 获取指定请求结构体引用或响应结构体引用的原始报文头部并输出在标准输出
+// Example:
+// ```
+// req, err = http.NewRequest("GET", "http://www.yaklang.com", http.timeout(10))
+// http.showhead(req)
+// rsp, err = http.Do(req)
+// http.showhead(rsp)
+// ```
+func showhead(i interface{}) {
+	rsp, err := dumphead(i)
 	if err != nil {
 		log.Errorf("show failed: %s", err)
 		return
@@ -117,18 +159,25 @@ type YakHttpRequest struct {
 
 type HttpOption func(req *YakHttpRequest)
 
-func yakHttpConfig_Timeout(f float64) HttpOption {
+// timeout 是一个请求选项参数，用于设置请求超时时间，单位是秒
+// Example:
+// ```
+// rsp, err = http.Get("http://www.yaklang.com", http.timeout(10))
+// ```
+func timeout(f float64) HttpOption {
 	return func(req *YakHttpRequest) {
 		req.timeout = utils.FloatSecondDuration(f)
 	}
 }
 
-/*
-*
-http 扩展包
-*/
-var rawRequest = func(i interface{}) (*http.Request, error) {
-
+// Raw 根据原始请求报文生成请求结构体引用，返回请求结构体引用与错误
+// 注意，此函数只会生成请求结构体引用，不会发起请求
+// ! 已弃用，使用 poc.HTTP 或 poc.HTTPEx 代替
+// Example:
+// ```
+// req, err = http.Raw("GET / HTTP/1.1\r\nHost: www.yaklang.com\r\n\r\n")
+// ```
+func rawRequest(i interface{}) (*http.Request, error) {
 	var rawReq string
 	switch ret := i.(type) {
 	case []byte:
@@ -150,7 +199,12 @@ var rawRequest = func(i interface{}) (*http.Request, error) {
 	return lowhttp.ParseStringToHttpRequest(rawReq)
 }
 
-func YakHttpConfig_Proxy(values ...string) HttpOption {
+// proxy 是一个请求选项参数，用于设置一个或多个请求的代理，请求时会根据顺序找到一个可用的代理使用
+// Example:
+// ```
+// rsp, err = http.Get("http://www.yaklang.com", http.proxy("http://127.0.0.1:7890", "http://127.0.0.1:8083"))
+// ```
+func WithProxy(values ...string) HttpOption {
 	return func(req *YakHttpRequest) {
 		values = utils.StringArrayFilterEmpty(values)
 		if len(values) <= 0 {
@@ -162,7 +216,14 @@ func YakHttpConfig_Proxy(values ...string) HttpOption {
 	}
 }
 
-var NewHttpNewRequest = func(method, url string, opts ...HttpOption) (*YakHttpRequest, error) {
+// NewRequest 根据指定的 method 和 URL 生成请求结构体引用，返回请求结构体引用与错误，它的第一个参数是 URL ，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如设置超时时间等
+// 注意，此函数只会生成请求结构体引用，不会发起请求
+// ! 已弃用
+// Example:
+// ```
+// req, err = http.NewRequest("GET", "http://www.yaklang.com", http.timeout(10))
+// ```
+func NewHttpNewRequest(method, url string, opts ...HttpOption) (*YakHttpRequest, error) {
 	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
 		return nil, err
@@ -177,6 +238,12 @@ var NewHttpNewRequest = func(method, url string, opts ...HttpOption) (*YakHttpRe
 	return rawReq, nil
 }
 
+// GetAllBody 获取响应结构体引用的原始响应报文
+// Example:
+// ```
+// rsp, err = http.Get("http://www.yaklang.com")
+// raw = http.GetAllBody(rsp)
+// ```
 func GetAllBody(raw interface{}) []byte {
 	switch r := raw.(type) {
 	case *http.Response:
@@ -201,93 +268,45 @@ func GetAllBody(raw interface{}) []byte {
 	}
 }
 
-var HttpExports = map[string]interface{}{
-	// 获取原生 Raw 请求包
-	"Raw": rawRequest,
-
-	// 快捷方式
-	"Get": func(url string, opts ...HttpOption) (*YakHttpResponse, error) {
-		return httpRequest("GET", url, opts...)
-	},
-	"Post": func(url string, opts ...HttpOption) (*YakHttpResponse, error) {
-		return httpRequest("POST", url, opts...)
-	},
-	"Request": httpRequest,
-
-	// Do 和 Request 组合发起请求
-	"Do":         Do,
-	"NewRequest": NewHttpNewRequest,
-
-	// 获取响应内容的 response
-	"GetAllBody": GetAllBody,
-
-	//
-
-	// 调试信息
-	"dump":     dump,
-	"show":     httpShow,
-	"dumphead": dumphead,
-	"showhead": func(i interface{}) {
-		rsp, err := dumphead(i)
-		if err != nil {
-			log.Errorf("show failed: %s", err)
-			return
-		}
-		fmt.Println(string(rsp))
-	},
-
-	// ua
-	"ua":        UserAgent,
-	"useragent": UserAgent,
-	"fakeua":    FakeUserAgent,
-
-	// header
-	"header": Header,
-
-	// cookie
-	"cookie": Cookie,
-
-	// body
-	"body": Body,
-
-	// json
-	"json": JsonBody,
-
-	// urlencode params 区别于 body，这个会编码
-	// params 针对 get 请求
-	// data 针对 post 请求
-	"params":     GetParams,
-	"postparams": PostParams,
-
-	// proxy
-	"proxy": YakHttpConfig_Proxy,
-
-	// timeout
-	"timeout": yakHttpConfig_Timeout,
-
-	// redirect
-	"redirect":   RedirectHandler,
-	"noredirect": NoRedirect,
-
-	// session
-	"session": Session,
-
-	"uarand": _getuarand,
-}
-
-// GetParams set query params
+// params 是一个请求选项参数，用于添加/指定 GET 参数，这会将参数进行 URL 编码
+// Example:
+// ```
+// rsp, err = http.Get("http://www.yaklang.com", http.params("a=b"), http.params("c=d"))
+// ```
 func GetParams(i interface{}) HttpOption {
 	return func(req *YakHttpRequest) {
 		req.URL.RawQuery = utils.UrlJoinParams(req.URL.RawQuery, i)
 	}
 }
 
-// PostParams set post params
+// postparams 是一个请求选项参数，用于添加/指定 POST 参数，这会将参数进行 URL 编码
+// Example:
+// ```
+// rsp, err = http.Post("http://www.yaklang.com", http.postparams("a=b"), http.postparams("c=d"))
+// ```
 func PostParams(i interface{}) HttpOption {
 	return Body(utils.UrlJoinParams("", i))
 }
 
-func Do(req *YakHttpRequest) (*http.Response, error) {
+// Do 根据构造好的请求结构体引用发送请求，返回响应结构体引用与错误
+// ! 已弃用
+// Example:
+// ```
+// req, err = http.Raw("GET / HTTP/1.1\r\nHost: www.yaklang.com\r\n\r\n")
+// rsp, err = http.Do(req)
+// ```
+func Do(i interface{}) (*http.Response, error) {
+	switch ret := i.(type) {
+	case *http.Request:
+		return Do(&YakHttpRequest{Request: ret})
+	case http.Request:
+		return Do(&YakHttpRequest{Request: &ret})
+	case *YakHttpRequest:
+	default:
+		return nil, utils.Errorf("not a valid type: %v for req: %v", reflect.TypeOf(i), spew.Sdump(i))
+	}
+	req, _ := i.(*YakHttpRequest)
+
 	var client *http.Client
 	if req.session != nil {
 		client = GetClient(req.session)
@@ -313,34 +332,65 @@ func Do(req *YakHttpRequest) (*http.Response, error) {
 	return client.Do(req.Request)
 }
 
+// uarand 返回一个随机的 User-Agent
+// Example:
+// ```
+// ua = http.uarand()
+// ```
 func _getuarand() string {
 	return uarand.GetRandom()
 }
 
+// header 是一个请求选项参数，用于添加/指定请求头
+// Example:
+// ```
+// rsp, err = http.Get("http://www.yaklang.com", http.header("AAA", "BBB"))
+// ```
 func Header(key, value interface{}) HttpOption {
 	return func(req *YakHttpRequest) {
 		req.Header.Set(fmt.Sprint(key), fmt.Sprint(value))
 	}
 }
 
+// useragent 是一个请求选项参数，用于指定请求的 User-Agent
+// Example:
+// ```
+// rsp, err = http.Get("http://www.yaklang.com", http.ua("yaklang-http"))
+// ```
 func UserAgent(value interface{}) HttpOption {
 	return func(req *YakHttpRequest) {
 		req.Header.Set("User-Agent", fmt.Sprint(value))
 	}
 }
 
+// fakeua 是一个请求选项参数，用于随机指定请求的 User-Agent
+// Example:
+// ```
+// rsp, err = http.Get("http://www.yaklang.com", http.fakeua())
+// ```
 func FakeUserAgent() HttpOption {
 	return func(req *YakHttpRequest) {
 		req.Header.Set("User-Agent", _getuarand())
 	}
 }
 
+// redirect 是一个请求选项参数，它接收重定向处理函数，用于自定义重定向处理逻辑，返回 true 代表继续重定向，返回 false 代表终止重定向
+// 重定向处理函数中第一个参数是当前的请求结构体引用，第二个参数是之前的请求结构体引用
+// Example:
+// ```
+// rsp, err = http.Get("http://pie.dev/redirect/3", http.redirect(func(r, vias) bool { return true })
+// ```
 func RedirectHandler(c func(r *http.Request, vias []*http.Request) bool) HttpOption {
 	return func(req *YakHttpRequest) {
 		req.redirector = c
 	}
 }
 
+// noredirect 是一个请求选项参数，用于禁止重定向
+// Example:
+// ```
+// rsp, err = http.Get("http://pie.dev/redirect/3", http.noredirect())
+// ```
 func NoRedirect() HttpOption {
 	return func(req *YakHttpRequest) {
 		req.redirector = func(r *http.Request, vias []*http.Request) bool {
@@ -349,12 +399,23 @@ func NoRedirect() HttpOption {
 	}
 }
 
+// header 是一个请求选项参数，用于设置 Cookie
+// Example:
+// ```
+// rsp, err = http.Get("http://www.yaklang.com", http.Cookie("a=b; c=d"))
+// ```
 func Cookie(value interface{}) HttpOption {
 	return func(req *YakHttpRequest) {
 		req.Header.Set("Cookie", fmt.Sprint(value))
 	}
 }
 
+// body 是一个请求选项参数，用于指定 JSON 格式的请求体
+// 它会将传入的值进行 JSON 序列化，然后设置序列化后的值为请求体
+// Example:
+// ```
+// rsp, err = http.Post("https://pie.dev/post", http.header("Content-Type", "application/json"), http.json({"a": "b", "c": "d"}))
+// ```
 func JsonBody(value interface{}) HttpOption {
 	return func(req *YakHttpRequest) {
 		body, err := json.Marshal(value)
@@ -367,6 +428,11 @@ func JsonBody(value interface{}) HttpOption {
 	}
 }
 
+// body 是一个请求选项参数，用于指定请求体
+// Example:
+// ```
+// rsp, err = http.Post("https://pie.dev/post", http.body("a=b&c=d"))
+// ```
 func Body(value interface{}) HttpOption {
 	return func(req *YakHttpRequest) {
 		var rc *bytes.Buffer
@@ -396,12 +462,24 @@ func Body(value interface{}) HttpOption {
 	}
 }
 
+// session 是一个请求选项参数，用于根据传入的值指定会话，使用相同的值会使用同一个会话，同一个会话会自动复用 Cookie
+// Example:
+// ```
+// rsp, err = http.Get("http://www.yaklang.com", http.session("request1"))
+// ```
 func Session(value interface{}) HttpOption {
 	return func(req *YakHttpRequest) {
 		req.session = value
 	}
 }
 
+// Request 根据指定的 URL 发起请求，它的第一个参数是 URL ，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如设置请求体，设置超时时间等
+// 返回响应结构体引用与错误
+// ! 已弃用，使用 poc.Do 代替
+// Example:
+// ```
+// rsp, err = http.Request("POST","http://pie.dev/post", http.body("a=b&c=d"), http.timeout(10))
+// ```
 func httpRequest(method, url string, options ...HttpOption) (*YakHttpResponse, error) {
 	reqRaw, err := http.NewRequest(method, url, nil)
 	if err != nil {
@@ -433,12 +511,34 @@ func httpRequest(method, url string, options ...HttpOption) (*YakHttpResponse, e
 	return &YakHttpResponse{Response: rspRaw}, nil
 }
 
+// Get 根据指定的 URL 发起 GET 请求，它的第一个参数是 URL ，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如设置超时时间等
+// 返回响应结构体引用与错误
+// ! 已弃用，使用 poc.Get 代替
+// Example:
+// ```
+// rsp, err = http.Get("http://www.yaklang.com", http.timeout(10))
+// ```
+func _get(url string, options ...HttpOption) (*YakHttpResponse, error) {
+	return httpRequest("GET", url, options...)
+}
+
+// Post 根据指定的 URL 发起 POST 请求，它的第一个参数是 URL ，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如设置请求体，设置超时时间等
+// 返回响应结构体引用与错误
+// ! 已弃用，使用 poc.Post 代替
+// Example:
+// ```
+// rsp, err = http.Post("http://pie.dev/post", http.body("a=b&c=d"), http.timeout(10))
+// ```
+func _post(url string, options ...HttpOption) (*YakHttpResponse, error) {
+	return httpRequest("POST", url, options...)
+}
+
 type YakHttpResponse struct {
 	*http.Response
 }
 
 func (y *YakHttpResponse) Json() interface{} {
-	var data = y.Data()
+	data := y.Data()
 	if data == "" {
 		return nil
 	}
@@ -473,4 +573,65 @@ func (y *YakHttpResponse) GetHeader(key string) string {
 func (y *YakHttpResponse) Raw() []byte {
 	raw, _ := dumpWithBody(y, true)
 	return raw
+}
+
+var HttpExports = map[string]interface{}{
+	// 获取原生 Raw 请求包
+	"Raw": rawRequest,
+
+	// 快捷方式
+	"Get":     _get,
+	"Post":    _post,
+	"Request": httpRequest,
+
+	// Do 和 Request 组合发起请求
+	"Do":         Do,
+	"NewRequest": NewHttpNewRequest,
+
+	// 获取响应内容的 response
+	"GetAllBody": GetAllBody,
+
+	// 调试信息
+	"dump":     dump,
+	"show":     httpShow,
+	"dumphead": dumphead,
+	"showhead": showhead,
+
+	// ua
+	"ua":        UserAgent,
+	"useragent": UserAgent,
+	"fakeua":    FakeUserAgent,
+
+	// header
+	"header": Header,
+
+	// cookie
+	"cookie": Cookie,
+
+	// body
+	"body": Body,
+
+	// json
+	"json": JsonBody,
+
+	// urlencode params 区别于 body，这个会编码
+	// params 针对 get 请求
+	// data 针对 post 请求
+	"params":     GetParams,
+	"postparams": PostParams,
+
+	// proxy
+	"proxy": WithProxy,
+
+	// timeout
+	"timeout": timeout,
+
+	// redirect
+	"redirect":   RedirectHandler,
+	"noredirect": NoRedirect,
+
+	// session
+	"session": Session,
+
+	"uarand": _getuarand,
 }

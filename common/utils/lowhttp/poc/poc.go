@@ -1093,7 +1093,7 @@ func pochttp(packet []byte, config *_pocConfig) (*lowhttp.LowhttpResponse, error
 	return response, err
 }
 
-// HTTPEx 与HTTP类似，它发送请求并且返回响应结构体，请求结构体以及错误，它的第一个参数可以接收[]byte, string, http.Request结构体，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如对设置超时时间，或者修改请求报文等
+// HTTPEx 与HTTP类似，它发送请求并且返回响应结构体，请求结构体以及错误，它的第一个参数可以接收[]byte, string, http.Request结构体，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如设置超时时间，或者修改请求报文等
 // 关于结构体中的可用字段和方法可以使用desc函数进行查看
 // Example:
 // ```
@@ -1130,7 +1130,7 @@ func BuildRequest(i interface{}, opts ...PocConfig) []byte {
 	return packet
 }
 
-// HTTP 发送请求并且返回原始响应报文，原始请求报文以及错误，它的第一个参数可以接收[]byte, string, http.Request结构体，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如对设置超时时间，或者修改请求报文等
+// HTTP 发送请求并且返回原始响应报文，原始请求报文以及错误，它的第一个参数可以接收[]byte, string, http.Request结构体，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如设置超时时间，或者修改请求报文等
 // Example:
 // ```
 // poc.HTTP("GET / HTTP/1.1\r\nHost: www.yaklang.com\r\n\r\n", poc.https(true), poc.replaceHeader("AAA", "BBB")) // yaklang.com发送一个基于HTTPS协议的GET请求，并且添加一个请求头AAA，它的值为BBB
@@ -1144,7 +1144,7 @@ func HTTP(i interface{}, opts ...PocConfig) (rsp []byte, req []byte, err error) 
 	return response.RawPacket, lowhttp.FixHTTPPacketCRLF(packet, config.NoFixContentLength), err
 }
 
-// Do 向指定URL发送指定请求方法的请求并且返回响应结构体，请求结构体以及错误，它的是第一个参数是请求方法，第二个参数URL字符串，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如对设置超时时间，或者修改请求报文等
+// Do 向指定URL发送指定请求方法的请求并且返回响应结构体，请求结构体以及错误，它的是第一个参数是请求方法，第二个参数URL字符串，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如设置超时时间，或者修改请求报文等
 
 // 关于结构体中的可用字段和方法可以使用desc函数进行查看
 // Example:

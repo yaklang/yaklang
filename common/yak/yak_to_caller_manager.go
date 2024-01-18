@@ -4,6 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+	"reflect"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/crawler"
 	"github.com/yaklang/yaklang/common/fuzztag"
@@ -13,11 +19,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/pingutil"
 	"github.com/yaklang/yaklang/common/utils/yakgit"
 	"github.com/yaklang/yaklang/common/yak/yaklib/yakhttp"
-	"net/http"
-	"reflect"
-	"strings"
-	"sync"
-	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -56,7 +57,7 @@ func Fuzz_WithHotPatch(ctx context.Context, code string) mutate.FuzzConfigOpt {
 		})
 	}
 	return mutate.Fuzz_WithExtraFuzzErrorTagHandler("yak", func(s string) (result []*parser.FuzzResult, err error) {
-		var handle, params, _ = strings.Cut(s, "|")
+		handle, params, _ := strings.Cut(s, "|")
 
 		defer func() {
 			if r := recover(); r != nil {
@@ -83,7 +84,6 @@ func Fuzz_WithHotPatch(ctx context.Context, code string) mutate.FuzzConfigOpt {
 			funk.ForEach(strings.Split(params, "|"), func(s any) {
 				iparams = append(iparams, s)
 			})
-
 		} else {
 			paramIn := yakFunc.GetNumIn()
 			splits := strings.Split(params, "|")
@@ -117,7 +117,7 @@ func Fuzz_WithHotPatch(ctx context.Context, code string) mutate.FuzzConfigOpt {
 }
 
 func FetchFunctionFromSourceCode(ctx context.Context, pluginContext *YakitPluginContext, timeout time.Duration, id string, code string, hook func(e *antlr4yak.Engine) error, functionNames ...string) (map[string]*YakFunctionCaller, error) {
-	var fTable = map[string]*YakFunctionCaller{}
+	fTable := map[string]*YakFunctionCaller{}
 	engine := NewScriptEngine(1) // 因为需要在 hook 里传回执行引擎, 所以这里不能并发
 	engine.RegisterEngineHooks(hook)
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
@@ -129,8 +129,8 @@ func FetchFunctionFromSourceCode(ctx context.Context, pluginContext *YakitPlugin
 		return nil
 	})
 	engine.HookOsExit()
-	//timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
-	//defer func() { cancel() }()
+	// timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
+	// defer func() { cancel() }()
 	ins, err := engine.ExecuteExWithContext(ctx, code, map[string]interface{}{
 		"ROOT_CONTEXT": ctx,
 		"YAK_FILENAME": id,
@@ -175,7 +175,6 @@ func FetchFunctionFromSourceCode(ctx context.Context, pluginContext *YakitPlugin
 
 	}
 	return fTable, nil
-
 }
 
 type Caller struct {
@@ -200,6 +199,7 @@ type YakToCallerManager struct {
 func (c *YakToCallerManager) SetLoadPluginTimeout(i float64) {
 	c.timeout = time.Duration(i * float64(time.Second))
 }
+
 func (y *YakToCallerManager) SetDividedContext(b bool) {
 	y.dividedContext = b
 }
@@ -283,7 +283,8 @@ func (y *YakToCallerManager) SetForYakit(
 	code string, callerIf interface {
 		Send(result *ypb.ExecResult) error
 	},
-	hooks ...string) error {
+	hooks ...string,
+) error {
 	caller := func(result *ypb.ExecResult) error {
 		return callerIf.Send(result)
 	}
@@ -355,7 +356,7 @@ func (y *YakToCallerManager) Set(ctx context.Context, code string, hook func(eng
 				Core:   caller,
 				Hash:   utils.CalcSha1(code, name),
 				Engine: engine,
-				//NativeFunction: caller.NativeYakFunction,
+				// NativeFunction: caller.NativeYakFunction,
 			},
 		})
 	}
@@ -450,9 +451,9 @@ func FeedbackFactory(db *gorm.DB, caller func(result *ypb.ExecResult) error, sav
 			Message:   raw,
 		}
 		if saveToDb {
-			//mitmSaveToDBLock.Lock()
-			//yakit.SaveExecResult(db, yakScriptName, result)
-			//mitmSaveToDBLock.Unlock()
+			// mitmSaveToDBLock.Lock()
+			// yakit.SaveExecResult(db, yakScriptName, result)
+			// mitmSaveToDBLock.Unlock()
 		}
 
 		caller(result)
@@ -477,7 +478,7 @@ func (y *YakToCallerManager) AddGoNative(id string, name string, cb func(...inte
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("load caller failed: %v", err)
-			//retError = utils.Errorf("load caller error: %v", err)
+			// retError = utils.Errorf("load caller error: %v", err)
 			return
 		}
 	}()
@@ -495,11 +496,11 @@ func (y *YakToCallerManager) AddGoNative(id string, name string, cb func(...inte
 					return
 				}
 			},
-			//NativeYakFunction: nil,
+			// NativeYakFunction: nil,
 		},
 		Hash: utils.CalcSha1(name, id),
 		Id:   id,
-		//NativeFunction: caller.NativeYakFunction,
+		// NativeFunction: caller.NativeYakFunction,
 		Verbose: id,
 	}
 
@@ -509,7 +510,7 @@ func (y *YakToCallerManager) AddGoNative(id string, name string, cb func(...inte
 		return
 	}
 	callers := res.([]*Caller)
-	var targetIndex = -1
+	targetIndex := -1
 	for index, c := range callers {
 		if c.Hash == ins.Hash {
 			targetIndex = index
@@ -553,7 +554,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 			originFunc, ok := i.(func(u string, opts ...yakhttp.HttpOption) (*yakhttp.YakHttpResponse, error))
 			if ok {
 				return func(u string, opts ...yakhttp.HttpOption) (*yakhttp.YakHttpResponse, error) {
-					opts = append(opts, yakhttp.YakHttpConfig_Proxy(proxy))
+					opts = append(opts, yakhttp.WithProxy(proxy))
 					return originFunc(u, opts...)
 				}
 			}
@@ -583,7 +584,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		originFunc, ok := i.(func(method, u string, opts ...yakhttp.HttpOption) (*yakhttp.YakHttpResponse, error))
 		if ok {
 			return func(method, u string, opts ...yakhttp.HttpOption) (*yakhttp.YakHttpResponse, error) {
-				opts = append(opts, yakhttp.YakHttpConfig_Proxy(proxy))
+				opts = append(opts, yakhttp.WithProxy(proxy))
 				return originFunc(method, u, opts...)
 			}
 		}
@@ -597,7 +598,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		originFunc, ok := i.(func(method, u string, opts ...yakhttp.HttpOption) (*yakhttp.YakHttpRequest, error))
 		if ok {
 			return func(method, u string, opts ...yakhttp.HttpOption) (*yakhttp.YakHttpRequest, error) {
-				opts = append(opts, yakhttp.YakHttpConfig_Proxy(proxy))
+				opts = append(opts, yakhttp.WithProxy(proxy))
 				return originFunc(method, u, opts...)
 			}
 		}
@@ -904,7 +905,7 @@ func HookEngineContext(engine *antlr4yak.Engine, streamContext context.Context) 
 		engine.GetVM().RegisterMapMemberCallHandler("git", funcName, hookGitFunc)
 	}
 
-	//hook fuzz context
+	// hook fuzz context
 	engine.GetVM().RegisterMapMemberCallHandler("fuzz", "HTTPRequest", func(f interface{}) interface{} {
 		originFunc, ok := f.(func(i interface{}, opts ...mutate.BuildFuzzHTTPRequestOption) (*mutate.FuzzHTTPRequest, error))
 		if ok {
@@ -949,7 +950,6 @@ func HookEngineContext(engine *antlr4yak.Engine, streamContext context.Context) 
 	engine.GetVM().RegisterMapMemberCallHandler("cli", "check", func(f interface{}) interface{} {
 		return cli.CliCheckWithContext(cancel)
 	})
-
 }
 
 func (y *YakToCallerManager) AddForYakit(
@@ -958,7 +958,8 @@ func (y *YakToCallerManager) AddForYakit(
 	code string, callerIf interface {
 		Send(result *ypb.ExecResult) error
 	},
-	hooks ...string) error {
+	hooks ...string,
+) error {
 	caller := func(result *ypb.ExecResult) error {
 		return callerIf.Send(result)
 	}
@@ -1025,7 +1026,7 @@ func (y *YakToCallerManager) Add(ctx context.Context, id string, params []*ypb.E
 		if engine == nil {
 			engine = e
 		}
-		var paramMap = make(map[string]string)
+		paramMap := make(map[string]string)
 		for _, p := range params {
 			paramMap[p.Key] = p.Value
 		}
@@ -1073,7 +1074,7 @@ func (y *YakToCallerManager) Add(ctx context.Context, id string, params []*ypb.E
 			Hash:   utils.CalcSha1(code, name, id),
 			Id:     id,
 			Engine: engine,
-			//NativeFunction: caller.NativeYakFunction,
+			// NativeFunction: caller.NativeYakFunction,
 			Verbose: id,
 		}
 
@@ -1145,6 +1146,7 @@ func (y *YakToCallerManager) SyncCallPluginKeyByNameEx(pluginId string, name str
 func (y *YakToCallerManager) CallPluginKeyByNameEx(pluginId string, name string, itemsFuncs ...func() interface{}) {
 	y.CallPluginKeyByNameExWithAsync(false, pluginId, name, itemsFuncs...)
 }
+
 func (y *YakToCallerManager) CallPluginKeyByNameExWithAsync(forceSync bool, pluginId string, name string, itemsFuncs ...func() interface{}) {
 	if y.table == nil {
 		y.table = new(sync.Map)
@@ -1200,11 +1202,11 @@ func (y *YakToCallerManager) CallPluginKeyByNameExWithAsync(forceSync bool, plug
 	}
 
 	for _, iRaw := range ins {
-		var verbose = iRaw.Verbose
+		verbose := iRaw.Verbose
 		if iRaw.Id != verbose {
 			verbose = fmt.Sprintf("%v[%v]", iRaw.Id, iRaw.Verbose)
 		}
-		//println(fmt.Sprintf("hook.Caller call [%v]'s %v", verbose, name))
+		// println(fmt.Sprintf("hook.Caller call [%v]'s %v", verbose, name))
 
 		// 没有设置并发控制，就直接顺序执行
 		if y.swg == nil || forceSync {
@@ -1247,7 +1249,7 @@ func (y *YakToCallerManager) Wait() {
 		return
 	}
 
-	var count = 0
+	count := 0
 	for {
 		y.baseWaitGroup.Wait()
 		y.swg.Wait()
