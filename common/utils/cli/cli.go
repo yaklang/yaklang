@@ -451,6 +451,23 @@ func _cliFile(name string, opts ...SetCliExtraParam) []byte {
 	return raw
 }
 
+// FileNames 获取对应名称的命令行参数，获得选中的所有文件路径，并返回 []string 类型
+// Example:
+// ```
+// file = cli.FileNames("file")
+// // --file /etc/passwd,/etc/hosts 则 file 为 ["/etc/passwd", "/etc/hosts"]
+// ```
+func _cliFileNames(name string, opts ...SetCliExtraParam) []string {
+	rawStr, c := _cliFromString(name, opts...)
+	c._type = "file-names"
+
+	if rawStr == "" {
+		return []string{}
+	}
+
+	return utils.PrettifyListFromStringSplited(rawStr, ",")
+}
+
 // FileOrContent 获取对应名称的命令行参数
 // 根据其传入的值尝试读取其对应文件内容，如果无法读取则直接返回，最后返回 []byte 类型
 // Example:
@@ -603,6 +620,7 @@ var CliExports = map[string]interface{}{
 
 	// 解析文件之类的
 	"File":          _cliFile,
+	"FileNames":     _cliFileNames,
 	"FileOrContent": _cliFileOrContent,
 	"LineDict":      _cliLineDict,
 
