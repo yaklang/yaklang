@@ -114,8 +114,9 @@ func ParseCliParameter(prog *ssaapi.Program) []*CliParameter {
 	parseCliFunction("cli.Double", "float")
 	parseCliFunction("cli.Float", "float")
 
-	parseCliFunction("cli.File", "upload-path")   // "file"
-	parseCliFunction("cli.StringSlice", "select") // "string-slice"
+	parseCliFunction("cli.File", "upload-path")    // "file"
+	parseCliFunction("cli.FileNames", "file-name") // "file-name"
+	parseCliFunction("cli.StringSlice", "select")  // "string-slice"
 	parseCliFunction("cli.YakCode", "yak")
 	parseCliFunction("cli.HTTPPacket", "http-packet")
 	parseCliFunction("cli.Text", "text")
