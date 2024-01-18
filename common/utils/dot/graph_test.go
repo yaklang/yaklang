@@ -73,7 +73,7 @@ func TestGraph(t *testing.T) {
 	data = strings.ReplaceAll(data, "\n", "")
 	data = strings.ReplaceAll(data, "\r", "")
 	spew.Dump(data)
-	if !utils.MatchAllOfSubString(`label="1"`, `label="2"`) {
+	if !utils.MatchAllOfSubString(data, `label="1"`, `label="2"`) {
 		t.Errorf("label not match")
 		t.Fail()
 	}
