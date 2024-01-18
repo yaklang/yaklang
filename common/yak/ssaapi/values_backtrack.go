@@ -15,11 +15,18 @@ func (v *Value) Backtrack() *omap.OrderedMap[string, *Value] {
 	var count = 1
 	var current = v
 	vals.Push(v)
+	visited := make(map[int]bool)
 	for current != nil {
 		deps := current.DependOn
 		var p *Value
 		if len(deps) > 0 {
-			p = deps[0]
+			for _, result := range deps {
+				if _, ok := visited[result.GetId()]; !ok {
+					visited[result.GetId()] = true
+					p = result
+					break
+				}
+			}
 		} else {
 			break
 		}
@@ -47,6 +54,9 @@ func (v *Value) ShowBacktrack() {
 	}
 
 	for index, track := range om.Values() {
+		if track == nil {
+			continue
+		}
 		indent := strings.Repeat(" ", index*2) + fmt.Sprintf("[depth:%2d]->", track.GetDepth())
 		buf.WriteString(indent + track.String() + "\n")
 	}

@@ -127,7 +127,7 @@ func (g *Graph) GraphAttribute(name, value string) {
 }
 
 // GenerateDOT generates the graph description in DOT language
-func (g Graph) GenerateDOT(w io.Writer) {
+func (g *Graph) GenerateDOT(w io.Writer) {
 	if !g.drawMultiEdges {
 		fmt.Fprint(w, "strict ")
 	}
