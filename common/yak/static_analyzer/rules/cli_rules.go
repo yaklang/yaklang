@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/plugin_type"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
 )
 
 func init() {
@@ -22,8 +23,9 @@ func init() {
 }
 
 // 检查 cli.setDefault 设置的默认值是否符合规范
-func RuleCliDefault(prog *ssaapi.Program) {
-	tag := "SSA-cli-setDefault"
+func RuleCliDefault(prog *ssaapi.Program) *result.StaticAnalyzeResults {
+	ret := result.NewStaticAnalyzeResults()
+	// tag := "SSA-cli-setDefault"
 	checkCliDefault := func(funcName string, typs []*ssaapi.Type, checkCallBack func(funcName string, v *ssaapi.Value) (string, bool)) {
 		prog.Ref(funcName).GetUsers().Filter(func(v *ssaapi.Value) bool {
 			return v.IsCall() && v.IsReachable() != -1
@@ -41,7 +43,7 @@ func RuleCliDefault(prog *ssaapi.Program) {
 					break
 				}
 				if !field.IsConstInst() {
-					field.NewWarn(tag, fmt.Sprintf("%s want const value, but not", funcName))
+					ret.NewWarn(fmt.Sprintf("%s want const value, but not", funcName), field)
 					break
 				}
 
@@ -54,16 +56,19 @@ func RuleCliDefault(prog *ssaapi.Program) {
 					}
 				}
 				if !pass {
-					field.NewError(tag, fmt.Sprintf("%s want [%s] type, but got [%s] type", funcName,
-						strings.Join(lo.Map(typs, func(typ *ssaapi.Type, _ int) string { return typ.String() }), "|"),
-						fieldTyp))
+					ret.NewError(
+						fmt.Sprintf("%s want [%s] type, but got [%s] type", funcName,
+							strings.Join(lo.Map(typs, func(typ *ssaapi.Type, _ int) string { return typ.String() }), "|"),
+							fieldTyp),
+						field,
+					)
 					break
 				}
 
 				if checkCallBack != nil {
 					message, ok := checkCallBack(funcName, field)
 					if !ok {
-						field.NewError(tag, message)
+						ret.NewError(message, field)
 						break
 					}
 				}
@@ -204,11 +209,13 @@ func RuleCliDefault(prog *ssaapi.Program) {
 	checkCliDefault("cli.HTTPPacket", []*ssaapi.Type{ssaapi.String}, nil)
 	checkCliDefault("cli.YakCode", []*ssaapi.Type{ssaapi.String}, nil)
 	checkCliDefault("cli.Text", []*ssaapi.Type{ssaapi.String}, nil)
+	return ret
 }
 
 // 检查参数名是否重复和参数名是否符合规范
-func RuleCliParamName(prog *ssaapi.Program) {
-	tag := "SSA-cli-paramName"
+func RuleCliParamName(prog *ssaapi.Program) *result.StaticAnalyzeResults {
+	ret := result.NewStaticAnalyzeResults()
+	// tag := "SSA-cli-paramName"
 	cliFuncNames := []string{
 		"cli.String",
 		"cli.StringSlice",
@@ -252,18 +259,19 @@ func RuleCliParamName(prog *ssaapi.Program) {
 			if _, ok := paramLineMap[paramName]; !ok {
 				paramLineMap[paramName] = int(v.GetRange().Start.Line)
 				if !utils.MatchAllOfRegexp(rawParamName, `^[a-zA-Z0-9_-]+$`) {
-					firstField.NewError(tag, ErrorStrInvalidParamName(rawParamName))
+					ret.NewError(ErrorStrInvalidParamName(rawParamName), firstField)
 				}
 			} else {
-				firstField.NewError(tag, ErrorStrSameParamName(rawParamName, paramLineMap[paramName]))
+				ret.NewError(ErrorStrSameParamName(rawParamName, paramLineMap[paramName]), firstField)
 			}
 		})
 	}
+	return ret
 }
 
 // 检查是否在最后面调用了 cli.check
-func RuleCliCheck(prog *ssaapi.Program) {
-	tag := "SSA-cli-check"
+func RuleCliCheck(prog *ssaapi.Program) *result.StaticAnalyzeResults {
+	ret := result.NewStaticAnalyzeResults()
 	cliFuncNames := []string{
 		"cli.String",
 		"cli.StringSlice",
@@ -311,8 +319,9 @@ func RuleCliCheck(prog *ssaapi.Program) {
 	}
 
 	if lastCallName != "cli.check" && lastCallValue != nil {
-		lastCallValue.NewError(tag, ErrorStrNotCallCliCheck())
+		ret.NewError(ErrorStrNotCallCliCheck(), lastCallValue)
 	}
+	return ret
 }
 
 func ErrorStrNotCallCliCheck() string {

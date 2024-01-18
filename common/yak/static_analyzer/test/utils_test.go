@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
 )
 
 func check(t *testing.T, code string, want []string, typ ...string) *ssaapi.Program {
@@ -23,7 +24,7 @@ func check(t *testing.T, code string, want []string, typ ...string) *ssaapi.Prog
 	test.Nil(err)
 	prog.Show()
 	gotErr := yak.StaticAnalyzeYaklang(code, pluginType)
-	got := lo.Map(gotErr, func(res *static_analyzer.StaticAnalyzeResult, _ int) string {
+	got := lo.Map(gotErr, func(res *result.StaticAnalyzeResult, _ int) string {
 		return res.Message
 	})
 
