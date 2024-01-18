@@ -6,8 +6,10 @@ request = REQUEST != undefined ? REQUEST : b"GET / HTTP/1.1\r\nHost: www.example
 ctx = CTX != undefined ? CTX : context.Background()
 // @ssa-ignore
 https := !!(HTTPS)
+// @ssa-ignore
+callerFilter := CALLER_FILTER != undefined ? CALLER_FILTER : str.NewFilter()
 
-caller := hook.NewMixPluginCaller()~
+caller := hook.NewMixPluginCallerWithFilter(callerFilter)~
 caller.LoadPlugin(plugin.ScriptName)~
 
 needResponse := plugin.Type == "mitm"

@@ -145,3 +145,7 @@ func FilterPorts(sourcePorts, excludePorts string) []int {
 
 	return result
 }
+
+func (s *StringFilter) Clear() {
+	s.container.Clear()
+}

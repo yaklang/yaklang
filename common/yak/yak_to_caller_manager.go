@@ -1399,13 +1399,14 @@ func loadScriptByNameCtx(mng *YakToCallerManager, ctx context.Context, scriptNam
 }
 
 var HooksExports = map[string]interface{}{
-	"NewManager":              NewYakToCallerManager,
-	"NewMixPluginCaller":      NewMixPluginCaller,
-	"RemoveYakitPluginByName": removeScriptByNameCtx,
-	"LoadYakitPluginContext":  loadScriptCtx,
-	"LoadYakitPlugin":         loadScript,
-	"LoadYakitPluginByName":   loadScriptByName,
-	"CallYakitPluginFunc":     CallYakitPluginFunc,
+	"NewManager":                   NewYakToCallerManager,
+	"NewMixPluginCaller":           NewMixPluginCaller,
+	"NewMixPluginCallerWithFilter": NewMixPluginCallerWithFilter,
+	"RemoveYakitPluginByName":      removeScriptByNameCtx,
+	"LoadYakitPluginContext":       loadScriptCtx,
+	"LoadYakitPlugin":              loadScript,
+	"LoadYakitPluginByName":        loadScriptByName,
+	"CallYakitPluginFunc":          CallYakitPluginFunc,
 }
 
 func init() {

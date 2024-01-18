@@ -255,6 +255,29 @@ func NewMixPluginCaller() (*MixPluginCaller, error) {
 	return c, nil
 }
 
+func NewMixPluginCallerWithFilter(callerFilter *filter.StringFilter) (*MixPluginCaller, error) {
+	resetFilterLock.Lock()
+	defer resetFilterLock.Unlock()
+	yaklib.AutoInitYakit()
+	c := &MixPluginCaller{
+		websiteFilter:       callerFilter,
+		websitePathFilter:   callerFilter,
+		websiteParamsFilter: callerFilter,
+		callers:             NewYakToCallerManager(),
+		feedbackHandler: func(result *ypb.ExecResult) error {
+			return fmt.Errorf("feedback handler not set")
+		},
+	}
+	c.SetLoadPluginTimeout(10)
+	var err error
+	c.fingerprintMatcher, err = fp.NewDefaultFingerprintMatcher(fp.NewConfig(fp.WithDatabaseCache(true), fp.WithCache(true)))
+	if err != nil {
+		return nil, utils.Errorf("create default fingerprint matcher failed: %s", err)
+	}
+	c.swg = utils.NewSizedWaitGroup(30)
+	return c, nil
+}
+
 func (c *MixPluginCaller) SetLoadPluginTimeout(i float64) {
 	c.callers.timeout = time.Duration(i * float64(time.Second))
 }
