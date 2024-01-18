@@ -171,6 +171,9 @@ func NewValue(n ssa.InstructionNode) *Value {
 }
 
 func (v *Value) GetId() int {
+	if v.node == nil {
+		return -1
+	}
 	return v.node.GetId()
 }
 
