@@ -107,6 +107,7 @@ func ParseCliParameter(prog *ssaapi.Program) []*CliParameter {
 		})
 	}
 
+	// second parameter is front-end render type, not Cli.Parameter type
 	parseCliFunction("cli.String", "string")
 	parseCliFunction("cli.Bool", "boolean") // "bool"
 	parseCliFunction("cli.Int", "uint")     // "int"
@@ -114,23 +115,23 @@ func ParseCliParameter(prog *ssaapi.Program) []*CliParameter {
 	parseCliFunction("cli.Double", "float")
 	parseCliFunction("cli.Float", "float")
 
-	parseCliFunction("cli.File", "upload-path")    // "file"
-	parseCliFunction("cli.FileNames", "file-name") // "file-name"
-	parseCliFunction("cli.StringSlice", "select")  // "string-slice"
+	parseCliFunction("cli.File", "upload-path")             // "file"
+	parseCliFunction("cli.FileNames", "multiple-file-path") // "file-name" 多选文件路径
+	parseCliFunction("cli.StringSlice", "select")           // "string-slice"
 	parseCliFunction("cli.YakCode", "yak")
 	parseCliFunction("cli.HTTPPacket", "http-packet")
 	parseCliFunction("cli.Text", "text")
 
-	parseCliFunction("cli.Url", "urls")
-	parseCliFunction("cli.Urls", "urls")
-	parseCliFunction("cli.Port", "port")
-	parseCliFunction("cli.Ports", "port")
-	parseCliFunction("cli.Net", "hosts")
-	parseCliFunction("cli.Network", "hosts")
-	parseCliFunction("cli.Host", "hosts")
-	parseCliFunction("cli.Hosts", "hosts")
-	parseCliFunction("cli.FileOrContent", "file_or_content")
-	parseCliFunction("cli.LineDict", "line_dict")
+	parseCliFunction("cli.Url", "text") // 多行输入
+	parseCliFunction("cli.Urls", "text")
+	parseCliFunction("cli.Port", "string") // 单行输入
+	parseCliFunction("cli.Ports", "string")
+	parseCliFunction("cli.Net", "text")
+	parseCliFunction("cli.Network", "text")
+	parseCliFunction("cli.Host", "text")
+	parseCliFunction("cli.Hosts", "text")
+	parseCliFunction("cli.FileOrContent", "upload-file-content") // 单选文件并获取内容
+	parseCliFunction("cli.LineDict", "upload-file-content")
 
 	return ret
 }
