@@ -249,14 +249,18 @@ func shouldExport(key string) bool {
 }
 
 func getFuncDeclDesc(funcDecl *yakdoc.FuncDecl, typStr string) string {
-	desc := fmt.Sprintf("```go\nfunc %s\n```\n\n%s", funcDecl.Decl, funcDecl.Document)
+	document := funcDecl.Document
+	if document != "" {
+		document = "\n\n" + document
+	}
+	desc := fmt.Sprintf("```go\nfunc %s\n```%s", funcDecl.Decl, document)
 	desc = strings.Replace(desc, "func(", typStr+"(", 1)
 	desc = yakdoc.ShrinkTypeVerboseName(desc)
 	return desc
 }
 
-func getInstanceDesc(instance *yakdoc.LibInstance) string {
-	desc := fmt.Sprintf("```go\nconst %s %s = %s\n```", instance.InstanceName, getGolangTypeStringByTypeStr(instance.Type), instance.ValueStr)
+func getConstInstanceDesc(instance *yakdoc.LibInstance) string {
+	desc := fmt.Sprintf("```go\nconst %s = %s\n```", instance.InstanceName, instance.ValueStr)
 	desc = yakdoc.ShrinkTypeVerboseName(desc)
 	return desc
 }
@@ -381,13 +385,11 @@ func getFuncDeclAndDocBySSAValue(name string, v *ssaapi.Value) (desc string, doc
 		funcTyp, ok := ssa.ToFunctionType(bareTyp)
 		if ok {
 			desc = getFuncTypeDesc(funcTyp, lastName)
-			desc = strings.TrimLeft(desc, "```go ")
-			desc = strings.TrimRight(desc, "```")
 			return
 		}
 	}
 
-	// 内置方法
+	// 类型内置方法
 	desc, document = getBuiltinFuncDeclAndDoc(lastName, bareTyp)
 	if desc != "" {
 		return
@@ -439,6 +441,7 @@ func getDescFromSSAValue(name string, v *ssaapi.Value) string {
 			funcDecl := getFuncDeclByName(name)
 			if funcDecl != nil {
 				desc = getFuncDeclDesc(funcDecl, typStr)
+				break
 			}
 			// 用户自定义函数
 			funcTyp, ok := ssa.ToFunctionType(bareTyp)
@@ -497,7 +500,7 @@ func getDescFromSSAValue(name string, v *ssaapi.Value) string {
 			// 标准库常量
 			instance := getInstanceByName(name)
 			if instance != nil {
-				desc = getInstanceDesc(instance)
+				desc = getConstInstanceDesc(instance)
 			}
 		} else {
 			// 结构体 / 接口方法
@@ -506,6 +509,11 @@ func getDescFromSSAValue(name string, v *ssaapi.Value) string {
 				funcDecl, ok := lib.Functions[lastName]
 				if ok {
 					desc = getFuncDeclDesc(funcDecl, lastName)
+				} else {
+					instance, ok := lib.Instances[lastName]
+					if ok {
+						desc = yakdoc.ShrinkTypeVerboseName(fmt.Sprintf("```go\nfield %s %s\n```", instance.InstanceName, getGolangTypeStringByTypeStr(instance.Type)))
+					}
 				}
 			} else {
 				// 内置方法
@@ -737,24 +745,22 @@ func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionReques
 			break
 		}
 
-		rTyp.GetMethod()
-		for _, key := range rTyp.Keys {
+		lib, ok := doc.DefaultDocumentHelper.StructMethods[typStr]
+		if !ok {
+			return ret
+		}
+		for _, instance := range lib.Instances {
 			// 过滤掉非导出字段
-			if !shouldExport(key.String()) {
+			if !shouldExport(instance.InstanceName) {
 				continue
 			}
-			keyStr := key.String()
+			keyStr := instance.InstanceName
 			ret = append(ret, &ypb.SuggestionDescription{
 				Label:       keyStr,
 				Description: "",
 				InsertText:  keyStr,
 				Kind:        "Field",
 			})
-		}
-
-		lib, ok := doc.DefaultDocumentHelper.StructMethods[typStr]
-		if !ok {
-			return ret
 		}
 
 		for methodName, funcDecl := range lib.Functions {
