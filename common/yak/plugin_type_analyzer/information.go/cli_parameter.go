@@ -121,7 +121,6 @@ func ParseCliParameter(prog *ssaapi.Program) []*CliParameter {
 	parseCliFunction("cli.HTTPPacket", "http-packet")
 	parseCliFunction("cli.Text", "text")
 
-	// TODO: un-support  in front-end
 	parseCliFunction("cli.Url", "urls")
 	parseCliFunction("cli.Urls", "urls")
 	parseCliFunction("cli.Port", "port")
@@ -131,7 +130,7 @@ func ParseCliParameter(prog *ssaapi.Program) []*CliParameter {
 	parseCliFunction("cli.Host", "hosts")
 	parseCliFunction("cli.Hosts", "hosts")
 	parseCliFunction("cli.FileOrContent", "file_or_content")
-	parseCliFunction("cli.LineDict", "file-or-content")
+	parseCliFunction("cli.LineDict", "line_dict")
 
 	return ret
 }
