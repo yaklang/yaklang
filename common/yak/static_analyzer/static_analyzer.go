@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/plugin_type"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 
 	// for init function
@@ -17,29 +18,8 @@ import (
 
 // plugin type : "yak" "mitm" "port-scan" "codec"
 
-// static analyze result  generate by rule and ssa
-type StaticAnalyzeResult struct {
-	Message         string `json:"message"`
-	Severity        string `json:"severity"` // Error / Warning
-	StartLineNumber int    `json:"startLineNumber"`
-	StartColumn     int    `json:"startColumn"`
-	EndLineNumber   int    `json:"endLineNumber"`
-	EndColumn       int    `json:"endColumn"`
-	RawMessage      string `json:"rawMessage"`
-	From            string `json: "from"`
-}
-
-func (e *StaticAnalyzeResult) String() string {
-	return fmt.Sprintf("[%s]: %s in [%d:%d -- %d:%d] from %s\n",
-		e.Severity, e.Message,
-		e.StartLineNumber, e.StartColumn,
-		e.EndLineNumber, e.EndColumn,
-		e.From,
-	)
-}
-
-func StaticAnalyzeYaklang(code, codeTyp string) []*StaticAnalyzeResult {
-	var results []*StaticAnalyzeResult
+func StaticAnalyzeYaklang(code, codeTyp string) []*result.StaticAnalyzeResult {
+	var results []*result.StaticAnalyzeResult
 
 	// compiler
 	newEngine := yaklang.New()
@@ -49,14 +29,13 @@ func StaticAnalyzeYaklang(code, codeTyp string) []*StaticAnalyzeResult {
 		switch ret := err.(type) {
 		case yakast.YakMergeError:
 			for _, e := range ret {
-				results = append(results, &StaticAnalyzeResult{
+				results = append(results, &result.StaticAnalyzeResult{
 					Message:         fmt.Sprintf("基础语法错误（Syntax Error）：%v", e.Message),
 					Severity:        "error",
-					StartLineNumber: e.StartPos.LineNumber,
-					StartColumn:     e.StartPos.ColumnNumber + 1,
-					EndLineNumber:   e.EndPos.LineNumber,
-					EndColumn:       e.EndPos.ColumnNumber + 2,
-					RawMessage:      e.Error(),
+					StartLineNumber: int64(e.StartPos.LineNumber),
+					StartColumn:     int64(e.StartPos.ColumnNumber + 1),
+					EndLineNumber:   int64(e.EndPos.LineNumber),
+					EndColumn:       int64(e.EndPos.ColumnNumber + 2),
 					From:            "compiler",
 				})
 			}
@@ -70,7 +49,7 @@ func StaticAnalyzeYaklang(code, codeTyp string) []*StaticAnalyzeResult {
 		log.Error("SSA 解析失败：", err)
 		return results
 	}
-	checkPluginType(codeTyp, prog)
+	results = append(results, checkPluginType(codeTyp, prog).Get()...)
 
 	errs := prog.GetErrors()
 	for _, err := range errs {
@@ -81,14 +60,13 @@ func StaticAnalyzeYaklang(code, codeTyp string) []*StaticAnalyzeResult {
 		case ssa.Error:
 			severity = "error"
 		}
-		results = append(results, &StaticAnalyzeResult{
+		results = append(results, &result.StaticAnalyzeResult{
 			Message:         err.Message,
 			Severity:        severity,
-			StartLineNumber: int(err.Pos.Start.Line),
-			StartColumn:     int(err.Pos.Start.Column + 1),
-			EndLineNumber:   int(err.Pos.End.Line),
-			EndColumn:       int(err.Pos.End.Column + 1),
-			RawMessage:      err.String(),
+			StartLineNumber: int64(err.Pos.Start.Line),
+			StartColumn:     int64(err.Pos.Start.Column + 1),
+			EndLineNumber:   int64(err.Pos.End.Line),
+			EndColumn:       int64(err.Pos.End.Column + 1),
 			From:            "SSA:" + string(err.Tag),
 		})
 	}
@@ -104,10 +82,12 @@ func GetPluginSSAOpt(plugin string) []ssaapi.Option {
 	return ret
 }
 
-func checkPluginType(plugin string, prog *ssaapi.Program) {
-	plugin_type.CheckPluginType(plugin_type.PluginTypeYak, prog)
+func checkPluginType(plugin string, prog *ssaapi.Program) *result.StaticAnalyzeResults {
+	ret := result.NewStaticAnalyzeResults()
+	ret.Merge(plugin_type.CheckPluginType(plugin_type.PluginTypeYak, prog))
 	pluginType := plugin_type.ToPluginType(plugin)
 	if pluginType != plugin_type.PluginTypeYak {
-		plugin_type.CheckPluginType(pluginType, prog)
+		ret.Merge(plugin_type.CheckPluginType(pluginType, prog))
 	}
+	return ret
 }

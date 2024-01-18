@@ -34,16 +34,6 @@ func (p *Program) GetErrors() ssa.SSAErrors {
 	return p.Program.GetErrors()
 }
 
-func (p *Program) NewError(tag string, message string) {
-	p.Program.AddError(&ssa.SSAError{
-		Pos:     ssa.NewRange(ssa.NewPosition(0, 1, 0), ssa.NewPosition(0, 1, 1), ""),
-		Tag:     ssa.ErrorTag(tag),
-		Message: message,
-		Kind:    ssa.Error,
-	})
-
-}
-
 func (p *Program) GetValueById(id int) (*Value, error) {
 	val, ok := p.Program.GetInstructionById(id).(ssa.InstructionNode)
 	if val == nil {

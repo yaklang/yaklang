@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/plugin_type"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
 )
 
 func init() {
@@ -13,17 +14,19 @@ func init() {
 	plugin_type.RegisterCheckRuler(plugin_type.PluginTypeMitm, CheckDefineFunctionMitm)
 }
 
-var CheckDefineFunctionTag string = "CheckDefineFunction"
+// var CheckDefineFunctionTag string = "CheckDefineFunction"
 
-func checkDefineFunction(prog *ssaapi.Program, name string) {
+func checkDefineFunction(prog *ssaapi.Program, name string) *result.StaticAnalyzeResults {
+	ret := result.NewStaticAnalyzeResults()
 	handlers := prog.Ref(name)
 	if len(handlers) == 0 {
-		prog.NewError(CheckDefineFunctionTag, NoImplementFunction(name))
+		ret.NewError(NoImplementFunction(name), nil)
 	} else if len(handlers) > 1 {
 		handlers.ForEach(func(v *ssaapi.Value) {
-			v.NewWarn(CheckDefineFunctionTag, DuplicateFunction(name))
+			ret.NewError(DuplicateFunction(name), v)
 		})
 	}
+	return ret
 }
 
 func NoImplementFunction(name string) string {
@@ -41,15 +44,16 @@ func checkFreeValue(fun *ssaapi.Value) {
 
 }
 
-func CheckDefineFunctionCodec(prog *ssaapi.Program) {
-	checkDefineFunction(prog, "handle")
+func CheckDefineFunctionCodec(prog *ssaapi.Program) *result.StaticAnalyzeResults {
+	return checkDefineFunction(prog, "handle")
 }
 
-func CheckDefineFunctionPortScan(prog *ssaapi.Program) {
-	checkDefineFunction(prog, "handle")
+func CheckDefineFunctionPortScan(prog *ssaapi.Program) *result.StaticAnalyzeResults {
+	return checkDefineFunction(prog, "handle")
 }
 
-func CheckDefineFunctionMitm(prog *ssaapi.Program) {
+func CheckDefineFunctionMitm(prog *ssaapi.Program) *result.StaticAnalyzeResults {
+	ret := result.NewStaticAnalyzeResults()
 	funcs := []string{
 		"hijackSaveHTTPFlow",
 		"hijackHTTPResponse",
@@ -77,13 +81,15 @@ func CheckDefineFunctionMitm(prog *ssaapi.Program) {
 		}
 		// duplicate
 		defineFuncs.ForEach(func(v *ssaapi.Value) {
-			v.NewWarn(CheckDefineFunctionTag, DuplicateFunction(name))
+			// v.NewWarn(CheckDefineFunctionTag, DuplicateFunction(name))
+			ret.NewWarn(DuplicateFunction(name), v)
 		})
 	}
 
 	if !find {
-		prog.NewError(CheckDefineFunctionTag, LeastImplementOneFunctions(funcs))
+		ret.NewError(LeastImplementOneFunctions(funcs), nil)
 	}
+	return ret
 }
 
 func LeastImplementOneFunctions(name []string) string {

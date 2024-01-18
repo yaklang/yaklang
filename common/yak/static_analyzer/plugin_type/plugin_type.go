@@ -3,6 +3,7 @@ package plugin_type
 import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
 )
 
 type PluginType string
@@ -32,7 +33,7 @@ func ToPluginType(plugin string) PluginType {
 }
 
 type (
-	CheckRuler      func(*ssaapi.Program)
+	CheckRuler      func(*ssaapi.Program) *result.StaticAnalyzeResults
 	SSAOptCollector func() []ssaapi.Option
 )
 
@@ -65,7 +66,8 @@ func GetPluginSSAOpt(pluginType PluginType) []ssaapi.Option {
 	return ret
 }
 
-func CheckPluginType(pluginType PluginType, prog *ssaapi.Program) {
+func CheckPluginType(pluginType PluginType, prog *ssaapi.Program) *result.StaticAnalyzeResults {
+	ret := result.NewStaticAnalyzeResults()
 	if funcs, ok := pluginTypeAnalyzer.CheckRulers[pluginType]; ok {
 		for _, f := range funcs {
 			func() {
@@ -75,8 +77,9 @@ func CheckPluginType(pluginType PluginType, prog *ssaapi.Program) {
 						log.Errorf("CheckPluginType %s panic: %v", pluginType, err)
 					}
 				}()
-				f(prog)
+				ret.Merge(f(prog))
 			}()
 		}
 	}
+	return ret
 }

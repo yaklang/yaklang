@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/yak"
-	"github.com/yaklang/yaklang/common/yak/static_analyzer"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 
 	_ "github.com/yaklang/yaklang/common/yak"
@@ -22,7 +22,7 @@ func exec(raw string) error {
 	return yaklang.New().SafeEval(context.Background(), raw)
 }
 
-func analyze(raw string) []*static_analyzer.StaticAnalyzeResult {
+func analyze(raw string) []*result.StaticAnalyzeResult {
 	return yak.StaticAnalyzeYaklang(raw)
 }
 

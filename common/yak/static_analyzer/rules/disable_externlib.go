@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/plugin_type"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
 )
 
 func init() {
@@ -15,21 +16,24 @@ func init() {
 	plugin_type.RegisterCheckRuler(plugin_type.PluginTypeMitm, DisableMitmExternLib)
 }
 
-func DisableCli(prog *ssaapi.Program) {
-	tag := "SSA-cli-disableType"
+func DisableCli(prog *ssaapi.Program) *result.StaticAnalyzeResults {
+	ret := result.NewStaticAnalyzeResults()
+	// tag := "SSA-cli-disableType"
 	prog.Ref("cli").GetDefs().GetUsers().Filter(func(v *ssaapi.Value) bool {
 		return v.IsCall() && v.IsReachable() != -1
 	}).ForEach(func(v *ssaapi.Value) {
-		v.NewError(tag, ErrorDisableCLi())
+		ret.NewError(ErrorDisableCLi(), v)
 	})
+	return ret
 }
 
 func ErrorDisableCLi() string {
 	return "This PluginType does not support CLI package"
 }
 
-func DisableMitmExternLib(prog *ssaapi.Program) {
-	tag := "SSA-cli-disableMitmExternLib"
+func DisableMitmExternLib(prog *ssaapi.Program) *result.StaticAnalyzeResults {
+	ret := result.NewStaticAnalyzeResults()
+	// tag := "SSA-cli-disableMitmExternLib"
 	// 在MITM插件禁用 risk、poc、http、tcp、udp、fuzz.Exec、fuzz.ExecFirst
 	DisablePack := []string{
 		"risk",
@@ -44,7 +48,7 @@ func DisableMitmExternLib(prog *ssaapi.Program) {
 				return v.IsCall() && v.IsReachable() != -1
 			}).ForEach(func(v *ssaapi.Value) {
 				if v.InMainFunction() {
-					v.NewError(tag, MITMNotSupport(Func.GetName()))
+					ret.NewError(MITMNotSupport(Func.GetName()), v)
 				}
 			})
 		})
@@ -68,10 +72,11 @@ func DisableMitmExternLib(prog *ssaapi.Program) {
 			return v.IsCall() && v.IsReachable() != -1
 		}).ForEach(func(v *ssaapi.Value) {
 			if v.InMainFunction() {
-				v.NewError(tag, MITMNotSupport("fuzz.Exec or fuzz.ExecFirst"))
+				ret.NewError(MITMNotSupport("fuzz.Exec or fuzz.ExecFirst"), v)
 			}
 		})
 	}
+	return ret
 }
 
 func MITMNotSupport(pkg string) string {
