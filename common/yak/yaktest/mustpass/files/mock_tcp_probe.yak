@@ -5,6 +5,7 @@ checked = false
 for result in servicescan.Scan(host, string(port),
     servicescan.proto(["tcp"]...),
     servicescan.maxProbes(100),
+    servicescan.all(),
 )~{
     dump(result)
     if result.Fingerprint.ServiceName == "rdp" {
