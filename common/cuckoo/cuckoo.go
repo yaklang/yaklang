@@ -191,3 +191,12 @@ func (f *Filter) alternateIndex(fp fingerprint, i uint) uint {
 	hash := binary.LittleEndian.Uint64(bytes)
 	return uint(uint64(i)^(hash*magicNumber)) % f.capacity
 }
+
+// clear padding zero
+func (f *Filter) Clear() {
+	for i := range f.buckets {
+		for j := range f.buckets[i] {
+			f.buckets[i][j] = []byte{}
+		}
+	}
+}
