@@ -362,7 +362,12 @@ func AnyTypeToLibInstance(libName, name string, typ reflect.Type, value interfac
 		pkgPath = typ.Elem().PkgPath()
 		typName = typ.Elem().Name()
 	}
-	typName = fmt.Sprintf("%s.%s", pkgPath, typName)
+	if typName == "" {
+		typName = typ.String()
+	}
+	if pkgPath != "" {
+		typName = fmt.Sprintf("%s.%s", pkgPath, typName)
+	}
 
 	return &LibInstance{
 		LibName:      libName,
