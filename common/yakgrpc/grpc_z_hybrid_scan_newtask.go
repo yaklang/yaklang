@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -141,6 +142,7 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 	}
 
 	var riskCount uint32 = 0
+	var scanFilterManager = NewFilterManager(12, 1<<15, 30)
 
 	// start dispatch tasks
 	for _, __currentTarget := range targetCached {
@@ -178,7 +180,6 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 
 			go func() {
 				defer swg.Done()
-
 				defer targetWg.Done()
 				defer func() {
 					statusManager.DoneTask(taskIndex)
@@ -206,7 +207,9 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 					currentStatus.ExecResult = result
 					return stream.Send(currentStatus)
 				}, &riskCount)
-				err := s.ScanTargetWithPlugin(taskId, manager.Context(), targetRequestInstance, pluginInstance, feedbackClient)
+				callerFilter := scanFilterManager.DequeueFilter()
+				defer scanFilterManager.EnqueueFilter(callerFilter)
+				err := s.ScanTargetWithPlugin(taskId, manager.Context(), targetRequestInstance, pluginInstance, feedbackClient, callerFilter)
 				if err != nil {
 					log.Warnf("scan target failed: %s", err)
 				}
@@ -245,8 +248,9 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 var execTargetWithPluginScript string
 
 func (s *Server) ScanTargetWithPlugin(
-	taskId string, ctx context.Context, target *HybridScanTarget, plugin *yakit.YakScript, feedbackClient *yaklib.YakitClient,
+	taskId string, ctx context.Context, target *HybridScanTarget, plugin *yakit.YakScript, feedbackClient *yaklib.YakitClient, callerFilter *filter.StringFilter,
 ) error {
+
 	engine := yak.NewYakitVirtualClientScriptEngine(feedbackClient)
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
 		engine.SetVar("RUNTIME_ID", taskId)
@@ -260,9 +264,11 @@ func (s *Server) ScanTargetWithPlugin(
 		engine.SetVar("HTTPS", target.IsHttps)
 		engine.SetVar("PLUGIN", plugin)
 		engine.SetVar("CTX", ctx)
+		engine.SetVar("CALLER_FILTER", callerFilter)
 		return nil
 	})
 	err := engine.ExecuteWithContext(ctx, execTargetWithPluginScript)
+
 	if err != nil {
 		return utils.Errorf("execute script failed: %s", err)
 	}
@@ -452,26 +458,45 @@ func (s *Server) TargetGenerator(ctx context.Context, targetConfig *ypb.HybridSc
 	return outTarget, nil
 }
 
-//func fixRiskCount(result *ypb.ExecResult, riskCount *atomic.Uint32) {
-//	if result.IsMessage {
-//		var message yaklib.YakitMessage
-//		err := json.Unmarshal(result.Message, &message)
-//		if err == nil && strings.ToLower(message.Type) == "log" { // log message
-//			var logMessage yaklib.YakitLog
-//			err := json.Unmarshal(message.Content, &logMessage)
-//			if err == nil && logMessage.Level == "feature-status-card-data" { // risk
-//				data, _ := json.Marshal(&yaklib.YakitStatusCard{
-//					Id: "漏洞/风险/指纹", Data: fmt.Sprint(addRiskCount(riskCount)), Tags: nil,
-//				})
-//				logMessage.Data = string(data)
-//				message.Content, _ = json.Marshal(logMessage)
-//				result.Message, _ = json.Marshal(message)
-//			}
-//		}
-//	}
-//}
-//
-//func addRiskCount(riskCount *atomic.Uint32) uint32 {
-//	riskCount.Add(1)
-//	return riskCount.Load()
-//}
+type FilterManager struct {
+	size                       int
+	capacity                   int
+	filterPool                 *sync.Pool
+	filterEntries, filterTotal uint
+	cond                       *sync.Cond
+}
+
+func (m *FilterManager) DequeueFilter() *filter.StringFilter {
+	return m.filterPool.Get().(*filter.StringFilter)
+}
+
+func (m *FilterManager) EnqueueFilter(f *filter.StringFilter) {
+	m.cond.L.Lock()
+	defer m.cond.L.Unlock()
+	f.Clear()
+	m.filterPool.Put(f)
+	m.cond.Signal()
+}
+
+func NewFilterManager(filterEntries, filterTotal uint, capacity int) *FilterManager {
+	m := &FilterManager{
+		capacity:      capacity,
+		filterEntries: filterEntries,
+		filterTotal:   filterTotal,
+	}
+	condMutex := new(sync.Mutex)
+	m.cond = sync.NewCond(condMutex)
+	filterPool := &sync.Pool{
+		New: func() interface{} {
+			if m.size < m.capacity {
+				return filter.NewFilterWithSize(filterEntries, filterTotal)
+			}
+			m.cond.L.Lock()
+			defer m.cond.L.Unlock()
+			m.cond.Wait()
+			return m.filterPool.Get()
+		},
+	}
+	m.filterPool = filterPool
+	return m
+}

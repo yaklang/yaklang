@@ -80,6 +80,7 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 
 	swg := utils.NewSizedWaitGroup(20)
 	riskCount, _ := yakit.CountRiskByRuntimeId(s.GetProfileDatabase(), task.TaskId)
+	resumeFilterManager := NewFilterManager(12, 1<<15, 30)
 
 	// dispatch
 	for _, __currentTarget := range targets {
@@ -160,8 +161,9 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 					currentStatus.ExecResult = result
 					return stream.Send(currentStatus)
 				}, &riskCount)
-
-				err := s.ScanTargetWithPlugin(task.TaskId, manager.Context(), targetRequestInstance, pluginInstance, feedbackClient)
+				callerFilter := resumeFilterManager.DequeueFilter()
+				defer resumeFilterManager.EnqueueFilter(callerFilter)
+				err := s.ScanTargetWithPlugin(task.TaskId, manager.Context(), targetRequestInstance, pluginInstance, feedbackClient, callerFilter)
 				if err != nil {
 					log.Warnf("scan target failed: %s", err)
 				}
