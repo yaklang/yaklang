@@ -229,7 +229,7 @@ func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.Doc
 			}
 		}
 	}
-	// 标准库函数可能会返回结构体，我们也需要将其结构体的方法签名与文档拿到
+	// 标准库函数可能会返回结构体，我们也需要拿到结构体的成员，方法签名与文档
 	handleTypes := make([]reflect.Type, 0)
 
 	var getTypeFromReflectFunctionType func(typ reflect.Type, level int) []reflect.Type
@@ -303,10 +303,10 @@ func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.Doc
 		filter[typ] = struct{}{}
 
 		var (
-			structName string
-			pkgPath    string
-			documents  map[string]string
-			isStruct   bool
+			structName          string
+			pkgPath             string
+			documents           map[string]string
+			isStructOrInterface bool
 
 			pkg *ast.Package
 			ok  bool
@@ -323,12 +323,12 @@ func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.Doc
 
 		typKind := typ.Kind()
 		if typKind == reflect.Struct || typKind == reflect.Interface {
-			isStruct = true
+			isStructOrInterface = true
 			pkgPath = typ.PkgPath()
 			structName = typ.Name()
 
 		} else if typKind == reflect.Ptr {
-			isStruct = typ.Elem().Kind() == reflect.Struct || typ.Elem().Kind() == reflect.Interface
+			isStructOrInterface = typ.Elem().Kind() == reflect.Struct || typ.Elem().Kind() == reflect.Interface
 			pkgPath = typ.Elem().PkgPath()
 			structName = typ.Elem().Name()
 		} else if typKind == reflect.Func {
@@ -339,7 +339,7 @@ func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.Doc
 			}
 		}
 
-		if structName == "" || !isStruct {
+		if structName == "" || !isStructOrInterface {
 			continue
 		}
 
@@ -360,7 +360,39 @@ func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.Doc
 		lib := &yakdoc.ScriptLib{
 			Name:      structName,
 			Functions: make(map[string]*yakdoc.FuncDecl),
+			Instances: make(map[string]*yakdoc.LibInstance),
 		}
+		// 成员
+		if typKind == reflect.Struct || typKind == reflect.Pointer {
+			targetTyp := typ
+			if typKind == reflect.Pointer {
+				targetTyp = typ.Elem()
+			}
+			if targetTyp.Kind() == reflect.Struct {
+				var getTypMember func(typ reflect.Type)
+				getTypMember = func(typ reflect.Type) {
+					for i := 0; i < typ.NumField(); i++ {
+						field := typ.Field(i)
+						if !field.Anonymous {
+							lib.Instances[field.Name] = yakdoc.AnyTypeToLibInstance(structName, field.Name, field.Type, nil)
+							continue
+						}
+						lib.Instances[field.Name] = yakdoc.AnyTypeToLibInstance(structName, field.Name, field.Type, nil)
+
+						innerTyp := field.Type
+						if innerTyp.Kind() == reflect.Pointer {
+							innerTyp = innerTyp.Elem()
+						}
+						if innerTyp.Kind() == reflect.Struct {
+							getTypMember(innerTyp)
+						}
+					}
+				}
+				getTypMember(targetTyp)
+			}
+		}
+
+		// 方法与文档
 		for i := 0; i < typ.NumMethod(); i++ {
 			method := typ.Method(i)
 			methodName := method.Name

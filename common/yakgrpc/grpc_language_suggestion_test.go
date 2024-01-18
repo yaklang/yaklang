@@ -72,6 +72,27 @@ prog.
 			t.Fatalf("want %v, but got %v", want, got)
 		}
 	})
+
+	t.Run("check anyonmous field struct completion", func(t *testing.T) {
+		res := getCompletion(t, `
+rsp, err = http.Request("GET", "https://baidu.com")
+rsp.
+		`, &ypb.Range{
+			Code:        "rsp.",
+			StartLine:   3,
+			StartColumn: 0,
+			EndLine:     3,
+			EndColumn:   4,
+		})
+		got := lo.Map(res.SuggestionMessage, func(item *ypb.SuggestionDescription, _ int) string {
+			return item.Label
+		})
+		log.Info("got: ", got)
+		want := []string{"Response", "Body", "Status", "Data"}
+		if utils.StringSliceContainsAll(got, want...) {
+			t.Fatalf("want %v, but got %v", want, got)
+		}
+	})
 }
 
 var local ypb.YakClient = nil
@@ -148,6 +169,7 @@ prog  = ssa.Parse(
         ssa.Javascript
     )
 )~
+prog.Packages
 `
 
 	t.Run("check extern lib hover", func(t *testing.T) {
@@ -187,7 +209,7 @@ prog  = ssa.Parse(
 		}
 		// 标准库变量
 		instance := getInstanceByName("ssa.Javascript")
-		desc := getInstanceDesc(instance)
+		desc := getConstInstanceDesc(instance)
 		want := desc
 		check(t, code, "yak", ssaParseRange, want)
 	})
@@ -251,7 +273,7 @@ prog = ssa.Parse(
 		}
 		// 标准库变量
 		instance := getInstanceByName("ssa.Javascript")
-		desc := getInstanceDesc(instance)
+		desc := getConstInstanceDesc(instance)
 		want := desc
 		check(t, code, "yak", ssaParseRange, want)
 	})
@@ -265,5 +287,36 @@ prog = ssa.Parse(
 		}
 		want := `func (Program) Ref(name string) Value`
 		check(t, code, "yak", progRange, want, true)
+	})
+}
+
+func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_StructMemberAndMethod(t *testing.T) {
+	check := CheckHover(t)
+	code := `rsp, err = http.Request("GET", "https://baidu.com")
+rsp.Status
+rsp.Data()`
+	t.Run("check member hover", func(t *testing.T) {
+		ssaRange := &ypb.Range{
+			Code:        "rsp.Status",
+			StartLine:   2,
+			StartColumn: 0,
+			EndLine:     2,
+			EndColumn:   10,
+		}
+		want := "```go\n" + `field Status string` + "\n```"
+		check(t, code, "yak", ssaRange, want)
+	})
+
+	t.Run("check method hover", func(t *testing.T) {
+		ssaParseRange := &ypb.Range{
+			Code:        "rsp.Data",
+			StartLine:   3,
+			StartColumn: 0,
+			EndLine:     3,
+			EndColumn:   8,
+		}
+		// 标准库函数
+		want := "```go\n" + `func Data() string` + "\n```"
+		check(t, code, "yak", ssaParseRange, want)
 	})
 }
