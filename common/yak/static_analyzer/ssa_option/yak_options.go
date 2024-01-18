@@ -124,6 +124,7 @@ func (b *Builder) Build(t ssa.Type, s string) *ssa.FunctionType {
 		case "Pop":
 			IsVariadic = true
 			IsModifySelf = true
+			arg = append(arg, NumberTyp)
 			ret = append(ret, fieldTyp)
 		case "Extend", "Merge":
 			IsModifySelf = true
@@ -153,6 +154,7 @@ func (b *Builder) Build(t ssa.Type, s string) *ssa.FunctionType {
 		case "Insert":
 			IsModifySelf = true
 			arg = append(arg, NumberTyp, fieldTyp)
+			ret = append(ret, ot)
 		case "Remove":
 			IsModifySelf = true
 			arg = append(arg, fieldTyp)
