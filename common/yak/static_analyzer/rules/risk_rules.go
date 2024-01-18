@@ -3,6 +3,7 @@ package rules
 import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/plugin_type"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
 )
 
 func init() {
@@ -10,8 +11,10 @@ func init() {
 }
 
 // 检查 cli.risk 是否符合规范
-func RuleRisk(prog *ssaapi.Program) {
-	tag := "cli.risk"
+func RuleRisk(prog *ssaapi.Program) *result.StaticAnalyzeResults {
+	ret := result.NewStaticAnalyzeResults()
+
+	// tag := "cli.risk"
 
 	checkRiskOption := func(funcName string) {
 		prog.Ref(funcName).GetUsers().Filter(func(v *ssaapi.Value) bool {
@@ -41,7 +44,7 @@ func RuleRisk(prog *ssaapi.Program) {
 
 			}
 			if !(RiskCVE || (RiskDescription && RiskSolution)) {
-				v.NewError(tag, funcName+" should be called with (risk.description and risk.solution) or risk.cve")
+				ret.NewError(funcName+" should be called with (risk.description and risk.solution) or risk.cve", v)
 			}
 		})
 	}
@@ -64,10 +67,11 @@ func RuleRisk(prog *ssaapi.Program) {
 			}
 		})
 		if !flag {
-			v.NewError(tag, ErrorRiskCreateNotSave())
+			ret.NewError(ErrorRiskCreateNotSave(), v)
 		}
 	})
 
+	return ret
 }
 
 func ErrorRiskCreateNotSave() string {
