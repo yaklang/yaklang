@@ -3,15 +3,11 @@ package ssaapi
 import "testing"
 
 func TestFunctionTrace(t *testing.T) {
-	prog, err := Parse(`c =(i=>i)(1);a = {};a.b=c;e=a.b;dump(e)`)
+	prog, err := Parse(`c =((i,i1)=>i)(1,2);a = {};a.b=c;e=a.b;dump(e)`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	prog.Show().Ref("e").ForEach(func(value *Value) {
-		value.GetTopDefs().ForEach(func(value *Value) {
-			t.Log(value.String())
-		})
-	})
+	prog.Ref("e").GetTopDefs().Show()
 }
 
 func TestFunctionTrace_FormalParametersCheck(t *testing.T) {
