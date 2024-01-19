@@ -7,6 +7,7 @@ Host: www.example.com
 isUrlParam = false
 pluginType = "mitm"
 isSmoking = false
+runtimeId = ""
 if getParams("REQUESTS") != undefined {
     reqs = getParams("REQUESTS")
     ctx = getParams("CTX")
@@ -14,6 +15,7 @@ if getParams("REQUESTS") != undefined {
     isUrlParam = getParams("IS_URL_PARAM")
     pluginType = getParams("PLUGIN_TYPE")
     isSmoking = getParams("IS_SMOKING")
+    runtimeId = getParams("RUNTIME_ID")
 }
 
 /*
@@ -25,6 +27,7 @@ yakit.Info("RuntimeID: %v", RUNTIME_ID)
 
 caller, err := hook.NewMixPluginCaller()
 if err != nil { die(err) }
+caller.SetRuntimeId(runtimeId)
 err = caller.LoadPluginByName(ctx,pluginName,[])
 if err != nil { die(err) }
 caller.SetCache(false)
