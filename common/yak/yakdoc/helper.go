@@ -63,12 +63,12 @@ func GetProjectAstPackages() (map[string]*ast.Package, *token.FileSet, error) {
 }
 
 type DocumentHelper struct {
-	Libs          map[string]*ScriptLib
-	Functions     map[string]*FuncDecl
-	Instances     map[string]*LibInstance
-	StructMethods map[string]*ScriptLib // 结构体方法，名字 -> 所有结构体与结构体指针方法
-
-	hooks []func(h *DocumentHelper)
+	Libs                map[string]*ScriptLib
+	Functions           map[string]*FuncDecl
+	Instances           map[string]*LibInstance
+	StructMethods       map[string]*ScriptLib // 结构体方法，名字 -> 所有结构体与结构体指针方法
+	DeprecatedFunctions []*FuncDecl
+	hooks               []func(h *DocumentHelper)
 }
 
 func RegisterHook(hook func(h *DocumentHelper)) {
