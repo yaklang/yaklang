@@ -32,6 +32,8 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 		return nil, utils.Errorf("cannot create yak template from yaml: %v", err)
 	}
 
+	extractorMap := map[int][]*ypb.HTTPResponseExtractor{}
+	matcherMap := map[int][]*ypb.HTTPResponseMatcher{}
 	// 转FuzzerRequest
 	seqs := yakTemplate.GenerateRequestSequences("http://www.example.com")
 	for _, sequence := range seqs {
@@ -44,7 +46,7 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 			})
 		}
 		config := sequence.RequestConfig
-		extractors := funk.Map(config.Extractor, func(extractor *httptpl.YakExtractor) *ypb.HTTPResponseExtractor {
+		funk.Map(config.Extractor, func(extractor *httptpl.YakExtractor) *ypb.HTTPResponseExtractor {
 			typeName := ""
 			switch extractor.Type {
 			case "dsl":
@@ -54,7 +56,7 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 			default:
 				typeName = extractor.Type
 			}
-			return &ypb.HTTPResponseExtractor{
+			httpExtractor := &ypb.HTTPResponseExtractor{
 				Name:             extractor.Name,
 				Type:             typeName,
 				Scope:            extractor.Scope,
@@ -62,7 +64,13 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 				RegexpMatchGroup: funk.Map(extractor.RegexpMatchGroup, func(n int) int64 { return int64(n) }).([]int64),
 				XPathAttribute:   extractor.XPathAttribute,
 			}
-		}).([]*ypb.HTTPResponseExtractor)
+			if _, ok := extractorMap[extractor.Id]; ok {
+				extractorMap[extractor.Id] = append(extractorMap[extractor.Id], httpExtractor)
+			} else {
+				extractorMap[extractor.Id] = []*ypb.HTTPResponseExtractor{httpExtractor}
+			}
+			return httpExtractor
+		})
 		var yakMatchers2HttpResponseMatchers func(matchers []*httptpl.YakMatcher) []*ypb.HTTPResponseMatcher
 		yakMatchers2HttpResponseMatchers = func(matchers []*httptpl.YakMatcher) []*ypb.HTTPResponseMatcher {
 			return funk.Map(matchers, func(matcher *httptpl.YakMatcher) *ypb.HTTPResponseMatcher {
@@ -79,7 +87,7 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 				if matcher.Condition == "" {
 					condition = "or"
 				}
-				return &ypb.HTTPResponseMatcher{
+				httpMatcher := &ypb.HTTPResponseMatcher{
 					SubMatchers:         yakMatchers2HttpResponseMatchers(matcher.SubMatchers),
 					SubMatcherCondition: matcher.SubMatcherCondition,
 					MatcherType:         matcher.MatcherType,
@@ -90,16 +98,22 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 					Negative:            matcher.Negative,
 					ExprType:            matcher.ExprType,
 				}
+				if _, ok := matcherMap[matcher.Id]; ok {
+					matcherMap[matcher.Id] = append(matcherMap[matcher.Id], httpMatcher)
+				} else {
+					matcherMap[matcher.Id] = []*ypb.HTTPResponseMatcher{httpMatcher}
+				}
+				return httpMatcher
 			}).([]*ypb.HTTPResponseMatcher)
 		}
-		var matchers []*ypb.HTTPResponseMatcher
+		//var matchers []*ypb.HTTPResponseMatcher
 		var matchersCondition string
 		if config.Matcher != nil {
 			if len(config.Matcher.SubMatchers) > 0 {
-				matchers = yakMatchers2HttpResponseMatchers(config.Matcher.SubMatchers)
+				yakMatchers2HttpResponseMatchers(config.Matcher.SubMatchers)
 				matchersCondition = config.Matcher.SubMatcherCondition
 			} else {
-				matchers = yakMatchers2HttpResponseMatchers([]*httptpl.YakMatcher{config.Matcher})
+				yakMatchers2HttpResponseMatchers([]*httptpl.YakMatcher{config.Matcher})
 				matchersCondition = config.Matcher.SubMatcherCondition
 			}
 		}
@@ -149,8 +163,12 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 
 		for index, fuzzerReq := range fuzzerReqs {
 			if index == len(fuzzerReqs)-1 {
-				fuzzerReq.Extractors = extractors
-				fuzzerReq.Matchers = matchers
+				if extractorMap[index+1] != nil {
+					fuzzerReq.Extractors = extractorMap[index+1]
+				}
+				if matcherMap[index+1] != nil {
+					fuzzerReq.Matchers = matcherMap[index+1]
+				}
 				fuzzerReq.MatchersCondition = matchersCondition
 			}
 			fuzzerReq.NoFixContentLength = noFixContentLength
@@ -223,7 +241,7 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 	bulk.Matcher = &httptpl.YakMatcher{
 		SubMatcherCondition: "and",
 	}
-	for _, request := range seq.GetRequests() {
+	for index, request := range seq.GetRequests() {
 		vars := httptpl.NewVars()
 		for _, param := range request.Params {
 			if err := vars.SetWithType(param.Key, param.Value, param.Type); err != nil {
@@ -265,6 +283,9 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 			})
 		}
 		matchers := HttpResponseMatchers2YakMatchers(request.Matchers)
+		for _, matcher := range matchers {
+			matcher.Id = index + 1
+		}
 		if len(matchers) > 0 {
 			bulk.Matcher.SubMatchers = append(bulk.Matcher.SubMatchers, matchers...)
 			bulk.Matcher.SubMatcherCondition = request.MatchersCondition
@@ -280,6 +301,7 @@ func (s *Server) ExportHTTPFuzzerTaskToYaml(ctx context.Context, req *ypb.Export
 				typeName = extractor.Type
 			}
 			return &httptpl.YakExtractor{
+				Id:               index + 1,
 				Name:             extractor.Name,
 				Type:             typeName,
 				Scope:            extractor.Scope,
@@ -433,6 +455,11 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 	//		signElements = append(signElements, string(res))
 	//	}
 	//}
+	packagesNum := 0
+	for _, sequence := range y.HTTPRequestSequences {
+		packagesNum += len(sequence.Paths)
+		packagesNum += len(sequence.HTTPRequests)
+	}
 	for _, sequence := range y.HTTPRequestSequences {
 		sequenceItem := NewYamlMapBuilder()
 		sequenceItem.SetDefaultField(map[string]any{
@@ -521,6 +548,9 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 					"part":      "raw",
 					"condition": "or",
 				})
+				if packagesNum > 0 {
+					matcherItem.Set("id", subMatcher.Id)
+				}
 				switch subMatcher.MatcherType {
 				case "word":
 					matcherItem.Set("type", "word")
@@ -559,6 +589,9 @@ func MarshalYakTemplateToYaml(y *httptpl.YakTemplate) (string, error) {
 		extratorsArray := sequenceItem.NewSubArrayBuilder("extractors")
 		for _, extractor := range sequence.Extractor {
 			extractorItem := NewYamlMapBuilder()
+			if packagesNum > 0 {
+				extractorItem.Set("id", extractor.Id)
+			}
 			extractorItem.Set("name", extractor.Name)
 			extractorItem.Set("scope", extractor.Scope)
 			switch extractor.Type {

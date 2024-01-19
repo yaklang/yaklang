@@ -319,6 +319,8 @@ func generateYakExtractors(req map[string]interface{}) ([]*YakExtractor, error) 
 		m := utils.InterfaceToMapInterface(i)
 		ext.Name = utils.MapGetString(m, "name")
 		ext.Scope = utils.MapGetString(m, "scope")
+		ext.Id = utils.MapGetInt(m, "id")
+
 		switch utils.MapGetString(m, "type") {
 		case "regex":
 			ext.Type = "regex"
@@ -367,6 +369,7 @@ func generateYakMatcher(req map[string]interface{}) (*YakMatcher, error) {
 		m := utils.InterfaceToMapInterface(i)
 		match.Negative = utils.MapGetBool(m, "negative")
 		match.Condition = utils.MapGetString(m, "condition")
+		match.Id = utils.MapGetInt(m, "id")
 
 		switch utils.MapGetString(m, "part") {
 		case "body":

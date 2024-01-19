@@ -290,13 +290,15 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 			for k, v := range varsInResponse {
 				runtimeVars[k] = v
 			}
-			for index, extractor := range reqOrigin.Extractor {
+			for _, extractor := range reqOrigin.Extractor {
+				if extractor.Id != 0 && extractor.Id != index+1 {
+					continue
+				}
 				varIns, err := extractor.Execute(rsp.RawPacket, y.Variables.ToMap())
 				if err != nil {
 					log.Error("extractor execute failed: ", err)
 					continue
 				}
-				_ = index
 				if varIns != nil {
 					for k, v := range varIns {
 						v := ExtractResultToString(v)
@@ -310,7 +312,15 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 					runtimeVars[k] = v
 				}
 				if !reqOrigin.AfterRequested {
-					matchResult, err := matcher.ExecuteWithConfig(config, rsp, runtimeVars)
+					newMatcher := *matcher
+					newMatcher.SubMatchers = nil
+					for _, m := range matcher.SubMatchers {
+						if m.Id != 0 && m.Id != index+1 {
+							continue
+						}
+						newMatcher.SubMatchers = append(newMatcher.SubMatchers, m)
+					}
+					matchResult, err := newMatcher.ExecuteWithConfig(config, rsp, runtimeVars)
 					if err != nil {
 						log.Error("matcher execute failed: ", err)
 					}
@@ -330,8 +340,16 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 	//}
 	if reqOrigin.AfterRequested {
 		if matcher != nil {
-			for _, rsp := range responses {
-				matchResult, err := matcher.ExecuteWithConfig(config, rsp, runtimeVars)
+			for index, rsp := range responses {
+				newMatcher := *matcher
+				newMatcher.SubMatchers = nil
+				for _, m := range matcher.SubMatchers {
+					if m.Id != 0 && m.Id != index+1 {
+						continue
+					}
+					newMatcher.SubMatchers = append(newMatcher.SubMatchers, m)
+				}
+				matchResult, err := newMatcher.ExecuteWithConfig(config, rsp, runtimeVars)
 				if err != nil {
 					log.Error("matcher execute failed: ", err)
 				}
