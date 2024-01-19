@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/stretchr/testify/assert"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -697,4 +699,161 @@ func TestGRPCMUSTPASS_HTTPFuzzer_WebFuzzerSequenceConvertYaml(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+}
+func TestGRPCMUSTPASS_HTTPFuzzer_ExtractWithId(t *testing.T) {
+	tests := []struct{ raw, expect string }{
+		{
+			raw: `id: WebFuzzer-Template-wZJQIpvW
+
+info:
+  name: WebFuzzer Template wZJQIpvW
+  author: god
+  severity: low
+  description: write your description here
+  reference:
+  - https://github.com/
+  - https://cve.mitre.org/
+  metadata:
+    max-request: 2
+    shodan-query: ""
+    verified: true
+  yakit-info:
+    sign: 1203fbcb93204b12702f78c74186a6cd
+
+http:
+- raw:
+  - |-
+    @timeout: 30s
+    POST /?action=getTitle1 HTTP/1.1
+    Content-Type: application/json
+    Host: {{Hostname}}
+    Content-Length: 16
+
+    {"key": "value"}
+  - |-
+    @timeout: 30s
+    POST /?action=getTitle2 HTTP/1.1
+    Content-Type: application/json
+    Host: {{Hostname}}
+    Content-Length: 16
+
+    {"key": "value"}
+  - |-
+    @timeout: 30s
+    POST /?check={{title}} HTTP/1.1
+    Content-Type: application/json
+    Host: {{Hostname}}
+    Content-Length: 16
+
+    {"key": "value"}
+
+  max-redirects: 3
+  cookie-reuse: true
+  matchers-condition: and
+  extractors:
+  - id: 1
+    name: title
+    scope: raw
+    type: kval
+    kval:
+    - title
+
+
+# Generated From WebFuzzer on 2024-01-19 16:42:48`,
+			expect: `title1`,
+		}, // bind extractor and matcher by id
+		{
+			raw: `id: WebFuzzer-Template-wZJQIpvW
+
+info:
+  name: WebFuzzer Template wZJQIpvW
+  author: god
+  severity: low
+  description: write your description here
+  reference:
+  - https://github.com/
+  - https://cve.mitre.org/
+  metadata:
+    max-request: 2
+    shodan-query: ""
+    verified: true
+  yakit-info:
+    sign: 1203fbcb93204b12702f78c74186a6cd
+
+http:
+- raw:
+  - |-
+    @timeout: 30s
+    POST /?action=getTitle1 HTTP/1.1
+    Content-Type: application/json
+    Host: {{Hostname}}
+    Content-Length: 16
+
+    {"key": "value"}
+  - |-
+    @timeout: 30s
+    POST /?action=getTitle2 HTTP/1.1
+    Content-Type: application/json
+    Host: {{Hostname}}
+    Content-Length: 16
+
+    {"key": "value"}
+  - |-
+    @timeout: 30s
+    POST /?check={{title}} HTTP/1.1
+    Content-Type: application/json
+    Host: {{Hostname}}
+    Content-Length: 16
+
+    {"key": "value"}
+
+  max-redirects: 3
+  cookie-reuse: true
+  matchers-condition: and
+  extractors:
+  - name: title
+    scope: raw
+    type: kval
+    kval:
+    - title
+
+
+# Generated From WebFuzzer on 2024-01-19 16:42:48`,
+			expect: `title2`,
+		}, // default action: match all package
+	}
+	for _, test := range tests {
+		t.Run(test.raw, func(t *testing.T) {
+			yamlRaw := test.raw
+			var extractedTitle string
+			host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+				request.ParseForm()
+				action := request.Form.Get("action")
+				if action != "" {
+					switch action {
+					case "getTitle1":
+						writer.Write([]byte(`{"title": "title1"}`))
+					case "getTitle2":
+						writer.Write([]byte(`{"title": "title2"}`))
+					}
+				}
+				if v := request.Form.Get("check"); v != "" {
+					extractedTitle = v
+					writer.Write([]byte(`ok`))
+				}
+			})
+			addr := utils.HostPort(host, port)
+			yakTemplate, err := httptpl.CreateYakTemplateFromNucleiTemplateRaw(yamlRaw)
+			if err != nil {
+				t.Fatal(err)
+			}
+			sendN, err := yakTemplate.ExecWithUrl("http://"+addr, httptpl.NewConfig())
+			if err != nil {
+				t.Fatal(err)
+			}
+			assert.Equal(t, 3, sendN)
+			assert.Equal(t, test.expect, extractedTitle)
+		})
+	}
+
 }
