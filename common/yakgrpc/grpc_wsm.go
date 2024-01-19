@@ -101,6 +101,7 @@ func (s *Server) DeleteWebShell(ctx context.Context, req *ypb.DeleteWebShellRequ
 	}
 	if req.Id > 0 {
 		_ = yakit.DeleteWebShellByID(db, req.Id)
+		delete(webShellManagerCache, req.Id)
 		return &ypb.Empty{}, nil
 	}
 	return &ypb.Empty{}, nil
@@ -142,6 +143,7 @@ func (s *Server) UpdateWebShell(ctx context.Context, req *ypb.WebShell) (*ypb.We
 		log.Error(err)
 		return nil, err
 	}
+	delete(webShellManagerCache, req.GetId())
 	return webShell.ToGRPCModel(), nil
 }
 
