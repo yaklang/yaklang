@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/filter"
+	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -141,20 +142,43 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 		statusManager.Feedback(stream)
 	}
 
+	// Send RuntimeID immediately
+	currentStatus := getStatus()
+	currentStatus.ExecResult = &ypb.ExecResult{RuntimeID: taskId}
+	stream.Send(currentStatus)
+
 	var riskCount uint32 = 0
 	var scanFilterManager = NewFilterManager(12, 1<<15, 30)
-
+	// build match
+	matcher, err := fp.NewDefaultFingerprintMatcher(fp.NewConfig(fp.WithDatabaseCache(true), fp.WithCache(true)))
+	if err != nil {
+		return utils.Wrap(err, "init fingerprint matcher failed")
+	}
 	// start dispatch tasks
 	for _, __currentTarget := range targetCached {
 		// load targets
 		statusManager.DoActiveTarget()
+		targetWg := new(sync.WaitGroup)
+
+		// just request once
+		resp, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes(__currentTarget.Request), lowhttp.WithHttps(__currentTarget.IsHttps))
+		if err != nil {
+			log.Errorf("request target failed: %s", err)
+			continue
+		}
+		__currentTarget.Response = resp.RawPacket
+
+		// fingerprint match just once
+		host, port, _ := utils.ParseStringToHostPort(__currentTarget.Url)
+		_, err = matcher.Match(host, port)
+		if err != nil {
+			log.Errorf("match fingerprint failed: %s", err)
+		}
 
 		pluginChan, err := s.PluginGenerator(pluginCache, manager.Context(), plugin)
 		if err != nil {
 			return utils.Errorf("generate plugin queue failed: %s", err)
 		}
-		targetWg := new(sync.WaitGroup)
-
 		for __pluginInstance := range pluginChan {
 			targetRequestInstance := __currentTarget
 			pluginInstance := __pluginInstance
@@ -258,9 +282,10 @@ func (s *Server) ScanTargetWithPlugin(
 			PluginName: plugin.ScriptName,
 			RuntimeId:  taskId,
 			Proxy:      "",
+			Ctx:        ctx,
 		})
-		yak.HookEngineContext(engine, ctx)
 		engine.SetVar("REQUEST", target.Request)
+		engine.SetVar("RESPONSE", target.Response)
 		engine.SetVar("HTTPS", target.IsHttps)
 		engine.SetVar("PLUGIN", plugin)
 		engine.SetVar("CTX", ctx)
@@ -320,9 +345,10 @@ func (s *Server) PluginGenerator(l *list.List, ctx context.Context, plugin *ypb.
 }
 
 type HybridScanTarget struct {
-	IsHttps bool
-	Request []byte
-	Url     string
+	IsHttps  bool
+	Request  []byte
+	Response []byte
+	Url      string
 }
 
 func (s *Server) TargetGenerator(ctx context.Context, targetConfig *ypb.HybridScanInputTarget) (chan *HybridScanTarget, error) {

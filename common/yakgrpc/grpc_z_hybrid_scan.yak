@@ -10,9 +10,11 @@ https := !!(HTTPS)
 callerFilter := CALLER_FILTER != undefined ? CALLER_FILTER : str.NewFilter()
 
 caller := hook.NewMixPluginCallerWithFilter(callerFilter)~
-caller.LoadPlugin(plugin.ScriptName)~
+caller.SetCache(true)
+caller.SetRuntimeId(RUNTIME_ID)
+caller.LoadPluginByName(CTX,plugin.ScriptName,[])~
 
-needResponse := plugin.Type == "mitm"
+needResponse := plugin.Type == "mitm" && RESPONSE == undefined
 
 // handle response
 var responseBytes = []byte{}
@@ -23,6 +25,9 @@ try {
         if len(responseBytes) > 0 {
             _, responseBody = poc.Split(responseBytes)
         }
+    }else{
+        responseBytes = RESPONSE
+       _, responseBody = poc.Split(responseBytes)
     }
 } catch err {
     log.warn(f"load RESPONSE failed ${err}")
