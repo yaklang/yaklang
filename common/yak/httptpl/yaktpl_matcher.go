@@ -35,6 +35,7 @@ type YakMatcher struct {
 	// word
 	// regexp
 	// expr
+	Id          int
 	MatcherType string
 	/*
 		nuclei-dsl

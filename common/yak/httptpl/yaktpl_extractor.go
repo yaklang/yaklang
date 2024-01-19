@@ -32,6 +32,7 @@ func NewExtractorFromGRPCModel(m *ypb.HTTPResponseExtractor) *YakExtractor {
 }
 
 type YakExtractor struct {
+	Id int
 	Name string // name or index
 
 	// regexp
