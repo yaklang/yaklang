@@ -721,32 +721,11 @@ info:
     sign: 1203fbcb93204b12702f78c74186a6cd
 
 http:
-- raw:
-  - |-
-    @timeout: 30s
-    POST /?action=getTitle1 HTTP/1.1
-    Content-Type: application/json
-    Host: {{Hostname}}
-    Content-Length: 16
-
-    {"key": "value"}
-  - |-
-    @timeout: 30s
-    POST /?action=getTitle2 HTTP/1.1
-    Content-Type: application/json
-    Host: {{Hostname}}
-    Content-Length: 16
-
-    {"key": "value"}
-  - |-
-    @timeout: 30s
-    POST /?check={{title}} HTTP/1.1
-    Content-Type: application/json
-    Host: {{Hostname}}
-    Content-Length: 16
-
-    {"key": "value"}
-
+- method: GET
+  path:
+  - '{{RootURL}}/?action=getTitle1'
+  - '{{RootURL}}/?action=getTitle2'
+  - '{{RootURL}}/?check={{title}}'
   max-redirects: 3
   cookie-reuse: true
   matchers-condition: and
@@ -781,32 +760,11 @@ info:
     sign: 1203fbcb93204b12702f78c74186a6cd
 
 http:
-- raw:
-  - |-
-    @timeout: 30s
-    POST /?action=getTitle1 HTTP/1.1
-    Content-Type: application/json
-    Host: {{Hostname}}
-    Content-Length: 16
-
-    {"key": "value"}
-  - |-
-    @timeout: 30s
-    POST /?action=getTitle2 HTTP/1.1
-    Content-Type: application/json
-    Host: {{Hostname}}
-    Content-Length: 16
-
-    {"key": "value"}
-  - |-
-    @timeout: 30s
-    POST /?check={{title}} HTTP/1.1
-    Content-Type: application/json
-    Host: {{Hostname}}
-    Content-Length: 16
-
-    {"key": "value"}
-
+- method: GET
+  path:
+  - '{{RootURL}}/?action=getTitle1'
+  - '{{RootURL}}/?action=getTitle2'
+  - '{{RootURL}}/?check={{title}}'
   max-redirects: 3
   cookie-reuse: true
   matchers-condition: and

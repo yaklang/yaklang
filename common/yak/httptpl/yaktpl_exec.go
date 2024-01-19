@@ -3,11 +3,14 @@ package httptpl
 import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	utils2 "github.com/yaklang/yaklang/common/yak/httptpl/utils"
+	"net/url"
+	"strings"
 	"sync/atomic"
 	"time"
 )
@@ -40,11 +43,19 @@ func (y *YakTemplate) GenerateRequestSequences(u string) []*RequestBulk {
 				log.Error(err)
 				continue
 			}
-			isHttps, packet, err := lowhttp.ParseUrlToHttpRequestRaw(sequenceCfg.Method, path)
+			isHttps := strings.HasPrefix(strings.ToLower(path), "https://")
+			//isHttps, packet, err := lowhttp.ParseUrlToHttpRequestRaw(sequenceCfg.Method, path)
+			uarlIns, err := url.Parse(path)
 			if err != nil {
 				log.Error(err)
 				continue
 			}
+			packetStr := fmt.Sprintf(`%s %s HTTP/1.1
+Host: %s
+User-Agent: %s
+`, sequenceCfg.Method, uarlIns.RequestURI(), uarlIns.Host, consts.DefaultUserAgent)
+
+			packet := []byte(packetStr)
 			for k, v := range sequenceCfg.Headers {
 				packet = lowhttp.ReplaceHTTPPacketHeader(packet, k, v)
 			}
