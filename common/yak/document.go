@@ -53,6 +53,32 @@ func ClearHelper(helper *yakdoc.DocumentHelper) {
 	clearFieldParamsType(helper.Functions)
 }
 
+func GetDeprecatedFunctionDecls(helper *yakdoc.DocumentHelper) []*yakdoc.FuncDecl {
+	getDeprecatedFunctionList := func(funcs map[string]*yakdoc.FuncDecl) []*yakdoc.FuncDecl {
+		results := make([]*yakdoc.FuncDecl, 0)
+		for _, funcDecl := range funcs {
+			if funcDecl.Document == "" {
+				continue
+			}
+			if strings.Contains(funcDecl.Document, "! 已弃用") {
+				results = append(results, funcDecl)
+			}
+		}
+		return results
+	}
+	results := make([]*yakdoc.FuncDecl, 0)
+	results = append(results, getDeprecatedFunctionList(helper.Functions)...)
+	for _, lib := range helper.Libs {
+		results = append(results, getDeprecatedFunctionList(lib.Functions)...)
+	}
+
+	for _, lib := range helper.StructMethods {
+		results = append(results, getDeprecatedFunctionList(lib.Functions)...)
+	}
+
+	return results
+}
+
 func IsSameTypeName(typName1, typName2 string) bool {
 	return typName1 == typName2 || "*"+typName1 == typName2 || typName1 == "*"+typName2
 }
@@ -547,6 +573,7 @@ func EngineToDocumentHelperWithVerboseInfo(engine *antlr4yak.Engine) *yakdoc.Doc
 	// 调用回调，注入一些其他的函数注释
 	helper.Callback()
 	ClearHelper(helper)
+	helper.DeprecatedFunctions = GetDeprecatedFunctionDecls(helper)
 	return helper
 }
 
