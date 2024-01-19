@@ -63,8 +63,8 @@ func (s *Server) execScriptWithExecParam(scriptName string, input string, stream
 		yak.BindYakitPluginContextToEngine(engine, &yak.YakitPluginContext{
 			PluginName: scriptName,
 			RuntimeId:  runtimeId,
+			Ctx:        stream.Context(),
 		})
-		yak.HookEngineContext(engine, stream.Context())
 		return nil
 	})
 	sendLog := func(res interface{}) {
@@ -345,8 +345,8 @@ func (s *Server) execScriptWithRequest(scriptName string, targetInput string, st
 		yak.BindYakitPluginContextToEngine(engine, &yak.YakitPluginContext{
 			PluginName: scriptName,
 			RuntimeId:  runtimeId,
+			Ctx:        stream.Context(),
 		})
-		yak.HookEngineContext(engine, stream.Context())
 		return nil
 	})
 	subEngine, err := engine.ExecuteExWithContext(stream.Context(), debugScript, map[string]any{
@@ -356,6 +356,7 @@ func (s *Server) execScriptWithRequest(scriptName string, targetInput string, st
 		"IS_URL_PARAM": isUrlParam,
 		"PLUGIN_TYPE":  strings.ToLower(debugType),
 		"IS_SMOKING":   isSmoking,
+		"RUNTIME_ID":   runtimeId,
 	})
 	if err != nil {
 		log.Warnf("execute debug script failed: %v", err)
