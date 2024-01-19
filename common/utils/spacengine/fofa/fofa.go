@@ -23,11 +23,12 @@ type Fofa struct {
 
 // User struct for fofa user
 type User struct {
-	Email  string `json:"email,omitempty"`
-	Fcoin  int    `json:"fcoin,omitempty"`
-	Vip    bool   `json:"bool,omitempty"`
-	Avatar string `json:"avatar,omitempty"`
-	Err    string `json:"errmsg,omitempty"`
+	Email          string `json:"email,omitempty"`
+	Fcoin          int    `json:"fcoin,omitempty"`
+	Vip            bool   `json:"bool,omitempty"`
+	RemainApiQuery int64    `json:"remain_api_query,omitempty"`
+	Avatar         string `json:"avatar,omitempty"`
+	Err            string `json:"errmsg,omitempty"`
 }
 
 const (

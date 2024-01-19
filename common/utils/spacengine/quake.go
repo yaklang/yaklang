@@ -38,6 +38,9 @@ func QuakeQuery(key string, filter string, maxPage, maxRecord int) (chan *NetSpa
 			data := result.Get("data").Array()
 
 			for _, d := range data {
+				if nextFinished {
+					break
+				}
 				ip, port := d.Get("ip").String(), int(d.Get("port").Int())
 				log.Infof("quake fetch: %v", utils.HostPort(ip, port))
 
