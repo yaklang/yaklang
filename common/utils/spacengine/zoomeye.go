@@ -107,6 +107,9 @@ func ZoomeyeQuery(key, query string, maxPage, maxRecord int) (chan *NetSpaceEngi
 			}
 
 			for _, record := range zoomeyeResultToSpacengineList(query, result) {
+				if nextFinished {
+					break
+				}
 				ch <- record
 				count++
 				if maxRecord > 0 && count >= maxRecord {

@@ -78,28 +78,34 @@ func fixUTF8(i string) string {
 }
 
 func (s *Server) QueryPorts(ctx context.Context, req *ypb.QueryPortsRequest) (*ypb.QueryPortsResponse, error) {
-	p, res, err := yakit.QueryPorts(s.GetProjectDatabase(), req)
-	if err != nil {
-		return nil, err
-	}
 	var results []*ypb.Port
-	if !req.GetAll() { // 分页
-		for _, r := range res {
-			results = append(results, ToGrpcPort(r))
-		}
-	} else { // 全部
+	if req.GetAll() {
 		db := yakit.FilterPort(s.GetProjectDatabase(), req)
+		count := bizhelper.QueryCount(db, &yakit.Port{}, nil)
+		db = bizhelper.QueryOrder(db, req.GetOrderBy(), req.GetOrder())
 		data := yakit.YieldPorts(db, context.Background())
 		for r := range data {
 			results = append(results, ToGrpcPort(r))
 		}
+		return &ypb.QueryPortsResponse{
+			Pagination: req.Pagination,
+			Total:      int64(count),
+			Data:       results,
+		}, nil
+	} else { // 全部
+		p, res, err := yakit.QueryPorts(s.GetProjectDatabase(), req) // Query ports by pagination and query total count
+		if err != nil {
+			return nil, err
+		}
+		for _, r := range res {
+			results = append(results, ToGrpcPort(r))
+		}
+		return &ypb.QueryPortsResponse{
+			Pagination: req.Pagination,
+			Total:      int64(p.TotalRecord),
+			Data:       results,
+		}, nil
 	}
-
-	return &ypb.QueryPortsResponse{
-		Pagination: req.Pagination,
-		Total:      int64(p.TotalRecord),
-		Data:       results,
-	}, nil
 }
 
 func ToGrpcPort(r *yakit.Port) *ypb.Port {

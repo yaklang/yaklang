@@ -81,7 +81,8 @@ func ConfigureNetWork(c *ypb.GlobalNetworkConfig) {
 
 	consts.GLOBAL_HTTP_FLOW_SAVE.SetTo(!c.GetSkipSaveHTTPFlow())
 	consts.SetGlobalHTTPAuthInfo(c.GetAuthInfos())
-
+	c.GetAppConfigs()
+	consts.ClearThirdPartyApplicationConfig()
 	for _, r := range c.GetAppConfigs() {
 		consts.UpdateThirdPartyApplicationConfig(r)
 	}

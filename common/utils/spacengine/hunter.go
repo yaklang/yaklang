@@ -106,6 +106,9 @@ func HunterQuery(name, key, query string, maxPage, pageSize, maxRecord int) (cha
 			}
 
 			for _, record := range resultToSpacengineList(query, result) {
+				if nextFinished {
+					break
+				}
 				ch <- record
 				count++
 				if maxRecord > 0 && count >= maxRecord {
