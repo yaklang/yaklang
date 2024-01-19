@@ -42,7 +42,12 @@ func AllThirdPartyApplicationConfig() []*ypb.ThirdPartyApplicationConfig {
 	})
 	return configs
 }
-
+func ClearThirdPartyApplicationConfig() {
+	thirdPartyConfig.Range(func(key, value interface{}) bool {
+		thirdPartyConfig.Delete(key)
+		return true
+	})
+}
 func UpdateThirdPartyApplicationConfig(config *ypb.ThirdPartyApplicationConfig) {
 	if config.Type == "" {
 		return

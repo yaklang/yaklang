@@ -620,8 +620,14 @@ service Yak {
   rpc DeleteHybridScanTask(DeleteHybridScanTaskRequest) returns (Empty);
 
   rpc GetSpaceEngineStatus(GetSpaceEngineStatusRequest) returns(SpaceEngineStatus);
+  rpc GetSpaceEngineAccountStatus(GetSpaceEngineAccountStatusRequest) returns(SpaceEngineStatus);
   rpc FetchPortAssetFromSpaceEngine(FetchPortAssetFromSpaceEngineRequest) returns (stream ExecResult);
 
+}
+message GetSpaceEngineAccountStatusRequest {
+  string Type = 1;
+  string Key = 2;
+  string Account = 3;
 }
 
 message GetSpaceEngineStatusRequest {
@@ -3308,6 +3314,13 @@ message QueryPortsRequest {
   string ComplexSelect = 10;
   string Proto = 11;
   string RuntimeId = 12;
+
+  int64 BeforeUpdatedAt = 13;
+  int64 AfterUpdatedAt = 14;
+  int64 AfterId = 15;
+  int64 BeforeId = 16;
+  string OrderBy = 17;
+  string Order = 18;
 }
 
 message QueryPortsResponse {

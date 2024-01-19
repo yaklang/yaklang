@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"context"
+	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
@@ -152,6 +153,19 @@ func QueryPorts(db *gorm.DB, params *ypb.QueryPortsRequest) (*bizhelper.Paginato
 		}
 	}
 
+	if params.GetAfterUpdatedAt() > 0 {
+		db = bizhelper.QueryByTimeRangeWithTimestamp(db, "updated_at", params.GetAfterUpdatedAt(), time.Now().Add(10*time.Minute).Unix())
+	}
+	if params.GetBeforeUpdatedAt() > 0 {
+		db = bizhelper.QueryByTimeRangeWithTimestamp(db, "updated_at", 0, params.GetBeforeUpdatedAt())
+	}
+	if params.GetAfterId() > 0 {
+		db = db.Where("id > ?", params.GetAfterId())
+	}
+	if params.GetBeforeId() > 0 {
+		db = db.Where("id < ?", params.GetBeforeId())
+	}
+
 	p := params.Pagination
 	db = bizhelper.QueryOrder(db, p.OrderBy, p.Order)
 	db = FilterPort(db, params)
@@ -196,9 +210,10 @@ func FilterPort(db *gorm.DB, params *ypb.QueryPortsRequest) *gorm.DB {
 	}
 	if params.GetRuntimeId() != "" {
 		db = db.Where("runtime_id = ?", params.GetRuntimeId())
-	} else {
-		db = db.Where("runtime_id is null OR (runtime_id = '')")
 	}
+	//else {
+	//	db = db.Where("runtime_id is null OR (runtime_id = '')")
+	//}
 	return db
 }
 

@@ -1,7 +1,9 @@
 package spacengine
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -9,6 +11,37 @@ import (
 	"github.com/yaklang/yaklang/common/utils/spacengine/go-shodan"
 )
 
+var defaultHttpClient = utils.NewDefaultHTTPClient()
+
+type ShodanUser struct {
+	Member      bool        `json:"member"`
+	Credits     int         `json:"credits"`
+	DisplayName interface{} `json:"display_name"`
+	Created     string      `json:"created"`
+}
+
+func ShodanUserProfile(key string) (*ShodanUser, error) {
+	profileApi := "https://api.shodan.io/account/profile?key="
+	profileApi = fmt.Sprintf("%s%s", profileApi, key)
+	rsp, err := defaultHttpClient.Get(profileApi)
+	if err != nil {
+		return nil, err
+	}
+	if rsp.StatusCode != 200 {
+		return nil, utils.Errorf("[%v]: invalid status code", rsp.StatusCode)
+	}
+	var user ShodanUser
+	body, err := io.ReadAll(rsp.Body)
+	if err != nil {
+		return nil, err
+	}
+	defer rsp.Body.Close()
+	err = json.Unmarshal(body, &user)
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
 func interfaceArrayToString(rets []interface{}) string {
 	var r []string
 	for _, i := range rets {
@@ -72,6 +105,9 @@ func ShodanQuery(key string, filter string, maxPage, maxRecord int) (chan *NetSp
 					return
 				}
 				for _, port := range hostResult.Ports {
+					if nextFinished {
+						break
+					}
 					tmpR := &NetSpaceEngineResult{
 						Addr:            utils.HostPort(hostResult.IPStr, port),
 						FromEngine:      "shodan",

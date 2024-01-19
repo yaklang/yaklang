@@ -45,6 +45,9 @@ func FofaQuery(email string, fofaKey string, filter string, maxPage, pageSize, m
 			rResults := result.Get("results").Array()
 
 			for _, r := range rResults {
+				if nextFinished {
+					break
+				}
 				rData := r.Array()
 				if len(rData) < 7 {
 					continue
