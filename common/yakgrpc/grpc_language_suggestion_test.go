@@ -67,8 +67,8 @@ prog.
 			return item.Label
 		})
 		log.Info("got: ", got)
-		want := []string{"Programe", "Ref"}
-		if utils.StringSliceContainsAll(got, want...) {
+		want := []string{"Program", "Ref"}
+		if !utils.StringSliceContainsAll(got, want...) {
 			t.Fatalf("want %v, but got %v", want, got)
 		}
 	})
@@ -89,7 +89,7 @@ rsp.
 		})
 		log.Info("got: ", got)
 		want := []string{"Response", "Body", "Status", "Data"}
-		if utils.StringSliceContainsAll(got, want...) {
+		if !utils.StringSliceContainsAll(got, want...) {
 			t.Fatalf("want %v, but got %v", want, got)
 		}
 	})
