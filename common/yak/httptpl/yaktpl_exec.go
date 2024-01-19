@@ -53,6 +53,7 @@ func (y *YakTemplate) GenerateRequestSequences(u string) []*RequestBulk {
 			packetStr := fmt.Sprintf(`%s %s HTTP/1.1
 Host: %s
 User-Agent: %s
+
 `, sequenceCfg.Method, uarlIns.RequestURI(), uarlIns.Host, consts.DefaultUserAgent)
 
 			packet := []byte(packetStr)
