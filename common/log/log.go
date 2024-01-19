@@ -222,6 +222,8 @@ var (
 )
 
 func SetLevel(level golog.Level) {
+	lock.Lock()
+	defer lock.Unlock()
 	DefaultLogger.Level = level
 	for _, l := range loggers {
 		l.Level = level
@@ -233,6 +235,8 @@ func GetLevel() golog.Level {
 }
 
 func SetOutput(w io.Writer) {
+	lock.Lock()
+	defer lock.Unlock()
 	DefaultLogger.SetOutput(w)
 	for _, l := range loggers {
 		l.SetOutput(w)
