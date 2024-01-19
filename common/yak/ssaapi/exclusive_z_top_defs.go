@@ -149,6 +149,14 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		return Values{}
 	}
 
+	// hook everynode
+	if actx.config.HookEveryNode != nil {
+		if err := actx.config.HookEveryNode(i); err != nil {
+			log.Errorf("hook-every-node error: %v", err)
+			return Values{}
+		}
+	}
+
 	switch ret := i.node.(type) {
 	case *ssa.Field:
 		return i.visitedDefsDefault(actx)
