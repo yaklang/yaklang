@@ -4,8 +4,10 @@ import (
 	"container/list"
 	"encoding/json"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -82,18 +84,37 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 	riskCount, _ := yakit.CountRiskByRuntimeId(s.GetProfileDatabase(), task.TaskId)
 	resumeFilterManager := NewFilterManager(12, 1<<15, 30)
 
+	matcher, err := fp.NewDefaultFingerprintMatcher(fp.NewConfig(fp.WithDatabaseCache(true), fp.WithCache(true)))
+	if err != nil {
+		return utils.Wrap(err, "init fingerprint matcher failed")
+	}
 	// dispatch
 	for _, __currentTarget := range targets {
 		statusManager.DoActiveTarget()
 		feedbackStatus()
 
+		targetWg := new(sync.WaitGroup)
+
+		// just request once
+		resp, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes(__currentTarget.Request), lowhttp.WithHttps(__currentTarget.IsHttps))
+		if err != nil {
+			log.Errorf("request target failed: %s", err)
+			continue
+		}
+		__currentTarget.Response = resp.RawPacket
+
+		// fingerprint match just once
+		host, port, _ := utils.ParseStringToHostPort(__currentTarget.Url)
+		_, err = matcher.Match(host, port)
+		if err != nil {
+			log.Errorf("match fingerprint failed: %s", err)
+		}
 		// load plugins
 		pluginChan, err := s.PluginGenerator(pluginCacheList, manager.Context(), &ypb.HybridScanPluginConfig{PluginNames: pluginName})
 		if err != nil {
 			return utils.Wrapf(err, "PluginGenerator")
 		}
 
-		targetWg := new(sync.WaitGroup)
 		for __pluginInstance := range pluginChan {
 			targetRequestInstance := __currentTarget
 			pluginInstance := __pluginInstance
