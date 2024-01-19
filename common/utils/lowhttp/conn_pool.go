@@ -544,21 +544,19 @@ func (pc *persistConn) writeLoop() {
 		case wr := <-pc.writeCh:
 			count++
 			_, err := pc.bw.Write(wr.reqPacket)
-			if err == nil {
+			if err != nil {
 				err = pc.bw.Flush()
 				pc.serverStartTime = time.Now()
 			}
-			wr.ch <- err //to exec.go
+			wr.ch <- err
 			if err != nil {
 				pc.writeErrCh <- err
-				//log.Infof("!!!conn [%v] connect [%v] has be writed [%d]", pc.Conn.LocalAddr(), pc.cacheKey.addr, count)
 				return
 			}
 			pc.mu.Lock()
 			pc.numExpectedResponses++
 			pc.mu.Unlock()
 		case <-pc.closeCh:
-			//log.Infof("!!!conn [%v] connect [%v] has be writed [%d]", pc.Conn.LocalAddr(), pc.cacheKey.addr, count)
 			return
 		}
 	}
