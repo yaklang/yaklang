@@ -373,7 +373,7 @@ func (s *Server) TargetGenerator(ctx context.Context, targetConfig *ypb.HybridSc
 	go func() {
 		defer close(outC)
 		if target != "" {
-			for _, line := range utils.ParseStringToLines(target) {
+			for _, line := range utils.PrettifyListFromStringSplitEx(target, "\n", "|", ",") {
 				outC <- line
 			}
 		}
