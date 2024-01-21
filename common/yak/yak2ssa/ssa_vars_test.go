@@ -500,7 +500,12 @@ func TestInclude(t *testing.T) {
 		t.Errorf("parse ssa failed: %v", prog.GetErrors())
 		t.Failed()
 	}
-	var a = prog.GetFunctionFast("c")
-	_ = a
-	spew.Dump(prog.GetErrors())
+	if len(prog.GetAndCreateMainFunction().GetReferenceFiles()) != 1 {
+		t.Fatal("include file error, ref files failed")
+	}
+
+	if prog.GetAndCreateMainFunction().GetReferenceFiles()[0] != fileName {
+		t.Fatal("include file error, ref files failed")
+	}
+	spew.Dump(fileName)
 }

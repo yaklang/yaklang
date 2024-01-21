@@ -1,7 +1,6 @@
 package yak2ssa
 
 import (
-	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"os"
@@ -12,8 +11,6 @@ import (
 func (s *astbuilder) buildInclude(i *yak.IncludeStmtContext) {
 	targetFile := i.StringLiteral().GetText()
 	targetFile, _ = strconv.Unquote(targetFile)
-
-	spew.Dump(targetFile)
 	var newCode string
 	if filepath.IsAbs(targetFile) {
 		codeRaw, _ := os.ReadFile(targetFile)
@@ -32,10 +29,15 @@ func (s *astbuilder) buildInclude(i *yak.IncludeStmtContext) {
 		return
 	}
 
+	s.recordIncludeFile(targetFile, newCode)
 	err := frontEnd(newCode, false, func(ast *yak.ProgramContext) {
 		s.build(ast)
 	})
 	if err != nil {
 		log.Errorf("yaklang builder include %v failed: %v", targetFile, err)
 	}
+}
+
+func (v *astbuilder) recordIncludeFile(i string, code string) {
+	v.Function.PushReferenceFile(i, code)
 }
