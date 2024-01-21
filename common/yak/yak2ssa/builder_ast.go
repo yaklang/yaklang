@@ -163,6 +163,10 @@ func (b *astbuilder) buildStatement(stmt *yak.StatementContext) {
 		return
 	}
 	//TODO: include stmt and check file path
+	if s, ok := stmt.IncludeStmt().(*yak.IncludeStmtContext); ok {
+		b.buildInclude(s)
+		return
+	}
 
 	// defer stmt
 	if s, ok := stmt.DeferStmt().(*yak.DeferStmtContext); ok {
