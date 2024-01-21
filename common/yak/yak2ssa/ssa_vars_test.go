@@ -2,6 +2,8 @@ package yak2ssa
 
 import (
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/consts"
 	"regexp"
 	"testing"
 
@@ -484,4 +486,21 @@ func TestExternLib(t *testing.T) {
 			t.Fatal("get test value error want:", want[i], " vs got:", values[i].String())
 		}
 	}
+}
+
+func TestInclude(t *testing.T) {
+	fileContent := `b=1; c = i => i;`
+	fileName := consts.TempFileFast(fileContent)
+	prog, err := ParseSSA(fmt.Sprintf(`include %#v; assert c(2) == 2; _ = e;`, fileName))
+	if err != nil {
+		t.Errorf("parse ssa failed: %v", err.Error())
+		t.Failed()
+	}
+	if len(prog.GetErrors()) != 1 {
+		t.Errorf("parse ssa failed: %v", prog.GetErrors())
+		t.Failed()
+	}
+	var a = prog.GetFunctionFast("c")
+	_ = a
+	spew.Dump(prog.GetErrors())
 }
