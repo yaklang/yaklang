@@ -287,6 +287,9 @@ type Function struct {
 	externInstance map[string]Value // lib and value
 	externType     map[string]Type
 
+	// include / require / eval-code / import packet
+	referenceFiles *omap.OrderedMap[string, string]
+
 	// ssa error
 	errComment ErrorComment
 
@@ -295,6 +298,10 @@ type Function struct {
 	builder *FunctionBuilder
 	// this function is variadic parameter, for function type create
 	hasEllipsis bool
+}
+
+func (f *Function) PushReferenceFile(file, code string) {
+	f.referenceFiles.Set(file, code)
 }
 
 func (f *Function) FirstBlockInstruction() []Instruction {

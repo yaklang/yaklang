@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/omap"
 
 	"github.com/samber/lo"
 )
@@ -37,6 +38,7 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		externInstance: make(map[string]Value),
 		externType:     make(map[string]Type),
 		builder:        nil,
+		referenceFiles: omap.NewOrderedMap(map[string]string{}),
 	}
 	f.SetName(name)
 	if parent != nil {
@@ -52,6 +54,10 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 
 func (f *Function) GetProgram() *Program {
 	return f.Package.Prog
+}
+
+func (f *Function) GetReferenceFiles() []string {
+	return f.referenceFiles.Keys()
 }
 
 func (f *Function) addAnonymous(anon *Function) {
@@ -89,8 +95,9 @@ func (f *Function) GetParent() *Function {
 // just create a function define, only function parameter type \ return type \ ellipsis
 func NewFunctionWithType(name string, typ *FunctionType) *Function {
 	f := &Function{
-		anInstruction: NewInstruction(),
-		anValue:       NewValue(),
+		anInstruction:  NewInstruction(),
+		anValue:        NewValue(),
+		referenceFiles: omap.NewOrderedMap(map[string]string{}),
 	}
 	f.SetType(typ)
 	f.SetName(name)
