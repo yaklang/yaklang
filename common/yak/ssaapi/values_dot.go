@@ -54,7 +54,6 @@ func _marshal(m *sync.Map, g *dot.Graph, self int, t *Value) {
 
 func (v *Value) Dot() string {
 	g := dot.New()
-	g.DrawMultipleEdges()
 	g.MakeDirected()
 	g.GraphAttribute("rankdir", "BT")
 

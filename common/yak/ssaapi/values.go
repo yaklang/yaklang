@@ -185,7 +185,8 @@ func (v *Value) NewWarn(tag, msg string) {
 	v.node.NewError(ssa.Warn, ssa.ErrorTag(tag), msg)
 }
 
-func (v *Value) String() string { return ssa.LineDisasm(v.node) }
+func (v *Value) String() string      { return ssa.LineDisasm(v.node) }
+func (v *Value) ShortString() string { return ssa.LineShortDisasm(v.node) }
 func (i *Value) StringWithSource() string {
 	if i.disasmLine == "" {
 		i.disasmLine = fmt.Sprintf("[%-6s] %s\t%s", i.node.GetOpcode(), ssa.LineDisasm(i.node), i.node.GetRange())
@@ -199,7 +200,11 @@ func (i *Value) GetVerboseName() string {
 	if i.node.GetName() != "" {
 		return i.node.GetName()
 	}
-	return fmt.Sprintf(`t%d: %v`, i.GetId(), i.String())
+	verboseName := i.node.GetVerboseName()
+	if verboseName != "" {
+		return fmt.Sprintf(`t%d: %v=%v`, i.GetId(), verboseName, i.ShortString())
+	}
+	return fmt.Sprintf(`t%d: %v`, i.GetId(), i.ShortString())
 }
 
 func (i *Value) Show()           { fmt.Println(i) }

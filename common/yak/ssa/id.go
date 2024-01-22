@@ -53,6 +53,7 @@ func (p *Program) SetInstructionWithName(name string, i Instruction) {
 		insts = make([]Instruction, 0, 1)
 		insts = append(insts, i)
 	}
+	i.SetVerboseName(name)
 	p.NameToInstructions.Set(name, insts)
 }
 
