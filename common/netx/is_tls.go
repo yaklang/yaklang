@@ -42,7 +42,7 @@ func IsTLSService(addr string, proxies ...string) bool {
 			//// 打印使用的密码套件
 			//log.Infof("Cipher Suite: %s\n", tls.CipherSuiteName(state.CipherSuite))
 		} else {
-			log.Errorf("TLS handshake failed: %v", err)
+			log.Infof("TLS handshake failed: %v", err)
 			// 检查错误消息中是否包含特定的TLS错误
 			if strings.Contains(err.Error(), "handshake failure") || strings.Contains(err.Error(), "protocol version not supported") || strings.HasSuffix(err.Error(), "unsupported elliptic curve") {
 				isHttps = true
