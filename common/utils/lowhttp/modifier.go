@@ -486,7 +486,7 @@ func DeleteHTTPPacketPostParam(packet []byte, key string) []byte {
 	})
 }
 
-// ReplaceHTTPPacketHeader 是一个辅助函数，用于改变请求报文，修改修改请求头，如果不存在则会增加
+// ReplaceHTTPPacketHeader 是一个辅助函数，用于改变请求报文，修改请求头，如果不存在则会增加
 // Example:
 // ```
 // poc.ReplaceHTTPPacketHeader(poc.BasicRequest(),"AAA", "BBB") // 修改AAA请求头的值为BBB，这里没有AAA请求头，所以会增加该请求头
@@ -526,6 +526,47 @@ func ReplaceHTTPPacketHeader(packet []byte, headerKey string, headerValue any) [
 	buf.WriteString(CRLF)
 	for _, line := range header {
 		buf.WriteString(line)
+		buf.WriteString(CRLF)
+	}
+	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
+}
+
+// ReplaceAllHTTPPacketHeaders 是一个辅助函数，用于改变请求报文，修改所有请求头
+// Example:
+// ```
+// poc.ReplaceAllHTTPPacketHeaders(poc.BasicRequest(), {"AAA": "BBB"}) // 修改所有请求头，这里没有AAA请求头，所以会增加该请求头
+// ```
+func ReplaceAllHTTPPacketHeaders(packet []byte, headers map[string]string) []byte {
+	var firstLine string
+	isChunked := false
+	host := ""
+	_, body := SplitHTTPPacket(packet, func(method string, requestUri string, proto string) error {
+		firstLine = method + " " + requestUri + " " + proto
+		return nil
+	}, func(proto string, code int, codeMsg string) error {
+		if codeMsg == "" {
+			firstLine = proto + " " + fmt.Sprint(code)
+		} else {
+			firstLine = proto + " " + fmt.Sprint(code) + " " + codeMsg
+		}
+		return nil
+	}, func(line string) string {
+		if IsHeader(line, "Host") {
+			splited := strings.Split(line, ":")
+			if len(splited) > 1 {
+				host = strings.TrimSpace(splited[1])
+			}
+		}
+		return line
+	})
+	var buf bytes.Buffer
+	buf.WriteString(firstLine)
+	buf.WriteString(CRLF)
+	if _, ok := headers["Host"]; !ok {
+		headers["Host"] = host
+	}
+	for key, value := range headers {
+		buf.WriteString(fmt.Sprintf("%s: %s", key, value))
 		buf.WriteString(CRLF)
 	}
 	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
