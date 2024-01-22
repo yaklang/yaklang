@@ -105,7 +105,7 @@ func (s *Server) HybridScan(stream ypb.Yak_HybridScanServer) error {
 		if err != nil {
 			return err
 		}
-		risks, err := yakit.GetRisksByRuntimeId(s.GetProfileDatabase(), taskId)
+		risks, err := yakit.GetRisksByRuntimeId(s.GetProjectDatabase(), taskId)
 		if err != nil {
 			return err
 		}
