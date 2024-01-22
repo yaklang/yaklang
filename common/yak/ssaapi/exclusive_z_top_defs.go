@@ -29,6 +29,10 @@ func (v *Value) GetDepth() int {
 }
 
 func (v *Value) AppendDependOn(i *Value) *Value {
+	if v.GetId() == i.GetId() {
+		return v
+	}
+
 	var existed bool
 	for _, node := range v.DependOn {
 		if node.GetId() == i.GetId() {
@@ -53,6 +57,10 @@ func (v *Value) AppendDependOn(i *Value) *Value {
 }
 
 func (v *Value) AppendEffectOn(i *Value) *Value {
+	if v.GetId() == i.GetId() {
+		return v
+	}
+
 	var existed bool
 	for _, node := range v.EffectOn {
 		if node.GetId() == i.GetId() {
@@ -124,7 +132,7 @@ func (i *Value) visitedDefsDefault(actx *AnalyzeContext) Values {
 			}
 		}
 	}
-	return vals.AppendEffectOn(i)
+	return vals
 }
 
 var (
@@ -182,9 +190,27 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 
 		// TODO: trace the specific return-values
 		callerValue := NewValue(caller)
+		callerFunc, isFunc := ssa.ToFunction(caller)
+		if !isFunc {
+			i.AppendDependOn(callerValue)
+			var nodes = Values{callerValue}
+			for _, val := range ret.Args {
+				arg := NewValue(val)
+				i.AppendDependOn(arg)
+				nodes = append(nodes, arg)
+			}
+			var results Values
+			for _, subNode := range nodes {
+				vals := subNode.getTopDefs(actx, opt...).AppendEffectOn(subNode)
+				results = append(results, vals...)
+			}
+			return results
+		}
+		_ = callerFunc
+
 		callerValue.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY, i)
 		callerValue.AppendEffectOn(i)
-		return callerValue.getTopDefs(actx).AppendEffectOn(callerValue)
+		return callerValue.getTopDefs(actx, opt...).AppendEffectOn(callerValue)
 	case *ssa.Function:
 		log.Info("ssa.Function checking...")
 		var vals Values

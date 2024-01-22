@@ -28,6 +28,8 @@ type Instruction interface {
 
 	GetName() string
 	SetName(variable string)
+	GetVerboseName() string
+	SetVerboseName(string)
 
 	GetId() int // for identify
 	SetId(int)
@@ -104,8 +106,9 @@ type anInstruction struct {
 	R     *Range
 	scope *Scope
 
-	name string
-	id   int
+	name        string
+	verboseName string // verbose name for output or debug or tag
+	id          int
 
 	isExtern  bool
 	variables map[string]*Variable
@@ -117,6 +120,20 @@ type anInstruction struct {
 
 func (i *anInstruction) AddMask(v Value) {
 	i.mask.Add(v)
+}
+
+func (i *anInstruction) GetVerboseName() string {
+	if i.verboseName != "" {
+		return i.verboseName
+	}
+	if i.name != "" {
+		return i.name
+	}
+	return ""
+}
+
+func (i *anInstruction) SetVerboseName(verbose string) {
+	i.verboseName = verbose
 }
 
 func (i *anInstruction) GetMask() []Value {
