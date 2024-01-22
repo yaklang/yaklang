@@ -155,6 +155,7 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 		return utils.Wrap(err, "init fingerprint matcher failed")
 	}
 	// start dispatch tasks
+	hasUnavailableTarget := false
 	for _, __currentTarget := range targetCached {
 		// load targets
 		statusManager.DoActiveTarget()
@@ -164,6 +165,7 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 		resp, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes(__currentTarget.Request), lowhttp.WithHttps(__currentTarget.IsHttps))
 		if err != nil {
 			log.Errorf("request target failed: %s", err)
+			hasUnavailableTarget = true
 			continue
 		}
 		__currentTarget.Response = resp.RawPacket
@@ -264,6 +266,10 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 	feedbackStatus()
 	if !manager.IsPaused() {
 		taskRecorder.Status = yakit.HYBRIDSCAN_DONE
+	}
+
+	if hasUnavailableTarget {
+		return utils.Errorf("Has unreachable target")
 	}
 	return nil
 }
