@@ -197,12 +197,14 @@ func (i *Value) StringWithSource() string {
 func (i *Value) GetName() string { return i.node.GetName() }
 
 func (i *Value) GetVerboseName() string {
-	if i.node.GetName() != "" {
-		return i.node.GetName()
-	}
-	verboseName := i.node.GetVerboseName()
-	if verboseName != "" {
-		return fmt.Sprintf(`t%d: %v=%v`, i.GetId(), verboseName, i.ShortString())
+	var name string
+	if name = i.node.GetName(); name != "" {
+		if i.IsPhi() {
+			return "[phi]: " + name
+		}
+		return name
+	} else if name = i.node.GetVerboseName(); name != "" {
+		return fmt.Sprintf(`t%d: %v=%v`, i.GetId(), name, i.ShortString())
 	}
 	return fmt.Sprintf(`t%d: %v`, i.GetId(), i.ShortString())
 }
