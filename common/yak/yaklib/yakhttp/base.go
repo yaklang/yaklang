@@ -9,34 +9,16 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
-	"strconv"
-	"sync"
-	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/http_struct"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 
 	"github.com/corpix/uarand"
 	"github.com/davecgh/go-spew/spew"
 )
-
-var getDefaultHTTPClient = utils.NewDefaultHTTPClient
-
-var ClientPool sync.Map
-
-func GetClient(session interface{}) *http.Client {
-	var client *http.Client
-
-	if iClient, ok := ClientPool.Load(session); !ok {
-		client = getDefaultHTTPClient()
-		ClientPool.Store(session, client)
-	} else {
-		client = iClient.(*http.Client)
-	}
-
-	return client
-}
 
 // dump 获取指定请求结构体引用或响应结构体引用的原始报文，返回原始报文与错误
 // Example:
@@ -98,16 +80,16 @@ func _dumpWithBody(i interface{}, body bool) (isReq bool, _ []byte, _ error) {
 		return false, raw, err
 	case http.Response:
 		return _dumpWithBody(&ret, body)
-	case YakHttpResponse:
+	case http_struct.YakHttpResponse:
 		return _dumpWithBody(ret.Response, body)
-	case *YakHttpResponse:
+	case *http_struct.YakHttpResponse:
 		if ret == nil {
-			return false, nil, utils.Error("nil YakHttpResponse for http.dump")
+			return false, nil, utils.Error("nil http_struct.YakHttpResponse for http.dump")
 		}
 		return _dumpWithBody(ret.Response, body)
-	case YakHttpRequest:
+	case http_struct.YakHttpRequest:
 		return _dumpWithBody(ret.Request, body)
-	case *YakHttpRequest:
+	case *http_struct.YakHttpRequest:
 		return _dumpWithBody(ret.Request, body)
 	default:
 		return false, nil, utils.Errorf("error type for http.dump, Type: [%v]", reflect.TypeOf(i))
@@ -148,25 +130,14 @@ func showhead(i interface{}) {
 	fmt.Println(string(rsp))
 }
 
-type YakHttpRequest struct {
-	*http.Request
-
-	timeout    time.Duration
-	proxies    func(req *http.Request) (*url.URL, error)
-	redirector func(i *http.Request, reqs []*http.Request) bool
-	session    interface{}
-}
-
-type HttpOption func(req *YakHttpRequest)
-
 // timeout 是一个请求选项参数，用于设置请求超时时间，单位是秒
 // Example:
 // ```
 // rsp, err = http.Get("http://www.yaklang.com", http.timeout(10))
 // ```
-func timeout(f float64) HttpOption {
-	return func(req *YakHttpRequest) {
-		req.timeout = utils.FloatSecondDuration(f)
+func timeout(f float64) http_struct.HttpOption {
+	return func(config *http_struct.HTTPConfig) {
+		config.Timeout = f
 	}
 }
 
@@ -188,9 +159,9 @@ func rawRequest(i interface{}) (*http.Request, error) {
 		return ret, nil
 	case http.Request:
 		return &ret, nil
-	case *YakHttpRequest:
+	case *http_struct.YakHttpRequest:
 		return ret.Request, nil
-	case YakHttpRequest:
+	case http_struct.YakHttpRequest:
 		return ret.Request, nil
 	default:
 		return nil, utils.Errorf("not a valid type: %v for req: %v", reflect.TypeOf(i), spew.Sdump(i))
@@ -204,15 +175,16 @@ func rawRequest(i interface{}) (*http.Request, error) {
 // ```
 // rsp, err = http.Get("http://www.yaklang.com", http.proxy("http://127.0.0.1:7890", "http://127.0.0.1:8083"))
 // ```
-func WithProxy(values ...string) HttpOption {
-	return func(req *YakHttpRequest) {
+func WithProxy(values ...string) http_struct.HttpOption {
+	return func(config *http_struct.HTTPConfig) {
 		values = utils.StringArrayFilterEmpty(values)
 		if len(values) <= 0 {
 			return
 		}
-		req.proxies = func(req *http.Request) (*url.URL, error) {
-			return url.Parse(values[0])
+		if len(config.Proxies) == 0 {
+			config.Proxies = make([]string, 0)
 		}
+		config.Proxies = append(config.Proxies, values...)
 	}
 }
 
@@ -223,18 +195,17 @@ func WithProxy(values ...string) HttpOption {
 // ```
 // req, err = http.NewRequest("GET", "http://www.yaklang.com", http.timeout(10))
 // ```
-func NewHttpNewRequest(method, url string, opts ...HttpOption) (*YakHttpRequest, error) {
+func NewHttpNewRequest(method, url string, opts ...http_struct.HttpOption) (*http_struct.YakHttpRequest, error) {
 	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	rawReq := &YakHttpRequest{
-		Request: req,
-	}
+	config := http_struct.NewHTTPConfig()
 	for _, op := range opts {
-		op(rawReq)
+		op(config)
 	}
+	rawReq := &http_struct.YakHttpRequest{Request: req, Config: config}
 	return rawReq, nil
 }
 
@@ -260,7 +231,7 @@ func GetAllBody(raw interface{}) []byte {
 			return nil
 		}
 		return rspRaw
-	case *YakHttpResponse:
+	case *http_struct.YakHttpResponse:
 		return GetAllBody(r.Response)
 	default:
 		log.Errorf("unsupported GetAllBody for %v", reflect.TypeOf(raw))
@@ -273,9 +244,16 @@ func GetAllBody(raw interface{}) []byte {
 // ```
 // rsp, err = http.Get("http://www.yaklang.com", http.params("a=b"), http.params("c=d"))
 // ```
-func GetParams(i interface{}) HttpOption {
-	return func(req *YakHttpRequest) {
-		req.URL.RawQuery = utils.UrlJoinParams(req.URL.RawQuery, i)
+func GetParams(i interface{}) http_struct.HttpOption {
+	return func(config *http_struct.HTTPConfig) {
+		params := utils.InterfaceToString(i)
+		values, _ := url.ParseQuery(params)
+
+		for k, v := range values {
+			if len(v) > 0 {
+				config.GetParams[k] = v[len(v)-1]
+			}
+		}
 	}
 }
 
@@ -284,7 +262,7 @@ func GetParams(i interface{}) HttpOption {
 // ```
 // rsp, err = http.Post("http://www.yaklang.com", http.postparams("a=b"), http.postparams("c=d"))
 // ```
-func PostParams(i interface{}) HttpOption {
+func PostParams(i interface{}) http_struct.HttpOption {
 	return Body(utils.UrlJoinParams("", i))
 }
 
@@ -298,38 +276,45 @@ func PostParams(i interface{}) HttpOption {
 func Do(i interface{}) (*http.Response, error) {
 	switch ret := i.(type) {
 	case *http.Request:
-		return Do(&YakHttpRequest{Request: ret})
+		return Do(&http_struct.YakHttpRequest{Request: ret})
 	case http.Request:
-		return Do(&YakHttpRequest{Request: &ret})
-	case *YakHttpRequest:
+		return Do(&http_struct.YakHttpRequest{Request: &ret})
+	case *http_struct.YakHttpRequest:
 	default:
 		return nil, utils.Errorf("not a valid type: %v for req: %v", reflect.TypeOf(i), spew.Sdump(i))
 	}
-	req, _ := i.(*YakHttpRequest)
-
-	var client *http.Client
-	if req.session != nil {
-		client = GetClient(req.session)
-	} else {
-		client = getDefaultHTTPClient()
+	yakHTTPRequest, _ := i.(*http_struct.YakHttpRequest)
+	config := yakHTTPRequest.Config
+	rawRequest, err := utils.DumpHTTPRequest(yakHTTPRequest.Request, true)
+	if err != nil {
+		return nil, err
 	}
 
-	httpTr := client.Transport.(*http.Transport)
-	httpTr.Proxy = req.proxies
-	if req.timeout > 0 {
-		client.Timeout = req.timeout
-	}
-	client.Transport = httpTr
-	if req.redirector != nil {
-		client.CheckRedirect = func(i *http.Request, via []*http.Request) error {
-			if !req.redirector(i, via) {
-				return utils.Errorf("user aborted...")
-			} else {
-				return nil
+	rsp, _, err := poc.HTTP(rawRequest,
+		poc.WithTimeout(config.Timeout),
+		poc.WithProxy(config.Proxies...),
+		poc.WithRedirectHandler(func(isHttps bool, req, rsp []byte) bool {
+			if config.Redirector != nil {
+				reqInstance, err := lowhttp.ParseBytesToHttpRequest(req)
+				if err != nil {
+					return config.Redirector(reqInstance, []*http.Request{reqInstance})
+				}
 			}
-		}
+			return true
+		}),
+		poc.WithSession(config.Session),
+		poc.WithReplaceAllHttpPacketQueryParams(config.GetParams),
+		poc.WithReplaceHttpPacketBody(config.Body, false),
+		poc.WithReplaceAllHttpPacketHeaders(config.Headers),
+	)
+	if err != nil {
+		return nil, err
 	}
-	return client.Do(req.Request)
+	rspInstance, err := lowhttp.ParseBytesToHTTPResponse(rsp)
+	if err != nil {
+		return nil, err
+	}
+	return rspInstance, nil
 }
 
 // uarand 返回一个随机的 User-Agent
@@ -346,9 +331,9 @@ func _getuarand() string {
 // ```
 // rsp, err = http.Get("http://www.yaklang.com", http.header("AAA", "BBB"))
 // ```
-func Header(key, value interface{}) HttpOption {
-	return func(req *YakHttpRequest) {
-		req.Header.Set(fmt.Sprint(key), fmt.Sprint(value))
+func Header(key, value interface{}) http_struct.HttpOption {
+	return func(config *http_struct.HTTPConfig) {
+		config.Headers[utils.InterfaceToString(key)] = utils.InterfaceToString(value)
 	}
 }
 
@@ -357,9 +342,9 @@ func Header(key, value interface{}) HttpOption {
 // ```
 // rsp, err = http.Get("http://www.yaklang.com", http.ua("yaklang-http"))
 // ```
-func UserAgent(value interface{}) HttpOption {
-	return func(req *YakHttpRequest) {
-		req.Header.Set("User-Agent", fmt.Sprint(value))
+func UserAgent(value interface{}) http_struct.HttpOption {
+	return func(config *http_struct.HTTPConfig) {
+		config.Headers["UserAgent"] = utils.InterfaceToString(value)
 	}
 }
 
@@ -368,9 +353,9 @@ func UserAgent(value interface{}) HttpOption {
 // ```
 // rsp, err = http.Get("http://www.yaklang.com", http.fakeua())
 // ```
-func FakeUserAgent() HttpOption {
-	return func(req *YakHttpRequest) {
-		req.Header.Set("User-Agent", _getuarand())
+func FakeUserAgent() http_struct.HttpOption {
+	return func(config *http_struct.HTTPConfig) {
+		config.Headers["UserAgent"] = _getuarand()
 	}
 }
 
@@ -380,9 +365,9 @@ func FakeUserAgent() HttpOption {
 // ```
 // rsp, err = http.Get("http://pie.dev/redirect/3", http.redirect(func(r, vias) bool { return true })
 // ```
-func RedirectHandler(c func(r *http.Request, vias []*http.Request) bool) HttpOption {
-	return func(req *YakHttpRequest) {
-		req.redirector = c
+func RedirectHandler(c func(r *http.Request, vias []*http.Request) bool) http_struct.HttpOption {
+	return func(config *http_struct.HTTPConfig) {
+		config.Redirector = c
 	}
 }
 
@@ -391,9 +376,9 @@ func RedirectHandler(c func(r *http.Request, vias []*http.Request) bool) HttpOpt
 // ```
 // rsp, err = http.Get("http://pie.dev/redirect/3", http.noredirect())
 // ```
-func NoRedirect() HttpOption {
-	return func(req *YakHttpRequest) {
-		req.redirector = func(r *http.Request, vias []*http.Request) bool {
+func NoRedirect() http_struct.HttpOption {
+	return func(config *http_struct.HTTPConfig) {
+		config.Redirector = func(r *http.Request, vias []*http.Request) bool {
 			return false
 		}
 	}
@@ -404,9 +389,9 @@ func NoRedirect() HttpOption {
 // ```
 // rsp, err = http.Get("http://www.yaklang.com", http.Cookie("a=b; c=d"))
 // ```
-func Cookie(value interface{}) HttpOption {
-	return func(req *YakHttpRequest) {
-		req.Header.Set("Cookie", fmt.Sprint(value))
+func Cookie(value interface{}) http_struct.HttpOption {
+	return func(config *http_struct.HTTPConfig) {
+		config.Headers["Cookie"] = utils.InterfaceToString(value)
 	}
 }
 
@@ -416,15 +401,15 @@ func Cookie(value interface{}) HttpOption {
 // ```
 // rsp, err = http.Post("https://pie.dev/post", http.header("Content-Type", "application/json"), http.json({"a": "b", "c": "d"}))
 // ```
-func JsonBody(value interface{}) HttpOption {
-	return func(req *YakHttpRequest) {
+func JsonBody(value interface{}) http_struct.HttpOption {
+	return func(config *http_struct.HTTPConfig) {
 		body, err := json.Marshal(value)
 		if err != nil {
 			log.Errorf("yak http.json cannot marshal json: %v\n  ORIGIN: %v\n", err, string(spew.Sdump(value)))
 			return
 		}
-		Body(body)(req)
-		Header("Content-Type", "application/json")(req)
+		config.Body = body
+		config.Headers["Content-Type"] = "application/json"
 	}
 }
 
@@ -433,8 +418,8 @@ func JsonBody(value interface{}) HttpOption {
 // ```
 // rsp, err = http.Post("https://pie.dev/post", http.body("a=b&c=d"))
 // ```
-func Body(value interface{}) HttpOption {
-	return func(req *YakHttpRequest) {
+func Body(value interface{}) http_struct.HttpOption {
+	return func(config *http_struct.HTTPConfig) {
 		var rc *bytes.Buffer
 		switch ret := value.(type) {
 		case string:
@@ -451,13 +436,7 @@ func Body(value interface{}) HttpOption {
 			rc = bytes.NewBufferString(fmt.Sprint(ret))
 		}
 		if rc != nil {
-			req.ContentLength = int64(len(rc.Bytes()))
-			buf := rc.Bytes()
-			req.GetBody = func() (io.ReadCloser, error) {
-				r := bytes.NewReader(buf)
-				return ioutil.NopCloser(r), nil
-			}
-			req.Body, _ = req.GetBody()
+			config.Body = rc.Bytes()
 		}
 	}
 }
@@ -467,9 +446,9 @@ func Body(value interface{}) HttpOption {
 // ```
 // rsp, err = http.Get("http://www.yaklang.com", http.session("request1"))
 // ```
-func Session(value interface{}) HttpOption {
-	return func(req *YakHttpRequest) {
-		req.session = value
+func Session(value interface{}) http_struct.HttpOption {
+	return func(session *http_struct.HTTPConfig) {
+		session.Session = value
 	}
 }
 
@@ -480,35 +459,37 @@ func Session(value interface{}) HttpOption {
 // ```
 // rsp, err = http.Request("POST","http://pie.dev/post", http.body("a=b&c=d"), http.timeout(10))
 // ```
-func httpRequest(method, url string, options ...HttpOption) (*YakHttpResponse, error) {
-	reqRaw, err := http.NewRequest(method, url, nil)
+func httpRequest(method, url string, options ...http_struct.HttpOption) (*http_struct.YakHttpResponse, error) {
+	config := http_struct.NewHTTPConfig()
+	for _, op := range options {
+		op(config)
+	}
+
+	lowhttpRspInst, _, err := poc.Do(method, url,
+		poc.WithTimeout(config.Timeout),
+		poc.WithProxy(config.Proxies...),
+		poc.WithRedirectHandler(func(isHttps bool, req, rsp []byte) bool {
+			if config.Redirector != nil {
+				reqInstance, err := lowhttp.ParseBytesToHttpRequest(req)
+				if err != nil {
+					return config.Redirector(reqInstance, []*http.Request{reqInstance})
+				}
+			}
+			return true
+		}),
+		poc.WithSession(config.Session),
+		poc.WithReplaceAllHttpPacketQueryParams(config.GetParams),
+		poc.WithReplaceHttpPacketBody(config.Body, false),
+		poc.WithReplaceAllHttpPacketHeaders(config.Headers),
+	)
 	if err != nil {
 		return nil, err
 	}
-
-	req := &YakHttpRequest{Request: reqRaw}
-	for _, opt := range options {
-		opt(req)
-	}
-	// client复用，实现会话管理
-	var client *http.Client
-	if req.session != nil {
-		client = GetClient(req.session)
-	} else {
-		client = getDefaultHTTPClient()
-	}
-
-	httpTr := client.Transport.(*http.Transport)
-	httpTr.Proxy = req.proxies
-	if req.timeout > 0 {
-		client.Timeout = req.timeout
-	}
-	client.Transport = httpTr
-	rspRaw, err := client.Do(req.Request)
+	rspInst, err := lowhttp.ParseBytesToHTTPResponse(lowhttpRspInst.RawPacket)
 	if err != nil {
 		return nil, err
 	}
-	return &YakHttpResponse{Response: rspRaw}, nil
+	return &http_struct.YakHttpResponse{Response: rspInst}, nil
 }
 
 // Get 根据指定的 URL 发起 GET 请求，它的第一个参数是 URL ，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如设置超时时间等
@@ -518,7 +499,7 @@ func httpRequest(method, url string, options ...HttpOption) (*YakHttpResponse, e
 // ```
 // rsp, err = http.Get("http://www.yaklang.com", http.timeout(10))
 // ```
-func _get(url string, options ...HttpOption) (*YakHttpResponse, error) {
+func _get(url string, options ...http_struct.HttpOption) (*http_struct.YakHttpResponse, error) {
 	return httpRequest("GET", url, options...)
 }
 
@@ -529,50 +510,8 @@ func _get(url string, options ...HttpOption) (*YakHttpResponse, error) {
 // ```
 // rsp, err = http.Post("http://pie.dev/post", http.body("a=b&c=d"), http.timeout(10))
 // ```
-func _post(url string, options ...HttpOption) (*YakHttpResponse, error) {
+func _post(url string, options ...http_struct.HttpOption) (*http_struct.YakHttpResponse, error) {
 	return httpRequest("POST", url, options...)
-}
-
-type YakHttpResponse struct {
-	*http.Response
-}
-
-func (y *YakHttpResponse) Json() interface{} {
-	data := y.Data()
-	if data == "" {
-		return nil
-	}
-	var i interface{}
-	err := json.Unmarshal([]byte(data), &i)
-	if err != nil {
-		log.Errorf("parse %v to json failed: %v", strconv.Quote(data), err)
-		return ""
-	}
-	return i
-}
-
-func (y *YakHttpResponse) Data() string {
-	if y.Response == nil {
-		log.Error("response empty")
-		return ""
-	}
-
-	if y.Response.Body == nil {
-		return ""
-	}
-
-	body, _ := ioutil.ReadAll(y.Response.Body)
-	y.Response.Body = ioutil.NopCloser(bytes.NewBuffer(body))
-	return string(body)
-}
-
-func (y *YakHttpResponse) GetHeader(key string) string {
-	return y.Response.Header.Get(key)
-}
-
-func (y *YakHttpResponse) Raw() []byte {
-	raw, _ := dumpWithBody(y, true)
-	return raw
 }
 
 var HttpExports = map[string]interface{}{

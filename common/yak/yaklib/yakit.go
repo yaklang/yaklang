@@ -4,6 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"os"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"time"
+
 	uuid "github.com/satori/go.uuid"
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/consts"
@@ -14,17 +22,11 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/cli"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/http_struct"
 	"github.com/yaklang/yaklang/common/utils/spacengine"
 	"github.com/yaklang/yaklang/common/yak/yaklib/yakhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io/ioutil"
-	"net/http"
-	"os"
-	"path/filepath"
-	"reflect"
-	"strings"
-	"time"
 )
 
 var emptyVirtualClient = NewVirtualYakitClient(func(i *ypb.ExecResult) error {
@@ -686,7 +688,7 @@ func updateOnlineYakitStore() error {
 	return nil
 }
 
-func generateYakitMITMHookParams(method string, url string, opts ...yakhttp.HttpOption) ([]interface{}, error) {
+func generateYakitMITMHookParams(method string, url string, opts ...http_struct.HttpOption) ([]interface{}, error) {
 	var isHttps = false
 	if strings.HasPrefix(url, "https://") {
 		isHttps = true

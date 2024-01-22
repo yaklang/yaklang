@@ -184,12 +184,12 @@ func ScanUrl(u string, opt ...interface{}) (count uint64) {
 func toConfig(opts ...interface{}) (*Config, *lowhttp.LowhttpExecConfig, []lowhttp.LowhttpOpt) {
 	var configOpt []ConfigOption
 	var lowhttpOpt []lowhttp.LowhttpOpt
-	var pocOpt []poc.PocConfig
+	var pocOpt []poc.PocConfigOption
 	for _, opt := range opts {
 		switch ret := opt.(type) {
 		case lowhttp.LowhttpOpt:
 			lowhttpOpt = append(lowhttpOpt, ret)
-		case poc.PocConfig:
+		case poc.PocConfigOption:
 			pocOpt = append(pocOpt, ret)
 		case ConfigOption:
 			configOpt = append(configOpt, ret)

@@ -14,8 +14,8 @@ import (
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/http_struct"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"github.com/yaklang/yaklang/common/yak/yaklib/yakhttp"
 
 	"github.com/pkg/errors"
 
@@ -36,7 +36,7 @@ var (
 	PoCOptWithProxy        = WithProxy
 )
 
-type _pocConfig struct {
+type PocConfig struct {
 	Host                 string
 	Port                 int
 	ForceHttps           bool
@@ -79,7 +79,7 @@ type _pocConfig struct {
 	RuntimeId  string
 }
 
-func (c *_pocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
+func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 	var opts []lowhttp.LowhttpOpt
 	if c.Host != "" {
 		opts = append(opts, lowhttp.WithHost(c.Host))
@@ -146,8 +146,8 @@ func (c *_pocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 	return opts
 }
 
-func NewDefaultPoCConfig() *_pocConfig {
-	config := &_pocConfig{
+func NewDefaultPoCConfig() *PocConfig {
+	config := &PocConfig{
 		Host:                   "",
 		Port:                   0,
 		ForceHttps:             false,
@@ -176,7 +176,7 @@ func NewDefaultPoCConfig() *_pocConfig {
 	return config
 }
 
-type PocConfig func(c *_pocConfig)
+type PocConfigOption func(c *PocConfig)
 
 // params 是一个请求选项参数，用于在请求时使用传入的值，需要注意的是，它可以很方便地使用str.f()代替
 // Example:
@@ -185,8 +185,8 @@ type PocConfig func(c *_pocConfig)
 // Host: pie.dev
 //
 // {"key": "{{params(a)}}"}`, poc.params({"a":"bbb"})) // 实际上发送的POST参数为{"key": "bbb"}
-func WithParams(i interface{}) PocConfig {
-	return func(c *_pocConfig) {
+func WithParams(i interface{}) PocConfigOption {
+	return func(c *PocConfig) {
 		c.FuzzParams = utils.InterfaceToMap(i)
 	}
 }
@@ -200,8 +200,8 @@ func WithParams(i interface{}) PocConfig {
 // return count >= 0
 // })) // 向 pie.edv 发起请求，使用自定义 redirectHandler 函数，使用count控制，进行最多3次重定向
 // ```
-func WithRedirectHandler(i func(isHttps bool, req, rsp []byte) bool) PocConfig {
-	return func(c *_pocConfig) {
+func WithRedirectHandler(i func(isHttps bool, req, rsp []byte) bool) PocConfigOption {
+	return func(c *PocConfig) {
 		c.RedirectHandler = i
 	}
 }
@@ -211,8 +211,8 @@ func WithRedirectHandler(i func(isHttps bool, req, rsp []byte) bool) PocConfig {
 // ```
 // poc.HTTP(poc.BasicRequest(), poc.retryTimes(5), poc.retryInStatusCode(500, 502)) // 向 example.com 发起请求，如果响应状态码500或502则进行重试，最多进行5次重试
 // ```
-func WithRetryTimes(t int) PocConfig {
-	return func(c *_pocConfig) {
+func WithRetryTimes(t int) PocConfigOption {
+	return func(c *PocConfig) {
 		c.RetryTimes = t
 	}
 }
@@ -222,8 +222,8 @@ func WithRetryTimes(t int) PocConfig {
 // ```
 // poc.HTTP(poc.BasicRequest(), poc.retryTimes(5), poc.retryInStatusCode(500, 502)) // 向 example.com 发起请求，如果响应状态码500或502则进行重试，最多进行5次重试
 // ```
-func WithRetryInStatusCode(codes ...int) PocConfig {
-	return func(c *_pocConfig) {
+func WithRetryInStatusCode(codes ...int) PocConfigOption {
+	return func(c *PocConfig) {
 		c.RetryInStatusCode = codes
 	}
 }
@@ -233,8 +233,8 @@ func WithRetryInStatusCode(codes ...int) PocConfig {
 // ```
 // poc.HTTP(poc.BasicRequest(), poc.retryTimes(5), poc.retryNotInStatusCode(200)) // 向 example.com 发起请求，如果响应状态码不等于200则进行重试，最多进行5次重试
 // ```
-func WithRetryNotInStausCode(codes ...int) PocConfig {
-	return func(c *_pocConfig) {
+func WithRetryNotInStausCode(codes ...int) PocConfigOption {
+	return func(c *PocConfig) {
 		c.RetryNotInStatusCode = codes
 	}
 }
@@ -244,8 +244,8 @@ func WithRetryNotInStausCode(codes ...int) PocConfig {
 // ```
 // poc.HTTP(poc.BasicRequest(), poc.retryTimes(5), poc.retryNotInStatusCode(200), poc.retryWaitTime(0.1)) // 向 example.com 发起请求，如果响应状态码不等于200则进行重试，最多进行5次重试，重试时最小等待0.1秒
 // ```
-func WithRetryWaitTime(f float64) PocConfig {
-	return func(c *_pocConfig) {
+func WithRetryWaitTime(f float64) PocConfigOption {
+	return func(c *PocConfig) {
 		c.RetryWaitTime = utils.FloatSecondDuration(f)
 	}
 }
@@ -255,8 +255,8 @@ func WithRetryWaitTime(f float64) PocConfig {
 // ```
 // poc.HTTP(poc.BasicRequest(), poc.retryTimes(5), poc.retryNotInStatusCode(200), poc.retryWaitTime(2)) // 向 example.com 发起请求，如果响应状态码不等于200则进行重试，最多进行5次重试，重试时最多等待2秒
 // ```
-func WithRetryMaxWaitTime(f float64) PocConfig {
-	return func(c *_pocConfig) {
+func WithRetryMaxWaitTime(f float64) PocConfigOption {
+	return func(c *PocConfig) {
 		c.RetryMaxWaitTime = utils.FloatSecondDuration(f)
 	}
 }
@@ -266,8 +266,8 @@ func WithRetryMaxWaitTime(f float64) PocConfig {
 // ```
 // poc.HTTP(poc.BasicRequest(), poc.redirectTimes(5)) // 向 example.com 发起请求，如果响应重定向到其他链接，则会自动跟踪重定向最多5次
 // ```
-func WithRedirectTimes(t int) PocConfig {
-	return func(c *_pocConfig) {
+func WithRedirectTimes(t int) PocConfigOption {
+	return func(c *PocConfig) {
 		c.RedirectTimes = t
 	}
 }
@@ -277,8 +277,8 @@ func WithRedirectTimes(t int) PocConfig {
 // ```
 // poc.HTTP(poc.BasicRequest(), poc.noFixContentLength()) // 向 example.com 发起请求，如果响应报文中的Content-Length字段不正确或不存在	也不会自动修复
 // ```
-func WithNoFixContentLength(b bool) PocConfig {
-	return func(c *_pocConfig) {
+func WithNoFixContentLength(b bool) PocConfigOption {
+	return func(c *PocConfig) {
 		c.NoFixContentLength = b
 	}
 }
@@ -288,8 +288,8 @@ func WithNoFixContentLength(b bool) PocConfig {
 // ```
 // poc.HTTP(poc.BasicRequest(), poc.noRedirect()) // 向 example.com 发起请求，如果响应重定向到其他链接也不会自动跟踪重定向
 // ```
-func WithNoRedirect(b bool) PocConfig {
-	return func(c *_pocConfig) {
+func WithNoRedirect(b bool) PocConfigOption {
+	return func(c *PocConfig) {
 		c.NoRedirect = b
 	}
 }
@@ -299,8 +299,8 @@ func WithNoRedirect(b bool) PocConfig {
 // ```
 // poc.HTTP(poc.BasicRequest(), poc.proxy("http://127.0.0.1:7890")) // 向 example.com 发起请求，使用 http://127.0.0.1:7890 代理
 // ```
-func WithProxy(proxies ...string) PocConfig {
-	return func(c *_pocConfig) {
+func WithProxy(proxies ...string) PocConfigOption {
+	return func(c *PocConfig) {
 		data := utils.StringArrayFilterEmpty(proxies)
 		if len(data) > 0 {
 			c.Proxy = proxies
@@ -313,8 +313,8 @@ func WithProxy(proxies ...string) PocConfig {
 // ```
 // poc.HTTP(poc.BasicRequest(), poc.https(true)) // 向 example.com 发起请求，使用 https 协议
 // ```
-func WithForceHTTPS(isHttps bool) PocConfig {
-	return func(c *_pocConfig) {
+func WithForceHTTPS(isHttps bool) PocConfigOption {
+	return func(c *PocConfig) {
 		c.ForceHttps = isHttps
 	}
 }
@@ -324,8 +324,8 @@ func WithForceHTTPS(isHttps bool) PocConfig {
 // ```
 // poc.Get("https://www.example.com", poc.http2(true), poc.https(true)) // 向 www.example.com 发起请求，使用 http2 协议
 // ```
-func WithForceHTTP2(isHttp2 bool) PocConfig {
-	return func(c *_pocConfig) {
+func WithForceHTTP2(isHttp2 bool) PocConfigOption {
+	return func(c *PocConfig) {
 		c.ForceHttp2 = isHttp2
 	}
 }
@@ -335,8 +335,8 @@ func WithForceHTTP2(isHttp2 bool) PocConfig {
 // ```
 // poc.Get("https://www.example.com", poc.timeout(15)) // 向 www.baidu.com 发起请求，读取超时时间为15秒
 // ```
-func WithTimeout(f float64) PocConfig {
-	return func(c *_pocConfig) {
+func WithTimeout(f float64) PocConfigOption {
+	return func(c *PocConfig) {
 		c.Timeout = utils.FloatSecondDuration(f)
 	}
 }
@@ -346,20 +346,20 @@ func WithTimeout(f float64) PocConfig {
 // ```
 // poc.HTTP(poc.BasicRequest(), poc.host("yaklang.com")) // 实际上请求 yaklang.com
 // ```
-func WithHost(h string) PocConfig {
-	return func(c *_pocConfig) {
+func WithHost(h string) PocConfigOption {
+	return func(c *PocConfig) {
 		c.Host = h
 	}
 }
 
-func WithRuntimeId(r string) PocConfig {
-	return func(c *_pocConfig) {
+func WithRuntimeId(r string) PocConfigOption {
+	return func(c *PocConfig) {
 		c.RuntimeId = r
 	}
 }
 
-func WithFromPlugin(b string) PocConfig {
-	return func(c *_pocConfig) {
+func WithFromPlugin(b string) PocConfigOption {
+	return func(c *PocConfig) {
 		c.FromPlugin = b
 	}
 }
@@ -385,8 +385,8 @@ func WithFromPlugin(b string) PocConfig {
 // )
 // time.Sleep(100)
 // ```
-func WithWebsocket(w bool) PocConfig {
-	return func(c *_pocConfig) {
+func WithWebsocket(w bool) PocConfigOption {
+	return func(c *PocConfig) {
 		c.Websocket = w
 	}
 }
@@ -412,8 +412,8 @@ func WithWebsocket(w bool) PocConfig {
 // )
 // time.Sleep(100)
 // ```
-func WithWebsocketHandler(w func(i []byte, cancel func())) PocConfig {
-	return func(c *_pocConfig) {
+func WithWebsocketHandler(w func(i []byte, cancel func())) PocConfigOption {
+	return func(c *PocConfig) {
 		c.WebsocketHandler = w
 	}
 }
@@ -439,8 +439,8 @@ func WithWebsocketHandler(w func(i []byte, cancel func())) PocConfig {
 // )
 // time.Sleep(100)
 // ```
-func WithWebsocketClientHandler(w func(c *lowhttp.WebsocketClient)) PocConfig {
-	return func(c *_pocConfig) {
+func WithWebsocketClientHandler(w func(c *lowhttp.WebsocketClient)) PocConfigOption {
+	return func(c *PocConfig) {
 		c.WebsocketClientHandler = w
 	}
 }
@@ -450,8 +450,8 @@ func WithWebsocketClientHandler(w func(c *lowhttp.WebsocketClient)) PocConfig {
 // ```
 // poc.HTTP(poc.BasicRequest(), poc.host("yaklang.com"), poc.port(443), poc.https(true)) // 实际上请求 yaklang.com 的443端口
 // ```
-func WithPort(port int) PocConfig {
-	return func(c *_pocConfig) {
+func WithPort(port int) PocConfigOption {
+	return func(c *PocConfig) {
 		c.Port = port
 	}
 }
@@ -461,8 +461,8 @@ func WithPort(port int) PocConfig {
 // ```
 // poc.HTTP(poc.BasicRequest(), poc.redirectTimes(5), poc.jsRedirect(true)) // 向 www.baidu.com 发起请求，如果响应重定向到其他链接也会自动跟踪JS重定向，最多进行5次重定向
 // ```
-func WithJSRedirect(b bool) PocConfig {
-	return func(c *_pocConfig) {
+func WithJSRedirect(b bool) PocConfigOption {
+	return func(c *PocConfig) {
 		c.JsRedirect = b
 	}
 }
@@ -473,8 +473,8 @@ func WithJSRedirect(b bool) PocConfig {
 // poc.Get("https://pie.dev/cookies/set/AAA/BBB", poc.session("test")) // 向 pie.dev 发起第一次请求，这会设置一个名为AAA，值为BBB的cookie
 // rsp, req, err = poc.Get("https://pie.dev/cookies", poc.session("test")) // 向 pie.dev 发起第二次请求，这个请求会输出所有的cookies，可以看到第一次请求设置的cookie已经存在了
 // ```
-func WithSession(i interface{}) PocConfig {
-	return func(c *_pocConfig) {
+func WithSession(i interface{}) PocConfigOption {
+	return func(c *PocConfig) {
 		c.Session = i
 	}
 }
@@ -484,8 +484,8 @@ func WithSession(i interface{}) PocConfig {
 // ```
 // poc.Get("https://exmaple.com", poc.save(true)) // 向 example.com 发起请求，会将此次请求保存到数据库中
 // ```
-func WithSave(i bool) PocConfig {
-	return func(c *_pocConfig) {
+func WithSave(i bool) PocConfigOption {
+	return func(c *PocConfig) {
 		c.SaveHTTPFlow = i
 	}
 }
@@ -495,8 +495,8 @@ func WithSave(i bool) PocConfig {
 // ```
 // poc.Get("https://exmaple.com", poc.save(true), poc.source("test")) // 向 example.com 发起请求，会将此次请求保存到数据库中，指示此次请求的来源为test
 // ```
-func WithSource(i string) PocConfig {
-	return func(c *_pocConfig) {
+func WithSource(i string) PocConfigOption {
+	return func(c *PocConfig) {
 		c.Source = i
 	}
 }
@@ -506,8 +506,8 @@ func WithSource(i string) PocConfig {
 // ```
 // poc.Get("https://exmaple.com", poc.replaceFirstLine("GET /test HTTP/1.1")) // 向 example.com 发起请求，修改请求报文的第一行，请求/test路径
 // ```
-func WithReplaceHttpPacketFirstLine(firstLine string) PocConfig {
-	return func(c *_pocConfig) {
+func WithReplaceHttpPacketFirstLine(firstLine string) PocConfigOption {
+	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
 			return lowhttp.ReplaceHTTPPacketFirstLine(packet, firstLine)
 		},
@@ -520,8 +520,8 @@ func WithReplaceHttpPacketFirstLine(firstLine string) PocConfig {
 // ```
 // poc.Options("https://exmaple.com", poc.replaceMethod("GET")) // 向 example.com 发起请求，修改请求方法为GET
 // ```
-func WithReplaceHttpPacketMethod(method string) PocConfig {
-	return func(c *_pocConfig) {
+func WithReplaceHttpPacketMethod(method string) PocConfigOption {
+	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
 			return lowhttp.ReplaceHTTPPacketMethod(packet, method)
 		},
@@ -534,10 +534,24 @@ func WithReplaceHttpPacketMethod(method string) PocConfig {
 // ```
 // poc.Get("https://pie.dev/get", poc.replaceHeader("AAA", "BBB")) // 向 pie.dev 发起请求，修改AAA请求头的值为BBB，这里没有AAA请求头，所以会增加该请求头
 // ```
-func WithReplaceHttpPacketHeader(key, value string) PocConfig {
-	return func(c *_pocConfig) {
+func WithReplaceHttpPacketHeader(key, value string) PocConfigOption {
+	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
 			return lowhttp.ReplaceHTTPPacketHeader(packet, key, value)
+		},
+		)
+	}
+}
+
+// replaceAllHeaders 是一个请求选项参数，用于改变请求报文，修改修改所有请求头
+// Example:
+// ```
+// poc.Get("https://pie.dev/get", poc.replaceHeader("AAA", "BBB")) // 向 pie.dev 发起请求，修改AAA请求头的值为BBB，这里没有AAA请求头，所以会增加该请求头
+// ```
+func WithReplaceAllHttpPacketHeaders(headers map[string]string) PocConfigOption {
+	return func(c *PocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.ReplaceAllHTTPPacketHeaders(packet, headers)
 		},
 		)
 	}
@@ -548,7 +562,7 @@ func WithReplaceHttpPacketHeader(key, value string) PocConfig {
 // ```
 // poc.Get("https://yaklang.com/", poc.replaceHost("www.yaklang.com")) // 向 yaklang.com 发起请求，修改Host请求头的值为 www.yaklang.com
 // ```
-func WithReplaceHttpPacketHost(host string) PocConfig {
+func WithReplaceHttpPacketHost(host string) PocConfigOption {
 	return WithReplaceHttpPacketHeader("Host", host)
 }
 
@@ -557,7 +571,7 @@ func WithReplaceHttpPacketHost(host string) PocConfig {
 // ```
 // poc.Get("https://pie.dev/basic-auth/admin/password", poc.replaceBasicAuth("admin", "password")) // 向 pie.dev 发起请求进行基础认证，会得到200响应状态码
 // ```
-func WithReplaceHttpPacketBasicAuth(username, password string) PocConfig {
+func WithReplaceHttpPacketBasicAuth(username, password string) PocConfigOption {
 	return WithReplaceHttpPacketHeader("Authorization", "Basic "+codec.EncodeBase64(username+":"+password))
 }
 
@@ -566,8 +580,8 @@ func WithReplaceHttpPacketBasicAuth(username, password string) PocConfig {
 // ```
 // poc.Get("https://pie.dev/get", poc.replaceCookie("aaa", "bbb")) // 向 pie.dev 发起请求，这里没有aaa的cookie值，所以会增加
 // ```
-func WithReplaceHttpPacketCookie(key, value string) PocConfig {
-	return func(c *_pocConfig) {
+func WithReplaceHttpPacketCookie(key, value string) PocConfigOption {
+	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
 			return lowhttp.ReplaceHTTPPacketCookie(packet, key, value)
 		},
@@ -580,8 +594,8 @@ func WithReplaceHttpPacketCookie(key, value string) PocConfig {
 // ```
 // poc.Post("https://pie.dev/post", poc.replaceBody("a=b", false)) // 向 pie.dev 发起请求，修改请求体内容为a=b
 // ```
-func WithReplaceHttpPacketBody(body []byte, chunk bool) PocConfig {
-	return func(c *_pocConfig) {
+func WithReplaceHttpPacketBody(body []byte, chunk bool) PocConfigOption {
+	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
 			return lowhttp.ReplaceHTTPPacketBody(packet, body, chunk)
 		},
@@ -594,8 +608,8 @@ func WithReplaceHttpPacketBody(body []byte, chunk bool) PocConfig {
 // ```
 // poc.Get("https://pie.dev/post", poc.replacePath("/get")) // 向 pie.dev 发起请求，实际上请求路径为/get
 // ```
-func WithReplaceHttpPacketPath(path string) PocConfig {
-	return func(c *_pocConfig) {
+func WithReplaceHttpPacketPath(path string) PocConfigOption {
+	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
 			return lowhttp.ReplaceHTTPPacketPath(packet, path)
 		},
@@ -603,8 +617,8 @@ func WithReplaceHttpPacketPath(path string) PocConfig {
 	}
 }
 
-func WithReplaceHttpPacketQueryParamRaw(rawQuery string) PocConfig {
-	return func(c *_pocConfig) {
+func WithReplaceHttpPacketQueryParamRaw(rawQuery string) PocConfigOption {
+	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
 			return lowhttp.ReplaceHTTPPacketQueryParamRaw(packet, rawQuery)
 		},
@@ -617,8 +631,8 @@ func WithReplaceHttpPacketQueryParamRaw(rawQuery string) PocConfig {
 // ```
 // poc.Get("https://pie.dev/get", poc.replaceQueryParam("a", "b")) // 向 pie.dev 发起请求，添加GET请求参数a，值为b
 // ```
-func WithReplaceHttpPacketQueryParam(key, value string) PocConfig {
-	return func(c *_pocConfig) {
+func WithReplaceHttpPacketQueryParam(key, value string) PocConfigOption {
+	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
 			return lowhttp.ReplaceHTTPPacketQueryParam(packet, key, value)
 		},
@@ -631,8 +645,8 @@ func WithReplaceHttpPacketQueryParam(key, value string) PocConfig {
 // ```
 // poc.Get("https://pie.dev/get", poc.replaceAllQueryParams({"a":"b", "c":"d"})) // 向 pie.dev 发起请求，添加GET请求参数a，值为b，添加GET请求参数c，值为d
 // ```
-func WithReplaceAllHttpPacketQueryParams(values map[string]string) PocConfig {
-	return func(c *_pocConfig) {
+func WithReplaceAllHttpPacketQueryParams(values map[string]string) PocConfigOption {
+	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
 			return lowhttp.ReplaceAllHTTPPacketQueryParams(packet, values)
 		},
@@ -645,8 +659,8 @@ func WithReplaceAllHttpPacketQueryParams(values map[string]string) PocConfig {
 // ```
 // poc.Post("https://pie.dev/post", poc.replacePostParam("a", "b")) // 向 pie.dev 发起请求，添加POST请求参数a，值为b
 // ```
-func WithReplaceHttpPacketPostParam(key, value string) PocConfig {
-	return func(c *_pocConfig) {
+func WithReplaceHttpPacketPostParam(key, value string) PocConfigOption {
+	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
 			return lowhttp.ReplaceHTTPPacketPostParam(packet, key, value)
 		},
@@ -659,8 +673,8 @@ func WithReplaceHttpPacketPostParam(key, value string) PocConfig {
 // ```
 // poc.Post("https://pie.dev/post", poc.replaceAllPostParams({"a":"b", "c":"d"})) // 向 pie.dev 发起请求，添加POST请求参数a，值为b，POST请求参数c，值为d
 // ```
-func WithReplaceAllHttpPacketPostParams(values map[string]string) PocConfig {
-	return func(c *_pocConfig) {
+func WithReplaceAllHttpPacketPostParams(values map[string]string) PocConfigOption {
+	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
 			return lowhttp.ReplaceAllHTTPPacketPostParams(packet, values)
 		},
@@ -673,8 +687,8 @@ func WithReplaceAllHttpPacketPostParams(values map[string]string) PocConfig {
 // ```
 // poc.Post("https://pie.dev/post", poc.appendHeader("AAA", "BBB")) // 向 pie.dev 发起请求，添加AAA请求头的值为BBB
 // ```
-func WithAppendHeader(key, value string) PocConfig {
-	return func(c *_pocConfig) {
+func WithAppendHeader(key, value string) PocConfigOption {
+	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
 			return lowhttp.AppendHTTPPacketHeader(packet, key, value)
 		},
@@ -682,8 +696,8 @@ func WithAppendHeader(key, value string) PocConfig {
 	}
 }
 
-func WithAppendHeaderIfNotExist(key, value string) PocConfig {
-	return func(c *_pocConfig) {
+func WithAppendHeaderIfNotExist(key, value string) PocConfigOption {
+	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
 			return lowhttp.AppendHTTPPacketHeaderIfNotExist(packet, key, value)
 		},
@@ -696,8 +710,8 @@ func WithAppendHeaderIfNotExist(key, value string) PocConfig {
 // ```
 // poc.Post("https://pie.dev/post", poc.appendHeaders({"AAA": "BBB","CCC": "DDD"})) // 向 pie.dev 发起请求，添加AAA请求头的值为BBB
 // ```
-func WithAppendHeaders(headers map[string]string) PocConfig {
-	return func(c *_pocConfig) {
+func WithAppendHeaders(headers map[string]string) PocConfigOption {
+	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
 			for key, value := range headers {
 				packet = lowhttp.AppendHTTPPacketHeader(packet, key, value)
@@ -713,8 +727,8 @@ func WithAppendHeaders(headers map[string]string) PocConfig {
 // ```
 // poc.Get("https://pie.dev/get", poc.appendCookie("aaa", "bbb")) // 向 pie.dev 发起请求，添加cookie键值对aaa:bbb
 // ```
-func WithAppendCookie(key, value string) PocConfig {
-	return func(c *_pocConfig) {
+func WithAppendCookie(key, value string) PocConfigOption {
+	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
 			return lowhttp.AppendHTTPPacketCookie(packet, key, value)
 		},
@@ -727,8 +741,8 @@ func WithAppendCookie(key, value string) PocConfig {
 // ```
 // poc.Get("https://pie.dev/get", poc.appendQueryParam("a", "b")) // 向 pie.dev 发起请求，添加GET请求参数a，值为b
 // ```
-func WithAppendQueryParam(key, value string) PocConfig {
-	return func(c *_pocConfig) {
+func WithAppendQueryParam(key, value string) PocConfigOption {
+	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
 			return lowhttp.AppendHTTPPacketQueryParam(packet, key, value)
 		},
@@ -741,8 +755,8 @@ func WithAppendQueryParam(key, value string) PocConfig {
 // ```
 // poc.Post("https://pie.dev/post", poc.appendPostParam("a", "b")) // 向 pie.dev 发起请求，添加POST请求参数a，值为b
 // ```
-func WithAppendPostParam(key, value string) PocConfig {
-	return func(c *_pocConfig) {
+func WithAppendPostParam(key, value string) PocConfigOption {
+	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
 			return lowhttp.AppendHTTPPacketPostParam(packet, key, value)
 		},
@@ -755,8 +769,8 @@ func WithAppendPostParam(key, value string) PocConfig {
 // ```
 // poc.Get("https://yaklang.com/docs", poc.appendPath("/api/poc")) // 向 yaklang.com 发起请求，实际上请求路径为/docs/api/poc
 // ```
-func WithAppendHttpPacketPath(path string) PocConfig {
-	return func(c *_pocConfig) {
+func WithAppendHttpPacketPath(path string) PocConfigOption {
+	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
 			return lowhttp.AppendHTTPPacketPath(packet, path)
 		},
@@ -769,8 +783,8 @@ func WithAppendHttpPacketPath(path string) PocConfig {
 // ```
 // poc.Post("https://pie.dev/post", poc.appendFormEncoded("aaa", "bbb")) // 向 pie.dev 发起请求，添加POST请求表单，其中aaa为键，bbb为值
 // ```
-func WithAppendHttpPacketFormEncoded(key, value string) PocConfig {
-	return func(c *_pocConfig) {
+func WithAppendHttpPacketFormEncoded(key, value string) PocConfigOption {
+	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
 			return lowhttp.AppendHTTPPacketFormEncoded(packet, key, value)
 		},
@@ -783,8 +797,8 @@ func WithAppendHttpPacketFormEncoded(key, value string) PocConfig {
 // ```
 // poc.Post("https://pie.dev/post", poc.appendUploadFile("file", "phpinfo.php", "<?php phpinfo(); ?>", "image/jpeg"))// 向 pie.dev 发起请求，添加POST请求表单，其文件名为phpinfo.php，内容为<?php phpinfo(); ?>，文件类型为image/jpeg
 // ```
-func WithAppendHttpPacketUploadFile(fieldName, fileName string, fileContent interface{}, contentType ...string) PocConfig {
-	return func(c *_pocConfig) {
+func WithAppendHttpPacketUploadFile(fieldName, fileName string, fileContent interface{}, contentType ...string) PocConfigOption {
+	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
 			return lowhttp.AppendHTTPPacketUploadFile(packet, fieldName, fileName, fileContent, contentType...)
 		},
@@ -802,8 +816,8 @@ func WithAppendHttpPacketUploadFile(fieldName, fileName string, fileContent inte
 //
 // `, poc.deleteHeader("AAA"))// 向 pie.dev 发起请求，删除AAA请求头
 // ```
-func WithDeleteHeader(key string) PocConfig {
-	return func(c *_pocConfig) {
+func WithDeleteHeader(key string) PocConfigOption {
+	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
 			return lowhttp.DeleteHTTPPacketHeader(packet, key)
 		},
@@ -821,8 +835,8 @@ func WithDeleteHeader(key string) PocConfig {
 //
 // `, poc.deleteCookie("aaa"))// 向 pie.dev 发起请求，删除Cookie中的aaa
 // ```
-func WithDeleteCookie(key string) PocConfig {
-	return func(c *_pocConfig) {
+func WithDeleteCookie(key string) PocConfigOption {
+	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
 			return lowhttp.DeleteHTTPPacketCookie(packet, key)
 		},
@@ -839,8 +853,8 @@ func WithDeleteCookie(key string) PocConfig {
 //
 // `, poc.deleteQueryParam("a")) // 向 pie.dev 发起请求，删除GET请求参数a
 // ```
-func WithDeleteQueryParam(key string) PocConfig {
-	return func(c *_pocConfig) {
+func WithDeleteQueryParam(key string) PocConfigOption {
+	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
 			return lowhttp.DeleteHTTPPacketQueryParam(packet, key)
 		},
@@ -858,8 +872,8 @@ func WithDeleteQueryParam(key string) PocConfig {
 //
 // a=b&c=d`, poc.deletePostParam("a")) // 向 pie.dev 发起请求，删除POST请求参数a
 // ```
-func WithDeletePostParam(key string) PocConfig {
-	return func(c *_pocConfig) {
+func WithDeletePostParam(key string) PocConfigOption {
+	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
 			return lowhttp.DeleteHTTPPacketPostParam(packet, key)
 		},
@@ -885,8 +899,8 @@ func WithDeletePostParam(key string) PocConfig {
 // ddd
 // --------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm--`, poc.deleteForm("aaa")) // 向 pie.dev 发起请求，删除POST请求表单aaa
 // ```
-func WithDeleteForm(key string) PocConfig {
-	return func(c *_pocConfig) {
+func WithDeleteForm(key string) PocConfigOption {
+	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
 			return lowhttp.DeleteHTTPPacketForm(packet, key)
 		},
@@ -894,14 +908,14 @@ func WithDeleteForm(key string) PocConfig {
 	}
 }
 
-func fixPacketByConfig(packet []byte, config *_pocConfig) []byte {
+func fixPacketByConfig(packet []byte, config *PocConfig) []byte {
 	for _, fixFunc := range config.PacketHandler {
 		packet = fixFunc(packet)
 	}
 	return packet
 }
 
-func handleUrlAndConfig(urlStr string, opts ...PocConfig) (*_pocConfig, error) {
+func handleUrlAndConfig(urlStr string, opts ...PocConfigOption) (*PocConfig, error) {
 	// poc 模块收 proxy 影响
 	proxy := cli.CliStringSlice("proxy")
 	config := NewDefaultPoCConfig()
@@ -937,7 +951,7 @@ func handleUrlAndConfig(urlStr string, opts ...PocConfig) (*_pocConfig, error) {
 	return config, nil
 }
 
-func handleRawPacketAndConfig(i interface{}, opts ...PocConfig) ([]byte, *_pocConfig, error) {
+func handleRawPacketAndConfig(i interface{}, opts ...PocConfigOption) ([]byte, *PocConfig, error) {
 	var packet []byte
 	switch ret := i.(type) {
 	case string:
@@ -959,7 +973,7 @@ func handleRawPacketAndConfig(i interface{}, opts ...PocConfig) ([]byte, *_pocCo
 			return nil, nil, utils.Errorf("dump request out failed: %s", err)
 		}
 		packet = raw
-	case *yakhttp.YakHttpRequest:
+	case *http_struct.YakHttpRequest:
 		raw, err := utils.DumpHTTPRequest(ret.Request, true)
 		if err != nil {
 			return nil, nil, utils.Errorf("dump request out failed: %s", err)
@@ -1026,7 +1040,7 @@ func handleRawPacketAndConfig(i interface{}, opts ...PocConfig) ([]byte, *_pocCo
 	return packet, config, nil
 }
 
-func pochttp(packet []byte, config *_pocConfig) (*lowhttp.LowhttpResponse, error) {
+func pochttp(packet []byte, config *PocConfig) (*lowhttp.LowhttpResponse, error) {
 	if config.Websocket {
 		if config.Timeout <= 0 {
 			config.Timeout = 15 * time.Second
@@ -1100,7 +1114,7 @@ func pochttp(packet []byte, config *_pocConfig) (*lowhttp.LowhttpResponse, error
 // rsp, req, err = poc.HTTPEx(`GET / HTTP/1.1\r\nHost: www.yaklang.com\r\n\r\n`, poc.https(true), poc.replaceHeader("AAA", "BBB")) // 向yaklang.com发送一个基于HTTPS协议的GET请求，并且添加一个请求头AAA，它的值为BBB
 // desc(rsp) // 查看响应结构体中的可用字段
 // ```
-func HTTPEx(i interface{}, opts ...PocConfig) (rspInst *lowhttp.LowhttpResponse, reqInst *http.Request, err error) {
+func HTTPEx(i interface{}, opts ...PocConfigOption) (rspInst *lowhttp.LowhttpResponse, reqInst *http.Request, err error) {
 	packet, config, err := handleRawPacketAndConfig(i, opts...)
 	if err != nil {
 		return nil, nil, err
@@ -1122,7 +1136,7 @@ func HTTPEx(i interface{}, opts ...PocConfig) (rspInst *lowhttp.LowhttpResponse,
 // raw = poc.BuildRequest(poc.BasicRequest(), poc.https(true), poc.replaceHost("yaklang.com"), poc.replacePath("/docs/api/poc")) // 构建一个基础GET请求，修改其Host为yaklang.com，访问的URI路径为/docs/api/poc
 // // raw = b"GET /docs/api/poc HTTP/1.1\r\nHost: www.yaklang.com\r\n\r\n"
 // ```
-func BuildRequest(i interface{}, opts ...PocConfig) []byte {
+func BuildRequest(i interface{}, opts ...PocConfigOption) []byte {
 	packet, _, err := handleRawPacketAndConfig(i, opts...)
 	if err != nil {
 		log.Errorf("build request error: %s", err)
@@ -1135,7 +1149,7 @@ func BuildRequest(i interface{}, opts ...PocConfig) []byte {
 // ```
 // poc.HTTP("GET / HTTP/1.1\r\nHost: www.yaklang.com\r\n\r\n", poc.https(true), poc.replaceHeader("AAA", "BBB")) // yaklang.com发送一个基于HTTPS协议的GET请求，并且添加一个请求头AAA，它的值为BBB
 // ```
-func HTTP(i interface{}, opts ...PocConfig) (rsp []byte, req []byte, err error) {
+func HTTP(i interface{}, opts ...PocConfigOption) (rsp []byte, req []byte, err error) {
 	packet, config, err := handleRawPacketAndConfig(i, opts...)
 	if err != nil {
 		return nil, nil, err
@@ -1152,7 +1166,7 @@ func HTTP(i interface{}, opts ...PocConfig) (rsp []byte, req []byte, err error) 
 // poc.Do("GET","https://yaklang.com", poc.https(true)) // 向yaklang.com发送一个基于HTTPS协议的GET请求
 // desc(rsp) // 查看响应结构体中的可用字段
 // ```
-func Do(method string, urlStr string, opts ...PocConfig) (rspInst *lowhttp.LowhttpResponse, reqInst *http.Request, err error) {
+func Do(method string, urlStr string, opts ...PocConfigOption) (rspInst *lowhttp.LowhttpResponse, reqInst *http.Request, err error) {
 	config, err := handleUrlAndConfig(urlStr, opts...)
 	if err != nil {
 		return nil, nil, err
@@ -1179,7 +1193,7 @@ func Do(method string, urlStr string, opts ...PocConfig) (rspInst *lowhttp.Lowht
 // poc.Get("https://yaklang.com", poc.https(true)) // 向yaklang.com发送一个基于HTTPS协议的GET请求
 // desc(rsp) // 查看响应结构体中的可用字段
 // ```
-func DoGET(urlStr string, opts ...PocConfig) (rspInst *lowhttp.LowhttpResponse, reqInst *http.Request, err error) {
+func DoGET(urlStr string, opts ...PocConfigOption) (rspInst *lowhttp.LowhttpResponse, reqInst *http.Request, err error) {
 	return Do("GET", urlStr, opts...)
 }
 
@@ -1190,7 +1204,7 @@ func DoGET(urlStr string, opts ...PocConfig) (rspInst *lowhttp.LowhttpResponse, 
 // poc.Post("https://yaklang.com", poc.https(true)) // 向yaklang.com发送一个基于HTTPS协议的POST请求
 // desc(rsp) // 查看响应结构体中的可用字段
 // ```
-func DoPOST(urlStr string, opts ...PocConfig) (rspInst *lowhttp.LowhttpResponse, reqInst *http.Request, err error) {
+func DoPOST(urlStr string, opts ...PocConfigOption) (rspInst *lowhttp.LowhttpResponse, reqInst *http.Request, err error) {
 	return Do("POST", urlStr, opts...)
 }
 
@@ -1201,7 +1215,7 @@ func DoPOST(urlStr string, opts ...PocConfig) (rspInst *lowhttp.LowhttpResponse,
 // poc.Head("https://yaklang.com", poc.https(true)) // 向yaklang.com发送一个基于HTTPS协议的HEAD请求
 // desc(rsp) // 查看响应结构体中的可用字段
 // ```
-func DoHEAD(urlStr string, opts ...PocConfig) (rspInst *lowhttp.LowhttpResponse, reqInst *http.Request, err error) {
+func DoHEAD(urlStr string, opts ...PocConfigOption) (rspInst *lowhttp.LowhttpResponse, reqInst *http.Request, err error) {
 	return Do("HEAD", urlStr, opts...)
 }
 
@@ -1212,7 +1226,7 @@ func DoHEAD(urlStr string, opts ...PocConfig) (rspInst *lowhttp.LowhttpResponse,
 // poc.Delete("https://yaklang.com", poc.https(true)) // 向yaklang.com发送一个基于HTTPS协议的DELETE请求
 // desc(rsp) // 查看响应结构体中的可用字段
 // ```
-func DoDELETE(urlStr string, opts ...PocConfig) (rspInst *lowhttp.LowhttpResponse, reqInst *http.Request, err error) {
+func DoDELETE(urlStr string, opts ...PocConfigOption) (rspInst *lowhttp.LowhttpResponse, reqInst *http.Request, err error) {
 	return Do("DELETE", urlStr, opts...)
 }
 
@@ -1223,7 +1237,7 @@ func DoDELETE(urlStr string, opts ...PocConfig) (rspInst *lowhttp.LowhttpRespons
 // poc.Options("https://yaklang.com", poc.https(true)) // 向yaklang.com发送一个基于HTTPS协议的Options请求
 // desc(rsp) // 查看响应结构体中的可用字段
 // ```
-func DoOPTIONS(urlStr string, opts ...PocConfig) (rspInst *lowhttp.LowhttpResponse, reqInst *http.Request, err error) {
+func DoOPTIONS(urlStr string, opts ...PocConfigOption) (rspInst *lowhttp.LowhttpResponse, reqInst *http.Request, err error) {
 	return Do("OPTIONS", urlStr, opts...)
 }
 
@@ -1248,7 +1262,7 @@ func DoOPTIONS(urlStr string, opts ...PocConfig) (rspInst *lowhttp.LowhttpRespon
 // )
 // time.Sleep(100)
 // ```
-func DoWebSocket(raw interface{}, opts ...PocConfig) (rsp []byte, req []byte, err error) {
+func DoWebSocket(raw interface{}, opts ...PocConfigOption) (rsp []byte, req []byte, err error) {
 	opts = append(opts, WithWebsocket(true))
 	return HTTP(raw, opts...)
 }

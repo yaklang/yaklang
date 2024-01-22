@@ -15,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/fuzztag"
 	"github.com/yaklang/yaklang/common/fuzztagx/parser"
 	"github.com/yaklang/yaklang/common/utils/cli"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/http_struct"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/utils/pingutil"
 	"github.com/yaklang/yaklang/common/utils/yakgit"
@@ -551,9 +552,9 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 			if proxy == "" {
 				return i
 			}
-			originFunc, ok := i.(func(u string, opts ...yakhttp.HttpOption) (*yakhttp.YakHttpResponse, error))
+			originFunc, ok := i.(func(u string, opts ...http_struct.HttpOption) (*http_struct.YakHttpResponse, error))
 			if ok {
-				return func(u string, opts ...yakhttp.HttpOption) (*yakhttp.YakHttpResponse, error) {
+				return func(u string, opts ...http_struct.HttpOption) (*http_struct.YakHttpResponse, error) {
 					opts = append(opts, yakhttp.WithProxy(proxy))
 					return originFunc(u, opts...)
 				}
@@ -581,9 +582,9 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		if proxy == "" {
 			return i
 		}
-		originFunc, ok := i.(func(method, u string, opts ...yakhttp.HttpOption) (*yakhttp.YakHttpResponse, error))
+		originFunc, ok := i.(func(method, u string, opts ...http_struct.HttpOption) (*http_struct.YakHttpResponse, error))
 		if ok {
-			return func(method, u string, opts ...yakhttp.HttpOption) (*yakhttp.YakHttpResponse, error) {
+			return func(method, u string, opts ...http_struct.HttpOption) (*http_struct.YakHttpResponse, error) {
 				opts = append(opts, yakhttp.WithProxy(proxy))
 				return originFunc(method, u, opts...)
 			}
@@ -595,9 +596,9 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		if proxy == "" {
 			return i
 		}
-		originFunc, ok := i.(func(method, u string, opts ...yakhttp.HttpOption) (*yakhttp.YakHttpRequest, error))
+		originFunc, ok := i.(func(method, u string, opts ...http_struct.HttpOption) (*http_struct.YakHttpRequest, error))
 		if ok {
-			return func(method, u string, opts ...yakhttp.HttpOption) (*yakhttp.YakHttpRequest, error) {
+			return func(method, u string, opts ...http_struct.HttpOption) (*http_struct.YakHttpRequest, error) {
 				opts = append(opts, yakhttp.WithProxy(proxy))
 				return originFunc(method, u, opts...)
 			}
@@ -606,9 +607,9 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 	})
 
 	nIns.GetVM().RegisterMapMemberCallHandler("poc", "HTTP", func(i interface{}) interface{} {
-		originFunc, ok := i.(func(interface{}, ...poc.PocConfig) ([]byte, []byte, error))
+		originFunc, ok := i.(func(interface{}, ...poc.PocConfigOption) ([]byte, []byte, error))
 		if ok {
-			return func(raw interface{}, opts ...poc.PocConfig) ([]byte, []byte, error) {
+			return func(raw interface{}, opts ...poc.PocConfigOption) ([]byte, []byte, error) {
 				opts = append(opts, poc.PoCOptWithSource(pluginName))
 				opts = append(opts, poc.PoCOptWithFromPlugin(pluginName))
 				opts = append(opts, poc.PoCOptWithRuntimeId(runtimeId))
@@ -621,9 +622,9 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		return i
 	})
 	nIns.GetVM().RegisterMapMemberCallHandler("poc", "HTTPEx", func(i interface{}) interface{} {
-		originFunc, ok := i.(func(interface{}, ...poc.PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error))
+		originFunc, ok := i.(func(interface{}, ...poc.PocConfigOption) (*lowhttp.LowhttpResponse, *http.Request, error))
 		if ok {
-			return func(raw interface{}, opts ...poc.PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
+			return func(raw interface{}, opts ...poc.PocConfigOption) (*lowhttp.LowhttpResponse, *http.Request, error) {
 				opts = append(opts, poc.PoCOptWithSource(pluginName))
 				opts = append(opts, poc.PoCOptWithFromPlugin(pluginName))
 				opts = append(opts, poc.PoCOptWithRuntimeId(runtimeId))
@@ -638,12 +639,12 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 	for _, method := range []string{"Get", "Post", "Head", "Delete", "Options"} {
 		method := method
 		nIns.GetVM().RegisterMapMemberCallHandler("poc", method, func(i interface{}) interface{} {
-			origin, ok := i.(func(string, ...poc.PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error))
+			origin, ok := i.(func(string, ...poc.PocConfigOption) (*lowhttp.LowhttpResponse, *http.Request, error))
 			if !ok {
 				log.Errorf("BUG: poc.%v 's signature is override", method)
 				return i
 			}
-			return func(u string, opts ...poc.PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
+			return func(u string, opts ...poc.PocConfigOption) (*lowhttp.LowhttpResponse, *http.Request, error) {
 				opts = append(opts, poc.PoCOptWithSource(pluginName))
 				opts = append(opts, poc.PoCOptWithFromPlugin(pluginName))
 				opts = append(opts, poc.PoCOptWithRuntimeId(runtimeId))
@@ -654,9 +655,9 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		})
 	}
 	nIns.GetVM().RegisterMapMemberCallHandler("poc", "Do", func(i interface{}) interface{} {
-		origin, ok := i.(func(method string, url string, opt ...poc.PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error))
+		origin, ok := i.(func(method string, url string, opt ...poc.PocConfigOption) (*lowhttp.LowhttpResponse, *http.Request, error))
 		if ok {
-			return func(method string, url string, opts ...poc.PocConfig) (*lowhttp.LowhttpResponse, *http.Request, error) {
+			return func(method string, url string, opts ...poc.PocConfigOption) (*lowhttp.LowhttpResponse, *http.Request, error) {
 				opts = append(opts, poc.PoCOptWithSource(pluginName))
 				opts = append(opts, poc.PoCOptWithFromPlugin(pluginName))
 				opts = append(opts, poc.PoCOptWithRuntimeId(runtimeId))
