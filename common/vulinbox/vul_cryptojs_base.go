@@ -541,6 +541,8 @@ setTimeout(function(){
 
 					var blocks []string
 					blocks = append(blocks, block("解密前端内容成功", string(origin)))
+					username := utils.MapGetString(params, "username")
+					password := utils.MapGetString(params, "password")
 					if isLogined(username, password) {
 						blocks = append(blocks, block("用户名密码验证成功", "恭喜您，登录成功！"))
 					} else {
