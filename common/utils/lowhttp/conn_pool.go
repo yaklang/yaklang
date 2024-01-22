@@ -544,11 +544,11 @@ func (pc *persistConn) writeLoop() {
 		case wr := <-pc.writeCh:
 			count++
 			_, err := pc.bw.Write(wr.reqPacket)
-			if err != nil {
+			if err == nil {
 				err = pc.bw.Flush()
 				pc.serverStartTime = time.Now()
 			}
-			wr.ch <- err
+			wr.ch <- err //to exec.go
 			if err != nil {
 				pc.writeErrCh <- err
 				return
