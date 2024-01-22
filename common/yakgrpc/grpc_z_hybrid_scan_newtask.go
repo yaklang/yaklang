@@ -37,13 +37,9 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 
 	taskId := manager.TaskId()
 
-	targetInputRaw, _ := json.Marshal(firstRequest.GetTargets())
-	pluginInputRaw, _ := json.Marshal(firstRequest.GetPlugin())
 	taskRecorder := &yakit.HybridScanTask{
-		TaskId:       taskId,
-		Status:       yakit.HYBRIDSCAN_EXECUTING,
-		InputTarget:  targetInputRaw,
-		PluginConfig: pluginInputRaw,
+		TaskId: taskId,
+		Status: yakit.HYBRIDSCAN_EXECUTING,
 	}
 	err := yakit.SaveHybridScanTask(consts.GetGormProjectDatabase(), taskRecorder)
 	if err != nil {
@@ -84,6 +80,12 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 		if plugin == nil {
 			plugin = rsp.GetPlugin()
 		}
+	}
+	taskRecorder.InputTarget, _ = json.Marshal(target)
+	taskRecorder.PluginConfig, _ = json.Marshal(plugin)
+	err = yakit.SaveHybridScanTask(consts.GetGormProjectDatabase(), taskRecorder)
+	if err != nil {
+		return utils.Errorf("save task failed: %s", err)
 	}
 
 	targetChan, err := s.TargetGenerator(manager.Context(), target)
