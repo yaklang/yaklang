@@ -54,6 +54,10 @@ func LineDisasm(v Instruction) string {
 	return lineDisasm(v, NewDisasmLiner())
 }
 
+func LineShortDisasm(v Instruction) string {
+	return lineShortDisasm(v, NewDisasmLiner())
+}
+
 func lineDisasm(v Instruction, liner *DisasmLiner) (ret string) {
 	if liner == nil {
 		liner = NewDisasmLiner()
