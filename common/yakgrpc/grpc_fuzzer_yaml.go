@@ -162,15 +162,22 @@ func (s *Server) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, req *ypb.Impo
 		//inheritVariables := sequence.InheritVariables
 
 		for index, fuzzerReq := range fuzzerReqs {
-			if index == len(fuzzerReqs)-1 {
-				if extractorMap[index+1] != nil {
-					fuzzerReq.Extractors = extractorMap[index+1]
-				}
-				if matcherMap[index+1] != nil {
-					fuzzerReq.Matchers = matcherMap[index+1]
-				}
-				fuzzerReq.MatchersCondition = matchersCondition
+			if extractorMap[index+1] != nil {
+				fuzzerReq.Extractors = extractorMap[index+1]
 			}
+			if matcherMap[index+1] != nil {
+				fuzzerReq.Matchers = matcherMap[index+1]
+			}
+			// if not set id
+			if index == len(fuzzerReqs)-1 {
+				if extractorMap[0] != nil {
+					fuzzerReq.Extractors = extractorMap[0]
+				}
+				if matcherMap[0] != nil {
+					fuzzerReq.Matchers = matcherMap[0]
+				}
+			}
+			fuzzerReq.MatchersCondition = matchersCondition
 			fuzzerReq.NoFixContentLength = noFixContentLength
 			fuzzerReq.NoFollowRedirect = noFollowRedirect
 			fuzzerReq.RedirectTimes = redirectTimes
