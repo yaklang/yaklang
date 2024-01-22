@@ -1280,7 +1280,7 @@ func (s *Server) HTTPRequestMutate(ctx context.Context, req *ypb.HTTPRequestMuta
 		for k, v := range lowhttp.GetAllHTTPRequestPostParams(rawRequest) {
 			params[k] = v
 		}
-		opts := make([]poc.PocConfig, 0)
+		opts := make([]poc.PocConfigOption, 0)
 		opts = append(opts, poc.WithReplaceHttpPacketBody([]byte{}, false))
 		opts = append(opts, poc.WithReplaceHttpPacketQueryParamRaw(""))
 		for k, v := range params {

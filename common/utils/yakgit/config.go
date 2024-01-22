@@ -2,6 +2,7 @@ package yakgit
 
 import (
 	"context"
+
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 
 	"github.com/go-git/go-git/v5"
@@ -35,7 +36,7 @@ type config struct {
 	// GitHack
 	Threads           int
 	UseLocalGitBinary bool
-	HTTPOptions       []poc.PocConfig
+	HTTPOptions       []poc.PocConfigOption
 
 	// handler
 	HandleGitReference func(r *plumbing.Reference) error
@@ -311,7 +312,7 @@ func WithUseLocalGitBinary(b bool) Option {
 // ```
 // git.GitHack("http://127.0.0.1:8787/git/website", "C:/Users/xxx/Desktop/githack-test", git.httpOpts(poc.timeout(10), poc.https(true)))
 // ```
-func WithHTTPOptions(opts ...poc.PocConfig) Option {
+func WithHTTPOptions(opts ...poc.PocConfigOption) Option {
 	return func(c *config) error {
 		c.HTTPOptions = opts
 		return nil

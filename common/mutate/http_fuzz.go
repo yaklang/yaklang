@@ -18,8 +18,8 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/http_struct"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"github.com/yaklang/yaklang/common/yak/yaklib/yakhttp"
 )
 
 type FuzzHTTPRequest struct {
@@ -402,7 +402,7 @@ func NewFuzzHTTPRequest(i interface{}, opts ...BuildFuzzHTTPRequestOption) (*Fuz
 			return nil, utils.Errorf("dump request out failed: %s", err)
 		}
 		originHttpRequest = raw
-	case *yakhttp.YakHttpRequest:
+	case *http_struct.YakHttpRequest:
 		return NewFuzzHTTPRequest(ret.Request, opts...)
 	case *FuzzHTTPRequest:
 		opts = ret.MergeOption(opts...)
