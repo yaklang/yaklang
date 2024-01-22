@@ -17,7 +17,7 @@ const (
 func (v *Value) visitUserFallback(actx *AnalyzeContext) Values {
 	var vals Values
 	for _, user := range v.node.GetUsers() {
-		if ret := NewValue(user).AppendEffectOn(v).getBottomUses(actx); len(ret) > 0 {
+		if ret := NewValue(user).AppendDependOn(v).getBottomUses(actx); len(ret) > 0 {
 			vals = append(vals, ret...)
 		}
 	}
@@ -27,10 +27,11 @@ func (v *Value) visitUserFallback(actx *AnalyzeContext) Values {
 	return vals
 }
 
-func (v *Value) getBottomUses(actx *AnalyzeContext) Values {
+func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Values {
 	if actx == nil {
-		actx = NewAnalyzeContext()
+		actx = NewAnalyzeContext(opt...)
 	}
+
 	switch ins := v.node.(type) {
 	case *ssa.Phi:
 		// enter function via phi
@@ -42,29 +43,37 @@ func (v *Value) getBottomUses(actx *AnalyzeContext) Values {
 		return v.visitUserFallback(actx)
 	case *ssa.Return:
 		// enter function via return
+		fallback := func() Values {
+			var results Values
+			for _, result := range ins.Results {
+				results = append(results, NewValue(result).AppendDependOn(v))
+			}
+			return results
+		}
 		if actx._callStack.Len() > 0 {
 			val := actx.GetCurrentCall()
 			if val == nil {
-				return Values{v}
+				return fallback()
 			}
 			call := val.node.(*ssa.Call)
 			fun, ok := call.Method.(*ssa.Function)
 			if !ok {
 				log.Warnf("BUG: (call's fun is not clean!) unknown function: %v", v.String())
-				return Values{v}
+				return fallback()
 			}
 			_ = fun //TODO: fun can tell u, which return value is the target
 			var vals Values
 			for _, u := range call.GetUsers() {
-				if ret := NewValue(u).AppendEffectOn(v).getBottomUses(actx); len(ret) > 0 {
+				if ret := NewValue(u).AppendDependOn(v).getBottomUses(actx); len(ret) > 0 {
 					vals = append(vals, ret...)
 				}
 			}
 			if len(vals) > 0 {
 				return vals
 			}
-			return Values{v}
+			return NewValue(call).AppendDependOn(v).getBottomUses(actx)
 		}
+		return fallback()
 	case *ssa.Function:
 		// enter function via function
 		// via call
@@ -90,7 +99,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext) Values {
 				return Values{v}
 			}
 			val := ins.Param[shouldHandleTarget]
-			return NewValue(val).AppendEffectOn(v).getBottomUses(actx)
+			return NewValue(val).AppendDependOn(v).getBottomUses(actx)
 		}
 	case *ssa.Call:
 		if !actx.TheCallShouldBeVisited(v) {

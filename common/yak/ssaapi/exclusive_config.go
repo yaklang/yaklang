@@ -36,7 +36,6 @@ func NewOperations(opt ...OperationOption) *OperationConfig {
 
 func FullUseDefChain(value *Value, opts ...OperationOption) *Value {
 	value.GetTopDefs(opts...)
-	// value.GetBottomUses()
-	value.ShowDot()
+	value.GetBottomUses()
 	return value
 }

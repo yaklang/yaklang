@@ -111,6 +111,13 @@ func (i Values) AppendEffectOn(v *Value) Values {
 	return i
 }
 
+func (i Values) AppendDependOn(v *Value) Values {
+	for _, node := range i {
+		node.AppendDependOn(v)
+	}
+	return i
+}
+
 func (i *Value) visitedDefsDefault(actx *AnalyzeContext) Values {
 	var vals Values
 	if i.node == nil {

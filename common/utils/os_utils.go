@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/user"
+	"strings"
 	"sync"
 	"time"
 
@@ -162,6 +163,27 @@ func GetHomeDirDefault(d string) string {
 
 func InDebugMode() bool {
 	return os.Getenv("DEBUG") != "" || os.Getenv("PALMDEBUG") != "" || os.Getenv("YAKLANGDEBUG") != ""
+}
+
+func InGithubActions() bool {
+	return os.Getenv("GITHUB_ACTIONS") != ""
+}
+
+func InTestcase() bool {
+	if len(os.Args) > 0 {
+		if strings.HasSuffix(strings.ToLower(os.Args[1]), ".test") {
+			return true
+		}
+	}
+	for _, v := range os.Args {
+		if strings.Contains(v, "-test.v") {
+			return true
+		}
+		if strings.Contains(v, "-test.run") {
+			return true
+		}
+	}
+	return false
 }
 
 func Debug(f func()) {
