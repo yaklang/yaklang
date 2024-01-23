@@ -26,6 +26,7 @@ type Engine struct {
 	debugMode     bool // 外部debugger
 	debugCallBack func(*yakvm.Debugger)
 	debugInit     func(*yakvm.Debugger)
+	sandboxMode   bool
 }
 
 func (e *Engine) SetStrictMode(b bool) {
@@ -313,6 +314,11 @@ func (n *Engine) _compile(code string) (*yakast.YakCompiler, error) {
 
 func (n *Engine) EnableDebug() {
 	n.debug = true
+}
+
+func (e *Engine) SetSandboxMode(mode bool) { // sandbox mode call use defineFrame
+	e.sandboxMode = mode
+	e.vm.SetSandboxMode(mode)
 }
 
 func (n *Engine) HaveEvaluatedCode() bool {
