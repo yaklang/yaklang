@@ -7,6 +7,7 @@ type CliParameter struct {
 	NameVerbose    string
 	Required       bool
 	Type           string
+	MethodType     string
 	Default        any
 	Help           string
 	Group          string
@@ -14,12 +15,13 @@ type CliParameter struct {
 	SelectOption   map[string]string
 }
 
-func newCliParameter(typ, name string) *CliParameter {
+func newCliParameter(name, typ, methodTyp string) *CliParameter {
 	return &CliParameter{
 		Name:           name,
 		NameVerbose:    name,
 		Required:       false,
 		Type:           typ,
+		MethodType:     methodTyp,
 		Default:        nil,
 		Help:           "",
 		Group:          "",
@@ -82,7 +84,7 @@ func ParseCliParameter(prog *ssaapi.Program) []*CliParameter {
 		}
 	}
 
-	parseCliFunction := func(funName, typName string) {
+	parseCliFunction := func(funName, typ, methodTyp string) {
 		prog.Ref(funName).GetUsers().Filter(
 			func(v *ssaapi.Value) bool {
 				// only function call and must be reachable
@@ -97,7 +99,7 @@ func ParseCliParameter(prog *ssaapi.Program) []*CliParameter {
 			if v.GetOperand(1).IsConstInst() {
 				name = v.GetOperand(1).GetConstValue().(string)
 			}
-			cli := newCliParameter(typName, name)
+			cli := newCliParameter(name, typ, methodTyp)
 			opLen := len(v.GetOperands())
 			// handler option
 			for i := 2; i < opLen; i++ {
@@ -107,31 +109,58 @@ func ParseCliParameter(prog *ssaapi.Program) []*CliParameter {
 		})
 	}
 
-	// second parameter is front-end render type, not Cli.Parameter type
-	parseCliFunction("cli.String", "string")
-	parseCliFunction("cli.Bool", "boolean") // "bool"
-	parseCliFunction("cli.Int", "uint")     // "int"
-	parseCliFunction("cli.Integer", "uint") // "int"
-	parseCliFunction("cli.Double", "float")
-	parseCliFunction("cli.Float", "float")
-
-	parseCliFunction("cli.File", "upload-path")             // "file"
-	parseCliFunction("cli.FileNames", "multiple-file-path") // "file-name" 多选文件路径
-	parseCliFunction("cli.StringSlice", "select")           // "string-slice"
-	parseCliFunction("cli.YakCode", "yak")
-	parseCliFunction("cli.HTTPPacket", "http-packet")
-	parseCliFunction("cli.Text", "text")
-
-	parseCliFunction("cli.Url", "text") // 多行输入
-	parseCliFunction("cli.Urls", "text")
-	parseCliFunction("cli.Port", "string") // 单行输入
-	parseCliFunction("cli.Ports", "string")
-	parseCliFunction("cli.Net", "text")
-	parseCliFunction("cli.Network", "text")
-	parseCliFunction("cli.Host", "text")
-	parseCliFunction("cli.Hosts", "text")
-	parseCliFunction("cli.FileOrContent", "upload-file-content") // 单选文件并获取内容
-	parseCliFunction("cli.LineDict", "upload-file-content")
+	for name, pair := range methodMap {
+		parseCliFunction(name, pair.typ, pair.methodTyp)
+	}
 
 	return ret
 }
+
+type pair struct {
+	typ       string
+	methodTyp string
+}
+
+var (
+	methodMap = map[string]pair{
+		"cli.String":        {"string", "string"},
+		"cli.Bool":          {"boolean", "boolean"},
+		"cli.Int":           {"uint", "uint"},
+		"cli.Integer":       {"uint", "uint"},
+		"cli.Double":        {"float", "float"},
+		"cli.Float":         {"float", "float"},
+		"cli.File":          {"upload-path", "file"},
+		"cli.FileNames":     {"multiple-file-path", "file_names"},
+		"cli.StringSlice":   {"select", "select"},
+		"cli.YakCode":       {"yak", "yak"},
+		"cli.HTTPPacket":    {"http-packet", "http-packet"},
+		"cli.Text":          {"text", "text"},
+		"cli.Url":           {"text", "urls"},
+		"cli.Urls":          {"text", "urls"},
+		"cli.Port":          {"string", "ports"},
+		"cli.Ports":         {"string", "ports"},
+		"cli.Net":           {"text", "hosts"},
+		"cli.Network":       {"text", "hosts"},
+		"cli.Host":          {"text", "hosts"},
+		"cli.Hosts":         {"text", "hosts"},
+		"cli.FileOrContent": {"upload-file-content", "file_content"},
+		"cli.LineDict":      {"upload-file-content", "line_dict"},
+	}
+	methodType2Method = map[string]string{
+		"string":       "cli.String",
+		"boolean":      "cli.Bool",
+		"uint":         "cli.Int",
+		"float":        "cli.Float",
+		"file":         "cli.File",
+		"file_names":   "cli.FileNames",
+		"select":       "cli.StringSlice",
+		"yak":          "cli.YakCode",
+		"http-packet":  "cli.HTTPPacket",
+		"text":         "cli.Text",
+		"urls":         "cli.Urls",
+		"ports":        "cli.Ports",
+		"hosts":        "cli.Hosts",
+		"file_content": "cli.FileOrContent",
+		"line_dict":    "cli.LineDict",
+	}
+)
