@@ -210,6 +210,49 @@ func TestIfScope_If_condition_assign(t *testing.T) {
 	test.Equal("const(1)", conditionVariable2.String())
 }
 
+func TestIfScope_If_condition_assign_checkMerge(t *testing.T) {
+	/*
+		check: ssautil.Merge function
+
+		if this example:
+			global:
+				a = 1
+				sub1:
+					a := 2
+					sub2:
+						a = 3
+
+				end: merge from sub2
+					a = phi[1, 3] ???  1
+					a should be 1 , not phi
+	*/
+
+	global := NewRootVersionedTable[value]()
+	one := NewConsts("1")
+	two := NewConsts("2")
+	three := NewConsts("3")
+
+	global.CreateLexicalVariable("a", one)
+
+	build := NewIfStmt(global)
+	build.BuildItem(
+		func(condition *ScopedVersionedTable[value]) {
+			condition.CreateLexicalVariable("a", two)
+		},
+		func(svt *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+			return BuildSyntaxBlock(svt, func(svt *ScopedVersionedTable[value]) bool {
+				svt.CreateLexicalVariable("a", three)
+				return false
+			})
+		},
+	)
+	end := build.BuildFinish(GeneratePhi)
+
+	test := assert.New(t)
+	test.Equal("const(1)", end.GetLatestVersion("a").String())
+
+}
+
 func TestLoopScope(t *testing.T) {
 	/*
 		{
