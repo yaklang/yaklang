@@ -1203,98 +1203,65 @@ var requestToMutateResult = func(reqs []*http.Request, chunked bool) (*ypb.Mutat
 
 func (s *Server) HTTPRequestMutate(ctx context.Context, req *ypb.HTTPRequestMutateParams) (*ypb.MutateResult, error) {
 	rawRequest := req.GetRequest()
+	result := rawRequest
 	method := strings.ToUpper(strings.Join(req.FuzzMethods, ""))
-	switch strings.Join(req.FuzzMethods, "") {
+	// get params
+	totalParams := lowhttp.GetAllHTTPRequestQueryParams(rawRequest)
+	// post params
+	contentType := lowhttp.GetHTTPPacketHeader(rawRequest, "Content-Type")
+	transferEncoding := lowhttp.GetHTTPPacketHeader(rawRequest, "Transfer-Encoding")
+	_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rawRequest)
+	// chunked 转 Content-Length
+	if !req.ChunkEncode && utils.IContains(transferEncoding, "chunked") {
+		result = lowhttp.ReplaceHTTPPacketBody(result, body, false)
+		_, body = lowhttp.SplitHTTPHeadersAndBodyFromPacket(result)
+	}
+	postParams, _, _ := lowhttp.GetParamsFromBody(contentType, body)
+	for k, v := range postParams {
+		totalParams[k] = v
+	}
+
+	switch method {
 	case "POST":
-		u, _ := lowhttp.ExtractURLFromHTTPRequestRaw(rawRequest, true)
-		if u != nil {
-			result := poc.BuildRequest(lowhttp.TrimLeftHTTPPacket(rawRequest),
-				poc.WithReplaceHttpPacketMethod("POST"),
-				poc.WithReplaceHttpPacketQueryParamRaw(""),
-				poc.WithReplaceHttpPacketHeader("Content-Type", "application/x-www-form-urlencoded"),
-				poc.WithDeleteHeader("Transfer-Encoding"),
-				poc.WithAppendHeaderIfNotExist("User-Agent", consts.DefaultUserAgent),
-				poc.WithReplaceHttpPacketBody(utils.UnsafeStringToBytes(u.RawQuery), false),
-			)
-			return &ypb.MutateResult{
-				Result: result,
-			}, nil
-		}
-	case "HEAD":
-		fallthrough
-	case "GET":
-		u, _ := lowhttp.ExtractURLFromHTTPRequestRaw(rawRequest, true)
-		_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rawRequest)
-		if u != nil {
-			contentType := lowhttp.GetHTTPPacketHeader(rawRequest, "Content-Type")
-			queryRaw := ""
-			postParams, useRaw, err := lowhttp.GetParamsFromBody(contentType, body)
-			if err != nil {
-				return nil, err
-			}
-			if useRaw {
-				queryRaw = utils.UnsafeBytesToString(body)
-			} else {
-				queryRaw = strings.Join(lo.MapToSlice(postParams, func(key string, value string) string { return fmt.Sprintf("%s=%s", key, value) }), "&")
-			}
-			if len(u.RawQuery) > 0 {
-				if len(queryRaw) > 0 {
-					queryRaw = fmt.Sprintf("%s&%s", queryRaw, u.RawQuery)
-				} else {
-					queryRaw = u.RawQuery
-				}
-			}
-			result := poc.BuildRequest(lowhttp.TrimLeftHTTPPacket(rawRequest),
+		result = poc.BuildRequest(lowhttp.TrimLeftHTTPPacket(result),
+			poc.WithReplaceHttpPacketMethod("POST"),
+			poc.WithReplaceHttpPacketQueryParamRaw(""),
+			poc.WithReplaceHttpPacketHeader("Content-Type", "application/x-www-form-urlencoded"),
+			poc.WithDeleteHeader("Transfer-Encoding"),
+			poc.WithAppendHeaderIfNotExist("User-Agent", consts.DefaultUserAgent),
+			poc.WithReplaceAllHttpPacketPostParams(totalParams),
+		)
+
+	default:
+		if len(method) > 0 {
+			result = poc.BuildRequest(lowhttp.TrimLeftHTTPPacket(result),
 				poc.WithReplaceHttpPacketMethod(method),
-				poc.WithReplaceHttpPacketQueryParamRaw(queryRaw),
-				poc.WithReplaceHttpPacketHeader("Content-Type", "application/x-www-form-urlencoded"),
+				poc.WithReplaceAllHttpPacketQueryParams(totalParams),
 				poc.WithDeleteHeader("Transfer-Encoding"),
 				poc.WithDeleteHeader("Content-Type"),
 				poc.WithAppendHeaderIfNotExist("User-Agent", consts.DefaultUserAgent),
-				poc.WithReplaceHttpPacketBody([]byte{}, false),
+				poc.WithReplaceHttpPacketBody(nil, false),
 			)
-			return &ypb.MutateResult{
-				Result: result,
-			}, nil
 		}
 	}
 
-	if len(req.FuzzMethods) > 0 {
-		result := poc.BuildRequest(lowhttp.TrimLeftHTTPPacket(rawRequest),
-			poc.WithReplaceHttpPacketMethod(method))
-		return &ypb.MutateResult{
-			Result: result,
-		}, nil
-	}
-
-	// chunk编码
 	if req.ChunkEncode {
-		_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rawRequest)
-		rawRequest = lowhttp.ReplaceHTTPPacketBody(rawRequest, body, true)
-		return &ypb.MutateResult{Result: rawRequest}, nil
+		// chunk编码
+		_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(result)
+		result = lowhttp.ReplaceHTTPPacketBody(result, body, true)
 	}
-
-	// 上传数据包
 	if req.UploadEncode {
-		params := lowhttp.GetAllHTTPRequestQueryParams(rawRequest)
-		for k, v := range lowhttp.GetAllHTTPRequestPostParams(rawRequest) {
-			params[k] = v
-		}
 		opts := make([]poc.PocConfigOption, 0)
-		opts = append(opts, poc.WithReplaceHttpPacketBody([]byte{}, false))
+		opts = append(opts, poc.WithReplaceHttpPacketBody(nil, false))
 		opts = append(opts, poc.WithReplaceHttpPacketQueryParamRaw(""))
-		for k, v := range params {
+		for k, v := range totalParams {
 			opts = append(opts, poc.WithAppendHttpPacketUploadFile(k, "", v, ""))
 		}
-		result := poc.BuildRequest(lowhttp.TrimLeftHTTPPacket(rawRequest),
-			opts...)
-		return &ypb.MutateResult{
-			Result: result,
-		}, nil
+		result = poc.BuildRequest(lowhttp.TrimLeftHTTPPacket(result), opts...)
 	}
 
 	return &ypb.MutateResult{
-		Result:       rawRequest,
+		Result:       result,
 		ExtraResults: nil,
 	}, nil
 }
