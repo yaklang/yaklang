@@ -79,6 +79,19 @@ func (i *_yakPortScanConfig) callSubmitTaskCallback(r string) {
 
 type scanOpt func(config *_yakPortScanConfig)
 
+// rateLimit syn scan 的配置选项，设置 syn 扫描的速率
+// @param {int} ms 延迟多少毫秒
+// @param {int} count 每隔多少个数据包延迟一次
+// @return {scanOpt} 返回配置选项
+// Example:
+// ```
+// res, err = synscan.Scan("127.0.0.1", "1-65535",
+//
+//	synscan.rateLimit(1, 2000) // 每隔 2000 个数据包延迟 1 毫秒
+//
+// )
+// die(err)
+// ```
 func _scanOptRateLimit(ms int, count int) scanOpt {
 	return func(config *_yakPortScanConfig) {
 		config.rateLimitDelayMs = float64(ms)
@@ -86,7 +99,18 @@ func _scanOptRateLimit(ms int, count int) scanOpt {
 	}
 }
 
-// 设置 SYN 扫描的并发可以有效控制精准度
+// concurrent syn scan 的配置选项，设置 syn 扫描的并发数
+// @param {int} count 并发数
+// @return {scanOpt} 返回配置选项
+// Example:
+// ```
+// res, err = synscan.Scan("127.0.0.1", "1-65535",
+//
+//	synscan.concurrent(1000) // 并发 1000
+//
+// )
+// die(err)
+// ```
 func _scanOptSYNConcurrent(count int) scanOpt {
 	return func(config *_yakPortScanConfig) {
 		if count <= 0 {
@@ -100,7 +124,18 @@ func _scanOptSYNConcurrent(count int) scanOpt {
 	}
 }
 
-// synscan 发出 SYN 包后等待多久？
+// wait syn scan 的配置选项，设置等待对端的反应时间
+// @param {float64} sec 等待时间，单位秒
+// @return {scanOpt} 返回配置选项
+// Example:
+// ```
+// res, err = synscan.Scan("127.0.0.1", "1-65535",
+//
+//	synscan.wait(5) // 等待 5 秒
+//
+// )
+// die(err)
+// ```
 func _scanOptWaiting(sec float64) scanOpt {
 	return func(config *_yakPortScanConfig) {
 		config.waiting = utils.FloatSecondDuration(sec)
@@ -110,6 +145,18 @@ func _scanOptWaiting(sec float64) scanOpt {
 	}
 }
 
+// excludePorts syn scan 的配置选项，设置本次扫描排除的端口
+// @param {string} ports 端口，支持 1-65535、1,2,3、1-100,200-300 格式
+// @return {scanOpt} 返回配置选项
+// Example:
+// ```
+// res, err = synscan.Scan("127.0.0.1", "1-65535",
+//
+//	synscan.excludePorts("1-100,200-300") // 排除 1-100 和 200-300 端口
+//
+// )
+// die(err)
+// ```
 func _scanOptExcludePorts(ports string) scanOpt {
 	return func(config *_yakPortScanConfig) {
 		if ports == "" {
@@ -142,6 +189,18 @@ func (c *_yakPortScanConfig) IsFiltered(host string, port int) bool {
 	return false
 }
 
+// excludeHosts syn scan 的配置选项，设置本次扫描排除的主机
+// @param {string} hosts 主机，支持逗号分割、CIDR、-的格式
+// @return {scanOpt} 返回配置选项
+// Example:
+// ```
+// res, err = synscan.Scan("192.168.1.1/24", "1-65535",
+//
+//	synscan.excludeHosts("192.168.1.1,192.168.1.3-10,192.168.1.1/26")
+//
+// )
+// die(err)
+// ```
 func _scanOptExcludeHosts(hosts string) scanOpt {
 	return func(config *_yakPortScanConfig) {
 		if hosts == "" {
@@ -151,26 +210,73 @@ func _scanOptExcludeHosts(hosts string) scanOpt {
 	}
 }
 
-// 端口开放的结果保存到文件
+// outputFile syn scan 的配置选项，设置本次扫描结果保存到指定的文件
+// @param {string} file 文件路径
+// @return {scanOpt} 返回配置选项
+// Example:
+// ```
+// res, err = synscan.Scan("127.0.0.1", "1-65535",
+//
+//	synscan.outputFile("/tmp/open_ports.txt")
+//
+// )
+// die(err)
+// ```
 func _scanOptOpenPortResult(file string) scanOpt {
 	return func(config *_yakPortScanConfig) {
 		config.outputFile = file
 	}
 }
 
-// 端口开放结果保存文件加个前缀，比如 tcp:// https:// http:// 等
+// outputPrefix syn scan 的配置选项，设置本次扫描结果保存到文件时添加自定义前缀，比如 tcp:// https:// http:// 等，需要配合 outputFile 使用
+// @param {string} prefix 前缀
+// @return {scanOpt} 返回配置选项
+// Example:
+// ```
+// res, err = synscan.Scan("127.0.0.1", "1-65535",
+//
+//	 synscan.outputFile("./open_ports.txt"),
+//		synscan.outputPrefix("tcp://")
+//
+// )
+// die(err)
+// ```
 func _scanOptOpenPortResultPrefix(prefix string) scanOpt {
 	return func(config *_yakPortScanConfig) {
 		config.outputFilePrefix = prefix
 	}
 }
 
+// initHostFilter syn scan 的配置选项，设置本次扫描的初始主机过滤器
+// @param {string} f 主机，支持逗号、CIDR、-分割
+// @return {scanOpt} 返回配置选项
+// Example:
+// ```
+// res, err = synscan.Scan("192.168.1.1/24", "1-65535",
+//
+//	synscan.initHostFilter("192.168.1.1,192.168.1.2")
+//
+// )
+// die(err)
+// ```
 func _scanOptOpenPortInitHostFilter(f string) scanOpt {
 	return func(config *_yakPortScanConfig) {
 		config.initFilterHosts = f
 	}
 }
 
+// initPortFilter syn scan 的配置选项，设置本次扫描的初始端口过滤器
+// @param {string} f 端口，支持逗号、-分割
+// @return {scanOpt} 返回配置选项
+// Example:
+// ```
+// res, err = synscan.Scan("192.168.3.1", "1-65535",
+//
+//	synscan.initPortFilter("1-100,200-300")
+//
+// )
+// die(err)
+// ```
 func _scanOptOpenPortInitPortFilter(f string) scanOpt {
 	return func(config *_yakPortScanConfig) {
 		config.initFilterPorts = f
@@ -483,6 +589,50 @@ func pingutilsToChan(res chan *pingutil.PingResult) chan string {
 	return c
 }
 
+// Scan 使用 SYN 扫描技术进行端口扫描，它不必打开一个完整的TCP连接，只发送一个SYN包，就能做到打开连接的效果，然后等待对端的反应
+// @param {string} target 目标地址，支持 CIDR 格式
+// @param {string} port 端口，支持 1-65535、1,2,3、1-100,200-300 格式
+// @param {scanOpt} [opts] synscan 扫描参数
+// @return {chan *synscan.SynScanResult} 返回结果
+// Example:
+// ```
+// res, err := synscan.Scan("127.0.0.1", "1-65535") //
+// die(err)
+//
+//	for result := range res {
+//	  result.Show()
+//	}
+//
+// ```
+func _scan(target string, port string, opts ...scanOpt) (chan *synscan.SynScanResult, error) {
+	config := &_yakPortScanConfig{
+		waiting:           5 * time.Second,
+		rateLimitDelayMs:  1,
+		rateLimitDelayGap: 5,
+	}
+	for _, opt := range opts {
+		opt(config)
+	}
+	return _synScanDo(hostsToChan(target), port, config)
+}
+
+// ScanFromPing 对使用 ping.Scan 探测出的存活结果进行端口扫描，需要配合 ping.Scan 使用
+// @param {chan *PingResult} res ping.Scan 的扫描结果
+// @param {string} ports 端口，支持 1-65535、1,2,3、1-100,200-300 格式
+// @param {scanOpt} [opts] synscan 扫描参数
+// @return {chan *synscan.SynScanResult} 返回结果
+// Example:
+// ```
+// pingResult, err = ping.Scan("192.168.1.1/24") // 先进行存活探测
+// die(err)
+// res, err = synscan.ScanFromPing(pingResult, "1-65535") // 对存活结果进行端口扫描
+// die(err)
+//
+//	for r := range res {
+//	  r.Show()
+//	}
+//
+// ```
 func _synscanFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...scanOpt) (chan *synscan.SynScanResult, error) {
 	config := &_yakPortScanConfig{
 		//requestTimeout: 5 * time.Second,
@@ -497,12 +647,40 @@ func _synscanFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...
 	return _synScanDo(pingutilsToChan(res), ports, config)
 }
 
+// callback syn scan 的配置选项，设置一个回调函数，每发现一个端口就会调用一次
+// @param {func(i *synscan.SynScanResult)} i 回调函数
+// @return {scanOpt} 返回配置选项
+// Example:
+// ```
+// res, err = synscan.Scan("127.0.0.1", "1-65535",
+//
+//	synscan.callback(func(i){
+//	   db.SavePortFromResult(i) // 将结果保存到数据库
+//	})
+//
+// )
+// die(err)
+// ```
 func _scanOptCallback(i func(i *synscan.SynScanResult)) scanOpt {
 	return func(config *_yakPortScanConfig) {
 		config.callback = i
 	}
 }
 
+// submitTaskCallback syn scan 的配置选项，设置一个回调函数，每提交一个探测数据包的时候，这个回调会执行一次
+// @param {func(string)} i 回调函数
+// @return {scanOpt} 返回配置选项
+// Example:
+// ```
+// res, err = synscan.Scan("127.0.0.1", "1-65535",
+//
+//	synscan.submitTaskCallback(func(i){
+//	   println(i) // 打印要探测的目标
+//	})
+//
+// )
+// die(err)
+// ```
 func _scanOptSubmitTaskCallback(i func(string)) scanOpt {
 	return func(config *_yakPortScanConfig) {
 		config.submitTaskCallback = i
@@ -514,18 +692,8 @@ func _scanOptSubmitTaskCallback(i func(string)) scanOpt {
 //  2. timeout
 var SynPortScanExports = map[string]interface{}{
 	"FixPermission": pcapfix.Fix,
-	"Scan": func(target string, port string, opts ...scanOpt) (chan *synscan.SynScanResult, error) {
-		config := &_yakPortScanConfig{
-			waiting:           5 * time.Second,
-			rateLimitDelayMs:  1,
-			rateLimitDelayGap: 5,
-		}
-		for _, opt := range opts {
-			opt(config)
-		}
-		return _synScanDo(hostsToChan(target), port, config)
-	},
-	"ScanFromPing": _synscanFromPingUtils,
+	"Scan":          _scan,
+	"ScanFromPing":  _synscanFromPingUtils,
 
 	"callback":           _scanOptCallback,
 	"submitTaskCallback": _scanOptSubmitTaskCallback,

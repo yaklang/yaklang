@@ -14,11 +14,45 @@ import (
 	"strings"
 )
 
+// Scan servicescan 库使用的端口扫描类型的方式为全连接扫描，用于对连接目标进行精准的扫描，相比 synscan 库的单纯扫描，servicescan 库会尝试获取精确指纹信息以及 CPE 信息
+// @param {string} target 目标地址，支持 CIDR 格式，支持 192.168.1.1-100 格式
+// @param {string} port 端口，支持 1-65535、1,2,3、1-100,200-300 格式
+// @param {ConfigOption} [opts] servicescan 扫描参数
+// @return {chan *MatchResult} 返回结果
+// Example:
+// ```
+// ch, err = servicescan.Scan("127.0.0.1", "22-80,443,3389")  // 开始扫描，函数会立即返回一个错误和结果管道
+// die(err) // 如果错误非空则报错
+// for result := range ch { // 通过遍历管道的形式获取管道中的结果
+//
+//	   if result.IsOpen() { // 获取到的结果是一个结构体，可以调用IsOpen方法判断该端口是否打开
+//	       println(result.String()) // 输出结果，调用String方法获取可读字符串
+//	       println(result.GetCPEs()) // 查看 CPE 结果
+//	   }
+//	}
+//
+// ```
 func scanFingerprint(target string, port string, opts ...fp.ConfigOption) (chan *fp.MatchResult, error) {
 	config := fp.NewConfig(opts...)
 	return _scanFingerprint(context.Background(), config, 50, target, port)
 }
 
+// ScanOne servicescan 单体扫描，同步扫描一个目标，主机+端口
+// @param {string} target 目标地址
+// @param {int} port 端口
+// @param {ConfigOption} [opts] servicescan 扫描参数
+// @return {MatchResult} 返回结果
+// Example:
+// ```
+// result, err = servicescan.ScanOne("127.0.0.1", "22-80,443,3389")  // 开始扫描，函数会立即返回一个错误和结果
+// die(err) // 如果错误非空则报错
+// if result.IsOpen() { // 获取到的结果是一个结构体，可以调用IsOpen方法判断该端口是否打开
+//
+//	    println(result.String()) // 输出结果，调用String方法获取可读字符串
+//	    println(result.GetCPEs()) // 查看 CPE 结果
+//	}
+//
+// ```
 func scanOneFingerprint(target string, port int, opts ...fp.ConfigOption) (*fp.MatchResult, error) {
 	config := fp.NewConfig(opts...)
 	matcher, err := fp.NewFingerprintMatcher(nil, config)
@@ -115,6 +149,23 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 	return outC, nil
 }
 
+// ScanFromPing 从 ping.Scan 的结果中进行指纹识别
+// @param {chan *pingutil.PingResult} res ping.Scan 的结果
+// @param {string} ports 端口，支持 1-65535、1,2,3、1-100,200-300 格式
+// @param {ConfigOption} [opts] synscan 扫描参数
+// @return {chan *MatchResult} 返回结果
+// Example:
+// ```
+// pingResult, err = ping.Scan("192.168.1.1/24") // 先进行存活探测
+// die(err)
+// fpResults, err := servicescan.ScanFromPing(pingResult, "22-80,443,3389") // 将ping中拿到的结果传入servicescan中进行指纹扫描
+// die(err) // 如果错误非空则报错
+// for result := range fpResults { // 通过遍历管道的形式获取管道中的结果，一旦有结果返回就会执行循环体的代码
+//
+//	   println(result.String()) // 输出结果，调用String方法获取可读字符串
+//	}
+//
+// ```
 func _scanFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...fp.ConfigOption) (chan *fp.MatchResult, error) {
 	var synResults = make(chan *synscan.SynScanResult, 1000)
 	portsInt := utils.ParseStringToPorts(ports)
@@ -143,6 +194,31 @@ func _scanFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...fp.
 	return _scanFromTargetStream(synResults, opts...)
 }
 
+// ScanFromSynResult / ScanFromSpaceEngine 从 synscan.Scan 或者 spacengine.Query 的结果中进行指纹识别
+// @param {interface{}} res synscan.Scan 或者 spacengine.Query 的结果
+// @param {scanOpt} [opts] synscan 扫描参数
+// @return {chan *MatchResult} 返回结果
+// Example:
+// ```
+// ch, err = synscan.Scan("127.0.0.1", "22-80,443,3389")  // 开始扫描，函数会立即返回一个错误和结果管道
+// die(err) // 如果错误非空则报错
+// fpResults, err := servicescan.ScanFromSynResult(ch) // 将synscan中拿到的结果传入servicescan中进行指纹扫描
+// die(err) // 如果错误非空则报错
+// for result := range fpResults { // 通过遍历管道的形式获取管道中的结果，一旦有结果返回就会执行循环体的代码
+//
+//	   println(result.String()) // 输出结果，调用String方法获取可读字符串
+//	}
+//
+// res, err := spacengine.ShodanQuery(Apikey,query)
+// die(err) // 如果错误非空则报错
+// fpResults, err := servicescan.ScanFromSpaceEngine(res) // 将spacengine中拿到的结果传入servicescan中进行指纹扫描
+// die(err) // 如果错误非空则报错
+// for result := range fpResults { // 通过遍历管道的形式获取管道中的结果，一旦有结果返回就会执行循环体的代码
+//
+//	   println(result.String()) // 输出结果，调用String方法获取可读字符串
+//	}
+//
+// ```
 func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.MatchResult, error) {
 	var synResults = make(chan *synscan.SynScanResult, 1000)
 
@@ -270,6 +346,77 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 	return outC, nil
 }
 
+// proto servicescan 的配置选项，用于指定扫描协议
+// @param {...interface{}} [proto] 协议，例如：tcp、udp，可选参数，不传入参数默认为 tcp
+// @return {ConfigOption} 返回配置选项
+// Example:
+// ```
+// result,err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.proto(["tcp","udp"]...)) // 使用 TCP 和 UDP 进行扫描
+// die(err) // 如果错误非空则报错
+// for res := range result { // 通过遍历管道的形式获取管道中的结果，一旦有结果返回就会执行循环体的代码
+//
+//	   println(res.String()) // 输出结果，调用String方法获取可读字符串
+//	}
+//
+// ```
+func _protoOption(proto ...interface{}) fp.ConfigOption {
+	return fp.WithTransportProtos(fp.ParseStringToProto(proto...)...)
+}
+
+// web servicescan 的配置选项，用于指定扫描指纹的类型为 web
+// @return {ConfigOption} 返回配置选项
+// Example:
+// ```
+// result,err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.web()) // 使用 web 指纹进行扫描
+// die(err) // 如果错误非空则报错
+// for res := range result { // 通过遍历管道的形式获取管道中的结果，一旦有结果返回就会执行循环体的代码
+//
+//	   println(res.String()) // 输出结果，调用String方法获取可读字符串
+//	}
+//
+// ```
+func _webOption() fp.ConfigOption {
+	return func(config *fp.Config) {
+		config.OnlyEnableWebFingerprint = true
+	}
+}
+
+// service servicescan 的配置选项，用于指定扫描指纹的类型为 service
+// @return {ConfigOption} 返回配置选项
+// Example:
+// ```
+// result,err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.service()) // 使用 service 指纹进行扫描
+// die(err) // 如果错误非空则报错
+// for res := range result { // 通过遍历管道的形式获取管道中的结果，一旦有结果返回就会执行循环体的代码
+//
+//	   println(res.String()) // 输出结果，调用String方法获取可读字符串
+//	}
+//
+// ```
+func _serviceOption() fp.ConfigOption {
+	return func(config *fp.Config) {
+		config.DisableWebFingerprint = true
+	}
+}
+
+// all servicescan 的配置选项，用于指定扫描指纹的类型为 web 和 service
+// @return {ConfigOption} 返回配置选项
+// Example:
+// ```
+// result,err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.all()) // 使用 web 和 service 指纹进行扫描
+// die(err) // 如果错误非空则报错
+// for res := range result { // 通过遍历管道的形式获取管道中的结果，一旦有结果返回就会执行循环体的代码
+//
+//	   println(res.String()) // 输出结果，调用String方法获取可读字符串
+//	}
+//
+// ```
+func _allOption() fp.ConfigOption {
+	return func(config *fp.Config) {
+		config.ForceEnableAllFingerprint = true
+	}
+}
+
 var FingerprintScanExports = map[string]interface{}{
 	"Scan":                scanFingerprint,
 	"ScanOne":             scanOneFingerprint,
@@ -277,9 +424,7 @@ var FingerprintScanExports = map[string]interface{}{
 	"ScanFromSpaceEngine": _scanFromTargetStream,
 	"ScanFromPing":        _scanFromPingUtils,
 
-	"proto": func(proto ...interface{}) fp.ConfigOption {
-		return fp.WithTransportProtos(fp.ParseStringToProto(proto...)...)
-	},
+	"proto": _protoOption,
 
 	// 整体扫描并发
 	"concurrent": fp.WithPoolSize,
@@ -316,23 +461,11 @@ var FingerprintScanExports = map[string]interface{}{
 	"maxProbesConcurrent": fp.WithProbesConcurrentMax,
 
 	// 指定选择扫描目标协议：指开启 web 服务扫描
-	"web": func() fp.ConfigOption {
-		return func(config *fp.Config) {
-			config.OnlyEnableWebFingerprint = true
-		}
-	},
+	"web": _webOption,
 
 	// 开启 nmap 规则库
-	"service": func() fp.ConfigOption {
-		return func(config *fp.Config) {
-			config.DisableWebFingerprint = true
-		}
-	},
+	"service": _serviceOption(),
 
 	// 全部服务扫描
-	"all": func() fp.ConfigOption {
-		return func(config *fp.Config) {
-			config.ForceEnableAllFingerprint = true
-		}
-	},
+	"all": _allOption,
 }
