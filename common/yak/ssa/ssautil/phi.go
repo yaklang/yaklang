@@ -1,6 +1,8 @@
 package ssautil
 
 import (
+	"fmt"
+
 	"github.com/yaklang/yaklang/common/log"
 )
 
@@ -89,25 +91,16 @@ func Merge[T comparable](
 		length++
 	}
 	tmp := make(map[string][]T)
-	for index, sub := range subScopes {
-		sub.captured.ForEach(func(name string, ver *Versioned[T]) bool {
-			if base.GetLatestVersion(name) == zero {
-				// not exist in base scope, this variable just set in sub-scope,
-				// just skip, not need generate phi
-				return true
-			}
 
-			m, ok := tmp[name]
-			if !ok {
-				m = make([]T, length)
-			}
-			m[index] = ver.Value
-			tmp[name] = m
-			return true
-		})
+	addPhiContent := func(index int, name string, ver *Versioned[T]) {
+		m, ok := tmp[name]
+		if !ok {
+			m = make([]T, length)
+		}
+		m[index] = ver.Value
+		tmp[name] = m
 	}
-
-	for name, m := range tmp {
+	generatePhi := func(name string, m []T) {
 		origin := base.GetLatestVersion(name)
 		// fill the missing value
 		// if len(m) != length {
@@ -121,7 +114,37 @@ func Merge[T comparable](
 				m[index] = origin
 			}
 		}
+
+		// generate phi
 		handler(name, m)
+	}
+
+	for index, sub := range subScopes {
+		sub.captured.ForEach(func(name string, ver *Versioned[T]) bool {
+			baseVariable := base.GetLatestVersionVersioned(name)
+			capturedVariable := sub.parent.GetLatestVersionVersioned(name)
+			if capturedVariable == nil {
+				panic(fmt.Sprintf("variable %s not exist in parent scope, but this variable is captured", name))
+			}
+			if baseVariable == nil {
+				// not exist in base scope, this variable just set in sub-scope,
+				// just skip, not need generate phi
+				return true
+			}
+
+			if baseVariable.scope != capturedVariable.scope {
+				// the ver scope is not equal to base scope,
+				// this `ver` is captured, but not same variable with base-variable
+				// just skip
+				return true
+			}
+			addPhiContent(index, name, ver)
+			return true
+		})
+	}
+
+	for name, m := range tmp {
+		generatePhi(name, m)
 	}
 }
 
