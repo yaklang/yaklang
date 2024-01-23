@@ -153,3 +153,38 @@ g=d+a;`)
 		t.Fatal("checkDotPhi failed")
 	}
 }
+
+func TestFunctionDotTrace(t *testing.T) {
+	text := `a = 1
+b = (c, d, e) => {
+	a = c + d
+	return d, c
+}
+f = b(2,3,4)`
+	prog, err := Parse(text)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	check2 := false
+	check3 := false
+	prog.Ref("f").FullUseDefChain(func(value *Value) {
+		value.ShowDot()
+		dot.ShowDotGraphToAsciiArt(value.Dot())
+		value.GetTopDefs().ForEach(func(value *Value) {
+			ret := value.GetConstValue()
+			if ret == 2 && len(value.EffectOn) == 3 {
+				check2 = true
+			}
+			if ret == 3 && len(value.EffectOn) == 3 {
+				check3 = true
+			}
+		})
+	})
+	if !check2 {
+		t.Fatal("the literal 2 trace failed")
+	}
+	if !check3 {
+		t.Fatal("the literal 3 trace failed")
+	}
+}
