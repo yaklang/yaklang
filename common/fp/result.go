@@ -8,6 +8,7 @@ import (
 	tablewriter "github.com/olekukonko/tablewriter"
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"io/ioutil"
 	"os"
@@ -32,6 +33,9 @@ type FingerprintInfo struct {
 	Banner           string                           `json:"banner"`
 	CPEFromUrls      map[string][]*webfingerprint.CPE `json:"cpe_from_urls"`
 	HttpFlows        []*HTTPFlow                      `json:"http_flows"`
+
+	// tls info for fill...
+	TLSInspectResults []*netx.TLSInspectResult
 }
 
 type HTTPFlow struct {
