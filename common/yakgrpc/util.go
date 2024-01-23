@@ -141,7 +141,7 @@ func NewLocalClient(locals ...bool) (ypb.YakClient, error) {
 		local = locals[0]
 	}
 
-	if local || !utils.CheckGithubAction() {
+	if local || !utils.InGithubActions() {
 		consts.InitilizeDatabase("", "")
 		yakit.InitializeDefaultDatabaseSchema()
 

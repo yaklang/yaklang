@@ -191,6 +191,4 @@ jobs:
 
       - name: ${{ matrix.name }}
         run: |
-          export YAKLANG_GRPCTEST_GITHUBACTION=true
-          export YAK_DISABLE=output
           ${{ matrix.run }}
