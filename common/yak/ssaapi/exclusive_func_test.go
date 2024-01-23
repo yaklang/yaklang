@@ -1,6 +1,8 @@
 package ssaapi
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestFunctionTrace(t *testing.T) {
 	prog, err := Parse(`c =((i,i1)=>i)(1,2);a = {};a.b=c;e=a.b;dump(e)`)

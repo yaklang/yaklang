@@ -107,7 +107,10 @@ type DisasmLiner interface {
 
 func lineDisasm(v Instruction, liner DisasmLiner) (ret string) {
 	if liner.AddLevel() {
-		return "..."
+		_, isNameLiner := liner.(*NameDisasmLiner)
+		if !isNameLiner {
+			return "..."
+		}
 	}
 
 	// check cache and set cache
