@@ -98,6 +98,7 @@ type DisasmLiner interface {
 	// level += 1; and check should stop?
 	// if this method return true, should stop
 	AddLevel() bool
+	SkipLevelChecking() bool
 
 	// cache // those method  should use `*cacheDisasmLiner`
 	GetName(v Instruction) (string, bool)
@@ -105,12 +106,17 @@ type DisasmLiner interface {
 	DeleteName(v Instruction)
 }
 
+func (b *NameDisasmLiner) SkipLevelChecking() bool {
+	return true
+}
+
+func (b *FullDisasmLiner) SkipLevelChecking() bool {
+	return false
+}
+
 func lineDisasm(v Instruction, liner DisasmLiner) (ret string) {
-	if liner.AddLevel() {
-		_, isNameLiner := liner.(*NameDisasmLiner)
-		if !isNameLiner {
-			return "..."
-		}
+	if liner.AddLevel() && !liner.SkipLevelChecking() {
+		return "..."
 	}
 
 	// check cache and set cache
