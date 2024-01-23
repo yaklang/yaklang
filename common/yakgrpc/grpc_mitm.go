@@ -43,8 +43,6 @@ var (
 	autoFoward   hijackStatusCode = 2
 )
 
-
-
 var enabledHooks = yak.MITMAndPortScanHooks
 
 var mitmSaveToDBLock = new(sync.Mutex)
@@ -333,7 +331,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	autoForward := utils.NewBool(true)
 	autoForwardCh := make(chan struct{}, 1)
 
-	filterWebSocket := utils.NewBool(false)
+	filterWebSocket := utils.NewBool(firstReq.GetFilterWebsocket())
 
 	go func() {
 		defer close(autoForwardCh)
@@ -555,7 +553,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 
 			// 是否过滤ws
-			if reqInstance.GetFilterWebsocket() {
+			if reqInstance.GetUpdateFilterWebsocket() {
 				filterWebSocket.SetTo(reqInstance.GetFilterWebsocket())
 				continue
 			}
