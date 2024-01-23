@@ -20,6 +20,7 @@ type Function struct {
 	uuid                      string
 	paramSymbols              []int
 	isVariableParameter       bool
+	defineFrame               *Frame
 }
 
 func (f *Function) GetActualName() string {
@@ -102,6 +103,7 @@ func (f *Function) Copy(s *Scope) *Function {
 		uuid:                      f.uuid,
 		paramSymbols:              f.paramSymbols,
 		isVariableParameter:       f.isVariableParameter,
+		defineFrame:               f.defineFrame,
 
 		// only this:
 		scope: s,

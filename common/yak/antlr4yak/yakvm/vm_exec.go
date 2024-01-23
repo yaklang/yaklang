@@ -655,6 +655,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		}
 		if c.Op1.IsYakFunction() {
 			fun := c.Op1.Value.(*Function)
+			fun.defineFrame = v
 			if c.Unary == 1 {
 				c.Op1.Value = fun.Copy(v.scope)
 			} else if c.Unary == 0 {
@@ -743,6 +744,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			}
 			return
 		}
+
 	case OpPushId:
 		// 不是赋值的符号，一般来说，这应该是外部注入的变量或者函数
 		// 通过 GlobalVariables 可以很棒的处理这个问题

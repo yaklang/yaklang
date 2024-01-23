@@ -27,6 +27,7 @@ func NewSandbox(vars map[string]interface{}) *antlr4yak.Engine {
 		engine.EnableStrictMode()
 	}
 	engine.ImportLibs(vars)
+	engine.SetSandboxMode(true)
 	return engine
 }
 

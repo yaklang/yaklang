@@ -18,6 +18,7 @@ const (
 	Sub                         // 使用栈顶的数据继续执行
 	Inline                      // 使用上一次执行的Trace继续执行
 	Asnyc                       // 异步执行
+	Sandbox
 )
 
 func GetFlag(flags ...ExecFlag) ExecFlag {
@@ -52,6 +53,9 @@ type (
 		hijackMapMemberCallHandlers sync.Map
 		globalVarFallback           func(string) interface{}
 		GetExternalVar              func(name string) (any, bool)
+
+		//sandbox
+		sandboxMode bool
 	}
 )
 
@@ -81,6 +85,10 @@ func (n *VirtualMachine) GetExternalVariableNames() []string {
 
 func (v *VirtualMachine) SetDebug(debug bool) {
 	v.debug = debug
+}
+
+func (v *VirtualMachine) SetSandboxMode(mode bool) {
+	v.sandboxMode = mode
 }
 
 func (v *VirtualMachine) SetDebugMode(debug bool, sourceCode string, codes []*Code, debugInit, debugCallback func(*Debugger)) {
@@ -198,6 +206,9 @@ func (v *VirtualMachine) ExecYakFunction(ctx context.Context, f *Function, args 
 		finalFlags = flags
 	}
 	err := v.Exec(ctx, func(frame *Frame) {
+		if v.sandboxMode && f.defineFrame != nil {
+			frame = NewSubFrame(f.defineFrame)
+		}
 		name := f.GetActualName()
 		frame.SetVerbose(fmt.Sprintf("function: %s", name))
 		frame.SetFunction(f)
@@ -230,6 +241,9 @@ func (v *VirtualMachine) ExecYakFunction(ctx context.Context, f *Function, args 
 
 func (v *VirtualMachine) ExecAsyncYakFunction(ctx context.Context, f *Function, args map[int]*Value) error {
 	return v.Exec(ctx, func(frame *Frame) {
+		if v.sandboxMode && f.defineFrame != nil {
+			frame = NewSubFrame(f.defineFrame)
+		}
 		name := f.GetActualName()
 		frame.SetVerbose("function: " + name)
 		frame.SetFunction(f)
