@@ -54,7 +54,7 @@ func init() {
 }
 
 func TestMustPassDebug(t *testing.T) {
-	var debugName = "pool_redirectTimes.yak"
+	var debugName = "sandbox.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {

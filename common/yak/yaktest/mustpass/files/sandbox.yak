@@ -1,0 +1,9 @@
+box := sandbox.Create(sandbox.library({
+    "do": i => {
+        dump(i)
+        return i + 4
+    }
+}))
+
+a = box.ExecuteAsBoolean("do(c) == undefined", {"c": 2})~
+dump(a)

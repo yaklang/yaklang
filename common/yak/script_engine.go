@@ -288,6 +288,8 @@ func initYaklangLib() {
 	// openapi
 	yaklang.Import("openapi", openapi.Exports)
 
+	yaklang.Import("sandbox", SandboxExports)
+
 	// 手动为一些缺失的导出的接口注入注释
 	// yakdoc.RegisterHook(func(h *yakdoc.DocumentHelper) {
 	// })
