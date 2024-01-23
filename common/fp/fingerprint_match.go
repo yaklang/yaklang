@@ -158,8 +158,13 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 		log.Debugf("service-detect first for: %v", utils2.HostPort(host, port))
 		matchResult, err = serviceFirst()
 	}
-	matchResult.Tidy()
 
+	// if port open, check tls...
+	if matchResult.State == OPEN && matchResult.Fingerprint != nil {
+		matchResult.Fingerprint.TLSInspectResults, _ = netx.TLSInspect(utils2.HostPort(host, port))
+	}
+
+	matchResult.Tidy()
 	if matchResult.State == OPEN {
 		if config.EnableCache {
 			SetMatchResultCache(addr, matchResult)
