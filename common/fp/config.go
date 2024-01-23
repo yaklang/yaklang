@@ -105,24 +105,76 @@ func (c *Config) IsFiltered(host string, port int) bool {
 	return false
 }
 
+// cache servicescan 的配置选项，设置本次扫描是否使用缓存
+// @param {bool} b 是否使用缓存
+// @return {ConfigOption} 返回配置项
+// Example:
+// ```
+// result, err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.cache(true))
+// die(err)
+//
+//	for v := range result {
+//		fmt.Println(v.String())
+//	}
+//
+// ```
 func WithCache(b bool) ConfigOption {
 	return func(config *Config) {
 		config.EnableCache = b
 	}
 }
 
+// databaseCache servicescan 的配置选项，设置本次扫描是否使用数据库缓存
+// @param {bool} b 是否使用数据库缓存
+// @return {ConfigOption} 返回配置项
+// Example:
+// ```
+// result, err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.databaseCache(true))
+// die(err)
+//
+//	for v := range result {
+//		fmt.Println(v.String())
+//	}
+//
+// ```
 func WithDatabaseCache(b bool) ConfigOption {
 	return func(config *Config) {
 		config.EnableDatabaseCache = b
 	}
 }
 
+// proxy servicescan 的配置选项，设置本次扫描使用的代理
+// @param {string} proxies 代理地址，支持 http 和 socks5
+// @return {ConfigOption} 返回配置项
+// Example:
+// ```
+// result, err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.proxy("http://127.0.0.1:1080"))
+// die(err)
+//
+//	for v := range result {
+//		fmt.Println(v.String())
+//	}
+//
+// ```
 func WithProxy(proxies ...string) ConfigOption {
 	return func(config *Config) {
 		config.Proxies = utils.StringArrayFilterEmpty(proxies)
 	}
 }
 
+// concurrent servicescan 的配置选项，用于设置整体扫描并发
+// @param {int} size 并发数量
+// @return {ConfigOption} 返回配置项
+// Example:
+// ```
+// result, err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.concurrent(100))
+// die(err)
+//
+//	for v := range result {
+//		fmt.Println(v.String())
+//	}
+//
+// ```
 func WithPoolSize(size int) ConfigOption {
 	return func(config *Config) {
 		config.PoolSize = size
@@ -132,12 +184,38 @@ func WithPoolSize(size int) ConfigOption {
 	}
 }
 
+// excludeHosts servicescan 的配置选项，设置本次扫描排除的主机
+// @param {string} hosts 主机，支持逗号分割、CIDR、-的格式
+// @return {ConfigOption} 返回配置项
+// Example:
+// ```
+// result, err = servicescan.Scan("192.168.1.1/24", "22-80,443,3389", servicescan.excludeHosts("192.168.1.1"))
+// die(err)
+//
+//	for v := range result {
+//		fmt.Println(v.String())
+//	}
+//
+// ```
 func WithExcludeHosts(hosts string) ConfigOption {
 	return func(config *Config) {
 		config.ExcludeHostsFilter = hostsparser.NewHostsParser(context.Background(), hosts)
 	}
 }
 
+// excludePorts servicescan 的配置选项，设置本次扫描排除的端口
+// @param {string} ports 端口，支持逗号分割、-的格式
+// @return {ConfigOption} 返回配置项
+// Example:
+// ```
+// result, err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.excludePorts("22,80"))
+// die(err)
+//
+//	for v := range result {
+//		fmt.Println(v.String())
+//	}
+//
+// ```
 func WithExcludePorts(ports string) ConfigOption {
 	return func(config *Config) {
 		config.ExcludePortsFilter = filter.NewFilter()
@@ -203,6 +281,22 @@ func (c *Config) lazyInit() {
 	}
 }
 
+// maxProbes servicescan 的配置选项，在主动模式发包的基础上设置本次扫描使用的最大探测包数量，默认值为 5
+// @param {int} m 最大探测包数量
+// @return {ConfigOption} 返回配置项
+// Example:
+// ```
+// result, err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161",
+// servicescan.active(true), // 需要在主动发包的基础上
+// servicescan.maxProbes(10)
+// )
+// die(err)
+//
+//	for v := range result {
+//		fmt.Println(v.String())
+//	}
+//
+// ```
 func WithProbesMax(m int) ConfigOption {
 	if m <= 0 {
 		m = 5
@@ -232,6 +326,23 @@ func ParseStringToProto(protos ...interface{}) []TransportProto {
 	return ret
 }
 
+// maxProbesConcurrent servicescan 的配置选项，设置本次扫描发送 Probe 的并发量，默认值为 5
+// @param {int} m 并发量
+// @return {ConfigOption} 返回配置项
+// Example:
+// ```
+// result, err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161",
+// servicescan.active(true), // 需要在主动发包的基础上
+// servicescan.maxProbes(50), // 设置本次扫描使用的最大探测包数量
+// servicescan.maxProbesConcurrent(10) // 设置本次扫描发送 Probe 的并发量
+// )
+// die(err)
+//
+//	for v := range result {
+//		fmt.Println(v.String())
+//	}
+//
+// ```
 func WithProbesConcurrentMax(m int) ConfigOption {
 	if m <= 0 {
 		m = 5
@@ -262,6 +373,23 @@ func WithTransportProtos(protos ...TransportProto) ConfigOption {
 	}
 }
 
+// nmapRarityMax servicescan 的配置选项，设置本次扫描使用的 Nmap 指纹稀有度，在主动模式发包的基础上进行探测控制
+// 稀有度越大，表示这个服务在现实存在的可能性越小，取值范围为 1-9，默认值为 5
+// @param {int} rarity 稀有度，取值范围为 1-9
+// @return {ConfigOption} 返回配置项
+// Example:
+// ```
+// result, err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161",
+// servicescan.active(true), // 需要在主动发包的基础上通过稀有度进行筛选
+// servicescan.nmapRarityMax(9),
+// )
+// die(err)
+//
+//	for v := range result {
+//		fmt.Println(v.String())
+//	}
+//
+// ```
 func WithRarityMax(rarity int) ConfigOption {
 	return func(config *Config) {
 		config.RarityMax = rarity
@@ -280,6 +408,19 @@ func WithProbeTimeout(timeout time.Duration) ConfigOption {
 	}
 }
 
+// probeTimeout servicescan 的配置选项，设置每一个探测包的超时时间
+// @param {float64} f 超时时间，单位为秒
+// @return {ConfigOption} 返回配置项
+// Example:
+// ```
+// result, err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.probeTimeout(5))
+// die(err)
+//
+//	for v := range result {
+//		fmt.Println(v.String())
+//	}
+//
+// ```
 func WithProbeTimeoutHumanRead(f float64) ConfigOption {
 	return func(config *Config) {
 		config.ProbeTimeout = utils.FloatSecondDuration(f)
@@ -325,6 +466,8 @@ func WithWebFingerprintUseAllRules(b bool) ConfigOption {
 	}
 }
 
+// webRule servicescan 的配置选项，设置本次扫描使用的 Web 指纹规则
+// @param {interface{}} i Web 指纹规则
 func WithWebFingerprintRule(i interface{}) ConfigOption {
 	var rules []*webfingerprint.WebRule
 	switch ret := i.(type) {
@@ -351,6 +494,8 @@ func WithWebFingerprintRule(i interface{}) ConfigOption {
 	}
 }
 
+// nmapRule servicescan 的配置选项，设置本次扫描使用的 Nmap 指纹规则
+// @param {interface{}} i Nmap 指纹规则
 func WithNmapRule(i interface{}) ConfigOption {
 	var nmapRules map[*NmapProbe][]*NmapMatch
 	switch ret := i.(type) {

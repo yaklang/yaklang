@@ -790,6 +790,16 @@ func GetFindClassByBombJavaObject(className string) (*JavaObject, error) {
 // GetSimplePrincipalCollectionJavaObject 基于SimplePrincipalCollection 序列化模板生成并返回一个Java对象。
 // 主要用于 Shiro 漏洞检测时判断 rememberMe cookie 的个数。
 // 使用一个空的 SimplePrincipalCollection作为 payload，序列化后使用待检测的秘钥进行加密并发送，秘钥正确和错误的响应表现是不一样的，可以使用这个方法来可靠的枚举 Shiro 当前使用的秘钥。
+// Example:
+// ```
+// javaObject, _ = yso.GetSimplePrincipalCollectionJavaObject()
+// classBytes,_ = yso.ToBytes(javaObject)
+// data = codec.PKCS5Padding(classBytes, 16)
+// keyDecoded,err = codec.DecodeBase64("kPH+bIxk5D2deZiIxcaaaA==")
+// iv = []byte(ramdstr(16))
+// cipherText ,_ = codec.AESCBCEncrypt(keyDecoded, data, iv)
+// payload = codec.EncodeBase64(append(iv, cipherText...))
+// 发送 payload
 // ```
 func GetSimplePrincipalCollectionJavaObject() (*JavaObject, error) {
 	obj, err := yserx.ParseFromBytes(template_ser_simplePrincipalCollection)
@@ -805,6 +815,9 @@ func GetSimplePrincipalCollectionJavaObject() (*JavaObject, error) {
 }
 
 // GetAllGadget 获取所有的支持的Gadget
+// Example:
+// ```
+// dump(yso.GetAllGadget())
 // ```
 func GetAllGadget() []interface{} {
 	var alGadget []any

@@ -630,7 +630,6 @@ func ToJson(i interface{}) (string, error) {
 	}
 }
 
-// Dump
 // dump 将Java 对象转换为类 Java 代码
 // Example:
 // ```
