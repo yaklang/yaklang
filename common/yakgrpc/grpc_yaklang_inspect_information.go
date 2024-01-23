@@ -114,33 +114,34 @@ func (s *Server) YaklangInspectInformation(ctx context.Context, req *ypb.Yaklang
 	return ret, nil
 }
 
-// compare p1 and p2 all field
+// CompareParameter p1 and p2 all field
+// if return true, p2 information is more than p1
 func CompareParameter(p1, p2 *ypb.YakScriptParam) bool {
-	if p1.Field != p2.Field {
-		return false
+	if len(p1.Field) < len(p2.Field) {
+		return true
 	}
-	if p1.FieldVerbose != p2.FieldVerbose {
-		return false
+	if len(p1.FieldVerbose) < len(p2.FieldVerbose) {
+		return true
 	}
-	if p1.TypeVerbose != p2.TypeVerbose {
-		return false
+	if len(p1.TypeVerbose) < len(p2.TypeVerbose) {
+		return true
 	}
-	if p1.Help != p2.Help {
-		return false
+	if len(p1.Help) < len(p2.Help) {
+		return true
 	}
-	if p1.DefaultValue != p2.DefaultValue {
-		return false
+	if len(p1.DefaultValue) < len(p2.DefaultValue) {
+		return true
 	}
-	if p1.Group != p2.Group {
-		return false
+	if len(p1.Group) < len(p2.Group) {
+		return true
 	}
 	if p1.Required != p2.Required {
 		return false
 	}
-	if p1.ExtraSetting != p2.ExtraSetting {
-		return false
+	if len(p1.ExtraSetting) < len(p2.ExtraSetting) {
+		return true
 	}
-	return true
+	return false
 }
 
 func getCliCodeFromParam(params []*ypb.YakScriptParam) string {
@@ -286,7 +287,7 @@ func getNeedReturn(script *yakit.YakScript) ([]*ypb.YakScriptParam, error) {
 
 	// compare codeParameter and databaseParameter, and add rest in databaseParameter to needReturn
 	for i := 0; i < len(codeParameter) && i < len(databaseParameter); i++ {
-		if !CompareParameter(codeParameter[i], databaseParameter[i]) {
+		if CompareParameter(codeParameter[i], databaseParameter[i]) {
 			needReturn = append(needReturn, databaseParameter[i])
 			// need = true
 		}
