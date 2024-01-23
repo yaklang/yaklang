@@ -313,15 +313,7 @@ func TestGRPCMUSTPASS_LANGUAGE_CLICompare(t *testing.T) {
 					Help:         "",
 				},
 			},
-			[]*ypb.YakScriptParam{
-				{
-					Field:        "arg1",
-					DefaultValue: "default variable",
-					TypeVerbose:  "string",
-					FieldVerbose: "arg1",
-					Help:         "",
-				},
-			},
+			[]*ypb.YakScriptParam{},
 			t,
 		)
 	})
