@@ -327,6 +327,7 @@ func ReplaceHTTPPacketBodyEx(raw []byte, body []byte, chunk bool, forceCL bool) 
 	raw = TrimLeftHTTPPacket(raw)
 	reader := bufio.NewReader(bytes.NewBuffer(raw))
 	firstLineBytes, err := utils.BufioReadLine(reader)
+	isChunked := false
 	if err != nil {
 		return raw
 	}
@@ -349,9 +350,9 @@ func ReplaceHTTPPacketBodyEx(raw []byte, body []byte, chunk bool, forceCL bool) 
 			break
 		}
 
-		lineLower := strings.ToLower(line)
 		// 移除 chunked
-		if strings.HasPrefix(lineLower, "transfer-encoding:") && utils.IContains(line, "chunked") {
+		if utils.IHasPrefix(line, "transfer-encoding:") && utils.IContains(line, "chunked") {
+			isChunked = true
 			continue
 		}
 
@@ -361,7 +362,7 @@ func ReplaceHTTPPacketBodyEx(raw []byte, body []byte, chunk bool, forceCL bool) 
 		//}
 
 		// 设置 content-length
-		if strings.HasPrefix(lineLower, "content-length") {
+		if utils.IHasPrefix(line, "content-length") {
 			continue
 		}
 		headers = append(headers, line)
@@ -376,18 +377,17 @@ func ReplaceHTTPPacketBodyEx(raw []byte, body []byte, chunk bool, forceCL bool) 
 	// chunked
 	if chunk {
 		headers = append(headers, "Transfer-Encoding: chunked")
-		body = codec.HTTPChunkedEncode(body)
-		buf := bytes.NewBuffer(nil)
-		for _, header := range headers {
-			buf.WriteString(header)
-			buf.WriteString(CRLF)
+		if !isChunked {
+			body = codec.HTTPChunkedEncode(body)
 		}
-		buf.WriteString(CRLF)
-		buf.Write(body)
-		return buf.Bytes()
+	} else if isChunked {
+		newBody, err := codec.HTTPChunkedDecode(body)
+		if err == nil {
+			body = newBody
+		}
 	}
 
-	if len(body) > 0 || forceCL {
+	if !chunk && (len(body) > 0 || forceCL) {
 		headers = append(headers, fmt.Sprintf("Content-Length: %d", len(body)))
 	}
 	buf := new(bytes.Buffer)
