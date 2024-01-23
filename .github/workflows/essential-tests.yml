@@ -104,19 +104,19 @@ jobs:
             run: go test -timeout 3m ./common/yak/yaktest/mustpass
 
           - name: Test gRPC MUSTPASS HTTP
-            run: go test -timeout 10m -run TestGRPCMUSTPASS_HTTP_* ./common/yakgrpc
+            run: go test -timeout 5m -run TestGRPCMUSTPASS_HTTP_* ./common/yakgrpc
 
           - name: Test gRPC MUSTPASS MITM
-            run: go test -timeout 10m -run TestGRPCMUSTPASS_MITM_* ./common/yakgrpc
+            run: go test -timeout 5m -run TestGRPCMUSTPASS_MITM_* ./common/yakgrpc
 
           - name: Test gRPC MUSTPASS Fuzzer
-            run: go test -timeout 10m -run TestGRPCMUSTPASS_HTTPFuzzer* ./common/yakgrpc
+            run: go test -timeout 5m -run TestGRPCMUSTPASS_HTTPFuzzer* ./common/yakgrpc
 
           - name: Test gRPC MUSTPASS Language
-            run: go test -timeout 10m -run TestGRPCMUSTPASS_LANGUAGE* ./common/yakgrpc
+            run: go test -timeout 5m -run TestGRPCMUSTPASS_LANGUAGE* ./common/yakgrpc
 
           - name: Test gRPC MUSTPASS COMMON
-            run: go test -timeout 10m -run TestGRPCMUSTPASS_COMMON* ./common/yakgrpc
+            run: go test -timeout 5m -run TestGRPCMUSTPASS_COMMON* ./common/yakgrpc
 
           - name: Test gRPC(LARGE)MUSTPASS
             run: go test -timeout 2m -run TestLARGEGRPCMUSTPASS ./common/yakgrpc
@@ -133,7 +133,7 @@ jobs:
 
           - name: Test Vulinbox(XSS/Shiro/SSTI/SMUGGLE/CSRF/OPEN_REDIRECT)
             run: |
-              go test -timeout 2m -run "^(TestGRPCMUSTPASS_XSS|TestGRPCMUSTPASS_Shiro|TestGRPCMUSTPASS_SSTI|TestGRPCMUSTPASS_Smuggle|TestGRPCMUSTPASS_CSRF|TestGRPCMUSTPASS_OPEN_REDIRECT)$" ./common/coreplugin
+              go test -timeout 5m -run "^(TestGRPCMUSTPASS_XSS|TestGRPCMUSTPASS_Shiro|TestGRPCMUSTPASS_SSTI|TestGRPCMUSTPASS_Smuggle|TestGRPCMUSTPASS_CSRF|TestGRPCMUSTPASS_OPEN_REDIRECT)$" ./common/coreplugin
 
           - name: Test gRPC MUSTPASS-PLUGIN-Fastjson
             run: go test -timeout 3m -run TestGRPCMUSTPASS_Fastjson ./common/coreplugin
