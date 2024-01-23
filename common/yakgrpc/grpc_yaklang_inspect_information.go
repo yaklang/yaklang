@@ -63,6 +63,7 @@ func cliParam2grpc(params []*information.CliParameter) []*ypb.YakScriptParam {
 			Required:     param.Required,
 			Group:        param.Group,
 			ExtraSetting: string(extra),
+			MethodType:   param.MethodType,
 		})
 	}
 
@@ -151,19 +152,15 @@ func getCliCodeFromParam(params []*ypb.YakScriptParam) string {
 		Option := make([]string, 0)
 		cliFunction := ""
 		var cliDefault string
-		switch para.TypeVerbose {
+		methodType := para.MethodType
+		if methodType == "" {
+			methodType = para.TypeVerbose
+		}
+		switch methodType {
 		case "string":
 			cliFunction = "String"
 			if para.DefaultValue != "" {
 				cliDefault = fmt.Sprintf("cli.setDefault(%#v)", para.DefaultValue)
-			}
-		case "uint":
-			cliFunction = "Int"
-			if para.DefaultValue != "" {
-				i, err := strconv.ParseInt(para.DefaultValue, 10, 64)
-				if err == nil {
-					cliDefault = fmt.Sprintf("cli.setDefault(%d)", i)
-				}
 			}
 		case "boolean":
 			cliFunction = "Bool"
@@ -171,6 +168,14 @@ func getCliCodeFromParam(params []*ypb.YakScriptParam) string {
 				b, err := strconv.ParseBool(para.DefaultValue)
 				if err == nil {
 					cliDefault = fmt.Sprintf("cli.setDefault(%t)", b)
+				}
+			}
+		case "uint":
+			cliFunction = "Int"
+			if para.DefaultValue != "" {
+				i, err := strconv.ParseInt(para.DefaultValue, 10, 64)
+				if err == nil {
+					cliDefault = fmt.Sprintf("cli.setDefault(%d)", i)
 				}
 			}
 		case "float":
@@ -181,15 +186,27 @@ func getCliCodeFromParam(params []*ypb.YakScriptParam) string {
 					cliDefault = fmt.Sprintf("cli.setDefault(%f)", f)
 				}
 			}
-		case "upload-path":
+		case "file":
 			cliFunction = "File"
-		case "http-packet":
-			cliFunction = "HTTPPacket"
-			if para.DefaultValue != "" {
-				cliDefault = fmt.Sprintf("cli.setDefault(%#v)", para.DefaultValue)
+		case "file-name":
+			cliFunction = "FileNames"
+		case "select":
+			cliFunction = "StringSlice"
+			if para.ExtraSetting != "" {
+				var dataSelect *PluginParamSelect
+				json.Unmarshal([]byte(para.ExtraSetting), &dataSelect)
+				Option = append(Option, fmt.Sprintf(`cli.setMultipleSelect(%t)`, dataSelect.Double))
+				for _, v := range dataSelect.Data {
+					Option = append(Option, fmt.Sprintf(`cli.setSelectOption(%#v, %#v)`, v.Label, v.Value))
+				}
 			}
 		case "yak":
 			cliFunction = "YakCode"
+			if para.DefaultValue != "" {
+				cliDefault = fmt.Sprintf("cli.setDefault(%#v)", para.DefaultValue)
+			}
+		case "http-packet":
+			cliFunction = "HTTPPacket"
 			if para.DefaultValue != "" {
 				cliDefault = fmt.Sprintf("cli.setDefault(%#v)", para.DefaultValue)
 			}
@@ -213,19 +230,19 @@ func getCliCodeFromParam(params []*ypb.YakScriptParam) string {
 			if para.DefaultValue != "" {
 				cliDefault = fmt.Sprintf("cli.setDefault(%#v)", para.DefaultValue)
 			}
-
-		case "select":
-			cliFunction = "StringSlice"
-			if para.ExtraSetting != "" {
-				var dataSelect *PluginParamSelect
-				json.Unmarshal([]byte(para.ExtraSetting), &dataSelect)
-				Option = append(Option, fmt.Sprintf(`cli.setMultipleSelect(%t)`, dataSelect.Double))
-				for _, v := range dataSelect.Data {
-					Option = append(Option, fmt.Sprintf(`cli.setSelectOption(%#v, %#v)`, v.Label, v.Value))
-				}
+		case "file_content":
+			cliFunction = "FileOrContent"
+			if para.DefaultValue != "" {
+				cliDefault = fmt.Sprintf("cli.setDefault(%#v)", para.DefaultValue)
+			}
+		case "line_dict":
+			cliFunction = "LineDict"
+			if para.DefaultValue != "" {
+				cliDefault = fmt.Sprintf("cli.setDefault(%#v)", para.DefaultValue)
 			}
 		default:
-			cliFunction = "Undefine-" + para.TypeVerbose
+			// cliFunction = "Undefine-" + para.TypeVerbose
+			continue
 		}
 
 		if cliDefault != "" {
@@ -245,7 +262,12 @@ func getCliCodeFromParam(params []*ypb.YakScriptParam) string {
 			Option = append(Option, fmt.Sprintf(`cli.setRequired(%t)`, para.Required))
 		}
 
-		str := fmt.Sprintf(`cli.%s(%#v, %s)`, cliFunction, para.Field, strings.Join(Option, ","))
+		var str string
+		if len(Option) == 0 {
+			str = fmt.Sprintf(`cli.%s(%#v)`, cliFunction, para.Field)
+		} else {
+			str = fmt.Sprintf(`cli.%s(%#v, %s)`, cliFunction, para.Field, strings.Join(Option, ","))
+		}
 		code += str + "\n"
 	}
 	return code

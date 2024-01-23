@@ -35,6 +35,14 @@ func CompareScriptParams(got, want []*ypb.YakScriptParam) error {
 		return utils.Errorf("cli parameter length not match")
 	}
 
+	sort.Slice(got, func(i, j int) bool {
+		return got[i].Field < got[j].Field
+	})
+
+	sort.Slice(want, func(i, j int) bool {
+		return want[i].Field < want[j].Field
+	})
+
 	for i := range want {
 		log.Infof("want: %v", want[i])
 		log.Infof("got: %v", got[i])
@@ -143,6 +151,7 @@ func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_Cli(t *testing.T) {
 					Required:     true,
 					Group:        "",
 					ExtraSetting: "",
+					MethodType:   "string",
 				},
 				{
 					Field:        "arg2",
@@ -153,6 +162,7 @@ func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_Cli(t *testing.T) {
 					Required:     false,
 					Group:        "group2",
 					ExtraSetting: "",
+					MethodType:   "uint",
 				},
 			},
 			t,
@@ -222,6 +232,7 @@ func TestGRPCMUSTPASS_LANGUAGE_GetCliCode(t *testing.T) {
 					Required:     true,
 					Group:        "",
 					ExtraSetting: "",
+					MethodType:   "string",
 				},
 				{
 					Field:        "arg2",
@@ -232,6 +243,7 @@ func TestGRPCMUSTPASS_LANGUAGE_GetCliCode(t *testing.T) {
 					Required:     false,
 					Group:        "group2",
 					ExtraSetting: "",
+					MethodType:   "uint",
 				},
 			},
 		)
@@ -248,6 +260,25 @@ func TestGRPCMUSTPASS_LANGUAGE_GetCliCode(t *testing.T) {
 					Required:     false,
 					Group:        "",
 					ExtraSetting: "{\"double\":true,\"data\":[{\"label\":\"c\",\"value\":\"c\"},{\"label\":\"a\",\"value\":\"A\"},{\"label\":\"b\",\"value\":\"B\"}]}",
+					MethodType:   "select",
+				},
+			},
+		)
+	})
+
+	t.Run("cli parameter with file-content", func(t *testing.T) {
+		check(t,
+			[]*ypb.YakScriptParam{
+				{
+					Field:        "arg",
+					DefaultValue: "",
+					TypeVerbose:  "upload-file-content",
+					FieldVerbose: "arg",
+					Help:         "",
+					Required:     false,
+					Group:        "",
+					ExtraSetting: "",
+					MethodType:   "file_content",
 				},
 			},
 		)
@@ -290,6 +321,7 @@ func TestGRPCMUSTPASS_LANGUAGE_CLICompare(t *testing.T) {
 					Required:     false,
 					Group:        "",
 					ExtraSetting: "",
+					MethodType:   "string",
 				},
 			},
 			[]*ypb.YakScriptParam{},
@@ -311,6 +343,7 @@ func TestGRPCMUSTPASS_LANGUAGE_CLICompare(t *testing.T) {
 					TypeVerbose:  "string",
 					FieldVerbose: "arg1",
 					Help:         "",
+					MethodType:   "string",
 				},
 			},
 			[]*ypb.YakScriptParam{},
@@ -331,6 +364,7 @@ func TestGRPCMUSTPASS_LANGUAGE_CLICompare(t *testing.T) {
 					TypeVerbose:  "string",
 					FieldVerbose: "arg1",
 					Help:         "help information",
+					MethodType:   "string",
 				},
 			},
 			[]*ypb.YakScriptParam{
@@ -340,6 +374,7 @@ func TestGRPCMUSTPASS_LANGUAGE_CLICompare(t *testing.T) {
 					TypeVerbose:  "string",
 					FieldVerbose: "arg1",
 					Help:         "help information",
+					MethodType:   "string",
 				},
 			},
 			t,
@@ -513,6 +548,7 @@ func TestGRPCMUSTPASS_LANGUAGE_GetCliGRPC(t *testing.T) {
 					TypeVerbose:  "string",
 					FieldVerbose: "参数1",
 					Help:         "这个是参数1",
+					MethodType:   "string",
 				},
 			},
 			`/*
@@ -547,6 +583,7 @@ cli.String("arg", cli.setDefault("\"aaa\""),cli.setHelp("这个是参数1"),cli.
 					Required:     false,
 					Group:        "",
 					ExtraSetting: "",
+					MethodType:   "string",
 				},
 			},
 			"", t,
