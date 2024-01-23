@@ -1103,15 +1103,20 @@ func GetParamsFromBody(contentType string, body []byte) (params map[string]strin
 		return params
 	}
 
-	var values url.Values
-	// try post values
-	values, err = url.ParseQuery(utils.UnsafeBytesToString(body))
-	if err == nil {
-		for k, v := range values {
-			if len(v) == 0 {
-				continue
-			}
-			params[k] = v[len(v)-1]
+	// try json
+	var tempMap map[string]any
+	if len(params) == 0 {
+		err = json.Unmarshal(body, &tempMap)
+		if err == nil {
+			params = handleUnmarshalResults(tempMap)
+		}
+	}
+
+	// try xml
+	if len(params) == 0 {
+		tempMap = utils.XmlLoads(body)
+		if len(tempMap) > 0 {
+			params = handleUnmarshalResults(tempMap)
 		}
 	}
 	// try post form
@@ -1139,20 +1144,17 @@ func GetParamsFromBody(contentType string, body []byte) (params map[string]strin
 			}
 		}
 	}
-	// try json
-	var tempMap map[string]any
+	// try post values
 	if len(params) == 0 {
-		err = json.Unmarshal(body, &tempMap)
+		var values url.Values
+		values, err = url.ParseQuery(utils.UnsafeBytesToString(body))
 		if err == nil {
-			params = handleUnmarshalResults(tempMap)
-		}
-	}
-
-	// try xml
-	if len(params) == 0 {
-		tempMap = utils.XmlLoads(body)
-		if err == nil {
-			params = handleUnmarshalResults(tempMap)
+			for k, v := range values {
+				if len(v) == 0 {
+					continue
+				}
+				params[k] = v[len(v)-1]
+			}
 		}
 	}
 
@@ -1161,6 +1163,9 @@ func GetParamsFromBody(contentType string, body []byte) (params map[string]strin
 		useRaw = true
 	}
 
+	if len(params) > 0 {
+		err = nil
+	}
 	return
 }
 
