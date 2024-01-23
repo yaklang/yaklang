@@ -149,15 +149,18 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 	currentStatus.ExecResult = &ypb.ExecResult{RuntimeID: taskId}
 	stream.Send(currentStatus)
 
+	// init some config
 	var riskCount uint32 = 0
+	var hasUnavailableTarget = false
 	var scanFilterManager = NewFilterManager(12, 1<<15, 30)
+
 	// build match
 	matcher, err := fp.NewDefaultFingerprintMatcher(fp.NewConfig(fp.WithDatabaseCache(true), fp.WithCache(true)))
 	if err != nil {
 		return utils.Wrap(err, "init fingerprint matcher failed")
 	}
+
 	// start dispatch tasks
-	hasUnavailableTarget := false
 	for _, __currentTarget := range targetCached {
 		// load targets
 		statusManager.DoActiveTarget()
@@ -173,16 +176,25 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 		__currentTarget.Response = resp.RawPacket
 
 		// fingerprint match just once
+		var portScanCond = &sync.Cond{L: &sync.Mutex{}}
+		var fingerprintMatchOK = false
 		host, port, _ := utils.ParseStringToHostPort(__currentTarget.Url)
-		_, err = matcher.Match(host, port)
-		if err != nil {
-			log.Errorf("match fingerprint failed: %s", err)
-		}
+		go func() {
+			_, err = matcher.Match(host, port)
+			if err != nil {
+				log.Errorf("match fingerprint failed: %s", err)
+			}
+			portScanCond.L.Lock()
+			defer portScanCond.L.Unlock()
+			portScanCond.Broadcast()
+			fingerprintMatchOK = true
+		}()
 
 		pluginChan, err := s.PluginGenerator(pluginCache, manager.Context(), plugin)
 		if err != nil {
 			return utils.Errorf("generate plugin queue failed: %s", err)
 		}
+
 		for __pluginInstance := range pluginChan {
 			targetRequestInstance := __currentTarget
 			pluginInstance := __pluginInstance
@@ -202,6 +214,12 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 				taskRecorder.Status = yakit.HYBRIDSCAN_PAUSED
 				quickSave()
 			})
+
+			for !fingerprintMatchOK { // wait for fingerprint match
+				portScanCond.L.Lock()
+				portScanCond.Wait()
+				portScanCond.L.Unlock()
+			}
 
 			taskIndex := statusManager.DoActiveTask()
 			feedbackStatus()
@@ -243,6 +261,7 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 				}
 				time.Sleep(time.Duration(300+rand.Int63n(700)) * time.Millisecond)
 			}()
+
 		}
 		// shrink context
 		select {
@@ -264,6 +283,7 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 			feedbackStatus()
 		}()
 	}
+
 	swg.Wait()
 	feedbackStatus()
 	if !manager.IsPaused() {
