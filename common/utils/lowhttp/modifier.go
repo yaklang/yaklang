@@ -416,16 +416,12 @@ func handleHTTPPacketPostParam(packet []byte, callback func(url.Values)) []byte 
 	var isChunked bool
 
 	headersRaw, bodyRaw := SplitHTTPPacket(packet, nil, nil)
-	bodyString := unsafe.String(unsafe.SliceData(bodyRaw), len(bodyRaw))
-	values, err := url.ParseQuery(bodyString)
-	if err == nil {
-		callback(values)
-		// values.Set(key, value)
-		newBody := values.Encode()
-		bodyRaw = unsafe.Slice(unsafe.StringData(newBody), len(newBody))
-	}
+	bodyString := utils.UnsafeBytesToString(bodyRaw)
+	values, _ := url.ParseQuery(bodyString)
+	callback(values)
+	newBody := values.Encode()
 
-	return ReplaceHTTPPacketBody([]byte(headersRaw), bodyRaw, isChunked)
+	return ReplaceHTTPPacketBody(utils.UnsafeStringToBytes(headersRaw), utils.UnsafeStringToBytes(newBody), isChunked)
 }
 
 // ReplaceAllHTTPPacketPostParams 是一个辅助函数，用于改变请求报文，修改所有POST请求参数，如果不存在则会增加，其接收一个map[string]string类型的参数，其中key为POST请求参数名，value为POST请求参数值
@@ -1059,10 +1055,11 @@ func DeleteHTTPPacketForm(packet []byte, key string) []byte {
 }
 
 func GetParamsFromBody(contentType string, body []byte) (params map[string]string, useRaw bool, err error) {
-	var (
-		mediaType         string
-		contentTYpeParams map[string]string
-	)
+	var contentTypeParams map[string]string
+	_, contentTypeParams, err = mime.ParseMediaType(contentType)
+	if err != nil {
+		return
+	}
 	params = make(map[string]string)
 	// 这是为了处理复杂json/xml的情况
 	handleUnmarshalValues := func(v any) ([]string, []string) {
@@ -1106,55 +1103,60 @@ func GetParamsFromBody(contentType string, body []byte) (params map[string]strin
 		return params
 	}
 
-	mediaType, contentTYpeParams, err = mime.ParseMediaType(contentType)
-	if err != nil {
-		return
+	var values url.Values
+	// try post values
+	values, err = url.ParseQuery(utils.UnsafeBytesToString(body))
+	if err == nil {
+		for k, v := range values {
+			if len(v) == 0 {
+				continue
+			}
+			params[k] = v[len(v)-1]
+		}
 	}
-	if mediaType == "application/x-www-form-urlencoded" {
-		var values url.Values
-		values, err = url.ParseQuery(utils.UnsafeBytesToString(body))
-		if err == nil {
-			for k, v := range values {
-				params[k] = v[0]
-			}
-		}
-	} else if mediaType == "multipart/form-data" {
-		boundary, ok := contentTYpeParams["boundary"]
-		if !ok {
-			err = utils.Error("boundary not found")
-			return
-		}
-		mr := multipart.NewReader(bytes.NewReader(body), boundary)
-		for {
-			part, err := mr.NextPart()
-			if err == io.EOF {
-				break
-			}
-			if err != nil {
-				return nil, false, err
-			}
-
-			// 检查part是否为表单字段
-			if part.FormName() != "" {
-				content, err := io.ReadAll(part)
-				if err != nil && err != io.EOF {
+	// try post form
+	if len(params) == 0 {
+		boundary, ok := contentTypeParams["boundary"]
+		if ok {
+			mr := multipart.NewReader(bytes.NewReader(body), boundary)
+			for {
+				part, err := mr.NextPart()
+				if err == io.EOF {
+					break
+				}
+				if err != nil {
 					return nil, false, err
 				}
-				params[part.FormName()] = utils.UnsafeBytesToString(content)
+
+				// 检查part是否为表单字段
+				if part.FormName() != "" {
+					content, err := io.ReadAll(part)
+					if err != nil && err != io.EOF {
+						return nil, false, err
+					}
+					params[part.FormName()] = utils.UnsafeBytesToString(content)
+				}
 			}
 		}
-	} else if strings.HasPrefix(strings.ToLower(contentType), "application/json") {
-		var tempMap map[string]any
+	}
+	// try json
+	var tempMap map[string]any
+	if len(params) == 0 {
 		err = json.Unmarshal(body, &tempMap)
 		if err == nil {
 			params = handleUnmarshalResults(tempMap)
 		}
-	} else if strings.HasPrefix(strings.ToLower(contentType), "application/xml") {
-		tempMap := utils.XmlLoads(body)
+	}
+
+	// try xml
+	if len(params) == 0 {
+		tempMap = utils.XmlLoads(body)
 		if err == nil {
 			params = handleUnmarshalResults(tempMap)
 		}
-	} else {
+	}
+
+	if len(params) == 0 {
 		// 这个flag位用于标记是否调用者直接使用原始的body, 这用于默认情况
 		useRaw = true
 	}
