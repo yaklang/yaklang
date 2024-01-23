@@ -5,12 +5,13 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"sort"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/davecgh/go-spew/spew"
 	filter2 "github.com/yaklang/yaklang/common/filter"
@@ -26,6 +27,7 @@ import (
 func init() {
 	yakit.InitialDatabase()
 }
+
 func TestGRPCMUSTPASS_HTTPFuzzer_WithNoFollowRedirect(t *testing.T) {
 	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.RequestURI != "/admin" {
@@ -90,6 +92,7 @@ Host: %v
 		}
 	}
 }
+
 func TestGRPCMUSTPASS_HTTPFuzzer_WITHPLUGIN(t *testing.T) {
 	var token string
 	name, err := httptpl.MockEchoPlugin(func(s string) {
@@ -167,7 +170,7 @@ Host: %v
 }
 
 func TestGRPCMUSTPASS_HTTPFuzzer_WithNoFixGZIP(t *testing.T) {
-	var token = utils.RandStringBytes(200)
+	token := utils.RandStringBytes(200)
 	body, _ := utils.GzipCompress(token)
 	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
 		"Content-Length: " + fmt.Sprint(len(body)) + "\r\n" +
@@ -209,7 +212,7 @@ Host: %v
 }
 
 func TestGRPCMUSTPASS_HTTPFuzzer_WithNoFixGZIP_Negative(t *testing.T) {
-	var token = utils.RandStringBytes(200)
+	token := utils.RandStringBytes(200)
 	body, _ := utils.GzipCompress(token)
 	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +
 		"Content-Length: " + fmt.Sprint(len(body)) + "\r\n" +
@@ -621,6 +624,33 @@ Connection: close
 	}
 }
 
+func TestServer_HTTPRequestMutateFormToPOST(t *testing.T) {
+	c, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := c.HTTPRequestMutate(context.Background(), &ypb.HTTPRequestMutateParams{
+		Request: []byte(`POST /ofcms-admin/admin/cms/template/save.json HTTP/1.1
+Host: localhost:8080
+Content-Type: multipart/form-data; boundary=b4287c56364c86452c746bc63feb846cd10a9ddc1e9ed979996b3519a5a3
+
+--b4287c56364c86452c746bc63feb846cd10a9ddc1e9ed979996b3519a5a3
+Content-Disposition: form-data; name="key"
+
+value
+--b4287c56364c86452c746bc63feb846cd10a9ddc1e9ed979996b3519a5a3--`),
+		FuzzMethods: []string{"POST"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, body := lowhttp.SplitHTTPPacketFast(r.Result)
+	if string(body) != "key=value" {
+		t.Fatal("expect body is key=value, got " + string(body))
+	}
+}
+
 func TestServer_HTTPRequestMutateWithoutConnection(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
@@ -691,12 +721,13 @@ func TestGRPCMUSTPASS_HTTPFuzzer_FuzztagVars(t *testing.T) {
 		Concurrent: 7,
 		Request: `GET /?c=1&d={{rs(10,10,3)}}&c={{params(a)}} HTTP/1.1
 Host: ` + utils.HostPort(targetHost, targetPort) + `
-`})
+`,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	var count = 0
+	count := 0
 	payloadDiffFilter := filter2.NewFilter()
 	for {
 		rsp, err := client.Recv()
@@ -725,7 +756,6 @@ Host: ` + utils.HostPort(targetHost, targetPort) + `
 
 // nuclei-dsl type tags and raw type tags
 func TestGRPCMUSTPASS_HTTPFuzzer_FuzztagVars2(t *testing.T) {
-
 	c, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
@@ -755,7 +785,8 @@ func TestGRPCMUSTPASS_HTTPFuzzer_FuzztagVars2(t *testing.T) {
 		Concurrent: 1,
 		Request: `GET /?v=1&d={{rs(10,10)}}&a={{params(a)}}&b={{params(b)}} HTTP/1.1
 Host: ` + utils.HostPort(targetHost, targetPort) + `
-`})
+`,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -838,7 +869,8 @@ key2: {{params(r2)}}
 key3: {{params(res)}}
 
 a={{base64dec(e3tyZXN9fQ==)}}&b={{base64dec(e3t4eHh4eH19)}}
-`})
+`,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -905,7 +937,8 @@ Content-Type: application/json
     "key": "value"
   }
 }
-`})
+`,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1067,6 +1100,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_FuzzTag(t *testing.T) {
 		}
 	}
 }
+
 func TestGRPCMUSTPASS_HTTPFuzzer_SyncFuzzTag(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
