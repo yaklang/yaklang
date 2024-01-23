@@ -13,6 +13,13 @@ import (
 	"strings"
 )
 
+// FixPermission 尝试修复 pcap 权限问题
+// Example:
+// ```
+// err := pcapfix.Fix()
+// die(err) // 没有错误，即可正常使用 syn 扫描
+// ...
+// ```
 func Fix() error {
 	u, err := user.Current()
 	if err != nil {
