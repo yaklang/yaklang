@@ -81,8 +81,10 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 	}
 
 	swg := utils.NewSizedWaitGroup(20)
-	riskCount, _ := yakit.CountRiskByRuntimeId(s.GetProfileDatabase(), task.TaskId)
-	resumeFilterManager := NewFilterManager(12, 1<<15, 30)
+	// init some config
+	var riskCount, _ = yakit.CountRiskByRuntimeId(s.GetProfileDatabase(), task.TaskId)
+	var resumeFilterManager = NewFilterManager(12, 1<<15, 30)
+	var hasUnavailableTarget = false
 
 	matcher, err := fp.NewDefaultFingerprintMatcher(fp.NewConfig(fp.WithDatabaseCache(true), fp.WithCache(true)))
 	if err != nil {
@@ -92,23 +94,31 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 	for _, __currentTarget := range targets {
 		statusManager.DoActiveTarget()
 		feedbackStatus()
-
 		targetWg := new(sync.WaitGroup)
 
-		// just request once
 		resp, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes(__currentTarget.Request), lowhttp.WithHttps(__currentTarget.IsHttps))
 		if err != nil {
 			log.Errorf("request target failed: %s", err)
+			hasUnavailableTarget = true
 			continue
 		}
 		__currentTarget.Response = resp.RawPacket
 
 		// fingerprint match just once
+		var portScanCond = &sync.Cond{L: &sync.Mutex{}}
+		var fingerprintMatchOK = false
 		host, port, _ := utils.ParseStringToHostPort(__currentTarget.Url)
-		_, err = matcher.Match(host, port)
-		if err != nil {
-			log.Errorf("match fingerprint failed: %s", err)
-		}
+		go func() {
+			_, err = matcher.Match(host, port)
+			if err != nil {
+				log.Errorf("match fingerprint failed: %s", err)
+			}
+			portScanCond.L.Lock()
+			defer portScanCond.L.Unlock()
+			portScanCond.Broadcast()
+			fingerprintMatchOK = true
+		}()
+
 		// load plugins
 		pluginChan, err := s.PluginGenerator(pluginCacheList, manager.Context(), &ypb.HybridScanPluginConfig{PluginNames: pluginName})
 		if err != nil {
@@ -130,6 +140,12 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 				task.Status = yakit.HYBRIDSCAN_PAUSED
 				quickSave()
 			})
+
+			for !fingerprintMatchOK { // wait for fingerprint match
+				portScanCond.L.Lock()
+				portScanCond.Wait()
+				portScanCond.L.Unlock()
+			}
 
 			taskIndex := statusManager.DoActiveTask()
 
@@ -216,6 +232,9 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 	feedbackStatus()
 	if !manager.IsPaused() {
 		task.Status = yakit.HYBRIDSCAN_DONE
+	}
+	if hasUnavailableTarget {
+		return utils.Errorf("Has unreachable target")
 	}
 	return nil
 }
