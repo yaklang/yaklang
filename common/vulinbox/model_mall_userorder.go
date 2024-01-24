@@ -3,7 +3,6 @@ package vulinbox
 import (
 	// "time"
 	"github.com/jinzhu/gorm"
-	// uuid "github.com/google/uuid"
 )
 
 type UserOrder struct {
