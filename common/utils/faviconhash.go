@@ -2,12 +2,15 @@ package utils
 
 import (
 	"bytes"
+	"golang.org/x/net/html"
 	"crypto/tls"
 	"encoding/base64"
 	"fmt"
 	"hash"
 	"io/ioutil"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 )
 
@@ -69,4 +72,40 @@ func CalcFaviconHash(urlRaw string) (string, error) {
 	} else {
 		return "", Errorf("status code: %v", resp.StatusCode)
 	}
+}
+
+func GetFaviconURL(siteURL string, content []byte) (string, error) {
+	tokenizer := html.NewTokenizer(bytes.NewReader(content))
+	maxIterations := 1000 // 安全检查：防止潜在的永久循环
+	for i := 0; i < maxIterations; i++ {
+		tokenType := tokenizer.Next()
+		switch tokenType {
+		case html.ErrorToken:
+			return "", fmt.Errorf("html ErrorToken")
+		case html.StartTagToken, html.SelfClosingTagToken:
+			token := tokenizer.Token()
+			if token.Data == "link" {
+				for _, attr := range token.Attr {
+					if attr.Key == "rel" && strings.Contains(attr.Val, "icon") {
+						href := getAttr(token.Attr, "href")
+						if href != "" {
+							parsedURL, err := url.Parse(href)
+							if err != nil {
+								return "", err
+							}
+							if parsedURL.IsAbs() {
+								return href, nil
+							}
+							base, err := url.Parse(siteURL)
+							if err != nil {
+								return "", err
+							}
+							return base.ResolveReference(parsedURL).String(), nil
+						}
+					}
+				}
+			}
+		}
+	}
+	return "", fmt.Errorf("reached maximum iterations without finding a favicon")
 }
