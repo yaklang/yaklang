@@ -67,7 +67,7 @@ type DocumentHelper struct {
 	Functions           map[string]*FuncDecl
 	Instances           map[string]*LibInstance
 	StructMethods       map[string]*ScriptLib // 结构体方法，名字 -> 所有结构体与结构体指针方法
-	DeprecatedFunctions []*FuncDecl
+	DeprecatedFunctions []*DeprecateFunction
 	hooks               []func(h *DocumentHelper)
 }
 
@@ -335,6 +335,12 @@ func (f *FuncDecl) String() string {
 	decl = fmt.Sprintf("%s.%s", f.LibName, decl)
 
 	return fmt.Sprintf("%s%s", decl, doc)
+}
+
+type DeprecateFunction struct {
+	Name string
+	Self *FuncDecl
+	Msg  string
 }
 
 // func FuncToFuncDecl(libName, methodName string, refType reflect.Type, f interface{}) *FuncDecl {

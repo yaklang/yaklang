@@ -53,27 +53,42 @@ func ClearHelper(helper *yakdoc.DocumentHelper) {
 	clearFieldParamsType(helper.Functions)
 }
 
-func GetDeprecatedFunctionDecls(helper *yakdoc.DocumentHelper) []*yakdoc.FuncDecl {
-	getDeprecatedFunctionList := func(funcs map[string]*yakdoc.FuncDecl) []*yakdoc.FuncDecl {
-		results := make([]*yakdoc.FuncDecl, 0)
+func GetDeprecatedFunctionDecls(helper *yakdoc.DocumentHelper) []*yakdoc.DeprecateFunction {
+	results := make([]*yakdoc.DeprecateFunction, 0)
+
+	AppendDeprecatedFunction := func(funcs map[string]*yakdoc.FuncDecl) {
 		for _, funcDecl := range funcs {
 			if funcDecl.Document == "" {
 				continue
 			}
-			if strings.Contains(funcDecl.Document, "! 已弃用") {
-				results = append(results, funcDecl)
+
+			index := strings.Index(funcDecl.Document, "! 已弃用")
+			if index < 0 {
+				continue
 			}
+			msg := ""
+			if strSlice := strings.Split(funcDecl.Document[index:], "\n"); len(strSlice) != 0 {
+				msg = strSlice[0]
+			}
+			name := funcDecl.MethodName
+			if funcDecl.LibName != globalBanner {
+				name = fmt.Sprintf("%s.%s", funcDecl.LibName, funcDecl.MethodName)
+			}
+			results = append(results, &yakdoc.DeprecateFunction{
+				Name: name,
+				Self: funcDecl,
+				Msg:  msg,
+			})
 		}
-		return results
 	}
-	results := make([]*yakdoc.FuncDecl, 0)
-	results = append(results, getDeprecatedFunctionList(helper.Functions)...)
+
+	AppendDeprecatedFunction(helper.Functions)
 	for _, lib := range helper.Libs {
-		results = append(results, getDeprecatedFunctionList(lib.Functions)...)
+		AppendDeprecatedFunction(lib.Functions)
 	}
 
 	for _, lib := range helper.StructMethods {
-		results = append(results, getDeprecatedFunctionList(lib.Functions)...)
+		AppendDeprecatedFunction(lib.Functions)
 	}
 
 	return results
