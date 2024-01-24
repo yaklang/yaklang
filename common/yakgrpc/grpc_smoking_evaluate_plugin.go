@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -100,11 +101,11 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 				EndLine:     int64(sRes.EndLineNumber),
 				EndColumn:   int64(sRes.EndColumn),
 			}
-			if sRes.Severity == "error" {
+			if sRes.Severity == result.Error {
 				staticCheckingFailed = true
-				pushSuggestion(`静态代码检测失败[`+sRes.Severity+`]`, sRes.Message, R, []byte(sRes.From))
+				pushSuggestion(`静态代码检测失败[`+string(sRes.Severity)+`]`, sRes.Message, R, []byte(sRes.From))
 			} else {
-				pushSuggestion(`静态代码检测警告[`+sRes.Severity+`]`, sRes.Message, R, []byte(sRes.From))
+				pushSuggestion(`静态代码检测警告[`+string(sRes.Severity)+`]`, sRes.Message, R, []byte(sRes.From))
 				score = 60
 			}
 		}
