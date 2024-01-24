@@ -160,6 +160,7 @@ func (s *Server) execScriptWithExecParam(scriptName string, input string, stream
 				"FileOrContent",
 				"LineDict",
 				"StringSlice",
+				"FileNames",
 			}
 			for _, name := range hookFuncList {
 				engine.GetVM().RegisterMapMemberCallHandler("cli", name, hook)
