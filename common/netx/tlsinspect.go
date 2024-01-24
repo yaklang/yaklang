@@ -28,12 +28,7 @@ func (t TLSInspectResult) Show() {
 	fmt.Println(t.Description)
 }
 
-// Inspect 检查目标地址的TLS证书，并返回其证书信息与错误
-// Example:
-// ```
-// cert, err := tls.Inspect("yaklang.io:443")
-// ```
-func TLSInspect(addr string) ([]*TLSInspectResult, error) {
+func TLSInspectTimeout(addr string, seconds float64) ([]*TLSInspectResult, error) {
 	host, port, _ := utils.ParseStringToHostPort(addr)
 	if port <= 0 {
 		port = 443
@@ -42,7 +37,12 @@ func TLSInspect(addr string) ([]*TLSInspectResult, error) {
 		host = addr
 	}
 
-	conn, err := DialTCPTimeout(10*time.Second, utils.HostPort(host, port))
+	dialTimeout := 10 * time.Second
+	if seconds > 0 {
+		dialTimeout = time.Duration(seconds) * time.Second
+	}
+
+	conn, err := DialTCPTimeout(dialTimeout, utils.HostPort(host, port))
 	if err != nil {
 		return nil, err
 	}
@@ -120,4 +120,13 @@ func TLSInspect(addr string) ([]*TLSInspectResult, error) {
 		log.Errorf("TLSInspect: handshake error: %s", err)
 	}
 	return results, nil
+}
+
+// Inspect 检查目标地址的TLS证书，并返回其证书信息与错误
+// Example:
+// ```
+// cert, err := tls.Inspect("yaklang.io:443")
+// ```
+func TLSInspect(addr string) ([]*TLSInspectResult, error) {
+	return TLSInspectTimeout(addr, 10)
 }
