@@ -161,7 +161,7 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 
 	// if port open, check tls...
 	if matchResult.State == OPEN && matchResult.Fingerprint != nil {
-		matchResult.Fingerprint.TLSInspectResults, _ = netx.TLSInspect(utils2.HostPort(host, port))
+		matchResult.Fingerprint.TLSInspectResults, _ = netx.TLSInspectTimeout(utils2.HostPort(host, port), 5)
 	}
 
 	matchResult.Tidy()
