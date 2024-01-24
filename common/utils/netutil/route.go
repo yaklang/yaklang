@@ -33,14 +33,12 @@ func FindInterfaceByIP(ip string) (net.Interface, error) {
 		}
 
 		for _, addr := range addrs {
-			ipIns, network, err := net.ParseCIDR(addr.String())
+			ipIns, _, err := net.ParseCIDR(addr.String())
 			if err != nil {
 				continue
 			}
-			if utils.IsIPv6(ipIns.String()) == utils.IsIPv6(ip) || utils.IsIPv4(ipIns.String()) == utils.IsIPv4(ip) {
-				if network.Contains(ipOriginIns) {
-					return i, nil
-				}
+			if ipIns.String() == ipOriginIns.String() {
+				return i, nil
 			}
 		}
 	}

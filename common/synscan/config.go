@@ -2,9 +2,13 @@ package synscan
 
 import (
 	"github.com/pkg/errors"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
+	"github.com/yaklang/yaklang/common/utils/netutil/netroute"
 	"net"
+	"runtime"
 	"time"
 )
 
@@ -62,11 +66,37 @@ func WithDefaultSourceIP(ip net.IP) ConfigOption {
 	}
 }
 
-func CreateConfigOptionsByTargetNetworkOrDomain(
-	targetRaw string, duration time.Duration,
-) (
-	[]ConfigOption, error,
-) {
+func CreateConfigOptionsByIfaceName(ifaceName string) ([]ConfigOption, error) {
+	var iface *net.Interface
+	var err error
+	// 支持 net interface name 和 pcap dev name
+	iface, err = net.InterfaceByName(ifaceName)
+	if err != nil {
+		iface, err = pcaputil.PcapIfaceNameToNetInterface(ifaceName)
+		if err != nil {
+			return nil, errors.Errorf("get iface failed: %s", err)
+		}
+	}
+	log.Infof("use net interface: %v", iface.Name)
+
+	route, err := netroute.New()
+	if err != nil {
+		return nil, errors.Errorf("create route failed: %s", err)
+	}
+	log.Debugf("start to find route for %s in %v", "ip", runtime.GOOS)
+	_, gateway, srcIP, err := route.Route(net.IPv4(0, 0, 0, 0))
+	if err != nil {
+		return nil, errors.Errorf("route to %s failed: %s", "ip", err)
+	}
+	var opts = []ConfigOption{
+		WithNetInterface(iface),
+		WithGatewayIP(gateway),
+		WithDefaultSourceIP(srcIP),
+	}
+	return opts, nil
+}
+
+func CreateConfigOptionsByTargetNetworkOrDomain(targetRaw string, duration time.Duration) ([]ConfigOption, error) {
 	target := utils.ExtractHost(targetRaw)
 	iface, gIp, sIp, err := netutil.Route(duration, target)
 	if err != nil {
