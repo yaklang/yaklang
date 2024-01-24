@@ -74,6 +74,17 @@ func CalcFaviconHash(urlRaw string) (string, error) {
 	}
 }
 
+
+func getAttr(attrs []html.Attribute, name string) string {
+	for _, attr := range attrs {
+		if attr.Key == name {
+			return attr.Val
+		}
+	}
+	return ""
+}
+
+
 func GetFaviconURL(siteURL string, content []byte) (string, error) {
 	tokenizer := html.NewTokenizer(bytes.NewReader(content))
 	maxIterations := 1000 // 安全检查：防止潜在的永久循环
