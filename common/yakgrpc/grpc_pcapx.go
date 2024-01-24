@@ -19,15 +19,25 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"runtime"
 	"strconv"
 	"strings"
 )
 
-func pcapIftoYpbIf(item *pcap.Interface, index int) *ypb.NetInterface {
+func pcapIftoYpbIf(item *pcap.Interface, index int) (*ypb.NetInterface, bool) {
 	var is4, is6 = false, false
 	var addr []string
-	var ip string
+	var ip, netName string
 	for _, a := range item.Addresses {
+		if a.IP == nil {
+			continue
+		}
+		iface, err := netutil.FindInterfaceByIP(a.IP.String())
+		if err != nil {
+			log.Errorf("find interface by ip failed: %s", err)
+			continue
+		}
+		netName = iface.Name
 		addr = append(addr, a.IP.String())
 		if !is4 {
 			ip = a.IP.String()
@@ -37,17 +47,31 @@ func pcapIftoYpbIf(item *pcap.Interface, index int) *ypb.NetInterface {
 			is6 = utils.IsIPv6(a.IP.String())
 		}
 	}
-	return &ypb.NetInterface{
-		Name:   item.Name,
-		Addr:   strings.Join(addr, ", "),
-		IP:     ip,
-		IsIpv4: is4,
-		IsIpv6: is6,
+	var desc string
+	switch runtime.GOOS {
+	case "windows":
+		desc = item.Description
+	case "linux":
+		fallthrough
+	case "darwin":
+		desc = item.Name
 	}
+	if len(ip) != 0 {
+		return &ypb.NetInterface{
+			Name:             item.Name,
+			NetInterfaceName: netName,
+			Description:      desc,
+			Addr:             strings.Join(addr, ", "),
+			IP:               ip,
+			IsIpv4:           is4,
+			IsIpv6:           is6,
+		}, true
+	}
+	return nil, false
 }
 
 func (s *Server) GetPcapMetadata(ctx context.Context, req *ypb.PcapMetadataRequest) (*ypb.PcapMetadata, error) {
-	ifs := lo.Map(
+	ifs := lo.FilterMap(
 		pcaputil.AllDevices(),
 		pcapIftoYpbIf,
 	)
@@ -60,11 +84,7 @@ func (s *Server) GetPcapMetadata(ctx context.Context, req *ypb.PcapMetadataReque
 
 	var defaultIfName *ypb.NetInterface
 	for _, ifItem := range ifs {
-		name, err := pcaputil.IfaceNameToPcapIfaceName(ifIns.Name)
-		if err != nil {
-			return nil, err
-		}
-		if ifItem.Name == name {
+		if ifItem.NetInterfaceName == ifIns.Name {
 			defaultIfName = ifItem
 			break
 		}
