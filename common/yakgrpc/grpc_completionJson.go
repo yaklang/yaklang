@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
@@ -131,15 +131,17 @@ func (s *Server) GetYakitCompletionRaw(ctx context.Context, _ *ypb.Empty) (*ypb.
 
 func (s *Server) StaticAnalyzeError(ctx context.Context, r *ypb.StaticAnalyzeErrorRequest) (*ypb.StaticAnalyzeErrorResponse, error) {
 	tmpRes := yak.StaticAnalyzeYaklang(utils.UnsafeBytesToString(r.GetCode()), r.GetPluginType())
-	es := funk.Map(tmpRes, func(i *result.StaticAnalyzeResult) *ypb.StaticAnalyzeErrorResult {
+	es := lo.Map(tmpRes, func(i *result.StaticAnalyzeResult, _ int) *ypb.StaticAnalyzeErrorResult {
 		return &ypb.StaticAnalyzeErrorResult{
 			Message:         []byte(i.Message),
-			StartLineNumber: int64(i.StartLineNumber),
-			EndLineNumber:   int64(i.EndLineNumber),
-			StartColumn:     int64(i.StartColumn),
-			EndColumn:       int64(i.EndColumn),
-			Severity:        i.Severity,
+			StartLineNumber: i.StartLineNumber,
+			EndLineNumber:   i.EndLineNumber,
+			StartColumn:     i.StartColumn,
+			EndColumn:       i.EndColumn,
+			// RawMessage:      []byte{},
+			Severity: string(i.Severity),
+			Tag:      string(i.Tag),
 		}
-	}).([]*ypb.StaticAnalyzeErrorResult)
+	})
 	return &ypb.StaticAnalyzeErrorResponse{Result: es}, nil
 }

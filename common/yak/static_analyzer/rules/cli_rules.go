@@ -24,7 +24,7 @@ func init() {
 
 // 检查 cli.setDefault 设置的默认值是否符合规范
 func RuleCliDefault(prog *ssaapi.Program) *result.StaticAnalyzeResults {
-	ret := result.NewStaticAnalyzeResults()
+	ret := result.NewStaticAnalyzeResults("cli-default type check")
 	// tag := "SSA-cli-setDefault"
 	checkCliDefault := func(funcName string, typs []*ssaapi.Type, checkCallBack func(funcName string, v *ssaapi.Value) (string, bool)) {
 		prog.Ref(funcName).GetUsers().Filter(func(v *ssaapi.Value) bool {
@@ -214,7 +214,7 @@ func RuleCliDefault(prog *ssaapi.Program) *result.StaticAnalyzeResults {
 
 // 检查参数名是否重复和参数名是否符合规范
 func RuleCliParamName(prog *ssaapi.Program) *result.StaticAnalyzeResults {
-	ret := result.NewStaticAnalyzeResults()
+	ret := result.NewStaticAnalyzeResults("cli param name check")
 	// tag := "SSA-cli-paramName"
 	cliFuncNames := []string{
 		"cli.String",
@@ -271,7 +271,7 @@ func RuleCliParamName(prog *ssaapi.Program) *result.StaticAnalyzeResults {
 
 // 检查是否在最后面调用了 cli.check
 func RuleCliCheck(prog *ssaapi.Program) *result.StaticAnalyzeResults {
-	ret := result.NewStaticAnalyzeResults()
+	ret := result.NewStaticAnalyzeResults("cli.check in the end")
 	cliFuncNames := []string{
 		"cli.String",
 		"cli.StringSlice",

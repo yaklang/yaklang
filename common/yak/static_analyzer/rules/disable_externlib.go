@@ -17,7 +17,7 @@ func init() {
 }
 
 func DisableCli(prog *ssaapi.Program) *result.StaticAnalyzeResults {
-	ret := result.NewStaticAnalyzeResults()
+	ret := result.NewStaticAnalyzeResults("disable cli")
 	// tag := "SSA-cli-disableType"
 	prog.Ref("cli").GetDefs().GetUsers().Filter(func(v *ssaapi.Value) bool {
 		return v.IsCall() && v.IsReachable() != -1
@@ -32,7 +32,7 @@ func ErrorDisableCLi() string {
 }
 
 func DisableMitmExternLib(prog *ssaapi.Program) *result.StaticAnalyzeResults {
-	ret := result.NewStaticAnalyzeResults()
+	ret := result.NewStaticAnalyzeResults("disable some extern lib in mitm")
 	// tag := "SSA-cli-disableMitmExternLib"
 	// 在MITM插件禁用 risk、poc、http、tcp、udp、fuzz.Exec、fuzz.ExecFirst
 	DisablePack := []string{
