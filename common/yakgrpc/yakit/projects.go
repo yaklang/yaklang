@@ -29,7 +29,7 @@ func InitializingProjectDatabase() error {
 	defaultProj, _ := GetDefaultProject(db)
 
 	defaultYakitPath := consts.GetDefaultYakitBaseDir()
-	log.Infof("Yakit base directory: %s", defaultYakitPath)
+	log.Debugf("Yakit base directory: %s", defaultYakitPath)
 	homeYakitPath := filepath.Join(utils.GetHomeDirDefault("."), "yakit-projects")
 	defaultDBPath := consts.GetDefaultYakitProjectDatabase(defaultYakitPath)
 	// 需要迁移所有yakit-projects/projects
