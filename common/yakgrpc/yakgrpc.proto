@@ -1900,6 +1900,7 @@ message StaticAnalyzeErrorResult {
   int64 EndColumn = 5;
   bytes RawMessage = 6;
   string Severity = 7;
+  string Tag = 8;
 }
 
 message StaticAnalyzeErrorResponse {
