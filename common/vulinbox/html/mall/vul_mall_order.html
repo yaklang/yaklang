@@ -38,7 +38,7 @@
                             <li>hi，欢迎<span style="color: red;">{{.Username}}</span></li>
                             <!-- <li><a href="#"><i class="fa fa-user"></i> My Account</a></li> -->
                             <!-- <li><a onclick='redirectToCart(event)'><i class="fa fa-shopping-cart"></i> My Cart</a></li> -->
-                            <li><a href="#" id="logoutButton"><i class="fa fa-sign-out"></i> Sign out</a></li>
+                            <li><a id="logoutButton"><i class="fa fa-sign-out"></i> Sign out</a></li>
                         </ul>
                     </div>
                 </div>
@@ -90,8 +90,10 @@
                         <li><a><img src="/static/logo.png" width="176" height="50" style="vertical-align: middle;"></a>
                         </li>
                         <li><a onclick="redirectToShop(event)">Home</a></li>
-                        <li class="active"><a>购物车</a></li>
-                        <li><a onclick="redirectToOrder(event)">我的订单</a></li>
+                        <li onclick="redirectToCart(event)"><a>购物车</a></li>
+                        <li class="active" style="vertical-align: middle;"><a
+                                onclick='redirectToOrder(event)'>我的订单</a>
+                        </li>
                     </ul>
                 </div>
             </div>
@@ -103,7 +105,7 @@
             <div class="row">
                 <div class="col-md-12">
                     <div class="product-bit-title text-center">
-                        <h2>Shopping Order</h2>
+                        <h2>购物订单</h2>
                     </div>
                 </div>
             </div>
@@ -167,24 +169,18 @@
                                     <thead>
                                         <tr>
                                             <th class="product-remove">&nbsp;</th>
-                                            <th class="product-thumbnail">&nbsp;</th>
+                                            <!-- <th class="product-thumbnail">&nbsp;</th> -->
                                             <th class="product-name">商品名称</th>
                                             <th class="product-price">数量</th>
-                                            <th class="product-price">价格</th>
+                                            <th class="product-price">总价格</th>
                                             <th class="product-quantity">发货状态</th>
                                             <th class="product-subtotal">操作</th>
                                         </tr>
                                     </thead>
 
                                     <tbody>
-                                        {{range .CartInfo}}
+                                    {{range .OrderInfo}}
                                         <tr class="cart_item">
-                                            <td class="product-remove">
-                                                <button title="Remove this item" class="remove"
-                                                    data-product-name="{{.ProductName}}"
-                                                    onclick="deleteProduct(this,event)">×</button>
-                                            </td>
-
                                             <td class="product-thumbnail">
                                                 <a href="single-product.html"><img width="145" height="145"
                                                         alt="poster_1_up" class="shop_thumbnail"
@@ -196,20 +192,22 @@
                                             </td>
 
                                             <td class="product-description">
-                                                <span class="amount">{{.ProductQuantity}}</span>
+                                                <span class="amount">{{.Quantity}}</span>
                                             </td>
                                             <td class="product-price">
                                                 <span class="amount">${{.TotalPrice}}</span>
                                             </td>
 
                                             <td class="product-quantity">
-                                                <div class="quantity buttons_added">
-                                                    {{ .deliveryStatus}}
+                                                <div style="color: red;" class="quantity buttons_added">
+                                                    {{.DeliveryStatus}}
                                                 </div>
                                             </td>
 
                                             <td class="product-subtotal">
-                                                <span class="amount">${{.action}}</span>
+                                                <button data-product-name="{{.ProductName}}" class="button"
+                                                        onclick="deleteOrder(this,event)">退货
+                                                </button>
                                             </td>
                                         </tr>
                                         {{end}}
@@ -226,28 +224,6 @@
                             </form>
 
                             <div class="cart-collaterals">
-                                <div class="cart_totals ">
-                                    <h2>Cart Totals</h2>
-
-                                    <table cellspacing="0">
-                                        <tbody>
-                                            <tr class="cart-subtotal">
-                                                <th>Cart Subtotal</th>
-                                                <td><span class="amount">$15.00</span></td>
-                                            </tr>
-
-                                            <tr class="shipping">
-                                                <th>Shipping and Handling</th>
-                                                <td>Free Shipping</td>
-                                            </tr>
-
-                                            <tr class="order-total">
-                                                <th>Order Total</th>
-                                                <td><strong><span class="amount">$15.00</span></strong> </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -356,38 +332,44 @@
         function showNotification(message, event) {
             event.preventDefault();
             alert(message);
-            // 设置一段时间后自动隐藏提示框
-            setTimeout(function () {
-                notification.style.display = "none";
-            }, 6000);
         }
-
         //获取userID和productName
         function getQueryString(btn) {
             //获取当前url中id
             var url = window.location.href;
             var userID = url.split("?")[1].split("=")[1];
             //检查是否存在'#'字符
-            if (userID.includes('#')) {
-                userID = userID.split('#')[0];
+            if (userID.includes("#")) {
+                userID = userID.split("#")[0];
             }
             // 获取当前行
             var row = btn.parentNode.parentNode;
             // 获取商品名称
-            var productName = btn.getAttribute('data-product-name');
+            var productName = btn.getAttribute("data-product-name");
             // var productName = row.getElementsByClassName('product-name')[0].textContent;
             // 删除字符串两端的空白符
             // productName = productName.trim();
             // 将userID和productName打包成一个对象
             var result = {
                 userID: userID,
-                productName: productName
+                productName: productName,
             };
 
             return result;
         }
 
-        //返回商城
+        //跳转到购物车页面
+        function redirectToCart(event) {
+            event.preventDefault(); // 阻止默认表单提交行为
+            //获取当前url中id
+            var url = window.location.href;
+            var userId = url.split("?")[1].split("=")[1];
+            // var userId = parseInt(document.getElementById('userId').textContent, 10);
+            console.log("userId:", userId);
+            window.location.href = "/mall/user/cart?id=" + userId;
+        }
+
+        //跳转到商城
         function redirectToShop(event) {
             event.preventDefault(); // 阻止默认表单提交行为
             //获取当前url中id
@@ -395,14 +377,40 @@
             var userID = url.split("?")[1].split("=")[1];
             window.location.href = "/mall/user/profile?id=" + userID;
         }
-        function redirectToOrder(event) {
-            event.preventDefault(); // 阻止默认表单提交行为
-            //获取当前url中id
-            var url = window.location.href;
-            var userID = url.split("?")[1].split("=")[1];
-            window.location.href = "/mall/user/oeder?id=" + userID;
-        }
 
+        //删除订单(退货)
+        function deleteOrder(btn, event) {
+            event.preventDefault(); // 阻止默认表单提交行为
+            var {userID, productName} = getQueryString(btn);
+            // 将userID转换为整数
+            userID = parseInt(userID);
+            // 创建一个对象，包含用户ID和产品名称
+            var order = {
+                "UserID": userID,
+                "ProductName": productName
+            };
+            // 将对象转换为JSON格式
+            var jsonData = JSON.stringify(order);
+            var xhr = new XMLHttpRequest();
+            // 打开一个新的请求
+            xhr.open("POST", "/mall/order/delete", true);
+            // 设置请求头
+            xhr.setRequestHeader("Content-Type", "application/json");
+            // 当请求状态改变时
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState === 4 && xhr.status === 200) {
+                    showNotification(xhr.responseText, event);
+                    console.log("订单退货成功");
+                    //刷新页面
+                    window.location.reload();
+                } else if (xhr.status === 0) {
+                    // 请求被取消
+                    console.log('Request was aborted');
+                }
+            };
+            // 发送请求
+            xhr.send(jsonData);
+        }
         //登出事件
         document.getElementById("logoutButton").addEventListener("click", function (e) {
             e.preventDefault();
@@ -423,7 +431,7 @@
                 }
             };
             xhr.send();
-        })
+        });
     </script>
 </body>
 
