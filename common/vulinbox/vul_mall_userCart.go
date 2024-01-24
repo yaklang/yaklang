@@ -324,6 +324,40 @@ func (s *VulinServer) mallCartRoute() {
 
 			},
 		},
+		//清空购物车
+		{
+			DefaultQuery: "",
+			Path:         "/cart/clear",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				_, err := s.database.mallAuthenticate(writer, request)
+				if err != nil {
+					return
+				}
+				//解析前端传来的JSON数据
+				var RequestBody struct {
+					UserID int `json:"userID"`
+				}
+				var ID UserCart
+
+				//获取前端传递的userID
+				err = json.NewDecoder(request.Body).Decode(&RequestBody)
+				if err != nil {
+					writer.WriteHeader(500)
+					writer.Write([]byte(err.Error()))
+					return
+				}
+				ID.UserID = RequestBody.UserID
+
+				//调用函数清空购物车
+				err = s.database.ClearCart(ID.UserID)
+				if err != nil {
+					return
+				}
+				writer.WriteHeader(http.StatusOK)
+				writer.Write([]byte("清空购物车成功"))
+
+			},
+		},
 	}
 
 	for _, v := range mallcartRoutes {

@@ -39,7 +39,7 @@
                             <li>hi，欢迎<span style="color: red;">{{.Username}}</span></li>
                             <!-- <li><a href="#"><i class="fa fa-user"></i> My Account</a></li> -->
                             <!-- <li><a onclick='redirectToCart(event)'><i class="fa fa-shopping-cart"></i> My Cart</a></li> -->
-                            <li><a href="#" id="logoutButton"><i class="fa fa-sign-out"></i> Sign out</a></li>
+                            <li><a id="logoutButton"><i class="fa fa-sign-out"></i> Sign out</a></li>
                         </ul>
                     </div>
                 </div>
@@ -116,6 +116,7 @@
                         </li>
                         <li><a onclick="redirectToShop(event)">Home</a></li>
                         <li class="active"><a>购物车</a></li>
+                        <li style="vertical-align: middle;"><a onclick='redirectToOrder(event)'>我的订单</a></li>
                     </ul>
                 </div>
             </div>
@@ -192,11 +193,11 @@
                                         <tr>
                                             <th class="product-remove">&nbsp;</th>
                                             <th class="product-thumbnail">&nbsp;</th>
-                                            <th class="product-name">Product</th>
+                                            <th class="product-name">ProductName</th>
                                             <th class="product-price">Description</th>
                                             <th class="product-price">Price</th>
                                             <th class="product-quantity">Quantity</th>
-                                            <th class="product-subtotal">Total</th>
+                                            <th class="product-subtotal">TotalPrice</th>
                                         </tr>
                                     </thead>
 
@@ -260,9 +261,10 @@
                                                     <input type="submit" value="核销优惠券" name="apply_coupon"
                                                         class="button">
                                                 </div>
-                                                <input type="submit" value="Update Cart" name="update_cart"
-                                                    class="button">
-                                                <input type="submit" value="Checkout" name="proceed"
+                                                <!-- <input type="submit" value="Update Cart" name="update_cart"
+                                                    class="button"> -->
+                                                <input type="submit" id="submitOrderButton" value="提交订单"
+                                                       name="proceed"
                                                     class="checkout-button button alt wc-forward">
                                             </td>
                                         </tr>
@@ -406,7 +408,6 @@
                 notification.style.display = "none";
             }, 6000);
         }
-
         //获取userID和productName
         function getQueryString(btn) {
             //获取当前url中id
@@ -432,6 +433,14 @@
             return result;
         }
 
+        //跳转到订单页面
+        function redirectToOrder(event) {
+            event.preventDefault(); // 阻止默认表单提交行为
+            //获取当前url中id
+            var url = window.location.href;
+            var userID = url.split("?")[1].split("=")[1];
+            window.location.href = "/mall/user/order?id=" + userID;
+        }
         //返回商城
         function redirectToShop(event) {
             event.preventDefault(); // 阻止默认表单提交行为
@@ -557,6 +566,91 @@
             };
             xhr.send();
         })
+
+        //提交订单
+        function submitOrder() {
+            // 从URL获取userID
+            var url = window.location.href;
+            var userID = parseInt(url.split("?")[1].split("=")[1]); // 使用parseInt将userID转换为整数
+
+            // 获取购物车中的所有项目
+            var cartItems = document.querySelectorAll('.cart_item');
+
+            // 创建一个数组来存储每个项目的信息
+            var orderItems = [];
+
+            // 遍历每个项目
+            cartItems.forEach(function (item) {
+                var productName = item.querySelector('.product-name').textContent.trim();
+                var quantity = item.querySelector('.product-quantity').textContent.replace(/\s+/g, '').replace(/[-+]/g, ''); // 去除空格、换行符、"-"和"+"
+                var totalPrice = item.querySelector('.product-subtotal .amount').textContent.slice(1).trim(); // 去掉货币符号
+
+                // 创建一个对象来存储这个项目的信息
+                var orderItem = {
+                    'ProductName': productName,
+                    'Quantity': quantity,
+                    'TotalPrice': totalPrice
+                };
+
+                // 将这个对象添加到数组中
+                orderItems.push(orderItem);
+            });
+
+            // 创建一个对象来存储订单信息
+            var order = {
+                'UserID': userID,
+                'OrderItems': orderItems
+            };
+
+            // 将这个对象转换为JSON
+            var orderJSON = JSON.stringify(order);
+
+            // 发送一个POST请求
+            fetch('/mall/order/submit', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: orderJSON
+            }).then(function (response) {
+                if (response.ok) {
+                    return response.text(); // 将响应的内容从文本转换为字符串
+                } else {
+                    console.error('Error:', response.statusText);
+                }
+            }).then(function (data) {
+                if (data === '订单提交成功') { // 检查内容是否为“订单提交成功”
+                    alert('订单提交成功'); // 弹出提示窗口
+                    // 清空购物车
+                    fetch('/mall/cart/clear', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({'UserID': userID})
+                    }).then(function (response) {
+                        if (response.ok) {
+                            console.log('购物车已清空');
+                            location.reload(); // 刷新页面
+                        } else {
+                            console.error('Error:', response.statusText);
+                        }
+                    }).catch(function (error) {
+                        console.error('Error:', error);
+                    });
+                }
+            }).catch(function (error) {
+                console.error('Error:', error);
+            });
+        }
+
+        document.getElementById('submitOrderButton').addEventListener('click', function (event) {
+            // 阻止表单的默认提交行为
+            event.preventDefault();
+
+            // 调用submitOrder函数
+            submitOrder();
+        });
     </script>
 </body>
 

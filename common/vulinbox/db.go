@@ -67,33 +67,71 @@ func newDBM() (*dbm, error) {
 	})
 
 	// 初始化数据库
+	db.AutoMigrate(&UserOrder{})
+	db.Save(&UserOrder{
+		UserID:         1,
+		ProductName:    "商品1",
+		Quantity:       1,
+		TotalPrice:     89,
+		DeliveryStatus: "已发货",
+	})
+
+	db.Save(&UserOrder{
+		UserID:         2,
+		ProductName:    "商品2",
+		Quantity:       2,
+		TotalPrice:     178,
+		DeliveryStatus: "已发货",
+	})
+	db.Save(&UserOrder{
+		UserID:         2,
+		ProductName:    "商品1",
+		Quantity:       3,
+		TotalPrice:     267,
+		DeliveryStatus: "已发货",
+	})
+	db.Save(&UserOrder{
+		UserID:         3,
+		ProductName:    "商品4",
+		Quantity:       5,
+		TotalPrice:     445,
+		DeliveryStatus: "已发货",
+	})
+	db.Save(&UserOrder{
+		UserID:         4,
+		ProductName:    "商品3",
+		Quantity:       1,
+		TotalPrice:     89,
+		DeliveryStatus: "已发货",
+	})
+
 	db.AutoMigrate(&UserCart{})
 	db.Save(&UserCart{
 		UserID:          1,
 		ProductName:     "商品2",
 		Description:     "这是商品2的描述信息。",
-		ProductPrice:    200,
+		ProductPrice:    89,
 		ProductQuantity: 2,
 	})
 	db.Save(&UserCart{
 		UserID:          1,
 		ProductName:     "商品1",
 		Description:     "这是商品1的描述信息。",
-		ProductPrice:    100,
+		ProductPrice:    89,
 		ProductQuantity: 3,
 	})
 	db.Save(&UserCart{
 		UserID:          2,
 		ProductName:     "商品5",
 		Description:     "这是商品5的描述信息。",
-		ProductPrice:    500,
+		ProductPrice:    89,
 		ProductQuantity: 3,
 	})
 	db.Save(&UserCart{
 		UserID:          3,
 		ProductName:     "商品4",
 		Description:     "这是商品4的描述信息。",
-		ProductPrice:    400,
+		ProductPrice:    89,
 		ProductQuantity: 5,
 	})
 	db.Save(&VulinUser{

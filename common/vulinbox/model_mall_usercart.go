@@ -107,3 +107,13 @@ func (s *dbm) CheckCart(UserID int, ProductName string) (bool, error) {
 	// 找到了匹配的记录，返回 true
 	return true, nil
 }
+
+// 清空购物车
+func (s *dbm) ClearCart(UserID int) (err error) {
+	var v UserCart
+	v.UserID = UserID
+	if err := s.db.Where("UserID = ?", v.UserID).Delete(&v).Error; err != nil {
+		return err
+	}
+	return nil
+}
