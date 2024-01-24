@@ -230,9 +230,11 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 	}
 	swg.Wait()
 	feedbackStatus()
+	statusManager.GetStatus(task)
 	if !manager.IsPaused() {
 		task.Status = yakit.HYBRIDSCAN_DONE
 	}
+	quickSave()
 	if hasUnavailableTarget {
 		return utils.Errorf("Has unreachable target")
 	}
