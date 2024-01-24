@@ -17,7 +17,7 @@ func init() {
 // var CheckDefineFunctionTag string = "CheckDefineFunction"
 
 func checkDefineFunction(prog *ssaapi.Program, name string) *result.StaticAnalyzeResults {
-	ret := result.NewStaticAnalyzeResults()
+	ret := result.NewStaticAnalyzeResults("check define function")
 	handlers := prog.Ref(name)
 	if len(handlers) == 0 {
 		ret.NewError(NoImplementFunction(name), nil)
@@ -53,7 +53,7 @@ func CheckDefineFunctionPortScan(prog *ssaapi.Program) *result.StaticAnalyzeResu
 }
 
 func CheckDefineFunctionMitm(prog *ssaapi.Program) *result.StaticAnalyzeResults {
-	ret := result.NewStaticAnalyzeResults()
+	ret := result.NewStaticAnalyzeResults("check define function in mitm ")
 	funcs := []string{
 		"hijackSaveHTTPFlow",
 		"hijackHTTPResponse",

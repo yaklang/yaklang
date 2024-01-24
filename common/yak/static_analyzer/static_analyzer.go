@@ -31,7 +31,7 @@ func StaticAnalyzeYaklang(code, codeTyp string) []*result.StaticAnalyzeResult {
 			for _, e := range ret {
 				results = append(results, &result.StaticAnalyzeResult{
 					Message:         fmt.Sprintf("基础语法错误（Syntax Error）：%v", e.Message),
-					Severity:        "error",
+					Severity:        result.Error,
 					StartLineNumber: int64(e.StartPos.LineNumber),
 					StartColumn:     int64(e.StartPos.ColumnNumber + 1),
 					EndLineNumber:   int64(e.EndPos.LineNumber),
@@ -53,12 +53,12 @@ func StaticAnalyzeYaklang(code, codeTyp string) []*result.StaticAnalyzeResult {
 
 	errs := prog.GetErrors()
 	for _, err := range errs {
-		var severity string
+		severity := result.Hint
 		switch err.Kind {
 		case ssa.Warn:
-			severity = "warning"
+			severity = result.Warn
 		case ssa.Error:
-			severity = "error"
+			severity = result.Error
 		}
 		results = append(results, &result.StaticAnalyzeResult{
 			Message:         err.Message,

@@ -12,7 +12,7 @@ func init() {
 
 // 检查 cli.risk 是否符合规范
 func RuleRisk(prog *ssaapi.Program) *result.StaticAnalyzeResults {
-	ret := result.NewStaticAnalyzeResults()
+	ret := result.NewStaticAnalyzeResults("risk check")
 
 	// tag := "cli.risk"
 
