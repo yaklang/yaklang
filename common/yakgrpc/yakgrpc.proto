@@ -699,9 +699,8 @@ message HybridScanResponse {
   // 这字段表示的是，正在执行的任务可以展示出来
   HybridScanUpdateActiveTaskTable UpdateActiveTask = 11;
 
-  // 展示输入输出
-  HybridScanInputTarget InputTarget = 12;
-  HybridScanPluginConfig PluginConfig = 13;
+  // 任务配置
+  string ScanConfig = 12;
 }
 
 message HybridScanUpdateActiveTaskTable {

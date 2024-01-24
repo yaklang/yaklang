@@ -2,7 +2,6 @@ package yakgrpc
 
 import (
 	"context"
-	"encoding/json"
 	"github.com/samber/lo"
 	uuid "github.com/satori/go.uuid"
 	"github.com/yaklang/yaklang/common/log"
@@ -109,10 +108,6 @@ func (s *Server) HybridScan(stream ypb.Yak_HybridScanServer) error {
 		if err != nil {
 			return err
 		}
-		var inputTarget ypb.HybridScanInputTarget
-		var pluginConfig ypb.HybridScanPluginConfig
-		json.Unmarshal(t.InputTarget, &inputTarget)
-		json.Unmarshal(t.PluginConfig, &pluginConfig)
 
 		stream.Send(&ypb.HybridScanResponse{
 			TotalTargets:     t.TotalTargets,
@@ -121,8 +116,7 @@ func (s *Server) HybridScan(stream ypb.Yak_HybridScanServer) error {
 			FinishedTasks:    t.FinishedTasks,
 			FinishedTargets:  t.FinishedTargets,
 			HybridScanTaskId: t.TaskId,
-			InputTarget:      &inputTarget,
-			PluginConfig:     &pluginConfig,
+			ScanConfig:       string(t.ScanConfig),
 		})
 
 		client := yaklib.NewVirtualYakitClient(func(result *ypb.ExecResult) error {
