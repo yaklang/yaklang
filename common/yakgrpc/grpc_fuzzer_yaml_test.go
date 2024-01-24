@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"net/http"
 	"strings"
 	"testing"
@@ -704,22 +705,6 @@ func TestGRPCMUSTPASS_HTTPFuzzer_ExtractWithId(t *testing.T) {
 	tests := []struct{ raw, expect string }{
 		{
 			raw: `id: WebFuzzer-Template-wZJQIpvW
-
-info:
-  name: WebFuzzer Template wZJQIpvW
-  author: god
-  severity: low
-  description: write your description here
-  reference:
-  - https://github.com/
-  - https://cve.mitre.org/
-  metadata:
-    max-request: 2
-    shodan-query: ""
-    verified: true
-  yakit-info:
-    sign: 1203fbcb93204b12702f78c74186a6cd
-
 http:
 - method: GET
   path:
@@ -743,22 +728,6 @@ http:
 		}, // bind extractor and matcher by id
 		{
 			raw: `id: WebFuzzer-Template-wZJQIpvW
-
-info:
-  name: WebFuzzer Template wZJQIpvW
-  author: god
-  severity: low
-  description: write your description here
-  reference:
-  - https://github.com/
-  - https://cve.mitre.org/
-  metadata:
-    max-request: 2
-    shodan-query: ""
-    verified: true
-  yakit-info:
-    sign: 1203fbcb93204b12702f78c74186a6cd
-
 http:
 - method: GET
   path:
@@ -811,6 +780,214 @@ http:
 			}
 			assert.Equal(t, 3, sendN)
 			assert.Equal(t, test.expect, extractedTitle)
+		})
+	}
+
+}
+func TestGRPCMUSTPASS_HTTPFuzzer_MatchWithId(t *testing.T) {
+	tests := []struct {
+		raw    string
+		expect bool
+	}{
+		{
+			raw: `id: WebFuzzer-Template-wZJQIpvW
+http:
+- method: GET
+  path:
+  - '{{RootURL}}/?action=getTitle1'
+  - '{{RootURL}}/?action=getTitle2'
+  max-redirects: 3
+  cookie-reuse: true
+  matchers-condition: and
+  matchers:
+  - id: 1
+    type: word
+    part: body
+    words:
+    - title1
+    condition: and
+
+
+# Generated From WebFuzzer on 2024-01-19 16:42:48`,
+			expect: true,
+		},
+		{
+			raw: `id: WebFuzzer-Template-wZJQIpvW
+http:
+- method: GET
+  path:
+  - '{{RootURL}}/?action=getTitle1'
+  - '{{RootURL}}/?action=getTitle2'
+  max-redirects: 3
+  cookie-reuse: true
+  matchers-condition: and
+  matchers:
+  - id: 2
+    type: word
+    part: body
+    words:
+    - title1
+    condition: and
+
+
+# Generated From WebFuzzer on 2024-01-19 16:42:48`,
+			expect: false,
+		},
+		{
+			raw: `id: WebFuzzer-Template-wZJQIpvW
+http:
+- method: GET
+  path:
+  - '{{RootURL}}/?action=getTitle1'
+  - '{{RootURL}}/?action=getTitle2'
+  max-redirects: 3
+  cookie-reuse: true
+  matchers-condition: and
+  matchers:
+  - type: word
+    part: body
+    words:
+    - title1
+    condition: and
+
+
+# Generated From WebFuzzer on 2024-01-19 16:42:48`,
+			expect: true,
+		},
+		{
+			raw: `id: WebFuzzer-Template-wZJQIpvW
+http:
+- method: GET
+  path:
+  - '{{RootURL}}/?action=getTitle1'
+  - '{{RootURL}}/?action=getTitle2'
+  max-redirects: 3
+  cookie-reuse: true
+  matchers-condition: and
+  matchers:
+  - type: word
+    part: body
+    words:
+    - title2
+    condition: and
+
+
+# Generated From WebFuzzer on 2024-01-19 16:42:48`,
+			expect: true,
+		}, // default action: match all package
+		{
+			raw: `id: WebFuzzer-Template-wZJQIpvW
+http:
+- method: GET
+  path:
+  - '{{RootURL}}/?action=getTitle1'
+  - '{{RootURL}}/?action=getTitle2'
+  max-redirects: 3
+  cookie-reuse: true
+  matchers-condition: and
+  matchers:
+  - id: 1
+    type: word
+    part: body
+    words:
+    - title1
+    condition: and
+  - id: 1
+    type: word
+    part: body
+    negative: true
+    words:
+    - title2
+    condition: and
+  - id: 2
+    type: word
+    part: body
+    words:
+    - title2
+    condition: and
+  - id: 2
+    type: word
+    part: body
+    words:
+    - title1
+    condition: and
+
+# Generated From WebFuzzer on 2024-01-19 16:42:48`,
+			expect: false,
+		}, // (package1 has title1) and (package1 not has title2) and (package2 has title2) and (package2 not has title1) => false
+		{
+			raw: `id: WebFuzzer-Template-wZJQIpvW
+http:
+- method: GET
+  path:
+  - '{{RootURL}}/?action=getTitle1'
+  - '{{RootURL}}/?action=getTitle2'
+  max-redirects: 3
+  cookie-reuse: true
+  matchers-condition: and
+  matchers:
+  - id: 1
+    type: word
+    part: body
+    words:
+    - title1
+    condition: and
+  - id: 1
+    type: word
+    part: body
+    negative: true
+    words:
+    - title2
+    condition: and
+  - id: 2
+    type: word
+    part: body
+    words:
+    - title2
+    condition: and
+  - id: 2
+    type: word
+    part: body
+    negative: true
+    words:
+    - title1
+    condition: and
+
+# Generated From WebFuzzer on 2024-01-19 16:42:48`,
+			expect: true,
+		}, // (package1 has title1) and (package1 not has title2) and (package2 has title2) and (package2 not has title1) => true
+	}
+	for _, test := range tests {
+		t.Run(test.raw, func(t *testing.T) {
+			yamlRaw := test.raw
+			host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+				request.ParseForm()
+				action := request.Form.Get("action")
+				if action != "" {
+					switch action {
+					case "getTitle1":
+						writer.Write([]byte(`{"title": "title1"}`))
+					case "getTitle2":
+						writer.Write([]byte(`{"title": "title2"}`))
+					default:
+						writer.Write(nil)
+					}
+					return
+				}
+				writer.Write(nil)
+			})
+			addr := utils.HostPort(host, port)
+			yakTemplate, err := httptpl.CreateYakTemplateFromNucleiTemplateRaw(yamlRaw)
+			if err != nil {
+				t.Fatal(err)
+			}
+			sendN, err := yakTemplate.ExecWithUrl("http://"+addr, httptpl.NewConfig(httptpl.WithResultCallback(func(y *httptpl.YakTemplate, reqBulk *httptpl.YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+				assert.Equal(t, test.expect, result)
+			})))
+			if err != nil {
+				t.Fatal(err)
+			}
+			assert.Equal(t, 2, sendN)
 		})
 	}
 
