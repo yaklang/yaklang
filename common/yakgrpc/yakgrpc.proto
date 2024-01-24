@@ -1038,6 +1038,9 @@ message GlobalNetworkConfig {
 
   // http auth info
   repeated AuthInfo AuthInfos = 13;
+
+  // syn扫描选择的网卡
+  string SynScanNetInterface = 14;
 }
 
 message AuthInfo {
@@ -2618,8 +2621,10 @@ message NetInterface {
   string Name = 1;
   string Addr = 2;
   string IP = 3;
+  string Description = 4;
   bool IsIpv4 = 5;
   bool IsIpv6 = 6;
+  string NetInterfaceName = 7;
 }
 
 message ConfigGlobalReverseParams {

@@ -30,6 +30,7 @@ type _yakPortScanConfig struct {
 	waiting         time.Duration
 	initFilterPorts string
 	initFilterHosts string
+	netInterface    string
 
 	rateLimitDelayMs  float64
 	rateLimitDelayGap int // 每隔多少数据包 delay 一次？
@@ -121,6 +122,27 @@ func _scanOptSYNConcurrent(count int) scanOpt {
 		config.rateLimitDelayGap = 5
 		log.Infof("rate limit delay ms: %v(ms)", config.rateLimitDelayMs)
 		log.Infof("rate limit delay gap: %v", config.rateLimitDelayGap)
+	}
+}
+
+// iface syn scan 的配置选项，设置 syn 扫描的网卡
+// @param {string} iface 网卡名称
+// @return {scanOpt} 返回配置选项
+// Example:
+// ```
+// res, err = synscan.Scan("192.168.1.1/24", "1-65535",
+//
+//	synscan.iface("eth0") // 使用 eth0 网卡
+//
+// )
+// die(err)
+// ```
+func _scanOptIface(iface string) scanOpt {
+	return func(config *_yakPortScanConfig) {
+		if iface == "" {
+			return
+		}
+		config.netInterface = iface
 	}
 }
 
@@ -386,7 +408,13 @@ func getSampleTarget(targetList []string) string {
 }
 
 func runScan(sampleTarget string, filteredTargetChan chan string, ports string, config *_yakPortScanConfig, openResult chan *synscan.SynScanResult) error {
-	synScanOptions, err := synscan.CreateConfigOptionsByTargetNetworkOrDomain(sampleTarget, 10*time.Second)
+	var synScanOptions []synscan.ConfigOption
+	var err error
+	if config.netInterface != "" {
+		synScanOptions, err = synscan.CreateConfigOptionsByIfaceName(config.netInterface)
+	} else {
+		synScanOptions, err = synscan.CreateConfigOptionsByTargetNetworkOrDomain(sampleTarget, 10*time.Second)
+	}
 	if err != nil {
 		return utils.Errorf("init syn scanner failed: %v", err)
 	}
@@ -706,6 +734,7 @@ var SynPortScanExports = map[string]interface{}{
 	"initPortFilter":     _scanOptOpenPortInitPortFilter,
 	"rateLimit":          _scanOptRateLimit,
 	"concurrent":         _scanOptSYNConcurrent,
+	"iface":              _scanOptIface,
 	//"fpOutputFile":       _scanOptFpResult,
 	//"fingerprint":        _scanOptEnableFpScan,
 	//"fingerprintTimeout": _scanOptFingerprintRequestTimeout,

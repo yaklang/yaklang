@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
 	"net"
+	"runtime"
 	"sort"
 	"strings"
 )
@@ -77,6 +78,36 @@ func IfaceNameToPcapIfaceName(name string) (string, error) {
 		}
 	}
 	return "", NewConvertIfaceNameError(name)
+}
+
+func PcapIfaceNameToNetInterface(ifaceName string) (*net.Interface, error) {
+	devs, err := cachedFindAllDevs()
+	if err != nil {
+		return nil, utils.Errorf("find pcap dev failed: %s", err)
+	}
+	for _, dev := range devs {
+		if dev.Name == ifaceName {
+			// windows 下的 pcap dev name 与 net.Interface.Name 不一致
+			if runtime.GOOS == "windows" {
+				iface, err := netutil.FindInterfaceByIP(dev.Addresses[0].IP.String())
+				if err != nil {
+					return nil, utils.Errorf("fetch net.Interface failed: %s", err)
+				}
+				if PcapInterfaceEqNetInterface(dev, &iface) {
+					return &iface, nil
+				}
+			} else {
+				iface, err := net.InterfaceByName(dev.Name)
+				if err != nil {
+					return nil, utils.Errorf("fetch net.Interface failed: %s", err)
+				}
+				if PcapInterfaceEqNetInterface(dev, iface) {
+					return iface, nil
+				}
+			}
+		}
+	}
+	return nil, utils.Errorf("no iface found: %s", ifaceName)
 }
 
 func AllDevices() []*pcap.Interface {
