@@ -2,9 +2,10 @@ package yakvm
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"reflect"
 	"sort"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type IteratorType int
@@ -174,6 +175,9 @@ type RepeatIterator struct {
 }
 
 func newRepeatIterator(i int64) *RepeatIterator {
+	if i == 0 {
+		return nil
+	}
 	return &RepeatIterator{
 		BaseIterator: BaseIterator{
 			Current: 0,
@@ -198,8 +202,8 @@ func NewIterator(i interface{}) (IteratorInterface, error) {
 	kind := reflect.TypeOf(i).Kind()
 	switch kind {
 	case reflect.String:
-		var runes = []rune(i.(string))
-		var strArr = make([]string, len(runes))
+		runes := []rune(i.(string))
+		strArr := make([]string, len(runes))
 		for i, r := range runes {
 			strArr[i] = string(r)
 		}

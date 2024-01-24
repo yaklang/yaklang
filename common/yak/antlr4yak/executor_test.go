@@ -3937,3 +3937,12 @@ assert a.Count(100) == count +1
 `
 	_marshallerTest(code)
 }
+
+func TestFixForIntAlwaysRun(t *testing.T) {
+	code := `
+for in 0 {
+	panic("should not run for in 0, but run")
+}
+`
+	_marshallerTest(code)
+}
