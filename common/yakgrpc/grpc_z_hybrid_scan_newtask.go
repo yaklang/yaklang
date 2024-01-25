@@ -160,8 +160,34 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 		return utils.Wrap(err, "init fingerprint matcher failed")
 	}
 
+	go func() { // 监听控制信号
+		for {
+			rsp, err = stream.Recv()
+			if err != nil {
+				taskRecorder.Reason = err.Error()
+				return
+			}
+			if rsp.HybridScanMode == "pause" {
+				manager.isPaused.Set()
+				manager.cancel()
+				statusManager.GetStatus(taskRecorder)
+				taskRecorder.Status = yakit.HYBRIDSCAN_PAUSED
+				quickSave()
+			}
+			if rsp.HybridScanMode == "stop" {
+				manager.isPaused.Set()
+				manager.cancel()
+				statusManager.GetStatus(taskRecorder)
+				quickSave()
+			}
+		}
+	}()
+
 	// start dispatch tasks
 	for _, __currentTarget := range targetCached {
+		if manager.IsPaused() { // 如果暂停立刻停止
+			break
+		}
 		// load targets
 		statusManager.DoActiveTarget()
 		targetWg := new(sync.WaitGroup)
@@ -214,8 +240,11 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 				taskRecorder.Status = yakit.HYBRIDSCAN_PAUSED
 				quickSave()
 			})
+			if manager.IsPaused() { // 如果暂停立即停止
+				break
+			}
 
-			for !fingerprintMatchOK { // wait for fingerprint match
+			for __pluginInstance.Type == "port-scan" && !fingerprintMatchOK { // wait for fingerprint match
 				portScanCond.L.Lock()
 				portScanCond.Wait()
 				portScanCond.L.Unlock()
@@ -228,7 +257,9 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 				defer swg.Done()
 				defer targetWg.Done()
 				defer func() {
-					statusManager.DoneTask(taskIndex)
+					if !manager.IsPaused() { // 暂停之后不再更新进度
+						statusManager.DoneTask(taskIndex)
+					}
 					statusManager.RemoveActiveTask(taskIndex, targetRequestInstance, pluginInstance.ScriptName, stream)
 				}()
 
@@ -279,8 +310,10 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 			}
 
 			targetWg.Wait()
-			statusManager.DoneTarget()
-			feedbackStatus()
+			if !manager.IsPaused() { // 暂停之后不再更新进度
+				statusManager.DoneTarget()
+				feedbackStatus()
+			}
 		}()
 	}
 

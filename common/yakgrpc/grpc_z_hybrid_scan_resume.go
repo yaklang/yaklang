@@ -90,8 +90,35 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 	if err != nil {
 		return utils.Wrap(err, "init fingerprint matcher failed")
 	}
+
+	go func() { // 监听控制信号
+		for {
+			rsp, err := stream.Recv()
+			if err != nil {
+				task.Reason = err.Error()
+				return
+			}
+			if rsp.HybridScanMode == "pause" {
+				manager.isPaused.Set()
+				manager.cancel()
+				statusManager.GetStatus(task)
+				task.Status = yakit.HYBRIDSCAN_PAUSED
+				quickSave()
+			}
+			if rsp.HybridScanMode == "stop" {
+				manager.isPaused.Set()
+				manager.cancel()
+				statusManager.GetStatus(task)
+				quickSave()
+			}
+		}
+	}()
+
 	// dispatch
 	for _, __currentTarget := range targets {
+		if manager.IsPaused() { // 如果暂停立刻停止
+			break
+		}
 		statusManager.DoActiveTarget()
 		feedbackStatus()
 		targetWg := new(sync.WaitGroup)
@@ -140,6 +167,9 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 				task.Status = yakit.HYBRIDSCAN_PAUSED
 				quickSave()
 			})
+			if manager.IsPaused() { // 如果暂停立刻停止
+				break
+			}
 
 			for !fingerprintMatchOK { // wait for fingerprint match
 				portScanCond.L.Lock()
@@ -156,7 +186,9 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 
 				defer targetWg.Done()
 				defer func() {
-					statusManager.DoneTask(taskIndex)
+					if !manager.IsPaused() { // 暂停之后不再更新进度
+						statusManager.DoneTask(taskIndex)
+					}
 					feedbackStatus()
 					statusManager.RemoveActiveTask(taskIndex, targetRequestInstance, pluginInstance.ScriptName, stream)
 				}()
