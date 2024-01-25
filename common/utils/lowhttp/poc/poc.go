@@ -929,7 +929,7 @@ func handleUrlAndConfig(urlStr string, opts ...PocConfigOption) (*PocConfig, err
 		return config, utils.Errorf("parse url failed: %s", err)
 	}
 
-	if port == 443 {
+	if port == 443 || strings.HasPrefix(urlStr, "https://") || strings.HasPrefix(urlStr, "wss://") {
 		config.ForceHttps = true
 	}
 
