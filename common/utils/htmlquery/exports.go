@@ -1,14 +1,14 @@
 package htmlquery
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"golang.org/x/net/html"
 	"strings"
 )
 
 var Exports = map[string]interface{}{
 	"LoadHTMLDocument": func(htmlText interface{}) (*html.Node, error) {
-		return Parse(strings.NewReader(utils.InterfaceToString(htmlText)))
+		return Parse(strings.NewReader(codec.AnyToString(htmlText)))
 	},
 	"Find":                 Find,
 	"FindOne":              FindOne,
