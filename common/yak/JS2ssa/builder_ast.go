@@ -963,7 +963,7 @@ func (b *astbuilder) buildIdentifierExpression(text string, IslValue bool, force
 			text = b.SetScopeLocalVariable(text)
 		}
 		lValue := ssa.NewIdentifierLV(text, b.CurrentRange)
-		if b.CanBuildFreeValue(text) {
+		if b.CanCaptureParentValue(text) {
 			lValue.SetIsSideEffect(true)
 		}
 		return nil, lValue

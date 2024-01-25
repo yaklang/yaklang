@@ -820,7 +820,7 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 		if i := b.TryBuildExternValue(text); i != nil {
 			b.NewErrorWithPos(ssa.Warn, TAG, b.CurrentRange, ssa.ContAssignExtern(text))
 		}
-		if b.CanBuildFreeValue(text) {
+		if b.CanCaptureParentValue(text) {
 			lv.SetIsSideEffect(true)
 		}
 		return lv
