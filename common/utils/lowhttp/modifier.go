@@ -548,10 +548,7 @@ func ReplaceAllHTTPPacketHeaders(packet []byte, headers map[string]string) []byt
 		return nil
 	}, func(line string) string {
 		if IsHeader(line, "Host") {
-			splited := strings.Split(line, ":")
-			if len(splited) > 1 {
-				host = strings.TrimSpace(splited[1])
-			}
+			_, host = SplitHTTPHeader(line)
 		}
 		return line
 	})
