@@ -482,7 +482,6 @@ var startGRPCServerCommand = cli.Command{
 			println("USE: go tool pprof -http=:18080 pprof file")
 			go startPProf(pprofSec)
 		}
-		// log.SetLevel(log.DebugLevel)
 		log.Info("start to initialize database")
 		err := initializeDatabase(c.String("project-db"), c.String("profile-db"))
 		if err != nil {
@@ -534,6 +533,7 @@ var startGRPCServerCommand = cli.Command{
 		debug := c.Bool("debug")
 		if debug {
 			unaryInterceptors = append(unaryInterceptors, slowLogUnaryInterceptor)
+			log.SetLevel(log.DebugLevel)
 		}
 		log.Infof("start to create grpc schema...")
 		grpcTrans := grpc.NewServer(
