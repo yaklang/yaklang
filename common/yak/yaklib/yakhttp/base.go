@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -286,6 +287,13 @@ func Do(i interface{}) (*http.Response, error) {
 		return nil, utils.Errorf("not a valid type: %v for req: %v", reflect.TypeOf(i), spew.Sdump(i))
 	}
 	yakHTTPRequest, _ := i.(*http_struct.YakHttpRequest)
+
+	// 修复 HTTPS
+	scheme := strings.ToLower(yakHTTPRequest.URL.Scheme)
+	isHttps := false
+	if scheme == "https" || scheme == "wss" {
+		isHttps = true
+	}
 	config := yakHTTPRequest.Config
 	if config == nil {
 		config = http_struct.NewHTTPConfig()
@@ -296,6 +304,7 @@ func Do(i interface{}) (*http.Response, error) {
 	}
 
 	rsp, _, err := poc.HTTP(rawRequest,
+		poc.WithForceHTTPS(isHttps),
 		poc.WithTimeout(config.Timeout),
 		poc.WithProxy(config.Proxies...),
 		poc.WithRedirectHandler(func(isHttps bool, req, rsp []byte) bool {
