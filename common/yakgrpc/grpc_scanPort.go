@@ -113,6 +113,13 @@ func (s *Server) PortScan(req *ypb.PortScanRequest, stream ypb.Yak_PortScanServe
 		})
 	}
 
+	// 设置 SYN 扫描的网卡
+	if req.GetSynScanNetInterface() != "" {
+		reqParams.Params = append(
+			reqParams.Params, &ypb.ExecParamItem{Key: "syn-scan-net-interface", Value: req.GetSynScanNetInterface()},
+		)
+	}
+
 	// 设置 SYN 扫描的并发
 	if req.GetSynConcurrent() > 0 {
 		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{Key: "syn-concurrent", Value: fmt.Sprint(req.GetSynConcurrent())})
