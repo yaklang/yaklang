@@ -12,6 +12,9 @@ callerFilter := CALLER_FILTER != undefined ? CALLER_FILTER : str.NewFilter()
 caller := hook.NewMixPluginCallerWithFilter(callerFilter)~
 caller.SetCache(true)
 caller.SetRuntimeId(RUNTIME_ID)
+if PROXY != undefined{
+    caller.SetProxy(PROXY)
+}
 caller.LoadPluginByName(CTX,plugin.ScriptName,[])~
 
 needResponse := plugin.Type == "mitm" && RESPONSE == undefined

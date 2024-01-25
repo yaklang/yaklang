@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"container/list"
+	"context"
 	"encoding/json"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/fp"
@@ -21,6 +22,12 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 	if err != nil {
 		return utils.Wrapf(err, "Resume HybridScanByID: %v", manager.TaskId())
 	}
+	var scanConfig ypb.HybridScanRequest
+	err = json.Unmarshal(task.ScanConfig, &scanConfig)
+	if err != nil {
+		return utils.Wrapf(err, "Resume HybridScanByID: %v", manager.TaskId())
+	}
+
 	quickSave := func() {
 		if consts.GetGormProjectDatabase().Save(task).Error != nil {
 			log.Error(err)
@@ -80,7 +87,8 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 		statusManager.Feedback(stream)
 	}
 
-	swg := utils.NewSizedWaitGroup(20)
+	swg := utils.NewSizedWaitGroup(int(scanConfig.Concurrent))                                                                     // 设置并发数
+	manager.ctx, manager.cancel = context.WithTimeout(manager.Context(), time.Duration(scanConfig.TotalTimeoutSecond)*time.Second) // 设置总超时
 	// init some config
 	var riskCount, _ = yakit.CountRiskByRuntimeId(s.GetProfileDatabase(), task.TaskId)
 	var resumeFilterManager = NewFilterManager(12, 1<<15, 30)
@@ -232,7 +240,7 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 				}, &riskCount)
 				callerFilter := resumeFilterManager.DequeueFilter()
 				defer resumeFilterManager.EnqueueFilter(callerFilter)
-				err := s.ScanTargetWithPlugin(task.TaskId, manager.Context(), targetRequestInstance, pluginInstance, feedbackClient, callerFilter)
+				err := s.ScanTargetWithPlugin(task.TaskId, manager.Context(), targetRequestInstance, pluginInstance, scanConfig.Proxy, feedbackClient, callerFilter)
 				if err != nil {
 					log.Warnf("scan target failed: %s", err)
 				}
