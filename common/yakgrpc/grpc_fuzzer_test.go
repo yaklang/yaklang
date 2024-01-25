@@ -624,7 +624,7 @@ Connection: close
 	}
 }
 
-func TestServer_HTTPRequestMutateFormToPOST(t *testing.T) {
+func TestGRPCMUSTPASS_Server_HTTPRequestMutateFormToPOST(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
