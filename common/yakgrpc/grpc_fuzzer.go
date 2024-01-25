@@ -617,7 +617,6 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 
 	// 重试处理，通过taskid找到所有失败的发送包
 	var iInput any
-	httpPoolOpts := make([]mutate.HttpPoolConfigOption, 0)
 	retryPayloadsMap := make(map[string][]string, 0) // key 是原始请求报文，value 是重试的payload，我们需要将重试的payload绑定回去
 	// 这里可能会出现原始请求报文一样的情况，但是这样也是因为payload没有而导致的，例如{{repeat(10)}}
 
@@ -685,7 +684,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			}
 		}()
 
-		httpPoolOpts = append(httpPoolOpts,
+		httpPoolOpts := []mutate.HttpPoolConfigOption{
 			mutate.WithPoolOpt_FuzzParams(mergedParams),
 			mutate.WithPoolOpt_ExtraFuzzOptions(extraOpt...),
 			mutate.WithPoolOpt_Timeout(timeoutSeconds),
@@ -717,7 +716,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_DNSServers(req.GetDNSServers()),
 			mutate.WithPoolOpt_EtcHosts(req.GetEtcHosts()),
 			mutate.WithPoolOpt_NoSystemProxy(req.GetNoSystemProxy()),
-			mutate.WithPoolOpt_RequestCountLimiter(requestCount))
+			mutate.WithPoolOpt_RequestCountLimiter(requestCount)}
 
 		fuzzMode := req.GetFuzzTagMode() // ""/"close"/"standard"/"legacy"
 		forceFuzz := req.GetForceFuzz()  // true/false
