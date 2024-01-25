@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -162,7 +163,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 
 func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_ExternLib(t *testing.T) {
 	check := CheckHover(t)
-	code := `
+	codeTemplate := `%s {
 prog  = ssa.Parse(
     "", 
     ssa.withLanguage(
@@ -170,124 +171,77 @@ prog  = ssa.Parse(
     )
 )~
 prog.Packages
-`
-
-	t.Run("check extern lib hover", func(t *testing.T) {
-		ssaRange := &ypb.Range{
-			Code:        "ssa",
-			StartLine:   2,
-			StartColumn: 8,
-			EndLine:     2,
-			EndColumn:   11,
-		}
-		want := getExternLibDesc("ssa", "any")
-		check(t, code, "yak", ssaRange, want)
-	})
-
-	t.Run("check extern lib method hover", func(t *testing.T) {
-		ssaParseRange := &ypb.Range{
-			Code:        "ssa.Parse",
-			StartLine:   2,
-			StartColumn: 8,
-			EndLine:     2,
-			EndColumn:   17,
-		}
-		// 标准库函数
-		funcDecl := getFuncDeclByName("ssa.Parse")
-		desc := getFuncDeclDesc(funcDecl, "Parse")
-		want := desc
-		check(t, code, "yak", ssaParseRange, want)
-	})
-
-	t.Run("check extern lib instance hover", func(t *testing.T) {
-		ssaParseRange := &ypb.Range{
-			Code:        "ssa.Javascript",
-			StartLine:   5,
-			StartColumn: 8,
-			EndLine:     5,
-			EndColumn:   22,
-		}
-		// 标准库变量
-		instance := getInstanceByName("ssa.Javascript")
-		desc := getConstInstanceDesc(instance)
-		want := desc
-		check(t, code, "yak", ssaParseRange, want)
-	})
-	t.Run("check extern lib method return hover", func(t *testing.T) {
-		progRange := &ypb.Range{
-			Code:        "prog",
-			StartLine:   2,
-			StartColumn: 0,
-			EndLine:     2,
-			EndColumn:   4,
-		}
-		want := `func (Program) Ref(name string) Value`
-		check(t, code, "yak", progRange, want, true)
-	})
-}
-
-func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_ExternLib_InLoop(t *testing.T) {
-	check := CheckHover(t)
-	code := `for a {
-prog = ssa.Parse(
-	"", 
-	ssa.withLanguage(
-		ssa.Javascript
-	)
-)~
 }`
-	t.Run("check extern lib hover", func(t *testing.T) {
-		ssaRange := &ypb.Range{
-			Code:        "ssa",
-			StartLine:   2,
-			StartColumn: 8,
-			EndLine:     2,
-			EndColumn:   11,
-		}
-		want := getExternLibDesc("ssa", "any")
-		check(t, code, "yak", ssaRange, want)
-	})
 
-	t.Run("check extern lib method hover", func(t *testing.T) {
-		ssaParseRange := &ypb.Range{
-			Code:        "ssa.Parse",
-			StartLine:   2,
-			StartColumn: 8,
-			EndLine:     2,
-			EndColumn:   17,
-		}
-		// 标准库函数
-		funcDecl := getFuncDeclByName("ssa.Parse")
-		desc := getFuncDeclDesc(funcDecl, "Parse")
-		want := desc
-		check(t, code, "yak", ssaParseRange, want)
-	})
+	type CheckItem struct {
+		name      string
+		want      string
+		Range     *ypb.Range
+		subString bool
+	}
 
-	t.Run("check extern lib instance hover", func(t *testing.T) {
-		ssaParseRange := &ypb.Range{
-			Code:        "ssa.Javascript",
-			StartLine:   5,
-			StartColumn: 8,
-			EndLine:     5,
-			EndColumn:   22,
+	data := []CheckItem{
+		{
+			name: "extern lib",
+			want: getExternLibDesc("ssa", "any"),
+			Range: &ypb.Range{
+				Code:        "ssa",
+				StartLine:   2,
+				StartColumn: 8,
+				EndLine:     2,
+				EndColumn:   11,
+			},
+		},
+		{
+			name: "extern lib method",
+			want: getFuncDeclDesc(getFuncDeclByName("ssa.Parse"), "Parse"),
+			Range: &ypb.Range{
+				Code:        "ssa.Parse",
+				StartLine:   2,
+				StartColumn: 8,
+				EndLine:     2,
+				EndColumn:   17,
+			},
+		},
+		{
+			name: "extern lib instance",
+			want: getConstInstanceDesc(getInstanceByName("ssa.Javascript")),
+			Range: &ypb.Range{
+				Code:        "ssa.Javascript",
+				StartLine:   5,
+				StartColumn: 8,
+				EndLine:     5,
+				EndColumn:   22,
+			},
+		},
+		{
+			name: "extern lib method return",
+			want: `func (Program) Ref(name string) Value`,
+			Range: &ypb.Range{
+				Code:        "prog",
+				StartLine:   2,
+				StartColumn: 0,
+				EndLine:     2,
+				EndColumn:   4,
+			},
+			subString: true,
+		},
+	}
+
+	test := map[string]string{
+		"normal":     "",
+		"in loop":    "for a ",
+		"in closure": "f = () => ",
+	}
+
+	for testName, prefix := range test {
+		code := fmt.Sprintf(codeTemplate, prefix)
+		for _, item := range data {
+			t.Run(fmt.Sprintf("test %s %s", item.name, testName), func(t *testing.T) {
+				check(t, code, "yak", item.Range, item.want, item.subString)
+			})
 		}
-		// 标准库变量
-		instance := getInstanceByName("ssa.Javascript")
-		desc := getConstInstanceDesc(instance)
-		want := desc
-		check(t, code, "yak", ssaParseRange, want)
-	})
-	t.Run("check extern lib method return hover", func(t *testing.T) {
-		progRange := &ypb.Range{
-			Code:        "prog",
-			StartLine:   2,
-			StartColumn: 0,
-			EndLine:     2,
-			EndColumn:   4,
-		}
-		want := `func (Program) Ref(name string) Value`
-		check(t, code, "yak", progRange, want, true)
-	})
+	}
 }
 
 func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_StructMemberAndMethod(t *testing.T) {

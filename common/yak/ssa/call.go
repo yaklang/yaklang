@@ -31,7 +31,7 @@ func (c *Call) HandleFreeValue(fvs []string, sideEffect []string) {
 		// get current function variable for call this closure
 		v := builder.ReadVariableBefore(name, false, c)
 		// if not get, try build freeValue in parent function.
-		if v == nil && builder.CanBuildFreeValue(name) {
+		if v == nil && builder.CanCaptureParentValue(name) {
 			v = builder.BuildFreeValue(name)
 		}
 		if v != nil {
