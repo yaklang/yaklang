@@ -27,13 +27,6 @@ import (
 )
 
 func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream HybridScanRequestStream, firstRequest *ypb.HybridScanRequest) error {
-	var (
-		concurrent = firstRequest.GetConcurrent()
-	)
-	if concurrent <= 0 {
-		concurrent = 20
-	}
-	swg := utils.NewSizedWaitGroup(int(concurrent))
 
 	taskId := manager.TaskId()
 
@@ -68,6 +61,9 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 	var target *ypb.HybridScanInputTarget
 	var plugin *ypb.HybridScanPluginConfig
 	var rsp *ypb.HybridScanRequest
+	var concurrent = 20 //默认值
+	var totalTimeout float32 = 72000
+	var proxy string
 	log.Infof("waiting for recv input and plugin config: %v", taskId)
 	for plugin == nil || target == nil {
 		rsp, err = stream.Recv()
@@ -81,12 +77,24 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 		if plugin == nil {
 			plugin = rsp.GetPlugin()
 		}
+		if rsp.GetConcurrent() > 0 {
+			concurrent = int(rsp.GetConcurrent())
+		}
+		if rsp.GetTotalTimeoutSecond() > 0 {
+			totalTimeout = rsp.GetTotalTimeoutSecond()
+		}
+		if rsp.GetProxy() != "" {
+			proxy = rsp.GetProxy()
+		}
 	}
 	taskRecorder.ScanConfig, _ = json.Marshal(rsp)
 	err = yakit.SaveHybridScanTask(consts.GetGormProjectDatabase(), taskRecorder)
 	if err != nil {
 		return utils.Errorf("save task failed: %s", err)
 	}
+
+	swg := utils.NewSizedWaitGroup(concurrent)                                                                    // 设置并发
+	manager.ctx, manager.cancel = context.WithTimeout(manager.Context(), time.Duration(totalTimeout)*time.Second) // 设置总超时
 
 	targetChan, err := s.TargetGenerator(manager.Context(), target)
 	if err != nil {
@@ -286,7 +294,7 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 				}, &riskCount)
 				callerFilter := scanFilterManager.DequeueFilter()
 				defer scanFilterManager.EnqueueFilter(callerFilter)
-				err := s.ScanTargetWithPlugin(taskId, manager.Context(), targetRequestInstance, pluginInstance, feedbackClient, callerFilter)
+				err := s.ScanTargetWithPlugin(taskId, manager.Context(), targetRequestInstance, pluginInstance, proxy, feedbackClient, callerFilter)
 				if err != nil {
 					log.Warnf("scan target failed: %s", err)
 				}
@@ -334,7 +342,7 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 var execTargetWithPluginScript string
 
 func (s *Server) ScanTargetWithPlugin(
-	taskId string, ctx context.Context, target *HybridScanTarget, plugin *yakit.YakScript, feedbackClient *yaklib.YakitClient, callerFilter *filter.StringFilter,
+	taskId string, ctx context.Context, target *HybridScanTarget, plugin *yakit.YakScript, proxy string, feedbackClient *yaklib.YakitClient, callerFilter *filter.StringFilter,
 ) error {
 
 	engine := yak.NewYakitVirtualClientScriptEngine(feedbackClient)
@@ -343,7 +351,7 @@ func (s *Server) ScanTargetWithPlugin(
 		yak.BindYakitPluginContextToEngine(engine, &yak.YakitPluginContext{
 			PluginName: plugin.ScriptName,
 			RuntimeId:  taskId,
-			Proxy:      "",
+			Proxy:      proxy,
 			Ctx:        ctx,
 		})
 		engine.SetVar("REQUEST", target.Request)
@@ -352,6 +360,7 @@ func (s *Server) ScanTargetWithPlugin(
 		engine.SetVar("PLUGIN", plugin)
 		engine.SetVar("CTX", ctx)
 		engine.SetVar("CALLER_FILTER", callerFilter)
+		engine.SetVar("PROXY", proxy)
 		return nil
 	})
 	err := engine.ExecuteWithContext(ctx, execTargetWithPluginScript)
