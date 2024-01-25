@@ -22,6 +22,7 @@ if proxies == "no" {
 active = cli.Bool("active")
 concurrent = cli.Int("concurrent", cli.setDefault(50))
 synConcurrent = cli.Int("syn-concurrent", cli.setDefault(800))
+synScanNetInterface = cli.String("syn-scan-net-interface", cli.setDefault(""))
 protos = cli.String("proto", cli.setDefault("tcp"))
 
 fpMode = cli.String("fp-mode", cli.setDefault("all"))
@@ -327,6 +328,7 @@ if mode == "syn" {
         synscan.excludeHosts(excludeHosts), synscan.excludePorts(excludePorts),
         synscan.submitTaskCallback(func(i){ addSynPacketCounter() }),
         synscan.concurrent(synConcurrent),
+        synscan.iface(synScanNetInterface),
     )
     die(err)
 
@@ -358,6 +360,7 @@ if mode == "all" {
         }),
         synscan.submitTaskCallback(func(i){ addSynPacketCounter() }),
         synscan.concurrent(synConcurrent),
+        synscan.iface(synScanNetInterface),
     )
     die(err)
 
