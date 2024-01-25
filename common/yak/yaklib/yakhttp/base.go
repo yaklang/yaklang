@@ -279,12 +279,17 @@ func Do(i interface{}) (*http.Response, error) {
 		return Do(&http_struct.YakHttpRequest{Request: ret})
 	case http.Request:
 		return Do(&http_struct.YakHttpRequest{Request: &ret})
+	case http_struct.YakHttpRequest:
+		return Do(&ret)
 	case *http_struct.YakHttpRequest:
 	default:
 		return nil, utils.Errorf("not a valid type: %v for req: %v", reflect.TypeOf(i), spew.Sdump(i))
 	}
 	yakHTTPRequest, _ := i.(*http_struct.YakHttpRequest)
 	config := yakHTTPRequest.Config
+	if config == nil {
+		config = http_struct.NewHTTPConfig()
+	}
 	rawRequest, err := utils.DumpHTTPRequest(yakHTTPRequest.Request, true)
 	if err != nil {
 		return nil, err
