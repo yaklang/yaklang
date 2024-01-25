@@ -61,7 +61,7 @@ func requestToMMH3Hash128x64(url string) (string, error) {
 }
 
 func init() {
-	HttpExports["RequestFaviconUrl"] = utils.GetFaviconURL
+	HttpExports["ExtractFaviconURL"] = utils.ExtractFaviconURL
 	HttpExports["RequestFaviconHash"] = utils.CalcFaviconHash
 	HttpExports["RequestToMD5"] = requestToMd5
 	HttpExports["RequestToSha1"] = requestToSha1
