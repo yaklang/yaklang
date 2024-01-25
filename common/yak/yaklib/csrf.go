@@ -25,6 +25,7 @@ var csrfFormTemplate = template.Must(template.New("csrf-form").Parse(strings.Tri
 </body>
 </html>
 `)))
+
 var csrfJSTemplate = template.Must(template.New("csrf-js").Parse(strings.TrimSpace(`
 <html>
 <body>
@@ -78,6 +79,11 @@ func newDefaultCsrfConfig() *_csrfConfig {
 
 type csrfConfig func(c *_csrfConfig)
 
+// Generate 根据传入的原始请求报文生成跨站请求伪造(CSRF)类型的漏洞验证(POC)，返回生成的POC HTML字符串与错误
+// Example:
+// ```
+// csrfPoc, err = csrf.Generate("POST / HTTP/1.1\r\nHost:example.com\r\nContent-Type:application/x-www-form-urlencoded\r\n\r\nname=1&age=2")
+// ```
 func GenerateCSRFPoc(raw interface{}, opts ...csrfConfig) (string, error) {
 	var (
 		packet     []byte
@@ -104,7 +110,7 @@ func GenerateCSRFPoc(raw interface{}, opts ...csrfConfig) (string, error) {
 	case []byte:
 		packet = raw.([]byte)
 	default:
-		return "", utils.Errorf("poc.CSRFPOC cannot support: %s", reflect.TypeOf(raw))
+		return "", utils.Errorf("raw type cannot support: %s", reflect.TypeOf(raw))
 	}
 
 	config = newDefaultCsrfConfig()
@@ -200,12 +206,23 @@ func GenerateCSRFPoc(raw interface{}, opts ...csrfConfig) (string, error) {
 	return builder.String(), nil
 }
 
+// multipartDefaultValue 手动设置请求报文是否为multipart/form-data类型
+// 如果设置为true，则会生成使用JavaScript提交的漏洞验证(POC)
+// Example:
+// ```
+// csrfPoc, err = csrf.Generate("POST / HTTP/1.1\r\nHost:example.com\r\nContent-Type:application/x-www-form-urlencoded\r\n\r\nname=1&age=2", csrf.MultipartDefaultValue(true))
+// ```
 func CsrfOptWithMultipartDefaultValue(b bool) csrfConfig {
 	return func(c *_csrfConfig) {
 		c.MultipartDefaultValue = b
 	}
 }
 
+// https 手动设置请求报文是否为HTTPS类型
+// Example:
+// ```
+// csrfPoc, err = csrf.Generate("POST / HTTP/1.1\r\nHost:example.com\r\nContent-Type:application/x-www-form-urlencoded\r\n\r\nname=1&age=2", csrf.HTTPS(true))
+// ```
 func CsrfOptWithHTTPS(b bool) csrfConfig {
 	return func(c *_csrfConfig) {
 		c.https = b
