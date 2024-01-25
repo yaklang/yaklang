@@ -441,6 +441,22 @@ func mergeBuildParams(params *ypb.HTTPRequestBuilderParams, t *url.URL) *ypb.HTT
 		return nil
 	}
 
+	if res == nil {
+		res = &ypb.HTTPRequestBuilderParams{
+			IsRawHTTPRequest:    false,
+			IsHttps:             false,
+			Method:              "GET",
+			Path:                []string{"/"},
+			GetParams:           []*ypb.KVPair{},
+			Headers:             []*ypb.KVPair{},
+			Cookie:              []*ypb.KVPair{},
+			Body:                []byte{},
+			PostParams:          []*ypb.KVPair{},
+			MultipartParams:     []*ypb.KVPair{},
+			MultipartFileParams: []*ypb.KVPair{},
+		}
+	}
+
 	pathFlag := true
 	for _, p := range res.Path {
 		if normalizeString(p) == normalizeString(t.Path) {
