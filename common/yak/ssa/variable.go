@@ -220,8 +220,8 @@ func (block *BasicBlock) GetValuesByVariable(name string) []Value {
 	return nil
 }
 
-func (b *FunctionBuilder) readVariableByBlockEx(variable string, block *BasicBlock, create bool) []Value {
-	if vs := block.GetValuesByVariable(variable); vs != nil {
+func (b *FunctionBuilder) readVariableByBlockEx(name string, block *BasicBlock, create bool) []Value {
+	if vs := block.GetValuesByVariable(name); vs != nil {
 		return vs
 	}
 
@@ -229,48 +229,70 @@ func (b *FunctionBuilder) readVariableByBlockEx(variable string, block *BasicBlo
 		return nil
 	}
 
-	var v Value
-	// if block in sealedBlock
-	if !block.isSealed {
-		if create {
-			phi := NewPhi(block, variable, create)
+	getValue := func() Value {
+		if !block.isSealed {
+			if !create {
+				return nil
+			}
+			phi := NewPhi(block, name, create)
 			phi.SetRange(b.CurrentRange)
 			block.inCompletePhi = append(block.inCompletePhi, phi)
-			v = phi
+			return phi
 		}
-	} else if len(block.Preds) == 0 {
-		// v = nil
-		if create && b.CanBuildFreeValue(variable) {
-			v = b.BuildFreeValue(variable)
-		} else if i := b.TryBuildExternValue(variable); i != nil {
-			v = i
-		} else if create {
-			un := NewUndefined(variable)
-			// b.emitInstructionBefore(un, block.LastInst())
-			b.EmitToBlock(un, block)
-			un.SetRange(b.CurrentRange)
-			v = un
-		} else {
-			v = nil
+		switch len(block.Preds) {
+		case 0:
+			{
+				// if can capture parent value, just use it
+				if value, ok := b.CaptureParentValue(name); ok {
+					return value
+				}
+
+				// if can build extern value, just use it
+				if value := b.TryBuildExternValue(name); value != nil {
+					return value
+				}
+
+				if !create {
+					return nil
+				}
+
+				// if can't capture parent value,  but has parent function (in closure),
+				if b.parentBuilder != nil {
+					// build free value
+					return b.BuildFreeValue(name)
+				}
+
+				// if not parent (in global main function)
+				// create undefine value
+				un := NewUndefined(name)
+				b.EmitToBlock(un, block)
+				un.SetRange(b.CurrentRange)
+				return un
+			}
+		case 1:
+			{
+				// just recursive read pred block
+				vs := b.readVariableByBlockEx(name, block.Preds[0], create)
+				if len(vs) == 0 {
+					return nil
+				}
+				return vs[len(vs)-1]
+			}
+		default:
+			{
+				phi := NewPhi(block, name, create)
+				phi.SetRange(b.CurrentRange)
+				return phi.Build()
+			}
 		}
-	} else if len(block.Preds) == 1 {
-		vs := b.readVariableByBlockEx(variable, block.Preds[0], create)
-		if len(vs) > 0 {
-			v = vs[len(vs)-1]
-		} else {
-			v = nil
-		}
-	} else {
-		phi := NewPhi(block, variable, create)
-		phi.SetRange(b.CurrentRange)
-		v = phi.Build()
 	}
-	b.writeVariableByBlock(variable, v, block) // NOTE: why write when the v is nil?
+
+	v := getValue()
+	b.writeVariableByBlock(name, v, block) // NOTE: why write when the v is nil?
 	if v != nil {
 		return []Value{v}
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // --------------- `f.freeValue`
@@ -283,6 +305,31 @@ func (b *FunctionBuilder) BuildFreeValue(variable string) Value {
 	return freeValue
 }
 
-func (b *FunctionBuilder) CanBuildFreeValue(name string) bool {
-	return b.parentBuilder != nil
+func (b *FunctionBuilder) CaptureParentValue(name string) (Value, bool) {
+	parent := b.parentBuilder
+	scope := b.parentScope
+	block := b.parentCurrentBlock
+	for parent != nil {
+		name = scope.GetLocalVariable(name)
+		v := parent.readVariableByBlock(name, block, false)
+		if v != nil {
+			// if v not extern instance
+			// or value assign by extern instance (extern instance but name not equal)
+			if (!v.IsExtern()) || (v.IsExtern() && v.GetName() != name) {
+				return v, true
+			}
+		}
+
+		// parent symbol and block
+		scope = parent.parentScope
+		block = parent.parentCurrentBlock
+		// next parent
+		parent = parent.parentBuilder
+	}
+	return nil, false
+}
+
+func (b *FunctionBuilder) CanCaptureParentValue(name string) bool {
+	_, ok := b.CaptureParentValue(name)
+	return ok
 }
