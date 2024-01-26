@@ -89,18 +89,19 @@ func (i *Value) GetTopDefs(opt ...OperationOption) Values {
 	return i.getTopDefs(nil, opt...)
 }
 
-func (v Values) GetTopDefs() Values {
-	ret := make(Values, 0, len(v))
-	var m = make(map[*Value]struct{})
-	v.WalkDefs(func(i *Value) {
-		if !i.HasOperands() {
-			if _, ok := m[i]; ok {
-				return
-			}
-			m[i] = struct{}{}
-			ret = append(ret, i)
-		}
-	})
+func (v Values) GetTopDefs(opts ...OperationOption) Values {
+	ret := make(Values, 0)
+	for _, sub := range v {
+		ret = append(ret, sub.GetTopDefs(opts...)...)
+	}
+	return ret
+}
+
+func (v Values) GetBottomUses() Values {
+	ret := make(Values, 0)
+	for _, sub := range v {
+		ret = append(ret, sub.GetBottomUses()...)
+	}
 	return ret
 }
 
@@ -155,13 +156,16 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		actx = NewAnalyzeContext(opt...)
 	}
 
-	actx.depth++
+	actx.depth--
 	defer func() {
-		actx.depth--
+		actx.depth++
 	}()
 	i.SetDepth(actx.depth)
-	if actx.config.MaxDepth >= 0 && actx.depth > actx.config.MaxDepth {
-		return Values{}
+	if actx.depth > 0 && actx.config.MaxDepth > 0 && actx.depth > actx.config.MaxDepth {
+		return i.DependOn
+	}
+	if actx.depth < 0 && actx.config.MinDepth < 0 && actx.depth < actx.config.MinDepth {
+		return i.EffectOn
 	}
 
 	// hook everynode

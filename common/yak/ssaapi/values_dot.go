@@ -70,3 +70,7 @@ func (v *Value) ShowDot() *Value {
 	fmt.Println(dotGraph)
 	return v
 }
+
+func (v *Value) AnalyzeDepth() int {
+	return v.GetDepth()
+}
