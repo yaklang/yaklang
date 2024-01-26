@@ -1020,7 +1020,7 @@ too_large_response_header_file, too_large_response_body_file
 		"response", "remote_addr",
 	}, params.GetKeyword(), false)
 	if params.GetAfterId() > 0 {
-		db = db.Where("id > ?", params.GetAfterId())
+		db = db.Where("id > ? and id <= ?", params.GetAfterId(), params.AfterId+params.Pagination.Limit)
 	}
 	if params.GetBeforeUpdatedAt() > 0 {
 		db = bizhelper.QueryByTimeRangeWithTimestamp(db, "updated_at", 0, params.GetBeforeUpdatedAt())
