@@ -11,37 +11,6 @@ import (
 
 type Values []*Value
 
-func _walkUsers(va Values, handler func(i *Value)) {
-	if len(va) <= 0 {
-		return
-	}
-
-	for _, v := range va {
-		handler(v)
-		_walkUsers(v.GetUsers(), handler)
-	}
-}
-
-func _walkDefs(va Values, handler func(i *Value)) {
-	if len(va) <= 0 {
-		return
-	}
-	for _, v := range va {
-		handler(v)
-		_walkDefs(v.GetOperands(), handler)
-	}
-}
-
-func (v Values) Walk(handler func(i *Value)) Values {
-	_walkUsers(v, handler)
-	return v
-}
-
-func (v Values) WalkDefs(handler func(i *Value)) Values {
-	_walkDefs(v, handler)
-	return v
-}
-
 func (value Values) Ref(name string) Values {
 	// return nil
 	var ret Values
