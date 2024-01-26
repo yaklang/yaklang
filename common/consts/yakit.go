@@ -55,6 +55,8 @@ var (
 
 	AuthInfoMutex         = new(sync.Mutex)
 	GLOBAL_HTTP_AUTH_INFO []*ypb.AuthInfo
+
+	OnceYakitHome = new(sync.Once)
 )
 
 func SetGlobalHTTPAuthInfo(info []*ypb.AuthInfo) {
@@ -214,6 +216,7 @@ func SetDefaultYakitProfileDatabaseName(i string) {
 }
 
 func GetDefaultYakitBaseDir() string {
+	OnceYakitHome.Do(GetRegistryYakitHome)
 	// 这个检测默认数据库
 	if os.Getenv("YAKIT_HOME") != "" {
 		return os.Getenv("YAKIT_HOME")
