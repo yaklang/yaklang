@@ -10,7 +10,10 @@ import (
 )
 
 func DotGraphToAsciiArt(t string) (string, error) {
-	if !utils.InTestcase() && !utils.InGithubActions() {
+	if utils.InGithubActions() {
+		return "", utils.Errorf("not exec in github actions")
+	}
+	if !utils.InTestcase() {
 		return "", utils.Error("only in testcase local")
 	}
 	// `https://dot-to-ascii.ggerganov.com/`

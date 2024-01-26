@@ -189,9 +189,37 @@ d = c + f;
 	if err != nil {
 		t.Fatal(err)
 	}
+	checkAdef := false
 	prog.Ref("a").GetBottomUses().ForEach(func(value *Value) {
-		spew.Dump(value.GetDepth())
+		if value.GetDepth() == 3 {
+			checkAdef = true
+		}
 	}).FullUseDefChain(func(value *Value) {
 		dot.ShowDotGraphToAsciiArt(value.Dot())
 	})
+	if !checkAdef {
+		t.Fatal("checkAdef failed")
+	}
+}
+
+func TestBottomUse_Func(t *testing.T) {
+	prog, err := Parse(`var a;
+b = (i, j) => i
+c = b(a,2)
+e = c + 3
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkAdef := false
+	prog.Ref("a").GetBottomUses().ForEach(func(value *Value) {
+		spew.Dump(value.GetDepth())
+	}).FullUseDefChain(func(value *Value) {
+		value.ShowDot()
+		dot.ShowDotGraphToAsciiArt(value.Dot())
+	})
+	if !checkAdef {
+		t.Fatal("checkAdef failed")
+	}
+
 }

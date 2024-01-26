@@ -1,18 +1,15 @@
 package ssaapi
 
 import (
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 func (v *Value) GetBottomUses() Values {
 	return v.getBottomUses(nil)
 }
-
-const (
-	SSA_BOTTOM_USES_targetActualParam      = "targetActualParam"
-	SSA_BOTTOM_USES_targetActualParamIndex = "targetActualParam_Index"
-)
 
 func (v *Value) visitUserFallback(actx *AnalyzeContext) Values {
 	var vals Values
@@ -60,6 +57,78 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		}
 		actx.VisitPhi(v)
 		return v.visitUserFallback(actx)
+	case *ssa.Call:
+		if !actx.TheCallShouldBeVisited(v) {
+			// call existed
+			return v.visitUserFallback(actx)
+		}
+
+		if ins.Method == nil {
+			log.Warnf("fallback: (callStack is not clean!) unknown caller: %v", ins.Method)
+			return v.visitUserFallback(actx)
+		}
+
+		// enter function via call
+		f, ok := ssa.ToFunction(ins.Method)
+		if !ok {
+			log.Warnf("fallback: (callStack is not clean!) unknown function(not valid func): %v", ins.Method)
+			return v.visitUserFallback(actx)
+		}
+
+		// push call
+		err := actx.PushCall(v)
+		if err != nil {
+			log.Errorf("push call error: %v", err)
+		} else {
+			defer actx.PopCall()
+		}
+
+		funcValue := NewValue(f).AppendDependOn(v)
+
+		// try to find formal param index from call
+		// v is calling instruction
+		// funcValue is the function
+		existed := map[int]struct{}{}
+		v.DependOn.ForEach(func(value *Value) {
+			existed[value.GetId()] = struct{}{}
+		})
+		var formalParamsIndex = make([]int, 0, len(ins.Args))
+		for _, targetIndex := range ins.Args {
+			if _, ok := existed[targetIndex.GetId()]; ok {
+				formalParamsIndex = append(formalParamsIndex, targetIndex.GetId())
+			}
+		}
+		var params = omap.NewOrderedMap(map[int]*ssa.Parameter{})
+		lo.ForEach(f.Param, func(param *ssa.Parameter, index int) {
+			for _, i := range formalParamsIndex {
+				if index == i {
+					params.Set(param.GetId(), param)
+				}
+			}
+		})
+		if lo.Max(formalParamsIndex) >= len(f.Param) && len(f.Param) > 0 {
+			last, _ := lo.Last(f.Param)
+			if last != nil {
+				params.Set(last.GetId(), last)
+			}
+		}
+
+		var vals Values
+		if params.Len() > 0 {
+			for _, formalParam := range params.Values() {
+				rets := NewValue(formalParam).AppendDependOn(funcValue).getBottomUses(actx, opt...)
+				vals = append(vals, rets...)
+			}
+			return vals
+		}
+
+		// no formal parameters found!
+		// enter return
+		for _, retStmt := range f.Return {
+			retVals := NewValue(retStmt).AppendDependOn(funcValue)
+			vals = append(vals, retVals)
+		}
+		return vals
 	case *ssa.Return:
 		// enter function via return
 		fallback := func() Values {
@@ -83,7 +152,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			_ = fun //TODO: fun can tell u, which return value is the target
 			var vals Values
 			for _, u := range call.GetUsers() {
-				if ret := NewValue(u).AppendDependOn(v).getBottomUses(actx); len(ret) > 0 {
+				if ret := NewValue(u).AppendDependOn(val).AppendDependOn(v).getBottomUses(actx); len(ret) > 0 {
 					vals = append(vals, ret...)
 				}
 			}
@@ -93,74 +162,6 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			return NewValue(call).AppendDependOn(v).getBottomUses(actx)
 		}
 		return fallback()
-	case *ssa.Function:
-		// enter function via function
-		// via call
-		// param is set
-		if actualParam, ok := v.GetContextValue(SSA_BOTTOM_USES_targetActualParam); ok {
-			var shouldHandleTarget int = -1
-			if actualParamIndex, ok := v.GetContextValue(SSA_BOTTOM_USES_targetActualParamIndex); ok {
-				if targetIndex, ok := actualParamIndex.GetConstValue().(int); ok {
-					shouldHandleTarget = targetIndex
-					goto NEXT
-				}
-				log.Warnf("BUG: unknown actual param index: %v", v.String())
-				return Values{v}
-			}
-		NEXT:
-			_ = actualParam // TODO: handle actual param, replace value! wait...
-			if shouldHandleTarget < 0 {
-				log.Warnf("BUG: unknown actual param index: %v", v.String())
-			}
-
-			if len(ins.Param) <= shouldHandleTarget {
-				log.Warnf("BUG: unknown actual param index: %v", v.String())
-				return Values{v}
-			}
-			val := ins.Param[shouldHandleTarget]
-			return NewValue(val).AppendDependOn(v).getBottomUses(actx)
-		}
-	case *ssa.Call:
-		if !actx.TheCallShouldBeVisited(v) {
-			// call existed
-			return v.visitUserFallback(actx)
-		}
-
-		log.Errorf("BUG: (callStack is not clean!) unknown call: %v", v.String())
-		return v.visitUserFallback(actx)
-		//
-		//parent, ok := v.GetParent()
-		//if !ok {
-		//	log.Warnf("BUG: unknown parent for call: %v", v.String())
-		//	return Values{v}
-		//}
-		//if ins.Method != nil {
-		//	if _, undefinedVar := ins.Method.(*ssa.Undefined); undefinedVar {
-		//		return Values{v}
-		//	}
-		//	var targetIndex = -1
-		//	for index, value := range ins.Args {
-		//		if parent.GetId() == value.GetId() {
-		//			targetIndex = index
-		//			break
-		//		}
-		//	}
-		//	if targetIndex == -1 {
-		//		log.Warnf("Wired: the actual param(t%v) is not in call's params list: %v", parent.GetId(), v.String())
-		//		return Values{v}
-		//	}
-		//	nv := NewValue(ins.Method)
-		//	nv.SetContextValue(SSA_BOTTOM_USES_targetActualParam, parent)
-		//	nv.SetContextValue(SSA_BOTTOM_USES_targetActualParamIndex, NewValue(ssa.NewConst(targetIndex)))
-		//	err := actx.PushCall(v)
-		//	if err != nil {
-		//		log.Warnf("BUG: (callStack is not clean!) push callStack failed: %T", v.node)
-		//		return v.visitUserFallback(actx)
-		//	}
-		//	defer actx.PopCall()
-		//	return nv.getBottomUses(actx)
-		//}
-		//return v.visitUserFallback(actx)
 	}
 	return v.visitUserFallback(actx)
 }
