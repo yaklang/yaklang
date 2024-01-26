@@ -1,6 +1,8 @@
 package ssaapi
 
 import (
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/utils/dot"
 	"testing"
 )
 
@@ -112,15 +114,15 @@ g = d
 	depthAllcheck := false
 	prog.Ref("g").ForEach(func(value *Value) {
 		var count int
-		value.GetTopDefs(WithMaxDepth(2)).ForEach(func(value *Value) {
+		value.GetTopDefs(WithDepthLimit(2)).ForEach(func(value *Value) {
 			count++
 		})
-		if count == 3 {
+		if count == 2 {
 			depth2check = true
 		}
 
 		count = 0
-		value.GetTopDefs(WithMaxDepth(-1)).ForEach(func(value *Value) {
+		value.GetTopDefs(WithMaxDepth(0)).ForEach(func(value *Value) {
 			count++
 		})
 		if count == 4 {
@@ -152,15 +154,16 @@ g = d
 	depthAllcheck := false
 	prog.Ref("g").ForEach(func(value *Value) {
 		var count int
-		value.GetTopDefs(WithMaxDepth(2)).ForEach(func(value *Value) {
+		value.GetTopDefs(WithDepthLimit(2)).ForEach(func(value *Value) {
 			count++
+			value.Show()
 		})
-		if count == 3 {
+		if count == 2 {
 			depth2check = true
 		}
 
 		count = 0
-		value.GetTopDefs(WithMaxDepth(-1)).ForEach(func(value *Value) {
+		value.GetTopDefs(WithMaxDepth(0)).ForEach(func(value *Value) {
 			count++
 		})
 		if count == 4 {
@@ -175,4 +178,20 @@ g = d
 	if !depthAllcheck {
 		t.Fatal("depthAllcheck failed")
 	}
+}
+
+func TestBottomUse(t *testing.T) {
+	prog, err := Parse(`var a;
+b = a+1
+c = b + e;
+d = c + f;	
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prog.Ref("a").GetBottomUses().ForEach(func(value *Value) {
+		spew.Dump(value.GetDepth())
+	}).FullUseDefChain(func(value *Value) {
+		dot.ShowDotGraphToAsciiArt(value.Dot())
+	})
 }

@@ -32,6 +32,25 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		actx = NewAnalyzeContext(opt...)
 	}
 
+	actx.depth++
+	defer func() {
+		actx.depth--
+	}()
+	v.SetDepth(actx.depth)
+	if actx.config.MaxDepth > 0 && actx.depth > actx.config.MaxDepth {
+		return Values{}
+	}
+	if actx.config.MinDepth < 0 && actx.depth < actx.config.MinDepth {
+		return Values{}
+	}
+
+	if actx.config.HookEveryNode != nil {
+		err := actx.config.HookEveryNode(v)
+		if err != nil {
+			log.Errorf("hook every node failed: %v", err)
+		}
+	}
+
 	switch ins := v.node.(type) {
 	case *ssa.Phi:
 		// enter function via phi
