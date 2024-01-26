@@ -244,7 +244,18 @@ func (b *FunctionBuilder) readVariableByBlockEx(name string, block *BasicBlock, 
 			{
 				// if can capture parent value, just use it
 				if value, ok := b.CaptureParentValue(name); ok {
-					return value
+					_ = value
+					/* TODO: only handle side-effect,
+					but this problem is not solved in here, need handle in Closure-Function.Finish
+					example1:
+						i = 1
+						f = () => {println(i)} // println(1)
+					example2:
+						i = 1
+						f = () => {i++; println(i)} // `println(i+1)` not `println(2)`
+					*/
+					// return value
+					return b.BuildFreeValue(name)
 				}
 
 				// if can build extern value, just use it
