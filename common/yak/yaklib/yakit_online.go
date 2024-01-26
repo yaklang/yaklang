@@ -103,6 +103,7 @@ type OnlinePluginParam struct {
 	Required     bool   `json:"required"`
 	Group        string `json:"group"`
 	ExtraSetting string `json:"extra_setting"`
+	MethodType   string `json:"method_type"`
 }
 
 type OnlinePaging struct {
@@ -113,10 +114,11 @@ type OnlinePaging struct {
 }
 
 type OnlineRiskDetail struct {
-	CweId       string `json:"cwe_id"`
-	RiskType    string `json:"risk_type"`
 	Description string `json:"description"`
 	Solution    string `json:"solution"`
+	Level       string `json:"level"`
+	TypeVerbose string `json:"typeVerbose"`
+	CVE         string `json:"cve"`
 }
 
 type OnlinePlugin struct {
@@ -145,9 +147,7 @@ type OnlinePlugin struct {
 	HeadImg              string                    `json:"head_img"`
 	BasePluginId         int64                     `json:"base_plugin_id"`
 	Group                string                    `json:"group"`
-	RiskType             string                    `json:"riskType"`
-	RiskDetail           *OnlineRiskDetail         `json:"riskDetail"`
-	RiskAnnotation       string                    `json:"risk_annotation"`
+	RiskInfo             []*OnlineRiskDetail       `json:"riskInfo"`
 	IsCorePlugin         bool                      `json:"isCorePlugin"`
 	CollaboratorInfo     []*OnlineCollaboratorInfo `json:"collaborator"`
 }
@@ -163,9 +163,7 @@ type SaveYakScriptOnlineRequest struct {
 	PluginSelectorTypes  string               `json:"plugin_selector_types"`
 	IsGeneralModule      bool                 `json:"is_general_module"`
 	IsPrivate            bool                 `json:"is_private"`
-	RiskType             string               `json:"riskType"`
-	RiskDetail           *OnlineRiskDetail    `json:"riskDetail"`
-	RiskAnnotation       string               `json:"annotation"`
+	RiskInfo             []*OnlineRiskDetail  `json:"riskInfo"`
 	IsCorePlugin         bool                 `json:"isCorePlugin"`
 }
 
@@ -409,6 +407,7 @@ func (s *OnlineClient) Save(db *gorm.DB, plugins ...*OnlinePlugin) error {
 				Required:     paramInstance.Required,
 				Group:        paramInstance.Group,
 				ExtraSetting: paramInstance.ExtraSetting,
+				MethodType:   paramInstance.MethodType,
 			})
 		}
 		raw, _ := json.Marshal(params)
@@ -459,19 +458,19 @@ func (s *OnlineClient) Save(db *gorm.DB, plugins ...*OnlinePlugin) error {
 			OnlineOfficial:       i.Official,
 			OnlineGroup:          strings.Join(onlineGroup, ","),
 			IsCorePlugin:         i.IsCorePlugin,
-			RiskAnnotation:       i.RiskAnnotation,
-			RiskType:             i.RiskType,
 		}
-		if i.RiskDetail != nil {
-			risk := &ypb.QueryYakScriptRiskDetailByCWEResponse{
-				CWEId:       i.RiskDetail.CweId,
-				RiskType:    i.RiskDetail.RiskType,
-				Description: i.RiskDetail.Description,
-				CWESolution: i.RiskDetail.Solution,
-			}
-			rawRisk, _ := json.Marshal(risk)
-			y.RiskDetail = string(rawRisk)
+		var riskDetail []*ypb.YakRiskInfo
+		for _, riskDetailInstance := range i.RiskInfo {
+			riskDetail = append(riskDetail, &ypb.YakRiskInfo{
+				Level:       riskDetailInstance.Level,
+				TypeVerbose: riskDetailInstance.TypeVerbose,
+				CVE:         riskDetailInstance.CVE,
+				Description: riskDetailInstance.Description,
+				Solution:    riskDetailInstance.Solution,
+			})
 		}
+		riskDetailRaw, _ := json.Marshal(riskDetail)
+		y.RiskDetail = strconv.Quote(string(riskDetailRaw))
 
 		if i.CollaboratorInfo != nil {
 			var collaboratorInfo []*ypb.Collaborator
@@ -705,9 +704,7 @@ func (s *OnlineClient) SaveToOnline(ctx context.Context, req *ypb.SaveYakScriptT
 		plugin.PluginSelectorTypes,
 		plugin.IsGeneralModule,
 		req.IsPrivate,
-		plugin.RiskType,
 		plugin.RiskDetail,
-		plugin.RiskAnnotation,
 		plugin.IsCorePlugin,
 	)
 	if err != nil {
@@ -719,12 +716,12 @@ func (s *OnlineClient) SaveToOnline(ctx context.Context, req *ypb.SaveYakScriptT
 }
 
 func (s *OnlineClient) SaveYakScriptToOnline(ctx context.Context,
-	token string, scriptName string, pluginType, content, params, help, tags string, enablePluginSelector bool, pluginSelectorTypes string, isGeneralModule, isPrivate bool, riskType, riskDetail, riskAnnotation string, isCorePlugin bool) error {
+	token string, scriptName string, pluginType, content, params, help, tags string, enablePluginSelector bool, pluginSelectorTypes string, isGeneralModule, isPrivate bool, riskDetail string, isCorePlugin bool) error {
 	urlIns, err := url.Parse(s.genUrl("/api/plugins"))
 	if err != nil {
 		return utils.Errorf("parse url-instance failed: %s", err)
 	}
-	var riskDetailJson *OnlineRiskDetail
+	var riskDetailJson []*OnlineRiskDetail
 	var paramsJson []*OnlinePluginParam
 	_ = json.Unmarshal([]byte(riskDetail), &riskDetailJson)
 	_ = json.Unmarshal([]byte(params), &paramsJson)
@@ -740,9 +737,7 @@ func (s *OnlineClient) SaveYakScriptToOnline(ctx context.Context,
 		PluginSelectorTypes:  pluginSelectorTypes,
 		IsGeneralModule:      isGeneralModule,
 		IsPrivate:            isPrivate,
-		RiskType:             riskType,
-		RiskDetail:           riskDetailJson,
-		RiskAnnotation:       riskAnnotation,
+		RiskInfo:             riskDetailJson,
 		IsCorePlugin:         isCorePlugin,
 	})
 

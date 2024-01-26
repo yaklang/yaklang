@@ -76,11 +76,12 @@ type YakScript struct {
 	OnlineGroup    string      `json:"online_group"`
 	sourceScript   interface{} // 用于存储原始的 script(可能是由原类型是NaslScript)
 
-	IsCorePlugin bool   `json:"is_core_plugin"` // 判断是否是核心插件
-	RiskType     string `json:"risk_type"`
+	IsCorePlugin bool `json:"is_core_plugin"` // 判断是否是核心插件
+	// 废弃字段
+	RiskType string `json:"risk_type"`
 	// 漏洞详情 建议，描述，cwe
 	RiskDetail string `json:"risk_detail"`
-	// 漏洞类型-补充说明
+	// 漏洞类型-补充说明 废弃
 	RiskAnnotation string `json:"risk_annotation"`
 	// 协作者
 	CollaboratorInfo string `json:"collaborator_info"`
@@ -126,14 +127,24 @@ func (s *YakScript) ToGRPCModel() *ypb.YakScript {
 			spew.Dump([]byte(r))
 		}
 	}
-	var riskDetail *ypb.QueryYakScriptRiskDetailByCWEResponse
+	/*var riskDetail *ypb.QueryYakScriptRiskDetailByCWEResponse
 	if s.RiskDetail != "" && s.RiskDetail != `""` {
 		err := json.Unmarshal([]byte(s.RiskDetail), &riskDetail)
 		if err != nil {
 			log.Errorf("unmarshal riskDetail failed: %s", err)
 			spew.Dump([]byte(s.RiskDetail))
 		}
+	}*/
+	var riskDetail []*ypb.YakRiskInfo
+	if s.RiskDetail != "" && s.RiskDetail != `""` {
+		r, _ := strconv.Unquote(s.RiskDetail)
+		err := json.Unmarshal([]byte(r), &riskDetail)
+		if err != nil {
+			log.Errorf("unmarshal RiskDetail failed: %s", err)
+			spew.Dump([]byte(r))
+		}
 	}
+
 	var collaboratorInfo []*ypb.Collaborator
 	if s.CollaboratorInfo != "" && s.CollaboratorInfo != `""` {
 		c, _ := strconv.Unquote(s.CollaboratorInfo)
@@ -176,10 +187,10 @@ func (s *YakScript) ToGRPCModel() *ypb.YakScript {
 		OnlineGroup:          s.OnlineGroup,
 		UpdatedAt:            s.UpdatedAt.Unix(),
 		RiskAnnotation:       s.RiskAnnotation,
-		RiskType:             s.RiskType,
-		RiskDetail:           riskDetail,
-		CollaboratorInfo:     collaboratorInfo,
-		IsCorePlugin:         s.IsCorePlugin,
+		//RiskType:             s.RiskType,
+		RiskInfo: riskDetail,
+		//CollaboratorInfo:     collaboratorInfo,
+		IsCorePlugin: s.IsCorePlugin,
 	}
 	/*if s.Type == "mitm" {
 		script.Params = mitmPluginDefaultPlugins
