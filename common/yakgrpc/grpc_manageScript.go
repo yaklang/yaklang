@@ -734,16 +734,6 @@ func (s *Server) DeleteYakScriptExec(ctx context.Context, req *ypb.Empty) (*ypb.
 
 func (s *Server) GetYakScriptTags(c context.Context, req *ypb.Empty) (*ypb.GetYakScriptTagsResponse, error) {
 	var tags ypb.GetYakScriptTagsResponse
-	/*onlineTags, err := yakit.YakScriptTags(s.GetProfileDatabase(), " and type in ( 'port-scan', 'mitm')", "")
-	if onlineTags == nil {
-		return nil, err
-	}*/
-	/*for _, v := range onlineTags {
-		tags.Tag = append(tags.Tag, &ypb.Tags{
-			Value: v.Value,
-			Total: int32(v.Count),
-		})
-	}*/
 	db := consts.GetGormProfileDatabase()
 	db = db.Where("type in ( 'port-scan', 'mitm') ")
 	tags.Tag = s.QueryYakScriptTagsGroup(db)
@@ -918,8 +908,6 @@ func GRPCYakScriptToYakScript(script *ypb.SaveNewYakScriptRequest) map[string]in
 		"is_general_module":      script.IsGeneralModule,
 		"general_module_key":     script.GeneralModuleKey,
 		"general_module_verbose": script.GeneralModuleVerbose,
-		"risk_type":              script.RiskType,
-		"risk_annotation":        script.RiskAnnotation,
 		"enable_plugin_selector": script.EnablePluginSelector,
 		"plugin_selector_types":  script.PluginSelectorTypes,
 	}
@@ -929,9 +917,9 @@ func GRPCYakScriptToYakScript(script *ypb.SaveNewYakScriptRequest) map[string]in
 	} else {
 		Data["params"] = ""
 	}
-	if script.RiskDetail != nil {
-		riskDetail, _ := json.Marshal(script.RiskDetail)
-		Data["risk_detail"] = string(riskDetail)
+	raw, err := json.Marshal(script.RiskInfo)
+	if err == nil {
+		Data["risk_detail"] = strconv.Quote(string(raw))
 	} else {
 		Data["risk_detail"] = ""
 	}
@@ -1112,22 +1100,7 @@ func (s *Server) ImportYakScript(req *ypb.ImportYakScriptRequest, stream ypb.Yak
 				}
 			}
 			if markdown != nil {
-				err = yakit.CreateOrUpdateMarkdownDoc(db, 0, markdown.YakScriptName, markdown)
-				if err != nil {
-					errorCount++
-					stream.Send(&ypb.ImportYakScriptResult{
-						Progress:    progress,
-						Message:     fmt.Sprintf("import [%s] yakScript  failed: %s", dir, filepath.Base(f.Path)),
-						MessageType: "error",
-					})
-				} else {
-					successCount++
-					stream.Send(&ypb.ImportYakScriptResult{
-						Progress:    progress,
-						Message:     fmt.Sprintf("import [%s] yakScript  success: %s", dir, filepath.Base(f.Path)),
-						MessageType: "success",
-					})
-				}
+				_ = yakit.CreateOrUpdateMarkdownDoc(db, 0, markdown.YakScriptName, markdown)
 			}
 		}
 
