@@ -221,5 +221,4 @@ e = c + 3
 	if !checkAdef {
 		t.Fatal("checkAdef failed")
 	}
-
 }
