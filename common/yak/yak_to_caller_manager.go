@@ -161,7 +161,7 @@ func FetchFunctionFromSourceCode(ctx context.Context, pluginContext *YakitPlugin
 			Handler: func(args ...interface{}) {
 				defer func() {
 					if err := recover(); err != nil {
-						log.Errorf("call [%v] yakvm native function failed: %s", funcName, err)
+						log.Errorf("call hook function `%v` of `%v` plugin failed: %s", funcName, id, err)
 						fmt.Println()
 						utils.PrintCurrentGoroutineRuntimeStack()
 					}
@@ -1029,12 +1029,12 @@ func (y *YakToCallerManager) Add(ctx context.Context, id string, params []*ypb.E
 	if _, ok := ctx.Value("ctx_info").(map[string]any)["isNaslScript"]; ok {
 		f := func(name string) {
 			if !strings.HasSuffix(strings.ToLower(name), ".nasl") {
-				log.Errorf("call [%v] yakvm native function failed: %s", HOOK_LoadNaslScriptByNameFunc, "nasl script name must end with .nasl")
+				log.Errorf("call hook function `%v` of `%v` plugin failed: %s", HOOK_LoadNaslScriptByNameFunc, id, "nasl script name must end with .nasl")
 				return
 			}
 			defer func() {
 				if err := recover(); err != nil {
-					log.Errorf("call [%v] yakvm native function failed: %s", HOOK_LoadNaslScriptByNameFunc, err)
+					log.Errorf("call hook function `%v` of `%v` plugin failed: %s", HOOK_LoadNaslScriptByNameFunc, id, err)
 					fmt.Println()
 					utils.PrintCurrentGoroutineRuntimeStack()
 				}
