@@ -1,8 +1,8 @@
 package ssaapi
 
 import (
-	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/utils/dot"
+	"regexp"
 	"testing"
 )
 
@@ -211,14 +211,17 @@ e = c + 3
 	if err != nil {
 		t.Fatal(err)
 	}
-	checkAdef := false
+	var vals string
 	prog.Ref("a").GetBottomUses().ForEach(func(value *Value) {
-		spew.Dump(value.GetDepth())
-	}).FullUseDefChain(func(value *Value) {
 		value.ShowDot()
-		dot.ShowDotGraphToAsciiArt(value.Dot())
+		vals = value.Dot()
 	})
-	if !checkAdef {
-		t.Fatal("checkAdef failed")
+	var count = 0
+	regexp.MustCompile(`n\d -> n\d `).ReplaceAllStringFunc(vals, func(s string) string {
+		count++
+		return s
+	})
+	if count < 5 {
+		t.Fatal("count edge failed")
 	}
 }
