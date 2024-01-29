@@ -77,6 +77,7 @@ func (s *SizedWaitGroup) AddWithContext(ctx context.Context, delta ...int) error
 	}
 
 	s.wg.Add(n)
+	s.WaitingEventCount += n
 	return nil
 }
 
