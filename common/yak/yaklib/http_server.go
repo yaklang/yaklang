@@ -3,11 +3,12 @@ package yaklib
 import (
 	"context"
 	"crypto/tls"
+	"net"
+	"net/http"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
-	"net"
-	"net/http"
 )
 
 var HttpServeExports = map[string]interface{}{
@@ -18,9 +19,11 @@ var HttpServeExports = map[string]interface{}{
 	"LocalFileSystemServe": _localFileSystemServe,
 }
 
-var HTTPServer_Serve = _httpServe
-var HTTPServer_ServeOpt_Context = _httpServerOptContext
-var HTTPServer_ServeOpt_Callback = _httpServerOptCallback
+var (
+	HTTPServer_Serve             = _httpServe
+	HTTPServer_ServeOpt_Context  = _httpServerOptContext
+	HTTPServer_ServeOpt_Callback = _httpServerOptCallback
+)
 
 type _httpServerConfig struct {
 	tlsConfig *tls.Config
@@ -46,6 +49,14 @@ func BuildTlsConfig(crt, key interface{}, cas ...interface{}) *tls.Config {
 	return tlsConfig
 }
 
+// tlsCertAndKey 用于设置 HTTP服务器的 TLS 证书和密钥，第一个参数为证书，第二个参数为密钥，第三个参数为可选的 CA 证书
+// 一般配合tls标准库使用
+// Example:
+// ```
+// ca, key, err = tls.GenerateRootCA("yaklang.io")
+// cert, sKey, err = tls.SignServerCertAndKey(ca, key)
+// err = httpserver.Serve("127.0.0.1", 8888, httpserver.tlsCertAndKey(cert, sKey))
+// ```
 func _httpServerOptCaAndKey(crt, key interface{}, cas ...interface{}) HttpServerConfigOpt {
 	config := BuildTlsConfig(crt, key, cas...)
 	return func(c *_httpServerConfig) {
@@ -53,12 +64,24 @@ func _httpServerOptCaAndKey(crt, key interface{}, cas ...interface{}) HttpServer
 	}
 }
 
+// context 用于设置 HTTP 服务器的上下文
+// Example:
+// ```
+// ctx = context.New()
+// err = httpserver.Serve("127.0.0.1", httpserver, http.context(ctx))
+// ```
 func _httpServerOptContext(ctx context.Context) HttpServerConfigOpt {
 	return func(c *_httpServerConfig) {
 		c.ctx = ctx
 	}
 }
 
+// handler 用于设置 HTTP 服务器的回调函数，此函数会在每次收到请求时被调用
+// 此函数的第一个参数为响应回复者结构体，第二个参数为 请求结构体，你可以调用第一个参数中的方法来设置响应头，响应体等
+// Example:
+// ```
+// err = httpserver.Serve("127.0.0.1", 8888, httpserver.handler(func(rspWriter, req) { rspWriter.Write("Hello world") }))
+// ```
 func _httpServerOptCallback(cb func(rsp http.ResponseWriter, req *http.Request)) HttpServerConfigOpt {
 	return func(c *_httpServerConfig) {
 		c.callback = cb
@@ -94,6 +117,11 @@ func _listen(host string, port int, opts ...HttpServerConfigOpt) (lis net.Listen
 	return lis, config, nil
 }
 
+// Serve 根据给定的 host 和 port 启动一个 http 服务，第一个参数为监听主机，第二个参数为监听端口，接下来可以接收零个到多个选项函数，用于设置上下文，回调函数等
+// Example:
+// ```
+// err = httpserver.Serve("127.0.0.1", 8888, httpserver.handler(func(rspWriter, req) { rspWriter.Write("Hello world") }))
+// ```
 func _httpServe(host string, port int, opts ...HttpServerConfigOpt) error {
 	lis, config, err := _listen(host, port, opts...)
 	if err != nil {
@@ -117,6 +145,12 @@ func _httpServe(host string, port int, opts ...HttpServerConfigOpt) error {
 	}))
 }
 
+// LocalFileSystemServe 根据给定的 host 和 port 启动一个 http 服务用于访问本地文件系统
+// 第一个参数为监听主机，第二个参数为监听端口，第三个参数为访问路径前缀，第四个参数为本地文件系统路径，接下来可以接收零个到多个选项函数，用于设置上下文，回调函数等
+// Example:
+// ```
+// err = httpserver.LocalFileSystemServe("127.0.0.1", 8888, "/static", "/var/www/static")
+// ```
 func _localFileSystemServe(host string, port int, prefix, localPath string, opts ...HttpServerConfigOpt) error {
 	lis, config, err := _listen(host, port, opts...)
 	if err != nil {
