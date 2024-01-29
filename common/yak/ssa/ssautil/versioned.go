@@ -9,10 +9,11 @@ import (
 
 type Versioned[T comparable] struct {
 	// origin desc the variable's last or renamed version
-	origin       *Versioned[T]
-	versionIndex int
-	globalIndex  int
-	lexicalName  string
+	origin            *Versioned[T]
+	overWriteVariable *Versioned[T]
+	versionIndex      int
+	globalIndex       int
+	lexicalName       string
 
 	// the version of variable in current scope
 	scope *ScopedVersionedTable[T]
