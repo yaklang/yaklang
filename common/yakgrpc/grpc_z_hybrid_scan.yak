@@ -38,3 +38,4 @@ try {
 
 u := str.ExtractURLFromHTTPRequestRaw(request, https)~
 caller.MirrorHTTPFlow(https, u.String(), request, responseBytes, responseBody)
+caller.Wait()
