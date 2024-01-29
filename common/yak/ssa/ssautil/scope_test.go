@@ -132,9 +132,9 @@ func TestIfScope_If(t *testing.T) {
 	build.BuildItem(
 		func(sub *ScopedVersionedTable[value]) {},
 		func(sub *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
-			return BuildSyntaxBlock(sub, func(sub *ScopedVersionedTable[value]) bool {
+			return BuildSyntaxBlock(sub, func(sub *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
 				sub.CreateLexicalVariable("a", NewConsts("2"))
-				return false
+				return sub
 			})
 		},
 	)
@@ -171,18 +171,18 @@ func TestIfScope_IfELse(t *testing.T) {
 	build.BuildItem(
 		func(sub *ScopedVersionedTable[value]) {},
 		func(sub *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
-			return BuildSyntaxBlock(sub, func(sub *ScopedVersionedTable[value]) bool {
+			return BuildSyntaxBlock(sub, func(sub *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
 				sub.CreateLexicalVariable("a", NewConsts("2"))
 				sub.CreateLexicalVariable("b", NewConsts("2"))
 				sub.CreateLexicalLocalVariable("c", NewConsts("2"))
-				return false
+				return sub
 			})
 		},
 	)
 	build.BuildElse(func(sub *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
-		return BuildSyntaxBlock(sub, func(sub *ScopedVersionedTable[value]) bool {
+		return BuildSyntaxBlock(sub, func(sub *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
 			sub.CreateLexicalVariable("a", NewConsts("3"))
-			return false
+			return sub
 		})
 	})
 	end := build.BuildFinish(GeneratePhi)
@@ -212,9 +212,9 @@ func TestIfScope_IfELseIf(t *testing.T) {
 	build.BuildItem(
 		func(svt *ScopedVersionedTable[value]) {},
 		func(svt *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
-			end := BuildSyntaxBlock(svt, func(svt *ScopedVersionedTable[value]) bool {
-				svt.CreateLexicalVariable("a", NewConsts("2"))
-				return false
+			end := BuildSyntaxBlock(svt, func(sub *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+				sub.CreateLexicalVariable("a", NewConsts("2"))
+				return sub
 			})
 			return end
 		},
@@ -222,9 +222,9 @@ func TestIfScope_IfELseIf(t *testing.T) {
 	build.BuildItem(
 		func(svt *ScopedVersionedTable[value]) {},
 		func(svt *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
-			end := BuildSyntaxBlock(svt, func(svt *ScopedVersionedTable[value]) bool {
+			end := BuildSyntaxBlock(svt, func(svt *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
 				svt.CreateLexicalVariable("a", NewConsts("3"))
-				return false
+				return svt
 			})
 			return end
 		},
@@ -260,9 +260,9 @@ func TestIfScope_If_condition_assign(t *testing.T) {
 			conditionVariable1 = condition.GetLatestVersion("a")
 		},
 		func(svt *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
-			return BuildSyntaxBlock(svt, func(svt *ScopedVersionedTable[value]) bool {
+			return BuildSyntaxBlock(svt, func(svt *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
 				svt.CreateLexicalVariable("a", two)
-				return false
+				return svt
 			})
 		},
 	)
@@ -271,9 +271,9 @@ func TestIfScope_If_condition_assign(t *testing.T) {
 			conditionVariable2 = condition.GetLatestVersion("a")
 		},
 		func(svt *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
-			return BuildSyntaxBlock(svt, func(svt *ScopedVersionedTable[value]) bool {
+			return BuildSyntaxBlock(svt, func(svt *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
 				svt.CreateLexicalVariable("a", NewConsts("3"))
-				return false
+				return svt
 			})
 		},
 	)
@@ -291,43 +291,196 @@ func TestIfScope_If_condition_assign_checkMerge(t *testing.T) {
 	/*
 		check: ssautil.Merge function
 
-		if this example:
-			global:
-				a = 1
-				sub1:
-					a := 2
-					sub2:
-						a = 3
-
-				end: merge from sub2
-					a = phi[1, 3] ???  1
-					a should be 1 , not phi
+		a = 1
+		if a = 2 {
+			a = 3
+		}
+		a // should 1, not phi
 	*/
+	check := func(
+		beforeIf BuilderFunc,
+		buildCondition BuilderFunc,
+		buildBody BuilderReturnScopeFunc,
+		afterIf BuilderFunc,
+	) {
+		global := NewRootVersionedTable[value]()
+		beforeIf(global)
+		build := NewIfStmt(global)
+		build.BuildItem(
+			buildCondition, buildBody,
+		)
+		end := build.BuildFinish(GeneratePhi)
+		afterIf(end)
+	}
 
-	global := NewRootVersionedTable[value]()
+	t.Run("no local variable", func(t *testing.T) {
+		/*
+			a = 1
+			if a = 2 {
+				a = 3
+			}
+			a // phi(1, 3)
+		*/
+
+		test := assert.New(t)
+		check(
+			func(svt *ScopedVersionedTable[value]) {
+				svt.CreateLexicalVariable("a", NewConsts("1"))
+			},
+			func(svt *ScopedVersionedTable[value]) {
+				svt.CreateLexicalVariable("a", NewConsts("2"))
+			},
+			func(svt *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+				return BuildSyntaxBlock(svt, func(svt *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+					svt.CreateLexicalVariable("a", NewConsts("3"))
+					return svt
+				})
+			},
+			func(svt *ScopedVersionedTable[value]) {
+				test.Equal("phi[const(3) const(1)]", svt.GetLatestVersion("a").String())
+			},
+		)
+	})
+
+	t.Run("local variable", func(t *testing.T) {
+		/*
+			a = 1
+			if a := 2 {
+				a = 3
+			}
+			a // 1
+		*/
+		test := assert.New(t)
+		check(
+			func(svt *ScopedVersionedTable[value]) {
+				svt.CreateLexicalVariable("a", NewConsts("1"))
+			},
+			func(svt *ScopedVersionedTable[value]) {
+				svt.CreateLexicalLocalVariable("a", NewConsts("2"))
+			},
+			func(svt *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+				return BuildSyntaxBlock(svt, func(svt *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+					svt.CreateLexicalVariable("a", NewConsts("3"))
+					return svt
+				})
+			},
+			func(svt *ScopedVersionedTable[value]) {
+				test.Equal("const(1)", svt.GetLatestVersion("a").String())
+			},
+		)
+	})
+}
+
+func TestIfScope_In_SyntaxBlock(t *testing.T) {
+	type builderFunc func(*ScopedVersionedTable[value])
+	check := func(
+		beforeBlock builderFunc,
+		beforeIf builderFunc,
+		buildIfBody builderFunc,
+		afterIf builderFunc,
+		afterBlock builderFunc,
+	) {
+		/*
+			beforeBlock()
+			{
+				beforeIf()
+				if c {
+					buildIfBody()
+				}
+				afterIf()
+			}
+			afterBlock()
+		*/
+
+		global := NewRootVersionedTable[value]()
+		beforeBlock(global)
+		end := BuildSyntaxBlock(global, func(svt *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+			beforeIf(svt)
+			builder := NewIfStmt(svt)
+			builder.BuildItem(
+				func(svt *ScopedVersionedTable[value]) {},
+				func(svt *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+					return BuildSyntaxBlock(svt, func(svt *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+						buildIfBody(svt)
+						return svt
+					})
+				},
+			)
+			end := builder.BuildFinish(GeneratePhi)
+			afterIf(end)
+			return end
+		})
+		afterBlock(end)
+	}
+	zero := NewConsts("0")
 	one := NewConsts("1")
 	two := NewConsts("2")
-	three := NewConsts("3")
 
-	global.CreateLexicalVariable("a", one)
+	t.Run("test 1, if in syntax block", func(t *testing.T) {
+		/*
+			a = 0
+			{
+				a = 1
+				if c {
+					a = 2
+				}
+				a // phi[1, 2]
+			}
+			a  //  phi[1,2]
+		*/
+		test := assert.New(t)
+		check(
+			func(svt *ScopedVersionedTable[value]) {
+				svt.CreateLexicalVariable("a", zero)
+			},
 
-	build := NewIfStmt(global)
-	build.BuildItem(
-		func(condition *ScopedVersionedTable[value]) {
-			condition.CreateLexicalVariable("a", two)
-		},
-		func(svt *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
-			return BuildSyntaxBlock(svt, func(svt *ScopedVersionedTable[value]) bool {
-				svt.CreateLexicalVariable("a", three)
-				return false
-			})
-		},
-	)
-	end := build.BuildFinish(GeneratePhi)
+			func(svt *ScopedVersionedTable[value]) {
+				svt.CreateLexicalVariable("a", one)
+			},
+			func(svt *ScopedVersionedTable[value]) {
+				svt.CreateLexicalVariable("a", two)
+			},
+			func(svt *ScopedVersionedTable[value]) {
+				afterIfVariable := svt.GetLatestVersion("a")
+				test.Equal(afterIfVariable, NewPhi(two, one))
+			},
+			func(svt *ScopedVersionedTable[value]) {
+				afterBlockVariable := svt.GetLatestVersion("a")
+				test.Equal(afterBlockVariable, NewPhi(two, one))
+			},
+		)
+	})
 
-	test := assert.New(t)
-	test.Equal("const(1)", end.GetLatestVersion("a").String())
-
+	t.Run("test 2", func(t *testing.T) {
+		/*
+			{
+				a = 1
+				if c {
+					a = 2
+				}
+				a // phi[1, 2]
+			}
+			a // nil
+		*/
+		test := assert.New(t)
+		check(
+			func(svt *ScopedVersionedTable[value]) {},
+			func(svt *ScopedVersionedTable[value]) {
+				svt.CreateLexicalVariable("a", one)
+			},
+			func(svt *ScopedVersionedTable[value]) {
+				svt.CreateLexicalVariable("a", two)
+			},
+			func(svt *ScopedVersionedTable[value]) {
+				afterIfVariable := svt.GetLatestVersion("a")
+				test.Equal(afterIfVariable, NewPhi(two, one))
+			},
+			func(svt *ScopedVersionedTable[value]) {
+				afterBlockVariable := svt.GetLatestVersion("a")
+				test.Nil(afterBlockVariable)
+			},
+		)
+	})
 }
 
 func TestLoopScope(t *testing.T) {
