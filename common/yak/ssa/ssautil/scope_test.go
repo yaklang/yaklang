@@ -6,34 +6,111 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type BuilderReturnScopeFunc func(*ScopedVersionedTable[value]) *ScopedVersionedTable[value]
+type BuilderFunc func(*ScopedVersionedTable[value])
+
+var (
+	zero = NewConsts("0")
+	one  = NewConsts("1")
+	two  = NewConsts("2")
+)
+
 func TestSyntaxBlock(t *testing.T) {
-	test := assert.New(t)
 
-	/*
-		a = 1 // scope 1
-		b = 1
-		{
-			a = 2  // sub-scope 1
-			b := 2
-		}
-		a // 2 // scope 2
-		b // 1
-	*/
+	check := func(
+		beforeBlock BuilderFunc,
+		block BuilderReturnScopeFunc,
+		afterBlock BuilderFunc,
+	) {
+		global := NewRootVersionedTable[value]()
+		/*
+			beforeBlock()
+			{
+				block()
+			}
+			afterBlock()
+		*/
 
-	table := NewRootVersionedTable[value]()
-	table.CreateLexicalVariable("a", NewConsts("1"))
-	table.CreateLexicalVariable("b", NewConsts("1"))
-	test.Equal("const(1)", table.GetLatestVersion("a").String())
+		beforeBlock(global)
+		end := BuildSyntaxBlock(global, func(svt *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+			return block(svt)
+		})
+		afterBlock(end)
+	}
 
-	end := BuildSyntaxBlock(table, func(sub *ScopedVersionedTable[value]) bool {
-		sub.CreateLexicalVariable("a", NewConsts("2"))
-		sub.CreateLexicalLocalVariable("b", NewConsts("2"))
-		return false
+	t.Run("test scope cover", func(t *testing.T) {
+		/*
+			a = 1
+			{
+				a = 2
+			}
+			a // 2
+		*/
+		test := assert.New(t)
+		check(
+			func(svt *ScopedVersionedTable[value]) {
+				svt.CreateLexicalVariable("a", one)
+			},
+			func(svt *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+				svt.CreateLexicalVariable("a", two)
+				return svt
+			},
+			func(svt *ScopedVersionedTable[value]) {
+				test.Equal(two, svt.GetLatestVersion("a"))
+			},
+		)
+	})
+	t.Run("test scope local variable, not cover", func(t *testing.T) {
+		/*
+			a = 1
+			{
+				a := 2
+			}
+			a //
+		*/
+		test := assert.New(t)
+		check(
+			func(svt *ScopedVersionedTable[value]) {
+				svt.CreateLexicalVariable("a", one)
+			},
+			func(svt *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+				svt.CreateLexicalLocalVariable("a", two)
+				return svt
+			},
+			func(svt *ScopedVersionedTable[value]) {
+				test.Equal(one, svt.GetLatestVersion("a"))
+			},
+		)
 	})
 
-	test.NotNil(end)
-	test.Equal("const(2)", end.GetLatestVersion("a").String())
-	test.Equal("const(1)", end.GetLatestVersion("b").String())
+	t.Run("test scope local variable, but not cover", func(t *testing.T) {
+		test := assert.New(t)
+		/*
+			{
+				a := 1
+				{
+					a = 2
+				}
+				a // 2
+			}
+			a // nil
+		*/
+		check(
+			func(svt *ScopedVersionedTable[value]) {},
+			func(svt *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+				svt.CreateLexicalVariable("a", one)
+				svt = BuildSyntaxBlock(svt, func(svt *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+					svt.CreateLexicalVariable("a", two)
+					return svt
+				})
+				test.Equal(two, svt.GetLatestVersion("a"))
+				return svt
+			},
+			func(svt *ScopedVersionedTable[value]) {
+				test.Nil(svt.GetLatestVersion("a"))
+			},
+		)
+	})
 }
 
 func TestIfScope_If(t *testing.T) {

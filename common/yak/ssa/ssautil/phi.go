@@ -86,10 +86,8 @@ func (s *ScopedVersionedTable[T]) CoverBy(scope *ScopedVersionedTable[T]) {
 		panic("cover scope is nil")
 	}
 
-	scope.captured.ForEach(func(name string, ver *Versioned[T]) bool {
-		log.Infof("cover %s by %s", name, ver.String())
+	scope.ForEachCapturedVariable(s, func(name string, ver *Versioned[T]) {
 		s.CreateLexicalVariable(name, ver.Value)
-		return true
 	})
 }
 
