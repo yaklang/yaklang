@@ -77,6 +77,7 @@ func NewConst(i any) *ConstInst {
 		anValue:       NewValue(),
 		Unary:         0,
 	}
+	ci.SetType(c.GetType())
 	return ci
 }
 

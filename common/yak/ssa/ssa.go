@@ -209,9 +209,7 @@ func (a *anInstruction) GetAllVariables() map[string]*Variable {
 }
 func (a *anInstruction) AddVariable(v *Variable) { a.variables[v.Name] = v }
 
-var (
-	_ Instruction = (*anInstruction)(nil)
-)
+var _ Instruction = (*anInstruction)(nil)
 
 type anValue struct {
 	typ      Type
@@ -408,9 +406,11 @@ type ExternLib struct {
 	Member    []Value
 }
 
-var _ Node = (*ExternLib)(nil)
-var _ Value = (*ExternLib)(nil)
-var _ User = (*ExternLib)(nil)
+var (
+	_ Node  = (*ExternLib)(nil)
+	_ Value = (*ExternLib)(nil)
+	_ User  = (*ExternLib)(nil)
+)
 
 // ----------- Parameter
 type Parameter struct {
@@ -449,8 +449,8 @@ type ConstInst struct {
 }
 
 // ConstInst cont set Type
-func (c *ConstInst) GetType() Type   { return c.Const.GetType() }
-func (c *ConstInst) SetType(ts Type) {}
+func (c *ConstInst) GetType() Type   { return c.anValue.GetType() }
+func (c *ConstInst) SetType(ts Type) { c.anValue.SetType(ts) }
 
 var (
 	_ Node        = (*ConstInst)(nil)
