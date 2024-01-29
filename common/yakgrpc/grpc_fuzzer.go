@@ -490,6 +490,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 							break
 						}
 					}
+					respModel.TaskId = int64(historyID)
 					feedbackResponse(respModel, true)
 				}
 
