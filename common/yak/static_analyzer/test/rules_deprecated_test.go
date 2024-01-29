@@ -14,3 +14,24 @@ func TestDeprecated(t *testing.T) {
 		},
 	)
 }
+
+func TestDeprecatedRange(t *testing.T) {
+	check(t,
+		`
+	c = 0
+	for _, url := range [] {
+		http.RequestFaviconHash("faviconUrl")~
+	}
+	rsp = http.Get(
+		"",
+	)~
+	if rsp == 0 {
+		b = c // 
+	}
+	rspRaw = http.dump(rsp)~
+		`,
+		[]string{
+			"! 已弃用，使用 poc.Get 代替",
+		},
+	)
+}
