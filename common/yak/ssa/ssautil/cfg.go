@@ -102,16 +102,11 @@ func (i *IfStmt[T]) BuildFinish(
 
 	endScope := i.global.CreateSubScope()
 
-	Merge(
-		i.global,   // base
+	endScope.Merge(
 		!i.hasElse, // has base
-		func(name string, t []T) {
-			ret := mergeHandler(name, t)
-			endScope.CreateLexicalVariable(name, ret)
-		},
+		mergeHandler,
 		i.BodyScopes...,
 	)
-
 	return endScope
 }
 

@@ -1,11 +1,5 @@
 package ssautil
 
-import (
-	"fmt"
-
-	"github.com/yaklang/yaklang/common/log"
-)
-
 type PhiContext[T comparable] struct {
 	scope *ScopedVersionedTable[T]
 	name  string
@@ -93,10 +87,9 @@ func (s *ScopedVersionedTable[T]) CoverBy(scope *ScopedVersionedTable[T]) {
 
 // Merge merge the sub-scope to current scope,
 // if hasSelf is true: the current scope will be merged to the result
-func Merge[T comparable](
-	base *ScopedVersionedTable[T],
+func (base *ScopedVersionedTable[T]) Merge(
 	hasSelf bool,
-	handler func(name string, t []T),
+	merge func(name string, t []T) T,
 	subScopes ...*ScopedVersionedTable[T],
 ) {
 	var zero T
@@ -132,30 +125,14 @@ func Merge[T comparable](
 		}
 
 		// generate phi
-		handler(name, m)
+		// handler(name, m)
+		ret := merge(name, m)
+		base.CreateLexicalVariable(name, ret)
 	}
 
 	for index, sub := range subScopes {
-		sub.captured.ForEach(func(name string, ver *Versioned[T]) bool {
-			baseVariable := base.GetLatestVersionVersioned(name)
-			capturedVariable := sub.parent.GetLatestVersionVersioned(name)
-			if capturedVariable == nil {
-				panic(fmt.Sprintf("variable %s not exist in parent scope, but this variable is captured", name))
-			}
-			if baseVariable == nil {
-				// not exist in base scope, this variable just set in sub-scope,
-				// just skip, not need generate phi
-				return true
-			}
-
-			if baseVariable.scope != capturedVariable.scope {
-				// the ver scope is not equal to base scope,
-				// this `ver` is captured, but not same variable with base-variable
-				// just skip
-				return true
-			}
+		sub.ForEachCapturedVariable(base, func(name string, ver *Versioned[T]) {
 			addPhiContent(index, name, ver)
-			return true
 		})
 	}
 
