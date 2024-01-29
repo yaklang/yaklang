@@ -278,6 +278,9 @@ func (i *IfBuilder) Build() {
 				SSABuilder.CurrentBlock = trueBlock
 				SSABuilder.CurrentBlock.ScopeTable = bodyScope
 				item.Body()
+				if SSABuilder.CurrentBlock.finish {
+					return nil
+				}
 				SSABuilder.EmitJump(DoneBlock)
 				return SSABuilder.CurrentBlock.ScopeTable
 			},
@@ -297,6 +300,9 @@ func (i *IfBuilder) Build() {
 		ScopeBuilder.BuildElse(func(sub *ssautil.ScopedVersionedTable[*Variable]) *ssautil.ScopedVersionedTable[*Variable] {
 			SSABuilder.CurrentBlock.ScopeTable = sub
 			i.elseBody()
+			if SSABuilder.CurrentBlock.finish {
+				return nil
+			}
 			return SSABuilder.CurrentBlock.ScopeTable
 		})
 	}
