@@ -3,14 +3,20 @@ package dot
 import (
 	"fmt"
 	"io"
+	"strings"
 )
 
 // Graph represents a set of nodes, edges and attributes that can be
 // translated to DOT language.
 type Graph struct {
+	idGetter        func() int
+	parent          *Graph
+	subGraphs       []*Graph
+	registeredNodes map[int]*node
+	registeredEdges map[int]*edge
+
 	nodes           map[int]*node
 	edges           map[int]*edge
-	n, e            int
 	graphAttributes attributes
 	nodeAttributes  attributes
 	edgeAttributes  attributes
@@ -19,8 +25,37 @@ type Graph struct {
 	sameRank        [][]*node
 }
 
+func (g *Graph) IsSubGraph() bool {
+	if g.parent != nil {
+		return true
+	}
+	return false
+}
+
+func (g *Graph) CreateSubGraph(label string) *Graph {
+	if label == "" {
+		return g
+	}
+	sub := &Graph{
+		idGetter:        g.idGetter,
+		registeredNodes: g.registeredNodes,
+		registeredEdges: g.registeredEdges,
+		drawMultiEdges:  g.drawMultiEdges,
+		directed:        g.directed,
+	}
+	sub.parent = g
+	sub.SetTitle(label)
+	g.subGraphs = append(g.subGraphs, sub)
+	return sub
+}
+
 func New() *Graph {
-	return &Graph{}
+	counter := 0
+	idGetter := func() int {
+		counter++
+		return counter
+	}
+	return &Graph{idGetter: idGetter, registeredEdges: make(map[int]*edge), registeredNodes: make(map[int]*node)}
 }
 
 // SetTitle sets a title for the graph.
@@ -30,13 +65,50 @@ func (g *Graph) SetTitle(title string) {
 
 // AddNode adds a new node with the given label and returns its id.
 func (g *Graph) AddNode(label string) int {
-	nod := node{id: g.n, label: label}
-	g.n++
+	newId := g.idGetter()
+	nod := node{id: newId, label: label}
 	if g.nodes == nil {
 		g.nodes = make(map[int]*node)
 	}
 	g.nodes[nod.id] = &nod
+	g.registeredNodes[nod.id] = &nod
 	return nod.id
+}
+
+func (g *Graph) GetOrCreateNodeInstance(label string) int {
+	id, ok := g.NodeExisted(label)
+	if ok {
+		return id
+	}
+	return g.AddNode(label)
+}
+
+func (g *Graph) GetOrCreateSubGraph(label string) *Graph {
+	for _, sub := range g.subGraphs {
+		if sub.GraphAttribute("label", label); sub != nil {
+			return sub
+		}
+	}
+	return g.CreateSubGraph(label)
+}
+
+func (g *Graph) GetOrCreateNodeWithSubGraph(node string, subGraph string) int {
+	return g.CreateSubGraph(subGraph).GetOrCreateNode(node)
+}
+
+func (g *Graph) Root() *Graph {
+	if g.parent != nil {
+		return g.parent.Root()
+	}
+	return g
+}
+
+func (g *Graph) AddEdgeInRoot(from, to string) {
+	g.Root().AddEdgeByLabel(from, to)
+}
+
+func (g *Graph) AddEdgeWithSubGraph(from, to string, subGraph string) {
+	g.CreateSubGraph(subGraph).AddEdgeByLabel(from, to)
 }
 
 // GetOrCreateNode returns the id of the node with the given label if it
@@ -45,6 +117,21 @@ func (g *Graph) GetOrCreateNode(label string) int {
 	if ok {
 		return id
 	}
+
+	if g.parent != nil {
+		id, ok := g.parent.NodeExisted(label)
+		if ok {
+			return id
+		}
+	}
+
+	for _, sub := range g.subGraphs {
+		id, ok := sub.NodeExisted(label)
+		if ok {
+			return id
+		}
+	}
+
 	return g.AddNode(label)
 }
 
@@ -70,19 +157,25 @@ func (g *Graph) MakeSameRank(node1, node2 int, others ...int) {
 	g.sameRank = append(g.sameRank, r)
 }
 
+// AddEdgeByLabel adds a new edge between the nodes with the given
+func (g *Graph) AddEdgeByLabel(from, to string, label ...string) int {
+	fromNode := g.GetOrCreateNode(from)
+	toNode := g.GetOrCreateNode(to)
+	return g.AddEdge(fromNode, toNode, strings.Join(label, ""))
+}
+
 // AddEdge adds a new edge between the given nodes with the specified
 // label and returns an id for the new edge.
 func (g *Graph) AddEdge(from, to int, label string) int {
-	fromNode := g.nodes[from]
-	toNode := g.nodes[to]
-	// TODO: Check for errors (non-existing nodes)
+	fromNode := g.registeredNodes[from]
+	toNode := g.registeredNodes[to]
+	id := g.idGetter()
 	edg := edge{from: fromNode, to: toNode, label: label}
-	id := g.e
-	g.e++
 	if g.edges == nil {
 		g.edges = make(map[int]*edge)
 	}
 	g.edges[id] = &edg
+	g.registeredEdges[id] = &edg
 	return id
 }
 
@@ -126,47 +219,68 @@ func (g *Graph) GraphAttribute(name, value string) {
 	g.graphAttributes.set(name, value)
 }
 
-// GenerateDOT generates the graph description in DOT language
-func (g *Graph) GenerateDOT(w io.Writer) {
-	if !g.drawMultiEdges {
-		fmt.Fprint(w, "strict ")
-	}
-	if g.directed {
-		fmt.Fprint(w, "digraph ")
+func (g *Graph) generateDot(indent int, w io.Writer) int {
+	if g.IsSubGraph() {
+		fmt.Fprintf(g.drawIndent(w, indent), "subgraph cluster_%v ", g.idGetter())
 	} else {
-		fmt.Fprint(w, "graph ")
+		if !g.drawMultiEdges {
+			fmt.Fprint(w, "strict ")
+		}
+		if g.directed {
+			fmt.Fprint(w, "digraph ")
+		} else {
+			fmt.Fprint(w, "graph ")
+		}
 	}
+
 	fmt.Fprintln(w, "{")
+	indent++
+
+	for _, sub := range g.subGraphs {
+		indent = sub.generateDot(indent, w)
+	}
+
 	for graphAttribs := g.graphAttributes.iterate(); graphAttribs.hasMore(); {
 		name, value := graphAttribs.next()
-		fmt.Fprintf(w, "  %v = %#v;\n", name, value)
+		fmt.Fprintf(g.drawIndent(w, indent), "%v = %#v;\n", name, value)
 	}
 	for nodeAttribs := g.nodeAttributes.iterate(); nodeAttribs.hasMore(); {
 		name, value := nodeAttribs.next()
-		fmt.Fprintf(w, "  node [ %v = %#v ]\n", name, value)
+		fmt.Fprintf(g.drawIndent(w, indent), "node [ %v = %#v ]\n", name, value)
 	}
 	for edgeAttribs := g.edgeAttributes.iterate(); edgeAttribs.hasMore(); {
 		name, value := edgeAttribs.next()
-		fmt.Fprintf(w, "  edge [ %v = %#v ]\n", name, value)
+		fmt.Fprintf(g.drawIndent(w, indent), "edge [ %v = %#v ]\n", name, value)
 	}
-	for i := 0; i < g.n; i++ {
-		fmt.Fprint(w, "  ")
-		g.nodes[i].generateDOT(w)
+	for _, node := range g.nodes {
+		g.drawIndent(w, indent)
+		node.generateDOT(w)
 		fmt.Fprintln(w)
 	}
 	for _, r := range g.sameRank {
-		fmt.Fprint(w, "  {rank=same; ")
+		fmt.Fprint(g.drawIndent(w, indent), "  {rank=same; ")
 		for _, x := range r {
 			fmt.Fprintf(w, "%v; ", x.name())
 		}
 		fmt.Fprintln(w, "}")
 	}
-	for i := 0; i < g.e; i++ {
-		fmt.Fprint(w, "  ")
-		g.edges[i].generateDOT(w, g.directed)
+	for _, edge := range g.edges {
+		g.drawIndent(w, indent)
+		edge.generateDOT(w, g.directed)
 		fmt.Fprintln(w)
 	}
-	fmt.Fprintln(w, "}")
+	fmt.Fprintln(g.drawIndent(w, indent-1), "}")
+	indent--
+	return indent
+}
+
+func (g *Graph) drawIndent(w io.Writer, indent int) io.Writer {
+	fmt.Fprint(w, strings.Repeat(" ", indent*4))
+	return w
+}
+
+func (g *Graph) GenerateDOT(w io.Writer) {
+	g.generateDot(0, w)
 }
 
 type attributes struct {
