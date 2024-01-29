@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/corpix/uarand"
 	"github.com/yaklang/yaklang/common/utils/cli"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -566,13 +567,31 @@ func WithReplaceHttpPacketHost(host string) PocConfigOption {
 	return WithReplaceHttpPacketHeader("Host", host)
 }
 
-// replaceBasicAuth 是一个请求选项参数，用于改变请求报文，修改Authorization请求头为基础认证的密文，如果不存在则会增加，实际上是replaceHeader("Authorization", codec.EncodeBase64(username + ":" + password))的简写
+// replaceBasicAuth 是一个请求选项参数，用于改变请求报文，修改 Authorization 请求头为基础认证的密文，如果不存在则会增加，实际上是replaceHeader("Authorization", codec.EncodeBase64(username + ":" + password))的简写
 // Example:
 // ```
 // poc.Get("https://pie.dev/basic-auth/admin/password", poc.replaceBasicAuth("admin", "password")) // 向 pie.dev 发起请求进行基础认证，会得到200响应状态码
 // ```
 func WithReplaceHttpPacketBasicAuth(username, password string) PocConfigOption {
 	return WithReplaceHttpPacketHeader("Authorization", "Basic "+codec.EncodeBase64(username+":"+password))
+}
+
+// replaceUserAgent 是一个请求选项参数，用于改变请求报文，修改 User-Agent 请求头，实际上是replaceHeader("User-Agent", userAgent)的简写
+// Example:
+// ```
+// poc.Get("https://pie.dev/basic-auth/admin/password", poc.replaceUserAgent("yak-http-client")) // 向 pie.dev 发起请求，修改 User-Agent 请求头为 yak-http-client
+// ```
+func WithReplaceHttpPacketUserAgent(ua string) PocConfigOption {
+	return WithReplaceHttpPacketHeader("User-Agent", ua)
+}
+
+// replaceRandomUserAgent 是一个请求选项参数，用于改变请求报文，修改 User-Agent 请求头为随机的常见请求头
+// Example:
+// ```
+// poc.Get("https://pie.dev/basic-auth/admin/password", poc.replaceRandomUserAgent()) // 向 pie.dev 发起请求，修改 User-Agent 请求头为随机的常见请求头
+// ```
+func WithReplaceHttpPacketRandomUserAgent() PocConfigOption {
+	return WithReplaceHttpPacketHeader("User-Agent", uarand.GetRandom())
 }
 
 // replaceCookie 是一个请求选项参数，用于改变请求报文，修改Cookie请求头中的值，如果不存在则会增加
@@ -1368,31 +1387,33 @@ var PoCExports = map[string]interface{}{
 	"websocketFromServer":  WithWebsocketHandler,
 	"websocketOnClient":    WithWebsocketClientHandler,
 
-	"replaceFirstLine":      WithReplaceHttpPacketFirstLine,
-	"replaceMethod":         WithReplaceHttpPacketMethod,
-	"replaceHeader":         WithReplaceHttpPacketHeader,
-	"replaceHost":           WithReplaceHttpPacketHost,
-	"replaceBasicAuth":      WithReplaceHttpPacketBasicAuth,
-	"replaceCookie":         WithReplaceHttpPacketCookie,
-	"replaceBody":           WithReplaceHttpPacketBody,
-	"replaceAllQueryParams": WithReplaceAllHttpPacketQueryParams,
-	"replaceAllPostParams":  WithReplaceAllHttpPacketPostParams,
-	"replaceQueryParam":     WithReplaceHttpPacketQueryParam,
-	"replacePostParam":      WithReplaceHttpPacketPostParam,
-	"replacePath":           WithReplaceHttpPacketPath,
-	"appendHeader":          WithAppendHeader,
-	"appendHeaders":         WithAppendHeaders,
-	"appendCookie":          WithAppendCookie,
-	"appendQueryParam":      WithAppendQueryParam,
-	"appendPostParam":       WithAppendPostParam,
-	"appendPath":            WithAppendHttpPacketPath,
-	"appendFormEncoded":     WithAppendHttpPacketFormEncoded,
-	"appendUploadFile":      WithAppendHttpPacketUploadFile,
-	"deleteHeader":          WithDeleteHeader,
-	"deleteCookie":          WithDeleteCookie,
-	"deleteQueryParam":      WithDeleteQueryParam,
-	"deletePostParam":       WithDeletePostParam,
-	"deleteForm":            WithDeleteForm,
+	"replaceFirstLine":       WithReplaceHttpPacketFirstLine,
+	"replaceMethod":          WithReplaceHttpPacketMethod,
+	"replaceHeader":          WithReplaceHttpPacketHeader,
+	"replaceHost":            WithReplaceHttpPacketHost,
+	"replaceBasicAuth":       WithReplaceHttpPacketBasicAuth,
+	"replaceUserAgent":       WithReplaceHttpPacketUserAgent,
+	"replaceRandomUserAgent": WithReplaceHttpPacketRandomUserAgent,
+	"replaceCookie":          WithReplaceHttpPacketCookie,
+	"replaceBody":            WithReplaceHttpPacketBody,
+	"replaceAllQueryParams":  WithReplaceAllHttpPacketQueryParams,
+	"replaceAllPostParams":   WithReplaceAllHttpPacketPostParams,
+	"replaceQueryParam":      WithReplaceHttpPacketQueryParam,
+	"replacePostParam":       WithReplaceHttpPacketPostParam,
+	"replacePath":            WithReplaceHttpPacketPath,
+	"appendHeader":           WithAppendHeader,
+	"appendHeaders":          WithAppendHeaders,
+	"appendCookie":           WithAppendCookie,
+	"appendQueryParam":       WithAppendQueryParam,
+	"appendPostParam":        WithAppendPostParam,
+	"appendPath":             WithAppendHttpPacketPath,
+	"appendFormEncoded":      WithAppendHttpPacketFormEncoded,
+	"appendUploadFile":       WithAppendHttpPacketUploadFile,
+	"deleteHeader":           WithDeleteHeader,
+	"deleteCookie":           WithDeleteCookie,
+	"deleteQueryParam":       WithDeleteQueryParam,
+	"deletePostParam":        WithDeletePostParam,
+	"deleteForm":             WithDeleteForm,
 
 	// split
 	"Split":           split,
