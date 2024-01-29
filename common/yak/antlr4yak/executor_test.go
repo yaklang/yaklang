@@ -3946,3 +3946,16 @@ for in 0 {
 `
 	_marshallerTest(code)
 }
+
+func TestType(t *testing.T) {
+	t.Run("var and any", func(t *testing.T) {
+		codeTemplate := `
+a = make(map[string]%s)
+assert typeof(a) == map[string]%s
+	`
+
+		_marshallerTest(fmt.Sprintf(codeTemplate, "var", "var"))
+		_marshallerTest(fmt.Sprintf(codeTemplate, "var", "any"))
+		_marshallerTest(fmt.Sprintf(codeTemplate, "any", "any"))
+	})
+}
