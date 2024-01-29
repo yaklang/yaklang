@@ -38,7 +38,9 @@ False: 'false';
 In: 'in';
 NotLiteral: 'not';
 Assert: 'assert';
-Var: 'var';
+Var
+    : 'var'
+    | 'any';
 VarTypeName
     : 'uint' |  'uint8' | 'byte' | 'uint16' | 'uint32' | 'uint64'
     | 'int' | 'int8' | 'int16' | 'int32' | 'int64'
