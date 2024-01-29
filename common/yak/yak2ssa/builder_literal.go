@@ -34,7 +34,7 @@ func (b *astbuilder) buildLiteral(stmt *yak.LiteralContext) (v ssa.Value) {
 		}
 		return b.EmitConstInst(boolLit)
 	} else if stmt.UndefinedLiteral() != nil {
-		//TODO: this ok??
+		// TODO: this ok??
 		return ssa.NewParam("undefined", false, b.FunctionBuilder)
 	} else if stmt.NilLiteral() != nil {
 		return b.EmitConstInst(nil)
@@ -85,7 +85,7 @@ func (b *astbuilder) buildLiteral(stmt *yak.LiteralContext) (v ssa.Value) {
 		return b.buildSliceTypedLiteral(s)
 	}
 
-	//TODO: type literal
+	// TODO: type literal
 	if s, ok := stmt.TypeLiteral().(*yak.TypeLiteralContext); ok {
 		return b.EmitTypeValue(b.buildTypeLiteral(s))
 	}
@@ -162,7 +162,6 @@ func (b *astbuilder) buildMapTypeLiteral(stmt *yak.MapTypeLiteralContext) ssa.Ty
 	}
 	if keyTyp != nil && valueTyp != nil {
 		return ssa.NewMapType(keyTyp, valueTyp)
-
 	}
 
 	return nil
@@ -176,8 +175,8 @@ func (b *astbuilder) buildNumericLiteral(stmt *yak.NumericLiteralContext) ssa.Va
 	// integer literal
 	if ilit := stmt.IntegerLiteral(); ilit != nil {
 		var err error
-		var originIntStr = ilit.GetText()
-		var intStr = strings.ToLower(originIntStr)
+		originIntStr := ilit.GetText()
+		intStr := strings.ToLower(originIntStr)
 		var resultInt64 int64
 		switch true {
 		case strings.HasPrefix(intStr, "0b"): // 二进制
@@ -208,7 +207,7 @@ func (b *astbuilder) buildNumericLiteral(stmt *yak.NumericLiteralContext) ssa.Va
 		if strings.HasPrefix(lit, ".") {
 			lit = "0" + lit
 		}
-		var f, _ = strconv.ParseFloat(lit, 64)
+		f, _ := strconv.ParseFloat(lit, 64)
 		return b.EmitConstInst(f)
 	}
 	b.NewError(ssa.Error, TAG, "cannot parse num for literal: %s", stmt.GetText())
@@ -298,14 +297,15 @@ func (b *astbuilder) buildTemplateStringLiteral(stmt *yak.TemplateStringLiteralC
 func (b *astbuilder) buildStringLiteral(stmt *yak.StringLiteralContext) ssa.Value {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
-	var text = stmt.GetText()
+	text := stmt.GetText()
 	if text == "" {
 		return b.EmitConstInst(text)
 	}
 
 	var prefix byte
-	var hasPrefix = false
-	var supportPrefix = []byte{'x', 'b', 'r'}
+	hasPrefix := false
+	supportPrefix := []byte{'x', 'b', 'r'}
+	var ret *ssa.ConstInst
 ParseStrLit:
 	switch text[0] {
 	case '"':
@@ -317,13 +317,13 @@ ParseStrLit:
 				val = lit
 			}
 			prefix = 0
-			return b.EmitConstInstWithUnary(val, int(prefix))
+			ret = b.EmitConstInstWithUnary(val, int(prefix))
 		} else {
 			val, err := strconv.Unquote(text)
 			if err != nil {
 				fmt.Printf("parse %v to string literal failed: %s", stmt.GetText(), err.Error())
 			}
-			return b.EmitConstInstWithUnary(val, int(prefix))
+			ret = b.EmitConstInstWithUnary(val, int(prefix))
 		}
 	case '\'':
 		if prefix == 'r' {
@@ -334,8 +334,7 @@ ParseStrLit:
 				val = lit
 			}
 			prefix = 0
-			return b.EmitConstInstWithUnary(val, int(prefix))
-
+			ret = b.EmitConstInstWithUnary(val, int(prefix))
 		} else {
 			if lit := stmt.GetText(); len(lit) >= 2 {
 				text = lit[1 : len(lit)-1]
@@ -348,11 +347,11 @@ ParseStrLit:
 			if err != nil {
 				fmt.Printf("pars %v to string literal field: %s", stmt.GetText(), err.Error())
 			}
-			return b.EmitConstInstWithUnary(val, int(prefix))
+			ret = b.EmitConstInstWithUnary(val, int(prefix))
 		}
 	case '`':
 		val := text[1 : len(text)-1]
-		return b.EmitConstInstWithUnary(val, int(prefix))
+		ret = b.EmitConstInstWithUnary(val, int(prefix))
 	case '0':
 		switch text[1] {
 		case 'h':
@@ -361,7 +360,7 @@ ParseStrLit:
 			if err != nil {
 				fmt.Printf("parse hex string error: %v", err)
 			}
-			return b.EmitConstInst(hex)
+			ret = b.EmitConstInst(hex)
 		}
 	default:
 		if !hasPrefix {
@@ -379,5 +378,9 @@ ParseStrLit:
 		}
 	}
 
-	return nil
+	if prefix == 'b' {
+		ret.SetType(ssa.BasicTypes[ssa.Bytes])
+	}
+
+	return ret
 }
