@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/dot"
 	"strings"
 	"testing"
@@ -186,5 +187,163 @@ f = b(2,3,4)`
 	}
 	if !check3 {
 		t.Fatal("the literal 3 trace failed")
+	}
+}
+
+func TestPathTrace(t *testing.T) {
+	text := `a = 1
+b = (c, d, e) => {
+	a = c + d
+	return d, c
+}
+f = b(2,3,4)`
+	prog, err := Parse(text)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var checkC, checkD bool
+	var checkA bool
+	prog.Ref("f").FullUseDefChain(func(value *Value) {
+		value.ShowDot()
+		var results = prog.Ref("c")
+		results = append(results, prog.Ref("d")...)
+		results = append(results, value)
+		ret := FindStrictCommonDepends(results)
+		if len(ret) != 2 {
+			t.Fatal("the literal 2 trace failed")
+		}
+		ret.ForEach(func(value *Value) {
+			if value.GetName() == "c" {
+				checkC = true
+			}
+			if value.GetName() == "d" {
+				checkD = true
+			}
+		})
+	})
+	_ = checkA
+	if !checkC {
+		t.Fatal("the literal 2 trace failed")
+	}
+
+	if !checkD {
+		t.Fatal("the literal 2 trace failed")
+	}
+}
+
+func TestPathTrace_Negative(t *testing.T) {
+	text := `a = 1
+b = (c, d, e) => {
+	a = c + d
+	return d, c
+}
+f = b(2,3,4)`
+	prog, err := Parse(text)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var checkC, checkD bool = true, true
+	var checkA bool
+	prog.Ref("f").FullUseDefChain(func(value *Value) {
+		value.ShowDot()
+		var results = prog.Ref("c")
+		results = append(results, prog.Ref("d")...)
+		ret := FindStrictCommonDepends(results)
+		if len(ret) != 0 {
+			t.Fatal("b & c is not common depends")
+		}
+		ret.ForEach(func(value *Value) {
+			if value.GetName() == "c" {
+				checkC = false
+			}
+			if value.GetName() == "d" {
+				checkD = false
+			}
+		})
+	})
+	_ = checkA
+	if !checkC {
+		t.Fatal("the literal 2 trace failed")
+	}
+
+	if !checkD {
+		t.Fatal("the literal 2 trace failed")
+	}
+}
+
+func TestPathTrace_Flexible(t *testing.T) {
+	text := `a = 1
+b = (c, d, e) => {
+	a = c + d
+	return d, c
+}
+f = b(2,3,4)`
+	prog, err := Parse(text)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	results := FindFlexibleCommonDepends(append(prog.Ref("a"), prog.Ref("f")...))
+	if len(results) <= 0 {
+		t.Fatal("f & a is common depends (flexible)")
+	}
+}
+
+func TestPathTrace_Flexible2(t *testing.T) {
+	text := `a = 1
+b = (c, d, e) => {
+	a = c + d
+	return d, c
+}
+f = b(2,3,4)`
+	prog, err := Parse(text)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	results := FindFlexibleCommonDepends(append(prog.Ref("c"), prog.Ref("d")...))
+	if len(results) <= 0 {
+		t.Fatal("common depends (flexible)")
+	}
+}
+
+func TestPathTrace_Strict(t *testing.T) {
+	text := `a = 1
+b = (c, d, e) => {
+	a = c + d
+	return d, c
+}
+f = b(2,3,4)`
+	prog, err := Parse(text)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	results := FindStrictCommonDepends(append(prog.Ref("c"), prog.Ref("d")...))
+	if len(results) > 0 {
+		t.Fatal("common depends (flexible)")
+	}
+}
+
+func TestPathTrace_FlexibleDepends(t *testing.T) {
+	text := `a = 1
+b = a + c
+d = b + e
+f = d + h
+z = f + g
+y = x + z
+`
+	prog, err := Parse(text)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	vals := prog.Ref("d").FlexibleDepends().ShowDot()
+	var d string
+	vals.ForEach(func(value *Value) {
+		d = value.Dot()
+	})
+	if !utils.MatchAllOfSubString(d, `label="c"`, `label="e"`, `label="h"`, `label="g"`, `label="x"`) {
+		t.Fatal("not flexible depends")
 	}
 }
