@@ -256,5 +256,5 @@ func TestExternLibInClosure(t *testing.T) {
 	libVariable := libVariables[0]
 
 	test.False(libVariable.IsParameter())
-	test.True(libVariable.IsExtern())
+	test.True(libVariable.IsExternLib())
 }
