@@ -211,6 +211,7 @@ service Yak {
   rpc ExtractData(stream ExtractDataRequest) returns (stream ExtractDataResponse);
   rpc ImportHTTPFuzzerTaskFromYaml(ImportHTTPFuzzerTaskFromYamlRequest) returns (ImportHTTPFuzzerTaskFromYamlResponse);
   rpc ExportHTTPFuzzerTaskToYaml(ExportHTTPFuzzerTaskToYamlRequest) returns (ExportHTTPFuzzerTaskToYamlResponse);
+  rpc RenderHTTPFuzzerPacket(RenderHTTPFuzzerPacketRequest) returns (RenderHTTPFuzzerPacketResponse);
 
   rpc SaveFuzzerLabel(SaveFuzzerLabelRequest) returns (Empty);
   rpc QueryFuzzerLabel(Empty) returns (QueryFuzzerLabelResponse);
@@ -4655,6 +4656,13 @@ message ExportHTTPFuzzerTaskToYamlResponse{
   string YamlContent = 2;
 }
 
+message RenderHTTPFuzzerPacketRequest {
+  bytes Packet = 1;
+}
+
+message RenderHTTPFuzzerPacketResponse {
+  bytes Packet = 1;
+}
 
 message SmokingEvaluatePluginBatchRequest {
   repeated string ScriptNames = 1;

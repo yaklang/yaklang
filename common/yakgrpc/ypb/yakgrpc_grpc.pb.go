@@ -105,6 +105,7 @@ type YakClient interface {
 	ExtractData(ctx context.Context, opts ...grpc.CallOption) (Yak_ExtractDataClient, error)
 	ImportHTTPFuzzerTaskFromYaml(ctx context.Context, in *ImportHTTPFuzzerTaskFromYamlRequest, opts ...grpc.CallOption) (*ImportHTTPFuzzerTaskFromYamlResponse, error)
 	ExportHTTPFuzzerTaskToYaml(ctx context.Context, in *ExportHTTPFuzzerTaskToYamlRequest, opts ...grpc.CallOption) (*ExportHTTPFuzzerTaskToYamlResponse, error)
+	RenderHTTPFuzzerPacket(ctx context.Context, in *RenderHTTPFuzzerPacketRequest, opts ...grpc.CallOption) (*RenderHTTPFuzzerPacketResponse, error)
 	SaveFuzzerLabel(ctx context.Context, in *SaveFuzzerLabelRequest, opts ...grpc.CallOption) (*Empty, error)
 	QueryFuzzerLabel(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*QueryFuzzerLabelResponse, error)
 	DeleteFuzzerLabel(ctx context.Context, in *DeleteFuzzerLabelRequest, opts ...grpc.CallOption) (*Empty, error)
@@ -1493,6 +1494,15 @@ func (c *yakClient) ImportHTTPFuzzerTaskFromYaml(ctx context.Context, in *Import
 func (c *yakClient) ExportHTTPFuzzerTaskToYaml(ctx context.Context, in *ExportHTTPFuzzerTaskToYamlRequest, opts ...grpc.CallOption) (*ExportHTTPFuzzerTaskToYamlResponse, error) {
 	out := new(ExportHTTPFuzzerTaskToYamlResponse)
 	err := c.cc.Invoke(ctx, "/ypb.Yak/ExportHTTPFuzzerTaskToYaml", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) RenderHTTPFuzzerPacket(ctx context.Context, in *RenderHTTPFuzzerPacketRequest, opts ...grpc.CallOption) (*RenderHTTPFuzzerPacketResponse, error) {
+	out := new(RenderHTTPFuzzerPacketResponse)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/RenderHTTPFuzzerPacket", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4882,6 +4892,7 @@ type YakServer interface {
 	ExtractData(Yak_ExtractDataServer) error
 	ImportHTTPFuzzerTaskFromYaml(context.Context, *ImportHTTPFuzzerTaskFromYamlRequest) (*ImportHTTPFuzzerTaskFromYamlResponse, error)
 	ExportHTTPFuzzerTaskToYaml(context.Context, *ExportHTTPFuzzerTaskToYamlRequest) (*ExportHTTPFuzzerTaskToYamlResponse, error)
+	RenderHTTPFuzzerPacket(context.Context, *RenderHTTPFuzzerPacketRequest) (*RenderHTTPFuzzerPacketResponse, error)
 	SaveFuzzerLabel(context.Context, *SaveFuzzerLabelRequest) (*Empty, error)
 	QueryFuzzerLabel(context.Context, *Empty) (*QueryFuzzerLabelResponse, error)
 	DeleteFuzzerLabel(context.Context, *DeleteFuzzerLabelRequest) (*Empty, error)
@@ -5451,6 +5462,9 @@ func (UnimplementedYakServer) ImportHTTPFuzzerTaskFromYaml(context.Context, *Imp
 }
 func (UnimplementedYakServer) ExportHTTPFuzzerTaskToYaml(context.Context, *ExportHTTPFuzzerTaskToYamlRequest) (*ExportHTTPFuzzerTaskToYamlResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ExportHTTPFuzzerTaskToYaml not implemented")
+}
+func (UnimplementedYakServer) RenderHTTPFuzzerPacket(context.Context, *RenderHTTPFuzzerPacketRequest) (*RenderHTTPFuzzerPacketResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RenderHTTPFuzzerPacket not implemented")
 }
 func (UnimplementedYakServer) SaveFuzzerLabel(context.Context, *SaveFuzzerLabelRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SaveFuzzerLabel not implemented")
@@ -7654,6 +7668,24 @@ func _Yak_ExportHTTPFuzzerTaskToYaml_Handler(srv interface{}, ctx context.Contex
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(YakServer).ExportHTTPFuzzerTaskToYaml(ctx, req.(*ExportHTTPFuzzerTaskToYamlRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_RenderHTTPFuzzerPacket_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RenderHTTPFuzzerPacketRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).RenderHTTPFuzzerPacket(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/RenderHTTPFuzzerPacket",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).RenderHTTPFuzzerPacket(ctx, req.(*RenderHTTPFuzzerPacketRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -12638,6 +12670,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ExportHTTPFuzzerTaskToYaml",
 			Handler:    _Yak_ExportHTTPFuzzerTaskToYaml_Handler,
+		},
+		{
+			MethodName: "RenderHTTPFuzzerPacket",
+			Handler:    _Yak_RenderHTTPFuzzerPacket_Handler,
 		},
 		{
 			MethodName: "SaveFuzzerLabel",
