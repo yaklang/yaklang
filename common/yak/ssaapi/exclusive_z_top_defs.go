@@ -223,7 +223,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		callerValue.AppendEffectOn(i)
 		return callerValue.getTopDefs(actx, opt...).AppendEffectOn(callerValue)
 	case *ssa.Function:
-		log.Info("ssa.Function checking...")
 		var vals Values
 		// handle return
 		for _, r := range ret.Return {
@@ -238,8 +237,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 		return vals.AppendEffectOn(i)
 	case *ssa.Parameter:
-		log.Infof("checking ssa.Parameters...: %v", ret.String())
-
 		called := actx.GetCurrentCall()
 		if called == nil {
 			log.Error("parent function is not called by any other function, skip")
