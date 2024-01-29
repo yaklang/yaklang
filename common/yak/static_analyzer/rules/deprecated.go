@@ -16,7 +16,7 @@ func Deprecated(prog *ssaapi.Program) *result.StaticAnalyzeResults {
 
 	handler := func(funName, msg string) {
 		prog.Ref(funName).GetUsers().Filter(func(v *ssaapi.Value) bool {
-			return !v.IsExtern()
+			return !v.IsExternLib()
 		}).ForEach(func(v *ssaapi.Value) {
 			res.NewDeprecated(msg, v)
 		})
