@@ -141,6 +141,73 @@ func CheckHover(t *testing.T) func(t *testing.T, code, typ string, Range *ypb.Ra
 func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 	check := CheckHover(t)
 
+	t.Run("check basic hover", func(t *testing.T) {
+		code := `
+				 a = 1
+				 b = 1.1
+				 c = "asd"
+				 d = b"asd"; d2 = []byte("asd")
+				 e = {"a": 1}
+				 f = [1, 2, 3]
+				 g = make(chan int)
+				 `
+		check(t, code, "yak", &ypb.Range{
+			Code:        "a",
+			StartLine:   2,
+			StartColumn: 5,
+			EndLine:     2,
+			EndColumn:   6,
+		}, "```go\na number\n```")
+		check(t, code, "yak", &ypb.Range{
+			Code:        "b",
+			StartLine:   3,
+			StartColumn: 5,
+			EndLine:     3,
+			EndColumn:   6,
+		}, "```go\nb number\n```")
+		check(t, code, "yak", &ypb.Range{
+			Code:        "c",
+			StartLine:   4,
+			StartColumn: 5,
+			EndLine:     4,
+			EndColumn:   6,
+		}, "```go\nc string\n```")
+		check(t, code, "yak", &ypb.Range{
+			Code:        "d",
+			StartLine:   5,
+			StartColumn: 5,
+			EndLine:     5,
+			EndColumn:   6,
+		}, "```go\nd []byte\n```")
+		check(t, code, "yak", &ypb.Range{
+			Code:        "d2",
+			StartLine:   5,
+			StartColumn: 11,
+			EndLine:     5,
+			EndColumn:   13,
+		}, "```go\nd2 []byte\n```")
+		check(t, code, "yak", &ypb.Range{
+			Code:        "e",
+			StartLine:   6,
+			StartColumn: 5,
+			EndLine:     6,
+			EndColumn:   6,
+		}, "```go\ne map[string]number\n```")
+		check(t, code, "yak", &ypb.Range{
+			Code:        "f",
+			StartLine:   7,
+			StartColumn: 5,
+			EndLine:     7,
+			EndColumn:   6,
+		}, "```go\nf []number\n```")
+		check(t, code, "yak", &ypb.Range{
+			Code:        "g",
+			StartLine:   8,
+			StartColumn: 5,
+			EndLine:     8,
+			EndColumn:   6,
+		}, "```go\ng chan number\n```")
+	})
 	t.Run("check mitm hover argument", func(t *testing.T) {
 		check(t, `
 		hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
