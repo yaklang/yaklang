@@ -78,3 +78,32 @@ func TestGraph(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestSubGraph(t *testing.T) {
+	g := New()
+	sub1 := g.CreateSubGraph("sub1")
+	sub1.GetOrCreateNode("a")
+	sub1.GetOrCreateNode("b")
+	sub1.AddEdgeByLabel("a", "b")
+	sub2 := g.CreateSubGraph("sub2")
+	sub2.GetOrCreateNode("c")
+	sub2.GetOrCreateNode("d")
+	sub2.AddEdgeByLabel("c", "d")
+	g.AddEdgeByLabel("a", "d")
+	var buf bytes.Buffer
+	g.GenerateDOT(&buf)
+	fmt.Println(buf.String())
+	if !utils.MatchAllOfSubString(buf.String(), `label="a"`, `label="b"`, `label="c"`, `label="d"`) {
+		t.Errorf("label not match")
+		t.Fail()
+	}
+	if len(g.subGraphs) != 2 {
+		t.Errorf("sub graph not match")
+		t.Fail()
+	}
+
+	if len(g.edges) != 1 {
+		t.Errorf("edges not match")
+		t.Fail()
+	}
+}
