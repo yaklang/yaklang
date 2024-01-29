@@ -57,6 +57,10 @@ var authFunc = map[string]*DefaultServiceAuthInfo{
 	"snmpv3_sha-384": snmpV3BruteFactory("snmpv3_sha-384"),
 	"snmpv3_sha-512": snmpV3BruteFactory("snmpv3_sha-512"),
 	"rtsp":           rtspAuth,
+	"http_proxy":     httpProxyAuth,
+	"socks5_proxy":   SocksProxyBruteAuthFactory("socks5"),
+	"socks4_proxy":   SocksProxyBruteAuthFactory("socks4"),
+	"socks4a_proxy":  SocksProxyBruteAuthFactory("socks4a"),
 	//"oracle": func(item *BruteItem) *BruteItemResult {
 	//
 	//},

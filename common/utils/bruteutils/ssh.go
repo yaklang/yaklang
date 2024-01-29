@@ -44,12 +44,9 @@ var sshAuth = &DefaultServiceAuthInfo{
 		"Changeme_@123", "huawei@123", "h3c@123", "admin@123456", "ruijie", "ruijie@123", "",
 	},
 	BrutePass: func(i *BruteItem) *BruteItemResult {
-		log.Infof("ssh client start to handle: %s", i.String())
-		defer log.Infof("ssh finished to handle: %s", i.String())
-
 		result := i.Result()
 
-		var target = fixToTarget(i.Target, 22)
+		target := fixToTarget(i.Target, 22)
 
 		config := &ssh.ClientConfig{
 			User:            i.Username,
