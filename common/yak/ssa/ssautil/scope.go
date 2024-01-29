@@ -115,8 +115,8 @@ func (v *ScopedVersionedTable[T]) createLexicalVariableEx(name string, value T, 
 		verVar := v.newVar(name, verIndex)
 		ret.Add(verVar)
 		// register captured variable
-		if !local && !v.IsRoot() && v.IsCapturedByCurrentScope(name) {
-			v.registerCapturedVariable(name, verVar)
+		if !local && !v.IsRoot() {
+			v.tryRegisterCapturedVariable(name, verVar)
 		}
 		if !isZeroValue(value) {
 			err := verVar.Assign(value)
@@ -149,7 +149,18 @@ func (v *ScopedVersionedTable[T]) CreateSymbolicVariable(value T) *Versioned[T] 
 	return verVar
 }
 
-func (v *ScopedVersionedTable[T]) registerCapturedVariable(name string, ver *Versioned[T]) {
+// try register captured variable
+func (v *ScopedVersionedTable[T]) tryRegisterCapturedVariable(name string, ver *Versioned[T]) {
+	if v.IsRoot() {
+		return
+	}
+	// get variable from parent
+	parentVariable := v.parent.GetLatestVersionVersioned(name)
+	if parentVariable == nil {
+		return
+	}
+	// mark original captured variable
+	ver.overWriteVariable = parentVariable.overWriteVariable
 	v.captured.Set(name, ver)
 }
 
@@ -162,6 +173,8 @@ func (v *ScopedVersionedTable[T]) newVar(lexName string, versionIndex int) *Vers
 		scope:        v,
 		isAssigned:   utils.NewBool(false),
 	}
+	// every variable is captured by itself
+	varIns.overWriteVariable = varIns
 	v.table[global] = varIns
 	return varIns
 }
@@ -284,13 +297,13 @@ func (v *ScopedVersionedTable[T]) GetVersions(name string) []*Versioned[T] {
 // IsCapturedByCurrentScope check if the variable is captured by current scope
 // note: closure function and if/for or block scope will capture the variable
 // it's useful for trace the phi or mask
-func (v *ScopedVersionedTable[T]) IsCapturedByCurrentScope(name string) bool {
-	if v.IsRoot() {
-		log.Warn("root scope can't capture any variable")
-		return false
-	}
-	return v.parent.GetLatestVersionVersioned(name) != nil
-}
+// func (v *ScopedVersionedTable[T]) IsCapturedByCurrentScope(name string) bool {
+// 	if v.IsRoot() {
+// 		log.Warn("root scope can't capture any variable")
+// 		return false
+// 	}
+// 	return v.parent.GetLatestVersionVersioned(name) != nil
+// }
 
 // GetAllCapturedVariableNames get the captured variable
 func (v *ScopedVersionedTable[T]) GetAllCapturedVariableNames() []string {
