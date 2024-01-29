@@ -55,19 +55,20 @@ func (b *FunctionBuilder) BuildSyntaxBlock(builder func()) {
 	b.EmitJump(SubBlock)
 	b.CurrentBlock = SubBlock
 
-	endScope := ssautil.BuildSyntaxBlock(Scope, func(sub *ssautil.ScopedVersionedTable[*Variable]) bool {
-		b.CurrentBlock.ScopeTable = sub
+	endScope := ssautil.BuildSyntaxBlock(Scope, func(svt *ssautil.ScopedVersionedTable[*Variable]) *ssautil.ScopedVersionedTable[*Variable] {
+		b.CurrentBlock.ScopeTable = svt
 		builder()
-		return b.CurrentBlock.finish
+		return b.CurrentBlock.ScopeTable
 	})
+
+	if b.CurrentBlock.finish {
+		return
+	}
 
 	EndBlock := b.NewBasicBlock("")
 	EndBlock.ScopeTable = endScope
 
 	b.EmitJump(EndBlock)
-	if len(EndBlock.Preds) == 0 {
-		EndBlock.finish = true
-	}
 	b.CurrentBlock = EndBlock
 }
 

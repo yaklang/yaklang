@@ -10,22 +10,20 @@ if this scope finish this program
 */
 func BuildSyntaxBlock[T comparable](
 	global *ScopedVersionedTable[T],
-	buildBody func(*ScopedVersionedTable[T]) bool,
+	buildBody func(*ScopedVersionedTable[T]) *ScopedVersionedTable[T],
 ) *ScopedVersionedTable[T] {
 	/*
 		scope
 			sub // build body
-			end // cover by sub
+				--- body
+			end // cover by body
 	*/
 
-	sub := global.CreateSubScope()
-	if buildBody(sub) {
-		// this program finish in this sub-scope
-		return nil
-	}
+	body := global.CreateSubScope()
+	bodyEnd := buildBody(body)
 
 	end := global.CreateSubScope()
-	end.CoverBy(sub)
+	end.CoverBy(bodyEnd)
 	return end
 }
 
