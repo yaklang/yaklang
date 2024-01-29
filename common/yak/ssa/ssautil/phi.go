@@ -63,6 +63,24 @@ func (p *PhiContext[T]) AddPhi(i *Versioned[T]) {
 // }
 // }
 
+// ForEachCapturedVariable call the handler for each captured by base scope Variable
+func (ps *ScopedVersionedTable[T]) ForEachCapturedVariable(base *ScopedVersionedTable[T], handler func(name string, ver *Versioned[T])) {
+	ps.captured.ForEach(func(name string, ver *Versioned[T]) bool {
+		baseVariable := base.GetLatestVersionVersioned(name)
+		if baseVariable == nil {
+			// not exist in base scope, this variable just set in sub-scope,
+			// just skip
+			return true
+		}
+		if baseVariable.overWriteVariable != ver.overWriteVariable {
+			return true
+		}
+
+		handler(name, ver)
+		return true
+	})
+}
+
 func (s *ScopedVersionedTable[T]) CoverBy(scope *ScopedVersionedTable[T]) {
 	if scope == nil {
 		panic("cover scope is nil")
