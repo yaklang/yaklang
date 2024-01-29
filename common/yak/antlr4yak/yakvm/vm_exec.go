@@ -1740,7 +1740,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			v.push(NewType(c.Op1.TypeVerbose, literalReflectType_Bool))
 		case "float":
 			v.push(NewType(c.Op1.TypeVerbose, literalReflectType_Float64))
-		case "var":
+		case "any":
 			v.push(NewType(c.Op1.TypeVerbose, literalReflectType_Interface))
 		case "slice":
 			if val := v.pop(); val.IsType() {

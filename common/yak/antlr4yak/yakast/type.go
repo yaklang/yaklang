@@ -1,8 +1,9 @@
 package yakast
 
 import (
-	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"strings"
+
+	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 )
 
 func (y *YakCompiler) VisitTypeLiteral(raw yak.ITypeLiteralContext) interface{} {
@@ -19,36 +20,40 @@ func (y *YakCompiler) VisitTypeLiteral(raw yak.ITypeLiteralContext) interface{} 
 	defer recoverRange()
 
 	text := i.GetText()
-	if text == "int" || text == "byte" || text == "string" || text == "bool" || text == "float" || text == "var" {
+	switch text {
+	case "string", "bool":
 		y.writeString(text)
 		y.pushType(text)
-	} else if text == "uint8" {
+	case "var", "any":
+		y.writeString("any")
+		y.pushType("any")
+	case "byte", "uint8":
 		y.writeString("byte")
 		y.pushType("byte")
-	} else if text == "uint" || text == "uint16" || text == "uint32" || text == "uint64" ||
-		text == "int8" || text == "int16" || text == "int32" || text == "int64" {
+	case "int", "uint", "uint16", "uint32", "uint64", "int8", "int16", "int32", "int64":
 		y.writeString("int")
 		y.pushType("int")
-	} else if text == "double" || text == "float32" || text == "float64" {
+	case "double", "float", "float32", "float64":
 		y.writeString("float")
 		y.pushType("float")
-	} else if slice := i.SliceTypeLiteral(); slice != nil {
-		y.VisitSliceTypeLiteral(slice)
-	} else if strings.HasPrefix(text, "map") {
-		iMapType := i.MapTypeLiteral()
-		if iMapType != nil {
-			mapType := iMapType.(*yak.MapTypeLiteralContext)
-			y.writeString("map[")
-			y.VisitTypeLiteral(mapType.TypeLiteral(0))
-			y.writeString("]")
-			y.VisitTypeLiteral(mapType.TypeLiteral(1))
-			y.pushType("map")
+	default:
+		if slice := i.SliceTypeLiteral(); slice != nil {
+			y.VisitSliceTypeLiteral(slice)
+		} else if strings.HasPrefix(text, "map") {
+			iMapType := i.MapTypeLiteral()
+			if iMapType != nil {
+				mapType := iMapType.(*yak.MapTypeLiteralContext)
+				y.writeString("map[")
+				y.VisitTypeLiteral(mapType.TypeLiteral(0))
+				y.writeString("]")
+				y.VisitTypeLiteral(mapType.TypeLiteral(1))
+				y.pushType("map")
+			}
+		} else if strings.HasPrefix(text, "chan") {
+			y.writeString("chan ")
+			y.VisitTypeLiteral(i.TypeLiteral())
+			y.pushType("chan")
 		}
-
-	} else if strings.HasPrefix(text, "chan") {
-		y.writeString("chan ")
-		y.VisitTypeLiteral(i.TypeLiteral())
-		y.pushType("chan")
 	}
 
 	return nil
