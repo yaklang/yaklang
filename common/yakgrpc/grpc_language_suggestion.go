@@ -230,7 +230,7 @@ func getInstanceByName(name string) *yakdoc.LibInstance {
 }
 
 func getGolangTypeStringBySSAType(typ ssa.Type) string {
-	typStr := typ.PkgPath()
+	typStr := typ.PkgPathString()
 	return getGolangTypeStringByTypeStr(typStr)
 }
 

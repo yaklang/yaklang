@@ -160,8 +160,8 @@ func IsObjectType(t Type) bool {
 }
 
 type Type interface {
-	String() string  // only string
-	PkgPath() string // package path string
+	String() string        // only string
+	PkgPathString() string // package path string
 	RawString() string
 	GetTypeKind() TypeKind
 
@@ -269,15 +269,18 @@ func NewBasicType(kind TypeKind, name string) *BasicType {
 		pkgPath: name,
 		method:  map[string]*FunctionType{},
 	}
-
 }
 
 func (b *BasicType) String() string {
 	return b.name
 }
 
-func (b *BasicType) PkgPath() string {
-	return b.pkgPath
+func (b *BasicType) PkgPathString() string {
+	result := b.pkgPath
+	if result == "" {
+		result = b.RawString()
+	}
+	return result
 }
 
 func (b *BasicType) RawString() string {
@@ -427,8 +430,12 @@ func (a *AliasType) String() string {
 	}
 }
 
-func (b *AliasType) PkgPath() string {
-	return b.pkgPath
+func (b *AliasType) PkgPathString() string {
+	result := b.pkgPath
+	if result == "" {
+		result = b.RawString()
+	}
+	return result
 }
 
 func (a *AliasType) RawString() string {
@@ -487,8 +494,12 @@ func (i *InterfaceType) String() string {
 	}
 }
 
-func (i *InterfaceType) PkgPath() string {
-	return i.pkgPath
+func (i *InterfaceType) PkgPathString() string {
+	result := i.pkgPath
+	if result == "" {
+		result = i.RawString()
+	}
+	return result
 }
 
 func (i *InterfaceType) RawString() string {
@@ -536,8 +547,8 @@ func (c ChanType) String() string {
 	return fmt.Sprintf("chan %s", c.Elem)
 }
 
-func (c ChanType) PkgPath() string {
-	return c.Elem.PkgPath()
+func (c ChanType) PkgPathString() string {
+	return fmt.Sprintf("chan %s", c.Elem.PkgPathString())
 }
 
 func (c ChanType) RawString() string {
@@ -643,8 +654,12 @@ func (itype ObjectType) String() string {
 	return itype.RawString()
 }
 
-func (i ObjectType) PkgPath() string {
-	return i.pkgPath
+func (i ObjectType) PkgPathString() string {
+	result := i.pkgPath
+	if result == "" {
+		result = i.RawString()
+	}
+	return result
 }
 
 func (itype ObjectType) RawString() string {
@@ -730,7 +745,7 @@ func (s *ObjectType) Finish() {
 	if s.Kind != ObjectTypeKind {
 		return
 	}
-	//TODO: handler this hash later
+	// TODO: handler this hash later
 	fieldTypes := lo.UniqBy(s.FieldTypes, func(t Type) string { return t.String() })
 	keyTypes := lo.UniqBy(s.keyTypes, func(t Type) string { return t.String() })
 	if len(fieldTypes) == 1 {
@@ -817,9 +832,14 @@ func (s *FunctionType) SetName(name string) {
 	s.Name = name
 }
 
-func (s *FunctionType) PkgPath() string {
-	return s.pkgPath
+func (s *FunctionType) PkgPathString() string {
+	result := s.pkgPath
+	if result == "" {
+		result = s.RawString()
+	}
+	return result
 }
+
 func (s *FunctionType) String() string {
 	if s.Name != "" {
 		return s.Name
