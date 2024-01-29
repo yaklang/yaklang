@@ -54,8 +54,7 @@ func NewWaitGroup() *WaitGroupProxy {
 // println("所有任务完成")
 // ```
 func NewSizedWaitGroup(size int) *utils.SizedWaitGroup {
-	swg := utils.NewSizedWaitGroup(size)
-	return swg
+	return utils.NewSizedWaitGroup(size)
 }
 
 // NewMutex 创建一个 Mutex 结构体引用，用于实现互斥锁，其帮助我们避免多个并发任务访问同一个资源时出现数据竞争问题
