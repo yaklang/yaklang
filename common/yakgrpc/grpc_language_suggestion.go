@@ -491,7 +491,7 @@ func getDescFromSSAValue(name string, v *ssaapi.Value) string {
 	} else {
 		// ! 这里可能存在value实际上是parent 而不是其本身
 		lastName := name[strings.LastIndex(name, ".")+1:]
-		if v.IsExtern() {
+		if v.IsExternLib() {
 			// 标准库函数
 			funcDecl := getFuncDeclByName(name)
 			if funcDecl != nil {
