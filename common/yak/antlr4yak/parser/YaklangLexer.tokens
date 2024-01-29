@@ -146,7 +146,6 @@ TemplateBackTickStringStartExpression=116
 'in'=31
 'not'=32
 'assert'=33
-'var'=34
 'undefined'=36
 'fallthrough'=37
 'nil'=38
