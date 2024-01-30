@@ -2,16 +2,15 @@ package netx
 
 import (
 	"bytes"
+	"context"
 	"errors"
-	"github.com/yaklang/yaklang/common/log"
+	"fmt"
 	"net"
 	"net/url"
 	"strconv"
 	"time"
-)
 
-import (
-	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 type requestBuilder struct {
@@ -23,8 +22,15 @@ func (b *requestBuilder) add(data ...byte) {
 }
 
 func (c *config) sendReceive(conn net.Conn, req []byte) (resp []byte, err error) {
-	if c.Timeout > 0 {
-		if err := conn.SetWriteDeadline(time.Now().Add(c.Timeout)); err != nil {
+	if c.Context != nil {
+		ddl, ok := c.Context.Deadline()
+		if ok {
+			if err := conn.SetDeadline(ddl); err != nil {
+				return nil, err
+			}
+		}
+	} else if c.Timeout > 0 {
+		if err := conn.SetDeadline(time.Now().Add(c.Timeout)); err != nil {
 			return nil, err
 		}
 	}
@@ -83,6 +89,7 @@ const (
 
 type (
 	config struct {
+		Context context.Context
 		Proto   int
 		Host    string
 		Auth    *auth
@@ -138,9 +145,10 @@ func parse(proxyURI string) (*config, error) {
 func (cfg *config) dialSocks5(targetAddr string) (_ net.Conn, err error) {
 RECON:
 	proxy := cfg.Host
+	ctx := cfg.Context
 
 	// dial TCP
-	conn, err := DialTimeoutWithoutProxy(cfg.Timeout, "tcp", proxy)
+	conn, err := DialContextWithoutProxy(ctx, "tcp", proxy)
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +210,7 @@ RECON:
 		}
 	}
 
-	if cfg.Check { //s5 just auth ok
+	if cfg.Check { // s5 just auth ok
 		return conn, nil
 	}
 
@@ -239,20 +247,20 @@ RECON:
 // DialSocksProxy returns the dial function to be used in http.Transport object.
 // Argument socksType should be one of SOCKS4, SOCKS4A and SOCKS5.
 // Argument proxy should be in this format "127.0.0.1:1080".
-func DialSocksProxy(socksType int, proxy string, username string, password string) func(string, string) (net.Conn, error) {
+func DialSocksProxy(ctx context.Context, socksType int, proxy string, username string, password string) func(string, string) (net.Conn, error) {
+	cfg := &config{Context: ctx, Proto: socksType, Host: proxy}
 	if username != "" {
-		return (&config{Proto: socksType, Host: proxy, Auth: &auth{username, password}}).dialFunc()
-	} else {
-		return (&config{Proto: socksType, Host: proxy}).dialFunc()
+		cfg.Auth = &auth{username, password}
 	}
+	return cfg.dialFunc()
 }
 
-func dialSocksProxyCheckConfig(socksType int, proxy string, timeout time.Duration, username string, password string) *config {
+func dialSocksProxyCheckConfig(ctx context.Context, socksType int, proxy string, timeout time.Duration, username string, password string) *config {
+	cfg := &config{Context: ctx, Proto: socksType, Host: proxy, Check: true, Timeout: timeout}
 	if username != "" {
-		return &config{Proto: socksType, Host: proxy, Check: true, Timeout: timeout, Auth: &auth{username, password}}
-	} else {
-		return &config{Proto: socksType, Host: proxy, Check: true, Timeout: timeout}
+		cfg.Auth = &auth{username, password}
 	}
+	return cfg
 }
 
 func (c *config) dialFunc() func(string, string) (net.Conn, error) {
@@ -278,9 +286,11 @@ func dialError(err error) func(string, string) (net.Conn, error) {
 func (cfg *config) dialSocks4(targetAddr string) (_ net.Conn, err error) {
 	socksType := cfg.Proto
 	proxy := cfg.Host
+	ctx := cfg.Context
 
 	// dial TCP
-	conn, err := DialTimeoutWithoutProxy(cfg.Timeout, "tcp", proxy)
+
+	conn, err := DialContextWithoutProxy(ctx, "tcp", proxy)
 	if err != nil {
 		return nil, err
 	}
