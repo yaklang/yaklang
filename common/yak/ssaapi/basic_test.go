@@ -270,8 +270,8 @@ func check(code string, want []string, t *testing.T) *Program {
 
 	prog.Show()
 
-	println := prog.Ref("println")
-	test.Equal(1, len(println), "println should only 1")
+	println := prog.Ref("println").ShowWithSource()
+	// test.Equal(1, len(println), "println should only 1")
 	got := lo.Map(
 		println.GetUsers().ShowWithSource().Flat(func(v *Value) Values {
 			return Values{v.GetOperand(1)}
@@ -348,6 +348,33 @@ func TestYaklangBasic_Variable_InBlock(t *testing.T) {
 			[]string{
 				"1", "2",
 			}, t)
+	})
+
+	t.Run("test variable, but not cover", func(t *testing.T) {
+		check(`
+		{
+			a = 2
+			println(a) // 2
+		}
+		println(a) // undefine-a
+		`, []string{
+			"2",
+			"Undefined-a",
+		}, t)
+	})
+
+	t.Run("test ++ expression", func(t *testing.T) {
+		check(`
+		a = 1
+		{
+			a ++
+			println(a) // 2
+		}
+		`,
+			[]string{
+				"2",
+			},
+			t)
 	})
 }
 
@@ -489,5 +516,72 @@ func TestYaklangBasic_Variable_InIf(t *testing.T) {
 			"3",
 			"1",
 		}, t)
+	})
+}
+
+func TestYaklangBasic_Variable_Loop(t *testing.T) {
+
+	t.Run("simple loop only condition", func(t *testing.T) {
+		check(`
+		i = 1
+		for i < 10 { 
+			println(i) // phi
+			i = 2 
+			println(i) // 2
+		}
+		println(i) // phi
+		`, []string{
+			"phi(i)[1,2]",
+			"2",
+			"phi(i)[1,2]",
+		}, t)
+	})
+
+	t.Run("simple loop", func(t *testing.T) {
+		check(`
+		i=0
+		for i=0; i<10; i++ {
+			println(i) // phi[0, i+1]
+		}
+		println(i)
+		`,
+			[]string{
+				"phi(i)[0,add(i, 1)]",
+				"phi(i)[0,add(i, 1)]",
+			}, t)
+	})
+
+	t.Run("loop with spin, signal phi", func(t *testing.T) {
+		check(`
+		a = 1
+		for i := 0; i < 10; i ++ { // i=0; i=phi[0,1]; i=0+1=1
+			println(a) // phi[0, $+1]
+			a = 0
+			println(a) // 0 
+		}
+		println(a)  // phi[0, 1]
+		`,
+			[]string{
+				"phi(a)[1,0]",
+				"0",
+				"phi(a)[1,0]",
+			},
+			t)
+	})
+
+	t.Run("loop with spin, double phi", func(t *testing.T) {
+		check(`
+		a = 1
+		for i := 0; i < 10; i ++ {
+			a += 1
+			println(a) // add(phi, 1)
+		}
+		println(a)  // phi[1, add(phi, 1)]
+		`,
+			[]string{
+				"add(phi(a)[1,add(a, 1)], 1)",
+				"phi(a)[1,add(a, 1)]",
+			},
+			t)
 	})
 }

@@ -188,34 +188,6 @@ func (b *FunctionBuilder) PopFunction() *FunctionBuilder {
 	return b.parentBuilder
 }
 
-// use in for/switch
-type target struct {
-	tail         *target // the stack
-	_break       *BasicBlock
-	_continue    *BasicBlock
-	_fallthrough *BasicBlock
-}
-
-// target stack
-func (b *FunctionBuilder) PushTarget(_break, _continue, _fallthrough *BasicBlock) {
-	b.target = &target{
-		tail:         b.target,
-		_break:       _break,
-		_continue:    _continue,
-		_fallthrough: _fallthrough,
-	}
-}
-
-func (b *FunctionBuilder) PopTarget() bool {
-	b.target = b.target.tail
-	if b.target == nil {
-		// b.NewError(Error, SSATAG, "error target struct this position when build")
-		return false
-	} else {
-		return true
-	}
-}
-
 // for goto and label
 func (b *FunctionBuilder) AddLabel(name string, block *BasicBlock) {
 	b.labels[name] = block

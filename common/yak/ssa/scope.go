@@ -1,177 +1,289 @@
 package ssa
 
 import (
-	"fmt"
-
-	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
-type Variable struct {
-	scope    *ssautil.ScopedVersionedTable[*Variable]
-	Name     string
-	DefRange *Range
-	UseRange map[*Range]struct{}
-	value    Value
-}
-
-func NewVariable(name string, r *Range, scope *ssautil.ScopedVersionedTable[*Variable]) *Variable {
-	ret := &Variable{
-		Name:     name,
-		UseRange: make(map[*Range]struct{}),
-		DefRange: r,
-		scope:    scope,
-	}
-	return ret
-}
-
-func (v *Variable) String() string {
-	ret := ""
-	ret += fmt.Sprintln("Variable ", v.Name, LineDisasm(v.value))
-	return ret
-}
-
-func (v *Variable) AddRange(p *Range, force bool) {
-	if force || len(*p.SourceCode) == len(v.Name) {
-		v.UseRange[p] = struct{}{}
+func (f *Function) ReplaceVariable(variable string, v, to Value) {
+	for _, block := range f.Blocks {
+		if vs, ok := block.symbolTable[variable]; ok {
+			vs = utils.ReplaceSliceItem(vs, v, to)
+			block.symbolTable[variable] = vs
+		}
 	}
 }
 
-func (v *Variable) NewError(kind ErrorKind, tag ErrorTag, msg string) {
-	// for R := range v.Range {
-	// 	v.value.GetFunc().NewErrorWithPos(kind, tag, R, msg)
-	// }
+func (b *Function) writeVariableByBlock(variable string, value Value, block *BasicBlock) {
+	vs := block.GetValuesByVariable(variable)
+	if vs == nil {
+		vs = make([]Value, 0, 1)
+	}
+	vs = append(vs, value)
+	block.symbolTable[variable] = vs
 }
 
-// type item struct {
-// 	v *Variable
-// 	r *Range
-// }
+// PeekVariable just same like `ReadVariable` , but `PeekVariable` don't create `Variable`
+// if your syntax read variable, please use `ReadVariable`
+// if you just want see what Value this variable, just use `PeekVariable`
+func (b *FunctionBuilder) PeekVariable(variable string, create bool) Value {
+	var ret Value
+	b.ReadVariableEx(variable, create, func(vs []Value) {
+		if len(vs) > 0 {
+			ret = vs[len(vs)-1]
+		} else {
+			ret = nil
+		}
+	})
 
-// type Scope struct {
-// 	Id                 int // scope id in a function
-// 	VarMap             map[string][]*Variable
-// 	Var                []item            // sort by Position
-// 	SymbolTable        map[string]string // variable -> variable-ID(variable-scopeID)
-// 	SymbolTableReverse map[string]string // variable -> variable-ID(variable-scopeID)
-// 	Range              *Range
-// 	Function           *Function
-// 	Parent             *Scope
-// 	Children           []*Scope
-// }
+	return ret
+}
 
-// func NewScope(id int, R *Range, Func *Function) *Scope {
-// 	return &Scope{
-// 		Id:                 id,
-// 		VarMap:             make(map[string][]*Variable),
-// 		Var:                make([]item, 0),
-// 		SymbolTable:        make(map[string]string),
-// 		SymbolTableReverse: make(map[string]string),
-// 		Range:              R,
-// 		Function:           Func,
-// 		Parent:             nil,
-// 		Children:           make([]*Scope, 0),
-// 	}
-// }
+// PeekLexicalVariableByName find the static variable in lexical scope
+func (b *FunctionBuilder) PeekLexicalVariableByName(variable string) Value {
+	i := b.PeekVariable(variable, false)
+	if i != nil {
+		return i
+	}
+	if b.parentBuilder != nil {
+		i := b.parentBuilder.PeekVariable(variable, false)
+		if i != nil {
+			return i
+		}
+	}
+	return nil
+}
 
-// func (s *Scope) AddChild(child *Scope) {
-// 	s.Children = append(s.Children, child)
-// 	child.Parent = s
-// }
+// get value by variable and block
+//
+//	return : undefined \ value \ phi
 
-// func (s *Scope) InsertByRange(v *Variable, R *Range) {
-// 	i := 0
-// 	for ; i < len(s.Var); i++ {
-// 		if s.Var[i].r.CompareStart(R) > 0 {
-// 			break
-// 		}
-// 	}
-// 	s.Var = utils.InsertSliceItem(s.Var, item{v, R}, i)
-// }
-
-// func (s *Scope) PeekLexicalVariableByName(i string) (*Variable, error) {
-// 	vals, _ := s.VarMap[i]
-// 	if len(vals) > 0 {
-// 		return vals[len(vals)-1], nil
-// 	}
-// 	if s.Parent == nil {
-// 		return nil, fmt.Errorf("can't find variable %s", i)
-// 	}
-// 	return s.Parent.PeekLexicalVariableByName(i)
-// }
-
-// func (s *Scope) AddVariable(v *Variable, R *Range) {
-// 	if R == nil {
-// 		log.Errorf("scope(%d) variable %s range is nil", s.Id, v.Name)
-// 	}
-// 	name, ok := s.SymbolTableReverse[v.Name]
-// 	if !ok {
-// 		name = v.Name
-// 	}
-// 	{
-// 		value := v.value
-// 		value.GetProgram().SetInstructionWithName(name, value)
-// 	}
-// 	v.Name = name
-// 	varList, ok := s.VarMap[name]
-// 	if !ok {
-// 		varList = make([]*Variable, 0, 1)
-// 	}
-// 	varList = append(varList, v)
-// 	s.VarMap[name] = varList
-// 	v.AddRange(R, true)
-// 	s.InsertByRange(v, R)
-// }
-
-// func (s *Scope) SetLocalVariable(text string) string {
-// 	newText := fmt.Sprintf("%s-%d", text, s.Id)
-// 	s.SymbolTable[text] = newText
-// 	s.SymbolTableReverse[newText] = text
-// 	return newText
-// }
-
-// func (s *Scope) GetLocalVariable(text string) string {
-// 	ret, ok := s.SymbolTable[text]
-// 	if !ok {
-// 		if s.Parent != nil {
-// 			ret = s.Parent.GetLocalVariable(text)
-// 			if ret != text {
-// 				s.SymbolTable[text] = ret
-// 			}
+// * first check builder.currentDef
+//
+// * if block sealed; just create a phi
+// * if len(block.preds) == 0: undefined
+// * if len(block.preds) == 1: just recursive
+// * if len(block.preds) >  1: create phi and builder
+// func (b *FunctionBuilder) ReadVariable(variable string, create bool) Value {
+// 	var ret Value
+// 	b.ReadVariableEx(variable, create, func(vs []Value) {
+// 		if len(vs) > 0 {
+// 			ret = vs[len(vs)-1]
 // 		} else {
-// 			ret = text
+// 			ret = nil
 // 		}
+// 	})
+
+// 	if ret == nil {
+// 		return ret
+// 	}
+
+// 	if ret.IsExtern() {
+// 		return ret
+// 	}
+
+// 	if v := ret.GetVariable(variable); v != nil {
+// 		v.AddRange(b.CurrentRange, false)
+// 		b.CurrentScope.InsertByRange(v, b.CurrentRange)
+// 	} else {
+// 		b.CurrentScope.AddVariable(NewVariable(variable, ret), b.CurrentRange)
 // 	}
 // 	return ret
 // }
 
-// func (s *Scope) String() string {
-// 	ret := ""
-// 	ret += fmt.Sprintf("Scope %d\n", s.Id)
-// 	ret += fmt.Sprintf("symbolTable: %#v\n", s.SymbolTable)
-// 	ret += fmt.Sprintln("Variable: ", s.VarMap)
-// 	return ret
-// }
+func (b *FunctionBuilder) ReadVariableBefore(variable string, create bool, before Instruction) Value {
+	var ret Value
+	b.ReadVariableEx(variable, create, func(vs []Value) {
+		for i := len(vs) - 1; i >= 0; i-- {
+			if vs[i] == nil {
+				continue
+			}
+			vpos := vs[i].GetRange()
+			bpos := before.GetRange()
+			if vpos == nil || bpos == nil {
+				continue
+			}
+			if vpos.CompareStart(bpos) <= 0 {
+				ret = vs[i]
+				return
+			}
+		}
+	})
+	return ret
+}
 
-// block symbol-table stack
-// func (b *FunctionBuilder) ScopeStart() {
-// newScope := NewScope(b.NewScopeId(), b.CurrentRange, b.Function)
-// b.CurrentScope.AddChild(newScope)
-// b.CurrentScope = newScope
-// }
+func (b *FunctionBuilder) ReadVariableEx(variable string, create bool, fun func([]Value)) {
+	// variable = b.GetScopeLocalVariable(variable)
+	var ret []Value
+	block := b.CurrentBlock
+	if block == nil {
+		block = b.ExitBlock
+	}
+	ret = b.readVariableByBlockEx(variable, block, create)
+	fun(ret)
+}
 
-// func (b *FunctionBuilder) NewScopeId() int {
-// 	b.scopeId++
-// 	return b.scopeId
-// }
+func (b *FunctionBuilder) deleteVariableByBlock(variable string, block *BasicBlock) {
+	delete(block.symbolTable, variable)
+}
 
-// func (b *FunctionBuilder) ScopeEnd() {
-// 	b.CurrentScope = b.CurrentScope.Parent
-// }
+func (b *FunctionBuilder) readVariableByBlock(variable string, block *BasicBlock, create bool) Value {
+	ret := b.readVariableByBlockEx(variable, block, create)
+	if len(ret) > 0 {
+		return ret[len(ret)-1]
+	} else {
+		return nil
+	}
+}
 
-// func (b *FunctionBuilder) SetScopeLocalVariable(text string) string {
-// 	return b.CurrentScope.SetLocalVariable(text)
-// }
+func (block *BasicBlock) GetValuesByVariable(name string) []Value {
+	if vs, ok := block.symbolTable[name]; ok && (len(vs) > 0 && vs[0] != nil) {
+		return vs
+	}
+	return nil
+}
 
-// func (b *FunctionBuilder) GetScopeLocalVariable(id string) string {
-// 	return b.CurrentScope.GetLocalVariable(id)
-// }
+func (b *FunctionBuilder) readVariableByBlockEx(variable string, block *BasicBlock, create bool) []Value {
+	if vs := block.GetValuesByVariable(variable); vs != nil {
+		return vs
+	}
+
+	if block.Skip {
+		return nil
+	}
+
+	var v Value
+	// if block in sealedBlock
+	if !block.isSealed {
+		if create {
+			phi := NewPhi(block, variable, create)
+			phi.SetRange(b.CurrentRange)
+			block.inCompletePhi = append(block.inCompletePhi, phi)
+			v = phi
+		}
+	} else if len(block.Preds) == 0 {
+		// v = nil
+		if create && b.CanBuildFreeValue(variable) {
+			v = b.BuildFreeValue(variable)
+		} else if i := b.TryBuildExternValue(variable); i != nil {
+			v = i
+		} else if create {
+			un := NewUndefined(variable)
+			// b.emitInstructionBefore(un, block.LastInst())
+			b.EmitToBlock(un, block)
+			un.SetRange(b.CurrentRange)
+			v = un
+		} else {
+			v = nil
+		}
+	} else if len(block.Preds) == 1 {
+		vs := b.readVariableByBlockEx(variable, block.Preds[0], create)
+		if len(vs) > 0 {
+			v = vs[len(vs)-1]
+		} else {
+			v = nil
+		}
+	} else {
+		phi := NewPhi(block, variable, create)
+		phi.SetRange(b.CurrentRange)
+		v = phi.Build()
+	}
+	b.writeVariableByBlock(variable, v, block) // NOTE: why write when the v is nil?
+	if v != nil {
+		return []Value{v}
+	} else {
+		return nil
+	}
+}
+
+// --------------- `f.freeValue`
+
+func (b *FunctionBuilder) BuildFreeValue(variable string) Value {
+	freeValue := NewParam(variable, true, b)
+	b.FreeValues[variable] = freeValue
+	// b.CurrentScope.AddVariable(NewVariable(variable, freeValue), b.CurrentRange)
+	b.WriteVariable(variable, freeValue)
+	return freeValue
+}
+
+func (b *FunctionBuilder) CanBuildFreeValue(variable string) bool {
+	// parent := b.parentBuilder
+	// scope := b.parentScope
+	// block := b.parentCurrentBlock
+	// for parent != nil {
+	// 	variable = scope.GetLocalVariable(variable)
+	// 	v := parent.readVariableByBlock(variable, block, false)
+	// 	if v != nil && !v.IsExtern() {
+	// 		return true
+	// 	}
+
+	// 	// parent symbol and block
+	// 	scope = parent.parentScope
+	// 	block = parent.parentCurrentBlock
+	// 	// next parent
+	// 	parent = parent.parentBuilder
+	// }
+	return false
+}
+
+// --------------- Read
+
+// ReadValue get value by name
+func (b *FunctionBuilder) ReadValue(name string) Value {
+	scope := b.CurrentBlock.ScopeTable
+	if ret := ReadVariableFromScope(scope, name); ret != nil {
+		ret.AddRange(b.CurrentRange, false)
+		if ret.Value != nil {
+			return ret.Value
+		}
+	}
+	undefine := b.EmitUndefine(name)
+	b.WriteVariable(name, undefine)
+	return undefine
+}
+
+// ReadValueByVariable get value by variable
+func (b *FunctionBuilder) ReadValueByVariable(v *Variable) Value {
+	if ret := v.GetValue(); ret != nil {
+		return ret
+	}
+
+	return b.ReadValue(v.GetName())
+}
+
+// ----------------- Write
+
+// WriteVariable write value to variable
+// will create Variable  and assign value
+func (b *FunctionBuilder) WriteVariable(name string, value Value) {
+	scope := b.CurrentBlock.ScopeTable
+	scope.WriteVariable(name, value)
+}
+
+// WriteLocalVariable write value to local variable
+func (b *FunctionBuilder) WriteLocalVariable(name string, value Value) {
+	scope := b.CurrentBlock.ScopeTable
+	scope.WriteLocalVariable(name, value)
+}
+
+// ------------------- Assign
+
+// AssignVariable  assign value to variable
+func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
+	scope := b.CurrentBlock.ScopeTable
+	scope.AssignVariable(variable, value)
+}
+
+// ------------------- Create
+
+// CreateVariable create variable
+func (b *FunctionBuilder) CreateVariable(name string) *Variable {
+	scope := b.CurrentBlock.ScopeTable
+	// return scope.CreateVariable(name, nil).(*Variable)
+	return scope.CreateVariable(name).(*Variable)
+}
+
+// CreateLocalVariable create local variable
+func (b *FunctionBuilder) CreateLocalVariable(name string) *Variable {
+	scope := b.CurrentBlock.ScopeTable
+	return scope.CreateLocalVariable(name).(*Variable)
+}
