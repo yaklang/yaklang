@@ -164,3 +164,7 @@ func TestNewMultiTargetBruteUtilWithContext_Tomcat(t *testing.T) {
 
 	_ = bu.RunWithContext(ctx)
 }
+
+func TestBruteNoPass(t *testing.T) {
+	 NewMultiTargetBruteUtilEx()
+}

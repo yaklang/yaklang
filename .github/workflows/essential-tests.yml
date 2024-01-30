@@ -69,6 +69,7 @@ jobs:
               go test -timeout 20s -run TestMUSTPASS_YakitLog ./common/yak/yaklib
               go test -timeout 30s ./common/openapi/...
               go test -timeout 10s ./common/utils/dot/...
+              go test -timeout 15s ./common/utils/bruteutils/.
 
           - name: Test NetX
             run: |
