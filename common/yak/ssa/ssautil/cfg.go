@@ -112,84 +112,104 @@ func (i *IfStmt[T]) BuildFinish(
 
 // LoopStmt represents a loop statement.
 type LoopStmt[T comparable] struct {
+	MergeToEnd   []*ScopedVersionedTable[T] // break, merge phi in exit
+	MergeToLatch []*ScopedVersionedTable[T] // continue, merge phi in latch
+
+	ThirdBuilder func(*ScopedVersionedTable[T]) // third
+
 	global    *ScopedVersionedTable[T]
-	First     func(*ScopedVersionedTable[T])
-	Condition func(*ScopedVersionedTable[T])
-	Third     func(*ScopedVersionedTable[T])
-	Body      func(*ScopedVersionedTable[T])
-	NewPhi    func() T
+	header    *ScopedVersionedTable[T]
+	condition *ScopedVersionedTable[T]
+	body      *ScopedVersionedTable[T]
 }
 
 // NoneBuilder is a helper function that does nothing.
-func NoneBuilder[T comparable](*ScopedVersionedTable[T]) {}
+// func NoneBuilder[T comparable](*ScopedVersionedTable[T])                                     {}
+// func NoneBuilderReturnScope[T comparable](*ScopedVersionedTable[T]) *ScopedVersionedTable[T] {}
 
 // NewLoopStmt creates a new LoopStmt with the given global scope.
-func NewLoopStmt[T comparable](global *ScopedVersionedTable[T], NewPhi func() T) *LoopStmt[T] {
-	return &LoopStmt[T]{
-		global:    global,
-		First:     NoneBuilder[T],
-		Condition: NoneBuilder[T],
-		Third:     NoneBuilder[T],
-		Body:      NoneBuilder[T],
-		NewPhi:    NewPhi,
+func NewLoopStmt[T comparable](global *ScopedVersionedTable[T], NewPhi func(string) T) *LoopStmt[T] {
+	l := &LoopStmt[T]{
+		global: global,
 	}
+	l.header = l.global.CreateSubScope()
+	l.condition = l.header.CreateSubScope()
+	l.condition.SetSpin(NewPhi)
+	l.body = l.condition.CreateSubScope()
+	l.ThirdBuilder = nil
+	return l
 }
 
 // SetFirst sets the first function for the LoopStmt.
-func (l *LoopStmt[T]) SetFirst(f func(*ScopedVersionedTable[T])) *LoopStmt[T] {
-	l.First = f
-	return l
+func (l *LoopStmt[T]) SetFirst(f func(*ScopedVersionedTable[T])) {
+	f(l.header)
 }
 
 // SetCondition sets the condition function for the LoopStmt.
-func (l *LoopStmt[T]) SetCondition(f func(*ScopedVersionedTable[T])) *LoopStmt[T] {
-	l.Condition = f
-	return l
+func (l *LoopStmt[T]) SetCondition(f func(*ScopedVersionedTable[T])) {
+	f(l.condition)
 }
 
 // SetThird sets the third function for the LoopStmt.
-func (l *LoopStmt[T]) SetThird(f func(*ScopedVersionedTable[T])) *LoopStmt[T] {
-	l.Third = f
-	return l
+func (l *LoopStmt[T]) SetThird(f func(*ScopedVersionedTable[T])) {
+	l.ThirdBuilder = f
 }
 
 // SetBody sets the body function for the LoopStmt.
-func (l *LoopStmt[T]) SetBody(f func(*ScopedVersionedTable[T])) *LoopStmt[T] {
-	l.Body = f
-	return l
+func (l *LoopStmt[T]) SetBody(f func(*ScopedVersionedTable[T]) *ScopedVersionedTable[T]) {
+	l.body = f(l.body)
+}
+
+func (l *LoopStmt[T]) Continue(from *ScopedVersionedTable[T]) {
+	l.MergeToLatch = append(l.MergeToLatch, from)
+}
+
+func (l *LoopStmt[T]) Break(from *ScopedVersionedTable[T]) {
+	l.MergeToEnd = append(l.MergeToEnd, from)
 }
 
 // Build builds the LoopStmt using the provided NewPhi and SpinHandler functions.
-func (l *LoopStmt[T]) Build(SpinHandler func(name string, phi T, origin T, last T) T) {
+func (l *LoopStmt[T]) Build(SpinHandler func(name string, phi, v1, v2 T) T, merge func(name string, t []T) T) *ScopedVersionedTable[T] {
 
 	/*
 		global [i = 0]
 			header [i] // first
-				condition // condition
-					body [i] // body + third
-				- cover
-				- spin
-			- cover
-		- cover
+				condition // condition [phi] from header and latch
+					body [i] // body
+						latch    // third [phi] from all continue and body
+			exit // exit loop [phi]  from all break and global
+
+		// in body
+		* break to global scope
+		* continue to latch scope
 	*/
 
-	header := l.global.CreateSubScope()
+	// latch
+	latch := l.body.CreateSubScope()
+	latch.Merge(
+		true,
+		merge,
+		l.MergeToLatch...,
+	)
+	// this `l.ThirdBuilder` only set in `l.SetThird`
+	if l.ThirdBuilder != nil {
+		// if not nil, mean, this `SetThird` is called before `SetBody`
+		// call it
+		l.ThirdBuilder(latch)
+	}
 
-	l.First(header)
+	l.condition.Spin(l.header, latch, SpinHandler)
 
-	condition := header.CreateSubScope()
-	condition.SetSpin(l.NewPhi)
-	l.Condition(condition)
+	// end
+	end := l.global.CreateSubScope()
+	l.header.CoverBy(l.condition)
+	end.CoverBy(l.header)
 
-	body := condition.CreateSubScope()
-	l.Body(body)
-	l.Third(body)
-	condition.CoverByChild()
+	end.Merge(
+		true,
+		merge,
+		l.MergeToEnd...,
+	)
 
-	// finish phi
-	condition.Spin(SpinHandler)
-
-	header.CoverByChild()
-	// finish
-	l.global.CoverByChild()
+	return end
 }
