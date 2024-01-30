@@ -16,7 +16,9 @@ func ReplaceValueInSymbolTable(v, to Value) {
 }
 func ReplaceValue(v Value, to Value, skip func(Instruction) bool) {
 	for _, variable := range v.GetAllVariables() {
-		variable.value = to
+		// TODO: handler variable replace value
+		variable.Assign(to)
+		// variable = to
 		to.AddVariable(variable)
 	}
 
