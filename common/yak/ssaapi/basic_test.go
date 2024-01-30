@@ -104,18 +104,6 @@ func TestYaklangBasic_DoublePhi(t *testing.T) {
 	prog.Ref("a")
 }
 
-func TestYaklangBasic_SinglePhi(t *testing.T) {
-	const code = `for i:=0; i<n; i ++ { dump(i) }`
-	prog, err := Parse(code)
-	if err != nil {
-		t.Fatal("prog parse error", err)
-	}
-	phi, ok := prog.GetValueByIdMust(9).node.(*ssa.Phi)
-	if ok {
-		log.Infof("phi: %v", phi.String())
-	}
-}
-
 func TestYaklangBasic_Used(t *testing.T) {
 	token := utils.RandStringBytes(10)
 	prog, err := Parse(`var a, b
@@ -520,6 +508,20 @@ func TestYaklangBasic_Variable_InIf(t *testing.T) {
 }
 
 func TestYaklangBasic_Variable_Loop(t *testing.T) {
+	t.Run("simple loop not change", func(t *testing.T) {
+		check(`
+		a = 1
+		for i=0; i < 10 ; i++ {
+			println(a) // 1
+		}
+		println(a) //1 
+		`,
+			[]string{
+				"1",
+				"1",
+			},
+			t)
+	})
 
 	t.Run("simple loop only condition", func(t *testing.T) {
 		check(`

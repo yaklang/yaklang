@@ -215,14 +215,19 @@ func (lb *LoopBuilder) Finish() {
 		}
 		SSABuild.EmitJump(condition)
 	})
-	endScope := LoopBuilder.Build(func(name string, phiVar, v1, v2 Value) Value {
-		log.Infof("build phi: %s %v %v %v", name, phiVar, v1, v2)
-		if phi, ok := ToPhi(phiVar); ok {
-			phi.Edge = append(phi.Edge, v1)
-			phi.Edge = append(phi.Edge, v2)
+	endScope := LoopBuilder.Build(func(name string, phiValue, origin, latch Value) Value {
+		// log.Infof("build phi: %s %v %v %v", name, phiVar, v1, v2)
+		if phiValue == latch {
+			ReplaceAllValue(phiValue, origin)
+			DeleteInst(phiValue)
+			return origin
+		}
+		if phi, ok := ToPhi(phiValue); ok {
+			phi.Edge = append(phi.Edge, origin)
+			phi.Edge = append(phi.Edge, latch)
 			phi.SetName(name)
 			phi.GetProgram().SetVirtualRegister(phi)
-			return phiVar
+			return phiValue
 		}
 		return nil
 	}, generalPhi(SSABuild))
