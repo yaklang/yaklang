@@ -1,0 +1,48 @@
+# Yso配置文件
+
+# Class配置
+#Dnslog: # 类名(用于索引文件名)
+#  name: dnslog # 类名（可选，展示的类名）
+#  desc: 通过DnsLog反连检测代码执行 # 类描述（可选，帮助信息）
+#  params: # 参数列表（可选）
+#    - name: dnslog # 参数名，将会替换class中的模板变量，如{{dnslog}}
+#      desc: Path to dns log file # 参数描述（可选）
+#      default: "" # 参数默认值（可选）
+#      test-default: "" # 测试时使用的默认值（可选）
+Classes:
+  DNSLog:
+    desc: 通过DnsLog反连检测代码执行
+    params:
+      - name: domain
+        desc: 用于反连的域名
+        test-default: "asdghjkgkj.xxxxxxxxxxxx.com"
+  ModifyTomcatMaxHeaderSize:
+    desc: 修改Tomcat请求Header的最大长度限制
+    params:
+      - name: max
+        desc: 最大长度
+        default: 40960
+
+# Gadgets配置
+#BeanShell1: # gadget名(用于索引模板文件)
+#  name: BeanShell1 # 展示名(可选)
+#  desc: 命令执行 # gadget描述(可选)
+#  template: false # 模板gadget，可选，默认为false
+Gadgets:
+  BeanShell1:
+    desc:
+  CommonsCollections1:
+    desc:
+  CommonsCollections5:
+    desc:
+  CommonsCollections6:
+    desc:
+  CommonsCollections7:
+    desc:
+  CommonsCollectionsK3:
+    desc:
+  CommonsCollectionsK4:
+    desc:
+#  CommonsCollections2:
+#    template: true
+

