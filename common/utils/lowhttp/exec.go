@@ -6,6 +6,14 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"net/url"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
@@ -15,13 +23,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"io"
-	"net"
-	"net/http"
-	"net/url"
-	"strings"
-	"sync"
-	"time"
 )
 
 var (
@@ -161,6 +162,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		port                 = option.Port
 		requestPacket        = option.Packet
 		timeout              = option.Timeout
+		connectTimeout       = option.ConnectTimeout
 		retryTimes           = option.RetryTimes
 		retryInStatusCode    = option.RetryInStatusCode
 		retryNotInStatusCode = option.RetryNotInStatusCode
@@ -236,7 +238,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	}
 	proxy = newProxy
 
-	var forceProxy = len(proxy) > 0
+	forceProxy := len(proxy) > 0
 	var legacyProxy []string
 	if option.ForceLegacyProxy {
 		var ordinaryProxy []string
@@ -271,7 +273,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	var haveTE bool
 	var haveCL bool
 	var clInt int
-	var enableHttp2 = false
+	enableHttp2 := false
 	_, originBody := SplitHTTPHeadersAndBodyFromPacketEx(requestPacket, func(method string, uri string, proto string) error {
 		requestURI = uri
 		if strings.HasPrefix(proto, "HTTP/2") || forceHttp2 {
@@ -302,7 +304,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		return response, utils.Errorf("host not found in packet and option (Check your `Host: ` header)")
 	}
 
-	var urlStr = forceOverrideURL
+	urlStr := forceOverrideURL
 	var noURI string
 	if urlStr == "" {
 		if hostInPacket != "" {
@@ -337,7 +339,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		if !noFixContentLength {
 			log.Warnf("request \n%v\n have both `Transfer-Encoding` and `Content-Length` header, maybe pipeline or smuggle, please enable noFixContentLength", spew.Sdump(requestPacket))
 		}
-		//noFixContentLength = true
+		// noFixContentLength = true
 	} else if haveCL && !haveTE && len(originBody) > clInt {
 		SplitHTTPPacket(originBody[clInt:], func(method string, requestUri string, proto string) error {
 			if ret := len(proto); ret > 5 && ret <= 8 && strings.HasPrefix(proto, "HTTP/") && proto[5] >= '0' && proto[5] <= '9' {
@@ -349,13 +351,13 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		}, nil)
 	} else if haveTE && !haveCL {
 		// have transfer-encoding and no cl!
-		var body, nextPacket = codec.HTTPChunkedDecodeWithRestBytes(originBody)
+		body, nextPacket := codec.HTTPChunkedDecodeWithRestBytes(originBody)
 		_ = body
 		if len(nextPacket) > 0 {
 			SplitHTTPPacket(nextPacket, func(method string, requestUri string, proto string) error {
 				if ret := len(proto); ret > 5 && ret <= 8 && strings.HasPrefix(proto, "HTTP/") && proto[5] >= '0' && proto[5] <= '9' {
 					if _, ok := commonHTTPMethod[method]; ok {
-						//noFixContentLength = true
+						// noFixContentLength = true
 					}
 				}
 				return utils.Error("pipeline or smuggle detected, auto enable noFixContentLength")
@@ -399,7 +401,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	if port <= 0 {
 		return response, utils.Errorf("empty port...")
 	}
-	var originAddr = utils.HostPort(host, port)
+	originAddr := utils.HostPort(host, port)
 
 	if timeout <= 0 {
 		timeout = 10 * time.Second
@@ -418,7 +420,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	response.RawRequest = requestPacket
 	response.Http2 = enableHttp2
 
-	//https://github.com/mattn/go-ieproxy
+	// https://github.com/mattn/go-ieproxy
 	var (
 		conn                 net.Conn
 		retry                int
@@ -447,7 +449,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	// configTLS
 	var dialopts []netx.DialXOption
 
-	dialopts = append(dialopts, netx.DialX_WithTLSNextProto(nextProto...))
+	dialopts = append(dialopts, netx.DialX_WithTimeout(connectTimeout), netx.DialX_WithTLSNextProto(nextProto...))
 
 	if https {
 		if gmTLS {
@@ -481,8 +483,8 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 
 	// 初次连接需要的
 	// retry use DialX
-	var dnsStart = time.Now()
-	var dnsEnd = time.Now()
+	dnsStart := time.Now()
+	dnsEnd := time.Now()
 	dialopts = append(
 		dialopts,
 		netx.DialX_WithTimeoutRetry(retryTimes),
@@ -511,7 +513,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		https:  option.Https,
 		gmTls:  option.GmTLS,
 	}
-	var haveNativeHTTPRequestInstance = option.NativeHTTPRequestInstance != nil
+	haveNativeHTTPRequestInstance := option.NativeHTTPRequestInstance != nil
 RECONNECT:
 	if haveNativeHTTPRequestInstance {
 		httpctx.SetRequestHTTPS(option.NativeHTTPRequestInstance, https)
@@ -533,8 +535,8 @@ RECONNECT:
 			noProxyDial := make([]netx.DialXOption, len(dialopts), len(dialopts)+1)
 			copy(noProxyDial, dialopts)
 			noProxyDial = append(noProxyDial, netx.DialX_WithDisableProxy(true))
-			var tried = make(map[string]struct{})
-			var merged = make([]string, len(legacyProxy)+len(proxy))
+			tried := make(map[string]struct{})
+			merged := make([]string, len(legacyProxy)+len(proxy))
 			copy(merged, legacyProxy)
 			copy(merged[len(legacyProxy):], proxy)
 			for _, basicProxy := range lo.Filter(merged, func(item string, index int) bool {
@@ -624,7 +626,7 @@ RECONNECT:
 	var rawBytes []byte
 
 	if withConnPool {
-		//连接池分支
+		// 连接池分支
 		pc := conn.(*persistConn)
 		writeErrCh := make(chan error, 1)
 		if option.BeforeDoRequest != nil {
@@ -655,7 +657,7 @@ RECONNECT:
 		for {
 			select {
 			case err := <-writeErrCh:
-				//写入失败，退出等待
+				// 写入失败，退出等待
 				if err != nil {
 					if pc.shouldRetryRequest(err) {
 						conn.(*persistConn).removeConn()
@@ -664,7 +666,7 @@ RECONNECT:
 					return nil, err
 				}
 			case re := <-resc:
-				//收到响应
+				// 收到响应
 				if (re.resp == nil) == (re.err == nil) {
 					return nil, utils.Errorf("BUG: internal error: exactly one of res or err should be set; nil=%v", re.resp == nil)
 				}
@@ -689,7 +691,7 @@ RECONNECT:
 		}
 
 	} else {
-		//不使用连接池分支
+		// 不使用连接池分支
 		if conn != nil {
 			defer func() {
 				conn.Close()
@@ -717,7 +719,7 @@ RECONNECT:
 			return response, errors.Wrap(err, "write request failed")
 		}
 
-		//TeeReader 用于畸形响应包: 即 ReadHTTPResponseFromBufioReader 无法解析但是conn中存在数据的情况
+		// TeeReader 用于畸形响应包: 即 ReadHTTPResponseFromBufioReader 无法解析但是conn中存在数据的情况
 		if option.DefaultBufferSize <= 0 {
 			option.DefaultBufferSize = 4096
 		}
@@ -742,7 +744,7 @@ RECONNECT:
 		}
 
 		traceInfo.ServerTime = time.Since(serverTimeStart)
-		var stashedRequest = option.NativeHTTPRequestInstance
+		stashedRequest := option.NativeHTTPRequestInstance
 		if stashedRequest == nil {
 			stashedRequest = new(http.Request)
 		}
@@ -757,7 +759,7 @@ RECONNECT:
 					authReq, err := auth.Authenticate(conn, option)
 					if err == nil {
 						_, err := conn.Write(authReq)
-						responseRaw.Reset() //发送认证请求成功，清空缓冲区
+						responseRaw.Reset() // 发送认证请求成功，清空缓冲区
 						if err != nil {
 							return response, errors.Wrap(err, "write request failed")
 						}
@@ -766,7 +768,6 @@ RECONNECT:
 					}
 				}
 			}
-
 		}
 
 		response.ResponseBodySize = httpctx.GetResponseBodySize(stashedRequest)
@@ -885,7 +886,7 @@ STATUSCODERETRY:
 	*/
 	if !noFixContentLength && !isMultiResponses {
 		// fix
-		//return responseRaw.Bytes(), nil
+		// return responseRaw.Bytes(), nil
 		rspRaw, _, err := FixHTTPResponse(rawBytes)
 		if err != nil {
 			log.Errorf("fix http response failed: %s", err)
