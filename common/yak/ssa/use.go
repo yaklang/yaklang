@@ -8,12 +8,8 @@ import (
 
 func ReplaceAllValue(v Value, to Value) {
 	ReplaceValue(v, to, func(i Instruction) bool { return false })
-	ReplaceValueInSymbolTable(v, to)
 }
 
-func ReplaceValueInSymbolTable(v, to Value) {
-	v.GetFunc().ReplaceVariable(v.GetName(), v, to)
-}
 func ReplaceValue(v Value, to Value, skip func(Instruction) bool) {
 	for _, variable := range v.GetAllVariables() {
 		// TODO: handler variable replace value
@@ -33,106 +29,6 @@ func ReplaceValue(v Value, to Value, skip func(Instruction) bool) {
 	}
 	for _, user := range deleteInst {
 		v.RemoveUser(user)
-	}
-}
-
-func InsertValueReplaceOriginal(name string, original Value, insert Value) {
-	block := insert.GetBlock()
-	fun := block.GetFunc()
-	builder := fun.builder
-	// builder := block.GetFunc().builder
-
-	deleteInst := make([]Instruction, 0)
-
-	// replace variable in block
-	replaceInBlock := func(v, to Value, block *BasicBlock, skip func(Instruction) bool) {
-		ReplaceValue(v, to, func(i Instruction) bool {
-			return i.GetBlock() != block || skip(i)
-		})
-	}
-
-	afterInsert := func(inst Instruction) bool {
-		if inst.GetRange() == nil {
-			return true
-		}
-		if inst.GetRange().CompareStart(insert.GetRange()) > 0 {
-			return false
-		} else {
-			return true
-		}
-	}
-
-	// replace variable in insert block after insert instruction position
-	replaceInBlock(original, insert, block, afterInsert)
-	// if this block current end variable is original, replace. !!! [if not, skip] !!!
-	if builder.readVariableByBlock(name, block, false) == original {
-		builder.writeVariableByBlock(name, insert, block)
-	}
-
-	handlerSuccBlock := func(item *BasicBlock) (Value, Value) {
-		old := builder.readVariableByBlock(name, item, false)
-		builder.deleteVariableByBlock(name, item)
-		new := builder.readVariableByBlock(name, item, false)
-		if !utils.IsNil(old) && !utils.IsNil(new) {
-			if old != new {
-				replaceInBlock(old, new, item, func(i Instruction) bool {
-					return i == new
-				})
-			}
-			if len(old.GetUsers()) == 0 {
-				deleteInst = append(deleteInst, old)
-			}
-		}
-		return old, new
-	}
-
-	var loopHeader *BasicBlock
-	for i := block.Index + 1; i < len(fun.Blocks); i++ {
-		item := fun.Blocks[i]
-		old, new := handlerSuccBlock(item)
-		if !utils.IsNil(old) && old == new {
-			// if not change
-			flag := true
-			// and all succ block of this block only one prev block
-			for _, succ := range item.Succs {
-				if len(succ.Preds) > 1 {
-					flag = false
-					break
-				}
-			}
-			// end loop
-			if flag {
-				break
-			}
-		}
-
-		if item.IsBlock(LoopLatch) {
-			loopHeader = item.Succs[0]
-			break
-		}
-	}
-
-	if loopHeader != nil {
-		old, new := handlerSuccBlock(loopHeader)
-		if old != new {
-			// replace variable loopCfG outside,  and must after loop enter block
-			ReplaceValue(old, new, func(i Instruction) bool {
-				if i == new {
-					return true
-				}
-				if i.GetBlock().Index <= loopHeader.Index {
-					return true
-				}
-				if i.GetBlock() == block {
-					return !afterInsert(i)
-				}
-				return false
-			})
-		}
-	}
-
-	for _, inst := range deleteInst {
-		DeleteInst(inst)
 	}
 }
 

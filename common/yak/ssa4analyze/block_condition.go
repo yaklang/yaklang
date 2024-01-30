@@ -180,7 +180,6 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 
 	// handler
 	fun.EnterBlock.Condition = ssa.NewConst(true)
-	fun.EnterBlock.Skip = true
 	// deep first search
 	var handlerBlock func(*ssa.BasicBlock)
 	handlerBlock = func(bb *ssa.BasicBlock) {
@@ -211,7 +210,6 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 	for _, bb := range fun.Blocks {
 		handlerBlock(bb)
 	}
-	fun.EnterBlock.Skip = false
 }
 
 func (s *BlockCondition) calcCondition(block *ssa.BasicBlock) ssa.Value {
