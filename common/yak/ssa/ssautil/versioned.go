@@ -16,7 +16,17 @@ type VersionedIF[T comparable] interface {
 
 	// Assign assign a value to the variable
 	Assign(T) error
+
+	// show, string and name
 	String() string
+	GetName() string
+
+	// version
+	SetVersion(int)
+	GetVersion() int
+
+	// local
+	GetLocal() bool
 
 	// capture variable
 	SetCaptured(VersionedIF[T]) // this capture will set self, when variable create.
@@ -38,10 +48,10 @@ type Versioned[T comparable] struct {
 	globalIndex     int
 	lexicalName     string
 
+	local bool
+
 	// the version of variable in current scope
 	scope *ScopedVersionedTable[T]
-
-	isPhi bool
 
 	isAssigned *utils.AtomicBool
 	Value      T
@@ -49,15 +59,15 @@ type Versioned[T comparable] struct {
 
 var _ VersionedIF[string] = (*Versioned[string])(nil)
 
-func NewVersioned[T comparable](versionIndex, globalIndex int, name string, scope *ScopedVersionedTable[T]) VersionedIF[T] {
+func NewVersioned[T comparable](globalIndex int, name string, local bool, scope *ScopedVersionedTable[T]) VersionedIF[T] {
 	ret := &Versioned[T]{
-		versionIndex: versionIndex,
-		globalIndex:  globalIndex,
-		lexicalName:  name,
-		scope:        scope,
-		isPhi:        false,
-		isAssigned:   utils.NewAtomicBool(),
-		Value:        *new(T),
+		captureVariable: nil,
+		versionIndex:    -1,
+		globalIndex:     globalIndex,
+		lexicalName:     name,
+		local:           local,
+		scope:           scope,
+		isAssigned:      utils.NewAtomicBool(),
 	}
 	ret.captureVariable = ret
 	return ret
@@ -89,7 +99,26 @@ func (v *Versioned[T]) String() string {
 	if v.lexicalName == "" {
 		return fmt.Sprintf("symbolic #%d", v.globalIndex)
 	}
-	return fmt.Sprintf("#%d %s_%d", v.globalIndex, v.lexicalName, v.versionIndex)
+	ret := fmt.Sprintf("#%d %s", v.globalIndex, v.lexicalName)
+	if v.versionIndex > 0 {
+		ret += fmt.Sprintf("_%d", v.versionIndex)
+	}
+	return ret
+}
+
+func (v *Versioned[T]) GetName() string {
+	return v.lexicalName
+}
+func (v *Versioned[T]) SetVersion(version int) {
+	v.versionIndex = version
+}
+
+func (v *Versioned[T]) GetVersion() int {
+	return v.versionIndex
+}
+
+func (v *Versioned[T]) GetLocal() bool {
+	return v.local
 }
 
 func (v *Versioned[T]) SetCaptured(capture VersionedIF[T]) {

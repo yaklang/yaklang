@@ -21,7 +21,7 @@ func (p *PhiContext[T]) AddPhi(i *Versioned[T]) {
 // 		return
 // 	}
 // 	for _, name := range v.GetAllCapturedVariableNames() {
-// 		capturedValue := v.parent.GetLatestVersion(name)
+// 		capturedValue := v.parent.ReadValue(name)
 // 		if capturedValue == nil {
 // 			continue
 // 		}
@@ -51,7 +51,7 @@ func (p *PhiContext[T]) AddPhi(i *Versioned[T]) {
 // 			vals = append(vals, v.Value)
 // 		}
 // 		phi := factory(vals...)
-// 		result := ctx.scope.CreateLexicalVariable(ctx.name, phi)
+// 		result := ctx.scope.CreateVariable(ctx.name, phi)
 // 		result.SetPhi(true)
 // 	}
 // }
@@ -60,7 +60,7 @@ func (p *PhiContext[T]) AddPhi(i *Versioned[T]) {
 // ForEachCapturedVariable call the handler for each captured by base scope Variable
 func (ps *ScopedVersionedTable[T]) ForEachCapturedVariable(base *ScopedVersionedTable[T], handler func(name string, ver VersionedIF[T])) {
 	ps.captured.ForEach(func(name string, ver VersionedIF[T]) bool {
-		baseVariable := base.GetLatestVersionVersioned(name)
+		baseVariable := base.ReadVariable(name)
 		if baseVariable == nil {
 			// not exist in base scope, this variable just set in sub-scope,
 			// just skip
@@ -82,7 +82,7 @@ func (s *ScopedVersionedTable[T]) CoverBy(scope *ScopedVersionedTable[T]) {
 	}
 
 	scope.ForEachCapturedVariable(s, func(name string, ver VersionedIF[T]) {
-		s.CreateLexicalVariable(name, ver.GetValue())
+		s.WriteVariable(name, ver.GetValue())
 	})
 }
 
@@ -111,7 +111,7 @@ func (base *ScopedVersionedTable[T]) Merge(
 		tmp[name] = m
 	}
 	generatePhi := func(name string, m []T) {
-		origin := base.GetLatestVersion(name)
+		origin := base.ReadValue(name)
 		// fill the missing value
 		// if len(m) != length {
 		if hasSelf {
@@ -128,7 +128,7 @@ func (base *ScopedVersionedTable[T]) Merge(
 		// generate phi
 		// handler(name, m)
 		ret := merge(name, m)
-		base.CreateLexicalVariable(name, ret)
+		base.WriteVariable(name, ret)
 	}
 
 	for index, sub := range subScopes {
@@ -145,10 +145,10 @@ func (base *ScopedVersionedTable[T]) Merge(
 // this handler merge [origin, last] to phi
 func (s *ScopedVersionedTable[T]) Spin(header, latch *ScopedVersionedTable[T], handler func(name string, phi, origin, last T) T) {
 	s.incomingPhi.ForEach(func(name string, ver VersionedIF[T]) bool {
-		last := latch.GetLatestVersion(name)
-		origin := header.GetLatestVersion(name)
+		last := latch.ReadValue(name)
+		origin := header.ReadValue(name)
 		res := handler(name, ver.GetValue(), origin, last)
-		s.CreateLexicalVariable(name, res)
+		s.WriteVariable(name, res)
 		return true
 	})
 }
