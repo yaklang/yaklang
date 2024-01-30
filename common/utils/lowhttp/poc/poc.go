@@ -43,6 +43,7 @@ type PocConfig struct {
 	ForceHttps           bool
 	ForceHttp2           bool
 	Timeout              time.Duration
+	ConnectTimeout       time.Duration
 	RetryTimes           int
 	RetryInStatusCode    []int
 	RetryNotInStatusCode []int
@@ -154,6 +155,7 @@ func NewDefaultPoCConfig() *PocConfig {
 		ForceHttps:             false,
 		ForceHttp2:             false,
 		Timeout:                15 * time.Second,
+		ConnectTimeout:         15 * time.Second,
 		RetryTimes:             0,
 		RetryInStatusCode:      []int{},
 		RetryNotInStatusCode:   []int{},
@@ -339,6 +341,17 @@ func WithForceHTTP2(isHttp2 bool) PocConfigOption {
 func WithTimeout(f float64) PocConfigOption {
 	return func(c *PocConfig) {
 		c.Timeout = utils.FloatSecondDuration(f)
+	}
+}
+
+// connectTimeout 是一个请求选项参数，用于指定连接超时时间，默认为15秒
+// Example:
+// ```
+// poc.Get("https://www.example.com", poc.timeout(15)) // 向 www.baidu.com 发起请求，读取超时时间为15秒
+// ```
+func WithConnectTimeout(f float64) PocConfigOption {
+	return func(c *PocConfig) {
+		c.ConnectTimeout = utils.FloatSecondDuration(f)
 	}
 }
 
@@ -1101,6 +1114,7 @@ func pochttp(packet []byte, config *PocConfig) (*lowhttp.LowhttpResponse, error)
 		lowhttp.WithPort(config.Port),
 		lowhttp.WithPacketBytes(packet),
 		lowhttp.WithTimeout(config.Timeout),
+		lowhttp.WithConnectTimeout(config.ConnectTimeout),
 		lowhttp.WithRetryTimes(config.RetryTimes),
 		lowhttp.WithRetryInStatusCode(config.RetryInStatusCode),
 		lowhttp.WithRetryNotInStatusCode(config.RetryNotInStatusCode),
@@ -1396,6 +1410,7 @@ var PoCExports = map[string]interface{}{
 	"params":               WithParams,
 	"proxy":                WithProxy,
 	"timeout":              WithTimeout,
+	"connectTimeout":       WithConnectTimeout,
 	"noFixContentLength":   WithNoFixContentLength,
 	"session":              WithSession,
 	"save":                 WithSave,

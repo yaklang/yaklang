@@ -2,14 +2,15 @@ package lowhttp
 
 import (
 	"context"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"net/http"
 	"reflect"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 const (
@@ -28,6 +29,7 @@ type LowhttpExecConfig struct {
 	GmTLS                            bool
 	OverrideEnableSystemProxyFromEnv bool
 	EnableSystemProxyFromEnv         bool
+	ConnectTimeout                   time.Duration
 	Timeout                          time.Duration
 	RedirectTimes                    int
 	RetryTimes                       int
@@ -135,7 +137,6 @@ func newLowhttpTraceInfo() *LowhttpTraceInfo {
 
 // NewLowhttpOption create a new LowhttpExecConfig
 func NewLowhttpOption() *LowhttpExecConfig {
-
 	return &LowhttpExecConfig{
 		Host:                 "",
 		Port:                 0,
@@ -143,6 +144,7 @@ func NewLowhttpOption() *LowhttpExecConfig {
 		Https:                false,
 		Http2:                false,
 		Timeout:              15 * time.Second,
+		ConnectTimeout:       15 * time.Second,
 		RetryTimes:           0,
 		RetryInStatusCode:    []int{},
 		RetryNotInStatusCode: []int{},
@@ -322,6 +324,18 @@ func WithTimeout(timeout time.Duration) LowhttpOpt {
 	}
 }
 
+func WithConnectTimeout(timeout time.Duration) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.ConnectTimeout = timeout
+	}
+}
+
+func WithConnectTimeoutFloat(i float64) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.ConnectTimeout = utils.FloatSecondDuration(i)
+	}
+}
+
 func WithTimeoutFloat(i float64) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.Timeout = utils.FloatSecondDuration(i)
@@ -369,11 +383,13 @@ func WithJsRedirect(jsRedirect bool) LowhttpOpt {
 		o.JsRedirect = jsRedirect
 	}
 }
+
 func WithContext(ctx context.Context) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.Ctx = ctx
 	}
 }
+
 func WithProxy(proxy ...string) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.Proxy = utils.StringArrayFilterEmpty(proxy)
