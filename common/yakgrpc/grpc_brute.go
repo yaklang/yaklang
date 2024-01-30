@@ -282,7 +282,17 @@ func (s *Server) StartBrute(params *ypb.StartBruteParams, stream ypb.Yak_StartBr
 		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{Key: "delay-max", Value: fmt.Sprint(params.GetDelayMax())})
 	}
 
-	return s.Exec(reqParams, stream)
+	var execParams = []*ypb.KVPair{}
+	for _, p := range reqParams.Params {
+		execParams = append(execParams, &ypb.KVPair{Key: p.Key, Value: p.Value})
+	}
+
+	return s.debugScript("",
+		"yak",
+		startBruteScript,
+		stream,
+		execParams,
+	)
 }
 
 func (s *Server) GetAvailableBruteTypes(ctx context.Context, req *ypb.Empty) (*ypb.GetAvailableBruteTypesResponse, error) {

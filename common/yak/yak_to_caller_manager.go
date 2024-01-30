@@ -933,6 +933,18 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 	nIns.GetVM().RegisterMapMemberCallHandler("cli", "check", func(f interface{}) interface{} {
 		return cli.CliCheckWithContext(cancel)
 	})
+
+	//brute
+	nIns.GetVM().RegisterMapMemberCallHandler("brute", "New", func(f interface{}) interface{} {
+		originFunc, ok := f.(func(typeStr string, opts ...tools.YakBruteOpt) (*tools.YakBruter, error))
+		if ok {
+			return func(typeStr string, opts ...tools.YakBruteOpt) (*tools.YakBruter, error) {
+				opts = append([]tools.YakBruteOpt{tools.YakBruteOpt_ctx(streamContext)}, opts...)
+				return originFunc(typeStr, opts...)
+			}
+		}
+		return f
+	})
 }
 
 func (y *YakToCallerManager) AddForYakit(
