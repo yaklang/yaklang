@@ -95,11 +95,6 @@ func (b *FunctionBuilder) AddUnsealedBlock(block *BasicBlock) {
 func (b *FunctionBuilder) Finish() {
 	// sub-function
 	b.SetDefineFunc()
-	//TODO: handler `goto` syntax and notice function reentrant for `Feed(code)`
-	for _, block := range b.unsealedBlock {
-		block.Sealed()
-		b.unsealedBlock = []*BasicBlock{}
-	}
 	// set defer function
 	if deferLen := len(b.deferExpr); deferLen > 0 {
 		endBlock := b.CurrentBlock

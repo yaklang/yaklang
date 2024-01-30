@@ -354,12 +354,9 @@ type BasicBlock struct {
 	Handler *ErrorHandler
 
 	// for build
-	symbolTable   map[string]Values
-	ScopeTable    *ssautil.ScopedVersionedTable[Value]
-	finish        bool // if emitJump finish!
-	isSealed      bool
-	inCompletePhi []*Phi // variable -> phi
-	Skip          bool   // for phi build, avoid recursive
+	symbolTable map[string]Values
+	ScopeTable  *ssautil.ScopedVersionedTable[Value]
+	finish      bool // if emitJump finish!
 }
 
 func (b *BasicBlock) GetType() Type {

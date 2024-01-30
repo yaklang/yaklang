@@ -283,21 +283,22 @@ func (r *Return) calcType(builder *FunctionBuilder) {
 				return t
 			}
 			// return closure, remove freeValue that can get in this function
-			freeValue := make([]string, 0, len(ft.FreeValue))
-			for _, name := range ft.FreeValue {
-				if v := builder.PeekVariable(name, false); v == nil {
-					freeValue = append(freeValue, name)
-				}
-			}
-			sideEffect := make([]string, 0, len(ft.SideEffects))
-			for _, name := range ft.SideEffects {
-				if v := builder.PeekVariable(name, false); v == nil {
-					sideEffect = append(sideEffect, name)
-				}
-			}
+			// TODO: handler closure
+			// freeValue := make([]string, 0, len(ft.FreeValue))
+			// for _, name := range ft.FreeValue {
+			// 	if v := builder.PeekVariable(name, false); v == nil {
+			// 		freeValue = append(freeValue, name)
+			// 	}
+			// }
+			// sideEffect := make([]string, 0, len(ft.SideEffects))
+			// for _, name := range ft.SideEffects {
+			// 	if v := builder.PeekVariable(name, false); v == nil {
+			// 		sideEffect = append(sideEffect, name)
+			// 	}
+			// }
 			new := NewFunctionType(ft.Name, ft.Parameter, ft.ReturnType, ft.IsVariadic)
-			new.SetFreeValue(freeValue)
-			new.SetSideEffect(sideEffect)
+			// new.SetFreeValue(freeValue)
+			// new.SetSideEffect(sideEffect)
 			return new
 		} else {
 			return t
