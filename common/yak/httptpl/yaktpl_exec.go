@@ -140,7 +140,7 @@ func (y *YakTemplate) ExecWithUrl(u string, config *Config, opts ...lowhttp.Lowh
 			swg.Add()
 			go func(ret *RequestBulk, payload map[string][]string) {
 				defer swg.Done()
-				rsps, result, extracted, reqCount := y.handleRequestSequences(config, ret.RequestConfig, ret.Requests, payload, func(raw []byte, req *requestRaw) (*lowhttp.LowhttpResponse, error) {
+				rsps, allResult, extracted, reqCount := y.handleRequestSequences(config, ret.RequestConfig, ret.Requests, payload, func(raw []byte, req *requestRaw) (*lowhttp.LowhttpResponse, error) {
 					if config.BeforeSendPackage != nil {
 						raw = config.BeforeSendPackage(raw, req.IsHttps)
 					}
@@ -183,6 +183,10 @@ func (y *YakTemplate) ExecWithUrl(u string, config *Config, opts ...lowhttp.Lowh
 					}
 					return rsp, nil
 				})
+				result := false
+				for _, b := range allResult {
+					result = result || b
+				}
 				if result {
 					log.Infof("[%v]-[%v] matched", y.Name, y.Id)
 				}
@@ -250,7 +254,7 @@ func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts 
 }
 
 // handleRequestSequences 渲染、发包、匹配、提取
-func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakRequestBulkConfig, reqSeqs []*requestRaw, payload map[string][]string, sender func(raw []byte, req *requestRaw) (*lowhttp.LowhttpResponse, error)) ([]*lowhttp.LowhttpResponse, bool, map[string]interface{}, int64) {
+func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakRequestBulkConfig, reqSeqs []*requestRaw, payload map[string][]string, sender func(raw []byte, req *requestRaw) (*lowhttp.LowhttpResponse, error)) ([]*lowhttp.LowhttpResponse, []bool, map[string]interface{}, int64) {
 
 	defer func() {
 		if err := recover(); err != nil {
@@ -261,12 +265,12 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 	var count int64 = 0
 	if reqOrigin == nil {
 		log.Error("request origin cannot be nil")
-		return nil, false, map[string]interface{}{}, count
+		return nil, nil, map[string]interface{}{}, count
 	}
 
 	if reqOrigin.Matcher == nil && len(reqOrigin.Extractor) == 0 {
 		log.Error("request sequence matcher and extractor all empty!")
-		return nil, false, map[string]interface{}{}, count
+		return nil, nil, map[string]interface{}{}, count
 	}
 
 	extracted := make(map[string]interface{})
@@ -283,11 +287,39 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 			matchers = []*YakMatcher{matcher}
 		}
 	}
-
-	var matchResults []any
-	var notSetIdMatchersResults = make(map[int][]any)
+	var matchResults []bool
 	var responses []*lowhttp.LowhttpResponse
 	runtimeVars := map[string]any{}
+	matchHelper := func(rsp *lowhttp.LowhttpResponse, index int) bool {
+		var tempMatchersResult []any
+		for _, matcher := range matchers {
+			if matcher.Id == 0 {
+				matchResult, err := matcher.ExecuteWithConfig(config, rsp, runtimeVars)
+				if err != nil {
+					log.Error("matcher execute failed: ", err)
+				}
+				tempMatchersResult = append(tempMatchersResult, matchResult)
+			} else {
+				if matcher.Id != index+1 {
+					tempMatchersResult = append(tempMatchersResult, false)
+					continue
+				}
+				matchResult, err := matcher.ExecuteWithConfig(config, rsp, runtimeVars)
+				if err != nil {
+					log.Error("matcher execute failed: ", err)
+				}
+				tempMatchersResult = append(tempMatchersResult, matchResult)
+			}
+		}
+		var matchRes bool
+		if matchersCondition == "or" {
+			matchRes = funk.Any(tempMatchersResult...)
+		} else {
+			matchRes = funk.All(tempMatchersResult...)
+		}
+		matchResults = append(matchResults, matchRes)
+		return matchRes
+	}
 	for index, req := range reqSeqs {
 		log.Debugf("sequence exec with Req Index:%v", index)
 		raw := req.Raw
@@ -334,31 +366,10 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 				runtimeVars[k] = v
 			}
 			if !reqOrigin.AfterRequested {
-				for matchersIndex, matcher := range matchers {
-					if matcher.Id == 0 {
-						matchResult, err := matcher.ExecuteWithConfig(config, rsp, runtimeVars)
-						if err != nil {
-							log.Error("matcher execute failed: ", err)
-						}
-						notSetIdMatchersResults[matchersIndex] = append(notSetIdMatchersResults[matchersIndex], matchResult)
-						if matchResult && reqOrigin.StopAtFirstMatch {
-							// 第一次匹配就退出
-							return responses, true, extracted, count
-						}
-					} else {
-						if matcher.Id != index+1 {
-							continue
-						}
-						matchResult, err := matcher.ExecuteWithConfig(config, rsp, runtimeVars)
-						if err != nil {
-							log.Error("matcher execute failed: ", err)
-						}
-						matchResults = append(matchResults, matchResult)
-						if matchResult && reqOrigin.StopAtFirstMatch {
-							// 第一次匹配就退出
-							return responses, true, extracted, count
-						}
-					}
+				matchRes := matchHelper(rsp, index)
+				if matchRes && reqOrigin.StopAtFirstMatch {
+					// 第一次匹配就退出
+					return responses, matchResults, extracted, count
 				}
 			}
 		}
@@ -370,34 +381,8 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 	//}
 	if reqOrigin.AfterRequested {
 		for index, rsp := range responses {
-			for matchersIndex, matcher := range matchers {
-				if matcher.Id == 0 {
-					matchResult, err := matcher.ExecuteWithConfig(config, rsp, runtimeVars)
-					if err != nil {
-						log.Error("matcher execute failed: ", err)
-					}
-					notSetIdMatchersResults[matchersIndex] = append(notSetIdMatchersResults[matchersIndex], matchResult)
-				} else {
-					if matcher.Id != index+1 {
-						continue
-					}
-					matchResult, err := matcher.ExecuteWithConfig(config, rsp, runtimeVars)
-					if err != nil {
-						log.Error("matcher execute failed: ", err)
-					}
-					matchResults = append(matchResults, matchResult)
-				}
-			}
+			matchHelper(rsp, index)
 		}
 	}
-	for _, res := range notSetIdMatchersResults {
-		matchResults = append(matchResults, funk.Any(res...))
-	}
-	var result bool
-	if matchersCondition == "or" {
-		result = funk.Any(matchResults...)
-	} else {
-		result = funk.All(matchResults...)
-	}
-	return responses, result, extracted, count
+	return responses, matchResults, extracted, count
 }
