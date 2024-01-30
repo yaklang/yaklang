@@ -13,114 +13,30 @@ func NewPhi(block *BasicBlock, variable string, create bool) *Phi {
 	return p
 }
 
-func (b *BasicBlock) Sealed() {
-	builder := b.GetFunc().builder
-	for _, p := range b.inCompletePhi {
-		v := p.Build()
-		if v.GetRange() == nil {
-			v.SetRange(p.GetRange())
-		}
-		if v != p {
-			p.GetProgram().RemoveInstructionWithName(p.GetName(), p)
-		}
-		if pa, ok := ToExternLib(v); ok && pa.IsExtern() {
-			pa.GetUsers().RunOnField(func(f *Field) {
-				if v := builder.getExternLibInstance(v, f.Key); v != nil {
-					f.GetUsers().RunOnUpdate(func(u *Update) {
-						u.NewError(Warn, SSATAG, ContAssignExtern(v.GetName()))
-					})
-					hasUpdate := false
-					// replace but skip update
-					ReplaceValue(f, v, func(i Instruction) bool {
-						// return false
-						_, ok := ToUpdate(i)
-						hasUpdate = hasUpdate || ok
-						return ok
-					})
-					if !hasUpdate {
-						DeleteInst(f)
-					}
-				}
-			})
-		}
+func SpinHandle(name string, phiValue, origin, latch Value) Value {
+	// log.Infof("build phi: %s %v %v %v", name, phiVar, v1, v2)
+	if phiValue == latch {
+		ReplaceAllValue(phiValue, origin)
+		DeleteInst(phiValue)
+		return origin
 	}
-	b.inCompletePhi = nil
-	b.isSealed = true
-}
-
-func (p *Phi) AddEdge(v Value) {
-	p.Edge = append(p.Edge, v)
-}
-
-func (phi *Phi) Name() string { return phi.GetName() }
-
-func (phi *Phi) Build() Value {
-	phi.GetBlock().Skip = true
-	for _, predBlock := range phi.GetBlock().Preds {
-		v := phi.GetFunc().builder.readVariableByBlock(phi.GetName(), predBlock, phi.create)
-		phi.Edge = append(phi.Edge, v)
-	}
-	phi.GetBlock().Skip = false
-	// phi.SetPosition(phi.GetBlock().GetPosition())
-	v := phi.tryRemoveTrivialPhi()
-	if v == phi {
-		block := phi.GetBlock()
-		block.Phis = append(block.Phis, phi)
+	if phi, ok := ToPhi(phiValue); ok {
+		phi.Edge = append(phi.Edge, origin)
+		phi.Edge = append(phi.Edge, latch)
+		phi.SetName(name)
 		phi.GetProgram().SetVirtualRegister(phi)
+		return phiValue
 	}
-	if v != nil {
-		fixupUseChain(v)
-	}
-	return v
+	return nil
 }
 
-func (phi *Phi) tryRemoveTrivialPhi() Value {
-	w1, w2 := phi.wit1, phi.wit2
-	getValue := func(pass Value) Value {
-		for _, v := range phi.Edge {
-			if v == phi || v == pass {
-				continue
-			}
-			return v
+// build phi
+func generalPhi(builder *FunctionBuilder) func(name string, t []Value) Value {
+	return func(name string, t []Value) Value {
+		phi := builder.EmitPhi(name, t)
+		if phi == nil {
+			return nil
 		}
-		return nil
-	}
-	if w1 == nil || w2 == nil {
-		// init w1 w2
-		w1 = getValue(nil)
-		w2 = getValue(w1)
-	} else {
-		if w1 == phi || w1 == w2 {
-			w1 = getValue(w2)
-		}
-		if w2 == phi || w2 == w1 {
-			w2 = getValue(w1)
-		}
-	}
-
-	var ret Value
-	ret = phi
-	if w1 == nil {
-		if w2 == nil {
-			ret = nil
-		} else {
-			ret = w2
-		}
-	} else if w2 == nil {
-		ret = w1
-	}
-	if ret != nil && ret != phi {
-		phi.Replace(ret)
-	}
-	return ret
-}
-
-func (phi *Phi) Replace(to Value) {
-	ReplaceAllValue(phi, to)
-	for _, user := range phi.GetUsers() {
-		switch p := user.(type) {
-		case *Phi:
-			p.tryRemoveTrivialPhi()
-		}
+		return phi
 	}
 }
