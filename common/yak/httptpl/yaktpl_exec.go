@@ -289,10 +289,12 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 	}
 	var matchResults []bool
 	var responses []*lowhttp.LowhttpResponse
+	cacheRes := make(map[string]bool)
 	runtimeVars := map[string]any{}
 	matchHelper := func(rsp *lowhttp.LowhttpResponse, index int) bool {
 		var tempMatchersResult []any
-		for _, matcher := range matchers {
+		for matcherIndex, matcher := range matchers {
+
 			if matcher.Id == 0 {
 				matchResult, err := matcher.ExecuteWithConfig(config, rsp, runtimeVars)
 				if err != nil {
@@ -301,7 +303,22 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 				tempMatchersResult = append(tempMatchersResult, matchResult)
 			} else {
 				if matcher.Id != index+1 {
-					tempMatchersResult = append(tempMatchersResult, false)
+					targetIndex := matcher.Id - 1
+					hashKey := fmt.Sprintf("%v-%v", matcherIndex, targetIndex)
+					if v, ok := cacheRes[hashKey]; ok {
+						tempMatchersResult = append(tempMatchersResult, v)
+					} else {
+						if targetIndex >= len(responses) {
+							tempMatchersResult = append(tempMatchersResult, false)
+						} else {
+							matchResult, err := matcher.ExecuteWithConfig(config, responses[targetIndex], runtimeVars)
+							if err != nil {
+								log.Error("matcher execute failed: ", err)
+							}
+							tempMatchersResult = append(tempMatchersResult, matchResult)
+							cacheRes[hashKey] = matchResult
+						}
+					}
 					continue
 				}
 				matchResult, err := matcher.ExecuteWithConfig(config, rsp, runtimeVars)
@@ -309,6 +326,8 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 					log.Error("matcher execute failed: ", err)
 				}
 				tempMatchersResult = append(tempMatchersResult, matchResult)
+				hashKey := fmt.Sprintf("%v-%v", matcherIndex, index)
+				cacheRes[hashKey] = matchResult
 			}
 		}
 		var matchRes bool
