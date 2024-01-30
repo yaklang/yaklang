@@ -4,11 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"os"
-	"github.com/yaklang/yaklang/common/javaclassparser"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yserx"
+	"os"
 	"testing"
 )
 
@@ -64,11 +63,11 @@ func TestGetCommonsBeanutil1(t *testing.T) {
 	//}
 	//println(codec.EncodeToHex(yserx.MarshalJavaObjects(res)))
 }
-func TestClassFileToJson(t *testing.T) {
-	obj, _ := javaclassparser.ParseFromFile("/Users/z3/Code/idea/rmiTest/src/dnslog.class")
-	js, _ := obj.Json()
-	println(js)
-}
+//func TestClassFileToJson(t *testing.T) {
+//	obj, _ := javaclassparser.ParseFromFile("/Users/z3/Code/idea/rmiTest/src/dnslog.class")
+//	js, _ := obj.Json()
+//	println(js)
+//}
 func TestGenExecClass(t *testing.T) {
 	//bytes := GenTomcatEchoFilterMemTarjon("whoami", ClassNameOption("whoami"), MemTarjonHeaderOption("aa", "bb"))
 	//bytes := GenExec("whoami", ClassNameOption("execClass"))

@@ -7,6 +7,20 @@ import (
 	"testing"
 )
 
+func TestGenerateGadget(t *testing.T) {
+	YsoConfigInstance, err := GetConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, _ := range YsoConfigInstance.Gadgets {
+		gadget, err := setCommandForRuntimeExecGadget(name, "whoami")
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = gadget
+	}
+}
+
 func TestMUSTPASSSetMajorVersion(t *testing.T) {
 	type testCase struct {
 		version     uint16

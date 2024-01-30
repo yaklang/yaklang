@@ -762,3 +762,149 @@ func writeJavaStructNode(writer *bytes.Buffer, packets map[string]struct{}, java
 	}
 	return nil
 }
+func RepClassName(echoTmplClass []byte, oldN string, newN string) []byte {
+	//查找出所有字符串的位置
+	var poss []int
+	start := 0
+	for i := 0; i < 3; i++ {
+		pos := IndexFromBytes(echoTmplClass[start:], oldN)
+		if pos == -1 {
+			break
+		}
+		poss = append(poss, pos+start)
+		start += (pos + len(oldN))
+	}
+
+	Bytes2Int := func(b []byte) int {
+		return int(b[0])<<8 + int(b[1])
+	}
+
+	ll := len(oldN)
+	var buffer bytes.Buffer
+
+	//分别对三种情况做替换
+	pre := 0
+	for _, pos := range poss {
+		if string(echoTmplClass[pos-1]) == "L" {
+			buffer.Write(echoTmplClass[pre : pos-3])
+			buffer.Write(yserx.IntTo2Bytes(len(newN) + 2))
+			buffer.Write([]byte("L" + newN))
+			pre = pos + len(oldN)
+		} else {
+			l := Bytes2Int(echoTmplClass[pos-2 : pos])
+			if l == ll+5 {
+				buffer.Write(echoTmplClass[pre : pos-2])
+				buffer.Write(yserx.IntTo2Bytes(len(newN) + 5))
+				buffer.Write([]byte(newN))
+				pre = pos + len(oldN)
+				//buffer.Write(echoTmplClass[pos+len(oldN):])
+			} else if l == ll {
+				buffer.Write(echoTmplClass[pre : pos-2])
+				buffer.Write(yserx.IntTo2Bytes(len(newN)))
+				buffer.Write([]byte(newN))
+				pre = pos + len(oldN)
+			}
+		}
+
+	}
+	buffer.Write(echoTmplClass[pre:])
+	res := buffer.Bytes()
+	return res
+}
+func RepCmd(echoTmplClass []byte, zw string, cmd string) []byte {
+	pos := IndexFromBytes(echoTmplClass, zw)
+	var buffer bytes.Buffer
+	buffer.Write(echoTmplClass[:pos-2])
+	buffer.Write(yserx.IntTo2Bytes(len(cmd)))
+	buffer.Write([]byte(cmd))
+	buffer.Write(echoTmplClass[pos+len(zw):])
+	echoTmplClassRep := buffer.Bytes()
+	return echoTmplClassRep
+}
+
+func IndexFromBytes(byt []byte, sub interface{}) int {
+	return bytes.Index(byt, utils.InterfaceToBytes(sub))
+}
+
+func getMapTaskWithAllowEmpty(currentKey []string, srcMap any, key string, allow bool, cb func([]string, map[string]any) error) func() error {
+	return func() error {
+		if v, ok := srcMap.(map[string]any); ok {
+			if v1, ok := v[key]; ok {
+				if v2, ok := v1.(map[string]any); ok {
+					return cb(append(currentKey, key), v2)
+				}
+				return utils.Errorf("config.yaml: %s is not map[string]any", strings.Join(append(currentKey, key), "."))
+			}
+			if allow {
+				return nil
+			}
+			return utils.Errorf("config.yaml: %s is not found", strings.Join(append(currentKey, key), "."))
+		}
+		return utils.Errorf("config.yaml: %s is not map[string]any", strings.Join(currentKey, "."))
+	}
+}
+func getStringTaskWithAllowEmpty(currentKey []string, srcMap any, key string, allow bool, cb func([]string, string) error) func() error {
+	return func() error {
+		if v, ok := srcMap.(map[string]any); ok {
+			if v1, ok := v[key]; ok {
+				switch ret := v1.(type) {
+				case string:
+					return cb(append(currentKey, key), ret)
+				case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64, nil:
+					return cb(append(currentKey, key), fmt.Sprint(ret))
+				default:
+					return utils.Errorf("config.yaml: %s is not string", strings.Join(append(currentKey, key), "."))
+				}
+			}
+			if allow {
+				return nil
+			}
+			return utils.Errorf("config.yaml: %s is not found", strings.Join(append(currentKey, key), "."))
+		}
+		return utils.Errorf("config.yaml: %s is not map[string]any", strings.Join(append(currentKey), "."))
+	}
+}
+func getListTaskWithAllowEmpty(currentKey []string, srcMap any, key string, allow bool, cb func([]string, []any) error) func() error {
+	return func() error {
+		if v, ok := srcMap.(map[string]any); ok {
+			if v1, ok := v[key]; ok {
+				if v2, ok := v1.([]any); ok {
+					return cb(append(currentKey, key), v2)
+				}
+				return utils.Errorf("config.yaml: %s is not []any", strings.Join(append(currentKey, key), "."))
+			}
+			if allow {
+				return nil
+			}
+			return utils.Errorf("config.yaml: %s is not found", strings.Join(append(currentKey, key), "."))
+		}
+		return utils.Errorf("config.yaml: %s is not map[string]any", strings.Join(append(currentKey), "."))
+	}
+}
+func getMapTask(currentKey []string, srcMap any, key string, cb func([]string, map[string]any) error) func() error {
+	return getMapTaskWithAllowEmpty(currentKey, srcMap, key, false, cb)
+}
+func getMapOrEmptyTask(currentKey []string, srcMap any, key string, cb func([]string, map[string]any) error) func() error {
+	return getMapTaskWithAllowEmpty(currentKey, srcMap, key, true, cb)
+}
+func getStringTask(currentKey []string, srcMap any, key string, cb func([]string, string) error) func() error {
+	return getStringTaskWithAllowEmpty(currentKey, srcMap, key, false, cb)
+}
+func getStringOrEmptyTask(currentKey []string, srcMap any, key string, cb func([]string, string) error) func() error {
+	return getStringTaskWithAllowEmpty(currentKey, srcMap, key, true, cb)
+}
+func getListTask(currentKey []string, srcMap any, key string, cb func([]string, []any) error) func() error {
+	return getListTaskWithAllowEmpty(currentKey, srcMap, key, false, cb)
+}
+func getListOrEmptyTask(currentKey []string, srcMap any, key string, cb func([]string, []any) error) func() error {
+	return getListTaskWithAllowEmpty(currentKey, srcMap, key, true, cb)
+}
+func runWorkFlow(works ...func() error) error {
+	for _, work := range works {
+		err := work()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}

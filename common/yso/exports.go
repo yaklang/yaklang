@@ -1,9 +1,5 @@
 package yso
 
-import (
-	"github.com/yaklang/yaklang/common/facades/ldap/ldapserver"
-)
-
 var Exports = map[string]interface{}{
 	// 生成链
 	"ToBytes": ToBytes,
@@ -121,9 +117,4 @@ var Exports = map[string]interface{}{
 	"useConstructorExecutor":       SetConstruct, // 使用构造器执行
 	"evilClassName":                SetClassName, // className
 	"obfuscationClassConstantPool": SetObfuscation,
-}
-
-var LDAPExports = map[string]interface{}{
-	"NewLdapServer":         ldapserver.NewLdapServer,
-	"NewLdapServerWithPort": ldapserver.NewLdapServerWithPort,
 }
