@@ -22,7 +22,7 @@ func TestSyntaxBlock(t *testing.T) {
 		block BuilderReturnScopeFunc,
 		afterBlock BuilderFunc,
 	) {
-		global := NewRootVersionedTable[value]()
+		global := NewRootVersionedTable[value](NewVersioned[value])
 		/*
 			beforeBlock()
 			{
@@ -111,6 +111,26 @@ func TestSyntaxBlock(t *testing.T) {
 			},
 		)
 	})
+
+	t.Run("test scope variable but not cover", func(t *testing.T) {
+		/*
+			{
+				a = 1
+			}
+			a // nil
+		*/
+		test := assert.New(t)
+		check(
+			func(svt *ScopedVersionedTable[value]) {},
+			func(svt *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+				svt.CreateLexicalVariable("a", one)
+				return svt
+			},
+			func(svt *ScopedVersionedTable[value]) {
+				test.Nil(svt.GetLatestVersion("a"))
+			},
+		)
+	})
 }
 
 func TestIfScope_If(t *testing.T) {
@@ -124,7 +144,7 @@ func TestIfScope_If(t *testing.T) {
 		a// phi(1, 2)
 		b// 1
 	*/
-	table := NewRootVersionedTable[value]()
+	table := NewRootVersionedTable[value](NewVersioned[value])
 	table.CreateLexicalVariable("a", NewConsts("1"))
 	table.CreateLexicalVariable("b", NewConsts("1"))
 
@@ -162,7 +182,7 @@ func TestIfScope_IfELse(t *testing.T) {
 		b// phi(2, 1)
 		c// 1
 	*/
-	table := NewRootVersionedTable[value]()
+	table := NewRootVersionedTable[value](NewVersioned[value])
 	table.CreateLexicalVariable("a", NewConsts("1"))
 	table.CreateLexicalVariable("b", NewConsts("1"))
 	table.CreateLexicalVariable("c", NewConsts("1"))
@@ -205,7 +225,7 @@ func TestIfScope_IfELseIf(t *testing.T) {
 		a // phi(1, 2, 3)
 	*/
 
-	global := NewRootVersionedTable[value]()
+	global := NewRootVersionedTable[value](NewVersioned[value])
 	global.CreateLexicalVariable("a", NewConsts("1"))
 
 	build := NewIfStmt(global)
@@ -247,7 +267,7 @@ func TestIfScope_If_condition_assign(t *testing.T) {
 			a // nil undefine
 	*/
 
-	global := NewRootVersionedTable[value]()
+	global := NewRootVersionedTable[value](NewVersioned[value])
 	one := NewConsts("1")
 	two := NewConsts("2")
 	// global.CreateLexicalVariable("a", one)
@@ -303,7 +323,7 @@ func TestIfScope_If_condition_assign_checkMerge(t *testing.T) {
 		buildBody BuilderReturnScopeFunc,
 		afterIf BuilderFunc,
 	) {
-		global := NewRootVersionedTable[value]()
+		global := NewRootVersionedTable[value](NewVersioned[value])
 		beforeIf(global)
 		build := NewIfStmt(global)
 		build.BuildItem(
@@ -392,7 +412,7 @@ func TestIfScope_In_SyntaxBlock(t *testing.T) {
 			afterBlock()
 		*/
 
-		global := NewRootVersionedTable[value]()
+		global := NewRootVersionedTable[value](NewVersioned[value])
 		beforeBlock(global)
 		end := BuildSyntaxBlock(global, func(svt *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
 			beforeIf(svt)

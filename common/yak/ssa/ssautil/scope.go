@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
@@ -14,20 +13,21 @@ type GlobalIndexFetcher func() int
 
 type ScopedVersionedTable[T comparable] struct {
 	offsetFetcher GlobalIndexFetcher // fetch the next global index
+	newVersioned  func(versionIndex, globalIndex int, name string, scope *ScopedVersionedTable[T]) VersionedIF[T]
 
 	// record the lexical variable
-	values *omap.OrderedMap[string, *omap.OrderedMap[string, *Versioned[T]]]
+	values *omap.OrderedMap[string, *omap.OrderedMap[string, VersionedIF[T]]]
 
 	// for closure function or block scope
-	captured *omap.OrderedMap[string, *Versioned[T]]
+	captured *omap.OrderedMap[string, VersionedIF[T]]
 
-	incomingPhi *omap.OrderedMap[string, *Versioned[T]]
+	incomingPhi *omap.OrderedMap[string, VersionedIF[T]]
 
 	// global id to versioned variable
-	table map[int]*Versioned[T]
+	table map[int]VersionedIF[T]
 
 	spin           bool
-	CreateEmptyPhi func() T
+	CreateEmptyPhi func(string) T
 
 	// relations
 	parent      *ScopedVersionedTable[T]
@@ -35,12 +35,13 @@ type ScopedVersionedTable[T comparable] struct {
 	child       []*ScopedVersionedTable[T]
 }
 
-func NewScope[T comparable](fetcher func() int, table map[int]*Versioned[T], parent *ScopedVersionedTable[T]) *ScopedVersionedTable[T] {
+func NewScope[T comparable](fetcher func() int, newVersioned func(versionIndex, globalIndex int, name string, scope *ScopedVersionedTable[T]) VersionedIF[T], table map[int]VersionedIF[T], parent *ScopedVersionedTable[T]) *ScopedVersionedTable[T] {
 	return &ScopedVersionedTable[T]{
 		offsetFetcher: fetcher,
-		values:        omap.NewOrderedMap[string, *omap.OrderedMap[string, *Versioned[T]]](map[string]*omap.OrderedMap[string, *Versioned[T]]{}),
-		captured:      omap.NewOrderedMap[string, *Versioned[T]](map[string]*Versioned[T]{}),
-		incomingPhi:   omap.NewOrderedMap[string, *Versioned[T]](map[string]*Versioned[T]{}),
+		newVersioned:  newVersioned,
+		values:        omap.NewOrderedMap[string, *omap.OrderedMap[string, VersionedIF[T]]](map[string]*omap.OrderedMap[string, VersionedIF[T]]{}),
+		captured:      omap.NewOrderedMap[string, VersionedIF[T]](map[string]VersionedIF[T]{}),
+		incomingPhi:   omap.NewOrderedMap[string, VersionedIF[T]](map[string]VersionedIF[T]{}),
 		table:         table,
 		parent:        parent,
 		finishChild:   make([]*ScopedVersionedTable[T], 0),
@@ -48,7 +49,7 @@ func NewScope[T comparable](fetcher func() int, table map[int]*Versioned[T], par
 	}
 }
 
-func NewRootVersionedTable[T comparable](fetcher ...func() int) *ScopedVersionedTable[T] {
+func NewRootVersionedTable[T comparable](newVersioned func(versionIndex, globalIndex int, name string, scope *ScopedVersionedTable[T]) VersionedIF[T], fetcher ...func() int) *ScopedVersionedTable[T] {
 	var finalFetcher GlobalIndexFetcher
 	for _, f := range fetcher {
 		if f != nil {
@@ -68,7 +69,7 @@ func NewRootVersionedTable[T comparable](fetcher ...func() int) *ScopedVersioned
 		}
 	}
 
-	return NewScope[T](finalFetcher, map[int]*Versioned[T]{}, nil)
+	return NewScope[T](finalFetcher, newVersioned, map[int]VersionedIF[T]{}, nil)
 }
 
 func (v *ScopedVersionedTable[T]) IsRoot() bool {
@@ -87,7 +88,7 @@ func isZeroValue(i any) bool {
 	return reflect.ValueOf(i).IsZero()
 }
 
-func (v *ScopedVersionedTable[T]) CreateLexicalLocalVariable(name string, value T) *Versioned[T] {
+func (v *ScopedVersionedTable[T]) CreateLexicalLocalVariable(name string, value T) VersionedIF[T] {
 	return v.createLexicalVariableEx(name, value, true)
 }
 
@@ -102,13 +103,13 @@ func (v *ScopedVersionedTable[T]) CreateLexicalLocalVariable(name string, value 
 // trans to:
 //
 //	x = 1; x1 = 2
-func (v *ScopedVersionedTable[T]) CreateLexicalVariable(name string, value T) *Versioned[T] {
+func (v *ScopedVersionedTable[T]) CreateLexicalVariable(name string, value T) VersionedIF[T] {
 	return v.createLexicalVariableEx(name, value, false)
 }
 
-func (v *ScopedVersionedTable[T]) createLexicalVariableEx(name string, value T, local bool) *Versioned[T] {
+func (v *ScopedVersionedTable[T]) createLexicalVariableEx(name string, value T, local bool) VersionedIF[T] {
 	if ret, ok := v.values.Get(name); !ok {
-		v.values.Set(name, omap.NewOrderedMap[string, *Versioned[T]](map[string]*Versioned[T]{}))
+		v.values.Set(name, omap.NewOrderedMap[string, VersionedIF[T]](map[string]VersionedIF[T]{}))
 		return v.createLexicalVariableEx(name, value, local)
 	} else {
 		verIndex := ret.Len()
@@ -134,10 +135,10 @@ func (v *ScopedVersionedTable[T]) createLexicalVariableEx(name string, value T, 
 // the f()'s return value is a symbolic variable
 // we can't trace its lexical name
 // the symbol is not traced by some version.
-func (v *ScopedVersionedTable[T]) CreateSymbolicVariable(value T) *Versioned[T] {
+func (v *ScopedVersionedTable[T]) CreateSymbolicVariable(value T) VersionedIF[T] {
 	verVar := v.newVar("", 0)
-	key := fmt.Sprintf("$%d$", verVar.globalIndex)
-	table := omap.NewOrderedMap[string, *Versioned[T]](map[string]*Versioned[T]{})
+	key := fmt.Sprintf("$%d$", verVar.GetGlobalIndex())
+	table := omap.NewOrderedMap[string, VersionedIF[T]](map[string]VersionedIF[T]{})
 	table.Add(verVar)
 	v.values.Set(key, table)
 	if !isZeroValue(value) {
@@ -150,7 +151,7 @@ func (v *ScopedVersionedTable[T]) CreateSymbolicVariable(value T) *Versioned[T] 
 }
 
 // try register captured variable
-func (v *ScopedVersionedTable[T]) tryRegisterCapturedVariable(name string, ver *Versioned[T]) {
+func (v *ScopedVersionedTable[T]) tryRegisterCapturedVariable(name string, ver VersionedIF[T]) {
 	if v.IsRoot() {
 		return
 	}
@@ -160,21 +161,16 @@ func (v *ScopedVersionedTable[T]) tryRegisterCapturedVariable(name string, ver *
 		return
 	}
 	// mark original captured variable
-	ver.overWriteVariable = parentVariable.overWriteVariable
+	ver.SetCaptured(parentVariable)
 	v.captured.Set(name, ver)
 }
 
-func (v *ScopedVersionedTable[T]) newVar(lexName string, versionIndex int) *Versioned[T] {
+func (v *ScopedVersionedTable[T]) newVar(lexName string, versionIndex int) VersionedIF[T] {
 	global := v.offsetFetcher()
-	varIns := &Versioned[T]{
-		versionIndex: versionIndex,
-		globalIndex:  global,
-		lexicalName:  lexName,
-		scope:        v,
-		isAssigned:   utils.NewBool(false),
-	}
-	// every variable is captured by itself
-	varIns.overWriteVariable = varIns
+	varIns := v.newVersioned(
+		versionIndex, global,
+		lexName, v,
+	)
 	v.table[global] = varIns
 	return varIns
 }
@@ -188,22 +184,22 @@ func (v *ScopedVersionedTable[T]) newVar(lexName string, versionIndex int) *Vers
 //
 // trace:
 // x = {}
-// (a.b -> x.b) = 1
-func (v *ScopedVersionedTable[T]) RenameAssociated(globalIdLeft int, globalIdRight int) error {
-	if _, ok := v.table[globalIdLeft]; !ok {
-		return fmt.Errorf("can't find variable %d", globalIdLeft)
-	}
-	if _, ok := v.table[globalIdRight]; !ok {
-		return fmt.Errorf("can't find variable %d", globalIdRight)
-	}
+// // (a.b -> x.b) = 1
+// func (v *ScopedVersionedTable[T]) RenameAssociated(globalIdLeft int, globalIdRight int) error {
+// 	if _, ok := v.table[globalIdLeft]; !ok {
+// 		return fmt.Errorf("can't find variable %d", globalIdLeft)
+// 	}
+// 	if _, ok := v.table[globalIdRight]; !ok {
+// 		return fmt.Errorf("can't find variable %d", globalIdRight)
+// 	}
 
-	left, right := v.table[globalIdLeft], v.table[globalIdRight]
-	left.origin = right
-	return nil
-}
+// 	left, right := v.table[globalIdLeft], v.table[globalIdRight]
+// 	left.origin = right
+// 	return nil
+// }
 
 // CreateStaticMemberCallVariable will need a trackable obj, and a trackable member access
-func (v *ScopedVersionedTable[T]) CreateStaticMemberCallVariable(obj int, member any, val T) (*Versioned[T], error) {
+func (v *ScopedVersionedTable[T]) CreateStaticMemberCallVariable(obj int, member any, val T) (VersionedIF[T], error) {
 	name, err := v.ConvertStaticMemberCallToLexicalName(obj, member)
 	if err != nil {
 		return nil, err
@@ -213,7 +209,7 @@ func (v *ScopedVersionedTable[T]) CreateStaticMemberCallVariable(obj int, member
 
 // CreateDynamicMemberCallVariable will need a trackable obj, and a trackable member access
 // member should be a variable
-func (v *ScopedVersionedTable[T]) CreateDynamicMemberCallVariable(obj int, member int, val T) (*Versioned[T], error) {
+func (v *ScopedVersionedTable[T]) CreateDynamicMemberCallVariable(obj int, member int, val T) (VersionedIF[T], error) {
 	name, err := v.ConvertDynamicMemberCallToLexicalName(obj, member)
 	if err != nil {
 		return nil, err
@@ -222,7 +218,7 @@ func (v *ScopedVersionedTable[T]) CreateDynamicMemberCallVariable(obj int, membe
 }
 
 func (v *ScopedVersionedTable[T]) CreateSubScope() *ScopedVersionedTable[T] {
-	sub := NewScope[T](v.offsetFetcher, v.table, v)
+	sub := NewScope[T](v.offsetFetcher, v.newVersioned, v.table, v)
 	v.child = append(v.child, sub)
 	return sub
 }
@@ -237,7 +233,7 @@ func (v *ScopedVersionedTable[T]) InCurrentLexicalScope(name string) bool {
 
 // GetLatestVersionInCurrentLexicalScope get the latest version of the variable
 // in current scope, not trace to parent scope
-func (v *ScopedVersionedTable[T]) GetLatestVersionInCurrentLexicalScope(name string) *Versioned[T] {
+func (v *ScopedVersionedTable[T]) GetLatestVersionInCurrentLexicalScope(name string) VersionedIF[T] {
 	if ret, ok := v.values.Get(name); !ok {
 		return nil
 	} else {
@@ -245,25 +241,23 @@ func (v *ScopedVersionedTable[T]) GetLatestVersionInCurrentLexicalScope(name str
 		return ver
 	}
 }
-func (v *ScopedVersionedTable[T]) GetLatestVersionVersioned(name string) *Versioned[T] {
+func (scope *ScopedVersionedTable[T]) GetLatestVersionVersioned(name string) VersionedIF[T] {
 	// var parent = v
 	// for parent != nil {
-	var ret *Versioned[T]
-	if result := v.GetLatestVersionInCurrentLexicalScope(name); result != nil {
+	var ret VersionedIF[T]
+	if result := scope.GetLatestVersionInCurrentLexicalScope(name); result != nil {
 		ret = result
 	} else {
-		if v.parent != nil {
-			ret = v.parent.GetLatestVersionVersioned(name)
+		if scope.parent != nil {
+			ret = scope.parent.GetLatestVersionVersioned(name)
 		} else {
 			ret = nil
 		}
 	}
-	if ret != nil && ret.scope != v && v.spin {
-		t := v.CreateLexicalVariable(name, v.CreateEmptyPhi())
-		t.isPhi = true
-		t.origin = ret
-		v.incomingPhi.Set(name, t)
-
+	if ret != nil && ret.GetScope() != scope && scope.spin {
+		t := scope.CreateLexicalVariable(name, scope.CreateEmptyPhi(name))
+		// t.origin = ret
+		scope.incomingPhi.Set(name, t)
 		ret = t
 	}
 	return ret
@@ -274,7 +268,7 @@ func (v *ScopedVersionedTable[T]) GetLatestVersionVersioned(name string) *Versio
 
 func (v *ScopedVersionedTable[T]) GetLatestVersion(name string) (t T) {
 	if ret := v.GetLatestVersionVersioned(name); ret != nil {
-		return ret.Value
+		return ret.GetValue()
 	} else {
 		return
 	}
@@ -282,8 +276,8 @@ func (v *ScopedVersionedTable[T]) GetLatestVersion(name string) (t T) {
 
 // GetVersions get all versions of the variable
 // trace to parent scope if not found
-func (v *ScopedVersionedTable[T]) GetVersions(name string) []*Versioned[T] {
-	var vers []*Versioned[T]
+func (v *ScopedVersionedTable[T]) GetVersions(name string) []VersionedIF[T] {
+	var vers []VersionedIF[T]
 	var parent = v
 	for parent != nil {
 		if ret, ok := parent.values.Get(name); ok {
@@ -327,7 +321,7 @@ func (v *ScopedVersionedTable[T]) ConvertStaticMemberCallToLexicalName(obj int, 
 		return "", fmt.Errorf("invalid static member type %T", member)
 	}
 
-	return fmt.Sprintf("#%v%s", rootLeft.GetId(), suffix), nil
+	return fmt.Sprintf("#%v%s", rootLeft.GetGlobalIndex(), suffix), nil
 }
 
 func (v *ScopedVersionedTable[T]) ConvertDynamicMemberCallToLexicalName(obj, member int) (string, error) {
@@ -342,14 +336,14 @@ func (v *ScopedVersionedTable[T]) ConvertDynamicMemberCallToLexicalName(obj, mem
 	rootLeft := left.GetRootVersion()
 	rootRight := right.GetRootVersion()
 
-	var suffix = fmt.Sprintf("#%v", rootRight.GetId())
-	return fmt.Sprintf("#%v.$(%s)", rootLeft.GetId(), suffix), nil
+	var suffix = fmt.Sprintf("#%v", rootRight.GetGlobalIndex())
+	return fmt.Sprintf("#%v.$(%s)", rootLeft.GetGlobalIndex(), suffix), nil
 }
 
 // func (s *ScopedVersionedTable[T]) Merge(sub ...*ScopedVersionedTable[T]) {
 // 	if len(sub) == 1 {
 // 		// cover origin value
-// 		sub[0].captured.ForEach(func(name string, ver *Versioned[T]) bool {
+// 		sub[0].captured.ForEach(func(name string, ver VersionedIF[T]) bool {
 // 			return true
 // 		})
 // 	} else {
