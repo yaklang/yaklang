@@ -1671,3 +1671,58 @@ http:
 		}
 	}
 }
+func TestMockTest_StopAtFirstMatch(t *testing.T) {
+	server, port := utils.DebugMockHTTPWithTimeout(10000*time.Second, []byte(`HTTP/1.1 200 OK
+TestDebug: 111
+
+Post Meta Setting Deleted Successfully
+`))
+	spew.Dump(server, port)
+
+	for _, caseItem := range [][]any{
+		{`http:
+  - method: GET
+    path:
+      - "{{BaseURL}}///////../../../etc/passwd"
+      - "{{BaseURL}}/static///////../../../../etc/passwd"
+      - "{{BaseURL}}///../app.js"
+
+    stop-at-first-match: true
+
+    matchers-condition: and
+    matchers:
+      - type: regex
+        regex:
+          - "root:.*:0:0:"
+          - "app.listen"
+        part: body
+        condition: or
+
+      - type: status
+        status:
+          - 200`, true},
+	} {
+		demo, expected := caseItem[0].(string), caseItem[1].(bool)
+		expectedMatched := expected
+		_ = expectedMatched
+		if len(caseItem) > 2 {
+			expectedMatched = caseItem[2].(bool)
+		}
+
+		ytpl, err := CreateYakTemplateFromNucleiTemplateRaw(demo)
+		if err != nil {
+			panic(err)
+		}
+		check := false
+		config := NewConfig(WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+			check = result
+		}))
+		_, err = ytpl.ExecWithUrl("http://www.baidu.com", config, lowhttp.WithHost(server), lowhttp.WithPort(port))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if check {
+			t.Fatal("check stop-at-first error")
+		}
+	}
+}
