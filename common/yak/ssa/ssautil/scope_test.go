@@ -502,116 +502,176 @@ func TestIfScope_In_SyntaxBlock(t *testing.T) {
 		)
 	})
 }
-
-func TestLoopScope(t *testing.T) {
+func TestLoopScope_Basic(t *testing.T) {
 	/*
-		{
-			i = 1
-			for i < 10 { // phi(1, 2)
-				i = 2 // phi
+		beforeLoop()
+		for loopFirst(); loopCondition(); loopThird() {
+			loopBody()
+		}
+		afterLoop()
+	*/
+	build := func(
+		beforeLoop, loopFirst, loopCondition BuilderFunc,
+		body BuilderReturnScopeFunc,
+		loopThird, afterLoop BuilderFunc,
+	) {
+		global := NewRootVersionedTable[value](NewVersioned[value])
+		beforeLoop(global)
+
+		builder := NewLoopStmt(global, NewPhiValue)
+		builder.SetFirst(func(sub *ScopedVersionedTable[value]) {
+			loopFirst(sub)
+		})
+		builder.SetCondition(func(sub *ScopedVersionedTable[value]) {
+			loopCondition(sub)
+		})
+		builder.SetThird(func(sub *ScopedVersionedTable[value]) {
+			loopThird(sub)
+		})
+		builder.SetBody(func(sub *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+			return BuildSyntaxBlock(sub, func(sub *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+				return body(sub)
+			})
+		})
+		end := builder.Build(SpinHandler, GeneratePhi)
+		afterLoop(end)
+	}
+
+	t.Run("test basic", func(t *testing.T) {
+		/*
+			{
+				i = 1
+				for i < 10 { // phi(1, 2)
+					i = 2
+				}
+				i // phi
 			}
-			i // phi
-		}
-	*/
-	test := assert.New(t)
+		*/
+		var conditionVariable, endVariable value
+		build(
+			func(svt *ScopedVersionedTable[value]) {
+				svt.CreateLexicalVariable("i", one)
+			},
+			func(svt *ScopedVersionedTable[value]) {},
+			func(svt *ScopedVersionedTable[value]) {
+				conditionVariable = svt.GetLatestVersion("i")
+			},
+			func(svt *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+				svt.CreateLexicalVariable("i", two)
+				return svt
+			},
+			func(svt *ScopedVersionedTable[value]) {},
+			func(svt *ScopedVersionedTable[value]) {
+				endVariable = svt.GetLatestVersion("i")
+			},
+		)
+		test := assert.New(t)
+		test.Equal("phi[const(1) const(2)]", conditionVariable.String())
+		test.Equal("phi[const(1) const(2)]", endVariable.String())
+	})
 
-	global := NewRootVersionedTable[value]()
+	t.Run("test spin", func(t *testing.T) {
+		/*
+			i = 0
+			for i < 10 { // t2
+				i = i + 1
+				// t2 = phi(t1, 0)
+				// t1 = t2 + 1
+			}
+			i // t2 phi(0, $+1)
+		*/
 
-	global.CreateLexicalVariable("i", NewConsts("1"))
-	var conditionVariableI, bodyVariableI value
-	NewLoopStmt(global, NewPhiValue).
-		SetCondition(func(sub *ScopedVersionedTable[value]) {
-			conditionVariableI = sub.GetLatestVersion("i")
-		}).
-		SetBody(func(sub *ScopedVersionedTable[value]) {
-			bodyVariableI = sub.GetLatestVersion("i")
-			sub.CreateLexicalVariable("i", NewConsts("2"))
-		}).
-		Build(SpinHandler)
-	test.Equal("phi[const(1) const(2)]", conditionVariableI.String())
-	test.Equal("phi[const(1) const(2)]", bodyVariableI.String())
-	test.Equal("phi[const(1) const(2)]", global.GetLatestVersion("i").String())
-}
+		var conditionVariable, Binary, endVariable value
+		build(
+			func(svt *ScopedVersionedTable[value]) {
+				svt.CreateLexicalVariable("i", zero)
+			},
+			func(svt *ScopedVersionedTable[value]) {},
+			func(svt *ScopedVersionedTable[value]) {
+				conditionVariable = svt.GetLatestVersion("i")
+			},
+			func(svt *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+				bodyVariable := svt.GetLatestVersion("i")
+				Binary = NewBinary(bodyVariable, one)
+				svt.CreateLexicalVariable("i", Binary)
+				return svt
+			},
+			func(svt *ScopedVersionedTable[value]) {},
+			func(svt *ScopedVersionedTable[value]) {
+				endVariable = svt.GetLatestVersion("i")
+			},
+		)
 
-func TestLoopScope_Spin(t *testing.T) {
-	/*
-		i = 0
-		for i < 10 { // t2
-			i = i + 1
-			// t2 = phi(t1, 0)
-			// t1 = t2 + 1
-		}
-		i // t2
-	*/
+		test := assert.New(t)
+		test.Equal(*NewPhi(zero, Binary), *conditionVariable.(*phi))
+		test.Equal(*NewPhi(zero, Binary), *endVariable.(*phi))
+		test.Equal(*NewBinary(conditionVariable, one), *Binary.(*binary))
+	})
 
-	test := assert.New(t)
+	t.Run("test spin with first", func(t *testing.T) {
+		/*
+			for i=1; i<10; i++ {
+				i // phi[1, i+1]
+			}
+			i // undefine
+		*/
 
-	global := NewRootVersionedTable[value]()
-	zero := NewConsts("0")
-	one := NewConsts("1")
-	global.CreateLexicalVariable("i", zero)
+		var conditionVariable, bodyVariable, thirdVariable, thirdVariableBinary, endVariable value
+		build(
+			func(svt *ScopedVersionedTable[value]) {},
+			func(svt *ScopedVersionedTable[value]) {
+				svt.CreateLexicalVariable("i", one)
+			},
+			func(svt *ScopedVersionedTable[value]) {
+				conditionVariable = svt.GetLatestVersion("i")
+			},
+			func(svt *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+				bodyVariable = svt.GetLatestVersion("i")
+				return svt
+			},
+			func(svt *ScopedVersionedTable[value]) {
+				thirdVariable = svt.GetLatestVersion("i")
+				thirdVariableBinary = NewBinary(thirdVariable, one)
+				svt.CreateLexicalVariable("i", thirdVariableBinary)
+			},
+			func(svt *ScopedVersionedTable[value]) {
+				endVariable = svt.GetLatestVersion("i")
+			},
+		)
+		test := assert.New(t)
+		test.Equal(*NewPhi(one, thirdVariableBinary), *conditionVariable.(*phi))
+		test.Equal(conditionVariable, bodyVariable)
+		test.Equal(conditionVariable, thirdVariable)
+		test.Equal(*NewBinary(conditionVariable, one), *thirdVariableBinary.(*binary))
+		test.Nil(endVariable)
+	})
 
-	var conditionVariablePhi, bodyVariablePhi, bodyVariableBinary value
-	NewLoopStmt(global, NewPhiValue).
-		SetCondition(func(sub *ScopedVersionedTable[value]) {
-			conditionVariablePhi = sub.GetLatestVersion("i")
-		}).
-		SetBody(func(body *ScopedVersionedTable[value]) {
-			bodyVariablePhi = body.GetLatestVersion("i")
-			test.Equal("phi[]", bodyVariablePhi.String())
+	t.Run("test undefine variable", func(t *testing.T) {
+		/*
+			for {
+				println // nil
+			}
+			println // nil
 
-			bin := NewBinary(bodyVariablePhi, one)
-			test.Equal("binary(phi[], const(1))", bin.String())
-			body.CreateLexicalVariable("i", bin)
+		*/
+		test := assert.New(t)
+		build(
+			func(svt *ScopedVersionedTable[value]) {},
+			func(svt *ScopedVersionedTable[value]) {},
+			func(svt *ScopedVersionedTable[value]) {},
+			func(svt *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+				bodyVariable := svt.GetLatestVersion("println")
+				test.Nil(bodyVariable)
+				return svt
+			},
+			func(svt *ScopedVersionedTable[value]) {},
+			func(svt *ScopedVersionedTable[value]) {
+				endVariable := svt.GetLatestVersion("println")
+				test.Nil(endVariable)
+			},
+		)
 
-			bodyVariableBinary = body.GetLatestVersion("i")
-			test.Equal("binary(phi[], const(1))", bodyVariableBinary.String())
-		}).
-		Build(SpinHandler)
-
-	test.Equal(*NewPhi(zero, bodyVariableBinary), *bodyVariablePhi.(*phi))
-	test.Equal(bodyVariablePhi, conditionVariablePhi)
-	test.Equal(*NewBinary(bodyVariablePhi, one), *bodyVariableBinary.(*binary))
-}
-
-func TestLoopScope_Spin_First(t *testing.T) {
-	/*
-		for i=1; i<10; i++ {
-			i // phi[1, i+1]
-		}
-		i // undefine
-	*/
-	global := NewRootVersionedTable[value]()
-	one := NewConsts("1")
-
-	var thirdVariable, thirdVariableBinary, conditionVariable, bodyVariable value
-
-	NewLoopStmt(global, NewPhiValue).
-		SetFirst(func(sub *ScopedVersionedTable[value]) {
-			sub.CreateLexicalVariable("i", one)
-		}).
-		SetCondition(func(sub *ScopedVersionedTable[value]) {
-			conditionVariable = sub.GetLatestVersion("i")
-		}).
-		SetThird(func(sub *ScopedVersionedTable[value]) {
-			thirdVariable = sub.GetLatestVersion("i")
-			thirdVariableBinary = NewBinary(thirdVariable, one)
-			sub.CreateLexicalVariable("i", thirdVariableBinary)
-		}).
-		SetBody(func(sub *ScopedVersionedTable[value]) {
-			bodyVariable = sub.GetLatestVersion("i")
-		}).
-		Build(SpinHandler)
-
-	globalVariable := global.GetLatestVersion("i")
-	test := assert.New(t)
-
-	test.Equal(*NewPhi(one, thirdVariableBinary), *bodyVariable.(*phi))
-	test.Nil(globalVariable)
-	test.Equal(*NewBinary(thirdVariable, one), *thirdVariableBinary.(*binary))
-	test.Equal(conditionVariable, thirdVariable)
-	test.Equal(bodyVariable, thirdVariable)
-
+	})
 }
 
 func TestIfLoopScope_Basic(t *testing.T) {
@@ -630,40 +690,160 @@ func TestIfLoopScope_Basic(t *testing.T) {
 
 	test := assert.New(t)
 
-	global := NewRootVersionedTable[value]()
+	global := NewRootVersionedTable[value](NewVersioned[value])
 	zero := NewConsts("0")
 	one := NewConsts("1")
 	two := NewConsts("2")
 	global.CreateLexicalVariable("i", zero)
 
-	var conditionVariable, bodyVariablePhi, trueVariableBinary, falseVariableBinary, globalVariablePhi value
-	NewLoopStmt(global, NewPhiValue).
-		SetCondition(func(sub *ScopedVersionedTable[value]) {
-			conditionVariable = sub.GetLatestVersion("i")
-		}).
-		SetBody(func(body *ScopedVersionedTable[value]) {
+	var conditionVariable, bodyVariablePhi, trueVariableBinary, falseVariableBinary, endVariablePhi value
+	builder := NewLoopStmt(global, NewPhiValue)
+	builder.SetCondition(func(sub *ScopedVersionedTable[value]) {
+		conditionVariable = sub.GetLatestVersion("i")
+	})
+	builder.SetBody(func(body *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+		return BuildSyntaxBlock(body, func(body *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
 			build := NewIfStmt(body)
 			build.BuildItem(
 				func(*ScopedVersionedTable[value]) {},
-				func(body *ScopedVersionedTable[value]) {
-					trueVariablePhi := body.GetLatestVersion("i")
-					body.CreateLexicalVariable("i", NewBinary(trueVariablePhi, one))
-					trueVariableBinary = body.GetLatestVersion("i")
+				func(body *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+					return BuildSyntaxBlock(body, func(body *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+						trueVariablePhi := body.GetLatestVersion("i")
+						body.CreateLexicalVariable("i", NewBinary(trueVariablePhi, one))
+						trueVariableBinary = body.GetLatestVersion("i")
+						return body
+					})
 				},
 			)
-			build.BuildElse(func(body *ScopedVersionedTable[value]) {
-				falseVariablePhi := body.GetLatestVersion("i")
-				body.CreateLexicalVariable("i", NewBinary(falseVariablePhi, two))
-				falseVariableBinary = body.GetLatestVersion("i")
+			build.BuildElse(func(body *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+				return BuildSyntaxBlock(body, func(body *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+					falseVariablePhi := body.GetLatestVersion("i")
+					body.CreateLexicalVariable("i", NewBinary(falseVariablePhi, two))
+					falseVariableBinary = body.GetLatestVersion("i")
+					return body
+				})
 			})
-			build.BuildFinish(GeneratePhi)
-			bodyVariablePhi = body.GetLatestVersion("i")
-		}).
-		Build(SpinHandler)
+			end := build.BuildFinish(GeneratePhi)
+			bodyVariablePhi = end.GetLatestVersion("i")
+			return end
+		})
+	})
+	end := builder.Build(SpinHandler, GeneratePhi)
 
-	globalVariablePhi = global.GetLatestVersion("i")
+	endVariablePhi = end.GetLatestVersion("i")
 
 	test.Equal(*NewPhi(trueVariableBinary, falseVariableBinary), *bodyVariablePhi.(*phi))
-	test.Equal(*NewPhi(zero, bodyVariablePhi), *globalVariablePhi.(*phi))
-	test.Equal(conditionVariable, globalVariablePhi)
+	test.Equal(*NewPhi(zero, bodyVariablePhi), *endVariablePhi.(*phi))
+	test.Equal(conditionVariable, endVariablePhi)
+}
+
+func TestIfLoopScope_Break(t *testing.T) {
+	/*
+		i = 0
+		for i=1; i<10; i++ {
+			if i == 2 {
+				i = 2
+				break
+			}
+		}
+		i // phi[2, phi[1+$]]
+	*/
+
+	test := assert.New(t)
+	global := NewRootVersionedTable[value](NewVersioned[value])
+	global.CreateLexicalVariable("i", zero)
+
+	var ConditionVariable, ThirdVariable1, TrueVariable, BinaryVariable value
+
+	LoopBuilder := NewLoopStmt(global, NewPhiValue)
+	LoopBuilder.SetFirst(func(sub *ScopedVersionedTable[value]) {
+		sub.CreateLexicalVariable("i", one)
+	})
+	LoopBuilder.SetCondition(func(sub *ScopedVersionedTable[value]) {
+		ConditionVariable = sub.GetLatestVersion("i")
+	})
+	LoopBuilder.SetThird(func(sub *ScopedVersionedTable[value]) {
+		ThirdVariable1 = sub.GetLatestVersion("i")
+		BinaryVariable = NewBinary(ThirdVariable1, one)
+		sub.CreateLexicalVariable("i", BinaryVariable)
+	})
+	LoopBuilder.SetBody(func(sub *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+		return BuildSyntaxBlock(sub, func(sub *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+			Build := NewIfStmt(sub)
+			Build.BuildItem(
+				func(sub *ScopedVersionedTable[value]) {
+					TrueVariable = sub.GetLatestVersion("i")
+				},
+				func(sub *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+					sub.CreateLexicalVariable("i", two)
+					LoopBuilder.Break(sub)
+					return nil
+				})
+			end := Build.BuildFinish(GeneratePhi)
+			return end
+		})
+	})
+
+	end := LoopBuilder.Build(SpinHandler, GeneratePhi)
+	endVariable := end.GetLatestVersion("i")
+
+	test.Equal(*NewPhi(one, BinaryVariable), *ConditionVariable.(*phi))
+	test.Equal(ThirdVariable1, ConditionVariable)
+	test.Equal(ThirdVariable1, TrueVariable)
+	test.Equal(*NewPhi(two, ThirdVariable1), *endVariable.(*phi))
+}
+func TestIfLoopScope_Continue(t *testing.T) {
+	/*
+		i = 0
+		for i=1; i<10; i++ { // i phi[1, $+1, 2]
+			if i == 2 {
+				i = 2
+				continue
+			}
+		}
+		i
+	*/
+
+	test := assert.New(t)
+	global := NewRootVersionedTable[value](NewVersioned[value])
+	global.CreateLexicalVariable("i", zero)
+
+	var ConditionVariable, ThirdVariable1, TrueVariable, BinaryVariable value
+
+	LoopBuilder := NewLoopStmt(global, NewPhiValue)
+	LoopBuilder.SetFirst(func(sub *ScopedVersionedTable[value]) {
+		sub.CreateLexicalVariable("i", one)
+	})
+	LoopBuilder.SetCondition(func(sub *ScopedVersionedTable[value]) {
+		ConditionVariable = sub.GetLatestVersion("i")
+	})
+	LoopBuilder.SetThird(func(sub *ScopedVersionedTable[value]) {
+		ThirdVariable1 = sub.GetLatestVersion("i")
+		BinaryVariable = NewBinary(ThirdVariable1, one)
+		sub.CreateLexicalVariable("i", BinaryVariable)
+	})
+	LoopBuilder.SetBody(func(sub *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+		return BuildSyntaxBlock(sub, func(sub *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+			Build := NewIfStmt(sub)
+			Build.BuildItem(
+				func(sub *ScopedVersionedTable[value]) {
+					TrueVariable = sub.GetLatestVersion("i")
+				},
+				func(sub *ScopedVersionedTable[value]) *ScopedVersionedTable[value] {
+					sub.CreateLexicalVariable("i", two)
+					LoopBuilder.Continue(sub)
+					return nil
+				})
+			end := Build.BuildFinish(GeneratePhi)
+			return end
+		})
+	})
+
+	end := LoopBuilder.Build(SpinHandler, GeneratePhi)
+	endVariable := end.GetLatestVersion("i")
+
+	test.Equal(*NewPhi(two, ConditionVariable), *ThirdVariable1.(*phi))
+	test.Equal(*NewPhi(one, BinaryVariable), *ConditionVariable.(*phi))
+	test.Equal(ConditionVariable, TrueVariable)
+	test.Equal(ConditionVariable, endVariable)
 }
