@@ -169,7 +169,7 @@ func (l *LoopStmt[T]) Break(from *ScopedVersionedTable[T]) {
 }
 
 // Build builds the LoopStmt using the provided NewPhi and SpinHandler functions.
-func (l *LoopStmt[T]) Build(SpinHandler func(name string, phi, v1, v2 T) T, merge func(name string, t []T) T) *ScopedVersionedTable[T] {
+func (l *LoopStmt[T]) Build(SpinHandler func(name string, phi, origin, latch T) T, merge func(name string, t []T) T) *ScopedVersionedTable[T] {
 
 	/*
 		global [i = 0]
