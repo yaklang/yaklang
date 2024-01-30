@@ -85,7 +85,7 @@ jobs:
           - name: Test SSA / SSARule / StaticAnalyze
             run: |
               # SSA
-              go test -timeout 20s ./common/yak/yak2ssa ./common/yak/ssaapi 
+              go test -timeout 20s ./common/yak/yak2ssa/test ./common/yak/ssaapi 
               # SSA plugin rule/option
               go test -timeout 20s ./common/yak/static_analyzer/test 
               # StaticAnalyze
