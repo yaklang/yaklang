@@ -327,7 +327,7 @@ func (b *astbuilder) buildForStmt(stmt *yak.ForStmtContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 	// current := f.currentBlock
-	loop := b.BuildLoop()
+	loop := b.CreateLoopBuilder()
 
 	// var cond ssa.Value
 	var cond *yak.ExpressionContext
@@ -337,7 +337,7 @@ func (b *astbuilder) buildForStmt(stmt *yak.ForStmtContext) {
 	} else if condition, ok := stmt.ForStmtCond().(*yak.ForStmtCondContext); ok {
 		if first, ok := condition.ForFirstExpr().(*yak.ForFirstExprContext); ok {
 			// first expression is initialization, in enter block
-			loop.BuildFirstExpr(func() []ssa.Value {
+			loop.SetFirst(func() []ssa.Value {
 				recoverRange := b.SetRange(first.BaseParserRuleContext)
 				defer recoverRange()
 				return b.ForExpr(first)
@@ -350,7 +350,7 @@ func (b *astbuilder) buildForStmt(stmt *yak.ForStmtContext) {
 
 		if third, ok := condition.ForThirdExpr().(*yak.ForThirdExprContext); ok {
 			// build latch
-			loop.BuildThird(func() []ssa.Value {
+			loop.SetThird(func() []ssa.Value {
 				// build third expression in loop.latch
 				recoverRange := b.SetRange(third.BaseParserRuleContext)
 				defer recoverRange()
@@ -359,7 +359,7 @@ func (b *astbuilder) buildForStmt(stmt *yak.ForStmtContext) {
 		}
 	}
 
-	loop.BuildCondition(func() ssa.Value {
+	loop.SetCondition(func() ssa.Value {
 		var condition ssa.Value
 		if cond == nil {
 			condition = b.EmitConstInst(true)
@@ -376,7 +376,7 @@ func (b *astbuilder) buildForStmt(stmt *yak.ForStmtContext) {
 	})
 
 	//  build body
-	loop.BuildBody(func() {
+	loop.SetBody(func() {
 		if block, ok := stmt.Block().(*yak.BlockContext); ok {
 			b.buildBlock(block)
 		}
@@ -406,30 +406,29 @@ func (b *astbuilder) buildForRangeStmt(stmt *yak.ForRangeStmtContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 	// current := f.currentBlock
-	loop := b.BuildLoop()
+	loop := b.CreateLoopBuilder()
 
-	loop.BuildCondition(func() ssa.Value {
-		var variables []*ssa.Variable
+	loop.SetCondition(func() ssa.Value {
+		var lefts []*ssa.Variable
 		if leftList, ok := stmt.LeftExpressionList().(*yak.LeftExpressionListContext); ok {
-			variables = b.buildLeftExpressionList(true, leftList)
+			lefts = b.buildLeftExpressionList(true, leftList)
 			// } else {
 		}
 		value := b.buildExpression(stmt.Expression().(*yak.ExpressionContext))
 		key, field, ok := b.EmitNext(value, stmt.In() != nil)
-		if len(variables) == 1 {
-			b.AssignVariable(variables[0], key)
+		if len(lefts) == 1 {
+			b.AssignVariable(lefts[0], key)
 			ssa.DeleteInst(field)
-		} else if len(variables) >= 2 {
-			b.AssignVariable(variables[0], key)
-			b.AssignVariable(variables[1], field)
+		} else if len(lefts) >= 2 {
+			b.AssignVariable(lefts[0], key)
+			b.AssignVariable(lefts[1], field)
 		}
 		return ok
 	})
 
-	loop.BuildBody(func() {
+	loop.SetBody(func() {
 		b.buildBlock(stmt.Block().(*yak.BlockContext))
 	})
-
 	loop.Finish()
 }
 

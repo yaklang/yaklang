@@ -208,7 +208,7 @@ func (a *anInstruction) GetVariable(name string) *Variable {
 func (a *anInstruction) GetAllVariables() map[string]*Variable {
 	return a.variables
 }
-func (a *anInstruction) AddVariable(v *Variable) { a.variables[v.Name] = v }
+func (a *anInstruction) AddVariable(v *Variable) { a.variables[v.GetName()] = v }
 
 var _ Instruction = (*anInstruction)(nil)
 
@@ -355,7 +355,7 @@ type BasicBlock struct {
 
 	// for build
 	symbolTable   map[string]Values
-	ScopeTable    *ssautil.ScopedVersionedTable[*Variable]
+	ScopeTable    *ssautil.ScopedVersionedTable[Value]
 	finish        bool // if emitJump finish!
 	isSealed      bool
 	inCompletePhi []*Phi // variable -> phi

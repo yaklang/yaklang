@@ -39,7 +39,7 @@ func (f *Function) newBasicBlockEx(name string, isSealed bool, nodAddToBlocks bo
 		Handler:       nil,
 		finish:        false,
 		isSealed:      isSealed,
-		ScopeTable:    ssautil.NewRootVersionedTable[*Variable](),
+		ScopeTable:    ssautil.NewRootVersionedTable[Value](NewVariable),
 		inCompletePhi: make([]*Phi, 0),
 		Skip:          false,
 		symbolTable:   make(map[string]Values),

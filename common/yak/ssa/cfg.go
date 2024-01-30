@@ -3,16 +3,17 @@ package ssa
 import (
 	"strings"
 
-	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
 const (
 	// loop
-	LoopHeader = "loop.header"
-	LoopBody   = "loop.body"
-	LoopExit   = "loop.exit"
-	LoopLatch  = "loop.latch"
+	LoopHeader    = "loop.header"    // first
+	LoopCondition = "loop.condition" // second // condition
+	LoopBody      = "loop.body"      // body
+	LoopExit      = "loop.exit"      // exit
+	LoopLatch     = "loop.latch"     // third // latch
 
 	// if
 	IfDone  = "if.done"
@@ -55,7 +56,7 @@ func (b *FunctionBuilder) BuildSyntaxBlock(builder func()) {
 	b.EmitJump(SubBlock)
 	b.CurrentBlock = SubBlock
 
-	endScope := ssautil.BuildSyntaxBlock(Scope, func(svt *ssautil.ScopedVersionedTable[*Variable]) *ssautil.ScopedVersionedTable[*Variable] {
+	endScope := ssautil.BuildSyntaxBlock(Scope, func(svt *ssautil.ScopedVersionedTable[Value]) *ssautil.ScopedVersionedTable[Value] {
 		b.CurrentBlock.ScopeTable = svt
 		builder()
 		return b.CurrentBlock.ScopeTable
@@ -91,104 +92,146 @@ func (b *FunctionBuilder) BuildSyntaxBlock(builder func()) {
 // rest:
 //      ...rest.code....
 
-type LoopBuilder struct {
-	// block
-	enter *BasicBlock
-
-	buildCondition         func() Value
-	buildBody              func()
-	buildFirst, buildThird func() []Value
-
-	// b
-	b *FunctionBuilder
+// use in for/switch
+type target struct {
+	tail         *target // the stack
+	_break       *BasicBlock
+	_continue    *BasicBlock
+	_fallthrough *BasicBlock
 }
 
-func (b *FunctionBuilder) BuildLoop() *LoopBuilder {
-	enter := b.CurrentBlock
-
-	return &LoopBuilder{
-		enter: enter,
-		b:     b,
+// target stack
+func (b *FunctionBuilder) PushTarget(_break, _continue, _fallthrough *BasicBlock) {
+	b.target = &target{
+		tail:         b.target,
+		_break:       _break,
+		_continue:    _continue,
+		_fallthrough: _fallthrough,
 	}
 }
 
-func (lb *LoopBuilder) BuildFirstExpr(f func() []Value) {
-	lb.buildFirst = f
+func (b *FunctionBuilder) PopTarget() bool {
+	b.target = b.target.tail
+	if b.target == nil {
+		// b.NewError(Error, SSATAG, "error target struct this position when build")
+		return false
+	} else {
+		return true
+	}
 }
 
-func (lb *LoopBuilder) BuildCondition(f func() Value) {
-	lb.buildCondition = f
+// LoopBuilder is a builder for loop statement
+type LoopBuilder struct {
+	// save data when create
+	enter   *BasicBlock
+	builder *FunctionBuilder
+
+	Condition            func() Value
+	Body                 func()
+	FirstExpr, ThirdExpr func() []Value
 }
 
-func (lb *LoopBuilder) BuildThird(f func() []Value) {
-	lb.buildThird = f
+// CreateLoopBuilder Create LoopBuilder
+func (b *FunctionBuilder) CreateLoopBuilder() *LoopBuilder {
+	return &LoopBuilder{
+		enter:   b.CurrentBlock,
+		builder: b,
+	}
 }
 
-func (lb *LoopBuilder) BuildBody(f func()) {
-	lb.buildBody = f
+// SetFirst : Loop First Expression
+func (lb *LoopBuilder) SetFirst(f func() []Value) {
+	lb.FirstExpr = f
+}
+
+// SetCondition : Loop Condition
+func (lb *LoopBuilder) SetCondition(f func() Value) {
+	lb.Condition = f
+}
+
+// SetThird : Loop Third Expression
+func (lb *LoopBuilder) SetThird(f func() []Value) {
+	lb.ThirdExpr = f
+}
+
+// SetBody : Loop Body
+func (lb *LoopBuilder) SetBody(f func()) {
+	lb.Body = f
 }
 
 func (lb *LoopBuilder) Finish() {
-	builder := lb.b
-	header := builder.NewBasicBlockUnSealed(LoopHeader)
-	body := builder.NewBasicBlockNotAddBlocks(LoopBody)
-	exit := builder.NewBasicBlockNotAddBlocks(LoopExit)
-	latch := builder.NewBasicBlockNotAddBlocks(LoopLatch)
-	// loop is a scope
-	// builder.ScopeStart()
-	var loop *Loop
-	var init, step []Value
-	// build first
-	if lb.buildFirst != nil {
-		builder.CurrentBlock = lb.enter
-		init = lb.buildFirst()
-		lb.enter = builder.CurrentBlock
-	}
 
-	// enter -> header
-	builder.CurrentBlock = lb.enter
-	builder.EmitJump(header)
+	SSABuild := lb.builder
+	ExternBlock := SSABuild.CurrentBlock
+	Scope := ExternBlock.ScopeTable
+	header := SSABuild.NewBasicBlock(LoopHeader)
+	condition := SSABuild.NewBasicBlockUnSealed(LoopCondition)
+	body := SSABuild.NewBasicBlockNotAddBlocks(LoopBody)
+	exit := SSABuild.NewBasicBlockNotAddBlocks(LoopExit)
+	latch := SSABuild.NewBasicBlockNotAddBlocks(LoopLatch)
 
-	// build condition
-	var condition Value
-	builder.CurrentBlock = header
-	condition = lb.buildCondition()
-	loop = builder.EmitLoop(body, exit, condition)
+	LoopBuilder := ssautil.NewLoopStmt(Scope, func(name string) Value {
+		log.Infof("create phi: %s", name)
+		phi := NewPhi(condition, name, false)
+		condition.Phis = append(condition.Phis, phi)
+		return phi
+	})
 
-	// build body
-	if lb.buildBody != nil {
-		addToBlocks(body)
-		builder.CurrentBlock = body
-		builder.PushTarget(exit, latch, nil)
-		lb.buildBody()
-		builder.PopTarget()
-	}
-
-	// body -> latch
-	builder.EmitJump(latch)
-
-	if len(latch.Preds) != 0 {
-		builder.CurrentBlock = latch
-		// build latch
-		if lb.buildThird != nil {
-			step = lb.buildThird()
+	LoopBuilder.SetFirst(func(svt *ssautil.ScopedVersionedTable[Value]) {
+		SSABuild.CurrentBlock = header
+		SSABuild.CurrentBlock.ScopeTable = svt
+		if lb.FirstExpr != nil {
+			lb.FirstExpr()
 		}
-		// latch -> header
-		builder.EmitJump(header)
-	}
+		SSABuild.EmitJump(condition)
+	})
 
-	// finish
-	header.Sealed()
-	loop.Finish(init, step)
+	LoopBuilder.SetCondition(func(svt *ssautil.ScopedVersionedTable[Value]) {
+		SSABuild.CurrentBlock = condition
+		SSABuild.CurrentBlock.ScopeTable = svt
+		if lb.Condition != nil {
+			lb.Condition()
+		}
+		SSABuild.EmitJump(body)
+	})
+
+	LoopBuilder.SetBody(func(svt *ssautil.ScopedVersionedTable[Value]) *ssautil.ScopedVersionedTable[Value] {
+		SSABuild.CurrentBlock = body
+		SSABuild.CurrentBlock.ScopeTable = svt
+		// TODO handle continue and break target
+
+		addToBlocks(body)
+		if lb.Body != nil {
+			lb.Body()
+		}
+		SSABuild.EmitJump(latch)
+		return SSABuild.CurrentBlock.ScopeTable
+	})
+	LoopBuilder.SetThird(func(svt *ssautil.ScopedVersionedTable[Value]) {
+		SSABuild.CurrentBlock = latch
+		SSABuild.CurrentBlock.ScopeTable = svt
+		if lb.ThirdExpr != nil {
+			lb.ThirdExpr()
+		}
+		SSABuild.EmitJump(condition)
+	})
+	endScope := LoopBuilder.Build(func(name string, phiVar, v1, v2 Value) Value {
+		log.Infof("build phi: %s %v %v %v", name, phiVar, v1, v2)
+		if phi, ok := ToPhi(phiVar); ok {
+			phi.Edge = append(phi.Edge, v1)
+			phi.Edge = append(phi.Edge, v2)
+			phi.SetName(name)
+			phi.GetProgram().SetVirtualRegister(phi)
+			return phiVar
+		}
+		return nil
+	}, generalPhi(SSABuild))
+
+	exit.ScopeTable = endScope
+	SSABuild.CurrentBlock = exit
 
 	addToBlocks(latch)
 	addToBlocks(exit)
-	// rest := builder.NewBasicBlock("")
-	builder.CurrentBlock = exit
-	// // exit -> rest
-	// builder.EmitJump(rest)
-	// builder.CurrentBlock = rest
-	// builder.ScopeEnd()
 }
 
 // if builder
@@ -234,18 +277,13 @@ func (i *IfBuilder) SetElse(body func()) *IfBuilder {
 }
 
 // build phi
-func generalPhi(builder *FunctionBuilder) func(name string, t []*Variable) *Variable {
-	scope := builder.CurrentBlock.ScopeTable
-	return func(name string, t []*Variable) *Variable {
-		values := lo.Map(t, func(v *Variable, _ int) Value { return v.value })
-		// log.Infof("generalPhi: %s %v", name, values)
-		phi := builder.EmitPhi(name, values)
+func generalPhi(builder *FunctionBuilder) func(name string, t []Value) Value {
+	return func(name string, t []Value) Value {
+		phi := builder.EmitPhi(name, t)
 		if phi == nil {
 			return nil
 		}
-		v := NewVariable(name, builder.CurrentRange, scope)
-		builder.AssignVariable(v, phi)
-		return v
+		return phi
 	}
 }
 
@@ -269,12 +307,12 @@ func (i *IfBuilder) Build() {
 		var condition Value
 		ScopeBuilder.BuildItem(
 			// ifStmt := builder
-			func(conditionScope *ssautil.ScopedVersionedTable[*Variable]) {
+			func(conditionScope *ssautil.ScopedVersionedTable[Value]) {
 				SSABuilder.CurrentBlock = CurrentBlock
 				SSABuilder.CurrentBlock.ScopeTable = conditionScope
 				condition = item.Condition()
 			},
-			func(bodyScope *ssautil.ScopedVersionedTable[*Variable]) *ssautil.ScopedVersionedTable[*Variable] {
+			func(bodyScope *ssautil.ScopedVersionedTable[Value]) *ssautil.ScopedVersionedTable[Value] {
 				SSABuilder.CurrentBlock = trueBlock
 				SSABuilder.CurrentBlock.ScopeTable = bodyScope
 				item.Body()
@@ -297,7 +335,7 @@ func (i *IfBuilder) Build() {
 	}
 
 	if i.elseBody != nil {
-		ScopeBuilder.BuildElse(func(sub *ssautil.ScopedVersionedTable[*Variable]) *ssautil.ScopedVersionedTable[*Variable] {
+		ScopeBuilder.BuildElse(func(sub *ssautil.ScopedVersionedTable[Value]) *ssautil.ScopedVersionedTable[Value] {
 			SSABuilder.CurrentBlock.ScopeTable = sub
 			i.elseBody()
 			if SSABuilder.CurrentBlock.finish {

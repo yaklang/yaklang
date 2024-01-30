@@ -50,7 +50,7 @@ func (t *TypeCheck) CheckOnInstruction(inst ssa.Instruction) {
 					}
 				}
 				for _, variable := range vs {
-					if variable.Name == "_" {
+					if variable.GetName() == "_" {
 						continue
 					}
 					variable.NewError(ssa.Error, TypeCheckTAG, ErrorUnhandled())
