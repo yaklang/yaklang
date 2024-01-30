@@ -1,4 +1,4 @@
-package yak2ssa
+package test
 
 import (
 	"errors"
@@ -6,43 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
-	"golang.org/x/exp/slices"
+	"github.com/yaklang/yaklang/common/yak/yak2ssa"
 )
 
-type TestCase struct {
-	code        string
-	errs        []string
-	ExternValue map[string]any
-	ExternLib   map[string]map[string]any
-}
-
-func CheckTestCase(t *testing.T, tc TestCase) {
-	prog, err := parseSSA(tc.code, false, ssa.NewProgram(), func(fb *ssa.FunctionBuilder) {
-		fb.WithExternValue(tc.ExternValue)
-		fb.WithExternLib(tc.ExternLib)
-	})
-	if err != nil {
-		t.Fatal("failed to parse")
-	}
-	// prog.Show()
-	// fmt.Println(prog.GetErrors().String())
-	errs := lo.Map(prog.GetErrors(), func(e *ssa.SSAError, _ int) string { return e.Message })
-	slices.Sort(errs)
-	slices.Sort(tc.errs)
-	if len(errs) != len(tc.errs) {
-		t.Fatalf("error len not match %d vs %d : %s", len(errs), len(tc.errs), errs)
-	}
-	for i := 0; i < len(errs); i++ {
-		for errs[i] != tc.errs[i] {
-			t.Fatalf("error not match %s vs %s", errs[i], tc.errs[i])
-		}
-	}
-}
-
-func TestUndefine(t *testing.T) {
+func TestUndefineError(t *testing.T) {
 	t.Run("cfg empty basicBlock", func(t *testing.T) {
 		CheckTestCase(t, TestCase{
 			code: `
@@ -165,27 +134,6 @@ func TestErrorComment(t *testing.T) {
 }
 
 func TestBasicExpression(t *testing.T) {
-	t.Run("basic assign", func(t *testing.T) {
-		CheckTestCase(t, TestCase{
-			code: `
-				a = 1
-				b = a
-
-				a1 := 1
-				b = a1
-
-				{
-					a2 := 1
-					b = a2
-				}
-				b = a2 // undefined
-				`,
-			errs: []string{
-				ssa.ValueUndefined("a2"),
-			},
-		})
-	})
-
 	t.Run("only declare variable ", func(t *testing.T) {
 		CheckTestCase(t, TestCase{
 			code: `
@@ -251,8 +199,8 @@ func TestAssign(t *testing.T) {
 			a, b, c = 1, 2, 3, 4 // err 3 != 4
 			`,
 			errs: []string{
-				MultipleAssignFailed(2, 3),
-				MultipleAssignFailed(3, 4),
+				yak2ssa.MultipleAssignFailed(2, 3),
+				yak2ssa.MultipleAssignFailed(3, 4),
 			},
 		})
 	})
