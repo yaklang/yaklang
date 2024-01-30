@@ -2,9 +2,8 @@ package bruteutils
 
 import (
 	"fmt"
-	"time"
 
-	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
 func testSocksProxy(scheme string, host string, username string, password string) bool {
@@ -15,8 +14,13 @@ func testSocksProxy(scheme string, host string, username string, password string
 		proxy = fmt.Sprintf("%s://%s", scheme, host)
 	}
 
-	conn, err := netx.DialTCPTimeoutForceProxy(15*time.Second, "https://example.com", proxy)
-	if err != nil && conn != nil {
+	rspInst, err := lowhttp.HTTP(
+		lowhttp.WithPacketBytes(lowhttp.BasicRequest()),
+		lowhttp.WithProxy(proxy),
+		lowhttp.WithConnectTimeoutFloat(15),
+		lowhttp.WithTimeoutFloat(10),
+	)
+	if err == nil && len(rspInst.MultiResponseInstances) > 0 && rspInst.MultiResponseInstances[0].StatusCode == 200 {
 		return true
 	}
 
