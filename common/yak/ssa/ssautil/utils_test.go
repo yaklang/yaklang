@@ -90,6 +90,6 @@ func SpinHandler(name string, current, origin, last value) (ret value) {
 	panic("this value not phi")
 }
 
-func NewPhiValue() value {
+func NewPhiValue(name string) value {
 	return NewPhi()
 }
