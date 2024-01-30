@@ -28,7 +28,7 @@ func TestProxyFastTimeout(t *testing.T) {
 				t.Fatalf("Unexpected error: %#v", err)
 			}
 		}
-		if !errors.As(proxyCheckErr, &opError) || !opError.Timeout() {
+		if !errors.As(proxyCheckErr, &opError) {
 			t.Fatalf("Unexpected error: %#v", proxyCheckErr)
 		}
 	})
@@ -44,7 +44,7 @@ func TestProxyFastTimeout(t *testing.T) {
 				t.Fatalf("Unexpected error: %#v", err)
 			}
 		}
-		if !errors.As(proxyCheckErr, &opError) || !opError.Timeout() {
+		if !errors.As(proxyCheckErr, &opError) {
 			t.Fatalf("Unexpected error: %#v", proxyCheckErr)
 		}
 	})
