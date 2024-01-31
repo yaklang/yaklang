@@ -445,35 +445,32 @@ func SplitHTTPPacket(
 	haveCl := false
 	for {
 		// lineBytes, _, err := reader.ReadLine()
-		lineBytes, err := utils.BufioReadLine(reader)
+		line, err := utils.BufioReadLineString(reader)
 		if err != nil && err != io.EOF {
 			break
 		}
-		if bytes.TrimSpace(lineBytes) == nil {
+		if strings.TrimSpace(line) == "" {
 			break
 		}
-
 		skipHeader := false
 		for _, h := range hook {
-			hooked := h(string(lineBytes))
+			hooked := h(line)
 			if hooked == "" {
 				skipHeader = true
 			}
 			if skipHeader {
 				break
 			}
-			k, _ := SplitHTTPHeader(hooked)
-			switch strings.ToLower(k) {
-			case "content-length":
-				haveCl = true
-			}
-			lineBytes = []byte(hooked)
+			line = hooked
 		}
 		if skipHeader {
 			continue
 		}
-
-		headers = append(headers, string(lineBytes))
+		k, _ := SplitHTTPHeader(line)
+		if strings.ToLower(k) == "content-length" {
+			haveCl = true
+		}
+		headers = append(headers, line)
 	}
 	headersRaw := strings.Join(headers, CRLF) + CRLF + CRLF
 	bodyRaw, _ := ioutil.ReadAll(reader)
