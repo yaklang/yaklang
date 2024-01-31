@@ -59,8 +59,8 @@ func SliceCallExpressionIsEmpty() string {
 	return "slice call expression is empty"
 }
 
-func MakeSliceArgumentTooMuch() string {
-	return "make slice expression argument too much!"
+func MakeArgumentTooMuch(typ string) string {
+	return fmt.Sprintf("make %s expression argument too much!", typ)
 }
 
 func NotSetTypeInMakeExpression() string {
