@@ -44,7 +44,7 @@ func NewJsonConfig() *jsonConfig {
 // withPrefix 设置 JSON dumps时的前缀
 // Example:
 // ```
-// v = json.dumps({"a": "b", "c": "d"}, withPrefix="  ")
+// v = json.dumps({"a": "b", "c": "d"}, json.withPrefix("  "))
 // ```
 func _withPrefix(prefix string) JsonOpt {
 	return func(opt *jsonConfig) {
@@ -55,7 +55,7 @@ func _withPrefix(prefix string) JsonOpt {
 // withIndent 设置 JSON dumps时的缩进
 // Example:
 // ```
-// v = json.dumps({"a": "b", "c": "d"}, withIndent="  ")
+// v = json.dumps({"a": "b", "c": "d"}, json.withIndent("  "))
 // ```
 func _withIndent(indent string) JsonOpt {
 	return func(opt *jsonConfig) {
