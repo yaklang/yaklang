@@ -230,27 +230,9 @@ func _cliSetRequired(t bool) SetCliExtraParam {
 }
 
 func _getExtraParams(name string, opts ...SetCliExtraParam) *cliExtraParams {
-	optName := name
-	optShortName := ""
-	if strings.Contains(name, " ") {
-		nameSlice := strings.SplitN(name, " ", 2)
-		optShortName = nameSlice[0]
-		optName = nameSlice[1]
-	} else if strings.Contains(name, ",") {
-		nameSlice := strings.SplitN(name, ",", 2)
-		optShortName = nameSlice[0]
-		optName = nameSlice[1]
-	}
-
-	if len(name) == 1 && optShortName == "" {
-		optShortName = name
-		optName = name
-	}
 
 	param := &cliExtraParams{
-		optName:      optName,
-		optShortName: optShortName,
-		params:       _getAvailableParams(optName, optShortName),
+		optName:      name,
 		required:     false,
 		defaultValue: nil,
 		helpInfo:     "",
@@ -259,6 +241,7 @@ func _getExtraParams(name string, opts ...SetCliExtraParam) *cliExtraParams {
 		opt(param)
 	}
 	currentExtraParams = append(currentExtraParams, param)
+	param.params = _getAvailableParams(param.optName, param.optShortName)
 	return param
 }
 
@@ -557,7 +540,8 @@ func CliStringSlice(name string, options ...SetCliExtraParam) []string {
 // ```
 // cli.String("target", cli.setVerboseName("目标"))
 // ```
-func _cliSetVerboseName(verboseName string) {
+func _cliSetVerboseName(verboseName string) SetCliExtraParam {
+	return func(cep *cliExtraParams) {}
 }
 
 // setGroup 是一个选项函数，设置参数的分组
@@ -568,7 +552,20 @@ func _cliSetVerboseName(verboseName string) {
 // cli.Int("threads", cli.setGroup("request"))
 // cli.Int("retryTimes", cli.setGroup("request"))
 // ```
-func _cliSetGroup(group string) {
+func _cliSetGroup(group string) SetCliExtraParam {
+	return func(cep *cliExtraParams) {}
+}
+
+// setShortName 是一个选项函数，设置参数的短名称
+// Example:
+// ```
+// cli.String("target", cli.setShortName("t"))
+// ```
+// 在命令行可以使用`-t`代替`--target`
+func _cliSetShortName(shortName string) SetCliExtraParam {
+	return func(c *cliExtraParams) {
+		c.optShortName = shortName
+	}
 }
 
 // setMultiSelect 是一个选项函数，设置参数是否可以多选
@@ -577,7 +574,8 @@ func _cliSetGroup(group string) {
 // ```
 // cli.StringSlice("targets", cli.setMultiSelect(true))
 // ```
-func _cliSetMultiSelect(multiSelect bool) {
+func _cliSetMultiSelect(multiSelect bool) SetCliExtraParam {
+	return func(cep *cliExtraParams) {}
 }
 
 // setSelectOption 是一个选项函数，设置参数的下拉框选项
@@ -586,7 +584,8 @@ func _cliSetMultiSelect(multiSelect bool) {
 // ```
 // cli.StringSlice("targets", cli.setSelectOption("下拉框选项", "下拉框值"))
 // ```
-func _cliSetSelectOption(name, value string) {
+func _cliSetSelectOption(name, value string) SetCliExtraParam {
+	return func(cep *cliExtraParams) {}
 }
 
 var CliExports = map[string]interface{}{
