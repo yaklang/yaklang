@@ -6,7 +6,6 @@ import (
 	stdlog "log"
 	"os"
 
-	"github.com/ReneKroon/ttlcache"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
@@ -27,13 +26,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/protocol/x224"
 )
 
-var (
-	rdpTLSCache = ttlcache.NewCache()
-)
-
-func init() {
-	rdpTLSCache.SetTTL(5 * time.Minute)
-}
 
 var rdpAuth = &DefaultServiceAuthInfo{
 	ServiceName:      "rdp",

@@ -1,30 +1,29 @@
 package hybridscan
 
 import (
-	"github.com/ReneKroon/ttlcache"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/synscan"
-	"time"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type Config struct {
 	DisableFingerprintMatch        bool
 	FingerprintMatcherConfig       *fp.Config
 	FingerprintMatchQueueBuffer    int
-	OpenPortTTLCache               *ttlcache.Cache
-	FingerprintMatchResultTTLCache *ttlcache.Cache
+	OpenPortTTLCache               *utils.Cache[int]
+	FingerprintMatchResultTTLCache *utils.Cache[*fp.MatchResult]
 	SynScanConfig                  *synscan.Config
 }
 
 type ConfigOption func(config *Config)
 
 func NewConfig(options ...ConfigOption) *Config {
-	c1 := ttlcache.NewCache()
-	c1.SetTTL(1 * time.Hour)
+	c1 := utils.NewTTLCache[int](1 * time.Hour)
 
-	c2 := ttlcache.NewCache()
-	c2.SetTTL(1 * time.Hour)
+	c2 := utils.NewTTLCache[*fp.MatchResult](1 * time.Hour)
 
 	config := &Config{
 		FingerprintMatcherConfig:       fp.NewConfig(),
@@ -78,16 +77,14 @@ func WithFingerprintMatchQueueBufferSize(size int) ConfigOption {
 func WithOpenPortTTLCache(ttl time.Duration) ConfigOption {
 	return func(config *Config) {
 		config.OpenPortTTLCache.Close()
-		config.OpenPortTTLCache = ttlcache.NewCache()
-		config.OpenPortTTLCache.SetTTL(ttl)
+		config.OpenPortTTLCache = utils.NewTTLCache[int](ttl)
 	}
 }
 
 func WithFingerprintMatchResultTTLCache(ttl time.Duration) ConfigOption {
 	return func(config *Config) {
 		config.FingerprintMatchResultTTLCache.Close()
-		config.FingerprintMatchResultTTLCache = ttlcache.NewCache()
-		config.FingerprintMatchResultTTLCache.SetTTL(ttl)
+		config.FingerprintMatchResultTTLCache = utils.NewTTLCache[*fp.MatchResult](ttl)
 	}
 }
 

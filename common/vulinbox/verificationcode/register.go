@@ -3,7 +3,11 @@ package verificationcode
 import (
 	_ "embed"
 	"fmt"
-	"github.com/ReneKroon/ttlcache"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gorilla/mux"
 	"github.com/segmentio/ksuid"
@@ -13,10 +17,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"net/http"
-	"strconv"
-	"strings"
-	"time"
 )
 
 //go:embed op.html
@@ -29,14 +29,13 @@ var op1Html []byte
 var secretHtml []byte
 
 var (
-	sessionCacher = ttlcache.NewCache()
-	defaultPass   = mutate.QuickMutateSimple(`{{ri(0,9999|4)}}`)[0]
+	sessionCache = utils.NewTTLCache[map[string]any](30 * time.Minute)
+	defaultPass  = mutate.QuickMutateSimple(`{{ri(0,9999|4)}}`)[0]
 )
 
 const COOKIECONST = "YSESSIONID"
 
 func init() {
-	sessionCacher.SetTTL(30 * time.Minute)
 	log.Infof("default pass generated: %v", defaultPass)
 }
 
@@ -59,24 +58,24 @@ func Register(t *mux.Router) (*mux.Router, []string) {
 		}()
 		rawBytes, _ := utils.HttpDumpWithBody(request, true)
 		if request.Method == "POST" {
-			var code = lowhttp.GetHTTPRequestPostParam(rawBytes, "code")
-			var password = lowhttp.GetHTTPRequestPostParam(rawBytes, "password")
-			var session = lowhttp.GetHTTPPacketCookie(rawBytes, COOKIECONST)
-			val, ok := sessionCacher.Get(session)
+			code := lowhttp.GetHTTPRequestPostParam(rawBytes, "code")
+			password := lowhttp.GetHTTPRequestPostParam(rawBytes, "password")
+			session := lowhttp.GetHTTPPacketCookie(rawBytes, COOKIECONST)
+			val, ok := sessionCache.Get(session)
 			if !ok {
 				writer.WriteHeader(500)
 				writer.Write([]byte(`session not found`))
 				return
 			}
-			data, ok := val.(map[string]any)["code"].(*captcha.Data)
+			data, ok := val["code"].(*captcha.Data)
 			if !ok {
 				writer.WriteHeader(500)
 				writer.Write([]byte(`session-code not found`))
 				return
 			}
 			log.Infof("data.Text: " + data.Text)
-			//var newData, _ = captcha.New(150, 50)
-			//val.(map[string]any)["code"] = newData
+			// var newData, _ = captcha.New(150, 50)
+			// val.(map[string]any)["code"] = newData
 			if strings.ToLower(data.Text) != strings.ToLower(code) {
 				writer.WriteHeader(500)
 				writer.Write([]byte(`verification code not match`))
@@ -100,7 +99,7 @@ func Register(t *mux.Router) (*mux.Router, []string) {
 				Name:  COOKIECONST,
 				Value: uid,
 			})
-			sessionCacher.Set(uid, map[string]any{})
+			sessionCache.Set(uid, map[string]any{})
 			writer.Write(opHtml)
 			return
 		}
@@ -114,14 +113,7 @@ func Register(t *mux.Router) (*mux.Router, []string) {
 			return
 		}
 
-		v, ok := sessionCacher.Get(session)
-		if !ok {
-			writer.Write([]byte(`{"code":500,"msg":"验证码生成失败(COOKIE NOT GENERATED)"}`))
-			writer.WriteHeader(502)
-			return
-		}
-
-		kv, ok := v.(map[string]any)
+		kv, ok := sessionCache.Get(session)
 		if !ok {
 			writer.Write([]byte(`{"code":500,"msg":"验证码生成失败(COOKIE NOT GENERATED)"}`))
 			writer.WriteHeader(502)
@@ -162,24 +154,24 @@ func Register(t *mux.Router) (*mux.Router, []string) {
 		}()
 		rawBytes, _ := utils.HttpDumpWithBody(request, true)
 		if request.Method == "POST" {
-			var code = lowhttp.GetHTTPRequestPostParam(rawBytes, "code")
-			var password = lowhttp.GetHTTPRequestPostParam(rawBytes, "password")
-			var session = lowhttp.GetHTTPPacketCookie(rawBytes, COOKIECONST_BAD)
-			val, ok := sessionCacher.Get(session)
+			code := lowhttp.GetHTTPRequestPostParam(rawBytes, "code")
+			password := lowhttp.GetHTTPRequestPostParam(rawBytes, "password")
+			session := lowhttp.GetHTTPPacketCookie(rawBytes, COOKIECONST_BAD)
+			val, ok := sessionCache.Get(session)
 			if !ok {
 				writer.WriteHeader(500)
 				writer.Write([]byte(`session not found`))
 				return
 			}
-			data, ok := val.(map[string]any)["code"].(*captcha.Data)
+			data, ok := val["code"].(*captcha.Data)
 			if !ok {
 				writer.WriteHeader(500)
 				writer.Write([]byte(`session-code not found`))
 				return
 			}
 			log.Infof("data.Text: " + data.Text)
-			//var newData, _ = captcha.New(150, 50)
-			//val.(map[string]any)["code"] = newData
+			// var newData, _ = captcha.New(150, 50)
+			// val.(map[string]any)["code"] = newData
 			if strings.ToLower(data.Text) != strings.ToLower(code) {
 				writer.WriteHeader(500)
 				writer.Write([]byte(`verification code not match`))
@@ -212,7 +204,7 @@ func Register(t *mux.Router) (*mux.Router, []string) {
 				Name:  "_ccc",
 				Value: codec.EncodeBase64(data.Text),
 			})
-			sessionCacher.Set(uid, map[string]any{
+			sessionCache.Set(uid, map[string]any{
 				"code": data,
 			})
 			writer.Write(op1Html)
@@ -228,14 +220,7 @@ func Register(t *mux.Router) (*mux.Router, []string) {
 			return
 		}
 
-		v, ok := sessionCacher.Get(session)
-		if !ok {
-			writer.Write([]byte(`{"code":500,"msg":"验证码生成失败(COOKIE NOT GENERATED)"}`))
-			writer.WriteHeader(502)
-			return
-		}
-
-		kv, ok := v.(map[string]any)
+		kv, ok := sessionCache.Get(session)
 		if !ok {
 			writer.Write([]byte(`{"code":500,"msg":"验证码生成失败(COOKIE NOT GENERATED)"}`))
 			writer.WriteHeader(502)

@@ -2,18 +2,20 @@ package netx
 
 import (
 	"context"
-	"github.com/ReneKroon/ttlcache"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
-var ipv6DNSCache = ttlcache.NewCache()
-var ipv4DNSCache = ttlcache.NewCache()
+var (
+	ipv6DNSCache = utils.NewTTLCache[string]()
+	ipv4DNSCache = utils.NewTTLCache[string]()
+)
 
 func reliableLookupHost(host string, opt ...DNSOption) error {
-	var config = NewDefaultReliableDNSConfig()
+	config := NewDefaultReliableDNSConfig()
 	for _, o := range opt {
 		o(config)
 	}
@@ -52,21 +54,15 @@ func reliableLookupHost(host string, opt ...DNSOption) error {
 
 	if !config.NoCache {
 		// ttlcache v4 > v6
-		cachedResult, ok := ipv4DNSCache.Get(host)
+		result, ok := ipv4DNSCache.Get(host)
 		if ok {
-			result, ok := cachedResult.(string)
-			if ok {
-				config.call("", host, result, "cache", "cache")
-				return nil
-			}
+			config.call("", host, result, "cache", "cache")
+			return nil
 		}
-		cachedResult, ok = ipv6DNSCache.Get(host)
+		result, ok = ipv6DNSCache.Get(host)
 		if ok {
-			result, ok := cachedResult.(string)
-			if ok {
-				config.call("", host, result, "cache", "cache")
-				return nil
-			}
+			config.call("", host, result, "cache", "cache")
+			return nil
 		}
 	}
 

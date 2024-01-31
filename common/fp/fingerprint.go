@@ -3,7 +3,12 @@ package fp
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/ReneKroon/ttlcache"
+	"net"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
@@ -11,14 +16,10 @@ import (
 	log "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/utils"
 	utils2 "github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"net"
-	"sort"
-	"strconv"
-	"strings"
-	"time"
 )
 
 type RuleBlock struct {
@@ -134,7 +135,7 @@ func (m *MatchResult) IsOpen() bool {
 }
 
 func (m *MatchResult) String(schemaForce ...string) string {
-	var schema = "tcp"
+	schema := "tcp"
 	if m.Fingerprint != nil {
 		schema = strings.ToLower(string(m.GetProto()))
 	}
@@ -187,7 +188,7 @@ func (m *MatchResult) GetResponseRaw() []byte {
 		return nil
 	}
 	if len(m.Fingerprint.HttpFlows) > 0 {
-		var flow, err = lo.Last(m.Fingerprint.HttpFlows)
+		flow, err := lo.Last(m.Fingerprint.HttpFlows)
 		if err != nil {
 			return nil
 		}
@@ -202,7 +203,7 @@ func (m *MatchResult) GetRequestRaw() (bool, []byte) {
 		return false, nil
 	}
 	if len(m.Fingerprint.HttpFlows) > 0 {
-		var flow, err = lo.Last(m.Fingerprint.HttpFlows)
+		flow, err := lo.Last(m.Fingerprint.HttpFlows)
 		if err != nil {
 			return false, nil
 		}
@@ -269,19 +270,19 @@ func (m *MatchResult) getServiceName() string {
 		fixDefaultSchema = GetDefaultTCPServiceName(m.Port)
 	}
 
-	var productsVer = make(map[string]string)
-	var products = []string{}
+	productsVer := make(map[string]string)
+	products := []string{}
 	for _, cpe := range m.Fingerprint.CPEs {
 		cpeInstance, err := webfingerprint.ParseToCPE(cpe)
 		if err != nil {
 			continue
 		}
 
-		var product = cpeInstance.Product
+		product := cpeInstance.Product
 		if product == "*" {
 			product = m.Fingerprint.ServiceName
 		}
-		var version = cpeInstance.Version
+		version := cpeInstance.Version
 		if version == "*" {
 			version = ""
 		}
@@ -331,10 +332,10 @@ func (m *MatchResult) GetDomains() []string {
 	}
 }
 
-var _fpMatchResultTTLCache = ttlcache.NewCache()
+var FpMatchResultTTLCache = utils.NewTTLCache[*MatchResult](3 * time.Minute)
 
 func SetMatchResultCache(addr string, result *MatchResult) {
-	_fpMatchResultTTLCache.SetWithTTL(addr, result, 3*time.Minute)
+	FpMatchResultTTLCache.SetWithTTL(addr, result, 3*time.Minute)
 }
 
 func databaseCacheKey(addr string) string {
@@ -388,18 +389,13 @@ func GetMatchResultDatabaseCache(addr string) *MatchResult {
 }
 
 func GetMatchResultCache(addr string) *MatchResult {
-	result, ok := _fpMatchResultTTLCache.Get(addr)
+	result, ok := FpMatchResultTTLCache.Get(addr)
 	if !ok {
 		return nil
 	}
 
-	resultIns, ok := result.(*MatchResult)
-	if !ok {
-		return nil
-	}
-
-	SetMatchResultCache(addr, resultIns)
-	return resultIns
+	SetMatchResultCache(addr, result)
+	return result
 }
 
 func NewFingerprintMatcher(rules map[*NmapProbe][]*NmapMatch, config *Config) (*Matcher, error) {

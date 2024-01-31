@@ -3,20 +3,17 @@ package cybertunnel
 import (
 	"context"
 	"fmt"
-	"github.com/ReneKroon/ttlcache"
-	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
-	"github.com/yaklang/yaklang/common/utils"
 	"math/rand"
 	"time"
+
+	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
-var tokenCache = ttlcache.NewCache()
-var portToTokenCache = ttlcache.NewCache()
-
-func init() {
-	tokenCache.SetTTL(1 * time.Minute)
-	portToTokenCache.SetTTL(1 * time.Minute)
-}
+var (
+	tokenCache       = utils.NewTTLCache[int](time.Minute)
+	portToTokenCache = utils.NewTTLCache[string](time.Minute)
+)
 
 func (t *TunnelServer) RequireRandomPortTrigger(ctx context.Context, req *tpb.RequireRandomPortTriggerParams) (*tpb.RequireRandomPortTriggerResponse, error) {
 	var targetPort int
@@ -42,7 +39,7 @@ func (t *TunnelServer) RequireRandomPortTrigger(ctx context.Context, req *tpb.Re
 		return nil, err
 	}
 	tokenCache.Set(req.GetToken(), targetPort)
-	tokenCache.Set(fmt.Sprint(targetPort), req.GetToken())
+	portToTokenCache.Set(fmt.Sprint(targetPort), req.GetToken())
 	return &tpb.RequireRandomPortTriggerResponse{
 		Port:       int32(targetPort),
 		Token:      req.GetToken(),
@@ -51,9 +48,9 @@ func (t *TunnelServer) RequireRandomPortTrigger(ctx context.Context, req *tpb.Re
 }
 
 func (t *TunnelServer) QueryExistedRandomPortTrigger(c context.Context, req *tpb.QueryExistedRandomPortTriggerRequest) (*tpb.QueryExistedRandomPortTriggerResponse, error) {
-	portRaw, ok := tokenCache.Get(req.GetToken())
+	localPort, ok := tokenCache.Get(req.GetToken())
 	if ok {
-		notif, err := randomPortTrigger.GetTriggerNotification(portRaw.(int))
+		notif, err := randomPortTrigger.GetTriggerNotification(localPort)
 		if err != nil {
 			return nil, err
 		}
@@ -64,7 +61,7 @@ func (t *TunnelServer) QueryExistedRandomPortTrigger(c context.Context, req *tpb
 			RemoteAddr:                            notif.CurrentRemoteAddr,
 			RemoteIP:                              host,
 			RemotePort:                            int32(port),
-			LocalPort:                             int32(portRaw.(int)),
+			LocalPort:                             int32(localPort),
 			History:                               notif.Histories,
 			CurrentRemoteCachedConnectionCount:    int32(notif.CurrentRemoteCachedConnectionCount),
 			LocalPortCachedHistoryConnectionCount: int32(notif.LocalPortCachedHistoryConnectionCount),

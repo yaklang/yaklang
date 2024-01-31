@@ -2,16 +2,16 @@ package httptpl
 
 import (
 	"fmt"
-	"github.com/ReneKroon/ttlcache"
+	"regexp"
+	"strings"
+	"time"
+
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"regexp"
-	"strings"
-	"time"
 )
 
 func NewMatcherFromGRPCModel(m *ypb.HTTPResponseMatcher) *YakMatcher {
@@ -68,11 +68,7 @@ type YakMatcher struct {
 	SubMatchers         []*YakMatcher
 }
 
-var matcherResponseCache = ttlcache.NewCache()
-
-func init() {
-	matcherResponseCache.SetTTL(1 * time.Minute)
-}
+var matcherResponseCache = utils.NewTTLCache[string](1 * time.Minute)
 
 func cacheHash(rsp []byte, location string) string {
 	return utils.CalcSha1(rsp, location)
@@ -149,7 +145,7 @@ func (y *YakMatcher) ExecuteWithConfig(config *Config, rsp *lowhttp.LowhttpRespo
 }
 
 func (y *YakMatcher) executeRaw(config *Config, rsp []byte, duration float64, vars map[string]any, sufs ...string) (bool, error) {
-	var isExpr = false
+	isExpr := false
 
 	var reverseProto []string
 
@@ -158,13 +154,11 @@ func (y *YakMatcher) executeRaw(config *Config, rsp []byte, duration float64, va
 			return string(rsp)
 		}
 		var material string
-		var scope = strings.ToLower(y.Scope)
-		var scopeHash = cacheHash(rsp, scope)
+		scope := strings.ToLower(y.Scope)
+		scopeHash := cacheHash(rsp, scope)
 
-		rawMaterial, ok := matcherResponseCache.Get(scopeHash)
-		if ok {
-			material = rawMaterial.(string)
-		} else {
+		material, ok := matcherResponseCache.Get(scopeHash)
+		if !ok {
 			switch scope {
 			case "status", "status_code":
 				material = utils.InterfaceToString(lowhttp.ExtractStatusCodeFromResponse(rsp))
@@ -212,7 +206,7 @@ func (y *YakMatcher) executeRaw(config *Config, rsp []byte, duration float64, va
 		return strings.Contains(s, sub)
 	}
 
-	var condition = strings.TrimSpace(strings.ToLower(y.Condition))
+	condition := strings.TrimSpace(strings.ToLower(y.Condition))
 	switch y.MatcherType {
 	case "status_code", "status":
 		statusCode := lowhttp.ExtractStatusCodeFromResponse(rsp)
@@ -301,7 +295,7 @@ func (y *YakMatcher) executeRaw(config *Config, rsp []byte, duration float64, va
 			dslEngine := NewNucleiDSLYakSandbox()
 			matcherFunc = func(fullResponse string, sub string) bool {
 				loadVars := LoadVarFromRawResponse(rsp, duration, sufs...)
-				//加载 resp 中的变量
+				// 加载 resp 中的变量
 				for k, v := range vars { // 合并若有重名以 vars 为准
 					loadVars[k] = v
 				}
@@ -325,7 +319,7 @@ func (y *YakMatcher) executeRaw(config *Config, rsp []byte, duration float64, va
 	material := getMaterial()
 	var groups []string
 	for _, wordRaw := range y.Group {
-		var word = wordRaw
+		word := wordRaw
 		switch strings.TrimSpace(strings.ToLower(y.GroupEncoding)) {
 		case "hex":
 			raw, err := codec.DecodeHex(wordRaw)
@@ -367,6 +361,6 @@ func (y *YakMatcher) executeRaw(config *Config, rsp []byte, duration float64, va
 
 func (y *YakMatcher) execute(config *Config, rspIns *lowhttp.LowhttpResponse, vars map[string]interface{}, sufs ...string) (bool, error) {
 	rsp := utils.CopyBytes(rspIns.RawPacket)
-	var duration = rspIns.GetDurationFloat()
+	duration := rspIns.GetDurationFloat()
 	return y.executeRaw(config, rsp, duration, vars, sufs...)
 }

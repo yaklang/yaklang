@@ -2,7 +2,11 @@ package match
 
 import (
 	"context"
-	"github.com/ReneKroon/ttlcache"
+	"net/http"
+	"strconv"
+	"sync"
+	"time"
+
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
@@ -10,10 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"net/http"
-	"strconv"
-	"sync"
-	"time"
 )
 
 /*
@@ -33,7 +33,7 @@ pcapx.Sniff("", pcapx.pcap_everyFrame(data => {
 
 // Group is a group of rules
 type Group struct {
-	pkCache *ttlcache.Cache
+	pkCache *utils.Cache[gopacket.Packet]
 	loader  SuricataRuleLoaderType
 
 	HTTPMatcher     []*sync.Pool
@@ -63,13 +63,12 @@ func RegisterSuricataRuleLoader(h SuricataRuleLoaderType) {
 }
 
 func NewGroup(opt ...GroupOption) *Group {
-	gopacketCacher := ttlcache.NewCache()
-	gopacketCacher.SetTTL(30 * time.Second)
+	gopacketCache := utils.NewTTLCache[gopacket.Packet](30 * time.Second)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
 	group := &Group{
-		pkCache: gopacketCacher,
+		pkCache: gopacketCache,
 		loader:  defaultSuricataRuleLoader,
 
 		// internal fields
@@ -139,7 +138,7 @@ func (g *Group) LoadRulesWithQuery(query string) error {
 }
 
 func (g *Group) unSerializingFrameWithoutCache(loopbackFirst bool, raw []byte) (gopacket.Packet, error) {
-	var order = make([]gopacket.Decoder, 2)
+	order := make([]gopacket.Decoder, 2)
 	if loopbackFirst {
 		order[0] = layers.LayerTypeLoopback
 		order[1] = layers.LayerTypeEthernet
@@ -147,7 +146,7 @@ func (g *Group) unSerializingFrameWithoutCache(loopbackFirst bool, raw []byte) (
 		order[0] = layers.LayerTypeEthernet
 		order[1] = layers.LayerTypeLoopback
 	}
-	var err = make([]error, 0, 2)
+	err := make([]error, 0, 2)
 	for _, decoder := range order {
 		pk := gopacket.NewPacket(raw, decoder, gopacket.NoCopy)
 		if pk.LinkLayer() != nil {
@@ -169,7 +168,7 @@ func (g *Group) unSerializingFrameWithoutCache(loopbackFirst bool, raw []byte) (
 func (g *Group) unSerializingFrame(loopback bool, raw []byte) (gopacket.Packet, error) {
 	sha256 := codec.Sha256(raw)
 	if pk, ok := g.pkCache.Get(sha256); ok {
-		return pk.(gopacket.Packet), nil
+		return pk, nil
 	}
 	packet, err := g.unSerializingFrameWithoutCache(loopback, raw)
 	if err != nil {

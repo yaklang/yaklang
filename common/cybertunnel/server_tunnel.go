@@ -5,21 +5,23 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/ReneKroon/ttlcache"
+	"sync"
+	"time"
+
 	uuid "github.com/satori/go.uuid"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"sync"
-	"time"
 )
 
-var tunnels = new(sync.Map)
-var registeredTunnel = ttlcache.NewCache()
-var portToTunnel = new(sync.Map)
-var historicalTunnel = ttlcache.NewCache()
+var (
+	tunnels          = new(sync.Map)
+	registeredTunnel = utils.NewTTLCache[*Tunnel](5 * time.Minute)
+	portToTunnel     = new(sync.Map)
+	historicalTunnel = utils.NewTTLCache[*Tunnel](3 * 24 * time.Hour)
+)
 
 type Tunnel struct {
 	Id string
@@ -35,7 +37,7 @@ type Tunnel struct {
 }
 
 func (t *Tunnel) GetAuth() []byte {
-	var auth = make(map[string]string)
+	auth := make(map[string]string)
 	auth["host"] = t.Host
 	auth["port"] = fmt.Sprint(t.Port)
 	auth["pubpem"] = codec.EncodeBase64(t.PublicKeyPEM)
@@ -47,20 +49,14 @@ func (t *Tunnel) GetAuth() []byte {
 func init() {
 	historicalTunnel.SetTTL(24 * time.Hour * 3)
 	registeredTunnel.SetTTL(5 * time.Minute)
-	registeredTunnel.SetExpirationCallback(func(key string, value interface{}) {
+	registeredTunnel.SetExpirationCallback(func(key string, value *Tunnel) {
 		historicalTunnel.Set(key, value)
-		ins, _ := value.(*Tunnel)
-		if ins != nil {
-			portToTunnel.Delete(ins.Port)
-			tunnels.Delete(ins.Id)
-		}
+		portToTunnel.Delete(value.Port)
+		tunnels.Delete(value.Id)
 	})
-	registeredTunnel.SetNewItemCallback(func(key string, value interface{}) {
-		ins, _ := value.(*Tunnel)
-		if ins != nil {
-			portToTunnel.Store(ins.Port, ins)
-			tunnels.Store(ins.Id, ins)
-		}
+	registeredTunnel.SetNewItemCallback(func(key string, value *Tunnel) {
+		portToTunnel.Store(value.Port, value)
+		tunnels.Store(value.Id, value)
 	})
 }
 
@@ -92,7 +88,7 @@ func GetTunnels() []*Tunnel {
 
 func GetTunnel(id string) (*Tunnel, error) {
 	ins, ok := tunnels.Load(id)
-	//registeredTunnel.Set(id, ins)
+	// registeredTunnel.Set(id, ins)
 	if ok {
 		return ins.(*Tunnel), nil
 	}

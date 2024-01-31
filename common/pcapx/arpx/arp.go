@@ -4,15 +4,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/arptable"
 	"net"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/ReneKroon/ttlcache"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/arptable"
+
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
@@ -31,24 +31,22 @@ func ArpWithTimeout(timeoutContext time.Duration, ifaceName string, target strin
 }
 
 var (
+	arpTableTTLCache = utils.NewTTLCache[net.HardwareAddr](30 * time.Minute)
+
 	TargetIsLoopback = utils.Error("loopback")
 	LinkTypeIsNull   = utils.Error("link type is null")
 )
 
 func ArpWithContext(ctx context.Context, ifaceName string, target string) (net.HardwareAddr, error) {
 	if arpTableTTLCache != nil {
-		if v, ok := arpTableTTLCache.Get(target); ok {
-			if hw, ok := v.(net.HardwareAddr); ok {
-				return hw, nil
-			}
+		if hw, ok := arpTableTTLCache.Get(target); ok {
+			return hw, nil
 		}
 	}
 
 	hw, _ := arptable.SearchHardware(target)
 	if hw != nil && hw.String() != "" {
-		if arpTableTTLCache != nil {
-			arpTableTTLCache.Set(target, hw)
-		}
+		arpTableTTLCache.Set(target, hw)
 		return hw, nil
 	}
 
@@ -60,27 +58,11 @@ func ArpWithContext(ctx context.Context, ifaceName string, target string) (net.H
 	if r != nil {
 		res, ok := r[target]
 		if ok {
-			if arpTableTTLCache != nil {
-				arpTableTTLCache.Set(target, res)
-			}
+			arpTableTTLCache.Set(target, res)
 			return res, nil
 		}
 	}
 	return nil, utils.Error("empty result")
-}
-
-var (
-	arpTableTTLCacheCreateOnce = new(sync.Once)
-	arpTableTTLCache           *ttlcache.Cache
-)
-
-func init() {
-	arpTableTTLCacheCreateOnce.Do(func() {
-		if arpTableTTLCache == nil {
-			arpTableTTLCache = ttlcache.NewCache()
-			arpTableTTLCache.SetTTL(30 * time.Minute)
-		}
-	})
 }
 
 func arpDial(ctx context.Context, ifaceName string, addrs string) (map[string]net.HardwareAddr, error) {
@@ -110,8 +92,8 @@ func arpDial(ctx context.Context, ifaceName string, addrs string) (map[string]ne
 		go func() {
 			defer wg.Done()
 
-			if res, ok := arpTableTTLCache.Get(target); ok {
-				results.Store(target, res.(net.HardwareAddr))
+			if hw, ok := arpTableTTLCache.Get(target); ok {
+				results.Store(target, hw)
 				return
 			}
 
@@ -187,9 +169,7 @@ func ArpIPAddressesWithContext(ctx context.Context, ifaceName string, addrs stri
 	return nil, utils.Errorf("cannot fetch (%v) %v 's mac address", ifaceName, addrs)
 }
 
-var (
-	ipLoopback = make(map[string]interface{})
-)
+var ipLoopback = make(map[string]interface{})
 
 func init() {
 	addrs, err := net.Interfaces()

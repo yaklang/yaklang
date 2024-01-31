@@ -2,7 +2,13 @@ package yakit
 
 import (
 	"fmt"
-	"github.com/ReneKroon/ttlcache"
+	"net/http"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/jinzhu/gorm"
@@ -10,12 +16,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
-	"net/http"
-	"sort"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
 )
 
 type TrafficStorageManager struct {
@@ -27,7 +27,7 @@ type TrafficStorageManager struct {
 	// icmp: hash = srcip + dstip + icmpid + seq
 	// arp: hash(device + req-ip + req-mac)
 	// dns: hash(id)
-	sessions *ttlcache.Cache // map[string]*TrafficSession
+	sessions *utils.Cache[*TrafficSession] // map[string]*TrafficSession
 }
 
 func getPacketPayload(packet gopacket.Packet) ([]byte, bool) {
@@ -48,11 +48,10 @@ func getPacketPayload(packet gopacket.Packet) ([]byte, bool) {
 }
 
 func NewTrafficStorageManager(db *gorm.DB) *TrafficStorageManager {
-	sessionCacher := ttlcache.NewCache()
-	sessionCacher.SetTTL(time.Minute)
+	sessionCache := utils.NewTTLCache[*TrafficSession](time.Minute)
 	return &TrafficStorageManager{
 		db:       db,
-		sessions: sessionCacher,
+		sessions: sessionCache,
 	}
 }
 
@@ -115,7 +114,7 @@ func (m *TrafficStorageManager) handleNetworkLayerTraffic(t *TrafficPacket, pack
 		if !ok {
 			return "", false
 		}
-		var hash = utils.CalcSha256("icmp4", networkFlowHash(packet), icmp.Id)
+		hash := utils.CalcSha256("icmp4", networkFlowHash(packet), icmp.Id)
 		return hash, true
 	case "igmp":
 		return "", true
@@ -226,11 +225,7 @@ func (m *TrafficStorageManager) FetchSession(hash string, packet gopacket.Packet
 		return nil, utils.Error("traffic_packet is nil")
 	}
 
-	sessionRaw, ok := m.sessions.Get(hash)
-	var session *TrafficSession
-	if ok {
-		session = sessionRaw.(*TrafficSession)
-	}
+	session, ok := m.sessions.Get(hash)
 	if !ok {
 		if noCreate {
 			return nil, utils.Errorf("no existed session/flow: %s", hash)
@@ -274,7 +269,7 @@ func (m *TrafficStorageManager) CreateTCPReassembledFlow(flow *pcaputil.TrafficF
 	if flow == nil {
 		return utils.Error("flow is nil")
 	}
-	var hash = flowHashCalc(flow.ClientConn.LocalAddr().String(), flow.ClientConn.RemoteAddr().String())
+	hash := flowHashCalc(flow.ClientConn.LocalAddr().String(), flow.ClientConn.RemoteAddr().String())
 	session := &TrafficSession{
 		Uuid:                  uuid.NewV4().String(),
 		SessionType:           "tcp",
@@ -297,12 +292,11 @@ func (m *TrafficStorageManager) CreateTCPReassembledFlow(flow *pcaputil.TrafficF
 }
 
 func (m *TrafficStorageManager) CloseTCPFlow(flow *pcaputil.TrafficFlow, force bool) error {
-	var hash = flowHashCalc(flow.ClientConn.LocalAddr().String(), flow.ClientConn.RemoteAddr().String())
-	sessionRaw, ok := m.sessions.Get(hash)
+	hash := flowHashCalc(flow.ClientConn.LocalAddr().String(), flow.ClientConn.RemoteAddr().String())
+	session, ok := m.sessions.Get(hash)
 	if !ok {
 		return utils.Errorf("no existed session/flow: %s", hash)
 	}
-	session := sessionRaw.(*TrafficSession)
 	session.IsClosed = true
 	if force {
 		session.IsForceClosed = true
@@ -311,12 +305,11 @@ func (m *TrafficStorageManager) CloseTCPFlow(flow *pcaputil.TrafficFlow, force b
 }
 
 func (m *TrafficStorageManager) SaveTCPReassembledFrame(flow *pcaputil.TrafficFlow, frame *pcaputil.TrafficFrame) error {
-	var hash = flowHashCalc(flow.ClientConn.LocalAddr().String(), flow.ClientConn.RemoteAddr().String())
-	sessionRaw, ok := m.sessions.Get(hash)
+	hash := flowHashCalc(flow.ClientConn.LocalAddr().String(), flow.ClientConn.RemoteAddr().String())
+	session, ok := m.sessions.Get(hash)
 	if !ok {
 		return utils.Errorf("no existed session/flow: %s", hash)
 	}
-	session := sessionRaw.(*TrafficSession)
 	storageFrame := &TrafficTCPReassembledFrame{
 		SessionUuid: session.Uuid,
 		QuotedData:  strconv.Quote(string(frame.Payload)),
@@ -335,7 +328,7 @@ func (m *TrafficStorageManager) SaveRawPacket(packet gopacket.Packet) error {
 	if !ok {
 		payload = nil
 	}
-	var trafficPacket = &TrafficPacket{
+	trafficPacket := &TrafficPacket{
 		LinkLayerType:        strings.ToLower(pcaputil.LinkLayerName(packet)),
 		NetworkLayerType:     strings.ToLower(pcaputil.NetworkLayerName(packet)),
 		TransportLayerType:   strings.ToLower(pcaputil.TransportLayerName(packet)),
