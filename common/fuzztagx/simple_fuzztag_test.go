@@ -146,18 +146,22 @@ var testMap1 = map[string]func(string) []string{
 // 同步渲染数量测试
 func TestSyncRender1(t *testing.T) {
 	for i, testcase := range [][2]any{
-		//{
-		//	"{{echo::1({{list(aaa|ccc)}})}}{{echo::1({{list(aaa|ccc|ddd)}})}}",
-		//	3,
-		//},
-		//{
-		//	"{{echo::1({{list(aaa|ccc|ddd)}})}}{{echo::1({{list(aaa|ccc|ddd)}})}}",
-		//	3,
-		//},
-		//{
-		//	"{{echo::1({{list(aaa|ccc|ddd|eee)}})}}{{echo::1({{list(aaa|ccc|ddd)}})}}",
-		//	4,
-		//},
+		{
+			"{{echo({{list::1(aaa|ccc|ddd)}}{{list::1(aaa|ccc|ddd)}})}}",
+			3,
+		},
+		{
+			"{{echo::1({{list(aaa|ccc)}})}}{{echo::1({{list(aaa|ccc|ddd)}})}}",
+			3,
+		},
+		{
+			"{{echo::1({{list(aaa|ccc|ddd)}})}}{{echo::1({{list(aaa|ccc|ddd)}})}}",
+			3,
+		},
+		{
+			"{{echo::1({{list(aaa|ccc|ddd|eee)}})}}{{echo::1({{list(aaa|ccc|ddd)}})}}",
+			4,
+		},
 		{
 			"{{echo::3({{list(aaa|ccc|ddd)}})}}{{echo::1({{list(aaa|ccc|ddd)}})}}",
 			9,
@@ -171,6 +175,7 @@ func TestSyncRender1(t *testing.T) {
 			9,
 		},
 	} {
+		spew.Dump(testcase[0].(string))
 		result, err := ExecuteSimpleTagWithStringHandler(testcase[0].(string), testMap1)
 		if err != nil {
 			panic(err)
