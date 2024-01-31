@@ -89,6 +89,7 @@ type TagExecNode struct {
 	submitResult    func(s *FuzzResult)
 	backpropagation func() error
 	ignoreError     bool
+	parentNode      ExecNode
 }
 
 func NewTagGenerator(tag TagNode, ctx *MethodContext) *TagExecNode {
@@ -247,14 +248,15 @@ func NewGenerator(nodes []Node, table map[string]*TagMethod) *Generator {
 		labelTable:     map[string]map[*TagExecNode]struct{}{},
 		tagToLabelsMap: map[*TagExecNode][]string{},
 	}
-	var node2generator func(nodes []Node) []ExecNode
-	node2generator = func(nodes []Node) []ExecNode {
+	var node2generator func(nodes []Node, parentNode ExecNode) []ExecNode
+	node2generator = func(nodes []Node, parentNode ExecNode) []ExecNode {
 		generatorNodes := []ExecNode{}
 		for _, node := range nodes {
 			switch ret := node.(type) {
 			case TagNode:
 				gener := NewTagGenerator(ret, methodCtx)
-				gener.params = node2generator(ret.GetData())
+				gener.params = node2generator(ret.GetData(), gener)
+				gener.parentNode = parentNode
 				methodCtx.tagToLabelsMap[gener] = ret.GetLabels()
 				generatorNodes = append(generatorNodes, gener)
 				for _, label := range ret.GetLabels() {
@@ -268,7 +270,7 @@ func NewGenerator(nodes []Node, table map[string]*TagMethod) *Generator {
 	}
 	g := newBackpropagationGenerator(func() error {
 		return nil
-	}, node2generator(nodes), cfg)
+	}, node2generator(nodes, nil), cfg)
 	g.allowedLabels = true
 	return g
 }
@@ -352,12 +354,15 @@ func (g *Generator) generate() (bool, error) {
 				}
 			}
 		} else {
-			if v, ok := g.data[i].(*TagExecNode); ok && g.allowedLabels {
+			if v, ok := g.data[i].(*TagExecNode); ok {
 				for _, label := range v.data.GetLabels() {
 					if ms, ok := v.methodCtx.labelTable[label]; ok {
 						for m := range ms {
 							uid1 := reflect.ValueOf(m).UnsafePointer()
-							if uid1 == uid {
+							if uid1 == uid { // not allow sync self
+								continue
+							}
+							if !allowSyncTag(v, m) { // check if allow sync by defined rules
 								continue
 							}
 							renderedNode[uid1] = struct{}{}
@@ -407,4 +412,28 @@ func (g *Generator) generate() (bool, error) {
 		i++
 	}
 	return isOk, nil
+}
+
+func allowSyncTag(srcTag, syncTag *TagExecNode) bool {
+	tag1, tag2 := srcTag, syncTag
+	for {
+		if tag1.parentNode == nil {
+			break
+		}
+		tag1 = tag1.parentNode.(*TagExecNode)
+		if tag1 == tag2 {
+			return false
+		}
+	}
+	tag1, tag2 = srcTag, syncTag
+	for {
+		if tag2.parentNode == nil {
+			break
+		}
+		tag2 = tag2.parentNode.(*TagExecNode)
+		if tag1 == tag2 {
+			return false
+		}
+	}
+	return true
 }

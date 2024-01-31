@@ -8,6 +8,7 @@ import (
 	"testing"
 )
 
+// TestSyncRootTag test generator global sync config
 func TestSyncRootTag(t *testing.T) {
 	for _, test := range []struct {
 		code   string
