@@ -5,16 +5,16 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/ReneKroon/ttlcache"
-	"github.com/google/shlex"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/google/shlex"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type PsAuxProcessEventType string
@@ -24,15 +24,17 @@ const (
 	PsAuxProcessEvent_Disappear PsAuxProcessEventType = "disappear"
 )
 
-type PsAuxProcessEventCallback func(name PsAuxProcessEventType, proc *PsProcess)
-type PsAuxProcessCallback func([]*PsProcess)
+type (
+	PsAuxProcessEventCallback func(name PsAuxProcessEventType, proc *PsProcess)
+	PsAuxProcessCallback      func([]*PsProcess)
+)
 
 type PsAuxProcessGuardTarget struct {
 	guardTargetBase
 
 	eventCallbacks []PsAuxProcessEventCallback
 	callbacks      []PsAuxProcessCallback
-	cache          *ttlcache.Cache
+	cache          *utils.Cache[*PsProcess]
 }
 
 func NewPsAuxProcessGuardTarget(intervalSeconds int, options ...PsAuxProcessGuardOption) (*PsAuxProcessGuardTarget, error) {
@@ -40,7 +42,7 @@ func NewPsAuxProcessGuardTarget(intervalSeconds int, options ...PsAuxProcessGuar
 		guardTargetBase: guardTargetBase{
 			intervalSeconds: intervalSeconds,
 		},
-		cache: ttlcache.NewCache(),
+		cache: utils.NewTTLCache[*PsProcess](),
 	}
 	t.children = t
 	for _, option := range options {
@@ -51,14 +53,14 @@ func NewPsAuxProcessGuardTarget(intervalSeconds int, options ...PsAuxProcessGuar
 	}
 
 	if t.eventCallbacks != nil {
-		t.cache.SetExpirationCallback(func(pid string, process interface{}) {
+		t.cache.SetExpirationCallback(func(pid string, process *PsProcess) {
 			for _, i := range t.eventCallbacks {
-				i(PsAuxProcessEvent_Disappear, process.(*PsProcess))
+				i(PsAuxProcessEvent_Disappear, process)
 			}
 		})
-		t.cache.SetNewItemCallback(func(pid string, process interface{}) {
+		t.cache.SetNewItemCallback(func(pid string, process *PsProcess) {
 			for _, i := range t.eventCallbacks {
-				i(PsAuxProcessEvent_New, process.(*PsProcess))
+				i(PsAuxProcessEvent_New, process)
 			}
 		})
 	}
@@ -128,14 +130,12 @@ func psCallAndParseWithCmd(cmd *exec.Cmd) ([]*PsProcess, error) {
 	if err != nil {
 		return nil, utils.Errorf("exec ps aux failed: %s", err)
 	}
-	var currentPid = -1
+	currentPid := -1
 	if cmd.ProcessState != nil {
 		currentPid = cmd.ProcessState.Pid()
 	}
 
-	var (
-		procs []*PsProcess
-	)
+	var procs []*PsProcess
 
 	s := bufio.NewScanner(bytes.NewBuffer(raw))
 	s.Split(bufio.ScanLines)
@@ -148,7 +148,7 @@ func psCallAndParseWithCmd(cmd *exec.Cmd) ([]*PsProcess, error) {
 	for s.Scan() {
 		p, err := readPsLine(s.Bytes())
 		if err != nil {
-			//log.Errorf("parse ps line [%v] failed: %s", string(s.Bytes()), err)
+			// log.Errorf("parse ps line [%v] failed: %s", string(s.Bytes()), err)
 			continue
 		}
 
@@ -186,9 +186,7 @@ func CallPsAux(ctx context.Context) ([]*PsProcess, error) {
 }
 
 func readPsLine(line []byte) (*PsProcess, error) {
-	var (
-		buf io.Reader = bytes.NewBuffer(line)
-	)
+	var buf io.Reader = bytes.NewBuffer(line)
 	p := &PsProcess{}
 
 	blockScanner := bufio.NewScanner(buf)

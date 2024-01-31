@@ -14,7 +14,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ReneKroon/ttlcache"
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
@@ -198,6 +197,7 @@ func ParseStringToPorts(ports string) []int {
 	sort.Ints(lports)
 	return lports
 }
+
 func ParsePortToProtoPort(port int) (string, int) {
 	if port > 65535 {
 		return "udp", port >> 12
@@ -352,6 +352,7 @@ func Uint32ToIPv4(ip uint32) net.IP {
 	binary.BigEndian.PutUint32(ipAddr, ip)
 	return ipAddr
 }
+
 func IPv4ToUint64(ip string) (int64, error) {
 	if strings.Contains(ip, ":") == false && len(ip) < 16 {
 		ret := big.NewInt(0)
@@ -450,7 +451,6 @@ func IsProtobuf(raw []byte) bool {
 			}
 		}
 	}
-
 }
 
 // HostPort 将 host 和 port 拼接成 host:port 的形式
@@ -461,12 +461,14 @@ func IsProtobuf(raw []byte) bool {
 func HostPort(host string, port interface{}) string {
 	return fmt.Sprintf("%v:%v", ParseHostToAddrString(host), port)
 }
+
 func ProtoHostPort(proto string, host string, port int) string {
 	if proto == "udp" {
 		port = port << 12
 	}
 	return HostPort(host, port)
 }
+
 func FixForParseIP(host string) string {
 	// 如果传入了 [::] 给 net.ParseIP 则会失败...
 	// 所以这里要特殊处理一下
@@ -707,7 +709,7 @@ func NewPortsFilter(blocks ...string) *PortsFilter {
 
 type HostPortClassifier struct {
 	idMap *sync.Map
-	cache *ttlcache.Cache
+	cache *Cache[*hostPortIdentifier]
 }
 
 type hostPortIdentifier struct {
@@ -718,9 +720,9 @@ type hostPortIdentifier struct {
 func NewHostPortClassifier() *HostPortClassifier {
 	cl := &HostPortClassifier{
 		idMap: new(sync.Map),
-		cache: ttlcache.NewCache(),
+		cache: NewTTLCache[*hostPortIdentifier](),
 	}
-	cl.cache.SetExpirationCallback(func(key string, value interface{}) {
+	cl.cache.SetExpirationCallback(func(key string, value *hostPortIdentifier) {
 		cl.idMap.Delete(key)
 	})
 	return cl

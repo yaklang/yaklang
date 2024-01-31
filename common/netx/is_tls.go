@@ -3,19 +3,19 @@ package netx
 import (
 	"context"
 	"crypto/tls"
-	"github.com/ReneKroon/ttlcache"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
-var isTlsCached = ttlcache.NewCache()
+var isTlsCached = utils.NewTTLCache[bool](30 * time.Second)
 
 func IsTLSService(addr string, proxies ...string) bool {
 	result, ok := isTlsCached.Get(addr)
 	if ok {
-		return result.(bool)
+		return result
 	}
 
 	isHttps := false

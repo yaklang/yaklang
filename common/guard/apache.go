@@ -5,16 +5,16 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/ReneKroon/ttlcache"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"io/ioutil"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 )
 
 type ApacheDetail struct {
@@ -27,11 +27,11 @@ type ApacheDetail struct {
 	ConfigPath     string `json:"config_path"`
 
 	// inconfig
-	//ServerRoot   string `json:"server_root"`
-	//DocumentRoot string `json:"document_root"`
-	//ServerName   string `json:"server_name"`
-	//ExecCGI      bool   `json:"exec_cgi"`
-	//Indexes      bool   `json:"indexes"`
+	// ServerRoot   string `json:"server_root"`
+	// DocumentRoot string `json:"document_root"`
+	// ServerName   string `json:"server_name"`
+	// ExecCGI      bool   `json:"exec_cgi"`
+	// Indexes      bool   `json:"indexes"`
 	isServing bool
 	Timestamp int64 `json:"timestamp"`
 }
@@ -182,7 +182,7 @@ type ApacheGuardTarget struct {
 	guardTargetBase
 
 	callbacks []ApacheGuardCallback
-	cache     *ttlcache.Cache
+	cache     *utils.Cache[*ApacheDetail]
 }
 
 func (a *ApacheGuardTarget) do() {
@@ -198,31 +198,26 @@ func (a *ApacheGuardTarget) do() {
 }
 
 func NewApacheGuardTarget(
-	interval int, cbs ...ApacheGuardCallback) *ApacheGuardTarget {
+	interval int, cbs ...ApacheGuardCallback,
+) *ApacheGuardTarget {
 	t := &ApacheGuardTarget{
 		guardTargetBase: guardTargetBase{intervalSeconds: interval},
 		callbacks:       cbs,
-		cache:           ttlcache.NewCache(),
+		cache:           utils.NewTTLCache[*ApacheDetail](),
 	}
 	t.children = t
-	t.cache.SetNewItemCallback(func(key string, value interface{}) {
-		d, ok := value.(*ApacheDetail)
-		if ok {
-			for _, c := range cbs {
-				res := *d
-				res.isServing = true
-				c(res)
-			}
+	t.cache.SetNewItemCallback(func(key string, value *ApacheDetail) {
+		for _, c := range cbs {
+			res := *value
+			res.isServing = true
+			c(res)
 		}
 	})
-	t.cache.SetExpirationCallback(func(key string, value interface{}) {
-		d, ok := value.(*ApacheDetail)
-		if ok {
-			for _, c := range cbs {
-				res := *d
-				res.isServing = false
-				c(res)
-			}
+	t.cache.SetExpirationCallback(func(key string, value *ApacheDetail) {
+		for _, c := range cbs {
+			res := *value
+			res.isServing = false
+			c(res)
 		}
 	})
 	return t

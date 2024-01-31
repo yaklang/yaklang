@@ -3,15 +3,15 @@ package cybertunnel
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/netutil"
 	"net"
 	"sync"
 	"time"
 
-	"github.com/ReneKroon/ttlcache"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/netutil"
+
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
@@ -22,7 +22,7 @@ type remoteIPDesc struct {
 
 	// map[string]string
 	// key: remoteAddr value: localPort
-	ConnectionDesc  *ttlcache.Cache
+	ConnectionDesc  *utils.Cache[int]
 	connectionCache map[string]int
 
 	cacheMutex *sync.Mutex
@@ -36,7 +36,7 @@ type addrConnEvent struct {
 type localPortDesc struct {
 	// map[string]interface{}
 	// key: remoteAddr value: timestamp
-	RemoteCache       *ttlcache.Cache
+	RemoteCache       *utils.Cache[int64]
 	CurrentRemoteAddr string
 	LastTimestamp     int64
 
@@ -48,7 +48,7 @@ type localPortDesc struct {
 type RandomPortTrigger struct {
 	// map[port]
 	localPort *sync.Map
-	remoteIP  *ttlcache.Cache
+	remoteIP  *utils.Cache[*remoteIPDesc]
 	ctx       context.Context
 	cancel    context.CancelFunc
 }
@@ -56,11 +56,10 @@ type RandomPortTrigger struct {
 func NewRandomPortTrigger() (*RandomPortTrigger, error) {
 	trigger := &RandomPortTrigger{
 		localPort: new(sync.Map),
-		remoteIP:  ttlcache.NewCache(),
+		remoteIP:  utils.NewTTLCache[*remoteIPDesc](1 * time.Minute),
 		ctx:       context.Background(),
 	}
 	trigger.ctx, trigger.cancel = context.WithCancel(trigger.ctx)
-	trigger.remoteIP.SetTTL(1 * time.Minute)
 
 	return trigger, nil
 }
@@ -103,30 +102,26 @@ func (p *RandomPortTrigger) handlePacket(interfaceIP net.IP, packet gopacket.Pac
 			localPortInt := int(l.DstPort)
 
 			// 记录远程 IP 对应的端口
-			var desc *remoteIPDesc
-			descRaw, ok := p.remoteIP.Get(ipv4.SrcIP.String())
+			desc, ok := p.remoteIP.Get(ipv4.SrcIP.String())
 			if !ok {
 				newDesc := &remoteIPDesc{
 					IP:              ipv4.SrcIP,
-					ConnectionDesc:  ttlcache.NewCache(),
+					ConnectionDesc:  utils.NewTTLCache[int](1 * time.Minute),
 					cacheMutex:      new(sync.Mutex),
 					connectionCache: make(map[string]int),
 				}
-				newDesc.ConnectionDesc.SetTTL(time.Minute)
-				newDesc.ConnectionDesc.SetExpirationCallback(func(key string, value interface{}) {
+				newDesc.ConnectionDesc.SetExpirationCallback(func(key string, value int) {
 					newDesc.cacheMutex.Lock()
 					defer newDesc.cacheMutex.Unlock()
 					delete(newDesc.connectionCache, key)
 				})
-				newDesc.ConnectionDesc.SetNewItemCallback(func(key string, value interface{}) {
+				newDesc.ConnectionDesc.SetNewItemCallback(func(key string, value int) {
 					newDesc.cacheMutex.Lock()
 					defer newDesc.cacheMutex.Unlock()
 					newDesc.connectionCache[key] = localPortInt
 				})
 				p.remoteIP.Set(ipv4.SrcIP.String(), newDesc)
 				desc = newDesc
-			} else {
-				desc = descRaw.(*remoteIPDesc)
 			}
 			desc.ConnectionDesc.Set(remoteAddr, localPortInt)
 
@@ -135,19 +130,18 @@ func (p *RandomPortTrigger) handlePacket(interfaceIP net.IP, packet gopacket.Pac
 			localDescRaw, ok := p.localPort.Load(int(l.DstPort))
 			if !ok {
 				lDesc := &localPortDesc{
-					RemoteCache: ttlcache.NewCache(),
+					RemoteCache: utils.NewTTLCache[int64](1 * time.Minute),
 					cacheMutex:  new(sync.Mutex),
 					addrCache:   make(map[string]int64),
 				}
-				lDesc.RemoteCache.SetTTL(time.Minute)
-				lDesc.RemoteCache.SetNewItemCallback(func(key string, value interface{}) {
+				lDesc.RemoteCache.SetNewItemCallback(func(key string, value int64) {
 					lDesc.CurrentRemoteAddr = key
 					lDesc.LastTimestamp = time.Now().Unix()
 					lDesc.cacheMutex.Lock()
 					defer lDesc.cacheMutex.Unlock()
 					lDesc.addrCache[lDesc.CurrentRemoteAddr] = lDesc.LastTimestamp
 				})
-				lDesc.RemoteCache.SetExpirationCallback(func(key string, value interface{}) {
+				lDesc.RemoteCache.SetExpirationCallback(func(key string, value int64) {
 					lDesc.cacheMutex.Lock()
 					defer lDesc.cacheMutex.Unlock()
 					delete(lDesc.addrCache, lDesc.CurrentRemoteAddr)
@@ -232,11 +226,11 @@ func (p *RandomPortTrigger) getRemoteAddrDesc(i int) (*remoteIPDesc, bool) {
 		return nil, false
 	}
 
-	return rDesc.(*remoteIPDesc), true
+	return rDesc, true
 }
 
 func (p *RandomPortTrigger) GetTriggerNotification(port int) (*TriggerNotification, error) {
-	var notif = &TriggerNotification{
+	notif := &TriggerNotification{
 		LocalPort: port,
 		Timestamp: time.Now().Unix(),
 	}

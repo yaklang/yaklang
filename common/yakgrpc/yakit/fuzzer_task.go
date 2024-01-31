@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ReneKroon/ttlcache"
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -18,15 +17,9 @@ import (
 )
 
 var (
-	_WebFuzzerTaskTTLCache     = ttlcache.NewCache()
-	_WebFuzzerResponseTTLCache = ttlcache.NewCache()
+	WebFuzzerTaskTTLCache     = utils.NewTTLCache[*ypb.HistoryHTTPFuzzerTask](30 * time.Minute)
+	WebFuzzerResponseTTLCache = utils.NewTTLCache[*ypb.FuzzerResponse](30 * time.Minute)
 )
-
-func init() {
-	ttl := 30 * time.Minute
-	_WebFuzzerResponseTTLCache.SetTTL(ttl)
-	_WebFuzzerTaskTTLCache.SetTTL(ttl)
-}
 
 /*
 这个结构用于保存当前测试的结果
@@ -66,15 +59,15 @@ func (w *WebFuzzerTask) CalcCacheHash() string {
 }
 
 func (w *WebFuzzerTask) getCacheGRPCModel() *ypb.HistoryHTTPFuzzerTask {
-	i, ok := _WebFuzzerTaskTTLCache.Get(w.CalcCacheHash())
+	t, ok := WebFuzzerTaskTTLCache.Get(w.CalcCacheHash())
 	if ok {
-		return i.(*ypb.HistoryHTTPFuzzerTask)
+		return t
 	}
 	return nil
 }
 
 func (w *WebFuzzerTask) setCacheGRPCModel(t *ypb.HistoryHTTPFuzzerTask) {
-	_WebFuzzerTaskTTLCache.Set(w.CalcCacheHash(), t)
+	WebFuzzerTaskTTLCache.Set(w.CalcCacheHash(), t)
 }
 
 func (w *WebFuzzerTask) ToGRPCModel() *ypb.HistoryHTTPFuzzerTask {
@@ -146,9 +139,7 @@ func QueryFuzzerHistoryTasks(db *gorm.DB, req *ypb.QueryHistoryHTTPFuzzerTaskExP
 	// 返回的任务跳过重试的任务
 	db = db.Where("id = retry_root_id or retry_root_id is null or retry_root_id = 0")
 
-	var (
-		returnTasks, tasks []*WebFuzzerTask
-	)
+	var returnTasks, tasks []*WebFuzzerTask
 
 	db = bizhelper.QueryOrder(db, orderby, order)
 	paging, db := bizhelper.Paging(db, int(pagination.GetPage()), int(pagination.GetLimit()), &returnTasks)
@@ -271,15 +262,15 @@ func (w *WebFuzzerResponse) CalcCacheHash() string {
 }
 
 func (w *WebFuzzerResponse) getCacheGRPCModel() *ypb.FuzzerResponse {
-	i, ok := _WebFuzzerResponseTTLCache.Get(w.CalcCacheHash())
+	rsp, ok := WebFuzzerResponseTTLCache.Get(w.CalcCacheHash())
 	if ok {
-		return i.(*ypb.FuzzerResponse)
+		return rsp
 	}
 	return nil
 }
 
 func (w *WebFuzzerResponse) setCacheGRPCModel(r *ypb.FuzzerResponse) {
-	_WebFuzzerResponseTTLCache.Set(w.CalcCacheHash(), r)
+	WebFuzzerResponseTTLCache.Set(w.CalcCacheHash(), r)
 }
 
 func (w *WebFuzzerResponse) ToGRPCModel() (*ypb.FuzzerResponse, error) {
@@ -367,7 +358,7 @@ func yieldWebFuzzerResponsesToChan(outC chan *WebFuzzerResponse, db *gorm.DB, ct
 	go func() {
 		defer close(outC)
 
-		var page = 1
+		page := 1
 		for {
 			var items []*WebFuzzerResponse
 			if _, b := bizhelper.NewPagination(&bizhelper.Param{
