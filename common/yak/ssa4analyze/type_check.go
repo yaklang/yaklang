@@ -121,18 +121,6 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 		wantParaLen := len(funcTyp.Parameter)
 		var gotPara ssa.Types = lo.Map(c.Args, func(arg ssa.Value, _ int) ssa.Type { return arg.GetType() })
 		gotParaLen := len(c.Args)
-		// is function variadic
-		if funcTyp.IsVariadic {
-			// not match minimum length
-			if gotParaLen >= (wantParaLen - 1) {
-				return
-			}
-		}
-		// call f (a ... )
-		if c.IsEllipsis {
-			return
-		}
-
 		funName := ""
 		if f, ok := c.Method.(*ssa.Function); ok {
 			funName = f.GetName()
@@ -140,16 +128,30 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 			funName = funcTyp.Name
 		}
 
-		// not match
-		if wantParaLen != gotParaLen {
+		lengthError := false
+		switch {
+		case funcTyp.IsVariadic && !c.IsEllipsis:
+			//len:  gotParaLen >=  wantParaLen-1
+			lengthError = gotParaLen < wantParaLen-1
+		case !funcTyp.IsVariadic && c.IsEllipsis:
+			// error, con't use ellipsis in this function
+			lengthError = true
+		case funcTyp.IsVariadic && c.IsEllipsis:
+			// lengthError = gotParaLen != wantParaLen
+			// TODO: warn
+			lengthError = false
+			return // skip type check
+		case !funcTyp.IsVariadic && !c.IsEllipsis:
+			lengthError = gotParaLen != wantParaLen
+		}
+		if lengthError {
 			c.NewError(
 				ssa.Error, TypeCheckTAG,
 				NotEnoughArgument(funName, gotPara.String(), funcTyp.GetParamString()),
 			)
 			return
 		}
-
-		for i := 0; i < wantParaLen; i++ {
+		checkParamType := func(i int) {
 			if !ssa.TypeCompare(gotPara[i], funcTyp.Parameter[i]) {
 				// any just skip
 				index := i + 1
@@ -159,8 +161,14 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 				c.NewError(ssa.Error, TypeCheckTAG,
 					ArgumentTypeError(index, gotPara[i].String(), funcTyp.Parameter[i].String(), funName),
 				)
-				return
 			}
+		}
+
+		for i := 0; i < wantParaLen; i++ {
+			if i == wantParaLen-1 && funcTyp.IsVariadic {
+				break // ignore
+			}
+			checkParamType(i)
 		}
 	}()
 	if len(c.GetAllVariables()) == 0 && len(c.GetUsers()) == 0 {
