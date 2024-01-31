@@ -122,6 +122,20 @@ func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_Cli(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	t.Run("simple cli parameter not string name", func(t *testing.T) {
+		check(
+			`
+			cli.String('a') // skip 
+			cli.String(1) // skip 
+			cli.String('aa')
+	`,
+
+			[]*ypb.YakScriptParam{
+				{Field: "aa", TypeVerbose: "string", FieldVerbose: "aa", MethodType: "string"},
+			},
+			t,
+		)
+	})
 
 	t.Run("simple cli parameter", func(t *testing.T) {
 		check(
