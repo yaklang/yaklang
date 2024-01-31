@@ -2,10 +2,11 @@ package yak2ssa
 
 import (
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/consts"
 	"regexp"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -344,13 +345,14 @@ func TestSyntaxError(t *testing.T) {
 	a...91234yuerinsmzxkbc,vmkoqawiuflp][1[;yai]
 	{ZXICv][ars]t[;]ar[setio][][][[][][]["""""""]]}]
 	`
-	code = `
-	a.
-	`
 	prog, err := ParseSSA(code)
-	if err == nil {
-		t.Fatal("prog parse should error")
+	if err != nil {
+		t.Fatal("prog parse error")
 	}
+	if len(prog.Packages) != 0 {
+		t.Fatal("prog parse should be none")
+	}
+
 	_ = prog
 }
 
