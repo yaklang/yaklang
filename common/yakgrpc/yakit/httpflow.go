@@ -32,7 +32,7 @@ import (
 )
 
 var (
-	globalHTTPFlowCache = make(map[string]*ypb.HTTPFlow)
+	globalHTTPFlowCache = utils.NewTTLCache[*ypb.HTTPFlow](10 * time.Minute)
 	cacheMu             = new(sync.RWMutex)
 )
 
@@ -278,7 +278,7 @@ func (f *HTTPFlow) getCacheGRPCModel(full bool) *ypb.HTTPFlow {
 	}
 	cacheMu.RLock()
 	defer cacheMu.RUnlock()
-	if v, ok := globalHTTPFlowCache[f.CalcCacheHash(full)]; ok {
+	if v, ok := globalHTTPFlowCache.Get(f.CalcCacheHash(full)); ok {
 		return v
 	}
 	return nil
@@ -290,7 +290,7 @@ func (f *HTTPFlow) setCacheGRPCModel(full bool, m *ypb.HTTPFlow) {
 	}
 	cacheMu.Lock()
 	defer cacheMu.Unlock()
-	globalHTTPFlowCache[f.CalcCacheHash(full)] = m
+	globalHTTPFlowCache.Set(f.CalcCacheHash(full), m)
 }
 
 func (f *HTTPFlow) toGRPCModel(full bool) (*ypb.HTTPFlow, error) {
@@ -364,11 +364,11 @@ func (f *HTTPFlow) toGRPCModel(full bool) (*ypb.HTTPFlow, error) {
 	flow.RequestLength = int64(len(unquotedRequest))
 	flow.RequestSizeVerbose = utils.ByteSize(uint64(len(unquotedRequest)))
 
-	var requireRequest = full || !f.IsRequestOversize
-	var requireResponse = full || !f.IsResponseOversize
-	var isStandardRequest = !flow.NoFixContentLength
+	requireRequest := full || !f.IsRequestOversize
+	requireResponse := full || !f.IsResponseOversize
+	isStandardRequest := !flow.NoFixContentLength
 
-	var haveRequest = funk.NotEmpty(unquotedRequest)
+	haveRequest := funk.NotEmpty(unquotedRequest)
 	var requestBody []byte
 	if requireRequest {
 		// return request:
@@ -397,7 +397,7 @@ func (f *HTTPFlow) toGRPCModel(full bool) (*ypb.HTTPFlow, error) {
 			fReq, _ := mutate.NewFuzzHTTPRequest(flow.Request, mutate.OptHTTPS(flow.IsHTTPS))
 			if fReq != nil {
 				for _, r := range fReq.GetCommonParams() {
-					var fReq = &ypb.FuzzableParam{
+					fReq := &ypb.FuzzableParam{
 						Position:  r.PositionVerbose(),
 						ParamName: utf8safe(utils.ParseStringToVisible(r.Name())),
 						IsHTTPS:   flow.IsHTTPS,
@@ -426,7 +426,7 @@ func (f *HTTPFlow) toGRPCModel(full bool) (*ypb.HTTPFlow, error) {
 		}
 	}
 
-	var haveResponse = funk.NotEmpty(unquotedResponse)
+	haveResponse := funk.NotEmpty(unquotedResponse)
 	var responseBody []byte
 	if requireResponse {
 		flow.Response = []byte(unquotedResponse)
@@ -569,7 +569,7 @@ func CreateHTTPFlowFromHTTPWithBodySavedFromRaw(isHttps bool, reqRaw []byte, rsp
 			rspContentType = v
 		}
 	})
-	var responseRaw = strconv.Quote(string(rspRaw))
+	responseRaw := strconv.Quote(string(rspRaw))
 	fReq, _ := mutate.NewFuzzHTTPRequest(reqRaw)
 
 	flow := &HTTPFlow{
@@ -610,7 +610,7 @@ func CreateHTTPFlowFromHTTPWithBodySavedFromRaw(isHttps bool, reqRaw []byte, rsp
 }
 
 func CreateHTTPFlowFromHTTPWithNoRspSaved(isHttps bool, req *http.Request, source string, url string, remoteAddr string) (*HTTPFlow, error) {
-	var urlRaw = url
+	urlRaw := url
 	if urlRaw == "" {
 		u, err := lowhttp.ExtractURLFromHTTPRequest(req, isHttps)
 		if err != nil {
@@ -647,7 +647,7 @@ func CreateHTTPFlowFromHTTPWithNoRspSaved(isHttps bool, req *http.Request, sourc
 }
 
 func CreateHTTPFlowFromHTTPWithBodySaved(isHttps bool, req *http.Request, rsp *http.Response, source string, url string, remoteAddr string) (*HTTPFlow, error) {
-	var urlRaw = url
+	urlRaw := url
 	if urlRaw == "" {
 		u, err := lowhttp.ExtractURLFromHTTPRequest(req, isHttps)
 		if err != nil {
@@ -889,12 +889,10 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 
 	if len(params.GetIncludePath()) > 0 {
 		db = bizhelper.FuzzQueryStringArrayOrLike(db, "path", params.GetIncludePath())
-
 	}
 
 	if len(params.GetExcludePath()) > 0 {
 		db = bizhelper.FuzzQueryStringArrayOrLikeExclude(db, "path", params.GetExcludePath())
-
 	}
 
 	if len(params.GetIncludeSuffix()) > 0 {
@@ -919,7 +917,6 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 	}
 	if len(params.GetExcludeContentType()) > 0 {
 		db = bizhelper.FuzzQueryStringArrayOrLikeExclude(db, "content_type", params.GetExcludeContentType())
-
 	}
 
 	if len(params.GetExcludeId()) > 0 {
@@ -1030,7 +1027,7 @@ too_large_response_header_file, too_large_response_body_file
 	}
 
 	if params.GetOnlyWebsocket() {
-		//log.Info("query websocket request flow")
+		// log.Info("query websocket request flow")
 		db = db.Where("(is_websocket = ?) AND (url LIKE 'ws%')", params.OnlyWebsocket)
 	}
 	switch params.GetIsWebsocket() {
@@ -1087,7 +1084,7 @@ func YieldHTTPUrl(db *gorm.DB, ctx context.Context) chan *HTTPFlowUrl {
 	go func() {
 		defer close(outC)
 
-		var page = 1
+		page := 1
 		for {
 			var items []*HTTPFlowUrl
 			if _, b := bizhelper.NewPagination(&bizhelper.Param{
@@ -1122,7 +1119,7 @@ func YieldHTTPFlows(db *gorm.DB, ctx context.Context) chan *HTTPFlow {
 	go func() {
 		defer close(outC)
 
-		var page = 1
+		page := 1
 		for {
 			var items []*HTTPFlow
 			if _, b := bizhelper.NewPagination(&bizhelper.Param{
@@ -1205,9 +1202,8 @@ const (
 }*/
 
 func HTTPFlowTags(refreshRequest bool) ([]*TagAndStatusCode, error) {
-	data := globalHTTPFlowCache
 	tagCounts := make(map[string]int)
-	for _, v := range data {
+	for _, v := range globalHTTPFlowCache.GetAll() {
 		for _, tag := range strings.Split(v.Tags, "|") {
 			tag = strings.TrimSpace(tag)
 			if tag != "" {
@@ -1215,7 +1211,7 @@ func HTTPFlowTags(refreshRequest bool) ([]*TagAndStatusCode, error) {
 			}
 		}
 	}
-	var tags = make([]*TagAndStatusCode, 0)
+	tags := make([]*TagAndStatusCode, 0)
 	for k, v := range tagCounts {
 		tags = append(tags, &TagAndStatusCode{
 			Value: k,
