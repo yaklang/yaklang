@@ -267,7 +267,7 @@ func getConstInstanceDesc(instance *yakdoc.LibInstance) string {
 
 func getFuncTypeDesc(funcTyp *ssa.FunctionType, funcName string) string {
 	lenOfParams := len(funcTyp.Parameter)
-	desc := fmt.Sprintf("```go\nfunc %s(%s) %s\n```", funcName, strings.Join(lo.Map(
+	desc := fmt.Sprintf("func %s(%s) %s", funcName, strings.Join(lo.Map(
 		funcTyp.Parameter, func(typ ssa.Type, i int) string {
 			if i == lenOfParams-1 && funcTyp.IsVariadic {
 				typStr := typ.String()
@@ -453,7 +453,7 @@ func getDescFromSSAValue(name string, v *ssaapi.Value) string {
 			if strings.Contains(lastName, ".") {
 				lastName = lastName[strings.LastIndex(lastName, ".")+1:]
 			}
-			desc = getFuncTypeDesc(funcTyp, lastName)
+			desc = fmt.Sprintf("```go\n%s\n```", getFuncTypeDesc(funcTyp, lastName))
 		case ssa.StructTypeKind:
 			rTyp, ok := bareTyp.(*ssa.ObjectType)
 			if !ok {
