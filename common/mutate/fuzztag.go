@@ -612,7 +612,7 @@ func init() {
 		Handler: func(s string) []string {
 			return regen.MustGenerate(s)
 		},
-		Alias:       []string{"re"},
+		Alias:       []string{"re", "regex", "regexp"},
 		Description: "使用正则生成所有可能的字符",
 	})
 	AddFuzzTagToGlobal(&FuzzTagDescription{
@@ -620,8 +620,29 @@ func init() {
 		Handler: func(s string) []string {
 			return []string{regen.MustGenerateOne(s)}
 		},
-		Alias:       []string{"re:one"},
+		Alias:       []string{"re:one", "regex:one", "regexp:one"},
 		Description: "使用正则生成所有可能的字符中的随机一个",
+		IsDyn:       true,
+	})
+	AddFuzzTagToGlobal(&FuzzTagDescription{
+		TagName: "regen:n",
+		Handler: func(s string) []string {
+			lastIndex := strings.LastIndexByte(s, '|')
+			if lastIndex > 0 && lastIndex+1 < len(s) {
+				regex := s[:lastIndex]
+				n := s[lastIndex+1:]
+				if ret := codec.Atoi(n); ret > 0 {
+					results := make([]string, ret)
+					for i := 0; i < ret; i++ {
+						results[i] = regen.MustGenerateOne(regex)
+					}
+					return results
+				}
+			}
+			return []string{regen.MustGenerateOne(s)}
+		},
+		Alias:       []string{"re:n", "regex:n", "regexp:n"},
+		Description: "使用正则生成所有可能的字符中的随机n个",
 		IsDyn:       true,
 	})
 	AddFuzzTagToGlobal(&FuzzTagDescription{
