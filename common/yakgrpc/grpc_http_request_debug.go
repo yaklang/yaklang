@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/url"
-	"reflect"
 	"strings"
 	"time"
 
@@ -13,7 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/cli"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
@@ -118,53 +116,7 @@ func (s *Server) execScriptWithExecParam(scriptName string, input string, stream
 	case "yak":
 		tempArgs := makeArgs(params)
 		engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
-			hook := func(f interface{}) interface{} {
-				funcValue := reflect.ValueOf(f)
-				funcType := funcValue.Type()
-				hookFunc := reflect.MakeFunc(funcType, func(args []reflect.Value) (results []reflect.Value) {
-					TempParams := []cli.SetCliExtraParam{cli.SetTempArgs(tempArgs)}
-					index := len(args) - 1 // 获取 option 参数的 index
-					interfaceValue := args[index].Interface()
-					args = args[:index]
-					cliExtraParams, ok := interfaceValue.([]cli.SetCliExtraParam)
-					if ok {
-						TempParams = append(TempParams, cliExtraParams...)
-					}
-					for _, p := range TempParams {
-						args = append(args, reflect.ValueOf(p))
-					}
-					res := funcValue.Call(args)
-					return res
-				})
-				return hookFunc.Interface()
-			}
-
-			hookFuncList := []string{
-				"String",
-				"Bool",
-				"Have",
-				"Int",
-				"Integer",
-				"Float",
-				"Double",
-				"YakitPlugin",
-				"Urls",
-				"Url",
-				"Ports",
-				"Port",
-				"Hosts",
-				"Host",
-				"Network",
-				"Net",
-				"File",
-				"FileOrContent",
-				"LineDict",
-				"StringSlice",
-				"FileNames",
-			}
-			for _, name := range hookFuncList {
-				engine.GetVM().RegisterMapMemberCallHandler("cli", name, hook)
-			}
+			yak.HookCliArgs(engine, tempArgs)
 			return nil
 		})
 		_, err := engine.ExecuteExWithContext(stream.Context(), scriptInstance.Content, map[string]any{
