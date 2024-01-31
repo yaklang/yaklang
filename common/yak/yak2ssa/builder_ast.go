@@ -1224,28 +1224,34 @@ func (b *astbuilder) buildMakeExpression(stmt *yak.MakeExpressionContext) ssa.Va
 		exprs = b.buildExpressionListMultiline(s)
 	}
 	zero := b.EmitConstInst(0)
-	switch typ := typ.(type) {
-	case *ssa.ObjectType:
-		switch typ.Kind {
-		case ssa.SliceTypeKind:
-			if len(exprs) == 0 {
-				return b.EmitMakeBuildWithType(typ, zero, zero)
-			} else if len(exprs) == 1 {
-				return b.EmitMakeBuildWithType(typ, exprs[0], exprs[0])
-			} else if len(exprs) == 2 {
-				return b.EmitMakeBuildWithType(typ, exprs[0], exprs[1])
-			} else {
-				b.NewError(ssa.Error, TAG, MakeSliceArgumentTooMuch())
-			}
-		case ssa.MapTypeKind:
-			return b.EmitMakeBuildWithType(typ, zero, zero)
-		case ssa.StructTypeKind:
-		}
-	case *ssa.ChanType:
+	switch typ.GetTypeKind() {
+	case ssa.SliceTypeKind, ssa.Bytes:
 		if len(exprs) == 0 {
 			return b.EmitMakeBuildWithType(typ, zero, zero)
-		} else {
+		} else if len(exprs) == 1 {
 			return b.EmitMakeBuildWithType(typ, exprs[0], exprs[0])
+		} else if len(exprs) == 2 {
+			return b.EmitMakeBuildWithType(typ, exprs[0], exprs[1])
+		} else {
+			b.NewError(ssa.Error, TAG, MakeArgumentTooMuch("slice"))
+		}
+	case ssa.MapTypeKind:
+		if len(exprs) == 0 {
+			return b.EmitMakeBuildWithType(typ, zero, zero)
+		} else if len(exprs) == 1 {
+			return b.EmitMakeBuildWithType(typ, exprs[0], exprs[0])
+		} else {
+			b.NewError(ssa.Error, TAG, MakeArgumentTooMuch("map"))
+		}
+	case ssa.StructTypeKind:
+		b.NewError(ssa.Error, TAG, "cannot make struct{}; type must be slice, map, bytes, or channel")
+	case ssa.ChanTypeKind:
+		if len(exprs) == 0 {
+			return b.EmitMakeBuildWithType(typ, zero, zero)
+		} else if len(exprs) == 1 {
+			return b.EmitMakeBuildWithType(typ, exprs[0], exprs[0])
+		} else {
+			b.NewError(ssa.Error, TAG, MakeArgumentTooMuch("chan"))
 		}
 	default:
 		b.NewError(ssa.Error, TAG, MakeUnknownType())

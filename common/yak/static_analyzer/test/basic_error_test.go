@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
+	"github.com/yaklang/yaklang/common/yak/yak2ssa"
 )
 
 func TestFunctionCallTypeCheck(t *testing.T) {
@@ -81,6 +82,39 @@ func TestFunctionCallParameterLength(t *testing.T) {
 		codec.DecodeBase64(a...)
 		`, []string{
 			ssa4analyze.NotEnoughArgument("codec.DecodeBase64", "[]string", "string"),
+		})
+	})
+}
+
+func TestMakeByte(t *testing.T) {
+	t.Run("make byte", func(t *testing.T) {
+		check(t, `
+		a = make([]byte, 1)
+		`, []string{})
+	})
+	t.Run("make slice, without size cap", func(t *testing.T) {
+		check(t, `
+		make([]int)`, []string{})
+	})
+	t.Run("make slice, without cap ", func(t *testing.T) {
+		check(t, `
+		make([]int, 1)`, []string{})
+	})
+	t.Run("make slice", func(t *testing.T) {
+		check(t, `
+		make([]int, 1, 1)`, []string{})
+	})
+	t.Run("make slice more argument", func(t *testing.T) {
+		check(t, `
+		make([]int, 1, 1, 3)`, []string{
+			yak2ssa.MakeArgumentTooMuch("slice"),
+		})
+	})
+
+	t.Run("make chan more argument", func(t *testing.T) {
+		check(t, `
+		make(chan int, 1, 3)`, []string{
+			yak2ssa.MakeArgumentTooMuch("chan"),
 		})
 	})
 }
