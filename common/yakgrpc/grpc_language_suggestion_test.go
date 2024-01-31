@@ -138,6 +138,56 @@ func CheckHover(t *testing.T) func(t *testing.T, code, typ string, Range *ypb.Ra
 	return check
 }
 
+func CheckSignature(t *testing.T) func(t *testing.T, code, typ string, Range *ypb.Range, wantLabel string, wantDesc string, subStr ...bool) {
+	if local == nil {
+		var err error
+		local, err = NewLocalClient()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	getHover := func(t *testing.T, code, typ string, Range *ypb.Range) *ypb.YaklangLanguageSuggestionResponse {
+		return GetSuggestion(local, "signature", typ, t, code, Range)
+	}
+	check := func(t *testing.T, code, typ string, Range *ypb.Range, wantLabel string, wantDesc string, sub ...bool) {
+		subStr := false
+		for _, v := range sub {
+			if v {
+				subStr = true
+				break
+			}
+		}
+
+		req := getHover(t, code, typ, Range)
+		log.Info(req.SuggestionMessage)
+		if len(req.SuggestionMessage) != 1 {
+			t.Fatal("should get 1 suggestion")
+		}
+		got := req.SuggestionMessage[0].Label
+		if subStr {
+			if !strings.Contains(got, wantLabel) {
+				t.Fatalf("want %s, but get %s", wantLabel, got)
+			}
+		} else {
+			if got != wantLabel {
+				t.Fatalf("want %s, but get %s", wantLabel, got)
+			}
+		}
+		got = req.SuggestionMessage[0].Description
+		if subStr {
+			if !strings.Contains(got, wantDesc) {
+				t.Fatalf("want %s, but get %s", wantDesc, got)
+			}
+		} else {
+			if got != wantDesc {
+				t.Fatalf("want %s, but get %s", wantDesc, got)
+			}
+		}
+	}
+	return check
+}
+
 func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 	check := CheckHover(t)
 
@@ -340,4 +390,49 @@ rsp.Data()`
 		want := "```go\n" + `func Data() string` + "\n```"
 		check(t, code, "yak", ssaParseRange, want)
 	})
+}
+
+func TestGRPCMUSTPASS_LANGUAGE_SuggestionSignature(t *testing.T) {
+	check := CheckSignature(t)
+	code := `a = func(b, c...) {}
+a()
+poc.HTTP()
+`
+
+	t.Run("check standard library function signature", func(t *testing.T) {
+		ssaRange := &ypb.Range{
+			Code:        "poc.HTTP",
+			StartLine:   3,
+			StartColumn: 0,
+			EndLine:     3,
+			EndColumn:   8,
+		}
+		wantLabel := "HTTP(i any, opts ...PocConfigOption) (rsp []byte, req []byte, err error)"
+		wantDesc := "HTTP 发送请求并且返回原始响应报文，原始请求报文以及错误，它的第一个参数可以接收[]byte, string, http.Request结构体，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如设置超时时间，或者修改请求报文等\n\nExample:\n```\npoc.HTTP(\"GET / HTTP/1.1\\r\\nHost: www.yaklang.com\\r\\n\\r\\n\", poc.https(true), poc.replaceHeader(\"AAA\", \"BBB\")) // yaklang.com发送一个基于HTTPS协议的GET请求，并且添加一个请求头AAA，它的值为BBB\n```\n"
+		check(t, code, "yak", ssaRange, wantLabel, wantDesc)
+	})
+	t.Run("check user function signature", func(t *testing.T) {
+		ssaRange := &ypb.Range{
+			Code:        "a",
+			StartLine:   2,
+			StartColumn: 0,
+			EndLine:     2,
+			EndColumn:   1,
+		}
+		wantLabel := "func a(r1 any, r2 ...any) null"
+		check(t, code, "yak", ssaRange, wantLabel, "")
+	})
+
+	// t.Run("check method hover", func(t *testing.T) {
+	// 	ssaParseRange := &ypb.Range{
+	// 		Code:        "rsp.Data",
+	// 		StartLine:   3,
+	// 		StartColumn: 0,
+	// 		EndLine:     3,
+	// 		EndColumn:   8,
+	// 	}
+	// 	// 标准库函数
+	// 	want := "```go\n" + `func Data() string` + "\n```"
+	// 	check(t, code, "yak", ssaParseRange, want)
+	// })
 }
