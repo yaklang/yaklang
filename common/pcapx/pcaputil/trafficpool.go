@@ -2,18 +2,18 @@ package pcaputil
 
 import (
 	"context"
-	"github.com/ReneKroon/ttlcache"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"net"
 	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 type TrafficPool struct {
@@ -22,7 +22,7 @@ type TrafficPool struct {
 	ctx                context.Context
 	currentStreamIndex uint64
 
-	flowCache *ttlcache.Cache
+	flowCache *utils.Cache[*TrafficFlow]
 
 	onFlowCreated                   func(flow *TrafficFlow)
 	onFlowClosed                    func(reason TrafficFlowCloseReason, flow *TrafficFlow)
@@ -32,19 +32,14 @@ type TrafficPool struct {
 
 func NewTrafficPool(ctx context.Context) *TrafficPool {
 	pool := &TrafficPool{pool: new(sync.Map), ctx: ctx}
-	fCache := ttlcache.NewCache()
-	fCache.SetExpirationCallback(func(key string, value interface{}) {
+	fCache := utils.NewTTLCache[*TrafficFlow](30 * time.Second)
+	fCache.SetExpirationCallback(func(key string, flow *TrafficFlow) {
 		pool.pool.Delete(key)
-		flow, ok := value.(*TrafficFlow)
-		if !ok {
-			return
-		}
 		flow.triggerCloseEvent(TrafficFlowCloseReason_INACTIVE)
 		flow.cancel()
 		flow.ServerConn.Close()
 		flow.ClientConn.Close()
 	})
-	fCache.SetTTL(30 * time.Second)
 	pool.flowCache = fCache
 	return pool
 }
@@ -57,10 +52,10 @@ func (p *TrafficPool) Feed(ethernetLayer *layers.Ethernet, networkLayer gopacket
 	var networkStr string
 	var srcIP net.IP
 	var dstIP net.IP
-	var srcPort = int(transportLayer.SrcPort)
-	var dstPort = int(transportLayer.DstPort)
-	var isIpv4 = false
-	var isIpv6 = false
+	srcPort := int(transportLayer.SrcPort)
+	dstPort := int(transportLayer.DstPort)
+	isIpv4 := false
+	isIpv6 := false
 	switch ret := networkLayer.(type) {
 	case *layers.IPv4:
 		networkStr = "tcp4"
@@ -76,13 +71,13 @@ func (p *TrafficPool) Feed(ethernetLayer *layers.Ethernet, networkLayer gopacket
 		return
 	}
 
-	var srcAddrString = utils.HostPort(srcIP.String(), srcPort)
-	var dstAddrString = utils.HostPort(dstIP.String(), dstPort)
-	var hash = p.flowhash(networkStr, srcAddrString, dstAddrString)
+	srcAddrString := utils.HostPort(srcIP.String(), srcPort)
+	dstAddrString := utils.HostPort(dstIP.String(), dstPort)
+	hash := p.flowhash(networkStr, srcAddrString, dstAddrString)
 	var flow *TrafficFlow
 
 	if ret, ok := p.pool.Load(hash); !ok {
-		var fitFlow = func(flow *TrafficFlow) {
+		fitFlow := func(flow *TrafficFlow) {
 			flow.Hash = hash
 			flow.IsIpv4 = isIpv4
 			flow.IsIpv6 = isIpv6

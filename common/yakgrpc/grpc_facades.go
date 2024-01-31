@@ -4,6 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"net"
+	"os"
+	"strings"
+	"sync"
+	"time"
+
 	uuid "github.com/satori/go.uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/cybertunnel"
@@ -13,19 +20,10 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"math/rand"
-	"net"
-	"os"
-	"strings"
-
-	"github.com/ReneKroon/ttlcache"
-
-	"sync"
-	"time"
 )
 
 var (
-	remoteAddrConvertor = ttlcache.NewCache()
+	remoteAddrConvertor = utils.NewTTLCache[string](30 * time.Second)
 
 	// 全局反连配置
 	globalReverseServerStarted = utils.NewBool(false)
@@ -34,13 +32,12 @@ var (
 	remoteReversePort          int
 	remoteAddr                 string
 	remoteSecret               string
-	//所有已创建的FacadeServer
+	// 所有已创建的FacadeServer
 	facadeServers    map[string]*facades.FacadeServer
 	facadeServersMux *sync.Mutex
 )
 
 func init() {
-	remoteAddrConvertor.SetTTL(30 * time.Second)
 	facadeServers = make(map[string]*facades.FacadeServer)
 	facadeServersMux = &sync.Mutex{}
 }
@@ -331,7 +328,7 @@ func (s *Server) StartFacades(req *ypb.StartFacadesParams, stream ypb.Yak_StartF
 		server.OnHandle(func(n *facades.Notification) {
 			res, ok := remoteAddrConvertor.Get(n.RemoteAddr)
 			if ok {
-				n.RemoteAddr = fmt.Sprint(res)
+				n.RemoteAddr = res
 			}
 			raw, err := json.Marshal(n)
 			if err != nil {
@@ -367,7 +364,7 @@ func (s *Server) StartFacades(req *ypb.StartFacadesParams, stream ypb.Yak_StartF
 
 func (s *Server) StartFacadesWithYsoObject(req *ypb.StartFacadesWithYsoParams, stream ypb.Yak_StartFacadesWithYsoObjectServer) error {
 	ctx := stream.Context()
-	//校验必要参数
+	// 校验必要参数
 	reversePort := req.GetReversePort()
 	if reversePort <= 0 {
 		return utils.Errorf("reversePort is not valid")
@@ -383,13 +380,13 @@ func (s *Server) StartFacadesWithYsoObject(req *ypb.StartFacadesWithYsoParams, s
 	//	return utils.Errorf("generate class error: %v", err)
 	//}
 
-	//如果启用公网反连，公网服务器监听指定端口，本地监听随机端口，否则本地监听指定端口
+	// 如果启用公网反连，公网服务器监听指定端口，本地监听随机端口，否则本地监听指定端口
 	wg := new(sync.WaitGroup)
 	var globalError error
 	var listenPort int
 	if req.GetIsRemote() {
 		listenPort = utils.GetRandomAvailableTCPPort()
-		//启动端口流量转发
+		// 启动端口流量转发
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -415,13 +412,12 @@ func (s *Server) StartFacadesWithYsoObject(req *ypb.StartFacadesWithYsoParams, s
 				log.Info(err)
 				stream.Send(yaklib.NewYakitLogExecResult("mirror_error", err.Error()))
 			}
-
 		}()
 	} else {
 		listenPort = int(reversePort)
 	}
 
-	//启动Facade Server
+	// 启动Facade Server
 	reverseHost := req.GetReverseHost()
 	//var className, classPath string
 	//if strings.HasSuffix(bytesRsp.GetFileName(), ".class") {
@@ -477,11 +473,11 @@ func (s *Server) StartFacadesWithYsoObject(req *ypb.StartFacadesWithYsoParams, s
 		defer wg.Done()
 		err := server.ServeWithContext(stream.Context())
 		if err != nil {
-			//客户端关闭
+			// 客户端关闭
 			if strings.Contains(err.Error(), "use of closed network connection") {
 				log.Info("connection closed")
 			} else {
-				//启动失败
+				// 启动失败
 				err := utils.Errorf("start facade server error: %v", err)
 				stream.Send(yaklib.NewYakitLogExecResult("error", err.Error()))
 			}

@@ -3,22 +3,24 @@ package vulinboxagentclient
 import (
 	"context"
 	"fmt"
-	"github.com/ReneKroon/ttlcache"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/vulinboxagentproto"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
 )
+
+type ackFunc func([]byte) error
 
 type Client struct {
 	wsClient *lowhttp.WebsocketClient
 
-	ackWaitMap *ttlcache.Cache
+	ackWaitMap *utils.Cache[ackFunc]
 	sendBuf    chan []byte
 
 	databackHandler     map[string]func(any)
@@ -45,12 +47,11 @@ type Option func(c *Client)
 
 func Connect(addr string, options ...Option) (*Client, error) {
 	// new client
-	var c = &Client{
+	c := &Client{
 		sendBuf:         make(chan []byte, 1024),
-		ackWaitMap:      ttlcache.NewCache(),
+		ackWaitMap:      utils.NewTTLCache[ackFunc](Expire),
 		databackHandler: map[string]func(any){},
 	}
-	c.ackWaitMap.SetTTL(Expire)
 	c.ackWaitMap.SkipTtlExtensionOnHit(true)
 	for _, option := range options {
 		option(c)
@@ -64,7 +65,7 @@ func Connect(addr string, options ...Option) (*Client, error) {
 	if err != nil {
 		return nil, utils.Errorf("cannot fetch host and port from addr: %s", err)
 	}
-	var isTls = port == 443
+	isTls := port == 443
 	if !isTls {
 		isTls = netx.IsTLSService(addr)
 	}
@@ -152,7 +153,7 @@ func (c *Client) MessageMux(bytes []byte) {
 			return
 		}
 
-		err := f.(func([]byte) error)(bytes)
+		err := f(bytes)
 		if err != nil {
 			log.Errorf("cannot handle ack: %v", err)
 			return

@@ -5,16 +5,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/ReneKroon/ttlcache"
 	"io/ioutil"
 	"os/exec"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
-	"strconv"
-	"strings"
 )
 
 type NginxDetail struct {
@@ -38,7 +37,6 @@ func (n *NginxDetail) CalcHash() string {
 }
 
 func getNginxPid(c context.Context) []int {
-
 	for index := range make([]int, 5) {
 		switch index {
 		case 1:
@@ -180,7 +178,7 @@ type NginxGuardTarget struct {
 	guardTargetBase
 
 	callbacks []NginxGuardCallback
-	cache     *ttlcache.Cache
+	cache     *utils.Cache[*NginxDetail]
 }
 
 func (n *NginxGuardTarget) do() {
@@ -203,27 +201,21 @@ func NewNginxGuardTarget(
 			intervalSeconds: interval,
 		},
 		callbacks: cbs,
-		cache:     ttlcache.NewCache(),
+		cache:     utils.NewTTLCache[*NginxDetail](),
 	}
 	t.guardTargetBase.children = t
-	t.cache.SetNewItemCallback(func(key string, value interface{}) {
-		d, ok := value.(*NginxDetail)
-		if ok {
-			for _, c := range cbs {
-				res := *d
-				res.isServing = true
-				c(res)
-			}
+	t.cache.SetNewItemCallback(func(key string, value *NginxDetail) {
+		for _, c := range cbs {
+			res := *value
+			res.isServing = true
+			c(res)
 		}
 	})
-	t.cache.SetExpirationCallback(func(key string, value interface{}) {
-		d, ok := value.(*NginxDetail)
-		if ok {
-			for _, c := range cbs {
-				res := *d
-				res.isServing = false
-				c(res)
-			}
+	t.cache.SetExpirationCallback(func(key string, value *NginxDetail) {
+		for _, c := range cbs {
+			res := *value
+			res.isServing = false
+			c(res)
 		}
 	})
 

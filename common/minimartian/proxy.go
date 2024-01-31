@@ -26,15 +26,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ReneKroon/ttlcache"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian/mitm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
-var errClose = errors.New("closing connection")
-var noop = Noop("martian")
+var (
+	errClose = errors.New("closing connection")
+	noop     = Noop("martian")
+)
 
 func isCloseable(err error) bool {
 	if err == nil {
@@ -73,13 +74,13 @@ type Proxy struct {
 	// context cache
 	ctxCacheLock     *sync.Mutex
 	ctxCacheInitOnce *sync.Once
-	ctxCache         *ttlcache.Cache
+	ctxCache         *utils.Cache[*Context]
 
 	// 限制用户名和密码
 	proxyUsername string
 	proxyPassword string
 
-	//lowhttp config
+	// lowhttp config
 	lowhttpConfig []lowhttp.LowhttpOpt
 
 	maxContentLength int
@@ -96,8 +97,7 @@ func (p *Proxy) saveCache(r *http.Request, ctx *Context) {
 	key := fmt.Sprintf("%p", r)
 	if p.ctxCache == nil {
 		p.ctxCacheInitOnce.Do(func() {
-			p.ctxCache = ttlcache.NewCache()
-			p.ctxCache.SetTTL(5 * time.Minute)
+			p.ctxCache = utils.NewTTLCache[*Context](5 * time.Minute)
 		})
 	}
 	p.ctxCache.Set(key, ctx)
@@ -108,11 +108,7 @@ func (p *Proxy) getCacheContext(r *http.Request) (*Context, bool) {
 		return nil, false
 	}
 	key := fmt.Sprintf("%p", r)
-	raw, ok := p.ctxCache.Get(key)
-	if !ok {
-		return nil, false
-	}
-	ins, ok := raw.(*Context)
+	ins, ok := p.ctxCache.Get(key)
 	if !ok {
 		return nil, false
 	}
@@ -136,9 +132,8 @@ func NewProxy() *Proxy {
 		resmod:           noop,
 		ctxCacheInitOnce: new(sync.Once),
 		ctxCacheLock:     new(sync.Mutex),
-		ctxCache:         ttlcache.NewCache(),
+		ctxCache:         utils.NewTTLCache[*Context](5 * time.Minute),
 	}
-	proxy.ctxCache.SetTTL(5 * time.Minute)
 	return proxy
 }
 

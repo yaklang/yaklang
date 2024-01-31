@@ -3,7 +3,6 @@ package ssaapi
 import (
 	"time"
 
-	"github.com/ReneKroon/ttlcache"
 	"github.com/yaklang/yaklang/common/utils"
 	js2ssa "github.com/yaklang/yaklang/common/yak/JS2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -22,12 +21,10 @@ type LanguageParser interface {
 	Feed(string, bool, *ssa.Program)
 }
 
-var (
-	LanguageParsers = map[Language]LanguageParser{
-		Yak: yak2ssa.NewParser(),
-		JS:  js2ssa.NewParser(),
-	}
-)
+var LanguageParsers = map[Language]LanguageParser{
+	Yak: yak2ssa.NewParser(),
+	JS:  js2ssa.NewParser(),
+}
 
 type config struct {
 	language        Language
@@ -129,7 +126,7 @@ func WithFeedCode(b ...bool) Option {
 	}
 }
 
-var ttlSSAParseCache = ttlcache.NewCache()
+var ttlSSAParseCache = utils.NewTTLCache[*Program](30 * time.Minute)
 
 func Parse(code string, opts ...Option) (*Program, error) {
 	config := defaultConfig(code)
@@ -140,9 +137,10 @@ func Parse(code string, opts ...Option) (*Program, error) {
 		return nil, utils.Errorf("not support language %s", config.language)
 	}
 	var ret *Program
+
 	hash := config.CaclHash()
 	if prog, ok := ttlSSAParseCache.Get(hash); ok {
-		ret = prog.(*Program)
+		ret = prog
 	} else {
 		prog, err := parseWithConfig(config)
 		if err != nil {

@@ -5,7 +5,6 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/ReneKroon/ttlcache"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
@@ -65,6 +64,7 @@ qweasdzxc
 88888888
 87654321
 987654321`)
+
 var defaultUserTomcat = utils.ParseStringToLines(`tomcat
 manager
 root
@@ -99,14 +99,12 @@ Upgrade-Insecure-Requests: 1
 User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.55 Safari/537.36
 `
 
-var tomcatUnLoginRegexp = regexp.MustCompile(fmt.Sprintf(`(?i)%v`, regexp.QuoteMeta(`<h1>401 Unauthorized</h1>`)))
-var tomcatManagerRegexp = regexp.MustCompile(fmt.Sprintf(`(?i)%v`, regexp.QuoteMeta(`alt="The Tomcat Servlet/JSP Container"`)))
+var (
+	tomcatUnLoginRegexp = regexp.MustCompile(fmt.Sprintf(`(?i)%v`, regexp.QuoteMeta(`<h1>401 Unauthorized</h1>`)))
+	tomcatManagerRegexp = regexp.MustCompile(fmt.Sprintf(`(?i)%v`, regexp.QuoteMeta(`alt="The Tomcat Servlet/JSP Container"`)))
+	tomcatTlsTTLcache = utils.NewTTLCache[bool](30 * time.Minute)
+)
 
-var tomcatTlsTTLcache = ttlcache.NewCache()
-
-func init() {
-	tomcatTlsTTLcache.SetTTL(30 * time.Minute)
-}
 
 var tomcat = &DefaultServiceAuthInfo{
 	ServiceName:      "tomcat",
@@ -156,7 +154,7 @@ var tomcat = &DefaultServiceAuthInfo{
 		}
 
 		addr := utils.HostPort(host, port)
-		var _, isTls = tomcatTlsTTLcache.Get(addr)
+		_, isTls := tomcatTlsTTLcache.Get(addr)
 		rsp, _ := packetToBrute(
 			tomcatAuthPacket,
 			map[string][]string{

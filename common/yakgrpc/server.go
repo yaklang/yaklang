@@ -38,9 +38,8 @@ func NewServer() (*Server, error) {
 }
 
 func NewServerWithLogCache(b bool) (*Server, error) {
-
 	yakitBase := consts.GetDefaultYakitBaseDir()
-	_ = os.MkdirAll(yakitBase, 0777)
+	_ = os.MkdirAll(yakitBase, 0o777)
 	port, err := utils.GetRangeAvailableTCPPort(50000, 65535, 3)
 	if err != nil {
 		return nil, err
@@ -124,7 +123,7 @@ func (s *Server) initDatabase() error {
 	err = s.initBasicData()
 	if err != nil {
 		log.Warnf("init database failed: %s", err)
-		//howToFix()
+		// howToFix()
 		return err
 	}
 
@@ -139,7 +138,7 @@ func (s *Server) initFacadeServer() error {
 	s.reverseServer.OnHandle(func(n *facades.Notification) {
 		res, ok := remoteAddrConvertor.Get(n.RemoteAddr)
 		if ok {
-			n.RemoteAddr = fmt.Sprint(res)
+			n.RemoteAddr = res
 		}
 		_, _ = yakit.NewRisk(
 			n.RemoteAddr,
@@ -155,10 +154,10 @@ func (s *Server) initFacadeServer() error {
 		if !ok {
 			return s
 		}
-		return fmt.Sprint(res)
+		return res
 	}
 	go func() {
-		var _run = func() {
+		_run := func() {
 			defer func() {
 				if err := recover(); err != nil {
 					log.Error(err)

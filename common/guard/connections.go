@@ -3,11 +3,11 @@ package guard
 import (
 	"context"
 	"fmt"
-	"github.com/ReneKroon/ttlcache"
+	"time"
+
 	gopsnet "github.com/shirou/gopsutil/v3/net"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"time"
 )
 
 type NetConn struct {
@@ -81,20 +81,22 @@ const (
 	NetConnEvent_Disappear NetConnEventType = "disappear"
 )
 
-type NetConnCallback func([]*NetConn)
-type NetConnEventCallback func(eventType NetConnEventType, conn *NetConn)
+type (
+	NetConnCallback      func([]*NetConn)
+	NetConnEventCallback func(eventType NetConnEventType, conn *NetConn)
+)
 
 type NetConnGuardOption func(t *NetConnGuardTarget) error
 
 type NetConnGuardTarget struct {
-	//intervalSeconds int
-	//intervalOffset  int
+	// intervalSeconds int
+	// intervalOffset  int
 	guardTargetBase
 
 	eventCallbacks []NetConnEventCallback
 	callbacks      []NetConnCallback
 
-	cache *ttlcache.Cache
+	cache *utils.Cache[*NetConn]
 }
 
 func NewNetConnGuardTarget(intervalSeconds int, options ...NetConnGuardOption) (*NetConnGuardTarget, error) {
@@ -102,7 +104,7 @@ func NewNetConnGuardTarget(intervalSeconds int, options ...NetConnGuardOption) (
 		guardTargetBase: guardTargetBase{
 			intervalSeconds: intervalSeconds,
 		},
-		cache: ttlcache.NewCache(),
+		cache: utils.NewTTLCache[*NetConn](),
 	}
 	t.children = t
 	for _, option := range options {
@@ -113,14 +115,14 @@ func NewNetConnGuardTarget(intervalSeconds int, options ...NetConnGuardOption) (
 	}
 
 	if t.eventCallbacks != nil {
-		t.cache.SetExpirationCallback(func(key string, value interface{}) {
+		t.cache.SetExpirationCallback(func(key string, value *NetConn) {
 			for _, i := range t.eventCallbacks {
-				i(NetConnEvent_Disappear, value.(*NetConn))
+				i(NetConnEvent_Disappear, value)
 			}
 		})
-		t.cache.SetNewItemCallback(func(key string, value interface{}) {
+		t.cache.SetNewItemCallback(func(key string, value *NetConn) {
 			for _, i := range t.eventCallbacks {
-				i(NetConnEvent_New, value.(*NetConn))
+				i(NetConnEvent_New, value)
 			}
 		})
 	}

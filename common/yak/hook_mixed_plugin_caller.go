@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ReneKroon/ttlcache"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/fp"
@@ -642,16 +641,13 @@ func calcWebsitePathHash(urlIns *url.URL, host, port interface{}, req []byte) st
 	return utils.CalcSha1(urlIns.Scheme, freq.GetMethod(), host, port, freq.GetPathWithoutQuery(), "path")
 }
 
-var ttlHTTPRequestCache = ttlcache.NewCache()
+var ttlHTTPRequestCache = utils.NewTTLCache[*mutate.FuzzHTTPRequest](30 * time.Minute)
 
 func getFuzzHTTPRequestByCache(req []byte) (*mutate.FuzzHTTPRequest, error) {
 	hash := utils.CalcSha1(req)
-	data, ok := ttlHTTPRequestCache.Get(hash)
-	if ok && data != nil {
-		reqIns, _ := data.(*mutate.FuzzHTTPRequest)
-		if reqIns != nil {
+	reqIns, ok := ttlHTTPRequestCache.Get(hash)
+	if ok {
 			return reqIns, nil
-		}
 	}
 	reqIns, err := mutate.NewFuzzHTTPRequest(req)
 	if err != nil {

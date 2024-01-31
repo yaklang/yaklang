@@ -3,15 +3,15 @@ package cybertunnel
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/netutil"
 	"net"
 	"sync"
 	"time"
 
-	"github.com/ReneKroon/ttlcache"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/netutil"
+
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
@@ -20,14 +20,14 @@ import (
 type remoteICMPIPDesc struct {
 	IP net.IP
 
-	ConnectionDesc  *ttlcache.Cache
+	ConnectionDesc  *utils.Cache[uint16]
 	connectionCache map[string]uint16
 
 	cacheMutex *sync.Mutex
 }
 
 type triggeredSizeDesc struct {
-	RemoteCache       *ttlcache.Cache
+	RemoteCache       *utils.Cache[int64]
 	CurrentRemoteAddr string
 	LastTimestamp     int64
 
@@ -37,7 +37,7 @@ type triggeredSizeDesc struct {
 
 type ICMPTrigger struct {
 	size         *sync.Map
-	remoteICMPIP *ttlcache.Cache
+	remoteICMPIP *utils.Cache[*remoteICMPIPDesc]
 	ctx          context.Context
 	cancel       context.CancelFunc
 }
@@ -45,7 +45,7 @@ type ICMPTrigger struct {
 func NewICMPTrigger() (*ICMPTrigger, error) {
 	trigger := &ICMPTrigger{
 		size:         new(sync.Map),
-		remoteICMPIP: ttlcache.NewCache(),
+		remoteICMPIP: utils.NewTTLCache[*remoteICMPIPDesc](),
 		ctx:          context.Background(),
 	}
 	trigger.ctx, trigger.cancel = context.WithCancel(trigger.ctx)
@@ -108,33 +108,29 @@ func (p *ICMPTrigger) handlePacket(interfaceIP net.IP, packet gopacket.Packet) {
 			icmpLayer.DstIP.String(),
 			icmpLength,
 		)
-		var desc *remoteICMPIPDesc
-		descRaw, ok := p.remoteICMPIP.Get(remoteAddr.String())
+		desc, ok := p.remoteICMPIP.Get(remoteAddr.String())
 		// 该远程IP没有记录
 		if !ok {
 			newDesc := &remoteICMPIPDesc{
 				IP:              remoteAddr,
-				ConnectionDesc:  ttlcache.NewCache(),
+				ConnectionDesc:  utils.NewTTLCache[uint16](time.Minute),
 				cacheMutex:      new(sync.Mutex),
 				connectionCache: make(map[string]uint16),
 			}
-			newDesc.ConnectionDesc.SetTTL(time.Minute)
 			// ttl到期删除
-			newDesc.ConnectionDesc.SetExpirationCallback(func(key string, value interface{}) {
+			newDesc.ConnectionDesc.SetExpirationCallback(func(key string, value uint16) {
 				newDesc.cacheMutex.Lock()
 				defer newDesc.cacheMutex.Unlock()
 				delete(newDesc.connectionCache, key)
 			})
 			// 添加
-			newDesc.ConnectionDesc.SetNewItemCallback(func(key string, value interface{}) {
+			newDesc.ConnectionDesc.SetNewItemCallback(func(key string, value uint16) {
 				newDesc.cacheMutex.Lock()
 				defer newDesc.cacheMutex.Unlock()
 				newDesc.connectionCache[key] = icmpLength
 			})
 			p.remoteICMPIP.Set(remoteAddr.String(), newDesc)
 			desc = newDesc
-		} else {
-			desc = descRaw.(*remoteICMPIPDesc)
 		}
 		desc.ConnectionDesc.Set(remoteAddr.String(), icmpLength)
 
@@ -142,19 +138,18 @@ func (p *ICMPTrigger) handlePacket(interfaceIP net.IP, packet gopacket.Packet) {
 		sizeDescRaw, ok := p.size.Load(icmpLength)
 		if !ok {
 			sDesc := &triggeredSizeDesc{
-				RemoteCache: ttlcache.NewCache(),
+				RemoteCache: utils.NewTTLCache[int64](time.Minute),
 				cacheMutex:  new(sync.Mutex),
 				addrCache:   make(map[string]int64),
 			}
-			sDesc.RemoteCache.SetTTL(time.Minute)
-			sDesc.RemoteCache.SetNewItemCallback(func(key string, value interface{}) {
+			sDesc.RemoteCache.SetNewItemCallback(func(key string, value int64) {
 				sDesc.CurrentRemoteAddr = key
 				sDesc.LastTimestamp = time.Now().Unix()
 				sDesc.cacheMutex.Lock()
 				defer sDesc.cacheMutex.Unlock()
 				sDesc.addrCache[sDesc.CurrentRemoteAddr] = sDesc.LastTimestamp
 			})
-			sDesc.RemoteCache.SetExpirationCallback(func(key string, value interface{}) {
+			sDesc.RemoteCache.SetExpirationCallback(func(key string, value int64) {
 				sDesc.cacheMutex.Lock()
 				defer sDesc.cacheMutex.Unlock()
 				delete(sDesc.addrCache, sDesc.CurrentRemoteAddr)
@@ -193,7 +188,7 @@ func (p *ICMPTrigger) getRemoteAddrDesc(i int) (*remoteICMPIPDesc, bool) {
 		return nil, false
 	}
 
-	return rDesc.(*remoteICMPIPDesc), true
+	return rDesc, true
 }
 
 type ICMPTriggerNotification struct {
@@ -219,7 +214,7 @@ func (t *ICMPTriggerNotification) Show() {
 
 func (p *ICMPTrigger) GetICMPTriggerNotification(i int) (*ICMPTriggerNotification, error) {
 	i = i + 28
-	var notif = &ICMPTriggerNotification{
+	notif := &ICMPTriggerNotification{
 		Size:      i,
 		Timestamp: time.Now().Unix(),
 	}
