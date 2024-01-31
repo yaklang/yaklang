@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bruteutils"
@@ -156,10 +157,10 @@ func (y *yakBruter) Start(targets ...string) (chan *bruteutils.BruteItemResult, 
 	go func() {
 		defer close(ch)
 
-		if y.userList == nil {
+		if funk.IsEmpty(y.userList) {
 			y.userList = []string{""}
 		}
-		if y.passList == nil {
+		if funk.IsEmpty(y.passList) {
 			y.passList = []string{""}
 		}
 
