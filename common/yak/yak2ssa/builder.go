@@ -37,10 +37,10 @@ func parseSSA(src string, force bool, prog *ssa.Program, callback func(*ssa.Func
 		}
 	}()
 
+	if prog == nil {
+		prog = ssa.NewProgram()
+	}
 	if err := frontEnd(src, force, func(ast *yak.ProgramContext) {
-		if prog == nil {
-			prog = ssa.NewProgram()
-		}
 		builder := prog.GetAndCreateMainFunctionBuilder()
 		if callback != nil {
 			callback(builder)
@@ -51,7 +51,8 @@ func parseSSA(src string, force bool, prog *ssa.Program, callback func(*ssa.Func
 		astbuilder.build(ast)
 		astbuilder.Finish()
 	}); err != nil {
-		return nil, err
+		//TODO: prog mark front error
+		return prog, nil
 	}
 
 	ssa4analyze.RunAnalyzer(prog)
