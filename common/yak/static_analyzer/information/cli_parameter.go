@@ -95,10 +95,20 @@ func ParseCliParameter(prog *ssaapi.Program) []*CliParameter {
 			// op(0) => cli.String
 			// op(1) => "arg1"
 			// op(2...) => opt
-			name := v.GetOperand(1).String()
-			if v.GetOperand(1).IsConstInst() {
-				name = v.GetOperand(1).GetConstValue().(string)
+			nameValue := v.GetOperand(1)
+			name := ""
+			if nameValue.IsConstInst() {
+				if c := nameValue.GetConst(); c.IsString() {
+					name = c.VarString()
+				}
+			} else {
+				name = nameValue.String()
 			}
+
+			if name == "" {
+				return
+			}
+
 			cli := newCliParameter(name, typ, methodTyp)
 			opLen := len(v.GetOperands())
 			// handler option
