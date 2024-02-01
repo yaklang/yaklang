@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -21,35 +22,369 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-type mitmContentReplaceRulesSortable []*ypb.MITMContentReplacer
+type Rules []*MITMReplaceRule
 
-func (a mitmContentReplaceRulesSortable) Len() int { // 重写 Len() 方法
+func NewRuleGroup(r ...*ypb.MITMContentReplacer) Rules {
+	var ret Rules
+	for _, i := range r {
+		ret = append(ret, &MITMReplaceRule{
+			MITMContentReplacer: i,
+		})
+	}
+	return ret
+}
+func (a Rules) MITMContentReplacers() []*ypb.MITMContentReplacer {
+	var ret []*ypb.MITMContentReplacer
+	for _, i := range a {
+		ret = append(ret, i.MITMContentReplacer)
+	}
+	return ret
+}
+func (a Rules) Len() int { // 重写 Len() 方法
 	return len(a)
 }
-func (a mitmContentReplaceRulesSortable) Swap(i, j int) { // 重写 Swap() 方法
+func (a Rules) Swap(i, j int) { // 重写 Swap() 方法
 	a[i], a[j] = a[j], a[i]
 }
-func (a mitmContentReplaceRulesSortable) Less(i, j int) bool { // 重写 Less() 方法， 从大到小排序
+func (a Rules) Less(i, j int) bool { // 重写 Less() 方法， 从大到小排序
 	return a[i].Index < a[j].Index
 }
 
-func sortContentReplacer(i []*ypb.MITMContentReplacer) []*ypb.MITMContentReplacer {
-	sort.Stable(mitmContentReplaceRulesSortable(i))
+type MITMReplaceRule struct {
+	*ypb.MITMContentReplacer
+	cache *regexp2.Regexp
+}
+type PacketInfo struct {
+	IsRequest     bool
+	GzipHeader    string
+	ChunkedHeader string
+	Method        string
+	RequestURI    string
+	Proto         string
+	Headers       [][2]string
+	Cookies       []*http.Cookie
+	HeaderRaw     string
+	BodyRaw       []byte
+}
+
+func (r *MITMReplaceRule) compile() (*regexp2.Regexp, error) {
+	if r.cache != nil {
+		return r.cache, nil
+	}
+
+	opt := regexp2.ECMAScript | regexp2.Multiline
+	var rule string
+	if strings.HasPrefix(r.Rule, "(?") {
+		rightParenIndex := strings.IndexRune(r.Rule, ')')
+		modes := r.Rule[2:rightParenIndex]
+		for _, mode := range strings.Split(modes, "") {
+			switch mode {
+			case "i":
+				opt |= regexp2.IgnoreCase
+			case "s":
+				opt |= regexp2.Singleline
+			case "m":
+				opt |= regexp2.Multiline
+			case "n":
+				opt |= regexp2.ExplicitCapture
+			case "c":
+				opt |= regexp2.Compiled
+			case "x":
+				opt |= regexp2.IgnorePatternWhitespace
+			case "r":
+				opt |= regexp2.RightToLeft
+			}
+		}
+		rule = r.Rule[rightParenIndex+1:]
+	} else {
+		rule = r.Rule
+	}
+
+	re, err := regexp2.Compile(rule, regexp2.RegexOptions(opt))
+	if err != nil {
+		log.Debugf("regexp2 compile %v failed: %s", rule, err)
+		re, err = regexp2.Compile(regexp2.Escape(r.Rule), regexp2.RegexOptions(opt))
+		if err != nil {
+			return nil, err
+		} else {
+			r.cache = re
+			return re, nil
+		}
+	}
+	r.cache = re
+	return re, nil
+}
+func (m *MITMReplaceRule) matchByPacketInfo(info *PacketInfo) ([]*regexp2.Match, error) {
+	r, err := m.compile()
+	if err != nil {
+		return nil, err
+	}
+	if info.IsRequest && !m.EnableForRequest {
+		return nil, nil // match nothing
+	}
+	if !info.IsRequest && !m.EnableForResponse {
+		return nil, nil // match nothing
+	}
+	var items [][]byte
+	if info.IsRequest {
+		enableUri := m.EnableForURI
+		if m.EnableForHeader {
+			enableUri = false
+			items = append(items, []byte(info.HeaderRaw))
+		}
+		if enableUri {
+			items = append(items, []byte(info.RequestURI))
+		}
+		if m.EnableForBody {
+			items = append(items, info.BodyRaw)
+		}
+	} else {
+		if m.EnableForHeader {
+			items = append(items, []byte(info.HeaderRaw))
+		}
+		if m.EnableForBody {
+			items = append(items, info.BodyRaw)
+		}
+	}
+	var res []*regexp2.Match
+	for _, data := range items {
+		match, err := r.FindStringMatch(utils.UnsafeBytesToString(data))
+		if err != nil {
+			return nil, err
+		}
+		if match == nil {
+			continue
+		}
+		var ret string
+		for ; err == nil && match != nil; match, err = r.FindNextMatch(match) {
+			if match.GroupCount() > 1 {
+				extractGroup := match.GroupByNumber(1)
+				if extractGroup != nil {
+					ret = extractGroup.String()
+				}
+			} else {
+				ret = match.String()
+			}
+			if ret == "" {
+				continue
+			}
+			res = append(res, match)
+		}
+	}
+	return res, nil
+}
+func (m *MITMReplaceRule) splitPacket(packet []byte) (*PacketInfo, error) {
+	info := &PacketInfo{}
+	headerRaw, bodyRaw := lowhttp.SplitHTTPHeadersAndBodyFromPacketEx(
+		packet, func(method string, requestUri string, proto string) error {
+			info.RequestURI = requestUri
+			info.Method = method
+			info.Proto = proto
+			return nil
+		}, func(line string) {
+			key, value := lowhttp.SplitHTTPHeader(line)
+			info.Headers = append(info.Headers, [2]string{key, value})
+			switch strings.ToLower(key) {
+			case "transfer-encoding":
+				if utils.IContains(value, "chunked") {
+					info.ChunkedHeader = key
+				}
+			case "content-encoding":
+				if value == "gzip" {
+					info.GzipHeader = key
+				}
+			case "cookie":
+				info.Cookies = append(info.Cookies, lowhttp.ParseCookie(value)...)
+			}
+		})
+	if info.ChunkedHeader != "" {
+		unchunked, err := codec.HTTPChunkedDecode(bodyRaw)
+		if err == nil {
+			bodyRaw = unchunked
+			headerRaw = string(lowhttp.DeleteHTTPPacketHeader([]byte(headerRaw), info.ChunkedHeader))
+		}
+	}
+	if info.GzipHeader != "" {
+		ungzip, err := utils.GzipDeCompress(bodyRaw)
+		if err == nil {
+			bodyRaw = ungzip
+			headerRaw = string(lowhttp.DeleteHTTPPacketHeader([]byte(headerRaw), info.ChunkedHeader))
+		}
+	}
+	info.HeaderRaw = headerRaw
+	info.BodyRaw = bodyRaw
+	if strings.HasPrefix(info.Proto, "HTTP") {
+		info.IsRequest = true
+	}
+	return info, nil
+}
+func (m *MITMReplaceRule) MatchPacket(packet []byte, isReq bool) ([]*regexp2.Match, error) {
+	var originPacket = packet // backup origin packet
+	if !isReq {
+		originDecoded, _, err := lowhttp.FixHTTPResponse(originPacket)
+		if err != nil {
+			return nil, fmt.Errorf("fix http response failed: %v", err)
+		}
+		packet = originDecoded
+	}
+	// parse http packet
+	packetInfo, err := m.splitPacket(packet)
+	if err != nil {
+		return nil, err
+	}
+	packetInfo.IsRequest = isReq
+	return m.matchByPacketInfo(packetInfo)
+}
+
+// MatchAndReplacePacket match and replace package, return matched result and replaced package
+func (m *MITMReplaceRule) MatchAndReplacePacket(packet []byte, isReq bool) ([]*regexp2.Match, []byte, error) {
+	var originPacket = packet // backup origin packet
+	if !isReq {
+		originDecoded, _, err := lowhttp.FixHTTPResponse(originPacket)
+		if err != nil {
+			return nil, nil, fmt.Errorf("fix http response failed: %v", err)
+		}
+		packet = originDecoded
+	}
+	// parse http packet
+	packetInfo, err := m.splitPacket(packet)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	packetInfo.IsRequest = isReq
+
+	matched, err := m.matchByPacketInfo(packetInfo)
+	if err != nil {
+		return nil, nil, err
+	}
+	// if not matched, skip replace step
+	if len(matched) <= 0 {
+		return matched, originPacket, nil
+	}
+
+	replaceHeadersByKV := false
+	if m.ExtraHeaders != nil || m.ExtraCookies != nil {
+		replaceHeadersByKV = true
+	}
+	re, err := m.compile()
+	if err != nil {
+		return nil, nil, fmt.Errorf("compile rule failed: %v", err)
+	}
+	headerRaw := packetInfo.HeaderRaw
+	bodyRaw := packetInfo.BodyRaw
+	if replaceHeadersByKV {
+		if !packetInfo.IsRequest {
+			return nil, nil, errors.New("replace headers by kv only support request")
+		}
+		var buf bytes.Buffer
+		// write first line
+		buf.Write([]byte(fmt.Sprintf("%v %v %v", packetInfo.Method, packetInfo.RequestURI, packetInfo.Proto)))
+		buf.WriteString(lowhttp.CRLF)
+		var extCookies []*http.Cookie // cookie config covert to http.Cookie
+		for _, c := range m.ExtraCookies {
+			tc := &http.Cookie{
+				Name:     c.Key,
+				Value:    c.Value,
+				Path:     c.Path,
+				Domain:   c.Domain,
+				Expires:  time.Unix(c.Expires, 0),
+				MaxAge:   int(c.MaxAge),
+				Secure:   c.Secure,
+				HttpOnly: c.HttpOnly,
+			}
+			switch c.SameSiteMode {
+			case "default":
+				tc.SameSite = http.SameSiteDefaultMode
+			case "lax":
+				tc.SameSite = http.SameSiteLaxMode
+			case "strict":
+				tc.SameSite = http.SameSiteStrictMode
+			case "none":
+				tc.SameSite = http.SameSiteNoneMode
+			default:
+				if c.SameSiteMode != "" {
+					log.Errorf("invalid same site mode: %s", c.SameSiteMode)
+				}
+			}
+			extCookies = append(extCookies, tc)
+		}
+		var keyHeader = make(map[string]*ypb.HTTPHeader) // build map for index by key
+		for _, v := range m.ExtraHeaders {
+			keyHeader[v.Header] = v
+		}
+
+		// write headers
+		setCookie := false
+		for _, c := range packetInfo.Headers {
+			key := c[0]
+			val := c[1]
+			if strings.ToLower(key) == "cookie" {
+				buf.WriteString("Cookie: " + lowhttp.MergeCookies(append(packetInfo.Cookies, extCookies...)...))
+				buf.WriteString(lowhttp.CRLF)
+				setCookie = true
+			} else {
+				i, ok := keyHeader[key]
+				if ok {
+					buf.WriteString(fmt.Sprintf("%v: %v", key, i.Value))
+					delete(keyHeader, key) // just replace once
+				} else {
+					buf.WriteString(fmt.Sprintf("%v: %v", key, val))
+				}
+				buf.WriteString(lowhttp.CRLF)
+			}
+		}
+
+		// is origin header not contains cookie, append it
+		if len(extCookies) > 0 && !setCookie {
+			buf.WriteString("Cookie: " + lowhttp.MergeCookies(extCookies...))
+			buf.WriteString(lowhttp.CRLF)
+		}
+		buf.WriteString(lowhttp.CRLF)
+		headerRaw = buf.String()
+	} else {
+		uri := packetInfo.RequestURI
+		if isReq && m.EnableForURI {
+			uri, err = re.Replace(uri, m.Result, 0, -1)
+			if err != nil {
+				return nil, nil, fmt.Errorf("replace uri failed: %v", err)
+			}
+		}
+		headerRaw = strings.Replace(headerRaw, packetInfo.RequestURI, uri, 1)
+		if m.EnableForHeader {
+			headerRaw, err = re.Replace(packetInfo.HeaderRaw, m.Result, 0, -1)
+			if err != nil {
+				return nil, nil, fmt.Errorf("replace header failed: %v", err)
+			}
+		}
+		if m.EnableForBody {
+			body, err := re.Replace(string(bodyRaw), m.Result, 0, -1)
+			if err != nil {
+				return nil, nil, fmt.Errorf("replace body failed: %v", err)
+			}
+			bodyRaw = []byte(body)
+		}
+	}
+	modifiedPacket := lowhttp.ReplaceHTTPPacketBody([]byte(headerRaw), bodyRaw, false)
+	return matched, modifiedPacket, nil
+}
+func sortContentReplacer(i []*MITMReplaceRule) []*MITMReplaceRule {
+	sort.Stable(Rules(i))
 	return i
 }
 
 type mitmReplacer struct {
 	// 所有正常启动的规则
-	rules []*ypb.MITMContentReplacer
+	rules Rules
 	// 所有规则，包含未启用
-	allRules []*ypb.MITMContentReplacer
+	allRules Rules
 
 	// 已经启动的需要劫持修改数据包内容的规则
-	_hijackingRules []*ypb.MITMContentReplacer
+	_hijackingRules Rules
 	// 已经启动的仅需要镜像劫持的规则
-	_mirrorRules []*ypb.MITMContentReplacer
+	_mirrorRules Rules
 
-	autoSave func(...*ypb.MITMContentReplacer)
+	autoSave func(...*MITMReplaceRule)
 
 	_ruleRegexpCache *sync.Map
 }
@@ -120,12 +455,19 @@ func NewMITMReplacer(initFunc ...func() []*ypb.MITMContentReplacer) *mitmReplace
 }
 
 // LoadRules Load replacer rules, cache regexp and filtered rules
-func (m *mitmReplacer) LoadRules(rules []*ypb.MITMContentReplacer) {
+func (m *mitmReplacer) LoadRules(ruleContents []*ypb.MITMContentReplacer) {
+	var rules []*MITMReplaceRule
+	for _, i := range ruleContents {
+		rules = append(rules, &MITMReplaceRule{
+			i,
+			nil,
+		})
+	}
 	m._ruleRegexpCache = new(sync.Map)
 	m._hijackingRules = nil
 	m._mirrorRules = nil
 	m.allRules = sortContentReplacer(rules)
-	enabledRules := funk.Filter(rules, func(i *ypb.MITMContentReplacer) bool {
+	enabledRules := funk.Filter(rules, func(i *MITMReplaceRule) bool {
 		if i.Rule == "" {
 			return false
 		}
@@ -136,12 +478,12 @@ func (m *mitmReplacer) LoadRules(rules []*ypb.MITMContentReplacer) {
 		}
 
 		// 缓存
-		raw := m.getRule(i)
-		if raw == nil {
-			log.Debugf("rule: %v is disabled(cannot compiled): %v", i.VerboseName, i.Rule)
+		re, err := i.compile()
+		if err != nil {
+			log.Debugf("rule: %v(%v) is disabled(cannot compiled): %v", i.VerboseName, i.Rule, err)
 			return false
 		}
-		log.Debugf("rule: %v is enabled", raw.String())
+		log.Debugf("rule: %v is enabled", re.String())
 
 		if i.GetNoReplace() {
 			// mirror rules
@@ -153,13 +495,13 @@ func (m *mitmReplacer) LoadRules(rules []*ypb.MITMContentReplacer) {
 		}
 
 		return true
-	}).([]*ypb.MITMContentReplacer)
+	}).([]*MITMReplaceRule)
 	m.rules = sortContentReplacer(enabledRules)
 	m._mirrorRules = sortContentReplacer(m._mirrorRules)
 	m._hijackingRules = sortContentReplacer(m._hijackingRules)
 }
 
-func (m *mitmReplacer) AutoSaveCallback(f func(...*ypb.MITMContentReplacer)) {
+func (m *mitmReplacer) AutoSaveCallback(f func(...*MITMReplaceRule)) {
 	m.autoSave = f
 }
 
@@ -179,19 +521,19 @@ func (m *mitmReplacer) ClearRules() {
 
 // GetRules 获取已经缓存好的规则们
 func (m *mitmReplacer) GetRules() []*ypb.MITMContentReplacer {
-	return m.allRules
+	return m.allRules.MITMContentReplacers()
 }
 
 func (m *mitmReplacer) GetEnabledRules() []*ypb.MITMContentReplacer {
-	return m.rules
+	return m.rules.MITMContentReplacers()
 }
 
 func (m *mitmReplacer) GetMirrorRules() []*ypb.MITMContentReplacer {
-	return m._mirrorRules
+	return m._mirrorRules.MITMContentReplacers()
 }
 
 func (m *mitmReplacer) GetHijackingRules() []*ypb.MITMContentReplacer {
-	return m._hijackingRules
+	return m._hijackingRules.MITMContentReplacers()
 }
 
 func stringForSettingColor(s string, extraTag []string, flow *yakit.HTTPFlow) {
@@ -256,7 +598,6 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 		}
 	}()
 	var extracted []*yakit.ExtractedData
-	var singleExtracted *yakit.ExtractedData
 
 	if ret := httpctx.GetMatchedRule(req); len(ret) > 0 {
 		stringForSettingColor(ret[0].Color, ret[0].ExtraTag, flow)
@@ -266,27 +607,46 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 		return nil
 	}
 
-	for _, rule := range m.GetMirrorRules() {
-		r := m.getRule(rule)
-		if r == nil {
-			continue
-		}
+	for _, rule := range m._mirrorRules {
 		if !rule.EnableForRequest && !rule.EnableForResponse {
 			continue
 		}
-
+		var matchRes []*regexp2.Match
 		if rule.EnableForRequest {
-			singleExtracted = m.matchAndRenderColor(flow, r, rule, request)
-			if singleExtracted != nil {
-				extracted = append(extracted, singleExtracted)
+			res, err := rule.MatchPacket(request, true)
+			if err != nil {
+				log.Errorf("match package failed: %v", err)
+				continue
 			}
+			matchRes = append(matchRes, res...)
+		} else {
+			res, err := rule.MatchPacket(response, false)
+			if err != nil {
+				log.Errorf("match package failed: %v", err)
+				continue
+			}
+			matchRes = append(matchRes, res...)
 		}
-
-		if rule.EnableForResponse {
-			singleExtracted = m.matchAndRenderColor(flow, r, rule, response)
-			if singleExtracted != nil {
-				extracted = append(extracted, singleExtracted)
+		for _, match := range matchRes {
+			var ret string
+			if match.GroupCount() > 1 {
+				extractGroup := match.GroupByNumber(1)
+				if extractGroup != nil {
+					ret = extractGroup.String()
+				}
+			} else {
+				ret = match.String()
 			}
+
+			if ret == "" {
+				continue
+			}
+			stringForSettingColor(rule.Color, rule.ExtraTag, flow)
+			extracted = append(extracted, yakit.ExtractedDataFromHTTPFlow(
+				flow.CalcHash(), rule.VerboseName,
+				ret,
+				rule.String(),
+			))
 		}
 	}
 	return extracted
@@ -456,15 +816,15 @@ func (m *mitmReplacer) replaceBody(rule *ypb.MITMContentReplacer, bodyMerged []b
 }
 
 func (m *mitmReplacer) hook(isRequest, isResponse bool, origin []byte, args ...any) ([]*ypb.MITMContentReplacer, []byte, bool) {
-	var matchedRules []*ypb.MITMContentReplacer
+	var matchedRules Rules
 	if m == nil {
-		return matchedRules, origin, false
+		return matchedRules.MITMContentReplacers(), origin, false
 	}
-	var rules []*ypb.MITMContentReplacer
+	var rules []*MITMReplaceRule
 
-	rules = m.GetHijackingRules()
+	rules = m._hijackingRules
 	if len(rules) <= 0 {
-		return matchedRules, origin, false
+		return matchedRules.MITMContentReplacers(), origin, false
 	}
 
 	var originPacket = origin
@@ -472,7 +832,7 @@ func (m *mitmReplacer) hook(isRequest, isResponse bool, origin []byte, args ...a
 	if isResponse {
 		originDecoded, _, err := lowhttp.FixHTTPResponse(origin)
 		if err != nil {
-			return matchedRules, origin, false
+			return matchedRules.MITMContentReplacers(), origin, false
 		}
 		origin = originDecoded
 	}
@@ -514,12 +874,13 @@ func (m *mitmReplacer) hook(isRequest, isResponse bool, origin []byte, args ...a
 	copy(bodyMerged, body)
 	headerMerged := headerRaw
 	if len(bodyMerged) <= 0 && headerMerged == "" {
-		return matchedRules, origin, false
+		return matchedRules.MITMContentReplacers(), origin, false
 	}
 
 	// 是否丢包
 	dropPacket := false
 	extraRepeat := false
+	modifiedPacket := origin
 	for _, rule := range rules {
 		if rule.NoReplace {
 			continue
@@ -527,43 +888,13 @@ func (m *mitmReplacer) hook(isRequest, isResponse bool, origin []byte, args ...a
 		if !((rule.EnableForRequest && isRequest) || (rule.EnableForResponse && isResponse) || rule.GetEnableForURI()) {
 			continue
 		}
-
-		// 如果修改了 header，将不会修改其他的了
-		// 这个优先级比较高，并且只对请求生效
-		var modified bool
-		if rule.ExtraHeaders != nil || rule.ExtraCookies != nil {
-			if isRequest && rule.EnableForHeader {
-				var matched bool
-				headerMerged, matched = m.replaceHTTPHeader(rule, headerMerged, bodyMerged, isRequest)
-				if matched {
-					modified = true
-				}
-			}
-		} else {
-			var matched bool
-			if rule.GetEnableForURI() && isRequest {
-				// 如果是请求，需要判断是否匹配了 uri
-				headerMerged, matched = m.replaceURIInHeader(rule, headerMerged, isRequest)
-				if matched {
-					modified = true
-				}
-			}
-
-			if rule.EnableForBody {
-				bodyMerged, matched = m.replaceBody(rule, bodyMerged)
-				if matched {
-					modified = true
-				}
-			}
-
-			if rule.EnableForHeader {
-				headerMerged, matched = m.replaceHeader(rule, headerMerged, isRequest)
-				if matched {
-					modified = true
-				}
-			}
+		matched, packet, err := rule.MatchAndReplacePacket(modifiedPacket, isRequest)
+		if err != nil {
+			log.Errorf("match package failed: %v", err)
+			continue
 		}
-		if modified {
+		modifiedPacket = packet
+		if len(matched) > 0 {
 			if rule.GetDrop() {
 				dropPacket = true
 			}
@@ -576,7 +907,6 @@ func (m *mitmReplacer) hook(isRequest, isResponse bool, origin []byte, args ...a
 		}
 	}
 
-	modifiedPacket := lowhttp.ReplaceHTTPPacketBody([]byte(headerMerged), bodyMerged, false)
 	if extraRepeat && isRequest {
 		var extraArgHttps bool
 		if len(args) > 0 {
@@ -599,8 +929,8 @@ func (m *mitmReplacer) hook(isRequest, isResponse bool, origin []byte, args ...a
 			}
 			_ = rsp
 		}()
-		return matchedRules, originPacket, dropPacket
+		return matchedRules.MITMContentReplacers(), originPacket, dropPacket
 	}
 
-	return matchedRules, modifiedPacket, dropPacket
+	return matchedRules.MITMContentReplacers(), modifiedPacket, dropPacket
 }

@@ -240,7 +240,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 		return nil
 	})
-	replacer.AutoSaveCallback(func(items ...*ypb.MITMContentReplacer) {
+	replacer.AutoSaveCallback(func(items ...*MITMReplaceRule) {
 		if len(items) <= 0 {
 			yakit.SetKey(s.GetProfileDatabase(), MITMReplacerKeyRecords, "[]")
 			return
