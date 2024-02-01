@@ -3,7 +3,7 @@ package mq
 import (
 	"context"
 	"github.com/pkg/errors"
-	"github.com/streadway/amqp"
+	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/tevino/abool"
 	"github.com/yaklang/yaklang/common/log"
 	"io"

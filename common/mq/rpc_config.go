@@ -2,7 +2,7 @@ package mq
 
 import (
 	"fmt"
-	"github.com/streadway/amqp"
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 func RPCClientConfig(exchange, id string, cb func(requestId string, msg *amqp.Delivery)) BrokerConfigHandler {
