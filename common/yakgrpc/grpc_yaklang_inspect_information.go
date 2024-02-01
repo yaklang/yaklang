@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/jinzhu/gorm"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/log"
@@ -31,8 +31,9 @@ type PluginParamSelectData struct {
 	Value string `json:"value"`
 }
 
-func cliParam2grpc(params []*information.CliParameter) []*ypb.YakScriptParam {
-	ret := make([]*ypb.YakScriptParam, 0, len(params))
+func cliParam2grpc(params []*information.CliParameter) map[string]*ypb.YakScriptParam {
+	// ret := make([]*ypb.YakScriptParam, 0, len(params))
+	ret := make(map[string]*ypb.YakScriptParam, len(params))
 
 	for _, param := range params {
 		defaultValue := ""
@@ -54,7 +55,7 @@ func cliParam2grpc(params []*information.CliParameter) []*ypb.YakScriptParam {
 			extra, _ = json.Marshal(paramSelect)
 		}
 
-		ret = append(ret, &ypb.YakScriptParam{
+		ret[param.Name] = &ypb.YakScriptParam{
 			Field:        param.Name,
 			DefaultValue: string(defaultValue),
 			TypeVerbose:  param.Type,
@@ -64,7 +65,7 @@ func cliParam2grpc(params []*information.CliParameter) []*ypb.YakScriptParam {
 			Group:        param.Group,
 			ExtraSetting: string(extra),
 			MethodType:   param.MethodType,
-		})
+		}
 	}
 
 	return ret
@@ -110,7 +111,7 @@ func (s *Server) YaklangInspectInformation(ctx context.Context, req *ypb.Yaklang
 	if err != nil {
 		return nil, errors.New("ssa parse error")
 	}
-	ret.CliParameter = cliParam2grpc(information.ParseCliParameter(prog))
+	ret.CliParameter = lo.Values(cliParam2grpc(information.ParseCliParameter(prog)))
 	ret.RiskInfo = riskInfo2grpc(information.ParseRiskInfo(prog), consts.GetGormCVEDatabase())
 	return ret, nil
 }
@@ -297,28 +298,26 @@ func getNeedReturn(script *yakit.YakScript) ([]*ypb.YakScriptParam, error) {
 	if err != nil {
 		return nil, utils.Wrapf(err, "get cli code from param json error")
 	}
-	needReturn := make([]*ypb.YakScriptParam, 0)
-	// need := false
-	// sort codeParameter and databaseParameter by field
-	sort.Slice(codeParameter, func(i, j int) bool {
-		return codeParameter[i].Field < codeParameter[j].Field
-	})
-	sort.Slice(databaseParameter, func(i, j int) bool {
-		return databaseParameter[i].Field < databaseParameter[j].Field
-	})
+
+	log.Infof("codeParameter: %d, databaseParameter: %d", len(codeParameter), len(databaseParameter))
+	log.Infof("codeParameter: %v", codeParameter)
+	log.Infof("databaseParameter: %v", databaseParameter)
+
+	if len(codeParameter) < len(databaseParameter) {
+		return databaseParameter, nil
+	}
 
 	// compare codeParameter and databaseParameter, and add rest in databaseParameter to needReturn
-	for i := 0; i < len(codeParameter) && i < len(databaseParameter); i++ {
-		if CompareParameter(codeParameter[i], databaseParameter[i]) {
-			needReturn = append(needReturn, databaseParameter[i])
-			// need = true
+	for _, databasePara := range databaseParameter {
+		codePara, ok := codeParameter[databasePara.Field]
+		if !ok {
+			return databaseParameter, nil
+		}
+		if CompareParameter(codePara, databasePara) {
+			return databaseParameter, nil
 		}
 	}
-	for i := len(codeParameter); i < len(databaseParameter); i++ {
-		needReturn = append(needReturn, databaseParameter[i])
-	}
-	return needReturn, nil
-
+	return nil, nil
 }
 
 func (s *Server) YaklangGetCliCodeFromDatabase(ctx context.Context, req *ypb.YaklangGetCliCodeFromDatabaseRequest) (*ypb.YaklangGetCliCodeFromDatabaseResponse, error) {
