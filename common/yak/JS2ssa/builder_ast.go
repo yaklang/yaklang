@@ -1031,6 +1031,10 @@ func (b *astbuilder) buildChainExpression(stmt *JS.ChainExpressionContext, IsVal
 	if s, ok := stmt.IdentifierName().(*JS.IdentifierNameContext); ok {
 		index = b.EmitConstInst(s.GetText())
 	}
+	if expr == nil {
+		log.Errorf("chain expression is nil")
+		return nil, nil
+	}
 
 	if IsValue {
 		lv := b.EmitFieldMust(expr, index)

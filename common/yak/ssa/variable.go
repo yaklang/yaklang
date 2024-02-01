@@ -220,7 +220,10 @@ func (block *BasicBlock) GetValuesByVariable(name string) []Value {
 }
 
 func (b *FunctionBuilder) readVariableByBlockEx(name string, block *BasicBlock, create bool) []Value {
-	if vs := block.GetValuesByVariable(name); vs != nil {
+	if vs, ok := block.symbolTable[name]; ok {
+		if len(vs) == 1 && vs[0] == nil {
+			return nil
+		}
 		return vs
 	}
 
@@ -300,7 +303,7 @@ func (b *FunctionBuilder) readVariableByBlockEx(name string, block *BasicBlock, 
 	}
 
 	v := getValue()
-	b.writeVariableByBlock(name, v, block) // NOTE: why write when the v is nil?
+	b.writeVariableByBlock(name, v, block)
 	if v != nil {
 		return []Value{v}
 	}
