@@ -75,7 +75,7 @@ func generateServerFunc(schema *PalmRpcApiSchema, f *jen.File) *jen.File {
 		jen.Id("broker").Add(jen.Op("*")).Qual("palm/common/mq", "Broker"),
 		jen.Id("ctx").Qual("context", "Context"),
 		jen.Id("f"), jen.Id("node").String(),
-		jen.Id("delivery").Add(jen.Op("*")).Qual("github.com/streadway/amqp", "Delivery"),
+		jen.Id("delivery").Add(jen.Op("*")).Qual("github.com/rabbitmq/amqp091-go", "Delivery"),
 	)).Parens(jen.List(
 		jen.Id("message").Interface(), jen.Id("e").Error(),
 	)).Block(jen.Switch(jen.Id("f")).Block(
@@ -155,7 +155,7 @@ func JenGeneratePalmRpcBySchema(schema *PalmRpcApiSchema) ([]byte, error) {
 	//f.ImportNames(map[string]string{
 	//	"context":                   "context",
 	//	"encoding/json":             "json",
-	//	"github.com/streadway/amqp": "amqp",
+	//	amqp "github.com/rabbitmq/amqp091-go": "amqp",
 	//	"palm/common/mq":            "mq",
 	//})
 

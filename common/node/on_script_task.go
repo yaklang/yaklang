@@ -2,7 +2,7 @@ package node
 
 import (
 	"encoding/json"
-	"github.com/streadway/amqp"
+	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/spec"
 )

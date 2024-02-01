@@ -3,7 +3,7 @@ package scanrpc
 import (
 	"context"
 	"encoding/json"
-	amqp "github.com/streadway/amqp"
+	amqp "github.com/rabbitmq/amqp091-go"
 	mq "github.com/yaklang/yaklang/common/mq"
 	utils "github.com/yaklang/yaklang/common/utils"
 )
