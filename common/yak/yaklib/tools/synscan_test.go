@@ -28,7 +28,9 @@ func TestBasicSynScanIntegrate(t *testing.T) {
 		waiting:           10 * time.Second,
 		rateLimitDelayMs:  1,
 		rateLimitDelayGap: 5,
-		netInterface:      "\\Device\\NPF_{C1FDE004-CE4B-4A95-BA47-73F217173BDF}",
+		//netInterface:      "\\Device\\NPF_{6E6F3FC9-4678-48E2-B746-C5DEEFE6CDF0}",
+		//netInterface: "WLAN 4",
+		netInterface: "Radmin VPN",
 	}
 
 	res, err := _synScanDo(hostsToChan("124.222.42.210"), "80", config)

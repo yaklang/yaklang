@@ -6,9 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
-	"github.com/yaklang/yaklang/common/utils/netutil/netroute"
 	"net"
-	"runtime"
 	"time"
 )
 
@@ -79,19 +77,19 @@ func CreateConfigOptionsByIfaceName(ifaceName string) ([]ConfigOption, error) {
 	}
 	log.Infof("use net interface: %v", iface.Name)
 
-	route, err := netroute.New()
-	if err != nil {
-		return nil, errors.Errorf("create route failed: %s", err)
-	}
-	log.Debugf("start to find route for %s in %v", "ip", runtime.GOOS)
-	_, gateway, srcIP, err := route.Route(net.IPv4(0, 0, 0, 0))
-	if err != nil {
-		return nil, errors.Errorf("route to %s failed: %s", "ip", err)
-	}
+	//route, err := netroute.New()
+	//if err != nil {
+	//	return nil, errors.Errorf("create route failed: %s", err)
+	//}
+	//log.Debugf("start to find route for %s in %v", "ip", runtime.GOOS)
+	//_, gateway, srcIP, err := route.Route(net.IPv4(0, 0, 0, 0))
+	//if err != nil {
+	//	return nil, errors.Errorf("route to %s failed: %s", "ip", err)
+	//}
 	var opts = []ConfigOption{
 		WithNetInterface(iface),
-		WithGatewayIP(gateway),
-		WithDefaultSourceIP(srcIP),
+		//WithGatewayIP(gateway),
+		//WithDefaultSourceIP(srcIP),
 	}
 	return opts, nil
 }
