@@ -3,7 +3,7 @@ package synscan
 import (
 	"context"
 	"fmt"
-	uuid2 "github.com/satori/go.uuid"
+	uuid2 "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
 	"net"

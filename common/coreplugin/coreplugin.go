@@ -3,7 +3,7 @@ package coreplugin
 import (
 	"strings"
 
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -51,7 +51,7 @@ func registerBuildInPlugin(pluginType string, name string, opt ...pluginOption) 
 		Help:               config.Help,
 		Author:             "yaklang.io",
 		OnlineContributors: strings.Join(config.Author, ","),
-		Uuid:               uuid.NewV4().String(),
+		Uuid:               uuid.New().String(),
 		OnlineOfficial:     true,
 		IsCorePlugin:       true,
 		HeadImg:            `https://yaklang.oss-cn-beijing.aliyuncs.com/yaklang-avator-logo.png`,

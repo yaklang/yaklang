@@ -33,8 +33,8 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
+	uuid "github.com/google/uuid"
 	"github.com/saintfish/chardet"
-	uuid "github.com/satori/go.uuid"
 )
 
 var _FuzzerTaskSwitchMap = new(sync.Map)
@@ -199,7 +199,7 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 		MatchedByMatcher:      httpTPLmatchersResult,
 		HitColor:              req.GetHitColor(),
 	}
-	rsp.UUID = uuid.NewV4().String()
+	rsp.UUID = uuid.New().String()
 	rsp.Timestamp = start.Unix()
 	rsp.DurationMs = time.Now().Sub(start).Milliseconds()
 
@@ -787,7 +787,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			if result.Error != nil {
 				rsp := &ypb.FuzzerResponse{}
 				rsp.RequestRaw = result.RequestRaw
-				rsp.UUID = uuid.NewV4().String()
+				rsp.UUID = uuid.New().String()
 				rsp.Url = utils.EscapeInvalidUTF8Byte([]byte(result.Url))
 				rsp.Ok = false
 				rsp.Reason = result.Error.Error()
@@ -858,7 +858,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			var tooLargeHeaderFile string
 			if bodyLength := len(body); bodyLength > maxBodySize {
 				tooLarge = true
-				uid := uuid.NewV4().String()
+				uid := uuid.New().String()
 				suffix := fmt.Sprintf("%v_%v",
 					time.Now().Format(utils.DatetimePretty()),
 					uid,
@@ -955,7 +955,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				}
 			}
 
-			rsp.UUID = uuid.NewV4().String()
+			rsp.UUID = uuid.New().String()
 			rsp.Timestamp = result.Timestamp
 			rsp.DurationMs = result.DurationMs
 			rsp.Host = utils.EscapeInvalidUTF8Byte([]byte(result.Request.Header.Get("Host")))
@@ -1034,7 +1034,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 						redirectRsp.Proxy = redirectRes.Proxy
 						redirectRsp.RemoteAddr = redirectRes.RemoteAddr
 					}
-					redirectRsp.UUID = uuid.NewV4().String()
+					redirectRsp.UUID = uuid.New().String()
 					redirectRsp.Timestamp = result.Timestamp
 					redirectRsp.DurationMs = result.DurationMs
 					redirectRsp.Host = utils.EscapeInvalidUTF8Byte([]byte(lowhttp.GetHTTPPacketHeader(redirectRes.RawRequest, "Host")))

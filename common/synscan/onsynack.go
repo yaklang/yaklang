@@ -2,7 +2,7 @@ package synscan
 
 import (
 	"context"
-	"github.com/gofrs/uuid"
+	uuid "github.com/google/uuid"
 	"github.com/pkg/errors"
 	"net"
 	"time"
@@ -49,11 +49,8 @@ func (s *Scanner) UnregisterSynAckHandler(tag string) {
 }
 
 func (s *Scanner) waitOpenPort(ctx context.Context, handler synAckHandler, async bool) error {
-	id, err := uuid.NewV4()
-	if err != nil {
-		return errors.Errorf("gen uuid v4 failed: %s", err)
-	}
-	err = s.RegisterSynAckHandler(id.String(), handler)
+	id := uuid.New()
+	err := s.RegisterSynAckHandler(id.String(), handler)
 	if err != nil {
 		return errors.Errorf("register failed: %s", err)
 	}

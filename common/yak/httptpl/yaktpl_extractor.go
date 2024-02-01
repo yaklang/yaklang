@@ -3,7 +3,6 @@ package httptpl
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/antchfx/htmlquery"
 	"github.com/antchfx/xmlquery"
 	"github.com/gobwas/httphead"
 	"github.com/itchyny/gojq"
@@ -11,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/htmlquery"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"mime"
@@ -32,7 +32,7 @@ func NewExtractorFromGRPCModel(m *ypb.HTTPResponseExtractor) *YakExtractor {
 }
 
 type YakExtractor struct {
-	Id int
+	Id   int
 	Name string // name or index
 
 	// regexp

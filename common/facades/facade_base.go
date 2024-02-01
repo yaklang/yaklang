@@ -2,7 +2,7 @@ package facades
 
 import (
 	"fmt"
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -27,7 +27,7 @@ func NewNotification(t string, remoteAddr string, raw []byte, token string) *Not
 		RemoteAddr: remoteAddr,
 		Raw:        raw,
 		Token:      token,
-		Uuid:       uuid.NewV4().String(),
+		Uuid:       uuid.New().String(),
 	}
 }
 

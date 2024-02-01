@@ -11,7 +11,7 @@ import (
 
 	"time"
 
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
@@ -29,7 +29,7 @@ type Client struct {
 // NewClient create Client
 func NewClient(webhook string) *Client {
 	return &Client{
-		SessionID: uuid.NewV4().String(),
+		SessionID: uuid.New().String(),
 		Webhook:   webhook,
 	}
 }

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -20,7 +20,7 @@ func TestGRPCMUSTPASS_COMMON_ChannelControlTest(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_COMMON_HybridScan_PROGRESS(t *testing.T) {
-	id := uuid.NewV4()
+	id := uuid.New()
 	manager, err := CreateHybridTask(id.String(), context.Background())
 	if err != nil {
 		t.Error(err)

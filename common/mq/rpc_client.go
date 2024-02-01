@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/gofrs/uuid"
+	uuid "github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/streadway/amqp"
 	"github.com/tevino/abool"
@@ -58,10 +58,7 @@ func NewRPCClient(ctx context.Context, exchange string, options ...BrokerConfigH
 		return nil, errors.Errorf("build broker failed: %v", err)
 	}
 
-	id, err := uuid.NewV4()
-	if err != nil {
-		return nil, errors.Errorf("build uuid failed: %v", err)
-	}
+	id := uuid.New()
 
 	return NewRPCClientWithBroker(broker, exchange, id.String())
 }
@@ -115,11 +112,7 @@ func (r *RPCClient) request(rootCtx context.Context, f, node string, req interfa
 		return nil, errors.Errorf("Marshal json buf msg failed: %s", err)
 	}
 
-	uid, err := uuid.NewV4()
-	if err != nil {
-		return nil, errors.Errorf("get uuid4 failed: %s", err)
-	}
-
+	uid := uuid.New()
 	msg := amqp.Publishing{
 		CorrelationId: uid.String(),
 		Timestamp:     time.Now(),

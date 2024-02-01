@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/crep"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
@@ -77,7 +77,7 @@ func (s *ScanNode) initScanRPC() {
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
-		taskId := fmt.Sprintf("scan-fingerprint-[H:%v P:%v]-[%v]", req.Hosts, req.Ports, uuid.NewV4().String())
+		taskId := fmt.Sprintf("scan-fingerprint-[H:%v P:%v]-[%v]", req.Hosts, req.Ports, uuid.New().String())
 		manager.Add(taskId, &Task{
 			TaskType: "scan-fingerprint",
 			TaskId:   taskId,
@@ -162,7 +162,7 @@ func (s *ScanNode) initScanRPC() {
 	}
 	scanHelper.DoSCAN_ProxyCollector = func(ctx context.Context, node string, req *scanrpc.SCAN_ProxyCollectorRequest, broker *mq.Broker) (*scanrpc.SCAN_ProxyCollectorResponse, error) {
 		ctx, cancel := context.WithCancel(ctx)
-		taskId := fmt.Sprintf("proxy-collector-[Port:%v]-[%v]", req.Port, uuid.NewV4().String())
+		taskId := fmt.Sprintf("proxy-collector-[Port:%v]-[%v]", req.Port, uuid.New().String())
 		manager.Add(taskId, &Task{
 			TaskType: "proxy-collector",
 			TaskId:   taskId,

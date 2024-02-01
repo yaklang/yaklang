@@ -1,7 +1,7 @@
 package luaast
 
 import (
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 	lua "github.com/yaklang/yaklang/common/yak/antlr4Lua/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"strings"
@@ -45,7 +45,7 @@ func (l *LuaTranslator) VisitFuncNameAndBody(name lua.IFuncnameContext, body lua
 	}
 
 	recoverCodeStack := l.SwitchCodes()
-	recoverSymbolTable := l.SwitchSymbolTable("function", uuid.NewV4().String())
+	recoverSymbolTable := l.SwitchSymbolTable("function", uuid.New().String())
 
 	if parList := t.Parlist(); parList != nil { // have arg
 		paramsSymbol, isVariable = l.VisitParList(parList)
@@ -167,7 +167,7 @@ func (l *LuaTranslator) VisitLocalFuncNameAndBody(name string, body lua.IFuncbod
 	}
 
 	recoverCodeStack := l.SwitchCodes()
-	recoverSymbolTable := l.SwitchSymbolTable("function", uuid.NewV4().String())
+	recoverSymbolTable := l.SwitchSymbolTable("function", uuid.New().String())
 	defer recoverSymbolTable()
 
 	if parList := t.Parlist(); parList != nil { // have arg
@@ -241,7 +241,7 @@ func (l *LuaTranslator) VisitFunctionDef(def lua.IFunctiondefContext) interface{
 	var isVariable bool
 
 	recoverCodeStack := l.SwitchCodes()
-	recoverSymbolTable := l.SwitchSymbolTable("function", uuid.NewV4().String())
+	recoverSymbolTable := l.SwitchSymbolTable("function", uuid.New().String())
 	defer recoverSymbolTable()
 
 	if parList := t.Parlist(); parList != nil { // have arg

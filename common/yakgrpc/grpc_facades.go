@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/cybertunnel"
 	"github.com/yaklang/yaklang/common/facades"
@@ -158,7 +158,7 @@ func (s *Server) ConfigGlobalReverse(req *ypb.ConfigGlobalReverseParams, stream 
 		for {
 			err := cybertunnel.MirrorLocalPortToRemote(
 				"tcp", s.reverseServer.Port, remoteReversePort,
-				fmt.Sprintf("yakit-global-%v", uuid.NewV4().String()),
+				fmt.Sprintf("yakit-global-%v", uuid.New().String()),
 				req.GetConnectParams().GetAddr(), req.GetConnectParams().GetSecret(),
 				stream.Context(), func(remoteAddr string, localAddr string) {
 					remoteAddrConvertor.SetWithTTL(localAddr, remoteAddr, 30*time.Second)

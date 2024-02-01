@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/fp"
@@ -96,7 +96,7 @@ func GetExtYakitLibByOutput(Output func(d any) error) map[string]interface{} {
 			tableData.Data = map[string]interface{}{}
 		}
 		if tableData.Data["uuid"] == nil {
-			tableData.Data["uuid"] = uuid.NewV4().String()
+			tableData.Data["uuid"] = uuid.New().String()
 		}
 		Output(tableData)
 		return nil

@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/google/shlex"
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -38,7 +38,7 @@ func status(verbose string, desc string) string {
 func (s *Server) execRequest(req *ypb.ExecRequest, moduleName string, ctx context.Context, handler func(
 	result *ypb.ExecResult, logInfo *yaklib.YakitLog,
 ) error, writer io.Writer) error {
-	runtimeId := uuid.NewV4().String()
+	runtimeId := uuid.New().String()
 
 	log.Infof("start to call exec-yak: %p", req)
 	yakEnginePath, err := os.Executable()

@@ -5,7 +5,7 @@ import (
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 )
 
 func (y *YakCompiler) VisitGoStmt(raw yak.IGoStmtContext) interface{} {
@@ -31,7 +31,7 @@ func (y *YakCompiler) VisitGoStmt(raw yak.IGoStmtContext) interface{} {
 	//  ...
 	//  call n 改成 async-call
 
-	id := fmt.Sprintf("go/%v", uuid.NewV4().String())
+	id := fmt.Sprintf("go/%v", uuid.New().String())
 	_ = id
 
 	if code := i.InstanceCode(); code != nil {

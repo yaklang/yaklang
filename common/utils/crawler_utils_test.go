@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"github.com/k0kubun/pp"
 	"testing"
 )
 
@@ -15,8 +14,6 @@ func TestMapQueryToString(t *testing.T) {
 	for result, params := range expects {
 		ret := MapQueryToString(params)
 		if result != ret {
-			pp.ColoringEnabled = false
-			t.Logf("params: %s value: %s expect %s", pp.Sprint(params), ret, result)
 			t.Fail()
 		}
 	}

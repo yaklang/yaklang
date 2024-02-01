@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -52,7 +52,7 @@ func TestDarwinSudo(t *testing.T) {
 	fp.Close()
 
 	tempDir := consts.GetDefaultYakitBaseTempDir()
-	uid := uuid.NewV4().String()
+	uid := uuid.New().String()
 	tempSudoAppDir := filepath.Join(tempDir, "macos-sudo-"+uid, "sudo.App")
 	err = ziputil.DeCompress(fp.Name(), tempSudoAppDir)
 	if err != nil {

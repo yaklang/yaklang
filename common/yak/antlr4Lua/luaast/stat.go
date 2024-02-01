@@ -2,7 +2,7 @@ package luaast
 
 import (
 	"fmt"
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	lua "github.com/yaklang/yaklang/common/yak/antlr4Lua/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
@@ -91,7 +91,7 @@ func (l *LuaTranslator) VisitStat(raw lua.IStatContext) interface{} {
 		startIndex := l.GetNextCodeIndex()
 		l.enterWhileContext(startIndex)
 
-		f := l.SwitchSymbolTableInNewScope("while-loop", uuid.NewV4().String())
+		f := l.SwitchSymbolTableInNewScope("while-loop", uuid.New().String())
 
 		exp := i.Exp(0)
 		l.VisitExp(exp)
@@ -127,7 +127,7 @@ func (l *LuaTranslator) VisitStat(raw lua.IStatContext) interface{} {
 		startIndex := l.GetNextCodeIndex()
 		l.enterWhileContext(startIndex)
 
-		f := l.SwitchSymbolTableInNewScope("repeat-loop", uuid.NewV4().String())
+		f := l.SwitchSymbolTableInNewScope("repeat-loop", uuid.New().String())
 
 		l.VisitBlock(i.Block(0))
 		// 把exp条件放进block-scope 这样在block里生命的local在until进行条件判断时仍可使用
@@ -185,7 +185,7 @@ func (l *LuaTranslator) VisitStat(raw lua.IStatContext) interface{} {
 
 	if s := i.For(); s != nil {
 		if i.Namelist() == nil && i.NAME() != nil {
-			f := l.SwitchSymbolTableInNewScope("for-numerical", uuid.NewV4().String())
+			f := l.SwitchSymbolTableInNewScope("for-numerical", uuid.New().String())
 			defer f()
 			iterateVarName := i.NAME().GetText()
 			// 把var赋值
@@ -227,7 +227,7 @@ func (l *LuaTranslator) VisitStat(raw lua.IStatContext) interface{} {
 			l.pushOperator(yakvm.OpFastAssign)
 			l.pushOpPop()
 
-			innerWhile := l.SwitchSymbolTableInNewScope("for-numerical-while-inner", uuid.NewV4().String())
+			innerWhile := l.SwitchSymbolTableInNewScope("for-numerical-while-inner", uuid.New().String())
 			innerStartIndex := l.GetNextCodeIndex()
 			l.enterWhileContext(innerStartIndex)
 
@@ -329,7 +329,7 @@ func (l *LuaTranslator) VisitStat(raw lua.IStatContext) interface{} {
 		if i.Namelist() != nil && i.Explist() != nil {
 			nameList := strings.Split(i.Namelist().GetText(), ",")
 			var nameRef []int
-			recoverSymtbl := l.SwitchSymbolTableInNewScope("for-iterate", uuid.NewV4().String())
+			recoverSymtbl := l.SwitchSymbolTableInNewScope("for-iterate", uuid.New().String())
 			defer recoverSymtbl()
 
 			l.VisitExpList(i.Explist())
@@ -351,7 +351,7 @@ func (l *LuaTranslator) VisitStat(raw lua.IStatContext) interface{} {
 				nameRef = append(nameRef, sym)
 			}
 
-			innerWhile := l.SwitchSymbolTableInNewScope("for-iterate-inner", uuid.NewV4().String())
+			innerWhile := l.SwitchSymbolTableInNewScope("for-iterate-inner", uuid.New().String())
 
 			innerStartIndex := l.GetNextCodeIndex()
 			l.enterWhileContext(innerStartIndex)

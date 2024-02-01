@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/utils"
 	"io/ioutil"
 	"os"
@@ -67,7 +67,7 @@ func (b *Backuper) Backup(ctx context.Context, path string) error {
 		return utils.Errorf("stats [%s] Err: %v", path, err)
 	}
 
-	id := uuid.NewV4().String()
+	id := uuid.New().String()
 	if stats.IsDir() {
 		// tar
 		fileName := fmt.Sprintf(".%v.tar.gz", id)
@@ -122,7 +122,7 @@ func (b *Backuper) Recover(ctx context.Context, id string) error {
 	}
 
 	if item.IsDir {
-		tmpPath := fmt.Sprintf("/tmp/%v", uuid.NewV4().String())
+		tmpPath := fmt.Sprintf("/tmp/%v", uuid.New().String())
 		_ = os.MkdirAll(tmpPath, 0777)
 		raw, err := exec.CommandContext(ctx, "tar", "-zxvf", item.BackupFilePath, "-C", tmpPath).CombinedOutput()
 		if err != nil {

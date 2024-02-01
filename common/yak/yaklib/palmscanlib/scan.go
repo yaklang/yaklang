@@ -86,7 +86,7 @@ func scanHTTPResponseToMatchResult(r *http.Response) ([]*webfingerprint.CPE, err
 //		return err
 //	}
 //
-//	rid, err := uuid.NewV4()
+//	rid, err := uuid.New()
 //	if err != nil {
 //		return err
 //	}

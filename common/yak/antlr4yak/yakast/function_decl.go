@@ -6,7 +6,7 @@ import (
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 )
 
 func (y *YakCompiler) VisitAnonymousFunctionDecl(raw yak.IAnonymousFunctionDeclContext) interface{} {
@@ -40,7 +40,7 @@ func (y *YakCompiler) VisitAnonymousFunctionDecl(raw yak.IAnonymousFunctionDeclC
 	// 切换符号表和代码栈
 
 	recoverCodeStack := y.SwitchCodes()
-	recoverSymbolTable := y.SwitchSymbolTable("function", uuid.NewV4().String())
+	recoverSymbolTable := y.SwitchSymbolTable("function", uuid.New().String())
 	defer recoverSymbolTable()
 	var paramsSymbol []int
 	var fun *yakvm.Function

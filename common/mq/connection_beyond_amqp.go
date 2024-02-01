@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 	"github.com/streadway/amqp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -329,7 +329,7 @@ func (c *Connection) init() error {
 		}),
 		WithConsumingParam(&ConsumingParam{
 			Queue:     localQueue(c.local),
-			Consumer:  uuid.NewV4().String(),
+			Consumer:  uuid.New().String(),
 			AutoACK:   false,
 			Exclusive: true,
 			Handler: func(b *Broker, conn *amqp.Connection, channel *amqp.Channel, msg amqp.Delivery) {

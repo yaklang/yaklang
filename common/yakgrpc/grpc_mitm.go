@@ -16,8 +16,8 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	uuid "github.com/google/uuid"
 	"github.com/jinzhu/gorm"
-	uuid "github.com/satori/go.uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/crep"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -1547,7 +1547,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				return tx.Commit().Error
 			}); err != nil {
 				log.Errorf("create / save httpflow from mirror error: %s", err)
-				flow.HiddenIndex = uuid.NewV4().String() + "_" + flow.HiddenIndex
+				flow.HiddenIndex = uuid.New().String() + "_" + flow.HiddenIndex
 			}
 
 			if GoColor {
