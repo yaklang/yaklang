@@ -30,14 +30,14 @@ func (b *FunctionBuilder) ReadValueByVariable(v *Variable) Value {
 // WriteVariable write value to variable
 // will create Variable  and assign value
 func (b *FunctionBuilder) WriteVariable(name string, value Value) {
-	scope := b.CurrentBlock.ScopeTable
-	scope.WriteVariable(name, value)
+	ret := b.CreateVariable(name)
+	b.AssignVariable(ret, value)
 }
 
 // WriteLocalVariable write value to local variable
 func (b *FunctionBuilder) WriteLocalVariable(name string, value Value) {
-	scope := b.CurrentBlock.ScopeTable
-	scope.WriteLocalVariable(name, value)
+	ret := b.CreateLocalVariable(name)
+	b.AssignVariable(ret, value)
 }
 
 // ------------------- Assign
@@ -54,11 +54,15 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 func (b *FunctionBuilder) CreateVariable(name string) *Variable {
 	scope := b.CurrentBlock.ScopeTable
 	// return scope.CreateVariable(name, nil).(*Variable)
-	return scope.CreateVariable(name).(*Variable)
+	ret := scope.CreateVariable(name).(*Variable)
+	ret.SetDefRange(b.CurrentRange)
+	return ret
 }
 
 // CreateLocalVariable create local variable
 func (b *FunctionBuilder) CreateLocalVariable(name string) *Variable {
 	scope := b.CurrentBlock.ScopeTable
-	return scope.CreateLocalVariable(name).(*Variable)
+	ret := scope.CreateLocalVariable(name).(*Variable)
+	ret.SetDefRange(b.CurrentRange)
+	return ret
 }

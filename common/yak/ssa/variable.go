@@ -15,11 +15,14 @@ var _ ssautil.VersionedIF[Value] = (*Variable)(nil)
 func NewVariable(globalIndex int, name string, local bool, scope *ssautil.ScopedVersionedTable[Value]) ssautil.VersionedIF[Value] {
 	ret := &Variable{
 		Versioned: ssautil.NewVersioned[Value](globalIndex, name, local, scope).(*ssautil.Versioned[Value]),
-		DefRange:  &Range{},
+		DefRange:  nil,
 		UseRange:  map[*Range]struct{}{},
 	}
 	return ret
+}
 
+func (v *Variable) SetDefRange(r *Range) {
+	v.DefRange = r
 }
 
 func (v *Variable) Assign(value Value) error {
