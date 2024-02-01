@@ -10,6 +10,7 @@ const (
 	OpFunction     = "Function"
 	OpBasicBlock   = "BasicBlock"
 	OpParameter    = "Parameter"
+	OpFreeValue    = "FreeValue"
 	OpExternLib    = "ExternLib"
 	OpPhi          = "Phi"
 	OpConstInst    = "ConstInst"
@@ -35,9 +36,14 @@ const (
 	OpSwitch       = "Switch"
 )
 
-func (i *Function) GetOpcode() Opcode     { return OpFunction }
-func (i *BasicBlock) GetOpcode() Opcode   { return OpBasicBlock }
-func (i *Parameter) GetOpcode() Opcode    { return OpParameter }
+func (i *Function) GetOpcode() Opcode   { return OpFunction }
+func (i *BasicBlock) GetOpcode() Opcode { return OpBasicBlock }
+func (i *Parameter) GetOpcode() Opcode {
+	if i.IsFreeValue {
+		return OpFreeValue
+	}
+	return OpParameter
+}
 func (i *ExternLib) GetOpcode() Opcode    { return OpExternLib }
 func (i *Phi) GetOpcode() Opcode          { return OpPhi }
 func (i *ConstInst) GetOpcode() Opcode    { return OpConstInst }

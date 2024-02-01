@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
 // Function builder API
@@ -15,13 +16,12 @@ type FunctionBuilder struct {
 	labels map[string]*BasicBlock
 	// defer function call
 	deferExpr []*Call // defer function, reverse  for-range
-	// unsealed block
-	unsealedBlock []*BasicBlock
 
 	// for build
-	CurrentBlock       *BasicBlock // current block to build
-	CurrentRange       *Range      // current position in source code
-	parentCurrentBlock *BasicBlock // parent build subFunction position
+	CurrentBlock *BasicBlock // current block to build
+	CurrentRange *Range      // current position in source code
+
+	parentScope *ssautil.ScopedVersionedTable[Value]
 
 	ExternInstance map[string]any
 	ExternLib      map[string]map[string]any
@@ -48,6 +48,8 @@ func NewBuilder(f *Function, parent *FunctionBuilder) *FunctionBuilder {
 		b.ExternInstance = parent.ExternInstance
 		b.ExternLib = parent.ExternLib
 		b.DefineFunc = parent.DefineFunc
+		// sub scope
+		b.parentScope = parent.CurrentBlock.ScopeTable
 	}
 
 	// b.ScopeStart()
@@ -69,6 +71,17 @@ func (b *FunctionBuilder) NewFunc(name string) *Function {
 	return f
 }
 
+// function stack
+func (b *FunctionBuilder) PushFunction(newFunc *Function) *FunctionBuilder {
+	build := NewBuilder(newFunc, b)
+	build.EnterBlock.ScopeTable = build.parentScope.CreateSubScope()
+	return build
+}
+
+func (b *FunctionBuilder) PopFunction() *FunctionBuilder {
+	return b.parentBuilder
+}
+
 // handler current function
 
 // function param
@@ -77,18 +90,9 @@ func (b FunctionBuilder) HandlerEllipsis() {
 	b.hasEllipsis = true
 }
 
-// get parent function
-func (b FunctionBuilder) GetParentBuilder() *FunctionBuilder {
-	return b.parentBuilder
-}
-
 // add current function defer function
 func (b *FunctionBuilder) AddDefer(call *Call) {
 	b.deferExpr = append(b.deferExpr, call)
-}
-
-func (b *FunctionBuilder) AddUnsealedBlock(block *BasicBlock) {
-	b.unsealedBlock = append(b.unsealedBlock, block)
 }
 
 // finish current function builder
@@ -169,18 +173,6 @@ func (b *FunctionBuilder) SetDefineFunc() {
 			}
 		}
 	}
-}
-
-// function stack
-func (b *FunctionBuilder) PushFunction(newFunc *Function, block *BasicBlock) *FunctionBuilder {
-	build := NewBuilder(newFunc, b)
-	// build.parentScope = scope
-	build.parentCurrentBlock = block
-	return build
-}
-
-func (b *FunctionBuilder) PopFunction() *FunctionBuilder {
-	return b.parentBuilder
 }
 
 // for goto and label
