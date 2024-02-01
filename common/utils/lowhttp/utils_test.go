@@ -1,14 +1,14 @@
 package lowhttp
 
 import (
+	"bytes"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils"
 	"strconv"
 	"strings"
 	"testing"
-
-	"github.com/davecgh/go-spew/spew"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestExtractURLFromHTTPRequest(t *testing.T) {
@@ -236,5 +236,12 @@ Content-Encoding: gzip
 	fmt.Println(string(result))
 	if !strings.Contains(string(result), "abc") || strings.Contains(string(result), `-Encoding: gzip`) {
 		panic("clear in request error")
+	}
+}
+
+func TestSplitHTTPPacket_BlankCharacterBody(t *testing.T) {
+	_, body := SplitHTTPHeadersAndBodyFromPacketEx([]byte("HTTP/1.1 200 OK\r\nServer: Apache-Coyote/1.1\r\nSet-Cookie: OASESSIONID=abc; Path=/defaultroot\r\nContent-Type: text/html;charset=UTF-8\r\nContent-Length: 6\r\nDate: Wed, 31 Jan 2024 07:44:24 GMT\r\n\r\n\r\n\r\n\r\n"), nil)
+	if bytes.Compare(body, []byte("\r\n\r\n\r\n")) != 0 {
+		t.Fatal("split body error ")
 	}
 }
