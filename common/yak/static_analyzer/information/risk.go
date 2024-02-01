@@ -68,7 +68,7 @@ func ParseRiskInfo(prog *ssaapi.Program) []*RiskInfo {
 			riskInfo.Type = arg1
 			riskInfo.TypeVerbose = yakit.RiskTypeToVerbose(riskInfo.Type)
 		case "risk.typeVerbose":
-			riskInfo.TypeVerbose = arg1
+			riskInfo.TypeVerbose = yakit.RiskTypeToVerbose(riskInfo.Type)
 		case "risk.description":
 			riskInfo.Description = arg1
 		case "risk.solution":

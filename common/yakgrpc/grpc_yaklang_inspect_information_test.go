@@ -30,7 +30,6 @@ func yaklangInspectInformationSend(client ypb.YakClient, yakScriptType, code str
 }
 
 func CompareScriptParams(got, want []*ypb.YakScriptParam) error {
-
 	if len(got) != len(want) {
 		return utils.Errorf("cli parameter length not match")
 	}
@@ -516,7 +515,6 @@ func TestGRPCMUSTPASS_LANGUAGE_CLIALL(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-
 }
 
 func TestGRPCMUSTPASS_LANGUAGE_GetCliGRPC(t *testing.T) {
@@ -622,7 +620,6 @@ cli.String("arg", cli.setDefault("\"aaa\""),cli.setHelp("这个是参数1"),cli.
 			"", t,
 		)
 	})
-
 }
 
 func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_Risk(t *testing.T) {
@@ -681,7 +678,7 @@ func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_Risk(t *testing.T) {
 			[]*ypb.YakRiskInfo{
 				{
 					Level:       "high",
-					TypeVerbose: "typeVerbose",
+					TypeVerbose: "其他",
 					CVE:         "CVE-2020-1234",
 					Description: "description",
 					Solution:    "solution",
@@ -705,7 +702,7 @@ func TestGRPCMUSTPASS_LANGUAGE_InspectInformation_Risk(t *testing.T) {
 			[]*ypb.YakRiskInfo{
 				{
 					Level:       "high",
-					TypeVerbose: "TYPE",
+					TypeVerbose: "其他",
 					CVE:         "CVE-2020-1234",
 					Description: "description",
 					Solution:    "solution",
