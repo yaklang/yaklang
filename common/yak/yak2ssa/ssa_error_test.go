@@ -782,7 +782,7 @@ func TestClosureBinding(t *testing.T) {
 		})
 	})
 
-	t.Run("use free-value in loop-if", func(t *testing.T) {
+	t.Run("use banding free-value in loop-if", func(t *testing.T) {
 		CheckTestCase(t, TestCase{
 			code: `
 			a = () => {} 
@@ -800,6 +800,24 @@ func TestClosureBinding(t *testing.T) {
 			errs: []string{
 				"empty block",
 			},
+		})
+	})
+	t.Run("use free-value in loop-if", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+			b = () => {
+				c = a
+			}
+			a = 1
+			for i in 10 {
+				b()
+				if b {
+					b()
+				}
+				b() 
+			}
+			`,
+			errs: []string{},
 		})
 	})
 

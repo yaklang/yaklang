@@ -37,7 +37,6 @@ func (i *IdentifierLV) Assign(v Value, f *FunctionBuilder) {
 		if beforeSSAValue != nil {
 			beforeSSAValue.AddMask(v)
 			// } else {
-			// 	log.Warn("freeValueParameter is nil, conflict, side effect cannot find the relative freevalue! maybe a **BUG**")
 		}
 		f.AddSideEffect(i.name, v)
 	}
@@ -255,7 +254,9 @@ func (b *FunctionBuilder) readVariableByBlockEx(name string, block *BasicBlock, 
 						f = () => {i++; println(i)} // `println(i+1)` not `println(2)`
 					*/
 					// return value
-					return b.BuildFreeValue(name)
+					fv := b.BuildFreeValue(name)
+					fv.SetDefault(value)
+					return fv
 				}
 
 				// if can build extern value, just use it
@@ -308,7 +309,7 @@ func (b *FunctionBuilder) readVariableByBlockEx(name string, block *BasicBlock, 
 
 // --------------- `f.freeValue`
 
-func (b *FunctionBuilder) BuildFreeValue(variable string) Value {
+func (b *FunctionBuilder) BuildFreeValue(variable string) *Parameter {
 	freeValue := NewParam(variable, true, b)
 	b.FreeValues[variable] = freeValue
 	b.CurrentScope.AddVariable(NewVariable(variable, freeValue), b.CurrentRange)

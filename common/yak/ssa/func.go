@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/utils/omap"
 
 	"github.com/samber/lo"
@@ -143,11 +144,15 @@ func (f *Function) Finish() {
 		f.hasEllipsis,
 	)
 	f.SetType(funType)
-	if len(f.FreeValues) != 0 {
-		funType.SetFreeValue(
-			lo.Keys(f.FreeValues),
-		)
+	fvNames := make([]string, 0, len(f.FreeValues))
+	for name, fv := range f.FreeValues {
+		if fv.defaultValue != nil {
+			continue
+		}
+		fvNames = append(fvNames, name)
 	}
+	funType.SetFreeValue(fvNames)
+
 	if len(f.SideEffects) != 0 {
 		funType.SetSideEffect(
 			lo.MapToSlice(f.SideEffects, func(name string, _ Value) string { return name }),
