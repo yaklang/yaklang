@@ -94,7 +94,7 @@ func (s *Scanner) getDefaultEthernet(target string, dstPort int, gateway string)
 		return nil
 	}
 
-	if gateway != "" && s.iface != nil && s.iface.HardwareAddr != nil {
+	if gateway != "" && gateway != "<nil>" && s.iface != nil && s.iface.HardwareAddr != nil {
 		// 传入的网关不为空
 		srcHw := s.iface.HardwareAddr
 		dstHw, err := arpx.ArpWithTimeout(5*time.Second, s.iface.Name, gateway)
@@ -118,7 +118,7 @@ func (s *Scanner) getDefaultEthernet(target string, dstPort int, gateway string)
 
 		just try to send packet by user mode...
 	*/
-	if gateway != "" {
+	if gateway != "" && gateway != "<nil>" {
 		s.tmpTargetForDetectMAC = gateway
 	} else {
 		s.tmpTargetForDetectMAC = target
@@ -141,7 +141,7 @@ func (s *Scanner) getDefaultEthernet(target string, dstPort int, gateway string)
 	defer timer.Stop()
 	select {
 	case <-timer.C:
-		return errors.New("get default eth timeout")
+		return utils.Errorf("cannot fetch hw addr for %v[%v]", target, s.iface.Name)
 	case hw := <-s.macChan:
 		s._cache_eth = &layers.Ethernet{
 			SrcMAC:       hw[0],

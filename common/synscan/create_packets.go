@@ -19,7 +19,6 @@ func init() {
 func (s *Scanner) createTCPWithDstMac(dstIp net.IP, dstPort int, syn bool, rst bool, dstMac net.HardwareAddr, gateway string) (_ []gopacket.SerializableLayer, loopback bool, _ error) {
 	var baseLayer gopacket.SerializableLayer
 	var err error
-
 	if dstMac == nil {
 		if !utils.IsLoopback(dstIp.String()) {
 			baseLayer, err = s.getDefaultCacheEthernet(dstIp.String(), dstPort, gateway)
