@@ -28,6 +28,9 @@ type VersionedIF[T comparable] interface {
 	// local
 	GetLocal() bool
 
+	// capture
+	CaptureInScope(*ScopedVersionedTable[T]) (VersionedIF[T], bool)
+	CanCaptureInScope(*ScopedVersionedTable[T]) bool
 	// capture variable
 	SetCaptured(VersionedIF[T]) // this capture will set self, when variable create.
 	GetCaptured() VersionedIF[T]
@@ -78,7 +81,7 @@ func (v *Versioned[T]) IsNil() bool {
 	return v.Value == zero
 }
 
-func (v *Versioned[T]) GetValue() T {
+func (v *Versioned[T]) GetValue() (ret T) {
 	return v.Value
 }
 func (v *Versioned[T]) Assign(val T) error {
@@ -121,6 +124,25 @@ func (v *Versioned[T]) GetLocal() bool {
 	return v.local
 }
 
+func (v *Versioned[T]) CaptureInScope(base *ScopedVersionedTable[T]) (VersionedIF[T], bool) {
+	baseVariable := base.ReadVariable(v.GetName())
+	if baseVariable == nil {
+		// not exist in base scope, this variable just set in sub-scope,
+		// just skip
+		return nil, false
+	}
+	if baseVariable.GetCaptured() != v.GetCaptured() {
+		return nil, false
+	}
+
+	return baseVariable, true
+}
+
+func (v *Versioned[T]) CanCaptureInScope(base *ScopedVersionedTable[T]) bool {
+	_, ok := v.CaptureInScope(base)
+	return ok
+}
+
 func (v *Versioned[T]) SetCaptured(capture VersionedIF[T]) {
 	v.captureVariable = capture.GetCaptured()
 }
@@ -144,6 +166,5 @@ func (v *Versioned[T]) GetRootVersion() VersionedIF[T] {
 	return v.captureVariable
 }
 func (v *Versioned[T]) IsRoot() bool {
-	var zero VersionedIF[T]
-	return v.captureVariable == zero
+	return v.captureVariable == v
 }
