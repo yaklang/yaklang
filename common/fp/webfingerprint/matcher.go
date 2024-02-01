@@ -2,7 +2,6 @@ package webfingerprint
 
 import (
 	"fmt"
-	"github.com/gocolly/colly"
 	"github.com/jinzhu/copier"
 	"github.com/pkg/errors"
 	log "github.com/yaklang/yaklang/common/log"
@@ -59,15 +58,6 @@ func ExtractHTTPResponseInfoFromHTTPResponseWithBodySize(res *http.Response, siz
 		Status:     res.Status,
 		Header:     &res.Header,
 		Body:       body,
-		URL:        res.Request.URL,
-	}
-}
-
-func ExtractHTTPResponseInfoFromCollyHTTPResponse(res *colly.Response) *HTTPResponseInfo {
-	return &HTTPResponseInfo{
-		StatusCode: res.StatusCode,
-		Header:     res.Headers,
-		Body:       res.Body,
 		URL:        res.Request.URL,
 	}
 }
