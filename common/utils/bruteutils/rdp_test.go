@@ -3,9 +3,6 @@ package bruteutils
 import (
 	"github.com/yaklang/yaklang/common/log"
 	"testing"
-
-	"github.com/icodeface/grdp"
-	"github.com/icodeface/grdp/glog"
 )
 
 func TestRdpClient_Login(t *testing.T) {
@@ -21,10 +18,4 @@ func TestRdpClient_Login(t *testing.T) {
 
 func TestBruteItem_Result(t *testing.T) {
 	t.SkipNow()
-
-	client := grdp.NewClient("127.0.0.1:3389", glog.DEBUG)
-	err := client.Login("administrator", "123456")
-	if err != nil {
-		log.Error(err)
-	}
 }
