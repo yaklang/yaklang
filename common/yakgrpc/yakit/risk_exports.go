@@ -5,6 +5,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
+	"os"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+	"unicode/utf8"
+
+	"github.com/samber/lo"
 	uuid "github.com/satori/go.uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/cve/cveresources"
@@ -13,59 +22,68 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
-	"net/url"
-	"os"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
-	"unicode/utf8"
 )
 
-type RiskParamsOpt func(r *Risk)
+type (
+	RiskParamsOpt func(r *Risk)
+	riskType      struct {
+		Types   []string
+		Verbose string
+	}
+)
+
+var (
+	riskTypeVerboses = []*riskType{
+		{Types: []string{"sqli", "sqlinj", "sql-inj", "sqlinjection", "sql-injection"}, Verbose: "SQL注入"},
+		{Types: []string{"xss"}, Verbose: "XSS"},
+		{Types: []string{"rce", "rce-command"}, Verbose: "命令执行/注入"},
+		{Types: []string{"rce-code"}, Verbose: "代码执行/注入"},
+		{Types: []string{"lfi", "file-read", "file-download"}, Verbose: "文件包含/读取/下载"},
+		{Types: []string{"rfi"}, Verbose: "远程文件包含"},
+		{Types: []string{"file-write", "file-upload"}, Verbose: "文件写入/上传"},
+		{Types: []string{"xxe"}, Verbose: "XML外部实体攻击"},
+		{Types: []string{"unserialize", "deserialization"}, Verbose: "反序列化"},
+		{Types: []string{"unath", "unauth-access"}, Verbose: "未授权访问"},
+		{Types: []string{"path-traversal"}, Verbose: "路径遍历"},
+		{Types: []string{"info-exposure", "information-exposure"}, Verbose: "敏感信息泄漏"},
+		{Types: []string{"auth-bypass", "authentication-bypass"}, Verbose: "身份验证绕过"},
+		{Types: []string{"privilege-escalation"}, Verbose: "垂直/水平权限提升"},
+		{Types: []string{"logic"}, Verbose: "逻辑漏洞"},
+		{Types: []string{"insecure-default"}, Verbose: "默认配置漏洞"},
+		{Types: []string{"weak-password", "weak-credential"}, Verbose: "弱口令"},
+		{Types: []string{"compliance-test"}, Verbose: "合规检测"},
+		{Types: []string{"ssti"}, Verbose: "SSTI"},
+		{Types: []string{"ssrf"}, Verbose: "SSRF"},
+		{Types: []string{"csrf"}, Verbose: "CSRF"},
+		{Types: []string{"random-port-trigger[tcp]"}, Verbose: "反连[TCP]-随机端口"},
+		{Types: []string{"random-port-trigger[udp]"}, Verbose: "反连[UDP]-随机端口"},
+		{Types: []string{"reverse", "reverse-"}, Verbose: "反连[unknown]"},
+		{Types: []string{"reverse-tcp"}, Verbose: "反连[TCP]"},
+		{Types: []string{"reverse-tls"}, Verbose: "反连[TLS]"},
+		{Types: []string{"reverse-rmi"}, Verbose: "反连[RMI]"},
+		{Types: []string{"reverse-rmi-handshake"}, Verbose: "反连[RMI握手]"},
+		{Types: []string{"reverse-http"}, Verbose: "反连[HTTP]"},
+		{Types: []string{"reverse-https"}, Verbose: "反连[HTTPS]"},
+		{Types: []string{"reverse-dns"}, Verbose: "反连[DNS]"},
+		{Types: []string{"reverse-ldap"}, Verbose: "反连[LDAP]"},
+	}
+	RiskTypes = make([]string, 0)
+)
+
+func init() {
+	for _, t := range riskTypeVerboses {
+		RiskTypes = append(RiskTypes, t.Types...)
+	}
+}
 
 func RiskTypeToVerbose(i string) string {
-	switch strings.ToLower(i) {
-	case "random-port-trigger[tcp]":
-		return "反连[TCP]-随机端口"
-	case "random-port-trigger[udp]":
-		return "反连[UDP]-随机端口"
-	case "reverse":
-		fallthrough
-	case "reverse-":
-		return "反连[unknown]"
-	case "reverse-tcp":
-		return "反连[TCP]"
-	case "reverse-tls":
-		return "反连[TLS]"
-	case "reverse-rmi":
-		return "反连[RMI]"
-	case "reverse-rmi-handshake":
-		return "反连[RMI握手]"
-	case "reverse-http":
-		return "反连[HTTP]"
-	case "reverse-https":
-		return "反连[HTTPS]"
-	case "reverse-dns":
-		return "反连[DNS]"
-	case "reverse-ldap":
-		return "反连[LDAP]"
-	case "xss":
-		return "XSS"
-	case "sqli", "sqlinj", "sql-inj", "sqlinjection", "sql-injection":
-		return "SQL注入"
-	case "ssti":
-		return "SSTI"
-	case "ssrf":
-		return "SSRF"
-	case "rce":
-		return "远程代码执行"
-	case "lfi":
-		return "本地文件包含(LFI)"
-	case "rfi":
-		return "远程文件包含(RFI)"
+	i = strings.ToLower(i)
+	for _, t := range riskTypeVerboses {
+		if lo.Contains(t.Types, i) {
+			return t.Verbose
+		}
 	}
-	return strings.ToUpper(i)
+	return "其他"
 }
 
 func WithRiskParam_Payload(i string) RiskParamsOpt {
@@ -113,7 +131,7 @@ func WithRiskParam_RiskType(i string) RiskParamsOpt {
 
 func WithRiskParam_RiskVerbose(i string) RiskParamsOpt {
 	return func(r *Risk) {
-		r.RiskTypeVerbose = i
+		r.RiskTypeVerbose = RiskTypeToVerbose(i)
 	}
 }
 
@@ -366,8 +384,10 @@ func NewUnverifiedRisk(u string, token string, opts ...RiskParamsOpt) (*Risk, er
 	return r, _saveRisk(r)
 }
 
-var beforeRiskSave []func(*Risk)
-var beforeRiskSaveMutex = new(sync.Mutex)
+var (
+	beforeRiskSave      []func(*Risk)
+	beforeRiskSaveMutex = new(sync.Mutex)
+)
 
 func RegisterBeforeRiskSave(f func(*Risk)) {
 	beforeRiskSaveMutex.Lock()
@@ -425,7 +445,6 @@ func _saveRisk(r *Risk) error {
 		}
 		return nil
 	}
-
 }
 
 func NewPublicReverseProtoUrl(proto string) func(opts ...RiskParamsOpt) string {
@@ -466,12 +485,12 @@ func HaveReverseRisk(token string) bool {
 	if token == "" {
 		return false
 	}
-	var db = consts.GetGormProjectDatabase()
+	db := consts.GetGormProjectDatabase()
 	if db == nil {
 		return false
 	}
 
-	var retryCount = 0
+	retryCount := 0
 	for {
 		retryCount++
 		var count int
@@ -511,7 +530,7 @@ func _fetBridgeAddrAndSecret() (string, string, error) {
 }
 
 func NewDNSLogDomainWithContext(ctx context.Context) (domain string, token string, _ error) {
-	var counter = 0
+	counter := 0
 	for {
 		counter++
 		domain, token, _, err := cybertunnel.RequireDNSLogDomainByRemote(consts.GetDefaultPublicReverseServer(), "")
@@ -530,8 +549,9 @@ func NewDNSLogDomainWithContext(ctx context.Context) (domain string, token strin
 		return domain, token, nil
 	}
 }
+
 func NewDNSLogDomain() (domain string, token string, _ error) {
-	var counter = 0
+	counter := 0
 	for {
 		counter++
 		domain, token, _, err := cybertunnel.RequireDNSLogDomainByRemote(consts.GetDefaultPublicReverseServer(), "")
@@ -554,7 +574,7 @@ func CheckDNSLogByToken(token string, timeout ...float64) ([]*tpb.DNSLogEvent, e
 	if f <= 0 {
 		f = 5.0
 	}
-	var counter = 0
+	counter := 0
 	for {
 		counter++
 		if counter > 3 {
@@ -647,8 +667,8 @@ func CheckRandomTriggerByToken(t string) (*tpb.RandomPortTriggerEvent, error) {
 		return nil, utils.Errorf("no result in 60s!")
 	}
 
-	var maybeScanner = ""
-	var maybeScannerVerbose = ""
+	maybeScanner := ""
+	maybeScannerVerbose := ""
 	if event.CurrentRemoteCachedConnectionCount > 50 {
 		maybeScanner = fmt.Sprintf(", Maybe Scanner [%v's connection count: %v in one minute]", event.RemoteIP, event.CurrentRemoteCachedConnectionCount)
 		maybeScanner = fmt.Sprintf(" (疑似扫描器 [该 IP[%v] 一分钟内缓存 %v 个连接])", event.RemoteIP, event.CurrentRemoteCachedConnectionCount)
