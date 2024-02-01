@@ -25,13 +25,6 @@ func (v *Variable) SetDefRange(r *Range) {
 	v.DefRange = r
 }
 
-func (v *Variable) Assign(value Value) error {
-	value.GetProgram().SetInstructionWithName(v.GetName(), value)
-	v.Versioned.Assign(value)
-	value.AddVariable(v)
-	return nil
-}
-
 func (v *Variable) AddRange(p *Range, force bool) {
 	if force || len(*p.SourceCode) == len(v.GetName()) {
 		v.UseRange[p] = struct{}{}

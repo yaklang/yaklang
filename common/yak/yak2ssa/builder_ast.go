@@ -789,13 +789,7 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 		if text == "_" {
 			// return ssa.NewIdentifierLV("_", b.CurrentRange)
 		}
-		if forceAssign {
-			// b.SetScopeLocalVariable(text)
-			// return ssa.NewIdentifierLV(text, b.CurrentRange)
-			return b.CreateLocalVariable(text)
-		} else {
-			return b.CreateVariable(text)
-		}
+		return b.CreateVariable(text, forceAssign)
 
 		// lv := ssa.NewIdentifierLV(text, b.CurrentRange)
 		// if i := b.TryBuildExternValue(text); i != nil {
@@ -1246,9 +1240,8 @@ func (b *astbuilder) buildInstanceCode(stmt *yak.InstanceCodeContext) *ssa.Call 
 	defer recoverRange()
 
 	newFunc := b.NewFunc("")
-	current := b.CurrentBlock
 	{
-		b.FunctionBuilder = b.PushFunction(newFunc, current)
+		b.FunctionBuilder = b.PushFunction(newFunc)
 
 		if block, ok := stmt.Block().(*yak.BlockContext); ok {
 			b.buildBlock(block)
@@ -1270,11 +1263,10 @@ func (b *astbuilder) buildAnonymousFunctionDecl(stmt *yak.AnonymousFunctionDeclC
 		funcName = name.GetText()
 	}
 	newFunc := b.NewFunc(funcName)
-	current := b.CurrentBlock
 	{
 		recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 
-		b.FunctionBuilder = b.PushFunction(newFunc, current)
+		b.FunctionBuilder = b.PushFunction(newFunc)
 
 		if stmt.EqGt() != nil {
 			if stmt.LParen() != nil && stmt.RParen() != nil {

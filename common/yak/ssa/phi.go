@@ -37,6 +37,8 @@ func generalPhi(builder *FunctionBuilder) func(name string, t []Value) Value {
 		if phi == nil {
 			return nil
 		}
+		phi.GetProgram().SetVirtualRegister(phi)
+		phi.GetProgram().SetInstructionWithName(name, phi)
 		return phi
 	}
 }
