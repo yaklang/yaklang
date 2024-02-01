@@ -1,7 +1,7 @@
 package yakgrpc
 
 import (
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
@@ -123,7 +123,7 @@ func (s *Server) ExecuteBatchPacketYakScript(req *ypb.ExecuteBatchPacketYakScrip
 				return
 			}
 
-			taskId := uuid.NewV4().String()
+			taskId := uuid.New().String()
 			err = s.execRequest(
 				&ypb.ExecRequest{Params: params, Script: code},
 				"exec-module",

@@ -3,8 +3,8 @@ package permutil
 import (
 	context "context"
 	"fmt"
+	uuid "github.com/google/uuid"
 	"github.com/hpcloud/tail"
-	uuid "github.com/satori/go.uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/ziputil"
@@ -47,7 +47,7 @@ func DarwinSudoRaw(
 	}
 
 	tempDir := os.TempDir()
-	uid := uuid.NewV4().String()
+	uid := uuid.New().String()
 	tempSudoAppDir := filepath.Join(tempDir, "macos-sudo-"+uid, "sudo.App")
 	err := ziputil.DeCompressFromRaw(_darwinSudoAppBytes, tempSudoAppDir)
 	if err != nil {

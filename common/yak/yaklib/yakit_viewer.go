@@ -2,7 +2,7 @@ package yaklib
 
 import (
 	"fmt"
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -62,7 +62,7 @@ func yakitTableData(tableName string, data any) *YakitFixedTableData {
 	if tableData.Data == nil {
 		tableData.Data = map[string]interface{}{}
 	}
-	tableData.Data["uuid"] = uuid.NewV4().String()
+	tableData.Data["uuid"] = uuid.New().String()
 	if yakitClientInstance != nil {
 		yakitClientInstance.Output(tableData)
 	}

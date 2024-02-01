@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
+	uuid "github.com/google/uuid"
 	"github.com/jinzhu/gorm"
-	uuid "github.com/satori/go.uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -122,7 +122,7 @@ func (p *Risk) ToGRPCModel() *ypb.Risk {
 
 func (p *Risk) BeforeSave() error {
 	if p.Hash == "" {
-		p.Hash = uuid.NewV4().String()
+		p.Hash = uuid.New().String()
 	}
 
 	p.RiskType = strings.ReplaceAll(p.RiskType, "|", "_")

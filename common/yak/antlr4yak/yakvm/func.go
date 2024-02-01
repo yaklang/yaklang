@@ -6,7 +6,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 )
 
 type Function struct {
@@ -83,7 +83,7 @@ func NewFunction(codes []*Code, tbl *SymbolTable) *Function {
 		name:        "anonymous",
 		codes:       codes,
 		symbolTable: tbl,
-		uuid:        uuid.NewV4().String(),
+		uuid:        uuid.New().String(),
 	}
 }
 

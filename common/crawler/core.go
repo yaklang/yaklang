@@ -768,7 +768,7 @@ func handleReqResultEx(r *Req, reqHandler func(*Req) bool, urlHandler func(strin
 		//		fReq.depth = r.depth
 		//		fReq.maybeLoginUsername = maybeUser
 		//		fReq.maybeLoginPassword = maybePass
-		//		foundFormRequests.Store(uuid.NewV4().String(), fReq)
+		//		foundFormRequests.Store(uuid.New().String(), fReq)
 		//	})
 		//}
 		//

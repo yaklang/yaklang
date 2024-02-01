@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
@@ -26,9 +26,9 @@ func (s *ScanNode) rpc_startScript(ctx context.Context, node string, req *scanrp
 		return nil, utils.Error("empty content")
 	}
 	rsp, err := s.rpc_invokeScript(ctx, node, &scanrpc.SCAN_InvokeScriptRequest{
-		TaskId:          uuid.NewV4().String(),
-		RuntimeId:       uuid.NewV4().String(),
-		SubTaskId:       uuid.NewV4().String(),
+		TaskId:          uuid.New().String(),
+		RuntimeId:       uuid.New().String(),
+		SubTaskId:       uuid.New().String(),
 		ScriptContent:   req.Content,
 		ScriptJsonParam: "{}",
 	}, broker)

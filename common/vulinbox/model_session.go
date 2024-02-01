@@ -1,8 +1,8 @@
 package vulinbox
 
 import (
+	uuid "github.com/google/uuid"
 	"github.com/jinzhu/gorm"
-	uuid "github.com/satori/go.uuid"
 )
 
 type Session struct {
@@ -14,7 +14,7 @@ type Session struct {
 
 func (v *VulinUser) CreateSession(dbm *dbm) (session Session, err error) {
 	session = Session{
-		Uuid:     uuid.NewV4().String(),
+		Uuid:     uuid.New().String(),
 		Username: v.Username,
 		Role:     v.Role,
 	}

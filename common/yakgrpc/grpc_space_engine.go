@@ -3,7 +3,7 @@ package yakgrpc
 import (
 	"context"
 	_ "embed"
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/spacengine/zoomeye"
@@ -47,7 +47,7 @@ var spaceEngineExecCode string
 
 func (s *Server) FetchPortAssetFromSpaceEngine(req *ypb.FetchPortAssetFromSpaceEngineRequest, stream ypb.Yak_FetchPortAssetFromSpaceEngineServer) error {
 	engine := yak.NewYakitVirtualClientScriptEngine(yaklib.NewVirtualYakitClient(stream.Send))
-	runtimeId := uuid.NewV4().String()
+	runtimeId := uuid.New().String()
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
 		engine.SetVar("FILTER", req.GetFilter())
 		engine.SetVar("SCAN_VERIFY", req.GetScanBeforeSave())

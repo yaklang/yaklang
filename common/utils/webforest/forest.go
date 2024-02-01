@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/utils"
 	"net/url"
 	"strings"
@@ -58,7 +58,7 @@ func NewWebsiteForest(size int) *WebsiteForest {
 	return &WebsiteForest{
 		MaxSize: size,
 		Roots:   make(map[string]*WebsiteNode),
-		Uuid:    uuid.NewV4().String(),
+		Uuid:    uuid.New().String(),
 	}
 }
 
@@ -89,7 +89,7 @@ func (w *WebsiteNode) toTreeItem() *treeItem {
 		Uuid:        w.Uuid,
 	}
 	if tree.Uuid == "" {
-		tree.Uuid = uuid.NewV4().String()
+		tree.Uuid = uuid.New().String()
 	}
 
 	for _, i := range w.Children {
@@ -130,14 +130,14 @@ func (w *WebsiteForest) AddNode(u string) error {
 		return utils.Errorf("add reqeust failed: %s", err)
 	}
 	if rootNode.Uuid == "" {
-		rootNode.Uuid = uuid.NewV4().String()
+		rootNode.Uuid = uuid.New().String()
 	}
 	websiteNode, err := rootNode.getOrCreateNode(urlobj.Path)
 	if err != nil {
 		return utils.Errorf("create or get website node failed: %s", urlobj.Path)
 	}
 	if websiteNode.Uuid == "" {
-		websiteNode.Uuid = uuid.NewV4().String()
+		websiteNode.Uuid = uuid.New().String()
 	}
 	websiteNode.Urls = utils.RemoveRepeatStringSlice(append(websiteNode.Urls, u))
 	//websiteNode.HTTPRequestIDs = utils.RemoveRepeatUintSlice(append(websiteNode.HTTPRequestIDs, req.ID))

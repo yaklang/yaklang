@@ -30,6 +30,7 @@ type Nodes struct {
 }
 
 func (d *Nodes) SetRoot() {
+	uuid.New()
 	d.IsRoot = true
 }
 

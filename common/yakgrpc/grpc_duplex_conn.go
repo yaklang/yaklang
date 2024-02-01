@@ -1,8 +1,8 @@
 package yakgrpc
 
 import (
+	uuid "github.com/google/uuid"
 	"github.com/samber/lo"
-	uuid "github.com/satori/go.uuid"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"sync"
@@ -78,7 +78,7 @@ func BroadcastData(typeString string, data any) {
 }
 
 func (s *Server) DuplexConnection(stream ypb.Yak_DuplexConnectionServer) error {
-	id := uuid.NewV4().String()
+	id := uuid.New().String()
 	registerServerPushCallback(id, stream)
 	defer func() {
 		unregisterServerPushCallback(id)
