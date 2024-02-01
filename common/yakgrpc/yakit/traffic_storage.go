@@ -11,8 +11,8 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	uuid "github.com/google/uuid"
 	"github.com/jinzhu/gorm"
-	uuid "github.com/satori/go.uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
@@ -231,7 +231,7 @@ func (m *TrafficStorageManager) FetchSession(hash string, packet gopacket.Packet
 			return nil, utils.Errorf("no existed session/flow: %s", hash)
 		}
 		session = &TrafficSession{
-			Uuid:                  uuid.NewV4().String(),
+			Uuid:                  uuid.New().String(),
 			SessionType:           strings.ToLower(typeStr),
 			LinkLayerSrc:          tpacket.EthernetEndpointHardwareAddrSrc,
 			LinkLayerDst:          tpacket.EthernetEndpointHardwareAddrDst,
@@ -271,7 +271,7 @@ func (m *TrafficStorageManager) CreateTCPReassembledFlow(flow *pcaputil.TrafficF
 	}
 	hash := flowHashCalc(flow.ClientConn.LocalAddr().String(), flow.ClientConn.RemoteAddr().String())
 	session := &TrafficSession{
-		Uuid:                  uuid.NewV4().String(),
+		Uuid:                  uuid.New().String(),
 		SessionType:           "tcp",
 		IsIpv4:                flow.IsIpv4,
 		IsIpv6:                flow.IsIpv6,

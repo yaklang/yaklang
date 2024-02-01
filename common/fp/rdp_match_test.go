@@ -3,8 +3,8 @@ package fp
 import (
 	"bytes"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/dlclark/regexp2"
-	"github.com/k0kubun/pp"
 	"github.com/yaklang/yaklang/common/log"
 	utils2 "github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/text/encoding/unicode"
@@ -22,18 +22,6 @@ func TestRDPRegexp2MatchFailed(t *testing.T) {
 		t.Fail()
 	}
 	//
-	//pp.Println("TARGET", []byte("Ð"), " | ", string([]byte{0xd0}))
-	//pp.Println("DATA SOURCE", []byte("\xd0"))
-	//
-	//pp.Print("\xd0 encode to ")
-	//pp.Println(UTF8Encode([]byte("\xd0")))
-	//
-	////pp.Print("     decode to ")
-	////pp.Println(unicode.UTF8.NewDecoder().Bytes([]byte("\xd0")))
-	//
-	//pp.Print("Ð encode to")
-	//pp.Println(UTF8Encode([]byte("Ð")))
-
 	log.Infof("%+q\n", "Ð")
 	log.Infof("%+q\n", "\xd0")
 	log.Infof("%+q\n", []byte("\x00\xd0")[1])
@@ -41,11 +29,8 @@ func TestRDPRegexp2MatchFailed(t *testing.T) {
 	log.Infof("%+q\n", 0xd0)
 	log.Infof("%+q\n", rune(0xd0))
 
-	//pp.Print("  decode to ")
-	//pp.Println(unicode.UTF8.NewDecoder().Bytes([]byte("Ð")))
-
 	if utils2.StringToAsciiBytes("Ð")[0] != 0xd0 {
-		log.Info(pp.Sprintln([]byte("Ð")))
+		log.Info(spew.Sprintln([]byte("Ð")))
 		t.FailNow()
 	}
 

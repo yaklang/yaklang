@@ -2,8 +2,8 @@ package utils
 
 import (
 	"context"
+	"github.com/google/uuid"
 	"github.com/hpcloud/tail"
-	uuid2 "github.com/satori/go.uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"io/ioutil"
 	"os"
@@ -42,7 +42,7 @@ func StartCacheLog(ctx context.Context, n int) {
 }
 func HandleStdout(ctx context.Context, handle func(string)) error {
 	if isInAttached.IsSet() {
-		uuid := uuid2.NewV4().String()
+		uuid := uuid.New().String()
 		attachOutputCallback.Store(uuid, func(result string) {
 			defer func() {
 				if err := recover(); err != nil {

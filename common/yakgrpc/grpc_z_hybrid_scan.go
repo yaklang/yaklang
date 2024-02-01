@@ -2,8 +2,8 @@ package yakgrpc
 
 import (
 	"context"
+	uuid "github.com/google/uuid"
 	"github.com/samber/lo"
-	uuid "github.com/satori/go.uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
@@ -162,7 +162,7 @@ func (s *Server) HybridScan(stream ypb.Yak_HybridScanServer) error {
 			}
 		}()
 	case "new":
-		taskId = uuid.NewV4().String()
+		taskId = uuid.New().String()
 		taskManager, err = CreateHybridTask(taskId, taskCtx)
 		if err != nil {
 			return err

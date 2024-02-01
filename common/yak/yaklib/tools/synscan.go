@@ -3,7 +3,7 @@ package tools
 import (
 	"context"
 	"fmt"
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/hybridscan"
 	"github.com/yaklang/yaklang/common/log"
@@ -467,7 +467,7 @@ func runScan(sampleTarget string, filteredTargetChan chan string, ports string, 
 	}
 
 	log.Infof("start submit task and scan...")
-	uid := uuid.NewV4().String()
+	uid := uuid.New().String()
 	hostsFilter := utils.NewHostsFilter()
 	portsFilter := utils.NewPortsFilter(ports)
 	stringFilter := filter.NewFilter()

@@ -1,9 +1,7 @@
 package mq
 
 import (
-	"fmt"
-	"github.com/gofrs/uuid"
-	"github.com/pkg/errors"
+	uuid "github.com/google/uuid"
 	"github.com/streadway/amqp"
 	"time"
 )
@@ -21,11 +19,7 @@ func (b *Broker) CreatePublisherFunc(exchange string, routingKey string) func(ms
 
 func (b *Broker) CreateRPCClient(exchange string, id string) (*RPCClient, error) {
 	if id == "" {
-		idObj, err := uuid.NewV4()
-		if err != nil {
-			return nil, errors.Errorf("uuid v4 failed: %v", err)
-		}
-		id = fmt.Sprintf("%v", idObj)
+		id = uuid.New().String()
 	}
 	return NewRPCClientWithBroker(b, exchange, id)
 }

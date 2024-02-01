@@ -1,7 +1,7 @@
 package openapi
 
 import (
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -34,7 +34,7 @@ func ValueViaField(field string, t string, defaults ...any) any {
 		case utils.MatchAnyOfGlob(field, "base64", "base64*", "*base64"):
 			return codec.EncodeBase64([]byte("mock_base64_data"))
 		case utils.MatchAnyOfGlob(field, "sid", "uid", "uuid", "*uid"):
-			return uuid.NewV4().String()
+			return uuid.New().String()
 		case utils.MatchAnyOfGlob(field, "nick*name", "last*name", "first*name", "name"):
 			return utils.RandChoice("Foo", "Bar", "Tom", "Jerry", "Alice", "Bob", "John", "Jane")
 		case utils.MatchAnyOfGlob(field, "user*name", "user", "username", "userid", "user*id"):

@@ -3,7 +3,7 @@ package vulinbox
 import (
 	"encoding/json"
 	"fmt"
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
@@ -27,7 +27,7 @@ func (s *VulinServer) registerSSRF() {
 
 	ssrfGroup.HandleFunc("/flag", func(writer http.ResponseWriter, request *http.Request) {
 		if strings.Contains(request.Host, "127.0.0.1") {
-			uuid := uuid.NewV4().String()
+			uuid := uuid.New().String()
 			DefaultRender(fmt.Sprintf("flag{%s}", uuid), writer, request)
 			return
 		}

@@ -283,7 +283,7 @@ func DrawPackagesDOT(pkgs []*dxtypes.Package) {
 	// if err != nil {
 	// 	return
 	// }
-	// uuid, err := uuid.NewV4()
+	// uuid, err := uuid.New()
 	// if err != nil {
 	// 	return
 	// }

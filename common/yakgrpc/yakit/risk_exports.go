@@ -13,8 +13,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/google/uuid"
 	"github.com/samber/lo"
-	uuid "github.com/satori/go.uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/cybertunnel"
@@ -319,7 +319,7 @@ func CreateRisk(u string, opts ...RiskParamsOpt) *Risk {
 
 func _createRisk(u string, opts ...RiskParamsOpt) *Risk {
 	r := &Risk{
-		Hash: uuid.NewV4().String(),
+		Hash: uuid.New().String(),
 	}
 
 	if utils.IsIPv4(u) {

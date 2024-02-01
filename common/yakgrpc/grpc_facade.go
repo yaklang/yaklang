@@ -3,7 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -74,7 +74,7 @@ func (s *Server) RegisterFacadesHTTP(ctx context.Context, req *ypb.RegisterFacad
 	if req.GetUrl() != "" {
 		urlStr = req.GetUrl()
 	}
-	uid := uuid.NewV4().String()
+	uid := uuid.New().String()
 	path := fmt.Sprintf("/%v", uid)
 	urlIns, err := url.Parse(urlStr)
 	if err != nil {

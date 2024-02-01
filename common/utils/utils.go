@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/progresswriter"
@@ -144,7 +144,7 @@ func GetMachineCode() string {
 		if raw != nil {
 			mid = EscapeInvalidUTF8Byte(raw)
 		} else {
-			mid = uuid.NewV4().String()
+			mid = uuid.New().String()
 			_ = ioutil.WriteFile(fileName, []byte(mid), 0666)
 		}
 	}

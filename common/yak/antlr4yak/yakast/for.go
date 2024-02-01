@@ -4,7 +4,7 @@ import (
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 )
 
 type forContext struct {
@@ -82,7 +82,7 @@ func (y *YakCompiler) VisitForStmt(raw yak.IForStmtContext) interface{} {
 
 	var endThirdExpr yak.IForThirdExprContext
 
-	f := y.SwitchSymbolTableInNewScope("for-legacy", uuid.NewV4().String())
+	f := y.SwitchSymbolTableInNewScope("for-legacy", uuid.New().String())
 
 	var toEnds []*yakvm.Code
 	var conditionSymbol int
@@ -169,7 +169,7 @@ func (y *YakCompiler) VisitForRangeStmt(raw yak.IForRangeStmtContext) interface{
 		y.panicCompilerError(compileError, "for-range/in need expression in right value at least")
 	}
 
-	recoverSymtbl := y.SwitchSymbolTableInNewScope("for", uuid.NewV4().String())
+	recoverSymtbl := y.SwitchSymbolTableInNewScope("for", uuid.New().String())
 	defer recoverSymtbl()
 
 	defaultValueSymbol, err := y.currentSymtbl.NewSymbolWithReturn("_")

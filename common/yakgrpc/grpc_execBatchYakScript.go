@@ -4,7 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
@@ -168,7 +168,7 @@ func (s *Server) ExecBatchYakScript(req *ypb.ExecBatchYakScriptRequest, stream y
 		if len(lastScripts) <= 0 {
 			return
 		}
-		uid := uuid.NewV4().String()
+		uid := uuid.New().String()
 		manager.AddExecBatchTaskToPool(uid, getPercent(), yakScriptOnlineGroup, taskName, &ypb.ExecBatchYakScriptRequest{
 			Target:                req.Target,
 			ExtraParams:           req.ExtraParams,
@@ -256,7 +256,7 @@ func (s *Server) ExecBatchYakScript(req *ypb.ExecBatchYakScriptRequest, stream y
 					sendStatus()
 				}()
 
-				taskId := uuid.NewV4().String() // codec.Sha512(target + script.ScriptName + fmt.Sprint(script.Id))
+				taskId := uuid.New().String() // codec.Sha512(target + script.ScriptName + fmt.Sprint(script.Id))
 
 				/**
 				这儿需要小心点处理：

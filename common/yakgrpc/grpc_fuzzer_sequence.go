@@ -3,7 +3,7 @@ package yakgrpc
 import (
 	"encoding/json"
 	"fmt"
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -68,7 +68,7 @@ func ConvertLowhttpResponseToFuzzerResponseBase(r *lowhttp.LowhttpResponse) *ypb
 	var (
 		method  string
 		code    int64
-		uid     = uuid.NewV4().String()
+		uid     = uuid.New().String()
 		headers []*ypb.HTTPHeader
 		host    string
 		body    []byte

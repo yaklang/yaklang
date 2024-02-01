@@ -2,7 +2,7 @@ package codec
 
 import (
 	"github.com/davecgh/go-spew/spew"
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 	"testing"
 )
 
@@ -51,7 +51,7 @@ aaaacccc`))
 	}
 
 	rand1 := "asdffffffffffffffdffffffffffffffdffffffffffffffdffffffffffffffdffffffffffffffdffffffffffffffdffffffffffffffdffffffffffffffdffffffffffffffdffffffffffffffdffffffffffffff"
-	rand2 := uuid.NewV4().String()
+	rand2 := uuid.New().String()
 	results := string(HTTPChunkedEncode([]byte(rand1))) + string(HTTPChunkedEncode([]byte(rand2)))
 	rand1a, res := readHTTPChunkedData([]byte(results))
 	spew.Dump(res)

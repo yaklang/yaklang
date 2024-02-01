@@ -2,7 +2,7 @@ package vulinbox
 
 import (
 	"github.com/jinzhu/gorm"
-	// uuid "github.com/satori/go.uuid"
+	// uuid "github.com/google/uuid"
 )
 
 type UserCart struct {

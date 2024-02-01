@@ -7,7 +7,7 @@ import (
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 )
 
 type switchContext struct {
@@ -64,7 +64,7 @@ func (y *YakCompiler) _VisitSwitchStmt(raw yak.ISwitchStmtContext) interface{} {
 		switchExprIsEmpty bool
 	)
 
-	recoverSymtbl := y.SwitchSymbolTableInNewScope("switch", uuid.NewV4().String())
+	recoverSymtbl := y.SwitchSymbolTableInNewScope("switch", uuid.New().String())
 	defer recoverSymtbl()
 
 	startIndex := y.GetNextCodeIndex()
@@ -103,7 +103,7 @@ func (y *YakCompiler) _VisitSwitchStmt(raw yak.ISwitchStmtContext) interface{} {
 	nextStmtIndexs := make([]int, 0, lenOfAllCases)
 
 	for index := range allcases {
-		recoverSymtbl = y.SwitchSymbolTableInNewScope("case", uuid.NewV4().String())
+		recoverSymtbl = y.SwitchSymbolTableInNewScope("case", uuid.New().String())
 		y.writeString("case ")
 
 		var jmpToStmt []*yakvm.Code
@@ -207,7 +207,7 @@ func (y *YakCompiler) _VisitSwitchStmt(raw yak.ISwitchStmtContext) interface{} {
 
 	// 访问default statementlist
 	if i.Default() != nil {
-		recoverSymtbl = y.SwitchSymbolTableInNewScope("default", uuid.NewV4().String())
+		recoverSymtbl = y.SwitchSymbolTableInNewScope("default", uuid.New().String())
 		y.writeString("default:")
 		y.writeNewLine()
 		y.incIndent()

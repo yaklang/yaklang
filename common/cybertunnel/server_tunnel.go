@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -100,7 +100,7 @@ func RemoveTunnel(id string) {
 }
 
 func (s *TunnelServer) RegisterTunnel(ctx context.Context, req *tpb.RegisterTunnelRequest) (*tpb.RegisterTunnelResponse, error) {
-	id := uuid.NewV4().String()
+	id := uuid.New().String()
 	port := utils.GetRandomAvailableTCPPort()
 	NewTunnel(id, s.ExternalIP, port, req.GetPublicKeyPEM(), req.GetSecret(), req.GetVerbose())
 	return &tpb.RegisterTunnelResponse{

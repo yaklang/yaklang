@@ -3,7 +3,7 @@ package cybertunnel
 import (
 	"context"
 	"fmt"
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/log"
@@ -166,7 +166,7 @@ func HoldingCreateTunnelClient(
 	remoteport int, id string,
 	fs ...func(remote, local string)) error {
 	if id == "" {
-		id = uuid.NewV4().String()
+		id = uuid.New().String()
 	}
 
 	ctx, cancel := context.WithCancel(client.Context())

@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/k0kubun/pp"
+	pp "github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"

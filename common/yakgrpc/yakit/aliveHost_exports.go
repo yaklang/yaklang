@@ -1,7 +1,7 @@
 package yakit
 
 import (
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -53,7 +53,7 @@ func _saveAliveHost(r *AliveHost) error {
 
 func _createAliveHost(u string, opts ...AliveHostParamsOpt) *AliveHost {
 	r := &AliveHost{
-		Hash: uuid.NewV4().String(),
+		Hash: uuid.New().String(),
 	}
 	r.IP = u
 	r.IPInteger, _ = utils.IPv4ToUint64(u)
