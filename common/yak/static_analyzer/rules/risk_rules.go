@@ -1,20 +1,25 @@
 package rules
 
 import (
+	"strconv"
+
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/plugin_type"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
+
+var RiskTypeFuncs = []string{"risk.type", "risk.typeVerbose"}
 
 func init() {
 	plugin_type.RegisterCheckRuler(plugin_type.PluginTypeYak, RuleRisk)
+	plugin_type.RegisterCheckRuler(plugin_type.PluginTypeYak, RuleRiskTypeVerbose)
 }
 
-// 检查 cli.risk 是否符合规范
+// 检查 risk 是否符合规范
 func RuleRisk(prog *ssaapi.Program) *result.StaticAnalyzeResults {
 	ret := result.NewStaticAnalyzeResults("risk check")
-
-	// tag := "cli.risk"
 
 	checkRiskOption := func(funcName string) {
 		prog.Ref(funcName).GetUsers().Filter(func(v *ssaapi.Value) bool {
@@ -72,6 +77,37 @@ func RuleRisk(prog *ssaapi.Program) *result.StaticAnalyzeResults {
 	})
 
 	return ret
+}
+
+// 检查 risk.type 是否符合规范
+func RuleRiskTypeVerbose(prog *ssaapi.Program) *result.StaticAnalyzeResults {
+	ret := result.NewStaticAnalyzeResults("risk verbose check")
+
+	for _, funcName := range RiskTypeFuncs {
+		prog.Ref(funcName).GetUsers().Filter(func(v *ssaapi.Value) bool {
+			return v.IsCall() && v.IsReachable() != -1
+		}).ForEach(func(v *ssaapi.Value) {
+			ops := v.GetOperands()
+			if len(ops) != 2 {
+				return
+			}
+			constValue := ops[1].String()
+			unquoted, err := strconv.Unquote(constValue)
+			if err == nil {
+				constValue = unquoted
+			}
+
+			if !lo.Contains(yakit.RiskTypes, constValue) {
+				ret.NewWarn(WarnInvalidRiskTypeVerbose(), v)
+			}
+		})
+	}
+
+	return ret
+}
+
+func WarnInvalidRiskTypeVerbose() string {
+	return "risk type invalid, will be replaced with `其他`"
 }
 
 func ErrorRiskCreateNotSave() string {
