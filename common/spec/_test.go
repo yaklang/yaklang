@@ -3,20 +3,19 @@ package test
 import (
 	"context"
 	"encoding/json"
-	"github.com/streadway/amqp"
+	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/yaklang/yaklang/common/mq"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-
 type ManagerAPI_ShutdownRequest struct {
-	Name	[]string
-	Z	string
+	Name []string
+	Z    string
 }
 
 type ManagerAPI_ShutdownResponse struct {
-	Ok	bool
-	Reason	string
+	Ok     bool
+	Reason string
 }
 
 var (
@@ -25,10 +24,7 @@ var (
 	}
 )
 
-
-
 type ManagerAPIServerHelper struct {
-
 	doManagerAPI_Shutdown func(ctx context.Context, node string, req *ManagerAPI_ShutdownRequest, broker *mq.Broker) (ManagerAPI_ShutdownResponse, error)
 }
 
@@ -55,15 +51,12 @@ func NewManagerAPIServerHelper() *ManagerAPIServerHelper {
 	return &ManagerAPIServerHelper{}
 }
 
-
-
-//
 type callRpcHandler func(ctx context.Context, funcName, node string, req interface{}) ([]byte, error)
 type ManagerAPIClientHelper struct {
 	callRpc callRpcHandler
 }
 
-func (h *ManagerAPIClientHelper) ManagerAPI_Shutdown(ctx context.Context, node string, req *ManagerAPI_ShutdownRequest) (ManagerAPI_ShutdownResponse, error){
+func (h *ManagerAPIClientHelper) ManagerAPI_Shutdown(ctx context.Context, node string, req *ManagerAPI_ShutdownRequest) (ManagerAPI_ShutdownResponse, error) {
 	rsp, err := h.callRpc(ctx, ManagerAPI_Shutdown, node, req)
 	if err != nil {
 		return nil, err

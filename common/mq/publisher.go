@@ -3,7 +3,7 @@ package mq
 import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
-	"github.com/streadway/amqp"
+	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/yaklang/yaklang/common/log"
 	"sync"
 	"time"
