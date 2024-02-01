@@ -301,7 +301,7 @@ func TestGRPCMUSTPASS_LANGUAGE_GetCliCode(t *testing.T) {
 
 func TestGRPCMUSTPASS_LANGUAGE_CLICompare(t *testing.T) {
 	// getNeedReturn
-	check := func(code string, param, want []*ypb.YakScriptParam, t *testing.T) {
+	check := func(code, want string, param []*ypb.YakScriptParam, t *testing.T) {
 		raw, _ := json.Marshal(param)
 		jsonBytes := strconv.Quote(string(raw))
 
@@ -313,8 +313,9 @@ func TestGRPCMUSTPASS_LANGUAGE_CLICompare(t *testing.T) {
 			t.Fatal(err)
 		}
 		log.Info("got: \n", ret)
-		if err := CompareScriptParams(ret, want); err != nil {
-			t.Fatal(err)
+		got := getCliCodeFromParam(ret)
+		if got != want {
+			t.Fatalf("want: \n%s, got: \n%s", want, got)
 		}
 	}
 
@@ -325,6 +326,7 @@ func TestGRPCMUSTPASS_LANGUAGE_CLICompare(t *testing.T) {
 			cli.setDefault("default variable"),
 			cli.setHelp("help information"),
 		)`,
+			``,
 			[]*ypb.YakScriptParam{
 				{
 					Field:        "arg1",
@@ -338,7 +340,6 @@ func TestGRPCMUSTPASS_LANGUAGE_CLICompare(t *testing.T) {
 					MethodType:   "string",
 				},
 			},
-			[]*ypb.YakScriptParam{},
 			t,
 		)
 	})
@@ -350,6 +351,7 @@ func TestGRPCMUSTPASS_LANGUAGE_CLICompare(t *testing.T) {
 			cli.setDefault("default variable"),
 			cli.setHelp("help information"),
 		)`,
+			``,
 			[]*ypb.YakScriptParam{
 				{
 					Field:        "arg1",
@@ -360,7 +362,6 @@ func TestGRPCMUSTPASS_LANGUAGE_CLICompare(t *testing.T) {
 					MethodType:   "string",
 				},
 			},
-			[]*ypb.YakScriptParam{},
 			t,
 		)
 	})
@@ -371,16 +372,8 @@ func TestGRPCMUSTPASS_LANGUAGE_CLICompare(t *testing.T) {
 			"arg1",
 			cli.setDefault("default variable"),
 		)`,
-			[]*ypb.YakScriptParam{
-				{
-					Field:        "arg1",
-					DefaultValue: "default variable",
-					TypeVerbose:  "string",
-					FieldVerbose: "arg1",
-					Help:         "help information",
-					MethodType:   "string",
-				},
-			},
+			`cli.String("arg1", cli.setDefault("default variable"),cli.setHelp("help information"))
+`,
 			[]*ypb.YakScriptParam{
 				{
 					Field:        "arg1",
@@ -395,6 +388,32 @@ func TestGRPCMUSTPASS_LANGUAGE_CLICompare(t *testing.T) {
 		)
 	})
 
+	t.Run("database same variable but more information", func(t *testing.T) {
+		check(`
+		domains = cli.String("domains")
+		domains = str.ParseStringToLines(domains)
+		thread = cli.Int("thread", cli.setDefault(10))
+		dnsServer = cli.String("dnsServer", cli.setDefault("114.114.114.114"))
+		dnsServer = str.Split(dnsServer, ",")
+		cli.check()
+		`,
+			`cli.Text("domains", cli.setVerboseName("域名"),cli.setRequired(true))
+cli.Int("thread", cli.setDefault(10),cli.setVerboseName("线程"),cli.setRequired(true))
+cli.String("dnsServer", cli.setDefault("114.114.114.114"),cli.setHelp("逗号分隔多个dns服务器"),cli.setVerboseName("dns服务器"))
+`,
+			[]*ypb.YakScriptParam{
+				{
+					Field: "domains", TypeVerbose: "text", FieldVerbose: "域名", Required: true,
+				},
+				{
+					Field: "thread", DefaultValue: "10", TypeVerbose: "uint", FieldVerbose: "线程", Required: true,
+				},
+				{
+					Field: "dnsServer", DefaultValue: "114.114.114.114", TypeVerbose: "string", FieldVerbose: "dns服务器", Help: "逗号分隔多个dns服务器",
+				},
+			},
+			t)
+	})
 }
 
 func TestGRPCMUSTPASS_LANGUAGE_CLIALL(t *testing.T) {
