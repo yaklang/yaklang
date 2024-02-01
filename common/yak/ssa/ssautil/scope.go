@@ -30,6 +30,7 @@ type ScopedVersionedTable[T comparable] struct {
 	// global id to versioned variable
 	table map[int]VersionedIF[T]
 
+	// for loop
 	spin           bool
 	CreateEmptyPhi func(string) T
 
@@ -117,16 +118,17 @@ func (scope *ScopedVersionedTable[T]) ReadVariable(name string) VersionedIF[T] {
 			ret = nil
 		}
 	}
-	if ret != nil && ret.GetScope() != scope && scope.spin {
-		t := scope.WriteVariable(name, scope.CreateEmptyPhi(name))
-		// t.origin = ret
-		scope.incomingPhi.Set(name, t)
-		ret = t
+	if ret != nil && ret.GetScope() != scope {
+		// not in current scope
+		if scope.spin {
+			t := scope.writeVariable(name, scope.CreateEmptyPhi(name))
+			// t.origin = ret
+			scope.incomingPhi.Set(name, t)
+			ret = t
+		}
 	}
+
 	return ret
-	// parent = parent.parent
-	// }
-	// return nil
 }
 
 func (v *ScopedVersionedTable[T]) ReadValue(name string) (t T) {
@@ -138,26 +140,22 @@ func (v *ScopedVersionedTable[T]) ReadValue(name string) (t T) {
 
 /// ---------------- write
 
-func (v *ScopedVersionedTable[T]) WriteVariable(name string, value T) VersionedIF[T] {
-	ret := v.CreateVariable(name)
+func (v *ScopedVersionedTable[T]) writeVariable(name string, value T) VersionedIF[T] {
+	ret := v.CreateVariable(name, false)
 	v.AssignVariable(ret, value)
 	return ret
 }
 
-func (v *ScopedVersionedTable[T]) WriteLocalVariable(name string, value T) VersionedIF[T] {
-	ret := v.CreateLocalVariable(name)
+func (v *ScopedVersionedTable[T]) writeLocalVariable(name string, value T) VersionedIF[T] {
+	ret := v.CreateVariable(name, true)
 	v.AssignVariable(ret, value)
 	return ret
 }
 
 // ---------------- create
 
-func (v *ScopedVersionedTable[T]) CreateLocalVariable(name string) VersionedIF[T] {
-	return v.newVar(name, true)
-}
-
-func (v *ScopedVersionedTable[T]) CreateVariable(name string) VersionedIF[T] {
-	return v.newVar(name, false)
+func (v *ScopedVersionedTable[T]) CreateVariable(name string, isLocal bool) VersionedIF[T] {
+	return v.newVar(name, isLocal)
 }
 
 // ---------------- Assign

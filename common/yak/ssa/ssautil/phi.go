@@ -60,18 +60,9 @@ func (p *PhiContext[T]) AddPhi(i *Versioned[T]) {
 // ForEachCapturedVariable call the handler for each captured by base scope Variable
 func (ps *ScopedVersionedTable[T]) ForEachCapturedVariable(base *ScopedVersionedTable[T], handler func(name string, ver VersionedIF[T])) {
 	ps.captured.ForEach(func(name string, ver VersionedIF[T]) bool {
-		baseVariable := base.ReadVariable(name)
-		if baseVariable == nil {
-			// not exist in base scope, this variable just set in sub-scope,
-			// just skip
-			return true
+		if ver.CanCaptureInScope(base) {
+			handler(name, ver)
 		}
-
-		if baseVariable.GetCaptured() != ver.GetCaptured() {
-			return true
-		}
-
-		handler(name, ver)
 		return true
 	})
 }
@@ -82,7 +73,7 @@ func (s *ScopedVersionedTable[T]) CoverBy(scope *ScopedVersionedTable[T]) {
 	}
 
 	scope.ForEachCapturedVariable(s, func(name string, ver VersionedIF[T]) {
-		s.WriteVariable(name, ver.GetValue())
+		s.writeVariable(name, ver.GetValue())
 	})
 }
 
@@ -128,7 +119,7 @@ func (base *ScopedVersionedTable[T]) Merge(
 		// generate phi
 		// handler(name, m)
 		ret := merge(name, m)
-		base.WriteVariable(name, ret)
+		base.writeVariable(name, ret)
 	}
 
 	for index, sub := range subScopes {
@@ -148,7 +139,7 @@ func (s *ScopedVersionedTable[T]) Spin(header, latch *ScopedVersionedTable[T], h
 		last := latch.ReadValue(name)
 		origin := header.ReadValue(name)
 		res := handler(name, ver.GetValue(), origin, last)
-		s.WriteVariable(name, res)
+		s.writeVariable(name, res)
 		return true
 	})
 }
