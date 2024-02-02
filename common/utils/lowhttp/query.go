@@ -3,10 +3,11 @@ package lowhttp
 import (
 	"bufio"
 	"bytes"
+	"net/url"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"net/url"
 )
 
 func ForceStringToUrl(i string) *url.URL {
@@ -66,7 +67,7 @@ func ParseQueryParams(s string) *QueryParams {
 	scanner := bufio.NewReaderSize(bytes.NewBufferString(s), len(s))
 	var items []*QueryParamItem
 
-	var handle = func(pair []byte) {
+	handle := func(pair []byte) {
 		if len(pair) <= 0 {
 			return
 		}
@@ -163,7 +164,7 @@ func (q *QueryParams) GetLast(key string) string {
 }
 
 func (q *QueryParams) GetAll(key string) []string {
-	var values = make([]string, 0, len(q.Items))
+	values := make([]string, 0, len(q.Items))
 	for _, item := range q.Items {
 		if item.Key == key {
 			values = append(values, item.Value)
@@ -181,4 +182,8 @@ func (q *QueryParams) Encode() string {
 		buf.WriteString(item.Encode())
 	}
 	return buf.String()
+}
+
+func (q *QueryParams) Clear() {
+	q.Items = make([]*QueryParamItem, 0)
 }

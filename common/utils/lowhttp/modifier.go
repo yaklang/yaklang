@@ -43,6 +43,42 @@ func IsChunkedHeaderLine(line string) bool {
 	return false
 }
 
+func replaceAllParams(values map[string]string, p *QueryParams) {
+	// clear all values
+	shouldRemove := make(map[string]struct{})
+	shouldReplace := make(map[string]string)
+	for _, item := range p.Items {
+		_, ok := values[item.Key]
+		if !ok {
+			shouldRemove[item.Key] = struct{}{}
+		} else {
+			shouldReplace[item.Key] = values[item.Key]
+		}
+	}
+
+	for k := range shouldRemove {
+		p.Remove(k)
+	}
+	var extraItem []*QueryParamItem
+	for k, v := range values {
+		_, ok := shouldReplace[k]
+		if ok {
+			p.Set(k, v)
+		} else {
+			extraItem = append(extraItem, &QueryParamItem{Key: k, Value: v})
+		}
+	}
+
+	if len(extraItem) > 0 {
+		sort.SliceStable(extraItem, func(i, j int) bool {
+			return extraItem[i].Key < extraItem[j].Key
+		})
+		lo.ForEach(extraItem, func(item *QueryParamItem, _ int) {
+			p.Set(item.Key, item.Value)
+		})
+	}
+}
+
 func SetHTTPPacketUrl(packet []byte, rawURL string) []byte {
 	var buf bytes.Buffer
 	var header []string
@@ -277,46 +313,26 @@ func handleHTTPPacketQueryParam(packet []byte, noAutoEncode bool, callback func(
 	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
 }
 
-// ReplaceAllHTTPPacketQueryParams 是一个辅助函数，用于改变请求报文，修改所有GET请求参数，如果不存在则会增加，其接收一个map[string]string类型的参数，其中key为请求参数名，value为请求参数值
+// ReplaceAllHTTPPacketQueryParams 是一个辅助函数，用于改变请求报文，修改所有 GET 请求参数，如果不存在则会增加，其接收一个 map[string]string 类型的参数，其中 key 为请求参数名，value 为请求参数值
 // Example:
 // ```
 // poc.ReplaceAllHTTPPacketQueryParams(poc.BasicRequest(), {"a":"b", "c":"d"}) // 添加GET请求参数a，值为b，添加GET请求参数c，值为d
 // ```
 func ReplaceAllHTTPPacketQueryParams(packet []byte, values map[string]string) []byte {
-	return handleHTTPPacketQueryParam(packet, false, func(q *QueryParams) {
-		// clear all values
-		shouldRemove := make(map[string]struct{})
-		shouldReplace := make(map[string]string)
-		for _, item := range q.Items {
-			_, ok := values[item.Key]
-			if !ok {
-				shouldRemove[item.Key] = struct{}{}
-			} else {
-				shouldReplace[item.Key] = values[item.Key]
-			}
-		}
+	return handleHTTPPacketQueryParam(packet, false, func(p *QueryParams) {
+		replaceAllParams(values, p)
+	})
+}
 
-		for k := range shouldRemove {
-			q.Remove(k)
-		}
-		var extraItem []*QueryParamItem
-		for k, v := range values {
-			_, ok := shouldReplace[k]
-			if ok {
-				q.Set(k, v)
-			} else {
-				extraItem = append(extraItem, &QueryParamItem{Key: k, Value: v})
-			}
-		}
-
-		if len(extraItem) > 0 {
-			sort.SliceStable(extraItem, func(i, j int) bool {
-				return extraItem[i].Key < extraItem[j].Key
-			})
-			lo.ForEach(extraItem, func(item *QueryParamItem, _ int) {
-				q.Set(item.Key, item.Value)
-			})
-		}
+// ReplaceAllHTTPPacketQueryParamsWithoutEscape 是一个辅助函数，用于改变请求报文，修改所有 GET 请求参数，如果不存在则会增加，其接收一个 map[string]string 类型的参数，其中 key 为请求参数名，value 为请求参数值
+// 与 poc.ReplaceAllHTTPPacketQueryParams 类似，但是不会将参数值进行转义
+// Example:
+// ```
+// poc.ReplaceAllHTTPPacketQueryParamsWithoutEscape(poc.BasicRequest(), {"a":"b", "c":"d"}) // 添加GET请求参数a，值为b，添加GET请求参数c，值为d
+// ```
+func ReplaceAllHTTPPacketQueryParamsWithoutEscape(packet []byte, values map[string]string) []byte {
+	return handleHTTPPacketQueryParam(packet, true, func(p *QueryParams) {
+		replaceAllParams(values, p)
 	})
 }
 
@@ -412,34 +428,41 @@ func DeleteHTTPPacketQueryParam(packet []byte, key string) []byte {
 	})
 }
 
-func handleHTTPPacketPostParam(packet []byte, callback func(url.Values)) []byte {
+func handleHTTPPacketPostParam(packet []byte, noAutoEncode bool, callback func(*QueryParams)) []byte {
 	var isChunked bool
 
 	headersRaw, bodyRaw := SplitHTTPPacket(packet, nil, nil)
 	bodyString := utils.UnsafeBytesToString(bodyRaw)
-	values, _ := url.ParseQuery(bodyString)
-	callback(values)
-	newBody := values.Encode()
+	u := NewQueryParams(bodyString).DisableAutoEncode(noAutoEncode)
+	callback(u)
+	newBody := u.Encode()
 
 	return ReplaceHTTPPacketBody(utils.UnsafeStringToBytes(headersRaw), utils.UnsafeStringToBytes(newBody), isChunked)
 }
 
-// ReplaceAllHTTPPacketPostParams 是一个辅助函数，用于改变请求报文，修改所有POST请求参数，如果不存在则会增加，其接收一个map[string]string类型的参数，其中key为POST请求参数名，value为POST请求参数值
+// ReplaceAllHTTPPacketPostParams 是一个辅助函数，用于改变请求报文，修改所有 POST 请求参数，如果不存在则会增加，其接收一个 map[string]string 类型的参数，其中 key 为 POST 请求参数名，value 为 POST 请求参数值
 // Example:
 // ```
 // _, raw, _ = poc.ParseUrlToHTTPRequestRaw("POST", "https://pie.dev/post")
 // poc.ReplaceAllHTTPPacketPostParams(raw, {"a":"b", "c":"d"}) // 添加POST请求参数a，值为b，POST请求参数c，值为d
 // ```
 func ReplaceAllHTTPPacketPostParams(packet []byte, values map[string]string) []byte {
-	return handleHTTPPacketPostParam(packet, func(q url.Values) {
-		// clear all values
-		for k := range q {
-			q.Del(k)
-		}
+	return handleHTTPPacketPostParam(packet, false, func(p *QueryParams) {
+		replaceAllParams(values, p)
+	})
+}
 
-		for k, v := range values {
-			q.Set(k, v)
-		}
+// ReplaceAllHTTPPacketPostParamsWithoutEscape 是一个辅助函数，用于改变请求报文，修改所有 POST 请求参数，如果不存在则会增加，其接收一个 map[string]string 类型的参数，其中 key 为 POST 请求参数名，value 为 POST 请求参数值
+// 与 poc.ReplaceAllHTTPPacketPostParams 类似，但是不会将参数值进行转义
+//
+// Example:
+// ```
+// _, raw, _ = poc.ParseUrlToHTTPRequestRaw("POST", "https://pie.dev/post")
+// poc.ReplaceAllHTTPPacketPostParamsWithoutEscape(raw, {"a":"b", "c":"d"}) // 添加POST请求参数a，值为b，POST请求参数c，值为d
+// ```
+func ReplaceAllHTTPPacketPostParamsWithoutEscape(packet []byte, values map[string]string) []byte {
+	return handleHTTPPacketPostParam(packet, true, func(p *QueryParams) {
+		replaceAllParams(values, p)
 	})
 }
 
@@ -450,8 +473,8 @@ func ReplaceAllHTTPPacketPostParams(packet []byte, values map[string]string) []b
 // poc.ReplaceHTTPPacketPostParam(raw, "a", "b") // 添加POST请求参数a，值为b
 // ```
 func ReplaceHTTPPacketPostParam(packet []byte, key, value string) []byte {
-	return handleHTTPPacketPostParam(packet, func(q url.Values) {
-		q.Set(key, value)
+	return handleHTTPPacketPostParam(packet, false, func(p *QueryParams) {
+		p.Set(key, value)
 	})
 }
 
@@ -461,8 +484,8 @@ func ReplaceHTTPPacketPostParam(packet []byte, key, value string) []byte {
 // poc.AppendHTTPPacketPostParam(poc.BasicRequest(), "a", "b") // 向 pie.dev 发起请求，添加POST请求参数a，值为b
 // ```
 func AppendHTTPPacketPostParam(packet []byte, key, value string) []byte {
-	return handleHTTPPacketPostParam(packet, func(q url.Values) {
-		q.Add(key, value)
+	return handleHTTPPacketPostParam(packet, false, func(p *QueryParams) {
+		p.Add(key, value)
 	})
 }
 
@@ -477,8 +500,8 @@ func AppendHTTPPacketPostParam(packet []byte, key, value string) []byte {
 // a=b&c=d`, "a") // 删除POST请求参数a
 // ```
 func DeleteHTTPPacketPostParam(packet []byte, key string) []byte {
-	return handleHTTPPacketPostParam(packet, func(q url.Values) {
-		q.Del(key)
+	return handleHTTPPacketPostParam(packet, false, func(p *QueryParams) {
+		p.Del(key)
 	})
 }
 
