@@ -240,7 +240,7 @@
                                             </td>
 
                                             <td class="product-subtotal">
-                                                <span class="amount">${{.TotalPrice}}</span>
+                                                <span class="amount" id="TotalPrice">${{.TotalPrice}}</span>
                                             </td>
                                         </tr>
                                         {{end}}
@@ -259,7 +259,7 @@
                                                     <input type="text" placeholder="Coupon code" value=""
                                                         id="coupon_code" class="input-text" name="coupon_code">
                                                     <input type="submit" value="核销优惠券" name="apply_coupon"
-                                                        class="button">
+                                                           class="button" onclick="applyDiscount(event)">
                                                 </div>
                                                 <!-- <input type="submit" value="Update Cart" name="update_cart"
                                                     class="button"> -->
@@ -651,6 +651,18 @@
             // 调用submitOrder函数
             submitOrder();
         });
+
+        function applyDiscount() {
+            event.preventDefault(); // 阻止默认表单提交行为
+            var coupon = document.getElementById('coupon_code').value;
+            var totalPrice = document.getElementById('TotalPrice').innerText;
+            // 去除"$"符号
+            totalPrice = parseFloat(totalPrice.replace('$', ''));
+            if (coupon === '88888888' || /^\d{8}$/.test(coupon)) {
+                totalPrice = totalPrice * 0.8;
+                document.getElementById('TotalPrice').innerText = '$' + totalPrice.toFixed(2);
+            }
+        }
     </script>
 </body>
 
