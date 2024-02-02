@@ -54,7 +54,7 @@ func init() {
 }
 
 func TestMustPassDebug(t *testing.T) {
-	var debugName = "sandbox.yak"
+	var debugName = "synscan_test.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {
