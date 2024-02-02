@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/netx"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -23,7 +24,6 @@ import (
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
@@ -103,9 +103,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 	}()
 
-	//var (
-	//	mitmLock = new(sync.Mutex)
-	//)
+	var mServer *crep.MITMServer
 
 	feedbacker := yak.YakitCallerIf(func(result *ypb.ExecResult) error {
 		return stream.Send(&ypb.MITMResponse{Message: result, HaveMessage: true})
@@ -131,17 +129,57 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	}
 	feedbackToUser("接收到 MITM 启动参数 / receive mitm config request")
 	hostMapping := make(map[string]string)
+	getDownstreamProxy := func(request *ypb.MITMRequest) (string, error) {
+		downstreamProxy := strings.TrimSpace(firstReq.GetDownstreamProxy())
+		// 容错处理一下代理
+		downstreamProxy = strings.Trim(downstreamProxy, `":`)
+		if downstreamProxy == "0" {
+			downstreamProxy = ""
+		}
+		if downstreamProxy != "" {
+			feedbackToUser(fmt.Sprintf("启用下游代理为 / downstream proxy:[%v]", downstreamProxy))
+			proxyUrl, err := url.Parse(downstreamProxy)
+			if err != nil {
+				feedbackToUser(fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", downstreamProxy, err))
+				return "", utils.Errorf("cannot use proxy[%v]", err)
+			}
+			_, port, err := utils.ParseStringToHostPort(proxyUrl.Host)
+			if err != nil {
+				feedbackToUser(fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", downstreamProxy, "parse host to host:port failed "+err.Error()))
+				return "", utils.Errorf("parse proxy host failed: %s", proxyUrl.Host)
+			}
+			if port <= 0 {
+				feedbackToUser(fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", downstreamProxy, "缺乏端口（Miss Port）"))
+				return "", utils.Errorf("proxy miss port. [%v]", proxyUrl.Host)
+			}
+			conn, err := netx.ProxyCheck(downstreamProxy, 5*time.Second) // 代理检查只做log记录，不在阻止MITM启动
+			if err != nil {
+				errInfo := "代理不通（Proxy Cannot be connected）"
+				if errors.Is(err, netx.ErrorProxyAuthFailed) {
+					errInfo = "认证失败（Proxy Auth Fail）"
+				}
+				feedbackToUser(fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", downstreamProxy, errInfo))
+			}
+			if conn != nil {
+				conn.Close()
+			}
+		}
+		return downstreamProxy, nil
+	}
 	var (
-		host            string = "127.0.0.1"
-		port            int    = 8089
-		downstreamProxy        = strings.TrimSpace(firstReq.GetDownstreamProxy())
-		enableGMTLS            = firstReq.GetEnableGMTLS()
-		preferGMTLS            = firstReq.GetPreferGMTLS()
-		onlyGMTLS              = firstReq.GetOnlyEnableGMTLS()
-		proxyUsername          = firstReq.GetProxyUsername()
-		proxyPassword          = firstReq.GetProxyPassword()
-		dnsServers             = firstReq.GetDnsServers()
+		host          string = "127.0.0.1"
+		port          int    = 8089
+		enableGMTLS          = firstReq.GetEnableGMTLS()
+		preferGMTLS          = firstReq.GetPreferGMTLS()
+		onlyGMTLS            = firstReq.GetOnlyEnableGMTLS()
+		proxyUsername        = firstReq.GetProxyUsername()
+		proxyPassword        = firstReq.GetProxyPassword()
+		dnsServers           = firstReq.GetDnsServers()
 	)
+	downstreamProxy, err := getDownstreamProxy(firstReq)
+	if err != nil {
+		return err
+	}
 	for _, pair := range firstReq.Hosts {
 		hostMapping[pair.GetKey()] = pair.GetValue()
 	}
@@ -154,40 +192,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	// restriction for username
 	if strings.Contains(proxyUsername, ":") {
 		return utils.Errorf("proxy username cannot contains ':'")
-	}
-
-	// 容错处理一下代理
-	downstreamProxy = strings.Trim(downstreamProxy, `":`)
-	if downstreamProxy == "0" {
-		downstreamProxy = ""
-	}
-	if downstreamProxy != "" {
-		feedbackToUser(fmt.Sprintf("启用下游代理为 / downstream proxy:[%v]", downstreamProxy))
-		proxyUrl, err := url.Parse(downstreamProxy)
-		if err != nil {
-			feedbackToUser(fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", downstreamProxy, err))
-			return utils.Errorf("cannot use proxy[%v]", err)
-		}
-		_, port, err := utils.ParseStringToHostPort(proxyUrl.Host)
-		if err != nil {
-			feedbackToUser(fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", downstreamProxy, "parse host to host:port failed "+err.Error()))
-			return utils.Errorf("parse proxy host failed: %s", proxyUrl.Host)
-		}
-		if port <= 0 {
-			feedbackToUser(fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", downstreamProxy, "缺乏端口（Miss Port）"))
-			return utils.Errorf("proxy miss port. [%v]", proxyUrl.Host)
-		}
-		conn, err := netx.ProxyCheck(downstreamProxy, 5*time.Second) // 代理检查只做log记录，不在阻止MITM启动
-		if err != nil {
-			errInfo := "代理不通（Proxy Cannot be connected）"
-			if errors.Is(err, netx.ErrorProxyAuthFailed) {
-				errInfo = "认证失败（Proxy Auth Fail）"
-			}
-			feedbackToUser(fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", downstreamProxy, errInfo))
-		}
-		if conn != nil {
-			conn.Close()
-		}
 	}
 
 	if firstReq.GetHost() != "" {
@@ -558,6 +562,17 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				continue
 			}
 
+			// 运行时更新代理
+			downstreamProxy, err := getDownstreamProxy(reqInstance)
+			if err == nil && downstreamProxy != "" && mServer != nil {
+				err = mServer.Configure(crep.MITM_SetDownstreamProxy(downstreamProxy))
+				if err != nil {
+					feedbackToUser(fmt.Sprintf("设置下游代理失败 / set downstream proxy failed: %v", err))
+					log.Errorf("set downstream proxy failed: %s", err)
+				}
+				mitmPluginCaller.SetProxy(downstreamProxy)
+				feedbackToUser(fmt.Sprintf("设置下游代理成功 / set downstream proxy successful: %v", downstreamProxy))
+			}
 			//defer func() {
 			//	recover()
 			//}()
@@ -592,7 +607,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		3. 镜像 HTTP 请求和响应
 	*/
 	var wshashFrameIndexLock sync.Mutex
-	var mServer *crep.MITMServer
 	websocketHashCache := new(sync.Map)
 	wshashFrameIndex := make(map[string]int)
 	requireWsFrameIndexByWSHash := func(i string) int {
