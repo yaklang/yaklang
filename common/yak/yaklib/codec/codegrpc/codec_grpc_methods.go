@@ -2,18 +2,23 @@ package codegrpc
 
 import (
 	"bytes"
+	"context"
 	_ "embed"
 	"encoding/gob"
 	"encoding/json"
+	"fmt"
 	"github.com/BurntSushi/toml"
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/authhack"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yakdoc"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"github.com/yaklang/yaklang/common/yserx"
 	"strings"
@@ -735,5 +740,51 @@ func (flow *CodecExecFlow) Fuzz() error {
 		return err
 	}
 	flow.Text = []byte(strings.Join(res, "\n"))
+	return nil
+}
+
+// Tag = "Yak脚本"
+// CodecName = "本地Codec插件"
+// Desc = """本地Codec插件"""
+// Params = [
+// { Name = "pluginName", Type = "search", Required = true , Label = "插件名"},
+// ]
+func (flow *CodecExecFlow) CodecPlugin(pluginName string) error {
+	script, err := yakit.GetYakScriptByName(consts.GetGormProfileDatabase(), pluginName)
+	if err != nil {
+		return err
+	}
+	engine, err := yak.NewScriptEngine(1000).ExecuteEx(script.Content, map[string]interface{}{
+		"YAK_FILENAME": pluginName,
+	})
+	if err != nil {
+		return utils.Errorf("execute file %s code failed: %s", pluginName, err.Error())
+	}
+	pluginRes, err := engine.CallYakFunction(context.Background(), "handle", []interface{}{flow.Text})
+	if err != nil {
+		return utils.Errorf("import %v' s handle failed: %s", pluginName, err)
+	}
+	flow.Text = []byte(fmt.Sprint(pluginRes))
+	return nil
+}
+
+// Tag = "Yak脚本"
+// CodecName = "临时Codec插件"
+// Desc = """自定义临时Codec插件"""
+// Params = [
+// { Name = "pluginContext", Type = "monaco", Required = true , Label = "插件内容"},
+// ]
+func (flow *CodecExecFlow) CustomCodecPlugin(pluginContext string) error {
+	engine, err := yak.NewScriptEngine(1000).ExecuteEx(pluginContext, map[string]interface{}{
+		"YAK_FILENAME": "temp-codec",
+	})
+	if err != nil {
+		return utils.Errorf("execute file %s code failed: %s", "temp-codec", err.Error())
+	}
+	pluginRes, err := engine.CallYakFunction(context.Background(), "handle", []interface{}{flow.Text})
+	if err != nil {
+		return utils.Errorf("import %v' s handle failed: %s", "temp-codec", err)
+	}
+	flow.Text = []byte(fmt.Sprint(pluginRes))
 	return nil
 }
