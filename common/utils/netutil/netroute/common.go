@@ -116,7 +116,7 @@ func (r *router) route(isV6 bool, routes routeSlice, input net.HardwareAddr, src
 	}
 	var mostSpecificRt *rtInfo
 
-	for _, rt := range routes {
+	for idx, rt := range routes {
 		if rt.InputIface != 0 && rt.InputIface != inputIndex {
 			continue
 		}
@@ -150,7 +150,12 @@ func (r *router) route(isV6 bool, routes routeSlice, input net.HardwareAddr, src
 			if candSpec < curSpec {
 				continue
 			}
-			log.Infof("found new route to %v, mask size: %v(>=%v), use out-iface: %v(%v->%v)", dst.String(), candSpec, curSpec, rt.OutputIface, rt.Src, rt.Dst)
+			log.Debugf("%v gateway: %v, found new route to %v, mask size: %v(>=%v), use out-iface: %v(%v->%v)", idx, rt.Gateway, dst.String(), candSpec, curSpec, rt.OutputIface, rt.Src, rt.Dst)
+		}
+
+		if rt.Gateway.To4() == nil {
+			log.Debugf("skip link-local route: %v", rt)
+			continue
 		}
 		mostSpecificRt = rt
 	}
