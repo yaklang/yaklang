@@ -481,6 +481,9 @@ func (c *Client) serverCoreData() *gcc.ServerCoreData {
 	return c.serverData[0].(*gcc.ServerCoreData)
 }
 func (c *Client) ServerSecurityData() *gcc.ServerSecurityData {
+	if len(c.serverData) < 2 {
+		return nil
+	}
 	return c.serverData[1].(*gcc.ServerSecurityData)
 }
 
@@ -627,22 +630,27 @@ func (c *Client) sendClientRandom() {
 	clientRandom := core.Random(32)
 	glog.Info("clientRandom:", string(clientRandom))
 
-	serverRandom := c.ServerSecurityData().ServerRandom
+	serverSecurityData := c.ServerSecurityData()
+	if serverSecurityData != nil {
+		return
+	}
+
+	serverRandom := serverSecurityData.ServerRandom
 	glog.Info("ServerRandom:", string(serverRandom))
 
 	c.macKey, c.initialDecrytKey, c.initialEncryptKey = generateKeys(clientRandom,
-		serverRandom, c.ServerSecurityData().EncryptionMethod)
+		serverRandom, serverSecurityData.EncryptionMethod)
 
 	//initialize keys
 	c.currentDecrytKey = c.initialDecrytKey
 	c.currentEncryptKey = c.initialEncryptKey
 
 	//verify certificate
-	if !c.ServerSecurityData().ServerCertificate.CertData.Verify() {
+	if !serverSecurityData.ServerCertificate.CertData.Verify() {
 		glog.Warn("Cannot verify server identity")
 	}
 
-	ePublicKey, mPublicKey := c.ServerSecurityData().ServerCertificate.CertData.GetPublicKey()
+	ePublicKey, mPublicKey := serverSecurityData.ServerCertificate.CertData.GetPublicKey()
 	b := new(big.Int).SetBytes(core.Reverse(mPublicKey))
 	e := new(big.Int).SetInt64(int64(ePublicKey))
 	d := new(big.Int).SetBytes(core.Reverse(clientRandom))
