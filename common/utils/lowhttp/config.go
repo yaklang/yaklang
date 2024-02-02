@@ -396,6 +396,12 @@ func WithProxy(proxy ...string) LowhttpOpt {
 	}
 }
 
+func WithProxyGetter(getter func() []string) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.Proxy = utils.StringArrayFilterEmpty(getter())
+	}
+}
+
 func WithForceLegacyProxy(b bool) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.ForceLegacyProxy = b

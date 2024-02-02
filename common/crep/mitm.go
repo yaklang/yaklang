@@ -207,7 +207,9 @@ func (m *MITMServer) Serve(ctx context.Context, addr string) error {
 	var config []lowhttp.LowhttpOpt
 
 	if m.proxyUrl != nil {
-		config = append(config, lowhttp.WithProxy(m.proxyUrl.String()))
+		config = append(config, lowhttp.WithProxyGetter(func() []string{
+			return []string{m.proxyUrl.String()}
+		}))
 	}
 
 	if len(m.DNSServers) > 0 {
