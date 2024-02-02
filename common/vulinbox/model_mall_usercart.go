@@ -112,7 +112,7 @@ func (s *dbm) CheckCart(UserID int, ProductName string) (bool, error) {
 func (s *dbm) ClearCart(UserID int) (err error) {
 	var v UserCart
 	v.UserID = UserID
-	if err := s.db.Where("UserID = ?", v.UserID).Delete(&v).Error; err != nil {
+	if err := s.db.Unscoped().Where("UserID = ?", v.UserID).Delete(&v).Error; err != nil {
 		return err
 	}
 	return nil
