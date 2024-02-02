@@ -64,6 +64,8 @@ func WithLanguage(language Language) Option {
 		c.language = language
 		if parser, ok := LanguageParsers[language]; ok {
 			c.Parser = parser
+		} else {
+			c.Parser = nil
 		}
 	}
 }
