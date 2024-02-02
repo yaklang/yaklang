@@ -148,12 +148,15 @@ func paramListToParameters(params []*openapi3.Parameter) []*openapi3.ParameterRe
 }
 
 func responseToOpenAPIStruct(response []byte) *openapi3.Response {
+	var body []byte
 	if funk.IsEmpty(response) {
-		response, _, _ = lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
+		response, body, _ = lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
 Content-Type: application/json
 
 {}`))
 	}
+
+	scheme := anyToScheme(body)
 
 	ins := &openapi3.Response{}
 	for key, value := range lowhttp.GetHTTPPacketHeaders(response) {
@@ -172,6 +175,9 @@ Content-Type: application/json
 			},
 		}
 
+	}
+	if scheme != nil {
+		ins.WithJSONSchema(scheme)
 	}
 	return ins
 }
@@ -319,6 +325,16 @@ func requestToOpenAPIStruct(beforePath string, item *openapi3.PathItem, request 
 	default:
 		return "", nil, nil, utils.Errorf("method [%v] not supported", method)
 	}
+
+	body := lowhttp.GetHTTPPacketBody(request)
+	if !funk.IsEmpty(body) {
+		operation.RequestBody = &openapi3.RequestBodyRef{
+			Value: &openapi3.RequestBody{
+				Content: openapi3.NewContentWithJSONSchema(anyToScheme(body)),
+			},
+		}
+	}
+
 	return pathWithoutQuery, ops, operation, nil
 }
 

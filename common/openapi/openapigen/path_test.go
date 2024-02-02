@@ -146,7 +146,10 @@ Host: www.example.com`),
 		string(raw),
 		`/v1/abc/eee/5:`,
 		`/v1/abc/ddd/{dddId}:`,
-		`/v1/abc/asdfasdf/{asdfasdfId}:`) {
+		`/v1/abc/asdfasdf/{asdfasdfId}:`,
+		`schem`, "type: integer",
+		"content:", `application/json:`,
+	) {
 		t.Log("ok")
 	} else {
 		t.Fatal("not match")
