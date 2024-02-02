@@ -3,15 +3,21 @@ package bizhelper
 import (
 	"encoding/json"
 	"fmt"
+	"net"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"net"
-	"strconv"
-	"strings"
-	"time"
 )
+
+type Range struct {
+	Min, Max int64
+}
 
 func QueryBySpecificPorts(db *gorm.DB, field string, ports string) *gorm.DB {
 	if ports == "" {
@@ -202,7 +208,7 @@ func FuzzQueryArrayOrPrefixLike(db *gorm.DB, field string, s []interface{}) *gor
 }
 
 func FuzzQueryIntArrayOr(db *gorm.DB, field string, s []int) *gorm.DB {
-	var raw = make([]interface{}, len(s))
+	raw := make([]interface{}, len(s))
 	for index, sub := range s {
 		raw[index] = sub
 	}
@@ -210,7 +216,7 @@ func FuzzQueryIntArrayOr(db *gorm.DB, field string, s []int) *gorm.DB {
 }
 
 func FuzzQueryInt64ArrayOr(db *gorm.DB, field string, s []int64) *gorm.DB {
-	var raw = make([]interface{}, len(s))
+	raw := make([]interface{}, len(s))
 	for index, sub := range s {
 		raw[index] = sub
 	}
@@ -223,7 +229,7 @@ func FuzzQueryStringArrayOr(db *gorm.DB, field string, s []string) *gorm.DB {
 		return db
 	}
 
-	var raw = make([]interface{}, len(s))
+	raw := make([]interface{}, len(s))
 	for index, sub := range s {
 		raw[index] = sub
 	}
@@ -236,7 +242,7 @@ func FuzzQueryStringArrayOrLike(db *gorm.DB, field string, s []string) *gorm.DB 
 		return db
 	}
 
-	var raw = make([]interface{}, len(s))
+	raw := make([]interface{}, len(s))
 	for index, sub := range s {
 		raw[index] = sub
 	}
@@ -249,7 +255,7 @@ func FuzzQueryStringArrayOrLikeExclude(db *gorm.DB, field string, s []string) *g
 		return db
 	}
 
-	var raw = make([]interface{}, len(s))
+	raw := make([]interface{}, len(s))
 	for index, sub := range s {
 		raw[index] = sub
 	}
@@ -262,11 +268,11 @@ func FuzzQueryStringArrayOrPrefixLike(db *gorm.DB, field string, s []string) *go
 		return db
 	}
 
-	var raw = make([]interface{}, len(s))
+	raw := make([]interface{}, len(s))
 	for index, sub := range s {
 		raw[index] = sub
 	}
-	//return FuzzQueryArrayOrLike(db, field, raw)
+	// return FuzzQueryArrayOrLike(db, field, raw)
 	return FuzzQueryArrayOrPrefixLike(db, field, raw)
 }
 
@@ -288,6 +294,7 @@ func FuzzQueryStringByFieldsOr(db *gorm.DB, fields []string, keyword string) *go
 
 	return db.Where(strings.Join(querys, " OR "), items...)
 }
+
 func FuzzQueryStringByFieldsOrP(db *gorm.DB, fields []string, keyword *string) *gorm.DB {
 	if keyword == nil {
 		return db
@@ -350,23 +357,52 @@ func ExactQueryExcludeArrayOr(db *gorm.DB, field string, s []interface{}) *gorm.
 }
 
 func ExactQueryIntArrayOr(db *gorm.DB, field string, s []int) *gorm.DB {
-	var raw = make([]interface{}, len(s))
+	raw := make([]int64, len(s))
 	for index, sub := range s {
-		raw[index] = sub
+		raw[index] = int64(sub)
 	}
-	return ExactQueryArrayOr(db, field, raw)
+	return ExactQueryInt64ArrayOr(db, field, raw)
 }
 
 func ExactQueryInt64ArrayOr(db *gorm.DB, field string, s []int64) *gorm.DB {
-	var raw = make([]interface{}, len(s))
-	for index, sub := range s {
-		raw[index] = sub
+	if len(s) <= 0 {
+		return db
 	}
-	return ExactQueryArrayOr(db, field, raw)
+
+	sort.Slice(s, func(i, j int) bool {
+		return s[i] < s[j]
+	})
+
+	ranges := make([]Range, 0)
+	querys := make([]string, 0)
+	items := make([]any, 0)
+
+	for _, val := range s {
+		if len(ranges) == 0 || val-1 > ranges[len(ranges)-1].Max {
+			ranges = append(ranges, Range{
+				Min: val,
+				Max: val,
+			})
+		} else {
+			ranges[len(ranges)-1].Max = val
+		}
+	}
+
+	for _, r := range ranges {
+		if r.Min == r.Max {
+			querys = append(querys, fmt.Sprintf("(%v = ?)", field))
+			items = append(items, r.Min)
+		} else {
+			querys = append(querys, fmt.Sprintf("(%v >= ? AND %v <= ?)", field, field))
+			items = append(items, r.Min, r.Max)
+		}
+	}
+
+	return db.Where(strings.Join(querys, " OR "), items...)
 }
 
 func ExactQueryStringArrayOr(db *gorm.DB, field string, s []string) *gorm.DB {
-	var raw = make([]interface{}, len(s))
+	raw := make([]interface{}, len(s))
 	for index, sub := range s {
 		raw[index] = sub
 	}
@@ -374,7 +410,7 @@ func ExactQueryStringArrayOr(db *gorm.DB, field string, s []string) *gorm.DB {
 }
 
 func ExactOrQueryStringArrayOr(db *gorm.DB, field string, s []string) *gorm.DB {
-	var raw = make([]interface{}, len(s))
+	raw := make([]interface{}, len(s))
 	for index, sub := range s {
 		raw[index] = sub
 	}
@@ -385,7 +421,7 @@ func ExactQueryExcludeStringArrayOr(db *gorm.DB, field string, s []string) *gorm
 	if s == nil {
 		return db
 	}
-	var raw = make([]interface{}, len(s))
+	raw := make([]interface{}, len(s))
 	for index, sub := range s {
 		raw[index] = sub
 	}
@@ -578,9 +614,7 @@ func FuzzQueryJsonTextP(db *gorm.DB, jsonField string, search *string) *gorm.DB 
 }
 
 func QueryOrderP(db *gorm.DB, orderBy, order *string) *gorm.DB {
-	var (
-		orderByS, orderS = "created_at", "desc"
-	)
+	orderByS, orderS := "created_at", "desc"
 	if orderBy != nil {
 		orderByS = *orderBy
 	}
@@ -597,7 +631,7 @@ func Paging(db *gorm.DB, page int, limit int, data interface{}) (*Paginator, *go
 		DB:    db,
 		Page:  page,
 		Limit: limit,
-		//ShowSQL: true,
+		// ShowSQL: true,
 	}, data)
 	return p, db
 }
@@ -611,9 +645,7 @@ func PagingByPagination(db *gorm.DB, p *ypb.Paging, data any) (*Paginator, *gorm
 }
 
 func PagingP(db *gorm.DB, page *int64, limit *int64, data interface{}) (*Paginator, *gorm.DB) {
-	var (
-		pageInt, limitInt = 1, 10
-	)
+	pageInt, limitInt := 1, 10
 	if page != nil {
 		pageInt = int(Int64(page))
 	}
@@ -648,9 +680,7 @@ func QueryByTimestampRange(db *gorm.DB, field string, start, end int64) *gorm.DB
 }
 
 func QueryByTimestampRangeP(db *gorm.DB, field string, start, end *int64) *gorm.DB {
-	var (
-		startTs, endTs int64
-	)
+	var startTs, endTs int64
 	if start != nil {
 		startTs = *start
 	}
@@ -888,9 +918,11 @@ func FuzzSearchEx(db *gorm.DB, fields []string, target string, ilike bool) *gorm
 
 	return db.Where(strings.Join(conds, " OR "), items...)
 }
+
 func FuzzSearchWithStringArrayOr(db *gorm.DB, fields []string, targets []string) *gorm.DB {
 	return FuzzSearchWithStringArrayOrEx(db, fields, targets, true)
 }
+
 func FuzzSearchWithStringArrayOrEx(db *gorm.DB, fields []string, targets []string, ilike bool) *gorm.DB {
 	if len(targets) <= 0 {
 		return db
@@ -948,7 +980,7 @@ func OrFuzzQueryStringArrayOrLike(db *gorm.DB, field string, s []string) *gorm.D
 		return db
 	}
 
-	var raw = make([]interface{}, len(s))
+	raw := make([]interface{}, len(s))
 	for index, sub := range s {
 		raw[index] = sub
 	}
