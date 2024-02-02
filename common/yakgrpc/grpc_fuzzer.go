@@ -717,7 +717,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_DNSServers(req.GetDNSServers()),
 			mutate.WithPoolOpt_EtcHosts(req.GetEtcHosts()),
 			mutate.WithPoolOpt_NoSystemProxy(req.GetNoSystemProxy()),
-			mutate.WithPoolOpt_RequestCountLimiter(requestCount)}
+			mutate.WithPoolOpt_RequestCountLimiter(requestCount),
+		}
 
 		fuzzMode := req.GetFuzzTagMode() // ""/"close"/"standard"/"legacy"
 		forceFuzz := req.GetForceFuzz()  // true/false
@@ -1229,14 +1230,14 @@ func (s *Server) HTTPRequestMutate(ctx context.Context, req *ypb.HTTPRequestMuta
 			poc.WithReplaceHttpPacketHeader("Content-Type", "application/x-www-form-urlencoded"),
 			poc.WithDeleteHeader("Transfer-Encoding"),
 			poc.WithAppendHeaderIfNotExist("User-Agent", consts.DefaultUserAgent),
-			poc.WithReplaceAllHttpPacketPostParams(totalParams),
+			poc.WithReplaceAllHttpPacketPostParamsWithoutEscape(totalParams),
 		)
 
 	default:
 		if len(method) > 0 {
 			result = poc.BuildRequest(lowhttp.TrimLeftHTTPPacket(result),
 				poc.WithReplaceHttpPacketMethod(method),
-				poc.WithReplaceAllHttpPacketQueryParams(totalParams),
+				poc.WithReplaceAllHttpPacketQueryParamsWithoutEscape(totalParams),
 				poc.WithDeleteHeader("Transfer-Encoding"),
 				poc.WithDeleteHeader("Content-Type"),
 				poc.WithAppendHeaderIfNotExist("User-Agent", consts.DefaultUserAgent),

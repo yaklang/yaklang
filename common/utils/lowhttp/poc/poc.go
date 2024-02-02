@@ -686,6 +686,21 @@ func WithReplaceAllHttpPacketQueryParams(values map[string]string) PocConfigOpti
 	}
 }
 
+// replaceAllQueryParamsWithoutEscape 是一个请求选项参数，用于改变请求报文，修改所有 GET 请求参数，如果不存在则会增加，其接收一个map[string]string 类型的参数，其中 key 为请求参数名，value 为请求参数值
+// 与 poc.replaceAllQueryParams 类似，但是不会将参数值进行转义
+// Example:
+// ```
+// poc.Get("https://pie.dev/get", poc.replaceAllQueryParamsWithoutEscape({"a":"{{}}", "c":"%%"})) // 向 pie.dev 发起请求，添加GET请求参数a，值为{{}}，添加GET请求参数c，值为%%
+// ```
+func WithReplaceAllHttpPacketQueryParamsWithoutEscape(values map[string]string) PocConfigOption {
+	return func(c *PocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.ReplaceAllHTTPPacketQueryParamsWithoutEscape(packet, values)
+		},
+		)
+	}
+}
+
 // replacePostParam 是一个请求选项参数，用于改变请求报文，修改 POST 请求参数，如果不存在则会增加
 // Example:
 // ```
@@ -709,6 +724,21 @@ func WithReplaceAllHttpPacketPostParams(values map[string]string) PocConfigOptio
 	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
 			return lowhttp.ReplaceAllHTTPPacketPostParams(packet, values)
+		},
+		)
+	}
+}
+
+// replaceAllPostParamsWithoutEscape 是一个请求选项参数，用于改变请求报文，修改所有POST请求参数，如果不存在则会增加，其接收一个map[string]string类型的参数，其中key为POST请求参数名，value为POST请求参数值
+// 与 poc.replaceAllPostParams 类似，但是不会将参数值进行转义
+// Example:
+// ```
+// poc.Post("https://pie.dev/post", poc.replaceAllPostParamsWithoutEscape({"a":"{{}}", "c":"%%"})) // 向 pie.dev 发起请求，添加POST请求参数a，值为{{}}，POST请求参数c，值为%%
+// ```
+func WithReplaceAllHttpPacketPostParamsWithoutEscape(values map[string]string) PocConfigOption {
+	return func(c *PocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.ReplaceAllHTTPPacketPostParamsWithoutEscape(packet, values)
 		},
 		)
 	}
@@ -1419,33 +1449,35 @@ var PoCExports = map[string]interface{}{
 	"websocketFromServer":  WithWebsocketHandler,
 	"websocketOnClient":    WithWebsocketClientHandler,
 
-	"replaceFirstLine":       WithReplaceHttpPacketFirstLine,
-	"replaceMethod":          WithReplaceHttpPacketMethod,
-	"replaceHeader":          WithReplaceHttpPacketHeader,
-	"replaceHost":            WithReplaceHttpPacketHost,
-	"replaceBasicAuth":       WithReplaceHttpPacketBasicAuth,
-	"replaceUserAgent":       WithReplaceHttpPacketUserAgent,
-	"replaceRandomUserAgent": WithReplaceHttpPacketRandomUserAgent,
-	"replaceCookie":          WithReplaceHttpPacketCookie,
-	"replaceBody":            WithReplaceHttpPacketBody,
-	"replaceAllQueryParams":  WithReplaceAllHttpPacketQueryParams,
-	"replaceAllPostParams":   WithReplaceAllHttpPacketPostParams,
-	"replaceQueryParam":      WithReplaceHttpPacketQueryParam,
-	"replacePostParam":       WithReplaceHttpPacketPostParam,
-	"replacePath":            WithReplaceHttpPacketPath,
-	"appendHeader":           WithAppendHeader,
-	"appendHeaders":          WithAppendHeaders,
-	"appendCookie":           WithAppendCookie,
-	"appendQueryParam":       WithAppendQueryParam,
-	"appendPostParam":        WithAppendPostParam,
-	"appendPath":             WithAppendHttpPacketPath,
-	"appendFormEncoded":      WithAppendHttpPacketFormEncoded,
-	"appendUploadFile":       WithAppendHttpPacketUploadFile,
-	"deleteHeader":           WithDeleteHeader,
-	"deleteCookie":           WithDeleteCookie,
-	"deleteQueryParam":       WithDeleteQueryParam,
-	"deletePostParam":        WithDeletePostParam,
-	"deleteForm":             WithDeleteForm,
+	"replaceFirstLine":                   WithReplaceHttpPacketFirstLine,
+	"replaceMethod":                      WithReplaceHttpPacketMethod,
+	"replaceHeader":                      WithReplaceHttpPacketHeader,
+	"replaceHost":                        WithReplaceHttpPacketHost,
+	"replaceBasicAuth":                   WithReplaceHttpPacketBasicAuth,
+	"replaceUserAgent":                   WithReplaceHttpPacketUserAgent,
+	"replaceRandomUserAgent":             WithReplaceHttpPacketRandomUserAgent,
+	"replaceCookie":                      WithReplaceHttpPacketCookie,
+	"replaceBody":                        WithReplaceHttpPacketBody,
+	"replaceAllQueryParams":              WithReplaceAllHttpPacketQueryParams,
+	"replaceAllQueryParamsWithoutEscape": WithReplaceAllHttpPacketQueryParamsWithoutEscape,
+	"replaceAllPostParams":               WithReplaceAllHttpPacketPostParams,
+	"replaceAllPostParamsWithoutEscape":  WithReplaceAllHttpPacketPostParamsWithoutEscape,
+	"replaceQueryParam":                  WithReplaceHttpPacketQueryParam,
+	"replacePostParam":                   WithReplaceHttpPacketPostParam,
+	"replacePath":                        WithReplaceHttpPacketPath,
+	"appendHeader":                       WithAppendHeader,
+	"appendHeaders":                      WithAppendHeaders,
+	"appendCookie":                       WithAppendCookie,
+	"appendQueryParam":                   WithAppendQueryParam,
+	"appendPostParam":                    WithAppendPostParam,
+	"appendPath":                         WithAppendHttpPacketPath,
+	"appendFormEncoded":                  WithAppendHttpPacketFormEncoded,
+	"appendUploadFile":                   WithAppendHttpPacketUploadFile,
+	"deleteHeader":                       WithDeleteHeader,
+	"deleteCookie":                       WithDeleteCookie,
+	"deleteQueryParam":                   WithDeleteQueryParam,
+	"deletePostParam":                    WithDeletePostParam,
+	"deleteForm":                         WithDeleteForm,
 
 	// split
 	"Split":           split,
@@ -1460,30 +1492,32 @@ var PoCExports = map[string]interface{}{
 	"ParseBytesToHTTPResponse": lowhttp.ParseBytesToHTTPResponse,
 	"ParseUrlToHTTPRequestRaw": lowhttp.ParseUrlToHttpRequestRaw,
 
-	"ReplaceHTTPPacketMethod":         lowhttp.ReplaceHTTPPacketMethod,
-	"ReplaceHTTPPacketFirstLine":      lowhttp.ReplaceHTTPPacketFirstLine,
-	"ReplaceHTTPPacketHeader":         lowhttp.ReplaceHTTPPacketHeader,
-	"ReplaceHTTPPacketBody":           lowhttp.ReplaceHTTPPacketBodyFast,
-	"ReplaceHTTPPacketCookie":         lowhttp.ReplaceHTTPPacketCookie,
-	"ReplaceHTTPPacketHost":           lowhttp.ReplaceHTTPPacketHost,
-	"ReplaceHTTPPacketBasicAuth":      lowhttp.ReplaceHTTPPacketBasicAuth,
-	"ReplaceAllHTTPPacketQueryParams": lowhttp.ReplaceAllHTTPPacketQueryParams,
-	"ReplaceAllHTTPPacketPostParams":  lowhttp.ReplaceAllHTTPPacketPostParams,
-	"ReplaceHTTPPacketQueryParam":     lowhttp.ReplaceHTTPPacketQueryParam,
-	"ReplaceHTTPPacketPostParam":      lowhttp.ReplaceHTTPPacketPostParam,
-	"ReplaceHTTPPacketPath":           lowhttp.ReplaceHTTPPacketPath,
-	"AppendHTTPPacketHeader":          lowhttp.AppendHTTPPacketHeader,
-	"AppendHTTPPacketCookie":          lowhttp.AppendHTTPPacketCookie,
-	"AppendHTTPPacketQueryParam":      lowhttp.AppendHTTPPacketQueryParam,
-	"AppendHTTPPacketPostParam":       lowhttp.AppendHTTPPacketPostParam,
-	"AppendHTTPPacketPath":            lowhttp.AppendHTTPPacketPath,
-	"AppendHTTPPacketFormEncoded":     lowhttp.AppendHTTPPacketFormEncoded,
-	"AppendHTTPPacketUploadFile":      lowhttp.AppendHTTPPacketUploadFile,
-	"DeleteHTTPPacketHeader":          lowhttp.DeleteHTTPPacketHeader,
-	"DeleteHTTPPacketCookie":          lowhttp.DeleteHTTPPacketCookie,
-	"DeleteHTTPPacketQueryParam":      lowhttp.DeleteHTTPPacketQueryParam,
-	"DeleteHTTPPacketPostParam":       lowhttp.DeleteHTTPPacketPostParam,
-	"DeleteHTTPPacketForm":            lowhttp.DeleteHTTPPacketForm,
+	"ReplaceHTTPPacketMethod":                      lowhttp.ReplaceHTTPPacketMethod,
+	"ReplaceHTTPPacketFirstLine":                   lowhttp.ReplaceHTTPPacketFirstLine,
+	"ReplaceHTTPPacketHeader":                      lowhttp.ReplaceHTTPPacketHeader,
+	"ReplaceHTTPPacketBody":                        lowhttp.ReplaceHTTPPacketBodyFast,
+	"ReplaceHTTPPacketCookie":                      lowhttp.ReplaceHTTPPacketCookie,
+	"ReplaceHTTPPacketHost":                        lowhttp.ReplaceHTTPPacketHost,
+	"ReplaceHTTPPacketBasicAuth":                   lowhttp.ReplaceHTTPPacketBasicAuth,
+	"ReplaceAllHTTPPacketQueryParams":              lowhttp.ReplaceAllHTTPPacketQueryParams,
+	"ReplaceAllHTTPPacketQueryParamsWithoutEscape": lowhttp.ReplaceAllHTTPPacketQueryParamsWithoutEscape,
+	"ReplaceAllHTTPPacketPostParams":               lowhttp.ReplaceAllHTTPPacketPostParams,
+	"ReplaceAllHTTPPacketPostParamsWithoutEscape":  lowhttp.ReplaceAllHTTPPacketPostParamsWithoutEscape,
+	"ReplaceHTTPPacketQueryParam":                  lowhttp.ReplaceHTTPPacketQueryParam,
+	"ReplaceHTTPPacketPostParam":                   lowhttp.ReplaceHTTPPacketPostParam,
+	"ReplaceHTTPPacketPath":                        lowhttp.ReplaceHTTPPacketPath,
+	"AppendHTTPPacketHeader":                       lowhttp.AppendHTTPPacketHeader,
+	"AppendHTTPPacketCookie":                       lowhttp.AppendHTTPPacketCookie,
+	"AppendHTTPPacketQueryParam":                   lowhttp.AppendHTTPPacketQueryParam,
+	"AppendHTTPPacketPostParam":                    lowhttp.AppendHTTPPacketPostParam,
+	"AppendHTTPPacketPath":                         lowhttp.AppendHTTPPacketPath,
+	"AppendHTTPPacketFormEncoded":                  lowhttp.AppendHTTPPacketFormEncoded,
+	"AppendHTTPPacketUploadFile":                   lowhttp.AppendHTTPPacketUploadFile,
+	"DeleteHTTPPacketHeader":                       lowhttp.DeleteHTTPPacketHeader,
+	"DeleteHTTPPacketCookie":                       lowhttp.DeleteHTTPPacketCookie,
+	"DeleteHTTPPacketQueryParam":                   lowhttp.DeleteHTTPPacketQueryParam,
+	"DeleteHTTPPacketPostParam":                    lowhttp.DeleteHTTPPacketPostParam,
+	"DeleteHTTPPacketForm":                         lowhttp.DeleteHTTPPacketForm,
 
 	"GetAllHTTPPacketQueryParams": lowhttp.GetAllHTTPRequestQueryParams,
 	"GetAllHTTPPacketPostParams":  lowhttp.GetAllHTTPRequestPostParams,

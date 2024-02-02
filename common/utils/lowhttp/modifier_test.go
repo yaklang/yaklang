@@ -1174,6 +1174,32 @@ Host: www.baidu.com
 	}
 }
 
+func TestReplaceAllHttpPacketQueryParamsWithoutEscape(t *testing.T) {
+	testcases := []struct {
+		origin   string
+		values   map[string]string
+		expected string
+	}{
+		{
+			origin: `GET / HTTP/1.1
+Host: www.baidu.com
+`,
+			values: map[string]string{"a": "{{int(1-100)}}", "b": "2"},
+			expected: `GET /?a={{int(1-100)}}&b=2 HTTP/1.1
+Host: www.baidu.com
+`,
+		},
+	}
+	for _, testcase := range testcases {
+		actual := ReplaceAllHTTPPacketQueryParamsWithoutEscape([]byte(testcase.origin), testcase.values)
+		expected := FixHTTPPacketCRLF([]byte(testcase.expected), false)
+		if bytes.Compare(actual, expected) != 0 {
+			spew.Dump(actual, expected)
+			t.Fatalf("ReplaceAllHTTPPacketQueryParamsWithoutEscape failed: %s", string(actual))
+		}
+	}
+}
+
 func TestAppendHTTPPacketQueryParam(t *testing.T) {
 	testcases := []struct {
 		origin   string
@@ -1316,6 +1342,33 @@ a=1&b=2`,
 	}
 	for _, testcase := range testcases {
 		actual := ReplaceAllHTTPPacketPostParams([]byte(testcase.origin), testcase.values)
+		expected := FixHTTPPacketCRLF([]byte(testcase.expected), false)
+		if bytes.Compare(actual, expected) != 0 {
+			t.Fatalf("ReplaceAllHTTPPacketQueryParams failed: %s", string(actual))
+		}
+	}
+}
+
+func TestReplaceAllHttpPacketPostParamsWithoutEscape(t *testing.T) {
+	testcases := []struct {
+		origin   string
+		values   map[string]string
+		expected string
+	}{
+		{
+			origin: `POST / HTTP/1.1
+Host: www.baidu.com
+
+c=1&d=2`,
+			values: map[string]string{"a": "{{int(1-100)}}", "b": "2"},
+			expected: `POST / HTTP/1.1
+Host: www.baidu.com
+
+a={{int(1-100)}}&b=2`,
+		},
+	}
+	for _, testcase := range testcases {
+		actual := ReplaceAllHTTPPacketPostParamsWithoutEscape([]byte(testcase.origin), testcase.values)
 		expected := FixHTTPPacketCRLF([]byte(testcase.expected), false)
 		if bytes.Compare(actual, expected) != 0 {
 			t.Fatalf("ReplaceAllHTTPPacketQueryParams failed: %s", string(actual))
