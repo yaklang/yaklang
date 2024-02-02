@@ -1,0 +1,4 @@
+// only for local
+for result in synscan.Scan("baidu.com", "80", )~ {
+    dump(result)
+}
