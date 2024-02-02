@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/openapi/jsonpointer"
 	"math"
 	"math/big"
@@ -631,6 +632,13 @@ func (schema *Schema) WithEnum(values ...interface{}) *Schema {
 func (schema *Schema) WithDefault(defaultValue interface{}) *Schema {
 	schema.Default = defaultValue
 	return schema
+}
+
+func (scheme *Schema) WithExample(e any) *Schema {
+	if !funk.IsEmpty(e) {
+		scheme.Example = e
+	}
+	return scheme
 }
 
 func (schema *Schema) WithFormat(value string) *Schema {
