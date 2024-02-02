@@ -46,7 +46,7 @@ var (
 	CONST_YAK_OVERRIDE_DNS_SERVERS          = "YAK_OVERRIDE_DNS_SERVERS"
 	CONST_YAK_SAVE_HTTPFLOW                 = "YAK_SAVE_HTTPFLOW"
 
-	//全局网络配置
+	// 全局网络配置
 	GLOBAL_NETWORK_CONFIG      = "GLOBAL_NETWORK_CONFIG"
 	GLOBAL_NETWORK_CONFIG_INIT = "GLOBAL_NETWORK_CONFIG_INIT"
 
@@ -177,7 +177,7 @@ func GetDefaultYakitProjectDatabase(base string) string {
 	}
 
 	blocks := filepath.SplitList(YAK_PROJECT_DATA_DB_NAME)
-	var paths = make([]string, 1+len(blocks))
+	paths := make([]string, 1+len(blocks))
 	paths[0] = base
 	for i := 0; i < len(blocks); i++ {
 		paths[i+1] = blocks[i]
@@ -191,7 +191,7 @@ func GetDefaultYakitPluginDatabase(base string) string {
 	}
 
 	blocks := filepath.SplitList(YAK_PROFILE_PLUGIN_DB_NAME)
-	var paths = make([]string, 1+len(blocks))
+	paths := make([]string, 1+len(blocks))
 	paths[0] = base
 	for i := 0; i < len(blocks); i++ {
 		paths[i+1] = blocks[i]
@@ -244,17 +244,19 @@ func TempFileFast(data ...any) string {
 }
 
 func GetDefaultYakitBaseTempDir() string {
+	OnceYakitHome.Do(GetRegistryYakitHome)
+
 	if os.Getenv("YAKIT_HOME") != "" {
 		dirName := filepath.Join(os.Getenv("YAKIT_HOME"), "temp")
 		if b, _ := utils.PathExists(dirName); !b {
-			os.MkdirAll(dirName, 0777)
+			os.MkdirAll(dirName, 0o777)
 		}
 		return dirName
 	}
 
 	a := filepath.Join(utils.GetHomeDirDefault("."), "yakit-projects", "temp")
 	if utils.GetFirstExistedPath(a) == "" {
-		_ = os.MkdirAll(a, 0777)
+		_ = os.MkdirAll(a, 0o777)
 	}
 	return a
 }
@@ -263,10 +265,11 @@ func GetDefaultBaseHomeDir() string {
 	yHome := GetDefaultYakitBaseDir()
 	return filepath.Dir(yHome)
 }
+
 func GetDefaultYakitPayloadsDir() string {
 	pt := filepath.Join(GetDefaultYakitBaseDir(), "payloads")
 	if !utils.IsDir(pt) {
-		os.MkdirAll(pt, 0777)
+		os.MkdirAll(pt, 0o777)
 	}
 	return pt
 }
@@ -274,7 +277,7 @@ func GetDefaultYakitPayloadsDir() string {
 func GetDefaultYakitProjectsDir() string {
 	pt := filepath.Join(GetDefaultYakitBaseDir(), "projects")
 	if !utils.IsDir(pt) {
-		os.MkdirAll(pt, 0777)
+		os.MkdirAll(pt, 0o777)
 	}
 	return pt
 }
@@ -408,9 +411,9 @@ func GetGormCVEDescriptionDatabase() *gorm.DB {
 
 func InitializeCVEDescriptionDatabase() (*gorm.DB, error) {
 	log.Info("start to initialize cve desc db")
-	var cveDescDb = GetCVEDescriptionDatabasePath()
-	var cveDescGzip = GetCVEDescriptionDatabaseGzipPath()
-	var ret = utils.GetFirstExistedFile(cveDescDb, cveDescGzip)
+	cveDescDb := GetCVEDescriptionDatabasePath()
+	cveDescGzip := GetCVEDescriptionDatabaseGzipPath()
+	ret := utils.GetFirstExistedFile(cveDescDb, cveDescGzip)
 	log.Infof("found first existed file: %s", ret)
 	if ret == cveDescGzip {
 		log.Infof("start to un-gzip %v", cveDescGzip)
@@ -419,7 +422,7 @@ func InitializeCVEDescriptionDatabase() (*gorm.DB, error) {
 			return nil, err
 		}
 		defer fp.Close()
-		dbFp, err := os.OpenFile(cveDescDb, os.O_RDWR|os.O_CREATE, 0666)
+		dbFp, err := os.OpenFile(cveDescDb, os.O_RDWR|os.O_CREATE, 0o666)
 		if err != nil {
 			return nil, err
 		}
@@ -448,7 +451,7 @@ func InitializeCVEDatabase() (*gorm.DB, error) {
 		if err != nil {
 			return nil, err
 		}
-		dbFp, err := os.OpenFile(cveDatabase, os.O_RDWR|os.O_CREATE, 0666)
+		dbFp, err := os.OpenFile(cveDatabase, os.O_RDWR|os.O_CREATE, 0o666)
 		if err != nil {
 			fp.Close()
 			return nil, err
@@ -536,7 +539,6 @@ func doDBRiskPatch() {
 	if err != nil {
 		log.Warnf("failed to add index on risks.ip: %v", err)
 	}
-
 }
 
 func GetGormProjectDatabase() *gorm.DB {
@@ -553,7 +555,7 @@ func GetGormProjectDatabase() *gorm.DB {
 		if exist, err = utils.PathExists(baseDir); err != nil {
 			log.Errorf("check dir[%v] if exist failed: %s", baseDir, err)
 		} else if !exist {
-			err = os.MkdirAll(baseDir, 0777)
+			err = os.MkdirAll(baseDir, 0o777)
 			if err != nil {
 				log.Errorf("make dir[%v] failed: %s", baseDir, err)
 			}
@@ -597,7 +599,7 @@ func GetGormProjectDatabase() *gorm.DB {
 			log.Errorf("init plugin-db[%v] failed: %s", profileDatabaseName, err)
 		} else {
 			configureAndOptimizeDB(gormPluginDatabase)
-			err := os.Chmod(profileDatabaseName, 0666)
+			err := os.Chmod(profileDatabaseName, 0o666)
 			if err != nil {
 				log.Errorf("chmod +rw failed: %s", err)
 			}
@@ -612,7 +614,7 @@ func GetGormProjectDatabase() *gorm.DB {
 			log.Errorf("init db[%v] failed: %s", projectDatabaseName, err)
 		} else {
 			configureAndOptimizeDB(gormDatabase)
-			err := os.Chmod(projectDatabaseName, 0666)
+			err := os.Chmod(projectDatabaseName, 0o666)
 			if err != nil {
 				log.Errorf("chmod +rw failed: %s", err)
 			}
@@ -620,7 +622,6 @@ func GetGormProjectDatabase() *gorm.DB {
 
 		doDBPatch()
 		doDBRiskPatch()
-
 	})
 	return gormDatabase
 }
@@ -631,7 +632,7 @@ func configureAndOptimizeDB(db *gorm.DB) {
 	db.DB().SetMaxOpenConns(100)
 
 	db.Exec("PRAGMA synchronous = OFF;")
-	//db.Exec("PRAGMA locking_mode = EXCLUSIVE;")
+	// db.Exec("PRAGMA locking_mode = EXCLUSIVE;")
 	db.Exec("PRAGMA journal_mode = OFF;")
 	db.Exec("PRAGMA temp_store = MEMORY;")
 	db.Exec("PRAGMA cache_size = 8000;")

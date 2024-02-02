@@ -10,15 +10,15 @@ import (
 )
 
 func GetRegistryYakitHome() {
-	k, err := registry.OpenKey(registry.CURRENT_USER, `Environment\YAKIT_HOME`, registry.QUERY_VALUE)
+	k, err := registry.OpenKey(registry.CURRENT_USER, `Environment`, registry.QUERY_VALUE)
 	if err != nil {
 		return
 	}
 	defer k.Close()
 
-	s, _, err := k.GetStringValue("")
+	s, _, err := k.GetStringValue("YAKIT_HOME")
 	if err == nil {
 		os.Setenv("YAKIT_HOME", s)
-		log.Debug("Set YAKIT_HOME from registry HKCU\\Environment")
+		log.Debugf("Set YAKIT_HOME from registry HKCU\\Environment: %s", s)
 	}
 }
