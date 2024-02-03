@@ -786,49 +786,36 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 	defer recoverRange()
 	if s := stmt.Identifier(); s != nil {
 		text := s.GetText()
-		if text == "_" {
-			// return ssa.NewIdentifierLV("_", b.CurrentRange)
-		}
 		return b.CreateVariable(text, forceAssign)
-
-		// lv := ssa.NewIdentifierLV(text, b.CurrentRange)
-		// if i := b.TryBuildExternValue(text); i != nil {
-		// 	b.NewErrorWithPos(ssa.Warn, TAG, b.CurrentRange, ssa.ContAssignExtern(text))
-		// }
-		// if b.CanCaptureParentValue(text) {
-		// 	lv.SetIsSideEffect(true)
-		// }
-		// return lv
 	}
 	// TODO: this is member call
-	// if s, ok := stmt.Expression().(*yak.ExpressionContext); ok {
-	// 	var ret *ssa.Variable
-	// 	inter := b.buildExpression(s)
-	// 	if s, ok := stmt.LeftSliceCall().(*yak.LeftSliceCallContext); ok {
-	// 		recoverRange := b.SetRange(s.BaseParserRuleContext)
-	// 		if s, ok := s.Expression().(*yak.ExpressionContext); ok {
-	// 			index := b.buildExpression(s)
-	// 			ret = b.EmitFieldMust(inter, index)
-	// 		}
-	// 		recoverRange()
-	// 	}
+	if s, ok := stmt.Expression().(*yak.ExpressionContext); ok {
+		var ret *ssa.Variable
+		expr := b.buildExpression(s)
 
-	// 	if s, ok := stmt.LeftMemberCall().(*yak.LeftMemberCallContext); ok {
-	// 		recoverRange := b.SetRange(s.BaseParserRuleContext)
-	// 		if inter.IsExtern() {
-	// 			b.NewErrorWithPos(ssa.Warn, TAG, b.CurrentRange, ssa.ContAssignExtern(stmt.GetText()))
-	// 		}
-	// 		if id := s.Identifier(); id != nil {
-	// 			idText := id.GetText()
-	// 			ret = b.EmitFieldMust(inter, b.EmitConstInst(idText))
-	// 		} else if id := s.IdentifierWithDollar(); id != nil {
-	// 			key := b.ReadValue(id.GetText()[1:])
-	// 			ret = b.EmitFieldMust(inter, key)
-	// 		}
-	// 		recoverRange()
-	// 	}
-	// 	return ret
-	// }
+		if s, ok := stmt.LeftSliceCall().(*yak.LeftSliceCallContext); ok {
+			recoverRange := b.SetRange(s.BaseParserRuleContext)
+			if s, ok := s.Expression().(*yak.ExpressionContext); ok {
+				index := b.buildExpression(s)
+				ret = b.CreateMemberCallVariable(expr, index)
+			}
+			recoverRange()
+		}
+
+		if s, ok := stmt.LeftMemberCall().(*yak.LeftMemberCallContext); ok {
+			recoverRange := b.SetRange(s.BaseParserRuleContext)
+			if id := s.Identifier(); id != nil {
+				idText := id.GetText()
+				ret = b.CreateMemberCallVariable(expr, b.EmitConstInst(idText))
+			} else if id := s.IdentifierWithDollar(); id != nil {
+				key := b.ReadValue(id.GetText()[1:])
+				ret = b.CreateMemberCallVariable(expr, key)
+			}
+			recoverRange()
+		}
+		return ret
+
+	}
 	return nil
 }
 
@@ -893,17 +880,19 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		if !ok {
 			return nil
 		}
-		inter := b.buildExpression(expr)
+		exprx := b.buildExpression(expr)
 		if id := s.Identifier(); id != nil {
 			idText := id.GetText()
-			return b.EmitField(inter, b.EmitConstInst(idText))
+			// return b.EmitField(exprx, b.EmitConstInst(idText))
+			return b.ReadMemberCallVariable(exprx, b.EmitConstInst(idText))
 		} else if id := s.IdentifierWithDollar(); id != nil {
 			key := b.ReadValue(id.GetText()[1:])
 			if key == nil {
 				b.NewError(ssa.Error, TAG, ExpressionNotVariable(id.GetText()))
 				return nil
 			}
-			return b.EmitField(inter, key)
+			// return b.EmitField(exprx, key)
+			return b.ReadMemberCallVariable(exprx, key)
 		}
 	}
 
@@ -916,7 +905,8 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		expr := b.buildExpression(expression)
 		keys := b.buildSliceCall(s)
 		if len(keys) == 1 {
-			return b.EmitField(expr, keys[0])
+			// return b.EmitField(expr, keys[0])
+			return b.ReadMemberCallVariable(expr, keys[0])
 		} else if len(keys) == 2 {
 			return b.EmitMakeSlice(expr, keys[0], keys[1], nil)
 		} else if len(keys) == 3 {
