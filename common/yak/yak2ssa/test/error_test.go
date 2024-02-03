@@ -319,7 +319,7 @@ func TestForEach(t *testing.T) {
 	})
 }
 
-func TestMemberCall(t *testing.T) {
+func TestErrorMemberCall(t *testing.T) {
 	t.Run("normal member call", func(t *testing.T) {
 		CheckError(t, TestCase{
 			code: `

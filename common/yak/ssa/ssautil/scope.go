@@ -5,7 +5,6 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
@@ -19,8 +18,8 @@ type ScopedVersionedTable[T comparable] struct {
 	newVersioned VersionedBuilder[T]
 
 	// record the lexical variable
-	values *omap.OrderedMap[string, *omap.OrderedMap[string, VersionedIF[T]]] // assign variable
-	define *omap.OrderedMap[VersionedIF[T], bool]                             // un-assign variable
+	values   *omap.OrderedMap[string, *omap.OrderedMap[string, VersionedIF[T]]] // from variable get value, assigned variable
+	variable *omap.OrderedMap[T, []VersionedIF[T]]                              // from value get variable
 
 	// for closure function or block scope
 	captured *omap.OrderedMap[string, VersionedIF[T]]
@@ -43,7 +42,7 @@ func NewScope[T comparable](fetcher func() int, newVersioned VersionedBuilder[T]
 		offsetFetcher: fetcher,
 		newVersioned:  newVersioned,
 		values:        omap.NewOrderedMap[string, *omap.OrderedMap[string, VersionedIF[T]]](map[string]*omap.OrderedMap[string, VersionedIF[T]]{}),
-		define:        omap.NewOrderedMap[VersionedIF[T], bool](map[VersionedIF[T]]bool{}),
+		variable:      omap.NewOrderedMap[T, []VersionedIF[T]](map[T][]VersionedIF[T]{}),
 		captured:      omap.NewOrderedMap[string, VersionedIF[T]](map[string]VersionedIF[T]{}),
 		incomingPhi:   omap.NewOrderedMap[string, VersionedIF[T]](map[string]VersionedIF[T]{}),
 		table:         table,
@@ -172,9 +171,26 @@ func (scope *ScopedVersionedTable[T]) AssignVariable(variable VersionedIF[T], va
 	variable.SetVersion(ret.Len())
 	ret.Add(variable)
 
+	{
+		variables, ok := scope.variable.Get(value)
+		if !ok {
+			variables = make([]VersionedIF[T], 0, 1)
+		}
+		variables = append(variables, variable)
+		scope.variable.Set(value, variables)
+	}
+
 	if !variable.GetLocal() && !scope.IsRoot() {
 		scope.tryRegisterCapturedVariable(variable.GetName(), variable)
 	}
+}
+
+func (scope *ScopedVersionedTable[T]) GetVariableFromValue(value T) VersionedIF[T] {
+	variables, ok := scope.variable.Get(value)
+	if ok {
+		return variables[len(variables)-1]
+	}
+	return nil
 }
 
 // CreateSymbolicVariable create a non-lexical and no named variable
@@ -183,20 +199,20 @@ func (scope *ScopedVersionedTable[T]) AssignVariable(variable VersionedIF[T], va
 // the f()'s return value is a symbolic variable
 // we can't trace its lexical name
 // the symbol is not traced by some version.
-func (v *ScopedVersionedTable[T]) CreateSymbolicVariable(value T) VersionedIF[T] {
-	verVar := v.newVar("", false)
-	key := fmt.Sprintf("$%d$", verVar.GetGlobalIndex())
-	table := omap.NewOrderedMap[string, VersionedIF[T]](map[string]VersionedIF[T]{})
-	table.Add(verVar)
-	v.values.Set(key, table)
-	if !isZeroValue(value) {
-		err := verVar.Assign(value)
-		if err != nil {
-			log.Errorf("assign failed: %s", err)
-		}
-	}
-	return verVar
-}
+// func (v *ScopedVersionedTable[T]) CreateSymbolicVariable(value T) VersionedIF[T] {
+// 	verVar := v.newVar("", false)
+// 	key := fmt.Sprintf("$%d$", verVar.GetGlobalIndex())
+// 	table := omap.NewOrderedMap[string, VersionedIF[T]](map[string]VersionedIF[T]{})
+// 	table.Add(verVar)
+// 	v.values.Set(key, table)
+// 	if !isZeroValue(value) {
+// 		err := verVar.Assign(value)
+// 		if err != nil {
+// 			log.Errorf("assign failed: %s", err)
+// 		}
+// 	}
+// 	return verVar
+// }
 
 // try register captured variable
 func (v *ScopedVersionedTable[T]) tryRegisterCapturedVariable(name string, ver VersionedIF[T]) {
@@ -252,7 +268,7 @@ func (v *ScopedVersionedTable[T]) newVar(lexName string, local bool) VersionedIF
 // 	if err != nil {
 // 		return nil, err
 // 	}
-// 	return v.CreateVariable(name, val), nil
+// 	return v.writeVariable(name, val), nil
 // }
 
 // // CreateDynamicMemberCallVariable will need a trackable obj, and a trackable member access
@@ -262,7 +278,7 @@ func (v *ScopedVersionedTable[T]) newVar(lexName string, local bool) VersionedIF
 // 	if err != nil {
 // 		return nil, err
 // 	}
-// 	return v.CreateVariable(name, val), nil
+// 	return v.writeVariable(name, val), nil
 // }
 
 // // InCurrentLexicalScope check if the variable is in current lexical scope
@@ -306,49 +322,14 @@ func (v *ScopedVersionedTable[T]) newVar(lexName string, local bool) VersionedIF
 // 	return v.captured.Keys()
 // }
 
-// func (v *ScopedVersionedTable[T]) ConvertStaticMemberCallToLexicalName(obj int, member any) (string, error) {
-// 	left, ok := v.table[obj]
-// 	if !ok {
-// 		return "", nil
-// 	}
-// 	rootLeft := left.GetRootVersion()
+func (scope *ScopedVersionedTable[T]) CoverNumberMemberCall(variable VersionedIF[T], index int) string {
+	return fmt.Sprintf("#%d[%d]", variable.GetGlobalIndex(), index)
+}
 
-// 	var suffix string
-// 	switch member.(type) {
-// 	case string, []byte, []rune:
-// 		suffix = fmt.Sprintf(".%s", member)
-// 	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
-// 		suffix = fmt.Sprintf("[%d]", member)
-// 	default:
-// 		return "", fmt.Errorf("invalid static member type %T", member)
-// 	}
+func (socep *ScopedVersionedTable[T]) CoverStringMemberCall(variable VersionedIF[T], key string) string {
+	return fmt.Sprintf("#%d.%s", variable.GetGlobalIndex(), key)
+}
 
-// 	return fmt.Sprintf("#%v%s", rootLeft.GetGlobalIndex(), suffix), nil
-// }
-
-// func (v *ScopedVersionedTable[T]) ConvertDynamicMemberCallToLexicalName(obj, member int) (string, error) {
-// 	left, ok := v.table[obj]
-// 	if !ok {
-// 		return "", nil
-// 	}
-// 	right, ok := v.table[member]
-// 	if !ok {
-// 		return "", nil
-// 	}
-// 	rootLeft := left.GetRootVersion()
-// 	rootRight := right.GetRootVersion()
-
-// 	var suffix = fmt.Sprintf("#%v", rootRight.GetGlobalIndex())
-// 	return fmt.Sprintf("#%v.$(%s)", rootLeft.GetGlobalIndex(), suffix), nil
-// }
-
-// // func (s *ScopedVersionedTable[T]) Merge(sub ...*ScopedVersionedTable[T]) {
-// // 	if len(sub) == 1 {
-// // 		// cover origin value
-// // 		sub[0].captured.ForEach(func(name string, ver VersionedIF[T]) bool {
-// // 			return true
-// // 		})
-// // 	} else {
-// // 		// merge, generate phi
-// // 	}
-// // }
+func (scope *ScopedVersionedTable[T]) CoverDynamicMemberCall(variable, key VersionedIF[T]) string {
+	return fmt.Sprintf("#%d.$(%d)", variable.GetGlobalIndex(), key.GetGlobalIndex())
+}

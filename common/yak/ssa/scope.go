@@ -105,6 +105,57 @@ func (b *FunctionBuilder) CreateVariable(name string, isLocal bool) *Variable {
 // 	return ret
 // }
 
+func (b *FunctionBuilder) getMemberCallName(value, key Value) string {
+	var name string
+	scope := b.CurrentBlock.ScopeTable
+	variable := scope.GetVariableFromValue(value)
+	if variable == nil {
+		return ""
+	}
+	if constInst, ok := ToConst(key); ok {
+		if constInst.IsNumber() {
+			name = scope.CoverNumberMemberCall(variable, int(constInst.Number()))
+		}
+		if constInst.IsString() {
+			name = scope.CoverStringMemberCall(variable, constInst.VarString())
+		}
+	} else {
+		keyVariable := scope.GetVariableFromValue(key)
+		if keyVariable != nil {
+			name = scope.CoverDynamicMemberCall(variable, keyVariable)
+		}
+	}
+	return name
+}
+
+func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
+	if externLib, ok := ToExternLib(value); ok {
+		if ret := externLib.BuildField(key.String()); ret != nil {
+			return ret
+		}
+		//TODO: create undefine
+	}
+
+	//TODO: check value is a object
+
+	name := b.getMemberCallName(value, key)
+	if name == "" {
+		//TODO: error
+		return nil
+	}
+	return b.ReadValue(name)
+}
+
+func (b *FunctionBuilder) CreateMemberCallVariable(value, key Value) *Variable {
+	name := b.getMemberCallName(value, key)
+	if name == "" {
+		//TODO: error
+		return nil
+	}
+
+	return b.CreateVariable(name, false)
+}
+
 // --------------- `f.freeValue`
 
 func (b *FunctionBuilder) BuildFreeValue(variable string) *Parameter {
