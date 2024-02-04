@@ -288,7 +288,7 @@ func (f *FunctionBuilder) EmitMakeBuildWithType(typ Type, Len, Cap Value) *Make 
 	return i
 }
 func (f *FunctionBuilder) EmitMakeWithoutType(Len, Cap Value) *Make {
-	return f.emitMake(nil, nil, nil, nil, nil, Len, Cap)
+	return f.emitMake(nil, BasicTypes[AnyTypeKind], nil, nil, nil, Len, Cap)
 }
 func (f *FunctionBuilder) EmitMakeSlice(i Value, low, high, max Value) *Make {
 	return f.emitMake(i, i.GetType(), low, high, max, nil, nil)
