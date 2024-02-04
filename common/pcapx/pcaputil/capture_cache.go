@@ -3,7 +3,6 @@ package pcaputil
 import (
 	"context"
 	"github.com/google/gopacket"
-	"github.com/google/gopacket/pcap"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"sync"
 )
@@ -16,7 +15,7 @@ type pcapPacketHandlerContext struct {
 }
 
 type daemonCache struct {
-	handler            *pcap.Handle
+	handler            PcapHandleOperation
 	registeredHandlers *omap.OrderedMap[string, *pcapPacketHandlerContext]
 	startOnce          *sync.Once
 }

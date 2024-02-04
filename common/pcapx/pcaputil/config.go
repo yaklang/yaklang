@@ -32,6 +32,9 @@ type CaptureConfig struct {
 
 	trafficPool *TrafficPool
 
+	// TEST MOCK
+	mock PcapHandleOperation
+
 	// output debug info
 	Debug         bool
 	onPoolCreated []func(*TrafficPool)
@@ -133,6 +136,13 @@ func WithContext(ctx context.Context) CaptureOption {
 func WithDebug(b bool) CaptureOption {
 	return func(c *CaptureConfig) error {
 		c.Debug = b
+		return nil
+	}
+}
+
+func WithMockPcapOperation(op PcapHandleOperation) CaptureOption {
+	return func(config *CaptureConfig) error {
+		config.mock = op
 		return nil
 	}
 }
@@ -239,7 +249,7 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 
 	save := true
 	var ts time.Time
-	if packet.Metadata() != nil {
+	if packet != nil && packet.Metadata() != nil {
 		ts = packet.Metadata().Timestamp
 	} else {
 		ts = time.Now()
@@ -250,6 +260,10 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 			c.onEveryPacket(packet)
 		}
 	}()
+
+	if packet == nil {
+		return
+	}
 
 	var matched bool
 	ret, isOk := packet.TransportLayer().(*layers.TCP)

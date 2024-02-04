@@ -40,15 +40,19 @@ func TestStart1(t *testing.T) {
 func TestBackgroundHandler(t *testing.T) {
 	var count = 0
 	var count1 = 0
+	swg := utils.NewSizedWaitGroup(2)
+	swg.Add(2)
 	go func() {
+		defer swg.Done()
 		err := Start(
 			WithEmptyDeviceStop(true),
 			WithDevice("en1"),
 			WithEveryPacket(func(packet gopacket.Packet) {
 				count++
 			}),
-			WithContext(utils.TimeoutContext(3*time.Second)),
+			WithContext(utils.TimeoutContext(2*time.Second)),
 			WithEnableCache(true),
+			WithMockPcapOperation(&MockPcapOperation{}),
 		)
 		if err != nil {
 			t.Fatal(err)
@@ -56,22 +60,24 @@ func TestBackgroundHandler(t *testing.T) {
 	}()
 
 	go func() {
+		defer swg.Done()
 		err := Start(
 			WithEmptyDeviceStop(true),
 			WithDevice("en1"),
 			WithEveryPacket(func(packet gopacket.Packet) {
 				count1++
 			}),
-			WithContext(utils.TimeoutContextSeconds(8)),
+			WithContext(utils.TimeoutContextSeconds(4)),
 			WithEnableCache(true),
+			WithMockPcapOperation(&MockPcapOperation{}),
 		)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}()
-
-	for {
-		time.Sleep(time.Second)
-		spew.Dump(count, count1)
+	swg.Wait()
+	spew.Dump(count, count1)
+	if count1-count < 10 {
+		t.Fatal("count1-count < 10")
 	}
 }
