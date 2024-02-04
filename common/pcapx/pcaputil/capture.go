@@ -5,20 +5,15 @@ import (
 	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcap"
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
-func _open(ctx context.Context, handler *pcap.Handle, bpf string, packetEntry func(context.Context, gopacket.Packet)) error {
+func _open(ctx context.Context, handler *pcap.Handle, packetEntry func(context.Context, gopacket.Packet)) error {
 	innerCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-
-	if bpf != "" {
-		if err := handler.SetBPFFilter(bpf); err != nil {
-			return utils.Errorf("set bpf filter failed: %s", err)
-		}
-	}
-
 	packetSource := gopacket.NewPacketSource(handler, handler.LinkType())
 	for {
 		select {
@@ -45,15 +40,19 @@ func Start(opt ...CaptureOption) error {
 		}
 	}
 
-	var handlers []*pcap.Handle
+	var handlers = omap.NewOrderedMap(map[string]*pcap.Handle{})
 	if conf.Filename != "" {
 		handler, err := OpenFile(conf.Filename)
 		if err != nil {
 			log.Errorf("open file (%v) failed: %s", conf.Filename, err)
 		} else {
-			handlers = append(handlers, handler)
+			handlers.Set(conf.Filename, handler)
 		}
 	} else if len(conf.Device) == 0 {
+		if conf.EmptyDeviceStop {
+			return utils.Errorf("no device found")
+		}
+
 		var ifs, err = pcap.FindAllDevs()
 		if err != nil {
 			return utils.Errorf("(pcap) find all devs failed: %s", err)
@@ -68,12 +67,12 @@ func Start(opt ...CaptureOption) error {
 		}
 
 		for _, iface := range ifs {
-			handler, err := OpenIfaceLive(iface.Name)
+			cacheId, handler, err := getInterfaceHandlerFromConfig(iface.Name, conf)
 			if err != nil {
 				log.Errorf("open device (%v) failed: %s", iface.Name, err)
 				continue
 			}
-			handlers = append(handlers, handler)
+			handlers.Set(cacheId, handler)
 		}
 	} else {
 		for _, i := range conf.Device {
@@ -82,17 +81,15 @@ func Start(opt ...CaptureOption) error {
 				log.Warnf("convert iface name (%v) failed: %s, use default", i, err)
 				pcapIface = i
 			}
-			handler, err := OpenIfaceLive(pcapIface)
+			cacheId, handler, err := getInterfaceHandlerFromConfig(pcapIface, conf)
 			if err != nil {
 				log.Errorf("open device (%v) failed: %s", pcapIface, err)
 				continue
 			}
-			handlers = append(handlers, handler)
-		}
-	}
-	for _, handler := range handlers {
-		if err := handler.SetBPFFilter(conf.BPFFilter); err != nil {
-			return err
+			if cacheId == "" {
+				cacheId = uuid.New().String()
+			}
+			handlers.Set(cacheId, handler)
 		}
 	}
 	if conf.Context == nil {
@@ -108,14 +105,50 @@ func Start(opt ...CaptureOption) error {
 	for _, p := range conf.onPoolCreated {
 		p(conf.trafficPool)
 	}
-	utils.WaitRoutinesFromSlice(handlers, func(handler *pcap.Handle) {
+
+	if conf.EnableCache {
+		// keep cache
+		// add cancel func to defer
+		// hack: use runtimeId to registerCallback
+		var cancels []func()
+		handlers.ForEach(func(i string, v *pcap.Handle) bool {
+			if conf.EnableCache {
+				cancels = append(cancels, keepDaemonCache(i, ctx))
+			}
+			return true
+		})
 		defer func() {
-			handler.Close()
+			for _, c := range cancels {
+				c()
+			}
 		}()
-		if err := _open(ctx, handler, "", conf.packetHandler); err != nil {
-			log.Errorf("open device failed: %s", err)
+
+		runtimeId := uuid.New().String()
+		handlers.ForEach(func(i string, v *pcap.Handle) bool {
+			registerCallback(i, runtimeId, ctx, func(ctx context.Context, packet gopacket.Packet) error {
+				conf.packetHandler(ctx, packet)
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				default:
+					return nil
+				}
+			})
+			return true
+		})
+		select {
+		case <-ctx.Done():
 		}
-	})
+	} else {
+		utils.WaitRoutinesFromSlice(handlers.Values(), func(handler *pcap.Handle) {
+			defer func() {
+				handler.Close()
+			}()
+			if err := _open(ctx, handler, conf.packetHandler); err != nil {
+				log.Errorf("open device failed: %s", err)
+			}
+		})
+	}
 
 	return nil
 }
