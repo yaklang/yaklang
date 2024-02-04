@@ -159,10 +159,12 @@ func NewErrorHandler(try, catch *BasicBlock) *ErrorHandler {
 	return e
 }
 
-func NewExternLib(variable string, builder *FunctionBuilder) *ExternLib {
+func NewExternLib(variable string, builder *FunctionBuilder, table map[string]any) *ExternLib {
 	e := &ExternLib{
 		anInstruction: NewInstruction(),
 		anValue:       NewValue(),
+		table:         table,
+		builder:       builder,
 		MemberMap:     make(map[string]Value),
 		Member:        make([]Value, 0),
 	}
