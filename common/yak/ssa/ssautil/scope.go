@@ -1,7 +1,6 @@
 package ssautil
 
 import (
-	"fmt"
 	"reflect"
 	"sync"
 
@@ -321,15 +320,3 @@ func (v *ScopedVersionedTable[T]) newVar(lexName string, local bool) VersionedIF
 // func (v *ScopedVersionedTable[T]) GetAllCapturedVariableNames() []string {
 // 	return v.captured.Keys()
 // }
-
-func (scope *ScopedVersionedTable[T]) CoverNumberMemberCall(variable VersionedIF[T], index int) string {
-	return fmt.Sprintf("#%d[%d]", variable.GetGlobalIndex(), index)
-}
-
-func (socep *ScopedVersionedTable[T]) CoverStringMemberCall(variable VersionedIF[T], key string) string {
-	return fmt.Sprintf("#%d.%s", variable.GetGlobalIndex(), key)
-}
-
-func (scope *ScopedVersionedTable[T]) CoverDynamicMemberCall(variable, key VersionedIF[T]) string {
-	return fmt.Sprintf("#%d.$(%d)", variable.GetGlobalIndex(), key.GetGlobalIndex())
-}
