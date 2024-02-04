@@ -335,7 +335,7 @@ func getBuiltinFuncDeclAndDoc(name string, bareTyp ssa.Type) (desc string, doc s
 		if !ok {
 			break
 		}
-		if rTyp.KeyTyp.GetTypeKind() == ssa.Bytes {
+		if rTyp.KeyTyp.GetTypeKind() == ssa.BytesTypeKind {
 			getBytesBuiltinMethodSuggestions()
 			m = bytesBuiltinMethodSuggestionMap
 		} else {
@@ -346,7 +346,7 @@ func getBuiltinFuncDeclAndDoc(name string, bareTyp ssa.Type) (desc string, doc s
 		// map 内置方法
 		getMapBuiltinMethodSuggestions()
 		m = mapBuiltinMethodSuggestionMap
-	case ssa.String:
+	case ssa.StringTypeKind:
 		// string 内置方法
 		getStringBuiltinMethodSuggestions()
 		m = stringBuiltinMethodSuggestionMap
@@ -485,7 +485,7 @@ func getDescFromSSAValue(name string, v *ssaapi.Value) string {
 			desc += methodDescriptions
 			desc += "}"
 			desc += "\n```"
-		case ssa.Any:
+		case ssa.AnyTypeKind:
 			desc = getExternLibDesc(name, typName)
 		}
 	} else {
@@ -791,7 +791,7 @@ func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionReques
 		if !ok {
 			break
 		}
-		if rTyp.KeyTyp.GetTypeKind() == ssa.Bytes {
+		if rTyp.KeyTyp.GetTypeKind() == ssa.BytesTypeKind {
 			ret = append(ret, getBytesBuiltinMethodSuggestions()...)
 		} else {
 			ret = append(ret, getSliceBuiltinMethodSuggestions()...)
@@ -835,7 +835,7 @@ func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionReques
 		// 		Kind:        "Field",
 		// 	})
 		// }
-	case ssa.String:
+	case ssa.StringTypeKind:
 		// string 内置方法
 		ret = append(ret, getStringBuiltinMethodSuggestions()...)
 	}

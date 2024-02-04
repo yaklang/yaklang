@@ -14,7 +14,7 @@ func init() {
 	BasicTypes[ErrorType].method["Error"] = NewFunctionTypeDefine(
 		"error.Error",
 		[]Type{BasicTypes[ErrorType]},
-		[]Type{BasicTypes[String]},
+		[]Type{BasicTypes[StringTypeKind]},
 		false,
 	)
 }
@@ -22,14 +22,14 @@ func init() {
 const MAXTypeCompareDepth = 10
 
 func TypeCompare(t1, t2 Type) bool {
-	return TypeCompareEx(t1, t2, 0) || TypeCompareEx(t2, t1, 0)
+	return typeCompareEx(t1, t2, 0) || typeCompareEx(t2, t1, 0)
 }
 
-func TypeCompareEx(t1, t2 Type, depth int) bool {
+func typeCompareEx(t1, t2 Type, depth int) bool {
 	t1kind := t1.GetTypeKind()
 	t2kind := t2.GetTypeKind()
 
-	if t1kind == Any || t2kind == Any {
+	if t1kind == AnyTypeKind || t2kind == AnyTypeKind {
 		return true
 	}
 
@@ -54,11 +54,11 @@ func TypeCompareEx(t1, t2 Type, depth int) bool {
 			return false
 		}
 		for i := 0; i < len(t1f.Parameter); i++ {
-			if !TypeCompareEx(t1f.Parameter[i], t2f.Parameter[i], depth) {
+			if !typeCompareEx(t1f.Parameter[i], t2f.Parameter[i], depth) {
 				return false
 			}
 		}
-		if !TypeCompareEx(t1f.ReturnType, t2f.ReturnType, depth) {
+		if !typeCompareEx(t1f.ReturnType, t2f.ReturnType, depth) {
 			return false
 		}
 		return true
@@ -68,27 +68,27 @@ func TypeCompareEx(t1, t2 Type, depth int) bool {
 			break
 		}
 		t1o, _ := ToObjectType(t1)
-		return TypeCompareEx(t1o.FieldType, t2o.FieldType, depth)
+		return typeCompareEx(t1o.FieldType, t2o.FieldType, depth)
 	case MapTypeKind:
 		t2o, ok := t2.(*ObjectType)
 		if !ok {
 			break
 		}
 		t1o := t1.(*ObjectType)
-		return TypeCompareEx(t1o.FieldType, t2o.FieldType, depth) && TypeCompareEx(t1o.KeyTyp, t2o.KeyTyp, depth)
+		return typeCompareEx(t1o.FieldType, t2o.FieldType, depth) && typeCompareEx(t1o.KeyTyp, t2o.KeyTyp, depth)
 	case StructTypeKind:
 	case ObjectTypeKind:
-	case Bytes:
+	case BytesTypeKind:
 		// string | []number
-		if t2kind == String {
+		if t2kind == StringTypeKind {
 			return true
 		}
-	case String:
-		if t2kind == Bytes {
+	case StringTypeKind:
+		if t2kind == BytesTypeKind {
 			return true
 		}
-	case Null:
-		if t2kind == Number || t2kind == Boolean || t2kind == String {
+	case NullTypeKind:
+		if t2kind == NumberTypeKind || t2kind == BooleanTypeKind || t2kind == StringTypeKind {
 			return false
 		} else {
 			return true
@@ -235,13 +235,13 @@ func (t Types) IsType(kind TypeKind) bool {
 type TypeKind int
 
 const (
-	Number TypeKind = iota
-	String
-	Bytes
-	Boolean
-	UndefinedType // undefined is nil in golang
-	Null          //
-	Any           // any type
+	NumberTypeKind TypeKind = iota
+	StringTypeKind
+	BytesTypeKind
+	BooleanTypeKind
+	UndefinedTypeKind // undefined is nil in golang
+	NullTypeKind      //
+	AnyTypeKind       // any type
 	ChanTypeKind
 	ErrorType
 
@@ -312,43 +312,43 @@ func (b *BasicType) AddMethod(id string, f *FunctionType) {
 
 var _ Type = (*BasicType)(nil)
 
-var BasicTypes = []*BasicType{
-	Number:        NewBasicType(Number, "number"),
-	String:        NewBasicType(String, "string"),
-	Bytes:         NewBasicType(Bytes, "bytes"),
-	Boolean:       NewBasicType(Boolean, "boolean"),
-	UndefinedType: NewBasicType(UndefinedType, "undefined"),
-	Null:          NewBasicType(Null, "null"),
-	Any:           NewBasicType(Any, "any"),
-	ErrorType:     NewBasicType(ErrorType, "error"),
+var BasicTypes = map[TypeKind]*BasicType{
+	NumberTypeKind:    NewBasicType(NumberTypeKind, "number"),
+	StringTypeKind:    NewBasicType(StringTypeKind, "string"),
+	BytesTypeKind:     NewBasicType(BytesTypeKind, "bytes"),
+	BooleanTypeKind:   NewBasicType(BooleanTypeKind, "boolean"),
+	UndefinedTypeKind: NewBasicType(UndefinedTypeKind, "undefined"),
+	NullTypeKind:      NewBasicType(NullTypeKind, "null"),
+	AnyTypeKind:       NewBasicType(AnyTypeKind, "any"),
+	ErrorType:         NewBasicType(ErrorType, "error"),
 }
 
 func GetNumberType() Type {
-	return BasicTypes[Number]
+	return BasicTypes[NumberTypeKind]
 }
 
 func GetStringType() Type {
-	return BasicTypes[String]
+	return BasicTypes[StringTypeKind]
 }
 
 func GetBytesType() Type {
-	return BasicTypes[Bytes]
+	return BasicTypes[BytesTypeKind]
 }
 
 func GetBooleanType() Type {
-	return BasicTypes[Boolean]
+	return BasicTypes[BooleanTypeKind]
 }
 
 func GetUndefinedType() Type {
-	return BasicTypes[UndefinedType]
+	return BasicTypes[UndefinedTypeKind]
 }
 
 func GetNullType() Type {
-	return BasicTypes[Null]
+	return BasicTypes[NullTypeKind]
 }
 
 func GetAnyType() Type {
-	return BasicTypes[Any]
+	return BasicTypes[AnyTypeKind]
 }
 
 func GetErrorType() Type {
@@ -366,17 +366,17 @@ func GetType(i any) Type {
 func GetTypeByStr(typ string) Type {
 	switch typ {
 	case "uint", "uint8", "byte", "uint16", "uint32", "uint64", "int", "int8", "int16", "int32", "int64", "uintptr":
-		return BasicTypes[Number]
+		return BasicTypes[NumberTypeKind]
 	case "float", "float32", "float64", "double", "complex128", "complex64":
-		return BasicTypes[Number]
+		return BasicTypes[NumberTypeKind]
 	case "string":
-		return BasicTypes[String]
+		return BasicTypes[StringTypeKind]
 	case "bool":
-		return BasicTypes[Boolean]
+		return BasicTypes[BooleanTypeKind]
 	case "bytes", "[]uint8", "[]byte":
-		return BasicTypes[Bytes]
+		return BasicTypes[BytesTypeKind]
 	case "interface {}", "var", "any":
-		return BasicTypes[Any]
+		return BasicTypes[AnyTypeKind]
 	case "error":
 		return BasicTypes[ErrorType]
 	default:
@@ -619,7 +619,7 @@ func NewObjectType() *ObjectType {
 func NewSliceType(elem Type) *ObjectType {
 	i := NewObjectType()
 	i.Kind = SliceTypeKind
-	i.KeyTyp = BasicTypes[Number]
+	i.KeyTyp = BasicTypes[NumberTypeKind]
 	i.FieldType = elem
 	return i
 }
@@ -677,11 +677,11 @@ func (itype ObjectType) RawString() string {
 		// if len(itype.keyType) == 1 && len(itype.Field) == 1 {
 		keyTyp := itype.KeyTyp
 		if utils.IsNil(keyTyp) {
-			keyTyp = BasicTypes[Any]
+			keyTyp = BasicTypes[AnyTypeKind]
 		}
 		fieldType := itype.FieldType
 		if utils.IsNil(fieldType) {
-			fieldType = BasicTypes[Any]
+			fieldType = BasicTypes[AnyTypeKind]
 		}
 		ret += fmt.Sprintf("map[%s]%s", keyTyp.String(), fieldType.String())
 		// } else {
@@ -708,7 +708,7 @@ func (s *ObjectType) AddField(key Value, field Type) {
 	keyTyp := key.GetType()
 	s.keyTypes = append(s.keyTypes, keyTyp)
 	if field == nil {
-		field = BasicTypes[Any]
+		field = BasicTypes[AnyTypeKind]
 	}
 	s.FieldTypes = append(s.FieldTypes, field)
 }
@@ -751,12 +751,12 @@ func (s *ObjectType) Finish() {
 	if len(fieldTypes) == 1 {
 		s.FieldType = fieldTypes[0]
 	} else {
-		s.FieldType = BasicTypes[Any]
+		s.FieldType = BasicTypes[AnyTypeKind]
 	}
 	if len(keyTypes) == 1 {
 		s.KeyTyp = keyTypes[0]
 	} else {
-		s.KeyTyp = BasicTypes[Any]
+		s.KeyTyp = BasicTypes[AnyTypeKind]
 	}
 }
 
@@ -789,7 +789,7 @@ func (f *FunctionType) SetModifySelf(b bool) { f.IsModifySelf = b }
 
 func CalculateType(ts []Type) Type {
 	if len(ts) == 0 {
-		return BasicTypes[Null]
+		return BasicTypes[NullTypeKind]
 	} else if len(ts) == 1 {
 		return ts[0]
 	} else {
