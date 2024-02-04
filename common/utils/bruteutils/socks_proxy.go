@@ -1,6 +1,7 @@
 package bruteutils
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -20,7 +21,7 @@ func testSocksProxy(scheme string, host string, username string, password string
 		lowhttp.WithConnectTimeoutFloat(15),
 		lowhttp.WithTimeoutFloat(10),
 	)
-	if err == nil && len(rspInst.MultiResponseInstances) > 0 && rspInst.MultiResponseInstances[0].StatusCode == 200 {
+	if err == nil && len(rspInst.MultiResponseInstances) > 0 && rspInst.MultiResponseInstances[0].StatusCode == 200 && bytes.Contains(rspInst.RawPacket, ExampleChallengeContent) {
 		return true
 	}
 

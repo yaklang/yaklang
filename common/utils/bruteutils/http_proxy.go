@@ -1,10 +1,13 @@
 package bruteutils
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
+
+var ExampleChallengeContent = []byte("This domain is for use in illustrative examples in documents.")
 
 func testHTTPProxy(host string, username string, password string) bool {
 	var proxy string
@@ -20,7 +23,7 @@ func testHTTPProxy(host string, username string, password string) bool {
 		lowhttp.WithConnectTimeoutFloat(15),
 		lowhttp.WithTimeoutFloat(10),
 	)
-	if err == nil && len(rspInst.MultiResponseInstances) > 0 && rspInst.MultiResponseInstances[0].StatusCode == 200 {
+	if err == nil && len(rspInst.MultiResponseInstances) > 0 && rspInst.MultiResponseInstances[0].StatusCode == 200 && bytes.Contains(rspInst.RawPacket, ExampleChallengeContent) {
 		return true
 	}
 
