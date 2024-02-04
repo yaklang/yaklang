@@ -57,37 +57,95 @@ func (b *FunctionBuilder) TryGetSimilarityKey(name, key string) string {
 	return ret
 }
 
-func (b *FunctionBuilder) TryBuildExternValue(id string) Value {
-	if v, ok := b.externInstance[id]; ok {
+func (ex *ExternLib) BuildField(key string) Value {
+	if ret, ok := ex.MemberMap[key]; ok {
+		return ret
+	}
+	b := ex.builder
+	if v, ok := ex.table[key]; ok {
+		v := b.BuildValueFromAny(ex.GetName()+"."+key, v)
+		ex.MemberMap[key] = v
+		ex.Member = append(ex.Member, v)
 		return v
-	}
-	if b.ExternInstance != nil {
-		if v, ok := b.ExternInstance[id]; ok {
-			return b.BuildValueFromAny(id, v)
-		}
-	}
-	if b.ExternLib != nil {
-		if table, ok := b.ExternLib[id]; ok {
-			ex := NewExternLib(id, b)
-			ex.SetExtern(true)
-			ex.BuildField = func(key string) Value {
-				if v, ok := table[key]; ok {
-					v := b.BuildValueFromAny(id+"."+key, v)
-					return v
-				} else {
-					return nil
-				}
-			}
-			return ex
-		}
 	}
 	return nil
 }
 
-func (b *FunctionBuilder) BuildValueFromAny(id string, v any) (value Value) {
-	if value, ok := b.externInstance[id]; ok {
-		return value
+func (b *FunctionBuilder) TryBuildExternValue(id string) Value {
+	getExternValue := func(id string) Value {
+		if v, ok := b.cacheExternInstance[id]; ok {
+			return v
+		}
+
+		if b.ExternInstance == nil {
+			return nil
+		}
+		v, ok := b.ExternInstance[id]
+		if !ok {
+			return nil
+		}
+		ret := b.BuildValueFromAny(id, v)
+		b.cacheExternInstance[id] = ret
+		return ret
 	}
+
+	getExternLib := func(id string) *ExternLib {
+		if v, ok := b.cacheExternInstance[id]; ok {
+			if ex, ok := v.(*ExternLib); ok {
+				return ex
+			}
+			return nil
+		}
+
+		if b.ExternLib == nil {
+			return nil
+		}
+		table, ok := b.ExternLib[id]
+		if !ok {
+			return nil
+		}
+		ex := NewExternLib(id, b, table)
+		ex.SetExtern(true)
+		b.cacheExternInstance[id] = ex
+		return ex
+	}
+
+	getExternInstance := func(id string) Value {
+		if ret := getExternValue(id); ret != nil {
+			return ret
+		}
+		if ret := getExternLib(id); ret != nil {
+			return ret
+		}
+		return nil
+	}
+
+	getExternField := func(lib string, key string) Value {
+		if v, ok := b.cacheExternInstance[id]; ok {
+			return v
+		}
+
+		extern := getExternLib(lib)
+		if extern == nil {
+			return nil
+		}
+		ret := extern.BuildField(key)
+		if ret != nil {
+			b.cacheExternInstance[id] = ret
+		}
+		return ret
+	}
+
+	if str := strings.Split(id, "."); len(str) == 1 {
+		return getExternInstance(id)
+	} else if len(str) == 2 {
+		return getExternField(str[0], str[1])
+	} else {
+		return nil
+	}
+}
+
+func (b *FunctionBuilder) BuildValueFromAny(id string, v any) (value Value) {
 
 	itype := reflect.TypeOf(v)
 	if itype == nil {
@@ -109,7 +167,6 @@ func (b *FunctionBuilder) BuildValueFromAny(id string, v any) (value Value) {
 		value.SetType(b.handlerType(itype, 0))
 	}
 	value.SetExtern(true)
-	b.externInstance[str] = value
 	b.GetProgram().SetInstructionWithName(str, value)
 	return
 }

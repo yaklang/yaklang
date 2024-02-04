@@ -300,8 +300,8 @@ type Function struct {
 	ChildFuncs []*Function // child function within this function
 
 	// extern lib
-	externInstance map[string]Value // lib and value
-	externType     map[string]Type
+	cacheExternInstance map[string]Value // lib and value
+	externType          map[string]Type
 
 	// include / require / eval-code / import packet
 	referenceFiles *omap.OrderedMap[string, string]
@@ -399,7 +399,8 @@ type ExternLib struct {
 	anInstruction
 	anValue
 
-	BuildField func(string) Value
+	table   map[string]any
+	builder *FunctionBuilder
 
 	MemberMap map[string]Value
 	Member    []Value

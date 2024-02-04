@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/plugin_type"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
@@ -32,8 +33,8 @@ func RuleRisk(prog *ssaapi.Program) *result.StaticAnalyzeResults {
 			for i := 2; i < len(ops); i++ {
 				// log.Infof("ops %v", ops[i])
 				opt := ops[i]
-				optFuncName := opt.GetOperand(0).String()
-				// log.Infof("optFuncName %v", optFuncName)
+				optFuncName := opt.GetOperand(0).GetName()
+				log.Infof("optFuncName %v", optFuncName)
 
 				if optFuncName == "risk.description" {
 					RiskDescription = true
@@ -67,7 +68,7 @@ func RuleRisk(prog *ssaapi.Program) *result.StaticAnalyzeResults {
 			return v.IsCall()
 		}).ForEach(func(v *ssaapi.Value) {
 			// this is user of risk.CreateRisk()
-			if v.GetCallee().String() == "risk.Save" {
+			if v.GetCallee().GetName() == "risk.Save" {
 				flag = true
 			}
 		})
