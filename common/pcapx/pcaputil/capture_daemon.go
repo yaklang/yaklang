@@ -55,7 +55,7 @@ func keepDaemonCache(key string, ctx context.Context) context.CancelFunc {
 	}
 }
 
-func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (string, *pcap.Handle, error) {
+func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (string, PcapHandleOperation, error) {
 	if conf.EnableCache {
 		var hashRaw bytes.Buffer
 		hashRaw.WriteString(ifaceName)
@@ -70,9 +70,22 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 		if handler, ok := getDaemonCache(cacheId); ok {
 			return cacheId, handler.handler, nil
 		}
-		handler, err := OpenIfaceLive(ifaceName)
+
+		var handler *pcap.Handle
+		var operation PcapHandleOperation
+		var err error
+
+		if conf.mock != nil {
+			operation = conf.mock
+		} else {
+			handler, err = OpenIfaceLive(ifaceName)
+			if err != nil {
+				return "", nil, err
+			}
+			operation = handler
+		}
 		if conf.BPFFilter != "" {
-			if err := handler.SetBPFFilter(conf.BPFFilter); err != nil {
+			if err := operation.SetBPFFilter(conf.BPFFilter); err != nil {
 				return "", nil, err
 			}
 		}
@@ -81,27 +94,59 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 			registeredHandlers: omap.NewOrderedMap(make(map[string]*pcapPacketHandlerContext)),
 			startOnce:          new(sync.Once),
 		}
-		daemon.startOnce.Do(func() {
-			if conf.BPFFilter != "" {
-				log.Infof("background iface: %v with %s is start...", ifaceName, conf.BPFFilter)
-			} else {
-				log.Infof("background iface: %v is start...", ifaceName)
-			}
 
-			packetSource := gopacket.NewPacketSource(handler, handler.LinkType())
-			go func() {
-				defer func() {
-					log.Infof("background iface: %v is stop...", ifaceName)
-				}()
-				for {
-					select {
-					case packet := <-packetSource.Packets():
-						if packet == nil {
-							return
+		if conf.mock == nil {
+			daemon.startOnce.Do(func() {
+				if conf.BPFFilter != "" {
+					log.Infof("background iface: %v with %s is start...", ifaceName, conf.BPFFilter)
+				} else {
+					log.Infof("background iface: %v is start...", ifaceName)
+				}
+
+				packetSource := gopacket.NewPacketSource(handler, handler.LinkType()).Packets()
+				go func() {
+					defer func() {
+						log.Infof("background iface: %v is stop...", ifaceName)
+					}()
+					for {
+						select {
+						case packet := <-packetSource:
+							if packet == nil {
+								return
+							}
+							var failedTrigger []string
+							daemon.registeredHandlers.ForEach(func(i string, v *pcapPacketHandlerContext) bool {
+								err := v.handler(v.ctx, packet)
+								if err != nil {
+									log.Errorf("%v handler error: %s", i, err)
+									failedTrigger = append(failedTrigger, i)
+								}
+								return true
+							})
+							for _, i := range failedTrigger {
+								daemon.registeredHandlers.Delete(i)
+							}
+						case <-time.After(3 * time.Second):
+							if handler.Error() != nil {
+								return
+							}
 						}
+					}
+				}()
+			})
+		} else {
+			daemon.startOnce.Do(func() {
+				log.Infof("mock background iface: %v is start...", ifaceName)
+				go func() {
+					defer func() {
+						log.Infof("mock background iface: %v is stop...", ifaceName)
+					}()
+					for {
+
+						time.Sleep(time.Millisecond * 100)
 						var failedTrigger []string
 						daemon.registeredHandlers.ForEach(func(i string, v *pcapPacketHandlerContext) bool {
-							err := v.handler(v.ctx, packet)
+							err := v.handler(v.ctx, nil)
 							if err != nil {
 								log.Errorf("%v handler error: %s", i, err)
 								failedTrigger = append(failedTrigger, i)
@@ -111,14 +156,10 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 						for _, i := range failedTrigger {
 							daemon.registeredHandlers.Delete(i)
 						}
-					case <-time.After(3 * time.Second):
-						if handler.Error() != nil {
-							return
-						}
 					}
-				}
-			}()
-		})
+				}()
+			})
+		}
 		registerDaemonCache(cacheId, daemon)
 		return cacheId, handler, err
 	}
