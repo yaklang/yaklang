@@ -14,6 +14,8 @@ type VersionedIF[T comparable] interface {
 	IsNil() bool
 	GetValue() T
 
+	// Replace
+	Replace(T, T)
 	// Assign assign a value to the variable
 	Assign(T) error
 
@@ -84,6 +86,13 @@ func (v *Versioned[T]) IsNil() bool {
 func (v *Versioned[T]) GetValue() (ret T) {
 	return v.Value
 }
+
+func (v *Versioned[T]) Replace(val, to T) {
+	if v.Value == val {
+		v.Value = to
+	}
+}
+
 func (v *Versioned[T]) Assign(val T) error {
 	if v.isAssigned.IsSet() {
 		log.Warnf("ssa: #%v have been assigned by %v", v.globalIndex, v.Value)
