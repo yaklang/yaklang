@@ -24,6 +24,12 @@ type CaptureConfig struct {
 	BPFFilter string
 	Context   context.Context
 
+	EmptyDeviceStop bool
+
+	/* cache for handler cache */
+	EnableCache     bool
+	OverrideCacheId string
+
 	trafficPool *TrafficPool
 
 	// output debug info
@@ -42,6 +48,27 @@ func emptyOption(_ *CaptureConfig) error {
 func WithEveryPacket(h func(packet gopacket.Packet)) CaptureOption {
 	return func(c *CaptureConfig) error {
 		c.onEveryPacket = h
+		return nil
+	}
+}
+
+func WithEmptyDeviceStop(b bool) CaptureOption {
+	return func(c *CaptureConfig) error {
+		c.EmptyDeviceStop = b
+		return nil
+	}
+}
+
+func WithEnableCache(b bool) CaptureOption {
+	return func(c *CaptureConfig) error {
+		c.EnableCache = b
+		return nil
+	}
+}
+
+func WithOverrideCacheId(id string) CaptureOption {
+	return func(c *CaptureConfig) error {
+		c.OverrideCacheId = id
 		return nil
 	}
 }
