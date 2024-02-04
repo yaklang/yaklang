@@ -63,11 +63,11 @@ func (b *Builder) Build(t ssa.Type, s string) *ssa.FunctionType {
 	)
 
 	var (
-		StrTyp      = ssa.BasicTypes[ssa.String]
-		NumberTyp   = ssa.BasicTypes[ssa.Number]
-		BoolTyp     = ssa.BasicTypes[ssa.Boolean]
-		AnyTyp      = ssa.BasicTypes[ssa.Any]
-		BytesTyp    = ssa.BasicTypes[ssa.Bytes]
+		StrTyp      = ssa.BasicTypes[ssa.StringTypeKind]
+		NumberTyp   = ssa.BasicTypes[ssa.NumberTypeKind]
+		BoolTyp     = ssa.BasicTypes[ssa.BooleanTypeKind]
+		AnyTyp      = ssa.BasicTypes[ssa.AnyTypeKind]
+		BytesTyp    = ssa.BasicTypes[ssa.BytesTypeKind]
 		HandlerFunc = func(arg, ret []ssa.Type, isVar bool) ssa.Type {
 			return ssa.NewFunctionTypeDefine("handler", arg, ret, isVar)
 		}
@@ -179,7 +179,7 @@ func (b *Builder) Build(t ssa.Type, s string) *ssa.FunctionType {
 		default:
 			name = ""
 		}
-	case ssa.String:
+	case ssa.StringTypeKind:
 		name += "string." + s
 		switch s {
 		case "First":
@@ -240,7 +240,7 @@ func (b *Builder) Build(t ssa.Type, s string) *ssa.FunctionType {
 		default:
 			name = ""
 		}
-	case ssa.Bytes:
+	case ssa.BytesTypeKind:
 		name = "bytes." + s
 		switch s {
 		case "First":
@@ -312,7 +312,7 @@ func (b *Builder) GetMethodNames(t ssa.Type) []string {
 		return []string{
 			"Append", "Push", "Pop", "Extend", "Merge", "Length", "Len", "Capability", "Cap", "StringSlice", "GeneralSlice", "Shift", "Unshift", "Map", "Filter", "Insert", "Remove", "Reverse", "Sort", "Clear", "Count", "Index",
 		}
-	case ssa.String:
+	case ssa.StringTypeKind:
 		return []string{
 			"Reverse", "Shuffle", "Fuzz", "Contains", "IContains", "ReplaceN", "ReplaceAll", "Replace", "Split", "SplitN", "Join", "Trim", "TrimLeft", "TrimRight", "HasPrefix", "HasSuffix", "StartsWith", "EndsWith", "RemovePrefix", "RemoveSuffix", "Zfill", "Rfill", "Lfill", "Ljust", "Rjust", "Count", "Find", "RFind", "IndexOf", "LastIndexOf", "Lower", "Upper", "Title", "IsLower", "IsUpper", "IsTitle", "IsAlpha", "IsDigit", "IsAlnum", "IsPrintable",
 		}
@@ -320,7 +320,7 @@ func (b *Builder) GetMethodNames(t ssa.Type) []string {
 		return []string{
 			"Keys", "Values", "Entries", "Item", "ForEach", "Set", "Remove", "Delete", "Has", "IsExisted", "Length", "Len",
 		}
-	case ssa.Bytes:
+	case ssa.BytesTypeKind:
 		return []string{
 			"First", "Reverse", "Shuffle", "FUzz", "Contains", "IContains", "ReplaceN", "ReplaceAll", "Replace", "Split", "SplitN", "Join", "Trim", "TrimLeft", "TrimRight", "HasPrefix", "HasSuffix", "StartsWith", "EndsWith", "RemovePrefix", "RemoveSuffix", "Zfill", "Rzfill", "Ljust", "Rjust", "Count", "Find", "Rfind", "IndexOf", "LastIndexOf", "Lower", "Upper", "Title", "IsLower", "IsUpper", "IsTitle", "IsAlpha", "IsDigit", "IsAlnum", "IsPrintable",
 		}

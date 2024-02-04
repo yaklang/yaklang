@@ -219,7 +219,7 @@ type anValue struct {
 
 func NewValue() anValue {
 	return anValue{
-		typ:      BasicTypes[Any],
+		typ:      BasicTypes[AnyTypeKind],
 		userList: make(Users, 0),
 	}
 }

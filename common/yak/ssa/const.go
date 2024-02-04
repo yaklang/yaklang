@@ -20,7 +20,7 @@ func (c *Const) GetRawValue() any {
 func (c *Const) GetType() Type {
 	t := c.typ
 	if t == nil {
-		t = BasicTypes[Any]
+		t = BasicTypes[AnyTypeKind]
 	}
 	return t
 }
@@ -40,13 +40,13 @@ func init() {
 
 	ConstMap[nil] = &Const{
 		value: nil,
-		typ:   BasicTypes[Null],
+		typ:   BasicTypes[NullTypeKind],
 		str:   "nil",
 	}
 
 	ConstMap[struct{}{}] = &Const{
 		value: struct{}{},
-		typ:   BasicTypes[Any],
+		typ:   BasicTypes[AnyTypeKind],
 		str:   "any",
 	}
 }
@@ -112,7 +112,7 @@ func (c *Const) GetTypeKind() TypeKind {
 }
 
 func (c *Const) IsBoolean() bool {
-	return c.typ.GetTypeKind() == Boolean
+	return c.typ.GetTypeKind() == BooleanTypeKind
 }
 
 func (c *Const) Boolean() bool {
@@ -120,7 +120,7 @@ func (c *Const) Boolean() bool {
 }
 
 func (c *Const) IsNumber() bool {
-	return c.typ.GetTypeKind() == Number
+	return c.typ.GetTypeKind() == NumberTypeKind
 }
 
 func (c *Const) Number() int64 {
@@ -150,7 +150,7 @@ func (c *Const) Number() int64 {
 }
 
 func (c *Const) IsFloat() bool {
-	return c.typ.GetTypeKind() == Number
+	return c.typ.GetTypeKind() == NumberTypeKind
 }
 
 func (c *Const) Float() float64 {
@@ -164,7 +164,7 @@ func (c *Const) Float() float64 {
 }
 
 func (c *Const) IsString() bool {
-	return c.typ.GetTypeKind() == String
+	return c.typ.GetTypeKind() == StringTypeKind
 }
 
 func (c *Const) VarString() string {

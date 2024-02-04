@@ -43,7 +43,7 @@ func (t *TypeInference) InferenceOnInstruction(inst ssa.Instruction) {
 	if iv, ok := inst.(ssa.Value); ok {
 		t := iv.GetType()
 		if utils.IsNil(t) {
-			iv.SetType(ssa.BasicTypes[ssa.Null])
+			iv.SetType(ssa.BasicTypes[ssa.NullTypeKind])
 		}
 	}
 
@@ -122,23 +122,23 @@ func (t *TypeInference) TypeInferenceNext(next *ssa.Next) {
 		}
 	*/
 	typ := ssa.NewStructType()
-	typ.AddField(ssa.NewConst("ok"), ssa.BasicTypes[ssa.Boolean])
+	typ.AddField(ssa.NewConst("ok"), ssa.BasicTypes[ssa.BooleanTypeKind])
 	if it, ok := next.Iter.GetType().(*ssa.ObjectType); ok {
 		switch it.Kind {
 		case ssa.SliceTypeKind:
 			if next.InNext {
 				typ.AddField(ssa.NewConst("key"), it.FieldType)
-				typ.AddField(ssa.NewConst("field"), ssa.BasicTypes[ssa.Null])
+				typ.AddField(ssa.NewConst("field"), ssa.BasicTypes[ssa.NullTypeKind])
 			} else {
 				typ.AddField(ssa.NewConst("key"), it.KeyTyp)
 				typ.AddField(ssa.NewConst("field"), it.FieldType)
 			}
 		case ssa.StructTypeKind:
-			typ.AddField(ssa.NewConst("key"), ssa.BasicTypes[ssa.String])
-			typ.AddField(ssa.NewConst("field"), ssa.BasicTypes[ssa.Any])
+			typ.AddField(ssa.NewConst("key"), ssa.BasicTypes[ssa.StringTypeKind])
+			typ.AddField(ssa.NewConst("field"), ssa.BasicTypes[ssa.AnyTypeKind])
 		case ssa.ObjectTypeKind:
-			typ.AddField(ssa.NewConst("key"), ssa.BasicTypes[ssa.Any])
-			typ.AddField(ssa.NewConst("field"), ssa.BasicTypes[ssa.Any])
+			typ.AddField(ssa.NewConst("key"), ssa.BasicTypes[ssa.AnyTypeKind])
+			typ.AddField(ssa.NewConst("field"), ssa.BasicTypes[ssa.AnyTypeKind])
 		case ssa.MapTypeKind:
 			typ.AddField(ssa.NewConst("key"), it.KeyTyp)
 			typ.AddField(ssa.NewConst("field"), it.FieldType)
@@ -147,7 +147,7 @@ func (t *TypeInference) TypeInferenceNext(next *ssa.Next) {
 	}
 	if it, ok := next.Iter.GetType().(*ssa.ChanType); ok {
 		typ.AddField(ssa.NewConst("key"), it.Elem)
-		typ.AddField(ssa.NewConst("field"), ssa.BasicTypes[ssa.Null])
+		typ.AddField(ssa.NewConst("field"), ssa.BasicTypes[ssa.NullTypeKind])
 		next.SetType(typ)
 		next.GetUsers().RunOnField(func(f *ssa.Field) {
 			if f.Key.String() == "field" && len(f.GetAllVariables()) != 0 {
@@ -193,16 +193,16 @@ func (t *TypeInference) TypeInferenceBinOp(bin *ssa.BinOp) {
 			return x
 		}
 
-		if x.GetTypeKind() == ssa.Any {
+		if x.GetTypeKind() == ssa.AnyTypeKind {
 			return y
 		}
-		if y.GetTypeKind() == ssa.Any {
+		if y.GetTypeKind() == ssa.AnyTypeKind {
 			return x
 		}
 
 		// if y.GetTypeKind() == ssa.Null {
 		if bin.Op >= ssa.OpGt && bin.Op <= ssa.OpNotEq {
-			return ssa.BasicTypes[ssa.Boolean]
+			return ssa.BasicTypes[ssa.BooleanTypeKind]
 		}
 		// }
 		return nil
@@ -215,7 +215,7 @@ func (t *TypeInference) TypeInferenceBinOp(bin *ssa.BinOp) {
 
 	// typ := handler
 	if bin.Op >= ssa.OpGt && bin.Op <= ssa.OpNotEq {
-		bin.SetType(ssa.BasicTypes[ssa.Boolean])
+		bin.SetType(ssa.BasicTypes[ssa.BooleanTypeKind])
 		return
 	} else {
 		bin.SetType(retTyp)
@@ -249,7 +249,7 @@ func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
 			return
 		}
 		if utils.IsNil(typ) {
-			typ = ssa.BasicTypes[ssa.Null]
+			typ = ssa.BasicTypes[ssa.NullTypeKind]
 		}
 		switch typ.GetTypeKind() {
 		case ssa.ObjectTypeKind, ssa.SliceTypeKind, ssa.MapTypeKind, ssa.StructTypeKind:
@@ -259,12 +259,12 @@ func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
 				f.SetType(fTyp)
 				return
 			}
-		case ssa.String:
-			f.SetType(ssa.BasicTypes[ssa.Number])
+		case ssa.StringTypeKind:
+			f.SetType(ssa.BasicTypes[ssa.NumberTypeKind])
 			return
-		case ssa.Any:
+		case ssa.AnyTypeKind:
 			// pass
-			f.SetType(ssa.BasicTypes[ssa.Any])
+			f.SetType(ssa.BasicTypes[ssa.AnyTypeKind])
 			return
 		default:
 		}
@@ -396,7 +396,7 @@ func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
 			}
 		} else if t, ok := funcTyp.ReturnType.(*ssa.BasicType); ok && t.Kind == ssa.ErrorType {
 			// pass
-			c.SetType(ssa.BasicTypes[ssa.Null])
+			c.SetType(ssa.BasicTypes[ssa.NullTypeKind])
 			for _, variable := range c.GetAllVariables() {
 				variable.NewError(ssa.Error, TITAG, ValueIsNull())
 			}

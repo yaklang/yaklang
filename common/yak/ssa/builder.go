@@ -86,7 +86,7 @@ func (b *FunctionBuilder) PopFunction() *FunctionBuilder {
 
 // function param
 func (b FunctionBuilder) HandlerEllipsis() {
-	b.Param[len(b.Param)-1].SetType(NewSliceType(BasicTypes[Any]))
+	b.Param[len(b.Param)-1].SetType(NewSliceType(BasicTypes[AnyTypeKind]))
 	b.hasEllipsis = true
 }
 

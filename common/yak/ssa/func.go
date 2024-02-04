@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/utils/omap"
 
 	"github.com/samber/lo"
@@ -116,7 +117,7 @@ func handlerReturnType(rs []*Return) Type {
 
 	typs := lo.Values(tmp)
 	if len(typs) == 0 {
-		return BasicTypes[Null]
+		return BasicTypes[NullTypeKind]
 	} else if len(typs) == 1 {
 		return typs[0]
 	} else {

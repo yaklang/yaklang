@@ -416,7 +416,7 @@ func (f *FunctionBuilder) EmitRecover() *Recover {
 		anInstruction: NewInstruction(),
 		anValue:       NewValue(),
 	}
-	r.SetType(BasicTypes[Any])
+	r.SetType(BasicTypes[AnyTypeKind])
 	f.emit(r)
 	return r
 }

@@ -46,7 +46,7 @@ func NewBinOpOnly(op BinaryOpcode, x, y Value) *BinOp {
 		Y:             y,
 	}
 	if op >= OpGt && op <= OpIn {
-		b.SetType(BasicTypes[Boolean])
+		b.SetType(BasicTypes[BooleanTypeKind])
 	}
 	return b
 }
@@ -138,9 +138,9 @@ func NewNext(iter Value, isIn bool) *Next {
 	if NextType == nil {
 		NextType = NewObjectType()
 		NextType.Kind = StructTypeKind
-		NextType.AddField(NewConst("ok"), BasicTypes[Boolean])
-		NextType.AddField(NewConst("key"), BasicTypes[Any])
-		NextType.AddField(NewConst("field"), BasicTypes[Any])
+		NextType.AddField(NewConst("ok"), BasicTypes[BooleanTypeKind])
+		NextType.AddField(NewConst("key"), BasicTypes[AnyTypeKind])
+		NextType.AddField(NewConst("field"), BasicTypes[AnyTypeKind])
 	}
 	n.SetType(NextType)
 	return n
@@ -273,7 +273,7 @@ func (e *ErrorHandler) AddDone(d *BasicBlock) {
 
 func (r *Return) calcType(builder *FunctionBuilder) {
 	if len(r.Results) == 0 {
-		r.SetType(BasicTypes[Null])
+		r.SetType(BasicTypes[NullTypeKind])
 	}
 
 	handleType := func(t Type) Type {

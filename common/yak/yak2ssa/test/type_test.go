@@ -31,6 +31,6 @@ func TestYaklangBasic_Foreach(t *testing.T) {
 
 		kind := v.GetTypeKind()
 		log.Info("type kind", kind)
-		test.Equal(kind, ssa.Number)
+		test.Equal(kind, ssa.NumberTypeKind)
 	})
 }
