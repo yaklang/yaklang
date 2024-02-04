@@ -40,7 +40,7 @@ func Start(opt ...CaptureOption) error {
 		}
 	}
 
-	var handlers = omap.NewOrderedMap(map[string]*pcap.Handle{})
+	var handlers = omap.NewOrderedMap(map[string]PcapHandleOperation{})
 	if conf.Filename != "" {
 		handler, err := OpenFile(conf.Filename)
 		if err != nil {
@@ -72,7 +72,7 @@ func Start(opt ...CaptureOption) error {
 				log.Errorf("open device (%v) failed: %s", iface.Name, err)
 				continue
 			}
-			handlers.Set(cacheId, handler)
+			handlers.Set(cacheId, handler.(PcapHandleOperation))
 		}
 	} else {
 		for _, i := range conf.Device {
@@ -111,7 +111,7 @@ func Start(opt ...CaptureOption) error {
 		// add cancel func to defer
 		// hack: use runtimeId to registerCallback
 		var cancels []func()
-		handlers.ForEach(func(i string, v *pcap.Handle) bool {
+		handlers.ForEach(func(i string, _ PcapHandleOperation) bool {
 			if conf.EnableCache {
 				cancels = append(cancels, keepDaemonCache(i, ctx))
 			}
@@ -124,7 +124,7 @@ func Start(opt ...CaptureOption) error {
 		}()
 
 		runtimeId := uuid.New().String()
-		handlers.ForEach(func(i string, v *pcap.Handle) bool {
+		for _, i := range handlers.Keys() {
 			registerCallback(i, runtimeId, ctx, func(ctx context.Context, packet gopacket.Packet) error {
 				conf.packetHandler(ctx, packet)
 				select {
@@ -134,13 +134,17 @@ func Start(opt ...CaptureOption) error {
 					return nil
 				}
 			})
-			return true
-		})
+		}
 		select {
 		case <-ctx.Done():
 		}
 	} else {
-		utils.WaitRoutinesFromSlice(handlers.Values(), func(handler *pcap.Handle) {
+		utils.WaitRoutinesFromSlice(handlers.Values(), func(origin PcapHandleOperation) {
+			handler, ok := origin.(*pcap.Handle)
+			if !ok {
+				log.Errorf("invalid handler: %v", origin)
+				return
+			}
 			defer func() {
 				handler.Close()
 			}()

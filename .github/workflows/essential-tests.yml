@@ -70,6 +70,7 @@ jobs:
               go test -timeout 30s ./common/openapi/...
               go test -timeout 10s ./common/utils/dot/...
               go test -timeout 15s ./common/utils/bruteutils/.
+              go test -timeout 15s ./common/pcapx/pcaputil/.
 
           - name: Test NetX
             run: |
