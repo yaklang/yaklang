@@ -79,12 +79,16 @@ func (t *TypeCheck) CheckOnInstruction(inst ssa.Instruction) {
 func (t *TypeCheck) TypeCheckUndefine(inst *ssa.Undefined) {
 	tmp := make(map[ssa.Value]struct{})
 	err := func(i ssa.Value) bool {
-		if variable := i.GetVariable(inst.GetName()); variable != nil {
+		for _, variable := range i.GetAllVariables() {
 			variable.NewError(ssa.Error, TypeCheckTAG, ssa.ValueUndefined(inst.GetName()))
-			return true
-		} else {
-			return false
 		}
+		return true
+		// if variable := i.GetVariable(inst.GetName()); variable != nil {
+		// 	variable.NewError(ssa.Error, TypeCheckTAG, ssa.ValueUndefined(inst.GetName()))
+		// 	return true
+		// } else {
+		// 	return false
+		// }
 	}
 	var mark func(i ssa.Value)
 	mark = func(i ssa.Value) {
