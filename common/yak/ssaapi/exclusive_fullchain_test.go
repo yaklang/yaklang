@@ -1,11 +1,12 @@
 package ssaapi
 
 import (
+	"strings"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/dot"
-	"strings"
-	"testing"
 )
 
 func TestFullChain(t *testing.T) {
@@ -70,7 +71,9 @@ func TestChain_Basic2(t *testing.T) {
 }
 
 func TestChain_Phi_If(t *testing.T) {
-	prog, err := Parse(`a=b+c;
+	prog, err := Parse(`
+d = 1
+a=b+c;
 if(a){
 	d=e
 }else{

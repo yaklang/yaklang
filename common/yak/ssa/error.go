@@ -117,5 +117,5 @@ func (err SSAError) String() string {
 		kind = "error"
 	}
 
-	return fmt.Sprintf("[%5s]\t(%s):\t%s", kind, string(err.Tag), err.Message)
+	return fmt.Sprintf("[%5s]\t(%s):\t%s: %s", kind, string(err.Tag), err.Message, err.Pos)
 }

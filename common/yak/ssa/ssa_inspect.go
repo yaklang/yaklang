@@ -8,13 +8,13 @@ func (p *Program) show(flag FunctionAsmFlag) {
 	showFunc = func(i *Function) {
 		fmt.Println(i.DisAsm(flag))
 		fmt.Println("extern type:")
-		for name, typ := range i.externType {
-			fmt.Printf("%s: %s\n", name, typ.RawString())
-		}
-		fmt.Println("extern Value:")
-		for name, v := range i.externInstance {
-			fmt.Printf("%s: %s\n", name, v)
-		}
+		// for name, typ := range i.externType {
+		// 	fmt.Printf("%s: %s\n", name, typ.RawString())
+		// }
+		// fmt.Println("extern Value:")
+		// for name, v := range i.externInstance {
+		// 	fmt.Printf("%s: %s\n", name, v)
+		// }
 
 		for _, f := range i.ChildFuncs {
 			showFunc(f)

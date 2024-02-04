@@ -143,6 +143,7 @@ var f = outter()
 a = e => {
 	return e
 }
+d = 0
 if (f) {
 	d = 3
 } else {
@@ -159,6 +160,7 @@ g = d
 	valCheck_eq3 := false
 	prog.Ref("g").ForEach(func(value *Value) {
 		defs := value.GetTopDefs()
+		log.Infof("defs: %v", defs)
 		if len(defs) == 2 {
 			lenCheck = true
 		}
@@ -192,6 +194,7 @@ var f = outter()
 a = e => {
 	return e
 }
+d = 1
 if (f) {
 	d = 3
 } else {
@@ -222,8 +225,8 @@ g = d
 			}
 		}
 	})
-	if topDefsCount != 4 {
-		t.Error("len check failed")
+	if topDefsCount != 5 {
+		t.Errorf("len check failed %d", topDefsCount)
 	}
 	if !valCheck {
 		t.Error("val check failed")
