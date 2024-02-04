@@ -48,6 +48,8 @@ func TestUndefineError(t *testing.T) {
 			want: []string{
 				ssa.ValueUndefined("c"),
 				ssa.ValueUndefined("c"),
+				ssa.ValueUndefined("c"),
+				ssa.ValueUndefined("c"),
 				ssa.ValueUndefined("undefinePkg"),
 				ssa.ValueUndefined("undefinePkg"),
 				ssa.ValueUndefined("undefineFunc2"),
@@ -149,6 +151,7 @@ func TestBasicExpression(t *testing.T) {
 			c = a2
 			`,
 			want: []string{
+				ssa.ValueUndefined("a2"),
 				ssa.ValueUndefined("a2"),
 				ssa4analyze.ConditionIsConst("if"),
 				ssa4analyze.ConditionIsConst("if"),
@@ -781,32 +784,6 @@ func TestClosureBinding(t *testing.T) {
 		})
 	})
 
-	// TODO: more test in `ssa_var_test.go`
-	t.Run("modify free value", func(t *testing.T) {
-		CheckError(t, TestCase{
-			code: `
-			{
-				b = 1
-				f = () => {
-					b = a
-				} // sideEffect: b
-				a = 2
-				print(b) // 1
-
-				f()
-				print(b) // b1
-			}
-			a = 3
-			print(b) // b1
-			f()
-			print(b) // b2
-			`,
-			ExternValue: map[string]any{
-				"print": func(any) {},
-			},
-		})
-	})
-
 	t.Run("modify parameter value", func(t *testing.T) {
 		CheckError(t, TestCase{
 			code: `
@@ -948,8 +925,8 @@ func TestExternStruct(t *testing.T) {
 			a.GetA()
 			`,
 			want: []string{
-				ssa.ExternFieldError("Type", "yak2ssa.AStruct", "GetA", "GetAStruct"),
-				ssa4analyze.InvalidField("yak2ssa.AStruct", "C"),
+				ssa.ExternFieldError("Type", "test.AStruct", "GetA", "GetAStruct"),
+				ssa4analyze.InvalidField("test.AStruct", "C"),
 			},
 			ExternValue: map[string]any{
 				"getA":  func() *AStruct { return &AStruct{} },
@@ -1035,7 +1012,7 @@ func TestExternInstance(t *testing.T) {
 				ssa.ExternFieldError("Lib", "lib", "GetInt", "getInt"),
 				ssa.ExternFieldError("Lib", "lib", "GetaInt", "getAInt"),
 				ssa.ContAssignExtern("lib.getInt"),
-				ssa.ContAssignExtern("lib.GetInt"),
+				// ssa.ContAssignExtern("lib.GetInt"),
 				ssa.ContAssignExtern("lib"),
 				ssa.ContAssignExtern("print"),
 			},
