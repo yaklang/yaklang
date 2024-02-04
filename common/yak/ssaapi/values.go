@@ -205,10 +205,6 @@ func (i *Value) HasOperands() bool {
 	return i.node.HasValues()
 }
 
-func (i *Value) GetDefs() Values {
-	return i.GetCallReturns()
-}
-
 func (i *Value) GetOperands() Values {
 	if i.operands == nil {
 		i.operands = lo.Map(ssa.GetValues(i.node), func(v ssa.Value, _ int) *Value { return NewValue(v) })

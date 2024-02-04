@@ -57,7 +57,7 @@ func ParseCliParameter(prog *ssaapi.Program) []*CliParameter {
 		arg2 := getConstString(opt.GetOperand(2))
 
 		// check option function, get information
-		switch opt.GetOperand(0).String() {
+		switch opt.GetOperand(0).GetName() {
 		case "cli.setHelp":
 			cli.Help = arg1
 		case "cli.setRequired":

@@ -58,7 +58,7 @@ func ParseRiskInfo(prog *ssaapi.Program) []*RiskInfo {
 			return
 		}
 		arg1 := getConstString(call.GetOperand(1))
-		switch call.GetOperand(0).String() {
+		switch call.GetOperand(0).GetName() {
 		case "risk.severity", "risk.level":
 			riskInfo.Level = handleRiskLevel(arg1)
 		case "risk.cve":
