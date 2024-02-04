@@ -13,9 +13,10 @@ func ReplaceAllValue(v Value, to Value) {
 func ReplaceValue(v Value, to Value, skip func(Instruction) bool) {
 	for _, variable := range v.GetAllVariables() {
 		// TODO: handler variable replace value
-		variable.Assign(to)
+		variable.Replace(v, to)
 		// variable = to
 		to.AddVariable(variable)
+		v.GetProgram().SetInstructionWithName(variable.GetName(), to)
 	}
 
 	deleteInst := make([]User, 0)
