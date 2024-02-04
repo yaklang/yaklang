@@ -131,7 +131,7 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 		feedbackStatus()
 		targetWg := new(sync.WaitGroup)
 
-		resp, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes(__currentTarget.Request), lowhttp.WithHttps(__currentTarget.IsHttps))
+		resp, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes(__currentTarget.Request), lowhttp.WithHttps(__currentTarget.IsHttps), lowhttp.WithRuntimeId(task.TaskId))
 		if err != nil {
 			log.Errorf("request target failed: %s", err)
 			hasUnavailableTarget = true
