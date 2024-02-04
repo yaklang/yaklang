@@ -26,13 +26,13 @@ func (t *Type) Compare(t2 *Type) bool {
 }
 
 var (
-	Number        = NewType(ssa.BasicTypes[ssa.Number])
-	String        = NewType(ssa.BasicTypes[ssa.String])
-	Bytes         = NewType(ssa.BasicTypes[ssa.Bytes])
-	Boolean       = NewType(ssa.BasicTypes[ssa.Boolean])
-	UndefinedType = NewType(ssa.BasicTypes[ssa.UndefinedType])
-	Null          = NewType(ssa.BasicTypes[ssa.Null])
-	Any           = NewType(ssa.BasicTypes[ssa.Any])
+	Number        = NewType(ssa.BasicTypes[ssa.NumberTypeKind])
+	String        = NewType(ssa.BasicTypes[ssa.StringTypeKind])
+	Bytes         = NewType(ssa.BasicTypes[ssa.BytesTypeKind])
+	Boolean       = NewType(ssa.BasicTypes[ssa.BooleanTypeKind])
+	UndefinedType = NewType(ssa.BasicTypes[ssa.UndefinedTypeKind])
+	Null          = NewType(ssa.BasicTypes[ssa.NullTypeKind])
+	Any           = NewType(ssa.BasicTypes[ssa.AnyTypeKind])
 	ErrorType     = NewType(ssa.BasicTypes[ssa.ErrorType])
 )
 

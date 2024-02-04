@@ -194,7 +194,7 @@ func (v *Value) GetTypeKind() ssa.TypeKind {
 	if n, ok := v.node.(ssa.TypedNode); ok {
 		return n.GetType().GetTypeKind()
 	}
-	return ssa.Any
+	return ssa.AnyTypeKind
 }
 
 func (v *Value) GetRange() *ssa.Range {

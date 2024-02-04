@@ -14,7 +14,7 @@ func (b *astbuilder) buildSliceFromExprList(stmt ExpressionListMultiline) ssa.Va
 	if _s == nil {
 		// b.NewError(ssa.Warn, TAG, "slice literal not have expression")
 		return b.EmitMakeBuildWithType(
-			ssa.NewSliceType(ssa.BasicTypes[ssa.Any]),
+			ssa.NewSliceType(ssa.BasicTypes[ssa.AnyTypeKind]),
 			b.EmitConstInst(0), b.EmitConstInst(0),
 		)
 	}
@@ -62,7 +62,7 @@ func (b *astbuilder) buildMapFromMapPairs(stmt MapPairs) ssa.Value {
 	if _s == nil {
 		b.NewError(ssa.Warn, TAG, "map literal not have map pairs")
 		return b.EmitMakeBuildWithType(
-			ssa.NewMapType(ssa.BasicTypes[ssa.Any], ssa.BasicTypes[ssa.Any]),
+			ssa.NewMapType(ssa.BasicTypes[ssa.AnyTypeKind], ssa.BasicTypes[ssa.AnyTypeKind]),
 			b.EmitConstInst(0), b.EmitConstInst(0),
 		)
 	}
@@ -83,8 +83,8 @@ func (b *astbuilder) buildMapFromMapPairs(stmt MapPairs) ssa.Value {
 	}
 	obj := b.CreateInterfaceWithVs(keys, values)
 	t := obj.GetType().(*ssa.ObjectType)
-	var fieldTyp ssa.Type = ssa.BasicTypes[ssa.Any]
-	var keyTyp ssa.Type = ssa.BasicTypes[ssa.Any]
+	var fieldTyp ssa.Type = ssa.BasicTypes[ssa.AnyTypeKind]
+	var keyTyp ssa.Type = ssa.BasicTypes[ssa.AnyTypeKind]
 	if t.FieldType != nil {
 		fieldTyp = t.FieldType
 	}

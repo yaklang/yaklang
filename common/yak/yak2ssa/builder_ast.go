@@ -1190,7 +1190,7 @@ func (b *astbuilder) buildMakeExpression(stmt *yak.MakeExpressionContext) ssa.Va
 	}
 	zero := b.EmitConstInst(0)
 	switch typ.GetTypeKind() {
-	case ssa.SliceTypeKind, ssa.Bytes:
+	case ssa.SliceTypeKind, ssa.BytesTypeKind:
 		if len(exprs) == 0 {
 			return b.EmitMakeBuildWithType(typ, zero, zero)
 		} else if len(exprs) == 1 {
