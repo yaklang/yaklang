@@ -143,3 +143,47 @@ func TestGRPCMUSTPASS_HybridScan_new(t *testing.T) {
 		t.Fatal("count not match")
 	}
 }
+
+func TestGRPCMUSTPASS_HybridScan_HTTPFlow_At_Least(t *testing.T) {
+	scriptName, err := yakit.CreateTemporaryYakScript("mitm", "")
+	if err != nil {
+		panic(err)
+	}
+	target := utils.HostPort(utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nContent-Length: 12\r\n\r\nHello, World!")))
+	client, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+	stream, err := client.HybridScan(context.Background())
+	if err != nil {
+		t.FailNow()
+	}
+	stream.Send(&ypb.HybridScanRequest{
+		Control:        true,
+		HybridScanMode: "new",
+	})
+	stream.Send(&ypb.HybridScanRequest{
+		Targets: &ypb.HybridScanInputTarget{
+			Input: target,
+		},
+		Plugin: &ypb.HybridScanPluginConfig{
+			PluginNames: []string{scriptName},
+		},
+	})
+	var runtimeID string
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			log.Error(err)
+			break
+		}
+		runtimeID = rsp.HybridScanTaskId
+		spew.Dump(rsp)
+	}
+	var count int
+	consts.GetGormProjectDatabase().Model(&yakit.HTTPFlow{}).Where("runtime_id = ?", runtimeID).Count(&count)
+	if count < 1 {
+		t.Fatal("count not match")
+	}
+	spew.Dump(count)
+}
