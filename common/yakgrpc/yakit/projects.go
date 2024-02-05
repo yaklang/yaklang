@@ -21,6 +21,7 @@ const (
 	TypeProject               = "project"
 	TypeFile                  = "file"
 	TEMPORARY_PROJECT_NAME    = "[temporary]"
+	MIGRATE_DATABASE_KEY      = "__migrate_database__"
 )
 
 func InitializingProjectDatabase() error {
@@ -33,8 +34,9 @@ func InitializingProjectDatabase() error {
 	homeYakitPath := filepath.Join(utils.GetHomeDirDefault("."), "yakit-projects")
 	defaultDBPath := consts.GetDefaultYakitProjectDatabase(defaultYakitPath)
 	// 需要迁移所有yakit-projects/projects
-	if defaultYakitPath != homeYakitPath {
-		log.Infof("migrate project database path from %s to %s", homeYakitPath, defaultYakitPath)
+	if defaultYakitPath != homeYakitPath && GetProjectKey(db, MIGRATE_DATABASE_KEY) == "" {
+		log.Debugf("migrate project database path from %s to %s", homeYakitPath, defaultYakitPath)
+		SetProjectKey(db, MIGRATE_DATABASE_KEY, true)
 		projCh := YieldProject(db, context.Background())
 		for proj := range projCh {
 			if proj.ProjectName == "[default]" || !utils.IsSubPath(proj.DatabasePath, homeYakitPath) {
@@ -51,7 +53,7 @@ func InitializingProjectDatabase() error {
 	// 迁移默认数据库
 	if defaultProj == nil || defaultProj.DatabasePath != defaultDBPath {
 		if defaultProj != nil {
-			log.Infof("migrate default database path from %s to %s", defaultProj.DatabasePath, defaultDBPath)
+			log.Debugf("migrate default database path from %s to %s", defaultProj.DatabasePath, defaultDBPath)
 		}
 		projectData := &Project{
 			ProjectName:   INIT_DATABASE_RECORD_NAME,
