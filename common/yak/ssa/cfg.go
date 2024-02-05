@@ -458,8 +458,10 @@ type SwitchBuilder struct {
 	enter          *BasicBlock
 	buildCondition func() Value
 	// TODO: should't use this `func() (int, []Value)`, should have `getCaseSize()int` and `getExpress(int)Value`, just like `buildBody`
-	buildHandler func() (int, []Value)
+	caseSize     int
+	buildExpress func(int) []Value
 	buildBody    func(int)
+
 	buildDefault func()
 
 	DefaultBreak bool
@@ -478,8 +480,12 @@ func (t *SwitchBuilder) BuildCondition(f func() Value) {
 	t.buildCondition = f
 }
 
-func (t *SwitchBuilder) BuildHandler(f func() (int, []Value)) {
-	t.buildHandler = f
+func (sw *SwitchBuilder) BuildCaseSize(size int) {
+	sw.caseSize = size
+}
+
+func (sw *SwitchBuilder) SetCase(f func(int) []Value) {
+	sw.buildExpress = f
 }
 
 func (t *SwitchBuilder) BuildBody(f func(int)) {
@@ -492,6 +498,9 @@ func (t *SwitchBuilder) BuildDefault(f func()) {
 
 func (t *SwitchBuilder) Finish() {
 	builder := t.b
+	enter := t.enter
+	scope := enter.ScopeTable
+	ScopeBuilder := ssautil.NewSwitchStmt(scope)
 	var cond Value
 	if t.buildCondition != nil {
 		cond = t.buildCondition()
@@ -502,25 +511,25 @@ func (t *SwitchBuilder) Finish() {
 	defaultb := builder.NewBasicBlockNotAddBlocks(SwitchDefault)
 	t.enter.AddSucc(defaultb)
 
-	// build handler and body
-	var exprs []Value
-	caseNum, exprs := t.buildHandler()
-
-	handlers := make([]*BasicBlock, 0, caseNum)
-	slabel := make([]SwitchLabel, 0, caseNum)
-	for i := 0; i < caseNum; i++ {
-		// build handler
-		handler := builder.NewBasicBlock(SwitchHandler)
-		t.enter.AddSucc(handler)
+	sLabels := make([]SwitchLabel, 0, t.caseSize)
+	handlers := make([]*BasicBlock, 0, t.caseSize)
+	for i := 0; i < t.caseSize; i++ {
+		vs := t.buildExpress(i)
+		handler := builder.NewBasicBlockNotAddBlocks(SwitchHandler)
 		handlers = append(handlers, handler)
-		slabel = append(slabel, NewSwitchLabel(exprs[i], handler))
+
+		for _, v := range vs {
+			sLabels = append(sLabels, NewSwitchLabel(
+				v, handler,
+			))
+		}
 	}
 
 	NextBlock := func(i int) *BasicBlock {
 		if t.DefaultBreak {
 			return done
 		} else {
-			if i == caseNum-1 {
+			if i == t.caseSize-1 {
 				return defaultb
 			} else {
 				return handlers[i+1]
@@ -528,40 +537,51 @@ func (t *SwitchBuilder) Finish() {
 		}
 	}
 
-	for i := 0; i < caseNum; i++ {
-		// build body
-		var _fallthrough *BasicBlock
-		if i == caseNum-1 {
-			_fallthrough = defaultb
-		} else {
-			_fallthrough = handlers[i+1]
-		}
-		builder.PushTarget(done, nil, _fallthrough) // fallthrough just jump to next handler
-		// build handlers block
+	for i := 0; i < t.caseSize; i++ {
+
+		// 	var _fallthrough *BasicBlock
+		// 	if i == caseNum-1 {
+		// 		_fallthrough = defaultb
+		// 	} else {
+		// 		_fallthrough = handlers[i+1]
+		// 	}
+		// 	builder.PushTarget(done, nil, _fallthrough) // fallthrough just jump to next handler
+
 		builder.CurrentBlock = handlers[i]
-		// builder.ScopeStart()
-		t.buildBody(i)
-		// builder.ScopeEnd()
-		// jump handlers-block -> done
+
+		addToBlocks(handlers[i])
+		ScopeBuilder.BuildBody(func(svt *ssautil.ScopedVersionedTable[Value]) *ssautil.ScopedVersionedTable[Value] {
+			builder.CurrentBlock.ScopeTable = svt
+			t.buildBody(i)
+			return builder.CurrentBlock.ScopeTable
+		})
+
 		builder.EmitJump(NextBlock(i))
-		builder.PopTarget()
+
+		// 	builder.PopTarget()
 	}
 
 	// can't fallthrough
-	builder.PushTarget(done, nil, nil)
+	// builder.PushTarget(done, nil, nil)
 	// build default block
 	builder.CurrentBlock = defaultb
-	// build default
-	if t.buildDefault != nil {
-		t.buildDefault()
-	}
+	// // build default
+	addToBlocks(defaultb)
+	ScopeBuilder.BuildBody(func(svt *ssautil.ScopedVersionedTable[Value]) *ssautil.ScopedVersionedTable[Value] {
+		builder.CurrentBlock.ScopeTable = svt
+		if t.buildDefault != nil {
+			t.buildDefault()
+		}
+		return builder.CurrentBlock.ScopeTable
+	})
 	// jump default -> done
 	builder.EmitJump(done)
-	builder.PopTarget()
+	// builder.PopTarget()
 
 	builder.CurrentBlock = t.enter
-	builder.EmitSwitch(cond, defaultb, slabel)
+	builder.EmitSwitch(cond, defaultb, sLabels)
 	addToBlocks(done)
-	addToBlocks(defaultb)
 	builder.CurrentBlock = done
+	end := ScopeBuilder.Build(generalPhi(builder))
+	done.ScopeTable = end
 }
