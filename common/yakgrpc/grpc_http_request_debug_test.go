@@ -1,6 +1,7 @@
 package yakgrpc
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -731,5 +732,41 @@ httpserver.Serve("127.0.0.1",%d)}`, serverPort),
 	} else {
 		cancel()
 		t.Fatal("start server port failed")
+	}
+}
+
+func TestGRPCMUSTPASS_MITM_Debug_BoolParams(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	randStr := utils.RandStringBytes(10)
+	ctx, _ := context.WithCancel(context.Background())
+	stream, err := client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
+		Code: fmt.Sprintf(`a = cli.Bool("a")
+cli.check()
+if !a{
+yakit.Output("%s")
+}`, randStr),
+		PluginType: "yak",
+		ExecParams: []*ypb.KVPair{{Key: "a", Value: "false"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ok := false
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		if rsp.IsMessage && bytes.Contains(rsp.Message, []byte(randStr)) {
+			ok = true
+		}
+		spew.Dump(rsp)
+	}
+	if !ok {
+		t.Fatal("bool param check err")
 	}
 }
