@@ -388,3 +388,68 @@ func TestYaklangParameter(t *testing.T) {
 		`, t)
 	})
 }
+
+func TestYaklangBasic_Variable_Try(t *testing.T) {
+	t.Run("simple, no final", func(t *testing.T) {
+		checkPrintlnValue(`
+		a = 1
+		try {
+			a = 2
+			println(a)
+		} catch err {
+			println(a)
+			a = 3
+		}
+		println(a)`, []string{
+			"2", "phi(a)[2,1]", "phi(a)[2,3]",
+		}, t)
+	})
+	t.Run("simple, with final", func(t *testing.T) {
+		checkPrintlnValue(`
+		a = 1
+		try {
+			a = 2
+			println(a)
+		} catch err {
+			println(a) // phi(1, 2)
+			a = 3
+		} finally {
+			println(a) // phi(2, 3)
+		}
+		println(a) // phi(2, 3)
+		`, []string{
+			"2", "phi(a)[2,1]", "phi(a)[2,3]", "phi(a)[2,3]",
+		}, t)
+	})
+
+	t.Run("simple, no finally, has err", func(t *testing.T) {
+		checkPrintlnValue(`
+		a = 1
+		try {
+		} catch err {
+			println(err)
+		}
+		println(err)
+		`, []string{
+			"Parameter-err", "Undefined-err",
+		}, t)
+	})
+
+	t.Run("simple, has finally, has err", func(t *testing.T) {
+		checkPrintlnValue(`
+		a = 1
+		try {
+		} catch err {
+			println(err)
+		} finally {
+			println(err)
+		}
+		println(err)
+		`, []string{
+			"Parameter-err",
+			"Undefined-err",
+			"Undefined-err",
+		}, t)
+	})
+}
+
