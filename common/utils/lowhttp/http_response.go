@@ -12,6 +12,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/h2non/filetype"
+	"github.com/h2non/filetype/types"
 	"github.com/yaklang/yaklang/common/log"
 	utils "github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -224,13 +225,17 @@ func FixHTTPResponse(raw []byte) (rsp []byte, body []byte, _ error) {
 	}
 
 	// 如果 bodyRaw 是图片的话，则不处理，如何判断是图片？
-	skipped := false
-	if len(bodyRaw) > 0 {
-		if utils.IsImage(bodyRaw) {
-			skipped = true
-		}
-	}
+	// skipped := false
+	// _ = skipped
+	// if len(bodyRaw) > 0 {
+	// if utils.IsImage(bodyRaw) {
+	// 		skipped = true
+	// 	}
+	// }
 
+	if len(bodyRaw) == 0 {
+		return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
+	}
 	// 取前几百个字节，来检测到底类型
 	var bodyPrescan []byte
 	if len(bodyRaw) > 200 {
@@ -238,54 +243,115 @@ func FixHTTPResponse(raw []byte) (rsp []byte, body []byte, _ error) {
 	} else {
 		bodyPrescan = bodyRaw[:]
 	}
-	overrideContentType, originCharset := GetOverrideContentType(bodyPrescan, contentType)
-	/*originCharset is lower!!!*/
-	_ = originCharset
 
-	// 都解开了，来处理编码问题
-	if bodyRaw != nil && !skipped {
-		var mimeType string
-		_, params, _ := mime.ParseMediaType(contentType)
-		ctUTF8 := false
-		if raw, ok := params["charset"]; ok {
-			raw = strings.ToLower(raw)
-			ctUTF8 = raw == "utf-8" || raw == "utf8"
-		}
-
-		if overrideContentType == "" {
-			// 如果类型一致，不需要替换，那么还是只处理 content-type 和编码问题
-			bodyRaw, mimeType = CharsetToUTF8(bodyRaw, contentType, originCharset)
-			if mimeType != contentType {
-				headerBytes = ReplaceMIMEType(headerBytes, mimeType)
+	mediaType, params, _ := mime.ParseMediaType(strings.ToLower(contentType))
+	mediaTypeLower := strings.ToLower(mediaType)
+	originCharSet, _ := params["charset"]
+	ctUTF8 := originCharSet == "utf-8" || originCharSet == "utf8"
+	isFile := false
+	isTextOrScript := strings.Contains(mediaTypeLower, "text/") || strings.Contains(mediaTypeLower, "script") || mediaType == ""
+	overrideContentType := ""
+	if contentType == "" || !filetype.IsMIME(bodyPrescan, contentType) {
+		typ, err := filetype.Match(bodyPrescan)
+		if err != nil {
+			log.Debugf("detect bodyPrescan file-type failed: %v", err)
+		} else if typ != types.Unknown {
+			isFile = true
+			if typ.MIME.Value != "" {
+				overrideContentType = typ.MIME.Value
 			}
-			// 是 Js，但是不包含 UTF8，按理说应该给他加成 UTF8
-			if utils.IContains(mimeType, "javascript") && !ctUTF8 && len(bodyRaw) > 0 {
-				// 这个顺序千万不要弄错了喔，一定要先判断是不是 UTF8，再去判断中文编码
-				if !codec.IsUtf8(bodyRaw) {
-					if codec.IsGBK(bodyRaw) {
-						decoded, err := codec.GbkToUtf8(bodyRaw)
-						if err == nil && len(decoded) > 0 {
-							bodyRaw = decoded
-						}
-					} else {
-						matchResult, _ := codec.CharDetectBest(bodyRaw)
-						if matchResult != nil {
-							switch strings.ToLower(matchResult.Charset) {
-							case "gbk", "gb2312", "gb-2312", "gb18030", "windows-1252", "gb-18030", "windows1252":
-								decoded, err := codec.GB18030ToUtf8(bodyRaw)
-								if err == nil && len(decoded) > 0 {
-									bodyRaw = decoded
-								}
-							}
-						}
-					}
-				}
-			}
-		} else {
-			log.Infof("replace content-type to: %s", overrideContentType)
-			headerBytes = ReplaceMIMEType(headerBytes, overrideContentType)
 		}
 	}
+	// 修复编码问题
+	if !isFile && !ctUTF8 && isTextOrScript && !utf8.Valid(bodyRaw) {
+		var encodeHandler encoding.Encoding
+		// 如果已经有 charset，就直接获取handler，否则尝试从 HTML 中解析
+		if originCharSet != "" {
+			encodeHandler, _ = charset.Lookup(strings.ToLower(originCharSet))
+		} else {
+			encodeHandler, originCharSet = charsetPrescan(bodyRaw)
+		}
+
+		// 尝试判断是否是 GBK 编码
+		if encodeHandler == nil && codec.IsGBK(bodyRaw) {
+			encodeHandler, originCharSet = charset.Lookup("gbk")
+		}
+
+		// 最后尝试使用基于 ICU 实现的算法与数据进行检测，返回置信度最高的编码
+		if encodeHandler == nil {
+			matchResult, err := codec.CharDetectBest(bodyRaw)
+			if err != nil {
+				log.Debugf("charset detect failed: %v", err)
+			} else if matchResult != nil {
+				encodeHandler, originCharSet = charset.Lookup(strings.ToLower(matchResult.Charset))
+			}
+		}
+
+		// 如果handler存在，就尝试解码
+		if encodeHandler != nil {
+			decoded, err := encodeHandler.NewDecoder().Bytes(bodyRaw)
+			if err == nil && len(decoded) > 0 {
+				bodyRaw = metaCharsetChanger(decoded)
+				if params == nil {
+					params = make(map[string]string)
+				}
+				params["charset"] = "utf-8"
+				overrideContentType = mime.FormatMediaType(mediaTypeLower, params)
+			}
+		}
+	}
+	// 如果是文件，应该修复 content-type
+	if overrideContentType != "" {
+		headerBytes = ReplaceMIMEType(headerBytes, overrideContentType)
+	}
+	// overrideContentType, originCharset := GetOverrideContentType(bodyPrescan, contentType)
+	// /*originCharset is lower!!!*/
+	// _ = originCharset
+
+	// // 都解开了，来处理编码问题
+	// if bodyRaw != nil && !skipped {
+	// 	var mimeType string
+	// 	_, params, _ := mime.ParseMediaType(contentType)
+	// 	ctUTF8 := false
+	// 	if raw, ok := params["charset"]; ok {
+	// 		raw = strings.ToLower(raw)
+	// 		ctUTF8 = raw == "utf-8" || raw == "utf8"
+	// 	}
+
+	// 	if overrideContentType == "" {
+	// 		// 如果类型一致，不需要替换，那么还是只处理 content-type 和编码问题
+	// bodyRaw, mimeType = CharsetToUTF8(bodyRaw, contentType, originCharset)
+	// 		if mimeType != contentType {
+	// 			headerBytes = ReplaceMIMEType(headerBytes, mimeType)
+	// 		}
+	// 		// 是 Js，但是不包含 UTF8，按理说应该给他加成 UTF8
+	// 		if utils.IContains(mimeType, "javascript") && !ctUTF8 && len(bodyRaw) > 0 {
+	// 			// 这个顺序千万不要弄错了喔，一定要先判断是不是 UTF8，再去判断中文编码
+	// 			if !codec.IsUtf8(bodyRaw) {
+	// 				if codec.IsGBK(bodyRaw) {
+	// 					decoded, err := codec.GbkToUtf8(bodyRaw)
+	// 					if err == nil && len(decoded) > 0 {
+	// 						bodyRaw = decoded
+	// 					}
+	// 				} else {
+	// 					matchResult, _ := codec.CharDetectBest(bodyRaw)
+	// 					if matchResult != nil {
+	// 						switch strings.ToLower(matchResult.Charset) {
+	// 						case "gbk", "gb2312", "gb-2312", "gb18030", "windows-1252", "gb-18030", "windows1252":
+	// 							decoded, err := codec.GB18030ToUtf8(bodyRaw)
+	// 							if err == nil && len(decoded) > 0 {
+	// 								bodyRaw = decoded
+	// 							}
+	// 						}
+	// 					}
+	// 				}
+	// 			}
+	// 		}
+	// 	} else {
+	// 		log.Infof("replace content-type to: %s", overrideContentType)
+	// 		headerBytes = ReplaceMIMEType(headerBytes, overrideContentType)
+	// 	}
+	// }
 
 	return ReplaceHTTPPacketBodyEx(headerBytes, bodyRaw, false, true), bodyRaw, nil
 }
