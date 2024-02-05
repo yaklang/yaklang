@@ -23,6 +23,7 @@ func BuildSyntaxBlock[T comparable](
 	bodyEnd := buildBody(body)
 
 	end := global.CreateSubScope()
+	end.captured = global.captured
 	end.CoverBy(bodyEnd)
 	return end
 }

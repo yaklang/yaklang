@@ -68,6 +68,8 @@ func (b *FunctionBuilder) IsBlockFinish() bool {
 func (b *FunctionBuilder) NewFunc(name string) *Function {
 	f := b.Package.NewFunctionWithParent(name, b.Function)
 	f.SetRange(b.CurrentRange)
+	f.SetFunc(b.Function)
+	f.SetBlock(b.CurrentBlock)
 	return f
 }
 
@@ -153,7 +155,7 @@ func (b *FunctionBuilder) SetDefineFunc() {
 			f.Param[index].SetType(typ)
 		}
 		for name, fv := range f.FreeValues {
-			if v := b.ReadValue(name); v == nil {
+			if v := b.PeekValue(name); v == nil {
 				fv.NewError(Error, SSATAG, ValueUndefined(name))
 			}
 		}

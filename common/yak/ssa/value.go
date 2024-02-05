@@ -23,8 +23,9 @@ func (b *FunctionBuilder) readValueEx(name string, create bool) Value {
 			}
 		}
 
-		// in main function
-		ret.AddRange(b.CurrentRange, false)
+		if b.CurrentRange != nil {
+			ret.AddRange(b.CurrentRange, false)
+		}
 		if ret.Value != nil {
 			// has value, just return
 			return ret.Value
@@ -35,11 +36,10 @@ func (b *FunctionBuilder) readValueEx(name string, create bool) Value {
 		return ret
 	}
 
-	if b.parentScope != nil {
-		return b.BuildFreeValue(name)
-	}
-
 	if create {
+		if b.parentScope != nil {
+			return b.BuildFreeValue(name)
+		}
 		return b.writeUndefine(name)
 	}
 	return nil
@@ -69,6 +69,11 @@ func (b *FunctionBuilder) ReadValueByVariable(v *Variable) Value {
 // WriteVariable write value to variable
 // will create Variable  and assign value
 func (b *FunctionBuilder) WriteVariable(name string, value Value) {
+	ret := b.CreateVariable(name, false)
+	b.AssignVariable(ret, value)
+}
+
+func (b *FunctionBuilder) WriteLocalVariable(name string, value Value) {
 	ret := b.CreateVariable(name, true)
 	b.AssignVariable(ret, value)
 }
