@@ -242,14 +242,14 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 			StartColumn: 5,
 			EndLine:     6,
 			EndColumn:   6,
-		}, "```go\ne map[string]number\n```")
+		}, "```go\ne map[any]any\n```")
 		check(t, code, "yak", &ypb.Range{
 			Code:        "f",
 			StartLine:   7,
 			StartColumn: 5,
 			EndLine:     7,
 			EndColumn:   6,
-		}, "```go\nf []number\n```")
+		}, "```go\nf []any\n```")
 		check(t, code, "yak", &ypb.Range{
 			Code:        "g",
 			StartLine:   8,

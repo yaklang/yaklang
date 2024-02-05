@@ -100,6 +100,23 @@ func TestYaklangBasic_Variable_InBlock(t *testing.T) {
 			},
 			t)
 	})
+
+	t.Run("test syntax block lose capture variable", func(t *testing.T) {
+		checkPrintlnValue(`
+		a = 1 
+		{
+			a = 2  // capture [a: 2]
+			{
+				println(a) // 2
+			} 
+			// end-scope capture is []
+		}
+		println(a) // 2
+		
+		`, []string{
+			"2", "2",
+		}, t)
+	})
 }
 
 func TestYaklangBasic_Variable_InIf(t *testing.T) {

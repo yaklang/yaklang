@@ -156,7 +156,7 @@ func TestExternValue(t *testing.T) {
 	})
 }
 
-func TestExetrnLib(t *testing.T) {
+func TestExternLib(t *testing.T) {
 
 	check := func(t *testing.T, tc TestCase, checkFunc func(*testing.T, *ssaapi.Program)) {
 		// tc.ExternValue = map[string]any{
