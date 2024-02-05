@@ -603,7 +603,7 @@ yakit.Output(codec.EncodeBase64(s))
 }
 `, utils.HostPort(host, port)),
 		PluginType: "yak",
-		ExecParams: []*ypb.KVPair{{Key: "s", Value: codecString}, {Key: "b", Value: codecString}},
+		ExecParams: []*ypb.KVPair{{Key: "s", Value: codecString}, {Key: "b", Value: "true"}},
 	})
 	if err != nil {
 		t.Fatal(err)
