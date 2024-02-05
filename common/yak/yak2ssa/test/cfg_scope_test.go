@@ -269,6 +269,28 @@ func TestYaklangBasic_Variable_InIf(t *testing.T) {
 	})
 }
 
+func TestYaklangBasic_Variable_If_Logical(t *testing.T) {
+	t.Run("test simple", func(t *testing.T) {
+		checkPrintlnValue(`
+		a = 1
+		if c || b {
+			a = 2
+		}
+		println(a)
+		`, []string{"phi(a)[2,1]"}, t)
+	})
+
+	t.Run("test multiple logical", func(t *testing.T) {
+		checkPrintlnValue(`
+		a = 1
+		if c || b && d {
+			a = 2
+		}
+		println(a)
+		`, []string{"phi(a)[2,1]"}, t)
+	})
+}
+
 func TestYaklangBasic_Variable_Loop(t *testing.T) {
 	t.Run("simple loop not change", func(t *testing.T) {
 		checkPrintlnValue(`

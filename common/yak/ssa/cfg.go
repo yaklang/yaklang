@@ -3,7 +3,6 @@ package ssa
 import (
 	"strings"
 
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
@@ -171,7 +170,6 @@ func (lb *LoopBuilder) Finish() {
 	latch := SSABuild.NewBasicBlockNotAddBlocks(LoopLatch)
 
 	LoopBuilder := ssautil.NewLoopStmt(Scope, func(name string) Value {
-		log.Infof("create phi: %s", name)
 		phi := NewPhi(condition, name, false)
 		condition.Phis = append(condition.Phis, phi)
 		return phi
@@ -290,6 +288,7 @@ func (i *IfBuilder) Build() {
 				SSABuilder.CurrentBlock = CurrentBlock
 				SSABuilder.CurrentBlock.ScopeTable = conditionScope
 				condition = item.Condition()
+				CurrentBlock = SSABuilder.CurrentBlock
 			},
 			func(bodyScope *ssautil.ScopedVersionedTable[Value]) *ssautil.ScopedVersionedTable[Value] {
 				SSABuilder.CurrentBlock = trueBlock
