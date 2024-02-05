@@ -453,3 +453,59 @@ func TestYaklangBasic_Variable_Try(t *testing.T) {
 	})
 }
 
+func TestYaklangBasic_Variable_Switch(t *testing.T) {
+	t.Run("simple switch, no default", func(t *testing.T) {
+		checkPrintlnValue(`
+		a = 1
+		switch a {
+		case 2: 
+			a = 22
+			println(a)
+		case 3, 4:
+			a = 33
+			println(a)
+		}
+		println(a) // phi[1, 22, 33]
+		`, []string{
+			"22", "33", "phi(a)[22,33,1]",
+		}, t)
+	})
+
+	t.Run("simple switch, has default but nothing", func(t *testing.T) {
+		checkPrintlnValue(`
+		a = 1
+		switch a {
+		case 2: 
+			a = 22
+			println(a)
+		case 3, 4:
+			a = 33
+			println(a)
+		default: 
+		}
+		println(a) // phi[1, 22, 33]
+		`, []string{
+			"22", "33", "phi(a)[22,33,1]",
+		}, t)
+	})
+
+	t.Run("simple switch, has default", func(t *testing.T) {
+		checkPrintlnValue(`
+		a = 1
+		switch a {
+		case 2: 
+			a = 22
+			println(a)
+		case 3, 4:
+			a = 33
+			println(a)
+		default: 
+			a = 44
+			println(a)
+		}
+		println(a) // phi[22, 33, 44]
+		`, []string{
+			"22", "33", "44", "phi(a)[22,33,44]",
+		}, t)
+	})
+}

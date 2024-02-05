@@ -297,3 +297,30 @@ func (t *TryStmt[T]) Build() *ScopedVersionedTable[T] {
 	return end
 }
 
+type SwitchStmt[T comparable] struct {
+	global     *ScopedVersionedTable[T]
+	handlers   []*ScopedVersionedTable[T]
+	hasDefault bool
+}
+
+func NewSwitchStmt[T comparable](global *ScopedVersionedTable[T]) *SwitchStmt[T] {
+	return &SwitchStmt[T]{
+		global: global,
+	}
+}
+
+func (s *SwitchStmt[T]) BuildBody(body func(*ScopedVersionedTable[T]) *ScopedVersionedTable[T]) {
+	sub := s.global.CreateSubScope()
+	ret := body(sub)
+	s.handlers = append(s.handlers, ret)
+}
+
+func (s *SwitchStmt[T]) Build(merge func(string, []T) T) *ScopedVersionedTable[T] {
+	end := s.global.CreateSubScope()
+	end.Merge(
+		false,
+		merge,
+		s.handlers...,
+	)
+	return end
+}

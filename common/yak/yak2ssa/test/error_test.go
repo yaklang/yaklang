@@ -1272,10 +1272,11 @@ func TestSwitch(t *testing.T) {
   			case "orange":
     			a = 2
   			default:
-    			b = a
+    			b = a // undefine
 			}
         `,
 			want: []string{
+				ssa.ValueUndefined("a"),
 				ssa.ValueUndefined("a"),
 				ssa4analyze.ConditionIsConst("switch"),
 				// ssa4analyze.BlockUnreachable(),

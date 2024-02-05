@@ -437,13 +437,13 @@ func (b *astbuilder) buildSwitchStmt(stmt *yak.SwitchStmtContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 
-	Switchb := b.BuildSwitch()
-	Switchb.DefaultBreak = true
+	SwitchBuilder := b.BuildSwitch()
+	SwitchBuilder.DefaultBreak = true
 
 	//  parse expression
 	var cond ssa.Value
 	if expr, ok := stmt.Expression().(*yak.ExpressionContext); ok {
-		Switchb.BuildCondition(func() ssa.Value {
+		SwitchBuilder.BuildCondition(func() ssa.Value {
 			cond = b.buildExpression(expr)
 			return cond
 		})
@@ -453,40 +453,30 @@ func (b *astbuilder) buildSwitchStmt(stmt *yak.SwitchStmtContext) {
 	}
 
 	allcase := stmt.AllCase()
-	var exprs []ssa.Value
-	var stList []*yak.StatementListContext
-	// handler label
-	for i := range allcase {
-		if exprlist, ok := stmt.ExpressionList(i).(*yak.ExpressionListContext); ok {
-			exprs = append(exprs, b.buildExpressionList(exprlist)...)
-		}
-	}
 
-	Switchb.BuildHandler(func() (int, []ssa.Value) {
-		return len(allcase), exprs
+	SwitchBuilder.BuildCaseSize(len(allcase))
+	SwitchBuilder.SetCase(func(i int) []ssa.Value {
+		if exprList, ok := stmt.ExpressionList(i).(*yak.ExpressionListContext); ok {
+			return b.buildExpressionList(exprList)
+		}
+		return nil
 	})
-
-	// build body
-	for i := range allcase {
-		if stmtlist, ok := stmt.StatementList(i).(*yak.StatementListContext); ok {
-			stList = append(stList, stmtlist)
+	SwitchBuilder.BuildBody(func(i int) {
+		if stmtList, ok := stmt.StatementList(i).(*yak.StatementListContext); ok {
+			b.buildStatementList(stmtList)
 		}
-	}
-
-	Switchb.BuildBody(func(i int) {
-		b.buildStatementList(stList[i])
 	})
 
 	// default
 	if stmt.Default() != nil {
 		if stmtlist, ok := stmt.StatementList(len(allcase)).(*yak.StatementListContext); ok {
-			Switchb.BuildDefault(func() {
+			SwitchBuilder.BuildDefault(func() {
 				b.buildStatementList(stmtlist)
 			})
 		}
 	}
 
-	Switchb.Finish()
+	SwitchBuilder.Finish()
 }
 
 // if stmt
