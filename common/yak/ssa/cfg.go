@@ -25,7 +25,7 @@ const (
 	TryStart   = "error.try"
 	TryCatch   = "error.catch"
 	TryFinally = "error.final"
-	TryDone    = ""
+	TryDone    = "error.done"
 
 	// switch
 	SwitchDone    = "switch.done"
@@ -371,62 +371,81 @@ func (t *TryBuilder) BuildFinally(f func()) {
 }
 
 func (t *TryBuilder) Finish() {
-	var final *BasicBlock
-	var id string
 	builder := t.b
+	enter := t.enter
+	scope := enter.ScopeTable
+
+	tryBuilder := ssautil.NewTryStmt(scope, generalPhi(builder))
+
+	// var final *BasicBlock
+	// var id string
+	// builder := t.b
 
 	builder.CurrentBlock = t.enter
 	try := builder.NewBasicBlock(TryStart)
-	catch := builder.NewBasicBlock(TryCatch)
+	catch := builder.NewBasicBlockNotAddBlocks(TryCatch)
 	e := builder.EmitErrorHandler(try, catch)
 
-	// build try
-	builder.CurrentBlock = try
-	t.buildTry()
-	try = builder.CurrentBlock
+	// // build try
+	tryBuilder.SetTryBody(func(svt *ssautil.ScopedVersionedTable[Value]) *ssautil.ScopedVersionedTable[Value] {
+		try.ScopeTable = svt
+		builder.CurrentBlock = try
+		t.buildTry()
+		try = builder.CurrentBlock
+		return try.ScopeTable
+	})
 
-	// build catch
-	// builder.ScopeStart()
+	// // build catch
+
+	addToBlocks(catch)
+
+	catch.ScopeTable = tryBuilder.CreateCatch()
 	builder.CurrentBlock = catch
-	id = t.buildError()
-	if id != "" {
+
+	if id := t.buildError(); id != "" {
 		p := NewParam(id, false, builder)
 		p.SetType(BasicTypes[ErrorType])
-		// builder.WriteVariable(builder.SetScopeLocalVariable(id), p)
-		// builder.WriteVariable(id, p)
+		builder.WriteLocalVariable(id, p)
 	}
-	t.buildCatch()
-	catch = builder.CurrentBlock
-	// builder.ScopeEnd()
 
-	// build finally
+	tryBuilder.SetCache(func() *ssautil.ScopedVersionedTable[Value] {
+		t.buildCatch()
+		catch = builder.CurrentBlock
+		return catch.ScopeTable
+	})
+
+	// // build finally
 	var target *BasicBlock
 	if t.buildFinally != nil {
-		builder.CurrentBlock = t.enter
-		final = builder.NewBasicBlock(TryFinally)
+		final := builder.NewBasicBlock(TryFinally)
 		e.AddFinal(final)
 		target = final
+
+		final.ScopeTable = tryBuilder.CreateFinally()
+		builder.CurrentBlock = final
+		tryBuilder.SetFinal(func() *ssautil.ScopedVersionedTable[Value] {
+			t.buildFinally()
+			final = builder.CurrentBlock
+			return final.ScopeTable
+		})
 	}
 
-	builder.CurrentBlock = t.enter
-	done := builder.NewBasicBlock("")
+	done := builder.NewBasicBlock(TryDone)
+	builder.CurrentBlock = done
+	end := tryBuilder.Build()
+	done.ScopeTable = end
 	e.AddDone(done)
-
 	if target == nil {
 		target = done
+	} else {
+		builder.CurrentBlock = target
+		builder.EmitJump(done)
 	}
 
 	builder.CurrentBlock = try
 	builder.EmitJump(target)
 	builder.CurrentBlock = catch
 	builder.EmitJump(target)
-
-	if t.buildFinally != nil {
-		// if target != done {
-		builder.CurrentBlock = final
-		t.buildFinally()
-		builder.EmitJump(done)
-	}
 
 	builder.CurrentBlock = done
 }

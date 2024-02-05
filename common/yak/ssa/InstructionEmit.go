@@ -389,8 +389,8 @@ func (f *FunctionBuilder) EmitErrorHandler(try, catch *BasicBlock) *ErrorHandler
 	e := NewErrorHandler(try, catch)
 	block := f.CurrentBlock
 	block.AddSucc(try)
-	block.AddSucc(catch)
 	try.AddSucc(catch)
+	block.AddSucc(catch)
 	f.emit(e)
 	return e
 }
