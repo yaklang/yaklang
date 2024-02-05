@@ -214,3 +214,86 @@ func (l *LoopStmt[T]) Build(SpinHandler func(name string, phi, origin, latch T) 
 
 	return end
 }
+
+type TryStmt[T comparable] struct {
+	global       *ScopedVersionedTable[T]
+	tryBody      *ScopedVersionedTable[T]
+	cacheBody    *ScopedVersionedTable[T]
+	finalBody    *ScopedVersionedTable[T]
+	ErrorName    string
+	mergeHandler func(name string, t []T) T
+}
+
+func NewTryStmt[T comparable](
+	global *ScopedVersionedTable[T],
+	mergeHandler func(name string, t []T) T,
+) *TryStmt[T] {
+	return &TryStmt[T]{
+		global:       global,
+		mergeHandler: mergeHandler,
+	}
+}
+
+func (t *TryStmt[T]) SetTryBody(body func(*ScopedVersionedTable[T]) *ScopedVersionedTable[T]) {
+	tryBody := t.global.CreateSubScope()
+	ret := body(tryBody)
+	t.tryBody = ret
+
+}
+
+func (t *TryStmt[T]) SetError(name string) {
+	t.ErrorName = name
+}
+
+func (t *TryStmt[T]) CreateCatch() *ScopedVersionedTable[T] {
+	t.cacheBody = t.global.CreateSubScope()
+	return t.cacheBody
+}
+
+func (t *TryStmt[T]) SetCache(build func() *ScopedVersionedTable[T]) {
+	t.cacheBody.Merge(
+		true,
+		t.mergeHandler,
+		t.tryBody,
+	)
+	t.cacheBody.CreateVariable(t.ErrorName, true)
+	t.cacheBody = build()
+}
+
+func (t *TryStmt[T]) CreateFinally() *ScopedVersionedTable[T] {
+	t.finalBody = t.global.CreateSubScope()
+	return t.finalBody
+}
+
+func (t *TryStmt[T]) SetFinal(build func() *ScopedVersionedTable[T]) {
+	t.finalBody.Merge(
+		false, t.mergeHandler,
+		t.tryBody, t.cacheBody,
+	)
+	ret := build()
+	t.finalBody = ret
+}
+
+func (t *TryStmt[T]) Build() *ScopedVersionedTable[T] {
+	/*
+		global
+			try
+				body
+			catch
+				...
+			finally // option
+				...
+		end
+	*/
+	end := t.global.CreateSubScope()
+	if t.finalBody != nil {
+		end.CoverBy(t.finalBody)
+	} else {
+		end.Merge(
+			false, t.mergeHandler,
+			t.tryBody, t.cacheBody,
+		)
+	}
+	return end
+}
+

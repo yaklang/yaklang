@@ -1194,16 +1194,17 @@ func TestTryCatch(t *testing.T) {
 	t.Run("try catch cfg", func(t *testing.T) {
 		CheckError(t, TestCase{
 			code: `
+			a = 0 
 			try {
 				a = 1
 				a1 = 1
 			} catch err {
 				a = 2
-				// a1 = 2 // a1 undefined
 			}
-			b = a
-			b = a1
+			b = a 
+			b = a1 // undefine
 
+			a2 = 0 
 			try {
 				a2 = 1
 				a3 = 1
@@ -1214,10 +1215,12 @@ func TestTryCatch(t *testing.T) {
 				a2 = 3
 			}
 			b = a2
-			b = a3
+			b = a3 // undefine
 			`,
 			want: []string{
 				ssa.ValueUndefined("a1"),
+				ssa.ValueUndefined("a1"),
+				ssa.ValueUndefined("a3"),
 				ssa.ValueUndefined("a3"),
 			},
 		})
@@ -1249,6 +1252,7 @@ func TestTryCatch(t *testing.T) {
 			want: []string{
 				"empty block",
 				"empty block",
+				ssa.ValueUndefined("err"),
 				ssa.ValueUndefined("err"),
 			},
 		})
