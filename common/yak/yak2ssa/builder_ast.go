@@ -553,39 +553,39 @@ func (b *astbuilder) AssignList(stmt assignlist) []ssa.Value {
 	// Colon Assign Means: ... create symbol to recv value force
 	if op, op2 := stmt.AssignEq(), stmt.ColonAssignEq(); op != nil || op2 != nil {
 		// right value
-		var values []ssa.Value
+		var rightValue []ssa.Value
 		if ri, ok := stmt.ExpressionList().(*yak.ExpressionListContext); ok {
-			values = b.buildExpressionList(ri)
+			rightValue = b.buildExpressionList(ri)
 		}
 
 		// left
-		var variables []*ssa.Variable
+		var leftVariables []*ssa.Variable
 		if li, ok := stmt.LeftExpressionList().(*yak.LeftExpressionListContext); ok {
-			variables = b.buildLeftExpressionList(op2 != nil, li)
+			leftVariables = b.buildLeftExpressionList(op2 != nil, li)
 		}
 
 		// assign
 		// (n) = (n), just assign
-		if len(values) == len(variables) {
-			for i := range values {
+		if len(rightValue) == len(leftVariables) {
+			for i := range rightValue {
 				// if inst, ok := rvalues[i].(ssa.va); ok {
 				// 	inst.SetLeftPosition(lvalues[i].GetPosition())
 				// }
-				b.AssignVariable(variables[i], values[i])
+				b.AssignVariable(leftVariables[i], rightValue[i])
 			}
-		} else if len(values) == 1 {
-			if len(variables) == 0 {
+		} else if len(rightValue) == 1 {
+			if len(leftVariables) == 0 {
 				// (0) = (1)
 				b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
 				return nil
 			}
 
 			// (n) = (1)
-			inter, ok := values[0].(ssa.Value)
+			inter, ok := rightValue[0].(ssa.Value)
 			if !ok {
 				return nil
 			}
-			if c, ok := values[0].(*ssa.Call); ok {
+			if c, ok := rightValue[0].(*ssa.Call); ok {
 				var length int
 				// 可以通过是否存在variable确定是函数调用是否存在左值
 				c.SetName(uuid.NewString())
@@ -593,56 +593,48 @@ func (b *astbuilder) AssignList(stmt assignlist) []ssa.Value {
 				if !ssa.IsObjectType(c.GetType()) {
 					// b.NewError(ssa.Error, TAG, "assign right side is not interface function call")
 					// return nil
-					length = len(variables)
+					length = len(leftVariables)
 				} else {
 					it := c.GetType().(*ssa.ObjectType)
 					length = it.Len
 				}
 				vs := make([]ssa.Value, 0)
 				for i := 0; i < length; i++ {
-					field := b.EmitField(c, b.EmitConstInst(i))
-					vs = append(vs, field)
+					returnVal := b.ReadMemberCallVariable(c, b.EmitConstInst(i))
+					vs = append(vs, returnVal)
 				}
-				if len(vs) == len(variables) {
+				if len(vs) == len(leftVariables) {
 					for i := range vs {
-
-						// if inst, ok := vs[i].(ssa.Instruction); ok {
-						// 	inst.SetRange(lvalues[i].GetRange())
-						// }
-
-						b.AssignVariable(variables[i], vs[i])
+						b.AssignVariable(leftVariables[i], vs[i])
 					}
 				} else {
-					b.NewError(ssa.Error, TAG, MultipleAssignFailed(len(variables), len(values)))
+					b.NewError(ssa.Error, TAG, MultipleAssignFailed(len(leftVariables), len(rightValue)))
 				}
 				return nil
 			}
 
 			// (n) = field(1, #index)
-			for i, variable := range variables {
-				field := b.EmitField(inter, b.EmitConstInst(i))
-				// if inst, ok := field.(ssa.Instruction); ok {
-				// 	inst.SetPosition(lv.GetPosition())
-				// }
-				b.AssignVariable(variable, field)
+			for i, variable := range leftVariables {
+				idxVar := b.ReadMemberCallVariable(inter, b.EmitConstInst(i))
+				b.AssignVariable(variable, idxVar)
 			}
-		} else if len(variables) == 1 {
-			if len(values) == 0 {
+		} else if len(leftVariables) == 1 {
+			if len(rightValue) == 0 {
 				// (1) = (0) undefined
 				b.NewError(ssa.Error, TAG, AssignRightSideEmpty())
 				return nil
 			}
 			// (1) = (n)
 			// (1) = interface(n)
-			_interface := b.CreateInterfaceWithVs(nil, values)
+			_interface := b.CreateInterfaceWithVs(nil, rightValue)
 			// lvalues[0].Assign(_interface)
-			b.AssignVariable(variables[0], _interface)
+			b.AssignVariable(leftVariables[0], _interface)
 		} else {
 			// (n) = (m) && n!=m
-			b.NewError(ssa.Error, TAG, MultipleAssignFailed(len(variables), len(values)))
+			b.NewError(ssa.Error, TAG, MultipleAssignFailed(len(leftVariables), len(rightValue)))
 			return nil
 		}
-		return lo.Map(variables, func(lv *ssa.Variable, _ int) ssa.Value { return b.ReadValueByVariable(lv) })
+		return lo.Map(leftVariables, func(lv *ssa.Variable, _ int) ssa.Value { return b.ReadValueByVariable(lv) })
 	}
 	return nil
 }
@@ -827,7 +819,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 			v := getValue(0)
 			if v == nil {
 				//TODO:  int() => type-cast [number] undefined-""
-				v = b.EmitUndefine("")
+				v = b.EmitUndefined("")
 			}
 			typ := b.buildTypeLiteral(s)
 			return b.EmitTypeCast(v, typ)
@@ -873,7 +865,6 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		exprx := b.buildExpression(expr)
 		if id := s.Identifier(); id != nil {
 			idText := id.GetText()
-			// return b.EmitField(exprx, b.EmitConstInst(idText))
 			return b.ReadMemberCallVariable(exprx, b.EmitConstInst(idText))
 		} else if id := s.IdentifierWithDollar(); id != nil {
 			key := b.ReadValue(id.GetText()[1:])
@@ -881,7 +872,6 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 				b.NewError(ssa.Error, TAG, ExpressionNotVariable(id.GetText()))
 				return nil
 			}
-			// return b.EmitField(exprx, key)
 			return b.ReadMemberCallVariable(exprx, key)
 		}
 	}
@@ -895,7 +885,6 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		expr := b.buildExpression(expression)
 		keys := b.buildSliceCall(s)
 		if len(keys) == 1 {
-			// return b.EmitField(expr, keys[0])
 			return b.ReadMemberCallVariable(expr, keys[0])
 		} else if len(keys) == 2 {
 			return b.EmitMakeSlice(expr, keys[0], keys[1], nil)
@@ -916,7 +905,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		if e, ok := s.Expression().(*yak.ExpressionContext); ok {
 			return b.buildExpression(e)
 		} else {
-			return b.EmitUndefine("")
+			return b.EmitUndefined("")
 		}
 	}
 

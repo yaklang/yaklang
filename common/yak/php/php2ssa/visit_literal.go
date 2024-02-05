@@ -27,7 +27,7 @@ func (y *builder) VisitConstant(raw phpparser.IConstantContext) ssa.Value {
 		return y.VisitLiteralConstant(i.LiteralConstant())
 	} else if i.MagicConstant() != nil {
 		// magic __dir__ / __file__
-		return y.ir.EmitUndefine(i.MagicConstant().GetText())
+		return y.ir.EmitUndefined(i.MagicConstant().GetText())
 	} else if i.ClassConstant() != nil {
 		// class constant
 		log.Warnf("class constant not support yet: %s", i.ClassConstant().GetText())

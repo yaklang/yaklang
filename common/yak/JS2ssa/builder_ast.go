@@ -545,7 +545,7 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 			} else if Unop.GetText() == "void" {
 				if expr := s.SingleExpression(); expr != nil {
 					rv, _ := b.buildSingleExpression(expr, false)
-					return b.EmitUndefine(rv.String())
+					return b.EmitUndefined(rv.String())
 				}
 			} else if Unop.GetText() == "++" || Unop.GetText() == "--" {
 				if expr := s.SingleExpression(); expr != nil {
