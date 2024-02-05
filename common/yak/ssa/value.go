@@ -50,7 +50,7 @@ func (b *FunctionBuilder) writeUndefine(variable string, names ...string) *Undef
 	if len(names) > 0 {
 		name = names[0]
 	}
-	undefine := b.EmitUndefine(name)
+	undefine := b.EmitUndefined(name)
 	b.WriteVariable(variable, undefine)
 	return undefine
 }
