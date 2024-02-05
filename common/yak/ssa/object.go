@@ -118,7 +118,6 @@ func (b *FunctionBuilder) getFieldWithCreate(i, key Value, forceCreate bool) Val
 		ci.isIdentify = true
 	}
 	field := NewFieldOnly(key, i, b.CurrentBlock)
-	b.emit(field)
 	return field
 }
 
@@ -220,12 +219,14 @@ func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
 		return p
 	}
 
-	if name, ok := b.checkCanMemberCall(value, key); ok {
+	name, ok := b.checkCanMemberCall(value, key)
+	if ok {
 		if ret := b.PeekValue(name); ret != nil {
 			return ret
 		}
 	}
-	return b.EmitField(value, key)
+
+	return b.createField(value, key, name)
 }
 
 func (b *FunctionBuilder) CreateMemberCallVariable(value, key Value) *Variable {
@@ -235,8 +236,27 @@ func (b *FunctionBuilder) CreateMemberCallVariable(value, key Value) *Variable {
 	}
 
 	if name, ok := b.checkCanMemberCall(value, key); ok {
+		b.createField(value, key, name)
 		return b.CreateVariable(name, false)
 	}
 
 	return nil
+}
+
+func (b *FunctionBuilder) createField(value, key Value, name string) Value {
+	var field Value
+	RecoverScope := b.SetCurrent(value)
+	if ret := b.PeekValue(name); ret != nil {
+		RecoverScope()
+		return ret
+	} else {
+		field = b.EmitField(value, key)
+		b.WriteVariable(name, field)
+		RecoverScope()
+		if field != nil {
+			field.SetRange(b.CurrentRange)
+		}
+		return field
+	}
+
 }

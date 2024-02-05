@@ -1,6 +1,12 @@
 package test
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/samber/lo"
+	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+)
 
 func TestMemberCall(t *testing.T) {
 	t.Run("normal", func(t *testing.T) {
@@ -101,4 +107,45 @@ func TestMemberCallNegative(t *testing.T) {
 		)
 	})
 
+}
+
+func TestMemberCall_CheckField(t *testing.T) {
+	t.Run("assign", func(t *testing.T) {
+		checkPrintlnValue(`
+		a = {} 
+		if c {
+			a.b = 1
+		}
+		println(a.b)
+		`, []string{
+			"phi(#2.b)[1,make(map[any]any).b]",
+		}, t)
+	})
+
+	t.Run("read", func(t *testing.T) {
+		CheckTestCase(t, TestCase{
+			code: `
+		a = {}
+		if c {
+			println(a.b)
+		}
+		println(a.b)
+			`,
+			Check: func(t *testing.T, p *ssaapi.Program) {
+				test := assert.New(t)
+				printlns := p.Ref("println").ShowWithSource()
+				arg := printlns.GetUsers().Filter(func(v *ssaapi.Value) bool {
+					return v.IsCall()
+				}).Flat(func(v *ssaapi.Value) ssaapi.Values {
+					return ssaapi.Values{v.GetOperand(1)}
+				}).ShowWithSource()
+
+				argUniqed := lo.UniqBy(arg, func(v *ssaapi.Value) int {
+					return v.GetId()
+				})
+
+				test.Len(argUniqed, 1)
+			},
+		})
+	})
 }
