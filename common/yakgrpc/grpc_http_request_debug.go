@@ -4,7 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	pta "github.com/yaklang/yaklang/common/yak/static_analyzer"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -114,7 +118,7 @@ func (s *Server) execScriptWithExecParam(scriptName string, input string, stream
 		})
 		return nil
 	case "yak":
-		tempArgs := makeArgs(params)
+		tempArgs := makeArgs(params, scriptInstance.Content)
 		engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
 			yak.HookCliArgs(engine, tempArgs)
 			return nil
@@ -341,7 +345,18 @@ func (s *Server) debugScript(
 	return utils.Error("unsupported plugin type: " + debugType)
 }
 
-func makeArgs(execParams []*ypb.KVPair) []string {
+func makeArgs(execParams []*ypb.KVPair, yakScript string) []string {
+	var boolParams []string
+	prog, err := ssaapi.Parse(yakScript, pta.GetPluginSSAOpt("yak")...)
+	if err != nil {
+		log.Error("ssa parse error")
+	} else {
+		for _, param := range information.ParseCliParameter(prog) {
+			if param.Type == "boolean" {
+				boolParams = append(boolParams, param.Name)
+			}
+		}
+	}
 	args := []string{"yak"}
 	canFilter := true
 	for _, p := range execParams {
@@ -373,9 +388,16 @@ func makeArgs(execParams []*ypb.KVPair) []string {
 			}
 			args = append(args, "--yakit-plugin-file", tempName)
 		default:
+			if utils.StringSliceContain(boolParams, p.Key) {
+				v, _ := strconv.ParseBool(p.Value)
+				if !v {
+					continue
+				}
+			}
 			args = append(args, "--"+p.Key, p.Value)
 		}
 	}
+
 	return args
 }
 
