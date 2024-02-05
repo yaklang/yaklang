@@ -225,3 +225,40 @@ dump("DONE")
 		})
 	})
 }
+
+func TestObject_Basic(t *testing.T) {
+	prog, err := Parse(`
+	a = {}
+	if c {
+		a.d = 1
+		println(a.d)
+	}
+	println(a.d)
+	target = a.d
+	`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prog.Show()
+	prog.Ref("target").ShowWithSource()
+}
+
+func TestObject_Basic_Mask(t *testing.T) {
+	prog, err := Parse(`
+	a = {};
+c = ()=>{
+ dump(a.b)
+}
+
+if d {a.b=2}
+
+c()
+
+`)
+	if err != nil {
+		t.Fatalf("parse failed: %s", err)
+	}
+	prog.Show()
+	prog.Ref("a").ShowWithSource()
+
+}

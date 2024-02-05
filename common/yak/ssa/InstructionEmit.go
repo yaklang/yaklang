@@ -318,10 +318,14 @@ func (f *FunctionBuilder) EmitConstInst(i any) *ConstInst {
 }
 
 func (f *FunctionBuilder) EmitField(i, key Value) Value {
+	ret := f.getFieldWithCreate(i, key, false)
+
 	if f.CurrentBlock.finish {
-		return nil
+		f.EmitInstructionBefore(ret, f.CurrentBlock.LastInst())
+	} else {
+		f.emit(ret)
 	}
-	return f.getFieldWithCreate(i, key, false)
+	return ret
 }
 func (f *FunctionBuilder) EmitFieldMust(i, key Value) *Field {
 	if f.CurrentBlock.finish {
