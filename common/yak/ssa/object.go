@@ -67,24 +67,6 @@ func NewFieldOnly(key, obj Value, block *BasicBlock) *Field {
 	return f
 }
 
-// EmitInterfaceMake quick build key=>value based object
-func (b *FunctionBuilder) EmitInterfaceMake(f func(feed func(key Value, val Value))) *Make {
-	itf := b.EmitMakeWithoutType(NewConst(0), NewConst(0))
-	ityp := NewObjectType()
-	count := 0
-	f(func(key Value, val Value) {
-		field := b.EmitFieldMust(itf, key)
-		field.SetType(val.GetType())
-		b.EmitUpdate(field, val)
-		ityp.AddField(key, val.GetType())
-		count++
-	})
-	ityp.Finish()
-	ityp.Len = count
-	itf.SetType(ityp)
-	return itf
-}
-
 func (b *FunctionBuilder) CreateInterfaceWithVs(keys []Value, vs []Value) *Make {
 	hasKey := true
 	if len(keys) == 0 {
@@ -226,7 +208,7 @@ func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
 		}
 	}
 
-	return b.createField(value, key, name)
+	return b.ReadValue(name)
 }
 
 func (b *FunctionBuilder) CreateMemberCallVariable(value, key Value) *Variable {
@@ -244,19 +226,12 @@ func (b *FunctionBuilder) CreateMemberCallVariable(value, key Value) *Variable {
 }
 
 func (b *FunctionBuilder) createField(value, key Value, name string) Value {
-	var field Value
 	RecoverScope := b.SetCurrent(value)
+	defer RecoverScope()
+
 	if ret := b.PeekValue(name); ret != nil {
-		RecoverScope()
 		return ret
 	} else {
-		field = b.EmitField(value, key)
-		b.WriteVariable(name, field)
-		RecoverScope()
-		if field != nil {
-			field.SetRange(b.CurrentRange)
-		}
-		return field
+		return b.ReadValue(name)
 	}
-
 }

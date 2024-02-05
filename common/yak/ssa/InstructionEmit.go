@@ -174,10 +174,13 @@ func (f *FunctionBuilder) emitEx(i Instruction, insert func(Instruction)) {
 	insert(i)
 }
 
-func (f *FunctionBuilder) EmitUndefine(name string) *Undefined {
-	if f.CurrentBlock.finish {
-		return nil
-	}
+// EmitUndefined emit undefined value
+// the current block is finished.
+// NOTE: the object/membercall will create vars in finished blocks
+func (f *FunctionBuilder) EmitUndefined(name string) *Undefined {
+	//if f.CurrentBlock.finish {
+	//	return nil
+	//}
 	u := NewUndefined(name)
 	f.emit(u)
 	return u

@@ -14,6 +14,32 @@ func TestFunctionTrace(t *testing.T) {
 	prog.Ref("e").GetTopDefs().Show()
 }
 
+func TestFunction_DoubleReturn(t *testing.T) {
+	prog, err := Parse(`c = () => {return 1,2}; a,b=c();`)
+	/**
+	main
+	type: ( ) -> null
+	entry-0: (true)
+		<[]number> t4 = call <( ) -> []number> main$1 () []
+		<number> t6 = <[]number> t4 field[<number> 0]
+		<number> t8 = <[]number> t4 field[<number> 1]
+
+	extern type:
+	main$1
+	parent: main
+	type: ( ) -> []number
+	entry-0: (true)
+		jump -> b-1
+	b-1: <- entry-0  (true)
+		ret <number> 1, <number> 2
+	*/
+	if err != nil {
+		t.Fatal(err)
+	}
+	prog.Show()
+	prog.Ref("a").GetTopDefs().Show()
+}
+
 func TestFunctionTrace_FormalParametersCheck(t *testing.T) {
 	prog, err := Parse(`
 a = 1
