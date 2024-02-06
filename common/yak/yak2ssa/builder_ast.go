@@ -788,7 +788,11 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 			recoverRange := b.SetRange(s.BaseParserRuleContext)
 			if id := s.Identifier(); id != nil {
 				idText := id.GetText()
-				ret = b.CreateMemberCallVariable(expr, b.EmitConstInst(idText))
+				callee := b.EmitConstInst(idText)
+				ret = b.CreateMemberCallVariable(expr, callee)
+				if val, _ := ssa.ToUndefined(ret.Value); val != nil {
+					val.SetMemberRelationship(expr, callee)
+				}
 			} else if id := s.IdentifierWithDollar(); id != nil {
 				key := b.ReadValue(id.GetText()[1:])
 				ret = b.CreateMemberCallVariable(expr, key)

@@ -177,6 +177,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 	}
 
 	switch ret := i.node.(type) {
+	case *ssa.Undefined:
+		// ret[n]
+		return i.visitedDefsDefault(actx)
 	case *ssa.Field:
 		return i.visitedDefsDefault(actx)
 	case *ssa.Phi:
