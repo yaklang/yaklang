@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -56,20 +57,29 @@ func (s *Server) GetHTTPFlowById(_ context.Context, r *ypb.GetHTTPFlowByIdReques
 }
 
 func (s *Server) GetHTTPFlowByIds(_ context.Context, r *ypb.GetHTTPFlowByIdsRequest) (*ypb.HTTPFlows, error) {
-	db := s.GetProjectDatabase()
+	db := s.GetProjectDatabase().Model(&yakit.HTTPFlow{})
 	var full []*ypb.HTTPFlow
-	for _, group := range funk.ChunkInt64s(r.Ids, 10) {
-		var g []*yakit.HTTPFlow
-		if db = db.Where("id in (?)", group).Find(&g); db.Error != nil {
-			continue
-		}
-		for _, flow := range g {
-			r, _ := flow.ToGRPCModel(true)
-			if r != nil {
-				full = append(full, r)
-			}
+	var g []*yakit.HTTPFlow
+	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", r.Ids)
+	db.Find(&g)
+	for _, flow := range g {
+		r, _ := flow.ToGRPCModelFull()
+		if r != nil {
+			full = append(full, r)
 		}
 	}
+
+	// for _, group := range funk.ChunkInt64s(r.Ids, 10) {
+	// 	if db = db.Where("id in (?)", group).Find(&g); db.Error != nil {
+	// 		continue
+	// 	}
+	// 	for _, flow := range g {
+	// 		r, _ := flow.ToGRPCModel(true)
+	// 		if r != nil {
+	// 			full = append(full, r)
+	// 		}
+	// 	}
+	// }
 	return &ypb.HTTPFlows{Data: full}, nil
 }
 
@@ -121,11 +131,17 @@ func (s *Server) ConvertFuzzerResponseToHTTPFlow(ctx context.Context, in *ypb.Fu
 
 func (s *Server) SetTagForHTTPFlow(ctx context.Context, req *ypb.SetTagForHTTPFlowRequest) (*ypb.Empty, error) {
 	if len(req.GetCheckTags()) > 0 {
-		for _, i := range req.GetCheckTags() {
-			err := s.SaveSetTagForHTTPFlow(i.GetId(), i.GetHash(), i.GetTags())
-			if err != nil {
-				return nil, err
+		err := utils.GormTransaction(s.GetProjectDatabase(), func(tx *gorm.DB) error {
+			for _, i := range req.GetCheckTags() {
+				err := s.SaveSetTagForHTTPFlow(i.GetId(), i.GetHash(), i.GetTags())
+				if err != nil {
+					return err
+				}
 			}
+			return nil
+		})
+		if err != nil {
+			return nil, err
 		}
 	} else {
 		err := s.SaveSetTagForHTTPFlow(req.GetId(), req.GetHash(), req.GetTags())
@@ -137,14 +153,11 @@ func (s *Server) SetTagForHTTPFlow(ctx context.Context, req *ypb.SetTagForHTTPFl
 }
 
 func (s *Server) SaveSetTagForHTTPFlow(id int64, hash string, tags []string) error {
-	flow, err := yakit.GetHTTPFlow(s.GetProjectDatabase(), id)
-	if flow == nil {
-		flow, err = yakit.GetHTTPFlowByHash(s.GetProjectDatabase(), hash)
-	}
+	flow, err := yakit.GetHTTPFlowByIDOrHash(s.GetProjectDatabase(), id, hash)
 	if err != nil {
 		return err
 	}
-	//flow.AddTag(tags...)
+	// flow.AddTag(tags...)
 	extLen := len(tags)
 	tagsData := make([]string, extLen)
 	if extLen > 0 {
@@ -160,6 +173,7 @@ func (s *Server) SaveSetTagForHTTPFlow(id int64, hash string, tags []string) err
 	return nil
 }
 
+// 似乎已弃用？没有调用
 func (s *Server) QueryHTTPFlowsIds(ctx context.Context, req *ypb.QueryHTTPFlowsIdsRequest) (*ypb.QueryHTTPFlowsIdsResponse, error) {
 	if len(req.GetIncludeInWhere()) == 0 {
 		return nil, utils.Errorf("IncludeInWhere is empty")
@@ -177,7 +191,6 @@ func (s *Server) QueryHTTPFlowsIds(ctx context.Context, req *ypb.QueryHTTPFlowsI
 		res = append(res, &ypb.HTTPFlow{
 			Id: uint64(k.ID),
 		})
-
 	}
 	return &ypb.QueryHTTPFlowsIdsResponse{
 		Data: res,
@@ -186,7 +199,7 @@ func (s *Server) QueryHTTPFlowsIds(ctx context.Context, req *ypb.QueryHTTPFlowsI
 
 func (s *Server) HTTPFlowsFieldGroup(ctx context.Context, req *ypb.HTTPFlowsFieldGroupRequest) (*ypb.HTTPFlowsFieldGroupResponse, error) {
 	tags, err := yakit.HTTPFlowTags(req.RefreshRequest)
-	//statusCode, err := yakit.HTTPFlowStatusCode(req.RefreshRequest)
+	// statusCode, err := yakit.HTTPFlowStatusCode(req.RefreshRequest)
 	var tagsCode ypb.HTTPFlowsFieldGroupResponse
 
 	if tags == nil {
@@ -271,7 +284,8 @@ func (s *Server) HTTPFlowsShare(ctx context.Context, req *ypb.HTTPFlowsShareRequ
 	if len(req.GetIds()) > 50 {
 		return nil, utils.Error("exceed the limit")
 	}
-	ret := yakit.YieldHTTPFlows(s.GetProjectDatabase().Where("id in (?)", req.Ids), ctx)
+	db := s.GetProjectDatabase()
+	ret := yakit.YieldHTTPFlows(bizhelper.ExactQueryInt64ArrayOr(db, "id", req.GetIds()), ctx)
 
 	for httpFlow := range ret {
 		if httpFlow.Hash != "" {
@@ -318,8 +332,8 @@ func (s *Server) HTTPFlowsShare(ctx context.Context, req *ypb.HTTPFlowsShareRequ
 			ContentType:        httpFlow.ContentType,
 			StatusCode:         httpFlow.StatusCode,
 			SourceType:         httpFlow.SourceType,
-			//Request:            request,
-			//Response:           response,
+			// Request:            request,
+			// Response:           response,
 			Request:           httpFlow.Request,
 			Response:          httpFlow.Response,
 			GetParamsTotal:    httpFlow.GetParamsTotal,
@@ -333,7 +347,7 @@ func (s *Server) HTTPFlowsShare(ctx context.Context, req *ypb.HTTPFlowsShareRequ
 			WebsocketHash:     httpFlow.WebsocketHash,
 		}
 		projectStoragesWhere := []string{strconv.Quote(strconv.FormatInt(int64(httpFlow.ID), 10) + "_response"), strconv.Quote(strconv.FormatInt(int64(httpFlow.ID), 10) + "_request")}
-		projectStorages, _ := yakit.GetProjectKeyByWhere(s.GetProjectDatabase(), projectStoragesWhere)
+		projectStorages, _ := yakit.GetProjectKeyByWhere(db, projectStoragesWhere)
 		for _, v := range projectStorages {
 			projectGeneralStorage = append(projectGeneralStorage, &yakit.ProjectGeneralStorage{
 				Key:        v.Key,
@@ -357,7 +371,7 @@ func (s *Server) HTTPFlowsShare(ctx context.Context, req *ypb.HTTPFlowsShareRequ
 	}
 
 	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
-	shareRes, err := client.HttpFlowShareWithToken(ctx, req.Token, req.ExpiredTime, req.Module, string(shareContent), req.Pwd, req.LimitNum)
+	shareRes, err := client.HttpFlowShareWithToken(ctx, req.Token, req.ExpiredTime, req.Module, utils.UnsafeBytesToString(shareContent), req.Pwd, req.LimitNum)
 	if err != nil {
 		return nil, utils.Errorf("HTTPFlowsShare failed: %s", err)
 	}
@@ -377,11 +391,8 @@ func (s *Server) HTTPFlowsExtract(ctx context.Context, req *ypb.HTTPFlowsExtract
 		WebsocketFlowsList    []*yakit.WebsocketFlowShare
 		ProjectGeneralStorage []*yakit.ProjectGeneralStorage
 	}
-	var (
-		shareData []*HTTPFlowShare
-	)
+	var shareData []*HTTPFlowShare
 	err := json.Unmarshal([]byte(req.ShareExtractContent), &shareData)
-
 	if err != nil {
 		return nil, utils.Errorf("HTTPFlowsExtract failed: %s", err)
 	}
