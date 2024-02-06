@@ -35,3 +35,13 @@ func TestUnpack_Basic3(t *testing.T) {
 	})
 	assert.Equal(t, 1, len(id))
 }
+
+func TestUnpack_BasicFunctionUnpack(t *testing.T) {
+	prog, err := Parse(`c = () => {return 1, 2};a,b = c()`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prog.Show().Ref("a").GetTopDefs().ForEach(func(value *Value) {
+		value.Show()
+	})
+}
