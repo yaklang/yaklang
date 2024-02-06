@@ -47,6 +47,8 @@ type Instruction interface {
 	IsExtern() bool
 	SetExtern(bool)
 
+	IsConstLiteral() bool
+
 	GetVariable(string) *Variable
 	GetAllVariables() map[string]*Variable
 	AddVariable(*Variable)
@@ -169,7 +171,11 @@ func (c *anInstruction) SetRange(pos *Range) {
 	// }
 }
 
-func (c *anInstruction) IsExtern() bool   { return c.isExtern }
+func (c *anInstruction) IsExtern() bool { return c.isExtern }
+func (c *anInstruction) IsConstLiteral() bool {
+	_, ok := ToConst(c)
+	return ok
+}
 func (c *anInstruction) SetExtern(b bool) { c.isExtern = b }
 
 // error logger
@@ -215,6 +221,56 @@ var _ Instruction = (*anInstruction)(nil)
 type anValue struct {
 	typ      Type
 	userList Users
+
+	// return value from call
+	// 标记这个值是不是从 call 来的返回值？
+	functionCall            *Call
+	functionCallReturnIndex int
+
+	memberCaller          Value
+	isStaticMemberLiteral Value
+	isDynamicMember       Value
+}
+
+func (n *anValue) SetMemberRelationship(caller, callee Value) {
+	n.memberCaller = caller
+	if callee.IsConstLiteral() {
+		n.isStaticMemberLiteral = callee
+	} else {
+		n.isDynamicMember = callee
+	}
+}
+
+func (n *anValue) IsMemberCall() bool {
+	return n.memberCaller != nil
+}
+
+func (n *anValue) IsStaticMemberCall() bool {
+	return n.isStaticMemberLiteral != nil
+}
+
+func (n *anValue) IsDynamicMemberCall() bool {
+	return n.isDynamicMember != nil
+}
+
+func (m *anValue) GetMemberCaller() Value {
+	return m.memberCaller
+}
+
+func (m *anValue) GetMemberCallee() Value {
+	if m.isStaticMemberLiteral != nil {
+		return m.isStaticMemberLiteral
+	}
+	return m.isDynamicMember
+}
+
+func (n *anValue) SetReturnTraceFromCall(call *Call, idx int) {
+	n.functionCall = call
+	n.functionCallReturnIndex = idx
+}
+
+func (v *anValue) IsFromReturnCall() bool {
+	return v.functionCall != nil
 }
 
 func NewValue() anValue {
