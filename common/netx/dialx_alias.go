@@ -41,6 +41,7 @@ func DialContextWithoutProxy(ctx context.Context, network, addr string) (net.Con
 	return DialX(
 		addr,
 		DialX_WithTimeout(timeout),
+		DialX_WithDisableProxy(true),
 		//DialX_WithContext(ctx),
 	)
 }
