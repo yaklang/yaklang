@@ -748,6 +748,15 @@ func GetHTTPFlow(db *gorm.DB, id int64) (*HTTPFlow, error) {
 	return &req, nil
 }
 
+func GetHTTPFlowByIDOrHash(db *gorm.DB, id int64, hash string) (*HTTPFlow, error) {
+	var req HTTPFlow
+	if db := db.Model(&HTTPFlow{}).Where("id = ? OR hash = ?", id, hash).First(&req); db.Error != nil {
+		return nil, utils.Errorf("get HTTPFlow failed: %s", db.Error)
+	}
+
+	return &req, nil
+}
+
 func GetHTTPFlowByHash(db *gorm.DB, hash string) (*HTTPFlow, error) {
 	var req HTTPFlow
 	if db := db.Model(&HTTPFlow{}).Where("hash = ?", hash).First(&req); db.Error != nil {
@@ -779,9 +788,10 @@ func DeleteHTTPFlow(db *gorm.DB, req *ypb.DeleteHTTPFlowRequest) error {
 
 	if len(req.GetId()) > 0 {
 		db = db.Or("false")
-		for _, id := range req.GetId() {
-			db = db.Or("id = ?", id)
-		}
+		db = bizhelper.ExactQueryInt64ArrayOr(db, "id", req.GetId())
+		// for _, id := range req.GetId() {
+		// 	db = db.Or("id = ?", id)
+		// }
 		db.Unscoped().Delete(&HTTPFlow{})
 		return nil
 	}
@@ -1226,9 +1236,7 @@ func QueryWebsocketFlowsByHTTPFlowHash(db *gorm.DB, req *ypb.DeleteHTTPFlowReque
 
 	if len(req.GetId()) > 0 {
 		db = db.Or("false")
-		for _, id := range req.GetId() {
-			db = db.Or("http_flows.id = ?", id)
-		}
+		db = bizhelper.ExactQueryInt64ArrayOr(db, "id", req.GetId())
 	}
 
 	if req.GetFilter() != nil {
@@ -1256,7 +1264,7 @@ func ExportHTTPFlow(db *gorm.DB, params *ypb.ExportHTTPFlowsRequest) (paging *bi
 		}
 	}()
 	db = BuildHTTPFlowQuery(db.Model(&HTTPFlow{}), params.ExportWhere)
-	db = db.Debug().Select(strings.Join(params.FieldName, ","))
+	db = db.Select(strings.Join(params.FieldName, ","))
 	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", params.Ids)
 	paging, db = bizhelper.Paging(db, int(params.ExportWhere.Pagination.Page), int(params.ExportWhere.Pagination.Limit), &ret)
 
