@@ -150,11 +150,13 @@ func QueryFuzzerHistoryTasks(db *gorm.DB, req *ypb.QueryHistoryHTTPFuzzerTaskExP
 	// 对重试任务进行处理
 
 	// 先获取所有task的id
-	ids := lo.Map(returnTasks, func(i *WebFuzzerTask, _ int) uint {
-		return uint(i.ID)
+	ids := lo.Map(returnTasks, func(i *WebFuzzerTask, _ int) int64 {
+		return int64(i.ID)
 	})
+	db = oldDB.Model(&WebFuzzerTask{}).Select([]string{"id", "retry_root_id"})
+	db = bizhelper.ExactQueryInt64ArrayOr(db, "retry_root_id", ids)
 	// 找到重试任务，计算总共成功的数量
-	if db = oldDB.Model(&WebFuzzerTask{}).Select([]string{"retry_root_id", "http_flow_success_count"}).Where("retry_root_id IN (?)", ids).Find(&tasks); db.Error != nil {
+	if db.Find(&tasks); db.Error != nil {
 		return nil, nil, utils.Errorf("search by retry_root_id failed: %s", db.Error)
 	}
 	successCountMap := make(map[uint]int)
@@ -315,7 +317,10 @@ func QueryWebFuzzerResponse(db *gorm.DB, params *ypb.QueryHTTPFuzzerResponseByTa
 }
 
 func YieldWebFuzzerResponseByTaskIDs(db *gorm.DB, ctx context.Context, taskIDs []uint, oks ...bool) chan *WebFuzzerResponse {
-	db = db.Model(&WebFuzzerResponse{}).Where("web_fuzzer_task_id IN (?)", taskIDs)
+	int64TaskIDs := lo.Map(taskIDs, func(i uint, _ int) int64 { return int64(i) })
+
+	db = db.Model(&WebFuzzerResponse{})
+	db = bizhelper.ExactQueryInt64ArrayOr(db, "web_fuzzer_task_id", int64TaskIDs)
 	if len(oks) > 0 {
 		db = db.Where("ok = ?", oks[0])
 	}
