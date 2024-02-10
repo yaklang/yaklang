@@ -11,9 +11,9 @@ import (
 )
 
 func init() {
-	BasicTypes[ErrorType].method["Error"] = NewFunctionTypeDefine(
+	BasicTypes[ErrorTypeKind].method["Error"] = NewFunctionTypeDefine(
 		"error.Error",
-		[]Type{BasicTypes[ErrorType]},
+		[]Type{BasicTypes[ErrorTypeKind]},
 		[]Type{BasicTypes[StringTypeKind]},
 		false,
 	)
@@ -133,6 +133,9 @@ func GetMethodsName(t Type) []string {
 }
 
 func GetAllKey(t Type) []string {
+	if t == nil {
+		return []string{}
+	}
 	ret := make([]string, 0)
 	switch t.GetTypeKind() {
 	case FunctionTypeKind:
@@ -243,7 +246,7 @@ const (
 	NullTypeKind      //
 	AnyTypeKind       // any type
 	ChanTypeKind
-	ErrorType
+	ErrorTypeKind
 
 	ObjectTypeKind
 	SliceTypeKind
@@ -320,7 +323,7 @@ var BasicTypes = map[TypeKind]*BasicType{
 	UndefinedTypeKind: NewBasicType(UndefinedTypeKind, "undefined"),
 	NullTypeKind:      NewBasicType(NullTypeKind, "null"),
 	AnyTypeKind:       NewBasicType(AnyTypeKind, "any"),
-	ErrorType:         NewBasicType(ErrorType, "error"),
+	ErrorTypeKind:     NewBasicType(ErrorTypeKind, "error"),
 }
 
 func GetNumberType() Type {
@@ -352,7 +355,7 @@ func GetAnyType() Type {
 }
 
 func GetErrorType() Type {
-	return BasicTypes[ErrorType]
+	return BasicTypes[ErrorTypeKind]
 }
 
 func GetType(i any) Type {
@@ -378,7 +381,7 @@ func GetTypeByStr(typ string) Type {
 	case "interface {}", "var", "any":
 		return BasicTypes[AnyTypeKind]
 	case "error":
-		return BasicTypes[ErrorType]
+		return BasicTypes[ErrorTypeKind]
 	default:
 		return nil
 	}

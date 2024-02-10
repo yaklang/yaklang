@@ -403,7 +403,7 @@ func (t *TryBuilder) Finish() {
 
 	if id := t.buildError(); id != "" {
 		p := NewParam(id, false, builder)
-		p.SetType(BasicTypes[ErrorType])
+		p.SetType(BasicTypes[ErrorTypeKind])
 		builder.WriteLocalVariable(id, p)
 	}
 
