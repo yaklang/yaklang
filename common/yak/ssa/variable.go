@@ -8,6 +8,10 @@ type Variable struct {
 	*ssautil.Versioned[Value]
 	DefRange *Range
 	UseRange map[*Range]struct{}
+
+	// for object.member variable  access
+	object Value
+	key    Value
 }
 
 var _ ssautil.VersionedIF[Value] = (*Variable)(nil)
@@ -19,6 +23,19 @@ func NewVariable(globalIndex int, name string, local bool, scope *ssautil.Scoped
 		UseRange:  map[*Range]struct{}{},
 	}
 	return ret
+}
+
+func (v *Variable) SetMemberCall(obj, key Value) {
+	v.object = obj
+	v.key = key
+}
+
+func (b *Variable) IsMemberCall() bool {
+	return b.object != nil
+}
+
+func (b *Variable) GetMemberCall() (Value, Value) {
+	return b.object, b.key
 }
 
 func (v *Variable) SetDefRange(r *Range) {

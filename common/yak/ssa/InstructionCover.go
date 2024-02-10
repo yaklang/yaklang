@@ -9,6 +9,7 @@ func ToFunction(n Node) (*Function, bool) { u, ok := n.(*Function); return u, ok
 
 // value
 func ToConst(v Instruction) (*ConstInst, bool)     { c, ok := v.(*ConstInst); return c, ok }
+func IsConst(v Instruction) bool                   { _, ok := ToConst(v); return ok }
 func ToPhi(v Instruction) (*Phi, bool)             { p, ok := v.(*Phi); return p, ok }
 func ToExternLib(v Instruction) (*ExternLib, bool) { p, ok := v.(*ExternLib); return p, ok }
 func ToParameter(v Instruction) (*Parameter, bool) { p, ok := v.(*Parameter); return p, ok }

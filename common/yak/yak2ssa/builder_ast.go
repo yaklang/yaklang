@@ -790,9 +790,6 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 				idText := id.GetText()
 				callee := b.EmitConstInst(idText)
 				ret = b.CreateMemberCallVariable(expr, callee)
-				if val, _ := ssa.ToUndefined(ret.Value); val != nil {
-					val.SetMemberRelationship(expr, callee)
-				}
 			} else if id := s.IdentifierWithDollar(); id != nil {
 				key := b.ReadValue(id.GetText()[1:])
 				ret = b.CreateMemberCallVariable(expr, key)

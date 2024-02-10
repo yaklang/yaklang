@@ -4,22 +4,36 @@ package ssa
 
 // ReadValue get value by name
 func (b *FunctionBuilder) ReadValue(name string) Value {
-	return b.readValueEx(name, true)
+	return b.readValueEx(name, true, false)
+}
+
+func (b *FunctionBuilder) ReadValueInThisFunction(name string) Value {
+	return b.readValueEx(name, true, true)
 }
 
 func (b *FunctionBuilder) PeekValue(name string) Value {
-	return b.readValueEx(name, false)
+	return b.readValueEx(name, false, false)
 }
 
-func (b *FunctionBuilder) readValueEx(name string, create bool) Value {
+func (b *FunctionBuilder) PeekValueInThisFunction(name string) Value {
+	return b.readValueEx(name, false, true)
+}
+
+func (b *FunctionBuilder) readValueEx(
+	name string,
+	create bool, // disable create undefine
+	onlyThisFunction bool, //disable free-value
+) Value {
 	scope := b.CurrentBlock.ScopeTable
 	if ret := ReadVariableFromScope(scope, name); ret != nil {
-		if ret.GetScope() != scope {
-			if b.IsParentFunctionVariable(ret) {
-				// the ret variable should be FreeValue
-				para := b.BuildFreeValue(name)
-				para.defaultValue = ret.Value
-				return para
+		if !onlyThisFunction {
+			if ret.GetScope() != scope {
+				if b.IsParentFunctionVariable(ret) {
+					// the ret variable should be FreeValue
+					para := b.BuildFreeValue(name)
+					para.defaultValue = ret.Value
+					return para
+				}
 			}
 		}
 
@@ -36,10 +50,12 @@ func (b *FunctionBuilder) readValueEx(name string, create bool) Value {
 		return ret
 	}
 
-	if create {
+	if !onlyThisFunction {
 		if b.parentScope != nil {
 			return b.BuildFreeValue(name)
 		}
+	}
+	if create {
 		return b.writeUndefine(name)
 	}
 	return nil
@@ -96,6 +112,11 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 		if parentValue, ok := b.getParentFunctionVariable(variable); ok {
 			parentValue.AddMask(value)
 		}
+	}
+
+	if variable.IsMemberCall() {
+		obj, key := variable.GetMemberCall()
+		SetMemberCall(obj, key, value)
 	}
 
 	if !value.IsExtern() || value.GetName() != variable.GetName() {

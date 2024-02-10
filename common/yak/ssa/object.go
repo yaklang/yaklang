@@ -2,33 +2,17 @@ package ssa
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"golang.org/x/exp/slices"
 )
 
-func GetFields(u Node) []*Field {
-	f := make([]*Field, 0)
-	for _, v := range u.GetUsers() {
-		if field, ok := ToField(v); ok {
-			if field.Obj == u {
-				f = append(f, field)
-			}
-		}
-	}
-	return f
-}
-
-func GetField(u, key Value) *Field {
-	fields := GetFields(u)
-	if index := slices.IndexFunc(fields, func(v *Field) bool {
-		return v.Key.String() == key.String()
-	}); index != -1 {
-		return fields[index]
-	} else {
-		return nil
-	}
+// value
+func SetMemberCall(obj, key, member Value) {
+	obj.AddMember(member)
+	member.SetObject(obj)
+	member.SetKey(key)
 }
 
 func NewMake(parentI Value, typ Type, low, high, step, Len, Cap Value) *Make {
@@ -103,7 +87,7 @@ func (b *FunctionBuilder) getFieldWithCreate(i, key Value, forceCreate bool) Val
 	return field
 }
 
-func (b *FunctionBuilder) checkCanMemberCall(value, key Value) (string, bool) {
+func (b *FunctionBuilder) checkCanMemberCall(value, key Value) (string, Type) {
 	type MemberCallKind int
 	const (
 		None MemberCallKind = iota
@@ -130,8 +114,12 @@ func (b *FunctionBuilder) checkCanMemberCall(value, key Value) (string, bool) {
 
 	if kind == DynamicKind {
 		//TODO: check type
+		return name, BasicTypes[AnyTypeKind]
+	}
 
-		return name, true
+	// check is method
+	if ret := GetMethod(value.GetType(), key.String()); ret != nil {
+		return name, ret
 	}
 
 	switch value.GetType().GetTypeKind() {
@@ -141,37 +129,48 @@ func (b *FunctionBuilder) checkCanMemberCall(value, key Value) (string, bool) {
 			log.Errorf("checkCanMemberCall: %v is structTypeKind but is not a ObjectType", value.GetType())
 			break
 		}
-		if fieldTyp := typ.GetField(key); fieldTyp != nil {
-			if TypeCompare(fieldTyp, key.GetType()) {
-				return name, true
+		if TypeCompare(BasicTypes[StringTypeKind], key.GetType()) {
+			if fieldTyp := typ.GetField(key); fieldTyp != nil {
+				return name, fieldTyp
 			} else {
-				// type check error
+				// not this field
 			}
 		} else {
-			// not this field
+			// type check error
 		}
 	case MapTypeKind: // string / number
 		typ, ok := ToObjectType(value.GetType())
 		if !ok {
-			log.Errorf("checkCanMemberCall: %v is structTypeKind but is not a ObjectType", value.GetType())
+			log.Errorf("checkCanMemberCall: %v is MapTypeKind but is not a ObjectType", value.GetType())
 			break
 		}
-		if TypeCompare(typ.FieldType, key.GetType()) {
-			return name, true
+		if TypeCompare(typ.KeyTyp, key.GetType()) {
+			return name, typ.FieldType
 		} else {
 			// type check error
 		}
-	case SliceTypeKind, BytesTypeKind, StringTypeKind: // number
+	case SliceTypeKind:
+		typ, ok := ToObjectType(value.GetType())
+		if !ok {
+			log.Errorf("checkCanMemberCall: %v is SliceTypeKind but is not a ObjectType", value.GetType())
+			break
+		}
 		if TypeCompare(BasicTypes[NumberTypeKind], key.GetType()) {
-			return name, true
+			return name, typ.FieldType
+		} else {
+			// type check error
+		}
+	case BytesTypeKind, StringTypeKind: // number
+		if TypeCompare(BasicTypes[NumberTypeKind], key.GetType()) {
+			return name, BasicTypes[NumberTypeKind]
 		} else {
 			// type check error
 		}
 	case AnyTypeKind:
-		return name, true
+		return name, BasicTypes[AnyTypeKind]
 	default:
 	}
-	return name, true
+	return name, nil
 }
 
 func (b *FunctionBuilder) getExternLibMemberCall(value, key Value) string {
@@ -180,6 +179,7 @@ func (b *FunctionBuilder) getExternLibMemberCall(value, key Value) string {
 
 func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
 	if extern, ok := ToExternLib(value); ok {
+		// write to extern Lib
 		name := b.getExternLibMemberCall(value, key)
 		// if ret := b.PeekValue(name); ret != nil {
 		// 	return ret
@@ -201,14 +201,16 @@ func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
 		return p
 	}
 
-	name, ok := b.checkCanMemberCall(value, key)
-	if ok {
-		if ret := b.PeekValue(name); ret != nil {
-			return ret
-		}
-	}
+	// name, ok := b.checkCanMemberCall(value, key)
+	// if ok {
+	// 	if ret := b.PeekValue(name); ret != nil {
+	// 		return ret
+	// 	}
+	// }
+	// log.Infof("ReadMemberCallVariable:  %v", key)
 
-	return b.ReadValue(name)
+	ret, _ := b.createField(value, key)
+	return ret
 }
 
 func (b *FunctionBuilder) CreateMemberCallVariable(value, key Value) *Variable {
@@ -217,21 +219,55 @@ func (b *FunctionBuilder) CreateMemberCallVariable(value, key Value) *Variable {
 		return b.CreateVariable(name, false)
 	}
 
-	if name, ok := b.checkCanMemberCall(value, key); ok {
-		b.createField(value, key, name)
-		return b.CreateVariable(name, false)
-	}
-
-	return nil
+	// if name, ok := b.checkCanMemberCall(value, key); ok {
+	_, name := b.createField(value, key)
+	// log.Infof("CreateMemberCallVariable: %v, %v", retValue.GetName(), key)
+	ret := b.CreateVariable(name, false)
+	ret.SetMemberCall(value, key)
+	return ret
 }
 
-func (b *FunctionBuilder) createField(value, key Value, name string) Value {
-	RecoverScope := b.SetCurrent(value)
-	defer RecoverScope()
+func (b *FunctionBuilder) createField(value, key Value) (Value, string) {
 
-	if ret := b.PeekValue(name); ret != nil {
-		return ret
-	} else {
-		return b.ReadValue(name)
+	name, typ := b.checkCanMemberCall(value, key)
+	if typ != nil {
+		if ret := b.PeekValueInThisFunction(name); ret != nil {
+			return ret, name
+		}
 	}
+
+	RecoverScope := b.SetCurrent(value)
+	ret := b.ReadValueInThisFunction(name)
+	RecoverScope()
+
+	if undefine, ok := ToUndefined(ret); ok {
+		undefine.SetRange(b.CurrentRange)
+		// undefine.SetName(b.setMember(key))
+		if typ != nil {
+			undefine.Kind = UndefinedMemberValid
+			undefine.SetType(typ)
+		} else {
+			undefine.Kind = UndefinedMemberInValid
+		}
+		SetMemberCall(value, key, undefine)
+	}
+
+	return ret, name
+}
+
+func GetKeyString(v Value) string {
+	if !v.IsMember() {
+		return ""
+	}
+
+	key := v.GetKey()
+	text := ""
+	if ci, ok := ToConst(key); ok {
+		text = ci.String()
+	}
+	if text == "" {
+		list := strings.Split(*v.GetRange().SourceCode, ".")
+		text = list[len(list)-1]
+	}
+	return text
 }

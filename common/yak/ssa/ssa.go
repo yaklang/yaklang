@@ -47,8 +47,6 @@ type Instruction interface {
 	IsExtern() bool
 	SetExtern(bool)
 
-	IsConstLiteral() bool
-
 	GetVariable(string) *Variable
 	GetAllVariables() map[string]*Variable
 	AddVariable(*Variable)
@@ -90,6 +88,18 @@ type Value interface {
 	Maskable
 	AddUser(User)
 	RemoveUser(User)
+
+	// object  member caller
+	IsObject() bool
+	AddMember(Value)
+	GetMember() []Value
+
+	// member, member callee
+	IsMember() bool
+	SetObject(Value)
+	SetKey(Value)
+	GetKey() Value
+	GetObject() Value
 }
 
 type Maskable interface {
@@ -171,11 +181,7 @@ func (c *anInstruction) SetRange(pos *Range) {
 	// }
 }
 
-func (c *anInstruction) IsExtern() bool { return c.isExtern }
-func (c *anInstruction) IsConstLiteral() bool {
-	_, ok := ToConst(c)
-	return ok
-}
+func (c *anInstruction) IsExtern() bool   { return c.isExtern }
 func (c *anInstruction) SetExtern(b bool) { c.isExtern = b }
 
 // error logger
@@ -224,53 +230,46 @@ type anValue struct {
 
 	// return value from call
 	// 标记这个值是不是从 call 来的返回值？
-	functionCall            *Call
-	functionCallReturnIndex int
+	// functionCall            *Call
+	// functionCallReturnIndex int
 
-	memberCaller          Value
-	isStaticMemberLiteral Value
-	isDynamicMember       Value
+	// memberCaller          Value
+	// isStaticMemberLiteral Value
+	// isDynamicMember       Value
+
+	object Value
+	key    Value
+	member []Value
 }
 
-func (n *anValue) SetMemberRelationship(caller, callee Value) {
-	n.memberCaller = caller
-	if callee.IsConstLiteral() {
-		n.isStaticMemberLiteral = callee
-	} else {
-		n.isDynamicMember = callee
-	}
+func (n *anValue) IsMember() bool {
+	return n.object != nil
+}
+func (n *anValue) SetObject(v Value) {
+	n.object = v
 }
 
-func (n *anValue) IsMemberCall() bool {
-	return n.memberCaller != nil
+func (n *anValue) GetObject() Value {
+	return n.object
 }
 
-func (n *anValue) IsStaticMemberCall() bool {
-	return n.isStaticMemberLiteral != nil
+func (n *anValue) SetKey(k Value) {
+	n.key = k
 }
 
-func (n *anValue) IsDynamicMemberCall() bool {
-	return n.isDynamicMember != nil
+func (n *anValue) GetKey() Value {
+	return n.key
 }
 
-func (m *anValue) GetMemberCaller() Value {
-	return m.memberCaller
+func (n *anValue) IsObject() bool {
+	return len(n.member) != 0
+}
+func (n *anValue) AddMember(v Value) {
+	n.member = append(n.member, v)
 }
 
-func (m *anValue) GetMemberCallee() Value {
-	if m.isStaticMemberLiteral != nil {
-		return m.isStaticMemberLiteral
-	}
-	return m.isDynamicMember
-}
-
-func (n *anValue) SetReturnTraceFromCall(call *Call, idx int) {
-	n.functionCall = call
-	n.functionCallReturnIndex = idx
-}
-
-func (v *anValue) IsFromReturnCall() bool {
-	return v.functionCall != nil
+func (n *anValue) GetMember() []Value {
+	return n.member
 }
 
 func NewValue() anValue {
@@ -516,9 +515,23 @@ var (
 )
 
 // ----------- Undefined
+
+// mark undefined value type
+type UndefinedKind int
+
+const (
+	// normal undefined value
+	UndefinedValue UndefinedKind = iota
+	// member call but not this key
+	UndefinedMemberInValid
+	// member call, has this key, but not this value, this shouldn't mark error
+	UndefinedMemberValid
+)
+
 type Undefined struct {
 	anInstruction
 	anValue
+	Kind UndefinedKind
 }
 
 var (
