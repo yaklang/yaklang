@@ -33,7 +33,7 @@ var (
 	UndefinedType = NewType(ssa.BasicTypes[ssa.UndefinedTypeKind])
 	Null          = NewType(ssa.BasicTypes[ssa.NullTypeKind])
 	Any           = NewType(ssa.BasicTypes[ssa.AnyTypeKind])
-	ErrorType     = NewType(ssa.BasicTypes[ssa.ErrorType])
+	ErrorType     = NewType(ssa.BasicTypes[ssa.ErrorTypeKind])
 )
 
 func SliceOf(t *Type) *Type {
