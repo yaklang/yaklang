@@ -7,6 +7,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/google/gopacket/pcap"
 	"github.com/google/gopacket/pcapgo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -36,10 +37,11 @@ type CaptureConfig struct {
 	mock PcapHandleOperation
 
 	// output debug info
-	Debug         bool
-	onPoolCreated []func(*TrafficPool)
-	onFlowCreated func(*TrafficFlow)
-	onEveryPacket func(packet gopacket.Packet)
+	Debug                 bool
+	onPoolCreated         []func(*TrafficPool)
+	onFlowCreated         func(*TrafficFlow)
+	onEveryPacket         func(packet gopacket.Packet)
+	onNetInterfaceCreated func(handle *pcap.Handle)
 }
 
 type CaptureOption func(*CaptureConfig) error
@@ -51,6 +53,13 @@ func emptyOption(_ *CaptureConfig) error {
 func WithEveryPacket(h func(packet gopacket.Packet)) CaptureOption {
 	return func(c *CaptureConfig) error {
 		c.onEveryPacket = h
+		return nil
+	}
+}
+
+func WithNetInterfaceCreated(h func(handle *pcap.Handle)) CaptureOption {
+	return func(c *CaptureConfig) error {
+		c.onNetInterfaceCreated = h
 		return nil
 	}
 }

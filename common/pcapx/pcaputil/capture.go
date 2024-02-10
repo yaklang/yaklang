@@ -11,10 +11,15 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
-func _open(ctx context.Context, handler *pcap.Handle, packetEntry func(context.Context, gopacket.Packet)) error {
+func _open(conf *CaptureConfig, ctx context.Context, handler *pcap.Handle, packetEntry func(context.Context, gopacket.Packet)) error {
 	innerCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	packetSource := gopacket.NewPacketSource(handler, handler.LinkType())
+
+	if conf.onNetInterfaceCreated != nil {
+		conf.onNetInterfaceCreated()
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -148,7 +153,7 @@ func Start(opt ...CaptureOption) error {
 			defer func() {
 				handler.Close()
 			}()
-			if err := _open(ctx, handler, conf.packetHandler); err != nil {
+			if err := _open(conf, ctx, handler, conf.packetHandler); err != nil {
 				log.Errorf("open device failed: %s", err)
 			}
 		})
