@@ -139,7 +139,12 @@ func lineDisasm(v Instruction, liner DisasmLiner) (ret string) {
 	}()
 
 	switch v := v.(type) {
-	case *Function, *BasicBlock, *Parameter, *ExternLib, *Undefined:
+	case *Function, *BasicBlock, *Parameter, *ExternLib:
+		return fmt.Sprintf("%s-%s", v.GetOpcode(), v.GetName())
+	case *Undefined:
+		if v.Kind == UndefinedMemberValid {
+			return fmt.Sprintf("%s-%s(valid)", v.GetOpcode(), v.GetName())
+		}
 		return fmt.Sprintf("%s-%s", v.GetOpcode(), v.GetName())
 	case *Phi:
 		liner.SetName(v, v.GetName())

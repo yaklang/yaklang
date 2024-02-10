@@ -3,7 +3,6 @@ package ssa4analyze
 import (
 	"strings"
 
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -61,8 +60,8 @@ func (t *TypeInference) InferenceOnInstruction(inst ssa.Instruction) {
 	// case *ssa.If:
 	case *ssa.Next:
 		t.TypeInferenceNext(inst)
-	case *ssa.Make:
-		t.TypeInferenceMake(inst)
+	// case *ssa.Make:
+	// 	t.TypeInferenceMake(inst)
 	case *ssa.Field:
 		t.TypeInferenceField(inst)
 	case *ssa.Update:
@@ -223,31 +222,28 @@ func (t *TypeInference) TypeInferenceBinOp(bin *ssa.BinOp) {
 	}
 }
 
-func (t *TypeInference) TypeInferenceMake(i *ssa.Make) {
-}
-
 func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
 	if typ := f.Obj.GetType(); typ != nil {
-		if methodTyp := ssa.GetMethod(typ, f.Key.String()); methodTyp != nil && f.GetType() != methodTyp {
-			obj := f.Obj
-			{
-				names := lo.Keys(obj.GetAllVariables())
-				if len(names) != 0 {
-					// log.Errorf("method %s has no variable", ssa.LineDisasm(obj))
-					// } else {
-					obj.SetName(names[0])
-				}
-			}
-			method := ssa.NewFunctionWithType(methodTyp.Name, methodTyp)
-			f.GetUsers().RunOnCall(func(c *ssa.Call) {
-				c.Args = utils.InsertSliceItem(c.Args, obj, 0)
-				obj.AddUser(c)
-			})
-			ssa.ReplaceAllValue(f, method)
-			f.GetProgram().SetInstructionWithName(method.GetName(), method)
-			t.DeleteInst = append(t.DeleteInst, f)
-			return
-		}
+		// if methodTyp := ssa.GetMethod(typ, f.Key.String()); methodTyp != nil && f.GetType() != methodTyp {
+		// 	obj := f.Obj
+		// 	{
+		// 		names := lo.Keys(obj.GetAllVariables())
+		// 		if len(names) != 0 {
+		// 			// log.Errorf("method %s has no variable", ssa.LineDisasm(obj))
+		// 			// } else {
+		// 			obj.SetName(names[0])
+		// 		}
+		// 	}
+		// 	method := ssa.NewFunctionWithType(methodTyp.Name, methodTyp)
+		// 	f.GetUsers().RunOnCall(func(c *ssa.Call) {
+		// 		c.Args = utils.InsertSliceItem(c.Args, obj, 0)
+		// 		obj.AddUser(c)
+		// 	})
+		// 	ssa.ReplaceAllValue(f, method)
+		// 	f.GetProgram().SetInstructionWithName(method.GetName(), method)
+		// 	t.DeleteInst = append(t.DeleteInst, f)
+		// 	return
+		// }
 		if utils.IsNil(typ) {
 			typ = ssa.BasicTypes[ssa.NullTypeKind]
 		}

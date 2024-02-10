@@ -176,6 +176,9 @@ func (c *ConstInst) String() string {
 
 // ----------- undefined
 func (u *Undefined) String() string {
+	if u.Kind == UndefinedMemberValid {
+		return fmt.Sprintf("%s = undefined-%s(valid)", getStr(u), u.GetName())
+	}
 	return fmt.Sprintf("%s = undefined-%s", getStr(u), u.GetName())
 }
 

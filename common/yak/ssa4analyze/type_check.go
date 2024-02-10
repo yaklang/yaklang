@@ -39,7 +39,7 @@ func (t *TypeCheck) Run(prog *ssa.Program) {
 func (t *TypeCheck) CheckOnInstruction(inst ssa.Instruction) {
 	if v, ok := inst.(ssa.Value); ok {
 		switch v.GetType().GetTypeKind() {
-		case ssa.ErrorType:
+		case ssa.ErrorTypeKind:
 			if len(v.GetUsers()) == 0 {
 				vs := v.GetAllVariables()
 				if len(vs) == 0 && v.GetOpcode() != ssa.OpCall {
@@ -63,8 +63,8 @@ func (t *TypeCheck) CheckOnInstruction(inst ssa.Instruction) {
 	switch inst := inst.(type) {
 	case *ssa.Make:
 		// pass; this is top instruction
-	case *ssa.Field:
-		t.TypeCheckField(inst)
+	// case *ssa.Field:
+	// 	t.TypeCheckField(inst)
 	case *ssa.Update:
 		t.TypeCheckUpdate(inst)
 	// case *ssa.ConstInst:
@@ -90,8 +90,8 @@ func (t *TypeCheck) TypeCheckUndefine(inst *ssa.Undefined) {
 		// 	return false
 		// }
 	}
-	var mark func(i ssa.Value)
-	mark = func(i ssa.Value) {
+	var markUndefinedValue func(i ssa.Value)
+	markUndefinedValue = func(i ssa.Value) {
 		if _, ok := tmp[i]; ok {
 			return
 		}
@@ -101,12 +101,34 @@ func (t *TypeCheck) TypeCheckUndefine(inst *ssa.Undefined) {
 		}
 		for _, user := range i.GetUsers() {
 			if phi, ok := ssa.ToPhi(user); ok {
-				mark(phi)
+				markUndefinedValue(phi)
 			}
 		}
 	}
 
-	mark(inst)
+	if inst.Kind == ssa.UndefinedValue {
+		markUndefinedValue(inst)
+	}
+
+	if inst.Kind == ssa.UndefinedMemberInValid {
+
+		objTyp := inst.GetObject().GetType()
+		key := inst.GetKey()
+		if ssa.IsConst(key) {
+			want := ssa.TryGetSimilarityKey(ssa.GetAllKey(objTyp), key.String())
+			if want != "" {
+				inst.NewError(
+					ssa.Error, TypeCheckTAG,
+					ssa.ExternFieldError("Type", objTyp.String(), key.String(), want),
+				)
+				return
+			}
+		}
+
+		inst.NewError(ssa.Error, TypeCheckTAG,
+			InvalidField(objTyp.String(), ssa.GetKeyString(inst)),
+		)
+	}
 }
 
 func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
