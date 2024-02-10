@@ -104,10 +104,21 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 				}
 
 				packetSource := gopacket.NewPacketSource(handler, handler.LinkType()).Packets()
+
+				onceFirstPacket := new(sync.Once)
+
 				go func() {
 					defer func() {
 						log.Infof("background iface: %v is stop...", ifaceName)
 					}()
+
+					onceFirstPacket.Do(func() {
+						// first packet
+						if conf.onNetInterfaceCreated != nil {
+							conf.onNetInterfaceCreated()
+						}
+					})
+
 					for {
 						select {
 						case packet := <-packetSource:
