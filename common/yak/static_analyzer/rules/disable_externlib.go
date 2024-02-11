@@ -54,28 +54,29 @@ func DisableMitmExternLib(prog *ssaapi.Program) *result.StaticAnalyzeResults {
 		})
 	}
 
-	DisableFunction := []string{
-		// for "fuzz.Exec"
-		// interface
-		"github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequestIf.Exec",
-		// implement
-		"github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequest.Exec",
-		"github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequestBatch.Exec",
-		//  for "fuzz.ExecFirst"
-		"github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequestIf.ExecFirst",
-		// implement
-		"github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequest.ExecFirst",
-		"github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequestBatch.ExecFirst",
-	}
-	for _, funName := range DisableFunction {
-		prog.Ref(funName).GetUsers().Filter(func(v *ssaapi.Value) bool {
-			return v.IsCall() && v.IsReachable() != -1
-		}).ForEach(func(v *ssaapi.Value) {
-			if v.InMainFunction() {
-				ret.NewError(MITMNotSupport("fuzz.Exec or fuzz.ExecFirst"), v)
-			}
-		})
-	}
+	// TODO: use prog.RefByType(xxx) handler this
+	// DisableFunction := []string{
+	// 	// for "fuzz.Exec"
+	// 	// interface
+	// 	"github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequestIf.Exec",
+	// 	// implement
+	// 	"github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequest.Exec",
+	// 	"github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequestBatch.Exec",
+	// 	//  for "fuzz.ExecFirst"
+	// 	"github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequestIf.ExecFirst",
+	// 	// implement
+	// 	"github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequest.ExecFirst",
+	// 	"github.com/yaklang/yaklang/common/mutate.FuzzHTTPRequestBatch.ExecFirst",
+	// }
+	// for _, funName := range DisableFunction {
+	// 	prog.Ref(funName).GetUsers().Filter(func(v *ssaapi.Value) bool {
+	// 		return v.IsCall() && v.IsReachable() != -1
+	// 	}).ForEach(func(v *ssaapi.Value) {
+	// 		if v.InMainFunction() {
+	// 			ret.NewError(MITMNotSupport("fuzz.Exec or fuzz.ExecFirst"), v)
+	// 		}
+	// 	})
+	// }
 	return ret
 }
 

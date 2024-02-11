@@ -32,6 +32,7 @@ func check(t *testing.T, code string, want []string, typ ...string) *ssaapi.Prog
 	log.Info("want: ", want)
 	sort.Strings(got)
 	log.Info("got: ", got)
+	test.Equal(len(want), len(got))
 
 	test.Equal(want, got)
 

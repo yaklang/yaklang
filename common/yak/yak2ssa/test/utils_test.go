@@ -13,35 +13,56 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
-func checkPrintlnValue(code string, want []string, t *testing.T) *ssaapi.Program {
-	var p *ssaapi.Program
-	CheckTestCase(t, TestCase{
+// ===================== struct =====================
+type ExampleInterface interface {
+	ExampleMethod()
+}
+
+type ExampleStruct struct {
+	ExampleFieldFunction func()
+}
+
+func (a ExampleStruct) ExampleMethod() {}
+
+func getExampleStruct() ExampleStruct {
+	return ExampleStruct{}
+}
+
+func getExampleInterface() ExampleInterface {
+	return ExampleStruct{}
+}
+
+// --------------------- for test ---------------------
+func checkPrintlnValue(code string, want []string, t *testing.T) {
+	CheckPrintf(t, TestCase{
 		code: code,
 		want: want,
-		Check: func(t *testing.T, prog *ssaapi.Program) {
-			p = prog
-			test := assert.New(t)
-			prog.Show()
-
-			println := prog.Ref("println").ShowWithSource()
-			// test.Equal(1, len(println), "println should only 1")
-			got := lo.Map(
-				println.GetUsers().ShowWithSource().Flat(func(v *ssaapi.Value) ssaapi.Values {
-					return ssaapi.Values{v.GetOperand(1)}
-				}),
-				func(v *ssaapi.Value, _ int) string {
-					return v.String()
-				},
-			)
-			// sort.Strings(got)
-			log.Info("got :", got)
-			// sort.Strings(want)
-			log.Info("want :", want)
-			test.Equal(want, got)
-		},
 	})
+}
 
-	return p
+func CheckPrintf(t *testing.T, tc TestCase) {
+	tc.Check = func(t *testing.T, prog *ssaapi.Program, want []string) {
+		test := assert.New(t)
+
+		println := prog.Ref("println").ShowWithSource()
+		// test.Equal(1, len(println), "println should only 1")
+		got := lo.Map(
+			println.GetUsers().ShowWithSource().Flat(func(v *ssaapi.Value) ssaapi.Values {
+				return ssaapi.Values{v.GetOperand(1)}
+			}),
+			func(v *ssaapi.Value, _ int) string {
+				return v.String()
+			},
+		)
+		// sort.Strings(got)
+		log.Info("got :", got)
+		// sort.Strings(want)
+		log.Info("want :", want)
+
+		test.Equal(want, got)
+
+	}
+	CheckTestCase(t, tc)
 }
 
 type TestCase struct {
@@ -49,7 +70,7 @@ type TestCase struct {
 	want        []string
 	ExternValue map[string]any
 	ExternLib   map[string]map[string]any
-	Check       func(*testing.T, *ssaapi.Program)
+	Check       func(*testing.T, *ssaapi.Program, []string)
 }
 
 func CheckTestCase(t *testing.T, tc TestCase) {
@@ -64,21 +85,22 @@ func CheckTestCase(t *testing.T, tc TestCase) {
 	}
 
 	prog.Show()
+	prog.Program.ShowWithSource()
 	fmt.Println(prog.GetErrors().String())
 
-	tc.Check(t, prog)
+	tc.Check(t, prog, tc.want)
 }
 
 func CheckError(t *testing.T, tc TestCase) {
-	check := func(t *testing.T, prog *ssaapi.Program) {
+	check := func(t *testing.T, prog *ssaapi.Program, want []string) {
 		errs := lo.Map(prog.GetErrors(), func(e *ssa.SSAError, _ int) string { return e.Message })
 		slices.Sort(errs)
-		slices.Sort(tc.want)
-		if len(errs) != len(tc.want) {
+		slices.Sort(want)
+		if len(errs) != len(want) {
 			t.Fatalf("error len not match %d vs %d : %s", len(errs), len(tc.want), errs)
 		}
 		for i := 0; i < len(errs); i++ {
-			for errs[i] != tc.want[i] {
+			for errs[i] != want[i] {
 				t.Fatalf("error not match %s vs %s", errs[i], tc.want[i])
 			}
 		}

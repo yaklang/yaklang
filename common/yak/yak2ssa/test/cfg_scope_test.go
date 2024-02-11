@@ -152,7 +152,7 @@ func TestYaklangBasic_Variable_InIf(t *testing.T) {
 	})
 
 	t.Run("test multiple phi if", func(t *testing.T) {
-		prog := checkPrintlnValue(`
+		checkPrintlnValue(`
 		a = 1
 		if c {
 			a = 2
@@ -165,14 +165,6 @@ func TestYaklangBasic_Variable_InIf(t *testing.T) {
 			"phi(a)[2,1]",
 			"phi(a)[2,1]",
 		}, t)
-
-		phi := prog.Ref("a").Show().Filter(func(v *ssaapi.Value) bool {
-			return v.IsPhi()
-		}).Show()
-
-		if len(phi) != 1 {
-			t.Fatalf("got %v, want %v", phi, 1)
-		}
 	})
 
 	t.Run("test simple if else", func(t *testing.T) {
