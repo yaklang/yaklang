@@ -590,33 +590,35 @@ func (b *astbuilder) AssignList(stmt assignlist) []ssa.Value {
 				// 可以通过是否存在variable确定是函数调用是否存在左值
 				c.SetName(uuid.NewString())
 				c.Unpack = true
-				if !ssa.IsObjectType(c.GetType()) {
-					// b.NewError(ssa.Error, TAG, "assign right side is not interface function call")
-					// return nil
-					length = len(leftVariables)
-				} else {
+				if c.GetType().GetTypeKind() == ssa.TupleTypeKind {
 					it := c.GetType().(*ssa.ObjectType)
 					length = it.Len
+				} else {
+					length = 1
 				}
-				vs := make([]ssa.Value, 0)
-				for i := 0; i < length; i++ {
-					returnVal := b.ReadMemberCallVariable(c, b.EmitConstInst(i))
-					vs = append(vs, returnVal)
-				}
-				if len(vs) == len(leftVariables) {
-					for i := range vs {
-						b.AssignVariable(leftVariables[i], vs[i])
+				if len(leftVariables) == length {
+					for i := range leftVariables {
+						value := b.ReadMemberCallVariable(c, b.EmitConstInst(i))
+						b.AssignVariable(leftVariables[i], value)
 					}
 				} else {
-					b.NewError(ssa.Error, TAG, MultipleAssignFailed(len(leftVariables), len(rightValue)))
+					if c.IsDropError {
+						c.NewError(ssa.Error, TAG,
+							ssa.CallAssignmentMismatchDropError(len(leftVariables), c.GetType().String()),
+						)
+					} else {
+						b.NewError(ssa.Error, TAG,
+							ssa.CallAssignmentMismatch(len(leftVariables), c.GetType().String()),
+						)
+					}
 				}
-				return nil
-			}
-
-			// (n) = field(1, #index)
-			for i, variable := range leftVariables {
-				idxVar := b.ReadMemberCallVariable(inter, b.EmitConstInst(i))
-				b.AssignVariable(variable, idxVar)
+				// return nil
+			} else {
+				// (n) = field(1, #index)
+				for i, variable := range leftVariables {
+					idxVar := b.ReadMemberCallVariable(inter, b.EmitConstInst(i))
+					b.AssignVariable(variable, idxVar)
+				}
 			}
 		} else if len(leftVariables) == 1 {
 			if len(rightValue) == 0 {
@@ -634,7 +636,7 @@ func (b *astbuilder) AssignList(stmt assignlist) []ssa.Value {
 			b.NewError(ssa.Error, TAG, MultipleAssignFailed(len(leftVariables), len(rightValue)))
 			return nil
 		}
-		return lo.Map(leftVariables, func(lv *ssa.Variable, _ int) ssa.Value { return b.ReadValueByVariable(lv) })
+		return lo.Map(leftVariables, func(lv *ssa.Variable, _ int) ssa.Value { return b.PeekValueByVariable(lv) })
 	}
 	return nil
 }

@@ -23,3 +23,25 @@ func NoCheckMustInFirst() string {
 func ValueUndefined(v string) string {
 	return fmt.Sprintf("Value undefined:%s", v)
 }
+
+func ValueIsNull() string {
+	return "This value is null"
+}
+
+func FunctionContReturnError() string {
+	return "This function cannot return error"
+}
+
+func CallAssignmentMismatch(left int, right string) string {
+	return fmt.Sprintf(
+		"The function call returns (%s) type, but %d variables on the left side. ",
+		right, left,
+	)
+}
+
+func CallAssignmentMismatchDropError(left int, right string) string {
+	return fmt.Sprintf(
+		"The function call with ~ returns (%s) type, but %d variables on the left side. ",
+		right, left,
+	)
+}

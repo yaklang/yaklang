@@ -381,7 +381,7 @@ func TestErrorMemberCall(t *testing.T) {
 				ssa4analyze.InvalidField("number", "B"),
 				ssa4analyze.InvalidField("( ) -> number", "B"),
 				ssa4analyze.InvalidField("number", "B"),
-				ssa4analyze.InvalidField("number", "$Key"),
+				// ssa4analyze.InvalidField("number", "$Key"),
 			},
 		})
 	})
@@ -605,9 +605,9 @@ func TestCallParamReturn(t *testing.T) {
 			a, b = func3()    // get error 2 vs 3
 			`,
 			want: []string{
-				ssa4analyze.CallAssignmentMismatch(2, "number"),
-				ssa4analyze.CallAssignmentMismatch(3, "number, number"),
-				ssa4analyze.CallAssignmentMismatch(2, "number, number, number"),
+				ssa.CallAssignmentMismatch(2, "number"),
+				ssa.CallAssignmentMismatch(3, "number, number"),
+				ssa.CallAssignmentMismatch(2, "number, number, number"),
 			},
 
 			ExternValue: map[string]any{
@@ -636,7 +636,7 @@ func TestCallParamReturn(t *testing.T) {
 			`,
 			want: []string{
 				ssa4analyze.InvalidField("number, number", "2"),
-				ssa4analyze.CallAssignmentMismatch(2, "number"),
+				ssa.CallAssignmentMismatch(2, "number"),
 				ssa4analyze.InvalidField("number", "0"),
 				ssa4analyze.InvalidField("number", "1"),
 			},
@@ -1131,6 +1131,7 @@ func TestErrorHandler(t *testing.T) {
 			want: []string{
 				ssa4analyze.ErrorUnhandled(),
 				ssa4analyze.ErrorUnhandled(),
+				ssa4analyze.ErrorUnhandled(),
 			},
 			ExternValue: map[string]any{"getError1": func() error { return errors.New("err") }, "getError2": func() (int, error) { return 1, errors.New("err") }},
 		})
@@ -1162,9 +1163,9 @@ func TestErrorHandler(t *testing.T) {
 			a, b, err = getError3()~
 			`,
 			want: []string{
-				ssa4analyze.ValueIsNull(),
-				ssa4analyze.CallAssignmentMismatchDropError(2, "number"),
-				ssa4analyze.CallAssignmentMismatchDropError(3, "number, number"),
+				ssa.ValueIsNull(),
+				ssa.CallAssignmentMismatchDropError(2, "number"),
+				ssa.CallAssignmentMismatchDropError(3, "number, number"),
 			},
 			ExternValue: map[string]any{
 				"getError1": func() error { return errors.New("err") },

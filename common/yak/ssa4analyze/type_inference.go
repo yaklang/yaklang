@@ -1,8 +1,6 @@
 package ssa4analyze
 
 import (
-	"strings"
-
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -60,12 +58,6 @@ func (t *TypeInference) InferenceOnInstruction(inst ssa.Instruction) {
 	// case *ssa.If:
 	case *ssa.Next:
 		t.TypeInferenceNext(inst)
-	// case *ssa.Make:
-	// 	t.TypeInferenceMake(inst)
-	case *ssa.Field:
-		t.TypeInferenceField(inst)
-	case *ssa.Update:
-		// return t.TypeInferenceUpdate(inst)
 	}
 }
 
@@ -222,112 +214,6 @@ func (t *TypeInference) TypeInferenceBinOp(bin *ssa.BinOp) {
 	}
 }
 
-func (t *TypeInference) TypeInferenceField(f *ssa.Field) {
-	if typ := f.Obj.GetType(); typ != nil {
-		// if methodTyp := ssa.GetMethod(typ, f.Key.String()); methodTyp != nil && f.GetType() != methodTyp {
-		// 	obj := f.Obj
-		// 	{
-		// 		names := lo.Keys(obj.GetAllVariables())
-		// 		if len(names) != 0 {
-		// 			// log.Errorf("method %s has no variable", ssa.LineDisasm(obj))
-		// 			// } else {
-		// 			obj.SetName(names[0])
-		// 		}
-		// 	}
-		// 	method := ssa.NewFunctionWithType(methodTyp.Name, methodTyp)
-		// 	f.GetUsers().RunOnCall(func(c *ssa.Call) {
-		// 		c.Args = utils.InsertSliceItem(c.Args, obj, 0)
-		// 		obj.AddUser(c)
-		// 	})
-		// 	ssa.ReplaceAllValue(f, method)
-		// 	f.GetProgram().SetInstructionWithName(method.GetName(), method)
-		// 	t.DeleteInst = append(t.DeleteInst, f)
-		// 	return
-		// }
-		if utils.IsNil(typ) {
-			typ = ssa.BasicTypes[ssa.NullTypeKind]
-		}
-		switch typ.GetTypeKind() {
-		case ssa.ObjectTypeKind, ssa.SliceTypeKind, ssa.MapTypeKind, ssa.StructTypeKind:
-			interfaceTyp := f.Obj.GetType().(*ssa.ObjectType)
-			fTyp := interfaceTyp.GetField(f.Key)
-			if !utils.IsNil(fTyp) {
-				f.SetType(fTyp)
-				return
-			}
-		case ssa.StringTypeKind:
-			f.SetType(ssa.BasicTypes[ssa.NumberTypeKind])
-			return
-		case ssa.AnyTypeKind:
-			// pass
-			f.SetType(ssa.BasicTypes[ssa.AnyTypeKind])
-			return
-		default:
-		}
-		// if object is call, just skip, because call will return map or slice, we don't know what in this map or slice
-		c, ok := ssa.ToCall(f.Obj)
-		if ok {
-			if c.Unpack {
-				return
-			}
-			funTyp, ok := ssa.ToFunctionType(c.Method.GetType())
-			if ok {
-				// if ssa.IsObjectType(funTyp.ReturnType) {
-				if kind := funTyp.ReturnType.GetTypeKind(); kind == ssa.SliceTypeKind || kind == ssa.MapTypeKind {
-					return
-				}
-			} else {
-				return
-			}
-		}
-		// if c, ok := ssa.ToCall(f.Obj); ok
-		// } else {
-		text := ""
-		if ci, ok := ssa.ToConst(f.Key); ok {
-			text = ci.String()
-			want := ssa.TryGetSimilarityKey(ssa.GetAllKey(typ), text)
-			if want != "" {
-				f.NewError(ssa.Error, TITAG, ssa.ExternFieldError("Type", typ.String(), text, want))
-				return
-			}
-		}
-		if text == "" {
-			list := strings.Split(*f.GetRange().SourceCode, ".")
-			text = list[len(list)-1]
-		}
-		f.Key.NewError(ssa.Error, TITAG, InvalidField(typ.String(), text))
-		// }
-	}
-	// use update
-	// vs := lo.FilterMap(f.GetValues(), func(v ssa.Value, i int) (ssa.Value, bool) {
-	// 	// switch v := v.(type) {
-	// 	// // case *ssa.Update:
-	// 	// // 	return v.Value, true
-	// 	// default:
-	// 	// 	return nil, false
-	// 	// }
-	// })
-
-	// // check value finish
-	// // TODO: handler Acyclic Graph
-	// if t.checkValuesNotFinish(vs) {
-	// 	return
-	// }
-
-	// ts := collectTypeFromValues(
-	// 	// f.Update,
-	// 	vs,
-	// 	func(i int, v ssa.Value) bool { return false },
-	// )
-	// if len(ts) == 0 {
-	// 	f.SetType(ssa.BasicTypes[ssa.Null])
-	// } else if len(ts) == 1 {
-	// 	f.SetType(ts[0])
-	// } else {
-	// 	f.SetType(ssa.BasicTypes[ssa.Any])
-	// }
-}
-
 func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
 
 	// get function type
@@ -369,37 +255,5 @@ func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
 		// for i := 1; i < num; i++ {
 		// 	c.Args = append(c.Args, getField(obj, ssa.NewConst(i)))
 		// }
-	}
-
-	// inference call instruction type
-	if c.IsDropError {
-		if t, ok := funcTyp.ReturnType.(*ssa.ObjectType); ok {
-			if t.Combination && t.FieldTypes[len(t.FieldTypes)-1].GetTypeKind() == ssa.ErrorType {
-				// if len(t.FieldTypes) == 1 {
-				// 	c.SetType(ssa.BasicTypes[ssa.Null])
-				// } else if len(t.FieldTypes) == 2 {
-				if len(t.FieldTypes) == 2 {
-					c.SetType(t.FieldTypes[0])
-				} else {
-					ret := ssa.NewStructType()
-					ret.FieldTypes = t.FieldTypes[:len(t.FieldTypes)-1]
-					ret.Keys = t.Keys[:len(t.Keys)-1]
-					ret.KeyTyp = t.KeyTyp
-					ret.Combination = true
-					c.SetType(ret)
-				}
-				return
-			}
-		} else if t, ok := funcTyp.ReturnType.(*ssa.BasicType); ok && t.Kind == ssa.ErrorType {
-			// pass
-			c.SetType(ssa.BasicTypes[ssa.NullTypeKind])
-			for _, variable := range c.GetAllVariables() {
-				variable.NewError(ssa.Error, TITAG, ValueIsNull())
-			}
-			return
-		}
-		c.NewError(ssa.Warn, TITAG, FunctionContReturnError())
-	} else {
-		c.SetType(funcTyp.ReturnType)
 	}
 }

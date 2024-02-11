@@ -260,14 +260,6 @@ func (f *FunctionBuilder) EmitReturn(vs []Value) *Return {
 	return r
 }
 
-func (f *FunctionBuilder) EmitCall(c *Call) *Call {
-	if f.CurrentBlock.finish {
-		return nil
-	}
-	f.emit(c)
-	return c
-}
-
 func (f *FunctionBuilder) EmitAssert(cond, msgValue Value, msg string) *Assert {
 	if f.CurrentBlock.finish {
 		return nil

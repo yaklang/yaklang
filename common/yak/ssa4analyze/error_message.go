@@ -30,31 +30,8 @@ func NotEnoughArgument(funName string, have, want string) string {
 	)
 }
 
-func CallAssignmentMismatch(left int, right string) string {
-	return fmt.Sprintf(
-		"The function call returns (%s) type, but %d variables on the left side. ",
-		right, left,
-	)
-}
-
-func CallAssignmentMismatchDropError(left int, right string) string {
-	return fmt.Sprintf(
-		"The function call with ~ returns (%s) type, but %d variables on the left side. ",
-		right, left,
-	)
-}
-
 func BlockUnreachable() string {
 	return "This block unreachable!"
-
-}
-
-func FunctionContReturnError() string {
-	return "This function cannot return error"
-}
-
-func ValueIsNull() string {
-	return "This value is null"
 }
 
 func InvalidField(typ, key string) string {

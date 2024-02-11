@@ -2,6 +2,15 @@ package ssa
 
 // --------------- Read
 
+// ReadValueByVariable get value by variable
+func (b *FunctionBuilder) ReadValueByVariable(v *Variable) Value {
+	if ret := v.GetValue(); ret != nil {
+		return ret
+	}
+
+	return b.ReadValue(v.GetName())
+}
+
 // ReadValue get value by name
 func (b *FunctionBuilder) ReadValue(name string) Value {
 	return b.readValueEx(name, true, false)
@@ -9,6 +18,14 @@ func (b *FunctionBuilder) ReadValue(name string) Value {
 
 func (b *FunctionBuilder) ReadValueInThisFunction(name string) Value {
 	return b.readValueEx(name, true, true)
+}
+
+func (b *FunctionBuilder) PeekValueByVariable(v *Variable) Value {
+	if ret := v.GetValue(); ret != nil {
+		return ret
+	}
+
+	return b.PeekValue(v.GetName())
 }
 
 func (b *FunctionBuilder) PeekValue(name string) Value {
@@ -69,15 +86,6 @@ func (b *FunctionBuilder) writeUndefine(variable string, names ...string) *Undef
 	undefine := b.EmitUndefined(name)
 	b.WriteVariable(variable, undefine)
 	return undefine
-}
-
-// ReadValueByVariable get value by variable
-func (b *FunctionBuilder) ReadValueByVariable(v *Variable) Value {
-	if ret := v.GetValue(); ret != nil {
-		return ret
-	}
-
-	return b.ReadValue(v.GetName())
 }
 
 // ----------------- Write
