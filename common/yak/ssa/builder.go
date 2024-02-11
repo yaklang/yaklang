@@ -27,6 +27,8 @@ type FunctionBuilder struct {
 	ExternLib      map[string]map[string]any
 	DefineFunc     map[string]any
 
+	MarkedFunc *FunctionType
+
 	parentBuilder *FunctionBuilder
 	cmap          map[string]struct{}
 	lmap          map[string]struct{}
@@ -175,6 +177,25 @@ func (b *FunctionBuilder) SetDefineFunc() {
 			}
 		}
 	}
+}
+
+func (b *FunctionBuilder) SetMarkedFunction(name string) {
+	i, ok := b.DefineFunc[name]
+	if !ok {
+		return
+	}
+	// fun := b.BuildValueFromAny()
+	typ := reflect.TypeOf(i)
+	if typ.Kind() != reflect.Func {
+		log.Errorf("config define function %s is not function", name)
+		return
+	}
+	funTyp := b.CoverReflectFunctionType(typ, 0)
+	b.MarkedFunc = funTyp
+}
+
+func (b *FunctionBuilder) GetMarkedFunction() *FunctionType {
+	return b.MarkedFunc
 }
 
 // for goto and label
