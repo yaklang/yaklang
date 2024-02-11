@@ -1,6 +1,8 @@
 package ssa4analyze
 
 import (
+	"slices"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -49,24 +51,26 @@ func (t *TypeCheck) CheckOnInstruction(inst ssa.Instruction) {
 						v.NewError(ssa.Error, TypeCheckTAG, ErrorUnhandled())
 					}
 				}
+				if slices.Contains(lo.Keys(vs), "_") {
+					break
+				}
 				for _, variable := range vs {
+					// if is `_` variable
 					if variable.GetName() == "_" {
-						continue
+						break
 					}
 					variable.NewError(ssa.Error, TypeCheckTAG, ErrorUnhandled())
 				}
+			}
+		case ssa.NullTypeKind:
+			if len(v.GetAllVariables()) != 0 {
+				inst.NewError(ssa.Warn, TypeCheckTAG, ssa.ValueIsNull())
 			}
 		default:
 		}
 	}
 
 	switch inst := inst.(type) {
-	case *ssa.Make:
-		// pass; this is top instruction
-	// case *ssa.Field:
-	// 	t.TypeCheckField(inst)
-	case *ssa.Update:
-		t.TypeCheckUpdate(inst)
 	// case *ssa.ConstInst:
 	// case *ssa.BinOp:
 	case *ssa.Call:
@@ -134,11 +138,6 @@ func (t *TypeCheck) TypeCheckUndefine(inst *ssa.Undefined) {
 func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 	funcTyp, ok := c.Method.GetType().(*ssa.FunctionType)
 	isMethod := false
-	if f, ok := ssa.ToField(c.Method); ok {
-		if f.IsMethod {
-			isMethod = true
-		}
-	}
 	if !ok {
 		return
 	}
@@ -201,21 +200,16 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 		return
 	}
 
-	leftLen := len(ssa.GetFields(c))
 	// check return number
 	objType, ok := funcTyp.ReturnType.(*ssa.ObjectType)
 	if !ok {
-		// not object type
-		if c.Unpack && leftLen != 1 {
-			c.NewError(ssa.Error, TypeCheckTAG, CallAssignmentMismatch(leftLen, c.GetType().String()))
-		}
 		return
 	}
 	if objType.Combination {
 		// a, b, err = fun()
 		hasError := false
 		rightLen := len(objType.FieldTypes)
-		if objType.FieldTypes[len(objType.FieldTypes)-1].GetTypeKind() == ssa.ErrorType {
+		if objType.FieldTypes[len(objType.FieldTypes)-1].GetTypeKind() == ssa.ErrorTypeKind {
 			if c.IsDropError {
 				rightLen -= 1
 				hasError = false
@@ -227,47 +221,29 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 		// 如果是 没有拆包 则检查后续错误是否处理
 		if !c.Unpack {
 			if hasError {
-				// a = func() (m * any, error)
-				f := ssa.GetField(c, ssa.NewConst(len(objType.FieldTypes)-1))
-				if f == nil {
+				hasError := true
+				for key := range c.GetAllMember() {
+					if c, ok := ssa.ToConst(key); ok {
+						if c.IsNumber() {
+							if int(c.Number()) == len(objType.FieldTypes)-1 {
+								hasError = false
+								break
+							}
+						}
+					}
+				}
+
+				if hasError {
 					vs := c.GetAllVariables()
 					for _, variable := range vs {
 						variable.NewError(ssa.Error, TypeCheckTAG,
 							ErrorUnhandledWithType(c.GetType().String()),
 						)
 					}
-				} else {
-					if f.GetName() == "" {
-						f.SetName(c.GetName() + ".error")
-					}
 				}
 			}
 			// 如果未拆包 不需要后续检查
 			return
 		}
-
-		if leftLen != rightLen {
-			if c.IsDropError {
-				c.NewError(ssa.Warn, TypeCheckTAG,
-					CallAssignmentMismatchDropError(leftLen, c.GetType().String()),
-				)
-
-			} else {
-				c.NewError(
-					ssa.Error, TypeCheckTAG,
-					CallAssignmentMismatch(leftLen, c.GetType().String()),
-				)
-			}
-		}
 	}
-}
-
-func (t *TypeCheck) TypeCheckField(f *ssa.Field) {
-	// use interface
-	// typ := f.GetType()
-	// if typ.GetTypeKind() == ssa.ErrorType {
-	// }
-}
-
-func (t *TypeCheck) TypeCheckUpdate(u *ssa.Update) {
 }

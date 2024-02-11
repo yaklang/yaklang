@@ -249,9 +249,10 @@ const (
 	ErrorTypeKind
 
 	ObjectTypeKind
-	SliceTypeKind
-	MapTypeKind
-	StructTypeKind
+	SliceTypeKind  // slice
+	MapTypeKind    // map
+	StructTypeKind // struct
+	TupleTypeKind  //  slice has fixed length
 
 	InterfaceTypeKind
 	FunctionTypeKind
@@ -723,7 +724,7 @@ func (s *ObjectType) GetField(key Value) Type {
 		if TypeCompare(key.GetType(), s.KeyTyp) {
 			return s.FieldType
 		}
-	case StructTypeKind, ObjectTypeKind:
+	case StructTypeKind, ObjectTypeKind, TupleTypeKind:
 		getField := func(o *ObjectType) Type {
 			if index := slices.IndexFunc(o.Keys, func(v Value) bool { return v.String() == key.String() }); index != -1 {
 				return o.FieldTypes[index]
@@ -802,7 +803,7 @@ func CalculateType(ts []Type) Type {
 		}
 		i.Finish()
 		i.Combination = true
-		i.Kind = StructTypeKind
+		i.Kind = TupleTypeKind
 		// i.SetLen(NewConst(len(ts)))
 		i.Len = len(ts)
 		return i
