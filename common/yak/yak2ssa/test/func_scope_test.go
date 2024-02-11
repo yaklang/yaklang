@@ -107,7 +107,7 @@ func TestClosureFreeValueScope(t *testing.T) {
 
 func TestClosureMask(t *testing.T) {
 	check := func(t *testing.T, tc TestCase) {
-		tc.Check = func(t *testing.T, p *ssaapi.Program) {
+		tc.Check = func(t *testing.T, p *ssaapi.Program, want []string) {
 			test := assert.New(t)
 
 			targets := p.Ref("target").ShowWithSource()
