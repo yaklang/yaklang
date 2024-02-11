@@ -312,11 +312,12 @@ func (r *Return) calcType(builder *FunctionBuilder) {
 
 	if len(r.Results) > 1 {
 		newObjTyp := NewObjectType()
-		for _, v := range r.Results {
-			newObjTyp.AddField(NewConst(1), handleType(v.GetType()))
+		for i, v := range r.Results {
+			newObjTyp.AddField(NewConst(i), handleType(v.GetType()))
 		}
 		newObjTyp.Finish()
-		newObjTyp.Kind = SliceTypeKind
+		newObjTyp.Kind = TupleTypeKind
+		newObjTyp.Len = len(r.Results)
 		r.SetType(newObjTyp)
 	}
 }
