@@ -552,16 +552,22 @@ type assignlist interface {
 func (b *astbuilder) AssignList(stmt assignlist) []ssa.Value {
 	// Colon Assign Means: ... create symbol to recv value force
 	if op, op2 := stmt.AssignEq(), stmt.ColonAssignEq(); op != nil || op2 != nil {
-		// right value
-		var rightValue []ssa.Value
-		if ri, ok := stmt.ExpressionList().(*yak.ExpressionListContext); ok {
-			rightValue = b.buildExpressionList(ri)
-		}
 
 		// left
 		var leftVariables []*ssa.Variable
 		if li, ok := stmt.LeftExpressionList().(*yak.LeftExpressionListContext); ok {
 			leftVariables = b.buildLeftExpressionList(op2 != nil, li)
+		}
+
+		// check if defined-function
+		if len(leftVariables) == 1 {
+			b.SetMarkedFunction(leftVariables[0].GetName())
+		}
+
+		// right value
+		var rightValue []ssa.Value
+		if ri, ok := stmt.ExpressionList().(*yak.ExpressionListContext); ok {
+			rightValue = b.buildExpressionList(ri)
 		}
 
 		// assign
@@ -1233,8 +1239,23 @@ func (b *astbuilder) buildAnonymousFunctionDecl(stmt *yak.AnonymousFunctionDeclC
 	funcName := ""
 	if name := stmt.FunctionNameDecl(); name != nil {
 		funcName = name.GetText()
+		b.SetMarkedFunction(funcName)
 	}
 	newFunc := b.NewFunc(funcName)
+	MarkedFunctionType := b.GetMarkedFunction()
+	handleFunctionType := func(fun *ssa.Function) {
+		if MarkedFunctionType == nil {
+			return
+		}
+		if len(fun.Param) != len(MarkedFunctionType.Parameter) {
+			return
+		}
+
+		for i, p := range fun.Param {
+			p.SetType(MarkedFunctionType.Parameter[i])
+		}
+	}
+
 	{
 		recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 
@@ -1254,6 +1275,10 @@ func (b *astbuilder) buildAnonymousFunctionDecl(stmt *yak.AnonymousFunctionDeclC
 				b.NewParam(id.GetText())
 				recoverRange()
 			}
+
+			// handler Marked Function
+			handleFunctionType(b.Function)
+
 			if block, ok := stmt.Block().(*yak.BlockContext); ok {
 				// build block
 				b.buildBlock(block)
@@ -1269,6 +1294,9 @@ func (b *astbuilder) buildAnonymousFunctionDecl(stmt *yak.AnonymousFunctionDeclC
 			if para, ok := stmt.FunctionParamDecl().(*yak.FunctionParamDeclContext); ok {
 				b.buildFunctionParamDecl(para)
 			}
+			// handler markedFunction
+			handleFunctionType(b.Function)
+
 			if block, ok := stmt.Block().(*yak.BlockContext); ok {
 				b.buildBlock(block)
 			}
