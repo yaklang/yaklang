@@ -10,7 +10,7 @@ import (
 
 // value
 func SetMemberCall(obj, key, member Value) {
-	obj.AddMember(member)
+	obj.AddMember(key, member)
 	member.SetObject(obj)
 	member.SetKey(key)
 }
@@ -137,6 +137,17 @@ func (b *FunctionBuilder) checkCanMemberCall(value, key Value) (string, Type) {
 			}
 		} else {
 			// type check error
+		}
+	case TupleTypeKind:
+		typ, ok := ToObjectType(value.GetType())
+		if !ok {
+			log.Errorf("checkCanMemberCall: %v is TupleTypeKind but is not a ObjectType", value.GetType())
+			break
+		}
+		if TypeCompare(BasicTypes[NumberTypeKind], key.GetType()) {
+			if fieldTyp := typ.GetField(key); fieldTyp != nil {
+				return name, fieldTyp
+			}
 		}
 	case MapTypeKind: // string / number
 		typ, ok := ToObjectType(value.GetType())

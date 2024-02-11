@@ -91,8 +91,9 @@ type Value interface {
 
 	// object  member caller
 	IsObject() bool
-	AddMember(Value)
-	GetMember() []Value
+	AddMember(Value, Value)
+	GetMember(Value) Value
+	GetAllMember() map[Value]Value
 
 	// member, member callee
 	IsMember() bool
@@ -239,7 +240,7 @@ type anValue struct {
 
 	object Value
 	key    Value
-	member []Value
+	member map[Value]Value
 }
 
 func (n *anValue) IsMember() bool {
@@ -264,11 +265,16 @@ func (n *anValue) GetKey() Value {
 func (n *anValue) IsObject() bool {
 	return len(n.member) != 0
 }
-func (n *anValue) AddMember(v Value) {
-	n.member = append(n.member, v)
+func (n *anValue) AddMember(k, v Value) {
+	// n.member = append(n.member, v)
+	n.member[k] = v
 }
 
-func (n *anValue) GetMember() []Value {
+func (n *anValue) GetMember(key Value) Value {
+	return n.member[key]
+}
+
+func (n *anValue) GetAllMember() map[Value]Value {
 	return n.member
 }
 
@@ -276,6 +282,7 @@ func NewValue() anValue {
 	return anValue{
 		typ:      BasicTypes[AnyTypeKind],
 		userList: make(Users, 0),
+		member:   make(map[Value]Value),
 	}
 }
 
