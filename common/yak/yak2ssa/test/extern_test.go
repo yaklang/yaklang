@@ -35,7 +35,9 @@ func TestExternValue(t *testing.T) {
 		tc.ExternValue = map[string]any{
 			"println": func(v ...any) {},
 		}
-		tc.Check = checkFunc
+		tc.Check = func(t *testing.T, p *ssaapi.Program, s []string) {
+			checkFunc(t, p)
+		}
 		CheckTestCase(t, tc)
 	}
 	checkIsFunction := func(t *testing.T, tc TestCase) {
@@ -167,7 +169,9 @@ func TestExternLib(t *testing.T) {
 				"method": func() {},
 			},
 		}
-		tc.Check = checkFunc
+		tc.Check = func(t *testing.T, p *ssaapi.Program, s []string) {
+			checkFunc(t, p)
+		}
 		CheckTestCase(t, tc)
 	}
 	checkIsExtern := func(t *testing.T, tc TestCase) {
@@ -325,7 +329,7 @@ func TestExternRef(t *testing.T) {
 			println("a")
 			println("a")
 			`,
-			Check: func(t *testing.T, p *ssaapi.Program) {
+			Check: func(t *testing.T, p *ssaapi.Program, want []string) {
 				test := assert.New(t)
 				printlns := p.Ref("println")
 				test.Len(printlns, 1)
@@ -350,7 +354,7 @@ func TestExternRef(t *testing.T) {
 			lib.method()
 			lib.method()
 			`,
-			Check: func(t *testing.T, p *ssaapi.Program) {
+			Check: func(t *testing.T, p *ssaapi.Program, w []string) {
 				test := assert.New(t)
 
 				libs := p.Ref("lib")
