@@ -17,7 +17,7 @@ func _open(conf *CaptureConfig, ctx context.Context, handler *pcap.Handle, packe
 	packetSource := gopacket.NewPacketSource(handler, handler.LinkType())
 
 	if conf.onNetInterfaceCreated != nil {
-		conf.onNetInterfaceCreated()
+		conf.onNetInterfaceCreated(handler)
 	}
 
 	for {
