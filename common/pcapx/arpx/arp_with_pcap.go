@@ -9,8 +9,10 @@ import (
 	"github.com/google/gopacket/pcap"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/hostsparser"
 	"net"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -32,15 +34,15 @@ func ArpWithPcap(ctx context.Context, ifaceName string, targets string) (map[str
 		return nil, err
 	}
 
+	var timeout time.Duration
 	if ctx == nil {
-		ctx, _ = context.WithTimeout(ctx, 5*time.Second)
+		ctx = context.Background()
 	} else {
-		_, haveDDL := ctx.Deadline()
-		if !haveDDL {
-			ctx, _ = context.WithTimeout(ctx, 5*time.Second)
+		ddl, haveDDL := ctx.Deadline()
+		if haveDDL {
+			timeout = time.Until(ddl)
 		}
 	}
-
 	if ifaceIns.Flags&net.FlagLoopback != 0 {
 		return nil, errors.New("loopback")
 	}
@@ -52,26 +54,66 @@ func ArpWithPcap(ctx context.Context, ifaceName string, targets string) (map[str
 	results := make(map[string]net.HardwareAddr)
 	maxSize := targetList.Size()
 	var resultSize int64 = 0
+
+	senderSwg := utils.NewSizedWaitGroup(20)
+	senderMutex := new(sync.Mutex)
+	_ = timeout
+
 	err = pcaputil.Start(
 		pcaputil.WithDevice(ifaceName),
 		pcaputil.WithEnableCache(true),
 		pcaputil.WithBPFFilter("arp"),
 		pcaputil.WithContext(ctx),
 		pcaputil.WithNetInterfaceCreated(func(handle *pcap.Handle) {
-			for p := range targetList.Hosts() {
-				buf, err := newArpARPPacket(ifaceIns, p)
-				if err != nil {
-					log.Errorf("new arp packet failed: %s", err)
-					continue
+			go func() {
+				for p := range targetList.Hosts() {
+					p := p
+
+					senderSwg.Add(1)
+					//err := senderSwg.Add(1)
+					//if err != nil {
+					//	continue
+					//}
+					// log.Infof("start to build arp packet for %s", p)
+
+					go func() {
+						defer func() {
+							senderSwg.Done()
+						}()
+
+						buf, err := newArpARPPacket(ifaceIns, p)
+						if err != nil {
+							log.Errorf("new arp packet failed: %s", err)
+							return
+						}
+						count := 3
+						for i := 0; i < count; i++ {
+							select {
+							case <-ctx.Done():
+								return
+							default:
+							}
+
+							senderMutex.Lock()
+							err = handle.WritePacketData(buf.Bytes())
+							time.Sleep(5 * time.Millisecond) // some ms delay for write
+							senderMutex.Unlock()
+							if err != nil {
+								log.Errorf("write packet failed: %s", err)
+								return
+							}
+
+							if i != count-1 {
+								time.Sleep(500 * time.Millisecond)
+							}
+						}
+
+					}()
 				}
-				err = handle.WritePacketData(buf.Bytes())
-				time.Sleep(5 * time.Millisecond) // 20ms delay for write
-				if err != nil {
-					log.Errorf("write packet failed: %s", err)
-					continue
-				}
-			}
-			return
+				senderSwg.Wait()
+				time.Sleep(timeout)
+				cancel()
+			}()
 		}),
 		pcaputil.WithEveryPacket(func(packet gopacket.Packet) {
 			select {
@@ -97,6 +139,7 @@ func ArpWithPcap(ctx context.Context, ifaceName string, targets string) (map[str
 			if !targetList.Contains(ipAddr) {
 				return
 			}
+			log.Infof("IP[%v] 's mac addr: %v", ipAddr, arpIns.SourceHwAddress)
 			hwAddr := net.HardwareAddr(arpIns.SourceHwAddress)
 			results[ipAddr] = hwAddr
 			if atomic.AddInt64(&resultSize, 1) >= int64(maxSize) {

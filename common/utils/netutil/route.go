@@ -7,7 +7,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
-	"github.com/yaklang/yaklang/common/pcapx/arpx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil/netroute"
 	"github.com/yaklang/yaklang/common/utils/netutil/routewrapper"
@@ -47,23 +46,6 @@ func FindInterfaceByIP(ip string) (net.Interface, error) {
 
 func IsPrivateIPString(target string) bool {
 	return utils.IsPrivateIP(net.ParseIP(utils.FixForParseIP(target)))
-}
-
-func RouteAndArp(target string) (net.HardwareAddr, error) {
-	return RouteAndArpWithTimeout(5*time.Second, target)
-}
-
-func RouteAndArpWithTimeout(t time.Duration, target string) (net.HardwareAddr, error) {
-	iface, targetIP, _, err := Route(t, target)
-	if err != nil {
-		return nil, err
-	}
-
-	if targetIP.String() == utils.FixForParseIP(target) {
-		return iface.HardwareAddr, nil
-	}
-
-	return arpx.ArpWithTimeout(t, iface.Name, targetIP.String())
 }
 
 var (

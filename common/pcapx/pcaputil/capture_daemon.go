@@ -115,7 +115,7 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 					onceFirstPacket.Do(func() {
 						// first packet
 						if conf.onNetInterfaceCreated != nil {
-							conf.onNetInterfaceCreated()
+							conf.onNetInterfaceCreated(handler)
 						}
 					})
 
