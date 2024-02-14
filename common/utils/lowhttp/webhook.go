@@ -49,7 +49,7 @@ func NewWebHookServerEx(port int, cb func(data interface{})) *WebHookServer {
 		Handler: http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			defer writer.WriteHeader(200)
 
-			log.Infof("webhook met req: %v<-%v", addr, request.RemoteAddr)
+			log.Debugf("webhook met req: %v<-%v", addr, request.RemoteAddr)
 
 			reqBytes, err := utils.HttpDumpWithBody(request, true)
 			if err != nil {
