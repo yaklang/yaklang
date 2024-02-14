@@ -7,6 +7,7 @@ import (
 	"github.com/google/gopacket/pcap"
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/pcapx/arpx"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/netutil"
@@ -100,7 +101,7 @@ func (s *Scanner) getDefaultEthernet(target string) error {
 		return timeout
 	}
 	srcMAC := srcIFace.HardwareAddr
-	dstMAC, timeout := netutil.RouteAndArpWithTimeout(time.Second*3, target)
+	dstMAC, timeout := arpx.RouteAndArpWithTimeout(time.Second*3, target)
 	if timeout != nil {
 		return timeout
 	}
