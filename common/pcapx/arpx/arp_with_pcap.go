@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/hostsparser"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -51,7 +52,7 @@ func ArpWithPcap(ctx context.Context, ifaceName string, targets string) (map[str
 	_ = cancel
 
 	targetList := hostsparser.NewHostsParser(ctx, targets)
-	results := make(map[string]net.HardwareAddr)
+	results := omap.NewOrderedMap(map[string]net.HardwareAddr{}) // make(map[string]net.HardwareAddr)
 	maxSize := targetList.Size()
 	var resultSize int64 = 0
 
@@ -86,12 +87,16 @@ func ArpWithPcap(ctx context.Context, ifaceName string, targets string) (map[str
 							log.Errorf("new arp packet failed: %s", err)
 							return
 						}
-						count := 3
+						count := 2
 						for i := 0; i < count; i++ {
 							select {
 							case <-ctx.Done():
 								return
 							default:
+							}
+
+							if results.Have(p) {
+								return
 							}
 
 							senderMutex.Lock()
@@ -141,14 +146,19 @@ func ArpWithPcap(ctx context.Context, ifaceName string, targets string) (map[str
 			}
 			log.Infof("IP[%v] 's mac addr: %v", ipAddr, arpIns.SourceHwAddress)
 			hwAddr := net.HardwareAddr(arpIns.SourceHwAddress)
-			results[ipAddr] = hwAddr
+			results.Set(ipAddr, hwAddr)
 			if atomic.AddInt64(&resultSize, 1) >= int64(maxSize) {
 				cancel()
 			}
 		}),
 	)
-	if len(results) > 0 {
-		return results, nil
+	if results.Len() > 0 {
+		var ret = make(map[string]net.HardwareAddr)
+		results.ForEach(func(i string, v net.HardwareAddr) bool {
+			ret[i] = v
+			return true
+		})
+		return ret, nil
 	}
 	return nil, err
 }

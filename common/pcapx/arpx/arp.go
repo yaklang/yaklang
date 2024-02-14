@@ -1,9 +1,7 @@
 package arpx
 
 import (
-	"bytes"
 	"context"
-	"fmt"
 	"net"
 	"strings"
 	"sync"
@@ -15,7 +13,6 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"github.com/google/gopacket/pcap"
 	"github.com/mdlayher/arp"
 	"github.com/pkg/errors"
 
@@ -156,7 +153,7 @@ func ArpIPAddressesWithContext(ctx context.Context, ifaceName string, addrs stri
 		return resultsMap, nil
 	}
 
-	resultsMap, err = ARPWithPcap(ctx, ifaceName, addrs)
+	resultsMap, err = ArpWithPcap(ctx, ifaceName, addrs)
 	if err != nil {
 		log.Errorf("send arpx request with pcap failed: %s", err)
 	}
@@ -256,92 +253,92 @@ func newArpARPPacket(iface *net.Interface, ip string) (gopacket.SerializeBuffer,
 	return buf, nil
 }
 
-func ARPWithPcap(ctx context.Context, ifaceName string, targets string) (map[string]net.HardwareAddr, error) {
-	ifaceIns, err := net.InterfaceByName(ifaceName)
-	if err != nil {
-		return nil, utils.Errorf("find interface by name failed: %s", ifaceName)
-	}
-	pcapName, err := _ifaceNameToPcapIfaceName(ifaceName)
-	if err != nil {
-		log.Errorf("find pcap name failed: %s", err)
-		return nil, utils.Errorf("find pcap name failed: %v", err)
-	}
-
-	handler, err := pcap.OpenLive(pcapName, 65535, true, pcap.BlockForever)
-	if err != nil {
-		return nil, utils.Errorf("pcap open live %v failed: %s", pcapName, err)
-	}
-
-	log.Infof(`Arp With Pcap in %v, LinkType: %v`, ifaceName, handler.LinkType())
-
-	expr := "arp"
-	err = handler.SetBPFFilter(expr)
-	if err != nil {
-		return nil, utils.Errorf("bind bpf(%v) filter failed: %s with name: %v", expr, err, "- "+ifaceName)
-	}
-
-	results := make(map[string]net.HardwareAddr)
-
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	srcs := gopacket.NewPacketSource(handler, handler.LinkType())
-	packets := srcs.Packets()
-
-	targetsList := utils.ParseStringToHosts(targets)
-	if targetsList == nil {
-		return nil, utils.Errorf("cannot fetch hosts: %v", targets)
-	}
-
-	wg := new(sync.WaitGroup)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case packet, ok := <-packets:
-				if !ok {
-					return
-				}
-
-				arpPacket := packet.Layer(layers.LayerTypeARP)
-				if arpPacket == nil {
-					continue
-				}
-
-				arpIns, ok := arpPacket.(*layers.ARP)
-				if !ok {
-					continue
-				}
-
-				if arpIns.Operation != layers.ARPReply || bytes.Equal([]byte(ifaceIns.HardwareAddr), arpIns.SourceHwAddress) {
-					continue
-				}
-
-				ipAddr := fmt.Sprintf("%v", net.IP(arpIns.SourceProtAddress))
-				hwAddr := net.HardwareAddr(arpIns.SourceHwAddress)
-				log.Debugf("IP[%v] 's mac addr: %v", ipAddr, hwAddr)
-				results[ipAddr] = hwAddr
-			}
-		}
-	}()
-
-	for _, p := range targetsList {
-		if utils.IsIPv4(p) {
-			buf, err := newArpARPPacket(ifaceIns, p)
-			if err != nil {
-				log.Errorf("create arpx packet [%v for %v] failed: %s", ifaceName, p, err)
-				continue
-			}
-			err = handler.WritePacketData(buf.Bytes())
-			if err != nil {
-				log.Errorf("write arpx[%v] request packet to %v failed", p, ifaceName)
-				continue
-			}
-		}
-	}
-
-	wg.Wait()
-	return results, nil
-}
+//func ARPWithPcap(ctx context.Context, ifaceName string, targets string) (map[string]net.HardwareAddr, error) {
+//	ifaceIns, err := net.InterfaceByName(ifaceName)
+//	if err != nil {
+//		return nil, utils.Errorf("find interface by name failed: %s", ifaceName)
+//	}
+//	pcapName, err := _ifaceNameToPcapIfaceName(ifaceName)
+//	if err != nil {
+//		log.Errorf("find pcap name failed: %s", err)
+//		return nil, utils.Errorf("find pcap name failed: %v", err)
+//	}
+//
+//	handler, err := pcap.OpenLive(pcapName, 65535, true, pcap.BlockForever)
+//	if err != nil {
+//		return nil, utils.Errorf("pcap open live %v failed: %s", pcapName, err)
+//	}
+//
+//	log.Infof(`Arp With Pcap in %v, LinkType: %v`, ifaceName, handler.LinkType())
+//
+//	expr := "arp"
+//	err = handler.SetBPFFilter(expr)
+//	if err != nil {
+//		return nil, utils.Errorf("bind bpf(%v) filter failed: %s with name: %v", expr, err, "- "+ifaceName)
+//	}
+//
+//	results := make(map[string]net.HardwareAddr)
+//
+//	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+//	defer cancel()
+//	srcs := gopacket.NewPacketSource(handler, handler.LinkType())
+//	packets := srcs.Packets()
+//
+//	targetsList := utils.ParseStringToHosts(targets)
+//	if targetsList == nil {
+//		return nil, utils.Errorf("cannot fetch hosts: %v", targets)
+//	}
+//
+//	wg := new(sync.WaitGroup)
+//	wg.Add(1)
+//	go func() {
+//		defer wg.Done()
+//		for {
+//			select {
+//			case <-ctx.Done():
+//				return
+//			case packet, ok := <-packets:
+//				if !ok {
+//					return
+//				}
+//
+//				arpPacket := packet.Layer(layers.LayerTypeARP)
+//				if arpPacket == nil {
+//					continue
+//				}
+//
+//				arpIns, ok := arpPacket.(*layers.ARP)
+//				if !ok {
+//					continue
+//				}
+//
+//				if arpIns.Operation != layers.ARPReply || bytes.Equal([]byte(ifaceIns.HardwareAddr), arpIns.SourceHwAddress) {
+//					continue
+//				}
+//
+//				ipAddr := fmt.Sprintf("%v", net.IP(arpIns.SourceProtAddress))
+//				hwAddr := net.HardwareAddr(arpIns.SourceHwAddress)
+//				log.Debugf("IP[%v] 's mac addr: %v", ipAddr, hwAddr)
+//				results[ipAddr] = hwAddr
+//			}
+//		}
+//	}()
+//
+//	for _, p := range targetsList {
+//		if utils.IsIPv4(p) {
+//			buf, err := newArpARPPacket(ifaceIns, p)
+//			if err != nil {
+//				log.Errorf("create arpx packet [%v for %v] failed: %s", ifaceName, p, err)
+//				continue
+//			}
+//			err = handler.WritePacketData(buf.Bytes())
+//			if err != nil {
+//				log.Errorf("write arpx[%v] request packet to %v failed", p, ifaceName)
+//				continue
+//			}
+//		}
+//	}
+//
+//	wg.Wait()
+//	return results, nil
+//}

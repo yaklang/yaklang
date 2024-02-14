@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
@@ -128,7 +127,6 @@ func main() {
 					return err
 				}
 
-				arpx.ARPWithPcap(context.Background(), iface.Name, targets)
 				res, err := arpx.ArpIPAddressesWithContext(
 					utils.TimeoutContextSeconds(5),
 					iface.Name,
