@@ -1,10 +1,9 @@
 package ssa4analyze
 
 import (
-	"slices"
-
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"golang.org/x/exp/slices"
 )
 
 const TypeCheckTAG ssa.ErrorTag = "TypeCheck"
