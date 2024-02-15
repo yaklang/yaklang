@@ -1,6 +1,11 @@
 package ssaapi
 
-import "testing"
+import (
+	"fmt"
+	"github.com/yaklang/yaklang/common/utils/omap"
+	"strings"
+	"testing"
+)
 
 /*
 OOP MVP
@@ -26,6 +31,65 @@ d ? b() : c();
 e = a.b // mask trace e -> 1 & 2
 
 */
+
+func topDefCheckMust(t *testing.T, code string, varName string, want ...any) {
+	topDefCheckMustWithOpts(t, code, varName, want)
+}
+
+func topDefCheckMustWithOpts(t *testing.T, code string, varName string, want []any, opts ...OperationOption) {
+	prog, err := Parse(code)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	om := omap.NewOrderedMap(make(map[string]bool))
+	prog.Show()
+	prog.Ref(varName).GetTopDefs(opts...).ForEach(func(value *Value) {
+		value.Show()
+		for _, w := range want {
+			if strings.Contains(value.String(), fmt.Sprint(w)) {
+				om.Set(fmt.Sprint(w), true)
+			}
+		}
+	})
+	if om.Len() < len(want) {
+		t.Fatalf("want %d, but got %d", len(want), om.Len())
+	}
+	om.ForEach(func(i string, v bool) bool {
+		t.Log(i)
+		if !v {
+			t.Errorf("want %s is not right", i)
+		}
+		return true
+	})
+}
+
+func TestBasic_BasicObject(t *testing.T) {
+	topDefCheckMust(t, `a = {}; a.b = 1; a.c = 3; d = a.c`, "d", "3")
+}
+func TestBasic_BasicObject2(t *testing.T) {
+	topDefCheckMust(t, `a = ()=>{return {}}; a.b = 1; a.c = 3; d = a.c`, "d", "3")
+}
+func TestBasic_BasicObject_Trace(t *testing.T) {
+	havePhi := false
+	topDefCheckMustWithOpts(
+		t,
+		`a ={}; a.b = 1; if e {a.b=3}; d = a.b`,
+		"d",
+		[]any{
+			"3", "1",
+		},
+		WithHookEveryNode(func(value *Value) error {
+			if value.IsPhi() {
+				havePhi = true
+			}
+			return nil
+		}),
+	)
+	if !havePhi {
+		t.Fatal("want to trace phi")
+	}
+}
 
 func TestBasic_Phi(t *testing.T) {
 	prog, err := Parse(`a = 0; if b {a = 1;} else if e {a = 2} else {a=4}; c = a`)
