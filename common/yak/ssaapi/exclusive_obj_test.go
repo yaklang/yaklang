@@ -91,6 +91,69 @@ func TestBasic_BasicObject_Trace(t *testing.T) {
 	}
 }
 
+func TestBasic_BasicObject_Trace2(t *testing.T) {
+	havePhi := false
+	topDefCheckMustWithOpts(
+		t,
+		`a.b=1;if c{a.b=3};d=a.b`,
+		"d",
+		[]any{
+			"3", "1",
+		},
+		WithHookEveryNode(func(value *Value) error {
+			if value.IsPhi() {
+				havePhi = true
+			}
+			return nil
+		}),
+	)
+	if !havePhi {
+		t.Fatal("want to trace phi")
+	}
+}
+
+func TestBasic_BasicObject_Trace3(t *testing.T) {
+	havePhi := false
+	topDefCheckMustWithOpts(
+		t,
+		`var a;a.b=1;if c{a.b=3};d=a.b`,
+		"d",
+		[]any{
+			"3", "1",
+		},
+		WithHookEveryNode(func(value *Value) error {
+			if value.IsPhi() {
+				havePhi = true
+			}
+			return nil
+		}),
+	)
+	if !havePhi {
+		t.Fatal("want to trace phi")
+	}
+}
+
+func TestBasic_BasicObject_Trace4(t *testing.T) {
+	havePhi := false
+	topDefCheckMustWithOpts(
+		t,
+		`a=(()=>({}))();a.b=1;if c{a.b=3};d=a.b`,
+		"d",
+		[]any{
+			"3", "1",
+		},
+		WithHookEveryNode(func(value *Value) error {
+			if value.IsPhi() {
+				havePhi = true
+			}
+			return nil
+		}),
+	)
+	if !havePhi {
+		t.Fatal("want to trace phi")
+	}
+}
+
 func TestBasic_Phi(t *testing.T) {
 	prog, err := Parse(`a = 0; if b {a = 1;} else if e {a = 2} else {a=4}; c = a`)
 	if err != nil {
