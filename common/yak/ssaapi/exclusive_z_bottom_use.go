@@ -163,14 +163,11 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 				return fallback()
 			}
 			_ = fun //TODO: fun can tell u, which return value is the target
-			var vals Values
 
-			if !call.IsObject() {
+			var vals Values
+			if !call.IsObject() || len(indexes) <= 0 {
 				// non-unpack
-				for idx, u := range call.GetUsers() {
-					if _, ok := indexes[idx]; !ok {
-						continue
-					}
+				for _, u := range call.GetUsers() {
 					if ret := NewValue(u).AppendDependOn(val).AppendDependOn(v).getBottomUses(actx); len(ret) > 0 {
 						vals = append(vals, ret...)
 					}
@@ -182,6 +179,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 				return NewValue(call).AppendDependOn(v).getBottomUses(actx)
 			}
 
+			// handle indexed return to call return
 			orderedIndex := lo.Keys(indexes)
 			sort.Ints(orderedIndex)
 			for _, idx := range orderedIndex {
