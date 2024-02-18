@@ -375,9 +375,9 @@ func (f *FunctionBuilder) EmitNext(iter Value, isIn bool) (key, field, ok Value)
 	}
 	n := f.EmitNextOnly(iter, isIn)
 	// n iter-type: map[T]U   n-type {key: T, field: U, ok: bool}
-	key = f.EmitField(n, NewConst("key"))
-	field = f.EmitField(n, NewConst("field"))
-	ok = f.EmitField(n, NewConst("ok"))
+	key = f.ReadMemberCallVariable(n, NextKey)
+	field = f.ReadMemberCallVariable(n, NextField)
+	ok = f.ReadMemberCallVariable(n, NextOk)
 	return
 }
 

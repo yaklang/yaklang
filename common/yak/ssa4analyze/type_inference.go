@@ -52,12 +52,6 @@ func (t *TypeInference) InferenceOnInstruction(inst ssa.Instruction) {
 		t.TypeInferenceBinOp(inst)
 	case *ssa.Call:
 		t.TypeInferenceCall(inst)
-	// case *ssa.Return:
-	// 	return t.TypeInferenceReturn(inst)
-	// case *ssa.Switch:
-	// case *ssa.If:
-	case *ssa.Next:
-		t.TypeInferenceNext(inst)
 	}
 }
 
@@ -100,55 +94,6 @@ func checkType(v ssa.Value, typ ssa.Type) bool {
 	}
 	v.SetType(typ)
 	return true
-}
-
-func (t *TypeInference) TypeInferenceNext(next *ssa.Next) {
-	/*
-		next map[T]U
-
-		{
-			key: T
-			field: U
-			ok: bool
-		}
-	*/
-	typ := ssa.NewStructType()
-	typ.AddField(ssa.NewConst("ok"), ssa.BasicTypes[ssa.BooleanTypeKind])
-	if it, ok := next.Iter.GetType().(*ssa.ObjectType); ok {
-		switch it.Kind {
-		case ssa.SliceTypeKind:
-			if next.InNext {
-				typ.AddField(ssa.NewConst("key"), it.FieldType)
-				typ.AddField(ssa.NewConst("field"), ssa.BasicTypes[ssa.NullTypeKind])
-			} else {
-				typ.AddField(ssa.NewConst("key"), it.KeyTyp)
-				typ.AddField(ssa.NewConst("field"), it.FieldType)
-			}
-		case ssa.StructTypeKind:
-			typ.AddField(ssa.NewConst("key"), ssa.BasicTypes[ssa.StringTypeKind])
-			typ.AddField(ssa.NewConst("field"), ssa.BasicTypes[ssa.AnyTypeKind])
-		case ssa.ObjectTypeKind:
-			typ.AddField(ssa.NewConst("key"), ssa.BasicTypes[ssa.AnyTypeKind])
-			typ.AddField(ssa.NewConst("field"), ssa.BasicTypes[ssa.AnyTypeKind])
-		case ssa.MapTypeKind:
-			typ.AddField(ssa.NewConst("key"), it.KeyTyp)
-			typ.AddField(ssa.NewConst("field"), it.FieldType)
-		}
-		next.SetType(typ)
-	}
-	if it, ok := next.Iter.GetType().(*ssa.ChanType); ok {
-		typ.AddField(ssa.NewConst("key"), it.Elem)
-		typ.AddField(ssa.NewConst("field"), ssa.BasicTypes[ssa.NullTypeKind])
-		next.SetType(typ)
-		next.GetUsers().RunOnField(func(f *ssa.Field) {
-			if f.Key.String() == "field" && len(f.GetAllVariables()) != 0 {
-				// checkType(f, it.Elem)
-				for _, variable := range f.GetAllVariables() {
-					variable.NewError(ssa.Error, TITAG, InvalidChanType(it.Elem.String()))
-				}
-			}
-		})
-	}
 }
 
 func (t *TypeInference) TypeInferencePhi(phi *ssa.Phi) {

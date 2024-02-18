@@ -407,6 +407,11 @@ func (b *astbuilder) buildForRangeStmt(stmt *yak.ForRangeStmtContext) {
 	defer recoverRange()
 	// current := f.currentBlock
 	loop := b.CreateLoopBuilder()
+	var value ssa.Value
+	loop.SetFirst(func() []ssa.Value {
+		value = b.buildExpression(stmt.Expression().(*yak.ExpressionContext))
+		return []ssa.Value{value}
+	})
 
 	loop.SetCondition(func() ssa.Value {
 		var lefts []*ssa.Variable
@@ -414,14 +419,20 @@ func (b *astbuilder) buildForRangeStmt(stmt *yak.ForRangeStmtContext) {
 			lefts = b.buildLeftExpressionList(true, leftList)
 			// } else {
 		}
-		value := b.buildExpression(stmt.Expression().(*yak.ExpressionContext))
 		key, field, ok := b.EmitNext(value, stmt.In() != nil)
 		if len(lefts) == 1 {
 			b.AssignVariable(lefts[0], key)
 			ssa.DeleteInst(field)
 		} else if len(lefts) >= 2 {
-			b.AssignVariable(lefts[0], key)
-			b.AssignVariable(lefts[1], field)
+			if value.GetType().GetTypeKind() == ssa.ChanTypeKind {
+				b.NewError(ssa.Error, TAG, InvalidChanType(value.GetType().String()))
+
+				b.AssignVariable(lefts[0], key)
+				ssa.DeleteInst(field)
+			} else {
+				b.AssignVariable(lefts[0], key)
+				b.AssignVariable(lefts[1], field)
+			}
 		}
 		return ok
 	})
