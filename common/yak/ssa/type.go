@@ -26,6 +26,9 @@ func TypeCompare(t1, t2 Type) bool {
 }
 
 func typeCompareEx(t1, t2 Type, depth int) bool {
+	if t1 == nil || t2 == nil {
+		return false
+	}
 	t1kind := t1.GetTypeKind()
 	t2kind := t2.GetTypeKind()
 
