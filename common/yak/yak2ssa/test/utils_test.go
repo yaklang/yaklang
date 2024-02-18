@@ -85,7 +85,7 @@ func CheckTestCase(t *testing.T, tc TestCase) {
 	}
 
 	prog.Show()
-	prog.Program.ShowWithSource()
+	// prog.Program.ShowWithSource()
 	fmt.Println(prog.GetErrors().String())
 
 	tc.Check(t, prog, tc.want)
@@ -107,4 +107,21 @@ func CheckError(t *testing.T, tc TestCase) {
 	}
 	tc.Check = check
 	CheckTestCase(t, tc)
+}
+
+func CheckType(t *testing.T, code, name string, kind ssa.TypeKind) {
+	test := assert.New(t)
+	prog, err := ssaapi.Parse(code)
+	test.Nil(err)
+
+	prog.Show()
+
+	vs := prog.Ref(name)
+	test.Equal(1, len(vs))
+
+	v := vs[0]
+	test.NotNil(v)
+
+	log.Info("type and kind: ", v.GetType(), v.GetTypeKind())
+	test.Equal(kind, v.GetTypeKind())
 }

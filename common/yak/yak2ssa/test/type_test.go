@@ -3,34 +3,41 @@ package test
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
 func TestYaklangBasic_Foreach(t *testing.T) {
 	t.Run("for each with chan", func(t *testing.T) {
-		test := assert.New(t)
-		prog, err := ssaapi.Parse(`
+		CheckType(t, `
 		ch = make(chan int)
 
 		for i in ch { 
 			_ = i 
 		}
-		`)
-		test.Nil(err)
+		`,
+			"i", ssa.NumberTypeKind)
+	})
 
-		prog.Show()
+	t.Run("for each with list", func(t *testing.T) {
+		CheckType(t, `
+		ch = make([]int, 3)
 
-		vs := prog.Ref("i")
-		test.Equal(1, len(vs))
+		for i in ch { 
+			_ = i 
+		}
+		`,
+			"i", ssa.NumberTypeKind)
+	})
+}
 
-		v := vs[0]
-		test.NotNil(v)
-
-		kind := v.GetTypeKind()
-		log.Info("type kind", kind)
-		test.Equal(kind, ssa.NumberTypeKind)
+func TestYaklangType_Loop(t *testing.T) {
+	t.Run("normal", func(t *testing.T) {
+		CheckType(t, `
+		num = make([]int, 3)
+		for i=0; i < 3; i++ {
+			n = num[i]
+		}
+		`,
+			"n", ssa.NumberTypeKind)
 	})
 }

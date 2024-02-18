@@ -316,7 +316,7 @@ func TestForEach(t *testing.T) {
 			}
 			`,
 			want: []string{
-				ssa4analyze.InvalidChanType("number"),
+				yak2ssa.InvalidChanType("chan number"),
 			},
 		})
 	})

@@ -15,6 +15,35 @@ func SetMemberCall(obj, key, member Value) {
 	member.SetKey(key)
 }
 
+func ReplaceMemberCall(v, to Value) {
+	builder := v.GetFunc().builder
+	recoverScope := builder.SetCurrent(v)
+	recoverScope()
+
+	// replace object member-call
+	if v.IsObject() {
+		for _, member := range v.GetAllMember() {
+			// replace this member object to to
+			_ = member
+			key := member.GetKey()
+			v.DeleteMember(key)
+
+			member.SetObject(to)
+			to.AddMember(key, member)
+			// re-set type
+			name, typ := checkCanMemberCall(to, key)
+			_ = name
+			member.SetName(name)
+			member.SetType(typ)
+		}
+	}
+
+	if v.IsMember() {
+		obj := v.GetObject()
+		obj.AddMember(v.GetKey(), to)
+	}
+}
+
 func NewMake(parentI Value, typ Type, low, high, step, Len, Cap Value) *Make {
 	i := &Make{
 		anInstruction: NewInstruction(),
@@ -87,7 +116,7 @@ func (b *FunctionBuilder) getFieldWithCreate(i, key Value, forceCreate bool) Val
 	return field
 }
 
-func (b *FunctionBuilder) checkCanMemberCall(value, key Value) (string, Type) {
+func checkCanMemberCall(value, key Value) (string, Type) {
 	type MemberCallKind int
 	const (
 		None MemberCallKind = iota
@@ -114,7 +143,15 @@ func (b *FunctionBuilder) checkCanMemberCall(value, key Value) (string, Type) {
 
 	if kind == DynamicKind {
 		//TODO: check type
-		return name, BasicTypes[AnyTypeKind]
+		switch value.GetType().GetTypeKind() {
+		case SliceTypeKind, MapTypeKind:
+			typ, _ := ToObjectType(value.GetType())
+			return name, typ.FieldType
+		case BytesTypeKind, StringTypeKind:
+			return name, BasicTypes[NumberTypeKind]
+		default:
+			return name, BasicTypes[AnyTypeKind]
+		}
 	}
 
 	// check is method
@@ -240,7 +277,7 @@ func (b *FunctionBuilder) CreateMemberCallVariable(value, key Value) *Variable {
 
 func (b *FunctionBuilder) createField(value, key Value) (Value, string) {
 
-	name, typ := b.checkCanMemberCall(value, key)
+	name, typ := checkCanMemberCall(value, key)
 	if ret := b.PeekValueInThisFunction(name); ret != nil {
 		return ret, name
 	}
