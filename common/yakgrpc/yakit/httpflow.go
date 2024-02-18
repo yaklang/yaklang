@@ -16,6 +16,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
+	"github.com/samber/lo"
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/domainextractor"
@@ -161,9 +162,9 @@ func (f *HTTPFlow) AddTagToFirst(appendTags ...string) {
 }
 
 func (f *HTTPFlow) RemoveColor() {
-	f.Tags = strings.Join(funk.Filter(utils.PrettifyListFromStringSplited(f.Tags, "|"), func(i string) bool {
+	f.Tags = strings.Join(lo.Filter(utils.PrettifyListFromStringSplited(f.Tags, "|"), func(i string, _ int) bool {
 		return !strings.HasPrefix(i, COLORPREFIX)
-	}).([]string), "|")
+	}), "|")
 }
 
 func (f *HTTPFlow) Red() {
@@ -522,7 +523,7 @@ func SaveFromHTTPFromRaw(db *gorm.DB, isHttps bool, req []byte, rsp []byte, sour
 	if err != nil {
 		return nil, err
 	}
-	return GetHTTPFlowByHash(db, flow.CalcHash())
+	return flow, nil
 }
 
 func SaveFromHTTPWithBodySaved(db *gorm.DB, isHttps bool, req *http.Request, rsp *http.Response, source string, url string, remoteAddr string) (*HTTPFlow, error) {
@@ -534,7 +535,7 @@ func SaveFromHTTPWithBodySaved(db *gorm.DB, isHttps bool, req *http.Request, rsp
 	if err != nil {
 		return nil, err
 	}
-	return GetHTTPFlowByHash(db, flow.CalcHash())
+	return flow, nil
 }
 
 const maxBodyLength = 4 * 1024 * 1024
@@ -687,19 +688,20 @@ func UpdateHTTPFlowTags(db *gorm.DB, i *HTTPFlow) error {
 	if i == nil {
 		return nil
 	}
+	db = db.Model(&HTTPFlow{})
 
 	if i.ID > 0 {
-		if db = db.Model(&HTTPFlow{}).Where("id = ?", i.ID).Update("tags", i.Tags); db.Error != nil {
+		if db = db.Where("id = ?", i.ID).Update("tags", i.Tags); db.Error != nil {
 			log.Errorf("update tags(by id) failed: %s", db.Error)
 			return db.Error
 		}
 	} else if i.HiddenIndex != "" {
-		if db = db.Model(&HTTPFlow{}).Where("hidden_index = ?", i.HiddenIndex).Update("tags", i.Tags); db.Error != nil {
+		if db = db.Where("hidden_index = ?", i.HiddenIndex).Update("tags", i.Tags); db.Error != nil {
 			log.Errorf("update tags(by hidden_index) failed: %s", db.Error)
 			return db.Error
 		}
 	} else if i.Hash != "" {
-		if db = db.Model(&HTTPFlow{}).Where("hash = ?", i.HiddenIndex).Update("tags", i.Tags); db.Error != nil {
+		if db = db.Where("hash = ?", i.HiddenIndex).Update("tags", i.Tags); db.Error != nil {
 			log.Errorf("update tags(by hash) failed: %s", db.Error)
 			return db.Error
 		}
@@ -886,7 +888,7 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 	}
 
 	if len(params.GetIncludeId()) > 0 {
-		db = db.Where("id in (?)", params.GetIncludeId())
+		db = bizhelper.ExactQueryInt64ArrayOr(db, "id", params.GetIncludeId())
 	}
 
 	if len(params.GetExcludeInUrl()) > 0 {
@@ -930,9 +932,7 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 	}
 
 	if len(params.GetExcludeId()) > 0 {
-		for _, id := range params.GetExcludeId() {
-			db = db.Where("id <> ?", id)
-		}
+		db = bizhelper.ExactExcludeQueryInt64Array(db, "id", params.GetExcludeId())
 	}
 
 	if params.AfterBodyLength > 0 {
