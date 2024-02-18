@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"fmt"
 	"github.com/yaklang/yaklang/common/utils/dot"
 	"regexp"
 	"testing"
@@ -16,28 +17,36 @@ func TestFunctionTrace(t *testing.T) {
 
 func TestFunction_DoubleReturn(t *testing.T) {
 	prog, err := Parse(`c = () => {return 1,2}; a,b=c();`)
-	/**
-	main
-	type: ( ) -> null
-	entry-0: (true)
-		<[]number> t4 = call <( ) -> []number> main$1 () []
-		<number> t6 = <[]number> t4 field[<number> 0]
-		<number> t8 = <[]number> t4 field[<number> 1]
+	if err != nil {
+		t.Fatal(err)
+	}
+	val := prog.Ref("a").GetTopDefs()[0].GetConstValue()
+	if fmt.Sprint(val) != `1` {
+		t.Fatal("the literal 1 trace failed")
+	}
+}
 
-	extern type:
-	main$1
-	parent: main
-	type: ( ) -> []number
-	entry-0: (true)
-		jump -> b-1
-	b-1: <- entry-0  (true)
-		ret <number> 1, <number> 2
-	*/
+func TestFunction_DoubleReturn2(t *testing.T) {
+	prog, err := Parse(`c = () => {return 1,2}; a,b=c();`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	val := prog.Ref("b").GetTopDefs()[0].GetConstValue()
+	if fmt.Sprint(val) != `2` {
+		t.Fatal("the literal 2 trace failed")
+	}
+}
+
+func TestFunction_DoubleReturn_Unpack(t *testing.T) {
+	prog, err := Parse(`c=()=>{return 1,2}; f=c();a,b=f;dump(b)`)
 	if err != nil {
 		t.Fatal(err)
 	}
 	prog.Show()
-	prog.Ref("a").GetTopDefs().Show()
+	val := prog.Ref("b").GetTopDefs()[0].GetConstValue()
+	if fmt.Sprint(val) != `2` {
+		t.Fatal("the literal 2 trace failed")
+	}
 }
 
 func TestFunctionTrace_FormalParametersCheck(t *testing.T) {
