@@ -4,7 +4,6 @@ import (
 	"strconv"
 
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/plugin_type"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
@@ -34,7 +33,7 @@ func RuleRisk(prog *ssaapi.Program) *result.StaticAnalyzeResults {
 				// log.Infof("ops %v", ops[i])
 				opt := ops[i]
 				optFuncName := opt.GetOperand(0).GetName()
-				log.Infof("optFuncName %v", optFuncName)
+				// log.Infof("optFuncName %v", optFuncName)
 
 				if optFuncName == "risk.description" {
 					RiskDescription = true
