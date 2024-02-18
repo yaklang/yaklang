@@ -84,6 +84,8 @@ type MemberCall interface {
 	IsObject() bool
 	AddMember(Value, Value)
 	GetMember(Value) (Value, bool)
+	GetIndexMember(int) (Value, bool)
+	GetStringMember(string) (Value, bool)
 	DeleteMember( /*key*/ Value)   // delete by key
 	GetAllMember() map[Value]Value // map[key]value
 
