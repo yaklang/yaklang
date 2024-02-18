@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/corpix/uarand"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils/cli"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -79,6 +80,13 @@ type PocConfig struct {
 
 	FromPlugin string
 	RuntimeId  string
+
+	ConnectionPool bool
+
+	Context context.Context
+
+	DNSServers []string
+	DNSNoCache bool
 }
 
 func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
@@ -118,7 +126,7 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 		opts = append(opts, lowhttp.WithRedirectTimes(0))
 	}
 
-	if c.Proxy != nil {
+	if len(c.Proxy) > 0 {
 		opts = append(opts, lowhttp.WithProxy(c.Proxy...))
 	}
 	if c.FuzzParams != nil {
@@ -132,7 +140,12 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 		opts = append(opts, lowhttp.WithJsRedirect(c.JsRedirect))
 	}
 	if c.RedirectHandler != nil {
-		opts = append(opts, lowhttp.WithRedirectHandler(c.RedirectHandler))
+		opts = append(opts, lowhttp.WithRedirectHandler(func(isHttps bool, req []byte, rsp []byte) bool {
+			if c.RedirectHandler == nil {
+				return true
+			}
+			return c.RedirectHandler(isHttps, req, rsp)
+		}))
 	}
 	if c.Session != nil {
 		opts = append(opts, lowhttp.WithSession(c.Session))
@@ -143,6 +156,22 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 	if c.Source != "" {
 		opts = append(opts, lowhttp.WithSource(c.Source))
 	}
+	if c.ConnectionPool {
+		opts = append(opts, lowhttp.WithConnPool(c.ConnectionPool))
+	}
+	if c.ConnectTimeout > 0 {
+		opts = append(opts, lowhttp.WithConnectTimeout(c.ConnectTimeout))
+	}
+	if c.Context != nil {
+		opts = append(opts, lowhttp.WithContext(c.Context))
+	}
+	if len(c.DNSServers) > 0 {
+		opts = append(opts, lowhttp.WithDNSServers(c.DNSServers))
+	}
+	if c.DNSNoCache {
+		opts = append(opts, lowhttp.WithDNSNoCache(c.DNSNoCache))
+	}
+
 	opts = append(opts, lowhttp.WithUsername(c.Username))
 	opts = append(opts, lowhttp.WithPassword(c.Password))
 	return opts
@@ -175,6 +204,10 @@ func NewDefaultPoCConfig() *PocConfig {
 		WebsocketHandler:       nil,
 		WebsocketClientHandler: nil,
 		PacketHandler:          make([]func([]byte) []byte, 0),
+		Context:                nil,
+		ConnectionPool:         false,
+		DNSServers:             make([]string, 0),
+		DNSNoCache:             false,
 	}
 	return config
 }
@@ -512,6 +545,55 @@ func WithSave(i bool) PocConfigOption {
 func WithSource(i string) PocConfigOption {
 	return func(c *PocConfig) {
 		c.Source = i
+	}
+}
+
+// connPool 是一个请求选项参数，用于指定是否使用连接池，默认不使用连接池
+// Example:
+// rsp, req, err = poc.HTTP(x`POST /post HTTP/1.1
+// Content-Type: application/json
+// Host: pie.dev
+//
+// {"key": "asd"}`, poc.connPool(true)) // 使用连接池发送请求，这在发送多个请求时非常有用
+func WithConnPool(b bool) PocConfigOption {
+	return func(c *PocConfig) {
+		c.ConnectionPool = b
+	}
+}
+
+// context 是一个请求选项参数，用于指定请求的上下文
+// Example:
+// ```
+// ctx = context.New()
+// poc.Get("https://exmaple.com", poc.withContext(ctx)) // 向 example.com 发起请求，使用指定的上下文
+// ```
+func WithContext(ctx context.Context) PocConfigOption {
+	return func(c *PocConfig) {
+		c.Context = ctx
+	}
+}
+
+// dnsServer 是一个请求选项参数，用于指定请求所使用的DNS服务器，默认使用系统自带的DNS服务器
+// Example:
+// ```
+// // 向 example.com 发起请求，使用指定的DNS服务器
+// poc.Get("https://exmaple.com", poc.dnsServer("8.8.8.8", "1.1.1.1"))
+// ```
+func WithDNSServers(servers ...string) PocConfigOption {
+	return func(c *PocConfig) {
+		c.DNSServers = lo.Uniq(append(c.DNSServers, servers...))
+	}
+}
+
+// dnsNoCache 是一个请求选项参数，用于指定请求时不使用DNS缓存，默认使用DNS缓存
+// Example:
+// ```
+// // 向 example.com 发起请求，不使用DNS缓存
+// poc.Get("https://exmaple.com", poc.dnsNoCache(true))
+// ```
+func WithDNSNoCache(b bool) PocConfigOption {
+	return func(c *PocConfig) {
+		c.DNSNoCache = b
 	}
 }
 
@@ -1138,34 +1220,11 @@ func pochttp(packet []byte, config *PocConfig) (*lowhttp.LowhttpResponse, error)
 		}, nil
 	}
 
+	opts := config.ToLowhttpOptions()
+	opts = append(opts, lowhttp.WithPacketBytes(packet))
+
 	response, err := lowhttp.HTTP(
-		lowhttp.WithHttps(config.ForceHttps),
-		lowhttp.WithHost(config.Host),
-		lowhttp.WithPort(config.Port),
-		lowhttp.WithPacketBytes(packet),
-		lowhttp.WithTimeout(config.Timeout),
-		lowhttp.WithConnectTimeout(config.ConnectTimeout),
-		lowhttp.WithRetryTimes(config.RetryTimes),
-		lowhttp.WithRetryInStatusCode(config.RetryInStatusCode),
-		lowhttp.WithRetryNotInStatusCode(config.RetryNotInStatusCode),
-		lowhttp.WithRetryWaitTime(config.RetryWaitTime),
-		lowhttp.WithRetryMaxWaitTime(config.RetryMaxWaitTime),
-		lowhttp.WithRedirectTimes(config.RedirectTimes),
-		lowhttp.WithJsRedirect(config.JsRedirect),
-		lowhttp.WithSession(config.Session),
-		lowhttp.WithRedirectHandler(func(isHttps bool, req []byte, rsp []byte) bool {
-			if config.RedirectHandler == nil {
-				return true
-			}
-			return config.RedirectHandler(isHttps, req, rsp)
-		}),
-		lowhttp.WithNoFixContentLength(config.NoFixContentLength),
-		lowhttp.WithHttp2(config.ForceHttp2),
-		lowhttp.WithProxy(config.Proxy...),
-		lowhttp.WithSaveHTTPFlow(config.SaveHTTPFlow),
-		lowhttp.WithSource(config.Source),
-		lowhttp.WithRuntimeId(config.RuntimeId),
-		lowhttp.WithFromPlugin(config.FromPlugin),
+		opts...,
 	)
 	return response, err
 }
@@ -1440,7 +1499,11 @@ var PoCExports = map[string]interface{}{
 	"params":               WithParams,
 	"proxy":                WithProxy,
 	"timeout":              WithTimeout,
+	"context":              WithContext,
+	"connPool":             WithConnPool,
 	"connectTimeout":       WithConnectTimeout,
+	"dnsServer":            WithDNSServers,
+	"dnsNoCache":           WithDNSNoCache,
 	"noFixContentLength":   WithNoFixContentLength,
 	"session":              WithSession,
 	"save":                 WithSave,
