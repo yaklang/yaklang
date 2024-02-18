@@ -364,6 +364,43 @@ func ExactQueryIntArrayOr(db *gorm.DB, field string, s []int) *gorm.DB {
 	return ExactQueryInt64ArrayOr(db, field, raw)
 }
 
+func ExactExcludeQueryInt64Array(db *gorm.DB, field string, s []int64) *gorm.DB {
+	if len(s) <= 0 {
+		return db
+	}
+
+	sort.Slice(s, func(i, j int) bool {
+		return s[i] < s[j]
+	})
+
+	ranges := make([]Range, 0)
+	querys := make([]string, 0)
+	items := make([]any, 0)
+
+	for _, val := range s {
+		if len(ranges) == 0 || val-1 > ranges[len(ranges)-1].Max {
+			ranges = append(ranges, Range{
+				Min: val,
+				Max: val,
+			})
+		} else {
+			ranges[len(ranges)-1].Max = val
+		}
+	}
+
+	for _, r := range ranges {
+		if r.Min == r.Max {
+			querys = append(querys, fmt.Sprintf("(%v <> ?)", field))
+			items = append(items, r.Min)
+		} else {
+			querys = append(querys, fmt.Sprintf("(%v < ? OR %v > ?)", field, field))
+			items = append(items, r.Min, r.Max)
+		}
+	}
+
+	return db.Where(strings.Join(querys, " AND "), items...)
+}
+
 func ExactQueryInt64ArrayOr(db *gorm.DB, field string, s []int64) *gorm.DB {
 	if len(s) <= 0 {
 		return db
