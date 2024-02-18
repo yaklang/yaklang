@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"sort"
 )
 
 func (v *Value) GetBottomUses() Values {
@@ -93,9 +94,9 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			existed[value.GetId()] = struct{}{}
 		})
 		var formalParamsIndex = make([]int, 0, len(ins.Args))
-		for _, targetIndex := range ins.Args {
+		for argIndex, targetIndex := range ins.Args {
 			if _, ok := existed[targetIndex.GetId()]; ok {
-				formalParamsIndex = append(formalParamsIndex, targetIndex.GetId())
+				formalParamsIndex = append(formalParamsIndex, argIndex)
 			}
 		}
 		var params = omap.NewOrderedMap(map[int]*ssa.Parameter{})
@@ -139,6 +140,17 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			return results
 		}
 		if actx._callStack.Len() > 0 {
+			existed := make(map[int]struct{})
+			v.DependOn.ForEach(func(value *Value) {
+				existed[value.GetId()] = struct{}{}
+			})
+			var indexes = make(map[int]struct{})
+			for idx, ret := range ins.Results {
+				if _, ok := existed[ret.GetId()]; ok {
+					indexes[idx] = struct{}{}
+				}
+			}
+
 			val := actx.GetCurrentCall()
 			if val == nil {
 				return fallback()
@@ -151,9 +163,33 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			}
 			_ = fun //TODO: fun can tell u, which return value is the target
 			var vals Values
-			for _, u := range call.GetUsers() {
-				if ret := NewValue(u).AppendDependOn(val).AppendDependOn(v).getBottomUses(actx); len(ret) > 0 {
-					vals = append(vals, ret...)
+
+			if !call.IsObject() {
+				// non-unpack
+				for idx, u := range call.GetUsers() {
+					if _, ok := indexes[idx]; !ok {
+						continue
+					}
+					if ret := NewValue(u).AppendDependOn(val).AppendDependOn(v).getBottomUses(actx); len(ret) > 0 {
+						vals = append(vals, ret...)
+					}
+				}
+
+				if len(vals) > 0 {
+					return vals
+				}
+				return NewValue(call).AppendDependOn(v).getBottomUses(actx)
+			}
+
+			orderedIndex := lo.Keys(indexes)
+			sort.Ints(orderedIndex)
+			for idx := range orderedIndex {
+				indexedReturn, ok := call.GetIndexMember(idx)
+				if !ok {
+					continue
+				}
+				if newVals := NewValue(indexedReturn).AppendDependOn(val).AppendDependOn(v).getBottomUses(actx); len(newVals) > 0 {
+					vals = append(vals, newVals...)
 				}
 			}
 			if len(vals) > 0 {

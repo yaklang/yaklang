@@ -260,3 +260,26 @@ e = c + 3
 		t.Fatal("count edge failed")
 	}
 }
+
+func TestBottomUse_ReturnUnpack(t *testing.T) {
+	prog, err := Parse(`a = (i, j, k) => {
+	return i, j, k
+}
+c,d,e = a(f,2,3);
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vals := prog.Ref("f").GetBottomUses()
+	if len(vals) != 1 {
+		t.Fatal("bottom use failed")
+	}
+	vals.Show()
+	cId := -1
+	prog.Ref("c").ForEach(func(value *Value) {
+		cId = value.GetId()
+	})
+	if ret := vals[0].GetId(); ret != cId {
+		t.Fatalf("bottom use failed: expect: %v got: %v", cId, ret)
+	}
+}
