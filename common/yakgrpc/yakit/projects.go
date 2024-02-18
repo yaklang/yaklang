@@ -25,25 +25,25 @@ const (
 )
 
 func InitializingProjectDatabase() error {
-	db := consts.GetGormProfileDatabase()
-	db.Model(&Project{}).RemoveIndex("uix_projects_project_name")
-	defaultProj, _ := GetDefaultProject(db)
+	profileDB := consts.GetGormProfileDatabase()
+	profileDB.Model(&Project{}).RemoveIndex("uix_projects_project_name")
+	defaultProj, _ := GetDefaultProject(profileDB)
 
 	defaultYakitPath := consts.GetDefaultYakitBaseDir()
 	log.Debugf("Yakit base directory: %s", defaultYakitPath)
 	homeYakitPath := filepath.Join(utils.GetHomeDirDefault("."), "yakit-projects")
 	defaultDBPath := consts.GetDefaultYakitProjectDatabase(defaultYakitPath)
 	// 需要迁移所有yakit-projects/projects
-	if defaultYakitPath != homeYakitPath && GetProjectKey(db, MIGRATE_DATABASE_KEY) == "" {
+	if defaultYakitPath != homeYakitPath && GetKey(profileDB, MIGRATE_DATABASE_KEY) == "" {
 		log.Debugf("migrate project database path from %s to %s", homeYakitPath, defaultYakitPath)
-		SetProjectKey(db, MIGRATE_DATABASE_KEY, true)
-		projCh := YieldProject(db, context.Background())
+		SetKey(profileDB, MIGRATE_DATABASE_KEY, true)
+		projCh := YieldProject(profileDB, context.Background())
 		for proj := range projCh {
 			if proj.ProjectName == "[default]" || !utils.IsSubPath(proj.DatabasePath, homeYakitPath) {
 				continue
 			}
 			filename := filepath.Base(proj.DatabasePath)
-			err := UpdateProjectDatabasePath(db, int64(proj.ID), filepath.Join(defaultYakitPath, "projects", filename))
+			err := UpdateProjectDatabasePath(profileDB, int64(proj.ID), filepath.Join(defaultYakitPath, "projects", filename))
 			if err != nil {
 				log.Errorf("migrate project %s failed: %s", proj.ProjectName, err)
 			}
@@ -63,7 +63,7 @@ func InitializingProjectDatabase() error {
 			ChildFolderID: ChildFolderID,
 			Type:          TypeProject,
 		}
-		err := CreateOrUpdateProject(db, INIT_DATABASE_RECORD_NAME, FolderID, ChildFolderID, TypeProject, projectData)
+		err := CreateOrUpdateProject(profileDB, INIT_DATABASE_RECORD_NAME, FolderID, ChildFolderID, TypeProject, projectData)
 		if err != nil {
 			log.Errorf("create default database file failed: %s", err)
 		}
