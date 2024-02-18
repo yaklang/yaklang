@@ -241,10 +241,8 @@ func (b *FunctionBuilder) CreateMemberCallVariable(value, key Value) *Variable {
 func (b *FunctionBuilder) createField(value, key Value) (Value, string) {
 
 	name, typ := b.checkCanMemberCall(value, key)
-	if typ != nil {
-		if ret := b.PeekValueInThisFunction(name); ret != nil {
-			return ret, name
-		}
+	if ret := b.PeekValueInThisFunction(name); ret != nil {
+		return ret, name
 	}
 
 	RecoverScope := b.SetCurrent(value)
