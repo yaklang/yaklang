@@ -87,7 +87,7 @@ func (i *IfStmt[T]) BuildElse(elseBody func(*ScopedVersionedTable[T]) *ScopedVer
 
 // Build builds the IfStmt using the provided mergeHandler function.
 func (i *IfStmt[T]) BuildFinish(
-	mergeHandler func(name string, t []T) T,
+	mergeHandler MergeHandle[T],
 ) *ScopedVersionedTable[T] {
 	/*
 		global
@@ -170,7 +170,7 @@ func (l *LoopStmt[T]) Break(from *ScopedVersionedTable[T]) {
 }
 
 // Build builds the LoopStmt using the provided NewPhi and SpinHandler functions.
-func (l *LoopStmt[T]) Build(SpinHandler func(name string, phi, origin, latch T) T, merge func(name string, t []T) T) *ScopedVersionedTable[T] {
+func (l *LoopStmt[T]) Build(SpinHandler SpinHandle[T], merge MergeHandle[T]) *ScopedVersionedTable[T] {
 
 	/*
 		global [i = 0]
@@ -221,12 +221,12 @@ type TryStmt[T comparable] struct {
 	cacheBody    *ScopedVersionedTable[T]
 	finalBody    *ScopedVersionedTable[T]
 	ErrorName    string
-	mergeHandler func(name string, t []T) T
+	mergeHandler MergeHandle[T]
 }
 
 func NewTryStmt[T comparable](
 	global *ScopedVersionedTable[T],
-	mergeHandler func(name string, t []T) T,
+	mergeHandler MergeHandle[T],
 ) *TryStmt[T] {
 	return &TryStmt[T]{
 		global:       global,

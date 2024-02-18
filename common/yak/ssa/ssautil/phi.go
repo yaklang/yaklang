@@ -1,5 +1,8 @@
 package ssautil
 
+type SpinHandle[T comparable] func(string, T, T, T) T
+type MergeHandle[T comparable] func(string, []T) T
+
 // ForEachCapturedVariable call the handler for each captured by base scope Variable
 func (ps *ScopedVersionedTable[T]) ForEachCapturedVariable(base *ScopedVersionedTable[T], handler func(name string, ver VersionedIF[T])) {
 	ps.captured.ForEach(func(name string, ver VersionedIF[T]) bool {
@@ -24,7 +27,7 @@ func (s *ScopedVersionedTable[T]) CoverBy(scope *ScopedVersionedTable[T]) {
 // if hasSelf is true: the current scope will be merged to the result
 func (base *ScopedVersionedTable[T]) Merge(
 	hasSelf bool,
-	merge func(name string, t []T) T,
+	merge MergeHandle[T],
 	subScopes ...*ScopedVersionedTable[T],
 ) {
 	var zero T
@@ -77,7 +80,10 @@ func (base *ScopedVersionedTable[T]) Merge(
 }
 
 // this handler merge [origin, last] to phi
-func (s *ScopedVersionedTable[T]) Spin(header, latch *ScopedVersionedTable[T], handler func(name string, phi, origin, last T) T) {
+func (s *ScopedVersionedTable[T]) Spin(
+	header, latch *ScopedVersionedTable[T],
+	handler SpinHandle[T],
+) {
 	s.incomingPhi.ForEach(func(name string, ver VersionedIF[T]) bool {
 		last := latch.ReadValue(name)
 		origin := header.ReadValue(name)

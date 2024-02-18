@@ -184,14 +184,14 @@ func (i *Value) ShowWithSource() { fmt.Println(i.StringWithSource()) }
 func (v *Value) Compare(other *Value) bool { return ValueCompare(v, other) }
 
 func (v *Value) GetType() *Type {
-	if n, ok := v.node.(ssa.TypedNode); ok {
+	if n, ok := v.node.(ssa.Typed); ok {
 		return NewType(n.GetType())
 	}
 	return Any
 }
 
 func (v *Value) GetTypeKind() ssa.TypeKind {
-	if n, ok := v.node.(ssa.TypedNode); ok {
+	if n, ok := v.node.(ssa.Typed); ok {
 		return n.GetType().GetTypeKind()
 	}
 	return ssa.AnyTypeKind
