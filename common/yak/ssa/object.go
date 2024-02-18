@@ -133,6 +133,11 @@ func (b *FunctionBuilder) getFieldWithCreate(i, key Value, forceCreate bool) Val
 	return field
 }
 
+func CombineMemberCallVariableName(caller, callee Value) (string, bool) {
+	name, _ := checkCanMemberCall(caller, callee)
+	return name, name != ""
+}
+
 func checkCanMemberCall(value, key Value) (string, Type) {
 	type MemberCallKind int
 	const (

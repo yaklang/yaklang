@@ -414,3 +414,39 @@ dump(c)
 		t.Fatal("oop trace failed")
 	}
 }
+
+func TestObject_OOP_class_2(t *testing.T) {
+	prog, err := Parse(`
+klass = () => {
+	this = {
+		"key": "value",
+		"changeKey": i => {this.key = i}
+	}
+	return this
+}
+
+obj := klass()
+obj.changeKey("kkk")
+c = obj.key
+dump(c)
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkDotKey := false
+	checkMaskedKey := false
+	prog.Show().Ref("c").GetTopDefs().ForEach(func(value *Value) {
+		if value.GetConstValue() == "value" {
+			checkDotKey = true
+		}
+		if value.GetConstValue() == "kkk" {
+			checkMaskedKey = true
+		}
+	}).Show()
+	if !checkDotKey {
+		t.Fatal("oop trace failed")
+	}
+	if !checkMaskedKey {
+		t.Fatal("oop trace masked failed")
+	}
+}
