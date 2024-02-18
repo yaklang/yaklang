@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/openapi"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/openapi"
 
 	"github.com/yaklang/yaklang/common/binx"
 	"github.com/yaklang/yaklang/common/utils/yakgit"
@@ -41,6 +43,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/yakdoc"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yak/yaklang/lib/builtin"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
@@ -89,7 +92,7 @@ func initYaklangLib() {
 		builtin.YaklangBaseLib["print"] = func(a ...any) {}
 		builtin.YaklangBaseLib["printf"] = func(a ...any) {}
 		builtin.YaklangBaseLib["println"] = func(a ...any) {}
-		//yaklib.YakitExports["Info"] = func(a string, b ...interface{}) {}
+		// yaklib.YakitExports["Info"] = func(a string, b ...interface{}) {}
 		yaklib.YakitExports["Warn"] = func(a string, b ...interface{}) {}
 		yaklib.YakitExports["Debug"] = func(a string, b ...interface{}) {}
 		yaklib.YakitExports["Error"] = func(a string, b ...interface{}) {}
@@ -290,9 +293,18 @@ func initYaklangLib() {
 
 	yaklang.Import("sandbox", SandboxExports)
 
-	// 手动为一些缺失的导出的接口注入注释
-	// yakdoc.RegisterHook(func(h *yakdoc.DocumentHelper) {
-	// })
+	// 处理 yakit 库的一些函数名
+	yakdoc.RegisterHook(func(h *yakdoc.DocumentHelper) {
+		lib, ok := h.Libs["yakit"]
+		if !ok {
+			return
+		}
+		for name, f := range lib.Functions {
+			if strings.HasPrefix(f.MethodName, "Yakit") && name != f.MethodName {
+				f.MethodName = name
+			}
+		}
+	})
 }
 
 type ScriptEngine struct {
