@@ -1,5 +1,7 @@
 package ssa
 
+import "github.com/yaklang/yaklang/common/yak/ssa/ssautil"
+
 func NewPhi(block *BasicBlock, variable string, create bool) *Phi {
 	p := &Phi{
 		anInstruction: NewInstruction(),
@@ -16,6 +18,7 @@ func NewPhi(block *BasicBlock, variable string, create bool) *Phi {
 func SpinHandle(name string, phiValue, origin, latch Value) Value {
 	// log.Infof("build phi: %s %v %v %v", name, phiVar, v1, v2)
 	if phiValue == latch {
+		// this  value not change in this loop, should replace phi-value to origin value
 		ReplaceAllValue(phiValue, origin)
 		DeleteInst(phiValue)
 		return origin
@@ -30,6 +33,8 @@ func SpinHandle(name string, phiValue, origin, latch Value) Value {
 	return nil
 }
 
+var _ ssautil.SpinHandle[Value] = SpinHandle
+
 // build phi
 func generalPhi(builder *FunctionBuilder) func(name string, t []Value) Value {
 	return func(name string, t []Value) Value {
@@ -42,3 +47,5 @@ func generalPhi(builder *FunctionBuilder) func(name string, t []Value) Value {
 		return phi
 	}
 }
+
+var _ ssautil.MergeHandle[Value] = generalPhi(nil)
