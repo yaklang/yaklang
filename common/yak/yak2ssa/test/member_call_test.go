@@ -264,3 +264,19 @@ func Test_CallMember_Method(t *testing.T) {
 	})
 
 }
+
+func Test_CallMember_Cfg(t *testing.T) {
+	t.Run("test if", func(t *testing.T) {
+		checkPrintlnValue(`
+		a=()=>({}); 
+		a.b = 1; 
+		if e {
+			a.b=3
+		}; 
+		d = a.b
+		println(d)
+		`, []string{
+			"phi(#-1.b)[3,1]",
+		}, t)
+	})
+}
