@@ -279,4 +279,16 @@ func Test_CallMember_Cfg(t *testing.T) {
 			"phi(#-1.b)[3,1]",
 		}, t)
 	})
+
+	t.Run("test loop", func(t *testing.T) {
+		checkPrintlnValue(`
+		a = {} 
+		for i=0; i<10; i++ {
+			a.b = 1
+		}
+		println(a.b)
+		`, []string{
+			"phi(#2.b)[Undefined-#2.b(valid),1]",
+		}, t)
+	})
 }
