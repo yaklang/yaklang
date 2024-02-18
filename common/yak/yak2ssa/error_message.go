@@ -74,3 +74,7 @@ func MakeUnknownType() string {
 func FieldCallTargetError(name string) string {
 	return fmt.Sprintf("%s call target Error", name)
 }
+
+func InvalidChanType(typ string) string {
+	return fmt.Sprintf("iteration (variable of type %s) permits only one right variable", typ)
+}

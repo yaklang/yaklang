@@ -126,8 +126,6 @@ func NewAssert(cond, msgValue Value, msg string) *Assert {
 	return a
 }
 
-var NextType *ObjectType = nil
-
 func NewNext(iter Value, isIn bool) *Next {
 	n := &Next{
 		anInstruction: NewInstruction(),
@@ -135,14 +133,8 @@ func NewNext(iter Value, isIn bool) *Next {
 		Iter:          iter,
 		InNext:        isIn,
 	}
-	if NextType == nil {
-		NextType = NewObjectType()
-		NextType.Kind = StructTypeKind
-		NextType.AddField(NewConst("ok"), BasicTypes[BooleanTypeKind])
-		NextType.AddField(NewConst("key"), BasicTypes[AnyTypeKind])
-		NextType.AddField(NewConst("field"), BasicTypes[AnyTypeKind])
-	}
-	n.SetType(NextType)
+	typ := newNextType(iter.GetType(), isIn)
+	n.SetType(typ)
 	return n
 }
 

@@ -21,6 +21,8 @@ func SpinHandle(name string, phiValue, origin, latch Value) Value {
 		// this  value not change in this loop, should replace phi-value to origin value
 		ReplaceAllValue(phiValue, origin)
 		DeleteInst(phiValue)
+
+		ReplaceMemberCall(phiValue, origin)
 		return origin
 	}
 	if phi, ok := ToPhi(phiValue); ok {
