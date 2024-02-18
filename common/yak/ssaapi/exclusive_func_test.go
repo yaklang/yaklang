@@ -283,3 +283,20 @@ c,d,e = a(f,2,3);
 		t.Fatalf("bottom use failed: expect: %v got: %v", cId, ret)
 	}
 }
+
+func TestBottomUse_ReturnUnpack2(t *testing.T) {
+	prog, err := Parse(`a = (i, j, k) => {
+	return i, i+1, k
+}
+c,d,e = a(f,2,3);
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prog.Show()
+	vals := prog.Ref("f").GetBottomUses()
+	if len(vals) != 2 {
+		t.Fatal("bottom use failed")
+	}
+	vals.Show()
+}

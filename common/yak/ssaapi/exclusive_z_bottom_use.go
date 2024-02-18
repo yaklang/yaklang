@@ -142,7 +142,8 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		if actx._callStack.Len() > 0 {
 			existed := make(map[int]struct{})
 			v.DependOn.ForEach(func(value *Value) {
-				existed[value.GetId()] = struct{}{}
+				existedId := value.GetId()
+				existed[existedId] = struct{}{}
 			})
 			var indexes = make(map[int]struct{})
 			for idx, ret := range ins.Results {
@@ -183,7 +184,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 
 			orderedIndex := lo.Keys(indexes)
 			sort.Ints(orderedIndex)
-			for idx := range orderedIndex {
+			for _, idx := range orderedIndex {
 				indexedReturn, ok := call.GetIndexMember(idx)
 				if !ok {
 					continue
