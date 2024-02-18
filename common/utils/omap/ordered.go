@@ -390,6 +390,10 @@ func (o *OrderedMap[T, V]) GetRoot() (*OrderedMap[T, V], bool) {
 	return o.parent.GetRoot()
 }
 
+func (o *OrderedMap[T, V]) GetMap() map[T]V {
+	return o.m
+}
+
 func (o *OrderedMap[T, V]) Map(f func(T, V) (T, V, error)) *OrderedMap[T, V] {
 	o.lock.Lock()
 	defer o.lock.Unlock()

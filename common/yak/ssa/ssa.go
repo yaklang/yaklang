@@ -92,7 +92,7 @@ type Value interface {
 	// object  member caller
 	IsObject() bool
 	AddMember(Value, Value)
-	GetMember(Value) Value
+	GetMember(Value) (Value, bool)
 	GetAllMember() map[Value]Value
 
 	// member, member callee
@@ -240,7 +240,7 @@ type anValue struct {
 
 	object Value
 	key    Value
-	member map[Value]Value
+	member *omap.OrderedMap[Value, Value] // map[Value]Value
 }
 
 func (n *anValue) IsMember() bool {
@@ -263,7 +263,7 @@ func (n *anValue) GetKey() Value {
 }
 
 func (n *anValue) IsObject() bool {
-	return len(n.member) != 0
+	return n.member.Len() != 0
 }
 
 func (n *anValue) IsMemberCallVariable() bool {
@@ -272,22 +272,31 @@ func (n *anValue) IsMemberCallVariable() bool {
 
 func (n *anValue) AddMember(k, v Value) {
 	// n.member = append(n.member, v)
-	n.member[k] = v
+	// n.member[k] = v
+	n.member.Set(k, v)
 }
 
-func (n *anValue) GetMember(key Value) Value {
-	return n.member[key]
+func (n *anValue) GetMember(key Value) (Value, bool) {
+	ret, ok := n.member.Get(key)
+	if !ok {
+		return nil, false
+	}
+	return ret, true
+}
+
+func (n *anValue) GetIndexMember(i int) (Value, bool) {
+	return n.member.GetByIndex(i)
 }
 
 func (n *anValue) GetAllMember() map[Value]Value {
-	return n.member
+	return n.member.GetMap()
 }
 
 func NewValue() anValue {
 	return anValue{
 		typ:      BasicTypes[AnyTypeKind],
 		userList: make(Users, 0),
-		member:   make(map[Value]Value),
+		member:   omap.NewOrderedMap(map[Value]Value{}),
 	}
 }
 
