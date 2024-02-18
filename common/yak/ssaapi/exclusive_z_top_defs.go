@@ -272,6 +272,15 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 						val, ok := traceVal.GetStringMember(retIndexRawStr)
 						if ok {
 							traceRets = append(traceRets, NewValue(val).AppendEffectOn(i))
+							// trace mask ?
+							if len(ret.Blocks) > 0 {
+								name, ok := ssa.CombineMemberCallVariableName(traceVal, ssa.NewConst(retIndexRawStr))
+								if ok {
+									lastBlock, _ := lo.Last(ret.Blocks)
+									variableInstance := lastBlock.ScopeTable.ReadVariable(name)
+									_ = variableInstance.String()
+								}
+							}
 						}
 					}
 				}
