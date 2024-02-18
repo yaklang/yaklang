@@ -97,9 +97,7 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 	if c.Port != 0 {
 		opts = append(opts, lowhttp.WithPort(c.Port))
 	}
-	if c.ForceHttps {
-		opts = append(opts, lowhttp.WithHttps(c.ForceHttps))
-	}
+	opts = append(opts, lowhttp.WithHttps(c.ForceHttps))
 	opts = append(opts, lowhttp.WithHttp2(c.ForceHttp2))
 	if c.Timeout > 0 {
 		opts = append(opts, lowhttp.WithTimeout(c.Timeout))
@@ -130,32 +128,28 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 		opts = append(opts, lowhttp.WithProxy(c.Proxy...))
 	}
 
-	if c.NoFixContentLength {
-		opts = append(opts, lowhttp.WithNoFixContentLength(c.NoFixContentLength))
-	}
-	if c.JsRedirect {
-		opts = append(opts, lowhttp.WithJsRedirect(c.JsRedirect))
-	}
-	if c.RedirectHandler != nil {
-		opts = append(opts, lowhttp.WithRedirectHandler(func(isHttps bool, req []byte, rsp []byte) bool {
-			if c.RedirectHandler == nil {
-				return true
-			}
-			return c.RedirectHandler(isHttps, req, rsp)
-		}))
-	}
+	opts = append(opts, lowhttp.WithNoFixContentLength(c.NoFixContentLength))
+	opts = append(opts, lowhttp.WithJsRedirect(c.JsRedirect))
+	opts = append(opts, lowhttp.WithSaveHTTPFlow(c.SaveHTTPFlow))
+	opts = append(opts, lowhttp.WithRedirectHandler(func(isHttps bool, req []byte, rsp []byte) bool {
+		if c.RedirectHandler == nil {
+			return true
+		}
+		return c.RedirectHandler(isHttps, req, rsp)
+	}))
 	if c.Session != nil {
 		opts = append(opts, lowhttp.WithSession(c.Session))
-	}
-	if c.SaveHTTPFlow {
-		opts = append(opts, lowhttp.WithSaveHTTPFlow(c.SaveHTTPFlow))
 	}
 	if c.Source != "" {
 		opts = append(opts, lowhttp.WithSource(c.Source))
 	}
-	if c.ConnectionPool {
-		opts = append(opts, lowhttp.WithConnPool(c.ConnectionPool))
+	if c.RuntimeId != "" {
+		opts = append(opts, lowhttp.WithRuntimeId(c.RuntimeId))
 	}
+	if c.FromPlugin != "" {
+		opts = append(opts, lowhttp.WithFromPlugin(c.FromPlugin))
+	}
+	opts = append(opts, lowhttp.WithConnPool(c.ConnectionPool))
 	if c.ConnectTimeout > 0 {
 		opts = append(opts, lowhttp.WithConnectTimeout(c.ConnectTimeout))
 	}
@@ -165,9 +159,7 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 	if len(c.DNSServers) > 0 {
 		opts = append(opts, lowhttp.WithDNSServers(c.DNSServers))
 	}
-	if c.DNSNoCache {
-		opts = append(opts, lowhttp.WithDNSNoCache(c.DNSNoCache))
-	}
+	opts = append(opts, lowhttp.WithDNSNoCache(c.DNSNoCache))
 
 	opts = append(opts, lowhttp.WithUsername(c.Username))
 	opts = append(opts, lowhttp.WithPassword(c.Password))
