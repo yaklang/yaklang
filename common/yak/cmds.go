@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -20,6 +19,8 @@ import (
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/synscan"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
 
@@ -542,7 +543,8 @@ die(nuclei.UpdateDatabase())`, "main")
 			},
 		},
 		Action: func(c *cli.Context) error {
-			destination, err := os.Executable()
+			exePath, err := os.Executable()
+			exeDir := filepath.Dir(exePath)
 			if err != nil {
 				return utils.Errorf("cannot fetch os.Executable()...: %s", err)
 			}
@@ -555,80 +557,68 @@ die(nuclei.UpdateDatabase())`, "main")
 			}
 
 			versionUrl := `https://yaklang.oss-accelerate.aliyuncs.com/yak/latest/version.txt`
-
-			client := utils.NewDefaultHTTPClient()
-			client.Timeout = time.Duration(c.Int("timeout")) * time.Second
-
-			rsp, _ := client.Get(versionUrl)
-			if rsp != nil && rsp.Body != nil {
-				raw, _ := ioutil.ReadAll(rsp.Body)
+			timeout := float64(c.Int("timeout"))
+			rspIns, _, err := poc.DoGET(versionUrl, poc.WithTimeout(timeout))
+			if err != nil {
+				log.Errorf("获取 yak 引擎最新版本失败：get yak latest version failed: %v", err)
+				return err
+			}
+			if len(rspIns.RawPacket) > 0 {
+				raw := lowhttp.GetHTTPPacketBody(rspIns.RawPacket)
 				if len(utils.ParseStringToLines(string(raw))) <= 3 {
 					log.Infof("当前 yak 核心引擎最新版本为 / current latest yak core engine version：%v", string(raw))
 				}
 			}
 
 			log.Infof("start to download yak: %v", binary)
-			rsp, err = client.Get(binary)
+			rspIns, _, err = poc.DoGET(binary, poc.WithTimeout(timeout))
 			if err != nil {
 				log.Errorf("下载 yak 引擎失败：download yak failed: %v", err)
 				return err
 			}
 
 			// 设置本地缓存
-			fd, err := ioutil.TempFile("", "yak-")
+			newFilePath := filepath.Join(exeDir, "yak.new")
+			fd, err := os.OpenFile(newFilePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o766)
 			if err != nil {
 				log.Errorf("create temp file failed: %v", err)
 				return err
 			}
 
-			tempFile := fd.Name()
-			defer func() {
-				os.RemoveAll(tempFile)
-				log.Infof("cleaning cache for %v", tempFile)
-			}()
-
 			log.Infof("downloading for yak binary to local")
-			_, err = io.Copy(fd, rsp.Body)
+			_, err = io.Copy(fd, rspIns.MultiResponseInstances[0].Body)
 			if err != nil && err != io.EOF {
-				log.Errorf("download failed... %v", err.Error())
+				log.Errorf("download failed...: %v", err)
 				return err
 			}
 			log.Infof("yak 核心引擎下载成功... / yak engine downloaded")
+			fd.Sync()
+			fd.Close()
 
-			err = os.Chmod(tempFile, os.ModePerm)
-			if err != nil {
-				log.Errorf("chmod +x to[%v] failed: %s", tempFile, err)
-				return err
-			}
-
-			destPath := destination
-			destDir, _ := filepath.Split(destPath)
-			oldPath := filepath.Join(destDir, fmt.Sprintf("yak_%s", consts.GetYakVersion()))
+			destDir, _ := filepath.Split(exePath)
+			backupPath := filepath.Join(destDir, fmt.Sprintf("yak_%s", consts.GetYakVersion()))
 			if runtime.GOOS == "windows" {
-				oldPath += ".exe"
+				backupPath += ".exe"
 			}
-			log.Infof("backup yak old engine to %s", oldPath)
+			log.Infof("backup yak old engine to %s", backupPath)
 
-			log.Infof("origin binary: %s", destination)
+			log.Infof("origin binary: %s", exePath)
 			// 备份旧的
-			if err := os.Rename(destPath, oldPath); err != nil {
+			if err := os.Rename(exePath, backupPath); err != nil {
 				return utils.Errorf("backup old yak-engine failed: %s, retry re-Install with \n"+
 					"    `bash <(curl -sS -L http://oss.yaklang.io/install-latest-yak.sh)`\n\n", err)
 			}
+			// 覆盖
+			if err := os.Rename(newFilePath, exePath); err != nil {
+				// rollback
+				rerr := os.Rename(backupPath, exePath)
+				if rerr != nil {
+					return utils.Errorf("rename new yak-engine failed: %s, rollback failed: %s, retry re-Install with \n"+"    `bash <(curl -sS -L http://oss.yaklang.io/install-latest-yak.sh)`\n\n", err, rerr)
+				}
 
-			localFile, err := os.OpenFile(destPath, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0o766)
-			if err != nil {
-				return fmt.Errorf("open file error, %s", err)
+				return utils.Errorf("rename new yak-engine failed: %s, retry re-Install with \n"+
+					"    `bash <(curl -sS -L http://oss.yaklang.io/install-latest-yak.sh)`\n\n", err)
 			}
-			defer localFile.Close()
-
-			fd.Seek(0, 0)
-			_, err = io.Copy(localFile, fd)
-			if err != nil {
-				return utils.Errorf("install/copy latest yak failed: %s", err)
-			}
-			fd.Close()
-
 			//cmd := exec.Command(destPath, "version")
 			//raw, err := cmd.CombinedOutput()
 			//if err != nil {
