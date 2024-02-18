@@ -129,9 +129,6 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 	if len(c.Proxy) > 0 {
 		opts = append(opts, lowhttp.WithProxy(c.Proxy...))
 	}
-	if c.FuzzParams != nil {
-		log.Warnf("fuzz params is not nil, but not support now")
-	}
 
 	if c.NoFixContentLength {
 		opts = append(opts, lowhttp.WithNoFixContentLength(c.NoFixContentLength))
@@ -1140,7 +1137,7 @@ func handleRawPacketAndConfig(i interface{}, opts ...PocConfigOption) ([]byte, *
 
 	// 最先应该修复数据包
 	if config.FuzzParams != nil && len(config.FuzzParams) > 0 {
-		packets, err := mutate.QuickMutate(string(packet), consts.GetGormProfileDatabase(), mutate.MutateWithExtraParams(config.FuzzParams))
+		packets, err := mutate.QuickMutate(utils.UnsafeBytesToString(packet), consts.GetGormProfileDatabase(), mutate.MutateWithExtraParams(config.FuzzParams))
 		if err != nil {
 			return nil, config, utils.Errorf("fuzz parameters failed: %v\n\nParams: \n%v", err, spew.Sdump(config.FuzzParams))
 		}
@@ -1148,7 +1145,7 @@ func handleRawPacketAndConfig(i interface{}, opts ...PocConfigOption) ([]byte, *
 			return nil, config, utils.Error("fuzzed packets empty!")
 		}
 
-		packet = []byte(packets[0])
+		packet = utils.UnsafeStringToBytes(packets[0])
 	}
 
 	u, err := lowhttp.ExtractURLFromHTTPRequestRaw(packet, config.ForceHttps)
