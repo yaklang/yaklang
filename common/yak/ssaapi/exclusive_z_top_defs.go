@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
@@ -248,18 +249,36 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		// handle return
 		returnIndex, traceIndexedReturn := i.GetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX)
 		if traceIndexedReturn {
-			targetIdx := codec.Atoi(fmt.Sprint(returnIndex.GetConstValue()))
-			var traceRets Values
-			for _, retIns := range ret.Return {
-				for idx, traceVal := range retIns.Results {
-					if idx == targetIdx {
-						traceRets = append(traceRets, NewValue(traceVal).AppendEffectOn(i))
+			retIndexRaw := returnIndex.GetConstValue()
+			retIndexRawStr := fmt.Sprint(retIndexRaw)
+			if utils.IsValidInteger(retIndexRawStr) {
+				targetIdx := codec.Atoi(retIndexRawStr)
+				var traceRets Values
+				for _, retIns := range ret.Return {
+					for idx, traceVal := range retIns.Results {
+						if idx == targetIdx {
+							traceRets = append(traceRets, NewValue(traceVal).AppendEffectOn(i))
+						}
 					}
 				}
+				return lo.FlatMap(traceRets, func(item *Value, index int) []*Value {
+					return item.getTopDefs(actx, opt...)
+				})
+			} else {
+				// string literal member
+				var traceRets Values
+				for _, retIns := range ret.Return {
+					for _, traceVal := range retIns.Results {
+						val, ok := traceVal.GetStringMember(retIndexRawStr)
+						if ok {
+							traceRets = append(traceRets, NewValue(val).AppendEffectOn(i))
+						}
+					}
+				}
+				return lo.FlatMap(traceRets, func(item *Value, index int) []*Value {
+					return item.getTopDefs(actx, opt...)
+				})
 			}
-			return lo.FlatMap(traceRets, func(item *Value, index int) []*Value {
-				return item.getTopDefs(actx, opt...)
-			})
 		}
 
 		for _, r := range ret.Return {

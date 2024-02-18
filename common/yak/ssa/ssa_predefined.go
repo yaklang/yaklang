@@ -175,6 +175,19 @@ func (n *anValue) GetIndexMember(i int) (Value, bool) {
 	return n.member.GetByIndex(i)
 }
 
+func (n *anValue) GetStringMember(key string) (Value, bool) {
+	for _, i := range n.member.Keys() {
+		lit, ok := i.(*ConstInst)
+		if !ok {
+			continue
+		}
+		if lit.value == key {
+			return n.member.Get(i)
+		}
+	}
+	return nil, false
+}
+
 func (n *anValue) GetAllMember() map[Value]Value {
 	return n.member.GetMap()
 }
