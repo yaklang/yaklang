@@ -389,3 +389,28 @@ c()
 	prog.Ref("a").ShowWithSource()
 
 }
+
+func TestObject_OOP_class(t *testing.T) {
+	prog, err := Parse(`
+a = () => {
+	return {
+		"key": "value"
+	}
+}
+
+c = a().key
+dump(c)
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkDotKey := false
+	prog.Show().Ref("c").GetTopDefs().ForEach(func(value *Value) {
+		if value.GetConstValue() == "value" {
+			checkDotKey = true
+		}
+	})
+	if !checkDotKey {
+		t.Fatal("oop trace failed")
+	}
+}
