@@ -1,6 +1,9 @@
 package ssa
 
-import "github.com/yaklang/yaklang/common/yak/ssa/ssautil"
+import (
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
+)
 
 func NewPhi(block *BasicBlock, variable string, create bool) *Phi {
 	p := &Phi{
@@ -15,24 +18,33 @@ func NewPhi(block *BasicBlock, variable string, create bool) *Phi {
 	return p
 }
 
-func SpinHandle(name string, phiValue, origin, latch Value) Value {
+func SpinHandle(name string, phiValue, origin, latch Value) map[string]Value {
 	// log.Infof("build phi: %s %v %v %v", name, phiVar, v1, v2)
+	ret := make(map[string]Value)
 	if phiValue == latch {
 		// this  value not change in this loop, should replace phi-value to origin value
 		ReplaceAllValue(phiValue, origin)
 		DeleteInst(phiValue)
 
-		ReplaceMemberCall(phiValue, origin)
-		return origin
-	}
-	if phi, ok := ToPhi(phiValue); ok {
+		for name, v := range ReplaceMemberCall(phiValue, origin) {
+			ret[name] = v
+		}
+
+		ret[name] = origin
+	} else {
+		// only this value change, create a Phi
+		phi, ok := ToPhi(phiValue)
+		if !ok {
+			log.Errorf("phiValue is not a phi %s: %v", name, phiValue)
+			return nil
+		}
 		phi.Edge = append(phi.Edge, origin)
 		phi.Edge = append(phi.Edge, latch)
 		phi.SetName(name)
 		phi.GetProgram().SetVirtualRegister(phi)
-		return phiValue
+		ret[name] = phiValue
 	}
-	return nil
+	return ret
 }
 
 var _ ssautil.SpinHandle[Value] = SpinHandle

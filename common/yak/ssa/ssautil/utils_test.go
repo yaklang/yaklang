@@ -77,17 +77,20 @@ func GeneratePhi(name string, t []value) value {
 	return NewPhi(t...)
 }
 
-func SpinHandler(name string, current, origin, last value) (ret value) {
+func SpinHandler(name string, current, origin, last value) map[string]value {
+	ret := make(map[string]value)
 	if origin == last {
-		return last
+		ret[name] = origin
 	}
 	// if different value, create phi
 	if phi, ok := current.(*phi); ok {
 		phi.edge = append(phi.edge, origin)
 		phi.edge = append(phi.edge, last)
-		return phi
+		// return phi
+		ret[name] = phi
 	}
-	panic("this value not phi")
+	// panic("this value not phi")
+	return ret
 }
 
 func NewPhiValue(name string) value {
