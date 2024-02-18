@@ -265,6 +265,11 @@ func (n *anValue) GetKey() Value {
 func (n *anValue) IsObject() bool {
 	return len(n.member) != 0
 }
+
+func (n *anValue) IsMemberCallVariable() bool {
+	return n.object != nil && n.key != nil
+}
+
 func (n *anValue) AddMember(k, v Value) {
 	// n.member = append(n.member, v)
 	n.member[k] = v

@@ -1,6 +1,8 @@
 package ssaapi
 
 import (
+	"fmt"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -144,7 +146,8 @@ func (i *Value) visitedDefsDefault(actx *AnalyzeContext) Values {
 }
 
 var (
-	ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY = "call_entry"
+	ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY             = "call_entry"
+	ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX = "call_entry_trace_idx"
 )
 
 func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values {
@@ -179,6 +182,15 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 	switch ret := i.node.(type) {
 	case *ssa.Undefined:
 		// ret[n]
+		if ret.IsMemberCallVariable() {
+			callIns, fromCallReturn := ret.GetObject().(*ssa.Call)
+			if fromCallReturn {
+				return NewValue(callIns).AppendEffectOn(i).SetContextValue(
+					ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX,
+					NewValue(ret.GetKey()),
+				).getTopDefs(actx, opt...)
+			}
+		}
 		return i.visitedDefsDefault(actx)
 	case *ssa.Field:
 		return i.visitedDefsDefault(actx)
@@ -224,10 +236,32 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 
 		callerValue.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY, i)
 		callerValue.AppendEffectOn(i)
+
+		// inherit return index
+		val, ok := i.GetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX)
+		if ok {
+			callerValue.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX, val)
+		}
 		return callerValue.getTopDefs(actx, opt...).AppendEffectOn(callerValue)
 	case *ssa.Function:
 		var vals Values
 		// handle return
+		returnIndex, traceIndexedReturn := i.GetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX)
+		if traceIndexedReturn {
+			targetIdx := codec.Atoi(fmt.Sprint(returnIndex.GetConstValue()))
+			var traceRets Values
+			for _, retIns := range ret.Return {
+				for idx, traceVal := range retIns.Results {
+					if idx == targetIdx {
+						traceRets = append(traceRets, NewValue(traceVal).AppendEffectOn(i))
+					}
+				}
+			}
+			return lo.FlatMap(traceRets, func(item *Value, index int) []*Value {
+				return item.getTopDefs(actx, opt...)
+			})
+		}
+
 		for _, r := range ret.Return {
 			for _, subVal := range r.GetValues() {
 				if ret := NewValue(subVal).AppendEffectOn(i).getTopDefs(actx); len(ret) > 0 {
