@@ -15,16 +15,17 @@ func SetMemberCall(obj, key, member Value) {
 	member.SetKey(key)
 }
 
-func ReplaceMemberCall(v, to Value) {
+func ReplaceMemberCall(v, to Value) map[string]Value {
+	ret := make(map[string]Value)
 	builder := v.GetFunc().builder
 	recoverScope := builder.SetCurrent(v)
-	recoverScope()
+	defer recoverScope()
+	createPhi := generalPhi(builder)
 
 	// replace object member-call
 	if v.IsObject() {
 		for _, member := range v.GetAllMember() {
 			// replace this member object to to
-			_ = member
 			key := member.GetKey()
 			v.DeleteMember(key)
 
@@ -35,6 +36,9 @@ func ReplaceMemberCall(v, to Value) {
 			_ = name
 			member.SetName(name)
 			member.SetType(typ)
+
+			origin := builder.getOriginMember(name, typ, key, to)
+			ret[name] = createPhi(name, []Value{origin, member})
 		}
 	}
 
@@ -42,6 +46,7 @@ func ReplaceMemberCall(v, to Value) {
 		obj := v.GetObject()
 		obj.AddMember(v.GetKey(), to)
 	}
+	return ret
 }
 
 func NewMake(parentI Value, typ Type, low, high, step, Len, Cap Value) *Make {
@@ -282,11 +287,16 @@ func (b *FunctionBuilder) createField(value, key Value) (Value, string) {
 		return ret, name
 	}
 
-	RecoverScope := b.SetCurrent(value)
-	ret := b.ReadValueInThisFunction(name)
-	RecoverScope()
+	ret := b.getOriginMember(name, typ, key, value)
 
-	if undefine, ok := ToUndefined(ret); ok {
+	return ret, name
+}
+
+func (b *FunctionBuilder) getOriginMember(name string, typ Type, key, value Value) Value {
+	recoverScope := b.SetCurrent(value)
+	origin := b.ReadValueInThisFunction(name)
+	recoverScope()
+	if undefine, ok := ToUndefined(origin); ok {
 		undefine.SetRange(b.CurrentRange)
 		// undefine.SetName(b.setMember(key))
 		if typ != nil {
@@ -297,8 +307,7 @@ func (b *FunctionBuilder) createField(value, key Value) (Value, string) {
 		}
 		SetMemberCall(value, key, undefine)
 	}
-
-	return ret, name
+	return origin
 }
 
 func GetKeyString(v Value) string {

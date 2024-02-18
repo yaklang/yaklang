@@ -108,6 +108,14 @@ func (f *FunctionBuilder) EmitToBlock(i Instruction, block *BasicBlock) {
 	}
 }
 
+func (b *FunctionBuilder) EmitFirst(i Instruction, block *BasicBlock) {
+	if len(block.Insts) == 0 {
+		b.emit(i)
+	} else {
+		b.EmitInstructionBefore(i, block.Insts[0])
+	}
+}
+
 func (f *FunctionBuilder) EmitInstructionBefore(i, before Instruction) {
 	f.emitAroundInstruction(i, before, func(i Instruction) {
 		insts := f.CurrentBlock.Insts
@@ -178,11 +186,8 @@ func (f *FunctionBuilder) emitEx(i Instruction, insert func(Instruction)) {
 // the current block is finished.
 // NOTE: the object/membercall will create vars in finished blocks
 func (f *FunctionBuilder) EmitUndefined(name string) *Undefined {
-	//if f.CurrentBlock.finish {
-	//	return nil
-	//}
 	u := NewUndefined(name)
-	f.emit(u)
+	f.EmitFirst(u, f.CurrentBlock)
 	return u
 }
 
@@ -421,10 +426,6 @@ func (f *FunctionBuilder) EmitRecover() *Recover {
 }
 
 func (f *FunctionBuilder) EmitPhi(name string, vs []Value) *Phi {
-	if f.CurrentBlock.finish {
-		return nil
-	}
-	// p := NewPhi(f.CurrentBlock,)
 	p := &Phi{
 		anInstruction: NewInstruction(),
 		anValue:       NewValue(),
@@ -434,6 +435,7 @@ func (f *FunctionBuilder) EmitPhi(name string, vs []Value) *Phi {
 		wit2:          nil,
 	}
 	p.SetName(name)
-	f.emit(p)
+	// f.emit(p)
+	f.EmitFirst(p, f.CurrentBlock)
 	return p
 }

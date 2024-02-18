@@ -1,6 +1,6 @@
 package ssautil
 
-type SpinHandle[T comparable] func(string, T, T, T) T
+type SpinHandle[T comparable] func(string, T, T, T) map[string]T
 type MergeHandle[T comparable] func(string, []T) T
 
 // ForEachCapturedVariable call the handler for each captured by base scope Variable
@@ -88,7 +88,9 @@ func (s *ScopedVersionedTable[T]) Spin(
 		last := latch.ReadValue(name)
 		origin := header.ReadValue(name)
 		res := handler(name, ver.GetValue(), origin, last)
-		s.writeVariable(name, res)
+		for name, value := range res {
+			s.writeVariable(name, value)
+		}
 		return true
 	})
 }
