@@ -78,7 +78,6 @@ func (b *FunctionBuilder) NewFunc(name string) *Function {
 // function stack
 func (b *FunctionBuilder) PushFunction(newFunc *Function) *FunctionBuilder {
 	build := NewBuilder(newFunc, b)
-	build.EnterBlock.ScopeTable = build.parentScope.CreateSubScope()
 	return build
 }
 

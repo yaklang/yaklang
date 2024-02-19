@@ -215,7 +215,7 @@ func TestFreeValue(t *testing.T) {
 			param() // extern value
 			param = "" // value
 			f =() =>{
-				param.a().b() // freeValue
+				b = param[1]
 			}
 			`,
 			want: []string{

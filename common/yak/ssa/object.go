@@ -29,16 +29,28 @@ func ReplaceMemberCall(v, to Value) map[string]Value {
 			key := member.GetKey()
 			v.DeleteMember(key)
 
-			member.SetObject(to)
-			to.AddMember(key, member)
 			// re-set type
 			name, typ := checkCanMemberCall(to, key)
-			_ = name
-			member.SetName(name)
-			member.SetType(typ)
-
 			origin := builder.getOriginMember(name, typ, key, to)
-			ret[name] = createPhi(name, []Value{origin, member})
+
+			if member.GetOpcode() != OpUndefined {
+				member.SetName(name)
+				member.SetType(typ)
+				member.SetObject(to)
+				to.AddMember(key, member)
+				ret[name] = createPhi(name, []Value{origin, member})
+				continue
+			}
+
+			ReplaceAllValue(member, origin)
+			DeleteInst(member)
+
+			origin.GetUsers().RunOnCall(func(c *Call) {
+				c.handleMethod()
+				c.handlerReturnType()
+			})
+
+			ret[name] = origin
 		}
 	}
 

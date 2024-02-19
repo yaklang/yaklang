@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 )
 
 // ===================== struct =====================
@@ -109,14 +110,16 @@ func CheckError(t *testing.T, tc TestCase) {
 	CheckTestCase(t, tc)
 }
 
-func CheckType(t *testing.T, code, name string, kind ssa.TypeKind) {
+func CheckType(t *testing.T, code string, kind ssa.TypeKind) {
 	test := assert.New(t)
-	prog, err := ssaapi.Parse(code)
+	prog, err := ssaapi.Parse(code, static_analyzer.GetPluginSSAOpt("yak")...)
 	test.Nil(err)
 
 	prog.Show()
+	errors := prog.GetErrors()
+	log.Infof("errors: %s", errors.String())
 
-	vs := prog.Ref(name)
+	vs := prog.Ref("target")
 	test.Equal(1, len(vs))
 
 	v := vs[0]
