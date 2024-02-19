@@ -43,7 +43,7 @@ var SystemExports = map[string]interface{}{
 	"Setenv":               Setenv,
 	"Getenv":               Getenv,
 	"Exit":                 Exit,
-	"Args":                 cli.Args,
+	"Args":                 cli.OsArgs,
 	"Stdout":               Stdout,
 	"Stdin":                Stdin,
 	"Stderr":               Stderr,

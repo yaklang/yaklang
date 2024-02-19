@@ -4,18 +4,20 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	pta "github.com/yaklang/yaklang/common/yak/static_analyzer"
-	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	pta "github.com/yaklang/yaklang/common/yak/static_analyzer"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
+
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/cli"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
@@ -62,11 +64,19 @@ func (s *Server) execScriptWithExecParam(scriptName string, input string, stream
 	log.Infof("engine.ExecuteExWithContext(stream.Context(), debugScript ... \n")
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
 		engine.SetVar("RUNTIME_ID", runtimeId)
+		app := cli.DefaultCliApp
+		// 额外处理 cli，新建 cli app
+		if strings.ToLower(debugType) == "yak" {
+			tempArgs := makeArgs(params, scriptInstance.Content)
+			app = yak.HookCliArgs(engine, tempArgs)
+		}
 		yak.BindYakitPluginContextToEngine(engine, &yak.YakitPluginContext{
 			PluginName: scriptName,
 			RuntimeId:  runtimeId,
 			Ctx:        stream.Context(),
+			CliApp:     app,
 		})
+
 		return nil
 	})
 	sendLog := func(res interface{}) {
@@ -118,11 +128,6 @@ func (s *Server) execScriptWithExecParam(scriptName string, input string, stream
 		})
 		return nil
 	case "yak":
-		tempArgs := makeArgs(params, scriptInstance.Content)
-		engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
-			yak.HookCliArgs(engine, tempArgs)
-			return nil
-		})
 		_, err := engine.ExecuteExWithContext(stream.Context(), scriptInstance.Content, map[string]any{
 			"CTX":         stream.Context(),
 			"PLUGIN_NAME": scriptName,
