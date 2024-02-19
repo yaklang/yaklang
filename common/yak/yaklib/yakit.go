@@ -32,6 +32,7 @@ import (
 var emptyVirtualClient = NewVirtualYakitClient(func(i *ypb.ExecResult) error {
 	return fmt.Errorf("empty virtual client")
 })
+
 var YakitExports = map[string]interface{}{
 	"NewClient":       NewYakitClient,
 	"NewTable":        NewTable,
@@ -68,7 +69,7 @@ var YakitExports = map[string]interface{}{
 }
 
 func GetExtYakitLibByOutput(Output func(d any) error) map[string]interface{} {
-	var exports = map[string]interface{}{}
+	exports := map[string]interface{}{}
 	exports["EnableWebsiteTrees"] = func(targets string) {
 		Output(&YakitFeature{
 			Feature: "website-trees",
@@ -108,8 +109,9 @@ func GetExtYakitLibByOutput(Output func(d any) error) map[string]interface{} {
 	}
 	return exports
 }
+
 func GetExtYakitLibByClient(client *YakitClient) map[string]interface{} {
-	var YakitExports = map[string]interface{}{
+	YakitExports := map[string]interface{}{
 		"Info":          client.YakitInfo,
 		"Warn":          client.YakitWarn,
 		"Error":         client.YakitError,
@@ -122,7 +124,7 @@ func GetExtYakitLibByClient(client *YakitClient) map[string]interface{} {
 		"SetProgressEx": client.YakitSetProgressEx,
 	}
 	if os.Getenv("YAK_DISABLE") == "output" {
-		//YakitExports["Info"] = func(a string, b ...interface{}) {}
+		// YakitExports["Info"] = func(a string, b ...interface{}) {}
 		YakitExports["Warn"] = func(a string, b ...interface{}) {}
 		YakitExports["Debug"] = func(a string, b ...interface{}) {}
 		YakitExports["Error"] = func(a string, b ...interface{}) {}
@@ -135,8 +137,7 @@ func GetExtYakitLibByClient(client *YakitClient) map[string]interface{} {
 	return YakitExports
 }
 
-//var yakitClientInstance YakitClient
-
+// var yakitClientInstance YakitClient
 type YakitMessage struct {
 	Type    string          `json:"type"`
 	Content json.RawMessage `json:"content"`
@@ -154,7 +155,7 @@ type YakitLog struct {
 }
 
 func NewYakitStatusCardExecResult(status, data string, items ...string) *ypb.ExecResult {
-	var card = &YakitStatusCard{
+	card := &YakitStatusCard{
 		Id:   status,
 		Data: data,
 		Tags: items,
@@ -167,7 +168,7 @@ func NewYakitStatusCardExecResult(status, data string, items ...string) *ypb.Exe
 }
 
 func NewYakitLogExecResult(level string, data string, items ...interface{}) *ypb.ExecResult {
-	var logItem = &YakitLog{
+	logItem := &YakitLog{
 		Level:     level,
 		Timestamp: time.Now().Unix(),
 	}
@@ -515,8 +516,8 @@ func (c *YakitClient) YakitReport(i int) {
 }
 
 func (c *YakitClient) YakitFile(fileName string, desc ...interface{}) {
-	var title = fileName
-	var descStr = ""
+	title := fileName
+	descStr := ""
 	if len(desc) > 1 {
 		title = utils.InterfaceToString(desc[0])
 		descStr = utils.InterfaceToString(funk.Reduce(funk.Tail(desc), func(i interface{}, s interface{}) string {
@@ -556,12 +557,15 @@ func (c *YakitClient) YakitFile(fileName string, desc ...interface{}) {
 func (c *YakitClient) YakitError(tmp string, items ...interface{}) {
 	c.YakitLog("error", tmp, items...)
 }
+
 func (c *YakitClient) YakitInfo(tmp string, items ...interface{}) {
 	c.YakitLog("info", tmp, items...)
 }
+
 func (c *YakitClient) YakitDebug(tmp string, items ...interface{}) {
 	c.YakitLog("debug", tmp, items...)
 }
+
 func (c *YakitClient) YakitWarn(tmp string, items ...interface{}) {
 	c.YakitLog("warn", tmp, items...)
 }
@@ -569,6 +573,7 @@ func (c *YakitClient) YakitWarn(tmp string, items ...interface{}) {
 func init() {
 	AutoInitYakit()
 }
+
 func InitYakit(y *YakitClient) {
 	*yakitClientInstanceP = y
 }
@@ -577,7 +582,7 @@ func AutoInitYakit() *YakitClient {
 	if yakitClientInstance != nil {
 		return nil
 	}
-	addr := cli.CliString("yakit-webhook")
+	addr := cli.DefaultCliApp.String("yakit-webhook")
 	if addr != "" {
 		client := NewYakitClient(addr)
 		InitYakit(client)
@@ -586,11 +591,10 @@ func AutoInitYakit() *YakitClient {
 		InitYakit(emptyVirtualClient)
 		return emptyVirtualClient
 	}
-
 }
 
 func updateYakitStore() error {
-	var db = consts.GetGormProfileDatabase()
+	db := consts.GetGormProfileDatabase()
 	if db == nil {
 		return utils.Errorf("no database found")
 	}
@@ -689,7 +693,7 @@ func updateOnlineYakitStore() error {
 }
 
 func generateYakitMITMHookParams(method string, url string, opts ...http_struct.HttpOption) ([]interface{}, error) {
-	var isHttps = false
+	isHttps := false
 	if strings.HasPrefix(url, "https://") {
 		isHttps = true
 	}

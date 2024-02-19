@@ -1,19 +1,54 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+type CliApp struct {
+	appName      string
+	document     string
+	errorMsg     string
+	paramInvalid *utils.AtomicBool
+
+	args        []string
+	helpParam   *cliExtraParams
+	extraParams []*cliExtraParams
+}
+
+func (c *CliApp) SetArgs(args []string) {
+	c.args = args
+}
+
+func NewCliApp() *CliApp {
+	helpParam := &cliExtraParams{
+		optShortName: "h",
+		optName:      "help",
+		params:       []string{"-h", "--help"},
+		defaultValue: false,
+		helpInfo:     "Show help information",
+		required:     false,
+		_type:        "bool",
+	}
+	app := &CliApp{
+		paramInvalid: utils.NewBool(false),
+		helpParam:    helpParam,
+		extraParams:  []*cliExtraParams{helpParam},
+	}
+	helpParam.cliApp = app
+	return app
+}
 
 type cliExtraParams struct {
 	optName      string
@@ -24,51 +59,67 @@ type cliExtraParams struct {
 	required     bool
 	tempArgs     []string
 	_type        string
+	cliApp       *CliApp
 }
 
 var (
-	Args []string
-
-	cliParamInvalid = utils.NewBool(false)
-	cliName         = "cmd"
-	cliDocument     = ""
-	errorMsg        = ""
-
-	helpParam = &cliExtraParams{
-		optShortName: "h",
-		optName:      "help",
-		params:       []string{"-h", "--help"},
-		defaultValue: false,
-		helpInfo:     "Show help information",
-		required:     false,
-		_type:        "bool",
+	OsArgs          []string
+	DefaultCliApp   = NewCliApp()
+	DefaultExitFunc = func() {
+		os.Exit(1)
 	}
-
-	currentExtraParams []*cliExtraParams = []*cliExtraParams{
-		helpParam,
-	}
+	CliExportFuncNames []string
 )
 
 func init() {
-	Args = os.Args[:]
-	if len(Args) > 1 {
+	OsArgs = os.Args[:]
+	if len(OsArgs) > 1 {
 		filename := filepath.Base(os.Args[1])
 		fileSuffix := path.Ext(filename)
-		cliName = strings.TrimSuffix(filename, fileSuffix)
+
+		// 设置默认的命令行程序名称
+		DefaultCliApp.appName = strings.TrimSuffix(filename, fileSuffix)
 	}
+
+	CliExportFuncNames = lo.Keys(CliExports)
+}
+
+func GetCliExportMapByCliApp(app *CliApp) map[string]any {
+	upperFirst := func(s string) string {
+		if len(s) == 0 {
+			return s
+		}
+		return strings.ToUpper(s[:1]) + s[1:]
+	}
+
+	ret := make(map[string]any)
+	funcMaps := make(map[string]any)
+
+	refV := reflect.ValueOf(app)
+	for i := 0; i < refV.NumMethod(); i++ {
+		method := refV.Method(i)
+		funcMaps[refV.Type().Method(i).Name] = method.Interface()
+	}
+
+	for _, name := range CliExportFuncNames {
+		if f, ok := funcMaps[name]; ok {
+			ret[name] = f
+		} else if f, ok = funcMaps[upperFirst(name)]; ok {
+			ret[name] = f
+		} else {
+			// log.Errorf("Cli Can't find function: %s", name)
+		}
+	}
+	return ret
 }
 
 func InjectCliArgs(args []string) {
-	Args = args
+	OsArgs = args
 }
 
 func (param *cliExtraParams) foundArgsIndex() int {
-	args := _getArgs()
-	if param.tempArgs != nil {
-		args = param.tempArgs
-	}
 	for _, opt := range param.params {
-		if ret := utils.StringArrayIndex(args, opt); ret < 0 {
+		if ret := utils.StringArrayIndex(param.cliApp.GetArgs(), opt); ret < 0 {
 			continue
 		} else {
 			return ret
@@ -86,19 +137,37 @@ func (param *cliExtraParams) GetDefaultValue(i interface{}) interface{} {
 		return i
 	}
 
-	cliParamInvalid.Set()
-	errorMsg += fmt.Sprintf("\n  Parameter [%s] error: miss parameter", param.optName)
+	param.cliApp.paramInvalid.Set()
+	param.cliApp.errorMsg += fmt.Sprintf("\n  Parameter [%s] error: miss parameter", param.optName)
 	return i
 }
 
 type SetCliExtraParam func(c *cliExtraParams)
+
+func parseInt(s string) int {
+	i, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		log.Errorf("parse int[%s] failed: %s", s, err)
+		return 0
+	}
+	return int(i)
+}
+
+func parseFloat(s string) float64 {
+	i, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		log.Errorf("parse float[%s] failed: %s", s, err)
+		return 0
+	}
+	return float64(i)
+}
 
 // help 用于输出命令行程序的帮助信息
 // Example:
 // ```
 // cli.help()
 // ```
-func _help(w ...io.Writer) {
+func (c *CliApp) Help(w ...io.Writer) {
 	var writer io.Writer = os.Stdout
 
 	if len(w) > 0 {
@@ -106,14 +175,14 @@ func _help(w ...io.Writer) {
 	}
 
 	fmt.Fprintln(writer, "Usage: ")
-	fmt.Fprintf(writer, "  %s [OPTIONS]\n", cliName)
+	fmt.Fprintf(writer, "  %s [OPTIONS]\n", c.appName)
 	fmt.Fprintln(writer)
-	if len(cliDocument) > 0 {
-		fmt.Fprintln(writer, cliDocument)
+	if len(c.document) > 0 {
+		fmt.Fprintln(writer, c.document)
 		fmt.Fprintln(writer)
 	}
 	fmt.Fprintln(writer, "Flags:")
-	for _, param := range currentExtraParams {
+	for _, param := range c.extraParams {
 		paramType := param._type
 		// bool类型不显示paramType
 		if paramType == "bool" {
@@ -133,40 +202,30 @@ func _help(w ...io.Writer) {
 	}
 }
 
+func (c *CliApp) CliCheckFactory(callback func()) func() {
+	return func() {
+		if c.helpParam.foundArgsIndex() != -1 {
+			c.Help()
+			callback()
+		} else if c.paramInvalid.IsSet() {
+			c.errorMsg = strings.TrimSpace(c.errorMsg)
+			if len(c.errorMsg) > 0 {
+				fmt.Printf("Error:\n  %s\n\n", c.errorMsg)
+			}
+			c.Help()
+			callback()
+		}
+	}
+}
+
 // check 用于检查命令行参数是否合法，这主要检查必要参数是否传入与传入值是否合法
 // Example:
 // ```
 // target = cli.String("target", cli.SetRequired(true))
 // cli.check()
 // ```
-func _cliCheck() {
-	if helpParam.foundArgsIndex() != -1 {
-		_help()
-		os.Exit(1)
-	} else if cliParamInvalid.IsSet() {
-		errorMsg = strings.TrimSpace(errorMsg)
-		if len(errorMsg) > 0 {
-			fmt.Printf("Error:\n  %s\n\n", errorMsg)
-		}
-		_help()
-
-	}
-}
-
-func CliCheckWithContext(cancel context.CancelFunc) func() {
-	return func() {
-		if helpParam.foundArgsIndex() != -1 {
-			_help()
-			cancel()
-		} else if cliParamInvalid.IsSet() {
-			errorMsg = strings.TrimSpace(errorMsg)
-			if len(errorMsg) > 0 {
-				fmt.Printf("Error:\n  %s\n\n", errorMsg)
-			}
-			_help()
-
-		}
-	}
+func (c *CliApp) Check() {
+	c.CliCheckFactory(DefaultExitFunc)()
 }
 
 // SetCliName 设置此命令行程序的名称
@@ -175,8 +234,8 @@ func CliCheckWithContext(cancel context.CancelFunc) func() {
 // ```
 // cli.SetCliName("example-tools")
 // ```
-func _cliSetName(name string) {
-	cliName = name
+func (c *CliApp) SetCliName(name string) {
+	c.appName = name
 }
 
 // SetDoc 设置此命令行程序的文档
@@ -185,16 +244,16 @@ func _cliSetName(name string) {
 // ```
 // cli.SetDoc("example-tools is a tool for example")
 // ```
-func _cliSetDocument(document string) {
-	cliDocument = document
+func (c *CliApp) SetDoc(document string) {
+	c.document = document
 }
 
-// setDefaultValue 是一个选项函数，设置参数的默认值
+// setDefault 是一个选项函数，设置参数的默认值
 // Example:
 // ```
-// cli.String("target", cli.SetDefaultValue("yaklang.com"))
+// cli.String("target", cli.SetDefault("yaklang.com"))
 // ```
-func _cliSetDefaultValue(i interface{}) SetCliExtraParam {
+func (c *CliApp) SetDefault(i interface{}) SetCliExtraParam {
 	return func(c *cliExtraParams) {
 		c.defaultValue = i
 	}
@@ -206,7 +265,7 @@ func _cliSetDefaultValue(i interface{}) SetCliExtraParam {
 // ```
 // cli.String("target", cli.SetHelp("target host or ip"))
 // ```
-func _cliSetHelpInfo(i string) SetCliExtraParam {
+func (c *CliApp) SetHelp(i string) SetCliExtraParam {
 	return func(c *cliExtraParams) {
 		c.helpInfo = i
 	}
@@ -223,24 +282,24 @@ func SetTempArgs(args []string) SetCliExtraParam {
 // ```
 // cli.String("target", cli.SetRequired(true))
 // ```
-func _cliSetRequired(t bool) SetCliExtraParam {
+func (c *CliApp) SetRequired(t bool) SetCliExtraParam {
 	return func(c *cliExtraParams) {
 		c.required = t
 	}
 }
 
-func _getExtraParams(name string, opts ...SetCliExtraParam) *cliExtraParams {
-
+func (c *CliApp) _getExtraParams(name string, opts ...SetCliExtraParam) *cliExtraParams {
 	param := &cliExtraParams{
 		optName:      name,
 		required:     false,
 		defaultValue: nil,
 		helpInfo:     "",
+		cliApp:       c,
 	}
 	for _, opt := range opts {
 		opt(param)
 	}
-	currentExtraParams = append(currentExtraParams, param)
+	c.extraParams = append(c.extraParams, param)
 	param.params = _getAvailableParams(param.optName, param.optShortName)
 	return param
 }
@@ -261,17 +320,21 @@ func _getAvailableParams(optName, optShortName string) []string {
 // ```
 // Args = cli.Args()
 // ```
-func _getArgs() []string {
-	return Args
+func (c *CliApp) GetArgs() []string {
+	return c.args
 }
 
-func _cliFromString(name string, opts ...SetCliExtraParam) (string, *cliExtraParams) {
-	param := _getExtraParams(name, opts...)
+func (c *CliApp) Args() []string {
+	return c.args
+}
+
+func (c *CliApp) _cliFromString(name string, opts ...SetCliExtraParam) (string, *cliExtraParams) {
+	param := c._getExtraParams(name, opts...)
 	index := param.foundArgsIndex()
 	if index < 0 {
 		return utils.InterfaceToString(param.GetDefaultValue("")), param
 	}
-	args := _getArgs()
+	args := c.GetArgs()
 	if param.tempArgs != nil {
 		args = param.tempArgs
 	}
@@ -287,16 +350,25 @@ func _cliFromString(name string, opts ...SetCliExtraParam) (string, *cliExtraPar
 // ```
 // verbose = cli.Bool("verbose") // --verbose 则为true
 // ```
-func _cliBool(name string, opts ...SetCliExtraParam) bool {
-	c := _getExtraParams(name, opts...)
-	c._type = "bool"
-	c.required = false
+func (c *CliApp) Bool(name string, opts ...SetCliExtraParam) bool {
+	p := c._getExtraParams(name, opts...)
+	p._type = "bool"
+	p.required = false
 
-	index := c.foundArgsIndex()
+	index := p.foundArgsIndex()
 	if index < 0 {
 		return false // c.GetDefaultValue(false).(bool)
 	}
 	return true
+}
+
+// Have 获取对应名称的命令行参数，并将其转换为 bool 类型返回
+// Example:
+// ```
+// verbose = cli.Have("verbose") // --verbose 则为true
+// ```
+func (c *CliApp) Have(name string, opts ...SetCliExtraParam) bool {
+	return c.Bool(name, opts...)
 }
 
 // String 获取对应名称的命令行参数，并将其转换为 string 类型返回
@@ -304,19 +376,40 @@ func _cliBool(name string, opts ...SetCliExtraParam) bool {
 // ```
 // target = cli.String("target") // --target yaklang.com 则 target 为 yaklang.com
 // ```
-func CliString(name string, opts ...SetCliExtraParam) string {
-	s, c := _cliFromString(name, opts...)
-	c._type = "string"
+func (c *CliApp) String(name string, opts ...SetCliExtraParam) string {
+	s, p := c._cliFromString(name, opts...)
+	p._type = "string"
 	return s
 }
 
-func parseInt(s string) int {
-	i, err := strconv.ParseInt(s, 10, 64)
-	if err != nil {
-		log.Errorf("parse int[%s] failed: %s", s, err)
-		return 0
-	}
-	return int(i)
+// HTTPPacket 获取对应名称的命令行参数，并将其转换为 string 类型返回
+// 其作为一个独立脚本运行时与 cli.String 没有区别，仅在 Yakit 图形化中展示为 HTTP 报文形式
+// Example:
+// ```
+// target = cli.HTTPPacket("target") // --target yaklang.com 则 target 为 yaklang.com
+// ```
+func (c *CliApp) HTTPPacket(name string, opts ...SetCliExtraParam) string {
+	return c.String(name, opts...)
+}
+
+// YakCode 获取对应名称的命令行参数，并将其转换为 string 类型返回
+// 其作为一个独立脚本运行时与 cli.String 没有区别，仅在 Yakit 图形化中展示为 Yak 代码形式
+// Example:
+// ```
+// target = cli.YakCode("target") // --target yaklang.com 则 target 为 yaklang.com
+// ```
+func (c *CliApp) YakCode(name string, opts ...SetCliExtraParam) string {
+	return c.String(name, opts...)
+}
+
+// Text 获取对应名称的命令行参数，并将其转换为 string 类型返回
+// 其作为一个独立脚本运行时与 cli.String 没有区别，仅在 Yakit 图形化中展示为文本框形式
+// Example:
+// ```
+// target = cli.Text("target") // --target yaklang.com 则 target 为 yaklang.com
+// ```
+func (c *CliApp) Text(name string, opts ...SetCliExtraParam) string {
+	return c.String(name, opts...)
 }
 
 // Int 获取对应名称的命令行参数，并将其转换为 int 类型返回
@@ -324,35 +417,45 @@ func parseInt(s string) int {
 // ```
 // port = cli.Int("port") // --port 80 则 port 为 80
 // ```
-func _cliInt(name string, opts ...SetCliExtraParam) int {
-	s, c := _cliFromString(name, opts...)
-	c._type = "int"
+func (c *CliApp) Int(name string, opts ...SetCliExtraParam) int {
+	s, p := c._cliFromString(name, opts...)
+	p._type = "int"
 	if s == "" {
 		return 0
 	}
 	return parseInt(s)
 }
 
-func parseFloat(s string) float64 {
-	i, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		log.Errorf("parse float[%s] failed: %s", s, err)
-		return 0
-	}
-	return float64(i)
+// Integer 获取对应名称的命令行参数，并将其转换为 int 类型返回
+// Example:
+// ```
+// port = cli.Integer("port") // --port 80 则 port 为 80
+// ```
+func (c *CliApp) Integer(name string, opts ...SetCliExtraParam) int {
+	return c.Int(name, opts...)
 }
 
 // Float 获取对应名称的命令行参数，并将其转换为 float 类型返回
 // Example:
 // ```
 // percent = cli.Float("percent") // --percent 0.5 则 percent 为 0.5
-func _cliFloat(name string, opts ...SetCliExtraParam) float64 {
-	s, c := _cliFromString(name, opts...)
-	c._type = "float"
+// ```
+func (c *CliApp) Float(name string, opts ...SetCliExtraParam) float64 {
+	s, p := c._cliFromString(name, opts...)
+	p._type = "float"
 	if s == "" {
 		return 0.0
 	}
 	return parseFloat(s)
+}
+
+// Double 获取对应名称的命令行参数，并将其转换为 float 类型返回
+// Example:
+// ```
+// percent = cli.Double("percent") // --percent 0.5 则 percent 为 0.5
+// ```
+func (c *CliApp) Double(name string, opts ...SetCliExtraParam) float64 {
+	return c.Float(name, opts...)
 }
 
 // Urls 获取对应名称的命令行参数，根据","切割并尝试将其转换为符合URL格式并返回 []string 类型
@@ -361,14 +464,24 @@ func _cliFloat(name string, opts ...SetCliExtraParam) float64 {
 // urls = cli.Urls("urls")
 // // --urls yaklang.com:443,google.com:443 则 urls 为 ["https://yaklang.com", "https://google.com"]
 // ```
-func _cliUrls(name string, opts ...SetCliExtraParam) []string {
-	s, c := _cliFromString(name, opts...)
-	c._type = "urls"
+func (c *CliApp) Urls(name string, opts ...SetCliExtraParam) []string {
+	s, p := c._cliFromString(name, opts...)
+	p._type = "urls"
 	ret := utils.ParseStringToUrlsWith3W(utils.ParseStringToHosts(s)...)
 	if ret == nil {
 		return []string{}
 	}
 	return ret
+}
+
+// Url 获取对应名称的命令行参数，根据","切割并尝试将其转换为符合URL格式并返回 []string 类型
+// Example:
+// ```
+// urls = cli.Url("urls")
+// // --urls yaklang.com:443,google.com:443 则 urls 为 ["https://yaklang.com", "https://google.com"]
+// ```
+func (c *CliApp) Url(name string, opts ...SetCliExtraParam) []string {
+	return c.Urls(name, opts...)
 }
 
 // Ports 获取对应名称的命令行参数，根据","与"-"切割并尝试解析端口并返回 []int 类型
@@ -377,9 +490,9 @@ func _cliUrls(name string, opts ...SetCliExtraParam) []string {
 // ports = cli.Ports("ports")
 // // --ports 10086-10088,23333 则 ports 为 [10086, 10087, 10088, 23333]
 // ```
-func _cliPort(name string, opts ...SetCliExtraParam) []int {
-	s, c := _cliFromString(name, opts...)
-	c._type = "port"
+func (c *CliApp) Ports(name string, opts ...SetCliExtraParam) []int {
+	s, p := c._cliFromString(name, opts...)
+	p._type = "port"
 	ret := utils.ParseStringToPorts(s)
 	if ret == nil {
 		return []int{}
@@ -387,21 +500,62 @@ func _cliPort(name string, opts ...SetCliExtraParam) []int {
 	return ret
 }
 
+// Port 获取对应名称的命令行参数，根据","与"-"切割并尝试解析端口并返回 []int 类型
+// Example:
+// ```
+// ports = cli.Port("ports")
+// // --ports 10086-10088,23333 则 ports 为 [10086, 10087, 10088, 23333]
+// ```
+func (c *CliApp) Port(name string, opts ...SetCliExtraParam) []int {
+	return c.Ports(name, opts...)
+}
+
 // Hosts 获取对应名称的命令行参数，根据","切割并尝试解析CIDR网段并返回 []string 类型
 // Example:
 // ```
 // hosts = cli.Hosts("hosts")
 // // --hosts 192.168.0.0/24,172.17.0.1 则 hosts 为 192.168.0.0/24对应的所有IP和172.17.0.1
-func _cliHosts(name string, opts ...SetCliExtraParam) []string {
-	s, c := _cliFromString(name, opts...)
-	c._type = "hosts"
+// ```
+func (c *CliApp) Hosts(name string, opts ...SetCliExtraParam) []string {
+	s, p := c._cliFromString(name, opts...)
+	p._type = "hosts"
 	ret := utils.ParseStringToHosts(s)
 	if ret == nil {
-		cliParamInvalid.Set()
-		errorMsg += fmt.Sprintf("\n  Parameter [%s] error: Parse string to host error: %s", c.optName, s)
+		c.paramInvalid.Set()
+		c.errorMsg += fmt.Sprintf("\n  Parameter [%s] error: Parse string to host error: %s", p.optName, s)
 		return []string{}
 	}
 	return ret
+}
+
+// Host 获取对应名称的命令行参数，根据","切割并尝试解析CIDR网段并返回 []string 类型
+// Example:
+// ```
+// hosts = cli.Host("hosts")
+// // --hosts 192.168.0.0/24,172.17.0.1 则 hosts 为 192.168.0.0/24对应的所有IP和172.17.0.1
+// ```
+func (c *CliApp) Host(name string, opts ...SetCliExtraParam) []string {
+	return c.Hosts(name, opts...)
+}
+
+// NetWork 获取对应名称的命令行参数，根据","切割并尝试解析CIDR网段并返回 []string 类型
+// Example:
+// ```
+// hosts = cli.NetWork("hosts")
+// // --hosts 192.168.0.0/24,172.17.0.1 则 hosts 为 192.168.0.0/24对应的所有IP和172.17.0.1
+// ```
+func (c *CliApp) Network(name string, opts ...SetCliExtraParam) []string {
+	return c.Hosts(name, opts...)
+}
+
+// Net 获取对应名称的命令行参数，根据","切割并尝试解析CIDR网段并返回 []string 类型
+// Example:
+// ```
+// hosts = cli.Net("hosts")
+// // --hosts 192.168.0.0/24,172.17.0.1 则 hosts 为 192.168.0.0/24对应的所有IP和172.17.0.1
+// ```
+func (c *CliApp) Net(name string, opts ...SetCliExtraParam) []string {
+	return c.Hosts(name, opts...)
 }
 
 // File 获取对应名称的命令行参数，根据其传入的值读取其对应文件内容并返回 []byte 类型
@@ -410,24 +564,23 @@ func _cliHosts(name string, opts ...SetCliExtraParam) []string {
 // file = cli.File("file")
 // // --file /etc/passwd 则 file 为 /etc/passwd 文件中的内容
 // ```
-func _cliFile(name string, opts ...SetCliExtraParam) []byte {
-	s, c := _cliFromString(name, opts...)
-	c._type = "file"
-	c.required = true
+func (c *CliApp) File(name string, opts ...SetCliExtraParam) []byte {
+	s, p := c._cliFromString(name, opts...)
+	p._type = "file"
 
-	if cliParamInvalid.IsSet() {
+	if c.paramInvalid.IsSet() {
 		return []byte{}
 	}
 
-	if utils.GetFirstExistedPath(s) == "" && !cliParamInvalid.IsSet() {
-		cliParamInvalid.Set()
-		errorMsg += fmt.Sprintf("\n  Parameter [%s] error: No such file: %s", c.optName, s)
+	if utils.GetFirstExistedPath(s) == "" && !c.paramInvalid.IsSet() {
+		c.paramInvalid.Set()
+		c.errorMsg += fmt.Sprintf("\n  Parameter [%s] error: No such file: %s", p.optName, s)
 		return []byte{}
 	}
 	raw, err := ioutil.ReadFile(s)
 	if err != nil {
-		cliParamInvalid.Set()
-		errorMsg += fmt.Sprintf("\n  Parameter [%s] error: %s", c.optName, err.Error())
+		c.paramInvalid.Set()
+		c.errorMsg += fmt.Sprintf("\n  Parameter [%s] error: %s", p.optName, err.Error())
 		return []byte{}
 	}
 
@@ -440,9 +593,9 @@ func _cliFile(name string, opts ...SetCliExtraParam) []byte {
 // file = cli.FileNames("file")
 // // --file /etc/passwd,/etc/hosts 则 file 为 ["/etc/passwd", "/etc/hosts"]
 // ```
-func _cliFileNames(name string, opts ...SetCliExtraParam) []string {
-	rawStr, c := _cliFromString(name, opts...)
-	c._type = "file-names"
+func (c *CliApp) FileNames(name string, opts ...SetCliExtraParam) []string {
+	rawStr, p := c._cliFromString(name, opts...)
+	p._type = "file-names"
 
 	if rawStr == "" {
 		return []string{}
@@ -459,13 +612,13 @@ func _cliFileNames(name string, opts ...SetCliExtraParam) []string {
 // // --foc /etc/passwd 则 foc 为 /etc/passwd 文件中的内容
 // // --file "asd" 则 file 为 "asd"
 // ```
-func _cliFileOrContent(name string, opts ...SetCliExtraParam) []byte {
-	s, c := _cliFromString(name, opts...)
-	c._type = "file_or_content"
+func (c *CliApp) FileOrContent(name string, opts ...SetCliExtraParam) []byte {
+	s, p := c._cliFromString(name, opts...)
+	p._type = "file_or_content"
 	ret := utils.StringAsFileParams(s)
 	if ret == nil {
-		cliParamInvalid.Set()
-		errorMsg += fmt.Sprintf("\n  Parameter [%s] error: Empty file or content: %s", c.optName, s)
+		c.paramInvalid.Set()
+		c.errorMsg += fmt.Sprintf("\n  Parameter [%s] error: Empty file or content: %s", p.optName, s)
 		return []byte{}
 	}
 	return ret
@@ -479,13 +632,13 @@ func _cliFileOrContent(name string, opts ...SetCliExtraParam) []byte {
 // // --dict /etc/passwd 则 dict 为 /etc/passwd 文件中的逐行的内容
 // // --dict "asd" 则 dict 为 ["asd"]
 // ```
-func _cliLineDict(name string, opts ...SetCliExtraParam) []string {
-	s, c := _cliFromString(name, opts...)
-	c._type = "file-or-content"
+func (c *CliApp) LineDict(name string, opts ...SetCliExtraParam) []string {
+	s, p := c._cliFromString(name, opts...)
+	p._type = "file-or-content"
 	raw := utils.StringAsFileParams(s)
 	if raw == nil {
-		cliParamInvalid.Set()
-		errorMsg += fmt.Sprintf("\n  Parameter [%s] error: Empty file or content: %s", c.optName, s)
+		c.paramInvalid.Set()
+		c.errorMsg += fmt.Sprintf("\n  Parameter [%s] error: Empty file or content: %s", p.optName, s)
 		return []string{}
 	}
 
@@ -499,20 +652,20 @@ func _cliLineDict(name string, opts ...SetCliExtraParam) []string {
 // plugins = cli.YakitPlugin()
 // // --yakit-plugin-file plugins.txt 则 plugins 为 plugins.txt 文件中的各个插件名
 // ```
-func _cliYakitPluginFiles(options ...SetCliExtraParam) []string {
+func (c *CliApp) YakitPlugin(options ...SetCliExtraParam) []string {
 	paramName := "yakit-plugin-file"
-	filename, c := _cliFromString(paramName, options...)
-	c._type = "yakit-plugin"
+	filename, p := c._cliFromString(paramName, options...)
+	p._type = "yakit-plugin"
 
 	raw, err := ioutil.ReadFile(filename)
 	if err != nil {
-		cliParamInvalid.Set()
-		errorMsg += fmt.Sprintf("\n  Parameter [%s] error: %s", c.optName, err.Error())
+		c.paramInvalid.Set()
+		c.errorMsg += fmt.Sprintf("\n  Parameter [%s] error: %s", p.optName, err.Error())
 		return []string{}
 	}
 	if raw == nil {
-		cliParamInvalid.Set()
-		errorMsg += fmt.Sprintf("\n  Parameter [%s] error: Can't read file: %s", c.optName, filename)
+		c.paramInvalid.Set()
+		c.errorMsg += fmt.Sprintf("\n  Parameter [%s] error: Can't read file: %s", p.optName, filename)
 		return []string{}
 	}
 	return utils.PrettifyListFromStringSplited(string(raw), "|")
@@ -524,9 +677,9 @@ func _cliYakitPluginFiles(options ...SetCliExtraParam) []string {
 // targets = cli.StringSlice("targets")
 // // --targets yaklang.com,google.com 则 targets 为 ["yaklang.com", "google.com"]
 // ```
-func CliStringSlice(name string, options ...SetCliExtraParam) []string {
-	rawStr, c := _cliFromString(name, options...)
-	c._type = "string-slice"
+func (c *CliApp) StringSlice(name string, options ...SetCliExtraParam) []string {
+	rawStr, p := c._cliFromString(name, options...)
+	p._type = "string-slice"
 
 	if rawStr == "" {
 		return []string{}
@@ -540,19 +693,19 @@ func CliStringSlice(name string, options ...SetCliExtraParam) []string {
 // ```
 // cli.String("target", cli.setVerboseName("目标"))
 // ```
-func _cliSetVerboseName(verboseName string) SetCliExtraParam {
+func (c *CliApp) SetVerboseName(verboseName string) SetCliExtraParam {
 	return func(cep *cliExtraParams) {}
 }
 
-// setGroup 是一个选项函数，设置参数的分组
+// setCliGroup 是一个选项函数，设置参数的分组
 // Example:
 // ```
-// cli.String("target", cli.setGroup("common"))
-// cli.Int("port", cli.setGroup("common"))
-// cli.Int("threads", cli.setGroup("request"))
-// cli.Int("retryTimes", cli.setGroup("request"))
+// cli.String("target", cli.setCliGroup("common"))
+// cli.Int("port", cli.setCliGroup("common"))
+// cli.Int("threads", cli.setCliGroup("request"))
+// cli.Int("retryTimes", cli.setCliGroup("request"))
 // ```
-func _cliSetGroup(group string) SetCliExtraParam {
+func (c *CliApp) SetCliGroup(group string) SetCliExtraParam {
 	return func(cep *cliExtraParams) {}
 }
 
@@ -562,19 +715,19 @@ func _cliSetGroup(group string) SetCliExtraParam {
 // cli.String("target", cli.setShortName("t"))
 // ```
 // 在命令行可以使用`-t`代替`--target`
-func _cliSetShortName(shortName string) SetCliExtraParam {
+func (c *CliApp) SetShortName(shortName string) SetCliExtraParam {
 	return func(c *cliExtraParams) {
 		c.optShortName = shortName
 	}
 }
 
-// setMultiSelect 是一个选项函数，设置参数是否可以多选
+// SetMultipleSelect 是一个选项函数，设置参数是否可以多选
 // 此选项仅在`cli.StringSlice`中生效
 // Example:
 // ```
-// cli.StringSlice("targets", cli.setMultiSelect(true))
+// cli.StringSlice("targets", cli.SetMultipleSelect(true))
 // ```
-func _cliSetMultiSelect(multiSelect bool) SetCliExtraParam {
+func (c *CliApp) SetMultipleSelect(multiSelect bool) SetCliExtraParam {
 	return func(cep *cliExtraParams) {}
 }
 
@@ -584,63 +737,63 @@ func _cliSetMultiSelect(multiSelect bool) SetCliExtraParam {
 // ```
 // cli.StringSlice("targets", cli.setSelectOption("下拉框选项", "下拉框值"))
 // ```
-func _cliSetSelectOption(name, value string) SetCliExtraParam {
+func (c *CliApp) SetSelectOption(name, value string) SetCliExtraParam {
 	return func(cep *cliExtraParams) {}
 }
 
 var CliExports = map[string]interface{}{
-	"Args":        _getArgs,
-	"Bool":        _cliBool,
-	"Have":        _cliBool,
-	"String":      CliString,
-	"HTTPPacket":  CliString,
-	"YakCode":     CliString,
-	"Text":        CliString,
-	"Int":         _cliInt,
-	"Integer":     _cliInt,
-	"Float":       _cliFloat,
-	"Double":      _cliFloat,
-	"YakitPlugin": _cliYakitPluginFiles,
-	"StringSlice": CliStringSlice,
+	"Args":        DefaultCliApp.Args,
+	"Bool":        DefaultCliApp.Bool,
+	"Have":        DefaultCliApp.Have,
+	"String":      DefaultCliApp.String,
+	"HTTPPacket":  DefaultCliApp.HTTPPacket,
+	"YakCode":     DefaultCliApp.YakCode,
+	"Text":        DefaultCliApp.Text,
+	"Int":         DefaultCliApp.Int,
+	"Integer":     DefaultCliApp.Integer,
+	"Float":       DefaultCliApp.Float,
+	"Double":      DefaultCliApp.Double,
+	"YakitPlugin": DefaultCliApp.YakitPlugin,
+	"StringSlice": DefaultCliApp.StringSlice,
 
 	// 解析成 URL
-	"Urls": _cliUrls,
-	"Url":  _cliUrls,
+	"Urls": DefaultCliApp.Urls,
+	"Url":  DefaultCliApp.Url,
 
 	// 解析端口
-	"Ports": _cliPort,
-	"Port":  _cliPort,
+	"Ports": DefaultCliApp.Ports,
+	"Port":  DefaultCliApp.Port,
 
 	// 解析网络目标
-	"Hosts":   _cliHosts,
-	"Host":    _cliHosts,
-	"Network": _cliHosts,
-	"Net":     _cliHosts,
+	"Hosts":   DefaultCliApp.Hosts,
+	"Host":    DefaultCliApp.Host,
+	"Network": DefaultCliApp.Network,
+	"Net":     DefaultCliApp.Net,
 
 	// 解析文件之类的
-	"File":          _cliFile,
-	"FileNames":     _cliFileNames,
-	"FileOrContent": _cliFileOrContent,
-	"LineDict":      _cliLineDict,
+	"File":          DefaultCliApp.File,
+	"FileNames":     DefaultCliApp.FileNames,
+	"FileOrContent": DefaultCliApp.FileOrContent,
+	"LineDict":      DefaultCliApp.LineDict,
 
 	// 设置param属性
-	"setHelp":     _cliSetHelpInfo,
-	"setDefault":  _cliSetDefaultValue,
-	"setRequired": _cliSetRequired,
+	"setHelp":     DefaultCliApp.SetHelp,
+	"setDefault":  DefaultCliApp.SetDefault,
+	"setRequired": DefaultCliApp.SetRequired,
 	// 设置中文名
-	"setVerboseName": _cliSetVerboseName,
+	"setVerboseName": DefaultCliApp.SetVerboseName,
 	// 设置参数组名
-	"setCliGroup": _cliSetGroup,
+	"setCliGroup": DefaultCliApp.SetCliGroup,
 	// 设置是否多选 (只支持`cli.StringSlice`)
-	"setMultipleSelect": _cliSetMultiSelect,
+	"setMultipleSelect": DefaultCliApp.SetMultipleSelect,
 	// 设置下拉框选项 (只支持`cli.StringSlice`)
-	"setSelectOption": _cliSetSelectOption,
+	"setSelectOption": DefaultCliApp.SetSelectOption,
 
 	// 设置cli属性
-	"SetCliName": _cliSetName,
-	"SetDoc":     _cliSetDocument,
+	"SetCliName": DefaultCliApp.SetCliName,
+	"SetDoc":     DefaultCliApp.SetDoc,
 
 	// 通用函数
-	"help":  _help,
-	"check": _cliCheck,
+	"help":  DefaultCliApp.Help,
+	"check": DefaultCliApp.Check,
 }

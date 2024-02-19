@@ -1050,7 +1050,7 @@ func fixPacketByConfig(packet []byte, config *PocConfig) []byte {
 
 func handleUrlAndConfig(urlStr string, opts ...PocConfigOption) (*PocConfig, error) {
 	// poc 模块收 proxy 影响
-	proxy := cli.CliStringSlice("proxy")
+	proxy := cli.DefaultCliApp.StringSlice("proxy")
 	config := NewDefaultPoCConfig()
 	config.Proxy = proxy
 	for _, opt := range opts {
@@ -1117,7 +1117,7 @@ func handleRawPacketAndConfig(i interface{}, opts ...PocConfigOption) ([]byte, *
 	}
 
 	// poc 模块收 proxy 影响
-	proxy := cli.CliStringSlice("proxy")
+	proxy := cli.DefaultCliApp.StringSlice("proxy")
 	config := NewDefaultPoCConfig()
 	config.Proxy = proxy
 	for _, opt := range opts {
