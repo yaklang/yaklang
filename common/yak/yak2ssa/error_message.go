@@ -36,15 +36,15 @@ func ExpressionNotVariable(expr string) string {
 }
 
 func UnexpectedBreakStmt() string {
-	return "unexpected break stmt"
+	return "break statement can only be used in for or switch"
 }
 
 func UnexpectedContinueStmt() string {
-	return "unexpected continue stmt"
+	return "continue statement can only be used in for"
 }
 
 func UnexpectedFallthroughStmt() string {
-	return "unexpected fallthrough stmt"
+	return "fallthrough statement can only be used in switch"
 }
 
 func UnexpectedAssertStmt() string {
