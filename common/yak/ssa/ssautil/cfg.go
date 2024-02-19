@@ -1,5 +1,11 @@
 package ssautil
 
+type LabelTarget[T comparable] interface {
+	Break(from *ScopedVersionedTable[T])
+	Continue(from *ScopedVersionedTable[T])
+	FallThough(from *ScopedVersionedTable[T])
+}
+
 // BuildSyntaxBlock builds a syntax block using the provided scope and buildBody function.
 /*
 if this scope finish this program
@@ -124,6 +130,8 @@ type LoopStmt[T comparable] struct {
 	body      *ScopedVersionedTable[T]
 }
 
+var _ LabelTarget[int] = (*LoopStmt[int])(nil)
+
 // NoneBuilder is a helper function that does nothing.
 // func NoneBuilder[T comparable](*ScopedVersionedTable[T])                                     {}
 // func NoneBuilderReturnScope[T comparable](*ScopedVersionedTable[T]) *ScopedVersionedTable[T] {}
@@ -169,8 +177,16 @@ func (l *LoopStmt[T]) Break(from *ScopedVersionedTable[T]) {
 	l.MergeToEnd = append(l.MergeToEnd, from)
 }
 
+func (l *LoopStmt[T]) FallThough(from *ScopedVersionedTable[T]) {
+	// do nothing
+}
+
 // Build builds the LoopStmt using the provided NewPhi and SpinHandler functions.
-func (l *LoopStmt[T]) Build(SpinHandler SpinHandle[T], merge MergeHandle[T]) *ScopedVersionedTable[T] {
+func (l *LoopStmt[T]) Build(
+	SpinHandler SpinHandle[T],
+	mergeLatch MergeHandle[T],
+	mergeEnd MergeHandle[T],
+) *ScopedVersionedTable[T] {
 
 	/*
 		global [i = 0]
@@ -189,7 +205,7 @@ func (l *LoopStmt[T]) Build(SpinHandler SpinHandle[T], merge MergeHandle[T]) *Sc
 	latch := l.body.CreateSubScope()
 	latch.Merge(
 		true,
-		merge,
+		mergeLatch,
 		l.MergeToLatch...,
 	)
 	// this `l.ThirdBuilder` only set in `l.SetThird`
@@ -208,7 +224,7 @@ func (l *LoopStmt[T]) Build(SpinHandler SpinHandle[T], merge MergeHandle[T]) *Sc
 
 	end.Merge(
 		true,
-		merge,
+		mergeEnd,
 		l.MergeToEnd...,
 	)
 
@@ -298,10 +314,13 @@ func (t *TryStmt[T]) Build() *ScopedVersionedTable[T] {
 }
 
 type SwitchStmt[T comparable] struct {
-	global     *ScopedVersionedTable[T]
-	handlers   []*ScopedVersionedTable[T]
-	hasDefault bool
+	global         *ScopedVersionedTable[T]
+	handler        []*ScopedVersionedTable[T]
+	waitingForNext *ScopedVersionedTable[T]
+	hasDefault     bool
 }
+
+var _ LabelTarget[int] = (*SwitchStmt[int])(nil)
 
 func NewSwitchStmt[T comparable](global *ScopedVersionedTable[T]) *SwitchStmt[T] {
 	return &SwitchStmt[T]{
@@ -309,10 +328,33 @@ func NewSwitchStmt[T comparable](global *ScopedVersionedTable[T]) *SwitchStmt[T]
 	}
 }
 
-func (s *SwitchStmt[T]) BuildBody(body func(*ScopedVersionedTable[T]) *ScopedVersionedTable[T]) {
+func (s *SwitchStmt[T]) Break(from *ScopedVersionedTable[T]) {
+	// do nothing
+	s.handler = append(s.handler, from)
+}
+
+func (s *SwitchStmt[T]) Continue(from *ScopedVersionedTable[T]) {
+	// do nothing
+}
+
+func (s *SwitchStmt[T]) FallThough(from *ScopedVersionedTable[T]) {
+	// do nothing
+	s.waitingForNext = from
+}
+
+func (s *SwitchStmt[T]) BuildBody(
+	body func(*ScopedVersionedTable[T]) *ScopedVersionedTable[T],
+	merge func(string, []T) T,
+) {
 	sub := s.global.CreateSubScope()
+	if s.waitingForNext != nil {
+		sub.Merge(true, merge, s.waitingForNext)
+		s.waitingForNext = nil
+	}
 	ret := body(sub)
-	s.handlers = append(s.handlers, ret)
+	if s.waitingForNext == nil {
+		s.handler = append(s.handler, ret)
+	}
 }
 
 func (s *SwitchStmt[T]) Build(merge func(string, []T) T) *ScopedVersionedTable[T] {
@@ -320,7 +362,7 @@ func (s *SwitchStmt[T]) Build(merge func(string, []T) T) *ScopedVersionedTable[T
 	end.Merge(
 		false,
 		merge,
-		s.handlers...,
+		s.handler...,
 	)
 	return end
 }

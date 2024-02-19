@@ -20,7 +20,7 @@ func ReplaceMemberCall(v, to Value) map[string]Value {
 	builder := v.GetFunc().builder
 	recoverScope := builder.SetCurrent(v)
 	defer recoverScope()
-	createPhi := generalPhi(builder)
+	createPhi := generalPhi(builder, nil)
 
 	// replace object member-call
 	if v.IsObject() {
