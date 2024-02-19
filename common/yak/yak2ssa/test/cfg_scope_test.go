@@ -523,3 +523,75 @@ func TestYaklangBasic_Variable_Switch(t *testing.T) {
 		}, t)
 	})
 }
+
+func TestYaklangBasic_CFG_Break(t *testing.T) {
+	t.Run("simple break in loop", func(t *testing.T) {
+		checkPrintlnValue(`
+		a = 1
+		for i := 0; i < 10; i++ {
+			if i == 5 {
+				a = 2
+				break
+			}
+		}
+		println(a) // phi[1, 2]
+		`, []string{
+			"phi(a)[2,1]",
+		}, t)
+	})
+
+	t.Run("simple continue in loop", func(t *testing.T) {
+		checkPrintlnValue(`
+		a = 1
+		for i := 0; i < 10; i++ {
+			if i == 5 {
+				a = 2
+				continue
+			}
+		}
+		println(a) // phi[1, 2]
+		`, []string{
+			"phi(a)[2,1]",
+		}, t)
+	})
+
+	t.Run("simple break in switch", func(t *testing.T) {
+		checkPrintlnValue(`
+		a = 1
+		switch a {
+		case 1:
+			if c {
+				a = 2
+				break
+			}
+			a = 4
+		case 2:
+			a = 3
+		}
+		println(a) // phi[1, 2, 3, 4]
+		`, []string{
+			"phi(a)[2,4,3,1]",
+		}, t)
+	})
+
+	t.Run("simple fallthrough in switch", func(t *testing.T) {
+		checkPrintlnValue(`
+		a = 1
+		switch a {
+		case 1:
+			a = 2
+			fallthrough
+		case 2:
+			println(a) // 1 2
+			a = 3
+		default: 
+			a = 4
+		}
+		println(a) // 3 4
+		`, []string{
+			"phi(a)[2,1]",
+			"phi(a)[3,4]",
+		}, t)
+	})
+
+}

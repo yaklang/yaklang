@@ -130,34 +130,28 @@ func (b *astbuilder) buildStatement(stmt *yak.StatementContext) {
 		return
 	}
 
-	// break stmt
-	if _, ok := stmt.BreakStmt().(*yak.BreakStmtContext); ok {
-		if _break := b.GetBreak(); _break != nil {
-			b.EmitJump(_break)
-		} else {
-			b.NewError(ssa.Error, TAG, UnexpectedBreakStmt())
-		}
-		return
-	}
 	// return stmt
 	if s, ok := stmt.ReturnStmt().(*yak.ReturnStmtContext); ok {
 		b.buildReturnStmt(s)
 		return
 	}
+	// break stmt
+	if _, ok := stmt.BreakStmt().(*yak.BreakStmtContext); ok {
+		if !b.Break() {
+			b.NewError(ssa.Error, TAG, UnexpectedBreakStmt())
+		}
+		return
+	}
 	// continue stmt
 	if _, ok := stmt.ContinueStmt().(*yak.ContinueStmtContext); ok {
-		if _continue := b.GetContinue(); _continue != nil {
-			b.EmitJump(_continue)
-		} else {
+		if !b.Continue() {
 			b.NewError(ssa.Error, TAG, UnexpectedContinueStmt())
 		}
 		return
 	}
 
 	if _, ok := stmt.FallthroughStmt().(*yak.FallthroughStmtContext); ok {
-		if _fall := b.GetFallthrough(); _fall != nil {
-			b.EmitJump(_fall)
-		} else {
+		if !b.Fallthrough() {
 			b.NewError(ssa.Error, TAG, UnexpectedFallthroughStmt())
 		}
 		return

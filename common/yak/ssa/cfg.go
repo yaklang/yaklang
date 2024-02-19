@@ -75,50 +75,33 @@ func (b *FunctionBuilder) BuildSyntaxBlock(builder func()) {
 // for build loop
 
 // enter:
-//        ...
-//	    // for first expression in here
-//      jump loop.header
+//
+//	       ...
+//		    // for first expression in here
+//	     jump loop.header
+//
 // loop.header: 		    <- enter, loop.latch
-//      // for stmt cond in here
-//      If [cond] true -> loop.body, false -> loop.exit
+//
+//	// for stmt cond in here
+//	If [cond] true -> loop.body, false -> loop.exit
+//
 // loop.body:	    		<- loop.header
-//      // for body block in here
+//
+//	// for body block in here
+//
 // loop.latch:              <- loop.body      (target of continue)
-//      // for third expr in here
-//      jump loop.header
+//
+//	// for third expr in here
+//	jump loop.header
+//
 // loop.exit:	    		<- loop.header    (target of break)
-//      jump rest
+//
+//	jump rest
+//
 // rest:
-//      ...rest.code....
-
-// use in for/switch
-type target struct {
-	tail         *target // the stack
-	_break       *BasicBlock
-	_continue    *BasicBlock
-	_fallthrough *BasicBlock
-}
-
-// target stack
-func (b *FunctionBuilder) PushTarget(_break, _continue, _fallthrough *BasicBlock) {
-	b.target = &target{
-		tail:         b.target,
-		_break:       _break,
-		_continue:    _continue,
-		_fallthrough: _fallthrough,
-	}
-}
-
-func (b *FunctionBuilder) PopTarget() bool {
-	b.target = b.target.tail
-	if b.target == nil {
-		// b.NewError(Error, SSATAG, "error target struct this position when build")
-		return false
-	} else {
-		return true
-	}
-}
-
+//
+//	...rest.code....
+//
 // LoopBuilder is a builder for loop statement
 type LoopBuilder struct {
 	// save data when create
@@ -203,7 +186,9 @@ func (lb *LoopBuilder) Finish() {
 
 		addToBlocks(body)
 		if lb.Body != nil {
+			SSABuild.PushTarget(LoopBuilder, exit, latch, nil)
 			lb.Body()
+			SSABuild.PopTarget()
 		}
 		SSABuild.EmitJump(latch)
 		return SSABuild.CurrentBlock.ScopeTable
@@ -541,13 +526,12 @@ func (t *SwitchBuilder) Finish() {
 
 	for i := 0; i < t.caseSize; i++ {
 
-		// 	var _fallthrough *BasicBlock
-		// 	if i == caseNum-1 {
-		// 		_fallthrough = defaultb
-		// 	} else {
-		// 		_fallthrough = handlers[i+1]
-		// 	}
-		// 	builder.PushTarget(done, nil, _fallthrough) // fallthrough just jump to next handler
+		var _fallthrough *BasicBlock
+		if i == t.caseSize-1 {
+			_fallthrough = defaultb
+		} else {
+			_fallthrough = handlers[i+1]
+		}
 
 		builder.CurrentBlock = handlers[i]
 
@@ -555,17 +539,19 @@ func (t *SwitchBuilder) Finish() {
 		t.enter.AddSucc(handlers[i])
 		switchBuilder.BuildBody(func(svt *ssautil.ScopedVersionedTable[Value]) *ssautil.ScopedVersionedTable[Value] {
 			builder.CurrentBlock.ScopeTable = svt
+
+			builder.PushTarget(switchBuilder, done, nil, _fallthrough) // fallthrough just jump to next handler
 			t.buildBody(i)
+			builder.PopTarget()
+
 			return builder.CurrentBlock.ScopeTable
 		}, generalPhi(builder, handlers[i]))
 
 		builder.EmitJump(NextBlock(i))
 
-		// 	builder.PopTarget()
 	}
 
 	// can't fallthrough
-	// builder.PushTarget(done, nil, nil)
 	// build default block
 	builder.CurrentBlock = defaultb
 	// // build default
@@ -574,7 +560,9 @@ func (t *SwitchBuilder) Finish() {
 	switchBuilder.BuildBody(func(svt *ssautil.ScopedVersionedTable[Value]) *ssautil.ScopedVersionedTable[Value] {
 		builder.CurrentBlock.ScopeTable = svt
 		if t.buildDefault != nil {
+			builder.PushTarget(switchBuilder, done, nil, nil)
 			t.buildDefault()
+			builder.PopTarget()
 		}
 		return builder.CurrentBlock.ScopeTable
 	}, generalPhi(builder, defaultb))

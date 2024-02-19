@@ -1285,4 +1285,25 @@ func TestSwitch(t *testing.T) {
 			},
 		})
 	})
+
+	t.Run("test fallthrough in switch ", func(t *testing.T) {
+		CheckError(t, TestCase{
+			code: ` 
+			a = 1
+			switch (a) {
+			case 1: 
+				fallthrough
+			default: 
+				if a == 2{
+					fallthrough
+				}
+			}
+		`,
+			want: []string{
+				yak2ssa.UnexpectedFallthroughStmt(),
+				ssa4analyze.ConditionIsConst("switch"),
+				ssa4analyze.ConditionIsConst("if"),
+			},
+		})
+	})
 }
