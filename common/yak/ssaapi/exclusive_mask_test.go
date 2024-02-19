@@ -116,3 +116,37 @@ g = originValue
 		t.Error("check4 failed, side-effect failed")
 	}
 }
+
+func TestMask_Rough(t *testing.T) {
+	prog, err := Parse(`
+var a=222;
+c = () => {a = 333}
+if b {c()}
+dump(a)
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	check222 := false
+	check333 := false
+	masked := prog.Ref("a").ForEach(func(value *Value) {
+		ins := value.node
+		_ = ins
+		ins.GetName()
+	}).Get(0).GetTopDefs().Show().ForEach(func(value *Value) {
+		if value.GetConstValue() == 222 {
+			check222 = true
+		}
+		if value.GetConstValue() == 333 {
+			check333 = true
+		}
+	})
+	_ = masked
+	if !check222 {
+		t.Error("check222 failed")
+	}
+	if !check333 {
+		t.Error("check333 failed")
+	}
+}
