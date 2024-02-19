@@ -190,14 +190,15 @@ type Caller struct {
 }
 
 type YakToCallerManager struct {
-	table          *sync.Map
-	swg            *utils.SizedWaitGroup
-	baseWaitGroup  *sync.WaitGroup
-	dividedContext bool
-	timeout        time.Duration
-	runtimeId      string
-	proxy          string
-	defaultFilter  *filter.StringFilter
+	table              *sync.Map
+	swg                *utils.SizedWaitGroup
+	baseWaitGroup      *sync.WaitGroup
+	dividedContext     bool
+	timeout            time.Duration
+	runtimeId          string
+	proxy              string
+	defaultFilter      *filter.StringFilter
+	ContextCancelFuncs map[string]context.CancelFunc
 }
 
 func (c *YakToCallerManager) SetLoadPluginTimeout(i float64) {
@@ -209,7 +210,7 @@ func (y *YakToCallerManager) SetDividedContext(b bool) {
 }
 
 func NewYakToCallerManager() *YakToCallerManager {
-	return &YakToCallerManager{table: new(sync.Map), baseWaitGroup: new(sync.WaitGroup), timeout: 10 * time.Second}
+	return &YakToCallerManager{table: new(sync.Map), baseWaitGroup: new(sync.WaitGroup), timeout: 10 * time.Second, ContextCancelFuncs: map[string]context.CancelFunc{}}
 }
 
 func (m *YakToCallerManager) SetConcurrent(i int) error {
@@ -382,26 +383,12 @@ func (y *YakToCallerManager) Remove(params *ypb.RemoveHookParams) {
 		keys = append(keys, key.(string))
 		return true
 	})
-	if params.HookName == nil && params.ClearAll {
-		y.CallByName(HOOK_CLAER)
-		for _, k := range keys {
-			y.table.Delete(k)
-		}
-		return
-	}
 
 	if params.HookName == nil {
 		params.HookName = keys
 	}
 
 	for _, k := range params.HookName {
-		if params.ClearAll {
-			if k == HOOK_CLAER {
-				y.CallByName(k)
-			}
-			y.table.Delete(k)
-			continue
-		}
 
 		res, ok := y.table.Load(k)
 		if !ok {
@@ -410,9 +397,12 @@ func (y *YakToCallerManager) Remove(params *ypb.RemoveHookParams) {
 		var existedCallers []*Caller
 		list := res.([]*Caller)
 		for _, l := range list {
-			if utils.StringArrayContains(params.RemoveHookID, l.Id) {
+			if params.ClearAll || utils.StringArrayContains(params.RemoveHookID, l.Id) {
 				if k == HOOK_CLAER {
 					y.CallPluginKeyByName(l.Id, HOOK_CLAER)
+				}
+				if cancelFunc, ok := y.ContextCancelFuncs[l.Id]; ok {
+					cancelFunc()
 				}
 				continue
 			}
@@ -888,6 +878,32 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		return f
 	})
 
+	// hook poc context
+	hookPocFunc := func(f interface{}) interface{} {
+		funcValue := reflect.ValueOf(f)
+		funcType := funcValue.Type()
+		hookFunc := reflect.MakeFunc(funcType, func(args []reflect.Value) (results []reflect.Value) {
+			pocContextOpt := []poc.PocConfigOption{poc.WithContext(streamContext)}
+			index := len(args) - 1 // 获取 option 参数的 index
+			interfaceValue := args[index].Interface()
+			args = args[:index]
+			pocExtraOpts, ok := interfaceValue.([]poc.PocConfigOption)
+			if ok {
+				pocExtraOpts = append(pocContextOpt, pocExtraOpts...)
+			}
+			for _, p := range pocExtraOpts {
+				args = append(args, reflect.ValueOf(p))
+			}
+			res := funcValue.Call(args)
+			return res
+		})
+		return hookFunc.Interface()
+	}
+	pocFuncList := []string{"Get", "Post", "Head", "Delete", "Options", "Do", "Websocket", "HTTP", "HTTPEx", "BuildRequest"}
+	for _, funcName := range pocFuncList {
+		nIns.GetVM().RegisterMapMemberCallHandler("poc", funcName, hookPocFunc)
+	}
+
 	// hook traceroute context
 	nIns.GetVM().RegisterMapMemberCallHandler("traceroute", "Diagnostic", func(f interface{}) interface{} {
 		originFunc, ok := f.(func(host string, opts ...pingutil.TracerouteConfigOption) (chan *pingutil.TracerouteResponse, error))
@@ -1075,6 +1091,13 @@ func (y *YakToCallerManager) Add(ctx context.Context, id string, params []*ypb.E
 			return nil
 		}
 	}
+
+	if y.dividedContext {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithCancel(ctx)
+		y.ContextCancelFuncs[id] = cancel
+	}
+
 	cTable, err := FetchFunctionFromSourceCode(ctx, y.getYakitPluginContext(ctx), y.timeout, id, code, func(e *antlr4yak.Engine) error {
 		if engine == nil {
 			engine = e
