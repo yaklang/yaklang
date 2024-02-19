@@ -29,15 +29,6 @@ const (
 	defaultMaxWaitTime = time.Duration(2000) * time.Millisecond
 )
 
-// for export
-var (
-	PoCOptWithSource       = WithSource
-	PoCOptWithRuntimeId    = WithRuntimeId
-	PoCOptWithFromPlugin   = WithFromPlugin
-	PoCOptWithSaveHTTPFlow = WithSave
-	PoCOptWithProxy        = WithProxy
-)
-
 type PocConfig struct {
 	Host                 string
 	Port                 int
