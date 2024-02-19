@@ -1,6 +1,7 @@
 name: updateCve
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - "cve/*"
