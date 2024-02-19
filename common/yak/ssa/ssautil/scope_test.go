@@ -534,7 +534,7 @@ func TestLoopScope_Basic(t *testing.T) {
 				return body(sub)
 			})
 		})
-		end := builder.Build(SpinHandler, GeneratePhi)
+		end := builder.Build(SpinHandler, GeneratePhi, GeneratePhi)
 		afterLoop(end)
 	}
 
@@ -729,7 +729,7 @@ func TestIfLoopScope_Basic(t *testing.T) {
 			return end
 		})
 	})
-	end := builder.Build(SpinHandler, GeneratePhi)
+	end := builder.Build(SpinHandler, GeneratePhi, GeneratePhi)
 
 	endVariablePhi = end.ReadValue("i")
 
@@ -785,7 +785,7 @@ func TestIfLoopScope_Break(t *testing.T) {
 		})
 	})
 
-	end := LoopBuilder.Build(SpinHandler, GeneratePhi)
+	end := LoopBuilder.Build(SpinHandler, GeneratePhi, GeneratePhi)
 	endVariable := end.ReadValue("i")
 
 	test.Equal(*NewPhi(one, BinaryVariable), *ConditionVariable.(*phi))
@@ -840,7 +840,7 @@ func TestIfLoopScope_Continue(t *testing.T) {
 		})
 	})
 
-	end := LoopBuilder.Build(SpinHandler, GeneratePhi)
+	end := LoopBuilder.Build(SpinHandler, GeneratePhi, GeneratePhi)
 	endVariable := end.ReadValue("i")
 
 	test.Equal(*NewPhi(two, ConditionVariable), *ThirdVariable1.(*phi))

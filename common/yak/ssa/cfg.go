@@ -184,13 +184,16 @@ func (lb *LoopBuilder) Finish() {
 		SSABuild.EmitJump(condition)
 	})
 
+	// var loop *Loop
 	LoopBuilder.SetCondition(func(svt *ssautil.ScopedVersionedTable[Value]) {
 		SSABuild.CurrentBlock = condition
 		SSABuild.CurrentBlock.ScopeTable = svt
+		var conditionValue Value
 		if lb.Condition != nil {
-			lb.Condition()
+			conditionValue = lb.Condition()
 		}
-		SSABuild.EmitJump(body)
+		// SSABuild.EmitJump(body)
+		SSABuild.EmitLoop(body, exit, conditionValue)
 	})
 
 	LoopBuilder.SetBody(func(svt *ssautil.ScopedVersionedTable[Value]) *ssautil.ScopedVersionedTable[Value] {
@@ -213,7 +216,7 @@ func (lb *LoopBuilder) Finish() {
 		}
 		SSABuild.EmitJump(condition)
 	})
-	endScope := LoopBuilder.Build(SpinHandle, generalPhi(SSABuild))
+	endScope := LoopBuilder.Build(SpinHandle, generalPhi(SSABuild, latch), generalPhi(SSABuild, exit))
 
 	exit.ScopeTable = endScope
 	SSABuild.CurrentBlock = exit
@@ -327,7 +330,7 @@ func (i *IfBuilder) Build() {
 	if len(DoneBlock.Preds) != 0 {
 		addToBlocks(DoneBlock)
 		SSABuilder.CurrentBlock = DoneBlock
-		end := ScopeBuilder.BuildFinish(generalPhi(i.builder))
+		end := ScopeBuilder.BuildFinish(generalPhi(i.builder, DoneBlock))
 		DoneBlock.ScopeTable = end
 	}
 }
@@ -374,7 +377,7 @@ func (t *TryBuilder) Finish() {
 	enter := t.enter
 	scope := enter.ScopeTable
 
-	tryBuilder := ssautil.NewTryStmt(scope, generalPhi(builder))
+	tryBuilder := ssautil.NewTryStmt(scope, generalPhi(builder, nil))
 
 	// var final *BasicBlock
 	// var id string
@@ -499,7 +502,7 @@ func (t *SwitchBuilder) Finish() {
 	builder := t.b
 	enter := t.enter
 	scope := enter.ScopeTable
-	ScopeBuilder := ssautil.NewSwitchStmt(scope)
+	switchBuilder := ssautil.NewSwitchStmt(scope)
 	var cond Value
 	if t.buildCondition != nil {
 		cond = t.buildCondition()
@@ -549,11 +552,12 @@ func (t *SwitchBuilder) Finish() {
 		builder.CurrentBlock = handlers[i]
 
 		addToBlocks(handlers[i])
-		ScopeBuilder.BuildBody(func(svt *ssautil.ScopedVersionedTable[Value]) *ssautil.ScopedVersionedTable[Value] {
+		t.enter.AddSucc(handlers[i])
+		switchBuilder.BuildBody(func(svt *ssautil.ScopedVersionedTable[Value]) *ssautil.ScopedVersionedTable[Value] {
 			builder.CurrentBlock.ScopeTable = svt
 			t.buildBody(i)
 			return builder.CurrentBlock.ScopeTable
-		})
+		}, generalPhi(builder, handlers[i]))
 
 		builder.EmitJump(NextBlock(i))
 
@@ -566,13 +570,14 @@ func (t *SwitchBuilder) Finish() {
 	builder.CurrentBlock = defaultb
 	// // build default
 	addToBlocks(defaultb)
-	ScopeBuilder.BuildBody(func(svt *ssautil.ScopedVersionedTable[Value]) *ssautil.ScopedVersionedTable[Value] {
+	t.enter.AddSucc(defaultb)
+	switchBuilder.BuildBody(func(svt *ssautil.ScopedVersionedTable[Value]) *ssautil.ScopedVersionedTable[Value] {
 		builder.CurrentBlock.ScopeTable = svt
 		if t.buildDefault != nil {
 			t.buildDefault()
 		}
 		return builder.CurrentBlock.ScopeTable
-	})
+	}, generalPhi(builder, defaultb))
 	// jump default -> done
 	builder.EmitJump(done)
 	// builder.PopTarget()
@@ -581,6 +586,6 @@ func (t *SwitchBuilder) Finish() {
 	builder.EmitSwitch(cond, defaultb, sLabels)
 	addToBlocks(done)
 	builder.CurrentBlock = done
-	end := ScopeBuilder.Build(generalPhi(builder))
+	end := switchBuilder.Build(generalPhi(builder, done))
 	done.ScopeTable = end
 }
