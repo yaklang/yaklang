@@ -11,14 +11,14 @@ on:
 jobs:
 
   test:
-    name: Test
-    runs-on: ubuntu-latest
+    name: Load CVE Database
+    runs-on: ubuntu-20.04
 
     steps:
       - name: Set up Go 1.x
         uses: actions/setup-go@v2
         with:
-          go-version: ^1.18
+          go-version: 1.20.3
         id: go
 
       - name: Check out code into the Go module directory
