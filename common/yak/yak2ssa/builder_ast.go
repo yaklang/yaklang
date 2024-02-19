@@ -1064,38 +1064,26 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 			c = t0, t1, t2
 		cfg:
 			enter:
-				t0 ...
-				if [t0] true-> if.true; false -> if.false
+				id = any
+				if [cond] true-> if.true; false -> if.false
 			if.true:
-				t1 ...
+				id = trueExpr
 				jump if.done
 			if.false:
-				t2 ...
+				id = falseExpr
 				jump if.done
 			if.done
-				c = phi[....]
+				id = phi[TrueExpr, falseExpr]
 
-		ast statement:
-			c = a || b
-				t0 = !a; t1 = b
-				c = phi[a enter; b if.true]
-
-			c = a && b
-				t0 = a; t1 = b
-				c = phi[a enter; b if.true]
-
-			c = cond ? a : b
-				t0 = cond; t1 = a; t2 = b
-				c = phi[a if.true; b if.false]
 	*/
 	handlerJumpExpression := func(cond func(string) ssa.Value, trueExpr, falseExpr func() ssa.Value) ssa.Value {
 		// 为了聚合产生Phi指令
 		id := uuid.NewString()
+		b.WriteVariable(id, b.EmitConstInstAny())
 		// 只需要使用b.WriteValue设置value到此ID，并最后调用b.ReadValue可聚合产生Phi指令，完成语句预期行为
 		ifb := b.CreateIfBuilder()
 		ifb.AppendItem(ssa.IfBuilderItem{
 			Condition: func() ssa.Value {
-				// 在上层函数中决定是否设置id, 在三元运算符时不会将condition加入结果中
 				return cond(id)
 			},
 			Body: func() {
@@ -1103,48 +1091,79 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 				b.WriteVariable(id, v)
 			},
 		})
-		if falseExpr != nil {
-			ifb.SetElse(func() {
-				v := falseExpr()
-				b.WriteVariable(id, v)
-			})
-		}
+		ifb.SetElse(func() {
+			v := falseExpr()
+			b.WriteVariable(id, v)
+		})
 		ifb.Build()
 		// generator phi instruction
-		return b.ReadValue(id)
+		v := b.ReadValue(id)
+		v.SetName(stmt.GetText())
+		return v
 	}
 
 	// | expression '&&' ws* expression
+	/*
+		target = a && b
+
+		if a {
+			target = b
+		}else {
+			target = a
+		}
+	*/
 	if s := stmt.LogicAnd(); s != nil {
+		value1 := getValue(0)
+		value2 := getValue(1)
 		return handlerJumpExpression(
 			func(id string) ssa.Value {
-				v := getValue(0)
-				b.WriteVariable(id, v)
-				return v
+				return value1
 			},
 			func() ssa.Value {
-				return getValue(1)
+				return value2
 			},
-			nil,
+			func() ssa.Value {
+				return value1
+			},
 		)
 	}
 
 	// | expression '||' ws* expression
+	/*
+		target = a || b
+
+		if a {
+			target = a
+		}else {
+			target = b
+		}
+	*/
 	if s := stmt.LogicOr(); s != nil {
+		value1 := getValue(0)
+		value2 := getValue(1)
 		return handlerJumpExpression(
 			func(id string) ssa.Value {
-				v := getValue(0)
-				b.WriteVariable(id, v)
-				return b.EmitUnOp(ssa.OpNot, v)
+				return value1
 			},
 			func() ssa.Value {
-				return getValue(1)
+				return value1
 			},
-			nil,
+			func() ssa.Value {
+				return value2
+			},
 		)
 	}
 
 	// | expression '?' ws* expression ws* ':' ws* expression
+	/*
+		target = cond ? a : b
+
+		if cond {
+			target = a
+		}else {
+			target = b
+		}
+	*/
 	if s := stmt.Question(); s != nil {
 		return handlerJumpExpression(
 			func(_ string) ssa.Value {
