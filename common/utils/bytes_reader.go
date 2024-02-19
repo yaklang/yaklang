@@ -310,7 +310,7 @@ func ReadN(reader io.Reader, n int) ([]byte, error) {
 func ReadConnWithTimeout(r net.Conn, timeout time.Duration) ([]byte, error) {
 	err := r.SetReadDeadline(time.Now().Add(timeout))
 	if err != nil {
-		return nil, errors.Errorf("set read timeout failed: %s", err)
+		return nil, errors.Wrap(err, "set read timeout failed")
 	}
 
 	raw, err := ioutil.ReadAll(ioutil.NopCloser(r))
@@ -318,7 +318,7 @@ func ReadConnWithTimeout(r net.Conn, timeout time.Duration) ([]byte, error) {
 		return raw, nil
 	}
 
-	return nil, errors.Errorf("read empty: %s", err)
+	return nil, errors.Wrap(err, "read empty")
 }
 
 func ConnExpect(c net.Conn, timeout time.Duration, callback func([]byte) bool) (bool, error) {

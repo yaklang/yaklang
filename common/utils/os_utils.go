@@ -417,7 +417,7 @@ func DebugMockHTTPServerWithContext(ctx context.Context, https, h2, gmtlsFlag, o
 
 func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string, https, h2, gmtlsFlag, onlyGmtls, keepAlive bool, handle func([]byte) []byte) (string, int) {
 	time.Sleep(300 * time.Millisecond)
-	var host, port, _ = ParseStringToHostPort(addr)
+	host, port, _ := ParseStringToHostPort(addr)
 	go func() {
 		var (
 			lis net.Listener
@@ -431,7 +431,7 @@ func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string,
 			lis, err = tls.Listen("tcp", addr, tlsConfig)
 		} else if h2 {
 			origin := GetDefaultTLSConfig(5)
-			var copied = *origin
+			copied := *origin
 			copied.NextProtos = []string{"h2"}
 			lis, err = tls.Listen("tcp", addr, &copied)
 		} else if gmtlsFlag {
@@ -472,7 +472,7 @@ func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string,
 				}
 				writer.Write([]byte("HELLO HTTP2"))
 			})}
-			var err = http2.ConfigureServer(srv, &http2.Server{})
+			err := http2.ConfigureServer(srv, &http2.Server{})
 			if err != nil {
 				log.Error(err)
 				return
@@ -579,7 +579,7 @@ func DebugMockHTTPWithTimeout(du time.Duration, rsp []byte) (string, int) {
 				c.Write(rsp)
 				time.Sleep(50 * time.Millisecond)
 				c.(*net.TCPConn).CloseWrite() // FIN
-				//c.Close() // RST
+				// c.Close() // RST
 			}(conn)
 		}
 		lis.Close()
