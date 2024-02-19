@@ -43,23 +43,22 @@ func (b *FunctionBuilder) readValueEx(
 ) Value {
 	scope := b.CurrentBlock.ScopeTable
 	if ret := ReadVariableFromScope(scope, name); ret != nil {
-		if !onlyThisFunction {
-			if ret.GetScope() != scope {
-				if b.IsParentFunctionVariable(ret) {
-					// the ret variable should be FreeValue
-					para := b.BuildFreeValue(name)
-					para.defaultValue = ret.Value
-					return para
-				}
-			}
-		}
-
 		if b.CurrentRange != nil {
 			ret.AddRange(b.CurrentRange, false)
 		}
 		if ret.Value != nil {
 			// has value, just return
 			return ret.Value
+		}
+	}
+
+	if !onlyThisFunction {
+		if parentValue, ok := b.getParentFunctionVariable(name); ok {
+			// the ret variable should be FreeValue
+			para := b.BuildFreeValue(name)
+			para.defaultValue = parentValue
+			para.SetType(parentValue.GetType())
+			return para
 		}
 	}
 
@@ -117,7 +116,7 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 		}
 
 		// if not freeValue, or not `a = a`(just create FreeValue)
-		if parentValue, ok := b.getParentFunctionVariable(variable); ok {
+		if parentValue, ok := b.getParentFunctionVariable(variable.GetName()); ok {
 			parentValue.AddMask(value)
 		}
 	}
@@ -167,19 +166,20 @@ func (b *FunctionBuilder) BuildFreeValue(variable string) *Parameter {
 }
 
 func (b *FunctionBuilder) IsParentFunctionVariable(v *Variable) bool {
-	_, ok := b.getParentFunctionVariable(v)
+	_, ok := b.getParentFunctionVariable(v.GetName())
 	return ok
 }
 
-func (b *FunctionBuilder) getParentFunctionVariable(v *Variable) (Value, bool) {
+func (b *FunctionBuilder) getParentFunctionVariable(name string) (Value, bool) {
 	// in closure function
 	// check is Capture parent-function value
 	if b.parentScope != nil {
-		if parentVariable := ReadVariableFromScope(b.parentScope, v.GetName()); parentVariable != nil {
-			// parent has this variable
-			if parentVariable.GetCaptured() == v.GetCaptured() {
-				// capture same variable
-				return parentVariable.Value, true
+		if parentVariable := ReadVariableFromScope(b.parentScope, name); parentVariable != nil {
+			return parentVariable.Value, true
+		}
+		if parent := b.parentBuilder; parent != nil {
+			if ret, ok := parent.getParentFunctionVariable(name); ok {
+				return ret, true
 			}
 		}
 	}
