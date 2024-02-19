@@ -3,13 +3,14 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"testing"
 )
 
 func init() {
@@ -76,7 +77,6 @@ requests:
 }
 
 func TestGRPCMUSTPASS_LANGUAGE_NesureProxyValidInExecBatchYakScript(t *testing.T) {
-
 	client, err := NewLocalClient()
 	if err != nil {
 		panic(err)
@@ -97,6 +97,29 @@ mirrorHTTPFlow = func(isHttps, url , req , rsp , body ) {
 		}
 		return []byte("HTTP/1.1 200 OK\r\n\r\nHello, world!")
 	})
+	// host, port := utils.DebugMockTCPEx(func(ctx context.Context, lis net.Listener, conn net.Conn) {
+	// 	for {
+	// 		bytes, err := utils.ReadConnWithTimeout(conn, 5*time.Second)
+	// 		if err != nil {
+	// 			break
+	// 		}
+	// 		r, err := lowhttp.ParseBytesToHttpRequest(bytes)
+	// 		if err != nil {
+	// 			break
+	// 		}
+	// 		spew.Dump(bytes)
+
+	// 		if r.Method == "CONNECT" {
+	// 			conn.Write([]byte("HTTP/1.0 200 Connection established\r\n\r\n"))
+	// 			continue
+	// 		}
+
+	// 		if keys, ok := r.URL.Query()["key"]; ok && keys[0] == "1" {
+	// 			count++
+	// 		}
+	// 		conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\nHello, world!"))
+	// 	}
+	// })
 
 	stream, err := client.ExecBatchYakScript(context.Background(), &ypb.ExecBatchYakScriptRequest{
 		Target:              "http://www.baidu.com?key=0",
