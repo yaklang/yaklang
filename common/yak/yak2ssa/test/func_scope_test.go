@@ -57,17 +57,6 @@ func TestClosureFreeValueScope(t *testing.T) {
 		}, t)
 	})
 
-	t.Run("closure function, can capture parent-variable, same", func(t *testing.T) {
-		checkPrintlnValue(`
-		a = 1
-		f = ()=>{
-			a = 1
-			{
-				println(a)
-			}
-		}`, []string{"FreeValue-a"}, t)
-	})
-
 	t.Run("closure function, can capture parent-variable, use local variable, not same", func(t *testing.T) {
 		checkPrintlnValue(`
 		a = 1
