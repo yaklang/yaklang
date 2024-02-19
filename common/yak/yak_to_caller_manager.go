@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
-	"net/http"
 	"reflect"
 	"strings"
 	"sync"
@@ -633,6 +632,39 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		})
 	}
 
+	// poc
+	hookPocFunc := func(f interface{}) interface{} {
+		funcValue := reflect.ValueOf(f)
+		funcType := funcValue.Type()
+		hookFunc := reflect.MakeFunc(funcType, func(args []reflect.Value) (results []reflect.Value) {
+			pocContextOpt := []poc.PocConfigOption{
+				poc.WithSource(pluginName),
+				poc.WithFromPlugin(pluginName),
+				poc.WithRuntimeId(runtimeId),
+				poc.WithSave(true),
+				poc.WithProxy(proxy),
+				poc.WithContext(streamContext),
+			}
+			index := len(args) - 1 // 获取 option 参数的 index
+			interfaceValue := args[index].Interface()
+			args = args[:index]
+			pocExtraOpts, ok := interfaceValue.([]poc.PocConfigOption)
+			if ok {
+				pocExtraOpts = append(pocContextOpt, pocExtraOpts...)
+			}
+			for _, p := range pocExtraOpts {
+				args = append(args, reflect.ValueOf(p))
+			}
+			res := funcValue.Call(args)
+			return res
+		})
+		return hookFunc.Interface()
+	}
+	pocFuncList := []string{"Get", "Post", "Head", "Delete", "Options", "Do", "Websocket", "HTTP", "HTTPEx", "BuildRequest"}
+	for _, funcName := range pocFuncList {
+		nIns.GetVM().RegisterMapMemberCallHandler("poc", funcName, hookPocFunc)
+	}
+
 	nIns.GetVM().RegisterMapMemberCallHandler("http", "Request", func(i interface{}) interface{} {
 		if proxy == "" {
 			return i
@@ -661,69 +693,6 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		return i
 	})
 
-	nIns.GetVM().RegisterMapMemberCallHandler("poc", "HTTP", func(i interface{}) interface{} {
-		originFunc, ok := i.(func(interface{}, ...poc.PocConfigOption) ([]byte, []byte, error))
-		if ok {
-			return func(raw interface{}, opts ...poc.PocConfigOption) ([]byte, []byte, error) {
-				opts = append(opts, poc.PoCOptWithSource(pluginName))
-				opts = append(opts, poc.PoCOptWithFromPlugin(pluginName))
-				opts = append(opts, poc.PoCOptWithRuntimeId(runtimeId))
-				opts = append(opts, poc.PoCOptWithSaveHTTPFlow(true))
-				opts = append(opts, poc.PoCOptWithProxy(proxy))
-				return originFunc(raw, opts...)
-			}
-		}
-		log.Errorf("BUG: poc.HTTP 's signature is override")
-		return i
-	})
-	nIns.GetVM().RegisterMapMemberCallHandler("poc", "HTTPEx", func(i interface{}) interface{} {
-		originFunc, ok := i.(func(interface{}, ...poc.PocConfigOption) (*lowhttp.LowhttpResponse, *http.Request, error))
-		if ok {
-			return func(raw interface{}, opts ...poc.PocConfigOption) (*lowhttp.LowhttpResponse, *http.Request, error) {
-				opts = append(opts, poc.PoCOptWithSource(pluginName))
-				opts = append(opts, poc.PoCOptWithFromPlugin(pluginName))
-				opts = append(opts, poc.PoCOptWithRuntimeId(runtimeId))
-				opts = append(opts, poc.PoCOptWithSaveHTTPFlow(true))
-				opts = append(opts, poc.PoCOptWithProxy(proxy))
-				return originFunc(raw, opts...)
-			}
-		}
-		log.Errorf("BUG: poc.HTTPEx 's signature is override")
-		return i
-	})
-	for _, method := range []string{"Get", "Post", "Head", "Delete", "Options"} {
-		method := method
-		nIns.GetVM().RegisterMapMemberCallHandler("poc", method, func(i interface{}) interface{} {
-			origin, ok := i.(func(string, ...poc.PocConfigOption) (*lowhttp.LowhttpResponse, *http.Request, error))
-			if !ok {
-				log.Errorf("BUG: poc.%v 's signature is override", method)
-				return i
-			}
-			return func(u string, opts ...poc.PocConfigOption) (*lowhttp.LowhttpResponse, *http.Request, error) {
-				opts = append(opts, poc.PoCOptWithSource(pluginName))
-				opts = append(opts, poc.PoCOptWithFromPlugin(pluginName))
-				opts = append(opts, poc.PoCOptWithRuntimeId(runtimeId))
-				opts = append(opts, poc.PoCOptWithSaveHTTPFlow(true))
-				opts = append(opts, poc.PoCOptWithProxy(proxy))
-				return origin(u, opts...)
-			}
-		})
-	}
-	nIns.GetVM().RegisterMapMemberCallHandler("poc", "Do", func(i interface{}) interface{} {
-		origin, ok := i.(func(method string, url string, opt ...poc.PocConfigOption) (*lowhttp.LowhttpResponse, *http.Request, error))
-		if ok {
-			return func(method string, url string, opts ...poc.PocConfigOption) (*lowhttp.LowhttpResponse, *http.Request, error) {
-				opts = append(opts, poc.PoCOptWithSource(pluginName))
-				opts = append(opts, poc.PoCOptWithFromPlugin(pluginName))
-				opts = append(opts, poc.PoCOptWithRuntimeId(runtimeId))
-				opts = append(opts, poc.PoCOptWithSaveHTTPFlow(true))
-				opts = append(opts, poc.PoCOptWithProxy(proxy))
-				return origin(method, url, opts...)
-			}
-		}
-		log.Errorf("BUG: poc.Do 's signature is override")
-		return i
-	})
 	nIns.GetVM().RegisterMapMemberCallHandler("nuclei", "Scan", func(i interface{}) interface{} {
 		originFunc, ok := i.(func(target any, opts ...any) (chan *tools.PocVul, error))
 		if ok {
@@ -877,32 +846,6 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		}
 		return f
 	})
-
-	// hook poc context
-	hookPocFunc := func(f interface{}) interface{} {
-		funcValue := reflect.ValueOf(f)
-		funcType := funcValue.Type()
-		hookFunc := reflect.MakeFunc(funcType, func(args []reflect.Value) (results []reflect.Value) {
-			pocContextOpt := []poc.PocConfigOption{poc.WithContext(streamContext)}
-			index := len(args) - 1 // 获取 option 参数的 index
-			interfaceValue := args[index].Interface()
-			args = args[:index]
-			pocExtraOpts, ok := interfaceValue.([]poc.PocConfigOption)
-			if ok {
-				pocExtraOpts = append(pocContextOpt, pocExtraOpts...)
-			}
-			for _, p := range pocExtraOpts {
-				args = append(args, reflect.ValueOf(p))
-			}
-			res := funcValue.Call(args)
-			return res
-		})
-		return hookFunc.Interface()
-	}
-	pocFuncList := []string{"Get", "Post", "Head", "Delete", "Options", "Do", "Websocket", "HTTP", "HTTPEx", "BuildRequest"}
-	for _, funcName := range pocFuncList {
-		nIns.GetVM().RegisterMapMemberCallHandler("poc", funcName, hookPocFunc)
-	}
 
 	// hook traceroute context
 	nIns.GetVM().RegisterMapMemberCallHandler("traceroute", "Diagnostic", func(f interface{}) interface{} {
