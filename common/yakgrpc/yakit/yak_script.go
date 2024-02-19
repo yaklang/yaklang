@@ -136,9 +136,12 @@ func (s *YakScript) ToGRPCModel() *ypb.YakScript {
 		}
 	}*/
 	var riskDetail []*ypb.YakRiskInfo
-	if s.RiskDetail != "" && s.RiskDetail != `""` {
-		r, _ := strconv.Unquote(s.RiskDetail)
-		err := json.Unmarshal([]byte(r), &riskDetail)
+	if s.RiskDetail != "" && s.RiskDetail != `""` && s.RiskDetail != "{}" { //"{}"
+		r, err := strconv.Unquote(s.RiskDetail)
+		if err != nil {
+			r = s.RiskDetail
+		}
+		err = json.Unmarshal([]byte(r), &riskDetail)
 		if err != nil {
 			log.Errorf("unmarshal RiskDetail failed: %s", err)
 			spew.Dump([]byte(r))
