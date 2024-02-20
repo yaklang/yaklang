@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/filter"
 	"net/http"
 	"reflect"
 	"strings"
@@ -745,6 +746,22 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 				opts = append(opts, lowhttp.WithSaveHTTPFlow(true))
 				opts = append(opts, lowhttp.WithProxy(proxy))
 				return originFunc(target, opts...)
+			}
+		}
+		return i
+	})
+
+	nIns.GetVM().RegisterMapMemberCallHandler("nuclei", "ScanEx", func(i interface{}) interface{} {
+		originFunc, ok := i.(func(target any, filterVul *filter.StringFilter, opts ...any) (chan *tools.PocVul, error))
+		if ok {
+			return func(target any, filterVul *filter.StringFilter, opts ...any) (chan *tools.PocVul, error) {
+				if runtimeId != "" {
+					opts = append(opts, lowhttp.WithRuntimeId(runtimeId))
+				}
+				opts = append(opts, lowhttp.WithFromPlugin(pluginName))
+				opts = append(opts, lowhttp.WithSaveHTTPFlow(true))
+				opts = append(opts, lowhttp.WithProxy(proxy))
+				return originFunc(target, filterVul, opts...)
 			}
 		}
 		return i
