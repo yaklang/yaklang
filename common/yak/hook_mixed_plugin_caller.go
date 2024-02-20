@@ -92,6 +92,8 @@ type MixPluginCaller struct {
 	websitePathFilter   *filter.StringFilter
 	websiteParamsFilter *filter.StringFilter
 
+	rawQuestFilter *filter.StringFilter
+
 	runtimeId string
 	proxy     string
 
@@ -161,14 +163,16 @@ execNasl = (target)=>{
 const nucleiCodeExecTemplate = `
 nucleiPoCName = MITM_PARAMS["CURRENT_NUCLEI_PLUGIN_NAME"]
 proxy = cli.StringSlice("proxy")
-execNuclei = func(target) {
+execNuclei = func(target,filter) { // 避免重复创建过滤器
     if len(proxy) > 0 {
         yakit.Info("PROXY: %v", proxy)
     } 
 	yakit.Info("开始执行插件: %s [%v]", nucleiPoCName, target)
     
-	res, err = nuclei.Scan(
-        target, nuclei.fuzzQueryTemplate(nucleiPoCName),
+	res, err = nuclei.ScanEx(
+        target,
+		filter,
+		nuclei.fuzzQueryTemplate(nucleiPoCName),
         nuclei.timeout(10), 
         nuclei.proxy(proxy...),
     )
@@ -239,6 +243,7 @@ func NewMixPluginCaller() (*MixPluginCaller, error) {
 		websiteFilter:       filter.NewFilter(),
 		websitePathFilter:   filter.NewFilter(),
 		websiteParamsFilter: filter.NewFilter(),
+		rawQuestFilter:      filter.NewFilter(),
 		callers:             NewYakToCallerManager(),
 		feedbackHandler: func(result *ypb.ExecResult) error {
 			return fmt.Errorf("feedback handler not set")
@@ -647,7 +652,7 @@ func getFuzzHTTPRequestByCache(req []byte) (*mutate.FuzzHTTPRequest, error) {
 	hash := utils.CalcSha1(req)
 	reqIns, ok := ttlHTTPRequestCache.Get(hash)
 	if ok {
-			return reqIns, nil
+		return reqIns, nil
 	}
 	reqIns, err := mutate.NewFuzzHTTPRequest(req)
 	if err != nil {
@@ -793,7 +798,7 @@ func (m *MixPluginCaller) MirrorHTTPFlowEx(
 				m.swg.Add()
 				go func() {
 					defer m.swg.Done()
-					callers.CallByName(HOOK_NucleiScanHandle, urlObj.String())
+					callers.CallByName(HOOK_NucleiScanHandle, urlObj.String(), m.rawQuestFilter)
 				}()
 			}
 			if callers.ShouldCallByName(HOOK_NaslScanHandle) {
