@@ -409,8 +409,12 @@ func processVulnerability(target any, filterVul *filter.StringFilter, vCh chan *
 }
 
 func ScanLegacy(target any, opt ...interface{}) (chan *tools.PocVul, error) {
-	vCh := make(chan *tools.PocVul)
 	filterVul := filter.NewFilter()
+	return ScanLegacyEx(target, filterVul, opt)
+}
+
+func ScanLegacyEx(target any, filterVul *filter.StringFilter, opt ...interface{}) (chan *tools.PocVul, error) {
+	vCh := make(chan *tools.PocVul)
 	i := processVulnerability(target, filterVul, vCh)
 	opt = append(opt, _callback(i))
 	opt = append(opt, _tcpCallback(i))
@@ -436,6 +440,7 @@ func ScanLegacy(target any, opt ...interface{}) (chan *tools.PocVul, error) {
 
 var Exports = map[string]interface{}{
 	"Scan":     ScanLegacy,
+	"ScanEx":   ScanLegacyEx,
 	"ScanAuto": ScanAuto,
 
 	// params
