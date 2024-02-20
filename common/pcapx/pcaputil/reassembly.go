@@ -158,6 +158,14 @@ func (t *TrafficConnection) _feedHandlePayload(tcp *layers.TCP, debug func(strin
 			//debug("close by fin")
 			t.nextSeq = tcp.Seq + 1
 			t.Close()
+
+			// trigger DataFrameReassembled when fin received and sent
+			if t.Flow.IsClosed() {
+				if len(t.Flow.frames) > 0 && t.Flow.onDataFrameReassembled != nil {
+					lastFrame := t.Flow.frames[len(t.Flow.frames)-1]
+					t.Flow.onDataFrameReassembled(t.Flow, lastFrame.Connection, lastFrame)
+				}
+			}
 			return
 		}
 	} else if tcp.Seq > t.nextSeq {
