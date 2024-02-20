@@ -460,13 +460,13 @@ func (f *HTTPFlow) toGRPCModel(full bool) (*ypb.HTTPFlow, error) {
 		}
 	}
 
-	// 提取数据
-	if requireResponse {
+	// 提取数据 - 完整详细的数据的时候，才应该提取
+	if full {
 		domains, rootDomains := domainextractor.ExtractDomainsEx(string(flow.Response))
 		var jsonObjects []string
 		if !utils.MatchAnyOfSubString(strings.ToLower(f.ContentType), "json") {
-			if len(flow.Response) > 1000*1000 {
-				jsonObjects = jsonextractor.ExtractStandardJSON(string(flow.Response[:1000*1000]))
+			if len(flow.Response) > 200*1000 {
+				jsonObjects = jsonextractor.ExtractStandardJSON(string(flow.Response[:200*1000]))
 			} else {
 				jsonObjects = jsonextractor.ExtractStandardJSON(string(flow.Response))
 			}
