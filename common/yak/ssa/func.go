@@ -143,9 +143,14 @@ func (f *Function) Finish() {
 	)
 	f.SetType(funType)
 	if len(f.FreeValues) != 0 {
-		funType.SetFreeValue(
-			lo.Keys(f.FreeValues),
-		)
+		fv := make([]string, len(f.FreeValues))
+		for name, value := range f.FreeValues {
+			if value.defaultValue != nil {
+				continue
+			}
+			fv = append(fv, name)
+		}
+		funType.SetFreeValue(fv)
 	}
 	if len(f.SideEffects) != 0 {
 		funType.SetSideEffect(f.SideEffects)

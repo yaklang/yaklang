@@ -252,6 +252,21 @@ func TestFreeValue(t *testing.T) {
 			},
 		})
 	})
+
+	t.Run("free-value capture value", func(t *testing.T) {
+		CheckError(t, TestCase{
+			code: `
+			f = () => {b = 1}
+			{
+				a = 1
+				f = () => {
+					b = a
+				}
+			}
+			f()
+			`,
+		})
+	})
 }
 
 func TestPhi(t *testing.T) {
