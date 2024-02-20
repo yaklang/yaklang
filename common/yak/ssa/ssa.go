@@ -303,6 +303,10 @@ type Parameter struct {
 	FormalParameterVariadic bool
 }
 
+func (p *Parameter) GetDefault() Value {
+	return p.defaultValue
+}
+
 func (p *Parameter) SetDefault(v Value) {
 	p.defaultValue = v
 }
