@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"fmt"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -302,6 +303,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 		return vals.AppendEffectOn(i)
 	case *ssa.Parameter:
+		if ret.GetDefault() != nil {
+			return Values{NewValue(ret.GetDefault())}
+		}
 		called := actx.GetCurrentCall()
 		if called == nil {
 			log.Error("parent function is not called by any other function, skip")
