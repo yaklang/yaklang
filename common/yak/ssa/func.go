@@ -148,8 +148,6 @@ func (f *Function) Finish() {
 		)
 	}
 	if len(f.SideEffects) != 0 {
-		funType.SetSideEffect(
-			lo.MapToSlice(f.SideEffects, func(name string, _ Value) string { return name }),
-		)
+		funType.SetSideEffect(f.SideEffects)
 	}
 }

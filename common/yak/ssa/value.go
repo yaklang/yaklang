@@ -118,6 +118,7 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 		// if not freeValue, or not `a = a`(just create FreeValue)
 		if parentValue, ok := b.getParentFunctionVariable(variable.GetName()); ok {
 			parentValue.AddMask(value)
+			b.AddSideEffect(variable.GetName(), value)
 		}
 	}
 
