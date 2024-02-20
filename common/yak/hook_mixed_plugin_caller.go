@@ -167,7 +167,7 @@ execNuclei = func(target,filter) { // 避免重复创建过滤器
     if len(proxy) > 0 {
         yakit.Info("PROXY: %v", proxy)
     } 
-	yakit.Info("开始执行插件: %s [%v]", nucleiPoCName, target)
+	log.Info("开始执行插件: %s [%v]", nucleiPoCName, target)
     
 	res, err = nuclei.ScanEx(
         target,
@@ -180,7 +180,7 @@ execNuclei = func(target,filter) { // 避免重复创建过滤器
 		yakit.Error("扫描[%v]失败: %s", target, err)
 		return
 	}
-    yakit.Info("开始等待插件: %v 针对: %v 的返回结果", nucleiPoCName, target)
+    log.Info("开始等待插件: %v 针对: %v 的返回结果", nucleiPoCName, target)
 	for pocVul = range res {
 		yakit.Output(pocVul)		
 		yakit.Output(nuclei.PocVulToRisk(pocVul))		
