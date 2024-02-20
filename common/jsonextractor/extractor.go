@@ -5,19 +5,17 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/tidwall/gjson"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 )
 
-import "github.com/tidwall/gjson"
-
-var (
-	reQuoted = regexp.MustCompile(`(?P<quoted>(\\x[0-9a-fA-F]{2}))`)
-)
+var reQuoted = regexp.MustCompile(`(?P<quoted>(\\x[0-9a-fA-F]{2}))`)
 
 func FixJson(b []byte) []byte {
 	// invalid character 'x' in string escape code
@@ -31,17 +29,17 @@ func FixJson(b []byte) []byte {
 	return b
 }
 
-func JsonValidObject(b []byte) ([]byte, bool) {
-	if gjson.ValidBytes(b) {
-		return b, true
+func JsonValidObject(raw string) (string, bool) {
+	if gjson.Valid(raw) {
+		return raw, true
 	}
 
-	r := gjson.ParseBytes(b)
+	r := gjson.Parse(raw)
 	var buf []string
 	if r.IsObject() {
 		for k, v := range r.Map() {
 			kJsonBytes, _ := json.Marshal(k)
-			var kJson = string(kJsonBytes)
+			kJson := string(kJsonBytes)
 			if strings.HasPrefix(kJson, `"`) && strings.HasSuffix(kJson, `"`) {
 				buf = append(buf, fmt.Sprintf(`%v: %s`, kJson, v.String()))
 			} else {
@@ -51,10 +49,10 @@ func JsonValidObject(b []byte) ([]byte, bool) {
 	}
 
 	if len(buf) > 0 {
-		return []byte("{" + strings.Join(buf, ", ") + "}"), true
+		return "{" + strings.Join(buf, ", ") + "}", true
 	}
 
-	return nil, false
+	return "", false
 }
 
 const (
@@ -71,9 +69,9 @@ func ExtractObjectIndexes(c string) [][2]int {
 	scanner := bufio.NewScanner(bytes.NewBufferString(c))
 	scanner.Split(bufio.ScanBytes)
 
-	var index = -1
-	var objectDepth = 0
-	var objectDepthIndexTable = make(map[int]int)
+	index := -1
+	objectDepth := 0
+	objectDepthIndexTable := make(map[int]int)
 
 	var results [][2]int
 	stack := vmstack.New()
@@ -205,16 +203,16 @@ func ExtractObjectIndexes(c string) [][2]int {
 			}
 		case state_reset:
 			// 空状态回溯，多半是有问题的
-			//currentPair[0] = -1
-			//currentPair[1] = -1
-			//currentPair[2] = -1
+			// currentPair[0] = -1
+			// currentPair[1] = -1
+			// currentPair[2] = -1
 			pushState(state_data)
 		}
 	}
 
 	// 收缩结果
 	var blocks [][2]int
-	var currentBlock = [2]int{-1, -1}
+	currentBlock := [2]int{-1, -1}
 	sort.SliceStable(results, func(i, j int) bool {
 		return results[i][0] < results[j][0]
 	})
@@ -222,11 +220,11 @@ func ExtractObjectIndexes(c string) [][2]int {
 		if currentBlock[0] < 0 {
 			return false
 		}
-		return json.Valid([]byte(c[currentBlock[0]:currentBlock[1]]))
+		return gjson.Valid(c[currentBlock[0]:currentBlock[1]])
 	}
 	for _, result := range results {
 		retRaw := c[result[0]:result[1]]
-		_, isJson := JsonValidObject([]byte(retRaw))
+		_, isJson := JsonValidObject(retRaw)
 		// fmt.Printf("%v: idx: %v json: %v\n", retRaw, result, isJson)
 		if currentBlock[0] < 0 {
 			currentBlock[0], currentBlock[1] = result[0], result[1]
@@ -262,21 +260,22 @@ func ExtractJSONWithRaw(raw string) (results []string, rawStr []string) {
 	var extraValid []string
 	for _, obj := range ExtractObjectIndexes(raw) {
 		jsonStr := raw[obj[0]:obj[1]]
-		if ret, ok := JsonValidObject([]byte(jsonStr)); ok {
+		if ret, ok := JsonValidObject(jsonStr); ok {
+			if len(jsonStr) > 10*1000 { // 过大的json不进行标准库的校验
+				extraValid = append(extraValid, ret)
+				continue
+			}
 			if !json.Valid([]byte(jsonStr)) {
 				rawStr = append(rawStr, jsonStr)
 				// 修复后的 JSON
-				extraValid = append(extraValid, string(ret))
+				extraValid = append(extraValid, ret)
 			} else {
-				// 完美的 JSON
+				// 完美 json
 				results = append(results, jsonStr)
 			}
 		} else {
 			rawStr = append(rawStr, jsonStr)
 		}
-	}
-	if len(extraValid) > 0 {
-		results = append(results, extraValid...)
 	}
 	return
 }

@@ -1,12 +1,13 @@
 package jsonextractor
 
 import (
-	"github.com/davecgh/go-spew/spew"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 func TestFixJson(t *testing.T) {
-	var a = FixJson([]byte(`\x12\x32`))
+	a := FixJson([]byte(`\x12\x32`))
 	spew.Dump(a)
 	if string(a) != `\u0012\u0032` {
 		panic(1)
@@ -49,25 +50,24 @@ df
 	spew.Dump(rawStr)
 
 	if results[1] != `{"abc": 123}` {
-		panic(1)
+		t.Fatalf("results[1] got %v but want %v", results[1], `{"abc": 123}`)
 	}
 	if results[2] != `{   }` {
-		panic(1)
+		t.Fatalf("results[3] got %v but want %v", results[3], `{   }`)
 	}
 	if results[3] != `{"test":                     123}` {
-		panic(1)
+		t.Fatalf("results[2] got %v but want %v", results[2], `{"test":                     123}`)
 	}
 	if rawStr[0] != `{{{   }} {"test":                     123}}` {
-		panic(2)
+		t.Fatalf("rawStr[0] got %v but want %v", rawStr[0], `{{{   }} {"test":                     123}}`)
 	}
 	if rawStr[1] != `{{   }}` {
-		panic(2)
+		t.Fatalf("rawStr[1] got %v but want %v", rawStr[1], `{{   }}`)
 	}
-
 }
 
 func TestExtractJSONWithRaw(t *testing.T) {
-	raw, ok := JsonValidObject([]byte(`{"abc": 123,}`))
+	raw, ok := JsonValidObject(`{"abc": 123,}`)
 	if !ok {
 		panic("abc")
 	}

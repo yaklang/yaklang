@@ -121,7 +121,7 @@ func _jsonLoad(raw interface{}, opts ...JsonOpt) interface{} {
 
 		// 如果 JSON 解码失败则尝试修复一下
 		if strings.HasPrefix(str, "{") {
-			fixed, ok := jsonextractor.JsonValidObject([]byte(str))
+			fixed, ok := jsonextractor.JsonValidObject(str)
 			if ok {
 				err := json.Unmarshal([]byte(fixed), &i)
 				if err == nil {
