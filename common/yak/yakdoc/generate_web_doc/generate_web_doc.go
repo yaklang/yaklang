@@ -15,6 +15,40 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
 
+func CheckDocCodeBlockMatched() {
+	helper := yak.EngineToDocumentHelperWithVerboseInfo(yaklang.New())
+	failCount := 0
+	checkFunc := func(f *yakdoc.FuncDecl) {
+		if len(f.Document) == 0 {
+			return
+		}
+		if count := strings.Count(f.Document, "```"); count%2 != 0 {
+			failCount++
+			fmt.Printf("%s.%s code block not matched\n", f.LibName, f.MethodName)
+		}
+	}
+
+	for _, lib := range helper.Libs {
+		for _, f := range lib.Functions {
+			checkFunc(f)
+		}
+	}
+
+	for _, f := range helper.Functions {
+		checkFunc(f)
+	}
+
+	for _, lib := range helper.StructMethods {
+		for _, f := range lib.Functions {
+			checkFunc(f)
+		}
+	}
+
+	if failCount > 0 {
+		panic("code block check not passed")
+	}
+}
+
 func GenerateSingleFile(basepath string, lib *yakdoc.ScriptLib) {
 	file, err := os.Create(path.Join(basepath, lib.Name+".md"))
 	if err != nil {
@@ -111,6 +145,8 @@ func main() {
 			return
 		}
 	}
+
+	CheckDocCodeBlockMatched()
 
 	helper := yak.EngineToDocumentHelperWithVerboseInfo(yaklang.New())
 	for _, lib := range helper.Libs {

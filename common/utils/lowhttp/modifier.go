@@ -1289,6 +1289,7 @@ func GetHTTPPacketCookieFirst(packet []byte, key string) (cookieValue string) {
 // Host: pie.dev
 //
 // `) // 获取URL，这里会返回"https://pie.dev/get"
+// ```
 func GetUrlFromHTTPRequest(scheme string, packet []byte) (url string) {
 	if scheme == "" {
 		scheme = "http"
