@@ -100,3 +100,4 @@ func TestGenerateDoc(t *testing.T) {
 	}
 	CheckDocumentHelper(t, newHelper)
 }
+

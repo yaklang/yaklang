@@ -607,6 +607,7 @@ func _readFileInfoInDirectory(path string) ([]*utils.FileInfo, error) {
 // for d in file.ReadDirInfoInDirectory("/tmp")~ {
 // println(d.Name)
 // }
+// ```
 func _readDirInfoInDirectory(path string) ([]*utils.FileInfo, error) {
 	return utils.ReadDirsRecursively(path)
 }
