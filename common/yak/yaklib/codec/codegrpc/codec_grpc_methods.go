@@ -107,8 +107,8 @@ func convertOutput(text []byte, output outputType) []byte {
 // Params = [
 // { Name = "hexKey", Type = "input", Required = true, Regex = "^[a-fA-F0-9]{32}|[a-fA-F0-9]{48}|[a-fA-F0-9]{64}$",Label = "Key"},
 // { Name = "hexIV", Type = "input", Required = false, Regex = "^[a-fA-F0-9]{32}$",Label = "IV"},
-// { Name = "mode", Type = "select", Options = ["CBC", "ECB", "GCM"], Required = true, Label = "Mode"},
-// { Name = "output", Type = "select", Options = ["hex", "raw"], Required = true ,Label = "输出格式"}
+// { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "GCM"], Required = true, Label = "Mode"},
+// { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw"], Required = true ,Label = "输出格式"}
 // ]
 func (flow *CodecExecFlow) AESEncrypt(hexKey string, hexIV string, mode string, output outputType) error {
 	var data []byte
@@ -143,8 +143,8 @@ func (flow *CodecExecFlow) AESEncrypt(hexKey string, hexIV string, mode string, 
 // Params = [
 // { Name = "hexKey", Type = "input", Required = true, Regex = "^[a-fA-F0-9]{32}|[a-fA-F0-9]{48}|[a-fA-F0-9]{64}$",Label = "Key"},
 // { Name = "hexIV", Type = "input", Required = false, Regex = "^[a-fA-F0-9]{32}$",Label = "IV"},
-// { Name = "mode", Type = "select", Options = ["CBC", "ECB", "GCM"], Required = true, Label = "Mode"},
-// { Name = "output", Type = "select", Options = ["hex", "raw"], Required = true,Label = "输出格式"}
+// { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "GCM"], Required = true, Label = "Mode"},
+// { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw"], Required = true,Label = "输出格式"}
 // ]
 func (flow *CodecExecFlow) AESDecrypt(hexKey string, hexIV string, mode string, output outputType) error {
 	var data []byte
@@ -175,8 +175,8 @@ func (flow *CodecExecFlow) AESDecrypt(hexKey string, hexIV string, mode string, 
 // Params = [
 // { Name = "hexKey", Type = "input", Required = true, Regex = "^[a-fA-F0-9]{32}$",Label = "Key"},
 // { Name = "hexIV", Type = "input", Required = false, Regex = "^[a-fA-F0-9]{32}$",Label = "IV"},
-// { Name = "mode", Type = "select", Options = ["CBC", "ECB", "GCM", "CFB", "OFB"], Required = true, Label = "Mode"},
-// { Name = "output", Type = "select", Options = ["hex", "raw"], Required = true,Label = "输出格式"}
+// { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "GCM", "CFB", "OFB"], Required = true, Label = "Mode"},
+// { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw"], Required = true,Label = "输出格式"}
 // ]
 func (flow *CodecExecFlow) SM4Encrypt(hexKey string, hexIV string, mode string, output outputType) error {
 	var data []byte
@@ -211,8 +211,8 @@ func (flow *CodecExecFlow) SM4Encrypt(hexKey string, hexIV string, mode string, 
 // Params = [
 // { Name = "hexKey", Type = "input", Required = true, Regex = "^[a-fA-F0-9]{32}$",Label = "Key"},
 // { Name = "hexIV", Type = "input", Required = false, Regex = "^[a-fA-F0-9]{32}$",Label = "IV"},
-// { Name = "mode", Type = "select", Options = ["CBC", "ECB", "GCM", "CFB", "OFB"], Required = true, Label = "Mode"},
-// { Name = "output", Type = "select", Options = ["hex", "raw"], Required = true ,Label = "输出格式"}
+// { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB", "GCM", "CFB", "OFB"], Required = true, Label = "Mode"},
+// { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw"], Required = true ,Label = "输出格式"}
 // ]
 func (flow *CodecExecFlow) SM4Decrypt(hexKey string, hexIV string, mode string, output outputType) error {
 	var data []byte
@@ -247,8 +247,8 @@ func (flow *CodecExecFlow) SM4Decrypt(hexKey string, hexIV string, mode string, 
 // Params = [
 // { Name = "hexKey", Type = "input", Required = true, Regex = "^[a-fA-F0-9]{16}$",	Label = "Key"},
 // { Name = "hexIV", Type = "input", Required = false, Regex = "^[a-fA-F0-9]{16}$",Label = "IV"},
-// { Name = "mode", Type = "select", Options = ["CBC", "ECB"], Required = true , Label = "Mode"},
-// { Name = "output", Type = "select", Options = ["hex", "raw"], Required = true,Label = "输出格式"}
+// { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB"], Required = true , Label = "Mode"},
+// { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw"], Required = true,Label = "输出格式"}
 // ]
 func (flow *CodecExecFlow) DESEncrypt(hexKey string, hexIV string, mode string, output outputType) error {
 	var data []byte
@@ -278,8 +278,8 @@ func (flow *CodecExecFlow) DESEncrypt(hexKey string, hexIV string, mode string, 
 // Params = [
 // { Name = "hexKey", Type = "input", Required = true, Regex = "^[a-fA-F0-9]{16}$",	Label = "Key"},
 // { Name = "hexIV", Type = "input", Required = false, Regex = "^[a-fA-F0-9]{16}$",Label = "IV"},
-// { Name = "mode", Type = "select", Options = ["CBC", "ECB"], Required = true , Label = "Mode"},
-// { Name = "output", Type = "select", Options = ["hex", "raw"], Required = true ,Label = "输出格式"}
+// { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB"], Required = true , Label = "Mode"},
+// { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw"], Required = true ,Label = "输出格式"}
 // ]
 func (flow *CodecExecFlow) DESDecrypt(hexKey string, hexIV string, mode string, output outputType) error {
 	var data []byte
@@ -308,8 +308,8 @@ func (flow *CodecExecFlow) DESDecrypt(hexKey string, hexIV string, mode string, 
 // Params = [
 // { Name = "hexKey", Type = "input", Required = true, Regex = "^[a-fA-F0-9]{32}|[a-fA-F0-9]{48}$",Label = "Key"},
 // { Name = "hexIV", Type = "input", Required = false, Regex = "^[a-fA-F0-9]{16}$",Label = "IV"},
-// { Name = "mode", Type = "select", Options = ["CBC", "ECB"], Required = true, Label = "Mode"},
-// { Name = "output", Type = "select", Options = ["hex", "raw"], Required = true ,Label = "输出格式"}
+// { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB"], Required = true, Label = "Mode"},
+// { Name = "output", Type = "select",DefaultValue = "hex", Options = ["hex", "raw"], Required = true ,Label = "输出格式"}
 // ]
 func (flow *CodecExecFlow) TripleDESEncrypt(hexKey string, hexIV string, mode string, output outputType) error {
 	var data []byte
@@ -338,8 +338,8 @@ func (flow *CodecExecFlow) TripleDESEncrypt(hexKey string, hexIV string, mode st
 // Params = [
 // { Name = "hexKey", Type = "input", Required = true, Regex = "^[a-fA-F0-9]{32}|[a-fA-F0-9]{48}$",Label = "Key"},
 // { Name = "hexIV", Type = "input", Required = false, Regex = "^[a-fA-F0-9]{16}$",Label = "IV" },
-// { Name = "mode", Type = "select", Options = ["CBC", "ECB"], Required = true , Label = "Mode"},
-// { Name = "output", Type = "select", Options = ["hex", "raw"], Required = true ,Label = "输出格式"}
+// { Name = "mode", Type = "select",DefaultValue = "CBC",  Options = ["CBC", "ECB"], Required = true , Label = "Mode"},
+// { Name = "output", Type = "select",DefaultValue = "hex",  Options = ["hex", "raw"], Required = true ,Label = "输出格式"}
 // ]
 func (flow *CodecExecFlow) TripleDESDecrypt(hexKey string, hexIV string, mode string, output outputType) error {
 	var data []byte
@@ -367,8 +367,8 @@ func (flow *CodecExecFlow) TripleDESDecrypt(hexKey string, hexIV string, mode st
 // Desc = """Java反序列化是一种将字节流转换为Java对象的机制，以便可以在网络上传输或将其保存到文件中。
 // Yak中提供了两种反序列化方式： dumper 和 object-stream ，其中object-stream是Yak独有的一种伪代码表达形式，更直观易读"""
 // Params = [
-// { Name = "input", Type = "select", Options = ["raw", "hex", "base64"], Required = true , Label = "输入格式"},
-// { Name = "output", Type = "select", Options = ["dumper", "object-stream"], Required = true , Label = "输出格式"}
+// { Name = "input", Type = "select",DefaultValue = "raw",  Options = ["raw", "hex", "base64"], Required = true , Label = "输入格式"},
+// { Name = "output", Type = "select",DefaultValue = "dumper", Options = ["dumper", "object-stream"], Required = true , Label = "输出格式"}
 // ]
 func (flow *CodecExecFlow) JavaUnserialize(input string, output string) error {
 	var err error
@@ -411,7 +411,7 @@ func (flow *CodecExecFlow) JavaUnserialize(input string, output string) error {
 // CodecName = "序列化"
 // Desc = """Java序列化是一种将Java对象转换为字节流的机制，以便可以在网络上传输或将其保存到文件中。 """
 // Params = [
-// { Name = "output", Type = "select", Options = ["raw", "hex", "base64"], Required = true , Label = "输出格式"}
+// { Name = "output", Type = "select",DefaultValue = "raw", Options = ["raw", "hex", "base64"], Required = true , Label = "输出格式"}
 // ]
 func (flow *CodecExecFlow) JavaSerialize(output string) error {
 	var err error
@@ -438,7 +438,7 @@ func (flow *CodecExecFlow) JavaSerialize(output string) error {
 // Desc = """Base64是一种基于64个可打印字符来表示二进制数据的表示方法。常用于在通常处理文本数据的场合，表示、传输、存储一些二进制数据，包括MIME的电子邮件及XML的一些复杂数据。
 // eg: yak -> eWFr"""
 // Params = [
-// { Name = "Alphabet", Type = "select", Options = ["standard", "urlsafe"], Required = true,Label = "Alphabet"}
+// { Name = "Alphabet", Type = "select",DefaultValue = "standard", Options = ["standard", "urlsafe"], Required = true,Label = "Alphabet"}
 // ]
 func (flow *CodecExecFlow) Base64Encode(Alphabet string) error {
 
@@ -458,7 +458,7 @@ func (flow *CodecExecFlow) Base64Encode(Alphabet string) error {
 // Desc = """Base64是一种基于64个可打印字符来表示二进制数据的表示方法。常用于在通常处理文本数据的场合，表示、传输、存储一些二进制数据，包括MIME的电子邮件及XML的一些复杂数据。
 // eg: eWFr -> yak"""
 // Params = [
-// { Name = "Alphabet", Type = "select", Options = ["A-Za-z0-9+/=", "A-Za-z0-9-_"], Required = true,Lable = "Alphabet" }
+// { Name = "Alphabet", Type = "select",DefaultValue = "standard",Options = ["standard", "urlsafe"], Required = true,Lable = "Alphabet" }
 // ]
 func (flow *CodecExecFlow) Base64Decode(Alphabet string) error {
 	var raw []byte
@@ -485,7 +485,7 @@ func (flow *CodecExecFlow) Base64Decode(Alphabet string) error {
 // CodecName = "HTML编码"
 // Desc = """HTML编码是一种将特殊字符转换为HTML实体的编码方式。"""
 // Params = [
-// { Name = "entityRef", Type = "select", Options = ["dec", "hex", "named"], Required = true ,Label = "实体编码格式"}},
+// { Name = "entityRef", Type = "select",DefaultValue = "named", Options = ["dec", "hex", "named"], Required = true ,Label = "实体编码格式"}},
 // { Name = "fullEncode", Type = "checkbox", Required = true , Label = "全部编码"}
 // ]
 func (flow *CodecExecFlow) HtmlEncode(entityRef string, fullEncode bool) error {
@@ -592,7 +592,7 @@ func (flow *CodecExecFlow) SHA1() error {
 // CodecName = "SHA-2"
 // Desc = """SHA-2是安全哈希算法家族的一部分，包括多个版本（如SHA-256和SHA-512），输出哈希值长度不同，用于数据完整性验证和数字签名，相较于SHA-1提供更强的安全性。"""
 // Params = [
-// { Name = "size", Type = "select", Options = ["SHA-224", "SHA-256","SHA-384","SHA-512"], Required = true ,Label = "哈希版本"}
+// { Name = "size", Type = "select",DefaultValue = "SHA-512", Options = ["SHA-224", "SHA-256","SHA-384","SHA-512"], Required = true ,Label = "哈希版本"}
 // ]
 func (flow *CodecExecFlow) SHA2(size string) error {
 	switch size {
@@ -614,7 +614,7 @@ func (flow *CodecExecFlow) SHA2(size string) error {
 // CodecName = "Json处理"
 // Desc = """JSON（JavaScript Object Notation）是一种轻量级数据交换格式，易于人阅读和编写，同时也易于机器解析和生成。它基于JavaScript语言标准，但独立于语言，被广泛应用于网络应用程序中数据的传输。"""
 // Params = [
-// { Name = "mode", Type = "select", Options = ["四格缩进", "两格缩进","压缩"], Required = true ,Label = "处理方式"}
+// { Name = "mode", Type = "select",DefaultValue = "两格缩进", Options = ["四格缩进", "两格缩进","压缩"], Required = true ,Label = "处理方式"}
 // ]
 func (flow *CodecExecFlow) JsonFormat(mode string) error {
 	var dst interface{}
@@ -644,7 +644,7 @@ func (flow *CodecExecFlow) JsonFormat(mode string) error {
 // CodecName = "生成数据包"
 // Desc = """生成HTTP数据包，支持使用cURL和URL"""
 // Params = [
-// { Name = "mode", Type = "select", Options = ["cURL", "URL"], Required = true ,Label = "输入格式"}
+// { Name = "mode", Type = "select",DefaultValue = "URL", Options = ["cURL", "URL"], Required = true ,Label = "输入格式"}
 // ]
 func (flow *CodecExecFlow) MakePacket(mode string) error {
 	var res []byte
@@ -703,7 +703,7 @@ func (flow *CodecExecFlow) JwtParse() error {
 // CodecName = "JWT签名"
 // Desc = """JWT（JSON Web Token）是一种开放标准（RFC 7519），用于在网络应用间安全地传输声明信息，通常用于身份验证和信息交换。"""
 // Params = [
-// { Name = "algorithm", Type = "select",Options = ["ES384","ES256","ES512","HS256","HS384","HS512","PS256","PS384","PS512","RS256","RS384","RS512","None"], Required = true , Label = "签名算法"},
+// { Name = "algorithm", Type = "select",DefaultValue = "HS256",Options = ["ES384","ES256","ES512","HS256","HS384","HS512","PS256","PS384","PS512","RS256","RS384","RS512","None"], Required = true , Label = "签名算法"},
 // { Name = "key", Type = "input", Required = true , Label = "JWT密钥"},
 // { Name = "isBase64", Type = "checkbox", Required = true , Label = "base64编码"},
 // ]
