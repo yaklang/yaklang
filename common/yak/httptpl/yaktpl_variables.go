@@ -118,7 +118,7 @@ func (v *YakVariables) ToMap() map[string]any {
 	}
 	v.outputMutex.Lock()
 	defer v.outputMutex.Unlock()
-
+	lockedVars := make(map[string]struct{})
 	var getVar, getVarAndWriteCache func(v *Var) (any, error)
 	getVar = func(s *Var) (any, error) {
 		switch s.Type {
@@ -127,8 +127,10 @@ func (v *YakVariables) ToMap() map[string]any {
 				if v, ok := res[s]; ok {
 					return toString(v), nil
 				}
-				if v, ok := v.raw[s]; ok {
+				if v, ok := v.raw[s]; ok && lockedVars[s] != struct{}{} {
+					lockedVars[s] = struct{}{}
 					v, err := getVarAndWriteCache(v)
+					delete(lockedVars, s)
 					if err != nil {
 						return "", err
 					}
@@ -165,7 +167,9 @@ func (v *YakVariables) ToMap() map[string]any {
 		if _, ok := res[k]; ok {
 			continue
 		}
+		lockedVars[k] = struct{}{}
 		val, err := getVarAndWriteCache(v)
+		delete(lockedVars, k)
 		if err != nil {
 			log.Error(err)
 			continue
