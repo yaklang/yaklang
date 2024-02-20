@@ -459,6 +459,7 @@ func _descToString(i interface{}) string {
 // count++
 // return count <= 5
 // })
+// ```
 func tick1s(f func() bool) {
 	t := time.NewTicker(1 * time.Second)
 	for {
