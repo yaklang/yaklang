@@ -127,7 +127,8 @@ func (v *YakVariables) ToMap() map[string]any {
 				if v, ok := res[s]; ok {
 					return toString(v), nil
 				}
-				if v, ok := v.raw[s]; ok && lockedVars[s] != struct{}{} {
+				_, isLocked := lockedVars[s]
+				if v, ok := v.raw[s]; ok && !isLocked {
 					lockedVars[s] = struct{}{}
 					v, err := getVarAndWriteCache(v)
 					delete(lockedVars, s)
