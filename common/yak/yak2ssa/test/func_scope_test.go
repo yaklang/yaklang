@@ -148,3 +148,21 @@ func TestClosureMask(t *testing.T) {
 		})
 	})
 }
+
+func TestClose_SideEffect(t *testing.T) {
+	t.Run("normal", func(t *testing.T) {
+		checkPrintlnValue(`
+		a = 0 
+		b = () => {
+			a = 1
+		}
+
+		if c {
+			b() // a = 1
+		}
+		println(a) // phi 1, 0
+		`, []string{
+			"phi(a)[1,0]",
+		}, t)
+	})
+}

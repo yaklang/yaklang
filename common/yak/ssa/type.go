@@ -773,7 +773,7 @@ type FunctionType struct {
 	ReturnType   Type
 	Parameter    Types
 	FreeValue    []string
-	SideEffects  []string
+	SideEffects  map[string]Value
 	IsVariadic   bool
 	IsMethod     bool
 	IsModifySelf bool // if this is method function
@@ -789,10 +789,6 @@ func (f *FunctionType) SetMethod(m map[string]*FunctionType) {}
 func (b *FunctionType) AddMethod(id string, f *FunctionType) {}
 
 func (f *FunctionType) SetModifySelf(b bool) { f.IsModifySelf = b }
-
-// func (b *FunctionType) GetAllKey() []string {
-// 	return []string{}
-// }
 
 func CalculateType(ts []Type) Type {
 	if len(ts) == 0 {
@@ -831,7 +827,7 @@ func (s *FunctionType) SetFreeValue(fv []string) {
 	s.FreeValue = fv
 }
 
-func (s *FunctionType) SetSideEffect(se []string) {
+func (s *FunctionType) SetSideEffect(se map[string]Value) {
 	s.SideEffects = se
 }
 

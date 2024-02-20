@@ -72,6 +72,14 @@ func (c *Call) handleMethod() {
 	if !ok {
 		return
 	}
+	{
+		builder := c.GetFunc().builder
+		recoverBuilder := builder.SetCurrent(c)
+		for name, value := range funcTyp.SideEffects {
+			builder.WriteVariable(name, value)
+		}
+		recoverBuilder()
+	}
 
 	// only handler in method call
 	if !funcTyp.IsMethod {
@@ -94,14 +102,15 @@ func (f *FunctionBuilder) EmitCall(c *Call) *Call {
 	if f.CurrentBlock.finish {
 		return nil
 	}
+
+	f.emit(c)
 	c.handlerReturnType()
 	c.handleMethod()
 
-	f.emit(c)
 	return c
 }
 
-func (c *Call) HandleFreeValue(fvs []string, sideEffect []string) {
+func (c *Call) HandleFreeValue(fvs []string) {
 
 	builder := c.GetFunc().builder
 	recoverBuilder := builder.SetCurrent(c)
@@ -131,21 +140,4 @@ func (c *Call) HandleFreeValue(fvs []string, sideEffect []string) {
 			}
 		}
 	}
-
-	// TODO: handler sideEffect
-	// for _, name := range sideEffect {
-	// 	v := builder.ReadVariableBefore(name, false, c)
-	// 	if v == nil {
-	// 		// if side effect not found, just skip
-	// 		continue
-	// 	}
-	// 	// handle side effect
-	// 	sideEffect := NewSideEffect(name, c)
-	// 	builder.EmitInstructionAfter(sideEffect, c)
-	// 	sideEffect.SetRange(c.GetRange())
-	// 	sideEffect.SetType(BasicTypes[Any])
-	// 	builder.WriteVariable(name, sideEffect)
-	// 	InsertValueReplaceOriginal(name, v, sideEffect)
-	// }
-
 }
