@@ -168,13 +168,10 @@ func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
 	}
 
 	sideEffect := funcTyp.SideEffects
-	if funcTyp.IsMethod && funcTyp.IsModifySelf {
-		sideEffect = append(sideEffect, c.Args[0].GetName())
-	}
 
 	// handle FreeValue
 	if len(funcTyp.FreeValue) != 0 || len(sideEffect) != 0 {
-		c.HandleFreeValue(funcTyp.FreeValue, sideEffect)
+		c.HandleFreeValue(funcTyp.FreeValue)
 	}
 
 	// handle ellipsis, unpack argument
