@@ -6,6 +6,18 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"math/rand"
+	"net"
+	"net/http"
+	"os"
+	"reflect"
+	"regexp"
+	"runtime"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
@@ -19,17 +31,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"math/rand"
-	"net"
-	"net/http"
-	"os"
-	"reflect"
-	"regexp"
-	"runtime"
-	"sort"
-	"strconv"
-	"strings"
-	"time"
 )
 
 var empty = yakvm.NewValue("empty", nil, "empty")
@@ -1090,8 +1091,7 @@ func init() {
 			}
 
 			list := res.(*vm.NaslArray).Num_elt
-			set := utils.NewSet[any]()
-			set.AddList(list)
+			set := utils.NewSet(list)
 			newArray, err := vm.NewNaslArray(set.List())
 			if err != nil {
 				return nil, err
