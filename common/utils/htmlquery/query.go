@@ -7,11 +7,12 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"github.com/golang/groupcache/lru"
 	"io"
 	"net/http"
 	"os"
 	"sync"
+
+	"github.com/golang/groupcache/lru"
 
 	"github.com/antchfx/xpath"
 	"golang.org/x/net/html"
@@ -49,19 +50,29 @@ func getQuery(expr string) (*xpath.Expr, error) {
 	}
 	cache.Add(expr, v)
 	return v, nil
-
 }
 
 var _ xpath.NodeNavigator = &NodeNavigator{}
 
-// CreateXPathNavigator creates a new xpath.NodeNavigator for the specified html.Node.
+// CreateXPathNavigator 根据传入的节点创建一个新的 XPath 导航器，使用该导航器的方法来遍历该节点及其子节点
+// Example:
+// ```
+// doc, err = xpath.LoadHTMLDocument(htmlText)
+// nav = xpath.CreateXPathNavigator(doc)
+// nav.MoveToChild()
+// println(nav.String())
+// ```
 func CreateXPathNavigator(top *html.Node) *NodeNavigator {
 	return &NodeNavigator{curr: top, root: top, attr: -1}
 }
 
-// Find is like QueryAll but Will panics if the expression `expr` cannot be parsed.
-//
-// See `QueryAll()` function.
+// Find 根据传入的 XPath 表达式从传入的节点开始查找匹配的节点，返回节点数组
+// 如果表达式解析出错会 panic
+// Example:
+// ```
+// doc, err = xpath.LoadHTMLDocument(htmlText)
+// nodes = xpath.Find(doc, "//div[@class='content']/text()")
+// ```
 func Find(top *html.Node, expr string) []*html.Node {
 	nodes, err := QueryAll(top, expr)
 	if err != nil {
@@ -70,8 +81,13 @@ func Find(top *html.Node, expr string) []*html.Node {
 	return nodes
 }
 
-// FindOne is like Query but will panics if the expression `expr` cannot be parsed.
-// See `Query()` function.
+// FindOne 根据传入的 XPath 表达式从传入的节点开始查找第一个匹配的节点
+// 如果表达式解析出错会 panic
+// Example:
+// ```
+// doc, err = xpath.LoadHTMLDocument(htmlText)
+// node = xpath.FindOne(doc, "//div[@class='content']/text()")
+// ```
 func FindOne(top *html.Node, expr string) *html.Node {
 	node, err := Query(top, expr)
 	if err != nil {
@@ -80,8 +96,12 @@ func FindOne(top *html.Node, expr string) *html.Node {
 	return node
 }
 
-// QueryAll searches the html.Node that matches by the specified XPath expr.
-// Return an error if the expression `expr` cannot be parsed.
+// QueryAll 根据传入的 XPath 表达式从传入的节点开始查找匹配的节点，返回节点数组与错误
+// Example:
+// ```
+// doc, err = xpath.LoadHTMLDocument(htmlText)
+// nodes, err = xpath.QueryAll(doc, "//div[@class='content']/text()")
+// ```
 func QueryAll(top *html.Node, expr string) ([]*html.Node, error) {
 	exp, err := getQuery(expr)
 	if err != nil {
@@ -91,10 +111,12 @@ func QueryAll(top *html.Node, expr string) ([]*html.Node, error) {
 	return nodes, nil
 }
 
-// Query runs the given XPath expression against the given html.Node and
-// returns the first matching html.Node, or nil if no matches are found.
-//
-// Returns an error if the expression `expr` cannot be parsed.
+// Query 根据传入的 XPath 表达式从传入的节点开始查找第一个匹配的节点，返回节点与错误
+// Example:
+// ```
+// doc, err = xpath.LoadHTMLDocument(htmlText)
+// node, err = xpath.Query(doc, "//div[@class='content']/text()")
+// ```
 func Query(top *html.Node, expr string) (*html.Node, error) {
 	exp, err := getQuery(expr)
 	if err != nil {
@@ -172,7 +194,13 @@ func Parse(r io.Reader) (*html.Node, error) {
 	return html.Parse(r)
 }
 
-// InnerText returns the text between the start and end tags of the object.
+// InnerText 返回指定节点及其子节点的字符串
+// Example:
+// ```
+// doc, err = xpath.LoadHTMLDocument(htmlText)
+// node = xpath.FindOne(doc, "//div[@class='content']")
+// text = xpath.InnerText(node)
+// ```
 func InnerText(n *html.Node) string {
 	var output func(*bytes.Buffer, *html.Node)
 	output = func(buf *bytes.Buffer, n *html.Node) {
@@ -193,7 +221,13 @@ func InnerText(n *html.Node) string {
 	return buf.String()
 }
 
-// SelectAttr returns the attribute value with the specified name.
+// SelectAttr 返回传入节点指定名称的属性值
+// Example:
+// ```
+// doc, err = xpath.LoadHTMLDocument(htmlText)
+// node = xpath.FindOne(doc, "//div[@class='content']")
+// attr = xpath.SelectAttr(node, "class")
+// ```
 func SelectAttr(n *html.Node, name string) (val string) {
 	if n == nil {
 		return
@@ -210,7 +244,13 @@ func SelectAttr(n *html.Node, name string) (val string) {
 	return
 }
 
-// ExistsAttr returns whether attribute with specified name exists.
+// ExistsAttr 判断传入节点是否存在指定名称的属性并返回布尔值
+// Example:
+// ```
+// doc, err = xpath.LoadHTMLDocument(htmlText)
+// node = xpath.FindOne(doc, "//div[@class='content']")
+// existed = xpath.ExistsAttr(node, "class") // true
+// ```
 func ExistsAttr(n *html.Node, name string) bool {
 	if n == nil {
 		return false
