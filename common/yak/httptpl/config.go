@@ -89,6 +89,16 @@ type Config struct {
 	// onTempalteLoaded
 	OnTemplateLoaded  func(*YakTemplate) bool
 	BeforeSendPackage func(data []byte, isHttps bool) []byte
+	defaultFilter     *filter.StringFilter
+}
+
+func WithCustomVulnFilter(f *filter.StringFilter) ConfigOption {
+	return func(config *Config) {
+		if f == nil {
+			return
+		}
+		config.defaultFilter = f
+	}
 }
 
 func WithOOBRequireCallback(f func(...float64) (string, string, error)) ConfigOption {
@@ -285,6 +295,9 @@ func (c *Config) ExecuteTCPResultCallback(y *YakTemplate, bulk *YakNetworkBulkCo
 	}
 }
 
+// NewConfig 创建一个默认的配置
+var defaultFilter = filter.NewFilter()
+
 func NewConfig(opts ...ConfigOption) *Config {
 	var c = &Config{
 		ConcurrentInTemplates: 20,
@@ -294,6 +307,9 @@ func NewConfig(opts ...ConfigOption) *Config {
 	}
 	for _, opt := range opts {
 		opt(c)
+	}
+	if c.defaultFilter == nil {
+		c.defaultFilter = defaultFilter
 	}
 	return c
 }

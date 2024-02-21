@@ -223,11 +223,12 @@ func (s *Server) FetchPortAssetFromSpaceEngine(req *ypb.FetchPortAssetFromSpaceE
 		engine.SetVar("PAGE_SIZE", req.GetPageSize())
 		engine.SetVar("SCAN_VERIFY", req.GetScanBeforeSave())
 		engine.SetVar("CONCURRENT", req.GetConcurrent())
-		yak.BindYakitPluginContextToEngine(engine, &yak.YakitPluginContext{
-			PluginName: "space-engine",
-			RuntimeId:  runtimeId,
-			Proxy:      req.GetProxy(),
-		})
+		yak.BindYakitPluginContextToEngine(
+			engine,
+			yak.CreateYakitPluginContext(runtimeId).
+				WithPluginName(`space-engine`).
+				WithProxy(req.GetProxy()).WithContext(stream.Context()),
+		)
 		return nil
 	})
 	return engine.ExecuteWithContext(stream.Context(), spaceEngineExecCode)
