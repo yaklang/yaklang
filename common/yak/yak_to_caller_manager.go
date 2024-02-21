@@ -532,14 +532,6 @@ func (y *YakToCallerManager) AddGoNative(id string, name string, cb func(...inte
 	y.table.Store(name, callers)
 }
 
-type YakitPluginContext struct {
-	PluginName string
-	RuntimeId  string
-	Proxy      string
-	CliApp     *cli.CliApp
-	Ctx        context.Context
-}
-
 func HookCliArgs(nIns *antlr4yak.Engine, tempArgs []string) *cli.CliApp {
 	app := cli.NewCliApp()
 	app.SetArgs(tempArgs)
