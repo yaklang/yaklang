@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -25,40 +26,53 @@ func (s *Server) SmokingEvaluatePluginBatch(req *ypb.SmokingEvaluatePluginBatchR
 	successNum := 0
 	errorNum := 0
 
+	host, port := setupEachServe(stream.Context())
+
+	ch := yakit.YieldYakScripts(
+		bizhelper.ExactQueryStringArrayOr(s.GetProfileDatabase(), "script_name", req.GetScriptNames()),
+		stream.Context(),
+	)
+
+	all := utils.NewSet(req.GetScriptNames())
+	exist := utils.NewSet[string]()
+
 	send(0, "开始检测", "success")
 	pluginSize := len(req.GetScriptNames())
-	for index, name := range req.GetScriptNames() {
+	index := 0
+	for ins := range ch {
 		progress := float64(index+1) / float64(pluginSize)
-		// fmt.Println("check name: ", index, name, pluginSize, progress)
-		ins, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), name)
-		if err != nil {
-			msg := fmt.Sprintf("%s: 无法获取该插件", name)
-			send(progress, msg, "error")
-			errorNum++
-			continue
-		}
+		index++
+		exist.Add(ins.ScriptName)
 		code := ins.Content
 		pluginType := ins.Type
-		res, err := s.EvaluatePlugin(stream.Context(), code, pluginType)
+		res, err := s.EvaluatePlugin(stream.Context(), code, pluginType, host, port)
 		if err != nil {
-			msg := fmt.Sprintf("%s 启动插件检测失败", name)
+			msg := fmt.Sprintf("%s 启动插件检测失败", ins.ScriptName)
 			send(progress, msg, "error")
 			errorNum++
 			continue
 		}
 		if res.Score >= 60 {
-			msg := fmt.Sprintf("%s 插件得分: %d", name, res.Score)
+			msg := fmt.Sprintf("%s 插件得分: %d", ins.ScriptName, res.Score)
 			send(progress, msg, "success")
-			names = append(names, name)
+			names = append(names, ins.ScriptName)
 			successNum++
 			continue
 		} else {
-			msg := fmt.Sprintf("%s 插件得分: %d (<60)", name, res.Score)
+			msg := fmt.Sprintf("%s 插件得分: %d (<60)", ins.ScriptName, res.Score)
 			send(progress, msg, "error")
 			errorNum++
 			continue
 		}
 	}
+
+	all.Diff(exist).ForEach(func(name string) {
+		progress := float64(index+1) / float64(pluginSize)
+		index++
+		msg := fmt.Sprintf("%s: 无法获取该插件", name)
+		send(progress, msg, "error")
+		errorNum++
+	})
 
 	{
 		msg := ""
