@@ -190,14 +190,14 @@ type Caller struct {
 }
 
 type YakToCallerManager struct {
-	table            *sync.Map
-	swg              *utils.SizedWaitGroup
-	baseWaitGroup    *sync.WaitGroup
-	dividedContext   bool
-	timeout          time.Duration
-	runtimeId        string
-	proxy            string
-	scanTargetFilter *filter.StringFilter
+	table          *sync.Map
+	swg            *utils.SizedWaitGroup
+	baseWaitGroup  *sync.WaitGroup
+	dividedContext bool
+	timeout        time.Duration
+	runtimeId      string
+	proxy          string
+	defaultFilter  *filter.StringFilter
 }
 
 func (c *YakToCallerManager) SetLoadPluginTimeout(i float64) {
@@ -329,7 +329,7 @@ func (y *YakToCallerManager) getYakitPluginContext(ctx ...context.Context) *Yaki
 	if len(ctx) > 0 {
 		finalCtx = ctx[0]
 	}
-	return CreateYakitPluginContext(y.runtimeId).WithProxy(y.proxy).WithContext(finalCtx).WithScanTargetFilter(y.getScanTargetFilter())
+	return CreateYakitPluginContext(y.runtimeId).WithProxy(y.proxy).WithContext(finalCtx).WithDefaultFilter(y.getDefaultFilter())
 }
 
 func (y *YakToCallerManager) Set(ctx context.Context, code string, hook func(engine *antlr4yak.Engine) error, funcName ...string) (retError error) {
@@ -1055,15 +1055,15 @@ func (y *YakToCallerManager) AddForYakit(
 
 var fetchFilterMutex = new(sync.Mutex)
 
-func (y *YakToCallerManager) getScanTargetFilter() *filter.StringFilter {
+func (y *YakToCallerManager) getDefaultFilter() *filter.StringFilter {
 	fetchFilterMutex.Lock()
 	defer fetchFilterMutex.Unlock()
 
-	if y.scanTargetFilter != nil {
-		return y.scanTargetFilter
+	if y.defaultFilter != nil {
+		return y.defaultFilter
 	}
-	y.scanTargetFilter = filter.NewFilter()
-	return y.scanTargetFilter
+	y.defaultFilter = filter.NewFilter()
+	return y.defaultFilter
 }
 
 func (y *YakToCallerManager) Add(ctx context.Context, id string, params []*ypb.ExecParamItem, code string, hook func(*antlr4yak.Engine) error, funcName ...string) (retError error) {
