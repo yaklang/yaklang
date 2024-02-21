@@ -418,7 +418,7 @@ func ScanLegacy(target any, opt ...interface{}) (chan *tools.PocVul, error) {
 		}
 		return ok
 	})
-	return ScanLegacyWithFilter(target, NewConfig(opts...).defaultFilter, opt)
+	return ScanLegacyWithFilter(target, NewConfig(opts...).defaultFilter, opt...)
 }
 
 func ScanLegacyWithFilter(target any, filterVul *filter.StringFilter, opt ...interface{}) (chan *tools.PocVul, error) {
