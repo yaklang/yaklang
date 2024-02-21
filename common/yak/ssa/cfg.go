@@ -246,6 +246,15 @@ func (i *IfBuilder) AppendItem(item IfBuilderItem) *IfBuilder {
 	return i
 }
 
+// SetCondition build if condition and body, short for append item
+func (i *IfBuilder) SetCondition(cond func() Value, body func()) *IfBuilder {
+	i.AppendItem(IfBuilderItem{
+		Condition: cond,
+		Body:      body,
+	})
+	return i
+}
+
 // SetElse build else  body
 func (i *IfBuilder) SetElse(body func()) *IfBuilder {
 	i.elseBody = body

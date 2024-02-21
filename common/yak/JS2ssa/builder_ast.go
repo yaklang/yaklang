@@ -126,7 +126,7 @@ func (b *astbuilder) buildVariableStatement(stmt *JS.VariableStatementContext) {
 
 }
 
-func (b *astbuilder) buildAllVariableDeclaration(stmt *JS.VariableDeclarationListContext, left bool) (ssa.Value, ssa.LeftValue) {
+func (b *astbuilder) buildAllVariableDeclaration(stmt *JS.VariableDeclarationListContext, left bool) (ssa.Value, ssa.Value) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 	// var ret []ssa.Value
@@ -134,7 +134,7 @@ func (b *astbuilder) buildAllVariableDeclaration(stmt *JS.VariableDeclarationLis
 	// checking varModifier - decorator (var / let / const)
 	// think `var a = 1`, `let a = 1`, `const a = 1`;
 
-	var fianlLvalue ssa.LeftValue
+	var finalLValue ssa.Value
 	var finalRvalue ssa.Value
 	declare := ""
 	if mI := stmt.GetModifier(); mI != nil {
@@ -154,15 +154,15 @@ func (b *astbuilder) buildAllVariableDeclaration(stmt *JS.VariableDeclarationLis
 		// 	return nil, nil
 		// }
 		for _, jsstmt := range stmt.AllVariableDeclaration() {
-			finalRvalue, fianlLvalue = b.buildVariableDeclaration(jsstmt, declare, left)
+			finalRvalue, finalLValue = b.buildVariableDeclaration(jsstmt, declare, left)
 		}
 		// fmt.Println(ret)
-		return finalRvalue, fianlLvalue
+		return finalRvalue, finalLValue
 	}
 	return nil, nil
 }
 
-func (b *astbuilder) buildVariableDeclaration(stmtIf JS.IVariableDeclarationContext, Type string, left bool) (ssa.Value, ssa.LeftValue) {
+func (b *astbuilder) buildVariableDeclaration(stmtIf JS.IVariableDeclarationContext, Type string, left bool) (ssa.Value, ssa.Value) {
 	var stmt = stmtIf.(*JS.VariableDeclarationContext)
 
 	a := stmt.Assign()
@@ -260,7 +260,7 @@ type getSingleExpr interface {
 	SingleExpression(i int) JS.ISingleExpressionContext
 }
 
-func (b *astbuilder) buildSingleExpression(stmt JS.ISingleExpressionContext, IslValue bool) (ssa.Value, ssa.LeftValue) {
+func (b *astbuilder) buildSingleExpression(stmt JS.ISingleExpressionContext, IslValue bool) (ssa.Value, ssa.Value) {
 	// TODO: singleExpressions unfinish
 
 	if v := b.buildOnlyRightSingleExpression(stmt); v != nil {
@@ -467,30 +467,20 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 		// 逻辑运算聚合产生phi指令
 		id := uuid.NewString()
 
-		ifb := b.BuildIf()
-		ifb.BuildCondition(
-			func() ssa.Value {
-				return cond(id)
-			},
-		)
-
-		ifb.BuildTrue(
-			func() {
-				v := trueExpr()
-				b.WriteVariable(id, v)
-			},
-		)
-
+		ifb := b.CreateIfBuilder().SetCondition(func() ssa.Value {
+			return cond(id)
+		}, func() {
+			v := trueExpr()
+			b.WriteVariable(id, v)
+		})
 		if falseExpr != nil {
-			ifb.BuildFalse(func() {
+			ifb.SetElse(func() {
 				v := falseExpr()
 				b.WriteVariable(id, v)
 			})
 		}
-
-		ifb.Finish()
-		return b.ReadVariable(id, true)
-
+		ifb.Build()
+		return b.ReadValue(id)
 	}
 
 	switch s := stmt.(type) {
@@ -514,7 +504,7 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 		// TODO: error 后返回nil会不会报错
 		if expr := s.SingleExpression(); expr != nil {
 			_, lValue := b.buildSingleExpression(expr, true)
-			if v := lValue.GetValue(b.FunctionBuilder); v == nil {
+			if v := lValue.Get(b.FunctionBuilder); v == nil {
 				b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
 				return nil
 			} else {
