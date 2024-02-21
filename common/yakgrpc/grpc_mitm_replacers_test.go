@@ -365,7 +365,6 @@ testBody`
 			for _, re := range []string{"testUri\\w*", "testHeader\\w*", "testBody\\w*"} {
 				rule.Rule = re
 				replacer.SetRules(rule)
-				replacer.hook()
 				extractedData := replacer.hookColor([]byte(reqRaw), responseBytes, req, &yakit.HTTPFlow{})
 				if len(extractedData) == 1 {
 					matchRes = append(matchRes, extractedData[0].Data)
