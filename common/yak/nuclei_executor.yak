@@ -1,6 +1,6 @@
 nucleiPoCName = MITM_PARAMS["CURRENT_NUCLEI_PLUGIN_NAME"]
 execNuclei = func(target) { // 避免重复创建过滤器
-	yakit.Info("开始执行插件: %s [%v]", nucleiPoCName, target)
+	log.Info("开始执行插件: %s [%v]", nucleiPoCName, target)
 	res, err = nuclei.Scan(
         target,
 		nuclei.fuzzQueryTemplate(nucleiPoCName),
