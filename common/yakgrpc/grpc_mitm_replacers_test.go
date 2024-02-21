@@ -11,7 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func TestHookColorWithRequest(t *testing.T) {
+func TestGRPCMUSTPASS_HookColorWithRequest(t *testing.T) {
 	replacer := NewMITMReplacer()
 	replacer.SetRules(&ypb.MITMContentReplacer{
 		Rule:             `百度`,
@@ -49,7 +49,7 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 
 }
 
-func TestHookColorWithResponse(t *testing.T) {
+func TestGRPCMUSTPASS_HookColorWithResponse(t *testing.T) {
 	replacer := NewMITMReplacer()
 	replacer.SetRules(&ypb.MITMContentReplacer{
 		Rule:              `(?i)(access[_-]?(key|secret|id)|accesskey(secret|id)|secret[_-]?(key|id))`,
@@ -83,7 +83,7 @@ secret-id:`)
 }
 
 // TestMatchScope match scope rule: scope =  opt1 ∩ ( ∪ { opt2s... } ), opt1 ∈ {request, response}, opt2 ∈ {uri, header, body}
-func TestMatchScope(t *testing.T) {
+func TestGRPCMUSTPASS_MatchScope(t *testing.T) {
 	const (
 		uri int = 1 << iota
 		header
@@ -200,7 +200,7 @@ testBody`
 }
 
 // TestMatchGroup if pattern has group, hookColor method should return group 1
-func TestMatchGroup(t *testing.T) {
+func TestGRPCMUSTPASS_MatchGroup(t *testing.T) {
 	rule := &ypb.MITMContentReplacer{
 		NoReplace:         true,
 		Result:            ``,
@@ -261,7 +261,7 @@ testBody`
 	}
 }
 
-func TestReplaceWithScope(t *testing.T) {
+func TestGRPCMUSTPASS_ReplaceWithScope(t *testing.T) {
 	const (
 		uri int = 1 << iota
 		header
