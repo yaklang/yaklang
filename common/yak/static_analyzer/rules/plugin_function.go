@@ -18,7 +18,7 @@ func init() {
 
 func checkDefineFunction(prog *ssaapi.Program, name string) *result.StaticAnalyzeResults {
 	ret := result.NewStaticAnalyzeResults("check define function")
-	handlers := prog.Ref(name)
+	handlers := prog.Ref(name).Filter(func(v *ssaapi.Value) bool { return v.IsFunction() })
 	if len(handlers) == 0 {
 		ret.NewError(NoImplementFunction(name), nil)
 	} else if len(handlers) > 1 {
@@ -68,7 +68,7 @@ func CheckDefineFunctionMitm(prog *ssaapi.Program) *result.StaticAnalyzeResults 
 
 	find := false
 	for _, name := range funcs {
-		defineFuncs := prog.Ref(name)
+		defineFuncs := prog.Ref(name).Filter(func(v *ssaapi.Value) bool { return v.IsFunction() })
 		if len(defineFuncs) == 0 {
 			// not implement
 			continue

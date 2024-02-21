@@ -83,6 +83,26 @@ func TestRulesDefineFunction(t *testing.T) {
 			"mitm")
 	})
 
+	t.Run("test use and define function", func(t *testing.T) {
+		check(t, `
+		_test_ = () => {
+			hijackSaveHTTPFlow()
+		}
+		hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
+			b = 1
+		}
+		`, []string{}, "mitm")
+
+		check(t, `
+		_test_ = () => {
+			handle()
+		}
+		handle = (s) => {
+			return s
+		}
+		`, []string{}, "codec")
+	})
+
 }
 
 func TestRuleDefineFunctionWithFreeValue(t *testing.T) {
