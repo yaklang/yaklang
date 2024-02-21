@@ -564,7 +564,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 			// 运行时更新代理
 			downstreamProxy, err := getDownstreamProxy(reqInstance)
-			if err == nil && downstreamProxy != "" && mServer != nil {
+			if err == nil && mServer != nil {
 				err = mServer.Configure(crep.MITM_SetDownstreamProxy(downstreamProxy))
 				if err != nil {
 					feedbackToUser(fmt.Sprintf("设置下游代理失败 / set downstream proxy failed: %v", err))
