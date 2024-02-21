@@ -204,6 +204,7 @@ func MITM_MergeOptions(b ...MITMConfig) MITMConfig {
 func MITM_SetDownstreamProxy(s string) MITMConfig {
 	return func(server *MITMServer) error {
 		if s == "" {
+			server.proxyUrl = nil
 			return nil
 		}
 		urlRaw, err := url.Parse(s)
