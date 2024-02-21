@@ -569,6 +569,7 @@ type ObjectType struct {
 	Kind       TypeKind
 	Len        int
 	Keys       []Value
+	keymap     map[string]int // remove duplicate key
 	keyTypes   []Type
 	FieldTypes []Type
 
@@ -585,6 +586,10 @@ type ObjectType struct {
 
 func (i *ObjectType) GetTypeKind() TypeKind {
 	return i.Kind
+}
+
+func (i *ObjectType) SetTypeKind(t TypeKind) {
+	i.Kind = t
 }
 
 func (i *ObjectType) GetMethod() map[string]*FunctionType {
@@ -616,6 +621,7 @@ func NewObjectType() *ObjectType {
 	return &ObjectType{
 		Kind:       ObjectTypeKind,
 		Keys:       make([]Value, 0),
+		keymap:     make(map[string]int),
 		keyTypes:   make([]Type, 0),
 		FieldTypes: make([]Type, 0),
 		method:     make(map[string]*FunctionType, 0),
@@ -711,30 +717,44 @@ func (itype ObjectType) RawString() string {
 
 // for struct build
 func (s *ObjectType) AddField(key Value, field Type) {
-	s.Keys = append(s.Keys, key)
 	keyTyp := key.GetType()
-	s.keyTypes = append(s.keyTypes, keyTyp)
 	if field == nil {
 		field = BasicTypes[AnyTypeKind]
 	}
+
+	if index, ok := s.keymap[key.String()]; ok {
+		s.keyTypes[index] = keyTyp
+		s.Keys[index] = key
+		s.FieldTypes[index] = field
+		return
+	}
+
+	s.Keys = append(s.Keys, key)
+	s.keyTypes = append(s.keyTypes, keyTyp)
 	s.FieldTypes = append(s.FieldTypes, field)
+
+	s.keymap[key.String()] = len(s.Keys) - 1
 }
 
 // return (field-type, key-type)
 func (s *ObjectType) GetField(key Value) Type {
+	getField := func(o *ObjectType) Type {
+		if index := slices.IndexFunc(o.Keys, func(v Value) bool { return v.String() == key.String() }); index != -1 {
+			return o.FieldTypes[index]
+		} else {
+			return nil
+		}
+	}
+
 	switch s.Kind {
 	case SliceTypeKind, MapTypeKind:
 		if TypeCompare(key.GetType(), s.KeyTyp) {
+			if t := getField(s); t != nil {
+				return t
+			}
 			return s.FieldType
 		}
 	case StructTypeKind, ObjectTypeKind, TupleTypeKind:
-		getField := func(o *ObjectType) Type {
-			if index := slices.IndexFunc(o.Keys, func(v Value) bool { return v.String() == key.String() }); index != -1 {
-				return o.FieldTypes[index]
-			} else {
-				return nil
-			}
-		}
 		if t := getField(s); t != nil {
 			return t
 		}
