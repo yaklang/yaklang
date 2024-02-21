@@ -348,12 +348,7 @@ func (s *Server) ScanTargetWithPlugin(
 	engine := yak.NewYakitVirtualClientScriptEngine(feedbackClient)
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
 		engine.SetVar("RUNTIME_ID", taskId)
-		yak.BindYakitPluginContextToEngine(engine, &yak.YakitPluginContext{
-			PluginName: plugin.ScriptName,
-			RuntimeId:  taskId,
-			Proxy:      proxy,
-			Ctx:        ctx,
-		})
+		yak.BindYakitPluginContextToEngine(engine, yak.CreateYakitPluginContext(taskId).WithPluginName(plugin.ScriptName).WithProxy(proxy).WithContext(ctx))
 		engine.SetVar("REQUEST", target.Request)
 		engine.SetVar("RESPONSE", target.Response)
 		engine.SetVar("HTTPS", target.IsHttps)
