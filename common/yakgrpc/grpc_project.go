@@ -384,40 +384,45 @@ func (s *Server) ImportProject(req *ypb.ImportProjectRequest, stream ypb.Yak_Imp
 		}
 	}
 
-	feedProgress("正在解压数据库", 0.4)
-	bytes, err := utils.GzipDeCompress(raw)
-	if err != nil {
-		return err
-	}
-
-	feedProgress("解压完成，正在解密数据库", 0.43)
-	if req.GetPassword() != "" {
-		decData, err := codec.SM4GCMDec(codec.PKCS7Padding([]byte(req.GetPassword())), bytes, nil)
+	rawBytes := raw
+	projectName := utils.TrimFileNameExt(filepath.Base(req.GetProjectFilePath()))
+	description := ""
+	if utils.IsGzipBytes(raw) {
+		feedProgress("正在解压数据库", 0.4)
+		rawBytes, err = utils.GzipDeCompress(raw)
 		if err != nil {
-			feedProgress("解密失败！", 0.99)
-			return utils.Error("解密失败！")
+			return err
 		}
-		bytes = decData
+		feedProgress("解压完成，正在解密数据库", 0.43)
+		if req.GetPassword() != "" {
+			decData, err := codec.SM4GCMDec(codec.PKCS7Padding([]byte(req.GetPassword())), rawBytes, nil)
+			if err != nil {
+				feedProgress("解密失败！", 0.99)
+				return utils.Error("解密失败！")
+			}
+			rawBytes = decData
+		}
+
+		feedProgress("读取项目基本信息", 0.45)
+		projectName, n := protowire.ConsumeString(rawBytes)
+		rawBytes = rawBytes[n:]
+		description, n := protowire.ConsumeString(rawBytes)
+		rawBytes = rawBytes[n:]
+		paramsBytes, n := protowire.ConsumeBytes(rawBytes)
+		rawBytes = rawBytes[n:]
+
+		var params = make(map[string]interface{})
+		json.Unmarshal(paramsBytes, &params)
+		if params != nil && len(params) > 0 {
+			// handle params
+		}
+
+		feedProgress(fmt.Sprintf(
+			"读取项目基本信息，原始项目名「%v」，描述信息：%v",
+			projectName, description,
+		), 0.5)
+
 	}
-
-	feedProgress("读取项目基本信息", 0.45)
-	projectName, n := protowire.ConsumeString(bytes)
-	bytes = bytes[n:]
-	description, n := protowire.ConsumeString(bytes)
-	bytes = bytes[n:]
-	paramsBytes, n := protowire.ConsumeBytes(bytes)
-	bytes = bytes[n:]
-
-	var params = make(map[string]interface{})
-	json.Unmarshal(paramsBytes, &params)
-	if params != nil && len(params) > 0 {
-		// handle params
-	}
-
-	feedProgress(fmt.Sprintf(
-		"读取项目基本信息，原始项目名「%v」，描述信息：%v",
-		projectName, description,
-	), 0.5)
 
 	if req.GetLocalProjectName() != "" {
 		projectName = req.GetLocalProjectName()
@@ -441,7 +446,7 @@ func (s *Server) ImportProject(req *ypb.ImportProjectRequest, stream ypb.Yak_Imp
 	fileName := filepath.Join(consts.GetDefaultYakitProjectsDir(), databaseName)
 	err = os.WriteFile(
 		fileName,
-		bytes,
+		rawBytes,
 		0666,
 	)
 	if err != nil {
