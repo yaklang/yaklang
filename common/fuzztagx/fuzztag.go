@@ -3,10 +3,11 @@ package fuzztagx
 import (
 	"errors"
 	"fmt"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/fuzztagx/parser"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/cartesian"
-	"strings"
 )
 
 const (
@@ -134,8 +135,7 @@ func (f *SimpleFuzzTag) Exec(raw *parser.FuzzResult, methods ...map[string]*pars
 							if isDynFun, ok := fun.Expand["IsDynFun"]; ok {
 								if v, ok := isDynFun.(func(name, params string) bool); ok {
 									if v(name, s) {
-										set := utils.NewSet[string]()
-										set.AddList(labels)
+										set := utils.NewSet(labels)
 										set.Add("dyn")
 										f.Labels = set.List()
 									}
@@ -296,8 +296,7 @@ func (f *SimpleFuzzTag) Exec(raw *parser.FuzzResult, methods ...map[string]*pars
 		escaper := parser.NewDefaultEscaper(`\`, "{{", "}}")
 		return []*parser.FuzzResult{parser.NewFuzzResultWithData(fmt.Sprintf("{{%s}}", escaper.Escape(rawData)))}, nil
 	}
-	set := utils.NewSet[string]()
-	set.AddList(labels)
+	set := utils.NewSet(labels)
 	f.Labels = set.List()
 	return method()
 }

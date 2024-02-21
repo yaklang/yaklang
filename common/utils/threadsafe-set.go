@@ -9,10 +9,14 @@ type Set[T comparable] struct {
 	sync.RWMutex
 }
 
-func NewSet[T comparable]() *Set[T] {
-	return &Set[T]{
+func NewSet[T comparable](list ...[]T) *Set[T] {
+	s := &Set[T]{
 		m: make(map[T]struct{}),
 	}
+	if len(list) > 0 {
+		s.AddList(list[0])
+	}
+	return s
 }
 
 //func main() {
@@ -103,4 +107,58 @@ func (s *Set[T]) List() []T {
 		list = append(list, item)
 	}
 	return list
+}
+
+func (s *Set[T]) ForEach(h func(T)) {
+	s.RLock()
+	defer s.RUnlock()
+	for item := range s.m {
+		h(item)
+	}
+}
+
+func (s *Set[T]) Diff(other *Set[T]) *Set[T] {
+	s.RLock()
+	other.RLock()
+	defer s.RUnlock()
+	defer other.RUnlock()
+
+	diff := NewSet[T]()
+	for item := range s.m {
+		if !other.Has(item) {
+			diff.Add(item)
+		}
+	}
+	return diff
+}
+
+func (s *Set[T]) And(other *Set[T]) *Set[T] {
+	s.RLock()
+	other.RLock()
+	defer s.RUnlock()
+	defer other.RUnlock()
+
+	intersection := NewSet[T]()
+	for item := range s.m {
+		if other.Has(item) {
+			intersection.Add(item)
+		}
+	}
+	return intersection
+}
+
+func (s *Set[T]) Or(other *Set[T]) *Set[T] {
+	s.RLock()
+	other.RLock()
+	defer s.RUnlock()
+	defer other.RUnlock()
+
+	union := NewSet[T]()
+	for item := range s.m {
+		union.Add(item)
+	}
+	for item := range other.m {
+		union.Add(item)
+	}
+	return union
 }
