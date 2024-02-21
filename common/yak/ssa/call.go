@@ -1,6 +1,8 @@
 package ssa
 
-import "github.com/yaklang/yaklang/common/utils"
+import (
+	"github.com/yaklang/yaklang/common/utils"
+)
 
 func NewCall(target Value, args, binding []Value, block *BasicBlock) *Call {
 	c := &Call{
@@ -22,6 +24,18 @@ func (f *FunctionBuilder) NewCall(target Value, args []Value) *Call {
 	return call
 }
 
+func (f *FunctionBuilder) EmitCall(c *Call) *Call {
+	if f.CurrentBlock.finish {
+		return nil
+	}
+
+	f.emit(c)
+	c.handlerReturnType()
+	c.handleMethod()
+
+	return c
+}
+
 // handler Return type, and handle drop error
 func (c *Call) handlerReturnType() {
 	// get function type
@@ -31,18 +45,18 @@ func (c *Call) handlerReturnType() {
 	}
 	// inference call instruction type
 	if c.IsDropError {
-		if t, ok := funcTyp.ReturnType.(*ObjectType); ok {
-			if t.Combination && t.FieldTypes[len(t.FieldTypes)-1].GetTypeKind() == ErrorTypeKind {
-				if len(t.FieldTypes) == 1 {
+		if retType, ok := funcTyp.ReturnType.(*ObjectType); ok {
+			if retType.Combination && retType.FieldTypes[len(retType.FieldTypes)-1].GetTypeKind() == ErrorTypeKind {
+				if len(retType.FieldTypes) == 1 {
 					c.SetType(BasicTypes[NullTypeKind])
-				} else if len(t.FieldTypes) == 2 {
+				} else if len(retType.FieldTypes) == 2 {
 					// if len(t.FieldTypes) == 2 {
-					c.SetType(t.FieldTypes[0])
+					c.SetType(retType.FieldTypes[0])
 				} else {
 					ret := NewStructType()
-					ret.FieldTypes = t.FieldTypes[:len(t.FieldTypes)-1]
-					ret.Keys = t.Keys[:len(t.Keys)-1]
-					ret.KeyTyp = t.KeyTyp
+					ret.FieldTypes = retType.FieldTypes[:len(retType.FieldTypes)-1]
+					ret.Keys = retType.Keys[:len(retType.Keys)-1]
+					ret.KeyTyp = retType.KeyTyp
 					ret.Combination = true
 					ret.Len = len(ret.FieldTypes)
 					ret.Kind = TupleTypeKind
@@ -96,18 +110,6 @@ func (c *Call) handleMethod() {
 	// get object
 	obj := c.Method.GetObject()
 	c.Args = utils.InsertSliceItem(c.Args, obj, 0)
-}
-
-func (f *FunctionBuilder) EmitCall(c *Call) *Call {
-	if f.CurrentBlock.finish {
-		return nil
-	}
-
-	f.emit(c)
-	c.handlerReturnType()
-	c.handleMethod()
-
-	return c
 }
 
 func (c *Call) HandleFreeValue(fvs []string) {

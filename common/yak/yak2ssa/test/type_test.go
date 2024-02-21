@@ -95,3 +95,53 @@ func TestYaklangType_FreeValue(t *testing.T) {
 		`, ssa.NumberTypeKind)
 	})
 }
+
+func TestYaklangType_Object(t *testing.T) {
+	t.Run("map, but not found", func(t *testing.T) {
+		CheckType(t, `
+		m = make(map[string]string)
+		target = m["key"]
+		`, ssa.StringTypeKind)
+	})
+
+	t.Run("map, can found", func(t *testing.T) {
+		CheckType(t, `
+		m = make(map[string]any)
+		m["key"] = 1
+		target = m["key"]
+		`, ssa.NumberTypeKind)
+	})
+
+	t.Run("map, not found, pass function", func(t *testing.T) {
+		CheckType(t, `
+		f = () => {
+			m = make(map[string]string)
+			return m
+		}
+		m = f() 
+		target = m["key"]
+		`, ssa.StringTypeKind)
+	})
+
+	t.Run("map, can found, pass function", func(t *testing.T) {
+		CheckType(t, `
+		f = () => {
+			m = make(map[string]any)
+			m["key"] = 1
+			return m
+		}
+		m = f() 
+		target = m["key"]
+		`, ssa.NumberTypeKind)
+	})
+
+	t.Run("map, just create and return", func(t *testing.T) {
+		CheckType(t, `
+		f = () => ({
+			"key": 1
+		})
+		m = f()
+		target = m["key"]
+		`, ssa.NumberTypeKind)
+	})
+}

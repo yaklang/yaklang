@@ -125,6 +125,9 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 	if variable.IsMemberCall() {
 		obj, key := variable.GetMemberCall()
 		SetMemberCall(obj, key, value)
+		if objTyp, ok := ToObjectType(obj.GetType()); ok {
+			objTyp.AddField(key, value.GetType())
+		}
 	}
 
 	if !value.IsExtern() || value.GetName() != variable.GetName() {

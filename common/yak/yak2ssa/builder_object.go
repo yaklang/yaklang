@@ -25,8 +25,7 @@ func (b *astbuilder) buildSliceFromExprList(stmt ExpressionListMultiline) ssa.Va
 	}
 	vs := b.buildExpressionListMultiline(s)
 	obj := b.CreateInterfaceWithVs(nil, vs)
-	fieldTyp := obj.GetType().(*ssa.ObjectType).FieldType
-	obj.SetType(ssa.NewSliceType(fieldTyp))
+	obj.GetType().(*ssa.ObjectType).Kind = ssa.SliceTypeKind
 	return obj
 }
 
@@ -45,7 +44,13 @@ func (b *astbuilder) buildSliceTypedLiteral(stmt *yak.SliceTypedLiteralContext) 
 	slice := b.buildSliceFromExprList(stmt)
 
 	if s, ok := stmt.SliceTypeLiteral().(*yak.SliceTypeLiteralContext); ok {
-		slice.SetType(b.buildSliceTypeLiteral(s))
+		typ := b.buildSliceTypeLiteral(s)
+		if typ.GetTypeKind() != ssa.SliceTypeKind {
+			// []number may be ByteTypeKind
+			slice.SetType(typ)
+		} else {
+			coverType(slice.GetType(), typ)
+		}
 	} else {
 		b.NewError(ssa.Warn, TAG, "slice type not set")
 	}
@@ -91,7 +96,9 @@ func (b *astbuilder) buildMapFromMapPairs(stmt MapPairs) ssa.Value {
 	if t.KeyTyp != nil {
 		keyTyp = t.KeyTyp
 	}
-	obj.SetType(ssa.NewMapType(keyTyp, fieldTyp))
+
+	coverType(obj.GetType(), ssa.NewMapType(keyTyp, fieldTyp))
+
 	return obj
 }
 
@@ -118,10 +125,31 @@ func (b *astbuilder) buildMapTypedLiteral(stmt *yak.MapTypedLiteralContext) ssa.
 	maps := b.buildMapFromMapPairs(stmt)
 
 	if s, ok := stmt.MapTypeLiteral().(*yak.MapTypeLiteralContext); ok {
-		maps.SetType(b.buildMapTypeLiteral(s))
+		typ := b.buildMapTypeLiteral(s)
+		coverType(maps.GetType(), typ)
 	} else {
 		b.NewError(ssa.Warn, TAG, "map type not set")
 	}
 
 	return maps
+}
+
+func coverType(ityp, iwantTyp ssa.Type) {
+	typ, ok := ityp.(*ssa.ObjectType)
+	if !ok {
+		return
+	}
+	wantTyp, ok := iwantTyp.(*ssa.ObjectType)
+	if !ok {
+		return
+	}
+
+	typ.SetTypeKind(wantTyp.GetTypeKind())
+	switch wantTyp.GetTypeKind() {
+	case ssa.SliceTypeKind:
+		typ.FieldType = wantTyp.FieldType
+	case ssa.MapTypeKind:
+		typ.FieldType = wantTyp.FieldType
+		typ.KeyTyp = wantTyp.KeyTyp
+	}
 }

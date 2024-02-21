@@ -188,77 +188,126 @@ func CheckSignature(t *testing.T) func(t *testing.T, code, typ string, Range *yp
 	return check
 }
 
+type CheckItem struct {
+	name      string
+	want      string
+	Range     *ypb.Range
+	subString bool
+}
+
 func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 	check := CheckHover(t)
 
-	t.Run("check basic hover", func(t *testing.T) {
-		code := `
-				 a = 1
-				 b = 1.1
-				 c = "asd"
-				 d = b"asd"; d2 = []byte("asd")
-				 e = {"a": 1}
-				 f = [1, 2, 3]
-				 g = make(chan int)
-				 `
-		check(t, code, "yak", &ypb.Range{
-			Code:        "a",
-			StartLine:   2,
-			StartColumn: 5,
-			EndLine:     2,
-			EndColumn:   6,
-		}, "```go\na number\n```")
-		check(t, code, "yak", &ypb.Range{
-			Code:        "b",
-			StartLine:   3,
-			StartColumn: 5,
-			EndLine:     3,
-			EndColumn:   6,
-		}, "```go\nb number\n```")
-		check(t, code, "yak", &ypb.Range{
-			Code:        "c",
-			StartLine:   4,
-			StartColumn: 5,
-			EndLine:     4,
-			EndColumn:   6,
-		}, "```go\nc string\n```")
-		check(t, code, "yak", &ypb.Range{
-			Code:        "d",
-			StartLine:   5,
-			StartColumn: 5,
-			EndLine:     5,
-			EndColumn:   6,
-		}, "```go\nd []byte\n```")
-		check(t, code, "yak", &ypb.Range{
-			Code:        "d2",
-			StartLine:   5,
-			StartColumn: 11,
-			EndLine:     5,
-			EndColumn:   13,
-		}, "```go\nd2 []byte\n```")
-		check(t, code, "yak", &ypb.Range{
-			Code:        "e",
-			StartLine:   6,
-			StartColumn: 5,
-			EndLine:     6,
-			EndColumn:   6,
-		}, "```go\ne map[any]any\n```")
-		check(t, code, "yak", &ypb.Range{
-			Code:        "f",
-			StartLine:   7,
-			StartColumn: 5,
-			EndLine:     7,
-			EndColumn:   6,
-		}, "```go\nf []any\n```")
-		check(t, code, "yak", &ypb.Range{
-			Code:        "g",
-			StartLine:   8,
-			StartColumn: 5,
-			EndLine:     8,
-			EndColumn:   6,
-		}, "```go\ng chan number\n```")
-	})
+	data := []CheckItem{
+		{
+			name: "a",
+			want: "```go\na number\n```",
+			Range: &ypb.Range{
+				Code:        "a",
+				StartLine:   2,
+				StartColumn: 5,
+				EndLine:     2,
+				EndColumn:   6,
+			},
+		},
+
+		{
+			name: "b",
+			want: "```go\nb number\n```",
+			Range: &ypb.Range{
+				Code:        "b",
+				StartLine:   3,
+				StartColumn: 5,
+				EndLine:     3,
+				EndColumn:   6,
+			},
+		},
+		{
+			name: "c",
+			want: "```go\nc string\n```",
+			Range: &ypb.Range{
+				Code:        "c",
+				StartLine:   4,
+				StartColumn: 5,
+				EndLine:     4,
+				EndColumn:   6,
+			},
+		},
+		{
+			name: "d",
+			want: "```go\nd []byte\n```",
+			Range: &ypb.Range{
+				Code:        "d",
+				StartLine:   5,
+				StartColumn: 5,
+				EndLine:     5,
+				EndColumn:   6,
+			},
+		},
+		{
+			name: "d2",
+			want: "```go\nd2 []byte\n```",
+			Range: &ypb.Range{
+				Code:        "d2",
+				StartLine:   5,
+				StartColumn: 11,
+				EndLine:     5,
+				EndColumn:   13,
+			},
+		},
+		{
+			name: "e",
+			want: "```go\ne map[string]number\n```",
+			Range: &ypb.Range{
+				Code:        "e",
+				StartLine:   6,
+				StartColumn: 5,
+				EndLine:     6,
+				EndColumn:   6,
+			},
+		},
+		{
+			name: "f",
+			want: "```go\nf []number\n```",
+			Range: &ypb.Range{
+				Code:        "f",
+				StartLine:   7,
+				StartColumn: 5,
+				EndLine:     7,
+				EndColumn:   6,
+			},
+		},
+		{
+			name: "g",
+			want: "```go\ng chan number\n```",
+			Range: &ypb.Range{
+				Code:        "g",
+				StartLine:   8,
+				StartColumn: 5,
+				EndLine:     8,
+				EndColumn:   6,
+			},
+		},
+	}
+	code := `
+				a = 1
+				b = 1.1
+				c = "asd"
+				d = b"asd"; d2 = []byte("asd")
+				e = {"a": 1}
+				f = [1, 2, 3]
+				g = make(chan int)
+				`
+
+	for _, item := range data {
+		t.Run(item.name, func(t *testing.T) {
+			check(t, code, "yak", item.Range, item.want, item.subString)
+		})
+	}
+}
+func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Mitm(t *testing.T) {
 	t.Run("check mitm hover argument", func(t *testing.T) {
+		check := CheckHover(t)
 		check(t, `
 		hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
 			responseBytes, _ = codec.StrconvUnquote(flow.Response)
@@ -289,13 +338,6 @@ prog  = ssa.Parse(
 )~
 prog.Packages
 }`
-
-	type CheckItem struct {
-		name      string
-		want      string
-		Range     *ypb.Range
-		subString bool
-	}
 
 	data := []CheckItem{
 		{

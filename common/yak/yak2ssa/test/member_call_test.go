@@ -143,6 +143,24 @@ func TestMemberCall_Negative_Closure(t *testing.T) {
 }
 
 func TestMemberCall_CheckField(t *testing.T) {
+
+	t.Run("assign in same scope", func(t *testing.T) {
+		checkPrintlnValue(`
+		a = {} 
+		a.b = 1
+		println(a.b)
+		`, []string{"1"}, t)
+	})
+
+	t.Run("assign in same scope printf undefine", func(t *testing.T) {
+		checkPrintlnValue(`
+		a = {} 
+		println(a.b)
+		a.b = 1
+		println(a.b)
+		`, []string{"Undefined-#2.b(valid)", "1"}, t)
+	})
+
 	t.Run("assign", func(t *testing.T) {
 		checkPrintlnValue(`
 		a = {} 
