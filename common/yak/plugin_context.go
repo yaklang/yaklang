@@ -3,6 +3,7 @@ package yak
 import (
 	"context"
 	"github.com/yaklang/yaklang/common/filter"
+	"github.com/yaklang/yaklang/common/utils/cli"
 )
 
 type YakitPluginContext struct {
@@ -10,6 +11,7 @@ type YakitPluginContext struct {
 	RuntimeId     string
 	Proxy         string
 	Ctx           context.Context
+	CliApp        *cli.CliApp
 	defaultFilter *filter.StringFilter
 }
 
@@ -30,6 +32,11 @@ func (y *YakitPluginContext) WithDefaultFilter(filter *filter.StringFilter) *Yak
 
 func (y *YakitPluginContext) WithContext(ctx context.Context) *YakitPluginContext {
 	y.Ctx = ctx
+	return y
+}
+
+func (y *YakitPluginContext) WithCliApp(cliApp *cli.CliApp) *YakitPluginContext {
+	y.CliApp = cliApp
 	return y
 }
 
