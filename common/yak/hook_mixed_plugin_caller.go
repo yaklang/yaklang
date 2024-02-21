@@ -2,6 +2,7 @@ package yak
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"net/url"
 	"sort"
@@ -85,8 +86,6 @@ var MITMAndPortScanHooks = []string{
 	HOOK_PortScanHandle,
 }
 
-var MixScanHooks = append(MITMAndPortScanHooks, HOOK_NucleiScanHandle)
-
 type MixPluginCaller struct {
 	websiteFilter       *filter.StringFilter
 	websitePathFilter   *filter.StringFilter
@@ -160,33 +159,8 @@ execNasl = (target)=>{
 }
 `
 
-const nucleiCodeExecTemplate = `
-nucleiPoCName = MITM_PARAMS["CURRENT_NUCLEI_PLUGIN_NAME"]
-proxy = cli.StringSlice("proxy")
-execNuclei = func(target,filter) { // 避免重复创建过滤器
-    if len(proxy) > 0 {
-        yakit.Info("PROXY: %v", proxy)
-    } 
-	log.Info("开始执行插件: %s [%v]", nucleiPoCName, target)
-    
-	res, err = nuclei.ScanEx(
-        target,
-		filter,
-		nuclei.fuzzQueryTemplate(nucleiPoCName),
-        nuclei.timeout(10), 
-        nuclei.proxy(proxy...),
-    )
-	if err != nil {
-		yakit.Error("扫描[%v]失败: %s", target, err)
-		return
-	}
-    log.Info("开始等待插件: %v 针对: %v 的返回结果", nucleiPoCName, target)
-	for pocVul = range res {
-		yakit.Output(pocVul)		
-		yakit.Output(nuclei.PocVulToRisk(pocVul))		
-	}
-}
-`
+//go:embed nuclei_executor.yak
+var YAK_TEMPLATE_NUCLEI_EXECUTOR string
 
 func (m *MixPluginCaller) SetFeedback(i func(i *ypb.ExecResult) error) {
 	if i == nil {
@@ -422,7 +396,7 @@ func (m *MixPluginCaller) LoadPluginByName(ctx context.Context, name string, par
 					Key:   "CURRENT_NUCLEI_PLUGIN_NAME",
 					Value: ins.ScriptName,
 				})
-				code = nucleiCodeExecTemplate
+				code = YAK_TEMPLATE_NUCLEI_EXECUTOR
 			}
 		}
 	}
@@ -798,7 +772,7 @@ func (m *MixPluginCaller) MirrorHTTPFlowEx(
 				m.swg.Add()
 				go func() {
 					defer m.swg.Done()
-					callers.CallByName(HOOK_NucleiScanHandle, urlObj.String(), m.rawQuestFilter)
+					callers.CallByName(HOOK_NucleiScanHandle, urlObj.String())
 				}()
 			}
 			if callers.ShouldCallByName(HOOK_NaslScanHandle) {

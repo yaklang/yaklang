@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/samber/lo"
 	"math"
 	"math/rand"
 	"strings"
@@ -409,12 +410,23 @@ func processVulnerability(target any, filterVul *filter.StringFilter, vCh chan *
 }
 
 func ScanLegacy(target any, opt ...interface{}) (chan *tools.PocVul, error) {
-	filterVul := filter.NewFilter()
-	return ScanLegacyEx(target, filterVul, opt)
+	var opts = make([]ConfigOption, 0, len(opt))
+	lo.Filter(opt, func(item interface{}, index int) bool {
+		_, ok := item.(ConfigOption)
+		if ok {
+			opts = append(opts, item.(ConfigOption))
+		}
+		return ok
+	})
+	return ScanLegacyWithFilter(target, NewConfig(opts...).defaultFilter, opt)
 }
 
-func ScanLegacyEx(target any, filterVul *filter.StringFilter, opt ...interface{}) (chan *tools.PocVul, error) {
+func ScanLegacyWithFilter(target any, filterVul *filter.StringFilter, opt ...interface{}) (chan *tools.PocVul, error) {
+	if filterVul == nil {
+		filterVul = defaultFilter
+	}
 	vCh := make(chan *tools.PocVul)
+
 	i := processVulnerability(target, filterVul, vCh)
 	opt = append(opt, _callback(i))
 	opt = append(opt, _tcpCallback(i))
@@ -440,10 +452,10 @@ func ScanLegacyEx(target any, filterVul *filter.StringFilter, opt ...interface{}
 
 var Exports = map[string]interface{}{
 	"Scan":     ScanLegacy,
-	"ScanEx":   ScanLegacyEx,
 	"ScanAuto": ScanAuto,
 
 	// params
+	"customVulnFilter":        WithCustomVulnFilter,
 	"tags":                    WithTags,
 	"excludeTags":             nucleiOptionDummy("excludeTags"),
 	"workflows":               nucleiOptionDummy("workflows"),

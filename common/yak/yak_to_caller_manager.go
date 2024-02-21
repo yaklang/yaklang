@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/filter"
+	"github.com/yaklang/yaklang/common/yak/httptpl"
 	"net/http"
 	"reflect"
 	"strings"
@@ -189,13 +190,14 @@ type Caller struct {
 }
 
 type YakToCallerManager struct {
-	table          *sync.Map
-	swg            *utils.SizedWaitGroup
-	baseWaitGroup  *sync.WaitGroup
-	dividedContext bool
-	timeout        time.Duration
-	runtimeId      string
-	proxy          string
+	table            *sync.Map
+	swg              *utils.SizedWaitGroup
+	baseWaitGroup    *sync.WaitGroup
+	dividedContext   bool
+	timeout          time.Duration
+	runtimeId        string
+	proxy            string
+	scanTargetFilter *filter.StringFilter
 }
 
 func (c *YakToCallerManager) SetLoadPluginTimeout(i float64) {
@@ -322,6 +324,14 @@ func (y *YakToCallerManager) SetForYakit(
 	}, hooks...)
 }
 
+func (y *YakToCallerManager) getYakitPluginContext(ctx ...context.Context) *YakitPluginContext {
+	var finalCtx context.Context
+	if len(ctx) > 0 {
+		finalCtx = ctx[0]
+	}
+	return CreateYakitPluginContext(y.runtimeId).WithProxy(y.proxy).WithContext(finalCtx).WithScanTargetFilter(y.getScanTargetFilter())
+}
+
 func (y *YakToCallerManager) Set(ctx context.Context, code string, hook func(engine *antlr4yak.Engine) error, funcName ...string) (retError error) {
 	defer func() {
 		if err := recover(); err != nil {
@@ -332,10 +342,7 @@ func (y *YakToCallerManager) Set(ctx context.Context, code string, hook func(eng
 	}()
 
 	var engine *antlr4yak.Engine
-	cTable, err := FetchFunctionFromSourceCode(ctx, &YakitPluginContext{
-		RuntimeId: y.runtimeId,
-		Proxy:     y.proxy,
-	}, y.timeout, "", code, func(e *antlr4yak.Engine) error {
+	cTable, err := FetchFunctionFromSourceCode(ctx, y.getYakitPluginContext(ctx), y.timeout, "", code, func(e *antlr4yak.Engine) error {
 		if engine == nil {
 			engine = e
 		}
@@ -742,6 +749,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 				if runtimeId != "" {
 					opts = append(opts, lowhttp.WithRuntimeId(runtimeId))
 				}
+				opts = append(opts, httptpl.WithCustomVulnFilter(pluginContext.defaultFilter))
 				opts = append(opts, lowhttp.WithFromPlugin(pluginName))
 				opts = append(opts, lowhttp.WithSaveHTTPFlow(true))
 				opts = append(opts, lowhttp.WithProxy(proxy))
@@ -751,29 +759,14 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		return i
 	})
 
-	nIns.GetVM().RegisterMapMemberCallHandler("nuclei", "ScanEx", func(i interface{}) interface{} {
-		originFunc, ok := i.(func(target any, filterVul *filter.StringFilter, opts ...any) (chan *tools.PocVul, error))
-		if ok {
-			return func(target any, filterVul *filter.StringFilter, opts ...any) (chan *tools.PocVul, error) {
-				if runtimeId != "" {
-					opts = append(opts, lowhttp.WithRuntimeId(runtimeId))
-				}
-				opts = append(opts, lowhttp.WithFromPlugin(pluginName))
-				opts = append(opts, lowhttp.WithSaveHTTPFlow(true))
-				opts = append(opts, lowhttp.WithProxy(proxy))
-				return originFunc(target, filterVul, opts...)
-			}
-		}
-		return i
-	})
-
-	// `
-
 	nIns.GetVM().RegisterMapMemberCallHandler("nuclei", "ScanAuto", func(i interface{}) interface{} {
 		originFunc, ok := i.(func(target any, opts ...any))
 		if ok {
 			return func(target any, opts ...any) {
-				opts = append(opts, lowhttp.WithRuntimeId(runtimeId))
+				if runtimeId != "" {
+					opts = append(opts, lowhttp.WithRuntimeId(runtimeId))
+				}
+				opts = append(opts, httptpl.WithCustomVulnFilter(pluginContext.defaultFilter))
 				opts = append(opts, lowhttp.WithFromPlugin(pluginName))
 				opts = append(opts, lowhttp.WithSaveHTTPFlow(true))
 				opts = append(opts, lowhttp.WithProxy(proxy))
@@ -1055,13 +1048,22 @@ func (y *YakToCallerManager) AddForYakit(
 			}
 			return caller(result)
 		}))
-		BindYakitPluginContextToEngine(engine, &YakitPluginContext{
-			PluginName: id,
-			RuntimeId:  y.runtimeId,
-			Proxy:      y.proxy,
-		})
+		BindYakitPluginContextToEngine(engine, y.getYakitPluginContext().WithPluginName(id))
 		return nil
 	}, hooks...)
+}
+
+var fetchFilterMutex = new(sync.Mutex)
+
+func (y *YakToCallerManager) getScanTargetFilter() *filter.StringFilter {
+	fetchFilterMutex.Lock()
+	defer fetchFilterMutex.Unlock()
+
+	if y.scanTargetFilter != nil {
+		return y.scanTargetFilter
+	}
+	y.scanTargetFilter = filter.NewFilter()
+	return y.scanTargetFilter
 }
 
 func (y *YakToCallerManager) Add(ctx context.Context, id string, params []*ypb.ExecParamItem, code string, hook func(*antlr4yak.Engine) error, funcName ...string) (retError error) {
@@ -1081,10 +1083,7 @@ func (y *YakToCallerManager) Add(ctx context.Context, id string, params []*ypb.E
 			return nil
 		}
 	}
-	cTable, err := FetchFunctionFromSourceCode(ctx, &YakitPluginContext{
-		RuntimeId: y.runtimeId,
-		Proxy:     y.proxy,
-	}, y.timeout, id, code, func(e *antlr4yak.Engine) error {
+	cTable, err := FetchFunctionFromSourceCode(ctx, y.getYakitPluginContext(ctx), y.timeout, id, code, func(e *antlr4yak.Engine) error {
 		if engine == nil {
 			engine = e
 		}
