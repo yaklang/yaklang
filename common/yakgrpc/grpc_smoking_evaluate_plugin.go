@@ -62,11 +62,32 @@ func (s *Server) SmokingEvaluatePlugin(ctx context.Context, req *ypb.SmokingEval
 		pluginCode = ins.Content
 		pluginType = ins.Type
 	}
-	return s.EvaluatePlugin(ctx, pluginCode, pluginType)
+	host, port := setupEachServe(ctx)
+	return s.EvaluatePlugin(ctx, pluginCode, pluginType, host, port)
+}
+
+func setupEachServe(ctx context.Context) (string, int) {
+	var host string
+	var port int
+	var wg sync.WaitGroup
+	// start each server
+	wg.Add(1)
+	go func() {
+		defer func() {
+			defer wg.Done()
+			if err := recover(); err != nil {
+				log.Errorf("lowhttp.DebugEchoServer panic: %v", err)
+				utils.PrintCurrentGoroutineRuntimeStack()
+			}
+		}()
+		host, port = lowhttp.DebugEchoServerContext(ctx)
+	}()
+	wg.Wait()
+	return host, port
 }
 
 // 只在评分中使用
-func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType string) (*ypb.SmokingEvaluatePluginResponse, error) {
+func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType string, host string, port int) (*ypb.SmokingEvaluatePluginResponse, error) {
 	if pluginType == "nuclei" {
 		return &ypb.SmokingEvaluatePluginResponse{
 			Score:   60,
@@ -128,22 +149,6 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 
 	if pluginType == "mitm" || pluginType == "port-scan" { // echo debug script
 
-		var host string
-		var port int
-		var wg sync.WaitGroup
-		// start each server
-		wg.Add(1)
-		go func() {
-			defer func() {
-				defer wg.Done()
-				if err := recover(); err != nil {
-					log.Errorf("lowhttp.DebugEchoServer panic: %v", err)
-					utils.PrintCurrentGoroutineRuntimeStack()
-				}
-			}()
-			host, port = lowhttp.DebugEchoServerContext(ctx)
-		}()
-		wg.Wait()
 		if host == "" || port <= 0 {
 			return nil, utils.Error("debug echo server start failed")
 		}
