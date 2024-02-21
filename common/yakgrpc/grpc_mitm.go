@@ -130,7 +130,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	feedbackToUser("接收到 MITM 启动参数 / receive mitm config request")
 	hostMapping := make(map[string]string)
 	getDownstreamProxy := func(request *ypb.MITMRequest) (string, error) {
-		downstreamProxy := strings.TrimSpace(firstReq.GetDownstreamProxy())
+		downstreamProxy := strings.TrimSpace(request.GetDownstreamProxy())
 		// 容错处理一下代理
 		downstreamProxy = strings.Trim(downstreamProxy, `":`)
 		if downstreamProxy == "0" {
