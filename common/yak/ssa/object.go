@@ -105,6 +105,7 @@ func (b *FunctionBuilder) CreateInterfaceWithVs(keys []Value, vs []Value) *Make 
 	lValueLen := NewConst(len(vs))
 	ityp := NewObjectType()
 	itf := b.EmitMakeWithoutType(lValueLen, lValueLen)
+	itf.SetType(ityp)
 	for i, rv := range vs {
 		if utils.IsNil(rv) {
 			continue
@@ -119,8 +120,7 @@ func (b *FunctionBuilder) CreateInterfaceWithVs(keys []Value, vs []Value) *Make 
 		b.AssignVariable(v, rv)
 	}
 	ityp.Finish()
-	ityp.Len = len(vs)
-	itf.SetType(ityp)
+	// ityp.Len = len(vs)
 	return itf
 }
 
@@ -182,6 +182,17 @@ func checkCanMemberCall(value, key Value) (string, Type) {
 	}
 
 	switch value.GetType().GetTypeKind() {
+	case ObjectTypeKind:
+		typ, ok := ToObjectType(value.GetType())
+		if !ok {
+			log.Errorf("checkCanMemberCall: %v is structTypeKind but is not a ObjectType", value.GetType())
+			break
+		}
+		if fieldTyp := typ.GetField(key); fieldTyp != nil {
+			return name, fieldTyp
+		}
+		// not this field
+		return name, BasicTypes[AnyTypeKind]
 	case StructTypeKind: // string
 		typ, ok := ToObjectType(value.GetType())
 		if !ok {
@@ -215,6 +226,11 @@ func checkCanMemberCall(value, key Value) (string, Type) {
 			break
 		}
 		if TypeCompare(typ.KeyTyp, key.GetType()) {
+			if typ.FieldType.GetTypeKind() == AnyTypeKind {
+				if fieldTyp := typ.GetField(key); fieldTyp != nil {
+					return name, fieldTyp
+				}
+			}
 			return name, typ.FieldType
 		} else {
 			// type check error
@@ -226,6 +242,11 @@ func checkCanMemberCall(value, key Value) (string, Type) {
 			break
 		}
 		if TypeCompare(BasicTypes[NumberTypeKind], key.GetType()) {
+			if typ.FieldType.GetTypeKind() == AnyTypeKind {
+				if fieldTyp := typ.GetField(key); fieldTyp != nil {
+					return name, fieldTyp
+				}
+			}
 			return name, typ.FieldType
 		} else {
 			// type check error
@@ -279,8 +300,7 @@ func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
 	// }
 	// log.Infof("ReadMemberCallVariable:  %v", key)
 
-	ret, _ := b.createField(value, key)
-	return ret
+	return b.getFieldValue(value, key)
 }
 
 func (b *FunctionBuilder) CreateMemberCallVariable(value, key Value) *Variable {
@@ -289,24 +309,25 @@ func (b *FunctionBuilder) CreateMemberCallVariable(value, key Value) *Variable {
 		return b.CreateVariable(name, false)
 	}
 
-	// if name, ok := b.checkCanMemberCall(value, key); ok {
-	_, name := b.createField(value, key)
+	name := b.getFieldName(value, key)
 	// log.Infof("CreateMemberCallVariable: %v, %v", retValue.GetName(), key)
 	ret := b.CreateVariable(name, false)
 	ret.SetMemberCall(value, key)
 	return ret
 }
 
-func (b *FunctionBuilder) createField(value, key Value) (Value, string) {
+func (b *FunctionBuilder) getFieldName(value, key Value) string {
+	name, typ := checkCanMemberCall(value, key)
+	b.getOriginMember(name, typ, key, value) // create undefine member
+	return name
+}
 
+func (b *FunctionBuilder) getFieldValue(value, key Value) Value {
 	name, typ := checkCanMemberCall(value, key)
 	if ret := b.PeekValueInThisFunction(name); ret != nil {
-		return ret, name
+		return ret
 	}
-
-	ret := b.getOriginMember(name, typ, key, value)
-
-	return ret, name
+	return b.getOriginMember(name, typ, key, value)
 }
 
 func (b *FunctionBuilder) getOriginMember(name string, typ Type, key, value Value) Value {

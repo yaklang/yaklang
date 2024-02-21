@@ -92,6 +92,14 @@ func TestClosureFreeValueScope(t *testing.T) {
 			"2", "1",
 		}, t)
 	})
+
+	t.Run("FreeValue self", func(t *testing.T) {
+		checkPrintlnValue(`
+		a = () => {
+			a = 2
+		}
+		`, []string{}, t)
+	})
 }
 
 func TestClosureMask(t *testing.T) {
@@ -149,7 +157,7 @@ func TestClosureMask(t *testing.T) {
 	})
 }
 
-func TestClose_SideEffect(t *testing.T) {
+func TestClosure_SideEffect(t *testing.T) {
 	t.Run("normal", func(t *testing.T) {
 		checkPrintlnValue(`
 		a = 0 
@@ -163,6 +171,20 @@ func TestClose_SideEffect(t *testing.T) {
 		println(a) // phi 1, 0
 		`, []string{
 			"phi(a)[1,0]",
+		}, t)
+	})
+
+	t.Run("object", func(t *testing.T) {
+		checkPrintlnValue(`
+		var b
+		get = () => ({
+			"change": i=>{b=i}	
+		})
+		a = get() 
+		a.change("c")
+		println(b)
+		`, []string{
+			"Parameter-i",
 		}, t)
 	})
 }

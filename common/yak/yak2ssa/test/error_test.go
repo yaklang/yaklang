@@ -183,19 +183,45 @@ func TestBasicExpression(t *testing.T) {
 }
 
 func TestAssign(t *testing.T) {
-	t.Run("multiple value assignment ", func(t *testing.T) {
+	t.Run("value assignment 1=1", func(t *testing.T) {
 		CheckError(t, TestCase{
 			code: `
 			// 1 = 1
 			a = 1
-
+			`,
+		})
+	})
+	t.Run("value assignment 1=n", func(t *testing.T) {
+		CheckError(t, TestCase{
+			code: `
 			// 1 = n
 			a = 1, 2
 			a = 1, 2, 3
+			`,
+		})
+	})
 
+	t.Run("value assignment n=1", func(t *testing.T) {
+		CheckError(t, TestCase{
+			code: `
+			// 1 = n
+			n = 1, 2
+			a, b = n
+			`,
+		})
+	})
+
+	t.Run("value assignment n=n", func(t *testing.T) {
+		CheckError(t, TestCase{
+			code: `
 			// n = n
 			a, b, c = 1, 2, 3
-
+			`,
+		})
+	})
+	t.Run("value assignment m=n", func(t *testing.T) {
+		CheckError(t, TestCase{
+			code: `
 			// m = n
 			a, b = 1, 2, 3       // err 2 != 3
 			a, b, c = 1, 2, 3, 4 // err 3 != 4
@@ -206,6 +232,7 @@ func TestAssign(t *testing.T) {
 			},
 		})
 	})
+
 }
 
 func TestFreeValue(t *testing.T) {
@@ -485,11 +512,31 @@ func TestSliceCall(t *testing.T) {
 	t.Run("slice call with string type", func(t *testing.T) {
 		CheckError(t, TestCase{
 			code: `
-			a = 1
-			a[1] = 1
 			a = "abc"
 			a[1] = 1
 			a[2] = 3
+			`,
+			want: []string{},
+		})
+	})
+
+	t.Run("slice call with number type left ", func(t *testing.T) {
+		CheckError(t, TestCase{
+			code: `
+			a = 1 
+			a[1] = 1
+			`,
+			want: []string{
+				ssa4analyze.InvalidField("number", "1"),
+			},
+		})
+	})
+
+	t.Run("slice call with number type right ", func(t *testing.T) {
+		CheckError(t, TestCase{
+			code: `
+			a = 1 
+			b = a[1]
 			`,
 			want: []string{
 				ssa4analyze.InvalidField("number", "1"),

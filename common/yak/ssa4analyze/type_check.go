@@ -210,7 +210,7 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 		rightLen := len(objType.FieldTypes)
 		if objType.FieldTypes[len(objType.FieldTypes)-1].GetTypeKind() == ssa.ErrorTypeKind {
 			if c.IsDropError {
-				rightLen -= 1
+				rightLen--
 				hasError = false
 			} else {
 				hasError = true
