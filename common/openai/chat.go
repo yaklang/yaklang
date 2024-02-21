@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
@@ -36,6 +37,10 @@ func NewOpenAIClient(opt ...ConfigOption) *Client {
 	if c.httpClient == nil {
 		c.httpClient = utils.NewDefaultHTTPClientWithProxy(c.Proxy)
 		c.httpClient.Timeout = time.Minute
+	}
+	config := consts.GetThirdPartyApplicationConfig("openai")
+	if config.APIKey != "" {
+		c.APIKey = config.APIKey
 	}
 	return c
 }
