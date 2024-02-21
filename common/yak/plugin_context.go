@@ -23,7 +23,7 @@ func (y *YakitPluginContext) WithProxy(proxy string) *YakitPluginContext {
 	return y
 }
 
-func (y *YakitPluginContext) WithScanTargetFilter(filter *filter.StringFilter) *YakitPluginContext {
+func (y *YakitPluginContext) WithDefaultFilter(filter *filter.StringFilter) *YakitPluginContext {
 	y.defaultFilter = filter
 	return y
 }
@@ -33,11 +33,8 @@ func (y *YakitPluginContext) WithContext(ctx context.Context) *YakitPluginContex
 	return y
 }
 
-var fallbackFilter = filter.NewFilter()
-
 func CreateYakitPluginContext(runtimeId string) *YakitPluginContext {
 	return &YakitPluginContext{
-		RuntimeId:     runtimeId,
-		defaultFilter: fallbackFilter,
+		RuntimeId: runtimeId,
 	}
 }

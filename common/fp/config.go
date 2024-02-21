@@ -3,7 +3,6 @@ package fp
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/hostsparser"
@@ -84,7 +83,7 @@ type Config struct {
 
 	// Exclude
 	ExcludeHostsFilter *hostsparser.HostsParser
-	ExcludePortsFilter *filter.StringFilter
+	ExcludePortsFilter *utils.PortsFilter
 }
 
 func (c *Config) IsFiltered(host string, port int) bool {
@@ -98,7 +97,7 @@ func (c *Config) IsFiltered(host string, port int) bool {
 	}
 
 	if c.ExcludePortsFilter != nil {
-		if c.ExcludePortsFilter.Exist(fmt.Sprint(port)) {
+		if c.ExcludePortsFilter.Contains(port) {
 			return true
 		}
 	}
@@ -218,10 +217,7 @@ func WithExcludeHosts(hosts string) ConfigOption {
 // ```
 func WithExcludePorts(ports string) ConfigOption {
 	return func(config *Config) {
-		config.ExcludePortsFilter = filter.NewFilter()
-		for _, port := range utils.ParseStringToPorts(ports) {
-			config.ExcludePortsFilter.Insert(fmt.Sprint(port))
-		}
+		config.ExcludePortsFilter = utils.NewPortsFilter(ports)
 	}
 }
 
