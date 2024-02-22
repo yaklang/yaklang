@@ -1011,6 +1011,9 @@ User-Agent: 111
 Host: ` + addr
 	var hasForward, started bool
 	var useID int64
+
+	wg := new(sync.WaitGroup)
+	defer wg.Wait()
 	for {
 		rsp, err := stream.Recv()
 		if err != nil {
@@ -1051,7 +1054,9 @@ Host: ` + addr
 				AutoForwardValue: false, //手动劫持
 			})
 			time.Sleep(1 * time.Second)
+			wg.Add(1)
 			go func() {
+				defer wg.Done()
 				for i := 0; i < 10; i++ {
 					_, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes([]byte(fmt.Sprintf(packet, i))), lowhttp.WithProxy(proxy))
 					if err != nil {
