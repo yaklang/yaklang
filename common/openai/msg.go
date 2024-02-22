@@ -1,19 +1,43 @@
 package openai
 
 type ChatMessage struct {
-	Model    string       `json:"model"`
-	Messages []ChatDetail `json:"messages"`
+	Model     string       `json:"model"`
+	Messages  []ChatDetail `json:"messages"`
+	Functions []Function   `json:"functions,omitempty"` // 用于描述函数的参数
+}
+
+type FunctionCall struct {
+	Name      string `json:"name"`
+	Arguments string `json:"arguments"`
 }
 
 type ChatDetail struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role         string        `json:"role"`
+	Content      string        `json:"content"`
+	FunctionCall *FunctionCall `json:"function_call,omitempty"`
 }
 
-func NewChatMessage(model string, messages ...ChatDetail) *ChatMessage {
+type Property struct {
+	Type        string   `json:"type"`
+	Description string   `json:"description"`
+	Enum        []string `json:"enum,omitempty"`
+}
+type Parameters struct {
+	Type       string              `json:"type"`
+	Properties map[string]Property `json:"properties"`
+	Required   []string            `json:"required"`
+}
+type Function struct {
+	Name        string     `json:"name"`
+	Description string     `json:"description"`
+	Parameters  Parameters `json:"parameters"`
+}
+
+func NewChatMessage(model string, messages []ChatDetail, funcs ...Function) *ChatMessage {
 	return &ChatMessage{
-		Model:    model,
-		Messages: messages,
+		Model:     model,
+		Messages:  messages,
+		Functions: funcs,
 	}
 }
 

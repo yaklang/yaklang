@@ -26,10 +26,18 @@ type Client struct {
 	// Role in Org! public model, the role is user
 	Role   string
 	Domain string
+
+	// function call
+	Parameters Parameters
 }
 
 func NewOpenAIClient(opt ...ConfigOption) *Client {
-	c := &Client{}
+	c := &Client{
+		Parameters: Parameters{
+			Type:       "object",
+			Properties: make(map[string]Property),
+		},
+	}
 	for _, o := range opt {
 		o(c)
 	}
@@ -68,8 +76,7 @@ func (c *Client) TranslateToChinese(data string) (string, error) {
 	return strings.Trim(results, "\r\n \v\f\""), nil
 }
 
-func (c *Client) Chat(data string) (string, error) {
-	// build body
+func (c *Client) Chat(data string, funcs ...Function) (string, error) {
 	chatModel := c.ChatModel
 	if chatModel == "" {
 		chatModel = "gpt-3.5-turbo"
@@ -82,13 +89,17 @@ func (c *Client) Chat(data string) (string, error) {
 	if c.Domain != "" {
 		domain = c.Domain
 	}
-	raw, err := json.Marshal(NewChatMessage(chatModel, ChatDetail{
-		Role:    role,
-		Content: data,
-	}))
+	chatMessage := NewChatMessage(chatModel, []ChatDetail{
+		{
+			Role:    role,
+			Content: data,
+		},
+	}, funcs...)
+	raw, err := json.Marshal(chatMessage)
 	if err != nil {
 		return "", err
 	}
+
 	rsp, _, err := poc.DoPOST(
 		fmt.Sprintf("https://%v/v1/chat/completions", domain),
 		poc.WithReplaceHttpPacketHeader("Authorization", fmt.Sprintf("Bearer %v", c.APIKey)),
@@ -116,9 +127,20 @@ func (c *Client) Chat(data string) (string, error) {
 		}
 		return "", utils.Errorf("cannot chat... sorry")
 	}
-	list := funk.Map(comp.Choices, func(c ChatChoice) string {
-		return c.Message.Content
-	}).([]string)
-	list = utils.StringArrayFilterEmpty(list)
-	return strings.Join(list, "\n\n"), nil
+	if len(funcs) == 0 {
+		list := funk.Map(comp.Choices, func(c ChatChoice) string {
+			return c.Message.Content
+		}).([]string)
+		list = utils.StringArrayFilterEmpty(list)
+		return strings.Join(list, "\n\n"), nil
+	} else {
+		list := funk.Map(comp.Choices, func(c ChatChoice) string {
+			return c.Message.FunctionCall.Arguments
+		}).([]string)
+		list = utils.StringArrayFilterEmpty(list)
+		if len(list) == 0 {
+			return "", nil
+		}
+		return strings.TrimSpace(list[0]), nil
+	}
 }
