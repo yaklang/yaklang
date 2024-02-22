@@ -1,25 +1,24 @@
 package openai
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"io/ioutil"
-	"net/http"
-	"strconv"
-	"strings"
-	"time"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
 
 type Client struct {
 	Proxy        string
-	httpClient   *http.Client
 	APIKey       string
 	Organization string
 	ChatModel    string
@@ -34,13 +33,18 @@ func NewOpenAIClient(opt ...ConfigOption) *Client {
 	for _, o := range opt {
 		o(c)
 	}
-	if c.httpClient == nil {
-		c.httpClient = utils.NewDefaultHTTPClientWithProxy(c.Proxy)
-		c.httpClient.Timeout = time.Minute
-	}
 	config := consts.GetThirdPartyApplicationConfig("openai")
 	if config.APIKey != "" {
 		c.APIKey = config.APIKey
+	}
+	if model := config.GetExtraParam("model"); model != "" {
+		c.ChatModel = model
+	}
+	if domain := config.GetExtraParam("domain"); domain != "" {
+		c.Domain = domain
+	}
+	if proxy := config.GetExtraParam("proxy"); proxy != "" {
+		c.Proxy = proxy
 	}
 	return c
 }
@@ -54,7 +58,7 @@ func (c *Client) TranslateToChinese(data string) (string, error) {
 	transData, _ := jsonextractor.ExtractJSONWithRaw(results)
 	if len(transData) > 0 {
 		raw := jsonextractor.FixJson([]byte(transData[0]))
-		var data = make(map[string]string)
+		data := make(map[string]string)
 		err := json.Unmarshal(raw, &data)
 		if err != nil {
 			return "", err
@@ -66,13 +70,17 @@ func (c *Client) TranslateToChinese(data string) (string, error) {
 
 func (c *Client) Chat(data string) (string, error) {
 	// build body
-	var chatModel = c.ChatModel
+	chatModel := c.ChatModel
 	if chatModel == "" {
 		chatModel = "gpt-3.5-turbo"
 	}
-	var role = c.Role
+	role := c.Role
 	if role == "" {
 		role = "user"
+	}
+	domain := "api.openai.com"
+	if c.Domain != "" {
+		domain = c.Domain
 	}
 	raw, err := json.Marshal(NewChatMessage(chatModel, ChatDetail{
 		Role:    role,
@@ -81,35 +89,18 @@ func (c *Client) Chat(data string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	reader := ioutil.NopCloser(bytes.NewBuffer(raw))
-
-	var domain = "api.openai.com"
-	if c.Domain != "" {
-		domain = c.Domain
-	}
-
-	// build request
-	req, err := http.NewRequest("POST", fmt.Sprintf(
-		"https://%v/v1/chat/completions",
-		domain,
-	), reader)
+	rsp, _, err := poc.DoPOST(
+		fmt.Sprintf("https://%v/v1/chat/completions", domain),
+		poc.WithReplaceHttpPacketHeader("Authorization", fmt.Sprintf("Bearer %v", c.APIKey)),
+		poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"),
+		poc.WithReplaceHttpPacketBody(raw, false),
+		poc.WithProxy(c.Proxy),
+		poc.WithConnPool(true),
+	)
 	if err != nil {
 		return "", err
 	}
-
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %v", c.APIKey))
-	if c.Organization != "" {
-		req.Header.Set("OpenAI-Organization", c.Organization)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	rsp, err := c.httpClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	rspRaw, err := ioutil.ReadAll(rsp.Body)
-	if err != nil {
-		return "", err
-	}
+	rspRaw := lowhttp.GetHTTPPacketBody(rsp.RawPacket)
 	var comp ChatCompletion
 	err = json.Unmarshal(rspRaw, &comp)
 	if err != nil {
