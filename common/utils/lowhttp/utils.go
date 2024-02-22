@@ -650,56 +650,56 @@ func ToLower(s string) (lower string, ok bool) {
 	return strings.ToLower(s), true
 }
 
-func deflate(data []byte) (_ []byte, rerr error) {
+func deflate(data []byte) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	w, err := flate.NewWriter(buf, flate.BestSpeed)
-	defer func() {
-		if err := w.Close(); err != nil && rerr != nil {
-			rerr = err
-		}
-	}()
 	if err != nil {
 		return nil, err
 	}
-	w.Write(data)
-	w.Flush()
+	_, err = w.Write(data)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := w.Close(); err != nil {
+		return nil, err
+	}
 	return buf.Bytes(), nil
 }
 
-func _inflate(data []byte) (_ []byte, rerr error) {
-	r := flate.NewReader(io.MultiReader(bytes.NewReader(data), bytes.NewReader(TAIL)))
-
+func _inflate(data []byte) ([]byte, error) {
+	r := flate.NewReader(bytes.NewReader(data))
 	defer func() {
-		if err := r.Close(); err != nil && rerr != nil {
-			rerr = err
+		if err := r.Close(); err != nil {
+			log.Errorf("flate.Reader close error: %v", err)
 		}
 	}()
 
 	newData, err := ioutil.ReadAll(r)
-	if err == io.EOF || err == io.ErrUnexpectedEOF {
-		err = nil
-	} else if _, ok := err.(flate.CorruptInputError); ok {
-		r = flate.NewReader(bytes.NewReader(data))
-		newData, err = ioutil.ReadAll(r)
-		if err == io.EOF || err == io.ErrUnexpectedEOF {
-			err = nil
-		}
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		return nil, err
 	}
-
-	return newData, err
+	return newData, nil
 }
 
 func inflate(data []byte) ([]byte, error) {
 	after, err := _inflate(data)
 	if err != nil {
-		if zr, _ := zlib.NewReader(bytes.NewReader(data)); zr != nil {
-			after, err = ioutil.ReadAll(zr)
-			if err != nil {
-				return data, err
-			}
-			return after, nil
+		zr, err := zlib.NewReader(bytes.NewReader(data))
+		if err != nil {
+			return data, err
 		}
-		return data, err
+		defer func() {
+			if err := zr.Close(); err != nil {
+				log.Errorf("zlib.Reader close error: %v", err)
+			}
+		}()
+
+		after, err = ioutil.ReadAll(zr)
+		if err != nil {
+			return data, err
+		}
+		return after, nil
 	}
 	return after, nil
 }

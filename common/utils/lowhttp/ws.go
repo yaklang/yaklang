@@ -7,6 +7,7 @@ import (
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -63,9 +64,11 @@ func (f *Frame) Bytes() ([]byte, []byte) {
 	var err error
 
 	data := utils.BytesClone(f.payloadData)
+	log.Infof("hex Bytes : %s", hex.EncodeToString(data))
 
 	dataLength := f.payloadLength
 	firstByte, secondByte := f.firstByte, f.secondByte
+
 	if f.isDeflate && !f.IsControl() {
 		data, err = deflate(data)
 		if err != nil {
@@ -87,6 +90,7 @@ func (f *Frame) Bytes() ([]byte, []byte) {
 			secondByte |= byte(dataLength)
 		}
 	}
+	log.Infof("enc Bytes : %s", hex.EncodeToString(data))
 
 	rawBuf := bytes.NewBuffer(nil)
 	rawBuf.WriteByte(firstByte)
@@ -283,22 +287,28 @@ func (fr *FrameReader) ReadFrame() (frame *Frame, err error) {
 	if err != nil {
 		return frame, errors.Wrap(err, "ws frameReader.Reader io.LimitReader failed")
 	}
+	log.Infof("hex ReadFrame 11111 : %s", hex.EncodeToString(data))
+
+	// 先对 masked payload 进行异或操作
+	if frame.mask {
+		maskBytes(frame.maskingKey, data, len(frame.payloadData))
+	}
+	log.Infof("hex maskBytes 22222 : %s", hex.EncodeToString(data))
 
 	// websocket扩展：permessage-deflate，只有frameType为TextMessage和BinaryMessage时才需要解压缩
 	if fr.isDeflate && !frame.IsControl() {
-		newData, err := inflate(data)
-		if err != nil {
+		newData, errx := inflate(data)
+
+		if errx != nil {
 			log.Warn("permessage-deflate is set, but permessage-deflate failed!")
-			log.Warnf("ws frameReader.Reader inflate failed: %v", err)
+			log.Warnf("ws frameReader.Reader inflate failed: %v", errx)
 		} else {
 			data = newData
 		}
 	}
+	log.Infof("hex ReadFrame 44444 : %s", hex.EncodeToString(data))
 
 	frame.payloadData = data
-	if frame.mask {
-		maskBytes(frame.maskingKey, frame.payloadData, len(frame.payloadData))
-	}
 
 	frame.raw = rawBuf.Bytes()
 	return
@@ -415,13 +425,14 @@ func DataToWebsocketControlFrame(messageType int, data []byte, mask bool) (frame
 	return
 }
 
-func DataToWebsocketFrame(data []byte, firstByte byte, mask bool) (frame *Frame, err error) {
+func DataToWebsocketFrame(data1 []byte, firstByte byte, mask bool) (frame *Frame, err error) {
 	frame = new(Frame)
 	frame.firstByte = firstByte
 	frame.mask = mask
-
+	frame.messageType = int(firstByte & FRAME_TYPE_BIT)
+	frame.isDeflate = true
 	secondByte := byte(0)
-
+	data, _ := inflate(data1)
 	// count payload length
 	dataLength := len(data)
 	if dataLength > TWO_BYTE_SIZE {

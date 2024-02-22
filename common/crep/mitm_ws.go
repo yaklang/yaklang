@@ -222,7 +222,7 @@ func (w *WebSocketModifier) copyHijack(writer *bufio.Writer, reader *bufio.Reade
 		callbackHandler func([]byte, *http.Request, *http.Response, int64) []byte
 		//forceTextFrame  bool = !(w.forceTextFrame == nil || !w.forceTextFrame.IsSet())
 	)
-
+	_ = b
 	// hijack
 	if isRequest {
 		callbackHandler = w.websocketRequestHijackHandler
@@ -235,7 +235,6 @@ func (w *WebSocketModifier) copyHijack(writer *bufio.Writer, reader *bufio.Reade
 			return bytes
 		}
 	}
-
 	frameReader := lowhttp.NewFrameReaderFromBufio(reader, isDeflate)
 	frameWriter := lowhttp.NewFrameWriterFromBufio(writer, isDeflate)
 
@@ -259,25 +258,14 @@ func (w *WebSocketModifier) copyHijack(writer *bufio.Writer, reader *bufio.Reade
 			break
 		}
 		_ = clearData
-		//frame.Show()
+		frame.Show()
 
 		masked := raw[1]&0b10000000 != 0
 
 		switch frame.Type() {
-		case lowhttp.TextMessage:
-			b = callbackHandler(clearData, req, rsp, ts)
-			newFrame, err := lowhttp.DataToWebsocketFrame(b, raw[0], masked)
-			if err != nil {
-				frameWriter.WriteRaw(raw)
-				frameWriter.Flush()
-				continue
-			}
-			newFrame.SetMaskingKey(frame.GetMaskingKey())
-			newRaw, _ := newFrame.Bytes()
-			frameWriter.WriteRaw(newRaw)
-		case lowhttp.BinaryMessage:
-			b = callbackHandler(clearData, req, rsp, ts)
-			newFrame, err := lowhttp.DataToWebsocketFrame(b, raw[0], masked)
+		case lowhttp.TextMessage, lowhttp.BinaryMessage:
+			//b = callbackHandler(clearData, req, rsp, ts)
+			newFrame, err := lowhttp.DataToWebsocketFrame(clearData, raw[0], masked)
 			if err != nil {
 				frameWriter.WriteRaw(raw)
 				frameWriter.Flush()
