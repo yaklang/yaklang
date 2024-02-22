@@ -22,6 +22,7 @@ func (b *requestBuilder) add(data ...byte) {
 }
 
 func (c *config) sendReceive(conn net.Conn, req []byte) (resp []byte, err error) {
+	defer conn.SetDeadline(time.Time{})
 	if c.Context != nil {
 		ddl, ok := c.Context.Deadline()
 		if ok {
