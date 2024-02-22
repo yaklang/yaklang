@@ -163,6 +163,7 @@ func httpProxyDial(ctx context.Context, proxyAddr string, username string, crede
 		_, err = conn.Write(generateHTTPProxyConnect(target))
 	}
 	if err = isHTTPConnectWork(conn); err == nil {
+		conn.SetDeadline(time.Time{}) // 置空取消 deadline
 		return conn, nil
 	}
 	conn.Close()
