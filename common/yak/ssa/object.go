@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 // value
@@ -97,27 +96,37 @@ func NewFieldOnly(key, obj Value, block *BasicBlock) *Field {
 	return f
 }
 
-func (b *FunctionBuilder) CreateInterfaceWithVs(keys []Value, vs []Value) *Make {
-	hasKey := true
-	if len(keys) == 0 {
-		hasKey = false
-	}
-	lValueLen := NewConst(len(vs))
-	ityp := NewObjectType()
+func (b *FunctionBuilder) CreateInterfaceWithSlice(vs []Value) *Make {
+	return b.InterfaceAddFieldBuild(len(vs),
+		func(i int) Value { return NewConst(i) },
+		func(i int) Value { return vs[i] },
+	)
+}
+func (b *FunctionBuilder) CreateInterfaceWithMap(keys []Value, vs []Value) *Make {
+	return b.InterfaceAddFieldBuild(len(vs),
+		func(i int) Value { return keys[i] },
+		func(i int) Value { return vs[i] },
+	)
+}
+
+func (b *FunctionBuilder) InterfaceAddFieldBuild(size int, keys func(int) Value, value func(int) Value) *Make {
+	lValueLen := NewConst(size)
 	itf := b.EmitMakeWithoutType(lValueLen, lValueLen)
+	if b.MarkedVariable != nil {
+		itf.SetName(b.MarkedVariable.GetName())
+		b.MarkedThisObject = itf
+
+		defer func() {
+			b.MarkedThisObject = nil
+		}()
+	}
+	ityp := NewObjectType()
 	itf.SetType(ityp)
-	for i, rv := range vs {
-		if utils.IsNil(rv) {
-			continue
-		}
-		var key Value
-		if hasKey {
-			key = keys[i]
-		} else {
-			key = NewConst(i)
-		}
+	for i := 0; i < size; i++ {
+		key := keys(i)
+		value := value(i)
 		v := b.CreateMemberCallVariable(itf, key)
-		b.AssignVariable(v, rv)
+		b.AssignVariable(v, value)
 	}
 	ityp.Finish()
 	// ityp.Len = len(vs)
@@ -292,13 +301,11 @@ func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
 		return p
 	}
 
-	// name, ok := b.checkCanMemberCall(value, key)
-	// if ok {
-	// 	if ret := b.PeekValue(name); ret != nil {
-	// 		return ret
-	// 	}
-	// }
-	// log.Infof("ReadMemberCallVariable:  %v", key)
+	if para, ok := ToParameter(value); ok && para.IsFreeValue && (para.GetDefault() != nil) {
+		name := b.getFieldName(para.GetDefault(), key)
+		ret := b.ReadValue(name)
+		return ret
+	}
 
 	return b.getFieldValue(value, key)
 }
@@ -306,6 +313,11 @@ func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
 func (b *FunctionBuilder) CreateMemberCallVariable(value, key Value) *Variable {
 	if _, ok := ToExternLib(value); ok {
 		name := b.getExternLibMemberCall(value, key)
+		return b.CreateVariable(name, false)
+	}
+
+	if para, ok := ToParameter(value); ok && para.IsFreeValue {
+		name := b.getFieldName(para.GetDefault(), key)
 		return b.CreateVariable(name, false)
 	}
 

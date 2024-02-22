@@ -557,20 +557,57 @@ type assignlist interface {
 func (b *astbuilder) AssignList(stmt assignlist) []ssa.Value {
 	// Colon Assign Means: ... create symbol to recv value force
 	if op, op2 := stmt.AssignEq(), stmt.ColonAssignEq(); op != nil || op2 != nil {
+		var leftVariables []*ssa.Variable
+		var rightValue []ssa.Value
+
+		markInformation := func() func() {
+			if len(leftVariables) != 1 {
+				return func() {}
+			}
+			left := leftVariables[0]
+			ri := stmt.ExpressionList().(*yak.ExpressionListContext)
+			if ri != nil && len(ri.AllExpression()) != 1 {
+				return func() {}
+			}
+			right := ri.Expression(0).(*yak.ExpressionContext)
+
+			// is function define
+			if _, ok := right.AnonymousFunctionDecl().(*yak.AnonymousFunctionDeclContext); ok {
+				b.SetMarkedFunction(leftVariables[0].GetName())
+				return func() {
+					b.MarkedFunc = nil
+				}
+			}
+
+			{ // is object define
+
+				literal, ok := right.Literal().(*yak.LiteralContext)
+				if !ok {
+					return func() {}
+				}
+				_, isMapLiteral := literal.MapLiteral().(*yak.MapLiteralContext)
+				_, isSliceLiteral := literal.SliceLiteral().(*yak.SliceLiteralContext)
+				_, isSliceTypeLiteral := literal.SliceTypedLiteral().(*yak.SliceTypedLiteralContext)
+				if isMapLiteral || isSliceLiteral || isSliceTypeLiteral {
+					b.MarkedVariable = left
+					return func() {
+						b.MarkedVariable = nil
+					}
+				}
+			}
+			return func() {}
+		}
 
 		// left
-		var leftVariables []*ssa.Variable
 		if li, ok := stmt.LeftExpressionList().(*yak.LeftExpressionListContext); ok {
 			leftVariables = b.buildLeftExpressionList(op2 != nil, li)
 		}
 
 		// check if defined-function
-		if len(leftVariables) == 1 {
-			b.SetMarkedFunction(leftVariables[0].GetName())
-		}
+		recoverMark := markInformation()
+		defer recoverMark()
 
 		// right value
-		var rightValue []ssa.Value
 		if ri, ok := stmt.ExpressionList().(*yak.ExpressionListContext); ok {
 			rightValue = b.buildExpressionList(ri)
 		}
@@ -639,7 +676,7 @@ func (b *astbuilder) AssignList(stmt assignlist) []ssa.Value {
 			}
 			// (1) = (n)
 			// (1) = interface(n)
-			_interface := b.CreateInterfaceWithVs(nil, rightValue)
+			_interface := b.CreateInterfaceWithSlice(rightValue)
 			// lvalues[0].Assign(_interface)
 			b.AssignVariable(leftVariables[0], _interface)
 		} else {

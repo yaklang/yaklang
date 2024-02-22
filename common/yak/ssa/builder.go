@@ -39,7 +39,9 @@ type FunctionBuilder struct {
 	ExternLib      map[string]map[string]any
 	DefineFunc     map[string]any
 
-	MarkedFunc *FunctionType
+	MarkedFunc       *FunctionType
+	MarkedVariable   *Variable
+	MarkedThisObject Value
 
 	parentBuilder *FunctionBuilder
 	cmap          map[string]struct{}
@@ -91,6 +93,13 @@ func (b *FunctionBuilder) NewFunc(name string) *Function {
 // function stack
 func (b *FunctionBuilder) PushFunction(newFunc *Function) *FunctionBuilder {
 	build := NewBuilder(newFunc, b)
+	if this := b.MarkedThisObject; this != nil {
+		parentScope := build.parentScope.scope
+		parentScope = parentScope.CreateSubScope()
+		v := parentScope.CreateVariable(this.GetName(), false)
+		parentScope.AssignVariable(v, this)
+		build.parentScope.scope = parentScope
+	}
 	return build
 }
 
