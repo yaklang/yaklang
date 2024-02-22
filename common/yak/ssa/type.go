@@ -651,7 +651,7 @@ func NewStructType() *ObjectType {
 	return i
 }
 
-func (itype ObjectType) String() string {
+func (itype *ObjectType) String() string {
 	if itype.Combination {
 		return strings.Join(
 			lo.Map(
@@ -667,7 +667,7 @@ func (itype ObjectType) String() string {
 	return itype.RawString()
 }
 
-func (i ObjectType) PkgPathString() string {
+func (i *ObjectType) PkgPathString() string {
 	result := i.pkgPath
 	if result == "" {
 		result = i.RawString()
@@ -675,7 +675,8 @@ func (i ObjectType) PkgPathString() string {
 	return result
 }
 
-func (itype ObjectType) RawString() string {
+func (itype *ObjectType) RawString() string {
+	itype.Name = "..."
 	ret := ""
 	switch itype.Kind {
 	case SliceTypeKind:
@@ -697,9 +698,6 @@ func (itype ObjectType) RawString() string {
 			fieldType = BasicTypes[AnyTypeKind]
 		}
 		ret += fmt.Sprintf("map[%s]%s", keyTyp.String(), fieldType.String())
-		// } else {
-		// 	panic("this interface type not map")
-		// }
 	case StructTypeKind:
 		// map[string](T/U/xx)
 		ret += fmt.Sprintf(
@@ -712,6 +710,7 @@ func (itype ObjectType) RawString() string {
 	case ObjectTypeKind:
 		ret += "object{}"
 	}
+	itype.Name = ""
 	return ret
 }
 
