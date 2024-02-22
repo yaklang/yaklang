@@ -214,6 +214,7 @@ func (s *Server) execRequest(req *ypb.ExecRequest, moduleName string, ctx contex
 	cmd.Stderr = io.MultiWriter(writer, &stderrBuffer, os.Stderr)
 
 	start := time.Now()
+	println(cmd.String())
 	err = cmd.Run()
 	history := &yakit.ExecHistory{
 		Script:        code,
