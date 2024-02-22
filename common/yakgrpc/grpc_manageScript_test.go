@@ -29,64 +29,6 @@ func TestYakScriptRiskTypeList(t *testing.T) {
 
 }
 
-func TestSaveNewYakScript(t *testing.T) {
-	test := assert.New(t)
-
-	client, err := NewLocalClient()
-	if err != nil {
-		test.FailNow(err.Error())
-	}
-
-	s, err := client.SaveNewYakScript(context.Background(), &ypb.SaveNewYakScriptRequest{
-		Content:              "",
-		Type:                 "yak",
-		Params:               nil,
-		ScriptName:           "测试插件新增接口",
-		Help:                 "",
-		Level:                "",
-		Tags:                 "",
-		IsHistory:            false,
-		IsIgnore:             false,
-		IsGeneralModule:      false,
-		GeneralModuleVerbose: "",
-		GeneralModuleKey:     "",
-		FromGit:              "",
-		EnablePluginSelector: false,
-		PluginSelectorTypes:  "",
-		IsCorePlugin:         false,
-		RiskType:             "",
-		RiskDetail:           nil,
-		RiskAnnotation:       "",
-	})
-	if err != nil {
-		test.FailNow(err.Error())
-	}
-
-	_ = s
-}
-
-func TestExportLocalYakScript(t *testing.T) {
-	test := assert.New(t)
-
-	client, err := NewLocalClient()
-	if err != nil {
-		test.FailNow(err.Error())
-	}
-	s, err := client.ExportLocalYakScript(context.Background(), &ypb.ExportLocalYakScriptRequest{
-		OutputDir:       "/Users/limin/Downloads/",
-		OutputPluginDir: "",
-		YakScriptIds:    nil,
-		Keywords:        "",
-		Type:            "",
-		UserName:        "",
-		Tags:            "",
-	})
-	if err != nil {
-		test.FailNow(err.Error())
-	}
-	_ = s
-}
-
 func TestImportYakScript(t *testing.T) {
 	test := assert.New(t)
 

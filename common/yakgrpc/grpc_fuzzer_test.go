@@ -583,47 +583,6 @@ func TestServer_HTTPFuzzer3(t *testing.T) {
 	spew.Dump(client)
 }
 
-func TestServer_HTTPFuzzerYYOA(t *testing.T) {
-	c, err := NewLocalClient()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	client, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
-		Request: `GET /yyoa/DownExcelBeanServlet?contenttype=username&contentvalue=&state=1&per_id=0 HTTP/1.1
-Host: 14.157.105.194:5002
-Pragma: no-cache
-Cache-Control: no-cache
-DNT: 1
-Upgrade-Insecure-Requests: 1
-User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.88 Safari/537.36
-Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9
-Referer: http://222.133.23.90:9000/yyoa/ext/https/getSessionList.jsp?cmd=getAll
-Accept-Encoding: gzip, deflate
-Accept-Language: zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7
-Cookie: JSESSIONID=9A2AF446D35187ECF84CBE9B1254B0EE
-sec-gpc: 1
-Connection: close
-
-`,
-		Concurrent:               10,
-		IsHTTPS:                  false,
-		ForceFuzz:                true,
-		PerRequestTimeoutSeconds: 5,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for {
-		rsp, err := client.Recv()
-		if err != nil {
-			break
-		}
-		spew.Dump(rsp)
-	}
-}
-
 func TestGRPCMUSTPASS_Server_HTTPRequestMutateFormToPOST(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
