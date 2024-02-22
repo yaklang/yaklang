@@ -390,7 +390,8 @@ func TestGRPCMUSTPASS_WebSocket_Filter_RSP(t *testing.T) {
 	}, func(mitmClient ypb.Yak_MITMClient) {
 
 		mitmClient.Send(&ypb.MITMRequest{
-			FilterWebsocket: true,
+			FilterWebsocket:       true,
+			UpdateFilterWebsocket: true,
 		})
 		defer NewMITMFilterManager(consts.GetGormProfileDatabase()).Recover()
 		_, err = lowhttp.NewWebsocketClient([]byte(fmt.Sprintf(`GET /?%s HTTP/1.1
@@ -443,7 +444,8 @@ func TestGRPCMUSTPASS_WebSocket_Filter_REQ(t *testing.T) {
 		Host: "127.0.0.1",
 	}, func(mitmClient ypb.Yak_MITMClient) {
 		mitmClient.Send(&ypb.MITMRequest{
-			FilterWebsocket: true,
+			FilterWebsocket:       true,
+			UpdateFilterWebsocket: true,
 		})
 		defer NewMITMFilterManager(consts.GetGormProfileDatabase()).Recover()
 		wsClient, err := lowhttp.NewWebsocketClient([]byte(fmt.Sprintf(`GET /?%s HTTP/1.1
