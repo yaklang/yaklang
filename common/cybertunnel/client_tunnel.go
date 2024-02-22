@@ -204,7 +204,6 @@ func HoldingCreateTunnelClient(
 					fmt.Sprintf("%v - %v", id, utils.HostPort(localhost, localport)),
 					remoteport, err,
 				)
-				utils.PrintCurrentGoroutineRuntimeStack()
 			}
 		}()
 
