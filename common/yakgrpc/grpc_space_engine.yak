@@ -63,8 +63,11 @@ feeddata = (result) => {
         "uuid":str.HostPort(host, port),"主机": host, "端口": port, "基础指纹": service, "网站标题": title,
     })
 }
-
-for result in spacengine.Query(filter, spacengine.engine(engineType),spacengine.maxRecord(maxRecord),spacengine.maxPage(maxPage),spacengine.pageSize(pageSize))~ {
+queryResult,err = spacengine.Query(filter, spacengine.engine(engineType),spacengine.maxRecord(maxRecord),spacengine.maxPage(maxPage),spacengine.pageSize(pageSize))
+if err != nil {
+    die("query failed: %v" % err)
+}
+for result in queryResult {
     total ++
     feeddata(result)
     if !scan {
