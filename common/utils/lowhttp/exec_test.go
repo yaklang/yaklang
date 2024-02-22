@@ -439,3 +439,24 @@ Host: ` + utils.HostPort(host, port) + `
 	}
 
 }
+
+func TestLowhttp_HTTP_ProxyTimeout(t *testing.T) {
+	proxyUrl := fmt.Sprintf("http://%s", utils.HostPort(utils.DebugMockHTTPKeepAliveEx(func(req []byte) []byte {
+		r, _ := ParseBytesToHttpRequest(req)
+		if r.Method == "CONNECT" {
+			return []byte("HTTP/1.0 200 Connection established\r\n\r\n")
+		}
+		return []byte("HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\na")
+	})))
+
+	_, err := HTTPWithoutRedirect(WithProxy(proxyUrl), WithConnectTimeout(3*time.Second), WithConnPool(true), WithPacketBytes([]byte("GET / HTTP/1.1\r\nHost: www.baidu.com\r\n\r\n")))
+	if err != nil {
+		panic(err)
+	}
+	time.Sleep(5 * time.Second)
+	_, err = HTTPWithoutRedirect(WithProxy(proxyUrl), WithConnectTimeout(3*time.Second), WithConnPool(true), WithPacketBytes([]byte("GET / HTTP/1.1\r\nHost: www.baidu.com\r\n\r\n")))
+	if err != nil {
+		panic(err)
+	}
+
+}
