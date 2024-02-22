@@ -121,6 +121,7 @@ func (s *Server) GetSpaceEngineAccountStatus(ctx context.Context, req *ypb.GetSp
 		if key == "" {
 			status = SPACE_ENGINE_STATUS_EMPTY_KEY
 			info = "Quake API Key为空"
+			break
 		}
 		client := utils.NewQuake360Client(key)
 		userInfo, err := client.UserInfo()
