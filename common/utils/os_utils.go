@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"golang.org/x/net/websocket"
 	"math/rand"
 	"net"
 	"net/http"
@@ -14,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/net/websocket"
 
 	"github.com/miekg/dns"
 	"github.com/pkg/errors"
@@ -48,7 +49,6 @@ RESET:
 			goto RESET
 		}
 	}
-
 }
 
 func GetRangeAvailableTCPPort(startPort, endPort, maxRetries int) (int, error) {
@@ -124,7 +124,7 @@ func IsPortAvailableWithUDP(host string, p int) bool {
 
 func GetRandomLocalAddr() string {
 	return HostPort("127.0.0.1", GetRandomAvailableTCPPort())
-	//return HostPort("127.0.0.1", 161)
+	// return HostPort("127.0.0.1", 161)
 }
 
 func GetSystemNameServerList() ([]string, error) {
@@ -283,7 +283,6 @@ func DebugMockWs(handler func(conn *websocket.Conn)) (string, int) {
 	addr := GetRandomLocalAddr()
 
 	go func() {
-
 		server := &websocket.Server{
 			Handler: websocket.Handler(handler),
 			Handshake: func(config *websocket.Config, req *http.Request) error {
@@ -299,6 +298,7 @@ func DebugMockWs(handler func(conn *websocket.Conn)) (string, int) {
 	host, port, _ := ParseStringToHostPort(addr)
 	return host, port
 }
+
 func DebugMockTCPEx(handleFunc handleTCPFunc) (string, int) {
 	return DebugMockTCPHandlerFuncContext(TimeoutContext(time.Minute*5), handleFunc)
 }
@@ -306,6 +306,7 @@ func DebugMockTCPEx(handleFunc handleTCPFunc) (string, int) {
 func DebugMockHTTP(rsp []byte) (string, int) {
 	return DebugMockHTTPWithTimeout(time.Minute, rsp)
 }
+
 func DebugMockHTTPS(rsp []byte) (string, int) {
 	return DebugMockHTTPServerWithContext(TimeoutContext(time.Minute), true, false, false, false, false, func(bytes []byte) []byte {
 		return rsp
@@ -318,6 +319,10 @@ func DebugMockHTTPEx(handle func(req []byte) []byte) (string, int) {
 
 func DebugMockHTTPExContext(ctx context.Context, handle func(req []byte) []byte) (string, int) {
 	return DebugMockHTTPServerWithContext(ctx, false, false, false, false, false, handle)
+}
+
+func DebugMockHTTPKeepAliveEx(handle func(req []byte) []byte) (string, int) {
+	return DebugMockHTTPServerWithContext(TimeoutContext(time.Minute), false, false, false, false, true, handle)
 }
 
 func DebugMockHTTP2(ctx context.Context, handler func(req []byte) []byte) (string, int) {
