@@ -8,6 +8,18 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
+type ParentScope struct {
+	scope *ssautil.ScopedVersionedTable[Value]
+	next  *ParentScope
+}
+
+func (p *ParentScope) Create(scope *ssautil.ScopedVersionedTable[Value]) *ParentScope {
+	return &ParentScope{
+		scope: scope,
+		next:  p,
+	}
+}
+
 // Function builder API
 type FunctionBuilder struct {
 	*Function
@@ -21,7 +33,7 @@ type FunctionBuilder struct {
 	CurrentBlock *BasicBlock // current block to build
 	CurrentRange *Range      // current position in source code
 
-	parentScope *ssautil.ScopedVersionedTable[Value]
+	parentScope *ParentScope
 
 	ExternInstance map[string]any
 	ExternLib      map[string]map[string]any
@@ -51,7 +63,8 @@ func NewBuilder(f *Function, parent *FunctionBuilder) *FunctionBuilder {
 		b.ExternLib = parent.ExternLib
 		b.DefineFunc = parent.DefineFunc
 		// sub scope
-		b.parentScope = parent.CurrentBlock.ScopeTable
+		// b.parentScope = parent.CurrentBlock.ScopeTable
+		b.parentScope = parent.parentScope.Create(parent.CurrentBlock.ScopeTable)
 	}
 
 	// b.ScopeStart()

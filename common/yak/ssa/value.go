@@ -177,15 +177,12 @@ func (b *FunctionBuilder) IsParentFunctionVariable(v *Variable) bool {
 func (b *FunctionBuilder) getParentFunctionVariable(name string) (Value, bool) {
 	// in closure function
 	// check is Capture parent-function value
-	if b.parentScope != nil {
-		if parentVariable := ReadVariableFromScope(b.parentScope, name); parentVariable != nil {
+	parentScope := b.parentScope
+	for parentScope != nil {
+		if parentVariable := ReadVariableFromScope(parentScope.scope, name); parentVariable != nil {
 			return parentVariable.Value, true
 		}
-		if parent := b.parentBuilder; parent != nil {
-			if ret, ok := parent.getParentFunctionVariable(name); ok {
-				return ret, true
-			}
-		}
+		parentScope = parentScope.next
 	}
 	return nil, false
 }
