@@ -142,9 +142,9 @@ func (s *YakScript) ToGRPCModel() *ypb.YakScript {
 			r = s.RiskDetail
 		}
 		err = json.Unmarshal([]byte(r), &riskDetail)
-		if err != nil {
-			log.Errorf("unmarshal RiskDetail failed: %s", err)
-			spew.Dump([]byte(r))
+		if err != nil { // errors may occur due to version iterations has break change, so we just ignore it (this field has been deprecated actually)
+			//log.Errorf("unmarshal RiskDetail failed: %s", err)
+			//spew.Dump([]byte(r))
 		}
 	}
 
