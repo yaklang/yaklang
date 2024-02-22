@@ -108,9 +108,9 @@ type LoopBuilder struct {
 	enter   *BasicBlock
 	builder *FunctionBuilder
 
-	Condition            func() Value
-	Body                 func()
-	FirstExpr, ThirdExpr func() []Value
+	condition            func() Value
+	body                 func()
+	firstExpr, thirdExpr func() []Value
 }
 
 // CreateLoopBuilder Create LoopBuilder
@@ -123,22 +123,22 @@ func (b *FunctionBuilder) CreateLoopBuilder() *LoopBuilder {
 
 // SetFirst : Loop First Expression
 func (lb *LoopBuilder) SetFirst(f func() []Value) {
-	lb.FirstExpr = f
+	lb.firstExpr = f
 }
 
 // SetCondition : Loop Condition
 func (lb *LoopBuilder) SetCondition(f func() Value) {
-	lb.Condition = f
+	lb.condition = f
 }
 
 // SetThird : Loop Third Expression
 func (lb *LoopBuilder) SetThird(f func() []Value) {
-	lb.ThirdExpr = f
+	lb.thirdExpr = f
 }
 
 // SetBody : Loop Body
 func (lb *LoopBuilder) SetBody(f func()) {
-	lb.Body = f
+	lb.body = f
 }
 
 func (lb *LoopBuilder) Finish() {
@@ -161,8 +161,8 @@ func (lb *LoopBuilder) Finish() {
 	LoopBuilder.SetFirst(func(svt *ssautil.ScopedVersionedTable[Value]) {
 		SSABuild.CurrentBlock = header
 		SSABuild.CurrentBlock.ScopeTable = svt
-		if lb.FirstExpr != nil {
-			lb.FirstExpr()
+		if lb.firstExpr != nil {
+			lb.firstExpr()
 		}
 		SSABuild.EmitJump(condition)
 	})
@@ -172,8 +172,8 @@ func (lb *LoopBuilder) Finish() {
 		SSABuild.CurrentBlock = condition
 		SSABuild.CurrentBlock.ScopeTable = svt
 		var conditionValue Value
-		if lb.Condition != nil {
-			conditionValue = lb.Condition()
+		if lb.condition != nil {
+			conditionValue = lb.condition()
 		}
 		// SSABuild.EmitJump(body)
 		SSABuild.EmitLoop(body, exit, conditionValue)
@@ -185,9 +185,9 @@ func (lb *LoopBuilder) Finish() {
 		// TODO handle continue and break target
 
 		addToBlocks(body)
-		if lb.Body != nil {
+		if lb.body != nil {
 			SSABuild.PushTarget(LoopBuilder, exit, latch, nil)
-			lb.Body()
+			lb.body()
 			SSABuild.PopTarget()
 		}
 		SSABuild.EmitJump(latch)
@@ -196,8 +196,8 @@ func (lb *LoopBuilder) Finish() {
 	LoopBuilder.SetThird(func(svt *ssautil.ScopedVersionedTable[Value]) {
 		SSABuild.CurrentBlock = latch
 		SSABuild.CurrentBlock.ScopeTable = svt
-		if lb.ThirdExpr != nil {
-			lb.ThirdExpr()
+		if lb.thirdExpr != nil {
+			lb.thirdExpr()
 		}
 		SSABuild.EmitJump(condition)
 	})
@@ -241,8 +241,11 @@ func (b *FunctionBuilder) CreateIfBuilder() *IfBuilder {
 }
 
 // AppendItem append IfBuilderItem to IfBuilder
-func (i *IfBuilder) AppendItem(item IfBuilderItem) *IfBuilder {
-	i.items = append(i.items, item)
+func (i *IfBuilder) AppendItem(cond func() Value, body func()) *IfBuilder {
+	i.items = append(i.items, IfBuilderItem{
+		Condition: cond,
+		Body:      body,
+	})
 	return i
 }
 

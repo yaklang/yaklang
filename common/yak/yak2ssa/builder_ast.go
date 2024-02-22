@@ -486,49 +486,44 @@ func (b *astbuilder) buildSwitchStmt(stmt *yak.SwitchStmtContext) {
 
 // if stmt
 func (b *astbuilder) buildIfStmt(stmt *yak.IfStmtContext) {
+	builder := b.CreateIfBuilder()
 
-	var build func(stmt *yak.IfStmtContext) ([]ssa.IfBuilderItem, func())
-	build = func(stmt *yak.IfStmtContext) ([]ssa.IfBuilderItem, func()) {
-		ret := make([]ssa.IfBuilderItem, 0)
+	var build func(stmt *yak.IfStmtContext) func()
+	build = func(stmt *yak.IfStmtContext) func() {
 
 		// for index := range stmt.AllElif() {
 		// }
 		// for index :=0; index < len(stmt.AllExpression())
 		for index, expression := range stmt.AllExpression() {
-			ret = append(ret, ssa.IfBuilderItem{
-				Condition: func() ssa.Value {
+			builder.AppendItem(
+				func() ssa.Value {
 					return b.buildExpression(expression.(*yak.ExpressionContext))
 				},
-				Body: func() {
+				func() {
 					b.buildBlock(stmt.Block(index).(*yak.BlockContext))
 				},
-			})
+			)
 		}
 
 		elseStmt, ok := stmt.ElseBlock().(*yak.ElseBlockContext)
 		if !ok {
-			return ret, nil
+			return nil
 		}
 		if elseBlock, ok := elseStmt.Block().(*yak.BlockContext); ok {
-			return ret, func() {
+			return func() {
 				b.buildBlock(elseBlock)
 			}
 		} else if elifstmt, ok := elseStmt.IfStmt().(*yak.IfStmtContext); ok {
 			// "else if"
 			// create elif block
-			sub, build := build(elifstmt)
-			ret = append(ret, sub...)
-			return ret, build
+			build := build(elifstmt)
+			return build
 		} else {
-			return ret, nil
+			return nil
 		}
 	}
 
-	builder := b.CreateIfBuilder()
-	ret, elseBlock := build(stmt)
-	for _, item := range ret {
-		builder.AppendItem(item)
-	}
+	elseBlock := build(stmt)
 	builder.SetElse(elseBlock)
 	builder.Build()
 }
@@ -1119,15 +1114,15 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		b.WriteVariable(id, b.EmitConstInstAny())
 		// 只需要使用b.WriteValue设置value到此ID，并最后调用b.ReadValue可聚合产生Phi指令，完成语句预期行为
 		ifb := b.CreateIfBuilder()
-		ifb.AppendItem(ssa.IfBuilderItem{
-			Condition: func() ssa.Value {
+		ifb.AppendItem(
+			func() ssa.Value {
 				return cond(id)
 			},
-			Body: func() {
+			func() {
 				v := trueExpr()
 				b.WriteVariable(id, v)
 			},
-		})
+		)
 		ifb.SetElse(func() {
 			v := falseExpr()
 			b.WriteVariable(id, v)
