@@ -8,9 +8,10 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"golang.org/x/exp/slices"
 )
 
-func TestClosureFreeValueScope(t *testing.T) {
+func TestClosure_FreeValue_Value(t *testing.T) {
 
 	t.Run("normal function", func(t *testing.T) {
 		checkPrintlnValue(`
@@ -102,7 +103,101 @@ func TestClosureFreeValueScope(t *testing.T) {
 	})
 }
 
-func TestClosureMask(t *testing.T) {
+func TestClosure_FreeValue_Function(t *testing.T) {
+	check := func(t *testing.T, tc TestCase) {
+		tc.Check = func(t *testing.T, p *ssaapi.Program, s []string) {
+			test := assert.New(t)
+
+			targets := p.Ref("target").ShowWithSource()
+			test.Len(targets, 1)
+
+			target := targets[0]
+
+			v := ssaapi.GetBareNode(target)
+			test.NotNil(v)
+
+			test.Equal(ssa.OpFunction, v.GetOpcode())
+			fun, ok := v.(*ssa.Function)
+			test.True(ok)
+
+			fvs := lo.Keys(fun.FreeValues)
+			slices.Sort(fvs)
+			test.Equal(tc.want, fvs)
+		}
+		CheckTestCase(t, tc)
+	}
+
+	t.Run("func capture value", func(t *testing.T) {
+		check(t, TestCase{
+			code: `
+		a = 1
+		target = () => {
+			b = a
+		}
+		`,
+			want: []string{"a"},
+		})
+	})
+
+	t.Run("member capture value", func(t *testing.T) {
+		check(t, TestCase{
+			code: `
+		a = 1
+		b = {
+			"get": () => a
+		}
+
+		target = b.get 
+		`,
+			want: []string{"a"},
+		})
+	})
+
+	t.Run("func capture member", func(t *testing.T) {
+		check(t, TestCase{
+			code: ` 
+			a = {
+				"key": 1,
+			}
+			f = () => {
+				b = a.key
+			}
+			target = f
+			`,
+			want: []string{"#0.key", "a"},
+		})
+	})
+
+	t.Run("member capture member", func(t *testing.T) {
+		check(t, TestCase{
+			code: `
+			a = {
+				"key": 1, 
+			}
+			b = {
+				"get": () => a.key
+			}
+			target = b.get
+			`,
+			want: []string{"#0.key", "a"},
+		})
+	})
+
+	t.Run("member capture member, self", func(t *testing.T) {
+		check(t, TestCase{
+			code: `
+			a = {
+				"key": 1, 
+				"get": () => a.key 
+			}
+			target = a.get
+			`,
+			want: []string{"#0.key", "a"},
+		})
+	})
+}
+
+func TestClosure_Mask(t *testing.T) {
 	check := func(t *testing.T, tc TestCase) {
 		tc.Check = func(t *testing.T, p *ssaapi.Program, want []string) {
 			test := assert.New(t)
@@ -115,7 +210,7 @@ func TestClosureMask(t *testing.T) {
 			v := ssaapi.GetBareNode(target)
 			test.NotNil(v)
 
-			test.Equal("1", v.String())
+			// test.Equal("1", v.String())
 
 			maskV, ok := v.(ssa.Maskable)
 			test.True(ok)
@@ -155,10 +250,53 @@ func TestClosureMask(t *testing.T) {
 			want: []string{"add(FreeValue-a, 2)"},
 		})
 	})
+
+	t.Run("object member", func(t *testing.T) {
+		check(t, TestCase{
+			code: `
+			a = {
+				"key": 1,
+			}
+			f = () => {
+				a.key = 2
+			}
+			target = a.key
+			`,
+			want: []string{"2"},
+		})
+	})
+
+	t.Run("object member, not found", func(t *testing.T) {
+		check(t, TestCase{
+			code: `
+		a = {}
+		f = () => {
+			a.key = 2
+		}
+		target = a.key
+		`,
+			want: []string{"2"},
+		})
+	})
+
+	t.Run("object member, self", func(t *testing.T) {
+		check(t, TestCase{
+			code: `
+			a = {
+				"key": 1,
+				"set": (i) => {a.key = i}
+			}
+			target = a.key
+			`,
+			want: []string{
+				"Parameter-i",
+			},
+		})
+	})
 }
 
 func TestClosure_SideEffect(t *testing.T) {
-	t.Run("normal", func(t *testing.T) {
+	t.Run("function modify value", func(t *testing.T) {
 		checkPrintlnValue(`
 		a = 0 
 		b = () => {
@@ -174,7 +312,7 @@ func TestClosure_SideEffect(t *testing.T) {
 		}, t)
 	})
 
-	t.Run("object", func(t *testing.T) {
+	t.Run("object member modify value", func(t *testing.T) {
 		checkPrintlnValue(`
 		var b
 		get = () => ({
@@ -187,4 +325,73 @@ func TestClosure_SideEffect(t *testing.T) {
 			"Parameter-i",
 		}, t)
 	})
+
+	t.Run("function modify object member", func(t *testing.T) {
+		checkPrintlnValue(`
+		a =  {
+			"key": 1,
+		}
+		f = (i) => {
+			a.key = i
+		}
+
+		println(a.key) // 1
+		f(2) 
+		println(a.key) // parameter-i
+		`, []string{
+			"1",
+			"Parameter-i",
+		}, t)
+	})
+
+	t.Run("function modify object member, not found", func(t *testing.T) {
+		checkPrintlnValue(`
+		a =  {}
+		f = (i) => {
+			a.key = i
+		}
+
+		println(a.key) // undefined
+		f(2) 
+		println(a.key) // parameter-i
+		`, []string{
+			"Undefined-#2.key(valid)",
+			"Parameter-i",
+		}, t)
+	})
+
+	t.Run("member modify member", func(t *testing.T) {
+		checkPrintlnValue(`
+		a = {
+			"key": 1, 
+		}
+		b = {
+			"change": (i)=>{
+				a.key = i
+			}
+		}
+		println(a.key)
+		b.change(2)
+		println(a.key)
+		`, []string{
+			"1",
+			"Parameter-i",
+		}, t)
+	})
+
+	t.Run("object modify self", func(t *testing.T) {
+		checkPrintlnValue(`
+		a = {
+			"key": 1,
+			"add": (i) => {a.key = i},
+		}
+		println(a.key)
+		a.add(2)
+		println(a.key)
+		`, []string{
+			"1",
+			"Parameter-i",
+		}, t)
+	})
+
 }
