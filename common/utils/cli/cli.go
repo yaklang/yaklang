@@ -79,6 +79,7 @@ func init() {
 
 		// 设置默认的命令行程序名称
 		DefaultCliApp.appName = strings.TrimSuffix(filename, fileSuffix)
+		DefaultCliApp.args = OsArgs[1:]
 	}
 
 	CliExportFuncNames = lo.Keys(CliExports)
