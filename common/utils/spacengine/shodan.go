@@ -77,7 +77,7 @@ func ShodanQuery(key string, filter string, maxPage, maxRecord int) (chan *NetSp
 	client := shodan.New(key)
 	info, err := client.APIInfo()
 	if err != nil {
-		return nil, err
+		return nil, utils.Errorf("get shodan info failed: %s", err)
 	}
 	_ = info
 
