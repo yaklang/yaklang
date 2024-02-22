@@ -409,7 +409,9 @@ Sec-WebSocket-Key: w4v7O6xFTi36lq3RNcgctw==
 		count := yakit.SearchWebsocketFlow(token)
 		//fmt.Println(count)
 		if count != 0 {
+			cancel()
 			t.Fatalf("search httpflow by token failed: yakit.QuickSearchMITMHTTPFlowCount(token)")
+			t.FailNow()
 		}
 		cancel()
 	})
@@ -463,6 +465,7 @@ Sec-WebSocket-Key: w4v7O6xFTi36lq3RNcgctw==
 		count := yakit.SearchWebsocketFlow(token)
 		fmt.Println(count)
 		if count != 0 {
+			cancel()
 			t.Errorf("search httpflow by token failed: yakit.QuickSearchMITMHTTPFlowCount(token)")
 		}
 		cancel()

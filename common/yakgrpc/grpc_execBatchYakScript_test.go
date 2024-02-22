@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -73,36 +72,6 @@ requests:
 			break
 		}
 		spew.Dump(data)
-	}
-}
-
-func TestNewServer(t *testing.T) {
-	test := assert.New(t)
-
-	client, err := NewLocalClient()
-	if err != nil {
-		test.FailNow(err.Error())
-		return
-	}
-
-	stream, err := client.ExecBatchYakScript(context.Background(), &ypb.ExecBatchYakScriptRequest{
-		Target:              "16.170.15.55:8005",
-		Keyword:             "thinkphp",
-		Limit:               10,
-		TotalTimeoutSeconds: 1000,
-		Concurrent:          4,
-	})
-	if err != nil {
-		test.FailNow(err.Error())
-		return
-	}
-
-	for {
-		rsp, err := stream.Recv()
-		if err != nil {
-			break
-		}
-		spew.Dump(rsp)
 	}
 }
 
