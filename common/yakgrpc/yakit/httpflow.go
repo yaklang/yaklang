@@ -725,7 +725,7 @@ func InsertHTTPFlow(db *gorm.DB, i *HTTPFlow) (fErr error) {
 	return nil
 }
 
-func CreateOrUpdateHTTPFlow(db *gorm.DB, hash string, i interface{}) (fErr error) {
+func CreateOrUpdateHTTPFlow(db *gorm.DB, hash string, i *HTTPFlow) (fErr error) {
 	defer func() {
 		if err := recover(); err != nil {
 			fErr = utils.Errorf("met panic error: %v", err)
@@ -734,10 +734,9 @@ func CreateOrUpdateHTTPFlow(db *gorm.DB, hash string, i interface{}) (fErr error
 
 	db = db.Model(&HTTPFlow{})
 
-	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(&HTTPFlow{}); db.Error != nil {
+	if db := db.Where("hash = ?", hash).Assign(i).FirstOrCreate(i); db.Error != nil {
 		return utils.Errorf("create/update HTTPFlow failed: %s", db.Error)
 	}
-
 	return nil
 }
 
