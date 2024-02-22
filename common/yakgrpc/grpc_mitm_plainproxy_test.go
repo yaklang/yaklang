@@ -2,7 +2,6 @@ package yakgrpc
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -13,16 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
-
-func TestDemoServer(t *testing.T) {
-	mockHost, mockPort := utils.DebugMockHTTPHandlerFuncContext(context.Background(), func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Add("Set-Cookie", "abc="+"aaa")
-		writer.Header().Add("Set-Cookie", "ddd=111"+"bbb")
-		writer.Write([]byte("hello"))
-	})
-	fmt.Println("http://" + utils.HostPort(mockHost, mockPort))
-	time.Sleep(time.Hour)
-}
 
 func TestGRPCMUSTPASS_MITM_PlainProxy2(t *testing.T) {
 	var ctx, cancel = context.WithCancel(utils.TimeoutContextSeconds(5))
