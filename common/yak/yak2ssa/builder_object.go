@@ -23,8 +23,14 @@ func (b *astbuilder) buildSliceFromExprList(stmt ExpressionListMultiline) ssa.Va
 		// b.NewError(ssa.Error, TAG, "slice literal expression parse error")
 		return nil
 	}
-	vs := b.buildExpressionListMultiline(s)
-	obj := b.CreateInterfaceWithVs(nil, vs)
+	allExpr := s.AllExpression()
+
+	obj := b.InterfaceAddFieldBuild(len(allExpr),
+		func(i int) ssa.Value { return ssa.NewConst(i) },
+		func(i int) ssa.Value {
+			return b.buildExpression(allExpr[i].(*yak.ExpressionContext))
+		},
+	)
 	obj.GetType().(*ssa.ObjectType).Kind = ssa.SliceTypeKind
 	return obj
 }
@@ -78,15 +84,14 @@ func (b *astbuilder) buildMapFromMapPairs(stmt MapPairs) ssa.Value {
 	}
 	allPair := s.AllMapPair()
 
-	// itf :=
-	keys := make([]ssa.Value, 0, len(allPair))
-	values := make([]ssa.Value, 0, len(allPair))
-	for _, p := range allPair {
-		p := p.(*yak.MapPairContext)
-		keys = append(keys, b.buildExpression(p.Expression(0).(*yak.ExpressionContext)))
-		values = append(values, b.buildExpression(p.Expression(1).(*yak.ExpressionContext)))
-	}
-	obj := b.CreateInterfaceWithVs(keys, values)
+	obj := b.InterfaceAddFieldBuild(len(allPair),
+		func(i int) ssa.Value {
+			return b.buildExpression(allPair[i].(*yak.MapPairContext).Expression(0).(*yak.ExpressionContext))
+		},
+		func(i int) ssa.Value {
+			return b.buildExpression(allPair[i].(*yak.MapPairContext).Expression(1).(*yak.ExpressionContext))
+		},
+	)
 	t := obj.GetType().(*ssa.ObjectType)
 	var fieldTyp ssa.Type = ssa.BasicTypes[ssa.AnyTypeKind]
 	var keyTyp ssa.Type = ssa.BasicTypes[ssa.AnyTypeKind]

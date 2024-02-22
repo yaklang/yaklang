@@ -310,3 +310,30 @@ func Test_CallMember_Cfg(t *testing.T) {
 		}, t)
 	})
 }
+
+func Test_CallMember_Make(t *testing.T) {
+	t.Run("test make self variable", func(t *testing.T) {
+		checkPrintlnValue(`
+		a = "this string" 
+		a = {
+			"key": a,
+		}
+		println(a.key)
+		`, []string{
+			`"this string"`,
+		}, t)
+	})
+
+	t.Run("test make self method ", func(t *testing.T) {
+		checkPrintlnValue(`
+		a = "this string"
+		a = {
+			"get": () => {
+				println(a)
+				return a
+			}
+		}
+		`, []string{"FreeValue-a"}, t)
+	})
+
+}
