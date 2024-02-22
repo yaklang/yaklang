@@ -31,7 +31,7 @@ func ReplaceMemberCall(v, to Value) map[string]Value {
 
 			// re-set type
 			name, typ := checkCanMemberCall(to, key)
-			origin := builder.getOriginMember(name, typ, key, to)
+			origin := builder.getOriginMember(name, typ, to, key)
 
 			if member.GetOpcode() != OpUndefined {
 				member.SetName(name)
@@ -318,7 +318,7 @@ func (b *FunctionBuilder) CreateMemberCallVariable(value, key Value) *Variable {
 
 func (b *FunctionBuilder) getFieldName(value, key Value) string {
 	name, typ := checkCanMemberCall(value, key)
-	b.getOriginMember(name, typ, key, value) // create undefine member
+	b.getOriginMember(name, typ, value, key) // create undefine member
 	return name
 }
 
@@ -327,10 +327,10 @@ func (b *FunctionBuilder) getFieldValue(value, key Value) Value {
 	if ret := b.PeekValueInThisFunction(name); ret != nil {
 		return ret
 	}
-	return b.getOriginMember(name, typ, key, value)
+	return b.getOriginMember(name, typ, value, key)
 }
 
-func (b *FunctionBuilder) getOriginMember(name string, typ Type, key, value Value) Value {
+func (b *FunctionBuilder) getOriginMember(name string, typ Type, value, key Value) Value {
 	recoverScope := b.SetCurrent(value)
 	origin := b.ReadValueInThisFunction(name)
 	recoverScope()
