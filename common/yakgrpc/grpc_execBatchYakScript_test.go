@@ -7,9 +7,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"net/http"
 	"testing"
 )
 
@@ -118,13 +118,15 @@ mirrorHTTPFlow = func(isHttps, url , req , rsp , body ) {
 }
 `)
 	count := 0
-	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	host, port := utils.DebugMockHTTPKeepAliveEx(func(req []byte) []byte {
+		r, _ := lowhttp.ParseBytesToHttpRequest(req)
 		if r.Method == "CONNECT" {
-			w.Write([]byte("HTTP/1.0 200 Connection established\r\n\r\n"))
-		} else if keys, ok := r.URL.Query()["key"]; ok && keys[0] == "1" {
+			return []byte("HTTP/1.0 200 Connection established\r\n\r\n")
+		}
+		if keys, ok := r.URL.Query()["key"]; ok && keys[0] == "1" {
 			count++
 		}
-		w.Write([]byte("HTTP/1.1 200 OK\r\n\r\nHello, world!"))
+		return []byte("HTTP/1.1 200 OK\r\n\r\nHello, world!")
 	})
 
 	stream, err := client.ExecBatchYakScript(context.Background(), &ypb.ExecBatchYakScriptRequest{
