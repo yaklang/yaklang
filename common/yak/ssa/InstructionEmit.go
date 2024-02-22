@@ -157,9 +157,7 @@ func (f *FunctionBuilder) emit(i Instruction) {
 	if f.CurrentBlock.finish || utils.IsNil(i) {
 		log.Errorf("this block [%s] is finish, instruction[%s] can't insert!", f.CurrentBlock, i)
 	}
-	f.emitEx(i, func(i Instruction) {
-		f.CurrentBlock.Insts = append(f.CurrentBlock.Insts, i)
-	})
+	f.emitEx(i, f.EmitOnly)
 }
 
 func (f *FunctionBuilder) SetInstructionPosition(i Instruction) {
@@ -435,7 +433,8 @@ func (f *FunctionBuilder) EmitPhi(name string, vs []Value) *Phi {
 		wit2:          nil,
 	}
 	p.SetName(name)
-	// f.emit(p)
-	f.EmitFirst(p, f.CurrentBlock)
+	f.emitEx(p, func(i Instruction) {
+		f.CurrentBlock.Phis = append(f.CurrentBlock.Phis, p)
+	})
 	return p
 }
