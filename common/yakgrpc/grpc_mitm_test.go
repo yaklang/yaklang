@@ -1193,6 +1193,10 @@ Host: example.com
 			if err != nil {
 				t.Fatal(err)
 			}
+			err = utils.WaitConnect(utils.HostPort("127.0.0.1", mitmPort), 3)
+			if err != nil {
+				t.Fatal(err)
+			}
 			conn, err := netx.DialX(utils.HostPort("127.0.0.1", mitmPort), netx.DialX_WithDisableProxy(true))
 			if err != nil {
 				spew.Dump(err)
