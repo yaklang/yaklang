@@ -1,7 +1,6 @@
 package php2ssa
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -16,10 +15,9 @@ func (y *builder) VisitBreakStatement(raw phpparser.IBreakStatementContext) inte
 		return nil
 	}
 
-	if break_ := y.ir.GetBreak(); break_ != nil {
-		return y.ir.EmitJump(break_)
+	if !y.ir.Break() {
+		y.ir.NewError(ssa.Error, "break statement not in loop or switch: raw %v", i.GetText())
 	}
-	log.Errorf("break statement not in loop or switch: raw %v", i.GetText())
 	return nil
 }
 

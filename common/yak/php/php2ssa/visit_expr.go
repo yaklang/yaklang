@@ -53,25 +53,23 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		// 浅拷贝，一个对象
 		// 如果类定义了 __clone，就执行 __clone
 		target := y.VisitExpression(ret.Expression())
-		checkCloneBuildin := y.ir.BuildIf()
-		checkCloneBuildin.BuildCondition(func() ssa.Value {
-			return y.ir.EmitBinOp(
-				ssa.OpNotEq,
-				y.ir.EmitField(target, y.ir.EmitConstInst("__clone")),
-				y.ir.EmitConstInstNil(),
-			)
-		})
-
-		checkCloneBuildin.BuildTrue(func() {
-			// have __clone
-			calling := y.ir.NewCall(
-				y.ir.EmitField(target, y.ir.EmitConstInst("__clone")),
-				nil,
-			)
-			y.ir.EmitCall(calling)
-		})
-
-		//
+		y.ir.CreateIfBuilder().AppendItem(ssa.IfBuilderItem{
+			Condition: func() ssa.Value {
+				return y.ir.EmitBinOp(
+					ssa.OpNotEq,
+					y.ir.EmitField(target, y.ir.EmitConstInst("__clone")),
+					y.ir.EmitConstInstNil(),
+				)
+			},
+			Body: func() {
+				// have __clone
+				calling := y.ir.NewCall(
+					y.ir.EmitField(target, y.ir.EmitConstInst("__clone")),
+					nil,
+				)
+				y.ir.EmitCall(calling)
+			},
+		}).Build()
 		return nil
 	case *phpparser.KeywordNewExpressionContext:
 		return y.VisitNewExpr(ret.NewExpr())
@@ -242,32 +240,37 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 	case *phpparser.BitwiseExpressionContext:
 		switch ret.GetOp().GetText() {
 		case "&&":
-			ifStmt := y.ir.BuildIf()
+			ifStmt := y.ir.CreateIfBuilder()
 			var v1, v2 ssa.Value
 			var result ssa.Value
-			ifStmt.BuildCondition(func() ssa.Value {
-				v1 = y.VisitExpression(ret.Expression(0))
-				return v1
-			}).BuildTrue(func() {
+			ifStmt.AppendItem(ssa.IfBuilderItem{
+				Condition: func() ssa.Value {
+					v1 = y.VisitExpression(ret.Expression(0))
+					return v1
+				},
+				Body: func() {
+					result = y.ir.EmitBinOp(ssa.OpEq, v1, y.ir.EmitConstInst(true))
+				},
+			}).SetElse(func() {
 				v2 = y.VisitExpression(ret.Expression(1))
 				result = y.ir.EmitBinOp(ssa.OpEq, v2, y.ir.EmitConstInst(true))
-			}).BuildFalse(func() {
-				result = y.ir.EmitConstInst(false)
-			})
-			ifStmt.Finish()
+			}).Build()
 			return result
 		case "||":
 			var v1, v2 ssa.Value
 			var result ssa.Value
-			y.ir.BuildIf().BuildCondition(func() ssa.Value {
-				v1 = y.VisitExpression(ret.Expression(0))
-				return v1
-			}).BuildTrue(func() {
-				result = y.ir.EmitConstInst(true)
-			}).BuildFalse(func() {
+			y.ir.CreateIfBuilder().AppendItem(ssa.IfBuilderItem{
+				Condition: func() ssa.Value {
+					v1 = y.VisitExpression(ret.Expression(0))
+					return v1
+				},
+				Body: func() {
+					result = y.ir.EmitConstInst(true)
+				},
+			}).SetElse(func() {
 				v2 = y.VisitExpression(ret.Expression(1))
 				result = y.ir.EmitBinOp(ssa.OpEq, v2, y.ir.EmitConstInst(true))
-			}).Finish()
+			}).Build()
 			return result
 		case "|":
 			return y.ir.EmitBinOp(ssa.OpOr, y.VisitExpression(ret.Expression(0)), y.VisitExpression(ret.Expression(1)))
@@ -282,57 +285,55 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		v1 := y.VisitExpression(ret.Expression(0))
 		exprCount := len(ret.AllExpression())
 		var result ssa.Value
-		ifb := y.ir.BuildIf().BuildCondition(func() ssa.Value {
-			// false 0 nil
-			t1 := y.ir.EmitBinOp(ssa.OpNotEq, v1, y.ir.EmitConstInstNil())
-			t2 := y.ir.EmitBinOp(ssa.OpNotEq, v1, y.ir.EmitConstInst(0))
-			t3 := y.ir.EmitBinOp(ssa.OpNotEq, v1, y.ir.EmitConstInst(false))
-			return y.ir.EmitBinOp(ssa.OpLogicAnd, t1, y.ir.EmitBinOp(ssa.OpLogicAnd, t2, t3))
-		})
-		switch exprCount {
-		case 2:
-			ifb.BuildTrue(func() {
-				result = v1
-			}).BuildFalse(func() {
+		y.ir.CreateIfBuilder().AppendItem(ssa.IfBuilderItem{
+			Condition: func() ssa.Value {
+				// false 0 nil
+				t1 := y.ir.EmitBinOp(ssa.OpNotEq, v1, y.ir.EmitConstInstNil())
+				t2 := y.ir.EmitBinOp(ssa.OpNotEq, v1, y.ir.EmitConstInst(0))
+				t3 := y.ir.EmitBinOp(ssa.OpNotEq, v1, y.ir.EmitConstInst(false))
+				return y.ir.EmitBinOp(ssa.OpLogicAnd, t1, y.ir.EmitBinOp(ssa.OpLogicAnd, t2, t3))
+			},
+			Body: func() {
+				if exprCount == 2 {
+					result = v1
+				} else {
+					// exprCount == 3
+					result = y.VisitExpression(ret.Expression(1))
+				}
+			},
+		}).SetElse(func() {
+			if exprCount == 2 {
 				result = y.VisitExpression(ret.Expression(1))
-			}).Finish()
-			return result
-		case 3:
-			ifb.BuildTrue(func() {
-				result = y.VisitExpression(ret.Expression(1))
-			}).BuildFalse(func() {
+			} else {
 				result = y.VisitExpression(ret.Expression(2))
-			}).Finish()
-			return result
-		default:
-			log.Errorf("unhandled conditional expression: %v", ret.GetText())
-			return y.ir.EmitConstInstNil()
-		}
+			}
+		}).Build()
+		return result
 	case *phpparser.NullCoalescingExpressionContext:
-		v1 := y.VisitExpression(ret.Expression(0))
+		//v1 := y.VisitExpression(ret.Expression(0))
 		var result ssa.Value
-		y.ir.BuildIf().BuildCondition(func() ssa.Value {
-			return y.ir.EmitBinOp(ssa.OpEq, v1, y.ir.EmitConstInstNil())
-		}).BuildTrue(func() {
-			result = v1
-		}).BuildFalse(func() {
-			result = y.VisitExpression(ret.Expression(1))
-		})
+		//y.ir.BuildIf().BuildCondition(func() ssa.Value {
+		//	return y.ir.EmitBinOp(ssa.OpEq, v1, y.ir.EmitConstInstNil())
+		//}).BuildTrue(func() {
+		//	result = v1
+		//}).BuildFalse(func() {
+		//	result = y.VisitExpression(ret.Expression(1))
+		//})
 		return result
 	case *phpparser.SpaceshipExpressionContext:
 		var result ssa.Value
-		var v1, v2 = y.VisitExpression(ret.Expression(0)), y.VisitExpression(ret.Expression(1))
-		y.ir.BuildIf().BuildCondition(func() ssa.Value {
-			return y.ir.EmitBinOp(ssa.OpEq, v1, v2)
-		}).BuildTrue(func() {
-			result = y.ir.EmitConstInst(0)
-		}).BuildElif(func() ssa.Value {
-			return y.ir.EmitBinOp(ssa.OpLt, v1, v2)
-		}, func() {
-			result = y.ir.EmitConstInst(-1)
-		}).BuildFalse(func() {
-			result = y.ir.EmitConstInst(1)
-		}).Finish()
+		//var v1, v2 = y.VisitExpression(ret.Expression(0)), y.VisitExpression(ret.Expression(1))
+		//y.ir.BuildIf().BuildCondition(func() ssa.Value {
+		//	return y.ir.EmitBinOp(ssa.OpEq, v1, v2)
+		//}).BuildTrue(func() {
+		//	result = y.ir.EmitConstInst(0)
+		//}).BuildElif(func() ssa.Value {
+		//	return y.ir.EmitBinOp(ssa.OpLt, v1, v2)
+		//}, func() {
+		//	result = y.ir.EmitConstInst(-1)
+		//}).BuildFalse(func() {
+		//	result = y.ir.EmitConstInst(1)
+		//}).Finish()
 		return result
 	case *phpparser.ArrayDestructExpressionContext:
 		// [$1, $2, $3] = $arr;
@@ -382,14 +383,14 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 			case "??=":
 				// 左值为空的时候，才会赋值
 				var returnVal = leftValues
-				var leftValueIsEmpty ssa.Value
-				y.ir.BuildIf().BuildCondition(func() ssa.Value {
-					leftValueIsEmpty = y.ir.EmitBinOp(ssa.OpEq, leftValues, y.ir.EmitConstInstNil())
-					return leftValueIsEmpty
-				}).BuildTrue(func() {
-					y.ir.EmitUpdate(leftValues, rightValue)
-					returnVal = rightValue
-				}).Finish()
+				//var leftValueIsEmpty ssa.Value
+				//y.ir.BuildIf().BuildCondition(func() ssa.Value {
+				//	leftValueIsEmpty = y.ir.EmitBinOp(ssa.OpEq, leftValues, y.ir.EmitConstInstNil())
+				//	return leftValueIsEmpty
+				//}).BuildTrue(func() {
+				//	y.ir.EmitUpdate(leftValues, rightValue)
+				//	returnVal = rightValue
+				//}).Finish()
 				return returnVal
 			default:
 				log.Errorf("unhandled assignment operator: %v", operator.GetText())
@@ -414,51 +415,51 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		}
 
 	case *phpparser.LogicalExpressionContext:
-		if ret.LogicalAnd() != nil {
-			ifStmt := y.ir.BuildIf()
-			var v1, v2 ssa.Value
-			var result ssa.Value
-			ifStmt.BuildCondition(func() ssa.Value {
-				v1 = y.VisitExpression(ret.Expression(0))
-				return v1
-			}).BuildTrue(func() {
-				v2 = y.VisitExpression(ret.Expression(1))
-				result = y.ir.EmitBinOp(ssa.OpEq, v2, y.ir.EmitConstInst(true))
-			}).BuildFalse(func() {
-				result = y.ir.EmitConstInst(false)
-			})
-			ifStmt.Finish()
-			return result
-		} else if ret.LogicalOr() != nil {
-			var v1, v2 ssa.Value
-			var result ssa.Value
-			y.ir.BuildIf().BuildCondition(func() ssa.Value {
-				v1 = y.VisitExpression(ret.Expression(0))
-				return v1
-			}).BuildTrue(func() {
-				result = y.ir.EmitConstInst(true)
-			}).BuildFalse(func() {
-				v2 = y.VisitExpression(ret.Expression(1))
-				result = y.ir.EmitBinOp(ssa.OpEq, v2, y.ir.EmitConstInst(true))
-			}).Finish()
-			return result
-		} else if ret.LogicalXor() != nil {
-			var v1, v2 ssa.Value
-			var result ssa.Value
-			v1 = y.VisitExpression(ret.Expression(0))
-			v2 = y.VisitExpression(ret.Expression(1))
-			y.ir.BuildIf().BuildCondition(func() ssa.Value {
-				return v1
-			}).BuildTrue(func() {
-				result = y.ir.EmitBinOp(ssa.OpEq, v2, y.ir.EmitConstInst(false))
-			}).BuildFalse(func() {
-				result = y.ir.EmitBinOp(ssa.OpEq, v2, y.ir.EmitConstInst(true))
-			}).Finish()
-			return result
-		} else {
-			log.Errorf("unhandled logical expression: %v", ret.GetText())
-			return nil
-		}
+		//if ret.LogicalAnd() != nil {
+		//	ifStmt := y.ir.BuildIf()
+		//	var v1, v2 ssa.Value
+		//	var result ssa.Value
+		//	ifStmt.BuildCondition(func() ssa.Value {
+		//		v1 = y.VisitExpression(ret.Expression(0))
+		//		return v1
+		//	}).BuildTrue(func() {
+		//		v2 = y.VisitExpression(ret.Expression(1))
+		//		result = y.ir.EmitBinOp(ssa.OpEq, v2, y.ir.EmitConstInst(true))
+		//	}).BuildFalse(func() {
+		//		result = y.ir.EmitConstInst(false)
+		//	})
+		//	ifStmt.Finish()
+		//	return result
+		//} else if ret.LogicalOr() != nil {
+		//	var v1, v2 ssa.Value
+		//	var result ssa.Value
+		//	y.ir.BuildIf().BuildCondition(func() ssa.Value {
+		//		v1 = y.VisitExpression(ret.Expression(0))
+		//		return v1
+		//	}).BuildTrue(func() {
+		//		result = y.ir.EmitConstInst(true)
+		//	}).BuildFalse(func() {
+		//		v2 = y.VisitExpression(ret.Expression(1))
+		//		result = y.ir.EmitBinOp(ssa.OpEq, v2, y.ir.EmitConstInst(true))
+		//	}).Finish()
+		//	return result
+		//} else if ret.LogicalXor() != nil {
+		//	var v1, v2 ssa.Value
+		//	var result ssa.Value
+		//	v1 = y.VisitExpression(ret.Expression(0))
+		//	v2 = y.VisitExpression(ret.Expression(1))
+		//	y.ir.BuildIf().BuildCondition(func() ssa.Value {
+		//		return v1
+		//	}).BuildTrue(func() {
+		//		result = y.ir.EmitBinOp(ssa.OpEq, v2, y.ir.EmitConstInst(false))
+		//	}).BuildFalse(func() {
+		//		result = y.ir.EmitBinOp(ssa.OpEq, v2, y.ir.EmitConstInst(true))
+		//	}).Finish()
+		//	return result
+		//} else {
+		//	log.Errorf("unhandled logical expression: %v", ret.GetText())
+		//	return nil
+		//}
 	default:
 		ret.GetText()
 		log.Errorf("unhandled expression: %v(T: %T)", ret.GetText(), ret)
@@ -581,7 +582,7 @@ func (y *builder) VisitKeyedVariable(raw phpparser.IKeyedVariableContext) ssa.Va
 	if i.VarName() != nil {
 		// ($*)$a
 		//// {} as index [] as sliceCall
-		varMain = y.ir.ReadVariable(i.VarName().GetText(), true)
+		//varMain = y.ir.ReadVariable(i.VarName().GetText(), true)
 		for i := 0; i < dollarCount; i++ {
 			//TODO: val = y.ir.ReadDynamicVariable(val)
 		}
@@ -596,7 +597,8 @@ func (y *builder) VisitKeyedVariable(raw phpparser.IKeyedVariableContext) ssa.Va
 	for _, a := range i.AllSquareCurlyExpression() {
 		v := y.VisitSquareCurlyExpression(a)
 		if v == nil {
-			count := y.ir.ReadVariable("count", true)
+			//count := y.ir.ReadVariable("count", true)
+			var count ssa.Value
 			calling := y.ir.NewCall(count, nil)
 			y.ir.EmitCall(calling)
 			v = calling
@@ -694,7 +696,7 @@ func (y *builder) VisitFunctionCallName(raw phpparser.IFunctionCallNameContext) 
 	} else if ret := i.Parentheses(); ret != nil {
 		return y.VisitParentheses(ret)
 	} else if ret := i.Label(); ret != nil {
-		return y.ir.ReadVariable(i.Label().GetText(), true)
+		//return y.ir.ReadVariable(i.Label().GetText(), true)
 	}
 	log.Errorf("BUG: unknown function call name: %v", i.GetText())
 	return nil
@@ -764,15 +766,16 @@ func (y *builder) VisitArrayCreation(raw phpparser.IArrayCreationContext) ssa.Va
 		return nil
 	}
 
-	val := y.ir.EmitInterfaceMake(func(feed func(key ssa.Value, val ssa.Value)) {
-		for _, kv := range y.VisitArrayItemList(i.ArrayItemList()) {
-			feed(kv[0], kv[1])
-		}
-	})
-
-	if i := i.Expression(); i != nil {
-		return y.ir.EmitField(val, y.VisitExpression(i))
-	}
+	var val ssa.Value
+	//val := y.ir.EmitInterfaceMake(func(feed func(key ssa.Value, val ssa.Value)) {
+	//	for _, kv := range y.VisitArrayItemList(i.ArrayItemList()) {
+	//		feed(kv[0], kv[1])
+	//	}
+	//})
+	//
+	//if i := i.Expression(); i != nil {
+	//	return y.ir.EmitField(val, y.VisitExpression(i))
+	//}
 	return val
 }
 
@@ -895,12 +898,13 @@ func (y *builder) VisitStringConstant(raw phpparser.IStringConstantContext) ssa.
 		return nil
 	}
 
-	ret := y.ir.ReadVariable(i.GetText(), false)
-	if ret == nil {
-		return y.ir.EmitConstInst(i.GetText())
-	}
+	//ret := y.ir.ReadVariable(i.GetText(), false)
+	//if ret == nil {
+	//	return y.ir.EmitConstInst(i.GetText())
+	//}
 
-	return ret
+	//return ret
+	return nil
 }
 
 func (y *builder) VisitConstantInitializer(raw phpparser.IConstantInitializerContext) ssa.Value {
@@ -914,11 +918,11 @@ func (y *builder) VisitConstantInitializer(raw phpparser.IConstantInitializerCon
 	}
 
 	if ret := i.ArrayItemList(); ret != nil {
-		return y.ir.EmitInterfaceMake(func(feed func(key ssa.Value, val ssa.Value)) {
-			for _, kv := range y.VisitArrayItemList(ret) {
-				feed(kv[0], kv[1])
-			}
-		})
+		//return y.ir.EmitInterfaceMake(func(feed func(key ssa.Value, val ssa.Value)) {
+		//	for _, kv := range y.VisitArrayItemList(ret) {
+		//		feed(kv[0], kv[1])
+		//	}
+		//})
 	} else if ret := i.ConstantInitializer(); ret != nil {
 		val := y.VisitConstantInitializer(ret)
 		if i.Minus() != nil {
@@ -940,6 +944,8 @@ func (y *builder) VisitConstantInitializer(raw phpparser.IConstantInitializerCon
 		}
 		return initVal
 	}
+	log.Errorf("fallback constant initializer: %v", i.GetText())
+	return nil
 }
 
 func (y *builder) VisitConstantString(raw phpparser.IConstantStringContext) ssa.Value {

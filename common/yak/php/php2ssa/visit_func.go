@@ -22,11 +22,12 @@ func (y *builder) VisitFunctionDeclaration(raw phpparser.IFunctionDeclarationCon
 	_ = isRef
 
 	funcName := i.Identifier().GetText()
-	funcDec, symbolTable := y.ir.NewFunc(funcName)
+	//funcDec, symbolTable := y.ir.NewFunc(funcName)
 	current := y.ir.CurrentBlock
-
+	_ = funcName
+	_ = current
 	{
-		y.ir = y.ir.PushFunction(funcDec, symbolTable, current)
+		//y.ir = y.ir.PushFunction(funcDec, symbolTable, current)
 
 		y.VisitFormalParameterList(i.FormalParameterList())
 		y.VisitBlockStatement(i.BlockStatement())
@@ -35,6 +36,6 @@ func (y *builder) VisitFunctionDeclaration(raw phpparser.IFunctionDeclarationCon
 		y.ir = y.ir.PopFunction()
 	}
 
-	y.ir.WriteVariable(funcName, funcDec)
+	//y.ir.WriteVariable(funcName, funcDec)
 	return nil
 }
