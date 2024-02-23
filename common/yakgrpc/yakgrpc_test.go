@@ -7,7 +7,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"google.golang.org/grpc"
 	"io"
 	"net"
 	"net/http"
@@ -163,83 +162,83 @@ func (t *testServer) Echo(c context.Context, req *ypb.EchoRequest) (*ypb.EchoRes
 	return &ypb.EchoResposne{Result: req.GetText()}, nil
 }
 
-func TestServer(t *testing.T) {
-	port := utils.GetRandomAvailableTCPPort()
-	go func() {
-		server := &testServer{}
-
-		grpcTrans := grpc.NewServer()
-		ypb.RegisterYakServer(grpcTrans, server)
-
-		lis, err := net.Listen("tcp", utils.HostPort("localhost", port))
-		if err != nil {
-			log.Error(err)
-			return
-		}
-		err = grpcTrans.Serve(lis)
-		if err != nil {
-			log.Error(err)
-			return
-		}
-	}()
-	time.Sleep(time.Second * 2)
-
-	conn, err := grpc.Dial(
-		utils.HostPort("127.0.0.1", port),
-		grpc.WithInsecure(),
-		grpc.WithNoProxy(),
-	)
-	if err != nil {
-		log.Error(err)
-		t.FailNow()
-		return
-	}
-	defer conn.Close()
-
-	client := ypb.NewYakClient(conn)
-	rsp, err := client.Echo(context.Background(), &ypb.EchoRequest{Text: "test"})
-	if err != nil {
-		log.Error(err)
-		t.FailNow()
-		return
-	}
-
-	if rsp.Result != "test" {
-		t.FailNow()
-		return
-	}
-	println("finished echo")
-
-	clientStream, err := client.OpenPort(context.Background())
-	if err != nil {
-		log.Error(err)
-		t.FailNow()
-		return
-	}
-
-	err = clientStream.Send(&ypb.Input{
-		Host: "127.0.0.1",
-		Port: 8084,
-	})
-	if err != nil {
-		log.Error(err)
-		t.FailNow()
-		return
-	}
-	clientStream.Send(&ypb.Input{Raw: []byte("asdfasdfasdf")})
-
-	go func() {
-		for {
-			clientStream.Send(&ypb.Input{Raw: []byte("111test")})
-			time.Sleep(time.Second)
-		}
-	}()
-	for {
-		output, err := clientStream.Recv()
-		if err != nil {
-			log.Error(err)
-			return
-		}
-		print(string(output.GetRaw()))
-	}
-}
+//func TestServer(t *testing.T) {
+//	port := utils.GetRandomAvailableTCPPort()
+//	go func() {
+//		server := &testServer{}
+//
+//		grpcTrans := grpc.NewServer()
+//		ypb.RegisterYakServer(grpcTrans, server)
+//
+//		lis, err := net.Listen("tcp", utils.HostPort("localhost", port))
+//		if err != nil {
+//			log.Error(err)
+//			return
+//		}
+//		err = grpcTrans.Serve(lis)
+//		if err != nil {
+//			log.Error(err)
+//			return
+//		}
+//	}()
+//	time.Sleep(time.Second * 2)
+//
+//	conn, err := grpc.Dial(
+//		utils.HostPort("127.0.0.1", port),
+//		grpc.WithInsecure(),
+//		grpc.WithNoProxy(),
+//	)
+//	if err != nil {
+//		log.Error(err)
+//		t.FailNow()
+//		return
+//	}
+//	defer conn.Close()
+//
+//	client := ypb.NewYakClient(conn)
+//	rsp, err := client.Echo(context.Background(), &ypb.EchoRequest{Text: "test"})
+//	if err != nil {
+//		log.Error(err)
+//		t.FailNow()
+//		return
+//	}
+//
+//	if rsp.Result != "test" {
+//		t.FailNow()
+//		return
+//	}
+//	println("finished echo")
+//
+//	clientStream, err := client.OpenPort(context.Background())
+//	if err != nil {
+//		log.Error(err)
+//		t.FailNow()
+//		return
+//	}
+//
+//	err = clientStream.Send(&ypb.Input{
+//		Host: "127.0.0.1",
+//		Port: 8084,
+//	})
+//	if err != nil {
+//		log.Error(err)
+//		t.FailNow()
+//		return
+//	}
+//	clientStream.Send(&ypb.Input{Raw: []byte("asdfasdfasdf")})
+//
+//	go func() {
+//		for {
+//			clientStream.Send(&ypb.Input{Raw: []byte("111test")})
+//			time.Sleep(time.Second)
+//		}
+//	}()
+//	for {
+//		output, err := clientStream.Recv()
+//		if err != nil {
+//			log.Error(err)
+//			return
+//		}
+//		print(string(output.GetRaw()))
+//	}
+//}

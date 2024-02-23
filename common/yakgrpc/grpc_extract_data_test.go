@@ -43,7 +43,3 @@ T($%&*(*(
 	}
 
 }
-
-func TestExtractBetween(t *testing.T) {
-
-}
