@@ -1,43 +1,16 @@
-package js2ssa
+package test
 
 import (
 	_ "embed"
 	"fmt"
 	_ "net/http/pprof"
-	"regexp"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
-func none(*ssa.FunctionBuilder) {}
-
-func ParseSSA(code string) (*ssa.Program, error) {
-	return parseSSA(code, false, nil, none)
-}
-
-func check(t *testing.T, code string, funcs string, regex string) {
-	re, err := regexp.Compile(".*" + regex + ".*")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	prog, err := ParseSSA(code)
-	if err != nil {
-		t.Fatal("prog parse error", err)
-	}
-
-	prog.ShowWithSource()
-
-	showFunc := prog.Packages["main"].Funcs["main"].GetValuesByName(funcs)[0]
-	for _, v := range showFunc.GetUsers() {
-		line := ssa.LineDisasm(v)
-		fmt.Println(line)
-		if !re.Match(utils.UnsafeStringToBytes(line)) {
-			t.Fatal(line)
-		}
-	}
+func ParseSSA(code string) (*ssaapi.Program, error) {
+	return ssaapi.Parse(code, ssaapi.WithLanguage(ssaapi.JS))
 }
 
 func TestDemo1(t *testing.T) {
@@ -103,7 +76,7 @@ func TestBreak(t *testing.T) {
 	if err != nil {
 		t.Fatal("prog parse error", err)
 	}
-	prog.ShowWithSource()
+	prog.Show()
 }
 
 func Test_Main(t *testing.T) {
@@ -242,18 +215,6 @@ func TestLet(t *testing.T) {
 	prog2.Show()
 }
 
-func TestExpr(t *testing.T) {
-	prog, err := ParseSSA(`
-	for(a=1,s=1;a<11&&s<20;a++,s++){
-		a+1,s+a;
-	}
-	`)
-	if err != nil {
-		t.Fatal("prog parse error", err)
-	}
-	prog.Show()
-}
-
 func TestReturn(t *testing.T) {
 	prog, err := ParseSSA(`
 		f = () => {a = 1; b = 2; return a, b;}
@@ -293,9 +254,15 @@ func TestUse(t *testing.T) {
 	code := `
 		o = function() {o = 1}
 		c = a && o()
-		print(c)
+		target = c
 	`
-	check(t, code, "print", "phi")
+	// check(t, code, "print", "phi")
+	check(t, TestCase{
+		code:   code,
+		ref:    "target",
+		target: []string{"phi"},
+		fuzz:   true,
+	})
 }
 
 func TestNumber(t *testing.T) {
