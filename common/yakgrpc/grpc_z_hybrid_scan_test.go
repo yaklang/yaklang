@@ -135,7 +135,7 @@ func TestGRPCMUSTPASS_HybridScan_new(t *testing.T) {
 		runtimeID = rsp.HybridScanTaskId
 		spew.Dump(rsp)
 	}
-	count, err := yakit.CountRiskByRuntimeId(consts.GetGormProfileDatabase(), runtimeID)
+	count, err := yakit.CountRiskByRuntimeId(consts.GetGormProjectDatabase(), runtimeID)
 	if err != nil {
 		panic(err)
 	}
