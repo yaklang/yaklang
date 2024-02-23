@@ -313,17 +313,17 @@ func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
 func (b *FunctionBuilder) CreateMemberCallVariable(value, key Value) *Variable {
 	if _, ok := ToExternLib(value); ok {
 		name := b.getExternLibMemberCall(value, key)
-		return b.CreateVariable(name, false)
+		return b.CreateVariable(name)
 	}
 
 	if para, ok := ToParameter(value); ok && para.IsFreeValue {
 		name := b.getFieldName(para.GetDefault(), key)
-		return b.CreateVariable(name, false)
+		return b.CreateVariable(name)
 	}
 
 	name := b.getFieldName(value, key)
 	// log.Infof("CreateMemberCallVariable: %v, %v", retValue.GetName(), key)
-	ret := b.CreateVariable(name, false)
+	ret := b.CreateVariable(name)
 	ret.SetMemberCall(value, key)
 	return ret
 }
