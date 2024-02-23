@@ -9,8 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -322,14 +320,14 @@ assert string(body) == token2, sprintf("get %s != %s", string(body), string(toke
 	}
 }
 
-func TestHTTPFlowTreeHelper(t *testing.T) {
-	//db := yakit.FilterHTTPFlowByDomain(consts.GetGormProjectDatabase(), "w.baidu.com").Debug()
-	//for result := range yakit.YieldHTTPFlows(db, context.Background()) {
-	//	fmt.Println(result.Url)
-	//}
-	result := yakit.GetHTTPFlowNextPartPathByPathPrefix(consts.GetGormProjectDatabase(), "v1")
-	spew.Dump(result)
-}
+//func TestHTTPFlowTreeHelper(t *testing.T) {
+//	//db := yakit.FilterHTTPFlowByDomain(consts.GetGormProjectDatabase(), "w.baidu.com").Debug()
+//	//for result := range yakit.YieldHTTPFlows(db, context.Background()) {
+//	//	fmt.Println(result.Url)
+//	//}
+//	result := yakit.GetHTTPFlowNextPartPathByPathPrefix(consts.GetGormProjectDatabase(), "v1")
+//	spew.Dump(result)
+//}
 
 func TestExportHTTPFlows(t *testing.T) {
 	client, err := NewLocalClient()
