@@ -4,10 +4,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func TestMUSTPASS_JSHandle(t *testing.T) {
-	t.Skip()
 	var count = 0
 	code := `console.log('1.js'); var deepUrl = 'deep.js';;
 console.log('2.js'); fetch(deepUrl, {
@@ -63,6 +63,7 @@ xhr.send();;
 Host: www.example.com
 
 `), code, func(b bool, bytes []byte) {
+		log.Infof("https: %v, bytes: %v", b, string(bytes))
 		count++
 	})
 	assert.Equal(t, 3, count)
