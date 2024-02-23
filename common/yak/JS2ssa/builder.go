@@ -1,6 +1,8 @@
 package js2ssa
 
 import (
+	"runtime/debug"
+
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -26,12 +28,22 @@ func (p *Parser) Feed(src string, must bool, prog *ssa.Program) {
 
 type astbuilder struct {
 	*ssa.FunctionBuilder
+	lmap map[string]struct{}
+	cmap map[string]struct{}
+}
+
+func NewAstBuilder(functionBuilder *ssa.FunctionBuilder) *astbuilder {
+	return &astbuilder{
+		FunctionBuilder: functionBuilder,
+		lmap:            make(map[string]struct{}),
+		cmap:            make(map[string]struct{}),
+	}
 }
 
 func parseSSA(src string, force bool, prog *ssa.Program, callback func(*ssa.FunctionBuilder)) (ret *ssa.Program, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			// debug.PrintStack()
+			debug.PrintStack()
 			ret = nil
 			err = utils.Errorf("parse error with panic : %v", r)
 		}
@@ -48,9 +60,7 @@ func parseSSA(src string, force bool, prog *ssa.Program, callback func(*ssa.Func
 		if callback != nil {
 			callback(funcBuilder)
 		}
-		astbuilder := astbuilder{
-			FunctionBuilder: funcBuilder,
-		}
+		astbuilder := NewAstBuilder(funcBuilder)
 		astbuilder.build(ast)
 		astbuilder.Finish()
 	}); err != nil {
@@ -98,5 +108,29 @@ func frontend(src string, must bool, handler func(*JS.ProgramContext)) error {
 		return nil
 	} else {
 		return utils.Errorf("parse AST FrontEnd error : %v", errListener.err)
+	}
+}
+
+func (b *astbuilder) AddToCmap(key string) {
+	b.cmap[key] = struct{}{}
+}
+
+func (b *astbuilder) GetFromCmap(key string) bool {
+	if _, ok := b.cmap[key]; ok {
+		return true
+	} else {
+		return false
+	}
+}
+
+func (b *astbuilder) AddToLmap(key string) {
+	b.lmap[key] = struct{}{}
+}
+
+func (b *astbuilder) GetFromLmap(key string) bool {
+	if _, ok := b.lmap[key]; ok {
+		return true
+	} else {
+		return false
 	}
 }
