@@ -15,6 +15,7 @@ func (y *builder) VisitIfStatement(raw phpparser.IIfStatementContext) interface{
 		return nil
 	}
 	stmt := i
+	_ = stmt
 
 	if i.Colon() == nil {
 		// classicIf
@@ -23,50 +24,50 @@ func (y *builder) VisitIfStatement(raw phpparser.IIfStatementContext) interface{
 			if (true) echo "abc"; else if true 1+1;
 			if (true) echo "abc"; else if true 1+1; else "abc"."ccc";
 		*/
-		i := y.ir.BuildIf()
-		i.BuildCondition(func() ssa.Value {
-			return y.VisitParentheses(stmt.Parentheses())
-		})
-		i.BuildTrue(func() {
-			y.VisitStatement(stmt.Statement())
-		})
-		for _, elseIf := range stmt.AllElseIfStatement() {
-			elseIfStmt := elseIf.(*phpparser.ElseIfStatementContext)
-			i.BuildElif(func() ssa.Value {
-				return y.VisitParentheses(elseIfStmt.Parentheses())
-			}, func() {
-				y.VisitStatement(elseIfStmt.Statement())
-			})
-		}
-		if stmt.ElseStatement() != nil {
-			i.BuildFalse(func() {
-				y.VisitStatement(stmt.ElseStatement().(*phpparser.ElseStatementContext).Statement())
-			})
-		}
-		i.Finish()
+		//i := y.ir.CreateIfBuilder()
+		//i.BuildCondition(func() ssa.Value {
+		//	return y.VisitParentheses(stmt.Parentheses())
+		//})
+		//i.BuildTrue(func() {
+		//	y.VisitStatement(stmt.Statement())
+		//})
+		//for _, elseIf := range stmt.AllElseIfStatement() {
+		//	elseIfStmt := elseIf.(*phpparser.ElseIfStatementContext)
+		//	i.BuildElif(func() ssa.Value {
+		//		return y.VisitParentheses(elseIfStmt.Parentheses())
+		//	}, func() {
+		//		y.VisitStatement(elseIfStmt.Statement())
+		//	})
+		//}
+		//if stmt.ElseStatement() != nil {
+		//	i.BuildFalse(func() {
+		//		y.VisitStatement(stmt.ElseStatement().(*phpparser.ElseStatementContext).Statement())
+		//	})
+		//}
+		//i.Finish()
 	} else {
 		// tag if
-		i := y.ir.BuildIf()
-		i.BuildCondition(func() ssa.Value {
-			return y.VisitParentheses(stmt.Parentheses())
-		})
-		i.BuildTrue(func() {
-			y.VisitInnerStatementList(stmt.InnerStatementList())
-		})
-		for _, elseIf := range stmt.AllElseIfColonStatement() {
-			elseIfStmt := elseIf.(*phpparser.ElseIfColonStatementContext)
-			i.BuildElif(func() ssa.Value {
-				return y.VisitParentheses(elseIfStmt.Parentheses())
-			}, func() {
-				y.VisitInnerStatementList(elseIfStmt.InnerStatementList())
-			})
-		}
-		if stmt.ElseStatement() != nil {
-			i.BuildFalse(func() {
-				y.VisitInnerStatementList(stmt.ElseColonStatement().(*phpparser.ElseColonStatementContext).InnerStatementList())
-			})
-		}
-		i.Finish()
+		//i := y.ir.BuildIf()
+		//i.BuildCondition(func() ssa.Value {
+		//	return y.VisitParentheses(stmt.Parentheses())
+		//})
+		//i.BuildTrue(func() {
+		//	y.VisitInnerStatementList(stmt.InnerStatementList())
+		//})
+		//for _, elseIf := range stmt.AllElseIfColonStatement() {
+		//	elseIfStmt := elseIf.(*phpparser.ElseIfColonStatementContext)
+		//	i.BuildElif(func() ssa.Value {
+		//		return y.VisitParentheses(elseIfStmt.Parentheses())
+		//	}, func() {
+		//		y.VisitInnerStatementList(elseIfStmt.InnerStatementList())
+		//	})
+		//}
+		//if stmt.ElseStatement() != nil {
+		//	i.BuildFalse(func() {
+		//		y.VisitInnerStatementList(stmt.ElseColonStatement().(*phpparser.ElseColonStatementContext).InnerStatementList())
+		//	})
+		//}
+		//i.Finish()
 	}
 
 	return nil
