@@ -92,12 +92,12 @@ func (b *FunctionBuilder) writeUndefine(variable string, names ...string) *Undef
 // WriteVariable write value to variable
 // will create Variable  and assign value
 func (b *FunctionBuilder) WriteVariable(name string, value Value) {
-	ret := b.CreateVariable(name, false)
+	ret := b.CreateVariable(name)
 	b.AssignVariable(ret, value)
 }
 
 func (b *FunctionBuilder) WriteLocalVariable(name string, value Value) {
-	ret := b.CreateVariable(name, true)
+	ret := b.CreateLocalVariable(name)
 	b.AssignVariable(ret, value)
 }
 
@@ -141,7 +141,13 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 // ------------------- Create
 
 // CreateVariable create variable
-func (b *FunctionBuilder) CreateVariable(name string, isLocal bool) *Variable {
+func (b *FunctionBuilder) CreateLocalVariable(name string) *Variable {
+	return b.createVariableEx(name, true)
+}
+func (b *FunctionBuilder) CreateVariable(name string) *Variable {
+	return b.createVariableEx(name, false)
+}
+func (b *FunctionBuilder) createVariableEx(name string, isLocal bool) *Variable {
 	scope := b.CurrentBlock.ScopeTable
 	ret := scope.CreateVariable(name, isLocal).(*Variable)
 	ret.SetDefRange(b.CurrentRange)

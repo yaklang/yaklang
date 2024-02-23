@@ -813,7 +813,11 @@ func (b *astbuilder) buildLeftExpression(forceAssign bool, stmt *yak.LeftExpress
 	defer recoverRange()
 	if s := stmt.Identifier(); s != nil {
 		text := s.GetText()
-		return b.CreateVariable(text, forceAssign)
+		if forceAssign {
+			return b.CreateLocalVariable(text)
+		} else {
+			return b.CreateVariable(text)
+		}
 	}
 	// TODO: this is member call
 	if s, ok := stmt.Expression().(*yak.ExpressionContext); ok {
