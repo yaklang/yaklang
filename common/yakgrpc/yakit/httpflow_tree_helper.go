@@ -52,7 +52,7 @@ func GetHTTPFlowDomainsByDomainSuffix(db *gorm.DB, domainSuffix string) []*Websi
 			"SUBSTR(url, 0, INSTR(url, '://'))",
 	).Table("http_flows").Limit(1000) //.Debug()
 	if rows, err := db.Rows(); err != nil {
-		log.Error("query nextPart for website tree failed: %s", err)
+		log.Errorf("query nextPart for website tree failed: %s", err)
 		return nil
 	} else {
 		resultMap := make(map[string]*WebsiteNextPart)
