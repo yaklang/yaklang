@@ -8,8 +8,6 @@ import (
 )
 
 func TestA(t *testing.T) {
-	// TODO:
-	t.Skip()
 
 	prog, err := Parse(
 		`
@@ -190,8 +188,6 @@ window.location.href = "www"
 }
 
 func TestB(t *testing.T) {
-	// TODO:
-	t.Skip()
 	prog, err := Parse(`
 	$(document).ready(function(){
 		$("button").click(function(){
