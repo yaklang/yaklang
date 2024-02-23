@@ -127,20 +127,21 @@ func (c *Client) Chat(data string, funcs ...Function) (string, error) {
 		}
 		return "", utils.Errorf("cannot chat... sorry")
 	}
-	if len(funcs) == 0 {
-		list := funk.Map(comp.Choices, func(c ChatChoice) string {
-			return c.Message.Content
-		}).([]string)
-		list = utils.StringArrayFilterEmpty(list)
-		return strings.Join(list, "\n\n"), nil
-	} else {
-		list := funk.Map(comp.Choices, func(c ChatChoice) string {
+	var list []string
+
+	if len(funcs) > 0 {
+		list = funk.Map(comp.Choices, func(c ChatChoice) string {
 			return c.Message.FunctionCall.Arguments
 		}).([]string)
 		list = utils.StringArrayFilterEmpty(list)
-		if len(list) == 0 {
-			return "", nil
+		if len(list) > 0 {
+			return strings.TrimSpace(list[0]), nil
 		}
-		return strings.TrimSpace(list[0]), nil
 	}
+
+	list = funk.Map(comp.Choices, func(c ChatChoice) string {
+		return c.Message.Content
+	}).([]string)
+	list = utils.StringArrayFilterEmpty(list)
+	return strings.Join(list, "\n\n"), nil
 }
