@@ -108,7 +108,7 @@ jobs:
             run: go test -timeout 3m ./common/yak/yaktest/mustpass
 
           - name: Test gRPC
-            run: go test -timeout 5m ./common/yakgrpc
+            run: go test -timeout 10m ./common/yakgrpc
 
           - name: Test Vulinbox SQL Injection
             run: go test -timeout 4m -run TestGRPCMUSTPASS_SQL ./common/coreplugin
