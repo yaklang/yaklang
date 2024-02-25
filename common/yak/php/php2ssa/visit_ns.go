@@ -36,9 +36,37 @@ func (y *builder) VisitQualifiedNamespaceName(raw phpparser.IQualifiedNamespaceN
 
 		}
 		return y.ir.EmitConstInst(nil)
-	} else {
-
 	}
+
+	if nameList := i.NamespaceNameList(); nameList != nil {
+		// use namespace mode
+		y.VisitNamespaceNameList(nameList.(*phpparser.NamespaceNameListContext))
+	}
+
+	return nil
+}
+
+func (y *builder) VisitNamespaceNameList(raw phpparser.INamespaceNameListContext) ssa.Value {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*phpparser.NamespaceNameListContext)
+	if i == nil {
+		return nil
+	}
+
+	ir := y.ir
+	var lastName string
+	var result ssa.Value
+	for _, id := range i.AllIdentifier() {
+		val := ir.ReadValue(id.GetText())
+		result = val
+		if lastName != "" {
+			_ = val
+		}
+	}
+	_ = result
 
 	return nil
 }

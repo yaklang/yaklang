@@ -38,7 +38,7 @@ func (y *builder) VisitReturnStatement(raw phpparser.IReturnStatementContext) in
 	return y.ir.EmitReturn([]ssa.Value{y.ir.EmitConstInstNil()})
 }
 
-func (y *builder) VisitYieldExpression(raw phpparser.IYieldExpressionContext) interface{} {
+func (y *builder) VisitYieldExpression(raw phpparser.IYieldExpressionContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
