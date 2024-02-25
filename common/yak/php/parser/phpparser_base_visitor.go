@@ -351,6 +351,10 @@ func (v *BasePHPParserVisitor) VisitBackQuoteStringExpression(ctx *BackQuoteStri
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitArrayCreationUnpackExpression(ctx *ArrayCreationUnpackExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitKeywordNewExpression(ctx *KeywordNewExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -363,11 +367,11 @@ func (v *BasePHPParserVisitor) VisitLogicalExpression(ctx *LogicalExpressionCont
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitPrintExpression(ctx *PrintExpressionContext) interface{} {
+func (v *BasePHPParserVisitor) VisitSliceCallAssignmentExpression(ctx *SliceCallAssignmentExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitAssignmentExpression(ctx *AssignmentExpressionContext) interface{} {
+func (v *BasePHPParserVisitor) VisitPrintExpression(ctx *PrintExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -415,7 +419,15 @@ func (v *BasePHPParserVisitor) VisitPrefixIncDecExpression(ctx *PrefixIncDecExpr
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitFieldMemberCallAssignmentExpression(ctx *FieldMemberCallAssignmentExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitComparisonExpression(ctx *ComparisonExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitOrdinaryAssignmentExpression(ctx *OrdinaryAssignmentExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -427,15 +439,27 @@ func (v *BasePHPParserVisitor) VisitInstanceOfExpression(ctx *InstanceOfExpressi
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitArrayDestructExpression(ctx *ArrayDestructExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BasePHPParserVisitor) VisitLambdaFunctionExpression(ctx *LambdaFunctionExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
 func (v *BasePHPParserVisitor) VisitBitwiseExpression(ctx *BitwiseExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitLeftFieldMemberCall(ctx *LeftFieldMemberCallContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitLeftSliceCall(ctx *LeftSliceCallContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitLeftVariable(ctx *LeftVariableContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitLeftArrayCreation(ctx *LeftArrayCreationContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
