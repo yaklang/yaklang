@@ -526,26 +526,33 @@ func (y *builder) VisitMemberAccess(raw phpparser.IMemberAccessContext) ssa.Valu
 	return nil
 }
 
-func (y *builder) VisitActualArguments(raw phpparser.IActualArgumentsContext) interface{} {
+func (y *builder) VisitActualArguments(raw phpparser.IActualArgumentsContext) ([]ssa.Value, bool) {
 	if y == nil || raw == nil {
-		return nil
+		return nil, false
 	}
 
 	i, _ := raw.(*phpparser.ActualArgumentsContext)
 	if i == nil {
-		return nil
+		return nil, false
 	}
 
 	// PHP8 annotation
-	for _, a := range i.AllArguments() {
-		y.VisitArguments(a)
+	argStmt := i.AllArguments()
+	var args []ssa.Value
+	ellipsis := false
+	for _, a := range argStmt {
+		vals, ellipsisCurrent := y.VisitArguments(a)
+		args = append(args, vals...)
+		if ellipsisCurrent {
+			ellipsis = true
+		}
 	}
 
 	for _, a := range i.AllSquareCurlyExpression() {
 		y.VisitSquareCurlyExpression(a)
 	}
 
-	return nil
+	return args, ellipsis
 }
 
 func (y *builder) VisitKeyedFieldName(raw phpparser.IKeyedFieldNameContext) interface{} {
@@ -673,7 +680,10 @@ func (y *builder) VisitFunctionCall(raw phpparser.IFunctionCallContext) ssa.Valu
 	}
 
 	v := y.VisitFunctionCallName(i.FunctionCallName())
-	c := y.ir.NewCall(v, nil)
+
+	args, ellipsis := y.VisitActualArguments(i.ActualArguments())
+	c := y.ir.NewCall(v, args)
+	c.IsEllipsis = ellipsis
 	return y.ir.EmitCall(c)
 }
 

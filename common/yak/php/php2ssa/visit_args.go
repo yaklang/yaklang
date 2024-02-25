@@ -1,40 +1,50 @@
 package php2ssa
 
-import phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
+import (
+	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
+	"github.com/yaklang/yaklang/common/yak/ssa"
+)
 
-func (y *builder) VisitArguments(raw phpparser.IArgumentsContext) interface{} {
+func (y *builder) VisitArguments(raw phpparser.IArgumentsContext) ([]ssa.Value, bool) {
 	if y == nil || raw == nil {
-		return nil
+		return nil, false
 	}
 
 	i, _ := raw.(*phpparser.ArgumentsContext)
 	if i == nil {
-		return nil
+		return nil, false
 	}
 
+	var ret []ssa.Value
+
+	var ellipsis bool
 	for _, arg := range i.AllActualArgument() {
-		y.VisitActualArgument(arg)
+		value, b := y.VisitActualArgument(arg)
+		if b {
+			ellipsis = true
+		}
+		ret = append(ret, value)
 	}
 
-	return nil
+	return ret, ellipsis
 }
 
-func (y *builder) VisitActualArgument(raw phpparser.IActualArgumentContext) interface{} {
+func (y *builder) VisitActualArgument(raw phpparser.IActualArgumentContext) (ssa.Value, bool) {
 	if y == nil || raw == nil {
-		return nil
+		return nil, false
 	}
 
 	i, _ := raw.(*phpparser.ActualArgumentContext)
 	if i == nil {
-		return nil
+		return nil, false
 	}
 
 	if i.Expression() != nil {
-		return y.VisitExpression(i.Expression())
+		return y.VisitExpression(i.Expression()), i.Ellipsis().GetText() == "..."
 	} else if i.Ampersand() != nil {
-
+		return y.VisitChain(i.Chain()), false
 	} else if i.YieldExpression() != nil {
-		return y.VisitYieldExpression(i.YieldExpression())
+		return y.VisitYieldExpression(i.YieldExpression()), false
 	}
-	return nil
+	return nil, false
 }
