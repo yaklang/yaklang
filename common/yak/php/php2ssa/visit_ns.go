@@ -40,7 +40,7 @@ func (y *builder) VisitQualifiedNamespaceName(raw phpparser.IQualifiedNamespaceN
 
 	if nameList := i.NamespaceNameList(); nameList != nil {
 		// use namespace mode
-		y.VisitNamespaceNameList(nameList.(*phpparser.NamespaceNameListContext))
+		return y.VisitNamespaceNameList(nameList.(*phpparser.NamespaceNameListContext))
 	}
 
 	return nil
@@ -57,18 +57,19 @@ func (y *builder) VisitNamespaceNameList(raw phpparser.INamespaceNameListContext
 	}
 
 	ir := y.ir
-	var lastName string
-	var result ssa.Value
+	var lastValue ssa.Value
 	for _, id := range i.AllIdentifier() {
 		val := ir.ReadValue(id.GetText())
-		result = val
-		if lastName != "" {
-			_ = val
+		if lastValue != nil {
+			lastValue = ir.CreateMemberCallVariable(lastValue, val).GetValue()
+		} else {
+			lastValue = val
 		}
 	}
-	_ = result
-
-	return nil
+	if i.NamespaceNameTail() != nil {
+		log.Warn("namespace tail build unfinished")
+	}
+	return lastValue
 }
 
 func (y *builder) VisitNamespaceNameTail(raw phpparser.INamespaceNameTailContext) interface{} {

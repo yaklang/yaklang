@@ -524,12 +524,26 @@ expression
     | expression op = '??' expression                             # NullCoalescingExpression
     | expression op = '<=>' expression                            # SpaceshipExpression
     | Throw expression                                            # SpecialWordExpression
-    | arrayDestructuring Eq expression                            # ArrayDestructExpression
-    | assignable assignmentOperator attributes? expression        # AssignmentExpression
-    | assignable Eq attributes? '&' (chain | newExpr)             # AssignmentExpression
+    | leftArrayCreation Eq expression                             # ArrayCreationUnpackExpression
+    | expression leftSliceCall assignmentOperator expression      # SliceCallAssignmentExpression
+    | expression leftFieldMemberCall assignmentOperator expression# FieldMemberCallAssignmentExpression
+    | leftVariable assignmentOperator expression                  # OrdinaryAssignmentExpression
     | expression op = LogicalAnd expression                       # LogicalExpression
     | expression op = LogicalXor expression                       # LogicalExpression
     | expression op = LogicalOr expression                        # LogicalExpression
+    ;
+
+leftFieldMemberCall: '[' expression ']';
+
+leftSliceCall: '[' expression ']';
+
+leftVariable
+    : Dollar+ identifier // $a= 1;
+    ;
+
+leftArrayCreation // PHP7.1+
+    : identifier '(' arrayItemList? ')'
+    | arrayDestructuring
     ;
 
 assignable
@@ -729,7 +743,7 @@ chainList
 
 chain
     : chainOrigin memberAccess*
-    //| arrayCreation // [$a,$b]=$c
+    | arrayCreation // [$a,$b]=$c
     ;
 
 chainOrigin

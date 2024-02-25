@@ -136,7 +136,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		return y.VisitArrayCreation(ret.ArrayCreation())
 	case *phpparser.ChainExpressionContext:
 		return y.VisitChain(ret.Chain())
-	case *phpparser.ScalarExpressionContext: // constant / string / label
+	case *phpparser.ScalarExpressionContext: // constant / string / label / php literal
 		if i := ret.Constant(); i != nil {
 			return y.VisitConstant(i)
 		} else if i := ret.String_(); i != nil {
@@ -184,6 +184,10 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 	case *phpparser.LambdaFunctionExpressionContext:
 	case *phpparser.MatchExpressionContext:
 	case *phpparser.ArithmeticExpressionContext:
+		exprs := ret.AllExpression()
+		if len(exprs) == 0 {
+			log.Error("Arithmetic Expression need 2 ops")
+		}
 		op1 := y.VisitExpression(ret.Expression(0))
 		op2 := y.VisitExpression(ret.Expression(1))
 		var o ssa.BinaryOpcode
@@ -202,10 +206,10 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		case "%":
 			o = ssa.OpMod
 		case ".":
-			return y.ir.EmitFieldMust(op1, op2)
+			o = ssa.OpAdd
 		default:
-			log.Errorf("unhandled arithmetic expression: %v", ret.GetText())
-			return nil
+			log.Errorf("unexpected op: %v", opStr)
+			return y.ir.EmitConstInstAny()
 		}
 		return y.ir.EmitBinOp(o, op1, op2)
 	case *phpparser.InstanceOfExpressionContext:
@@ -335,83 +339,62 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		//	result = y.ir.EmitConstInst(1)
 		//}).Finish()
 		return result
-	case *phpparser.ArrayDestructExpressionContext:
+	case *phpparser.ArrayCreationUnpackExpressionContext:
 		// [$1, $2, $3] = $arr;
 		// unpacking
-	case *phpparser.AssignmentExpressionContext:
+		log.Errorf("unpack unfinished")
+	case *phpparser.SliceCallAssignmentExpressionContext:
+		memberExpr := ret.LeftSliceCall().(*phpparser.LeftSliceCallContext).Expression()
+		// build left
+		leftValue := y.VisitExpression(ret.Expression(0))
+		// build member
+		memberValue := y.VisitExpression(memberExpr)
+		variable := y.ir.CreateMemberCallVariable(leftValue, memberValue)
+		rightValue := y.VisitExpression(ret.Expression(1))
+		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), variable.GetValue(), rightValue)
+		y.ir.AssignVariable(variable, rightValue)
+		return rightValue
+	case *phpparser.FieldMemberCallAssignmentExpressionContext:
+		memberExpr := ret.LeftFieldMemberCall().(*phpparser.LeftFieldMemberCallContext).Expression()
+		// build left
+		leftValue := y.VisitExpression(ret.Expression(0))
+		// build member
+		memberValue := y.VisitExpression(memberExpr)
+		variable := y.ir.CreateMemberCallVariable(leftValue, memberValue)
+		rightValue := y.VisitExpression(ret.Expression(1))
+		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), variable.GetValue(), rightValue)
+		y.ir.AssignVariable(variable, rightValue)
+		return rightValue
+	case *phpparser.OrdinaryAssignmentExpressionContext:
 		if ret.AssignmentOperator() != nil {
 			// assignable assignmentOperator attributes? expression        # AssignmentExpression
 
 			// left value: chain array creation
-			leftValues := y.VisitAssignable(ret.Assignable())
-
-			var annotation any
-			if ret.Attributes() != nil {
-				annotation = y.VisitAttributes(ret.Attributes())
-				_ = annotation
+			variableDescription := ret.LeftVariable().(*phpparser.LeftVariableContext)
+			dollarCount := len(variableDescription.AllDollar())
+			if dollarCount > 1 {
+				log.Warn("multi dollar case is waiting for supporting")
 			}
-
+			identifer := variableDescription.Identifier().GetText()
+			variable := y.ir.CreateVariable(identifer, false)
 			rightValue := y.VisitExpression(ret.Expression())
-			operator := ret.AssignmentOperator()
-			switch operator.GetText() {
-			case "=":
-				break
-			case "+=":
-				rightValue = y.ir.EmitBinOp(ssa.OpAdd, leftValues, rightValue)
-			case "-=":
-				rightValue = y.ir.EmitBinOp(ssa.OpSub, leftValues, rightValue)
-			case "*=":
-				rightValue = y.ir.EmitBinOp(ssa.OpMul, leftValues, rightValue)
-			case "**=":
-				rightValue = y.ir.EmitBinOp(ssa.OpPow, leftValues, rightValue)
-			case "/=":
-				rightValue = y.ir.EmitBinOp(ssa.OpDiv, leftValues, rightValue)
-			case "%=":
-				rightValue = y.ir.EmitBinOp(ssa.OpMod, leftValues, rightValue)
-			case ".=":
-				rightValue = y.ir.EmitFieldMust(leftValues, rightValue)
-			case "&=":
-				rightValue = y.ir.EmitBinOp(ssa.OpAnd, leftValues, rightValue)
-			case "|=":
-				rightValue = y.ir.EmitBinOp(ssa.OpOr, leftValues, rightValue)
-			case "^=":
-				rightValue = y.ir.EmitBinOp(ssa.OpXor, leftValues, rightValue)
-			case "<<=":
-				rightValue = y.ir.EmitBinOp(ssa.OpShl, leftValues, rightValue)
-			case ">>=":
-				rightValue = y.ir.EmitBinOp(ssa.OpShr, leftValues, rightValue)
-			case "??=":
-				// 左值为空的时候，才会赋值
-				var returnVal = leftValues
-				//var leftValueIsEmpty ssa.Value
-				//y.ir.BuildIf().BuildCondition(func() ssa.Value {
-				//	leftValueIsEmpty = y.ir.EmitBinOp(ssa.OpEq, leftValues, y.ir.EmitConstInstNil())
-				//	return leftValueIsEmpty
-				//}).BuildTrue(func() {
-				//	y.ir.EmitUpdate(leftValues, rightValue)
-				//	returnVal = rightValue
-				//}).Finish()
-				return returnVal
-			default:
-				log.Errorf("unhandled assignment operator: %v", operator.GetText())
-			}
-			updateVal := y.ir.EmitUpdate(leftValues, rightValue)
-			_ = updateVal
+			rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), variable.GetValue(), rightValue)
+			y.ir.AssignVariable(variable, rightValue)
 			return rightValue
-		} else if ret.Ampersand() != nil {
-			// assignable Eq attributes? '&' (chain | newExpr)
-			leftValues := y.VisitAssignable(ret.Assignable())
-			if ret.Attributes() != nil {
-				y.VisitAttributes(ret.Attributes())
-			}
-
-			// right val
-			if i := ret.Chain(); i != nil {
-				y.VisitChain(i)
-			} else if i := ret.NewExpr(); i != nil {
-				y.VisitNewExpr(i)
-			}
-			_ = leftValues
+			//} else if ret.Ampersand() != nil {
+			//	// assignable Eq attributes? '&' (chain | newExpr)
+			//	leftValues := y.VisitAssignable(ret.Assignable())
+			//	if ret.Attributes() != nil {
+			//		y.VisitAttributes(ret.Attributes())
+			//	}
+			//
+			//	// right val
+			//	if i := ret.Chain(); i != nil {
+			//		y.VisitChain(i)
+			//	} else if i := ret.NewExpr(); i != nil {
+			//		y.VisitNewExpr(i)
+			//	}
+			//	_ = leftValues
 		}
 
 	case *phpparser.LogicalExpressionContext:
@@ -589,28 +572,27 @@ func (y *builder) VisitKeyedVariable(raw phpparser.IKeyedVariableContext) ssa.Va
 	if i.VarName() != nil {
 		// ($*)$a
 		//// {} as index [] as sliceCall
-		//varMain = y.ir.ReadVariable(i.VarName().GetText(), true)
-		for i := 0; i < dollarCount; i++ {
-			//TODO: val = y.ir.ReadDynamicVariable(val)
+		variable := y.ir.CreateVariable(i.VarName().GetText(), false)
+		varMain = variable.GetValue()
+		if varMain == nil {
+			varMain = y.ir.EmitUndefined(i.VarName().GetText())
 		}
+		if dollarCount > 1 {
+			for i := 0; i < dollarCount-1; i++ {
+				// 处理变量的变量
+			}
+		}
+
 	} else {
 		// {} as name [] as sliceCall
-		varMain = nil // TODO: y.ir.ReadDynamicVariable()
-		for i := 0; i < dollarCount; i++ {
-			// val = y.ir.ReadDynamicVariable(val)
-		}
+		varMain = y.VisitExpression(i.Expression())
 	}
 
 	for _, a := range i.AllSquareCurlyExpression() {
 		v := y.VisitSquareCurlyExpression(a)
 		if v == nil {
-			//count := y.ir.ReadVariable("count", true)
-			var count ssa.Value
-			calling := y.ir.NewCall(count, nil)
-			y.ir.EmitCall(calling)
-			v = calling
+			varMain = y.ir.CreateMemberCallVariable(varMain, v).GetValue()
 		}
-		varMain = y.ir.EmitField(varMain, v)
 	}
 
 	return varMain
@@ -662,7 +644,7 @@ func (y *builder) VisitSquareCurlyExpression(raw phpparser.ISquareCurlyExpressio
 				// 现在，$a 包含 "apple", "banana", "cherry"
 			*/
 			log.Warnf("PHP $a[...] call empty")
-			return nil
+			return y.ir.EmitUndefined("$var[]")
 		}
 	} else {
 		return y.VisitExpression(i.Expression())
@@ -732,7 +714,7 @@ func (y *builder) VisitChainOrigin(raw phpparser.IChainOriginContext) ssa.Value 
 		log.Errorf("BUG: unknown chain origin: %v", i.GetText())
 	}
 
-	return nil
+	return y.ir.EmitUndefined(i.GetText())
 }
 
 func (y *builder) VisitChainBase(raw phpparser.IChainBaseContext) ssa.Value {
@@ -759,7 +741,7 @@ func (y *builder) VisitChainBase(raw phpparser.IChainBaseContext) ssa.Value {
 				ret = y.VisitKeyedVariable(i)
 				continue
 			}
-			ret = y.ir.EmitField(ret, y.VisitKeyedVariable(i))
+			ret = y.ir.CreateMemberCallVariable(ret, y.VisitKeyedVariable(i)).GetValue()
 		}
 		return ret
 	}
@@ -972,4 +954,50 @@ func (y *builder) VisitConstantString(raw phpparser.IConstantStringContext) ssa.
 		return y.VisitString_(r)
 	}
 	return y.VisitConstant(i.Constant())
+}
+
+func (y *builder) reduceAssignCalcExpression(operator string, leftValues ssa.Value, rightValue ssa.Value) ssa.Value {
+	switch operator {
+	case "=":
+		return rightValue
+	case "+=":
+		rightValue = y.ir.EmitBinOp(ssa.OpAdd, leftValues, rightValue)
+	case "-=":
+		rightValue = y.ir.EmitBinOp(ssa.OpSub, leftValues, rightValue)
+	case "*=":
+		rightValue = y.ir.EmitBinOp(ssa.OpMul, leftValues, rightValue)
+	case "**=":
+		rightValue = y.ir.EmitBinOp(ssa.OpPow, leftValues, rightValue)
+	case "/=":
+		rightValue = y.ir.EmitBinOp(ssa.OpDiv, leftValues, rightValue)
+	case "%=":
+		rightValue = y.ir.EmitBinOp(ssa.OpMod, leftValues, rightValue)
+	case ".=":
+		rightValue = y.ir.EmitBinOp(ssa.OpAdd, leftValues, rightValue)
+	case "&=":
+		rightValue = y.ir.EmitBinOp(ssa.OpAnd, leftValues, rightValue)
+	case "|=":
+		rightValue = y.ir.EmitBinOp(ssa.OpOr, leftValues, rightValue)
+	case "^=":
+		rightValue = y.ir.EmitBinOp(ssa.OpXor, leftValues, rightValue)
+	case "<<=":
+		rightValue = y.ir.EmitBinOp(ssa.OpShl, leftValues, rightValue)
+	case ">>=":
+		rightValue = y.ir.EmitBinOp(ssa.OpShr, leftValues, rightValue)
+	case "??=":
+		// 左值为空的时候，才会赋值
+		var returnVal = leftValues
+		//var leftValueIsEmpty ssa.Value
+		//y.ir.BuildIf().BuildCondition(func() ssa.Value {
+		//	leftValueIsEmpty = y.ir.EmitBinOp(ssa.OpEq, leftValues, y.ir.EmitConstInstNil())
+		//	return leftValueIsEmpty
+		//}).BuildTrue(func() {
+		//	y.ir.EmitUpdate(leftValues, rightValue)
+		//	returnVal = rightValue
+		//}).Finish()
+		return returnVal
+	default:
+		log.Errorf("unhandled assignment operator: %v", operator)
+	}
+	return rightValue
 }

@@ -265,6 +265,9 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#BackQuoteStringExpression.
 	VisitBackQuoteStringExpression(ctx *BackQuoteStringExpressionContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#ArrayCreationUnpackExpression.
+	VisitArrayCreationUnpackExpression(ctx *ArrayCreationUnpackExpressionContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#KeywordNewExpression.
 	VisitKeywordNewExpression(ctx *KeywordNewExpressionContext) interface{}
 
@@ -274,11 +277,11 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#LogicalExpression.
 	VisitLogicalExpression(ctx *LogicalExpressionContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#SliceCallAssignmentExpression.
+	VisitSliceCallAssignmentExpression(ctx *SliceCallAssignmentExpressionContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#PrintExpression.
 	VisitPrintExpression(ctx *PrintExpressionContext) interface{}
-
-	// Visit a parse tree produced by PHPParser#AssignmentExpression.
-	VisitAssignmentExpression(ctx *AssignmentExpressionContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#PostfixIncDecExpression.
 	VisitPostfixIncDecExpression(ctx *PostfixIncDecExpressionContext) interface{}
@@ -313,8 +316,14 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#PrefixIncDecExpression.
 	VisitPrefixIncDecExpression(ctx *PrefixIncDecExpressionContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#FieldMemberCallAssignmentExpression.
+	VisitFieldMemberCallAssignmentExpression(ctx *FieldMemberCallAssignmentExpressionContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#ComparisonExpression.
 	VisitComparisonExpression(ctx *ComparisonExpressionContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#OrdinaryAssignmentExpression.
+	VisitOrdinaryAssignmentExpression(ctx *OrdinaryAssignmentExpressionContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#CastExpression.
 	VisitCastExpression(ctx *CastExpressionContext) interface{}
@@ -322,14 +331,23 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#InstanceOfExpression.
 	VisitInstanceOfExpression(ctx *InstanceOfExpressionContext) interface{}
 
-	// Visit a parse tree produced by PHPParser#ArrayDestructExpression.
-	VisitArrayDestructExpression(ctx *ArrayDestructExpressionContext) interface{}
-
 	// Visit a parse tree produced by PHPParser#LambdaFunctionExpression.
 	VisitLambdaFunctionExpression(ctx *LambdaFunctionExpressionContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#BitwiseExpression.
 	VisitBitwiseExpression(ctx *BitwiseExpressionContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#leftFieldMemberCall.
+	VisitLeftFieldMemberCall(ctx *LeftFieldMemberCallContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#leftSliceCall.
+	VisitLeftSliceCall(ctx *LeftSliceCallContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#leftVariable.
+	VisitLeftVariable(ctx *LeftVariableContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#leftArrayCreation.
+	VisitLeftArrayCreation(ctx *LeftArrayCreationContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#assignable.
 	VisitAssignable(ctx *AssignableContext) interface{}
