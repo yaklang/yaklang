@@ -26,7 +26,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/protocol/x224"
 )
 
-
 var rdpAuth = &DefaultServiceAuthInfo{
 	ServiceName:      "rdp",
 	DefaultPorts:     "3389",

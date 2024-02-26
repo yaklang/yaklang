@@ -280,6 +280,7 @@ func (s *SEC) Write(b []byte) (n int, err error) {
 	}
 
 	var flag uint16 = ENCRYPT
+
 	if s.enableSecureCheckSum {
 		flag |= SECURE_CHECKSUM
 	}
@@ -459,10 +460,6 @@ func (c *Client) connect(clientData []interface{}, serverData []interface{}, use
 	}
 	c.enableEncryption = c.ClientCoreData().ServerSelectedProtocol == 0
 
-	if c.enableEncryption {
-		c.sendClientRandom()
-	}
-
 	c.sendInfoPkt()
 	c.transport.Once("global", c.recvLicenceInfo)
 }
@@ -631,7 +628,7 @@ func (c *Client) sendClientRandom() {
 	glog.Info("clientRandom:", string(clientRandom))
 
 	serverSecurityData := c.ServerSecurityData()
-	if serverSecurityData != nil {
+	if serverSecurityData == nil {
 		return
 	}
 
@@ -678,6 +675,7 @@ func (c *Client) sendInfoPkt() {
 	var secFlag uint16 = INFO_PKT
 	if c.enableEncryption {
 		secFlag |= ENCRYPT
+		c.sendClientRandom()
 	}
 
 	glog.Debug("RdpVersion:", c.ClientCoreData().RdpVersion, ":", gcc.RDP_VERSION_5_PLUS)
