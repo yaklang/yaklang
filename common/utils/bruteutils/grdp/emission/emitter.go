@@ -7,6 +7,7 @@ package emission
 import (
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"os"
 	"reflect"
 	"sync"
@@ -269,5 +270,8 @@ func NewEmitter() (emitter *Emitter) {
 	emitter.events = make(map[interface{}][]reflect.Value)
 	emitter.maxListeners = DefaultMaxListeners
 	emitter.onces = make(map[interface{}][]reflect.Value)
+	emitter.RecoverWith(func(i interface{}, i2 interface{}, err error) {
+		log.Errorf("event[%v] listener[%v] failed: %v", i, i2, err)
+	})
 	return
 }
