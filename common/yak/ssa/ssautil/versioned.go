@@ -46,7 +46,17 @@ type VersionedIF[T comparable] interface {
 	IsRoot() bool
 }
 
-type Versioned[T comparable] struct {
+type versionedValue interface {
+	comparable
+	SSAValue
+}
+
+type SSAValue interface {
+	IsUndefined() bool
+	SelfDelete()
+}
+
+type Versioned[T versionedValue] struct {
 	// origin desc the variable's last or renamed version
 	captureVariable VersionedIF[T]
 	versionIndex    int
@@ -62,9 +72,7 @@ type Versioned[T comparable] struct {
 	Value      T
 }
 
-var _ VersionedIF[string] = (*Versioned[string])(nil)
-
-func NewVersioned[T comparable](globalIndex int, name string, local bool, scope *ScopedVersionedTable[T]) VersionedIF[T] {
+func NewVersioned[T versionedValue](globalIndex int, name string, local bool, scope *ScopedVersionedTable[T]) VersionedIF[T] {
 	ret := &Versioned[T]{
 		captureVariable: nil,
 		versionIndex:    -1,
@@ -102,7 +110,13 @@ func (v *Versioned[T]) Assign(val T) error {
 	if isZeroValue(val) {
 		log.Warnf("ssa: #%v is trying to be assigned by nil", v.GetGlobalIndex())
 	}
-	v.isAssigned.Set()
+	if !val.IsUndefined() {
+		v.isAssigned.Set()
+		if v.Value.IsUndefined() {
+			// unregister undefined
+			v.Value.SelfDelete()
+		}
+	}
 	v.Value = val
 	return nil
 }

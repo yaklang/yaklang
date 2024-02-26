@@ -23,13 +23,10 @@ func (y *builder) VisitFunctionDeclaration(raw phpparser.IFunctionDeclarationCon
 
 	funcName := i.Identifier().GetText()
 	ir := y.ir
-	if funcName != "" {
-		ir.SetMarkedFunction(funcName)
-	}
+	ir.SetMarkedFunction(funcName)
 
 	newFunction := ir.NewFunc(funcName)
-	val := ir.ReadOrCreateVariable(funcName)
-	variable := val.GetVariable(funcName)
+	variable := ir.ReadOrCreateVariable(funcName).GetLastVariable()
 	ir.AssignVariable(variable, newFunction)
 
 	y.ir = ir.PushFunction(newFunction)

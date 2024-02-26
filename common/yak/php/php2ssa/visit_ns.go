@@ -59,7 +59,8 @@ func (y *builder) VisitNamespaceNameList(raw phpparser.INamespaceNameListContext
 	ir := y.ir
 	var lastValue ssa.Value
 	for _, id := range i.AllIdentifier() {
-		val := ir.ReadValue(id.GetText())
+		name := id.GetText()
+		val := ir.ReadOrCreateVariable(name)
 		if lastValue != nil {
 			lastValue = ir.CreateMemberCallVariable(lastValue, val).GetValue()
 		} else {
