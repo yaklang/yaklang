@@ -1,6 +1,8 @@
 package php2ssa
 
-import phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
+import (
+	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
+)
 
 func (y *builder) VisitFunctionDeclaration(raw phpparser.IFunctionDeclarationContext) interface{} {
 	if y == nil || raw == nil {
@@ -33,8 +35,17 @@ func (y *builder) VisitFunctionDeclaration(raw phpparser.IFunctionDeclarationCon
 
 	{
 		//y.ir = y.ir.PushFunction(funcDec, symbolTable, current)
-		for _, formal := range i.FormalParameterList().(*phpparser.FormalParameterListContext).AllFormalParameter() {
-			_ = formal
+		paramCodes := i.FormalParameterList().(*phpparser.FormalParameterListContext).AllFormalParameter()
+		for _, formal := range paramCodes {
+			param := formal.(*phpparser.FormalParameterContext)
+			defaultValue := param.VariableInitializer().(*phpparser.VariableInitializerContext)
+			varName := defaultValue.VarName()
+
+			val := y.VisitConstantInitializer(defaultValue.ConstantInitializer())
+			paramInstance := y.ir.NewParam(varName.GetText())
+			if val != nil {
+				paramInstance.SetDefault(val)
+			}
 			// build param
 		}
 		y.VisitBlockStatement(i.BlockStatement())

@@ -2,6 +2,7 @@ package php2ssa
 
 import (
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -903,6 +904,11 @@ func (y *builder) VisitConstantInitializer(raw phpparser.IConstantInitializerCon
 	}
 
 	if ret := i.ArrayItemList(); ret != nil {
+		om := omap.NewGeneralOrderedMap()
+		for idx, item := range i.ArrayItemList().(*phpparser.ArrayItemListContext).AllArrayItem() {
+			item.(*phpa)
+		}
+		y.ir.EmitMakeWithoutType(nil, nil)
 		//return y.ir.EmitInterfaceMake(func(feed func(key ssa.Value, val ssa.Value)) {
 		//	for _, kv := range y.VisitArrayItemList(ret) {
 		//		feed(kv[0], kv[1])
@@ -921,7 +927,7 @@ func (y *builder) VisitConstantInitializer(raw phpparser.IConstantInitializerCon
 				initVal = y.VisitConstantString(c)
 				continue
 			}
-			initVal = y.ir.EmitField(initVal, y.VisitConstantString(c))
+			initVal = y.ir.EmitBinOp(ssa.OpAdd, initVal, y.VisitConstantString(c))
 		}
 		if initVal == nil {
 			log.Errorf("unhandled constant initializer: %v", i.GetText())
