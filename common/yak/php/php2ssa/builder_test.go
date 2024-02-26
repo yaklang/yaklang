@@ -22,6 +22,30 @@ funcName().$a;
 `)
 }
 
+func TestParseSSA_FuncCall_ActualParams1(t *testing.T) {
+	smokingtest(`<?php
+function a1($a, $b) {return "2";}
+`)
+}
+
+func TestParseSSA_FuncCall_ActualParams2(t *testing.T) {
+	smokingtest(`<?php
+function a2($a, $b="1"."2") {return "2";}
+`)
+}
+
+func TestParseSSA_FuncCall_ActualParams3(t *testing.T) {
+	smokingtest(`<?php
+function a3($a, $b=["1", "2"], $dd=null) {return "2";}
+`)
+}
+
+func TestParseSSA_FuncCall_ActualParams4(t *testing.T) {
+	smokingtest(`<?php
+function a3($a, $b=["1", "2"], $dd=array(1,2,3), $e=1) {return "2";}
+`)
+}
+
 func TestParseSSA_DoWhileTag(t *testing.T) {
 	smokingtest(`<?php
 function funcName() {
