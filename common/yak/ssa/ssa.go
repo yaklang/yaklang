@@ -46,6 +46,7 @@ type Instruction interface {
 	SetExtern(bool)
 
 	GetVariable(string) *Variable
+	GetLastVariable() *Variable
 	GetAllVariables() map[string]*Variable
 	AddVariable(*Variable)
 }

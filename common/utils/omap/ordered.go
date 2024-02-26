@@ -116,6 +116,18 @@ func (o *OrderedMap[T, V]) Set(key T, v V) {
 	o.namedKey = true
 }
 
+func (o *OrderedMap[T, V]) BringKeyToLastOne(target T) {
+	o.lock.Lock()
+	defer o.lock.Unlock()
+	for key, instance := range o.keyChain {
+		if instance == target {
+			o.keyChain = append(o.keyChain[:key], o.keyChain[key+1:]...)
+			break
+		}
+	}
+	o.keyChain = append(o.keyChain, target)
+}
+
 func (o *OrderedMap[T, V]) Get(key T) (V, bool) {
 	o.lock.RLock()
 	defer o.lock.RUnlock()
