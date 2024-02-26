@@ -496,13 +496,15 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 
 			} else {
 				// 只展示之前成功的包
-				for resp := range yakit.YieldWebFuzzerResponseByTaskIDs(s.GetProjectDatabase(), stream.Context(), oldIDs, true) {
-					respModel, err := resp.ToGRPCModel()
-					if err != nil {
-						log.Errorf("convert web fuzzer response to grpc model failed: %s", err)
-						continue
+				if len(oldIDs) > 0 {
+					for resp := range yakit.YieldWebFuzzerResponseByTaskIDs(s.GetProjectDatabase(), stream.Context(), oldIDs, true) {
+						respModel, err := resp.ToGRPCModel()
+						if err != nil {
+							log.Errorf("convert web fuzzer response to grpc model failed: %s", err)
+							continue
+						}
+						feedbackResponse(respModel, true)
 					}
-					feedbackResponse(respModel, true)
 				}
 
 				// 展示最新任务的所有包
