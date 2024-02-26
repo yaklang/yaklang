@@ -49,6 +49,8 @@ type Instruction interface {
 	GetLastVariable() *Variable
 	GetAllVariables() map[string]*Variable
 	AddVariable(*Variable)
+	ReplaceValue(Value, Value)
+	SelfDelete()
 }
 
 type (
@@ -67,6 +69,7 @@ type Node interface {
 	GetUsers() Users
 	HasValues() bool
 	GetValues() Values
+	IsUndefined() bool
 }
 type Typed interface {
 	// Node

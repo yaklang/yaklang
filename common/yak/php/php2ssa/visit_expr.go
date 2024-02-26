@@ -572,7 +572,10 @@ func (y *builder) VisitKeyedVariable(raw phpparser.IKeyedVariableContext) ssa.Va
 	if i.VarName() != nil {
 		// ($*)$a
 		//// {} as index [] as sliceCall
-		variable := y.ir.CreateVariable(i.VarName().GetText(), false)
+		variable := y.ir.ReadOrCreateVariable(i.VarName().GetText()).GetLastVariable()
+		if variable == nil {
+			variable = y.ir.CreateVariable(i.VarName().GetText(), false)
+		}
 		varMain = variable.GetValue()
 		if varMain == nil {
 			varMain = y.ir.EmitUndefined(i.VarName().GetText())

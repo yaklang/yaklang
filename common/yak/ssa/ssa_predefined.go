@@ -24,6 +24,17 @@ type anInstruction struct {
 	mask *omap.OrderedMap[string, Value]
 }
 
+func (i *anInstruction) IsUndefined() bool {
+	return false
+}
+
+func (i *anInstruction) SelfDelete() {
+	DeleteInst(i)
+}
+
+func (i *anInstruction) ReplaceValue(Value, Value) {
+}
+
 func (i *anInstruction) AddMask(v Value) {
 	i.mask.Add(v)
 }
