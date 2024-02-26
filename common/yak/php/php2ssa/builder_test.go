@@ -17,6 +17,7 @@ func TestParseSSA_Basic(t *testing.T) {
 func TestParseSSA_FuncCall(t *testing.T) {
 	smokingtest(`<?php
 function funcName() {return "2";}
+funcName().$a
 `)
 }
 
