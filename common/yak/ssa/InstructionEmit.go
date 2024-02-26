@@ -321,6 +321,7 @@ func (f *FunctionBuilder) EmitConstInst(i any) *ConstInst {
 }
 
 func (f *FunctionBuilder) EmitField(i, key Value) Value {
+	log.Error("ssa.field instruction is deprecated temporally")
 	ret := f.getFieldWithCreate(i, key, false)
 
 	if f.CurrentBlock.finish {

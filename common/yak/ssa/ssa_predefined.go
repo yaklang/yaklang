@@ -17,7 +17,7 @@ type anInstruction struct {
 	id          int
 
 	isExtern  bool
-	variables map[string]*Variable
+	variables *omap.OrderedMap[string, *Variable] // map[string]*Variable
 
 	// mask is a map, key is variable name, value is variable value
 	// it record the variable is masked by closure function or some scope changed
@@ -52,7 +52,7 @@ func (i *anInstruction) Masked() bool {
 
 func NewInstruction() anInstruction {
 	return anInstruction{
-		variables: make(map[string]*Variable),
+		variables: omap.NewOrderedMap(make(map[string]*Variable)),
 		id:        -1,
 		mask:      omap.NewEmptyOrderedMap[string, Value](),
 	}
@@ -103,17 +103,26 @@ func (a *anInstruction) GetOperand(i int) Value { return a.GetOperands()[i] }
 func (a *anInstruction) GetOperandNum() int     { return len(a.GetOperands()) }
 
 func (a *anInstruction) GetVariable(name string) *Variable {
-	if ret, ok := a.variables[name]; ok {
+	if ret, ok := a.variables.Get(name); ok {
 		return ret
 	} else {
 		return nil
 	}
 }
 
-func (a *anInstruction) GetAllVariables() map[string]*Variable {
-	return a.variables
+func (a *anInstruction) GetLastVariable() *Variable {
+	_, v, _ := a.variables.Last()
+	return v
 }
-func (a *anInstruction) AddVariable(v *Variable) { a.variables[v.GetName()] = v }
+
+func (a *anInstruction) GetAllVariables() map[string]*Variable {
+	return a.variables.GetMap()
+}
+func (a *anInstruction) AddVariable(v *Variable) {
+	name := v.GetName()
+	a.variables.Set(name, v)
+	a.variables.BringKeyToLastOne(name)
+}
 
 var _ Instruction = (*anInstruction)(nil)
 
