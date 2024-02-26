@@ -2,6 +2,7 @@ package ssautil
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -112,8 +113,8 @@ func (v *Versioned[T]) Assign(val T) error {
 	}
 	if !val.IsUndefined() {
 		v.isAssigned.Set()
-		if v.Value.IsUndefined() {
-			// unregister undefined
+		rVal := reflect.ValueOf(v.Value)
+		if rVal.IsValid() && !rVal.IsZero() && v.Value.IsUndefined() {
 			v.Value.SelfDelete()
 		}
 	}
