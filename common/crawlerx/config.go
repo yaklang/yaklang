@@ -57,6 +57,9 @@ type BaseConfig struct {
 	urlTree        *tools.UrlTree
 	waitGroup      *utils.SizedWaitGroup
 	startWaitGroup *utils.SizedWaitGroup
+
+	sourceType string
+	fromPlugin string
 }
 
 type BrowserConfig struct {
@@ -99,6 +102,7 @@ func NewConfig() *Config {
 			evalJs:            make(map[string][]string),
 			vue:               false,
 			response:          make(map[string]string),
+			sourceType:        "crawlerx",
 		},
 	}
 }
@@ -396,5 +400,17 @@ func WithVue(vue bool) ConfigOpt {
 func WithResponse(targetUrl string, response string) ConfigOpt {
 	return func(config *Config) {
 		config.baseConfig.response[targetUrl] = response
+	}
+}
+
+func WithSourceType(sourceType string) ConfigOpt {
+	return func(config *Config) {
+		config.baseConfig.sourceType = sourceType
+	}
+}
+
+func WithFromPlugin(fromPlugin string) ConfigOpt {
+	return func(config *Config) {
+		config.baseConfig.fromPlugin = fromPlugin
 	}
 }

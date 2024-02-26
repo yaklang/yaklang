@@ -85,6 +85,8 @@ type BrowserStarter struct {
 	https        bool
 	evalJs       []*JSEval
 	jsResultSend func(string)
+	sourceType   string
+	fromPlugin   string
 }
 
 func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *BrowserStarter {
@@ -126,7 +128,9 @@ func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *Br
 		saveToDB:  baseConfig.saveToDB,
 		https:     false,
 
-		evalJs: make([]*JSEval, 0),
+		evalJs:     make([]*JSEval, 0),
+		sourceType: baseConfig.sourceType,
+		fromPlugin: baseConfig.fromPlugin,
 	}
 	var ctx context.Context
 	var cancel context.CancelFunc
@@ -359,6 +363,21 @@ func (starter *BrowserStarter) scanCreatedTarget(targetID proto.TargetTargetID) 
 
 func (starter *BrowserStarter) createBrowserHijack(browser *rod.Browser) error {
 	browserHijackRouter := NewBrowserHijackRequests(browser)
+	opts := []lowhttp.LowhttpOpt{
+		lowhttp.WithTimeout(30 * time.Second),
+		lowhttp.WithHttps(starter.https),
+		lowhttp.WithSaveHTTPFlow(starter.saveToDB),
+		lowhttp.WithSource(starter.sourceType),
+	}
+	if starter.browserConfig.proxyAddress != nil {
+		opts = append(opts, lowhttp.WithProxy(starter.browserConfig.proxyAddress.String()))
+	}
+	if starter.runtimeID != "" {
+		opts = append(opts, lowhttp.WithRuntimeId(starter.runtimeID))
+	}
+	if starter.fromPlugin != "" {
+		opts = append(opts, lowhttp.WithFromPlugin(starter.fromPlugin))
+	}
 	err := browserHijackRouter.Add("*", "", func(hijack *CrawlerHijack) {
 		//if pageUrl == "" {
 		//	pageUrl = hijack.Request.URL().String()
@@ -390,18 +409,6 @@ func (starter *BrowserStarter) createBrowserHijack(browser *rod.Browser) error {
 		refererInfo := hijack.Request.Req().Header.Get("Referer")
 		if refererInfo == "" && hijack.Request.URL().String() != starter.baseUrl {
 			hijack.Request.Req().Header.Add("Referer", starter.baseUrl)
-		}
-		opts := []lowhttp.LowhttpOpt{
-			lowhttp.WithTimeout(30 * time.Second),
-			lowhttp.WithHttps(starter.https),
-			lowhttp.WithSaveHTTPFlow(starter.saveToDB),
-			lowhttp.WithSource("crawlerx"),
-		}
-		if starter.browserConfig.proxyAddress != nil {
-			opts = append(opts, lowhttp.WithProxy(starter.browserConfig.proxyAddress.String()))
-		}
-		if starter.runtimeID != "" {
-			opts = append(opts, lowhttp.WithRuntimeId(starter.runtimeID))
 		}
 		err := hijack.LoadResponse(opts, true)
 		if err != nil {
