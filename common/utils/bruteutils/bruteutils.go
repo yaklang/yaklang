@@ -228,8 +228,13 @@ func (b *BruteUtil) run(ctx context.Context) error {
 
 		go func(t string) {
 			defer b.targetsSwg.Done()
-
+			defer func() {
+				if err := recover(); err != nil {
+					log.Errorf("bruete target[%s] failed: %v", t, err)
+				}
+			}()
 			log.Tracef("start processing for target: %s", t)
+
 			err := b.startProcessingTarget(t, ctx)
 			if err != nil {
 				log.Errorf("start processing brute target failed: %s", err)
