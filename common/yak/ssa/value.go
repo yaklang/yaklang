@@ -16,6 +16,14 @@ func (b *FunctionBuilder) ReadValue(name string) Value {
 	return b.readValueEx(name, true, false)
 }
 
+func (b *FunctionBuilder) ReadOrCreateVariable(name string) Value {
+	return b.ReadValue(name)
+}
+
+func (b *FunctionBuilder) ReadOrCreateMemberCallVariable(caller, callee Value) Value {
+	return b.ReadMemberCallVariable(caller, callee)
+}
+
 func (b *FunctionBuilder) ReadValueInThisFunction(name string) Value {
 	return b.readValueEx(name, true, true)
 }
