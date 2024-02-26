@@ -22,18 +22,30 @@ func (y *builder) VisitFunctionDeclaration(raw phpparser.IFunctionDeclarationCon
 	_ = isRef
 
 	funcName := i.Identifier().GetText()
-	//funcDec, symbolTable := y.ir.NewFunc(funcName)
-	current := y.ir.CurrentBlock
-	_ = funcName
-	_ = current
+	ir := y.ir
+	if funcName != "" {
+		ir.SetMarkedFunction(funcName)
+	}
+
+	newFunction := ir.NewFunc(funcName)
+	val := ir.ReadOrCreateVariable(funcName)
+	variable := val.GetVariable(funcName)
+	ir.AssignVariable(variable, newFunction)
+
+	y.ir = ir.PushFunction(newFunction)
+
 	{
 		//y.ir = y.ir.PushFunction(funcDec, symbolTable, current)
-
-		y.VisitFormalParameterList(i.FormalParameterList())
+		for _, formal := range i.FormalParameterList().(*phpparser.FormalParameterListContext).AllFormalParameter() {
+			_ = formal
+			// build param
+		}
 		y.VisitBlockStatement(i.BlockStatement())
-
 		y.ir.Finish()
-		y.ir = y.ir.PopFunction()
+		y.ir = ir.PopFunction()
+		if y.ir == nil {
+			y.ir = ir
+		}
 	}
 
 	//y.ir.WriteVariable(funcName, funcDec)

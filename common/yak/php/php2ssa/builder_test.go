@@ -5,17 +5,19 @@ import (
 	"testing"
 )
 
-func TestParseSSA_ExprWithFuncCall(t *testing.T) {
+func TestParseSSA_Basic(t *testing.T) {
 	smokingtest(`<?php
 1+a()+1;
 "1"."2"
+($b[1] = "1"."2");
+($b[1] = "1"."abc");
 `)
 }
 
 func TestParseSSA_FuncCall(t *testing.T) {
 	smokingtest(`<?php
-($b[1] = "1"."2");
-($b[1] = "1");
+function funcName() {return "2";}
+funcName().$a
 `)
 }
 
