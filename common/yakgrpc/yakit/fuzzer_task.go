@@ -153,7 +153,7 @@ func QueryFuzzerHistoryTasks(db *gorm.DB, req *ypb.QueryHistoryHTTPFuzzerTaskExP
 	ids := lo.Map(returnTasks, func(i *WebFuzzerTask, _ int) int64 {
 		return int64(i.ID)
 	})
-	db = oldDB.Model(&WebFuzzerTask{}).Select([]string{"id", "retry_root_id"})
+	db = oldDB.Model(&WebFuzzerTask{}).Select([]string{"id", "retry_root_id", "http_flow_total", "http_flow_success_count"})
 	db = bizhelper.ExactQueryInt64ArrayOr(db, "retry_root_id", ids)
 	// 找到重试任务，计算总共成功的数量
 	if db.Find(&tasks); db.Error != nil {
