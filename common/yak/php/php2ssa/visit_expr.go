@@ -1,6 +1,7 @@
 package php2ssa
 
 import (
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -30,13 +31,7 @@ func (y *builder) VisitParentheses(raw phpparser.IParenthesesContext) ssa.Value 
 		return nil
 	}
 
-	if i.Expression() != nil {
-		return y.VisitExpression(i.Expression())
-	} else if i.YieldExpression() != nil {
-		y.VisitYieldExpression(i.YieldExpression())
-	}
-
-	return nil
+	return y.VisitExpression(i.Expression())
 }
 
 func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
@@ -68,12 +63,45 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 			y.ir.EmitCall(calling)
 		}).Build()
 		return nil
+	case *phpparser.VariableNameExpressionContext:
+		return y.ir.ReadOrCreateVariable(ret.GetText())
+	case *phpparser.VariableExpressionContext:
+		dollarCount := len(ret.AllDollar())
+		val := y.ir.ReadOrCreateVariable(ret.GetText())
+		if dollarCount > 1 {
+			for i := 0; i < dollarCount-1; i++ {
+				// ref handling
+			}
+		}
+		return val
+	case *phpparser.DynamicVariableExpressionContext:
+		dollarCount := len(ret.AllDollar())
+		val := y.VisitExpression(ret.Expression())
+		if dollarCount > 1 {
+			for i := 0; i < dollarCount-1; i++ {
+				// ref handling
+			}
+		}
+		log.Errorf("DyanmicVariableExpressionContext error")
+		return val
 	case *phpparser.KeywordNewExpressionContext:
 		return y.VisitNewExpr(ret.NewExpr())
-	case *phpparser.IndexerExpressionContext:
-		v1 := y.VisitStringConstant(ret.StringConstant())
-		indexKey := y.VisitExpression(ret.Expression())
-		return y.ir.EmitField(v1, indexKey)
+	case *phpparser.IndexCallExpressionContext:
+		v1 := y.VisitExpression(ret.Expression(0))
+		indexKey := y.VisitExpression(ret.Expression(1))
+		return y.ir.ReadOrCreateMemberCallVariable(v1, indexKey)
+	case *phpparser.MemberCallExpressionContext:
+		v1 := y.VisitExpression(ret.Expression(0))
+		indexKey := y.VisitExpression(ret.Expression(1))
+		return y.ir.ReadOrCreateMemberCallVariable(v1, indexKey)
+	case *phpparser.FunctionCallExpressionContext:
+		caller := y.VisitExpression(ret.Expression())
+		args, ellipsis := y.VisitArguments(ret.Arguments())
+		callInst := y.ir.NewCall(caller, args)
+		if ellipsis {
+			callInst.IsEllipsis = true
+		}
+		return y.ir.EmitCall(callInst)
 	case *phpparser.CastExpressionContext:
 		target := y.VisitExpression(ret.Expression())
 		return y.ir.EmitTypeCast(target, y.VisitCastOperation(ret.CastOperation()))
@@ -103,7 +131,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 			return val
 		}
 	case *phpparser.PrefixIncDecExpressionContext:
-		val := y.VisitChain(ret.Chain())
+		val := y.VisitExpression(ret.Expression())
 		if ret.Inc() != nil {
 			after := y.ir.EmitBinOp(ssa.OpAdd, val, y.ir.EmitConstInst(1))
 			y.ir.EmitUpdate(val, after)
@@ -115,7 +143,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		}
 		return y.ir.EmitConstInstNil()
 	case *phpparser.PostfixIncDecExpressionContext:
-		val := y.VisitChain(ret.Chain())
+		val := y.VisitExpression(ret.Expression())
 		if ret.Inc() != nil {
 			after := y.ir.EmitBinOp(ssa.OpAdd, val, y.ir.EmitConstInst(1))
 			y.ir.EmitUpdate(val, after)
@@ -131,8 +159,6 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 	case *phpparser.ArrayCreationExpressionContext:
 		// arrayCreation
 		return y.VisitArrayCreation(ret.ArrayCreation())
-	case *phpparser.ChainExpressionContext:
-		return y.VisitChain(ret.Chain())
 	case *phpparser.ScalarExpressionContext: // constant / string / label / php literal
 		if i := ret.Constant(); i != nil {
 			return y.VisitConstant(i)
@@ -150,7 +176,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		}
 		return y.ir.EmitConstInst(r)
 	case *phpparser.ParenthesisExpressionContext:
-		return y.VisitParentheses(ret.Parentheses())
+		return y.VisitExpression(ret.Expression())
 	case *phpparser.SpecialWordExpressionContext:
 		if i := ret.Yield(); i != nil {
 			return y.ir.EmitConstInstNil()
@@ -356,90 +382,74 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		y.ir.AssignVariable(variable, rightValue)
 		return rightValue
 	case *phpparser.OrdinaryAssignmentExpressionContext:
-		if ret.AssignmentOperator() != nil {
-			// assignable assignmentOperator attributes? expression        # AssignmentExpression
+		// assignable assignmentOperator attributes? expression        # AssignmentExpression
 
-			// left value: chain array creation
-			variableDescription := ret.LeftVariable().(*phpparser.LeftVariableContext)
+		// left value: chain array creation
+		variableDescription := ret.LeftVariable().(*phpparser.LeftVariableContext)
+		var variable *ssa.Variable
+		if variableDescription.VarName() != nil {
+			variable = y.ir.CreateVariable(variableDescription.VarName().GetText())
+		} else if variableDescription.Identifier() != nil {
 			dollarCount := len(variableDescription.AllDollar())
-			if dollarCount > 1 {
-				log.Warn("multi dollar case is waiting for supporting")
+			variable = y.ir.CreateVariable("$" + variableDescription.Identifier().GetText())
+			for i := 0; i < dollarCount; i++ {
+				log.Warnf("$$ref unhandled")
 			}
-			identifer := variableDescription.Identifier().GetText()
-			variable := y.ir.CreateVariable(identifer)
-			rightValue := y.VisitExpression(ret.Expression())
-			rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), variable.GetValue(), rightValue)
-			y.ir.AssignVariable(variable, rightValue)
-			return rightValue
-			//} else if ret.Ampersand() != nil {
-			//	// assignable Eq attributes? '&' (chain | newExpr)
-			//	leftValues := y.VisitAssignable(ret.Assignable())
-			//	if ret.Attributes() != nil {
-			//		y.VisitAttributes(ret.Attributes())
-			//	}
-			//
-			//	// right val
-			//	if i := ret.Chain(); i != nil {
-			//		y.VisitChain(i)
-			//	} else if i := ret.NewExpr(); i != nil {
-			//		y.VisitNewExpr(i)
-			//	}
-			//	_ = leftValues
+		} else {
+			val := y.VisitExpression(variableDescription.Expression())
+			log.Errorf("${expr} variable unhandled")
+			variable = y.ir.CreateVariable(val.GetVerboseName())
+		}
+		rightValue := y.VisitExpression(ret.Expression())
+		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), variable.GetValue(), rightValue)
+		y.ir.AssignVariable(variable, rightValue)
+		return rightValue
+	case *phpparser.LogicalExpressionContext:
+		id := uuid.New().String()
+		tempVar := y.ir.CreateVariable(id)
+		if ret.LogicalAnd() != nil {
+			y.ir.CreateIfBuilder().SetCondition(func() ssa.Value {
+				expr1 := ret.Expression(0)
+				return y.ir.EmitBinOp(ssa.OpEq, y.VisitExpression(expr1), y.ir.EmitConstInst(true))
+			}, func() {
+				result := y.ir.EmitBinOp(ssa.OpEq, y.VisitExpression(ret.Expression(1)), y.ir.EmitConstInst(true))
+				y.ir.AssignVariable(tempVar, result)
+			}).SetElse(func() {
+				y.ir.AssignVariable(tempVar, y.ir.EmitConstInst(false))
+			}).Build()
+			return tempVar.GetValue()
 		}
 
-	case *phpparser.LogicalExpressionContext:
-		//if ret.LogicalAnd() != nil {
-		//	ifStmt := y.ir.BuildIf()
-		//	var v1, v2 ssa.Value
-		//	var result ssa.Value
-		//	ifStmt.BuildCondition(func() ssa.Value {
-		//		v1 = y.VisitExpression(ret.Expression(0))
-		//		return v1
-		//	}).BuildTrue(func() {
-		//		v2 = y.VisitExpression(ret.Expression(1))
-		//		result = y.ir.EmitBinOp(ssa.OpEq, v2, y.ir.EmitConstInst(true))
-		//	}).BuildFalse(func() {
-		//		result = y.ir.EmitConstInst(false)
-		//	})
-		//	ifStmt.Finish()
-		//	return result
-		//} else if ret.LogicalOr() != nil {
-		//	var v1, v2 ssa.Value
-		//	var result ssa.Value
-		//	y.ir.BuildIf().BuildCondition(func() ssa.Value {
-		//		v1 = y.VisitExpression(ret.Expression(0))
-		//		return v1
-		//	}).BuildTrue(func() {
-		//		result = y.ir.EmitConstInst(true)
-		//	}).BuildFalse(func() {
-		//		v2 = y.VisitExpression(ret.Expression(1))
-		//		result = y.ir.EmitBinOp(ssa.OpEq, v2, y.ir.EmitConstInst(true))
-		//	}).Finish()
-		//	return result
-		//} else if ret.LogicalXor() != nil {
-		//	var v1, v2 ssa.Value
-		//	var result ssa.Value
-		//	v1 = y.VisitExpression(ret.Expression(0))
-		//	v2 = y.VisitExpression(ret.Expression(1))
-		//	y.ir.BuildIf().BuildCondition(func() ssa.Value {
-		//		return v1
-		//	}).BuildTrue(func() {
-		//		result = y.ir.EmitBinOp(ssa.OpEq, v2, y.ir.EmitConstInst(false))
-		//	}).BuildFalse(func() {
-		//		result = y.ir.EmitBinOp(ssa.OpEq, v2, y.ir.EmitConstInst(true))
-		//	}).Finish()
-		//	return result
-		//} else {
-		//	log.Errorf("unhandled logical expression: %v", ret.GetText())
-		//	return nil
-		//}
-	default:
-		ret.GetText()
-		log.Errorf("unhandled expression: %v(T: %T)", ret.GetText(), ret)
-		log.Errorf("-------------unhandled expression: %v(%T)", ret.GetText(), ret)
-		_ = ret
-	}
+		if ret.LogicalOr() != nil {
+			y.ir.CreateIfBuilder().SetCondition(func() ssa.Value {
+				expr1 := ret.Expression(0)
+				return y.ir.EmitBinOp(ssa.OpEq, y.VisitExpression(expr1), y.ir.EmitConstInst(true))
+			}, func() {
+				y.ir.AssignVariable(tempVar, y.ir.EmitConstInst(true))
+			}).SetElse(func() {
+				result := y.ir.EmitBinOp(ssa.OpEq, y.VisitExpression(ret.Expression(1)), y.ir.EmitConstInst(true))
+				y.ir.AssignVariable(tempVar, result)
+			}).Build()
+			return tempVar.GetValue()
+		}
 
+		if ret.LogicalXor() != nil {
+			// no advanced logic
+			r1, r2 := y.VisitExpression(ret.Expression(0)), y.VisitExpression(ret.Expression(1))
+			r1 = y.ir.EmitBinOp(ssa.OpEq, r1, y.ir.EmitConstInst(true))
+			r2 = y.ir.EmitBinOp(ssa.OpEq, r2, y.ir.EmitConstInst(true))
+			y.ir.CreateIfBuilder().SetCondition(func() ssa.Value {
+				return y.ir.EmitBinOp(ssa.OpEq, r1, r2)
+			}, func() {
+				y.ir.AssignVariable(tempVar, y.ir.EmitConstInst(false))
+			}).SetElse(func() {
+				y.ir.AssignVariable(tempVar, y.ir.EmitConstInst(true))
+			})
+		}
+	}
+	raw.GetText()
+	log.Errorf("unhandled expression: %v(T: %T)", raw.GetText(), raw)
+	log.Errorf("-------------unhandled expression: %v(%T)", raw.GetText(), raw)
 	return nil
 }
 
@@ -476,7 +486,7 @@ func (y *builder) VisitChain(raw phpparser.IChainContext) ssa.Value {
 	origin := y.VisitChainOrigin(i.ChainOrigin())
 
 	for _, m := range i.AllMemberAccess() {
-		origin = y.ir.ReadOrCreateMemberCallVariable(origin, y.VisitMemberAccess(m))
+		origin = y.VisitMemberAccess(origin, m)
 	}
 	return origin
 }
@@ -752,17 +762,15 @@ func (y *builder) VisitArrayCreation(raw phpparser.IArrayCreationContext) ssa.Va
 		return nil
 	}
 
-	var val ssa.Value
-	//val := y.ir.EmitInterfaceMake(func(feed func(key ssa.Value, val ssa.Value)) {
-	//	for _, kv := range y.VisitArrayItemList(i.ArrayItemList()) {
-	//		feed(kv[0], kv[1])
-	//	}
-	//})
-	//
-	//if i := i.Expression(); i != nil {
-	//	return y.ir.EmitField(val, y.VisitExpression(i))
-	//}
-	return val
+	itemList := i.ArrayItemList().(*phpparser.ArrayItemListContext)
+	l := len(itemList.AllArrayItem())
+	obj := y.ir.EmitMakeWithoutType(y.ir.EmitConstInst(l), y.ir.EmitConstInst(l))
+	for _, kv := range y.VisitArrayItemList(itemList) {
+		k, v := kv[0], kv[1]
+		variable := y.ir.ReadOrCreateMemberCallVariable(obj, k).GetLastVariable()
+		y.ir.AssignVariable(variable, v)
+	}
+	return obj
 }
 
 func (y *builder) VisitArrayItemList(raw phpparser.IArrayItemListContext) [][2]ssa.Value {
