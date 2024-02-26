@@ -251,10 +251,7 @@ func (i *IfBuilder) AppendItem(cond func() Value, body func()) *IfBuilder {
 
 // SetCondition build if condition and body, short for append item
 func (i *IfBuilder) SetCondition(cond func() Value, body func()) *IfBuilder {
-	i.AppendItem(IfBuilderItem{
-		Condition: cond,
-		Body:      body,
-	})
+	i.AppendItem(cond, body)
 	return i
 }
 
