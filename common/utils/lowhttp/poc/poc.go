@@ -34,6 +34,7 @@ type PocConfig struct {
 	Port                 int
 	ForceHttps           bool
 	ForceHttp2           bool
+	SNI                  string
 	Timeout              time.Duration
 	ConnectTimeout       time.Duration
 	RetryTimes           int
@@ -90,6 +91,7 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 	}
 	opts = append(opts, lowhttp.WithHttps(c.ForceHttps))
 	opts = append(opts, lowhttp.WithHttp2(c.ForceHttp2))
+	opts = append(opts, lowhttp.WithSNI(c.SNI))
 	if c.Timeout > 0 {
 		opts = append(opts, lowhttp.WithTimeout(c.Timeout))
 	}
@@ -343,6 +345,17 @@ func WithForceHTTPS(isHttps bool) PocConfigOption {
 func WithForceHTTP2(isHttp2 bool) PocConfigOption {
 	return func(c *PocConfig) {
 		c.ForceHttp2 = isHttp2
+	}
+}
+
+// sni 是一个请求选项参数，用于指定使用 tls(https) 协议时的 服务器名称指示(SNI)
+// Example:
+// ```
+// poc.Get("https://www.example.com", poc.sni("google.com"))
+// ```
+func WithSNI(sni string) PocConfigOption {
+	return func(c *PocConfig) {
+		c.SNI = sni
 	}
 }
 
@@ -1475,6 +1488,7 @@ var PoCExports = map[string]interface{}{
 	"redirectHandler":      WithRedirectHandler,
 	"https":                WithForceHTTPS,
 	"http2":                WithForceHTTP2,
+	"sni":                  WithSNI,
 	"params":               WithParams,
 	"proxy":                WithProxy,
 	"timeout":              WithTimeout,

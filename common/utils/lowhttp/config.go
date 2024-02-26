@@ -69,6 +69,9 @@ type LowhttpExecConfig struct {
 	ResponseBodyMirrorWriter io.Writer
 
 	DNSNoCache bool
+
+	// SNI
+	SNI string
 }
 
 type LowhttpResponse struct {
@@ -441,5 +444,11 @@ func ConnPool(p *LowHttpConnPool) LowhttpOpt {
 func WithConnPool(b bool) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.WithConnPool = b
+	}
+}
+
+func WithSNI(sni string) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.SNI = sni
 	}
 }

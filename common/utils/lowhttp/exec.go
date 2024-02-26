@@ -155,7 +155,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	}
 
 	var (
-		forceHttps           = option.Https
+		https                = option.Https
 		forceHttp2           = option.Http2
 		gmTLS                = option.GmTLS
 		host                 = option.Host
@@ -180,6 +180,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		dnsHosts             = option.EtcHosts
 		connPool             = option.ConnPool
 		withConnPool         = option.WithConnPool
+		sni                  = option.SNI
 		firstAuth            = true
 	)
 
@@ -251,8 +252,6 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		})
 		proxy = ordinaryProxy
 	}
-
-	https := forceHttps
 
 	if gmTLS {
 		https = true
@@ -471,6 +470,9 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 			}))
 		}
 		dialopts = append(dialopts, netx.DialX_WithGMTLSSupport(gmTLS), netx.DialX_WithTLS(https))
+		if sni != "" {
+			dialopts = append(dialopts, netx.DialX_WithSNI(sni))
+		}
 	}
 
 	if forceProxy {
