@@ -31,9 +31,8 @@ type PluginParamSelectData struct {
 	Value string `json:"value"`
 }
 
-func cliParam2grpc(params []*information.CliParameter) map[string]*ypb.YakScriptParam {
-	// ret := make([]*ypb.YakScriptParam, 0, len(params))
-	ret := make(map[string]*ypb.YakScriptParam, len(params))
+func cliParam2grpc(params []*information.CliParameter) []*ypb.YakScriptParam {
+	ret := make([]*ypb.YakScriptParam, 0, len(params))
 
 	for _, param := range params {
 		defaultValue := ""
@@ -55,7 +54,7 @@ func cliParam2grpc(params []*information.CliParameter) map[string]*ypb.YakScript
 			extra, _ = json.Marshal(paramSelect)
 		}
 
-		ret[param.Name] = &ypb.YakScriptParam{
+		ret = append(ret, &ypb.YakScriptParam{
 			Field:        param.Name,
 			DefaultValue: string(defaultValue),
 			TypeVerbose:  param.Type,
@@ -65,7 +64,7 @@ func cliParam2grpc(params []*information.CliParameter) map[string]*ypb.YakScript
 			Group:        param.Group,
 			ExtraSetting: string(extra),
 			MethodType:   param.MethodType,
-		}
+		})
 	}
 
 	return ret
@@ -111,7 +110,7 @@ func (s *Server) YaklangInspectInformation(ctx context.Context, req *ypb.Yaklang
 	if err != nil {
 		return nil, errors.New("ssa parse error")
 	}
-	ret.CliParameter = lo.Values(cliParam2grpc(information.ParseCliParameter(prog)))
+	ret.CliParameter = cliParam2grpc(information.ParseCliParameter(prog))
 	ret.RiskInfo = riskInfo2grpc(information.ParseRiskInfo(prog), consts.GetGormCVEDatabase())
 	return ret, nil
 }
@@ -293,7 +292,12 @@ func getNeedReturn(script *yakit.YakScript) ([]*ypb.YakScriptParam, error) {
 	if err != nil {
 		return nil, errors.New("ssa parse error")
 	}
-	codeParameter := cliParam2grpc(information.ParseCliParameter(prog))
+	codeParameter := lo.SliceToMap(
+		cliParam2grpc(information.ParseCliParameter(prog)),
+		func(ysp *ypb.YakScriptParam) (string, *ypb.YakScriptParam) {
+			return ysp.Field, ysp
+		},
+	)
 	databaseParameter, err := getParameterFromParamJson(script.Params)
 	if err != nil {
 		return nil, utils.Wrapf(err, "get cli code from param json error")

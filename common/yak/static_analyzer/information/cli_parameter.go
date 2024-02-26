@@ -84,8 +84,8 @@ func ParseCliParameter(prog *ssaapi.Program) []*CliParameter {
 		}
 	}
 
-	parseCliFunction := func(funName, typ, methodTyp string) {
-		prog.Ref(funName).GetUsers().Filter(
+	parseCliFunction := func(v *ssaapi.Value, typ, methodTyp string) {
+		v.GetUsers().Filter(
 			func(v *ssaapi.Value) bool {
 				// only function call and must be reachable
 				return v.IsCall() && v.IsReachable() != -1
@@ -119,9 +119,16 @@ func ParseCliParameter(prog *ssaapi.Program) []*CliParameter {
 		})
 	}
 
-	for name, pair := range methodMap {
-		parseCliFunction(name, pair.typ, pair.methodTyp)
-	}
+	prog.Ref("cli").GetDefs().ForEach(func(v *ssaapi.Value) {
+		if !v.IsFunction() {
+			return
+		}
+		pair, ok := methodMap[v.GetName()]
+		if !ok {
+			return
+		}
+		parseCliFunction(v, pair.typ, pair.methodTyp)
+	})
 
 	return ret
 }
