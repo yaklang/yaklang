@@ -335,10 +335,6 @@ func (v *BasePHPParserVisitor) VisitParentheses(ctx *ParenthesesContext) interfa
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitChainExpression(ctx *ChainExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BasePHPParserVisitor) VisitSpecialWordExpression(ctx *SpecialWordExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -351,6 +347,10 @@ func (v *BasePHPParserVisitor) VisitBackQuoteStringExpression(ctx *BackQuoteStri
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitMemberCallExpression(ctx *MemberCallExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitArrayCreationUnpackExpression(ctx *ArrayCreationUnpackExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -360,6 +360,10 @@ func (v *BasePHPParserVisitor) VisitKeywordNewExpression(ctx *KeywordNewExpressi
 }
 
 func (v *BasePHPParserVisitor) VisitMatchExpression(ctx *MatchExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitFunctionCallExpression(ctx *FunctionCallExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -376,6 +380,18 @@ func (v *BasePHPParserVisitor) VisitPrintExpression(ctx *PrintExpressionContext)
 }
 
 func (v *BasePHPParserVisitor) VisitPostfixIncDecExpression(ctx *PostfixIncDecExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitIndexCallExpression(ctx *IndexCallExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitDynamicVariableExpression(ctx *DynamicVariableExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitVariableNameExpression(ctx *VariableNameExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -399,15 +415,15 @@ func (v *BasePHPParserVisitor) VisitConditionalExpression(ctx *ConditionalExpres
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitVariableExpression(ctx *VariableExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitNullCoalescingExpression(ctx *NullCoalescingExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
 func (v *BasePHPParserVisitor) VisitArithmeticExpression(ctx *ArithmeticExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BasePHPParserVisitor) VisitIndexerExpression(ctx *IndexerExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

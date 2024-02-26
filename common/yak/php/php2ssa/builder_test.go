@@ -5,13 +5,30 @@ import (
 	"testing"
 )
 
+func TestParseSSA_BasicMember(t *testing.T) {
+	smokingtest(`<?php
+$c=[1,2,3];
+dump($c[2]);
+`)
+}
+
+func TestParseSSA_BasicMember2(t *testing.T) {
+	smokingtest(`<?php
+$a;
+$b[1]=1;
+dump($b[1]);
+`)
+}
+
 func TestParseSSA_Basic(t *testing.T) {
 	smokingtest(`<?php
+$ancasdfasdfasdf;
 1+a()+1;
 "1"."2";
+$c=[1,2,3,];
 ($b[1] = "1"."2");
 ($b[1] = "1"."abc");
-
+array(1, "2", "key" => "value");
 `)
 }
 
@@ -108,7 +125,7 @@ echo "This concludes the basic syntax test.\n";
 
 func TestParseSSA_RightValue(t *testing.T) {
 	smokingtest(`<?php
-$a($b[0]); 
+a($b[0]); 
 `)
 }
 

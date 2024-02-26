@@ -28,11 +28,6 @@ func (y *builder) VisitConstant(raw phpparser.IConstantContext) ssa.Value {
 	} else if i.MagicConstant() != nil {
 		// magic __dir__ / __file__
 		return y.ir.EmitUndefined(i.MagicConstant().GetText())
-	} else if i.ClassConstant() != nil {
-		// class constant
-		log.Warnf("class constant not support yet: %s", i.ClassConstant().GetText())
-	} else if i.QualifiedNamespaceName() != nil {
-		y.VisitQualifiedNamespaceName(i.QualifiedNamespaceName())
 	} else {
 		log.Warnf("unknown constant: %s", i.GetText())
 	}
