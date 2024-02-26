@@ -15,6 +15,103 @@ func TestParseSSA_Basic(t *testing.T) {
 `)
 }
 
+func TestParseSSA_Basic2(t *testing.T) {
+	smokingtest(`<?php
+<?php
+// PHPALLINONE.php: A simplified PHP file containing various syntax elements for compiler testing.
+
+// Basic variable declaration and printing
+$name = "PHP Compiler";
+echo "Hello, $name!\n";
+
+// Arrays and foreach loop
+$numbers = [1, 2, 3, 4, 5];
+foreach ($numbers as $number) {
+    echo $number . " ";
+}
+echo "\n";
+
+// Associative array and for loop
+$fruits = ['apple' => 'red', 'banana' => 'yellow', 'grape' => 'purple'];
+for ($i = 0; $i < count(array_keys($fruits)); $i++) {
+    echo array_keys($fruits)[$i] . " is " . array_values($fruits)[$i] . "\n";
+}
+
+// Functions
+function greet($name) {
+    return "Hello, $name!\n";
+}
+echo greet("World");
+
+// Classes and Objects
+class Greeter {
+    private $greeting = "Hello";
+
+    public function greet($name) {
+        return $this->greeting . ", $name!\n";
+    }
+}
+$greeter = new Greeter();
+echo $greeter->greet("OOP World");
+
+// Inheritance
+class PoliteGreeter extends Greeter {
+    public function greet($name) {
+        return parent::greet($name) . "How are you?\n";
+    }
+}
+$politeGreeter = new PoliteGreeter();
+echo $politeGreeter->greet("Polite World");
+
+// Interfaces
+interface Logger {
+    public function log($message);
+}
+class EchoLogger implements Logger {
+    public function log($message) {
+        echo $message . "\n";
+    }
+}
+$logger = new EchoLogger();
+$logger->log("This is a log message.");
+
+// Traits
+trait SayGoodbye {
+    public function goodbye($name) {
+        return "Goodbye, $name!\n";
+    }
+}
+class FarewellGreeter {
+    use SayGoodbye;
+}
+$farewell = new FarewellGreeter();
+echo $farewell->goodbye("Trait World");
+
+// Anonymous functions and closures
+$goodbyeFunction = function ($name) {
+    return "Goodbye, $name!\n";
+};
+echo $goodbyeFunction("Anonymous World");
+
+// Try and Catch
+try {
+    throw new Exception("Just testing exceptions.");
+} catch (Exception $e) {
+    echo "Caught exception: " . $e->getMessage() . "\n";
+}
+
+// Final message
+echo "This concludes the basic syntax test.\n";
+
+`)
+}
+
+func TestParseSSA_RightValue(t *testing.T) {
+	smokingtest(`<?php
+$a($b[0]); 
+`)
+}
+
 func TestParseSSA_FuncCall(t *testing.T) {
 	smokingtest(`<?php
 function funcName() {return "2";}
@@ -36,7 +133,7 @@ function a2($a, $b="1"."2") {return "2";}
 
 func TestParseSSA_FuncCall_ActualParams3(t *testing.T) {
 	smokingtest(`<?php
-function a3($a, $b=["1", "2"], $dd=null) {return "2";}
+function a3($a, $b=["1", "2"], $dd=null) {return $b[0];}
 `)
 }
 

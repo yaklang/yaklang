@@ -2,7 +2,6 @@ package php2ssa
 
 import (
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/omap"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -477,12 +476,12 @@ func (y *builder) VisitChain(raw phpparser.IChainContext) ssa.Value {
 	origin := y.VisitChainOrigin(i.ChainOrigin())
 
 	for _, m := range i.AllMemberAccess() {
-		origin = y.ir.EmitField(origin, y.VisitMemberAccess(m))
+		origin = y.ir.ReadOrCreateMemberCallVariable(origin, y.VisitMemberAccess(m))
 	}
 	return origin
 }
 
-func (y *builder) VisitMemberAccess(raw phpparser.IMemberAccessContext) ssa.Value {
+func (y *builder) VisitMemberAccess(origin ssa.Value, raw phpparser.IMemberAccessContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -492,12 +491,13 @@ func (y *builder) VisitMemberAccess(raw phpparser.IMemberAccessContext) ssa.Valu
 		return nil
 	}
 
-	y.VisitKeyedFieldName(i.KeyedFieldName())
+	fieldName := y.VisitKeyedFieldName(i.KeyedFieldName())
+	origin = y.ir.ReadOrCreateMemberCallVariable(origin, fieldName)
 	if i.ActualArguments() != nil {
 		y.VisitActualArguments(i.ActualArguments())
 	}
 
-	return nil
+	return origin
 }
 
 func (y *builder) VisitActualArguments(raw phpparser.IActualArgumentsContext) ([]ssa.Value, bool) {
@@ -529,7 +529,7 @@ func (y *builder) VisitActualArguments(raw phpparser.IActualArgumentsContext) ([
 	return args, ellipsis
 }
 
-func (y *builder) VisitKeyedFieldName(raw phpparser.IKeyedFieldNameContext) interface{} {
+func (y *builder) VisitKeyedFieldName(raw phpparser.IKeyedFieldNameContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -585,7 +585,7 @@ func (y *builder) VisitKeyedVariable(raw phpparser.IKeyedVariableContext) ssa.Va
 	for _, a := range i.AllSquareCurlyExpression() {
 		v := y.VisitSquareCurlyExpression(a)
 		if v == nil {
-			varMain = y.ir.CreateMemberCallVariable(varMain, v).GetValue()
+			varMain = y.ir.ReadOrCreateMemberCallVariable(varMain, v)
 		}
 	}
 
@@ -893,6 +893,11 @@ func (y *builder) VisitStringConstant(raw phpparser.IStringConstantContext) ssa.
 	return nil
 }
 
+type arrayKeyValuePair struct {
+	Key   ssa.Value
+	Value ssa.Value
+}
+
 func (y *builder) VisitConstantInitializer(raw phpparser.IConstantInitializerContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
@@ -904,17 +909,19 @@ func (y *builder) VisitConstantInitializer(raw phpparser.IConstantInitializerCon
 	}
 
 	if ret := i.ArrayItemList(); ret != nil {
-		om := omap.NewGeneralOrderedMap()
-		for idx, item := range i.ArrayItemList().(*phpparser.ArrayItemListContext).AllArrayItem() {
-			item.(*phpa)
+		//    | Array '(' (arrayItemList ','?)? ')'
+		//    | '[' (arrayItemList ','?)? ']'
+		results := y.VisitArrayItemList(ret)
+		lnc := len(results)
+		array := y.ir.EmitMakeWithoutType(y.ir.EmitConstInst(lnc), y.ir.EmitConstInst(lnc))
+		for _, v := range results {
+			key, value := v[0], v[1]
+			variable := y.ir.ReadOrCreateMemberCallVariable(array, key).GetLastVariable()
+			y.ir.AssignVariable(variable, value)
 		}
-		y.ir.EmitMakeWithoutType(nil, nil)
-		//return y.ir.EmitInterfaceMake(func(feed func(key ssa.Value, val ssa.Value)) {
-		//	for _, kv := range y.VisitArrayItemList(ret) {
-		//		feed(kv[0], kv[1])
-		//	}
-		//})
+		return array
 	} else if ret := i.ConstantInitializer(); ret != nil {
+		// op = ('+' | '-') constantInitializer
 		val := y.VisitConstantInitializer(ret)
 		if i.Minus() != nil {
 			return y.ir.EmitUnOp(ssa.OpNeg, val)
@@ -935,8 +942,6 @@ func (y *builder) VisitConstantInitializer(raw phpparser.IConstantInitializerCon
 		}
 		return initVal
 	}
-	log.Errorf("fallback constant initializer: %v", i.GetText())
-	return nil
 }
 
 func (y *builder) VisitConstantString(raw phpparser.IConstantStringContext) ssa.Value {
