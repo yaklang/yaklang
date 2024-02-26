@@ -8,6 +8,8 @@ import (
 type value interface {
 	Replace(value, value)
 	String() string
+	IsUndefined() bool
+	SelfDelete()
 }
 type phi struct {
 	edge []value
@@ -31,6 +33,9 @@ func (p *phi) String() string {
 	return fmt.Sprintf("phi%s", p.edge)
 }
 
+func (p *phi) IsUndefined() bool { return false }
+func (p *phi) SelfDelete()       {}
+
 type consts struct {
 	value any
 }
@@ -46,6 +51,8 @@ func (c *consts) Replace(old, new value) {}
 func (c *consts) String() string {
 	return fmt.Sprintf("const(%v)", c.value)
 }
+func (p *consts) IsUndefined() bool { return false }
+func (p *consts) SelfDelete()       {}
 
 type binary struct {
 	X, Y value
@@ -70,6 +77,9 @@ func (b *binary) Replace(old, new value) {
 func (b *binary) String() string {
 	return fmt.Sprintf("binary(%v, %v)", b.X, b.Y)
 }
+
+func (p *binary) IsUndefined() bool { return false }
+func (p *binary) SelfDelete()       {}
 
 // ======== builder
 
