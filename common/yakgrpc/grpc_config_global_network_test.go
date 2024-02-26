@@ -257,6 +257,53 @@ try {
 	_, _ = client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
 }
 
+func TestGRPCMUSTPASS_COMMON_DISALLOW_DOMAIN(t *testing.T) {
+	client, err := NewLocalClient(true)
+	if err != nil {
+		panic(err)
+	}
+	_, _ = client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
+	config, err := client.GetGlobalNetworkConfig(context.Background(), &ypb.GetGlobalNetworkConfigRequest{})
+	if err != nil {
+		panic(err)
+	}
+
+	config.DisallowDomain = []string{"a.com"}
+	_, err = client.SetGlobalNetworkConfig(context.Background(), config)
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		_, _ = client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
+	}()
+	os.Unsetenv("http_proxy")
+	os.Unsetenv("https_proxy")
+	os.Unsetenv("all_proxy")
+	os.Unsetenv("proxy")
+	os.Unsetenv("HTTP_PROXY")
+	os.Unsetenv("HTTPS_PROXY")
+	os.Unsetenv("ALL_PROXY")
+
+	_, err = yak.Execute(`
+try {
+	poc.Get("http://a.com",poc.proxy("http://127.0.0.1:9999"))~
+	die("unexpected result")
+} catch e {
+	if f"${e}".Contains("disallow domain") {
+		dump(e)
+		return
+	} else{
+		die(e)
+	}
+}
+`)
+	if err != nil {
+		log.Error(err)
+		t.FailNow()
+	}
+	_, _ = client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
+}
+
 func TestValidP12PassWord(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
