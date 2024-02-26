@@ -684,7 +684,7 @@ constantInitializer
     : constantString ('.' constantString)*
     | Array '(' (arrayItemList ','?)? ')'
     | '[' (arrayItemList ','?)? ']'
-    | op = ('+' | '-') constantInitializer
+    | ('+' | '-') constantInitializer
     ;
 
 constantString: string | constant;
