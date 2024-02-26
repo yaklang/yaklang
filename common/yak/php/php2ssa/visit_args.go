@@ -40,11 +40,10 @@ func (y *builder) VisitActualArgument(raw phpparser.IActualArgumentContext) (ssa
 	}
 
 	if i.Expression() != nil {
-		return y.VisitExpression(i.Expression()), i.Ellipsis().GetText() == "..."
+		val := y.VisitExpression(i.Expression())
+		return val, i.Ellipsis() != nil
 	} else if i.Ampersand() != nil {
 		return y.VisitChain(i.Chain()), false
-	} else if i.YieldExpression() != nil {
-		return y.VisitYieldExpression(i.YieldExpression()), false
 	}
 	return nil, false
 }

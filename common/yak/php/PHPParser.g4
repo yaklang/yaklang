@@ -476,7 +476,7 @@ expressionList
     ;
 
 parentheses
-    : '(' (expression | yieldExpression) ')'
+    : '(' expression ')'
     ;
 
 // Expressions
@@ -484,30 +484,34 @@ parentheses
 expression
     : Clone expression                                            # CloneExpression
     | newExpr                                                     # KeywordNewExpression
-    | stringConstant '[' expression ']'                           # IndexerExpression
-    | '(' castOperation ')' expression                            # CastExpression
-    | ('~' | '@') expression                                      # UnaryOperatorExpression
-    | ('!' | '+' | '-') expression                                # UnaryOperatorExpression
-    | ('++' | '--') chain                                         # PrefixIncDecExpression
-    | chain ('++' | '--')                                         # PostfixIncDecExpression
-    | Print expression                                            # PrintExpression
+    | VarName                                                     # VariableNameExpression
+    | Dollar+ identifier                                          # VariableExpression
+    | Dollar+ OpenCurlyBracket expression CloseCurlyBracket       # DynamicVariableExpression
     | arrayCreation                                               # ArrayCreationExpression
-    | chain                                                       # ChainExpression
+    | Print expression                                            # PrintExpression
     | constant                                                    # ScalarExpression
     | string                                                      # ScalarExpression
     | Label                                                       # ScalarExpression
     | BackQuoteString                                             # BackQuoteStringExpression
-    | parentheses                                                 # ParenthesisExpression
+    | '(' expression ')'                                          # ParenthesisExpression
     | Yield                                                       # SpecialWordExpression
     | List '(' assignmentList ')' Eq expression                   # SpecialWordExpression
     | IsSet '(' chainList ')'                                     # SpecialWordExpression
     | Empty '(' chain ')'                                         # SpecialWordExpression
     | Eval '(' expression ')'                                     # SpecialWordExpression
-    | Exit ( '(' ')' | parentheses)?                              # SpecialWordExpression
+    | Exit  '(' expression? ')'                                   # SpecialWordExpression
     | (Include | IncludeOnce) expression                          # SpecialWordExpression
     | (Require | RequireOnce) expression                          # SpecialWordExpression
     | lambdaFunctionExpr                                          # LambdaFunctionExpression
     | matchExpr                                                   # MatchExpression
+    | '(' castOperation ')' expression                            # CastExpression
+    | ('~' | '@') expression                                      # UnaryOperatorExpression
+    | ('!' | '+' | '-') expression                                # UnaryOperatorExpression
+    | ('++' | '--') expression                                    # PrefixIncDecExpression
+    | expression ('++' | '--')                                    # PostfixIncDecExpression
+    | expression arguments                                        # FunctionCallExpression
+    | expression '[' expression ']'                               # IndexCallExpression
+    | expression '->' expression                                  # MemberCallExpression
     | <assoc = right> expression op = '**' expression             # ArithmeticExpression
     | expression InstanceOf typeRef                               # InstanceOfExpression
     | expression op = ('*' | Divide | '%') expression             # ArithmeticExpression
@@ -533,12 +537,14 @@ expression
     | expression op = LogicalOr expression                        # LogicalExpression
     ;
 
-leftFieldMemberCall: '[' expression ']';
+leftFieldMemberCall: '->' expression;
 
 leftSliceCall: '[' expression ']';
 
 leftVariable
-    : Dollar+ identifier // $a= 1;
+    : Dollar+ identifier // $$a= 1;
+    | VarName            // $a=3
+    | Dollar+ OpenCurlyBracket expression CloseCurlyBracket // ${"a"."b"}=3
     ;
 
 leftArrayCreation // PHP7.1+
@@ -552,7 +558,8 @@ assignable
     ;
 
 arrayCreation
-    : (Array '(' arrayItemList? ')' | '[' arrayItemList? ']') ('[' expression ']')?
+    : Array '(' arrayItemList? ')'
+    | '[' arrayItemList? ']'
     ;
 
 arrayDestructuring
@@ -673,7 +680,6 @@ arguments
 actualArgument
     : argumentName? '...'? expression
     | '&' chain
-    | yieldExpression
     ;
 
 argumentName
@@ -694,8 +700,6 @@ constant
     : Null
     | literalConstant
     | magicConstant
-    | classConstant
-    | qualifiedNamespaceName
     ;
 
 literalConstant

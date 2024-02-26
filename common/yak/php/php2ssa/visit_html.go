@@ -1,6 +1,8 @@
 package php2ssa
 
-import phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
+import (
+	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
+)
 
 func (y *builder) VisitHtmlDocument(raw phpparser.IHtmlDocumentContext) interface{} {
 	if y == nil || raw == nil {
@@ -16,7 +18,8 @@ func (y *builder) VisitHtmlDocument(raw phpparser.IHtmlDocumentContext) interfac
 		// handle shebang
 	}
 
-	for _, el := range i.AllHtmlDocumentElement() {
+	elements := i.AllHtmlDocumentElement()
+	for _, el := range elements {
 		y.VisitHtmlDocumentElement(el)
 	}
 
