@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/filter"
-	"github.com/yaklang/yaklang/common/yak/httptpl"
 	"reflect"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/filter"
+	"github.com/yaklang/yaklang/common/yak/httptpl"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/crawler"
@@ -197,7 +198,7 @@ type YakToCallerManager struct {
 	runtimeId          string
 	proxy              string
 	defaultFilter      *filter.StringFilter
-	ContextCancelFuncs map[string]context.CancelFunc
+	ContextCancelFuncs *sync.Map
 }
 
 func (c *YakToCallerManager) SetLoadPluginTimeout(i float64) {
@@ -209,7 +210,7 @@ func (y *YakToCallerManager) SetDividedContext(b bool) {
 }
 
 func NewYakToCallerManager() *YakToCallerManager {
-	return &YakToCallerManager{table: new(sync.Map), baseWaitGroup: new(sync.WaitGroup), timeout: 10 * time.Second, ContextCancelFuncs: map[string]context.CancelFunc{}}
+	return &YakToCallerManager{table: new(sync.Map), baseWaitGroup: new(sync.WaitGroup), timeout: 10 * time.Second, ContextCancelFuncs: new(sync.Map)}
 }
 
 func (m *YakToCallerManager) SetConcurrent(i int) error {
@@ -400,8 +401,10 @@ func (y *YakToCallerManager) Remove(params *ypb.RemoveHookParams) {
 				if k == HOOK_CLAER {
 					y.CallPluginKeyByName(l.Id, HOOK_CLAER)
 				}
-				if cancelFunc, ok := y.ContextCancelFuncs[l.Id]; ok {
-					cancelFunc()
+				if iCancelFunc, ok := y.ContextCancelFuncs.Load(l.Id); ok {
+					if cancelFunc, ok := iCancelFunc.(context.CancelFunc); ok {
+						cancelFunc()
+					}
 				}
 				continue
 			}
@@ -1038,7 +1041,7 @@ func (y *YakToCallerManager) Add(ctx context.Context, id string, params []*ypb.E
 	if y.dividedContext {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithCancel(ctx)
-		y.ContextCancelFuncs[id] = cancel
+		y.ContextCancelFuncs.Store(id, cancel)
 	}
 
 	cTable, err := FetchFunctionFromSourceCode(ctx, y.getYakitPluginContext(ctx), y.timeout, id, code, func(e *antlr4yak.Engine) error {
