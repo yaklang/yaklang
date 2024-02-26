@@ -36,6 +36,8 @@ var CrawlerXExports = map[string]interface{}{
 	"jsResultSend":      WithJsResultSave,
 	"vue":               WithVue,
 	"response":          WithResponse,
+	"sourceType":        WithSourceType,
+	"fromPlugin":        WithFromPlugin,
 
 	"UnLimitRepeat":      unlimited,
 	"LowRepeatLevel":     lowLevel,
