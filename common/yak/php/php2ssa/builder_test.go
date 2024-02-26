@@ -9,6 +9,7 @@ func TestParseSSA_BasicMember(t *testing.T) {
 	smokingtest(`<?php
 $c=[1,2,3];
 dump($c[2]);
+echo 1,2,3,5;
 `)
 }
 
