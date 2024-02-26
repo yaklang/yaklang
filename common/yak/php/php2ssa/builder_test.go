@@ -8,16 +8,17 @@ import (
 func TestParseSSA_Basic(t *testing.T) {
 	smokingtest(`<?php
 1+a()+1;
-"1"."2"
+"1"."2";
 ($b[1] = "1"."2");
 ($b[1] = "1"."abc");
+
 `)
 }
 
 func TestParseSSA_FuncCall(t *testing.T) {
 	smokingtest(`<?php
 function funcName() {return "2";}
-funcName().$a
+funcName().$a;
 `)
 }
 
