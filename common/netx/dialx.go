@@ -103,6 +103,18 @@ RETRY:
 		return conn, nil
 	}
 
+	DnsConfig := NewDefaultReliableDNSConfig()
+	for _, o := range config.DNSOpts {
+		o(DnsConfig)
+	}
+
+	if DnsConfig.DisabledDomain != nil {
+		host, _, err := utils.ParseStringToHostPort(target)
+		if err == nil && DnsConfig.DisabledDomain.Contains(host) {
+			return nil, utils.Errorf("disallow domain %v by config(check your yakit system/network config)", target)
+		}
+	}
+
 	var errs error
 	for _, proxy := range config.Proxy {
 		conn, err := getConnForceProxy(target, proxy, config.Timeout)
