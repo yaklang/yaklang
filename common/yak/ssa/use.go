@@ -102,7 +102,6 @@ func (c *ConstInst) ReplaceValue(v Value, to Value) {
 // ----------- undefined
 func (u *Undefined) HasValues() bool   { return false }
 func (u *Undefined) GetValues() Values { return nil }
-func (u *Undefined) IsUndefined() bool { return true }
 
 // ----------- BinOp
 func (b *BinOp) HasValues() bool   { return true }

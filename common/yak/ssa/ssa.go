@@ -364,6 +364,8 @@ type Undefined struct {
 	Kind UndefinedKind
 }
 
+func (u *Undefined) IsUndefined() bool { return true }
+
 var (
 	_ Node        = (*Undefined)(nil)
 	_ Value       = (*Undefined)(nil)
