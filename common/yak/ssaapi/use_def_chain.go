@@ -14,7 +14,7 @@ func showAllUseDefChain(v *Value) {
 }
 
 func showUserDefChainEx(flag int, v *Value) {
-	ret := "use-def: |Type\t|index\t|Opcode\t|Value\n"
+	ret := "UseDef: |Type\t|index\t|Opcode\t|Value\n"
 
 	show := func(prefix string, index int, v *Value) string {
 		indexStr := ""
@@ -39,6 +39,20 @@ func showUserDefChainEx(flag int, v *Value) {
 	ret += show("Self", -1, v)
 	for i, u := range v.GetUsers() {
 		ret += show("User", i, u)
+	}
+
+	if v.IsMember() {
+		ret += "Members:\n"
+		ret += show("Key", -1, v.GetKey())
+		ret += show("Object", -1, v.GetObject())
+	}
+
+	if v.IsObject() {
+		ret += "Object:\n"
+		for _, value := range v.GetAllMember() {
+			ret += show("Key", -1, value.GetKey())
+			ret += show("Member", -1, value)
+		}
 	}
 	fmt.Println(ret)
 }

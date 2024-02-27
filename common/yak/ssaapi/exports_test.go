@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestA(t *testing.T) {
@@ -244,4 +246,23 @@ func TestFeedCode(t *testing.T) {
 
 	prog.Ref("f").Show()
 
+}
+
+func TestAAA(t *testing.T) {
+	test := assert.New(t)
+	prog, err := Parse(`
+	a = {} 
+	a[0] = 1
+	target = a[0]
+	`)
+	test.Nil(err)
+	prog.Ref("a").ForEach(func(v *Value) {
+		v.ShowWithSource()
+		v.ShowUseDefChain()
+	})
+
+	prog.Ref("target").ForEach(func(v *Value) {
+		v.ShowWithSource()
+		v.ShowUseDefChain()
+	})
 }
