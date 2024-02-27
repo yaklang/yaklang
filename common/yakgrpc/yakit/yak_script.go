@@ -127,14 +127,6 @@ func (s *YakScript) ToGRPCModel() *ypb.YakScript {
 			spew.Dump([]byte(r))
 		}
 	}
-	/*var riskDetail *ypb.QueryYakScriptRiskDetailByCWEResponse
-	if s.RiskDetail != "" && s.RiskDetail != `""` {
-		err := json.Unmarshal([]byte(s.RiskDetail), &riskDetail)
-		if err != nil {
-			log.Errorf("unmarshal riskDetail failed: %s", err)
-			spew.Dump([]byte(s.RiskDetail))
-		}
-	}*/
 	var riskDetail []*ypb.YakRiskInfo
 	if s.RiskDetail != "" && s.RiskDetail != `""` && s.RiskDetail != "{}" { //"{}"
 		r, err := strconv.Unquote(s.RiskDetail)
@@ -190,10 +182,8 @@ func (s *YakScript) ToGRPCModel() *ypb.YakScript {
 		OnlineGroup:          s.OnlineGroup,
 		UpdatedAt:            s.UpdatedAt.Unix(),
 		RiskAnnotation:       s.RiskAnnotation,
-		//RiskType:             s.RiskType,
-		RiskInfo: riskDetail,
-		//CollaboratorInfo:     collaboratorInfo,
-		IsCorePlugin: s.IsCorePlugin,
+		RiskInfo:             riskDetail,
+		IsCorePlugin:         s.IsCorePlugin,
 	}
 	/*if s.Type == "mitm" {
 		script.Params = mitmPluginDefaultPlugins
@@ -441,33 +431,7 @@ func DeleteYakScriptAll(db *gorm.DB) error {
 	return nil
 }
 
-func DeleteYakScriptByWhere(db *gorm.DB, params *ypb.DeleteLocalPluginsByWhereRequest) error {
-	yakScriptOpLock.Lock()
-	defer yakScriptOpLock.Unlock()
-	db = UserDataAndPluginDatabaseScope(db)
-
-	db = db.Model(&YakScript{}).Unscoped()
-	/*if params.GetType() == "" && params.GetKeywords() == "" {
-		db = db.Where(
-			"true",
-		)
-	} else {*/
-	db = bizhelper.ExactQueryStringArrayOr(db, "type", utils.PrettifyListFromStringSplited(params.GetType(), ","))
-	db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{
-		"script_name", "content", "help", "author", "tags",
-	}, strings.Split(params.GetKeywords(), ","), false)
-	if params.GetUserId() > 0 {
-		db = db.Where("user_id = ?", params.GetUserId())
-	}
-	/*if params.GetUserName() != "" {
-		db = db.Where("author like ?", "%"+params.GetUserName()+"%")
-	}*/
-	db = bizhelper.FuzzQueryLike(db, "author", params.GetUserName())
-	db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{"tags"}, strings.Split(params.GetTags(), ","), false)
-	/*if len(params.Ids) > 0 {
-		db = db.Where("id in (?)", params.Ids)
-	}*/
-	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", params.Ids)
+func DeleteYakScriptByWhere(db *gorm.DB) error {
 	if db = db.Delete(&YakScript{}); db.Error != nil {
 		return db.Error
 	}
@@ -566,16 +530,26 @@ func FilterYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) *gorm.DB {
 	db = bizhelper.ExactQueryExcludeStringArrayOr(db, "script_name", params.GetExcludeScriptNames())
 	if len(params.GetIncludedScriptNames()) > 0 {
 		if len(utils.StringArrayFilterEmpty(params.GetExcludeScriptNames())) > 0 || len(tags) > 0 {
-			//db = db.Or("script_name IN(?)", params.GetIncludedScriptNames())
 			db = bizhelper.ExactOrQueryStringArrayOr(db, "script_name", params.GetIncludedScriptNames())
 		} else {
-			//db = db.Where("script_name IN(?)", params.GetIncludedScriptNames())
 			db = bizhelper.ExactQueryStringArrayOr(db, "script_name", params.GetIncludedScriptNames())
 		}
 	}
 	if params.GetUUID() != "" {
 		db = db.Where("uuid = ?", params.GetUUID())
 	}
+
+	if params.Group != nil {
+		if params.Group.UnSetGroup {
+			db = db.Not("script_name IN (SELECT DISTINCT(yak_script_name) FROM plugin_groups)")
+		} else {
+			if len(params.Group.Group) > 0 {
+				db = db.Joins("left join plugin_groups P on yak_scripts.script_name = P.yak_script_name ")
+				db = bizhelper.ExactQueryStringArrayOr(db, "`group`", params.Group.Group)
+			}
+		}
+	}
+	db = bizhelper.ExactQueryExcludeStringArrayOr(db, "type", params.GetExcludeTypes())
 	return db
 }
 
@@ -609,7 +583,6 @@ func QueryYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) (*bizhelper.
 		}
 	}
 	p := params.Pagination
-
 	if !utils.StringArrayContains([]string{
 		"desc", "asc", "",
 	}, strings.ToLower(params.GetPagination().GetOrder())) {
@@ -691,9 +664,6 @@ func GetYakScriptList(db *gorm.DB, id int64, ids []int64) ([]*YakScript, error) 
 	if id > 0 {
 		db = db.Where("id = ?", id)
 	}
-	/*if len(ids) > 0 {
-		db = db.Where("id in (?)", ids)
-	}*/
 	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", ids)
 	db = db.Scan(&req)
 	if db.Error != nil {
@@ -714,5 +684,38 @@ func QueryExportYakScript(db *gorm.DB, params *ypb.ExportLocalYakScriptRequest) 
 	db = bizhelper.FuzzQueryLike(db, "author", params.GetUserName())
 	db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{"tags"}, strings.Split(params.GetTags(), ","), false)
 	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", params.YakScriptIds)
+	return db
+}
+
+func CountYakScriptByWhere(db *gorm.DB, isGroup bool) (total int64, err error) {
+	db = UserDataAndPluginDatabaseScope(db)
+	db = db.Model(&YakScript{})
+	db = bizhelper.ExactQueryExcludeStringArrayOr(db, "type", []string{"yak", "codec"})
+	if isGroup {
+		db = db.Not("script_name IN (SELECT DISTINCT(yak_script_name) FROM plugin_groups)")
+	}
+	db = db.Count(&total)
+	if db.Error != nil {
+		return 0, utils.Errorf("get YakScript failed: %s", db.Error)
+	}
+	return total, nil
+}
+
+func DeleteYakScript(db *gorm.DB, params *ypb.DeleteLocalPluginsByWhereRequest) *gorm.DB {
+	yakScriptOpLock.Lock()
+	defer yakScriptOpLock.Unlock()
+	db = UserDataAndPluginDatabaseScope(db)
+
+	db = db.Model(&YakScript{}).Unscoped()
+	db = bizhelper.ExactQueryStringArrayOr(db, "type", utils.PrettifyListFromStringSplited(params.GetType(), ","))
+	db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{
+		"script_name", "content", "help", "author", "tags",
+	}, strings.Split(params.GetKeywords(), ","), false)
+	if params.GetUserId() > 0 {
+		db = db.Where("user_id = ?", params.GetUserId())
+	}
+	db = bizhelper.FuzzQueryLike(db, "author", params.GetUserName())
+	db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{"tags"}, strings.Split(params.GetTags(), ","), false)
+	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", params.Ids)
 	return db
 }

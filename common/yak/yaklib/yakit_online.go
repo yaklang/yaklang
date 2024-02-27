@@ -434,6 +434,18 @@ func (s *OnlineClient) Save(db *gorm.DB, plugins ...*OnlinePlugin) error {
 		} else {
 			onlineGroup = utils.RemoveRepeatStringSlice(utils.PrettifyListFromStringSplited(i.Group, ","))
 		}
+		// 更新组
+		for _, group := range onlineGroup {
+			saveData := &yakit.PluginGroup{
+				YakScriptName: i.ScriptName,
+				Group:         group,
+			}
+			saveData.Hash = saveData.CalcHash()
+			err := yakit.CreateOrUpdatePluginGroup(db, saveData.Hash, saveData)
+			if err != nil {
+				log.Errorf("[%v] Save YakScriptGroup [%v] err %s", i.ScriptName, group, err.Error())
+			}
+		}
 
 		y := &yakit.YakScript{
 			ScriptName:           scriptName,
@@ -456,8 +468,8 @@ func (s *OnlineClient) Save(db *gorm.DB, plugins ...*OnlinePlugin) error {
 			OnlineBaseUrl:        s.BaseUrl,
 			BaseOnlineId:         i.BasePluginId,
 			OnlineOfficial:       i.Official,
-			OnlineGroup:          strings.Join(onlineGroup, ","),
-			IsCorePlugin:         i.IsCorePlugin,
+			//OnlineGroup:          strings.Join(onlineGroup, ","),
+			IsCorePlugin: i.IsCorePlugin,
 		}
 		var riskDetail []*ypb.YakRiskInfo
 		for _, riskDetailInstance := range i.RiskInfo {

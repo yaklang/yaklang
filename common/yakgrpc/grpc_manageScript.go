@@ -699,26 +699,29 @@ func (s *Server) DeleteYakScriptExecResult(ctx context.Context, req *ypb.DeleteY
 func (s *Server) GetYakScriptTagsAndType(ctx context.Context, req *ypb.Empty) (*ypb.GetYakScriptTagsAndTypeResponse, error) {
 	var tagsAndType ypb.GetYakScriptTagsAndTypeResponse
 	onlineType, _ := yakit.YakScriptType(s.GetProfileDatabase())
-	db := consts.GetGormProfileDatabase()
-	onlineTags := s.QueryYakScriptTagsGroup(db)
-
-	if onlineTags == nil && onlineType == nil {
-		return nil, utils.Errorf("GetYakScriptTagsAndTypeResponse Empty")
-	}
 	for _, v := range onlineType {
 		tagsAndType.Type = append(tagsAndType.Type, &ypb.TagsAndType{
 			Value: v.Value,
 			Total: int32(v.Count),
 		})
 	}
-
+	db := consts.GetGormProfileDatabase()
+	onlineTags := s.QueryYakScriptTagsGroup(db)
 	for _, v := range onlineTags {
 		if v.Total > 1 {
 			tagsAndType.Tag = append(tagsAndType.Tag, &ypb.TagsAndType{
 				Value: v.Value,
-				Total: int32(v.Total),
+				Total: v.Total,
 			})
 		}
+	}
+
+	group, _ := yakit.GroupCount(s.GetProfileDatabase())
+	for _, v := range group {
+		tagsAndType.Group = append(tagsAndType.Group, &ypb.TagsAndType{
+			Value: v.Value,
+			Total: int32(v.Count),
+		})
 	}
 
 	return &tagsAndType, nil
@@ -770,9 +773,8 @@ func (s *Server) QueryYakScriptByOnlineGroup(c context.Context, req *ypb.QueryYa
 	rsp := &ypb.QueryYakScriptLocalAndUserResponse{}
 
 	db := consts.GetGormProfileDatabase()
-	db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{
-		"online_group",
-	}, strings.Split(req.GetOnlineGroup(), ","), false)
+	db = db.Joins("left join plugin_groups P on yak_scripts.script_name = P.yak_script_name ")
+	db = bizhelper.ExactQueryStringArrayOr(db, "`group`", strings.Split(req.GetOnlineGroup(), ","))
 	data := yakit.YieldYakScripts(db, context.Background())
 
 	for d := range data {
