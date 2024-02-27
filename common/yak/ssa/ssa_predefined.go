@@ -146,6 +146,14 @@ type anValue struct {
 	member *omap.OrderedMap[Value, Value] // map[Value]Value
 }
 
+func NewValue() anValue {
+	return anValue{
+		typ:      BasicTypes[AnyTypeKind],
+		userList: make(Users, 0),
+		member:   omap.NewOrderedMap(map[Value]Value{}),
+	}
+}
+
 func (n *anValue) IsMember() bool {
 	return n.object != nil
 }
@@ -210,14 +218,6 @@ func (n *anValue) GetStringMember(key string) (Value, bool) {
 
 func (n *anValue) GetAllMember() map[Value]Value {
 	return n.member.GetMap()
-}
-
-func NewValue() anValue {
-	return anValue{
-		typ:      BasicTypes[AnyTypeKind],
-		userList: make(Users, 0),
-		member:   omap.NewOrderedMap(map[Value]Value{}),
-	}
 }
 
 func (n *anValue) String() string { return "" }

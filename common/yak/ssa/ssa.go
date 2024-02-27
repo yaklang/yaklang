@@ -54,9 +54,8 @@ type Instruction interface {
 }
 
 type (
-	Users            []User
-	Values           []Value
-	InstructionNodes []InstructionNode
+	Users  []User
+	Values []Value
 )
 
 // data-flow
@@ -76,11 +75,6 @@ type Typed interface {
 	// type
 	GetType() Type
 	SetType(Type)
-}
-
-type InstructionNode interface {
-	Node
-	Instruction
 }
 
 type MemberCall interface {
@@ -107,7 +101,8 @@ type MemberCall interface {
 
 // basic handle item (interface)
 type Value interface {
-	InstructionNode
+	Node
+	Instruction
 	MemberCall
 	Typed
 	Maskable
@@ -122,7 +117,8 @@ type Maskable interface {
 }
 
 type User interface {
-	InstructionNode
+	Node
+	Instruction
 	ReplaceValue(Value, Value)
 }
 
@@ -486,45 +482,6 @@ var (
 	_ Value       = (*Make)(nil)
 	_ User        = (*Make)(nil)
 	_ Instruction = (*Make)(nil)
-)
-
-// instruction
-// ----------- Field
-type Field struct {
-	anInstruction
-	anValue
-
-	// field
-	Key Value
-	Obj Value
-	// this field is Obj[Key]
-
-	update []User
-	// all update for this Field, also contain this update in field.GetUser()
-
-	// Method or Field
-	IsMethod bool
-}
-
-var (
-	_ Node        = (*Field)(nil)
-	_ Value       = (*Field)(nil)
-	_ User        = (*Field)(nil)
-	_ Instruction = (*Field)(nil)
-)
-
-// ----------- Update
-type Update struct {
-	anInstruction
-
-	Value   Value
-	Address Value // this point to field
-}
-
-var (
-	_ Node        = (*Update)(nil)
-	_ User        = (*Update)(nil)
-	_ Instruction = (*Update)(nil)
 )
 
 // ------------- Next

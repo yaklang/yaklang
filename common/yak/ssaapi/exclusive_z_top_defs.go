@@ -194,8 +194,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			}
 		}
 		return i.visitedDefsDefault(actx)
-	case *ssa.Field:
-		return i.visitedDefsDefault(actx)
 	case *ssa.Phi:
 		if !actx.ThePhiShouldBeVisited(i) {
 			// phi is visited...

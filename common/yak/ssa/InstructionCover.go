@@ -22,9 +22,7 @@ func ToCall(v Instruction) (*Call, bool) { p, ok := v.(*Call); return p, ok }
 func ToMake(v Instruction) (*Make, bool) { p, ok := v.(*Make); return p, ok }
 
 // memory
-func ToObject(v Instruction) (*Make, bool)   { o, ok := v.(*Make); return o, ok }
-func ToField(v Instruction) (*Field, bool)   { o, ok := v.(*Field); return o, ok }
-func ToUpdate(v Instruction) (*Update, bool) { o, ok := v.(*Update); return o, ok }
+func ToObject(v Instruction) (*Make, bool) { o, ok := v.(*Make); return o, ok }
 
 // type cover
 

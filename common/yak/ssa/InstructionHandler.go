@@ -21,23 +21,3 @@ func (u Users) RunOnCallOr(f func(*Call), or func(User)) {
 func (u Users) RunOnCall(f func(*Call)) {
 	u.RunOnCallOr(f, noneForUser)
 }
-
-func (u Users) RunOnFieldOr(f func(*Field), or func(User)) {
-	RunOnCoverOr(
-		u,
-		ToField, f, or,
-	)
-}
-func (u Users) RunOnField(f func(*Field)) {
-	u.RunOnFieldOr(f, noneForUser)
-}
-
-func (u Users) RunOnUpdateOr(f func(*Update), or func(User)) {
-	RunOnCoverOr(
-		u,
-		ToUpdate, f, or,
-	)
-}
-func (u Users) RunOnUpdate(f func(*Update)) {
-	u.RunOnUpdateOr(f, noneForUser)
-}

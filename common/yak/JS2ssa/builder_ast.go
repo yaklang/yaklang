@@ -522,8 +522,7 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 				} else if s.GetOp().GetText() == "++" {
 					rValue = b.EmitBinOp(ssa.OpAdd, lValue.GetValue(), ssa.NewConst(1))
 				}
-				lValue.Assign(rValue)
-				// fmt.Println("++ result: ", lValue.GetValue(b.FunctionBuilder))
+				b.AssignVariable(lValue, rValue)
 				return lValue.GetValue()
 			}
 		}
@@ -988,7 +987,7 @@ func (b *astbuilder) buildMemberIndexExpression(stmt *JS.MemberIndexExpressionCo
 	if s := stmt.SingleExpression(1); s != nil {
 		value, _ = b.buildSingleExpression(s, false)
 	}
-	return b.EmitField(expr, value), nil
+	return b.ReadMemberCallVariable(expr, value), nil
 }
 
 func (b *astbuilder) buildChainExpression(stmt *JS.ChainExpressionContext, IsValue bool) (ssa.Value, *ssa.Variable) {
@@ -1013,7 +1012,7 @@ func (b *astbuilder) buildChainExpression(stmt *JS.ChainExpressionContext, IsVal
 		variable := b.CreateMemberCallVariable(expr, index)
 		return nil, variable
 	}
-	return b.EmitField(expr, index), nil
+	return b.ReadMemberCallVariable(expr, index), nil
 }
 
 func (b *astbuilder) buildArrayLiteral(stmt *JS.ArrayLiteralContext) ssa.Value {
