@@ -19,15 +19,7 @@ type requestNewTarget struct {
 	Header []*ypb.KVPair
 }
 
-func HandleJS(isHttps bool, req []byte, code string, cb ...func(bool, []byte)) {
-	// prog := js2ssa.ParseSSA(code, nil)
-	// js := ssaapi.NewProgram(prog)
-	js, err := ssaapi.Parse(code, ssaapi.WithLanguage(ssaapi.JS))
-	if err != nil {
-		log.Error("parse js failed")
-		return
-	}
-
+func HandleJSGetNewRequest(isHttps bool, req []byte, code string, cb ...func(bool, []byte)) {
 	getOriginReq := func() []byte {
 		var result = make([]byte, len(req))
 		copy(result, req)
@@ -58,56 +50,64 @@ func HandleJS(isHttps bool, req []byte, code string, cb ...func(bool, []byte)) {
 		}
 	}
 
-	js.Ref("XMLHttpRequest").Filter(func(value *ssaapi.Value) bool {
-		return value.IsCalled()
+	handleJS(code, execCallback)
+}
+
+func handleJS(code string, callback func(*requestNewTarget)) {
+	js, err := ssaapi.Parse(code, ssaapi.WithLanguage(ssaapi.JS))
+	if err != nil {
+		log.Error("parse js failed")
+		return
+	}
+
+	js.Ref("XMLHttpRequest").GetUsers().Filter(func(value *ssaapi.Value) bool {
+		return value.IsCall()
 	}).ForEach(func(value *ssaapi.Value) {
 		target := &requestNewTarget{Method: "GET", Path: ""}
-		value.GetCalledBy().Flat(func(value *ssaapi.Value) ssaapi.Values {
-			return value.GetCallReturns()
-		}).Filter(func(value *ssaapi.Value) bool {
-			if !value.IsField() {
-				return false
-			}
-			switch value.GetFieldName().GetConstValue() {
+		value.GetAllMember().Filter(func(value *ssaapi.Value) bool {
+			// log.Infof("v: %s, key: %s, key-const: %v", value.String(), value.GetKey().String(), value.GetKey().GetConstValue())
+			switch value.GetKey().GetConstValue() {
 			case "open":
-				value.GetFieldValues().ForEach(func(value *ssaapi.Value) {
-					if value.IsCall() {
-						args := value.GetCallArgs()
-						if method := args.Get(0); method != nil {
-							methodStr := utils.InterfaceToString(method.GetConstValue())
-							if ret := strings.ToUpper(methodStr); utils.IsCommonHTTPRequestMethod(ret) {
-								target.Method = ret
-							}
+				log.Infof("open: %v", value.StringWithSource())
+				value.GetUsers().Filter(func(v *ssaapi.Value) bool {
+					return v.IsCall()
+				}).ForEach(func(value *ssaapi.Value) {
+					args := value.GetCallArgs()
+					if method := args.Get(0); method != nil {
+						methodStr := utils.InterfaceToString(method.GetConstValue())
+						if ret := strings.ToUpper(methodStr); utils.IsCommonHTTPRequestMethod(ret) {
+							target.Method = ret
 						}
-						if path := args.Get(1); path != nil {
-							targetPath := utils.InterfaceToString(path.GetConstValue())
-							target.Path = targetPath
-						}
+					}
+					if path := args.Get(1); path != nil {
+						targetPath := utils.InterfaceToString(path.GetConstValue())
+						target.Path = targetPath
 					}
 				})
 			case "setRequestHeader":
-				value.GetFieldValues().ForEach(func(value *ssaapi.Value) {
-					if !value.IsCall() {
+				log.Infof("set request header: %v", value.StringWithSource())
+				value.GetUsers().Filter(func(v *ssaapi.Value) bool {
+					return v.IsCall()
+				}).ForEach(func(value *ssaapi.Value) {
+					args := value.GetCallArgs()
+					if len(args) < 2 {
 						return
 					}
-					args := value.GetCallArgs()
-					if len(args) > 1 {
-						key := utils.InterfaceToString(args.Get(0).GetConstValue())
-						val := utils.InterfaceToString(args.Get(1).GetConstValue())
-						target.Header = append(target.Header, &ypb.KVPair{
-							Key: key, Value: val,
-						})
-					}
+					key := utils.InterfaceToString(args.Get(0).GetConstValue())
+					val := utils.InterfaceToString(args.Get(1).GetConstValue())
+					target.Header = append(target.Header, &ypb.KVPair{
+						Key: key, Value: val,
+					})
 				})
 			}
 			return false
 		})
-		execCallback(target)
+		callback(target)
 	})
 
 	// handle fetch
 	js.Ref("fetch").GetUsers().Filter(func(value *ssaapi.Value) bool {
-		return value.IsCall() || value.IsField()
+		return value.IsCall() || value.IsMember()
 	}).ForEach(func(value *ssaapi.Value) {
 		switch {
 		case value.IsCall():
@@ -119,17 +119,17 @@ func HandleJS(isHttps bool, req []byte, code string, cb ...func(bool, []byte)) {
 			}
 			if opt := args.Get(1); opt.IsMake() {
 				// args.GetMakeSliceArgs()
-				for _, field := range opt.GetMakeObjectFields() {
-					switch field.GetFieldName().GetConstValue() {
+				for _, field := range opt.GetAllMember() {
+					switch field.GetKey().GetConstValue() {
 					case "method":
-						target.Method = utils.InterfaceToString(field.GetLatestFieldValue().GetConstValue())
+						target.Method = utils.InterfaceToString(field.GetConstValue())
 						if ret := strings.ToUpper(target.Method); !utils.IsCommonHTTPRequestMethod(ret) {
 							target.Method = "GET"
 						}
 					case "headers":
-						for _, header := range field.GetLatestFieldValue().GetMakeObjectFields() {
-							key := utils.InterfaceToString(header.GetFieldName().GetConstValue())
-							val := utils.InterfaceToString(header.GetLatestFieldValue().GetConstValue())
+						for _, header := range field.GetAllMember() {
+							key := utils.InterfaceToString(header.GetKey().GetConstValue())
+							val := utils.InterfaceToString(header.GetConstValue())
 							if strings.HasPrefix(key, "'") || strings.HasPrefix(key, "\"") {
 								keyRes, _ := yakunquote.Unquote(key)
 								if keyRes == "" {
@@ -143,7 +143,7 @@ func HandleJS(isHttps bool, req []byte, code string, cb ...func(bool, []byte)) {
 					}
 				}
 			}
-			execCallback(target)
+			callback(target)
 		}
 	})
 }
