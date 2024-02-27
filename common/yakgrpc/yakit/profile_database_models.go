@@ -16,6 +16,7 @@ var ProfileTables = []interface{}{
 	&Project{},
 	&NavigationBar{}, &NaslScript{},
 	&WebFuzzerLabel{},
+	&PluginGroup{},
 }
 
 func InitializeDefaultDatabaseSchema() {
