@@ -144,9 +144,6 @@ window.location.href = "www"
 		// get this function :
 		window.GetUsers().ForEach(func(v *Value) {
 			// v.ShowUseDefChain()
-			if !v.IsUpdate() {
-				return
-			}
 			// check this value reachable
 
 			target := v.GetOperand(1)

@@ -9,119 +9,12 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-type Values []*Value
-
-func (value Values) Ref(name string) Values {
-	// return nil
-	var ret Values
-	for _, v := range value {
-		if v.IsField() {
-			if v.GetOperand(1).String() == name {
-				ret = append(ret, v)
-			}
-		}
-		v.GetUsers().ForEach(func(v *Value) {
-			// get value.Name or value["name"]
-			if v.IsField() {
-				if v.GetOperand(1).String() == name {
-					ret = append(ret, v)
-				}
-			}
-		})
-	}
-	return getValuesWithUpdate(ret)
-}
-
-func (v Values) StringEx(flag int) string {
-	ret := ""
-	ret += fmt.Sprintf("Values: %d\n", len(v))
-	for i, v := range v {
-		switch flag {
-		case 0:
-			ret += fmt.Sprintf("\t%d: %5s: %s\n", i, v.node.GetOpcode(), v)
-		case 1:
-			ret += fmt.Sprintf("\t%d: %s\n", i, v.StringWithSource())
-		}
-	}
-	return ret
-}
-
-func (v Values) String() string { return v.StringEx(0) }
-func (v Values) Show(b ...bool) Values {
-	if len(b) > 0 && !b[0] {
-		return v
-	}
-	fmt.Println(v.StringEx(0))
-	return v
-}
-func (v Values) ShowWithSource(b ...bool) Values {
-	if len(b) > 0 && !b[0] {
-		return v
-	}
-	fmt.Println(v.StringEx(1))
-	return v
-}
-
-func (v Values) Get(i int) *Value {
-	if i < len(v) {
-		return v[i]
-	}
-	return NewValue(ssa.NewUndefined(""))
-}
-
-func (v Values) ForEach(f func(*Value)) Values {
-	for _, v := range v {
-		f(v)
-	}
-	return v
-}
-
-func (v Values) Flat(f func(*Value) Values) Values {
-	var newVals Values
-	for _, subValue := range v {
-		if ret := f(subValue); len(ret) > 0 {
-			newVals = append(newVals, ret...)
-		}
-	}
-	return newVals
-}
-
-func (v Values) Filter(f func(*Value) bool) Values {
-	ret := make(Values, 0, len(v))
-	v.ForEach(func(v *Value) {
-		if f(v) {
-			ret = append(ret, v)
-		}
-	})
-	return ret
-}
-
-func (v *Value) FixUpdateValue() Values {
-	return getValuesWithUpdateSingle(v)
-}
-
-func (v Values) GetUsers() Values {
-	ret := make(Values, 0, len(v))
-	v.ForEach(func(v *Value) {
-		ret = append(ret, v.GetUsers()...)
-	})
-	return ret
-}
-
-func (v Values) GetDefs() Values {
-	ret := make(Values, 0, len(v))
-	v.ForEach(func(v *Value) {
-		ret = append(ret, v.GetOperands()...)
-	})
-	return ret
-}
-
 type Value struct {
 	runtimeCtx *omap.OrderedMap[string, *Value]
 	EffectOn   Values
 	DependOn   Values
 
-	node ssa.InstructionNode
+	node ssa.Value
 	// cache
 	disasmLine string
 	users      Values
@@ -132,7 +25,7 @@ func ValueCompare(v1, v2 *Value) bool {
 	return v1.node == v2.node
 }
 
-func NewValue(n ssa.InstructionNode) *Value {
+func NewValue(n ssa.Value) *Value {
 	return &Value{
 		runtimeCtx: omap.NewEmptyOrderedMap[string, *Value](),
 		node:       n,
@@ -220,48 +113,20 @@ func (i *Value) GetOperand(index int) *Value {
 	return opts[index]
 }
 
-func (i *Value) GetFieldName() *Value {
-	if p, ok := ssa.ToField(i.node); ok {
-		return NewValue(p.Key)
-	}
-	return nil
-}
-
-func (i *Value) GetFieldValues() Values {
-	if p, ok := ssa.ToField(i.node); ok {
-		return lo.Map(p.GetUsers(), func(item ssa.User, index int) *Value {
-			if p, ok := ssa.ToUpdate(item); ok {
-				return NewValue(p.Value)
-			}
-			return NewValue(item)
-		})
-	}
-	return nil
-}
-
-func (i *Value) GetFirstFieldValue() *Value {
-	vals := i.GetFieldValues()
-	if len(vals) > 0 {
-		return vals[0]
-	}
-	return nil
-}
-
-func (i *Value) GetLatestFieldValue() *Value {
-	vals := i.GetFieldValues()
-	if len(vals) > 0 {
-		return vals[len(vals)-1]
-	}
-	return nil
-}
-
 func (i *Value) HasUsers() bool {
 	return i.node.HasUsers()
 }
 
 func (i *Value) GetUsers() Values {
 	if i.users == nil {
-		i.users = lo.Map(i.node.GetUsers(), func(v ssa.User, _ int) *Value { return NewValue(v) })
+		i.users = lo.FilterMap(i.node.GetUsers(),
+			func(v ssa.User, _ int) (*Value, bool) {
+				if value, ok := ssa.ToValue(v); ok {
+					return NewValue(value), true
+				}
+				return nil, false
+			},
+		)
 	}
 	return i.users
 }
@@ -318,24 +183,13 @@ func (v *Value) GetCallArgs() Values {
 	return nil
 }
 
-func (v *Value) GetMakeObjectFields() Values {
-	if f, ok := ssa.ToMake(v.node); ok {
-		return lo.Filter(lo.Map(f.GetUsers(), func(item ssa.User, index int) *Value {
-			return NewValue(item)
-		}), func(item *Value, index int) bool {
-			return item.IsField()
-		})
-	}
-	return nil
-}
-
 func (v *Value) GetCallReturns() Values {
 	return v.GetUsers()
 }
 
 // for const instruction
 func (v *Value) GetConstValue() any {
-	if v == nil {
+	if v == nil || v.node == nil {
 		return nil
 	}
 	if v.IsConstInst() {
@@ -372,44 +226,95 @@ func (v *Value) GetSelf() *Value {
 	return v
 }
 
-func (v *Value) IsExternLib() bool    { return v.node.GetOpcode() == ssa.OpExternLib }
-func (v *Value) IsFunction() bool     { return v.node.GetOpcode() == ssa.OpFunction }
-func (v *Value) IsBasicBlock() bool   { return v.node.GetOpcode() == ssa.OpBasicBlock }
-func (v *Value) IsParameter() bool    { return v.node.GetOpcode() == ssa.OpParameter }
-func (v *Value) IsPhi() bool          { return v.node.GetOpcode() == ssa.OpPhi }
-func (v *Value) IsConstInst() bool    { return v.node.GetOpcode() == ssa.OpConstInst }
-func (v *Value) IsUndefined() bool    { return v.node.GetOpcode() == ssa.OpUndefined }
-func (v *Value) IsBinOp() bool        { return v.node.GetOpcode() == ssa.OpBinOp }
-func (v *Value) IsUnOp() bool         { return v.node.GetOpcode() == ssa.OpUnOp }
-func (v *Value) IsCall() bool         { return v.node.GetOpcode() == ssa.OpCall }
-func (v *Value) IsReturn() bool       { return v.node.GetOpcode() == ssa.OpReturn }
-func (v *Value) IsMake() bool         { return v.node.GetOpcode() == ssa.OpMake }
-func (v *Value) IsField() bool        { return v.node.GetOpcode() == ssa.OpField }
-func (v *Value) IsUpdate() bool       { return v.node.GetOpcode() == ssa.OpUpdate }
-func (v *Value) IsNext() bool         { return v.node.GetOpcode() == ssa.OpNext }
-func (v *Value) IsAssert() bool       { return v.node.GetOpcode() == ssa.OpAssert }
-func (v *Value) IsTypeCast() bool     { return v.node.GetOpcode() == ssa.OpTypeCast }
-func (v *Value) IsTypeValue() bool    { return v.node.GetOpcode() == ssa.OpTypeValue }
-func (v *Value) IsErrorHandler() bool { return v.node.GetOpcode() == ssa.OpErrorHandler }
-func (v *Value) IsPanic() bool        { return v.node.GetOpcode() == ssa.OpPanic }
-func (v *Value) IsRecover() bool      { return v.node.GetOpcode() == ssa.OpRecover }
-func (v *Value) IsJump() bool         { return v.node.GetOpcode() == ssa.OpJump }
-func (v *Value) IsIf() bool           { return v.node.GetOpcode() == ssa.OpIf }
-func (v *Value) IsLoop() bool         { return v.node.GetOpcode() == ssa.OpLoop }
-func (v *Value) IsSwitch() bool       { return v.node.GetOpcode() == ssa.OpSwitch }
+// // Instruction Opcode
+func (v *Value) getOpcode() ssa.Opcode {
+	if v.node == nil {
+		return ssa.OpUnknown
+	}
+	return v.node.GetOpcode()
+}
 
-func GetBareNode(v *Value) ssa.InstructionNode {
+// IsExternLib desc if the value is extern lib
+//
+// extern-lib is a special value that is used to represent the external library
+/*
+	code := `a = fmt.Println`
+	fmt := prog.Ref("fmt") // extern-lib
+	fmt.GetOperands() // Values // [Function-Println]
+*/
+func (v *Value) IsExternLib() bool    { return v.getOpcode() == ssa.OpExternLib }
+func (v *Value) IsFunction() bool     { return v.getOpcode() == ssa.OpFunction }
+func (v *Value) IsBasicBlock() bool   { return v.getOpcode() == ssa.OpBasicBlock }
+func (v *Value) IsParameter() bool    { return v.getOpcode() == ssa.OpParameter }
+func (v *Value) IsPhi() bool          { return v.getOpcode() == ssa.OpPhi }
+func (v *Value) IsConstInst() bool    { return v.getOpcode() == ssa.OpConstInst }
+func (v *Value) IsUndefined() bool    { return v.getOpcode() == ssa.OpUndefined }
+func (v *Value) IsBinOp() bool        { return v.getOpcode() == ssa.OpBinOp }
+func (v *Value) IsUnOp() bool         { return v.getOpcode() == ssa.OpUnOp }
+func (v *Value) IsCall() bool         { return v.getOpcode() == ssa.OpCall }
+func (v *Value) IsReturn() bool       { return v.getOpcode() == ssa.OpReturn }
+func (v *Value) IsMake() bool         { return v.getOpcode() == ssa.OpMake }
+func (v *Value) IsNext() bool         { return v.getOpcode() == ssa.OpNext }
+func (v *Value) IsAssert() bool       { return v.getOpcode() == ssa.OpAssert }
+func (v *Value) IsTypeCast() bool     { return v.getOpcode() == ssa.OpTypeCast }
+func (v *Value) IsTypeValue() bool    { return v.getOpcode() == ssa.OpTypeValue }
+func (v *Value) IsErrorHandler() bool { return v.getOpcode() == ssa.OpErrorHandler }
+func (v *Value) IsPanic() bool        { return v.getOpcode() == ssa.OpPanic }
+func (v *Value) IsRecover() bool      { return v.getOpcode() == ssa.OpRecover }
+func (v *Value) IsJump() bool         { return v.getOpcode() == ssa.OpJump }
+func (v *Value) IsIf() bool           { return v.getOpcode() == ssa.OpIf }
+func (v *Value) IsLoop() bool         { return v.getOpcode() == ssa.OpLoop }
+func (v *Value) IsSwitch() bool       { return v.getOpcode() == ssa.OpSwitch }
+
+// // MemberCall : Object
+
+// IsObject desc if the value is object
+func (v *Value) IsObject() bool { return v.node.IsObject() }
+
+// GetMember get member of object by key
+func (v *Value) GetMember(key Value) *Value {
+	node := v.node
+	if ret, ok := node.GetMember(key.node); ok {
+		return NewValue(ret)
+	}
+	return nil
+}
+
+// GetAllMember get all member of object
+func (v *Value) GetAllMember() Values {
+	all := v.node.GetAllMember()
+	ret := make(Values, 0, len(all))
+	for _, value := range all {
+		ret = append(ret, NewValue(value))
+	}
+	return ret
+}
+
+// // MemberCall : member
+
+// IsMember desc if the value is member of some object
+func (v *Value) IsMember() bool { return v.node.IsMember() }
+
+// GetObject get object of member
+func (v *Value) GetObject() *Value { return NewValue(v.node.GetObject()) }
+
+// GetKey get key of member
+func (v *Value) GetKey() *Value { return NewValue(v.node.GetKey()) }
+
+// GetBareNode get ssa.Value from ssaapi.Value
+// only use this function in golang
+func GetBareNode(v *Value) ssa.Value {
 	return v.node
 }
 
-// IsCalled desc any of 'Users' is Call or Make
+// IsCalled desc any of 'Users' is Call
 func (v *Value) IsCalled() bool {
 	return len(v.GetUsers().Filter(func(value *Value) bool {
 		return value.IsCall()
 	})) > 0
 }
 
-// GetCalledBy desc all of 'Users' is Call or Make
+// GetCalledBy desc all of 'Users' is Call
 func (v *Value) GetCalledBy() Values {
 	return v.GetUsers().Filter(func(value *Value) bool {
 		return value.IsCall()
@@ -422,4 +327,98 @@ func (v *Value) GetCallee() *Value {
 		return v.GetOperand(0)
 	}
 	return nil
+}
+
+type Values []*Value
+
+func (value Values) Ref(name string) Values {
+	ret := make(Values, 0, len(value))
+	for _, v := range value {
+		v.GetAllMember().ForEach(func(v *Value) {
+			if v.GetKey().String() == name {
+				ret = append(ret, v)
+			}
+		})
+	}
+	return ret
+}
+
+func (v Values) StringEx(flag int) string {
+	ret := ""
+	ret += fmt.Sprintf("Values: %d\n", len(v))
+	for i, v := range v {
+		switch flag {
+		case 0:
+			ret += fmt.Sprintf("\t%d: %5s: %s\n", i, v.node.GetOpcode(), v)
+		case 1:
+			ret += fmt.Sprintf("\t%d: %s\n", i, v.StringWithSource())
+		}
+	}
+	return ret
+}
+
+func (v Values) String() string { return v.StringEx(0) }
+func (v Values) Show(b ...bool) Values {
+	if len(b) > 0 && !b[0] {
+		return v
+	}
+	fmt.Println(v.StringEx(0))
+	return v
+}
+func (v Values) ShowWithSource(b ...bool) Values {
+	if len(b) > 0 && !b[0] {
+		return v
+	}
+	fmt.Println(v.StringEx(1))
+	return v
+}
+
+func (v Values) Get(i int) *Value {
+	if i < len(v) {
+		return v[i]
+	}
+	return NewValue(ssa.NewUndefined(""))
+}
+
+func (v Values) ForEach(f func(*Value)) Values {
+	for _, v := range v {
+		f(v)
+	}
+	return v
+}
+
+func (v Values) Flat(f func(*Value) Values) Values {
+	var newVals Values
+	for _, subValue := range v {
+		if ret := f(subValue); len(ret) > 0 {
+			newVals = append(newVals, ret...)
+		}
+	}
+	return newVals
+}
+
+func (v Values) Filter(f func(*Value) bool) Values {
+	ret := make(Values, 0, len(v))
+	v.ForEach(func(v *Value) {
+		if f(v) {
+			ret = append(ret, v)
+		}
+	})
+	return ret
+}
+
+func (v Values) GetUsers() Values {
+	ret := make(Values, 0, len(v))
+	v.ForEach(func(v *Value) {
+		ret = append(ret, v.GetUsers()...)
+	})
+	return ret
+}
+
+func (v Values) GetOperands() Values {
+	ret := make(Values, 0, len(v))
+	v.ForEach(func(v *Value) {
+		ret = append(ret, v.GetOperands()...)
+	})
+	return ret
 }
