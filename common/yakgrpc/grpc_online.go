@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
@@ -145,8 +146,19 @@ func (s *Server) DeleteAllLocalPlugins(ctx context.Context, req *ypb.Empty) (*yp
 }
 
 func (s *Server) DeleteLocalPluginsByWhere(ctx context.Context, req *ypb.DeleteLocalPluginsByWhereRequest) (*ypb.Empty, error) {
+	var scriptName []string
+	db := yakit.DeleteYakScript(s.GetProfileDatabase(), req)
+	res := yakit.YieldYakScripts(db, context.Background())
+	for v := range res {
+		scriptName = append(scriptName, v.ScriptName)
+	}
 
-	err := yakit.DeleteYakScriptByWhere(s.GetProfileDatabase(), req)
+	for _, v := range funk.ChunkStrings(scriptName, 100) {
+		err := yakit.DeletePluginGroupByScriptName(s.GetProjectDatabase(), v)
+		log.Error(err)
+	}
+
+	err := yakit.DeleteYakScriptByWhere(db)
 	if err != nil {
 		return nil, err
 	}
@@ -295,6 +307,7 @@ func (s *Server) DownloadOnlinePluginByPluginName(ctx context.Context, req *ypb.
 			if err != nil {
 				log.Errorf("save err failed: %s", err)
 			}
+
 		}
 		YakPlugin = append(YakPlugin, QueryYakScriptByNames(s.GetProfileDatabase(), scriptNames)...)
 	}

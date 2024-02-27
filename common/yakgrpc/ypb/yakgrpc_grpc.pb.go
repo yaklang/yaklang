@@ -72,6 +72,13 @@ type YakClient interface {
 	ExportLocalYakScript(ctx context.Context, in *ExportLocalYakScriptRequest, opts ...grpc.CallOption) (*ExportLocalYakScriptResponse, error)
 	ExportLocalYakScriptStream(ctx context.Context, in *ExportLocalYakScriptRequest, opts ...grpc.CallOption) (Yak_ExportLocalYakScriptStreamClient, error)
 	ImportYakScript(ctx context.Context, in *ImportYakScriptRequest, opts ...grpc.CallOption) (Yak_ImportYakScriptClient, error)
+	// YakScript Group
+	QueryYakScriptGroup(ctx context.Context, in *QueryYakScriptGroupRequest, opts ...grpc.CallOption) (*QueryYakScriptGroupResponse, error)
+	SaveYakScriptGroup(ctx context.Context, in *SaveYakScriptGroupRequest, opts ...grpc.CallOption) (*Empty, error)
+	RenameYakScriptGroup(ctx context.Context, in *RenameYakScriptGroupRequest, opts ...grpc.CallOption) (*Empty, error)
+	DeleteYakScriptGroup(ctx context.Context, in *DeleteYakScriptGroupRequest, opts ...grpc.CallOption) (*Empty, error)
+	GetYakScriptGroup(ctx context.Context, in *QueryYakScriptRequest, opts ...grpc.CallOption) (*GetYakScriptGroupResponse, error)
+	ResetYakScriptGroup(ctx context.Context, in *ResetYakScriptGroupRequest, opts ...grpc.CallOption) (*Empty, error)
 	// HTTPFlow
 	GetHTTPFlowByHash(ctx context.Context, in *GetHTTPFlowByHashRequest, opts ...grpc.CallOption) (*HTTPFlow, error)
 	GetHTTPFlowById(ctx context.Context, in *GetHTTPFlowByIdRequest, opts ...grpc.CallOption) (*HTTPFlow, error)
@@ -1146,6 +1153,60 @@ func (x *yakImportYakScriptClient) Recv() (*ImportYakScriptResult, error) {
 		return nil, err
 	}
 	return m, nil
+}
+
+func (c *yakClient) QueryYakScriptGroup(ctx context.Context, in *QueryYakScriptGroupRequest, opts ...grpc.CallOption) (*QueryYakScriptGroupResponse, error) {
+	out := new(QueryYakScriptGroupResponse)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/QueryYakScriptGroup", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) SaveYakScriptGroup(ctx context.Context, in *SaveYakScriptGroupRequest, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/SaveYakScriptGroup", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) RenameYakScriptGroup(ctx context.Context, in *RenameYakScriptGroupRequest, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/RenameYakScriptGroup", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DeleteYakScriptGroup(ctx context.Context, in *DeleteYakScriptGroupRequest, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/DeleteYakScriptGroup", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) GetYakScriptGroup(ctx context.Context, in *QueryYakScriptRequest, opts ...grpc.CallOption) (*GetYakScriptGroupResponse, error) {
+	out := new(GetYakScriptGroupResponse)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/GetYakScriptGroup", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) ResetYakScriptGroup(ctx context.Context, in *ResetYakScriptGroupRequest, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/ypb.Yak/ResetYakScriptGroup", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *yakClient) GetHTTPFlowByHash(ctx context.Context, in *GetHTTPFlowByHashRequest, opts ...grpc.CallOption) (*HTTPFlow, error) {
@@ -4872,6 +4933,13 @@ type YakServer interface {
 	ExportLocalYakScript(context.Context, *ExportLocalYakScriptRequest) (*ExportLocalYakScriptResponse, error)
 	ExportLocalYakScriptStream(*ExportLocalYakScriptRequest, Yak_ExportLocalYakScriptStreamServer) error
 	ImportYakScript(*ImportYakScriptRequest, Yak_ImportYakScriptServer) error
+	// YakScript Group
+	QueryYakScriptGroup(context.Context, *QueryYakScriptGroupRequest) (*QueryYakScriptGroupResponse, error)
+	SaveYakScriptGroup(context.Context, *SaveYakScriptGroupRequest) (*Empty, error)
+	RenameYakScriptGroup(context.Context, *RenameYakScriptGroupRequest) (*Empty, error)
+	DeleteYakScriptGroup(context.Context, *DeleteYakScriptGroupRequest) (*Empty, error)
+	GetYakScriptGroup(context.Context, *QueryYakScriptRequest) (*GetYakScriptGroupResponse, error)
+	ResetYakScriptGroup(context.Context, *ResetYakScriptGroupRequest) (*Empty, error)
 	// HTTPFlow
 	GetHTTPFlowByHash(context.Context, *GetHTTPFlowByHashRequest) (*HTTPFlow, error)
 	GetHTTPFlowById(context.Context, *GetHTTPFlowByIdRequest) (*HTTPFlow, error)
@@ -5383,6 +5451,24 @@ func (UnimplementedYakServer) ExportLocalYakScriptStream(*ExportLocalYakScriptRe
 }
 func (UnimplementedYakServer) ImportYakScript(*ImportYakScriptRequest, Yak_ImportYakScriptServer) error {
 	return status.Errorf(codes.Unimplemented, "method ImportYakScript not implemented")
+}
+func (UnimplementedYakServer) QueryYakScriptGroup(context.Context, *QueryYakScriptGroupRequest) (*QueryYakScriptGroupResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryYakScriptGroup not implemented")
+}
+func (UnimplementedYakServer) SaveYakScriptGroup(context.Context, *SaveYakScriptGroupRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SaveYakScriptGroup not implemented")
+}
+func (UnimplementedYakServer) RenameYakScriptGroup(context.Context, *RenameYakScriptGroupRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RenameYakScriptGroup not implemented")
+}
+func (UnimplementedYakServer) DeleteYakScriptGroup(context.Context, *DeleteYakScriptGroupRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteYakScriptGroup not implemented")
+}
+func (UnimplementedYakServer) GetYakScriptGroup(context.Context, *QueryYakScriptRequest) (*GetYakScriptGroupResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetYakScriptGroup not implemented")
+}
+func (UnimplementedYakServer) ResetYakScriptGroup(context.Context, *ResetYakScriptGroupRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ResetYakScriptGroup not implemented")
 }
 func (UnimplementedYakServer) GetHTTPFlowByHash(context.Context, *GetHTTPFlowByHashRequest) (*HTTPFlow, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetHTTPFlowByHash not implemented")
@@ -7100,6 +7186,114 @@ type yakImportYakScriptServer struct {
 
 func (x *yakImportYakScriptServer) Send(m *ImportYakScriptResult) error {
 	return x.ServerStream.SendMsg(m)
+}
+
+func _Yak_QueryYakScriptGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryYakScriptGroupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryYakScriptGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/QueryYakScriptGroup",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryYakScriptGroup(ctx, req.(*QueryYakScriptGroupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_SaveYakScriptGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SaveYakScriptGroupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).SaveYakScriptGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/SaveYakScriptGroup",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).SaveYakScriptGroup(ctx, req.(*SaveYakScriptGroupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_RenameYakScriptGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RenameYakScriptGroupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).RenameYakScriptGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/RenameYakScriptGroup",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).RenameYakScriptGroup(ctx, req.(*RenameYakScriptGroupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeleteYakScriptGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteYakScriptGroupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteYakScriptGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/DeleteYakScriptGroup",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteYakScriptGroup(ctx, req.(*DeleteYakScriptGroupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_GetYakScriptGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryYakScriptRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetYakScriptGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/GetYakScriptGroup",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetYakScriptGroup(ctx, req.(*QueryYakScriptRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_ResetYakScriptGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResetYakScriptGroupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).ResetYakScriptGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/ypb.Yak/ResetYakScriptGroup",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).ResetYakScriptGroup(ctx, req.(*ResetYakScriptGroupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _Yak_GetHTTPFlowByHash_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -12592,6 +12786,30 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ExportLocalYakScript",
 			Handler:    _Yak_ExportLocalYakScript_Handler,
+		},
+		{
+			MethodName: "QueryYakScriptGroup",
+			Handler:    _Yak_QueryYakScriptGroup_Handler,
+		},
+		{
+			MethodName: "SaveYakScriptGroup",
+			Handler:    _Yak_SaveYakScriptGroup_Handler,
+		},
+		{
+			MethodName: "RenameYakScriptGroup",
+			Handler:    _Yak_RenameYakScriptGroup_Handler,
+		},
+		{
+			MethodName: "DeleteYakScriptGroup",
+			Handler:    _Yak_DeleteYakScriptGroup_Handler,
+		},
+		{
+			MethodName: "GetYakScriptGroup",
+			Handler:    _Yak_GetYakScriptGroup_Handler,
+		},
+		{
+			MethodName: "ResetYakScriptGroup",
+			Handler:    _Yak_ResetYakScriptGroup_Handler,
 		},
 		{
 			MethodName: "GetHTTPFlowByHash",
