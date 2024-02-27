@@ -35,7 +35,7 @@ func (p *Program) GetErrors() ssa.SSAErrors {
 }
 
 func (p *Program) GetValueById(id int) (*Value, error) {
-	val, ok := p.Program.GetInstructionById(id).(ssa.InstructionNode)
+	val, ok := p.Program.GetInstructionById(id).(ssa.Value)
 	if val == nil {
 		return nil, utils.Errorf("instruction not found: %d", id)
 	}
@@ -62,7 +62,7 @@ func (p *Program) Ref(name string) Values {
 	return lo.FilterMap(
 		p.Program.GetInstructionsByName(name),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
-			if v, ok := i.(ssa.InstructionNode); ok {
+			if v, ok := i.(ssa.Value); ok {
 				return NewValue(v), true
 			} else {
 				return nil, false
@@ -77,7 +77,7 @@ func (p *Program) GetAllSymbols() map[string]Values {
 		ret[name] = lo.FilterMap(
 			insts,
 			func(i ssa.Instruction, _ int) (*Value, bool) {
-				if v, ok := i.(ssa.InstructionNode); ok {
+				if v, ok := i.(ssa.Value); ok {
 					return NewValue(v), true
 				} else {
 					return nil, false
@@ -86,28 +86,5 @@ func (p *Program) GetAllSymbols() map[string]Values {
 		)
 		return true
 	})
-	return ret
-}
-
-func getValuesWithUpdateSingle(v *Value) Values {
-	ret := make(Values, 0)
-	ret = append(ret, v)
-	// check if: a[0] = value.Name; also append a[0]
-	v.GetUsers().ForEach(func(user *Value) {
-		if user.IsUpdate() && v.Compare(user.GetOperand(1)) {
-			ret = append(ret, getValuesWithUpdateSingle(user.GetOperand(0))...)
-		}
-	})
-	return ret
-}
-
-func getValuesWithUpdate(vs Values) Values {
-	ret := make(Values, 0, len(vs))
-	// copy(ret, vs)
-
-	vs.ForEach(func(v *Value) {
-		ret = append(ret, getValuesWithUpdateSingle(v)...)
-	})
-
 	return ret
 }

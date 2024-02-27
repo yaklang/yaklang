@@ -19,7 +19,7 @@ func init() {
 func DisableCli(prog *ssaapi.Program) *result.StaticAnalyzeResults {
 	ret := result.NewStaticAnalyzeResults("disable cli")
 	// tag := "SSA-cli-disableType"
-	prog.Ref("cli").GetDefs().GetUsers().Filter(func(v *ssaapi.Value) bool {
+	prog.Ref("cli").GetOperands().GetUsers().Filter(func(v *ssaapi.Value) bool {
 		return v.IsCall() && v.IsReachable() != -1
 	}).ForEach(func(v *ssaapi.Value) {
 		ret.NewError(ErrorDisableCLi(), v)
@@ -40,10 +40,11 @@ func DisableMitmExternLib(prog *ssaapi.Program) *result.StaticAnalyzeResults {
 		"poc",
 		"http",
 		"tcp",
-		"udp"}
+		"udp",
+	}
 
 	for _, pkgName := range DisablePack {
-		prog.Ref(pkgName).GetDefs().ForEach(func(Func *ssaapi.Value) {
+		prog.Ref(pkgName).GetOperands().ForEach(func(Func *ssaapi.Value) {
 			Func.GetUsers().Filter(func(v *ssaapi.Value) bool {
 				return v.IsCall() && v.IsReachable() != -1
 			}).ForEach(func(v *ssaapi.Value) {

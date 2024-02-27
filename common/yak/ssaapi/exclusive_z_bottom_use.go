@@ -1,11 +1,12 @@
 package ssaapi
 
 import (
+	"sort"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"sort"
 )
 
 func (v *Value) GetBottomUses() Values {
@@ -14,11 +15,11 @@ func (v *Value) GetBottomUses() Values {
 
 func (v *Value) visitUserFallback(actx *AnalyzeContext) Values {
 	var vals Values
-	for _, user := range v.node.GetUsers() {
-		if ret := NewValue(user).AppendDependOn(v).getBottomUses(actx); len(ret) > 0 {
+	v.GetUsers().ForEach(func(value *Value) {
+		if ret := value.AppendDependOn(v).getBottomUses(actx); len(ret) > 0 {
 			vals = append(vals, ret...)
 		}
-	}
+	})
 	if len(vals) <= 0 {
 		return Values{v}
 	}
@@ -166,12 +167,11 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 
 			var vals Values
 			if !call.IsObject() || len(indexes) <= 0 {
-				// non-unpack
-				for _, u := range call.GetUsers() {
-					if ret := NewValue(u).AppendDependOn(val).AppendDependOn(v).getBottomUses(actx); len(ret) > 0 {
+				NewValue(call).GetUsers().ForEach(func(user *Value) {
+					if ret := user.AppendDependOn(val).AppendDependOn(v).getBottomUses(actx); len(ret) > 0 {
 						vals = append(vals, ret...)
 					}
-				}
+				})
 
 				if len(vals) > 0 {
 					return vals

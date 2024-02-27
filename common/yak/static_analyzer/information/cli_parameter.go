@@ -119,7 +119,7 @@ func ParseCliParameter(prog *ssaapi.Program) []*CliParameter {
 		})
 	}
 
-	prog.Ref("cli").GetDefs().ForEach(func(v *ssaapi.Value) {
+	prog.Ref("cli").GetOperands().ForEach(func(v *ssaapi.Value) {
 		if !v.IsFunction() {
 			return
 		}
