@@ -269,6 +269,18 @@ func (f *FuzzHTTPRequestBatch) FuzzPostJsonParams(k, v interface{}) FuzzHTTPRequ
 	return f.toFuzzHTTPRequestIf(reqs)
 }
 
+func (f *FuzzHTTPRequestBatch) FuzzPostXMLParams(k, v interface{}) FuzzHTTPRequestIf {
+	if len(f.nextFuzzRequests) <= 0 {
+		return f.fallback.FuzzPostXMLParams(k, v)
+	}
+	var reqs []FuzzHTTPRequestIf
+	for _, req := range f.nextFuzzRequests {
+		reqs = append(reqs, req.FuzzPostXMLParams(k, v))
+	}
+
+	return f.toFuzzHTTPRequestIf(reqs)
+}
+
 func (f *FuzzHTTPRequestBatch) FuzzCookieRaw(value interface{}) FuzzHTTPRequestIf {
 	return f.FuzzHTTPHeader("Cookie", value)
 }

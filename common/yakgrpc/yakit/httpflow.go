@@ -598,11 +598,16 @@ func CreateHTTPFlowFromHTTPWithBodySavedFromRaw(isHttps bool, reqRaw []byte, rsp
 
 	if fReq != nil {
 		flow.GetParamsTotal = len(fReq.GetGetQueryParams())
-		if len(fReq.GetPostJsonParams()) > 0 {
-			flow.PostParamsTotal = len(fReq.GetPostJsonParams())
-		} else {
-			flow.PostParamsTotal = len(fReq.GetPostParams())
+
+		postParams := fReq.GetPostJsonParams()
+		if len(postParams) <= 0 {
+			postParams = fReq.GetPostXMLParams()
 		}
+		if len(postParams) <= 0 {
+			postParams = fReq.GetPostParams()
+		}
+		flow.PostParamsTotal = len(postParams)
+
 		flow.CookieParamsTotal = len(fReq.GetCookieParams())
 	}
 

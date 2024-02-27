@@ -3,9 +3,11 @@ package mutate
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"testing"
+
+	"github.com/antchfx/xmlquery"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -48,9 +50,10 @@ Host: www.baidu.com
 		println(string(raw))
 	}
 }
-func TestNewFuzzHTTPRequestFuzzCookies(t *testing.T) {
 
+func TestNewFuzzHTTPRequestFuzzCookies(t *testing.T) {
 }
+
 func TestNewFuzzHTTPRequestFuzzHeader(t *testing.T) {
 	test := assert.New(t)
 	fuzzReq, err := NewFuzzHTTPRequest(`
@@ -586,7 +589,7 @@ Host: www.baidu.com
 		t.FailNow()
 		return
 	}
-	var freqIf = freq.FuzzUploadKVPair("test", "123123").FuzzUploadKVPair("test123", "123123").FuzzUploadKVPair("121aaa123test", "123asdfa123")
+	freqIf := freq.FuzzUploadKVPair("test", "123123").FuzzUploadKVPair("test123", "123123").FuzzUploadKVPair("121aaa123test", "123asdfa123")
 	freqIf.Show() //
 }
 
@@ -600,11 +603,11 @@ c=1&d=1
 		t.FailNow()
 		return
 	}
-	//rsp, err := freq.ExecFirst()
-	//reqRaw, err := utils.DumpHTTPRequest(rsp.Request, true)
-	//println(string(reqRaw))
+	// rsp, err := freq.ExecFirst()
+	// reqRaw, err := utils.DumpHTTPRequest(rsp.Request, true)
+	// println(string(reqRaw))
 	freq.GetCommonParams()[0].Fuzz("aaa").ExecFirst()
-	//freq.fuzzGetParams("a", "1")
+	// freq.fuzzGetParams("a", "1")
 	println(len(freq.GetCommonParams()))
 	rsp, err := freq.ExecFirst()
 	if err != nil {
@@ -657,10 +660,10 @@ c=1&d=1
 		t.FailNow()
 		return
 	}
-	//fparam := freq.FuzzGetParams("a", "1")
-	//fparam.Show()
-	//res, _ := freq.FuzzGetParams("a", "1")
-	//res.
+	// fparam := freq.FuzzGetParams("a", "1")
+	// fparam.Show()
+	// res, _ := freq.FuzzGetParams("a", "1")
+	// res.
 	//	res.RequestRaw
 	if !strings.Contains(freq.GetHeader("Header111"), "dfs") {
 		panic(1)
@@ -716,5 +719,100 @@ b={"c":123}`)
 	}
 	for _, r := range freq.GetCommonParams() {
 		r.Fuzz("ccc").Show()
+	}
+}
+
+func TestRecursiveXMLNode(t *testing.T) {
+	t.Run("soap", func(t *testing.T) {
+		rootNode, err := xmlquery.Parse(strings.NewReader(`<?xml version="1.0"?>
+<soap:Envelope
+xmlns:soap="http://www.w3.org/2003/05/soap-envelope/"
+soap:encodingStyle="http://www.w3.org/2003/05/soap-encoding">
+<soap:Header>
+<TestHeader></TestHeader>
+</soap:Header>
+
+<soap:Body>
+	<m:GetPrice xmlns:m="https://www.w3schools.com/prices">
+	<m:Item>Apples</m:Item>
+	</m:GetPrice>
+	<soap:Fault>
+		<Error></Error>
+	</soap:Fault>
+</soap:Body>
+</soap:Envelope>`))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		count, want := 0, 2
+		RecursiveXMLNode(rootNode, func(node *xmlquery.Node) {
+			count++
+		})
+		if count != want {
+			t.Fatalf("want %d nodes, but got %d", want, count)
+		}
+	})
+
+	t.Run("normal", func(t *testing.T) {
+		rootNode, err := xmlquery.Parse(strings.NewReader(`<?xml version="1.0"?>
+<bookstore>
+  <book>
+    <title lang="en">Harry Potter</title>
+    <author>J K. Rowling</author>
+    <year>2005</year>
+    <price>29.99</price>
+  </book>
+  <book>
+    <title lang="en">English Book</title>
+    <author>Lang</author>
+    <year>2000</year>
+    <price>1.99</price>
+  </book>
+</bookstore>`))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		count, want := 0, 11
+		RecursiveXMLNode(rootNode, func(node *xmlquery.Node) {
+			count++
+		})
+		if count != want {
+			t.Fatalf("want %d nodes, but got %d", want, count)
+		}
+	})
+}
+
+func TestGetXpathFromNode(t *testing.T) {
+	rootNode, err := xmlquery.Parse(strings.NewReader(`<?xml version="1.0" encoding="UTF-8"?>
+	<bookstore>
+	<book>
+	  <title lang="en">Harry Potter</title>
+	  <author>J K. Rowling</author>
+	  <year>2005</year>
+	  <price>29.99</price>
+	</book>
+	<book>
+	  <title lang="en">English Book</title>
+	  <author>Hello</author>
+	  <year>2000</year>
+	  <price>19.99</price>
+	</book>
+</bookstore>`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	nodes, _ := xmlquery.QueryAll(rootNode, "//author")
+	for _, node := range nodes {
+		xpath := GetXpathFromNode(node)
+		if n, err := xmlquery.Query(rootNode, xpath); err != nil {
+			t.Fatalf("can't find node[%s]", xpath)
+			break
+		} else if n != node {
+			t.Fatalf("node[%s] not equal", xpath)
+			break
+		}
 	}
 }

@@ -1,16 +1,15 @@
 package utils
 
 import (
-	"github.com/dlclark/regexp2"
-	"github.com/yaklang/yaklang/common/log"
 	"net"
 	"strconv"
 	"strings"
+
+	"github.com/dlclark/regexp2"
+	"github.com/yaklang/yaklang/common/log"
 )
 
-var (
-	domainRe = regexp2.MustCompile(`^(((?!-))(xn--|_)?[a-z0-9-]{0,61}[a-z0-9]{1,1}\.)*(xn--)?([a-z0-9][a-z0-9\-]{0,60}|[a-z0-9-]{1,30}\.[a-z]{2,})$`, regexp2.Singleline|regexp2.IgnoreCase)
-)
+var domainRe = regexp2.MustCompile(`^(((?!-))(xn--|_)?[a-z0-9-]{0,61}[a-z0-9]{1,1}\.)*(xn--)?([a-z0-9][a-z0-9\-]{0,60}|[a-z0-9-]{1,30}\.[a-z]{2,})$`, regexp2.Singleline|regexp2.IgnoreCase)
 
 func IsValidDomain(raw string) bool {
 	var isIDN bool
@@ -69,6 +68,11 @@ func IsValidInteger(raw string) bool {
 func IsValidFloat(raw string) bool {
 	_, err := strconv.ParseFloat(raw, 64)
 	return err == nil && strings.Contains(strings.Trim(raw, "."), ".")
+}
+
+func IsValidBool(raw string) bool {
+	_, err := strconv.ParseBool(raw)
+	return err == nil
 }
 
 func IsValidHost(raw string) bool {
