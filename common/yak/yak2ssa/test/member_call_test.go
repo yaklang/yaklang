@@ -124,7 +124,7 @@ func TestMemberCall_Negative_Closure(t *testing.T) {
 	})
 
 	t.Run("create undefine in this function", func(t *testing.T) {
-		CheckPrintf(t, TestCase{
+		checkPrintf(t, TestCase{
 			code: `
 			f = () =>{
 				v = {} 
@@ -182,8 +182,7 @@ func TestMemberCall_CheckField(t *testing.T) {
 		}
 		println(a.b)
 			`,
-			Check: func(t *testing.T, p *ssaapi.Program, want []string) {
-				test := assert.New(t)
+			Check: func(test *assert.Assertions, p *ssaapi.Program, want []string) {
 				printlns := p.Ref("println").ShowWithSource()
 				arg := printlns.GetUsers().Filter(func(v *ssaapi.Value) bool {
 					return v.IsCall()
@@ -207,7 +206,7 @@ func TestMemberCall_Struct(t *testing.T) {
 	}
 
 	check := func(t *testing.T, code string, want []string) {
-		CheckPrintf(t, TestCase{
+		checkPrintf(t, TestCase{
 			ExternValue: map[string]any{
 				"get": func() A { return A{} },
 			},
@@ -236,7 +235,7 @@ func TestMemberCall_Struct(t *testing.T) {
 }
 func TestMemberCall_Method(t *testing.T) {
 	check := func(t *testing.T, code string, want []string) {
-		CheckPrintf(t, TestCase{
+		checkPrintf(t, TestCase{
 			code: code,
 			want: want,
 			ExternValue: map[string]any{
@@ -258,7 +257,7 @@ func TestMemberCall_Method(t *testing.T) {
 func Test_CallMember_Method(t *testing.T) {
 
 	t.Run("test method call", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			a = get()
 			a.ExampleMethod()
@@ -270,7 +269,7 @@ func Test_CallMember_Method(t *testing.T) {
 	})
 
 	t.Run("test fieldFunction call", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			a = get()
 			a.ExampleFieldFunction()

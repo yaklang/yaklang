@@ -30,32 +30,21 @@ func TestExternLibInClosure(t *testing.T) {
 }
 
 func TestExternValue(t *testing.T) {
-
-	check := func(t *testing.T, tc TestCase, checkFunc func(*testing.T, *ssaapi.Program)) {
+	checkIsFunction := func(t *testing.T, tc TestCase) {
 		tc.ExternValue = map[string]any{
 			"println": func(v ...any) {},
 		}
-		tc.Check = func(t *testing.T, p *ssaapi.Program, s []string) {
-			checkFunc(t, p)
+		tc.Check = func(test *assert.Assertions, prog *ssaapi.Program, want []string) {
+			ps := prog.Ref("target").ShowWithSource()
+			test.NotEqual(0, len(ps), "target should has value")
+			test.Equal(0,
+				len(ps.Filter(func(v *ssaapi.Value) bool {
+					return !v.IsFunction()
+				})),
+				"target should all is function",
+			)
 		}
 		CheckTestCase(t, tc)
-	}
-	checkIsFunction := func(t *testing.T, tc TestCase) {
-		check(t, tc,
-			func(t *testing.T, prog *ssaapi.Program) {
-				ps := prog.Ref("target").ShowWithSource()
-				if len(ps) == 0 {
-					t.Fatalf("target should has value")
-				}
-				if len(
-					ps.Filter(func(v *ssaapi.Value) bool {
-						return !v.IsFunction()
-					}),
-				) != 0 {
-					t.Fatalf("target should all is function")
-				}
-			},
-		)
 	}
 
 	t.Run("use normal", func(t *testing.T) {
@@ -98,21 +87,19 @@ func TestExternValue(t *testing.T) {
 	})
 
 	checkIsCover := func(t *testing.T, tc TestCase) {
-		check(t, tc,
-			func(t *testing.T, p *ssaapi.Program) {
-				ps := p.Ref("target").ShowWithSource()
-				if len(ps) == 0 {
-					t.Fatalf("target should has value")
-				}
-				if len(
-					ps.Filter(func(v *ssaapi.Value) bool {
-						return v.String() != "1"
-					}),
-				) != 0 {
-					t.Fatalf("println should all is 1")
-				}
-			},
-		)
+		tc.ExternValue = map[string]any{
+			"println": func(v ...any) {},
+		}
+		tc.Check = func(test *assert.Assertions, p *ssaapi.Program, s []string) {
+			vs := p.Ref("target")
+			// test.Len(vs, 0, "target should has value")
+			test.NotEqual(0, len(vs), "target should has value")
+			test.NotEqual(0, len(vs.Filter(func(v *ssaapi.Value) bool {
+				return v.String() != "1"
+			})),
+				"target should all is 1",
+			)
+		}
 	}
 
 	t.Run("cover normal", func(t *testing.T) {
@@ -159,42 +146,21 @@ func TestExternValue(t *testing.T) {
 }
 
 func TestExternLib(t *testing.T) {
-
-	check := func(t *testing.T, tc TestCase, checkFunc func(*testing.T, *ssaapi.Program)) {
-		// tc.ExternValue = map[string]any{
-		// 	"println": func(v ...any) {},
-		// }
+	checkIsExtern := func(t *testing.T, tc TestCase) {
 		tc.ExternLib = map[string]map[string]any{
 			"lib": map[string]any{
 				"method": func() {},
 			},
 		}
-		tc.Check = func(t *testing.T, p *ssaapi.Program, s []string) {
-			checkFunc(t, p)
+		tc.Check = func(test *assert.Assertions, p *ssaapi.Program, s []string) {
+			test.NotEqual(0, p.Ref("lib").Filter(func(v *ssaapi.Value) bool {
+				return !v.IsExternLib()
+			}), "lib shoud all is externLib")
+			test.NotEqual(0, p.Ref("target").Filter(func(v *ssaapi.Value) bool {
+				return !v.IsFunction()
+			}), "println should all is function")
 		}
 		CheckTestCase(t, tc)
-	}
-	checkIsExtern := func(t *testing.T, tc TestCase) {
-		check(t, tc,
-			func(t *testing.T, prog *ssaapi.Program) {
-				if len(
-					prog.Ref("lib").Filter(func(v *ssaapi.Value) bool {
-						return !v.IsExternLib()
-					}),
-				) != 0 {
-					t.Fatalf("lib shoud all is externLib")
-				}
-
-				ps := prog.Ref("target").ShowWithSource()
-				if len(
-					ps.Filter(func(v *ssaapi.Value) bool {
-						return !v.IsFunction()
-					}),
-				) != 0 {
-					t.Fatalf("println should all is function")
-				}
-			},
-		)
 	}
 
 	t.Run("use normal", func(t *testing.T) {
@@ -248,21 +214,18 @@ func TestExternLib(t *testing.T) {
 	})
 
 	checkIsCover := func(t *testing.T, tc TestCase) {
-		check(t, tc,
-			func(t *testing.T, p *ssaapi.Program) {
-				ps := p.Ref("target").ShowWithSource()
-				if len(ps) == 0 {
-					t.Fatalf("target should has value")
-				}
-				if len(
-					ps.Filter(func(v *ssaapi.Value) bool {
-						return v.String() != "1"
-					}),
-				) != 0 {
-					t.Fatalf("target should all is 1")
-				}
+		tc.ExternLib = map[string]map[string]any{
+			"lib": map[string]any{
+				"method": func() {},
 			},
-		)
+		}
+		tc.Check = func(test *assert.Assertions, p *ssaapi.Program, s []string) {
+			vs := p.Ref("target")
+			test.NotEqual(0, len(vs), "target should has value")
+			test.NotEqual(0, vs.Filter(func(v *ssaapi.Value) bool {
+				return v.String() != "1"
+			}), "target should all is 1")
+		}
 	}
 
 	t.Run("cover normal  ", func(t *testing.T) {
@@ -329,8 +292,7 @@ func TestExternRef(t *testing.T) {
 			println("a")
 			println("a")
 			`,
-			Check: func(t *testing.T, p *ssaapi.Program, want []string) {
-				test := assert.New(t)
+			Check: func(test *assert.Assertions, p *ssaapi.Program, want []string) {
 				printlns := p.Ref("println")
 				test.Len(printlns, 1)
 
@@ -354,9 +316,7 @@ func TestExternRef(t *testing.T) {
 			lib.method()
 			lib.method()
 			`,
-			Check: func(t *testing.T, p *ssaapi.Program, w []string) {
-				test := assert.New(t)
-
+			Check: func(test *assert.Assertions, p *ssaapi.Program, w []string) {
 				libs := p.Ref("lib")
 				test.Len(libs, 1)
 
