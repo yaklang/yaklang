@@ -4,7 +4,6 @@ import (
 	"errors"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
@@ -13,7 +12,7 @@ import (
 
 func TestUndefineError(t *testing.T) {
 	t.Run("cfg empty basicBlock", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			for i {
 				if j {
@@ -34,7 +33,7 @@ func TestUndefineError(t *testing.T) {
 	})
 
 	t.Run("undefined field function", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			a = c
 			b = c
@@ -59,7 +58,7 @@ func TestUndefineError(t *testing.T) {
 	})
 
 	t.Run("undefined value in template string", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			a = f"${undefined_var}"
 			`,
@@ -70,7 +69,7 @@ func TestUndefineError(t *testing.T) {
 	})
 
 	t.Run("undefine in closure", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			a = () => {
 				b = xxx
@@ -89,7 +88,7 @@ func TestUndefineError(t *testing.T) {
 
 func TestErrorComment(t *testing.T) {
 	t.Run("test basic undefine error", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			// @ssa-ignore
 			print(a)
@@ -124,7 +123,7 @@ func TestErrorComment(t *testing.T) {
 	})
 
 	t.Run("test nocheck in first line ", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `// @ssa-nocheck
 			print(a)
 			print(b)
@@ -136,7 +135,7 @@ func TestErrorComment(t *testing.T) {
 
 func TestBasicExpression(t *testing.T) {
 	t.Run("only declare variable ", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			var a1
 			if 1 {
@@ -160,7 +159,7 @@ func TestBasicExpression(t *testing.T) {
 	})
 
 	t.Run("test type variable", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			typeof(1) == map[int]string
 			`,
@@ -171,7 +170,7 @@ func TestBasicExpression(t *testing.T) {
 	})
 
 	t.Run("undefined lexical", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			a == undefined
 			`,
@@ -184,7 +183,7 @@ func TestBasicExpression(t *testing.T) {
 
 func TestAssign(t *testing.T) {
 	t.Run("value assignment 1=1", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			// 1 = 1
 			a = 1
@@ -192,7 +191,7 @@ func TestAssign(t *testing.T) {
 		})
 	})
 	t.Run("value assignment 1=n", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			// 1 = n
 			a = 1, 2
@@ -202,7 +201,7 @@ func TestAssign(t *testing.T) {
 	})
 
 	t.Run("value assignment n=1", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			// 1 = n
 			n = 1, 2
@@ -212,7 +211,7 @@ func TestAssign(t *testing.T) {
 	})
 
 	t.Run("value assignment n=n", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			// n = n
 			a, b, c = 1, 2, 3
@@ -220,7 +219,7 @@ func TestAssign(t *testing.T) {
 		})
 	})
 	t.Run("value assignment m=n", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			// m = n
 			a, b = 1, 2, 3       // err 2 != 3
@@ -237,9 +236,9 @@ func TestAssign(t *testing.T) {
 
 func TestFreeValue(t *testing.T) {
 	t.Run("freeValue ahead ExternInstance", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
-			param() // extern value
+			param("a") // extern value
 			param = "" // value
 			f =() =>{
 				b = param[1]
@@ -248,14 +247,11 @@ func TestFreeValue(t *testing.T) {
 			want: []string{
 				ssa.ContAssignExtern("param"),
 			},
-			ExternValue: map[string]any{
-				"param": func() {},
-			},
 		})
 	})
 
 	t.Run("freeValue force assign in block", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			{
 				a  := 1
@@ -281,7 +277,7 @@ func TestFreeValue(t *testing.T) {
 	})
 
 	t.Run("free-value capture value", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			f = () => {b = 1}
 			{
@@ -298,7 +294,7 @@ func TestFreeValue(t *testing.T) {
 
 func TestPhi(t *testing.T) {
 	t.Run("test phi ", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			for 1 {
 				b = str.F()
@@ -331,7 +327,7 @@ func TestPhi(t *testing.T) {
 
 func TestForEach(t *testing.T) {
 	t.Run("for in variadic parameter", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			f = (first...) => {
 				for num in first {
@@ -345,7 +341,7 @@ func TestForEach(t *testing.T) {
 	})
 
 	t.Run("for in with chan", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			ch = make(chan int)
 
@@ -366,7 +362,7 @@ func TestForEach(t *testing.T) {
 
 func TestErrorMemberCall(t *testing.T) {
 	t.Run("normal member call", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			a = {
 				"F": ()=>{b = 1},
@@ -381,19 +377,16 @@ func TestErrorMemberCall(t *testing.T) {
 	})
 
 	t.Run("extern variable method member call", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
-			param().String() // param is extern variable
+			param("").String() // param is extern variable
 			`,
 			want: []string{},
-			ExternValue: map[string]any{
-				"param": func() time.Duration { return time.Duration(1) },
-			},
 		})
 	})
 
 	t.Run("undefined variable member call", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			b.E = 1
 			`,
@@ -405,7 +398,7 @@ func TestErrorMemberCall(t *testing.T) {
 
 	// TODO: handle this case in type check rule
 	t.Run("unable member call", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			a = 1 // number
 			a.F()  // invalid field number
@@ -429,7 +422,7 @@ func TestErrorMemberCall(t *testing.T) {
 	})
 
 	t.Run("left member call", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			a = {
 				"A": 1,
@@ -449,7 +442,7 @@ func TestErrorMemberCall(t *testing.T) {
 	})
 
 	t.Run("any value member call", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			f = (a) => {
 				b = a.Field
@@ -459,7 +452,7 @@ func TestErrorMemberCall(t *testing.T) {
 		})
 	})
 	t.Run("test map type ", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			a = {"a": 1, 2: 2}
 			b = ["1", 2, "3"]
@@ -470,7 +463,7 @@ func TestErrorMemberCall(t *testing.T) {
 
 func TestSliceCall(t *testing.T) {
 	t.Run("normal slice call", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			a = [1, 2, 3]
 			a[1] = 1
@@ -480,7 +473,7 @@ func TestSliceCall(t *testing.T) {
 	})
 
 	t.Run("unable slice call", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			// undefined
 			a1[1] = 1 // undefined a1
@@ -510,7 +503,7 @@ func TestSliceCall(t *testing.T) {
 	})
 
 	t.Run("slice call with string type", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			a = "abc"
 			a[1] = 1
@@ -521,7 +514,7 @@ func TestSliceCall(t *testing.T) {
 	})
 
 	t.Run("slice call with number type left ", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			a = 1 
 			a[1] = 1
@@ -533,7 +526,7 @@ func TestSliceCall(t *testing.T) {
 	})
 
 	t.Run("slice call with number type right ", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			a = 1 
 			b = a[1]
@@ -545,7 +538,7 @@ func TestSliceCall(t *testing.T) {
 	})
 
 	t.Run("any value slice call", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			f = (a) => {
 				b = a[0]
@@ -556,14 +549,14 @@ func TestSliceCall(t *testing.T) {
 	})
 
 	t.Run("slice type check", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			a = make([]int, 0)
 			b = a[0]
-			b = a.bb
+			b = a.CCCCC
 			`,
 			want: []string{
-				ssa4analyze.InvalidField("[]number", "bb"),
+				ssa.ExternFieldError("Type", "[]number", "CCCCC", "Cap"),
 			},
 		})
 	})
@@ -571,7 +564,7 @@ func TestSliceCall(t *testing.T) {
 
 func TestType(t *testing.T) {
 	t.Run("check bytes", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			f1([]byte{1, 2})
 			f1([]uint8{1, 2})
@@ -589,7 +582,7 @@ func TestType(t *testing.T) {
 	})
 
 	t.Run("check nil", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			fint(nil)
 			fstring(nil)
@@ -611,7 +604,7 @@ func TestType(t *testing.T) {
 func TestCallParamReturn(t *testing.T) {
 	// check argument
 	t.Run("check argument", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 		func1(1)
 		func1() // err
@@ -643,7 +636,7 @@ func TestCallParamReturn(t *testing.T) {
 	})
 
 	t.Run("check return", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			// just call
 			// (0) = (n)
@@ -681,7 +674,7 @@ func TestCallParamReturn(t *testing.T) {
 	})
 
 	t.Run("check return field ", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			// normal
 			a = func1()
@@ -711,7 +704,7 @@ func TestCallParamReturn(t *testing.T) {
 	})
 
 	t.Run("test function parameter", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			count = 0
 			tick1s(func() {
@@ -726,7 +719,7 @@ func TestCallParamReturn(t *testing.T) {
 	})
 
 	t.Run("test go function call", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			f1 = ()=> {
 				go f2()
@@ -743,7 +736,7 @@ func TestCallParamReturn(t *testing.T) {
 
 func TestClosureBinding(t *testing.T) {
 	t.Run("use free value", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 				{
 					a1 = 1
@@ -775,7 +768,7 @@ func TestClosureBinding(t *testing.T) {
 	})
 
 	t.Run("use free value with instance function", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			fn {
 				b = a1
@@ -795,7 +788,7 @@ func TestClosureBinding(t *testing.T) {
 	})
 
 	t.Run("use free-value in loop-if", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			a = () => {}
 			b = () => {
@@ -816,7 +809,7 @@ func TestClosureBinding(t *testing.T) {
 	})
 
 	t.Run("use parameter value", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			f = (a) => {
 				innerF = () => {
@@ -831,7 +824,7 @@ func TestClosureBinding(t *testing.T) {
 		})
 	})
 	t.Run("use parameter value 2", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			a = f =>{
 				fun = () =>{
@@ -847,7 +840,7 @@ func TestClosureBinding(t *testing.T) {
 	})
 
 	t.Run("modify parameter value", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			f = (a) => {
 				innerF = () => {
@@ -865,7 +858,7 @@ func TestClosureBinding(t *testing.T) {
 	})
 
 	t.Run("closure side effect", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			f = () => {
 				a = 1
@@ -877,7 +870,7 @@ func TestClosureBinding(t *testing.T) {
 	})
 
 	t.Run("function factor", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			getF = func(a) {
 				return func() {
@@ -921,7 +914,7 @@ type BStruct struct {
 
 func TestExternStruct(t *testing.T) {
 	t.Run("check alias type method", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			b = getAliasType()
 			b.GetInt()
@@ -935,7 +928,7 @@ func TestExternStruct(t *testing.T) {
 	})
 
 	t.Run("check extern type recursive", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			a = getA()
 			`,
@@ -946,7 +939,7 @@ func TestExternStruct(t *testing.T) {
 	})
 
 	t.Run("check extern type in next-loop", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			a = getA()
 			for i, v := range a.A {
@@ -967,7 +960,7 @@ func TestExternStruct(t *testing.T) {
 	})
 
 	t.Run("check interface type method", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			a = getCanGetInt()
 			a.GetInt()
@@ -979,7 +972,7 @@ func TestExternStruct(t *testing.T) {
 	})
 
 	t.Run("extern type field error", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			a = getA()
 			b = a.C
@@ -998,7 +991,7 @@ func TestExternStruct(t *testing.T) {
 	})
 
 	t.Run("extern function return type map", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			a = getA()
 			a = a.E
@@ -1012,7 +1005,7 @@ func TestExternStruct(t *testing.T) {
 
 func TestExternInstance(t *testing.T) {
 	t.Run("basic extern", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			a = getInt()
 			b = lib.getString()
@@ -1053,7 +1046,7 @@ func TestExternInstance(t *testing.T) {
 	})
 
 	t.Run("wrong method name", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			lib.getString()
 			lib.getInt()
@@ -1092,7 +1085,7 @@ func TestExternInstance(t *testing.T) {
 	})
 
 	t.Run("test bytes", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			fun1("1")
 			fun("1")
@@ -1108,7 +1101,7 @@ func TestExternInstance(t *testing.T) {
 	})
 
 	t.Run("use extern instance free value", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			p = print // print
 			f = () => { // p
@@ -1128,7 +1121,7 @@ func TestExternInstance(t *testing.T) {
 
 func TestErrorHandler(t *testing.T) {
 	t.Run("error handler check - getError1", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			// this ok
 			getError1()
@@ -1139,7 +1132,7 @@ func TestErrorHandler(t *testing.T) {
 	})
 
 	t.Run("error handler check - getError2", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			// this ok
 			getError2()
@@ -1150,7 +1143,7 @@ func TestErrorHandler(t *testing.T) {
 	})
 
 	t.Run("error handler check - die", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			err = getError1()
 			die(err)
@@ -1161,7 +1154,7 @@ func TestErrorHandler(t *testing.T) {
 	})
 
 	t.Run("error handler check - panic", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			a, err = getError2()
 			if err {
@@ -1174,7 +1167,7 @@ func TestErrorHandler(t *testing.T) {
 	})
 
 	t.Run("ignore handle error", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			_ = getError1()     // error
 			a, _ = getError2()  // error
@@ -1185,7 +1178,7 @@ func TestErrorHandler(t *testing.T) {
 	})
 
 	t.Run("not handle error", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			err = getError1()     // error
 			a, err = getError2()  // error
@@ -1200,7 +1193,7 @@ func TestErrorHandler(t *testing.T) {
 	})
 
 	t.Run("error handler check - all", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			all = getError2() // this has error !!
 			all2 = getError2()
@@ -1215,7 +1208,7 @@ func TestErrorHandler(t *testing.T) {
 	})
 
 	t.Run("function error with drop", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			a = getError1()~
 			a = getError2()~
@@ -1239,7 +1232,7 @@ func TestErrorHandler(t *testing.T) {
 	})
 
 	t.Run("recover error", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			err := recover()
 			if err != nil {
@@ -1255,7 +1248,7 @@ func TestErrorHandler(t *testing.T) {
 
 func TestTryCatch(t *testing.T) {
 	t.Run("try catch cfg", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			a = 0 
 			try {
@@ -1290,7 +1283,7 @@ func TestTryCatch(t *testing.T) {
 	})
 
 	t.Run("catch block err variable ", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			try {
 			} catch err {
@@ -1304,7 +1297,7 @@ func TestTryCatch(t *testing.T) {
 			},
 		})
 
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 			try{
 			}catch err {
@@ -1324,7 +1317,7 @@ func TestTryCatch(t *testing.T) {
 
 func TestSwitch(t *testing.T) {
 	t.Run("test switch cfg", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: `
 		fruit = "banana";
 
@@ -1349,7 +1342,7 @@ func TestSwitch(t *testing.T) {
 	})
 
 	t.Run("test fallthrough in switch ", func(t *testing.T) {
-		CheckError(t, TestCase{
+		checkError(t, TestCase{
 			code: ` 
 			a = 1
 			switch (a) {

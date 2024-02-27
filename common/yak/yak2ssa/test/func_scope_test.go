@@ -2,13 +2,6 @@ package test
 
 import (
 	"testing"
-
-	"github.com/samber/lo"
-	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yak/ssa"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"golang.org/x/exp/slices"
 )
 
 func TestClosure_FreeValue_Value(t *testing.T) {
@@ -104,43 +97,21 @@ func TestClosure_FreeValue_Value(t *testing.T) {
 }
 
 func TestClosure_FreeValue_Function(t *testing.T) {
-	check := func(t *testing.T, tc TestCase) {
-		tc.Check = func(t *testing.T, p *ssaapi.Program, s []string) {
-			test := assert.New(t)
-
-			targets := p.Ref("target").ShowWithSource()
-			test.Len(targets, 1)
-
-			target := targets[0]
-
-			v := ssaapi.GetBareNode(target)
-			test.NotNil(v)
-
-			test.Equal(ssa.OpFunction, v.GetOpcode())
-			fun, ok := v.(*ssa.Function)
-			test.True(ok)
-
-			fvs := lo.Keys(fun.FreeValues)
-			slices.Sort(fvs)
-			test.Equal(tc.want, fvs)
-		}
-		CheckTestCase(t, tc)
-	}
-
 	t.Run("func capture value", func(t *testing.T) {
-		check(t, TestCase{
+		checkFreeValue(t, TestCase{
 			code: `
 		a = 1
-		target = () => {
+		f = () => {
 			b = a
 		}
+		target = f
 		`,
 			want: []string{"a"},
 		})
 	})
 
 	t.Run("member capture value", func(t *testing.T) {
-		check(t, TestCase{
+		checkFreeValue(t, TestCase{
 			code: `
 		a = 1
 		b = {
@@ -154,7 +125,7 @@ func TestClosure_FreeValue_Function(t *testing.T) {
 	})
 
 	t.Run("func capture member", func(t *testing.T) {
-		check(t, TestCase{
+		checkFreeValue(t, TestCase{
 			code: ` 
 			a = {
 				"key": 1,
@@ -169,7 +140,7 @@ func TestClosure_FreeValue_Function(t *testing.T) {
 	})
 
 	t.Run("member capture member", func(t *testing.T) {
-		check(t, TestCase{
+		checkFreeValue(t, TestCase{
 			code: `
 			a = {
 				"key": 1, 
@@ -184,7 +155,7 @@ func TestClosure_FreeValue_Function(t *testing.T) {
 	})
 
 	t.Run("member capture member, self", func(t *testing.T) {
-		check(t, TestCase{
+		checkFreeValue(t, TestCase{
 			code: `
 			a = {
 				"key": 1, 
@@ -198,33 +169,8 @@ func TestClosure_FreeValue_Function(t *testing.T) {
 }
 
 func TestClosure_Mask(t *testing.T) {
-	check := func(t *testing.T, tc TestCase) {
-		tc.Check = func(t *testing.T, p *ssaapi.Program, want []string) {
-			test := assert.New(t)
-
-			targets := p.Ref("target").ShowWithSource()
-			test.Len(targets, 1)
-
-			target := targets[0]
-
-			v := ssaapi.GetBareNode(target)
-			test.NotNil(v)
-
-			// test.Equal("1", v.String())
-
-			maskV, ok := v.(ssa.Maskable)
-			test.True(ok)
-
-			maskValues := maskV.GetMask()
-			log.Infof("mask values: %s", maskValues)
-
-			test.Equal(tc.want, lo.Map(maskValues, func(v ssa.Value, _ int) string { return ssa.LineDisasm(v) }))
-		}
-		CheckTestCase(t, tc)
-	}
-
 	t.Run("normal", func(t *testing.T) {
-		check(t, TestCase{
+		checkMask(t, TestCase{
 			code: `
 			a = 1
 			f = () => {
@@ -239,7 +185,7 @@ func TestClosure_Mask(t *testing.T) {
 	})
 
 	t.Run("closure function, freeValue and Mask", func(t *testing.T) {
-		check(t, TestCase{
+		checkMask(t, TestCase{
 			code: `
 			a = 1
 			f = () => {
@@ -252,7 +198,7 @@ func TestClosure_Mask(t *testing.T) {
 	})
 
 	t.Run("object member", func(t *testing.T) {
-		check(t, TestCase{
+		checkMask(t, TestCase{
 			code: `
 			a = {
 				"key": 1,
@@ -267,7 +213,7 @@ func TestClosure_Mask(t *testing.T) {
 	})
 
 	t.Run("object member, not found", func(t *testing.T) {
-		check(t, TestCase{
+		checkMask(t, TestCase{
 			code: `
 		a = {}
 		f = () => {
@@ -280,7 +226,7 @@ func TestClosure_Mask(t *testing.T) {
 	})
 
 	t.Run("object member, self", func(t *testing.T) {
-		check(t, TestCase{
+		checkMask(t, TestCase{
 			code: `
 			a = {
 				"key": 1,
@@ -393,5 +339,4 @@ func TestClosure_SideEffect(t *testing.T) {
 			"Parameter-i",
 		}, t)
 	})
-
 }

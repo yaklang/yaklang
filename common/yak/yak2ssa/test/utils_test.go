@@ -14,6 +14,37 @@ import (
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 )
 
+// ===================== test case ====================
+type TestCase struct {
+	code        string
+	want        []string
+	ExternValue map[string]any
+	ExternLib   map[string]map[string]any
+	Check       func(*assert.Assertions, *ssaapi.Program, []string)
+}
+
+func CheckTestCase(t *testing.T, tc TestCase) {
+	test := assert.New(t)
+
+	opt := make([]ssaapi.Option, 0)
+	for k, v := range tc.ExternLib {
+		opt = append(opt, ssaapi.WithExternLib(k, v))
+	}
+	opt = append(opt, ssaapi.WithExternValue(tc.ExternValue))
+	opt = append(opt, static_analyzer.GetPluginSSAOpt("yak")...)
+	prog, err := ssaapi.Parse(tc.code, opt...)
+	test.Nil(err, "parse error")
+
+	prog.Show()
+	// prog.Program.ShowWithSource()
+	fmt.Println(prog.GetErrors().String())
+
+	if tc.want == nil {
+		tc.want = make([]string, 0)
+	}
+	tc.Check(test, prog, tc.want)
+}
+
 // ===================== struct =====================
 type ExampleInterface interface {
 	ExampleMethod()
@@ -35,16 +66,14 @@ func getExampleInterface() ExampleInterface {
 
 // --------------------- for test ---------------------
 func checkPrintlnValue(code string, want []string, t *testing.T) {
-	CheckPrintf(t, TestCase{
+	checkPrintf(t, TestCase{
 		code: code,
 		want: want,
 	})
 }
 
-func CheckPrintf(t *testing.T, tc TestCase) {
-	tc.Check = func(t *testing.T, prog *ssaapi.Program, want []string) {
-		test := assert.New(t)
-
+func checkPrintf(t *testing.T, tc TestCase) {
+	tc.Check = func(test *assert.Assertions, prog *ssaapi.Program, want []string) {
 		println := prog.Ref("println").ShowWithSource()
 		// test.Equal(1, len(println), "println should only 1")
 		got := lo.Map(
@@ -66,65 +95,74 @@ func CheckPrintf(t *testing.T, tc TestCase) {
 	CheckTestCase(t, tc)
 }
 
-type TestCase struct {
-	code        string
-	want        []string
-	ExternValue map[string]any
-	ExternLib   map[string]map[string]any
-	Check       func(*testing.T, *ssaapi.Program, []string)
-}
-
-func CheckTestCase(t *testing.T, tc TestCase) {
-	opt := make([]ssaapi.Option, 0)
-	for k, v := range tc.ExternLib {
-		opt = append(opt, ssaapi.WithExternLib(k, v))
-	}
-	opt = append(opt, ssaapi.WithExternValue(tc.ExternValue))
-	prog, err := ssaapi.Parse(tc.code, opt...)
-	if err != nil {
-		t.Fatal("failed to parse: ", err)
-	}
-
-	prog.Show()
-	// prog.Program.ShowWithSource()
-	fmt.Println(prog.GetErrors().String())
-
-	tc.Check(t, prog, tc.want)
-}
-
-func CheckError(t *testing.T, tc TestCase) {
-	check := func(t *testing.T, prog *ssaapi.Program, want []string) {
+func checkError(t *testing.T, tc TestCase) {
+	check := func(test *assert.Assertions, prog *ssaapi.Program, want []string) {
 		errs := lo.Map(prog.GetErrors(), func(e *ssa.SSAError, _ int) string { return e.Message })
 		slices.Sort(errs)
 		slices.Sort(want)
-		if len(errs) != len(want) {
-			t.Fatalf("error len not match %d vs %d : %s", len(errs), len(tc.want), errs)
-		}
-		for i := 0; i < len(errs); i++ {
-			for errs[i] != want[i] {
-				t.Fatalf("error not match %s vs %s", errs[i], tc.want[i])
-			}
-		}
+		test.Len(errs, len(want), "error len not match")
+		test.Equal(want, errs, "error not match")
 	}
 	tc.Check = check
 	CheckTestCase(t, tc)
 }
 
-func CheckType(t *testing.T, code string, kind ssa.TypeKind) {
-	test := assert.New(t)
-	prog, err := ssaapi.Parse(code, static_analyzer.GetPluginSSAOpt("yak")...)
-	test.Nil(err)
+func checkType(t *testing.T, code string, kind ssa.TypeKind) {
+	tc := TestCase{
+		code: code,
+		Check: func(test *assert.Assertions, prog *ssaapi.Program, _ []string) {
+			vs := prog.Ref("target")
+			test.Equal(1, len(vs))
 
-	prog.Show()
-	errors := prog.GetErrors()
-	log.Infof("errors: %s", errors.String())
+			v := vs[0]
+			test.NotNil(v)
 
-	vs := prog.Ref("target")
-	test.Equal(1, len(vs))
+			log.Info("type and kind: ", v.GetType(), v.GetTypeKind())
+			test.Equal(kind, v.GetTypeKind())
+		},
+	}
+	CheckTestCase(t, tc)
+}
 
-	v := vs[0]
-	test.NotNil(v)
+func checkMask(t *testing.T, tc TestCase) {
+	tc.Check = func(test *assert.Assertions, p *ssaapi.Program, want []string) {
+		targets := p.Ref("target").ShowWithSource()
+		test.Len(targets, 1)
 
-	log.Info("type and kind: ", v.GetType(), v.GetTypeKind())
-	test.Equal(kind, v.GetTypeKind())
+		target := targets[0]
+
+		v := ssaapi.GetBareNode(target)
+		test.NotNil(v)
+
+		// test.Equal("1", v.String())
+
+		maskV, ok := v.(ssa.Maskable)
+		test.True(ok)
+
+		maskValues := maskV.GetMask()
+		log.Infof("mask values: %s", maskValues)
+
+		test.Equal(want, lo.Map(maskValues, func(v ssa.Value, _ int) string { return ssa.LineDisasm(v) }))
+	}
+	CheckTestCase(t, tc)
+}
+
+func checkFreeValue(t *testing.T, tc TestCase) {
+	tc.Check = func(test *assert.Assertions, p *ssaapi.Program, want []string) {
+		targets := p.Ref("target").ShowWithSource()
+		test.Len(targets, 1)
+
+		target := targets[0]
+
+		typ := ssaapi.GetBareType(target.GetType())
+		test.Equal(ssa.FunctionTypeKind, typ.GetTypeKind())
+
+		funTyp, ok := ssa.ToFunctionType(typ)
+		test.True(ok)
+
+		freeValues := funTyp.FreeValue
+		slices.Sort(freeValues)
+		test.Equal(want, freeValues)
+	}
+	CheckTestCase(t, tc)
 }

@@ -46,7 +46,7 @@ func TestUnpack_Line(t *testing.T) {
 	})
 
 	t.Run("normal extern function ", func(t *testing.T) {
-		CheckPrintf(t, TestCase{
+		checkPrintf(t, TestCase{
 			code: `
 			a, b = f()
 			println(a)
@@ -75,8 +75,7 @@ func TestUnpack_Line(t *testing.T) {
 				"Undefined-#4[0](valid)",
 				"Undefined-#4[1](valid)",
 			},
-			Check: func(t *testing.T, p *ssaapi.Program, s []string) {
-				test := assert.New(t)
+			Check: func(test *assert.Assertions, p *ssaapi.Program, s []string) {
 				as := p.Ref("a").ShowWithSource()
 				test.Equal(1, len(as), "a should only 1")
 				a := as[0]
