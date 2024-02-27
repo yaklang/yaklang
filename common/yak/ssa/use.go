@@ -201,36 +201,6 @@ func (i *Make) ReplaceValue(v, to Value) {
 	}
 }
 
-// // ----------- Field
-func (f *Field) HasValues() bool   { return true }
-func (f *Field) GetValues() Values { return []Value{f.Obj, f.Key} }
-func (f *Field) ReplaceValue(v, to Value) {
-	if f.Key == v {
-		f.Key = to
-	} else if f.Obj == v {
-		f.Obj = to
-	} else {
-		panic("field not use this value")
-	}
-}
-
-// ----------- Update
-func (s *Update) HasValues() bool   { return true }
-func (s *Update) GetValues() Values { return []Value{s.Address, s.Value} }
-func (s *Update) ReplaceValue(v, to Value) {
-	if s.Value == v {
-		s.Value = to
-	} else if s.Address == v {
-		s.Address = to
-	} else {
-		panic("update not use this value")
-	}
-}
-
-// node
-func (r *Update) HasUsers() bool  { return false }
-func (r *Update) GetUsers() Users { return nil }
-
 // // ----------- Next
 func (n *Next) HasValues() bool   { return true }
 func (n *Next) GetValues() Values { return []Value{n.Iter} }

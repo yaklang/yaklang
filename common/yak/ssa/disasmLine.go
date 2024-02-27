@@ -174,10 +174,6 @@ func lineDisasm(v Instruction, liner DisasmLiner) (ret string) {
 		return fmt.Sprintf("side-effect(%s, %s)", liner.DisasmValue(v.target), v.GetName())
 	case *Make:
 		return fmt.Sprintf("make(%s)", v.GetType())
-	case *Field:
-		return fmt.Sprintf("%s.%s", liner.DisasmValue(v.Obj), liner.DisasmValue(v.Key))
-	case *Update:
-		return fmt.Sprintf("update(%s, %s)", liner.DisasmValue(v.Address), liner.DisasmValue(v.Value))
 	case *Next:
 		return fmt.Sprintf("next(%s)", liner.DisasmValue(v.Iter))
 	case *TypeCast:

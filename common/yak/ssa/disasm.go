@@ -308,22 +308,6 @@ func (i *Make) String() string {
 	}
 }
 
-// ----------- Field
-func (f *Field) String() string {
-	return fmt.Sprintf(
-		"%s = %s field[%s]",
-		getStr(f), getStr(f.Obj), getStr(f.Key),
-	)
-}
-
-// ----------- Update
-func (s *Update) String() string {
-	return fmt.Sprintf(
-		"update [%s] = %s",
-		getStr(s.Address), getStr(s.Value),
-	)
-}
-
 func (t *TypeCast) String() string {
 	return fmt.Sprintf(
 		"%s = type-case[%s] %s",

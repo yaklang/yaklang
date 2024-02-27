@@ -20,8 +20,6 @@ const (
 	OpSideEffect   Opcode = "SideEffect"
 	OpReturn       Opcode = "Return"
 	OpMake         Opcode = "Make"
-	OpField        Opcode = "Field"
-	OpUpdate       Opcode = "Update"
 	OpNext         Opcode = "Next"
 	OpAssert       Opcode = "Assert"
 	OpTypeCast     Opcode = "TypeCast"
@@ -53,8 +51,6 @@ func (i *Call) GetOpcode() Opcode         { return OpCall }
 func (i *SideEffect) GetOpcode() Opcode   { return OpSideEffect }
 func (i *Return) GetOpcode() Opcode       { return OpReturn }
 func (i *Make) GetOpcode() Opcode         { return OpMake }
-func (i *Field) GetOpcode() Opcode        { return OpField }
-func (i *Update) GetOpcode() Opcode       { return OpUpdate }
 func (i *Next) GetOpcode() Opcode         { return OpNext }
 func (i *Assert) GetOpcode() Opcode       { return OpAssert }
 func (i *TypeCast) GetOpcode() Opcode     { return OpTypeCast }

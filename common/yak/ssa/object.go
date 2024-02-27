@@ -35,8 +35,7 @@ func ReplaceMemberCall(v, to Value) map[string]Value {
 			if member.GetOpcode() != OpUndefined {
 				member.SetName(name)
 				member.SetType(typ)
-				member.SetObject(to)
-				to.AddMember(key, member)
+				SetMemberCall(to, key, member)
 				ret[name] = createPhi(name, []Value{origin, member})
 				continue
 			}
@@ -55,7 +54,8 @@ func ReplaceMemberCall(v, to Value) map[string]Value {
 
 	if v.IsMember() {
 		obj := v.GetObject()
-		obj.AddMember(v.GetKey(), to)
+		// obj.AddMember(v.GetKey(), to)
+		SetMemberCall(obj, v.GetKey(), v)
 	}
 	return ret
 }
@@ -73,27 +73,6 @@ func NewMake(parentI Value, typ Type, low, high, step, Len, Cap Value) *Make {
 	}
 	i.SetType(typ)
 	return i
-}
-
-func NewUpdate(address, v Value) *Update {
-	s := &Update{
-		anInstruction: NewInstruction(),
-		Value:         v,
-		Address:       address,
-	}
-	return s
-}
-
-func NewFieldOnly(key, obj Value, block *BasicBlock) *Field {
-	f := &Field{
-		anInstruction: NewInstruction(),
-		anValue:       NewValue(),
-		Key:           key,
-		Obj:           obj,
-		update:        make([]User, 0),
-		IsMethod:      false,
-	}
-	return f
 }
 
 func (b *FunctionBuilder) CreateInterfaceWithSlice(vs []Value) *Make {
@@ -131,15 +110,6 @@ func (b *FunctionBuilder) InterfaceAddFieldBuild(size int, keys func(int) Value,
 	ityp.Finish()
 	// ityp.Len = len(vs)
 	return itf
-}
-
-// --------------- `f.symbol` handler, read && write
-func (b *FunctionBuilder) getFieldWithCreate(i, key Value, forceCreate bool) Value {
-	if ci, ok := ToConst(key); ok {
-		ci.isIdentify = true
-	}
-	field := NewFieldOnly(key, i, b.CurrentBlock)
-	return field
 }
 
 func CombineMemberCallVariableName(caller, callee Value) (string, bool) {
@@ -316,7 +286,7 @@ func (b *FunctionBuilder) CreateMemberCallVariable(value, key Value) *Variable {
 		return b.CreateVariable(name)
 	}
 
-	if para, ok := ToParameter(value); ok && para.IsFreeValue {
+	if para, ok := ToParameter(value); ok && para.IsFreeValue && (para.GetDefault() != nil) {
 		name := b.getFieldName(para.GetDefault(), key)
 		return b.CreateVariable(name)
 	}
