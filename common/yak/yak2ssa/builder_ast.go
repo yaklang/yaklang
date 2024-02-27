@@ -1076,9 +1076,10 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 	}
 
 	// | expression '<-' expression
+	// TODO: handler "<-"
 	if stmt.ChanIn() != nil {
-		op1, op2 := getValue(0), getValue(1)
-		b.EmitUpdate(op1, op2)
+		// op1, op2 := getValue(0), getValue(1)
+		// b.EmitUpdate(op1, op2)
 	}
 
 	// | expression 'not'? 'in' expression

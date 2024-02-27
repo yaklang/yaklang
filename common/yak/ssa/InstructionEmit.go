@@ -325,37 +325,6 @@ func (f *FunctionBuilder) EmitConstInst(i any) *ConstInst {
 	return ci
 }
 
-func (f *FunctionBuilder) EmitField(i, key Value) Value {
-	log.Error("ssa.field instruction is deprecated temporally")
-	ret := f.getFieldWithCreate(i, key, false)
-
-	if f.CurrentBlock.finish {
-		f.EmitInstructionBefore(ret, f.CurrentBlock.LastInst())
-	} else {
-		f.emit(ret)
-	}
-	return ret
-}
-func (f *FunctionBuilder) EmitFieldMust(i, key Value) *Field {
-	if f.CurrentBlock.finish {
-		return nil
-	}
-	if field, ok := ToField(f.getFieldWithCreate(i, key, true)); ok {
-		return field
-	}
-	return nil
-}
-
-func (f *FunctionBuilder) EmitUpdate(address, v Value) *Update {
-	if f.CurrentBlock.finish {
-		return nil
-	}
-	// CheckUpdateType(address.GetType(), v.GetType())
-	s := NewUpdate(address, v)
-	f.emit(s)
-	return s
-}
-
 func (f *FunctionBuilder) EmitTypeCast(v Value, typ Type) *TypeCast {
 	if f.CurrentBlock.finish {
 		return nil
