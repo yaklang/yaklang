@@ -807,7 +807,7 @@ func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionReques
 			if position2 == nil {
 				return false
 			}
-			return u.IsField() && position2.Start.Line <= position.Start.Line
+			return u.IsMember() && position2.Start.Line <= position.Start.Line
 		}).ForEach(func(v *ssaapi.Value) {
 			key := v.GetOperand(1)
 			if _, ok := filterMap[key.String()]; ok {
