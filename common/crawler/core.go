@@ -668,7 +668,7 @@ func (c *Crawler) handleReqResult(r *Req) {
 		fullJSCode.WriteByte('\n')
 	}
 	utils.CallWithTimeout(30, func() {
-		HandleJS(r.https, r.requestRaw, fullJSCode.String(), func(b bool, i []byte) {
+		HandleJSGetNewRequest(r.https, r.requestRaw, fullJSCode.String(), func(b bool, i []byte) {
 			submit(b, i)
 		})
 	})
