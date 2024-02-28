@@ -1,13 +1,21 @@
 package rule
 
 import (
+	"fmt"
+	"github.com/yaklang/yaklang/common/jsonextractor"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/openai"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
 	"github.com/yaklang/yaklang/common/suricata/pcre"
+	"github.com/yaklang/yaklang/common/utils"
+	"strconv"
+	"strings"
 )
 
 type Rule struct {
 	Raw                string       `json:"raw"`
 	Message            string       `json:"message"`
+	MessageChinese     string       `json:"message_chinese"`
 	Action             string       `json:"action"`
 	Protocol           string       `json:"protocol"`
 	SourceAddress      *AddressRule `json:"source_address"`
@@ -25,6 +33,37 @@ type Rule struct {
 	Target    string // src_ip/dest_ip
 
 	ContentRuleConfig *ContentRuleConfig
+}
+
+func (r *Rule) AIDecoration(opts ...openai.ConfigOption) {
+	client := openai.NewOpenAIClient(opts...)
+	fmt.Println(string(r.Raw))
+	if r.MessageChinese == "" {
+		msg := r.Message
+		if strings.HasPrefix(r.Message, "ET ") {
+			msg = r.Message[3:]
+		}
+		result, err := client.Chat(`我在翻译网络安全领域的规则的名称(Suricata)，帮我翻译下规则的内容，输入在当前消息的 json 中
+
+{"input": ` + strconv.Quote(msg) + `}
+
+把结果放在 json 中, json 的 key 为 result, 以方便我提取，翻译过程中尽量使用网络安全术语，注重可读性，不要太晦涩。注意，我有一些翻译偏好，希望能遵守：
+
+Hash 是一个专有名词，不要翻译；
+“可能” 使用 “潜在” 代替；
+按习惯来说你认为是产品名或专有名字可以不翻译
+
+`)
+		if err != nil {
+			log.Warnf("openai failed: %s", err)
+		} else {
+			for _, i := range jsonextractor.ExtractStandardJSON(result) {
+				m := utils.ParseStringToGeneralMap(i)
+				r.MessageChinese = utils.MapGetString(m, "result")
+				fmt.Println("translate: " + msg + " to " + r.MessageChinese)
+			}
+		}
+	}
 }
 
 type ContentRuleConfig struct {
