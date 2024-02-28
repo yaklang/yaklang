@@ -1051,11 +1051,12 @@ func (s *Server) Codec(ctx context.Context, req *ypb.CodecRequest) (*ypb.CodecRe
 //	return &ypb.CodecResponse{Result: utils.EscapeInvalidUTF8Byte([]byte(result))}, nil
 //}
 
-func (s *Server) NewCodec(ctx context.Context, req *ypb.CodecRequestFlow) (*ypb.CodecResponse, error) {
+func (s *Server) NewCodec(ctx context.Context, req *ypb.CodecRequestFlow) (resp *ypb.CodecResponse, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Error(r)
 			utils.PrintCurrentGoroutineRuntimeStack()
+			err = r.(error)
 		}
 	}()
 
