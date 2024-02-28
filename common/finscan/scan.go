@@ -150,7 +150,7 @@ func (s *Scanner) scanPrivate(privateHosts []string, ports []int, random bool) e
 					return
 				}
 
-				log.Infof("start to inject %v with loopback: %v", hwAddr.String(), loopback)
+				log.Debugf("start to inject %v with loopback: %v", hwAddr.String(), loopback)
 				err = s.inject(loopback, layers...)
 				if err != nil {
 					log.Errorf("inject fin-tcp packet error: %s", err)

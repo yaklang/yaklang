@@ -79,9 +79,7 @@ func TestResultHook(t *testing.T) {
 		t.FailNow()
 	}
 	scanner, err := NewScanner(context.Background(), config)
-	defer func() {
-		scanner.Close()
-	}()
+
 	if err != nil {
 		assert.Nil(t, err)
 		t.FailNow()

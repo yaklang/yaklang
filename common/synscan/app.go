@@ -278,58 +278,6 @@ func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 			pcaputil.WithEnableCache(true),
 			pcaputil.WithBPFFilter("(arp) or (tcp[tcpflags] & (tcp-syn) != 0)"),
 			pcaputil.WithContext(ctx),
-			pcaputil.WithEveryPacket(func(packet gopacket.Packet) {
-				if arpLayer := packet.Layer(layers.LayerTypeARP); arpLayer != nil {
-					switch arpLayer.LayerType() {
-					case layers.LayerTypeARP:
-						arp, ok := arpLayer.(*layers.ARP)
-						if !ok {
-							return
-						}
-						srcIP := net.IP(arp.SourceProtAddress)
-						srcHw := net.HardwareAddr(arp.SourceHwAddress)
-						scanner.onARP(srcIP, srcHw)
-					}
-				}
-
-				if tcpSynLayer := packet.TransportLayer(); tcpSynLayer != nil {
-					l, ok := tcpSynLayer.(*layers.TCP)
-					if !ok {
-						return
-					}
-
-					if l.SYN && l.ACK {
-						if nl := packet.NetworkLayer(); nl != nil {
-							scanner.onSynAck(net.ParseIP(nl.NetworkFlow().Src().String()), int(l.SrcPort))
-						}
-						return
-					}
-
-					if l.SYN && !l.ACK && scanner.tmpTargetForDetectMAC != "" {
-						nl := packet.NetworkLayer()
-						if nl == nil {
-							return
-						}
-
-						if nl.NetworkFlow().Dst().String() != scanner.tmpTargetForDetectMAC {
-							return
-						}
-						eth := packet.LinkLayer()
-						if eth == nil {
-							return
-						}
-						l, ok := eth.(*layers.Ethernet)
-						if !ok {
-							return
-						}
-						// 缓存地址 mac 地址
-						select {
-						case scanner.macChan <- [2]net.HardwareAddr{l.SrcMAC, l.DstMAC}:
-						default:
-						}
-					}
-				}
-			}),
 			pcaputil.WithNetInterfaceCreated(func(handle *pcap.Handle) {
 				go func() {
 					var counter int
@@ -392,6 +340,58 @@ func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 						}
 					}
 				}()
+			}),
+			pcaputil.WithEveryPacket(func(packet gopacket.Packet) {
+				if arpLayer := packet.Layer(layers.LayerTypeARP); arpLayer != nil {
+					switch arpLayer.LayerType() {
+					case layers.LayerTypeARP:
+						arp, ok := arpLayer.(*layers.ARP)
+						if !ok {
+							return
+						}
+						srcIP := net.IP(arp.SourceProtAddress)
+						srcHw := net.HardwareAddr(arp.SourceHwAddress)
+						scanner.onARP(srcIP, srcHw)
+					}
+				}
+
+				if tcpSynLayer := packet.TransportLayer(); tcpSynLayer != nil {
+					l, ok := tcpSynLayer.(*layers.TCP)
+					if !ok {
+						return
+					}
+
+					if l.SYN && l.ACK {
+						if nl := packet.NetworkLayer(); nl != nil {
+							scanner.onSynAck(net.ParseIP(nl.NetworkFlow().Src().String()), int(l.SrcPort))
+						}
+						return
+					}
+
+					if l.SYN && !l.ACK && scanner.tmpTargetForDetectMAC != "" {
+						nl := packet.NetworkLayer()
+						if nl == nil {
+							return
+						}
+
+						if nl.NetworkFlow().Dst().String() != scanner.tmpTargetForDetectMAC {
+							return
+						}
+						eth := packet.LinkLayer()
+						if eth == nil {
+							return
+						}
+						l, ok := eth.(*layers.Ethernet)
+						if !ok {
+							return
+						}
+						// 缓存地址 mac 地址
+						select {
+						case scanner.macChan <- [2]net.HardwareAddr{l.SrcMAC, l.DstMAC}:
+						default:
+						}
+					}
+				}
 			}),
 		)
 	}()
