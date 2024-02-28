@@ -652,7 +652,7 @@ func ToLower(s string) (lower string, ok bool) {
 
 func deflate(data []byte) ([]byte, error) {
 	buf := new(bytes.Buffer)
-	w, err := flate.NewWriter(buf, flate.BestSpeed)
+	w, err := flate.NewWriter(buf, flate.DefaultCompression)
 	if err != nil {
 		return nil, err
 	}
@@ -668,15 +668,15 @@ func deflate(data []byte) ([]byte, error) {
 }
 
 func _inflate(data []byte) ([]byte, error) {
-	r := flate.NewReader(bytes.NewReader(data))
-	defer func() {
-		if err := r.Close(); err != nil {
-			log.Errorf("flate.Reader close error: %v", err)
-		}
-	}()
+	r := flate.NewReader(io.MultiReader(bytes.NewReader(data), bytes.NewReader(TAIL)))
+	//r := flate.NewReader(bytes.NewReader(data))
 
 	newData, err := ioutil.ReadAll(r)
 	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		return nil, err
+	}
+	err = r.Close()
+	if err != nil {
 		return nil, err
 	}
 	return newData, nil

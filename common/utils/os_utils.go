@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	ws "github.com/gorilla/websocket"
 	"golang.org/x/net/websocket"
 
 	"github.com/miekg/dns"
@@ -586,5 +587,58 @@ func DebugMockHTTPWithTimeout(du time.Duration, rsp []byte) (string, int) {
 	}()
 
 	time.Sleep(time.Millisecond * 100)
+	return host, port
+}
+
+func DebugMockEchoWs(data []byte) (string, int) {
+	addr := GetRandomLocalAddr()
+	time.Sleep(time.Millisecond * 300)
+	host, port, _ := ParseStringToHostPort(addr)
+
+	upgrader := ws.Upgrader{
+		ReadBufferSize:    1024,
+		WriteBufferSize:   1024,
+		EnableCompression: true, // 启用压缩
+	}
+
+	http.HandleFunc("/echo", func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		defer conn.Close()
+		//// 循环三次
+		//for i := 0; i < 3; i++ {
+		//	err = conn.WriteMessage(ws.TextMessage, data)
+		//	if err != nil {
+		//		log.Errorf("write message failed: %s", err)
+		//		return
+		//	}
+		//}
+
+		for {
+			mt, message, err := conn.ReadMessage()
+			if err != nil && message == nil {
+				log.Errorf("read: %v", err)
+				return
+			}
+			serverMessage := []byte("server: " + string(message))
+			if err := conn.WriteMessage(mt, serverMessage); err != nil {
+				log.Errorf("write: %v", err)
+				return
+			}
+		}
+	})
+
+	server := &http.Server{Addr: addr}
+
+	go func() {
+		err := server.ListenAndServe()
+		if err != nil && err != http.ErrServerClosed {
+			log.Fatal(err)
+		}
+	}()
+
 	return host, port
 }
