@@ -226,9 +226,9 @@ func _finscanDo(targetChan chan string, ports string, config *_yakFinPortScanCon
 		}
 		scanner, err := finscan.NewScanner(context.Background(), finScanConfig)
 		scanner.SetRateLimit(config.rateLimitDelayMs, config.rateLimitDelayGap)
-		defer func() {
-			scanner.Close()
-		}()
+		//defer func() {
+		//	scanner.Close()
+		//}()
 		if err != nil {
 			log.Errorf("create fin scanner failed: %s", err)
 			return
