@@ -16,7 +16,7 @@ type Variable struct {
 
 var _ ssautil.VersionedIF[Value] = (*Variable)(nil)
 
-func NewVariable(globalIndex int, name string, local bool, scope *ssautil.ScopedVersionedTable[Value]) ssautil.VersionedIF[Value] {
+func NewVariable(globalIndex int, name string, local bool, scope ssautil.ScopedVersionedTableIF[Value]) ssautil.VersionedIF[Value] {
 	ret := &Variable{
 		Versioned: ssautil.NewVersioned[Value](globalIndex, name, local, scope).(*ssautil.Versioned[Value]),
 		DefRange:  nil,
@@ -56,7 +56,7 @@ func (v *Variable) NewError(kind ErrorKind, tag ErrorTag, msg string) {
 	}
 }
 
-func ReadVariableFromScope(scope *ssautil.ScopedVersionedTable[Value], name string) *Variable {
+func ReadVariableFromScope(scope *Scope, name string) *Variable {
 	if ret := scope.ReadVariable(name); ret != nil {
 		if variable, ok := ret.(*Variable); ok {
 			return variable
