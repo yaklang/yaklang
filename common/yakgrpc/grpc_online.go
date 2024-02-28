@@ -152,16 +152,19 @@ func (s *Server) DeleteLocalPluginsByWhere(ctx context.Context, req *ypb.DeleteL
 	for v := range res {
 		scriptName = append(scriptName, v.ScriptName)
 	}
-
 	for _, v := range funk.ChunkStrings(scriptName, 100) {
-		err := yakit.DeletePluginGroupByScriptName(s.GetProjectDatabase(), v)
-		log.Error(err)
+		err := yakit.DeletePluginGroupByScriptName(s.GetProfileDatabase(), v)
+		if err != nil {
+			log.Error(err)
+		}
+
+		db1 := bizhelper.ExactQueryStringArrayOr(s.GetProfileDatabase().Model(&yakit.YakScript{}), "script_name", v)
+		err = db1.Unscoped().Delete(&yakit.YakScript{}).Error
+		if err != nil {
+			log.Error(db.Error)
+		}
 	}
 
-	err := yakit.DeleteYakScriptByWhere(db)
-	if err != nil {
-		return nil, err
-	}
 	return &ypb.Empty{}, nil
 }
 

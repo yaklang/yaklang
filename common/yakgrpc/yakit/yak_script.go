@@ -717,5 +717,9 @@ func DeleteYakScript(db *gorm.DB, params *ypb.DeleteLocalPluginsByWhereRequest) 
 	db = bizhelper.FuzzQueryLike(db, "author", params.GetUserName())
 	db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{"tags"}, strings.Split(params.GetTags(), ","), false)
 	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", params.Ids)
+	if len(params.Groups) > 0 {
+		db = db.Joins("left join plugin_groups P on yak_scripts.script_name = P.yak_script_name ")
+		db = bizhelper.ExactQueryStringArrayOr(db, "`group`", params.Groups)
+	}
 	return db
 }
