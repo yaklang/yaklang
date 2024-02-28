@@ -233,6 +233,7 @@ func NewRuleFromSuricata(s *rule.Rule) *Storage {
 		Action:      s.Action,
 		Name:        s.Message,
 		ClassType:   s.ClassType,
+		NameZh:      s.MessageChinese,
 	}
 }
 
