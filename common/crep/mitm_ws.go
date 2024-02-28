@@ -235,6 +235,7 @@ func (w *WebSocketModifier) copyHijack(writer *bufio.Writer, reader *bufio.Reade
 			return bytes
 		}
 	}
+	//isDeflate = false
 	frameReader := lowhttp.NewFrameReaderFromBufio(reader, isDeflate)
 	frameWriter := lowhttp.NewFrameWriterFromBufio(writer, isDeflate)
 
@@ -253,19 +254,30 @@ func (w *WebSocketModifier) copyHijack(writer *bufio.Writer, reader *bufio.Reade
 			break
 		}
 
-		raw, clearData := frame.Bytes()
-		if len(raw) < 2 {
-			break
-		}
-		_ = clearData
-		frame.Show()
+		masked := frame.GetMask()
 
-		masked := raw[1]&0b10000000 != 0
-
+		firstByte := frame.GetFirstByte()
+		showData := frame.GetData()
+		raw := frame.GetRaw()
+		payload := frame.GetPayload()
 		switch frame.Type() {
 		case lowhttp.TextMessage, lowhttp.BinaryMessage:
-			//b = callbackHandler(clearData, req, rsp, ts)
-			newFrame, err := lowhttp.DataToWebsocketFrame(clearData, raw[0], masked)
+			b = callbackHandler(showData, req, rsp, ts)
+			newFrame, err := lowhttp.DataToWebsocketFrame(payload, firstByte, masked)
+			if err != nil {
+				frameWriter.WriteRaw(raw)
+				frameWriter.Flush()
+				continue
+			}
+			newFrame.SetData(showData)
+			newFrame.SetMaskingKey(frame.GetMaskingKey())
+			newRaw, _ := newFrame.Bytes()
+			frameWriter.WriteRaw(newRaw)
+		case lowhttp.PingMessage:
+			frameWriter.WritePong(showData, masked)
+		default:
+			b = callbackHandler(showData, req, rsp, ts)
+			newFrame, err := lowhttp.DataToWebsocketFrame(b, firstByte, masked)
 			if err != nil {
 				frameWriter.WriteRaw(raw)
 				frameWriter.Flush()
@@ -274,12 +286,9 @@ func (w *WebSocketModifier) copyHijack(writer *bufio.Writer, reader *bufio.Reade
 			newFrame.SetMaskingKey(frame.GetMaskingKey())
 			newRaw, _ := newFrame.Bytes()
 			frameWriter.WriteRaw(newRaw)
-		case lowhttp.PingMessage:
-			frameWriter.WritePong(frame.RawPayloadData(), masked)
-		default:
-			if err = frameWriter.WriteFrame(frame); err != nil {
-				log.Errorf("write frame failed: %s", err)
-			}
+			//if err = frameWriter.WriteFrame(frame); err != nil {
+			//	log.Errorf("write frame failed: %s", err)
+			//}
 		}
 
 		if err = frameWriter.Flush(); err != nil {
@@ -314,7 +323,7 @@ func (w *WebSocketModifier) copySync(writer *lowhttp.FrameWriter, reader *lowhtt
 		case lowhttp.BinaryMessage, lowhttp.TextMessage:
 
 		case lowhttp.PingMessage:
-			writer.WritePong(frame.RawPayloadData(), true)
+			writer.WritePong(frame.GetData(), true)
 		default:
 			continue
 		}
@@ -426,11 +435,7 @@ func (w *WebSocketModifier) writeWSReq(req *http.Request, bw io.Writer) (webSock
 		}
 	}
 
-	_, err = io.WriteString(bw, "\r\n")
-	if err != nil {
-		return
-	}
-	//err = bw.Flush()
+	_, err = bw.Write([]byte("\r\n"))
 	if err != nil {
 		return
 	}
