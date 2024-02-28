@@ -42,17 +42,27 @@ func NewOpenAIClient(opt ...ConfigOption) *Client {
 		o(c)
 	}
 	config := consts.GetThirdPartyApplicationConfig("openai")
-	if config.APIKey != "" {
+	if config.APIKey != "" && c.APIKey == "" {
+		verbose := "sk-...."
+		if len(config.APIKey) > 10 {
+			verbose = config.APIKey[:10] + "..."
+		}
+		log.Infof("use yakit config: %v", verbose)
 		c.APIKey = config.APIKey
 	}
-	if model := config.GetExtraParam("model"); model != "" {
+	if model := config.GetExtraParam("model"); model != "" && c.ChatModel == "" {
 		c.ChatModel = model
 	}
-	if domain := config.GetExtraParam("domain"); domain != "" {
+	if domain := config.GetExtraParam("domain"); domain != "" && c.Domain == "" {
 		c.Domain = domain
 	}
-	if proxy := config.GetExtraParam("proxy"); proxy != "" {
+	if proxy := config.GetExtraParam("proxy"); proxy != "" && c.Proxy == "" {
+		log.Infof("use yakit config ai proxy: %v", proxy)
 		c.Proxy = proxy
+	}
+
+	if c.APIKey == "" {
+		log.Warn("openai api key is empty")
 	}
 	return c
 }
