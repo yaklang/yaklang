@@ -84,9 +84,9 @@ func (c *HyperScanCenter) SetSynScanRateLimit(ms float64, count int) {
 func (c *HyperScanCenter) Close() {
 	defer c.cancel()
 
-	if c.synScanner != nil {
-		c.synScanner.Close()
-	}
+	//if c.synScanner != nil {
+	//	c.synScanner.Close()
+	//}
 
 	c.fpScanPool.Close()
 	close(c.fpTargetStream)

@@ -39,7 +39,7 @@ func syncKeepDaemonCache(key string, ctx context.Context) {
 			return
 		case <-time.After(3 * time.Second):
 			getDaemonCache(key)
-			log.Infof("keep daemon cache: %v", key)
+			//log.Infof("keep daemon cache: %v", key)
 		}
 	}
 }
@@ -60,7 +60,7 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 		var hashRaw bytes.Buffer
 		hashRaw.WriteString(ifaceName)
 		hashRaw.WriteString("|")
-		if conf.OverrideCacheId != "" {
+		if conf.OverrideCacheId == "" {
 			hashRaw.WriteString(conf.BPFFilter)
 		} else {
 			hashRaw.WriteString("override|")
