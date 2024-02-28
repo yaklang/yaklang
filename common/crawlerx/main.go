@@ -64,10 +64,15 @@ func NewCrawlerCore(targetUrl string, opts ...ConfigOpt) (*CrawlerCore, error) {
 	} else {
 		proxy = nil
 	}
-	checkedUrl, err := TargetUrlCheck(targetUrl, proxy)
-	if err != nil {
-		cancel()
-		return nil, utils.Errorf(`target url %s check failed: %s`, targetUrl, err)
+	var checkedUrl string
+	if config.urlCheck {
+		checkedUrl, err = TargetUrlCheck(targetUrl, proxy)
+		if err != nil {
+			cancel()
+			return nil, utils.Errorf(`target url %s check failed: %s`, targetUrl, err)
+		}
+	} else {
+		checkedUrl = targetUrl
 	}
 	WithTargetUrl(checkedUrl)(config)
 	WithUrlTree(tools.CreateTree(checkedUrl))(config)

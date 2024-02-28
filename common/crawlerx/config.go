@@ -16,6 +16,7 @@ import (
 type Config struct {
 	browsers   []*BrowserConfig
 	baseConfig *BaseConfig
+	urlCheck   bool
 }
 
 type ConfigOpt func(*Config)
@@ -104,6 +105,7 @@ func NewConfig() *Config {
 			response:          make(map[string]string),
 			sourceType:        "crawlerx",
 		},
+		urlCheck: true,
 	}
 }
 
@@ -412,5 +414,11 @@ func WithSourceType(sourceType string) ConfigOpt {
 func WithFromPlugin(fromPlugin string) ConfigOpt {
 	return func(config *Config) {
 		config.baseConfig.fromPlugin = fromPlugin
+	}
+}
+
+func WithUrlCheck(check bool) ConfigOpt {
+	return func(config *Config) {
+		config.urlCheck = check
 	}
 }
