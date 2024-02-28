@@ -893,6 +893,7 @@ STATUSCODERETRY:
 			response.RawPacket = rawBytes
 			return response, nil
 		}
+		response.BarePacket = rawBytes
 		response.RawPacket = rspRaw
 		return response, nil
 	}

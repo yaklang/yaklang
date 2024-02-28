@@ -72,6 +72,7 @@ type LowhttpExecConfig struct {
 }
 
 type LowhttpResponse struct {
+	BarePacket             []byte // no fix raw packet
 	RawPacket              []byte
 	RedirectRawPackets     []*RedirectFlow
 	PortIsOpen             bool

@@ -124,6 +124,8 @@ type HTTPFlow struct {
 	IsTooLargeResponse         bool
 	TooLargeResponseHeaderFile string
 	TooLargeResponseBodyFile   string
+
+	BareResponse []byte
 }
 
 type TagAndStatusCode struct {
@@ -322,6 +324,8 @@ func (f *HTTPFlow) toGRPCModel(full bool) (*ypb.HTTPFlow, error) {
 		IsTooLargeResponse:         f.IsTooLargeResponse,
 		TooLargeResponseBodyFile:   f.TooLargeResponseBodyFile,
 		TooLargeResponseHeaderFile: f.TooLargeResponseHeaderFile,
+
+		BareResponse: f.BareResponse,
 	}
 	// 设置 title
 	var (
@@ -558,6 +562,8 @@ func CreateHTTPFlowFromHTTPWithBodySavedFromRaw(isHttps bool, reqRaw []byte, rsp
 		log.Errorf("[BUG] requestRaw is invalid: %s", requestRaw)
 	}
 
+	bareRspRaw := rspRaw
+
 	rawNoGzip, _, _ := lowhttp.FixHTTPResponse(rspRaw)
 	if len(rawNoGzip) > 0 {
 		rspRaw = rawNoGzip
@@ -574,18 +580,19 @@ func CreateHTTPFlowFromHTTPWithBodySavedFromRaw(isHttps bool, reqRaw []byte, rsp
 	fReq, _ := mutate.NewFuzzHTTPRequest(reqRaw)
 
 	flow := &HTTPFlow{
-		IsHTTPS:     isHttps,
-		Url:         url,
-		Path:        requestUri,
-		Method:      method,
-		BodyLength:  int64(len(body)),
-		ContentType: rspContentType,
-		StatusCode:  int64(lowhttp.ExtractStatusCodeFromResponse(rspRaw)),
-		SourceType:  source,
-		Request:     requestRaw,
-		Response:    responseRaw,
-		RemoteAddr:  remoteAddr,
-		HiddenIndex: ksuid.New().String(),
+		IsHTTPS:      isHttps,
+		Url:          url,
+		Path:         requestUri,
+		Method:       method,
+		BodyLength:   int64(len(body)),
+		ContentType:  rspContentType,
+		StatusCode:   int64(lowhttp.ExtractStatusCodeFromResponse(rspRaw)),
+		SourceType:   source,
+		Request:      requestRaw,
+		Response:     responseRaw,
+		BareResponse: bareRspRaw,
+		RemoteAddr:   remoteAddr,
+		HiddenIndex:  ksuid.New().String(),
 	}
 	ip, _, _ := utils.ParseStringToHostPort(remoteAddr)
 	if ip != "" {
@@ -997,6 +1004,9 @@ CASE WHEN LENGTH(request) > 204800 THEN '' ELSE request END as request,
 -- response is larger than 500K, return empty string
 LENGTH(response) > 512000 as is_response_oversize,
 CASE WHEN LENGTH(response) > 512000 THEN '' ELSE response END as response,
+
+-- response is larger than 500K, return empty string
+CASE WHEN LENGTH(response) > 512000 THEN '' ELSE bare_response END as bare_response,
 
 -- is response too large
 is_too_large_response, 

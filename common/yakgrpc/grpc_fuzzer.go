@@ -193,6 +193,7 @@ func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestPa
 	rsp := &ypb.FuzzerResponse{
 		Method:                "GET",
 		ResponseRaw:           rspRaw,
+		BareResponse:          rspIns.BarePacket,
 		GuessResponseEncoding: Chardet(rspRaw),
 		RequestRaw:            resultRequest,
 		ExtractedResults:      extractResults,
@@ -902,6 +903,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				Url:                        utils.EscapeInvalidUTF8Byte([]byte(result.Url)),
 				Method:                     utils.EscapeInvalidUTF8Byte([]byte(result.Request.Method)),
 				ResponseRaw:                result.ResponseRaw,
+				BareResponse:               result.BareResponse,
 				GuessResponseEncoding:      Chardet(result.ResponseRaw),
 				RequestRaw:                 result.RequestRaw,
 				Payloads:                   payloads,
@@ -1020,6 +1022,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 						Url:                   utils.EscapeInvalidUTF8Byte([]byte(redirectRes.Url)),
 						Method:                utils.EscapeInvalidUTF8Byte([]byte(method)),
 						ResponseRaw:           redirectRes.RawPacket,
+						BareResponse:          redirectRes.BarePacket,
 						GuessResponseEncoding: Chardet(redirectRes.RawPacket),
 						RequestRaw:            redirectRes.RawRequest,
 						Payloads:              payloads,

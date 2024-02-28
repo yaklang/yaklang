@@ -388,14 +388,15 @@ func _httpPool_ExternSwitch(sw *utils.Switch) HttpPoolConfigOption {
 type HttpPoolConfigOption func(config *httpPoolConfig)
 
 type HttpResult struct {
-	Url         string
-	Request     *http.Request
-	Error       error
-	RequestRaw  []byte
-	ResponseRaw []byte
-	Response    *http.Response
-	Payloads    []string
-	params      []interface{}
+	Url          string
+	Request      *http.Request
+	Error        error
+	RequestRaw   []byte
+	ResponseRaw  []byte
+	BareResponse []byte
+	Response     *http.Response
+	Payloads     []string
+	params       []interface{}
 
 	DurationMs       int64
 	ServerDurationMs int64
@@ -705,6 +706,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							ExtraInfo:        extra,
 							RequestRaw:       targetRequest,
 							ResponseRaw:      rsp,
+							BareResponse:     rspInstance.BarePacket,
 							DurationMs:       rspInstance.TraceInfo.GetServerDurationMS(),
 							ServerDurationMs: rspInstance.TraceInfo.GetServerDurationMS(),
 							Timestamp:        time.Now().Unix(),

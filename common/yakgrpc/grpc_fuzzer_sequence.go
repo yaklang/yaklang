@@ -3,15 +3,16 @@ package yakgrpc
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"sync"
+	"time"
+
 	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/grpc"
-	"net/http"
-	"sync"
-	"time"
 )
 
 type httpFuzzerFallback struct {
@@ -52,7 +53,7 @@ func (h *httpFuzzerFallback) Send(r *ypb.FuzzerResponse) error {
 }
 
 func newHTTPFuzzerFallback(req *ypb.FuzzerRequest, server ypb.Yak_HTTPFuzzerSequenceServer) *httpFuzzerFallback {
-	var belong = req
+	belong := req
 	if req.GetFuzzerIndex() != "" {
 		belong = &ypb.FuzzerRequest{FuzzerIndex: req.GetFuzzerIndex(), FuzzerTabIndex: req.GetFuzzerTabIndex()}
 	}
@@ -75,10 +76,7 @@ func ConvertLowhttpResponseToFuzzerResponseBase(r *lowhttp.LowhttpResponse) *ypb
 	)
 	host = utils.ExtractHost(r.RemoteAddr)
 
-	lowhttp.SplitHTTPPacket(r.RawPacket, func(m string, requestUri string, proto string) error {
-		method = m
-		return nil
-	}, nil)
+	method, _, _ = lowhttp.GetHTTPPacketFirstLine(r.RawRequest)
 	rsp, err := lowhttp.ParseBytesToHTTPResponse(r.RawPacket)
 	if rsp == nil {
 		return &ypb.FuzzerResponse{
@@ -105,26 +103,25 @@ func ConvertLowhttpResponseToFuzzerResponseBase(r *lowhttp.LowhttpResponse) *ypb
 			})
 		}
 	}
-	var (
-		fuzzerResponse = &ypb.FuzzerResponse{
-			Method:                method,
-			StatusCode:            int32(code),
-			Host:                  host,
-			ContentType:           rsp.Header.Get("Content-Type"),
-			Headers:               headers,
-			ResponseRaw:           r.RawPacket,
-			BodyLength:            int64(len(body)),
-			UUID:                  uid,
-			Timestamp:             time.Now().Unix(),
-			RequestRaw:            r.RawRequest,
-			GuessResponseEncoding: Chardet(r.RawPacket),
-			Ok:                    r.PortIsOpen,
-			IsHTTPS:               r.Https,
-			Url:                   r.Url,
-			Proxy:                 r.Proxy,
-			RemoteAddr:            r.RemoteAddr,
-		}
-	)
+	fuzzerResponse := &ypb.FuzzerResponse{
+		Url:                   utils.EscapeInvalidUTF8Byte([]byte(r.Url)),
+		Method:                utils.EscapeInvalidUTF8Byte([]byte(method)),
+		StatusCode:            int32(code),
+		Host:                  host,
+		ContentType:           rsp.Header.Get("Content-Type"),
+		Headers:               headers,
+		ResponseRaw:           r.RawPacket,
+		BodyLength:            int64(len(body)),
+		UUID:                  uid,
+		Timestamp:             time.Now().Unix(),
+		RequestRaw:            r.RawRequest,
+		GuessResponseEncoding: Chardet(r.RawPacket),
+		Ok:                    r.PortIsOpen,
+		IsHTTPS:               r.Https,
+		Proxy:                 r.Proxy,
+		RemoteAddr:            r.RemoteAddr,
+		BareResponse:          r.BarePacket,
+	}
 	if r.TraceInfo != nil {
 		fuzzerResponse.DurationMs = r.TraceInfo.ServerTime.Milliseconds()
 		fuzzerResponse.DNSDurationMs = r.TraceInfo.DNSTime.Milliseconds()
@@ -165,7 +162,7 @@ func (f *fuzzerSequenceFlow) FromFuzzerResponse(response *ypb.FuzzerResponse) *f
 		}
 
 		if request.InheritCookies {
-			var cookieFromReq = lowhttp.GetHTTPPacketCookies(response.GetRequestRaw())
+			cookieFromReq := lowhttp.GetHTTPPacketCookies(response.GetRequestRaw())
 			for _, f := range response.RedirectFlows {
 				for k, v := range lowhttp.GetHTTPPacketCookies(f.GetRequest()) {
 					cookieFromReq[k] = v
@@ -174,7 +171,7 @@ func (f *fuzzerSequenceFlow) FromFuzzerResponse(response *ypb.FuzzerResponse) *f
 			for k, v := range lowhttp.GetHTTPPacketCookies(response.GetResponseRaw()) {
 				cookieFromReq[k] = v
 			}
-			var reqBytes = request.RequestRaw
+			reqBytes := request.RequestRaw
 			if reqBytes == nil || len(reqBytes) <= 0 {
 				reqBytes = []byte(request.Request)
 			}
@@ -195,17 +192,17 @@ func (f *fuzzerSequenceFlow) FromFuzzerResponse(response *ypb.FuzzerResponse) *f
 }
 
 func (s *Server) execFlow(flowMax int64, wg *sync.WaitGroup, f *fuzzerSequenceFlow, stream ypb.Yak_HTTPFuzzerSequenceServer) error {
-	var req = f.GetFuzzerRequest()
+	req := f.GetFuzzerRequest()
 	fallback := newHTTPFuzzerFallback(req, stream)
 	if f.next != nil {
-		var swg = utils.NewSizedWaitGroup(int(flowMax))
-		var originRequest = f.next.origin
+		swg := utils.NewSizedWaitGroup(int(flowMax))
+		originRequest := f.next.origin
 		fallback.onEveryResponse = func(response *ypb.FuzzerResponse) {
 			/*
 				copy fuzzer request
 			*/
-			var copiedReq = ypb.FuzzerRequest{}
-			var raw, err = json.Marshal(originRequest)
+			copiedReq := ypb.FuzzerRequest{}
+			raw, err := json.Marshal(originRequest)
 			if err != nil {
 				log.Errorf("json marshal ypb.FuzzerRequest failed: %s", err)
 				return
@@ -242,18 +239,18 @@ func (s *Server) HTTPFuzzerSequence(seqreq *ypb.FuzzerRequests, stream ypb.Yak_H
 		return utils.Error("empty fuzzer request")
 	}
 
-	var sequenceFlow = make(chan *fuzzerSequenceFlow, len(reqs))
-	var finalErr = make(chan error, 1)
+	sequenceFlow := make(chan *fuzzerSequenceFlow, len(reqs))
+	finalErr := make(chan error, 1)
 	defer func() {
 		close(finalErr)
 	}()
 
-	var maxFlow = seqreq.GetConcurrent()
+	maxFlow := seqreq.GetConcurrent()
 	if maxFlow <= 0 {
 		maxFlow = 5
 	}
 
-	var wg = new(sync.WaitGroup)
+	wg := new(sync.WaitGroup)
 	wg.Add(1)
 	defer wg.Wait()
 	go func() {
