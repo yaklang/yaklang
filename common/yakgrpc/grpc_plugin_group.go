@@ -122,6 +122,9 @@ func (s *Server) RenameYakScriptGroup(ctx context.Context, req *ypb.RenameYakScr
 }
 
 func (s *Server) DeleteYakScriptGroup(ctx context.Context, req *ypb.DeleteYakScriptGroupRequest) (*ypb.Empty, error) {
+	if req.Group == "" {
+		return nil, utils.Errorf("params is empty")
+	}
 	err := yakit.DeletePluginGroup(s.GetProfileDatabase(), req.Group)
 	if err != nil {
 		return nil, err
