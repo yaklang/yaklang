@@ -145,7 +145,7 @@ func (c *WebsocketClient) StartFromServer() {
 				}
 
 				if frame.Type() == PingMessage {
-					c.WritePong(frame.rawPayloadData)
+					c.WritePong(frame.data)
 					continue
 				}
 

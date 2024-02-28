@@ -7,7 +7,6 @@ import (
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -48,49 +47,50 @@ var (
 type Frame struct {
 	raw []byte
 
-	firstByte      byte
-	secondByte     byte
-	mask           bool
-	maskingKey     []byte
-	payloadLength  uint64
-	payloadData    []byte
-	rawPayloadData []byte // 未经过inflate得到的payloadData
-	isDeflate      bool
+	firstByte     byte
+	secondByte    byte
+	mask          bool
+	payloadLength uint64
+	maskingKey    []byte
+	maskedPayload []byte
+	// 未与 maskingkey 异或的数据
+	payload []byte
+	// 明文
+	data      []byte
+	isDeflate bool
 
 	messageType int
 }
 
 func (f *Frame) Bytes() ([]byte, []byte) {
-	var err error
+	data := utils.BytesClone(f.payload)
 
-	data := utils.BytesClone(f.payloadData)
-	log.Infof("hex Bytes : %s", hex.EncodeToString(data))
-
-	dataLength := f.payloadLength
+	dataLength := uint64(len(data))
 	firstByte, secondByte := f.firstByte, f.secondByte
 
-	if f.isDeflate && !f.IsControl() {
-		data, err = deflate(data)
-		if err != nil {
-			log.Errorf("frame deflate error: %v", err)
-			return nil, nil
-		}
-		dataLength = uint64(len(data))
-
-		// set rsv1
-		firstByte |= RSV1BIT
-
-		// reset secondByte payload length
-		secondByte &= MASKBIT
-		if dataLength > TWO_BYTE_SIZE {
-			secondByte |= EIGHT_BYTE_BIT
-		} else if dataLength > SEVEN_BIT_SIZE {
-			secondByte |= TWO_BYTE_BIT
-		} else {
-			secondByte |= byte(dataLength)
-		}
-	}
-	log.Infof("enc Bytes : %s", hex.EncodeToString(data))
+	// 直接转发浏览器的 payload ，不再重新还原压缩
+	//if f.isDeflate && !f.IsControl() {
+	//	//if f.isDeflate {
+	//	data, err = deflate(data)
+	//	if err != nil {
+	//		log.Errorf("frame deflate error: %v", err)
+	//		return nil, nil
+	//	}
+	//	dataLength = uint64(len(data))
+	//
+	//	// set rsv1
+	//	firstByte |= RSV1BIT
+	//
+	//	// reset secondByte payload length
+	//	secondByte &= MASKBIT
+	//	if dataLength > TWO_BYTE_SIZE {
+	//		secondByte |= EIGHT_BYTE_BIT
+	//	} else if dataLength > SEVEN_BIT_SIZE {
+	//		secondByte |= TWO_BYTE_BIT
+	//	} else {
+	//		secondByte |= byte(dataLength)
+	//	}
+	//}
 
 	rawBuf := bytes.NewBuffer(nil)
 	rawBuf.WriteByte(firstByte)
@@ -106,32 +106,38 @@ func (f *Frame) Bytes() ([]byte, []byte) {
 		rawBuf.Write(l)
 	}
 
-	// 存储明文信息
-	var clearData = make([]byte, len(data))
-	copy(clearData, data)
-
 	// masking key
 	if f.mask {
 		rawBuf.Write(f.maskingKey)
 		maskBytes(f.maskingKey, data, int(dataLength))
 	}
 
-	if len(data) > int(dataLength) {
-		rawBuf.Write(data[:dataLength])
-		return rawBuf.Bytes(), clearData[:dataLength]
-	} else {
-		rawBuf.Write(data)
-	}
-
-	return rawBuf.Bytes(), clearData
+	rawBuf.Write(data)
+	return rawBuf.Bytes(), f.data
 }
 
 func (f *Frame) Type() int {
 	return f.messageType
 }
 
-func (f *Frame) RawPayloadData() []byte {
-	return f.rawPayloadData
+func (f *Frame) GetRaw() []byte {
+	return f.raw
+}
+
+func (f *Frame) GetMask() bool {
+	return f.mask
+}
+
+func (f *Frame) GetData() []byte {
+	return f.data
+}
+
+func (f *Frame) GetPayload() []byte {
+	return f.payload
+}
+
+func (f *Frame) GetFirstByte() byte {
+	return f.firstByte
 }
 
 func (f *Frame) GetMaskingKey() []byte {
@@ -140,6 +146,10 @@ func (f *Frame) GetMaskingKey() []byte {
 
 func (f *Frame) SetMaskingKey(r []byte) {
 	f.maskingKey = r[:]
+}
+
+func (f *Frame) SetData(d []byte) {
+	f.data = d
 }
 
 func (f *Frame) IsControl() bool {
@@ -167,7 +177,7 @@ func NewFrameReaderFromBufio(r *bufio.Reader, isDeflate bool) *FrameReader {
 
 func (f *Frame) Show() {
 
-	raw := utils.BytesClone(f.rawPayloadData)
+	raw := utils.BytesClone(f.data)
 	rawString := strings.Clone(string(raw))
 	if len(raw) > 30 {
 		rawString = rawString[:30] + "..."
@@ -223,6 +233,7 @@ func (fr *FrameReader) ReadFrame() (frame *Frame, err error) {
 		return nil, errors.Wrap(err, "read remaining flag failed")
 	}
 	rawBuf.Write(p)
+
 	// header bytes
 	frame.firstByte = p[0]
 	frame.secondByte = p[1]
@@ -279,21 +290,21 @@ func (fr *FrameReader) ReadFrame() (frame *Frame, err error) {
 	// todo: uint64 -> int64 maybe overflow
 	data, err := ioutil.ReadAll(io.LimitReader(fr.r, int64(dataLength)))
 
-	frame.payloadData = data
-	frame.rawPayloadData = make([]byte, len(data))
-	copy(frame.rawPayloadData, data)
-	rawBuf.Write(data)
+	frame.maskedPayload = make([]byte, len(data))
+	copy(frame.maskedPayload, data)
+	rawBuf.Write(frame.maskedPayload)
 
 	if err != nil {
 		return frame, errors.Wrap(err, "ws frameReader.Reader io.LimitReader failed")
 	}
-	log.Infof("hex ReadFrame 11111 : %s", hex.EncodeToString(data))
 
 	// 先对 masked payload 进行异或操作
 	if frame.mask {
-		maskBytes(frame.maskingKey, data, len(frame.payloadData))
+		maskBytes(frame.maskingKey, data, len(data))
 	}
-	log.Infof("hex maskBytes 22222 : %s", hex.EncodeToString(data))
+	// 保存 mask key 异或后的 payload
+	frame.payload = make([]byte, len(data))
+	copy(frame.payload, data)
 
 	// websocket扩展：permessage-deflate，只有frameType为TextMessage和BinaryMessage时才需要解压缩
 	if fr.isDeflate && !frame.IsControl() {
@@ -303,13 +314,12 @@ func (fr *FrameReader) ReadFrame() (frame *Frame, err error) {
 			log.Warn("permessage-deflate is set, but permessage-deflate failed!")
 			log.Warnf("ws frameReader.Reader inflate failed: %v", errx)
 		} else {
-			data = newData
+			frame.data = newData
 		}
+	} else {
+		// 如果解压失败，那么就认为数据没有进行压缩
+		frame.data = data
 	}
-	log.Infof("hex ReadFrame 44444 : %s", hex.EncodeToString(data))
-
-	frame.payloadData = data
-
 	frame.raw = rawBuf.Bytes()
 	return
 }
@@ -401,7 +411,7 @@ func (fw *FrameWriter) writeControl(data []byte, messageType int, mask bool) err
 
 func WebsocketFrameToData(frame *Frame) (data []byte) {
 
-	return frame.payloadData
+	return frame.payload
 }
 
 func DataToWebsocketControlFrame(messageType int, data []byte, mask bool) (frame *Frame, err error) {
@@ -411,7 +421,7 @@ func DataToWebsocketControlFrame(messageType int, data []byte, mask bool) (frame
 	frame.secondByte = byte(dataLength) | MASKBIT
 	frame.payloadLength = uint64(dataLength)
 	frame.messageType = messageType
-	frame.payloadData = data
+	frame.payload = data
 
 	if mask {
 		maskKey, err := generateMaskKey()
@@ -425,14 +435,14 @@ func DataToWebsocketControlFrame(messageType int, data []byte, mask bool) (frame
 	return
 }
 
-func DataToWebsocketFrame(data1 []byte, firstByte byte, mask bool) (frame *Frame, err error) {
+func DataToWebsocketFrame(data []byte, firstByte byte, mask bool) (frame *Frame, err error) {
 	frame = new(Frame)
 	frame.firstByte = firstByte
 	frame.mask = mask
 	frame.messageType = int(firstByte & FRAME_TYPE_BIT)
-	frame.isDeflate = true
+	//frame.isDeflate = true
 	secondByte := byte(0)
-	data, _ := inflate(data1)
+	//data, _ := inflate(data1)
 	// count payload length
 	dataLength := len(data)
 	if dataLength > TWO_BYTE_SIZE {
@@ -453,14 +463,15 @@ func DataToWebsocketFrame(data1 []byte, firstByte byte, mask bool) (frame *Frame
 	frame.payloadLength = uint64(dataLength)
 
 	// masking key
-	if mask {
-		maskKey, err := generateMaskKey()
-		if err != nil {
-			return nil, err
-		}
-		frame.maskingKey = maskKey
-	}
-	frame.payloadData = data
+	//if mask {
+	//	maskKey, err := generateMaskKey()
+	//	if err != nil {
+	//		return nil, err
+	//	}
+	//	frame.maskingKey = maskKey
+	//}
+	//frame.payload = data
+	frame.payload = data
 	return frame, nil
 }
 
@@ -481,6 +492,9 @@ func generateMaskKey() ([]byte, error) {
 }
 
 func maskBytes(key []byte, b []byte, length int) {
+	if key == nil {
+		key, _ = generateMaskKey()
+	}
 	if length > len(b) {
 		length = len(b)
 	}
