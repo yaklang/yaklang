@@ -4,7 +4,6 @@ import (
 	"sync"
 
 	"github.com/yaklang/yaklang/common/utils/omap"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
 type ErrorLogger interface {
@@ -232,7 +231,7 @@ type BasicBlock struct {
 
 	// for build
 	symbolTable map[string]Values
-	ScopeTable  *ssautil.ScopedVersionedTable[Value]
+	ScopeTable  *Scope
 	finish      bool // if emitJump finish!
 }
 

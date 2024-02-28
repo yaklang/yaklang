@@ -11,6 +11,7 @@ type value interface {
 	IsUndefined() bool
 	SelfDelete()
 }
+
 type phi struct {
 	edge []value
 }
@@ -106,3 +107,8 @@ func SpinHandler(name string, current, origin, last value) map[string]value {
 func NewPhiValue(name string) value {
 	return NewPhi()
 }
+
+var _ ScopedVersionedTableIF[value] = (*ScopedVersionedTable[value])(nil)
+
+var _ LabelTarget[value] = (*LoopStmt[value])(nil)
+var _ LabelTarget[value] = (*SwitchStmt[value])(nil)

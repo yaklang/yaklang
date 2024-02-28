@@ -8,8 +8,18 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+type versionedValue interface {
+	comparable
+	SSAValue
+}
+
+type SSAValue interface {
+	IsUndefined() bool
+	SelfDelete()
+}
+
 // VersionedIF is an interface for versioned variable, scope will use this interface
-type VersionedIF[T comparable] interface {
+type VersionedIF[T versionedValue] interface {
 	// value
 	// IsNil return true if the variable is nil
 	IsNil() bool
@@ -32,29 +42,19 @@ type VersionedIF[T comparable] interface {
 	GetLocal() bool
 
 	// capture
-	CaptureInScope(*ScopedVersionedTable[T]) (VersionedIF[T], bool)
-	CanCaptureInScope(*ScopedVersionedTable[T]) bool
+	CaptureInScope(ScopedVersionedTableIF[T]) (VersionedIF[T], bool)
+	CanCaptureInScope(ScopedVersionedTableIF[T]) bool
 	// capture variable
 	SetCaptured(VersionedIF[T]) // this capture will set self, when variable create.
 	GetCaptured() VersionedIF[T]
 
 	// scope
-	GetScope() *ScopedVersionedTable[T]
+	GetScope() ScopedVersionedTableIF[T]
 
 	// version and root
 	GetGlobalIndex() int // global id
 	GetRootVersion() VersionedIF[T]
 	IsRoot() bool
-}
-
-type versionedValue interface {
-	comparable
-	SSAValue
-}
-
-type SSAValue interface {
-	IsUndefined() bool
-	SelfDelete()
 }
 
 type Versioned[T versionedValue] struct {
@@ -67,13 +67,13 @@ type Versioned[T versionedValue] struct {
 	local bool
 
 	// the version of variable in current scope
-	scope *ScopedVersionedTable[T]
+	scope ScopedVersionedTableIF[T]
 
 	isAssigned *utils.AtomicBool
 	Value      T
 }
 
-func NewVersioned[T versionedValue](globalIndex int, name string, local bool, scope *ScopedVersionedTable[T]) VersionedIF[T] {
+func NewVersioned[T versionedValue](globalIndex int, name string, local bool, scope ScopedVersionedTableIF[T]) VersionedIF[T] {
 	ret := &Versioned[T]{
 		captureVariable: nil,
 		versionIndex:    -1,
@@ -148,7 +148,7 @@ func (v *Versioned[T]) GetLocal() bool {
 	return v.local
 }
 
-func (v *Versioned[T]) CaptureInScope(base *ScopedVersionedTable[T]) (VersionedIF[T], bool) {
+func (v *Versioned[T]) CaptureInScope(base ScopedVersionedTableIF[T]) (VersionedIF[T], bool) {
 	baseVariable := base.ReadVariable(v.GetName())
 	if baseVariable == nil {
 		// not exist in base scope, this variable just set in sub-scope,
@@ -162,7 +162,7 @@ func (v *Versioned[T]) CaptureInScope(base *ScopedVersionedTable[T]) (VersionedI
 	return baseVariable, true
 }
 
-func (v *Versioned[T]) CanCaptureInScope(base *ScopedVersionedTable[T]) bool {
+func (v *Versioned[T]) CanCaptureInScope(base ScopedVersionedTableIF[T]) bool {
 	_, ok := v.CaptureInScope(base)
 	return ok
 }
@@ -175,7 +175,7 @@ func (v *Versioned[T]) GetCaptured() VersionedIF[T] {
 	return v.captureVariable
 }
 
-func (v *Versioned[T]) GetScope() *ScopedVersionedTable[T] {
+func (v *Versioned[T]) GetScope() ScopedVersionedTableIF[T] {
 	return v.scope
 }
 

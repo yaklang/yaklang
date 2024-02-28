@@ -5,15 +5,14 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
 type ParentScope struct {
-	scope *ssautil.ScopedVersionedTable[Value]
+	scope *Scope
 	next  *ParentScope
 }
 
-func (p *ParentScope) Create(scope *ssautil.ScopedVersionedTable[Value]) *ParentScope {
+func (p *ParentScope) Create(scope *Scope) *ParentScope {
 	return &ParentScope{
 		scope: scope,
 		next:  p,
@@ -95,7 +94,7 @@ func (b *FunctionBuilder) PushFunction(newFunc *Function) *FunctionBuilder {
 	build := NewBuilder(newFunc, b)
 	if this := b.MarkedThisObject; this != nil {
 		parentScope := build.parentScope.scope
-		parentScope = parentScope.CreateSubScope()
+		parentScope = parentScope.CreateSubScope().(*Scope)
 		v := parentScope.CreateVariable(this.GetName(), false)
 		parentScope.AssignVariable(v, this)
 		build.parentScope.scope = parentScope
