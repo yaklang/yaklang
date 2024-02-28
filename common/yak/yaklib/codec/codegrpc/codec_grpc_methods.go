@@ -11,6 +11,7 @@ import (
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/authhack"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
@@ -77,11 +78,18 @@ func decodeHexKeyAndIV(k string, i string) ([]byte, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	if funk.IsEmpty(key) {
+		key = nil
+	}
 
 	iv, err := codec.DecodeHex(i)
 	if err != nil {
 		return nil, nil, err
 	}
+	if funk.IsEmpty(iv) {
+		iv = nil
+	}
+
 	return key, iv, nil
 }
 
@@ -90,7 +98,22 @@ func convertOutput(text []byte, output outputType) []byte {
 	case OUTPUT_RAW:
 		return text
 	case OUTPUT_HEX:
-		return utils.UnsafeStringToBytes(codec.EncodeToHex(text))
+		return []byte(codec.EncodeToHex(text))
+	default:
+		return text
+	}
+}
+
+func covertInput(text []byte, input outputType) []byte {
+	switch input {
+	case OUTPUT_RAW:
+		return text
+	case OUTPUT_HEX:
+		data, err := codec.DecodeHex(string(text))
+		if err != nil {
+			return text
+		}
+		return data
 	default:
 		return text
 	}
@@ -144,27 +167,28 @@ func (flow *CodecExecFlow) AESEncrypt(hexKey string, hexIV string, mode string, 
 // { Name = "hexKey", Type = "input", Required = true, Regex = "^[a-fA-F0-9]{32}|[a-fA-F0-9]{48}|[a-fA-F0-9]{64}$",Label = "Key"},
 // { Name = "hexIV", Type = "input", Required = false, Regex = "^[a-fA-F0-9]{32}$",Label = "IV"},
 // { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "GCM"], Required = true, Label = "Mode"},
-// { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw"], Required = true,Label = "输出格式"}
+// { Name = "input", Type = "select", DefaultValue = "hex", Options = ["hex", "raw"], Required = true,Label = "输入格式"}
 // ]
-func (flow *CodecExecFlow) AESDecrypt(hexKey string, hexIV string, mode string, output outputType) error {
+func (flow *CodecExecFlow) AESDecrypt(hexKey string, hexIV string, mode string, input outputType) error {
 	var data []byte
 	var err error
 	key, iv, err := decodeHexKeyAndIV(hexKey, hexIV)
 	if err != nil {
 		return err
 	}
+	inputText := covertInput(flow.Text, input)
 	switch mode {
 	case "CBC":
-		data, err = codec.AESCBCEncrypt(key, flow.Text, iv)
+		data, err = codec.AESCBCDecrypt(key, inputText, iv)
 	case "ECB":
-		data, err = codec.AESECBEncrypt(key, flow.Text, iv)
+		data, err = codec.AESECBDecrypt(key, inputText, iv)
 	case "GCM":
-		data, err = codec.AESGCMEncrypt(key, flow.Text, iv)
+		data, err = codec.AESGCMDecrypt(key, inputText, iv)
 	default:
 		return utils.Error("AESEncryptEx: unknown mode")
 	}
 	if err == nil {
-		flow.Text = convertOutput(data, output)
+		flow.Text = data
 	}
 	return err
 }
@@ -212,31 +236,32 @@ func (flow *CodecExecFlow) SM4Encrypt(hexKey string, hexIV string, mode string, 
 // { Name = "hexKey", Type = "input", Required = true, Regex = "^[a-fA-F0-9]{32}$",Label = "Key"},
 // { Name = "hexIV", Type = "input", Required = false, Regex = "^[a-fA-F0-9]{32}$",Label = "IV"},
 // { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB", "GCM", "CFB", "OFB"], Required = true, Label = "Mode"},
-// { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw"], Required = true ,Label = "输出格式"}
+// { Name = "input", Type = "select", DefaultValue = "hex", Options = ["hex", "raw"], Required = true ,Label = "输入格式"}
 // ]
-func (flow *CodecExecFlow) SM4Decrypt(hexKey string, hexIV string, mode string, output outputType) error {
+func (flow *CodecExecFlow) SM4Decrypt(hexKey string, hexIV string, mode string, input outputType) error {
 	var data []byte
 	var err error
 	key, iv, err := decodeHexKeyAndIV(hexKey, hexIV)
 	if err != nil {
 		return err
 	}
+	inputText := covertInput(flow.Text, input)
 	switch mode {
 	case "CBC":
-		data, err = codec.SM4CBCDec(key, flow.Text, iv)
+		data, err = codec.SM4CBCDec(key, inputText, iv)
 	case "ECB":
-		data, err = codec.SM4ECBDec(key, flow.Text, iv)
+		data, err = codec.SM4ECBDec(key, inputText, iv)
 	case "GCM":
-		data, err = codec.SM4GCMDec(key, flow.Text, iv)
+		data, err = codec.SM4GCMDec(key, inputText, iv)
 	case "CFB":
-		data, err = codec.SM4CFBDec(key, flow.Text, iv)
+		data, err = codec.SM4CFBDec(key, inputText, iv)
 	case "OFB":
-		data, err = codec.SM4OFBDec(key, flow.Text, iv)
+		data, err = codec.SM4OFBDec(key, inputText, iv)
 	default:
 		return utils.Error("AESEncryptEx: unknown mode")
 	}
 	if err == nil {
-		flow.Text = convertOutput(data, output)
+		flow.Text = data
 	}
 	return err
 }
@@ -279,25 +304,26 @@ func (flow *CodecExecFlow) DESEncrypt(hexKey string, hexIV string, mode string, 
 // { Name = "hexKey", Type = "input", Required = true, Regex = "^[a-fA-F0-9]{16}$",	Label = "Key"},
 // { Name = "hexIV", Type = "input", Required = false, Regex = "^[a-fA-F0-9]{16}$",Label = "IV"},
 // { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB"], Required = true , Label = "Mode"},
-// { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw"], Required = true ,Label = "输出格式"}
+// { Name = "input", Type = "select", DefaultValue = "hex", Options = ["hex", "raw"], Required = true ,Label = "输入格式"}
 // ]
-func (flow *CodecExecFlow) DESDecrypt(hexKey string, hexIV string, mode string, output outputType) error {
+func (flow *CodecExecFlow) DESDecrypt(hexKey string, hexIV string, mode string, input outputType) error {
 	var data []byte
 	var err error
 	key, iv, err := decodeHexKeyAndIV(hexKey, hexIV)
 	if err != nil {
 		return err
 	}
+	inputText := covertInput(flow.Text, input)
 	switch mode {
 	case "CBC":
-		data, err = codec.DESCBCDec(key, flow.Text, iv)
+		data, err = codec.DESCBCDec(key, inputText, iv)
 	case "ECB":
-		data, err = codec.DESECBDec(key, flow.Text)
+		data, err = codec.DESECBDec(key, inputText)
 	default:
 		return utils.Error("AESEncryptEx: unknown mode")
 	}
 	if err == nil {
-		flow.Text = convertOutput(data, output)
+		flow.Text = data
 	}
 	return err
 }
@@ -306,7 +332,7 @@ func (flow *CodecExecFlow) DESDecrypt(hexKey string, hexIV string, mode string, 
 // CodecName = "TripleDES对称加密"
 // Desc = """TripleDES（3DES）是DES的改进版，通过连续三次应用DES算法（可以使用三个不同的密钥）来增加加密的强度，提供了更高的安全性。"""
 // Params = [
-// { Name = "hexKey", Type = "input", Required = true, Regex = "^[a-fA-F0-9]{32}|[a-fA-F0-9]{48}$",Label = "Key"},
+// { Name = "hexKey", Type = "input", Required = true, Regex = "^[a-fA-F0-9]{48}$",Label = "Key"},
 // { Name = "hexIV", Type = "input", Required = false, Regex = "^[a-fA-F0-9]{16}$",Label = "IV"},
 // { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB"], Required = true, Label = "Mode"},
 // { Name = "output", Type = "select",DefaultValue = "hex", Options = ["hex", "raw"], Required = true ,Label = "输出格式"}
@@ -336,28 +362,29 @@ func (flow *CodecExecFlow) TripleDESEncrypt(hexKey string, hexIV string, mode st
 // CodecName = "TripleDES对称解密"
 // Desc = """TripleDES（3DES）是DES的改进版，通过连续三次应用DES算法（可以使用三个不同的密钥）来增加加密的强度，提供了更高的安全性。"""
 // Params = [
-// { Name = "hexKey", Type = "input", Required = true, Regex = "^[a-fA-F0-9]{32}|[a-fA-F0-9]{48}$",Label = "Key"},
+// { Name = "hexKey", Type = "input", Required = true, Regex = "^[a-fA-F0-9]{48}$",Label = "Key"},
 // { Name = "hexIV", Type = "input", Required = false, Regex = "^[a-fA-F0-9]{16}$",Label = "IV" },
 // { Name = "mode", Type = "select",DefaultValue = "CBC",  Options = ["CBC", "ECB"], Required = true , Label = "Mode"},
-// { Name = "output", Type = "select",DefaultValue = "hex",  Options = ["hex", "raw"], Required = true ,Label = "输出格式"}
+// { Name = "input", Type = "select",DefaultValue = "hex",  Options = ["hex", "raw"], Required = true ,Label = "输入格式"}
 // ]
-func (flow *CodecExecFlow) TripleDESDecrypt(hexKey string, hexIV string, mode string, output outputType) error {
+func (flow *CodecExecFlow) TripleDESDecrypt(hexKey string, hexIV string, mode string, input outputType) error {
 	var data []byte
 	var err error
 	key, iv, err := decodeHexKeyAndIV(hexKey, hexIV)
 	if err != nil {
 		return err
 	}
+	inputText := covertInput(flow.Text, input)
 	switch mode {
 	case "CBC":
-		data, err = codec.TripleDES_CBCDec(key, flow.Text, iv)
+		data, err = codec.TripleDES_CBCDec(key, inputText, iv)
 	case "ECB":
-		data, err = codec.TripleDES_ECBDec(key, flow.Text)
+		data, err = codec.TripleDES_ECBDec(key, inputText)
 	default:
 		return utils.Error("AESEncryptEx: unknown mode")
 	}
 	if err == nil {
-		flow.Text = convertOutput(data, output)
+		flow.Text = data
 	}
 	return err
 }
@@ -485,7 +512,7 @@ func (flow *CodecExecFlow) Base64Decode(Alphabet string) error {
 // CodecName = "HTML编码"
 // Desc = """HTML编码是一种将特殊字符转换为HTML实体的编码方式。"""
 // Params = [
-// { Name = "entityRef", Type = "select",DefaultValue = "named", Options = ["dec", "hex", "named"], Required = true ,Label = "实体编码格式"}},
+// { Name = "entityRef", Type = "select",DefaultValue = "named", Options = ["dec", "hex", "named"], Required = true ,Label = "实体编码格式"},
 // { Name = "fullEncode", Type = "checkbox", Required = true , Label = "全部编码"}
 // ]
 func (flow *CodecExecFlow) HtmlEncode(entityRef string, fullEncode bool) error {
