@@ -7,11 +7,54 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
+// for builder
 type GlobalIndexFetcher func() int
+type VersionedBuilder[T versionedValue] func(globalIndex int, name string, local bool, scope ScopedVersionedTableIF[T]) VersionedIF[T]
 
-type VersionedBuilder[T comparable] func(globalIndex int, name string, local bool, scope *ScopedVersionedTable[T]) VersionedIF[T]
+// capture variable
+type CaptureVariableHandler[T versionedValue] func(string, VersionedIF[T])
 
-type ScopedVersionedTable[T comparable] struct {
+// phi
+
+// SpinHandle for Loop Spin Phi
+type SpinHandle[T comparable] func(string, T, T, T) map[string]T
+
+// MergeHandle handler Merge Value generate Phi
+type MergeHandle[T comparable] func(string, []T) T
+
+// ScopedVersionedTableIF is the interface for scope versioned table
+type ScopedVersionedTableIF[T versionedValue] interface {
+	// Read Variable by name
+	ReadVariable(name string) VersionedIF[T]
+	// read value by name
+	ReadValue(name string) T
+
+	// create variable, if isLocal is true, the variable is local
+	CreateVariable(name string, isLocal bool) VersionedIF[T]
+
+	// assign a value to the variable
+	AssignVariable(VersionedIF[T], T)
+
+	GetVariableFromValue(T) VersionedIF[T]
+
+	// create sub scope
+	CreateSubScope() ScopedVersionedTableIF[T]
+	// get scope level, each scope has a level, the root scope is 0, the sub scope is {parent-scope.level + 1}
+	GetScopeLevel() int
+
+	// use in ssautil, handle inner member
+	ForEachCapturedVariable(CaptureVariableHandler[T])
+	SetCapturedVariable(string, VersionedIF[T])
+
+	// use in phi
+	CoverBy(ScopedVersionedTableIF[T])
+	Merge(bool, MergeHandle[T], ...ScopedVersionedTableIF[T])
+	Spin(ScopedVersionedTableIF[T], ScopedVersionedTableIF[T], SpinHandle[T])
+	SetSpin(func(string) T)
+}
+
+type ScopedVersionedTable[T versionedValue] struct {
+	level         int
 	offsetFetcher GlobalIndexFetcher // fetch the next global index
 	// new versioned variable
 	newVersioned VersionedBuilder[T]
@@ -30,14 +73,19 @@ type ScopedVersionedTable[T comparable] struct {
 
 	// for loop
 	spin           bool
-	CreateEmptyPhi func(string) T
+	createEmptyPhi func(string) T
 
 	// relations
-	parent *ScopedVersionedTable[T]
+	parent ScopedVersionedTableIF[T]
 }
 
-func NewScope[T comparable](fetcher func() int, newVersioned VersionedBuilder[T], table map[int]VersionedIF[T], parent *ScopedVersionedTable[T]) *ScopedVersionedTable[T] {
-	return &ScopedVersionedTable[T]{
+func NewScope[T versionedValue](
+	fetcher func() int,
+	newVersioned VersionedBuilder[T],
+	table map[int]VersionedIF[T],
+	parent ScopedVersionedTableIF[T],
+) *ScopedVersionedTable[T] {
+	s := &ScopedVersionedTable[T]{
 		offsetFetcher: fetcher,
 		newVersioned:  newVersioned,
 		values:        omap.NewOrderedMap[string, *omap.OrderedMap[string, VersionedIF[T]]](map[string]*omap.OrderedMap[string, VersionedIF[T]]{}),
@@ -47,9 +95,18 @@ func NewScope[T comparable](fetcher func() int, newVersioned VersionedBuilder[T]
 		table:         table,
 		parent:        parent,
 	}
+	if parent != nil {
+		s.level = parent.GetScopeLevel() + 1
+	} else {
+		s.level = 0
+	}
+	return s
 }
 
-func NewRootVersionedTable[T comparable](newVersioned VersionedBuilder[T], fetcher ...func() int) *ScopedVersionedTable[T] {
+func NewRootVersionedTable[T versionedValue](
+	newVersioned VersionedBuilder[T],
+	fetcher ...func() int,
+) *ScopedVersionedTable[T] {
 	var finalFetcher GlobalIndexFetcher
 	for _, f := range fetcher {
 		if f != nil {
@@ -72,7 +129,7 @@ func NewRootVersionedTable[T comparable](newVersioned VersionedBuilder[T], fetch
 	return NewScope[T](finalFetcher, newVersioned, map[int]VersionedIF[T]{}, nil)
 }
 
-func (v *ScopedVersionedTable[T]) CreateSubScope() *ScopedVersionedTable[T] {
+func (v *ScopedVersionedTable[T]) CreateSubScope() ScopedVersionedTableIF[T] {
 	sub := NewScope[T](v.offsetFetcher, v.newVersioned, v.table, v)
 	return sub
 }
@@ -119,7 +176,8 @@ func (scope *ScopedVersionedTable[T]) ReadVariable(name string) VersionedIF[T] {
 	if ret != nil && ret.GetScope() != scope {
 		// not in current scope
 		if scope.spin {
-			t := scope.writeVariable(name, scope.CreateEmptyPhi(name))
+			t := scope.CreateVariable(name, false)
+			scope.AssignVariable(t, scope.createEmptyPhi(name))
 			// t.origin = ret
 			scope.incomingPhi.Set(name, t)
 			ret = t
@@ -134,20 +192,6 @@ func (v *ScopedVersionedTable[T]) ReadValue(name string) (t T) {
 		return ret.GetValue()
 	}
 	return
-}
-
-/// ---------------- write
-
-func (v *ScopedVersionedTable[T]) writeVariable(name string, value T) VersionedIF[T] {
-	ret := v.CreateVariable(name, false)
-	v.AssignVariable(ret, value)
-	return ret
-}
-
-func (v *ScopedVersionedTable[T]) writeLocalVariable(name string, value T) VersionedIF[T] {
-	ret := v.CreateVariable(name, true)
-	v.AssignVariable(ret, value)
-	return ret
 }
 
 // ---------------- create
@@ -190,6 +234,17 @@ func (scope *ScopedVersionedTable[T]) GetVariableFromValue(value T) VersionedIF[
 		return variables[len(variables)-1]
 	}
 	return nil
+}
+
+func (ps *ScopedVersionedTable[T]) ForEachCapturedVariable(handler CaptureVariableHandler[T]) {
+	ps.captured.ForEach(func(name string, ver VersionedIF[T]) bool {
+		handler(name, ver)
+		return true
+	})
+}
+
+func (scope *ScopedVersionedTable[T]) SetCapturedVariable(name string, ver VersionedIF[T]) {
+	scope.captured.Set(name, ver)
 }
 
 // CreateSymbolicVariable create a non-lexical and no named variable
@@ -320,3 +375,8 @@ func (v *ScopedVersionedTable[T]) newVar(lexName string, local bool) VersionedIF
 // func (v *ScopedVersionedTable[T]) GetAllCapturedVariableNames() []string {
 // 	return v.captured.Keys()
 // }
+
+// use for up lever
+func (s *ScopedVersionedTable[T]) GetScopeLevel() int {
+	return s.level
+}

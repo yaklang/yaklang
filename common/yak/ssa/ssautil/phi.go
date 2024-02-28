@@ -1,25 +1,27 @@
 package ssautil
 
-type SpinHandle[T comparable] func(string, T, T, T) map[string]T
-type MergeHandle[T comparable] func(string, []T) T
-
 // ForEachCapturedVariable call the handler for each captured by base scope Variable
-func (ps *ScopedVersionedTable[T]) ForEachCapturedVariable(base *ScopedVersionedTable[T], handler func(name string, ver VersionedIF[T])) {
-	ps.captured.ForEach(func(name string, ver VersionedIF[T]) bool {
+func ForEachCapturedVariable[T versionedValue](
+	scope ScopedVersionedTableIF[T],
+	base ScopedVersionedTableIF[T],
+	handler CaptureVariableHandler[T],
+) {
+	scope.ForEachCapturedVariable(func(name string, ver VersionedIF[T]) {
 		if ver.CanCaptureInScope(base) {
 			handler(name, ver)
 		}
-		return true
 	})
 }
 
-func (s *ScopedVersionedTable[T]) CoverBy(scope *ScopedVersionedTable[T]) {
+func (base *ScopedVersionedTable[T]) CoverBy(scope ScopedVersionedTableIF[T]) {
 	if scope == nil {
 		panic("cover scope is nil")
 	}
 
-	scope.ForEachCapturedVariable(s, func(name string, ver VersionedIF[T]) {
-		s.writeVariable(name, ver.GetValue())
+	baseScope := ScopedVersionedTableIF[T](base)
+	ForEachCapturedVariable(scope, baseScope, func(name string, ver VersionedIF[T]) {
+		v := base.CreateVariable(name, false)
+		base.AssignVariable(v, ver.GetValue())
 	})
 }
 
@@ -28,7 +30,7 @@ func (s *ScopedVersionedTable[T]) CoverBy(scope *ScopedVersionedTable[T]) {
 func (base *ScopedVersionedTable[T]) Merge(
 	hasSelf bool,
 	merge MergeHandle[T],
-	subScopes ...*ScopedVersionedTable[T],
+	subScopes ...ScopedVersionedTableIF[T],
 ) {
 	var zero T
 	// subScopes := s.child
@@ -65,11 +67,13 @@ func (base *ScopedVersionedTable[T]) Merge(
 		// generate phi
 		// handler(name, m)
 		ret := merge(name, m)
-		base.writeVariable(name, ret)
+		v := base.CreateVariable(name, false)
+		base.AssignVariable(v, ret)
 	}
 
+	baseScope := ScopedVersionedTableIF[T](base)
 	for index, sub := range subScopes {
-		sub.ForEachCapturedVariable(base, func(name string, ver VersionedIF[T]) {
+		ForEachCapturedVariable(sub, baseScope, func(name string, ver VersionedIF[T]) {
 			addPhiContent(index, name, ver)
 		})
 	}
@@ -81,7 +85,7 @@ func (base *ScopedVersionedTable[T]) Merge(
 
 // this handler merge [origin, last] to phi
 func (s *ScopedVersionedTable[T]) Spin(
-	header, latch *ScopedVersionedTable[T],
+	header, latch ScopedVersionedTableIF[T],
 	handler SpinHandle[T],
 ) {
 	s.incomingPhi.ForEach(func(name string, ver VersionedIF[T]) bool {
@@ -89,7 +93,8 @@ func (s *ScopedVersionedTable[T]) Spin(
 		origin := header.ReadValue(name)
 		res := handler(name, ver.GetValue(), origin, last)
 		for name, value := range res {
-			s.writeVariable(name, value)
+			v := s.CreateVariable(name, false)
+			s.AssignVariable(v, value)
 		}
 		return true
 	})
@@ -97,5 +102,5 @@ func (s *ScopedVersionedTable[T]) Spin(
 
 func (s *ScopedVersionedTable[T]) SetSpin(create func(string) T) {
 	s.spin = true
-	s.CreateEmptyPhi = create
+	s.createEmptyPhi = create
 }
