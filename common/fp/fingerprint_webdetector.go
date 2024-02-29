@@ -2,6 +2,7 @@ package fp
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"net"
 	"strconv"
 	"strings"
@@ -11,7 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 	"github.com/yaklang/yaklang/common/log"
 	utils2 "github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
 func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *Config, host string, ip net.IP, port int) (*MatchResult, error) {
@@ -124,6 +124,17 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 			}
 
 			info := i
+			requestHeader, requestBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(info.RequestRaw)
+			flow := &HTTPFlow{
+				StatusCode:     info.StatusCode,
+				IsHTTPS:        info.IsHttps,
+				RequestHeader:  []byte(requestHeader),
+				RequestBody:    requestBody,
+				ResponseHeader: info.ResponseHeaderBytes(),
+				ResponseBody:   info.Body,
+				CPEs:           currentCPE,
+			}
+			httpflows = append(httpflows, flow)
 			cpes, err := f.wfMatcher.MatchWithOptions(info, config.GenerateWebFingerprintConfigOptions()...)
 			if err != nil {
 				if !strings.Contains(err.Error(), "no rules matched") {
@@ -139,17 +150,9 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 				results.Store(urlStr, cpes)
 			}
 
-			requestHeader, requestBody := lowhttp.SplitHTTPHeadersAndBodyFromPacket(info.RequestRaw)
-			flow := &HTTPFlow{
-				StatusCode:     info.StatusCode,
-				IsHTTPS:        info.IsHttps,
-				RequestHeader:  []byte(requestHeader),
-				RequestBody:    requestBody,
-				ResponseHeader: info.ResponseHeaderBytes(),
-				ResponseBody:   info.Body,
-				CPEs:           currentCPE,
+			if len(flow.CPEs) < len(currentCPE) {
+				flow.CPEs = currentCPE
 			}
-			httpflows = append(httpflows, flow)
 		}
 	}
 	urlCpe := map[string][]*webfingerprint.CPE{}
