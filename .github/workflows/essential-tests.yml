@@ -151,6 +151,11 @@ jobs:
               # crawler
               go test -timeout 20s -run TestMUSTPASS ./common/crawler
 
+          - name: Test Other
+            run: |
+              # cli
+              go test --timeout 1m ./common/utils/cli
+
     steps:
       - name: Cache YakLang Project
         uses: actions/cache/restore@v3
