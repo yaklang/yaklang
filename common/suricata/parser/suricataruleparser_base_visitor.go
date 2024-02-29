@@ -115,3 +115,7 @@ func (v *BaseSuricataRuleParserVisitor) VisitNegative(ctx *NegativeContext) inte
 func (v *BaseSuricataRuleParserVisitor) VisitSettingcontent(ctx *SettingcontentContext) interface{} {
 	return v.VisitChildren(ctx)
 }
+
+func (v *BaseSuricataRuleParserVisitor) VisitSep(ctx *SepContext) interface{} {
+	return v.VisitChildren(ctx)
+}

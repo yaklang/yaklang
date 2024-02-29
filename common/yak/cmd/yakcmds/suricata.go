@@ -10,18 +10,26 @@ import (
 	"github.com/yaklang/yaklang/common/openai"
 	"github.com/yaklang/yaklang/common/pcapx"
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
+	"github.com/yaklang/yaklang/common/utils"
 	"os"
 	"strconv"
 	"strings"
 )
 
+var ChaosMakerAIHelperCommand = cli.Command{}
+
 var SuricataLoaderCommand = cli.Command{
-	Name:  "suricata",
-	Usage: "Load suricata rules to database",
+	Name:     "suricata",
+	Usage:    "Load suricata rules to database",
+	Category: "Suricata Rules Operations",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "rule-file,i",
 			Usage: `load suricata`,
+		},
+		cli.StringFlag{
+			Name:  "rule-dir",
+			Usage: `load suricata in directory, file ext: .rules`,
 		},
 		cli.BoolFlag{
 			Name:  "ai",
@@ -52,13 +60,15 @@ var SuricataLoaderCommand = cli.Command{
 			return nil
 		}
 
-		if c.String("rule-file") != "" {
-			raw, err := os.ReadFile(c.String("rule-file"))
+		loadFile := func(i string) error {
+			raw, err := os.ReadFile(i)
 			if err != nil {
 				return err
 			}
-			log.Infof("start to load suricata rule: %s", c.String("rule-file"))
+			log.Infof("start to parse suricata rule: %s", i)
 			subRules, err := surirule.Parse(string(raw))
+			log.Infof("parse suricata rule: %s, got %d sub rules", i, len(subRules))
+
 			if err != nil {
 				return err
 			}
@@ -71,7 +81,33 @@ var SuricataLoaderCommand = cli.Command{
 					log.Errorf("save suricata error: %s", err)
 				}
 			}
+			return nil
 		}
+
+		if c.String("rule-file") != "" {
+			err := loadFile(c.String("rule-file"))
+			if err != nil {
+				log.Errorf("load suricata rule failed: %v", err)
+			}
+		}
+
+		if c.String("rule-dir") != "" {
+			log.Infof("start to load suricata rule in dir: %s", c.String("rule-dir"))
+			infos, err := utils.ReadFilesRecursively(c.String("rule-dir"))
+			if err != nil {
+				return utils.Errorf("read dir failed: %v", err)
+			}
+			for _, i := range infos {
+				log.Infof("start to check file: %s", i.Path)
+				if strings.HasSuffix(i.Name, ".rules") {
+					err := loadFile(i.Path)
+					if err != nil {
+						log.Errorf("load suricata rule failed: %v", err)
+					}
+				}
+			}
+		}
+
 		return nil
 	},
 }
