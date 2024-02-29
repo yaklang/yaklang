@@ -54,7 +54,7 @@ func NewOpenAIClient(opt ...ConfigOption) *Client {
 		c.ChatModel = model
 	}
 	if domain := config.GetExtraParam("domain"); domain != "" && c.Domain == "" {
-		c.Domain = domain
+		c.Domain = utils.ExtractHostPort(domain)
 	}
 	if proxy := config.GetExtraParam("proxy"); proxy != "" && c.Proxy == "" {
 		log.Infof("use yakit config ai proxy: %v", proxy)

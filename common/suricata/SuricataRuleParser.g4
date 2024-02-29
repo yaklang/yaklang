@@ -67,15 +67,22 @@ port
     ;
 
 /* rules configuration */
-params: ParamStart param ( ParamSep param ) * ParamSep ? ParamEnd;
-param: keyword ( ParamColon setting )? ;
+params: ParamStart param ( sep param ) * sep ? ParamEnd;
+param
+    : keyword ( ParamColon setting )?
+    ;
 keyword
-    : ParamCommonString;
+    : ParamCommonString
+    ;
 setting : singleSetting ( ParamComma singleSetting )*;
 singleSetting
-    : negative? settingcontent;
+    : negative? settingcontent
+    | NonQuotedString
+    ;
 negative: ParamNegative;
 settingcontent
     : ParamCommonString
-    | ParamQuotedString
+    | ModeStringStart ModeString? ModeStringEnd
     ;
+
+sep: ParamSep | UntilSepSettingEnd;

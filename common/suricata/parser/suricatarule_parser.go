@@ -36,7 +36,7 @@ func suricataruleparserParserInit() {
 		"", "'any'", "", "'$'", "'->'", "'<>'", "'*'", "'/'", "'%'", "'&'",
 		"'+'", "'-'", "'^'", "'<'", "'>'", "'<='", "'>='", "", "'::'", "'['",
 		"']'", "'('", "'{'", "'}'", "", "'='", "'~'", "'.'", "", "", "", "",
-		"", "", "", "", "", "", "')'", "", "", "';'",
+		"", "", "", "", "", "", "')'",
 	}
 	staticData.symbolicNames = []string{
 		"", "Any", "Negative", "Dollar", "Arrow", "BothDirect", "Mul", "Div",
@@ -44,113 +44,121 @@ func suricataruleparserParserInit() {
 		"DoubleColon", "LBracket", "RBracket", "ParamStart", "LBrace", "RBrace",
 		"Comma", "Eq", "NotSymbol", "Dot", "LINE_COMMENT", "NORMALSTRING", "INT",
 		"HEX", "ID", "HexDigit", "WS", "NonSemiColon", "SHEBANG", "ParamWS",
-		"ParamEnd", "ParamQuotedString", "ParamColon", "ParamSep", "ParamNegative",
-		"ParamComma", "ParamCommonString",
+		"ParamEnd", "ParamColon", "ParamNegative", "ParamComma", "ParamSep",
+		"ParamCommonStringChar", "ParamCommonString", "ModeStringStart", "UntilSepSettingEnd",
+		"UntilSEPParamWS", "NonQuotedString", "ModeString", "ModeStringEnd",
+		"ANY",
 	}
 	staticData.ruleNames = []string{
 		"rules", "rule", "action", "protocol", "src_address", "dest_address",
 		"address", "ipv4", "ipv4block", "ipv4mask", "environment_var", "ipv6",
 		"ipv6full", "ipv6compact", "ipv6part", "ipv6block", "ipv6mask", "src_port",
 		"dest_port", "port", "params", "param", "keyword", "setting", "singleSetting",
-		"negative", "settingcontent",
+		"negative", "settingcontent", "sep",
 	}
 	staticData.predictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
-		4, 1, 44, 229, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7,
+		4, 1, 51, 242, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7,
 		4, 2, 5, 7, 5, 2, 6, 7, 6, 2, 7, 7, 7, 2, 8, 7, 8, 2, 9, 7, 9, 2, 10, 7,
 		10, 2, 11, 7, 11, 2, 12, 7, 12, 2, 13, 7, 13, 2, 14, 7, 14, 2, 15, 7, 15,
 		2, 16, 7, 16, 2, 17, 7, 17, 2, 18, 7, 18, 2, 19, 7, 19, 2, 20, 7, 20, 2,
 		21, 7, 21, 2, 22, 7, 22, 2, 23, 7, 23, 2, 24, 7, 24, 2, 25, 7, 25, 2, 26,
-		7, 26, 1, 0, 4, 0, 56, 8, 0, 11, 0, 12, 0, 57, 1, 0, 1, 0, 1, 1, 1, 1,
-		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 3, 1, 3, 1, 4,
-		1, 4, 1, 5, 1, 5, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 5, 6,
-		87, 8, 6, 10, 6, 12, 6, 90, 9, 6, 1, 6, 1, 6, 1, 6, 1, 6, 3, 6, 96, 8,
-		6, 1, 7, 1, 7, 1, 7, 1, 7, 1, 7, 1, 7, 1, 7, 1, 7, 1, 7, 3, 7, 107, 8,
-		7, 1, 8, 1, 8, 1, 9, 1, 9, 1, 10, 1, 10, 1, 10, 1, 11, 1, 11, 3, 11, 118,
-		8, 11, 1, 11, 1, 11, 3, 11, 122, 8, 11, 1, 12, 1, 12, 1, 12, 1, 12, 1,
+		7, 26, 2, 27, 7, 27, 1, 0, 4, 0, 58, 8, 0, 11, 0, 12, 0, 59, 1, 0, 1, 0,
+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 3,
+		1, 3, 1, 4, 1, 4, 1, 5, 1, 5, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6,
+		1, 6, 5, 6, 89, 8, 6, 10, 6, 12, 6, 92, 9, 6, 1, 6, 1, 6, 1, 6, 1, 6, 3,
+		6, 98, 8, 6, 1, 7, 1, 7, 1, 7, 1, 7, 1, 7, 1, 7, 1, 7, 1, 7, 1, 7, 3, 7,
+		109, 8, 7, 1, 8, 1, 8, 1, 9, 1, 9, 1, 10, 1, 10, 1, 10, 1, 11, 1, 11, 3,
+		11, 120, 8, 11, 1, 11, 1, 11, 3, 11, 124, 8, 11, 1, 12, 1, 12, 1, 12, 1,
 		12, 1, 12, 1, 12, 1, 12, 1, 12, 1, 12, 1, 12, 1, 12, 1, 12, 1, 12, 1, 12,
-		1, 12, 1, 13, 1, 13, 1, 13, 1, 13, 1, 14, 1, 14, 3, 14, 146, 8, 14, 1,
-		14, 1, 14, 1, 14, 5, 14, 151, 8, 14, 10, 14, 12, 14, 154, 9, 14, 1, 15,
-		1, 15, 1, 16, 1, 16, 1, 17, 1, 17, 1, 18, 1, 18, 1, 19, 1, 19, 1, 19, 1,
-		19, 1, 19, 1, 19, 3, 19, 170, 8, 19, 1, 19, 1, 19, 1, 19, 1, 19, 1, 19,
-		1, 19, 1, 19, 1, 19, 5, 19, 180, 8, 19, 10, 19, 12, 19, 183, 9, 19, 1,
-		19, 1, 19, 1, 19, 1, 19, 3, 19, 189, 8, 19, 1, 20, 1, 20, 1, 20, 1, 20,
-		5, 20, 195, 8, 20, 10, 20, 12, 20, 198, 9, 20, 1, 20, 3, 20, 201, 8, 20,
-		1, 20, 1, 20, 1, 21, 1, 21, 1, 21, 3, 21, 208, 8, 21, 1, 22, 1, 22, 1,
-		23, 1, 23, 1, 23, 5, 23, 215, 8, 23, 10, 23, 12, 23, 218, 9, 23, 1, 24,
-		3, 24, 221, 8, 24, 1, 24, 1, 24, 1, 25, 1, 25, 1, 26, 1, 26, 1, 26, 0,
-		1, 28, 27, 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32,
-		34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 0, 3, 1, 0, 4, 5, 1, 0, 30, 31,
-		2, 0, 39, 39, 44, 44, 227, 0, 55, 1, 0, 0, 0, 2, 61, 1, 0, 0, 0, 4, 70,
-		1, 0, 0, 0, 6, 72, 1, 0, 0, 0, 8, 74, 1, 0, 0, 0, 10, 76, 1, 0, 0, 0, 12,
-		95, 1, 0, 0, 0, 14, 97, 1, 0, 0, 0, 16, 108, 1, 0, 0, 0, 18, 110, 1, 0,
-		0, 0, 20, 112, 1, 0, 0, 0, 22, 117, 1, 0, 0, 0, 24, 123, 1, 0, 0, 0, 26,
-		139, 1, 0, 0, 0, 28, 143, 1, 0, 0, 0, 30, 155, 1, 0, 0, 0, 32, 157, 1,
-		0, 0, 0, 34, 159, 1, 0, 0, 0, 36, 161, 1, 0, 0, 0, 38, 188, 1, 0, 0, 0,
-		40, 190, 1, 0, 0, 0, 42, 204, 1, 0, 0, 0, 44, 209, 1, 0, 0, 0, 46, 211,
-		1, 0, 0, 0, 48, 220, 1, 0, 0, 0, 50, 224, 1, 0, 0, 0, 52, 226, 1, 0, 0,
-		0, 54, 56, 3, 2, 1, 0, 55, 54, 1, 0, 0, 0, 56, 57, 1, 0, 0, 0, 57, 55,
-		1, 0, 0, 0, 57, 58, 1, 0, 0, 0, 58, 59, 1, 0, 0, 0, 59, 60, 5, 0, 0, 1,
-		60, 1, 1, 0, 0, 0, 61, 62, 3, 4, 2, 0, 62, 63, 3, 6, 3, 0, 63, 64, 3, 8,
-		4, 0, 64, 65, 3, 34, 17, 0, 65, 66, 7, 0, 0, 0, 66, 67, 3, 10, 5, 0, 67,
-		68, 3, 36, 18, 0, 68, 69, 3, 40, 20, 0, 69, 3, 1, 0, 0, 0, 70, 71, 5, 32,
-		0, 0, 71, 5, 1, 0, 0, 0, 72, 73, 5, 32, 0, 0, 73, 7, 1, 0, 0, 0, 74, 75,
-		3, 12, 6, 0, 75, 9, 1, 0, 0, 0, 76, 77, 3, 12, 6, 0, 77, 11, 1, 0, 0, 0,
-		78, 96, 5, 1, 0, 0, 79, 96, 3, 20, 10, 0, 80, 96, 3, 14, 7, 0, 81, 96,
-		3, 22, 11, 0, 82, 83, 5, 19, 0, 0, 83, 88, 3, 12, 6, 0, 84, 85, 5, 24,
-		0, 0, 85, 87, 3, 12, 6, 0, 86, 84, 1, 0, 0, 0, 87, 90, 1, 0, 0, 0, 88,
-		86, 1, 0, 0, 0, 88, 89, 1, 0, 0, 0, 89, 91, 1, 0, 0, 0, 90, 88, 1, 0, 0,
-		0, 91, 92, 5, 20, 0, 0, 92, 96, 1, 0, 0, 0, 93, 94, 5, 2, 0, 0, 94, 96,
-		3, 12, 6, 0, 95, 78, 1, 0, 0, 0, 95, 79, 1, 0, 0, 0, 95, 80, 1, 0, 0, 0,
-		95, 81, 1, 0, 0, 0, 95, 82, 1, 0, 0, 0, 95, 93, 1, 0, 0, 0, 96, 13, 1,
-		0, 0, 0, 97, 98, 3, 16, 8, 0, 98, 99, 5, 27, 0, 0, 99, 100, 3, 16, 8, 0,
-		100, 101, 5, 27, 0, 0, 101, 102, 3, 16, 8, 0, 102, 103, 5, 27, 0, 0, 103,
-		106, 3, 16, 8, 0, 104, 105, 5, 7, 0, 0, 105, 107, 3, 18, 9, 0, 106, 104,
-		1, 0, 0, 0, 106, 107, 1, 0, 0, 0, 107, 15, 1, 0, 0, 0, 108, 109, 5, 30,
-		0, 0, 109, 17, 1, 0, 0, 0, 110, 111, 5, 30, 0, 0, 111, 19, 1, 0, 0, 0,
-		112, 113, 5, 3, 0, 0, 113, 114, 5, 32, 0, 0, 114, 21, 1, 0, 0, 0, 115,
-		118, 3, 24, 12, 0, 116, 118, 3, 26, 13, 0, 117, 115, 1, 0, 0, 0, 117, 116,
-		1, 0, 0, 0, 118, 121, 1, 0, 0, 0, 119, 120, 5, 7, 0, 0, 120, 122, 3, 32,
-		16, 0, 121, 119, 1, 0, 0, 0, 121, 122, 1, 0, 0, 0, 122, 23, 1, 0, 0, 0,
-		123, 124, 3, 30, 15, 0, 124, 125, 5, 17, 0, 0, 125, 126, 3, 30, 15, 0,
-		126, 127, 5, 17, 0, 0, 127, 128, 3, 30, 15, 0, 128, 129, 5, 17, 0, 0, 129,
-		130, 3, 30, 15, 0, 130, 131, 5, 17, 0, 0, 131, 132, 3, 30, 15, 0, 132,
-		133, 5, 17, 0, 0, 133, 134, 3, 30, 15, 0, 134, 135, 5, 17, 0, 0, 135, 136,
-		3, 30, 15, 0, 136, 137, 5, 17, 0, 0, 137, 138, 3, 30, 15, 0, 138, 25, 1,
-		0, 0, 0, 139, 140, 3, 28, 14, 0, 140, 141, 5, 18, 0, 0, 141, 142, 3, 28,
-		14, 0, 142, 27, 1, 0, 0, 0, 143, 145, 6, 14, -1, 0, 144, 146, 3, 30, 15,
-		0, 145, 144, 1, 0, 0, 0, 145, 146, 1, 0, 0, 0, 146, 152, 1, 0, 0, 0, 147,
-		148, 10, 1, 0, 0, 148, 149, 5, 17, 0, 0, 149, 151, 3, 30, 15, 0, 150, 147,
-		1, 0, 0, 0, 151, 154, 1, 0, 0, 0, 152, 150, 1, 0, 0, 0, 152, 153, 1, 0,
-		0, 0, 153, 29, 1, 0, 0, 0, 154, 152, 1, 0, 0, 0, 155, 156, 7, 1, 0, 0,
-		156, 31, 1, 0, 0, 0, 157, 158, 5, 30, 0, 0, 158, 33, 1, 0, 0, 0, 159, 160,
-		3, 38, 19, 0, 160, 35, 1, 0, 0, 0, 161, 162, 3, 38, 19, 0, 162, 37, 1,
-		0, 0, 0, 163, 189, 5, 1, 0, 0, 164, 189, 3, 20, 10, 0, 165, 189, 5, 30,
-		0, 0, 166, 167, 5, 30, 0, 0, 167, 169, 5, 17, 0, 0, 168, 170, 5, 30, 0,
-		0, 169, 168, 1, 0, 0, 0, 169, 170, 1, 0, 0, 0, 170, 189, 1, 0, 0, 0, 171,
-		172, 5, 17, 0, 0, 172, 189, 5, 30, 0, 0, 173, 174, 5, 30, 0, 0, 174, 189,
-		5, 17, 0, 0, 175, 176, 5, 19, 0, 0, 176, 181, 3, 38, 19, 0, 177, 178, 5,
-		24, 0, 0, 178, 180, 3, 38, 19, 0, 179, 177, 1, 0, 0, 0, 180, 183, 1, 0,
-		0, 0, 181, 179, 1, 0, 0, 0, 181, 182, 1, 0, 0, 0, 182, 184, 1, 0, 0, 0,
-		183, 181, 1, 0, 0, 0, 184, 185, 5, 20, 0, 0, 185, 189, 1, 0, 0, 0, 186,
-		187, 5, 2, 0, 0, 187, 189, 3, 38, 19, 0, 188, 163, 1, 0, 0, 0, 188, 164,
-		1, 0, 0, 0, 188, 165, 1, 0, 0, 0, 188, 166, 1, 0, 0, 0, 188, 171, 1, 0,
-		0, 0, 188, 173, 1, 0, 0, 0, 188, 175, 1, 0, 0, 0, 188, 186, 1, 0, 0, 0,
-		189, 39, 1, 0, 0, 0, 190, 191, 5, 21, 0, 0, 191, 196, 3, 42, 21, 0, 192,
-		193, 5, 41, 0, 0, 193, 195, 3, 42, 21, 0, 194, 192, 1, 0, 0, 0, 195, 198,
-		1, 0, 0, 0, 196, 194, 1, 0, 0, 0, 196, 197, 1, 0, 0, 0, 197, 200, 1, 0,
-		0, 0, 198, 196, 1, 0, 0, 0, 199, 201, 5, 41, 0, 0, 200, 199, 1, 0, 0, 0,
-		200, 201, 1, 0, 0, 0, 201, 202, 1, 0, 0, 0, 202, 203, 5, 38, 0, 0, 203,
-		41, 1, 0, 0, 0, 204, 207, 3, 44, 22, 0, 205, 206, 5, 40, 0, 0, 206, 208,
-		3, 46, 23, 0, 207, 205, 1, 0, 0, 0, 207, 208, 1, 0, 0, 0, 208, 43, 1, 0,
-		0, 0, 209, 210, 5, 44, 0, 0, 210, 45, 1, 0, 0, 0, 211, 216, 3, 48, 24,
-		0, 212, 213, 5, 43, 0, 0, 213, 215, 3, 48, 24, 0, 214, 212, 1, 0, 0, 0,
-		215, 218, 1, 0, 0, 0, 216, 214, 1, 0, 0, 0, 216, 217, 1, 0, 0, 0, 217,
-		47, 1, 0, 0, 0, 218, 216, 1, 0, 0, 0, 219, 221, 3, 50, 25, 0, 220, 219,
-		1, 0, 0, 0, 220, 221, 1, 0, 0, 0, 221, 222, 1, 0, 0, 0, 222, 223, 3, 52,
-		26, 0, 223, 49, 1, 0, 0, 0, 224, 225, 5, 42, 0, 0, 225, 51, 1, 0, 0, 0,
-		226, 227, 7, 2, 0, 0, 227, 53, 1, 0, 0, 0, 16, 57, 88, 95, 106, 117, 121,
-		145, 152, 169, 181, 188, 196, 200, 207, 216, 220,
+		1, 12, 1, 12, 1, 13, 1, 13, 1, 13, 1, 13, 1, 14, 1, 14, 3, 14, 148, 8,
+		14, 1, 14, 1, 14, 1, 14, 5, 14, 153, 8, 14, 10, 14, 12, 14, 156, 9, 14,
+		1, 15, 1, 15, 1, 16, 1, 16, 1, 17, 1, 17, 1, 18, 1, 18, 1, 19, 1, 19, 1,
+		19, 1, 19, 1, 19, 1, 19, 3, 19, 172, 8, 19, 1, 19, 1, 19, 1, 19, 1, 19,
+		1, 19, 1, 19, 1, 19, 1, 19, 5, 19, 182, 8, 19, 10, 19, 12, 19, 185, 9,
+		19, 1, 19, 1, 19, 1, 19, 1, 19, 3, 19, 191, 8, 19, 1, 20, 1, 20, 1, 20,
+		1, 20, 1, 20, 5, 20, 198, 8, 20, 10, 20, 12, 20, 201, 9, 20, 1, 20, 3,
+		20, 204, 8, 20, 1, 20, 1, 20, 1, 21, 1, 21, 1, 21, 3, 21, 211, 8, 21, 1,
+		22, 1, 22, 1, 23, 1, 23, 1, 23, 5, 23, 218, 8, 23, 10, 23, 12, 23, 221,
+		9, 23, 1, 24, 3, 24, 224, 8, 24, 1, 24, 1, 24, 3, 24, 228, 8, 24, 1, 25,
+		1, 25, 1, 26, 1, 26, 1, 26, 3, 26, 235, 8, 26, 1, 26, 3, 26, 238, 8, 26,
+		1, 27, 1, 27, 1, 27, 0, 1, 28, 28, 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20,
+		22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54, 0,
+		3, 1, 0, 4, 5, 1, 0, 30, 31, 2, 0, 42, 42, 46, 46, 242, 0, 57, 1, 0, 0,
+		0, 2, 63, 1, 0, 0, 0, 4, 72, 1, 0, 0, 0, 6, 74, 1, 0, 0, 0, 8, 76, 1, 0,
+		0, 0, 10, 78, 1, 0, 0, 0, 12, 97, 1, 0, 0, 0, 14, 99, 1, 0, 0, 0, 16, 110,
+		1, 0, 0, 0, 18, 112, 1, 0, 0, 0, 20, 114, 1, 0, 0, 0, 22, 119, 1, 0, 0,
+		0, 24, 125, 1, 0, 0, 0, 26, 141, 1, 0, 0, 0, 28, 145, 1, 0, 0, 0, 30, 157,
+		1, 0, 0, 0, 32, 159, 1, 0, 0, 0, 34, 161, 1, 0, 0, 0, 36, 163, 1, 0, 0,
+		0, 38, 190, 1, 0, 0, 0, 40, 192, 1, 0, 0, 0, 42, 207, 1, 0, 0, 0, 44, 212,
+		1, 0, 0, 0, 46, 214, 1, 0, 0, 0, 48, 227, 1, 0, 0, 0, 50, 229, 1, 0, 0,
+		0, 52, 237, 1, 0, 0, 0, 54, 239, 1, 0, 0, 0, 56, 58, 3, 2, 1, 0, 57, 56,
+		1, 0, 0, 0, 58, 59, 1, 0, 0, 0, 59, 57, 1, 0, 0, 0, 59, 60, 1, 0, 0, 0,
+		60, 61, 1, 0, 0, 0, 61, 62, 5, 0, 0, 1, 62, 1, 1, 0, 0, 0, 63, 64, 3, 4,
+		2, 0, 64, 65, 3, 6, 3, 0, 65, 66, 3, 8, 4, 0, 66, 67, 3, 34, 17, 0, 67,
+		68, 7, 0, 0, 0, 68, 69, 3, 10, 5, 0, 69, 70, 3, 36, 18, 0, 70, 71, 3, 40,
+		20, 0, 71, 3, 1, 0, 0, 0, 72, 73, 5, 32, 0, 0, 73, 5, 1, 0, 0, 0, 74, 75,
+		5, 32, 0, 0, 75, 7, 1, 0, 0, 0, 76, 77, 3, 12, 6, 0, 77, 9, 1, 0, 0, 0,
+		78, 79, 3, 12, 6, 0, 79, 11, 1, 0, 0, 0, 80, 98, 5, 1, 0, 0, 81, 98, 3,
+		20, 10, 0, 82, 98, 3, 14, 7, 0, 83, 98, 3, 22, 11, 0, 84, 85, 5, 19, 0,
+		0, 85, 90, 3, 12, 6, 0, 86, 87, 5, 24, 0, 0, 87, 89, 3, 12, 6, 0, 88, 86,
+		1, 0, 0, 0, 89, 92, 1, 0, 0, 0, 90, 88, 1, 0, 0, 0, 90, 91, 1, 0, 0, 0,
+		91, 93, 1, 0, 0, 0, 92, 90, 1, 0, 0, 0, 93, 94, 5, 20, 0, 0, 94, 98, 1,
+		0, 0, 0, 95, 96, 5, 2, 0, 0, 96, 98, 3, 12, 6, 0, 97, 80, 1, 0, 0, 0, 97,
+		81, 1, 0, 0, 0, 97, 82, 1, 0, 0, 0, 97, 83, 1, 0, 0, 0, 97, 84, 1, 0, 0,
+		0, 97, 95, 1, 0, 0, 0, 98, 13, 1, 0, 0, 0, 99, 100, 3, 16, 8, 0, 100, 101,
+		5, 27, 0, 0, 101, 102, 3, 16, 8, 0, 102, 103, 5, 27, 0, 0, 103, 104, 3,
+		16, 8, 0, 104, 105, 5, 27, 0, 0, 105, 108, 3, 16, 8, 0, 106, 107, 5, 7,
+		0, 0, 107, 109, 3, 18, 9, 0, 108, 106, 1, 0, 0, 0, 108, 109, 1, 0, 0, 0,
+		109, 15, 1, 0, 0, 0, 110, 111, 5, 30, 0, 0, 111, 17, 1, 0, 0, 0, 112, 113,
+		5, 30, 0, 0, 113, 19, 1, 0, 0, 0, 114, 115, 5, 3, 0, 0, 115, 116, 5, 32,
+		0, 0, 116, 21, 1, 0, 0, 0, 117, 120, 3, 24, 12, 0, 118, 120, 3, 26, 13,
+		0, 119, 117, 1, 0, 0, 0, 119, 118, 1, 0, 0, 0, 120, 123, 1, 0, 0, 0, 121,
+		122, 5, 7, 0, 0, 122, 124, 3, 32, 16, 0, 123, 121, 1, 0, 0, 0, 123, 124,
+		1, 0, 0, 0, 124, 23, 1, 0, 0, 0, 125, 126, 3, 30, 15, 0, 126, 127, 5, 17,
+		0, 0, 127, 128, 3, 30, 15, 0, 128, 129, 5, 17, 0, 0, 129, 130, 3, 30, 15,
+		0, 130, 131, 5, 17, 0, 0, 131, 132, 3, 30, 15, 0, 132, 133, 5, 17, 0, 0,
+		133, 134, 3, 30, 15, 0, 134, 135, 5, 17, 0, 0, 135, 136, 3, 30, 15, 0,
+		136, 137, 5, 17, 0, 0, 137, 138, 3, 30, 15, 0, 138, 139, 5, 17, 0, 0, 139,
+		140, 3, 30, 15, 0, 140, 25, 1, 0, 0, 0, 141, 142, 3, 28, 14, 0, 142, 143,
+		5, 18, 0, 0, 143, 144, 3, 28, 14, 0, 144, 27, 1, 0, 0, 0, 145, 147, 6,
+		14, -1, 0, 146, 148, 3, 30, 15, 0, 147, 146, 1, 0, 0, 0, 147, 148, 1, 0,
+		0, 0, 148, 154, 1, 0, 0, 0, 149, 150, 10, 1, 0, 0, 150, 151, 5, 17, 0,
+		0, 151, 153, 3, 30, 15, 0, 152, 149, 1, 0, 0, 0, 153, 156, 1, 0, 0, 0,
+		154, 152, 1, 0, 0, 0, 154, 155, 1, 0, 0, 0, 155, 29, 1, 0, 0, 0, 156, 154,
+		1, 0, 0, 0, 157, 158, 7, 1, 0, 0, 158, 31, 1, 0, 0, 0, 159, 160, 5, 30,
+		0, 0, 160, 33, 1, 0, 0, 0, 161, 162, 3, 38, 19, 0, 162, 35, 1, 0, 0, 0,
+		163, 164, 3, 38, 19, 0, 164, 37, 1, 0, 0, 0, 165, 191, 5, 1, 0, 0, 166,
+		191, 3, 20, 10, 0, 167, 191, 5, 30, 0, 0, 168, 169, 5, 30, 0, 0, 169, 171,
+		5, 17, 0, 0, 170, 172, 5, 30, 0, 0, 171, 170, 1, 0, 0, 0, 171, 172, 1,
+		0, 0, 0, 172, 191, 1, 0, 0, 0, 173, 174, 5, 17, 0, 0, 174, 191, 5, 30,
+		0, 0, 175, 176, 5, 30, 0, 0, 176, 191, 5, 17, 0, 0, 177, 178, 5, 19, 0,
+		0, 178, 183, 3, 38, 19, 0, 179, 180, 5, 24, 0, 0, 180, 182, 3, 38, 19,
+		0, 181, 179, 1, 0, 0, 0, 182, 185, 1, 0, 0, 0, 183, 181, 1, 0, 0, 0, 183,
+		184, 1, 0, 0, 0, 184, 186, 1, 0, 0, 0, 185, 183, 1, 0, 0, 0, 186, 187,
+		5, 20, 0, 0, 187, 191, 1, 0, 0, 0, 188, 189, 5, 2, 0, 0, 189, 191, 3, 38,
+		19, 0, 190, 165, 1, 0, 0, 0, 190, 166, 1, 0, 0, 0, 190, 167, 1, 0, 0, 0,
+		190, 168, 1, 0, 0, 0, 190, 173, 1, 0, 0, 0, 190, 175, 1, 0, 0, 0, 190,
+		177, 1, 0, 0, 0, 190, 188, 1, 0, 0, 0, 191, 39, 1, 0, 0, 0, 192, 193, 5,
+		21, 0, 0, 193, 199, 3, 42, 21, 0, 194, 195, 3, 54, 27, 0, 195, 196, 3,
+		42, 21, 0, 196, 198, 1, 0, 0, 0, 197, 194, 1, 0, 0, 0, 198, 201, 1, 0,
+		0, 0, 199, 197, 1, 0, 0, 0, 199, 200, 1, 0, 0, 0, 200, 203, 1, 0, 0, 0,
+		201, 199, 1, 0, 0, 0, 202, 204, 3, 54, 27, 0, 203, 202, 1, 0, 0, 0, 203,
+		204, 1, 0, 0, 0, 204, 205, 1, 0, 0, 0, 205, 206, 5, 38, 0, 0, 206, 41,
+		1, 0, 0, 0, 207, 210, 3, 44, 22, 0, 208, 209, 5, 39, 0, 0, 209, 211, 3,
+		46, 23, 0, 210, 208, 1, 0, 0, 0, 210, 211, 1, 0, 0, 0, 211, 43, 1, 0, 0,
+		0, 212, 213, 5, 44, 0, 0, 213, 45, 1, 0, 0, 0, 214, 219, 3, 48, 24, 0,
+		215, 216, 5, 41, 0, 0, 216, 218, 3, 48, 24, 0, 217, 215, 1, 0, 0, 0, 218,
+		221, 1, 0, 0, 0, 219, 217, 1, 0, 0, 0, 219, 220, 1, 0, 0, 0, 220, 47, 1,
+		0, 0, 0, 221, 219, 1, 0, 0, 0, 222, 224, 3, 50, 25, 0, 223, 222, 1, 0,
+		0, 0, 223, 224, 1, 0, 0, 0, 224, 225, 1, 0, 0, 0, 225, 228, 3, 52, 26,
+		0, 226, 228, 5, 48, 0, 0, 227, 223, 1, 0, 0, 0, 227, 226, 1, 0, 0, 0, 228,
+		49, 1, 0, 0, 0, 229, 230, 5, 40, 0, 0, 230, 51, 1, 0, 0, 0, 231, 238, 5,
+		44, 0, 0, 232, 234, 5, 45, 0, 0, 233, 235, 5, 49, 0, 0, 234, 233, 1, 0,
+		0, 0, 234, 235, 1, 0, 0, 0, 235, 236, 1, 0, 0, 0, 236, 238, 5, 50, 0, 0,
+		237, 231, 1, 0, 0, 0, 237, 232, 1, 0, 0, 0, 238, 53, 1, 0, 0, 0, 239, 240,
+		7, 2, 0, 0, 240, 55, 1, 0, 0, 0, 19, 59, 90, 97, 108, 119, 123, 147, 154,
+		171, 183, 190, 199, 203, 210, 219, 223, 227, 234, 237,
 	}
 	deserializer := antlr.NewATNDeserializer(nil)
 	staticData.atn = deserializer.Deserialize(staticData.serializedATN)
@@ -188,51 +196,58 @@ func NewSuricataRuleParser(input antlr.TokenStream) *SuricataRuleParser {
 
 // SuricataRuleParser tokens.
 const (
-	SuricataRuleParserEOF               = antlr.TokenEOF
-	SuricataRuleParserAny               = 1
-	SuricataRuleParserNegative          = 2
-	SuricataRuleParserDollar            = 3
-	SuricataRuleParserArrow             = 4
-	SuricataRuleParserBothDirect        = 5
-	SuricataRuleParserMul               = 6
-	SuricataRuleParserDiv               = 7
-	SuricataRuleParserMod               = 8
-	SuricataRuleParserAmp               = 9
-	SuricataRuleParserPlus              = 10
-	SuricataRuleParserSub               = 11
-	SuricataRuleParserPower             = 12
-	SuricataRuleParserLt                = 13
-	SuricataRuleParserGt                = 14
-	SuricataRuleParserLtEq              = 15
-	SuricataRuleParserGtEq              = 16
-	SuricataRuleParserColon             = 17
-	SuricataRuleParserDoubleColon       = 18
-	SuricataRuleParserLBracket          = 19
-	SuricataRuleParserRBracket          = 20
-	SuricataRuleParserParamStart        = 21
-	SuricataRuleParserLBrace            = 22
-	SuricataRuleParserRBrace            = 23
-	SuricataRuleParserComma             = 24
-	SuricataRuleParserEq                = 25
-	SuricataRuleParserNotSymbol         = 26
-	SuricataRuleParserDot               = 27
-	SuricataRuleParserLINE_COMMENT      = 28
-	SuricataRuleParserNORMALSTRING      = 29
-	SuricataRuleParserINT               = 30
-	SuricataRuleParserHEX               = 31
-	SuricataRuleParserID                = 32
-	SuricataRuleParserHexDigit          = 33
-	SuricataRuleParserWS                = 34
-	SuricataRuleParserNonSemiColon      = 35
-	SuricataRuleParserSHEBANG           = 36
-	SuricataRuleParserParamWS           = 37
-	SuricataRuleParserParamEnd          = 38
-	SuricataRuleParserParamQuotedString = 39
-	SuricataRuleParserParamColon        = 40
-	SuricataRuleParserParamSep          = 41
-	SuricataRuleParserParamNegative     = 42
-	SuricataRuleParserParamComma        = 43
-	SuricataRuleParserParamCommonString = 44
+	SuricataRuleParserEOF                   = antlr.TokenEOF
+	SuricataRuleParserAny                   = 1
+	SuricataRuleParserNegative              = 2
+	SuricataRuleParserDollar                = 3
+	SuricataRuleParserArrow                 = 4
+	SuricataRuleParserBothDirect            = 5
+	SuricataRuleParserMul                   = 6
+	SuricataRuleParserDiv                   = 7
+	SuricataRuleParserMod                   = 8
+	SuricataRuleParserAmp                   = 9
+	SuricataRuleParserPlus                  = 10
+	SuricataRuleParserSub                   = 11
+	SuricataRuleParserPower                 = 12
+	SuricataRuleParserLt                    = 13
+	SuricataRuleParserGt                    = 14
+	SuricataRuleParserLtEq                  = 15
+	SuricataRuleParserGtEq                  = 16
+	SuricataRuleParserColon                 = 17
+	SuricataRuleParserDoubleColon           = 18
+	SuricataRuleParserLBracket              = 19
+	SuricataRuleParserRBracket              = 20
+	SuricataRuleParserParamStart            = 21
+	SuricataRuleParserLBrace                = 22
+	SuricataRuleParserRBrace                = 23
+	SuricataRuleParserComma                 = 24
+	SuricataRuleParserEq                    = 25
+	SuricataRuleParserNotSymbol             = 26
+	SuricataRuleParserDot                   = 27
+	SuricataRuleParserLINE_COMMENT          = 28
+	SuricataRuleParserNORMALSTRING          = 29
+	SuricataRuleParserINT                   = 30
+	SuricataRuleParserHEX                   = 31
+	SuricataRuleParserID                    = 32
+	SuricataRuleParserHexDigit              = 33
+	SuricataRuleParserWS                    = 34
+	SuricataRuleParserNonSemiColon          = 35
+	SuricataRuleParserSHEBANG               = 36
+	SuricataRuleParserParamWS               = 37
+	SuricataRuleParserParamEnd              = 38
+	SuricataRuleParserParamColon            = 39
+	SuricataRuleParserParamNegative         = 40
+	SuricataRuleParserParamComma            = 41
+	SuricataRuleParserParamSep              = 42
+	SuricataRuleParserParamCommonStringChar = 43
+	SuricataRuleParserParamCommonString     = 44
+	SuricataRuleParserModeStringStart       = 45
+	SuricataRuleParserUntilSepSettingEnd    = 46
+	SuricataRuleParserUntilSEPParamWS       = 47
+	SuricataRuleParserNonQuotedString       = 48
+	SuricataRuleParserModeString            = 49
+	SuricataRuleParserModeStringEnd         = 50
+	SuricataRuleParserANY                   = 51
 )
 
 // SuricataRuleParser rules.
@@ -264,6 +279,7 @@ const (
 	SuricataRuleParserRULE_singleSetting   = 24
 	SuricataRuleParserRULE_negative        = 25
 	SuricataRuleParserRULE_settingcontent  = 26
+	SuricataRuleParserRULE_sep             = 27
 )
 
 // IRulesContext is an interface to support dynamic dispatch.
@@ -392,22 +408,22 @@ func (p *SuricataRuleParser) Rules() (localctx IRulesContext) {
 	}()
 
 	p.EnterOuterAlt(localctx, 1)
-	p.SetState(55)
+	p.SetState(57)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
 	for ok := true; ok; ok = _la == SuricataRuleParserID {
 		{
-			p.SetState(54)
+			p.SetState(56)
 			p.Rule_()
 		}
 
-		p.SetState(57)
+		p.SetState(59)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
-		p.SetState(59)
+		p.SetState(61)
 		p.Match(SuricataRuleParserEOF)
 	}
 
@@ -616,23 +632,23 @@ func (p *SuricataRuleParser) Rule_() (localctx IRuleContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(61)
+		p.SetState(63)
 		p.Action_()
 	}
 	{
-		p.SetState(62)
+		p.SetState(64)
 		p.Protocol()
 	}
 	{
-		p.SetState(63)
+		p.SetState(65)
 		p.Src_address()
 	}
 	{
-		p.SetState(64)
+		p.SetState(66)
 		p.Src_port()
 	}
 	{
-		p.SetState(65)
+		p.SetState(67)
 		_la = p.GetTokenStream().LA(1)
 
 		if !(_la == SuricataRuleParserArrow || _la == SuricataRuleParserBothDirect) {
@@ -643,15 +659,15 @@ func (p *SuricataRuleParser) Rule_() (localctx IRuleContext) {
 		}
 	}
 	{
-		p.SetState(66)
+		p.SetState(68)
 		p.Dest_address()
 	}
 	{
-		p.SetState(67)
+		p.SetState(69)
 		p.Dest_port()
 	}
 	{
-		p.SetState(68)
+		p.SetState(70)
 		p.Params()
 	}
 
@@ -743,7 +759,7 @@ func (p *SuricataRuleParser) Action_() (localctx IActionContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(70)
+		p.SetState(72)
 		p.Match(SuricataRuleParserID)
 	}
 
@@ -835,7 +851,7 @@ func (p *SuricataRuleParser) Protocol() (localctx IProtocolContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(72)
+		p.SetState(74)
 		p.Match(SuricataRuleParserID)
 	}
 
@@ -939,7 +955,7 @@ func (p *SuricataRuleParser) Src_address() (localctx ISrc_addressContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(74)
+		p.SetState(76)
 		p.Address()
 	}
 
@@ -1043,7 +1059,7 @@ func (p *SuricataRuleParser) Dest_address() (localctx IDest_addressContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(76)
+		p.SetState(78)
 		p.Address()
 	}
 
@@ -1243,78 +1259,78 @@ func (p *SuricataRuleParser) Address() (localctx IAddressContext) {
 		}
 	}()
 
-	p.SetState(95)
+	p.SetState(97)
 	p.GetErrorHandler().Sync(p)
 	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 2, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(78)
+			p.SetState(80)
 			p.Match(SuricataRuleParserAny)
 		}
 
 	case 2:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(79)
+			p.SetState(81)
 			p.Environment_var()
 		}
 
 	case 3:
 		p.EnterOuterAlt(localctx, 3)
 		{
-			p.SetState(80)
+			p.SetState(82)
 			p.Ipv4()
 		}
 
 	case 4:
 		p.EnterOuterAlt(localctx, 4)
 		{
-			p.SetState(81)
+			p.SetState(83)
 			p.Ipv6()
 		}
 
 	case 5:
 		p.EnterOuterAlt(localctx, 5)
 		{
-			p.SetState(82)
+			p.SetState(84)
 			p.Match(SuricataRuleParserLBracket)
 		}
 		{
-			p.SetState(83)
+			p.SetState(85)
 			p.Address()
 		}
-		p.SetState(88)
+		p.SetState(90)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
 		for _la == SuricataRuleParserComma {
 			{
-				p.SetState(84)
+				p.SetState(86)
 				p.Match(SuricataRuleParserComma)
 			}
 			{
-				p.SetState(85)
+				p.SetState(87)
 				p.Address()
 			}
 
-			p.SetState(90)
+			p.SetState(92)
 			p.GetErrorHandler().Sync(p)
 			_la = p.GetTokenStream().LA(1)
 		}
 		{
-			p.SetState(91)
+			p.SetState(93)
 			p.Match(SuricataRuleParserRBracket)
 		}
 
 	case 6:
 		p.EnterOuterAlt(localctx, 6)
 		{
-			p.SetState(93)
+			p.SetState(95)
 			p.Match(SuricataRuleParserNegative)
 		}
 		{
-			p.SetState(94)
+			p.SetState(96)
 			p.Address()
 		}
 
@@ -1474,14 +1490,6 @@ func (p *SuricataRuleParser) Ipv4() (localctx IIpv4Context) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(97)
-		p.Ipv4block()
-	}
-	{
-		p.SetState(98)
-		p.Match(SuricataRuleParserDot)
-	}
-	{
 		p.SetState(99)
 		p.Ipv4block()
 	}
@@ -1501,17 +1509,25 @@ func (p *SuricataRuleParser) Ipv4() (localctx IIpv4Context) {
 		p.SetState(103)
 		p.Ipv4block()
 	}
-	p.SetState(106)
+	{
+		p.SetState(104)
+		p.Match(SuricataRuleParserDot)
+	}
+	{
+		p.SetState(105)
+		p.Ipv4block()
+	}
+	p.SetState(108)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == SuricataRuleParserDiv {
 		{
-			p.SetState(104)
+			p.SetState(106)
 			p.Match(SuricataRuleParserDiv)
 		}
 		{
-			p.SetState(105)
+			p.SetState(107)
 			p.Ipv4mask()
 		}
 
@@ -1605,7 +1621,7 @@ func (p *SuricataRuleParser) Ipv4block() (localctx IIpv4blockContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(108)
+		p.SetState(110)
 		p.Match(SuricataRuleParserINT)
 	}
 
@@ -1697,7 +1713,7 @@ func (p *SuricataRuleParser) Ipv4mask() (localctx IIpv4maskContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(110)
+		p.SetState(112)
 		p.Match(SuricataRuleParserINT)
 	}
 
@@ -1793,11 +1809,11 @@ func (p *SuricataRuleParser) Environment_var() (localctx IEnvironment_varContext
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(112)
+		p.SetState(114)
 		p.Match(SuricataRuleParserDollar)
 	}
 	{
-		p.SetState(113)
+		p.SetState(115)
 		p.Match(SuricataRuleParserID)
 	}
 
@@ -1937,33 +1953,33 @@ func (p *SuricataRuleParser) Ipv6() (localctx IIpv6Context) {
 	}()
 
 	p.EnterOuterAlt(localctx, 1)
-	p.SetState(117)
+	p.SetState(119)
 	p.GetErrorHandler().Sync(p)
 	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 4, p.GetParserRuleContext()) {
 	case 1:
 		{
-			p.SetState(115)
+			p.SetState(117)
 			p.Ipv6full()
 		}
 
 	case 2:
 		{
-			p.SetState(116)
+			p.SetState(118)
 			p.Ipv6compact()
 		}
 
 	}
-	p.SetState(121)
+	p.SetState(123)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == SuricataRuleParserDiv {
 		{
-			p.SetState(119)
+			p.SetState(121)
 			p.Match(SuricataRuleParserDiv)
 		}
 		{
-			p.SetState(120)
+			p.SetState(122)
 			p.Ipv6mask()
 		}
 
@@ -2102,14 +2118,6 @@ func (p *SuricataRuleParser) Ipv6full() (localctx IIpv6fullContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(123)
-		p.Ipv6block()
-	}
-	{
-		p.SetState(124)
-		p.Match(SuricataRuleParserColon)
-	}
-	{
 		p.SetState(125)
 		p.Ipv6block()
 	}
@@ -2159,6 +2167,14 @@ func (p *SuricataRuleParser) Ipv6full() (localctx IIpv6fullContext) {
 	}
 	{
 		p.SetState(137)
+		p.Ipv6block()
+	}
+	{
+		p.SetState(138)
+		p.Match(SuricataRuleParserColon)
+	}
+	{
+		p.SetState(139)
 		p.Ipv6block()
 	}
 
@@ -2291,15 +2307,15 @@ func (p *SuricataRuleParser) Ipv6compact() (localctx IIpv6compactContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(139)
+		p.SetState(141)
 		p.ipv6part(0)
 	}
 	{
-		p.SetState(140)
+		p.SetState(142)
 		p.Match(SuricataRuleParserDoubleColon)
 	}
 	{
-		p.SetState(141)
+		p.SetState(143)
 		p.ipv6part(0)
 	}
 
@@ -2433,19 +2449,19 @@ func (p *SuricataRuleParser) ipv6part(_p int) (localctx IIpv6partContext) {
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
-	p.SetState(145)
+	p.SetState(147)
 	p.GetErrorHandler().Sync(p)
 
 	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 6, p.GetParserRuleContext()) == 1 {
 		{
-			p.SetState(144)
+			p.SetState(146)
 			p.Ipv6block()
 		}
 
 	}
 
 	p.GetParserRuleContext().SetStop(p.GetTokenStream().LT(-1))
-	p.SetState(152)
+	p.SetState(154)
 	p.GetErrorHandler().Sync(p)
 	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 7, p.GetParserRuleContext())
 
@@ -2457,22 +2473,22 @@ func (p *SuricataRuleParser) ipv6part(_p int) (localctx IIpv6partContext) {
 			_prevctx = localctx
 			localctx = NewIpv6partContext(p, _parentctx, _parentState)
 			p.PushNewRecursionContext(localctx, _startState, SuricataRuleParserRULE_ipv6part)
-			p.SetState(147)
+			p.SetState(149)
 
 			if !(p.Precpred(p.GetParserRuleContext(), 1)) {
 				panic(antlr.NewFailedPredicateException(p, "p.Precpred(p.GetParserRuleContext(), 1)", ""))
 			}
 			{
-				p.SetState(148)
+				p.SetState(150)
 				p.Match(SuricataRuleParserColon)
 			}
 			{
-				p.SetState(149)
+				p.SetState(151)
 				p.Ipv6block()
 			}
 
 		}
-		p.SetState(154)
+		p.SetState(156)
 		p.GetErrorHandler().Sync(p)
 		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 7, p.GetParserRuleContext())
 	}
@@ -2570,7 +2586,7 @@ func (p *SuricataRuleParser) Ipv6block() (localctx IIpv6blockContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(155)
+		p.SetState(157)
 		_la = p.GetTokenStream().LA(1)
 
 		if !(_la == SuricataRuleParserINT || _la == SuricataRuleParserHEX) {
@@ -2669,7 +2685,7 @@ func (p *SuricataRuleParser) Ipv6mask() (localctx IIpv6maskContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(157)
+		p.SetState(159)
 		p.Match(SuricataRuleParserINT)
 	}
 
@@ -2773,7 +2789,7 @@ func (p *SuricataRuleParser) Src_port() (localctx ISrc_portContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(159)
+		p.SetState(161)
 		p.Port()
 	}
 
@@ -2877,7 +2893,7 @@ func (p *SuricataRuleParser) Dest_port() (localctx IDest_portContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(161)
+		p.SetState(163)
 		p.Port()
 	}
 
@@ -3057,47 +3073,47 @@ func (p *SuricataRuleParser) Port() (localctx IPortContext) {
 		}
 	}()
 
-	p.SetState(188)
+	p.SetState(190)
 	p.GetErrorHandler().Sync(p)
 	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 10, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(163)
+			p.SetState(165)
 			p.Match(SuricataRuleParserAny)
 		}
 
 	case 2:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(164)
+			p.SetState(166)
 			p.Environment_var()
 		}
 
 	case 3:
 		p.EnterOuterAlt(localctx, 3)
 		{
-			p.SetState(165)
+			p.SetState(167)
 			p.Match(SuricataRuleParserINT)
 		}
 
 	case 4:
 		p.EnterOuterAlt(localctx, 4)
 		{
-			p.SetState(166)
+			p.SetState(168)
 			p.Match(SuricataRuleParserINT)
 		}
 		{
-			p.SetState(167)
+			p.SetState(169)
 			p.Match(SuricataRuleParserColon)
 		}
-		p.SetState(169)
+		p.SetState(171)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
 		if _la == SuricataRuleParserINT {
 			{
-				p.SetState(168)
+				p.SetState(170)
 				p.Match(SuricataRuleParserINT)
 			}
 
@@ -3106,66 +3122,66 @@ func (p *SuricataRuleParser) Port() (localctx IPortContext) {
 	case 5:
 		p.EnterOuterAlt(localctx, 5)
 		{
-			p.SetState(171)
+			p.SetState(173)
 			p.Match(SuricataRuleParserColon)
 		}
 		{
-			p.SetState(172)
+			p.SetState(174)
 			p.Match(SuricataRuleParserINT)
 		}
 
 	case 6:
 		p.EnterOuterAlt(localctx, 6)
 		{
-			p.SetState(173)
+			p.SetState(175)
 			p.Match(SuricataRuleParserINT)
 		}
 		{
-			p.SetState(174)
+			p.SetState(176)
 			p.Match(SuricataRuleParserColon)
 		}
 
 	case 7:
 		p.EnterOuterAlt(localctx, 7)
 		{
-			p.SetState(175)
+			p.SetState(177)
 			p.Match(SuricataRuleParserLBracket)
 		}
 		{
-			p.SetState(176)
+			p.SetState(178)
 			p.Port()
 		}
-		p.SetState(181)
+		p.SetState(183)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
 		for _la == SuricataRuleParserComma {
 			{
-				p.SetState(177)
+				p.SetState(179)
 				p.Match(SuricataRuleParserComma)
 			}
 			{
-				p.SetState(178)
+				p.SetState(180)
 				p.Port()
 			}
 
-			p.SetState(183)
+			p.SetState(185)
 			p.GetErrorHandler().Sync(p)
 			_la = p.GetTokenStream().LA(1)
 		}
 		{
-			p.SetState(184)
+			p.SetState(186)
 			p.Match(SuricataRuleParserRBracket)
 		}
 
 	case 8:
 		p.EnterOuterAlt(localctx, 8)
 		{
-			p.SetState(186)
+			p.SetState(188)
 			p.Match(SuricataRuleParserNegative)
 		}
 		{
-			p.SetState(187)
+			p.SetState(189)
 			p.Port()
 		}
 
@@ -3261,12 +3277,45 @@ func (s *ParamsContext) ParamEnd() antlr.TerminalNode {
 	return s.GetToken(SuricataRuleParserParamEnd, 0)
 }
 
-func (s *ParamsContext) AllParamSep() []antlr.TerminalNode {
-	return s.GetTokens(SuricataRuleParserParamSep)
+func (s *ParamsContext) AllSep() []ISepContext {
+	children := s.GetChildren()
+	len := 0
+	for _, ctx := range children {
+		if _, ok := ctx.(ISepContext); ok {
+			len++
+		}
+	}
+
+	tst := make([]ISepContext, len)
+	i := 0
+	for _, ctx := range children {
+		if t, ok := ctx.(ISepContext); ok {
+			tst[i] = t.(ISepContext)
+			i++
+		}
+	}
+
+	return tst
 }
 
-func (s *ParamsContext) ParamSep(i int) antlr.TerminalNode {
-	return s.GetToken(SuricataRuleParserParamSep, i)
+func (s *ParamsContext) Sep(i int) ISepContext {
+	var t antlr.RuleContext
+	j := 0
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(ISepContext); ok {
+			if j == i {
+				t = ctx.(antlr.RuleContext)
+				break
+			}
+			j++
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(ISepContext)
 }
 
 func (s *ParamsContext) GetRuleContext() antlr.RuleContext {
@@ -3315,46 +3364,46 @@ func (p *SuricataRuleParser) Params() (localctx IParamsContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(190)
+		p.SetState(192)
 		p.Match(SuricataRuleParserParamStart)
 	}
 	{
-		p.SetState(191)
+		p.SetState(193)
 		p.Param()
 	}
-	p.SetState(196)
+	p.SetState(199)
 	p.GetErrorHandler().Sync(p)
 	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 11, p.GetParserRuleContext())
 
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
-				p.SetState(192)
-				p.Match(SuricataRuleParserParamSep)
+				p.SetState(194)
+				p.Sep()
 			}
 			{
-				p.SetState(193)
+				p.SetState(195)
 				p.Param()
 			}
 
 		}
-		p.SetState(198)
+		p.SetState(201)
 		p.GetErrorHandler().Sync(p)
 		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 11, p.GetParserRuleContext())
 	}
-	p.SetState(200)
+	p.SetState(203)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == SuricataRuleParserParamSep {
+	if _la == SuricataRuleParserParamSep || _la == SuricataRuleParserUntilSepSettingEnd {
 		{
-			p.SetState(199)
-			p.Match(SuricataRuleParserParamSep)
+			p.SetState(202)
+			p.Sep()
 		}
 
 	}
 	{
-		p.SetState(202)
+		p.SetState(205)
 		p.Match(SuricataRuleParserParamEnd)
 	}
 
@@ -3479,20 +3528,20 @@ func (p *SuricataRuleParser) Param() (localctx IParamContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(204)
+		p.SetState(207)
 		p.Keyword()
 	}
-	p.SetState(207)
+	p.SetState(210)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == SuricataRuleParserParamColon {
 		{
-			p.SetState(205)
+			p.SetState(208)
 			p.Match(SuricataRuleParserParamColon)
 		}
 		{
-			p.SetState(206)
+			p.SetState(209)
 			p.Setting()
 		}
 
@@ -3586,7 +3635,7 @@ func (p *SuricataRuleParser) Keyword() (localctx IKeywordContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(209)
+		p.SetState(212)
 		p.Match(SuricataRuleParserParamCommonString)
 	}
 
@@ -3724,24 +3773,24 @@ func (p *SuricataRuleParser) Setting() (localctx ISettingContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(211)
+		p.SetState(214)
 		p.SingleSetting()
 	}
-	p.SetState(216)
+	p.SetState(219)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == SuricataRuleParserParamComma {
 		{
-			p.SetState(212)
+			p.SetState(215)
 			p.Match(SuricataRuleParserParamComma)
 		}
 		{
-			p.SetState(213)
+			p.SetState(216)
 			p.SingleSetting()
 		}
 
-		p.SetState(218)
+		p.SetState(221)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 	}
@@ -3819,6 +3868,10 @@ func (s *SingleSettingContext) Negative() INegativeContext {
 	return t.(INegativeContext)
 }
 
+func (s *SingleSettingContext) NonQuotedString() antlr.TerminalNode {
+	return s.GetToken(SuricataRuleParserNonQuotedString, 0)
+}
+
 func (s *SingleSettingContext) GetRuleContext() antlr.RuleContext {
 	return s
 }
@@ -3861,21 +3914,37 @@ func (p *SuricataRuleParser) SingleSetting() (localctx ISingleSettingContext) {
 		}
 	}()
 
-	p.EnterOuterAlt(localctx, 1)
-	p.SetState(220)
+	p.SetState(227)
 	p.GetErrorHandler().Sync(p)
-	_la = p.GetTokenStream().LA(1)
 
-	if _la == SuricataRuleParserParamNegative {
+	switch p.GetTokenStream().LA(1) {
+	case SuricataRuleParserParamNegative, SuricataRuleParserParamCommonString, SuricataRuleParserModeStringStart:
+		p.EnterOuterAlt(localctx, 1)
+		p.SetState(223)
+		p.GetErrorHandler().Sync(p)
+		_la = p.GetTokenStream().LA(1)
+
+		if _la == SuricataRuleParserParamNegative {
+			{
+				p.SetState(222)
+				p.Negative()
+			}
+
+		}
 		{
-			p.SetState(219)
-			p.Negative()
+			p.SetState(225)
+			p.Settingcontent()
 		}
 
-	}
-	{
-		p.SetState(222)
-		p.Settingcontent()
+	case SuricataRuleParserNonQuotedString:
+		p.EnterOuterAlt(localctx, 2)
+		{
+			p.SetState(226)
+			p.Match(SuricataRuleParserNonQuotedString)
+		}
+
+	default:
+		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
 	}
 
 	return localctx
@@ -3966,7 +4035,7 @@ func (p *SuricataRuleParser) Negative() (localctx INegativeContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(224)
+		p.SetState(229)
 		p.Match(SuricataRuleParserParamNegative)
 	}
 
@@ -4015,8 +4084,16 @@ func (s *SettingcontentContext) ParamCommonString() antlr.TerminalNode {
 	return s.GetToken(SuricataRuleParserParamCommonString, 0)
 }
 
-func (s *SettingcontentContext) ParamQuotedString() antlr.TerminalNode {
-	return s.GetToken(SuricataRuleParserParamQuotedString, 0)
+func (s *SettingcontentContext) ModeStringStart() antlr.TerminalNode {
+	return s.GetToken(SuricataRuleParserModeStringStart, 0)
+}
+
+func (s *SettingcontentContext) ModeStringEnd() antlr.TerminalNode {
+	return s.GetToken(SuricataRuleParserModeStringEnd, 0)
+}
+
+func (s *SettingcontentContext) ModeString() antlr.TerminalNode {
+	return s.GetToken(SuricataRuleParserModeString, 0)
 }
 
 func (s *SettingcontentContext) GetRuleContext() antlr.RuleContext {
@@ -4061,12 +4138,140 @@ func (p *SuricataRuleParser) Settingcontent() (localctx ISettingcontentContext) 
 		}
 	}()
 
-	p.EnterOuterAlt(localctx, 1)
-	{
-		p.SetState(226)
+	p.SetState(237)
+	p.GetErrorHandler().Sync(p)
+
+	switch p.GetTokenStream().LA(1) {
+	case SuricataRuleParserParamCommonString:
+		p.EnterOuterAlt(localctx, 1)
+		{
+			p.SetState(231)
+			p.Match(SuricataRuleParserParamCommonString)
+		}
+
+	case SuricataRuleParserModeStringStart:
+		p.EnterOuterAlt(localctx, 2)
+		{
+			p.SetState(232)
+			p.Match(SuricataRuleParserModeStringStart)
+		}
+		p.SetState(234)
+		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		if !(_la == SuricataRuleParserParamQuotedString || _la == SuricataRuleParserParamCommonString) {
+		if _la == SuricataRuleParserModeString {
+			{
+				p.SetState(233)
+				p.Match(SuricataRuleParserModeString)
+			}
+
+		}
+		{
+			p.SetState(236)
+			p.Match(SuricataRuleParserModeStringEnd)
+		}
+
+	default:
+		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+	}
+
+	return localctx
+}
+
+// ISepContext is an interface to support dynamic dispatch.
+type ISepContext interface {
+	antlr.ParserRuleContext
+
+	// GetParser returns the parser.
+	GetParser() antlr.Parser
+
+	// IsSepContext differentiates from other interfaces.
+	IsSepContext()
+}
+
+type SepContext struct {
+	*antlr.BaseParserRuleContext
+	parser antlr.Parser
+}
+
+func NewEmptySepContext() *SepContext {
+	var p = new(SepContext)
+	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	p.RuleIndex = SuricataRuleParserRULE_sep
+	return p
+}
+
+func (*SepContext) IsSepContext() {}
+
+func NewSepContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *SepContext {
+	var p = new(SepContext)
+
+	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+
+	p.parser = parser
+	p.RuleIndex = SuricataRuleParserRULE_sep
+
+	return p
+}
+
+func (s *SepContext) GetParser() antlr.Parser { return s.parser }
+
+func (s *SepContext) ParamSep() antlr.TerminalNode {
+	return s.GetToken(SuricataRuleParserParamSep, 0)
+}
+
+func (s *SepContext) UntilSepSettingEnd() antlr.TerminalNode {
+	return s.GetToken(SuricataRuleParserUntilSepSettingEnd, 0)
+}
+
+func (s *SepContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *SepContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
+	return antlr.TreesStringTree(s, ruleNames, recog)
+}
+
+func (s *SepContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+	switch t := visitor.(type) {
+	case SuricataRuleParserVisitor:
+		return t.VisitSep(s)
+
+	default:
+		return t.VisitChildren(s)
+	}
+}
+
+func (p *SuricataRuleParser) Sep() (localctx ISepContext) {
+	this := p
+	_ = this
+
+	localctx = NewSepContext(p, p.GetParserRuleContext(), p.GetState())
+	p.EnterRule(localctx, 54, SuricataRuleParserRULE_sep)
+	var _la int
+
+	defer func() {
+		p.ExitRule()
+	}()
+
+	defer func() {
+		if err := recover(); err != nil {
+			if v, ok := err.(antlr.RecognitionException); ok {
+				localctx.SetException(v)
+				p.GetErrorHandler().ReportError(p, v)
+				p.GetErrorHandler().Recover(p, v)
+			} else {
+				panic(err)
+			}
+		}
+	}()
+
+	p.EnterOuterAlt(localctx, 1)
+	{
+		p.SetState(239)
+		_la = p.GetTokenStream().LA(1)
+
+		if !(_la == SuricataRuleParserParamSep || _la == SuricataRuleParserUntilSepSettingEnd) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)

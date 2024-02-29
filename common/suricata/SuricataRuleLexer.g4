@@ -46,7 +46,7 @@ HEX
     ;
 
 ID
-    : [a-zA-Z_][a-zA-Z_0-9]*
+    : [a-zA-Z_][-a-zA-Z_0-9]*
     ;
 
 
@@ -111,13 +111,25 @@ SHEBANG
     ;
 
 mode PARAM_MODE;
-    fragment Quote: '"';
-    fragment CharInQuotedString: '\\"' | '\\;' | ~["] ;
     ParamWS: [ \t\u000C]+ -> skip;
     ParamEnd: ')' -> popMode;
-    ParamQuotedString: Quote CharInQuotedString* Quote;
-    ParamColon: ':';
-    ParamSep: ';';
+    ParamColon: ':' -> pushMode(UNTIL_SEP_MODE);
     ParamNegative: '!';
     ParamComma: ',';
-    ParamCommonString: ((~[,;":\n!\r() ])(~[,;":\n!\r()])*(~[,;":\n!\r() ])) | (~[,;":\n!\r()]) ;
+    ParamSep: ';';
+    ParamCommonStringChar: (~[,;":\n!\r()]) ;
+    ParamCommonString: ParamCommonStringChar+ ;
+
+mode UNTIL_SEP_MODE;
+    ModeStringStart: '"' -> pushMode(MODE_STRING);
+    fragment UntilSettingDataChar: ~[\n\r;"] | '\\"';
+    UntilSepSettingEnd: ';' -> popMode;
+    UntilSEPParamWS: [ \t\u000C]+ -> skip;
+    NonQuotedString: UntilSettingDataChar+;
+
+mode MODE_STRING;
+    fragment ModeStringChar: ~[\n\r"] | '\\"';
+    ModeString: ModeStringChar+;
+    ModeStringEnd: '"' -> popMode;
+
+ANY: .;

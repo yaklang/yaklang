@@ -1,6 +1,7 @@
 package rule
 
 import (
+	"bufio"
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/log"
 	rule "github.com/yaklang/yaklang/common/suricata/parser"
@@ -13,7 +14,22 @@ var presetEnv = map[string]string{
 }
 
 func Parse(data string, envs ...string) ([]*Rule, error) {
-	lexer := rule.NewSuricataRuleLexer(antlr.NewInputStream(data))
+	var buf strings.Builder
+	var dataBuf = bufio.NewReader(strings.NewReader(data))
+	for {
+		line, err := utils.BufioReadLineString(dataBuf)
+		if err != nil {
+			break
+		}
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "#") || strings.HasPrefix(line, "//") || line == "" {
+			buf.WriteByte('\n')
+			continue
+		}
+		buf.WriteString(line)
+		buf.WriteByte('\n')
+	}
+	lexer := rule.NewSuricataRuleLexer(antlr.NewInputStream(buf.String()))
 	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	parser := rule.NewSuricataRuleParser(tokenStream)
 	parser.RemoveErrorListeners()
