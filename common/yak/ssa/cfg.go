@@ -402,7 +402,8 @@ func (t *TryBuilder) Finish() {
 	if id := t.buildError(); id != "" {
 		p := NewParam(id, false, builder)
 		p.SetType(BasicTypes[ErrorTypeKind])
-		builder.WriteLocalVariable(id, p)
+		variable := builder.CreateLocalVariable(id)
+		builder.AssignVariable(variable, p)
 	}
 
 	tryBuilder.SetCache(func() ssautil.ScopedVersionedTableIF[Value] {

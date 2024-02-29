@@ -91,22 +91,9 @@ func (b *FunctionBuilder) writeUndefine(variable string, names ...string) *Undef
 		name = names[0]
 	}
 	undefine := b.EmitUndefined(name)
-	b.WriteVariable(variable, undefine)
+	v := b.CreateVariable(variable)
+	b.AssignVariable(v, undefine)
 	return undefine
-}
-
-// ----------------- Write
-
-// WriteVariable write value to variable
-// will create Variable  and assign value
-func (b *FunctionBuilder) WriteVariable(name string, value Value) {
-	ret := b.CreateVariable(name)
-	b.AssignVariable(ret, value)
-}
-
-func (b *FunctionBuilder) WriteLocalVariable(name string, value Value) {
-	ret := b.CreateLocalVariable(name)
-	b.AssignVariable(ret, value)
 }
 
 // ------------------- Assign
@@ -179,7 +166,9 @@ func (b *FunctionBuilder) createVariableEx(name string, isLocal bool) *Variable 
 func (b *FunctionBuilder) BuildFreeValue(variable string) *Parameter {
 	freeValue := NewParam(variable, true, b)
 	b.FreeValues[variable] = freeValue
-	b.WriteVariable(variable, freeValue)
+	// b.WriteVariable(variable, freeValue)
+	v := b.CreateVariable(variable)
+	b.AssignVariable(v, freeValue)
 	return freeValue
 }
 
