@@ -70,7 +70,8 @@ func (f *FunctionBuilder) NewParam(name string) *Parameter {
 	p := NewParam(name, false, f)
 	p.SetRange(f.CurrentRange)
 	f.Param = append(f.Param, p)
-	f.WriteVariable(name, p)
+	variable := f.CreateVariable(name)
+	f.AssignVariable(variable, p)
 	return p
 }
 

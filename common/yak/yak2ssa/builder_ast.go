@@ -779,7 +779,9 @@ func (b *astbuilder) buildDeclareVariableOnly(stmt *yak.DeclareVariableOnlyConte
 	for _, idstmt := range stmt.AllIdentifier() {
 		recoverRange := b.SetRangeFromTerminalNode(idstmt)
 		id := idstmt.GetText()
-		b.WriteVariable(id, b.EmitConstInstAny())
+		// b.WriteVariable(id, b.EmitConstInstAny())
+		v := b.CreateVariable(id)
+		b.AssignVariable(v, b.EmitConstInstAny())
 		recoverRange()
 	}
 }
@@ -1116,7 +1118,8 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 	handlerJumpExpression := func(cond func(string) ssa.Value, trueExpr, falseExpr func() ssa.Value) ssa.Value {
 		// 为了聚合产生Phi指令
 		id := uuid.NewString()
-		b.WriteVariable(id, b.EmitConstInstAny())
+		variable := b.CreateVariable(id)
+		b.AssignVariable(variable, b.EmitConstInstAny())
 		// 只需要使用b.WriteValue设置value到此ID，并最后调用b.ReadValue可聚合产生Phi指令，完成语句预期行为
 		ifb := b.CreateIfBuilder()
 		ifb.AppendItem(
@@ -1125,12 +1128,14 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 			},
 			func() {
 				v := trueExpr()
-				b.WriteVariable(id, v)
+				variable := b.CreateVariable(id)
+				b.AssignVariable(variable, v)
 			},
 		)
 		ifb.SetElse(func() {
 			v := falseExpr()
-			b.WriteVariable(id, v)
+			variable := b.CreateVariable(id)
+			b.AssignVariable(variable, v)
 		})
 		ifb.Build()
 		// generator phi instruction
@@ -1371,7 +1376,8 @@ func (b *astbuilder) buildAnonymousFunctionDecl(stmt *yak.AnonymousFunctionDeclC
 	// b.AddSubFunction(buildFunc)
 
 	if funcName != "" {
-		b.WriteVariable(funcName, newFunc)
+		variable := b.CreateVariable(funcName)
+		b.AssignVariable(variable, newFunc)
 	}
 	return newFunc
 }
