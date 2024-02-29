@@ -125,6 +125,7 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 		}
 		paramctx := params[i].(*parser.ParamContext)
 		key := paramctx.Keyword().GetText()
+		key = strings.TrimSpace(key)
 		if key == "" {
 			continue
 		}
@@ -136,7 +137,7 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 
 		if st := paramctx.Setting(); st != nil {
 			setting = paramctx.Setting().(*parser.SettingContext)
-			vStr = setting.GetText()
+			vStr = strings.TrimSpace(setting.GetText())
 			ssts = setting.AllSingleSetting()
 		}
 
@@ -206,6 +207,8 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 				STATUS = SavingPCRE
 			}
 		}
+
+		log.Infof("key: %#v value: %#v", key, vStr)
 
 		switch key {
 		// meta keywords

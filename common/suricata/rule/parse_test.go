@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils"
 	"testing"
 )
@@ -120,6 +121,17 @@ func TestParse2(t *testing.T) {
 		panic(err)
 	}
 	spew.Dump(rules)
+}
+
+func TestParse3(t *testing.T) {
+	rules, err := Parse(`alert http any any -> any any  (msg: "Behinder3 PHP HTTP Request"; flow: established, to_server; content:".php"; http_uri;  pcre:"/[a-zA-Z0-9+/]{1000,}=/i"; flowbits:set,behinder3;noalert; classtype:shellcode-detect; sid: 3016017; rev: 1; metadata:created_at 2020_08_17,by al0ne;)`)
+	if err != nil {
+		panic(err)
+	}
+	r := rules[0]
+	spew.Dump(r)
+	flag := r.Sid > 0 && r.Rev > 0 && len(r.ContentRuleConfig.ContentRules) > 0
+	assert.True(t, flag)
 }
 
 func TestMUSTPASS_Parse_PortSyntaxAndMatch(t *testing.T) {
