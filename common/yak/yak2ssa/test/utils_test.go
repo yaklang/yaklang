@@ -160,7 +160,7 @@ func checkFreeValue(t *testing.T, tc TestCase) {
 		funTyp, ok := ssa.ToFunctionType(typ)
 		test.True(ok)
 
-		freeValues := funTyp.FreeValue
+		freeValues := lo.Map(funTyp.FreeValue, func(v *ssa.FunctionFreeValue, _ int) string { return v.Name })
 		slices.Sort(freeValues)
 		test.Equal(want, freeValues)
 	}

@@ -242,6 +242,7 @@ func TestClosure_Mask(t *testing.T) {
 }
 
 func TestClosure_SideEffect(t *testing.T) {
+
 	t.Run("function modify value", func(t *testing.T) {
 		checkPrintlnValue(`
 		a = 0 
@@ -255,6 +256,28 @@ func TestClosure_SideEffect(t *testing.T) {
 		println(a) // phi 1, 0
 		`, []string{
 			"phi(a)[1,0]",
+		}, t)
+	})
+
+	t.Run("func not modify value", func(t *testing.T) {
+		checkPrintlnValue(`
+		f  = () =>{}
+		{
+			a = 1
+			f = () => {
+				a = 2
+			}
+			println(a) // 1
+			f()
+			println(a) // 2
+		}
+		a = 1
+		println(a) // 1 
+		f() 
+		println(a) // 1
+		`, []string{
+			"1", "2",
+			"1", "1",
 		}, t)
 	})
 

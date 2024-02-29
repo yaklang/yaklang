@@ -46,6 +46,10 @@ type ScopedVersionedTableIF[T versionedValue] interface {
 	CreateSubScope() ScopedVersionedTableIF[T]
 	// get scope level, each scope has a level, the root scope is 0, the sub scope is {parent-scope.level + 1}
 	GetScopeLevel() int
+	GetParent() ScopedVersionedTableIF[T]
+
+	IsSameOrSubScope(ScopedVersionedTableIF[T]) bool
+	Compare(ScopedVersionedTableIF[T]) bool
 
 	// use in ssautil, handle inner member
 	ForEachCapturedVariable(CaptureVariableHandler[T])
@@ -141,6 +145,10 @@ func (v *ScopedVersionedTable[T]) CreateSubScope() ScopedVersionedTableIF[T] {
 	return sub
 }
 
+func (v *ScopedVersionedTable[T]) GetParent() ScopedVersionedTableIF[T] {
+	return v.parent
+}
+
 func (v *ScopedVersionedTable[T]) IsRoot() bool {
 	return v.parent == nil
 }
@@ -188,7 +196,7 @@ func (scope *ScopedVersionedTable[T]) ReadVariable(name string) VersionedIF[T] {
 			ret = nil
 		}
 	}
-	if ret != nil && ret.GetScope() != scope.GetThis() {
+	if ret != nil && !scope.Compare(ret.GetScope()) {
 		// not in current scope
 		if scope.spin {
 			t := scope.CreateVariable(name, false)
@@ -395,4 +403,30 @@ func (v *ScopedVersionedTable[T]) newVar(lexName string, local bool) VersionedIF
 // use for up lever
 func (s *ScopedVersionedTable[T]) GetScopeLevel() int {
 	return s.level
+}
+
+// IsSubScope check if the scope is sub scope of the other
+func (s *ScopedVersionedTable[T]) IsSameOrSubScope(other ScopedVersionedTableIF[T]) bool {
+	// if scope level lower, scope will in top than other
+
+	var scope ScopedVersionedTableIF[T] = s
+
+	for ; scope != nil; scope = scope.GetParent() {
+		// if scope level is lower than other, break
+		if scope.GetScopeLevel() < other.GetScopeLevel() {
+			break
+		}
+
+		//  only scope == other, return true,
+		// scope is sub-scope of other
+		if scope.Compare(other) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (s *ScopedVersionedTable[T]) Compare(other ScopedVersionedTableIF[T]) bool {
+	return s.GetThis() == other.GetThis()
 }

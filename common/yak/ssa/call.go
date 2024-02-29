@@ -89,9 +89,15 @@ func (c *Call) handleMethod() {
 	{
 		builder := c.GetFunc().builder
 		recoverBuilder := builder.SetCurrent(c)
-		for name, value := range funcTyp.SideEffects {
-			variable := builder.CreateVariable(name)
-			builder.AssignVariable(variable, value)
+		currentScope := c.GetBlock().ScopeTable
+		for _, se := range funcTyp.SideEffects {
+			// side-effect only create in scope that lower or same than modify's scope
+			if !currentScope.IsSameOrSubScope(se.Scope) {
+				continue
+			}
+
+			variable := builder.CreateVariable(se.Name)
+			builder.AssignVariable(variable, se.Modify)
 		}
 		recoverBuilder()
 	}
@@ -113,34 +119,38 @@ func (c *Call) handleMethod() {
 	c.Args = utils.InsertSliceItem(c.Args, obj, 0)
 }
 
-func (c *Call) HandleFreeValue(fvs []string) {
+func (c *Call) HandleFreeValue(fvs []*FunctionFreeValue) {
 
 	builder := c.GetFunc().builder
 	recoverBuilder := builder.SetCurrent(c)
 	defer recoverBuilder()
 
-	for _, name := range fvs {
-		v := builder.PeekValue(name)
+	for _, fv := range fvs {
+		// if freeValue has default value, skip
+		if fv.HasDefault {
+			continue
+		}
+
+		v := builder.PeekValue(fv.Name)
 
 		if v != nil {
 			c.binding = append(c.binding, v)
 		} else {
 			// mark error in freeValue.Variable
 			// get freeValue
-			fun, ok := ToFunction(c.Method)
-			if !ok {
-				continue
+			if variable := fv.Variable; variable != nil {
+				variable.NewError(Error, SSATAG, BindingNotFound(fv.Name, c.GetRange()))
 			}
-			freeValue, ok := fun.FreeValues[name]
-			if !ok {
-				continue
-			}
-			if variable := freeValue.GetVariable(name); variable != nil {
-				variable.NewError(Error, SSATAG, BindingNotFound(name, c.GetRange()))
-				if len(fun.GetAllVariables()) != 0 {
-					c.NewError(Error, SSATAG, BindingNotFoundInCall(name))
+			// skip instance function, or `go` with instance function,
+			// this function no variable, and code-range of call-site same as function.
+			// we don't mark error in call-site.
+			if fun, ok := ToFunction(c.Method); ok {
+				if len(fun.GetAllVariables()) == 0 {
+					continue
 				}
 			}
+			// other code will mark error in function call-site
+			c.NewError(Error, SSATAG, BindingNotFoundInCall(fv.Name))
 		}
 	}
 }
