@@ -84,7 +84,8 @@ func mustSoloSingleSetting(ssts []parser.ISingleSettingContext) (bool, string) {
 		return false, ""
 	}
 	ctx := ssts[0].(*parser.SingleSettingContext)
-	return ctx.Negative() != nil, ctx.Settingcontent().GetText()
+	data := ctx.GetText()
+	return ctx.Negative() != nil, data
 }
 
 type MultipleBufferMatching struct {
