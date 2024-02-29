@@ -104,8 +104,13 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 	_ = name
 	scope := b.CurrentBlock.ScopeTable
 	scope.AssignVariable(variable, value)
-	// skip FreeValue
-	if value.GetOpcode() != OpFreeValue || value.GetName() != variable.GetName() {
+	checkAssign := func() {
+		if value.GetName() == variable.GetName() {
+			if value.GetOpcode() == OpFreeValue || value.GetOpcode() == OpParameter {
+				return
+			}
+		}
+
 		if b.TryBuildExternValue(variable.GetName()) != nil {
 			b.NewErrorWithPos(Warn, SSATAG, b.CurrentRange, ContAssignExtern(variable.GetName()))
 		}
@@ -113,10 +118,11 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 		// if not freeValue, or not `a = a`(just create FreeValue)
 		if parentValue, ok := b.getParentFunctionVariable(variable.GetName()); ok {
 			parentValue.AddMask(value)
-			b.AddSideEffect(variable.GetName(), value)
+			v := parentValue.GetVariable(variable.GetName())
+			b.AddSideEffect(v, value)
 		}
 	}
-
+	checkAssign()
 	if variable.IsMemberCall() {
 		obj, key := variable.GetMemberCall()
 		SetMemberCall(obj, key, value)

@@ -35,7 +35,7 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		ChildFuncs:          make([]*Function, 0),
 		parent:              nil,
 		FreeValues:          make(map[string]*Parameter),
-		SideEffects:         make(map[string]Value),
+		SideEffects:         make(map[*Variable]Value),
 		cacheExternInstance: make(map[string]Value),
 		externType:          make(map[string]Type),
 		builder:             nil,
@@ -75,7 +75,7 @@ func (f *FunctionBuilder) NewParam(name string) *Parameter {
 	return p
 }
 
-func (f *Function) AddSideEffect(name string, v Value) {
+func (f *Function) AddSideEffect(name *Variable, v Value) {
 	f.SideEffects[name] = v
 }
 
@@ -129,7 +129,7 @@ func handlerReturnType(rs []*Return) Type {
 	}
 }
 
-// current function finish
+// Finish current function
 func (f *Function) Finish() {
 	f.EnterBlock = f.Blocks[0]
 	f.ExitBlock = f.Blocks[len(f.Blocks)-1]
@@ -143,17 +143,6 @@ func (f *Function) Finish() {
 		f.hasEllipsis,
 	)
 	f.SetType(funType)
-	if len(f.FreeValues) != 0 {
-		fv := make([]string, len(f.FreeValues))
-		for name, value := range f.FreeValues {
-			if value.defaultValue != nil {
-				continue
-			}
-			fv = append(fv, name)
-		}
-		funType.SetFreeValue(fv)
-	}
-	if len(f.SideEffects) != 0 {
-		funType.SetSideEffect(f.SideEffects)
-	}
+	funType.SetFreeValue(f.FreeValues)
+	funType.SetSideEffect(f.SideEffects)
 }
