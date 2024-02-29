@@ -1,5 +1,7 @@
 package ssautil
 
+import "github.com/yaklang/yaklang/common/log"
+
 // ForEachCapturedVariable call the handler for each captured by base scope Variable
 func ForEachCapturedVariable[T versionedValue](
 	scope ScopedVersionedTableIF[T],
@@ -89,6 +91,7 @@ func (s *ScopedVersionedTable[T]) Spin(
 	handler SpinHandle[T],
 ) {
 	s.incomingPhi.ForEach(func(name string, ver VersionedIF[T]) bool {
+		log.Infof("spin %s scope %v", name, s.GetScopeLevel())
 		last := latch.ReadValue(name)
 		origin := header.ReadValue(name)
 		res := handler(name, ver.GetValue(), origin, last)

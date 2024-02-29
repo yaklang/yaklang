@@ -14,11 +14,14 @@ func NewScope() *Scope {
 	s := &Scope{
 		ScopedVersionedTable: ssautil.NewRootVersionedTable[Value](NewVariable),
 	}
+	s.SetThis(s)
 	return s
 }
 
 func (s *Scope) CreateSubScope() ssautil.ScopedVersionedTableIF[Value] {
-	return &Scope{
+	scope := &Scope{
 		ScopedVersionedTable: s.ScopedVersionedTable.CreateSubScope().(*ssautil.ScopedVersionedTable[Value]),
 	}
+	scope.SetThis(scope)
+	return scope
 }
