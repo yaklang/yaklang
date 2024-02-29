@@ -10,13 +10,13 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"testing"
+	"time"
 )
 
 func TestGRPCMUSTPASS_MITM_WebSocket(t *testing.T) {
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(20))
 	defer cancel()
-	//token := utils.RandNumberStringBytes(20)
-	token := "GGGGGGGGGG"
+	token := utils.RandNumberStringBytes(20)
 
 	host, port := utils.DebugMockEchoWs([]byte(token))
 	log.Infof("addr:  %s:%d", host, port)
@@ -50,18 +50,17 @@ Accept: */*
 		if err != nil {
 			t.Fatalf("send websocket request err: %v", err)
 		}
-		for i := 0; i < 5; i++ {
+		for i := 0; i < 3; i++ {
 			err = wsClient.Write([]byte(token))
 		}
 		if err != nil {
 			t.Fatalf("send websocket request err: %v", err)
 		}
-
-		count := yakit.SearchWebsocketFlow(token)
+		time.Sleep(1 * time.Second)
+		count := yakit.SearchWebsocketFlow("server: " + token)
 		fmt.Println(count)
-		//if count == 0 {
-		//	t.Errorf("search httpflow by token failed: yakit.QuickSearchMITMHTTPFlowCount(token)")
-		//}
-		//cancel()
+		if count != 3 {
+			t.Errorf("search httpflow by token failed: yakit.QuickSearchMITMHTTPFlowCount(token)")
+		}
 	})
 }
