@@ -14,7 +14,7 @@ var badrule string
 //go:embed badrules1.rules
 var badrule_mini string
 
-func TestMustpass_block(t *testing.T) {
+func TestMUSTPASS_block(t *testing.T) {
 	rules, err := Parse(badrule)
 	if err != nil {
 		t.Fatal(err)
@@ -22,7 +22,7 @@ func TestMustpass_block(t *testing.T) {
 	_ = rules
 }
 
-func TestMustpass_block1(t *testing.T) {
+func TestMUSTPASS_block1(t *testing.T) {
 	rules, err := Parse(badrule_mini)
 	if err != nil {
 		t.Fatal(err)
