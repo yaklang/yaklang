@@ -51,13 +51,13 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		y.ir.CreateIfBuilder().SetCondition(func() ssa.Value {
 			return y.ir.EmitBinOp(
 				ssa.OpNotEq,
-				y.ir.EmitField(target, y.ir.EmitConstInst("__clone")),
+				y.ir.ReadOrCreateMemberCallVariable(target, y.ir.EmitConstInst("__clone")),
 				y.ir.EmitConstInstNil(),
 			)
 		}, func() {
 			// have __clone
 			calling := y.ir.NewCall(
-				y.ir.EmitField(target, y.ir.EmitConstInst("__clone")),
+				y.ir.ReadOrCreateMemberCallVariable(target, y.ir.EmitConstInst("__clone")),
 				nil,
 			)
 			y.ir.EmitCall(calling)
@@ -131,26 +131,31 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 			return val
 		}
 	case *phpparser.PrefixIncDecExpressionContext:
-		val := y.VisitExpression(ret.Expression())
+		// variable := y.variable
+		// val := y.VisitExpression(ret.Expression())
+		variable := y.VisitLeftVariable(ret.LeftVariable())
+		val := y.ir.ReadValueByVariable(variable)
 		if ret.Inc() != nil {
 			after := y.ir.EmitBinOp(ssa.OpAdd, val, y.ir.EmitConstInst(1))
-			y.ir.EmitUpdate(val, after)
+			y.ir.AssignVariable(variable, after)
+			// y.ir.EmitUpdate(val, after)
 			return after
 		} else if ret.Dec() != nil {
 			after := y.ir.EmitBinOp(ssa.OpSub, val, y.ir.EmitConstInst(1))
-			y.ir.EmitUpdate(val, after)
+			y.ir.AssignVariable(variable, after)
 			return after
 		}
 		return y.ir.EmitConstInstNil()
 	case *phpparser.PostfixIncDecExpressionContext:
-		val := y.VisitExpression(ret.Expression())
+		variable := y.VisitLeftVariable(ret.LeftVariable())
+		val := y.ir.ReadValueByVariable(variable)
 		if ret.Inc() != nil {
 			after := y.ir.EmitBinOp(ssa.OpAdd, val, y.ir.EmitConstInst(1))
-			y.ir.EmitUpdate(val, after)
+			y.ir.AssignVariable(variable, after)
 			return val
 		} else if ret.Dec() != nil {
 			after := y.ir.EmitBinOp(ssa.OpSub, val, y.ir.EmitConstInst(1))
-			y.ir.EmitUpdate(val, after)
+			y.ir.AssignVariable(variable, after)
 			return val
 		}
 		return y.ir.EmitConstInstNil()
@@ -383,23 +388,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		return rightValue
 	case *phpparser.OrdinaryAssignmentExpressionContext:
 		// assignable assignmentOperator attributes? expression        # AssignmentExpression
-
-		// left value: chain array creation
-		variableDescription := ret.LeftVariable().(*phpparser.LeftVariableContext)
-		var variable *ssa.Variable
-		if variableDescription.VarName() != nil {
-			variable = y.ir.CreateVariable(variableDescription.VarName().GetText())
-		} else if variableDescription.Identifier() != nil {
-			dollarCount := len(variableDescription.AllDollar())
-			variable = y.ir.CreateVariable("$" + variableDescription.Identifier().GetText())
-			for i := 0; i < dollarCount; i++ {
-				log.Warnf("$$ref unhandled")
-			}
-		} else {
-			val := y.VisitExpression(variableDescription.Expression())
-			log.Errorf("${expr} variable unhandled")
-			variable = y.ir.CreateVariable(val.GetVerboseName())
-		}
+		variable := y.VisitLeftVariable(ret.LeftVariable())
 		rightValue := y.VisitExpression(ret.Expression())
 		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), variable.GetValue(), rightValue)
 		y.ir.AssignVariable(variable, rightValue)
@@ -1012,4 +1001,30 @@ func (y *builder) reduceAssignCalcExpression(operator string, leftValues ssa.Val
 		log.Errorf("unhandled assignment operator: %v", operator)
 	}
 	return rightValue
+}
+
+func (y *builder) VisitLeftVariable(raw phpparser.ILeftVariableContext) *ssa.Variable {
+	// left value: chain array creation
+	if y == nil || raw == nil {
+		return nil
+	}
+	variableDescription, ok := raw.(*phpparser.LeftVariableContext)
+	if !ok {
+		return nil
+	}
+	var variable *ssa.Variable
+	if variableDescription.VarName() != nil {
+		variable = y.ir.CreateVariable(variableDescription.VarName().GetText())
+	} else if variableDescription.Identifier() != nil {
+		dollarCount := len(variableDescription.AllDollar())
+		variable = y.ir.CreateVariable("$" + variableDescription.Identifier().GetText())
+		for i := 0; i < dollarCount; i++ {
+			log.Warnf("$$ref unhandled")
+		}
+	} else {
+		val := y.VisitExpression(variableDescription.Expression())
+		log.Errorf("${expr} variable unhandled")
+		variable = y.ir.CreateVariable(val.GetVerboseName())
+	}
+	return variable
 }

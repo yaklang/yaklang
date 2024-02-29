@@ -507,8 +507,8 @@ expression
     | '(' castOperation ')' expression                            # CastExpression
     | ('~' | '@') expression                                      # UnaryOperatorExpression
     | ('!' | '+' | '-') expression                                # UnaryOperatorExpression
-    | ('++' | '--') expression                                    # PrefixIncDecExpression
-    | expression ('++' | '--')                                    # PostfixIncDecExpression
+    | ('++' | '--') leftVariable                                    # PrefixIncDecExpression
+    | leftVariable ('++' | '--')                                    # PostfixIncDecExpression
     | expression arguments                                        # FunctionCallExpression
     | expression '[' expression ']'                               # IndexCallExpression
     | expression '->' expression                                  # MemberCallExpression
