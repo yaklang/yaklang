@@ -262,6 +262,14 @@ func (f *FunctionBuilder) EmitSwitch(cond Value, defaultb *BasicBlock, label []S
 	return sw
 }
 
+func (f *FunctionBuilder) EmitSideEffect(name string, call *Call, value Value) *SideEffect {
+	if f.CurrentBlock.finish {
+		return nil
+	}
+	s := NewSideEffect(name, call, value)
+	f.emit(s)
+	return s
+}
 func (f *FunctionBuilder) EmitReturn(vs []Value) *Return {
 	if f.CurrentBlock.finish {
 		return nil

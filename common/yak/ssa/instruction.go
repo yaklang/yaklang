@@ -188,13 +188,15 @@ func NewParam(variable string, isFreeValue bool, builder *FunctionBuilder) *Para
 	return p
 }
 
-func NewSideEffect(variable string, target Value) *SideEffect {
+func NewSideEffect(variable string, call *Call, value Value) *SideEffect {
 	s := &SideEffect{
 		anInstruction: NewInstruction(),
 		anValue:       NewValue(),
-		target:        target,
+		CallSite:      call,
+		Value:         value,
 	}
 	s.SetName(variable)
+	s.SetType(value.GetType())
 	return s
 }
 

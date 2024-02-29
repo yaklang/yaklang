@@ -96,8 +96,9 @@ func (c *Call) handleMethod() {
 				continue
 			}
 
+			sideEffect := builder.EmitSideEffect(se.Name, c, se.Modify)
 			variable := builder.CreateVariable(se.Name)
-			builder.AssignVariable(variable, se.Modify)
+			builder.AssignVariable(variable, sideEffect)
 		}
 		recoverBuilder()
 	}
