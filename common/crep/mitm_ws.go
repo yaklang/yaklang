@@ -276,19 +276,9 @@ func (w *WebSocketModifier) copyHijack(writer *bufio.Writer, reader *bufio.Reade
 		case lowhttp.PingMessage:
 			frameWriter.WritePong(showData, masked)
 		default:
-			b = callbackHandler(showData, req, rsp, ts)
-			newFrame, err := lowhttp.DataToWebsocketFrame(b, firstByte, masked)
-			if err != nil {
-				frameWriter.WriteRaw(raw)
-				frameWriter.Flush()
-				continue
+			if err = frameWriter.WriteFrame(frame); err != nil {
+				log.Errorf("write frame failed: %s", err)
 			}
-			newFrame.SetMaskingKey(frame.GetMaskingKey())
-			newRaw, _ := newFrame.Bytes()
-			frameWriter.WriteRaw(newRaw)
-			//if err = frameWriter.WriteFrame(frame); err != nil {
-			//	log.Errorf("write frame failed: %s", err)
-			//}
 		}
 
 		if err = frameWriter.Flush(); err != nil {
