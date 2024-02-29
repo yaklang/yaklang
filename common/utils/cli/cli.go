@@ -569,7 +569,7 @@ func (c *CliApp) File(name string, opts ...SetCliExtraParam) []byte {
 	s, p := c._cliFromString(name, opts...)
 	p._type = "file"
 
-	if c.paramInvalid.IsSet() {
+	if s == "" {
 		return []byte{}
 	}
 
