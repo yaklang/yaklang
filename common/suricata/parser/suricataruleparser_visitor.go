@@ -88,4 +88,7 @@ type SuricataRuleParserVisitor interface {
 
 	// Visit a parse tree produced by SuricataRuleParser#settingcontent.
 	VisitSettingcontent(ctx *SettingcontentContext) interface{}
+
+	// Visit a parse tree produced by SuricataRuleParser#sep.
+	VisitSep(ctx *SepContext) interface{}
 }

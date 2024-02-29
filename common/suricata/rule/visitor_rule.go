@@ -61,10 +61,17 @@ func (v *RuleSyntaxVisitor) VisitRule(rule *parser.RuleContext) interface{} {
 
 	defer func() {
 		if err := recover(); err != nil {
-			log.Errorf("visit rule failed: %s", err)
+			start := rule.GetStart()
+			end := rule.GetStop()
+			log.Errorf("visit rule %v (%v:%v-%v:%v) failed: %s",
+				rule.GetText(),
+				start.GetLine(), start.GetColumn(),
+				end.GetLine(), end.GetColumn(),
+				err,
+			)
+			panic(err)
 		}
 	}()
-
 	ruleIns := &Rule{
 		Raw: strings.TrimSpace(rule.GetText()),
 	}

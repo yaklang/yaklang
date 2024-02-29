@@ -485,7 +485,7 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 			// fallback
 			contentRule.ExtraFlags = append(contentRule.ExtraFlags, fmt.Sprintf("%v:%v", key, vStr))
 			if key != "metad" {
-				log.Warnf("unknown content rule params: %s\n%v\n\n", key, rule.Raw)
+				log.Debugf("unknown content rule params: %s\n%v\n\n", key, rule.Raw)
 			} else {
 				log.Warnf("BAD RULE:\n\n%v\n\n", rule.Raw)
 			}

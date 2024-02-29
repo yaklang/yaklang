@@ -237,7 +237,8 @@ func (v *RuleSyntaxVisitor) VisitAddress(i *parser.AddressContext) (addr *Addres
 		addr.SubRules = subs
 		return addr
 	default:
-		log.Errorf("unhandled unit: %v", i.GetText())
-		return nil
+		log.Debugf("unhandled unit: %v", i.GetText())
+		addr.Any = true
+		return addr
 	}
 }
