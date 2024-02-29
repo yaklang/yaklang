@@ -123,20 +123,13 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 		}
 	}
 	checkAssign()
-	if variable.IsMemberCall() {
-		obj, key := variable.GetMemberCall()
-		SetMemberCall(obj, key, value)
-		if objTyp, ok := ToObjectType(obj.GetType()); ok {
-			objTyp.AddField(key, value.GetType())
-		}
-	}
 
 	if !value.IsExtern() || value.GetName() != variable.GetName() {
 		// if value not extern instance
 		// or variable assign by extern instance (extern instance but name not equal)
 		b.GetProgram().SetInstructionWithName(variable.GetName(), value)
 	}
-	value.AddVariable(variable)
+
 }
 
 // ------------------- Create
