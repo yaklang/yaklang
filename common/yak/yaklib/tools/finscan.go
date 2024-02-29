@@ -161,47 +161,11 @@ func _finScanOptOpenPortInitPortFilter(f string) finScanOpt {
 //		}
 //	}
 func _finscanDo(targetChan chan string, ports string, config *_yakFinPortScanConfig) (chan *finscan.FinScanResult, error) {
-	var sampleTarget string
 
-	var newTargetChan = targetChan
 	if targetChan == nil {
 		return nil, utils.Errorf("empty target")
-	} else {
-		// copy/concat channel
-		result := <-targetChan
-		targetList := []string{result}
-		newTargetChan = make(chan string, 1)
-		newTargetChan <- result
-		go func() {
-			defer close(newTargetChan)
-			for {
-				select {
-				case result, ok := <-targetChan:
-					if !ok {
-						return
-					}
-					if config.IsFiltered(result, 0) {
-						continue
-					}
-					newTargetChan <- result
-				}
-			}
-		}()
-
-		if len(targetList) == 1 {
-			sampleTarget = targetList[0]
-		} else {
-			for _, target := range targetList {
-				if !utils.IsLoopback(target) {
-					sampleTarget = target
-					break
-				}
-			}
-			if sampleTarget == "" {
-				sampleTarget = targetList[1]
-			}
-		}
 	}
+	newTargetChan, sampleTarget := filterTargetChannel(targetChan, config.IsFiltered)
 
 	var closeResult = make(chan *finscan.FinScanResult, 10000)
 

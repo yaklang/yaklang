@@ -68,6 +68,13 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 		}
 		cacheId := codec.Sha256(hashRaw.String())
 		if handler, ok := getDaemonCache(cacheId); ok {
+			if conf.onNetInterfaceCreated != nil { // 取缓存时 检测是否有新的 onNetInterfaceCreated 回调
+				if conf.onNetInterfaceCreated != nil {
+					if oldHandle, ok := handler.handler.(*pcap.Handle); ok {
+						conf.onNetInterfaceCreated(oldHandle)
+					}
+				}
+			}
 			return cacheId, handler.handler, nil
 		}
 
