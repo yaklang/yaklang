@@ -7,6 +7,7 @@ import (
 	log "github.com/yaklang/yaklang/common/log"
 	utils2 "github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"net/http"
 	"net/url"
 	"strings"
@@ -155,33 +156,18 @@ func (f *Matcher) matchByRule(r *HTTPResponseInfo, ruleToUse *WebRule, config *C
 		value, ok := faviconCache.Load(r.URL.Host)
 		if !ok {
 			log.Debugf("sending active web-fingerprint request to: %s origin: %v", ruleToUse.Path, path)
-			newUrl := lowhttp.MergeUrlFromHTTPRequest(r.RequestRaw, ruleToUse.Path, r.IsHttps)
-			request := lowhttp.UrlToGetRequestPacket(newUrl, r.RequestRaw, r.IsHttps, lowhttp.ExtractCookieJarFromHTTPResponse(
-				append(r.ResponseHeaderBytes(), r.Body...))...)
-			host, port, _ := utils2.ParseStringToHostPort(r.URL.String())
-			isOpen, infos, err := FetchBannerFromHostPortEx(
-				utils2.TimeoutContext(config.ProbeTimeout), request, host, port, int64(config.FingerprintDataSize),
-				config.Proxies...)
+
+			rsp, req, err := poc.HTTP(r.RequestRaw, poc.WithReplaceHttpPacketPath(ruleToUse.Path), poc.WithForceHTTPS(r.IsHttps))
 			if err != nil {
-				log.Errorf("fetch banner for %v failed: %s", newUrl, err)
+				log.Errorf("poc.HTTP failed: %s", err)
 				return nil
 			}
-			_ = isOpen
-			var results []*CPE
-			for _, i := range infos {
-				if i == nil {
-					continue
-				}
-				byteFavicon, ok := value.([]byte)
-				if !ok {
-					byteFavicon = i.Body
-					faviconCache.Store(r.URL.Host, byteFavicon)
-				}
-				// Use the cached favicon
-				i.Body = byteFavicon
-				results = append(results, f.matchByRule(i, ruleToUse, config)...)
-			}
-			return results
+			httpRsp, err := lowhttp.ParseBytesToHTTPResponse(rsp)
+			httpReq, err := lowhttp.ParseBytesToHttpRequest(req)
+			httpRsp.Request = httpReq
+			info := ExtractHTTPResponseInfoFromHTTPResponse(httpRsp)
+			byteFavicon := info.Body
+			faviconCache.Store(r.URL.Host, byteFavicon)
 		} else {
 			favicon, ok := value.([]byte)
 			if !ok {
