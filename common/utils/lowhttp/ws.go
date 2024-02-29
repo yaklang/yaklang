@@ -68,10 +68,10 @@ func (f *Frame) Bytes() ([]byte, []byte) {
 	dataLength := uint64(len(data))
 	firstByte, secondByte := f.firstByte, f.secondByte
 
-	// 直接转发浏览器的 payload ，不再重新还原压缩
+	// 直接转发浏览器的 payload ，不再重新还原压缩(todo)
 	//if f.isDeflate && !f.IsControl() {
 	//	//if f.isDeflate {
-	//	data, err = deflate(data)
+	//	data, err := deflate(data)
 	//	if err != nil {
 	//		log.Errorf("frame deflate error: %v", err)
 	//		return nil, nil
@@ -463,13 +463,13 @@ func DataToWebsocketFrame(data []byte, firstByte byte, mask bool) (frame *Frame,
 	frame.payloadLength = uint64(dataLength)
 
 	// masking key
-	//if mask {
-	//	maskKey, err := generateMaskKey()
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	//	frame.maskingKey = maskKey
-	//}
+	if mask {
+		maskKey, err := generateMaskKey()
+		if err != nil {
+			return nil, err
+		}
+		frame.maskingKey = maskKey
+	}
 	//frame.payload = data
 	frame.payload = data
 	return frame, nil
