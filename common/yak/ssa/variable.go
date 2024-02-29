@@ -25,6 +25,18 @@ func NewVariable(globalIndex int, name string, local bool, scope ssautil.ScopedV
 	return ret
 }
 
+func (variable *Variable) Assign(value Value) error {
+	value.AddVariable(variable)
+	if variable.IsMemberCall() {
+		obj, key := variable.GetMemberCall()
+		SetMemberCall(obj, key, value)
+		if objTyp, ok := ToObjectType(obj.GetType()); ok {
+			objTyp.AddField(key, value.GetType())
+		}
+	}
+	return variable.Versioned.Assign(value)
+}
+
 func (v *Variable) SetMemberCall(obj, key Value) {
 	v.object = obj
 	v.key = key
