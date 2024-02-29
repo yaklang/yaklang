@@ -90,7 +90,8 @@ func (c *Call) handleMethod() {
 		builder := c.GetFunc().builder
 		recoverBuilder := builder.SetCurrent(c)
 		for name, value := range funcTyp.SideEffects {
-			builder.WriteVariable(name, value)
+			variable := builder.CreateVariable(name)
+			builder.AssignVariable(variable, value)
 		}
 		recoverBuilder()
 	}

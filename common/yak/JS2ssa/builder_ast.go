@@ -467,7 +467,8 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 	handlerAdvancedExpression := func(cond func(string) ssa.Value, trueExpr, falseExpr func() ssa.Value) ssa.Value {
 		// 逻辑运算聚合产生phi指令
 		id := uuid.NewString()
-		b.WriteVariable(id, b.EmitConstInstAny())
+		variable := b.CreateVariable(id)
+		b.AssignVariable(variable, b.EmitConstInstAny())
 		ifb := b.CreateIfBuilder()
 		ifb.AppendItem(
 			func() ssa.Value {
@@ -476,14 +477,16 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 
 			func() {
 				v := trueExpr()
-				b.WriteVariable(id, v)
+				variable := b.CreateVariable(id)
+				b.AssignVariable(variable, v)
 			},
 		)
 
 		if falseExpr != nil {
 			ifb.SetElse(func() {
 				v := falseExpr()
-				b.WriteVariable(id, v)
+				variable := b.CreateVariable(id)
+				b.AssignVariable(variable, v)
 			})
 		}
 
@@ -594,7 +597,8 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 		return handlerAdvancedExpression(
 			func(id string) ssa.Value {
 				v := getValue(s, 0)
-				b.WriteVariable(id, v)
+				variable := b.CreateVariable(id)
+				b.AssignVariable(variable, v)
 				return v
 			},
 			func() ssa.Value {
@@ -608,7 +612,8 @@ func (b *astbuilder) buildOnlyRightSingleExpression(stmt JS.ISingleExpressionCon
 		return handlerAdvancedExpression(
 			func(id string) ssa.Value {
 				v := getValue(s, 0)
-				b.WriteVariable(id, v)
+				variable := b.CreateVariable(id)
+				b.AssignVariable(variable, v)
 				return b.EmitUnOp(ssa.OpNot, v)
 			},
 			func() ssa.Value {
@@ -798,7 +803,8 @@ func (b *astbuilder) buildFunctionExpression(stmt *JS.FunctionExpressionContext)
 		}
 
 		if funcName != "" {
-			b.WriteVariable(funcName, newFunc)
+			variable := b.CreateVariable(funcName)
+			b.AssignVariable(variable, newFunc)
 		}
 
 		return newFunc
@@ -826,7 +832,8 @@ func (b *astbuilder) buildFunctionExpression(stmt *JS.FunctionExpressionContext)
 			}
 
 			if funcName != "" {
-				b.WriteVariable(funcName, newFunc)
+				variable := b.CreateVariable(funcName)
+				b.AssignVariable(variable, newFunc)
 			}
 
 			return newFunc
@@ -1118,7 +1125,8 @@ func (b *astbuilder) buildObjectLiteral(stmt *JS.ObjectLiteralContext) ssa.Value
 			}
 
 			if funcName != "" {
-				b.WriteVariable(funcName, newFunc)
+				variable := b.CreateVariable(funcName)
+				b.AssignVariable(variable, newFunc)
 			}
 			return newFunc
 
@@ -1567,7 +1575,8 @@ func (b *astbuilder) buildFunctionDeclaration(stmt *JS.FunctionDeclarationContex
 	}
 
 	if funcName != "" {
-		b.WriteVariable(funcName, newFunc)
+		variable := b.CreateVariable(funcName)
+		b.AssignVariable(variable, newFunc)
 	}
 	return newFunc
 }
