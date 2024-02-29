@@ -11,25 +11,6 @@ import (
 	"strconv"
 )
 
-const (
-	RuntimeExecClass               = "RuntimeExec"
-	ProcessBuilderExecClass        = "ProcessBuilderExec"
-	ProcessImplExecClass           = "ProcessImplExec"
-	DNSlogClass                    = "DNSlog"
-	SpringEchoClass                = "SpringEcho"
-	AutoEchoClass                  = "SpringEcho"
-	ModifyTomcatMaxHeaderSizeClass = "ModifyTomcatMaxHeaderSize"
-	EmptyClassInTemplate           = "EmptyClassInTemplate"
-	TcpReverseClass                = "TcpReverse"
-	TcpReverseShellClass           = "TcpReverseShell"
-	TomcatEchoClass                = "TomcatEcho"
-	BytesClass                     = "Bytes"
-	MultiEchoClass                 = "MultiEcho"
-	HeaderEchoClass                = "HeaderEcho"
-	SleepClass                     = "Sleep"
-	//NoneClass                                = "NoneClass"
-)
-
 type ClassPayload struct {
 	ClassName string
 	Help      string
@@ -50,7 +31,12 @@ func GetAllClassGenerator() map[string]*ClassPayload {
 func setClass(name string, help string, f func(config *ClassGenConfig) (*javaclassparser.ClassObject, error)) {
 	var templateBytes []byte
 	var err error
-	if name != BytesClass { // preload template, assert template name is valid
+	if name == BytesClass { // preload template, assert template name is valid
+		templateBytes, err = resources.YsoResourceFS.ReadFile(path.Join("classes", "TemplateImpClassLoader.class"))
+		if err != nil {
+			panic(fmt.Sprintf("read template class %s failed: %s", name, err))
+		}
+	} else {
 		templateBytes, err = resources.YsoResourceFS.ReadFile(path.Join("classes", name+".class"))
 		if err != nil {
 			panic(fmt.Sprintf("read template class %s failed: %s", name, err))
@@ -77,7 +63,6 @@ func setClass(name string, help string, f func(config *ClassGenConfig) (*javacla
 }
 
 type ClassGenConfig struct {
-	Errors    []error
 	ClassType string
 
 	// common
@@ -86,7 +71,8 @@ type ClassGenConfig struct {
 	IsConstruct   bool
 
 	// user define class
-	ClassBytes []byte
+	ClassBytes           []byte
+	Base64ClassBytesCode string
 
 	// exec
 	Command      string
@@ -125,16 +111,11 @@ func NewClassConfig(options ...GenClassOptionFun) *ClassGenConfig {
 	}
 	return obj
 }
-func (cf *ClassGenConfig) AddError(err error) {
-	if err != nil {
-		cf.Errors = append(cf.Errors, err)
-	}
-}
 
 // GetParamByName get param by name
 func (cf *ClassGenConfig) GetParamByName(name string) (string, bool) {
 	switch name {
-	case "command":
+	case "cmd":
 		return cf.Command, true
 	case "domain":
 		return cf.Domain, true
@@ -156,6 +137,8 @@ func (cf *ClassGenConfig) GetParamByName(name string) (string, bool) {
 		return cf.Token, true
 	case "sleepTime":
 		return strconv.Itoa(cf.SleepTime), true
+	case "base64Class":
+		return cf.Base64ClassBytesCode, true
 	}
 	return "", false
 }
@@ -170,7 +153,7 @@ func (cf *ClassGenConfig) GenerateClassObject() (obj *javaclassparser.ClassObjec
 	if YsoConfigInstance != nil && YsoConfigInstance.Classes != nil {
 		classTmplCfg, ok := YsoConfigInstance.Classes[cf.ClassType]
 		if !ok {
-			return nil, utils.Errorf("not found class type: %s", cf.ClassType)
+			return nil, utils.Errorf("load class: %s failed: not found template", cf.ClassType)
 		}
 		obj, err = javaclassparser.Parse(classTmplCfg.Template)
 		if err != nil {
@@ -187,7 +170,7 @@ func (cf *ClassGenConfig) GenerateClassObject() (obj *javaclassparser.ClassObjec
 			}
 			constant := obj.FindConstStringFromPool(fmt.Sprintf("{{%s}}", param.Name))
 			if constant == nil {
-				return nil, utils.Errorf("param %s not found in class %s", param.Name, cf.ClassType)
+				return nil, utils.Errorf("param %s not found in template class `%s`", param.Name, cf.ClassType)
 			}
 			constant.Value = utils.InterfaceToString(val)
 		}
@@ -405,6 +388,8 @@ func _init() {
 			if err != nil {
 				return nil, err
 			}
+			javaClassBuilder := javaclassparser.NewClassObjectBuilder(obj)
+			javaClassBuilder.SetParam("base64Class", cf.Base64ClassBytesCode)
 			return obj, nil
 		},
 	)
@@ -644,7 +629,7 @@ func SetClassBase64Bytes(base64 string) GenClassOptionFun {
 func SetClassBytes(data []byte) GenClassOptionFun {
 	return func(config *ClassGenConfig) {
 		config.ClassType = BytesClass
-		config.ClassBytes = data
+		config.Base64ClassBytesCode = codec.EncodeBase64(data)
 	}
 }
 

