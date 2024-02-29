@@ -40,7 +40,7 @@ type CaptureConfig struct {
 	Debug                 bool
 	onPoolCreated         []func(*TrafficPool)
 	onFlowCreated         func(*TrafficFlow)
-	onEveryPacket         func(packet gopacket.Packet)
+	onEveryPacket         []func(packet gopacket.Packet)
 	onNetInterfaceCreated func(handle *pcap.Handle)
 }
 
@@ -52,7 +52,10 @@ func emptyOption(_ *CaptureConfig) error {
 
 func WithEveryPacket(h func(packet gopacket.Packet)) CaptureOption {
 	return func(c *CaptureConfig) error {
-		c.onEveryPacket = h
+		if c.onEveryPacket == nil {
+			c.onEveryPacket = make([]func(packet gopacket.Packet), 0)
+		}
+		c.onEveryPacket = append(c.onEveryPacket, h)
 		return nil
 	}
 }
@@ -266,7 +269,9 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 
 	defer func() {
 		if c.onEveryPacket != nil {
-			c.onEveryPacket(packet)
+			for _, f := range c.onEveryPacket {
+				f(packet)
+			}
 		}
 	}()
 

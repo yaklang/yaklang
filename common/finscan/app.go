@@ -196,10 +196,17 @@ func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 
 	netInterface, err := pcaputil.PcapIfaceNameToNetInterface(ifaceName)
 	if err != nil {
-		return nil, utils.Errorf("no iface found")
+		return nil, utils.Errorf("iface not found")
 	}
 
 	deviceName := netInterface.Name
+
+	localNetInterface, err := pcaputil.PcapIfaceNameToNetInterface(localIfaceName)
+	if err != nil {
+		return nil, utils.Errorf("loopback iface not found")
+	}
+
+	localDeviceName := localNetInterface.Name
 
 	scannerCtx, cancel := context.WithCancel(ctx)
 	scanner := &Scanner{
@@ -230,6 +237,27 @@ func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 		macChan:            make(chan [2]net.HardwareAddr, 1),
 	}
 
+	packetHandle := func(packet gopacket.Packet) {
+		if tcpLayer := packet.TransportLayer(); tcpLayer != nil {
+			l, ok := tcpLayer.(*layers.TCP)
+			if !ok {
+				return
+			}
+
+			//端口扫描的响应包
+			if scanner.config.TcpFilter(l) {
+				if nl := packet.NetworkLayer(); nl != nil {
+					scanner.onRstAck(net.ParseIP(nl.NetworkFlow().Src().String()), int(l.SrcPort))
+				} else {
+					scanner.onNoRsp(net.ParseIP(nl.NetworkFlow().Src().String()), int(l.SrcPort))
+				}
+				return
+			}
+
+		}
+	}
+
+	// handle
 	go func() {
 		pcaputil.Start(
 			pcaputil.WithDevice(deviceName),
@@ -249,19 +277,6 @@ func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 							}
 						}
 						select {
-						case localPackets, ok := <-scanner.localHandlerWriteChan:
-							if !ok {
-								continue
-							}
-
-							err := handle.WritePacketData(localPackets)
-
-							total++
-							counter++
-
-							if err != nil {
-								log.Errorf("loopback handler write failed: %s", err)
-							}
 						case packets, ok := <-scanner.handlerWriteChan:
 							if !ok {
 								continue
@@ -299,25 +314,50 @@ func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 					}
 				}()
 			}),
-			pcaputil.WithEveryPacket(func(packet gopacket.Packet) {
-				if tcpLayer := packet.TransportLayer(); tcpLayer != nil {
-					l, ok := tcpLayer.(*layers.TCP)
-					if !ok {
-						return
-					}
+			pcaputil.WithEveryPacket(packetHandle),
+		)
+	}()
 
-					//端口扫描的响应包
-					if scanner.config.TcpFilter(l) {
-						if nl := packet.NetworkLayer(); nl != nil {
-							scanner.onRstAck(net.ParseIP(nl.NetworkFlow().Src().String()), int(l.SrcPort))
-						} else {
-							scanner.onNoRsp(net.ParseIP(nl.NetworkFlow().Src().String()), int(l.SrcPort))
+	//local handle
+	go func() {
+		pcaputil.Start(
+			pcaputil.WithDevice(localDeviceName),
+			pcaputil.WithEnableCache(true),
+			pcaputil.WithBPFFilter("(tcp[tcpflags] & (tcp-rst) != 0)"),
+			pcaputil.WithContext(ctx),
+			pcaputil.WithNetInterfaceCreated(func(handle *pcap.Handle) {
+				go func() {
+					var counter int
+					var total int64
+					for {
+						if scanner.delayMs > 0 && scanner.delayGapCount >= 0 {
+							if counter > scanner.delayGapCount {
+								counter = 0
+								//fmt.Printf("rate limit trigger! for %vms\n", s.delayMs)
+								scanner.sleepRateLimit()
+							}
 						}
-						return
-					}
+						select {
+						case localPackets, ok := <-scanner.localHandlerWriteChan:
+							if !ok {
+								continue
+							}
 
-				}
+							err := handle.WritePacketData(localPackets)
+
+							total++
+							counter++
+
+							if err != nil {
+								log.Errorf("loopback handler write failed: %s", err)
+							}
+						case <-scanner.ctx.Done():
+							return
+						}
+					}
+				}()
 			}),
+			pcaputil.WithEveryPacket(packetHandle),
 		)
 	}()
 

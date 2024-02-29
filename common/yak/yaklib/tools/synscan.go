@@ -334,9 +334,7 @@ func _synScanDo(targetChan chan string, ports string, config *_yakPortScanConfig
 		return nil, utils.Error("empty target")
 	}
 
-	filteredTargetChan, targetList := filterTargetChannel(targetChan, config)
-
-	sampleTarget := getSampleTarget(targetList)
+	filteredTargetChan, sampleTarget := filterTargetChannel(targetChan, config.IsFiltered)
 
 	openResult := make(chan *synscan.SynScanResult, 10000)
 
@@ -361,30 +359,60 @@ func _synScanDo(targetChan chan string, ports string, config *_yakPortScanConfig
 	}
 }
 
-func filterTargetChannel(targetChan chan string, config *_yakPortScanConfig) (chan string, []string) {
-	result := <-targetChan
-	targetList := []string{result}
-	newTargetChan := make(chan string, 1)
-	newTargetChan <- result
+func filterTargetChannel(targetChan chan string, filterFunc func(string, int) bool) (chan string, string) {
+	var hasLoopback bool
+	var hasSampleTarget bool
+	sampleTargetChan := make(chan string)
+	newTargetChan := make(chan string, 2) // 2缓冲区,至少有一个是非127
 
+	firstResult := <-targetChan // 取出一个目标 保证有返回值
+	if utils.IsLoopback(firstResult) {
+		newTargetChan <- "127.0.0.1" // 避免使用 loopback 网卡导致的源地址错误
+		hasLoopback = true
+	} else {
+		sampleTargetChan <- firstResult
+		hasSampleTarget = true
+		newTargetChan <- firstResult
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
-		defer close(newTargetChan)
+		defer func() {
+			close(newTargetChan)
+			cancel()
+		}()
+
 		for {
 			select {
 			case result, ok := <-targetChan:
 				if !ok {
 					return
 				}
-				if config.IsFiltered(result, 0) {
+				if filterFunc(result, 0) {
 					continue
 				}
-				newTargetChan <- result
-				targetList = append(targetList, result)
+				if !utils.IsLoopback(result) {
+					if !hasSampleTarget {
+						sampleTargetChan <- result
+						hasSampleTarget = true
+					}
+					newTargetChan <- result
+				} else if !hasLoopback { // 收取第一个本地回环目标，也仅收取一个
+					//newTargetChan <- result // 避免使用 loopback 网卡导致的源地址错误
+					newTargetChan <- "127.0.0.1" // 避免使用 loopback 网卡导致的源地址错误
+					hasLoopback = true
+				}
 			}
 		}
 	}()
 
-	return newTargetChan, targetList
+	select {
+	case sampleTarget := <-sampleTargetChan:
+		close(sampleTargetChan)
+		return newTargetChan, sampleTarget
+	case <-ctx.Done():
+	}
+	return newTargetChan, firstResult
 }
 
 func getSampleTarget(targetList []string) string {
