@@ -76,7 +76,7 @@ var (
 	cacheEthernetLock = new(sync.Mutex)
 )
 
-// 以进行一次连接的代价让操作系统帮我们src mac和det mac的获取
+// 以进行一次连接的代价让操作系统帮我们src mac和dst mac的获取
 // 实际上不需要等包发出去，也无所谓这个端口是否开放
 // dstPort可选，如果填了相当于多探测了这个端口一次
 func (s *Scanner) getDefaultEthernet(target string, dstPort int, gateway string) error {
@@ -237,10 +237,15 @@ func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 
 	netInterface, err := pcaputil.PcapIfaceNameToNetInterface(ifaceName)
 	if err != nil {
-		return nil, utils.Errorf("no iface found")
+		return nil, utils.Errorf("iface not found")
 	}
-
 	deviceName := netInterface.Name
+
+	localNetInterface, err := pcaputil.PcapIfaceNameToNetInterface(localIfaceName)
+	if err != nil {
+		return nil, utils.Errorf("loopback iface not unfound")
+	}
+	localDeviceName := localNetInterface.Name
 
 	scannerCtx, cancel := context.WithCancel(ctx)
 	scanner := &Scanner{
@@ -271,6 +276,59 @@ func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 		macChan:            make(chan [2]net.HardwareAddr, 100),
 	}
 
+	packetHandle := func(packet gopacket.Packet) {
+		if arpLayer := packet.Layer(layers.LayerTypeARP); arpLayer != nil {
+			switch arpLayer.LayerType() {
+			case layers.LayerTypeARP:
+				arp, ok := arpLayer.(*layers.ARP)
+				if !ok {
+					return
+				}
+				srcIP := net.IP(arp.SourceProtAddress)
+				srcHw := net.HardwareAddr(arp.SourceHwAddress)
+				scanner.onARP(srcIP, srcHw)
+			}
+		}
+
+		if tcpSynLayer := packet.TransportLayer(); tcpSynLayer != nil {
+			l, ok := tcpSynLayer.(*layers.TCP)
+			if !ok {
+				return
+			}
+
+			if l.SYN && l.ACK {
+				if nl := packet.NetworkLayer(); nl != nil {
+					scanner.onSynAck(net.ParseIP(nl.NetworkFlow().Src().String()), int(l.SrcPort))
+				}
+				return
+			}
+
+			if l.SYN && !l.ACK && scanner.tmpTargetForDetectMAC != "" {
+				nl := packet.NetworkLayer()
+				if nl == nil {
+					return
+				}
+
+				if nl.NetworkFlow().Dst().String() != scanner.tmpTargetForDetectMAC {
+					return
+				}
+				eth := packet.LinkLayer()
+				if eth == nil {
+					return
+				}
+				l, ok := eth.(*layers.Ethernet)
+				if !ok {
+					return
+				}
+				// 缓存地址 mac 地址
+				select {
+				case scanner.macChan <- [2]net.HardwareAddr{l.SrcMAC, l.DstMAC}:
+				default:
+				}
+			}
+		}
+	}
+
 	// handler
 	go func() {
 		pcaputil.Start(
@@ -291,19 +349,6 @@ func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 							}
 						}
 						select {
-						case localPackets, ok := <-scanner.localHandlerWriteChan:
-							if !ok {
-								continue
-							}
-
-							err := handle.WritePacketData(localPackets)
-
-							total++
-							counter++
-
-							if err != nil {
-								//log.Errorf("loopback handler write failed: %s", err)
-							}
 						case packets, ok := <-scanner.handlerWriteChan:
 							if !ok {
 								continue
@@ -341,58 +386,50 @@ func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 					}
 				}()
 			}),
-			pcaputil.WithEveryPacket(func(packet gopacket.Packet) {
-				if arpLayer := packet.Layer(layers.LayerTypeARP); arpLayer != nil {
-					switch arpLayer.LayerType() {
-					case layers.LayerTypeARP:
-						arp, ok := arpLayer.(*layers.ARP)
-						if !ok {
-							return
-						}
-						srcIP := net.IP(arp.SourceProtAddress)
-						srcHw := net.HardwareAddr(arp.SourceHwAddress)
-						scanner.onARP(srcIP, srcHw)
-					}
-				}
+			pcaputil.WithEveryPacket(packetHandle),
+		)
+	}()
 
-				if tcpSynLayer := packet.TransportLayer(); tcpSynLayer != nil {
-					l, ok := tcpSynLayer.(*layers.TCP)
-					if !ok {
-						return
-					}
-
-					if l.SYN && l.ACK {
-						if nl := packet.NetworkLayer(); nl != nil {
-							scanner.onSynAck(net.ParseIP(nl.NetworkFlow().Src().String()), int(l.SrcPort))
+	// local handler
+	go func() {
+		pcaputil.Start(
+			pcaputil.WithDevice(localDeviceName),
+			pcaputil.WithEnableCache(true),
+			pcaputil.WithBPFFilter("(arp) or (tcp[tcpflags] & (tcp-syn) != 0)"),
+			pcaputil.WithContext(ctx),
+			pcaputil.WithNetInterfaceCreated(func(handle *pcap.Handle) {
+				go func() {
+					var counter int
+					var total int64
+					for {
+						if scanner.delayMs > 0 && scanner.delayGapCount > 0 {
+							if counter > scanner.delayGapCount {
+								counter = 0
+								//fmt.Printf("rate limit trigger! for %vms\n", s.delayMs)
+								scanner.sleepRateLimit()
+							}
 						}
-						return
-					}
-
-					if l.SYN && !l.ACK && scanner.tmpTargetForDetectMAC != "" {
-						nl := packet.NetworkLayer()
-						if nl == nil {
-							return
-						}
-
-						if nl.NetworkFlow().Dst().String() != scanner.tmpTargetForDetectMAC {
-							return
-						}
-						eth := packet.LinkLayer()
-						if eth == nil {
-							return
-						}
-						l, ok := eth.(*layers.Ethernet)
-						if !ok {
-							return
-						}
-						// 缓存地址 mac 地址
 						select {
-						case scanner.macChan <- [2]net.HardwareAddr{l.SrcMAC, l.DstMAC}:
-						default:
+						case localPackets, ok := <-scanner.localHandlerWriteChan:
+							if !ok {
+								continue
+							}
+
+							err := handle.WritePacketData(localPackets)
+
+							total++
+							counter++
+
+							if err != nil {
+								//log.Errorf("loopback handler write failed: %s", err)
+							}
+						case <-scanner.ctx.Done():
+							return
 						}
 					}
-				}
+				}()
 			}),
+			pcaputil.WithEveryPacket(packetHandle),
 		)
 	}()
 
