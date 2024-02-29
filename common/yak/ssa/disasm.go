@@ -265,7 +265,7 @@ func (c *Call) String() string {
 }
 
 func (s *SideEffect) String() string {
-	return fmt.Sprintf("%s = side-effect %s [%s]", getStr(s), getStr(s.target), s.GetName())
+	return fmt.Sprintf("%s = side-effect %s [%s] by %s", getStr(s), getStr(s.Value), s.GetName(), getStr(s.CallSite))
 }
 
 // ----------- Switch

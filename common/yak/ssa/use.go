@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/slices"
 )
@@ -156,10 +157,17 @@ func (c *Call) ReplaceValue(v Value, to Value) {
 
 // ------------ SideEffect
 func (s *SideEffect) HasValues() bool   { return true }
-func (s *SideEffect) GetValues() Values { return []Value{s.target} }
+func (s *SideEffect) GetValues() Values { return []Value{s.CallSite, s.Value} }
 func (s *SideEffect) ReplaceValue(v Value, to Value) {
-	if s.target == v {
-		s.target = to
+	if s.CallSite == v {
+		c, ok := ToCall(to)
+		if !ok {
+			log.Errorf("SideEffect not use this value")
+			return
+		}
+		s.CallSite = c
+	} else if s.Value == v {
+		s.Value = to
 	} else {
 		panic("SideEffect not use this value")
 	}

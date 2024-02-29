@@ -255,7 +255,7 @@ func TestClosure_SideEffect(t *testing.T) {
 		}
 		println(a) // phi 1, 0
 		`, []string{
-			"phi(a)[1,0]",
+			"phi(a)[side-effect(1, a),0]",
 		}, t)
 	})
 
@@ -276,7 +276,7 @@ func TestClosure_SideEffect(t *testing.T) {
 		f() 
 		println(a) // 1
 		`, []string{
-			"1", "2",
+			"1", "side-effect(2, a)",
 			"1", "1",
 		}, t)
 	})
@@ -291,7 +291,7 @@ func TestClosure_SideEffect(t *testing.T) {
 		a.change("c")
 		println(b)
 		`, []string{
-			"Parameter-i",
+			"side-effect(Parameter-i, b)",
 		}, t)
 	})
 
@@ -309,7 +309,7 @@ func TestClosure_SideEffect(t *testing.T) {
 		println(a.key) // parameter-i
 		`, []string{
 			"1",
-			"Parameter-i",
+			"side-effect(Parameter-i, #0.key)",
 		}, t)
 	})
 
@@ -325,7 +325,7 @@ func TestClosure_SideEffect(t *testing.T) {
 		println(a.key) // parameter-i
 		`, []string{
 			"Undefined-#2.key(valid)",
-			"Parameter-i",
+			"side-effect(Parameter-i, #2.key)",
 		}, t)
 	})
 
@@ -344,7 +344,7 @@ func TestClosure_SideEffect(t *testing.T) {
 		println(a.key)
 		`, []string{
 			"1",
-			"Parameter-i",
+			"side-effect(Parameter-i, #0.key)",
 		}, t)
 	})
 
@@ -359,7 +359,7 @@ func TestClosure_SideEffect(t *testing.T) {
 		println(a.key)
 		`, []string{
 			"1",
-			"Parameter-i",
+			"side-effect(Parameter-i, #0.key)",
 		}, t)
 	})
 }
