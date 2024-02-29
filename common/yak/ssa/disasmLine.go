@@ -171,7 +171,8 @@ func lineDisasm(v Instruction, liner DisasmLiner) (ret string) {
 		}
 		return fmt.Sprintf("%s(%s%s)", liner.DisasmValue(v.Method), arg, binding)
 	case *SideEffect:
-		return fmt.Sprintf("side-effect(%s, %s)", liner.DisasmValue(v.target), v.GetName())
+		// return fmt.Sprintf("side-effect(%s, %s, by %s)", liner.DisasmValue(v.Value), v.GetName(), liner.DisasmValue(v.CallSite))
+		return fmt.Sprintf("side-effect(%s, %s)", liner.DisasmValue(v.Value), v.GetName())
 	case *Make:
 		return fmt.Sprintf("make(%s)", v.GetType())
 	case *Next:

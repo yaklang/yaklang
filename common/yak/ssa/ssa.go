@@ -434,7 +434,8 @@ var (
 type SideEffect struct {
 	anInstruction
 	anValue
-	target Value // call instruction
+	CallSite *Call // call instruction
+	Value    Value // modify to this value
 }
 
 var (
