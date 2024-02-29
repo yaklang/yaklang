@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"sync"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
@@ -36,6 +37,10 @@ type ScopedVersionedTableIF[T versionedValue] interface {
 	AssignVariable(VersionedIF[T], T)
 
 	GetVariableFromValue(T) VersionedIF[T]
+
+	// this scope
+	SetThis(ScopedVersionedTableIF[T])
+	GetThis() ScopedVersionedTableIF[T]
 
 	// create sub scope
 	CreateSubScope() ScopedVersionedTableIF[T]
@@ -76,6 +81,7 @@ type ScopedVersionedTable[T versionedValue] struct {
 	createEmptyPhi func(string) T
 
 	// relations
+	this   ScopedVersionedTableIF[T]
 	parent ScopedVersionedTableIF[T]
 }
 
@@ -93,10 +99,11 @@ func NewScope[T versionedValue](
 		captured:      omap.NewOrderedMap[string, VersionedIF[T]](map[string]VersionedIF[T]{}),
 		incomingPhi:   omap.NewOrderedMap[string, VersionedIF[T]](map[string]VersionedIF[T]{}),
 		table:         table,
-		parent:        parent,
 	}
+	s.SetThis(s)
 	if parent != nil {
 		s.level = parent.GetScopeLevel() + 1
+		s.parent = parent.GetThis()
 	} else {
 		s.level = 0
 	}
@@ -138,6 +145,14 @@ func (v *ScopedVersionedTable[T]) IsRoot() bool {
 	return v.parent == nil
 }
 
+func (v *ScopedVersionedTable[T]) SetThis(scope ScopedVersionedTableIF[T]) {
+	v.this = scope
+}
+
+func (v *ScopedVersionedTable[T]) GetThis() ScopedVersionedTableIF[T] {
+	return v.this
+}
+
 func isZeroValue(i any) bool {
 	if i == nil {
 		return true
@@ -173,12 +188,13 @@ func (scope *ScopedVersionedTable[T]) ReadVariable(name string) VersionedIF[T] {
 			ret = nil
 		}
 	}
-	if ret != nil && ret.GetScope() != scope {
+	if ret != nil && ret.GetScope() != scope.GetThis() {
 		// not in current scope
 		if scope.spin {
 			t := scope.CreateVariable(name, false)
 			scope.AssignVariable(t, scope.createEmptyPhi(name))
 			// t.origin = ret
+			log.Infof("create phi %s in scope %d", name, scope.GetScopeLevel())
 			scope.incomingPhi.Set(name, t)
 			ret = t
 		}
@@ -287,7 +303,7 @@ func (v *ScopedVersionedTable[T]) newVar(lexName string, local bool) VersionedIF
 	global := v.offsetFetcher()
 	varIns := v.newVersioned(
 		global,
-		lexName, local, v,
+		lexName, local, v.GetThis(),
 	)
 	v.table[global] = varIns
 	return varIns

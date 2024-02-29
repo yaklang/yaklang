@@ -1,6 +1,8 @@
 package yak2ssa
 
 import (
+	"runtime/debug"
+
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
@@ -31,7 +33,7 @@ type astbuilder struct {
 func parseSSA(src string, force bool, prog *ssa.Program, callback func(*ssa.FunctionBuilder)) (ret *ssa.Program, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			// debug.PrintStack()
+			debug.PrintStack()
 			ret = nil
 			err = utils.Errorf("parse error with panic : %v", r)
 		}
