@@ -10,7 +10,7 @@ import (
 
 // TestGetConfig assert config is valid
 func TestGetConfig(t *testing.T) {
-	config, err := GetConfig()
+	config, err := getConfig()
 	if err != nil {
 		t.Fatal(err)
 	}

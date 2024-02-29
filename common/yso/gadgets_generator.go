@@ -7,43 +7,14 @@ import (
 	"reflect"
 )
 
-const (
-	BeanShell1GadgetName              = "BeanShell1"
-	CommonsCollections1GadgetName     = "CommonsCollections1"
-	CommonsCollections5GadgetName     = "CommonsCollections5"
-	CommonsCollections6GadgetName     = "CommonsCollections6"
-	CommonsCollections7GadgetName     = "CommonsCollections7"
-	CommonsCollectionsK3GadgetName    = "CommonsCollectionsK3"
-	CommonsCollectionsK4GadgetName    = "CommonsCollectionsK4"
-	Groovy1GadgetName                 = "Groovy1"
-	Click1GadgetName                  = "Click1"
-	CommonsBeanutils1GadgetName       = "CommonsBeanutils1"
-	CommonsBeanutils183NOCCGadgetName = "CommonsBeanutils183NOCC"
-	CommonsBeanutils192NOCCGadgetName = "CommonsBeanutils192NOCC"
-	CommonsCollections2GadgetName     = "CommonsCollections2"
-	CommonsCollections3GadgetName     = "CommonsCollections3"
-	CommonsCollections4GadgetName     = "CommonsCollections4"
-	CommonsCollections8GadgetName     = "CommonsCollections8"
-	CommonsCollectionsK1GadgetName    = "CommonsCollectionsK1"
-	CommonsCollectionsK2GadgetName    = "CommonsCollectionsK2"
-	JBossInterceptors1GadgetName      = "JBossInterceptors1"
-	JSON1GadgetName                   = "JSON1"
-	JavassistWeld1GadgetName          = "JavassistWeld1"
-	Jdk7u21GadgetName                 = "Jdk7u21"
-	Jdk8u20GadgetName                 = "Jdk8u20"
-	URLDNS                            = "URLDNS"
-	FindGadgetByDNS                   = "FindGadgetByDNS"
-	FindClassByBomb                   = "FindClassByBomb"
-)
-
 type GadgetInfo struct {
-	Name            string
-	GeneratorName   string
-	Generator       any
-	NameVerbose     string
-	Help            string
-	YakFun          string
-	SupportTemplate bool
+	Name                string
+	GeneratorName       string
+	Generator           any
+	NameVerbose         string
+	Help                string
+	YakFun              string
+	SupportTemplateImpl bool
 }
 
 func (g *GadgetInfo) GetNameVerbose() string {
@@ -56,7 +27,7 @@ func (g *GadgetInfo) GetHelp() string {
 	return g.Help
 }
 func (g *GadgetInfo) IsSupportTemplate() bool {
-	return g.SupportTemplate
+	return g.SupportTemplateImpl
 }
 
 var AllGadgets = map[string]*GadgetInfo{
@@ -127,13 +98,13 @@ func RegisterGadget(f any, name string, verbose string, help string) {
 		}
 	}
 	AllGadgets[name] = &GadgetInfo{
-		Name:            name,
-		NameVerbose:     verbose,
-		Generator:       f,
-		GeneratorName:   name,
-		Help:            help,
-		SupportTemplate: supportTemplate,
-		YakFun:          fmt.Sprintf("Get%sJavaObject", name),
+		Name:                name,
+		NameVerbose:         verbose,
+		Generator:           f,
+		GeneratorName:       name,
+		Help:                help,
+		SupportTemplateImpl: supportTemplate,
+		YakFun:              fmt.Sprintf("Get%sJavaObject", name),
 	}
 }
 
@@ -155,8 +126,97 @@ var verboseWrapper = func(y yserx.JavaSerializable, verbose *GadgetInfo) *JavaOb
 
 type TemplatesGadget func(options ...GenClassOptionFun) (*JavaObject, error)
 type RuntimeExecGadget func(cmd string) (*JavaObject, error)
+type GenGadgetOptionFun func(*GenerateGadgetConfig)
+type GenerateGadgetConfig struct {
+	ChainType string
+	Args      []string
+}
 
-func ConfigJavaObject(templ []byte, name string, options ...GenClassOptionFun) (*JavaObject, error) {
+func SetTransformChainType(s string, arg1 string, args ...string) GenGadgetOptionFun {
+	return func(config *GenerateGadgetConfig) {
+		config.ChainType = s
+		config.Args = append([]string{arg1}, args...)
+	}
+}
+func GenerateGadget(name string, opts ...any) (*JavaObject, error) {
+	genConfig := &GenerateGadgetConfig{}
+	genClassCfg := NewClassConfig()
+	for _, opt := range opts {
+		switch f := opt.(type) {
+		case GenGadgetOptionFun:
+			f(genConfig)
+		case GenClassOptionFun:
+			f(genClassCfg)
+		default:
+			return nil, utils.Errorf("unknown option type: %v(need type GenGadgetOptionFun or GenClassOptionFun)", reflect.TypeOf(opt).String())
+		}
+	}
+	cfg, ok := YsoConfigInstance.Gadgets[name]
+	if !ok {
+		return nil, utils.Errorf("not found template: %s", name)
+	}
+	if cfg.IsTemplate {
+		templ := cfg.Template
+		if genClassCfg.ClassType == "" {
+			genClassCfg.ClassType = RuntimeExecClass
+		}
+		classObj, err := genClassCfg.GenerateClassObject()
+		if err != nil {
+			return nil, err
+		}
+		classObj, err = NewClassConfig(SetClassBytes(classObj.Bytes())).GenerateClassObject()
+		if err != nil {
+			return nil, err
+		}
+		objs, err := yserx.ParseJavaSerialized(templ)
+		if err != nil {
+			return nil, err
+		}
+		obj := objs[0]
+		err = SetJavaObjectClass(obj, classObj)
+		if err != nil {
+			return nil, utils.Errorf("set class object failed: %v", err)
+		}
+		return verboseWrapper(obj, AllGadgets[name]), nil
+	} else {
+		chainType := genConfig.ChainType
+		if chainType == "" {
+			chainType = "raw_cmd"
+		}
+		template, ok := cfg.ChainTemplate[chainType]
+		if !ok {
+			return nil, utils.Errorf("template: %s_%s", name, chainType)
+		}
+		objs, err := yserx.ParseJavaSerialized(template)
+		if err != nil {
+			return nil, err
+		}
+		if len(objs) <= 0 {
+			return nil, utils.Error("parse gadget error")
+		}
+		obj := objs[0]
+		if len(genConfig.Args) == 0 {
+			return nil, utils.Errorf("transform chain template need at least one arg")
+		}
+		for i, arg := range genConfig.Args {
+			err = ReplaceStringInJavaSerilizable(obj, fmt.Sprintf("{{param%d}}", i), arg, 1)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return verboseWrapper(obj, AllGadgets[name]), nil
+	}
+}
+
+func ConfigJavaObject(name string, options ...GenClassOptionFun) (*JavaObject, error) {
+	cfg, ok := YsoConfigInstance.Gadgets[name]
+	if !ok {
+		return nil, utils.Errorf("gadget %s not found", name)
+	}
+	if !cfg.IsTemplate {
+		return nil, utils.Errorf("gadget %s not support template", name)
+	}
+	templ := cfg.Template
 	config := NewClassConfig(options...)
 	if config.ClassType == "" {
 		config.ClassType = RuntimeExecClass
@@ -172,7 +232,7 @@ func ConfigJavaObject(templ []byte, name string, options ...GenClassOptionFun) (
 	obj := objs[0]
 	err = SetJavaObjectClass(obj, classObj)
 	if err != nil {
-		return nil, err
+		return nil, utils.Errorf("set class object failed: %v", err)
 	}
 	return verboseWrapper(obj, AllGadgets[name]), nil
 }
@@ -385,7 +445,7 @@ func GetGroovy1JavaObject(cmd string) (*JavaObject, error) {
 //
 // ```
 func GetClick1JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return ConfigJavaObject(template_ser_Click1, "Click1", options...)
+	return ConfigJavaObject("Click1", options...)
 }
 
 // GetCommonsBeanutils1JavaObject 基于Commons Beanutils 1 序列化模板生成并返回一个Java对象。
@@ -406,7 +466,7 @@ func GetClick1JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
 // )
 // ```
 func GetCommonsBeanutils1JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return ConfigJavaObject(template_ser_CommonsBeanutils1, "CommonsBeanutils1", options...)
+	return ConfigJavaObject("CommonsBeanutils1", options...)
 }
 
 // GetCommonsBeanutils183NOCCJavaObject 基于Commons Beanutils 1.8.3 序列化模板生成并返回一个Java对象。
@@ -428,7 +488,7 @@ func GetCommonsBeanutils1JavaObject(options ...GenClassOptionFun) (*JavaObject, 
 // )
 // ```
 func GetCommonsBeanutils183NOCCJavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return ConfigJavaObject(template_ser_CommonsBeanutils183NOCC, "CommonsBeanutils183NOCC", options...)
+	return ConfigJavaObject("CommonsBeanutils183NOCC", options...)
 }
 
 // GetCommonsBeanutils192NOCCJavaObject 基于Commons Beanutils 1.9.2 序列化模板生成并返回一个Java对象。
@@ -450,7 +510,7 @@ func GetCommonsBeanutils183NOCCJavaObject(options ...GenClassOptionFun) (*JavaOb
 // )
 // ```
 func GetCommonsBeanutils192NOCCJavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return ConfigJavaObject(template_ser_CommonsBeanutils192NOCC, "CommonsBeanutils192NOCC", options...)
+	return ConfigJavaObject("CommonsBeanutils192NOCC", options...)
 }
 
 // GetCommonsCollections2JavaObject 基于Commons Collections 4.0 序列化模板生成并返回一个Java对象。
@@ -471,7 +531,7 @@ func GetCommonsBeanutils192NOCCJavaObject(options ...GenClassOptionFun) (*JavaOb
 // )
 // ```
 func GetCommonsCollections2JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return ConfigJavaObject(template_ser_CommonsCollections2, "CommonsCollections2", options...)
+	return ConfigJavaObject("CommonsCollections2", options...)
 }
 
 // GetCommonsCollections3JavaObject 基于Commons Collections 3.1 序列化模板生成并返回一个Java对象。
@@ -492,7 +552,7 @@ func GetCommonsCollections2JavaObject(options ...GenClassOptionFun) (*JavaObject
 // )
 // ```
 func GetCommonsCollections3JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return ConfigJavaObject(template_ser_CommonsCollections3, "CommonsCollections3", options...)
+	return ConfigJavaObject("CommonsCollections3", options...)
 }
 
 // GetCommonsCollections4JavaObject 基于Commons Collections 4.0 序列化模板生成并返回一个Java对象。
@@ -513,7 +573,7 @@ func GetCommonsCollections3JavaObject(options ...GenClassOptionFun) (*JavaObject
 // )
 // ```
 func GetCommonsCollections4JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return ConfigJavaObject(template_ser_CommonsCollections4, "CommonsCollections4", options...)
+	return ConfigJavaObject("CommonsCollections4", options...)
 }
 
 // GetCommonsCollections8JavaObject 基于Commons Collections 4.0 序列化模板生成并返回一个Java对象。
@@ -534,7 +594,7 @@ func GetCommonsCollections4JavaObject(options ...GenClassOptionFun) (*JavaObject
 // )
 // ```
 func GetCommonsCollections8JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return ConfigJavaObject(template_ser_CommonsCollections8, "CommonsCollections8", options...)
+	return ConfigJavaObject("CommonsCollections8", options...)
 }
 
 // GetCommonsCollectionsK1JavaObject 基于Commons Collections <=3.2.1 序列化模板生成并返回一个Java对象。
@@ -555,7 +615,7 @@ func GetCommonsCollections8JavaObject(options ...GenClassOptionFun) (*JavaObject
 // )
 // ```
 func GetCommonsCollectionsK1JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return ConfigJavaObject(template_ser_CommonsCollectionsK1, "CommonsCollectionsK1", options...)
+	return ConfigJavaObject("CommonsCollectionsK1", options...)
 }
 
 // GetCommonsCollectionsK2JavaObject 基于Commons Collections 4.0 序列化模板生成并返回一个Java对象。
@@ -576,7 +636,7 @@ func GetCommonsCollectionsK1JavaObject(options ...GenClassOptionFun) (*JavaObjec
 // )
 // ```
 func GetCommonsCollectionsK2JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return ConfigJavaObject(template_ser_CommonsCollectionsK2, "CommonsCollectionsK2", options...)
+	return ConfigJavaObject("CommonsCollectionsK2", options...)
 }
 
 // GetJBossInterceptors1JavaObject 基于JBossInterceptors1 序列化模板生成并返回一个Java对象。
@@ -597,7 +657,7 @@ func GetCommonsCollectionsK2JavaObject(options ...GenClassOptionFun) (*JavaObjec
 // )
 // ```
 func GetJBossInterceptors1JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return ConfigJavaObject(template_ser_JBossInterceptors1, "JBossInterceptors1", options...)
+	return ConfigJavaObject("JBossInterceptors1", options...)
 }
 
 // GetJSON1JavaObject 基于JSON1 序列化模板生成并返回一个Java对象。
@@ -618,7 +678,7 @@ func GetJBossInterceptors1JavaObject(options ...GenClassOptionFun) (*JavaObject,
 // )
 // ```
 func GetJSON1JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return ConfigJavaObject(template_ser_JSON1, "JSON1", options...)
+	return ConfigJavaObject("JSON1", options...)
 }
 
 // GetJavassistWeld1JavaObject 基于JavassistWeld1 序列化模板生成并返回一个Java对象。
@@ -646,7 +706,7 @@ func GetJavassistWeld1JavaObject(options ...GenClassOptionFun) (*JavaObject, err
 	//obj := objs[0]
 	//return verboseWrapper(obj, AllGadgets["JavassistWeld1"]), nil
 
-	return ConfigJavaObject(template_ser_JavassistWeld1, "JavassistWeld1", options...)
+	return ConfigJavaObject("JavassistWeld1", options...)
 }
 
 // GetJdk7u21JavaObject 基于Jdk7u21 序列化模板生成并返回一个Java对象。
@@ -667,7 +727,7 @@ func GetJavassistWeld1JavaObject(options ...GenClassOptionFun) (*JavaObject, err
 // )
 // ```
 func GetJdk7u21JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return ConfigJavaObject(template_ser_Jdk7u21, "Jdk7u21", options...)
+	return ConfigJavaObject("Jdk7u21", options...)
 }
 
 // GetJdk8u20JavaObject 基于Jdk8u20 序列化模板生成并返回一个Java对象。
@@ -688,7 +748,7 @@ func GetJdk7u21JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
 // )
 // ```
 func GetJdk8u20JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return ConfigJavaObject(template_ser_Jdk8u20, "Jdk8u20", options...)
+	return ConfigJavaObject("Jdk8u20", options...)
 }
 
 // GetURLDNSJavaObject 利用Java URL类的特性，生成一个在反序列化时会尝试对提供的URL执行DNS查询的Java对象。
@@ -722,10 +782,10 @@ func GetURLDNSJavaObject(url string) (*JavaObject, error) {
 		return nil, err
 	}
 	return verboseWrapper(obj, &GadgetInfo{
-		Name:            "URLDNS",
-		NameVerbose:     "URLDNS",
-		SupportTemplate: false,
-		Help:            "",
+		Name:                "URLDNS",
+		NameVerbose:         "URLDNS",
+		SupportTemplateImpl: false,
+		Help:                "",
 	}), nil
 }
 
@@ -760,10 +820,10 @@ func GetFindGadgetByDNSJavaObject(url string) (*JavaObject, error) {
 		return nil, err
 	}
 	return verboseWrapper(obj, &GadgetInfo{
-		Name:            "FindGadgetByDNS",
-		NameVerbose:     "FindGadgetByDNS",
-		SupportTemplate: false,
-		Help:            "",
+		Name:                "FindGadgetByDNS",
+		NameVerbose:         "FindGadgetByDNS",
+		SupportTemplateImpl: false,
+		Help:                "",
 	}), nil
 }
 
@@ -787,10 +847,10 @@ func GetFindClassByBombJavaObject(className string) (*JavaObject, error) {
 		return nil, err
 	}
 	return verboseWrapper(obj, &GadgetInfo{
-		Name:            "FindClassByBomb",
-		NameVerbose:     "FindClassByBomb",
-		SupportTemplate: false,
-		Help:            "通过构造反序列化炸弹探测Gadget",
+		Name:                "FindClassByBomb",
+		NameVerbose:         "FindClassByBomb",
+		SupportTemplateImpl: false,
+		Help:                "通过构造反序列化炸弹探测Gadget",
 	}), nil
 }
 
@@ -814,10 +874,10 @@ func GetSimplePrincipalCollectionJavaObject() (*JavaObject, error) {
 		return nil, err
 	}
 	return verboseWrapper(obj, &GadgetInfo{
-		Name:            "SimplePrincipalCollection",
-		NameVerbose:     "SimplePrincipalCollection",
-		SupportTemplate: false,
-		Help:            "",
+		Name:                "SimplePrincipalCollection",
+		NameVerbose:         "SimplePrincipalCollection",
+		SupportTemplateImpl: false,
+		Help:                "",
 	}), nil
 }
 
@@ -855,7 +915,7 @@ func GetAllGadget() []interface{} {
 func GetAllTemplatesGadget() []TemplatesGadget {
 	var alGadget []TemplatesGadget
 	for _, gadget := range AllGadgets {
-		if gadget.SupportTemplate {
+		if gadget.SupportTemplateImpl {
 			alGadget = append(alGadget, gadget.Generator.(func(options ...GenClassOptionFun) (*JavaObject, error)))
 		}
 	}
@@ -883,7 +943,7 @@ func GetAllTemplatesGadget() []TemplatesGadget {
 func GetAllRuntimeExecGadget() []RuntimeExecGadget {
 	var alGadget []RuntimeExecGadget
 	for _, gadget := range AllGadgets {
-		if !gadget.SupportTemplate {
+		if !gadget.SupportTemplateImpl {
 			alGadget = append(alGadget, gadget.Generator.(func(cmd string) (*JavaObject, error)))
 		}
 	}
