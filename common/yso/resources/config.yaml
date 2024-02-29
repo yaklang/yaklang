@@ -10,6 +10,11 @@
 #      default: "" # 参数默认值（可选）
 #      test-default: "" # 测试时使用的默认值（可选）
 Classes:
+  TemplateImplClassLoader:
+    desc: 用于TemplateImp的类加载器，可以加载未继承AbstractTranslet的类
+    params:
+      - name: base64Class
+        desc: base64编码的字节码
   DNSLog:
     desc: 通过DnsLog反连检测代码执行
     params:
@@ -22,27 +27,105 @@ Classes:
       - name: max
         desc: 最大长度
         default: 40960
-
+  RuntimeExec:
+    desc: 命令执行
+    params:
+      - name: cmd
+        desc: 命令
+        default: "whoami"
+  EmptyClassInTemplate:
+    desc: 用于TemplateImpl的空类
 # Gadgets配置
 #BeanShell1: # gadget名(用于索引模板文件)
 #  name: BeanShell1 # 展示名(可选)
 #  desc: 命令执行 # gadget描述(可选)
 #  template: false # 模板gadget，可选，默认为false
 Gadgets:
-  BeanShell1:
-    desc:
   CommonsCollections1:
     desc:
+  CommonsCollections2:
+    desc:
+    template: true
+  CommonsCollections3:
+    desc:
+    template: true
+  CommonsCollections4:
+    desc:
+    template: true
   CommonsCollections5:
     desc:
   CommonsCollections6:
     desc:
   CommonsCollections7:
     desc:
+  CommonsCollections8:
+    desc:
+    template: true
+  CommonsCollections9:
+    desc:
+  CommonsCollections10:
+    desc:
+    template: true
+  CommonsCollections11:
+    desc:
+    template: true
+  CommonsCollectionsK1:
+    desc:
+    template: true
+  CommonsCollectionsK2:
+    desc:
+    template: true
   CommonsCollectionsK3:
     desc:
-  CommonsCollectionsK4:
-    desc:
-#  CommonsCollections2:
-#    template: true
-
+ReflectChainFunction:
+#  sleep:
+#    desc: 休眠时间
+#    default: 1000
+  dnslog:
+    desc: 用于反连的域名
+    default: "asdghjkgkj.xxxxxxxxxxxx.com"
+  httplog:
+    desc: http协议反连
+    default: "http://asdghjkgkj.xxxxxxxxxxxx.com"
+  raw_cmd:
+    desc: 命令执行
+  win_cmd:
+    desc: Windows命令执行
+  linux_cmd:
+    desc: Linux命令执行
+  bcel:
+    desc: BCEL类加载
+  bcel_with_args:
+    desc: BCEL类加载，支持通过使用|附带一个参数，如：$$BCEL$$xxxx|whoami
+    params:
+      - name: bcel
+        desc: becl代码
+      - name: args
+        desc: 参数
+  script_base64:
+    desc: 指定一个base64编码的js脚本
+  upload_file_base64:
+    desc: 指定一个base64编码的文件，用于上传。使用|分割文件名和文件内容，如：test.txt|xxxx
+    params:
+      - name: filename
+        desc: 文件名
+      - name: content
+        desc: 文件内容
+  loadjar:
+    desc: 加载一个jar文件，使用|分割jar文件路径和类名
+    params:
+      - name: url
+        desc: jar文件路径
+      - name: name
+        desc: 类名
+  loadjar_with_args:
+    desc: 加载一个jar文件，使用|分割jar文件路径和类名和参数
+    params:
+      - name: url
+        desc: jar文件路径
+      - name: name
+        desc: 类名
+      - name: args
+        desc: 参数
+  jndi:
+    desc: 指定一个JNDI地址，用于JNDI注入

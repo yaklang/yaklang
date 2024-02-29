@@ -1,6 +1,7 @@
 package yso
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	yaml "github.com/yaklang/yaklang/common/openapi/openapiyaml"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yso/resources"
@@ -21,35 +22,63 @@ type ClassConfig struct {
 	Params   []*ClassGenConfigParam
 }
 type GadgetConfig struct {
-	Name       string
-	IsTemplate bool
-	Template   []byte
-	Desc       string
+	Name          string
+	IsTemplate    bool
+	Template      []byte
+	ChainTemplate map[string][]byte
+	Desc          string
+	CCVersion     string
+}
+
+type ReflectChainFunctionConfig struct {
+	Name string
+	Desc string
+	Args []string
 }
 type YsoConfig struct {
-	Classes map[string]*ClassConfig
-	Gadgets map[string]*GadgetConfig
+	Classes              map[string]*ClassConfig
+	Gadgets              map[string]*GadgetConfig
+	ReflectChainFunction map[string]*ReflectChainFunctionConfig
 }
 
 var YsoConfigInstance *YsoConfig
 
 func init() {
-	YsoConfigInstance, _ = GetConfig()
+	var err error
+	YsoConfigInstance, err = getConfig()
+	if err != nil {
+		log.Errorf("load yso config failed: %v", err)
+	}
 }
-func GetConfig() (*YsoConfig, error) {
+func getConfig() (*YsoConfig, error) {
 	config := &YsoConfig{
-		Classes: map[string]*ClassConfig{},
-		Gadgets: map[string]*GadgetConfig{},
+		Classes:              map[string]*ClassConfig{},
+		Gadgets:              map[string]*GadgetConfig{},
+		ReflectChainFunction: map[string]*ReflectChainFunctionConfig{},
 	}
 	content, err := resources.YsoResourceFS.ReadFile("config.yaml")
 	if err != nil {
-		return nil, err
+		return nil, utils.Errorf("read config.yaml failed: %v", err)
 	}
 	configMap := make(map[string]any)
 	err = yaml.Unmarshal(content, &configMap)
 	if err != nil {
-		return nil, err
+		return nil, utils.Errorf("unmarshal config.yaml failed: %v", err)
 	}
+	parseReflectChainFounction := getMapOrEmptyTask([]string{}, configMap, "ReflectChainFunction", func(currentKey []string, dict map[string]any) error {
+		for k, value := range dict {
+			reflectFunc := &ReflectChainFunctionConfig{Name: k}
+			err = getStringOrEmptyTask(currentKey, value, "desc", func(currentKey []string, v string) error {
+				reflectFunc.Desc = v
+				return nil
+			})()
+			if err != nil {
+				return err
+			}
+			config.ReflectChainFunction[reflectFunc.Name] = reflectFunc
+		}
+		return nil
+	})
 	parseClassesTask := getMapOrEmptyTask([]string{}, configMap, "Classes", func(currentKey []string, classesInfo map[string]any) error {
 		for name, attr := range classesInfo {
 			cfg := &ClassConfig{}
@@ -113,13 +142,9 @@ func GetConfig() (*YsoConfig, error) {
 	parseGadgetTask := getMapOrEmptyTask([]string{}, configMap, "Gadgets", func(currentKey []string, gadgetsMap map[string]any) error {
 		for name, attr := range gadgetsMap {
 			gadgetConfig := &GadgetConfig{
-				Name: name,
+				Name:          name,
+				ChainTemplate: map[string][]byte{},
 			}
-			templateBytes, err := resources.YsoResourceFS.ReadFile(path.Join("gadgets", name+".ser"))
-			if err != nil {
-				return utils.Errorf("read gadget %s template failed: %v", name, err)
-			}
-			gadgetConfig.Template = templateBytes
 			currentKey := append(currentKey, name)
 			err = runWorkFlow(
 				getStringOrEmptyTask(currentKey, attr, "name", func(currentKey []string, v string) error {
@@ -127,7 +152,21 @@ func GetConfig() (*YsoConfig, error) {
 					return nil
 				}),
 				getStringOrEmptyTask(currentKey, attr, "desc", func(currentKey []string, v string) error {
+					if v == "<nil>" {
+						println()
+					}
 					gadgetConfig.Desc = v
+					return nil
+				}),
+				getStringOrEmptyTask(currentKey, attr, "group", func(currentKey []string, v string) error {
+					switch v {
+					case "1":
+						gadgetConfig.CCVersion = "1"
+					case "2":
+						gadgetConfig.CCVersion = "4"
+					default:
+						gadgetConfig.CCVersion = "1"
+					}
 					return nil
 				}),
 				getStringOrEmptyTask(currentKey, attr, "template", func(currentKey []string, v string) error {
@@ -138,13 +177,31 @@ func GetConfig() (*YsoConfig, error) {
 			if err != nil {
 				return err
 			}
+			fileName := name
+			if gadgetConfig.IsTemplate {
+				fileName = "template_" + name
+				templateBytes, err := resources.YsoResourceFS.ReadFile(path.Join("gadgets", fileName+".ser"))
+				if err != nil {
+					return utils.Errorf("read gadget %s template failed: %v", fileName, err)
+				}
+				gadgetConfig.Template = templateBytes
+			} else {
+				for _, chainInfo := range config.ReflectChainFunction {
+					fileName = "transform_" + chainInfo.Name + "_" + name
+					templateBytes, err := resources.YsoResourceFS.ReadFile(path.Join("gadgets", fileName+".ser"))
+					if err != nil {
+						return utils.Errorf("read gadget %s template failed: %v", fileName, err)
+					}
+					gadgetConfig.ChainTemplate[chainInfo.Name] = templateBytes
+				}
+			}
 			config.Gadgets[name] = gadgetConfig
 		}
 		return nil
 	})
-	err = runWorkFlow(parseClassesTask, parseGadgetTask)
+	err = runWorkFlow(parseReflectChainFounction, parseClassesTask, parseGadgetTask)
 	if err != nil {
-		return nil, err
+		return nil, utils.Errorf("load yso config failed: %v", err)
 	}
 
 	return config, nil
