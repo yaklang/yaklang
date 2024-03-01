@@ -209,7 +209,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 
 		err := actx.PushCall(i)
 		if err != nil {
-			log.Errorf("push call error: %v", err)
+			log.Warnf("push call failed, if the current path in side-effect, ignore it: %v", err)
 			return Values{i}
 		}
 		defer actx.PopCall()
@@ -336,6 +336,39 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			return Values{NewValue(ssa.NewUndefined("_")).AppendEffectOn(i)} // no return, use undefined
 		}
 		return vals.AppendEffectOn(i)
+	case *ssa.SideEffect:
+		callIns := ret.CallSite
+		if callIns != nil {
+			err := actx.PushCall(NewValue(callIns).AppendEffectOn(i))
+			if err != nil {
+				log.Errorf("push call error: %v", err)
+			} else {
+				defer actx.PopCall()
+				var results Values
+
+				callInsVal := NewValue(callIns).AppendEffectOn(i)
+				filter := make(map[int]struct{})
+				results = append(results, callInsVal)
+				for _, val := range ret.GetValues() {
+					filter[val.GetId()] = struct{}{}
+					if val.GetId() == callIns.GetId() {
+						continue
+					}
+					results = append(results, NewValue(val).AppendEffectOn(callInsVal).getTopDefs(actx)...)
+				}
+				masks := ret.GetMask()
+				for _, val := range masks {
+					_, ok := filter[val.GetId()]
+					if !ok {
+						results = append(results, NewValue(val).AppendEffectOn(i).getTopDefs(actx)...)
+					}
+				}
+				return results
+			}
+		} else {
+			log.Errorf("side effect: %v is not created from call instruction", i.String())
+		}
+
 	}
 	return i.visitedDefsDefault(actx)
 }
