@@ -89,7 +89,7 @@ func PcapIfaceNameToNetInterface(ifaceName string) (*net.Interface, error) {
 		if dev.Name == ifaceName {
 			// windows 下的 pcap dev name 与 net.Interface.Name 不一致
 			if runtime.GOOS == "windows" {
-				if len(dev.Addresses) < 0 {
+				if len(dev.Addresses) < 1 {
 					return nil, utils.Errorf("addresses length is too short: %s", ifaceName)
 				}
 				iface, err := netutil.FindInterfaceByIP(dev.Addresses[0].IP.String())
