@@ -20,6 +20,12 @@ type thirdPartyApplicationConfig struct {
 	ExtraParams    map[string]string
 }
 
+// GetExtraParam 获取 Yakit 第三方应用配置的其他信息值，如: OpenAI的model,domain,proxy
+// Example:
+// ```
+// config = yakit.GetThirdPartyAppConfig("openai")
+// model = config.GetExtraParam("model") // 获取配置 openai 模型名称
+// ```
 func (c *thirdPartyApplicationConfig) GetExtraParam(name string) string {
 	if c.ExtraParams == nil {
 		return ""
@@ -30,8 +36,39 @@ func (c *thirdPartyApplicationConfig) GetExtraParam(name string) string {
 	return ""
 }
 
-func GetThirdPartyApplicationConfig(t string) *thirdPartyApplicationConfig {
-	if v, ok := thirdPartyConfig.Load(t); ok {
+// GetOpenAIModel 获取 OpenAI类型第三方应用配置的模型名称
+// Example:
+// ```
+// config = yakit.GetThirdPartyAppConfig("openai")
+// model = config.GetOpenAIModel() // 获取openai的模型名称
+// ```
+func (c *thirdPartyApplicationConfig) GetOpenAIModel() string {
+	return c.GetExtraParam("model")
+}
+
+// GetOpenAIDomain 获取 OpenAI类型第三方应用配置的第三方加速域名
+// Example:
+// ```
+// config = yakit.GetThirdPartyAppConfig("openai")
+// domain = config.GetOpenAIDomain() // 获取openai的第三方加速域名
+// ```
+func (c *thirdPartyApplicationConfig) GetOpenAIDomain() string {
+	return c.GetExtraParam("domain")
+}
+
+// GetOpenAIProxy 获取 OpenAI类型第三方应用配置的代理
+// Example:
+// ```
+// config = yakit.GetThirdPartyAppConfig("openai")
+// proxy = config.GetOpenAIProxy() // 获取openai的代理
+// ```
+func (c *thirdPartyApplicationConfig) GetOpenAIProxy() string {
+	return c.GetExtraParam("proxy")
+}
+
+// GetThirdPartyAppConfig 获取对应类型的 Yakit 第三方应用配置
+func GetThirdPartyApplicationConfig(typ string) *thirdPartyApplicationConfig {
+	if v, ok := thirdPartyConfig.Load(typ); ok {
 		return v.(*thirdPartyApplicationConfig)
 	}
 	return &thirdPartyApplicationConfig{ExtraParams: make(map[string]string)}

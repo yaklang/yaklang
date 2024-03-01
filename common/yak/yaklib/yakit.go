@@ -53,6 +53,7 @@ var YakitExports = map[string]interface{}{
 	"GetHomeTempDir":               consts.GetDefaultYakitBaseTempDir,
 	"GetOnlineBaseUrl":             consts.GetOnlineBaseUrl,
 	"SetOnlineBaseUrl":             consts.SetOnlineBaseUrl,
+	"GetThirdPartyAppConfig":       consts.GetThirdPartyApplicationConfig,
 
 	// dummy
 	"Info":          emptyVirtualClient.YakitInfo,
