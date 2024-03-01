@@ -25,8 +25,9 @@ c = a;
 	cRef := prog.Ref("c")
 	cRefToFunc := false
 	cRefTo2 := false
+	cRef.Show()
 	results := cRef.GetTopDefs().Show().ForEach(func(value *Value) {
-		if value.IsFunction() {
+		if value.IsCall() {
 			cRefToFunc = true
 		}
 		if fmt.Sprint(value.GetConstValue()) == `2` {
@@ -37,7 +38,7 @@ c = a;
 		t.Fatalf("Expect 2 results, but got %d", len(results))
 	}
 	if !cRefToFunc {
-		t.Fatal("Expect c ref defsto to function, but not")
+		t.Fatal("Expect c ref defsto to c, but not")
 	}
 
 	if !cRefTo2 {
@@ -58,7 +59,7 @@ c = a.b;
 	cRefToFunc := false
 	cRefTo2 := false
 	results := cRef.GetTopDefs().Show().ForEach(func(value *Value) {
-		if value.IsFunction() {
+		if value.IsCall() {
 			cRefToFunc = true
 		}
 		if fmt.Sprint(value.GetConstValue()) == `2` {
@@ -91,7 +92,7 @@ c = a;
 	cRefTo2 := false
 	cRefTo1 := false
 	results := cRef.GetTopDefs().Show().ForEach(func(value *Value) {
-		if value.IsFunction() {
+		if value.IsCall() {
 			cRefToFunc = true
 		}
 		if fmt.Sprint(value.GetConstValue()) == `2` {
@@ -134,7 +135,7 @@ c = a;
 	cRefTo2 := false
 	cRefTo1 := false
 	results := cRef.GetTopDefs().Show().ForEach(func(value *Value) {
-		if value.IsFunction() {
+		if value.IsCall() {
 			cRefToFunc = true
 		}
 		if fmt.Sprint(value.GetConstValue()) == `2` {
