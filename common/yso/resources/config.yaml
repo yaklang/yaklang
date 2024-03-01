@@ -41,6 +41,57 @@ Classes:
 #  desc: 命令执行 # gadget描述(可选)
 #  template: false # 模板gadget，可选，默认为false
 Gadgets:
+  Vaadin1:
+    desc: 用于Vaadin反序列化
+    template: true
+  Spring2:
+    desc: 用于Spring反序列化
+    template: true
+  Spring1:
+    desc: 用于Spring反序列化
+    template: true
+  ROME:
+    desc: 用于ROME反序列化
+    template: true
+  MozillaRhino2:
+    desc: 用于Mozilla Rhino反序列化
+    template: true
+  MozillaRhino1:
+    desc: 用于Mozilla Rhino反序列化
+    template: true
+  JSON1:
+    desc: 用于JSON反序列化
+    template: true
+  Jdk8u20:
+    desc: 用于JDK8u20反序列化
+    template: true
+  Jdk7u21:
+    desc: 用于JDK7u21反序列化
+    template: true
+  JavassistWeld1:
+    desc: 用于Javassist反序列化
+    template: true
+  JBossInterceptors1:
+    desc: 用于JBoss Interceptors反序列化
+    template: true
+  Hibernate1:
+    desc: 用于Hibernate反序列化
+    template: true
+  Click1:
+    desc: 用于Click反序列化
+    template: true
+  CommonsBeanutils1:
+    desc:
+    template: true
+  CommonsBeanutils1_183:
+    desc:
+    template: true
+  CommonsBeanutils2:
+    desc:
+    template: true
+  CommonsBeanutils2_183:
+    desc:
+    template: true
   CommonsCollections1:
     desc:
   CommonsCollections2:

