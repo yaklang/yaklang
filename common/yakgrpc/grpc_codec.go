@@ -1117,7 +1117,7 @@ func (s *Server) NewCodec(ctx context.Context, req *ypb.CodecRequestFlow) (resp 
 			return nil, err
 		}
 	}
-	return &ypb.CodecResponse{Result: utils.EscapeInvalidUTF8Byte(codecFlow.Text)}, nil
+	return &ypb.CodecResponse{Result: utils.EscapeInvalidUTF8Byte(codecFlow.Text), RawResult: codecFlow.Text}, nil
 }
 
 func (s *Server) GetAllCodecMethods(ctx context.Context, in *ypb.Empty) (*ypb.CodecMethods, error) {

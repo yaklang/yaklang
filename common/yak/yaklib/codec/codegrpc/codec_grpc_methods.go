@@ -6,7 +6,6 @@ import (
 	_ "embed"
 	"encoding/gob"
 	"encoding/json"
-	"fmt"
 	"github.com/BurntSushi/toml"
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/authhack"
@@ -680,7 +679,7 @@ func (flow *CodecExecFlow) MakePacket(mode string) error {
 	case "cURL":
 		res, err = lowhttp.CurlToHTTPRequest(string(flow.Text))
 	case "URL":
-		res, err = lowhttp.UrlToHTTPRequest(string(flow.Text))
+		res, err = lowhttp.UrlToHTTPRequest(strings.TrimSpace(string(flow.Text)))
 	default:
 		return utils.Error("MakeHTTPPacket: unknown mode")
 	}
@@ -711,7 +710,7 @@ func (flow *CodecExecFlow) Packet2cURL(https bool) error {
 // Desc = """JWT（JSON Web Token）是一种开放标准（RFC 7519），用于在网络应用间安全地传输声明信息，通常用于身份验证和信息交换。"""
 func (flow *CodecExecFlow) JwtParse() error {
 	token, key, err := authhack.JwtParse(string(flow.Text))
-	if err != nil {
+	if err != nil || token == nil {
 		return utils.Errorf("codec JWT解析 failed: %s", err)
 	}
 	flow.Text, err = json.MarshalIndent(map[string]interface{}{
@@ -738,7 +737,7 @@ func (flow *CodecExecFlow) JwtSign(algorithm string, key []byte, isBase64 bool) 
 	if !gjson.Valid(string(flow.Text)) {
 		return utils.Error("codec JWT签名失败: json格式错误")
 	}
-	var data map[string]interface{}
+	var data = make(map[string]interface{})
 	var err error
 	gjson.Parse(string(flow.Text)).ForEach(func(key, value gjson.Result) bool {
 		data[key.String()] = value.Value()
@@ -791,7 +790,7 @@ func (flow *CodecExecFlow) CodecPlugin(pluginName string) error {
 	if err != nil {
 		return utils.Errorf("import %v' s handle failed: %s", pluginName, err)
 	}
-	flow.Text = []byte(fmt.Sprint(pluginRes))
+	flow.Text = utils.InterfaceToBytes(pluginRes)
 	return nil
 }
 
@@ -812,6 +811,6 @@ func (flow *CodecExecFlow) CustomCodecPlugin(pluginContext string) error {
 	if err != nil {
 		return utils.Errorf("import %v' s handle failed: %s", "temp-codec", err)
 	}
-	flow.Text = []byte(fmt.Sprint(pluginRes))
+	flow.Text = utils.InterfaceToBytes(pluginRes)
 	return nil
 }
