@@ -65,6 +65,8 @@ g = originValue
 			if value.GetConstValue() == 4 {
 				check4 = true
 			}
+
+			value.Show()
 		})
 	})
 	if !check1 {
