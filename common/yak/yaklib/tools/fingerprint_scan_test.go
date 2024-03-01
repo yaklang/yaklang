@@ -3,10 +3,14 @@ package tools
 import (
 	"context"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/synscan"
 	"github.com/yaklang/yaklang/common/utils"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -16,17 +20,18 @@ func Test_scanFingerprint(t *testing.T) {
 
 	target := "127.0.0.1"
 
-	port := "55072"
+	port := "58606"
 
-	protoList := []interface{}{"tcp", "udp"}
+	protoList := []interface{}{"tcp"}
 
 	pp := func(proto ...interface{}) fp.ConfigOption {
 		return fp.WithTransportProtos(fp.ParseStringToProto(proto...)...)
 	}
 
 	ch, err := scanFingerprint(target, port, pp(protoList...),
-		fp.WithProbeTimeoutHumanRead(5),
-		fp.WithProbesMax(100),
+		fp.WithActiveMode(true),
+		//fp.WithProbeTimeoutHumanRead(5),
+		//fp.WithProbesMax(100),
 	)
 	//ch, err := scanFingerprint(target, "162", pp(protoList...), fp.WithProbeTimeoutHumanRead(5))
 
@@ -35,7 +40,7 @@ func Test_scanFingerprint(t *testing.T) {
 	}
 
 	for v := range ch {
-		fmt.Println(v.String())
+		spew.Dump(v.Fingerprint.HttpFlows)
 	}
 }
 
@@ -102,7 +107,7 @@ func Test_scanFingerprint1(t *testing.T) {
 	wg.Wait()
 }
 
-func Test_scanFingerprint2(t *testing.T) {
+func TestMUSTPASS_Fp_GMTls(t *testing.T) {
 	mockGMHost, mockGMPort := utils.DebugMockOnlyGMHTTP(context.Background(), nil)
 	t.Logf("mockGMHost: %v, mockGMPort: %v", mockGMHost, mockGMPort)
 	type args struct {
@@ -157,5 +162,56 @@ func Test_scanFingerprint2(t *testing.T) {
 				assert.Equalf(t, tt.want, v.State, "scanFingerprint(%v, %v)", tt.args.target, tt.args.port)
 			}
 		})
+	}
+}
+
+func mockRedirectServer(resp []byte) (server *httptest.Server) {
+	// 创建一个新的ServeMux（路由器）
+	mux := http.NewServeMux()
+
+	// 处理函数，返回模拟的响应
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/second", http.StatusFound)
+	}
+
+	handler2 := func(w http.ResponseWriter, r *http.Request) {
+		w.Write(resp)
+	}
+
+	// 注册处理函数到路由器
+	mux.HandleFunc("/", handler)
+	mux.HandleFunc("/second", handler2)
+
+	// 创建一个httptest.Server
+	server = httptest.NewServer(mux)
+
+	return server
+}
+func TestMUSTPASS_Fp_ScanHttpFlow(t *testing.T) {
+	resp := utils.RandNumberStringBytes(20)
+
+	server := mockRedirectServer([]byte(resp))
+
+	defer server.Close()
+
+	host, port, err := utils.ParseStringToHostPort(server.URL)
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	ch, err := scanFingerprint(host, fmt.Sprintf("%d", port), fp.WithActiveMode(true))
+
+	for v := range ch {
+		if len(v.Fingerprint.HttpFlows) != 2 {
+			t.FailNow()
+		}
+		if string(v.Fingerprint.HttpFlows[0].ResponseBody) != resp {
+			t.FailNow()
+		}
+
+		if !strings.Contains(string(v.Fingerprint.HttpFlows[1].RequestHeader), "/second") {
+			t.FailNow()
+		}
 	}
 }
