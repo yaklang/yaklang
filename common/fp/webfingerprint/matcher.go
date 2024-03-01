@@ -163,7 +163,15 @@ func (f *Matcher) matchByRule(r *HTTPResponseInfo, ruleToUse *WebRule, config *C
 				return nil
 			}
 			httpRsp, err := lowhttp.ParseBytesToHTTPResponse(rsp)
+			if err != nil {
+				log.Errorf("poc.HTTP failed: %s", err)
+				return nil
+			}
 			httpReq, err := lowhttp.ParseBytesToHttpRequest(req)
+			if err != nil {
+				log.Errorf("poc.HTTP failed: %s", err)
+				return nil
+			}
 			httpRsp.Request = httpReq
 			info := ExtractHTTPResponseInfoFromHTTPResponse(httpRsp)
 			byteFavicon := info.Body
