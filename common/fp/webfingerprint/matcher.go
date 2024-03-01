@@ -157,7 +157,7 @@ func (f *Matcher) matchByRule(r *HTTPResponseInfo, ruleToUse *WebRule, config *C
 		if !ok {
 			log.Debugf("sending active web-fingerprint request to: %s origin: %v", ruleToUse.Path, path)
 
-			rsp, req, err := poc.HTTP(r.RequestRaw, poc.WithReplaceHttpPacketPath(ruleToUse.Path), poc.WithForceHTTPS(r.IsHttps))
+			rsp, req, err := poc.HTTP(r.RequestRaw, poc.WithReplaceHttpPacketPath(ruleToUse.Path), poc.WithNoRedirect(false), poc.WithForceHTTPS(r.IsHttps))
 			if err != nil {
 				log.Errorf("poc.HTTP failed: %s", err)
 				return nil
