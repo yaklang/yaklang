@@ -3765,6 +3765,7 @@ message CodecRequestFlow{
 
 message CodecResponse {
   string Result = 1;
+  bytes  RawResult = 2;
 }
 
 message CodecMethods {
