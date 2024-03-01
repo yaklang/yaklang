@@ -362,7 +362,7 @@ func _synScanDo(targetChan chan string, ports string, config *_yakPortScanConfig
 func filterTargetChannel(targetChan chan string, filterFunc func(string, int) bool) (chan string, string) {
 	var hasLoopback bool
 	var hasSampleTarget bool
-	sampleTargetChan := make(chan string)
+	sampleTargetChan := make(chan string, 1)
 	newTargetChan := make(chan string, 2) // 2缓冲区,至少有一个是非127
 
 	firstResult := <-targetChan // 取出一个目标 保证有返回值
