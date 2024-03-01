@@ -106,12 +106,12 @@ func SetTemplateObjectClass(object *yserx.JavaObject, classBytes []byte) error {
 				if len(arrObj.Values) != 2 {
 					return utils.Error("template struct not match")
 				}
-				emptyClass, err := GenEmptyClassInTemplateClassObject()
-				if err != nil {
-					return err
-				}
+				//emptyClass, err := GenEmptyClassInTemplateClassObject()
+				//if err != nil {
+				//	return err
+				//}
 				arrObj.Values[0] = yserx.NewJavaFieldBytes(string(classBytes))
-				arrObj.Values[1] = yserx.NewJavaFieldBytes(string(emptyClass.Bytes()))
+				//arrObj.Values[1] = yserx.NewJavaFieldBytes(string(emptyClass.Bytes()))
 				return nil
 			}
 		}

