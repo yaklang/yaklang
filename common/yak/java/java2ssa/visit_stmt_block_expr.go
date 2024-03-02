@@ -111,7 +111,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		panic("unsupported expression type")
 	}
 
-	return nil
+	return y.EmitUndefined("_")
 }
 
 func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext) ssa.Value {
@@ -176,9 +176,16 @@ func (y *builder) VisitLocalVariableDeclaration(raw javaparser.ILocalVariableDec
 		return nil
 	}
 
-	varName := i.Identifier().GetText()
-	variable := y.CreateVariable(varName)
-	exprResult := y.VisitExpression(i.Expression())
-	y.AssignVariable(variable, exprResult)
+	id := i.Identifier()
+	if id != nil {
+		varName := id.GetText()
+		variable := y.CreateVariable(varName)
+		exprResult := y.VisitExpression(i.Expression())
+		if exprResult == nil {
+			exprResult = y.EmitConstInstAny()
+		}
+		y.AssignVariable(variable, exprResult)
+		return nil
+	}
 	return nil
 }
