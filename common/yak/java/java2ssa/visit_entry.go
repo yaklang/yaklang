@@ -21,7 +21,7 @@ func (y *builder) VisitCompilationUnit(raw javaparser.ICompilationUnitContext) i
 
 	for _, pkgImport := range i.AllImportDeclaration() {
 		paths, static, all := y.VisitImportDeclaration(pkgImport)
-		log.Info("import %v (static: %v) (all: %v)", paths, static, all)
+		log.Infof("import %v (static: %v) (all: %v)", paths, static, all)
 	}
 
 	for _, inst := range i.AllTypeDeclaration() {
