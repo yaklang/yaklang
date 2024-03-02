@@ -335,6 +335,18 @@ func (v *BasePHPParserVisitor) VisitParentheses(ctx *ParenthesesContext) interfa
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitFullyQualifiedNamespaceExpr(ctx *FullyQualifiedNamespaceExprContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitClassStaticFunctionMember(ctx *ClassStaticFunctionMemberContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitClassStaticVariable(ctx *ClassStaticVariableContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitSpecialWordExpression(ctx *SpecialWordExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -460,6 +472,14 @@ func (v *BasePHPParserVisitor) VisitLambdaFunctionExpression(ctx *LambdaFunction
 }
 
 func (v *BasePHPParserVisitor) VisitBitwiseExpression(ctx *BitwiseExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitFullyQualifiedNamespaceExpression(ctx *FullyQualifiedNamespaceExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitStaticClassAccessExpression(ctx *StaticClassAccessExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
