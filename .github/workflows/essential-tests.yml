@@ -95,6 +95,11 @@ jobs:
               # SSA UTIL
               go test -timeout 20s ./common/yak/ssa/ssautil/...
 
+          - name: Test (Java/PHP/JS/Go) Frontend Language
+            run: |
+              # Test Java Syntax
+              go test -timeout 10s ./common/yak/java/...
+
           - name: Test lowhttp / DNSX
             run: |
               # lowhttp
