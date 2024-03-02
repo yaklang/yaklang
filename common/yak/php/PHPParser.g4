@@ -479,11 +479,21 @@ parentheses
     : '(' expression ')'
     ;
 
+fullyQualifiedNamespaceExpr: identifier '\\' (identifier '\\')* identifier;
+
+classVariable
+    : fullyQualifiedNamespaceExpr '::' identifier # ClassStaticFunctionMember
+    | fullyQualifiedNamespaceExpr '::' VarName    # ClassStaticVariable
+    ;
+
+
 // Expressions
 // Grouped by priorities: http://php.net/manual/en/language.operators.precedence.php
 expression
     : Clone expression                                            # CloneExpression
     | newExpr                                                     # KeywordNewExpression
+    | fullyQualifiedNamespaceExpr                                 # FullyQualifiedNamespaceExpression
+    | classVariable                                               # StaticClassAccessExpression
     | VarName                                                     # VariableNameExpression
     | Dollar+ identifier                                          # VariableExpression
     | Dollar+ OpenCurlyBracket expression CloseCurlyBracket       # DynamicVariableExpression

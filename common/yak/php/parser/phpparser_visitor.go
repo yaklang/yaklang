@@ -253,6 +253,15 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#parentheses.
 	VisitParentheses(ctx *ParenthesesContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#fullyQualifiedNamespaceExpr.
+	VisitFullyQualifiedNamespaceExpr(ctx *FullyQualifiedNamespaceExprContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#ClassStaticFunctionMember.
+	VisitClassStaticFunctionMember(ctx *ClassStaticFunctionMemberContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#ClassStaticVariable.
+	VisitClassStaticVariable(ctx *ClassStaticVariableContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#SpecialWordExpression.
 	VisitSpecialWordExpression(ctx *SpecialWordExpressionContext) interface{}
 
@@ -348,6 +357,12 @@ type PHPParserVisitor interface {
 
 	// Visit a parse tree produced by PHPParser#BitwiseExpression.
 	VisitBitwiseExpression(ctx *BitwiseExpressionContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#FullyQualifiedNamespaceExpression.
+	VisitFullyQualifiedNamespaceExpression(ctx *FullyQualifiedNamespaceExpressionContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#StaticClassAccessExpression.
+	VisitStaticClassAccessExpression(ctx *StaticClassAccessExpressionContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#leftFieldMemberCall.
 	VisitLeftFieldMemberCall(ctx *LeftFieldMemberCallContext) interface{}
