@@ -22,7 +22,6 @@ func validateSource(t *testing.T, filename string, src string) {
 			t.Errorf("file: %v 's syntax parsing failed, no html document entry", filename)
 		}
 	})
-
 }
 
 func TestAllSyntaxForPHP_G4(t *testing.T) {
@@ -41,4 +40,8 @@ func TestAllSyntaxForPHP_G4(t *testing.T) {
 		}
 		validateSource(t, path, string(raw))
 	}
+}
+
+func TestSyntax_(t *testing.T) {
+	validateSource(t, "class", ``)
 }
