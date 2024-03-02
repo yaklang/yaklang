@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
@@ -26,6 +27,9 @@ func NewVariable(globalIndex int, name string, local bool, scope ssautil.ScopedV
 }
 
 func (variable *Variable) Assign(value Value) error {
+	if value == nil {
+		return utils.Error("assign empty")
+	}
 	value.AddVariable(variable)
 	if variable.IsMemberCall() {
 		obj, key := variable.GetMemberCall()

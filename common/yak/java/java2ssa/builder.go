@@ -15,7 +15,7 @@ type builder struct {
 	prog *ssa.Program
 }
 
-func ParserSSA(src string, f func(builder *ssa.FunctionBuilder)) *ssa.Program {
+func ParserSSA(src string) *ssa.Program {
 	lex := javaparser.NewJavaLexer(antlr.NewInputStream(src))
 	tokenStream := antlr.NewCommonTokenStream(lex, antlr.TokenDefaultChannel)
 	parser := javaparser.NewJavaParser(tokenStream)
