@@ -99,6 +99,8 @@ jobs:
             run: |
               # Test Java Syntax
               go test -timeout 10s ./common/yak/java/...
+              # Test php syntax
+              go test -timeout 10s ./common/yak/php/...
 
           - name: Test lowhttp / DNSX
             run: |
