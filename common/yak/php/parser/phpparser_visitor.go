@@ -262,6 +262,12 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#ClassStaticVariable.
 	VisitClassStaticVariable(ctx *ClassStaticVariableContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#ClassDirectFunctionMember.
+	VisitClassDirectFunctionMember(ctx *ClassDirectFunctionMemberContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#ClassDirectStaticVariable.
+	VisitClassDirectStaticVariable(ctx *ClassDirectStaticVariableContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#SpecialWordExpression.
 	VisitSpecialWordExpression(ctx *SpecialWordExpressionContext) interface{}
 

@@ -751,13 +751,21 @@ func (y *builder) VisitArrayCreation(raw phpparser.IArrayCreationContext) ssa.Va
 		return nil
 	}
 
-	itemList := i.ArrayItemList().(*phpparser.ArrayItemListContext)
-	l := len(itemList.AllArrayItem())
+	var l int
+
+	if ret := i.ArrayItemList(); ret != nil {
+		itemList := ret.(*phpparser.ArrayItemListContext)
+		l = len(itemList.AllArrayItem())
+	}
+
 	obj := y.ir.EmitMakeWithoutType(y.ir.EmitConstInst(l), y.ir.EmitConstInst(l))
-	for _, kv := range y.VisitArrayItemList(itemList) {
-		k, v := kv[0], kv[1]
-		variable := y.ir.ReadOrCreateMemberCallVariable(obj, k).GetLastVariable()
-		y.ir.AssignVariable(variable, v)
+
+	if ret := i.ArrayItemList(); ret != nil {
+		for _, kv := range y.VisitArrayItemList(ret.(*phpparser.ArrayItemListContext)) {
+			k, v := kv[0], kv[1]
+			variable := y.ir.ReadOrCreateMemberCallVariable(obj, k).GetLastVariable()
+			y.ir.AssignVariable(variable, v)
+		}
 	}
 	return obj
 }
@@ -1012,19 +1020,19 @@ func (y *builder) VisitLeftVariable(raw phpparser.ILeftVariableContext) *ssa.Var
 	if !ok {
 		return nil
 	}
-	var variable *ssa.Variable
+	var variable ssa.Value
 	if variableDescription.VarName() != nil {
-		variable = y.ir.CreateVariable(variableDescription.VarName().GetText())
+		variable = y.ir.ReadOrCreateVariable(variableDescription.VarName().GetText())
 	} else if variableDescription.Identifier() != nil {
 		dollarCount := len(variableDescription.AllDollar())
-		variable = y.ir.CreateVariable("$" + variableDescription.Identifier().GetText())
+		variable = y.ir.ReadOrCreateVariable("$" + variableDescription.Identifier().GetText())
 		for i := 0; i < dollarCount; i++ {
 			log.Warnf("$$ref unhandled")
 		}
 	} else {
 		val := y.VisitExpression(variableDescription.Expression())
 		log.Errorf("${expr} variable unhandled")
-		variable = y.ir.CreateVariable(val.GetVerboseName())
+		variable = y.ir.ReadOrCreateVariable(val.GetVerboseName())
 	}
-	return variable
+	return variable.GetLastVariable()
 }
