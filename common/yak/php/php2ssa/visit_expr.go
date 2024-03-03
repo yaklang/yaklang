@@ -333,33 +333,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		}).Build()
 		return result
 	case *phpparser.NullCoalescingExpressionContext:
-		//v1 := y.VisitExpression(ret.Expression(0))
-		var result ssa.Value
-
-		//y.ir.BuildIf().BuildCondition(func() ssa.Value {
-		//	return y.ir.EmitBinOp(ssa.OpEq, v1, y.ir.EmitConstInstNil())
-		//}).BuildTrue(func() {
-		//	result = v1
-		//}).BuildFalse(func() {
-		//	result = y.VisitExpression(ret.Expression(1))
-		//})
-		return result
 	case *phpparser.SpaceshipExpressionContext:
-		var result ssa.Value
-
-		//var v1, v2 = y.VisitExpression(ret.Expression(0)), y.VisitExpression(ret.Expression(1))
-		//y.ir.BuildIf().BuildCondition(func() ssa.Value {
-		//	return y.ir.EmitBinOp(ssa.OpEq, v1, v2)
-		//}).BuildTrue(func() {
-		//	result = y.ir.EmitConstInst(0)
-		//}).BuildElif(func() ssa.Value {
-		//	return y.ir.EmitBinOp(ssa.OpLt, v1, v2)
-		//}, func() {
-		//	result = y.ir.EmitConstInst(-1)
-		//}).BuildFalse(func() {
-		//	result = y.ir.EmitConstInst(1)
-		//}).Finish()
-		return result
 	case *phpparser.ArrayCreationUnpackExpressionContext:
 		// [$1, $2, $3] = $arr;
 		// unpacking
@@ -406,7 +380,6 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 			}).SetElse(func() {
 				y.ir.AssignVariable(tempVar, y.ir.EmitConstInst(false))
 			}).Build()
-			return tempVar.GetValue()
 		}
 
 		if ret.LogicalOr() != nil {
@@ -419,7 +392,6 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 				result := y.ir.EmitBinOp(ssa.OpEq, y.VisitExpression(ret.Expression(1)), y.ir.EmitConstInst(true))
 				y.ir.AssignVariable(tempVar, result)
 			}).Build()
-			return tempVar.GetValue()
 		}
 
 		if ret.LogicalXor() != nil {
@@ -435,11 +407,14 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 				y.ir.AssignVariable(tempVar, y.ir.EmitConstInst(true))
 			})
 		}
+		return tempVar.GetValue()
+	case *phpparser.ShortQualifiedNameExpressionContext:
+		return y.ir.EmitConstInstAny()
 	}
 	raw.GetText()
 	log.Errorf("unhandled expression: %v(T: %T)", raw.GetText(), raw)
 	log.Errorf("-------------unhandled expression: %v(%T)", raw.GetText(), raw)
-	return nil
+	return y.ir.EmitConstInstAny()
 }
 
 func (y *builder) VisitAssignable(raw phpparser.IAssignableContext) ssa.Value {
