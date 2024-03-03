@@ -83,7 +83,7 @@ scriptText
 // PHP
 
 phpBlock
-    : importStatement* topStatement+
+    : importStatement* topStatement+ PHPEnd?
     ;
 
 importStatement
@@ -239,6 +239,8 @@ blockStatement
 ifStatement
     : If parentheses statement elseIfStatement* elseStatement?
     | If parentheses ':' innerStatementList elseIfColonStatement* elseColonStatement? EndIf SemiColon
+    | If parentheses ':'
+    | ElseIf parentheses ':'
     ;
 
 elseIfStatement
@@ -484,6 +486,8 @@ fullyQualifiedNamespaceExpr: identifier '\\' (identifier '\\')* identifier;
 classVariable
     : fullyQualifiedNamespaceExpr '::' identifier # ClassStaticFunctionMember
     | fullyQualifiedNamespaceExpr '::' VarName    # ClassStaticVariable
+    | identifier '::' identifier                  # ClassDirectFunctionMember
+    | identifier '::' VarName                     # ClassDirectStaticVariable
     ;
 
 

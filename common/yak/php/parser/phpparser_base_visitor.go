@@ -347,6 +347,14 @@ func (v *BasePHPParserVisitor) VisitClassStaticVariable(ctx *ClassStaticVariable
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitClassDirectFunctionMember(ctx *ClassDirectFunctionMemberContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitClassDirectStaticVariable(ctx *ClassDirectStaticVariableContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitSpecialWordExpression(ctx *SpecialWordExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
