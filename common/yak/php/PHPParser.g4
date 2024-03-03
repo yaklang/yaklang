@@ -83,7 +83,7 @@ scriptText
 // PHP
 
 phpBlock
-    : importStatement* topStatement+ PHPEnd?
+    : importStatement* topStatement+ (PHPEnd|PHPEndSingleLineComment)?
     ;
 
 importStatement
@@ -488,6 +488,8 @@ classVariable
     | fullyQualifiedNamespaceExpr '::' VarName    # ClassStaticVariable
     | identifier '::' identifier                  # ClassDirectFunctionMember
     | identifier '::' VarName                     # ClassDirectStaticVariable
+    | string '::' identifier                      # StringAsIndirectClassStaticFunctionMember
+    | string '::' VarName                         # StringAsIndirectClassStaticVariable
     ;
 
 
@@ -497,6 +499,7 @@ expression
     : Clone expression                                            # CloneExpression
     | newExpr                                                     # KeywordNewExpression
     | fullyQualifiedNamespaceExpr                                 # FullyQualifiedNamespaceExpression
+    | identifier                                                  # ShortQualifiedNameExpression
     | classVariable                                               # StaticClassAccessExpression
     | VarName                                                     # VariableNameExpression
     | Dollar+ identifier                                          # VariableExpression
@@ -573,6 +576,7 @@ assignable
 
 arrayCreation
     : Array '(' arrayItemList? ')'
+    | List '(' arrayItemList? ')'
     | '[' arrayItemList? ']'
     ;
 
