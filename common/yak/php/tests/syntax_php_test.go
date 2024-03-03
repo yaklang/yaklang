@@ -6,6 +6,7 @@ import (
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -34,6 +35,9 @@ func TestAllSyntaxForPHP_G4(t *testing.T) {
 			continue
 		}
 		path := filepath.Join("syntax", f.Name())
+		if !strings.HasSuffix(path, ".php") {
+			continue
+		}
 		raw, err := syntaxFs.ReadFile(path)
 		if err != nil {
 			t.Fatalf("cannot found syntax fs: %v", path)
@@ -43,5 +47,9 @@ func TestAllSyntaxForPHP_G4(t *testing.T) {
 }
 
 func TestSyntax_(t *testing.T) {
-	validateSource(t, "class", ``)
+	validateSource(t, "class member access", `<?php $c->fn = 1; ?>`)
+	validateSource(t, `string as class identifier`, `
+<?php 
+class foo { static $bar = 'baz'; }
+var_dump('foo'::$bar);`)
 }
