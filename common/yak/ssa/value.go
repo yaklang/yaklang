@@ -1,5 +1,7 @@
 package ssa
 
+import "github.com/yaklang/yaklang/common/log"
+
 // --------------- Read
 
 // ReadValueByVariable get value by variable
@@ -102,6 +104,10 @@ func (b *FunctionBuilder) writeUndefine(variable string, names ...string) *Undef
 func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 	name := variable.GetName()
 	_ = name
+	if value == nil {
+		log.Warnf("assign nil value to variable: %v", name)
+		return
+	}
 	scope := b.CurrentBlock.ScopeTable
 	scope.AssignVariable(variable, value)
 	checkAssign := func() {
