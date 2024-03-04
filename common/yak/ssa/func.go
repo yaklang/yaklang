@@ -24,7 +24,6 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		}
 	}
 	f := &Function{
-		anInstruction:       NewInstruction(),
 		anValue:             NewValue(),
 		Package:             p,
 		Param:               make([]*Parameter, 0),
@@ -95,7 +94,6 @@ func (f *Function) GetParent() *Function {
 // just create a function define, only function parameter type \ return type \ ellipsis
 func NewFunctionWithType(name string, typ *FunctionType) *Function {
 	f := &Function{
-		anInstruction:  NewInstruction(),
 		anValue:        NewValue(),
 		referenceFiles: omap.NewOrderedMap(map[string]string{}),
 	}

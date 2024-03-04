@@ -72,10 +72,9 @@ func NewConst(i any) *ConstInst {
 		c = newConstCreate(i)
 	}
 	ci := &ConstInst{
-		Const:         c,
-		anInstruction: NewInstruction(),
-		anValue:       NewValue(),
-		Unary:         0,
+		Const:   c,
+		anValue: NewValue(),
+		Unary:   0,
 	}
 	ci.SetType(c.GetType())
 	return ci

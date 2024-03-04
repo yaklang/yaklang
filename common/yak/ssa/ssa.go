@@ -146,7 +146,6 @@ type Package struct {
 
 // implement Value
 type Function struct {
-	anInstruction
 	anValue
 
 	// package, double link
@@ -210,7 +209,6 @@ var (
 
 // implement Value
 type BasicBlock struct {
-	anInstruction
 	anValue
 
 	Index int
@@ -252,7 +250,6 @@ var (
 
 // ----------- Phi
 type Phi struct {
-	anInstruction
 	anValue
 
 	Edge []Value // edge[i] from phi.Block.Preds[i]
@@ -272,7 +269,6 @@ var (
 
 // ----------- externLib
 type ExternLib struct {
-	anInstruction
 	anValue
 
 	table   map[string]any
@@ -291,7 +287,6 @@ var (
 // ----------- Parameter
 type Parameter struct {
 	anValue
-	anInstruction
 
 	IsFreeValue bool
 
@@ -321,7 +316,6 @@ var (
 // ConstInst also have block pointer, which block set this const to variable
 type ConstInst struct {
 	*Const
-	anInstruction
 	anValue
 	Unary      int
 	isIdentify bool // field key
@@ -354,7 +348,6 @@ const (
 )
 
 type Undefined struct {
-	anInstruction
 	anValue
 	Kind UndefinedKind
 }
@@ -369,7 +362,6 @@ var (
 
 // ----------- BinOp
 type BinOp struct {
-	anInstruction
 	anValue
 	Op   BinaryOpcode
 	X, Y Value
@@ -384,8 +376,6 @@ var (
 
 type UnOp struct {
 	anValue
-
-	anInstruction
 
 	Op UnaryOpcode
 	X  Value
@@ -403,7 +393,6 @@ var (
 // ----------- Call
 // call instruction call method function  with args as argument
 type Call struct {
-	anInstruction
 	// call is a value
 	anValue
 
@@ -432,7 +421,6 @@ var (
 
 // ----------- SideEffect
 type SideEffect struct {
-	anInstruction
 	anValue
 	CallSite *Call // call instruction
 	Value    Value // modify to this value
@@ -449,7 +437,6 @@ var (
 // The Return instruction returns values and control back to the calling
 // function.
 type Return struct {
-	anInstruction
 	anValue
 	Results []Value
 }
@@ -465,7 +452,6 @@ var (
 
 // ----------- Make
 type Make struct {
-	anInstruction
 	anValue
 
 	// when slice
@@ -486,7 +472,6 @@ var (
 
 // ------------- Next
 type Next struct {
-	anInstruction
 	anValue
 	Iter   Value
 	InNext bool // "in" grammar
@@ -519,7 +504,6 @@ var (
 // ----------- Type-cast
 // cast value -> type
 type TypeCast struct {
-	anInstruction
 	anValue
 
 	Value Value
@@ -534,7 +518,6 @@ var (
 
 // ------------- type value
 type TypeValue struct {
-	anInstruction
 	anValue
 }
 
@@ -556,7 +539,6 @@ var _ Instruction = (*ErrorHandler)(nil)
 
 // -------------- PANIC
 type Panic struct {
-	anInstruction
 	anValue
 	Info Value
 }
@@ -569,7 +551,6 @@ var (
 
 // --------------- RECOVER
 type Recover struct {
-	anInstruction
 	anValue
 }
 

@@ -390,9 +390,8 @@ func (f *FunctionBuilder) EmitPanic(info Value) *Panic {
 		return nil
 	}
 	p := &Panic{
-		anInstruction: NewInstruction(),
-		anValue:       NewValue(),
-		Info:          info,
+		anValue: NewValue(),
+		Info:    info,
 	}
 	f.emit(p)
 	return p
@@ -403,8 +402,7 @@ func (f *FunctionBuilder) EmitRecover() *Recover {
 		return nil
 	}
 	r := &Recover{
-		anInstruction: NewInstruction(),
-		anValue:       NewValue(),
+		anValue: NewValue(),
 	}
 	r.SetType(BasicTypes[AnyTypeKind])
 	f.emit(r)
@@ -413,12 +411,11 @@ func (f *FunctionBuilder) EmitRecover() *Recover {
 
 func (f *FunctionBuilder) EmitPhi(name string, vs []Value) *Phi {
 	p := &Phi{
-		anInstruction: NewInstruction(),
-		anValue:       NewValue(),
-		Edge:          vs,
-		create:        false,
-		wit1:          nil,
-		wit2:          nil,
+		anValue: NewValue(),
+		Edge:    vs,
+		create:  false,
+		wit1:    nil,
+		wit2:    nil,
 	}
 	p.SetName(name)
 	f.emitEx(p, func(i Instruction) {

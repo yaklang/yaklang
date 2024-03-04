@@ -22,16 +22,14 @@ func NewLoop(cond Value) *Loop {
 
 func NewConstInst(c *Const) *ConstInst {
 	v := &ConstInst{
-		Const:         c,
-		anInstruction: NewInstruction(),
+		Const: c,
 	}
 	return v
 }
 
 func NewUndefined(name string) *Undefined {
 	u := &Undefined{
-		anInstruction: NewInstruction(),
-		anValue:       NewValue(),
+		anValue: NewValue(),
 	}
 	u.SetName(name)
 	return u
@@ -39,11 +37,10 @@ func NewUndefined(name string) *Undefined {
 
 func NewBinOpOnly(op BinaryOpcode, x, y Value) *BinOp {
 	b := &BinOp{
-		anInstruction: NewInstruction(),
-		anValue:       NewValue(),
-		Op:            op,
-		X:             x,
-		Y:             y,
+		anValue: NewValue(),
+		Op:      op,
+		X:       x,
+		Y:       y,
 	}
 	if op >= OpGt && op <= OpIn {
 		b.SetType(BasicTypes[BooleanTypeKind])
@@ -58,10 +55,9 @@ func NewBinOp(op BinaryOpcode, x, y Value) Value {
 
 func NewUnOpOnly(op UnaryOpcode, x Value) *UnOp {
 	u := &UnOp{
-		anInstruction: NewInstruction(),
-		anValue:       NewValue(),
-		Op:            op,
-		X:             x,
+		anValue: NewValue(),
+		Op:      op,
+		X:       x,
 	}
 	return u
 }
@@ -90,18 +86,16 @@ func NewSwitch(cond Value, defaultb *BasicBlock, label []SwitchLabel) *Switch {
 
 func NewReturn(vs []Value) *Return {
 	r := &Return{
-		anInstruction: NewInstruction(),
-		anValue:       NewValue(),
-		Results:       vs,
+		anValue: NewValue(),
+		Results: vs,
 	}
 	return r
 }
 
 func NewTypeCast(typ Type, v Value) *TypeCast {
 	t := &TypeCast{
-		anInstruction: NewInstruction(),
-		anValue:       NewValue(),
-		Value:         v,
+		anValue: NewValue(),
+		Value:   v,
 	}
 	t.SetType(typ)
 	return t
@@ -109,8 +103,7 @@ func NewTypeCast(typ Type, v Value) *TypeCast {
 
 func NewTypeValue(typ Type) *TypeValue {
 	t := &TypeValue{
-		anInstruction: NewInstruction(),
-		anValue:       NewValue(),
+		anValue: NewValue(),
 	}
 	t.SetType(typ)
 	return t
@@ -128,10 +121,9 @@ func NewAssert(cond, msgValue Value, msg string) *Assert {
 
 func NewNext(iter Value, isIn bool) *Next {
 	n := &Next{
-		anInstruction: NewInstruction(),
-		anValue:       NewValue(),
-		Iter:          iter,
-		InNext:        isIn,
+		anValue: NewValue(),
+		Iter:    iter,
+		InNext:  isIn,
 	}
 	typ := newNextType(iter.GetType(), isIn)
 	n.SetType(typ)
@@ -153,12 +145,11 @@ func NewErrorHandler(try, catch *BasicBlock) *ErrorHandler {
 
 func NewExternLib(variable string, builder *FunctionBuilder, table map[string]any) *ExternLib {
 	e := &ExternLib{
-		anInstruction: NewInstruction(),
-		anValue:       NewValue(),
-		table:         table,
-		builder:       builder,
-		MemberMap:     make(map[string]Value),
-		Member:        make([]Value, 0),
+		anValue:   NewValue(),
+		table:     table,
+		builder:   builder,
+		MemberMap: make(map[string]Value),
+		Member:    make([]Value, 0),
 	}
 	e.SetName(variable)
 	e.SetFunc(builder.Function)
@@ -171,9 +162,8 @@ func NewExternLib(variable string, builder *FunctionBuilder, table map[string]an
 
 func NewParam(variable string, isFreeValue bool, builder *FunctionBuilder) *Parameter {
 	p := &Parameter{
-		anInstruction: NewInstruction(),
-		anValue:       NewValue(),
-		IsFreeValue:   isFreeValue,
+		anValue:     NewValue(),
+		IsFreeValue: isFreeValue,
 	}
 	p.SetName(variable)
 	p.SetFunc(builder.Function)
@@ -190,10 +180,9 @@ func NewParam(variable string, isFreeValue bool, builder *FunctionBuilder) *Para
 
 func NewSideEffect(variable string, call *Call, value Value) *SideEffect {
 	s := &SideEffect{
-		anInstruction: NewInstruction(),
-		anValue:       NewValue(),
-		CallSite:      call,
-		Value:         value,
+		anValue:  NewValue(),
+		CallSite: call,
+		Value:    value,
 	}
 	s.SetName(variable)
 	s.SetType(value.GetType())

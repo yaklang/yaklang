@@ -138,6 +138,8 @@ func (a *anInstruction) AddVariable(v *Variable) {
 var _ Instruction = (*anInstruction)(nil)
 
 type anValue struct {
+	anInstruction
+
 	typ      Type
 	userList Users
 
@@ -148,9 +150,12 @@ type anValue struct {
 
 func NewValue() anValue {
 	return anValue{
-		typ:      BasicTypes[AnyTypeKind],
-		userList: make(Users, 0),
-		member:   omap.NewOrderedMap(map[Value]Value{}),
+		anInstruction: NewInstruction(),
+		typ:           BasicTypes[AnyTypeKind],
+		userList:      make(Users, 0),
+		object:        nil,
+		key:           nil,
+		member:        omap.NewOrderedMap(map[Value]Value{}),
 	}
 }
 
