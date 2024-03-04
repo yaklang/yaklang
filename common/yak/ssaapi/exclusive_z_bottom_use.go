@@ -66,21 +66,23 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		}
 
 		if ins.Method == nil {
-			log.Warnf("fallback: (callStack is not clean!) unknown caller: %v", ins.Method)
+			// log.Infof("fallback: (call instruction 's method/func is not *Function) unknown caller, got: %v", ins.Method.String())
 			return v.visitUserFallback(actx)
 		}
 
 		// enter function via call
 		f, ok := ssa.ToFunction(ins.Method)
 		if !ok {
-			log.Warnf("fallback: (callStack is not clean!) unknown function(not valid func): %v", ins.Method)
+			log.Infof("fallback: (call instruction 's method/func is not *Function) unknown caller, got: %v", ins.Method.String())
 			return v.visitUserFallback(actx)
 		}
 
 		// push call
 		err := actx.PushCall(v)
 		if err != nil {
-			log.Errorf("push call error: %v", err)
+			log.Infof("push call failed: %v", err)
+			return v.visitUserFallback(actx)
+			// existed call
 		} else {
 			defer actx.PopCall()
 		}
@@ -134,7 +136,24 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 	case *ssa.Return:
 		// enter function via return
 		fallback := func() Values {
-			var results Values
+			// var results Values
+			results := make(Values, 0)
+			if f := ins.GetFunc(); f != nil {
+				NewValue(f).GetCalledBy().ForEach(func(value *Value) {
+					dep := value.AppendDependOn(v)
+					err := actx.PushCall(dep)
+
+					if err != nil {
+						log.Errorf("push call failed: %v", err)
+					} else {
+						defer actx.PopCall()
+					}
+					results = append(results, dep.getBottomUses(actx)...)
+				})
+			}
+			if len(results) > 0 {
+				return results
+			}
 			for _, result := range ins.Results {
 				results = append(results, NewValue(result).AppendDependOn(v))
 			}
