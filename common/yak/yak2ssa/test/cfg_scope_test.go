@@ -42,6 +42,38 @@ func TestYaklangBasic_Variable_InBlock(t *testing.T) {
 		}, t)
 	})
 
+	t.Run("test sub-scope var local variable in basic block", func(t *testing.T) {
+		checkPrintlnValue(`
+		a = 1
+		println(a) // 1
+		{
+			var a = 2
+			println(a) // 2
+		}
+		println(a) // 1
+		`, []string{
+			"1",
+			"2",
+			"1",
+		}, t)
+	})
+
+	t.Run("test sub-scope var local variable without assign in basic block", func(t *testing.T) {
+		checkPrintlnValue(`
+		a = 1
+		println(a) // 1
+		{
+			var a
+			println(a) // any
+		}
+		println(a) // 1
+		`, []string{
+			"1",
+			"any",
+			"1",
+		}, t)
+	})
+
 	t.Run("test sub-scope local variable in basic block", func(t *testing.T) {
 		checkPrintlnValue(`
 		a = 1
@@ -386,6 +418,7 @@ func TestYaklangBasic_Variable_Loop(t *testing.T) {
 			t)
 	})
 }
+
 func TestYaklangParameter(t *testing.T) {
 	check := func(code string, t *testing.T) {
 		test := assert.New(t)
@@ -398,7 +431,6 @@ func TestYaklangParameter(t *testing.T) {
 		as := prog.Ref("a").ShowWithSource()
 		test.Equal(1, len(as))
 		test.Equal("a", *as[0].GetRange().SourceCode)
-
 	}
 	t.Run("test parameter used", func(t *testing.T) {
 		check(
@@ -616,5 +648,4 @@ func TestYaklangBasic_CFG_Break(t *testing.T) {
 			"phi(a)[3,4]",
 		}, t)
 	})
-
 }
