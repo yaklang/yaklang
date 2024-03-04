@@ -27,17 +27,16 @@ func (f *Function) NewBasicBlockNotAddUnSealed(name string) *BasicBlock {
 
 func (f *Function) newBasicBlockEx(name string, isSealed bool, nodAddToBlocks bool) *BasicBlock {
 	b := &BasicBlock{
-		anInstruction: NewInstruction(),
-		anValue:       NewValue(),
-		Preds:         make([]*BasicBlock, 0),
-		Succs:         make([]*BasicBlock, 0),
-		Condition:     nil,
-		Insts:         make([]Instruction, 0),
-		Phis:          make([]*Phi, 0),
-		Handler:       nil,
-		finish:        false,
-		ScopeTable:    NewScope(),
-		symbolTable:   make(map[string]Values),
+		anValue:     NewValue(),
+		Preds:       make([]*BasicBlock, 0),
+		Succs:       make([]*BasicBlock, 0),
+		Condition:   nil,
+		Insts:       make([]Instruction, 0),
+		Phis:        make([]*Phi, 0),
+		Handler:     nil,
+		finish:      false,
+		ScopeTable:  NewScope(),
+		symbolTable: make(map[string]Values),
 	}
 	b.SetName(name)
 	b.SetFunc(f)

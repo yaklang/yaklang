@@ -62,14 +62,13 @@ func ReplaceMemberCall(v, to Value) map[string]Value {
 
 func NewMake(parentI Value, typ Type, low, high, step, Len, Cap Value) *Make {
 	i := &Make{
-		anInstruction: NewInstruction(),
-		anValue:       NewValue(),
-		low:           low,
-		high:          high,
-		step:          step,
-		parentI:       parentI,
-		Len:           Len,
-		Cap:           Cap,
+		anValue: NewValue(),
+		low:     low,
+		high:    high,
+		step:    step,
+		parentI: parentI,
+		Len:     Len,
+		Cap:     Cap,
 	}
 	i.SetType(typ)
 	return i

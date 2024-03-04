@@ -8,10 +8,9 @@ import (
 
 func NewPhi(block *BasicBlock, variable string, create bool) *Phi {
 	p := &Phi{
-		anInstruction: NewInstruction(),
-		anValue:       NewValue(),
-		Edge:          make([]Value, 0, len(block.Preds)),
-		create:        create,
+		anValue: NewValue(),
+		Edge:    make([]Value, 0, len(block.Preds)),
+		create:  create,
 	}
 	p.SetName(variable)
 	p.SetBlock(block)
