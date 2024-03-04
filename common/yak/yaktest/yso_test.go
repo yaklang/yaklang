@@ -14,9 +14,9 @@ extArgsMap = {
 	"CommonsBeanutils1_183":"org.apache.commons.beanutils.BeanComparator:cb183",
 	"Jdk7u21":"sun.reflect.annotation.AnnotationInvocationHandler:AnnotationInvocationHandler_7u21,sun.reflect.annotation.AnnotationInvocationHandler$1:AnnotationInvocationHandler$1_7u21",
 	"Jdk8u20":"sun.reflect.annotation.AnnotationInvocationHandler:AnnotationInvocationHandler_8u20,sun.reflect.annotation.AnnotationInvocationHandler$1:AnnotationInvocationHandler$1_8u20,java.beans.beancontext.BeanContextSupport:BeanContextSupport,java.beans.beancontext.BeanContextSupport$1:BeanContextSupport$1,java.beans.beancontext.BeanContextSupport$2:BeanContextSupport$2,java.beans.beancontext.BeanContextSupport$BCSChild:BeanContextSupport$BCSChild,java.beans.beancontext.BeanContextSupport$BCSIterator:BeanContextSupport$BCSIterator",
-	"Spring2":"Spring2",
-	"Spring1":"Spring1",
-	"CommonsCollections3":"CommonsCollections3",
+	"Spring2":"sun.reflect.annotation.AnnotationInvocationHandler:AnnotationInvocationHandler_7u21,sun.reflect.annotation.AnnotationInvocationHandler$1:AnnotationInvocationHandler$1_7u21",
+	"Spring1":"sun.reflect.annotation.AnnotationInvocationHandler:AnnotationInvocationHandler_7u21,sun.reflect.annotation.AnnotationInvocationHandler$1:AnnotationInvocationHandler$1_7u21",
+	"CommonsCollections3":"sun.reflect.annotation.AnnotationInvocationHandler:AnnotationInvocationHandler_7u21,sun.reflect.annotation.AnnotationInvocationHandler$1:AnnotationInvocationHandler$1_7u21",
 }
 //templateGadgetNames = ["MozillaRhino1"]
 failedGadgets = []
