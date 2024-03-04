@@ -4,8 +4,6 @@ import (
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/utils/omap"
-
-	"github.com/samber/lo"
 )
 
 func (p *Package) NewFunction(name string) *Function {
@@ -100,47 +98,4 @@ func NewFunctionWithType(name string, typ *FunctionType) *Function {
 	f.SetType(typ)
 	f.SetName(name)
 	return f
-}
-
-// calculate all return instruction in function, get return type
-func handlerReturnType(rs []*Return) Type {
-	tmp := make(map[string]Type, len(rs))
-	for _, r := range rs {
-		id := ""
-		typs := r.GetType()
-
-		if _, ok := tmp[id]; !ok {
-			tmp[id] = typs
-		}
-	}
-
-	typs := lo.Values(tmp)
-	if len(typs) == 0 {
-		return BasicTypes[NullTypeKind]
-	} else if len(typs) == 1 {
-		return typs[0]
-	} else {
-		//TODO: how handler this? multiple return with different type
-		// should set Warn!!
-		// and ?? Type ??
-		return nil
-	}
-}
-
-// Finish current function
-func (f *Function) Finish() {
-	f.EnterBlock = f.Blocks[0]
-	f.ExitBlock = f.Blocks[len(f.Blocks)-1]
-
-	funType := NewFunctionType("",
-		lo.Map(f.Param, func(p *Parameter, _ int) Type {
-			t := p.GetType()
-			return t
-		}),
-		handlerReturnType(f.Return),
-		f.hasEllipsis,
-	)
-	f.SetType(funType)
-	funType.SetFreeValue(f.FreeValues)
-	funType.SetSideEffect(f.SideEffects)
 }

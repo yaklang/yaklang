@@ -1307,8 +1307,12 @@ func (b *astbuilder) buildAnonymousFunctionDecl(stmt *yak.AnonymousFunctionDeclC
 		b.SetMarkedFunction(funcName)
 	}
 	newFunc := b.NewFunc(funcName)
+
+	hitDefinedFunction := false
+	// save Current function builder marked FunctionType
 	MarkedFunctionType := b.GetMarkedFunction()
 	handleFunctionType := func(fun *ssa.Function) {
+		// in this function, builder is sub-function builder
 		if MarkedFunctionType == nil {
 			return
 		}
@@ -1319,6 +1323,7 @@ func (b *astbuilder) buildAnonymousFunctionDecl(stmt *yak.AnonymousFunctionDeclC
 		for i, p := range fun.Param {
 			p.SetType(MarkedFunctionType.Parameter[i])
 		}
+		hitDefinedFunction = true
 	}
 
 	{
@@ -1367,6 +1372,14 @@ func (b *astbuilder) buildAnonymousFunctionDecl(stmt *yak.AnonymousFunctionDeclC
 			}
 		}
 		b.Finish()
+		if hitDefinedFunction {
+			for name, fv := range b.FreeValues {
+				if fv.GetDefault() != nil {
+					continue
+				}
+				fv.NewError(ssa.Error, TAG, ssa.ValueUndefined(name))
+			}
+		}
 		b.FunctionBuilder = b.PopFunction()
 
 		recoverRange()

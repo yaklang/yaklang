@@ -4,7 +4,6 @@ import (
 	"reflect"
 
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 type ParentScope struct {
@@ -117,86 +116,6 @@ func (b FunctionBuilder) HandlerEllipsis() {
 // add current function defer function
 func (b *FunctionBuilder) AddDefer(call *Call) {
 	b.deferExpr = append(b.deferExpr, call)
-}
-
-// finish current function builder
-func (b *FunctionBuilder) Finish() {
-	// sub-function
-	b.SetDefineFunc()
-	// set defer function
-	if deferLen := len(b.deferExpr); deferLen > 0 {
-		endBlock := b.CurrentBlock
-
-		deferBlock := b.GetDeferBlock()
-		b.CurrentBlock = deferBlock
-		for _, i := range b.deferExpr {
-			if len(deferBlock.Insts) == 0 {
-				deferBlock.Insts = append(deferBlock.Insts, i)
-			} else {
-				// b.EmitInstructionBefore()
-				deferBlock.Insts = utils.InsertSliceItem(deferBlock.Insts, Instruction(i), 0)
-			}
-			// b.EmitInstructionBefore(i, deferBlock.LastInst())
-			// b.EmitOnly(b.deferExpr[i])
-		}
-		b.deferExpr = []*Call{}
-
-		b.CurrentBlock = endBlock
-	}
-	// re-calculate return type
-	for _, ret := range b.Return {
-		recoverRange := b.SetCurrent(ret)
-		ret.calcType(b)
-		recoverRange()
-	}
-
-	// function finish
-	b.Function.Finish()
-}
-
-func (b *FunctionBuilder) SetDefineFunc() {
-	// check all sub-function is DefineFunction ?
-	check := func(name string, f *Function) bool {
-		i, ok := b.DefineFunc[name]
-		if !ok {
-			return false
-		}
-		// fun := b.BuildValueFromAny()
-		typ := reflect.TypeOf(i)
-		if typ.Kind() != reflect.Func {
-			log.Errorf("config define function %s is not function", name)
-			return false
-		}
-		funTyp := b.CoverReflectFunctionType(typ, 0)
-		f.SetType(funTyp)
-		for index, typ := range funTyp.Parameter {
-			if index >= len(f.Param) {
-				log.Errorf("config define function %s parameter count is not match define(%d) vs function(%d)", name, len(funTyp.Parameter), len(f.Param))
-				return false
-			}
-			f.Param[index].SetType(typ)
-		}
-		for name, fv := range f.FreeValues {
-			if v := b.PeekValue(name); v == nil {
-				fv.NewError(Error, SSATAG, ValueUndefined(name))
-			}
-		}
-		_ = funTyp
-		return true
-	}
-
-	// check by name and variable, if hit once, just next sub-function
-	for _, sub := range b.ChildFuncs {
-		if check(sub.GetName(), sub) {
-			continue
-		}
-		for name := range sub.GetAllVariables() {
-			// log.Infof("sub function: %s", name)
-			if check(name, sub) {
-				break
-			}
-		}
-	}
 }
 
 func (b *FunctionBuilder) SetMarkedFunction(name string) {
