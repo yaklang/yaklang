@@ -72,6 +72,12 @@ func (s *SizedWaitGroup) AddWithContext(ctx context.Context, delta ...int) error
 		case <-ctx.Done():
 			return ctx.Err()
 		case s.current <- struct{}{}:
+			select {
+			case <-ctx.Done():
+				<-s.current
+				return ctx.Err()
+			default:
+			}
 			break
 		}
 	}
