@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"net/http"
 	"strings"
 	"testing"
@@ -472,5 +473,80 @@ aaacccaaabbb`))
 	}
 	if !checked {
 		t.Fatal("plugin is not executed")
+	}
+}
+
+func TestGRPCMUSTPASS_DebugPlugin(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rspRaw, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 Ok
+Content-Length: 12
+
+aaacccaaabbb`))
+	var host, port = utils.DebugMockHTTP(rspRaw)
+	log.Infof("start to debug mock http on: %v", utils.HostPort(host, port))
+
+	tempName1, err := yakit.CreateTemporaryYakScript("mitm", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tempName2, err := yakit.CreateTemporaryYakScript("mitm", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// println(string(raw))
+
+	testCode := fmt.Sprintf(`yakit.AutoInitYakit()
+pluginList = cli.YakitPlugin()
+for p in pluginList{
+    if p == "%s"{
+        yakit.Info("load plugin by name ok")
+    }
+    if p == "%s"{
+        yakit.Info("load plugin by filter ok")
+    }
+}
+cli.check()
+`, tempName1, tempName2)
+
+	stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
+		Code:       testCode,
+		PluginType: "yak",
+		LinkPluginConfig: &ypb.HybridScanPluginConfig{
+			PluginNames: []string{tempName1},
+			Filter: &ypb.QueryYakScriptRequest{
+				Keyword: tempName2,
+			},
+		},
+		Input: "http://" + utils.HostPort(host, port),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var checkedName = false
+	var checkedFilter = false
+	for {
+		exec, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		if string(exec.Message) != "" {
+			if strings.Contains(string(exec.Message), "load plugin by name ok") {
+				checkedName = true
+			}
+			if strings.Contains(string(exec.Message), "load plugin by filter ok") {
+				checkedFilter = true
+			}
+		}
+	}
+	if !checkedName {
+		t.Fatal("load plugin by name failed")
+	}
+
+	if !checkedFilter {
+		t.Fatal("load plugin by filter failed")
 	}
 }
