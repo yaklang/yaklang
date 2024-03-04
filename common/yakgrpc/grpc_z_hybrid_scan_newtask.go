@@ -6,6 +6,7 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/filter"
@@ -176,15 +177,13 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 				return
 			}
 			if rsp.HybridScanMode == "pause" {
-				manager.isPaused.Set()
-				manager.cancel()
+				manager.Pause()
 				statusManager.GetStatus(taskRecorder)
 				taskRecorder.Status = yakit.HYBRIDSCAN_PAUSED
 				quickSave()
 			}
 			if rsp.HybridScanMode == "stop" {
-				manager.isPaused.Set()
-				manager.cancel()
+				manager.Stop()
 				statusManager.GetStatus(taskRecorder)
 				quickSave()
 			}
@@ -233,8 +232,12 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 			targetRequestInstance := __currentTarget
 			pluginInstance := __pluginInstance
 			if swgErr := swg.AddWithContext(manager.Context()); swgErr != nil {
+				if errors.Is(swgErr, context.Canceled) {
+					break
+				}
 				continue
 			}
+
 			targetWg.Add(1)
 
 			manager.Checkpoint(func() {
@@ -247,10 +250,8 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 				feedbackStatus()
 				taskRecorder.Status = yakit.HYBRIDSCAN_PAUSED
 				quickSave()
+
 			})
-			if manager.IsPaused() { // 如果暂停立即停止
-				break
-			}
 
 			for __pluginInstance.Type == "port-scan" && !fingerprintMatchOK { // wait for fingerprint match
 				portScanCond.L.Lock()
@@ -265,14 +266,11 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 				defer swg.Done()
 				defer targetWg.Done()
 				defer func() {
-					if !manager.IsPaused() { // 暂停之后不再更新进度
+					if !manager.IsStop() { // 停止之后不再更新进度
 						statusManager.DoneTask(taskIndex)
 					}
 					statusManager.RemoveActiveTask(taskIndex, targetRequestInstance, pluginInstance.ScriptName, stream)
 				}()
-
-				statusManager.PushActiveTask(taskIndex, targetRequestInstance, pluginInstance.ScriptName, stream)
-
 				// shrink context
 				select {
 				case <-manager.Context().Done():
@@ -280,6 +278,8 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 					return
 				default:
 				}
+				statusManager.PushActiveTask(taskIndex, targetRequestInstance, pluginInstance.ScriptName, stream)
+
 				feedbackClient := yaklib.NewVirtualYakitClientWithRiskCount(func(result *ypb.ExecResult) error {
 					select {
 					case <-manager.Context().Done():
@@ -318,7 +318,7 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 			}
 
 			targetWg.Wait()
-			if !manager.IsPaused() { // 暂停之后不再更新进度
+			if !manager.IsStop() { // 停止之后不再更新进度
 				statusManager.DoneTarget()
 				feedbackStatus()
 			}
