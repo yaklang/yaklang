@@ -156,7 +156,7 @@ func (b *astbuilder) buildStatement(stmt *yak.StatementContext) {
 		}
 		return
 	}
-	//TODO: include stmt and check file path
+	// TODO: include stmt and check file path
 	if s, ok := stmt.IncludeStmt().(*yak.IncludeStmtContext); ok {
 		b.buildInclude(s)
 		return
@@ -490,7 +490,6 @@ func (b *astbuilder) buildIfStmt(stmt *yak.IfStmtContext) {
 
 	var build func(stmt *yak.IfStmtContext) func()
 	build = func(stmt *yak.IfStmtContext) func() {
-
 		// for index := range stmt.AllElif() {
 		// }
 		// for index :=0; index < len(stmt.AllExpression())
@@ -549,7 +548,7 @@ type assignlist interface {
 	LeftExpressionList() yak.ILeftExpressionListContext
 }
 
-func (b *astbuilder) AssignList(stmt assignlist) []ssa.Value {
+func (b *astbuilder) AssignList(forceAssign bool, stmt assignlist) []ssa.Value {
 	// Colon Assign Means: ... create symbol to recv value force
 	if op, op2 := stmt.AssignEq(), stmt.ColonAssignEq(); op != nil || op2 != nil {
 		var leftVariables []*ssa.Variable
@@ -595,7 +594,7 @@ func (b *astbuilder) AssignList(stmt assignlist) []ssa.Value {
 
 		// left
 		if li, ok := stmt.LeftExpressionList().(*yak.LeftExpressionListContext); ok {
-			leftVariables = b.buildLeftExpressionList(op2 != nil, li)
+			leftVariables = b.buildLeftExpressionList(forceAssign || op2 != nil, li)
 		}
 
 		// check if defined-function
@@ -689,7 +688,7 @@ func (b *astbuilder) buildAssignExpression(stmt *yak.AssignExpressionContext) []
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
 
-	if ret := b.AssignList(stmt); ret != nil {
+	if ret := b.AssignList(false, stmt); ret != nil {
 		return ret
 	}
 
@@ -780,7 +779,7 @@ func (b *astbuilder) buildDeclareVariableOnly(stmt *yak.DeclareVariableOnlyConte
 		recoverRange := b.SetRangeFromTerminalNode(idstmt)
 		id := idstmt.GetText()
 		// b.WriteVariable(id, b.EmitConstInstAny())
-		v := b.CreateVariable(id)
+		v := b.CreateLocalVariable(id)
 		b.AssignVariable(v, b.EmitConstInstAny())
 		recoverRange()
 	}
@@ -789,7 +788,7 @@ func (b *astbuilder) buildDeclareVariableOnly(stmt *yak.DeclareVariableOnlyConte
 func (b *astbuilder) buildDeclareAndAssignExpression(stmt *yak.DeclareAndAssignExpressionContext) {
 	recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 	defer recoverRange()
-	b.AssignList(stmt)
+	b.AssignList(true, stmt)
 }
 
 // left expression list
@@ -870,7 +869,7 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 		if stmt.LParen() != nil && stmt.RParen() != nil {
 			v := getValue(0)
 			if v == nil {
-				//TODO:  int() => type-cast [number] undefined-""
+				// TODO:  int() => type-cast [number] undefined-""
 				v = b.EmitUndefined("")
 			}
 			typ := b.buildTypeLiteral(s)
