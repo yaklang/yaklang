@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/samber/lo"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
@@ -174,7 +174,7 @@ func TestMemberCall_CheckField(t *testing.T) {
 	})
 
 	t.Run("read", func(t *testing.T) {
-		CheckTestCase(t, TestCase{
+		_CheckTestCase(t, TestCase{
 			code: `
 		a = {}
 		if c {
@@ -182,7 +182,7 @@ func TestMemberCall_CheckField(t *testing.T) {
 		}
 		println(a.b)
 			`,
-			Check: func(test *assert.Assertions, p *ssaapi.Program, want []string) {
+			Check: func(p *ssaapi.Program, want []string) {
 				printlns := p.Ref("println").ShowWithSource()
 				arg := printlns.GetUsers().Filter(func(v *ssaapi.Value) bool {
 					return v.IsCall()
@@ -194,7 +194,7 @@ func TestMemberCall_CheckField(t *testing.T) {
 					return v.GetId()
 				})
 
-				test.Len(argUniqed, 1)
+				require.Len(t, argUniqed, 1)
 			},
 		})
 	})
