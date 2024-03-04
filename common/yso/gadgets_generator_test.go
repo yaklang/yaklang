@@ -48,7 +48,7 @@ func TestParseCC6(t *testing.T) {
 	os.WriteFile("/Users/z3/Downloads/_payload1.ser", byts, 0777)
 }
 func TestGenerateGadgetByGadgetName(t *testing.T) {
-	gadget, err := GenerateGadget("Jdk8u20", SetRuntimeExecEvilClass("touch /tmp/a.a"))
+	gadget, err := GenerateGadget("Spring1", SetRuntimeExecEvilClass("touch /tmp/a.a"))
 	if err != nil {
 		t.Fatal(err)
 	}
