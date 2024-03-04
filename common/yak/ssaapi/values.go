@@ -317,7 +317,7 @@ func (v *Value) IsCalled() bool {
 // GetCalledBy desc all of 'Users' is Call
 func (v *Value) GetCalledBy() Values {
 	return v.GetUsers().Filter(func(value *Value) bool {
-		return value.IsCall()
+		return value.IsCall() && ValueCompare(value.GetCallee(), v)
 	})
 }
 
