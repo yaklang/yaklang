@@ -163,3 +163,38 @@ c = a;
 		t.Fatal("c is phi must")
 	}
 }
+
+func TestSideEffect_BottomUse(t *testing.T) {
+	prog := ParseMustForTestCase(`
+a = 5
+b = () => {
+	a = 2
+}
+if e {b()}
+c = a+1;
+`)
+	aRef := prog.Ref("a").Filter(func(value *Value) bool {
+		return value.GetConstValue() == 5
+	})
+	aRef.Show()
+	checkPhi := false
+	checkVal5 := false
+	aRef.GetBottomUses().Show().ForEach(func(value *Value) {
+		value.GetOperands().ForEach(func(value *Value) {
+			if value.IsPhi() {
+				checkPhi = true
+				value.GetOperands().ForEach(func(value *Value) {
+					if value.GetConstValue() == 5 {
+						checkVal5 = true
+					}
+				})
+			}
+		})
+	})
+	if !checkVal5 {
+		t.Fatal("expect 5, but not")
+	}
+	if !checkPhi {
+		t.Fatal("expect phi, but not")
+	}
+}
