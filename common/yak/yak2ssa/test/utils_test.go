@@ -7,7 +7,7 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/samber/lo"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -20,11 +20,10 @@ type TestCase struct {
 	want        []string
 	ExternValue map[string]any
 	ExternLib   map[string]map[string]any
-	Check       func(*assert.Assertions, *ssaapi.Program, []string)
+	Check       func(*ssaapi.Program, []string)
 }
 
-func CheckTestCase(t *testing.T, tc TestCase) {
-	test := assert.New(t)
+func _CheckTestCase(t *testing.T, tc TestCase) {
 
 	opt := make([]ssaapi.Option, 0)
 	for k, v := range tc.ExternLib {
@@ -33,7 +32,7 @@ func CheckTestCase(t *testing.T, tc TestCase) {
 	opt = append(opt, ssaapi.WithExternValue(tc.ExternValue))
 	opt = append(opt, static_analyzer.GetPluginSSAOpt("yak")...)
 	prog, err := ssaapi.Parse(tc.code, opt...)
-	test.Nil(err, "parse error")
+	require.Nil(t, err, "parse error")
 
 	prog.Show()
 	// prog.Program.ShowWithSource()
@@ -42,7 +41,7 @@ func CheckTestCase(t *testing.T, tc TestCase) {
 	if tc.want == nil {
 		tc.want = make([]string, 0)
 	}
-	tc.Check(test, prog, tc.want)
+	tc.Check(prog, tc.want)
 }
 
 // ===================== struct =====================
@@ -73,7 +72,7 @@ func checkPrintlnValue(code string, want []string, t *testing.T) {
 }
 
 func checkPrintf(t *testing.T, tc TestCase) {
-	tc.Check = func(test *assert.Assertions, prog *ssaapi.Program, want []string) {
+	tc.Check = func(prog *ssaapi.Program, want []string) {
 		println := prog.Ref("println").ShowWithSource()
 		// test.Equal(1, len(println), "println should only 1")
 		got := lo.Map(
@@ -89,80 +88,79 @@ func checkPrintf(t *testing.T, tc TestCase) {
 		// sort.Strings(want)
 		log.Info("want :", want)
 
-		test.Equal(want, got)
-
+		require.Equal(t, want, got)
 	}
-	CheckTestCase(t, tc)
+	_CheckTestCase(t, tc)
 }
 
 func checkError(t *testing.T, tc TestCase) {
-	check := func(test *assert.Assertions, prog *ssaapi.Program, want []string) {
+	check := func(prog *ssaapi.Program, want []string) {
 		errs := lo.Map(prog.GetErrors(), func(e *ssa.SSAError, _ int) string { return e.Message })
 		slices.Sort(errs)
 		slices.Sort(want)
-		test.Len(errs, len(want), "error len not match")
-		test.Equal(want, errs, "error not match")
+		require.Len(t, errs, len(want), "error len not match")
+		require.Equal(t, want, errs, "error not match")
 	}
 	tc.Check = check
-	CheckTestCase(t, tc)
+	_CheckTestCase(t, tc)
 }
 
 func checkType(t *testing.T, code string, kind ssa.TypeKind) {
 	tc := TestCase{
 		code: code,
-		Check: func(test *assert.Assertions, prog *ssaapi.Program, _ []string) {
+		Check: func(prog *ssaapi.Program, _ []string) {
 			vs := prog.Ref("target")
-			test.Equal(1, len(vs))
+			require.Len(t, vs, 1)
 
 			v := vs[0]
-			test.NotNil(v)
+			require.NotNil(t, v)
 
 			log.Info("type and kind: ", v.GetType(), v.GetTypeKind())
-			test.Equal(kind, v.GetTypeKind())
+			require.Equal(t, kind, v.GetTypeKind())
 		},
 	}
-	CheckTestCase(t, tc)
+	_CheckTestCase(t, tc)
 }
 
 func checkMask(t *testing.T, tc TestCase) {
-	tc.Check = func(test *assert.Assertions, p *ssaapi.Program, want []string) {
+	tc.Check = func(p *ssaapi.Program, want []string) {
 		targets := p.Ref("target").ShowWithSource()
-		test.Len(targets, 1)
+		require.Len(t, targets, 1)
 
 		target := targets[0]
 
 		v := ssaapi.GetBareNode(target)
-		test.NotNil(v)
+		require.NotNil(t, v)
 
 		// test.Equal("1", v.String())
 
 		maskV, ok := v.(ssa.Maskable)
-		test.True(ok)
+		require.True(t, ok)
 
 		maskValues := maskV.GetMask()
 		log.Infof("mask values: %s", maskValues)
 
-		test.Equal(want, lo.Map(maskValues, func(v ssa.Value, _ int) string { return ssa.LineDisasm(v) }))
+		require.Equal(t, want, lo.Map(maskValues, func(v ssa.Value, _ int) string { return ssa.LineDisasm(v) }))
 	}
-	CheckTestCase(t, tc)
+	_CheckTestCase(t, tc)
 }
 
 func checkFreeValue(t *testing.T, tc TestCase) {
-	tc.Check = func(test *assert.Assertions, p *ssaapi.Program, want []string) {
+	tc.Check = func(p *ssaapi.Program, want []string) {
 		targets := p.Ref("target").ShowWithSource()
-		test.Len(targets, 1)
+		require.Len(t, targets, 1, "target len not match")
 
 		target := targets[0]
 
 		typ := ssaapi.GetBareType(target.GetType())
-		test.Equal(ssa.FunctionTypeKind, typ.GetTypeKind())
+		require.Equal(t, ssa.FunctionTypeKind, typ.GetTypeKind())
 
 		funTyp, ok := ssa.ToFunctionType(typ)
-		test.True(ok)
+		require.True(t, ok)
 
 		freeValues := lo.Map(funTyp.FreeValue, func(v *ssa.FunctionFreeValue, _ int) string { return v.Name })
 		slices.Sort(freeValues)
-		test.Equal(want, freeValues)
+		require.Equal(t, want, freeValues)
 	}
-	CheckTestCase(t, tc)
+	_CheckTestCase(t, tc)
 }

@@ -3,7 +3,7 @@ package test
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
@@ -63,7 +63,7 @@ func TestUnpack_Line(t *testing.T) {
 	})
 
 	t.Run("check variable ", func(t *testing.T) {
-		CheckTestCase(t, TestCase{
+		_CheckTestCase(t, TestCase{
 			code: `
 		f = () => {
 			return 1, 2
@@ -75,9 +75,9 @@ func TestUnpack_Line(t *testing.T) {
 				"Undefined-#4[0](valid)",
 				"Undefined-#4[1](valid)",
 			},
-			Check: func(test *assert.Assertions, p *ssaapi.Program, s []string) {
+			Check: func(p *ssaapi.Program, s []string) {
 				as := p.Ref("a").ShowWithSource()
-				test.Equal(1, len(as), "a should only 1")
+				require.Equal(t, 1, len(as), "a should only 1")
 				a := as[0]
 
 				call := ssaapi.GetBareNode(a)
