@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
@@ -34,17 +35,17 @@ func TestExternValue(t *testing.T) {
 		tc.ExternValue = map[string]any{
 			"println": func(v ...any) {},
 		}
-		tc.Check = func(test *assert.Assertions, prog *ssaapi.Program, want []string) {
+		tc.Check = func(prog *ssaapi.Program, want []string) {
 			ps := prog.Ref("target").ShowWithSource()
-			test.NotEqual(0, len(ps), "target should has value")
-			test.Equal(0,
+			require.NotEqual(t, 0, len(ps), "target should has value")
+			require.Equal(t, 0,
 				len(ps.Filter(func(v *ssaapi.Value) bool {
 					return !v.IsFunction()
 				})),
 				"target should all is function",
 			)
 		}
-		CheckTestCase(t, tc)
+		_CheckTestCase(t, tc)
 	}
 
 	t.Run("use normal", func(t *testing.T) {
@@ -90,11 +91,11 @@ func TestExternValue(t *testing.T) {
 		tc.ExternValue = map[string]any{
 			"println": func(v ...any) {},
 		}
-		tc.Check = func(test *assert.Assertions, p *ssaapi.Program, s []string) {
+		tc.Check = func(p *ssaapi.Program, s []string) {
 			vs := p.Ref("target")
 			// test.Len(vs, 0, "target should has value")
-			test.NotEqual(0, len(vs), "target should has value")
-			test.NotEqual(0, len(vs.Filter(func(v *ssaapi.Value) bool {
+			require.NotEqual(t, 0, len(vs), "target should has value")
+			require.NotEqual(t, 0, len(vs.Filter(func(v *ssaapi.Value) bool {
 				return v.String() != "1"
 			})),
 				"target should all is 1",
@@ -152,15 +153,15 @@ func TestExternLib(t *testing.T) {
 				"method": func() {},
 			},
 		}
-		tc.Check = func(test *assert.Assertions, p *ssaapi.Program, s []string) {
-			test.NotEqual(0, p.Ref("lib").Filter(func(v *ssaapi.Value) bool {
+		tc.Check = func(p *ssaapi.Program, s []string) {
+			require.NotEqual(t, 0, p.Ref("lib").Filter(func(v *ssaapi.Value) bool {
 				return !v.IsExternLib()
 			}), "lib shoud all is externLib")
-			test.NotEqual(0, p.Ref("target").Filter(func(v *ssaapi.Value) bool {
+			require.NotEqual(t, 0, p.Ref("target").Filter(func(v *ssaapi.Value) bool {
 				return !v.IsFunction()
 			}), "println should all is function")
 		}
-		CheckTestCase(t, tc)
+		_CheckTestCase(t, tc)
 	}
 
 	t.Run("use normal", func(t *testing.T) {
@@ -219,10 +220,10 @@ func TestExternLib(t *testing.T) {
 				"method": func() {},
 			},
 		}
-		tc.Check = func(test *assert.Assertions, p *ssaapi.Program, s []string) {
+		tc.Check = func(p *ssaapi.Program, s []string) {
 			vs := p.Ref("target")
-			test.NotEqual(0, len(vs), "target should has value")
-			test.NotEqual(0, vs.Filter(func(v *ssaapi.Value) bool {
+			require.NotEqual(t, 0, len(vs), "target should has value")
+			require.NotEqual(t, 0, vs.Filter(func(v *ssaapi.Value) bool {
 				return v.String() != "1"
 			}), "target should all is 1")
 		}
@@ -281,7 +282,7 @@ func TestExternRef(t *testing.T) {
 				"method": func() {},
 			},
 		}
-		CheckTestCase(t, tc)
+		_CheckTestCase(t, tc)
 	}
 
 	t.Run("extern value", func(t *testing.T) {
@@ -292,15 +293,15 @@ func TestExternRef(t *testing.T) {
 			println("a")
 			println("a")
 			`,
-			Check: func(test *assert.Assertions, p *ssaapi.Program, want []string) {
+			Check: func(p *ssaapi.Program, want []string) {
 				printlns := p.Ref("println")
-				test.Len(printlns, 1)
+				require.Len(t, printlns, 1)
 
 				println := printlns[0]
-				test.True(println.IsFunction())
+				require.True(t, println.IsFunction())
 
 				printlnCaller := println.GetUsers()
-				test.Len(printlnCaller, 4)
+				require.Len(t, printlnCaller, 4)
 			},
 		})
 	})
@@ -316,21 +317,21 @@ func TestExternRef(t *testing.T) {
 			lib.method()
 			lib.method()
 			`,
-			Check: func(test *assert.Assertions, p *ssaapi.Program, w []string) {
+			Check: func(p *ssaapi.Program, w []string) {
 				libs := p.Ref("lib")
-				test.Len(libs, 1)
+				require.Len(t, libs, 1)
 
 				lib := libs[0]
-				test.True(lib.IsExternLib())
+				require.True(t, lib.IsExternLib())
 
 				methods := lib.GetOperands()
-				test.Len(methods, 1)
+				require.Len(t, methods, 1)
 
 				method := methods[0]
-				test.True(method.IsFunction())
+				require.True(t, method.IsFunction())
 
 				methodCaller := method.GetUsers()
-				test.Len(methodCaller, 7)
+				require.Len(t, methodCaller, 7)
 			},
 		})
 	})
