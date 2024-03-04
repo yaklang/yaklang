@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"gopkg.in/yaml.v3"
 	"strings"
@@ -27,7 +28,22 @@ func (s *Server) DebugPlugin(req *ypb.DebugPluginRequest, stream ypb.Yak_DebugPl
 		return utils.Error("cannot find/extract debug target")
 	}
 
-	return s.debugScript(input, req.GetPluginType(), req.GetCode(), stream, req.GetExecParams(), req.GetHTTPRequestTemplate())
+	execParams := req.GetExecParams()
+	if pluginType == "yak" && req.GetLinkPluginConfig() != nil { // yak 类型插件 构造联动插件参数
+		LinkPluginList := s.PluginListGenerator(req.GetLinkPluginConfig(), stream.Context())
+		replace := false
+		for i := 0; i < len(execParams); i++ {
+			if execParams[i].GetKey() == "__yakit_plugin_names__" {
+				execParams[i].Value = strings.Join(LinkPluginList, "|")
+				replace = true
+			}
+		}
+		if !replace {
+			execParams = append(execParams, &ypb.KVPair{Key: "__yakit_plugin_names__", Value: strings.Join(LinkPluginList, "|")})
+		}
+	}
+
+	return s.debugScript(input, req.GetPluginType(), req.GetCode(), stream, execParams, req.GetHTTPRequestTemplate())
 }
 
 func (s *Server) HTTPRequestBuilder(ctx context.Context, req *ypb.HTTPRequestBuilderParams) (*ypb.HTTPRequestBuilderResponse, error) {
@@ -191,4 +207,23 @@ Host: example.com
 	encoder.Close()
 	templates := utils.EscapeInvalidUTF8Byte(buf.Bytes())
 	return &ypb.HTTPRequestBuilderResponse{Templates: templates, Results: results}, nil
+}
+
+func (s *Server) PluginListGenerator(plugin *ypb.HybridScanPluginConfig, ctx context.Context) (res []string) {
+	// 生成插件列表参数
+	for _, i := range plugin.GetPluginNames() {
+		script, err := yakit.GetYakScriptByName(s.GetProfileDatabase().Model(&yakit.YakScript{}), i)
+		if err != nil {
+			continue
+		}
+		res = append(res, script.ScriptName)
+	}
+	if plugin.GetFilter() != nil {
+		for pluginInstance := range yakit.YieldYakScripts(yakit.FilterYakScript(
+			s.GetProfileDatabase().Model(&yakit.YakScript{}), plugin.GetFilter(),
+		), ctx) {
+			res = append(res, pluginInstance.ScriptName)
+		}
+	}
+	return
 }
