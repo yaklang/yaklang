@@ -52,7 +52,7 @@ func SetJavaObjectClass(object yserx.JavaSerializable, classObject *javaclasspar
 		}
 	})
 	if tmpl == nil {
-		return utils.Error("Not found template")
+		return utils.Error("not found TemplateImpl in java object")
 	}
 	err := SetTemplateObjectClass(tmpl, classObject.Bytes())
 	if err != nil {
@@ -103,9 +103,9 @@ func SetTemplateObjectClass(object *yserx.JavaObject, classBytes []byte) error {
 				if !ok {
 					continue
 				}
-				if len(arrObj.Values) != 2 {
-					return utils.Error("template struct not match")
-				}
+				//if len(arrObj.Values) != 2 {
+				//	return utils.Error("template struct not match")
+				//}
 				//emptyClass, err := GenEmptyClassInTemplateClassObject()
 				//if err != nil {
 				//	return err
@@ -391,6 +391,11 @@ func _WalkJavaSerializableObject(objSer yserx.JavaSerializable, replace func(new
 	fieldIndex := 0
 	p := desc
 	for p != nil {
+		if p.Detail.Annotations != nil {
+			for _, annotation := range p.Detail.Annotations {
+				_WalkJavaSerializableObject(annotation, replace, handleTable, handle, node, structHandleTable)
+			}
+		}
 		tmpFields := []*JavaStruct{}
 		handleTable[p.Detail.Handle] = p
 		for _, field := range p.Detail.Fields.Fields {
