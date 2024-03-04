@@ -6,15 +6,14 @@ import (
 
 func NewCall(target Value, args, binding []Value, block *BasicBlock) *Call {
 	c := &Call{
-		anInstruction: NewInstruction(),
-		anValue:       NewValue(),
-		Method:        target,
-		Args:          args,
-		binding:       binding,
-		Async:         false,
-		Unpack:        false,
-		IsDropError:   false,
-		IsEllipsis:    false,
+		anValue:     NewValue(),
+		Method:      target,
+		Args:        args,
+		binding:     binding,
+		Async:       false,
+		Unpack:      false,
+		IsDropError: false,
+		IsEllipsis:  false,
 	}
 	return c
 }
