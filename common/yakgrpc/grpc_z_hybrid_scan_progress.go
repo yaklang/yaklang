@@ -22,6 +22,15 @@ func (h *HybridScanTaskManager) IsPaused() bool {
 	return h.isPaused.IsSet()
 }
 
+func (h *HybridScanTaskManager) IsStop() bool {
+	select {
+	case <-h.ctx.Done():
+		return true
+	default:
+		return false
+	}
+}
+
 func (h *HybridScanTaskManager) TaskId() string {
 	return h.taskId
 }

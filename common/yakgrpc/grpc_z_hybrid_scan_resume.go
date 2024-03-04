@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"context"
 	"encoding/json"
+	"errors"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
@@ -107,15 +108,13 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 				return
 			}
 			if rsp.HybridScanMode == "pause" {
-				manager.isPaused.Set()
-				manager.cancel()
+				manager.Pause()
 				statusManager.GetStatus(task)
 				task.Status = yakit.HYBRIDSCAN_PAUSED
 				quickSave()
 			}
 			if rsp.HybridScanMode == "stop" {
-				manager.isPaused.Set()
-				manager.cancel()
+				manager.Stop()
 				statusManager.GetStatus(task)
 				quickSave()
 			}
@@ -165,6 +164,9 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 			pluginInstance := __pluginInstance
 
 			if swgErr := swg.AddWithContext(manager.Context()); swgErr != nil {
+				if errors.Is(swgErr, context.Canceled) {
+					break
+				}
 				continue
 			}
 			targetWg.Add(1)
@@ -175,9 +177,6 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 				task.Status = yakit.HYBRIDSCAN_PAUSED
 				quickSave()
 			})
-			if manager.IsPaused() { // 如果暂停立刻停止
-				break
-			}
 
 			for !fingerprintMatchOK { // wait for fingerprint match
 				portScanCond.L.Lock()
@@ -194,7 +193,7 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 
 				defer targetWg.Done()
 				defer func() {
-					if !manager.IsPaused() { // 暂停之后不再更新进度
+					if !manager.IsStop() { // 暂停之后不再更新进度
 						statusManager.DoneTask(taskIndex)
 					}
 					feedbackStatus()
@@ -264,8 +263,10 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 			}
 
 			targetWg.Wait()
-			statusManager.DoneTarget()
-			feedbackStatus()
+			if manager.IsStop() { //停止之后不再 更新进度
+				statusManager.DoneTarget()
+				feedbackStatus()
+			}
 		}()
 	}
 	swg.Wait()
