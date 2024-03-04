@@ -25,6 +25,7 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		anValue:             NewValue(),
 		Package:             p,
 		Param:               make([]*Parameter, 0),
+		paramMap:            make(map[Value]int),
 		hasEllipsis:         false,
 		Blocks:              make([]*BasicBlock, 0),
 		EnterBlock:          nil,
@@ -32,7 +33,7 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		ChildFuncs:          make([]*Function, 0),
 		parent:              nil,
 		FreeValues:          make(map[string]*Parameter),
-		SideEffects:         make(map[*Variable]Value),
+		SideEffects:         make([]*FunctionSideEffect, 0),
 		cacheExternInstance: make(map[string]Value),
 		externType:          make(map[string]Type),
 		builder:             nil,
@@ -67,13 +68,10 @@ func (f *FunctionBuilder) NewParam(name string) *Parameter {
 	p := NewParam(name, false, f)
 	p.SetRange(f.CurrentRange)
 	f.Param = append(f.Param, p)
+	f.paramMap[p] = len(f.Param) - 1
 	variable := f.CreateVariable(name)
 	f.AssignVariable(variable, p)
 	return p
-}
-
-func (f *Function) AddSideEffect(name *Variable, v Value) {
-	f.SideEffects[name] = v
 }
 
 func (f *Function) ReturnValue() []Value {

@@ -786,21 +786,6 @@ func (s *ObjectType) Finish() {
 	}
 }
 
-type FunctionSideEffect struct {
-	Name   string
-	Modify Value
-	// only call-side Scope > this Scope-level, this side-effect can be create
-	Scope *Scope
-}
-
-type FunctionFreeValue struct {
-	Name     string
-	Variable *Variable
-
-	HasDefault bool // this is mark is capture value
-	Default    Value
-}
-
 type FunctionType struct {
 	Name         string
 	pkgPath      string
@@ -856,37 +841,6 @@ func NewFunctionType(name string, Parameter []Type, ReturnType Type, IsVariadic 
 func NewFunctionTypeDefine(name string, Parameter []Type, ReturnType []Type, IsVariadic bool) *FunctionType {
 	return NewFunctionType(name, Parameter, CalculateType(ReturnType), IsVariadic)
 }
-
-func (s *FunctionType) SetFreeValue(fv map[string]*Parameter) {
-	s.FreeValue = make([]*FunctionFreeValue, 0, len(fv))
-	for name, p := range fv {
-		v := &FunctionFreeValue{
-			Name: name,
-		}
-
-		if variable := p.GetVariable(name); variable != nil {
-			v.Variable = variable
-		}
-		if p.GetDefault() != nil {
-			v.HasDefault = true
-			v.Default = p.GetDefault()
-		}
-		s.FreeValue = append(s.FreeValue, v)
-	}
-}
-
-func (s *FunctionType) SetSideEffect(se map[*Variable]Value) {
-	s.SideEffects = make([]*FunctionSideEffect, 0, len(se))
-	for capture, to := range se {
-		se := &FunctionSideEffect{
-			Modify: to,
-			Name:   capture.GetName(),
-			Scope:  capture.GetScope().(*Scope),
-		}
-		s.SideEffects = append(s.SideEffects, se)
-	}
-}
-
 func (s *FunctionType) SetName(name string) {
 	s.Name = name
 }

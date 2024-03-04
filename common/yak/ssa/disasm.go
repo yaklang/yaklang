@@ -82,7 +82,7 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 	}
 	if len(f.SideEffects) > 0 {
 		ret += "sideEffects: " + strings.Join(
-			lo.MapToSlice(f.SideEffects, func(variable *Variable, v Value) string { return variable.GetName() }),
+			lo.Map(f.SideEffects, func(se *FunctionSideEffect, _ int) string { return se.Name }),
 			",",
 		) + "\n"
 	}

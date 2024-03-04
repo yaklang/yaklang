@@ -152,8 +152,9 @@ type Function struct {
 	Package *Package
 
 	// just function parameter and all return instruction
-	Param  []*Parameter
-	Return []*Return
+	Param    []*Parameter
+	paramMap map[Value]int // for get parameter index
+	Return   []*Return
 
 	// BasicBlock list
 	Blocks []*BasicBlock
@@ -169,7 +170,7 @@ type Function struct {
 	FreeValues map[string]*Parameter // store the captured variable form parent-function, just contain name, and type is Parameter
 	// closure function side effects
 	// TODO: currently, this value is not being used, but it should be utilized in the future.
-	SideEffects map[*Variable]Value // (modified)value to value
+	SideEffects []*FunctionSideEffect
 	// closure function double link. parentFunc <-> childFuncs
 	parent     *Function   // parent function;  can be nil if there is no parent function
 	ChildFuncs []*Function // child function within this function
