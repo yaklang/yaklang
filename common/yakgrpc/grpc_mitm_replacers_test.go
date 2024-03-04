@@ -211,6 +211,7 @@ func TestGRPCMUSTPASS_MatchGroup(t *testing.T) {
 		VerboseName:       "",
 		EnableForHeader:   true,
 		EnableForResponse: true,
+		EnableForURI:      true,
 	}
 	replacer := NewMITMReplacer()
 	responseBytes := []byte(`HTTP/1.1 200 OK
@@ -317,7 +318,18 @@ func TestGRPCMUSTPASS_ReplaceWithScope(t *testing.T) {
 			name:   "test match response uri",
 			flag:   response | uri,
 			expect: ",,",
-		}, // response has no uri
+		},
+		{
+			name:   "test match response uri body header",
+			flag:   response | uri | body | header,
+			expect: ",testHeaderRsp,testBodyRsp",
+		},
+		{
+			name:   "test match response uri",
+			flag:   response | uri | header,
+			expect: ",testHeaderRsp,",
+		},
+		// response has no uri
 		{
 			name:   "test match response header",
 			flag:   response | header,
@@ -349,7 +361,7 @@ Date: Tue, 10 Oct 2023 07:28:15 GMT
 testHeaderRsp: xxx
 Content-Length: 23
 
-`)
+testBodyRsp`)
 			reqRaw := `POST /testUri HTTP/1.1
 Host: www.baidu.com
 Accept-Encoding: gzip, deflate, br
