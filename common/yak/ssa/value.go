@@ -127,6 +127,7 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 			v := parentValue.GetVariable(variable.GetName())
 			b.AddSideEffect(v, value)
 		}
+		b.CheckAndSetSideEffect(variable, value)
 	}
 	checkAssign()
 

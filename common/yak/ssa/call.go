@@ -90,13 +90,18 @@ func (c *Call) handleMethod() {
 		recoverBuilder := builder.SetCurrent(c)
 		currentScope := c.GetBlock().ScopeTable
 		for _, se := range funcTyp.SideEffects {
-			// side-effect only create in scope that lower or same than modify's scope
-			if !currentScope.IsSameOrSubScope(se.Scope) {
-				continue
+			var variable *Variable
+			if se.IsMemberCall {
+				variable = builder.CreateMemberCallVariable(c.Args[se.Parameter], se.Key)
+			} else {
+				// side-effect only create in scope that lower or same than modify's scope
+				if !currentScope.IsSameOrSubScope(se.Variable.GetScope()) {
+					continue
+				}
+				variable = builder.CreateVariable(se.Name)
 			}
 
 			sideEffect := builder.EmitSideEffect(se.Name, c, se.Modify)
-			variable := builder.CreateVariable(se.Name)
 			builder.AssignVariable(variable, sideEffect)
 		}
 		recoverBuilder()
