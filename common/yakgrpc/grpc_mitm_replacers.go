@@ -345,20 +345,20 @@ func (m *MITMReplaceRule) MatchAndReplacePacket(packet []byte, isReq bool) ([]*r
 	} else {
 		uri := packetInfo.RequestURI
 		if isReq && m.EnableForURI {
-			uri, err = re.Replace(uri, m.Result, 0, -1)
+			uri, err = re.Replace(uri, m.Result, -1, -1)
 			if err != nil {
 				return nil, nil, fmt.Errorf("replace uri failed: %v", err)
 			}
 		}
 		headerRaw = strings.Replace(headerRaw, packetInfo.RequestURI, uri, 1)
 		if m.EnableForHeader {
-			headerRaw, err = re.Replace(packetInfo.HeaderRaw, m.Result, 0, -1)
+			headerRaw, err = re.Replace(packetInfo.HeaderRaw, m.Result, -1, -1)
 			if err != nil {
 				return nil, nil, fmt.Errorf("replace header failed: %v", err)
 			}
 		}
 		if m.EnableForBody {
-			body, err := re.Replace(string(bodyRaw), m.Result, 0, -1)
+			body, err := re.Replace(string(bodyRaw), m.Result, -1, -1)
 			if err != nil {
 				return nil, nil, fmt.Errorf("replace body failed: %v", err)
 			}
@@ -600,7 +600,8 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 	var extracted []*yakit.ExtractedData
 
 	if ret := httpctx.GetMatchedRule(req); len(ret) > 0 {
-		stringForSettingColor(ret[0].Color, ret[0].ExtraTag, flow)
+		lastElement := ret[len(ret)-1]
+		stringForSettingColor(lastElement.Color, lastElement.ExtraTag, flow)
 		return nil
 	}
 	if m == nil {
@@ -755,7 +756,7 @@ func (m *mitmReplacer) replaceHeader(rule *ypb.MITMContentReplacer, headerMerged
 		return headerMerged, false
 	}
 
-	merged, _ := i.Replace(headerMerged, rule.Result, 0, -1)
+	merged, _ := i.Replace(headerMerged, rule.Result, -1, -1)
 	if merged == "" {
 		return headerMerged, false
 	}
@@ -775,7 +776,7 @@ func (m *mitmReplacer) replaceURIInHeader(rule *ypb.MITMContentReplacer, headerM
 	var headers []string
 	var matched bool
 	lowhttp.SplitHTTPHeadersAndBodyFromPacketEx([]byte(headerMerged), func(method string, requestUri string, proto string) error {
-		requestUriReplaced, err := i.Replace(requestUri, rule.Result, 0, -1)
+		requestUriReplaced, err := i.Replace(requestUri, rule.Result, -1, -1)
 		if err != nil {
 			headers = append(headers, fmt.Sprintf("%v %v %v", method, requestUri, proto))
 			return nil
@@ -808,7 +809,7 @@ func (m *mitmReplacer) replaceBody(rule *ypb.MITMContentReplacer, bodyMerged []b
 		return bodyMerged, false
 	}
 
-	merged, _ := i.Replace(origin, rule.Result, 0, -1)
+	merged, _ := i.Replace(origin, rule.Result, -1, -1)
 	if merged == "" {
 		return bodyMerged, false
 	}
