@@ -62,14 +62,20 @@ func NewConvertIfaceNameError(name string) *ConvertIfaceNameError {
 var cachedFindAllDevs = utils.CacheFunc(60, pcap.FindAllDevs)
 
 func IfaceNameToPcapIfaceName(name string) (string, error) {
-	iface, err := net.InterfaceByName(name)
-	if err != nil {
-		return "", utils.Errorf("fetch net.Interface failed: %s", err)
-	}
-
 	devs, err := cachedFindAllDevs()
 	if err != nil {
 		return "", utils.Errorf("find pcap dev failed: %s", err)
+	}
+
+	for _, dev := range devs {
+		if dev.Name == name {
+			return name, nil
+		}
+	}
+
+	iface, err := net.InterfaceByName(name)
+	if err != nil {
+		return "", utils.Errorf("fetch net.Interface failed: %s", err)
 	}
 
 	for _, dev := range devs {
