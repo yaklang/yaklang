@@ -7,9 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -28,17 +27,72 @@ type Client struct {
 	Domain string
 
 	// function call
+	Functions  []Function
 	Parameters Parameters
 }
 
-func NewOpenAIClient(opt ...ConfigOption) *Client {
+type Session struct {
+	client   *Client
+	messages []ChatDetail
+}
+
+func NewSession(opt ...ConfigOption) *Session {
+	return &Session{
+		client:   NewOpenAIClient(opt...),
+		messages: make([]ChatDetail, 0),
+	}
+}
+
+func (s *Session) Chat(message ChatDetail, opts ...ConfigOption) (ChatDetails, error) {
+	c := NewRawOpenAIClient(opts...)
+
+	// if the message is a tool call, and the tool call ID is not set, set it to the latest tool call ID
+	if message.Role == "tool" && message.ToolCallID == "" && len(s.messages) > 0 {
+		latestMessage := s.messages[len(s.messages)-1]
+		for _, toolCall := range latestMessage.ToolCalls {
+			if toolCall == nil || toolCall.ID == "" {
+				continue
+			}
+			message.ToolCallID = toolCall.ID
+			break
+		}
+	}
+
+	s.messages = append(s.messages, message)
+
+	choices, err := s.client.ChatEx(s.messages, c.Functions...)
+	details := lo.Map(choices, func(c ChatChoice, _ int) ChatDetail {
+		return c.Message
+	})
+
+	s.messages = append(s.messages, details...)
+
+	return details, err
+}
+
+func NewRawOpenAIClient(opts ...ConfigOption) *Client {
 	c := &Client{
+		Functions: make([]Function, 0),
 		Parameters: Parameters{
 			Type:       "object",
 			Properties: make(map[string]Property),
 		},
 	}
-	for _, o := range opt {
+	for _, o := range opts {
+		o(c)
+	}
+	return c
+}
+
+func NewOpenAIClient(opts ...ConfigOption) *Client {
+	c := &Client{
+		Functions: make([]Function, 0),
+		Parameters: Parameters{
+			Type:       "object",
+			Properties: make(map[string]Property),
+		},
+	}
+	for _, o := range opts {
 		o(c)
 	}
 	config := consts.GetThirdPartyApplicationConfig("openai")
@@ -86,7 +140,7 @@ func (c *Client) TranslateToChinese(data string) (string, error) {
 	return strings.Trim(results, "\r\n \v\f\""), nil
 }
 
-func (c *Client) Chat(data string, funcs ...Function) (string, error) {
+func (c *Client) ChatEx(messages []ChatDetail, funcs ...Function) ([]ChatChoice, error) {
 	chatModel := c.ChatModel
 	if chatModel == "" {
 		chatModel = "gpt-3.5-turbo"
@@ -99,15 +153,12 @@ func (c *Client) Chat(data string, funcs ...Function) (string, error) {
 	if c.Domain != "" {
 		domain = c.Domain
 	}
-	chatMessage := NewChatMessage(chatModel, []ChatDetail{
-		{
-			Role:    role,
-			Content: data,
-		},
-	}, funcs...)
+	c.Functions = append(c.Functions, funcs...)
+
+	chatMessage := NewChatMessage(chatModel, messages, c.Functions...)
 	raw, err := json.Marshal(chatMessage)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	rsp, _, err := poc.DoPOST(
@@ -119,39 +170,69 @@ func (c *Client) Chat(data string, funcs ...Function) (string, error) {
 		poc.WithConnPool(true),
 	)
 	if err != nil {
-		return "", err
+		return nil, utils.Wrapf(err, "OpenAI Chat failed: http error")
 	}
 	rspRaw := lowhttp.GetHTTPPacketBody(rsp.RawPacket)
 	var comp ChatCompletion
 	err = json.Unmarshal(rspRaw, &comp)
 	if err != nil {
-		spew.Dump(rspRaw)
-		return "", utils.Errorf("unmarshal completion failed: %s", err)
+		log.Errorf("OpenAI Chat Error: unmarshal completion failed: %#v", rspRaw)
+		return nil, utils.Wrapf(err, "unmarshal completion failed")
 	}
 
-	if len(comp.Choices) <= 0 {
-		println(string(rspRaw))
-		if strings.Contains(string(rspRaw), "increase your rate limit") {
+	if comp.Error != nil && comp.Error.Message != "" {
+		errorMsg := comp.Error.Message
+		if strings.Contains(errorMsg, "increase your rate limit") {
 			log.Infof("reach rate limit... sleep 7s")
 			time.Sleep(7 * time.Second) // 20 / min
 		}
-		return "", utils.Errorf("cannot chat... sorry")
+		return nil, utils.Errorf("OpenAI Chat Error: %s", errorMsg)
 	}
+
+	return comp.Choices, nil
+}
+
+func (c *Client) Chat(data string, funcs ...Function) (string, error) {
+	choices, err := c.ChatEx([]ChatDetail{
+		{
+			Role:    "user",
+			Content: data,
+		},
+	}, funcs...)
+	if err != nil {
+		return "", err
+	}
+
+	return DetailsToString(lo.Map(choices, func(c ChatChoice, index int) ChatDetail { return c.Message })), nil
+}
+
+func DetailsToString(details []ChatDetail) string {
 	var list []string
 
-	if len(funcs) > 0 {
-		list = funk.Map(comp.Choices, func(c ChatChoice) string {
-			return c.Message.FunctionCall.Arguments
-		}).([]string)
-		list = utils.StringArrayFilterEmpty(list)
-		if len(list) > 0 {
-			return strings.TrimSpace(list[0]), nil
+	hasFunctionCallResults := false
+	for _, d := range details {
+		if len(d.ToolCalls) > 0 {
+			hasFunctionCallResults = true
+			break
 		}
 	}
+	if hasFunctionCallResults {
+		list = lo.Map(details, func(d ChatDetail, _ int) string {
+			return strings.Join(
+				lo.Map(d.ToolCalls, func(tool *ToolCall, _ int) string {
+					if tool == nil {
+						return ""
+					}
+					return strings.TrimSpace(tool.Function.Arguments)
+				}),
+				"\n")
+		})
+	} else {
+		list = lo.Map(details, func(d ChatDetail, _ int) string {
+			return strings.TrimSpace(d.Content)
+		})
+	}
 
-	list = funk.Map(comp.Choices, func(c ChatChoice) string {
-		return c.Message.Content
-	}).([]string)
 	list = utils.StringArrayFilterEmpty(list)
-	return strings.Join(list, "\n\n"), nil
+	return strings.Join(list, "\n\n")
 }
