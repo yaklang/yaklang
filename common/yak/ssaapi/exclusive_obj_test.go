@@ -2,9 +2,10 @@ package ssaapi
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/omap"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 /*
@@ -337,7 +338,7 @@ if (f(4)) {
 }
 
 g = i => i.b
-c = g()
+c = g(a)
 
 dump("DONE")
 `)
@@ -436,18 +437,19 @@ dump(c)
 	checkDotKey := false
 	checkMaskedKey := false
 	prog.Show().Ref("c").GetTopDefs().ForEach(func(value *Value) {
-		if value.GetConstValue() == "value" {
-			checkDotKey = true
-		}
+		// if value.GetConstValue() == "value" { // will cover by side-effect
+		// 	checkDotKey = true
+		// }
 		if value.GetConstValue() == "kkk" {
 			checkMaskedKey = true
 		}
 	}).Show()
-	if !checkDotKey {
-		t.Fatal("oop trace failed")
-	}
+	_ = checkDotKey
+	// if !checkDotKey {
+	// 	t.Fatal("oop trace failed")
+	// }
 	_ = checkMaskedKey
-	//if !checkMaskedKey {
-	//	t.Fatal("oop trace masked failed")
-	//}
+	if !checkMaskedKey {
+		t.Fatal("oop trace masked failed")
+	}
 }

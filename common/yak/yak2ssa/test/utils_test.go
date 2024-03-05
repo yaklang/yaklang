@@ -158,9 +158,56 @@ func checkFreeValue(t *testing.T, tc TestCase) {
 		funTyp, ok := ssa.ToFunctionType(typ)
 		require.True(t, ok)
 
-		freeValues := lo.Map(funTyp.FreeValue, func(v *ssa.FunctionFreeValue, _ int) string { return v.Name })
+		freeValues := lo.Map(funTyp.FreeValue, func(v *ssa.Parameter, _ int) string { return v.GetName() })
 		slices.Sort(freeValues)
 		require.Equal(t, want, freeValues)
+	}
+	_CheckTestCase(t, tc)
+}
+
+func checkParameter(t *testing.T, tc TestCase) {
+	tc.Check = func(p *ssaapi.Program, want []string) {
+		targets := p.Ref("target").ShowWithSource()
+		require.Len(t, targets, 1, "target len not match")
+
+		target := targets[0]
+
+		typ := ssaapi.GetBareType(target.GetType())
+		require.Equal(t, ssa.FunctionTypeKind, typ.GetTypeKind())
+
+		funTyp, ok := ssa.ToFunctionType(typ)
+		require.True(t, ok)
+
+		parameters := lo.Map(funTyp.ParameterValue, func(v *ssa.Parameter, _ int) string { return v.GetName() })
+		require.Equal(t, want, parameters)
+	}
+	_CheckTestCase(t, tc)
+
+}
+
+func checkFunctionReturnType(t *testing.T, code string, kind ssa.TypeKind) {
+	tc := TestCase{
+		code: code,
+		Check: func(prog *ssaapi.Program, _ []string) {
+			vs := prog.Ref("target")
+			require.Equal(t, 1, len(vs))
+
+			v := vs[0]
+			require.NotNil(t, v)
+
+			typ := v.GetType()
+
+			rawTyp := ssaapi.GetBareType(typ)
+			funTyp, ok := ssa.ToFunctionType(rawTyp)
+
+			require.True(t, ok)
+
+			retType := funTyp.ReturnType
+			require.NotNil(t, retType)
+
+			log.Info("return type : ", retType)
+			require.Equal(t, kind, retType.GetTypeKind())
+		},
 	}
 	_CheckTestCase(t, tc)
 }
