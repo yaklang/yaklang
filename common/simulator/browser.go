@@ -91,7 +91,7 @@ func (starter *BrowserStarter) doLaunch(l *launcher.Launcher) *launcher.Launcher
 	if starter.config.proxy != nil {
 		l = l.Proxy(starter.config.proxy.String())
 	}
-	l = l.NoSandbox(true).Headless(false)
+	l = l.NoSandbox(true).Headless(true)
 	if starter.config.leakless == LeaklessOff {
 		l = l.Leakless(false)
 	} else if starter.config.leakless == LeaklessDefault && strings.Contains(runtime.GOOS, "windows") {
