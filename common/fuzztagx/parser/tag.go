@@ -58,10 +58,12 @@ func (f *FuzzResult) GetVerbose() []string {
 }
 
 type TagMethod struct {
-	Name   string
-	IsDyn  bool
-	Fun    func(string) ([]*FuzzResult, error)
-	Expand map[string]any
+	Name        string
+	IsDyn       bool
+	Fun         func(string) ([]*FuzzResult, error)
+	Expand      map[string]any
+	Alias       []string
+	Description string
 }
 type Node interface {
 	IsNode()

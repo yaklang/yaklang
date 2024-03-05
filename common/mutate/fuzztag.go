@@ -51,9 +51,11 @@ func AddFuzzTagDescriptionToMap(methodMap map[string]*parser.TagMethod, f *FuzzT
 		}
 	}
 	methodMap[name] = &parser.TagMethod{
-		Name:   name,
-		IsDyn:  f.IsDyn,
-		Expand: expand,
+		Name:        name,
+		IsDyn:       f.IsDyn,
+		Expand:      expand,
+		Alias:       alias,
+		Description: f.Description,
 		Fun: func(s string) (result []*parser.FuzzResult, err error) {
 			defer func() {
 				if r := recover(); r != nil {
@@ -99,6 +101,13 @@ var (
 	existedFuzztag []*FuzzTagDescription
 	tagMethodMap   = map[string]*parser.TagMethod{}
 )
+
+func GetExistedFuzzTagMap() map[string]*parser.TagMethod {
+	if tagMethodMap == nil {
+		tagMethodMap = map[string]*parser.TagMethod{}
+	}
+	return tagMethodMap
+}
 
 func AddFuzzTagToGlobal(f *FuzzTagDescription) {
 	AddFuzzTagDescriptionToMap(tagMethodMap, f)

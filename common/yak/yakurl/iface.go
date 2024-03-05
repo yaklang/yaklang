@@ -67,6 +67,8 @@ func (s *ActionService) CreateAction(schema string) Action {
 		return &wsm.BehidnerResourceSystemAction{}
 	case "godzilla":
 		return &wsm.GodzillaFileSystemAction{}
+	case "fuzztag":
+		return &fuzzTagDocAction{}
 	default:
 		return nil
 	}
