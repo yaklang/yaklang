@@ -17,6 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/crawlerx"
 	"github.com/yaklang/yaklang/common/fuzztag"
 	"github.com/yaklang/yaklang/common/fuzztagx/parser"
+	"github.com/yaklang/yaklang/common/simulator"
 	"github.com/yaklang/yaklang/common/utils/cli"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/http_struct"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
@@ -795,6 +796,18 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 			}
 		}
 		log.Errorf("BUG: crawlerx.StartCrawler 's signature is override")
+		return i
+	})
+
+	nIns.GetVM().RegisterMapMemberCallHandler("simulator", "HttpBruteForce", func(i interface{}) interface{} {
+		originFunc, ok := i.(func(string, ...simulator.BruteConfigOpt) (chan simulator.Result, error))
+		if ok {
+			return func(url string, opts ...simulator.BruteConfigOpt) (chan simulator.Result, error) {
+				opts = append(opts, simulator.WithRuntimeID(runtimeId))
+				return originFunc(url, opts...)
+			}
+		}
+		log.Errorf("BUG: simulator.HttpBruteForce 's signature is override")
 		return i
 	})
 
