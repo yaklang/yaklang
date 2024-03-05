@@ -33,6 +33,11 @@ var Exports = map[string]interface{}{
 	"leaklessOn":      LeaklessOn,
 	"leaklessOff":     LeaklessOff,
 
+	"saveToDB":   WithSaveToDB,
+	"sourceType": WithSourceType,
+	"fromPlugin": WithFromPlugin,
+	"runtimeID":  WithRuntimeID,
+
 	"simple": SimpleExports,
 }
 

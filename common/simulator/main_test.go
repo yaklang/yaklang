@@ -379,11 +379,13 @@ func TestHttpBruteForce(t *testing.T) {
 			password := r.PostForm.Get("password")
 			fmt.Println(username, password)
 			if username == "admin" && password == "admin" {
-				w.Header().Add("Location", "result")
+				w.Header().Add("Location", "/result")
 				w.WriteHeader(302)
 				_, _ = w.Write([]byte{})
 			} else {
-				_, _ = w.Write([]byte(LoginHTML))
+				w.Header().Add("Location", "/login")
+				w.WriteHeader(302)
+				_, _ = w.Write([]byte{})
 			}
 		} else if r.URL.Path == "/login" {
 			_, _ = w.Write([]byte(LoginHTML))
@@ -393,7 +395,7 @@ func TestHttpBruteForce(t *testing.T) {
 			if strings.Contains(r.URL.Path, ".ico") {
 				return
 			}
-			w.Header().Add("Location", "login")
+			w.Header().Add("Location", "/login")
 			w.WriteHeader(302)
 			_, _ = w.Write([]byte{})
 		}
@@ -405,7 +407,7 @@ func TestHttpBruteForce(t *testing.T) {
 		//WithCaptchaUrl(`http://192.168.3.20:8008/runtime/text/invoke`),
 		//WithCaptchaMode(`common_arithmetic`),
 		WithUsernameList("admin"),
-		WithPasswordList("admin", "luckyadmin123"),
+		WithPasswordList("123321", "admin"),
 		WithExtraWaitLoadTime(1000),
 		//WithUsernameSelector("#loginpage > div > div > form > div:nth-child(2) > div > div > input"),
 		//WithPasswordSelector("#loginpage > div > div > form > div:nth-child(3) > div > div > input"),

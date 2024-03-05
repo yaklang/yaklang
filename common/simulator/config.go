@@ -27,13 +27,20 @@ type BrowserConfig struct {
 	wsAddress string
 	proxy     *url.URL
 	leakless  LeaklessMode
+
+	saveToDB   bool
+	sourceType string
+	fromPlugin string
+	runtimeID  string
 }
 
 type BrowserConfigOpt func(*BrowserConfig)
 
 func CreateNewBrowserConfig() *BrowserConfig {
 	config := BrowserConfig{
-		leakless: LeaklessDefault,
+		leakless:   LeaklessDefault,
+		saveToDB:   false,
+		sourceType: "scan",
 	}
 	return &config
 }
@@ -62,6 +69,30 @@ func withLeakless(leakless LeaklessMode) BrowserConfigOpt {
 	}
 }
 
+func withSaveToDB(saveToDB bool) BrowserConfigOpt {
+	return func(config *BrowserConfig) {
+		config.saveToDB = saveToDB
+	}
+}
+
+func withSourceType(sourceType string) BrowserConfigOpt {
+	return func(config *BrowserConfig) {
+		config.sourceType = sourceType
+	}
+}
+
+func withFromPlugin(fromPlugin string) BrowserConfigOpt {
+	return func(config *BrowserConfig) {
+		config.fromPlugin = fromPlugin
+	}
+}
+
+func withRuntimeID(runtimeID string) BrowserConfigOpt {
+	return func(config *BrowserConfig) {
+		config.runtimeID = runtimeID
+	}
+}
+
 type BruteConfig struct {
 	wsAddress     string
 	exePath       string
@@ -86,6 +117,11 @@ type BruteConfig struct {
 	leakless          LeaklessMode
 	extraWaitLoadTime int
 	similarityDegree  float64
+
+	saveToDB   bool
+	sourceType string
+	fromPlugin string
+	runtimeID  string
 }
 
 type BruteConfigOpt func(*BruteConfig)
@@ -97,6 +133,9 @@ func NewBruteConfig() *BruteConfig {
 		loginDetect:      DefaultChangeMode,
 		leakless:         LeaklessDefault,
 		similarityDegree: 0.6,
+
+		saveToDB:   false,
+		sourceType: "scan",
 	}
 }
 
@@ -209,5 +248,29 @@ func WithLeakless(leakless LeaklessMode) BruteConfigOpt {
 func WithExtraWaitLoadTime(time int) BruteConfigOpt {
 	return func(config *BruteConfig) {
 		config.extraWaitLoadTime = time
+	}
+}
+
+func WithSaveToDB(saveToDB bool) BruteConfigOpt {
+	return func(config *BruteConfig) {
+		config.saveToDB = saveToDB
+	}
+}
+
+func WithSourceType(sourceType string) BruteConfigOpt {
+	return func(config *BruteConfig) {
+		config.sourceType = sourceType
+	}
+}
+
+func WithFromPlugin(fromPlugin string) BruteConfigOpt {
+	return func(config *BruteConfig) {
+		config.fromPlugin = fromPlugin
+	}
+}
+
+func WithRuntimeID(runtimeID string) BruteConfigOpt {
+	return func(config *BruteConfig) {
+		config.runtimeID = runtimeID
 	}
 }

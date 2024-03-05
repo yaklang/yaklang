@@ -127,17 +127,20 @@ func getSimRate(doc1, doc2 *goquery.Document) float64 {
 	cssSimNum := LongestCommonSubsequence(cssList1, cssList2)
 	domLen := len(domList1) + len(domList2)
 	cssLen := len(cssList1) + len(cssList2)
-	if domLen == 0 {
-		domRate = 0
-	} else {
+	var simRate float64
+	if domLen != 0 {
 		domRate = float64(2*domSimNum) / float64(domLen)
+		simRate += domRate * 0.3
 	}
 	if cssLen == 0 {
-		cssRate = 0
-	} else {
-		cssRate = float64(2*cssSimNum) / float64(cssLen)
+		return simRate / 0.3
 	}
-	return 0.3*domRate + 0.7*cssRate
+	cssRate = float64(2*cssSimNum) / float64(cssLen)
+	if simRate == 0 {
+		return cssRate
+	} else {
+		return simRate + 0.7*cssRate
+	}
 }
 
 func LongestCommonSubsequence(text1, text2 []string) int {

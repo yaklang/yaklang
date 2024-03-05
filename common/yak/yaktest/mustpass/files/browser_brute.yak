@@ -1,0 +1,34 @@
+yakit.AutoInitYakit()
+
+userList = ["admin"]
+passList = ["123321","admin"]
+
+opts = [
+    simulator.usernameList(userList),
+    simulator.passwordList(passList),
+    simulator.loginDetectMode(simulator.defaultChangeMode, 0.6),
+    simulator.leaklessStatus(simulator.leaklessDefault),
+    simulator.extraWaitLoadTime(500),
+]
+
+targetUrl = ""
+vulinboxAddr = getParam("VULINBOX")
+if vulinboxAddr != "" {
+    targetUrl = vulinboxAddr + "/logic/user/login"
+    yakit.Info(`get target login url: %v`, targetUrl)
+} else {
+    yakit.Error("vulinboxAddr not found")
+    return
+}
+
+ch, err = simulator.HttpBruteForce(targetUrl, opts...)
+if err != nil{
+    yakit.Info("模拟点击爆破错误：%s", err)
+    return
+}
+
+for item := range ch {
+    yakit.Info(`[bruteforce] try username & password: %s %s ...`, item.Username(), item.Password())
+    yakit.Info(`[bruteforce] login success %v!`, item.Status())
+    yakit.Info(`[bruteforce] login info: %s`, item.Info())
+}
