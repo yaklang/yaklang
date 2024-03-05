@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func LoadFromRaw(raw string) (*ypb.YakURL, error) {
+func CreateUrlFromString(raw string) (*ypb.YakURL, error) {
 	if raw == "" {
 		return nil, utils.Error("empty yak url")
 	}
@@ -39,4 +39,17 @@ func LoadFromRaw(raw string) (*ypb.YakURL, error) {
 		}
 	}
 	return yu, nil
+}
+
+func LoadGetResource(u string) (*ypb.RequestYakURLResponse, error) {
+	yu, err := CreateUrlFromString(u)
+	if err != nil {
+		return nil, err
+	}
+	return GetActionService().GetAction(yu.Schema).Get(&ypb.RequestYakURLParams{
+		Method:   "get",
+		Url:      yu,
+		Page:     1,
+		PageSize: 200,
+	})
 }

@@ -12,7 +12,7 @@ import (
 func (s *Server) RequestYakURL(ctx context.Context, req *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	var err error
 	if req.GetUrl().GetFromRaw() != "" {
-		req.Url, err = yakurl.LoadFromRaw(req.GetUrl().GetFromRaw())
+		req.Url, err = yakurl.CreateUrlFromString(req.GetUrl().GetFromRaw())
 		if err != nil {
 			return nil, utils.Error(err)
 		}
