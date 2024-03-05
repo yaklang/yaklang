@@ -42,8 +42,6 @@ type FunctionBuilder struct {
 	MarkedThisObject Value
 
 	parentBuilder *FunctionBuilder
-	cmap          map[string]struct{}
-	lmap          map[string]struct{}
 }
 
 func NewBuilder(f *Function, parent *FunctionBuilder) *FunctionBuilder {
@@ -55,8 +53,6 @@ func NewBuilder(f *Function, parent *FunctionBuilder) *FunctionBuilder {
 		CurrentBlock:  nil,
 		CurrentRange:  nil,
 		parentBuilder: parent,
-		cmap:          make(map[string]struct{}),
-		lmap:          make(map[string]struct{}),
 	}
 	if parent != nil {
 		b.ExternInstance = parent.ExternInstance
@@ -91,12 +87,15 @@ func (b *FunctionBuilder) NewFunc(name string) *Function {
 // function stack
 func (b *FunctionBuilder) PushFunction(newFunc *Function) *FunctionBuilder {
 	build := NewBuilder(newFunc, b)
+	// build.MarkedThisObject = b.MarkedThisObject
 	if this := b.MarkedThisObject; this != nil {
-		parentScope := build.parentScope.scope
-		parentScope = parentScope.CreateSubScope().(*Scope)
-		v := parentScope.CreateVariable(this.GetName(), false)
-		parentScope.AssignVariable(v, this)
-		build.parentScope.scope = parentScope
+		newParentScopeLevel := build.parentScope.scope
+		newParentScopeLevel = newParentScopeLevel.CreateSubScope().(*Scope)
+		// create this object and assign
+		v := newParentScopeLevel.CreateVariable(this.GetName(), false)
+		newParentScopeLevel.AssignVariable(v, this)
+		// update parent  scope
+		build.parentScope.scope = newParentScopeLevel
 	}
 	return build
 }
