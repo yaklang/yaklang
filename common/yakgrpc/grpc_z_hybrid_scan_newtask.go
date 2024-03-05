@@ -192,7 +192,7 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 
 	// start dispatch tasks
 	for _, __currentTarget := range targetCached {
-		if manager.IsPaused() { // 如果暂停立刻停止
+		if manager.IsStop() { // 如果暂停立刻停止
 			break
 		}
 		// load targets
