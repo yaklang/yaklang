@@ -26,8 +26,10 @@ type Scanner struct {
 	config *Config
 
 	handlerWriteChan chan []byte
+	handlerIsAlive   *utils.AtomicBool
 	//handler               *pcap.Handle
 	localHandlerWriteChan chan []byte
+	localHandlerIsAlive   *utils.AtomicBool
 	//localHandler          *pcap.Handle
 
 	opts gopacket.SerializeOptions
@@ -182,13 +184,6 @@ func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 	isLoopback := srcIp.IsLoopback()
 
 	log.Debugf("start to init network dev: %v", iface.Name)
-	ifaceName, err := pcaputil.IfaceNameToPcapIfaceName(iface.Name)
-	if err != nil {
-		if _, ok := err.(*pcaputil.ConvertIfaceNameError); !isLoopback || !ok {
-			return nil, err
-		}
-	}
-
 	// 初始化本地端口，用来扫描本地环回地址
 	log.Debug("start to create local network dev")
 	var localIfaceName string
@@ -231,22 +226,6 @@ func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 		return nil, utils.Errorf("no loopback iface found")
 	}
 
-	if isLoopback {
-		ifaceName = localIfaceName
-	}
-
-	netInterface, err := pcaputil.PcapIfaceNameToNetInterface(ifaceName)
-	if err != nil {
-		return nil, utils.Errorf("iface not found")
-	}
-	deviceName := netInterface.Name
-
-	localNetInterface, err := pcaputil.PcapIfaceNameToNetInterface(localIfaceName)
-	if err != nil {
-		return nil, utils.Errorf("loopback iface not unfound")
-	}
-	localDeviceName := localNetInterface.Name
-
 	scannerCtx, cancel := context.WithCancel(ctx)
 	scanner := &Scanner{
 		ctx:                   scannerCtx,
@@ -255,6 +234,8 @@ func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 		config:                config,
 		handlerWriteChan:      make(chan []byte, 100000),
 		localHandlerWriteChan: make(chan []byte, 100000),
+		handlerIsAlive:        utils.NewBool(true),
+		localHandlerIsAlive:   utils.NewBool(true),
 		//handler:               handler,
 		//localHandler:          localHandler,
 
@@ -329,71 +310,78 @@ func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 		}
 	}
 
-	// handler
-	go func() {
-		pcaputil.Start(
-			pcaputil.WithDevice(deviceName),
-			pcaputil.WithEnableCache(true),
-			pcaputil.WithBPFFilter("(arp) or (tcp[tcpflags] & (tcp-syn) != 0)"),
-			pcaputil.WithContext(ctx),
-			pcaputil.WithNetInterfaceCreated(func(handle *pcap.Handle) {
-				go func() {
-					var counter int
-					var total int64
-					for {
-						if scanner.delayMs > 0 && scanner.delayGapCount > 0 {
-							if counter > scanner.delayGapCount {
-								counter = 0
-								//fmt.Printf("rate limit trigger! for %vms\n", s.delayMs)
-								scanner.sleepRateLimit()
-							}
-						}
-						select {
-						case packets, ok := <-scanner.handlerWriteChan:
-							if !ok {
-								continue
-							}
-
-							failedCount := 0
-						RETRY_WRITE_IF:
-							// 5-15 us (每秒可以开到 1000 * 200 个包最快)
-							err := handle.WritePacketData(packets)
-
-							total++
-							counter++
-
-							if err != nil {
-								switch true {
-								case utils.IContains(err.Error(), "no buffer space available"):
-									if failedCount > 10 {
-										log.Errorf("write device failed: for %v", err.Error())
-										break
-									}
-									if scanner.delayMs > 0 {
-										scanner.sleepRateLimit()
-									} else {
-										time.Sleep(time.Millisecond * 10)
-									}
-									failedCount++
-									goto RETRY_WRITE_IF
-								default:
-									log.Errorf("iface: %v handler write failed: %s: retry", scanner.iface, err)
+	if !isLoopback {
+		// handler
+		go func() {
+			err := pcaputil.Start(
+				pcaputil.WithDevice(iface.Name),
+				pcaputil.WithEnableCache(true),
+				pcaputil.WithBPFFilter("(arp) or (tcp[tcpflags] & (tcp-syn) != 0)"),
+				pcaputil.WithContext(ctx),
+				pcaputil.WithNetInterfaceCreated(func(handle *pcap.Handle) {
+					go func() {
+						var counter int
+						var total int64
+						for {
+							if scanner.delayMs > 0 && scanner.delayGapCount > 0 {
+								if counter > scanner.delayGapCount {
+									counter = 0
+									//fmt.Printf("rate limit trigger! for %vms\n", s.delayMs)
+									scanner.sleepRateLimit()
 								}
 							}
-						case <-scanner.ctx.Done():
-							return
+							select {
+							case packets, ok := <-scanner.handlerWriteChan:
+								if !ok {
+									continue
+								}
+
+								failedCount := 0
+							RETRY_WRITE_IF:
+								// 5-15 us (每秒可以开到 1000 * 200 个包最快)
+								err := handle.WritePacketData(packets)
+
+								total++
+								counter++
+
+								if err != nil {
+									switch true {
+									case utils.IContains(err.Error(), "no buffer space available"):
+										if failedCount > 10 {
+											log.Errorf("write device failed: for %v", err.Error())
+											break
+										}
+										if scanner.delayMs > 0 {
+											scanner.sleepRateLimit()
+										} else {
+											time.Sleep(time.Millisecond * 10)
+										}
+										failedCount++
+										goto RETRY_WRITE_IF
+									default:
+										log.Errorf("iface: %v handler write failed: %s: retry", scanner.iface, err)
+									}
+								}
+							case <-scanner.ctx.Done():
+								return
+							}
 						}
-					}
-				}()
-			}),
-			pcaputil.WithEveryPacket(packetHandle),
-		)
-	}()
+					}()
+				}),
+				pcaputil.WithEveryPacket(packetHandle),
+			)
+			if err != nil {
+				scanner.handlerIsAlive.UnSet()
+			}
+		}()
+	} else {
+		scanner.handlerIsAlive.UnSet()
+	}
 
 	// local handler
 	go func() {
-		pcaputil.Start(
-			pcaputil.WithDevice(localDeviceName),
+		err := pcaputil.Start(
+			pcaputil.WithDevice(localIfaceName),
 			pcaputil.WithEnableCache(true),
 			pcaputil.WithBPFFilter("(arp) or (tcp[tcpflags] & (tcp-syn) != 0)"),
 			pcaputil.WithContext(ctx),
@@ -431,6 +419,9 @@ func NewScanner(ctx context.Context, config *Config) (*Scanner, error) {
 			}),
 			pcaputil.WithEveryPacket(packetHandle),
 		)
+		if err != nil {
+			scanner.localHandlerIsAlive.UnSet()
+		}
 	}()
 
 	//scanner.daemon()
