@@ -131,7 +131,70 @@ type TagAndStatusCode struct {
 	Count int
 }
 
-func (f *HTTPFlow) FitHTTPRequest(req *http.Request) {
+type CreateHTTPFlowConfig struct {
+	isHttps    bool
+	reqRaw     []byte
+	rspRaw     []byte
+	fixRspRaw  []byte // 如果设置了，则不会再修复rspRaw
+	source     string
+	url        string
+	remoteAddr string
+	reqIns     *http.Request // 如果设置了，则不会再解析reqRaw
+}
+
+type CreateHTTPFlowOptions func(c *CreateHTTPFlowConfig)
+
+func CreateHTTPFlowWithHTTPS(isHttps bool) CreateHTTPFlowOptions {
+	return func(c *CreateHTTPFlowConfig) {
+		c.isHttps = isHttps
+	}
+}
+
+func CreateHTTPFlowWithRequestRaw(reqRaw []byte) CreateHTTPFlowOptions {
+	return func(c *CreateHTTPFlowConfig) {
+		c.reqRaw = reqRaw
+	}
+}
+
+func CreateHTTPFlowWithResponseRaw(rspRaw []byte) CreateHTTPFlowOptions {
+	return func(c *CreateHTTPFlowConfig) {
+		c.rspRaw = rspRaw
+	}
+}
+
+// 如果传入了fixRspRaw，则不会再修复
+func CreateHTTPFlowWithFixResponseRaw(fixRspRaw []byte) CreateHTTPFlowOptions {
+	return func(c *CreateHTTPFlowConfig) {
+		c.fixRspRaw = fixRspRaw
+	}
+}
+
+func CreateHTTPFlowWithSource(source string) CreateHTTPFlowOptions {
+	return func(c *CreateHTTPFlowConfig) {
+		c.source = source
+	}
+}
+
+func CreateHTTPFlowWithURL(url string) CreateHTTPFlowOptions {
+	return func(c *CreateHTTPFlowConfig) {
+		c.url = url
+	}
+}
+
+func CreateHTTPFlowWithRemoteAddr(remoteAddr string) CreateHTTPFlowOptions {
+	return func(c *CreateHTTPFlowConfig) {
+		c.remoteAddr = remoteAddr
+	}
+}
+
+// 如果传入了RequestIns，则优先使用这个作为NewFuzzRequest的参数
+func CreateHTTPFlowWithRequestIns(reqIns *http.Request) CreateHTTPFlowOptions {
+	return func(c *CreateHTTPFlowConfig) {
+		c.reqIns = reqIns
+	}
+}
+
+func (f *HTTPFlow) FixHTTPRequest(req *http.Request) {
 	if req == nil {
 		return
 	}
@@ -449,7 +512,9 @@ func (f *HTTPFlow) toGRPCModel(full bool) (*ypb.HTTPFlow, error) {
 		flow.InvalidForUTF8Request = !utf8.ValidString(unquotedRequest)
 		if flow.InvalidForUTF8Request {
 			flow.RawRequestBodyBase64 = codec.EncodeBase64(requestBody)
-			flow.SafeHTTPRequest = codec.EscapeInvalidUTF8Byte(lowhttp.ConvertHTTPRequestToFuzzTag(flow.Request))
+			// 这里需要修复请求，这是为了解决Content-Type与body中boundary不一致的问题
+			fixReq := lowhttp.FixHTTPRequest(flow.Request)
+			flow.SafeHTTPRequest = codec.EscapeInvalidUTF8Byte(lowhttp.ConvertHTTPRequestToFuzzTag(fixReq))
 		}
 	}
 
@@ -540,9 +605,29 @@ func SaveFromHTTPWithBodySaved(db *gorm.DB, isHttps bool, req *http.Request, rsp
 
 const maxBodyLength = 4 * 1024 * 1024
 
-func CreateHTTPFlowFromHTTPWithBodySavedFromRaw(isHttps bool, reqRaw []byte, rspRaw []byte, source string, url string, remoteAddr string) (*HTTPFlow, error) {
-	var method string
-	var requestUri string
+func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*HTTPFlow, error) {
+	c := &CreateHTTPFlowConfig{}
+	for _, opt := range opts {
+		opt(c)
+	}
+
+	var (
+		isHttps    = c.isHttps
+		reqRaw     = c.reqRaw
+		rspRaw     = c.rspRaw
+		fixRspRaw  = c.fixRspRaw
+		source     = c.source
+		url        = c.url
+		remoteAddr = c.remoteAddr
+		reqIns     = c.reqIns
+	)
+
+	var (
+		method     string
+		requestUri string
+		fReq       *mutate.FuzzHTTPRequest
+	)
+
 	header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacketEx(reqRaw, func(m string, r string, proto string) error {
 		method = m
 		requestUri = r
@@ -558,20 +643,33 @@ func CreateHTTPFlowFromHTTPWithBodySavedFromRaw(isHttps bool, reqRaw []byte, rsp
 		log.Errorf("[BUG] requestRaw is invalid: %s", requestRaw)
 	}
 
-	rawNoGzip, _, _ := lowhttp.FixHTTPResponse(rspRaw)
-	if len(rawNoGzip) > 0 {
-		rspRaw = rawNoGzip
+	// 如果已经修复过响应，则不会再修复
+	if len(fixRspRaw) == 0 {
+		rawNoGzip, _, _ := lowhttp.FixHTTPResponse(rspRaw)
+		if len(rawNoGzip) > 0 {
+			rspRaw = rawNoGzip
+		}
+	} else {
+		rspRaw = fixRspRaw
+	}
+	if rspRaw == nil {
+		rspRaw = make([]byte, 0)
 	}
 
 	var rspContentType string
-	header, body = lowhttp.SplitHTTPHeadersAndBodyFromPacket(rawNoGzip, func(line string) {
+	header, body = lowhttp.SplitHTTPHeadersAndBodyFromPacket(rspRaw, func(line string) {
 		k, v := lowhttp.SplitHTTPHeader(line)
 		if strings.ToLower(k) == "content-type" {
 			rspContentType = v
 		}
 	})
 	responseRaw := strconv.Quote(string(rspRaw))
-	fReq, _ := mutate.NewFuzzHTTPRequest(reqRaw)
+	// 如果设置了 reqIns，则不会再解析 reqRaw
+	if reqIns != nil {
+		fReq, _ = mutate.NewFuzzHTTPRequest(reqIns)
+	} else {
+		fReq, _ = mutate.NewFuzzHTTPRequest(reqRaw)
+	}
 
 	flow := &HTTPFlow{
 		IsHTTPS:     isHttps,
@@ -615,7 +713,19 @@ func CreateHTTPFlowFromHTTPWithBodySavedFromRaw(isHttps bool, reqRaw []byte, rsp
 	return flow, nil
 }
 
-func CreateHTTPFlowFromHTTPWithNoRspSaved(isHttps bool, req *http.Request, source string, url string, remoteAddr string) (*HTTPFlow, error) {
+func CreateHTTPFlowFromHTTPWithBodySavedFromRaw(isHttps bool, reqRaw []byte, rspRaw []byte, source string, url string, remoteAddr string, opts ...CreateHTTPFlowOptions) (*HTTPFlow, error) {
+	extOpts := []CreateHTTPFlowOptions{
+		CreateHTTPFlowWithHTTPS(isHttps), CreateHTTPFlowWithRequestRaw(reqRaw), CreateHTTPFlowWithResponseRaw(rspRaw), CreateHTTPFlowWithSource(source), CreateHTTPFlowWithURL(url), CreateHTTPFlowWithRemoteAddr(remoteAddr),
+	}
+	extOpts = append(extOpts, opts...)
+	flow, err := CreateHTTPFlow(extOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return flow, nil
+}
+
+func CreateHTTPFlowFromHTTPWithNoRspSaved(isHttps bool, req *http.Request, source string, url string, remoteAddr string, opts ...CreateHTTPFlowOptions) (*HTTPFlow, error) {
 	urlRaw := url
 	if urlRaw == "" {
 		u, err := lowhttp.ExtractURLFromHTTPRequest(req, isHttps)
@@ -652,7 +762,7 @@ func CreateHTTPFlowFromHTTPWithNoRspSaved(isHttps bool, req *http.Request, sourc
 	return flow, nil
 }
 
-func CreateHTTPFlowFromHTTPWithBodySaved(isHttps bool, req *http.Request, rsp *http.Response, source string, url string, remoteAddr string) (*HTTPFlow, error) {
+func CreateHTTPFlowFromHTTPWithBodySaved(isHttps bool, req *http.Request, rsp *http.Response, source string, url string, remoteAddr string, opts ...CreateHTTPFlowOptions) (*HTTPFlow, error) {
 	urlRaw := url
 	if urlRaw == "" {
 		u, err := lowhttp.ExtractURLFromHTTPRequest(req, isHttps)
@@ -686,7 +796,7 @@ func CreateHTTPFlowFromHTTPWithBodySaved(isHttps bool, req *http.Request, rsp *h
 	if err != nil {
 		log.Errorf("dump response failed: %s", err)
 	}
-	return CreateHTTPFlowFromHTTPWithBodySavedFromRaw(isHttps, reqRaw, rspRaw, source, urlRaw, remoteAddr)
+	return CreateHTTPFlowFromHTTPWithBodySavedFromRaw(isHttps, reqRaw, rspRaw, source, urlRaw, remoteAddr, opts...)
 }
 
 func UpdateHTTPFlowTags(db *gorm.DB, i *HTTPFlow) error {

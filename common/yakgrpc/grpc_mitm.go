@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/netx"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -15,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/netx"
 
 	"github.com/davecgh/go-spew/spew"
 	uuid "github.com/google/uuid"
@@ -1123,6 +1124,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 		httpctx.SetMatchedRule(originReqIns, make([]*ypb.MITMContentReplacer, 0))
 		originReqRaw := req[:]
+		fixReq := lowhttp.FixHTTPRequest(req)
+		fixReqIns, _ := lowhttp.ParseBytesToHttpRequest(fixReq)
 		method := originReqIns.Method
 
 		// make it plain
@@ -1162,7 +1165,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			hostname = originReqIns.Host
 			extName  = ""
 		)
-		urlRaw, err := lowhttp.ExtractURLFromHTTPRequestRaw(req, isHttps)
+		urlRaw, err := lowhttp.ExtractURLFromHTTPRequest(originReqIns, isHttps)
 		if err != nil {
 			log.Errorf("extract url from request failed: %s", err)
 			fmt.Println(string(req))
@@ -1274,9 +1277,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					RemoteAddr:          httpctx.GetRemoteAddr(originReqIns),
 				}
 
-				isMultipartData := lowhttp.IsMultipartFormDataRequest(req)
+				isMultipartData := lowhttp.IsMultipartFormDataRequest(fixReq)
 				if isMultipartData {
-					feedbackOrigin.Request = lowhttp.ConvertHTTPRequestToFuzzTag(req)
+					feedbackOrigin.Request = lowhttp.ConvertHTTPRequestToFuzzTag(fixReq)
 				}
 
 				err = send(feedbackOrigin)
@@ -1331,7 +1334,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					// 保存到数据库
 					log.Debugf("start to create httpflow from mitm[%v %v]", originReqIns.Method, truncate(originReqIns.URL.String()))
 					startCreateFlow := time.Now()
-					flow, err := yakit.CreateHTTPFlowFromHTTPWithNoRspSaved(isHttps, originReqIns, "mitm", originReqIns.URL.String(), remoteAddr)
+					flow, err := yakit.CreateHTTPFlowFromHTTPWithNoRspSaved(isHttps, originReqIns, "mitm", originReqIns.URL.String(), remoteAddr, yakit.CreateHTTPFlowWithRequestIns(fixReqIns))
 					if err != nil {
 						log.Errorf("save http flow[%v %v] from mitm failed: %s", originReqIns.Method, originReqIns.URL.String(), err)
 						return nil
@@ -1456,7 +1459,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		log.Debugf("yakit.CreateHTTPFlowFromHTTPWithBodySaved for %v cost: %s", truncate(reqUrl), time.Now().Sub(startCreateFlow))
 		startCreateFlow = time.Now()
 
-		flow.FitHTTPRequest(req)
+		flow.FixHTTPRequest(req)
 
 		// Hidden Index 用来标注 MITM 劫持的顺序
 		flow.HiddenIndex = getPacketIndex()
