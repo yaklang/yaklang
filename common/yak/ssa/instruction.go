@@ -170,8 +170,6 @@ func NewParam(variable string, isFreeValue bool, builder *FunctionBuilder) *Para
 	p.SetBlock(builder.EnterBlock)
 	p.SetRange(builder.CurrentRange)
 	p.GetProgram().SetVirtualRegister(p)
-	// p.GetProgram().SetInstructionWithName(variable, p)
-	p.FormalParameterIndex = len(builder.Param)
 	return p
 }
 

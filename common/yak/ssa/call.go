@@ -124,27 +124,26 @@ func (c *Call) handleCalleeFunction() {
 	c.Args = utils.InsertSliceItem(c.Args, obj, 0)
 }
 
-func (c *Call) HandleFreeValue(fvs []*FunctionFreeValue) {
-
+func (c *Call) HandleFreeValue(fvs []*Parameter) {
 	builder := c.GetFunc().builder
 	recoverBuilder := builder.SetCurrent(c)
 	defer recoverBuilder()
 
 	for _, fv := range fvs {
 		// if freeValue has default value, skip
-		if fv.HasDefault {
+		if fv.GetDefault() != nil {
 			continue
 		}
 
-		v := builder.PeekValue(fv.Name)
+		v := builder.PeekValue(fv.GetName())
 
 		if v != nil {
 			c.binding = append(c.binding, v)
 		} else {
 			// mark error in freeValue.Variable
 			// get freeValue
-			if variable := fv.Variable; variable != nil {
-				variable.NewError(Error, SSATAG, BindingNotFound(fv.Name, c.GetRange()))
+			if variable := fv.GetVariable(fv.GetName()); variable != nil {
+				variable.NewError(Error, SSATAG, BindingNotFound(fv.GetName(), c.GetRange()))
 			}
 			// skip instance function, or `go` with instance function,
 			// this function no variable, and code-range of call-site same as function.
@@ -155,7 +154,7 @@ func (c *Call) HandleFreeValue(fvs []*FunctionFreeValue) {
 				}
 			}
 			// other code will mark error in function call-site
-			c.NewError(Error, SSATAG, BindingNotFoundInCall(fv.Name))
+			c.NewError(Error, SSATAG, BindingNotFoundInCall(fv.GetName()))
 		}
 	}
 }
