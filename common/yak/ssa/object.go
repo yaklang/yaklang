@@ -270,10 +270,22 @@ func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
 		return p
 	}
 
-	if para, ok := ToParameter(value); ok && para.IsFreeValue && (para.GetDefault() != nil) {
-		name := b.getFieldName(para.GetDefault(), key)
-		ret := b.ReadValue(name)
-		return ret
+	if para, ok := ToParameter(value); ok {
+		if para.IsFreeValue {
+			b.appendParam(para)
+			delete(b.FreeValues, para.GetName())
+		}
+
+		name, typ := checkCanMemberCall(para, key)
+		new := b.NewParam(name)
+		new.SetType(typ)
+		new.IsMemberCall = true
+		new.MemberCallObjectIndex = para.FormalParameterIndex
+		new.MemberCallKey = key
+
+		SetMemberCall(para, key, new)
+
+		return new
 	}
 
 	return b.getFieldValue(value, key)
@@ -285,9 +297,16 @@ func (b *FunctionBuilder) CreateMemberCallVariable(value, key Value) *Variable {
 		return b.CreateVariable(name)
 	}
 
-	if para, ok := ToParameter(value); ok && para.IsFreeValue && (para.GetDefault() != nil) {
-		name := b.getFieldName(para.GetDefault(), key)
-		return b.CreateVariable(name)
+	if para, ok := ToParameter(value); ok {
+		if para.IsFreeValue {
+			b.appendParam(para)
+			delete(b.FreeValues, para.GetName())
+		}
+		name, _ := checkCanMemberCall(para, key)
+		ret := b.CreateVariable(name)
+		ret.object = para
+		ret.key = key
+		return ret
 	}
 
 	name := b.getFieldName(value, key)

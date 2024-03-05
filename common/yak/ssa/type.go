@@ -259,6 +259,8 @@ const (
 
 	InterfaceTypeKind
 	FunctionTypeKind
+
+	ClassBluePrintTypeKind
 )
 
 type BasicType struct {
@@ -787,15 +789,16 @@ func (s *ObjectType) Finish() {
 }
 
 type FunctionType struct {
-	Name         string
-	pkgPath      string
-	ReturnType   Type
-	Parameter    Types
-	FreeValue    []*FunctionFreeValue
-	SideEffects  []*FunctionSideEffect
-	IsVariadic   bool
-	IsMethod     bool
-	IsModifySelf bool // if this is method function
+	Name           string
+	pkgPath        string
+	ReturnType     Type
+	Parameter      Types
+	ParameterValue []*Parameter
+	FreeValue      []*Parameter
+	SideEffects    []*FunctionSideEffect
+	IsVariadic     bool
+	IsMethod       bool
+	IsModifySelf   bool // if this is method function
 }
 
 var _ Type = (*FunctionType)(nil)
@@ -898,4 +901,20 @@ func (s *FunctionType) GetParamString() string {
 
 func (s *FunctionType) GetTypeKind() TypeKind {
 	return FunctionTypeKind
+}
+
+func (f *FunctionType) Copy() *FunctionType {
+	new := &FunctionType{
+		Name:           f.Name,
+		pkgPath:        "",
+		ReturnType:     f.ReturnType,
+		Parameter:      f.Parameter,
+		ParameterValue: f.ParameterValue,
+		FreeValue:      f.FreeValue,
+		SideEffects:    f.SideEffects,
+		IsVariadic:     f.IsVariadic,
+		IsMethod:       f.IsMethod,
+		IsModifySelf:   f.IsMethod,
+	}
+	return new
 }

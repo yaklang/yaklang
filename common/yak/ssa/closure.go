@@ -15,9 +15,9 @@ type FunctionSideEffect struct {
 	Variable *Variable
 
 	// is modify parameter field
-	IsMemberCall bool
-	Parameter    int
-	Key          Value
+	IsMemberCall   bool
+	ParameterIndex int
+	Key            Value
 }
 
 func (f *Function) AddSideEffect(name *Variable, v Value) {
@@ -33,12 +33,12 @@ func (f *Function) CheckAndSetSideEffect(variable *Variable, v Value) {
 		// if name is member call, it's modify parameter field
 		if index, ok := f.paramMap[variable.object]; ok {
 			f.SideEffects = append(f.SideEffects, &FunctionSideEffect{
-				Modify:       v,
-				Name:         variable.GetName(),
-				Variable:     variable,
-				IsMemberCall: true,
-				Parameter:    index,
-				Key:          variable.key,
+				Modify:         v,
+				Name:           variable.GetName(),
+				Variable:       variable,
+				IsMemberCall:   true,
+				ParameterIndex: index,
+				Key:            variable.key,
 			})
 		}
 	}
