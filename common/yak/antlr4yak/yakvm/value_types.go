@@ -116,7 +116,7 @@ func GuessBasicType(vals ...interface{}) reflect.Type {
 }
 
 func GuessValuesTypeToBasicType(vals ...*Value) reflect.Type {
-	var anyT = literalReflectType_Interface
+	anyT := literalReflectType_Interface
 	if len(vals) <= 0 {
 		return anyT
 	}
@@ -139,7 +139,23 @@ func GuessValuesTypeToBasicType(vals ...*Value) reflect.Type {
 				last = literalReflectType_Float64
 			} else if i.Callable() {
 				last = literalReflectType_Interface
+			} else {
+				last = reflect.TypeOf(i.Value)
 			}
+			continue
+		}
+
+		if i.IsUndefined() {
+			return anyT
+		}
+
+		refTyp := reflect.TypeOf(i.Value)
+		refKind := refTyp.Kind()
+		if last == refTyp {
+			continue
+		}
+		isStructKind := refKind == reflect.Struct || (refKind == reflect.Pointer && refTyp.Elem().Kind() == reflect.Struct)
+		if isStructKind && refTyp.ConvertibleTo(last) {
 			continue
 		}
 
@@ -195,6 +211,7 @@ func GuessValuesTypeToBasicType(vals ...*Value) reflect.Type {
 func GuessValuesKindToBasicType(vals ...*Value) reflect.Kind {
 	return GuessValuesTypeToBasicType(vals...).Kind()
 }
+
 func (v *Frame) AutoConvertYakValueToNativeValue(val *Value) (reflect.Value, error) {
 	i := (*interface{})(nil)
 
@@ -217,11 +234,11 @@ func (v *Frame) AutoConvertYakValueToNativeValue(val *Value) (reflect.Value, err
 	}
 	return refV, nil
 }
+
 func (v *Frame) AutoConvertReflectValueByType(
 	reflectValue *reflect.Value,
 	reflectType /*, targetReflectType*/ reflect.Type,
 ) error {
-
 	srcKind := reflectValue.Kind()
 
 	if srcKind == reflect.Invalid {
@@ -312,7 +329,7 @@ func (v *Frame) AutoConvertReflectValueByType(
 					return []reflect.Value{reflectReturn}
 				}
 
-				var outputResults = make([]reflect.Value, outCount)
+				outputResults := make([]reflect.Value, outCount)
 				if reflectReturn.Kind() != reflect.Slice || reflectReturn.Len() != outCount {
 					panic(fmt.Sprintf("unexpected return value count, we need `%d` values", outCount))
 				}
