@@ -365,7 +365,7 @@ func (starter *BrowserStarter) createBrowserHijack(browser *rod.Browser) error {
 	browserHijackRouter := NewBrowserHijackRequests(browser)
 	opts := []lowhttp.LowhttpOpt{
 		lowhttp.WithTimeout(30 * time.Second),
-		lowhttp.WithHttps(starter.https),
+		//lowhttp.WithHttps(starter.https),
 		lowhttp.WithSaveHTTPFlow(starter.saveToDB),
 		lowhttp.WithSource(starter.sourceType),
 	}
@@ -410,7 +410,13 @@ func (starter *BrowserStarter) createBrowserHijack(browser *rod.Browser) error {
 		if refererInfo == "" && hijack.Request.URL().String() != starter.baseUrl {
 			hijack.Request.Req().Header.Add("Referer", starter.baseUrl)
 		}
-		err := hijack.LoadResponse(opts, true)
+		tempOpts := make([]lowhttp.LowhttpOpt, 0)
+		tempOpts = append(tempOpts, opts...)
+		url := hijack.Request.URL().String()
+		if strings.HasPrefix(url, "https://") || strings.HasPrefix(url, "wss://") {
+			tempOpts = append(tempOpts, lowhttp.WithHttps(true))
+		}
+		err := hijack.LoadResponse(tempOpts, true)
 		if err != nil {
 			if !strings.Contains(err.Error(), "context canceled") {
 				log.Errorf("load response error: %s", err)
