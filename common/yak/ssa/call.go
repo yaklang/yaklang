@@ -30,7 +30,7 @@ func (f *FunctionBuilder) EmitCall(c *Call) *Call {
 
 	f.emit(c)
 	c.handlerReturnType()
-	c.handleMethod()
+	c.handleCalleeFunction()
 
 	return c
 }
@@ -78,7 +78,7 @@ func (c *Call) handlerReturnType() {
 }
 
 // handler if method, set object for first argument
-func (c *Call) handleMethod() {
+func (c *Call) handleCalleeFunction() {
 
 	// get function type
 	funcTyp, ok := ToFunctionType(c.Method.GetType())

@@ -44,7 +44,7 @@ func ReplaceMemberCall(v, to Value) map[string]Value {
 			DeleteInst(member)
 
 			origin.GetUsers().RunOnCall(func(c *Call) {
-				c.handleMethod()
+				c.handleCalleeFunction()
 				c.handlerReturnType()
 			})
 

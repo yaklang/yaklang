@@ -19,7 +19,6 @@ func NewPhi(block *BasicBlock, variable string, create bool) *Phi {
 }
 
 func SpinHandle(name string, phiValue, origin, latch Value) map[string]Value {
-	// log.Infof("build phi: %s %v %v %v", name, phiVar, v1, v2)
 	ret := make(map[string]Value)
 	handler := func() {
 

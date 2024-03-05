@@ -292,10 +292,8 @@ type Parameter struct {
 	IsFreeValue bool
 
 	defaultValue            Value
-	Function                *Function
 	FormalParameterIndex    int
-	FormalParameterName     string
-	FormalParameterVariadic bool
+
 }
 
 func (p *Parameter) GetDefault() Value {
