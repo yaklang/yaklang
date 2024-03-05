@@ -117,6 +117,10 @@ func (bruteForce *HttpBruteForceCore) pageCreate() (err error) {
 		withWsAddress(bruteForce.config.wsAddress),
 		withProxy(bruteForce.proxy),
 		withLeakless(bruteForce.config.leakless),
+		withSaveToDB(bruteForce.config.saveToDB),
+		withSourceType(bruteForce.config.sourceType),
+		withFromPlugin(bruteForce.config.fromPlugin),
+		withRuntimeID(bruteForce.config.runtimeID),
 	}
 	starter := CreateNewStarter(opts...)
 	bruteForce.starter = starter

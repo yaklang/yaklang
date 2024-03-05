@@ -8,8 +8,13 @@ import (
 	"github.com/go-rod/rod/lib/cdp"
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/go-rod/rod/lib/proto"
+	"github.com/yaklang/yaklang/common/crawlerx"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"runtime"
 	"strings"
+	"time"
 )
 
 type BrowserStarter struct {
@@ -75,6 +80,10 @@ func (starter *BrowserStarter) Start() error {
 	if err != nil {
 		return err
 	}
+	err = starter.createBrowserHijack()
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -82,7 +91,7 @@ func (starter *BrowserStarter) doLaunch(l *launcher.Launcher) *launcher.Launcher
 	if starter.config.proxy != nil {
 		l = l.Proxy(starter.config.proxy.String())
 	}
-	l = l.NoSandbox(true).Headless(true)
+	l = l.NoSandbox(true).Headless(false)
 	if starter.config.leakless == LeaklessOff {
 		l = l.Leakless(false)
 	} else if starter.config.leakless == LeaklessDefault && strings.Contains(runtime.GOOS, "windows") {
@@ -101,6 +110,54 @@ func (starter *BrowserStarter) CreatePage() (*rod.Page, error) {
 		return nil, err
 	}
 	return page, nil
+}
+
+func (starter *BrowserStarter) createBrowserHijack() error {
+	opts := []lowhttp.LowhttpOpt{
+		lowhttp.WithTimeout(30 * time.Second),
+		lowhttp.WithSaveHTTPFlow(starter.config.saveToDB),
+		lowhttp.WithSource(starter.config.sourceType),
+	}
+	if starter.config.proxy != nil {
+		opts = append(opts, lowhttp.WithProxy(starter.config.proxy.String()))
+	}
+	if starter.config.runtimeID != "" {
+		opts = append(opts, lowhttp.WithRuntimeId(starter.config.runtimeID))
+	}
+	if starter.config.fromPlugin != "" {
+		opts = append(opts, lowhttp.WithFromPlugin(starter.config.fromPlugin))
+	}
+	router := crawlerx.NewBrowserHijackRequests(starter.browser)
+	err := router.Add("*", "", func(hijack *crawlerx.CrawlerHijack) {
+		contentType := hijack.Request.Header("Content-Type")
+		if strings.Contains(contentType, "multipart/form-data") {
+			hijack.ContinueRequest(&proto.FetchContinueRequest{})
+			return
+		}
+		tempOpts := make([]lowhttp.LowhttpOpt, 0)
+		tempOpts = append(tempOpts, opts...)
+		url := hijack.Request.URL().String()
+		if strings.HasPrefix(url, "https://") || strings.HasPrefix(url, "wss://") {
+			tempOpts = append(tempOpts, lowhttp.WithHttps(true))
+		}
+		err := hijack.LoadResponse(tempOpts, true)
+		if err != nil {
+			if !strings.Contains(err.Error(), "context canceled") {
+				log.Errorf("load response error: %s", err)
+			}
+			hijack.Response.SetHeader()
+			hijack.Response.SetBody("")
+			return
+		}
+		return
+	})
+	if err != nil {
+		return utils.Errorf(`create hijack error: %v`, err.Error())
+	}
+	go func() {
+		router.Run()
+	}()
+	return nil
 }
 
 func (starter *BrowserStarter) Close() error {
