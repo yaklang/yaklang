@@ -39,6 +39,7 @@ func init() {
 	})
 	Import("timeNow", time.Now) // timeNow.Unix()
 	Import("testIns", &testStructed{A: []int{1, 2, 3}})
+	Import("wantInsSlice", []*testStructed{{A: []int{1, 2, 3}}})
 	Import("dump", func(v ...interface{}) {
 		spew.Dump(v...)
 	})
@@ -3957,5 +3958,11 @@ assert typeof(a) == map[string]%s
 		_marshallerTest(fmt.Sprintf(codeTemplate, "var", "var"))
 		_marshallerTest(fmt.Sprintf(codeTemplate, "var", "any"))
 		_marshallerTest(fmt.Sprintf(codeTemplate, "any", "any"))
+	})
+
+	t.Run("struct type", func(t *testing.T) {
+		_marshallerTest(`
+assert typeof([testIns]) == typeof(wantInsSlice)
+`)
 	})
 }
