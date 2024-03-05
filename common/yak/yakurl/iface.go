@@ -69,6 +69,8 @@ func (s *ActionService) CreateAction(schema string) Action {
 		return &wsm.GodzillaFileSystemAction{}
 	case "fuzztag":
 		return &fuzzTagDocAction{}
+	case "yakdocument":
+		return &documentAction{}
 	default:
 		return nil
 	}
