@@ -66,11 +66,17 @@ func (f *Function) addAnonymous(anon *Function) {
 
 func (f *FunctionBuilder) NewParam(name string) *Parameter {
 	p := NewParam(name, false, f)
+	f.appendParam(p)
+	return p
+}
+
+func (f *FunctionBuilder) appendParam(p *Parameter) {
 	f.Param = append(f.Param, p)
 	f.paramMap[p] = len(f.Param) - 1
-	variable := f.CreateVariable(name)
+	p.FormalParameterIndex = len(f.Param) - 1
+	p.IsFreeValue = false
+	variable := f.CreateVariable(p.GetName())
 	f.AssignVariable(variable, p)
-	return p
 }
 
 func (f *Function) ReturnValue() []Value {

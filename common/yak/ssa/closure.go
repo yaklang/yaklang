@@ -1,30 +1,9 @@
 package ssa
 
-// FunctionFreeValue is a free-value in a closure
-type FunctionFreeValue struct {
-	Name     string
-	Variable *Variable
-
-	HasDefault bool // this is mark is capture value
-	Default    Value
-}
+import "github.com/samber/lo"
 
 func (s *FunctionType) SetFreeValue(fv map[string]*Parameter) {
-	s.FreeValue = make([]*FunctionFreeValue, 0, len(fv))
-	for name, p := range fv {
-		v := &FunctionFreeValue{
-			Name: name,
-		}
-
-		if variable := p.GetVariable(name); variable != nil {
-			v.Variable = variable
-		}
-		if p.GetDefault() != nil {
-			v.HasDefault = true
-			v.Default = p.GetDefault()
-		}
-		s.FreeValue = append(s.FreeValue, v)
-	}
+	s.FreeValue = lo.MapToSlice(fv, func(name string, para *Parameter) *Parameter { return para })
 }
 
 // FunctionSideEffect is a side-effect in a closure
