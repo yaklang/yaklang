@@ -92,8 +92,6 @@ Gadgets:
   CommonsBeanutils2_183:
     desc:
     template: true
-  CommonsCollections1:
-    desc:
   CommonsCollections2:
     desc:
     template: true
@@ -103,17 +101,9 @@ Gadgets:
   CommonsCollections4:
     desc:
     template: true
-  CommonsCollections5:
-    desc:
-  CommonsCollections6:
-    desc:
-  CommonsCollections7:
-    desc:
   CommonsCollections8:
     desc:
     template: true
-  CommonsCollections9:
-    desc:
   CommonsCollections10:
     desc:
     template: true
@@ -126,6 +116,18 @@ Gadgets:
   CommonsCollectionsK2:
     desc:
     template: true
+  CommonsCollections1:
+    desc:
+  CommonsCollections5:
+    desc:
+  CommonsCollections6:
+    desc:
+  CommonsCollections6Lite:
+    desc:
+  CommonsCollections7:
+    desc:
+  CommonsCollections9:
+    desc:
   CommonsCollectionsK3:
     desc:
 ReflectChainFunction:
