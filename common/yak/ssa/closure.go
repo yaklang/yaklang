@@ -61,7 +61,6 @@ func (f *Function) CheckAndSetSideEffect(variable *Variable, v Value) {
 				Parameter:    index,
 				Key:          variable.key,
 			})
-			// f.AddSideEffect(variable, v)
 		}
 	}
 }

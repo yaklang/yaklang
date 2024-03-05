@@ -4,7 +4,6 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
@@ -202,7 +201,6 @@ func (scope *ScopedVersionedTable[T]) ReadVariable(name string) VersionedIF[T] {
 			t := scope.CreateVariable(name, false)
 			scope.AssignVariable(t, scope.createEmptyPhi(name))
 			// t.origin = ret
-			log.Infof("create phi %s in scope %d", name, scope.GetScopeLevel())
 			scope.incomingPhi.Set(name, t)
 			ret = t
 		}
