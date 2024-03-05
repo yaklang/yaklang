@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -89,10 +90,38 @@ func (c *Call) handleCalleeFunction() {
 		builder := c.GetFunc().builder
 		recoverBuilder := builder.SetCurrent(c)
 		currentScope := c.GetBlock().ScopeTable
+
+		for true {
+			for _, p := range funcTyp.ParameterValue {
+				if len(c.Args) == p.FormalParameterIndex {
+					if p.GetDefault() != nil {
+						c.Args = append(c.Args, p.GetDefault())
+					}
+				}
+				if !p.IsMemberCall {
+					continue
+				}
+				if p.MemberCallObjectIndex >= len(c.Args) {
+					log.Errorf("handleCalleeFunction: memberCallObjectIndex out of range %d vs len: %d", p.MemberCallObjectIndex, len(c.Args))
+					continue
+				}
+				c.Args = append(c.Args,
+					builder.ReadMemberCallVariable(c.Args[p.MemberCallObjectIndex], p.MemberCallKey),
+				)
+			}
+			break
+		}
+
+		// handle side effect
 		for _, se := range funcTyp.SideEffects {
 			var variable *Variable
 			if se.IsMemberCall {
-				variable = builder.CreateMemberCallVariable(c.Args[se.Parameter], se.Key)
+				if se.ParameterIndex >= len(c.Args) {
+					log.Errorf("handleCalleeFunction: ParameterIndex out of range %d", se.ParameterIndex)
+					continue
+				}
+				// if side-effect is member call, create member call variable
+				variable = builder.CreateMemberCallVariable(c.Args[se.ParameterIndex], se.Key)
 			} else {
 				// side-effect only create in scope that lower or same than modify's scope
 				if !currentScope.IsSameOrSubScope(se.Variable.GetScope()) {

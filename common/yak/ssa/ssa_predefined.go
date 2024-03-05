@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"golang.org/x/exp/slices"
@@ -243,5 +244,24 @@ func (n *anValue) RemoveUser(u User) {
 }
 
 // for Value : type
-func (n *anValue) GetType() Type    { return n.typ }
-func (n *anValue) SetType(typ Type) { n.typ = typ }
+func (n *anValue) GetType() Type { return n.typ }
+func (n *anValue) SetType(typ Type) {
+	if typ == nil {
+		return
+	}
+	if typ.GetTypeKind() != ClassBluePrintTypeKind {
+		n.typ = typ
+		return
+	}
+	classBluePrint, ok := typ.(*ClassBluePrint)
+	if !ok {
+		log.Errorf("SetType: typ is not ClassBluePrint but is ClassBluePrintTypeKind")
+		return
+	}
+
+	value, ok := n.GetProgram().GetInstructionById(n.GetId()).(Value)
+	if !ok {
+		log.Errorf("SetType: value is not Value but is %d", n.GetId())
+	}
+	n.typ = classBluePrint.Apply(value)
+}

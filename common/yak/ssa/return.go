@@ -8,6 +8,9 @@ import (
 func (r *Return) calcType() Type {
 	handleType := func(v Value) Type {
 		t := v.GetType()
+		if objTyp, ok := ToObjectType(t); ok {
+			t = ParseClassBluePrint(v, objTyp)
+		}
 		return t
 	}
 
@@ -89,6 +92,7 @@ func (f *Function) Finish() {
 		handlerReturnType(f.Return),
 		f.hasEllipsis,
 	)
+	funType.ParameterValue = f.Param
 	funType.SetFreeValue(f.FreeValues)
 	funType.SetSideEffect(f.SideEffects)
 	f.SetType(funType)

@@ -291,9 +291,14 @@ type Parameter struct {
 
 	IsFreeValue bool
 
-	defaultValue            Value
-	FormalParameterIndex    int
+	defaultValue         Value
+	FormalParameterIndex int
 
+	// if this flag set, this parameter will be set to member call,
+	// if pass a as parameter, it will be set to `a.Key` is parameter
+	IsMemberCall          bool
+	MemberCallObjectIndex int
+	MemberCallKey         Value
 }
 
 func (p *Parameter) GetDefault() Value {
