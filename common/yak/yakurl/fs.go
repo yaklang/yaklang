@@ -114,7 +114,7 @@ END:
 
 func (f fileSystemAction) Post(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
 	//TODO implement me
-	panic("implement me")
+	return nil, utils.Error("not implemented")
 }
 
 func (f fileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakURLResponse, error) {
