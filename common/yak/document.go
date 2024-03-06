@@ -341,6 +341,7 @@ func DocumentHelperWithVerboseInfo(funcMap map[string]interface{}) *yakdoc.Docum
 		handleTypesList.Remove(iTyp)
 
 		typ := iTyp.Value.(reflect.Type)
+		typName := typ.Name()
 
 		if _, ok := filter[typ]; ok {
 			continue
@@ -348,10 +349,10 @@ func DocumentHelperWithVerboseInfo(funcMap map[string]interface{}) *yakdoc.Docum
 		filter[typ] = struct{}{}
 
 		var (
-			structName          string
-			pkgPath             string
-			documents           map[string]string
-			isStructOrInterface bool
+			structName   string
+			pkgPath      string
+			documents    map[string]string
+			shouldHandle bool
 
 			pkg *ast.Package
 			ok  bool
@@ -359,32 +360,40 @@ func DocumentHelperWithVerboseInfo(funcMap map[string]interface{}) *yakdoc.Docum
 
 		for {
 			typKind := typ.Kind()
-			if typKind == reflect.Slice || typKind == reflect.Array || typKind == reflect.Chan {
-				typ = typ.Elem()
+			// 需要额外处理Array的元素类型
+			if typKind == reflect.Array || typKind == reflect.Slice || typKind == reflect.Chan {
+				pushBackWithoutNil(handleTypesList, typ.Elem())
 			} else {
+				break
+			}
+			// 别名类型
+			if typKind.String() != typName {
+				structName = typName
+				shouldHandle = true
 				break
 			}
 		}
 
 		typKind := typ.Kind()
-		if typKind == reflect.Struct || typKind == reflect.Interface {
-			isStructOrInterface = true
-			pkgPath = typ.PkgPath()
-			structName = typ.Name()
-
-		} else if typKind == reflect.Ptr {
-			isStructOrInterface = typ.Elem().Kind() == reflect.Struct || typ.Elem().Kind() == reflect.Interface
-			pkgPath = typ.Elem().PkgPath()
-			structName = typ.Elem().Name()
-		} else if typKind == reflect.Func {
-			// 形如 (s *Struct) MethodName() (callback func(*Struct2)) {}
-			// 需要递归再获取类型
-			for _, newTyp := range getTypeFromReflectFunctionType(typ, 0) {
-				pushBackWithoutNil(handleTypesList, newTyp)
+		pkgPath = typ.PkgPath()
+		if !shouldHandle {
+			if typKind == reflect.Struct || typKind == reflect.Interface {
+				shouldHandle = true
+				structName = typ.Name()
+			} else if typKind == reflect.Ptr {
+				shouldHandle = typ.Elem().Kind() == reflect.Struct || typ.Elem().Kind() == reflect.Interface
+				pkgPath = typ.Elem().PkgPath()
+				structName = typ.Elem().Name()
+			} else if typKind == reflect.Func {
+				// 形如 (s *Struct) MethodName() (callback func(*Struct2)) {}
+				// 需要递归再获取类型
+				for _, newTyp := range getTypeFromReflectFunctionType(typ, 0) {
+					pushBackWithoutNil(handleTypesList, newTyp)
+				}
 			}
 		}
 
-		if structName == "" || !isStructOrInterface {
+		if structName == "" || !shouldHandle {
 			continue
 		}
 
