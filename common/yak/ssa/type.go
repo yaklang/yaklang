@@ -909,12 +909,13 @@ func (f *FunctionType) Copy() *FunctionType {
 		pkgPath:        "",
 		ReturnType:     f.ReturnType,
 		Parameter:      f.Parameter,
-		ParameterValue: f.ParameterValue,
+		ParameterValue: make([]*Parameter, len(f.ParameterValue)),
 		FreeValue:      f.FreeValue,
 		SideEffects:    f.SideEffects,
 		IsVariadic:     f.IsVariadic,
 		IsMethod:       f.IsMethod,
 		IsModifySelf:   f.IsMethod,
 	}
+	copy(new.ParameterValue, f.ParameterValue)
 	return new
 }
