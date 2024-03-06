@@ -95,9 +95,11 @@ func (c *ClassBluePrint) Apply(obj Value) Type {
 	for key, funTyp := range c.MarkedField {
 		new := funTyp.Copy()
 
-		for _, para := range new.ParameterValue {
+		for index, para := range new.ParameterValue {
 			if v := para.GetDefault(); v == this {
-				para.SetDefault(obj)
+				newPara := para.Copy()
+				newPara.SetDefault(obj)
+				new.ParameterValue[index] = newPara
 			}
 		}
 
