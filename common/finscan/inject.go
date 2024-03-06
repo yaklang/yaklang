@@ -4,6 +4,7 @@ import (
 	"github.com/google/gopacket"
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"time"
 )
 
@@ -92,11 +93,12 @@ func (s *Scanner) inject(loopback bool, l ...gopacket.SerializableLayer) error {
 	}
 	ret := buf.Bytes()
 
-	if !loopback {
+	if !loopback && s.handlerIsAlive.IsSet() {
 		s.handlerWriteChan <- ret
-	} else {
+	} else if loopback && s.localHandlerIsAlive.IsSet() {
 		s.localHandlerWriteChan <- ret
+	} else {
+		return utils.Error("no handler available")
 	}
-
 	return nil
 }
