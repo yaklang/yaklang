@@ -3,6 +3,7 @@ package arpx
 import (
 	"context"
 	"net"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -142,17 +143,20 @@ func arpDial(ctx context.Context, ifaceName string, addrs string) (map[string]ne
 }
 
 func ArpIPAddressesWithContext(ctx context.Context, ifaceName string, addrs string) (map[string]net.HardwareAddr, error) {
-	resultsMap, err := arpDial(ctx, ifaceName, addrs)
-	if err != nil {
-		log.Errorf("use arpx.Dial for send packet failed: %s", err)
-	}
-	if resultsMap != nil && len(resultsMap) > 0 {
-		for ip, hw := range resultsMap {
-			arpTableTTLCache.Set(ip, hw)
+	var resultsMap = make(map[string]net.HardwareAddr)
+	var err error
+	if runtime.GOOS != "windows" {
+		resultsMap, err = arpDial(ctx, ifaceName, addrs)
+		if err != nil {
+			log.Errorf("use arpx.Dial for send packet failed: %s", err)
 		}
-		return resultsMap, nil
+		if resultsMap != nil && len(resultsMap) > 0 {
+			for ip, hw := range resultsMap {
+				arpTableTTLCache.Set(ip, hw)
+			}
+			return resultsMap, nil
+		}
 	}
-
 	resultsMap, err = ArpWithPcap(ctx, ifaceName, addrs)
 	if err != nil {
 		log.Errorf("send arpx request with pcap failed: %s", err)
