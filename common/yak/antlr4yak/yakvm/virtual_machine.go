@@ -365,9 +365,6 @@ func (v *VirtualMachine) Exec(ctx context.Context, f func(frame *Frame), flags .
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
 	return nil
 }
 
