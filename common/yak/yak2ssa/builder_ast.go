@@ -593,6 +593,50 @@ func (b *astbuilder) AssignList(stmt assignlist) []ssa.Value {
 			return func() {}
 		}
 
+		GetCallField := func(c *ssa.Call, lvs []*ssa.Variable) {
+			length := 1
+			// 可以通过是否存在variable确定是函数调用是否存在左值
+			c.SetName(uuid.NewString())
+			c.Unpack = true
+			if it, ok := ssa.ToObjectType(c.GetType()); c.GetType().GetTypeKind() == ssa.TupleTypeKind && ok {
+				length = it.Len
+				if len(leftVariables) == length {
+					for i := range leftVariables {
+						value := b.ReadMemberCallVariable(c, b.EmitConstInst(i))
+						b.AssignVariable(leftVariables[i], value)
+					}
+					return
+				}
+			}
+
+			if c.IsDropError {
+				c.NewError(ssa.Error, TAG,
+					ssa.CallAssignmentMismatchDropError(len(leftVariables), c.GetType().String()),
+				)
+			} else {
+				b.NewError(ssa.Error, TAG,
+					ssa.CallAssignmentMismatch(len(leftVariables), c.GetType().String()),
+				)
+			}
+			for i := range leftVariables {
+				if i < length {
+					if length == 1 {
+						// this call type not tuple type, can't read member
+						// in this case `i = 0`
+						b.AssignVariable(leftVariables[i], c)
+					} else {
+						// this call type is tuple type, can read member
+						value := b.ReadMemberCallVariable(c, b.EmitConstInst(i))
+						b.AssignVariable(leftVariables[i], value)
+					}
+				} else {
+					value := b.EmitUndefined(leftVariables[i].GetName())
+					b.AssignVariable(leftVariables[i], value)
+				}
+			}
+			return
+		}
+
 		// left
 		if li, ok := stmt.LeftExpressionList().(*yak.LeftExpressionListContext); ok {
 			leftVariables = b.buildLeftExpressionList(op2 != nil, li)
@@ -607,74 +651,50 @@ func (b *astbuilder) AssignList(stmt assignlist) []ssa.Value {
 			rightValue = b.buildExpressionList(ri)
 		}
 
-		// assign
-		// (n) = (n), just assign
-		if len(rightValue) == len(leftVariables) {
+		leftLen := len(leftVariables)
+		rightLen := len(rightValue)
+		switch {
+		case leftLen == rightLen:
+			// (n) = (n) just assign
 			for i := range rightValue {
 				// if inst, ok := rvalues[i].(ssa.va); ok {
 				// 	inst.SetLeftPosition(lvalues[i].GetPosition())
 				// }
 				b.AssignVariable(leftVariables[i], rightValue[i])
 			}
-		} else if len(rightValue) == 1 {
-			if len(leftVariables) == 0 {
-				// (0) = (1)
-				b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
-				return nil
+		case leftLen == 1 && rightLen == 0:
+			// (1) = (0)
+			// assign to  undefined
+			//TODO
+			b.NewError(ssa.Error, TAG, AssignRightSideEmpty())
+			// b.AssignVariable(leftVariables[0], b.EmitUndefined(leftVariables[0].GetName()))
+			return nil
+		case leftLen == 0 && rightLen == 1:
+			// (0) = (1)
+			b.NewError(ssa.Error, TAG, AssignLeftSideEmpty())
+			return nil
+
+		case rightLen == 1:
+			// (n) = (1)
+			// (n) = field(1, #index)
+			inter := rightValue[0]
+
+			if c, ok := inter.(*ssa.Call); ok {
+				GetCallField(c, leftVariables)
+				break
 			}
 
-			// (n) = (1)
-			inter, ok := rightValue[0].(ssa.Value)
-			if !ok {
-				return nil
+			for i, variable := range leftVariables {
+				idxVar := b.ReadMemberCallVariable(inter, b.EmitConstInst(i))
+				b.AssignVariable(variable, idxVar)
 			}
-			if c, ok := rightValue[0].(*ssa.Call); ok {
-				var length int
-				// 可以通过是否存在variable确定是函数调用是否存在左值
-				c.SetName(uuid.NewString())
-				c.Unpack = true
-				if c.GetType().GetTypeKind() == ssa.TupleTypeKind {
-					it := c.GetType().(*ssa.ObjectType)
-					length = it.Len
-				} else {
-					length = 1
-				}
-				if len(leftVariables) == length {
-					for i := range leftVariables {
-						value := b.ReadMemberCallVariable(c, b.EmitConstInst(i))
-						b.AssignVariable(leftVariables[i], value)
-					}
-				} else {
-					if c.IsDropError {
-						c.NewError(ssa.Error, TAG,
-							ssa.CallAssignmentMismatchDropError(len(leftVariables), c.GetType().String()),
-						)
-					} else {
-						b.NewError(ssa.Error, TAG,
-							ssa.CallAssignmentMismatch(len(leftVariables), c.GetType().String()),
-						)
-					}
-				}
-				// return nil
-			} else {
-				// (n) = field(1, #index)
-				for i, variable := range leftVariables {
-					idxVar := b.ReadMemberCallVariable(inter, b.EmitConstInst(i))
-					b.AssignVariable(variable, idxVar)
-				}
-			}
-		} else if len(leftVariables) == 1 {
-			if len(rightValue) == 0 {
-				// (1) = (0) undefined
-				b.NewError(ssa.Error, TAG, AssignRightSideEmpty())
-				return nil
-			}
+		case leftLen == 1:
 			// (1) = (n)
 			// (1) = interface(n)
 			_interface := b.CreateInterfaceWithSlice(rightValue)
 			// lvalues[0].Assign(_interface)
 			b.AssignVariable(leftVariables[0], _interface)
-		} else {
+		default:
 			// (n) = (m) && n!=m
 			b.NewError(ssa.Error, TAG, MultipleAssignFailed(len(leftVariables), len(rightValue)))
 			return nil

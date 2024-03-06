@@ -40,7 +40,7 @@ func TestMemberCallNegative(t *testing.T) {
 	t.Run("expr is undefine, create right-now", func(t *testing.T) {
 		checkPrintlnValue(`
 		println(a.b)
-		`, []string{"Undefined-#1.b(valid)"}, t)
+		`, []string{"Undefined-#0.b(valid)"}, t)
 	})
 
 	t.Run("expr conn't be index", func(t *testing.T) {
@@ -208,7 +208,7 @@ func TestMemberCall_Struct(t *testing.T) {
 	check := func(t *testing.T, code string, want []string) {
 		checkPrintf(t, TestCase{
 			ExternValue: map[string]any{
-				"get": func() A { return A{} },
+				"GetA": func() A { return A{} },
 			},
 			code: code,
 			want: want,
@@ -217,7 +217,7 @@ func TestMemberCall_Struct(t *testing.T) {
 
 	t.Run("normal", func(t *testing.T) {
 		check(t, `
-		a = get()
+		a = GetA()
 		println(a.AField)
 		`, []string{
 			"Undefined-#0.AField(valid)",
@@ -226,7 +226,7 @@ func TestMemberCall_Struct(t *testing.T) {
 
 	t.Run("invalid", func(t *testing.T) {
 		check(t, `
-		a = get()
+		a = GetA()
 		println(a.UUUUUUU)
 		`, []string{
 			"Undefined-#0.UUUUUUU",
@@ -239,14 +239,14 @@ func TestMemberCall_Method(t *testing.T) {
 			code: code,
 			want: want,
 			ExternValue: map[string]any{
-				"get": func() ExampleInterface { return ExampleStruct{} },
+				"getExample": func() ExampleInterface { return ExampleStruct{} },
 			},
 		})
 	}
 
 	t.Run("normal", func(t *testing.T) {
 		check(t, `
-		a = get()
+		a = getExample()
 		println(a.ExampleMethod)
 		`, []string{
 			"Undefined-#0.ExampleMethod(valid)",
@@ -255,15 +255,14 @@ func TestMemberCall_Method(t *testing.T) {
 }
 
 func Test_CallMember_Method(t *testing.T) {
-
 	t.Run("test method call", func(t *testing.T) {
 		checkError(t, TestCase{
 			code: `
-			a = get()
+			a = getExample()
 			a.ExampleMethod()
 			`,
 			ExternValue: map[string]any{
-				"get": getExampleInterface,
+				"getExample": getExampleInterface,
 			},
 		})
 	})
@@ -271,11 +270,11 @@ func Test_CallMember_Method(t *testing.T) {
 	t.Run("test fieldFunction call", func(t *testing.T) {
 		checkError(t, TestCase{
 			code: `
-			a = get()
+			a = getExample()
 			a.ExampleFieldFunction()
 			`,
 			ExternValue: map[string]any{
-				"get": getExampleStruct,
+				"getExample": getExampleStruct,
 			},
 		})
 	})

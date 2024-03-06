@@ -363,9 +363,53 @@ func Test_ObjectFactor_ALL(t *testing.T) {
 			`,
 			want: []string{
 				"Undefined-#19.get(valid)(Function-main$1(),side-effect(Parameter-i, #14.key))",
-				"Undefined-#33.get(valid)(Function-main$1(),side-effect(Parameter-i, #14.key))",
+				"Undefined-#32.get(valid)(Function-main$1(),side-effect(Parameter-i, #14.key))",
 				"Undefined-#19.get(valid)(Function-main$1(),side-effect(Parameter-i, #14.key))",
-				"Undefined-#33.get(valid)(Function-main$1(),side-effect(Parameter-i, #14.key))",
+				"Undefined-#32.get(valid)(Function-main$1(),side-effect(Parameter-i, #14.key))",
+			},
+		})
+	})
+}
+
+func Test_Object_Assign(t *testing.T) {
+	t.Run("normal", func(t *testing.T) {
+		checkParameter(t, TestCase{
+			code: `
+		target = func(https, request) {
+			payloads = []
+			for payload in payloads {
+				rsp, err := payload.Fuzz(payload).ExecFirst()
+				if err != nil {
+					info("FAILED: %v" % err)
+					continue
+				}
+				a = rsp.RequestRaw
+				b = rsp.ResponseRaw
+			}
+		}
+		`,
+			want: []string{"https", "request"},
+		})
+	})
+
+	t.Run("normal 2", func(t *testing.T) {
+		checkError(t, TestCase{
+			code: `
+		freq = fuzz.HTTPRequest("", fuzz.https(true))~
+		params = freq.GetCommonParams()
+		for i in params {
+			rsp, err := i.Fuzz(payload).ExecFirst()
+			if err != nil {
+				info("FAILED: %v" % err)
+				continue
+			}
+			a = rsp.RequestRaw
+			b = rsp.ResponseRaw
+		}
+		`,
+			want: []string{
+				ssa.ValueUndefined("info"),
+				ssa.ValueUndefined("payload"),
 			},
 		})
 	})
