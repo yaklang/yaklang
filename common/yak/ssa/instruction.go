@@ -173,6 +173,12 @@ func NewParam(variable string, isFreeValue bool, builder *FunctionBuilder) *Para
 	return p
 }
 
+func (p *Parameter) Copy() *Parameter {
+	new := NewParam(p.GetName(), p.IsFreeValue, p.GetFunc().builder)
+	new.FormalParameterIndex = p.FormalParameterIndex
+	return new
+}
+
 func NewSideEffect(variable string, call *Call, value Value) *SideEffect {
 	s := &SideEffect{
 		anValue:  NewValue(),

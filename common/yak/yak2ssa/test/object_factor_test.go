@@ -220,6 +220,46 @@ func Test_ObjectFactor_SideEffect(t *testing.T) {
 		}, t)
 	})
 
+	t.Run("two object ", func(t *testing.T) {
+		checkPrintlnValue(`
+		f = () => {
+			this = {
+				"key": 1, 
+				"set": (i) => {this.key = i},
+			}
+			return this
+		}
+		b = f()
+		a = f()
+		println(a.key)
+		a.set(2)
+		println(a.key)
+		`, []string{
+			"Undefined-#15.key(valid)",
+			"side-effect(Parameter-i, #8.key)",
+		}, t)
+	})
+
+	t.Run("two object 2", func(t *testing.T) {
+		checkPrintlnValue(`
+		f = () => {
+			this = {
+				"key": 1, 
+				"set": (i) => {this.key = i},
+			}
+			return this
+		}
+		a = f()
+		b = f()
+		println(a.key)
+		a.set(2)
+		println(a.key)
+		`, []string{
+			"Undefined-#13.key(valid)",
+			"side-effect(Parameter-i, #8.key)",
+		}, t)
+	})
+
 }
 
 func Test_ObjectFactor_FreeValue(t *testing.T) {
@@ -241,6 +281,91 @@ func Test_ObjectFactor_FreeValue(t *testing.T) {
 		`,
 			want: []string{
 				"Undefined-#12.get(valid)(Function-main$1(),Undefined-#12.key(valid))",
+			},
+		})
+	})
+
+	t.Run("two object", func(t *testing.T) {
+		checkPrintf(t, TestCase{
+			code: `
+		f = ()=> {
+			this = {
+				"key": 1,
+				"get": () => this.key
+			}
+			return this
+		}
+
+		a = f()
+		b = f()
+
+		target = b.get()
+		println(target)
+
+		`,
+			want: []string{
+				"Undefined-#14.get(valid)(Function-main$1(),Undefined-#14.key(valid))",
+			},
+		})
+	})
+
+	t.Run("two object 2", func(t *testing.T) {
+		checkPrintf(t, TestCase{
+			code: `
+		f = ()=> {
+			this = {
+				"key": 1,
+				"get": () => this.key
+			}
+			return this
+		}
+		a = f()
+		b = f()
+
+		target = a.get()
+		println(target)
+
+		`,
+			want: []string{
+				"Undefined-#12.get(valid)(Function-main$1(),Undefined-#12.key(valid))",
+			},
+		})
+	})
+}
+
+func Test_ObjectFactor_ALL(t *testing.T) {
+	t.Run("normal", func(t *testing.T) {
+		checkPrintf(t, TestCase{
+			code: `
+			f= () => {
+				this = {
+					"key": 1, 
+					"get": () => this.key,
+					"set": (i) => {this.key = i},
+				}
+				return this
+			}
+
+			a = f()
+			a.set(2)
+			println(a.get())
+
+			b = f()
+			b.set(2)
+			println(b.get())
+
+
+			b.set(3)
+			println(a.get())
+
+			a.set(3)
+			println(b.get())
+			`,
+			want: []string{
+				"Undefined-#19.get(valid)(Function-main$1(),side-effect(Parameter-i, #14.key))",
+				"Undefined-#33.get(valid)(Function-main$1(),side-effect(Parameter-i, #14.key))",
+				"Undefined-#19.get(valid)(Function-main$1(),side-effect(Parameter-i, #14.key))",
+				"Undefined-#33.get(valid)(Function-main$1(),side-effect(Parameter-i, #14.key))",
 			},
 		})
 	})
