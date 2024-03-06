@@ -145,7 +145,7 @@ func getInterfaceHandlerFromConfig(ifaceName string, conf *CaptureConfig) (strin
 								daemon.registeredHandlers.Delete(i)
 							}
 						case <-time.After(3 * time.Second):
-							if handler.Error() != nil {
+							if handler.Error() != nil && handler.Error().Error() != "" {
 								log.Errorf("background iface: %v error: %s", ifaceName, handler.Error())
 								captureDaemonCache.Remove(cacheId)
 								return
