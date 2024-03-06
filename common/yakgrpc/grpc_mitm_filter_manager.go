@@ -42,7 +42,7 @@ var (
 	defaultExcludeMethods = []string{"OPTIONS", "CONNECT"}
 	defaultExcludeMIME    = []string{
 		"image/*",
-		"audio/*", "video/*", "*octet-stream*",
+		"audio/*", "video/*", // "*octet-stream*",
 		"application/ogg", "application/pdf", "application/msword",
 		"application/x-ppt", "video/avi", "application/x-ico",
 		"*zip",
