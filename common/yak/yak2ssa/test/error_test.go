@@ -110,13 +110,9 @@ func TestErrorComment(t *testing.T) {
 			`,
 			want: []string{
 				ssa.ValueUndefined("c"),
-				ssa.ValueUndefined("print"),
 				ssa.ValueUndefined("d"),
-				ssa.ValueUndefined("print"),
 				ssa.ValueUndefined("e"),
-				ssa.ValueUndefined("print"),
 				ssa.ValueUndefined("f"),
-				ssa.ValueUndefined("print"),
 				ssa.NoCheckMustInFirst(),
 			},
 		})
@@ -297,26 +293,26 @@ func TestPhi(t *testing.T) {
 		checkError(t, TestCase{
 			code: `
 			for 1 {
-				b = str.F()
+				b = lib.F()
 			}
 			b = 2
 
 			for 2 {
-				str.F2() // only handler "field str[F2]"
+				lib.F2() // only handler "field str[F2]"
 			}
 
 			for 3 {
-				str.F()
-				str.F = 1
-				str.F2()
-				str.F()
+				lib.F()
+				lib.F = 1
+				lib.F2()
+				lib.F()
 			}
 			`,
 			want: []string{
-				ssa.ContAssignExtern("str.F"),
+				ssa.ContAssignExtern("lib.F"),
 			},
 			ExternLib: map[string]map[string]any{
-				"str": {
+				"lib": {
 					"F":  func() int { return 1 },
 					"F2": func() {},
 				},
@@ -635,7 +631,7 @@ func TestCallParamReturn(t *testing.T) {
 		})
 	})
 
-	t.Run("check return", func(t *testing.T) {
+	t.Run("check return, all right", func(t *testing.T) {
 		checkError(t, TestCase{
 			code: `
 			// just call
@@ -653,18 +649,7 @@ func TestCallParamReturn(t *testing.T) {
 			a = func2()
 			a = func3()
 
-			// (m) = (n)
-			// m != 1 && m != n
-			a, b = func1()    // get error 2 vs 1
-			a, b, c = func2() // get error 3 vs 2
-			a, b = func3()    // get error 2 vs 3
 			`,
-			want: []string{
-				ssa.CallAssignmentMismatch(2, "number"),
-				ssa.CallAssignmentMismatch(3, "number, number"),
-				ssa.CallAssignmentMismatch(2, "number, number, number"),
-			},
-
 			ExternValue: map[string]any{
 				"func1": func() int { return 1 },
 				"func2": func() (a, b int) { return 1, 2 },
@@ -673,7 +658,61 @@ func TestCallParamReturn(t *testing.T) {
 		})
 	})
 
-	t.Run("check return field ", func(t *testing.T) {
+	t.Run("check return, (2) = (1)", func(t *testing.T) {
+		checkError(t, TestCase{
+			code: `
+			// (m) = (n)
+			// m != 1 && m != n
+			a, b = func1()    // get error 2 vs 1
+			`,
+			want: []string{
+				ssa.CallAssignmentMismatch(2, "number"),
+				ssa.ValueUndefined("b"),
+			},
+
+			ExternValue: map[string]any{
+				"func1": func() int { return 1 },
+			},
+		})
+	})
+
+	t.Run("check return, (3) = (2)", func(t *testing.T) {
+		checkError(t, TestCase{
+			code: `
+
+			// (m) = (n)
+			// m != 1 && m != n
+			a, b, c = func2() // get error 3 vs 2
+			`,
+			want: []string{
+				ssa.CallAssignmentMismatch(3, "number, number"),
+				ssa.ValueUndefined("c"),
+			},
+
+			ExternValue: map[string]any{
+				"func2": func() (a, b int) { return 1, 2 },
+			},
+		})
+	})
+	t.Run("check return, (2) = (3)", func(t *testing.T) {
+		checkError(t, TestCase{
+			code: `
+
+			// (m) = (n)
+			// m != 1 && m != n
+			a, b = func3()    // get error 2 vs 3
+			`,
+			want: []string{
+				ssa.CallAssignmentMismatch(2, "number, number, number"),
+			},
+
+			ExternValue: map[string]any{
+				"func3": func() (a, b, c int) { return 1, 2, 3 },
+			},
+		})
+	})
+
+	t.Run("check return field", func(t *testing.T) {
 		checkError(t, TestCase{
 			code: `
 			// normal
@@ -692,6 +731,7 @@ func TestCallParamReturn(t *testing.T) {
 			want: []string{
 				ssa4analyze.InvalidField("number, number", "2"),
 				ssa.CallAssignmentMismatch(2, "number"),
+				ssa.ValueUndefined("b"),
 				ssa4analyze.InvalidField("number", "0"),
 				ssa4analyze.InvalidField("number", "1"),
 			},
@@ -1207,26 +1247,50 @@ func TestErrorHandler(t *testing.T) {
 		})
 	})
 
-	t.Run("function error with drop", func(t *testing.T) {
+	t.Run("function error with drop, return  null", func(t *testing.T) {
 		checkError(t, TestCase{
 			code: `
 			a = getError1()~
+			`,
+			want: []string{
+				ssa.ValueIsNull(),
+			},
+			ExternValue: map[string]any{
+				"getError1": func() error { return errors.New("err") },
+			},
+		})
+	})
+
+	t.Run("function error with drop, return int", func(t *testing.T) {
+		checkError(t, TestCase{
+			code: `
 			a = getError2()~
 			a, err = getError2()~
+			`,
+			want: []string{
+				ssa.CallAssignmentMismatchDropError(2, "number"),
+				ssa.ValueUndefined("err"),
+			},
+
+			ExternValue: map[string]any{
+				"getError2": func() (int, error) { return 1, errors.New("err") },
+			},
+		})
+	})
+
+	t.Run("function error with drop, return int, int", func(t *testing.T) {
+		checkError(t, TestCase{
+			code: `
 			a = getError3()~
 			a, b = getError3()~
 			a, b, err = getError3()~
 			`,
 			want: []string{
-				ssa.ValueIsNull(),
-				ssa.CallAssignmentMismatchDropError(2, "number"),
+				ssa.ValueUndefined("err"),
 				ssa.CallAssignmentMismatchDropError(3, "number, number"),
 			},
 			ExternValue: map[string]any{
-				"getError1": func() error { return errors.New("err") },
-				"getError2": func() (int, error) { return 1, errors.New("err") },
 				"getError3": func() (int, int, error) { return 1, 2, errors.New("err") },
-				"die":       func(error) {},
 			},
 		})
 	})
