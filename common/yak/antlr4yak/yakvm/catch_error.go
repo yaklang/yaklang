@@ -15,20 +15,24 @@ func (v *Frame) catchErrorRun(catchCodeIndex, id int) (err interface{}) {
 	// 情况4需要手动复原作用域到try-catch-finally
 	// 情况5需要手动复原作用域到try-catch-finally
 	defer func() {
-		// 除1/2情况，都需要恢复到try-catch-finally作用域
-		if !(v.codes[v.codePointer+1].Opcode == OpBreak || v.codes[v.codePointer+1].Opcode == OpContinue) {
-			v.scope = scopeBackpack
-			// 情况3需要退出try-catch-finally作用域
-			if v.codes[v.codePointer+1].Opcode == OpReturn {
-				v.ExitScope()
+		if v.codePointer+1 < len(v.codes) {
+			// 除1/2情况，都需要恢复到try-catch-finally作用域
+			if !(v.codes[v.codePointer+1].Opcode == OpBreak || v.codes[v.codePointer+1].Opcode == OpContinue) {
+				v.scope = scopeBackpack
+				// 情况3需要退出try-catch-finally作用域
+				if v.codes[v.codePointer+1].Opcode == OpReturn {
+					v.ExitScope()
+				}
 			}
 		}
 
 		//出现错误后为 err 赋值并跳转到 catch block
 		if err != nil {
-			v.setCodeIndex(catchCodeIndex)
-			if id > 0 {
-				NewValueRef(id).Assign(v, NewAutoValue(err))
+			if catchCodeIndex >= 0 && catchCodeIndex < len(v.codes) {
+				v.setCodeIndex(catchCodeIndex)
+				if id > 0 {
+					NewValueRef(id).Assign(v, NewAutoValue(err))
+				}
 			}
 		}
 	}()
