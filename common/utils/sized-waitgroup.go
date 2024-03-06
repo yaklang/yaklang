@@ -4,34 +4,52 @@ import (
 	"context"
 	"math"
 	"sync"
+	"sync/atomic"
 )
 
 // SizedWaitGroup has the same role and close to the
 // same API as the Golang sync.WaitGroup but adds a limit of
 // the amount of goroutines started concurrently.
 type SizedWaitGroup struct {
+	ctx               context.Context
 	Size              int
-	WaitingEventCount int
-
-	current chan struct{}
-	wg      *sync.WaitGroup
+	WaitingEventCount atomic.Int64
+	current           chan struct{}
+	wg                *sync.WaitGroup
 }
 
 // New creates a SizedWaitGroup.
 // The limit parameter is the maximum amount of
 // goroutines which can be started concurrently.
-func NewSizedWaitGroup(limit int) *SizedWaitGroup {
+func NewSizedWaitGroup(limit int, ctxs ...context.Context) *SizedWaitGroup {
 	size := math.MaxInt32 // 2^32 - 1
 	if limit > 0 {
 		size = limit
 	}
-	return &SizedWaitGroup{
-		Size:              size,
-		WaitingEventCount: 0,
-
+	s := &SizedWaitGroup{
+		Size:    size,
 		current: make(chan struct{}, size),
 		wg:      new(sync.WaitGroup),
 	}
+	for _, ctx := range ctxs {
+		s.SetContext(ctx)
+	}
+
+	return s
+}
+
+// SetContext sets the context for the SizedWaitGroup.
+// ! If Call twice or more, any of the previous context Done will cause the WaitGroup to be SetZero.
+func (s *SizedWaitGroup) SetContext(ctx context.Context) {
+	s.ctx = ctx
+	go func() {
+		<-ctx.Done()
+		s.SetZero()
+	}()
+}
+
+func (s *SizedWaitGroup) SetZero() {
+	s.Add(0 - int(s.WaitingEventCount.Load()))
 }
 
 // Add increments the internal WaitGroup counter.
@@ -46,11 +64,10 @@ func (s *SizedWaitGroup) Add(delta ...int) {
 		n = delta[0]
 	}
 
-	err := s.AddWithContext(context.Background(), n)
+	err := s.AddWithContext(s.ctx, n)
 	if err != nil {
 		return
 	}
-	s.WaitingEventCount += n
 }
 
 // AddWithContext increments the internal WaitGroup counter.
@@ -66,9 +83,18 @@ func (s *SizedWaitGroup) AddWithContext(ctx context.Context, delta ...int) error
 	if len(delta) > 0 {
 		n = delta[0]
 	}
+	selfCtx := s.ctx
+	if selfCtx == nil {
+		selfCtx = context.Background()
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
 
 	for i := 0; i < n; i++ {
 		select {
+		case <-selfCtx.Done():
+			return selfCtx.Err()
 		case <-ctx.Done():
 			return ctx.Err()
 		case s.current <- struct{}{}:
@@ -86,7 +112,7 @@ func (s *SizedWaitGroup) AddWithContext(ctx context.Context, delta ...int) error
 	}
 
 	s.wg.Add(n)
-	s.WaitingEventCount += n
+	s.WaitingEventCount.Add(int64(n))
 	return nil
 }
 
@@ -95,7 +121,7 @@ func (s *SizedWaitGroup) AddWithContext(ctx context.Context, delta ...int) error
 func (s *SizedWaitGroup) Done() {
 	<-s.current
 	s.wg.Done()
-	s.WaitingEventCount -= 1
+	s.WaitingEventCount.Add(-1)
 }
 
 // Wait blocks until the SizedWaitGroup counter is zero.

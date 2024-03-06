@@ -1,21 +1,48 @@
 package yaklib
 
 import (
+	"context"
 	"sync"
+	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/utils"
 )
 
 type WaitGroupProxy struct {
-	*sync.WaitGroup
+	sync.WaitGroup
+
+	ctx   context.Context
+	count atomic.Int64
 }
 
-func (w *WaitGroupProxy) Add(delta ...int) {
-	n := 1
-	if len(delta) > 0 {
-		n = delta[0]
+// SetContext sets the context for the WaitGroup.
+// ! If Call twice or more, any of the previous context Done will cause the WaitGroup to be SetZero.
+func (wg *WaitGroupProxy) SetContext(ctx context.Context) {
+	wg.ctx = ctx
+	go func() {
+		<-ctx.Done()
+		wg.SetZero()
+	}()
+}
+
+func (wg *WaitGroupProxy) Add(deltas ...int) {
+	delta := 1
+	if len(deltas) > 0 {
+		delta = deltas[0]
 	}
-	w.WaitGroup.Add(n)
+	if delta < 0 && wg.count.Load()+int64(delta) < 0 {
+		delta = 0 - int(wg.count.Load())
+	}
+	wg.count.Add(int64(delta))
+	wg.WaitGroup.Add(delta)
+}
+
+func (wg *WaitGroupProxy) SetZero() {
+	wg.Add(0 - int(wg.count.Load()))
+}
+
+func (wg *WaitGroupProxy) Done() {
+	wg.Add(-1)
 }
 
 // NewWaitGroup 创建一个 WaitGroup 结构体引用，其帮助我们在处理多个并发任务时，等待所有任务完成后再进行下一步操作
@@ -33,8 +60,12 @@ func (w *WaitGroupProxy) Add(delta ...int) {
 // wg.Wait()
 // println("所有任务完成")
 // ```
-func NewWaitGroup() *WaitGroupProxy {
-	return &WaitGroupProxy{&sync.WaitGroup{}}
+func NewWaitGroup(ctxs ...context.Context) *WaitGroupProxy {
+	wg := &WaitGroupProxy{}
+	for _, ctx := range ctxs {
+		wg.SetContext(ctx)
+	}
+	return wg
 }
 
 // NewSizedWaitGroup 创建一个 SizedWaitGroup 结构体引用，其帮助我们在处理多个并发任务时，等待所有任务完成后再进行下一步操作
@@ -53,8 +84,8 @@ func NewWaitGroup() *WaitGroupProxy {
 // wg.Wait()
 // println("所有任务完成")
 // ```
-func NewSizedWaitGroup(size int) *utils.SizedWaitGroup {
-	return utils.NewSizedWaitGroup(size)
+func NewSizedWaitGroup(size int, ctxs ...context.Context) *utils.SizedWaitGroup {
+	return utils.NewSizedWaitGroup(size, ctxs...)
 }
 
 // NewMutex 创建一个 Mutex 结构体引用，用于实现互斥锁，其帮助我们避免多个并发任务访问同一个资源时出现数据竞争问题
