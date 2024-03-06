@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/samber/lo"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -161,28 +162,18 @@ func CheckSignature(t *testing.T) func(t *testing.T, code, typ string, Range *yp
 
 		req := getHover(t, code, typ, Range)
 		log.Info(req.SuggestionMessage)
-		if len(req.SuggestionMessage) != 1 {
-			t.Fatal("should get 1 suggestion")
-		}
+		require.Equal(t, 1, len(req.SuggestionMessage), "should get 1 suggestion")
 		got := req.SuggestionMessage[0].Label
 		if subStr {
-			if !strings.Contains(got, wantLabel) {
-				t.Fatalf("want %s, but get %s", wantLabel, got)
-			}
+			require.Contains(t, got, wantLabel)
 		} else {
-			if got != wantLabel {
-				t.Fatalf("want %s, but get %s", wantLabel, got)
-			}
+			require.Equal(t, wantLabel, got)
 		}
 		got = req.SuggestionMessage[0].Description
 		if subStr {
-			if !strings.Contains(got, wantDesc) {
-				t.Fatalf("want %s, but get %s", wantDesc, got)
-			}
+			require.Contains(t, got, wantDesc)
 		} else {
-			if got != wantDesc {
-				t.Fatalf("want %s, but get %s", wantDesc, got)
-			}
+			require.Equal(t, wantDesc, got)
 		}
 	}
 	return check
@@ -305,6 +296,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 		})
 	}
 }
+
 func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Mitm(t *testing.T) {
 	t.Run("check mitm hover argument", func(t *testing.T) {
 		check := CheckHover(t)
@@ -450,7 +442,7 @@ poc.HTTP()
 			EndColumn:   8,
 		}
 		wantLabel := "HTTP(i any, opts ...PocConfigOption) (rsp []byte, req []byte, err error)"
-		wantDesc := "HTTP 发送请求并且返回原始响应报文，原始请求报文以及错误，它的第一个参数可以接收[]byte, string, http.Request结构体，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如设置超时时间，或者修改请求报文等\n\nExample:\n```\npoc.HTTP(\"GET / HTTP/1.1\\r\\nHost: www.yaklang.com\\r\\n\\r\\n\", poc.https(true), poc.replaceHeader(\"AAA\", \"BBB\")) // yaklang.com发送一个基于HTTPS协议的GET请求，并且添加一个请求头AAA，它的值为BBB\n```\n"
+		wantDesc := "HTTP 发送请求并且返回原始响应报文，原始请求报文以及错误，它的第一个参数可以接收 []byte, string, http.Request 结构体，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如设置超时时间，或者修改请求报文等\n\nExample:\n```\npoc.HTTP(\"GET / HTTP/1.1\\r\\nHost: www.yaklang.com\\r\\n\\r\\n\", poc.https(true), poc.replaceHeader(\"AAA\", \"BBB\")) // yaklang.com发送一个基于HTTPS协议的GET请求，并且添加一个请求头AAA，它的值为BBB\n```\n"
 		check(t, code, "yak", ssaRange, wantLabel, wantDesc)
 	})
 	t.Run("check user function signature", func(t *testing.T) {

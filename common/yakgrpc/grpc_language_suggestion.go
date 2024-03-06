@@ -735,56 +735,6 @@ func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionReques
 		typName = typName[strings.LastIndex(typName, ".")+1:]
 	}
 	switch bareTyp.GetTypeKind() {
-	case ssa.StructTypeKind:
-		// 结构体成员 / 方法
-		rTyp, ok := bareTyp.(*ssa.ObjectType)
-		if !ok {
-			break
-		}
-		if rTyp.Combination {
-			break
-		}
-
-		lib, ok := doc.DefaultDocumentHelper.StructMethods[typStr]
-		if !ok {
-			return ret
-		}
-		for _, instance := range lib.Instances {
-			// 过滤掉非导出字段
-			if !shouldExport(instance.InstanceName) {
-				continue
-			}
-			keyStr := instance.InstanceName
-			ret = append(ret, &ypb.SuggestionDescription{
-				Label:       keyStr,
-				Description: "",
-				InsertText:  keyStr,
-				Kind:        "Field",
-			})
-		}
-
-		for methodName, funcDecl := range lib.Functions {
-			ret = append(ret, &ypb.SuggestionDescription{
-				Label:       methodName,
-				Description: funcDecl.Document,
-				InsertText:  funcDecl.VSCodeSnippets,
-				Kind:        "Method",
-			})
-		}
-	case ssa.InterfaceTypeKind:
-		// 接口方法
-		lib, ok := doc.DefaultDocumentHelper.StructMethods[typStr]
-		if !ok {
-			return ret
-		}
-		for methodName, funcDecl := range lib.Functions {
-			ret = append(ret, &ypb.SuggestionDescription{
-				Label:       methodName,
-				Description: funcDecl.Document,
-				InsertText:  funcDecl.VSCodeSnippets,
-				Kind:        "Method",
-			})
-		}
 	case ssa.SliceTypeKind:
 		// []byte / [] 内置方法
 		rTyp, ok := bareTyp.(*ssa.ObjectType)
@@ -821,23 +771,38 @@ func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionReques
 			})
 			filterMap[key.String()] = struct{}{}
 		})
-
-		// mapTyp, ok := ssa.ToObjectType(bareTyp)
-		// if !ok {
-		// 	break
-		// }
-		// _ = mapTyp
-		// for _, key := range mapTyp.Keys {
-		// 	ret = append(ret, &ypb.SuggestionDescription{
-		// 		Label:       key.String(),
-		// 		Description: "",
-		// 		InsertText:  key.String(),
-		// 		Kind:        "Field",
-		// 	})
-		// }
 	case ssa.StringTypeKind:
 		// string 内置方法
 		ret = append(ret, getStringBuiltinMethodSuggestions()...)
+	}
+
+	// 接口方法，结构体成员与方法，定义类型方法
+	lib, ok := doc.DefaultDocumentHelper.StructMethods[typStr]
+	if !ok {
+		return ret
+	}
+
+	for _, instance := range lib.Instances {
+		// 过滤掉非导出字段
+		if !shouldExport(instance.InstanceName) {
+			continue
+		}
+		keyStr := instance.InstanceName
+		ret = append(ret, &ypb.SuggestionDescription{
+			Label:       keyStr,
+			Description: "",
+			InsertText:  keyStr,
+			Kind:        "Field",
+		})
+	}
+
+	for methodName, funcDecl := range lib.Functions {
+		ret = append(ret, &ypb.SuggestionDescription{
+			Label:       methodName,
+			Description: funcDecl.Document,
+			InsertText:  funcDecl.VSCodeSnippets,
+			Kind:        "Method",
+		})
 	}
 
 	return ret
