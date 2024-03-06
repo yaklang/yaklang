@@ -3314,6 +3314,9 @@ message PortScanRequest {
   bool EnableBrute = 26;
 
   string SynScanNetInterface = 27;
+
+  // 联动插件的配置
+  HybridScanPluginConfig LinkPluginConfig = 28;
 }
 
 message DeletePortsRequest {
