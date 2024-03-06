@@ -18,8 +18,14 @@ var scanPortScript []byte
 
 func (s *Server) PortScan(req *ypb.PortScanRequest, stream ypb.Yak_PortScanServer) error {
 
-	reqParams := &ypb.ExecRequest{
-		Script: string(scanPortScript),
+	//reqParams := &ypb.ExecRequest{
+	//	Script: string(scanPortScript),
+	//}
+
+	reqParams := &ypb.DebugPluginRequest{
+		Code:             string(scanPortScript),
+		PluginType:       "yak",
+		LinkPluginConfig: req.GetLinkPluginConfig(),
 	}
 
 	// 把文件写到本地。
@@ -54,60 +60,60 @@ func (s *Server) PortScan(req *ypb.PortScanRequest, stream ypb.Yak_PortScanServe
 	tmpTargetFile.Close()
 	defer os.RemoveAll(tmpTargetFile.Name())
 
-	reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+	reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
 		Key:   "target-file",
 		Value: tmpTargetFile.Name(),
 	})
-	reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+	reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
 		Key:   "ports",
 		Value: utils.ConcatPorts(utils.ParseStringToPorts(req.Ports)),
 	})
-	reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+	reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
 		Key:   "mode",
 		Value: req.GetMode(),
 	})
 
 	if req.GetExcludeHosts() != "" {
-		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
 			Key:   "exclude-hosts",
 			Value: req.GetExcludeHosts(),
 		})
 	}
 
 	if req.GetExcludePorts() != "" {
-		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
 			Key:   "exclude-ports",
 			Value: req.GetExcludePorts(),
 		})
 	}
 
 	if req.GetSaveToDB() {
-		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
 			Key: "save-to-db",
 		})
 	}
 
 	if req.GetSaveClosedPorts() {
-		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
 			Key: "save-closed-ports",
 		})
 	}
 
 	// 主动发包
 	if req.GetActive() {
-		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
 			Key: "active",
 		})
 	}
 
 	// 设置指纹扫描的并发
 	if req.GetConcurrent() > 0 {
-		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
 			Key:   "concurrent",
 			Value: fmt.Sprint(req.GetConcurrent()),
 		})
 	} else {
-		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
 			Key:   "concurrent",
 			Value: fmt.Sprint(50),
 		})
@@ -115,32 +121,32 @@ func (s *Server) PortScan(req *ypb.PortScanRequest, stream ypb.Yak_PortScanServe
 
 	// 设置 SYN 扫描的网卡
 	if req.GetSynScanNetInterface() != "" {
-		reqParams.Params = append(
-			reqParams.Params, &ypb.ExecParamItem{Key: "syn-scan-net-interface", Value: req.GetSynScanNetInterface()},
+		reqParams.ExecParams = append(
+			reqParams.ExecParams, &ypb.KVPair{Key: "syn-scan-net-interface", Value: req.GetSynScanNetInterface()},
 		)
 	}
 
 	// 设置 SYN 扫描的并发
 	if req.GetSynConcurrent() > 0 {
-		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{Key: "syn-concurrent", Value: fmt.Sprint(req.GetSynConcurrent())})
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "syn-concurrent", Value: fmt.Sprint(req.GetSynConcurrent())})
 	} else {
-		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{Key: "syn-concurrent", Value: "1000"})
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "syn-concurrent", Value: "1000"})
 	}
 
 	if len(req.GetProto()) > 0 {
-		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
 			Key:   "proto",
 			Value: strings.Join(req.GetProto(), ","),
 		})
 	} else {
-		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
 			Key:   "proto",
 			Value: "tcp",
 		})
 	}
 
 	if len(utils.StringArrayFilterEmpty(req.GetProxy())) > 0 {
-		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
 			Key:   "proxy",
 			Value: strings.Join(req.GetProxy(), ","),
 		})
@@ -148,86 +154,76 @@ func (s *Server) PortScan(req *ypb.PortScanRequest, stream ypb.Yak_PortScanServe
 
 	// 爬虫设置
 	if req.GetEnableBasicCrawler() {
-		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
 			Key: "enable-basic-crawler",
 		})
 	}
 	if req.GetBasicCrawlerRequestMax() > 0 {
-		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
 			Key:   "basic-crawler-request-max",
 			Value: fmt.Sprint(req.GetBasicCrawlerRequestMax()),
 		})
 	} else {
-		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
 			Key:   "basic-crawler-request-max",
 			Value: "5",
 		})
 	}
 
 	if req.GetProbeTimeout() > 0 {
-		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{Key: "probe-timeout", Value: fmt.Sprint(req.GetProbeTimeout())})
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "probe-timeout", Value: fmt.Sprint(req.GetProbeTimeout())})
 	} else {
-		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{Key: "probe-timeout", Value: "5.0"})
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "probe-timeout", Value: "5.0"})
 	}
 
 	if req.GetProbeMax() > 0 {
 		probeMax := strconv.Itoa(int(req.GetProbeMax()))
-		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{Key: "probe-max", Value: probeMax})
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "probe-max", Value: probeMax})
 	} else {
-		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{Key: "probe-max", Value: "3"})
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "probe-max", Value: "3"})
 	}
 
 	switch req.GetFingerprintMode() {
 	case "service":
-		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
 			Key:   "fp-mode",
 			Value: "service",
 		})
 	case "web":
-		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
 			Key:   "fp-mode",
 			Value: "web",
 		})
 	default:
-		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
 			Key:   "fp-mode",
 			Value: "all",
 		})
 	}
 
-	// handle plugin names
-	var callback func()
-	reqParams.Params, callback, err = appendPluginNamesEx("script-name-file", "\n", reqParams.Params, req.GetScriptNames()...)
-	if callback != nil {
-		defer callback()
-	}
-	if err != nil {
-		return utils.Errorf("load plugin names failed: %s", err)
-	}
-
 	if req.GetSkippedHostAliveScan() {
-		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{Key: "skipped-host-alive-scan"})
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "skipped-host-alive-scan"})
 	}
 
 	if req.GetHostAliveConcurrent() > 0 {
-		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{Key: "host-alive-concurrent", Value: fmt.Sprint(req.GetHostAliveConcurrent())})
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "host-alive-concurrent", Value: fmt.Sprint(req.GetHostAliveConcurrent())})
 	} else {
-		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{Key: "host-alive-concurrent", Value: fmt.Sprint(20)})
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "host-alive-concurrent", Value: fmt.Sprint(20)})
 	}
 
 	if req.GetHostAliveTimeout() > 0 {
-		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{Key: "host-alive-timeout", Value: fmt.Sprint(req.GetHostAliveTimeout())})
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "host-alive-timeout", Value: fmt.Sprint(req.GetHostAliveTimeout())})
 	} else {
-		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{Key: "host-alive-timeout", Value: fmt.Sprint(5.0)})
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "host-alive-timeout", Value: fmt.Sprint(5.0)})
 	}
 
 	if req.GetHostAlivePorts() != "" {
-		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{Key: "host-alive-ports", Value: fmt.Sprint(req.GetHostAlivePorts())})
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "host-alive-ports", Value: fmt.Sprint(req.GetHostAlivePorts())})
 	} else {
-		reqParams.Params = append(reqParams.Params, &ypb.ExecParamItem{Key: "host-alive-ports", Value: "22,80,443"})
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "host-alive-ports", Value: "22,80,443"})
 	}
 
-	return s.Exec(reqParams, stream)
+	return s.DebugPlugin(reqParams, stream)
 }
 
 func (s *Server) ViewPortScanCode(ctx context.Context, req *ypb.Empty) (*ypb.SimpleScript, error) {
