@@ -842,6 +842,9 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		}
 		return i
 	})
+	// context hook
+
+	// new context
 	streamContext, cancel := context.WithCancel(streamContext)
 	nIns.GetVM().RegisterMapMemberCallHandler("context", "Seconds", func(f interface{}) interface{} {
 		funcValue := reflect.ValueOf(f)
@@ -856,7 +859,6 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		return hookFunc.Interface()
 	})
 
-	// hook new background context
 	newContextHook := func(f interface{}) interface{} {
 		return func() context.Context {
 			return streamContext
@@ -864,6 +866,29 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 	}
 	nIns.GetVM().RegisterMapMemberCallHandler("context", "New", newContextHook)
 	nIns.GetVM().RegisterMapMemberCallHandler("context", "Background", newContextHook)
+
+	// hook sync context
+	nIns.GetVM().RegisterMapMemberCallHandler("sync", "NewWaitGroup", func(f interface{}) interface{} {
+		originFunc, ok := f.(func(ctxs ...context.Context))
+		if ok {
+			return func(ctxs ...context.Context) {
+				ctxs = append(ctxs, streamContext)
+				originFunc(ctxs...)
+			}
+		}
+		return f
+	})
+
+	nIns.GetVM().RegisterMapMemberCallHandler("sync", "NewSizedWaitGroup", func(f interface{}) interface{} {
+		originFunc, ok := f.(func(limit int, ctxs ...context.Context) *utils.SizedWaitGroup)
+		if ok {
+			return func(limit int, ctxs ...context.Context) *utils.SizedWaitGroup {
+				ctxs = append(ctxs, streamContext)
+				return originFunc(limit, ctxs...)
+			}
+		}
+		return f
+	})
 
 	// hook httpserver context
 	nIns.GetVM().RegisterMapMemberCallHandler("httpserver", "Serve", func(f interface{}) interface{} {
