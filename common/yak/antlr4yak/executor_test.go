@@ -97,6 +97,7 @@ func init() {
 	Import("getUint16Wrapper", func() (*struct{ A uint16 }, map[string]uint16, []uint16) {
 		return &struct{ A uint16 }{A: 1}, map[string]uint16{"a": 1}, []uint16{1, 2, 3}
 	})
+	Import("NewSizedWaitGroup", utils2.NewSizedWaitGroup)
 }
 
 func TestRangeString(t *testing.T) {
@@ -772,7 +773,7 @@ func _viewLexerTokens(i string) {
 	}
 }
 
-func _marshallerTest(i string) {
+func _marshallerTestWithCtx(i string, ctx context.Context) {
 	m := yakvm.NewCodesMarshaller()
 	cl := compiler(i)
 	oldSymbolTable, oldCodes := cl.GetRootSymbolTable(), cl.GetOpcodes()
@@ -876,7 +877,7 @@ func _marshallerTest(i string) {
 
 	vm := yakvm.NewWithSymbolTable(symbolTable)
 	vm.ImportLibs(buildinLib)
-	err = vm.Exec(context.Background(), func(frame *yakvm.Frame) {
+	err = vm.Exec(ctx, func(frame *yakvm.Frame) {
 		frame.NormalExec(codes)
 		if err := frame.CheckExit(); err != nil {
 			panic(err)
@@ -885,6 +886,10 @@ func _marshallerTest(i string) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func _marshallerTest(i string) {
+	_marshallerTestWithCtx(i, context.Background())
 }
 
 func _formattest(i string) []*yakvm.Code {
@@ -3958,4 +3963,34 @@ assert typeof(a) == map[string]%s
 		_marshallerTest(fmt.Sprintf(codeTemplate, "var", "any"))
 		_marshallerTest(fmt.Sprintf(codeTemplate, "any", "any"))
 	})
+}
+
+func TestCancelCtx(t *testing.T) {
+	code := `
+wg = NewSizedWaitGroup(1)
+
+for i=0 ; i < 20; i ++ {
+    t = i
+    wg.Add()
+    go fn {
+        defer wg.Done()
+        try{
+            sleep(0.5)
+            println(t)
+        }catch e {
+            println(e)
+        }
+	}
+}
+
+wg.Wait()
+`
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	go func() {
+		_marshallerTestWithCtx(code, ctx)
+	}()
+
+	time.Sleep(5 * time.Second)
 }
