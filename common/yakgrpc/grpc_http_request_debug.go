@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -65,7 +66,7 @@ func (s *Server) execScriptWithExecParam(scriptName string, input string, stream
 		app := cli.DefaultCliApp
 		// 额外处理 cli，新建 cli app
 		if strings.ToLower(debugType) == "yak" {
-			tempArgs := makeArgs(params, scriptInstance.Content)
+			tempArgs := makeArgs(stream.Context(), params, scriptInstance.Content)
 			app = yak.HookCliArgs(engine, tempArgs)
 		}
 		yak.BindYakitPluginContextToEngine(engine, yak.CreateYakitPluginContext(runtimeId).WithPluginName(scriptName).WithContext(stream.Context()).WithCliApp(app))
@@ -355,7 +356,7 @@ func (s *Server) execScript(
 	return utils.Error("unsupported plugin type: " + scriptType)
 }
 
-func makeArgs(execParams []*ypb.KVPair, yakScript string) []string {
+func makeArgs(ctx context.Context, execParams []*ypb.KVPair, yakScript string) []string {
 	var boolParams []string
 	prog, err := ssaapi.Parse(yakScript, pta.GetPluginSSAOpt("yak")...)
 	if err != nil {
@@ -379,6 +380,13 @@ func makeArgs(execParams []*ypb.KVPair, yakScript string) []string {
 			}
 			args = append(args, "--yakit-plugin-file", tempName)
 			canFilter = false
+			go func() {
+				select {
+				case <-ctx.Done():
+					os.Remove(tempName)
+				}
+			}()
+
 		case "__yakit_plugin_filter__": // 筛选情况
 			if !canFilter {
 				continue
