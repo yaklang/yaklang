@@ -4,33 +4,12 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
-	js2ssa "github.com/yaklang/yaklang/common/yak/JS2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"github.com/yaklang/yaklang/common/yak/yak2ssa"
-)
-
-type Language string
-
-const (
-	JS  Language = "js"
-	Yak Language = "yak"
-)
-
-type LanguageParser interface {
-	Parse(string, bool, func(*ssa.FunctionBuilder)) (*ssa.Program, error)
-	Feed(string, bool, *ssa.Program)
-}
-
-var (
-	LanguageParsers = map[Language]LanguageParser{
-		Yak: yak2ssa.NewParser(),
-		JS:  js2ssa.NewParser(),
-	}
 )
 
 type config struct {
 	language        Language
-	Parser          LanguageParser
+	Build           Build
 	code            string
 	feedCode        bool
 	ignoreSyntaxErr bool
@@ -46,7 +25,7 @@ type config struct {
 func defaultConfig(code string) *config {
 	return &config{
 		language:    Yak,
-		Parser:      LanguageParsers[Yak],
+		Build:       LanguageBuilders[Yak],
 		code:        code,
 		externLib:   make(map[string]map[string]any),
 		externValue: make(map[string]any),
@@ -63,10 +42,10 @@ type Option func(*config)
 func WithLanguage(language Language) Option {
 	return func(c *config) {
 		c.language = language
-		if parser, ok := LanguageParsers[language]; ok {
-			c.Parser = parser
+		if parser, ok := LanguageBuilders[language]; ok {
+			c.Build = parser
 		} else {
-			c.Parser = nil
+			c.Build = nil
 		}
 	}
 }
@@ -137,7 +116,7 @@ func Parse(code string, opts ...Option) (*Program, error) {
 	for _, opt := range opts {
 		opt(config)
 	}
-	if config.Parser == nil {
+	if config.Build == nil {
 		return nil, utils.Errorf("not support language %s", config.language)
 	}
 	var ret *Program
@@ -158,20 +137,14 @@ func Parse(code string, opts ...Option) (*Program, error) {
 }
 
 func parseWithConfig(c *config) (*ssa.Program, error) {
-	callback := func(fb *ssa.FunctionBuilder) {
-		fb.WithExternLib(c.externLib)
-		fb.WithExternValue(c.externValue)
-		fb.WithExternMethod(c.externMethod)
-		fb.WithDefineFunction(c.defineFunc)
-	}
-	return c.Parser.Parse(c.code, c.ignoreSyntaxErr, callback)
+	return parse(c, nil)
 }
 
 func (p *Program) Feed(code string) {
-	if p.config == nil || !p.config.feedCode || p.config.Parser == nil {
+	if p.config == nil || !p.config.feedCode || p.config.Build == nil {
 		return
 	}
-	p.config.Parser.Feed(code, p.config.ignoreSyntaxErr, p.Program)
+	feed(p.config, p.Program, code)
 }
 
 var Exports = map[string]any{

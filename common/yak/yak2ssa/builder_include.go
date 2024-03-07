@@ -1,11 +1,12 @@
 package yak2ssa
 
 import (
-	"github.com/yaklang/yaklang/common/log"
-	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"os"
 	"path/filepath"
 	"strconv"
+
+	"github.com/yaklang/yaklang/common/log"
+	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 )
 
 func (s *astbuilder) buildInclude(i *yak.IncludeStmtContext) {
@@ -30,10 +31,8 @@ func (s *astbuilder) buildInclude(i *yak.IncludeStmtContext) {
 	}
 
 	s.recordIncludeFile(targetFile, newCode)
-	err := frontEnd(newCode, false, func(ast *yak.ProgramContext) {
-		s.build(ast)
-	})
-	if err != nil {
+	// TODO: here need more test-case
+	if err := Build(newCode, false, s.FunctionBuilder); err != nil {
 		log.Errorf("yaklang builder include %v failed: %v", targetFile, err)
 	}
 }
