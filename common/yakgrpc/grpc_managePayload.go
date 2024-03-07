@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -459,7 +460,7 @@ func (s *Server) SavePayloadToFileStream(req *ypb.SavePayloadRequest, stream ypb
 	total = int64(len(data))
 	// save to file
 	ProjectFolder := consts.GetDefaultYakitPayloadsDir()
-	fileName := fmt.Sprintf("%s/%s_%s.txt", ProjectFolder, folder, group)
+	fileName := filepath.Join(ProjectFolder, fmt.Sprintf("%s_%s.txt", folder, group))
 	fd, err := os.OpenFile(fileName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o666)
 	if err != nil {
 		return err
@@ -558,10 +559,12 @@ func (s *Server) RemoveDuplicatePayloads(req *ypb.NameRequest, stream ypb.Yak_Re
 	if group == "" {
 		return utils.Error("group is empty")
 	}
-	filename, err := yakit.GetPayloadGroupFileName(s.GetProfileDatabase(), group)
+	p, err := yakit.GetPayloadFirst(s.GetProfileDatabase(), group)
+	// filename, err := yakit.GetPayloadGroupFileName(s.GetProfileDatabase(), group)
 	if err != nil {
 		return utils.Wrapf(err, "not a file payload group")
 	}
+	filename, folder := *p.Content, *p.Folder
 
 	ctx, cancel := context.WithCancel(stream.Context())
 	defer cancel()
@@ -602,7 +605,10 @@ func (s *Server) RemoveDuplicatePayloads(req *ypb.NameRequest, stream ypb.Yak_Re
 	}
 
 	filter := filter.NewFilter()
-	file, err := utils.NewFileLineWriter(filename, os.O_WRONLY|os.O_TRUNC, 0o644)
+
+	ProjectFolder := consts.GetDefaultYakitPayloadsDir()
+	newFilename := filepath.Join(ProjectFolder, fmt.Sprintf("%s_%s_new.txt", folder, group))
+	file, err := utils.NewFileLineWriter(newFilename, os.O_CREATE|os.O_RDWR, 0o644)
 	if err != nil {
 		return utils.Wrap(err, "open file for write payload error")
 	}
@@ -625,6 +631,14 @@ func (s *Server) RemoveDuplicatePayloads(req *ypb.NameRequest, stream ypb.Yak_Re
 		if _, err := file.WriteLineString(line); err != nil {
 			return utils.Wrap(err, "write payload to file error")
 		}
+	}
+	feedback(0.99, "正在覆写文件")
+	if err := os.RemoveAll(filename); err != nil {
+		return utils.Wrap(err, "remove old file error")
+	}
+	file.Close()
+	if err := os.Rename(newFilename, filename); err != nil {
+		return utils.Wrap(err, "rename new file error")
 	}
 
 	feedback(0.99, fmt.Sprintf("总共%d项数据，重复%d项数据，实际写入%d项数据", filtered+duplicate, duplicate, filtered))
