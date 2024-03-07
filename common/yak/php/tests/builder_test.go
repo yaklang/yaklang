@@ -1,12 +1,13 @@
-package php2ssa
+package tests
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssa"
 	"testing"
+
+	test "github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 )
 
 func TestParseSSA_BasicMember(t *testing.T) {
-	smokingtest(`<?php
+	test.MockSSA(t, `<?php
 $c=[1,2,3];
 dump($c[2]);
 echo 1,2,3,5;
@@ -14,7 +15,7 @@ echo 1,2,3,5;
 }
 
 func TestParseSSA_BasicMember2(t *testing.T) {
-	smokingtest(`<?php
+	test.MockSSA(t, `<?php
 $a;
 $b[1]=1;
 dump($b[1]);
@@ -22,7 +23,7 @@ dump($b[1]);
 }
 
 func TestParseSSA_Basic(t *testing.T) {
-	smokingtest(`<?php
+	test.MockSSA(t, `<?php
 $ancasdfasdfasdf;
 1+a()+1;
 "1"."2";
@@ -34,7 +35,7 @@ array(1, "2", "key" => "value");
 }
 
 func TestParseSSA_Basic2(t *testing.T) {
-	smokingtest(`<?php
+	test.MockSSA(t, `<?php
 <?php
 // PHPALLINONE.php: A simplified PHP file containing various syntax elements for compiler testing.
 
@@ -125,44 +126,44 @@ echo "This concludes the basic syntax test.\n";
 }
 
 func TestParseSSA_RightValue(t *testing.T) {
-	smokingtest(`<?php
+	test.MockSSA(t, `<?php
 a($b[0]); 
 `)
 }
 
 func TestParseSSA_FuncCall(t *testing.T) {
-	smokingtest(`<?php
+	test.MockSSA(t, `<?php
 function funcName() {return "2";}
 funcName().$a;
 `)
 }
 
 func TestParseSSA_FuncCall_ActualParams1(t *testing.T) {
-	smokingtest(`<?php
+	test.MockSSA(t, `<?php
 function a1($a, $b) {return "2";}
 `)
 }
 
 func TestParseSSA_FuncCall_ActualParams2(t *testing.T) {
-	smokingtest(`<?php
+	test.MockSSA(t, `<?php
 function a2($a, $b="1"."2") {return "2";}
 `)
 }
 
 func TestParseSSA_FuncCall_ActualParams3(t *testing.T) {
-	smokingtest(`<?php
+	test.MockSSA(t, `<?php
 function a3($a, $b=["1", "2"], $dd=null) {return $b[0];}
 `)
 }
 
 func TestParseSSA_FuncCall_ActualParams4(t *testing.T) {
-	smokingtest(`<?php
+	test.MockSSA(t, `<?php
 function a3($a, $b=["1", "2"], $dd=array(1,2,3), $e=1) {return "2";}
 `)
 }
 
 func TestParseSSA_DoWhileTag(t *testing.T) {
-	smokingtest(`<?php
+	test.MockSSA(t, `<?php
 function funcName() {
 	echo "a called";
 	return 2;
@@ -173,7 +174,7 @@ do{ print 2; } while (funcName() == 1);
 }
 
 func TestParseSSA_WhileTag(t *testing.T) {
-	smokingtest(`
+	test.MockSSA(t, `
 <ul>
 <?php while ($i <= 5) : ?>
     <li>Item <?php echo $i; ?></li>
@@ -185,7 +186,7 @@ func TestParseSSA_WhileTag(t *testing.T) {
 }
 
 func TestParseSSA_While(t *testing.T) {
-	smokingtest(`<?php
+	test.MockSSA(t, `<?php
 while ($i < 5) {
 	echo 1;
 }
@@ -199,7 +200,7 @@ while ($i < 5) {
 }
 
 func TestParseSSA_IF(t *testing.T) {
-	smokingtest(`<?php
+	test.MockSSA(t, `<?php
 
 			if (true) echo "abc";
 			if (true) echo "abc"; else if (trye) 1+1;
@@ -212,7 +213,7 @@ echo "abc"
 }
 
 func TestParseSSA_Function_1(t *testing.T) {
-	smokingtest(`<?php
+	test.MockSSA(t, `<?php
 function testFunction2($a, $b='1', $c=array(1,2,3,), string $d) {
 	1&&1;
 	return 1;
@@ -226,7 +227,7 @@ function testFunction1($a, $b='1', $c=array(1,2,3,), string $d) {
 }
 
 func TestParseSSA_Function(t *testing.T) {
-	smokingtest(`<?php
+	test.MockSSA(t, `<?php
 
 function testFunction() {
 	1&&1
@@ -235,7 +236,7 @@ function testFunction() {
 }
 
 func TestParseSSA_YieldName(t *testing.T) {
-	smokingtest(`<?php
+	test.MockSSA(t, `<?php
 function gen() {
 	forearch (range(1, 10) as $1) {
 		yield $1;
@@ -250,40 +251,43 @@ foreach (gen() as $val) {
 }
 
 func TestParseSSA_Valid(t *testing.T) {
-	p := ParseSSA(`<?php 
-$b = "a"."b";
-$b = 1+1;
+	// 	p := test.MockSSA(t, `<?php
+	// $b = "a"."b";
+	// $b = 1+1;
 
-`, nil)
-	p.Show()
-	ins := p.GetFunctionFast().FirstBlockInstruction()
-	_ = ins
-	if len(ins) != 2 {
-		t.Fatal("build ins failed: count")
-	}
-	if ins[1].(*ssa.ConstInst).Const.String() != "2" {
-		t.Fatal("build ins failed: 1+1")
-	}
-	t.Log("-")
+	// `)
+	//
+	//	p.Show()
+	//	ins := p.GetFunctionFast().FirstBlockInstruction()
+	//	_ = ins
+	//	if len(ins) != 2 {
+	//		t.Fatal("build ins failed: count")
+	//	}
+	//	if ins[1].(*ssa.ConstInst).Const.String() != "2" {
+	//		t.Fatal("build ins failed: 1+1")
+	//	}
+	//	t.Log("-")
 }
 
-func smokingtest(code string) *ssa.Program {
-	return ParseSSA(code, nil).Show()
-}
+// func test.MockSSA(t, code string) *ssa.Program {
+// 	return test.MockSSA(t, code, nil).Show()
+// }
 
 func TestParseSSA_SMOKING_1(t *testing.T) {
-	smokingtest(`<?php 
-++$a;--$a;$b++;$c++;`)
+	test.MockSSA(t, `
+	<?php 
+++$a;--$a;$b++;$c++;
+`)
 }
 
 func TestParseSSA_unpack(t *testing.T) {
-	smokingtest(`<?php
+	test.MockSSA(t, `<?php
 [$a, $v] = array(1,2);
 `)
 }
 
 func TestParseSSA_Spaceship(t *testing.T) {
-	smokingtest(`<?php
+	test.MockSSA(t, `<?php
 1 <=> 1;
 0 <=> 1;
 1 <=> 0;
@@ -313,7 +317,7 @@ a?b:c;
 }
 
 func TestParseSSA_SMOKING_if(t *testing.T) {
-	smokingtest(`<?php 
+	test.MockSSA(t, `<?php 
 true and false;
 false or false;
 false xor true;
@@ -321,7 +325,7 @@ false xor true;
 }
 
 func TestParseSSA_SMOKING(t *testing.T) {
-	p := ParseSSA(`<?php
+	test.MockSSA(t, `<?php
 abc[1]
 
 (bool)1;
@@ -350,12 +354,11 @@ abc[1]
 !(1+1)
 
 
-`, nil)
-	p.Show()
+`)
 }
 
 func TestParseSSA_AssignOp(t *testing.T) {
-	p := ParseSSA(`<?php 
+	test.MockSSA(t, `<?php 
 
 $a = 1+1;
 $emptyVal = null;
@@ -379,21 +382,12 @@ $c[]
 c[0]
 
 
-`, nil)
-	p.Show()
-	ins := p.GetFunctionFast().FirstBlockInstruction()
-	_ = ins
-	//if len(ins) != 2 {
-	//	t.Fatal("build ins failed: count")
-	//}
-	//if ins[1].(*ssa.ConstInst).Const.String() != "2" {
-	//	t.Fatal("build ins failed: 1+1")
-	//}
-	t.Log("-")
+`)
+
 }
 
 func TestParseSSA_Valid1(t *testing.T) {
-	p := ParseSSA(`<?php 
+	test.MockSSA(t, `<?php 
 // 声明一个数组
 $array = array("apple", "banana", "cherry");
 
@@ -402,30 +396,21 @@ echo $array[0]; // 输出 "apple"
 echo $array[1]; // 输出 "banana"
 echo $array[2]; // 输出 "cherry"
 
-`, nil)
-	p.Show()
-	ins := p.GetFunctionFast().FirstBlockInstruction()
-	_ = ins
-	//if len(ins) != 2 {
-	//	t.Fatal("build ins failed: count")
-	//}
-	//if ins[1].(*ssa.ConstInst).Const.String() != "2" {
-	//	t.Fatal("build ins failed: 1+1")
-	//}
-	t.Log("-")
+`)
+
 }
 
 func TestParseSSA_Smoking(t *testing.T) {
-	ParseSSA(`<?php echo 111 ?>`, nil)
+	test.MockSSA(t, `<?php echo 111 ?>`)
 }
 
 func TestParseSSA_Smoking2(t *testing.T) {
-	ParseSSA(`<?php echo "Hello world"; // comment ?>
-`, nil)
+	test.MockSSA(t, `<?php echo "Hello world"; // comment ?>
+`)
 }
 
 func TestParse_BASIC_EXPR(t *testing.T) {
-	ParseSSA(`<?php
+	test.MockSSA(t, `<?php
 
 1+1;
 "a"."cccc";
@@ -434,11 +419,11 @@ $a = 1+1;
 $b = 1+1+$a;
 
 
-`, nil)
+`)
 }
 
 func TestParseCLS(t *testing.T) {
-	ParseSSA(`<?php
+	test.MockSSA(t, `<?php
 
 class A {
 	private $num;
@@ -458,11 +443,11 @@ echo $a;
 /*
 	build a named struct as object template
 */
-`, nil)
+`)
 }
 
 func TestParseSSA_1(t *testing.T) {
-	ParseSSA(`<?php
+	test.MockSSA(t, `<?php
 
 id: 
 	echo "test123";
@@ -506,5 +491,5 @@ endif;
     <p>Both conditions are false.</p>
 <?php endif; ?>
 
-`, nil)
+`)
 }

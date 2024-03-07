@@ -6,11 +6,12 @@ import (
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	test "github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 )
 
 func TestMemberCall(t *testing.T) {
 	t.Run("normal", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		a = {}
 		a.b = 1
 		println(a.b)
@@ -18,7 +19,7 @@ func TestMemberCall(t *testing.T) {
 	})
 
 	t.Run("normal slice", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		a = [] 
 		a[0] = 1
 		println(a[0])
@@ -31,20 +32,20 @@ func TestMemberCallNegative(t *testing.T) {
 
 	/// check v
 	t.Run("expr is undefine, create before", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		b = a
 		println(a.b)
 		`, []string{"Undefined-#0.b(valid)"}, t)
 	})
 
 	t.Run("expr is undefine, create right-now", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		println(a.b)
 		`, []string{"Undefined-#0.b(valid)"}, t)
 	})
 
 	t.Run("expr conn't be index", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		a = 1
 		println(a.b)
 		`, []string{
@@ -54,13 +55,13 @@ func TestMemberCallNegative(t *testing.T) {
 
 	// in left
 	t.Run("expr is undefine in left", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		a.b = 1
 		println(a.b)
 		`, []string{"1"}, t)
 	})
 	t.Run("expr is undefine, create before, in left", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		b = a
 		a.b = 1
 		println(a.b)
@@ -68,7 +69,7 @@ func TestMemberCallNegative(t *testing.T) {
 	})
 
 	t.Run("expr is, conn't be index, in left", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		a = 1
 		a.b = 1
 		println(a.b)
@@ -77,7 +78,7 @@ func TestMemberCallNegative(t *testing.T) {
 
 	// expr = {}
 	t.Run("expr is make", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		a = {
 			"A": 1,
 		}
@@ -93,7 +94,7 @@ func TestMemberCallNegative(t *testing.T) {
 
 	// check key
 	t.Run("expr normal, but undefine expr.key,", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		v = {}
 		println(v.key)
 		`, []string{
@@ -102,7 +103,7 @@ func TestMemberCallNegative(t *testing.T) {
 	})
 
 	t.Run("expr normal, key is type", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		v = "111"
 		println(v[1])
 		`, []string{
@@ -115,7 +116,7 @@ func TestMemberCallNegative(t *testing.T) {
 
 func TestMemberCall_Negative_Closure(t *testing.T) {
 	t.Run("create in this function", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		f = () => {
 			v = {"a": 1}
 			println(v.a)
@@ -124,14 +125,14 @@ func TestMemberCall_Negative_Closure(t *testing.T) {
 	})
 
 	t.Run("create undefine in this function", func(t *testing.T) {
-		checkPrintf(t, TestCase{
-			code: `
+		test.CheckPrintf(t, test.TestCase{
+			Code: `
 			f = () =>{
 				v = {} 
 				println(v.a)
 			}
 			`,
-			want: []string{
+			Want: []string{
 				"Undefined-#3.a(valid)",
 			},
 			ExternValue: map[string]any{
@@ -145,7 +146,7 @@ func TestMemberCall_Negative_Closure(t *testing.T) {
 func TestMemberCall_CheckField(t *testing.T) {
 
 	t.Run("assign in same scope", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		a = {} 
 		a.b = 1
 		println(a.b)
@@ -153,7 +154,7 @@ func TestMemberCall_CheckField(t *testing.T) {
 	})
 
 	t.Run("assign in same scope printf undefine", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		a = {} 
 		println(a.b)
 		a.b = 1
@@ -162,7 +163,7 @@ func TestMemberCall_CheckField(t *testing.T) {
 	})
 
 	t.Run("assign", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		a = {} 
 		if c {
 			a.b = 1
@@ -174,8 +175,8 @@ func TestMemberCall_CheckField(t *testing.T) {
 	})
 
 	t.Run("read", func(t *testing.T) {
-		_CheckTestCase(t, TestCase{
-			code: `
+		test.CheckTestCase(t, test.TestCase{
+			Code: `
 		a = {}
 		if c {
 			println(a.b)
@@ -206,12 +207,12 @@ func TestMemberCall_Struct(t *testing.T) {
 	}
 
 	check := func(t *testing.T, code string, want []string) {
-		checkPrintf(t, TestCase{
+		test.CheckPrintf(t, test.TestCase{
 			ExternValue: map[string]any{
 				"GetA": func() A { return A{} },
 			},
-			code: code,
-			want: want,
+			Code: code,
+			Want: want,
 		})
 	}
 
@@ -235,11 +236,11 @@ func TestMemberCall_Struct(t *testing.T) {
 }
 func TestMemberCall_Method(t *testing.T) {
 	check := func(t *testing.T, code string, want []string) {
-		checkPrintf(t, TestCase{
-			code: code,
-			want: want,
+		test.CheckPrintf(t, test.TestCase{
+			Code: code,
+			Want: want,
 			ExternValue: map[string]any{
-				"getExample": func() ExampleInterface { return ExampleStruct{} },
+				"getExample": func() test.ExampleInterface { return test.ExampleStruct{} },
 			},
 		})
 	}
@@ -256,25 +257,25 @@ func TestMemberCall_Method(t *testing.T) {
 
 func Test_CallMember_Method(t *testing.T) {
 	t.Run("test method call", func(t *testing.T) {
-		checkError(t, TestCase{
-			code: `
+		test.CheckError(t, test.TestCase{
+			Code: `
 			a = getExample()
 			a.ExampleMethod()
 			`,
 			ExternValue: map[string]any{
-				"getExample": getExampleInterface,
+				"getExample": test.GetExampleInterface,
 			},
 		})
 	})
 
 	t.Run("test fieldFunction call", func(t *testing.T) {
-		checkError(t, TestCase{
-			code: `
+		test.CheckError(t, test.TestCase{
+			Code: `
 			a = getExample()
 			a.ExampleFieldFunction()
 			`,
 			ExternValue: map[string]any{
-				"getExample": getExampleStruct,
+				"getExample": test.GetExampleStruct,
 			},
 		})
 	})
@@ -283,7 +284,7 @@ func Test_CallMember_Method(t *testing.T) {
 
 func Test_CallMember_Cfg(t *testing.T) {
 	t.Run("test if", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		a=()=>({}); 
 		a.b = 1; 
 		if e {
@@ -297,7 +298,7 @@ func Test_CallMember_Cfg(t *testing.T) {
 	})
 
 	t.Run("test loop", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		a = {} 
 		for i=0; i<10; i++ {
 			a.b = 1
@@ -311,7 +312,7 @@ func Test_CallMember_Cfg(t *testing.T) {
 
 func Test_CallMember_Make(t *testing.T) {
 	t.Run("test make self variable", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		a = "this string" 
 		a = {
 			"key": a,
@@ -323,7 +324,7 @@ func Test_CallMember_Make(t *testing.T) {
 	})
 
 	t.Run("test make self method ", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		a = "this string"
 		a = {
 			"get": () => {

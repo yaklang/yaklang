@@ -1,14 +1,15 @@
 package php2ssa
 
 import (
+	"math"
+	"strconv"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"math"
-	"strconv"
-	"strings"
 )
 
 func (y *builder) VisitConstant(raw phpparser.IConstantContext) ssa.Value {
