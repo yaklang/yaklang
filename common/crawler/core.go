@@ -530,6 +530,7 @@ func HandleRequestResult(isHttps bool, reqBytes, rspBytes []byte) ([][]byte, err
 		subReqs = append(subReqs, req)
 		return true
 	}, nil)
+	urlFilter.Close()
 
 	var result [][]byte
 	funk.ForEach(subReqs, func(i *Req) {

@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/samber/lo"
 	"math"
 	"math/rand"
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/samber/lo"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/filter"
@@ -323,6 +324,7 @@ func httpPayloadsToString(payloads *YakPayloads) (string, error) {
 func WithOnRisk(target string, onRisk func(i *yakit.Risk)) ConfigOption {
 	vCh := make(chan *tools.PocVul)
 	filterVul := filter.NewFilter()
+	defer filterVul.Close()
 	i := processVulnerability(target, filterVul, vCh, onRisk)
 	return func(config *Config) {
 		_callback(i)(config)
@@ -410,7 +412,7 @@ func processVulnerability(target any, filterVul *filter.StringFilter, vCh chan *
 }
 
 func ScanLegacy(target any, opt ...interface{}) (chan *tools.PocVul, error) {
-	var opts = make([]ConfigOption, 0, len(opt))
+	opts := make([]ConfigOption, 0, len(opt))
 	lo.Filter(opt, func(item interface{}, index int) bool {
 		_, ok := item.(ConfigOption)
 		if ok {

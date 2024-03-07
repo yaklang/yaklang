@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/rpa"
 	"github.com/yaklang/yaklang/common/rpa/core"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"testing"
 )
 
 func TestSpiderRun(t *testing.T) {
@@ -30,15 +31,16 @@ func TestSpiderRun(t *testing.T) {
 	if err != nil {
 		log.Errorf("spider run error:%s", err)
 	}
-	// hasPrint filter repeat urls
-	hasPrint := filter.NewFilter()
+	// hasPrintFilter filter repeat urls
+	hasPrintFilter := filter.NewFilter()
+	defer hasPrintFilter.Close()
 	for rst := range rsts {
 		url := rst.Url()
 		h := codec.Sha256(url)
-		if hasPrint.Exist(h) {
+		if hasPrintFilter.Exist(h) {
 			continue
 		} else {
-			hasPrint.Insert(h)
+			hasPrintFilter.Insert(h)
 			fmt.Println(url)
 		}
 	}

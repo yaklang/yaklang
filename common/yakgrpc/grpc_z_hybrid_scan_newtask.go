@@ -8,6 +8,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
+	"net/url"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/fp"
@@ -20,16 +26,11 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"math/rand"
-	"net/url"
-	"strings"
-	"sync"
-	"time"
 )
 
 func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream HybridScanRequestStream, firstRequest *ypb.HybridScanRequest) error {
-
 	taskId := manager.TaskId()
+	defer manager.Stop()
 
 	taskRecorder := &yakit.HybridScanTask{
 		TaskId: taskId,
@@ -62,7 +63,7 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 	var target *ypb.HybridScanInputTarget
 	var plugin *ypb.HybridScanPluginConfig
 	var rsp *ypb.HybridScanRequest
-	var concurrent = 20 //默认值
+	concurrent := 20 // 默认值
 	var totalTimeout float32 = 72000
 	var proxy string
 	log.Infof("waiting for recv input and plugin config: %v", taskId)
@@ -160,8 +161,8 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 
 	// init some config
 	var riskCount uint32 = 0
-	var hasUnavailableTarget = false
-	var scanFilterManager = NewFilterManager(12, 1<<15, 30)
+	hasUnavailableTarget := false
+	scanFilterManager := NewFilterManager(12, 1<<15, 30)
 
 	// build match
 	matcher, err := fp.NewDefaultFingerprintMatcher(fp.NewConfig(fp.WithDatabaseCache(true), fp.WithCache(true)))
@@ -209,8 +210,8 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 		__currentTarget.Response = resp.RawPacket
 
 		// fingerprint match just once
-		var portScanCond = &sync.Cond{L: &sync.Mutex{}}
-		var fingerprintMatchOK = false
+		portScanCond := &sync.Cond{L: &sync.Mutex{}}
+		fingerprintMatchOK := false
 		host, port, _ := utils.ParseStringToHostPort(__currentTarget.Url)
 		go func() {
 			_, err = matcher.Match(host, port)
@@ -250,7 +251,6 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 				feedbackStatus()
 				taskRecorder.Status = yakit.HYBRIDSCAN_PAUSED
 				quickSave()
-
 			})
 
 			for __pluginInstance.Type == "port-scan" && !fingerprintMatchOK { // wait for fingerprint match
@@ -344,7 +344,6 @@ var execTargetWithPluginScript string
 func (s *Server) ScanTargetWithPlugin(
 	taskId string, ctx context.Context, target *HybridScanTarget, plugin *yakit.YakScript, proxy string, feedbackClient *yaklib.YakitClient, callerFilter *filter.StringFilter,
 ) error {
-
 	engine := yak.NewYakitVirtualClientScriptEngine(feedbackClient)
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
 		engine.SetVar("RUNTIME_ID", taskId)
@@ -359,7 +358,6 @@ func (s *Server) ScanTargetWithPlugin(
 		return nil
 	})
 	err := engine.ExecuteWithContext(ctx, execTargetWithPluginScript)
-
 	if err != nil {
 		return utils.Errorf("execute script failed: %s", err)
 	}
@@ -385,7 +383,7 @@ func (s *Server) PluginGenerator(l *list.List, ctx context.Context, plugin *ypb.
 		}()
 		return outC, nil
 	}
-	var outC = make(chan *yakit.YakScript)
+	outC := make(chan *yakit.YakScript)
 	go func() {
 		defer close(outC)
 
@@ -407,7 +405,6 @@ func (s *Server) PluginGenerator(l *list.List, ctx context.Context, plugin *ypb.
 		}
 	}()
 	return outC, nil
-
 }
 
 type HybridScanTarget struct {
@@ -425,15 +422,15 @@ func (s *Server) TargetGenerator(ctx context.Context, targetConfig *ypb.HybridSc
 	if err != nil {
 		log.Warn(err)
 	}
-	var templates = requestTemplates.GetResults()
+	templates := requestTemplates.GetResults()
 	if len(templates) == 0 {
 		templates = append(templates, &ypb.HTTPRequestBuilderResult{
 			HTTPRequest: []byte("GET / HTTP/1.1\r\nHost: {{Hostname}}"),
 		})
 	}
 
-	var target = targetConfig.GetInput()
-	var files = targetConfig.GetInputFile()
+	target := targetConfig.GetInput()
+	files := targetConfig.GetInputFile()
 
 	outC := make(chan string)
 	go func() {
@@ -513,7 +510,7 @@ func (s *Server) TargetGenerator(ctx context.Context, targetConfig *ypb.HybridSc
 				for _, result := range results {
 					packet := bytes.ReplaceAll(result.HTTPRequest, []byte(`{{Hostname}}`), []byte(urlIns.Host))
 					tUrl, _ := lowhttp.ExtractURLFromHTTPRequestRaw(packet, result.IsHttps)
-					var uStr = urlIns.String()
+					uStr := urlIns.String()
 					if tUrl != nil {
 						uStr = tUrl.String()
 					}
