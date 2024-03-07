@@ -8,7 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"sync"
+	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -29,7 +29,7 @@ func IsYakc(b []byte) bool {
 	return IsNormalYakc(b) || IsCryptoYakc(b)
 }
 
-var yakcCache = new(sync.Map)
+var yakcCache = utils.NewTTLCache[[]byte](10 * time.Minute)
 
 func HaveYakcCache(code string) ([]byte, bool) {
 	return HaveYakcCacheWithKey(code, nil)
@@ -55,9 +55,9 @@ func HaveYakcCacheWithKey(code string, key []byte) ([]byte, bool) {
 	}()
 	codeHash := calcHash(code, key)
 
-	yakcBytes, ok := yakcCache.Load(codeHash)
+	yakcBytes, ok := yakcCache.Get(codeHash)
 	if ok {
-		return yakcBytes.([]byte), true
+		return yakcBytes, true
 	}
 
 	// 完整性校验双 Hash
@@ -74,7 +74,7 @@ func HaveYakcCacheWithKey(code string, key []byte) ([]byte, bool) {
 				os.RemoveAll(SipAbsPath)
 				return nil, false
 			}
-			yakcCache.Store(codeHash, raw)
+			yakcCache.Set(codeHash, raw)
 			return raw, true
 		}
 		return nil, false
@@ -103,22 +103,22 @@ func SaveYakcCacheWithKey(code string, yakc []byte, key []byte) {
 
 	hash := calcHash(code, key)
 
-	_, ok := yakcCache.Load(hash)
+	_, ok := yakcCache.Get(hash)
 	if ok {
 		return
 	}
-	yakcCache.Store(hash, yakc)
+	yakcCache.Set(hash, yakc)
 
 	dir := consts.GetDefaultYakitBaseTempDir()
 	sipHash := codec.Sha256(yakc)
 	absPath := filepath.Join(dir, fmt.Sprintf(".%v.yakc", hash))
 	SipAbsPath := filepath.Join(dir, fmt.Sprintf(".%v.yakc.sip", hash))
 
-	err := ioutil.WriteFile(absPath, yakc, 0644)
+	err := ioutil.WriteFile(absPath, yakc, 0o644)
 	if err != nil {
 		log.Errorf("cache %v failed: %s", absPath, err)
 	}
-	err = ioutil.WriteFile(SipAbsPath, []byte(sipHash), 0644)
+	err = ioutil.WriteFile(SipAbsPath, []byte(sipHash), 0o644)
 	if err != nil {
 		log.Errorf("cache %v failed: %s", SipAbsPath, err)
 	}
@@ -205,7 +205,6 @@ func (n *Engine) UnMarshal(b []byte, key []byte, code string) (*yakvm.SymbolTabl
 		} else {
 			log.Warnf("the key is provided but not used")
 		}
-
 	}
 
 	// gzip
