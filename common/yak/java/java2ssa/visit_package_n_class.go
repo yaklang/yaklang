@@ -50,10 +50,12 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext)
 	className := i.Identifier().GetText()
 	log.Infof("building class: %v", className)
 
+	// Generic Type
 	if ret := i.TypeParameters(); ret != nil {
-		log.Infof("class: %v 's type is %v, ignore for ssa building", className, ret.GetText())
+		log.Infof("class: %v 's (generic type) type is %v, ignore for ssa building", className, ret.GetText())
 	}
 
+	// Extend Type
 	if extend := i.TypeType(); extend != nil {
 		log.Infof("class: %v extend: %s", className, extend.GetText())
 		y.VisitTypeType(extend)
@@ -88,27 +90,72 @@ func (y *builder) VisitClassBody(raw javaparser.IClassBodyContext) interface{} {
 		return nil
 	}
 
-	for _, decl := range i.AllClassBodyDeclaration() {
+	ir := y
+	allMembers := i.AllClassBodyDeclaration()
+	pb := ir.EmitNewClassBluePrint(len(allMembers))
+	for _, decl := range allMembers {
 		instance := decl.(*javaparser.ClassBodyDeclarationContext)
 		if ret := instance.Block(); ret != nil {
 			isStatic := instance.STATIC() != nil
 			log.Infof("handle class static code: %v", isStatic)
 			y.VisitBlock(instance.Block())
 		} else if ret := instance.MemberDeclaration(); ret != nil {
-			y.VisitMemberDeclaration(ret)
+			y.VisitMemberDeclaration(pb, ret)
 		}
 	}
 
 	return nil
 }
 
-func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContext) interface{} {
+func (y *builder) VisitFormalParameters(raw javaparser.IFormalParametersContext) interface{} {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*javaparser.FormalParametersContext)
+	if i == nil {
+		return nil
+	}
+
+	return nil
+}
+
+func (y *builder) VisitMemberDeclaration(klass *ssa.ClassBluePrint, raw javaparser.IMemberDeclarationContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
 
 	i, _ := raw.(*javaparser.MemberDeclarationContext)
 	if i == nil {
+		return nil
+	}
+
+	ir := y
+	if ret := i.RecordDeclaration(); ret != nil {
+		log.Infof("todo: java17: %v", ret.GetText())
+	} else if ret := i.MethodDeclaration(); ret != nil {
+		log.Infof("method declearation: %v", ret.GetText())
+		// create function
+		method := ret.(*javaparser.MethodDeclarationContext)
+		funcName := method.Identifier().GetText()
+		ir.NewFunc(funcName)
+	} else if ret := i.GenericMethodDeclaration(); ret != nil {
+	} else if ret := i.FieldDeclaration(); ret != nil {
+
+	} else if ret := i.ConstructorDeclaration(); ret != nil {
+
+	} else if ret := i.GenericConstructorDeclaration(); ret != nil {
+
+	} else if ret := i.InterfaceDeclaration(); ret != nil {
+
+	} else if ret := i.AnnotationTypeDeclaration(); ret != nil {
+
+	} else if ret := i.ClassDeclaration(); ret != nil {
+
+	} else if ret := i.EnumDeclaration(); ret != nil {
+
+	} else {
+		log.Errorf("no member declaration found: %v", i.GetText())
 		return nil
 	}
 
