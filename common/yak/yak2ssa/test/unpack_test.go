@@ -6,12 +6,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	test "github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 )
 
 func TestUnpack_Line(t *testing.T) {
 
 	t.Run("simple", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		a, b = 1, 2
 		println(a)
 		println(b)
@@ -21,7 +22,7 @@ func TestUnpack_Line(t *testing.T) {
 	})
 
 	t.Run("normal", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		m = [1, 2]
 		a, b = m
 		println(a)
@@ -32,7 +33,7 @@ func TestUnpack_Line(t *testing.T) {
 	})
 
 	t.Run("normal function", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		f = () => {
 			return 1, 2
 		}
@@ -46,13 +47,13 @@ func TestUnpack_Line(t *testing.T) {
 	})
 
 	t.Run("normal extern function ", func(t *testing.T) {
-		checkPrintf(t, TestCase{
-			code: `
+		test.CheckPrintf(t, test.TestCase{
+			Code: `
 			a, b = f()
 			println(a)
 			println(b)
 			`,
-			want: []string{
+			Want: []string{
 				"Undefined-#0[0](valid)",
 				"Undefined-#0[1](valid)",
 			},
@@ -63,15 +64,15 @@ func TestUnpack_Line(t *testing.T) {
 	})
 
 	t.Run("check variable ", func(t *testing.T) {
-		_CheckTestCase(t, TestCase{
-			code: `
+		test.CheckTestCase(t, test.TestCase{
+			Code: `
 		f = () => {
 			return 1, 2
 		}
 		c = f()
 		a, b = c
 		`,
-			want: []string{
+			Want: []string{
 				"Undefined-#4[0](valid)",
 				"Undefined-#4[1](valid)",
 			},

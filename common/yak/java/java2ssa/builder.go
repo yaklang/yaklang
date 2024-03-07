@@ -2,7 +2,7 @@ package java2ssa
 
 import (
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
-	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -11,32 +11,35 @@ import (
 type builder struct {
 	*ssa.FunctionBuilder
 
-	ast  javaparser.ICompilationUnitContext
-	prog *ssa.Program
+	ast javaparser.ICompilationUnitContext
 }
 
-func ParserSSA(src string) *ssa.Program {
-	lex := javaparser.NewJavaLexer(antlr.NewInputStream(src))
-	tokenStream := antlr.NewCommonTokenStream(lex, antlr.TokenDefaultChannel)
+func Build(src string, force bool, b *ssa.FunctionBuilder) error {
+	ast, err := frontend(src, force)
+	if err != nil {
+		return err
+	}
+	build := &builder{
+		FunctionBuilder: b,
+		ast:             ast,
+	}
+	build.VisitCompilationUnit(ast)
+	return nil
+}
+
+func frontend(src string, force bool) (javaparser.ICompilationUnitContext, error) {
+	errListener := antlr4util.NewErrorListener()
+	lexer := javaparser.NewJavaLexer(antlr.NewInputStream(src))
+	lexer.RemoveErrorListeners()
+	lexer.AddErrorListener(errListener)
+	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	parser := javaparser.NewJavaParser(tokenStream)
 	parser.RemoveErrorListeners()
-	parser.AddErrorListener(antlr4util.NewLegacyErrorListener())
-	prog := ssa.NewProgram()
-	build := &builder{
-		prog: prog, ast: parser.CompilationUnit(),
+	parser.AddErrorListener(errListener)
+	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
+	ast := parser.CompilationUnit()
+	if force || len(errListener.GetErrors()) == 0 {
+		return ast, nil
 	}
-	build.Build()
-	for _, r := range build.prog.GetErrors() {
-		log.Errorf("ssa-ir programe error: %s", r)
-	}
-	return build.prog
-}
-
-func (b *builder) Build() {
-	pkg := ssa.NewPackage("main")
-	b.prog.AddPackage(pkg)
-	main := pkg.NewFunction("main")
-	b.FunctionBuilder = ssa.NewBuilder(main, nil)
-	b.VisitCompilationUnit(b.ast)
-	b.Finish()
+	return nil, utils.Errorf("parse AST FrontEnd error : %v", errListener.GetErrors())
 }

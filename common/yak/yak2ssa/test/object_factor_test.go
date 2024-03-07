@@ -4,13 +4,14 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	test "github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 )
 
 func Test_ObjectFactor_Closure(t *testing.T) {
 
 	t.Run("free value", func(t *testing.T) {
-		checkPrintf(t, TestCase{
-			code: `
+		test.CheckPrintf(t, test.TestCase{
+			Code: `
 			f = (arg) => {
 				return arg["b"]
 			}
@@ -20,44 +21,44 @@ func Test_ObjectFactor_Closure(t *testing.T) {
 			}
 			println(f(a))
 			`,
-			want: []string{
+			Want: []string{
 				"Function-main$1(make(map[string]number),1)",
 			},
 		})
 	})
 
 	t.Run("free value, object is free-value", func(t *testing.T) {
-		checkPrintf(t, TestCase{
-			code: `
+		test.CheckPrintf(t, test.TestCase{
+			Code: `
 			a = {}
 			f = () => {
 				return a.b
 			}
 			println(f())
 			`,
-			want: []string{
+			Want: []string{
 				"Function-main$1(make(map[any]any),Undefined-#2.b(valid))",
 			},
 		})
 	})
 
 	t.Run("free value, object self", func(t *testing.T) {
-		checkPrintf(t, TestCase{
-			code: `
+		test.CheckPrintf(t, test.TestCase{
+			Code: `
 			a = {
 				"key": 1, 
 				"get": () => a.key, 
 			} 
 			println(a.get())
 			`,
-			want: []string{
+			Want: []string{
 				"Function-main$1(make(map[string]any),1)",
 			},
 		})
 	})
 
 	t.Run("side effect", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		f = (arg) => {
 			arg["b"] = 1 
 		} 
@@ -70,8 +71,8 @@ func Test_ObjectFactor_Closure(t *testing.T) {
 	})
 
 	t.Run("side effect, object is free-value", func(t *testing.T) {
-		checkPrintf(t, TestCase{
-			code: `
+		test.CheckPrintf(t, test.TestCase{
+			Code: `
 			a = {}
 			f = () => {
 				a.b = 1
@@ -80,7 +81,7 @@ func Test_ObjectFactor_Closure(t *testing.T) {
 			f()
 			println(a.b)
 			`,
-			want: []string{
+			Want: []string{
 				"Undefined-#2.b(valid)",
 				"side-effect(1, #4.b)",
 			},
@@ -88,8 +89,8 @@ func Test_ObjectFactor_Closure(t *testing.T) {
 	})
 
 	t.Run("side effect, self", func(t *testing.T) {
-		checkPrintf(t, TestCase{
-			code: `
+		test.CheckPrintf(t, test.TestCase{
+			Code: `
 			a = {
 				"key": 1, 
 				"set": (i) => {a.key = i}
@@ -98,7 +99,7 @@ func Test_ObjectFactor_Closure(t *testing.T) {
 			a.set(1)
 			println(a.key)
 			`,
-			want: []string{
+			Want: []string{
 				"1",
 				"side-effect(Parameter-i, #7.key)",
 			},
@@ -108,7 +109,7 @@ func Test_ObjectFactor_Closure(t *testing.T) {
 
 func Test_ObjectFactor_Type(t *testing.T) {
 	t.Run("normal", func(t *testing.T) {
-		checkFunctionReturnType(t, `
+		test.CheckFunctionReturnType(t, `
 		f = () => {
 			this = {
 				"key": 1, 
@@ -123,7 +124,7 @@ func Test_ObjectFactor_Type(t *testing.T) {
 	})
 
 	t.Run("normal, free-value", func(t *testing.T) {
-		checkFunctionReturnType(t, `
+		test.CheckFunctionReturnType(t, `
 		f = () => {
 			a = 1
 			this = {
@@ -139,7 +140,7 @@ func Test_ObjectFactor_Type(t *testing.T) {
 	})
 
 	t.Run("normal, side-effect", func(t *testing.T) {
-		checkFunctionReturnType(t, `
+		test.CheckFunctionReturnType(t, `
 		f = () => {
 			a = 1
 			this = {
@@ -155,7 +156,7 @@ func Test_ObjectFactor_Type(t *testing.T) {
 	})
 
 	t.Run("class, free value", func(t *testing.T) {
-		checkFunctionReturnType(t, `
+		test.CheckFunctionReturnType(t, `
 		f = () => {
 			this = {
 				"key": 1, 
@@ -169,7 +170,7 @@ func Test_ObjectFactor_Type(t *testing.T) {
 		)
 	})
 	t.Run("class, side effect", func(t *testing.T) {
-		checkFunctionReturnType(t, `
+		test.CheckFunctionReturnType(t, `
 		f = () => {
 			a = 1
 			this = {
@@ -184,7 +185,7 @@ func Test_ObjectFactor_Type(t *testing.T) {
 		)
 	})
 	t.Run("class, full", func(t *testing.T) {
-		checkFunctionReturnType(t, `
+		test.CheckFunctionReturnType(t, `
 		f = () => {
 			a = 1
 			this = {
@@ -202,7 +203,7 @@ func Test_ObjectFactor_Type(t *testing.T) {
 }
 func Test_ObjectFactor_SideEffect(t *testing.T) {
 	t.Run("normal", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		f = () => {
 			this = {
 				"key": 1, 
@@ -221,7 +222,7 @@ func Test_ObjectFactor_SideEffect(t *testing.T) {
 	})
 
 	t.Run("two object ", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		f = () => {
 			this = {
 				"key": 1, 
@@ -241,7 +242,7 @@ func Test_ObjectFactor_SideEffect(t *testing.T) {
 	})
 
 	t.Run("two object 2", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		f = () => {
 			this = {
 				"key": 1, 
@@ -264,8 +265,8 @@ func Test_ObjectFactor_SideEffect(t *testing.T) {
 
 func Test_ObjectFactor_FreeValue(t *testing.T) {
 	t.Run("normal", func(t *testing.T) {
-		checkPrintf(t, TestCase{
-			code: `
+		test.CheckPrintf(t, test.TestCase{
+			Code: `
 		f = ()=> {
 			this = {
 				"key": 1,
@@ -279,15 +280,15 @@ func Test_ObjectFactor_FreeValue(t *testing.T) {
 		println(target)
 
 		`,
-			want: []string{
+			Want: []string{
 				"Undefined-#12.get(valid)(Function-main$1(),Undefined-#12.key(valid))",
 			},
 		})
 	})
 
 	t.Run("two object", func(t *testing.T) {
-		checkPrintf(t, TestCase{
-			code: `
+		test.CheckPrintf(t, test.TestCase{
+			Code: `
 		f = ()=> {
 			this = {
 				"key": 1,
@@ -303,15 +304,15 @@ func Test_ObjectFactor_FreeValue(t *testing.T) {
 		println(target)
 
 		`,
-			want: []string{
+			Want: []string{
 				"Undefined-#14.get(valid)(Function-main$1(),Undefined-#14.key(valid))",
 			},
 		})
 	})
 
 	t.Run("two object 2", func(t *testing.T) {
-		checkPrintf(t, TestCase{
-			code: `
+		test.CheckPrintf(t, test.TestCase{
+			Code: `
 		f = ()=> {
 			this = {
 				"key": 1,
@@ -326,7 +327,7 @@ func Test_ObjectFactor_FreeValue(t *testing.T) {
 		println(target)
 
 		`,
-			want: []string{
+			Want: []string{
 				"Undefined-#12.get(valid)(Function-main$1(),Undefined-#12.key(valid))",
 			},
 		})
@@ -335,8 +336,8 @@ func Test_ObjectFactor_FreeValue(t *testing.T) {
 
 func Test_ObjectFactor_ALL(t *testing.T) {
 	t.Run("normal", func(t *testing.T) {
-		checkPrintf(t, TestCase{
-			code: `
+		test.CheckPrintf(t, test.TestCase{
+			Code: `
 			f= () => {
 				this = {
 					"key": 1, 
@@ -361,7 +362,7 @@ func Test_ObjectFactor_ALL(t *testing.T) {
 			a.set(3)
 			println(b.get())
 			`,
-			want: []string{
+			Want: []string{
 				"Undefined-#19.get(valid)(Function-main$1(),side-effect(Parameter-i, #14.key))",
 				"Undefined-#32.get(valid)(Function-main$1(),side-effect(Parameter-i, #14.key))",
 				"Undefined-#19.get(valid)(Function-main$1(),side-effect(Parameter-i, #14.key))",
@@ -373,8 +374,8 @@ func Test_ObjectFactor_ALL(t *testing.T) {
 
 func Test_Object_Assign(t *testing.T) {
 	t.Run("normal", func(t *testing.T) {
-		checkParameter(t, TestCase{
-			code: `
+		test.CheckParameter(t, test.TestCase{
+			Code: `
 		target = func(https, request) {
 			payloads = []
 			for payload in payloads {
@@ -388,13 +389,13 @@ func Test_Object_Assign(t *testing.T) {
 			}
 		}
 		`,
-			want: []string{"https", "request"},
+			Want: []string{"https", "request"},
 		})
 	})
 
 	t.Run("normal 2", func(t *testing.T) {
-		checkError(t, TestCase{
-			code: `
+		test.CheckError(t, test.TestCase{
+			Code: `
 		freq = fuzz.HTTPRequest("", fuzz.https(true))~
 		params = freq.GetCommonParams()
 		for i in params {
@@ -407,7 +408,7 @@ func Test_Object_Assign(t *testing.T) {
 			b = rsp.ResponseRaw
 		}
 		`,
-			want: []string{
+			Want: []string{
 				ssa.ValueUndefined("info"),
 				ssa.ValueUndefined("payload"),
 			},
