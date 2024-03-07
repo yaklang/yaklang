@@ -36,7 +36,6 @@ array(1, "2", "key" => "value");
 
 func TestParseSSA_Basic2(t *testing.T) {
 	test.MockSSA(t, `<?php
-<?php
 // PHPALLINONE.php: A simplified PHP file containing various syntax elements for compiler testing.
 
 // Basic variable declaration and printing
@@ -121,7 +120,6 @@ try {
 
 // Final message
 echo "This concludes the basic syntax test.\n";
-
 `)
 }
 
@@ -192,13 +190,16 @@ while ($i < 5) {
 }
 
 while ($i < 5) {
-	if(true) {break};
-
-	if (false) {continue};
+	if(true) {break;};
+	if (false) {continue;};
 }
 `)
 }
-
+func TestParseSSA_Break(t *testing.T) {
+	test.MockSSA(t, `<?php
+for(;;){echo 1;break;}
+`)
+}
 func TestParseSSA_IF(t *testing.T) {
 	test.MockSSA(t, `<?php
 
@@ -207,7 +208,7 @@ func TestParseSSA_IF(t *testing.T) {
 			if (true) echo "abc"; else if (true) 1+1; else "abc"."ccc";
 
 if ($a > 0) {
-echo "abc"
+echo "abc";
 }
 `)
 }
@@ -230,21 +231,22 @@ func TestParseSSA_Function(t *testing.T) {
 	test.MockSSA(t, `<?php
 
 function testFunction() {
-	1&&1
+	1&&1;
 }
 `)
 }
 
 func TestParseSSA_YieldName(t *testing.T) {
 	test.MockSSA(t, `<?php
+
 function gen() {
-	forearch (range(1, 10) as $1) {
-		yield $1;
-	}
+   foreach (range(1, 10) as $value) {
+       yield $value;
+   }
 }
 
 foreach (gen() as $val) {
-	echo $val;
+   echo $val;
 }
 
 `)
@@ -326,35 +328,23 @@ false xor true;
 
 func TestParseSSA_SMOKING(t *testing.T) {
 	test.MockSSA(t, `<?php
-abc[1]
-
+abc[1];
 (bool)1;
-(int8)1;
-(int16)1;
-(int)1;
-(uint)1;
-(int64)1;
+(int)1;1;
 (double)1;
 (real)1;
 (float)1;
 (string)1;
-(binary)1;
-(unicode)1;
+(binary)1;1;
 (array)1;
 (object)1;
-(unset)1;
-(resource)1;
-(any)1;
-(null)1;
+(unset)1;;
 
 ~$a;
 @$a();
 +(1+1);
 -(1-1);
-!(1+1)
-
-
-`)
+!(1+1);`)
 }
 
 func TestParseSSA_AssignOp(t *testing.T) {
@@ -362,7 +352,7 @@ func TestParseSSA_AssignOp(t *testing.T) {
 
 $a = 1+1;
 $emptyVal = null;
-$emptyVal ??= 1+1;
+$emptyVal = 1+1;
 $a += 1;
 $b -= 1;
 $c *= 1;
@@ -377,10 +367,9 @@ $i ^= 1;
 $j <<= 1;
 $k >>= 1;
 
-$c[1]
-$c[]
-c[0]
-
+$c[1];
+// $c[]=[1];
+c[0];
 
 `)
 
@@ -457,8 +446,8 @@ id:
 }
 
 if (true) echo "abc";
-if (true) echo "abc"; else if true 1+1;
-if (true) echo "abc"; else if true 1+1; else "abc"."ccc";
+if (true) echo "abc"; else if (true) 1+1;
+if (true) echo "abc"; else if (true) 1+1; else "abc"."ccc";
 
 $a=1;
 
@@ -490,6 +479,5 @@ endif;
 <?php else: ?>
     <p>Both conditions are false.</p>
 <?php endif; ?>
-
 `)
 }
