@@ -11,7 +11,7 @@ func TestOOP_1(t *testing.T) {
 package foo.bar;
 
 class A {
-	public key int;
+	public  int key;
 
 	public void foo() {
 	}

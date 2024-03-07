@@ -2,14 +2,14 @@ package tests
 
 import (
 	"embed"
-	"path/filepath"
+	"path"
 	"strings"
 	"testing"
 
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 )
 
-//go:embed code/***
+//go:embed code
 var codeFs embed.FS
 
 func TestJavaBasicParse_MockFile(t *testing.T) {
@@ -21,7 +21,7 @@ func TestJavaBasicParse_MockFile(t *testing.T) {
 		if f.IsDir() {
 			continue
 		}
-		path := filepath.Join("code", f.Name())
+		path := path.Join("code", f.Name())
 		if !strings.HasSuffix(path, ".java") {
 			continue
 		}
