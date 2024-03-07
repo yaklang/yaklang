@@ -303,6 +303,16 @@ func (f *FunctionBuilder) EmitMakeBuildWithType(typ Type, Len, Cap Value) *Make 
 	i := f.emitMake(nil, typ, nil, nil, nil, Len, Cap)
 	return i
 }
+
+func (f *FunctionBuilder) EmitNewClassBluePrint(memberCount int) *ClassBluePrint {
+	c := NewClassBluePrint()
+	containerLen := f.EmitConstInst(memberCount)
+	containerCap := f.EmitConstInst(memberCount)
+	this := f.EmitMakeBuildWithType(NewObjectType(), containerLen, containerCap)
+	c.SetThis(this)
+	return c
+}
+
 func (f *FunctionBuilder) EmitMakeWithoutType(Len, Cap Value) *Make {
 	return f.emitMake(nil, BasicTypes[AnyTypeKind], nil, nil, nil, Len, Cap)
 }
