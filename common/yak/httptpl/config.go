@@ -3,6 +3,8 @@ package httptpl
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -11,12 +13,13 @@ import (
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"strings"
 )
 
-type ResultCallback func(y *YakTemplate, reqBulk any /**YakRequestBulkConfig / YakNetworkBulkConfig*/, rsp any /*[]*lowhttp.LowhttpResponse / [][]byte*/, result bool, extractor map[string]interface{})
-type HTTPResultCallback func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{})
-type TCPResultCallback func(y *YakTemplate, reqBulk *YakNetworkBulkConfig, rsp []*NucleiTcpResponse, result bool, extractor map[string]interface{})
+type (
+	ResultCallback     func(y *YakTemplate, reqBulk any /**YakRequestBulkConfig / YakNetworkBulkConfig*/, rsp any /*[]*lowhttp.LowhttpResponse / [][]byte*/, result bool, extractor map[string]interface{})
+	HTTPResultCallback func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{})
+	TCPResultCallback  func(y *YakTemplate, reqBulk *YakNetworkBulkConfig, rsp []*NucleiTcpResponse, result bool, extractor map[string]interface{})
+)
 
 func HTTPResultCallbackWrapper(callback HTTPResultCallback) ResultCallback {
 	return func(y *YakTemplate, reqBulk any, rsp any, result bool, extractor map[string]interface{}) {
@@ -224,6 +227,7 @@ func WithBeforeSendPackage(f func(data []byte, isHttps bool) []byte) ConfigOptio
 		config.BeforeSendPackage = f
 	}
 }
+
 func WithResultCallback(f HTTPResultCallback) ConfigOption {
 	return func(config *Config) {
 		if config.Callback != nil {
@@ -299,7 +303,7 @@ func (c *Config) ExecuteTCPResultCallback(y *YakTemplate, bulk *YakNetworkBulkCo
 var defaultFilter = filter.NewFilter()
 
 func NewConfig(opts ...ConfigOption) *Config {
-	var c = &Config{
+	c := &Config{
 		ConcurrentInTemplates: 20,
 		ConcurrentTemplates:   20,
 		ConcurrentTarget:      10,
@@ -373,6 +377,7 @@ func (c *Config) GenerateYakTemplate() (chan *YakTemplate, error) {
 			}()
 
 			scriptFilter := filter.NewFilter()
+			defer scriptFilter.Close()
 			feedback := func(t *YakTemplate) {
 				if t == nil {
 					return

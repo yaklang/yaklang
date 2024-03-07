@@ -503,6 +503,7 @@ func init() {
 				isFile     bool
 			)
 			f := filter.NewFilter()
+			defer f.Close()
 			for rows.Next() {
 				err := rows.Scan(&payloadRaw, &isFile)
 				if err != nil {

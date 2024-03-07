@@ -361,6 +361,7 @@ func ParseCookie(i string) []*http.Cookie {
 func MergeCookies(cookies ...*http.Cookie) string {
 	req := &http.Request{Header: make(http.Header)}
 	f := filter.NewFilter()
+	defer f.Close()
 	for _, c := range cookies {
 		if f.Exist(c.String()) {
 			continue
@@ -669,7 +670,7 @@ func deflate(data []byte) ([]byte, error) {
 
 func _inflate(data []byte) ([]byte, error) {
 	r := flate.NewReader(io.MultiReader(bytes.NewReader(data), bytes.NewReader(TAIL)))
-	//r := flate.NewReader(bytes.NewReader(data))
+	// r := flate.NewReader(bytes.NewReader(data))
 
 	newData, err := ioutil.ReadAll(r)
 	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {

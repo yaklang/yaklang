@@ -3,6 +3,10 @@ package tools
 import (
 	"context"
 	"fmt"
+	"net"
+	"sync"
+	"time"
+
 	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/finscan"
@@ -10,19 +14,16 @@ import (
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/hostsparser"
-	"net"
-	"sync"
-	"time"
 )
 
 type _yakFinPortScanConfig struct {
-	//rulePath              string
-	//onlyUserRule          bool
-	//requestTimeout        time.Duration
-	//enableFingerprint     bool
+	// rulePath              string
+	// onlyUserRule          bool
+	// requestTimeout        time.Duration
+	// enableFingerprint     bool
 	outputFile       string
 	outputFilePrefix string
-	//fingerprintResultFile string
+	// fingerprintResultFile string
 	waiting         time.Duration
 	initFilterPorts string
 	initFilterHosts string
@@ -161,18 +162,21 @@ func _finScanOptOpenPortInitPortFilter(f string) finScanOpt {
 //		}
 //	}
 func _finscanDo(targetChan chan string, ports string, config *_yakFinPortScanConfig) (chan *finscan.FinScanResult, error) {
-
 	if targetChan == nil {
 		return nil, utils.Errorf("empty target")
 	}
 	newTargetChan, sampleTarget := filterTargetChannel(targetChan, config.IsFiltered)
 
-	var closeResult = make(chan *finscan.FinScanResult, 10000)
+	closeResult := make(chan *finscan.FinScanResult, 10000)
 
 	go func() {
-		defer close(closeResult)
+		var stringFilter *filter.StringFilter
 
 		defer func() {
+			close(closeResult)
+			config.excludePorts.Close()
+			stringFilter.Close()
+
 			if err := recover(); err != nil {
 				log.Errorf("fin failed: %v", err)
 			}
@@ -190,23 +194,21 @@ func _finscanDo(targetChan chan string, ports string, config *_yakFinPortScanCon
 		}
 		scanner, err := finscan.NewScanner(context.Background(), finScanConfig)
 		scanner.SetRateLimit(config.rateLimitDelayMs, config.rateLimitDelayGap)
-		//defer func() {
-		//	scanner.Close()
-		//}()
+
 		if err != nil {
 			log.Errorf("create fin scanner failed: %s", err)
 			return
 		}
 
 		log.Info("preparing for result collectors")
-		var openPortLock = new(sync.Mutex)
+		openPortLock := new(sync.Mutex)
 		var closePortCount int
 
 		log.Infof("start submit task and scan...")
 		uid := uuid.New().String()
 		hostsFilter := utils.NewHostsFilter()
 		portsFilter := utils.NewPortsFilter(ports)
-		stringFilter := filter.NewFilter()
+		stringFilter = filter.NewFilter()
 
 		hostsFilter.Add(config.initFilterHosts)
 		portsFilter.Add(config.initFilterPorts)
@@ -248,14 +250,12 @@ func _finscanDo(targetChan chan string, ports string, config *_yakFinPortScanCon
 				Port:   port,
 				Status: finscan.CLOSED_STATE,
 			}
-			//config.callCallback(result)
+			// config.callCallback(result)
 
 			select {
 			case closeResult <- result:
 			}
-
 		})
-
 		if err != nil {
 			log.Errorf("register finscan result handler failed: %s", err)
 			return

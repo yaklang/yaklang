@@ -2,6 +2,11 @@ package yakgrpc
 
 import (
 	"fmt"
+	"net/url"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
@@ -9,10 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/netutil"
 	"github.com/yaklang/yaklang/common/utils/pingutil"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"net/url"
-	"strings"
-	"sync"
-	"time"
 )
 
 func (s *Server) DiagnoseNetwork(req *ypb.DiagnoseNetworkRequest, server ypb.Yak_DiagnoseNetworkServer) error {
@@ -22,7 +23,7 @@ func (s *Server) DiagnoseNetwork(req *ypb.DiagnoseNetworkRequest, server ypb.Yak
 		timeout = 10 * time.Second
 	}
 
-	var addNetworkDiagnose = func(title string, diagnoseType string, desc string, level ...string) {
+	addNetworkDiagnose := func(title string, diagnoseType string, desc string, level ...string) {
 		// diagnose type:
 		// 1. route
 		// 2. network
@@ -39,21 +40,23 @@ func (s *Server) DiagnoseNetwork(req *ypb.DiagnoseNetworkRequest, server ypb.Yak
 			LogLevel:       loglevel,
 		})
 	}
-	var _addDiagnoseLog = func(level, message string) {
+	_addDiagnoseLog := func(level, message string) {
 		addNetworkDiagnose("diagnose-log", "log", message, level)
 	}
-	var info = func(message string) {
+	info := func(message string) {
 		_addDiagnoseLog("info", message)
 	}
-	var warning = func(message string) {
+	warning := func(message string) {
 		_addDiagnoseLog("warning", message)
 	}
 
-	var ipChannel = make(chan string, 1000)
-	var ipPortChannel = make(chan string, 1000)
-	var domainChannel = make(chan string, 1000)
+	ipChannel := make(chan string, 1000)
+	ipPortChannel := make(chan string, 1000)
+	domainChannel := make(chan string, 1000)
 
 	routeFilter := filter.NewFilter()
+	defer routeFilter.Close()
+
 	route := func(ip string, verbose ...string) {
 		if routeFilter.Exist(ip) {
 			return
@@ -97,9 +100,14 @@ func (s *Server) DiagnoseNetwork(req *ypb.DiagnoseNetworkRequest, server ypb.Yak
 
 	wg.Add(4)
 	defer wg.Wait()
+
 	go func() {
-		defer wg.Done()
 		f := filter.NewFilter()
+		defer func() {
+			wg.Done()
+			f.Close()
+		}()
+
 		for domain := range domainChannel {
 			if f.Exist(domain) {
 				continue
@@ -186,8 +194,11 @@ func (s *Server) DiagnoseNetwork(req *ypb.DiagnoseNetworkRequest, server ypb.Yak
 	}()
 
 	go func() {
-		defer wg.Done()
 		f := filter.NewFilter()
+		defer func() {
+			wg.Done()
+			f.Close()
+		}()
 		for ipPort := range ipPortChannel {
 			if f.Exist(ipPort) {
 				continue
@@ -224,7 +235,7 @@ func (s *Server) DiagnoseNetwork(req *ypb.DiagnoseNetworkRequest, server ypb.Yak
 		} else {
 			h = i
 		}
-		var params = make(map[string]any)
+		params := make(map[string]any)
 		params["origin"] = h
 		host, port, _ := utils.ParseStringToHostPort(h)
 		if port <= 0 {
@@ -247,9 +258,13 @@ func (s *Server) DiagnoseNetwork(req *ypb.DiagnoseNetworkRequest, server ypb.Yak
 	if req.GetDomain() != "" {
 		domainChannel <- req.GetDomain()
 	}
-	defer close(ipPortChannel)
-	defer close(domainChannel)
-	defer close(ipChannel)
+
+	defer func() {
+		close(ipPortChannel)
+		close(domainChannel)
+		close(ipChannel)
+	}()
+
 	return nil
 }
 
