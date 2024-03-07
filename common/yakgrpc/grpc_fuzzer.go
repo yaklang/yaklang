@@ -1142,6 +1142,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		errBuf.WriteString(retErr.Error())
 		errBuf.WriteString("\n")
 	}
+	errFilter.Close()
 
 	if errBuf.Len() > 0 {
 		task.Ok = false

@@ -377,15 +377,17 @@ func (s *Server) SavePayloadToFileStream(req *ypb.SavePayloadRequest, stream ypb
 		data     string
 		hitCount int64
 	}, 0)
-	filter := filter.NewFilter()
+	dataFilter := filter.NewFilter()
+	defer dataFilter.Close()
+
 	saveDataByFilter := func(s string, hitCount int64) error {
 		handledSize += int64(len(s))
 		if total < handledSize {
 			total = handledSize + 1
 		}
-		if !filter.Exist(s) {
+		if !dataFilter.Exist(s) {
 			filtered++
-			filter.Insert(s)
+			dataFilter.Insert(s)
 			data = append(data,
 				struct {
 					data     string
@@ -604,7 +606,8 @@ func (s *Server) RemoveDuplicatePayloads(req *ypb.NameRequest, stream ypb.Yak_Re
 		return err
 	}
 
-	filter := filter.NewFilter()
+	dataFilter := filter.NewFilter()
+	defer dataFilter.Close()
 
 	ProjectFolder := consts.GetDefaultYakitPayloadsDir()
 	newFilename := filepath.Join(ProjectFolder, fmt.Sprintf("%s_%s_new.txt", folder, group))
@@ -621,13 +624,13 @@ func (s *Server) RemoveDuplicatePayloads(req *ypb.NameRequest, stream ypb.Yak_Re
 		if total < handledSize {
 			total = handledSize + 1
 		}
-		if filter.Exist(line) {
+		if dataFilter.Exist(line) {
 			duplicate++
 			continue
 
 		}
 		filtered++
-		filter.Insert(line)
+		dataFilter.Insert(line)
 		if _, err := file.WriteLineString(line); err != nil {
 			return utils.Wrap(err, "write payload to file error")
 		}

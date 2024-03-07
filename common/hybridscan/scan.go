@@ -2,12 +2,13 @@ package hybridscan
 
 import (
 	"context"
+	"net"
+
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"net"
 )
 
 //func (h *HyperScanCenter) SyncScan(ctx context.Context, target, port string, shuffle bool) {
@@ -36,8 +37,9 @@ func (h *HyperScanCenter) Scan(
 	hostFilter := utils.NewHostsFilter(target)
 	portFilter := utils.NewPortsFilter(port)
 
-	//cacher := new(sync.Map)
+	// cacher := new(sync.Map)
 	addrFilter := filter.NewFilter()
+	defer addrFilter.Close()
 	err := h.synScanner.WaitOpenPortAsync(ctx, func(ip net.IP, port int) {
 		addr := utils.HostPort(ip.String(), port)
 		if addrFilter.Exist(addr) {

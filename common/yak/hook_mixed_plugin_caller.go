@@ -213,12 +213,14 @@ func NewMixPluginCaller() (*MixPluginCaller, error) {
 	resetFilterLock.Lock()
 	defer resetFilterLock.Unlock()
 	yaklib.AutoInitYakit()
+	webFilter := filter.NewFilter()
+	callerFilter := filter.NewFilter()
 	c := &MixPluginCaller{
-		websiteFilter:       filter.NewFilter(),
-		websitePathFilter:   filter.NewFilter(),
-		websiteParamsFilter: filter.NewFilter(),
-		rawQuestFilter:      filter.NewFilter(),
-		callers:             NewYakToCallerManager(),
+		websiteFilter:       webFilter,
+		websitePathFilter:   webFilter,
+		websiteParamsFilter: webFilter,
+		rawQuestFilter:      webFilter,
+		callers:             NewYakToCallerManager().WithDefaultFilter(callerFilter),
 		feedbackHandler: func(result *ypb.ExecResult) error {
 			return fmt.Errorf("feedback handler not set")
 		},
@@ -233,15 +235,16 @@ func NewMixPluginCaller() (*MixPluginCaller, error) {
 	return c, nil
 }
 
-func NewMixPluginCallerWithFilter(callerFilter *filter.StringFilter) (*MixPluginCaller, error) {
+func NewMixPluginCallerWithFilter(webFilter *filter.StringFilter) (*MixPluginCaller, error) {
 	resetFilterLock.Lock()
 	defer resetFilterLock.Unlock()
 	yaklib.AutoInitYakit()
+	callerFilter := filter.NewFilter()
 	c := &MixPluginCaller{
-		websiteFilter:       callerFilter,
-		websitePathFilter:   callerFilter,
-		websiteParamsFilter: callerFilter,
-		callers:             NewYakToCallerManager(),
+		websiteFilter:       webFilter,
+		websitePathFilter:   webFilter,
+		websiteParamsFilter: webFilter,
+		callers:             NewYakToCallerManager().WithDefaultFilter(callerFilter),
 		feedbackHandler: func(result *ypb.ExecResult) error {
 			return fmt.Errorf("feedback handler not set")
 		},
@@ -267,6 +270,8 @@ func (c *MixPluginCaller) SetConcurrent(i int) error {
 func (c *MixPluginCaller) Wait() {
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
+	defer c.websiteFilter.Close()
+
 	go func() {
 		defer wg.Done()
 
@@ -284,9 +289,12 @@ func (c *MixPluginCaller) Wait() {
 func (c *MixPluginCaller) ResetFilter() {
 	resetFilterLock.Lock()
 	defer resetFilterLock.Unlock()
-	c.websiteParamsFilter = filter.NewFilter()
-	c.websitePathFilter = filter.NewFilter()
-	c.websiteFilter = filter.NewFilter()
+	c.websiteFilter.Close()
+
+	webFilter := filter.NewFilter()
+	c.websiteParamsFilter = webFilter
+	c.websitePathFilter = webFilter
+	c.websiteFilter = webFilter
 }
 
 func (c *MixPluginCaller) FeedbackOrdinary(i interface{}) {

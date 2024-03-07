@@ -3,6 +3,9 @@ package tools
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"strings"
+
 	filter2 "github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
@@ -10,8 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/pingutil"
 	"github.com/yaklang/yaklang/common/utils/spacengine"
-	"reflect"
-	"strings"
 )
 
 // Scan servicescan 库使用的端口扫描类型的方式为全连接扫描，用于对连接目标进行精准的扫描，相比 synscan 库的单纯扫描，servicescan 库会尝试获取精确指纹信息以及 CPE 信息
@@ -79,7 +80,7 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 	outC := make(chan *fp.MatchResult)
 	go func() {
 		swg := utils.NewSizedWaitGroup(concurrent)
-		var portsInt = utils.ParseStringToPorts(port)
+		portsInt := utils.ParseStringToPorts(port)
 		for _, p := range portsInt {
 			for _, hRaw := range utils.ParseStringToHosts(host) {
 				h := utils.ExtractHost(hRaw)
@@ -142,6 +143,7 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 		}
 		go func() {
 			swg.Wait()
+			filter.Close()
 			close(outC)
 		}()
 	}()
@@ -167,7 +169,7 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 //
 // ```
 func _scanFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...fp.ConfigOption) (chan *fp.MatchResult, error) {
-	var synResults = make(chan *synscan.SynScanResult, 1000)
+	synResults := make(chan *synscan.SynScanResult, 1000)
 	portsInt := utils.ParseStringToPorts(ports)
 	go func() {
 		defer close(synResults)
@@ -177,12 +179,12 @@ func _scanFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...fp.
 				continue
 			}
 
-			var hostRaw, portRaw, _ = utils.ParseStringToHostPort(result.IP)
+			hostRaw, portRaw, _ := utils.ParseStringToHostPort(result.IP)
 			if portRaw > 0 {
 				synResults <- &synscan.SynScanResult{Host: hostRaw, Port: portRaw}
 			}
 
-			//log.Errorf("%v is alive", result.IP)
+			// log.Errorf("%v is alive", result.IP)
 			for _, port := range portsInt {
 				synResults <- &synscan.SynScanResult{
 					Host: result.IP,
@@ -220,7 +222,7 @@ func _scanFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...fp.
 //
 // ```
 func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.MatchResult, error) {
-	var synResults = make(chan *synscan.SynScanResult, 1000)
+	synResults := make(chan *synscan.SynScanResult, 1000)
 
 	// 生成扫描结果
 	go func() {
@@ -257,7 +259,6 @@ func _scanFromTargetStream(res interface{}, opts ...fp.ConfigOption) (chan *fp.M
 						Port: port,
 					}
 				}
-
 			}
 		case []*synscan.SynScanResult:
 			for _, r := range ret {

@@ -17,7 +17,49 @@ type StringFilter struct {
 	sync.Mutex
 	container   *cuckoo.Filter
 	conf        *Config
+	manager     *FilterManager
 	lastUpdated int64
+}
+
+var DefaultFilterManager = NewFilterManager(12, 1<<15, 80)
+
+type FilterManager struct {
+	size                       int
+	capacity                   int
+	filterPool                 *sync.Pool
+	filterEntries, filterTotal uint
+}
+
+func (m *FilterManager) DequeueFilter() *StringFilter {
+	return m.filterPool.Get().(*StringFilter)
+}
+
+func (m *FilterManager) EnqueueFilter(f *StringFilter) {
+	if f == nil {
+		return
+	}
+	f.Clear()
+	m.filterPool.Put(f)
+}
+
+func NewFilterManager(filterEntries, filterTotal uint, capacity int) *FilterManager {
+	m := &FilterManager{
+		capacity:      capacity,
+		filterEntries: filterEntries,
+		filterTotal:   filterTotal,
+	}
+	filterPool := &sync.Pool{
+		New: func() interface{} {
+			if m.size < m.capacity {
+				f := NewFilterWithSize(filterEntries, filterTotal)
+				f.manager = m
+				return f
+			}
+			return m.filterPool.Get()
+		},
+	}
+	m.filterPool = filterPool
+	return m
 }
 
 func (s *StringFilter) build(str string) []byte {
@@ -60,6 +102,16 @@ func NewStringFilter(config *Config, container *cuckoo.Filter) *StringFilter {
 	}
 }
 
+func NewFilter() *StringFilter {
+	return DefaultFilterManager.DequeueFilter()
+}
+
+func (f *StringFilter) Close() {
+	if f.manager != nil {
+		f.manager.EnqueueFilter(f)
+	}
+}
+
 // NewFilter 创建一个默认的字符串布谷鸟过滤器，布谷鸟过滤器用于判断一个元素是否在一个集合中，它存在极低的假阳性（即说存在的元素实际上不存在），通常这个集合中的元素数量非常大才会使用布谷鸟过滤器。
 // Example:
 // ```
@@ -67,7 +119,7 @@ func NewStringFilter(config *Config, container *cuckoo.Filter) *StringFilter {
 // f.Insert("hello")
 // f.Exist("hello") // true
 // ```
-func NewFilter() *StringFilter {
+func NoCacheNewFilter() *StringFilter {
 	filterConfig := NewDefaultConfig()
 	filterConfig.CaseSensitive = true
 	f := NewStringFilter(filterConfig, NewGenericCuckoo())

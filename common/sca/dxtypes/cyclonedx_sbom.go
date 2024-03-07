@@ -3,10 +3,11 @@ package dxtypes
 import (
 	"bytes"
 	"fmt"
+	"strings"
+
 	cdx "github.com/CycloneDX/cyclonedx-go"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/go-funk"
-	"strings"
 )
 
 func normalCyloneDXHashType(i string) (cdx.HashAlgorithm, bool) {
@@ -40,7 +41,7 @@ func normalCyloneDXHashType(i string) (cdx.HashAlgorithm, bool) {
 }
 
 func dxPackagesToCycloneDXComponent(pkgFilter *filter.StringFilter, pkgs []*Package) []cdx.Component {
-	var ret = make([]cdx.Component, 0, len(pkgs))
+	ret := make([]cdx.Component, 0, len(pkgs))
 	for _, pkg := range pkgs {
 		id := fmt.Sprintf("%v-%v", pkg.Name, pkg.Version)
 		if pkgFilter.Exist(id) {
@@ -67,7 +68,7 @@ func dxPackagesToCycloneDXComponent(pkgFilter *filter.StringFilter, pkgs []*Pack
 		}
 		var sub []cdx.Component
 		if pkg.DownStreamPackages != nil && len(pkg.DownStreamPackages) > 0 {
-			var downstream = make([]*Package, 0, len(pkg.DownStreamPackages))
+			downstream := make([]*Package, 0, len(pkg.DownStreamPackages))
 			for _, v := range pkg.DownStreamPackages {
 				downstream = append(downstream, v)
 			}
@@ -100,8 +101,9 @@ func dxPackagesToCycloneDXComponent(pkgFilter *filter.StringFilter, pkgs []*Pack
 
 func CreateCycloneDXSBOMByDXPackages(pkgs []*Package) *cdx.BOM {
 	bom := cdx.NewBOM()
-	filter := filter.NewFilter()
-	ret := dxPackagesToCycloneDXComponent(filter, pkgs)
+	f := filter.NewFilter()
+	defer f.Close()
+	ret := dxPackagesToCycloneDXComponent(f, pkgs)
 	bom.Components = &ret
 	return bom
 }

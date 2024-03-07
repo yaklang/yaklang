@@ -702,6 +702,7 @@ Host: ` + utils.HostPort(targetHost, targetPort) + `
 		}
 		log.Infof("url: %v payloads: %v", rsp.Url, rsp.Payloads)
 	}
+	payloadDiffFilter.Close()
 	if count != 30 {
 		t.Fatal("expect 30, got " + fmt.Sprint(count))
 	}

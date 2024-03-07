@@ -2,6 +2,12 @@ package core
 
 import (
 	"context"
+	"net"
+	"net/http"
+	"net/url"
+	"os"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/rpa/captcha"
@@ -9,11 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/rpa/web"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"net"
-	"net/http"
-	"net/url"
-	"os"
-	"strings"
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
@@ -111,7 +112,7 @@ func (m *Manager) init() error {
 	}
 	// log.Infof("timeout:%s", m.config.timeout)
 
-	//设置cookie
+	// 设置cookie
 	if len(m.config.cookie) > 0 {
 		m.Browser.SetCookies(m.config.cookie)
 	}
@@ -215,7 +216,6 @@ func (m *Manager) init() error {
 		if m.urlCount != 0 && m.hijacked.Count() >= int64(m.urlCount) {
 			m.rootCancel()
 		}
-
 	})
 
 	go func() {
@@ -291,7 +291,7 @@ func NewManager(urls string, ch chan RequestIf, opts ...ConfigOpt) (*Manager, er
 }
 
 func (m *Manager) Run() error {
-	defer m.CloseBrowser(m.Browser)
+	defer m.Release(m.Browser)
 	return m.RunContext(m.rootContext)
 }
 
@@ -322,7 +322,8 @@ func CleanupPage(page *rod.Page) {
 	log.Infof("clean page %s end.", page)
 }
 
-func (m *Manager) CloseBrowser(browser *rod.Browser) {
+func (m *Manager) Release(browser *rod.Browser) {
+	m.visited.Close()
 	err := browser.Close()
 	if err != nil && m.detailLog {
 		log.Errorf("clean up browser error: %s", err)

@@ -3,6 +3,11 @@ package tools
 import (
 	"context"
 	"fmt"
+	"net"
+	"os"
+	"sync"
+	"time"
+
 	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/hybridscan"
@@ -13,20 +18,16 @@ import (
 	"github.com/yaklang/yaklang/common/utils/hostsparser"
 	"github.com/yaklang/yaklang/common/utils/pcapfix"
 	"github.com/yaklang/yaklang/common/utils/pingutil"
-	"net"
-	"os"
-	"sync"
-	"time"
 )
 
 type _yakPortScanConfig struct {
-	//rulePath              string
-	//onlyUserRule          bool
-	//requestTimeout        time.Duration
-	//enableFingerprint     bool
+	// rulePath              string
+	// onlyUserRule          bool
+	// requestTimeout        time.Duration
+	// enableFingerprint     bool
 	outputFile       string
 	outputFilePrefix string
-	//fingerprintResultFile string
+	// fingerprintResultFile string
 	waiting         time.Duration
 	initFilterPorts string
 	initFilterHosts string
@@ -333,6 +334,7 @@ func _synScanDo(targetChan chan string, ports string, config *_yakPortScanConfig
 	if targetChan == nil {
 		return nil, utils.Error("empty target")
 	}
+	defer config.excludePorts.Close()
 
 	filteredTargetChan, sampleTarget := filterTargetChannel(targetChan, config.IsFiltered)
 
@@ -345,7 +347,6 @@ func _synScanDo(targetChan chan string, ports string, config *_yakPortScanConfig
 		if err != nil {
 			errChan <- err
 		}
-
 	}()
 
 	select {
@@ -398,7 +399,7 @@ func filterTargetChannel(targetChan chan string, filterFunc func(string, int) bo
 					}
 					newTargetChan <- result
 				} else if !hasLoopback { // 收取第一个本地回环目标，也仅收取一个
-					//newTargetChan <- result // 避免使用 loopback 网卡导致的源地址错误
+					// newTargetChan <- result // 避免使用 loopback 网卡导致的源地址错误
 					newTargetChan <- "127.0.0.1" // 避免使用 loopback 网卡导致的源地址错误
 					hasLoopback = true
 				}
@@ -436,8 +437,11 @@ func getSampleTarget(targetList []string) string {
 }
 
 func runScan(sampleTarget string, filteredTargetChan chan string, ports string, config *_yakPortScanConfig, openResult chan *synscan.SynScanResult) error {
-	var synScanOptions []synscan.ConfigOption
-	var err error
+	var (
+		synScanOptions []synscan.ConfigOption
+		err            error
+		stringFilter   *filter.StringFilter
+	)
 	if config.netInterface != "" {
 		synScanOptions, err = synscan.CreateConfigOptionsByIfaceName(config.netInterface)
 	} else {
@@ -453,7 +457,6 @@ func runScan(sampleTarget string, filteredTargetChan chan string, ports string, 
 	}
 
 	scanCenterConfig, err := hybridscan.NewDefaultConfigWithSynScanConfig(synScanConfig)
-
 	if err != nil {
 		return fmt.Errorf("default config failed: %w", err)
 	}
@@ -467,18 +470,20 @@ func runScan(sampleTarget string, filteredTargetChan chan string, ports string, 
 		return utils.Errorf("create hyper scan center failed: %s", err)
 	}
 
-	defer scanCenter.Close()
 	defer func() {
+		scanCenter.Close()
+		close(openResult)
+		stringFilter.Close()
+
 		if err := recover(); err != nil {
 			log.Errorf("syn failed: %v", err)
 		}
 	}()
-	defer close(openResult)
 
 	scanCenter.SetSynScanRateLimit(config.rateLimitDelayMs, config.rateLimitDelayGap)
 
 	log.Info("preparing for result collectors")
-	var openPortLock = new(sync.Mutex)
+	openPortLock := new(sync.Mutex)
 	var openPortCount int
 
 	// Output file
@@ -498,7 +503,7 @@ func runScan(sampleTarget string, filteredTargetChan chan string, ports string, 
 	uid := uuid.New().String()
 	hostsFilter := utils.NewHostsFilter()
 	portsFilter := utils.NewPortsFilter(ports)
-	stringFilter := filter.NewFilter()
+	stringFilter = filter.NewFilter()
 
 	hostsFilter.Add(config.initFilterHosts)
 	portsFilter.Add(config.initFilterPorts)
@@ -691,7 +696,7 @@ func _scan(target string, port string, opts ...scanOpt) (chan *synscan.SynScanRe
 // ```
 func _synscanFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...scanOpt) (chan *synscan.SynScanResult, error) {
 	config := &_yakPortScanConfig{
-		//requestTimeout: 5 * time.Second,
+		// requestTimeout: 5 * time.Second,
 		waiting:           5 * time.Second,
 		rateLimitDelayMs:  1,
 		rateLimitDelayGap: 5,

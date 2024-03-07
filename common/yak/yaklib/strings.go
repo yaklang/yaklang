@@ -541,7 +541,7 @@ var StringsExport = map[string]interface{}{
 	"ParamsGetOr":     ParamsGetOr,
 	"ToJsonIndentStr": toJsonIndentStr,
 
-	"NewFilter":            filter.NewFilter,
+	"NewFilter":            filter.NoCacheNewFilter,
 	"RemoveDuplicatePorts": filter.RemoveDuplicatePorts,
 	"FilterPorts":          filter.FilterPorts,
 

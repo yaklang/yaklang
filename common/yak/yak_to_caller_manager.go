@@ -215,6 +215,11 @@ func NewYakToCallerManager() *YakToCallerManager {
 	return &YakToCallerManager{table: new(sync.Map), baseWaitGroup: new(sync.WaitGroup), timeout: 10 * time.Second, ContextCancelFuncs: new(sync.Map)}
 }
 
+func (y *YakToCallerManager) WithDefaultFilter(filter *filter.StringFilter) *YakToCallerManager {
+	y.defaultFilter = filter
+	return y
+}
+
 func (m *YakToCallerManager) SetConcurrent(i int) error {
 	if m.swg != nil {
 		err := utils.Error("cannot set swg for YakToCallerManager: existed swg")
@@ -1319,6 +1324,7 @@ func (y *YakToCallerManager) CallPluginKeyByNameExWithAsync(forceSync bool, plug
 }
 
 func (y *YakToCallerManager) Wait() {
+	defer y.defaultFilter.Close()
 	if y.swg == nil {
 		return
 	}

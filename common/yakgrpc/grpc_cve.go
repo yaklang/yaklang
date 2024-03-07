@@ -4,6 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/cve/cvequeryops"
 	"github.com/yaklang/yaklang/common/cve/cveresources"
@@ -12,12 +19,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/progresswriter"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io"
-	"io/ioutil"
-	"os"
-	"strconv"
-	"strings"
-	"time"
 )
 
 func (s *Server) QueryCVE(ctx context.Context, req *ypb.QueryCVERequest) (*ypb.QueryCVEResponse, error) {
@@ -70,6 +71,7 @@ func (s *Server) GetCVE(ctx context.Context, req *ypb.GetCVERequest) (*ypb.CVEDe
 	cve.References = []byte(urlStr)
 	var cwes []*ypb.CWEDetail
 	f := filter.NewFilter()
+	defer f.Close()
 	for _, cwe := range utils.PrettifyListFromStringSplitEx(cve.CWE, "|", ",") {
 		if strings.HasPrefix(strings.ToLower(cwe), "cwe-") {
 			cwe = cwe[4:]
@@ -130,7 +132,6 @@ func (s *Server) IsCVEDatabaseReady(ctx context.Context, req *ypb.IsCVEDatabaseR
 }
 
 func (s *Server) UpdateCVEDatabase(req *ypb.UpdateCVEDatabaseRequest, stream ypb.Yak_UpdateCVEDatabaseServer) error {
-
 	const targetUrl = "https://cve-db.oss-cn-beijing.aliyuncs.com/default-cve.db.gzip"
 	info := func(progress float64, s string, items ...interface{}) {
 		var msg string
@@ -267,7 +268,7 @@ func (s *Server) UpdateCVEDatabase(req *ypb.UpdateCVEDatabaseRequest, stream ypb
 		return utils.Errorf("download db failed: %s", err)
 	}
 
-	fp, err := os.OpenFile(consts.GetCVEDatabaseGzipPath(), os.O_RDWR|os.O_CREATE, 0666)
+	fp, err := os.OpenFile(consts.GetCVEDatabaseGzipPath(), os.O_RDWR|os.O_CREATE, 0o666)
 	if err != nil {
 		return utils.Errorf("open gzip file failed: %s", err)
 	}
