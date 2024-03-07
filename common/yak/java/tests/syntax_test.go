@@ -1,47 +1,36 @@
 package tests
 
 import (
-	_ "embed"
-	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
+	"embed"
+	"path/filepath"
+	"strings"
 	"testing"
+
+	test "github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 )
 
-//go:embed allinone8.java
-var allinone8 string
+//go:embed code/***
+var codeFs embed.FS
 
-//go:embed allinone7.java
-var allinone7 string
-
-//go:embed allinone11.java
-var allinone11 string
-
-//go:embed allinone17.java
-var allinone17 string
-
-func TestJavaBasicParser_Java8(t *testing.T) {
-	errs := java2ssa.ParserSSA(allinone8).GetErrors()
-	if len(errs) > 0 {
-		t.Fatal(errs)
+func TestJavaBasicParse_MockFile(t *testing.T) {
+	entry, err := codeFs.ReadDir("code")
+	if err != nil {
+		t.Fatalf("no embed syntax files found: %v", err)
 	}
-}
-
-func TestJavaBasicParser_Java7(t *testing.T) {
-	errs := java2ssa.ParserSSA(allinone7).GetErrors()
-	if len(errs) > 0 {
-		t.Fatal(errs)
-	}
-}
-
-func TestJavaBasicParser_Java17(t *testing.T) {
-	errs := java2ssa.ParserSSA(allinone17).GetErrors()
-	if len(errs) > 0 {
-		t.Fatal(errs)
-	}
-}
-
-func TestJavaBasicParser_Java11(t *testing.T) {
-	errs := java2ssa.ParserSSA(allinone11).GetErrors()
-	if len(errs) > 0 {
-		t.Fatal(errs)
+	for _, f := range entry {
+		if f.IsDir() {
+			continue
+		}
+		path := filepath.Join("code", f.Name())
+		if !strings.HasSuffix(path, ".java") {
+			continue
+		}
+		raw, err := codeFs.ReadFile(path)
+		if err != nil {
+			t.Fatalf("cannot found syntax fs: %v", path)
+		}
+		t.Run(path, func(t *testing.T) {
+			test.MockSSA(t, string(raw))
+		})
 	}
 }

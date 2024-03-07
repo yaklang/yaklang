@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	test "github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 )
 
 func TestExternLibInClosure(t *testing.T) {
@@ -31,7 +32,7 @@ func TestExternLibInClosure(t *testing.T) {
 }
 
 func TestExternValue(t *testing.T) {
-	checkIsFunction := func(t *testing.T, tc TestCase) {
+	checkIsFunction := func(t *testing.T, tc test.TestCase) {
 		tc.ExternValue = map[string]any{
 			"println": func(v ...any) {},
 		}
@@ -45,20 +46,20 @@ func TestExternValue(t *testing.T) {
 				"target should all is function",
 			)
 		}
-		_CheckTestCase(t, tc)
+		test.CheckTestCase(t, tc)
 	}
 
 	t.Run("use normal", func(t *testing.T) {
-		checkIsFunction(t, TestCase{
-			code: `
+		checkIsFunction(t, test.TestCase{
+			Code: `
 			target = println
 			`,
 		})
 	})
 
 	t.Run("use in loop", func(t *testing.T) {
-		checkIsFunction(t, TestCase{
-			code: `
+		checkIsFunction(t, test.TestCase{
+			Code: `
 			for i=0; i<10;i++{
 				target = println
 			}
@@ -67,8 +68,8 @@ func TestExternValue(t *testing.T) {
 	})
 
 	t.Run("use in closure", func(t *testing.T) {
-		checkIsFunction(t, TestCase{
-			code: `
+		checkIsFunction(t, test.TestCase{
+			Code: `
 			f = () => {
 				target = println
 			}
@@ -77,8 +78,8 @@ func TestExternValue(t *testing.T) {
 	})
 
 	t.Run("use in closure can capture", func(t *testing.T) {
-		checkIsFunction(t, TestCase{
-			code: `
+		checkIsFunction(t, test.TestCase{
+			Code: `
 			target = println
 			f = () => {
 				target = println
@@ -87,7 +88,7 @@ func TestExternValue(t *testing.T) {
 		})
 	})
 
-	checkIsCover := func(t *testing.T, tc TestCase) {
+	checkIsCover := func(t *testing.T, tc test.TestCase) {
 		tc.ExternValue = map[string]any{
 			"println": func(v ...any) {},
 		}
@@ -104,8 +105,8 @@ func TestExternValue(t *testing.T) {
 	}
 
 	t.Run("cover normal", func(t *testing.T) {
-		checkIsCover(t, TestCase{
-			code: `
+		checkIsCover(t, test.TestCase{
+			Code: `
 			println = 1
 			target = println
 			`,
@@ -113,8 +114,8 @@ func TestExternValue(t *testing.T) {
 	})
 
 	t.Run("cover check in syntax block", func(t *testing.T) {
-		checkIsCover(t, TestCase{
-			code: `
+		checkIsCover(t, test.TestCase{
+			Code: `
 			println = 1
 			{
 				target = println
@@ -124,8 +125,8 @@ func TestExternValue(t *testing.T) {
 	})
 
 	t.Run("cover assign in syntax block", func(t *testing.T) {
-		checkIsFunction(t, TestCase{
-			code: `
+		checkIsFunction(t, test.TestCase{
+			Code: `
 			{
 				println = 1
 			}
@@ -135,8 +136,8 @@ func TestExternValue(t *testing.T) {
 	})
 
 	t.Run("cover in loop", func(t *testing.T) {
-		checkIsCover(t, TestCase{
-			code: `
+		checkIsCover(t, test.TestCase{
+			Code: `
 			println = 1
 			for i in 10{
 				target = println
@@ -147,7 +148,7 @@ func TestExternValue(t *testing.T) {
 }
 
 func TestExternLib(t *testing.T) {
-	checkIsExtern := func(t *testing.T, tc TestCase) {
+	checkIsExtern := func(t *testing.T, tc test.TestCase) {
 		tc.ExternLib = map[string]map[string]any{
 			"lib": map[string]any{
 				"method": func() {},
@@ -161,20 +162,20 @@ func TestExternLib(t *testing.T) {
 				return !v.IsFunction()
 			}), "println should all is function")
 		}
-		_CheckTestCase(t, tc)
+		test.CheckTestCase(t, tc)
 	}
 
 	t.Run("use normal", func(t *testing.T) {
-		checkIsExtern(t, TestCase{
-			code: `
+		checkIsExtern(t, test.TestCase{
+			Code: `
 			target = lib.method
 			`,
 		})
 	})
 
 	t.Run("use in loop", func(t *testing.T) {
-		checkIsExtern(t, TestCase{
-			code: `
+		checkIsExtern(t, test.TestCase{
+			Code: `
 			for i in 10 {
 				target = lib.method
 			}
@@ -183,8 +184,8 @@ func TestExternLib(t *testing.T) {
 	})
 
 	t.Run("use in closure", func(t *testing.T) {
-		checkIsExtern(t, TestCase{
-			code: `
+		checkIsExtern(t, test.TestCase{
+			Code: `
 			f = () => {
 				target = lib.method
 			}
@@ -193,8 +194,8 @@ func TestExternLib(t *testing.T) {
 	})
 
 	t.Run("use in closure, can capture method", func(t *testing.T) {
-		checkIsExtern(t, TestCase{
-			code: `
+		checkIsExtern(t, test.TestCase{
+			Code: `
 				target = lib.method
 				f = () => {
 					target = lib.method
@@ -204,8 +205,8 @@ func TestExternLib(t *testing.T) {
 	})
 
 	t.Run("use in closure, can capture lib", func(t *testing.T) {
-		checkIsExtern(t, TestCase{
-			code: `
+		checkIsExtern(t, test.TestCase{
+			Code: `
 				b = lib
 				f = () => {
 					target = lib.method
@@ -214,7 +215,7 @@ func TestExternLib(t *testing.T) {
 		})
 	})
 
-	checkIsCover := func(t *testing.T, tc TestCase) {
+	checkIsCover := func(t *testing.T, tc test.TestCase) {
 		tc.ExternLib = map[string]map[string]any{
 			"lib": map[string]any{
 				"method": func() {},
@@ -230,8 +231,8 @@ func TestExternLib(t *testing.T) {
 	}
 
 	t.Run("cover normal  ", func(t *testing.T) {
-		checkIsCover(t, TestCase{
-			code: `
+		checkIsCover(t, test.TestCase{
+			Code: `
 			lib.method = 1
 			target = lib.method
 			`,
@@ -239,8 +240,8 @@ func TestExternLib(t *testing.T) {
 	})
 
 	t.Run("cover assign in syntax block", func(t *testing.T) {
-		checkIsExtern(t, TestCase{
-			code: `
+		checkIsExtern(t, test.TestCase{
+			Code: `
 			{
 				lib.method = 1
 			}
@@ -250,8 +251,8 @@ func TestExternLib(t *testing.T) {
 	})
 
 	t.Run("cover check in syntax block", func(t *testing.T) {
-		checkIsCover(t, TestCase{
-			code: `
+		checkIsCover(t, test.TestCase{
+			Code: `
 			lib.method = 1
 			{
 				target = lib.method
@@ -261,8 +262,8 @@ func TestExternLib(t *testing.T) {
 	})
 
 	t.Run("cover check in loop", func(t *testing.T) {
-		checkIsCover(t, TestCase{
-			code: `
+		checkIsCover(t, test.TestCase{
+			Code: `
 			lib.method = 1
 			for i in 10{
 				target = lib.method
@@ -273,7 +274,7 @@ func TestExternLib(t *testing.T) {
 }
 
 func TestExternRef(t *testing.T) {
-	check := func(t *testing.T, tc TestCase) {
+	check := func(t *testing.T, tc test.TestCase) {
 		tc.ExternValue = map[string]any{
 			"println": func(v ...any) {},
 		}
@@ -282,12 +283,12 @@ func TestExternRef(t *testing.T) {
 				"method": func() {},
 			},
 		}
-		_CheckTestCase(t, tc)
+		test.CheckTestCase(t, tc)
 	}
 
 	t.Run("extern value", func(t *testing.T) {
-		check(t, TestCase{
-			code: `
+		check(t, test.TestCase{
+			Code: `
 			println("a")
 			println("a")
 			println("a")
@@ -307,8 +308,8 @@ func TestExternRef(t *testing.T) {
 	})
 
 	t.Run("extern lib", func(t *testing.T) {
-		check(t, TestCase{
-			code: `
+		check(t, test.TestCase{
+			Code: `
 			lib.method()
 			lib.method()
 			lib.method()

@@ -2,41 +2,41 @@ package php2ssa
 
 import (
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
-	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 type builder struct {
-	ast  phpparser.IHtmlDocumentContext
-	prog *ssa.Program
-	ir   *ssa.FunctionBuilder
+	ir *ssa.FunctionBuilder
 }
 
-func ParseSSA(src string, f func(builder *ssa.FunctionBuilder)) (prog *ssa.Program) {
-	lex := phpparser.NewPHPLexer(antlr.NewInputStream(src))
-	tokenStream := antlr.NewCommonTokenStream(lex, antlr.TokenDefaultChannel)
+func Build(src string, force bool, b *ssa.FunctionBuilder) error {
+	ast, err := frondEnd(src, force)
+	if err != nil {
+		return err
+	}
+	build := builder{
+		ir: b,
+	}
+	build.VisitHtmlDocument(ast)
+	return nil
+}
+
+func frondEnd(src string, force bool) (phpparser.IHtmlDocumentContext, error) {
+	errListener := antlr4util.NewErrorListener()
+	lexer := phpparser.NewPHPLexer(antlr.NewInputStream(src))
+	lexer.RemoveErrorListeners()
+	lexer.AddErrorListener(errListener)
+	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	parser := phpparser.NewPHPParser(tokenStream)
 	parser.RemoveErrorListeners()
-	parser.AddErrorListener(antlr4util.NewLegacyErrorListener())
-	program := ssa.NewProgram()
-	builder := &builder{
-		prog: program,
-		ast:  parser.HtmlDocument(),
+	parser.AddErrorListener(errListener)
+	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
+	ast := parser.HtmlDocument()
+	if force || len(errListener.GetErrors()) == 0 {
+		return ast, nil
 	}
-	builder.Build()
-	for _, r := range builder.prog.GetErrors() {
-		log.Errorf("ssa-ir program error: %v", r)
-	}
-	return builder.prog
-}
-
-func (y *builder) Build() {
-	pkg := ssa.NewPackage("main")
-	y.prog.AddPackage(pkg)
-	main := pkg.NewFunction("main")
-	y.ir = ssa.NewBuilder(main, nil)
-	y.VisitHtmlDocument(y.ast)
-	y.ir.Finish()
+	return nil, utils.Errorf("parse AST FrontEnd error : %v", errListener.GetErrors())
 }

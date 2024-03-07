@@ -1,19 +1,20 @@
 package tests
 
 import (
-	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
 	"testing"
+
+	test "github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 )
 
 func TestOOP_1(t *testing.T) {
-	java2ssa.ParserSSA(`
+	test.MockSSA(t, `
 package foo.bar;
 
 class A {
-	public key int a;
+	public key int;
 
 	public void foo() {
 	}
 }
-`).Show()
+`)
 }

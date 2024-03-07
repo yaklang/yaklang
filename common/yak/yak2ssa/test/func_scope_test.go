@@ -2,12 +2,14 @@ package test
 
 import (
 	"testing"
+
+	test "github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 )
 
 func TestClosure_FreeValue_Value(t *testing.T) {
 
 	t.Run("normal function", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		func a(){
 			a = 1
 			println(a)
@@ -19,7 +21,7 @@ func TestClosure_FreeValue_Value(t *testing.T) {
 	})
 
 	t.Run("closure function, only free-value, con't capture", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		f = () => {
 			println(a)
 		}
@@ -29,7 +31,7 @@ func TestClosure_FreeValue_Value(t *testing.T) {
 	})
 
 	t.Run("closure function, only free-value, can capture", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		a  = 1
 		f = () => {
 			println(a)
@@ -40,7 +42,7 @@ func TestClosure_FreeValue_Value(t *testing.T) {
 	})
 
 	t.Run("closure function, capture variable but in this function", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		f = () => {
 			a = 1
 			{
@@ -52,7 +54,7 @@ func TestClosure_FreeValue_Value(t *testing.T) {
 	})
 
 	t.Run("closure function, can capture parent-variable, use local variable, not same", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		a = 1
 		f = ()=>{
 			a := 1
@@ -63,7 +65,7 @@ func TestClosure_FreeValue_Value(t *testing.T) {
 	})
 
 	t.Run("closure function, side-effect, con't capture", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		f = () => {
 			a = 2
 			println(a)
@@ -75,7 +77,7 @@ func TestClosure_FreeValue_Value(t *testing.T) {
 	})
 
 	t.Run("closure function, side-effect, can capture", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		a = 1
 		f = () => {
 			a = 2
@@ -88,7 +90,7 @@ func TestClosure_FreeValue_Value(t *testing.T) {
 	})
 
 	t.Run("FreeValue self", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		a = () => {
 			a = 2
 		}
@@ -98,21 +100,21 @@ func TestClosure_FreeValue_Value(t *testing.T) {
 
 func TestClosure_FreeValue_Function(t *testing.T) {
 	t.Run("func capture value", func(t *testing.T) {
-		checkFreeValue(t, TestCase{
-			code: `
+		test.CheckFreeValue(t, test.TestCase{
+			Code: `
 		a = 1
 		f = () => {
 			b = a
 		}
 		target = f
 		`,
-			want: []string{"a"},
+			Want: []string{"a"},
 		})
 	})
 
 	t.Run("member capture value", func(t *testing.T) {
-		checkFreeValue(t, TestCase{
-			code: `
+		test.CheckFreeValue(t, test.TestCase{
+			Code: `
 		a = 1
 		b = {
 			"get": () => a
@@ -120,13 +122,13 @@ func TestClosure_FreeValue_Function(t *testing.T) {
 
 		target = b.get 
 		`,
-			want: []string{"a"},
+			Want: []string{"a"},
 		})
 	})
 
 	t.Run("func capture member", func(t *testing.T) {
-		checkParameter(t, TestCase{
-			code: ` 
+		test.CheckParameter(t, test.TestCase{
+			Code: ` 
 			a = {
 				"key": 1,
 			}
@@ -135,7 +137,7 @@ func TestClosure_FreeValue_Function(t *testing.T) {
 			}
 			target = f
 			`,
-			want: []string{
+			Want: []string{
 				"a",
 				"#5.key",
 			},
@@ -143,8 +145,8 @@ func TestClosure_FreeValue_Function(t *testing.T) {
 	})
 
 	t.Run("member capture member", func(t *testing.T) {
-		checkParameter(t, TestCase{
-			code: `
+		test.CheckParameter(t, test.TestCase{
+			Code: `
 			a = {
 				"key": 1, 
 			}
@@ -153,20 +155,20 @@ func TestClosure_FreeValue_Function(t *testing.T) {
 			}
 			target = b.get
 			`,
-			want: []string{"a", "#6.key"},
+			Want: []string{"a", "#6.key"},
 		})
 	})
 
 	t.Run("member capture member, self", func(t *testing.T) {
-		checkParameter(t, TestCase{
-			code: `
+		test.CheckParameter(t, test.TestCase{
+			Code: `
 			a = {
 				"key": 1, 
 				"get": () => a.key
 			}
 			target = a.get
 			`,
-			want: []string{
+			Want: []string{
 				"a", "#5.key",
 			},
 		})
@@ -175,36 +177,36 @@ func TestClosure_FreeValue_Function(t *testing.T) {
 
 func TestClosure_Mask(t *testing.T) {
 	t.Run("normal", func(t *testing.T) {
-		checkMask(t, TestCase{
-			code: `
+		test.CheckMask(t, test.TestCase{
+			Code: `
 			a = 1
 			f = () => {
 				a = 2
 			}
 			target = a
 			`,
-			want: []string{
+			Want: []string{
 				"2",
 			},
 		})
 	})
 
 	t.Run("closure function, freeValue and Mask", func(t *testing.T) {
-		checkMask(t, TestCase{
-			code: `
+		test.CheckMask(t, test.TestCase{
+			Code: `
 			a = 1
 			f = () => {
 				a = a + 2
 			}
 			target = a
 			`,
-			want: []string{"add(FreeValue-a, 2)"},
+			Want: []string{"add(FreeValue-a, 2)"},
 		})
 	})
 
 	// t.Run("object member", func(t *testing.T) {
-	// 	checkMask(t, TestCase{
-	// 		code: `
+	// 	test.CheckMask(t, test.TestCase{
+	// 		Code: `
 	// 		a = {
 	// 			"key": 1,
 	// 		}
@@ -213,33 +215,33 @@ func TestClosure_Mask(t *testing.T) {
 	// 		}
 	// 		target = a.key
 	// 		`,
-	// 		want: []string{"2"},
+	// 		Want: []string{"2"},
 	// 	})
 	// })
 
 	// t.Run("object member, not found", func(t *testing.T) {
-	// 	checkMask(t, TestCase{
-	// 		code: `
+	// 	test.CheckMask(t, test.TestCase{
+	// 		Code: `
 	// 	a = {}
 	// 	f = () => {
 	// 		a.key = 2
 	// 	}
 	// 	target = a.key
 	// 	`,
-	// 		want: []string{"2"},
+	// 		Want: []string{"2"},
 	// 	})
 	// })
 
 	// t.Run("object member, self", func(t *testing.T) {
-	// 	checkMask(t, TestCase{
-	// 		code: `
+	// 	test.CheckMask(t, test.TestCase{
+	// 		Code: `
 	// 		a = {
 	// 			"key": 1,
 	// 			"set": (i) => {a.key = i}
 	// 		}
 	// 		target = a.key
 	// 		`,
-	// 		want: []string{},
+	// 		Want: []string{},
 	// 	})
 	// })
 }
@@ -247,7 +249,7 @@ func TestClosure_Mask(t *testing.T) {
 func TestClosure_SideEffect(t *testing.T) {
 
 	t.Run("function modify value", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		a = 0 
 		b = () => {
 			a = 1
@@ -263,7 +265,7 @@ func TestClosure_SideEffect(t *testing.T) {
 	})
 
 	t.Run("func not modify value", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		f  = () =>{}
 		{
 			a = 1
@@ -285,7 +287,7 @@ func TestClosure_SideEffect(t *testing.T) {
 	})
 
 	t.Run("object member modify value", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		var b
 		get = () => ({
 			"change": i=>{b=i}	
@@ -299,7 +301,7 @@ func TestClosure_SideEffect(t *testing.T) {
 	})
 
 	t.Run("function modify object member", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		a =  {
 			"key": 1,
 		}
@@ -317,7 +319,7 @@ func TestClosure_SideEffect(t *testing.T) {
 	})
 
 	t.Run("function modify object member, not found", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		a =  {}
 		f = (i) => {
 			a.key = i
@@ -333,7 +335,7 @@ func TestClosure_SideEffect(t *testing.T) {
 	})
 
 	t.Run("member modify member", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		a = {
 			"key": 1, 
 		}
@@ -352,7 +354,7 @@ func TestClosure_SideEffect(t *testing.T) {
 	})
 
 	t.Run("object modify self", func(t *testing.T) {
-		checkPrintlnValue(`
+		test.CheckPrintlnValue(`
 		a = {
 			"key": 1,
 			"add": (i) => {a.key = i},
