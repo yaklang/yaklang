@@ -559,7 +559,7 @@ leftFieldMemberCall: '->' expression;
 leftSliceCall: '[' expression ']';
 
 leftVariable
-    : Dollar? VarName                                       # DynamicVariable// $$a= 1; 
+    : Dollar+ VarName                                       # DynamicVariable// $$a= 1; or $$$a=1;
     | VarName                                               # Variable// $a=3 
     | Dollar? OpenCurlyBracket expression CloseCurlyBracket # MemberCallVariable// ${"a"."b"}=3 
     ;

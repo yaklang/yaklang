@@ -1,9 +1,8 @@
 package tests
 
 import (
-	"testing"
-
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
+	"testing"
 )
 
 func TestExpression_DynamicVariable(t *testing.T) {
@@ -16,7 +15,17 @@ $$identifier = "Hello, dynamic!";
 
 	ssatest.MockSSA(t, code)
 }
+func TestExpression_DynamicVariable_2(t *testing.T) {
+	code := `<?php
+// Variable expression and dynamic variable expression
+$identifier = "dynamicVar";
+$dynamicVar = "test";
+$test="1";
+$$$identifier=123;
 
+echo $test;`
+	ssatest.MockSSA(t, code)
+}
 func TestExpressionAllInONE(t *testing.T) {
 	code := `<?php
 
