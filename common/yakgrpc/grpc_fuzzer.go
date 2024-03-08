@@ -720,6 +720,65 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_EtcHosts(req.GetEtcHosts()),
 			mutate.WithPoolOpt_NoSystemProxy(req.GetNoSystemProxy()),
 			mutate.WithPoolOpt_RequestCountLimiter(requestCount),
+			mutate.WithPoolOpt_MutateHook(func(raw []byte) [][]byte {
+				params := make(map[string][]string, 2)
+				oFreq, _ := mutate.NewFuzzHTTPRequest(raw)
+
+				for _, mm := range req.GetMutateMethods() {
+					if len(mm.GetValue()) == 0 {
+						continue
+					}
+					for _, kv := range mm.GetValue() {
+						name := mm.GetType() + "-" + kv.GetKey()
+						params[name] = append(params[name], kv.GetValue())
+					}
+					switch mm.GetType() {
+					case "Headers":
+						for _, hp := range oFreq.GetHeaderParams() {
+							name := mm.GetType() + "-" + hp.Name()
+							params[name] = append(params[name], hp.GetFirstValue())
+						}
+					case "Cookie":
+						for _, cp := range oFreq.GetCookieParams() {
+							name := mm.GetType() + "-" + cp.Name()
+							params[name] = append(params[name], cp.GetFirstValue())
+						}
+					case "Get":
+						for _, qp := range oFreq.GetGetQueryParams() {
+							name := mm.GetType() + "-" + qp.Name()
+							params[name] = append(params[name], qp.GetFirstValue())
+						}
+					case "Post":
+						for _, pp := range oFreq.GetPostCommonParams() {
+							name := mm.GetType() + "-" + pp.Name()
+							params[name] = append(params[name], pp.GetFirstValue())
+						}
+
+					}
+				}
+				var nReq mutate.FuzzHTTPRequestIf
+				nReq = oFreq
+				for key, vs := range params {
+					if strings.HasPrefix(key, "Headers-") {
+						key = strings.TrimPrefix(key, "Headers-")
+						nReq = nReq.FuzzHTTPHeader(key, vs)
+					} else if strings.HasPrefix(key, "Cookie-") {
+						key = strings.TrimPrefix(key, "Cookie-")
+						nReq = nReq.FuzzCookie(key, vs)
+					} else if strings.HasPrefix(key, "Get-") {
+						key = strings.TrimPrefix(key, "Get-")
+						nReq = nReq.FuzzGetParams(key, vs)
+					} else if strings.HasPrefix(key, "Post-") {
+						key = strings.TrimPrefix(key, "Post-")
+						nReq = nReq.FuzzPostParams(key, vs)
+					}
+				}
+				var results [][]byte
+				nReq.RequestMap(func(i []byte) {
+					results = append(results, i)
+				})
+				return results
+			}),
 		}
 
 		fuzzMode := req.GetFuzzTagMode() // ""/"close"/"standard"/"legacy"
