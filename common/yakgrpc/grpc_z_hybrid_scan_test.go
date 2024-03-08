@@ -282,10 +282,10 @@ func TestGRPCMUSTPASS_HybridScan_Stop_Smoking(t *testing.T) {
 		spew.Dump(rsp)
 	}
 	if !streamReturnCheck {
-		t.Fatal("stop hybridScan fail")
+		t.Fatal("return front fail")
 	}
 	sendStop = true             // 已经向前端发送停止信号,检查是否成功停止
-	time.Sleep(2 * time.Second) // 等待 2 秒,是否还有请求mock服务
+	time.Sleep(4 * time.Second) // 等待 4 秒,是否还有请求mock服务
 	if !check {
 		t.Fatal("stop hybridScan fail")
 	}
