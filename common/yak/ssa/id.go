@@ -27,7 +27,9 @@ func (p *Program) SetVirtualRegister(i Instruction) {
 	if p.IdToInstructionMap.Have(i) {
 		return
 	}
-	id := p.IdToInstructionMap.Len()
+	id, _, _ := p.IdToInstructionMap.Last()
+	id++
+	// id := p.IdToInstructionMap.Len()
 	i.SetId(id)
 	p.IdToInstructionMap.Set(id, i)
 
