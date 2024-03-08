@@ -1,8 +1,9 @@
 package test
 
 import (
-	"slices"
 	"testing"
+
+	"golang.org/x/exp/slices"
 
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
