@@ -24,7 +24,7 @@ func NewAstBuilder(functionBuilder *ssa.FunctionBuilder) *astbuilder {
 }
 
 func Build(src string, force bool, builder *ssa.FunctionBuilder) error {
-	ast, err := frontend(src, force)
+	ast, err := Frontend(src, force)
 	if err != nil {
 		return err
 	}
@@ -33,7 +33,7 @@ func Build(src string, force bool, builder *ssa.FunctionBuilder) error {
 	return nil
 }
 
-func frontend(src string, must bool) (*JS.ProgramContext, error) {
+func Frontend(src string, must bool) (*JS.ProgramContext, error) {
 	errListener := antlr4util.NewErrorListener()
 	lexer := JS.NewJavaScriptLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()
