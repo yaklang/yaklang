@@ -285,6 +285,7 @@ func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
 
 		SetMemberCall(para, key, new)
 
+		setMemberVerboseName(new)
 		return new
 	}
 
@@ -345,22 +346,35 @@ func (b *FunctionBuilder) getOriginMember(name string, typ Type, value, key Valu
 		}
 		SetMemberCall(value, key, undefine)
 	}
+	setMemberVerboseName(origin)
 	return origin
 }
 
-func GetKeyString(v Value) string {
-	if !v.IsMember() {
-		return ""
+func getMemberVerboseName(obj, key Value) string {
+	return fmt.Sprintf("%s.%s", obj.GetVerboseName(), GetKeyString(key))
+}
+func setMemberVerboseName(member Value) {
+	if !member.IsMember() {
+		return
 	}
+	text := getMemberVerboseName(member.GetObject(), member.GetKey())
+	member.SetVerboseName(text)
+}
 
-	key := v.GetKey()
+func GetKeyString(key Value) string {
 	text := ""
 	if ci, ok := ToConst(key); ok {
 		text = ci.String()
 	}
 	if text == "" {
-		list := strings.Split(*v.GetRange().SourceCode, ".")
-		text = list[len(list)-1]
+		text = key.GetVerboseName()
+	}
+
+	if text == "" {
+		if r := key.GetRange(); r != nil && r.SourceCode != nil {
+			list := strings.Split(*r.SourceCode, ".")
+			text = list[len(list)-1]
+		}
 	}
 	return text
 }

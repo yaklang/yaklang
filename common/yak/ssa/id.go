@@ -1,6 +1,10 @@
 package ssa
 
-import "github.com/yaklang/yaklang/common/utils"
+import (
+	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
+)
 
 func (p *Program) DeleteInstruction(i Instruction) {
 	// delete IdToInstructionMap
@@ -55,7 +59,9 @@ func (p *Program) SetInstructionWithName(name string, i Instruction) {
 		insts = make([]Instruction, 0, 1)
 		insts = append(insts, i)
 	}
-	i.SetVerboseName(name)
+	if !strings.Contains(name, ".") {
+		i.SetVerboseName(name)
+	}
 	p.NameToInstructions.Set(name, insts)
 }
 

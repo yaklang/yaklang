@@ -41,8 +41,8 @@ func TestUnpack_Line(t *testing.T) {
 		println(a)
 		println(b)
 		`, []string{
-			"Undefined-#4[0](valid)",
-			"Undefined-#4[1](valid)",
+			"Undefined-a(valid)",
+			"Undefined-b(valid)",
 		}, t)
 	})
 
@@ -54,8 +54,8 @@ func TestUnpack_Line(t *testing.T) {
 			println(b)
 			`,
 			Want: []string{
-				"Undefined-#0[0](valid)",
-				"Undefined-#0[1](valid)",
+				"Undefined-a(valid)",
+				"Undefined-b(valid)",
 			},
 			ExternValue: map[string]any{
 				"f": func() (int, int) { return 1, 2 },

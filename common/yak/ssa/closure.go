@@ -8,8 +8,9 @@ func (s *FunctionType) SetFreeValue(fv map[string]*Parameter) {
 
 // FunctionSideEffect is a side-effect in a closure
 type FunctionSideEffect struct {
-	Name   string
-	Modify Value
+	Name        string
+	VerboseName string
+	Modify      Value
 	// only call-side Scope > this Scope-level, this side-effect can be create
 	// Scope *Scope
 	Variable *Variable
@@ -35,6 +36,7 @@ func (f *Function) CheckAndSetSideEffect(variable *Variable, v Value) {
 			f.SideEffects = append(f.SideEffects, &FunctionSideEffect{
 				Modify:         v,
 				Name:           variable.GetName(),
+				VerboseName:    getMemberVerboseName(variable.object, variable.key),
 				Variable:       variable,
 				IsMemberCall:   true,
 				ParameterIndex: index,
