@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"gopkg.in/yaml.v3"
+	"net/url"
 	"strings"
 )
 
@@ -226,4 +228,115 @@ func (s *Server) PluginListGenerator(plugin *ypb.HybridScanPluginConfig, ctx con
 		}
 	}
 	return
+}
+
+type HTTPRequestBuilderRes struct {
+	IsHttps bool
+	Request []byte
+	Url     string
+}
+
+func (s Server) BuildHttpRequestPaket(baseBuilderParams *ypb.HTTPRequestBuilderParams, targetInput string) (chan *HTTPRequestBuilderRes, error) {
+	if baseBuilderParams == nil {
+		return nil, utils.Error("builderParams is nil")
+	}
+
+	builderRes := make(chan *HTTPRequestBuilderRes)
+
+	if baseBuilderParams.GetIsRawHTTPRequest() {
+		reqUrl, err := lowhttp.ExtractURLFromHTTPRequestRaw(baseBuilderParams.RawHTTPRequest, baseBuilderParams.IsHttps)
+		if err != nil {
+			return nil, err
+		}
+		go func() {
+			defer close(builderRes)
+			builderRes <- &HTTPRequestBuilderRes{
+				IsHttps: baseBuilderParams.IsHttps,
+				Request: baseBuilderParams.RawHTTPRequest,
+				Url:     reqUrl.String(),
+			}
+		}()
+		return builderRes, nil
+	}
+
+	if baseBuilderParams.GetIsHttpFlowId() {
+		_, flows, err := yakit.QueryHTTPFlow(s.GetProfileDatabase(), &ypb.QueryHTTPFlowRequest{
+			IncludeId: baseBuilderParams.GetHTTPFlowId(),
+		})
+		if err != nil {
+			return nil, err
+		}
+		go func() {
+			defer close(builderRes)
+			for _, flow := range flows {
+				builderRes <- &HTTPRequestBuilderRes{
+					IsHttps: flow.IsHTTPS,
+					Request: []byte(flow.Request),
+					Url:     flow.Url,
+				}
+			}
+		}()
+		return builderRes, nil
+	}
+
+	targets := make(chan *url.URL)
+	go func() {
+		defer close(targets)
+		for _, target := range utils.PrettifyListFromStringSplitEx(targetInput, "\n", "|", ",") {
+			target = strings.TrimSpace(target)
+			if target == "" {
+				continue
+			}
+			if utils.IsValidHost(target) { // 处理没有单独一个host情况 不含port
+				targets <- &url.URL{Host: target, Path: "/"}
+			}
+			urlIns := utils.ParseStringToUrl(target)
+			if urlIns.Host == "" {
+				continue
+			}
+
+			host, port, _ := utils.ParseStringToHostPort(urlIns.Host) // 处理包含 port 的情况
+			if !utils.IsValidHost(host) {                             // host不合规情况 比如 a:80
+				continue
+			}
+
+			if port > 0 && urlIns.Scheme == "" { // fix https
+				if port == 443 {
+					urlIns.Scheme = "https"
+				}
+			}
+			if urlIns.Path == "" {
+				urlIns.Path = "/"
+			}
+			targets <- urlIns
+		}
+	}()
+
+	go func() {
+		defer close(builderRes)
+		baseTemplates := []byte("GET {{Path}} HTTP/1.1\r\nHost: {{Hostname}}\r\n\r\n")
+
+		for target := range targets {
+			builderParams := mergeBuildParams(baseBuilderParams, target)
+			if builderParams == nil {
+				continue
+			}
+			builderResponse, err := s.HTTPRequestBuilder(context.Background(), builderParams)
+			if err != nil {
+				log.Errorf("failed to build http request: %v", err)
+			}
+			results := builderResponse.GetResults()
+			if len(results) <= 0 {
+				packet := bytes.ReplaceAll(baseTemplates, []byte(`{{Hostname}}`), []byte(target.Host))
+				packet = bytes.ReplaceAll(packet, []byte(`{{Path}}`), []byte(target.Path))
+				builderRes <- &HTTPRequestBuilderRes{IsHttps: target.Scheme == "https", Request: packet, Url: target.String()}
+			} else {
+				for _, result := range results {
+					packet := bytes.ReplaceAll(result.HTTPRequest, []byte(`{{Hostname}}`), []byte(target.Host))
+					builderRes <- &HTTPRequestBuilderRes{IsHttps: result.IsHttps, Request: packet, Url: target.String()}
+				}
+			}
+		}
+	}()
+	return builderRes, nil
 }

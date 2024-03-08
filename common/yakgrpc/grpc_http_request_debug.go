@@ -1,7 +1,6 @@
 package yakgrpc
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"net/url"
@@ -18,7 +17,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/cli"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
@@ -179,75 +177,81 @@ func (s *Server) execScriptWithRequest(scriptName string, targetInput string, st
 	}
 
 	var reqs []any
-	feed := func(req []byte, isHttps bool) {
+
+	BuildRes, err := s.BuildHttpRequestPaket(baseBuilderParams, targetInput)
+	if err != nil {
+		return utils.Wrapf(err, "build http request failed")
+	}
+
+	for packet := range BuildRes {
 		reqs = append(reqs, map[string]any{
-			"RawHTTPRequest": req,
-			"IsHttps":        isHttps,
+			"RawHTTPRequest": packet.Request,
+			"IsHttps":        packet.IsHttps,
 		})
 	}
 
-	var targets []*url.URL // build request targets
-	for _, target := range utils.PrettifyListFromStringSplitEx(targetInput, "\n", "|", ",") {
-		target = strings.TrimSpace(target)
-		if target == "" {
-			continue
-		}
-		if utils.IsValidHost(target) { // 处理没有单独一个host情况 不含port
-			targets = append(targets, &url.URL{Host: target, Path: "/"})
-		}
-		urlIns := utils.ParseStringToUrl(target)
-		if urlIns.Host == "" {
-			continue
-		}
-
-		host, port, _ := utils.ParseStringToHostPort(urlIns.Host) // 处理包含 port 的情况
-		if !utils.IsValidHost(host) {                             // host不合规情况 比如 a:80
-			continue
-		}
-
-		if port > 0 && urlIns.Scheme == "" { // fix https
-			if port == 443 {
-				urlIns.Scheme = "https"
-			}
-		}
-		if urlIns.Path == "" {
-			urlIns.Path = "/"
-		}
-
-		targets = append(targets, urlIns)
-
-	}
-
-	if len(targets) != 0 { // 调试目标分支
-
-		// var results = builderResponse.GetResults()
-		baseTemplates := []byte("GET {{Path}} HTTP/1.1\r\nHost: {{Hostname}}\r\n\r\n")
-
-		for _, target := range targets {
-			builderParams := mergeBuildParams(baseBuilderParams, target)
-			if builderParams == nil {
-				continue
-			}
-			builderResponse, err := s.HTTPRequestBuilder(stream.Context(), builderParams)
-			if err != nil {
-				log.Errorf("failed to build http request: %v", err)
-			}
-			results := builderResponse.GetResults()
-			if len(results) <= 0 {
-				packet := bytes.ReplaceAll(baseTemplates, []byte(`{{Hostname}}`), []byte(target.Host))
-				packet = bytes.ReplaceAll(packet, []byte(`{{Path}}`), []byte(target.Path))
-				feed(lowhttp.AppendAllHTTPPacketQueryParam(packet, target.Query()), target.Scheme == "https")
-			} else {
-				for _, result := range results {
-					packet := bytes.ReplaceAll(result.HTTPRequest, []byte(`{{Hostname}}`), []byte(target.Host))
-					feed(packet, result.IsHttps)
-				}
-			}
-		}
-
-	} else if baseBuilderParams.GetIsRawHTTPRequest() { // 原始请求分支
-		feed(baseBuilderParams.RawHTTPRequest, baseBuilderParams.IsHttps)
-	}
+	//var targets []*url.URL // build request targets
+	//for _, target := range utils.PrettifyListFromStringSplitEx(targetInput, "\n", "|", ",") {
+	//	target = strings.TrimSpace(target)
+	//	if target == "" {
+	//		continue
+	//	}
+	//	if utils.IsValidHost(target) { // 处理没有单独一个host情况 不含port
+	//		targets = append(targets, &url.URL{Host: target, Path: "/"})
+	//	}
+	//	urlIns := utils.ParseStringToUrl(target)
+	//	if urlIns.Host == "" {
+	//		continue
+	//	}
+	//
+	//	host, port, _ := utils.ParseStringToHostPort(urlIns.Host) // 处理包含 port 的情况
+	//	if !utils.IsValidHost(host) {                             // host不合规情况 比如 a:80
+	//		continue
+	//	}
+	//
+	//	if port > 0 && urlIns.Scheme == "" { // fix https
+	//		if port == 443 {
+	//			urlIns.Scheme = "https"
+	//		}
+	//	}
+	//	if urlIns.Path == "" {
+	//		urlIns.Path = "/"
+	//	}
+	//
+	//	targets = append(targets, urlIns)
+	//
+	//}
+	//
+	//if len(targets) != 0 { // 调试目标分支
+	//
+	//	// var results = builderResponse.GetResults()
+	//	baseTemplates := []byte("GET {{Path}} HTTP/1.1\r\nHost: {{Hostname}}\r\n\r\n")
+	//
+	//	for _, target := range targets {
+	//		builderParams := mergeBuildParams(baseBuilderParams, target)
+	//		if builderParams == nil {
+	//			continue
+	//		}
+	//		builderResponse, err := s.HTTPRequestBuilder(builderParams)
+	//		if err != nil {
+	//			log.Errorf("failed to build http request: %v", err)
+	//		}
+	//		results := builderResponse.GetResults()
+	//		if len(results) <= 0 {
+	//			packet := bytes.ReplaceAll(baseTemplates, []byte(`{{Hostname}}`), []byte(target.Host))
+	//			packet = bytes.ReplaceAll(packet, []byte(`{{Path}}`), []byte(target.Path))
+	//			feed(lowhttp.AppendAllHTTPPacketQueryParam(packet, target.Query()), target.Scheme == "https")
+	//		} else {
+	//			for _, result := range results {
+	//				packet := bytes.ReplaceAll(result.HTTPRequest, []byte(`{{Hostname}}`), []byte(target.Host))
+	//				feed(packet, result.IsHttps)
+	//			}
+	//		}
+	//	}
+	//
+	//} else if baseBuilderParams.GetIsRawHTTPRequest() { // 原始请求分支
+	//	feed(baseBuilderParams.RawHTTPRequest, baseBuilderParams.IsHttps)
+	//}
 
 	if len(reqs) <= 0 {
 		return utils.Error("build http request failed: no results")
