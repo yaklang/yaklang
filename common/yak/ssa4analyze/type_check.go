@@ -129,7 +129,7 @@ func (t *TypeCheck) TypeCheckUndefine(inst *ssa.Undefined) {
 		}
 
 		inst.NewError(ssa.Error, TypeCheckTAG,
-			InvalidField(objTyp.String(), ssa.GetKeyString(inst)),
+			InvalidField(objTyp.String(), ssa.GetKeyString(inst.GetKey())),
 		)
 	}
 }

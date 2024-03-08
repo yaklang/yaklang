@@ -83,6 +83,7 @@ func generalPhi(builder *FunctionBuilder, block *BasicBlock) func(name string, t
 		}
 		phi.GetProgram().SetVirtualRegister(phi)
 		phi.GetProgram().SetInstructionWithName(name, phi)
+		phi.SetVerboseName(t[0].GetVerboseName())
 		return phi
 	}
 }

@@ -139,16 +139,18 @@ func lineDisasm(v Instruction, liner DisasmLiner) (ret string) {
 	}()
 
 	switch v := v.(type) {
-	case *Function, *BasicBlock, *Parameter, *ExternLib:
+	case *Parameter:
 		return fmt.Sprintf("%s-%s", v.GetOpcode(), v.GetName())
+	case *Function, *BasicBlock, *ExternLib:
+		return fmt.Sprintf("%s-%s", v.GetOpcode(), v.GetVerboseName())
 	case *Undefined:
 		if v.Kind == UndefinedMemberValid {
-			return fmt.Sprintf("%s-%s(valid)", v.GetOpcode(), v.GetName())
+			return fmt.Sprintf("%s-%s(valid)", v.GetOpcode(), v.GetVerboseName())
 		}
-		return fmt.Sprintf("%s-%s", v.GetOpcode(), v.GetName())
+		return fmt.Sprintf("%s-%s", v.GetOpcode(), v.GetVerboseName())
 	case *Phi:
-		liner.SetName(v, v.GetName())
-		ret = fmt.Sprintf("phi(%s)[%s]", v.GetName(), DisasmValues(v.Edge))
+		liner.SetName(v, v.GetVerboseName())
+		ret = fmt.Sprintf("phi(%s)[%s]", v.GetVerboseName(), DisasmValues(v.Edge))
 		liner.DeleteName(v)
 		return ret
 	case *ConstInst:
@@ -171,8 +173,7 @@ func lineDisasm(v Instruction, liner DisasmLiner) (ret string) {
 		}
 		return fmt.Sprintf("%s(%s%s)", liner.DisasmValue(v.Method), arg, binding)
 	case *SideEffect:
-		// return fmt.Sprintf("side-effect(%s, %s, by %s)", liner.DisasmValue(v.Value), v.GetName(), liner.DisasmValue(v.CallSite))
-		return fmt.Sprintf("side-effect(%s, %s)", liner.DisasmValue(v.Value), v.GetName())
+		return fmt.Sprintf("side-effect(%s, %s)", liner.DisasmValue(v.Value), v.GetVerboseName())
 	case *Make:
 		return fmt.Sprintf("make(%s)", v.GetType())
 	case *Next:

@@ -132,6 +132,7 @@ func (c *Call) handleCalleeFunction() {
 
 			sideEffect := builder.EmitSideEffect(se.Name, c, se.Modify)
 			builder.AssignVariable(variable, sideEffect)
+			sideEffect.SetVerboseName(se.VerboseName)
 		}
 		recoverBuilder()
 	}

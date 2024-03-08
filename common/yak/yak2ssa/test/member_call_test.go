@@ -35,13 +35,13 @@ func TestMemberCallNegative(t *testing.T) {
 		test.CheckPrintlnValue(`
 		b = a
 		println(a.b)
-		`, []string{"Undefined-#0.b(valid)"}, t)
+		`, []string{"Undefined-b.b(valid)"}, t)
 	})
 
 	t.Run("expr is undefine, create right-now", func(t *testing.T) {
 		test.CheckPrintlnValue(`
 		println(a.b)
-		`, []string{"Undefined-#0.b(valid)"}, t)
+		`, []string{"Undefined-a.b(valid)"}, t)
 	})
 
 	t.Run("expr conn't be index", func(t *testing.T) {
@@ -49,7 +49,7 @@ func TestMemberCallNegative(t *testing.T) {
 		a = 1
 		println(a.b)
 		`, []string{
-			"Undefined-#0.b",
+			"Undefined-a.b",
 		}, t)
 	})
 
@@ -98,7 +98,7 @@ func TestMemberCallNegative(t *testing.T) {
 		v = {}
 		println(v.key)
 		`, []string{
-			"Undefined-#2.key(valid)",
+			"Undefined-v.key(valid)",
 		}, t)
 	})
 
@@ -107,7 +107,7 @@ func TestMemberCallNegative(t *testing.T) {
 		v = "111"
 		println(v[1])
 		`, []string{
-			"Undefined-#0[1](valid)",
+			"Undefined-v.1(valid)",
 		}, t,
 		)
 	})
@@ -133,10 +133,7 @@ func TestMemberCall_Negative_Closure(t *testing.T) {
 			}
 			`,
 			Want: []string{
-				"Undefined-#3.a(valid)",
-			},
-			ExternValue: map[string]any{
-				"println": func() {},
+				"Undefined-v.a(valid)",
 			},
 		})
 	})
@@ -159,7 +156,7 @@ func TestMemberCall_CheckField(t *testing.T) {
 		println(a.b)
 		a.b = 1
 		println(a.b)
-		`, []string{"Undefined-#2.b(valid)", "1"}, t)
+		`, []string{"Undefined-a.b(valid)", "1"}, t)
 	})
 
 	t.Run("assign", func(t *testing.T) {
@@ -170,7 +167,7 @@ func TestMemberCall_CheckField(t *testing.T) {
 		}
 		println(a.b)
 		`, []string{
-			"phi(#2.b)[1,Undefined-#2.b(valid)]",
+			"phi(a.b)[1,Undefined-a.b(valid)]",
 		}, t)
 	})
 
@@ -221,7 +218,7 @@ func TestMemberCall_Struct(t *testing.T) {
 		a = GetA()
 		println(a.AField)
 		`, []string{
-			"Undefined-#0.AField(valid)",
+			"Undefined-a.AField(valid)",
 		})
 	})
 
@@ -230,7 +227,7 @@ func TestMemberCall_Struct(t *testing.T) {
 		a = GetA()
 		println(a.UUUUUUU)
 		`, []string{
-			"Undefined-#0.UUUUUUU",
+			"Undefined-a.UUUUUUU",
 		})
 	})
 }
@@ -250,7 +247,7 @@ func TestMemberCall_Method(t *testing.T) {
 		a = getExample()
 		println(a.ExampleMethod)
 		`, []string{
-			"Undefined-#0.ExampleMethod(valid)",
+			"Undefined-a.ExampleMethod(valid)",
 		})
 	})
 }
@@ -293,7 +290,7 @@ func Test_CallMember_Cfg(t *testing.T) {
 		d = a.b
 		println(d)
 		`, []string{
-			"phi(#-1.b)[3,1]",
+			"phi(d)[3,1]",
 		}, t)
 	})
 
@@ -305,7 +302,7 @@ func Test_CallMember_Cfg(t *testing.T) {
 		}
 		println(a.b)
 		`, []string{
-			"phi(#2.b)[Undefined-#2.b(valid),1]",
+			"phi(a.b)[Undefined-a.b(valid),1]",
 		}, t)
 	})
 }

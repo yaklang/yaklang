@@ -176,8 +176,11 @@ func (c *ConstInst) String() string {
 
 // ----------- undefined
 func (u *Undefined) String() string {
-	if u.Kind == UndefinedMemberValid {
-		return fmt.Sprintf("%s = undefined-%s(valid)", getStr(u), u.GetName())
+	// if u.Kind == UndefinedMemberValid {
+	// 	return fmt.Sprintf("%s = undefined-%s(valid)", getStr(u), u.GetName())
+	// }
+	if u.IsMember() {
+		return fmt.Sprintf("%s = undefined-%s", getStr(u), u.GetVerboseName())
 	}
 	return fmt.Sprintf("%s = undefined-%s", getStr(u), u.GetName())
 }
@@ -191,7 +194,7 @@ func (p *Phi) String() string {
 		if utils.IsNil(v) {
 			continue
 		}
-		ret += fmt.Sprintf("[%s, %s] ", getStr(v), b.GetName())
+		ret += fmt.Sprintf("[%s, %s] ", getStr(v), b.GetVerboseName())
 	}
 	return ret
 }
@@ -265,7 +268,7 @@ func (c *Call) String() string {
 }
 
 func (s *SideEffect) String() string {
-	return fmt.Sprintf("%s = side-effect %s [%s] by %s", getStr(s), getStr(s.Value), s.GetName(), getStr(s.CallSite))
+	return fmt.Sprintf("%s = side-effect %s [%s] by %s", getStr(s), getStr(s.Value), s.GetVerboseName(), getStr(s.CallSite))
 }
 
 // ----------- Switch
