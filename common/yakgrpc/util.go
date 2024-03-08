@@ -102,6 +102,31 @@ func (s *YakOutputStreamerHelperWC) Close() (err error) {
 func appendPluginNames(params []*ypb.ExecParamItem, plugins ...string) ([]*ypb.ExecParamItem, func(), error) {
 	return appendPluginNamesEx("yakit-plugin-file", "|", params, plugins...)
 }
+
+func KVPairToParamItem(params []*ypb.KVPair) []*ypb.ExecParamItem {
+	var res = []*ypb.ExecParamItem{}
+	for _, i := range params {
+		res = append(res, &ypb.ExecParamItem{Key: i.Key, Value: i.Value})
+	}
+	return res
+}
+
+func ParamItemToKVPair(params []*ypb.ExecParamItem) []*ypb.KVPair {
+	var res = []*ypb.KVPair{}
+	for _, i := range params {
+		res = append(res, &ypb.KVPair{Key: i.Key, Value: i.Value})
+	}
+	return res
+}
+
+func appendPluginNamesExKVPair(key string, splitStr string, params []*ypb.KVPair, plugins ...string) ([]*ypb.KVPair, func(), error) {
+	item, f, err := appendPluginNamesEx(key, splitStr, KVPairToParamItem(params), plugins...)
+	if err != nil {
+		return nil, nil, err
+	}
+	return ParamItemToKVPair(item), f, nil
+}
+
 func appendPluginNamesEx(key string, splitStr string, params []*ypb.ExecParamItem, plugins ...string) ([]*ypb.ExecParamItem, func(), error) {
 	// handle plugin names
 	names := plugins
