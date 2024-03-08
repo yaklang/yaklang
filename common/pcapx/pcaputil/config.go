@@ -1,6 +1,7 @@
 package pcaputil
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -11,10 +12,12 @@ import (
 	"github.com/google/gopacket/pcapgo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -32,6 +35,8 @@ type CaptureConfig struct {
 	OverrideCacheId string
 
 	trafficPool *TrafficPool
+
+	wg *sync.WaitGroup
 
 	// TEST MOCK
 	mock PcapHandleOperation
@@ -215,21 +220,68 @@ func WithHTTPRequest(h func(flow *TrafficFlow, req *http.Request)) CaptureOption
 }
 
 func WithHTTPFlow(h func(flow *TrafficFlow, req *http.Request, rsp *http.Response)) CaptureOption {
+	runner := omap.NewOrderedMap(make(map[string]*sync.Once))
 	return withPool(func(pool *TrafficPool) {
+		pool._onHTTPFlow = h
 		pool.onFlowFrameDataFrameReassembled = append(pool.onFlowFrameDataFrameReassembled, func(flow *TrafficFlow, conn *TrafficConnection, frame *TrafficFrame) {
 			if len(frame.Payload) <= 0 {
 				return
 			}
 
-			if req, err := utils.ReadHTTPRequestFromBytes(frame.Payload); err == nil && utils.IsCommonHTTPRequestMethod(req) {
-				flow.StashHTTPRequest(req)
-			} else if rsp, err := utils.ReadHTTPResponseFromBytes(frame.Payload, nil); err == nil && strings.HasPrefix(rsp.Proto, "HTTP/") {
-				rsp.Request = flow.FetchStashedHTTPRequest()
-				h(flow, rsp.Request, rsp)
-				if rsp.Request == nil {
-					log.Warnf("no request found for response: %v %v", rsp.Proto, rsp.Status)
+			if !conn.IsMarkedAsHttpPacket() {
+				if _, err := utils.ReadHTTPRequestFromBytes(frame.Payload); err == nil {
+					flow.httpflowWg.Add(2)
+					if flow.ClientConn == conn {
+						flow.ClientConn.MarkAsHttpRequestConn(true)
+						flow.ServerConn.MarkAsHttpRequestConn(false)
+					} else {
+						flow.ClientConn.MarkAsHttpRequestConn(false)
+						flow.ServerConn.MarkAsHttpRequestConn(true)
+					}
+				} else if rsp, err := utils.ReadHTTPResponseFromBytes(frame.Payload, nil); err == nil && strings.HasPrefix(rsp.Proto, "HTTP/") {
+					flow.httpflowWg.Add(2)
+					if flow.ClientConn == conn {
+						flow.ClientConn.MarkAsHttpRequestConn(false)
+						flow.ServerConn.MarkAsHttpRequestConn(true)
+					} else {
+						flow.ClientConn.MarkAsHttpRequestConn(true)
+						flow.ServerConn.MarkAsHttpRequestConn(false)
+					}
 				}
 			}
+
+			if conn.IsMarkedAsHttpPacket() && !runner.Have(flow.Hash) {
+				// recognized http packet direction
+				once := new(sync.Once)
+				runner.Set(flow.Hash, once)
+				once.Do(func() {
+					go func() {
+						defer flow.httpflowWg.Done()
+						reader := bufio.NewReader(flow.ClientConn.reader)
+						for {
+							req, err := utils.ReadHTTPRequestFromBufioReader(reader)
+							if err != nil {
+								return
+							}
+							flow.StashHTTPRequest(req)
+							flow.AutoTriggerHTTPFlow(h)
+						}
+					}()
+					go func() {
+						defer flow.httpflowWg.Done()
+						reader := bufio.NewReader(flow.ServerConn.reader)
+						for {
+							req, err := utils.ReadHTTPResponseFromBufioReader(reader, nil)
+							if err != nil {
+								return
+							}
+							flow.StashHTTPResponse(req)
+							flow.AutoTriggerHTTPFlow(h)
+						}
+					}()
+				})
+			}
+
 		})
 	})
 }
@@ -303,5 +355,5 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 }
 
 func NewDefaultConfig() *CaptureConfig {
-	return &CaptureConfig{}
+	return &CaptureConfig{wg: new(sync.WaitGroup)}
 }

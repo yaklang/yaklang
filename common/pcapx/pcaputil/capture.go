@@ -44,7 +44,6 @@ func Start(opt ...CaptureOption) error {
 			return utils.Errorf("set option failed: %s", err)
 		}
 	}
-
 	var handlers = omap.NewOrderedMap(map[string]PcapHandleOperation{})
 	if conf.Filename != "" {
 		handler, err := OpenFile(conf.Filename)
@@ -104,9 +103,28 @@ func Start(opt ...CaptureOption) error {
 	defer func() {
 		log.Info("pcapx.utils.capture context done")
 		cancel()
+		conf.trafficPool.pool.Range(func(key, value any) bool {
+			flow, ok := value.(*TrafficFlow)
+			if !ok {
+				return true
+			}
+			if flow.requestQueue.Len() > 0 || flow.responseQueue.Len() > 0 {
+				if conf.trafficPool._onHTTPFlow == nil {
+					log.Warnf("unbalanced flow request/response flow: req[%v] rsp[%v]", flow.requestQueue.Len(), flow.responseQueue.Len())
+				} else {
+					flow.ForceShutdownConnection()
+					for flow.CanShiftHTTPFlow() {
+						req, rsp := flow.ShiftFlow()
+						conf.trafficPool._onHTTPFlow(flow, req, rsp)
+					}
+				}
+			}
+			return true
+		})
 	}()
 
 	conf.trafficPool = NewTrafficPool(ctx)
+	conf.trafficPool.captureConf = conf
 	for _, p := range conf.onPoolCreated {
 		p(conf.trafficPool)
 	}

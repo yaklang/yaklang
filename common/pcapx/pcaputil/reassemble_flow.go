@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/google/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"net/http"
 	"sync"
 	"time"
@@ -54,7 +55,10 @@ type TrafficFlow struct {
 	onDataFrameReassembled func(*TrafficFlow, *TrafficConnection, *TrafficFrame)
 	onDataFrameArrived     func(*TrafficFlow, *TrafficConnection, *TrafficFrame)
 
-	StashedHTTPRequest []*http.Request
+	httpflowMutex *sync.Mutex
+	httpflowWg    *sync.WaitGroup
+	requestQueue  *omap.OrderedMap[string, *http.Request]
+	responseQueue *omap.OrderedMap[string, *http.Response]
 }
 
 func (t *TrafficFlow) IsClosed() bool {
@@ -70,6 +74,36 @@ func (t *TrafficFlow) IsClosed() bool {
 		}
 		return false
 	}
+}
+
+func (t *TrafficFlow) ShiftFlow() (*http.Request, *http.Response) {
+	t.httpflowMutex.Lock()
+	defer t.httpflowMutex.Unlock()
+	req := t.requestQueue.Shift()
+	rsp := t.responseQueue.Shift()
+	return req, rsp
+}
+
+func (t *TrafficFlow) CanShiftHTTPFlow() bool {
+	t.httpflowMutex.Lock()
+	defer t.httpflowMutex.Unlock()
+	return t.requestQueue.Len() > 0 || t.responseQueue.Len() > 0
+}
+
+func (t *TrafficFlow) AutoTriggerHTTPFlow(h func(*TrafficFlow, *http.Request, *http.Response)) {
+	t.httpflowMutex.Lock()
+	defer t.httpflowMutex.Unlock()
+	if t.requestQueue.Len() > 0 && t.responseQueue.Len() > 0 {
+		req := t.requestQueue.Shift()
+		rsp := t.responseQueue.Shift()
+		h(t, req, rsp)
+	}
+}
+
+func (t *TrafficFlow) ForceShutdownConnection() {
+	t.ServerConn.Close()
+	t.ClientConn.Close()
+	t.httpflowWg.Wait()
 }
 
 func (t *TrafficFlow) String() string {
@@ -166,14 +200,13 @@ func (t *TrafficFlow) onCloseFlow(h func(reason TrafficFlowCloseReason, frame *T
 }
 
 func (t *TrafficFlow) StashHTTPRequest(req *http.Request) {
-	t.StashedHTTPRequest = append(t.StashedHTTPRequest, req)
+	t.httpflowMutex.Lock()
+	defer t.httpflowMutex.Unlock()
+	t.requestQueue.Push(req)
 }
 
-func (t *TrafficFlow) FetchStashedHTTPRequest() *http.Request {
-	if len(t.StashedHTTPRequest) > 0 {
-		req := t.StashedHTTPRequest[0]
-		t.StashedHTTPRequest = t.StashedHTTPRequest[1:]
-		return req
-	}
-	return nil
+func (t *TrafficFlow) StashHTTPResponse(rsp *http.Response) {
+	t.httpflowMutex.Lock()
+	defer t.httpflowMutex.Unlock()
+	t.responseQueue.Push(rsp)
 }
