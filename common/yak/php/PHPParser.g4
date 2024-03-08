@@ -559,9 +559,9 @@ leftFieldMemberCall: '->' expression;
 leftSliceCall: '[' expression ']';
 
 leftVariable
-    : Dollar+ identifier // $$a= 1;
-    | VarName            // $a=3
-    | Dollar+ OpenCurlyBracket expression CloseCurlyBracket // ${"a"."b"}=3
+    : Dollar? VarName                                       # DynamicVariable// $$a= 1; 
+    | VarName                                               # Variable// $a=3 
+    | Dollar? OpenCurlyBracket expression CloseCurlyBracket # MemberCallVariable// ${"a"."b"}=3 
     ;
 
 leftArrayCreation // PHP7.1+
