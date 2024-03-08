@@ -1,14 +1,16 @@
 package pcaputil
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"github.com/google/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"io"
 	"net"
+	"net/http"
 	"sort"
 	"sync"
 	"time"
@@ -29,9 +31,11 @@ type TrafficConnection struct {
 	initialed  bool
 	waitACK    bool
 
-	ctx        context.Context
-	cancel     context.CancelFunc
-	buf        *bytes.Buffer
+	ctx    context.Context
+	cancel context.CancelFunc
+	reader *utils.PipeReader
+	writer *utils.PipeWriter
+
 	remoteIP   net.IP
 	remoteAddr net.Addr
 	remotePort int
@@ -42,10 +46,33 @@ type TrafficConnection struct {
 	waitGroup []*futureFrame
 
 	Flow *TrafficFlow
+
+	initHttpPacketDirect bool
+	isHttpRequestConn    bool
+}
+
+func (t *TrafficConnection) MarkAsHttpRequestConn(b bool) {
+	if t.initHttpPacketDirect {
+		return
+	}
+	t.initHttpPacketDirect = true
+	t.isHttpRequestConn = b
+}
+
+func (t *TrafficConnection) IsMarkedAsHttpPacket() bool {
+	return t.initHttpPacketDirect
+}
+
+func (t *TrafficConnection) IsHttpRequestConn() bool {
+	return t.isHttpRequestConn
+}
+
+func (t *TrafficConnection) IsHttpResponseConn() bool {
+	return !t.isHttpRequestConn
 }
 
 func (t *TrafficConnection) Read(buf []byte) (int, error) {
-	return t.buf.Read(buf)
+	return t.reader.Read(buf)
 }
 
 func (t *TrafficConnection) String() string {
@@ -91,6 +118,8 @@ func (t *TrafficConnection) IsClosed() bool {
 
 func (t *TrafficConnection) Close() bool {
 	t.cancel()
+	t.reader.Close()
+	t.writer.Close()
 	return t.IsClosed()
 }
 
@@ -113,7 +142,7 @@ func (t *TrafficConnection) Write(b []byte, seq int64) (int, error) {
 		Connection: t,
 	})
 
-	n, err := t.buf.Write(b)
+	n, err := t.writer.Write(b)
 	if err != nil {
 		log.Errorf("write %v bytes to %v failed: %s", len(b), t.String(), err)
 		return n, err
@@ -312,16 +341,18 @@ func (p *TrafficPool) NewFlow(netType string, srcAddr, dstAddr string) (*Traffic
 	if err != nil {
 		return nil, utils.Errorf("parse [%v] to addr failed: %s", srcAddr, err)
 	}
-	var c2sBuffer bytes.Buffer
+	clientReader, clientWriter := utils.NewBufPipe(make([]byte, 0))
+	serverReader, serverWriter := utils.NewBufPipe(make([]byte, 0))
 	c2sConn := &TrafficConnection{
-		buf:        &c2sBuffer,
+		reader:     clientReader,
+		writer:     clientWriter,
 		remoteAddr: dst,
 		localAddr:  src,
 	}
-	var s2cBuffer bytes.Buffer
 	c2sConn.ctx, c2sConn.cancel = context.WithCancel(flowCtx)
 	s2cConn := &TrafficConnection{
-		buf:        &s2cBuffer,
+		reader:     serverReader,
+		writer:     serverWriter,
 		remoteAddr: src,
 		localAddr:  dst,
 	}
@@ -329,14 +360,18 @@ func (p *TrafficPool) NewFlow(netType string, srcAddr, dstAddr string) (*Traffic
 
 	// bind flow
 	flow := &TrafficFlow{
-		ClientConn:  c2sConn,
-		ServerConn:  s2cConn,
-		Index:       p.nextStream(),
-		ctx:         flowCtx,
-		cancel:      cancel,
-		pool:        p,
-		createdOnce: new(sync.Once),
-		closedOnce:  new(sync.Once),
+		ClientConn:    c2sConn,
+		ServerConn:    s2cConn,
+		Index:         p.nextStream(),
+		ctx:           flowCtx,
+		cancel:        cancel,
+		pool:          p,
+		createdOnce:   new(sync.Once),
+		closedOnce:    new(sync.Once),
+		httpflowMutex: new(sync.Mutex),
+		httpflowWg:    new(sync.WaitGroup),
+		requestQueue:  omap.NewOrderedMap(make(map[string]*http.Request)),
+		responseQueue: omap.NewOrderedMap(make(map[string]*http.Response)),
 	}
 	c2sConn.Flow = flow
 	s2cConn.Flow = flow
@@ -345,6 +380,6 @@ func (p *TrafficPool) NewFlow(netType string, srcAddr, dstAddr string) (*Traffic
 	return flow, nil
 }
 
-func (c *TrafficConnection) GetBuffer() *bytes.Buffer {
-	return c.buf
+func (c *TrafficConnection) GetBuffer() io.Reader {
+	return c.reader
 }

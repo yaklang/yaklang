@@ -723,6 +723,15 @@ func (s *OrderedMap[T, V]) Pop() V {
 		return v
 	}
 	var ret V
-	log.Errorf("pop failed: %v", s)
+	return ret
+}
+
+func (s *OrderedMap[T, V]) Shift() V {
+	key, v, ok := s.First()
+	if ok {
+		s.Delete(key)
+		return v
+	}
+	var ret V
 	return ret
 }
