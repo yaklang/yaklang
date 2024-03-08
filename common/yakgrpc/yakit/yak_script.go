@@ -544,8 +544,9 @@ func FilterYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) *gorm.DB {
 			db = db.Not("script_name IN (SELECT DISTINCT(yak_script_name) FROM plugin_groups)")
 		} else {
 			if len(params.Group.Group) > 0 {
-				db = db.Joins("left join plugin_groups P on yak_scripts.script_name = P.yak_script_name ")
-				db = bizhelper.ExactQueryStringArrayOr(db, "`group`", params.Group.Group)
+				db = db.Where("yak_scripts.script_name in  (select yak_script_name from plugin_groups where `group` in (?) )", params.Group.Group)
+				//db = db.Joins("left join plugin_groups P on yak_scripts.script_name = P.yak_script_name ")
+				//db = bizhelper.ExactQueryStringArrayOr(db, "`group`", params.Group.Group)
 			}
 		}
 	}
