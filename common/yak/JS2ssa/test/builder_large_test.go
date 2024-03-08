@@ -1,12 +1,15 @@
-package js2ssa
+package test
 
 import (
 	_ "embed"
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
-	"github.com/yaklang/yaklang/common/log"
-	JS "github.com/yaklang/yaklang/common/yak/antlr4JS/parser"
 	"testing"
 	"time"
+
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/log"
+	js2ssa "github.com/yaklang/yaklang/common/yak/JS2ssa"
+	JS "github.com/yaklang/yaklang/common/yak/antlr4JS/parser"
 )
 
 //go:embed test.js
@@ -56,3 +59,17 @@ func TestJS_ASTLargeText(t *testing.T) {
 	log.Infof("finish to build ast via parser")
 
 }
+
+func TestRealJsFrontEnd(t *testing.T) {
+	ast, err := js2ssa.Frontend(largeJS, false)
+	require.Nil(t, err)
+	_ = ast
+}
+
+// func TestRealJs(t *testing.T) {
+// 	prog, err := ssaapi.Parse(largeJS, ssaapi.WithLanguage(ssaapi.JS))
+// 	if err != nil {
+// 		t.Fatal("prog parse error", err)
+// 	}
+// 	_ = prog
+// }
