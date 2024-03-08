@@ -3,6 +3,7 @@ package pcaputil
 import (
 	"context"
 	"net"
+	"net/http"
 	"sort"
 	"strings"
 	"sync"
@@ -21,6 +22,7 @@ type TrafficPool struct {
 	pool               *sync.Map
 	ctx                context.Context
 	currentStreamIndex uint64
+	captureConf        *CaptureConfig
 
 	flowCache *utils.Cache[*TrafficFlow]
 
@@ -28,6 +30,9 @@ type TrafficPool struct {
 	onFlowClosed                    func(reason TrafficFlowCloseReason, flow *TrafficFlow)
 	onFlowFrameDataFrameArrived     []func(flow *TrafficFlow, conn *TrafficConnection, frame *TrafficFrame)
 	onFlowFrameDataFrameReassembled []func(flow *TrafficFlow, conn *TrafficConnection, frame *TrafficFrame)
+
+	// internal field, not for user
+	_onHTTPFlow func(flow *TrafficFlow, r *http.Request, response *http.Response)
 }
 
 func NewTrafficPool(ctx context.Context) *TrafficPool {
@@ -42,6 +47,14 @@ func NewTrafficPool(ctx context.Context) *TrafficPool {
 	})
 	pool.flowCache = fCache
 	return pool
+}
+
+func (p *TrafficPool) AddWaitGroupDelta(delta int) {
+	p.captureConf.wg.Add(delta)
+}
+
+func (p *TrafficPool) Done() {
+	p.captureConf.wg.Done()
 }
 
 func (p *TrafficPool) nextStream() uint64 {
