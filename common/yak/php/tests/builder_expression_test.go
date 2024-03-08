@@ -1,6 +1,21 @@
-package php2ssa
+package tests
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
+)
+
+func TestExpression_DynamicVariable(t *testing.T) {
+	code := `<?php
+
+// Variable expression and dynamic variable expression
+$identifier = "dynamicVar";
+$$identifier = "Hello, dynamic!";
+`
+
+	ssatest.MockSSA(t, code)
+}
 
 func TestExpressionAllInONE(t *testing.T) {
 	code := `<?php
@@ -111,4 +126,5 @@ $logicalXorSimple = $a xor $b;
 echo "Script execution completed.\n";
 `
 	_ = code
+	// ssatest.MockSSA(t, code)
 }
