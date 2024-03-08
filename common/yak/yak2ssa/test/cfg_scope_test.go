@@ -322,7 +322,7 @@ func TestYaklangBasic_variable_logical(t *testing.T) {
 		a = 1 || 2 
 		println(a)`,
 			[]string{
-				"phi(1||2)[1,2]",
+				"phi(a)[1,2]",
 			}, t)
 	})
 
@@ -334,7 +334,7 @@ func TestYaklangBasic_variable_logical(t *testing.T) {
 		}
 		a()
 		`, []string{
-			"phi(1||2)[1,2]",
+			"phi(t)[1,2]",
 		}, t)
 	})
 }

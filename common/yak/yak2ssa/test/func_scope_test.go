@@ -139,7 +139,7 @@ func TestClosure_FreeValue_Function(t *testing.T) {
 			`,
 			Want: []string{
 				"a",
-				"#5.key",
+				"#6.key",
 			},
 		})
 	})
@@ -155,7 +155,7 @@ func TestClosure_FreeValue_Function(t *testing.T) {
 			}
 			target = b.get
 			`,
-			Want: []string{"a", "#6.key"},
+			Want: []string{"a", "#7.key"},
 		})
 	})
 
@@ -169,7 +169,7 @@ func TestClosure_FreeValue_Function(t *testing.T) {
 			target = a.get
 			`,
 			Want: []string{
-				"a", "#5.key",
+				"a", "#6.key",
 			},
 		})
 	})
@@ -314,7 +314,7 @@ func TestClosure_SideEffect(t *testing.T) {
 		println(a.key) // parameter-i
 		`, []string{
 			"1",
-			"side-effect(Parameter-i, #6.key)",
+			"side-effect(Parameter-i, a.key)",
 		}, t)
 	})
 
@@ -329,8 +329,8 @@ func TestClosure_SideEffect(t *testing.T) {
 		f(2) 
 		println(a.key) // parameter-i
 		`, []string{
-			"Undefined-#2.key(valid)",
-			"side-effect(Parameter-i, #5.key)",
+			"Undefined-a.key(valid)",
+			"side-effect(Parameter-i, a.key)",
 		}, t)
 	})
 
@@ -349,7 +349,7 @@ func TestClosure_SideEffect(t *testing.T) {
 		println(a.key)
 		`, []string{
 			"1",
-			"side-effect(Parameter-i, #8.key)",
+			"side-effect(Parameter-i, a.key)",
 		}, t)
 	})
 
@@ -364,7 +364,7 @@ func TestClosure_SideEffect(t *testing.T) {
 		println(a.key)
 		`, []string{
 			"1",
-			"side-effect(Parameter-i, #7.key)",
+			"side-effect(Parameter-i, a.key)",
 		}, t)
 	})
 }
