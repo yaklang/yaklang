@@ -60,6 +60,10 @@ func (s *Server) PortScan(req *ypb.PortScanRequest, stream ypb.Yak_PortScanServe
 	tmpTargetFile.Close()
 	defer os.RemoveAll(tmpTargetFile.Name())
 
+	if len(req.ScriptNames) > 0 {
+		reqParams.LinkPluginConfig.PluginNames = append(reqParams.LinkPluginConfig.PluginNames, req.ScriptNames...)
+	}
+
 	reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
 		Key:   "target-file",
 		Value: tmpTargetFile.Name(),
