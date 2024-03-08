@@ -418,7 +418,7 @@ type HybridScanTarget struct {
 func (s *Server) TargetGenerator(ctx context.Context, targetConfig *ypb.HybridScanInputTarget) (chan *HybridScanTarget, error) {
 	// handle target
 	outTarget := make(chan *HybridScanTarget)
-	buildRes, err := s.BuildHttpRequestPaket(targetConfig.GetHTTPRequestTemplate(), targetConfig.GetInput())
+	buildRes, err := s.BuildHttpRequestPacket(targetConfig.GetHTTPRequestTemplate(), targetConfig.GetInput())
 	if err != nil {
 		return nil, err
 	}
