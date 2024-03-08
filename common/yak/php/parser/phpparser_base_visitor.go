@@ -511,7 +511,15 @@ func (v *BasePHPParserVisitor) VisitLeftSliceCall(ctx *LeftSliceCallContext) int
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitLeftVariable(ctx *LeftVariableContext) interface{} {
+func (v *BasePHPParserVisitor) VisitDynamicVariable(ctx *DynamicVariableContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitVariable(ctx *VariableContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitMemberCallVariable(ctx *MemberCallVariableContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

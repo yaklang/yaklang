@@ -991,22 +991,17 @@ func (y *builder) VisitLeftVariable(raw phpparser.ILeftVariableContext) *ssa.Var
 	if y == nil || raw == nil {
 		return nil
 	}
-	variableDescription, ok := raw.(*phpparser.LeftVariableContext)
-	if !ok {
-		return nil
-	}
+
 	var variable ssa.Value
-	if variableDescription.VarName() != nil {
-		variable = y.ir.ReadOrCreateVariable(variableDescription.VarName().GetText())
-	} else if variableDescription.Identifier() != nil {
-		dollarCount := len(variableDescription.AllDollar())
-		variable = y.ir.ReadOrCreateVariable("$" + variableDescription.Identifier().GetText())
-		for i := 0; i < dollarCount; i++ {
-			log.Warnf("$$ref unhandled")
-		}
-	} else {
-		val := y.VisitExpression(variableDescription.Expression())
-		log.Errorf("${expr} variable unhandled")
+	switch stmt := raw.(type) {
+	case *phpparser.VariableContext:
+		variable = y.ir.ReadOrCreateVariable(stmt.VarName().GetText())
+
+	case *phpparser.DynamicVariableContext:
+		// TODO: handler DynamicVariable
+		variable = y.ir.ReadOrCreateVariable("$" + stmt.VarName().GetText())
+	case *phpparser.MemberCallVariableContext:
+		val := y.VisitExpression(stmt.Expression())
 		variable = y.ir.ReadOrCreateVariable(val.GetVerboseName())
 	}
 	return variable.GetLastVariable()

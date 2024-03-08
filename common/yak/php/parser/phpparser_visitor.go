@@ -385,8 +385,14 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#leftSliceCall.
 	VisitLeftSliceCall(ctx *LeftSliceCallContext) interface{}
 
-	// Visit a parse tree produced by PHPParser#leftVariable.
-	VisitLeftVariable(ctx *LeftVariableContext) interface{}
+	// Visit a parse tree produced by PHPParser#DynamicVariable.
+	VisitDynamicVariable(ctx *DynamicVariableContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#Variable.
+	VisitVariable(ctx *VariableContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#MemberCallVariable.
+	VisitMemberCallVariable(ctx *MemberCallVariableContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#leftArrayCreation.
 	VisitLeftArrayCreation(ctx *LeftArrayCreationContext) interface{}
