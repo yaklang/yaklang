@@ -723,6 +723,25 @@ func (f *FuzzHTTPRequest) GetCookieParams() []*FuzzHTTPRequestParam {
 	return params
 }
 
+func (f *FuzzHTTPRequest) GetCookieParamsByName(name string) *FuzzHTTPRequestParam {
+	req, err := f.GetOriginHTTPRequest()
+	if err != nil {
+		return nil
+	}
+
+	for _, k := range req.Cookies() {
+		if k.Name == name {
+			return &FuzzHTTPRequestParam{
+				typePosition:     posCookie,
+				param:            k.Name,
+				paramOriginValue: []string{k.Value},
+				origin:           f,
+			}
+		}
+	}
+	return nil
+}
+
 func (f *FuzzHTTPRequest) GetPathAppendParams() []*FuzzHTTPRequestParam {
 	return []*FuzzHTTPRequestParam{{
 		typePosition:     posPathAppend,
@@ -779,6 +798,27 @@ func (f *FuzzHTTPRequest) GetCommonParams() []*FuzzHTTPRequestParam {
 	ret = append(ret, f.GetCookieParams()...)
 
 	return ret
+}
+
+func (f *FuzzHTTPRequest) GetPostCommonParams() []*FuzzHTTPRequestParam {
+	postParams := f.GetPostJsonParams()
+	if len(postParams) <= 0 {
+		postParams = f.GetPostXMLParams()
+	}
+	if len(postParams) <= 0 {
+		postParams = f.GetPostParams()
+	}
+	return postParams
+}
+
+func (f *FuzzHTTPRequest) GetPostCommonParamsByName(name string) *FuzzHTTPRequestParam {
+	postParams := f.GetPostCommonParams()
+	for _, param := range postParams {
+		if param.Name() == name {
+			return param
+		}
+	}
+	return nil
 }
 
 func (f *FuzzHTTPRequest) GetAllParams() []*FuzzHTTPRequestParam {
