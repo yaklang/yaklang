@@ -1,7 +1,6 @@
 package yakgrpc
 
 import (
-	"bytes"
 	"container/list"
 	"context"
 	_ "embed"
@@ -20,12 +19,14 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/utils/mfreader"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"math/rand"
+	"sync"
+	"time"
 )
 
 func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream HybridScanRequestStream, firstRequest *ypb.HybridScanRequest) error {
@@ -416,135 +417,167 @@ type HybridScanTarget struct {
 
 func (s *Server) TargetGenerator(ctx context.Context, targetConfig *ypb.HybridScanInputTarget) (chan *HybridScanTarget, error) {
 	// handle target
-	baseBuilderParams := targetConfig.GetHTTPRequestTemplate()
-	baseTemplates := []byte("GET {{Path}} HTTP/1.1\r\nHost: {{Hostname}}\r\n\r\n")
-	requestTemplates, err := s.HTTPRequestBuilder(ctx, targetConfig.GetHTTPRequestTemplate())
-	if err != nil {
-		log.Warn(err)
-	}
-	templates := requestTemplates.GetResults()
-	if len(templates) == 0 {
-		templates = append(templates, &ypb.HTTPRequestBuilderResult{
-			HTTPRequest: []byte("GET / HTTP/1.1\r\nHost: {{Hostname}}"),
-		})
-	}
-
-	target := targetConfig.GetInput()
-	files := targetConfig.GetInputFile()
-
-	outC := make(chan string)
-	go func() {
-		defer close(outC)
-		if target != "" {
-			for _, line := range utils.PrettifyListFromStringSplitEx(target, "\n", "|", ",") {
-				outC <- line
-			}
-		}
-		if len(files) > 0 {
-			fr, err := mfreader.NewMultiFileLineReader(files...)
-			if err != nil {
-				log.Errorf("failed to read file: %v", err)
-				return
-			}
-			for fr.Next() {
-				line := fr.Text()
-				if err != nil {
-					break
-				}
-				outC <- line
-			}
-		}
-	}()
-
 	outTarget := make(chan *HybridScanTarget)
+	buildRes, err := s.BuildHttpRequestPaket(targetConfig.GetHTTPRequestTemplate(), targetConfig.GetInput())
+	if err != nil {
+		return nil, err
+	}
 	go func() {
-		defer func() {
-			close(outTarget)
-		}()
-		for target := range outC {
-			target = strings.TrimSpace(target)
-			if target == "" {
-				continue
-			}
-			var urlIns *url.URL
-			if utils.IsValidHost(target) { // 处理没有单独一个host情况 不含port
-				urlIns = &url.URL{Host: target, Path: "/"}
-			} else {
-				urlIns = utils.ParseStringToUrl(target)
-				if urlIns.Host == "" {
-					continue
-				}
-
-				host, port, _ := utils.ParseStringToHostPort(urlIns.Host) // 处理包含 port 的情况
-				if !utils.IsValidHost(host) {                             // host不合规情况 比如 a:80
-					continue
-				}
-
-				if port > 0 && urlIns.Scheme == "" { // fix https
-					if port == 443 {
-						urlIns.Scheme = "https"
-					}
-				}
-				if urlIns.Path == "" {
-					urlIns.Path = "/"
-				}
-			}
-			builderParams := mergeBuildParams(baseBuilderParams, urlIns)
-			if builderParams == nil {
-				continue
-			}
-			builderResponse, err := s.HTTPRequestBuilder(ctx, builderParams)
-			if err != nil {
-				log.Errorf("failed to build http request: %v", err)
-			}
-			results := builderResponse.GetResults()
-			if len(results) <= 0 {
-				packet := bytes.ReplaceAll(baseTemplates, []byte(`{{Hostname}}`), []byte(urlIns.Host))
-				packet = bytes.ReplaceAll(packet, []byte(`{{Path}}`), []byte(urlIns.Path))
-				outTarget <- &HybridScanTarget{
-					IsHttps: urlIns.Scheme == "https",
-					Request: packet,
-					Url:     urlIns.String(),
-				}
-			} else {
-				for _, result := range results {
-					packet := bytes.ReplaceAll(result.HTTPRequest, []byte(`{{Hostname}}`), []byte(urlIns.Host))
-					tUrl, _ := lowhttp.ExtractURLFromHTTPRequestRaw(packet, result.IsHttps)
-					uStr := urlIns.String()
-					if tUrl != nil {
-						uStr = tUrl.String()
-					}
-					outTarget <- &HybridScanTarget{
-						IsHttps: result.IsHttps,
-						Request: packet,
-						Url:     uStr,
-					}
-				}
+		defer close(outTarget)
+		for target := range buildRes {
+			outTarget <- &HybridScanTarget{
+				IsHttps: target.IsHttps,
+				Request: target.Request,
+				Url:     target.Url,
 			}
 		}
-
-		//for target := range outC {
-		//	for _, template := range templates {
-		//		https, hostname := utils.ParseStringToHttpsAndHostname(target)
-		//		if hostname == "" {
-		//			log.Infof("skip invalid target: %v", target)
-		//			continue
-		//		}
-		//		reqBytes := bytes.ReplaceAll(template.GetHTTPRequest(), []byte("{{Hostname}}"), []byte(hostname))
-		//		uIns, _ := lowhttp.ExtractURLFromHTTPRequestRaw(reqBytes, https)
-		//		var uStr = target
-		//		if uIns != nil {
-		//			uStr = uIns.String()
-		//		}
-		//		outTarget <- &HybridScanTarget{
-		//			IsHttps: https,
-		//			Request: reqBytes,
-		//			Url:     uStr,
-		//		}
-		//	}
-		//}
 	}()
 	return outTarget, nil
+
+	//outTarget := make(chan *HybridScanTarget)
+	//baseBuilderParams := targetConfig.GetHTTPRequestTemplate()
+	//if baseBuilderParams != nil && baseBuilderParams.IsRawHTTPRequest {
+	//	reqUrl, err := lowhttp.ExtractURLFromHTTPRequestRaw(baseBuilderParams.RawHTTPRequest, baseBuilderParams.IsHttps)
+	//	if err != nil {
+	//		return nil, err
+	//	}
+	//	go func() {
+	//		outTarget <- &HybridScanTarget{
+	//			IsHttps: baseBuilderParams.IsHttps,
+	//			Request: baseBuilderParams.RawHTTPRequest,
+	//			Url:     reqUrl.String(),
+	//		}
+	//	}()
+	//	//return outTarget, nil
+	//}
+	//
+	//baseTemplates := []byte("GET {{Path}} HTTP/1.1\r\nHost: {{Hostname}}\r\n\r\n")
+	//requestTemplates, err := s.HTTPRequestBuilder(targetConfig.GetHTTPRequestTemplate())
+	//if err != nil {
+	//	log.Warn(err)
+	//}
+	//var templates = requestTemplates.GetResults()
+	//if len(templates) == 0 {
+	//	templates = append(templates, &ypb.HTTPRequestBuilderResult{
+	//		HTTPRequest: []byte("GET / HTTP/1.1\r\nHost: {{Hostname}}"),
+	//	})
+	//}
+	//
+	//var target = targetConfig.GetInput()
+	//var files = targetConfig.GetInputFile()
+	//
+	//outC := make(chan string)
+	//go func() {
+	//	defer close(outC)
+	//	if target != "" {
+	//		for _, line := range utils.PrettifyListFromStringSplitEx(target, "\n", "|", ",") {
+	//			outC <- line
+	//		}
+	//	}
+	//	if len(files) > 0 {
+	//		fr, err := mfreader.NewMultiFileLineReader(files...)
+	//		if err != nil {
+	//			log.Errorf("failed to read file: %v", err)
+	//			return
+	//		}
+	//		for fr.Next() {
+	//			line := fr.Text()
+	//			if err != nil {
+	//				break
+	//			}
+	//			outC <- line
+	//		}
+	//	}
+	//}()
+	//
+	//go func() {
+	//	defer func() {
+	//		close(outTarget)
+	//	}()
+	//	for target := range outC {
+	//		target = strings.TrimSpace(target)
+	//		if target == "" {
+	//			continue
+	//		}
+	//		var urlIns *url.URL
+	//		if utils.IsValidHost(target) { // 处理没有单独一个host情况 不含port
+	//			urlIns = &url.URL{Host: target, Path: "/"}
+	//		} else {
+	//			urlIns = utils.ParseStringToUrl(target)
+	//			if urlIns.Host == "" {
+	//				continue
+	//			}
+	//
+	//			host, port, _ := utils.ParseStringToHostPort(urlIns.Host) // 处理包含 port 的情况
+	//			if !utils.IsValidHost(host) {                             // host不合规情况 比如 a:80
+	//				continue
+	//			}
+	//
+	//			if port > 0 && urlIns.Scheme == "" { // fix https
+	//				if port == 443 {
+	//					urlIns.Scheme = "https"
+	//				}
+	//			}
+	//			if urlIns.Path == "" {
+	//				urlIns.Path = "/"
+	//			}
+	//		}
+	//		builderParams := mergeBuildParams(baseBuilderParams, urlIns)
+	//		if builderParams == nil {
+	//			continue
+	//		}
+	//		builderResponse, err := s.HTTPRequestBuilder(builderParams)
+	//		if err != nil {
+	//			log.Errorf("failed to build http request: %v", err)
+	//		}
+	//		results := builderResponse.GetResults()
+	//		if len(results) <= 0 {
+	//			packet := bytes.ReplaceAll(baseTemplates, []byte(`{{Hostname}}`), []byte(urlIns.Host))
+	//			packet = bytes.ReplaceAll(packet, []byte(`{{Path}}`), []byte(urlIns.Path))
+	//			outTarget <- &HybridScanTarget{
+	//				IsHttps: urlIns.Scheme == "https",
+	//				Request: packet,
+	//				Url:     urlIns.String(),
+	//			}
+	//		} else {
+	//			for _, result := range results {
+	//				packet := bytes.ReplaceAll(result.HTTPRequest, []byte(`{{Hostname}}`), []byte(urlIns.Host))
+	//				tUrl, _ := lowhttp.ExtractURLFromHTTPRequestRaw(packet, result.IsHttps)
+	//				var uStr = urlIns.String()
+	//				if tUrl != nil {
+	//					uStr = tUrl.String()
+	//				}
+	//				outTarget <- &HybridScanTarget{
+	//					IsHttps: result.IsHttps,
+	//					Request: packet,
+	//					Url:     uStr,
+	//				}
+	//			}
+	//		}
+	//	}
+	//
+	//	//for target := range outC {
+	//	//	for _, template := range templates {
+	//	//		https, hostname := utils.ParseStringToHttpsAndHostname(target)
+	//	//		if hostname == "" {
+	//	//			log.Infof("skip invalid target: %v", target)
+	//	//			continue
+	//	//		}
+	//	//		reqBytes := bytes.ReplaceAll(template.GetHTTPRequest(), []byte("{{Hostname}}"), []byte(hostname))
+	//	//		uIns, _ := lowhttp.ExtractURLFromHTTPRequestRaw(reqBytes, https)
+	//	//		var uStr = target
+	//	//		if uIns != nil {
+	//	//			uStr = uIns.String()
+	//	//		}
+	//	//		outTarget <- &HybridScanTarget{
+	//	//			IsHttps: https,
+	//	//			Request: reqBytes,
+	//	//			Url:     uStr,
+	//	//		}
+	//	//	}
+	//	//}
+	//}()
+	//return outTarget, nil
 }
 
 type FilterManager struct {
