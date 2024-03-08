@@ -237,46 +237,43 @@ type HTTPRequestBuilderRes struct {
 }
 
 func (s Server) BuildHttpRequestPaket(baseBuilderParams *ypb.HTTPRequestBuilderParams, targetInput string) (chan *HTTPRequestBuilderRes, error) {
-	if baseBuilderParams == nil {
-		return nil, utils.Error("builderParams is nil")
-	}
-
 	builderRes := make(chan *HTTPRequestBuilderRes)
-
-	if baseBuilderParams.GetIsRawHTTPRequest() {
-		reqUrl, err := lowhttp.ExtractURLFromHTTPRequestRaw(baseBuilderParams.RawHTTPRequest, baseBuilderParams.IsHttps)
-		if err != nil {
-			return nil, err
-		}
-		go func() {
-			defer close(builderRes)
-			builderRes <- &HTTPRequestBuilderRes{
-				IsHttps: baseBuilderParams.IsHttps,
-				Request: baseBuilderParams.RawHTTPRequest,
-				Url:     reqUrl.String(),
+	if baseBuilderParams != nil {
+		if baseBuilderParams.GetIsRawHTTPRequest() {
+			reqUrl, err := lowhttp.ExtractURLFromHTTPRequestRaw(baseBuilderParams.RawHTTPRequest, baseBuilderParams.IsHttps)
+			if err != nil {
+				return nil, err
 			}
-		}()
-		return builderRes, nil
-	}
-
-	if baseBuilderParams.GetIsHttpFlowId() {
-		_, flows, err := yakit.QueryHTTPFlow(s.GetProfileDatabase(), &ypb.QueryHTTPFlowRequest{
-			IncludeId: baseBuilderParams.GetHTTPFlowId(),
-		})
-		if err != nil {
-			return nil, err
-		}
-		go func() {
-			defer close(builderRes)
-			for _, flow := range flows {
+			go func() {
+				defer close(builderRes)
 				builderRes <- &HTTPRequestBuilderRes{
-					IsHttps: flow.IsHTTPS,
-					Request: []byte(flow.Request),
-					Url:     flow.Url,
+					IsHttps: baseBuilderParams.IsHttps,
+					Request: baseBuilderParams.RawHTTPRequest,
+					Url:     reqUrl.String(),
 				}
+			}()
+			return builderRes, nil
+		}
+
+		if baseBuilderParams.GetIsHttpFlowId() {
+			_, flows, err := yakit.QueryHTTPFlow(s.GetProfileDatabase(), &ypb.QueryHTTPFlowRequest{
+				IncludeId: baseBuilderParams.GetHTTPFlowId(),
+			})
+			if err != nil {
+				return nil, err
 			}
-		}()
-		return builderRes, nil
+			go func() {
+				defer close(builderRes)
+				for _, flow := range flows {
+					builderRes <- &HTTPRequestBuilderRes{
+						IsHttps: flow.IsHTTPS,
+						Request: []byte(flow.Request),
+						Url:     flow.Url,
+					}
+				}
+			}()
+			return builderRes, nil
+		}
 	}
 
 	targets := make(chan *url.URL)
