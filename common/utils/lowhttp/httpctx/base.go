@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
@@ -232,6 +233,10 @@ const (
 	RESPONSE_CONTEXT_KEY_AutoFoward                  = "isResponseAutoForward"
 	REQUEST_CONTEXT_KEY_Url                          = "url"
 	REQUEST_CONTEXT_KEY_Tags                         = "flowTags"
+	REQUEST_CONTEET_KEY_Timestamp                    = "timestamp_request"
+	REQUEST_CONTEXT_KEY_ReaderOffset                 = "req_reader_offset"
+	RESPONSE_CONTEXT_KEY_ReaderOffset                = "rsp_reader_offset"
+	RESPONSE_CONTEXT_KEY_Timestamp                   = "timestamp_response"
 	REQUEST_CONTEXT_KEY_RequestIsModified            = "requestIsModified"
 	REQUEST_CONTEXT_KEY_ResponseIsModified           = "responseIsModified"
 	REQUEST_CONTEXT_KEY_RequestModifiedBy            = "requestIsModifiedBy"
@@ -564,4 +569,44 @@ func GetFlowTags(r *http.Request) []string {
 
 func SetFlowTags(r *http.Request, tags []string) {
 	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_Tags, tags)
+}
+
+func SetRequestTimestamp(r *http.Request, ts time.Time) {
+	SetContextValueInfoFromRequest(r, REQUEST_CONTEET_KEY_Timestamp, ts)
+}
+
+func GetRequestTimestamp(r *http.Request) time.Time {
+	v := GetContextAnyFromRequest(r, REQUEST_CONTEET_KEY_Timestamp)
+	switch ret := v.(type) {
+	case time.Time:
+		return ret
+	}
+	return time.Time{}
+}
+
+func SetResponseTimestamp(r *http.Response, ts time.Time) {
+	if r.Request == nil {
+		return
+	}
+	SetContextValueInfoFromRequest(r.Request, RESPONSE_CONTEXT_KEY_Timestamp, ts)
+}
+
+func GetResponseTimestamp(r *http.Response) time.Time {
+	if r.Request == nil {
+		return time.Time{}
+	}
+	v := GetContextAnyFromRequest(r.Request, RESPONSE_CONTEXT_KEY_Timestamp)
+	switch ret := v.(type) {
+	case time.Time:
+		return ret
+	}
+	return time.Time{}
+}
+
+func SetRequestReaderOffset(r *http.Request, offset int) {
+	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_ReaderOffset, offset)
+}
+
+func GetRequestReaderOffset(r *http.Request) int {
+	return GetContextIntInfoFromRequest(r, REQUEST_CONTEXT_KEY_ReaderOffset)
 }

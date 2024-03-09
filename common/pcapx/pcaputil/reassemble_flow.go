@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"github.com/google/gopacket/layers"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"net/http"
 	"sync"
 	"time"
@@ -96,6 +98,20 @@ func (t *TrafficFlow) AutoTriggerHTTPFlow(h func(*TrafficFlow, *http.Request, *h
 	if t.requestQueue.Len() > 0 && t.responseQueue.Len() > 0 {
 		req := t.requestQueue.Shift()
 		rsp := t.responseQueue.Shift()
+		rsp.Request = req
+		if req != nil && rsp != nil {
+			if offset := codec.Atoi(rsp.Header.Get(tsconst)); offset > 0 {
+				count := 0
+				for _, frame := range t.GetHTTPResponseConnection().frames.Values() {
+					count += len(frame.Payload)
+					if count >= offset {
+						httpctx.SetResponseTimestamp(rsp, frame.Timestamp)
+						break
+					}
+				}
+			}
+		}
+
 		h(t, req, rsp)
 	}
 }
@@ -110,7 +126,7 @@ func (t *TrafficFlow) String() string {
 	return fmt.Sprintf("stream[%3d]: %v <-> %v", t.Index, t.ClientConn.localAddr, t.ServerConn.localAddr)
 }
 
-func (t *TrafficFlow) feed(packet *layers.TCP) {
+func (t *TrafficFlow) feed(packet *layers.TCP, ts time.Time) {
 	if t != nil {
 		if t.pool != nil {
 			t.pool.flowCache.Set(t.Hash, t)
@@ -118,9 +134,9 @@ func (t *TrafficFlow) feed(packet *layers.TCP) {
 	}
 
 	if t.ClientConn.localPort == int(packet.SrcPort) {
-		t.ClientConn.FeedClient(packet)
+		t.ClientConn.FeedClient(packet, ts)
 	} else {
-		t.ServerConn.FeedServer(packet)
+		t.ServerConn.FeedServer(packet, ts)
 	}
 }
 
@@ -202,6 +218,17 @@ func (t *TrafficFlow) onCloseFlow(h func(reason TrafficFlowCloseReason, frame *T
 func (t *TrafficFlow) StashHTTPRequest(req *http.Request) {
 	t.httpflowMutex.Lock()
 	defer t.httpflowMutex.Unlock()
+	if offset := httpctx.GetRequestReaderOffset(req); offset > 0 {
+		// have offset
+		count := 0
+		for _, frame := range t.GetHTTPRequestConnection().frames.Values() {
+			count += len(frame.Payload)
+			if count >= offset {
+				httpctx.SetRequestTimestamp(req, frame.Timestamp)
+				break
+			}
+		}
+	}
 	t.requestQueue.Push(req)
 }
 
@@ -209,4 +236,24 @@ func (t *TrafficFlow) StashHTTPResponse(rsp *http.Response) {
 	t.httpflowMutex.Lock()
 	defer t.httpflowMutex.Unlock()
 	t.responseQueue.Push(rsp)
+}
+
+func (t *TrafficFlow) GetHTTPRequestConnection() *TrafficConnection {
+	if !t.ClientConn.IsMarkedAsHttpPacket() {
+		return nil
+	}
+	if t.ClientConn.IsHttpRequestConn() {
+		return t.ClientConn
+	}
+	return t.ServerConn
+}
+
+func (t *TrafficFlow) GetHTTPResponseConnection() *TrafficConnection {
+	if !t.ClientConn.IsMarkedAsHttpPacket() {
+		return nil
+	}
+	if t.ClientConn.IsHttpRequestConn() {
+		return t.ServerConn
+	}
+	return t.ClientConn
 }
