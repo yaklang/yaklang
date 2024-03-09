@@ -108,11 +108,11 @@ func Start(opt ...CaptureOption) error {
 			if !ok {
 				return true
 			}
+			flow.ForceShutdownConnection()
 			if flow.requestQueue.Len() > 0 || flow.responseQueue.Len() > 0 {
 				if conf.trafficPool._onHTTPFlow == nil {
 					log.Warnf("unbalanced flow request/response flow: req[%v] rsp[%v]", flow.requestQueue.Len(), flow.responseQueue.Len())
 				} else {
-					flow.ForceShutdownConnection()
 					for flow.CanShiftHTTPFlow() {
 						req, rsp := flow.ShiftFlow()
 						conf.trafficPool._onHTTPFlow(flow, req, rsp)
