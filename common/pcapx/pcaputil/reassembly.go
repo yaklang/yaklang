@@ -36,6 +36,9 @@ type TrafficConnection struct {
 	reader *utils.PipeReader
 	writer *utils.PipeWriter
 
+	// frames
+	frames *omap.OrderedMap[int64, *TrafficFrame]
+
 	remoteIP   net.IP
 	remoteAddr net.Addr
 	remotePort int
@@ -132,15 +135,20 @@ func (t *TrafficConnection) CloseFlow() bool {
 	return t.IsClosed()
 }
 
-func (t *TrafficConnection) Write(b []byte, seq int64) (int, error) {
+func (t *TrafficConnection) Write(b []byte, seq int64, ts time.Time) (int, error) {
 	// log.Infof("write %v bytes to %v => %v total: %v", len(b), t.String(), len(b), t.buf.Len())
-	t.Flow.onFrame(&TrafficFrame{
+	if ts.IsZero() {
+		ts = time.Now()
+	}
+	frame := &TrafficFrame{
 		ConnHash:   t.Hash(),
 		Seq:        uint32(seq),
 		Payload:    b,
-		Timestamp:  time.Now(),
+		Timestamp:  ts,
 		Connection: t,
-	})
+	}
+	t.frames.Set(ts.UnixNano(), frame)
+	t.Flow.onFrame(frame)
 
 	n, err := t.writer.Write(b)
 	if err != nil {
@@ -150,12 +158,12 @@ func (t *TrafficConnection) Write(b []byte, seq int64) (int, error) {
 	return n, err
 }
 
-func (t *TrafficConnection) _feedHandlePayload(tcp *layers.TCP, debug func(string)) {
+func (t *TrafficConnection) _feedHandlePayload(tcp *layers.TCP, debug func(string), ts time.Time) {
 	// flow is created
 	haveBody := len(tcp.Payload) > 0
 	if tcp.Seq == t.nextSeq {
 		if haveBody {
-			t.Write(tcp.Payload, int64(tcp.Seq))
+			t.Write(tcp.Payload, int64(tcp.Seq), ts)
 			t.currentSeq = tcp.Seq
 			t.nextSeq = tcp.Seq + uint32(len(tcp.Payload))
 			var count = 0
@@ -168,7 +176,7 @@ func (t *TrafficConnection) _feedHandlePayload(tcp *layers.TCP, debug func(strin
 						break
 					}
 
-					t.Write(frame.Payload, int64(tcp.Seq))
+					t.Write(frame.Payload, int64(tcp.Seq), ts)
 					t.nextSeq = frame.Seq + uint32(frame.Len)
 					count++
 					continue
@@ -233,7 +241,7 @@ func (t *TrafficConnection) _feedHandlePayload(tcp *layers.TCP, debug func(strin
 	log.Debugf("unknown *(%v -> %v) Packet(%-6d bytes):  PSH:%v ACK:%v", t.localAddr, t.remoteAddr, len(tcp.Payload), tcp.PSH, tcp.ACK)
 }
 
-func (t *TrafficConnection) FeedServer(tcp *layers.TCP) {
+func (t *TrafficConnection) FeedServer(tcp *layers.TCP, ts time.Time) {
 	//if t.IsClosed() {
 	//	return
 	//}
@@ -270,15 +278,15 @@ func (t *TrafficConnection) FeedServer(tcp *layers.TCP) {
 			t.nextSeq = tcp.Seq + uint32(len(tcp.Payload))
 			t.isn = tcp.Seq
 			t.initialed = true
-			t.Write(tcp.Payload, int64(tcp.Seq))
+			t.Write(tcp.Payload, int64(tcp.Seq), ts)
 		}
 		return
 	}
 
-	t._feedHandlePayload(tcp, debug)
+	t._feedHandlePayload(tcp, debug, ts)
 }
 
-func (t *TrafficConnection) FeedClient(tcp *layers.TCP) {
+func (t *TrafficConnection) FeedClient(tcp *layers.TCP, ts time.Time) {
 	debug := func(verbose string) {
 		// future frame, put it into packet
 		log.Infof(`*client*-> `+verbose+": expect: %v, got: %v(%v) - (%v -> %v) Packet(%-4dbytes):  SYN: %v PSH: %v ACK: %v",
@@ -320,12 +328,12 @@ func (t *TrafficConnection) FeedClient(tcp *layers.TCP) {
 			t.nextSeq = tcp.Seq + uint32(len(tcp.Payload))
 			t.isn = tcp.Seq
 			t.initialed = true
-			t.Write(tcp.Payload, int64(tcp.Seq))
+			t.Write(tcp.Payload, int64(tcp.Seq), ts)
 		}
 		return
 	}
 
-	t._feedHandlePayload(tcp, debug)
+	t._feedHandlePayload(tcp, debug, ts)
 }
 
 func (p *TrafficPool) NewFlow(netType string, srcAddr, dstAddr string) (*TrafficFlow, error) {
@@ -348,6 +356,7 @@ func (p *TrafficPool) NewFlow(netType string, srcAddr, dstAddr string) (*Traffic
 		writer:     clientWriter,
 		remoteAddr: dst,
 		localAddr:  src,
+		frames:     omap.NewOrderedMap(make(map[int64]*TrafficFrame)),
 	}
 	c2sConn.ctx, c2sConn.cancel = context.WithCancel(flowCtx)
 	s2cConn := &TrafficConnection{
@@ -355,6 +364,7 @@ func (p *TrafficPool) NewFlow(netType string, srcAddr, dstAddr string) (*Traffic
 		writer:     serverWriter,
 		remoteAddr: src,
 		localAddr:  dst,
+		frames:     omap.NewOrderedMap(make(map[int64]*TrafficFrame)),
 	}
 	s2cConn.ctx, s2cConn.cancel = context.WithCancel(flowCtx)
 
