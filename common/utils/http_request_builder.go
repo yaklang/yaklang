@@ -462,7 +462,7 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool,
 	} else {
 		// by header
 		if useContentLength && useTransferEncodingChunked {
-			log.Debug("content-length and transfer-encoding chunked both exist, try smuggle? use content-length first!")
+			log.Warn("content-length and transfer-encoding chunked both exist, try smuggle? use content-length first!")
 			if contentLengthInt > 0 {
 				// smuggle
 				bodyRaw, _ := io.ReadAll(io.NopCloser(io.LimitReader(reader, int64(contentLengthInt))))

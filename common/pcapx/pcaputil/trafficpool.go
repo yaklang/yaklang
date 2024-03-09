@@ -61,7 +61,7 @@ func (p *TrafficPool) nextStream() uint64 {
 	return atomic.AddUint64(&p.currentStreamIndex, 1)
 }
 
-func (p *TrafficPool) Feed(ethernetLayer *layers.Ethernet, networkLayer gopacket.SerializableLayer, transportLayer *layers.TCP) {
+func (p *TrafficPool) Feed(ethernetLayer *layers.Ethernet, networkLayer gopacket.SerializableLayer, transportLayer *layers.TCP, tss ...time.Time) {
 	var networkStr string
 	var srcIP net.IP
 	var dstIP net.IP
@@ -69,6 +69,12 @@ func (p *TrafficPool) Feed(ethernetLayer *layers.Ethernet, networkLayer gopacket
 	dstPort := int(transportLayer.DstPort)
 	isIpv4 := false
 	isIpv6 := false
+
+	var ts = time.Now()
+	if len(tss) > 0 {
+		ts = tss[0]
+	}
+
 	switch ret := networkLayer.(type) {
 	case *layers.IPv4:
 		networkStr = "tcp4"
@@ -113,7 +119,7 @@ func (p *TrafficPool) Feed(ethernetLayer *layers.Ethernet, networkLayer gopacket
 				return
 			}
 			fitFlow(flow)
-			flow.feed(transportLayer)
+			flow.feed(transportLayer, ts)
 			flow.IsHalfOpen = true
 			p.pool.Store(hash, flow)
 			flow.init(p.onFlowCreated, p.onFlowFrameDataFrameReassembled, p.onFlowFrameDataFrameArrived, p.onFlowClosed)
@@ -139,7 +145,7 @@ func (p *TrafficPool) Feed(ethernetLayer *layers.Ethernet, networkLayer gopacket
 	if flow == nil {
 		return
 	}
-	flow.feed(transportLayer)
+	flow.feed(transportLayer, ts)
 }
 
 func (p *TrafficPool) flowhash(netType, srcAddr, dstAddr string) string {

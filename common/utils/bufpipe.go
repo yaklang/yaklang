@@ -23,11 +23,21 @@ func (p *pipe) BytesBuffer() *bytes.Buffer {
 // A PipeReader is the read half of a pipe.
 type PipeReader struct {
 	*pipe
+	count int
 }
 
 // A PipeWriter is the write half of a pipe.
 type PipeWriter struct {
 	*pipe
+	count int
+}
+
+func (p *PipeWriter) Count() int {
+	return p.count
+}
+
+func (p *PipeReader) Count() int {
+	return p.count
 }
 
 func (p *PipeWriter) BytesBuffer() *bytes.Buffer {
@@ -74,6 +84,7 @@ func (r *PipeReader) Read(data []byte) (int, error) {
 
 RETRY:
 	n, err := r.buf.Read(data)
+	r.count += n
 	// If not closed and no read, wait for writing.
 	if err == io.EOF && r.rerr == nil && n == 0 {
 		r.cond.Wait()
@@ -116,6 +127,7 @@ func (w *PipeWriter) Write(data []byte) (int, error) {
 	}
 
 	n, err := w.buf.Write(data)
+	w.count += n
 	w.cond.Signal()
 	return n, err
 }

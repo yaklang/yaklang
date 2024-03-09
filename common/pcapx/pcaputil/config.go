@@ -10,8 +10,10 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
 	"github.com/google/gopacket/pcapgo"
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"net/http"
@@ -20,6 +22,8 @@ import (
 	"sync"
 	"time"
 )
+
+var tsconst = uuid.New().String()
 
 type CaptureConfig struct {
 	Device    []string
@@ -255,27 +259,33 @@ func WithHTTPFlow(h func(flow *TrafficFlow, req *http.Request, rsp *http.Respons
 				once := new(sync.Once)
 				runner.Set(flow.Hash, once)
 				once.Do(func() {
+					requestConn := flow.GetHTTPRequestConnection()
+					responseConn := flow.GetHTTPResponseConnection()
 					go func() {
 						defer flow.httpflowWg.Done()
-						reader := bufio.NewReader(flow.ClientConn.reader)
+						reader := bufio.NewReader(requestConn.reader)
 						for {
 							req, err := utils.ReadHTTPRequestFromBufioReader(reader)
 							if err != nil {
 								return
 							}
+							offset := requestConn.reader.Count() - reader.Buffered()
+							httpctx.SetRequestReaderOffset(req, offset)
 							flow.StashHTTPRequest(req)
 							flow.AutoTriggerHTTPFlow(h)
 						}
 					}()
 					go func() {
 						defer flow.httpflowWg.Done()
-						reader := bufio.NewReader(flow.ServerConn.reader)
+						reader := bufio.NewReader(responseConn.reader)
 						for {
-							req, err := utils.ReadHTTPResponseFromBufioReader(reader, nil)
+							rsp, err := utils.ReadHTTPResponseFromBufioReader(reader, nil)
 							if err != nil {
 								return
 							}
-							flow.StashHTTPResponse(req)
+							offset := responseConn.reader.Count() - reader.Buffered()
+							rsp.Header.Set(tsconst, fmt.Sprint(offset))
+							flow.StashHTTPResponse(rsp)
 							flow.AutoTriggerHTTPFlow(h)
 						}
 					}()
@@ -294,13 +304,7 @@ func (c *CaptureConfig) assemblyWithTS(flow gopacket.Packet, networkLayer gopack
 		}
 	}()
 	raw, _ := flow.Layer(layers.LayerTypeEthernet).(*layers.Ethernet)
-	c.trafficPool.Feed(raw, networkLayer, tcp)
-	//if c.Assembler != nil {
-	//	if tcp.Payload == nil {
-	//		return
-	//	}
-	//	c.Assembler.AssembleWithTimestamp(flow, tcp, ts)
-	//}
+	c.trafficPool.Feed(raw, networkLayer, tcp, ts)
 }
 
 func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packet) {
