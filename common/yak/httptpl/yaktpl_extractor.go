@@ -3,6 +3,12 @@ package httptpl
 import (
 	"encoding/json"
 	"fmt"
+	"mime"
+	"net/url"
+	"reflect"
+	"regexp"
+	"strings"
+
 	"github.com/antchfx/xmlquery"
 	"github.com/gobwas/httphead"
 	"github.com/itchyny/gojq"
@@ -13,11 +19,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/htmlquery"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"mime"
-	"net/url"
-	"reflect"
-	"regexp"
-	"strings"
 )
 
 func NewExtractorFromGRPCModel(m *ypb.HTTPResponseExtractor) *YakExtractor {
@@ -66,7 +67,7 @@ func (y *YakExtractor) Execute(rsp []byte, previous ...map[string]any) (map[stri
 	default:
 		material = string(rsp)
 	}
-	var results = []string{}
+	results := []string{}
 	addResult := func(result interface{}) {
 		results = append(results, utils.InterfaceToString(result))
 	}
@@ -193,7 +194,7 @@ func (y *YakExtractor) Execute(rsp []byte, previous ...map[string]any) (map[stri
 	case "nuclei-dsl", "nuclei", "dsl":
 		box := NewNucleiDSLYakSandbox()
 		header, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(rsp)
-		var previousMap = make(map[string]any)
+		previousMap := make(map[string]any)
 		for _, p := range previous {
 			for k, v := range p {
 				switch reflect.TypeOf(v).Kind() {
@@ -308,7 +309,7 @@ func extractKVal(rsp []byte, shouldSplit bool) map[string]interface{} {
 		}
 	}
 	// 特殊处理 JSON
-	var skipJson = false
+	skipJson := false
 	for _, bodyRaw := range jsonextractor.ExtractStandardJSON(string(body)) {
 		skipJson = true
 		var ok bool
