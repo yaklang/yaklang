@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"sync"
 	"time"
 )
@@ -17,9 +16,7 @@ func NewDebounce(wait float64) func(f func()) {
 			timer.Stop()
 		}
 		timer = time.AfterFunc(FloatSecondDuration(wait), func() {
-			log.Info("start to call")
 			f()
-			log.Info("end to call")
 		})
 	}
 }
