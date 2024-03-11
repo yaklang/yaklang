@@ -10,6 +10,59 @@
 #      default: "" # 参数默认值（可选）
 #      test-default: "" # 测试时使用的默认值（可选）
 Classes:
+  MultiEcho:
+    desc: 支持Tomcat环境和Weblogic回显
+    params:
+      - name: header-au-key
+        desc: 用于标记当前请求的Header Key（建议使用header中比较常见的key）
+        default: "Accept-Language"
+      - name: header-au-val
+        desc: headerAuKey对应的Value，回显类将会通过此值判断当前请求是否为回显请求
+        default: "zh-CN,zh;q=1.9"
+      - name: header
+        desc: 当position为header时，此参数将作为回显的Header Key
+        default: "Etag"
+      - name: action
+        desc: 枚举值，可选值为：echo（只回显）, exec（回显执行结果）
+        default: "echo"
+      - name: position
+        desc: 枚举值，可选值为：header, body，用于指定回显的位置
+        default: "header"
+      - name: cmd
+        desc: 此值用于指定执行命令，当action为echo时，只回显不执行，当action为exec时，会回显执行命令
+  TomcatEcho:
+    params:
+      - name: header-au-key
+        desc: 用于标记当前请求的Header Key（建议使用header中比较常见的key）
+        default: "Accept-Language"
+      - name: header-au-val
+        desc: headerAuKey对应的Value，回显类将会通过此值判断当前请求是否为回显请求
+        default: "zh-CN,zh;q=1.9"
+      - name: header
+        desc: 当position为header时，此参数将作为回显的Header Key
+        default: "Etag"
+      - name: action
+        desc: 枚举值，可选值为：echo（只回显）, exec（回显执行结果）
+        default: "echo"
+      - name: position
+        desc: 枚举值，可选值为：header, body，用于指定回显的位置
+        default: "header"
+      - name: cmd
+        desc: 此值用于指定执行命令，当action为echo时，只回显不执行，当action为exec时，会回显执行命令
+  SpringEcho:
+    desc: Spring的回显
+    params:
+      - name: header
+        desc: 当position为header时，此参数将作为回显的Header Key
+        default: "Etag"
+      - name: action
+        desc: 枚举值，可选值为：echo（只回显）, exec（回显执行结果）
+        default: "echo"
+      - name: position
+        desc: 枚举值，可选值为：header, body，用于指定回显的位置
+        default: "header"
+      - name: cmd
+        desc: 此值用于指定执行命令，当action为echo时，只回显不执行，当action为exec时，会回显执行命令
   TemplateImplClassLoader:
     desc: 用于TemplateImp的类加载器，可以加载任意类
     params:
@@ -68,7 +121,6 @@ Classes:
     params:
       - name: time
         desc: 休眠时间
-        default: 1000
 
 # Gadgets配置
 #BeanShell1: # gadget名(用于索引模板文件)
@@ -164,6 +216,12 @@ Gadgets:
   CommonsCollections9:
     desc:
   CommonsCollectionsK3:
+    desc:
+  CommonsCollectionsK4:
+    desc:
+  BeanShell1:
+    desc:
+  Groovy1:
     desc:
 ReflectChainFunction:
 #  sleep:

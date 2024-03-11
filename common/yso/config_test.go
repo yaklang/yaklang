@@ -8,13 +8,9 @@ import (
 	"testing"
 )
 
-// TestGetConfig assert config is valid
+// TestGetConfig assert config is valid, test load serialized payload and class payload
 func TestGetConfig(t *testing.T) {
-	config, err := getConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for name, classInfo := range config.Classes {
+	for name, classInfo := range YsoConfigInstance.Classes {
 		classIns, err := javaclassparser.Parse(classInfo.Template)
 		if err != nil {
 			t.Fatal(utils.Errorf("parse class %s failed: %s", name, err))
@@ -26,11 +22,22 @@ func TestGetConfig(t *testing.T) {
 			}
 		}
 	}
-	for name, gadgetInfo := range config.Gadgets {
-		gadgetIns, err := yserx.ParseJavaSerialized(gadgetInfo.Template)
-		if err != nil {
-			t.Fatal(utils.Errorf("parse class %s failed: %s", name, err))
+	for name, gadgetInfo := range YsoConfigInstance.Gadgets {
+		if gadgetInfo.IsTemplateImpl {
+			_, err := yserx.ParseJavaSerialized(gadgetInfo.Template)
+			if err != nil {
+				t.Fatal(utils.Errorf("parse class %s failed: %s", name, err))
+			}
+		} else {
+			for k, templ := range gadgetInfo.ChainTemplate {
+				if len(templ) == 0 {
+					continue
+				}
+				_, err := yserx.ParseJavaSerialized(templ)
+				if err != nil {
+					t.Fatal(utils.Errorf("parse class %s failed: %s", k, err))
+				}
+			}
 		}
-		_ = gadgetIns
 	}
 }
