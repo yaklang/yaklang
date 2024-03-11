@@ -4,6 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
+	"sync"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/gorm"
 	"github.com/segmentio/ksuid"
@@ -12,9 +16,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strconv"
-	"strings"
-	"sync"
 )
 
 var yakScriptOpLock = new(sync.Mutex)
@@ -117,6 +118,26 @@ func (s *YakScript) BeforeSave() error {
 	return nil
 }
 
+func (s *YakScript) AfterCreate(tx *gorm.DB) (err error) {
+	BroadcastData("yakscript", "create")
+	return nil
+}
+
+func (s *YakScript) AfterSave(tx *gorm.DB) (err error) {
+	BroadcastData("yakscript", "save")
+	return nil
+}
+
+func (s *YakScript) AfterUpdate(tx *gorm.DB) (err error) {
+	BroadcastData("yakscript", "update")
+	return nil
+}
+
+func (s *YakScript) AfterDelete(tx *gorm.DB) (err error) {
+	BroadcastData("yakscript", "delete")
+	return nil
+}
+
 func (s *YakScript) ToGRPCModel() *ypb.YakScript {
 	var params []*ypb.YakScriptParam
 	if s.Params != "" && s.Params != `""` {
@@ -135,8 +156,8 @@ func (s *YakScript) ToGRPCModel() *ypb.YakScript {
 		}
 		err = json.Unmarshal([]byte(r), &riskDetail)
 		if err != nil { // errors may occur due to version iterations has break change, so we just ignore it (this field has been deprecated actually)
-			//log.Errorf("unmarshal RiskDetail failed: %s", err)
-			//spew.Dump([]byte(r))
+			// log.Errorf("unmarshal RiskDetail failed: %s", err)
+			// spew.Dump([]byte(r))
 		}
 	}
 
@@ -276,8 +297,8 @@ func CreateOrUpdateYakScriptByName(db *gorm.DB, scriptName string, i interface{}
 }
 
 func CreateTemporaryYakScript(t string, code string) (string, error) {
-	var name = fmt.Sprintf("tmp-%v", ksuid.New().String())
-	var err = CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), name, &YakScript{
+	name := fmt.Sprintf("tmp-%v", ksuid.New().String())
+	err := CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), name, &YakScript{
 		ScriptName: name,
 		Type:       t,
 		Content:    code,
@@ -545,8 +566,8 @@ func FilterYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) *gorm.DB {
 		} else {
 			if len(params.Group.Group) > 0 {
 				db = db.Where("yak_scripts.script_name in  (select yak_script_name from plugin_groups where `group` in (?) )", params.Group.Group)
-				//db = db.Joins("left join plugin_groups P on yak_scripts.script_name = P.yak_script_name ")
-				//db = bizhelper.ExactQueryStringArrayOr(db, "`group`", params.Group.Group)
+				// db = db.Joins("left join plugin_groups P on yak_scripts.script_name = P.yak_script_name ")
+				// db = bizhelper.ExactQueryStringArrayOr(db, "`group`", params.Group.Group)
 			}
 		}
 	}
@@ -571,7 +592,7 @@ func QueryYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) (*bizhelper.
 		}
 		return p, yakScripts, err
 	}
-	//db = UserDataAndPluginDatabaseScope(db)
+	// db = UserDataAndPluginDatabaseScope(db)
 	db = db.Model(&YakScript{}) // .Debug()
 
 	/*pagination*/
@@ -590,7 +611,7 @@ func QueryYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) (*bizhelper.
 		return nil, nil, utils.Error("invalid order")
 	}
 
-	var orderOrdinary = "updated_at desc"
+	orderOrdinary := "updated_at desc"
 	if utils.StringArrayContains([]string{
 		"created_at", "updated_at", "id", "script_name",
 		"author",
@@ -621,13 +642,12 @@ YieldYakScripts no use spec, checking
 	calling
 */
 func YieldYakScripts(db *gorm.DB, ctx context.Context) chan *YakScript {
-
 	outC := make(chan *YakScript)
 
 	go func() {
 		defer close(outC)
 
-		var page = 1
+		page := 1
 		for {
 			var items []*YakScript
 			if _, b := bizhelper.NewPagination(&bizhelper.Param{

@@ -590,6 +590,26 @@ func (f *HTTPFlow) fixURL() {
 	}
 }
 
+func (f *HTTPFlow) AfterCreate(tx *gorm.DB) (err error) {
+	BroadcastData("httpflow", "create")
+	return nil
+}
+
+func (f *HTTPFlow) AfterSave(tx *gorm.DB) (err error) {
+	BroadcastData("httpflow", "save")
+	return nil
+}
+
+func (f *HTTPFlow) AfterUpdate(tx *gorm.DB) (err error) {
+	BroadcastData("httpflow", "update")
+	return nil
+}
+
+func (f *HTTPFlow) AfterDelete(tx *gorm.DB) (err error) {
+	BroadcastData("httpflow", "delete")
+	return nil
+}
+
 func SaveFromHTTP(db *gorm.DB, isHttps bool, req *http.Request, rsp *http.Response, source string, url string, remoteAddr string) (*HTTPFlow, error) {
 	return SaveFromHTTPWithBodySaved(db, isHttps, req, rsp, source, url, remoteAddr)
 }
