@@ -126,25 +126,33 @@ func (m *MITMReplaceRule) matchByPacketInfo(info *PacketInfo) ([]*regexp2.Match,
 		return nil, nil // match nothing
 	}
 	var items [][]byte
+	var enableURI, enableHeader, enableBody, enableEntire bool
+	enableURI = m.EnableForURI
+	enableHeader = m.EnableForHeader
+	enableBody = m.EnableForBody
 	if info.IsRequest {
-		enableUri := m.EnableForURI
 		if m.EnableForHeader {
-			enableUri = false
-			items = append(items, []byte(info.HeaderRaw))
-		}
-		if enableUri {
-			items = append(items, []byte(info.RequestURI))
-		}
-		if m.EnableForBody {
-			items = append(items, info.BodyRaw)
+			enableURI = false
 		}
 	} else {
-		if m.EnableForHeader {
-			items = append(items, []byte(info.HeaderRaw))
-		}
-		if m.EnableForBody {
-			items = append(items, info.BodyRaw)
-		}
+		enableURI = false
+	}
+	if enableHeader && enableBody {
+		enableEntire = true
+		enableHeader = false
+		enableBody = false
+	}
+	if enableURI {
+		items = append(items, []byte(info.RequestURI))
+	}
+	if enableHeader {
+		items = append(items, []byte(info.HeaderRaw))
+	}
+	if enableBody {
+		items = append(items, info.BodyRaw)
+	}
+	if enableEntire {
+		items = append(items, lowhttp.ReplaceHTTPPacketBody([]byte(info.HeaderRaw), info.BodyRaw, false))
 	}
 	var res []*regexp2.Match
 	for _, data := range items {
@@ -273,6 +281,7 @@ func (m *MITMReplaceRule) MatchAndReplacePacket(packet []byte, isReq bool) ([]*r
 	}
 	headerRaw := packetInfo.HeaderRaw
 	bodyRaw := packetInfo.BodyRaw
+	var newPacket []byte
 	if replaceHeadersByKV {
 		if !packetInfo.IsRequest {
 			return nil, nil, errors.New("replace headers by kv only support request")
@@ -335,6 +344,11 @@ func (m *MITMReplaceRule) MatchAndReplacePacket(packet []byte, isReq bool) ([]*r
 			}
 		}
 
+		// is origin header not contains extheaders, append it
+		for k, v := range keyHeader {
+			buf.WriteString(fmt.Sprintf("%v: %v", k, v.Value))
+			buf.WriteString(lowhttp.CRLF)
+		}
 		// is origin header not contains cookie, append it
 		if len(extCookies) > 0 && !setCookie {
 			buf.WriteString("Cookie: " + lowhttp.MergeCookies(extCookies...))
@@ -343,30 +357,42 @@ func (m *MITMReplaceRule) MatchAndReplacePacket(packet []byte, isReq bool) ([]*r
 		buf.WriteString(lowhttp.CRLF)
 		headerRaw = buf.String()
 	} else {
-		uri := packetInfo.RequestURI
-		if isReq && m.EnableForURI {
-			uri, err = re.Replace(uri, m.Result, -1, -1)
+		if m.EnableForHeader && m.EnableForBody {
+			raw, err := re.Replace(string(lowhttp.ReplaceHTTPPacketBody([]byte(packetInfo.HeaderRaw), packetInfo.BodyRaw, false)), m.Result, -1, -1)
 			if err != nil {
-				return nil, nil, fmt.Errorf("replace uri failed: %v", err)
+				return nil, nil, fmt.Errorf("replace packet failed: %v", err)
 			}
-		}
-		headerRaw = strings.Replace(headerRaw, packetInfo.RequestURI, uri, 1)
-		if m.EnableForHeader {
-			headerRaw, err = re.Replace(packetInfo.HeaderRaw, m.Result, -1, -1)
-			if err != nil {
-				return nil, nil, fmt.Errorf("replace header failed: %v", err)
+			newPacket = []byte(raw)
+		} else {
+			uri := packetInfo.RequestURI
+			if isReq && m.EnableForURI {
+				uri, err = re.Replace(uri, m.Result, -1, -1)
+				if err != nil {
+					return nil, nil, fmt.Errorf("replace uri failed: %v", err)
+				}
 			}
-		}
-		if m.EnableForBody {
-			body, err := re.Replace(string(bodyRaw), m.Result, -1, -1)
-			if err != nil {
-				return nil, nil, fmt.Errorf("replace body failed: %v", err)
+			headerRaw = strings.Replace(headerRaw, packetInfo.RequestURI, uri, 1)
+			if m.EnableForHeader {
+				headerRaw, err = re.Replace(packetInfo.HeaderRaw, m.Result, -1, -1)
+				if err != nil {
+					return nil, nil, fmt.Errorf("replace header failed: %v", err)
+				}
 			}
-			bodyRaw = []byte(body)
+			if m.EnableForBody {
+				body, err := re.Replace(string(bodyRaw), m.Result, -1, -1)
+				if err != nil {
+					return nil, nil, fmt.Errorf("replace body failed: %v", err)
+				}
+				bodyRaw = []byte(body)
+			}
 		}
 	}
-	modifiedPacket := lowhttp.ReplaceHTTPPacketBody([]byte(headerRaw), bodyRaw, false)
-	return matched, modifiedPacket, nil
+	if newPacket != nil {
+		return matched, newPacket, nil
+	} else {
+		modifiedPacket := lowhttp.ReplaceHTTPPacketBody([]byte(headerRaw), bodyRaw, false)
+		return matched, modifiedPacket, nil
+	}
 }
 func sortContentReplacer(i []*MITMReplaceRule) []*MITMReplaceRule {
 	sort.Stable(Rules(i))
