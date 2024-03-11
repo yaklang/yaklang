@@ -1,0 +1,11 @@
+check = false
+for r in tls.Inspect(getParam("VULINBOX"))~ {
+    dump(r.Protocol)
+    if r.Protocol in ["http/1.1", "h2"] {
+        check = true
+    }
+}
+
+if !check {
+   die("PROTOCOL CANNOT FOUND")
+}
