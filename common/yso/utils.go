@@ -3,17 +3,14 @@ package yso
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"github.com/yaklang/yaklang/common/javaclassparser"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yserx"
 	"reflect"
 	"runtime"
 	"strings"
-	"text/template"
 )
 
 type GadgetFunc func(cmd string) (yserx.JavaSerializable, error)
@@ -74,17 +71,6 @@ func SetJavaObjectClass(object yserx.JavaSerializable, classObject *javaclasspar
 //	*tmpl = *newTmpl
 //	return nil
 //}
-
-func CreateTemplateByClassObject(class *javaclassparser.ClassObject) *yserx.JavaObject {
-	obj, err := yserx.ParseFromBytes(template_templateObjectSer)
-	if err != nil {
-		log.Error(err)
-	}
-	byts := class.Bytes()
-	obj.ClassData[1].(*yserx.JavaClassData).Fields[2].(*yserx.JavaFieldValue).Object.(*yserx.JavaArray).Values[0].Object.(*yserx.JavaArray).Bytes = byts
-	obj.ClassData[1].(*yserx.JavaClassData).Fields[2].(*yserx.JavaFieldValue).Object.(*yserx.JavaArray).Values[0].Object.(*yserx.JavaArray).Size = len(byts)
-	return obj
-}
 
 func SetTemplateObjectClass(object *yserx.JavaObject, classBytes []byte) error {
 	for _, data := range object.ClassData {
@@ -488,114 +474,7 @@ func _WalkJavaSerializableObject(objSer yserx.JavaSerializable, replace func(new
 	}
 	return
 }
-func cmdToTemplate(cmd string, tempers ...Temper) (map[string]interface{}, error) {
-	for _, r := range tempers {
-		if r == nil {
-			continue
-		}
-		cmd = r(cmd)
-	}
-	raw, err := json.Marshal(cmd)
-	if err != nil {
-		return nil, err
-	}
 
-	rawBase64, err := json.Marshal(codec.EncodeBase64(cmd))
-	if err != nil {
-		return nil, err
-	}
-	result := map[string]interface{}{
-		"Length":     len(cmd),
-		"Command":    string(raw),
-		"CommandRaw": string(rawBase64),
-	}
-	return result, nil
-}
-
-func cmdToTemplateImpl(cmd string, tempers []Temper, suffix ...string) (map[string]interface{}, error) {
-	for _, r := range tempers {
-		if r == nil {
-			continue
-		}
-		cmd = r(cmd)
-	}
-	raw, err := yserx.ToJson(generateTemplates(cmd))
-	if err != nil {
-		return nil, err
-	}
-	return map[string]interface{}{
-		"TemplatesImpl": string(raw) + strings.Join(suffix, ""),
-	}, nil
-}
-
-func buildTemplate(name string, raw string) (*template.Template, error) {
-	templ, err := template.New(name).Parse(raw)
-	if err != nil {
-		return nil, err
-	}
-
-	return templ, nil
-}
-
-func createTemplatesImplGadgetFactory(name string, tmp string, temper []Temper, suffix ...string) GadgetFunc {
-	return func(cmd string) (yserx.JavaSerializable, error) {
-		params, err := cmdToTemplateImpl(cmd, temper, suffix...)
-		if err != nil {
-			return nil, err
-		}
-
-		tmp, err := buildTemplate(name, tmp)
-		if err != nil {
-			return nil, err
-		}
-
-		var buf bytes.Buffer
-		err = tmp.Execute(&buf, params)
-		if err != nil {
-			return nil, err
-		}
-
-		r, err := yserx.FromJson(buf.Bytes())
-		if err != nil {
-			return nil, err
-		}
-
-		if len(r) > 0 {
-			return r[0], nil
-		}
-		return nil, utils.Error("empty java serialization object")
-	}
-}
-
-func createOrdinaryGadgetFactory(name string, tmp string, tempers ...Temper) GadgetFunc {
-	return func(cmd string) (yserx.JavaSerializable, error) {
-		var buf bytes.Buffer
-		s, err := cmdToTemplate(cmd, tempers...)
-		if err != nil {
-			return nil, err
-		}
-
-		tmp, err := buildTemplate(name, tmp)
-		if err != nil {
-			return nil, err
-		}
-
-		err = tmp.Execute(&buf, s)
-		if err != nil {
-			return nil, err
-		}
-
-		rs, err := yserx.FromJson((&buf).Bytes())
-		if err != nil {
-			return nil, err
-		}
-
-		if len(rs) > 0 {
-			return rs[0], nil
-		}
-		return nil, utils.Error("generate common collections failed: empty")
-	}
-}
 
 func ToBcel(i interface{}) (string, error) {
 	switch ret := i.(type) {

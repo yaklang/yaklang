@@ -4,13 +4,10 @@ import "testing"
 
 // TestGenClasses test generate class object
 func TestGenClasses(t *testing.T) {
-	genCfg := &ClassGenConfig{}
 
 	for name, _ := range YsoConfigInstance.Classes {
-		genCfg.ClassType = name
-
 		// test generate class object
-		obj, err := genCfg.GenerateClassObject()
+		obj, err := GenerateClassWithType(name)
 		if err != nil {
 			t.Fatal(err)
 		}

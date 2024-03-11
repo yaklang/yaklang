@@ -7,10 +7,11 @@ import (
 	"github.com/yaklang/yaklang/common/yso/resources"
 	"path"
 	"strconv"
+	"strings"
 )
 
 type ClassGenConfigParam struct {
-	Name                           string
+	Name                           ClassParamType
 	Desc                           string
 	DefaultValue, TestDefaultValue any
 }
@@ -22,12 +23,11 @@ type ClassConfig struct {
 	Params   []*ClassGenConfigParam
 }
 type GadgetConfig struct {
-	Name          string
-	IsTemplate    bool
-	Template      []byte
-	ChainTemplate map[string][]byte
-	Desc          string
-	CCVersion     string
+	Name           string
+	IsTemplateImpl bool
+	Template       []byte
+	ChainTemplate  map[string][]byte
+	Desc           string
 }
 
 type ReflectChainFunctionConfig struct {
@@ -36,9 +36,9 @@ type ReflectChainFunctionConfig struct {
 	Args []string
 }
 type YsoConfig struct {
-	Classes              map[string]*ClassConfig
-	Gadgets              map[string]*GadgetConfig
-	ReflectChainFunction map[string]*ReflectChainFunctionConfig
+	Classes              map[ClassType]*ClassConfig
+	Gadgets              map[GadgetType]*GadgetConfig
+	ReflectChainFunction map[GadgetType]*ReflectChainFunctionConfig
 }
 
 var YsoConfigInstance *YsoConfig
@@ -47,14 +47,14 @@ func init() {
 	var err error
 	YsoConfigInstance, err = getConfig()
 	if err != nil {
-		log.Errorf("load yso config failed: %v", err)
+		log.Error(err)
 	}
 }
 func getConfig() (*YsoConfig, error) {
 	config := &YsoConfig{
-		Classes:              map[string]*ClassConfig{},
-		Gadgets:              map[string]*GadgetConfig{},
-		ReflectChainFunction: map[string]*ReflectChainFunctionConfig{},
+		Classes:              map[ClassType]*ClassConfig{},
+		Gadgets:              map[GadgetType]*GadgetConfig{},
+		ReflectChainFunction: map[GadgetType]*ReflectChainFunctionConfig{},
 	}
 	content, err := resources.YsoResourceFS.ReadFile("config.yaml")
 	if err != nil {
@@ -75,7 +75,7 @@ func getConfig() (*YsoConfig, error) {
 			if err != nil {
 				return err
 			}
-			config.ReflectChainFunction[reflectFunc.Name] = reflectFunc
+			config.ReflectChainFunction[GadgetType(reflectFunc.Name)] = reflectFunc
 		}
 		return nil
 	})
@@ -89,7 +89,7 @@ func getConfig() (*YsoConfig, error) {
 			cfg.Template = templateBytes
 			cfg.FileName = name + ".class"
 			cfg.Name = name
-			config.Classes[name] = cfg
+			config.Classes[ClassType(name)] = cfg
 			currentKey := append(currentKey, name)
 			err = runWorkFlow(
 				getStringOrEmptyTask(currentKey, attr, "name", func(currentKey []string, v string) error {
@@ -109,7 +109,7 @@ func getConfig() (*YsoConfig, error) {
 						tasks = append(
 							tasks,
 							getStringTask(currentKey, param, "name", func(currentKey []string, v string) error {
-								paramConfig.Name = v
+								paramConfig.Name = ClassParamType(v)
 								return nil
 							}),
 							getStringOrEmptyTask(currentKey, param, "desc", func(currentKey []string, v string) error {
@@ -158,19 +158,8 @@ func getConfig() (*YsoConfig, error) {
 					gadgetConfig.Desc = v
 					return nil
 				}),
-				getStringOrEmptyTask(currentKey, attr, "group", func(currentKey []string, v string) error {
-					switch v {
-					case "1":
-						gadgetConfig.CCVersion = "1"
-					case "2":
-						gadgetConfig.CCVersion = "4"
-					default:
-						gadgetConfig.CCVersion = "1"
-					}
-					return nil
-				}),
 				getStringOrEmptyTask(currentKey, attr, "template", func(currentKey []string, v string) error {
-					gadgetConfig.IsTemplate = v == "true"
+					gadgetConfig.IsTemplateImpl = v == "true"
 					return nil
 				}),
 			)
@@ -178,7 +167,7 @@ func getConfig() (*YsoConfig, error) {
 				return err
 			}
 			fileName := name
-			if gadgetConfig.IsTemplate {
+			if gadgetConfig.IsTemplateImpl {
 				fileName = "template_" + name
 				templateBytes, err := resources.YsoResourceFS.ReadFile(path.Join("gadgets", fileName+".ser"))
 				if err != nil {
@@ -189,13 +178,13 @@ func getConfig() (*YsoConfig, error) {
 				for _, chainInfo := range config.ReflectChainFunction {
 					fileName = "transform_" + chainInfo.Name + "_" + name
 					templateBytes, err := resources.YsoResourceFS.ReadFile(path.Join("gadgets", fileName+".ser"))
-					if err != nil {
+					if err != nil && !strings.Contains(err.Error(), "file does not exist") {
 						return utils.Errorf("read gadget %s template failed: %v", fileName, err)
 					}
 					gadgetConfig.ChainTemplate[chainInfo.Name] = templateBytes
 				}
 			}
-			config.Gadgets[name] = gadgetConfig
+			config.Gadgets[GadgetType(name)] = gadgetConfig
 		}
 		return nil
 	})

