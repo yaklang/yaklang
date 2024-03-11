@@ -138,10 +138,20 @@ func TLSInspect(addr string) ([]*TLSInspectResult, error) {
 	return TLSInspectTimeout(addr, 10)
 }
 
+// InspectForceHttp2 检查目标地址的TLS证书，并返回其证书信息与错误，强制使用HTTP/2协议
+// Example:
+// ```
+// cert, err := tls.InspectForceHttp2("yaklang.io:443")
+// ```
 func TLSInspectForceHttp2(addr string) ([]*TLSInspectResult, error) {
 	return TLSInspectTimeout(addr, 10, "h2")
 }
 
+// InspectForceHttp1_1 检查目标地址的TLS证书，并返回其证书信息与错误，强制使用HTTP/1.1协议
+// Example:
+// ```
+// cert, err := tls.InspectForceHttp1_1("yaklang.io:443")
+// ```
 func TLSInspectForceHttp1_1(addr string) ([]*TLSInspectResult, error) {
 	return TLSInspectTimeout(addr, 10, "http/1.1")
 }
