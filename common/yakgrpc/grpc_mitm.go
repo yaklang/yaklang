@@ -667,12 +667,19 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			controller.finishHijack(taskID)
 		}()
 		_, urlStr := lowhttp.ExtractWebsocketURLFromHTTPRequest(req)
+
+		wsReq, err := utils.DumpHTTPRequest(req, true)
+		if err != nil {
+			log.Errorf("dump request failed: %s", err)
+			return raw
+		}
 		responseCounter := time.Now().UnixNano()
 		feedbackRspIns := &ypb.MITMResponse{
 			ForResponse: true,
-			Response:    raw,
+			Payload:     raw,
 			Url:         urlStr,
 			ResponseId:  responseCounter,
+			Request:     wsReq,
 			RemoteAddr:  httpctx.GetRemoteAddr(req),
 			IsWebsocket: true,
 		}
@@ -1020,6 +1027,12 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			controller.finishHijack(taskID)
 		}()
 
+		wsReq, err := utils.DumpHTTPRequest(req, true)
+
+		if err != nil {
+			log.Errorf("dump request failed: %s", err)
+			return raw
+		}
 		counter := time.Now().UnixNano()
 		select {
 		case hijackingStream <- counter:
@@ -1037,7 +1050,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 			for {
 				feedbackOrigin := &ypb.MITMResponse{
-					Request:             raw,
+					Request:             wsReq,
+					Payload:             raw,
 					IsHttps:             false,
 					Url:                 urlStr,
 					Id:                  id,

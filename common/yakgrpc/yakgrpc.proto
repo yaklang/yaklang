@@ -4654,6 +4654,8 @@ message MITMResponse {
 
   // Websocket 相关配置
   bool isWebsocket = 37;
+  // Websocket 传输的数据
+  bytes Payload = 39;
   repeated string websocketEncode = 38;
 }
 
