@@ -882,6 +882,7 @@ STATUSCODERETRY:
 		goto RECONNECT
 	}
 
+	response.BareResponse = rawBytes
 	/*
 		FixHTTPResponse will be executed when:
 		1. SMUGGLE: noFixContentLength is false

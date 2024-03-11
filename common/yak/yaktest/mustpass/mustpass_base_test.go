@@ -54,7 +54,7 @@ func init() {
 }
 
 func TestMustPassDebug(t *testing.T) {
-	var debugName = "synscan_test.yak"
+	var debugName = "expect_100_continue.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {
@@ -105,7 +105,8 @@ func TestMustPass(t *testing.T) {
 		go func(caseName string, caseContent string) {
 			defer wg.Done()
 			_, err := yak.Execute(caseContent, map[string]interface{}{
-				"VULINBOX": vulinboxAddr,
+				"VULINBOX":      vulinboxAddr,
+				"VULINBOX_HOST": utils.ExtractHostPort(vulinboxAddr),
 			})
 			if err != nil {
 				err := utils.Errorf("run script: %s : %v", caseName, err)
