@@ -35,6 +35,5 @@ func (y *builder) VisitCastOperation(raw phpparser.ICastOperationContext) ssa.Ty
 	default:
 		return ssa.GetAnyType()
 	}
-
 	return nil
 }

@@ -171,6 +171,14 @@ func (v *BasePHPParserVisitor) VisitSwitchStatement(ctx *SwitchStatementContext)
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitSwitchCaseBlock(ctx *SwitchCaseBlockContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitSwitchDefaultBlock(ctx *SwitchDefaultBlockContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitSwitchBlock(ctx *SwitchBlockContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -728,6 +736,10 @@ func (v *BasePHPParserVisitor) VisitModifier(ctx *ModifierContext) interface{} {
 }
 
 func (v *BasePHPParserVisitor) VisitIdentifier(ctx *IdentifierContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitKey(ctx *KeyContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
