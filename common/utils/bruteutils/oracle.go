@@ -36,7 +36,9 @@ var oracleAuth = &DefaultServiceAuthInfo{
 
 		for _, service := range oracleServiceNames {
 			dataSourceName := go_ora.BuildUrl(ip, port, service, i.Username, i.Password, urlOptions)
-			db, err := sql.Open("oracle", dataSourceName)
+			connector := go_ora.NewConnector(dataSourceName).(*go_ora.OracleConnector)
+			connector.Dialer(defaultDialer)
+			db := sql.OpenDB(connector)
 			if err != nil {
 				return res
 			}

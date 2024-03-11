@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/crypto/ssh"
 )
@@ -33,6 +34,18 @@ func handleSSHError(result *BruteItemResult, target string, err error) {
 	}
 }
 
+func sshDial(network, addr string, config *ssh.ClientConfig) (*ssh.Client, error) {
+	conn, err := netx.DialTimeout(config.Timeout, addr)
+	if err != nil {
+		return nil, err
+	}
+	c, chans, reqs, err := ssh.NewClientConn(conn, addr, config)
+	if err != nil {
+		return nil, err
+	}
+	return ssh.NewClient(c, chans, reqs), nil
+}
+
 var sshAuth = &DefaultServiceAuthInfo{
 	ServiceName:  "ssh",
 	DefaultPorts: "22",
@@ -55,7 +68,7 @@ var sshAuth = &DefaultServiceAuthInfo{
 		}
 		config.Auth = []ssh.AuthMethod{ssh.Password(i.Password)}
 
-		client, err := ssh.Dial("tcp", target, config)
+		client, err := sshDial("tcp", target, config)
 		if err != nil {
 			// 107.187.110.241/24
 			log.Errorf("ssh: %v conn failed: %s", i.Target, err)
