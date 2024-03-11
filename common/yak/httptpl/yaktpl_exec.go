@@ -2,6 +2,11 @@ package httptpl
 
 import (
 	"fmt"
+	"net/url"
+	"strings"
+	"sync/atomic"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -9,10 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	utils2 "github.com/yaklang/yaklang/common/yak/httptpl/utils"
-	"net/url"
-	"strings"
-	"sync/atomic"
-	"time"
 )
 
 type requestRaw struct {
@@ -44,7 +45,7 @@ func (y *YakTemplate) GenerateRequestSequences(u string) []*RequestBulk {
 				continue
 			}
 			isHttps := strings.HasPrefix(strings.ToLower(path), "https://")
-			//isHttps, packet, err := lowhttp.ParseUrlToHttpRequestRaw(sequenceCfg.Method, path)
+			// isHttps, packet, err := lowhttp.ParseUrlToHttpRequestRaw(sequenceCfg.Method, path)
 			uarlIns, err := url.Parse(path)
 			if err != nil {
 				log.Error(err)
@@ -96,6 +97,7 @@ User-Agent: %s
 	}
 	return result
 }
+
 func (y *YakTemplate) ExecWithUrl(u string, config *Config, opts ...lowhttp.LowhttpOpt) (int, error) {
 	defer func() {
 		if err := recover(); err != nil {
@@ -245,6 +247,7 @@ func (y *YakTemplate) ExecWithUrl(u string, config *Config, opts ...lowhttp.Lowh
 		return 0, utils.Errorf("[%s] tcp/http is all empty!", y.Name)
 	}
 }
+
 func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts ...lowhttp.LowhttpOpt) (int, error) {
 	urlIns, err := lowhttp.ExtractURLFromHTTPRequestRaw(reqOrigin, isHttps)
 	if err != nil {
@@ -255,7 +258,6 @@ func (y *YakTemplate) Exec(config *Config, isHttps bool, reqOrigin []byte, opts 
 
 // handleRequestSequences 渲染、发包、匹配、提取
 func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakRequestBulkConfig, reqSeqs []*requestRaw, payload map[string][]string, sender func(raw []byte, req *requestRaw) (*lowhttp.LowhttpResponse, error)) ([]*lowhttp.LowhttpResponse, []bool, map[string]interface{}, int64) {
-
 	defer func() {
 		if err := recover(); err != nil {
 			log.Error(err)
@@ -278,7 +280,7 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 	reqConfig := reqOrigin
 	matcher := reqConfig.Matcher
 	var matchers []*YakMatcher
-	var matchersCondition = "and"
+	matchersCondition := "and"
 	if matcher != nil {
 		if len(matcher.SubMatchers) > 0 {
 			matchers = matcher.SubMatchers
@@ -294,7 +296,6 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 	matchHelper := func(rsp *lowhttp.LowhttpResponse, index int) bool {
 		var tempMatchersResult []any
 		for matcherIndex, matcher := range matchers {
-
 			if matcher.Id == 0 {
 				matchResult, err := matcher.ExecuteWithConfig(config, rsp, runtimeVars)
 				if err != nil {
@@ -331,10 +332,12 @@ func (y *YakTemplate) handleRequestSequences(config *Config, reqOrigin *YakReque
 			}
 		}
 		var matchRes bool
-		if matchersCondition == "or" {
-			matchRes = funk.Any(tempMatchersResult...)
-		} else {
-			matchRes = funk.All(tempMatchersResult...)
+		if len(tempMatchersResult) > 0 {
+			if matchersCondition == "or" {
+				matchRes = funk.Any(tempMatchersResult...)
+			} else {
+				matchRes = funk.All(tempMatchersResult...)
+			}
 		}
 		matchResults = append(matchResults, matchRes)
 		return matchRes
