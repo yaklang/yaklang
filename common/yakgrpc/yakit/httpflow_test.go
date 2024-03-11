@@ -1,5 +1,13 @@
 package yakit
 
+import (
+	"fmt"
+	"github.com/go-rod/rod/lib/utils"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"testing"
+)
+
 //func TestYieldHTTPUrl(t *testing.T) {
 //	forest := assets.NewWebsiteForest(10000)
 //
@@ -36,3 +44,55 @@ package yakit
 //{"key": "value"}`),
 //	})
 //}
+
+func TestHTTPFlow_Inset_FixUrl(t *testing.T) {
+	token := utils.RandString(10)
+	httpsFlow := &HTTPFlow{
+		Url: fmt.Sprintf("https://baidu.com:443?a=%s", token),
+	}
+	InsertHTTPFlow(consts.GetGormProjectDatabase().Debug(), httpsFlow)
+
+	httpFlow := &HTTPFlow{
+		Url: fmt.Sprintf("http://baidu.com:80?a=%s", token),
+	}
+	InsertHTTPFlow(consts.GetGormProjectDatabase().Debug(), httpFlow)
+
+	_, flows, err := QueryHTTPFlow(consts.GetGormProjectDatabase().Debug(), &ypb.QueryHTTPFlowRequest{Keyword: token})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, flow := range flows {
+		if flow.ID == httpsFlow.ID {
+			if flow.Url != "https://baidu.com?a="+token {
+				t.Fatal("insert fix https url error")
+			}
+			CreateOrUpdateHTTPFlow(consts.GetGormProjectDatabase().Debug(), flow.Hash, &HTTPFlow{
+				Url: fmt.Sprintf("https://baidu.com:443?a=%s", token),
+			})
+		}
+
+		if flow.ID == httpFlow.ID {
+			if flow.Url != "http://baidu.com?a="+token {
+				t.Fatal("insert fix http url error")
+			}
+			CreateOrUpdateHTTPFlow(consts.GetGormProjectDatabase().Debug(), flow.Hash, &HTTPFlow{
+				Url: fmt.Sprintf("http://baidu.com:80?a=%s", token),
+			})
+		}
+	}
+
+	for _, flow := range flows {
+		if flow.ID == httpsFlow.ID {
+			if flow.Url != "https://baidu.com?a="+token {
+				t.Fatal("update fix https url error")
+			}
+		}
+
+		if flow.ID == httpFlow.ID {
+			if flow.Url != "http://baidu.com?a="+token {
+				t.Fatal("update fix http url error")
+			}
+		}
+	}
+
+}
