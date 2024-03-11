@@ -1,7 +1,9 @@
 package yakgrpc
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/utils"
 	"net/http"
 	"strings"
 	"testing"
@@ -9,6 +11,14 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+)
+
+const (
+	uri int = 1 << iota
+	header
+	body
+	request
+	response
 )
 
 func TestGRPCMUSTPASS_HookColorWithRequest(t *testing.T) {
@@ -169,7 +179,7 @@ func TestGRPCMUSTPASS_MatchScope(t *testing.T) {
 Content-Type: application/json; charset=utf-8
 Date: Tue, 10 Oct 2023 07:28:15 GMT
 testHeaderRsp: xxx
-Content-Length: 23
+Content-Length: 11
 
 `)
 			reqRaw := `POST /testUri HTTP/1.1
@@ -262,15 +272,26 @@ testBody`
 	}
 }
 
+// TestReplaceWithScope verify the replacer can replace the matched content in the right scope
+// Since matching and replacement are two implementation methods, the scope of replacement needs to be tested.
 func TestGRPCMUSTPASS_ReplaceWithScope(t *testing.T) {
-	const (
-		uri int = 1 << iota
-		header
-		body
-		request
-		response
-	)
+	var replaceOkFlag = fmt.Sprintf("===%s===", utils.RandStringBytes(8))
 
+	responseBytes := []byte(`HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Date: Tue, 10 Oct 2023 07:28:15 GMT
+testHeaderRsp: xxx
+Content-Length: 11
+
+testBodyRsp`)
+	reqRaw := `POST /testUri HTTP/1.1
+Host: www.baidu.com
+Accept-Encoding: gzip, deflate, br
+testHeader: xxx
+Accept-Language: zh-CN,zh;q=0.9
+Content-Length: 23
+
+testBody`
 	for _, testCase := range []struct {
 		flag   int
 		expect string
@@ -340,51 +361,237 @@ func TestGRPCMUSTPASS_ReplaceWithScope(t *testing.T) {
 			replacer := NewMITMReplacer()
 			rule := &ypb.MITMContentReplacer{
 				Rule:        `test.*`,
-				NoReplace:   true,
-				Result:      ``,
+				NoReplace:   false,
+				Result:      replaceOkFlag,
 				Color:       "",
 				Index:       0,
 				ExtraTag:    nil,
 				Disabled:    false,
 				VerboseName: "",
 			}
-			ruleFlag := testCase.flag
-			rule.EnableForRequest = ruleFlag&request != 0
-			rule.EnableForResponse = ruleFlag&response != 0
-			rule.EnableForHeader = ruleFlag&header != 0
-			rule.EnableForBody = ruleFlag&body != 0
-			rule.EnableForURI = ruleFlag&uri != 0
+			ConfigRuleByFlags(rule, testCase.flag)
+			expcetItems := strings.Split(testCase.expect, ",")
+			var expectLines [3]int
+			for i, item := range expcetItems {
+				item = strings.TrimSpace(item)
+				if item == "" {
+					continue
+				}
+				switch item {
+				case "testUri":
+					expectLines[i] = 1
+				case "testHeader":
+					expectLines[i] = 4
+				case "testBody":
+					expectLines[i] = 8
+				case "testHeaderRsp":
+					expectLines[i] = 4
+				case "testBodyRsp":
+					expectLines[i] = 7
+				}
+			}
+			for i, re := range []string{"testUri\\w*", "testHeader\\w*", "testBody\\w*"} {
+				rule.Rule = re
+				replacer.SetRules(rule)
+				var packet []byte
+				if rule.EnableForRequest {
+					packet = []byte(reqRaw)
+				} else {
+					packet = responseBytes
+				}
+				_, modified, _ := replacer.hook(rule.EnableForRequest, rule.EnableForResponse, packet)
+				packetLines := strings.Split(string(modified), "\n")
+				targetLine := expectLines[i] - 1
+				if targetLine == -1 {
+					assert.Equal(t, strings.Replace(string(modified), "\r\n", "\n", -1), string(packet))
+				} else {
+					assert.Contains(t, packetLines[targetLine], replaceOkFlag)
+				}
+			}
+		})
+	}
+}
 
-			responseBytes := []byte(`HTTP/1.1 200 OK
-Content-Type: application/json; charset=utf-8
-Date: Tue, 10 Oct 2023 07:28:15 GMT
-testHeaderRsp: xxx
-Content-Length: 23
-
-testBodyRsp`)
-			reqRaw := `POST /testUri HTTP/1.1
+// TestGRPCMUSTPASS_ReplaceWhenMultiMatch verify the situation that replacer should replace all matched content
+func TestGRPCMUSTPASS_ReplaceWhenMultiMatch(t *testing.T) {
+	flag := "==ok=="
+	reqRaw := `POST /testUri HTTP/1.1
 Host: www.baidu.com
 Accept-Encoding: gzip, deflate, br
 testHeader: xxx
 Accept-Language: zh-CN,zh;q=0.9
+Content-Length: 23
 
 testBody`
-			req, err := http.NewRequest("GET", "https://www.baidu.com/testUri", nil)
-			if err != nil {
-				t.Fatal(err)
+	replacer := NewMITMReplacer()
+	rule := &ypb.MITMContentReplacer{
+		Rule:        `test.*`,
+		NoReplace:   false,
+		Result:      flag,
+		Color:       "",
+		Index:       0,
+		ExtraTag:    nil,
+		Disabled:    false,
+		VerboseName: "",
+	}
+	for _, testCase := range []struct {
+		name       string
+		flags      int
+		expectLine [3]int
+	}{
+		{
+			name:       "test match uri",
+			flags:      request | uri,
+			expectLine: [3]int{1, 0, 0},
+		},
+		{
+			name:       "test match header",
+			flags:      request | header,
+			expectLine: [3]int{1, 4, 0},
+		},
+		{
+			name:       "test match body",
+			flags:      request | body,
+			expectLine: [3]int{0, 0, 8},
+		},
+		{
+			name:       "test match packet",
+			flags:      request | header | body,
+			expectLine: [3]int{1, 4, 8},
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			ConfigRuleByFlags(rule, testCase.flags)
+			replacer.SetRules(rule)
+			_, modifiedPacket, _ := replacer.hook(true, false, []byte(reqRaw))
+			packetLines := strings.Split(string(modifiedPacket), "\n")
+			p := 0
+			m := map[int]struct{}{}
+			for _, l := range testCase.expectLine {
+				m[l-1] = struct{}{}
 			}
-			var matchRes []string
-			for _, re := range []string{"testUri\\w*", "testHeader\\w*", "testBody\\w*"} {
-				rule.Rule = re
-				replacer.SetRules(rule)
-				extractedData := replacer.hookColor([]byte(reqRaw), responseBytes, req, &yakit.HTTPFlow{})
-				if len(extractedData) == 1 {
-					matchRes = append(matchRes, extractedData[0].Data)
+			for i, line := range packetLines {
+				if _, ok := m[i]; ok {
+					assert.Contains(t, line, flag)
+					p++
 				} else {
-					matchRes = append(matchRes, "")
+					assert.NotContains(t, line, flag)
 				}
 			}
-			assert.Equal(t, testCase.expect, strings.Join(matchRes, ","))
 		})
 	}
+}
+
+// TestExtraHeaders if header content the config header, replace it. Otherwise, add the config header
+func TestExtraHeaders(t *testing.T) {
+	replacer := NewMITMReplacer()
+	replacer.SetRules(&ypb.MITMContentReplacer{
+		Rule:              `POST`,
+		NoReplace:         false,
+		Result:            ``,
+		Color:             "",
+		EnableForResponse: false,
+		EnableForRequest:  true,
+		EnableForHeader:   true,
+		EnableForBody:     true,
+		Index:             0,
+		ExtraTag:          nil,
+		Disabled:          false,
+		VerboseName:       "",
+		ExtraHeaders: []*ypb.HTTPHeader{
+			{
+				Header: "aa",
+				Value:  "a",
+			},
+		},
+	})
+	reqRaw := `POST /testUri HTTP/1.1
+Host: www.baidu.com
+aa: 1`
+	_, modifiedPacket, _ := replacer.hook(true, false, []byte(reqRaw))
+	assert.NotContains(t, string(modifiedPacket), "aa: 1")
+	assert.Contains(t, string(modifiedPacket), "aa: a")
+	reqRaw = `POST /testUri HTTP/1.1
+Host: www.baidu.com`
+	_, modifiedPacket, _ = replacer.hook(true, false, []byte(reqRaw))
+	assert.NotContains(t, string(modifiedPacket), "aa: 1")
+	assert.Contains(t, string(modifiedPacket), "aa: a")
+}
+
+// TestExtraCookie if cookie content the config cookie, replace it. Otherwise, add the config cookie
+func TestExtraCookie(t *testing.T) {
+	replacer := NewMITMReplacer()
+	replacer.SetRules(&ypb.MITMContentReplacer{
+		Rule:              `POST`,
+		NoReplace:         false,
+		Result:            ``,
+		Color:             "",
+		EnableForResponse: false,
+		EnableForRequest:  true,
+		EnableForHeader:   true,
+		EnableForBody:     true,
+		Index:             0,
+		ExtraTag:          nil,
+		Disabled:          false,
+		VerboseName:       "",
+		ExtraCookies: []*ypb.HTTPCookieSetting{
+			{
+				Key:          "aa",
+				Value:        "a",
+				Path:         "/",
+				Domain:       "www.baidu.com",
+				Expires:      123,
+				MaxAge:       123,
+				Secure:       true,
+				HttpOnly:     true,
+				SameSiteMode: "strict",
+			},
+		},
+	})
+	reqRaw := `POST /testUri HTTP/1.1
+Host: www.baidu.com
+Cookie: cc=1`
+	_, modifiedPacket, _ := replacer.hook(true, false, []byte(reqRaw))
+	assert.Contains(t, string(modifiedPacket), "Cookie: cc=1; aa=a")
+	reqRaw = `POST /testUri HTTP/1.1
+Host: www.baidu.com
+`
+	_, modifiedPacket, _ = replacer.hook(true, false, []byte(reqRaw))
+	assert.Contains(t, string(modifiedPacket), "Cookie: aa=a")
+}
+
+// TestMatchPatternMatchHeaderAndBody verify the situation that pattern matched data content header and body
+func TestMatchPatternMatchHeaderAndBody(t *testing.T) {
+	replacer := NewMITMReplacer()
+	replacer.SetRules(&ypb.MITMContentReplacer{
+		Rule:              "\r\n\r\n.*",
+		NoReplace:         false,
+		Result:            `==ok==`,
+		Color:             "",
+		EnableForResponse: false,
+		EnableForRequest:  true,
+		EnableForHeader:   true,
+		EnableForBody:     true,
+		Index:             0,
+		ExtraTag:          nil,
+		Disabled:          false,
+		VerboseName:       "",
+	})
+	reqRaw := `POST /testUri HTTP/1.1
+Host: www.baidu.com
+header: 1
+
+body
+`
+	_, modifiedPacket, _ := replacer.hook(true, false, []byte(reqRaw))
+	if !strings.HasSuffix(string(modifiedPacket), "Content-Length: 5==ok==\n") {
+		t.Fatal("replace failed")
+	}
+}
+func ConfigRuleByFlags(rule *ypb.MITMContentReplacer, ruleFlag int) {
+	rule.EnableForRequest = ruleFlag&request != 0
+	rule.EnableForResponse = ruleFlag&response != 0
+	rule.EnableForHeader = ruleFlag&header != 0
+	rule.EnableForBody = ruleFlag&body != 0
+	rule.EnableForURI = ruleFlag&uri != 0
 }
