@@ -2,7 +2,6 @@ package php2ssa
 
 import (
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
-	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 func (y *builder) VisitEchoStatement(raw phpparser.IEchoStatementContext) interface{} {
@@ -16,12 +15,7 @@ func (y *builder) VisitEchoStatement(raw phpparser.IEchoStatementContext) interf
 	}
 
 	caller := y.ir.ReadOrCreateVariable("echo")
-	var args []ssa.Value
-	for _, expr := range i.ExpressionList().(*phpparser.ExpressionListContext).AllExpression() {
-		val := y.VisitExpression(expr)
-		args = append(args, val)
-	}
-
+	args := y.VisitExpressionList(i.ExpressionList())
 	call := y.ir.NewCall(caller, args)
 	y.ir.EmitCall(call)
 	return nil

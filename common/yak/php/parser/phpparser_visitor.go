@@ -130,6 +130,12 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#switchStatement.
 	VisitSwitchStatement(ctx *SwitchStatementContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#switchCaseBlock.
+	VisitSwitchCaseBlock(ctx *SwitchCaseBlockContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#switchDefaultBlock.
+	VisitSwitchDefaultBlock(ctx *SwitchDefaultBlockContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#switchBlock.
 	VisitSwitchBlock(ctx *SwitchBlockContext) interface{}
 
@@ -549,6 +555,9 @@ type PHPParserVisitor interface {
 
 	// Visit a parse tree produced by PHPParser#identifier.
 	VisitIdentifier(ctx *IdentifierContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#key.
+	VisitKey(ctx *KeyContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#memberModifier.
 	VisitMemberModifier(ctx *MemberModifierContext) interface{}

@@ -200,7 +200,7 @@ innerStatement
     ;
 
 // Statements
-labelStatement: identifier ':';
+labelStatement: Label ':';
 
 statement
     : labelStatement
@@ -239,8 +239,6 @@ blockStatement
 ifStatement
     : If parentheses statement elseIfStatement* elseStatement?
     | If parentheses ':' innerStatementList elseIfColonStatement* elseColonStatement? EndIf SemiColon
-    | If parentheses ':'
-    | ElseIf parentheses ':'
     ;
 
 elseIfStatement
@@ -284,13 +282,20 @@ forUpdate
 
 switchStatement
     : Switch parentheses (
-        OpenCurlyBracket SemiColon? switchBlock* CloseCurlyBracket
-        | ':' SemiColon? switchBlock* EndSwitch SemiColon
+        OpenCurlyBracket SemiColon? (switchCaseBlock | switchDefaultBlock)* CloseCurlyBracket
+        | ':' SemiColon? (switchCaseBlock | switchDefaultBlock)* EndSwitch SemiColon
     )
     ;
+switchCaseBlock
+    : Case expression  (':' | SemiColon) SemiColon* innerStatementList
+    ;
+switchDefaultBlock
+    : Default (':' | SemiColon) SemiColon* innerStatementList
+    ;
+
 
 switchBlock
-    : ((Case expression | Default) (':' | SemiColon))+ innerStatementList
+    : (((Case expression) | Default) (':' | SemiColon) SemiColon*)+ innerStatementList
     ;
 
 breakStatement
@@ -561,7 +566,7 @@ leftSliceCall: '[' expression ']';
 leftVariable
     : Dollar+ VarName                                       # DynamicVariable// $$a= 1; or $$$a=1;
     | VarName                                               # Variable// $a=3 
-    | Dollar? OpenCurlyBracket expression CloseCurlyBracket # MemberCallVariable// ${"a"."b"}=3 
+    | Dollar* OpenCurlyBracket expression CloseCurlyBracket # MemberCallVariable// ${"a"."b"}=3
     ;
 
 leftArrayCreation // PHP7.1+
@@ -835,7 +840,11 @@ modifier
 
 identifier
     : Label
-    | Abstract
+    | key
+    ;
+
+key
+    : Abstract
     | Array
     | As
     | BinaryCast

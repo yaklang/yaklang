@@ -2,6 +2,7 @@ package php2ssa
 
 import (
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 func (y *builder) VisitWhileStatement(raw phpparser.IWhileStatementContext) interface{} {
@@ -13,21 +14,18 @@ func (y *builder) VisitWhileStatement(raw phpparser.IWhileStatementContext) inte
 	if i == nil {
 		return nil
 	}
-
-	//loop := y.ir.BuildLoop()
-	//loop.BuildCondition(func() ssa.Value {
-	//	return y.VisitParentheses(i.Parentheses())
-	//})
-	//if i.Statement() != nil {
-	//	loop.BuildBody(func() {
-	//		y.VisitStatement(i.Statement())
-	//	})
-	//} else {
-	//	loop.BuildBody(func() {
-	//		y.VisitInnerStatementList(i.InnerStatementList())
-	//	})
-	//}
-	//loop.Finish()
+	loopBuilder := y.ir.CreateLoopBuilder()
+	loopBuilder.SetCondition(func() ssa.Value {
+		return y.VisitParentheses(i.Parentheses())
+	})
+	loopBuilder.SetBody(func() {
+		if i.Colon() != nil {
+			y.VisitInnerStatementList(i.InnerStatementList())
+		} else {
+			y.VisitStatement(i.Statement())
+		}
+	})
+	loopBuilder.Finish()
 	return nil
 }
 
@@ -35,27 +33,24 @@ func (y *builder) VisitDoWhileStatement(raw phpparser.IDoWhileStatementContext) 
 	if y == nil || raw == nil {
 		return nil
 	}
-
 	i, _ := raw.(*phpparser.DoWhileStatementContext)
 	if i == nil {
 		return nil
 	}
-
-	//loop := y.ir.BuildLoop()
-	//loop.BuildCondition(func() ssa.Value {
-	//	return y.ir.EmitConstInst(true)
-	//})
-	//loop.BuildBody(func() {
-	//	y.VisitStatement(i.Statement())
-	//	y.ir.BuildIf().BuildCondition(func() ssa.Value {
-	//		return y.VisitParentheses(i.Parentheses())
-	//	}).BuildTrue(func() {
-	//		y.ir.EmitJump(y.ir.GetContinue())
-	//	}).BuildFalse(func() {
-	//		y.ir.EmitJump(y.ir.GetBreak())
-	//	}).Finish()
-	//})
-	//loop.Finish()
+	loopBuilder := y.ir.CreateLoopBuilder()
+	_ = loopBuilder
+	loopBuilder.SetCondition(func() ssa.Value {
+		return y.ir.EmitConstInst(true)
+	})
+	loopBuilder.SetBody(func() {
+		y.VisitStatement(i.Statement())
+		y.ir.CreateIfBuilder().SetCondition(func() ssa.Value {
+			return y.VisitParentheses(i.Parentheses())
+		}, func() {}).SetElse(func() {
+			y.ir.Break()
+		}).Build()
+	})
+	loopBuilder.Finish()
 	return nil
 }
 
@@ -63,29 +58,81 @@ func (y *builder) VisitForStatement(raw phpparser.IForStatementContext) interfac
 	if y == nil || raw == nil {
 		return nil
 	}
-
 	i, _ := raw.(*phpparser.ForStatementContext)
 	if i == nil {
 		return nil
 	}
-
+	loopBuilder := y.ir.CreateLoopBuilder()
+	if i.ForInit() != nil {
+		loopBuilder.SetFirst(func() []ssa.Value {
+			return y.VisitForInit(i.ForInit())
+		})
+	}
+	//先设置为true，在if-body前面做匹配
+	loopBuilder.SetCondition(func() ssa.Value {
+		return y.ir.EmitConstInst(true)
+	})
+	if i.ForUpdate() != nil {
+		loopBuilder.SetThird(func() []ssa.Value {
+			return y.VisitForUpdate(i.ForUpdate())
+		})
+	}
+	loopBuilder.SetBody(func() {
+		if i.ExpressionList() != nil {
+			list := y.VisitExpressionList(i.ExpressionList())
+			for _, value := range list {
+				value1 := value
+				y.ir.CreateIfBuilder().SetCondition(func() ssa.Value {
+					return value1
+				}, func() {
+				}).SetElse(func() {
+					y.ir.Break()
+				})
+			}
+		}
+		if i.Statement() != nil {
+			y.VisitStatement(i.Statement())
+		} else {
+			y.VisitInnerStatementList(i.InnerStatementList())
+		}
+	})
+	loopBuilder.Finish()
 	return nil
+}
+
+func (y *builder) VisitForInit(raw phpparser.IForInitContext) []ssa.Value {
+	if y == nil || raw == nil {
+		return nil
+	}
+	i, _ := raw.(*phpparser.ForInitContext)
+	if i == nil {
+		return nil
+	}
+	return y.VisitExpressionList(i.ExpressionList())
+}
+
+func (y *builder) VisitForUpdate(raw phpparser.IForUpdateContext) []ssa.Value {
+	if y == nil || raw == nil {
+		return nil
+	}
+	i, _ := raw.(*phpparser.ForUpdateContext)
+	if i == nil {
+		return nil
+	}
+	return y.VisitExpressionList(i.ExpressionList())
 }
 
 func (y *builder) VisitContinueStatement(raw phpparser.IContinueStatementContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
-
 	i, _ := raw.(*phpparser.ContinueStatementContext)
 	if i == nil {
 		return nil
 	}
-
 	//if t := y.ir.GetContinue(); t != nil {
 	//	return y.ir.EmitJump(t)
 	//}
-
 	return nil
 }
 
@@ -98,6 +145,5 @@ func (y *builder) VisitForeachStatement(raw phpparser.IForeachStatementContext) 
 	if i == nil {
 		return nil
 	}
-
 	return nil
 }
