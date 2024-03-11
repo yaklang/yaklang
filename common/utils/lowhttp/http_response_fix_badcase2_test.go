@@ -22,6 +22,25 @@ Transfer-Encoding: chunked
 	}
 }
 
+func TestFixHTTPResponse_100Continue(t *testing.T) {
+	rsp, body, err := FixHTTPResponse([]byte("HTTP/1.1 100 Continue\r\n\r\n" + `HTTP/1.1 200 OK
+Transfer-Encoding: chunked
+
+0` + "\r\n\r\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(body)) != "" {
+		t.Fatal("body should be empty")
+	}
+	if !bytes.HasSuffix(rsp, []byte("Content-Length: 0\r\n\r\n")) {
+		t.Fatal("rsp should end with Content-Length: 0\\r\\n\\r\\n")
+	}
+	if bytes.Contains(rsp, []byte("HTTP/1.1 100 Continue")) {
+		t.Fatal("rsp should not contain HTTP/1.1 100 Continue")
+	}
+}
+
 func TestFixHTTPResponse3(t *testing.T) {
 	rsp, body, err := FixHTTPResponse([]byte(`HTTP/1.1 200 OK
 Transfer-Encoding: chunked
