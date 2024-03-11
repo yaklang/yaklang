@@ -147,6 +147,26 @@ func (p *Risk) BeforeSave() error {
 	return nil
 }
 
+func (r *Risk) AfterCreate(tx *gorm.DB) (err error) {
+	BroadcastData("risk", "create")
+	return nil
+}
+
+func (r *Risk) AfterSave(tx *gorm.DB) (err error) {
+	BroadcastData("risk", "save")
+	return nil
+}
+
+func (r *Risk) AfterUpdate(tx *gorm.DB) (err error) {
+	BroadcastData("risk", "update")
+	return nil
+}
+
+func (r *Risk) AfterDelete(tx *gorm.DB) (err error) {
+	BroadcastData("risk", "delete")
+	return nil
+}
+
 func CreateOrUpdateRisk(db *gorm.DB, hash string, i interface{}) error {
 	db = db.Model(&Risk{})
 
@@ -325,7 +345,7 @@ func QueryRisks(db *gorm.DB, params *ypb.QueryRisksRequest) (*bizhelper.Paginato
 
 func DeleteRiskByTarget(db *gorm.DB, target string) {
 	db = db.Model(&Risk{})
-	var host, port, _ = utils.ParseStringToHostPort(target)
+	host, port, _ := utils.ParseStringToHostPort(target)
 	if port > 0 {
 		db = db.Where("port = ?", port)
 		if host != "" {
@@ -344,7 +364,7 @@ func DeleteRiskByTarget(db *gorm.DB, target string) {
 func YieldRisksByTarget(db *gorm.DB, ctx context.Context, target string) chan *Risk {
 	outC := make(chan *Risk)
 	db = db.Model(&Risk{})
-	var host, port, _ = utils.ParseStringToHostPort(target)
+	host, port, _ := utils.ParseStringToHostPort(target)
 	if port > 0 {
 		db = db.Where("port = ?", port)
 		if host != "" {
@@ -357,7 +377,7 @@ func YieldRisksByTarget(db *gorm.DB, ctx context.Context, target string) chan *R
 	go func() {
 		defer close(outC)
 
-		var page = 1
+		page := 1
 		for {
 			var items []*Risk
 			if _, b := bizhelper.NewPagination(&bizhelper.Param{
@@ -395,7 +415,7 @@ func YieldRisksByRuntimeId(db *gorm.DB, ctx context.Context, runtimeId string) c
 	go func() {
 		defer close(outC)
 
-		var page = 1
+		page := 1
 		for {
 			var items []*Risk
 			if _, b := bizhelper.NewPagination(&bizhelper.Param{
@@ -433,7 +453,7 @@ func YieldRisksByCreateAt(db *gorm.DB, ctx context.Context, timestamp int64) cha
 	go func() {
 		defer close(outC)
 
-		var page = 1
+		page := 1
 		for {
 			var items []*Risk
 			if _, b := bizhelper.NewPagination(&bizhelper.Param{
@@ -507,7 +527,7 @@ func YieldRisks(db *gorm.DB, ctx context.Context) chan *Risk {
 	go func() {
 		defer close(outC)
 
-		var page = 1
+		page := 1
 		for {
 			var items []*Risk
 			if _, b := bizhelper.NewPagination(&bizhelper.Param{
