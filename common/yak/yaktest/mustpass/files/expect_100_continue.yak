@@ -1,0 +1,19 @@
+target:=getParam("VULINBOX")
+host = str.ExtractHostPort(target)
+dump(target, host)
+
+rsp, req = poc.HTTPEx(f`GET /misc/response/expect100 HTTP/1.1
+Host: ${host}
+Expect: 100-continue
+`, poc.https(true))~
+
+if "HTTP/1.1 100 Continue" in rsp.RawPacket {
+    die("BAD PACKET")
+}
+
+if "HTTP/1.1 100 Continue" not in rsp.BareResponse {
+    die("RAW PACKET should contains 100-continue")
+}
+
+dump(rsp.BareResponse)
+dump(rsp.RawPacket)

@@ -235,6 +235,12 @@ func ExtractHost(raw string) string {
 	return raw
 }
 
+// ExtractHostPort 尝试从字符串中解析出host和port，并返回host:port
+// Example:
+// ```
+// str.ExtractHostPort("https://127.0.0.1:8888") // 127.0.0.1:8888
+// str.ExtractHostPort("https://baidu.com") // 127.0.0.1:443
+// ```
 func ExtractHostPort(raw string) string {
 	host, port, _ := ParseStringToHostPort(raw)
 	if host != "" && host != raw && port > 0 {
