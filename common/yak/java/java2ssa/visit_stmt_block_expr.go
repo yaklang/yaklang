@@ -4,6 +4,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/yak2ssa"
 )
 
 func (y *builder) VisitBlock(raw javaparser.IBlockContext) interface{} {
@@ -44,19 +45,15 @@ func (y *builder) VisitBlockStatement(raw javaparser.IBlockStatementContext) int
 	return nil
 }
 
-func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
+func (y *builder) VisitExpression(raw javaparser.IExpressionContext) interface{} {
 	if y == nil || raw == nil {
-		return nil
-	}
-
-	i, _ := raw.(*javaparser.ExpressionContext)
-	if i == nil {
 		return nil
 	}
 
 	switch ret := raw.(type) {
 	case *javaparser.PrimaryExpressionContext:
 		// 处理主要表达式
+		return y.VisitPrimary(ret.Primary())
 	case *javaparser.SliceCallExpressionContext:
 		// 处理切片调用表达式
 	case *javaparser.MemberCallExpressionContext:
@@ -71,6 +68,26 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		// 处理 Java 17 的 switch 表达式
 	case *javaparser.PostfixExpressionContext:
 		// 处理后缀表达式，如自增、自减操作
+		if ret.INC() != nil { //++
+			variable := y.VisitExpression(ret.Expression()).(*ssa.Variable)
+			if variable == nil {
+				y.NewError(ssa.Error, "javaast", yak2ssa.AssignLeftSideEmpty())
+				return nil
+			}
+			value := y.EmitBinOp(ssa.OpAdd, y.ReadValueByVariable(variable), y.EmitConstInst(1))
+			y.AssignVariable(variable, value)
+			return variable
+		}
+		if ret.DEC() != nil { //--
+			variable := y.VisitExpression(ret.Expression()).(*ssa.Variable)
+			if variable == nil {
+				y.NewError(ssa.Error, "javaast", yak2ssa.AssignLeftSideEmpty())
+				return nil
+			}
+			value := y.EmitBinOp(ssa.OpSub, y.ReadValueByVariable(variable), y.EmitConstInst(1))
+			y.AssignVariable(variable, value)
+			return variable
+		}
 	case *javaparser.PrefixExpressionContext:
 		// 处理前缀表达式，如正负号、逻辑非等
 	case *javaparser.CastExpressionContext:
@@ -127,7 +144,7 @@ func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext) ssa.Value {
 	return nil
 }
 
-func (y *builder) VisitPrimary(raw javaparser.IPrimaryContext) ssa.Value {
+func (y *builder) VisitPrimary(raw javaparser.IPrimaryContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -136,7 +153,14 @@ func (y *builder) VisitPrimary(raw javaparser.IPrimaryContext) ssa.Value {
 	if i == nil {
 		return nil
 	}
-
+	if ret := i.Literal(); ret != nil {
+		literal := ret.(*javaparser.LiteralContext)
+		return literal.GetText()
+	}
+	if ret := i.Identifier(); ret != nil {
+		text := ret.GetText()
+		return y.CreateVariable(text)
+	}
 	return nil
 }
 
@@ -148,6 +172,11 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 	i, _ := raw.(*javaparser.StatementContext)
 	if i == nil {
 		return nil
+	}
+
+	if ret := i.Expression(0); ret != nil {
+		log.Infof("visit expression: %v", ret.GetText())
+		y.VisitExpression(ret)
 	}
 
 	return nil
@@ -179,12 +208,10 @@ func (y *builder) VisitLocalVariableDeclaration(raw javaparser.ILocalVariableDec
 	id := i.Identifier()
 	if id != nil {
 		varName := id.GetText()
-		variable := y.CreateVariable(varName)
+		variable := y.CreateLocalVariable(varName)
 		exprResult := y.VisitExpression(i.Expression())
-		if exprResult == nil {
-			exprResult = y.EmitConstInstAny()
-		}
-		y.AssignVariable(variable, exprResult)
+		value := y.EmitConstInst(exprResult)
+		y.AssignVariable(variable, value)
 		return nil
 	}
 	return nil

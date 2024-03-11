@@ -139,8 +139,18 @@ func (y *builder) VisitMemberDeclaration(klass *ssa.ClassBluePrint, raw javapars
 		method := ret.(*javaparser.MethodDeclarationContext)
 		funcName := method.Identifier().GetText()
 		ir.NewFunc(funcName)
+		// TODO : handle OOP
+		methodBody := method.MethodBody().(*javaparser.MethodBodyContext)
+		ir.VisitBlock(methodBody.Block())
 	} else if ret := i.GenericMethodDeclaration(); ret != nil {
 	} else if ret := i.FieldDeclaration(); ret != nil {
+		// 声明成员变量
+		field := ret.(*javaparser.FieldDeclarationContext)
+		variables := field.VariableDeclarators().(*javaparser.VariableDeclaratorsContext).AllVariableDeclarator()
+		for _, variable := range variables {
+			y.CreateLocalVariable(variable.GetText())
+			log.Infof("create member declaration%v", variable.GetText())
+		}
 
 	} else if ret := i.ConstructorDeclaration(); ret != nil {
 
