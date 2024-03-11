@@ -212,7 +212,14 @@ echo "abc";
 }
 `)
 }
-
+func TestParseSSA_TryCatch(t *testing.T) {
+	test.MockSSA(t, `<?php
+try {
+    echo 1;
+}finally{
+    echo 2;
+}`)
+}
 func TestParseSSA_Function_1(t *testing.T) {
 	test.MockSSA(t, `<?php
 function testFunction2($a, $b='1', $c=array(1,2,3,), string $d) {

@@ -6,11 +6,9 @@ func (y *builder) VisitGlobalStatement(raw phpparser.IGlobalStatementContext) in
 	if y == nil || raw == nil {
 		return nil
 	}
-
 	i, _ := raw.(*phpparser.GlobalStatementContext)
 	if i == nil {
 		return nil
 	}
-
 	return nil
 }

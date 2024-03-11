@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 	"github.com/yaklang/yaklang/common/yak/yak2ssa"
+	"runtime/debug"
 )
 
 type Language string
@@ -27,7 +28,7 @@ var (
 func parse(c *config, prog *ssa.Program) (ret *ssa.Program, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			// debug.PrintStack()
+			debug.PrintStack()
 			ret = nil
 			err = utils.Errorf("parse error with panic : %v", r)
 		}

@@ -160,7 +160,10 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		}
 		return y.ir.EmitConstInstNil()
 	case *phpparser.PrintExpressionContext:
-		return y.ir.EmitConstInst(1)
+		caller := y.ir.ReadValue("print")
+		args := y.VisitExpression(ret.Expression())
+		callInst := y.ir.NewCall(caller, []ssa.Value{args})
+		return y.ir.EmitCall(callInst)
 	case *phpparser.ArrayCreationExpressionContext:
 		// arrayCreation
 		return y.VisitArrayCreation(ret.ArrayCreation())
@@ -361,7 +364,6 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		y.ir.AssignVariable(variable, rightValue)
 		return rightValue
 	case *phpparser.OrdinaryAssignmentExpressionContext:
-		// assignable assignmentOperator attributes? expression        # AssignmentExpression
 		variable := y.VisitLeftVariable(ret.LeftVariable())
 		rightValue := y.VisitExpression(ret.Expression())
 		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), variable.GetValue(), rightValue)
@@ -409,7 +411,9 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		}
 		return tempVar.GetValue()
 	case *phpparser.ShortQualifiedNameExpressionContext:
-		return y.ir.EmitConstInstAny()
+		return y.ir.ReadOrCreateVariable(y.VisitIdentifier(ret.Identifier()))
+		//return y.ir.EmitUndefined(y.VisitIdentifier(ret.Identifier()))
+		//return y.ir.EmitConstInstAny()
 	}
 	raw.GetText()
 	log.Errorf("unhandled expression: %v(T: %T)", raw.GetText(), raw)
@@ -656,6 +660,7 @@ func (y *builder) VisitFunctionCallName(raw phpparser.IFunctionCallNameContext) 
 	} else if ret := i.Parentheses(); ret != nil {
 		return y.VisitParentheses(ret)
 	} else if ret := i.Label(); ret != nil {
+		return y.ir.ReadValue(i.Label().GetText())
 		//return y.ir.ReadVariable(i.Label().GetText(), true)
 	}
 	log.Errorf("BUG: unknown function call name: %v", i.GetText())
@@ -923,7 +928,21 @@ func (y *builder) VisitConstantInitializer(raw phpparser.IConstantInitializerCon
 		return initVal
 	}
 }
+func (y *builder) VisitExpressionList(raw phpparser.IExpressionListContext) []ssa.Value {
+	if y == nil || raw == nil {
+		return nil
+	}
 
+	i, _ := raw.(*phpparser.ExpressionListContext)
+	if i == nil {
+		return nil
+	}
+	var value = make([]ssa.Value, len(i.AllExpression()))
+	for _, expressionContext := range i.AllExpression() {
+		value = append(value, y.VisitExpression(expressionContext))
+	}
+	return value
+}
 func (y *builder) VisitConstantString(raw phpparser.IConstantStringContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
@@ -992,17 +1011,18 @@ func (y *builder) VisitLeftVariable(raw phpparser.ILeftVariableContext) *ssa.Var
 		return nil
 	}
 
-	var variable ssa.Value
 	switch stmt := raw.(type) {
 	case *phpparser.VariableContext:
-		variable = y.ir.ReadOrCreateVariable(stmt.VarName().GetText())
-
+		return y.ir.CreateVariable(stmt.VarName().GetText())
 	case *phpparser.DynamicVariableContext:
 		// TODO: handler DynamicVariable
-		variable = y.ir.ReadOrCreateVariable("$" + stmt.VarName().GetText())
+		//variable = y.ir.ReadOrCreateVariable("$" + stmt.VarName().GetText())
+		return nil
 	case *phpparser.MemberCallVariableContext:
-		val := y.VisitExpression(stmt.Expression())
-		variable = y.ir.ReadOrCreateVariable(val.GetVerboseName())
+		return nil
+		//val := y.VisitExpression(stmt.Expression())
+		//variable = y.ir.ReadOrCreateVariable(val.GetVerboseName())
 	}
-	return variable.GetLastVariable()
+	return nil
+	//return variable.GetLastVariable()
 }

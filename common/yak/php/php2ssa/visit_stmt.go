@@ -188,12 +188,10 @@ func (y *builder) VisitInnerStatementList(raw phpparser.IInnerStatementListConte
 	if y == nil || raw == nil {
 		return nil
 	}
-
 	i, _ := raw.(*phpparser.InnerStatementListContext)
 	if i == nil {
 		return nil
 	}
-
 	for _, is := range i.AllInnerStatement() {
 		y.VisitInnerStatement(is)
 	}
