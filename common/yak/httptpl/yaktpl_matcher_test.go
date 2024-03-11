@@ -1,10 +1,14 @@
 package httptpl
 
 import (
+	"fmt"
+	"testing"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"testing"
 )
 
 func TestYakMatcher_Execute(t *testing.T) {
@@ -14,7 +18,7 @@ Content-Length: 202
 
 <html>
 <head>
-	<META HTTP-EQUIV="Refresh" CONTENT="0;URL=example/HelloWorld.action">
+    <META HTTP-EQUIV="Refresh" CONTENT="0;URL=example/HelloWorld.action">
 </head>
 
 Hello World
@@ -64,12 +68,14 @@ Content-Length: 202
 
 <html>
 <head>
-	<META HTTP-EQUIV="Refresh" CONTENT="0;URL=example/HelloWorld.action">
+    <META HTTP-EQUIV="Refresh" CONTENT="0;URL=example/HelloWorld.action">
 </head>
 
 Hello World
 
 </html>`)
+	rsp, body, _ := lowhttp.FixHTTPResponse(rsp)
+	realCL := fmt.Sprintf("%d", len(body))
 	for _, i := range [][]any{
 		{
 			&YakMatcher{
@@ -83,7 +89,7 @@ Hello World
 			&YakMatcher{
 				MatcherType: "content_length",
 				Condition:   "or",
-				Group:       []string{"200,201,203,114"},
+				Group:       []string{"200,201,203," + realCL},
 			},
 			true,
 		},
@@ -91,7 +97,7 @@ Hello World
 			&YakMatcher{
 				MatcherType: "content_length",
 				Condition:   "and",
-				Group:       []string{"200,201,203,114"},
+				Group:       []string{"200,201,203," + realCL},
 			},
 			false,
 		},
@@ -99,7 +105,7 @@ Hello World
 			&YakMatcher{
 				MatcherType: "content_length",
 				Condition:   "and",
-				Group:       []string{"114"},
+				Group:       []string{realCL},
 			},
 			true,
 		},
@@ -121,7 +127,7 @@ Content-Length: 202
 
 <html>
 <head>
-	<META HTTP-EQUIV="Refresh" CONTENT="0;URL=example/HelloWorld.action">
+    <META HTTP-EQUIV="Refresh" CONTENT="0;URL=example/HelloWorld.action">
 </head>
 
 Hello World
@@ -218,7 +224,7 @@ Content-Length: 202
 
 <html>
 <head>
-	<META HTTP-EQUIV="Refresh" CONTENT="0;URL=example/HelloWorld.action">
+    <META HTTP-EQUIV="Refresh" CONTENT="0;URL=example/HelloWorld.action">
 </head>
 
 Hello World
@@ -338,7 +344,7 @@ Content-Length: 202
 
 <html>
 <head>
-	<META HTTP-EQUIV="Refresh" CONTENT="0;URL=example/HelloWorld.action">
+    <META HTTP-EQUIV="Refresh" CONTENT="0;URL=example/HelloWorld.action">
 </head>
 
 Hello World
@@ -389,7 +395,7 @@ Content-Length: 202
 
 <html>
 <head>
-	<META HTTP-EQUIV="Refresh" CONTENT="0;URL=example/HelloWorld.action">
+    <META HTTP-EQUIV="Refresh" CONTENT="0;URL=example/HelloWorld.action">
 </head>
 
 Hello World
@@ -413,4 +419,57 @@ Hello World
 		}
 	}
 	log.Infof("executed %v testcases", count)
+}
+
+func TestYakMatcher_Empty(t *testing.T) {
+	server, port := utils.DebugMockHTTPWithTimeout(10*time.Second, []byte(`HTTP/1.1 200 OK
+TestDebug: 111
+
+ccc`))
+
+	demo := `
+id: test1
+info:
+  name: test1
+
+requests:
+  - raw:
+    - |
+      GET / HTTP/1.1
+      Host: {{Hostname}}
+      
+      abc
+    - |
+      GET / HTTP/1.1
+      Host: {{Hostname}}
+      
+      abc
+    extractors:
+    - type: regex
+      regex:
+      - 'Not Existed'
+`
+	ytpl, err := CreateYakTemplateFromNucleiTemplateRaw(demo)
+	if err != nil {
+		panic(err)
+	}
+
+	matched := false
+	config := NewConfig(WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+		if result {
+			matched = true
+		}
+	}))
+	_, err = ytpl.Exec(
+		config, false,
+		[]byte("GET / HTTP/1.1\r\nHost: www.baidu.com\r\n\r\n"),
+		lowhttp.WithHost(server), lowhttp.WithPort(port),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	if matched {
+		t.Fatalf("should not matched but matched")
+	}
 }
