@@ -12,6 +12,7 @@ import (
 )
 
 type TLSInspectResult struct {
+	Protocol        string
 	Description     string
 	Raw             []byte
 	RelativeDomains []string
@@ -99,6 +100,7 @@ func TLSInspectTimeout(addr string, seconds float64) ([]*TLSInspectResult, error
 				}
 
 				result := TLSInspectResult{
+					Protocol:        state.NegotiatedProtocol,
 					Description:     text,
 					Raw:             cert.Raw,
 					RelativeDomains: domains,
@@ -114,6 +116,7 @@ func TLSInspectTimeout(addr string, seconds float64) ([]*TLSInspectResult, error
 		MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
 		MaxVersion:         tls.VersionTLS13,
 		KeyLogWriter:       nil,
+		NextProtos:         []string{"h2", "http/1.1"},
 	})
 	err = tlsConn.HandshakeContext(utils.TimeoutContextSeconds(5))
 	if err != nil {
