@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"gopkg.in/yaml.v3"
@@ -256,7 +257,7 @@ func (s Server) BuildHttpRequestPacket(baseBuilderParams *ypb.HTTPRequestBuilder
 		}
 
 		if baseBuilderParams.GetIsHttpFlowId() {
-			_, flows, err := yakit.QueryHTTPFlow(s.GetProfileDatabase(), &ypb.QueryHTTPFlowRequest{
+			_, flows, err := yakit.QueryHTTPFlow(s.GetProjectDatabase(), &ypb.QueryHTTPFlowRequest{
 				IncludeId: baseBuilderParams.GetHTTPFlowId(),
 			})
 			if err != nil {
@@ -267,7 +268,7 @@ func (s Server) BuildHttpRequestPacket(baseBuilderParams *ypb.HTTPRequestBuilder
 				for _, flow := range flows {
 					builderRes <- &HTTPRequestBuilderRes{
 						IsHttps: flow.IsHTTPS,
-						Request: []byte(flow.Request),
+						Request: codec.StrConvUnquoteForce(flow.Request),
 						Url:     flow.Url,
 					}
 				}

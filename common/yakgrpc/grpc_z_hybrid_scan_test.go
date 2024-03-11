@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/vulinbox"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -288,6 +289,84 @@ func TestGRPCMUSTPASS_HybridScan_Stop_Smoking(t *testing.T) {
 	time.Sleep(4 * time.Second) // 等待 4 秒,是否还有请求mock服务
 	if !check {
 		t.Fatal("stop hybridScan fail")
+	}
+
+}
+
+func TestGRPCMUSTPASS_HybridScan_HttpflowID(t *testing.T) {
+	token := utils.RandSecret(10)
+	scriptName, err := yakit.CreateTemporaryYakScript("mitm", fmt.Sprintf(`
+mirrorHTTPFlow = func(isHttps , url , req , rsp , body) { 
+	dump(req)
+	if str.Contains(string(req),"%s"){
+    yakit.Output("ok")
+	}
+}
+`, token))
+	if err != nil {
+		panic(err)
+	}
+	defer yakit.DeleteYakScriptByName(consts.GetGormProjectDatabase(), scriptName)
+	target := utils.HostPort(utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nContent-Length: 12\r\n\r\nHello, World!")))
+
+	packet := fmt.Sprintf("POST /\r\nHost: %s\r\n\r\n"+
+		"%s", target, token)
+	for i := 0; i < 3; i++ {
+		lowhttp.HTTPWithoutRedirect(lowhttp.WithRequest(packet))
+	}
+	_, flows, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{
+		Keyword: token,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ids := []int64{}
+	for _, flow := range flows {
+		ids = append(ids, int64(flow.ID))
+	}
+
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stream, err := client.HybridScan(context.Background())
+	if err != nil {
+		t.FailNow()
+	}
+	stream.Send(&ypb.HybridScanRequest{
+		Control:        true,
+		HybridScanMode: "new",
+	})
+	stream.Send(&ypb.HybridScanRequest{
+		Targets: &ypb.HybridScanInputTarget{
+			HTTPRequestTemplate: &ypb.HTTPRequestBuilderParams{
+				IsHttpFlowId: true,
+				HTTPFlowId:   ids,
+			},
+		},
+		Plugin: &ypb.HybridScanPluginConfig{
+			PluginNames: []string{scriptName},
+		},
+	})
+	var checkCount int
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			log.Error(err)
+			break
+		}
+		if rsp.ExecResult != nil && rsp.ExecResult.IsMessage {
+			if bytes.Contains(rsp.ExecResult.Message, []byte("ok")) {
+				checkCount++
+			}
+		}
+		spew.Dump(rsp)
+	}
+	spew.Dump(checkCount)
+	if checkCount != 3 {
+		t.Fatal("count not match")
 	}
 
 }
