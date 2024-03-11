@@ -99,11 +99,29 @@ func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bo
 	if err != nil {
 		return nil, errors.Wrap(err, "read HTTPResponse firstline failed")
 	}
-	rawPacket.Write(firstLine)
-	rawPacket.WriteString(CRLF)
 
 	var statusText string
 	rsp.Proto, rsp.StatusCode, statusText, _ = ParseHTTPResponseLine(string(firstLine))
+
+HandleExpect100Continue:
+	// Expect: 100-continue cause the first line is not the real first line
+	if rsp.StatusCode == 100 && strings.ToLower(statusText) == "continue" {
+		for {
+			firstLine, err = ReadLine(headerReader)
+			if err != nil {
+				return nil, errors.Wrap(err, "read HTTPResponse firstline failed")
+			}
+			if string(bytes.TrimSpace(firstLine)) == "" {
+				continue
+			} else {
+				break
+			}
+		}
+		rsp.Proto, rsp.StatusCode, statusText, _ = ParseHTTPResponseLine(string(firstLine))
+		goto HandleExpect100Continue
+	}
+	rawPacket.Write(firstLine)
+	rawPacket.WriteString(CRLF)
 	rsp.Status = fmt.Sprintf("%v %s", rsp.StatusCode, statusText)
 	_, after, _ := strings.Cut(rsp.Proto, "/")
 	major, minor, _ := strings.Cut(after, ".")

@@ -502,6 +502,7 @@ var StringsExport = map[string]interface{}{
 	"IsIPv4":                            utils.IsIPv4,
 	"StringContainsAnyOfSubString":      utils.StringContainsAnyOfSubString,
 	"ExtractHost":                       utils.ExtractHost,
+	"ExtractHostPort":                   utils.ExtractHostPort,
 	"ExtractDomain":                     extractDomain,
 	"ExtractRootDomain":                 extractRootDomain,
 	"ExtractJson":                       extractValidJson,

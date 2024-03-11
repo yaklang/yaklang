@@ -174,6 +174,8 @@ func GetOverrideContentType(bodyPrescan []byte, contentType string) (overrideCon
 	return overrideContentType, originCharset
 }
 
+var expect100continue = []byte("HTTP/1.1 100 Continue\r\n\r\n")
+
 // FixHTTPResponse 尝试对传入的响应进行修复，并返回修复后的响应，响应体和错误
 // Example:
 // ```
@@ -181,6 +183,14 @@ func GetOverrideContentType(bodyPrescan []byte, contentType string) (overrideCon
 // ```
 func FixHTTPResponse(raw []byte) (rsp []byte, body []byte, _ error) {
 	// log.Infof("response raw: \n%v", codec.EncodeBase64(raw))
+	var haveExpect100Continue bool
+	if len(raw) > 0 && raw[0] != 'H' {
+		raw = TrimLeftHTTPPacket(raw)
+	}
+	raw, haveExpect100Continue = bytes.CutPrefix(raw, expect100continue)
+	if !haveExpect100Continue {
+		raw, haveExpect100Continue = bytes.CutPrefix(raw, expect100continue)
+	}
 
 	isChunked := false
 	// 这两个用来处理编码特殊情况
