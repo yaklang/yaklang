@@ -29,7 +29,7 @@ func (t TLSInspectResult) Show() {
 	fmt.Println(t.Description)
 }
 
-func TLSInspectTimeout(addr string, seconds float64) ([]*TLSInspectResult, error) {
+func TLSInspectTimeout(addr string, seconds float64, proto ...string) ([]*TLSInspectResult, error) {
 	host, port, _ := utils.ParseStringToHostPort(addr)
 	if port <= 0 {
 		port = 443
@@ -50,7 +50,7 @@ func TLSInspectTimeout(addr string, seconds float64) ([]*TLSInspectResult, error
 	defer conn.Close()
 
 	var results []*TLSInspectResult
-	tlsConn := tls.Client(conn, &tls.Config{
+	tlsConfig := &tls.Config{
 		ServerName: host,
 		VerifyConnection: func(state tls.ConnectionState) error {
 			for _, cert := range state.PeerCertificates {
@@ -117,7 +117,11 @@ func TLSInspectTimeout(addr string, seconds float64) ([]*TLSInspectResult, error
 		MaxVersion:         tls.VersionTLS13,
 		KeyLogWriter:       nil,
 		NextProtos:         []string{"h2", "http/1.1"},
-	})
+	}
+	tlsConn := tls.Client(conn, tlsConfig)
+	if len(proto) > 0 {
+		tlsConfig.NextProtos = proto
+	}
 	err = tlsConn.HandshakeContext(utils.TimeoutContextSeconds(5))
 	if err != nil {
 		log.Errorf("TLSInspect: handshake error: %s", err)
@@ -132,4 +136,12 @@ func TLSInspectTimeout(addr string, seconds float64) ([]*TLSInspectResult, error
 // ```
 func TLSInspect(addr string) ([]*TLSInspectResult, error) {
 	return TLSInspectTimeout(addr, 10)
+}
+
+func TLSInspectForceHttp2(addr string) ([]*TLSInspectResult, error) {
+	return TLSInspectTimeout(addr, 10, "h2")
+}
+
+func TLSInspectForceHttp1_1(addr string) ([]*TLSInspectResult, error) {
+	return TLSInspectTimeout(addr, 10, "http/1.1")
 }

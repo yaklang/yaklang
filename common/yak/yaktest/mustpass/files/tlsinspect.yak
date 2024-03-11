@@ -9,3 +9,29 @@ for r in tls.Inspect(getParam("VULINBOX"))~ {
 if !check {
    die("PROTOCOL CANNOT FOUND")
 }
+
+check = false
+for r in tls.InspectForceHttp2(getParam("VULINBOX"))~ {
+    dump(r.Protocol)
+    if r.Protocol in ["h2"] {
+        check = true
+    }
+}
+
+if !check {
+   die("PROTOCOL H2 CANNOT FOUND")
+}
+
+
+
+check = false
+for r in tls.InspectForceHttp1_1(getParam("VULINBOX"))~ {
+    dump(r.Protocol)
+    if r.Protocol in ["http/1.1"] {
+        check = true
+    }
+}
+
+if !check {
+   die("PROTOCOL H1.1 CANNOT FOUND")
+}
