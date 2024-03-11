@@ -348,7 +348,7 @@ func (f *HTTPFlow) getCacheGRPCModel(full bool) *ypb.HTTPFlow {
 	return nil
 }
 
-func (f *HTTPFlow) setCacheGRPCModel(full bool, m *ypb.HTTPFlow) {
+func (f *HTTPFlow) SetCacheGRPCModel(full bool, m *ypb.HTTPFlow) {
 	if f == nil {
 		return
 	}
@@ -558,7 +558,7 @@ func (f *HTTPFlow) toGRPCModel(full bool) (*ypb.HTTPFlow, error) {
 			flow.JsonObjects = append(flow.JsonObjects, utf8safe(j))
 		}
 	}
-	f.setCacheGRPCModel(full, flow)
+	f.SetCacheGRPCModel(full, flow)
 	return flow, nil
 }
 
@@ -571,8 +571,23 @@ func (f *HTTPFlow) CalcCacheHash(full bool) string {
 }
 
 func (f *HTTPFlow) BeforeSave() error {
+	f.fixURL()
 	f.Hash = f.CalcHash()
 	return nil
+}
+
+func (f *HTTPFlow) fixURL() {
+	urlIns := utils.ParseStringToUrl(f.Url)
+	if f.IsHTTPS {
+		urlIns.Scheme = "https"
+	}
+	if urlIns != nil {
+		host, port, _ := utils.ParseStringToHostPort(urlIns.Host)
+		if (port == 443 && urlIns.Scheme == "https") || (port == 80 && urlIns.Scheme == "http") {
+			urlIns.Host = host
+			f.Url = urlIns.String()
+		}
+	}
 }
 
 func SaveFromHTTP(db *gorm.DB, isHttps bool, req *http.Request, rsp *http.Response, source string, url string, remoteAddr string) (*HTTPFlow, error) {
@@ -1386,14 +1401,4 @@ func ExportHTTPFlow(db *gorm.DB, params *ypb.ExportHTTPFlowsRequest) (paging *bi
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
 	}
 	return paging, ret, nil
-}
-
-func SaveHTTPFlow(db *gorm.DB, flow *HTTPFlow) error {
-	db = db.Model(&HTTPFlow{})
-	if db = db.Save(flow); db.Error != nil {
-		return db.Error
-	}
-	m, _ := flow.ToGRPCModel(true)
-	flow.setCacheGRPCModel(false, m)
-	return nil
 }
