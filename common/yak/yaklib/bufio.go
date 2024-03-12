@@ -32,7 +32,13 @@ func _newBuffer(b ...[]byte) *bytes.Buffer {
 // ```
 // reader = bufio.NewReader(os.Stdin)
 // ```
-func _newReader(i interface{}) (*bufio.Reader, error) {
+func _newReader(raw ...interface{}) (*bufio.Reader, error) {
+	var i any
+	if len(raw) > 0 {
+		i = raw[0].(io.Reader)
+	} else {
+		i = &bytes.Buffer{}
+	}
 	if rd, ok := i.(io.Reader); ok {
 		return bufio.NewReader(rd), nil
 	} else {
@@ -62,7 +68,13 @@ func _newReaderSize(i interface{}, size int) (*bufio.Reader, error) {
 // writer.WriteString("hello yak")
 // writer.Flush()
 // ```
-func _newWriter(i interface{}) (*bufio.Writer, error) {
+func _newWriter(raw ...interface{}) (*bufio.Writer, error) {
+	var i any
+	if len(raw) > 0 {
+		i = raw[0].(io.Writer)
+	} else {
+		i = &bytes.Buffer{}
+	}
 	if wd, ok := i.(io.Writer); ok {
 		return bufio.NewWriter(wd), nil
 	} else {
