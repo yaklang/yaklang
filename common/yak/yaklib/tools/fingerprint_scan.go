@@ -465,7 +465,7 @@ var FingerprintScanExports = map[string]interface{}{
 	"web": _webOption,
 
 	// 开启 nmap 规则库
-	"service": _serviceOption(),
+	"service": _serviceOption,
 
 	// 全部服务扫描
 	"all": _allOption,

@@ -1,0 +1,29 @@
+
+host,port = tcp.MockTCPProtocol("mysql")
+checked = false
+for result in servicescan.Scan(host, string(port), servicescan.service(),servicescan.active(true))~{
+    //dump(result)
+    if result.Fingerprint.ServiceName == "mysql" {
+        checked = true
+    }
+}
+
+
+checked2 = false
+for result in servicescan.Scan(host, string(port), servicescan.web(),servicescan.active(true))~{
+    //dump(result)
+    if result.Fingerprint.ServiceName == "" {
+        checked2 = true
+    }
+}
+
+checked3 = false
+for result in servicescan.Scan(host, string(port), servicescan.all(),servicescan.active(true))~{
+    //dump(result)
+    if result.Fingerprint.ServiceName == "mysql" {
+        checked3 = true
+    }
+}
+
+
+if !(checked && checked2 && checked3) { die("ERROR for Mock protocol smoking test!")}
