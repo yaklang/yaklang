@@ -634,7 +634,7 @@ expression
     // Level 11, Additive operators
     | expression bop = ('+' | '-') expression                       # AdditiveExpression
     // Level 10, Shift operators
-    | expression ('<' '<' | '>' '>' '>' | '>' '>') expression       # ShiftExpression
+    | expression bop=('<<'| '>>>' | '>>') expression       # ShiftExpression
     // Level 9, Relational operators
     | expression bop = ('<=' | '>=' | '>' | '<') expression         # RelationalExpression
     | expression bop = INSTANCEOF (typeType | pattern)              # InstanceofExpression

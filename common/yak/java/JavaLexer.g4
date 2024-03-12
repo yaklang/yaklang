@@ -154,7 +154,10 @@ DOT    : '.';
 
 ASSIGN   : '=';
 GT       : '>';
+GTGT     : '>>';
+GTGTGT   : '>>>';
 LT       : '<';
+LTLT     : '<<';
 BANG     : '!';
 TILDE    : '~';
 QUESTION : '?';
