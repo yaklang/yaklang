@@ -20,7 +20,7 @@ func TestGRPCMUSTPASS_MITM_WebSocket(t *testing.T) {
 	defer cancel()
 	token := utils.RandNumberStringBytes(20)
 
-	host, port := utils.DebugMockEchoWs([]byte(token))
+	host, port := utils.DebugMockEchoWs("enPayload")
 	log.Infof("addr:  %s:%d", host, port)
 	client, err := NewLocalClient()
 	if err != nil {
@@ -35,7 +35,7 @@ func TestGRPCMUSTPASS_MITM_WebSocket(t *testing.T) {
 	}, func(mitmClient ypb.Yak_MITMClient) {
 
 		defer NewMITMFilterManager(consts.GetGormProfileDatabase()).Recover()
-		wsClient, err := lowhttp.NewWebsocketClient([]byte(fmt.Sprintf(`GET /echo HTTP/1.1
+		wsClient, err := lowhttp.NewWebsocketClient([]byte(fmt.Sprintf(`GET /enPayload HTTP/1.1
 Host: %s
 Accept-Encoding: gzip, deflate
 Sec-WebSocket-Extensions: permessage-deflate
@@ -72,7 +72,7 @@ func TestGRPCMUSTPASS_MITM_WebSocket_Payload(t *testing.T) {
 	defer cancel()
 	token := utils.RandNumberStringBytes(20)
 
-	host, port := utils.DebugMockEchoWs([]byte(token))
+	host, port := utils.DebugMockEchoWs("payload")
 
 	client, err := NewLocalClient() // 新建一个 yakit client
 	if err != nil {
@@ -135,7 +135,7 @@ func TestGRPCMUSTPASS_MITM_WebSocket_Payload(t *testing.T) {
 		if strings.Contains(rspMsg, `starting mitm serve`) {
 			go func() {
 				time.Sleep(1 * time.Second)
-				wsClient, err := lowhttp.NewWebsocketClient([]byte(fmt.Sprintf(`GET /echo HTTP/1.1
+				wsClient, err := lowhttp.NewWebsocketClient([]byte(fmt.Sprintf(`GET /payload HTTP/1.1
 Host: %s
 Accept-Encoding: gzip, deflate
 Sec-WebSocket-Key: 3o0bLKJzcaNwhJQs4wBw2g==
