@@ -2,9 +2,11 @@ package utils
 
 import (
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"strings"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestExtractHost(t *testing.T) {
@@ -19,6 +21,17 @@ func TestExtractHost(t *testing.T) {
 			t.Fatal(ret)
 		}
 	}
+}
+
+func TestParseStringToUrlBadURI(t *testing.T) {
+	t.Run("query include uri", func(t *testing.T) {
+		test := assert.New(t)
+		ret := ParseStringToUrl("https://example.com/login?curl=https://example.com:443/")
+		test.Equal("https", ret.Scheme, "scheme invalid")
+		test.Equal("example.com", ret.Host, "host invalid")
+		test.Equal("/login", ret.Path, "path invalid")
+		test.Equal("curl=https://example.com:443/", ret.RawQuery, "query invalid")
+	})
 }
 
 func TestParseStringToUrl(t *testing.T) {
@@ -41,7 +54,6 @@ func TestParseStringToUrl(t *testing.T) {
 		"http_tls://example.com:",
 		"http-.+tls://example.com:",
 	} {
-
 		if ParseStringToUrl(i).Host != "example.com" {
 			fmt.Println(i)
 			t.Logf("origin: %v -> %v   Host: %v Path: %v Query: %v", i, ParseStringToUrl(i), ParseStringToUrl(i).Host, ParseStringToUrl(i).Path, ParseStringToUrl(i).RawQuery)
