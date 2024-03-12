@@ -161,7 +161,7 @@ func (p *FuzzHTTPRequestParam) Value() interface{} {
 				if err != nil {
 					break
 				}
-				return utils.InterfaceToStringSlice(decoded)
+				return utils.InterfaceToStringSlice(string(decoded))
 			} else {
 				return utils.InterfaceToStringSlice("")
 			}
@@ -170,7 +170,7 @@ func (p *FuzzHTTPRequestParam) Value() interface{} {
 			if err != nil {
 				break
 			}
-			return utils.InterfaceToStringSlice(decoded)
+			return utils.InterfaceToStringSlice(string(decoded))
 		default:
 			log.Error("unrecognized param value type")
 			return p.paramOriginValue
@@ -194,20 +194,20 @@ func (p *FuzzHTTPRequestParam) Value() interface{} {
 		switch paramOriginValue := p.paramOriginValue.(type) {
 		case []string:
 			if len(paramOriginValue) > 0 {
-				jsonStr, err := codec.DecodeBase64Url(paramOriginValue[0])
+				decoded, err := codec.DecodeBase64Url(paramOriginValue[0])
 				if err != nil {
 					break
 				}
-				return utils.InterfaceToStringSlice(jsonpath.Find(jsonStr, p.path))
+				return utils.InterfaceToStringSlice(jsonpath.Find(decoded, p.path))
 			} else {
 				return utils.InterfaceToStringSlice("")
 			}
 		case string:
-			jsonStr, err := codec.DecodeBase64Url(paramOriginValue)
+			decoded, err := codec.DecodeBase64Url(paramOriginValue)
 			if err != nil {
 				break
 			}
-			return utils.InterfaceToStringSlice(jsonpath.Find(jsonStr, p.path))
+			return utils.InterfaceToStringSlice(jsonpath.Find(decoded, p.path))
 
 		default:
 			log.Error("unrecognized param value type")
