@@ -204,7 +204,6 @@ func LoadYamlPoCDatabase(nucleiDir ...string) error {
 			LocalPath:  r.LocalPath,
 			IsExternal: true,
 		}
-		log.Infof("start to save yaml poc(nuclei) by name: %s", y.ScriptName)
 		err = yakit.CreateOrUpdateYakScriptByName(db, y.ScriptName, y)
 		if err != nil {
 			total--

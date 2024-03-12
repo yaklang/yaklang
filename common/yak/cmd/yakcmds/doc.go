@@ -16,16 +16,10 @@ import (
 	"strings"
 )
 
-func init() {
-	for _, doc := range DocCommands {
-		doc.Category = "Document Utils"
-	}
-}
-
-var DocCommands = []cli.Command{
+var DocCommands = []*cli.Command{
 	{
 		Name:  "doc",
-		Usage: "查看脚本引擎所有的可使用的接口和说明",
+		Usage: "Show Help Information for coding, document in YakLang",
 		Flags: []cli.Flag{
 			cli.StringFlag{
 				Name:  "lib,extlib,l,t",
@@ -82,7 +76,8 @@ var DocCommands = []cli.Command{
 	},
 	// gendoc / build doc
 	{
-		Name: "gendoc",
+		Name:  "gendoc",
+		Usage: "Generate Basic Yaml Structure for YakLang",
 		Flags: []cli.Flag{
 			cli.StringFlag{
 				Name:  "dir",
@@ -135,7 +130,8 @@ var DocCommands = []cli.Command{
 		},
 	},
 	{
-		Name: "builddoc",
+		Name:  "builddoc",
+		Usage: "Build Markdown Documents for YakLang(From Structured Yaml Text)",
 		Flags: []cli.Flag{
 			cli.StringFlag{
 				Name:  "from",
@@ -191,15 +187,6 @@ var DocCommands = []cli.Command{
 			if err != nil {
 				return utils.Errorf("write vscode auto-completions json failed: %s", err)
 			}
-			return nil
-		},
-	},
-	{
-		Hidden: true, Name: "vscdoc", Action: func(c *cli.Context) error {
-			libs := yak.EngineToLibDocuments(
-				yaklang.New(),
-			)
-			_ = libs
 			return nil
 		},
 	},

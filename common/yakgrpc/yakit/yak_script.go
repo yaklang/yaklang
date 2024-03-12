@@ -93,7 +93,7 @@ func (s *YakScript) BeforeSave() error {
 	}
 
 	if utils.MatchAnyOfSubString(s.ScriptName, "|") {
-		return utils.Errorf("invalid scriptName, do not contains '|'")
+		s.ScriptName = strings.ReplaceAll(s.ScriptName, "|", "/")
 	}
 
 	resRaw, _ := strconv.Unquote(s.Params)

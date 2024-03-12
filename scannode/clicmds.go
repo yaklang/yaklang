@@ -10,7 +10,8 @@ import (
 )
 
 var DistYakCommand = cli.Command{
-	Name: "distyak",
+	Name:  "distyak",
+	Usage: "used by distribution node for running yak file",
 	Action: func(c *cli.Context) error {
 		var err error
 		args := c.Args()

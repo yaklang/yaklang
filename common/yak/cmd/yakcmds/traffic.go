@@ -7,10 +7,11 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-var TrafficUtilCommands = []cli.Command{
+var TrafficUtilCommands = []*cli.Command{
 	// chaosmaker
 	{
-		Name: "import-chaosmaker-json",
+		Name:  "import-chaosmaker-json",
+		Usage: "Import ChaosMaker Rules from JSON File",
 		Flags: []cli.Flag{
 			cli.StringFlag{Name: "file,f"},
 		},
@@ -24,7 +25,8 @@ var TrafficUtilCommands = []cli.Command{
 		},
 	},
 	{
-		Name: "export-chaosmaker-json",
+		Name:  "export-chaosmaker-json",
+		Usage: "Export ChaosMaker Rules to JSON File",
 		Flags: []cli.Flag{
 			cli.StringFlag{Name: "file,f"},
 		},
@@ -32,13 +34,7 @@ var TrafficUtilCommands = []cli.Command{
 			return rule.ExportRulesToFile(consts.GetGormProfileDatabase(), c.String("file"))
 		},
 	},
-	ChaosMakerCommand,
-	SuricataLoaderCommand,
-	PcapCommand,
-}
-
-func init() {
-	for _, i := range TrafficUtilCommands {
-		i.Category = "Traffic Processing Utils"
-	}
+	&chaosMakerCommand,
+	&suricataLoaderCommand,
+	&pcapCommand,
 }

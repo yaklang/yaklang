@@ -18,7 +18,7 @@ import (
 
 var ChaosMakerAIHelperCommand = cli.Command{}
 
-var SuricataLoaderCommand = cli.Command{
+var suricataLoaderCommand = cli.Command{
 	Name:     "suricata",
 	Usage:    "Load suricata rules to database",
 	Category: "Suricata Rules Operations",
@@ -112,7 +112,7 @@ var SuricataLoaderCommand = cli.Command{
 	},
 }
 
-var ChaosMakerCommand = cli.Command{
+var chaosMakerCommand = cli.Command{
 	Name:    "chaosmaker",
 	Aliases: []string{"chaos"},
 	Usage:   `Chaos Maker is designed to generate chaos traffic for testing`,
