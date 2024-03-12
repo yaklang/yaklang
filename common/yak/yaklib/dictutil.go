@@ -2,10 +2,8 @@ package yaklib
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/mixer"
-	"reflect"
 )
 
 func _dictParams(i ...interface{}) [][]string {
@@ -21,7 +19,7 @@ func _dictParams(i ...interface{}) [][]string {
 		case [][]byte:
 			ret = append(ret, utils.ParseStringToLines(string(bytes.Join(r, []byte("\n")))))
 		default:
-			panic(fmt.Sprintf("unsupported dict params type: %v", reflect.TypeOf(param)))
+			ret = append(ret, utils.InterfaceToStringSlice(param))
 		}
 	}
 	return ret

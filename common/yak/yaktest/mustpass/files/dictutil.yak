@@ -1,0 +1,18 @@
+a = []
+b = []
+b.Push(1,2,3,4,5)
+a.Push(b)
+c = []
+c.Push(1,2,3)
+a.Push(c)
+count = 0
+for i in dictutil.Mix(a...)~ {
+    count++
+}
+assert count == 15
+
+buf = bufio.NewBuffer()
+buf.Write("abc")
+buf.Write("def")
+dump(string(buf.Bytes()))
+assert buf.String() == "abcdef"
