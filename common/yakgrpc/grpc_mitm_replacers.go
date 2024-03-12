@@ -24,6 +24,10 @@ import (
 
 type Rules []*MITMReplaceRule
 
+func isMatchTimeout(err error) bool {
+	return strings.Contains(err.Error(), "match timeout")
+}
+
 func NewRuleGroup(r ...*ypb.MITMContentReplacer) Rules {
 	var ret Rules
 	for _, i := range r {
@@ -33,6 +37,7 @@ func NewRuleGroup(r ...*ypb.MITMContentReplacer) Rules {
 	}
 	return ret
 }
+
 func (a Rules) MITMContentReplacers() []*ypb.MITMContentReplacer {
 	var ret []*ypb.MITMContentReplacer
 	for _, i := range a {
@@ -40,12 +45,15 @@ func (a Rules) MITMContentReplacers() []*ypb.MITMContentReplacer {
 	}
 	return ret
 }
+
 func (a Rules) Len() int { // 重写 Len() 方法
 	return len(a)
 }
+
 func (a Rules) Swap(i, j int) { // 重写 Swap() 方法
 	a[i], a[j] = a[j], a[i]
 }
+
 func (a Rules) Less(i, j int) bool { // 重写 Less() 方法， 从大到小排序
 	return a[i].Index < a[j].Index
 }
@@ -114,6 +122,7 @@ func (r *MITMReplaceRule) compile() (*regexp2.Regexp, error) {
 	r.cache = re
 	return re, nil
 }
+
 func (m *MITMReplaceRule) matchByPacketInfo(info *PacketInfo) ([]*regexp2.Match, error) {
 	r, err := m.compile()
 	if err != nil {
@@ -181,6 +190,7 @@ func (m *MITMReplaceRule) matchByPacketInfo(info *PacketInfo) ([]*regexp2.Match,
 	}
 	return res, nil
 }
+
 func (m *MITMReplaceRule) splitPacket(packet []byte) (*PacketInfo, error) {
 	info := &PacketInfo{}
 	headerRaw, bodyRaw := lowhttp.SplitHTTPHeadersAndBodyFromPacketEx(
@@ -226,8 +236,9 @@ func (m *MITMReplaceRule) splitPacket(packet []byte) (*PacketInfo, error) {
 	}
 	return info, nil
 }
+
 func (m *MITMReplaceRule) MatchPacket(packet []byte, isReq bool) ([]*regexp2.Match, error) {
-	var originPacket = packet // backup origin packet
+	originPacket := packet // backup origin packet
 	if !isReq {
 		originDecoded, _, err := lowhttp.FixHTTPResponse(originPacket)
 		if err != nil {
@@ -246,7 +257,7 @@ func (m *MITMReplaceRule) MatchPacket(packet []byte, isReq bool) ([]*regexp2.Mat
 
 // MatchAndReplacePacket match and replace package, return matched result and replaced package
 func (m *MITMReplaceRule) MatchAndReplacePacket(packet []byte, isReq bool) ([]*regexp2.Match, []byte, error) {
-	var originPacket = packet // backup origin packet
+	originPacket := packet // backup origin packet
 	if !isReq {
 		originDecoded, _, err := lowhttp.FixHTTPResponse(originPacket)
 		if err != nil {
@@ -318,7 +329,7 @@ func (m *MITMReplaceRule) MatchAndReplacePacket(packet []byte, isReq bool) ([]*r
 			}
 			extCookies = append(extCookies, tc)
 		}
-		var keyHeader = make(map[string]*ypb.HTTPHeader) // build map for index by key
+		keyHeader := make(map[string]*ypb.HTTPHeader) // build map for index by key
 		for _, v := range m.ExtraHeaders {
 			keyHeader[v.Header] = v
 		}
@@ -394,6 +405,7 @@ func (m *MITMReplaceRule) MatchAndReplacePacket(packet []byte, isReq bool) ([]*r
 		return matched, modifiedPacket, nil
 	}
 }
+
 func sortContentReplacer(i []*MITMReplaceRule) []*MITMReplaceRule {
 	sort.Stable(Rules(i))
 	return i
@@ -641,14 +653,14 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 		var matchRes []*regexp2.Match
 		if rule.EnableForRequest {
 			res, err := rule.MatchPacket(request, true)
-			if err != nil {
+			if err != nil && !isMatchTimeout(err) {
 				log.Errorf("match package failed: %v", err)
 				continue
 			}
 			matchRes = append(matchRes, res...)
 		} else {
 			res, err := rule.MatchPacket(response, false)
-			if err != nil {
+			if err != nil && !isMatchTimeout(err) {
 				log.Errorf("match package failed: %v", err)
 				continue
 			}
@@ -706,7 +718,7 @@ func (m *mitmReplacer) replaceHTTPHeader(rule *ypb.MITMContentReplacer, headerMe
 
 	var buf bytes.Buffer
 	var cookies []*http.Cookie
-	var keyHeader = make(map[string]*ypb.HTTPHeader)
+	keyHeader := make(map[string]*ypb.HTTPHeader)
 	for _, v := range rule.ExtraHeaders {
 		keyHeader[v.Header] = v
 	}
@@ -854,7 +866,7 @@ func (m *mitmReplacer) hook(isRequest, isResponse bool, origin []byte, args ...a
 		return matchedRules.MITMContentReplacers(), origin, false
 	}
 
-	var originPacket = origin
+	originPacket := origin
 	_ = originPacket
 	if isResponse {
 		originDecoded, _, err := lowhttp.FixHTTPResponse(origin)
@@ -897,7 +909,7 @@ func (m *mitmReplacer) hook(isRequest, isResponse bool, origin []byte, args ...a
 		}
 	}
 
-	var bodyMerged = make([]byte, len(body))
+	bodyMerged := make([]byte, len(body))
 	copy(bodyMerged, body)
 	headerMerged := headerRaw
 	if len(bodyMerged) <= 0 && headerMerged == "" {
@@ -916,7 +928,7 @@ func (m *mitmReplacer) hook(isRequest, isResponse bool, origin []byte, args ...a
 			continue
 		}
 		matched, packet, err := rule.MatchAndReplacePacket(modifiedPacket, isRequest)
-		if err != nil {
+		if err != nil && !isMatchTimeout(err) {
 			log.Errorf("match package failed: %v", err)
 			continue
 		}
