@@ -590,7 +590,7 @@ func DebugMockHTTPWithTimeout(du time.Duration, rsp []byte) (string, int) {
 	return host, port
 }
 
-func DebugMockEchoWs(data []byte) (string, int) {
+func DebugMockEchoWs(point string) (string, int) {
 	addr := GetRandomLocalAddr()
 	time.Sleep(time.Millisecond * 300)
 	host, port, _ := ParseStringToHostPort(addr)
@@ -601,7 +601,7 @@ func DebugMockEchoWs(data []byte) (string, int) {
 		EnableCompression: true, // 启用压缩
 	}
 
-	http.HandleFunc("/echo", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/"+point, func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			log.Println(err)
