@@ -310,6 +310,9 @@ type JavaParserVisitor interface {
 	// Visit a parse tree produced by JavaParser#PrimaryExpression.
 	VisitPrimaryExpression(ctx *PrimaryExpressionContext) interface{}
 
+	// Visit a parse tree produced by JavaParser#PrefixUnaryExpression.
+	VisitPrefixUnaryExpression(ctx *PrefixUnaryExpressionContext) interface{}
+
 	// Visit a parse tree produced by JavaParser#MemberCallExpression.
 	VisitMemberCallExpression(ctx *MemberCallExpressionContext) interface{}
 
@@ -334,6 +337,9 @@ type JavaParserVisitor interface {
 	// Visit a parse tree produced by JavaParser#InstanceofExpression.
 	VisitInstanceofExpression(ctx *InstanceofExpressionContext) interface{}
 
+	// Visit a parse tree produced by JavaParser#AssignmentEqExpression.
+	VisitAssignmentEqExpression(ctx *AssignmentEqExpressionContext) interface{}
+
 	// Visit a parse tree produced by JavaParser#EqualityExpression.
 	VisitEqualityExpression(ctx *EqualityExpressionContext) interface{}
 
@@ -352,6 +358,9 @@ type JavaParserVisitor interface {
 	// Visit a parse tree produced by JavaParser#NewCreatorExpression.
 	VisitNewCreatorExpression(ctx *NewCreatorExpressionContext) interface{}
 
+	// Visit a parse tree produced by JavaParser#PrefixBinayExpression.
+	VisitPrefixBinayExpression(ctx *PrefixBinayExpressionContext) interface{}
+
 	// Visit a parse tree produced by JavaParser#ShiftExpression.
 	VisitShiftExpression(ctx *ShiftExpressionContext) interface{}
 
@@ -366,9 +375,6 @@ type JavaParserVisitor interface {
 
 	// Visit a parse tree produced by JavaParser#Java8LambdaExpression.
 	VisitJava8LambdaExpression(ctx *Java8LambdaExpressionContext) interface{}
-
-	// Visit a parse tree produced by JavaParser#PrefixExpression.
-	VisitPrefixExpression(ctx *PrefixExpressionContext) interface{}
 
 	// Visit a parse tree produced by JavaParser#PostfixExpression.
 	VisitPostfixExpression(ctx *PostfixExpressionContext) interface{}

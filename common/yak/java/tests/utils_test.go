@@ -15,19 +15,6 @@ func init() {
 	test.SetLanguage("java", java2ssa.Build)
 }
 
-func createJavaProgram(s string) string {
-	template := `package org.example;
-
-public class Main {
-    public static void main(String[] args) {
-        %s
-    }
-}`
-
-	program := fmt.Sprintf(template, s)
-	return program
-}
-
 func CheckJavaTestCase(t *testing.T, tc test.TestCase) {
 	prog, err := ssaapi.Parse(tc.Code, ssaapi.WithLanguage("java"))
 	require.Nil(t, err, "parse error")
@@ -71,5 +58,17 @@ func CheckJavaPrintf(t *testing.T, tc test.TestCase) {
 }
 
 func CheckJavaCode(code string, t *testing.T) {
+	template := `package org.example;
+
+public class Main {
+    public static void main(String[] args) {
+        %s
+    }
+}`
+	code = fmt.Sprintf(template, code)
+	CheckJavaTestCase(t, test.TestCase{Code: code})
+}
+
+func CheckAllJavaCode(code string, t *testing.T) {
 	CheckJavaTestCase(t, test.TestCase{Code: code})
 }

@@ -1,0 +1,130 @@
+package java2ssa
+
+import (
+	"fmt"
+	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
+	"github.com/yaklang/yaklang/common/yak/ssa"
+	"math"
+	"strconv"
+	"strings"
+)
+
+func (y *builder) VisitLiteral(raw javaparser.ILiteralContext) ssa.Value {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*javaparser.LiteralContext)
+	if i == nil {
+		return nil
+	}
+
+	if ret := i.IntegerLiteral(); ret != nil {
+		return y.VisitIntegerLiteral(ret)
+	} else if ret := i.FloatLiteral(); ret != nil {
+		return y.VisitFloatLiteral(ret)
+	} else if ret := i.CHAR_LITERAL(); ret != nil {
+		lit := ret.GetText()
+		var s string
+		var err error
+		if lit == "'\\''" {
+			s = "'"
+		} else {
+			lit = strings.ReplaceAll(lit, `"`, `\"`)
+			s, err = strconv.Unquote(fmt.Sprintf("\"%s\"", lit[1:len(lit)-1]))
+			if err != nil {
+				y.NewError(ssa.Error, "javaast", "unquote error %s", err)
+				return nil
+			}
+		}
+		runeChar := []rune(s)[0]
+		if runeChar < 256 {
+			return y.EmitConstInst(byte(runeChar))
+		} else {
+			return y.EmitConstInst(runeChar)
+		}
+	} else if ret := i.STRING_LITERAL(); ret != nil {
+
+		text := ret.GetText()
+		if text == "\"\"" {
+			return y.EmitConstInst(text)
+		}
+		val, err := strconv.Unquote(text)
+		if err != nil {
+			y.NewError(ssa.Error, "javaast", "unquote error %s", err)
+			return nil
+		}
+		return y.EmitConstInst(val)
+	} else if ret := i.BOOL_LITERAL(); ret != nil {
+		boolLit, err := strconv.ParseBool(ret.GetText())
+		if err != nil {
+			y.NewError(ssa.Error, "javaast", "parse bool error %s", err)
+			return nil
+		}
+		return y.EmitConstInst(boolLit)
+	} else if ret = i.NULL_LITERAL(); ret != nil {
+		return y.EmitConstInst(nil)
+	} else if ret = i.TEXT_BLOCK(); ret != nil {
+		text := ret.GetText()
+		val := text[3 : len(text)-3]
+		return y.EmitConstInst(val)
+	}
+	return nil
+}
+
+// integer literal
+func (y *builder) VisitIntegerLiteral(raw javaparser.IIntegerLiteralContext) ssa.Value {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*javaparser.IntegerLiteralContext)
+	if i == nil {
+		return nil
+	}
+
+	var err error
+	originIntStr := i.GetText()
+	intStr := strings.ToLower(originIntStr)
+	var resultInt64 int64
+	switch true {
+	case strings.HasPrefix(intStr, "0b"): // 二进制
+		resultInt64, err = strconv.ParseInt(intStr[2:], 2, 64)
+	case strings.HasPrefix(intStr, "0x"): // 十六进制
+		resultInt64, err = strconv.ParseInt(intStr[2:], 16, 64)
+	case strings.HasPrefix(intStr, "0o"): // 八进制
+		resultInt64, err = strconv.ParseInt(intStr[2:], 8, 64)
+	case len(intStr) > 1 && intStr[0] == '0':
+		resultInt64, err = strconv.ParseInt(intStr[1:], 8, 64)
+	default:
+		resultInt64, err = strconv.ParseInt(intStr, 10, 64)
+	}
+	if err != nil {
+		y.NewError(ssa.Error, "javaast", "const parse %s as integer literal... is to large for int64: %v", originIntStr, err)
+		return nil
+	}
+	if resultInt64 > math.MaxInt {
+		return y.EmitConstInst(int64(resultInt64))
+	} else {
+		return y.EmitConstInst(int(resultInt64))
+	}
+}
+
+func (y *builder) VisitFloatLiteral(raw javaparser.IFloatLiteralContext) ssa.Value {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*javaparser.FloatLiteralContext)
+	if i == nil {
+		return nil
+	}
+
+	lit := i.GetText()
+	if strings.HasPrefix(lit, ".") {
+		lit = "0" + lit
+	}
+	f, _ := strconv.ParseFloat(lit, 64)
+	return y.EmitConstInst(f)
+
+}
