@@ -18,7 +18,7 @@ import (
 	"strings"
 )
 
-var PcapCommand = cli.Command{
+var pcapCommand = cli.Command{
 	Name:  "pcap",
 	Usage: "Sniff network traffic and output to stdout",
 	Flags: []cli.Flag{

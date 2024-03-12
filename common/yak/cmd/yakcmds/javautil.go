@@ -7,22 +7,21 @@ import (
 	"github.com/yaklang/yaklang/common/yserx"
 )
 
-var JavaUtils = []cli.Command{
-	{Name: "serialdumper", Aliases: []string{"sd"}, Action: func(c *cli.Context) {
-		if len(c.Args()) > 0 {
-			raw, err := codec.DecodeHex(c.Args()[0])
-			if err != nil {
-				log.Error(err)
-				return
+var JavaUtils = []*cli.Command{
+	{
+		Name:    "serialdumper",
+		Usage:   "Java SerialDumper in Yaklang/Golang Implemented",
+		Aliases: []string{"sd"},
+		Action: func(c *cli.Context) {
+			if len(c.Args()) > 0 {
+				raw, err := codec.DecodeHex(c.Args()[0])
+				if err != nil {
+					log.Error(err)
+					return
+				}
+				d := yserx.JavaSerializedDumper(raw)
+				println(d)
 			}
-			d := yserx.JavaSerializedDumper(raw)
-			println(d)
-		}
-	}},
-}
-
-func init() {
-	for _, i := range JavaUtils {
-		i.Category = "Java Serialization Utils"
-	}
+		},
+	},
 }

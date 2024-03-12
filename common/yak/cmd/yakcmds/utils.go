@@ -8,10 +8,12 @@ import (
 	"github.com/yaklang/yaklang/common/cybertunnel"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/spec"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/dap"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakast"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/scannode"
 	"io"
@@ -20,19 +22,10 @@ import (
 	"path/filepath"
 )
 
-func init() {
-	for _, util := range UtilsCommands {
-		util.Category = "Utils"
-	}
-
-	for _, util := range DistributionCommands {
-		util.Category = "Distribution Deploy"
-	}
-}
-
-var UtilsCommands = []cli.Command{
+var UtilsCommands = []*cli.Command{
 	{
-		Name: "gzip",
+		Name:  "gzip",
+		Usage: "gzip data or file",
 		Flags: []cli.Flag{
 			cli.StringFlag{
 				Name:  "f,file",
@@ -84,34 +77,55 @@ var UtilsCommands = []cli.Command{
 			gzipWriter.Close()
 			return nil
 		}},
-	{Name: "hex", Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "f,file",
-			Usage: "input file",
+	{
+		Name: "hex",
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name:  "f,file",
+				Usage: "input file",
+			},
+			cli.StringFlag{
+				Name:  "d,data",
+				Usage: "input data",
+			},
 		},
-		cli.StringFlag{
-			Name:  "d,data",
-			Usage: "input data",
-		},
-	}, Action: func(c *cli.Context) {
-		if c.String("file") != "" {
-			raw, err := ioutil.ReadFile(c.String("file"))
-			if err != nil {
-				log.Error(err)
-				return
+		Usage: "hex encode file or data to hex string",
+		Action: func(c *cli.Context) {
+			if c.String("file") != "" {
+				raw, err := ioutil.ReadFile(c.String("file"))
+				if err != nil {
+					log.Error(err)
+					return
+				}
+				println(codec.EncodeToHex(raw))
 			}
-			println(codec.EncodeToHex(raw))
-		}
 
-		if c.String("data") != "" {
-			println(codec.EncodeToHex(c.String("data")))
-		}
-	}},
+			if c.String("data") != "" {
+				println(codec.EncodeToHex(c.String("data")))
+			}
+		}},
+	{
+		Name:  "tag-stats",
+		Usage: "Generate Tag Status(for Yakit)",
+		Action: func(c *cli.Context) error {
+			stats, err := yaklib.NewTagStat()
+			if err != nil {
+				return err
+			}
+			for _, v := range stats.All() {
+				if v.Count <= 1 {
+					continue
+				}
+				fmt.Printf("TAG:[%v]-%v\n", v.Name, v.Count)
+			}
+			return nil
+		},
+	},
 
 	// dap
 	{
 		Name:  "dap",
-		Usage: "启动基于调试适配器协议(dap)的服务器以调试脚本",
+		Usage: "Start a server based on the Debug Adapter Protocol (DAP) to debug scripts.",
 		Flags: []cli.Flag{
 			cli.StringFlag{Name: "host", Usage: "debugger adapter listen host"},
 			cli.IntFlag{Name: "port", Usage: "debugger adapter listen port"},
@@ -152,7 +166,7 @@ var UtilsCommands = []cli.Command{
 	// fmt
 	{
 		Name:  "fmt",
-		Usage: "格式化代码",
+		Usage: "Formatter for Yaklang Code",
 		Flags: []cli.Flag{
 			cli.BoolFlag{Name: "version,v", Usage: "show formatter version"},
 		},
@@ -185,10 +199,26 @@ var UtilsCommands = []cli.Command{
 			return nil
 		},
 	},
+
+	{
+		Name:  "fuzz",
+		Usage: "fuzztag short for fuzz tag, fuzz tag is a tool to generate fuzz string for fuzz testing",
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name:  "t,target",
+				Usage: "Fuzztag Template, like: `{{int(1-10)}}`",
+			},
+		},
+		Action: func(c *cli.Context) {
+			for _, r := range mutate.MutateQuick(c.String("t")) {
+				println(r)
+			}
+		},
+	},
 }
 
-var DistributionCommands = []cli.Command{
-	scannode.DistYakCommand,
+var DistributionCommands = []*cli.Command{
+	&scannode.DistYakCommand,
 	{
 		Name:   "mq",
 		Usage:  "distributed by private amqp application protocol, execute yak via rabbitmq",
@@ -206,7 +236,8 @@ var DistributionCommands = []cli.Command{
 		Flags: spec.GetCliBasicConfig("scannode"),
 	},
 	{
-		Name: "tunnel",
+		Name:  "tunnel",
+		Usage: "Create Tunnel For CyberTunnel Service",
 		Flags: []cli.Flag{
 			cli.StringFlag{Name: "server", Value: "cybertunnel.run:64333"},
 			cli.IntFlag{Name: "local-port", Value: 53},
@@ -230,7 +261,7 @@ var DistributionCommands = []cli.Command{
 	},
 	{
 		Name:    "inspect-tuns",
-		Usage:   "查看注册 tunnels 信息",
+		Usage:   "Inspect Registered Tunnels",
 		Aliases: []string{"lst"},
 		Flags: []cli.Flag{
 			cli.StringFlag{Name: "server", Usage: "远程 Yak Bridge X 服务器", Value: "127.0.0.1:64333"},

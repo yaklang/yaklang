@@ -18,13 +18,7 @@ import (
 	"sync"
 )
 
-func init() {
-	for _, i := range CVEUtilCommands {
-		i.Category = "CVE Database Utils"
-	}
-}
-
-var CVEUtilCommands = []cli.Command{
+var CVEUtilCommands = []*cli.Command{
 	{
 		Name: "translating",
 		Flags: []cli.Flag{
@@ -48,11 +42,13 @@ var CVEUtilCommands = []cli.Command{
 			cli.BoolFlag{
 				Name: "chaosmaker-rules",
 			},
+			cli.StringFlag{Name: "proxy", Usage: "Network Proxy", EnvVar: "http_proxy"},
 		},
+		Usage:  "Translate CVE Models to Chinese, Supported in OPENAI",
 		Hidden: true,
 		Action: func(c *cli.Context) error {
 			if c.Bool("chaosmaker-rules") {
-				rule.DecorateRules(c.Int("concurrent"), "http://127.0.0.1:7890")
+				rule.DecorateRules(c.Int("concurrent"), c.String("proxy"))
 				return nil
 			}
 
@@ -63,7 +59,8 @@ var CVEUtilCommands = []cli.Command{
 		},
 	},
 	{
-		Name: "build-cve-database",
+		Name:  "build-cve-database",
+		Usage: "Build CVE Database in SQLite",
 		Flags: []cli.Flag{
 			cli.BoolFlag{Name: "cwe"},
 			cli.BoolFlag{Name: "cache"},
