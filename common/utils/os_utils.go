@@ -608,14 +608,6 @@ func DebugMockEchoWs(data []byte) (string, int) {
 			return
 		}
 		defer conn.Close()
-		//// 循环三次
-		//for i := 0; i < 3; i++ {
-		//	err = conn.WriteMessage(ws.TextMessage, data)
-		//	if err != nil {
-		//		log.Errorf("write message failed: %s", err)
-		//		return
-		//	}
-		//}
 
 		for {
 			mt, message, err := conn.ReadMessage()

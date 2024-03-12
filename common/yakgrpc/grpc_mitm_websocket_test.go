@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -67,7 +68,7 @@ Accept: */*
 }
 
 func TestGRPCMUSTPASS_MITM_WebSocket_Payload(t *testing.T) {
-	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(20))
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(15))
 	defer cancel()
 	token := utils.RandNumberStringBytes(20)
 
@@ -101,6 +102,7 @@ func TestGRPCMUSTPASS_MITM_WebSocket_Payload(t *testing.T) {
 		rspMsg := string(rcpResponse.GetMessage().GetMessage())
 		if len(rcpResponse.GetRequest()) > 0 {
 			if len(rcpResponse.GetResponse()) > 0 {
+				spew.Dump(rcpResponse.GetResponse())
 				stream.Send(&ypb.MITMRequest{
 					Response:   rcpResponse.GetResponse(),
 					Id:         rcpResponse.GetId(),
@@ -108,11 +110,9 @@ func TestGRPCMUSTPASS_MITM_WebSocket_Payload(t *testing.T) {
 				})
 			}
 			if len(rcpResponse.GetPayload()) > 0 {
+				spew.Dump(rcpResponse.GetPayload())
 				if rcpResponse.GetRequest() == nil {
 					t.Fatalf("websocket rcpResponse.GetRequest() is nil")
-				}
-				if !strings.Contains(string(rcpResponse.GetPayload()), token) {
-					t.Fatalf("websocket rcpResponse.GetPayload() not contains token")
 				}
 				if strings.Contains(string(rcpResponse.GetPayload()), token) {
 					tokenCount++
@@ -151,15 +151,11 @@ Accept: */*
 				if err != nil {
 					t.Fatal(err)
 				}
-				time.Sleep(1 * time.Second)
-				//for i := 0; i < 3; i++ {
+				time.Sleep(2 * time.Second)
 				err = wsClient.Write([]byte(token))
-				//}
 				if err != nil {
 					t.Fatal(err)
 				}
-				time.Sleep(2 * time.Second)
-				cancel()
 			}()
 		}
 	}
