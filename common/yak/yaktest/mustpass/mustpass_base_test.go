@@ -54,7 +54,7 @@ func init() {
 }
 
 func TestMustPassDebug(t *testing.T) {
-	var debugName = "expect_100_continue.yak"
+	var debugName = "dictutil.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {
