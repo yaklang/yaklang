@@ -82,8 +82,7 @@ bool d=true;`), t)
         ret = a % b;`), t)
 	})
 	t.Run("test AdditiveExpression", func(t *testing.T) {
-		CheckJavaCode(createJavaProgram(` int a = 2;
-		int b = 3;
+		CheckJavaCode(createJavaProgram(` 
 		a + b;
 		b - a;`), t)
 	})
