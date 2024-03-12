@@ -156,7 +156,7 @@ func init() {
 
 var installSubCommand = cli.Command{
 	Name:  "install",
-	Usage: "安装 Yak/Install Yak  (Add to ENV PATH)",
+	Usage: "Install Yak  (Add to ENV PATH)",
 	Action: func(c *cli.Context) error {
 		file, err := exec.LookPath(os.Args[0])
 		if err != nil && !errors.Is(err, exec.ErrDot) {
@@ -222,7 +222,7 @@ var installSubCommand = cli.Command{
 
 var mirrorGRPCServerCommand = cli.Command{
 	Name:  "xgrpc",
-	Usage: "启动 GRPC，开启映射",
+	Usage: "Start GRPC Server Local, and Auto-Create Tunnel for Remote Controll",
 	Flags: []cli.Flag{
 		cli.StringFlag{Name: "server", Usage: "远程 Yak Bridge X 服务器"},
 		cli.StringFlag{Name: "secret", Usage: "远程 Yak Bridge X 服务器密码"},
@@ -313,7 +313,7 @@ func slowLogUnaryInterceptor(ctx context.Context, req interface{}, info *grpc.Un
 
 var startGRPCServerCommand = cli.Command{
 	Name:   "grpc",
-	Usage:  "启动 GRPC 服务器",
+	Usage:  "Start GRPC Server to Receive Connections",
 	Hidden: false,
 	Flags: []cli.Flag{
 		cli.StringFlag{
@@ -570,6 +570,16 @@ func startPProf(sec float64) {
 	}
 }
 
+func cliGroup(group string, cmds ...*cli.Command) []cli.Command {
+	res := make([]cli.Command, len(cmds))
+	for idx, i := range cmds {
+		i.Category = group
+		i.Hidden = false
+		res[idx] = *i
+	}
+	return res
+}
+
 func main() {
 	// log.SetLevel(log.WarnLevel)
 	app := cli.NewApp()
@@ -581,14 +591,15 @@ func main() {
 	// 启动 bridge
 	tunnelServerCliApp := cybertunnel.GetTunnelServerCommandCli()
 	tunnelServerCommand := cli.Command{
-		Name:    "tunnel-server",
-		Aliases: []string{"bridge"},
+		Name:    "brige",
+		Usage:   "Create Yak-Bridge Server",
+		Aliases: []string{"tunnel-server"},
 		Flags:   tunnelServerCliApp.Flags,
 		Before:  tunnelServerCliApp.Before,
 		Action:  tunnelServerCliApp.Action,
 	}
 
-	mainCommands := []cli.Command{
+	mainCommands := []*cli.Command{
 		{
 			Name: "version",
 			Flags: []cli.Flag{
@@ -597,6 +608,7 @@ func main() {
 					Usage: "output as json",
 				},
 			},
+			Usage: "Show Version Info",
 			Action: func(c *cli.Context) {
 				infoMap := map[string]string{"Version": yakVersion, "GoVersion": goVersion, "BuildTime": buildTime}
 				if gitHash != "" {
@@ -620,7 +632,7 @@ func main() {
 
 		{
 			Name:  "compile",
-			Usage: "编译yak脚本，生成yakc文件(仅限新引擎)",
+			Usage: "Compile Yaklang Code to YakVM ByteCodes",
 			Flags: []cli.Flag{
 				cli.StringFlag{
 					Name:  "output,o",
@@ -686,47 +698,52 @@ func main() {
 				return nil
 			},
 		},
-		startGRPCServerCommand,
-		installSubCommand,
-		tunnelServerCommand,
-		mirrorGRPCServerCommand,
+		&startGRPCServerCommand,
+		&installSubCommand,
+		&tunnelServerCommand,
+		&mirrorGRPCServerCommand,
+		&yakcmds.UpgradeCommand,
 	}
 
 	app.Commands = []cli.Command{}
-	app.Commands = append(app.Commands, mainCommands...)
-	app.Commands = append(app.Commands, yakcmds.CVEUtilCommands...)
-	app.Commands = append(app.Commands, yakcmds.DocCommands...)
-	app.Commands = append(app.Commands, yakcmds.JavaUtils...)
-	app.Commands = append(app.Commands, yakcmds.ProjectCommands...)
-	app.Commands = append(app.Commands, yakcmds.TrafficUtilCommands...)
-	app.Commands = append(app.Commands, yakcmds.UtilsCommands...)
-	app.Commands = append(app.Commands, yakcmds.DistributionCommands...)
-	app.Commands = append(app.Commands, yak.Subcommands...)
+	app.Commands = append(app.Commands, cliGroup("", mainCommands...)...)
+	app.Commands = append(app.Commands, cliGroup("CVE Database Utils", yakcmds.CVEUtilCommands...)...)
+	app.Commands = append(app.Commands, cliGroup("Document Helper", yakcmds.DocCommands...)...)
+	app.Commands = append(app.Commands, cliGroup("Java Serialization Utils", yakcmds.JavaUtils...)...)
+	app.Commands = append(app.Commands, cliGroup("Project Management", yakcmds.ProjectCommands...)...)
+	app.Commands = append(app.Commands, cliGroup("Traffic Utils", yakcmds.TrafficUtilCommands...)...)
+	app.Commands = append(app.Commands, cliGroup("Utils", yakcmds.UtilsCommands...)...)
+	app.Commands = append(app.Commands, cliGroup("Network Distribution Utils", yakcmds.DistributionCommands...)...)
+	app.Commands = append(app.Commands, cliGroup("Vuln Scanner", yakcmds.ScanCommands...)...)
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name:  "code,c",
-			Usage: "yak代码",
+			Usage: "Yaklang Code",
 		},
 		cli.BoolFlag{
 			Name:  "hex",
-			Usage: "yak代码(被HEX编码)",
+			Usage: "Hex Encoded Yak Code",
 		},
 		cli.BoolFlag{
 			Name:  "base64",
-			Usage: "yak代码(被Base64编码)",
+			Usage: "Base64 Encoded Yak Code",
 		},
 		cli.StringFlag{
-			Name:  "key,k",
-			Usage: "执行yakc时所需要的密钥文件，是可选的，长度为128 bit(16 字节)",
+			Name:  "keyfile,k",
+			Usage: "SecretKey-File for executing Yak Code, len: 128 bit(16 byte) PaddingFor PKCS7",
+		},
+		cli.StringFlag{
+			Name:  "secret,s",
+			Usage: "SecretKey for executing Yak Code, len: 128 bit(16 byte)",
 		},
 		cli.BoolFlag{
 			Name:  "cdebug",
-			Usage: "以命令行debug模式执行yak(仅限新引擎,对yakc文件无效)，进入cli debug",
+			Usage: "(Not Worked on Yakc) Enter Cli Debug Mode",
 		},
 		cli.StringFlag{
 			Name:   "netx-proxy",
-			Usage:  "为底层Netx设置代理",
+			Usage:  "Force Set Network Proxy for yak.netx",
 			EnvVar: "NETX_PROXY",
 		},
 	}
@@ -740,12 +757,33 @@ func main() {
 			key []byte
 		)
 		args := c.Args()
-		keyfile := c.String("key")
+		keyfile := c.String("keyfile")
 		debug := c.Bool("cdebug")
+
+		setKey := false
 		if keyfile != "" {
+			p := utils.GetFirstExistedPath(keyfile)
+			if p == "" {
+				return utils.Errorf("keyfile not found: %s", keyfile)
+			}
+
 			key, err = ioutil.ReadFile(keyfile)
 			if err != nil {
 				return err
+			}
+			setKey = true
+		} else if keyStr := c.String("secret"); keyStr != "" {
+			key = []byte(keyStr)
+			setKey = true
+		}
+
+		if setKey {
+			if len(key) > 16 {
+				key = key[:16]
+			} else if len(key) == 16 {
+				key = key[:]
+			} else {
+				key = codec.PKCS7Padding(key)
 			}
 		}
 
