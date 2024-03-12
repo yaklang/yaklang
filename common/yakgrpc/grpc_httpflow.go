@@ -166,7 +166,7 @@ func (s *Server) SaveSetTagForHTTPFlow(id int64, hash string, tags []string) err
 		}
 	}
 	flow.Tags = strings.Join(utils.RemoveRepeatStringSlice(tagsData), "|")
-	err = yakit.InsertHTTPFlow(s.GetProjectDatabase(), flow)
+	err = yakit.UpdateHTTPFlowTags(s.GetProjectDatabase(), flow)
 	m, _ := flow.ToGRPCModel(true)
 	flow.SetCacheGRPCModel(false, m)
 	if err != nil {

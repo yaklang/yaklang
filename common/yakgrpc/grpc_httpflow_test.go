@@ -429,4 +429,34 @@ rsp, req = poc.HTTP(packet, poc.proxy(mitmProxy))~
 	if !strings.Contains(flow.Tags, "YAKIT_COLOR_RED") {
 		t.Fatal("flow preset tag failed")
 	}
+
+	_, err = client.SetTagForHTTPFlow(context.Background(), &ypb.SetTagForHTTPFlowRequest{
+		Id:   int64(flow.GetId()),
+		Tags: strings.Split(strings.ReplaceAll(flow.GetTags(), "YAKIT_COLOR_RED", "YAKIT_COLOR_BLUE"), "|"),
+
+		CheckTags: nil,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(time.Second)
+	fixRpcResponse, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
+		Pagination: &ypb.Paging{
+			Page:  1,
+			Limit: 100,
+		},
+		SourceType: "mitm",
+		Keyword:    token1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fixRpcResponse.GetTotal() <= 0 {
+		t.Fatal("no flow")
+	}
+	fixFlow := fixRpcResponse.GetData()[0]
+	if !strings.Contains(fixFlow.Tags, "YAKIT_COLOR_BLUE") {
+		t.Fatal("flow preset tag failed")
+	}
+
 }
