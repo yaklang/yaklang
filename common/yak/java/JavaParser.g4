@@ -619,11 +619,11 @@ expression
     | switchExpression                                              # Java17SwitchExpression
 
     // Level 15 Post-increment/decrement operators
-    | expression postfix = ('++' | '--')                            # PostfixExpression
+    | identifier postfix = ('++' | '--')                            # PostfixExpression
 
     // Level 14, Unary operators
-    | prefix = ('+' | '-' | '++' | '--' | '~' | '!') expression     # PrefixExpression
-
+    | prefix = ('+' | '-'  | '~' | '!') expression                   # PrefixUnaryExpression
+    | prefix = ('++' | '--') identifier                            # PrefixBinayExpression
     // Level 13 Cast and object creation
     | '(' annotation* typeType ('&' typeType)* ')' expression       # CastExpression
     | NEW creator                                                   # NewCreatorExpression
@@ -653,9 +653,8 @@ expression
     // Level 2, Ternary (Conditional) operator
     | <assoc = right> expression bop = '?' expression ':' expression# TernaryExpression
     // Level 1, Assignment
-    | <assoc = right> expression bop = (
-        '='
-        | '+='
+    | <assoc = right> identifier bop = (
+         '+='
         | '-='
         | '*='
         | '/='
@@ -667,7 +666,7 @@ expression
         | '<<='
         | '%='
     ) expression                                                    # AssignmentExpression
-
+    | <assoc = right> identifier bop = '=' identifier               # AssignmentEqExpression
     // Level 0, Lambda Expression Java8
     | lambdaExpression                                              # Java8LambdaExpression
     ;
