@@ -45,7 +45,7 @@ func (y *builder) VisitBlockStatement(raw javaparser.IBlockStatementContext) int
 	return nil
 }
 
-func (y *builder) VisitExpression(raw javaparser.IExpressionContext) interface{} {
+func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -53,7 +53,9 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) interface{}
 	switch ret := raw.(type) {
 	case *javaparser.PrimaryExpressionContext:
 		// 处理主要表达式
-		return y.VisitPrimary(ret.Primary())
+		value := y.VisitPrimary(ret.Primary())
+		return value
+
 	case *javaparser.SliceCallExpressionContext:
 		// 处理切片调用表达式
 	case *javaparser.MemberCallExpressionContext:
@@ -68,26 +70,6 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) interface{}
 		// 处理 Java 17 的 switch 表达式
 	case *javaparser.PostfixExpressionContext:
 		// 处理后缀表达式，如自增、自减操作
-		if ret.INC() != nil { //++
-			variable := y.VisitExpression(ret.Expression()).(*ssa.Variable)
-			if variable == nil {
-				y.NewError(ssa.Error, "javaast", yak2ssa.AssignLeftSideEmpty())
-				return nil
-			}
-			value := y.EmitBinOp(ssa.OpAdd, y.ReadValueByVariable(variable), y.EmitConstInst(1))
-			y.AssignVariable(variable, value)
-			return variable
-		}
-		if ret.DEC() != nil { //--
-			variable := y.VisitExpression(ret.Expression()).(*ssa.Variable)
-			if variable == nil {
-				y.NewError(ssa.Error, "javaast", yak2ssa.AssignLeftSideEmpty())
-				return nil
-			}
-			value := y.EmitBinOp(ssa.OpSub, y.ReadValueByVariable(variable), y.EmitConstInst(1))
-			y.AssignVariable(variable, value)
-			return variable
-		}
 	case *javaparser.PrefixExpressionContext:
 		// 处理前缀表达式，如正负号、逻辑非等
 	case *javaparser.CastExpressionContext:
@@ -98,6 +80,18 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) interface{}
 		// 处理乘法、除法、模运算表达式
 	case *javaparser.AdditiveExpressionContext:
 		// 处理加法和减法表达式
+		op1 := y.VisitExpression(ret.Expression(0))
+		op2 := y.VisitExpression(ret.Expression(1))
+		var opcode ssa.BinaryOpcode
+		if ret.GetBop().GetText() == "+" {
+			opcode = ssa.OpAdd
+		} else if ret.GetBop().GetText() == "-" {
+			opcode = ssa.OpSub
+		} else {
+			y.NewError(ssa.Error, "javaast", yak2ssa.BinaryOperatorNotSupport(ret.GetText()))
+			return nil
+		}
+		return y.EmitBinOp(opcode, op1, op2)
 	case *javaparser.ShiftExpressionContext:
 		// 处理位移表达式
 	case *javaparser.RelationalExpressionContext:
@@ -144,7 +138,7 @@ func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext) ssa.Value {
 	return nil
 }
 
-func (y *builder) VisitPrimary(raw javaparser.IPrimaryContext) interface{} {
+func (y *builder) VisitPrimary(raw javaparser.IPrimaryContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -154,12 +148,16 @@ func (y *builder) VisitPrimary(raw javaparser.IPrimaryContext) interface{} {
 		return nil
 	}
 	if ret := i.Literal(); ret != nil {
-		literal := ret.(*javaparser.LiteralContext)
-		return literal.GetText()
+
 	}
 	if ret := i.Identifier(); ret != nil {
 		text := ret.GetText()
-		return y.CreateVariable(text)
+		if text == "_" {
+			y.NewError(ssa.Warn, "javaast", "cannot use _ as value")
+
+		}
+		v := y.ReadValue(text)
+		return v
 	}
 	return nil
 }
@@ -205,14 +203,33 @@ func (y *builder) VisitLocalVariableDeclaration(raw javaparser.ILocalVariableDec
 		return nil
 	}
 
-	id := i.Identifier()
-	if id != nil {
-		varName := id.GetText()
-		variable := y.CreateLocalVariable(varName)
+	if ret := i.Identifier(); ret != nil {
+		log.Infof("visit local variable declaration: %v", ret.GetText())
+		variable := y.CreateLocalVariable(ret.GetText())
 		exprResult := y.VisitExpression(i.Expression())
 		value := y.EmitConstInst(exprResult)
 		y.AssignVariable(variable, value)
 		return nil
+	} else if ret := i.VariableDeclarators(); ret != nil {
+		decls := ret.(*javaparser.VariableDeclaratorsContext)
+		for _, decl := range decls.AllVariableDeclarator() {
+			y.VisitVariableDeclarator(decl)
+		}
 	}
+
 	return nil
+}
+
+func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorContext) interface{} {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*javaparser.VariableDeclaratorContext)
+	if i == nil {
+		return nil
+	}
+
+	return nil
+
 }
