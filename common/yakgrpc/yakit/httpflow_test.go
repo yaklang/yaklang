@@ -2,11 +2,38 @@ package yakit
 
 import (
 	"fmt"
-	"github.com/go-rod/rod/lib/utils"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"testing"
+
+	"github.com/go-rod/rod/lib/utils"
+	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+func TestHTTPFlowToGRPCModelBase64(t *testing.T) {
+	test := assert.New(t)
+	reqInst, err := lowhttp.ParseBytesToHttpRequest(lowhttp.FixHTTPRequest([]byte(`POST / HTTP/1.1
+Content-Type: application/x-www-form-urlencoded
+Host: www.example.com
+Content-Length: 9
+
+key=MQ==`)))
+	test.NoError(err, "parse request failed")
+	flow, err := CreateHTTPFlowFromHTTPWithNoRspSaved(true, reqInst, "", "https://example.com", "127.0.0.1")
+	test.NoError(err, "create http flow failed")
+	model, err := flow.ToGRPCModel(true)
+	test.NoError(err, "convert to grpc model failed")
+	for _, param := range model.PostParams {
+		if param.Position == "post-query" {
+			test.Equal("key", param.ParamName)
+			test.Equal("MQ==", param.OriginValue)
+		} else if param.Position == "post-query-base64" {
+			test.Equal("key", param.ParamName)
+			test.Equal("1", param.OriginValue)
+		}
+	}
+}
 
 //func TestYieldHTTPUrl(t *testing.T) {
 //	forest := assets.NewWebsiteForest(10000)
@@ -94,5 +121,4 @@ func TestHTTPFlow_Inset_FixUrl(t *testing.T) {
 			}
 		}
 	}
-
 }
