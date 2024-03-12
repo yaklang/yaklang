@@ -411,6 +411,10 @@ func (v *BaseJavaParserVisitor) VisitPrimaryExpression(ctx *PrimaryExpressionCon
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseJavaParserVisitor) VisitPrefixUnaryExpression(ctx *PrefixUnaryExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseJavaParserVisitor) VisitMemberCallExpression(ctx *MemberCallExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -443,6 +447,10 @@ func (v *BaseJavaParserVisitor) VisitInstanceofExpression(ctx *InstanceofExpress
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseJavaParserVisitor) VisitAssignmentEqExpression(ctx *AssignmentEqExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseJavaParserVisitor) VisitEqualityExpression(ctx *EqualityExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -467,6 +475,10 @@ func (v *BaseJavaParserVisitor) VisitNewCreatorExpression(ctx *NewCreatorExpress
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseJavaParserVisitor) VisitPrefixBinayExpression(ctx *PrefixBinayExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseJavaParserVisitor) VisitShiftExpression(ctx *ShiftExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -484,10 +496,6 @@ func (v *BaseJavaParserVisitor) VisitSliceCallExpression(ctx *SliceCallExpressio
 }
 
 func (v *BaseJavaParserVisitor) VisitJava8LambdaExpression(ctx *Java8LambdaExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseJavaParserVisitor) VisitPrefixExpression(ctx *PrefixExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
