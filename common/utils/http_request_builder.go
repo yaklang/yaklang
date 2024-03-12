@@ -4,15 +4,16 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 // commonHeader interns common header strings.
@@ -63,7 +64,7 @@ func ParseHTTPRequestLine(line string) (method, requestURI, proto string, ok boo
 		return
 	}
 
-	var httpVersion = "HTTP/1.1"
+	httpVersion := "HTTP/1.1"
 	if s2 < 0 {
 		return line[:s1], line[s1+1:], httpVersion, true
 	}
@@ -97,7 +98,7 @@ func ParseStringToUrl(s string) *url.URL {
 	// 192.168.1.1:
 	// 0x01000000
 	// http://baidu.com?a=1
-	var u = new(url.URL)
+	u := new(url.URL)
 
 	// handle #
 	s, fragment, fragmentOk := strings.Cut(s, "#")
@@ -105,7 +106,7 @@ func ParseStringToUrl(s string) *url.URL {
 		u.Fragment = fragment
 	}
 
-	var haveSchemaSplit = false
+	haveSchemeSplit := false
 RETRY:
 	if strings.HasPrefix(s, "/") {
 		// /path?query#fragment
@@ -120,17 +121,17 @@ RETRY:
 			}
 		}
 		return u
-	} else if strings.HasPrefix(s, "://") {
+	} else if strings.HasPrefix(s, "://") && !haveSchemeSplit {
 		s = strings.TrimPrefix(s, "://")
-		haveSchemaSplit = true
+		haveSchemeSplit = true
 		goto RETRY
-	} else if strings.Contains(s, "://") {
+	} else if strings.Contains(s, "://") && !haveSchemeSplit {
 		origin := s
-		var schema string
-		schema, s, haveSchemaSplit = strings.Cut(origin, "://")
-		u.Scheme = schema
-		if strings.Contains(schema, ".") {
-			log.Warnf("unhealthy schema(%v) found in %v", schema, origin)
+		var scheme string
+		scheme, s, haveSchemeSplit = strings.Cut(origin, "://")
+		u.Scheme = scheme
+		if strings.Contains(scheme, ".") {
+			log.Warnf("unhealthy schema(%v) found in %v", scheme, origin)
 		}
 		goto RETRY
 	} else {
@@ -164,7 +165,7 @@ RETRY:
 			var queryOk bool
 			var result string
 			result, u.RawQuery, queryOk = strings.Cut(s, "?")
-			if u.Host == "" || (!queryOk && haveSchemaSplit) {
+			if u.Host == "" || (!queryOk && haveSchemeSplit) {
 				u.Host = result
 			} else {
 				u.Path = result
@@ -223,7 +224,7 @@ func generateConnectedToFromHTTPRequest(t *http.Request) (bool, string, int, err
 	}
 
 	var port int
-	var isHttps = (t.TLS != nil) || t.URL.Scheme == "https" || t.URL.Scheme == "wss"
+	isHttps := (t.TLS != nil) || t.URL.Scheme == "https" || t.URL.Scheme == "wss"
 	if isHttps {
 		port = 443
 	} else {
@@ -250,9 +251,9 @@ func generateConnectedToFromHTTPRequest(t *http.Request) (bool, string, int, err
 }
 
 func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool, onFirstLine func(string)) (*http.Request, error) {
-	var rawPacket = new(bytes.Buffer)
+	rawPacket := new(bytes.Buffer)
 
-	var req = &http.Request{
+	req := &http.Request{
 		Proto:      "HTTP/1.1",
 		ProtoMajor: 1,
 		ProtoMinor: 1,
@@ -319,11 +320,11 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool,
 		if not smuggle { if te keep te }
 	*/
 	// close is default in 0.9 or 1.0
-	var defaultClose = (req.ProtoMajor == 1 && req.ProtoMinor == 0) || req.ProtoMajor < 1
-	var header = make(http.Header)
-	var useContentLength = false
-	var contentLengthInt = 0
-	var useTransferEncodingChunked = false
+	defaultClose := (req.ProtoMajor == 1 && req.ProtoMinor == 0) || req.ProtoMajor < 1
+	header := make(http.Header)
+	useContentLength := false
+	contentLengthInt := 0
+	useTransferEncodingChunked := false
 	for {
 		lineBytes, err := BufioReadLine(reader)
 		if err != nil && err != io.EOF {
@@ -344,7 +345,7 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool,
 			keyStr = http.CanonicalHeaderKey(keyStr)
 		}
 
-		var isSingletonHeader = false
+		isSingletonHeader := false
 		switch strings.ToLower(keyStr) {
 		case "content-length":
 			useContentLength = true
@@ -388,7 +389,7 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool,
 	if method == "CONNECT" {
 		urlIns = new(url.URL)
 		// if connect, the uri should be host:port
-		var host, port, _ = ParseStringToHostPort(before)
+		host, port, _ := ParseStringToHostPort(before)
 		if port > 0 {
 			urlIns.Host = HostPort(host, port)
 		} else {
@@ -448,7 +449,7 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool,
 	}
 	req.Host = host
 
-	var bodyRawBuf = new(bytes.Buffer)
+	bodyRawBuf := new(bytes.Buffer)
 	if fixContentLength {
 		// by reader
 		raw, _ := io.ReadAll(reader)
@@ -492,7 +493,7 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool,
 			}
 		} else {
 			// handle content-length as default
-			var bodyRaw, err = io.ReadAll(io.NopCloser(io.LimitReader(reader, int64(contentLengthInt))))
+			bodyRaw, err := io.ReadAll(io.NopCloser(io.LimitReader(reader, int64(contentLengthInt))))
 			rawPacket.Write(bodyRaw)
 			if err != nil && err != io.EOF {
 				if !errors.Is(err, io.ErrUnexpectedEOF) {
