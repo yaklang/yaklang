@@ -874,11 +874,11 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 
 	// hook sync context
 	nIns.GetVM().RegisterMapMemberCallHandler("sync", "NewWaitGroup", func(f interface{}) interface{} {
-		originFunc, ok := f.(func(ctxs ...context.Context))
+		originFunc, ok := f.(func(ctxs ...context.Context) *yaklib.WaitGroupProxy)
 		if ok {
-			return func(ctxs ...context.Context) {
+			return func(ctxs ...context.Context) *yaklib.WaitGroupProxy {
 				ctxs = append(ctxs, streamContext)
-				originFunc(ctxs...)
+				return originFunc(ctxs...)
 			}
 		}
 		return f
