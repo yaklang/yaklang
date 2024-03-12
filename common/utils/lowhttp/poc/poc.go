@@ -32,8 +32,8 @@ const (
 type PocConfig struct {
 	Host                 string
 	Port                 int
-	ForceHttps           bool
-	ForceHttp2           bool
+	ForceHttps           *bool
+	ForceHttp2           *bool
 	SNI                  string
 	Timeout              time.Duration
 	ConnectTimeout       time.Duration
@@ -43,14 +43,14 @@ type PocConfig struct {
 	RetryWaitTime        time.Duration
 	RetryMaxWaitTime     time.Duration
 	RedirectTimes        int
-	NoRedirect           bool
+	NoRedirect           *bool
 	Proxy                []string
 	FuzzParams           map[string][]string
-	NoFixContentLength   bool
-	JsRedirect           bool
+	NoFixContentLength   *bool
+	JsRedirect           *bool
 	RedirectHandler      func(bool, []byte, []byte) bool
 	Session              interface{} // session的标识符，可以用任意对象
-	SaveHTTPFlow         bool
+	SaveHTTPFlow         *bool
 	Source               string
 	Username             string
 	Password             string
@@ -81,6 +81,10 @@ type PocConfig struct {
 	DNSNoCache bool
 }
 
+func (c *PocConfig) IsHTTPS() bool {
+	return c.ForceHttps != nil && *c.ForceHttps
+}
+
 func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 	var opts []lowhttp.LowhttpOpt
 	if c.Host != "" {
@@ -89,8 +93,12 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 	if c.Port != 0 {
 		opts = append(opts, lowhttp.WithPort(c.Port))
 	}
-	opts = append(opts, lowhttp.WithHttps(c.ForceHttps))
-	opts = append(opts, lowhttp.WithHttp2(c.ForceHttp2))
+	if c.ForceHttps != nil {
+		opts = append(opts, lowhttp.WithHttps(*c.ForceHttps))
+	}
+	if c.ForceHttp2 != nil {
+		opts = append(opts, lowhttp.WithHttp2(*c.ForceHttp2))
+	}
 	opts = append(opts, lowhttp.WithSNI(c.SNI))
 	if c.Timeout > 0 {
 		opts = append(opts, lowhttp.WithTimeout(c.Timeout))
@@ -113,7 +121,7 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 	if c.RedirectTimes > 0 {
 		opts = append(opts, lowhttp.WithRedirectTimes(c.RedirectTimes))
 	}
-	if c.NoRedirect {
+	if c.NoRedirect != nil && *c.NoRedirect {
 		opts = append(opts, lowhttp.WithRedirectTimes(0))
 	}
 
@@ -121,9 +129,15 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 		opts = append(opts, lowhttp.WithProxy(c.Proxy...))
 	}
 
-	opts = append(opts, lowhttp.WithNoFixContentLength(c.NoFixContentLength))
-	opts = append(opts, lowhttp.WithJsRedirect(c.JsRedirect))
-	opts = append(opts, lowhttp.WithSaveHTTPFlow(c.SaveHTTPFlow))
+	if c.NoFixContentLength != nil {
+		opts = append(opts, lowhttp.WithNoFixContentLength(*c.NoFixContentLength))
+	}
+	if c.JsRedirect != nil {
+		opts = append(opts, lowhttp.WithJsRedirect(*c.JsRedirect))
+	}
+	if c.SaveHTTPFlow != nil {
+		opts = append(opts, lowhttp.WithSaveHTTPFlow(*c.SaveHTTPFlow))
+	}
 	opts = append(opts, lowhttp.WithRedirectHandler(func(isHttps bool, req []byte, rsp []byte) bool {
 		if c.RedirectHandler == nil {
 			return true
@@ -160,11 +174,10 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 }
 
 func NewDefaultPoCConfig() *PocConfig {
+	saveHTTPFlow := consts.GLOBAL_HTTP_FLOW_SAVE.IsSet()
 	config := &PocConfig{
 		Host:                   "",
 		Port:                   0,
-		ForceHttps:             false,
-		ForceHttp2:             false,
 		Timeout:                15 * time.Second,
 		ConnectTimeout:         15 * time.Second,
 		RetryTimes:             0,
@@ -173,14 +186,11 @@ func NewDefaultPoCConfig() *PocConfig {
 		RetryWaitTime:          defaultWaitTime,
 		RetryMaxWaitTime:       defaultMaxWaitTime,
 		RedirectTimes:          5,
-		NoRedirect:             false,
 		Proxy:                  nil,
 		FuzzParams:             nil,
-		NoFixContentLength:     false,
-		JsRedirect:             false,
 		RedirectHandler:        nil,
 		Session:                nil,
-		SaveHTTPFlow:           consts.GLOBAL_HTTP_FLOW_SAVE.IsSet(),
+		SaveHTTPFlow:           &saveHTTPFlow,
 		Source:                 "",
 		Websocket:              false,
 		WebsocketHandler:       nil,
@@ -297,7 +307,7 @@ func WithRedirectTimes(t int) PocConfigOption {
 // ```
 func WithNoFixContentLength(b bool) PocConfigOption {
 	return func(c *PocConfig) {
-		c.NoFixContentLength = b
+		c.NoFixContentLength = &b
 	}
 }
 
@@ -308,7 +318,7 @@ func WithNoFixContentLength(b bool) PocConfigOption {
 // ```
 func WithNoRedirect(b bool) PocConfigOption {
 	return func(c *PocConfig) {
-		c.NoRedirect = b
+		c.NoRedirect = &b
 	}
 }
 
@@ -333,7 +343,7 @@ func WithProxy(proxies ...string) PocConfigOption {
 // ```
 func WithForceHTTPS(isHttps bool) PocConfigOption {
 	return func(c *PocConfig) {
-		c.ForceHttps = isHttps
+		c.ForceHttps = &isHttps
 	}
 }
 
@@ -344,7 +354,7 @@ func WithForceHTTPS(isHttps bool) PocConfigOption {
 // ```
 func WithForceHTTP2(isHttp2 bool) PocConfigOption {
 	return func(c *PocConfig) {
-		c.ForceHttp2 = isHttp2
+		c.ForceHttp2 = &isHttp2
 	}
 }
 
@@ -503,7 +513,7 @@ func WithPort(port int) PocConfigOption {
 // ```
 func WithJSRedirect(b bool) PocConfigOption {
 	return func(c *PocConfig) {
-		c.JsRedirect = b
+		c.JsRedirect = &b
 	}
 }
 
@@ -524,9 +534,9 @@ func WithSession(i interface{}) PocConfigOption {
 // ```
 // poc.Get("https://exmaple.com", poc.save(true)) // 向 example.com 发起请求，会将此次请求保存到数据库中
 // ```
-func WithSave(i bool) PocConfigOption {
+func WithSave(b bool) PocConfigOption {
 	return func(c *PocConfig) {
-		c.SaveHTTPFlow = i
+		c.SaveHTTPFlow = &b
 	}
 }
 
@@ -1067,7 +1077,8 @@ func handleUrlAndConfig(urlStr string, opts ...PocConfigOption) (*PocConfig, err
 	}
 
 	if port == 443 || strings.HasPrefix(urlStr, "https://") || strings.HasPrefix(urlStr, "wss://") {
-		config.ForceHttps = true
+		https := true
+		config.ForceHttps = &https
 	}
 
 	if config.Host == "" {
@@ -1078,7 +1089,7 @@ func handleUrlAndConfig(urlStr string, opts ...PocConfigOption) (*PocConfig, err
 		config.Port = port
 	}
 
-	if config.NoRedirect {
+	if config.NoRedirect != nil && *config.NoRedirect {
 		config.RedirectTimes = 0
 	}
 
@@ -1144,7 +1155,8 @@ func handleRawPacketAndConfig(i interface{}, opts ...PocConfigOption) ([]byte, *
 		packet = utils.UnsafeStringToBytes(packets[0])
 	}
 
-	u, err := lowhttp.ExtractURLFromHTTPRequestRaw(packet, config.ForceHttps)
+	https := config.IsHTTPS()
+	u, err := lowhttp.ExtractURLFromHTTPRequestRaw(packet, https)
 	if err != nil {
 		return nil, config, utils.Errorf("extract url failed: %s", err)
 	}
@@ -1155,7 +1167,8 @@ func handleRawPacketAndConfig(i interface{}, opts ...PocConfigOption) ([]byte, *
 	}
 
 	if port == 443 {
-		config.ForceHttps = true
+		https = true
+		config.ForceHttps = &https
 	}
 
 	if config.Host == "" {
@@ -1166,7 +1179,7 @@ func handleRawPacketAndConfig(i interface{}, opts ...PocConfigOption) ([]byte, *
 		config.Port = port
 	}
 
-	if config.NoRedirect {
+	if config.NoRedirect != nil && *config.NoRedirect {
 		config.RedirectTimes = 0
 	}
 
@@ -1185,9 +1198,11 @@ func pochttp(packet []byte, config *PocConfig) (*lowhttp.LowhttpResponse, error)
 		wsCtx, cancel := context.WithTimeout(context.Background(), config.Timeout)
 		defer cancel()
 
+		https := config.IsHTTPS()
+
 		c, err := lowhttp.NewWebsocketClient(
 			packet,
-			lowhttp.WithWebsocketTLS(config.ForceHttps),
+			lowhttp.WithWebsocketTLS(https),
 			lowhttp.WithWebsocketProxy(strings.Join(config.Proxy, ",")),
 			lowhttp.WithWebsocketWithContext(wsCtx),
 			lowhttp.WithWebsocketFromServerHandler(func(bytes []byte) {
@@ -1270,7 +1285,8 @@ func HTTP(i interface{}, opts ...PocConfigOption) (rsp []byte, req []byte, err e
 		return nil, nil, err
 	}
 	response, err := pochttp(packet, config)
-	return response.RawPacket, lowhttp.FixHTTPPacketCRLF(packet, config.NoFixContentLength), err
+	noFixContentLength := config.NoFixContentLength != nil && *config.NoFixContentLength
+	return response.RawPacket, lowhttp.FixHTTPPacketCRLF(packet, noFixContentLength), err
 }
 
 // Do 向指定 URL 发送指定请求方法的请求并且返回响应结构体，请求结构体以及错误，它的是第一个参数是请求方法，第二个参数 URL 字符串，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如设置超时时间，或者修改请求报文等
@@ -1285,8 +1301,8 @@ func Do(method string, urlStr string, opts ...PocConfigOption) (rspInst *lowhttp
 	if err != nil {
 		return nil, nil, err
 	}
-
-	packet := lowhttp.UrlToRequestPacket(method, urlStr, nil, config.ForceHttps)
+	https := config.IsHTTPS()
+	packet := lowhttp.UrlToRequestPacket(method, urlStr, nil, https)
 	packet = fixPacketByConfig(packet, config)
 
 	response, err := pochttp(packet, config)
