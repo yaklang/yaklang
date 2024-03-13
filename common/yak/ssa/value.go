@@ -49,10 +49,12 @@ func (b *FunctionBuilder) PeekValueInThisFunction(name string) Value {
 func (b *FunctionBuilder) readValueEx(
 	name string,
 	create bool, // disable create undefine
-	onlyThisFunction bool, //disable free-value
+	onlyThisFunction bool, // disable free-value
+
 ) Value {
 	scope := b.CurrentBlock.ScopeTable
 	if ret := ReadVariableFromScope(scope, name); ret != nil {
+		log.Info("readValueEx", name, ret.Value)
 		if b.CurrentRange != nil {
 			ret.AddRange(b.CurrentRange, false)
 		}
@@ -136,7 +138,6 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 		// or variable assign by extern instance (extern instance but name not equal)
 		b.GetProgram().SetInstructionWithName(variable.GetName(), value)
 	}
-
 }
 
 // ------------------- Create
@@ -145,9 +146,11 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 func (b *FunctionBuilder) CreateLocalVariable(name string) *Variable {
 	return b.createVariableEx(name, true)
 }
+
 func (b *FunctionBuilder) CreateVariable(name string) *Variable {
 	return b.createVariableEx(name, false)
 }
+
 func (b *FunctionBuilder) createVariableEx(name string, isLocal bool) *Variable {
 	scope := b.CurrentBlock.ScopeTable
 	ret := scope.CreateVariable(name, isLocal).(*Variable)

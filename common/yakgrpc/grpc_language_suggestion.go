@@ -593,26 +593,28 @@ func getSSAValueByPosition(prog *ssaapi.Program, sourceCode string, position *ss
 	return values[0].GetSelf()
 }
 
-func trimSourceCode(sourceCode string) (string, bool) {
-	containPoint := strings.Contains(sourceCode, ".")
-	if strings.HasSuffix(sourceCode, ".") {
-		sourceCode = sourceCode[:len(sourceCode)-1]
+func GetFrontValueByOffset(prog *ssaapi.Program, offset int64) *ssaapi.Value {
+	vs := prog.GetFrontValueByOffset(offset)
+	if len(vs) == 0 {
+		return nil
 	}
-	return sourceCode, containPoint
+	newVs := lo.Filter(vs, func(v *ssaapi.Value, index int) bool {
+		return !v.IsUndefined()
+	})
+	if len(newVs) > 0 {
+		return newVs[0]
+	}
+	return vs[0]
 }
 
 func OnHover(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionRequest) (ret []*ypb.SuggestionDescription) {
 	ret = make([]*ypb.SuggestionDescription, 0)
-	position := GrpcRangeToPosition(req.GetRange())
-	word, _ := trimSourceCode(*position.SourceCode)
-	v := getSSAParentValueByPosition(prog, word, position)
-	// fallback
+	rng := req.GetRange()
+	v := GetFrontValueByOffset(prog, rng.Offset)
 	if v == nil {
-		v = getSSAValueByPosition(prog, word, position)
-		if v == nil {
-			return ret
-		}
+		return
 	}
+	word := v.GetVerboseName()
 
 	ret = append(ret, &ypb.SuggestionDescription{
 		Label: getDescFromSSAValue(word, v),
@@ -623,16 +625,12 @@ func OnHover(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionRequest) (r
 
 func OnSignature(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionRequest) (ret []*ypb.SuggestionDescription) {
 	ret = make([]*ypb.SuggestionDescription, 0)
-	position := GrpcRangeToPosition(req.GetRange())
-	word, _ := trimSourceCode(*position.SourceCode)
-	v := getSSAParentValueByPosition(prog, word, position)
-	// fallback
+	rng := req.GetRange()
+	v := GetFrontValueByOffset(prog, rng.Offset)
 	if v == nil {
-		v = getSSAValueByPosition(prog, word, position)
-		if v == nil {
-			return ret
-		}
+		return
 	}
+	word := v.GetVerboseName()
 
 	desc, doc := getFuncDeclAndDocBySSAValue(word, v)
 	if desc != "" {
@@ -647,9 +645,15 @@ func OnSignature(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionRequest
 
 func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionRequest) (ret []*ypb.SuggestionDescription) {
 	ret = make([]*ypb.SuggestionDescription, 0)
-	position := GrpcRangeToPosition(req.GetRange())
-	word, containPoint := trimSourceCode(*position.SourceCode)
-	v := getSSAParentValueByPosition(prog, word, position)
+	rng := req.GetRange()
+	position := GrpcRangeToPosition(rng)
+	v := GetFrontValueByOffset(prog, rng.Offset)
+	if v == nil {
+		return
+	}
+	word := v.GetVerboseName()
+	containPoint := strings.Contains(word, ".")
+
 	if !containPoint {
 		// 库补全
 		ret = append(ret, getStandardLibrarySuggestions()...)
@@ -657,6 +661,7 @@ func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionReques
 		ret = append(ret, getLanguageKeywordSuggestions()...)
 		// 用户自定义变量补全
 		for id, values := range prog.GetAllSymbols() {
+
 			// 不应该再补全标准库
 			if _, ok := doc.DefaultDocumentHelper.Libs[id]; ok {
 				continue
@@ -811,8 +816,8 @@ func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionReques
 func GrpcRangeToPosition(r *ypb.Range) *ssa.Range {
 	// TODO: ypb.Range should have `Offset`
 	return ssa.NewRange(
-		ssa.NewPosition(0, r.StartLine, r.StartColumn-1),
-		ssa.NewPosition(0, r.EndLine, r.EndColumn-1),
+		ssa.NewPosition(r.Offset, r.StartLine, r.StartColumn-1),
+		ssa.NewPosition(r.Offset, r.EndLine, r.EndColumn-1),
 		r.Code,
 	)
 }

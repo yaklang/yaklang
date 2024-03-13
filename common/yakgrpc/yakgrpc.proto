@@ -1845,6 +1845,7 @@ message Range {
   int64 StartColumn = 3;
   int64 EndLine = 4;
   int64 EndColumn = 5;
+  int64 Offset = 6;
 }
 
 message YaklangInspectInformationRequest {

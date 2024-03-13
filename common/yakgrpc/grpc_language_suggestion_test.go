@@ -44,6 +44,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionCompletion(t *testing.T) {
 cli.
 	`, &ypb.Range{
 			Code:        "",
+			Offset:      4,
 			StartLine:   2,
 			StartColumn: 4,
 			EndLine:     2,

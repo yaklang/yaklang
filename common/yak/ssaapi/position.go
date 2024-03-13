@@ -1,5 +1,11 @@
 package ssaapi
 
+import (
+	"sort"
+
+	"github.com/samber/lo"
+)
+
 func (v *Value) GetFunction() *Value {
 	return NewValue(v.node.GetFunc())
 }
@@ -25,15 +31,21 @@ func (v *Value) GetReachable() *Value {
 	return NewValue(v.node.GetBlock().Condition)
 }
 
-func (p *Program) GetFrontValueByOffset(offset int64) *Value {
+func (p *Program) GetFrontValueByOffset(offset int64) Values {
 	prog := p.Program
 
-	vs := prog.GetValuesByOffset(offset)
-	// for _, v := range vs {
-	for i := len(vs) - 1; i >= 0; i-- {
-		v := vs[i]
+	m := prog.GetValuesMapByOffset(offset)
+	if m == nil {
+		return nil
+	}
+
+	offsetValues := lo.Values(m)
+	sort.SliceStable(offsetValues, func(i, j int) bool {
+		return offsetValues[i].Offset > offsetValues[j].Offset
+	})
+	for _, v := range offsetValues {
 		if v.Offset <= offset {
-			return NewValue(v.Values)
+			return NewValues(v.Values)
 		}
 	}
 

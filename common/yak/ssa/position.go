@@ -3,7 +3,7 @@ package ssa
 import (
 	"fmt"
 
-	"github.com/yaklang/yaklang/common/log"
+	"github.com/samber/lo"
 )
 
 type Range struct {
@@ -39,6 +39,7 @@ func NewPosition(offset, line, column int64) *Position {
 func (p *Range) CompareStart(other *Range) int {
 	return p.Start.Compare(other.Start)
 }
+
 func (p *Range) CompareEnd(other *Range) int {
 	return p.End.Compare(other.End)
 }
@@ -62,52 +63,69 @@ func (p *Position) String() string {
 }
 
 const (
-	OFFSET_MASK = 100
+	OFFSET_SEGMENT = 128
 )
+
+func (prog *Program) setOffsetForValue(offset int64, value Value) {
+	mask := offset - offset%OFFSET_SEGMENT
+	m, ok := prog.OffsetSegmentToValues[mask]
+	if !ok {
+		m = make(map[int64]*OffsetValues)
+		prog.OffsetSegmentToValues[mask] = m
+	}
+
+	vs, ok := m[offset]
+	if !ok {
+		m[offset] = &OffsetValues{
+			Offset: offset,
+			Values: Values{value},
+		}
+	} else {
+		vs.Values = lo.Uniq(append(vs.Values, value))
+	}
+}
 
 func (prog *Program) SetOffset(inst Instruction) {
 	value, ok := ToValue(inst)
 	if !ok {
 		return
 	}
-	set := func(offset int64) {
-		mask := offset - offset%OFFSET_MASK
-		prog.Offset[mask] = append(prog.Offset[mask], &OffsetValue{
-			Offset: offset,
-			Values: value,
-		})
-		log.Infof("SetOffset: %s %d", value, offset)
-	}
 
 	if r := value.GetRange(); r != nil {
-		// TODO : check if r.Start/End is nil
-		set(r.Start.Offset)
-		set(r.End.Offset)
-
+		var startOffset int64 = -1
+		if r.Start != nil {
+			startOffset = r.Start.Offset
+			// log.Infof("value=%s range=%s offset=%d", value.String(), r, startOffset)
+			prog.setOffsetForValue(r.Start.Offset, value)
+		}
+		if r.End != nil && startOffset != r.End.Offset {
+			// log.Infof("value=%s range=%s offset=%d", value.String(), r, r.End.Offset)
+			prog.setOffsetForValue(r.End.Offset, value)
+		}
 	}
 }
 
-func (prog *Program) SetOffsetByRange(value Value, r *Range) {
-	set := func(offset int64) {
-		mask := offset - offset%OFFSET_MASK
-		prog.Offset[mask] = append(prog.Offset[mask], &OffsetValue{
-			Offset: offset,
-			Values: value,
-		})
-		log.Infof("SetOffset: %s %d", value, offset)
+func (prog *Program) SetOffsetByRange(r *Range, value Value) {
+	if r == nil {
+		return
 	}
-
-	// TODO : check if r.Start/End is nil
-	set(r.Start.Offset)
-	set(r.End.Offset)
+	var startOffset int64 = -1
+	if r.Start != nil {
+		startOffset = r.Start.Offset
+		// log.Infof("value=%s range=%s offset=%d", value.String(), r, startOffset)
+		prog.setOffsetForValue(r.Start.Offset, value)
+	}
+	if r.End != nil && startOffset != r.End.Offset {
+		// log.Infof("value=%s range=%s offset=%d", value.String(), r, r.End.Offset)
+		prog.setOffsetForValue(r.End.Offset, value)
+	}
 }
 
-func (prog *Program) GetValuesByOffset(offset int64) []*OffsetValue {
+func (prog *Program) GetValuesMapByOffset(offset int64) map[int64]*OffsetValues {
+	mask := offset - offset%OFFSET_SEGMENT
 
-	mask := offset - offset%OFFSET_MASK
-
-	if vs, ok := prog.Offset[mask]; ok {
-		return vs
+	if m, ok := prog.OffsetSegmentToValues[mask]; ok {
+		return m
 	}
 	return nil
 }

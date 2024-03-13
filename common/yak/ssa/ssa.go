@@ -121,9 +121,9 @@ type User interface {
 	ReplaceValue(Value, Value)
 }
 
-type OffsetValue struct {
+type OffsetValues struct {
 	Offset int64
-	Values Value
+	Values Values
 }
 
 // both instruction and value
@@ -135,7 +135,7 @@ type Program struct {
 	NameToInstructions *omap.OrderedMap[string, []Instruction]
 	IdToInstructionMap *omap.OrderedMap[int, Instruction]
 
-	Offset map[int64][]*OffsetValue
+	OffsetSegmentToValues map[int64]map[int64]*OffsetValues // offset segment to offset values, OFFSET_SEGMENT=128, each offset may contains multi values
 
 	errors SSAErrors
 
