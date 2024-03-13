@@ -30,6 +30,7 @@ func (variable *Variable) Assign(value Value) error {
 	if value == nil {
 		return utils.Error("assign empty")
 	}
+	value.GetProgram().SetOffsetByRange(value, variable.DefRange)
 	value.AddVariable(variable)
 	if variable.IsMemberCall() {
 		// setMemberVerboseName(value)
@@ -57,11 +58,13 @@ func (b *Variable) GetMemberCall() (Value, Value) {
 }
 
 func (v *Variable) SetDefRange(r *Range) {
+	// TODO: check value, getProgram
 	v.DefRange = r
 }
 
 func (v *Variable) AddRange(p *Range, force bool) {
 	if force || len(*p.SourceCode) == len(v.GetName()) {
+		v.Value.GetProgram().SetOffsetByRange(v.Value, p)
 		v.UseRange[p] = struct{}{}
 	}
 }

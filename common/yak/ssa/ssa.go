@@ -121,6 +121,11 @@ type User interface {
 	ReplaceValue(Value, Value)
 }
 
+type OffsetValue struct {
+	Offset int64
+	Values Value
+}
+
 // both instruction and value
 type Program struct {
 	// package list
@@ -130,7 +135,7 @@ type Program struct {
 	NameToInstructions *omap.OrderedMap[string, []Instruction]
 	IdToInstructionMap *omap.OrderedMap[int, Instruction]
 
-	Offset map[int64]Values
+	Offset map[int64][]*OffsetValue
 
 	errors SSAErrors
 

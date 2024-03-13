@@ -3,31 +3,39 @@ package test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 )
 
 func Test_Yaklang_range(t *testing.T) {
-	t.Run("normal", func(t *testing.T) {
+	check := func(t *testing.T, code, want string, offset int64) {
 		ssatest.CheckTestCase(t, ssatest.TestCase{
-			Code: `
-			a = 1
-			{
-				a := 2
-			}
-			println(a)
-			{
-				a = 3
-			}
-			println(a)
-			`,
-			Want: []string{},
-			Check: func(prog *ssaapi.Program, t []string) {
-				value := prog.GetFrontValueByOffset(9)
-				// _ = value
-				value.ShowWithSource()
+			Code: code,
+			Want: []string{want},
+			Check: func(prog *ssaapi.Program, want []string) {
+				value := prog.GetFrontValueByOffset(offset)
+				require.NotNil(t, value)
+				require.Equal(t, want[0], value.String())
 			},
 		})
+	}
+	t.Run("normal", func(t *testing.T) {
+		// ssatest.CheckTestCase(t, ssatest.TestCase{
+		// 	Code: `
+		check(t, `
+			a = 1
+			`,
+			"1",
+			9)
+	})
+
+	t.Run("normal variable", func(t *testing.T) {
+		check(t, `
+			a = 1
+			`,
+			"1",
+			6)
 	})
 
 }

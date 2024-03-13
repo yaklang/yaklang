@@ -32,8 +32,8 @@ func (p *Program) GetFrontValueByOffset(offset int64) *Value {
 	// for _, v := range vs {
 	for i := len(vs) - 1; i >= 0; i-- {
 		v := vs[i]
-		if r := v.GetRange(); r != nil && r.End.Offset <= offset {
-			return NewValue(v)
+		if v.Offset <= offset {
+			return NewValue(v.Values)
 		}
 	}
 

@@ -12,7 +12,7 @@ func NewProgram() *Program {
 		ConstInstruction:   omap.NewEmptyOrderedMap[int, *ConstInst](),
 		NameToInstructions: omap.NewEmptyOrderedMap[string, []Instruction](),
 		IdToInstructionMap: omap.NewEmptyOrderedMap[int, Instruction](),
-		Offset:             make(map[int64]Values),
+		Offset:             make(map[int64][]*OffsetValue),
 		errors:             make([]*SSAError, 0),
 		buildOnce:          sync.Once{},
 	}

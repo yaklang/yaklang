@@ -72,7 +72,10 @@ func (prog *Program) SetOffset(inst Instruction) {
 	}
 	set := func(offset int64) {
 		mask := offset - offset%OFFSET_MASK
-		prog.Offset[mask] = append(prog.Offset[mask], value)
+		prog.Offset[mask] = append(prog.Offset[mask], &OffsetValue{
+			Offset: offset,
+			Values: value,
+		})
 		log.Infof("SetOffset: %s %d", value, offset)
 	}
 
@@ -80,15 +83,30 @@ func (prog *Program) SetOffset(inst Instruction) {
 		// TODO : check if r.Start/End is nil
 		set(r.Start.Offset)
 		set(r.End.Offset)
+
 	}
 }
 
-func (prog *Program) GetValuesByOffset(offset int64) Values {
+func (prog *Program) SetOffsetByRange(value Value, r *Range) {
+	set := func(offset int64) {
+		mask := offset - offset%OFFSET_MASK
+		prog.Offset[mask] = append(prog.Offset[mask], &OffsetValue{
+			Offset: offset,
+			Values: value,
+		})
+		log.Infof("SetOffset: %s %d", value, offset)
+	}
+
+	// TODO : check if r.Start/End is nil
+	set(r.Start.Offset)
+	set(r.End.Offset)
+}
+
+func (prog *Program) GetValuesByOffset(offset int64) []*OffsetValue {
 
 	mask := offset - offset%OFFSET_MASK
 
 	if vs, ok := prog.Offset[mask]; ok {
-
 		return vs
 	}
 	return nil
