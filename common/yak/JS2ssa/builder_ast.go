@@ -1772,7 +1772,7 @@ func (b *astbuilder) buildSwitchStatement(stmt *JS.SwitchStatementContext) {
 	defer revcoverRange()
 
 	Switchb := b.BuildSwitch()
-	Switchb.DefaultBreak = false
+	Switchb.AutoBreak = false
 
 	if s, ok := stmt.ExpressionSequence().(*JS.ExpressionSequenceContext); ok {
 		Switchb.BuildCondition(func() ssa.Value {

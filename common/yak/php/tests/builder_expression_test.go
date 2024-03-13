@@ -1,8 +1,9 @@
 package tests
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 )
 
 func TestPhpPrintln(t *testing.T) {
@@ -143,7 +144,7 @@ switch($b){
 println($a);
 `
 		ssatest.CheckPrintf(t, ssatest.TestCase{
-			Want: []string{"2", "3", "4", "phi($a)[2,3,4,1]"},
+			Want: []string{"2", "3", "4", "phi($a)[4,1]"},
 			Code: code,
 		})
 	})
@@ -165,7 +166,66 @@ switch($b){
        println($a);
 }
 println($a);`
-		ssatest.CheckPrintlnValue(code, []string{"2", "3", "4", "5", "phi($a)[2,3,4,5,1]"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"2", "3", "4", "5", "5"}, t)
+	})
+
+	t.Run("switch check case body, no break", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(
+			`<?php
+$a=1;
+switch($b){
+   case "1":
+       println($a); // 1
+       $a=2;
+       println($a); // 2
+   case "2":
+       println($a); // phi($a)[2,1]
+       $a=3;
+       println($a); // 3 
+    default:
+       println($a); // phi($a)[3,1]
+       $a=5;
+       println($a); // 5
+}
+println($a); // 5
+`,
+			[]string{
+				"1", "2",
+				"phi($a)[2,1]", "3",
+				"phi($a)[3,1]", "5",
+				"5",
+			},
+			t)
+	})
+
+	t.Run("switch check case body, has break", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(
+			`<?php
+$a=1;
+switch($b){
+   case "1":
+       println($a); // 1
+       $a=2;
+       println($a); // 2
+	   break;
+   case "2":
+       println($a); // 1
+       $a=3;
+       println($a); // 3 
+    default:
+       println($a); // phi($a)[3,1]
+       $a=5;
+       println($a); // 5
+}
+println($a); // phi[2, 5]
+`,
+			[]string{
+				"1", "2",
+				"1", "3",
+				"phi($a)[3,1]", "5",
+				"phi($a)[2,5]",
+			},
+			t)
 	})
 }
 func TestExpression_Loop(t *testing.T) {

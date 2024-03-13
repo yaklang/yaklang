@@ -443,7 +443,7 @@ func (b *astbuilder) buildSwitchStmt(stmt *yak.SwitchStmtContext) {
 	defer recoverRange()
 
 	SwitchBuilder := b.BuildSwitch()
-	SwitchBuilder.DefaultBreak = true
+	SwitchBuilder.AutoBreak = true
 
 	//  parse expression
 	var cond ssa.Value

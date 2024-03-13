@@ -18,7 +18,6 @@ func (y *builder) VisitBreakStatement(raw phpparser.IBreakStatementContext) inte
 	if !y.ir.Break() {
 		y.ir.NewError(ssa.Error, "break statement not in loop or switch: raw %v", i.GetText())
 	}
-	y.ir.Break()
 	return nil
 }
 
