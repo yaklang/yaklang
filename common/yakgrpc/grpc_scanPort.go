@@ -206,7 +206,7 @@ func (s *Server) PortScan(req *ypb.PortScanRequest, stream ypb.Yak_PortScanServe
 	}
 
 	if req.GetSkippedHostAliveScan() {
-		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "skipped-host-alive-scan"})
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "skipped-host-alive-scan", Value: "true"})
 	}
 
 	if req.GetHostAliveConcurrent() > 0 {
