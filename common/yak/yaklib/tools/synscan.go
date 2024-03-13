@@ -666,15 +666,20 @@ func pingutilsToChan(res chan *pingutil.PingResult) chan string {
 //
 // ```
 func _scan(target string, port string, opts ...scanOpt) (chan *synscan.SynScanResult, error) {
-	config := &_yakPortScanConfig{
-		waiting:           5 * time.Second,
-		rateLimitDelayMs:  1,
-		rateLimitDelayGap: 5,
-	}
+	config := getDefaultPortScanConfig()
 	for _, opt := range opts {
 		opt(config)
 	}
 	return _synScanDo(hostsToChan(target), port, config)
+}
+
+func getDefaultPortScanConfig() *_yakPortScanConfig {
+	return &_yakPortScanConfig{
+		waiting:           5 * time.Second,
+		rateLimitDelayMs:  1,
+		rateLimitDelayGap: 5,
+		excludePorts:      filter.NewFilter(),
+	}
 }
 
 // ScanFromPing 对使用 ping.Scan 探测出的存活结果进行端口扫描，需要配合 ping.Scan 使用
@@ -695,12 +700,7 @@ func _scan(target string, port string, opts ...scanOpt) (chan *synscan.SynScanRe
 //
 // ```
 func _synscanFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...scanOpt) (chan *synscan.SynScanResult, error) {
-	config := &_yakPortScanConfig{
-		// requestTimeout: 5 * time.Second,
-		waiting:           5 * time.Second,
-		rateLimitDelayMs:  1,
-		rateLimitDelayGap: 5,
-	}
+	config := getDefaultPortScanConfig()
 	for _, opt := range opts {
 		opt(config)
 	}
