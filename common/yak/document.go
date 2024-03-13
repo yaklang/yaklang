@@ -139,7 +139,7 @@ func GetMethodFuncDeclFromAST(pkg *ast.Package, libName, structName, methodName,
 	}
 	funcDecl := &yakdoc.FuncDecl{
 		LibName:    libName,
-		MethodName: methodName,
+		MethodName: yakFuncName,
 	}
 	for _, file := range pkg.Files {
 		for _, decl := range file.Decls {
