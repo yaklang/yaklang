@@ -397,7 +397,7 @@ func (e *ScriptEngine) RegisterEngineHooks(f func(engine *antlr4yak.Engine) erro
 func (e *ScriptEngine) SetYakitClient(client *yaklib.YakitClient) {
 	e.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
 		client.SetYakLog(*e.logger)
-		log.Infof("set yakit client: %v", client)
+		log.Debugf("set yakit client: %v", client)
 		yaklib.SetEngineClient(engine, client)
 		vm := engine.GetVM()
 		if vm != nil {

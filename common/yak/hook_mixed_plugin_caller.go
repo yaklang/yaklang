@@ -275,13 +275,13 @@ func (c *MixPluginCaller) Wait() {
 	go func() {
 		defer wg.Done()
 
-		log.Info("start to wait local mix caller...")
+		log.Debugf("start to wait local mix caller...")
 		c.swg.Wait()
-		log.Infof("mix caller tasks all done")
+		log.Debugf("mix caller tasks all done")
 
-		log.Infof("start to wait native caller concurrent")
+		log.Debugf("start to wait native caller concurrent")
 		c.GetNativeCaller().Wait()
-		log.Infof("native caller all done")
+		log.Debugf("native caller all done")
 	}()
 	wg.Wait()
 }

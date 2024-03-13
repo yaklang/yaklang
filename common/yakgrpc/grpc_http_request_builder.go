@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
@@ -50,6 +51,10 @@ func (s *Server) DebugPlugin(req *ypb.DebugPluginRequest, stream ypb.Yak_DebugPl
 }
 
 func (s *Server) HTTPRequestBuilder(ctx context.Context, req *ypb.HTTPRequestBuilderParams) (*ypb.HTTPRequestBuilderResponse, error) {
+	return httpRequestBuilder(ctx, req)
+}
+
+func httpRequestBuilder(ctx context.Context, req *ypb.HTTPRequestBuilderParams) (*ypb.HTTPRequestBuilderResponse, error) {
 	var isHttps = req.GetIsHttps()
 	const tempTag = "[[__REPLACE_ME__]]"
 
@@ -237,7 +242,7 @@ type HTTPRequestBuilderRes struct {
 	Url     string
 }
 
-func BuildHttpRequestPacket(baseBuilderParams *ypb.HTTPRequestBuilderParams, targetInput string) (chan *HTTPRequestBuilderRes, error) {
+func BuildHttpRequestPacket(db *gorm.DB, baseBuilderParams *ypb.HTTPRequestBuilderParams, targetInput string) (chan *HTTPRequestBuilderRes, error) {
 	builderRes := make(chan *HTTPRequestBuilderRes)
 	if baseBuilderParams != nil {
 		if baseBuilderParams.GetIsRawHTTPRequest() {
@@ -257,7 +262,7 @@ func BuildHttpRequestPacket(baseBuilderParams *ypb.HTTPRequestBuilderParams, tar
 		}
 
 		if baseBuilderParams.GetIsHttpFlowId() {
-			_, flows, err := yakit.QueryHTTPFlow(s.GetProjectDatabase(), &ypb.QueryHTTPFlowRequest{
+			_, flows, err := yakit.QueryHTTPFlow(db, &ypb.QueryHTTPFlowRequest{
 				IncludeId: baseBuilderParams.GetHTTPFlowId(),
 			})
 			if err != nil {
@@ -319,7 +324,7 @@ func BuildHttpRequestPacket(baseBuilderParams *ypb.HTTPRequestBuilderParams, tar
 			if builderParams == nil {
 				continue
 			}
-			builderResponse, err := s.HTTPRequestBuilder(context.Background(), builderParams)
+			builderResponse, err := httpRequestBuilder(context.Background(), builderParams)
 			if err != nil {
 				log.Errorf("failed to build http request: %v", err)
 			}

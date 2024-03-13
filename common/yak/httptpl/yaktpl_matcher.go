@@ -66,6 +66,9 @@ type YakMatcher struct {
 	// or / and
 	SubMatcherCondition string
 	SubMatchers         []*YakMatcher
+
+	// record poc name / script name or some verbose
+	TemplateName string
 }
 
 var matcherResponseCache = utils.NewTTLCache[string](1 * time.Minute)
@@ -102,13 +105,13 @@ func (y *YakMatcher) ExecuteRawWithConfig(config *Config, rsp []byte, vars map[s
 	}
 
 	if y.Negative {
-		res, err := y.executeRaw(config, rsp, 0, vars, suf...)
+		res, err := y.executeRaw(y.TemplateName, config, rsp, 0, vars, suf...)
 		if err != nil {
 			return false, err
 		}
 		return !res, err
 	}
-	return y.executeRaw(config, rsp, 0, vars, suf...)
+	return y.executeRaw(y.TemplateName, config, rsp, 0, vars, suf...)
 }
 
 func (y *YakMatcher) Execute(rsp *lowhttp.LowhttpResponse, vars map[string]interface{}, suf ...string) (bool, error) {
@@ -144,7 +147,7 @@ func (y *YakMatcher) ExecuteWithConfig(config *Config, rsp *lowhttp.LowhttpRespo
 	return y.execute(config, rsp, vars, suf...)
 }
 
-func (y *YakMatcher) executeRaw(config *Config, rsp []byte, duration float64, vars map[string]any, sufs ...string) (bool, error) {
+func (y *YakMatcher) executeRaw(name string, config *Config, rsp []byte, duration float64, vars map[string]any, sufs ...string) (bool, error) {
 	isExpr := false
 
 	var reverseProto []string
@@ -283,7 +286,7 @@ func (y *YakMatcher) executeRaw(config *Config, rsp []byte, duration float64, va
 		matcherFunc = func(s string, sub string) bool {
 			result, err := regexp.MatchString(sub, s)
 			if err != nil {
-				log.Errorf("regexp match failed: %s, origin regex: %v", err, sub)
+				log.Errorf("[%v] regexp match failed: %s, origin regex: %v", name, err, sub)
 				return false
 			}
 			return result
@@ -302,7 +305,7 @@ func (y *YakMatcher) executeRaw(config *Config, rsp []byte, duration float64, va
 
 				result, err := dslEngine.ExecuteAsBool(sub, loadVars)
 				if err != nil {
-					log.Errorf("dsl engine execute as bool failed: %s", err)
+					log.Errorf("[%v] dsl engine execute as bool failed: %s", name, err)
 					return false
 				}
 				return result
@@ -362,5 +365,5 @@ func (y *YakMatcher) executeRaw(config *Config, rsp []byte, duration float64, va
 func (y *YakMatcher) execute(config *Config, rspIns *lowhttp.LowhttpResponse, vars map[string]interface{}, sufs ...string) (bool, error) {
 	rsp := utils.CopyBytes(rspIns.RawPacket)
 	duration := rspIns.GetDurationFloat()
-	return y.executeRaw(config, rsp, duration, vars, sufs...)
+	return y.executeRaw(y.TemplateName, config, rsp, duration, vars, sufs...)
 }

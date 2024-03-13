@@ -3,13 +3,16 @@ package yakcmds
 import (
 	"context"
 	_ "embed"
+	"github.com/google/uuid"
 	"github.com/olekukonko/tablewriter"
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -18,10 +21,7 @@ import (
 	"strings"
 )
 
-//go:embed scan_yamlpoc.yak
-var yamlScanScript string
-
-var yamlpocCommand = &cli.Command{
+var hybridScanCommand = &cli.Command{
 	Name:    "scan",
 	Aliases: []string{"poc"},
 	Usage:   "Use plugins (UI in Yakit) to scan",
@@ -56,6 +56,8 @@ var yamlpocCommand = &cli.Command{
 		cli.StringFlag{
 			Name: "type", Usage: `Type of Plugins in Yakit, port-scan / mitm / yaml-poc`,
 		},
+		cli.StringFlag{Name: "proxy", Usage: "Proxy Server, like http://127.0.0.1:8083"},
+		cli.IntFlag{Name: "concurrent,thread", Usage: "(Thread)Concurrent Scan Number", Value: 50},
 	},
 
 	Action: func(c *cli.Context) error {
@@ -96,7 +98,7 @@ var yamlpocCommand = &cli.Command{
 		db = bizhelper.FuzzSearchEx(db, []string{
 			"script_name", "tags", "content", "help",
 		}, keyword, false)
-		db = db.Order("updated_at desc").Debug()
+		db = db.Order("updated_at desc")
 
 		pluginList := omap.NewOrderedMap(map[string]*yakit.YakScript{})
 		for result := range yakit.YieldYakScripts(db, context.Background()) {
@@ -131,15 +133,71 @@ var yamlpocCommand = &cli.Command{
 			return nil
 		}
 
-		gen, err := yakgrpc.TargetGenerator(context.Background(), &ypb.HybridScanInputTarget{
-			Input:               "",
-			InputFile:           nil,
-			HTTPRequestTemplate: nil,
-		})
+		// build targets
+		targetsLine := []string{c.String("target")}
+		targetsLine = append(targetsLine, c.Args()...)
+		targets := &ypb.HybridScanInputTarget{
+			Input:     strings.Join(targetsLine, "\n"),
+			InputFile: utils.PrettifyListFromStringSplitEx(c.String("target-file"), ","),
+		}
+		if ret := c.String("raw"); ret != "" {
+			raw, err := os.ReadFile(ret)
+			if err != nil {
+				return utils.Errorf("read raw packet file failed: %s", err)
+			}
+			targets.HTTPRequestTemplate = &ypb.HTTPRequestBuilderParams{
+				IsRawHTTPRequest: true,
+				IsHttps:          c.Bool("https"),
+				RawHTTPRequest:   raw,
+			}
+		}
+
+		gen, err := yakgrpc.TargetGenerator(context.Background(), consts.GetGormProjectDatabase(), targets)
 		if err != nil {
 			return utils.Errorf("generate target failed: %s", err)
 		}
 
+		id := uuid.New().String()
+
+		thread := c.Int("thread")
+		if thread <= 0 {
+			thread = 50
+		}
+		swg := utils.NewSizedWaitGroup(thread)
+		publicFilter := filter.NewFilter()
+		public := yaklib.NewVirtualYakitClient(func(i *ypb.ExecResult) error {
+			if risk, ok := yakit.IsRiskExecResult(i); ok {
+				log.Infof("risk: %s", risk.Title)
+			}
+			return nil
+		})
+		if err != nil {
+			return utils.Errorf("create local client failed: %s", err)
+		}
+		for target := range gen {
+			for _, plugin := range pluginList.Values() {
+				log.Debugf("prepare target: %p in: %v", target, plugin.ScriptName)
+				swg.Add()
+				plugin := plugin
+				go func() {
+					defer swg.Done()
+
+					defer func() {
+						if err := recover(); err != nil {
+							log.Errorf("scan target failed(panic): %s", err)
+						}
+					}()
+					err := yakgrpc.ScanHybridTargetWithPlugin(
+						id, context.Background(), target, plugin, c.String("proxy"),
+						public, publicFilter,
+					)
+					if err != nil {
+						log.Errorf("scan target failed: %s", err)
+					}
+				}()
+
+			}
+		}
 		return nil
 	},
 }
