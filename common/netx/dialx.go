@@ -4,12 +4,13 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/gmsm/gmtls"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"net"
 	"sync/atomic"
 	"time"
+
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // dialPlainTCPConnWithRetry just handle plain tcp connection
@@ -34,7 +35,7 @@ func dialPlainTCPConnWithRetry(target string, config *dialXConfig) (net.Conn, er
 	}
 
 	var lastError error
-	var proxyHaveTimeoutError = false
+	proxyHaveTimeoutError := false
 RETRY:
 	if ret := addRetry(); ret > timeoutRetryMax {
 		if timeoutRetryMax > 0 {
@@ -66,7 +67,7 @@ RETRY:
 		if err != nil {
 			return nil, utils.Errorf("invalid target %#v, cannot find host:port", target)
 		}
-		var ip = host
+		ip := host
 		if net.ParseIP(utils.FixForParseIP(host)) == nil {
 			// not valid ip
 			ip = LookupFirst(host, config.DNSOpts...)
@@ -94,7 +95,7 @@ RETRY:
 					if config.Debug {
 						log.Infof("dial %s timeout, retrying", target)
 					}
-					jitterBackoff(minWait, maxWait, int(timeoutRetryCount+1))
+					utils.JitterBackoff(minWait, maxWait, int(timeoutRetryCount+1))
 					goto RETRY
 				}
 			}
@@ -176,7 +177,7 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 	}
 
 	// Enable TLS as default
-	var strategies = []TLSStrategy{TLS_Strategy_Ordinary}
+	strategies := []TLSStrategy{TLS_Strategy_Ordinary}
 	if config.GMTLSSupport {
 		if config.GMTLSOnly {
 			strategies = []TLSStrategy{TLS_Strategy_GMDail, TLS_Strategy_GMDial_Without_GMSupport}
@@ -202,12 +203,12 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 	if config.ShouldOverrideTLSConfig {
 		tlsConfig = config.TLSConfig
 	}
-	var tlsTimeout = 10 * time.Second
+	tlsTimeout := 10 * time.Second
 	if config.TLSTimeout > 0 {
 		tlsTimeout = config.TLSTimeout
 	}
 
-	var errs = make([]error, 0, len(strategies))
+	errs := make([]error, 0, len(strategies))
 	for _, strategy := range strategies {
 		if config.Debug {
 			log.Infof("dial %v with tls strategy: %v", target, strategy)
