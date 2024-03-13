@@ -36,5 +36,5 @@ die(nuclei.UpdateDatabase())`, "main")
 	},
 	&synscanCommand,
 	&servicescanCommand,
-	yamlpocCommand,
+	hybridScanCommand,
 }

@@ -205,6 +205,7 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 		} else if matcher != nil {
 			hasMatcherOrExtractor = true
 		}
+		matcher.TemplateName = yakTemp.Name
 		payloads, err := generateYakPayloads(req)
 		if err != nil {
 			log.Debugf("extractYakPayloads failed: %v", err)
