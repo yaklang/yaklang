@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/jinzhu/gorm"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/filter"
@@ -94,7 +95,7 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 	swg := utils.NewSizedWaitGroup(concurrent)                                                                    // 设置并发
 	manager.ctx, manager.cancel = context.WithTimeout(manager.Context(), time.Duration(totalTimeout)*time.Second) // 设置总超时
 
-	targetChan, err := s.TargetGenerator(manager.Context(), target)
+	targetChan, err := TargetGenerator(manager.Context(), s.GetProjectDatabase(), target)
 	if err != nil {
 		taskRecorder.Reason = err.Error()
 		return utils.Errorf("TargetGenerator failed: %s", err)
@@ -410,20 +411,25 @@ type HybridScanTarget struct {
 	Url      string
 }
 
-func TargetGenerator(ctx context.Context, targetConfig *ypb.HybridScanInputTarget) (chan *HybridScanTarget, error) {
+func TargetGenerator(ctx context.Context, db *gorm.DB, targetConfig *ypb.HybridScanInputTarget) (chan *HybridScanTarget, error) {
 	// handle target
 	outTarget := make(chan *HybridScanTarget)
-	buildRes, err := BuildHttpRequestPacket(targetConfig.GetHTTPRequestTemplate(), targetConfig.GetInput())
+	buildRes, err := BuildHttpRequestPacket(db, targetConfig.GetHTTPRequestTemplate(), targetConfig.GetInput())
 	if err != nil {
 		return nil, err
 	}
 	go func() {
 		defer close(outTarget)
 		for target := range buildRes {
-			outTarget <- &HybridScanTarget{
+			select {
+			case <-ctx.Done():
+				return
+			case outTarget <- &HybridScanTarget{
 				IsHttps: target.IsHttps,
 				Request: target.Request,
 				Url:     target.Url,
+			}:
+				continue
 			}
 		}
 	}()

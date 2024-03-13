@@ -20,6 +20,28 @@ type TagAndTypeValue struct {
 	Count int
 }
 
+func IsRiskExecResult(i any) (*Risk, bool) {
+	switch ret := i.(type) {
+	case *ExecResult:
+		var r ypb.ExecResult
+		err := json.Unmarshal([]byte(ret.Raw), &r)
+		if err != nil {
+			return nil, false
+		}
+		return IsRiskExecResult(&r)
+	case *ypb.ExecResult:
+		if !ret.IsMessage {
+			return nil, false
+		}
+		var risk *Risk
+		err := json.Unmarshal([]byte(ret.Message), &risk)
+		if err != nil {
+			return nil, false
+		}
+	}
+	return nil, false
+}
+
 func (e *ExecResult) ToGRPCModel() *ypb.ExecResult {
 	var res ypb.ExecResult
 	err := json.Unmarshal([]byte(e.Raw), &res)

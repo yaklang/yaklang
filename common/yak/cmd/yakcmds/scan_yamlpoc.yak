@@ -1,6 +1,0 @@
-if targets == undefined {
-    targets = [
-        {"https": "true", "packet": "GET /?id=1 HTTP/1.1\r\nHost: www.example.com\r\n\r\n"},
-    ]
-}
-
