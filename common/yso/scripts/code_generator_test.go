@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yserx"
 	"github.com/yaklang/yaklang/common/yso"
-	"github.com/yaklang/yaklang/common/yso/resources"
 	"os"
 	"strings"
 	"testing"
@@ -64,7 +64,7 @@ func TestGenConst(t *testing.T) {
 func TestCompress(t *testing.T) {
 	var buf bytes.Buffer
 	zw := gzip.NewWriter(&buf)
-	dirEntry, err := resources.YsoResourceFS.ReadDir("/tmp/ser-file")
+	fileInfos, err := utils.ReadDir("/tmp/ser-file")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,15 +79,18 @@ func TestCompress(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for _, entry := range dirEntry {
-		if entry.IsDir() {
+	for _, info := range fileInfos {
+		if info.IsDir {
 			continue
 		}
-		content, err := resources.YsoResourceFS.ReadFile("/tmp/ser-file/" + entry.Name())
+		if !strings.HasSuffix(info.Name, ".ser") {
+			continue
+		}
+		content, err := os.ReadFile("/tmp/ser-file/" + info.Name)
 		if err != nil {
 			t.Fatal(err)
 		}
-		writeDataBlock([]byte(entry.Name()))
+		writeDataBlock([]byte(info.Name))
 		writeDataBlock(content)
 	}
 	if err := zw.Close(); err != nil {

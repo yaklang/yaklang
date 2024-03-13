@@ -33,7 +33,7 @@ type GadgetConfig struct {
 type ReflectChainFunctionConfig struct {
 	Name string
 	Desc string
-	Args []string
+	Args []*ClassGenConfigParam
 }
 type YsoConfig struct {
 	Classes              map[ClassType]*ClassConfig
@@ -68,10 +68,27 @@ func getConfig() (*YsoConfig, error) {
 	parseReflectChainFounction := getMapOrEmptyTask([]string{}, configMap, "ReflectChainFunction", func(currentKey []string, dict map[string]any) error {
 		for k, value := range dict {
 			reflectFunc := &ReflectChainFunctionConfig{Name: k}
-			err = getStringOrEmptyTask(currentKey, value, "desc", func(currentKey []string, v string) error {
+			err := runWorkFlow(getStringOrEmptyTask(currentKey, value, "desc", func(currentKey []string, v string) error {
 				reflectFunc.Desc = v
 				return nil
-			})()
+			}), getListOrEmptyTask(currentKey, value, "params", func(currentKey []string, args []any) error {
+				for _, arg := range args {
+					p := &ClassGenConfigParam{}
+					err := runWorkFlow(getStringOrEmptyTask(currentKey, arg, "name", func(currentKey []string, v string) error {
+						p.Name = ClassParamType(v)
+						return nil
+					}), getStringTask(currentKey, arg, "desc", func(currentKey []string, v string) error {
+						p.Desc = v
+						return nil
+					}))
+					if err != nil {
+						return err
+					}
+					reflectFunc.Args = append(reflectFunc.Args, p)
+				}
+				return nil
+			}),
+			)
 			if err != nil {
 				return err
 			}

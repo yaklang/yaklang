@@ -30,6 +30,14 @@ func (g *GadgetInfo) IsSupportTemplate() bool {
 	return g.SupportTemplateImpl
 }
 
+func IsTemplateImpl(name GadgetType) bool {
+	cfg, ok := YsoConfigInstance.Gadgets[name]
+	if !ok {
+		return false
+	}
+	return cfg.IsTemplateImpl
+}
+
 var AllGadgets = map[GadgetType]*GadgetInfo{}
 
 func init() {
@@ -86,10 +94,25 @@ type GenerateGadgetConfig struct {
 	Args      []string
 }
 
-func SetTransformChainType(s string, arg1 string, args ...string) GenGadgetOptionFun {
+func SetTransformChainTypeByMap(s string, params map[string]string) GenGadgetOptionFun {
 	return func(config *GenerateGadgetConfig) {
 		config.ChainType = s
-		config.Args = append([]string{arg1}, args...)
+		if v, ok := YsoConfigInstance.ReflectChainFunction[GadgetType(s)]; ok {
+			for _, arg := range v.Args {
+				if val, ok := params[string(arg.Name)]; ok {
+					config.Args = append(config.Args, val)
+				} else {
+					config.Args = append(config.Args, "")
+				}
+			}
+		}
+	}
+}
+
+func SetTransformChainType(s string, args ...string) GenGadgetOptionFun {
+	return func(config *GenerateGadgetConfig) {
+		config.ChainType = s
+		config.Args = args
 	}
 }
 
@@ -137,7 +160,7 @@ func GenerateGadget(name GadgetType, opts ...any) (*JavaObject, error) {
 		}
 		template, ok := cfg.ChainTemplate[chainType]
 		if !ok {
-			return nil, utils.Errorf("template: %s_%s", name, chainType)
+			return nil, utils.Errorf("not support transform chain type: %s", chainType)
 		}
 		objs, err := yserx.ParseJavaSerialized(template)
 		if err != nil {

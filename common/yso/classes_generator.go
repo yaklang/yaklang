@@ -15,7 +15,7 @@ type ClassPayload struct {
 }
 
 func GenerateClassWithType(typ ClassType, options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
-	return GenerateClass(append(options, setClassType(typ))...)
+	return GenerateClass(append(options, SetClassType(typ))...)
 }
 func GenerateClass(options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
 	config := NewClassConfig(options...)
@@ -78,7 +78,7 @@ func NewClassConfig(options ...GenClassOptionFun) *ClassGenConfig {
 	return obj
 }
 
-func setClassType(t ClassType) GenClassOptionFun {
+func SetClassType(t ClassType) GenClassOptionFun {
 	return func(config *ClassGenConfig) {
 		config.ClassType = t
 	}
@@ -93,6 +93,12 @@ func (cf *ClassGenConfig) GetParam(name ClassParamType) (string, bool) {
 }
 
 type GenClassOptionFun func(config *ClassGenConfig)
+
+func SetClassParam(k, v string) GenClassOptionFun {
+	return func(config *ClassGenConfig) {
+		config.SetParam(ClassParamType(k), v)
+	}
+}
 
 // SetClassName
 // evilClassName 请求参数选项函数，用于设置生成的类名。

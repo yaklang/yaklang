@@ -70,11 +70,13 @@ type optionInfo struct {
 
 func getAllGadgetInfo() []*yso.GadgetInfo {
 	res := []*yso.GadgetInfo{}
-	names := []string{}
+	names := []yso.GadgetType{}
 	for name, _ := range yso.AllGadgets {
 		names = append(names, name)
 	}
-	sort.Strings(names)
+	sort.SliceIsSorted(names, func(i, j int) bool {
+		return names[i] < names[j]
+	})
 	for _, name := range names {
 		res = append(res, yso.AllGadgets[name])
 	}
@@ -85,7 +87,7 @@ func checkGadgetIsTemplateSupported(gadget string) bool {
 	if gadget == "None" {
 		return true
 	}
-	info, ok := yso.AllGadgets[gadget]
+	info, ok := yso.AllGadgets[yso.GadgetType(gadget)]
 	if !ok {
 		log.Error("gadget not found")
 		return false
@@ -105,10 +107,10 @@ func getClassByGadgetName(name string) []optionInfo {
 			{Name: "TcpReverse", NameVerbose: "TcpReverse", Help: "反连到指定地址，并发送Token的内容"},
 			{Name: "TcpReverseShell", NameVerbose: "TcpReverseShell", Help: "反弹Shell"},
 		}
-	} else if name == yso.URLDNS || name == yso.FindGadgetByDNS {
-		return []optionInfo{
-			{Name: "DNSlog", NameVerbose: "DNSlog", Help: "通过DNSLog检测"},
-		}
+		//} else if name == yso.URLDNS || name == yso.FindGadgetByDNS {
+		//	return []optionInfo{
+		//		{Name: "DNSlog", NameVerbose: "DNSlog", Help: "通过DNSLog检测"},
+		//	}
 	} else {
 		return []optionInfo{
 			{Name: "RuntimeExec", NameVerbose: "RuntimeExec", Help: ""},
