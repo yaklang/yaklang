@@ -172,9 +172,6 @@ func (c *Storage) DecoratedByOpenAI(opts ...openai.ConfigOption) {
 			log.Errorf("openai extract data by ai failed: %s", err)
 			return
 		}
-		if err != nil {
-			return
-		}
 		log.Infof("find raw answer: %v", raw)
 		if c.NameZh == "" {
 			c.NameZh = utils.MapGetString(raw, "name_zh")
@@ -184,6 +181,8 @@ func (c *Storage) DecoratedByOpenAI(opts ...openai.ConfigOption) {
 		c.Description = utils.MapGetString(raw, "description")
 		c.DescriptionZh = utils.MapGetString(raw, "description_zh")
 	}
+
+	log.Infof("find keywords: %v", c.Keywords)
 
 	//err := UpsertRule(db, c.Hash, c)
 	//if err != nil {
