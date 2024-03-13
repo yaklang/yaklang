@@ -130,9 +130,12 @@ func (c *Call) handleCalleeFunction() {
 				variable = builder.CreateVariable(se.Name)
 			}
 
+			// TODO: handle side effect in loop scope, will replace value in scope and create new phi
 			sideEffect := builder.EmitSideEffect(se.Name, c, se.Modify)
-			builder.AssignVariable(variable, sideEffect)
-			sideEffect.SetVerboseName(se.VerboseName)
+			if sideEffect != nil {
+				builder.AssignVariable(variable, sideEffect)
+				sideEffect.SetVerboseName(se.VerboseName)
+			}
 		}
 		recoverBuilder()
 	}

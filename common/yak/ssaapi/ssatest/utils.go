@@ -25,10 +25,12 @@ type TestCase struct {
 }
 
 var languageOption ssaapi.Option = nil
+var language ssaapi.Language
 
 func SetLanguage(language ssaapi.Language, build ssaapi.Build) {
 	ssaapi.LanguageBuilders[language] = build
 	languageOption = ssaapi.WithLanguage(language)
+	language = language
 }
 
 func CheckTestCase(t *testing.T, tc TestCase) {
@@ -41,7 +43,7 @@ func CheckTestCase(t *testing.T, tc TestCase) {
 		opt = append(opt, languageOption)
 	}
 	opt = append(opt, ssaapi.WithExternValue(tc.ExternValue))
-	opt = append(opt, static_analyzer.GetPluginSSAOpt("yak")...)
+	opt = append(opt, static_analyzer.GetPluginSSAOpt(string(language))...)
 	prog, err := ssaapi.Parse(tc.Code, opt...)
 	require.Nil(t, err, "parse error")
 
@@ -115,6 +117,15 @@ func CheckPrintf(t *testing.T, tc TestCase) {
 	CheckTestCase(t, tc)
 }
 
+func CheckNoError(t *testing.T, code string) {
+	tc := TestCase{
+		Code: code,
+		Check: func(prog *ssaapi.Program, _ []string) {
+			require.Len(t, prog.GetErrors(), 0, "error not match")
+		},
+	}
+	CheckTestCase(t, tc)
+}
 func CheckError(t *testing.T, tc TestCase) {
 	check := func(prog *ssaapi.Program, want []string) {
 		errs := lo.Map(prog.GetErrors(), func(e *ssa.SSAError, _ int) string { return e.Message })

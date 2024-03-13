@@ -81,7 +81,7 @@ func TestFunctionCallParameterLength(t *testing.T) {
 		a = ["a", "b"]
 		codec.DecodeBase64(a...)
 		`, []string{
-			ssa4analyze.NotEnoughArgument("codec.DecodeBase64", "[]string", "string"),
+			ssa4analyze.ArgumentTypeError(1, "[]string", "string", "codec.DecodeBase64"),
 		})
 	})
 }

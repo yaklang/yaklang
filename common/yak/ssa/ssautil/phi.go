@@ -88,6 +88,8 @@ func (s *ScopedVersionedTable[T]) Spin(
 	header, latch ScopedVersionedTableIF[T],
 	handler SpinHandle[T],
 ) {
+	s.spin = false
+	s.createEmptyPhi = nil
 	s.incomingPhi.ForEach(func(name string, ver VersionedIF[T]) bool {
 		last := latch.ReadValue(name)
 		origin := header.ReadValue(name)
