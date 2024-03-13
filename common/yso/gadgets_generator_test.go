@@ -25,9 +25,6 @@ func TestGenerateGadget(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, gadget := range YsoConfigInstance.Gadgets {
-		if name != "Jdk8u20" {
-			continue
-		}
 		if gadget.IsTemplateImpl {
 			_, err = GenerateGadget(name, SetRuntimeExecEvilClass("whoami"))
 			if err != nil {

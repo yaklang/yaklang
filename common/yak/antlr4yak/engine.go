@@ -399,7 +399,10 @@ func (n *Engine) ExecuteAsBooleanExpression(expr string, dependencies map[string
 	if dependencies != nil {
 		n.ImportLibs(dependencies)
 	}
-
+	n.SetExternalVarGetter(func(name string) (any, bool) {
+		val, ok := n.GetVar(name)
+		return val, ok
+	})
 	err := n.SafeEvalInline(context.Background(), expr)
 	if err != nil {
 		return false, err

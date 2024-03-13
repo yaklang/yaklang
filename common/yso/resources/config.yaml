@@ -229,18 +229,36 @@ ReflectChainFunction:
 #    default: 1000
   dnslog:
     desc: 用于反连的域名
-    default: "asdghjkgkj.xxxxxxxxxxxx.com"
+    params:
+      - name: domain
+        desc: 用于反连的域名
+        test-default: "asdghjkgkj.xxxxxxxxxxxx.com"
   httplog:
     desc: http协议反连
-    default: "http://asdghjkgkj.xxxxxxxxxxxx.com"
+    params:
+      - name: url
+        desc: 反连地址
   raw_cmd:
     desc: 命令执行
+    params:
+      - name: cmd
+        desc: 命令
   win_cmd:
     desc: Windows命令执行
+    params:
+      - name: cmd
+        desc: 命令
   linux_cmd:
     desc: Linux命令执行
+    params:
+      - name: cmd
+        desc: 命令
+        default: "whoami"
   bcel:
     desc: BCEL类加载
+    params:
+      - name: bcel
+        desc: becl代码
   bcel_with_args:
     desc: BCEL类加载，支持通过使用|附带一个参数，如：$$BCEL$$xxxx|whoami
     params:
@@ -250,13 +268,16 @@ ReflectChainFunction:
         desc: 参数
   script_base64:
     desc: 指定一个base64编码的js脚本
-  upload_file_base64:
-    desc: 指定一个base64编码的文件，用于上传。使用|分割文件名和文件内容，如：test.txt|xxxx
     params:
-      - name: filename
-        desc: 文件名
-      - name: content
-        desc: 文件内容
+      - name: script
+        desc: base64编码的js脚本
+#  upload_file_base64:
+#    desc: 指定一个base64编码的文件，用于上传。使用|分割文件名和文件内容，如：test.txt|xxxx
+#    params:
+#      - name: filename
+#        desc: 文件名
+#      - name: content
+#        desc: 文件内容
   loadjar:
     desc: 加载一个jar文件，使用|分割jar文件路径和类名
     params:
@@ -275,3 +296,6 @@ ReflectChainFunction:
         desc: 参数
   jndi:
     desc: 指定一个JNDI地址，用于JNDI注入
+    params:
+      - name: jndi
+        desc: JNDI地址
