@@ -1,6 +1,10 @@
 package ssa
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/yaklang/yaklang/common/log"
+)
 
 type Range struct {
 	SourceCode *string
@@ -55,4 +59,37 @@ func (p *Position) String() string {
 		"%d:%d",
 		p.Line, p.Column,
 	)
+}
+
+const (
+	OFFSET_MASK = 100
+)
+
+func (prog *Program) SetOffset(inst Instruction) {
+	value, ok := ToValue(inst)
+	if !ok {
+		return
+	}
+	set := func(offset int64) {
+		mask := offset - offset%OFFSET_MASK
+		prog.Offset[mask] = append(prog.Offset[mask], value)
+		log.Infof("SetOffset: %s %d", value, offset)
+	}
+
+	if r := value.GetRange(); r != nil {
+		// TODO : check if r.Start/End is nil
+		set(r.Start.Offset)
+		set(r.End.Offset)
+	}
+}
+
+func (prog *Program) GetValuesByOffset(offset int64) Values {
+
+	mask := offset - offset%OFFSET_MASK
+
+	if vs, ok := prog.Offset[mask]; ok {
+
+		return vs
+	}
+	return nil
 }

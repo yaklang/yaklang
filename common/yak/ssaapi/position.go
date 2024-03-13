@@ -24,3 +24,18 @@ func (v *Value) IsReachable() int {
 func (v *Value) GetReachable() *Value {
 	return NewValue(v.node.GetBlock().Condition)
 }
+
+func (p *Program) GetFrontValueByOffset(offset int64) *Value {
+	prog := p.Program
+
+	vs := prog.GetValuesByOffset(offset)
+	// for _, v := range vs {
+	for i := len(vs) - 1; i >= 0; i-- {
+		v := vs[i]
+		if r := v.GetRange(); r != nil && r.End.Offset <= offset {
+			return NewValue(v)
+		}
+	}
+
+	return nil
+}

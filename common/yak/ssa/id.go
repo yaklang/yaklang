@@ -52,6 +52,10 @@ func (p *Program) GetInstructionById(id int) Instruction {
 }
 
 func (p *Program) SetInstructionWithName(name string, i Instruction) {
+
+	// set range
+	p.SetOffset(i)
+
 	insts, ok := p.NameToInstructions.Get(name)
 	if ok {
 		insts = append(insts, i)

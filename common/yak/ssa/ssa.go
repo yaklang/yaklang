@@ -130,6 +130,8 @@ type Program struct {
 	NameToInstructions *omap.OrderedMap[string, []Instruction]
 	IdToInstructionMap *omap.OrderedMap[int, Instruction]
 
+	Offset map[int64]Values
+
 	errors SSAErrors
 
 	// for build
