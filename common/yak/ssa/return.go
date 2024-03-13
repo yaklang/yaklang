@@ -92,6 +92,7 @@ func (f *Function) Finish() {
 		handlerReturnType(f.Return),
 		f.hasEllipsis,
 	)
+	funType.ParameterLen = f.ParamLength
 	funType.ParameterValue = f.Param
 	funType.SetFreeValue(f.FreeValues)
 	funType.SetSideEffect(f.SideEffects)

@@ -152,9 +152,10 @@ type Function struct {
 	Package *Package
 
 	// just function parameter and all return instruction
-	Param    []*Parameter
-	paramMap map[Value]int // for get parameter index
-	Return   []*Return
+	Param       []*Parameter
+	paramMap    map[Value]int // for get parameter index
+	ParamLength int
+	Return      []*Return
 
 	// BasicBlock list
 	Blocks []*BasicBlock

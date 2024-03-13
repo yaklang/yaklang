@@ -2,6 +2,7 @@ package ssa4analyze
 
 import (
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"golang.org/x/exp/slices"
 )
@@ -169,11 +170,15 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 			lengthError = gotParaLen != wantParaLen
 		}
 		if lengthError {
-			c.NewError(
-				ssa.Error, TypeCheckTAG,
-				NotEnoughArgument(funName, gotPara.String(), funcTyp.GetParamString()),
-			)
-			return
+			if gotParaLen != funcTyp.ParameterLen {
+				c.NewError(
+					ssa.Error, TypeCheckTAG,
+					NotEnoughArgument(funName, gotPara.String(), funcTyp.GetParamString()),
+				)
+				return
+			}
+			log.Errorf("TypeCheckCall: %s, %s", c.Method.GetVerboseName(),
+				"gotParaLen == funcTyp.ParameterLen but no enough argument")
 		}
 		checkParamType := func(i int) {
 			if !ssa.TypeCompare(gotPara[i], funcTyp.Parameter[i]) {
@@ -188,7 +193,7 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 			}
 		}
 
-		for i := 0; i < wantParaLen; i++ {
+		for i := 0; i < gotParaLen; i++ {
 			if i == wantParaLen-1 && funcTyp.IsVariadic {
 				break // ignore
 			}
