@@ -86,9 +86,10 @@ var suricataLoaderCommand = cli.Command{
 				swg.Add()
 				subRule := subRule
 				go func() {
-					swg.Done()
+					defer swg.Done()
 					r := rule.NewRuleFromSuricata(subRule)
 					if c.Bool("ai") {
+						log.Infof("start to decorator suricata rule: %s", subRule.Message)
 						r.DecoratedByOpenAI(openai.WithAPIKey(c.String("ai-token")), openai.WithProxy(c.String("ai-proxy")), openai.WithDomain(domain), openai.WithModel(c.String("model")))
 					}
 					err := rule.SaveToDB(r)

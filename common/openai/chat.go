@@ -101,7 +101,7 @@ func NewOpenAIClient(opts ...ConfigOption) *Client {
 		if len(config.APIKey) > 10 {
 			verbose = config.APIKey[:10] + "..."
 		}
-		log.Infof("use yakit config: %v", verbose)
+		log.OnceInfoLog("ai-config-apikey", "use openai apikey config: %v", verbose)
 		c.APIKey = config.APIKey
 	}
 	if model := config.GetExtraParam("model"); model != "" && c.ChatModel == "" {
@@ -111,7 +111,7 @@ func NewOpenAIClient(opts ...ConfigOption) *Client {
 		c.Domain = utils.ExtractHostPort(domain)
 	}
 	if proxy := config.GetExtraParam("proxy"); proxy != "" && c.Proxy == "" {
-		log.Infof("use yakit config ai proxy: %v", proxy)
+		log.OnceInfoLog("ai-config-proxy", "use openai apikey config: %v", proxy)
 		c.Proxy = proxy
 	}
 
