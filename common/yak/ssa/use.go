@@ -146,6 +146,8 @@ func (c *Call) GetValues() Values {
 func (c *Call) ReplaceValue(v Value, to Value) {
 	if c.Method == v {
 		c.Method = to
+		c.handleCalleeFunction()
+		c.handlerReturnType()
 	} else if index := slices.Index(c.Args, v); index > -1 {
 		c.Args[index] = to
 	} else if index := slices.Index(c.binding, v); index > -1 {
