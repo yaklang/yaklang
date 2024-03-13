@@ -164,7 +164,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		requestPacket        = option.Packet
 		timeout              = option.Timeout
 		connectTimeout       = option.ConnectTimeout
-		retryTimes           = option.RetryTimes
+		maxRetryTimes        = option.RetryTimes
 		retryInStatusCode    = option.RetryInStatusCode
 		retryNotInStatusCode = option.RetryNotInStatusCode
 		retryWaitTime        = option.RetryWaitTime
@@ -407,8 +407,8 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		timeout = 10 * time.Second
 	}
 
-	if retryTimes < 0 {
-		retryTimes = 0
+	if maxRetryTimes < 0 {
+		maxRetryTimes = 0
 	}
 
 	response.TraceInfo.AvailableDNSServers = dnsServers
@@ -422,9 +422,8 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 
 	// https://github.com/mattn/go-ieproxy
 	var (
-		conn                 net.Conn
-		retry                int
-		statusCodeRetryTimes int = 0
+		conn       net.Conn
+		retryTimes int
 	)
 	if len(proxy) == 1 && proxy[0] == "" {
 		proxy = proxy[1:]
@@ -490,7 +489,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	dnsEnd := time.Now()
 	dialopts = append(
 		dialopts,
-		netx.DialX_WithTimeoutRetry(retryTimes),
+		netx.DialX_WithTimeoutRetry(maxRetryTimes),
 		netx.DialX_WithTimeoutRetryWaitRange(
 			retryWaitTime,
 			retryMaxWaitTime,
@@ -875,10 +874,10 @@ RECONNECT:
 	}
 
 STATUSCODERETRY:
-	if retryFlag && statusCodeRetryTimes < retryTimes {
-		statusCodeRetryTimes += 1
-		time.Sleep(jitterBackoff(retryWaitTime, retryMaxWaitTime, retry))
-		log.Infof("retry reconnect because of status code [%d / %d]", statusCodeRetryTimes, retryTimes)
+	if retryFlag && retryTimes < maxRetryTimes {
+		retryTimes += 1
+		time.Sleep(utils.JitterBackoff(retryWaitTime, retryMaxWaitTime, retryTimes))
+		log.Infof("retry reconnect because of status code [%d / %d]", retryTimes, maxRetryTimes)
 		goto RECONNECT
 	}
 
