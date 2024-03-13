@@ -1,6 +1,7 @@
 package openai
 
 import (
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"io/ioutil"
 	"path/filepath"
 	"strings"
@@ -38,6 +39,22 @@ func TestClient_FunctionCall(t *testing.T) {
 		t.Fail()
 	}
 	spew.Dump(result)
+}
+func TestExtractDataByAi(t *testing.T) {
+	consts.GetGormProjectDatabase()
+	yakit.ConfigureNetWork(yakit.GetNetworkConfig())
+	result, err := ExtractDataByAi(`老板，你听我狡辩，今天下雨，路上车堵得很，所以迟到了`, "这是一个提取文本内容的函数", map[string]string{
+		"原因": "事件发生的原因",
+		"结果": "事件造成的结果",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	spew.Dump(result)
+	//(map[string]interface {}) (len=2) {
+	//	(string) (len=6) "原因": (string) (len=21) "下雨，路上车堵",
+	//		(string) (len=6) "结果": (string) (len=6) "迟到"
+	//}
 }
 
 func TestClient_Session(t *testing.T) {

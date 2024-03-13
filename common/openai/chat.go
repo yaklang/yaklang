@@ -176,7 +176,7 @@ func (c *Client) ChatEx(messages []ChatDetail, funcs ...Function) ([]ChatChoice,
 	var comp ChatCompletion
 	err = json.Unmarshal(rspRaw, &comp)
 	if err != nil {
-		log.Errorf("OpenAI Chat Error: unmarshal completion failed: %#v", rspRaw)
+		log.Errorf("OpenAI Chat Error: unmarshal completion failed: %#v", string(rspRaw))
 		return nil, utils.Wrapf(err, "unmarshal completion failed")
 	}
 

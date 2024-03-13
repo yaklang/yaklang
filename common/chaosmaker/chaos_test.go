@@ -274,7 +274,7 @@ func TestParseTCP(t *testing.T) {
 func TestTranslating(t *testing.T) {
 	consts.GetGormProfileDatabase().AutoMigrate(&rule.Storage{})
 	for r := range yieldRules() {
-		r.DecoratedByOpenAI(consts.GetGormProfileDatabase(), openai.WithAPIKeyFromYakitHome(), openai.WithProxy("http://127.0.0.1:7890"))
+		r.DecoratedByOpenAI(openai.WithAPIKeyFromYakitHome(), openai.WithProxy("http://127.0.0.1:7890"))
 	}
 }
 

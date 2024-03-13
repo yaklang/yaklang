@@ -2,6 +2,9 @@ package yakit
 
 import (
 	"context"
+	"encoding/json"
+	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"os"
 	"strconv"
 	"sync"
@@ -382,4 +385,84 @@ func YieldGeneralStorages(db *gorm.DB, ctx context.Context) chan *GeneralStorage
 		}
 	}()
 	return outC
+}
+func GetNetworkConfig() *ypb.GlobalNetworkConfig {
+	data := Get(consts.GLOBAL_NETWORK_CONFIG)
+	if data == "" {
+		return nil
+	}
+	config := &ypb.GlobalNetworkConfig{}
+	err := json.Unmarshal([]byte(data), &config)
+	if err != nil {
+		log.Errorf("unmarshal global network config failed: %s", err)
+		return nil
+	}
+	return config
+}
+
+func GetDefaultNetworkConfig() *ypb.GlobalNetworkConfig {
+	defaultConfig := &ypb.GlobalNetworkConfig{
+		DisableSystemDNS: false,
+		CustomDNSServers: nil,
+		DNSFallbackTCP:   false,
+		DNSFallbackDoH:   false,
+		CustomDoHServers: nil,
+		SkipSaveHTTPFlow: false,
+		AuthInfos:        make([]*ypb.AuthInfo, 0),
+	}
+	config := netx.NewBackupInitilizedReliableDNSConfig()
+	defaultConfig.CustomDoHServers = config.SpecificDoH
+	defaultConfig.CustomDNSServers = config.SpecificDNSServers
+	defaultConfig.DNSFallbackDoH = config.FallbackDoH
+	defaultConfig.DNSFallbackTCP = config.FallbackTCP
+	defaultConfig.DisableSystemDNS = config.DisableSystemResolver
+	return defaultConfig
+}
+
+func ConfigureNetWork(c *ypb.GlobalNetworkConfig) {
+	if c == nil {
+		return
+	}
+
+	consts.GLOBAL_HTTP_FLOW_SAVE.SetTo(!c.GetSkipSaveHTTPFlow())
+	consts.SetGlobalHTTPAuthInfo(c.GetAuthInfos())
+	c.GetAppConfigs()
+	consts.ClearThirdPartyApplicationConfig()
+	for _, r := range c.GetAppConfigs() {
+		consts.UpdateThirdPartyApplicationConfig(r)
+	}
+
+	netx.SetDefaultDNSOptions(
+		netx.WithDNSFallbackDoH(c.DNSFallbackDoH),
+		netx.WithDNSFallbackTCP(c.DNSFallbackTCP),
+		netx.WithDNSDisableSystemResolver(c.DisableSystemDNS),
+		netx.WithDNSSpecificDoH(c.CustomDoHServers...),
+		netx.WithDNSServers(c.CustomDNSServers...),
+		netx.WithDNSDisabledDomain(c.GetDisallowDomain()...),
+	)
+
+	netx.SetDefaultDialXConfig(
+		netx.DialX_WithDisallowAddress(c.GetDisallowIPAddress()...),
+		netx.DialX_WithProxy(c.GetGlobalProxy()...),
+		netx.DialX_WithEnableSystemProxyFromEnv(c.GetEnableSystemProxyFromEnv()),
+	)
+
+	for _, certs := range c.GetClientCertificates() {
+		if len(certs.GetPkcs12Bytes()) > 0 {
+			err := netx.LoadP12Bytes(certs.Pkcs12Bytes, string(certs.GetPkcs12Password()))
+			if err != nil {
+				log.Errorf("load p12 bytes failed: %s", err)
+			}
+		} else {
+			p12bytes, err := tlsutils.BuildP12(certs.GetCrtPem(), certs.GetKeyPem(), "", certs.GetCaCertificates()...)
+			if err != nil {
+				log.Errorf("build p12 bytes failed: %s", err)
+				continue
+			}
+			err = netx.LoadP12Bytes(p12bytes, "")
+			if err != nil {
+				log.Errorf("load p12 bytes failed: %s", err)
+			}
+		}
+	}
 }
