@@ -98,6 +98,7 @@ http:
 	rawVarMap := tmp.Variables.GetRaw()
 	assert.Equal(t, "{{replace(BaseURL,\"/\",\"_\")}}", rawVarMap["filename"].Data, "parse variables error")
 	assert.Equal(t, "screenshots", rawVarMap["dir"].Data, "parse variables error")
+	assert.NotEqual(t, "", tmp.HTTPRequestSequences[1].Matcher.TemplateName)
 }
 func TestCreateYakTemplateFromSelfContained(t *testing.T) {
 	var demo = `
