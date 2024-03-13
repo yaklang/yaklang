@@ -290,7 +290,7 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 				}, &riskCount)
 				callerFilter := scanFilterManager.DequeueFilter()
 				defer scanFilterManager.EnqueueFilter(callerFilter)
-				err := s.ScanTargetWithPlugin(taskId, manager.Context(), targetRequestInstance, pluginInstance, proxy, feedbackClient, callerFilter)
+				err := ScanHybridTargetWithPlugin(taskId, manager.Context(), targetRequestInstance, pluginInstance, proxy, feedbackClient, callerFilter)
 				if err != nil {
 					log.Warnf("scan target failed: %s", err)
 				}
@@ -337,7 +337,7 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 //go:embed grpc_z_hybrid_scan.yak
 var execTargetWithPluginScript string
 
-func (s *Server) ScanTargetWithPlugin(
+func ScanHybridTargetWithPlugin(
 	taskId string, ctx context.Context, target *HybridScanTarget, plugin *yakit.YakScript, proxy string, feedbackClient *yaklib.YakitClient, callerFilter *filter.StringFilter,
 ) error {
 	engine := yak.NewYakitVirtualClientScriptEngine(feedbackClient)
@@ -410,10 +410,10 @@ type HybridScanTarget struct {
 	Url      string
 }
 
-func (s *Server) TargetGenerator(ctx context.Context, targetConfig *ypb.HybridScanInputTarget) (chan *HybridScanTarget, error) {
+func TargetGenerator(ctx context.Context, targetConfig *ypb.HybridScanInputTarget) (chan *HybridScanTarget, error) {
 	// handle target
 	outTarget := make(chan *HybridScanTarget)
-	buildRes, err := s.BuildHttpRequestPacket(targetConfig.GetHTTPRequestTemplate(), targetConfig.GetInput())
+	buildRes, err := BuildHttpRequestPacket(targetConfig.GetHTTPRequestTemplate(), targetConfig.GetInput())
 	if err != nil {
 		return nil, err
 	}

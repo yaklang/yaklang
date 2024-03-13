@@ -178,7 +178,7 @@ func (s *Server) execScriptWithRequest(scriptName string, targetInput string, st
 
 	var reqs []any
 
-	BuildRes, err := s.BuildHttpRequestPacket(baseBuilderParams, targetInput)
+	BuildRes, err := BuildHttpRequestPacket(baseBuilderParams, targetInput)
 	if err != nil {
 		return utils.Wrapf(err, "build http request failed")
 	}
