@@ -782,7 +782,10 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 				return
 			}
 		}
-		log.Warnf("yakvm: cannot found variable: %v, use undefined", c.Op1.String())
+
+		if !v.vm.sandboxMode {
+			log.Warnf("yakvm: cannot found variable: %v, use undefined", c.Op1.String())
+		}
 		v.push(undefined)
 		return
 	case OpTypeCast:
