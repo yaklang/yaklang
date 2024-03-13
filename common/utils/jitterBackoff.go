@@ -1,15 +1,27 @@
-package netx
+package utils
 
 import (
 	"math"
 	"math/rand"
+	"net"
 	"sync"
 	"time"
 )
 
+func newRnd() *rand.Rand {
+	seed := time.Now().UnixNano()
+	src := rand.NewSource(seed)
+	return rand.New(src)
+}
+
+var (
+	rnd   = newRnd()
+	rndMu sync.Mutex
+)
+
 // Return capped exponential backoff with jitter
 // http://www.awsarchitectureblog.com/2015/03/backoff.html
-func jitterBackoff(min, max time.Duration, attempt int) time.Duration {
+func JitterBackoff(min, max time.Duration, attempt int) time.Duration {
 	base := float64(min)
 	capLevel := float64(max)
 
@@ -24,23 +36,21 @@ func jitterBackoff(min, max time.Duration, attempt int) time.Duration {
 	return result
 }
 
-func newRnd() *rand.Rand {
-	var seed = time.Now().UnixNano()
-	var src = rand.NewSource(seed)
-	return rand.New(src)
-}
-
-var rnd = newRnd()
-var rndMu sync.Mutex
-
 func randDuration(center time.Duration) time.Duration {
 	rndMu.Lock()
 	defer rndMu.Unlock()
 
-	var ri = int64(center)
+	ri := int64(center)
 	if ri <= 0 {
 		return 0
 	}
-	var jitter = rnd.Int63n(ri)
+	jitter := rnd.Int63n(ri)
 	return time.Duration(math.Abs(float64(ri + jitter)))
+}
+
+func isErrorTimeout(err error) bool {
+	if neterr, ok := err.(net.Error); ok && neterr.Timeout() {
+		return true
+	}
+	return false
 }
