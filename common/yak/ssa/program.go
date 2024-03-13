@@ -8,12 +8,13 @@ import (
 
 func NewProgram() *Program {
 	prog := &Program{
-		Packages:           make(map[string]*Package),
-		ConstInstruction:   omap.NewEmptyOrderedMap[int, *ConstInst](),
-		NameToInstructions: omap.NewEmptyOrderedMap[string, []Instruction](),
-		IdToInstructionMap: omap.NewEmptyOrderedMap[int, Instruction](),
-		errors:             make([]*SSAError, 0),
-		buildOnce:          sync.Once{},
+		Packages:              make(map[string]*Package),
+		ConstInstruction:      omap.NewEmptyOrderedMap[int, *ConstInst](),
+		NameToInstructions:    omap.NewEmptyOrderedMap[string, []Instruction](),
+		IdToInstructionMap:    omap.NewEmptyOrderedMap[int, Instruction](),
+		OffsetSegmentToValues: make(map[int64]map[int64]*OffsetValues),
+		errors:                make([]*SSAError, 0),
+		buildOnce:             sync.Once{},
 	}
 	return prog
 }
@@ -45,6 +46,7 @@ func (prog *Program) AddPackage(pkg *Package) {
 	pkg.Prog = prog
 	prog.Packages[pkg.Name] = pkg
 }
+
 func (prog *Program) GetPackage(name string) *Package {
 	if p, ok := prog.Packages[name]; ok {
 		return p
@@ -85,7 +87,6 @@ func (prog *Program) EachFunction(handler func(*Function)) {
 			handFunc(f)
 		}
 	}
-
 }
 
 func NewPackage(name string) *Package {

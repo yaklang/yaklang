@@ -81,9 +81,7 @@ func (a *anInstruction) GetBlock() *BasicBlock      { return a.block }
 func (c *anInstruction) GetRange() *Range { return c.R }
 
 func (c *anInstruction) SetRange(pos *Range) {
-	// if c.Pos == nil {
 	c.R = pos
-	// }
 }
 
 func (c *anInstruction) IsExtern() bool   { return c.isExtern }

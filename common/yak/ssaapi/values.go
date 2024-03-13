@@ -60,12 +60,12 @@ func (i *Value) GetName() string { return i.node.GetName() }
 
 func (i *Value) GetVerboseName() string {
 	var name string
-	if name = i.node.GetName(); name != "" {
+	if name = i.node.GetVerboseName(); name != "" {
 		if i.IsPhi() {
 			return "[phi]: " + name
 		}
 		return name
-	} else if name = i.node.GetVerboseName(); name != "" {
+	} else if name = i.node.GetName(); name != "" {
 		return fmt.Sprintf(`t%d: %v=%v`, i.GetId(), name, i.ShortString())
 	}
 	return fmt.Sprintf(`t%d: %v`, i.GetId(), i.ShortString())
@@ -331,6 +331,14 @@ func (v *Value) GetCallee() *Value {
 
 type Values []*Value
 
+func NewValues(ns ssa.Values) Values {
+	ret := make(Values, 0, len(ns))
+	for _, n := range ns {
+		ret = append(ret, NewValue(n))
+	}
+	return ret
+}
+
 func (value Values) Ref(name string) Values {
 	ret := make(Values, 0, len(value))
 	for _, v := range value {
@@ -365,6 +373,7 @@ func (v Values) Show(b ...bool) Values {
 	fmt.Println(v.StringEx(0))
 	return v
 }
+
 func (v Values) ShowWithSource(b ...bool) Values {
 	if len(b) > 0 && !b[0] {
 		return v
