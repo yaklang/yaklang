@@ -2,6 +2,7 @@ package yakcmds
 
 import (
 	"context"
+	_ "embed"
 	"github.com/olekukonko/tablewriter"
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/consts"
@@ -9,15 +10,21 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"os"
 	"strconv"
 	"strings"
 )
 
+//go:embed scan_yamlpoc.yak
+var yamlScanScript string
+
 var yamlpocCommand = &cli.Command{
-	Name:  "poc",
-	Usage: "Use plugins (UI in Yakit) to scan",
+	Name:    "scan",
+	Aliases: []string{"poc"},
+	Usage:   "Use plugins (UI in Yakit) to scan",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "target,host,t",
@@ -122,6 +129,15 @@ var yamlpocCommand = &cli.Command{
 			table.Render()
 			log.Info("Total Matched Plugins: ", count)
 			return nil
+		}
+
+		gen, err := yakgrpc.TargetGenerator(context.Background(), &ypb.HybridScanInputTarget{
+			Input:               "",
+			InputFile:           nil,
+			HTTPRequestTemplate: nil,
+		})
+		if err != nil {
+			return utils.Errorf("generate target failed: %s", err)
 		}
 
 		return nil
