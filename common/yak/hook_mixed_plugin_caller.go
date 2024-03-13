@@ -87,6 +87,8 @@ var MITMAndPortScanHooks = []string{
 }
 
 type MixPluginCaller struct {
+	ctx context.Context
+
 	websiteFilter       *filter.StringFilter
 	websitePathFilter   *filter.StringFilter
 	websiteParamsFilter *filter.StringFilter
@@ -107,6 +109,10 @@ type MixPluginCaller struct {
 
 func (m *MixPluginCaller) SetCache(b bool) {
 	m.cache = b
+}
+
+func (m *MixPluginCaller) SetCtx(ctx context.Context) {
+	m.ctx = ctx
 }
 
 func (m *MixPluginCaller) SetRuntimeId(s string) {
@@ -226,6 +232,7 @@ func NewMixPluginCaller() (*MixPluginCaller, error) {
 		feedbackHandler: func(result *ypb.ExecResult) error {
 			return fmt.Errorf("feedback handler not set")
 		},
+		ctx: context.Background(),
 	}
 	c.SetLoadPluginTimeout(10)
 	var err error
@@ -251,6 +258,7 @@ func NewMixPluginCallerWithFilter(webFilter *filter.StringFilter) (*MixPluginCal
 		feedbackHandler: func(result *ypb.ExecResult) error {
 			return fmt.Errorf("feedback handler not set")
 		},
+		ctx: context.Background(),
 	}
 	c.SetLoadPluginTimeout(10)
 	var err error
@@ -334,7 +342,10 @@ func (c *MixPluginCaller) LoadHotPatch(ctx context.Context, code string) error {
 }
 
 func (m *MixPluginCaller) LoadPlugin(scriptName string, params ...*ypb.ExecParamItem) error {
-	return m.LoadPluginByName(context.Background(), scriptName, params)
+	if m.ctx == nil {
+		m.ctx = context.Background()
+	}
+	return m.LoadPluginByName(m.ctx, scriptName, params)
 }
 
 // LoadPluginByName 基于脚本名加载插件，如果没有指定代码，则从数据库中加载，如果指定了代码，则默认视为mitm插件执行
@@ -732,6 +743,116 @@ func (m *MixPluginCaller) MirrorHTTPFlow(
 		return
 	}
 	m.MirrorHTTPFlowEx(true, isHttps, u, req, rsp, body, filters...)
+}
+
+func (m *MixPluginCaller) MirrorHTTPFlowExSync(
+	scanPort bool,
+	isHttps bool, u string, req, rsp, body []byte,
+	filters ...bool) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("panic from mirror httpflow ex: %s", err)
+		}
+	}()
+	callers := m.callers
+
+	if !utils.IsHttpOrHttpsUrl(u) {
+		host, port, _ := utils.ParseStringToHostPort(u)
+		if host == "" {
+			host = u
+		}
+		if port == 443 {
+			u = fmt.Sprintf("https://%s", host)
+		} else {
+			u = fmt.Sprintf("http://%s", host)
+		}
+	}
+	if callers.ShouldCallByName(HOOK_MirrorHTTPFlow) {
+		callers.CallByNameSync(HOOK_MirrorHTTPFlow, isHttps, u, req, rsp, body)
+	}
+
+	urlObj, err := url.Parse(u)
+	if err != nil {
+		yaklib.GetYakitClientInstance().YakitInfo("解析 URL 失败：%v 原因: %v", u, err)
+	}
+	if urlObj != nil {
+		host, port, _ := utils.ParseStringToHostPort(u)
+		websiteHash := calcNewWebsiteHash(urlObj, host, port, req)
+		websitePathHash := calcWebsitePathHash(urlObj, host, port, req)
+		websitePathParamsHash := calcWebsitePathParamsHash(urlObj, host, port, req)
+		if !m.websiteFilter.Exist(websiteHash) {
+			m.websiteFilter.Insert(websiteHash)
+			if callers.ShouldCallByName(HOOK_MirrorNewWebsite) {
+				callers.CallByNameSync(HOOK_MirrorNewWebsite, isHttps, u, req, rsp, body)
+			}
+
+			if callers.ShouldCallByName(HOOK_PortScanHandle) {
+				var (
+					matchResult *fp.MatchResult = &fp.MatchResult{State: fp.OPEN}
+					err         error
+				)
+				host, port, _ = utils.ParseStringToHostPort(u)
+				if host != "" && port > 0 {
+					m.swg.Add()
+					go func() {
+						defer m.swg.Done()
+						if scanPort {
+							addr := utils.HostPort(host, port)
+							log.Debugf("(port/mitm) start to match %v", addr)
+							matchResult, err = m.fingerprintMatcher.Match(
+								host, port, fp.WithCache(m.cache), fp.WithDatabaseCache(true),
+								fp.WithProxy(m.proxy),
+							)
+							if err != nil {
+								return
+							}
+							log.Debugf("%v", matchResult.String())
+						}
+						callers.CallByNameSync(HOOK_PortScanHandle, matchResult)
+					}()
+				}
+			}
+
+			// 异步+并发限制执行 Nuclei
+			if callers.ShouldCallByName(HOOK_NucleiScanHandle) {
+				m.swg.Add()
+				go func() {
+					defer m.swg.Done()
+					callers.CallByNameSync(HOOK_NucleiScanHandle, urlObj.String())
+				}()
+			}
+			if callers.ShouldCallByName(HOOK_NaslScanHandle) {
+				m.swg.Add()
+				go func() {
+					defer m.swg.Done()
+					callers.CallByNameSync(HOOK_NaslScanHandle, urlObj.String())
+				}()
+			}
+		}
+
+		if !m.websitePathFilter.Exist(websitePathHash) {
+			m.websitePathFilter.Insert(websitePathHash)
+			if callers.ShouldCallByName(HOOK_MirrorNewWebsitePath) {
+				callers.CallByNameSync(HOOK_MirrorNewWebsitePath, isHttps, u, req, rsp, body)
+			}
+		}
+
+		if !m.websiteParamsFilter.Exist(websitePathParamsHash) {
+			m.websiteParamsFilter.Insert(websitePathParamsHash)
+			if callers.ShouldCallByName(HOOK_MirrorNewWebsitePathParams) {
+				callers.CallByNameSync(HOOK_MirrorNewWebsitePathParams, isHttps, u, req, rsp, body)
+			}
+		}
+	}
+
+	for _, i := range filters {
+		if !i {
+			return
+		}
+	}
+	if callers.ShouldCallByName(HOOK_MirrorFilteredHTTPFlow) {
+		callers.CallByNameSync(HOOK_MirrorFilteredHTTPFlow, isHttps, u, req, rsp, body)
+	}
 }
 
 func (m *MixPluginCaller) MirrorHTTPFlowEx(
