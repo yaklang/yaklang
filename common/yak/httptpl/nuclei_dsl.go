@@ -812,11 +812,25 @@ func GetNucleiDSLFunctions() map[string]interface{} {
 }
 
 type NucleiDSL struct {
-	Functions map[string]interface{}
+	Functions         map[string]interface{}
+	ExternalVarGetter func(string) (any, bool)
 }
 
 func NewNucleiDSLYakSandbox() *NucleiDSL {
-	dsl := &NucleiDSL{Functions: make(map[string]interface{})}
+	dsl := &NucleiDSL{
+		Functions: make(map[string]interface{}),
+		ExternalVarGetter: func(name string) (any, bool) {
+			if utils.MatchAnyOfRegexp(name, `duration_\d+`) {
+				return 0.0, true
+			} else if utils.MatchAnyOfRegexp(name, "status_code_\\d+") {
+				return 0, true
+			} else if utils.MatchAnyOfRegexp(name, "content_length_\\d+") {
+				return 0, true
+			} else if utils.MatchAnyOfRegexp(name, "all_headers_\\d+", "body_\\d+", "raw_\\d+") {
+				return "", true
+			}
+			return nil, false
+		}}
 	return dsl
 }
 
@@ -865,8 +879,28 @@ func LoadVarFromRawResponse(rsp []byte, duration float64, sufs ...string) map[st
 	return rs
 }
 
-func (d *NucleiDSL) _execute(expr string, items ...map[string]interface{}) (*antlr4yak.Engine, map[string]interface{}, error) {
+func (d *NucleiDSL) MergeExternalGetter(getters ...func(string) (any, bool)) func(string) (any, bool) {
+	return func(name string) (any, bool) {
+		for _, g := range getters {
+			if g != nil {
+				if v, ok := g(name); ok {
+					return v, ok
+				}
+			}
+		}
+		if d.ExternalVarGetter != nil {
+			v, ok := d.ExternalVarGetter(name)
+			if ok {
+				return v, ok
+			}
+		}
+		return nil, false
+	}
+}
+
+func (d *NucleiDSL) createSandboxEngine(items ...map[string]interface{}) (*antlr4yak.Engine, map[string]interface{}, error) {
 	box := yaklang.NewSandbox(GetNucleiDSLFunctions())
+	box.SetExternalVarGetter(d.MergeExternalGetter())
 	merged := make(map[string]interface{})
 	for _, v := range items {
 		if v == nil {
@@ -879,16 +913,16 @@ func (d *NucleiDSL) _execute(expr string, items ...map[string]interface{}) (*ant
 	return box, merged, nil
 }
 func (d *NucleiDSL) ExecuteWithOnGetVar(expr string, getter func(name string) (any, bool), items ...map[string]interface{}) (interface{}, error) {
-	box, merged, err := d._execute(expr, items...)
+	box, merged, err := d.createSandboxEngine(items...)
 	if err != nil {
 		return nil, err
 	}
-	box.SetExternalVarGetter(getter)
+	box.SetExternalVarGetter(d.MergeExternalGetter(getter))
 	return box.ExecuteAsExpression(expr, merged)
 }
 
 func (d *NucleiDSL) Execute(expr string, items ...map[string]interface{}) (interface{}, error) {
-	box, merged, err := d._execute(expr, items...)
+	box, merged, err := d.createSandboxEngine(items...)
 	if err != nil {
 		return nil, err
 	}
@@ -896,7 +930,7 @@ func (d *NucleiDSL) Execute(expr string, items ...map[string]interface{}) (inter
 }
 
 func (d *NucleiDSL) ExecuteAsBool(expr string, items ...map[string]interface{}) (bool, error) {
-	box, merged, err := d._execute(expr, items...)
+	box, merged, err := d.createSandboxEngine(items...)
 	if err != nil {
 		return false, err
 	}
@@ -922,7 +956,6 @@ func (d *NucleiDSL) GetUndefinedVarNames(expr string, extra map[string]interface
 					continue
 				}
 			}
-
 			vars = append(vars, varName)
 		}
 	}
