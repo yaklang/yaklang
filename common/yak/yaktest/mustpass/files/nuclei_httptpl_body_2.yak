@@ -50,5 +50,6 @@ for r in result {
 count++
 }
 
+dump(count)
 assert count == 1;
 
