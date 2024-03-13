@@ -314,21 +314,22 @@ func (t *TryStmt[T]) Build() ScopedVersionedTableIF[T] {
 }
 
 type SwitchStmt[T versionedValue] struct {
-	global         ScopedVersionedTableIF[T]
-	handler        []ScopedVersionedTableIF[T]
-	waitingForNext ScopedVersionedTableIF[T]
-	hasDefault     bool
+	global           ScopedVersionedTableIF[T]
+	mergeToSwitchEnd []ScopedVersionedTableIF[T]
+	mergeToNextBody  ScopedVersionedTableIF[T]
+	AutoBreak        bool
 }
 
-func NewSwitchStmt[T versionedValue](global ScopedVersionedTableIF[T]) *SwitchStmt[T] {
+func NewSwitchStmt[T versionedValue](global ScopedVersionedTableIF[T], AutoBreak bool) *SwitchStmt[T] {
 	return &SwitchStmt[T]{
-		global: global,
+		global:    global,
+		AutoBreak: AutoBreak,
 	}
 }
 
 func (s *SwitchStmt[T]) Break(from ScopedVersionedTableIF[T]) {
 	// do nothing
-	s.handler = append(s.handler, from)
+	s.mergeToSwitchEnd = append(s.mergeToSwitchEnd, from)
 }
 
 func (s *SwitchStmt[T]) Continue(from ScopedVersionedTableIF[T]) {
@@ -337,7 +338,7 @@ func (s *SwitchStmt[T]) Continue(from ScopedVersionedTableIF[T]) {
 
 func (s *SwitchStmt[T]) FallThough(from ScopedVersionedTableIF[T]) {
 	// do nothing
-	s.waitingForNext = from
+	s.mergeToNextBody = from
 }
 
 func (s *SwitchStmt[T]) BuildBody(
@@ -345,22 +346,45 @@ func (s *SwitchStmt[T]) BuildBody(
 	merge func(string, []T) T,
 ) {
 	sub := s.global.CreateSubScope()
-	if s.waitingForNext != nil {
-		sub.Merge(true, merge, s.waitingForNext)
-		s.waitingForNext = nil
+	if s.mergeToNextBody != nil {
+		sub.Merge(true, merge, s.mergeToNextBody)
+		s.mergeToNextBody = nil
 	}
 	ret := body(sub)
-	if s.waitingForNext == nil {
-		s.handler = append(s.handler, ret)
+	if s.AutoBreak { // if this switch fall through, then merge to next body
+		// if switch default break to switch end
+		if s.mergeToNextBody == nil {
+			// if not write FallThough, then merge to switch end
+			s.mergeToSwitchEnd = append(s.mergeToSwitchEnd, ret)
+		}
+	} else {
+		length := len(s.mergeToSwitchEnd)
+		if length == 0 || s.mergeToSwitchEnd[length-1] != ret {
+			s.mergeToNextBody = ret
+		}
 	}
 }
 
 func (s *SwitchStmt[T]) Build(merge func(string, []T) T) ScopedVersionedTableIF[T] {
 	end := s.global.CreateSubScope()
-	end.Merge(
-		false,
-		merge,
-		s.handler...,
-	)
+	if s.AutoBreak {
+		// if switch default break to switch end
+		// just merge
+		end.Merge(
+			false,
+			merge,
+			s.mergeToSwitchEnd...,
+		)
+	} else {
+		DefaultBody := s.mergeToNextBody
+		if len(s.mergeToSwitchEnd) == 0 {
+			// has default, no break, just cover by default
+			end.CoverBy(DefaultBody)
+		} else {
+			// has default, has break, merge
+			s.mergeToSwitchEnd = append(s.mergeToSwitchEnd, DefaultBody)
+			end.Merge(false, merge, s.mergeToSwitchEnd...)
+		}
+	}
 	return end
 }

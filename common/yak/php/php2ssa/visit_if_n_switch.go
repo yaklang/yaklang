@@ -148,7 +148,7 @@ func (y *builder) VisitSwitchStatement(raw phpparser.ISwitchStatementContext) in
 		return nil
 	}
 	ir := y.ir.BuildSwitch()
-	ir.DefaultBreak = false
+	ir.AutoBreak = false
 	ir.BuildCondition(func() ssa.Value {
 		return y.VisitParentheses(stmt.Parentheses())
 	})

@@ -462,7 +462,7 @@ type SwitchBuilder struct {
 
 	buildDefault func()
 
-	DefaultBreak bool
+	AutoBreak bool
 }
 
 func (b *FunctionBuilder) BuildSwitch() *SwitchBuilder {
@@ -498,7 +498,7 @@ func (t *SwitchBuilder) Finish() {
 	builder := t.b
 	enter := t.enter
 	scope := enter.ScopeTable
-	switchBuilder := ssautil.NewSwitchStmt(ssautil.ScopedVersionedTableIF[Value](scope))
+	switchBuilder := ssautil.NewSwitchStmt(ssautil.ScopedVersionedTableIF[Value](scope), t.AutoBreak)
 	var cond Value
 	if t.buildCondition != nil {
 		cond = t.buildCondition()
@@ -524,7 +524,7 @@ func (t *SwitchBuilder) Finish() {
 	}
 
 	NextBlock := func(i int) *BasicBlock {
-		if t.DefaultBreak {
+		if t.AutoBreak {
 			return done
 		} else {
 			if i == t.caseSize-1 {
