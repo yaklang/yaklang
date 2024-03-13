@@ -172,7 +172,7 @@ func FetchFunctionFromSourceCode(ctx context.Context, pluginContext *YakitPlugin
 				}()
 
 				_, err = nIns.CallYakFunctionNative(ctx, f, args...)
-				if err != nil {
+				if err != nil && !errors.Is(err, context.Canceled) {
 					log.Errorf("call YakFunction (DividedCTX) error: \n%v", err)
 				}
 			},
@@ -833,6 +833,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 				log.Debugf("bind hook.NewMixPluginCaller to runtime: %v", runtimeId)
 				manager.SetRuntimeId(runtimeId)
 				manager.SetProxy(proxy)
+				manager.SetCtx(streamContext)
 				manager.SetFeedback(func(result *ypb.ExecResult) error { // 临时解决方案
 					yakitLib, ok := nIns.GetVar("yakit")
 					if ok && yakitLib != nil {
@@ -1206,6 +1207,10 @@ func (y *YakToCallerManager) CallByName(name string, items ...interface{}) {
 	y.CallPluginKeyByName("", name, items...)
 }
 
+func (y *YakToCallerManager) CallByNameSync(name string, items ...interface{}) {
+	y.CallPluginKeyByName("", name, items...)
+}
+
 func (y *YakToCallerManager) CallByNameEx(name string, items ...func() interface{}) {
 	y.CallPluginKeyByNameEx("", name, items...)
 }
@@ -1222,6 +1227,16 @@ func (y *YakToCallerManager) CallPluginKeyByName(pluginId string, name string, i
 	}
 	itemsFunc := funk.Map(items, interfaceToClojure).([]func() interface{})
 	y.CallPluginKeyByNameEx(pluginId, name, itemsFunc...)
+}
+
+func (y *YakToCallerManager) CallPluginKeyByNameSync(pluginId string, name string, items ...interface{}) {
+	interfaceToClojure := func(i interface{}) func() interface{} {
+		return func() interface{} {
+			return i
+		}
+	}
+	itemsFunc := funk.Map(items, interfaceToClojure).([]func() interface{})
+	y.SyncCallPluginKeyByNameEx(pluginId, name, itemsFunc...)
 }
 
 func (y *YakToCallerManager) SyncCallPluginKeyByNameEx(pluginId string, name string, itemsFuncs ...func() interface{}) {
