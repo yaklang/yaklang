@@ -237,7 +237,7 @@ type HTTPRequestBuilderRes struct {
 	Url     string
 }
 
-func (s Server) BuildHttpRequestPacket(baseBuilderParams *ypb.HTTPRequestBuilderParams, targetInput string) (chan *HTTPRequestBuilderRes, error) {
+func BuildHttpRequestPacket(baseBuilderParams *ypb.HTTPRequestBuilderParams, targetInput string) (chan *HTTPRequestBuilderRes, error) {
 	builderRes := make(chan *HTTPRequestBuilderRes)
 	if baseBuilderParams != nil {
 		if baseBuilderParams.GetIsRawHTTPRequest() {

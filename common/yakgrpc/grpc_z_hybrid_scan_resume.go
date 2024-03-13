@@ -239,7 +239,7 @@ func (s *Server) hybridScanResume(manager *HybridScanTaskManager, stream HybridS
 				}, &riskCount)
 				callerFilter := resumeFilterManager.DequeueFilter()
 				defer resumeFilterManager.EnqueueFilter(callerFilter)
-				err := s.ScanTargetWithPlugin(task.TaskId, manager.Context(), targetRequestInstance, pluginInstance, scanConfig.Proxy, feedbackClient, callerFilter)
+				err := ScanHybridTargetWithPlugin(task.TaskId, manager.Context(), targetRequestInstance, pluginInstance, scanConfig.Proxy, feedbackClient, callerFilter)
 				if err != nil {
 					log.Warnf("scan target failed: %s", err)
 				}
