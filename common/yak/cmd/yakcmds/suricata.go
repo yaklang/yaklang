@@ -5,14 +5,12 @@ import (
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/chaosmaker"
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/openai"
 	"github.com/yaklang/yaklang/common/pcapx"
 	surirule "github.com/yaklang/yaklang/common/suricata/rule"
 	"github.com/yaklang/yaklang/common/utils"
 	"os"
-	"strconv"
 	"strings"
 )
 
@@ -20,7 +18,7 @@ var ChaosMakerAIHelperCommand = cli.Command{}
 
 var suricataLoaderCommand = cli.Command{
 	Name:     "suricata",
-	Usage:    "Load suricata rules to database",
+	Usage:    "Load suricata rules to database, for example: yak suricata --rule-dir /tmp/rules --ai --domain api.openai.com --ai-proxy http://127.0.0.1:10808 --ai-token sk-xxx --model gpt-4-0613 --concurrent 5",
 	Category: "Suricata Rules Operations",
 	Flags: []cli.Flag{
 		cli.StringFlag{
@@ -46,20 +44,32 @@ var suricataLoaderCommand = cli.Command{
 			Name:  "ai-token",
 			Usage: "use token to access openai api",
 		},
+		cli.StringFlag{
+			Name:  "model",
+			Usage: "use model to access openai api",
+		},
+		cli.StringFlag{
+			Name:  "concurrent",
+			Usage: "set concurrent number to load suricata rules",
+		},
 	},
 	Action: func(c *cli.Context) error {
 		domain := c.String("domain")
-		if domain != "" {
-			domainRule := strings.Trim(strconv.Quote(domain), ` "'`+"`")
-			rule := `alert http any any -> any any (msg:"Domain Fetch: ` + domainRule + `"; content:"` + domainRule + `"; http_header; sid:1; rev:1;)`
-			log.Infof("generate suricata rule: %s", rule)
-			err := chaosmaker.LoadSuricataToDatabase(rule)
-			if err != nil {
-				return err
-			}
-			return nil
+		//if domain != "" {
+		//	domainRule := strings.Trim(strconv.Quote(domain), ` "'`+"`")
+		//	rule := `alert http any any -> any any (msg:"Domain Fetch: ` + domainRule + `"; content:"` + domainRule + `"; http_header; sid:1; rev:1;)`
+		//	log.Infof("generate suricata rule: %s", rule)
+		//	err := chaosmaker.LoadSuricataToDatabase(rule)
+		//	if err != nil {
+		//		return err
+		//	}
+		//	return nil
+		//}
+		concurrent := 1
+		if c.Int("concurrent") > 0 {
+			concurrent = c.Int("concurrent")
 		}
-
+		swg := utils.NewSizedWaitGroup(concurrent)
 		loadFile := func(i string) error {
 			raw, err := os.ReadFile(i)
 			if err != nil {
@@ -73,13 +83,19 @@ var suricataLoaderCommand = cli.Command{
 				return err
 			}
 			for _, subRule := range subRules {
-				if c.Bool("ai") {
-					subRule.AIDecoration(openai.WithAPIKey(c.String("ai-token")), openai.WithProxy(c.String("ai-proxy")))
-				}
-				err := rule.SaveSuricata(consts.GetGormProfileDatabase(), subRule)
-				if err != nil {
-					log.Errorf("save suricata error: %s", err)
-				}
+				swg.Add()
+				subRule := subRule
+				go func() {
+					swg.Done()
+					r := rule.NewRuleFromSuricata(subRule)
+					if c.Bool("ai") {
+						r.DecoratedByOpenAI(openai.WithAPIKey(c.String("ai-token")), openai.WithProxy(c.String("ai-proxy")), openai.WithDomain(domain), openai.WithModel(c.String("model")))
+					}
+					err := rule.SaveToDB(r)
+					if err != nil {
+						log.Errorf("save suricata error: %s", err)
+					}
+				}()
 			}
 			return nil
 		}
@@ -107,7 +123,7 @@ var suricataLoaderCommand = cli.Command{
 				}
 			}
 		}
-
+		swg.Wait()
 		return nil
 	},
 }

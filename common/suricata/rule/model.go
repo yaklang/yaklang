@@ -12,6 +12,7 @@ import (
 	"strings"
 )
 
+// Rule is a suricata rule
 type Rule struct {
 	Raw                string       `json:"raw"`
 	Message            string       `json:"message"`
@@ -33,6 +34,24 @@ type Rule struct {
 	Target    string // src_ip/dest_ip
 
 	ContentRuleConfig *ContentRuleConfig
+
+	RuleUpdatedAt      string `json:"update_at"`
+	RuleCreatedAt      string `json:"created_at"`
+	Deployment         string `json:"deployment"`
+	SignatureSeverity  string `json:"signature_severity"`
+	AttackTarget       string `json:"attack_target"`
+	FormerCategory     string `json:"former_category"`
+	AffectedProduct    string `json:"affected_product"`
+	Tag                string `json:"tag"`
+	PerformanceImpact  string `json:"performance_impact"`
+	MalwareFamily      string `json:"malware_family"`
+	MitreTechniqueID   string `json:"mitre_technique_id"`
+	MitreTacticID      string `json:"mitre_tactic_id"`
+	MitreTechniqueName string `json:"mitre_technique_name"`
+	MitreTacticName    string `json:"mitre_tactic_name"`
+	Confidence         string `json:"confidence"`
+	ReviewedAt         string `json:"reviewed_at"`
+	CVE                string `json:"cve"`
 }
 
 func (r *Rule) AIDecoration(opts ...openai.ConfigOption) {

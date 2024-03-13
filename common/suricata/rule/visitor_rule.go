@@ -69,7 +69,7 @@ func (v *RuleSyntaxVisitor) VisitRule(rule *parser.RuleContext) interface{} {
 				end.GetLine(), end.GetColumn(),
 				err,
 			)
-			panic(err)
+			//panic(err)
 		}
 	}()
 	ruleIns := &Rule{
@@ -79,8 +79,8 @@ func (v *RuleSyntaxVisitor) VisitRule(rule *parser.RuleContext) interface{} {
 	if len(v.Raw) > end {
 		end += 1
 	}
-	data := v.Raw[rule.GetStart().GetStart():end]
-	ruleIns.Raw = utils.EscapeInvalidUTF8Byte(data)
+	data := v.CompileRaw[rule.GetStart().GetStart():end]
+	ruleIns.Raw = utils.EscapeInvalidUTF8Byte([]byte(data))
 	ruleIns.ContentRuleConfig = &ContentRuleConfig{}
 
 	/*

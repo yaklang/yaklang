@@ -3,10 +3,8 @@ package rule
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/openai"
 	"github.com/yaklang/yaklang/common/suricata/rule"
@@ -48,7 +46,24 @@ type Storage struct {
 	KeywordsZh    string
 	Description   string
 	DescriptionZh string
-	CVE           string
+
+	RuleUpdatedAt      string `json:"update_at"`
+	RuleCreatedAt      string `json:"created_at"`
+	Deployment         string `json:"deployment"`
+	SignatureSeverity  string `json:"signature_severity"`
+	AttackTarget       string `json:"attack_target"`
+	FormerCategory     string `json:"former_category"`
+	AffectedProduct    string `json:"affected_product"`
+	Tag                string `json:"tag"`
+	PerformanceImpact  string `json:"performance_impact"`
+	MalwareFamily      string `json:"malware_family"`
+	MitreTechniqueID   string `json:"mitre_technique_id"`
+	MitreTacticID      string `json:"mitre_tactic_id"`
+	MitreTechniqueName string `json:"mitre_technique_name"`
+	MitreTacticName    string `json:"mitre_tactic_name"`
+	Confidence         string `json:"confidence"`
+	ReviewedAt         string `json:"reviewed_at"`
+	CVE                string `json:"cve"`
 }
 
 func (Storage) TableName() string {
@@ -108,7 +123,7 @@ func (c *Storage) ToGPRCModel() *ypb.ChaosMakerRule {
 	}
 }
 
-func (c *Storage) DecoratedByOpenAI(db *gorm.DB, opts ...openai.ConfigOption) {
+func (c *Storage) DecoratedByOpenAI(opts ...openai.ConfigOption) {
 	/*
 		这是一个提炼攻击流量特征的任务，请提炼 %v 中的特征关键字（去除引用）？提取成 json array，以方便系统打标签和筛选，提供中文和英文的版本，放在 json 中，以 keywords 和 keywords_zh 作为字段，再描述一下这个特征（中文50字以内，去除‘检测’等字段意图），作为 description_zh 字段，同时补充他的 description（英文）
 	*/
@@ -135,7 +150,6 @@ func (c *Storage) DecoratedByOpenAI(db *gorm.DB, opts ...openai.ConfigOption) {
 		log.Errorf("empty clearData")
 		return
 	}
-	client := openai.NewOpenAIClient(opts...)
 
 	if c.CVE == "" && c.SuricataRaw != "" {
 		records := regexp.MustCompile(`(?i)CVE-\d+-\d+`).FindAllString(c.SuricataRaw, -1)
@@ -145,43 +159,36 @@ func (c *Storage) DecoratedByOpenAI(db *gorm.DB, opts ...openai.ConfigOption) {
 		}
 	}
 
-	if c.NameZh == "" && c.Name != "" {
-		if strings.HasPrefix(c.Name, `"ET `) {
-			c.Name = `"` + strings.TrimPrefix(c.Name, `"ET `)
-		}
-		raw, _ := client.TranslateToChinese(c.Name)
-		c.NameZh = raw
-	}
-
 	if c.Keywords == "" || c.KeywordsZh == "" {
-		prompt := fmt.Sprintf(`这是一个提炼攻击流量特征的任务，
-请提炼 %v 中的特征关键字（去除引用），并提取成 json array，以方便系统打标签和筛选
-提供中文和英文的版本，放在 json 中，以 keywords 和 keywords_zh 作为字段
-再描述一下这个特征（中文50字左右）
-作为 description_zh 字段，同时补充他的 description（英文）`, clearData)
-		log.Infof("start to question: %v", prompt)
-		result, err := client.Chat(prompt)
+		opts = append(opts, openai.WithFunctionRequired("keywords", "keywords_zh", "description", "description_zh"))
+		raw, err := openai.ExtractDataByAi(clearData, "从规则内的流量特征中提取关键信息", map[string]string{
+			"keywords":       "所有规则中的特征关键字，数量大概5个，关键字长度不要超过4个词，注意要去除引用，以','分隔", //  gpt4不需要这个提示 `一定要重点注意不要提取suricata语法的关键字，如alert, content, sid等（英文）`
+			"keywords_zh":    "keywords的中文翻译",
+			"description":    "描述这个规则的作用，必须要说清楚此规则描述了什么样的规则，尽量详细（英文）",
+			"description_zh": "description的中文翻译",
+			"name_zh":        "msg的中文翻译",
+		}, opts...)
+		if err != nil {
+			log.Errorf("openai extract data by ai failed: %s", err)
+			return
+		}
 		if err != nil {
 			return
 		}
-		for _, data := range jsonextractor.ExtractStandardJSON(result) {
-			var raw map[string]interface{}
-			err := json.Unmarshal([]byte(data), &raw)
-			if err != nil {
-				continue
-			}
-			log.Infof("find raw answer: %v", string(data))
-			c.Keywords = strings.Join(utils.InterfaceToStringSlice(utils.MapGetRawOr(raw, "keywords", []string{})), "|")
-			c.KeywordsZh = strings.Join(utils.InterfaceToStringSlice(utils.MapGetRawOr(raw, "keywords_zh", []string{})), "|")
-			c.Description = utils.MapGetString(raw, "description")
-			c.DescriptionZh = utils.MapGetString(raw, "description_zh")
+		log.Infof("find raw answer: %v", raw)
+		if c.NameZh == "" {
+			c.NameZh = utils.MapGetString(raw, "name_zh")
 		}
+		c.Keywords = strings.Join(utils.InterfaceToStringSlice(strings.Split(utils.MapGetString(raw, "keywords"), ",")), "|")
+		c.KeywordsZh = strings.Join(utils.InterfaceToStringSlice(strings.Split(utils.MapGetString(raw, "keywords_zh"), "，")), "|")
+		c.Description = utils.MapGetString(raw, "description")
+		c.DescriptionZh = utils.MapGetString(raw, "description_zh")
 	}
 
-	err := UpsertRule(db, c.Hash, c)
-	if err != nil {
-		log.Warn(err)
-	}
+	//err := UpsertRule(db, c.Hash, c)
+	//if err != nil {
+	//	log.Warn(err)
+	//}
 }
 
 func DecorateRules(concurrent int, proxy string) {
@@ -192,7 +199,11 @@ func DecorateRules(concurrent int, proxy string) {
 		r := r
 		go func() {
 			defer swg.Done()
-			r.DecoratedByOpenAI(db, openai.WithAPIKeyFromYakitHome(), openai.WithProxy(proxy))
+			r.DecoratedByOpenAI(openai.WithAPIKeyFromYakitHome(), openai.WithProxy(proxy))
+			err := UpsertRule(db, r.Hash, r)
+			if err != nil {
+				log.Errorf("upsert rule failed: %s", err)
+			}
 		}()
 	}
 	swg.Wait()
@@ -227,13 +238,30 @@ func init() {
 
 func NewRuleFromSuricata(s *rule.Rule) *Storage {
 	return &Storage{
-		SuricataRaw: s.Raw,
-		Protocol:    s.Protocol,
-		RuleType:    "suricata",
-		Action:      s.Action,
-		Name:        s.Message,
-		ClassType:   s.ClassType,
-		NameZh:      s.MessageChinese,
+		SuricataRaw:        s.Raw,
+		Protocol:           s.Protocol,
+		RuleType:           "suricata",
+		Action:             s.Action,
+		Name:               s.Message,
+		ClassType:          s.ClassType,
+		NameZh:             s.MessageChinese,
+		RuleUpdatedAt:      s.RuleUpdatedAt,
+		RuleCreatedAt:      s.RuleCreatedAt,
+		Deployment:         s.Deployment,
+		SignatureSeverity:  s.SignatureSeverity,
+		AttackTarget:       s.AttackTarget,
+		FormerCategory:     s.FormerCategory,
+		AffectedProduct:    s.AffectedProduct,
+		Tag:                s.Tag,
+		PerformanceImpact:  s.PerformanceImpact,
+		MalwareFamily:      s.MalwareFamily,
+		MitreTechniqueID:   s.MitreTechniqueID,
+		MitreTacticID:      s.MitreTacticID,
+		MitreTechniqueName: s.MitreTechniqueName,
+		MitreTacticName:    s.MitreTacticName,
+		Confidence:         s.Confidence,
+		ReviewedAt:         s.ReviewedAt,
+		CVE:                strings.Join(utils.RemoveRepeatStringSlice(utils.PrettifyListFromStringSplitEx(s.CVE, ",", "|")), ","),
 	}
 }
 
@@ -284,6 +312,9 @@ func SaveICMPTraffic(db *gorm.DB, name string, raw []byte) error {
 
 var saveChaosMaker sync.Mutex
 
+func SaveToDB(rule *Storage) error {
+	return UpsertRule(consts.GetGormProfileDatabase(), rule.CalcHash(), rule)
+}
 func UpsertRule(db *gorm.DB, hash string, i interface{}) error {
 	saveChaosMaker.Lock()
 	defer saveChaosMaker.Unlock()

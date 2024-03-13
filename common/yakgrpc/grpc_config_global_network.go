@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -17,29 +16,22 @@ func init() {
 	INIT:
 		if yakit.Get(consts.GLOBAL_NETWORK_CONFIG_INIT) == "" {
 			log.Info("initialize global network config")
-			defaultConfig := GetDefaultNetworkConfig()
+			defaultConfig := yakit.GetDefaultNetworkConfig()
 			raw, err := json.Marshal(defaultConfig)
 			if err != nil {
 				return err
 			}
 			log.Infof("use config: %v", string(raw))
 			yakit.Set(consts.GLOBAL_NETWORK_CONFIG, string(raw))
-			ConfigureNetWork(defaultConfig)
+			yakit.ConfigureNetWork(defaultConfig)
 			yakit.Set(consts.GLOBAL_NETWORK_CONFIG_INIT, "1")
 			return nil
 		} else {
-			data := yakit.Get(consts.GLOBAL_NETWORK_CONFIG)
-			if data == "" {
+			config := yakit.GetNetworkConfig()
+			if config == nil {
 				yakit.Set(consts.GLOBAL_NETWORK_CONFIG_INIT, "")
 				goto INIT
 			}
-			var config ypb.GlobalNetworkConfig
-			err := json.Unmarshal([]byte(data), &config)
-			if err != nil {
-				log.Errorf("unmarshal global network config failed: %s", err)
-				return nil
-			}
-
 			log.Debugf("load global network config from database user config")
 			log.Debugf("disable system dns: %v", config.DisableSystemDNS)
 			log.Debugf("dns fallback tcp: %v", config.DNSFallbackTCP)
@@ -49,83 +41,16 @@ func init() {
 			log.Debugf("disallow ip address: %v", config.DisallowIPAddress)
 			log.Debugf("disallow domain: %v", config.DisallowDomain)
 			log.Debugf("global proxy: %v", config.GlobalProxy)
-			ConfigureNetWork(&config)
+			yakit.ConfigureNetWork(config)
 			return nil
 		}
 	})
 }
 
-func GetDefaultNetworkConfig() *ypb.GlobalNetworkConfig {
-	defaultConfig := &ypb.GlobalNetworkConfig{
-		DisableSystemDNS: false,
-		CustomDNSServers: nil,
-		DNSFallbackTCP:   false,
-		DNSFallbackDoH:   false,
-		CustomDoHServers: nil,
-		SkipSaveHTTPFlow: false,
-		AuthInfos:        make([]*ypb.AuthInfo, 0),
-	}
-	config := netx.NewBackupInitilizedReliableDNSConfig()
-	defaultConfig.CustomDoHServers = config.SpecificDoH
-	defaultConfig.CustomDNSServers = config.SpecificDNSServers
-	defaultConfig.DNSFallbackDoH = config.FallbackDoH
-	defaultConfig.DNSFallbackTCP = config.FallbackTCP
-	defaultConfig.DisableSystemDNS = config.DisableSystemResolver
-	return defaultConfig
-}
-
-func ConfigureNetWork(c *ypb.GlobalNetworkConfig) {
-	if c == nil {
-		return
-	}
-
-	consts.GLOBAL_HTTP_FLOW_SAVE.SetTo(!c.GetSkipSaveHTTPFlow())
-	consts.SetGlobalHTTPAuthInfo(c.GetAuthInfos())
-	c.GetAppConfigs()
-	consts.ClearThirdPartyApplicationConfig()
-	for _, r := range c.GetAppConfigs() {
-		consts.UpdateThirdPartyApplicationConfig(r)
-	}
-
-	netx.SetDefaultDNSOptions(
-		netx.WithDNSFallbackDoH(c.DNSFallbackDoH),
-		netx.WithDNSFallbackTCP(c.DNSFallbackTCP),
-		netx.WithDNSDisableSystemResolver(c.DisableSystemDNS),
-		netx.WithDNSSpecificDoH(c.CustomDoHServers...),
-		netx.WithDNSServers(c.CustomDNSServers...),
-		netx.WithDNSDisabledDomain(c.GetDisallowDomain()...),
-	)
-
-	netx.SetDefaultDialXConfig(
-		netx.DialX_WithDisallowAddress(c.GetDisallowIPAddress()...),
-		netx.DialX_WithProxy(c.GetGlobalProxy()...),
-		netx.DialX_WithEnableSystemProxyFromEnv(c.GetEnableSystemProxyFromEnv()),
-	)
-
-	for _, certs := range c.GetClientCertificates() {
-		if len(certs.GetPkcs12Bytes()) > 0 {
-			err := netx.LoadP12Bytes(certs.Pkcs12Bytes, string(certs.GetPkcs12Password()))
-			if err != nil {
-				log.Errorf("load p12 bytes failed: %s", err)
-			}
-		} else {
-			p12bytes, err := tlsutils.BuildP12(certs.GetCrtPem(), certs.GetKeyPem(), "", certs.GetCaCertificates()...)
-			if err != nil {
-				log.Errorf("build p12 bytes failed: %s", err)
-				continue
-			}
-			err = netx.LoadP12Bytes(p12bytes, "")
-			if err != nil {
-				log.Errorf("load p12 bytes failed: %s", err)
-			}
-		}
-	}
-}
-
 func (s *Server) GetGlobalNetworkConfig(ctx context.Context, req *ypb.GetGlobalNetworkConfigRequest) (*ypb.GlobalNetworkConfig, error) {
 	data := yakit.Get(consts.GLOBAL_NETWORK_CONFIG)
 	if data == "" {
-		defaultConfig := GetDefaultNetworkConfig()
+		defaultConfig := yakit.GetDefaultNetworkConfig()
 		raw, err := json.Marshal(defaultConfig)
 		if err != nil {
 			return nil, err
@@ -146,19 +71,19 @@ func (s *Server) SetGlobalNetworkConfig(ctx context.Context, req *ypb.GlobalNetw
 	if err != nil {
 		return nil, err
 	}
-	ConfigureNetWork(req)
+	yakit.ConfigureNetWork(req)
 	yakit.Set(consts.GLOBAL_NETWORK_CONFIG, string(defaultBytes))
 	return &ypb.Empty{}, nil
 }
 
 func (s *Server) ResetGlobalNetworkConfig(ctx context.Context, req *ypb.ResetGlobalNetworkConfigRequest) (*ypb.Empty, error) {
-	defaultConfig := GetDefaultNetworkConfig()
+	defaultConfig := yakit.GetDefaultNetworkConfig()
 	raw, err := json.Marshal(defaultConfig)
 	if err != nil {
 		return nil, err
 	}
 	yakit.Set(consts.GLOBAL_NETWORK_CONFIG, string(raw))
-	ConfigureNetWork(defaultConfig)
+	yakit.ConfigureNetWork(defaultConfig)
 	return &ypb.Empty{}, nil
 }
 

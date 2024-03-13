@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/openai"
 	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/workpool"
@@ -35,9 +36,27 @@ func (s *Server) ImportChaosMakerRules(ctx context.Context, req *ypb.ImportChaos
 	case "http-request":
 		rules = chaosmaker.ParseRuleFromHTTPRequestRawJSON(req.GetContent())
 	}
+	for _, subRule := range rules {
+		if req.GetAIDecoration() {
+			var opts []openai.ConfigOption
+			if req.GetProxy() != "" {
+				opts = append(opts, openai.WithProxy(req.GetProxy()))
+			}
+			if req.GetKey() != "" {
+				opts = append(opts, openai.WithAPIKey(req.GetKey()))
+			}
+			if req.GetDomain() != "" {
+				opts = append(opts, openai.WithDomain(req.GetDomain()))
+			}
+			subRule.DecoratedByOpenAI(opts...)
+		}
+	}
 	log.Infof("load suricata rules finished! fetch rule: %v", len(rules))
 	for _, i := range rules {
-		rule.UpsertRule(consts.GetGormProfileDatabase(), i.CalcHash(), i)
+		err := rule.UpsertRule(consts.GetGormProfileDatabase(), i.CalcHash(), i)
+		if err != nil {
+			log.Errorf("upsert rule failed: %s", err)
+		}
 	}
 	return &ypb.Empty{}, nil
 }

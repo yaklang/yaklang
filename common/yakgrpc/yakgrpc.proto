@@ -1382,6 +1382,10 @@ message ImportChaosMakerRulesRequest {
   string Content = 1;
   // suricata / http-request / icmp
   string RuleType = 2;
+  bool AIDecoration = 3;
+  string Domain = 4;
+  string Proxy = 5;
+  string Key = 6;
 }
 
 message ChaosMakerRuleGroup {
