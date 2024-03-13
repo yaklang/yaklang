@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	rule "github.com/yaklang/yaklang/common/suricata/parser"
 	"github.com/yaklang/yaklang/common/utils"
+	"reflect"
 	"strings"
 )
 
@@ -29,14 +30,16 @@ func Parse(data string, envs ...string) ([]*Rule, error) {
 		buf.WriteString(line)
 		buf.WriteByte('\n')
 	}
-	lexer := rule.NewSuricataRuleLexer(antlr.NewInputStream(buf.String()))
+
+	compileRaw := buf.String()
+	lexer := rule.NewSuricataRuleLexer(antlr.NewInputStream(compileRaw))
 	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	parser := rule.NewSuricataRuleParser(tokenStream)
 	parser.RemoveErrorListeners()
 	//for _, t := range lexer.GetAllTokens() {
 	//	fmt.Println(t)
 	//}
-	v := &RuleSyntaxVisitor{Raw: []byte(data)}
+	v := &RuleSyntaxVisitor{Raw: []byte(data), CompileRaw: compileRaw}
 	v.Environment = make(map[string]string)
 	for k, val := range presetEnv {
 		v.Environment[k] = val
@@ -50,9 +53,51 @@ func Parse(data string, envs ...string) ([]*Rule, error) {
 		v.Environment[before] = after
 	}
 	v.VisitRules(parser.Rules().(*rule.RulesContext))
+	for _, r := range v.Rules {
+		ParseRuleMetadata(r)
+	}
 	if len(v.Rules) > 0 {
 		return v.Rules, nil
 	} else {
 		return nil, v.MergeErrors()
+	}
+}
+
+func ParseRuleMetadata(rule *Rule) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("parse rule metadata failed: %s", err)
+		}
+	}()
+	if rule == nil {
+		return
+	}
+	for _, meta := range rule.Metadata {
+		for _, item := range strings.Split(meta, ",") {
+			info := strings.Split(strings.TrimSpace(item), " ")
+			if len(info) != 2 {
+				continue
+			}
+			t := reflect.TypeOf(rule).Elem()
+			for i := 0; i < t.NumField(); i++ {
+				field := t.Field(i)
+				tag := field.Tag.Get("json")
+				if tag == info[0] {
+					if info[0] == "CVE" {
+						info[1] = strings.Replace(info[1], "_", "-", -1)
+					}
+					if info[0] == "updated_at" {
+						info[1] = strings.Replace(info[1], "_", "-", -1)
+					}
+					if info[0] == "created_at" {
+						info[1] = strings.Replace(info[1], "_", "-", -1)
+					}
+					if info[0] == "reviewed_at" {
+						info[1] = strings.Replace(info[1], "_", "-", -1)
+					}
+					reflect.ValueOf(rule).Elem().Field(i).SetString(info[1])
+				}
+			}
+		}
 	}
 }
