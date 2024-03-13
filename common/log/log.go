@@ -205,6 +205,23 @@ func Infof(format string, args ...interface{}) {
 	DefaultLogger.Infof(format, args...)
 }
 
+var _onceLog = new(sync.Map)
+
+func OnceInfoLog(key string, fmtStr string, args ...interface{}) {
+	if key == "" {
+		Infof(fmtStr, args...)
+		return
+	}
+	raw, ok := _onceLog.Load(key)
+	if !ok {
+		raw = new(sync.Once)
+		_onceLog.Store(key, raw)
+	}
+	raw.(*sync.Once).Do(func() {
+		Infof(fmtStr, args...)
+	})
+}
+
 // Debug will print when logger's Level is debug.
 func Debug(v ...interface{}) {
 	DefaultLogger.Debug(v...)
