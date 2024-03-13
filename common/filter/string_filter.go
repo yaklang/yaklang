@@ -107,6 +107,9 @@ func NewFilter() *StringFilter {
 }
 
 func (f *StringFilter) Close() {
+	if f == nil {
+		return
+	}
 	if f.manager != nil {
 		f.manager.EnqueueFilter(f)
 	}
