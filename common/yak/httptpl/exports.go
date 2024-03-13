@@ -348,7 +348,8 @@ func processVulnerability(target any, filterVul *filter.StringFilter, vCh chan *
 				currTarget = resp[0].RemoteAddr
 				reqBulk := i["requests"].(*YakRequestBulkConfig)
 				// 根据 payload , tpl 名称 , target 条件过滤
-				calcSha1 = utils.CalcSha1(tpl.Name, resp[0].RawRequest, target)
+				// calcSha1 = utils.CalcSha1(tpl.Name, resp[0].RawRequest, target)
+				calcSha1 = utils.CalcSha1(tpl.Name, target)
 				if len(resp) == 1 {
 					details["request"] = string(resp[0].RawRequest)
 					details["response"] = string(resp[0].RawPacket)
