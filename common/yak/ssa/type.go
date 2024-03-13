@@ -53,10 +53,10 @@ func typeCompareEx(t1, t2 Type, depth int) bool {
 			break
 		}
 		t1f, _ := ToFunctionType(t1)
-		if len(t1f.Parameter) != len(t2f.Parameter) {
+		if t1f.ParameterLen != t2f.ParameterLen {
 			return false
 		}
-		for i := 0; i < len(t1f.Parameter); i++ {
+		for i := 0; i < t1f.ParameterLen; i++ {
 			if !typeCompareEx(t1f.Parameter[i], t2f.Parameter[i], depth) {
 				return false
 			}
@@ -793,6 +793,7 @@ type FunctionType struct {
 	pkgPath        string
 	ReturnType     Type
 	Parameter      Types
+	ParameterLen   int
 	ParameterValue []*Parameter
 	FreeValue      []*Parameter
 	SideEffects    []*FunctionSideEffect
@@ -833,10 +834,11 @@ func CalculateType(ts []Type) Type {
 
 func NewFunctionType(name string, Parameter []Type, ReturnType Type, IsVariadic bool) *FunctionType {
 	f := &FunctionType{
-		Name:       name,
-		Parameter:  Parameter,
-		IsVariadic: IsVariadic,
-		ReturnType: ReturnType,
+		Name:         name,
+		Parameter:    Parameter,
+		ParameterLen: len(Parameter),
+		IsVariadic:   IsVariadic,
+		ReturnType:   ReturnType,
 	}
 	return f
 }
@@ -869,10 +871,15 @@ func (s *FunctionType) RawString() string {
 		str += "..."
 	}
 
+	paras := make([]string, 0, s.ParameterLen)
+	for i := 0; i < s.ParameterLen; i++ {
+		paras = append(paras, s.Parameter[i].String())
+	}
+
 	return fmt.Sprintf(
 		"(%s %s) -> %s",
 		strings.Join(
-			lo.Map(s.Parameter, func(t Type, _ int) string { return t.String() }),
+			paras,
 			",",
 		),
 		str,

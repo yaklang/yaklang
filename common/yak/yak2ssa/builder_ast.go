@@ -1332,6 +1332,7 @@ func (b *astbuilder) buildAnonymousFunctionDecl(stmt *yak.AnonymousFunctionDeclC
 	// save Current function builder marked FunctionType
 	MarkedFunctionType := b.GetMarkedFunction()
 	handleFunctionType := func(fun *ssa.Function) {
+		fun.ParamLength = len(fun.Param)
 		// in this function, builder is sub-function builder
 		if MarkedFunctionType == nil {
 			return
