@@ -35,7 +35,7 @@ type YakMatcher struct {
 	// word
 	// regexp
 	// expr
-	Id          int
+	Id          int // first request means 1 second request means 2
 	MatcherType string
 	/*
 		nuclei-dsl
