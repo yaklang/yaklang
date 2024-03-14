@@ -118,6 +118,9 @@ func (t *TypeInference) TypeInferencePhi(phi *ssa.Phi) {
 }
 
 func (t *TypeInference) TypeInferenceBinOp(bin *ssa.BinOp) {
+	if bin == nil || bin.X == nil || bin.Y == nil {
+		return
+	}
 	XTyps := bin.X.GetType()
 	YTyps := bin.Y.GetType()
 

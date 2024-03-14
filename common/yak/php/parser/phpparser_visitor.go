@@ -331,6 +331,9 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#CloneExpression.
 	VisitCloneExpression(ctx *CloneExpressionContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#StaticClassMemberCallAssignmentExpression.
+	VisitStaticClassMemberCallAssignmentExpression(ctx *StaticClassMemberCallAssignmentExpressionContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#UnaryOperatorExpression.
 	VisitUnaryOperatorExpression(ctx *UnaryOperatorExpressionContext) interface{}
 
@@ -384,12 +387,6 @@ type PHPParserVisitor interface {
 
 	// Visit a parse tree produced by PHPParser#StaticClassAccessExpression.
 	VisitStaticClassAccessExpression(ctx *StaticClassAccessExpressionContext) interface{}
-
-	// Visit a parse tree produced by PHPParser#leftFieldMemberCall.
-	VisitLeftFieldMemberCall(ctx *LeftFieldMemberCallContext) interface{}
-
-	// Visit a parse tree produced by PHPParser#leftSliceCall.
-	VisitLeftSliceCall(ctx *LeftSliceCallContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#DynamicVariable.
 	VisitDynamicVariable(ctx *DynamicVariableContext) interface{}

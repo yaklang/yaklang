@@ -14,14 +14,20 @@ type ClassBluePrint struct {
 	// when set type to a new object, it will be set to the new object
 	MarkedField map[Value]*FunctionType // key -> value
 	NormalField map[Value]Type          // key -> value
+
+	// Static Member
+	NormalMember map[string]Value
+	StaticMember map[string]Value
 }
 
 func NewClassBluePrint() *ClassBluePrint {
 	class := &ClassBluePrint{
-		This:        nil,
-		ObjectType:  nil,
-		MarkedField: make(map[Value]*FunctionType),
-		NormalField: make(map[Value]Type),
+		This:         nil,
+		ObjectType:   nil,
+		MarkedField:  make(map[Value]*FunctionType),
+		NormalField:  make(map[Value]Type),
+		NormalMember: make(map[string]Value),
+		StaticMember: make(map[string]Value),
 	}
 	return class
 }
