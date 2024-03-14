@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai"
 	"os"
 	"path/filepath"
 	"strings"
@@ -292,6 +293,8 @@ func initYaklangLib() {
 	yaklang.Import("openapi", openapi.Exports)
 
 	yaklang.Import("sandbox", SandboxExports)
+
+	yaklang.Import("ai", ai.Exports)
 
 	// 处理 yakit 库的一些函数名
 	yakdoc.RegisterHook(func(h *yakdoc.DocumentHelper) {
