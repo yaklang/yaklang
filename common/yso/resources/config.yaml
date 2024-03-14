@@ -179,6 +179,14 @@ Gadgets:
   CommonsBeanutils2_183:
     desc:
     template: true
+  CommonsBeanutils3:
+    desc:
+    params:
+      - name: jndi
+        desc: JNDI地址
+#  CommonsBeanutils3_183:
+#    desc:
+#    template: true
   CommonsCollections2:
     desc:
     template: true
@@ -223,6 +231,30 @@ Gadgets:
     desc:
   Groovy1:
     desc:
+  FindClassByBomb:
+    desc: 通过延时检测class是否存在
+    params:
+      - name: class
+        desc: 类名
+  FindClassByDNS:
+    desc: 通过DNS检测class是否存在
+    params:
+      - name: domain
+        desc: dnslog域名
+      - name: class
+        desc: 类名
+  FindAllClassesByDNS:
+    desc: 通过DNS检测所有class是否存在
+    params:
+      - name: domain
+        desc: dnslog域名
+  URLDNS:
+    desc: 通过URLDNS检测
+    params:
+      - name: domain
+        desc: dnslog域名
+  SimplePrincipalCollection:
+    desc: 用于Shiro反序列化检测
 ReflectChainFunction:
 #  sleep:
 #    desc: 休眠时间

