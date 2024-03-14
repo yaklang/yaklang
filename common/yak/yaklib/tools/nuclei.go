@@ -207,7 +207,7 @@ func LoadYamlPoCDatabase(nucleiDir ...string) error {
 		err = yakit.CreateOrUpdateYakScriptByName(db, y.ScriptName, y)
 		if err != nil {
 			total--
-			log.Errorf("save nuclei yak script failed: %s", err)
+			log.Errorf("save nuclei yak script [%v] failed: %s", y.ScriptName, err)
 		}
 	}
 	log.Infof("success for saving nuclei poc to database total: %v", total)
@@ -229,7 +229,20 @@ func RemovePoCDatabase() error {
 	return nil
 }
 
+func UpdatePoC(proxy ...string) {
+	dir, err := PullTemplatesFromGithub("https://github.com/projectdiscovery/nuclei-templates", proxy...)
+	if err != nil {
+		log.Errorf("pull nuclei templates failed: %s", err)
+		return
+	}
+	err = LoadYamlPoCDatabase(dir)
+	if err != nil {
+		log.Errorf("load nuclei templates failed: %s", err)
+	}
+}
+
 var NucleiOperationsExports = map[string]interface{}{
+	"UpdatePoC":      UpdatePoC,
 	"PullDatabase":   PullTemplatesFromGithub,
 	"UpdateDatabase": LoadYamlPoCDatabase,
 	"RemoveDatabase": RemovePoCDatabase,
