@@ -1,7 +1,9 @@
-package openai
+package aispec
 
 import (
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/utils"
+	"strings"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
@@ -281,4 +283,35 @@ func (details ChatDetails) FunctionCallResult() map[string]any {
 	}
 
 	return result
+}
+
+func DetailsToString(details []ChatDetail) string {
+	var list []string
+
+	hasFunctionCallResults := false
+	for _, d := range details {
+		if len(d.ToolCalls) > 0 {
+			hasFunctionCallResults = true
+			break
+		}
+	}
+	if hasFunctionCallResults {
+		list = lo.Map(details, func(d ChatDetail, _ int) string {
+			return strings.Join(
+				lo.Map(d.ToolCalls, func(tool *ToolCall, _ int) string {
+					if tool == nil {
+						return ""
+					}
+					return strings.TrimSpace(tool.Function.Arguments)
+				}),
+				"\n")
+		})
+	} else {
+		list = lo.Map(details, func(d ChatDetail, _ int) string {
+			return strings.TrimSpace(d.Content)
+		})
+	}
+
+	list = utils.StringArrayFilterEmpty(list)
+	return strings.Join(list, "\n\n")
 }

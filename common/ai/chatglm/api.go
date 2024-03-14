@@ -13,15 +13,19 @@ type ModelAPI struct {
 	Temperature float64
 }
 
+func NewGLMMessage(msg string) *ModelAPI {
+	var api = &ModelAPI{
+		Model: "glm-4",
+		Prompt: []map[string]any{
+			{"role": "user", "content": msg},
+		},
+	}
+	return api
+}
+
 const (
-	BaseURL         = "https://open.bigmodel.cn/api/paas/v3/model-api"
-	InvokeTypeSync  = "invoke"
-	InvokeTypeAsync = "async-invoke"
-	InvokeTypeSSE   = "sse-invoke"
-	APITimeout      = 300 * time.Second
-	ChatGLMLite     = "chatglm_lite"
-	ChatGLMStd      = "chatglm_std"
-	ChatGLMPro      = "chatglm_pro"
+	BaseURL    = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+	APITimeout = 300 * time.Second
 )
 
 func (m ModelAPI) Invoke(apiKey string) (map[string]interface{}, error) {
@@ -29,36 +33,17 @@ func (m ModelAPI) Invoke(apiKey string) (map[string]interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	return post(buildAPIURL(m.Model, InvokeTypeSync), token, m.buildParams(), APITimeout)
-}
-
-func (m ModelAPI) AsyncInvoke(apiKey string) (map[string]interface{}, error) {
-	token, err := generateToken(apiKey)
-	if err != nil {
-		return nil, err
-	}
-	return post(buildAPIURL(m.Model, InvokeTypeAsync), token, m.buildParams(), APITimeout)
-}
-
-func QueryAsyncInvokeResult(apiKey, taskID string) (map[string]interface{}, error) {
-	token, err := generateToken(apiKey)
-	if err != nil {
-		return nil, err
-	}
-	return get(buildGetAPIURL(InvokeTypeAsync, taskID), token, APITimeout)
+	return post(BaseURL, token, m.buildParams(), APITimeout)
 }
 
 func (m ModelAPI) buildParams() map[string]interface{} {
 	params := make(map[string]interface{})
-	params["prompt"] = m.Prompt
-	params["top_p"] = m.TopP
-	params["temperature"] = m.Temperature
+	if m.Model == "" {
+		m.Model = "glm-4"
+	}
+	params["model"] = m.Model
+	params["messages"] = m.Prompt
 	return params
-}
-
-func buildAPIURL(module, invokeMethod string) string {
-	url := getBaseURL()
-	return fmt.Sprintf("%s/%s/%s", url, module, invokeMethod)
 }
 
 func buildGetAPIURL(invokeMethod, taskID string) string {
