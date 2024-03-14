@@ -575,6 +575,7 @@ func (m *MixPluginCaller) CallHijackRequest(
 	drop func() interface{},
 ) {
 	if !m.IsPassed(u) {
+		log.Infof("call HijackRequest error: url[%v] not passed", u)
 		return
 	}
 	callers := m.callers
@@ -598,6 +599,7 @@ func (m *MixPluginCaller) CallHijackResponse(
 	reject, drop func() interface{},
 ) {
 	if !m.IsPassed(u) {
+		log.Infof("call HijackResponse error: url[%v] not passed", u)
 		return
 	}
 	callers := m.callers
@@ -615,6 +617,7 @@ func (m *MixPluginCaller) CallHijackResponseEx(
 	reject, drop func() interface{},
 ) {
 	if !m.IsPassed(u) {
+		log.Infof("call HijackResponseEx error: url[%v] not passed", u)
 		return
 	}
 	callers := m.callers
@@ -725,6 +728,7 @@ func (m *MixPluginCaller) MirrorHTTPFlow(
 	filters ...bool,
 ) {
 	if !m.IsPassed(u) {
+		log.Infof("call MirrorHTTPFlow error: url[%v] not passed", u)
 		return
 	}
 	m.MirrorHTTPFlowEx(true, isHttps, u, req, rsp, body, filters...)
@@ -736,6 +740,7 @@ func (m *MixPluginCaller) MirrorHTTPFlowEx(
 	filters ...bool,
 ) {
 	if !m.IsPassed(u) {
+		log.Infof("call MirrorHTTPFlowEx error: url[%v] not passed", u)
 		return
 	}
 	defer func() {
@@ -846,6 +851,7 @@ func (m *MixPluginCaller) MirrorHTTPFlowEx(
 
 func (m *MixPluginCaller) HijackSaveHTTPFlow(flow *yakit.HTTPFlow, reject func(httpFlow *yakit.HTTPFlow), drop func()) {
 	if !m.IsPassed(flow.Url) {
+		log.Infof("call HijackSaveHTTPFlow error: url[%v] not passed", flow.Url)
 		return
 	}
 	if m.callers.ShouldCallByName(HOOK_hijackSaveHTTPFlow) {
