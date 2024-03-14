@@ -1,9 +1,10 @@
 package php2ssa
 
 import (
+	"strings"
+
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"strings"
 )
 
 func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
@@ -107,7 +108,7 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 		// not in PHP, as abnormal
 	}
 
-	var objectTemplate string
+	var className string
 	var mergedTemplate []string
 	if i.ClassEntryType() != nil {
 		switch strings.ToLower(i.ClassEntryType().GetText()) {
@@ -116,7 +117,7 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 			// as class alias is right as compiler! XD
 			fallthrough
 		case "class":
-			objectTemplate = i.Identifier().GetText()
+			className = i.Identifier().GetText()
 
 			if i.Extends() != nil {
 				mergedTemplate = append(mergedTemplate, i.QualifiedStaticTypeRef().GetText())
@@ -130,22 +131,25 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 		}
 	} else {
 		// as interface
-		objectTemplate = i.Identifier().GetText()
+		className = i.Identifier().GetText()
 		if i.Extends() != nil {
 			for _, impl := range i.InterfaceList().(*phpparser.InterfaceListContext).AllQualifiedStaticTypeRef() {
 				mergedTemplate = append(mergedTemplate, impl.GetText())
 			}
 		}
 	}
-	_ = objectTemplate
+	_ = className
 	_ = mergedTemplate
-
-	for _, field := range i.AllClassStatement() {
-		y.VisitClassStatement(field)
-	}
 
 	//// how to build a template?
 	//// y.ir is a SSA.Function
+	class := y.ir.CreateClass(className)
+	for _, statement := range i.AllClassStatement() {
+		y.VisitClassStatement(statement, class)
+
+	}
+
+	// class.AddMethod()
 	//template := y.ir.BuildObjectTemplate(objectTemplate)    // 注册一个对象模版（有构造和析构方法的对象）
 	//template.SetDecorationVerbose(...)                        // 记录一下修饰词
 	//for _, i := range mergedTemplate {
@@ -161,14 +165,14 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 	return nil
 }
 
-func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext) interface{} {
+func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, class *ssa.ClassBluePrint) {
 	if y == nil || raw == nil {
-		return nil
+		return
 	}
 
 	i, _ := raw.(*phpparser.ClassStatementContext)
 	if i == nil {
-		return nil
+		return
 	}
 
 	// note: PHP8 #[...] attributes
@@ -177,9 +181,16 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext) inte
 	}
 
 	var memberDecorationVerbose string
-	if i.PropertyModifiers() != nil {
+	if modifiers := i.PropertyModifiers(); modifiers != nil { // variable
+		_ = modifiers
+		modifiers := y.VisitPropertyModifiers(i.PropertyModifiers())
+
+		setMember := class.BuildMember
+		if _, ok := modifiers[ssa.Static]; ok {
+			setMember = class.BuildStaticMember
+		}
+
 		// handle variable
-		memberDecorationVerbose = i.PropertyModifiers().GetText()
 		if i.TypeHint() != nil {
 			// handle type hint
 			y.VisitTypeHint(i.TypeHint())
@@ -187,10 +198,11 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext) inte
 
 		// handle variable name
 		for _, va := range i.AllVariableInitializer() {
-			y.VisitVariableInitializer(va)
+			name, value := y.VisitVariableInitializer(va)
+			setMember(name, value)
 		}
 
-		return nil
+		return
 	} else if i.MemberModifiers() != nil {
 		memberDecorationVerbose = i.MemberModifiers().GetText()
 		// const / function
@@ -229,7 +241,7 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext) inte
 	}
 	_ = memberDecorationVerbose
 
-	return nil
+	return
 }
 
 func (y *builder) VisitTraitAdaptations(raw phpparser.ITraitAdaptationsContext) interface{} {
@@ -436,7 +448,12 @@ func (y *builder) VisitVariableInitializer(raw phpparser.IVariableInitializerCon
 		return "", nil
 	}
 
-	val := y.VisitConstantInitializer(i.ConstantInitializer())
+	var val ssa.Value
+	if constInit := i.ConstantInitializer(); constInit != nil {
+		val = y.VisitConstantInitializer(i.ConstantInitializer())
+	} else {
+		val = y.ir.EmitConstInstAny()
+	}
 
 	return i.VarName().GetText(), val
 }
@@ -454,4 +471,91 @@ func (y *builder) VisitClassConstant(raw phpparser.IClassConstantContext) ssa.Va
 	panic("CLASS CONSTANT TODO")
 
 	return nil
+}
+
+func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) (string, string) {
+	if y == nil || raw == nil {
+		return "", ""
+	}
+
+	var class, key string
+	switch i := raw.(type) {
+	case *phpparser.ClassStaticFunctionMemberContext:
+		// TODO: class
+		key = i.Identifier().GetText()
+	case *phpparser.ClassStaticVariableContext:
+		// TODO class
+		key = i.VarName().GetText()
+	case *phpparser.ClassDirectFunctionMemberContext:
+		class = i.Identifier(0).GetText()
+		key = i.Identifier(1).GetText()
+	case *phpparser.ClassDirectStaticVariableContext:
+		class = i.Identifier().GetText()
+		key = i.VarName().GetText()
+	case *phpparser.StringAsIndirectClassStaticFunctionMemberContext:
+		class = i.String_().GetText()
+		key = i.Identifier().GetText()
+	case *phpparser.StringAsIndirectClassStaticVariableContext:
+		class = i.String_().GetText()
+		key = i.VarName().GetText()
+	default:
+		_ = i
+	}
+
+	return class, key
+}
+
+/// class modifier
+
+func (y *builder) VisitPropertyModifiers(raw phpparser.IPropertyModifiersContext) map[ssa.ClassModifier]struct{} {
+	ret := make(map[ssa.ClassModifier]struct{})
+	i, ok := raw.(*phpparser.PropertyModifiersContext)
+	if !ok {
+		return ret
+	}
+
+	if i.Var() != nil {
+		return ret
+	} else {
+		return y.VisitMemberModifiers(i.MemberModifiers())
+	}
+}
+
+func (y *builder) VisitMemberModifiers(raw phpparser.IMemberModifiersContext) map[ssa.ClassModifier]struct{} {
+	ret := make(map[ssa.ClassModifier]struct{})
+	i, ok := raw.(*phpparser.MemberModifiersContext)
+	if !ok {
+		return ret
+	}
+
+	for _, item := range i.AllMemberModifier() {
+		ret[y.VisitMemberModifier(item)] = struct{}{}
+	}
+
+	return ret
+}
+
+func (y *builder) VisitMemberModifier(raw phpparser.IMemberModifierContext) ssa.ClassModifier {
+	i, ok := raw.(*phpparser.MemberModifierContext)
+	if !ok {
+		return ssa.NoneModifier
+	}
+
+	if i.Public() != nil {
+		return ssa.Public
+	} else if i.Protected() != nil {
+		return ssa.Protected
+	} else if i.Private() != nil {
+		return ssa.Private
+	} else if i.Static() != nil {
+		return ssa.Static
+	} else if i.Final() != nil {
+		return ssa.Final
+	} else if i.Abstract() != nil {
+		return ssa.Abstract
+	} else if i.Readonly() != nil {
+		return ssa.Readonly
+	} else {
+		return ssa.NoneModifier
+	}
 }
