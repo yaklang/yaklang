@@ -98,6 +98,11 @@ type LowhttpResponse struct {
 	ResponseBodySize int64
 }
 
+func (l *LowhttpResponse) GetBody() []byte {
+	_, body := SplitHTTPPacketFast(l.RawPacket)
+	return body
+}
+
 func (l *LowhttpResponse) GetDurationFloat() float64 {
 	if l == nil {
 		return 0
