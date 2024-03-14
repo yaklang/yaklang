@@ -6,7 +6,9 @@ import (
 )
 
 func init() {
-	aispec.Register("chatglm", &GLMClient{})
+	aispec.Register("chatglm", func() aispec.AIGateway {
+		return &GLMClient{}
+	})
 }
 
 type ModelAPI struct {

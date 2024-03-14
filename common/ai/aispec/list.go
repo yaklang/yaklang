@@ -2,9 +2,9 @@ package aispec
 
 import "github.com/yaklang/yaklang/common/utils/omap"
 
-var list = omap.NewOrderedMap(map[string]AIGateway{})
+var list = omap.NewOrderedMap(map[string]func() AIGateway{})
 
-func Register(name string, gateway AIGateway) {
+func Register(name string, gateway func() AIGateway) {
 	if gateway == nil {
 		return
 	}
@@ -12,5 +12,9 @@ func Register(name string, gateway AIGateway) {
 }
 
 func Lookup(name string) (AIGateway, bool) {
-	return list.Get(name)
+	creator, ok := list.Get(name)
+	if !ok {
+		return nil, false
+	}
+	return creator(), true
 }
