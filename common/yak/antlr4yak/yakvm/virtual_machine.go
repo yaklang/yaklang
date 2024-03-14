@@ -298,7 +298,8 @@ func (v *VirtualMachine) Exec(ctx context.Context, f func(frame *Frame), flags .
 		vmstackLock.Unlock()
 
 		if topFrame == nil {
-			panic("BUG: VMStack is empty(Sub)")
+			log.Errorf("BUG: VMStack is empty(Sub)")
+			return utils.Error("BUG: VMStack is empty(Sub)")
 		}
 		frame = NewSubFrame(topFrame.(*Frame))
 	} else if flag&Inline == Inline {
