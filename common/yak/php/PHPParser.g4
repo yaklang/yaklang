@@ -488,7 +488,7 @@ parentheses
 
 fullyQualifiedNamespaceExpr: identifier '\\' (identifier '\\')* identifier;
 
-classVariable
+staticClassExpr
     : fullyQualifiedNamespaceExpr '::' identifier # ClassStaticFunctionMember
     | fullyQualifiedNamespaceExpr '::' VarName    # ClassStaticVariable
     | identifier '::' identifier                  # ClassDirectFunctionMember
@@ -505,7 +505,7 @@ expression
     | newExpr                                                     # KeywordNewExpression
     | fullyQualifiedNamespaceExpr                                 # FullyQualifiedNamespaceExpression
     | identifier                                                  # ShortQualifiedNameExpression
-    | classVariable                                               # StaticClassAccessExpression
+    | staticClassExpr                                               # StaticClassAccessExpression
     | VarName                                                     # VariableNameExpression
     | Dollar+ identifier                                          # VariableExpression
     | Dollar+ OpenCurlyBracket expression CloseCurlyBracket       # DynamicVariableExpression
@@ -550,18 +550,18 @@ expression
     | expression op = '??' expression                             # NullCoalescingExpression
     | expression op = '<=>' expression                            # SpaceshipExpression
     | Throw expression                                            # SpecialWordExpression
+    //  assign 
     | leftArrayCreation Eq expression                             # ArrayCreationUnpackExpression
-    | expression leftSliceCall assignmentOperator expression      # SliceCallAssignmentExpression
-    | expression leftFieldMemberCall assignmentOperator expression# FieldMemberCallAssignmentExpression
+    | expression '[' expression ']' assignmentOperator expression # SliceCallAssignmentExpression
+    | expression '->' expression assignmentOperator expression    # FieldMemberCallAssignmentExpression
+    | staticClassExpr assignmentOperator expression               # StaticClassMemberCallAssignmentExpression 
     | leftVariable assignmentOperator expression                  # OrdinaryAssignmentExpression
+    // logical 
     | expression op = LogicalAnd expression                       # LogicalExpression
     | expression op = LogicalXor expression                       # LogicalExpression
     | expression op = LogicalOr expression                        # LogicalExpression
     ;
 
-leftFieldMemberCall: '->' expression;
-
-leftSliceCall: '[' expression ']';
 
 leftVariable
     : Dollar+ VarName                                       # DynamicVariable// $$a= 1; or $$$a=1;

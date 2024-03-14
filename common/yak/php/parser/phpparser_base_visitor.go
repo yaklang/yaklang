@@ -439,6 +439,10 @@ func (v *BasePHPParserVisitor) VisitCloneExpression(ctx *CloneExpressionContext)
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitStaticClassMemberCallAssignmentExpression(ctx *StaticClassMemberCallAssignmentExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitUnaryOperatorExpression(ctx *UnaryOperatorExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -508,14 +512,6 @@ func (v *BasePHPParserVisitor) VisitFullyQualifiedNamespaceExpression(ctx *Fully
 }
 
 func (v *BasePHPParserVisitor) VisitStaticClassAccessExpression(ctx *StaticClassAccessExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BasePHPParserVisitor) VisitLeftFieldMemberCall(ctx *LeftFieldMemberCallContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BasePHPParserVisitor) VisitLeftSliceCall(ctx *LeftSliceCallContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
