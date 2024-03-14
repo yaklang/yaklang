@@ -483,7 +483,7 @@ func QueryYakScriptByIsCore(db *gorm.DB, isCore bool) []*YakScript {
 }
 
 func FilterYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) *gorm.DB {
-	//db = db.Where("ignored = ?", params.GetIsIgnore())
+	db = db.Where("ignored = ?", params.GetIsIgnore())
 	db = bizhelper.ExactQueryStringArrayOr(db, "type", utils.PrettifyListFromStringSplited(params.GetType(), ","))
 	if params.GetKeyword() != "" {
 		db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{
