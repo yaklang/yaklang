@@ -18,9 +18,11 @@ func IncludeExcludeChecker(includes, excludes []string, target string) (passed b
 	for _, exclude := range excludes {
 		if match, err := regexp.MatchString(exclude, target); err == nil && match {
 			return false
-		} else if StringGlobContains(exclude, target) {
+		}
+		if StringGlobContains(exclude, target) {
 			return false
-		} else if exclude == target {
+		}
+		if exclude == target {
 			return false
 		}
 	}
@@ -32,9 +34,11 @@ func IncludeExcludeChecker(includes, excludes []string, target string) (passed b
 	for _, include := range includes {
 		if match, err := regexp.MatchString(include, target); err == nil && match {
 			return true
-		} else if StringGlobContains(include, target) {
+		}
+		if StringGlobContains(include, target) {
 			return true
-		} else if include == target {
+		}
+		if include == target {
 			return true
 		}
 	}
