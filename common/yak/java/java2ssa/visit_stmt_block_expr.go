@@ -102,6 +102,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		return y.ReadMemberCallVariable(expr, key)
 	case *javaparser.MemberCallExpressionContext:
 		// 处理成员调用表达式，如通过点操作符访问成员
+		// todo: 成员调用表达式
 	case *javaparser.FunctionCallExpressionContext:
 		// 处理函数调用表达式
 		if s := ret.MethodCall(); s != nil {
@@ -110,10 +111,13 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		return nil
 	case *javaparser.MethodReferenceExpressionContext:
 		// 处理方法引用表达式
+		// todo: 方法引用表达式
 	case *javaparser.ConstructorReferenceExpressionContext:
 		// 处理构造器引用表达式
+		// todo: 构造器引用表达式
 	case *javaparser.Java17SwitchExpressionContext:
 		// 处理 Java 17 的 switch 表达式
+		// todo: Java 17 的 switch 表达式
 	case *javaparser.PostfixExpressionContext:
 		// 处理后缀表达式，如自增、自减操作
 		if s := ret.Identifier(); s != nil {
@@ -175,8 +179,10 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		return value
 	case *javaparser.CastExpressionContext:
 		// 处理类型转换表达式
+		// todo: 类型转换表达式
 	case *javaparser.NewCreatorExpressionContext:
 		// 处理创建对象的表达式
+		// todo: 创建对象的表达式
 	case *javaparser.MultiplicativeExpressionContext:
 		// 处理乘法、除法、模运算表达式
 		op1 := y.VisitExpression(ret.Expression(0))
@@ -245,6 +251,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 
 	case *javaparser.InstanceofExpressionContext:
 		// 处理 instanceof 表达式
+		// todo instanceof 表达式
 	case *javaparser.EqualityExpressionContext:
 		// 处理等于和不等于表达式
 		op1 := y.VisitExpression(ret.Expression(0))
@@ -324,6 +331,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		)
 	case *javaparser.TernaryExpressionContext:
 		// 处理三元运算符表达式
+		// todo 三元运算符表达式
 	case *javaparser.AssignmentExpressionContext:
 		// 处理赋值表达式，包括所有赋值运算符
 		variable = y.CreateVariable(ret.Identifier().GetText())
@@ -374,6 +382,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		return value
 	case *javaparser.Java8LambdaExpressionContext:
 		// 处理 Java 8 的 lambda 表达式
+		// todo: Java 8 的 lambda 表达式
 	default:
 		// 默认情况，可能是不支持的表达式类型
 		log.Errorf("unsupported expression type: %T", ret)
