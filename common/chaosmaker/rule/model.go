@@ -123,26 +123,36 @@ func (c *Storage) ToGPRCModel() *ypb.ChaosMakerRule {
 	}
 }
 
-func (c *Storage) DecoratedByOpenAI(opts ...openai.ConfigOption) {
+func (origin *Storage) DecoratedByOpenAI(opts ...openai.ConfigOption) {
+	ruleIns := origin
+	if ruleIns.ID <= 0 {
+		existed, err := GetSuricataChaosMakerRuleByHash(consts.GetGormProfileDatabase(), ruleIns.CalcHash())
+		if err == nil {
+			ruleIns = existed
+		}
+	}
+
+	ruleIns.Name, _ = strings.CutPrefix(ruleIns.Name, "ET ")
+
 	/*
 		这是一个提炼攻击流量特征的任务，请提炼 %v 中的特征关键字（去除引用）？提取成 json array，以方便系统打标签和筛选，提供中文和英文的版本，放在 json 中，以 keywords 和 keywords_zh 作为字段，再描述一下这个特征（中文50字以内，去除‘检测’等字段意图），作为 description_zh 字段，同时补充他的 description（英文）
 	*/
 	var clearData string
-	switch c.RuleType {
+	switch ruleIns.RuleType {
 	case "suricata":
-		clearData = strconv.Quote(c.SuricataRaw)
+		clearData = strconv.Quote(ruleIns.SuricataRaw)
 	case "http-request":
-		raw, _ := codec.DecodeBase64(c.RawTrafficBeyondHTTPBase64)
+		raw, _ := codec.DecodeBase64(ruleIns.RawTrafficBeyondHTTPBase64)
 		if raw != nil {
 			clearData = strconv.Quote(string(raw))
 		}
 	case "tcp":
-		raw, _ := codec.DecodeBase64(c.RawTrafficBeyondIPPacketBase64)
+		raw, _ := codec.DecodeBase64(ruleIns.RawTrafficBeyondIPPacketBase64)
 		if raw != nil {
 			clearData = strconv.Quote(string(raw))
 		}
 	default:
-		log.Errorf("unknown rule type: %v", c.RuleType)
+		log.Errorf("unknown rule type: %v", ruleIns.RuleType)
 		return
 	}
 
@@ -151,15 +161,15 @@ func (c *Storage) DecoratedByOpenAI(opts ...openai.ConfigOption) {
 		return
 	}
 
-	if c.CVE == "" && c.SuricataRaw != "" {
-		records := regexp.MustCompile(`(?i)CVE-\d+-\d+`).FindAllString(c.SuricataRaw, -1)
+	if ruleIns.CVE == "" && ruleIns.SuricataRaw != "" {
+		records := regexp.MustCompile(`(?i)CVE-\d+-\d+`).FindAllString(ruleIns.SuricataRaw, -1)
 		records = utils.RemoveRepeatStringSlice(strings.Split(strings.ToUpper(strings.Join(records, ",")), ","))
 		if len(records) > 0 {
-			c.CVE = strings.Join(records, ",")
+			ruleIns.CVE = strings.Join(records, ",")
 		}
 	}
 
-	if c.Keywords == "" || c.KeywordsZh == "" {
+	if ruleIns.Keywords == "" || ruleIns.KeywordsZh == "" {
 		opts = append(opts, openai.WithFunctionRequired("keywords", "keywords_zh", "description", "description_zh"))
 		raw, err := openai.ExtractDataByAi(clearData, "从规则内的流量特征中提取关键信息", map[string]string{
 			"keywords":       "所有规则中的特征关键字，数量大概5个，关键字长度不要超过4个词，注意要去除引用，以','分隔", //  gpt4不需要这个提示 `一定要重点注意不要提取suricata语法的关键字，如alert, content, sid等（英文）`
@@ -173,17 +183,14 @@ func (c *Storage) DecoratedByOpenAI(opts ...openai.ConfigOption) {
 			return
 		}
 		log.Infof("find raw answer: %v", raw)
-		if c.NameZh == "" {
-			c.NameZh = utils.MapGetString(raw, "name_zh")
+		if ruleIns.NameZh == "" {
+			ruleIns.NameZh = utils.MapGetString(raw, "name_zh")
 		}
-		c.Keywords = strings.Join(utils.InterfaceToStringSlice(strings.Split(utils.MapGetString(raw, "keywords"), ",")), "|")
-		c.KeywordsZh = strings.Join(utils.InterfaceToStringSlice(strings.Split(utils.MapGetString(raw, "keywords_zh"), "，")), "|")
-		c.Description = utils.MapGetString(raw, "description")
-		c.DescriptionZh = utils.MapGetString(raw, "description_zh")
+		ruleIns.Keywords = strings.Join(utils.InterfaceToStringSlice(strings.Split(utils.MapGetString(raw, "keywords"), ",")), "|")
+		ruleIns.KeywordsZh = strings.Join(utils.InterfaceToStringSlice(strings.Split(utils.MapGetString(raw, "keywords_zh"), "，")), "|")
+		ruleIns.Description = utils.MapGetString(raw, "description")
+		ruleIns.DescriptionZh = utils.MapGetString(raw, "description_zh")
 	}
-
-	log.Infof("find keywords: %v", c.Keywords)
-
 	//err := UpsertRule(db, c.Hash, c)
 	//if err != nil {
 	//	log.Warn(err)
@@ -330,6 +337,15 @@ func UpsertRule(db *gorm.DB, hash string, i interface{}) error {
 func GetSuricataChaosMakerRule(db *gorm.DB, id int64) (*Storage, error) {
 	var req Storage
 	if db := db.Model(&Storage{}).Where("id = ?", id).First(&req); db.Error != nil {
+		return nil, utils.Errorf("get Storage failed: %s", db.Error)
+	}
+
+	return &req, nil
+}
+
+func GetSuricataChaosMakerRuleByHash(db *gorm.DB, hash string) (*Storage, error) {
+	var req Storage
+	if db := db.Model(&Storage{}).Where("hash = ?", hash).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get Storage failed: %s", db.Error)
 	}
 

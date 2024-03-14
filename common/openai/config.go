@@ -1,12 +1,12 @@
 package openai
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
 )
 
 type ConfigOption func(client *Client)
@@ -42,7 +42,7 @@ func WithAPIKeyFromYakitHome() ConfigOption {
 	return func(client *Client) {
 		raw, err := os.ReadFile(filepath.Join(consts.GetDefaultYakitBaseDir(), "openai-key.txt"))
 		if err != nil {
-			log.Warnf("cannot find openai-key.txt in %s", consts.GetDefaultYakitProjectsDir())
+			log.OnceInfoLog("check-openai-apikey", "cannot find openai-key.txt in %s", consts.GetDefaultYakitProjectsDir())
 			return
 		}
 		client.APIKey = strings.TrimSpace(string(raw))

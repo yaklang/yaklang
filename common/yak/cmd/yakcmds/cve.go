@@ -20,11 +20,12 @@ import (
 
 var CVEUtilCommands = []*cli.Command{
 	{
-		Name: "translating",
+		Name:    "translating",
+		Aliases: []string{"ai-desc", "desc"},
 		Flags: []cli.Flag{
 			cli.StringFlag{
 				Name:  "keyfile",
-				Usage: "API Key 的文件",
+				Usage: "API KeyFile",
 			},
 			cli.BoolFlag{
 				Name: "no-critical",
@@ -40,7 +41,7 @@ var CVEUtilCommands = []*cli.Command{
 				Name: "cwe",
 			},
 			cli.BoolFlag{
-				Name: "chaosmaker-rules",
+				Name: "chaosmaker-rules,chaosmaker",
 			},
 			cli.StringFlag{Name: "proxy", Usage: "Network Proxy", EnvVar: "http_proxy"},
 		},
