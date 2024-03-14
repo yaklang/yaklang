@@ -2,6 +2,7 @@ package openai
 
 import (
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
@@ -45,12 +46,12 @@ func chat(data string, opts ...ConfigOption) string {
 // )~
 // println(d.FunctionCallResult())
 // ```
-func chatEx(messages []ChatDetail, opts ...ConfigOption) (ChatDetails, error) {
+func chatEx(messages []aispec.ChatDetail, opts ...ConfigOption) (aispec.ChatDetails, error) {
 	choices, err := NewOpenAIClient(opts...).ChatEx(messages)
 	if err != nil {
 		return nil, err
 	}
-	details := lo.Map(choices, func(c ChatChoice, _ int) ChatDetail {
+	details := lo.Map(choices, func(c aispec.ChatChoice, _ int) aispec.ChatDetail {
 		return c.Message
 	})
 	return details, nil
@@ -76,7 +77,7 @@ func chatEx(messages []ChatDetail, opts ...ConfigOption) (ChatDetails, error) {
 // ```
 func functionCall(data, funcName, funcDesc string, opts ...ConfigOption) map[string]any {
 	client := NewOpenAIClient(opts...)
-	functions := Function{
+	functions := aispec.Function{
 		Name:        funcName,
 		Description: funcDesc,
 		Parameters:  client.Parameters,
@@ -130,10 +131,10 @@ var Exports = map[string]interface{}{
 	"functionProperty":  WithFunctionProperty,
 	"functionRequired":  WithFunctionRequired,
 
-	"systemMessage":     NewSystemChatDetail,
-	"userMessage":       NewUserChatDetail,
-	"assistantMessage":  NewAIChatDetail,
-	"toolMessage":       NewToolChatDetail,
-	"toolMessageWithID": NewToolChatDetailWithID,
+	"systemMessage":     aispec.NewSystemChatDetail,
+	"userMessage":       aispec.NewUserChatDetail,
+	"assistantMessage":  aispec.NewAIChatDetail,
+	"toolMessage":       aispec.NewToolChatDetail,
+	"toolMessageWithID": aispec.NewToolChatDetailWithID,
 	// "functionMessage":  NewFunctionChatDetail,
 }

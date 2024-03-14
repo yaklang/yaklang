@@ -3,6 +3,7 @@ package openai
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"strconv"
 	"strings"
 	"time"
@@ -27,23 +28,23 @@ type Client struct {
 	Domain string
 
 	// function call
-	Functions  []Function
-	Parameters Parameters
+	Functions  []aispec.Function
+	Parameters aispec.Parameters
 }
 
 type Session struct {
 	client   *Client
-	messages []ChatDetail
+	messages []aispec.ChatDetail
 }
 
 func NewSession(opt ...ConfigOption) *Session {
 	return &Session{
 		client:   NewOpenAIClient(opt...),
-		messages: make([]ChatDetail, 0),
+		messages: make([]aispec.ChatDetail, 0),
 	}
 }
 
-func (s *Session) Chat(message ChatDetail, opts ...ConfigOption) (ChatDetails, error) {
+func (s *Session) Chat(message aispec.ChatDetail, opts ...ConfigOption) (aispec.ChatDetails, error) {
 	c := NewRawOpenAIClient(opts...)
 
 	// if the message is a tool call, and the tool call ID is not set, set it to the latest tool call ID
@@ -61,7 +62,7 @@ func (s *Session) Chat(message ChatDetail, opts ...ConfigOption) (ChatDetails, e
 	s.messages = append(s.messages, message)
 
 	choices, err := s.client.ChatEx(s.messages, c.Functions...)
-	details := lo.Map(choices, func(c ChatChoice, _ int) ChatDetail {
+	details := lo.Map(choices, func(c aispec.ChatChoice, _ int) aispec.ChatDetail {
 		return c.Message
 	})
 
@@ -72,10 +73,10 @@ func (s *Session) Chat(message ChatDetail, opts ...ConfigOption) (ChatDetails, e
 
 func NewRawOpenAIClient(opts ...ConfigOption) *Client {
 	c := &Client{
-		Functions: make([]Function, 0),
-		Parameters: Parameters{
+		Functions: make([]aispec.Function, 0),
+		Parameters: aispec.Parameters{
 			Type:       "object",
-			Properties: make(map[string]Property),
+			Properties: make(map[string]aispec.Property),
 		},
 	}
 	for _, o := range opts {
@@ -86,10 +87,10 @@ func NewRawOpenAIClient(opts ...ConfigOption) *Client {
 
 func NewOpenAIClient(opts ...ConfigOption) *Client {
 	c := &Client{
-		Functions: make([]Function, 0),
-		Parameters: Parameters{
+		Functions: make([]aispec.Function, 0),
+		Parameters: aispec.Parameters{
 			Type:       "object",
-			Properties: make(map[string]Property),
+			Properties: make(map[string]aispec.Property),
 		},
 	}
 	for _, o := range opts {
@@ -140,7 +141,7 @@ func (c *Client) TranslateToChinese(data string) (string, error) {
 	return strings.Trim(results, "\r\n \v\f\""), nil
 }
 
-func (c *Client) ChatEx(messages []ChatDetail, funcs ...Function) ([]ChatChoice, error) {
+func (c *Client) ChatEx(messages []aispec.ChatDetail, funcs ...aispec.Function) ([]aispec.ChatChoice, error) {
 	chatModel := c.ChatModel
 	if chatModel == "" {
 		chatModel = "gpt-3.5-turbo"
@@ -155,7 +156,7 @@ func (c *Client) ChatEx(messages []ChatDetail, funcs ...Function) ([]ChatChoice,
 	}
 	c.Functions = append(c.Functions, funcs...)
 
-	chatMessage := NewChatMessage(chatModel, messages, c.Functions...)
+	chatMessage := aispec.NewChatMessage(chatModel, messages, c.Functions...)
 	raw, err := json.Marshal(chatMessage)
 	if err != nil {
 		return nil, err
@@ -173,7 +174,7 @@ func (c *Client) ChatEx(messages []ChatDetail, funcs ...Function) ([]ChatChoice,
 		return nil, utils.Wrapf(err, "OpenAI Chat failed: http error")
 	}
 	rspRaw := lowhttp.GetHTTPPacketBody(rsp.RawPacket)
-	var comp ChatCompletion
+	var comp aispec.ChatCompletion
 	err = json.Unmarshal(rspRaw, &comp)
 	if err != nil {
 		log.Errorf("OpenAI Chat Error: unmarshal completion failed: %#v", string(rspRaw))
@@ -192,8 +193,8 @@ func (c *Client) ChatEx(messages []ChatDetail, funcs ...Function) ([]ChatChoice,
 	return comp.Choices, nil
 }
 
-func (c *Client) Chat(data string, funcs ...Function) (string, error) {
-	choices, err := c.ChatEx([]ChatDetail{
+func (c *Client) Chat(data string, funcs ...aispec.Function) (string, error) {
+	choices, err := c.ChatEx([]aispec.ChatDetail{
 		{
 			Role:    "user",
 			Content: data,
@@ -203,36 +204,5 @@ func (c *Client) Chat(data string, funcs ...Function) (string, error) {
 		return "", err
 	}
 
-	return DetailsToString(lo.Map(choices, func(c ChatChoice, index int) ChatDetail { return c.Message })), nil
-}
-
-func DetailsToString(details []ChatDetail) string {
-	var list []string
-
-	hasFunctionCallResults := false
-	for _, d := range details {
-		if len(d.ToolCalls) > 0 {
-			hasFunctionCallResults = true
-			break
-		}
-	}
-	if hasFunctionCallResults {
-		list = lo.Map(details, func(d ChatDetail, _ int) string {
-			return strings.Join(
-				lo.Map(d.ToolCalls, func(tool *ToolCall, _ int) string {
-					if tool == nil {
-						return ""
-					}
-					return strings.TrimSpace(tool.Function.Arguments)
-				}),
-				"\n")
-		})
-	} else {
-		list = lo.Map(details, func(d ChatDetail, _ int) string {
-			return strings.TrimSpace(d.Content)
-		})
-	}
-
-	list = utils.StringArrayFilterEmpty(list)
-	return strings.Join(list, "\n\n")
+	return aispec.DetailsToString(lo.Map(choices, func(c aispec.ChatChoice, index int) aispec.ChatDetail { return c.Message })), nil
 }

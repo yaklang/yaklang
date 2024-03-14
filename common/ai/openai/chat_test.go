@@ -1,6 +1,7 @@
 package openai
 
 import (
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"io/ioutil"
 	"path/filepath"
@@ -63,13 +64,13 @@ func TestClient_Session(t *testing.T) {
 		WithProxy("http://127.0.0.1:7890"),
 	)
 
-	details, err := s.Chat(NewUserChatDetail("1+=1=?"))
+	details, err := s.Chat(aispec.NewUserChatDetail("1+=1=?"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	result := details.FirstString()
 	spew.Dump(result)
-	details, err = s.Chat(NewUserChatDetail("Repeat the first sentence assistant just replied"))
+	details, err = s.Chat(aispec.NewUserChatDetail("Repeat the first sentence assistant just replied"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,8 +98,8 @@ func TestClient_ChatEx(t *testing.T) {
 	//   println(d.FunctionCallResult())
 
 	result, err := chatEx(
-		[]ChatDetail{
-			NewUserChatDetail("What is the weather like in Boston?"),
+		[]aispec.ChatDetail{
+			aispec.NewUserChatDetail("What is the weather like in Boston?"),
 		},
 		WithFunction(
 			"get_current_weather",
