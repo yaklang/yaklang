@@ -2,9 +2,9 @@ package rule
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/openai"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/openai"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
 	"github.com/yaklang/yaklang/common/suricata/pcre"
 	"github.com/yaklang/yaklang/common/utils"

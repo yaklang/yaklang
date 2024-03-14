@@ -17,6 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/ai/openai"
 	"github.com/yaklang/yaklang/common/authhack"
 	"github.com/yaklang/yaklang/common/chaosmaker"
 	"github.com/yaklang/yaklang/common/crawler"
@@ -28,7 +29,6 @@ import (
 	"github.com/yaklang/yaklang/common/ja3"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
-	"github.com/yaklang/yaklang/common/openai"
 	"github.com/yaklang/yaklang/common/pcapx"
 	"github.com/yaklang/yaklang/common/rpa"
 	"github.com/yaklang/yaklang/common/sca"
