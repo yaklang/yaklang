@@ -36,4 +36,5 @@ die(nuclei.UpdateDatabase())`, "main")
 	},
 	&synscanCommand,
 	&servicescanCommand,
+	&crawlerxCommand,
 }

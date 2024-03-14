@@ -69,6 +69,14 @@ type BrowserConfig struct {
 	proxyAddress *url.URL
 }
 
+func NewBrowserConfig(exePath, wsAddress string, proxyAddress *url.URL) *BrowserConfig {
+	return &BrowserConfig{
+		exePath:      exePath,
+		wsAddress:    wsAddress,
+		proxyAddress: proxyAddress,
+	}
+}
+
 type headers struct {
 	Key   string
 	Value string
@@ -154,6 +162,12 @@ func WithBrowserInfo(data string) ConfigOpt {
 		}
 		browserConfig.proxyAddress = proxyUrl
 	}
+	return func(config *Config) {
+		config.browsers = append(config.browsers, browserConfig)
+	}
+}
+
+func WithBrowserData(browserConfig *BrowserConfig) ConfigOpt {
 	return func(config *Config) {
 		config.browsers = append(config.browsers, browserConfig)
 	}
