@@ -335,14 +335,24 @@ func (s *Server) debugScript(
 	if err != nil {
 		return err
 	}
+	return s.execScript(input, debugType, tempName, stream, execParams, params...)
+}
 
-	switch debugType {
+func (s *Server) execScript(
+	input string, // only "codec" / url: "mitm" "nuclei" "port-scan"
+	scriptType string,
+	name string,
+	stream sender,
+	execParams []*ypb.KVPair, // 脚本执行的参数, only "yak"
+	params ...*ypb.HTTPRequestBuilderParams, // 用于构建请求, only used in "mitm", "nuclei", "port-scan"
+) error {
+	switch scriptType {
 	case "yak", "codec":
-		return s.execScriptWithExecParam(tempName, input, stream, execParams)
+		return s.execScriptWithExecParam(name, input, stream, execParams)
 	case "mitm", "nuclei", "port-scan":
-		return s.execScriptWithRequest(tempName, input, stream, execParams, params...)
+		return s.execScriptWithRequest(name, input, stream, execParams, params...)
 	}
-	return utils.Error("unsupported plugin type: " + debugType)
+	return utils.Error("unsupported plugin type: " + scriptType)
 }
 
 func makeArgs(execParams []*ypb.KVPair, yakScript string) []string {
