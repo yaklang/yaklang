@@ -93,7 +93,7 @@ func TestGRPCMUSTPASS_COMMON_RPOXY_FROM_ENV(t *testing.T) {
 		panic(err)
 	}
 
-	var triggerProxy = false
+	triggerProxy := false
 	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
 		spew.Dump(req)
 		if strings.Contains(string(req), "CONNECT 8.8.8.8:80") {
@@ -156,7 +156,7 @@ func TestGRPCMUSTPASS_COMMON_GLOBAL_RPOXY(t *testing.T) {
 		panic(err)
 	}
 
-	var triggerProxy = false
+	triggerProxy := false
 	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
 		spew.Dump(req)
 		if strings.Contains(string(req), "CONNECT 8.8.8.8:80") {
@@ -326,7 +326,6 @@ func TestValidP12PassWord(t *testing.T) {
 		log.Error(err)
 		t.FailNow()
 	}
-
 }
 
 func TestGRPCMUSTPASS_COMMON_HTTPAuth(t *testing.T) {
@@ -446,8 +445,39 @@ func TestGRPCMUSTPASS_COMMON_HTTPAuth(t *testing.T) {
 	if statusCode != "200" {
 		t.Fatalf("want 200 got %s", statusCode)
 	}
-
 }
+
+// func TestPluginScanLists(t *testing.T) {
+// 	client, err := NewLocalClient()
+// 	require.Nil(t, err, "new local client error")
+
+// 	_, _ = client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
+// 	config, err := client.GetGlobalNetworkConfig(context.Background(), &ypb.GetGlobalNetworkConfigRequest{})
+// 	require.Nil(t, err, "get global network config error")
+
+// 	host, port := utils.DebugMockHTTP([]byte("Hello"))
+
+// 	config.ExcludePluginScanURIs = []string{host}
+
+// 	_, err = client.SetGlobalNetworkConfig(context.Background(), config)
+// 	require.Nil(t, err, "set global network config error")
+
+// 	manager, err := yak.NewMixPluginCaller()
+// 	require.Nil(t, err, "new mix plugin caller error")
+
+// 	token := utils.RandStringBytes(100)
+// 	tmpName, err := yakit.CreateTemporaryYakScript("mitm", fmt.Sprintf(`
+// mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+// 	risk.NewRisk(%#v, risk.description("test"), risk.solution("test solution"))
+// }
+// `, token))
+// 	require.Nil(t, err, "create temporary yak script error")
+// 	manager.LoadPlugin(tmpName)
+// 	manager.MirrorHTTPFlow(false, fmt.Sprintf("http://%s:%d", host, port ), nil, nil, nil)
+// 	_, ret, err := yakit.QueryRisks(consts.GetGormProjectDatabase(), &ypb.QueryRisksRequest{Search: token})
+// 	require.Nil(t, err, "query risks error")
+// 	require.Len(t, ret, 0, "global network config plugin scan blacklist error")
+// }
 
 //func TestHTTPAuth(t *testing.T) {
 //	client, err := NewLocalClient()
