@@ -40,4 +40,12 @@ func ChatGLM(opts ...aispec.AIConfigOption) aispec.AIGateway {
 var Exports = map[string]any{
 	"OpenAI":  OpenAI,
 	"ChatGLM": ChatGLM,
+
+	"timeout": aispec.WithTimeout,
+	"proxy":   aispec.WithProxy,
+	"model":   aispec.WithModel,
+	"apiKey":  aispec.WithAPIKey,
+	"noHttps": aispec.WithNoHttps,
+	"domain":  aispec.WithDomain,
+	"baseURL": aispec.WithBaseURL,
 }
