@@ -2,16 +2,50 @@ package utils
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"net/http"
 	"regexp"
 	"sort"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
-type httpPacketFilterCondType string
-type httpFilterAction string
+func IncludeExcludeChecker(includes, excludes []string, target string) (passed bool) {
+	excludes = StringArrayFilterEmpty(excludes)
+	includes = StringArrayFilterEmpty(includes)
+
+	for _, exclude := range excludes {
+		if match, err := regexp.MatchString(exclude, target); err == nil && match {
+			return false
+		} else if StringGlobContains(exclude, target) {
+			return false
+		} else if exclude == target {
+			return false
+		}
+	}
+
+	if includes == nil {
+		return true
+	}
+
+	for _, include := range includes {
+		if match, err := regexp.MatchString(include, target); err == nil && match {
+			return true
+		} else if StringGlobContains(include, target) {
+			return true
+		} else if include == target {
+			return true
+		}
+	}
+
+	return false
+}
+
+type (
+	httpPacketFilterCondType string
+	httpFilterAction         string
+)
 
 const (
 	httpFilter_RequestPath    httpPacketFilterCondType = "path"
@@ -39,9 +73,7 @@ func (h *httpPacketFilterCondition) Name() string {
 }
 
 func (h *httpPacketFilterCondition) IsAllowed(req *http.Request, rsp *http.Response) bool {
-	var (
-		matched bool
-	)
+	var matched bool
 
 	if req != nil {
 		var (
@@ -103,7 +135,7 @@ func NewHTTPPacketFilter() *HTTPPacketFilter {
 }
 
 func (h *HTTPPacketFilter) IsAllowed(req *http.Request, rsp *http.Response) bool {
-	var result = true
+	result := true
 	h.conds.Range(func(key, value interface{}) bool {
 		if value.(*httpPacketFilterCondition).IsAllowed(req, rsp) {
 			return true
