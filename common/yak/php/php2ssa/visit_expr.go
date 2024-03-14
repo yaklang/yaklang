@@ -1,7 +1,6 @@
 package php2ssa
 
 import (
-	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -66,15 +65,41 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 	case *phpparser.VariableNameExpressionContext:
 		return y.ir.ReadOrCreateVariable(ret.GetText())
 	case *phpparser.VariableExpressionContext:
+		//解析$$的右值
+		var result ssa.Value
+		var variable *ssa.Variable
 		dollarCount := len(ret.AllDollar())
-		val := y.ir.ReadOrCreateVariable(ret.GetText())
-		if dollarCount > 1 {
-			for i := 0; i < dollarCount-1; i++ {
-				// ref handling
-			}
+
+		//读取到了 "$xx" 就直接返回这个值
+		if value := y.ir.ReadValue("$" + ret.Identifier().GetText()); !value.IsUndefined() {
+			result = value
+			variable = y.ir.GetVariable("$" + ret.Identifier().GetText())
+		} else {
+			//如果没有读取到就创建Undefined的变量
+			result = y.ir.EmitUndefined("$" + ret.Identifier().GetText())
+			variable = y.ir.CreateVariable("$" + ret.Identifier().GetText())
+			y.ir.AssignVariable(variable, y.ir.EmitUndefined("$"+ret.Identifier().GetText()))
 		}
-		return val
+
+		for i := 0; i < dollarCount-1; i++ {
+			//如果能从variable获取到值，那么我们更新variable （2）看是否能从 $variables.values中读取到
+			if !variable.GetValue().IsUndefined() {
+				if value := y.ir.ReadValue("$" + variable.GetValue().String()); !value.IsUndefined() {
+					result = value
+					variable = y.ir.GetVariable("$" + variable.GetValue().String())
+				} else {
+					result = y.ir.EmitUndefined("$" + variable.GetValue().String())
+					variable = y.ir.CreateVariable("$" + variable.GetName())
+				}
+			} else {
+				result = y.ir.EmitUndefined("$" + variable.GetName())
+				variable = y.ir.CreateVariable("$" + variable.GetName())
+			}
+			y.ir.AssignVariable(variable, result)
+		}
+		return result
 	case *phpparser.DynamicVariableExpressionContext:
+		//todo:
 		dollarCount := len(ret.AllDollar())
 		val := y.VisitExpression(ret.Expression())
 		if dollarCount > 1 {
@@ -315,7 +340,6 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		exprCount := len(ret.AllExpression())
 		var result ssa.Value
 		y.ir.CreateIfBuilder().AppendItem(func() ssa.Value {
-			// false 0 nil
 			t1 := y.ir.EmitBinOp(ssa.OpNotEq, v1, y.ir.EmitConstInstNil())
 			t2 := y.ir.EmitBinOp(ssa.OpNotEq, v1, y.ir.EmitConstInst(0))
 			t3 := y.ir.EmitBinOp(ssa.OpNotEq, v1, y.ir.EmitConstInst(false))
@@ -336,11 +360,32 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		}).Build()
 		return result
 	case *phpparser.NullCoalescingExpressionContext:
+		if leftValue := y.VisitExpression(ret.Expression(0)); leftValue.IsUndefined() {
+			return y.VisitExpression(ret.Expression(1)) //如果是undefined就返回1
+		} else {
+			return nil
+		}
 	case *phpparser.SpaceshipExpressionContext:
+		var result ssa.Value
+		y.ir.CreateIfBuilder().SetCondition(func() ssa.Value {
+			return y.ir.EmitBinOp(ssa.OpEq, y.VisitExpression(ret.Expression(0)), y.VisitExpression(ret.Expression(1)))
+		}, func() {
+			result = y.ir.EmitConstInst(0)
+		}).SetElse(func() {
+			y.ir.CreateIfBuilder().SetCondition(func() ssa.Value {
+				return y.ir.EmitBinOp(ssa.OpLt, y.VisitExpression(ret.Expression(0)), y.VisitExpression(ret.Expression(1)))
+			}, func() {
+				result = y.ir.EmitConstInst(-1)
+			}).SetElse(func() {
+				result = y.ir.EmitConstInst(1)
+			})
+		})
+		return result
 	case *phpparser.ArrayCreationUnpackExpressionContext:
 		// [$1, $2, $3] = $arr;
 		// unpacking
 		log.Errorf("unpack unfinished")
+		return nil
 	case *phpparser.SliceCallAssignmentExpressionContext:
 		memberExpr := ret.LeftSliceCall().(*phpparser.LeftSliceCallContext).Expression()
 		// build left
@@ -370,50 +415,35 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		y.ir.AssignVariable(variable, rightValue)
 		return rightValue
 	case *phpparser.LogicalExpressionContext:
-		id := uuid.New().String()
-		tempVar := y.ir.CreateVariable(id)
-		if ret.LogicalAnd() != nil {
-			y.ir.CreateIfBuilder().SetCondition(func() ssa.Value {
-				expr1 := ret.Expression(0)
-				return y.ir.EmitBinOp(ssa.OpEq, y.VisitExpression(expr1), y.ir.EmitConstInst(true))
-			}, func() {
-				result := y.ir.EmitBinOp(ssa.OpEq, y.VisitExpression(ret.Expression(1)), y.ir.EmitConstInst(true))
-				y.ir.AssignVariable(tempVar, result)
-			}).SetElse(func() {
-				y.ir.AssignVariable(tempVar, y.ir.EmitConstInst(false))
-			}).Build()
+		var tmpVar ssa.Value
+		tmpVar = y.VisitExpression(ret.Expression(0))
+		//LogicalXor 遍历所有的expr 执行即可
+		if ret.LogicalXor() != nil {
+			for _, expressionContext := range ret.AllExpression() {
+				y.VisitExpression(expressionContext)
+			}
 		}
-
 		if ret.LogicalOr() != nil {
 			y.ir.CreateIfBuilder().SetCondition(func() ssa.Value {
-				expr1 := ret.Expression(0)
-				return y.ir.EmitBinOp(ssa.OpEq, y.VisitExpression(expr1), y.ir.EmitConstInst(true))
+				return y.ir.EmitBinOp(ssa.OpEq, y.VisitExpression(ret.Expression(0)), y.ir.EmitConstInst(true))
 			}, func() {
-				y.ir.AssignVariable(tempVar, y.ir.EmitConstInst(true))
+				y.ir.Break()
 			}).SetElse(func() {
-				result := y.ir.EmitBinOp(ssa.OpEq, y.VisitExpression(ret.Expression(1)), y.ir.EmitConstInst(true))
-				y.ir.AssignVariable(tempVar, result)
+				y.VisitExpression(ret.Expression(1))
 			}).Build()
 		}
-
-		if ret.LogicalXor() != nil {
-			// no advanced logic
-			r1, r2 := y.VisitExpression(ret.Expression(0)), y.VisitExpression(ret.Expression(1))
-			r1 = y.ir.EmitBinOp(ssa.OpEq, r1, y.ir.EmitConstInst(true))
-			r2 = y.ir.EmitBinOp(ssa.OpEq, r2, y.ir.EmitConstInst(true))
+		if ret.LogicalAnd() != nil {
 			y.ir.CreateIfBuilder().SetCondition(func() ssa.Value {
-				return y.ir.EmitBinOp(ssa.OpEq, r1, r2)
+				return y.ir.EmitBinOp(ssa.OpEq, y.VisitExpression(ret.Expression(0)), y.ir.EmitConstInst(true))
 			}, func() {
-				y.ir.AssignVariable(tempVar, y.ir.EmitConstInst(false))
+				y.VisitExpression(ret.Expression(1))
 			}).SetElse(func() {
-				y.ir.AssignVariable(tempVar, y.ir.EmitConstInst(true))
-			})
+				y.ir.Break()
+			}).Build()
 		}
-		return tempVar.GetValue()
+		return tmpVar
 	case *phpparser.ShortQualifiedNameExpressionContext:
 		return y.ir.ReadOrCreateVariable(y.VisitIdentifier(ret.Identifier()))
-		//return y.ir.EmitUndefined(y.VisitIdentifier(ret.Identifier()))
-		//return y.ir.EmitConstInstAny()
 	}
 	raw.GetText()
 	log.Errorf("unhandled expression: %v(T: %T)", raw.GetText(), raw)
@@ -699,12 +729,6 @@ func (y *builder) VisitChainBase(raw phpparser.IChainBaseContext) ssa.Value {
 	if i == nil {
 		return nil
 	}
-
-	/*
-		$hello = "world";
-		$a = "hello";
-		echo $$a; // world
-	*/
 	if ret := i.QualifiedStaticTypeRef(); ret != nil {
 		panic("NOT IMPL")
 	} else {
@@ -971,12 +995,14 @@ func (y *builder) reduceAssignCalcExpression(operator string, leftValues ssa.Val
 		rightValue = y.ir.EmitBinOp(ssa.OpMul, leftValues, rightValue)
 	case "**=":
 		rightValue = y.ir.EmitBinOp(ssa.OpPow, leftValues, rightValue)
+		//rightValue = ssa.CalcConstBinary(y.ir.c, rightValue, ssa.OpPow)
 	case "/=":
 		rightValue = y.ir.EmitBinOp(ssa.OpDiv, leftValues, rightValue)
 	case "%=":
 		rightValue = y.ir.EmitBinOp(ssa.OpMod, leftValues, rightValue)
 	case ".=":
-		rightValue = y.ir.EmitBinOp(ssa.OpAdd, leftValues, rightValue)
+		rightValue = y.ir.EmitConstInst(leftValues.String() + rightValue.String())
+		//rightValue = y.ir.EmitBinOp(ssa.OpAdd, leftValues, rightValue)
 	case "&=":
 		rightValue = y.ir.EmitBinOp(ssa.OpAnd, leftValues, rightValue)
 	case "|=":
@@ -988,17 +1014,11 @@ func (y *builder) reduceAssignCalcExpression(operator string, leftValues ssa.Val
 	case ">>=":
 		rightValue = y.ir.EmitBinOp(ssa.OpShr, leftValues, rightValue)
 	case "??=":
-		// 左值为空的时候，才会赋值
-		var returnVal = leftValues
-		//var leftValueIsEmpty ssa.Value
-		//y.ir.BuildIf().BuildCondition(func() ssa.Value {
-		//	leftValueIsEmpty = y.ir.EmitBinOp(ssa.OpEq, leftValues, y.ir.EmitConstInstNil())
-		//	return leftValueIsEmpty
-		//}).BuildTrue(func() {
-		//	y.ir.EmitUpdate(leftValues, rightValue)
-		//	returnVal = rightValue
-		//}).Finish()
-		return returnVal
+		if leftValues.IsUndefined() {
+			return rightValue
+		} else {
+			return leftValues
+		}
 	default:
 		log.Errorf("unhandled assignment operator: %v", operator)
 	}
@@ -1006,18 +1026,49 @@ func (y *builder) reduceAssignCalcExpression(operator string, leftValues ssa.Val
 }
 
 func (y *builder) VisitLeftVariable(raw phpparser.ILeftVariableContext) *ssa.Variable {
-	// left value: chain array creation
 	if y == nil || raw == nil {
 		return nil
 	}
-
 	switch stmt := raw.(type) {
 	case *phpparser.VariableContext:
+		if value := y.ir.ReadValue(stmt.VarName().GetText()); value != nil {
+			variable := y.ir.CreateVariable(stmt.VarName().GetText())
+			variable.Value = value
+			return variable
+		}
 		return y.ir.CreateVariable(stmt.VarName().GetText())
 	case *phpparser.DynamicVariableContext:
-		// TODO: handler DynamicVariable
-		//variable = y.ir.ReadOrCreateVariable("$" + stmt.VarName().GetText())
-		return nil
+		var variable *ssa.Variable
+		if value := y.ir.ReadValue(stmt.VarName().GetText()); !value.IsUndefined() {
+			// 读取到 $xx 的内容,variable的内容就将，我们就将variable赋值到$xx
+			variable = y.ir.CreateVariable(stmt.VarName().GetText())
+			y.ir.AssignVariable(variable, value)
+		} else {
+			//	没有读取到$xx 的内容，我们就将上面的进行赋值
+			variable = y.ir.CreateVariable(stmt.VarName().GetText())
+			y.ir.AssignVariable(variable, y.ir.EmitUndefined(stmt.VarName().GetText()))
+		}
+		//遍历$
+		for i := 0; i < len(stmt.AllDollar()); i++ {
+			//如果原来的值就是undefined，直接将variable更新
+			if variable.GetValue().IsUndefined() {
+				//更新成这种
+				variable = y.ir.CreateVariable("$" + variable.GetName())
+				y.ir.AssignVariable(variable, y.ir.EmitUndefined(variable.GetName()))
+				continue
+			}
+			tmpVariable := y.ir.CreateVariable("$" + variable.GetValue().String())
+			//如果原来有值，我们就尝试是否能读取到
+			if value := y.ir.ReadValue("$" + variable.GetValue().String()); !value.IsUndefined() {
+				//	说明能读取到值
+				y.ir.AssignVariable(tmpVariable, value)
+			} else {
+				// 如果不能读取到值，那么我们就将设置成undefined
+				y.ir.AssignVariable(tmpVariable, y.ir.EmitUndefined(tmpVariable.GetName()))
+			}
+			variable = tmpVariable
+		}
+		return variable
 	case *phpparser.MemberCallVariableContext:
 		return nil
 		//val := y.VisitExpression(stmt.Expression())
