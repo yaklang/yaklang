@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-type ClassGenConfigParam struct {
+type ParamConfig struct {
 	Name                           ClassParamType
 	Desc                           string
 	DefaultValue, TestDefaultValue any
@@ -20,7 +20,7 @@ type ClassConfig struct {
 	Name     string
 	Template []byte
 	Desc     string
-	Params   []*ClassGenConfigParam
+	Params   []*ParamConfig
 }
 type GadgetConfig struct {
 	Name           string
@@ -28,12 +28,13 @@ type GadgetConfig struct {
 	Template       []byte
 	ChainTemplate  map[string][]byte
 	Desc           string
+	Params         []*ParamConfig
 }
 
 type ReflectChainFunctionConfig struct {
 	Name string
 	Desc string
-	Args []*ClassGenConfigParam
+	Args []*ParamConfig
 }
 type YsoConfig struct {
 	Classes              map[ClassType]*ClassConfig
@@ -73,7 +74,7 @@ func getConfig() (*YsoConfig, error) {
 				return nil
 			}), getListOrEmptyTask(currentKey, value, "params", func(currentKey []string, args []any) error {
 				for _, arg := range args {
-					p := &ClassGenConfigParam{}
+					p := &ParamConfig{}
 					err := runWorkFlow(getStringOrEmptyTask(currentKey, arg, "name", func(currentKey []string, v string) error {
 						p.Name = ClassParamType(v)
 						return nil
@@ -121,7 +122,7 @@ func getConfig() (*YsoConfig, error) {
 					var tasks []func() error // parse class attr tasks
 					for index, param := range params {
 						currentKey := append(currentKey, "["+strconv.Itoa(index)+"]")
-						paramConfig := &ClassGenConfigParam{}
+						paramConfig := &ParamConfig{}
 						cfg.Params = append(cfg.Params, paramConfig)
 						tasks = append(
 							tasks,
@@ -192,13 +193,57 @@ func getConfig() (*YsoConfig, error) {
 				}
 				gadgetConfig.Template = templateBytes
 			} else {
+				var isTransformChain bool
 				for _, chainInfo := range config.ReflectChainFunction {
 					fileName = "transform_" + chainInfo.Name + "_" + name
 					templateBytes, err := resources.YsoResourceFS.ReadFile(path.Join("gadgets", fileName+".ser"))
-					if err != nil && !strings.Contains(err.Error(), "file does not exist") {
+					if err != nil {
+						if strings.Contains(err.Error(), "file does not exist") {
+							continue
+						}
 						return utils.Errorf("read gadget %s template failed: %v", fileName, err)
 					}
 					gadgetConfig.ChainTemplate[chainInfo.Name] = templateBytes
+					isTransformChain = true
+				}
+				if !isTransformChain {
+					fileName = name
+					templateBytes, err := resources.YsoResourceFS.ReadFile(path.Join("gadgets", fileName+".ser"))
+					if err != nil {
+						return utils.Errorf("read gadget %s template failed: %v", fileName, err)
+					}
+					gadgetConfig.Template = templateBytes
+					err = getListOrEmptyTask(currentKey, attr, "params", func(currentKey []string, params []any) error {
+						for _, param := range params {
+							p := &ParamConfig{}
+							err := runWorkFlow(
+								getStringTask(currentKey, param, "name", func(currentKey []string, v string) error {
+									p.Name = ClassParamType(v)
+									return nil
+								}),
+								getStringOrEmptyTask(currentKey, param, "desc", func(currentKey []string, v string) error {
+									p.Desc = v
+									return nil
+								}),
+								getStringOrEmptyTask(currentKey, param, "default", func(currentKey []string, v string) error {
+									p.DefaultValue = v
+									return nil
+								}),
+								getStringOrEmptyTask(currentKey, param, "test-default", func(currentKey []string, v string) error {
+									p.TestDefaultValue = v
+									return nil
+								}),
+							)
+							if err != nil {
+								return err
+							}
+							gadgetConfig.Params = append(gadgetConfig.Params, p)
+						}
+						return nil
+					})()
+					if err != nil {
+						return err
+					}
 				}
 			}
 			config.Gadgets[GadgetType(name)] = gadgetConfig
