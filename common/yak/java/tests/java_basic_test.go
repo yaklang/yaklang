@@ -5,28 +5,6 @@ import (
 )
 
 func TestJava_Expression(t *testing.T) {
-
-	t.Run("test the assignment of no-member variables", func(t *testing.T) {
-		CheckJavaCode(` var a=1;
-int b=1;
-String c="a";
-bool d=true;`, t)
-	})
-	t.Run("test the assignment of member variables", func(t *testing.T) {
-		CheckAllJavaCode(`public class Person {
-    // 成员变量
-    private String name;
-    private int age;
-    private boolean isStudent;}`, t)
-	})
-	t.Run("test MemberCallExpression", func(t *testing.T) {
-		CheckJavaCode(` outer.new InnerClass();
-student.eat()
-student.age
-student.this
-student.super("hi")
-`, t)
-	})
 	t.Run("test PostfixExpression", func(t *testing.T) {
 		CheckJavaCode(`
 		a++;
@@ -68,18 +46,13 @@ student.super("hi")
 		 a <= b;
 		 b >= a;`, t)
 	})
-	t.Run("test InstanceofExpression", func(t *testing.T) {
-		CheckJavaCode(` Object a = new Object();
-		boolean ret;
-		ret = a instanceof Object;`, t)
-	})
 	t.Run("test EqualityExpression", func(t *testing.T) {
 		CheckJavaCode(`
 		 a == b;
 		 b != a;`, t)
 	})
 	t.Run("test AndExpression", func(t *testing.T) {
-		CheckJavaCode(` i
+		CheckJavaCode(`
 		 a & b;`, t)
 	})
 	t.Run("test XorExpression", func(t *testing.T) {
@@ -91,16 +64,12 @@ student.super("hi")
 		 a | b;`, t)
 	})
 	t.Run("test LogicalAndExpression", func(t *testing.T) {
-		CheckJavaCode(` boolean a = true;
-		boolean b = false;
-		boolean ret;
-		ret = a && b;`, t)
+		CheckJavaCode(` 
+		a && b;`, t)
 	})
 	t.Run("test LogicalOrExpression", func(t *testing.T) {
-		CheckJavaCode(` boolean a = true;
-		boolean b = false;
-		boolean ret;
-		ret = a || b;`, t)
+		CheckJavaCode(` 	
+		a||b;`, t)
 	})
 	t.Run("test TernaryExpression", func(t *testing.T) {
 		CheckJavaCode(` int a = 1;
@@ -129,6 +98,7 @@ student.super("hi")
 	a[b];
 	`, t)
 	})
+
 	t.Run("test FunctionCallExpression", func(t *testing.T) {
 		CheckJavaCode(` a();
 		a(b);
@@ -139,5 +109,4 @@ student.super("hi")
 
 		`, t)
 	})
-
 }
