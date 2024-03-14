@@ -1,10 +1,13 @@
 package chatglm
 
 import (
-	"fmt"
-	"os"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"time"
 )
+
+func init() {
+	aispec.Register("chatglm", &GLMClient{})
+}
 
 type ModelAPI struct {
 	Model       string
@@ -44,18 +47,4 @@ func (m ModelAPI) buildParams() map[string]interface{} {
 	params["model"] = m.Model
 	params["messages"] = m.Prompt
 	return params
-}
-
-func buildGetAPIURL(invokeMethod, taskID string) string {
-	url := getBaseURL()
-	return fmt.Sprintf("%s/-/%s/%s", url, invokeMethod, taskID)
-}
-
-func getBaseURL() string {
-	var url string
-	url = os.Getenv("ZHIPUAI_MODEL_API_URL")
-	if url == "" {
-		url = BaseURL
-	}
-	return url
 }
