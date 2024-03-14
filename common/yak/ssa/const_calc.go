@@ -1,5 +1,7 @@
 package ssa
 
+import "math"
+
 type BinaryOpcode int
 
 const (
@@ -57,6 +59,7 @@ var BinaryOpcodeName = map[BinaryOpcode]string{
 	OpEq:     `eq`,
 	OpIn:     `in`,
 	OpSend:   `send`,
+	OpPow:    `pow`,
 }
 
 type UnaryOpcode int
@@ -188,6 +191,10 @@ func CalcConstBinary(x, y *ConstInst, op BinaryOpcode) *ConstInst {
 	case OpShl:
 		if x.IsNumber() && y.IsNumber() {
 			return NewConst(x.Number() << y.Number())
+		}
+	case OpPow:
+		if x.IsNumber() && y.IsNumber() {
+			return NewConst(math.Pow(float64(x.Number()), float64(y.Number())))
 		}
 	case OpShr:
 		if x.IsNumber() && y.IsNumber() {

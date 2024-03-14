@@ -3,21 +3,214 @@ package tests
 import (
 	"testing"
 
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 )
 
+func TestExpression_NullCoalescingExpression(t *testing.T) {
+	code := `<?php
+$a = $a??12312;
+println($a);
+`
+	t.Run("mock", func(t *testing.T) {
+		ssatest.MockSSA(t, code)
+	})
+	t.Run("check no variables declare", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(code, []string{"12312"}, t)
+	})
+	t.Run("check has variables declare", func(t *testing.T) {
+		code := `<?php
+$a = 1;
+$a = $a??12312;
+println($a);`
+		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
+	})
+
+}
 func TestPhpPrintln(t *testing.T) {
 	c := `<?php $a=1; println($a);`
 	ssatest.CheckPrintf(t, ssatest.TestCase{Want: []string{"1"}, Code: c})
 }
-
+func TestExpression_AssignmentOperator(t *testing.T) {
+	t.Run("operator -=", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`<?php
+$a=1;
+$a-=1;
+println($a);
+`,
+			[]string{"0"}, t,
+		)
+	})
+	t.Run("opertor +=", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`<?php
+$a=1;
+$a+=1;
+println($a);`, []string{"2"}, t)
+	})
+	t.Run("opertor *=", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`<?php
+$a=1;
+$a*=5;
+println($a);
+`, []string{"5"}, t)
+	})
+	t.Run("opertor /=", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`<?php
+$a=5;
+$a/=5;
+println($a);
+`, []string{"1"}, t)
+	})
+	t.Run("opertor **=", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`<?php
+$a=2;
+$a**=3;
+println($a);
+`, []string{"8"}, t)
+	})
+	t.Run("opertor %=", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`<?php
+$a = 10;
+$a %=3;
+println($a);`, []string{"1"}, t)
+	})
+	t.Run("opertor &=", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`<?php
+$a = 10;
+$a &=3;
+println($a);
+`, []string{"2"}, t)
+	})
+	t.Run("opertor |=", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`<?php
+$a = 10;
+$a |=3;
+println($a);
+`, []string{"11"}, t)
+	})
+	t.Run("opertor ^=", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`<?php
+$a = 10;
+$a ^=3;
+println($a);
+`, []string{"9"}, t)
+	})
+	t.Run("operator <<=", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`<?php
+$a = 10;
+$a <<=3;
+println($a);
+`, []string{"80"}, t)
+	})
+	t.Run("operator ??=", func(t *testing.T) {
+		t.Run("no variable declare", func(t *testing.T) {
+			ssatest.CheckPrintlnValue(`<?php
+$a ??= 1;
+println($a);
+?>`, []string{"1"}, t)
+		})
+		t.Run("has variable declare", func(t *testing.T) {
+			ssatest.CheckPrintlnValue(`<?php
+$a = 2;
+$a ??= 1;
+println($a);
+?>`, []string{"2"}, t)
+		})
+	})
+	//	t.Run("all-operator", func(t *testing.T) {
+	//		code := `<?php
+	//$a=0;
+	//$a+=1;
+	//println($a);
+	//$a-=2; //-1
+	//println($a);
+	//$a*=5; //-5
+	//println($a);
+	//$a/=5; //-1
+	//println($a);
+	//$a.=1; //-11
+	//println($a);
+	//$a|=2; //-9
+	//println($a);
+	//$a>>=10; //-1
+	//println($a);
+	//$a<<=10; //-1024
+	//println($a);
+	//$a^=10; //-1014
+	//println($a);
+	//$a&=10; //10
+	//println($a);
+	//$a%=3; //1
+	//println($a);
+	//$a++; //2
+	//println($a);
+	//$a**=3; //8
+	//println($a);`
+	//		ssatest.CheckPrintlnValue(code, []string{"1", "-1", "-5", "-1", "-11", "-9", "-1", "-1024", "-1014", "10", "1", "2", "8"}, t)
+	//	})
+	t.Run("operator-'.='", func(t *testing.T) {
+		code := `<?php
+$a=1;
+$a.=$a;
+println($a);`
+		ssatest.CheckPrintlnValue(code, []string{"\"11\""}, t)
+	})
+}
+func TestExpression_OrdinaryAssignmentExpression(t *testing.T) {
+	t.Run("=", func(t *testing.T) {
+		code := `<?php 
+$a=0;
+$a+=1;
+println($a);
+$a-=2;
+println($a);
+$a*=5;
+println($a);
+`
+		ssatest.CheckPrintlnValue(code, []string{"1", "-1", "-5"}, t)
+	})
+	t.Run("+=", func(t *testing.T) {
+		code := `<?php
+$a=0;
+$a+=1;
+println($a);
+$a-=1;
+`
+		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
+	})
+	t.Run("and", func(t *testing.T) {
+		code := `<?php
+$a = 0;
+($a=3) and ($a=1) and ($a=4);
+println($a);
+`
+		ssatest.CheckPrintlnValue(code, []string{"phi($a)[4,phi($a)[1,3]]"}, t)
+	})
+	t.Run("xor", func(t *testing.T) {
+		code := `<?php
+$a = 0;
+($a=3) xor ($a=1) xor ($a=4);
+println($a);`
+		ssatest.CheckPrintlnValue(code, []string{"4"}, t)
+	})
+	t.Run("or", func(t *testing.T) {
+		code := `<?php
+$a = 0;
+($a=0) or ($a=1) or ($a=4);
+println($a);
+`
+		ssatest.CheckPrintlnValue(code, []string{"phi($a)[phi($a)[0,1],4]"}, t)
+	})
+}
 func TestExpression_DynamicVariable(t *testing.T) {
 	code := `<?php
 // Variable expression and dynamic variable expression
 $identifier = "dynamicVar";
 $$identifier = "Hello, dynamic!";
+println($dynamicVar);
 `
 	ssatest.MockSSA(t, code)
+	ssatest.CheckPrintlnValue(code, []string{"\"Hello, dynamic!\""}, t)
 }
 func TestExpression_DynamicVariable_2(t *testing.T) {
 	code := `<?php
@@ -72,6 +265,69 @@ println($a);
 			Want: []string{"1", "2", "3", "4", "5", "phi($a)[1,2,3,4,5]"},
 		})
 	})
+	t.Run("other-if", func(t *testing.T) {
+		code := `<?php
+$a = 1;
+println($a);
+if($b):
+$a=2;
+println($a);
+endif;
+println($a);`
+
+		ssatest.CheckPrintf(t, ssatest.TestCase{
+			Want: []string{"1", "2", "phi($a)[2,1]"},
+			Code: code,
+		})
+	})
+	t.Run("other-if-else", func(t *testing.T) {
+		code := `<?php
+$a = 1;
+println($a);
+if($b):
+$a=2;
+println($a);
+elseif($b):
+$a=3;
+println($a);
+endif;
+println($a);`
+		ssatest.CheckPrintf(t, ssatest.TestCase{
+			Want: []string{"1", "2", "3", "phi($a)[2,3,1]"},
+			Code: code,
+		})
+	})
+}
+
+func TestExpression_If(t *testing.T) {
+	//todo: 还有问题
+	t.Run("customIf", func(t *testing.T) {
+		code := `<?php
+$a=0;
+if($b){
+    $a=1;
+    println($a);
+}elseif($c){
+    $a=2;
+    println($a);
+}elseif($d){
+    $a=3;
+    println($a);
+}elseif($e){
+    $a=4;
+    println($a);
+}else{
+    $a=5;
+    println($a);
+}
+println($a);
+`
+		ssatest.CheckPrintf(t, ssatest.TestCase{
+			Code: code,
+			Want: []string{"1", "2", "3", "4", "5", "phi($a)[1,2,3,4,5]"},
+		})
+	})
+
 	t.Run("other-if", func(t *testing.T) {
 		code := `<?php
 $a = 1;
@@ -238,7 +494,7 @@ while ($a<4) {
 }
 println($a);
 `
-		ssatest.CheckPrintlnValue(code, []string{}, t)
+		ssatest.CheckPrintlnValue(code, []string{"phi($a)[0,add($a, 1)]"}, t)
 	})
 	t.Run("do-while-custom", func(t *testing.T) {
 		code := `<?php
@@ -274,10 +530,20 @@ do {
 $a++;
 } while ($a>3);
 println($a);`
-		ssatest.CheckPrintlnValue(code, []string{}, t)
+		ssatest.CheckPrintlnValue(code, []string{"phi($a)[0,add(phi($a)[1,0], 1)]"}, t)
 	})
 }
 
+func TestAssignVariables(t *testing.T) {
+	code := `<?php $a=1;if($b){$a=2;}`
+	parse, err := ssaapi.Parse(code, ssaapi.WithLanguage("php"))
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	parse.Ref("$a").Show()
+	//fmt.Println(parse.GetAllSymbols())
+}
 func TestExpressionAllInONE(t *testing.T) {
 	code := `<?php
 // Clone expression

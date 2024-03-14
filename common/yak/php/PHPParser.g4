@@ -529,8 +529,8 @@ expression
     | '(' castOperation ')' expression                            # CastExpression
     | ('~' | '@') expression                                      # UnaryOperatorExpression
     | ('!' | '+' | '-') expression                                # UnaryOperatorExpression
-    | ('++' | '--') leftVariable                                    # PrefixIncDecExpression
-    | leftVariable ('++' | '--')                                    # PostfixIncDecExpression
+    | ('++' | '--') leftVariable                                   # PrefixIncDecExpression
+    | leftVariable ('++' | '--')                                   # PostfixIncDecExpression
     | expression arguments                                        # FunctionCallExpression
     | expression '[' expression ']'                               # IndexCallExpression
     | expression '->' expression                                  # MemberCallExpression
@@ -565,8 +565,8 @@ leftSliceCall: '[' expression ']';
 
 leftVariable
     : Dollar+ VarName                                       # DynamicVariable// $$a= 1; or $$$a=1;
-    | VarName                                               # Variable// $a=3 
-    | Dollar* OpenCurlyBracket expression CloseCurlyBracket # MemberCallVariable// ${"a"."b"}=3
+    | VarName                                               # Variable// $a=3
+    | Dollar+ OpenCurlyBracket expression CloseCurlyBracket # MemberCallVariable// ${"a"."b"}=3
     ;
 
 leftArrayCreation // PHP7.1+
@@ -629,7 +629,7 @@ assignmentOperator
     | '^='
     | '<<='
     | '>>='
-    | '??='
+    | '??=' //高版本引入 7.4
     ;
 
 yieldExpression
