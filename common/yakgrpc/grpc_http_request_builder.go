@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
+	"net/url"
+	"strings"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
@@ -13,8 +16,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"gopkg.in/yaml.v3"
-	"net/url"
-	"strings"
 )
 
 //go:embed grpc_http_request_builder_scripts.yak
@@ -47,6 +48,9 @@ func (s *Server) DebugPlugin(req *ypb.DebugPluginRequest, stream ypb.Yak_DebugPl
 		}
 	}
 
+	if req.GetPluginName() != "" {
+		return s.execScript(input, req.GetPluginType(), req.GetPluginName(), stream, execParams, req.GetHTTPRequestTemplate())
+	}
 	return s.debugScript(input, req.GetPluginType(), req.GetCode(), stream, execParams, req.GetHTTPRequestTemplate())
 }
 
