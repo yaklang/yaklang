@@ -518,7 +518,8 @@ cli.check()
 		LinkPluginConfig: &ypb.HybridScanPluginConfig{
 			PluginNames: []string{tempName1},
 			Filter: &ypb.QueryYakScriptRequest{
-				Keyword: tempName2,
+				Keyword:  tempName2,
+				IsIgnore: true,
 			},
 		},
 		Input: "http://" + utils.HostPort(host, port),
