@@ -3,6 +3,8 @@ package yakgrpc
 import (
 	"context"
 	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"testing"
 )
@@ -63,4 +65,39 @@ func TestExportLocalYakScriptStream(t *testing.T) {
 		test.FailNow(err.Error())
 	}
 	_ = s
+}
+
+func TestTempYakScriptQuery(t *testing.T) {
+	scriptName, err := yakit.CreateTemporaryYakScript("yak", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), scriptName)
+
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := client.QueryYakScript(context.Background(), &ypb.QueryYakScriptRequest{
+		Keyword:  scriptName,
+		IsIgnore: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(res.Data) != 1 {
+		t.Fatalf("just keyword query err, len(res)[%d] != 1", len(res.Data))
+	}
+
+	res, err = client.QueryYakScript(context.Background(), &ypb.QueryYakScriptRequest{
+		Keyword: scriptName,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Data) != 0 {
+		t.Fatalf("ingore is ineffective, len(res)[%d] != 0", len(res.Data))
+	}
 }
