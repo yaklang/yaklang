@@ -233,7 +233,7 @@ func (starter *BrowserStarter) doLauncher(l *launcher.Launcher) *launcher.Launch
 	if starter.browserConfig.proxyAddress != nil {
 		l = l.Proxy(starter.browserConfig.proxyAddress.String())
 	}
-	l = l.NoSandbox(true).Headless(false)
+	l = l.NoSandbox(true).Headless(true)
 	if (starter.baseConfig.leakless == "default" && strings.Contains(runtime.GOOS, "windows")) ||
 		starter.baseConfig.leakless == "false" {
 		l = l.Leakless(false)
@@ -503,7 +503,7 @@ func (starter *BrowserStarter) createBrowserHijack(browser *rod.Browser) error {
 		default:
 			starter.ch <- &result
 		}
-		if starter.maxUrl != 0 && starter.baseConfig.resultSent.Count() >= int64(starter.maxUrl) {
+		if starter.maxUrl > 0 && starter.baseConfig.resultSent.Count() >= int64(starter.maxUrl) {
 			starter.stopSignal = true
 		}
 	})
