@@ -76,37 +76,6 @@ func _exactChecker(includes, excludes []string, target string) bool {
 	return false
 }
 
-func _checker(includes, excludes []string, target string) bool {
-	excludes = utils.StringArrayFilterEmpty(excludes)
-	includes = utils.StringArrayFilterEmpty(includes)
-
-	for _, exclude := range excludes {
-		if match, err := regexp.MatchString(exclude, target); err == nil && match {
-			return false
-		} else if utils.StringGlobContains(exclude, target) {
-			return false
-		} else if exclude == target {
-			return false
-		}
-	}
-
-	if includes == nil {
-		return true
-	}
-
-	for _, include := range includes {
-		if match, err := regexp.MatchString(include, target); err == nil && match {
-			return true
-		} else if utils.StringGlobContains(include, target) {
-			return true
-		} else if include == target {
-			return true
-		}
-	}
-
-	return false
-}
-
 func fixSuffix(suf string) string {
 	if strings.HasPrefix(suf, ".") {
 		return suf
@@ -334,13 +303,13 @@ func (m *MITMFilterManager) IsPassed(method string, hostport, urlStr string, ext
 		return false
 	}
 
-	passed = _checker(m.IncludeHostnames, m.ExcludeHostnames, hostport)
+	passed = utils.IncludeExcludeChecker(m.IncludeHostnames, m.ExcludeHostnames, hostport)
 	if !passed {
 		log.Debugf("url: %s is filtered via hostnames(%v)", truncate(urlStr), hostport)
 		return false
 	}
 
-	passed = _checker(m.IncludeUri, m.ExcludeUri, urlStr)
+	passed = utils.IncludeExcludeChecker(m.IncludeUri, m.ExcludeUri, urlStr)
 	if !passed {
 		log.Debugf("url: %s is filtered via uri(url)", truncate(urlStr))
 		return false

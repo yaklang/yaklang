@@ -212,7 +212,13 @@ func (y *YakToCallerManager) SetDividedContext(b bool) {
 }
 
 func NewYakToCallerManager() *YakToCallerManager {
-	return &YakToCallerManager{table: new(sync.Map), baseWaitGroup: new(sync.WaitGroup), timeout: 10 * time.Second, ContextCancelFuncs: new(sync.Map)}
+	caller := &YakToCallerManager{
+		table:              new(sync.Map),
+		baseWaitGroup:      new(sync.WaitGroup),
+		timeout:            10 * time.Second,
+		ContextCancelFuncs: new(sync.Map),
+	}
+	return caller
 }
 
 func (y *YakToCallerManager) WithDefaultFilter(filter *filter.StringFilter) *YakToCallerManager {

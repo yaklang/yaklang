@@ -102,6 +102,7 @@ type MixPluginCaller struct {
 	fingerprintMatcher *fp.Matcher
 	swg                *utils.SizedWaitGroup
 	cache              bool
+	pluginScanFilter   *yakit.PluginScanFilter // 插件扫描黑白名单，现在直接使用yakit全局网络配置
 }
 
 func (m *MixPluginCaller) SetCache(b bool) {
@@ -220,6 +221,7 @@ func NewMixPluginCaller() (*MixPluginCaller, error) {
 		websitePathFilter:   webFilter,
 		websiteParamsFilter: webFilter,
 		rawQuestFilter:      webFilter,
+		pluginScanFilter:    yakit.GlobalPluginScanFilter,
 		callers:             NewYakToCallerManager().WithDefaultFilter(callerFilter),
 		feedbackHandler: func(result *ypb.ExecResult) error {
 			return fmt.Errorf("feedback handler not set")
@@ -244,6 +246,7 @@ func NewMixPluginCallerWithFilter(webFilter *filter.StringFilter) (*MixPluginCal
 		websiteFilter:       webFilter,
 		websitePathFilter:   webFilter,
 		websiteParamsFilter: webFilter,
+		pluginScanFilter:    yakit.GlobalPluginScanFilter,
 		callers:             NewYakToCallerManager().WithDefaultFilter(callerFilter),
 		feedbackHandler: func(result *ypb.ExecResult) error {
 			return fmt.Errorf("feedback handler not set")
@@ -295,6 +298,15 @@ func (c *MixPluginCaller) ResetFilter() {
 	c.websiteParamsFilter = webFilter
 	c.websitePathFilter = webFilter
 	c.websiteFilter = webFilter
+}
+
+func (c *MixPluginCaller) IsPassed(target string) bool {
+	if c.pluginScanFilter == nil {
+		return true
+	}
+	f := c.pluginScanFilter
+
+	return utils.IncludeExcludeChecker(f.IncludePluginScanURIs, f.ExcludePluginScanURIs, target)
 }
 
 func (c *MixPluginCaller) FeedbackOrdinary(i interface{}) {
@@ -562,6 +574,9 @@ func (m *MixPluginCaller) CallHijackRequest(
 	reject func() interface{},
 	drop func() interface{},
 ) {
+	if !m.IsPassed(u) {
+		return
+	}
 	callers := m.callers
 	if callers.ShouldCallByName(HOOK_HijackHTTPRequest) {
 		callers.CallByNameExSync(
@@ -582,6 +597,9 @@ func (m *MixPluginCaller) CallHijackResponse(
 	isHttps bool, u string, getResponse,
 	reject, drop func() interface{},
 ) {
+	if !m.IsPassed(u) {
+		return
+	}
 	callers := m.callers
 	if callers.ShouldCallByName(HOOK_HijackHTTPResponse) {
 		callers.CallByNameExSync(
@@ -596,6 +614,9 @@ func (m *MixPluginCaller) CallHijackResponseEx(
 	isHttps bool, u string, getRequest, getResponse,
 	reject, drop func() interface{},
 ) {
+	if !m.IsPassed(u) {
+		return
+	}
 	callers := m.callers
 	if callers.ShouldCallByName(HOOK_HijackHTTPResponseEx) {
 		callers.CallByNameExSync(
@@ -703,6 +724,9 @@ func (m *MixPluginCaller) MirrorHTTPFlow(
 	isHttps bool, u string, req, rsp, body []byte,
 	filters ...bool,
 ) {
+	if !m.IsPassed(u) {
+		return
+	}
 	m.MirrorHTTPFlowEx(true, isHttps, u, req, rsp, body, filters...)
 }
 
@@ -711,6 +735,9 @@ func (m *MixPluginCaller) MirrorHTTPFlowEx(
 	isHttps bool, u string, req, rsp, body []byte,
 	filters ...bool,
 ) {
+	if !m.IsPassed(u) {
+		return
+	}
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("panic from mirror httpflow ex: %s", err)
@@ -818,6 +845,9 @@ func (m *MixPluginCaller) MirrorHTTPFlowEx(
 }
 
 func (m *MixPluginCaller) HijackSaveHTTPFlow(flow *yakit.HTTPFlow, reject func(httpFlow *yakit.HTTPFlow), drop func()) {
+	if !m.IsPassed(flow.Url) {
+		return
+	}
 	if m.callers.ShouldCallByName(HOOK_hijackSaveHTTPFlow) {
 		m.callers.CallByName(HOOK_hijackSaveHTTPFlow, flow, reject, drop)
 	}

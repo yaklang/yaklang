@@ -3,12 +3,13 @@ package yakit
 import (
 	"context"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/netx"
-	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"os"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/utils/tlsutils"
 
 	"github.com/jinzhu/copier"
 	"github.com/jinzhu/gorm"
@@ -31,7 +32,7 @@ func MigrateLegacyDatabase() error {
 		if count > 0 {
 			log.Infof("start auto migrate kv user cache: %v", count)
 			for i := range YieldGeneralStorages(projectDB.Model(&GeneralStorage{}), context.Background()) {
-				var kv = &GeneralStorage{}
+				kv := &GeneralStorage{}
 				err := copier.Copy(kv, i)
 				if err != nil {
 					log.Errorf("copier.Copy for kv failed: %s", err)
@@ -218,8 +219,8 @@ func SetKey(db *gorm.DB, key interface{}, value interface{}) error {
 		return utils.Error("no set database")
 	}
 
-	var keyStr = strconv.Quote(utils.InterfaceToString(key))
-	var valueStr = strconv.Quote(utils.InterfaceToString(value))
+	keyStr := strconv.Quote(utils.InterfaceToString(key))
+	valueStr := strconv.Quote(utils.InterfaceToString(value))
 	if valueStr == `""` {
 		valueStr = ""
 	}
@@ -238,8 +239,8 @@ func InitKey(db *gorm.DB, key interface{}, verbose interface{}, env bool) error 
 		return utils.Error("no set database")
 	}
 
-	var keyStr = strconv.Quote(utils.InterfaceToString(key))
-	var valueStr = strconv.Quote(utils.InterfaceToString(verbose))
+	keyStr := strconv.Quote(utils.InterfaceToString(key))
+	valueStr := strconv.Quote(utils.InterfaceToString(verbose))
 	if db := db.Model(&GeneralStorage{}).Where("key = ?", keyStr).Assign(map[string]interface{}{
 		"key": keyStr, "verbose": valueStr, "process_env": env,
 	}).FirstOrCreate(&GeneralStorage{}); db.Error != nil {
@@ -255,8 +256,8 @@ func SetKeyWithTTL(db *gorm.DB, key interface{}, value interface{}, seconds int)
 		return utils.Error("no set database")
 	}
 
-	var keyStr = strconv.Quote(utils.InterfaceToString(key))
-	var valueStr = strconv.Quote(utils.InterfaceToString(value))
+	keyStr := strconv.Quote(utils.InterfaceToString(key))
+	valueStr := strconv.Quote(utils.InterfaceToString(value))
 	if db := db.Model(&GeneralStorage{}).Where("key = ?", keyStr).Assign(map[string]interface{}{
 		"key": keyStr, "value": valueStr, "expired_at": time.Now().Add(time.Duration(seconds) * time.Second),
 	}).FirstOrCreate(&GeneralStorage{}); db.Error != nil {
@@ -268,7 +269,7 @@ func SetKeyWithTTL(db *gorm.DB, key interface{}, value interface{}, seconds int)
 func SetKeyProcessEnv(db *gorm.DB, key interface{}, processEnv bool) {
 	db = UserDataAndPluginDatabaseScope(db)
 
-	var keyStr = strconv.Quote(utils.InterfaceToString(key))
+	keyStr := strconv.Quote(utils.InterfaceToString(key))
 	if db := db.Model(&GeneralStorage{}).Where("key = ?", keyStr).Updates(map[string]interface{}{
 		"process_env": processEnv,
 	}); db.Error != nil {
@@ -299,7 +300,7 @@ func GetKeyModel(db *gorm.DB, key interface{}) (*GeneralStorage, error) {
 		yakitZeroTime,
 		time.Now(),
 	).First(&kv); db.Error != nil {
-		//log.Errorf("error for query[%v] general storage: %s", keyStr, db.Error)
+		// log.Errorf("error for query[%v] general storage: %s", keyStr, db.Error)
 		return nil, db.Error
 	}
 	return &kv, nil
@@ -357,7 +358,7 @@ func YieldGeneralStorages(db *gorm.DB, ctx context.Context) chan *GeneralStorage
 	go func() {
 		defer close(outC)
 
-		var page = 1
+		page := 1
 		for {
 			var items []*GeneralStorage
 			if _, b := bizhelper.NewPagination(&bizhelper.Param{
@@ -386,6 +387,7 @@ func YieldGeneralStorages(db *gorm.DB, ctx context.Context) chan *GeneralStorage
 	}()
 	return outC
 }
+
 func GetNetworkConfig() *ypb.GlobalNetworkConfig {
 	data := Get(consts.GLOBAL_NETWORK_CONFIG)
 	if data == "" {
@@ -451,6 +453,9 @@ func ConfigureNetWork(c *ypb.GlobalNetworkConfig) {
 		netx.DialX_WithProxy(c.GetGlobalProxy()...),
 		netx.DialX_WithEnableSystemProxyFromEnv(c.GetEnableSystemProxyFromEnv()),
 	)
+
+	// 插件扫描黑白名单
+	SetGlobalPluginScanLists(c.IncludePluginScanURIs, c.ExcludePluginScanURIs)
 
 	for _, certs := range c.GetClientCertificates() {
 		if len(certs.GetPkcs12Bytes()) > 0 {
