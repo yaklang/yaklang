@@ -49,3 +49,21 @@ func WithTimeout(timeout float64) AIConfigOption {
 		c.Timeout = timeout
 	}
 }
+
+func WithProxy(p string) AIConfigOption {
+	return func(c *AIConfig) {
+		c.Proxy = p
+	}
+}
+
+func WithAPIKey(k string) AIConfigOption {
+	return func(c *AIConfig) {
+		c.APIKey = k
+	}
+}
+
+func WithNoHttps(b bool) AIConfigOption {
+	return func(c *AIConfig) {
+		c.NoHttps = b
+	}
+}
