@@ -290,7 +290,7 @@ func FilterByQueryRisks(db *gorm.DB, params *ypb.QueryRisksRequest) (_ *gorm.DB,
 		db, "severity",
 		utils.PrettifyListFromStringSplitEx(params.GetSeverity()),
 	)
-	db = bizhelper.ExactQueryString(db, "token", params.GetToken())
+	db = bizhelper.ExactQueryString(db, "reverse_token", params.GetToken())
 	return db, nil
 }
 
