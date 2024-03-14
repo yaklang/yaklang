@@ -206,6 +206,15 @@ func ReplaceStringInJavaSerilizable(objSer yserx.JavaSerializable, old string, n
 			o.Size = uint64(len(rep))
 			times--
 		}
+		classIns, ok := objSer.(*yserx.JavaClass)
+		if ok {
+			jd, ok2 := classIns.Desc.(*yserx.JavaClassDesc)
+			if ok2 && jd.Detail.ClassName == old && times != 0 {
+				err = nil
+				jd.Detail.ClassName = new
+				times--
+			}
+		}
 	})
 	return err
 }
@@ -474,7 +483,6 @@ func _WalkJavaSerializableObject(objSer yserx.JavaSerializable, replace func(new
 	}
 	return
 }
-
 
 func ToBcel(i interface{}) (string, error) {
 	switch ret := i.(type) {
