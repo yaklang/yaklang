@@ -1,6 +1,7 @@
 package openai
 
 import (
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
 	"os"
 	"path/filepath"
@@ -107,7 +108,7 @@ func WithYakDomain() ConfigOption {
 // ```
 func WithFunction(name, description string, opts ...ConfigOption) ConfigOption {
 	c := NewRawOpenAIClient(opts...)
-	f := Function{
+	f := aispec.Function{
 		Name:        name,
 		Description: description,
 		Parameters:  c.Parameters,
@@ -155,7 +156,7 @@ func WithFunctionProperty(name, typ, description string, enum ...[]string) Confi
 	}
 
 	return func(client *Client) {
-		client.Parameters.Properties[name] = Property{
+		client.Parameters.Properties[name] = aispec.Property{
 			Type:        typ,
 			Description: description,
 			Enum:        _enum,

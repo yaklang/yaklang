@@ -715,6 +715,7 @@ func main() {
 	app.Commands = append(app.Commands, cliGroup("Utils", yakcmds.UtilsCommands...)...)
 	app.Commands = append(app.Commands, cliGroup("Network Distribution Utils", yakcmds.DistributionCommands...)...)
 	app.Commands = append(app.Commands, cliGroup("Vuln & Network Scanner", yakcmds.ScanCommands...)...)
+	app.Commands = append(app.Commands, cliGroup("AI", yakcmds.AICommands...)...)
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{

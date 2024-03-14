@@ -30,6 +30,9 @@ func post(apiURL, token string, params map[string]interface{}, timeout time.Dura
 	if err != nil {
 		return nil, fmt.Errorf("JSON response failed：%w", err)
 	}
+	if utils.MapGetString(result, "error") != "" {
+		return nil, fmt.Errorf("API to %v error: %s, message: %v\n\n\n", apiURL, utils.MapGetString(result, "error"), string(rsp.GetBody()))
+	}
 	return result, nil
 }
 

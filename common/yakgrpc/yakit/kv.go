@@ -400,6 +400,11 @@ func GetNetworkConfig() *ypb.GlobalNetworkConfig {
 	return config
 }
 
+// LoadGlobalNetworkConfig load config from yakit config in db
+func LoadGlobalNetworkConfig() {
+	ConfigureNetWork(GetNetworkConfig())
+}
+
 func GetDefaultNetworkConfig() *ypb.GlobalNetworkConfig {
 	defaultConfig := &ypb.GlobalNetworkConfig{
 		DisableSystemDNS: false,
