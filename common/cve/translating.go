@@ -15,11 +15,15 @@ import (
 )
 
 func TranslatingCWE(apiKeyFile string, concurrent int, cveResourceDb string) error {
-	key, err := ioutil.ReadFile(apiKeyFile)
-	if err != nil {
-		return err
+	var keyStr string
+	var err error
+	if apiKeyFile != "" {
+		key, err := ioutil.ReadFile(apiKeyFile)
+		if err != nil {
+			return err
+		}
+		keyStr = strings.TrimSpace(string(key))
 	}
-	var keyStr = strings.TrimSpace(string(key))
 	var db *gorm.DB // = consts.GetGormCVEDatabase()
 	if cveResourceDb == "" {
 		db = consts.GetGormCVEDatabase()
@@ -67,7 +71,7 @@ func TranslatingCWE(apiKeyFile string, concurrent int, cveResourceDb string) err
 				swg.Done()
 			}()
 			start := time.Now()
-			cweIns, err := MakeOpenAITranslateCWE(c, string(keyStr), "http://127.0.0.1:7890")
+			cweIns, err := MakeOpenAITranslateCWE(c, keyStr)
 			log.Infof(
 				"%6d/%-6d save [%v] chinese desc finished: cost: %v",
 				current, count, c.CWEString(), time.Now().Sub(start).String(),
@@ -96,11 +100,18 @@ func TranslatingCWE(apiKeyFile string, concurrent int, cveResourceDb string) err
 }
 
 func Translating(apiKeyFile string, noCritical bool, concurrent int, cveResourceDb string) error {
-	key, err := ioutil.ReadFile(apiKeyFile)
-	if err != nil {
-		return err
+	var (
+		keyStr string
+		err    error
+	)
+	if apiKeyFile != "" {
+		key, err := ioutil.ReadFile(apiKeyFile)
+		if err != nil {
+			return err
+		}
+		keyStr = strings.TrimSpace(string(key))
 	}
-	var keyStr = strings.TrimSpace(string(key))
+
 	var db *gorm.DB // = consts.GetGormCVEDatabase()
 	if cveResourceDb == "" {
 		db = consts.GetGormCVEDatabase()
@@ -145,7 +156,7 @@ func Translating(apiKeyFile string, noCritical bool, concurrent int, cveResource
 				swg.Done()
 			}()
 			start := time.Now()
-			err := MakeOpenAIWorking(c, c.DescriptionMain, string(keyStr), "http://127.0.0.1:7890")
+			err := MakeOpenAIWorking(c, c.DescriptionMain, keyStr)
 			log.Infof(
 				"%6d/%-6d save [%v] chinese desc finished: cost: %v",
 				current, count, c.CVE, time.Now().Sub(start).String(),
