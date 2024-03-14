@@ -20,6 +20,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 )
 
 type Storage struct {
@@ -132,7 +133,12 @@ func (origin *Storage) DecoratedByOpenAI(opts ...openai.ConfigOption) {
 		}
 	}
 
-	ruleIns.Name, _ = strings.CutPrefix(ruleIns.Name, "ET ")
+	// et
+	var ok bool
+	ruleIns.Name, ok = strings.CutPrefix(ruleIns.Name, "ET ")
+	if ok {
+		log.Debugf("cut 'et ' prefix failed: %v", ruleIns.Name)
+	}
 
 	/*
 		这是一个提炼攻击流量特征的任务，请提炼 %v 中的特征关键字（去除引用）？提取成 json array，以方便系统打标签和筛选，提供中文和英文的版本，放在 json 中，以 keywords 和 keywords_zh 作为字段，再描述一下这个特征（中文50字以内，去除‘检测’等字段意图），作为 description_zh 字段，同时补充他的 description（英文）
@@ -141,18 +147,25 @@ func (origin *Storage) DecoratedByOpenAI(opts ...openai.ConfigOption) {
 	switch ruleIns.RuleType {
 	case "suricata":
 		clearData = strconv.Quote(ruleIns.SuricataRaw)
+
 	case "http-request":
 		raw, _ := codec.DecodeBase64(ruleIns.RawTrafficBeyondHTTPBase64)
 		if raw != nil {
 			clearData = strconv.Quote(string(raw))
 		}
+		return
 	case "tcp":
 		raw, _ := codec.DecodeBase64(ruleIns.RawTrafficBeyondIPPacketBase64)
 		if raw != nil {
 			clearData = strconv.Quote(string(raw))
 		}
+		return
 	default:
 		log.Errorf("unknown rule type: %v", ruleIns.RuleType)
+		return
+	}
+
+	if ret := strings.TrimLeftFunc(clearData, unicode.IsSpace); ret == "" || strings.HasPrefix(ret, "#") {
 		return
 	}
 
@@ -179,7 +192,7 @@ func (origin *Storage) DecoratedByOpenAI(opts ...openai.ConfigOption) {
 			"name_zh":        "msg的中文翻译",
 		}, opts...)
 		if err != nil {
-			log.Errorf("openai extract data by ai failed: %s", err)
+			log.Errorf("openai extract data by ai failed: %s with:\n    %v\n\n", err, clearData)
 			return
 		}
 		log.Infof("find raw answer: %v", raw)
@@ -200,13 +213,33 @@ func (origin *Storage) DecoratedByOpenAI(opts ...openai.ConfigOption) {
 func DecorateRules(concurrent int, proxy string) {
 	var db = consts.GetGormProfileDatabase()
 	swg := utils.NewSizedWaitGroup(concurrent)
+	db = db.Where("name_zh = '' or name_zh is null")
 	for r := range YieldRules(db, context.Background()) {
 		swg.Add()
 		r := r
 		go func() {
 			defer swg.Done()
+			if r.RuleType != "suricata" {
+				return
+			}
+			raw, err := strconv.Unquote(r.SuricataRaw)
+			if err != nil {
+				raw = string(r.SuricataRaw)
+			}
+			suricataRule, err := rule.Parse(raw)
+			if err != nil || len(suricataRule) > 0 {
+				target := suricataRule[0]
+				if target.Action == "" || target.Protocol == "" || target.Message == "" || target.DestinationPort == nil || target.SourceAddress == nil {
+					log.Errorf("parse suricata rule failed: %s, remove bad rule", err, raw)
+					DeleteSuricataRuleByID(consts.GetGormProfileDatabase(), int64(r.ID))
+				}
+				return
+			} else if len(suricataRule) == 0 {
+				DeleteSuricataRuleByID(consts.GetGormProfileDatabase(), int64(r.ID))
+				return
+			}
 			r.DecoratedByOpenAI(openai.WithAPIKeyFromYakitHome(), openai.WithProxy(proxy))
-			err := UpsertRule(db, r.Hash, r)
+			err = UpsertRule(db, r.Hash, r)
 			if err != nil {
 				log.Errorf("upsert rule failed: %s", err)
 			}
@@ -403,6 +436,7 @@ func ExportRulesToFile(db *gorm.DB, fileName string) error {
 	}
 	defer fp.Close()
 	for result := range YieldRules(db.Model(&Storage{}), context.Background()) {
+		result.ID = 0
 		raw, err := json.Marshal(result)
 		if err != nil {
 			log.Errorf("marshal rules failed: %s", err)

@@ -24,7 +24,7 @@ func ExtractDataByAi(data string, desc string, params map[string]string, opts ..
 	}
 	err = json.Unmarshal([]byte(rspMsg), &result)
 	if err != nil {
-		return nil, utils2.Errorf("openai function call failed: %s", err)
+		return nil, utils2.Errorf("openai function call failed: %s, raw: %v", err, string(rspMsg))
 	}
 	return result, nil
 }
