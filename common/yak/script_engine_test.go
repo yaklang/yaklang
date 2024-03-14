@@ -3,6 +3,7 @@ package yak
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
@@ -18,4 +19,18 @@ a, b = abc("123", "a", 1235)`)
 		log.Error(err)
 		t.FailNow()
 	}
+}
+
+func TestScriptEngine_nativeCall_YakScript_smoking1(t *testing.T) {
+	code := `
+time.AfterFunc(2 ,func(){
+    println(a)
+})
+`
+	engine := NewScriptEngine(10)
+	_, err := engine.ExecuteExWithContext(context.Background(), code, map[string]any{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(2 * time.Second)
 }
