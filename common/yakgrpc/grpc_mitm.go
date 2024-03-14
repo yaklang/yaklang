@@ -1028,7 +1028,6 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}()
 
 		wsReq, err := utils.DumpHTTPRequest(req, true)
-
 		if err != nil {
 			log.Errorf("dump request failed: %s", err)
 			return raw

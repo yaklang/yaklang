@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
@@ -12,7 +13,6 @@ import (
 
 func init() {
 	yakit.RegisterPostInitDatabaseFunction(func() error {
-
 	INIT:
 		if yakit.Get(consts.GLOBAL_NETWORK_CONFIG_INIT) == "" {
 			log.Info("initialize global network config")
