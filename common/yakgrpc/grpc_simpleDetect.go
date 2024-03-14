@@ -73,7 +73,7 @@ func (s *Server) SimpleDetect(req *ypb.RecordPortScanRequest, stream ypb.Yak_Sim
 	})
 	// 解析用户名
 	userListFile, err := utils.DumpFileWithTextAndFiles(
-		strings.Join(reqBrute.Usernames, "\n"), "\n", reqBrute.UsernameFile,
+		strings.Join(reqBrute.GetUsernames(), "\n"), "\n", reqBrute.GetUsernameFile(),
 	)
 
 	if err != nil {
@@ -88,7 +88,7 @@ func (s *Server) SimpleDetect(req *ypb.RecordPortScanRequest, stream ypb.Yak_Sim
 
 	// 解析密码
 	passListFile, err := utils.DumpFileWithTextAndFiles(
-		strings.Join(reqBrute.Passwords, "\n"), "\n", reqBrute.PasswordFile,
+		strings.Join(reqBrute.GetPasswords(), "\n"), "\n", reqBrute.GetPasswordFile(),
 	)
 	if err != nil {
 		return err
@@ -144,7 +144,7 @@ func (s *Server) SimpleDetect(req *ypb.RecordPortScanRequest, stream ypb.Yak_Sim
 
 	reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
 		Key:   "task-name",
-		Value: reqPortScan.TaskName,
+		Value: reqPortScan.GetTaskName(),
 	})
 
 	reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
@@ -152,7 +152,7 @@ func (s *Server) SimpleDetect(req *ypb.RecordPortScanRequest, stream ypb.Yak_Sim
 		Value: fmt.Sprintf("%v", hostCount),
 	})
 
-	if reqRecord.Percent > 0 {
+	if reqRecord.GetPercent() > 0 {
 		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
 			Key:   "record-ptr",
 			Value: strconv.FormatInt(reqRecord.GetLastRecordPtr(), 10),
@@ -163,7 +163,7 @@ func (s *Server) SimpleDetect(req *ypb.RecordPortScanRequest, stream ypb.Yak_Sim
 			Value: fmt.Sprintf("%.3f", reqRecord.GetPercent()),
 		})
 
-		runtimeId := gjson.Get(reqRecord.ExtraInfo, `Params.#(Key="runtime_id").Value`).String()
+		runtimeId := gjson.Get(reqRecord.GetExtraInfo(), `Params.#(Key="runtime_id").Value`).String()
 		var targets []string
 		for ah := range yakit.YieldAliveHostRuntimeId(consts.GetGormProjectDatabase(), context.Background(), runtimeId) {
 			targets = append(targets, ah.IP)
@@ -176,7 +176,7 @@ func (s *Server) SimpleDetect(req *ypb.RecordPortScanRequest, stream ypb.Yak_Sim
 
 	reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
 		Key:   "ports",
-		Value: reqPortScan.Ports,
+		Value: reqPortScan.GetPorts(),
 	})
 	reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{
 		Key:   "mode",
