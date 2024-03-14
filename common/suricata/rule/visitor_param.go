@@ -208,7 +208,7 @@ func (v *RuleSyntaxVisitor) VisitParams(i *parser.ParamsContext, rule *Rule) {
 			}
 		}
 
-		log.Infof("key: %#v value: %#v", key, vStr)
+		log.Debugf("key: %#v value: %#v", key, vStr)
 
 		switch key {
 		// meta keywords
