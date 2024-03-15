@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/gopacket"
-	"github.com/yaklang/yaklang/common/ai/openai"
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -268,13 +267,6 @@ func TestParseTCP(t *testing.T) {
 				log.Error("database empty")
 			}
 		}
-	}
-}
-
-func TestTranslating(t *testing.T) {
-	consts.GetGormProfileDatabase().AutoMigrate(&rule.Storage{})
-	for r := range yieldRules() {
-		r.DecoratedByOpenAI(openai.WithAPIKeyFromYakitHome(), openai.WithProxy("http://127.0.0.1:7890"))
 	}
 }
 
