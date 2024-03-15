@@ -786,7 +786,7 @@ func (flow *CodecExecFlow) CodecPlugin(pluginName string) error {
 	if err != nil {
 		return utils.Errorf("execute file %s code failed: %s", pluginName, err.Error())
 	}
-	pluginRes, err := engine.CallYakFunction(context.Background(), "handle", []interface{}{flow.Text})
+	pluginRes, err := engine.CallYakFunction(context.Background(), "handle", []interface{}{string(flow.Text)})
 	if err != nil {
 		return utils.Errorf("import %v' s handle failed: %s", pluginName, err)
 	}
@@ -807,7 +807,7 @@ func (flow *CodecExecFlow) CustomCodecPlugin(pluginContext string) error {
 	if err != nil {
 		return utils.Errorf("execute file %s code failed: %s", "temp-codec", err.Error())
 	}
-	pluginRes, err := engine.CallYakFunction(context.Background(), "handle", []interface{}{flow.Text})
+	pluginRes, err := engine.CallYakFunction(context.Background(), "handle", []interface{}{string(flow.Text)})
 	if err != nil {
 		return utils.Errorf("import %v' s handle failed: %s", "temp-codec", err)
 	}
