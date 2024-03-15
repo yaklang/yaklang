@@ -343,7 +343,79 @@ func (v *BaseJavaParserVisitor) VisitLocalTypeDeclaration(ctx *LocalTypeDeclarat
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaParserVisitor) VisitStatement(ctx *StatementContext) interface{} {
+func (v *BaseJavaParserVisitor) VisitBlockLabelStatement(ctx *BlockLabelStatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitAssertStatement(ctx *AssertStatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitIfStatement(ctx *IfStatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitForStatement(ctx *ForStatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitWhileStatement(ctx *WhileStatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitDoWhileStatement(ctx *DoWhileStatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitTryStatement(ctx *TryStatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitTryWithResourcesStatement(ctx *TryWithResourcesStatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitSwitchStatement(ctx *SwitchStatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitSynchronizedStatement(ctx *SynchronizedStatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitReturnStatement(ctx *ReturnStatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitThrowStatement(ctx *ThrowStatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitBreakStatement(ctx *BreakStatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitContinueStatement(ctx *ContinueStatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitYieldStatement(ctx *YieldStatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitEmptyStatement(ctx *EmptyStatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitStatementExpression(ctx *StatementExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitSwitchExpressionStatement(ctx *SwitchExpressionStatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitLabelStatement(ctx *LabelStatementContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
