@@ -454,6 +454,9 @@ recordBody
 block
     : '{' blockStatement* '}'
     ;
+elseBlock
+    :block
+    ;
 
 blockStatement
     : localVariableDeclaration ';'
@@ -506,25 +509,25 @@ localTypeDeclaration
     ;
 
 statement
-    : blockLabel = block                                                           # BlockLabelStatement
-    | ASSERT expression (':' expression)? ';'                                      # AssertStatement
-    | IF parExpression block (ELSEIF parExpression block)* (ELSE statement)?      # IfStatement
-    | FOR '(' forControl ')' block                                                 # ForStatement
-    | WHILE parExpression block                                                    # WhileStatement
-    | DO block WHILE parExpression ';'                                             # DoWhileStatement
-    | TRY block (catchClause+ finallyBlock? | finallyBlock)                        # TryStatement
-    | TRY resourceSpecification block catchClause* finallyBlock?                   # TryWithResourcesStatement
-    | SWITCH parExpression '{' switchBlockStatementGroup* switchLabel* '}'         # SwitchStatement
-    | SYNCHRONIZED parExpression block                                             # SynchronizedStatement
-    | RETURN expression? ';'                                                       # ReturnStatement
-    | THROW expression ';'                                                         # ThrowStatement
-    | BREAK identifier? ';'                                                        # BreakStatement
-    | CONTINUE identifier? ';'                                                     # ContinueStatement
-    | YIELD expression ';'                                                         # YieldStatement// Java17
-    | SEMI                                                                         # EmptyStatement
-    | statementExpression = expression ';'                                         # StatementExpression
-    | switchExpression ';'?                                                        # SwitchExpressionStatement // Java17
-    | identifierLabel = identifier ':' statement                                   # LabelStatement
+    : blockLabel = block                                                        # BlockLabelStatement
+    | ASSERT expression (':' expression)? ';'                                   # AssertStatement
+    | IF parExpression block (ELSEIF parExpression block)* (ELSE elseBlock)?    # IfStatement
+    | FOR '(' forControl ')' block                                              # ForStatement
+    | WHILE parExpression block                                                 # WhileStatement
+    | DO block WHILE parExpression ';'                                          # DoWhileStatement
+    | TRY block (catchClause+ finallyBlock? | finallyBlock)                     # TryStatement
+    | TRY resourceSpecification block catchClause* finallyBlock?                # TryWithResourcesStatement
+    | SWITCH parExpression '{' switchBlockStatementGroup* switchLabel* '}'      # SwitchStatement
+    | SYNCHRONIZED parExpression block                                          # SynchronizedStatement
+    | RETURN expression? ';'                                                    # ReturnStatement
+    | THROW expression ';'                                                      # ThrowStatement
+    | BREAK identifier? ';'                                                     # BreakStatement
+    | CONTINUE identifier? ';'                                                  # ContinueStatement
+    | YIELD expression ';'                                                      # YieldStatement// Java17
+    | SEMI                                                                      # SemiStatement
+    | statementExpression = expression ';'                                      # ExpressionStatement
+    | switchExpression ';'?                                                     #SwitchLabelExpression // Java17
+    | identifierLabel = identifier ':' statement                                # IdentifierLabelStatement
     ;
 
 catchClause
@@ -666,7 +669,7 @@ expression
         | '<<='
         | '%='
     ) expression                                                    # AssignmentExpression
-    | <assoc = right> identifier bop = '=' identifier               # AssignmentEqExpression
+    | <assoc = right> identifier bop = '=' (identifier|expression)            # AssignmentEqExpression
     // Level 0, Lambda Expression Java8
     | lambdaExpression                                              # Java8LambdaExpression
     ;
