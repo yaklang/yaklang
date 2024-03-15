@@ -123,6 +123,7 @@ func (s *Server) execScriptWithExecParam(scriptName string, input string, stream
 		return nil
 	case "yak":
 		_, err := engine.ExecuteExWithContext(stream.Context(), scriptInstance.Content, map[string]any{
+			"RUNTIME_ID":  runtimeId,
 			"CTX":         stream.Context(),
 			"PLUGIN_NAME": scriptName,
 		})
