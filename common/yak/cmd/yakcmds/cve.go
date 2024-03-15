@@ -52,7 +52,7 @@ var CVEUtilCommands = []*cli.Command{
 		Hidden: true,
 		Action: func(c *cli.Context) error {
 			if c.Bool("chaosmaker-rules") {
-				rule.DecorateRules("chatglm", c.Int("concurrent"), c.String("proxy"))
+				rule.DecorateRules(c.String("ai"), c.Int("concurrent"), c.String("proxy"))
 				return nil
 			}
 
