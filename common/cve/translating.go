@@ -3,6 +3,8 @@ package cve
 import (
 	"context"
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/ai"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/log"
@@ -78,7 +80,7 @@ func TranslatingCWE(apiKeyFile string, concurrent int, cveResourceDb string) err
 			)
 			if err != nil {
 				if !strings.Contains(err.Error(), `translating existed`) {
-					log.Errorf("make openai working failed: %s", err)
+					log.Errorf("make openai working failed cwe: %s", err)
 				}
 
 				if strings.Contains(err.Error(), `Service Unavailable`) {
@@ -99,17 +101,17 @@ func TranslatingCWE(apiKeyFile string, concurrent int, cveResourceDb string) err
 	return nil
 }
 
-func Translating(apiKeyFile string, noCritical bool, concurrent int, cveResourceDb string) error {
+func Translating(aiGatewayType string, noCritical bool, concurrent int, cveResourceDb string, opts ...aispec.AIConfigOption) error {
 	var (
-		keyStr string
-		err    error
+		err error
 	)
-	if apiKeyFile != "" {
-		key, err := ioutil.ReadFile(apiKeyFile)
-		if err != nil {
-			return err
-		}
-		keyStr = strings.TrimSpace(string(key))
+
+	if aiGatewayType == "" {
+		aiGatewayType = "openai"
+	}
+
+	if !ai.HaveAI(aiGatewayType) {
+		return utils.Errorf("ai gateway type: %s not found", aiGatewayType)
 	}
 
 	var db *gorm.DB // = consts.GetGormCVEDatabase()
@@ -142,6 +144,9 @@ func Translating(apiKeyFile string, noCritical bool, concurrent int, cveResource
 	}
 	swg := utils.NewSizedWaitGroup(concurrent)
 	current := 0
+
+	aiClient := ai.GetAI(aiGatewayType, opts...)
+
 	for c := range cveresources.YieldCVEs(db, context.Background()) {
 		current++
 		lowlevel := c.BaseCVSSv2Score <= 6.0 && c.ImpactScore <= 6.0 && c.ExploitabilityScore <= 6.0
@@ -156,7 +161,7 @@ func Translating(apiKeyFile string, noCritical bool, concurrent int, cveResource
 				swg.Done()
 			}()
 			start := time.Now()
-			err := MakeOpenAIWorking(c, c.DescriptionMain, keyStr)
+			err := MakeOpenAIWorking(c, aiClient)
 			log.Infof(
 				"%6d/%-6d save [%v] chinese desc finished: cost: %v",
 				current, count, c.CVE, time.Now().Sub(start).String(),

@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/openai"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/cve/cveresources"
-	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
@@ -167,14 +167,14 @@ func MakeOpenAITranslateCWE(cwe *cveresources.CWE, apiKey string, proxies ...str
 	return cwe, nil
 }
 
-func MakeOpenAIWorking(src *cveresources.CVE, cveDescription string, apiKey string, proxy ...string) error {
+func MakeOpenAIWorking(src *cveresources.CVE, gateway aispec.AIGateway) error {
 	once.Do(func() {
 		InitializeCVEDescription()
 	})
 
 	db := consts.GetGormCVEDescriptionDatabase()
 	if db == nil {
-		return utils.Error("no database found")
+		return utils.Error("no database (cve desc) found")
 	}
 
 	var d CVEDescription
@@ -186,55 +186,45 @@ func MakeOpenAIWorking(src *cveresources.CVE, cveDescription string, apiKey stri
 		return utils.Errorf("%v's translating existed", d.CVE)
 	}
 
-	var tmpl = fmt.Sprintf(`把 %v 整理成 JSON 数据，要求是中文，提取标题(title)，并给出中文翻译(desc)，并给出修复方案(solution)`, strconv.Quote(cveDescription))
-	var proxyReal string
-	if len(proxy) > 0 {
-		proxyReal = proxy[0]
-	}
-
 	log.Debugf("cve: %s's being translated...", src.CVE)
 	var start = time.Now()
-	client := openai.NewOpenAIClient(openai.WithAPIKey(apiKey), openai.WithProxy(proxyReal))
-	data, err := client.Chat(tmpl)
+
+	data, err := json.Marshal(string(src.Descriptions) + string(src.DescriptionMain))
+	if err != nil {
+		return utils.Errorf("marshal cve failed: %s", err)
+	}
+	raw, err := gateway.ExtractData(strconv.Quote(string(data)), "这是一个CVE的JSON格式，请你提取其中有用的信息，包括中文以及修复方案等", map[string]string{
+		"title":          "从数据源中提取成一个精炼的标题（英文）",
+		"title_zh":       "把提取出的 title 翻译成中文（中文）",
+		"solution":       "从数据源中提取出一个修复方案（中文）",
+		"description_zh": "提炼或者翻译出一个适合中文的漏洞描述信息",
+	})
 	if err != nil {
 		println(string(data))
-		log.Infof("openai.Chat met error: %s", err)
+		log.Infof("ai.Chat met error: %s", err)
 		return err
 	}
-	results := jsonextractor.ExtractStandardJSON(data)
-	if len(results) > 0 {
-		var raw = make(map[string]interface{})
-		err := json.Unmarshal([]byte(jsonextractor.FixJson([]byte(results[0]))), &raw)
-		if err != nil {
-			log.Warnf("unmarshal origin data: ")
-			fmt.Println(string(data))
-			return utils.Errorf("convert json result failed: %s", err)
-		}
-		titleZh := utils.MapGetString(raw, "title")
-		descZh := utils.MapGetString(raw, "desc")
-		solutionZh := utils.MapGetString(raw, "solution")
-		dec := &CVEDescription{
-			CVE:                src.CVE,
-			Title:              "",
-			ChineseTitle:       titleZh,
-			Description:        src.DescriptionMain,
-			ChineseDescription: descZh,
-			OpenAISolution:     solutionZh,
-		}
-		log.Debugf("save [%v] chinese desc finished: cost: %v", src.CVE, time.Now().Sub(start).String())
-		transLock.Lock()
-		for {
-			if db := db.Model(&CVEDescription{}).Where(
-				"cve = ?", src.CVE,
-			).Assign(dec).FirstOrCreate(&CVEDescription{}); db.Error != nil {
-				log.Errorf("save cve database failed: %s", db.Error)
-				time.Sleep(time.Second)
-				continue
-			}
-			break
-		}
-		transLock.Unlock()
+	dec := &CVEDescription{
+		CVE:                src.CVE,
+		Title:              utils.MapGetString(raw, "title"),
+		ChineseTitle:       utils.MapGetString(raw, "title_zh"),
+		Description:        src.DescriptionMain,
+		ChineseDescription: utils.MapGetString(raw, "description_zh"),
+		OpenAISolution:     utils.MapGetString(raw, "solution"),
 	}
+	log.Debugf("save [%v] chinese desc finished: cost: %v", src.CVE, time.Now().Sub(start).String())
+	transLock.Lock()
+	for {
+		if db := db.Model(&CVEDescription{}).Where(
+			"cve = ?", src.CVE,
+		).Assign(dec).FirstOrCreate(&CVEDescription{}); db.Error != nil {
+			log.Errorf("save cve database failed: %s", db.Error)
+			time.Sleep(time.Second)
+			continue
+		}
+		break
+	}
+	transLock.Unlock()
 	return nil
 }
 
