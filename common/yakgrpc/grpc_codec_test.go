@@ -95,3 +95,44 @@ func TestGRPCNewCodec(t *testing.T) {
 		t.Fatal("workflow codec fail")
 	}
 }
+
+func TestGRPCNewCodec_YakScript(t *testing.T) {
+	workFlow := []*ypb.CodecWork{
+		{
+			CodecType: "CustomCodecPlugin",
+			Params: []*ypb.ExecParamItem{
+				{
+					Key: "pluginContext",
+					Value: `
+handle = func(origin /*string*/) {
+    if type(origin).String() != "string"{
+		println(type(origin))
+        return "no"
+    }
+    return "ok"
+}
+`,
+				},
+			},
+		},
+	}
+	client, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+	rsp, err := client.NewCodec(utils.TimeoutContextSeconds(1),
+		&ypb.CodecRequestFlow{
+			Text:       "text",
+			Auto:       false,
+			WorkFlow:   workFlow,
+			InputBytes: nil,
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(rsp.GetResult())
+	if rsp.GetResult() != "ok" {
+		t.Fatal("check yak script input type fail")
+	}
+}
