@@ -25,7 +25,10 @@ func (s *Server) PortScan(req *ypb.PortScanRequest, stream ypb.Yak_PortScanServe
 	reqParams := &ypb.DebugPluginRequest{
 		Code:             string(scanPortScript),
 		PluginType:       "yak",
-		LinkPluginConfig: req.GetLinkPluginConfig(),
+		LinkPluginConfig: &ypb.HybridScanPluginConfig{},
+	}
+	if req.GetLinkPluginConfig() != nil {
+		reqParams.LinkPluginConfig = req.LinkPluginConfig
 	}
 
 	// 把文件写到本地。
