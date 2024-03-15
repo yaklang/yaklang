@@ -26,30 +26,30 @@ import (
 type Storage struct {
 	gorm.Model
 
-	RawTrafficBeyondIPPacketBase64  string
-	RawTrafficBeyondLinkLayerBase64 string
-	RawTrafficBeyondHTTPBase64      string
+	RawTrafficBeyondIPPacketBase64  string `json:"raw_traffic_beyond_ip_packet_base64"`
+	RawTrafficBeyondLinkLayerBase64 string `json:"raw_traffic_beyond_link_layer_base64"`
+	RawTrafficBeyondHTTPBase64      string `json:"raw_traffic_beyond_http_base64"`
 
 	// suricata / http-request
-	RuleType string
+	RuleType string `json:"rule_type"`
 
 	SuricataRaw string `json:"raw"`
-	Protocol    string
-	Action      string
-	Name        string
-	NameZh      string
-	ClassType   string
-	ClassTypeZh string
-	Group       string
+	Protocol    string `json:"protocol"`
+	Action      string `json:"action"`
+	Name        string `json:"name"`
+	NameZh      string `json:"name_zh"`
+	ClassType   string `json:"class_type"`
+	ClassTypeZh string `json:"class_type_zh"`
+	Group       string `json:"group"`
 	Hash        string `json:"hash" gorm:"unique_index"`
 
-	Keywords      string
-	KeywordsZh    string
-	Description   string
-	DescriptionZh string
+	Keywords      string `json:"keywords"`
+	KeywordsZh    string `json:"keywords_zh"`
+	Description   string `json:"description"`
+	DescriptionZh string `json:"description_zh"`
 
-	RuleUpdatedAt      string `json:"update_at"`
-	RuleCreatedAt      string `json:"created_at"`
+	RuleUpdatedAt      string `json:"origin_updated_at"`
+	RuleCreatedAt      string `json:"origin_created_at"`
 	Deployment         string `json:"deployment"`
 	SignatureSeverity  string `json:"signature_severity"`
 	AttackTarget       string `json:"attack_target"`
@@ -449,7 +449,6 @@ func ExportRulesToFile(db *gorm.DB, fileName string) error {
 		delete(rawMap, "CreatedAt")
 		delete(rawMap, "DeletedAt")
 		delete(rawMap, "UpdatedAt")
-		raw, _ = json.Marshal(rawMap)
 		fp.Write(raw)
 		fp.Write([]byte("\n"))
 	}
