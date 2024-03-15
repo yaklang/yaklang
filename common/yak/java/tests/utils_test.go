@@ -2,9 +2,7 @@ package tests
 
 import (
 	"fmt"
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
@@ -30,34 +28,20 @@ func CheckJavaTestCase(t *testing.T, tc test.TestCase) {
 }
 
 func CheckJavaPrintlnValue(code string, want []string, t *testing.T) {
-	CheckJavaPrintf(t, test.TestCase{
-		Code: code,
-		Want: want,
-	})
-}
-
-func CheckJavaPrintf(t *testing.T, tc test.TestCase) {
-	tc.Check = func(prog *ssaapi.Program, want []string) {
-		println := prog.Ref("packages").ShowWithSource()
-		got := lo.Map(
-			println.GetUsers().ShowWithSource().Flat(func(v *ssaapi.Value) ssaapi.Values {
-				return ssaapi.Values{v.GetOperand(1)}
-			}),
-			func(v *ssaapi.Value, _ int) string {
-				return v.String()
-			},
-		)
-
-		log.Info("got :", got)
-
-		log.Info("want :", want)
-
-		require.Equal(t, want, got)
-	}
-	CheckJavaTestCase(t, tc)
+	code = CreateJavaProgram(code)
+	test.CheckPrintlnValue(code, want, t)
 }
 
 func CheckJavaCode(code string, t *testing.T) {
+	code = CreateJavaProgram(code)
+	CheckJavaTestCase(t, test.TestCase{Code: code})
+}
+
+func CheckAllJavaCode(code string, t *testing.T) {
+	CheckJavaTestCase(t, test.TestCase{Code: code})
+}
+
+func CreateJavaProgram(code string) string {
 	template := `package org.example;
 
 public class Main {
@@ -66,9 +50,5 @@ public class Main {
     }
 }`
 	code = fmt.Sprintf(template, code)
-	CheckJavaTestCase(t, test.TestCase{Code: code})
-}
-
-func CheckAllJavaCode(code string, t *testing.T) {
-	CheckJavaTestCase(t, test.TestCase{Code: code})
+	return code
 }

@@ -4,109 +4,46 @@ import (
 	"testing"
 )
 
-func TestJava_Expression(t *testing.T) {
-	t.Run("test PostfixExpression", func(t *testing.T) {
-		CheckJavaCode(`
-		a++;
-		a--;`, t)
+func TestJava_LocalType_Declaration(t *testing.T) {
+	t.Run("test simple variable assign", func(t *testing.T) {
+		CheckJavaPrintlnValue(`
+		int a;
+		println(a);
+		int a = 1;
+		println(a);
+		Boolen b= true;
+		println(b);
+		float c=3.14;
+		println(c);
+		string s ="aaa";
+		println(s);`, []string{"Undefined-a", "1", "true", "3.14", "\"aaa\""}, t)
 	})
-	t.Run("test PrefixUnaryExpression", func(t *testing.T) {
-		CheckJavaCode(`
-        +a;
-		-a;
-		~a;
-		!a;`, t)
+	t.Run("test array declaration", func(t *testing.T) {
+		CheckJavaPrintlnValue(`
+		int a[] = {};
+		println(a);
+		int a[] = {1,2,3};
+		println(a);
+	    string s[] = {"world","hello"};
+		println(s[1]);
+		println(a[2]);
+		int c=a[1]+a[0];
+		println(c);
+		int[] numbers = {1,2,3};
+		println(numbers);
+		`, []string{"make([]any)", "make([]number)", "\"hello\"", "3", "3", "make([]number)"}, t)
 	})
-	t.Run("test PrefixBinaryExpression", func(t *testing.T) {
-		CheckJavaCode(`
-		++a;
-		--a;`, t)
-	})
-	t.Run("test MultiplicativeExpression", func(t *testing.T) {
-		CheckJavaCode(` 
-         a * b;
-         b / a;
-         a % b;`, t)
-	})
-	t.Run("test AdditiveExpression", func(t *testing.T) {
-		CheckJavaCode(` 
-		a + b;
-		b - a;`, t)
-	})
-	t.Run("test ShiftExpression", func(t *testing.T) {
-		CheckJavaCode(`
-         a << b;
-         a >>>b  ; //无符号位移
-         a >> b  ; //有符号位移`, t)
-	})
-	t.Run("test RelationalExpression", func(t *testing.T) {
-		CheckJavaCode(`
-		 a < b;
-		 b > a;
-		 a <= b;
-		 b >= a;`, t)
-	})
-	t.Run("test EqualityExpression", func(t *testing.T) {
-		CheckJavaCode(`
-		 a == b;
-		 b != a;`, t)
-	})
-	t.Run("test AndExpression", func(t *testing.T) {
-		CheckJavaCode(`
-		 a & b;`, t)
-	})
-	t.Run("test XorExpression", func(t *testing.T) {
-		CheckJavaCode(` 
-		 a ^ b;`, t)
-	})
-	t.Run("test OrExpression", func(t *testing.T) {
-		CheckJavaCode(` 
-		 a | b;`, t)
-	})
-	t.Run("test LogicalAndExpression", func(t *testing.T) {
-		CheckJavaCode(` 
-		a && b;`, t)
-	})
-	t.Run("test LogicalOrExpression", func(t *testing.T) {
-		CheckJavaCode(` 	
-		a||b;`, t)
-	})
-	t.Run("test TernaryExpression", func(t *testing.T) {
-		CheckJavaCode(` int a = 1;
-		int b = 0;
-		int ret;
-		ret = a > b ? a : b;`, t)
-	})
-	t.Run("test AssignmentExpression", func(t *testing.T) {
-		CheckJavaCode(` 
-		a=b;
-		c+=b;
-		a+=b;
-		a-=b;
-		a*=b;
-		a/=b;
-		a&=b;
-		a|=b;
-		a^=b;
-		a>>=b;
-		a>>>=b;
-		a<<=b;
-		a%=b;`, t)
-	})
-	t.Run("test SliceCallExpression", func(t *testing.T) {
-		CheckJavaCode(` a[1];
-	a[b];
-	`, t)
-	})
+	t.Run("test two dim array declaration", func(t *testing.T) {
+		CheckJavaPrintlnValue(`
+		int a[][] = {{1,2,3},{4,5,6}};
+		println(a);
+		println(a[1][2]);
 
-	t.Run("test FunctionCallExpression", func(t *testing.T) {
-		CheckJavaCode(` a();
-		a(b);
-		a(b,c);
-		a(1);
-		a(1,"dog",true);
-		a(b());
-
-		`, t)
+		String a[][]={{"hello","world"},{"world","hello"}};
+		println(a[1][1]);
+		`,
+			[]string{"make([][]number)",
+				"6",
+				"\"hello\""}, t)
 	})
 }
