@@ -4,7 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/ai/openai"
+	"github.com/yaklang/yaklang/common/ai"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/suricata/rule"
@@ -123,7 +124,7 @@ func (c *Storage) ToGPRCModel() *ypb.ChaosMakerRule {
 	}
 }
 
-func (origin *Storage) DecoratedByOpenAI(opts ...openai.ConfigOption) {
+func (origin *Storage) DecoratedByOpenAI(t string, opts ...aispec.AIConfigOption) {
 	ruleIns := origin
 	if ruleIns.ID <= 0 {
 		existed, err := GetSuricataChaosMakerRuleByHash(consts.GetGormProfileDatabase(), ruleIns.CalcHash())
@@ -176,14 +177,18 @@ func (origin *Storage) DecoratedByOpenAI(opts ...openai.ConfigOption) {
 	}
 
 	if ruleIns.Keywords == "" || ruleIns.KeywordsZh == "" {
-		opts = append(opts, openai.WithFunctionRequired("keywords", "keywords_zh", "description", "description_zh"))
-		raw, err := openai.ExtractDataByAi(clearData, "从规则内的流量特征中提取关键信息", map[string]string{
+		agent := ai.GetAI(t, opts...)
+		if agent == nil {
+			log.Errorf("cannot get ai type: %s", t)
+			return
+		}
+		raw, err := agent.ExtractData(clearData, "从规则内的流量特征中提取关键信息", map[string]string{
 			"keywords":       "所有规则中的特征关键字，数量大概5个，关键字长度不要超过4个词，注意要去除引用，以','分隔", //  gpt4不需要这个提示 `一定要重点注意不要提取suricata语法的关键字，如alert, content, sid等（英文）`
 			"keywords_zh":    "keywords的中文翻译",
 			"description":    "描述这个规则的作用，必须要说清楚此规则描述了什么样的规则，尽量详细（英文）",
 			"description_zh": "description的中文翻译",
 			"name_zh":        "msg的中文翻译",
-		}, opts...)
+		})
 		if err != nil {
 			log.Errorf("openai extract data by ai failed: %s with:\n    %v\n\n", err, clearData)
 			return
@@ -203,7 +208,7 @@ func (origin *Storage) DecoratedByOpenAI(opts ...openai.ConfigOption) {
 	//}
 }
 
-func DecorateRules(concurrent int, proxy string) {
+func DecorateRules(t string, concurrent int, proxy string) {
 	var db = consts.GetGormProfileDatabase()
 	swg := utils.NewSizedWaitGroup(concurrent)
 	db = db.Where("name_zh = '' or name_zh is null")
@@ -231,7 +236,7 @@ func DecorateRules(concurrent int, proxy string) {
 				DeleteSuricataRuleByID(consts.GetGormProfileDatabase(), int64(r.ID))
 				return
 			}
-			r.DecoratedByOpenAI(openai.WithAPIKeyFromYakitHome(), openai.WithProxy(proxy))
+			r.DecoratedByOpenAI(t, aispec.WithProxy(proxy))
 			err = UpsertRule(db, r.Hash, r)
 			if err != nil {
 				log.Errorf("upsert rule failed: %s", err)

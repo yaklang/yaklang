@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/ai/openai"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/chaosmaker"
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/consts"
@@ -38,17 +38,21 @@ func (s *Server) ImportChaosMakerRules(ctx context.Context, req *ypb.ImportChaos
 	}
 	for _, subRule := range rules {
 		if req.GetAIDecoration() {
-			var opts []openai.ConfigOption
+			var opts []aispec.AIConfigOption
 			if req.GetProxy() != "" {
-				opts = append(opts, openai.WithProxy(req.GetProxy()))
+				opts = append(opts, aispec.WithProxy(req.GetProxy()))
 			}
 			if req.GetKey() != "" {
-				opts = append(opts, openai.WithAPIKey(req.GetKey()))
+				opts = append(opts, aispec.WithAPIKey(req.GetKey()))
 			}
 			if req.GetDomain() != "" {
-				opts = append(opts, openai.WithDomain(req.GetDomain()))
+				opts = append(opts, aispec.WithDomain(req.GetDomain()))
 			}
-			subRule.DecoratedByOpenAI(opts...)
+			var t string
+			if t == "" {
+				t = "openai"
+			}
+			subRule.DecoratedByOpenAI(t, opts...)
 		}
 	}
 	log.Infof("load suricata rules finished! fetch rule: %v", len(rules))
