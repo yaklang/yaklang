@@ -3,6 +3,7 @@ package java2ssa
 import (
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/yak2ssa"
@@ -17,7 +18,8 @@ func (y *builder) VisitBlock(raw javaparser.IBlockContext) interface{} {
 	if i == nil {
 		return nil
 	}
-
+	block := i.GetText()
+	log.Info("block", block)
 	for _, stmt := range i.AllBlockStatement() {
 		y.VisitBlockStatement(stmt)
 	}
@@ -103,6 +105,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 	case *javaparser.MemberCallExpressionContext:
 		// 处理成员调用表达式，如通过点操作符访问成员
 		// todo: 成员调用表达式
+		return nil
 	case *javaparser.FunctionCallExpressionContext:
 		// 处理函数调用表达式
 		if s := ret.MethodCall(); s != nil {
@@ -112,15 +115,18 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 	case *javaparser.MethodReferenceExpressionContext:
 		// 处理方法引用表达式
 		// todo: 方法引用表达式
+		return nil
 	case *javaparser.ConstructorReferenceExpressionContext:
 		// 处理构造器引用表达式
 		// todo: 构造器引用表达式
+		return nil
 	case *javaparser.Java17SwitchExpressionContext:
 		// 处理 Java 17 的 switch 表达式
 		// todo: Java 17 的 switch 表达式
+		return nil
 	case *javaparser.PostfixExpressionContext:
 		// 处理后缀表达式，如自增、自减操作
-		if s := ret.Identifier(); s != nil {
+		if s := ret.LeftExpression(); s != nil {
 			text := s.GetText()
 			variable = y.CreateVariable(text)
 		}
@@ -161,7 +167,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		return y.EmitUnOp(unaryOpcode, value)
 	case *javaparser.PrefixBinayExpressionContext:
 		// 处理前缀表达式中的"--"和"++"
-		if s := ret.Identifier(); s != nil {
+		if s := ret.LeftExpression(); s != nil {
 			text := s.GetText()
 			variable = y.CreateVariable(text)
 		}
@@ -180,9 +186,11 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 	case *javaparser.CastExpressionContext:
 		// 处理类型转换表达式
 		// todo: 类型转换表达式
+		return nil
 	case *javaparser.NewCreatorExpressionContext:
 		// 处理创建对象的表达式
 		// todo: 创建对象的表达式
+		return nil
 	case *javaparser.MultiplicativeExpressionContext:
 		// 处理乘法、除法、模运算表达式
 		op1 := y.VisitExpression(ret.Expression(0))
@@ -217,15 +225,30 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		// 处理位移表达式
 		op1 := y.VisitExpression(ret.Expression(0))
 		op2 := y.VisitExpression(ret.Expression(1))
-		switch ret.GetBop().GetText() {
-		case "<<":
+		var ltNum int
+		var rtNum int
+
+		for index, _ := range ret.AllLT() {
+			_ = index
+			ltNum++
+		}
+		for index, _ := range ret.AllGT() {
+			_ = index
+			rtNum++
+		}
+
+		if ltNum != 0 && rtNum != 0 {
+			y.NewError(ssa.Error, "javaast", yak2ssa.BinaryOperatorNotSupport(ret.GetText()))
+			return nil
+		}
+		if ltNum == 2 {
 			opcode = ssa.OpShl
-		case ">>":
+		} else if rtNum == 2 {
 			opcode = ssa.OpShr
-		case ">>>":
+		} else if rtNum == 3 {
 			//todo: 无符号右移运算符
 			opcode = ssa.OpShr
-		default:
+		} else {
 			y.NewError(ssa.Error, "javaast", yak2ssa.BinaryOperatorNotSupport(ret.GetText()))
 			return nil
 		}
@@ -332,9 +355,10 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 	case *javaparser.TernaryExpressionContext:
 		// 处理三元运算符表达式
 		// todo 三元运算符表达式
+		return nil
 	case *javaparser.AssignmentExpressionContext:
 		// 处理赋值表达式，包括所有赋值运算符
-		variable = y.CreateVariable(ret.Identifier().GetText())
+		variable = y.CreateVariable(ret.LeftExpression().GetText())
 		if variable == nil {
 			y.NewError(ssa.Error, "javaast", yak2ssa.AssignLeftSideEmpty())
 			return nil
@@ -372,17 +396,28 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		return value
 	case *javaparser.AssignmentEqExpressionContext:
 		// 处理赋值表达式的等于号
-		leftVariable := y.CreateVariable(ret.Identifier(0).GetText())
-		rightVariable := y.CreateVariable(ret.Identifier(1).GetText())
-		if leftVariable == nil || rightVariable == nil {
-			return nil
+		if ret.Expression() == nil {
+			leftVariable := y.CreateVariable(ret.LeftExpression().GetText())
+			rightVariable := y.CreateVariable(ret.Identifier().GetText())
+			if leftVariable == nil || rightVariable == nil {
+				return nil
+			}
+			value := y.ReadValueByVariable(rightVariable)
+			y.AssignVariable(leftVariable, value)
+			return value
+		} else if ret.Expression() != nil {
+			leftVariable := y.CreateVariable(ret.LeftExpression().GetText())
+			value := y.VisitExpression(ret.Expression())
+			if leftVariable == nil || value == nil {
+				return nil
+			}
+			y.AssignVariable(leftVariable, value)
+			return value
 		}
-		value := y.ReadValueByVariable(rightVariable)
-		y.AssignVariable(leftVariable, value)
-		return value
 	case *javaparser.Java8LambdaExpressionContext:
 		// 处理 Java 8 的 lambda 表达式
 		// todo: Java 8 的 lambda 表达式
+		return nil
 	default:
 		// 默认情况，可能是不支持的表达式类型
 		log.Errorf("unsupported expression type: %T", ret)
@@ -410,10 +445,13 @@ func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext) ssa.Value {
 	} else if ret = i.SUPER(); ret != nil {
 		v = y.ReadValue(ret.GetText())
 	}
-
-	args := y.VisitArguments(i.Arguments())
-	c := y.NewCall(v, args)
-	return y.EmitCall(c)
+	var args []ssa.Value
+	if argument := i.Arguments(); argument != nil {
+		args = y.VisitArguments(i.Arguments())
+		c := y.NewCall(v, args)
+		return y.EmitCall(c)
+	}
+	return nil
 }
 
 func (y *builder) VisitPrimary(raw javaparser.IPrimaryContext) ssa.Value {
@@ -447,16 +485,215 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 		return nil
 	}
 
-	i, _ := raw.(*javaparser.StatementContext)
-	if i == nil {
+	switch ret := raw.(type) {
+	case *javaparser.BlockLabelStatementContext:
+		return y.VisitBlock(ret.Block())
+	case *javaparser.AssertStatementContext:
+		// 处理断言语句
+		getExpr := func(i int) ssa.Value {
+			if expr := ret.Expression(i); expr != nil {
+				return y.VisitExpression(expr)
+			}
+			y.NewError(ssa.Error, "javaast", yak2ssa.UnexpectedAssertStmt())
+			return nil
+		}
+		exprs := ret.AllExpression()
+		lenExprs := len(exprs)
+
+		var cond, msgV ssa.Value
+
+		cond = getExpr(0)
+		if lenExprs > 1 {
+			msgV = getExpr(1)
+		}
+		y.EmitAssert(cond, msgV, exprs[0].GetText())
+		return nil
+	case *javaparser.IfStatementContext:
+		// 处理 if 语句
+		y.VisitIfStmt(ret.Ifstmt())
+		return nil
+	case *javaparser.ForStatementContext:
+		//处理 for 语句
+		if ret.ForControl() != nil {
+			loop := y.VisitForControl(ret.ForControl())
+			//设置循环体
+			loop.SetBody(func() {
+				if block := ret.Block(); block != nil {
+					y.VisitBlock(block)
+				}
+			})
+			loop.Finish()
+		}
+		return nil
+	case *javaparser.WhileStatementContext:
+		// 处理 while 语句
+		loop := y.CreateLoopBuilder()
+		parExpr := ret.ParExpression().(*javaparser.ParExpressionContext)
+
+		if parExpr != nil {
+			expr := parExpr.Expression()
+			loop.SetCondition(func() ssa.Value {
+				condition := y.VisitExpression(expr)
+				if condition == nil {
+					condition = y.EmitConstInst(true)
+				} else {
+					condition = y.VisitExpression(expr)
+				}
+				return condition
+			})
+		}
+		loop.SetBody(func() {
+			if block := ret.Block(); block != nil {
+				y.VisitBlock(block)
+			}
+		})
+		loop.Finish()
+		return nil
+	case *javaparser.DoWhileStatementContext:
+		// 处理 do while 语句
+		loop := y.CreateLoopBuilder()
+
+		loop.SetCondition(
+			func() ssa.Value {
+				return y.EmitConstInst(true)
+			})
+		parExprs := ret.ParExpressionList().(*javaparser.ParExpressionListContext)
+		if parExprs != nil {
+			exprs := parExprs.ExpressionList()
+			loop.SetThird(func() []ssa.Value {
+				return y.VisitExpressionList(exprs)
+			})
+		}
+
+		loop.SetBody(func() {
+			if block := ret.Block(); block != nil {
+				y.VisitBlock(block)
+			}
+		})
+
+		loop.Finish()
+		return nil
+	case *javaparser.TryStatementContext:
+		// 处理 try 语句
+		if ret.TRY() != nil {
+			tryBuilder := y.BuildTry()
+
+			tryBuilder.BuildTryBlock(func() {
+				if ret := ret.Block(); ret != nil {
+					y.VisitBlock(ret)
+				}
+			})
+			// todo: 多catch case的情况
+			// 处理第一个catch
+			if catchClause := ret.CatchClause(0).(*javaparser.CatchClauseContext); catchClause != nil {
+				tryBuilder.BuildError(func() string {
+					id := catchClause.Identifier().GetText()
+					return id
+				})
+				tryBuilder.BuildCatch(func() {
+					y.VisitBlock(catchClause.Block())
+				})
+				if finallyBlock := ret.FinallyBlock(); finallyBlock != nil {
+					tryBuilder.BuildFinally(func() {
+						y.VisitBlock(finallyBlock.(*javaparser.FinallyBlockContext).Block())
+					})
+				}
+			} else if finallyBlock := ret.FinallyBlock(); finallyBlock != nil {
+				tryBuilder.BuildFinally(func() {
+					y.VisitBlock(finallyBlock.(*javaparser.FinallyBlockContext).Block())
+				})
+			}
+			tryBuilder.Finish()
+
+		}
+		return nil
+	case *javaparser.TryWithResourcesStatementContext:
+		// 处理 try with resources 语句
+		// todo 处理try with resources语句
+		return nil
+	case *javaparser.SwitchStatementContext:
+		// 处理 switch 语句
+		SwitchBuilder := y.BuildSwitch()
+		SwitchBuilder.AutoBreak = false
+		// 设置switch的参数
+		var cond ssa.Value
+		parExpr := ret.ParExpression().(*javaparser.ParExpressionContext)
+		if expr := parExpr.Expression(); expr != nil {
+			SwitchBuilder.BuildCondition(func() ssa.Value {
+				cond = y.VisitExpression(expr)
+				return cond
+			})
+		} else {
+			y.NewError(ssa.Warn, "javaast", "switch expression is nil")
+		}
+		// 设置case数目
+		allcase := ret.AllCASE()
+		SwitchBuilder.BuildCaseSize(len(allcase))
+		// 设置case参数
+		SwitchBuilder.SetCase(func(i int) []ssa.Value {
+			if exprList := ret.ExpressionList(i); exprList != nil {
+				return y.VisitExpressionList(exprList)
+			}
+			return nil
+		})
+		// 设置case执行体
+		SwitchBuilder.BuildBody(func(i int) {
+			if stmtList := ret.StatementList(i); stmtList != nil {
+				y.VisitStatementList(stmtList)
+			}
+		})
+		//设置defalut
+		if ret.DEFAULT() != nil {
+			if stmtlist := ret.StatementList(len(allcase)); stmtlist != nil {
+				SwitchBuilder.BuildDefault(func() {
+					y.VisitStatementList(stmtlist)
+				})
+			}
+		}
+		SwitchBuilder.Finish()
+	case *javaparser.SynchronizedStatementContext:
+		// 处理 synchronized 语句
+		return nil
+	case *javaparser.ReturnStatementContext:
+		// 处理 return 语句
+		if ret.Expression() != nil {
+			value := y.VisitExpression(ret.Expression())
+			return y.EmitReturn([]ssa.Value{value})
+		} else {
+			return y.EmitReturn(nil)
+		}
+	case *javaparser.ThrowStatementContext:
+		// 处理 throw 语句
+		return nil
+	case *javaparser.BreakStatementContext:
+		// 处理 break 语句
+		// todo break使用标签
+		if !y.Break() {
+			y.NewError(ssa.Error, "javaast", yak2ssa.UnexpectedBreakStmt())
+		}
+		return nil
+	case *javaparser.ContinueStatementContext:
+		// 处理 continue 语句
+		// todo continue使用标签
+		if !y.Continue() {
+			y.NewError(ssa.Error, "javaast", yak2ssa.UnexpectedContinueStmt())
+		}
+		return nil
+	case *javaparser.YieldStatementContext:
+		// 处理 yield 语句
+		return nil
+	case *javaparser.ExpressionStatementContext:
+		// 处理表达式语句
+		return y.VisitExpression(ret.Expression())
+	case *javaparser.SwitchArrowExpressionContext:
+		// 处理 switch 语句
+		return nil
+	case *javaparser.IdentifierLabelStatementContext:
+		// 处理标识符标签语句
+		return nil
+	default:
 		return nil
 	}
-
-	if ret := i.Expression(0); ret != nil {
-		log.Infof("visit expression: %v", ret.GetText())
-		y.VisitExpression(ret)
-	}
-
 	return nil
 }
 
@@ -490,6 +727,7 @@ func (y *builder) VisitLocalVariableDeclaration(raw javaparser.ILocalVariableDec
 		y.AssignVariable(variable, value)
 		return nil
 	} else if ret := i.VariableDeclarators(); ret != nil {
+		log.Infof("visit local variable declaration: %v", ret.GetText())
 		decls := ret.(*javaparser.VariableDeclaratorsContext)
 		for _, decl := range decls.AllVariableDeclarator() {
 			y.VisitVariableDeclarator(decl)
@@ -509,8 +747,38 @@ func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorCont
 		return nil
 	}
 
+	if i.VariableInitializer() != nil {
+		text := i.VariableDeclaratorId().(*javaparser.VariableDeclaratorIdContext).Identifier().GetText()
+		variable := y.CreateVariable(text)
+		value := y.VisitVariableInitializer(i.VariableInitializer())
+		y.AssignVariable(variable, value)
+	} else {
+		text := i.VariableDeclaratorId().(*javaparser.VariableDeclaratorIdContext).Identifier().GetText()
+		y.CreateVariable(text)
+	}
+
 	return nil
 
+}
+
+func (y *builder) VisitVariableInitializer(raw javaparser.IVariableInitializerContext) ssa.Value {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*javaparser.VariableInitializerContext)
+	if i == nil {
+		return nil
+	}
+
+	if ret := i.Expression(); ret != nil {
+		return y.VisitExpression(ret)
+	} else if ret := i.ArrayInitializer(); ret != nil {
+		return y.VisitArrayInitializer(ret)
+	} else if ret := i.TwoDimArraryInitializer(); ret != nil {
+		return y.VisitTwoDimArrayInitializer(ret)
+	}
+	return nil
 }
 
 func (y *builder) VisitArguments(raw javaparser.IArgumentsContext) []ssa.Value {
@@ -531,4 +799,199 @@ func (y *builder) VisitArguments(raw javaparser.IArgumentsContext) []ssa.Value {
 		}
 	}
 	return args
+}
+
+func (y *builder) VisitExpressionList(raw javaparser.IExpressionListContext) []ssa.Value {
+	if y == nil || raw == nil {
+		return nil
+	}
+	i, _ := raw.(*javaparser.ExpressionListContext)
+	if i == nil {
+		return nil
+	}
+	exprs := i.AllExpression()
+	valueLen := len(exprs)
+	values := make([]ssa.Value, 0, valueLen)
+	for _, expr := range exprs {
+		if expr != nil {
+			if v := y.VisitExpression(expr); !utils.IsNil(v) {
+				values = append(values, v)
+			}
+		}
+	}
+	return values
+}
+
+func (y *builder) VisitStatementList(raw javaparser.IStatementListContext) interface{} {
+	if y == nil || raw == nil {
+		return nil
+	}
+	i, _ := raw.(*javaparser.StatementListContext)
+	if i == nil {
+		return nil
+	}
+
+	for _, stmt := range i.AllStatement() {
+		if stmt != nil {
+			y.VisitStatement(stmt)
+		}
+	}
+	return nil
+}
+
+func (y *builder) VisitForControl(raw javaparser.IForControlContext) *ssa.LoopBuilder {
+	if y == nil || raw == nil {
+		return nil
+	}
+	i, _ := raw.(*javaparser.ForControlContext)
+	if i == nil {
+		return nil
+	}
+
+	var cond javaparser.IExpressionContext
+	loop := y.CreateLoopBuilder()
+	if i.EnhancedForControl() != nil {
+		//处理增强for循环形式(for each)
+		enhanced := i.EnhancedForControl().(*javaparser.EnhancedForControlContext)
+		var value ssa.Value
+		loop.SetFirst(func() []ssa.Value {
+			value = y.VisitExpression(enhanced.Expression())
+			return []ssa.Value{value}
+		})
+
+		loop.SetCondition(func() ssa.Value {
+			var variable *ssa.Variable
+			if decl := enhanced.VariableDeclaratorId(); decl != nil {
+				text := decl.(*javaparser.VariableDeclaratorIdContext).Identifier().GetText()
+				variable = y.CreateVariable(text)
+			}
+			_, field, ok := y.EmitNext(value, false)
+			y.AssignVariable(variable, field)
+			return ok
+		})
+		return loop
+	} else {
+		// 处理标准for循环形式
+		// 设置第一个参数
+		if first := i.ForInit(); first != nil {
+			loop.SetFirst(func() []ssa.Value { return y.VisitForInit(first) })
+		}
+		// 设置第二个参数
+		if expr := i.Expression(); expr != nil {
+			cond = expr
+		}
+		// 设置第三个参数
+		if third := i.GetForUpdate(); third != nil {
+			loop.SetThird(func() []ssa.Value { return y.VisitExpressionList(third) })
+		}
+	}
+	// 设置循环条件
+	loop.SetCondition(func() ssa.Value {
+		var condition ssa.Value
+		if cond == nil {
+			condition = y.EmitConstInst(true)
+		} else {
+			condition = y.VisitExpression(cond)
+		}
+		return condition
+	})
+	return loop
+}
+
+func (y *builder) VisitForInit(raw javaparser.IForInitContext) []ssa.Value {
+	if y == nil || raw == nil {
+		return nil
+	}
+	i, _ := raw.(*javaparser.ForInitContext)
+	if i == nil {
+		return nil
+	}
+	// for循环first为局部变量声明
+	// for(int a=1;;){}
+	var value []ssa.Value
+	if ret := i.LocalVariableDeclaration(); ret != nil {
+		y.VisitLocalVariableDeclaration(ret)
+		// 访问expressionlist获取变量名的Value
+		if name := ret.(*javaparser.LocalVariableDeclarationContext).Identifier(); name != nil {
+			text := name.GetText()
+			value = append(value, y.ReadValue(text))
+		} else if name := ret.(*javaparser.LocalVariableDeclarationContext).VariableDeclarators(); name != nil {
+			// 访问localVariableDeclaration，定义变量，并获取变量名的value
+			y.VisitLocalVariableDeclaration(ret)
+			// 获取所有定义变量的变量名
+			decls := name.(*javaparser.VariableDeclaratorsContext)
+			for _, decl := range decls.AllVariableDeclarator() {
+				if decl != nil {
+					variableDeclaratorId := decl.(*javaparser.VariableDeclaratorContext).VariableDeclaratorId()
+					text := variableDeclaratorId.(*javaparser.VariableDeclaratorIdContext).Identifier().GetText()
+					value = append(value, y.ReadValue(text))
+				}
+			}
+		}
+	}
+	return value
+}
+
+func (y *builder) VisitIfStmt(raw javaparser.IIfstmtContext) interface{} {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	builder := y.CreateIfBuilder()
+
+	var build func(raw javaparser.IIfstmtContext) func()
+	build = func(raw javaparser.IIfstmtContext) func() {
+		if raw == nil {
+			return nil
+		}
+		i, _ := raw.(*javaparser.IfstmtContext)
+		if i == nil {
+			return nil
+		}
+
+		if parExpr := i.ParExpression(); parExpr != nil {
+			expr := parExpr.(*javaparser.ParExpressionContext).Expression()
+			if block := i.Block(); block != nil {
+				builder.AppendItem(
+					func() ssa.Value { return y.VisitExpression(expr) },
+					func() {
+						y.VisitBlock(i.Block())
+					})
+			} else {
+				// 没有block的情况
+				builder.AppendItem(
+					func() ssa.Value { return y.VisitExpression(expr) },
+					func() {})
+			}
+
+		}
+
+		for _, elseIfBlock := range i.AllElseIfBlock() {
+			if elseIfBlock != nil {
+				elseIfStmt := elseIfBlock.(*javaparser.ElseIfBlockContext)
+				block := elseIfStmt.Block()
+				parExpr := elseIfStmt.ParExpression()
+				expr := parExpr.(*javaparser.ParExpressionContext).Expression()
+				builder.AppendItem(
+					func() ssa.Value {
+						return (y.VisitExpression(expr))
+					},
+					func() {
+						y.VisitBlock(block)
+					},
+				)
+			}
+		}
+		elseStmt := i.ElseBlock()
+		if elseStmt != nil {
+			if elseBlock := elseStmt.(*javaparser.ElseBlockContext).Block(); elseBlock != nil {
+				return func() { y.VisitBlock(elseBlock) }
+			}
+		}
+		return nil
+	}
+	elseBlock := build(raw)
+	builder.SetElse(elseBlock)
+	builder.Build()
+	return nil
 }

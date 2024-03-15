@@ -10,12 +10,9 @@ import (
 
 func TestYaklangBasic_Variable_InBlock(t *testing.T) {
 	t.Run("test simple assign", func(t *testing.T) {
-		test.CheckPrintlnValue(`
-		a = 1
-		println(a)
-		a = 2
-		println(a)
-		`, []string{
+		test.CheckPrintlnValue(`a = []int {1,2,3}
+println(a)
+`, []string{
 			"1",
 			"2",
 		}, t)
@@ -245,9 +242,9 @@ func TestYaklangBasic_Variable_InIf(t *testing.T) {
 		if c {
 			a = 2
 			println(a)
-		}else if c == 2{
-			a = 3 
-			println(a)
+		}elif   c == 2{
+			a = 3
+			println(a+d)
 		}
 		println(a)
 		`,

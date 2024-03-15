@@ -171,6 +171,10 @@ func (v *BaseJavaParserVisitor) VisitArrayInitializer(ctx *ArrayInitializerConte
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseJavaParserVisitor) VisitTwoDimArraryInitializer(ctx *TwoDimArraryInitializerContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseJavaParserVisitor) VisitClassOrInterfaceType(ctx *ClassOrInterfaceTypeContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -327,6 +331,10 @@ func (v *BaseJavaParserVisitor) VisitElseBlock(ctx *ElseBlockContext) interface{
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseJavaParserVisitor) VisitElseIfBlock(ctx *ElseIfBlockContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseJavaParserVisitor) VisitBlockStatement(ctx *BlockStatementContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -415,11 +423,19 @@ func (v *BaseJavaParserVisitor) VisitExpressionStatement(ctx *ExpressionStatemen
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaParserVisitor) VisitSwitchLabelExpression(ctx *SwitchLabelExpressionContext) interface{} {
+func (v *BaseJavaParserVisitor) VisitSwitchArrowExpression(ctx *SwitchArrowExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
 func (v *BaseJavaParserVisitor) VisitIdentifierLabelStatement(ctx *IdentifierLabelStatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitStatementList(ctx *StatementListContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitIfstmt(ctx *IfstmtContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -447,14 +463,6 @@ func (v *BaseJavaParserVisitor) VisitResource(ctx *ResourceContext) interface{} 
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaParserVisitor) VisitSwitchBlockStatementGroup(ctx *SwitchBlockStatementGroupContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseJavaParserVisitor) VisitSwitchLabel(ctx *SwitchLabelContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BaseJavaParserVisitor) VisitForControl(ctx *ForControlContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -468,6 +476,10 @@ func (v *BaseJavaParserVisitor) VisitEnhancedForControl(ctx *EnhancedForControlC
 }
 
 func (v *BaseJavaParserVisitor) VisitParExpression(ctx *ParExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitParExpressionList(ctx *ParExpressionListContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -584,6 +596,14 @@ func (v *BaseJavaParserVisitor) VisitCastExpression(ctx *CastExpressionContext) 
 }
 
 func (v *BaseJavaParserVisitor) VisitBitwiseXORExpression(ctx *BitwiseXORExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitLeftExpression(ctx *LeftExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitLeftVariable(ctx *LeftVariableContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
