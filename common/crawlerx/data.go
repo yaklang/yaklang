@@ -32,12 +32,25 @@ const (
 	extremeLevel repeatLevel = 4
 )
 
+var RepeatLevelMap = map[int]repeatLevel{
+	0: unlimited,
+	1: lowLevel,
+	2: midLevel,
+	3: highLevel,
+	4: extremeLevel,
+}
+
 type scanRangeLevel int
 
 const (
 	mainDomain scanRangeLevel = 0
 	subDomain  scanRangeLevel = 1
 )
+
+var ScanRangeLevelMap = map[int]scanRangeLevel{
+	0: mainDomain,
+	1: subDomain,
+}
 
 var generalScanRangeMap = map[scanRangeLevel]func(string) []string{
 	mainDomain: generalMainDomainRange,

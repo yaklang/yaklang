@@ -78,8 +78,6 @@ type BrowserStarter struct {
 
 	invalidSuffix []string
 
-	storageSave bool
-
 	runtimeID    string
 	saveToDB     bool
 	https        bool
@@ -121,8 +119,6 @@ func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *Br
 
 		headers: baseConfig.headers,
 		cookies: baseConfig.cookies,
-
-		storageSave: false,
 
 		runtimeID: baseConfig.runtimeId,
 		saveToDB:  baseConfig.saveToDB,
@@ -174,6 +170,12 @@ func (starter *BrowserStarter) startBrowser() error {
 	err := starter.baseBrowserStarter()
 	if err != nil {
 		return err
+	}
+	if len(starter.baseConfig.localStorage) > 0 {
+		err = starter.localStorage()
+		if err != nil {
+			return utils.Errorf("do local storage error: %v", err)
+		}
 	}
 	err = starter.createBrowserHijack(starter.browser)
 	if err != nil {
@@ -239,6 +241,29 @@ func (starter *BrowserStarter) doLauncher(l *launcher.Launcher) *launcher.Launch
 	return l
 }
 
+func (starter *BrowserStarter) localStorage() error {
+	log.Debugf(`do local storage on %s`, starter.baseUrl)
+	page, err := starter.browser.Page(proto.TargetCreateTarget{URL: starter.baseUrl})
+	defer func() {
+		_ = page.Close()
+	}()
+	if err != nil {
+		return utils.Errorf("local storage create base page error: %v", err)
+	}
+	err = page.WaitLoad()
+	if err != nil {
+		return utils.Errorf("local storage base page wait load error: %v", err)
+	}
+	for key, value := range starter.baseConfig.localStorage {
+		setStorageJS := fmt.Sprintf(`()=>window.localStorage.setItem("%s", "%s")`, key, value)
+		_, err := page.Eval(setStorageJS)
+		if err != nil {
+			return utils.Errorf("local storage save data error: %v", err)
+		}
+	}
+	return nil
+}
+
 func (starter *BrowserStarter) pageActionGenerator() {
 	starter.urlCheck["crawler_range"] = starter.scanRange
 	starter.urlCheck["repeat_url"] = starter.pageVisit
@@ -289,7 +314,7 @@ func (starter *BrowserStarter) scanCreatedTarget(targetID proto.TargetTargetID) 
 	}()
 	go page.EachEvent(
 		func(e *proto.PageJavascriptDialogOpening) {
-			proto.PageHandleJavaScriptDialog{
+			_ = proto.PageHandleJavaScriptDialog{
 				Accept:     false,
 				PromptText: "",
 			}.Call(page)
@@ -303,18 +328,6 @@ func (starter *BrowserStarter) scanCreatedTarget(targetID proto.TargetTargetID) 
 	}
 	urlStr, _ := getCurrentUrl(page)
 	log.Debugf(`page opened: %v with targetID %v`, urlStr, targetID)
-	if !starter.storageSave && len(starter.baseConfig.localStorage) > 0 {
-		starter.storageSave = true
-		log.Debugf(`do local storage on %s`, urlStr)
-		for key, value := range starter.baseConfig.localStorage {
-			setStorageJS := fmt.Sprintf(`(key, value) => { window.localStorage.setItem(%s, %s) }`, key, value)
-			_, err := page.EvalOnNewDocument(setStorageJS)
-			if err != nil {
-				log.Errorf(`local storage save error: %s`, err)
-				break
-			}
-		}
-	}
 	_, err = page.EvalOnNewDocument(pageScript)
 	if err != nil {
 		log.Errorf(`page script run error: %v`, err)
@@ -365,7 +378,6 @@ func (starter *BrowserStarter) createBrowserHijack(browser *rod.Browser) error {
 	browserHijackRouter := NewBrowserHijackRequests(browser)
 	opts := []lowhttp.LowhttpOpt{
 		lowhttp.WithTimeout(30 * time.Second),
-		//lowhttp.WithHttps(starter.https),
 		lowhttp.WithSaveHTTPFlow(starter.saveToDB),
 		lowhttp.WithSource(starter.sourceType),
 	}
@@ -382,6 +394,7 @@ func (starter *BrowserStarter) createBrowserHijack(browser *rod.Browser) error {
 		//if pageUrl == "" {
 		//	pageUrl = hijack.Request.URL().String()
 		//}
+		urlStr := hijack.Request.URL().String()
 		starter.subWaitGroup.Add()
 		defer starter.subWaitGroup.Done()
 		for _, header := range starter.headers {
@@ -407,13 +420,12 @@ func (starter *BrowserStarter) createBrowserHijack(browser *rod.Browser) error {
 			return
 		}
 		refererInfo := hijack.Request.Req().Header.Get("Referer")
-		if refererInfo == "" && hijack.Request.URL().String() != starter.baseUrl {
+		if refererInfo == "" && urlStr != starter.baseUrl {
 			hijack.Request.Req().Header.Add("Referer", starter.baseUrl)
 		}
 		tempOpts := make([]lowhttp.LowhttpOpt, 0)
 		tempOpts = append(tempOpts, opts...)
-		url := hijack.Request.URL().String()
-		if strings.HasPrefix(url, "https://") || strings.HasPrefix(url, "wss://") {
+		if strings.HasPrefix(urlStr, "https://") || strings.HasPrefix(urlStr, "wss://") {
 			tempOpts = append(tempOpts, lowhttp.WithHttps(true))
 		}
 		err := hijack.LoadResponse(tempOpts, true)
@@ -428,14 +440,14 @@ func (starter *BrowserStarter) createBrowserHijack(browser *rod.Browser) error {
 		if starter.stopSignal {
 			return
 		}
-		if !starter.scanRange(hijack.Request.URL().String()) {
+		if !starter.scanRange(urlStr) {
 			return
 		}
 		var afterRepeatUrl string
 		if starter.requestAfterRepeat != nil {
 			afterRepeatUrl = starter.requestAfterRepeat(hijack.Request)
 		} else {
-			afterRepeatUrl = hijack.Request.URL().String()
+			afterRepeatUrl = urlStr
 			if starter.urlAfterRepeat != nil {
 				afterRepeatUrl = starter.urlAfterRepeat(afterRepeatUrl)
 			}
@@ -448,12 +460,12 @@ func (starter *BrowserStarter) createBrowserHijack(browser *rod.Browser) error {
 		// do tree
 		//
 
-		//if pageUrl != hijack.Request.URL().String() {
-		//	starter.urlTree.Add(pageUrl, hijack.Request.URL().String())
+		//if pageUrl != urlStr {
+		//	starter.urlTree.Add(pageUrl, urlStr)
 		//}
 
 		if StringArrayContains(jsContentTypes, hijack.Response.Headers().Get("Content-Type")) {
-			jsUrls := analysisJsInfo(hijack.Request.URL().String(), hijack.Response.Body())
+			jsUrls := analysisJsInfo(urlStr, hijack.Response.Body())
 			for _, jsUrl := range jsUrls {
 				var jsAfterRepeatUrl string
 				if starter.urlAfterRepeat != nil {
@@ -468,7 +480,7 @@ func (starter *BrowserStarter) createBrowserHijack(browser *rod.Browser) error {
 					url:        jsUrl,
 					resultType: "js url",
 					method:     "JS GET",
-					from:       hijack.Request.URL().String(),
+					from:       urlStr,
 				}
 				select {
 				case <-starter.ctx.Done():
@@ -491,7 +503,7 @@ func (starter *BrowserStarter) createBrowserHijack(browser *rod.Browser) error {
 		default:
 			starter.ch <- &result
 		}
-		if starter.maxUrl != 0 && starter.baseConfig.resultSent.Count() >= int64(starter.maxUrl) {
+		if starter.maxUrl > 0 && starter.baseConfig.resultSent.Count() >= int64(starter.maxUrl) {
 			starter.stopSignal = true
 		}
 	})
