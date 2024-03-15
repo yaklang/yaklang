@@ -244,6 +244,9 @@ type JavaParserVisitor interface {
 	// Visit a parse tree produced by JavaParser#block.
 	VisitBlock(ctx *BlockContext) interface{}
 
+	// Visit a parse tree produced by JavaParser#elseBlock.
+	VisitElseBlock(ctx *ElseBlockContext) interface{}
+
 	// Visit a parse tree produced by JavaParser#blockStatement.
 	VisitBlockStatement(ctx *BlockStatementContext) interface{}
 
@@ -304,17 +307,17 @@ type JavaParserVisitor interface {
 	// Visit a parse tree produced by JavaParser#YieldStatement.
 	VisitYieldStatement(ctx *YieldStatementContext) interface{}
 
-	// Visit a parse tree produced by JavaParser#EmptyStatement.
-	VisitEmptyStatement(ctx *EmptyStatementContext) interface{}
+	// Visit a parse tree produced by JavaParser#SemiStatement.
+	VisitSemiStatement(ctx *SemiStatementContext) interface{}
 
-	// Visit a parse tree produced by JavaParser#StatementExpression.
-	VisitStatementExpression(ctx *StatementExpressionContext) interface{}
+	// Visit a parse tree produced by JavaParser#ExpressionStatement.
+	VisitExpressionStatement(ctx *ExpressionStatementContext) interface{}
 
-	// Visit a parse tree produced by JavaParser#SwitchExpressionStatement.
-	VisitSwitchExpressionStatement(ctx *SwitchExpressionStatementContext) interface{}
+	// Visit a parse tree produced by JavaParser#SwitchLabelExpression.
+	VisitSwitchLabelExpression(ctx *SwitchLabelExpressionContext) interface{}
 
-	// Visit a parse tree produced by JavaParser#LabelStatement.
-	VisitLabelStatement(ctx *LabelStatementContext) interface{}
+	// Visit a parse tree produced by JavaParser#IdentifierLabelStatement.
+	VisitIdentifierLabelStatement(ctx *IdentifierLabelStatementContext) interface{}
 
 	// Visit a parse tree produced by JavaParser#catchClause.
 	VisitCatchClause(ctx *CatchClauseContext) interface{}

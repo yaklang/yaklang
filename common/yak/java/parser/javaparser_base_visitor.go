@@ -323,6 +323,10 @@ func (v *BaseJavaParserVisitor) VisitBlock(ctx *BlockContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseJavaParserVisitor) VisitElseBlock(ctx *ElseBlockContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseJavaParserVisitor) VisitBlockStatement(ctx *BlockStatementContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -403,19 +407,19 @@ func (v *BaseJavaParserVisitor) VisitYieldStatement(ctx *YieldStatementContext) 
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaParserVisitor) VisitEmptyStatement(ctx *EmptyStatementContext) interface{} {
+func (v *BaseJavaParserVisitor) VisitSemiStatement(ctx *SemiStatementContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaParserVisitor) VisitStatementExpression(ctx *StatementExpressionContext) interface{} {
+func (v *BaseJavaParserVisitor) VisitExpressionStatement(ctx *ExpressionStatementContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaParserVisitor) VisitSwitchExpressionStatement(ctx *SwitchExpressionStatementContext) interface{} {
+func (v *BaseJavaParserVisitor) VisitSwitchLabelExpression(ctx *SwitchLabelExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaParserVisitor) VisitLabelStatement(ctx *LabelStatementContext) interface{} {
+func (v *BaseJavaParserVisitor) VisitIdentifierLabelStatement(ctx *IdentifierLabelStatementContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
