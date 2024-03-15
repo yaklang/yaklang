@@ -440,6 +440,16 @@ func ExportRulesToFile(db *gorm.DB, fileName string) error {
 			log.Errorf("marshal rules failed: %s", err)
 			continue
 		}
+		var rawMap = make(map[string]any)
+		if err := json.Unmarshal(raw, &rawMap); err != nil {
+			log.Errorf("unmarshal rules failed: %s", err)
+			continue
+		}
+		delete(rawMap, "ID")
+		delete(rawMap, "CreatedAt")
+		delete(rawMap, "DeletedAt")
+		delete(rawMap, "UpdatedAt")
+		raw, _ = json.Marshal(rawMap)
 		fp.Write(raw)
 		fp.Write([]byte("\n"))
 	}
