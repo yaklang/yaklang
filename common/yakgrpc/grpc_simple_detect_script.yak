@@ -2,7 +2,7 @@ yakit.AutoInitYakit()
 
 loglevel("info")
 
-runtimeID = env.Get("YAK_RUNTIME_ID")
+runtimeID = getParams("RUNTIME_ID")
 yakit.StatusCard("RuntimeIDFromRisks", runtimeID)
 
 # Input your code!
