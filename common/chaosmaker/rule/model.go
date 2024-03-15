@@ -176,7 +176,7 @@ func (origin *Storage) DecoratedByOpenAI(t string, opts ...aispec.AIConfigOption
 		}
 	}
 
-	if ruleIns.Keywords == "" || ruleIns.KeywordsZh == "" {
+	if ruleIns.Keywords == "" || ruleIns.KeywordsZh == "" || ruleIns.NameZh == "" {
 		agent := ai.GetAI(t, opts...)
 		if agent == nil {
 			log.Errorf("cannot get ai type: %s", t)
