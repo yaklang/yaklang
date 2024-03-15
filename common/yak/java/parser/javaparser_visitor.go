@@ -259,8 +259,62 @@ type JavaParserVisitor interface {
 	// Visit a parse tree produced by JavaParser#localTypeDeclaration.
 	VisitLocalTypeDeclaration(ctx *LocalTypeDeclarationContext) interface{}
 
-	// Visit a parse tree produced by JavaParser#statement.
-	VisitStatement(ctx *StatementContext) interface{}
+	// Visit a parse tree produced by JavaParser#BlockLabelStatement.
+	VisitBlockLabelStatement(ctx *BlockLabelStatementContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#AssertStatement.
+	VisitAssertStatement(ctx *AssertStatementContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#IfStatement.
+	VisitIfStatement(ctx *IfStatementContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#ForStatement.
+	VisitForStatement(ctx *ForStatementContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#WhileStatement.
+	VisitWhileStatement(ctx *WhileStatementContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#DoWhileStatement.
+	VisitDoWhileStatement(ctx *DoWhileStatementContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#TryStatement.
+	VisitTryStatement(ctx *TryStatementContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#TryWithResourcesStatement.
+	VisitTryWithResourcesStatement(ctx *TryWithResourcesStatementContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#SwitchStatement.
+	VisitSwitchStatement(ctx *SwitchStatementContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#SynchronizedStatement.
+	VisitSynchronizedStatement(ctx *SynchronizedStatementContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#ReturnStatement.
+	VisitReturnStatement(ctx *ReturnStatementContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#ThrowStatement.
+	VisitThrowStatement(ctx *ThrowStatementContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#BreakStatement.
+	VisitBreakStatement(ctx *BreakStatementContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#ContinueStatement.
+	VisitContinueStatement(ctx *ContinueStatementContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#YieldStatement.
+	VisitYieldStatement(ctx *YieldStatementContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#EmptyStatement.
+	VisitEmptyStatement(ctx *EmptyStatementContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#StatementExpression.
+	VisitStatementExpression(ctx *StatementExpressionContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#SwitchExpressionStatement.
+	VisitSwitchExpressionStatement(ctx *SwitchExpressionStatementContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#LabelStatement.
+	VisitLabelStatement(ctx *LabelStatementContext) interface{}
 
 	// Visit a parse tree produced by JavaParser#catchClause.
 	VisitCatchClause(ctx *CatchClauseContext) interface{}
