@@ -2,6 +2,7 @@ package aispec
 
 import (
 	"encoding/json"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
@@ -81,10 +82,22 @@ func ExtractDataBase(
 	if err != nil {
 		return nil, err
 	}
+
 	if choice == nil || len(choice) == 0 {
 		return nil, utils.Error("no choice for chat result")
 	}
 	choiceMsg := choice[0].Message.Content
+	if choiceMsg == "" {
+		calls := choice[0].Message.ToolCalls
+		if len(calls) > 0 {
+			choiceMsg = calls[0].Function.Arguments
+		}
+	}
+	if choiceMsg == "" {
+		spew.Dump(choice)
+		return nil, utils.Error("no choice message")
+	}
+
 	result := make(map[string]any)
 	err = json.Unmarshal([]byte(choiceMsg), &result)
 	if err != nil {
