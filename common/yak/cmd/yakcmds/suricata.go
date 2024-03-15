@@ -3,7 +3,7 @@ package yakcmds
 import (
 	"fmt"
 	"github.com/urfave/cli"
-	"github.com/yaklang/yaklang/common/ai/openai"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/chaosmaker"
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/log"
@@ -34,9 +34,6 @@ var suricataLoaderCommand = cli.Command{
 			Usage: "use openai api to generate description for suricata rule",
 		},
 		cli.StringFlag{
-			Name: "domain",
-		},
-		cli.StringFlag{
 			Name:  "ai-proxy",
 			Usage: "use proxy to access openai api",
 		},
@@ -54,17 +51,6 @@ var suricataLoaderCommand = cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		domain := c.String("domain")
-		//if domain != "" {
-		//	domainRule := strings.Trim(strconv.Quote(domain), ` "'`+"`")
-		//	rule := `alert http any any -> any any (msg:"Domain Fetch: ` + domainRule + `"; content:"` + domainRule + `"; http_header; sid:1; rev:1;)`
-		//	log.Infof("generate suricata rule: %s", rule)
-		//	err := chaosmaker.LoadSuricataToDatabase(rule)
-		//	if err != nil {
-		//		return err
-		//	}
-		//	return nil
-		//}
 		concurrent := 1
 		if c.Int("concurrent") > 0 {
 			concurrent = c.Int("concurrent")
@@ -90,7 +76,7 @@ var suricataLoaderCommand = cli.Command{
 					r := rule.NewRuleFromSuricata(subRule)
 					if c.Bool("ai") {
 						log.Infof("start to decorator suricata rule: %s", subRule.Message)
-						r.DecoratedByOpenAI(openai.WithAPIKey(c.String("ai-token")), openai.WithProxy(c.String("ai-proxy")), openai.WithDomain(domain), openai.WithModel(c.String("model")))
+						r.DecoratedByOpenAI("openai", aispec.WithAPIKey(c.String("ai-token")), aispec.WithProxy(c.String("ai-proxy")))
 					}
 					err := rule.SaveToDB(r)
 					if err != nil {
