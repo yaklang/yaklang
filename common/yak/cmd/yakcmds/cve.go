@@ -5,6 +5,7 @@ import (
 	"context"
 	"github.com/jinzhu/gorm"
 	"github.com/urfave/cli"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/chaosmaker/rule"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/cve"
@@ -24,8 +25,8 @@ var CVEUtilCommands = []*cli.Command{
 		Aliases: []string{"ai-desc", "desc"},
 		Flags: []cli.Flag{
 			cli.StringFlag{
-				Name:  "keyfile",
-				Usage: "API KeyFile",
+				Name:  "apikey",
+				Usage: "API Key for AI",
 			},
 			cli.BoolFlag{
 				Name: "no-critical",
@@ -44,6 +45,8 @@ var CVEUtilCommands = []*cli.Command{
 				Name: "chaosmaker-rules,chaosmaker",
 			},
 			cli.StringFlag{Name: "proxy", Usage: "Network Proxy", EnvVar: "http_proxy"},
+			cli.StringFlag{Name: "ai", Usage: "Which AI Gateway? (openai/chatglm)", Value: "openai"},
+			cli.Float64Flag{Name: "timeout", Usage: "timeout for seconds", Value: 60},
 		},
 		Usage:  "Translate CVE Models to Chinese, Supported in OPENAI",
 		Hidden: true,
@@ -56,7 +59,17 @@ var CVEUtilCommands = []*cli.Command{
 			if c.Bool("cwe") {
 				return cve.TranslatingCWE(c.String("keyfile"), c.Int("concurrent"), c.String("cve-database"))
 			}
-			return cve.Translating(c.String("keyfile"), c.Bool("no-critical"), c.Int("concurrent"), c.String("cve-database"))
+			_ = consts.GetGormCVEDatabase()
+			_ = consts.GetGormCVEDescriptionDatabase()
+			return cve.Translating(
+				c.String("ai"),
+				c.Bool("no-critical"),
+				c.Int("concurrent"),
+				c.String("cve-database"),
+				aispec.WithAPIKey(c.String("apikey")),
+				aispec.WithProxy(c.String("proxy")),
+				aispec.WithTimeout(c.Float64("timeout")),
+			)
 		},
 	},
 	{

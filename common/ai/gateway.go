@@ -29,6 +29,19 @@ func OpenAI(opts ...aispec.AIConfigOption) aispec.AIGateway {
 	return agent
 }
 
+func HaveAI(t string) bool {
+	_, ok := aispec.Lookup(t)
+	return ok
+}
+
+func GetAI(t string, opts ...aispec.AIConfigOption) aispec.AIGateway {
+	agent := createAIGateway(t)
+	if agent != nil {
+		agent.LoadOption(opts...)
+	}
+	return agent
+}
+
 func ChatGLM(opts ...aispec.AIConfigOption) aispec.AIGateway {
 	agent := createAIGateway("chatglm")
 	if agent != nil {
