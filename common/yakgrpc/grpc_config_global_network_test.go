@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
@@ -17,6 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -447,37 +449,31 @@ func TestGRPCMUSTPASS_COMMON_HTTPAuth(t *testing.T) {
 	}
 }
 
-// func TestPluginScanLists(t *testing.T) {
-// 	client, err := NewLocalClient()
-// 	require.Nil(t, err, "new local client error")
+func TestPluginScanLists(t *testing.T) {
+	client, err := NewLocalClient()
+	require.Nil(t, err, "new local client error")
 
-// 	_, _ = client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
-// 	config, err := client.GetGlobalNetworkConfig(context.Background(), &ypb.GetGlobalNetworkConfigRequest{})
-// 	require.Nil(t, err, "get global network config error")
+	_, _ = client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
+	host, port := utils.DebugMockHTTP([]byte("Hello"))
+	yakit.SetGlobalPluginScanLists([]string{}, []string{host})
 
-// 	host, port := utils.DebugMockHTTP([]byte("Hello"))
+	manager, err := yak.NewMixPluginCaller()
+	require.Nil(t, err, "new mix plugin caller error")
 
-// 	config.ExcludePluginScanURIs = []string{host}
-
-// 	_, err = client.SetGlobalNetworkConfig(context.Background(), config)
-// 	require.Nil(t, err, "set global network config error")
-
-// 	manager, err := yak.NewMixPluginCaller()
-// 	require.Nil(t, err, "new mix plugin caller error")
-
-// 	token := utils.RandStringBytes(100)
-// 	tmpName, err := yakit.CreateTemporaryYakScript("mitm", fmt.Sprintf(`
-// mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
-// 	risk.NewRisk(%#v, risk.description("test"), risk.solution("test solution"))
-// }
-// `, token))
-// 	require.Nil(t, err, "create temporary yak script error")
-// 	manager.LoadPlugin(tmpName)
-// 	manager.MirrorHTTPFlow(false, fmt.Sprintf("http://%s:%d", host, port ), nil, nil, nil)
-// 	_, ret, err := yakit.QueryRisks(consts.GetGormProjectDatabase(), &ypb.QueryRisksRequest{Search: token})
-// 	require.Nil(t, err, "query risks error")
-// 	require.Len(t, ret, 0, "global network config plugin scan blacklist error")
-// }
+	token := utils.RandStringBytes(100)
+	tmpName, err := yakit.CreateTemporaryYakScript("mitm", fmt.Sprintf(`
+mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+	risk.NewRisk(%#v, risk.description("test"), risk.solution("test solution"))
+}
+`, token))
+	require.Nil(t, err, "create temporary yak script error")
+	manager.LoadPlugin(tmpName)
+	t.Logf("GlobalPluginScanFilter lists: %#v", yakit.GlobalPluginScanFilter)
+	manager.MirrorHTTPFlow(false, fmt.Sprintf("http://%s:%d", host, port), nil, nil, nil)
+	_, ret, err := yakit.QueryRisks(consts.GetGormProjectDatabase(), &ypb.QueryRisksRequest{Search: token})
+	require.Nil(t, err, "query risks error")
+	require.Len(t, ret, 0, "global network config plugin scan blacklist error")
+}
 
 //func TestHTTPAuth(t *testing.T) {
 //	client, err := NewLocalClient()
