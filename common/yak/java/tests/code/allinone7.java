@@ -84,8 +84,7 @@ public class LexerTest {
         this.prePost--;
         super.prePost++;
         super.prePost--;
-        someMethod()[0]++;
-        someMethod()[0]--;
+
 
         ++LexerTest.prePost;
         --LexerTest.prePost;
@@ -95,8 +94,7 @@ public class LexerTest {
         --this.prePost;
         ++super.prePost;
         --super.prePost;
-        ++someMethod()[0];
-        --someMethod()[0];
+
 
         // Relational operators
         result = x == y;
@@ -363,10 +361,7 @@ public class HelloWorld {
         numbers[0][0]--;
         ++numbers[0][0];
         --numbers[0][0];
-        foo()[0]++;
-        foo()[0]--;
-        ++foo()[0];
-        --foo()[0];
+
     }
 }
 

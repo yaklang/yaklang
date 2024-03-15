@@ -257,10 +257,15 @@ variableDeclaratorId
 variableInitializer
     : arrayInitializer
     | expression
+    | twoDimArraryInitializer //二维数组
     ;
 
 arrayInitializer
-    : '{' (variableInitializer (',' variableInitializer)* ','?)? '}'
+    : '{' (expression (',' expression)* ','?)? '}'
+    ;
+ // 二维数组
+twoDimArraryInitializer
+    : '{' (arrayInitializer (',' arrayInitializer)* ','?)? '}'
     ;
 
 classOrInterfaceType
@@ -455,9 +460,11 @@ block
     : '{' blockStatement* '}'
     ;
 elseBlock
-    :block
+    :ELSE block
     ;
-
+elseIfBlock
+    :ELSEIF parExpression block
+    ;
 blockStatement
     : localVariableDeclaration ';'
     | localTypeDeclaration
@@ -511,13 +518,13 @@ localTypeDeclaration
 statement
     : blockLabel = block                                                        # BlockLabelStatement
     | ASSERT expression (':' expression)? ';'                                   # AssertStatement
-    | IF parExpression block (ELSEIF parExpression block)* (ELSE elseBlock)?    # IfStatement
+    | ifstmt                                                                    # IfStatement
     | FOR '(' forControl ')' block                                              # ForStatement
     | WHILE parExpression block                                                 # WhileStatement
-    | DO block WHILE parExpression ';'                                          # DoWhileStatement
+    | DO block WHILE parExpressionList ';'                                          # DoWhileStatement
     | TRY block (catchClause+ finallyBlock? | finallyBlock)                     # TryStatement
     | TRY resourceSpecification block catchClause* finallyBlock?                # TryWithResourcesStatement
-    | SWITCH parExpression '{' switchBlockStatementGroup* switchLabel* '}'      # SwitchStatement
+    | SWITCH parExpression '{' (CASE expressionList ':' statementList?)* ( DEFAULT ':' statementList?)?'}'*  # SwitchStatement
     | SYNCHRONIZED parExpression block                                          # SynchronizedStatement
     | RETURN expression? ';'                                                    # ReturnStatement
     | THROW expression ';'                                                      # ThrowStatement
@@ -526,10 +533,15 @@ statement
     | YIELD expression ';'                                                      # YieldStatement// Java17
     | SEMI                                                                      # SemiStatement
     | statementExpression = expression ';'                                      # ExpressionStatement
-    | switchExpression ';'?                                                     #SwitchLabelExpression // Java17
+    | switchExpression ';'?                                                     # SwitchArrowExpression // Java17
     | identifierLabel = identifier ':' statement                                # IdentifierLabelStatement
     ;
 
+statementList: (statement  )+;
+
+ifstmt
+    :IF parExpression block? elseIfBlock* elseBlock?
+    ;
 catchClause
     : CATCH '(' variableModifier* catchType identifier ')' block
     ;
@@ -558,18 +570,7 @@ resource
 /** Matches cases then statements, both of which are mandatory.
  *  To handle empty cases at the end, we add switchLabel* to statement.
  */
-switchBlockStatementGroup
-    : switchLabel+ blockStatement+
-    ;
 
-switchLabel
-    : CASE (
-        constantExpression = expression
-        | enumConstantName = IDENTIFIER
-        | typeType varName = identifier
-    ) ':'
-    | DEFAULT ':'
-    ;
 
 forControl
     : enhancedForControl
@@ -591,8 +592,12 @@ parExpression
     : '(' expression ')'
     ;
 
+parExpressionList
+    : '(' expressionList ')'
+    ;
+
 expressionList
-    : expression (',' expression)*
+    : expression (',' expression)* ','?
     ;
 
 methodCall
@@ -622,11 +627,11 @@ expression
     | switchExpression                                              # Java17SwitchExpression
 
     // Level 15 Post-increment/decrement operators
-    | identifier postfix = ('++' | '--')                            # PostfixExpression
+    | leftExpression postfix = ('++' | '--')                            # PostfixExpression
 
     // Level 14, Unary operators
     | prefix = ('+' | '-'  | '~' | '!') expression                   # PrefixUnaryExpression
-    | prefix = ('++' | '--') identifier                            # PrefixBinayExpression
+    | prefix = ('++' | '--') leftExpression                           # PrefixBinayExpression
     // Level 13 Cast and object creation
     | '(' annotation* typeType ('&' typeType)* ')' expression       # CastExpression
     | NEW creator                                                   # NewCreatorExpression
@@ -637,7 +642,7 @@ expression
     // Level 11, Additive operators
     | expression bop = ('+' | '-') expression                       # AdditiveExpression
     // Level 10, Shift operators
-    | expression bop=('<<'| '>>>' | '>>') expression       # ShiftExpression
+    | expression   ('<''<'| '>''>''>'| '>''>' ) expression       # ShiftExpression
     // Level 9, Relational operators
     | expression bop = ('<=' | '>=' | '>' | '<') expression         # RelationalExpression
     | expression bop = INSTANCEOF (typeType | pattern)              # InstanceofExpression
@@ -656,7 +661,7 @@ expression
     // Level 2, Ternary (Conditional) operator
     | <assoc = right> expression bop = '?' expression ':' expression# TernaryExpression
     // Level 1, Assignment
-    | <assoc = right> identifier bop = (
+    | <assoc = right> leftExpression bop = (
          '+='
         | '-='
         | '*='
@@ -669,10 +674,23 @@ expression
         | '<<='
         | '%='
     ) expression                                                    # AssignmentExpression
-    | <assoc = right> identifier bop = '=' (identifier|expression)            # AssignmentEqExpression
+    | <assoc = right> leftExpression bop = '=' (identifier|expression)            # AssignmentEqExpression
     // Level 0, Lambda Expression Java8
     | lambdaExpression                                              # Java8LambdaExpression
     ;
+
+// 暂时使用，等弄类的时候再换掉
+
+leftExpression
+    :leftVariable ('[' expression ']')*
+    ;
+
+leftVariable
+    : identifier ('.' identifier)*
+    | THIS ('.' identifier)*
+    | SUPER ('.' identifier)*
+    ;
+
 
 // Java17
 pattern

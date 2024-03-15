@@ -130,6 +130,9 @@ type JavaParserVisitor interface {
 	// Visit a parse tree produced by JavaParser#arrayInitializer.
 	VisitArrayInitializer(ctx *ArrayInitializerContext) interface{}
 
+	// Visit a parse tree produced by JavaParser#twoDimArraryInitializer.
+	VisitTwoDimArraryInitializer(ctx *TwoDimArraryInitializerContext) interface{}
+
 	// Visit a parse tree produced by JavaParser#classOrInterfaceType.
 	VisitClassOrInterfaceType(ctx *ClassOrInterfaceTypeContext) interface{}
 
@@ -247,6 +250,9 @@ type JavaParserVisitor interface {
 	// Visit a parse tree produced by JavaParser#elseBlock.
 	VisitElseBlock(ctx *ElseBlockContext) interface{}
 
+	// Visit a parse tree produced by JavaParser#elseIfBlock.
+	VisitElseIfBlock(ctx *ElseIfBlockContext) interface{}
+
 	// Visit a parse tree produced by JavaParser#blockStatement.
 	VisitBlockStatement(ctx *BlockStatementContext) interface{}
 
@@ -313,11 +319,17 @@ type JavaParserVisitor interface {
 	// Visit a parse tree produced by JavaParser#ExpressionStatement.
 	VisitExpressionStatement(ctx *ExpressionStatementContext) interface{}
 
-	// Visit a parse tree produced by JavaParser#SwitchLabelExpression.
-	VisitSwitchLabelExpression(ctx *SwitchLabelExpressionContext) interface{}
+	// Visit a parse tree produced by JavaParser#SwitchArrowExpression.
+	VisitSwitchArrowExpression(ctx *SwitchArrowExpressionContext) interface{}
 
 	// Visit a parse tree produced by JavaParser#IdentifierLabelStatement.
 	VisitIdentifierLabelStatement(ctx *IdentifierLabelStatementContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#statementList.
+	VisitStatementList(ctx *StatementListContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#ifstmt.
+	VisitIfstmt(ctx *IfstmtContext) interface{}
 
 	// Visit a parse tree produced by JavaParser#catchClause.
 	VisitCatchClause(ctx *CatchClauseContext) interface{}
@@ -337,12 +349,6 @@ type JavaParserVisitor interface {
 	// Visit a parse tree produced by JavaParser#resource.
 	VisitResource(ctx *ResourceContext) interface{}
 
-	// Visit a parse tree produced by JavaParser#switchBlockStatementGroup.
-	VisitSwitchBlockStatementGroup(ctx *SwitchBlockStatementGroupContext) interface{}
-
-	// Visit a parse tree produced by JavaParser#switchLabel.
-	VisitSwitchLabel(ctx *SwitchLabelContext) interface{}
-
 	// Visit a parse tree produced by JavaParser#forControl.
 	VisitForControl(ctx *ForControlContext) interface{}
 
@@ -354,6 +360,9 @@ type JavaParserVisitor interface {
 
 	// Visit a parse tree produced by JavaParser#parExpression.
 	VisitParExpression(ctx *ParExpressionContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#parExpressionList.
+	VisitParExpressionList(ctx *ParExpressionListContext) interface{}
 
 	// Visit a parse tree produced by JavaParser#expressionList.
 	VisitExpressionList(ctx *ExpressionListContext) interface{}
@@ -441,6 +450,12 @@ type JavaParserVisitor interface {
 
 	// Visit a parse tree produced by JavaParser#BitwiseXORExpression.
 	VisitBitwiseXORExpression(ctx *BitwiseXORExpressionContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#leftExpression.
+	VisitLeftExpression(ctx *LeftExpressionContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#leftVariable.
+	VisitLeftVariable(ctx *LeftVariableContext) interface{}
 
 	// Visit a parse tree produced by JavaParser#pattern.
 	VisitPattern(ctx *PatternContext) interface{}
