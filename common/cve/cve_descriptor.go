@@ -189,7 +189,7 @@ func MakeOpenAIWorking(src *cveresources.CVE, gateway aispec.AIGateway) error {
 	log.Debugf("cve: %s's being translated...", src.CVE)
 	var start = time.Now()
 
-	data, err := json.Marshal(string(src.Descriptions) + string(src.DescriptionMain))
+	data, err := json.Marshal(src.DescriptionMain)
 	if err != nil {
 		return utils.Errorf("marshal cve failed: %s", err)
 	}
@@ -204,10 +204,16 @@ func MakeOpenAIWorking(src *cveresources.CVE, gateway aispec.AIGateway) error {
 		log.Infof("ai.Chat met error: %s", err)
 		return err
 	}
+	zh := utils.MapGetString(raw, "title_zh")
+	title := utils.MapGetString(raw, "title")
+	log.Infof("handle: %v -> en:%v zh:%v", src.CVE, title, zh)
+	if title == "" && zh == "" {
+		log.Warnf("abnormal data data: %#v", string(data))
+	}
 	dec := &CVEDescription{
 		CVE:                src.CVE,
-		Title:              utils.MapGetString(raw, "title"),
-		ChineseTitle:       utils.MapGetString(raw, "title_zh"),
+		Title:              title,
+		ChineseTitle:       zh,
 		Description:        src.DescriptionMain,
 		ChineseDescription: utils.MapGetString(raw, "description_zh"),
 		OpenAISolution:     utils.MapGetString(raw, "solution"),
