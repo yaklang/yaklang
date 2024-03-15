@@ -9,16 +9,13 @@ import (
 func (s *Server) DuplexConnection(stream ypb.Yak_DuplexConnectionServer) error {
 	id := uuid.New().String()
 	yakit.RegisterServerPushCallback(id, stream)
-	defer func() {
-		yakit.UnRegisterServerPushCallback(id)
-	}()
+	defer yakit.UnRegisterServerPushCallback(id)
+
 	yakit.BroadcastData("global", map[string]any{
 		"config": map[string]any{
 			"enableServerPush": true,
 		},
 	})
-	select {
-	case <-stream.Context().Done():
-		return nil
-	}
+	<-stream.Context().Done()
+	return stream.Context().Err()
 }
