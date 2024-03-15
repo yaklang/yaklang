@@ -76,20 +76,31 @@ func CreateConfigOptionsByIfaceName(ifaceName string) ([]ConfigOption, error) {
 		}
 	}
 	log.Infof("use net interface: %v", iface.Name)
+	addrs, err := iface.Addrs()
+	if err != nil {
+		return nil, err
+	}
 
-	//route, err := netroute.New()
-	//if err != nil {
-	//	return nil, errors.Errorf("create route failed: %s", err)
-	//}
-	//log.Debugf("start to find route for %s in %v", "ip", runtime.GOOS)
-	//_, gateway, srcIP, err := route.Route(net.IPv4(0, 0, 0, 0))
-	//if err != nil {
-	//	return nil, errors.Errorf("route to %s failed: %s", "ip", err)
-	//}
+	// 获取网关和默认源地址
+	var ifaceIp net.IP
+	for _, addr := range addrs { // 获取网卡的ip地址，作为默认源地址使用，有限ipv4
+		ip := addr.(*net.IPNet).IP
+		if utils.IsIPv6(ip.String()) {
+			ifaceIp = ip
+		}
+		if utils.IsIPv4(ip.String()) {
+			ifaceIp = ip
+			break
+		}
+	}
+	if ifaceIp == nil {
+		return nil, errors.Errorf("iface: %s has no addrs", iface.Name)
+	}
+
 	var opts = []ConfigOption{
 		WithNetInterface(iface),
-		//WithGatewayIP(gateway),
-		//WithDefaultSourceIP(srcIP),
+		//WithGatewayIP(gIp),
+		WithDefaultSourceIP(ifaceIp),
 	}
 	return opts, nil
 }
