@@ -1,6 +1,7 @@
 package php2ssa
 
 import (
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -415,33 +416,29 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		y.ir.AssignVariable(variable, rightValue)
 		return rightValue
 	case *phpparser.LogicalExpressionContext:
-		var tmpVar ssa.Value
-		tmpVar = y.VisitExpression(ret.Expression(0))
-		//LogicalXor 遍历所有的expr 执行即可
 		if ret.LogicalXor() != nil {
-			for _, expressionContext := range ret.AllExpression() {
-				y.VisitExpression(expressionContext)
-			}
+			v1 := y.VisitExpression(ret.Expression(0))
+			v2 := y.VisitExpression(ret.Expression(1))
+			return y.ir.EmitBinOp(ssa.OpEq, v1, v2)
 		}
-		if ret.LogicalOr() != nil {
-			y.ir.CreateIfBuilder().SetCondition(func() ssa.Value {
-				return y.ir.EmitBinOp(ssa.OpEq, y.VisitExpression(ret.Expression(0)), y.ir.EmitConstInst(true))
-			}, func() {
-				y.ir.Break()
-			}).SetElse(func() {
-				y.VisitExpression(ret.Expression(1))
-			}).Build()
-		}
+		var flag bool
 		if ret.LogicalAnd() != nil {
-			y.ir.CreateIfBuilder().SetCondition(func() ssa.Value {
-				return y.ir.EmitBinOp(ssa.OpEq, y.VisitExpression(ret.Expression(0)), y.ir.EmitConstInst(true))
-			}, func() {
-				y.VisitExpression(ret.Expression(1))
-			}).SetElse(func() {
-				y.ir.Break()
-			}).Build()
+			flag = true
+		} else {
+			flag = false
 		}
-		return tmpVar
+		id := uuid.NewString()
+		expression := y.VisitExpression(ret.Expression(0))
+		y.ir.AssignVariable(y.ir.CreateVariable(id), expression)
+		y.ir.CreateIfBuilder().SetCondition(func() ssa.Value {
+			return y.ir.EmitBinOp(ssa.OpEq, expression, y.ir.EmitConstInst(flag))
+		}, func() {
+			value := y.VisitExpression(ret.Expression(1))
+			variable := y.ir.CreateVariable(id)
+			y.ir.AssignVariable(variable, value)
+		}).Build()
+		b := y.ir.ReadValue(id)
+		return b
 	case *phpparser.ShortQualifiedNameExpressionContext:
 		return y.ir.ReadOrCreateVariable(y.VisitIdentifier(ret.Identifier()))
 	}
@@ -1031,7 +1028,7 @@ func (y *builder) VisitLeftVariable(raw phpparser.ILeftVariableContext) *ssa.Var
 	}
 	switch stmt := raw.(type) {
 	case *phpparser.VariableContext:
-		if value := y.ir.ReadValue(stmt.VarName().GetText()); value != nil {
+		if value := y.ir.ReadValue(stmt.VarName().GetText()); !value.IsUndefined() {
 			variable := y.ir.CreateVariable(stmt.VarName().GetText())
 			variable.Value = value
 			return variable

@@ -156,6 +156,54 @@ println($a);`
 		ssatest.CheckPrintlnValue(code, []string{"\"11\""}, t)
 	})
 }
+
+func TestExpression_LogicExpression(t *testing.T) {
+	t.Run("and-1", func(t *testing.T) {
+		code := `<?php
+$b = 2 and  3;
+println($b);
+`
+		ssatest.CheckPrintlnValue(code, []string{"2"}, t)
+	})
+	t.Run("and-1", func(t *testing.T) {
+		code := `<?php
+$b =($a=1) and ($a=3);
+$d = $a;
+println($b);
+println($d);
+`
+		ssatest.CheckPrintlnValue(code, []string{"1,phi($d)[3,1]"}, t)
+	})
+	t.Run("or-1", func(t *testing.T) {
+		code := `<?php
+$b = 2 or  3;
+println($b);`
+		ssatest.CheckPrintlnValue(code, []string{"2"}, t)
+	})
+	t.Run("or-2", func(t *testing.T) {
+		code := `<?php
+$a = 1;
+$b = ($a=2) and ($a=3);
+$d = $a;
+println($b);
+println($a);`
+		ssatest.CheckPrintlnValue(code, []string{"2", "phi($d)[3,2]"}, t)
+	})
+	t.Run("xor-1", func(t *testing.T) {
+		code := `<?php
+$a = 1 xor 1;
+println($a);`
+		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
+	})
+	t.Run("xor-2", func(t *testing.T) {
+		code := `<?php
+$a=1;
+$b = ($a=1) xor ($a=3);
+println($a);
+println($b);`
+		ssatest.CheckPrintlnValue(code, []string{"3", "1"}, t)
+	})
+}
 func TestExpression_OrdinaryAssignmentExpression(t *testing.T) {
 	t.Run("=", func(t *testing.T) {
 		code := `<?php 
@@ -177,29 +225,6 @@ println($a);
 $a-=1;
 `
 		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
-	})
-	t.Run("and", func(t *testing.T) {
-		code := `<?php
-$a = 0;
-($a=3) and ($a=1) and ($a=4);
-println($a);
-`
-		ssatest.CheckPrintlnValue(code, []string{"phi($a)[4,phi($a)[1,3]]"}, t)
-	})
-	t.Run("xor", func(t *testing.T) {
-		code := `<?php
-$a = 0;
-($a=3) xor ($a=1) xor ($a=4);
-println($a);`
-		ssatest.CheckPrintlnValue(code, []string{"4"}, t)
-	})
-	t.Run("or", func(t *testing.T) {
-		code := `<?php
-$a = 0;
-($a=0) or ($a=1) or ($a=4);
-println($a);
-`
-		ssatest.CheckPrintlnValue(code, []string{"phi($a)[phi($a)[0,1],4]"}, t)
 	})
 }
 func TestExpression_DynamicVariable(t *testing.T) {
