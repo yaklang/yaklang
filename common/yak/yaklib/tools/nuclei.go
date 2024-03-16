@@ -230,7 +230,11 @@ func RemovePoCDatabase() error {
 }
 
 func UpdatePoC(proxy ...string) {
-	dir, err := PullTemplatesFromGithub("https://github.com/projectdiscovery/nuclei-templates", proxy...)
+	UpdatePoCWithUrl("https://github.com/projectdiscovery/nuclei-templates", proxy...)
+}
+
+func UpdatePoCWithUrl(u string, proxy ...string) {
+	dir, err := PullTemplatesFromGithub(u, proxy...)
 	if err != nil {
 		log.Errorf("pull nuclei templates failed: %s", err)
 		return
