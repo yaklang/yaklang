@@ -12,12 +12,14 @@ import (
 
 var ScanCommands = []*cli.Command{
 	{
-		Name:  "pull-plugins",
-		Usage: "pull plugins from yaklang.io and nuclei-templates",
+		Name:    "pull-plugins",
+		Aliases: []string{"pull"},
+		Usage:   "pull plugins from yaklang.io and nuclei-templates",
 		Flags: []cli.Flag{
 			cli.StringFlag{
-				Name:  "proxy",
-				Usage: "Proxy Server(http/socks5...)",
+				Name:   "proxy",
+				Usage:  "Proxy Server(http/socks5...)",
+				EnvVar: "http_proxy",
 			},
 			cli.StringFlag{
 				Name:  "base-url,u",
