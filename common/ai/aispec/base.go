@@ -1,11 +1,17 @@
 package aispec
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/jsonextractor"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"sort"
+	"strconv"
 )
 
 func ChatBase(url string, model string, msg string, fs []Function, opt func() ([]poc.PocConfigOption, error)) (string, error) {
@@ -30,6 +36,54 @@ func ChatBase(url string, model string, msg string, fs []Function, opt func() ([
 		return "", utils.Errorf("JSON response (%v) failed：%v", string(rsp.GetBody()), err)
 	}
 	return compl.Choices[0].Message.Content, nil
+}
+
+func ChatBasedExtractData(url string, model string, msg string, fields map[string]string, opt func() ([]poc.PocConfigOption, error)) (map[string]any, error) {
+	if len(fields) <= 0 {
+		return nil, utils.Error("no fields config for extract")
+	}
+
+	var buf = bytes.NewBufferString("")
+	var keys []string
+	for k := range fields {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for i := 0; i < len(keys); i++ {
+		buf.WriteString(fmt.Sprintf("%v. 字段名：%#v, 含义：%#v;\n",
+			i+1, keys[i], fields[keys[i]]))
+	}
+
+	sampleField := keys[0]
+
+	var text = `我在完成数据精炼和提取任务，数据源是：` + strconv.Quote(msg) + "，如要提取一系列字段，请提取内容，输出成JSON格式，对JSON对象需求的字段列表为: \n" + buf.String()
+	msg = text
+	result, err := ChatBase(url, model, msg, nil, opt)
+	if err != nil {
+		log.Errorf("chatbase error: %s", err)
+		return nil, err
+	}
+	stdjsons, raw := jsonextractor.ExtractJSONWithRaw(result)
+	for _, stdjson := range stdjsons {
+		var rawMap = make(map[string]any)
+		_ = json.Unmarshal([]byte(stdjson), &rawMap)
+		_, ok := rawMap[sampleField]
+		if ok {
+			return rawMap, nil
+		}
+	}
+
+	for _, rawJson := range raw {
+		stdjson := jsonextractor.FixJson([]byte(rawJson))
+		var rawMap = make(map[string]any)
+		_ = json.Unmarshal([]byte(stdjson), &rawMap)
+		_, ok := rawMap[sampleField]
+		if ok {
+			return rawMap, nil
+		}
+	}
+
+	return nil, utils.Errorf("cannot extractjson from: %#v", result)
 }
 
 func ChatExBase(url string, model string, details []ChatDetail, function []Function, opt func() ([]poc.PocConfigOption, error)) ([]ChatChoice, error) {
