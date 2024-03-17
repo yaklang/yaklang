@@ -51,9 +51,18 @@ func ChatGLM(opts ...aispec.AIConfigOption) aispec.AIGateway {
 	return agent
 }
 
+func Moonshot(opts ...aispec.AIConfigOption) aispec.AIGateway {
+	agent := createAIGateway("moonshot")
+	if agent != nil {
+		agent.LoadOption(opts...)
+	}
+	return agent
+}
+
 var Exports = map[string]any{
-	"OpenAI":  OpenAI,
-	"ChatGLM": ChatGLM,
+	"OpenAI":   OpenAI,
+	"ChatGLM":  ChatGLM,
+	"Moonshot": Moonshot,
 
 	"timeout": aispec.WithTimeout,
 	"proxy":   aispec.WithProxy,
