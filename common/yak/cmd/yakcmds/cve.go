@@ -3,7 +3,6 @@ package yakcmds
 import (
 	"compress/gzip"
 	"context"
-	"fmt"
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 	"github.com/jinzhu/gorm"
 	"github.com/urfave/cli"
@@ -233,20 +232,20 @@ var CVEUtilCommands = []*cli.Command{
 			cli.StringFlag{Name: "db", Value: consts.GetCVEDatabasePath()},
 		},
 		Action: func(c *cli.Context) error {
+			log.Info("start to cve description and origin database")
 			desc, err := gorm.Open("sqlite3", c.String("desc-db"))
 			if err != nil {
 				return err
 			}
-			defer desc.Close()
 			cvedb, err := gorm.Open("sqlite3", c.String("db"))
 			if err != nil {
 				return err
 			}
-			defer cvedb.Close()
 
 			cvedb = cvedb.Where("title_zh is '' or title_zh is null")
 			count := 0
 			updateCount := 0
+			log.Infof("start to merge cve info from %s", c.String("desc-db"))
 			for ins := range cveresources.YieldCVEs(cvedb, context.Background()) {
 				count++
 				var descIns cve.CVEDescription
@@ -275,8 +274,154 @@ var CVEUtilCommands = []*cli.Command{
 				}
 			}
 			_ = cvedb
-			fmt.Println("count: ", count, "updated: ", updateCount)
+			log.Info("count: ", count, "updated: ", updateCount)
+			desc.Close()
+			cvedb.Close()
 
+			// update cve gzip
+			existedGzipCVE := c.String("db") + ".gzip"
+			log.Infof("start gzip origin db: %v", existedGzipCVE)
+			// if gzip existed, backup with suffix (.tmp.bak)
+			if utils.GetFirstExistedPath(existedGzipCVE) != "" {
+				backup := existedGzipCVE + ".tmp.bak"
+				os.RemoveAll(backup)
+				err := os.Rename(existedGzipCVE, backup)
+				if err != nil {
+					return err
+				}
+			}
+
+			// gzip for cvedb
+			cvefp, err := os.OpenFile(existedGzipCVE, os.O_CREATE|os.O_RDWR, 0o666)
+			if err != nil {
+				return err
+			}
+			w := gzip.NewWriter(cvefp)
+			cveOrigin, err := os.Open(c.String("db"))
+			if err != nil {
+				return err
+			}
+			io.Copy(w, cveOrigin)
+			w.Flush()
+			w.Close()
+			cvefp.Close()
+			cveOrigin.Close()
+			log.Infof("gzip cve finished: %v", existedGzipCVE)
+
+			// gzip for cve-desc
+			existedGzipCVE = c.String("desc-db") + ".gzip"
+			log.Infof("start gzip description cve db: %v", existedGzipCVE)
+
+			// if gzip existed, backup with suffix (.tmp.bak)
+			if utils.GetFirstExistedPath(existedGzipCVE) != "" {
+				backup := existedGzipCVE + ".tmp.bak"
+				os.RemoveAll(backup)
+				err := os.Rename(existedGzipCVE, backup)
+				if err != nil {
+					return err
+				}
+			}
+			descfp, err := os.OpenFile(existedGzipCVE, os.O_CREATE|os.O_RDWR, 0o666)
+			if err != nil {
+				return err
+			}
+			descGzipW := gzip.NewWriter(descfp)
+			descorigin, err := os.Open(c.String("desc-db"))
+			if err != nil {
+				return err
+			}
+			io.Copy(descGzipW, descorigin)
+			descGzipW.Flush()
+			descGzipW.Close()
+			descfp.Close()
+			descorigin.Close()
+			log.Infof("gzip cve desc finished: %v", existedGzipCVE)
+
+			return nil
+		},
+	},
+	{
+		Name:  "cve-upload",
+		Usage: "upload local cve to aliyun oss (gzip)",
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name:  "ak",
+				Usage: "oss aliyun access key",
+			},
+			cli.StringFlag{
+				Name: "sk", Usage: "oss aliyun secret key",
+			},
+			cli.StringFlag{
+				Name: "endpoint", Usage: "endpoint for aliyun oss",
+				Value: `oss-accelerate.aliyuncs.com`,
+			},
+			cli.StringFlag{
+				Name:  "bucket",
+				Usage: `aliyunoss bucket name`,
+				Value: "cve-db",
+			},
+		},
+		Action: func(c *cli.Context) error {
+			client, err := oss.New(c.String("endpoint"), c.String("ak"), c.String("sk"))
+			if err != nil {
+				log.Errorf("oss new client failed: %s", err)
+				return nil
+			}
+			bucket, err := client.Bucket("cve-db")
+			if err != nil {
+				log.Errorf("fetch bucket failed: %s", err)
+				return nil
+			}
+
+			// upload cve
+			cvePath := consts.GetCVEDatabaseGzipPath()
+			log.Infof("start to upload cve database: %v", cvePath)
+			if cvePath == "" {
+				return utils.Errorf("no path found for cve: %s", cvePath)
+			}
+			if utils.GetFirstExistedPath(cvePath) == "" {
+				return utils.Errorf("no cve database found: %s", cvePath)
+			}
+			// check the filesize is larger than 10M
+			if fi, err := os.Stat(cvePath); err != nil {
+				log.Errorf("stat cve failed: %s", err)
+				return err
+			} else {
+				if fi.Size() < 10*1024*1024 {
+					log.Errorf("cve file size is too small: %v", fi.Size())
+					return nil
+				}
+			}
+			if err := bucket.PutObjectFromFile("default-cve.db.gzip", cvePath); err != nil {
+				log.Errorf("upload cve failed: %s", err)
+				return err
+			}
+
+			// description database
+			cveDescPath := consts.GetCVEDescriptionDatabaseGzipPath()
+			log.Infof("start to upload cve(translating description database: %s)", cveDescPath)
+			if cveDescPath == "" {
+				log.Errorf("cannot found cve database gzip path")
+				return nil
+			}
+			if utils.GetFirstExistedPath(cveDescPath) == "" {
+				return utils.Errorf("no cve database found: %s", cveDescPath)
+			}
+			// check filesize is larger than 10M
+			if fi, err := os.Stat(cveDescPath); err != nil {
+				log.Errorf("stat cve desc failed: %s", err)
+				return err
+			} else {
+				if fi.Size() < 10*1024*1024 {
+					log.Errorf("cve desc file size is too small: %v", fi.Size())
+					return nil
+				}
+			}
+
+			if err := bucket.PutObjectFromFile("default-cve-description.db.gzip", cveDescPath); err != nil {
+				log.Errorf("upload cve desc failed: %s", err)
+				return nil
+			}
 			return nil
 		},
 	},
