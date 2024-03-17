@@ -127,6 +127,8 @@ func PullTemplatesFromGithub(giturl string, proxy ...string) (string, error) {
 	dir := consts.GetDefaultBaseHomeDir()
 	nDir := filepath.Join(dir, "nuclei-templates")
 
+	proxy = utils.StringArrayFilterEmpty(proxy)
+
 	if utils.GetFirstExistedPath(nDir) != "" {
 		err := os.Rename(nDir, filepath.Join(dir, fmt.Sprintf("_nuclei-templates-%v", time.Now().Format(utils.DefaultTimeFormat))))
 		if err != nil {
