@@ -339,12 +339,12 @@ func (s *Server) hybridScanNewTask(manager *HybridScanTaskManager, stream Hybrid
 var execTargetWithPluginScript string
 
 func ScanHybridTargetWithPlugin(
-	taskId string, ctx context.Context, target *HybridScanTarget, plugin *yakit.YakScript, proxy string, feedbackClient *yaklib.YakitClient, callerFilter *filter.StringFilter,
+	runtimeId string, ctx context.Context, target *HybridScanTarget, plugin *yakit.YakScript, proxy string, feedbackClient *yaklib.YakitClient, callerFilter *filter.StringFilter,
 ) error {
 	engine := yak.NewYakitVirtualClientScriptEngine(feedbackClient)
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
-		engine.SetVar("RUNTIME_ID", taskId)
-		yak.BindYakitPluginContextToEngine(engine, yak.CreateYakitPluginContext(taskId).WithPluginName(plugin.ScriptName).WithProxy(proxy).WithContext(ctx))
+		engine.SetVar("RUNTIME_ID", runtimeId)
+		yak.BindYakitPluginContextToEngine(engine, yak.CreateYakitPluginContext(runtimeId).WithPluginName(plugin.ScriptName).WithProxy(proxy).WithContext(ctx))
 		engine.SetVar("REQUEST", target.Request)
 		engine.SetVar("RESPONSE", target.Response)
 		engine.SetVar("HTTPS", target.IsHttps)

@@ -343,13 +343,15 @@ func processVulnerability(target any, filterVul *filter.StringFilter, vCh chan *
 				calcSha1   string
 			)
 			details := make(map[string]interface{}, 2)
+			var runtimeId string
 			if len(tpl.HTTPRequestSequences) > 0 {
 				resp := i["responses"].([]*lowhttp.LowhttpResponse)
 				currTarget = resp[0].RemoteAddr
 				reqBulk := i["requests"].(*YakRequestBulkConfig)
+				runtimeId = resp[0].RuntimeId
 				// 根据 payload , tpl 名称 , target 条件过滤
 				// calcSha1 = utils.CalcSha1(tpl.Name, resp[0].RawRequest, target)
-				calcSha1 = utils.CalcSha1(tpl.Name, target)
+				calcSha1 = utils.CalcSha1(tpl.Name, resp[0].RemoteAddr, target)
 				if len(resp) == 1 {
 					details["request"] = string(resp[0].RawRequest)
 					details["response"] = string(resp[0].RawPacket)
@@ -398,6 +400,8 @@ func processVulnerability(target any, filterVul *filter.StringFilter, vCh chan *
 			if !filterVul.Exist(calcSha1) {
 				filterVul.Insert(calcSha1)
 				risk := tools.PocVulToRisk(pv)
+				risk.FromYakScript = tpl.Name
+				risk.RuntimeId = runtimeId
 				for _, h := range handlers {
 					h(risk)
 				}

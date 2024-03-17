@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"gopkg.in/yaml.v2"
 	"strconv"
 	"strings"
 	"sync"
@@ -296,8 +297,18 @@ func CreateOrUpdateYakScriptByName(db *gorm.DB, scriptName string, i interface{}
 	return nil
 }
 
-func CreateTemporaryYakScript(t string, code string) (string, error) {
+func CreateTemporaryYakScript(t string, code string, suffix ...string) (string, error) {
 	name := fmt.Sprintf("tmp-%v", ksuid.New().String())
+	if strings.TrimSpace(strings.ToLower(t)) == "nuclei" {
+		// nuclei
+		tempInfo := make(map[string]any)
+		err := yaml.Unmarshal([]byte(code), &tempInfo)
+		if err != nil {
+			return "", utils.Errorf("plugin code: %s is not yaml: %v", string(code), err)
+		}
+		nameInfo := utils.MapGetString(tempInfo, "id")
+		name = "[TMP]-" + nameInfo + "-" + ksuid.New().String() + strings.Join(suffix, "-")
+	}
 	err := CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), name, &YakScript{
 		ScriptName: name,
 		Type:       t,
@@ -309,6 +320,13 @@ func CreateTemporaryYakScript(t string, code string) (string, error) {
 		return "", err
 	}
 	return name, nil
+}
+
+func RemoveTemporaryYakScriptAll(db *gorm.DB, suffix string) {
+	db = db.Model(&YakScript{}).Where("script_name LIKE ?", "[TMP]%"+suffix).Where("ignored = true")
+	if db := db.Unscoped().Delete(&YakScript{}); db.Error != nil {
+		log.Errorf("remove temporary yak script failed: %s", db.Error)
+	}
 }
 
 func UpdateGeneralModuleFromByYakScriptName(db *gorm.DB, scriptName string, i bool) error {

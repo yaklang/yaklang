@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"github.com/google/uuid"
 	"github.com/olekukonko/tablewriter"
+	"github.com/segmentio/ksuid"
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/filter"
@@ -27,7 +28,11 @@ var hybridScanCommand = &cli.Command{
 	Usage:   "Use plugins (UI in Yakit) to scan",
 	Flags: []cli.Flag{
 		cli.StringFlag{
-			Name:  "target,host,t",
+			Name:  "templates,t",
+			Usage: "plugin-file templates (file / dir), split by 'comma', like './templates/1.yaml,./templates/vulns/'",
+		},
+		cli.StringFlag{
+			Name:  "target,host",
 			Usage: "Target Hosts, separated by comma, like (example.com, http://www2.example.com, 192.168.1.2/24)",
 		},
 		cli.StringFlag{
@@ -93,15 +98,100 @@ var hybridScanCommand = &cli.Command{
 
 		keyword := c.String("k")
 
+		// remove temporary plugin
+		log.Infof("start to load templates: %v", c.String("templates"))
+		uid := ksuid.New().String()
+		var templatesCodes []string
+		var yakMITM []string
+		var portScan []string
+		handleTempFileTemplate := func(filename string) error {
+			log.Infof("start to handle file: %s", filename)
+			if strings.HasSuffix(filename, ".yaml") || strings.HasSuffix(filename, ".yml") {
+				raw, err := os.ReadFile(filename)
+				if err != nil {
+					return err
+				}
+				log.Infof("handle yaml template finished: %s", filename)
+				templatesCodes = append(templatesCodes, string(raw))
+				return nil
+			} else if strings.HasSuffix(filename, ".yak") {
+				raw, err := os.ReadFile(filename)
+				if err != nil {
+					return err
+				}
+				yakMITM = append(yakMITM, string(raw))
+				return nil
+			}
+			return nil
+		}
+		for _, file := range utils.PrettifyListFromStringSplitEx(c.String("templates"), ",", "|", "\n") {
+			if file == "" {
+				continue
+			}
+
+			if utils.IsDir(file) {
+				files, err := utils.ReadFilesRecursively(file)
+				if err != nil {
+					return utils.Errorf("handle path(dir) %v failed: %s", file, err.Error())
+				}
+				for _, f := range files {
+					if f.IsDir {
+						continue
+					}
+					if strings.HasSuffix(f.Path, ".yaml") || strings.HasSuffix(f.Path, ".yml") || strings.HasSuffix(f.Path, ".yak") {
+						err := handleTempFileTemplate(f.Path)
+						if err != nil {
+							return err
+						}
+					}
+				}
+			} else {
+				err := handleTempFileTemplate(file)
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+		handledUUID := false
+		if len(templatesCodes) > 0 {
+			for _, temp := range templatesCodes {
+				pluginName, err := yakit.CreateTemporaryYakScript(`nuclei`, temp, uid)
+				if err != nil {
+					return utils.Errorf("create temporary nuclei template failed: %s", err)
+				}
+				handledUUID = true
+				if pluginName != "" {
+					log.Infof("Generate Temporary Yaml PoC Plugin: %s", pluginName)
+				}
+				if !utils.StringArrayContains(plugins, "nuclei") {
+					plugins = append(plugins, "nuclei")
+				}
+			}
+		}
+
+		if len(portScan) > 0 {
+			log.Warn("portscan plugin is unfinished supporting")
+		}
+		if len(yakMITM) > 0 {
+			log.Warn("mitm plugin is unfinished supporting")
+		}
+
 		db = db.Model(&yakit.YakScript{})
 		db.Where("type IN ?", plugins)
-		db = bizhelper.FuzzSearchEx(db, []string{
-			"script_name", "tags", "content", "help",
-		}, keyword, false)
+		if handledUUID {
+			db = db.Where("script_name LIKE ?", "%"+uid)
+		}
+		if keyword != "" {
+			db = bizhelper.FuzzSearchEx(db, []string{
+				"script_name", "tags", "content", "help",
+			}, keyword, false)
+		}
 		db = db.Order("updated_at desc")
 
 		pluginList := omap.NewOrderedMap(map[string]*yakit.YakScript{})
 		for result := range yakit.YieldYakScripts(db, context.Background()) {
+			log.Infof("start to load plugin: %s", result.ScriptName)
 			pluginList.Set(result.ScriptName, result)
 		}
 
@@ -157,7 +247,7 @@ var hybridScanCommand = &cli.Command{
 			return utils.Errorf("generate target failed: %s", err)
 		}
 
-		id := uuid.New().String()
+		runtimeId := uuid.New().String()
 
 		thread := c.Int("thread")
 		if thread <= 0 {
@@ -175,6 +265,7 @@ var hybridScanCommand = &cli.Command{
 			return utils.Errorf("create local client failed: %s", err)
 		}
 		for target := range gen {
+			log.Infof("start to scan target: %p with plugins list cap: %v", target, pluginList.Len())
 			for _, plugin := range pluginList.Values() {
 				log.Debugf("prepare target: %p in: %v", target, plugin.ScriptName)
 				swg.Add()
@@ -188,16 +279,22 @@ var hybridScanCommand = &cli.Command{
 						}
 					}()
 					err := yakgrpc.ScanHybridTargetWithPlugin(
-						id, context.Background(), target, plugin, c.String("proxy"),
+						runtimeId, context.Background(), target, plugin, c.String("proxy"),
 						public, publicFilter,
 					)
 					if err != nil {
 						log.Errorf("scan target failed: %s", err)
 					}
 				}()
-
 			}
 		}
+		log.Infof("start to waiting for all scan finished")
+		swg.Wait()
+
+		for riskInfo := range yakit.YieldRisksByRuntimeId(consts.GetGormProjectDatabase(), context.Background(), runtimeId) {
+			log.Infof("match risk: %s", riskInfo.Title)
+		}
+
 		return nil
 	},
 }
