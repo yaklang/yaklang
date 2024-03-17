@@ -4,6 +4,7 @@ import "github.com/yaklang/yaklang/common/ai/aispec"
 
 import (
 	_ "github.com/yaklang/yaklang/common/ai/chatglm"
+	_ "github.com/yaklang/yaklang/common/ai/moonshot"
 	_ "github.com/yaklang/yaklang/common/ai/openai"
 )
 
