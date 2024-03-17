@@ -291,8 +291,10 @@ var hybridScanCommand = &cli.Command{
 		log.Infof("start to waiting for all scan finished")
 		swg.Wait()
 
+		log.Infof("start to checking runtimeId: %s", runtimeId)
 		for riskInfo := range yakit.YieldRisksByRuntimeId(consts.GetGormProjectDatabase(), context.Background(), runtimeId) {
 			log.Infof("match risk: %s", riskInfo.Title)
+			riskInfo.ColorizedShow()
 		}
 
 		return nil

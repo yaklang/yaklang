@@ -204,6 +204,9 @@ func toConfig(opts ...interface{}) (*Config, *lowhttp.LowhttpExecConfig, []lowht
 		opt(pocConfig)
 	}
 	config := NewConfig(configOpt...)
+	if config.RuntimeId != "" {
+		pocConfig.RuntimeId = config.RuntimeId
+	}
 	lowhttpConfig := lowhttp.NewLowhttpOption()
 	totalConfig := append(lowhttpOpt, pocConfig.ToLowhttpOptions()...)
 	for _, opt := range totalConfig {
@@ -343,12 +346,14 @@ func processVulnerability(target any, filterVul *filter.StringFilter, vCh chan *
 				calcSha1   string
 			)
 			details := make(map[string]interface{}, 2)
-			var runtimeId string
+			runtimeId := utils.MapGetString(i, "runtimeId")
 			if len(tpl.HTTPRequestSequences) > 0 {
 				resp := i["responses"].([]*lowhttp.LowhttpResponse)
 				currTarget = resp[0].RemoteAddr
 				reqBulk := i["requests"].(*YakRequestBulkConfig)
-				runtimeId = resp[0].RuntimeId
+				if runtimeId != "" {
+					runtimeId = resp[0].RuntimeId
+				}
 				// 根据 payload , tpl 名称 , target 条件过滤
 				// calcSha1 = utils.CalcSha1(tpl.Name, resp[0].RawRequest, target)
 				calcSha1 = utils.CalcSha1(tpl.Name, resp[0].RemoteAddr, target)
@@ -396,6 +401,7 @@ func processVulnerability(target any, filterVul *filter.StringFilter, vCh chan *
 				DescriptionZh: tpl.DescriptionZh,
 				Description:   tpl.Description,
 				Payload:       payloads,
+				RuntimeId:     runtimeId,
 			}
 			if !filterVul.Exist(calcSha1) {
 				filterVul.Insert(calcSha1)
@@ -508,17 +514,28 @@ var Exports = map[string]interface{}{
 	"rawTemplate":             WithTemplateRaw,
 	"fuzzQueryTemplate":       WithFuzzQueryTemplate,
 	"all":                     WithAllTemplate,
-	"mode":                    WithMode,
-	"resultCallback":          _callback,
-	"tcpResultCallback":       _tcpCallback,
-	"https":                   lowhttp.WithHttps,
-	"http2":                   lowhttp.WithHttp2,
-	"runtimeId":               lowhttp.WithRuntimeId,
-	"fromPlugin":              lowhttp.WithFromPlugin,
+	// "runtimeId":               lowhttp.WithRuntimeId,
+	"runtimeId":         WithHttpTplRuntimeId,
+	"mode":              WithMode,
+	"resultCallback":    _callback,
+	"tcpResultCallback": _tcpCallback,
+	"https":             lowhttp.WithHttps,
+	"http2":             lowhttp.WithHttp2,
+	"fromPlugin":        lowhttp.WithFromPlugin,
+}
+
+func WithHttpTplRuntimeId(id string) ConfigOption {
+	return func(config *Config) {
+		config.RuntimeId = id
+	}
 }
 
 func _callback(handler func(i map[string]interface{})) ConfigOption {
 	return WithResultCallback(func(y *YakTemplate, reqBulk *YakRequestBulkConfig, rsp []*lowhttp.LowhttpResponse, result bool, extractor map[string]interface{}) {
+		var runtimeId string
+		if len(rsp) > 0 {
+			runtimeId = rsp[0].RuntimeId
+		}
 		handler(map[string]interface{}{
 			"template":  y,
 			"requests":  reqBulk,
@@ -526,12 +543,17 @@ func _callback(handler func(i map[string]interface{})) ConfigOption {
 			"response":  rsp,
 			"match":     result,
 			"extractor": extractor,
+			"runtimeId": runtimeId,
 		})
 	})
 }
 
 func _tcpCallback(handler func(i map[string]interface{})) ConfigOption {
 	return WithTCPResultCallback(func(y *YakTemplate, reqBulk *YakNetworkBulkConfig, rsp []*NucleiTcpResponse, result bool, extractor map[string]interface{}) {
+		var runtimeId string
+		if len(rsp) > 0 {
+			runtimeId = rsp[0].RuntimeId
+		}
 		handler(map[string]interface{}{
 			"template":  y,
 			"requests":  reqBulk,
@@ -539,6 +561,7 @@ func _tcpCallback(handler func(i map[string]interface{})) ConfigOption {
 			"response":  rsp,
 			"match":     result,
 			"extractor": extractor,
+			"runtimeId": runtimeId,
 		})
 	})
 }

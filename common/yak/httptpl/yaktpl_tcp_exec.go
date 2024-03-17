@@ -20,6 +20,7 @@ type NucleiTcpResponse struct {
 	RawPacket  []byte
 	RawRequest []byte
 	RemoteAddr string
+	RuntimeId  string
 }
 
 func (y *YakNetworkBulkConfig) handleConn(
@@ -49,6 +50,7 @@ func (y *YakNetworkBulkConfig) handleConn(
 		for _, inputElement := range y.Inputs {
 			tcpResp := &NucleiTcpResponse{
 				RemoteAddr: conn.RemoteAddr().String(),
+				RuntimeId:  config.RuntimeId,
 			}
 			var raw []byte
 			switch strings.ToLower(strings.TrimSpace(inputElement.Type)) {
@@ -102,6 +104,7 @@ func (y *YakNetworkBulkConfig) handleConn(
 		tcpResp := &NucleiTcpResponse{
 			RemoteAddr: conn.RemoteAddr().String(),
 			RawRequest: nil,
+			RuntimeId:  config.RuntimeId,
 		}
 		response := utils.StableReaderEx(conn, 5*time.Second, y.ReadSize)
 		for _, extractor := range y.Extractor {

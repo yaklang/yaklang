@@ -90,6 +90,9 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 	if c.Host != "" {
 		opts = append(opts, lowhttp.WithHost(c.Host))
 	}
+	if c.RuntimeId != "" {
+		opts = append(opts, lowhttp.WithRuntimeId(c.RuntimeId))
+	}
 	if c.Port != 0 {
 		opts = append(opts, lowhttp.WithPort(c.Port))
 	}
