@@ -522,4 +522,5 @@ type PocVul struct {
 	Tags          string
 	TitleName     string
 	Details       map[string]interface{}
+	RuntimeId     string
 }

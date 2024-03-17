@@ -54,7 +54,7 @@ func init() {
 }
 
 func TestMustPassDebug(t *testing.T) {
-	var debugName = "nuclei_httptpl_body_2.yak"
+	var debugName = "nuclei_network_runtime.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {

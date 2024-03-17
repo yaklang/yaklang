@@ -1,7 +1,10 @@
 package yakit
 
 import (
+	"bytes"
 	"context"
+	"fmt"
+	"github.com/kataras/pio"
 	"strconv"
 	"strings"
 
@@ -63,6 +66,22 @@ type Risk struct {
 	TaskName            string `json:"task_name"`
 	CveAccessVector     string `json:"cve_access_vector"`
 	CveAccessComplexity string `json:"cve_access_complexity"`
+}
+
+func (p *Risk) ColorizedShow() {
+	buf := bytes.NewBufferString("")
+	buf.WriteString(pio.Red("RISK: " + p.Title))
+	buf.WriteByte('\n')
+	buf.WriteString(pio.Red("    TYPE: " + p.RiskType + "(" + p.RiskTypeVerbose + ")"))
+	buf.WriteByte('\n')
+	buf.WriteString(pio.Red("    Target: " + p.Url + " (" + p.IP + ":" + fmt.Sprint(p.Port) + ")"))
+	buf.WriteByte('\n')
+	buf.WriteString(pio.Red("    REQUEST:"))
+	buf.WriteByte('\n')
+	requsetRaw, _ := strconv.Unquote(p.QuotedRequest)
+	if len(requsetRaw) > 0 {
+		buf.WriteString(string(requsetRaw))
+	}
 }
 
 func (p *Risk) ToGRPCModel() *ypb.Risk {

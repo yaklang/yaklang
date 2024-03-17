@@ -65,6 +65,9 @@ type Config struct {
 
 	Callback ResultCallback
 
+	// runtime id for match task
+	RuntimeId string
+
 	// nuclei / xray
 	Mode string
 

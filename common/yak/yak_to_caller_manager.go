@@ -714,7 +714,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		if ok {
 			return func(target any, opts ...any) (chan *tools.PocVul, error) {
 				if runtimeId != "" {
-					opts = append(opts, lowhttp.WithRuntimeId(runtimeId))
+					opts = append(opts, httptpl.WithHttpTplRuntimeId(runtimeId))
 				}
 				opts = append(opts, httptpl.WithCustomVulnFilter(pluginContext.defaultFilter))
 				opts = append(opts, lowhttp.WithFromPlugin(pluginName))
@@ -731,7 +731,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		if ok {
 			return func(target any, opts ...any) {
 				if runtimeId != "" {
-					opts = append(opts, lowhttp.WithRuntimeId(runtimeId))
+					opts = append(opts, httptpl.WithHttpTplRuntimeId(runtimeId))
 				}
 				opts = append(opts, httptpl.WithCustomVulnFilter(pluginContext.defaultFilter))
 				opts = append(opts, lowhttp.WithFromPlugin(pluginName))
