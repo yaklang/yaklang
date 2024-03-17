@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"sort"
 	"strconv"
+	"strings"
 )
 
 func ChatBase(url string, model string, msg string, fs []Function, opt func() ([]poc.PocConfigOption, error)) (string, error) {
@@ -57,16 +58,22 @@ func ChatBasedExtractData(url string, model string, msg string, fields map[strin
 	sampleField := keys[0]
 
 	var text = `我在完成数据精炼和提取任务，数据源是：` + strconv.Quote(msg) + "，如要提取一系列字段，请提取内容，输出成JSON格式，对JSON对象需求的字段列表为: \n" + buf.String()
-	msg = text
+	msg = text + "\n\n注意：尽量不要输出和JSON的东西 尽量少提出意见"
 	result, err := ChatBase(url, model, msg, nil, opt)
 	if err != nil {
 		log.Errorf("chatbase error: %s", err)
 		return nil, err
 	}
+	result = strings.ReplaceAll(result, "`", "")
 	stdjsons, raw := jsonextractor.ExtractJSONWithRaw(result)
 	for _, stdjson := range stdjsons {
 		var rawMap = make(map[string]any)
-		_ = json.Unmarshal([]byte(stdjson), &rawMap)
+		err := json.Unmarshal([]byte(stdjson), &rawMap)
+		if err != nil {
+			fmt.Println(string(stdjson))
+			log.Errorf("parse failed: %v", err)
+			continue
+		}
 		_, ok := rawMap[sampleField]
 		if ok {
 			return rawMap, nil
@@ -76,14 +83,19 @@ func ChatBasedExtractData(url string, model string, msg string, fields map[strin
 	for _, rawJson := range raw {
 		stdjson := jsonextractor.FixJson([]byte(rawJson))
 		var rawMap = make(map[string]any)
-		_ = json.Unmarshal([]byte(stdjson), &rawMap)
+		err = json.Unmarshal([]byte(stdjson), &rawMap)
+		if err != nil {
+			fmt.Println(string(stdjson))
+			log.Errorf("parse failed: %v", err)
+			continue
+		}
 		_, ok := rawMap[sampleField]
 		if ok {
 			return rawMap, nil
 		}
 	}
 
-	return nil, utils.Errorf("cannot extractjson from: %#v", result)
+	return nil, utils.Errorf("cannot extractjson: \n%v\n", string(result))
 }
 
 func ChatExBase(url string, model string, details []ChatDetail, function []Function, opt func() ([]poc.PocConfigOption, error)) ([]ChatChoice, error) {

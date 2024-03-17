@@ -50,10 +50,16 @@ var CVEUtilCommands = []*cli.Command{
 			cli.StringFlag{Name: "proxy", Usage: "Network Proxy", EnvVar: "http_proxy"},
 			cli.StringFlag{Name: "ai", Usage: "Which AI Gateway? (openai/chatglm)", Value: "openai"},
 			cli.Float64Flag{Name: "timeout", Usage: "timeout for seconds", Value: 60},
+			cli.Float64Flag{Name: "total-timeout", Usage: "total timeout (useful in CI)"},
 		},
 		Usage:  "Translate CVE Models to Chinese, Supported in OPENAI",
 		Hidden: true,
 		Action: func(c *cli.Context) error {
+			totalTimeout := c.Float64("total-timeout")
+			if totalTimeout <= 0 {
+
+			}
+
 			if c.Bool("chaosmaker-rules") {
 				rule.DecorateRules(c.String("ai"), c.Int("concurrent"), c.String("proxy"))
 				return nil

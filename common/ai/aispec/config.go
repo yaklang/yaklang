@@ -1,5 +1,7 @@
 package aispec
 
+import "time"
+
 type AIConfig struct {
 	// gateway network config
 	BaseURL string
@@ -7,8 +9,9 @@ type AIConfig struct {
 	NoHttps bool
 
 	// basic model
-	Model   string
-	Timeout float64
+	Model    string
+	Timeout  float64
+	Deadline time.Time
 
 	APIKey string
 	Proxy  string
