@@ -3,7 +3,7 @@ execNuclei = func(target) {
 	log.Info("start to execute: %s [%v]", nucleiPoCName, target)
 	res, err = nuclei.Scan(
         target,
-		nuclei.fuzzQueryTemplate(nucleiPoCName),
+        nuclei.fuzzQueryTemplate(nucleiPoCName),
         nuclei.timeout(10),
     )
 	if err != nil {
