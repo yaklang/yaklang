@@ -70,7 +70,7 @@ type Risk struct {
 
 func (p *Risk) ColorizedShow() {
 	buf := bytes.NewBufferString("")
-	buf.WriteString(pio.Red("RISK: " + p.Title))
+	buf.WriteString(pio.Red("========RISK: " + p.Title + "========"))
 	buf.WriteByte('\n')
 	buf.WriteString(pio.Red("    TYPE: " + p.RiskType + "(" + p.RiskTypeVerbose + ")"))
 	buf.WriteByte('\n')
@@ -80,8 +80,12 @@ func (p *Risk) ColorizedShow() {
 	buf.WriteByte('\n')
 	requsetRaw, _ := strconv.Unquote(p.QuotedRequest)
 	if len(requsetRaw) > 0 {
-		buf.WriteString(string(requsetRaw))
+		buf.WriteString(pio.Yellow(string(requsetRaw)))
 	}
+	buf.WriteByte('\n')
+	buf.WriteString(pio.Red(`========================================`))
+	buf.WriteByte('\n')
+	fmt.Println(buf.String())
 }
 
 func (p *Risk) ToGRPCModel() *ypb.Risk {

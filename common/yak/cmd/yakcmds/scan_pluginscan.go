@@ -3,6 +3,7 @@ package yakcmds
 import (
 	"context"
 	_ "embed"
+	"fmt"
 	"github.com/google/uuid"
 	"github.com/olekukonko/tablewriter"
 	"github.com/segmentio/ksuid"
@@ -21,6 +22,16 @@ import (
 	"strconv"
 	"strings"
 )
+
+const yakitScanBanner = `
+             _    _ _
+ _   _  __ _| | _(_) |_      ___  ___ __ _ _ __
+| | | |/ _` + "`" + ` | |/ / | __|____/ __|/ __/ _` + "`" + ` | '_ \
+| |_| | (_| |   <| | ||_____\__ \ (_| (_| | | | |
+ \__, |\__,_|_|\_\_|\__|    |___/\___\__,_|_| |_|
+ |___/
+						--- Powered by yaklang.io
+`
 
 var hybridScanCommand = &cli.Command{
 	Name:    "scan",
@@ -66,6 +77,8 @@ var hybridScanCommand = &cli.Command{
 	},
 
 	Action: func(c *cli.Context) error {
+		fmt.Println(yakitScanBanner)
+
 		db := consts.GetGormProfileDatabase()
 		if db == nil {
 			return utils.Error("yak profile/plugin database is nil")
