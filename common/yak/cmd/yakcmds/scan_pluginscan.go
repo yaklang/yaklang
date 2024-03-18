@@ -76,6 +76,11 @@ var hybridScanCommand = &cli.Command{
 		cli.IntFlag{Name: "concurrent,thread", Usage: "(Thread)Concurrent Scan Number", Value: 50},
 	},
 
+	Before: func(c *cli.Context) error {
+		// in this mode, the log will be short and limited
+		os.Setenv(`YAK_IN_TERMINAL_MODE`, "1")
+		return nil
+	},
 	Action: func(c *cli.Context) error {
 		fmt.Println(yakitScanBanner)
 
