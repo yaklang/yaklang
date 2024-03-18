@@ -55,6 +55,13 @@ func formatter(l *golog.Log, name string, line int) bool {
 		name = name[:len(name)-4]
 		if line == -1 {
 			l.Message = fmt.Sprintf("[%v] %v", name, l.Message)
+		} else if os.Getenv("YAK_IN_TERMINAL_MODE") != "" {
+			if ret := len([]rune(name)); ret > 20 {
+				nameBuf := append(([]rune(name))[:14], '.', '.')
+				nameBuf = append(nameBuf, []rune(name)[ret-4:]...)
+				name = string(nameBuf)
+			}
+			l.Message = fmt.Sprintf("[%v:%v] %v", name, line, l.Message)
 		} else {
 			l.Message = fmt.Sprintf("[%v:%v] %v", name, line, l.Message)
 		}
