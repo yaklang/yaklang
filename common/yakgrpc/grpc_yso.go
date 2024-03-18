@@ -4,10 +4,8 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -15,42 +13,14 @@ import (
 	"github.com/yaklang/yaklang/common/yso"
 )
 
-//func (s *Server) Version(ctx context.Context, _ *ypb.Empty) (*ypb.VersionResponse, error) {
-//	return &ypb.VersionResponse{Version: secret.GetPalmVersion()}, nil
-//}
-
 type JavaBytesCodeType string
-
-const (
-	JavaBytesCodeType_FromBytes                 JavaBytesCodeType = "FromBytes"
-	JavaBytesCodeType_RuntimeExec               JavaBytesCodeType = "RuntimeExec"
-	JavaBytesCodeType_ProcessBuilderExec        JavaBytesCodeType = "ProcessBuilderExec"
-	JavaBytesCodeType_ProcessImplExec           JavaBytesCodeType = "ProcessImplExec"
-	JavaBytesCodeType_DNSlog                    JavaBytesCodeType = "DNSlog"
-	JavaBytesCodeType_SpringEcho                JavaBytesCodeType = "SpringEcho"
-	JavaBytesCodeType_ModifyTomcatMaxHeaderSize JavaBytesCodeType = "ModifyTomcatMaxHeaderSize"
-	JavaBytesCodeType_TcpReverse                JavaBytesCodeType = "TcpReverse"
-	JavaBytesCodeType_TcpReverseShell           JavaBytesCodeType = "TcpReverseShell"
-)
 
 type JavaClassGeneraterOption string
 
 const (
-	JavaClassGeneraterOption_ClassName                 JavaClassGeneraterOption = "className"
-	JavaClassGeneraterOption_IsConstructer             JavaClassGeneraterOption = "isConstructer"
-	JavaClassGeneraterOption_IsObfuscation             JavaClassGeneraterOption = "isObfuscation"
-	JavaClassGeneraterOption_Bytes                     JavaClassGeneraterOption = "bytes"
-	JavaClassGeneraterOption_Command                   JavaClassGeneraterOption = "command"
-	JavaClassGeneraterOption_Version                   JavaClassGeneraterOption = "version"
-	JavaClassGeneraterOption_Domain                    JavaClassGeneraterOption = "domain"
-	JavaClassGeneraterOption_Host                      JavaClassGeneraterOption = "host"
-	JavaClassGeneraterOption_Port                      JavaClassGeneraterOption = "port"
-	JavaClassGeneraterOption_TcpReverseToken           JavaClassGeneraterOption = "tcpReverseToken"
-	JavaClassGeneraterOption_SpringHeaderKey           JavaClassGeneraterOption = "springHeaderKey"
-	JavaClassGeneraterOption_SpringHeaderValue         JavaClassGeneraterOption = "springHeaderValue"
-	JavaClassGeneraterOption_SpringParam               JavaClassGeneraterOption = "springParam"
-	JavaClassGeneraterOption_IsSpringRuntimeExecAction JavaClassGeneraterOption = "isSpringRuntimeExec"
-	JavaClassGeneraterOption_IsSpringEchoBody          JavaClassGeneraterOption = "isSpringEchoBody"
+	JavaClassGeneraterOption_ClassName     JavaClassGeneraterOption = "className"
+	JavaClassGeneraterOption_IsObfuscation JavaClassGeneraterOption = "isObfuscation"
+	JavaClassGeneraterOption_Version       JavaClassGeneraterOption = "version"
 )
 
 type JavaClassGeneraterOptionTypeVerbose string
@@ -62,81 +32,79 @@ const (
 	StringPort  JavaClassGeneraterOptionTypeVerbose = "StringPort"
 )
 
-type optionInfo struct {
-	Name        string
-	NameVerbose string
-	Help        string
-}
-
-func getAllGadgetInfo() []*yso.GadgetInfo {
-	res := []*yso.GadgetInfo{}
-	names := []yso.GadgetType{}
-	for name, _ := range yso.AllGadgets {
-		names = append(names, name)
-	}
-	sort.SliceIsSorted(names, func(i, j int) bool {
-		return names[i] < names[j]
-	})
-	for _, name := range names {
-		res = append(res, yso.AllGadgets[name])
-	}
-	return res
-}
-
-func checkGadgetIsTemplateSupported(gadget string) bool {
+func isTemplateSupported(gadget string) bool {
 	if gadget == "None" {
-		return true
-	}
-	info, ok := yso.AllGadgets[yso.GadgetType(gadget)]
-	if !ok {
-		log.Error("gadget not found")
 		return false
 	}
-	return info.IsSupportTemplate()
-}
-func getClassByGadgetName(name string) []optionInfo {
-	if checkGadgetIsTemplateSupported(name) {
-		return []optionInfo{
-			{Name: "FromBytes", NameVerbose: "FromBytes", Help: "自定义字节码，BASE64格式"},
-			{Name: "RuntimeExec", NameVerbose: "RuntimeExec", Help: ""},
-			{Name: "ProcessBuilderExec", NameVerbose: "ProcessBuilderExec", Help: "可用于绕过RuntimeExec限制"},
-			{Name: "ProcessImplExec", NameVerbose: "ProcessImplExec", Help: "可用于绕过RuntimeExec限制"},
-			{Name: "DNSlog", NameVerbose: "DNSlog", Help: "用于DNSLog检测"},
-			{Name: "SpringEcho", NameVerbose: "SpringEcho", Help: "Spring回显利用"},
-			{Name: "ModifyTomcatMaxHeaderSize", NameVerbose: "ModifyTomcatMaxHeaderSize", Help: "修改TomcatMaxHeaderSize，可用于Shiro漏洞利用时绕过Header长度限制"},
-			{Name: "TcpReverse", NameVerbose: "TcpReverse", Help: "反连到指定地址，并发送Token的内容"},
-			{Name: "TcpReverseShell", NameVerbose: "TcpReverseShell", Help: "反弹Shell"},
-		}
-		//} else if name == yso.URLDNS || name == yso.FindGadgetByDNS {
-		//	return []optionInfo{
-		//		{Name: "DNSlog", NameVerbose: "DNSlog", Help: "通过DNSLog检测"},
-		//	}
-	} else {
-		return []optionInfo{
-			{Name: "RuntimeExec", NameVerbose: "RuntimeExec", Help: ""},
-		}
+	cfg, ok := yso.YsoConfigInstance.Gadgets[yso.GadgetType(gadget)]
+	if !ok {
+		return false
 	}
+	return cfg.IsTemplateImpl
 }
 
 func (s *Server) GetAllYsoGadgetOptions(ctx context.Context, _ *ypb.Empty) (*ypb.YsoOptionsWithVerbose, error) {
-	allGadget := getAllGadgetInfo()
+	allGadget := []*yso.GadgetConfig{}
+	names := []string{}
+	for name, _ := range yso.YsoConfigInstance.Gadgets {
+		if name == yso.GadgetSimplePrincipalCollection {
+			continue
+		}
+		names = append(names, string(name))
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		allGadget = append(allGadget, yso.YsoConfigInstance.Gadgets[yso.GadgetType(name)])
+	}
 	var allGadgetName []*ypb.YsoOption
 	for _, gadget := range allGadget {
-		allGadgetName = append(allGadgetName, &ypb.YsoOption{Name: gadget.GetName(), NameVerbose: gadget.GetNameVerbose(), Help: gadget.GetHelp()})
+		allGadgetName = append(allGadgetName, &ypb.YsoOption{Name: gadget.Name, NameVerbose: gadget.Name, Help: gadget.Desc})
 	}
 	return &ypb.YsoOptionsWithVerbose{
 		Options: allGadgetName,
 	}, nil
 }
 func (s *Server) GetAllYsoClassOptions(ctx context.Context, req *ypb.YsoOptionsRequerstWithVerbose) (*ypb.YsoOptionsWithVerbose, error) {
-	// log.Infof("%v", req)
-	options := getClassByGadgetName(req.Gadget)
-	var allGadgetName []*ypb.YsoOption
-	for _, gadget := range options {
-		allGadgetName = append(allGadgetName, &ypb.YsoOption{Name: gadget.Name, NameVerbose: gadget.NameVerbose, Help: gadget.Help})
+	if req.Gadget == "None" {
+		var nextOpts []*ypb.YsoOption
+		for name, config := range yso.YsoConfigInstance.Classes {
+			if name == yso.ClassEmptyClassInTemplate {
+				continue
+			}
+			nextOpts = append(nextOpts, &ypb.YsoOption{Name: string(config.Name), NameVerbose: string(config.Name), Help: config.Desc})
+		}
+		return &ypb.YsoOptionsWithVerbose{
+			Options: nextOpts,
+		}, nil
+	}
+	cfg, ok := yso.YsoConfigInstance.Gadgets[yso.GadgetType(req.Gadget)]
+	if !ok {
+		return nil, utils.Errorf("not support gadget: %s", req.Gadget)
+	}
+	var nextOpts []*ypb.YsoOption
+	if cfg.IsTemplateImpl { // templateImpl, next opt is classes
+		for _, config := range yso.YsoConfigInstance.Classes {
+			nextOpts = append(nextOpts, &ypb.YsoOption{Name: string(config.Name), NameVerbose: string(config.Name), Help: config.Desc})
+		}
+	} else if cfg.Template != nil { // custom template
+		v, ok := yso.YsoConfigInstance.ReflectChainFunction[cfg.ReferenceFun]
+		if ok {
+			nextOpts = append(nextOpts, &ypb.YsoOption{Name: v.Name, NameVerbose: v.Name, Help: v.Desc})
+		}
+	} else { // transform, next opt is transform chain type
+		for name, tmpl := range cfg.ChainTemplate {
+			if tmpl == nil {
+				continue
+			}
+			v, ok := yso.YsoConfigInstance.ReflectChainFunction[name]
+			if !ok {
+				continue
+			}
+			nextOpts = append(nextOpts, &ypb.YsoOption{Name: v.Name, NameVerbose: v.Name, Help: v.Desc})
+		}
 	}
 	return &ypb.YsoOptionsWithVerbose{
-		Options: allGadgetName,
+		Options: nextOpts,
 	}, nil
 }
 func (s *Server) GetAllYsoClassGeneraterOptions(ctx context.Context, req *ypb.YsoOptionsRequerstWithVerbose) (*ypb.YsoClassOptionsResponseWithVerbose, error) {
@@ -144,217 +112,99 @@ func (s *Server) GetAllYsoClassGeneraterOptions(ctx context.Context, req *ypb.Ys
 		{Key: string(JavaClassGeneraterOption_Version), Value: "52", Type: string(StringPort), KeyVerbose: "Java 版本", Help: "Class 使用的Java 版本"},
 	}
 	commonOptions := []*ypb.YsoClassGeneraterOptionsWithVerbose{
-		{Key: string(JavaClassGeneraterOption_IsConstructer), Value: "false", Type: string(StringBool), KeyVerbose: "构造方法", Help: "开启则使用构造函数，否则使用静态代码块触发恶意代码"},
 		{Key: string(JavaClassGeneraterOption_IsObfuscation), Value: "true", Type: string(StringBool), KeyVerbose: "混淆", Help: "开启则混淆，否则不混淆"},
 		{Key: string(JavaClassGeneraterOption_ClassName), Value: utils.RandStringBytes(8), Type: string(String), KeyVerbose: "类名", Help: "类名"},
 	}
 	commonOptions = append(commonOptions, versionOptions...)
-	if checkGadgetIsTemplateSupported(req.Gadget) {
-		switch JavaBytesCodeType(req.Class) {
-		case JavaBytesCodeType_FromBytes:
-			return &ypb.YsoClassOptionsResponseWithVerbose{
-				Options: append(commonOptions, []*ypb.YsoClassGeneraterOptionsWithVerbose{
-					{Key: string(JavaClassGeneraterOption_Bytes), Value: "", Type: string(Base64Bytes), KeyVerbose: "字节码", Help: "字节码"},
-				}...),
-			}, nil
-		case JavaBytesCodeType_RuntimeExec, JavaBytesCodeType_ProcessImplExec, JavaBytesCodeType_ProcessBuilderExec:
-			return &ypb.YsoClassOptionsResponseWithVerbose{
-				Options: append(commonOptions, []*ypb.YsoClassGeneraterOptionsWithVerbose{
-					{Key: string(JavaClassGeneraterOption_Command), Value: "", Type: string(String), KeyVerbose: "命令", Help: "命令"},
-				}...),
-			}, nil
-		case JavaBytesCodeType_DNSlog:
-			return &ypb.YsoClassOptionsResponseWithVerbose{
-				Options: append(commonOptions, []*ypb.YsoClassGeneraterOptionsWithVerbose{
-					{Key: string(JavaClassGeneraterOption_Domain), Value: "", Type: string(String), KeyVerbose: "DNSLog域名", Help: "填入DNSLog地址"},
-				}...),
-			}, nil
-		case JavaBytesCodeType_SpringEcho:
-			return &ypb.YsoClassOptionsResponseWithVerbose{
-				Options: append(commonOptions, []*ypb.YsoClassGeneraterOptionsWithVerbose{
-					{Key: string(JavaClassGeneraterOption_IsSpringEchoBody), Value: "false", Type: string(StringBool), KeyVerbose: "Body输出", Help: "开启则在Body输出，否则在Header输出", BindOptions: map[string]*ypb.YsoClassOptionsResponseWithVerbose{
-						"false": {
-							Options: []*ypb.YsoClassGeneraterOptionsWithVerbose{
-								{Key: string(JavaClassGeneraterOption_SpringHeaderKey), Value: "", Type: string(String), KeyVerbose: "HeaderKey", Help: "在Header回显的Key"},
-								{Key: string(JavaClassGeneraterOption_SpringHeaderValue), Value: "", Type: string(String), KeyVerbose: "HeaderValue", Help: "在Header回显的Value"},
-							},
-						},
-						"true": {
-							Options: []*ypb.YsoClassGeneraterOptionsWithVerbose{
-								{Key: string(JavaClassGeneraterOption_SpringParam), Value: "", Type: string(String), KeyVerbose: "命令", Help: "在Body回显的命令"},
-							},
-						},
-					}},
-					{Key: string(JavaClassGeneraterOption_IsSpringRuntimeExecAction), Value: "false", Type: string(StringBool), KeyVerbose: "执行命令", Help: "开启则执行命令并回显结果，否则只回显命令"},
-					{Key: string(JavaClassGeneraterOption_SpringHeaderKey), Value: "", Type: string(String), KeyVerbose: "HeaderKey", Help: "在Header回显的Key"},
-					{Key: string(JavaClassGeneraterOption_SpringHeaderValue), Value: "", Type: string(String), KeyVerbose: "HeaderValue", Help: "在Header回显的Value"},
-					{Key: string(JavaClassGeneraterOption_SpringParam), Value: "", Type: string(String), KeyVerbose: "命令", Help: "在Body回显的命令"},
-				}...),
-			}, nil
-		case JavaBytesCodeType_ModifyTomcatMaxHeaderSize:
-			return &ypb.YsoClassOptionsResponseWithVerbose{Options: commonOptions}, nil
-		case JavaBytesCodeType_TcpReverse:
-			return &ypb.YsoClassOptionsResponseWithVerbose{
-				Options: append(commonOptions, []*ypb.YsoClassGeneraterOptionsWithVerbose{
-					{Key: string(JavaClassGeneraterOption_Port), Value: "", Type: string(StringPort), KeyVerbose: "端口", Help: "端口"},
-					{Key: string(JavaClassGeneraterOption_Host), Value: "", Type: string(String), KeyVerbose: "主机", Help: "主机"},
-					{Key: string(JavaClassGeneraterOption_TcpReverseToken), Value: "", Type: string(String), KeyVerbose: "Token", Help: "反连的Token"},
-				}...),
-			}, nil
-		case JavaBytesCodeType_TcpReverseShell:
-			return &ypb.YsoClassOptionsResponseWithVerbose{
-				Options: append(commonOptions, []*ypb.YsoClassGeneraterOptionsWithVerbose{
-					{Key: string(JavaClassGeneraterOption_Port), Value: "", Type: string(StringPort), KeyVerbose: "端口", Help: "端口"},
-					{Key: string(JavaClassGeneraterOption_Host), Value: "", Type: string(String), KeyVerbose: "主机", Help: "主机"},
-				}...),
-			}, nil
-		default:
-			return nil, utils.Errorf("not support gadget: %s and class: %s", req.Gadget, req.Class)
+	var gadgetOptions []*ypb.YsoClassGeneraterOptionsWithVerbose
+	paramsToOptInfo := func(params []*yso.ParamConfig) []*ypb.YsoClassGeneraterOptionsWithVerbose {
+		var res []*ypb.YsoClassGeneraterOptionsWithVerbose
+		for _, param := range params {
+			var typ string
+			switch param.Type {
+			case "int":
+				typ = string(StringPort)
+			case "bool":
+				typ = string(StringBool)
+			case "bytes":
+				typ = string(Base64Bytes)
+			default:
+				typ = string(String)
+			}
+			res = append(res, &ypb.YsoClassGeneraterOptionsWithVerbose{
+				Key: string(param.Name), Value: param.DefaultValue, Type: typ, KeyVerbose: string(param.NameZh), Help: param.Desc,
+			})
+		}
+		return res
+	}
+	gadgetCfg, ok := yso.YsoConfigInstance.Gadgets[yso.GadgetType(req.Gadget)]
+	var isNone bool
+	if !ok {
+		if req.Gadget == "None" {
+			isNone = true
+		} else {
+			return nil, utils.Errorf("not support gadget: %s", req.Gadget)
+		}
+	}
+	if isNone || gadgetCfg.IsTemplateImpl {
+		if cfg, ok := yso.YsoConfigInstance.Classes[yso.ClassType(req.Class)]; ok {
+			gadgetOptions = paramsToOptInfo(cfg.Params)
+
+			//if req.Class == string(yso.ClassSpringEcho) && param.Name == "isSpringEchoBody" {
+			//	gadgetOptions = append(gadgetOptions, &ypb.YsoClassGeneraterOptionsWithVerbose{
+			//
+			//	})
+			//}
+			//return &ypb.YsoClassOptionsResponseWithVerbose{
+			//	Options: append(commonOptions, []*ypb.YsoClassGeneraterOptionsWithVerbose{
+			//		{Key: string(JavaClassGeneraterOption_IsSpringEchoBody), Value: "false", Type: string(StringBool), KeyVerbose: "Body输出", Help: "开启则在Body输出，否则在Header输出", BindOptions: map[string]*ypb.YsoClassOptionsResponseWithVerbose{
+			//			"false": {
+			//				Options: []*ypb.YsoClassGeneraterOptionsWithVerbose{
+			//					{Key: string(JavaClassGeneraterOption_SpringHeaderKey), Value: "", Type: string(String), KeyVerbose: "HeaderKey", Help: "在Header回显的Key"},
+			//					{Key: string(JavaClassGeneraterOption_SpringHeaderValue), Value: "", Type: string(String), KeyVerbose: "HeaderValue", Help: "在Header回显的Value"},
+			//				},
+			//			},
+			//			"true": {
+			//				Options: []*ypb.YsoClassGeneraterOptionsWithVerbose{
+			//					{Key: string(JavaClassGeneraterOption_SpringParam), Value: "", Type: string(String), KeyVerbose: "命令", Help: "在Body回显的命令"},
+			//				},
+			//			},
+			//		}},
+			//		{Key: string(JavaClassGeneraterOption_IsSpringRuntimeExecAction), Value: "false", Type: string(StringBool), KeyVerbose: "执行命令", Help: "开启则执行命令并回显结果，否则只回显命令"},
+			//		{Key: string(JavaClassGeneraterOption_SpringHeaderKey), Value: "", Type: string(String), KeyVerbose: "HeaderKey", Help: "在Header回显的Key"},
+			//		{Key: string(JavaClassGeneraterOption_SpringHeaderValue), Value: "", Type: string(String), KeyVerbose: "HeaderValue", Help: "在Header回显的Value"},
+			//		{Key: string(JavaClassGeneraterOption_SpringParam), Value: "", Type: string(String), KeyVerbose: "命令", Help: "在Body回显的命令"},
+			//	}...),
+			//}, nil
+
+		} else {
+			return nil, utils.Errorf("not support class: %s", req.Class)
 		}
 	} else {
-		if JavaBytesCodeType(req.Class) == JavaBytesCodeType_RuntimeExec {
-			return &ypb.YsoClassOptionsResponseWithVerbose{Options: []*ypb.YsoClassGeneraterOptionsWithVerbose{
-				{Key: string(JavaClassGeneraterOption_Command), Value: "", Type: string(String), KeyVerbose: "命令", Help: "命令"},
-			}}, nil
-		} else if JavaBytesCodeType(req.Class) == JavaBytesCodeType_DNSlog {
-			return &ypb.YsoClassOptionsResponseWithVerbose{Options: []*ypb.YsoClassGeneraterOptionsWithVerbose{
-				{Key: string(JavaClassGeneraterOption_Domain), Value: "", Type: string(String), KeyVerbose: "DNSLog域名", Help: "填入DNSLog地址"},
-			}}, nil
-		} else {
-			return nil, utils.Errorf("not support gadget: %s and class: %s", req.Gadget, req.Class)
+		if gadgetCfg.Template != nil { // custom param
+			if v, ok := yso.YsoConfigInstance.ReflectChainFunction[gadgetCfg.ReferenceFun]; ok {
+				gadgetOptions = paramsToOptInfo(v.Args)
+			}
+		} else { // transform chain param
+			cfg, ok := yso.YsoConfigInstance.ReflectChainFunction[req.Class]
+			if !ok {
+				return nil, utils.Errorf("not support chain type: %s", req.Class)
+			}
+			gadgetOptions = paramsToOptInfo(cfg.Args)
 		}
 	}
+	return &ypb.YsoClassOptionsResponseWithVerbose{Options: append(commonOptions, gadgetOptions...)}, nil
 }
 
-func optionsToYaklangCode(options []*ypb.YsoClassGeneraterOptionsWithVerbose, isClass bool) (string, map[string]any, string) {
-	className := ""
-	optionsCode := []string{}
-	preOptionsCode := make(map[string]any)
-	expect := ""
-	args := []string{}
-	for _, option := range options {
-		switch JavaClassGeneraterOption(option.Key) {
-		case JavaClassGeneraterOption_ClassName:
-			className = option.Value
-			//code := fmt.Sprintf("yso.%s(\"%s\")", "evilClassName", option.Value)
-			code := "yso.evilClassName(className)"
-			optionsCode = append(optionsCode, code)
-		case JavaClassGeneraterOption_IsConstructer:
-			if option.Value == "true" {
-				code := fmt.Sprintf("yso.%s()", "useConstructorExecutor")
-				optionsCode = append(optionsCode, code)
-			}
-		case JavaClassGeneraterOption_IsObfuscation:
-			if option.Value == "true" {
-				code := fmt.Sprintf("yso.%s()", "obfuscationClassConstantPool")
-				optionsCode = append(optionsCode, code)
-			}
-		case JavaClassGeneraterOption_Bytes:
-			if isClass {
-				preOptionsCode[option.Key] = option.Value
-			} else {
-				code := fmt.Sprintf("yso.%s(\"%s\")", "useBase64BytesClass", option.Value)
-				optionsCode = append(optionsCode, code)
-			}
-		case JavaClassGeneraterOption_Command:
-			if isClass {
-				preOptionsCode[option.Key] = option.Value
-			} else {
-				preOptionsCode[option.Key] = option.Value
-				code := fmt.Sprintf("yso.%s(\"%s\")", "command", option.Value)
-				optionsCode = append(optionsCode, code)
-			}
-		case JavaClassGeneraterOption_Version:
-			v, err := strconv.Atoi(option.Value)
-			if err != nil {
-				v = 0
-			}
-			preOptionsCode[option.Key] = v
-			code := fmt.Sprintf("yso.%s(%s)", "majorVersion", JavaClassGeneraterOption_Version)
-			optionsCode = append(optionsCode, code)
-		case JavaClassGeneraterOption_Domain:
-			if isClass {
-				preOptionsCode[option.Key] = option.Value
-			} else {
-				code := fmt.Sprintf("yso.%s(\"%s\")", "dnslogDomain", option.Value)
-				optionsCode = append(optionsCode, code)
-			}
-		case JavaClassGeneraterOption_Port:
-			if isClass {
-				v, err := strconv.Atoi(option.Value)
-				if err != nil {
-					v = 0
-				}
-				preOptionsCode[option.Key] = v
-			} else {
-				code := fmt.Sprintf("yso.%s(%s)", "tcpReversePort", option.Value)
-				optionsCode = append(optionsCode, code)
-			}
-		case JavaClassGeneraterOption_Host:
-			if isClass {
-				preOptionsCode[option.Key] = option.Value
-			} else {
-				code := fmt.Sprintf("yso.%s(\"%s\")", "tcpReverseHost", option.Value)
-				optionsCode = append(optionsCode, code)
-			}
-		case JavaClassGeneraterOption_TcpReverseToken:
-			code := fmt.Sprintf("yso.%s(\"%s\")", "tcpReverseToken", option.Value)
-			optionsCode = append(optionsCode, code)
-		case JavaClassGeneraterOption_SpringHeaderKey:
-			if expect == "" {
-				expect = "springHeaderValue"
-				args = append(args, option.Value)
-			}
-			if expect == "springHeaderKey" {
-				args = append(args, option.Value)
-				code := fmt.Sprintf("yso.%s(%s, %s)", "springHeader", args[1], args[0])
-				optionsCode = append(optionsCode, code)
-				expect = ""
-				args = []string{}
-			}
-		case JavaClassGeneraterOption_SpringHeaderValue:
-			if expect == "" {
-				expect = "springHeaderKey"
-				args = append(args, option.Value)
-			}
-			if expect == "springHeaderValue" {
-				args = append(args, option.Value)
-				code := fmt.Sprintf("yso.%s(\"%s\", \"%s\")", "springHeader", args[0], args[1])
-				optionsCode = append(optionsCode, code)
-				expect = ""
-				args = []string{}
-			}
-		case JavaClassGeneraterOption_SpringParam:
-			code := fmt.Sprintf("yso.%s(\"%s\")", "springParam", option.Value)
-			optionsCode = append(optionsCode, code)
-		case JavaClassGeneraterOption_IsSpringRuntimeExecAction:
-			if option.Value == "true" {
-				code := fmt.Sprintf("yso.%s()", "springRuntimeExecAction")
-				optionsCode = append(optionsCode, code)
-			}
-		case JavaClassGeneraterOption_IsSpringEchoBody:
-			if option.Value == "true" {
-				code := fmt.Sprintf("yso.%s()", "springEchoBody")
-				optionsCode = append(optionsCode, code)
-			}
-		}
-	}
-	return className, preOptionsCode, strings.Join(optionsCode, ",")
-}
-func generateYsoCode(req *ypb.YsoOptionsRequerstWithVerbose) (string, map[string]any, error) {
-	// log.Infof("%v", req)
+func generateYsoCode(req *ypb.YsoOptionsRequerstWithVerbose) (string, error) {
 	if req == nil {
-		return "", nil, utils.Error("request params is nil")
+		return "", utils.Error("request params is nil")
 	}
 	if req.Class == "" {
-		return "", nil, utils.Error("not set class")
-	}
-	var gadget string
-	if req.Gadget != "None" {
-		gadget = fmt.Sprintf("Get%sJavaObject", req.Gadget)
+		return "", utils.Error("not set class")
 	}
 	gadgetCodeTmp := `log.setLevel("info")
-gadgetObj,err = yso.$gadgetFun($options)
+gadgetObj,err = yso.GetGadget($options)
 if err {
     log.error("%v",err)
 	return
@@ -389,7 +239,7 @@ hexPayload = codec.EncodeToHex(gadgetBytes)
 // log.info("发送Payload成功")
 // log.info("响应包: ",string(rsp))	`
 
-	classCodeTmp := `classObj,err = yso.$evilClass($options)
+	classCodeTmp := `classObj,err = yso.GenerateClass($options)
 if err {
 	log.error("%v",err)
 	return
@@ -450,142 +300,165 @@ hexPayload = codec.EncodeToHex(classBytes)
 // log.info("发送Payload成功")
 // log.info("响应包: %s",string(rsp))
 `
-
-	className, preOptionsCode, optionsCode := optionsToYaklangCode(req.Options, true)
-	var code string
-	switch JavaBytesCodeType(req.Class) {
-	case JavaBytesCodeType_FromBytes:
-		bytesCode := `bytesCode,err =codec.DecodeBase64(%s)
-if err != nil {
-	println(err.Error())
-	return
-}`
-		bytesCode = fmt.Sprintf(bytesCode, string(JavaClassGeneraterOption_Bytes))
-		if gadget != "" {
-			optionsCode = "yso.useBytesEvilClass(bytesCode)," + optionsCode
-			code = bytesCode + "\n" + utils.Format(gadgetCodeTmp, map[string]string{"gadgetFun": gadget, "options": optionsCode})
-		} else {
-			optionsCode = "bytesCode," + optionsCode
-			generateCodeTmp := utils.Format(classCodeTmp, map[string]string{"evilClass": "GenerateClassObjectFromBytes", "options": optionsCode})
-			code = bytesCode + "\n" + generateCodeTmp
-		}
-	case JavaBytesCodeType_RuntimeExec:
-		command := string(JavaClassGeneraterOption_Command)
-		if gadget != "" {
-			if !checkGadgetIsTemplateSupported(req.Gadget) {
-				//if checkIsRuntimeExecGadget(JavaSerilizedObjectType(req.Gadget)) {
-				code = utils.Format(gadgetCodeTmp, map[string]string{"gadgetFun": gadget, "options": command})
-			} else {
-				optionsCode = "yso.useRuntimeExecEvilClass(" + command + ")," + optionsCode
-				code = utils.Format(gadgetCodeTmp, map[string]string{"gadgetFun": gadget, "options": optionsCode})
+	optionsToCode := func(options []*ypb.YsoClassGeneraterOptionsWithVerbose) string {
+		optionsMapTemplate := `{
+%s}`
+		tmpStr := ""
+		for _, option := range req.Options {
+			if option.Key == string(JavaClassGeneraterOption_ClassName) || option.Key == string(JavaClassGeneraterOption_IsObfuscation) || option.Key == string(JavaClassGeneraterOption_Version) {
+				continue
 			}
-		} else {
-			optionsCode = fmt.Sprintf("%s,", command) + optionsCode
-			code = utils.Format(classCodeTmp, map[string]string{"evilClass": "GenerateRuntimeExecEvilClassObject", "options": optionsCode})
+			tmpStr += fmt.Sprintf("\t\"%s\":\"%s\",\n", option.Key, option.Value)
 		}
-	case JavaBytesCodeType_ProcessImplExec:
-		command := string(JavaClassGeneraterOption_Command)
-		if gadget != "" {
-			optionsCode = "yso.useProcessImplExecEvilClass(" + command + ")," + optionsCode
-			code = utils.Format(gadgetCodeTmp, map[string]string{"gadgetFun": gadget, "options": optionsCode})
-		} else {
-			optionsCode = fmt.Sprintf("%s,", command) + optionsCode
-			code = utils.Format(classCodeTmp, map[string]string{"evilClass": "GenerateProcessImplExecEvilClassObject", "options": optionsCode})
-		}
-	case JavaBytesCodeType_ProcessBuilderExec:
-		command := string(JavaClassGeneraterOption_Command)
-		if gadget != "" {
-			optionsCode = "yso.useProcessBuilderExecEvilClass(" + command + ")," + optionsCode
-			code = utils.Format(gadgetCodeTmp, map[string]string{"gadgetFun": gadget, "options": optionsCode})
-
-		} else {
-			optionsCode = fmt.Sprintf("%s,", command) + optionsCode
-			code = utils.Format(classCodeTmp, map[string]string{"evilClass": "GenerateProcessBuilderExecEvilClassObject", "options": optionsCode})
-		}
-	case JavaBytesCodeType_DNSlog:
-		domain := string(JavaClassGeneraterOption_Domain)
-		if gadget != "" {
-			if !checkGadgetIsTemplateSupported(req.Gadget) {
-				code = utils.Format(gadgetCodeTmp, map[string]string{"gadgetFun": gadget, "options": "" + domain + ""})
-			} else {
-				optionsCode = "yso.useDNSLogEvilClass(" + domain + ")," + optionsCode
-				code = utils.Format(gadgetCodeTmp, map[string]string{"gadgetFun": gadget, "options": optionsCode})
+		return fmt.Sprintf(optionsMapTemplate, tmpStr)
+	}
+	if req.Gadget == "None" { // generate class
+		optionsCode := []string{}
+		optionsCode = append(optionsCode, fmt.Sprintf(`yso.useTemplate("%s")`, req.Class))
+		for _, option := range req.Options {
+			if option.Key == string(JavaClassGeneraterOption_ClassName) {
+				optionsCode = append(optionsCode, fmt.Sprintf(`yso.evilClassName("%s")`, option.Value))
+				continue
 			}
-
-		} else {
-			optionsCode = fmt.Sprintf("%s,", domain) + optionsCode
-			code = utils.Format(classCodeTmp, map[string]string{"evilClass": "GenerateDNSlogEvilClassObject", "options": optionsCode})
+			if option.Key == string(JavaClassGeneraterOption_IsObfuscation) && option.Value == "true" {
+				optionsCode = append(optionsCode, "yso.obfuscationClassConstantPool()")
+				continue
+			}
+			if option.Key == string(JavaClassGeneraterOption_Version) {
+				optionsCode = append(optionsCode, fmt.Sprintf(`yso.majorVersion(%s)`, option.Value))
+				continue
+			}
+			optionsCode = append(optionsCode, fmt.Sprintf(`yso.useClassParam("%s","%s")`, option.Key, option.Value))
 		}
-	case JavaBytesCodeType_SpringEcho:
-
-		if gadget != "" {
-			optionsCode = "yso.useSpringEchoTemplate()," + optionsCode
-			code = utils.Format(gadgetCodeTmp, map[string]string{"gadgetFun": gadget, "options": optionsCode})
-		} else {
-			code = utils.Format(classCodeTmp, map[string]string{"evilClass": "GenerateSpringEchoEvilClassObject", "options": optionsCode})
+		classCode := utils.Format(classCodeTmp, map[string]string{
+			"options": strings.Join(optionsCode, ","),
+		})
+		return classCode, nil
+	} else { // generate gadget
+		cfg, ok := yso.YsoConfigInstance.Gadgets[yso.GadgetType(req.Gadget)]
+		if !ok {
+			return "", utils.Errorf("not support gadget: %s", req.Gadget)
 		}
-	case JavaBytesCodeType_ModifyTomcatMaxHeaderSize:
-		if gadget != "" {
-			optionsCode = "yso.useModifyTomcatMaxHeaderSizeTemplate()," + optionsCode
-			code = utils.Format(gadgetCodeTmp, map[string]string{"gadgetFun": gadget, "options": optionsCode})
+		if cfg.IsTemplateImpl {
+			optionsCode := []string{}
+			optionsCode = append(optionsCode, fmt.Sprintf(`"%s"`, req.Gadget))
+			optionsCode = append(optionsCode, fmt.Sprintf(`yso.useTemplate("%s")`, req.Class))
+			for _, option := range req.Options {
+				if option.Key == string(JavaClassGeneraterOption_ClassName) {
+					optionsCode = append(optionsCode, fmt.Sprintf(`yso.evilClassName("%s")`, option.Value))
+					continue
+				}
+				if option.Key == string(JavaClassGeneraterOption_IsObfuscation) && option.Value == "true" {
+					optionsCode = append(optionsCode, "yso.obfuscationClassConstantPool()")
+					continue
+				}
+				if option.Key == string(JavaClassGeneraterOption_Version) {
+					optionsCode = append(optionsCode, fmt.Sprintf(`yso.majorVersion(%s)`, option.Value))
+					continue
+				}
+				optionsCode = append(optionsCode, fmt.Sprintf(`yso.useClassParam("%s","%s")`, option.Key, option.Value))
+			}
+			classCode := utils.Format(gadgetCodeTmp, map[string]string{
+				"options": strings.Join(optionsCode, ","),
+			})
+			return classCode, nil
+		} else if cfg.Template != nil {
+			optionsCode := []string{}
+			optionsCode = append(optionsCode, fmt.Sprintf(`"%s"`, req.Gadget))
+			optionsCode = append(optionsCode, fmt.Sprintf(`"%s"`, req.Class))
+			optionsCode = append(optionsCode, optionsToCode(req.Options))
+			classCode := utils.Format(gadgetCodeTmp, map[string]string{
+				"options": strings.Join(optionsCode, ","),
+			})
+			return classCode, nil
 		} else {
-			code = utils.Format(classCodeTmp, map[string]string{"evilClass": "GenerateModifyTomcatMaxHeaderSizeEvilClassObject", "options": optionsCode})
+			optionsCode := []string{}
+			optionsCode = append(optionsCode, fmt.Sprintf(`"%s"`, req.Gadget))
+			optionsCode = append(optionsCode, fmt.Sprintf(`"%s"`, req.Class))
+			optionsCode = append(optionsCode, optionsToCode(req.Options))
+			classCode := utils.Format(gadgetCodeTmp, map[string]string{
+				"options": strings.Join(optionsCode, ","),
+			})
+			return classCode, nil
 		}
-	case JavaBytesCodeType_TcpReverse:
-		host := string(JavaClassGeneraterOption_Host)
-		port := string(JavaClassGeneraterOption_Port)
-		if gadget != "" {
-			optionsCode = "yso.useTcpReverseEvilClass(" + host + "," + port + ")," + optionsCode
-			code = utils.Format(gadgetCodeTmp, map[string]string{"gadgetFun": gadget, "options": optionsCode})
-		} else {
-			optionsCode = fmt.Sprintf("%s,%s,", host, port) + optionsCode
-			code = utils.Format(classCodeTmp, map[string]string{"evilClass": "GenerateTcpReverseEvilClassObject", "options": optionsCode})
-		}
-	case JavaBytesCodeType_TcpReverseShell:
-		host := string(JavaClassGeneraterOption_Host)
-		port := string(JavaClassGeneraterOption_Port)
-		if gadget != "" {
-			optionsCode = "yso.useTcpReverseShellEvilClass(" + host + "," + port + ")," + optionsCode
-			code = utils.Format(gadgetCodeTmp, map[string]string{"gadgetFun": gadget, "options": optionsCode})
-		} else {
-			optionsCode = fmt.Sprintf("%s,%s,", host, port) + optionsCode
-			code = utils.Format(classCodeTmp, map[string]string{"evilClass": "GenerateTcpReverseShellEvilClassObject", "options": optionsCode})
-		}
-	default:
-		return "", nil, utils.Error("not support class")
 	}
-	//if gadget != "" {
-	//	optionsCode = "yso.majorVersion(" + version + ")," + optionsCode
-	//	code = utils.Format(gadgetCodeTmp, map[string]string{"gadgetFun": gadget, "options": optionsCode})
-	//}
-
-	if className != "" {
-		code = fmt.Sprintf("className = \"%s\"\n", className) + code
-	}
-	return code, preOptionsCode, nil
 }
 func (s *Server) GenerateYsoCode(ctx context.Context, req *ypb.YsoOptionsRequerstWithVerbose) (*ypb.YsoCodeResponse, error) {
-	code, params, err := generateYsoCode(req)
+	code, err := generateYsoCode(req)
 	if err != nil {
 		return nil, err
 	}
-	paramDefineCode := ""
-	for k, v := range params {
-		switch ret := v.(type) {
-		case string:
-			paramDefineCode += (fmt.Sprintf("%s = %s\n", k, strconv.Quote(ret)))
-		case int:
-			paramDefineCode += (fmt.Sprintf("%s = %d\n", k, ret))
-		}
-	}
-	code = paramDefineCode + code
 	return &ypb.YsoCodeResponse{Code: code}, nil
 }
 func (s *Server) GenerateYsoBytes(ctx context.Context, req *ypb.YsoOptionsRequerstWithVerbose) (*ypb.YsoBytesResponse, error) {
+	var fileName string
+	if req.Gadget == "None" {
+		fileName = fmt.Sprintf("%s.class", req.Class)
+		_, ok := yso.YsoConfigInstance.Classes[yso.ClassType(req.Class)]
+		if !ok {
+			return nil, utils.Errorf("not support class: %s", req.Class)
+		}
+		var opts []yso.GenClassOptionFun
+		opts = append(opts, yso.SetClassType(yso.ClassType(req.Class)))
+		for _, option := range req.Options {
+			opts = append(opts, yso.SetClassParam(option.Key, option.Value))
+		}
+		classIns, err := yso.GenerateClass(opts...)
+		if err != nil {
+			return nil, err
+		}
+		byts, err := yso.ToBytes(classIns)
+		if err != nil {
+			return nil, err
+		}
+		return &ypb.YsoBytesResponse{Bytes: byts, FileName: fileName}, nil
+	} else {
+		fileName = fmt.Sprintf("%s_%s.ser", req.Gadget, req.Class)
+		cfg, ok := yso.YsoConfigInstance.Gadgets[yso.GadgetType(req.Gadget)]
+		if !ok {
+			return nil, utils.Errorf("not support gadget: %s", req.Gadget)
+		}
+		var opts []any
+		var gadgetIns *yso.JavaObject
+		if cfg.IsTemplateImpl {
+			opts = append(opts, yso.SetClassType(yso.ClassType(req.Class)))
+			for _, option := range req.Options {
+				opts = append(opts, yso.SetClassParam(option.Key, option.Value))
+			}
+			o, err := yso.GenerateGadget(req.Gadget, opts...)
+			if err != nil {
+				return nil, err
+			}
+			gadgetIns = o
+		} else {
+			opts = append(opts, req.Class)
+			params := map[string]string{}
+			opts = append(opts, params)
+			for _, option := range req.Options {
+				if option.Key == string(JavaClassGeneraterOption_ClassName) || option.Key == string(JavaClassGeneraterOption_IsObfuscation) || option.Key == string(JavaClassGeneraterOption_Version) {
+					continue
+				}
+				params[option.Key] = option.Value
+			}
+			o, err := yso.GenerateGadget(req.Gadget, opts...)
+			if err != nil {
+				return nil, err
+			}
+			gadgetIns = o
+		}
+
+		byts, err := yso.ToBytes(gadgetIns)
+		if err != nil {
+			return nil, err
+		}
+		return &ypb.YsoBytesResponse{Bytes: byts, FileName: fileName}, nil
+	}
+}
+func (s *Server) _GenerateYsoBytes(ctx context.Context, req *ypb.YsoOptionsRequerstWithVerbose) (*ypb.YsoBytesResponse, error) {
 	if req == nil {
 		return nil, utils.Error("request params is nil")
 	}
-	codeRsp, params, err := generateYsoCode(req)
+	codeRsp, err := generateYsoCode(req)
 	if err != nil {
 		return nil, utils.Errorf("GenerateYsoCode error: %v", err)
 	}
@@ -595,7 +468,7 @@ func (s *Server) GenerateYsoBytes(ctx context.Context, req *ypb.YsoOptionsRequer
 			className = option.Value
 		}
 	}
-	if checkGadgetIsTemplateSupported(req.Gadget) && className == "" {
+	if isTemplateSupported(req.Gadget) && className == "" {
 		return nil, utils.Error("not set className")
 	}
 	if req.Gadget == "None" {
@@ -606,9 +479,9 @@ func (s *Server) GenerateYsoBytes(ctx context.Context, req *ypb.YsoOptionsRequer
 		code = codeRsp + "\nout(gadgetBytes)"
 	}
 	engin := yaklang.New()
-	for k, v := range params {
-		engin.SetVar(k, v)
-	}
+	//for k, v := range params {
+	//	engin.SetVar(k, v)
+	//}
 	var bytes []byte
 	out := func(b []byte) {
 		bytes = b

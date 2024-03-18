@@ -12,8 +12,10 @@ import (
 
 type ParamConfig struct {
 	Name                           ClassParamType
+	NameZh                         string
 	Desc                           string
-	DefaultValue, TestDefaultValue any
+	DefaultValue, TestDefaultValue string
+	Type                           string
 }
 type ClassConfig struct {
 	FileName string
@@ -28,7 +30,7 @@ type GadgetConfig struct {
 	Template       []byte
 	ChainTemplate  map[string][]byte
 	Desc           string
-	Params         []*ParamConfig
+	ReferenceFun   string
 }
 
 type ReflectChainFunctionConfig struct {
@@ -39,7 +41,7 @@ type ReflectChainFunctionConfig struct {
 type YsoConfig struct {
 	Classes              map[ClassType]*ClassConfig
 	Gadgets              map[GadgetType]*GadgetConfig
-	ReflectChainFunction map[GadgetType]*ReflectChainFunctionConfig
+	ReflectChainFunction map[string]*ReflectChainFunctionConfig
 }
 
 var YsoConfigInstance *YsoConfig
@@ -55,7 +57,7 @@ func getConfig() (*YsoConfig, error) {
 	config := &YsoConfig{
 		Classes:              map[ClassType]*ClassConfig{},
 		Gadgets:              map[GadgetType]*GadgetConfig{},
-		ReflectChainFunction: map[GadgetType]*ReflectChainFunctionConfig{},
+		ReflectChainFunction: map[string]*ReflectChainFunctionConfig{},
 	}
 	content, err := resources.YsoResourceFS.ReadFile("config.yaml")
 	if err != nil {
@@ -75,13 +77,27 @@ func getConfig() (*YsoConfig, error) {
 			}), getListOrEmptyTask(currentKey, value, "params", func(currentKey []string, args []any) error {
 				for _, arg := range args {
 					p := &ParamConfig{}
-					err := runWorkFlow(getStringOrEmptyTask(currentKey, arg, "name", func(currentKey []string, v string) error {
+					err := runWorkFlow(getStringTask(currentKey, arg, "name", func(currentKey []string, v string) error {
 						p.Name = ClassParamType(v)
 						return nil
-					}), getStringTask(currentKey, arg, "desc", func(currentKey []string, v string) error {
+					}), getStringTask(currentKey, arg, "name_zh", func(currentKey []string, v string) error {
+						p.NameZh = v
+						return nil
+					}), getStringOrEmptyTask(currentKey, arg, "desc", func(currentKey []string, v string) error {
 						p.Desc = v
 						return nil
-					}))
+					}), getStringOrEmptyTask(currentKey, arg, "type", func(currentKey []string, v string) error {
+						p.Type = v
+						return nil
+					}), getStringOrEmptyTask(currentKey, arg, "default", func(currentKey []string, v string) error {
+						p.DefaultValue = v
+						return nil
+					}),
+						getStringOrEmptyTask(currentKey, arg, "test-default", func(currentKey []string, v string) error {
+							p.TestDefaultValue = v
+							return nil
+						}),
+					)
 					if err != nil {
 						return err
 					}
@@ -93,7 +109,7 @@ func getConfig() (*YsoConfig, error) {
 			if err != nil {
 				return err
 			}
-			config.ReflectChainFunction[GadgetType(reflectFunc.Name)] = reflectFunc
+			config.ReflectChainFunction[reflectFunc.Name] = reflectFunc
 		}
 		return nil
 	})
@@ -110,10 +126,6 @@ func getConfig() (*YsoConfig, error) {
 			config.Classes[ClassType(name)] = cfg
 			currentKey := append(currentKey, name)
 			err = runWorkFlow(
-				getStringOrEmptyTask(currentKey, attr, "name", func(currentKey []string, v string) error {
-					cfg.Name = v
-					return nil
-				}),
 				getStringOrEmptyTask(currentKey, attr, "desc", func(currentKey []string, v string) error {
 					cfg.Desc = v
 					return nil
@@ -130,6 +142,10 @@ func getConfig() (*YsoConfig, error) {
 								paramConfig.Name = ClassParamType(v)
 								return nil
 							}),
+							getStringTask(currentKey, param, "name_zh", func(currentKey []string, v string) error {
+								paramConfig.NameZh = v
+								return nil
+							}),
 							getStringOrEmptyTask(currentKey, param, "desc", func(currentKey []string, v string) error {
 								paramConfig.Desc = v
 								return nil
@@ -140,6 +156,10 @@ func getConfig() (*YsoConfig, error) {
 							}),
 							getStringOrEmptyTask(currentKey, param, "test-default", func(currentKey []string, v string) error {
 								paramConfig.TestDefaultValue = v
+								return nil
+							}),
+							getStringOrEmptyTask(currentKey, param, "type", func(currentKey []string, v string) error {
+								paramConfig.Type = v
 								return nil
 							}),
 						)
@@ -165,10 +185,6 @@ func getConfig() (*YsoConfig, error) {
 			}
 			currentKey := append(currentKey, name)
 			err = runWorkFlow(
-				getStringOrEmptyTask(currentKey, attr, "name", func(currentKey []string, v string) error {
-					gadgetConfig.Name = v
-					return nil
-				}),
 				getStringOrEmptyTask(currentKey, attr, "desc", func(currentKey []string, v string) error {
 					if v == "<nil>" {
 						println()
@@ -213,34 +229,15 @@ func getConfig() (*YsoConfig, error) {
 						return utils.Errorf("read gadget %s template failed: %v", fileName, err)
 					}
 					gadgetConfig.Template = templateBytes
-					err = getListOrEmptyTask(currentKey, attr, "params", func(currentKey []string, params []any) error {
-						for _, param := range params {
-							p := &ParamConfig{}
-							err := runWorkFlow(
-								getStringTask(currentKey, param, "name", func(currentKey []string, v string) error {
-									p.Name = ClassParamType(v)
-									return nil
-								}),
-								getStringOrEmptyTask(currentKey, param, "desc", func(currentKey []string, v string) error {
-									p.Desc = v
-									return nil
-								}),
-								getStringOrEmptyTask(currentKey, param, "default", func(currentKey []string, v string) error {
-									p.DefaultValue = v
-									return nil
-								}),
-								getStringOrEmptyTask(currentKey, param, "test-default", func(currentKey []string, v string) error {
-									p.TestDefaultValue = v
-									return nil
-								}),
-							)
-							if err != nil {
-								return err
-							}
-							gadgetConfig.Params = append(gadgetConfig.Params, p)
-						}
-						return nil
-					})()
+					err = runWorkFlow(
+						getStringOrEmptyTask(currentKey, attr, "ref-fun", func(currentKey []string, v string) error {
+							gadgetConfig.ReferenceFun = v
+							return nil
+						}),
+					)
+					if err != nil {
+						return err
+					}
 					if err != nil {
 						return err
 					}

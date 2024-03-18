@@ -32,12 +32,15 @@ func GenerateClass(options ...GenClassOptionFun) (*javaclassparser.ClassObject, 
 		if err != nil {
 			return nil, utils.Errorf("parse template class %s failed: %s", name, err)
 		}
+		if config.MajorVersion > 0 {
+			obj.MajorVersion = config.MajorVersion
+		}
 		builder := javaclassparser.NewClassObjectBuilder(obj)
 		for _, param := range classTmplCfg.Params {
 			val, ok := config.GetParam(param.Name)
 			if !ok {
-				if param.DefaultValue != nil {
-					log.Warnf("param %s not found in template class `%s`, use default value: %v", param.Name, name, param.DefaultValue)
+				if param.DefaultValue != "" {
+					//log.Warnf("param %s not found in template class `%s`, use default value: %v", param.Name, name, param.DefaultValue)
 					val = utils.InterfaceToString(param.DefaultValue)
 				} else {
 					return nil, utils.Errorf("required param %s for class %s", param.Name, name)
