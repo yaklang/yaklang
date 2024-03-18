@@ -30,14 +30,10 @@ type sender interface {
 	Context() context.Context
 }
 
-func (s *Server) execScriptWithExecParam(scriptName string, input string, stream sender, params []*ypb.KVPair) error {
-	scriptInstance, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), scriptName)
-	if err != nil {
-		return err
-	}
+func (s *Server) execScriptWithExecParam(script *yakit.YakScript, input string, stream sender, params []*ypb.KVPair) error {
 	var (
-		debugType = scriptInstance.Type
-		isTemp    = scriptInstance.Ignored && strings.HasPrefix(scriptInstance.ScriptName, "tmp-")
+		scriptName = script.ScriptName
+		scriptType = script.Type
 	)
 	runtimeId := uuid.New().String()
 	stream.Send(&ypb.ExecResult{IsMessage: false, RuntimeID: runtimeId}) // 触发前端切换结果页面
@@ -45,14 +41,6 @@ func (s *Server) execScriptWithExecParam(scriptName string, input string, stream
 		if err := recover(); err != nil {
 			log.Warn(err)
 			utils.PrintCurrentGoroutineRuntimeStack()
-		}
-
-		if isTemp {
-			log.Infof("start to remove temp plugin: %v", scriptName)
-			err = yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), scriptName)
-			if err != nil {
-				log.Errorf("remove temp plugin failed: %v", err)
-			}
 		}
 	}()
 	feedbackClient := yaklib.NewVirtualYakitClient(func(result *ypb.ExecResult) error {
@@ -65,8 +53,8 @@ func (s *Server) execScriptWithExecParam(scriptName string, input string, stream
 		engine.SetVar("RUNTIME_ID", runtimeId)
 		app := cli.DefaultCliApp
 		// 额外处理 cli，新建 cli app
-		if strings.ToLower(debugType) == "yak" {
-			tempArgs := makeArgs(stream.Context(), params, scriptInstance.Content)
+		if strings.ToLower(scriptType) == "yak" {
+			tempArgs := makeArgs(stream.Context(), params, script.Content)
 			app = yak.HookCliArgs(engine, tempArgs)
 		}
 		yak.BindYakitPluginContextToEngine(engine, yak.CreateYakitPluginContext(runtimeId).WithPluginName(scriptName).WithContext(stream.Context()).WithCliApp(app))
@@ -82,10 +70,10 @@ func (s *Server) execScriptWithExecParam(scriptName string, input string, stream
 		execResult.RuntimeID = runtimeId
 		stream.Send(execResult)
 	}
-	switch strings.ToLower(debugType) {
+	switch strings.ToLower(scriptType) {
 	case "codec":
 		tabName := "Codec结果"
-		subEngine, err := engine.ExecuteExWithContext(stream.Context(), scriptInstance.Content, map[string]any{
+		subEngine, err := engine.ExecuteExWithContext(stream.Context(), script.Content, map[string]any{
 			"CTX":         stream.Context(),
 			"PLUGIN_NAME": scriptName,
 		})
@@ -105,7 +93,6 @@ func (s *Server) execScriptWithExecParam(scriptName string, input string, stream
 				"at_head":  true,
 			},
 		})
-
 		if err != nil {
 			return err
 		}
@@ -122,7 +109,7 @@ func (s *Server) execScriptWithExecParam(scriptName string, input string, stream
 		})
 		return nil
 	case "yak":
-		_, err := engine.ExecuteExWithContext(stream.Context(), scriptInstance.Content, map[string]any{
+		_, err := engine.ExecuteExWithContext(stream.Context(), script.Content, map[string]any{
 			"RUNTIME_ID":  runtimeId,
 			"CTX":         stream.Context(),
 			"PLUGIN_NAME": scriptName,
@@ -133,13 +120,19 @@ func (s *Server) execScriptWithExecParam(scriptName string, input string, stream
 		}
 		return nil
 	default:
-		return utils.Error("unsupported plugin type: " + debugType)
+		return utils.Error("unsupported plugin type: " + scriptType)
 	}
 }
 
-func (s *Server) execScriptWithRequest(scriptName string, targetInput string, stream sender, execParams []*ypb.KVPair, params ...*ypb.HTTPRequestBuilderParams) error {
+func (s *Server) execScriptWithRequest(scriptInstance *yakit.YakScript, targetInput string, stream sender, execParams []*ypb.KVPair, params ...*ypb.HTTPRequestBuilderParams) error {
+	var (
+		scriptName = scriptInstance.ScriptName
+		scriptCode = scriptInstance.Content
+		scriptType = scriptInstance.Type
+		isTemp     = scriptInstance.Ignored && strings.HasPrefix(scriptInstance.ScriptName, "tmp-")
+	)
 	if scriptName == "" {
-		return utils.Error("code N scriptName is empty")
+		return utils.Error("script name is empty")
 	}
 
 	runtimeId := uuid.New().String()
@@ -160,22 +153,14 @@ func (s *Server) execScriptWithRequest(scriptName string, targetInput string, st
 		return utils.Error("target is empty")
 	}
 
-	scriptInstance, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), scriptName)
-	if err != nil {
-		return err
-	}
-	var (
-		debugType = scriptInstance.Type
-		isTemp    = scriptInstance.Ignored && strings.HasPrefix(scriptInstance.ScriptName, "tmp-")
-	)
 	isUrlParam := false
-	switch strings.ToLower(debugType) {
+	switch strings.ToLower(scriptType) {
 	case "mitm", "port-scan":
 	case "nuclei":
 		isUrlParam = true
 		break
 	default:
-		return utils.Error("unsupported plugin type: " + debugType)
+		return utils.Error("unsupported plugin type: " + scriptType)
 	}
 
 	var reqs []any
@@ -191,69 +176,6 @@ func (s *Server) execScriptWithRequest(scriptName string, targetInput string, st
 			"IsHttps":        packet.IsHttps,
 		})
 	}
-
-	//var targets []*url.URL // build request targets
-	//for _, target := range utils.PrettifyListFromStringSplitEx(targetInput, "\n", "|", ",") {
-	//	target = strings.TrimSpace(target)
-	//	if target == "" {
-	//		continue
-	//	}
-	//	if utils.IsValidHost(target) { // 处理没有单独一个host情况 不含port
-	//		targets = append(targets, &url.URL{Host: target, Path: "/"})
-	//	}
-	//	urlIns := utils.ParseStringToUrl(target)
-	//	if urlIns.Host == "" {
-	//		continue
-	//	}
-	//
-	//	host, port, _ := utils.ParseStringToHostPort(urlIns.Host) // 处理包含 port 的情况
-	//	if !utils.IsValidHost(host) {                             // host不合规情况 比如 a:80
-	//		continue
-	//	}
-	//
-	//	if port > 0 && urlIns.Scheme == "" { // fix https
-	//		if port == 443 {
-	//			urlIns.Scheme = "https"
-	//		}
-	//	}
-	//	if urlIns.Path == "" {
-	//		urlIns.Path = "/"
-	//	}
-	//
-	//	targets = append(targets, urlIns)
-	//
-	//}
-	//
-	//if len(targets) != 0 { // 调试目标分支
-	//
-	//	// var results = builderResponse.GetResults()
-	//	baseTemplates := []byte("GET {{Path}} HTTP/1.1\r\nHost: {{Hostname}}\r\n\r\n")
-	//
-	//	for _, target := range targets {
-	//		builderParams := mergeBuildParams(baseBuilderParams, target)
-	//		if builderParams == nil {
-	//			continue
-	//		}
-	//		builderResponse, err := s.HTTPRequestBuilder(builderParams)
-	//		if err != nil {
-	//			log.Errorf("failed to build http request: %v", err)
-	//		}
-	//		results := builderResponse.GetResults()
-	//		if len(results) <= 0 {
-	//			packet := bytes.ReplaceAll(baseTemplates, []byte(`{{Hostname}}`), []byte(target.Host))
-	//			packet = bytes.ReplaceAll(packet, []byte(`{{Path}}`), []byte(target.Path))
-	//			feed(lowhttp.AppendAllHTTPPacketQueryParam(packet, target.Query()), target.Scheme == "https")
-	//		} else {
-	//			for _, result := range results {
-	//				packet := bytes.ReplaceAll(result.HTTPRequest, []byte(`{{Hostname}}`), []byte(target.Host))
-	//				feed(packet, result.IsHttps)
-	//			}
-	//		}
-	//	}
-	//
-	//} else if baseBuilderParams.GetIsRawHTTPRequest() { // 原始请求分支
-	//	feed(baseBuilderParams.RawHTTPRequest, baseBuilderParams.IsHttps)
-	//}
 
 	if len(reqs) <= 0 {
 		return utils.Error("build http request failed: no results")
@@ -275,12 +197,12 @@ func (s *Server) execScriptWithRequest(scriptName string, targetInput string, st
 	}()
 
 	// 不同的插件类型，需要不同的处理
-	switch strings.ToLower(debugType) {
+	switch strings.ToLower(scriptType) {
 	case "mitm":
 	case "nuclei":
 	case "port-scan":
 	default:
-		return utils.Error("unsupported plugin type: " + debugType)
+		return utils.Error("unsupported plugin type: " + scriptType)
 	}
 
 	// smoking
@@ -307,12 +229,14 @@ func (s *Server) execScriptWithRequest(scriptName string, targetInput string, st
 		yak.BindYakitPluginContextToEngine(engine, yak.CreateYakitPluginContext(runtimeId).WithPluginName(scriptName).WithContext(stream.Context()))
 		return nil
 	})
-	subEngine, err := engine.ExecuteExWithContext(stream.Context(), debugScript, map[string]any{
+	subEngine, err := engine.ExecuteExWithContext(stream.Context(), debugScriptCode, map[string]any{
 		"REQUESTS":     reqs,
 		"CTX":          stream.Context(),
+		"PLUGIN":       scriptInstance,
+		"PLUGIN_CODE":  scriptCode,
 		"PLUGIN_NAME":  scriptName,
 		"IS_URL_PARAM": isUrlParam,
-		"PLUGIN_TYPE":  strings.ToLower(debugType),
+		"PLUGIN_TYPE":  strings.ToLower(scriptType),
 		"IS_SMOKING":   isSmoking,
 		"RUNTIME_ID":   runtimeId,
 	})
@@ -333,11 +257,11 @@ func (s *Server) debugScript(
 	execParams []*ypb.KVPair,
 	params ...*ypb.HTTPRequestBuilderParams,
 ) error {
-	tempName, err := yakit.CreateTemporaryYakScript(debugType, debugCode)
+	script, err := yakit.NewTemporaryYakScript(debugType, debugCode)
 	if err != nil {
 		return err
 	}
-	return s.execScript(input, debugType, tempName, stream, execParams, params...)
+	return s.execScriptEx(input, script, stream, execParams, params...)
 }
 
 func (s *Server) execScript(
@@ -348,11 +272,26 @@ func (s *Server) execScript(
 	execParams []*ypb.KVPair, // 脚本执行的参数, only "yak"
 	params ...*ypb.HTTPRequestBuilderParams, // 用于构建请求, only used in "mitm", "nuclei", "port-scan"
 ) error {
+	script, err := yakit.GetYakScriptByName(consts.GetGormProfileDatabase(), name)
+	if err != nil {
+		return err
+	}
+	return s.execScriptEx(input, script, stream, execParams, params...)
+}
+
+func (s *Server) execScriptEx(
+	input string, // only "codec" / url: "mitm" "nuclei" "port-scan"
+	script *yakit.YakScript,
+	stream sender,
+	execParams []*ypb.KVPair, // 脚本执行的参数, only "yak"
+	params ...*ypb.HTTPRequestBuilderParams, // 用于构建请求, only used in "mitm", "nuclei", "port-scan"
+) error {
+	scriptType := script.Type
 	switch scriptType {
 	case "yak", "codec":
-		return s.execScriptWithExecParam(name, input, stream, execParams)
+		return s.execScriptWithExecParam(script, input, stream, execParams)
 	case "mitm", "nuclei", "port-scan":
-		return s.execScriptWithRequest(name, input, stream, execParams, params...)
+		return s.execScriptWithRequest(script, input, stream, execParams, params...)
 	}
 	return utils.Error("unsupported plugin type: " + scriptType)
 }

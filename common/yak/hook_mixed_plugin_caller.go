@@ -350,86 +350,90 @@ func (m *MixPluginCaller) LoadPlugin(scriptName string, params ...*ypb.ExecParam
 
 // LoadPluginByName 基于脚本名加载插件，如果没有指定代码，则从数据库中加载，如果指定了代码，则默认视为mitm插件执行
 func (m *MixPluginCaller) LoadPluginByName(ctx context.Context, name string, params []*ypb.ExecParamItem, codes ...string) error {
-	// loadTemplateLock.Lock()
-	// defer loadTemplateLock.Unlock()
-	ctx = context.WithValue(ctx, "ctx_info", map[string]interface{}{})
-	m.FeedbackOrdinary(fmt.Sprintf("Initializing MITM Plugin: %v", name))
-	var code string
+	var (
+		ins  *yakit.YakScript
+		err  error
+		code string
+	)
+
 	if len(codes) > 0 {
 		code = codes[0]
 	}
-
-	var forNuclei bool
-	var forPortScan bool
-	var forMitm bool
-	var forNasl bool
-
 	if code == "" {
 		db := consts.GetGormProfileDatabase()
 		// 从数据库加载脚本时，通过脚本名前缀判断脚本类型
-		if strings.HasSuffix(strings.ToLower(name), ".nasl") {
-			forNasl = true
-			code = naslCodeExecTemplate
-			params = append(params, &ypb.ExecParamItem{
-				Key:   "NASL_SCRIPT_NAME",
-				Value: name,
-			})
-			//params = append(params, &ypb.ExecParamItem{
-			//	Key:   "NASL_PROXY",
-			//	Value: proxy,
-			//})
-			//script, err := yakit.QueryNaslScriptByName(db, name[len(NaslTypePrefix):])
-			//if err == nil && script != nil && script.Hash != "" {
-			//	forNasl = true
-			//	naslScript = script
-			//}
+		if db == nil {
+			return utils.Error("no database conn is set / no code set")
 		}
-		if !forNasl {
-			if db == nil {
-				return utils.Error("no database conn is set / no code set")
-			}
-			ins, err := yakit.GetYakScriptByName(db, name)
-			if err != nil {
-				return utils.Errorf("load plugin name (yakScript name: %v) failed: %s", name, err)
-			}
-
-			if ins.Type == "yak" || ins.Type == "codec" {
-				return utils.Errorf("cannot load yak script[%v] - %v: not supported", name, ins.Type)
-			}
-
-			if ins.ForceInteractive {
-				log.Infof("script[%v] is interactive, skip load", name)
-				return nil
-			}
-
-			code = ins.Content
-			if ins.Type == "port-scan" {
-				forPortScan = true
-			}
-
-			if ins.Type == "mitm" {
-				forMitm = true
-			}
-
-			if ins.Type == "nuclei" {
-				//var rawTemp templates.Template
-				//_ = json.Unmarshal([]byte(ins.Content), &rawTemp)
-				//if len(rawTemp.Workflow.Workflows) > 0 || len(rawTemp.Workflows) > 0 || rawTemp.CompiledWorkflow != nil {
-				//	return utils.Errorf("cannot load nuclei workflow[%v]: not supported", name)
-				//}
-				_, err := httptpl.CreateYakTemplateFromNucleiTemplateRaw(ins.Content)
-				if err != nil {
-					return err
-				}
-
-				forNuclei = true
-				params = append(params, &ypb.ExecParamItem{
-					Key:   "CURRENT_NUCLEI_PLUGIN_NAME",
-					Value: ins.ScriptName,
-				})
-				code = YAK_TEMPLATE_NUCLEI_EXECUTOR
-			}
+		ins, err = yakit.GetYakScriptByName(db, name)
+		if err != nil {
+			return utils.Errorf("load plugin name (yakScript name: %v) failed: %s", name, err)
 		}
+
+		if ins.Type == "yak" || ins.Type == "codec" {
+			return utils.Errorf("cannot load yak script[%v] - %v: not supported", name, ins.Type)
+		}
+
+		if ins.ForceInteractive {
+			log.Infof("script[%v] is interactive, skip load", name)
+			return nil
+		}
+		return m.LoadPluginEx(ctx, ins)
+	} else {
+		ins = &yakit.YakScript{
+			ScriptName: name,
+			Content:    code,
+		}
+	}
+
+	return m.LoadPluginEx(ctx, ins)
+}
+
+func (m *MixPluginCaller) LoadPluginEx(ctx context.Context, script *yakit.YakScript, params ...*ypb.ExecParamItem) error {
+	if m.ctx == nil {
+		m.ctx = context.Background()
+	}
+	var (
+		code        = script.Content
+		name        = script.ScriptName
+		forNuclei   bool
+		forPortScan bool
+		forMitm     bool
+		forNasl     bool
+	)
+
+	ctx = context.WithValue(ctx, "ctx_info", map[string]interface{}{})
+	m.FeedbackOrdinary(fmt.Sprintf("Initializing MITM Plugin: %v", name))
+
+	if strings.HasSuffix(strings.ToLower(name), ".nasl") {
+		forNasl = true
+		code = naslCodeExecTemplate
+		params = append(params, &ypb.ExecParamItem{
+			Key:   "NASL_SCRIPT_NAME",
+			Value: name,
+		})
+	}
+
+	if script.Type == "port-scan" {
+		forPortScan = true
+	}
+
+	if script.Type == "mitm" {
+		forMitm = true
+	}
+
+	if script.Type == "nuclei" {
+		_, err := httptpl.CreateYakTemplateFromNucleiTemplateRaw(script.Content)
+		if err != nil {
+			return err
+		}
+
+		forNuclei = true
+		params = append(params, &ypb.ExecParamItem{
+			Key:   "CURRENT_NUCLEI_PLUGIN_NAME",
+			Value: script.ScriptName,
+		})
+		code = YAK_TEMPLATE_NUCLEI_EXECUTOR
 	}
 
 	if forNuclei {
@@ -448,119 +452,6 @@ func (m *MixPluginCaller) LoadPluginByName(ctx context.Context, name string, par
 			return nil
 		}
 		return nil
-		//v, ok := m.callers.table.Load("LoadPluginByName")
-		//if ok {
-		//	fun := v.(func(args ...interface{}))
-		//	fun(name) // 加载脚本
-		//} else {
-		//	// 加载第一个nasl脚本时，初始化一个nasl脚本引擎用来记录加载的nasl脚本
-		//	engine := NewScriptEngine(100)
-		//
-		//	caller := YakitCallerIf(m.feedbackHandler)
-		//	var executedEngine *antlr4yak.Engine
-		//	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
-		//		executedEngine = engine
-		//		var paramMap = make(map[string]string)
-		//		for _, p := range params {
-		//			paramMap[p.Key] = p.Value
-		//		}
-		//
-		//		engine.SetVar("MITM_PARAMS", paramMap)
-		//		engine.SetVar("MITM_PLUGIN", name)
-		//		yaklib.SetEngineClient(engine, yaklib.NewVirtualYakitClient(func(i interface{}) error {
-		//			switch ret := i.(type) {
-		//			case *yaklib.YakitProgress:
-		//				raw, _ := yaklib.YakitMessageGenerator(ret)
-		//				if err := caller(&ypb.ExecResult{
-		//					Hash:       "",
-		//					OutputJson: "",
-		//					Raw:        nil,
-		//					IsMessage:  true,
-		//					Message:    raw,
-		//					Id:         0,
-		//					RuntimeID:  "",
-		//				}); err != nil {
-		//					return err
-		//				}
-		//			case *yaklib.YakitLog:
-		//				raw, _ := yaklib.YakitMessageGenerator(ret)
-		//				if raw != nil {
-		//					if err := caller(&ypb.ExecResult{
-		//						IsMessage: true,
-		//						Message:   raw,
-		//					}); err != nil {
-		//						return err
-		//					}
-		//				}
-		//
-		//			}
-		//			return nil
-		//		}))
-		//		return nil
-		//	})
-		//	ins, err := engine.ExecuteExWithContext(ctx, code, map[string]interface{}{
-		//		"ROOT_CONTEXT": ctx,
-		//	})
-		//	if err != nil {
-		//		log.Errorf("init execute plugin finished: %s", err)
-		//		return utils.Errorf("load plugin failed: %s", err)
-		//	}
-		//	// NaslScript加载函数
-		//	raw, ok := ins.GetVar(HOOK_NaslScanHandle)
-		//	if !ok {
-		//		return utils.Error("no HOOK_NaslScanHandle found")
-		//	}
-		//	NaslScanHandleFunc, tOk := raw.(*yakvm.Function)
-		//	if !tOk {
-		//		return utils.Error("no HOOK_NaslScanHandle found")
-		//	}
-		//	m.callers.table.Store(HOOK_NaslScanHandle, []*Caller{&Caller{
-		//		Core: &YakFunctionCaller{
-		//			Handler: func(args ...interface{}) {
-		//				defer func() {
-		//					if err := recover(); err != nil {
-		//						log.Errorf("call [%v] yakvm native function failed: %s", HOOK_NaslScanHandle, err)
-		//						fmt.Println()
-		//						utils.PrintCurrentGoroutineRuntimeStack()
-		//					}
-		//				}()
-		//
-		//				_, err = ins.CallYakFunctionNative(ctx, NaslScanHandleFunc, args...)
-		//				if err != nil {
-		//					log.Errorf("call YakFunction (DividedCTX) error: \n%v", err)
-		//				}
-		//			},
-		//		},
-		//		Hash:    utils.CalcSha1(code, HOOK_NaslScanHandle, name),
-		//		Id:      name,
-		//		Engine:  executedEngine,
-		//		Verbose: name,
-		//	}})
-		//	// NaslScript加载函数
-		//	LoadNaslScriptByName, ok := ins.GetVar(HOOK_LoadNaslScriptByNameFunc)
-		//	if !ok {
-		//		return utils.Error("no HOOK_NaslScanHandle found")
-		//	}
-		//	LoadNaslScriptByNameFunc, tOk := LoadNaslScriptByName.(*yakvm.Function)
-		//	if !tOk {
-		//		return utils.Error("no HOOK_NaslScanHandle found")
-		//	}
-		//	m.callers.table.Store(HOOK_LoadNaslScriptByNameFunc, func(args ...interface{}) {
-		//		defer func() {
-		//			if err := recover(); err != nil {
-		//				log.Errorf("call [%v] yakvm native function failed: %s", HOOK_LoadNaslScriptByNameFunc, err)
-		//				fmt.Println()
-		//				utils.PrintCurrentGoroutineRuntimeStack()
-		//			}
-		//		}()
-		//
-		//		_, err = ins.CallYakFunctionNative(ctx, LoadNaslScriptByNameFunc, args...)
-		//		if err != nil {
-		//			log.Errorf("call YakFunction (DividedCTX) error: \n%v", err)
-		//		}
-		//	})
-		//}
-		//return nil
 	}
 	var hooks []string
 	switch true {
@@ -748,7 +639,8 @@ func (m *MixPluginCaller) MirrorHTTPFlow(
 func (m *MixPluginCaller) MirrorHTTPFlowExSync(
 	scanPort bool,
 	isHttps bool, u string, req, rsp, body []byte,
-	filters ...bool) {
+	filters ...bool,
+) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("panic from mirror httpflow ex: %s", err)

@@ -1,5 +1,9 @@
-pluginName = "被动指纹检测"
+
 ctx = context.Background()
+
+pluginName = "被动指纹检测"
+plugin = nil
+pluginCode = ""
 reqs = [{"RawHTTPRequest": b`GET / HTTP/1.1
 Host: www.example.com
 `, "IsHttps": true}]
@@ -11,7 +15,9 @@ runtimeId = ""
 if getParams("REQUESTS") != undefined {
     reqs = getParams("REQUESTS")
     ctx = getParams("CTX")
+    plugin = getParams("PLUGIN")
     pluginName = getParams("PLUGIN_NAME")
+    pluginCode = getParams("PLUGIN_CODE")
     isUrlParam = getParams("IS_URL_PARAM")
     pluginType = getParams("PLUGIN_TYPE")
     isSmoking = getParams("IS_SMOKING")
@@ -28,7 +34,7 @@ yakit.Info("RuntimeID: %v", RUNTIME_ID)
 caller, err := hook.NewMixPluginCaller()
 if err != nil { die(err) }
 caller.SetRuntimeId(runtimeId)
-err = caller.LoadPluginByName(ctx,pluginName,[])
+err = caller.LoadPluginEx(ctx, plugin)
 if err != nil { die(err) }
 caller.SetCache(false)
 caller.SetConcurrent(len(reqs))
