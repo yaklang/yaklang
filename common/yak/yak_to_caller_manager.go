@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -167,7 +168,9 @@ func FetchFunctionFromSourceCode(ctx context.Context, pluginContext *YakitPlugin
 					if err := recover(); err != nil {
 						log.Errorf("call hook function `%v` of `%v` plugin failed: %s", funcName, id, err)
 						fmt.Println()
-						utils.PrintCurrentGoroutineRuntimeStack()
+						if os.Getenv("YAK_IN_TERMINAL_MODE") == "" {
+							utils.PrintCurrentGoroutineRuntimeStack()
+						}
 					}
 				}()
 

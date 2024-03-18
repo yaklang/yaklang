@@ -45,3 +45,22 @@ func TestDuplexConnection(t *testing.T) {
 	}
 	cancel()
 }
+
+func TestWatchTable(t *testing.T) {
+	db := consts.GetGormProjectDatabase()
+	yakit.SaveFromHTTPFromRaw(db, false, []byte(`GET / HTTP/1.1
+Host: www.example.com
+
+`), []byte(`HTTP/1.1 200 OK
+Content-Length: 1
+
+a`), "mitm", "http://example.com", "127.0.0.1")
+	a, changed := WatchDatabaseTableMeta(db, 0, context.Background(), "http_flows")
+	if !changed {
+		t.Fatalf("watch database table failed: %v", a)
+	}
+	if a <= 0 {
+		t.Fatalf("watch database table failed: %v", a)
+	}
+	spew.Dump(a)
+}
