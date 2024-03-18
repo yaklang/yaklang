@@ -301,32 +301,31 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 	case *phpparser.BitwiseExpressionContext:
 		switch ret.GetOp().GetText() {
 		case "&&":
-			ifStmt := y.ir.CreateIfBuilder()
-			var v1, v2 ssa.Value
-			var result ssa.Value
-			ifStmt.SetCondition(func() ssa.Value {
-				v1 = y.VisitExpression(ret.Expression(0))
-				return v1
+			var id string
+			v1 := y.VisitExpression(ret.Expression(0))
+			y.ir.AssignVariable(y.ir.CreateVariable(id), y.ir.EmitConstInstAny())
+			y.ir.CreateIfBuilder().SetCondition(func() ssa.Value {
+				return y.ir.EmitBinOp(ssa.OpEq, v1, y.ir.EmitConstInst(true))
 			}, func() {
-				result = y.ir.EmitBinOp(ssa.OpEq, v1, y.ir.EmitConstInst(true))
+				v2 := y.VisitExpression(ret.Expression(1))
+				y.ir.AssignVariable(y.ir.CreateVariable(id), y.ir.EmitBinOp(ssa.OpEq, v2, y.ir.EmitConstInst(true)))
 			}).SetElse(func() {
-				v2 = y.VisitExpression(ret.Expression(1))
-				result = y.ir.EmitBinOp(ssa.OpEq, v2, y.ir.EmitConstInst(true))
+				y.ir.AssignVariable(y.ir.CreateVariable(id), y.ir.EmitConstInst(false))
 			}).Build()
-			return result
+			return y.ir.ReadValue(id)
 		case "||":
-			var v1, v2 ssa.Value
-			var result ssa.Value
-			y.ir.CreateIfBuilder().AppendItem(func() ssa.Value {
-				v1 = y.VisitExpression(ret.Expression(0))
-				return v1
+			var id string
+			v1 := y.VisitExpression(ret.Expression(0))
+			y.ir.AssignVariable(y.ir.CreateVariable(id), y.ir.EmitConstInstAny())
+			y.ir.CreateIfBuilder().SetCondition(func() ssa.Value {
+				return y.ir.EmitBinOp(ssa.OpEq, v1, y.ir.EmitConstInst(true))
 			}, func() {
-				result = y.ir.EmitConstInst(true)
+				y.ir.AssignVariable(y.ir.CreateVariable(id), y.ir.EmitConstInst(true))
 			}).SetElse(func() {
-				v2 = y.VisitExpression(ret.Expression(1))
-				result = y.ir.EmitBinOp(ssa.OpEq, v2, y.ir.EmitConstInst(true))
+				v2 := y.VisitExpression(ret.Expression(1))
+				y.ir.AssignVariable(y.ir.CreateVariable(id), y.ir.EmitBinOp(ssa.OpEq, v2, y.ir.EmitConstInst(true)))
 			}).Build()
-			return result
+			return y.ir.ReadValue(id)
 		case "|":
 			return y.ir.EmitBinOp(ssa.OpOr, y.VisitExpression(ret.Expression(0)), y.VisitExpression(ret.Expression(1)))
 		case "^":
@@ -416,29 +415,40 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		y.ir.AssignVariable(variable, rightValue)
 		return rightValue
 	case *phpparser.LogicalExpressionContext:
+		var id = uuid.NewString()
+		y.ir.AssignVariable(y.ir.CreateVariable(id), y.ir.EmitConstInstAny())
 		if ret.LogicalXor() != nil {
 			v1 := y.VisitExpression(ret.Expression(0))
 			v2 := y.VisitExpression(ret.Expression(1))
-			return y.ir.EmitBinOp(ssa.OpEq, v1, v2)
+			y.ir.CreateIfBuilder().SetCondition(func() ssa.Value {
+				return y.ir.EmitBinOp(ssa.OpEq, v1, v2)
+			}, func() {
+				y.ir.AssignVariable(y.ir.CreateVariable(id), y.ir.EmitConstInst(true))
+			}).SetElse(func() {
+				y.ir.AssignVariable(y.ir.CreateVariable(id), y.ir.EmitConstInst(false))
+			}).Build()
 		}
-		var flag bool
+		if ret.LogicalOr() != nil {
+			value := y.VisitExpression(ret.Expression(0))
+			y.ir.CreateIfBuilder().SetCondition(func() ssa.Value {
+				return y.ir.EmitBinOp(ssa.OpEq, value, y.ir.EmitConstInst(true))
+			}, func() {
+				y.ir.AssignVariable(y.ir.CreateVariable(id), y.ir.EmitConstInst(true))
+			}).SetElse(func() {
+				y.ir.AssignVariable(y.ir.CreateVariable(id), y.ir.EmitBinOp(ssa.OpEq, y.VisitExpression(ret.Expression(1)), y.ir.EmitConstInst(true)))
+			}).Build()
+		}
 		if ret.LogicalAnd() != nil {
-			flag = true
-		} else {
-			flag = false
+			value := y.VisitExpression(ret.Expression(0))
+			y.ir.CreateIfBuilder().SetCondition(func() ssa.Value {
+				return y.ir.EmitBinOp(ssa.OpEq, value, y.ir.EmitConstInst(true))
+			}, func() {
+				y.ir.AssignVariable(y.ir.CreateVariable(id), y.ir.EmitBinOp(ssa.OpEq, y.VisitExpression(ret.Expression(1)), y.ir.EmitConstInst(true)))
+			}).SetElse(func() {
+				y.ir.AssignVariable(y.ir.CreateVariable(id), y.ir.EmitConstInst(false))
+			}).Build()
 		}
-		id := uuid.NewString()
-		expression := y.VisitExpression(ret.Expression(0))
-		y.ir.AssignVariable(y.ir.CreateVariable(id), expression)
-		y.ir.CreateIfBuilder().SetCondition(func() ssa.Value {
-			return y.ir.EmitBinOp(ssa.OpEq, expression, y.ir.EmitConstInst(flag))
-		}, func() {
-			value := y.VisitExpression(ret.Expression(1))
-			variable := y.ir.CreateVariable(id)
-			y.ir.AssignVariable(variable, value)
-		}).Build()
-		b := y.ir.ReadValue(id)
-		return b
+		return y.ir.ReadValue(id)
 	case *phpparser.ShortQualifiedNameExpressionContext:
 		return y.ir.ReadOrCreateVariable(y.VisitIdentifier(ret.Identifier()))
 	}

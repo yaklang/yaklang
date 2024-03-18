@@ -7,6 +7,22 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 )
 
+func TestExpression_BitwiseExpression(t *testing.T) {
+	t.Run("&&", func(t *testing.T) {
+		code := `<?php
+$b =($a=1) && ($a=0);
+println($b);
+println($a);`
+		ssatest.CheckPrintlnValue(code, []string{"phi($b)[eq(0, true),false]", "phi($a)[0,1]"}, t)
+	})
+	t.Run("||", func(t *testing.T) {
+		code := `<?php
+$b =($a=0) || ($a=1);
+println($b);
+println($a);`
+		ssatest.CheckPrintlnValue(code, []string{"phi($b)[true,eq(1, true)]", "phi($a)[0,1]"}, t)
+	})
+}
 func TestExpression_NullCoalescingExpression(t *testing.T) {
 	code := `<?php
 $a = $a??12312;
@@ -204,14 +220,13 @@ println($b);
 `
 		ssatest.CheckPrintlnValue(code, []string{"2"}, t)
 	})
-	t.Run("and-1", func(t *testing.T) {
+	t.Run("and-2", func(t *testing.T) {
 		code := `<?php
-$b =($a=1) and ($a=3);
-$d = $a;
+$b =(($a=1) and ($a=3));
+println($a);
 println($b);
-println($d);
 `
-		ssatest.CheckPrintlnValue(code, []string{"1", "phi($d)[3,1]"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"phi($a)[3,1]", "phi($b)[eq(3, true),false]"}, t)
 	})
 	t.Run("or-1", func(t *testing.T) {
 		code := `<?php
@@ -221,12 +236,10 @@ println($b);`
 	})
 	t.Run("or-2", func(t *testing.T) {
 		code := `<?php
-$a = 1;
-$b = ($a=2) and ($a=3);
-$d = $a;
+$b = (($a=2) or ($a=3));
 println($b);
 println($a);`
-		ssatest.CheckPrintlnValue(code, []string{"2", "phi($d)[3,2]"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"phi($b)[true,eq(3, true)]", "phi($a)[2,3]"}, t)
 	})
 	t.Run("xor-1", func(t *testing.T) {
 		code := `<?php
@@ -236,11 +249,10 @@ println($a);`
 	})
 	t.Run("xor-2", func(t *testing.T) {
 		code := `<?php
-$a=1;
-$b = ($a=1) xor ($a=3);
+$b = (($a=1) xor ($a=3));
 println($a);
 println($b);`
-		ssatest.CheckPrintlnValue(code, []string{"3", "1"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"3", "phi($b)[true,false]"}, t)
 	})
 }
 func TestExpression_OrdinaryAssignmentExpression(t *testing.T) {
