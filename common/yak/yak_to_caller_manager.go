@@ -716,6 +716,9 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 				if runtimeId != "" {
 					opts = append(opts, httptpl.WithHttpTplRuntimeId(runtimeId))
 				}
+				if streamContext != nil {
+					opts = append(opts, httptpl.WithContext(streamContext))
+				}
 				opts = append(opts, httptpl.WithCustomVulnFilter(pluginContext.defaultFilter))
 				opts = append(opts, lowhttp.WithFromPlugin(pluginName))
 				opts = append(opts, lowhttp.WithSaveHTTPFlow(true))
@@ -732,6 +735,9 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 			return func(target any, opts ...any) {
 				if runtimeId != "" {
 					opts = append(opts, httptpl.WithHttpTplRuntimeId(runtimeId))
+				}
+				if streamContext != nil {
+					opts = append(opts, httptpl.WithContext(streamContext))
 				}
 				opts = append(opts, httptpl.WithCustomVulnFilter(pluginContext.defaultFilter))
 				opts = append(opts, lowhttp.WithFromPlugin(pluginName))
