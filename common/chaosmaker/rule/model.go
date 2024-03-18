@@ -449,6 +449,7 @@ func ExportRulesToFile(db *gorm.DB, fileName string) error {
 		delete(rawMap, "CreatedAt")
 		delete(rawMap, "DeletedAt")
 		delete(rawMap, "UpdatedAt")
+		raw, _ = json.Marshal(rawMap)
 		fp.Write(raw)
 		fp.Write([]byte("\n"))
 	}
