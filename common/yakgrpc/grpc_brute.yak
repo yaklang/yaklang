@@ -18,6 +18,8 @@ finishingThreshold = cli.Int("finishing-threshold", cli.setDefault(1))
 
 yakit.Info("检查爆破类型")
 bruteTypes = cli.String("types")
+cli.check()
+
 if bruteTypes == "" {
     yakit.Error("没有指定爆破类型")
     if !debug {
