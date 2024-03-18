@@ -19,11 +19,11 @@ import (
 )
 
 //go:embed grpc_http_request_builder_scripts.yak
-var debugScript string
+var debugScriptCode string
 
 func (s *Server) DebugPlugin(req *ypb.DebugPluginRequest, stream ypb.Yak_DebugPluginServer) error {
-	var input = req.GetInput()
-	var pluginType = req.GetPluginType()
+	input := req.GetInput()
+	pluginType := req.GetPluginType()
 	if pluginType != "yak" && input == "" && req.GetHTTPRequestTemplate() == nil {
 		return utils.Error("input / input packet is empty")
 	}
@@ -59,11 +59,11 @@ func (s *Server) HTTPRequestBuilder(ctx context.Context, req *ypb.HTTPRequestBui
 }
 
 func httpRequestBuilder(ctx context.Context, req *ypb.HTTPRequestBuilderParams) (*ypb.HTTPRequestBuilderResponse, error) {
-	var isHttps = req.GetIsHttps()
+	isHttps := req.GetIsHttps()
 	const tempTag = "[[__REPLACE_ME__]]"
 
 	if req.GetIsRawHTTPRequest() {
-		var reqStr = string(req.GetRawHTTPRequest())
+		reqStr := string(req.GetRawHTTPRequest())
 
 		freq, err := mutate.NewFuzzHTTPRequest(reqStr)
 		if err != nil {
@@ -155,7 +155,7 @@ Host: example.com
 		freq = freq.FuzzPostRaw(string(req.GetBody()))
 	}
 
-	var method = ""
+	method := ""
 	var body string
 	var results []*ypb.HTTPRequestBuilderResult
 	if res, _ := freq.Results(); len(res) > 0 {
@@ -199,7 +199,7 @@ Host: example.com
 		return nil, utils.Errorf("no path found")
 	}
 
-	var reqIns = map[string]any{
+	reqIns := map[string]any{
 		"method": method,
 		"path":   paths,
 	}
@@ -209,7 +209,7 @@ Host: example.com
 	if body != "" {
 		reqIns["body"] = body
 	}
-	var data = map[string]any{
+	data := map[string]any{
 		"requests": []any{reqIns},
 	}
 	var buf bytes.Buffer

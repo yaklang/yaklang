@@ -434,7 +434,7 @@ func (s *Server) ExecYakScript(req *ypb.ExecRequest, stream ypb.Yak_ExecYakScrip
 				target = paramItem.Value
 			}
 		}
-		return s.execScriptWithRequest(script.ScriptName, target, stream, nil)
+		return s.execScriptWithRequest(script, target, stream, nil)
 	case "port-scan":
 		params, code, err := s.generatePortScanParams(script.ScriptName, req.GetParams())
 		if err != nil {

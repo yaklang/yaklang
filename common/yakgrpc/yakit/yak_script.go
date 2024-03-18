@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"gopkg.in/yaml.v2"
 	"strconv"
 	"strings"
 	"sync"
+
+	"gopkg.in/yaml.v2"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/gorm"
@@ -298,28 +299,37 @@ func CreateOrUpdateYakScriptByName(db *gorm.DB, scriptName string, i interface{}
 }
 
 func CreateTemporaryYakScript(t string, code string, suffix ...string) (string, error) {
+	script, err := NewTemporaryYakScript(t, code, suffix...)
+	if err != nil {
+		return "", err
+	}
+	name := script.ScriptName
+	err = CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), name, script)
+	if err != nil {
+		return "", err
+	}
+	return name, nil
+}
+
+func NewTemporaryYakScript(t string, code string, suffix ...string) (*YakScript, error) {
 	name := fmt.Sprintf("tmp-%v", ksuid.New().String())
 	if strings.TrimSpace(strings.ToLower(t)) == "nuclei" {
 		// nuclei
 		tempInfo := make(map[string]any)
 		err := yaml.Unmarshal([]byte(code), &tempInfo)
 		if err != nil {
-			return "", utils.Errorf("plugin code: %s is not yaml: %v", string(code), err)
+			return nil, utils.Errorf("plugin code: %s is not yaml: %v", string(code), err)
 		}
 		nameInfo := utils.MapGetString(tempInfo, "id")
 		name = "[TMP]-" + nameInfo + "-" + ksuid.New().String() + strings.Join(suffix, "-")
 	}
-	err := CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), name, &YakScript{
+	return &YakScript{
 		ScriptName: name,
 		Type:       t,
 		Content:    code,
 		Author:     "temp",
 		Ignored:    true,
-	})
-	if err != nil {
-		return "", err
-	}
-	return name, nil
+	}, nil
 }
 
 func RemoveTemporaryYakScriptAll(db *gorm.DB, suffix string) {
