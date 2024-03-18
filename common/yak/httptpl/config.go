@@ -67,6 +67,7 @@ type Config struct {
 
 	// runtime id for match task
 	RuntimeId string
+	Ctx       context.Context
 
 	// nuclei / xray
 	Mode string
@@ -110,6 +111,12 @@ func WithCustomVulnFilter(f *filter.StringFilter) ConfigOption {
 func WithOOBRequireCallback(f func(...float64) (string, string, error)) ConfigOption {
 	return func(config *Config) {
 		config.OOBRequireCallback = f
+	}
+}
+
+func WithContext(c context.Context) ConfigOption {
+	return func(config *Config) {
+		config.Ctx = c
 	}
 }
 

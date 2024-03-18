@@ -91,7 +91,11 @@ func FuzzCalcExpr() map[string]any {
 
 func ScanPacket(req []byte, opts ...interface{}) (count uint64) {
 	config, lowhttpConfig, lowhttpOpts := toConfig(opts...)
-	baseContext, cancel := context.WithCancel(context.Background())
+	var ctx = context.Background()
+	if config.Ctx != nil {
+		ctx = config.Ctx
+	}
+	baseContext, cancel := context.WithCancel(ctx)
 	_ = cancel
 
 	if lowhttpConfig.Ctx == nil {
@@ -204,6 +208,9 @@ func toConfig(opts ...interface{}) (*Config, *lowhttp.LowhttpExecConfig, []lowht
 		opt(pocConfig)
 	}
 	config := NewConfig(configOpt...)
+	if pocConfig.Context == nil {
+		pocConfig.Context = config.Ctx
+	}
 	if config.RuntimeId != "" {
 		pocConfig.RuntimeId = config.RuntimeId
 	}
@@ -522,6 +529,7 @@ var Exports = map[string]interface{}{
 	"https":             lowhttp.WithHttps,
 	"http2":             lowhttp.WithHttp2,
 	"fromPlugin":        lowhttp.WithFromPlugin,
+	"context":           WithContext,
 }
 
 func WithHttpTplRuntimeId(id string) ConfigOption {
