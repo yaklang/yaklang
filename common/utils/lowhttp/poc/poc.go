@@ -171,6 +171,10 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 	}
 	opts = append(opts, lowhttp.WithDNSNoCache(c.DNSNoCache))
 
+	if c.Context != nil {
+		opts = append(opts, lowhttp.WithContext(c.Context))
+	}
+
 	opts = append(opts, lowhttp.WithUsername(c.Username))
 	opts = append(opts, lowhttp.WithPassword(c.Password))
 	return opts
