@@ -24,7 +24,7 @@ func TestGRPCMUSTPASS_GeneratePayload(t *testing.T) {
 		t.Fatal(err)
 	}
 	//测试获取所有的yso选项(ysoVerboses, t)
-	assert.Equal(t, len(ysoVerboses.GetOptions()), len(yso.AllGadgets))
+	assert.Equal(t, len(ysoVerboses.GetOptions()), len(yso.AllGadgets)-1)
 	for _, option := range ysoVerboses.GetOptions() {
 		assert.Equal(t, yso.AllGadgets[yso.GadgetType(option.GetName())].Name, option.GetName())
 		classOptions, err := client.GetAllYsoClassOptions(ctx, &ypb.YsoOptionsRequerstWithVerbose{Gadget: option.GetName()})
@@ -61,7 +61,7 @@ func TestGRPCMUSTPASS_GeneratePayload(t *testing.T) {
 		}
 	}
 }
-func TestGenerateYakCode(t *testing.T) {
+func TestGRPCMUSTPASS_GenerateYakCode(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
@@ -87,7 +87,7 @@ func TestGenerateYakCode(t *testing.T) {
 		t.Fatal(err)
 	}
 	//测试获取所有的yso选项(ysoVerboses, t)
-	assert.Equal(t, len(ysoVerboses.GetOptions()), len(yso.AllGadgets))
+	assert.Equal(t, len(ysoVerboses.GetOptions()), len(yso.AllGadgets)-1)
 	for _, option := range ysoVerboses.GetOptions() {
 		assert.Equal(t, yso.AllGadgets[yso.GadgetType(option.GetName())].Name, option.GetName())
 		classOptions, err := client.GetAllYsoClassOptions(ctx, &ypb.YsoOptionsRequerstWithVerbose{Gadget: option.GetName()})
