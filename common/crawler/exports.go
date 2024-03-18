@@ -26,5 +26,6 @@ var Exports = map[string]interface{}{
 	"userAgent":           WithUserAgent,
 	"ua":                  WithUserAgent,
 	"autoLogin":           WithAutoLogin,
+	"jsParser":            WithJSParser,
 	"RequestsFromFlow":    HandleRequestResult,
 }
