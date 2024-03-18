@@ -75,6 +75,8 @@ var hybridScanCommand = &cli.Command{
 		},
 		cli.StringFlag{Name: "proxy", Usage: "Proxy Server, like http://127.0.0.1:8083"},
 		cli.IntFlag{Name: "concurrent,thread", Usage: "(Thread)Concurrent Scan Number", Value: 50},
+		cli.Float64Flag{Name: "poc-timeout", Usage: "Scan Timeout in Which Sub-Task", Value: 30},
+		cli.Float64Flag{Name: "total-timeout", Usage: "Scan Timeout for all", Value: 7200},
 	},
 
 	Before: func(c *cli.Context) error {
@@ -268,7 +270,11 @@ var hybridScanCommand = &cli.Command{
 
 		runtimeId := uuid.New().String()
 
-		ctx, cancelAll := context.WithCancel(context.Background())
+		rootCtx := context.Background()
+		if ret := c.Float64("total-timeout"); ret > 0 {
+			rootCtx = utils.TimeoutContextSeconds(ret)
+		}
+		ctx, cancelAll := context.WithCancel(rootCtx)
 		_ = cancelAll
 
 		historyShowCtx, cancelHistory := context.WithCancel(ctx)
@@ -311,16 +317,22 @@ var hybridScanCommand = &cli.Command{
 				log.Debugf("prepare target: %p in: %v", target, plugin.ScriptName)
 				swg.Add()
 				plugin := plugin
+				du := 30 * time.Second
+				if ret := c.Float64("poc-timeout"); ret > 0 {
+					du = utils.FloatSecondDuration(ret)
+				}
+				singleTaskCtx, singleTaskCancel := context.WithTimeout(ctx, du)
 				go func() {
 					defer swg.Done()
-
+					defer singleTaskCancel()
 					defer func() {
 						if err := recover(); err != nil {
 							log.Errorf("scan target failed(panic): %s", err)
 						}
 					}()
+
 					err := yakgrpc.ScanHybridTargetWithPlugin(
-						runtimeId, context.Background(), target, plugin, c.String("proxy"),
+						runtimeId, singleTaskCtx, target, plugin, c.String("proxy"),
 						public, publicFilter,
 					)
 					if err != nil {
