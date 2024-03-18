@@ -21,6 +21,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const yakitScanBanner = `
@@ -267,6 +268,28 @@ var hybridScanCommand = &cli.Command{
 
 		runtimeId := uuid.New().String()
 
+		ctx, cancelAll := context.WithCancel(context.Background())
+		_ = cancelAll
+
+		historyShowCtx, cancelHistory := context.WithCancel(ctx)
+		defer cancelHistory()
+		go func() {
+			showHistoryFlow := utils.NewCoolDown(2 * time.Second)
+			var last int64
+			for {
+				select {
+				case <-historyShowCtx.Done():
+					return
+				default:
+					showHistoryFlow.DoOr(func() {
+						last = ShowHistoryHTTPFlowByRuntimeId(last, runtimeId)
+					}, func() {
+						time.Sleep(500 * time.Millisecond)
+					})
+				}
+			}
+		}()
+
 		thread := c.Int("thread")
 		if thread <= 0 {
 			thread = 50
@@ -308,6 +331,7 @@ var hybridScanCommand = &cli.Command{
 		}
 		log.Infof("start to waiting for all scan finished")
 		swg.Wait()
+		cancelHistory()
 
 		log.Infof("start to checking runtimeId: %s", runtimeId)
 		for riskInfo := range yakit.YieldRisksByRuntimeId(consts.GetGormProjectDatabase(), context.Background(), runtimeId) {
@@ -317,4 +341,17 @@ var hybridScanCommand = &cli.Command{
 
 		return nil
 	},
+}
+
+func ShowHistoryHTTPFlowByRuntimeId(last int64, runtimeId string) int64 {
+	db := consts.GetGormProjectDatabase()
+	db = db.Model(&yakit.HTTPFlow{}).Where("runtime_id = ?", runtimeId)
+	var count int64
+	if db.Count(&count).Error == nil {
+		if count != last {
+			log.Infof("runtime_id: %v cause %v http flows", runtimeId, count)
+			return count
+		}
+	}
+	return last
 }
