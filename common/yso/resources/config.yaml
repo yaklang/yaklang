@@ -14,88 +14,111 @@ Classes:
     desc: 支持Tomcat环境和Weblogic回显
     params:
       - name: header-au-key
+        name_zh: "认证键"
         desc: 用于标记当前请求的Header Key（建议使用header中比较常见的key）
         default: "Accept-Language"
       - name: header-au-val
+        name_zh: "认证值"
         desc: headerAuKey对应的Value，回显类将会通过此值判断当前请求是否为回显请求
         default: "zh-CN,zh;q=1.9"
       - name: header
+        name_zh: "回显Header"
         desc: 当position为header时，此参数将作为回显的Header Key
         default: "Etag"
       - name: action
+        name_zh: "动作"
         desc: 枚举值，可选值为：echo（只回显）, exec（回显执行结果）
         default: "echo"
       - name: position
+        name_zh: "位置"
         desc: 枚举值，可选值为：header, body，用于指定回显的位置
         default: "header"
       - name: cmd
+        name_zh: "命令"
         desc: 此值用于指定执行命令，当action为echo时，只回显不执行，当action为exec时，会回显执行命令
   TomcatEcho:
     params:
       - name: header-au-key
+        name_zh: "认证键"
         desc: 用于标记当前请求的Header Key（建议使用header中比较常见的key）
         default: "Accept-Language"
       - name: header-au-val
+        name_zh: "认证值"
         desc: headerAuKey对应的Value，回显类将会通过此值判断当前请求是否为回显请求
         default: "zh-CN,zh;q=1.9"
       - name: header
+        name_zh: "回显Header"
         desc: 当position为header时，此参数将作为回显的Header Key
         default: "Etag"
       - name: action
+        name_zh: "动作"
         desc: 枚举值，可选值为：echo（只回显）, exec（回显执行结果）
         default: "echo"
       - name: position
+        name_zh: "位置"
         desc: 枚举值，可选值为：header, body，用于指定回显的位置
         default: "header"
       - name: cmd
+        name_zh: "命令"
         desc: 此值用于指定执行命令，当action为echo时，只回显不执行，当action为exec时，会回显执行命令
   SpringEcho:
     desc: Spring的回显
     params:
       - name: header
+        name_zh: "回显Header"
         desc: 当position为header时，此参数将作为回显的Header Key
         default: "Etag"
       - name: action
+        name_zh: "动作"
         desc: 枚举值，可选值为：echo（只回显）, exec（回显执行结果）
         default: "echo"
       - name: position
+        name_zh: "位置"
         desc: 枚举值，可选值为：header, body，用于指定回显的位置
         default: "header"
       - name: cmd
+        name_zh: "命令"
         desc: 此值用于指定执行命令，当action为echo时，只回显不执行，当action为exec时，会回显执行命令
   TemplateImplClassLoader:
     desc: 用于TemplateImp的类加载器，可以加载任意类
     params:
       - name: base64Class
+        name_zh: "base64编码的类"
         desc: base64编码的字节码
+        type: bytes
   DNSLog:
     desc: 通过DnsLog反连检测代码执行
     params:
       - name: domain
+        name_zh: "域名"
         desc: 用于反连的域名
         test-default: "asdghjkgkj.xxxxxxxxxxxx.com"
   ModifyTomcatMaxHeaderSize:
     desc: 修改Tomcat请求Header的最大长度限制
     params:
       - name: max
+        name_zh: "最大长度"
         desc: 最大长度
         default: 40960
   RuntimeExec:
     desc: 命令执行
     params:
       - name: cmd
+        name_zh: "命令"
         desc: 命令
         default: "whoami"
   ProcessBuilderExec:
     desc: 命令执行
     params:
       - name: cmd
+        name_zh: "命令"
         desc: 命令
         default: "whoami"
   ProcessImplExec:
     desc: 命令执行
     params:
       - name: cmd
+        name_zh: "命令"
         desc: 命令
         default: "whoami"
   EmptyClassInTemplate:
@@ -104,22 +127,30 @@ Classes:
     desc: TCP反连
     params:
       - name: host
+        name_zh: "反连主机"
         desc: 反连Host
       - name: port
+        name_zh: "反连端口"
         desc: 反连端口
+        type: int
       - name: token
+        name_zh: "Token"
         desc: 反连token
   TcpReverseShell:
     desc: TCP反连
     params:
       - name: host
+        name_zh: "反连主机"
         desc: 接收地址Host
       - name: port
+        name_zh: "反连端口"
         desc: 接收地址Port
+        type: int
   Sleep:
     desc: 休眠
     params:
       - name: time
+        name_zh: "时间"
         desc: 休眠时间
 
 # Gadgets配置
@@ -181,9 +212,7 @@ Gadgets:
     template: true
   CommonsBeanutils3:
     desc:
-    params:
-      - name: jndi
-        desc: JNDI地址
+    ref-fun: jndi
 #  CommonsBeanutils3_183:
 #    desc:
 #    template: true
@@ -233,76 +262,90 @@ Gadgets:
     desc:
   FindClassByBomb:
     desc: 通过延时检测class是否存在
-    params:
-      - name: class
-        desc: 类名
+    ref-fun: class
   FindClassByDNS:
     desc: 通过DNS检测class是否存在
-    params:
-      - name: domain
-        desc: dnslog域名
-      - name: class
-        desc: 类名
+    ref-fun: class-dnslog
   FindAllClassesByDNS:
     desc: 通过DNS检测所有class是否存在
-    params:
-      - name: domain
-        desc: dnslog域名
+    ref-fun: dnslog
   URLDNS:
     desc: 通过URLDNS检测
-    params:
-      - name: domain
-        desc: dnslog域名
+    ref-fun: dnslog
   SimplePrincipalCollection:
     desc: 用于Shiro反序列化检测
 ReflectChainFunction:
 #  sleep:
 #    desc: 休眠时间
 #    default: 1000
+  class-dnslog:
+    desc: 用于反连的域名
+    params:
+      - name: domain
+        name_zh: "域名"
+        desc: dnslog域名
+      - name: class
+        name_zh: "类名"
+        desc: 类名
+  class:
+    desc: 类名
+    params:
+      - name: class
+        name_zh: "类名"
+        desc: 类名
   dnslog:
     desc: 用于反连的域名
     params:
       - name: domain
+        name_zh: "域名"
         desc: 用于反连的域名
         test-default: "asdghjkgkj.xxxxxxxxxxxx.com"
   httplog:
     desc: http协议反连
     params:
       - name: url
+        name_zh: "URL"
         desc: 反连地址
   raw_cmd:
     desc: 命令执行
     params:
       - name: cmd
+        name_zh: "命令"
         desc: 命令
   win_cmd:
     desc: Windows命令执行
     params:
       - name: cmd
+        name_zh: "命令"
         desc: 命令
   linux_cmd:
     desc: Linux命令执行
     params:
       - name: cmd
+        name_zh: "命令"
         desc: 命令
         default: "whoami"
   bcel:
     desc: BCEL类加载
     params:
       - name: bcel
+        name_zh: "BCEL代码"
         desc: becl代码
   bcel_with_args:
     desc: BCEL类加载，支持通过使用|附带一个参数，如：$$BCEL$$xxxx|whoami
     params:
       - name: bcel
+        name_zh: "BCEL代码"
         desc: becl代码
       - name: args
+        name_zh: "参数"
         desc: 参数
-  script_base64:
-    desc: 指定一个base64编码的js脚本
+  base64:
+    desc: 指定一个js脚本
     params:
       - name: script
-        desc: base64编码的js脚本
+        name_zh: "脚本"
+        desc: js脚本
 #  upload_file_base64:
 #    desc: 指定一个base64编码的文件，用于上传。使用|分割文件名和文件内容，如：test.txt|xxxx
 #    params:
@@ -314,20 +357,26 @@ ReflectChainFunction:
     desc: 加载一个jar文件，使用|分割jar文件路径和类名
     params:
       - name: url
+        name_zh: "URL"
         desc: jar文件路径
       - name: name
+        name_zh: "类名"
         desc: 类名
   loadjar_with_args:
     desc: 加载一个jar文件，使用|分割jar文件路径和类名和参数
     params:
       - name: url
+        name_zh: "URL"
         desc: jar文件路径
       - name: name
+        name_zh: "类名"
         desc: 类名
       - name: args
+        name_zh: "参数"
         desc: 参数
   jndi:
     desc: 指定一个JNDI地址，用于JNDI注入
     params:
       - name: jndi
+        name_zh: "JNDI地址"
         desc: JNDI地址

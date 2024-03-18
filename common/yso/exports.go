@@ -1,6 +1,5 @@
 package yso
 
-
 var Exports = map[string]interface{}{
 	// 生成链
 	"ToBytes": ToBytes,
@@ -33,8 +32,7 @@ var Exports = map[string]interface{}{
 	"GetFindGadgetByDNSJavaObject":         GetFindGadgetByDNSJavaObject,
 
 	// 通过gadget名称获取gadget
-	"GetGadget":         GenerateGadget,
-	"useTransformChain": SetTransformChainType,
+	"GetGadget": GenerateGadget,
 
 	//"GetJRMPClientJavaObject":              GetJRMPClientJavaObject,
 	"GetJSON1JavaObject":          GetJSON1JavaObject,
@@ -55,6 +53,9 @@ var Exports = map[string]interface{}{
 	"LoadClassFromBCEL":   LoadClassFromBCEL,
 
 	// 只生成恶意类的对象
+	"GenerateClass":                                    GenerateClass,
+	"useClassParam":                                    SetClassParam,
+	"useTemplate":                                      SetClassType,
 	"GenerateClassObjectFromBytes":                     GenerateClassObjectFromBytes,
 	"GenerateRuntimeExecEvilClassObject":               GenerateRuntimeExecEvilClassObject,
 	"GenerateProcessBuilderExecEvilClassObject":        GenerateProcessBuilderExecEvilClassObject,

