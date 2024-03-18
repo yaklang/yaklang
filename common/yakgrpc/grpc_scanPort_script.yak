@@ -15,9 +15,6 @@ hostAliveConcurrent = cli.Int("host-alive-concurrent", cli.setDefault(20), cli.s
 hostAliveTimeout = cli.Float("host-alive-timeout", cli.setDefault(5.0), cli.setRequired(false))
 hostAliveTCPPorts = cli.String("host-alive-ports", cli.setDefault("80,22,443"), cli.setRequired(false))
 
-if proxies == "no" {
-	proxies = ""
-}
 
 active = cli.Bool("active")
 concurrent = cli.Int("concurrent", cli.setDefault(50))
@@ -28,16 +25,19 @@ protos = cli.String("proto", cli.setDefault("tcp"))
 fpMode = cli.String("fp-mode", cli.setDefault("all"))
 scriptNames = cli.YakitPlugin()
 
-cli.check()
-
-hostRaw, _ = file.ReadFile(hostFile)
-hosts = string(hostRaw)
-
 excludeHosts = cli.String("exclude-hosts")
 excludePorts = cli.String("exclude-ports")
 enableCrawler = cli.Have("enable-basic-crawler")
 crawlerMaxRequest = cli.Int("basic-crawler-request-max")
+crawlerEnableJSParser = cli.Bool("basic-crawler-enable-jsparser", cli.setDefault(false), c.setRequired(false))
 cli.check()
+
+if proxies == "no" {
+	proxies = ""
+}
+
+hostRaw, _ = file.ReadFile(hostFile)
+hosts = string(hostRaw)
 
 if hosts == "" {
 	die("target / hosts empty")
@@ -206,7 +206,9 @@ handleCrawler = func(result) {
         addr = str.HostPort(result.Target, result.Port)
         res, err = crawler.Start(
             addr, crawler.maxRequest(crawlerMaxRequest),
-            crawler.autoLogin("admin", "password"), crawler.urlRegexpExclude(`(?i).*?\/?(logout|reset|delete|setup).*`),
+            crawler.autoLogin("admin", "password"), 
+            crawler.urlRegexpExclude(`(?i).*?\/?(logout|reset|delete|setup).*`),
+            crawler.jsParser(crawlerEnableJSParser),
         )
         if err != nil {
             yakit.Error("basic crawler start failed: %s", err)

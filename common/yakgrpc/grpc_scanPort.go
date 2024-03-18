@@ -4,13 +4,14 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/network"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/network"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 //go:embed grpc_scanPort_script.yak
@@ -228,6 +229,10 @@ func (s *Server) PortScan(req *ypb.PortScanRequest, stream ypb.Yak_PortScanServe
 		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "host-alive-ports", Value: fmt.Sprint(req.GetHostAlivePorts())})
 	} else {
 		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "host-alive-ports", Value: "22,80,443"})
+	}
+
+	if req.GetBasicCrawlerEnableJSParser() {
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "basic-crawler-enable-js-parser", Value: ""})
 	}
 
 	return s.DebugPlugin(reqParams, stream)
