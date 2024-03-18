@@ -616,6 +616,12 @@ func (c *Crawler) handleReqResult(r *Req) {
 		log.Errorf("page information walker error: %s", err.Error())
 	}
 
+	if !config.enableJSParser {
+		return
+	}
+
+	// with JS Parse
+
 	jsConcurrent := config.concurrent / 2
 	if jsConcurrent <= 0 {
 		jsConcurrent = 3

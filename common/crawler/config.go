@@ -68,6 +68,7 @@ func (c *Config) init() {
 	c.forbiddenUrlRegexp["(?i)setup"] = regexp.MustCompile(`(?i)setup`)
 	c.forbiddenUrlRegexp["(?i)/exit"] = regexp.MustCompile(`(?i)/exit`)
 	c.forbiddenUrlRegexp[`\?[^\s]*C=\w*;O=\w*`] = regexp.MustCompile(`\?\S*C=\w*;O=\w*`)
+	c.enableJSParser = false
 }
 
 type Config struct {
@@ -133,6 +134,8 @@ type Config struct {
 
 	// runtime id
 	runtimeID string
+	// js parser
+	enableJSParser bool
 }
 
 var configMutex = new(sync.Mutex)
@@ -599,5 +602,23 @@ func WithAutoLogin(username, password string, flags ...string) ConfigOpt {
 func WithRuntimeID(id string) ConfigOpt {
 	return func(c *Config) {
 		c.runtimeID = id
+	}
+}
+
+// jsParser 是一个选项函数，用于指定爬虫时是否进行对于JS的代码解析。
+// 填写该选项默认开启，也可以传入false强制关闭。
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.jsParser()) // 开启
+// crawler.Start("https://example.com", crawler.jsParser(true)) // 开启
+// crawler.Start("https://example.com", crawler.jsParser(false)) // 关闭
+// ```
+func WithJSParser(enable ...bool) ConfigOpt {
+	return func(c *Config) {
+		if len(enable) > 0 {
+			c.enableJSParser = enable[0]
+		} else {
+			c.enableJSParser = true
+		}
 	}
 }
