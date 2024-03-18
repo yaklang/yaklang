@@ -5,13 +5,8 @@ import (
 	"encoding/json"
 	"net/url"
 	"os"
-	"strconv"
 	"strings"
 	"time"
-
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	pta "github.com/yaklang/yaklang/common/yak/static_analyzer"
-	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
@@ -358,17 +353,6 @@ func (s *Server) execScript(
 }
 
 func makeArgs(ctx context.Context, execParams []*ypb.KVPair, yakScript string) []string {
-	var boolParams []string
-	prog, err := ssaapi.Parse(yakScript, pta.GetPluginSSAOpt("yak")...)
-	if err != nil {
-		log.Error("ssa parse error")
-	} else {
-		for _, param := range information.ParseCliParameter(prog) {
-			if param.Type == "boolean" {
-				boolParams = append(boolParams, param.Name)
-			}
-		}
-	}
 	args := []string{"yak"}
 	canFilter := true
 	for _, p := range execParams {
@@ -407,12 +391,6 @@ func makeArgs(ctx context.Context, execParams []*ypb.KVPair, yakScript string) [
 			}
 			args = append(args, "--yakit-plugin-file", tempName)
 		default:
-			if utils.StringSliceContain(boolParams, p.Key) {
-				v, _ := strconv.ParseBool(p.Value)
-				if !v {
-					continue
-				}
-			}
 			args = append(args, "--"+p.Key, p.Value)
 		}
 	}
