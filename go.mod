@@ -5,6 +5,7 @@ go 1.20
 replace github.com/yaklang/yaklang v0.0.0 => ./
 
 require (
+	github.com/BurntSushi/toml v1.3.2
 	github.com/CycloneDX/cyclonedx-go v0.7.2
 	github.com/DataDog/mmh3 v0.0.0-20210722141835-012dc69a9e49
 	github.com/PuerkitoBio/goquery v1.6.0
@@ -97,6 +98,7 @@ require (
 	github.com/tatsushid/go-fastping v0.0.0-20160109021039-d7bb493dee3e
 	github.com/tevino/abool v0.0.0-20170917061928-9b9efcf221b5
 	github.com/tidwall/gjson v1.14.4
+	github.com/tidwall/sjson v1.2.5
 	github.com/twmb/murmur3 v1.1.6
 	github.com/urfave/cli v1.22.12
 	github.com/valyala/bytebufferpool v1.0.0
@@ -122,7 +124,6 @@ require (
 require (
 	cloud.google.com/go/compute v1.23.3 // indirect
 	dario.cat/mergo v1.0.0 // indirect
-	github.com/BurntSushi/toml v1.3.2 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/ProtonMail/go-crypto v0.0.0-20230828082145-3c4c8a2d2371 // indirect
 	github.com/andybalholm/cascadia v1.1.0 // indirect

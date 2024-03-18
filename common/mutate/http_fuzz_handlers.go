@@ -2,9 +2,9 @@ package mutate
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/tidwall/gjson"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -29,6 +29,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/cartesian"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/tidwall/sjson"
 )
 
 var dump = spew.Dump
@@ -693,9 +694,13 @@ func (f *FuzzHTTPRequest) fuzzPostJsonParamsWithFuzzParam(p *FuzzHTTPRequestPara
 		values,
 	}, func(result []string) error {
 		value := result[0]
-		raw := jsonpath.ReplaceString(string(rawBody), p.path, value)
-		_req, _ := rebuildHTTPRequest(req, int64(len(raw)))
-		_req.Body = io.NopCloser(bytes.NewBufferString(raw))
+
+		newBody, err := sjson.SetBytes(rawBody, p.path, value)
+		if err != nil {
+			return err
+		}
+		_req, _ := rebuildHTTPRequest(req, int64(len(newBody)))
+		_req.Body = io.NopCloser(bytes.NewBuffer(newBody))
 		if _req != nil {
 			reqs = append(reqs, _req)
 		}
@@ -789,15 +794,11 @@ func (f *FuzzHTTPRequest) fuzzPostJsonParamsWithRaw(k, v interface{}) ([]*http.R
 		rawBody = []byte("{}")
 	}
 
-	var originParam map[string]interface{}
-	_ = json.Unmarshal(bytes.TrimSpace(rawBody), &originParam)
-	if originParam == nil {
-		originParam = make(map[string]interface{})
-	}
+	originBody := rawBody
 
 	keys, values := InterfaceToFuzzResults(k), InterfaceToFuzzResults(v)
 	if keys == nil || values == nil {
-		return nil, utils.Errorf("key or value is empty...")
+		return nil, utils.Wrapf(err, "keys or Values is empty...")
 	}
 
 	m, err := mixer.NewMixer(keys, values)
@@ -809,86 +810,50 @@ func (f *FuzzHTTPRequest) fuzzPostJsonParamsWithRaw(k, v interface{}) ([]*http.R
 	for {
 		pair := m.Value()
 		key, value := pair[0], pair[1]
-		newParam, _ := deepCopyMapRaw(originParam)
-		if newParam == nil {
-			newParam = make(map[string]interface{})
-		}
 
-		var isInteger bool
-		var isFloat bool
-		originValue, ok := newParam[key]
-		if ok {
-			isInteger = utils.IsValidInteger(fmt.Sprintf("%#v", originValue))
-			isFloat = utils.IsValidFloat(fmt.Sprintf("%#v", originValue))
-		}
+		originalValue := gjson.GetBytes(originBody, key)
 
-		if utils.IsValidInteger(value) {
-			forkedMap, _ := deepCopyMapRaw(newParam)
-			if forkedMap != nil {
-				forkedMap[key] = codec.Atoi(value)
-				raw, _ := json.Marshal(forkedMap)
-				_req, _ := rebuildHTTPRequest(req, int64(len(raw)))
-				_req.Body = ioutil.NopCloser(bytes.NewBuffer(raw))
-				if _req != nil {
-					reqs = append(reqs, _req)
+		var newValue interface{} = value
+
+		if originalValue.Type != gjson.Null {
+			// 根据原始值的类型决定如何转换 value,类型不应当 fuzz 吧？
+			switch originalValue.Type {
+			case gjson.True, gjson.False:
+				if boolVal, err := strconv.ParseBool(value); err == nil {
+					newValue = boolVal
+				} else {
+					continue
 				}
-			}
-		}
-
-		if utils.IsValidFloat(value) && strings.Contains(strings.Trim(value, `.`), ".") {
-			forkedMap, _ := deepCopyMapRaw(newParam)
-			if forkedMap != nil {
-				forkedMap[key] = codec.Atof(value)
-				raw, _ := json.Marshal(forkedMap)
-				_req, _ := rebuildHTTPRequest(req, int64(len(raw)))
-				_req.Body = ioutil.NopCloser(bytes.NewBuffer(raw))
-				if _req != nil {
-					reqs = append(reqs, _req)
+			case gjson.Number:
+				if floatVal, err := strconv.ParseFloat(value, 64); err == nil {
+					newValue = floatVal
+				} else {
+					continue
 				}
-			}
-		}
-
-		if value == "true" || value == "false" {
-			forkedMap, _ := deepCopyMapRaw(newParam)
-			if forkedMap != nil {
-				forkedMap[key] = codec.Atob(value)
-				raw, _ := json.Marshal(forkedMap)
-				_req, _ := rebuildHTTPRequest(req, int64(len(raw)))
-				_req.Body = io.NopCloser(bytes.NewBuffer(raw))
-				if _req != nil {
-					reqs = append(reqs, _req)
+			case gjson.String:
+				newValue = value
+			case gjson.JSON:
+				if gjson.Valid(value) {
+					newValue = gjson.Parse(value).Value()
+				} else {
+					continue
 				}
+			default:
+				log.Errorf("unknown type: %v", originalValue.Type)
+				continue
 			}
+		}
+		modifiedBody, err := sjson.SetBytes(rawBody, key, newValue)
+		if err != nil {
+			break
 		}
 
-		switch true {
-		case isFloat:
-			fallthrough
-		case isInteger && isFloat:
-			// isNumber
-			f, err := strconv.ParseFloat(value, 64)
-			if err != nil {
-				newParam[key] = value
-				break
-			}
-			newParam[key] = f
-		case isInteger:
-			i, err := strconv.ParseInt(value, 10, 64)
-			if err != nil {
-				newParam[key] = value
-				break
-			}
-			newParam[key] = i
-		default:
-			newParam[key] = value
+		_req, err := rebuildHTTPRequest(req, int64(len(modifiedBody)))
+		if err != nil {
+			break
 		}
-
-		raw, _ := json.Marshal(newParam)
-		_req, _ := rebuildHTTPRequest(req, int64(len(raw)))
-		_req.Body = ioutil.NopCloser(bytes.NewBuffer(raw))
-		if _req != nil {
-			reqs = append(reqs, _req)
-		}
+		_req.Body = ioutil.NopCloser(bytes.NewBuffer(modifiedBody))
+		reqs = append(reqs, _req)
 
 		if err = m.Next(); err != nil {
 			break

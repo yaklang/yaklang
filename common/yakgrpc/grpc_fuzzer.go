@@ -721,37 +721,106 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_NoSystemProxy(req.GetNoSystemProxy()),
 			mutate.WithPoolOpt_RequestCountLimiter(requestCount),
 			mutate.WithPoolOpt_MutateHook(func(raw []byte) [][]byte {
-				params := make(map[string][]string, 2)
+				type mutateMethod struct {
+					t        string // 修改类型，如"Headers", "Cookie", "Get", "Post"
+					position string
+					path     string
+					pp       *mutate.FuzzHTTPRequestParam
+					value    []interface{}
+				}
+
+				params := make(map[string]*mutateMethod, 2)
 				oFreq, _ := mutate.NewFuzzHTTPRequest(raw)
 
 				for _, mm := range req.GetMutateMethods() {
 					if len(mm.GetValue()) == 0 {
 						continue
 					}
-					for _, kv := range mm.GetValue() {
-						name := mm.GetType() + "-" + kv.GetKey()
-						params[name] = append(params[name], kv.GetValue())
-					}
+
 					switch mm.GetType() {
 					case "Headers":
-						for _, hp := range oFreq.GetHeaderParams() {
-							name := mm.GetType() + "-" + hp.Name()
-							params[name] = append(params[name], hp.GetFirstValue())
+						for _, p := range oFreq.GetHeaderParams() {
+							name := p.Name()
+							if _, exists := params[name]; !exists {
+								params[name] = &mutateMethod{
+									t:        mm.GetType(),
+									position: p.Position(),
+									path:     p.Path(),
+									value:    []any{p.GetFirstValue()},
+								}
+							} else {
+								params[name].value = append(params[name].value, p.GetFirstValue())
+								params[name].position = p.Position()
+								params[name].path = p.Path()
+							}
 						}
 					case "Cookie":
-						for _, cp := range oFreq.GetCookieParams() {
-							name := mm.GetType() + "-" + cp.Name()
-							params[name] = append(params[name], cp.GetFirstValue())
+						for _, p := range oFreq.GetCookieParams() {
+							name := p.Name()
+							if _, exists := params[name]; !exists {
+								params[name] = &mutateMethod{
+									t:        mm.GetType(),
+									position: p.Position(),
+									path:     p.Path(),
+									value:    []any{p.GetFirstValue()},
+								}
+							} else {
+								params[name].value = append(params[name].value, p.GetFirstValue())
+								params[name].position = p.Position()
+								params[name].path = p.Path()
+							}
 						}
 					case "Get":
-						for _, qp := range oFreq.GetGetQueryParams() {
-							name := mm.GetType() + "-" + qp.Name()
-							params[name] = append(params[name], qp.GetFirstValue())
+						for _, p := range oFreq.GetGetQueryParams() {
+							name := p.Name()
+							if _, exists := params[name]; !exists {
+								params[name] = &mutateMethod{
+									t:        mm.GetType(),
+									position: p.Position(),
+									path:     p.Path(),
+									value:    []any{p.GetFirstValue()},
+								}
+							} else {
+								params[name].value = append(params[name].value, p.GetFirstValue())
+								params[name].position = p.Position()
+								params[name].path = p.Path()
+							}
 						}
 					case "Post":
-						for _, pp := range oFreq.GetPostCommonParams() {
-							name := mm.GetType() + "-" + pp.Name()
-							params[name] = append(params[name], pp.GetFirstValue())
+						var position string
+						for _, p := range oFreq.GetPostCommonParams() {
+							if strings.Contains(p.Path(), ".") {
+								continue
+							}
+							name := p.Name()
+							position = p.Position()
+							if _, exists := params[name]; !exists {
+								params[name] = &mutateMethod{
+									t:        mm.GetType(),
+									position: p.Position(),
+									path:     p.Path(),
+									pp:       p,
+									value:    []any{p.OriginValue()},
+								}
+							} else {
+								params[name].value = append(params[name].value, p.GetFirstValue())
+								params[name].position = p.Position()
+								params[name].path = p.Path()
+								params[name].pp = p
+							}
+						}
+
+						for _, kv := range mm.GetValue() {
+							name := kv.GetKey()
+							if _, exists := params[name]; !exists {
+								params[name] = &mutateMethod{
+									t:        mm.GetType(),
+									position: position,
+									value:    []any{kv.GetValue()},
+								}
+							} else {
+								params[name].value = append(params[name].value, kv.GetValue())
+							}
 						}
 
 					}
@@ -759,18 +828,21 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				var nReq mutate.FuzzHTTPRequestIf
 				nReq = oFreq
 				for key, vs := range params {
-					if strings.HasPrefix(key, "Headers-") {
-						key = strings.TrimPrefix(key, "Headers-")
-						nReq = nReq.FuzzHTTPHeader(key, vs)
-					} else if strings.HasPrefix(key, "Cookie-") {
-						key = strings.TrimPrefix(key, "Cookie-")
-						nReq = nReq.FuzzCookie(key, vs)
-					} else if strings.HasPrefix(key, "Get-") {
-						key = strings.TrimPrefix(key, "Get-")
-						nReq = nReq.FuzzGetParams(key, vs)
-					} else if strings.HasPrefix(key, "Post-") {
-						key = strings.TrimPrefix(key, "Post-")
-						nReq = nReq.FuzzPostParams(key, vs)
+					if vs.t == "Post" {
+						switch vs.position {
+						case "post-query":
+							nReq = nReq.FuzzPostParams(key, vs.value)
+						case "post-xml":
+							nReq = nReq.FuzzPostXMLParams(key, vs.value)
+						case "post-query-base64":
+							nReq = nReq.FuzzPostBase64Params(key, vs.value)
+						case "post-query-json":
+							nReq = nReq.FuzzPostJsonPathParams(key, vs.path, vs.value)
+						case "post-query-base64-json":
+							nReq = nReq.FuzzPostBase64JsonPath(key, vs.path, vs.value)
+						case "post-json":
+							nReq = nReq.FuzzPostJsonParams(key, vs.value)
+						}
 					}
 				}
 				var results [][]byte
