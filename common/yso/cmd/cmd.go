@@ -140,7 +140,7 @@ yak yso -b CommonsCollections2 SpringEcho "cmd:whoami,position:header"
 				}
 				optsMap[item[0]] = item[1]
 			}
-			tmpGadgetIns, err := yso.GenerateGadget(yso.GadgetType(gadget), yso.SetTransformChainTypeByMap(typ, optsMap))
+			tmpGadgetIns, err := yso.GenerateGadget(yso.GadgetType(gadget), yso.SetGadgetParam(typ, optsMap))
 			if err != nil {
 				log.Errorf("generate gadget failed: %s", err)
 				return
