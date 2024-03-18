@@ -788,9 +788,7 @@ func GetJdk8u20JavaObject(options ...GenClassOptionFun) (*JavaObject, error) {
 //
 // ```
 func GetURLDNSJavaObject(url string) (*JavaObject, error) {
-	return GenerateGadget(string(GadgetURLDNS), map[string]string{
-		"domain": url,
-	})
+	return GenerateGadget(string(GadgetURLDNS), "domain", url)
 }
 
 // GetFindGadgetByDNSJavaObject 通过 DNSLOG 探测 CLass Name，进而探测 Gadget。
