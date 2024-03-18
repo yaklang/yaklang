@@ -42,65 +42,135 @@ println($a);
 		)
 	})
 	t.Run("opertor +=", func(t *testing.T) {
-		ssatest.CheckPrintlnValue(`<?php
+		t.Run("test-1", func(t *testing.T) {
+			ssatest.CheckPrintlnValue(`<?php
 $a=1;
 $a+=1;
 println($a);`, []string{"2"}, t)
+		})
+		t.Run("test-2", func(t *testing.T) {
+			ssatest.CheckPrintlnValue(`<?php
+$a+=1;
+println($a);`, []string{"add(Undefined-$a, 1)"}, t)
+		})
 	})
 	t.Run("opertor *=", func(t *testing.T) {
-		ssatest.CheckPrintlnValue(`<?php
+		t.Run("test-1", func(t *testing.T) {
+			ssatest.CheckPrintlnValue(`<?php
 $a=1;
 $a*=5;
 println($a);
 `, []string{"5"}, t)
+		})
+		t.Run("test-2", func(t *testing.T) {
+			ssatest.CheckPrintlnValue(`<?php
+$a*=5;
+println($a);
+`, []string{"mul(Undefined-$a, 5)"}, t)
+		})
 	})
 	t.Run("opertor /=", func(t *testing.T) {
-		ssatest.CheckPrintlnValue(`<?php
+		t.Run("test-1", func(t *testing.T) {
+			ssatest.CheckPrintlnValue(`<?php
 $a=5;
 $a/=5;
 println($a);
 `, []string{"1"}, t)
+		})
+		t.Run("test-2", func(t *testing.T) {
+			ssatest.CheckPrintlnValue(`<?php
+$a/=5;
+println($a);
+`, []string{"div(Undefined-$a, 5)"}, t)
+		})
 	})
 	t.Run("opertor **=", func(t *testing.T) {
-		ssatest.CheckPrintlnValue(`<?php
+		t.Run("test-1", func(t *testing.T) {
+			ssatest.CheckPrintlnValue(`<?php
 $a=2;
 $a**=3;
 println($a);
 `, []string{"8"}, t)
+		})
+		t.Run("test-2", func(t *testing.T) {
+			ssatest.CheckPrintlnValue(`<?php
+$a**=3;
+println($a);
+`, []string{"pow(Undefined-$a, 3)"}, t)
+		})
 	})
 	t.Run("opertor %=", func(t *testing.T) {
-		ssatest.CheckPrintlnValue(`<?php
+		t.Run("test-1", func(t *testing.T) {
+			ssatest.CheckPrintlnValue(`<?php
 $a = 10;
 $a %=3;
 println($a);`, []string{"1"}, t)
+		})
+		t.Run("test-2", func(t *testing.T) {
+			ssatest.CheckPrintlnValue(`<?php
+$a %=3;
+println($a);`, []string{"mod(Undefined-$a, 3)"}, t)
+		})
 	})
 	t.Run("opertor &=", func(t *testing.T) {
-		ssatest.CheckPrintlnValue(`<?php
+		t.Run("test-1", func(t *testing.T) {
+			ssatest.CheckPrintlnValue(`<?php
 $a = 10;
 $a &=3;
 println($a);
 `, []string{"2"}, t)
+		})
+		t.Run("test-2", func(t *testing.T) {
+			ssatest.CheckPrintlnValue(`<?php
+$a &=3;
+println($a);
+`, []string{"and(Undefined-$a, 3)"}, t)
+		})
 	})
 	t.Run("opertor |=", func(t *testing.T) {
-		ssatest.CheckPrintlnValue(`<?php
+		t.Run("test-1", func(t *testing.T) {
+			ssatest.CheckPrintlnValue(`<?php
 $a = 10;
 $a |=3;
 println($a);
 `, []string{"11"}, t)
+		})
+		t.Run("test-2", func(t *testing.T) {
+			ssatest.CheckPrintlnValue(`<?php
+$a |=3;
+println($a);
+`, []string{"or(Undefined-$a, 3)"}, t)
+		})
 	})
 	t.Run("opertor ^=", func(t *testing.T) {
-		ssatest.CheckPrintlnValue(`<?php
+		t.Run("test-1", func(t *testing.T) {
+			ssatest.CheckPrintlnValue(`<?php
 $a = 10;
 $a ^=3;
 println($a);
 `, []string{"9"}, t)
+		})
+		t.Run("test-2", func(t *testing.T) {
+			ssatest.CheckPrintlnValue(`<?php
+$a ^=3;
+println($a);
+`, []string{"xor(Undefined-$a, 3)"}, t)
+		})
 	})
 	t.Run("operator <<=", func(t *testing.T) {
-		ssatest.CheckPrintlnValue(`<?php
+		t.Run("test-1", func(t *testing.T) {
+			ssatest.CheckPrintlnValue(`<?php
 $a = 10;
 $a <<=3;
 println($a);
 `, []string{"80"}, t)
+		})
+		t.Run("test-2", func(t *testing.T) {
+			ssatest.CheckPrintlnValue(`<?php
+$a <<=3;
+println($a);
+`, []string{"shl(Undefined-$a, 3)"}, t)
+		})
 	})
 	t.Run("operator ??=", func(t *testing.T) {
 		t.Run("no variable declare", func(t *testing.T) {
@@ -117,37 +187,6 @@ println($a);
 ?>`, []string{"2"}, t)
 		})
 	})
-	//	t.Run("all-operator", func(t *testing.T) {
-	//		code := `<?php
-	//$a=0;
-	//$a+=1;
-	//println($a);
-	//$a-=2; //-1
-	//println($a);
-	//$a*=5; //-5
-	//println($a);
-	//$a/=5; //-1
-	//println($a);
-	//$a.=1; //-11
-	//println($a);
-	//$a|=2; //-9
-	//println($a);
-	//$a>>=10; //-1
-	//println($a);
-	//$a<<=10; //-1024
-	//println($a);
-	//$a^=10; //-1014
-	//println($a);
-	//$a&=10; //10
-	//println($a);
-	//$a%=3; //1
-	//println($a);
-	//$a++; //2
-	//println($a);
-	//$a**=3; //8
-	//println($a);`
-	//		ssatest.CheckPrintlnValue(code, []string{"1", "-1", "-5", "-1", "-11", "-9", "-1", "-1024", "-1014", "10", "1", "2", "8"}, t)
-	//	})
 	t.Run("operator-'.='", func(t *testing.T) {
 		code := `<?php
 $a=1;
@@ -172,7 +211,7 @@ $d = $a;
 println($b);
 println($d);
 `
-		ssatest.CheckPrintlnValue(code, []string{"1,phi($d)[3,1]"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"1", "phi($d)[3,1]"}, t)
 	})
 	t.Run("or-1", func(t *testing.T) {
 		code := `<?php

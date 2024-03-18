@@ -351,8 +351,7 @@ abc[1];
 }
 
 func TestParseSSA_AssignOp(t *testing.T) {
-	test.MockSSA(t, `<?php 
-
+	code := `<?php 
 $a = 1+1;
 $emptyVal = null;
 $emptyVal = 1+1;
@@ -371,11 +370,8 @@ $j <<= 1;
 $k >>= 1;
 
 $c[1];
-// $c[]=[1];
-c[0];
-
-`)
-
+c[0];`
+	test.MockSSA(t, code)
 }
 
 func TestParseSSA_Valid1(t *testing.T) {

@@ -1011,7 +1011,7 @@ func (y *builder) reduceAssignCalcExpression(operator string, leftValues ssa.Val
 	case ">>=":
 		rightValue = y.ir.EmitBinOp(ssa.OpShr, leftValues, rightValue)
 	case "??=":
-		if leftValues.IsUndefined() {
+		if leftValues == nil || leftValues.IsUndefined() {
 			return rightValue
 		} else {
 			return leftValues
@@ -1033,7 +1033,9 @@ func (y *builder) VisitLeftVariable(raw phpparser.ILeftVariableContext) *ssa.Var
 			variable.Value = value
 			return variable
 		}
-		return y.ir.CreateVariable(stmt.VarName().GetText())
+		createVariable := y.ir.CreateVariable(stmt.VarName().GetText())
+		createVariable.Value = y.ir.EmitUndefined(stmt.VarName().GetText())
+		return createVariable
 	case *phpparser.DynamicVariableContext:
 		var variable *ssa.Variable
 		if value := y.ir.ReadValue(stmt.VarName().GetText()); !value.IsUndefined() {
