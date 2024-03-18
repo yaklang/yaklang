@@ -474,7 +474,7 @@ Cookie: testCookie=13;
 				test.FailNow(err.Error())
 			}
 			if !bytes.Contains(raw, []byte("HACKEDPARAM")) {
-				test.FailNow(fmt.Sprintf("FUZZ PARAM FAILED: %v[%v]", string(p.typePosition), p.Name()))
+				test.FailNow(fmt.Sprintf("FUZZ PARAM FAILED: %v[%v]", string(p.position), p.Name()))
 			}
 			println(string(raw))
 		}
