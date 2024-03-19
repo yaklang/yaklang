@@ -119,6 +119,15 @@ func (s *SizedWaitGroup) AddWithContext(ctx context.Context, delta ...int) error
 // Done decrements the SizedWaitGroup counter.
 // See sync.WaitGroup documentation for more information.
 func (s *SizedWaitGroup) Done() {
+	defer func() {
+		if r := recover(); r != nil {
+			errMsg, ok := r.(string)
+			if ok && errMsg == "sync: negative WaitGroup counter" {
+			} else {
+				panic(r)
+			}
+		}
+	}()
 	<-s.current
 	s.wg.Done()
 	s.WaitingEventCount.Add(-1)
