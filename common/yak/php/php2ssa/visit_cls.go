@@ -387,7 +387,6 @@ func (y *builder) VisitFormalParameter(raw phpparser.IFormalParameterContext) in
 	if y == nil || raw == nil {
 		return nil
 	}
-
 	i, _ := raw.(*phpparser.FormalParameterContext)
 	if i == nil {
 		return nil
@@ -397,12 +396,7 @@ func (y *builder) VisitFormalParameter(raw phpparser.IFormalParameterContext) in
 	if i.Attributes() != nil {
 		_ = i.Attributes().GetText()
 	}
-
 	// member modifier cannot be used in function formal params
-	if len(i.AllMemberModifier()) > 0 {
-		// what the fuck?
-	}
-
 	allowNull := i.QuestionMark() != nil
 	_ = allowNull
 

@@ -370,7 +370,7 @@ formalParameterList
     ;
 
 formalParameter
-    : attributes? memberModifier* QuestionMark? typeHint? '&'? '...'? variableInitializer
+    : attributes?  QuestionMark? typeHint? '&'? '...'? variableInitializer
     ;
 
 typeHint
