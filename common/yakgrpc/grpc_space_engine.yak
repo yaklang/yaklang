@@ -50,14 +50,16 @@ feeddata = (result) => {
     defer func{ err = recover(); if err != nil { log.error(err)} }
     var host,port,service,title
     try {
+        //处理空间引擎
         host,port = str.ParseStringToHostPort(result.Addr)~
         service = result.Fingerprints
         title = result.HtmlTitle
     }catch e{
-        host = result.Host
+        //处理端口扫描
+        host = result.Target
         port = result.Port
-        service = result.Fingerprints
-        title = result.HtmlTitle
+        service = result.GetServiceName()
+        title = result.GetHtmlTitle()
     }
     yakit.TableData(tableName, {
         "uuid":str.HostPort(host, port),"主机": host, "端口": port, "基础指纹": service, "网站标题": title,

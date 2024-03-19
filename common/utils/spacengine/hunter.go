@@ -66,8 +66,7 @@ func resultToSpacengineList(filter string, result *gjson.Result) []*NetSpaceEngi
 		fps = utils.RemoveRepeatStringSlice(fps)
 
 		results[index] = &NetSpaceEngineResult{
-			Port:            port,
-			Addr:            utils.HostPort(host, host),
+			Addr:            utils.HostPort(host, port),
 			FromEngine:      "hunter",
 			HtmlTitle:       webTitle,
 			Domains:         domain,
