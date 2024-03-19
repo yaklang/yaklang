@@ -8,54 +8,29 @@ func (y *builder) VisitFunctionDeclaration(raw phpparser.IFunctionDeclarationCon
 	if y == nil || raw == nil {
 		return nil
 	}
-
 	i, _ := raw.(*phpparser.FunctionDeclarationContext)
 	if i == nil {
 		return nil
 	}
-
-	var attr string
+	//var attr string
 	if ret := i.Attributes(); ret != nil {
 		y.VisitAttributes(ret)
-		_ = attr
+		//_ = attr
 	}
-
+	//Ampersand 如果被设置了就是值引用
 	isRef := i.Ampersand() != nil
 	_ = isRef
-
 	funcName := i.Identifier().GetText()
-	ir := y.ir
-	ir.SetMarkedFunction(funcName)
-
-	newFunction := ir.NewFunc(funcName)
-	variable := ir.ReadOrCreateVariable(funcName).GetLastVariable()
-	ir.AssignVariable(variable, newFunction)
-
-	y.ir = ir.PushFunction(newFunction)
-
+	y.ir.SetMarkedFunction(funcName)
+	newFunction := y.ir.NewFunc(funcName)
+	y.ir = y.ir.PushFunction(newFunction)
 	{
-		//y.ir = y.ir.PushFunction(funcDec, symbolTable, current)
-		paramCodes := i.FormalParameterList().(*phpparser.FormalParameterListContext).AllFormalParameter()
-		for _, formal := range paramCodes {
-			param := formal.(*phpparser.FormalParameterContext)
-			defaultValue := param.VariableInitializer().(*phpparser.VariableInitializerContext)
-			varName := defaultValue.VarName()
-
-			val := y.VisitConstantInitializer(defaultValue.ConstantInitializer())
-			paramInstance := y.ir.NewParam(varName.GetText())
-			if val != nil {
-				paramInstance.SetDefault(val)
-			}
-			// build param
-		}
+		y.VisitFormalParameterList(i.FormalParameterList())
 		y.VisitBlockStatement(i.BlockStatement())
 		y.ir.Finish()
-		y.ir = ir.PopFunction()
-		if y.ir == nil {
-			y.ir = ir
-		}
 	}
-
-	//y.ir.WriteVariable(funcName, funcDec)
+	y.ir = y.ir.PopFunction()
+	variable := y.ir.CreateVariable(funcName)
+	y.ir.AssignVariable(variable, newFunction)
 	return nil
 }

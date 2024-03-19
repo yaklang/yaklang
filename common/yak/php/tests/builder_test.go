@@ -6,6 +6,25 @@ import (
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 )
 
+func TestParseSSA_functionDecl(t *testing.T) {
+
+	t.Run("test-1", func(t *testing.T) {
+		test.CheckPrintlnValue(`<?php
+function A(int $a){
+	println($a);
+}
+`, []string{"Parameter-$a"}, t)
+	})
+
+	t.Run("test-2", func(t *testing.T) {
+		test.MockSSA(t, `<?php
+function A(int $a){
+  println($a);
+}
+A(1);
+`)
+	})
+}
 func TestParseSSA_BasicMember(t *testing.T) {
 	test.MockSSA(t, `<?php
 $c=[1,2,3];
@@ -195,6 +214,7 @@ while ($i < 5) {
 }
 `)
 }
+
 func TestParseSSA_Break(t *testing.T) {
 	test.MockSSA(t, `<?php
 for(;;){echo 1;break;}
@@ -221,22 +241,27 @@ try {
 }`)
 }
 func TestParseSSA_Function_1(t *testing.T) {
-	test.MockSSA(t, `<?php
+	t.Run("mock function1", func(t *testing.T) {
+
+		test.MockSSA(t, `<?php
 function testFunction2($a, $b='1', $c=array(1,2,3,), string $d) {
 	1&&1;
 	return 1;
 }
 
-function testFunction1($a, $b='1', $c=array(1,2,3,), string $d) {
-	1&&1;
-	return 1;
+`)
+	})
+	t.Run("mock function2", func(t *testing.T) {
+		test.MockSSA(t, `<?php
+function a(public $a){
+  echo 1;
 }
 `)
+	})
 }
 
 func TestParseSSA_Function(t *testing.T) {
 	test.MockSSA(t, `<?php
-
 function testFunction() {
 	1&&1;
 }

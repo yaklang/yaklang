@@ -976,7 +976,7 @@ func (y *builder) VisitExpressionList(raw phpparser.IExpressionListContext) []ss
 	if i == nil {
 		return nil
 	}
-	var value = make([]ssa.Value, len(i.AllExpression()))
+	var value = make([]ssa.Value, 0, len(i.AllExpression()))
 	for _, expressionContext := range i.AllExpression() {
 		value = append(value, y.VisitExpression(expressionContext))
 	}
