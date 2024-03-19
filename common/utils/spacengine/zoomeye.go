@@ -24,7 +24,7 @@ func zoomeyeResultToSpacengineList(filter string, result *gjson.Result) []*NetSp
 
 		isTls := false
 		protocol := ""
-		host, port := dataMap["ip"].String(), rPortInfo.Get("port").Int()
+		host, port := dataMap["ip"].String(), rPortInfo.Get("port").String()
 		asn, isp := rGeoInfo.Get("asn").String(), rGeoInfo.Get("isp").String()
 		continent, country, city := rGeoInfo.Get("continent.names.zh-CN").String(), rGeoInfo.Get("country.names.zh-CN").String(), rGeoInfo.Get("city.names.zh-CN").String()
 		os := rPortInfo.Get("os").String()
@@ -66,6 +66,7 @@ func zoomeyeResultToSpacengineList(filter string, result *gjson.Result) []*NetSp
 		fps = utils.RemoveRepeatStringSlice(fps)
 
 		results[index] = &NetSpaceEngineResult{
+			Port:            port,
 			Addr:            utils.HostPort(host, port),
 			FromEngine:      "zoomeye",
 			Latitude:        latitule,
