@@ -130,6 +130,8 @@ type Program struct {
 	NameToInstructions *omap.OrderedMap[string, []Instruction]
 	IdToInstructionMap *omap.OrderedMap[int, Instruction]
 
+	persistentCallback func(Instruction)
+
 	errors SSAErrors
 
 	// for build
