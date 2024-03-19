@@ -724,6 +724,19 @@ func IsResp(raw any) (isHTTPResponse bool) {
 	return false
 }
 
+func IsRespFast(raw any) (isHTTPResponse bool) {
+	first := ""
+	switch data := raw.(type) {
+	case []byte:
+		first, _, _ = GetHTTPPacketFirstLine([]byte(data))
+	case string:
+		first, _, _ = GetHTTPPacketFirstLine([]byte(data))
+	case http.Response, *http.Response:
+		return true
+	}
+	return strings.HasPrefix(first, "HTTP/")
+}
+
 func IGetHeader(packet interface{}, headerKey string) []string {
 	var headers map[string][]string
 	switch data := packet.(type) {

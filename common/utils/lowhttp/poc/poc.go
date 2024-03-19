@@ -713,6 +713,20 @@ func WithReplaceHttpPacketCookie(key, value string) PocConfigOption {
 	}
 }
 
+// replaceAllCookies 是一个请求选项参数，用于改变请求报文，修改所有Cookie请求头中的值
+// Example:
+// ```
+// poc.Get("https://pie.dev/get", poc.replaceAllCookies({"aaa":"bbb", "ccc":"ddd"})) // 向 pie.dev 发起请求，修改aaa的cookie值为bbb，修改ccc的cookie值为ddd
+// ```
+func WithReplaceHttpPacketCookies(cookies any) PocConfigOption {
+	return func(c *PocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.ReplaceHTTPPacketCookies(packet, cookies)
+		},
+		)
+	}
+}
+
 // replaceBody 是一个请求选项参数，用于改变请求报文，修改请求体内容，第一个参数为修改后的请求体内容，第二个参数为是否分块传输
 // Example:
 // ```
@@ -831,6 +845,34 @@ func WithReplaceAllHttpPacketPostParamsWithoutEscape(values map[string]string) P
 	return func(c *PocConfig) {
 		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
 			return lowhttp.ReplaceAllHTTPPacketPostParamsWithoutEscape(packet, values)
+		},
+		)
+	}
+}
+
+// replaceFormEncoded 是一个请求选项参数，用于改变请求报文，修改请求体中的表单，如果不存在则会增加
+// Example:
+// ```
+// poc.Post("https://pie.dev/post", poc.replaceFormEncoded("aaa", "bbb")) // 向 pie.dev 发起请求，添加POST请求表单，其中aaa为键，bbb为值
+// ```
+func WithReplaceHttpPacketFormEncoded(key, value string) PocConfigOption {
+	return func(c *PocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.ReplaceHTTPPacketFormEncoded(packet, key, value)
+		},
+		)
+	}
+}
+
+// replaceUploadFile 是一个请求选项参数，用于改变请求报文，修改请求体中的上传的文件，其中第一个参数为表单名，第二个参数为文件名，第三个参数为文件内容，第四个参数是可选参数，为文件类型(Content-Type)，如果不存在则会增加
+// Example:
+// ```
+// poc.Post("https://pie.dev/post", poc.replaceUploadFile("file", "phpinfo.php", "<?php phpinfo(); ?>", "application/x-php")) // 向 pie.dev 发起请求，添加POST请求上传文件，其中file为表单名，phpinfo.php为文件名，<?php phpinfo(); ?>为文件内容，application/x-php为文件类型
+// ```
+func WithReplaceHttpPacketUploadFile(formName, fileName string, fileContent []byte, contentType ...string) PocConfigOption {
+	return func(c *PocConfig) {
+		c.PacketHandler = append(c.PacketHandler, func(packet []byte) []byte {
+			return lowhttp.ReplaceHTTPPacketUploadFile(packet, formName, fileName, fileContent, contentType...)
 		},
 		)
 	}
@@ -1536,6 +1578,7 @@ var PoCExports = map[string]interface{}{
 	"replaceUserAgent":                   WithReplaceHttpPacketUserAgent,
 	"replaceRandomUserAgent":             WithReplaceHttpPacketRandomUserAgent,
 	"replaceCookie":                      WithReplaceHttpPacketCookie,
+	"replaceCookies":                     WithReplaceHttpPacketCookies,
 	"replaceBody":                        WithReplaceHttpPacketBody,
 	"replaceAllQueryParams":              WithReplaceAllHttpPacketQueryParams,
 	"replaceAllQueryParamsWithoutEscape": WithReplaceAllHttpPacketQueryParamsWithoutEscape,
@@ -1544,6 +1587,8 @@ var PoCExports = map[string]interface{}{
 	"replaceQueryParam":                  WithReplaceHttpPacketQueryParam,
 	"replacePostParam":                   WithReplaceHttpPacketPostParam,
 	"replacePath":                        WithReplaceHttpPacketPath,
+	"replaceFormEncoded":                 WithReplaceHttpPacketFormEncoded,
+	"replaceUploadFile":                  WithReplaceHttpPacketUploadFile,
 	"appendHeader":                       WithAppendHeader,
 	"appendHeaders":                      WithAppendHeaders,
 	"appendCookie":                       WithAppendCookie,
@@ -1576,6 +1621,7 @@ var PoCExports = map[string]interface{}{
 	"ReplaceHTTPPacketHeader":                      lowhttp.ReplaceHTTPPacketHeader,
 	"ReplaceHTTPPacketBody":                        lowhttp.ReplaceHTTPPacketBodyFast,
 	"ReplaceHTTPPacketCookie":                      lowhttp.ReplaceHTTPPacketCookie,
+	"ReplaceHTTPPacketCookies":                     lowhttp.ReplaceHTTPPacketCookies,
 	"ReplaceHTTPPacketHost":                        lowhttp.ReplaceHTTPPacketHost,
 	"ReplaceHTTPPacketBasicAuth":                   lowhttp.ReplaceHTTPPacketBasicAuth,
 	"ReplaceAllHTTPPacketQueryParams":              lowhttp.ReplaceAllHTTPPacketQueryParams,
@@ -1585,6 +1631,8 @@ var PoCExports = map[string]interface{}{
 	"ReplaceHTTPPacketQueryParam":                  lowhttp.ReplaceHTTPPacketQueryParam,
 	"ReplaceHTTPPacketPostParam":                   lowhttp.ReplaceHTTPPacketPostParam,
 	"ReplaceHTTPPacketPath":                        lowhttp.ReplaceHTTPPacketPath,
+	"ReplaceHTTPPacketFormEncoded":                 lowhttp.ReplaceHTTPPacketFormEncoded,
+	"ReplaceHTTPPacketUploadFile":                  lowhttp.ReplaceHTTPPacketUploadFile,
 	"AppendHTTPPacketHeader":                       lowhttp.AppendHTTPPacketHeader,
 	"AppendHTTPPacketCookie":                       lowhttp.AppendHTTPPacketCookie,
 	"AppendHTTPPacketQueryParam":                   lowhttp.AppendHTTPPacketQueryParam,
