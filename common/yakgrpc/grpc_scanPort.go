@@ -232,7 +232,7 @@ func (s *Server) PortScan(req *ypb.PortScanRequest, stream ypb.Yak_PortScanServe
 	}
 
 	if req.GetBasicCrawlerEnableJSParser() {
-		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "basic-crawler-enable-js-parser", Value: ""})
+		reqParams.ExecParams = append(reqParams.ExecParams, &ypb.KVPair{Key: "basic-crawler-enable-jsparser", Value: ""})
 	}
 
 	return s.DebugPlugin(reqParams, stream)
