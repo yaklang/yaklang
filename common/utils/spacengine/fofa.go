@@ -89,7 +89,6 @@ func FofaQuery(email string, fofaKey string, filter string, maxPage, pageSize, m
 				}
 
 				ch <- &NetSpaceEngineResult{
-					Port:            port,
 					Addr:            utils.HostPort(ip, port),
 					FromEngine:      "fofa",
 					Latitude:        0,
