@@ -133,6 +133,8 @@ type Program struct {
 	// class blue print
 	ClassBluePrint map[string]*ClassBluePrint
 
+	persistentCallback func(Instruction)
+
 	errors SSAErrors
 
 	// for build
