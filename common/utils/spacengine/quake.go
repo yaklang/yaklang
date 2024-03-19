@@ -126,7 +126,6 @@ func QuakeQuery(key string, filter string, maxPage, maxRecord int) (chan *NetSpa
 				fps = utils.RemoveRepeatStringSlice(fps)
 				country, province, city := rLocation.Get("country_cn").String(), rLocation.Get("province_cn").String(), rLocation.Get("city_cn").String()
 				ch <- &NetSpaceEngineResult{
-					Port:            port,
 					Addr:            utils.HostPort(ip, port),
 					FromEngine:      "quake",
 					Latitude:        lat,

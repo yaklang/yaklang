@@ -66,7 +66,6 @@ func zoomeyeResultToSpacengineList(filter string, result *gjson.Result) []*NetSp
 		fps = utils.RemoveRepeatStringSlice(fps)
 
 		results[index] = &NetSpaceEngineResult{
-			Port:            port,
 			Addr:            utils.HostPort(host, port),
 			FromEngine:      "zoomeye",
 			Latitude:        latitule,
