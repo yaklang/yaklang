@@ -28,7 +28,6 @@ Include 25+ Instruction
 | `TypeValue`    | type literal, like `make([]int, 1)`, the `[]int` is type literal                                                                   |
 | `UnOp`         | unary operation                                                                                                                    |
 | `Undefined`    | undefined value, like `undefined`                                                                                                  |
-| `Update`       | update statement, with type, and optional init block, like `a = 1; a = a + 1` will cause the last `a` is changed                   |
 
 ## How Translate From AST?
 
