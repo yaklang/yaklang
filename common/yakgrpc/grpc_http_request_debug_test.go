@@ -749,7 +749,7 @@ if !a{
 yakit.Output("%s")
 }`, randStr),
 		PluginType: "yak",
-		ExecParams: []*ypb.KVPair{{Key: "a", Value: "false"}},
+		ExecParams: []*ypb.KVPair{},
 	})
 	if err != nil {
 		t.Fatal(err)
