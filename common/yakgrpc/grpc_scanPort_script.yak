@@ -29,7 +29,7 @@ excludeHosts = cli.String("exclude-hosts")
 excludePorts = cli.String("exclude-ports")
 enableCrawler = cli.Have("enable-basic-crawler")
 crawlerMaxRequest = cli.Int("basic-crawler-request-max")
-crawlerEnableJSParser = cli.Bool("basic-crawler-enable-jsparser", cli.setDefault(false), c.setRequired(false))
+crawlerEnableJSParser = cli.Bool("basic-crawler-enable-jsparser", cli.setDefault(false), cli.setRequired(false))
 cli.check()
 
 if proxies == "no" {
