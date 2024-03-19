@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -319,6 +320,41 @@ Cookie: c=1; d=1
 		}
 		if !bytes.Contains(byteResult, []byte(white)) {
 			t.Fatalf("ReplaceHTTPPacketCookie failed: %s", string(byteResult))
+		}
+	}
+}
+
+func TestReplaceHTTPRequestCookies(t *testing.T) {
+	for _, testcase := range []struct {
+		packet  string
+		m       map[string]string
+		excepts []string
+	}{
+		{
+			packet: `GET / HTTP/1.1
+Host: www.baidu.com
+Cookie: a=1
+`,
+			m: map[string]string{
+				"a": "3",
+				"b": "4",
+			},
+			excepts: []string{"a=3", "b=4"},
+		},
+		{
+			packet: `GET / HTTP/1.1
+Host: www.baidu.com
+`,
+			m: map[string]string{
+				"a": "3",
+				"b": "4",
+			},
+			excepts: []string{"a=3", "b=4"},
+		},
+	} {
+		result := string(ReplaceHTTPPacketCookies([]byte(testcase.packet), testcase.m))
+		for _, except := range testcase.excepts {
+			require.Contains(t, result, except)
 		}
 	}
 }
@@ -1548,6 +1584,125 @@ Host: www.baidu.com
 	}
 }
 
+func TestReplaceHTTPPacketFormEncoded(t *testing.T) {
+	compare := func(mutlipartReader *multipart.Reader, key, value string) {
+		part, err := mutlipartReader.NextPart()
+		if err != nil {
+			if !errors.Is(err, io.EOF) {
+				t.Fatal(err)
+			}
+			return
+		}
+		if part.FormName() != key {
+			t.Fatalf("ReplaceHTTPPacketFormEncoded failed: form-key failed: %s(got) != %s(want)", part.FormName(), key)
+		}
+
+		buf := new(bytes.Buffer)
+		if _, err = io.Copy(buf, part); err != nil {
+			t.Fatal(err)
+		}
+		if buf.String() != value {
+			t.Fatalf("ReplaceHTTPPacketFormEncoded failed: form-value failed: %s(got) != %s(want)", buf.String(), value)
+		}
+	}
+
+	testcases := []struct {
+		origin           string
+		oldKey, oldValue string
+		key, value       string
+		exceptFormCount  int // set if oldKey == key
+	}{
+		{
+			// append
+			origin: `GET / HTTP/1.1
+Host: www.baidu.com
+`,
+			key:   "a",
+			value: "1",
+		},
+		{
+			// append with no-form data
+			origin: `POST / HTTP/1.1
+Host: www.baidu.com
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 7
+
+a=1&b=2`,
+			key:   "a",
+			value: "1",
+		},
+		{
+			// replace
+			origin: `POST / HTTP/1.1
+Host: www.baidu.com
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="a"
+
+1
+------WebKitFormBoundary7MA4YWxkTrZu0gW--`,
+			oldKey:          "a",
+			oldValue:        "1",
+			key:             "a",
+			value:           "2",
+			exceptFormCount: 1,
+		},
+	}
+	for _, testcase := range testcases {
+		actual := ReplaceHTTPPacketFormEncoded([]byte(testcase.origin), testcase.key, testcase.value)
+
+		blocks := strings.SplitN(string(actual), "\r\n\r\n", 2)
+		headers := blocks[0]
+		re := regexp.MustCompile(`(?m)boundary=([-\w]+)`)
+		headers = re.ReplaceAllString(headers, "boundary=test")
+		for _, header := range strings.Split(headers, "\r\n") {
+			if !strings.HasPrefix(header, "Content-Type") {
+				continue
+			}
+			spilted := strings.Split(header, ":")
+			if len(spilted) != 2 {
+				t.Fatalf("ReplaceHTTPPacketFormEncoded failed: Content-Type not have colon : %s", header)
+			}
+			if strings.TrimSpace(spilted[1]) != "multipart/form-data; boundary=test" {
+				t.Fatalf("ReplaceHTTPPacketFormEncoded failed: wrong Content-Type: %s", header)
+			}
+		}
+		body := blocks[1]
+		re = regexp.MustCompile(`(?m)(--\w+)`)
+		result := re.ReplaceAllString(body, "--test")
+
+		// multipart reader
+		mutlipartReader := multipart.NewReader(strings.NewReader(result), "test")
+
+		if testcase.oldKey != testcase.key {
+			// compare old key and value
+			if testcase.oldKey != "" {
+				compare(mutlipartReader, testcase.oldKey, testcase.oldValue)
+			}
+
+			// compare new key and value
+			compare(mutlipartReader, testcase.key, testcase.value)
+		} else {
+			// compare new key and value
+			compare(mutlipartReader, testcase.key, testcase.value)
+			count := 1
+			for {
+				_, err := mutlipartReader.NextPart()
+				if err != nil {
+					if errors.Is(err, io.EOF) {
+						break
+					}
+					t.Fatal(err)
+				}
+				count++
+			}
+			require.Equal(t, testcase.exceptFormCount, count)
+		}
+
+	}
+}
+
 func TestAppendHTTPPacketFormEncoded(t *testing.T) {
 	compare := func(mutlipartReader *multipart.Reader, key, value string) {
 		part, err := mutlipartReader.NextPart()
@@ -1646,7 +1801,7 @@ Content-Disposition: form-data; name="a"
 	}
 }
 
-func TestAppendHTTPPacketUploadFile(t *testing.T) {
+func TestReplaceHTTPPacketUploadFile(t *testing.T) {
 	compare := func(mutlipartReader *multipart.Reader, fieldName, fileName string, fileContent interface{}, contentType string) {
 		part, err := mutlipartReader.NextPart()
 		if err != nil {
@@ -1656,10 +1811,10 @@ func TestAppendHTTPPacketUploadFile(t *testing.T) {
 			return
 		}
 		if part.FormName() != fieldName {
-			t.Fatalf("AppendHTTPPacketFormEncoded failed: form-key failed: %s(got) != %s(want)", part.FormName(), fieldName)
+			t.Fatalf("ReplaceHTTPPacketUploadFile failed: form-key failed: %s(got) != %s(want)", part.FormName(), fieldName)
 		}
 		if part.FileName() != fileName {
-			t.Fatalf("AppendHTTPPacketFormEncoded failed: form-key failed: %s(got) != %s(want)", part.FileName(), fileName)
+			t.Fatalf("ReplaceHTTPPacketUploadFile failed: form-key failed: %s(got) != %s(want)", part.FileName(), fileName)
 		}
 
 		buf := new(bytes.Buffer)
@@ -1670,11 +1825,11 @@ func TestAppendHTTPPacketUploadFile(t *testing.T) {
 		switch r := fileContent.(type) {
 		case string:
 			if buf.String() != r {
-				t.Fatalf("AppendHTTPPacketFormEncoded failed: form-value failed: %s(got) != %s(want)", buf.String(), r)
+				t.Fatalf("ReplaceHTTPPacketUploadFile failed: form-value failed: %s(got) != %s(want)", buf.String(), r)
 			}
 		case []byte:
 			if bytes.Compare(buf.Bytes(), r) != 0 {
-				t.Fatalf("AppendHTTPPacketFormEncoded failed: form-value failed: %s(got) != %s(want)", buf.String(), r)
+				t.Fatalf("ReplaceHTTPPacketUploadFile failed: form-value failed: %s(got) != %s(want)", buf.String(), r)
 			}
 		case io.Reader:
 			buf2 := new(bytes.Buffer)
@@ -1682,13 +1837,163 @@ func TestAppendHTTPPacketUploadFile(t *testing.T) {
 				t.Fatal(err)
 			}
 			if buf.String() != buf2.String() {
-				t.Fatalf("AppendHTTPPacketFormEncoded failed: form-value failed: %s(got) != %s(want)", buf.String(), buf2.String())
+				t.Fatalf("ReplaceHTTPPacketUploadFile failed: form-value failed: %s(got) != %s(want)", buf.String(), buf2.String())
 			}
 		}
 
 		if contentType != "" {
 			if part.Header.Get("Content-Type") != contentType {
-				t.Fatalf("AppendHTTPPacketFormEncoded failed: form-value failed: %s(got) != %s(want)", part.Header.Get("Content-Type"), contentType)
+				t.Fatalf("ReplaceHTTPPacketUploadFile failed: form-value failed: %s(got) != %s(want)", part.Header.Get("Content-Type"), contentType)
+			}
+		}
+	}
+
+	testcases := []struct {
+		origin                    string
+		oldfieldName, oldfileName string
+		oldFileContent            string
+		fieldName, fileName       string
+		fileContent               interface{}
+		contentType               string
+		exceptFormCount           int // set if oldfieldName == fieldName
+	}{
+		{
+			// append
+			origin: `GET / HTTP/1.1
+Host: www.baidu.com
+`,
+			fieldName:   "test",
+			fileName:    "test.txt",
+			fileContent: "test",
+		},
+		{
+			// append with already existed form-data
+			origin: `POST / HTTP/1.1
+Host: www.baidu.com
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="a"
+
+1
+------WebKitFormBoundary7MA4YWxkTrZu0gW--`,
+			oldfieldName:   "a",
+			oldfileName:    "",
+			oldFileContent: "1",
+			fieldName:      "test",
+			fileName:       "test.txt",
+			fileContent:    "test",
+		},
+		{
+			// replace
+			origin: `POST / HTTP/1.1
+Host: www.baidu.com
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="aaa"; filename="aaa.txt"
+Content-Type: application/octet-stream
+
+bbb
+------WebKitFormBoundary7MA4YWxkTrZu0gW--`,
+			oldfieldName:    "aaa",
+			oldfileName:     "aaa.txt",
+			oldFileContent:  "aaa",
+			fieldName:       "aaa",
+			fileName:        "test.txt",
+			fileContent:     "test",
+			exceptFormCount: 1,
+		},
+	}
+	for _, testcase := range testcases {
+		var actual []byte
+		if testcase.contentType != "" {
+			actual = ReplaceHTTPPacketUploadFile([]byte(testcase.origin), testcase.fieldName, testcase.fileName, testcase.fileContent, testcase.contentType)
+		} else {
+			actual = ReplaceHTTPPacketUploadFile([]byte(testcase.origin), testcase.fieldName, testcase.fileName, testcase.fileContent)
+		}
+
+		blocks := strings.SplitN(string(actual), "\r\n\r\n", 2)
+		body := blocks[1]
+		_ = body
+		re := regexp.MustCompile(`(?m)(--\w+)`)
+		result := re.ReplaceAllString(body, "--test")
+
+		// multipart reader
+		mutlipartReader := multipart.NewReader(strings.NewReader(result), "test")
+
+		if testcase.oldfieldName != testcase.fieldName {
+			// compare old
+			if testcase.oldfieldName != "" {
+				compare(mutlipartReader, testcase.oldfieldName, testcase.oldfileName, testcase.oldFileContent, testcase.contentType)
+			}
+
+			// compare new
+			compare(mutlipartReader, testcase.fieldName, testcase.fileName, testcase.fileContent, testcase.contentType)
+		} else {
+			// compare new
+			compare(mutlipartReader, testcase.fieldName, testcase.fileName, testcase.fileContent, testcase.contentType)
+			// check count
+			count := 1
+			for {
+				_, err := mutlipartReader.NextPart()
+				if err != nil {
+					if errors.Is(err, io.EOF) {
+						break
+					}
+					t.Fatal(err)
+				}
+				count++
+			}
+			require.Equal(t, testcase.exceptFormCount, count)
+		}
+
+	}
+}
+
+func TestAppendHTTPPacketUploadFile(t *testing.T) {
+	compare := func(mutlipartReader *multipart.Reader, fieldName, fileName string, fileContent interface{}, contentType string) {
+		part, err := mutlipartReader.NextPart()
+		if err != nil {
+			if !errors.Is(err, io.EOF) {
+				t.Fatal(err)
+			}
+			return
+		}
+		if part.FormName() != fieldName {
+			t.Fatalf("AppendHTTPPacketUploadFile failed: form-key failed: %s(got) != %s(want)", part.FormName(), fieldName)
+		}
+		if part.FileName() != fileName {
+			t.Fatalf("AppendHTTPPacketUploadFile failed: form-key failed: %s(got) != %s(want)", part.FileName(), fileName)
+		}
+
+		buf := new(bytes.Buffer)
+		if _, err = io.Copy(buf, part); err != nil {
+			t.Fatal(err)
+		}
+
+		switch r := fileContent.(type) {
+		case string:
+			if buf.String() != r {
+				t.Fatalf("AppendHTTPPacketUploadFile failed: form-value failed: %s(got) != %s(want)", buf.String(), r)
+			}
+		case []byte:
+			if bytes.Compare(buf.Bytes(), r) != 0 {
+				t.Fatalf("AppendHTTPPacketUploadFile failed: form-value failed: %s(got) != %s(want)", buf.String(), r)
+			}
+		case io.Reader:
+			buf2 := new(bytes.Buffer)
+			if _, err = io.Copy(buf2, r); err != nil {
+				t.Fatal(err)
+			}
+			if buf.String() != buf2.String() {
+				t.Fatalf("AppendHTTPPacketUploadFile failed: form-value failed: %s(got) != %s(want)", buf.String(), buf2.String())
+			}
+		}
+
+		if contentType != "" {
+			if part.Header.Get("Content-Type") != contentType {
+				t.Fatalf("AppendHTTPPacketUploadFile failed: form-value failed: %s(got) != %s(want)", part.Header.Get("Content-Type"), contentType)
 			}
 		}
 	}
@@ -1788,8 +2093,6 @@ bbb
 
 		// compare new
 		compare(mutlipartReader, testcase.fieldName, testcase.fileName, testcase.fileContent, testcase.contentType)
-
-		fmt.Printf("%s\n\n\n\n", actual)
 
 	}
 }
