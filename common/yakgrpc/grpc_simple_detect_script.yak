@@ -285,9 +285,6 @@ if loadPluginFinished > 0 || loadPluginFailed > 0 {
 } else if enableBrute {
     onlyBrute = true
     yakit.StatusCard("加载插件", "弱口令检测")
-} else {
-    yakit.StatusCard("加载插件失败ID", "请检查是否导入了插件", "加载插件失败")
-    die("没有插件加载")
 }
 
 
@@ -639,7 +636,7 @@ func handleTCP(target) {
 
             yakit.Info("GOT: %v", result.String())
             yakit.Output({"host": "TCP-" + result.Target, "port": result.Port, "fingerprint": result.GetServiceName(), "htmlTitle": "" + result.GetHtmlTitle(), "isOpen": true})
-            yakit.SavePortFromResult(result, taskName)
+            yakit.SavePortFromResult(result)
             addOpenPortCount()
             handleServiceScanResult(result)
         }
@@ -675,7 +672,7 @@ func handleSYN(target) {
 
                 yakit.Info("SYNGOT: %v", result.String())
                 yakit.Output({"host": "SYN-" + result.Target, "port": result.Port, "fingerprint": result.GetServiceName(), "htmlTitle": "" + result.GetHtmlTitle(), "isOpen": true})
-                yakit.SavePortFromResult(result, taskName)
+                yakit.SavePortFromResult(result)
 
                 addOpenPortCount()
                 handleServiceScanResult(result)
