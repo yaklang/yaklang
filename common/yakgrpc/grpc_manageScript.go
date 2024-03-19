@@ -718,6 +718,12 @@ func (s *Server) GetYakScriptTagsAndType(ctx context.Context, req *ypb.Empty) (*
 
 	group, _ := yakit.GroupCount(s.GetProfileDatabase())
 	for _, v := range group {
+		if v.IsPocBuiltIn {
+			continue
+		}
+		if len(v.TemporaryId) > 0 {
+			continue
+		}
 		tagsAndType.Group = append(tagsAndType.Group, &ypb.TagsAndType{
 			Value: v.Value,
 			Total: int32(v.Count),

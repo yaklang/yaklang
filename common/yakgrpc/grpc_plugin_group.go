@@ -10,11 +10,13 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"strings"
 )
 
 func (s *Server) QueryYakScriptGroup(ctx context.Context, req *ypb.QueryYakScriptGroupRequest) (*ypb.QueryYakScriptGroupResponse, error) {
 	var groupCount ypb.QueryYakScriptGroupResponse
-	if req.All {
+
+	if req.GetAll() {
 		countAll, err := yakit.CountYakScriptByWhere(s.GetProfileDatabase(), false)
 		if err == nil {
 			groupCount.Group = append(groupCount.Group, &ypb.GroupCount{
@@ -32,14 +34,56 @@ func (s *Server) QueryYakScriptGroup(ctx context.Context, req *ypb.QueryYakScrip
 			})
 		}
 	}
-	group, _ := yakit.GroupCount(s.GetProfileDatabase())
-	for _, v := range group {
-		groupCount.Group = append(groupCount.Group, &ypb.GroupCount{
-			Value:   v.Value,
-			Total:   int32(v.Count),
-			Default: false,
-		})
+	groups, _ := yakit.GroupCount(s.GetProfileDatabase())
+	for _, group := range groups {
+		if req.GetAll() {
+			if req.GetIsPocBuiltIn() != group.IsPocBuiltIn {
+				continue
+			}
+			if req.GetPageId() != group.TemporaryId {
+				continue
+			}
+			groupCount.Group = append(groupCount.Group, &ypb.GroupCount{
+				Value:        group.Value,
+				Total:        int32(group.Count),
+				Default:      false,
+				TemporaryId:  group.TemporaryId,
+				IsPocBuiltIn: group.IsPocBuiltIn,
+			})
+		} else if !req.GetIsPocBuiltIn() && req.GetPageId() == "" && !req.GetAll() {
+			if req.GetIsPocBuiltIn() != group.IsPocBuiltIn {
+				continue
+			}
+			if req.GetPageId() != group.TemporaryId {
+				continue
+			}
+			groupCount.Group = append(groupCount.Group, &ypb.GroupCount{
+				Value:        group.Value,
+				Total:        int32(group.Count),
+				Default:      false,
+				TemporaryId:  group.TemporaryId,
+				IsPocBuiltIn: group.IsPocBuiltIn,
+			})
+		} else {
+			// 检查记录是否满足IsPocBuiltIn为true
+			isPocBuiltInMatch := req.GetIsPocBuiltIn() && group.IsPocBuiltIn
+
+			// 检查记录的TemporaryId是否与PageId相等
+			pageIdMatch := req.GetPageId() != "" && group.TemporaryId == req.GetPageId()
+
+			// 如果记录满足IsPocBuiltIn为true或PageId相等的任一条件
+			if isPocBuiltInMatch || pageIdMatch {
+				groupCount.Group = append(groupCount.Group, &ypb.GroupCount{
+					Value:        group.Value,
+					Total:        int32(group.Count),
+					Default:      false,
+					TemporaryId:  group.TemporaryId,
+					IsPocBuiltIn: group.IsPocBuiltIn,
+				})
+			}
+		}
 	}
+
 	return &groupCount, nil
 }
 
@@ -61,6 +105,7 @@ func (s *Server) SaveYakScriptGroup(ctx context.Context, req *ypb.SaveYakScriptG
 				saveData := &yakit.PluginGroup{
 					YakScriptName: yakScript.ScriptName,
 					Group:         group,
+					TemporaryId:   req.GetPageId(),
 				}
 				saveData.Hash = saveData.CalcHash()
 				err := yakit.CreateOrUpdatePluginGroup(s.GetProfileDatabase(), saveData.Hash, saveData)
@@ -75,6 +120,7 @@ func (s *Server) SaveYakScriptGroup(ctx context.Context, req *ypb.SaveYakScriptG
 				saveData := &yakit.PluginGroup{
 					YakScriptName: yakScript.ScriptName,
 					Group:         group,
+					TemporaryId:   req.GetPageId(),
 				}
 				saveData.Hash = saveData.CalcHash()
 				err := yakit.DeletePluginGroupByHash(s.GetProfileDatabase(), saveData.Hash)
@@ -122,13 +168,17 @@ func (s *Server) RenameYakScriptGroup(ctx context.Context, req *ypb.RenameYakScr
 }
 
 func (s *Server) DeleteYakScriptGroup(ctx context.Context, req *ypb.DeleteYakScriptGroupRequest) (*ypb.Empty, error) {
-	if req.Group == "" {
+	if req.GetGroup() == "" {
 		return nil, utils.Errorf("params is empty")
 	}
-	err := yakit.DeletePluginGroup(s.GetProfileDatabase(), req.Group)
-	if err != nil {
-		return nil, err
+	groups := strings.Split(req.GetGroup(), ",")
+	for _, group := range groups {
+		err := yakit.DeletePluginGroup(s.GetProfileDatabase(), group)
+		if err != nil {
+			return nil, err
+		}
 	}
+
 	return &ypb.Empty{}, nil
 }
 

@@ -1192,7 +1192,7 @@ message DebugPluginRequest {
   HybridScanPluginConfig LinkPluginConfig = 6;
 
   // plugin name, if not empty, will use code
-  string PluginName  = 7;
+  string PluginName = 7;
 }
 
 message HTTPRequestBuilderResult {
@@ -3715,6 +3715,9 @@ message ImportYakScriptResult {
 
 message QueryYakScriptGroupRequest {
   bool All = 1;
+  string PageId = 2;
+  // 默认是false， 目前中有专项漏洞这里的关键词组传 true 才会返回数据，插件管理里面不传就不会返回 poc 这边的内置组
+  bool IsPocBuiltIn = 3;
 }
 
 message QueryYakScriptGroupResponse {
@@ -3725,12 +3728,16 @@ message GroupCount {
   string Value = 1;
   int32 Total = 2;
   bool Default = 3;
+  // 临时组ID
+  string TemporaryId = 5;
+  bool IsPocBuiltIn = 6;
 }
 
 message SaveYakScriptGroupRequest {
   QueryYakScriptRequest Filter = 1;
   repeated string SaveGroup = 2;
   repeated string RemoveGroup = 3;
+  string PageId = 4;
 }
 
 message RenameYakScriptGroupRequest {
