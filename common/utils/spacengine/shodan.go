@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -109,6 +110,7 @@ func ShodanQuery(key string, filter string, maxPage, maxRecord int) (chan *NetSp
 						break
 					}
 					tmpR := &NetSpaceEngineResult{
+						Port:            strconv.Itoa(port),
 						Addr:            utils.HostPort(hostResult.IPStr, port),
 						FromEngine:      "shodan",
 						Latitude:        hostResult.Latitude,

@@ -21,6 +21,7 @@ func resultToSpacengineList(filter string, result *gjson.Result) []*NetSpaceEngi
 		company := dataMap["company"].String()
 		os := dataMap["os"].String()
 		banner := dataMap["banner"].String()
+		port := dataMap["port"].String()
 		url := dataMap["url"].String()
 		protocol, baseProtocol := dataMap["protocol"].String(), dataMap["base_protocol"].String()
 		isp := dataMap["isp"].String()
@@ -65,6 +66,7 @@ func resultToSpacengineList(filter string, result *gjson.Result) []*NetSpaceEngi
 		fps = utils.RemoveRepeatStringSlice(fps)
 
 		results[index] = &NetSpaceEngineResult{
+			Port:            port,
 			Addr:            utils.HostPort(host, host),
 			FromEngine:      "hunter",
 			HtmlTitle:       webTitle,
