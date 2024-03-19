@@ -16,8 +16,10 @@ type ExecResult struct {
 }
 
 type TagAndTypeValue struct {
-	Value string
-	Count int
+	Value        string
+	Count        int
+	TemporaryId  string
+	IsPocBuiltIn bool
 }
 
 func IsRiskExecResult(i any) (*Risk, bool) {

@@ -974,6 +974,9 @@ func FuzzSearchWithStringArrayOrEx(db *gorm.DB, fields []string, targets []strin
 
 	for _, field := range fields {
 		for _, target := range targets {
+			if len(target) == 0 {
+				continue
+			}
 			if ilike {
 				conds = append(conds, fmt.Sprintf("( %v ILIKE ? )", field))
 			} else {
