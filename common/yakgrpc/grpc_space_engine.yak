@@ -54,10 +54,10 @@ feeddata = (result) => {
         service = result.Fingerprints
         title = result.HtmlTitle
     }catch e{
-        host = result.Target
+        host = result.Host
         port = result.Port
-        service = result.GetServiceName()
-        title = result.GetHtmlTitle()
+        service = result.Fingerprints
+        title = result.HtmlTitle
     }
     yakit.TableData(tableName, {
         "uuid":str.HostPort(host, port),"主机": host, "端口": port, "基础指纹": service, "网站标题": title,

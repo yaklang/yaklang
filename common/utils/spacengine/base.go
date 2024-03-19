@@ -10,6 +10,7 @@ type NetSpaceEngineResult struct {
 	Url                 string
 	ConfirmHttps        bool
 	Host                string
+	Port                string
 	City                string
 	Asn                 string
 	Location            string
