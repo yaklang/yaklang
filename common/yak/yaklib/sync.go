@@ -42,6 +42,15 @@ func (wg *WaitGroupProxy) SetZero() {
 }
 
 func (wg *WaitGroupProxy) Done() {
+	defer func() {
+		if r := recover(); r != nil {
+			errMsg, ok := r.(string)
+			if ok && errMsg == "sync: negative WaitGroup counter" {
+			} else {
+				panic(r)
+			}
+		}
+	}()
 	wg.Add(-1)
 }
 
