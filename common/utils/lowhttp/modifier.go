@@ -15,7 +15,6 @@ import (
 	"reflect"
 	"sort"
 	"strings"
-	"unsafe"
 
 	"github.com/samber/lo"
 
@@ -687,13 +686,16 @@ func DeleteHTTPPacketHeader(packet []byte, headerKey string) []byte {
 // ReplaceHTTPPacketCookie 是一个辅助函数，用于改变请求报文，修改Cookie请求头中的值，如果不存在则会增加
 // Example:
 // ```
-// poc.ReplaceHTTPPacketCookie(poc.BasicRequest(), p"aaa", "bbb") // 修改cookie值，由于这里没有aaa的cookie值，所以会增加
+// poc.ReplaceHTTPPacketCookie(poc.BasicRequest(), "aaa", "bbb") // 修改cookie值，由于这里没有aaa的cookie值，所以会增加
 // ```
 func ReplaceHTTPPacketCookie(packet []byte, key string, value any) []byte {
-	var isReq bool
-	var isRsp bool
-	handled := false
-	var isChunked bool
+	var (
+		isReq     bool
+		isRsp     bool
+		handled   bool
+		isChunked bool
+	)
+
 	header, body := SplitHTTPPacket(packet, func(method string, requestUri string, proto string) error {
 		isReq = true
 		return nil
@@ -732,6 +734,30 @@ func ReplaceHTTPPacketCookie(packet []byte, key string, value any) []byte {
 		return data
 	}
 	return AppendHTTPPacketCookie(data, key, value)
+}
+
+// ReplaceHTTPPacketCookies 是一个辅助函数，用于改变请求报文，修改Cookie请求头
+// Example:
+// ```
+// poc.ReplaceHTTPPacketCookies(poc.BasicRequest(), {"aaa":"bbb", "ccc":"ddd"}) // 修改cookie值为aaa=bbb;ccc=ddd
+// ```
+func ReplaceHTTPPacketCookies(packet []byte, m any) []byte {
+	cookiesMap, err := utils.InterfaceToMapInterfaceE(m)
+	if err != nil {
+		return packet
+	}
+	cookie := make([]*http.Cookie, 0, len(cookiesMap))
+	for key, value := range cookiesMap {
+		cookie = append(cookie, &http.Cookie{Name: key, Value: utils.InterfaceToString(value)})
+	}
+	cookieValue := CookiesToString(cookie)
+
+	cookieKey := "Cookie"
+	isRsp := IsRespFast(packet)
+	if isRsp {
+		cookieKey = "Set-Cookie"
+	}
+	return ReplaceHTTPPacketHeader(packet, cookieKey, cookieValue)
 }
 
 // AppendHTTPPacketCookie 是一个辅助函数，用于改变请求报文，添加Cookie请求头中的值
@@ -914,6 +940,54 @@ func handleHTTPRequestForm(packet []byte, fixMethod bool, fixContentType bool, c
 	return ReplaceHTTPPacketBody(buf.Bytes(), body, isChunked)
 }
 
+// ReplaceHTTPPacketFormEncoded 是一个辅助函数，用于改变请求报文，替换请求体中的表单，如果不存在则会增加
+// Example:
+// ```
+// poc.ReplaceHTTPPacketFormEncoded(`POST /post HTTP/1.1
+// Host: pie.dev
+// Content-Type: multipart/form-data; boundary=------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm
+// Content-Length: 203
+//
+// --------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm
+// Content-Disposition: form-data; name="aaa"
+//
+// bbb
+// --------------------------OFHnlKtUimimGcXvRSxgCZlIMAyDkuqsxeppbIFm--`, "ccc", "ddd") // 替换POST请求表单，其中ccc为键，ddd为值
+// ```
+func ReplaceHTTPPacketFormEncoded(packet []byte, key, value string) []byte {
+	return handleHTTPRequestForm(packet, true, true, func(_ string, multipartReader *multipart.Reader, multipartWriter *multipart.Writer) bool {
+		handled := false
+		if multipartReader != nil {
+			// copy part
+			for {
+				part, err := multipartReader.NextPart()
+				if err != nil {
+					break
+				}
+
+				if part.FormName() == key {
+					multipartWriter.WriteField(key, value)
+				} else {
+					partWriter, err := multipartWriter.CreatePart(part.Header)
+					if err != nil {
+						break
+					}
+					_, err = io.Copy(partWriter, part)
+					if err != nil {
+						break
+					}
+
+				}
+			}
+		}
+		// append form
+		if !handled && multipartWriter != nil {
+			multipartWriter.WriteField(key, value)
+		}
+		return true
+	})
+}
+
 // AppendHTTPPacketFormEncoded 是一个辅助函数，用于改变请求报文，添加请求体中的表单
 // Example:
 // ```
@@ -999,7 +1073,7 @@ func AppendHTTPPacketUploadFile(packet []byte, fieldName, fileName string, fileC
 
 			switch r := fileContent.(type) {
 			case string:
-				content = unsafe.Slice(unsafe.StringData(r), len(r))
+				content = utils.UnsafeStringToBytes(r)
 			case []byte:
 				content = r
 			case io.Reader:
@@ -1013,6 +1087,93 @@ func AppendHTTPPacketUploadFile(packet []byte, fieldName, fileName string, fileC
 				h.Set("Content-Type", guessContentType)
 			}
 
+			partWriter, err := multipartWriter.CreatePart(h)
+			if err == nil {
+				partWriter.Write(content)
+			}
+		}
+		return true
+	})
+}
+
+// ReplaceHTTPPacketUploadFile 是一个辅助函数，用于改变请求报文，替换请求体中的上传的文件，其中第一个参数为原始请求报文，第二个参数为表单名，第三个参数为文件名，第四个参数为文件内容，第五个参数是可选参数，为文件类型(Content-Type)，如果表单名不存在则会增加
+// Example:
+// ```
+// _, raw, _ = poc.ParseUrlToHTTPRequestRaw("POST", "https://pie.dev/post")
+// poc.ReplaceHTTPPacketUploadFile(raw, "file", "phpinfo.php", "<?php phpinfo(); ?>", "image/jpeg")) // 添加POST请求表单，其文件名为phpinfo.php，内容为<?php phpinfo(); ?>，文件类型为image/jpeg
+// ```
+func ReplaceHTTPPacketUploadFile(packet []byte, fieldName, fileName string, fileContent interface{}, contentType ...string) []byte {
+	var (
+		content        []byte
+		handled        bool
+		hasContentType = len(contentType) > 0
+	)
+
+	// 读取新的content
+	switch r := fileContent.(type) {
+	case string:
+		content = []byte(r)
+	case []byte:
+		content = r
+	case io.Reader:
+		r.Read(content)
+	}
+
+	// 构造MIME Header
+	buildMIMEHeader := func(h textproto.MIMEHeader) {
+		contentDisposition := fmt.Sprintf(`form-data; name="%s"`, escapeQuotes(fieldName))
+		if fileName != "" {
+			contentDisposition += fmt.Sprintf(`;filename="%s"`, escapeQuotes(fileName))
+		}
+		h.Set("Content-Disposition", contentDisposition)
+		guessContentType := "application/octet-stream"
+		if hasContentType {
+			guessContentType = contentType[0]
+		}
+
+		if !hasContentType {
+			guessContentType = http.DetectContentType(content)
+		}
+
+		if guessContentType != "" {
+			h.Set("Content-Type", guessContentType)
+		}
+	}
+
+	return handleHTTPRequestForm(packet, true, true, func(_ string, multipartReader *multipart.Reader, multipartWriter *multipart.Writer) bool {
+		if multipartReader != nil {
+			// copy part
+			for {
+				part, err := multipartReader.NextPart()
+				if err != nil {
+					break
+				}
+				isOldKey := false
+				if fieldName == part.FormName() {
+					// 重新构造MIME Header
+					handled = true
+					isOldKey = true
+					buildMIMEHeader(part.Header)
+				}
+				partWriter, err := multipartWriter.CreatePart(part.Header)
+				if err != nil {
+					break
+				}
+				if !isOldKey {
+					_, err = io.Copy(partWriter, part)
+					if err != nil {
+						break
+					}
+				} else {
+					partWriter.Write(content)
+				}
+
+			}
+		}
+		// append upload file
+		if multipartWriter != nil && !handled {
+			h := make(textproto.MIMEHeader)
+			buildMIMEHeader(h)
 			partWriter, err := multipartWriter.CreatePart(h)
 			if err == nil {
 				partWriter.Write(content)
