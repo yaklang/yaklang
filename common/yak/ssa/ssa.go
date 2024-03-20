@@ -27,6 +27,7 @@ type Instruction interface {
 	GetName() string
 	SetName(variable string)
 	GetVerboseName() string
+	GetShortVerboseName() string
 	SetVerboseName(string)
 
 	GetId() int // for identify
