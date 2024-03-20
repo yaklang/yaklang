@@ -75,12 +75,13 @@ type Config struct {
 	EnableReverseConnectionFeature bool
 
 	// 搜索 yakit.YakScript
-	SingleTemplateRaw string
-	TemplateName      []string
-	FuzzQueryTemplate []string
-	ExcludeTemplates  []string
-	Tags              []string
-	QueryAll          bool
+	SingleTemplateRaw      string
+	ExactTemplateInstances []*yakit.YakScript
+	TemplateName           []string
+	FuzzQueryTemplate      []string
+	ExcludeTemplates       []string
+	Tags                   []string
+	QueryAll               bool
 
 	// DebugMode
 	Debug         bool
@@ -187,6 +188,12 @@ func WithTemplateRaw(b string) ConfigOption {
 func WithTemplateName(s ...string) ConfigOption {
 	return func(config *Config) {
 		config.TemplateName = s
+	}
+}
+
+func WithExactTemplateInstance(script *yakit.YakScript) ConfigOption {
+	return func(config *Config) {
+		config.ExactTemplateInstances = append(config.ExactTemplateInstances, script)
 	}
 }
 
@@ -422,6 +429,15 @@ func (c *Config) GenerateYakTemplate() (chan *YakTemplate, error) {
 				tpl, err := CreateYakTemplateFromNucleiTemplateRaw(c.SingleTemplateRaw)
 				if err != nil {
 					log.Errorf("create yak template failed (raw): %s", err)
+				}
+				feedback(tpl)
+			}
+
+			for _, y := range c.ExactTemplateInstances {
+				tpl, err := CreateYakTemplateFromNucleiTemplateRaw(y.Content)
+				if err != nil {
+					log.Errorf("create yak template failed (template names): %s", err)
+					continue
 				}
 				feedback(tpl)
 			}

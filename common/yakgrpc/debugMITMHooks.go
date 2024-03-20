@@ -2,7 +2,9 @@ package yakgrpc
 
 import (
 	"context"
+
 	"github.com/jinzhu/gorm"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
@@ -66,9 +68,12 @@ func execTestCaseMITMHooksCaller(rootCtx context.Context, y *yakit.YakScript, pa
 	ctx, cancel := context.WithCancel(rootCtx)
 	defer cancel()
 
+	paramMap := lo.SliceToMap(params, func(item *ypb.ExecParamItem) (string, any) {
+		return item.Key, item.Value
+	})
 	manager := yak.NewYakToCallerManager()
 	err := manager.AddForYakit(
-		ctx, y.ScriptName, params, y.Content,
+		ctx, y.ScriptName, paramMap, y.Content,
 		yak.YakitCallerIf(func(result *ypb.ExecResult) error {
 			return streamFeedback(result)
 		}),

@@ -1,9 +1,10 @@
-nucleiPoCName = MITM_PARAMS["CURRENT_NUCLEI_PLUGIN_NAME"]
+nucleiPoC = MITM_PARAMS["CURRENT_NUCLEI_PLUGIN"]
 execNuclei = func(target) {
-	log.Info("start to execute: %s [%v]", nucleiPoCName, target)
+    nucleiPocName = nucleiPoC.ScriptName
+	log.Info("start to execute: %s [%v]", nucleiPocName, target)
 	res, err = nuclei.Scan(
         target,
-        nuclei.fuzzQueryTemplate(nucleiPoCName),
+        nuclei.exactTemplateIns(nucleiPoC),
         nuclei.timeout(10),
     )
 	if err != nil {
