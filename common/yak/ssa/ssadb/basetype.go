@@ -3,10 +3,49 @@ package ssadb
 import (
 	"database/sql/driver"
 	"errors"
+	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"reflect"
 	"strconv"
 	"strings"
 )
+
+type Uint64Map map[uint64]uint64
+
+func (m *Uint64Map) Scan(value any) error {
+	if m == nil {
+		return nil
+	}
+	val := codec.AnyToString(value)
+	nm := make(map[uint64]uint64)
+	for _, sub := range strings.Split(val, ",") {
+		subVals := strings.Split(sub, ":")
+		if len(subVals) != 2 {
+			continue
+		}
+		nmKey, err := strconv.ParseUint(subVals[0], 10, 64)
+		if err != nil {
+			continue
+		}
+		nmVal, err := strconv.ParseUint(subVals[1], 10, 64)
+		if err != nil {
+			continue
+		}
+		nm[nmKey] = nmVal
+	}
+	*m = nm
+	return nil
+}
+
+func (m Uint64Map) Value() (driver.Value, error) {
+	var parts []string
+	for k, v := range m {
+		parts = append(parts, strconv.FormatUint(k, 10)+":"+strconv.FormatUint(v, 10))
+	}
+	return strings.Join(parts, ","), nil
+}
+
+type Uint64OrderedMap *omap.OrderedMap[uint64, uint64]
 
 // Uint64Slice 是一个自定义类型，用于处理 []uint64 的序列化和反序列化
 type Uint64Slice []uint64
