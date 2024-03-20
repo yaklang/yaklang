@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -48,6 +49,13 @@ func (i *anInstruction) GetVerboseName() string {
 		return i.name
 	}
 	return ""
+}
+
+func (i *anInstruction) GetShortVerboseName() string {
+	if i.name != "" {
+		return i.name
+	}
+	return "t" + fmt.Sprint(i.GetId())
 }
 
 func (i *anInstruction) SetVerboseName(verbose string) {

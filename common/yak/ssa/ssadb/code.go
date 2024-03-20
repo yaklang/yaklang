@@ -19,8 +19,9 @@ type IrCode struct {
 	SourceCodeEndCol    int    `json:"source_code_end_col"`
 	SourceCodeHash      string `json:"source_code_hash"`
 
-	Opcode     int64  `json:"opcode"`
-	OpcodeName string `json:"opcode_name"`
+	Opcode         int64  `json:"opcode"`
+	OpcodeName     string `json:"opcode_name"`
+	OpcodeOperator string `json:"opcode_operator"`
 
 	// basic info
 	Name             string `json:"name"`
@@ -56,13 +57,14 @@ type IrCode struct {
 	Users Uint64Slice `json:"users" gorm:"type:text"`
 
 	// OOP Supporting
-	ObjectMembers Uint64Slice `json:"object_members" gorm:"type:text"`
-	ObjectParent  uint64      `json:"object_parent"`
+	IsObject       bool
+	IsObjectMember bool
+	ObjectMembers  Uint64Map `json:"object_members" gorm:"type:text"`
+	ObjectParent   uint64    `json:"object_parent"`
 
 	// Maskable
 	MaskedCodes Uint64Slice `json:"masked_codes" gorm:"type:text"`
 	IsMasked    bool        `json:"is_masked"`
-	IsMaskedBy  uint64      `json:"is_masked_by"`
 
 	// Called
 	IsCalled   bool        `json:"is_called"`
