@@ -22,6 +22,9 @@ func (p *ParentScope) Create(scope *Scope) *ParentScope {
 type FunctionBuilder struct {
 	*Function
 
+	// disable free-value
+	DisableFreeValue bool
+
 	target *target // for break and continue
 	labels map[string]*BasicBlock
 	// defer function call
@@ -67,6 +70,7 @@ func NewBuilder(f *Function, parent *FunctionBuilder) *FunctionBuilder {
 		// b.parentScope = parent.CurrentBlock.ScopeTable
 		b.parentScope = parent.parentScope.Create(parent.CurrentBlock.ScopeTable)
 		b.ClassBluePrint = parent.ClassBluePrint
+		b.DisableFreeValue = parent.DisableFreeValue
 	} else {
 		b.ClassBluePrint = make(map[string]*ClassBluePrint)
 	}

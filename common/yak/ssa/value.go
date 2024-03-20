@@ -15,7 +15,7 @@ func (b *FunctionBuilder) ReadValueByVariable(v *Variable) Value {
 
 // ReadValue get value by name
 func (b *FunctionBuilder) ReadValue(name string) Value {
-	return b.readValueEx(name, true, false)
+	return b.readValueEx(name, true, false || b.DisableFreeValue)
 }
 
 func (b *FunctionBuilder) ReadOrCreateVariable(name string) Value {
