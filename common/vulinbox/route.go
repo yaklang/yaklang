@@ -276,13 +276,17 @@ type VulInfoIf interface {
 }
 
 func addRouteWithVulInfo(router *mux.Router, info *VulInfo) {
+	pathWithQuery := info.Path
+	var pathRaw, query, found = strings.Cut(pathWithQuery, "?")
+	if found {
+		info.DefaultQuery = query
+	}
+	info.Path = pathRaw
 	infoStr, err := json.Marshal(info)
 	if err != nil {
 		log.Errorf("marshal vuln info failed: %v", err)
 		return
 	}
-	pathWithQuery := info.Path
-	var pathRaw, _, _ = strings.Cut(pathWithQuery, "?")
 	router.HandleFunc(pathRaw, info.Handler).Name(string(infoStr))
 }
 
