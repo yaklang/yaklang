@@ -235,12 +235,7 @@ func saveDomain(domain string, ip ...string) error {
 	return nil
 }
 
-func savePortFromObj(t interface{}, taskNames ...string) error {
-	var db = consts.GetGormProjectDatabase()
-	if db == nil {
-		return utils.Errorf("cannot found database")
-	}
-
+func interfaceToPort(t interface{}) (*yakit.Port, error) {
 	var r *yakit.Port
 	switch ret := t.(type) {
 	case *fp.MatchResult:
@@ -249,15 +244,24 @@ func savePortFromObj(t interface{}, taskNames ...string) error {
 		r = NewPortFromSynScanResult(ret)
 	case *spacengine.NetSpaceEngineResult:
 		r = NewPortFromSpaceEngineResult(ret)
+	case *yakit.Port:
+		r = ret
 	default:
-		return utils.Errorf("unsupported(%v): %#v", reflect.TypeOf(t), spew.Sdump(t))
+		return nil, utils.Errorf("unsupported(%v): %#v", reflect.TypeOf(t), spew.Sdump(t))
 	}
-	if len(taskNames) > 0 {
-		r.TaskName = taskNames[0]
-		r.RuntimeId = taskNames[0]
+	return r, nil
+}
+
+func savePortFromObj(t interface{}, RuntimeId ...string) error {
+	r, err := interfaceToPort(t)
+	if err != nil {
+		return err
+	}
+	if len(RuntimeId) > 0 {
+		r.RuntimeId = RuntimeId[0]
 	}
 
-	return yakit.CreateOrUpdatePort(db, r.CalcHash(), r)
+	return yakit.CreateOrUpdatePort(consts.GetGormProjectDatabase(), r.CalcHash(), r)
 }
 
 func queryUrlsByKeyword(k string) chan string {
@@ -378,6 +382,9 @@ func init() {
 	YakitExports["SaveDomain"] = saveDomain
 	YakitExports["SavePayload"] = savePayloads
 	YakitExports["SavePayloadByFile"] = savePayloadByFile
+
+	// 对象转port对象
+	YakitExports["ObjToPort"] = interfaceToPort
 
 	// HTTP 资产
 	YakitExports["QueryUrlsByKeyword"] = queryUrlsByKeyword
