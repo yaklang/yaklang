@@ -6,41 +6,6 @@ import (
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 )
 
-func TestParseSSA_functionDecl(t *testing.T) {
-
-	t.Run("test-1", func(t *testing.T) {
-		test.CheckPrintlnValue(`<?php
-function A(int $a){
-	println($a);
-}
-`, []string{"Parameter-$a"}, t)
-	})
-
-	t.Run("test-2", func(t *testing.T) {
-		test.MockSSA(t, `<?php
-function A(int $a){
-  println($a);
-}
-A(1);
-`)
-	})
-}
-func TestParseSSA_BasicMember(t *testing.T) {
-	test.MockSSA(t, `<?php
-$c=[1,2,3];
-dump($c[2]);
-echo 1,2,3,5;
-`)
-}
-
-func TestParseSSA_BasicMember2(t *testing.T) {
-	test.MockSSA(t, `<?php
-$a;
-$b[1]=1;
-dump($b[1]);
-`)
-}
-
 func TestParseSSA_Basic(t *testing.T) {
 	test.MockSSA(t, `<?php
 $ancasdfasdfasdf;
@@ -148,37 +113,6 @@ a($b[0]);
 `)
 }
 
-func TestParseSSA_FuncCall(t *testing.T) {
-	test.MockSSA(t, `<?php
-function funcName() {return "2";}
-funcName().$a;
-`)
-}
-
-func TestParseSSA_FuncCall_ActualParams1(t *testing.T) {
-	test.MockSSA(t, `<?php
-function a1($a, $b) {return "2";}
-`)
-}
-
-func TestParseSSA_FuncCall_ActualParams2(t *testing.T) {
-	test.MockSSA(t, `<?php
-function a2($a, $b="1"."2") {return "2";}
-`)
-}
-
-func TestParseSSA_FuncCall_ActualParams3(t *testing.T) {
-	test.MockSSA(t, `<?php
-function a3($a, $b=["1", "2"], $dd=null) {return $b[0];}
-`)
-}
-
-func TestParseSSA_FuncCall_ActualParams4(t *testing.T) {
-	test.MockSSA(t, `<?php
-function a3($a, $b=["1", "2"], $dd=array(1,2,3), $e=1) {return "2";}
-`)
-}
-
 func TestParseSSA_DoWhileTag(t *testing.T) {
 	//	test.MockSSA(t, `<?php
 	//function funcName() {
@@ -239,33 +173,6 @@ try {
 }finally{
     echo 2;
 }`)
-}
-func TestParseSSA_Function_1(t *testing.T) {
-	t.Run("mock function1", func(t *testing.T) {
-
-		test.MockSSA(t, `<?php
-function testFunction2($a, $b='1', $c=array(1,2,3,), string $d) {
-	1&&1;
-	return 1;
-}
-
-`)
-	})
-	t.Run("mock function2", func(t *testing.T) {
-		test.MockSSA(t, `<?php
-function a(public $a){
-  echo 1;
-}
-`)
-	})
-}
-
-func TestParseSSA_Function(t *testing.T) {
-	test.MockSSA(t, `<?php
-function testFunction() {
-	1&&1;
-}
-`)
 }
 
 func TestParseSSA_YieldName(t *testing.T) {

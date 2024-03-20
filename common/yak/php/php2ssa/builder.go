@@ -13,7 +13,7 @@ type builder struct {
 }
 
 func Build(src string, force bool, b *ssa.FunctionBuilder) error {
-	ast, err := frondEnd(src, force)
+	ast, err := FrondEnd(src, force)
 	if err != nil {
 		return err
 	}
@@ -24,7 +24,7 @@ func Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	return nil
 }
 
-func frondEnd(src string, force bool) (phpparser.IHtmlDocumentContext, error) {
+func FrondEnd(src string, force bool) (phpparser.IHtmlDocumentContext, error) {
 	errListener := antlr4util.NewErrorListener()
 	lexer := phpparser.NewPHPLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()
