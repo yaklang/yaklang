@@ -11,6 +11,8 @@ func (y *builder) VisitTopStatement(raw phpparser.ITopStatementContext) interfac
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.TopStatementContext)
 	if i == nil {
@@ -42,6 +44,8 @@ func (y *builder) VisitEnumDeclaration(raw phpparser.IEnumDeclarationContext) in
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.EnumDeclarationContext)
 	if i == nil {
@@ -55,6 +59,8 @@ func (y *builder) VisitGlobalConstantDeclaration(raw phpparser.IGlobalConstantDe
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.GlobalConstantDeclarationContext)
 	if i == nil {
@@ -68,6 +74,8 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.NamespaceDeclarationContext)
 	if i == nil {
@@ -81,6 +89,8 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.UseDeclarationContext)
 	if i == nil {
@@ -94,6 +104,8 @@ func (y *builder) VisitStatement(raw phpparser.IStatementContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.StatementContext)
 	if i == nil {
@@ -160,6 +172,8 @@ func (y *builder) VisitLabelStatement(raw phpparser.ILabelStatementContext) inte
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.LabelStatementContext)
 	if i == nil {
@@ -173,6 +187,8 @@ func (y *builder) VisitBlockStatement(raw phpparser.IBlockStatementContext) inte
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.BlockStatementContext)
 	if i == nil {
@@ -190,6 +206,9 @@ func (y *builder) VisitInnerStatementList(raw phpparser.IInnerStatementListConte
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
 	i, _ := raw.(*phpparser.InnerStatementListContext)
 	if i == nil {
 		return nil
@@ -205,6 +224,8 @@ func (y *builder) VisitInnerStatement(raw phpparser.IInnerStatementContext) inte
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.InnerStatementContext)
 	if i == nil {
@@ -228,6 +249,8 @@ func (y *builder) VisitTypeHint(raw phpparser.ITypeHintContext) ssa.Type {
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.TypeHintContext)
 	if i == nil {
@@ -255,6 +278,8 @@ func (y *builder) VisitQualifiedStaticTypeRef(raw phpparser.IQualifiedStaticType
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.QualifiedStaticTypeRefContext)
 	if i == nil {

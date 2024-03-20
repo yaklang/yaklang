@@ -8,6 +8,8 @@ func (y *builder) VisitHtmlDocument(raw phpparser.IHtmlDocumentContext) interfac
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.HtmlDocumentContext)
 	if i == nil {
@@ -30,6 +32,8 @@ func (y *builder) VisitHtmlDocumentElement(raw phpparser.IHtmlDocumentElementCon
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.HtmlDocumentElementContext)
 	if i == nil {
@@ -49,6 +53,8 @@ func (y *builder) VisitInlineHtml(raw phpparser.IInlineHtmlContext) interface{} 
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.InlineHtmlContext)
 	if i == nil {
@@ -62,6 +68,8 @@ func (y *builder) VisitInlineHtmlStatement(raw phpparser.IInlineHtmlStatementCon
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.InlineHtmlStatementContext)
 	if i == nil {

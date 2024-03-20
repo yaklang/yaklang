@@ -8,6 +8,9 @@ func (y *builder) VisitFunctionDeclaration(raw phpparser.IFunctionDeclarationCon
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
 	i, _ := raw.(*phpparser.FunctionDeclarationContext)
 	if i == nil {
 		return nil

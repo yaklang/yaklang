@@ -16,6 +16,8 @@ func (y *builder) VisitConstant(raw phpparser.IConstantContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.ConstantContext)
 	if i == nil {
@@ -39,6 +41,8 @@ func (y *builder) VisitLiteralConstant(raw phpparser.ILiteralConstantContext) ss
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.LiteralConstantContext)
 	if i == nil {
@@ -104,6 +108,8 @@ func (y *builder) VisitNumericConstant(raw phpparser.INumericConstantContext) ss
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.NumericConstantContext)
 	if i == nil {
@@ -139,6 +145,8 @@ func (y *builder) VisitString_(raw phpparser.IStringContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.StringContext)
 	if i == nil {

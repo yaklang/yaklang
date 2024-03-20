@@ -6,6 +6,8 @@ func (y *builder) VisitUnsetStatement(raw phpparser.IUnsetStatementContext) inte
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.UnsetStatementContext)
 	if i == nil {

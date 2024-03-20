@@ -11,6 +11,8 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.NewExprContext)
 	if i == nil {
@@ -29,6 +31,8 @@ func (y *builder) VisitTypeRef(raw phpparser.ITypeRefContext) ssa.Type {
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.TypeRefContext)
 	if i == nil {
@@ -52,6 +56,8 @@ func (y *builder) VisitPrimitiveType(raw phpparser.IPrimitiveTypeContext) ssa.Ty
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.PrimitiveTypeContext)
 	if i == nil {
@@ -82,6 +88,8 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.ClassDeclarationContext)
 	if i == nil {
@@ -248,6 +256,8 @@ func (y *builder) VisitTraitAdaptations(raw phpparser.ITraitAdaptationsContext) 
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.TraitAdaptationsContext)
 	if i == nil {
@@ -265,6 +275,8 @@ func (y *builder) VisitTraitAdaptationStatement(raw phpparser.ITraitAdaptationSt
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.TraitAdaptationStatementContext)
 	if i == nil {
@@ -287,6 +299,8 @@ func (y *builder) VisitTraitAlias(raw phpparser.ITraitAliasContext) interface{} 
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.TraitAliasContext)
 	if i == nil {
@@ -309,6 +323,8 @@ func (y *builder) VisitTraitPrecedence(raw phpparser.ITraitPrecedenceContext) in
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.TraitPrecedenceContext)
 	if i == nil {
@@ -326,6 +342,8 @@ func (y *builder) VisitMethodBody(raw phpparser.IMethodBodyContext) interface{} 
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.MethodBodyContext)
 	if i == nil {
@@ -339,6 +357,8 @@ func (y *builder) VisitReturnTypeDecl(raw phpparser.IReturnTypeDeclContext) inte
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.ReturnTypeDeclContext)
 	if i == nil {
@@ -357,6 +377,8 @@ func (y *builder) VisitBaseCtorCall(raw phpparser.IBaseCtorCallContext) interfac
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.BaseCtorCallContext)
 	if i == nil {
@@ -370,6 +392,8 @@ func (y *builder) VisitFormalParameterList(raw phpparser.IFormalParameterListCon
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.FormalParameterListContext)
 	if i == nil {
@@ -387,6 +411,9 @@ func (y *builder) VisitFormalParameter(raw phpparser.IFormalParameterContext) in
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
 	i, _ := raw.(*phpparser.FormalParameterContext)
 	if i == nil {
 		return nil
@@ -422,6 +449,8 @@ func (y *builder) VisitIdentifierInitializer(raw phpparser.IIdentifierInitialize
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.IdentifierInitializerContext)
 	if i == nil {
@@ -456,6 +485,8 @@ func (y *builder) VisitClassConstant(raw phpparser.IClassConstantContext) ssa.Va
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.ClassConstantContext)
 	if i == nil {
