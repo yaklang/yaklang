@@ -9,6 +9,8 @@ func (y *builder) VisitBreakStatement(raw phpparser.IBreakStatementContext) inte
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.BreakStatementContext)
 	if i == nil {
@@ -24,6 +26,8 @@ func (y *builder) VisitReturnStatement(raw phpparser.IReturnStatementContext) in
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.ReturnStatementContext)
 	if i == nil {
@@ -40,6 +44,8 @@ func (y *builder) VisitYieldExpression(raw phpparser.IYieldExpressionContext) ss
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.YieldExpressionContext)
 	if i == nil {
@@ -70,6 +76,8 @@ func (y *builder) VisitGotoStatement(raw phpparser.IGotoStatementContext) interf
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.GotoStatementContext)
 	if i == nil {
@@ -83,6 +91,8 @@ func (y *builder) VisitEmptyStatement(raw phpparser.IEmptyStatement_Context) int
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.EmptyStatement_Context)
 	if i == nil {

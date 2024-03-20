@@ -8,6 +8,9 @@ func (y *builder) VisitTryCatchFinally(raw phpparser.ITryCatchFinallyContext) in
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
 	stmt, _ := raw.(*phpparser.TryCatchFinallyContext)
 	if stmt == nil {
 		return nil
@@ -26,6 +29,9 @@ func (y *builder) VisitCatchClause(raw phpparser.ICatchClauseContext) interface{
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
 	i, _ := raw.(*phpparser.CatchClauseContext)
 	if i == nil {
 		return nil
@@ -39,6 +45,8 @@ func (y *builder) VisitFinallyStatement(raw phpparser.IFinallyStatementContext) 
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	stmt, _ := raw.(*phpparser.FinallyStatementContext)
 	if stmt == nil {
@@ -52,6 +60,9 @@ func (y *builder) VisitThrowStatement(raw phpparser.IThrowStatementContext) inte
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
 	stmt, _ := raw.(*phpparser.ThrowStatementContext)
 	if stmt == nil {
 		return nil

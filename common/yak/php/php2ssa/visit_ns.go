@@ -10,6 +10,8 @@ func (y *builder) VisitQualifiedNamespaceNameList(raw phpparser.IQualifiedNamesp
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.QualifiedNamespaceNameListContext)
 	if i == nil {
@@ -77,6 +79,8 @@ func (y *builder) VisitNamespaceNameTail(raw phpparser.INamespaceNameTailContext
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.NamespaceNameTailContext)
 	if i == nil {

@@ -8,6 +8,8 @@ func (y *builder) VisitEchoStatement(raw phpparser.IEchoStatementContext) interf
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.EchoStatementContext)
 	if i == nil {

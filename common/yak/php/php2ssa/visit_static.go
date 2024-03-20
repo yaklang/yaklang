@@ -6,6 +6,8 @@ func (y *builder) VisitStaticVariableStatement(raw phpparser.IStaticVariableStat
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.StaticVariableStatementContext)
 	if i == nil {

@@ -9,6 +9,8 @@ func (y *builder) VisitWhileStatement(raw phpparser.IWhileStatementContext) inte
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.WhileStatementContext)
 	if i == nil {
@@ -33,6 +35,9 @@ func (y *builder) VisitDoWhileStatement(raw phpparser.IDoWhileStatementContext) 
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
 	i, _ := raw.(*phpparser.DoWhileStatementContext)
 	if i == nil {
 		return nil
@@ -58,6 +63,9 @@ func (y *builder) VisitForStatement(raw phpparser.IForStatementContext) interfac
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
 	i, _ := raw.(*phpparser.ForStatementContext)
 	if i == nil {
 		return nil
@@ -104,6 +112,9 @@ func (y *builder) VisitForInit(raw phpparser.IForInitContext) []ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
 	i, _ := raw.(*phpparser.ForInitContext)
 	if i == nil {
 		return nil
@@ -115,6 +126,9 @@ func (y *builder) VisitForUpdate(raw phpparser.IForUpdateContext) []ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
 	i, _ := raw.(*phpparser.ForUpdateContext)
 	if i == nil {
 		return nil
@@ -126,6 +140,9 @@ func (y *builder) VisitContinueStatement(raw phpparser.IContinueStatementContext
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
 	i, _ := raw.(*phpparser.ContinueStatementContext)
 	if i == nil {
 		return nil
@@ -140,6 +157,8 @@ func (y *builder) VisitForeachStatement(raw phpparser.IForeachStatementContext) 
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.ForeachStatementContext)
 	if i == nil {
