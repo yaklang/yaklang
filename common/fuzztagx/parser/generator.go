@@ -227,7 +227,7 @@ func newBackpropagationGenerator(f func() error, nodes []ExecNode, cfg *Generate
 			}, ret.params, cfg)
 			bp = func() error {
 				err := ret.exec(childGen.Result())
-				ret.index = 0
+				ret.index = 1
 				ret.submitResult((*ret.cache)[0])
 				return err
 			}

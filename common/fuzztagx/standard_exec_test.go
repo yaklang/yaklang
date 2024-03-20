@@ -3,6 +3,7 @@ package fuzztagx
 import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/fuzztagx/parser"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
 	"strconv"
@@ -325,5 +326,44 @@ func TestErrors(t *testing.T) {
 	res, err = ExecuteWithStringHandler("{{echo(a{{panic(error)}}b)}}", testMap)
 	if res[0] != "ab" {
 		t.Fatal("expect `ab`")
+	}
+}
+func TestDynTag(t *testing.T) {
+	nodes, err := ParseFuzztag(`{{list}}{{append1({{randstr}})}}`, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	generator := parser.NewGenerator(nodes, map[string]*parser.TagMethod{
+		"list": {
+			Fun: func(n string) ([]*parser.FuzzResult, error) {
+				return []*parser.FuzzResult{parser.NewFuzzResultWithData("1"), parser.NewFuzzResultWithData("2")}, nil
+			},
+		},
+		"append1": {
+			Fun: func(n string) ([]*parser.FuzzResult, error) {
+				return []*parser.FuzzResult{parser.NewFuzzResultWithData(n + "1")}, nil
+			},
+		},
+		"randstr": {
+			IsDyn: true,
+			Fun: func(n string) ([]*parser.FuzzResult, error) {
+				return []*parser.FuzzResult{parser.NewFuzzResultWithData(utils.RandStringBytes(5))}, nil
+			},
+		},
+	})
+	n := 0
+	for generator.Next() {
+		if n > 2 {
+			t.Fatal("test dyn tag failed")
+		}
+
+		if generator.Error != nil {
+			t.Fatal(generator.Error)
+		}
+		println(string(generator.Result().GetData()))
+		n++
+	}
+	if n != 2 {
+		t.Fatal("test dyn tag failed")
 	}
 }
