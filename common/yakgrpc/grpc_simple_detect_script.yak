@@ -3,12 +3,12 @@ yakit.AutoInitYakit()
 loglevel("info")
 
 runtimeID = getParams("RUNTIME_ID")
-//yakit.StatusCard("RuntimeIDFromRisks", runtimeID)
+yakit.StatusCard("RuntimeIDFromRisks", runtimeID)
 
 # Input your code!
 updateStatus = s => yakit.StatusCard("当前状态", s)
 
-//updateStatus("解析参数")
+updateStatus("解析参数")
 yakit.Info("解析参数")
 yakit.Info("开始处理扫描参数")
 
@@ -348,7 +348,7 @@ if !skippedHostAliveScan && recordPtr == 0 {
     }
 
     hostCount = ScanHostCount
-    //yakit.StatusCard("Ping存活主机数", aliveHostCount)
+    yakit.StatusCard("Ping存活主机数", aliveHostCount)
     aliveHostStr = str.Trim(aliveHostStr, "\n")
 
     HostAliveFile = file.Join(yakit.GetHomeTempDir(), runtimeID)
@@ -380,8 +380,8 @@ files.Push(inputFiles...)
 hostTotal = hostCount
 portTotal = len(str.RemoveDuplicatePorts(tcpPorts, synPorts))
 // 需要传递给报告的参数
-//yakit.StatusCard("扫描主机数", hostTotal)
-//yakit.StatusCard("扫描端口数", portTotal)
+yakit.StatusCard("扫描主机数", hostTotal)
+yakit.StatusCard("扫描端口数", portTotal)
 yakit.StatusCard("开放端口数/已扫主机数", "-/-")
 
 totalTasks = hostTotal * portTotal
@@ -709,7 +709,7 @@ if recordPtr > 0 {
 
 for fileReader.Next(){
     var currentTarget = fileReader.Text()
-    //yakit.StatusCard("当前文件指针", fileReader.GetLastRecordPtr())
+    yakit.StatusCard("当前文件指针", fileReader.GetLastRecordPtr())
     swg.Add()
     go func {
         defer swg.Done()
