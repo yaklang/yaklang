@@ -394,6 +394,7 @@ func (m *MixPluginCaller) LoadPluginEx(ctx context.Context, script *yakit.YakScr
 		m.ctx = context.Background()
 	}
 	var (
+		paramMap    = make(map[string]any)
 		code        = script.Content
 		name        = script.ScriptName
 		forNuclei   bool
@@ -401,6 +402,9 @@ func (m *MixPluginCaller) LoadPluginEx(ctx context.Context, script *yakit.YakScr
 		forMitm     bool
 		forNasl     bool
 	)
+	for _, p := range params {
+		paramMap[p.Key] = p.Value
+	}
 
 	ctx = context.WithValue(ctx, "ctx_info", map[string]interface{}{})
 	m.FeedbackOrdinary(fmt.Sprintf("Initializing MITM Plugin: %v", name))
@@ -429,15 +433,12 @@ func (m *MixPluginCaller) LoadPluginEx(ctx context.Context, script *yakit.YakScr
 		}
 
 		forNuclei = true
-		params = append(params, &ypb.ExecParamItem{
-			Key:   "CURRENT_NUCLEI_PLUGIN_NAME",
-			Value: script.ScriptName,
-		})
+		paramMap["CURRENT_NUCLEI_PLUGIN"] = script
 		code = YAK_TEMPLATE_NUCLEI_EXECUTOR
 	}
 
 	if forNuclei {
-		err := m.callers.AddForYakit(ctx, name, params, code, YakitCallerIf(m.feedbackHandler), HOOK_NucleiScanHandle)
+		err := m.callers.AddForYakit(ctx, name, paramMap, code, YakitCallerIf(m.feedbackHandler), HOOK_NucleiScanHandle)
 		if err != nil {
 			m.FeedbackOrdinary(fmt.Sprintf("Initailzed Nuclei Plugin[%v] Failed: %v", name, err))
 			return nil
@@ -446,7 +447,7 @@ func (m *MixPluginCaller) LoadPluginEx(ctx context.Context, script *yakit.YakScr
 	}
 	if forNasl {
 		ctx.Value("ctx_info").(map[string]interface{})["isNaslScript"] = true
-		err := m.callers.AddForYakit(ctx, name, params, code, YakitCallerIf(m.feedbackHandler), HOOK_NaslScanHandle)
+		err := m.callers.AddForYakit(ctx, name, paramMap, code, YakitCallerIf(m.feedbackHandler), HOOK_NaslScanHandle)
 		if err != nil {
 			m.FeedbackOrdinary(fmt.Sprintf("Initailzed Nasl Plugin[%v] Failed: %v", name, err))
 			return nil
@@ -463,7 +464,7 @@ func (m *MixPluginCaller) LoadPluginEx(ctx context.Context, script *yakit.YakScr
 		hooks = MITMAndPortScanHooks
 	}
 
-	err := m.callers.AddForYakit(ctx, name, params, code, YakitCallerIf(m.feedbackHandler), hooks...)
+	err := m.callers.AddForYakit(ctx, name, paramMap, code, YakitCallerIf(m.feedbackHandler), hooks...)
 	if err != nil {
 		m.FeedbackOrdinary(fmt.Sprintf("Initailzed MITM/ScanPort Plugin[%v] Failed: %v", name, err))
 		return err

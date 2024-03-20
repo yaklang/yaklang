@@ -1036,7 +1036,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 
 func (y *YakToCallerManager) AddForYakit(
 	ctx context.Context, id string,
-	params []*ypb.ExecParamItem,
+	paramMap map[string]any,
 	code string, callerIf interface {
 		Send(result *ypb.ExecResult) error
 	},
@@ -1046,7 +1046,7 @@ func (y *YakToCallerManager) AddForYakit(
 		return callerIf.Send(result)
 	}
 	db := consts.GetGormProjectDatabase()
-	return y.Add(ctx, id, params, code, func(engine *antlr4yak.Engine) error {
+	return y.Add(ctx, id, paramMap, code, func(engine *antlr4yak.Engine) error {
 		engine.SetVar("RUNTIME_ID", y.runtimeId)
 		engine.SetVar("YAKIT_PLUGIN_ID", id)
 		engine.SetVar("yakit_output", FeedbackFactory(db, caller, false, id))
@@ -1093,7 +1093,7 @@ func (y *YakToCallerManager) getDefaultFilter() *filter.StringFilter {
 	return y.defaultFilter
 }
 
-func (y *YakToCallerManager) Add(ctx context.Context, id string, params []*ypb.ExecParamItem, code string, hook func(*antlr4yak.Engine) error, funcName ...string) (retError error) {
+func (y *YakToCallerManager) Add(ctx context.Context, id string, paramMap map[string]any, code string, hook func(*antlr4yak.Engine) error, funcName ...string) (retError error) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("load caller failed: %v", err)
@@ -1120,10 +1120,6 @@ func (y *YakToCallerManager) Add(ctx context.Context, id string, params []*ypb.E
 	cTable, err := FetchFunctionFromSourceCode(ctx, y.getYakitPluginContext(ctx), y.timeout, id, code, func(e *antlr4yak.Engine) error {
 		if engine == nil {
 			engine = e
-		}
-		paramMap := make(map[string]string)
-		for _, p := range params {
-			paramMap[p.Key] = p.Value
 		}
 
 		e.SetVar("MITM_PARAMS", paramMap)

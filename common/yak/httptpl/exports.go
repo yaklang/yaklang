@@ -91,7 +91,7 @@ func FuzzCalcExpr() map[string]any {
 
 func ScanPacket(req []byte, opts ...interface{}) (count uint64) {
 	config, lowhttpConfig, lowhttpOpts := toConfig(opts...)
-	var ctx = context.Background()
+	ctx := context.Background()
 	if config.Ctx != nil {
 		ctx = config.Ctx
 	}
@@ -520,6 +520,7 @@ var Exports = map[string]interface{}{
 	"targetConcurrent":        WithConcurrentTarget,
 	"rawTemplate":             WithTemplateRaw,
 	"fuzzQueryTemplate":       WithFuzzQueryTemplate,
+	"exactTemplateIns":        WithExactTemplateInstance,
 	"all":                     WithAllTemplate,
 	// "runtimeId":               lowhttp.WithRuntimeId,
 	"runtimeId":         WithHttpTplRuntimeId,
