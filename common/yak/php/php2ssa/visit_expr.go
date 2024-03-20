@@ -11,6 +11,8 @@ func (y *builder) VisitExpressionStatement(raw phpparser.IExpressionStatementCon
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.ExpressionStatementContext)
 	if i == nil {
@@ -25,6 +27,8 @@ func (y *builder) VisitParentheses(raw phpparser.IParenthesesContext) ssa.Value 
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.ParenthesesContext)
 	if i == nil {
@@ -38,6 +42,8 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	if raw.GetText() == "" {
 		return nil
@@ -476,6 +482,8 @@ func (y *builder) VisitAssignable(raw phpparser.IAssignableContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.AssignableContext)
 	if i == nil {
@@ -496,6 +504,8 @@ func (y *builder) VisitChain(raw phpparser.IChainContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.ChainContext)
 	if i == nil {
@@ -514,6 +524,8 @@ func (y *builder) VisitMemberAccess(origin ssa.Value, raw phpparser.IMemberAcces
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.MemberAccessContext)
 	if i == nil {
@@ -562,6 +574,8 @@ func (y *builder) VisitKeyedFieldName(raw phpparser.IKeyedFieldNameContext) ssa.
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.KeyedFieldNameContext)
 	if i == nil {
@@ -581,6 +595,8 @@ func (y *builder) VisitKeyedVariable(raw phpparser.IKeyedVariableContext) ssa.Va
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.KeyedVariableContext)
 	if i == nil {
@@ -625,6 +641,8 @@ func (y *builder) VisitKeyedSimpleFieldName(raw phpparser.IKeyedSimpleFieldNameC
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.KeyedSimpleFieldNameContext)
 	if i == nil {
@@ -650,6 +668,8 @@ func (y *builder) VisitSquareCurlyExpression(raw phpparser.ISquareCurlyExpressio
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.SquareCurlyExpressionContext)
 	if i == nil {
@@ -678,6 +698,8 @@ func (y *builder) VisitFunctionCall(raw phpparser.IFunctionCallContext) ssa.Valu
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.FunctionCallContext)
 	if i == nil {
@@ -696,6 +718,8 @@ func (y *builder) VisitFunctionCallName(raw phpparser.IFunctionCallNameContext) 
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.FunctionCallNameContext)
 	if i == nil {
@@ -722,6 +746,8 @@ func (y *builder) VisitChainOrigin(raw phpparser.IChainOriginContext) ssa.Value 
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.ChainOriginContext)
 	if i == nil {
@@ -745,6 +771,8 @@ func (y *builder) VisitChainBase(raw phpparser.IChainBaseContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.ChainBaseContext)
 	if i == nil {
@@ -770,6 +798,8 @@ func (y *builder) VisitArrayCreation(raw phpparser.IArrayCreationContext) ssa.Va
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.ArrayCreationContext)
 	if i == nil {
@@ -799,6 +829,8 @@ func (y *builder) VisitArrayItemList(raw phpparser.IArrayItemListContext) [][2]s
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.ArrayItemListContext)
 	if i == nil {
@@ -854,6 +886,8 @@ func (y *builder) VisitAttributes(raw phpparser.IAttributesContext) interface{} 
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.AttributesContext)
 	if i == nil {
@@ -871,6 +905,8 @@ func (y *builder) VisitAttributeGroup(raw phpparser.IAttributeGroupContext) inte
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.AttributeGroupContext)
 	if i == nil {
@@ -890,6 +926,8 @@ func (y *builder) VisitAttribute(raw phpparser.IAttributeContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.AttributeContext)
 	if i == nil {
@@ -908,6 +946,8 @@ func (y *builder) VisitStringConstant(raw phpparser.IStringConstantContext) ssa.
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.StringConstantContext)
 	if i == nil {
@@ -932,6 +972,8 @@ func (y *builder) VisitConstantInitializer(raw phpparser.IConstantInitializerCon
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.ConstantInitializerContext)
 	if i == nil {
@@ -977,6 +1019,8 @@ func (y *builder) VisitExpressionList(raw phpparser.IExpressionListContext) []ss
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.ExpressionListContext)
 	if i == nil {
@@ -992,6 +1036,8 @@ func (y *builder) VisitConstantString(raw phpparser.IConstantStringContext) ssa.
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.ConstantStringContext)
 	if i == nil {

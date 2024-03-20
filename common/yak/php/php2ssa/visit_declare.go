@@ -6,6 +6,8 @@ func (y *builder) VisitDeclareStatement(raw phpparser.IDeclareStatementContext) 
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*phpparser.DeclareStatementContext)
 	if i == nil {

@@ -10,6 +10,9 @@ func (y *builder) VisitIfStatement(raw phpparser.IIfStatementContext) interface{
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
 	i, _ := raw.(*phpparser.IfStatementContext)
 	if i == nil {
 		return nil
@@ -81,6 +84,9 @@ func (y *builder) VisitElseIfStatement(raw phpparser.IElseIfStatementContext) in
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
 	var stmt *phpparser.ElseIfStatementContext
 	if elseIfStatement, _ := raw.(*phpparser.ElseIfStatementContext); elseIfStatement == nil {
 		return nil
@@ -100,6 +106,9 @@ func (y *builder) VisitElseIfColonStatement(raw phpparser.IElseIfColonStatementC
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
 	i, _ := raw.(*phpparser.ElseIfColonStatementContext)
 	if i == nil {
 		return nil
@@ -117,6 +126,9 @@ func (y *builder) VisitElseStatement(raw phpparser.IElseStatementContext) interf
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
 	statement, _ := raw.(*phpparser.ElseStatementContext)
 	if statement == nil {
 		return nil
@@ -128,6 +140,9 @@ func (y *builder) VisitElseColonStatement(raw phpparser.IElseColonStatementConte
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
 	statement, _ := raw.(*phpparser.ElseColonStatementContext)
 	if statement == nil {
 		return nil
@@ -139,6 +154,9 @@ func (y *builder) VisitSwitchStatement(raw phpparser.ISwitchStatementContext) in
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
 	stmt, _ := raw.(*phpparser.SwitchStatementContext)
 	if stmt == nil {
 		return nil
@@ -187,6 +205,9 @@ func (y *builder) VisitSwitchDefaultBlock(raw phpparser.ISwitchDefaultBlockConte
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
 	stmt, _ := raw.(*phpparser.SwitchDefaultBlockContext)
 	if stmt == nil {
 		return nil
