@@ -46,8 +46,9 @@ func (s *VulinServer) registerMiscResponse() {
 			ret := codec.Atoi(request.URL.Query().Get("cl"))
 			writer.Write(bytes.Repeat([]byte{'a'}, ret))
 		},
-		Path:  "/content_length?cl=1024",
-		Title: "通过(cl=int)定义响应体长度",
+		Path:         "/content_length",
+		DefaultQuery: "cl=1024",
+		Title:        "通过(cl=int)定义响应体长度",
 	})
 
 	addRouteWithVulInfo(r, &VulInfo{
