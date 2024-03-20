@@ -393,9 +393,10 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		member := y.ir.CreateMemberCallVariable(object, key)
 		// right
 		rightValue := y.VisitExpression(ret.Expression(2))
-		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), member.GetValue(), rightValue)
+		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), member, rightValue)
 		y.ir.AssignVariable(member, rightValue)
 		return rightValue
+
 	case *phpparser.FieldMemberCallAssignmentExpressionContext:
 		// build left
 		object := y.VisitExpression(ret.Expression(0))
@@ -403,15 +404,17 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		member := y.ir.CreateMemberCallVariable(object, key)
 		// right
 		rightValue := y.VisitExpression(ret.Expression(2))
-		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), member.GetValue(), rightValue)
+		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), member, rightValue)
 		y.ir.AssignVariable(member, rightValue)
 		return rightValue
+
 	case *phpparser.OrdinaryAssignmentExpressionContext:
 		variable := y.VisitLeftVariable(ret.LeftVariable())
 		rightValue := y.VisitExpression(ret.Expression())
-		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), variable.GetValue(), rightValue)
+		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), variable, rightValue)
 		y.ir.AssignVariable(variable, rightValue)
 		return rightValue
+
 	case *phpparser.LogicalExpressionContext:
 		var id = uuid.NewString()
 		y.ir.AssignVariable(y.ir.CreateVariable(id), y.ir.EmitConstInstAny())
@@ -447,16 +450,19 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 			}).Build()
 		}
 		return y.ir.ReadValue(id)
+
 	case *phpparser.ShortQualifiedNameExpressionContext:
 		return y.ir.ReadOrCreateVariable(y.VisitIdentifier(ret.Identifier()))
+
 	case *phpparser.StaticClassAccessExpressionContext:
 		class, key := y.VisitStaticClassExpr(ret.StaticClassExpr())
 		return y.ir.GetStaticMember(class, key)
+
 	case *phpparser.StaticClassMemberCallAssignmentExpressionContext:
 		class, key := y.VisitStaticClassExpr(ret.StaticClassExpr())
 		leftValue := y.ir.GetStaticMember(class, key)
 		rightValue := y.VisitExpression(ret.Expression())
-		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), leftValue, rightValue)
+		rightValue = y.reduceAssignCalcExpressionEx(ret.AssignmentOperator().GetText(), leftValue, rightValue)
 		y.ir.SetStaticMember(class, key, rightValue)
 		return rightValue
 	}
@@ -998,7 +1004,14 @@ func (y *builder) VisitConstantString(raw phpparser.IConstantStringContext) ssa.
 	return y.VisitConstant(i.Constant())
 }
 
-func (y *builder) reduceAssignCalcExpression(operator string, leftValues ssa.Value, rightValue ssa.Value) ssa.Value {
+func (y *builder) reduceAssignCalcExpression(operator string, variable *ssa.Variable, value ssa.Value) ssa.Value {
+	if operator == "=" {
+		return value
+	}
+	return y.reduceAssignCalcExpressionEx(operator, y.ir.ReadValueByVariable(variable), value)
+}
+
+func (y *builder) reduceAssignCalcExpressionEx(operator string, leftValues ssa.Value, rightValue ssa.Value) ssa.Value {
 	switch operator {
 	case "=":
 		return rightValue
