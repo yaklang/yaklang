@@ -17,6 +17,7 @@ func Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	if err != nil {
 		return err
 	}
+	b.DisableFreeValue = true
 	build := builder{
 		ir: b,
 	}

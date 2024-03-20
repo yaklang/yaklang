@@ -25,6 +25,14 @@ function testFunction2($a, $b='1', $c=array(1,2,3,), string $d) {
 }
 `)
 	})
+
+	t.Run("test php not freeValue", func(t *testing.T) {
+		test.CheckPrintlnValue(`<?php
+function test() {
+	println($a); 
+}
+`, []string{"Undefined-$a"}, t)
+	})
 }
 
 func TestParseSSA_FuncCall_DefaultParameter(t *testing.T) {
