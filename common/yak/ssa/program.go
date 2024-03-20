@@ -1,6 +1,8 @@
 package ssa
 
 import (
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -8,12 +10,23 @@ import (
 
 func NewProgram() *Program {
 	prog := &Program{
-		Packages:           make(map[string]*Package),
-		ConstInstruction:   omap.NewEmptyOrderedMap[int, *ConstInst](),
-		NameToInstructions: omap.NewEmptyOrderedMap[string, []Instruction](),
-		IdToInstructionMap: omap.NewEmptyOrderedMap[int, Instruction](),
-		errors:             make([]*SSAError, 0),
-		buildOnce:          sync.Once{},
+		Packages:               make(map[string]*Package),
+		ConstInstruction:       omap.NewEmptyOrderedMap[int, *ConstInst](),
+		NameToInstructions:     omap.NewEmptyOrderedMap[string, []Instruction](),
+		IdToInstructionMap:     omap.NewEmptyOrderedMap[int, Instruction](),
+		errors:                 make([]*SSAError, 0),
+		buildOnce:              sync.Once{},
+		persistentBackendMutex: new(sync.Mutex),
+		persistentBackend: func() (int, func(Instruction) error) {
+			db := consts.GetGormProjectDatabase()
+			code, codeIns := ssadb.RequireIrCode(db)
+			return int(code), func(i Instruction) error {
+				defer func() {
+					db.Save(codeIns)
+				}()
+				return FitIRCode(codeIns, i)
+			}
+		},
 	}
 	return prog
 }

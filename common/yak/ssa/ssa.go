@@ -131,7 +131,8 @@ type Program struct {
 	NameToInstructions *omap.OrderedMap[string, []Instruction]
 	IdToInstructionMap *omap.OrderedMap[int, Instruction]
 
-	persistentCallback func(Instruction)
+	persistentBackendMutex *sync.Mutex
+	persistentBackend      func() (int, func(Instruction) error)
 
 	errors SSAErrors
 

@@ -42,10 +42,10 @@ func FitIRCode(c *ssadb.IrCode, r Instruction) error {
 	c.ShortVerboseName = r.GetShortVerboseName()
 
 	if ret := r.GetFunc(); ret != nil {
-		c.ParentFunction = uint64(ret.GetId())
+		c.ParentFunction = int64(ret.GetId())
 	}
 	if ret := r.GetBlock(); ret != nil {
-		c.CurrentBlock = uint64(ret.GetId())
+		c.CurrentBlock = int64(ret.GetId())
 	}
 
 	// handle func
@@ -56,13 +56,13 @@ func FitIRCode(c *ssadb.IrCode, r Instruction) error {
 			if formArg == nil {
 				continue
 			}
-			c.FormalArgs = append(c.FormalArgs, uint64(formArg.GetId()))
+			c.FormalArgs = append(c.FormalArgs, int64(formArg.GetId()))
 		}
 		for _, returnIns := range f.Return {
 			if returnIns == nil {
 				continue
 			}
-			c.ReturnCodes = append(c.ReturnCodes, uint64(returnIns.GetId()))
+			c.ReturnCodes = append(c.ReturnCodes, int64(returnIns.GetId()))
 		}
 		for _, sideEffect := range f.SideEffects {
 			if sideEffect == nil {
@@ -75,14 +75,21 @@ func FitIRCode(c *ssadb.IrCode, r Instruction) error {
 			if b == nil {
 				continue
 			}
-			c.CodeBlocks = append(c.CodeBlocks, uint64(b.GetId()))
+			c.CodeBlocks = append(c.CodeBlocks, int64(b.GetId()))
 		}
 
-		c.EnterBlock = uint64(f.EnterBlock.GetId())
-		c.ExitBlock = uint64(f.ExitBlock.GetId())
-		c.DeferBlock = uint64(f.DeferBlock.GetId())
+		if f.EnterBlock != nil {
+			c.EnterBlock = int64(f.EnterBlock.GetId())
+		}
+		if f.ExitBlock != nil {
+			c.ExitBlock = int64(f.ExitBlock.GetId())
+		}
+		if f.DeferBlock != nil {
+			c.DeferBlock = int64(f.DeferBlock.GetId())
+		}
+
 		for _, subFunc := range f.ChildFuncs {
-			c.ChildrenFunction = append(c.ChildrenFunction, uint64(subFunc.GetId()))
+			c.ChildrenFunction = append(c.ChildrenFunction, int64(subFunc.GetId()))
 		}
 	}
 
@@ -91,33 +98,33 @@ func FitIRCode(c *ssadb.IrCode, r Instruction) error {
 		// ud chain
 		for _, user := range v.GetUsers() {
 			if _, isCall := user.(*Call); isCall {
-				c.IsCalledBy = append(c.IsCalledBy, uint64(user.GetId()))
+				c.IsCalledBy = append(c.IsCalledBy, int64(user.GetId()))
 				if !c.IsCalled {
 					c.IsCalled = true
 				}
 			}
-			c.Users = append(c.Users, uint64(user.GetId()))
+			c.Users = append(c.Users, int64(user.GetId()))
 		}
 		for _, def := range v.GetValues() {
-			c.Defs = append(c.Defs, uint64(def.GetId()))
+			c.Defs = append(c.Defs, int64(def.GetId()))
 		}
 
 		// oop
 		if parent := v.GetObject(); parent != nil {
-			c.ObjectParent = uint64(parent.GetId())
+			c.ObjectParent = int64(parent.GetId())
 		}
 		if c.ObjectMembers == nil {
-			c.ObjectMembers = make(ssadb.Uint64Map)
+			c.ObjectMembers = make(ssadb.Int64Map)
 		}
 		for key, val := range v.GetAllMember() {
-			c.ObjectMembers[uint64(key.GetId())] = uint64(val.GetId())
+			c.ObjectMembers[int64(key.GetId())] = int64(val.GetId())
 		}
 		c.IsObject = v.IsObject()
 		c.IsObjectMember = v.IsMember()
 
 		// masked
 		for _, m := range v.GetMask() {
-			c.MaskedCodes = append(c.MaskedCodes, uint64(m.GetId()))
+			c.MaskedCodes = append(c.MaskedCodes, int64(m.GetId()))
 		}
 		c.IsMasked = v.Masked()
 	}
@@ -131,13 +138,13 @@ func FitIRCode(c *ssadb.IrCode, r Instruction) error {
 		c.Opcode = SSAOpcodeBasicBlock
 		c.IsBlock = true
 		for _, pred := range i.Preds {
-			c.PredBlock = append(c.PredBlock, uint64(pred.GetId()))
+			c.PredBlock = append(c.PredBlock, int64(pred.GetId()))
 		}
 		for _, succ := range i.Succs {
-			c.SuccBlock = append(c.SuccBlock, uint64(succ.GetId()))
+			c.SuccBlock = append(c.SuccBlock, int64(succ.GetId()))
 		}
 		for _, p := range i.Phis {
-			c.Phis = append(c.Phis, uint64(p.GetId()))
+			c.Phis = append(c.Phis, int64(p.GetId()))
 		}
 	case *BinOp:
 		c.OpcodeName = "binop"
@@ -147,7 +154,7 @@ func FitIRCode(c *ssadb.IrCode, r Instruction) error {
 		c.OpcodeName = "call"
 		c.Opcode = SSAOpcodeCall
 		for _, arg := range i.Args {
-			c.ActualArgs = append(c.ActualArgs, uint64(arg.GetId()))
+			c.ActualArgs = append(c.ActualArgs, int64(arg.GetId()))
 		}
 	case *ConstInst:
 		c.OpcodeName = "const"
