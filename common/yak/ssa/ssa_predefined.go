@@ -112,7 +112,12 @@ func (a *anInstruction) GetName() string  { return a.name }
 
 // id
 func (a *anInstruction) SetId(id int) { a.id = id }
-func (a *anInstruction) GetId() int   { return a.id }
+func (a *anInstruction) GetId() int {
+	if a == nil {
+		return 0
+	}
+	return a.id
+}
 
 func (a *anInstruction) LineDisasm() string { return "" }
 

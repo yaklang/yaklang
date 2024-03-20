@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -31,16 +32,35 @@ func (p *Program) SetVirtualRegister(i Instruction) {
 	if p.IdToInstructionMap.Have(i) {
 		return
 	}
+
+	programRegister := func(newId int) {
+		// id := p.IdToInstructionMap.Len()
+		i.SetId(newId)
+		p.IdToInstructionMap.Set(newId, i)
+
+		// set const
+		if c, ok := ToConst(i); ok {
+			p.ConstInstruction.Set(newId, c)
+		}
+	}
+
+	if p.persistentBackend != nil {
+		p.persistentBackendMutex.Lock()
+		defer p.persistentBackendMutex.Unlock()
+
+		id, register := p.persistentBackend()
+		programRegister(id)
+		err := register(i)
+		if err != nil {
+			log.Error("persistent backend error: " + err.Error())
+			return
+		}
+		return
+	}
+
 	id, _, _ := p.IdToInstructionMap.Last()
 	id++
-	// id := p.IdToInstructionMap.Len()
-	i.SetId(id)
-	p.IdToInstructionMap.Set(id, i)
-
-	// set const
-	if c, ok := ToConst(i); ok {
-		p.ConstInstruction.Set(id, c)
-	}
+	programRegister(id)
 }
 
 func (p *Program) GetInstructionById(id int) Instruction {

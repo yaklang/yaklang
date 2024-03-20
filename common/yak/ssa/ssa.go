@@ -134,7 +134,8 @@ type Program struct {
 	// class blue print
 	ClassBluePrint map[string]*ClassBluePrint
 
-	persistentCallback func(Instruction)
+	persistentBackendMutex *sync.Mutex
+	persistentBackend      func() (int, func(Instruction) error)
 
 	errors SSAErrors
 
