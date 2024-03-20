@@ -636,6 +636,8 @@ func handleTCP(target) {
 
             yakit.Info("GOT: %v", result.String())
             yakit.Output({"host": "TCP-" + result.Target, "port": result.Port, "fingerprint": result.GetServiceName(), "htmlTitle": "" + result.GetHtmlTitle(), "isOpen": true})
+            portRes,_ = yakit.ObjToPort(result)
+            portRes.TaskName = taskName
             yakit.SavePortFromResult(result)
             addOpenPortCount()
             handleServiceScanResult(result)
@@ -672,7 +674,9 @@ func handleSYN(target) {
 
                 yakit.Info("SYNGOT: %v", result.String())
                 yakit.Output({"host": "SYN-" + result.Target, "port": result.Port, "fingerprint": result.GetServiceName(), "htmlTitle": "" + result.GetHtmlTitle(), "isOpen": true})
-                yakit.SavePortFromResult(result)
+                portRes,_ = yakit.ObjToPort(result)
+                portRes.TaskName = taskName
+                yakit.SavePortFromResult(portRes)
 
                 addOpenPortCount()
                 handleServiceScanResult(result)
