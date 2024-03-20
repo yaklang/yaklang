@@ -124,7 +124,7 @@ func (s *Server) execScriptWithRequest(scriptInstance *yakit.YakScript, targetIn
 		scriptName = scriptInstance.ScriptName
 		scriptCode = scriptInstance.Content
 		scriptType = scriptInstance.Type
-		isTemp     = scriptInstance.Ignored && strings.HasPrefix(scriptInstance.ScriptName, "tmp-")
+		isTemp     = scriptInstance.Ignored && (strings.HasPrefix(scriptInstance.ScriptName, "[TMP]") || strings.HasPrefix(scriptInstance.ScriptName, "]"))
 	)
 	if scriptName == "" {
 		return utils.Error("script name is empty")
