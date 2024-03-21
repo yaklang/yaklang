@@ -192,6 +192,109 @@ func _httpPool_MutateHook(hook func([]byte) [][]byte) HttpPoolConfigOption {
 	}
 }
 
+func _httpPool_MutateHookWithYPBStruct(params []*ypb.MutateMethod) HttpPoolConfigOption {
+	if len(params) == 0 {
+		return func(config *httpPoolConfig) {
+
+		}
+	} else {
+		return _httpPool_MutateHook(func(raw []byte) [][]byte {
+			freq, err := NewFuzzHTTPRequest(raw)
+			if err != nil {
+				log.Errorf("parse request failed: %s", err)
+				return nil
+			}
+			var results [][]byte
+
+			results = append(results, lowhttp.FixHTTPRequest(raw))
+
+			//var newFReq mutate.FuzzHTTPRequestIf
+			//newFReq = freq
+			//_ = newFReq
+
+			for _, mm := range params {
+				if len(mm.GetValue()) == 0 {
+					continue
+				}
+				switch mm.GetType() {
+				case "Headers":
+					for _, kv := range mm.GetValue() {
+						var check bool
+						// fuzz 原有请求中存在的 key value 的情况
+						for _, v := range freq.GetHeaderParams() {
+							if v.Name() == kv.GetKey() {
+								check = true
+								v.Fuzz(kv.GetValue()).RequestMap(func(i []byte) {
+									results = append(results, i)
+								})
+							}
+						}
+						// 追加 key value 的情况
+						if !check {
+							freq.FuzzHTTPHeader(kv.GetKey(), kv.GetValue()).RequestMap(func(i []byte) {
+								results = append(results, i)
+							})
+						}
+					}
+				case "Cookie":
+					for _, kv := range mm.GetValue() {
+						var check bool
+						for _, v := range freq.GetCookieParams() {
+							if v.Name() == kv.GetKey() {
+								check = true
+								v.Fuzz(kv.GetValue()).RequestMap(func(i []byte) {
+									results = append(results, i)
+								})
+							}
+						}
+						if !check {
+							freq.FuzzCookie(kv.GetKey(), kv.GetValue()).RequestMap(func(i []byte) {
+								results = append(results, i)
+							})
+						}
+					}
+				case "Get":
+					for _, kv := range mm.GetValue() {
+						var check bool
+						for _, v := range freq.GetGetQueryParams() {
+							if v.Name() == kv.GetKey() {
+								check = true
+								v.Fuzz(kv.GetValue()).RequestMap(func(i []byte) {
+									results = append(results, i)
+								})
+							}
+						}
+						if !check {
+							freq.FuzzGetParams(kv.GetKey(), kv.GetValue()).RequestMap(func(i []byte) {
+								results = append(results, i)
+							})
+						}
+					}
+
+				case "Post":
+					for _, kv := range mm.GetValue() {
+						var check bool
+						for _, v := range freq.GetPostCommonParams() {
+							if v.Name() == kv.GetKey() {
+								check = true
+								v.Fuzz(kv.GetValue()).RequestMap(func(i []byte) {
+									results = append(results, i)
+								})
+							}
+						}
+						if !check {
+							freq.FuzzPostParams(kv.GetKey(), kv.GetValue()).RequestMap(func(i []byte) {
+								results = append(results, i)
+							})
+						}
+					}
+				}
+			}
+			return results
+		})
+	}
+}
+
 func _httpPool_Source(i string) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.Source = i
@@ -897,6 +1000,7 @@ var (
 	WithPoolOPt_DelaySeconds               = _httpPool_DelaySeconds
 	WithPoolOpt_HookCodeCaller             = _hoopPool_SetHookCaller
 	WithPoolOpt_MutateHook                 = _httpPool_MutateHook
+	WithPoolOpt_MutateWithMethods          = _httpPool_MutateHookWithYPBStruct
 	WithPoolOpt_Source                     = _httpPool_Source
 	WithPoolOpt_NamingContext              = _httpPool_namingContext
 	WithPoolOpt_RetryTimes                 = _httpPool_Retry
