@@ -38,7 +38,9 @@ func (b *buildinMethod) VSCodeSnippets() (string, string) {
 	}
 
 	paramsList := b.ParamTable[:]
+	variadicParam := ""
 	if b.IsVariadicParam {
+		variadicParam = fmt.Sprintf(`%s...`, paramsList[len(paramsList)-1])
 		paramsList = paramsList[:len(paramsList)-1]
 	}
 
@@ -61,11 +63,15 @@ func (b *buildinMethod) VSCodeSnippets() (string, string) {
 	bufVerbose.WriteString(strings.Join(paramVerbose, ", "))
 	if b.IsVariadicParam {
 		if paramsList != nil {
-			buf.WriteString(fmt.Sprintf(`${%d:, %v}`, len(paramsList)+1, b.ParamTable[len(b.ParamTable)-1]))
-			buf.WriteString(", " + b.ParamTable[len(b.ParamTable)-1] + "...")
+			buf.WriteString(fmt.Sprintf(`${%d:%v}`, len(paramsList)+1, b.ParamTable[len(b.ParamTable)-1]))
+			buf.WriteString(", " + fmt.Sprintf(`${%d:%v}`, len(paramsList)+2, variadicParam))
 		} else {
 			buf.WriteString(`$1`)
 		}
+		if len(paramVerbose) > 0 {
+			bufVerbose.WriteString(", ")
+		}
+		bufVerbose.WriteString(fmt.Sprintf("%v", variadicParam))
 	}
 	buf.WriteString(")$0")
 	bufVerbose.WriteString(")")
