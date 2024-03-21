@@ -1,6 +1,7 @@
 package codec
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 )
@@ -80,7 +81,13 @@ func AnyToBytes(i interface{}) (result []byte) {
 	//	}
 	//	return []byte(fmt.Sprintf("%v", i))
 	default:
-		b = []byte(fmt.Sprintf("%v", i))
+		// 尝试将i作为map转换成JSON
+		if jsonBytes, err := json.Marshal(i); err == nil {
+			b = jsonBytes
+		} else {
+			// 如果转换失败，则回退到使用fmt.Sprintf
+			b = []byte(fmt.Sprintf("%v", i))
+		}
 	}
 
 	return b

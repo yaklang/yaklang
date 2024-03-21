@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"strings"
@@ -22,14 +21,6 @@ func initDB() {
 
 func init() {
 	initDB()
-}
-
-type BaseCase struct {
-	InputPacket                 string
-	Code                        string
-	ExpectKeywordInOutputPacket []string
-	ExpectRegexpInOutputPacket  []string
-	Debug                       bool
 }
 
 /*
@@ -103,195 +94,295 @@ type github.com/yaklang/yaklang/common/mutate.(FuzzHTTPRequest) struct {
 */
 
 func TestYaklangFuzzHTTPRequestBaseCase(t *testing.T) {
+	type base struct {
+		inputPacket                 string
+		code                        string
+		expectKeywordInOutputPacket []string
+		expectRegexpInOutputPacket  []string
+		debug                       bool
+	}
+	tests := []struct {
+		name string
+		base base
+	}{
+		{
+			name: "Fuzz HTTP Header",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com`,
+				code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\")",
+				expectKeywordInOutputPacket: []string{"ABC: CCC\r\n"},
+			},
+		},
+		{
+			name: "Fuzz HTTP Header and Cookie",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com`,
+				code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzCookie(`foo`, `bar11`).FuzzCookie(`c`, `123`)",
+				expectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "foo=bar11", `c=123`},
+			},
+		},
 
-	total := []*BaseCase{
 		{
-			InputPacket: `GET / HTTP/1.1
+			name: "Fuzz HTTP Header and Cookie Raw",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
 Host: www.baidu.com`,
-			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\")",
-			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n"},
+				code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzCookieRaw(`CAasd9y812589yasdjkladsf`)",
+				expectKeywordInOutputPacket: []string{"ABC: CCC\r\n", `CAasd9y812589yasdjkladsf` + "\r\n"},
+			},
 		},
 		{
-			InputPacket: `GET / HTTP/1.1
-Host: www.baidu.com`,
-			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzCookie(`foo`, `bar11`).FuzzCookie(`c`, `123`)",
-			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "foo=bar11", `c=123`},
-		},
-		{
-			InputPacket: `GET / HTTP/1.1
-Host: www.baidu.com`,
-			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzCookieRaw(`CAasd9y812589yasdjkladsf`)",
-			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", `CAasd9y812589yasdjkladsf` + "\r\n"},
-		},
-		{
-			InputPacket: `GET / HTTP/1.1
+			name: "Fuzz HTTP Header and Form Encoded",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
 Host: www.baidu.com
 Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
 `,
-			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzFormEncoded(`Key`, 123)",
-			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", `Content-Disposition: form-data; name="Key"` + "\r\n\r\n123\r\n--"},
+				code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzFormEncoded(`Key`, 123)",
+				expectKeywordInOutputPacket: []string{"ABC: CCC\r\n", `Content-Disposition: form-data; name="Key"` + "\r\n\r\n123\r\n--"},
+			},
 		},
 		{
-			InputPacket: `GET / HTTP/1.1
+			name: "Fuzz HTTP Header and Form Encoded Raw no Content-Type",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
 Host: www.baidu.com
 `,
-			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzFormEncoded(`Key`, 123)",
-			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", `Content-Disposition: form-data; name="Key"` + "\r\n\r\n123\r\n--"},
+				code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzFormEncoded(`Key`, 123)",
+				expectKeywordInOutputPacket: []string{"ABC: CCC\r\n", `Content-Disposition: form-data; name="Key"` + "\r\n\r\n123\r\n--"},
+			},
 		},
 		{
-			InputPacket: `GET /?a={"abc": 123} HTTP/1.1
-Host: www.baidu.com
-
-`,
-			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetJsonPathParams(`a`, `$.abc`, `a123aaa1`)",
-			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "%7B%22abc%22%3A%22a123aaa1%22%7D"},
-		},
-		{
-			InputPacket: `GET /?a=ab HTTP/1.1
+			name: "Fuzz HTTP Header and Get Json Path Params",
+			base: base{
+				inputPacket: `GET /?a={"abc": 123} HTTP/1.1
 Host: www.baidu.com
 
 `,
-			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParams(`a`, `$.abc`).FuzzGetParams(`ccc`, `12`)",
-			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "a=%24.abc", "ccc=12"},
+				code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetJsonPathParams(`a`, `$.abc`, `a123aaa1`)",
+				expectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "%7B%22abc%22%3A%22a123aaa1%22%7D"},
+			},
 		},
+
 		{
-			InputPacket: `GET /?a=ab HTTP/1.1
+			name: "Fuzz HTTP Header and Get Params",
+			base: base{
+				inputPacket: `GET /?a=ab HTTP/1.1
 Host: www.baidu.com
 
 `,
-			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParams(`a`, `$.abc`).FuzzGetParams(`ccc`, `12`).FuzzGetParamsRaw(`ccccccccccccccc`)",
-			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "/?ccccccccccccccc"},
+				code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParams(`a`, `$.abc`).FuzzGetParams(`ccc`, `12`)",
+				expectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "a=%24.abc", "ccc=12"},
+			},
 		},
 		{
-			InputPacket: `GET /?a=ab HTTP/1.1
+			name: "Fuzz HTTP Header and Get Params and Get Params Raw",
+			base: base{
+				inputPacket: `GET /?a=ab HTTP/1.1
 Host: www.baidu.com
 
 `,
-			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`)",
-			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "XXX /?ccccccccccccccc"},
+				code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParams(`a`, `$.abc`).FuzzGetParams(`ccc`, `12`).FuzzGetParamsRaw(`ccccccccccccccc`)",
+				expectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "/?ccccccccccccccc"},
+			},
 		},
 		{
-			InputPacket: `GET /?a=ab HTTP/1.1
+			name: "Fuzz HTTP Header and Get Params Raw and Fuzz Method",
+			base: base{
+				inputPacket: `GET /?a=ab HTTP/1.1
 Host: www.baidu.com
 
 `,
-			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzPath(`/acc.t1`)",
-			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "XXX /acc.t1?ccccccccccccccc"},
+				code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`)",
+				expectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "XXX /?ccccccccccccccc"},
+			},
 		},
 		{
-			InputPacket: `GET /acc.t1?a=ab HTTP/1.1
+			name: "Fuzz HTTP Header and Get Params Raw and Fuzz Method and Fuzz Path",
+			base: base{
+				inputPacket: `GET /?a=ab HTTP/1.1
 Host: www.baidu.com
 
 `,
-			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzPath(`/acc.t1`).FuzzPathAppend(`/12`)",
-			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "XXX /acc.t1/12?ccccccccccccccc"},
+				code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzPath(`/acc.t1`)",
+				expectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "XXX /acc.t1?ccccccccccccccc"},
+			},
 		},
 		{
-			InputPacket: `GET /acc.t1?a=ab HTTP/1.1
+			name: "Fuzz HTTP Header and Get Params Raw and Fuzz Method and Fuzz Path and Fuzz Path Append",
+			base: base{
+				inputPacket: `GET /acc.t1?a=ab HTTP/1.1
 Host: www.baidu.com
 
 `,
-			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzPath(`/acc.t1`).FuzzPathAppend(`12`)",
-			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "XXX /acc.t112?ccccccccccccccc"},
+				code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzPath(`/acc.t1`).FuzzPathAppend(`/12`)",
+				expectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "XXX /acc.t1/12?ccccccccccccccc"},
+			},
 		},
 		{
-			InputPacket: `GET /acc.t1?a=ab HTTP/1.1
+			name: "Fuzz HTTP Header and Get Params Raw and Fuzz Method and Fuzz Path and Fuzz Path Append 2",
+			base: base{
+				inputPacket: `GET /acc.t1?a=ab HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzPath(`/acc.t1`).FuzzPathAppend(`12`)",
+				expectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "XXX /acc.t112?ccccccccccccccc"},
+			},
+		},
+		{
+			name: "Fuzz HTTP Header and Get Params Raw and Fuzz Method and Fuzz Path and Fuzz Path Append and Fuzz Post Json Params",
+			base: base{
+				inputPacket: `GET /acc.t1?a=ab HTTP/1.1
 Host: www.baidu.com
 
 {"bc": 222}
 `,
-			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzPath(`/acc.t1`).FuzzPathAppend(`12`).FuzzPostJsonParams(`bc`, 123)",
-			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "XXX /acc.t112?ccccccccccccccc", `{"bc":123}`},
+				code: ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzPath(`/acc.t1`).FuzzPathAppend(`12`).FuzzPostJsonParams(`bc`, 123)",
+				expectKeywordInOutputPacket: []string{
+					"ABC: CCC\r\n",
+					"XXX /acc.t112?ccccccccccccccc",
+					// 原始json中的空格会被保留
+					`{"bc": 123}`,
+				},
+			},
 		},
 		{
-			InputPacket: `GET /acc.t1?a=ab HTTP/1.1
+			name: "Fuzz HTTP Header and Get Params Raw and Method and  Path and Path Append and Post Json Params 2",
+			base: base{
+				inputPacket: `GET /acc.t1?a=ab HTTP/1.1
 Host: www.baidu.com
 
 {"bc": 222}
 `,
-			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzPath(`/acc.t1`).FuzzPathAppend(`12`).FuzzPostJsonParams(`bc`, 123).FuzzPostJsonParams(`ddddddd`, `dd1`)",
-			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "XXX /acc.t112?ccccccccccccccc", `"bc":123`, `"ddddddd":"dd1"`},
+				code: ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzPath(`/acc.t1`).FuzzPathAppend(`12`).FuzzPostJsonParams(`bc`, 123).FuzzPostJsonParams(`ddddddd`, `dd1`)",
+				expectKeywordInOutputPacket: []string{
+					"ABC: CCC\r\n",
+					"XXX /acc.t112?ccccccccccccccc",
+					`"bc": 123`, `"ddddddd":"dd1"`,
+				},
+				debug: true,
+			},
 		},
 		{
-			InputPacket: `GET /acc.t1?a=ab HTTP/1.1
+			name: "Fuzz Post Json Params no Body",
+			base: base{
+				inputPacket: `GET /acc.t1?a=ab HTTP/1.1
 Host: www.baidu.com
 
 `,
-			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzPath(`/acc.t1`).FuzzPathAppend(`12`).FuzzPostJsonParams(`bc`, 123).FuzzPostJsonParams(`ddddddd`, `dd1`)",
-			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "XXX /acc.t112?ccccccccccccccc", `"bc":123`, `"ddddddd":"dd1"`},
+				code: ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzPath(`/acc.t1`).FuzzPathAppend(`12`).FuzzPostJsonParams(`bc`, 123).FuzzPostJsonParams(`ddddddd`, `dd1`)",
+				expectKeywordInOutputPacket: []string{
+					"ABC: CCC\r\n",
+					"XXX /acc.t112?ccccccccccccccc",
+					`"bc":123`,
+					`"ddddddd":"dd1"`,
+				},
+				debug: true,
+			},
 		},
 		{
-			InputPacket: `GET /acc.t1?a=ab HTTP/1.1
+			name: "Fuzz Post Json Path Params",
+			base: base{
+				inputPacket: `GET /acc.t1?a=ab HTTP/1.1
 Host: www.baidu.com
 
 c={"abc":{"c":{"d":true}}}
 `,
-			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzPath(`/acc.t1`).FuzzPathAppend(`12`).FuzzPostJsonPathParams(`c`, `$.abc.c.d`, 123)",
-			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "XXX /acc.t112?ccccccccccccccc", `%7B%22abc%22%3A%7B%22c%22%3A%7B%22d%22%3A123%7D%7D%7D`},
-			Debug:                       true,
-		},
-		{
-			InputPacket: `GET /acc.t1?a=ab HTTP/1.1
-Host: www.baidu.com
-
-c={"abc":{"c":{"d":true}}}&&d=1234444
-`,
-			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzPath(`/acc.t1`).FuzzPathAppend(`12`).FuzzPostJsonPathParams(`c`, `$.abc.c.d`, 123).FuzzPostParams(`d`, `abc`)",
-			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "XXX /acc.t112?ccccccccccccccc", `%7B%22abc%22%3A%7B%22c%22%3A%7B%22d%22%3A123%7D%7D%7D`, `d=abc`},
-		},
-		{
-			InputPacket: `GET /acc.t1?a=ab HTTP/1.1
-Host: www.baidu.com
-
-c={"abc":{"c":{"d":true}}}&&d=1234444
-`,
-			Code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzPath(`/acc.t1`).FuzzPathAppend(`12`).FuzzPostJsonPathParams(`c`, `$.abc.c.d`, 123).FuzzPostParams(`d`, `abc`).FuzzPostRaw(`dhjkasdhjkasjkhdihasdhiouwaioheriohqweiohqweiohqiwhet--=-=-=-=-=-`)",
-			ExpectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "XXX /acc.t112?ccccccccccccccc", `dhjkasdhjkasjkhdihasdhiouwaioheriohqweiohqweiohqiwhet--=-=-=-=-=-`},
-		},
-		{
-			InputPacket: `GET /acc.t1?a=ab HTTP/1.1
-Host: www.baidu.com
-
-c={"abc":{"c":{"d":true}}}&&d=1234444
-`,
-			Code: ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzUploadFile(`ccc`, `abc.php`, `<?=1+1?>`)",
-			ExpectKeywordInOutputPacket: []string{
-				"ABC: CCC\r\n", "XXX /acc.t1?ccccccccccccccc",
-				"; filename=\"abc.php\"", `<?=1+1?>` + "\r\n--",
-				`multipart/form-data; boundary=-`,
+				code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzPath(`/acc.t1`).FuzzPathAppend(`12`).FuzzPostJsonPathParams(`c`, `$.abc.c.d`, 123)",
+				expectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "XXX /acc.t112?ccccccccccccccc", `%7B%22abc%22%3A%7B%22c%22%3A%7B%22d%22%3A123%7D%7D%7D`},
+				debug:                       true,
 			},
 		},
 		{
-			InputPacket: `GET /acc.t1?a=ab HTTP/1.1
+			name: "Fuzz Multiple Post Json Path Params",
+			base: base{
+				inputPacket: `GET /acc.t1?a=ab HTTP/1.1
 Host: www.baidu.com
 
 c={"abc":{"c":{"d":true}}}&&d=1234444
 `,
-			Code: ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzUploadFileName(`ccc`, `abc.php`)",
-			ExpectKeywordInOutputPacket: []string{
-				"ABC: CCC\r\n", "XXX /acc.t1?ccccccccccccccc",
-				"; filename=\"abc.php\"",
-				`multipart/form-data; boundary=-`,
+				code: ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzPath(`/acc.t1`).FuzzPathAppend(`12`).FuzzPostJsonPathParams(`c`, `$.abc.c.d`, 123).FuzzPostParams(`d`, `abc`)",
+				expectKeywordInOutputPacket: []string{
+					"ABC: CCC\r\n",
+					"XXX /acc.t112?ccccccccccccccc",
+					`%7B%22abc%22%3A%7B%22c%22%3A%7B%22d%22%3A123%7D%7D%7D`,
+					`d=abc`,
+				},
 			},
 		},
 		{
-			InputPacket: `GET /acc.t1?a=ab HTTP/1.1
+			name: "Fuzz Multiple Post Json Path Params and Post Raw",
+			base: base{
+				inputPacket: `GET /acc.t1?a=ab HTTP/1.1
 Host: www.baidu.com
 
 c={"abc":{"c":{"d":true}}}&&d=1234444
 `,
-			Code: ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzUploadFileName(`ccc`, `abc.php`).FuzzUploadKVPair(`cccddd`, `abccc.123.ph`).FuzzUploadFile(`your-filename`, 'php.pp12.txt', `adfkdsjklasjkldjklasdfjklasdf`)",
-			ExpectKeywordInOutputPacket: []string{
-				"ABC: CCC\r\n", "XXX /acc.t1?ccccccccccccccc",
-				"; filename=\"abc.php\"",
-				`multipart/form-data; boundary=-`,
-				`name="your-filename"; filename="php.pp12.txt"`,
-				`adfkdsjklasjkldjklasdfjklasdf` + "\r\n--",
-				"name=\"cccddd\"\r\n\r\nabccc.123.ph\r\n--",
+				code: ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzPath(`/acc.t1`).FuzzPathAppend(`12`).FuzzPostJsonPathParams(`c`, `$.abc.c.d`, 123).FuzzPostParams(`d`, `abc`).FuzzPostRaw(`dhjkasdhjkasjkhdihasdhiouwaioheriohqweiohqweiohqiwhet--=-=-=-=-=-`)",
+				expectKeywordInOutputPacket: []string{
+					"ABC: CCC\r\n", "XXX /acc.t112?ccccccccccccccc",
+					`dhjkasdhjkasjkhdihasdhiouwaioheriohqweiohqweiohqiwhet--=-=-=-=-=-`,
+				},
 			},
 		},
 		{
-			InputPacket: `POST / HTTP/1.1
+			name: "Fuzz Upload File",
+			base: base{
+				inputPacket: `GET /acc.t1?a=ab HTTP/1.1
+Host: www.baidu.com
+
+c={"abc":{"c":{"d":true}}}&&d=1234444
+`,
+				code: ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzUploadFile(`ccc`, `abc.php`, `<?=1+1?>`)",
+				expectKeywordInOutputPacket: []string{
+					"ABC: CCC\r\n", "XXX /acc.t1?ccccccccccccccc",
+					"; filename=\"abc.php\"", `<?=1+1?>` + "\r\n--",
+					`multipart/form-data; boundary=-`,
+				},
+			},
+		},
+		{
+			name: "Fuzz Upload File Name",
+			base: base{
+				inputPacket: `GET /acc.t1?a=ab HTTP/1.1
+Host: www.baidu.com
+
+c={"abc":{"c":{"d":true}}}&&d=1234444
+`,
+				code: ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzUploadFileName(`ccc`, `abc.php`)",
+				expectKeywordInOutputPacket: []string{
+					"ABC: CCC\r\n", "XXX /acc.t1?ccccccccccccccc",
+					"; filename=\"abc.php\"",
+					`multipart/form-data; boundary=-`,
+				},
+			},
+		},
+		{
+			name: "Fuzz Multiple Upload File",
+			base: base{
+				inputPacket: `GET /acc.t1?a=ab HTTP/1.1
+Host: www.baidu.com
+
+c={"abc":{"c":{"d":true}}}&&d=1234444
+`,
+				code: ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzUploadFileName(`ccc`, `abc.php`).FuzzUploadKVPair(`cccddd`, `abccc.123.ph`).FuzzUploadFile(`your-filename`, 'php.pp12.txt', `adfkdsjklasjkldjklasdfjklasdf`)",
+				expectKeywordInOutputPacket: []string{
+					"ABC: CCC\r\n", "XXX /acc.t1?ccccccccccccccc",
+					"; filename=\"abc.php\"",
+					`multipart/form-data; boundary=-`,
+					`name="your-filename"; filename="php.pp12.txt"`,
+					`adfkdsjklasjkldjklasdfjklasdf` + "\r\n--",
+					"name=\"cccddd\"\r\n\r\nabccc.123.ph\r\n--",
+				},
+			},
+		},
+		{
+			name: "Fuzz Upload File Name with fuzztag",
+			base: base{
+				inputPacket: `POST / HTTP/1.1
 Host: www.example.com
 Content-Type: multipart/form-data; boundary=------------------------mElesrxgGfeRzfHJlyONsWWKKiqXIiVGVuaxYhpG
 Content-Length: 245
@@ -302,142 +393,146 @@ Content-Type: application/octet-stream
 
 
 --------------------------mElesrxgGfeRzfHJlyONsWWKKiqXIiVGVuaxYhpG--`,
-			Code: ".FuzzUploadFileName(\"a\",\"abc{{i(1-2)}}.php\")",
-			ExpectKeywordInOutputPacket: []string{
-				"name=\"a\"; filename=\"abc1.php\"",
+				code: ".FuzzUploadFileName(\"a\",\"abc{{i(1-2)}}.php\")",
+				expectKeywordInOutputPacket: []string{
+					"name=\"a\"; filename=\"abc1.php\"",
+				},
 			},
 		},
 		{
-			InputPacket: `GET /acc.t1?a=ab HTTP/1.1
+			name: "Fuzz Multiple Params",
+			base: base{
+				inputPacket: `GET /acc.t1?a=ab HTTP/1.1
 Host: www.baidu.com
 Cookie: abc={"ccc":2311}
 
 c={"abc":{"c":{"d":true}}}&&d=1234444
 `,
-			Code: ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzUploadFileName(`ccc`, `abc.php`).FuzzUploadKVPair(`cccddd`, `abccc.123.ph`).FuzzUploadFile(`your-filename`, 'php.pp12.txt', `adfkdsjklasjkldjklasdfjklasdf`).FuzzCookieJsonPath(`abc`, `$.ccc`, `zk123`)",
-			ExpectKeywordInOutputPacket: []string{
-				"ABC: CCC\r\n", "XXX /acc.t1?ccccccccccccccc",
-				"; filename=\"abc.php\"",
-				`multipart/form-data; boundary=-`,
-				`name="your-filename"; filename="php.pp12.txt"`,
-				`adfkdsjklasjkldjklasdfjklasdf` + "\r\n--",
-				"name=\"cccddd\"\r\n\r\nabccc.123.ph\r\n--",
-				"zk123", `%7B%22ccc%22%3A%22zk123%22%7D`,
+				code: ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzUploadFileName(`ccc`, `abc.php`).FuzzUploadKVPair(`cccddd`, `abccc.123.ph`).FuzzUploadFile(`your-filename`, 'php.pp12.txt', `adfkdsjklasjkldjklasdfjklasdf`).FuzzCookieJsonPath(`abc`, `$.ccc`, `zk123`)",
+				expectKeywordInOutputPacket: []string{
+					"ABC: CCC\r\n", "XXX /acc.t1?ccccccccccccccc",
+					"; filename=\"abc.php\"",
+					`multipart/form-data; boundary=-`,
+					`name="your-filename"; filename="php.pp12.txt"`,
+					`adfkdsjklasjkldjklasdfjklasdf` + "\r\n--",
+					"name=\"cccddd\"\r\n\r\nabccc.123.ph\r\n--",
+					"zk123", `%7B%22ccc%22%3A%22zk123%22%7D`,
+				},
 			},
 		},
 		{
-			InputPacket: `GET /acc.t1?a=ab&&c=eyJkZCI6MTI1fQ%3D%3D HTTP/1.1
+			name: "Fuzz Get Base64 Json Path",
+			base: base{
+				inputPacket: `GET /acc.t1?a=ab&&c=eyJkZCI6MTI1fQ%3D%3D HTTP/1.1
 Host: www.baidu.com
 Cookie: abc={"ccc":2311}
 
 c={"abc":{"c":{"d":true}}}&&d=1234444
 `,
-			Code: ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetBase64JsonPath(`c`, `$.dd`, `ddda`)",
-			ExpectKeywordInOutputPacket: []string{
-				"ABC: CCC\r\n",
-				"a=ab", "c=ey",
-				"eyJkZCI6ImRkZGEifQ%3D%3D",
-				"c=eyJkZCI6ImRkZGEifQ%3D%3D",
+				code: ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetBase64JsonPath(`c`, `$.dd`, `ddda`)",
+				expectKeywordInOutputPacket: []string{
+					"ABC: CCC\r\n",
+					"a=ab", "c=ey",
+					"eyJkZCI6ImRkZGEifQ%3D%3D",
+					"c=eyJkZCI6ImRkZGEifQ%3D%3D",
+				},
 			},
 		},
 		{
-			InputPacket: `GET /acc.t1?a=ab HTTP/1.1
+			name: "Fuzz Post Base64 Json Path",
+			base: base{
+				inputPacket: `GET /acc.t1?a=ab HTTP/1.1
 Host: www.baidu.com
 Cookie: abc={"ccc":2311}
 
 c=eyJkZCI6MTI1fQ%3D%3D&&d=1234444
 `,
-			Code: ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzPostBase64JsonPath(`c`, `$.dd`, `ddda`)",
-			ExpectKeywordInOutputPacket: []string{
-				"ABC: CCC\r\n",
-				"a=ab", "c=ey",
-				"eyJkZCI6ImRkZGEifQ%3D%3D",
-				"c=eyJkZCI6ImRkZGEifQ%3D%3D",
+				code: ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzPostBase64JsonPath(`c`, `$.dd`, `ddda`)",
+				expectKeywordInOutputPacket: []string{
+					"ABC: CCC\r\n",
+					"a=ab", "c=ey",
+					"eyJkZCI6ImRkZGEifQ%3D%3D",
+					"c=eyJkZCI6ImRkZGEifQ%3D%3D",
+				},
 			},
 		},
 		{
-			InputPacket: `GET /acc.t1?a=ab HTTP/1.1
+			name: "Fuzz Cookie Base64 Json Path",
+			base: base{
+				inputPacket: `GET /acc.t1?a=ab HTTP/1.1
 Host: www.baidu.com
 Cookie: c=eyJkZCI6MTI1fQ%3D%3D
 
 d=1234444&&qa=1
 `,
-			Code: ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzCookieBase64JsonPath(`c`, `$.dd`, `ddda`)",
-			ExpectKeywordInOutputPacket: []string{
-				"ABC: CCC\r\n",
-				"a=ab", "Cookie: c=ey",
-				"eyJkZCI6ImRkZGEifQ%3D%3D",
-				"c=eyJkZCI6ImRkZGEifQ%3D%3D",
+				code: ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzCookieBase64JsonPath(`c`, `$.dd`, `ddda`)",
+				expectKeywordInOutputPacket: []string{
+					"ABC: CCC\r\n",
+					"a=ab", "Cookie: c=ey",
+					"eyJkZCI6ImRkZGEifQ%3D%3D",
+					"c=eyJkZCI6ImRkZGEifQ%3D%3D",
+				},
+			},
+		},
+
+		{
+			name: "Fuzz Post Json Type Params",
+			base: base{
+				inputPacket: `GET /acc.t1?a=ab HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzPostJsonParams("aaa", 123456789).FuzzPostJsonParams("bbb", "123456789").FuzzPostJsonParams("ccc",{"cd":"{{i(1-2)}}"})`,
+				expectKeywordInOutputPacket: []string{
+					`"aaa":123456789`,
+					`"bbb":"123456789"`,
+					`"ccc":{"cd":"1"}`,
+				},
 			},
 		},
 	}
 
-	debugCases := funk.Filter(total, func(i *BaseCase) bool {
-		return i.Debug
-	}).([]*BaseCase)
-	ordinaryCases := funk.Filter(total, func(i *BaseCase) bool {
-		return !i.Debug
-	}).([]*BaseCase)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			test := assert.New(t)
+			ctx := context.Background()
+			engine := yaklang.New()
+			data := tc.base
 
-	test := assert.New(t)
-	handle := func(data *BaseCase) {
-		ctx := context.Background()
-		engine := yaklang.New()
-		engine.SetVar("request", data.InputPacket)
-		engine.SetVar("keywords", data.ExpectKeywordInOutputPacket)
-		engine.SetVar("regexps", data.ExpectRegexpInOutputPacket)
-		engine.SetVar("debug", data.Debug)
+			engine.SetVar("request", data.inputPacket)
+			engine.SetVar("keywords", data.expectKeywordInOutputPacket)
+			engine.SetVar("regexps", data.expectRegexpInOutputPacket)
+			engine.SetVar("debug", data.debug)
 
-		if data.Code != "" {
-			data.Code = "." + strings.TrimLeft(data.Code, ".")
-		}
-		initCode := `result = fuzz.HTTPRequest(request)~` + data.Code
-		if data.Debug {
-			fmt.Println("----------------OP CODE-----------------")
-			fmt.Println(initCode)
-			fmt.Println("----------------------------------------")
-		}
-		err := engine.EvalInline(ctx, initCode)
-		if err != nil {
-			test.Fail("eval code failed: %s", err)
-			return
-		}
+			if data.code != "" {
+				data.code = "." + strings.TrimLeft(data.code, ".")
+			}
+			initCode := `result = fuzz.HTTPRequest(request)~` + data.code
+			if data.debug {
+				fmt.Println("----------------OP CODE-----------------")
+				fmt.Println(initCode)
+				fmt.Println("----------------------------------------")
+			}
+			err := engine.EvalInline(ctx, initCode)
+			test.NoError(err, "eval code should not fail")
 
-		if data.Debug {
-			fmt.Println("----------------KEYWORD-----------------")
-			engine.EvalInline(ctx, "dump(keywords)")
-			fmt.Println("----------------REGEXPS-----------------")
-			engine.EvalInline(ctx, "dump(regexps)")
-			fmt.Println()
-		}
+			if data.debug {
+				fmt.Println("----------------KEYWORD-----------------")
+				engine.EvalInline(ctx, "dump(keywords)")
+				fmt.Println("----------------REGEXPS-----------------")
+				engine.EvalInline(ctx, "dump(regexps)")
+				fmt.Println()
+			}
 
-		err = engine.EvalInline(context.Background(), `raw = result.GetFirstFuzzHTTPRequest()~.GetBytes()
+			err = engine.EvalInline(context.Background(), `raw = result.GetFirstFuzzHTTPRequest()~.GetBytes()
 if debug { println(string(raw)) }
-check = false
-if str.MatchAllOfSubString(raw, keywords...) || str.MatchAllOfRegexp(raw, regexps...){
-    check = true
-}`)
-		if err != nil {
-			test.Fail("eval code failed: %s", err)
-			return
-		}
+check = str.MatchAllOfSubString(raw, keywords...) || str.MatchAllOfRegexp(raw, regexps...)`)
+			test.NoError(err, "eval code should not fail")
 
-		checked, ok := engine.GetVar("check")
-		if !ok {
-			test.Fail("getvar[check] failed")
-		}
-		if !checked.(bool) {
-			fmt.Println("CHECK FAILED CODE: ")
-			fmt.Println(data.Code)
-			test.FailNow("check failed")
-		}
-	}
-
-	for _, c := range debugCases {
-		handle(c)
-	}
-	for _, c := range ordinaryCases {
-		handle(c)
+			checked, ok := engine.GetVar("check")
+			test.True(ok, "should get 'check' variable")
+			test.True(checked.(bool), "check should be true")
+		})
 	}
 
 }
