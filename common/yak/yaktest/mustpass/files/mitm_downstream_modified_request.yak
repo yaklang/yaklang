@@ -1,0 +1,31 @@
+ch = make(chan var)
+port1 = os.GetRandomAvailableTCPPort()
+port2 = os.GetRandomAvailableTCPPort()
+dur = time.ParseDuration("10s")~
+ctx, cancel = context.WithTimeout(context.New(), dur)
+host, port = tcp.MockServe("Hello")
+ok = false 
+log.Info("start first mitm proxy on port %d", port2)
+go mitm.Start(port2, mitm.hijackHTTPRequest(fn(isHttps, url, request, forward, drop){
+    println(string(request))
+    ok = string(request).Contains("bbb")
+    drop()
+    cancel()
+    ch <- 1
+}), mitm.context(ctx))
+time.sleep(1)
+log.Info("start second mitm proxy on port %d", port1)
+go mitm.Bridge(port1, "http://127.0.0.1:%d" % [port2], mitm.hijackHTTPRequest(fn(isHttps, url, request, forward, drop){
+    modified = string(request).ReplaceAll("aaa", "bbb")
+    forward(modified)
+}), mitm.context(ctx))
+time.sleep(1)
+poc.HTTP(`GET /aaa HTTP/1.1
+Content-Type: application/json
+Host: %s:%d
+
+` % [host, port], poc.proxy("http://127.0.0.1:%d" % [port1]))
+<- ch
+if !ok {
+    panic("mitm downstream proxy recv http request not modified by hijackHTTPRequest")
+}

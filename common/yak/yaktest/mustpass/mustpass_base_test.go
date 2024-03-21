@@ -16,9 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak"
 )
 
-var (
-	files = make(map[string]string)
-)
+var files = make(map[string]string)
 
 //go:embed files/*
 var testFiles embed.FS
@@ -26,7 +24,6 @@ var testFiles embed.FS
 var vulinboxAddr string
 
 func init() {
-
 	dirs, err := testFiles.ReadDir("files")
 	if err != nil {
 		panic(err)
@@ -50,11 +47,10 @@ func init() {
 	if err != nil {
 		panic("VULINBOX START ERROR")
 	}
-
 }
 
 func TestMustPassDebug(t *testing.T) {
-	var debugName = "nuclei_context.yak"
+	debugName := "mitm_downstream_modified_request.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {
