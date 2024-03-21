@@ -195,7 +195,10 @@ func _httpPool_MutateHook(hook func([]byte) [][]byte) HttpPoolConfigOption {
 func _httpPool_MutateHookWithYPBStruct(params []*ypb.MutateMethod) HttpPoolConfigOption {
 	if len(params) == 0 {
 		return func(config *httpPoolConfig) {
-
+			//config.MutateHook = func(i []byte) [][]byte {
+			//	return [][]byte{i}
+			//}
+			config.MutateHook = nil
 		}
 	} else {
 		return _httpPool_MutateHook(func(raw []byte) [][]byte {
