@@ -75,6 +75,7 @@ func (b *FunctionBuilder) CreateClass(name string) *ClassBluePrint {
 		log.Errorf("CreateClass: this class redeclare")
 	}
 	b.ClassBluePrint[name] = c
+	c.Name = name
 	return c
 }
 
