@@ -569,7 +569,7 @@ func (b *astbuilder) AssignList(forceAssign bool, stmt assignlist) []ssa.Value {
 			if _, ok := right.AnonymousFunctionDecl().(*yak.AnonymousFunctionDeclContext); ok {
 				b.SetMarkedFunction(leftVariables[0].GetName())
 				return func() {
-					b.MarkedFunc = nil
+					b.MarkedFuncType = nil
 				}
 			}
 
@@ -1393,15 +1393,10 @@ func (b *astbuilder) buildAnonymousFunctionDecl(stmt *yak.AnonymousFunctionDeclC
 			}
 		}
 		b.Finish()
-		if hitDefinedFunction {
-			for name, fv := range b.FreeValues {
-				if fv.GetDefault() != nil {
-					continue
-				}
-				fv.NewError(ssa.Error, TAG, ssa.ValueUndefined(name))
-			}
-		}
 		b.FunctionBuilder = b.PopFunction()
+		if hitDefinedFunction {
+			b.MarkedFunctions = append(b.MarkedFunctions, newFunc)
+		}
 
 		recoverRange()
 	}
