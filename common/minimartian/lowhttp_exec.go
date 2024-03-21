@@ -106,13 +106,17 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 		}
 
 		// content-length is too short
+		if key != "content-length" && key != "transfer-encoding" {
+			return
+		}
+
 		if key == "content-length" {
-			if contentLength := codec.Atoi(value); contentLength > 0 && contentLength < p.GetMaxContentLength() {
+			if contentLength := codec.Atoi(value); contentLength < p.GetMaxContentLength() {
 				return
 			}
 		}
 
-		// trigger: content-length is too large
+		// set if chunked or content-length is too large
 		httpctx.SetResponseHeaderCallback(req, func(response *http.Response, headerBytes []byte, bodyReader io.Reader) (io.Reader, error) {
 			writerCloser := utils.NewTriggerWriter(uint64(p.GetMaxContentLength()), func(buffer io.ReadCloser) {
 				httpctx.SetResponseTooLarge(req, true)
