@@ -271,7 +271,19 @@ func (v *BasePHPParserVisitor) VisitStaticVariableStatement(ctx *StaticVariableS
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitClassStatement(ctx *ClassStatementContext) interface{} {
+func (v *BasePHPParserVisitor) VisitTraitUse(ctx *TraitUseContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitPropertyModifiersVariable(ctx *PropertyModifiersVariableContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitConst(ctx *ConstContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitFunction(ctx *FunctionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
