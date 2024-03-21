@@ -75,14 +75,34 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 
 	case *phpparser.KeywordNewExpressionContext:
 		return y.VisitNewExpr(ret.NewExpr())
-	case *phpparser.IndexCallExpressionContext:
-		v1 := y.VisitExpression(ret.Expression(0))
-		indexKey := y.VisitExpression(ret.Expression(1))
-		return y.ir.ReadOrCreateMemberCallVariable(v1, indexKey)
-	case *phpparser.MemberCallExpressionContext:
-		v1 := y.VisitExpression(ret.Expression(0))
-		indexKey := y.VisitExpression(ret.Expression(1))
-		return y.ir.ReadOrCreateMemberCallVariable(v1, indexKey)
+	case *phpparser.IndexCallExpressionContext: // $a[1]
+		obj := y.VisitExpression(ret.Expression())
+		key := y.VisitIndexMemberCallKey(ret.IndexMemberCallKey())
+		return y.ir.ReadMemberCallVariable(obj, key)
+	case *phpparser.MemberCallExpressionContext: // $a->b
+		obj := y.VisitExpression(ret.Expression())
+		key := y.VisitMemberCallKey(ret.MemberCallKey())
+		return y.ir.ReadMemberCallVariable(obj, key)
+	case *phpparser.SliceCallAssignmentExpressionContext: // $a[1] = expr
+		// build left
+		object := y.VisitExpression(ret.Expression(0))
+		key := y.VisitIndexMemberCallKey(ret.IndexMemberCallKey())
+		member := y.ir.CreateMemberCallVariable(object, key)
+		// right
+		rightValue := y.VisitExpression(ret.Expression(1))
+		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), member, rightValue)
+		y.ir.AssignVariable(member, rightValue)
+		return rightValue
+	case *phpparser.FieldMemberCallAssignmentExpressionContext: // $a->b = expr
+		// build left
+		object := y.VisitExpression(ret.Expression(0))
+		key := y.VisitMemberCallKey(ret.MemberCallKey())
+		member := y.ir.CreateMemberCallVariable(object, key)
+		// right
+		rightValue := y.VisitExpression(ret.Expression(1))
+		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), member, rightValue)
+		y.ir.AssignVariable(member, rightValue)
+		return rightValue
 	case *phpparser.FunctionCallExpressionContext:
 		caller := y.VisitExpression(ret.Expression())
 		args, ellipsis := y.VisitArguments(ret.Arguments())
@@ -350,27 +370,6 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		// unpacking
 		log.Errorf("unpack unfinished")
 		return nil
-	case *phpparser.SliceCallAssignmentExpressionContext:
-		// build left
-		object := y.VisitExpression(ret.Expression(0))
-		key := y.VisitExpression(ret.Expression(1))
-		member := y.ir.CreateMemberCallVariable(object, key)
-		// right
-		rightValue := y.VisitExpression(ret.Expression(2))
-		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), member, rightValue)
-		y.ir.AssignVariable(member, rightValue)
-		return rightValue
-
-	case *phpparser.FieldMemberCallAssignmentExpressionContext:
-		// build left
-		object := y.VisitExpression(ret.Expression(0))
-		key := y.VisitExpression(ret.Expression(1))
-		member := y.ir.CreateMemberCallVariable(object, key)
-		// right
-		rightValue := y.VisitExpression(ret.Expression(2))
-		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), member, rightValue)
-		y.ir.AssignVariable(member, rightValue)
-		return rightValue
 
 	case *phpparser.OrdinaryAssignmentExpressionContext:
 		variable := y.VisitLeftVariable(ret.LeftVariable())

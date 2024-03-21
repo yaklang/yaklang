@@ -584,3 +584,46 @@ func (y *builder) VisitMemberModifier(raw phpparser.IMemberModifierContext) ssa.
 		return ssa.NoneModifier
 	}
 }
+
+func (y *builder) VisitIndexMemberCallKey(raw phpparser.IIndexMemberCallKeyContext) ssa.Value {
+	i, ok := raw.(*phpparser.IndexMemberCallKeyContext)
+
+	if !ok {
+		return nil
+	}
+
+	if i.NumericConstant() != nil {
+		return y.VisitNumericConstant(i.NumericConstant())
+	}
+
+	if i.MemberCallKey() != nil {
+		return y.VisitMemberCallKey(i.MemberCallKey())
+	}
+
+	return nil
+
+}
+
+func (y *builder) VisitMemberCallKey(raw phpparser.IMemberCallKeyContext) ssa.Value {
+	i, ok := raw.(*phpparser.MemberCallKeyContext)
+	if !ok {
+		return nil
+	}
+
+	_ = i
+	if i.Identifier() != nil {
+		return y.ir.EmitConstInst(i.Identifier().GetText())
+	}
+
+	if i.Variable() != nil {
+		name := y.VisitVariable(i.Variable())
+		value := y.ir.ReadValue(name)
+		return y.ir.EmitConstInst(value.String())
+	}
+
+	if i.String_() != nil {
+		return y.ir.EmitConstInst(i.String_().GetText())
+	}
+
+	return nil
+}

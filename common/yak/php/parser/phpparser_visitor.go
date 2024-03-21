@@ -280,6 +280,12 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#StringAsIndirectClassStaticVariable.
 	VisitStringAsIndirectClassStaticVariable(ctx *StringAsIndirectClassStaticVariableContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#memberCallKey.
+	VisitMemberCallKey(ctx *MemberCallKeyContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#indexMemberCallKey.
+	VisitIndexMemberCallKey(ctx *IndexMemberCallKeyContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#SpecialWordExpression.
 	VisitSpecialWordExpression(ctx *SpecialWordExpressionContext) interface{}
 
