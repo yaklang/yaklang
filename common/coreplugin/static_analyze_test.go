@@ -18,7 +18,7 @@ func Check(code string, t *testing.T) {
 		t.Fatal("Failed to parse code: ", err)
 	}
 	if res := yak.StaticAnalyzeYaklang(string(code), "mitm"); len(lo.Filter(res, func(item *result.StaticAnalyzeResult, index int) bool {
-		return item.Severity == "error"
+		return item.Severity == result.Error
 	})) != 0 {
 		t.Fatalf("plugin : static analyzer failed: \n%s", res)
 	}
