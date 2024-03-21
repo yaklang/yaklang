@@ -1,0 +1,40 @@
+packet = `POST /admin/test.php?abc=123&&c={"abc":12,"b":["12",{"efg":4,"ag":"123"}],"c":1} HTTP/1.1
+Host: www.baidu.com
+Cookie: jsonBase64Param=eyJhYmMiOjEyLCJiIjpbIjEyIix7ImVmZyI6NCwiYWciOiIxMjMifV0sImMiOjF9; jsonUrlParam=%7B%22abc%22%3A12%2C%22b%22%3A%5B%2212%22%2C%7B%22efg%22%3A4%2C%22ag%22%3A%22123%22%7D%5D%2C%22c%22%3A1%7D
+
+{"abc":12,"b":["12",{"efg":4,"ag":"123"}],"c":1}
+`
+
+packet2 = `POST /admin/test.php?abc=123&&c=%7B%22abc%22%3A12%2C%22b%22%3A%5B%2212%22%2C%7B%22efg%22%3A4%2C%22ag%22%3A%22123%22%7D%5D%2C%22c%22%3A1%7D HTTP/1.1
+Host: www.baidu.com
+Cookie: jsonBase64Param=eyJhYmMiOjEyLCJiIjpbIjEyIix7ImVmZyI6NCwiYWciOiIxMjMifV0sImMiOjF9; jsonUrlParam=%7B%22abc%22%3A12%2C%22b%22%3A%5B%2212%22%2C%7B%22efg%22%3A4%2C%22ag%22%3A%22123%22%7D%5D%2C%22c%22%3A1%7D
+
+ddd=%7B%22abc%22%3A12%2C%22b%22%3A%5B%2212%22%2C%7B%22efg%22%3A4%2C%22ag%22%3A%22123%22%7D%5D%2C%22c%22%3A1%7D&&c25=12&&postBase64=eyJhYmMiOjEyLCJiIjpbIjEyIix7ImVmZyI6NCwiYWciOiIxMjMifV0sImMiOjF9`
+
+allParams := fuzz.HTTPRequest(packet)~.GetAllParams()
+if allParams.Length() < 32 {
+    panic("至少需要32个参数，参数提取数据量不足")
+}
+
+resultLines = allParams.Map(i => i.String())
+paramsTable = "".Join(resultLines)
+if str.Count(paramsTable, `get-query-json`) < 7 {
+    panic("get-query-json 提取失败")
+}
+
+if str.Count(paramsTable, `post-json`) < 7 {
+    panic("post-json 提取失败")
+}
+
+if str.Count(paramsTable, `cookie-base64-json`) < 7 {
+    panic("cookie-base64-json 提取失败")
+}
+
+if str.Count(paramsTable, `cookie-json`) < 7 {
+    panic("cookie-json 提取失败")
+}
+
+if str.Count(paramsTable, `$.b[1].efg`) < 4 {
+    panic("JSONPATH 提取失败")
+}
+println(paramsTable)

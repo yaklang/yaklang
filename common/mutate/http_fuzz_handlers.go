@@ -795,7 +795,8 @@ func (f *FuzzHTTPRequest) fuzzPostJsonParamsWithRaw(k, v interface{}) ([]*http.R
 	}
 
 	originBody := rawBody
-
+	originV := v
+	//_ = originV
 	keys, values := InterfaceToFuzzResults(k), InterfaceToFuzzResults(v)
 	if keys == nil || values == nil {
 		return nil, utils.Wrapf(err, "keys or Values is empty...")
@@ -815,34 +816,44 @@ func (f *FuzzHTTPRequest) fuzzPostJsonParamsWithRaw(k, v interface{}) ([]*http.R
 
 		var newValue interface{} = value
 
-		if originalValue.Type != gjson.Null {
-			// 根据原始值的类型决定如何转换 value,类型不应当 fuzz 吧？
-			switch originalValue.Type {
-			case gjson.True, gjson.False:
-				if boolVal, err := strconv.ParseBool(value); err == nil {
-					newValue = boolVal
-				} else {
-					continue
-				}
-			case gjson.Number:
-				if floatVal, err := strconv.ParseFloat(value, 64); err == nil {
-					newValue = floatVal
-				} else {
-					continue
-				}
-			case gjson.String:
-				newValue = value
-			case gjson.JSON:
-				if gjson.Valid(value) {
-					newValue = gjson.Parse(value).Value()
-				} else {
-					continue
-				}
-			default:
-				log.Errorf("unknown type: %v", originalValue.Type)
+		// 根据原始值的类型决定如何转换 value
+		switch originalValue.Type {
+		case gjson.True, gjson.False:
+			if boolVal, err := strconv.ParseBool(value); err == nil {
+				newValue = boolVal
+			} else {
 				continue
 			}
+		case gjson.Number:
+			if floatVal, err := strconv.ParseFloat(value, 64); err == nil {
+				newValue = floatVal
+			} else {
+				continue
+			}
+		case gjson.String:
+			newValue = value
+		case gjson.JSON:
+			if gjson.Valid(value) {
+				newValue = gjson.Parse(value).Value()
+			} else {
+				continue
+			}
+		// 如果类型是 Null 则代表是向 json 中添加新的 kv ,需要根据传入值的类型决定如何添加
+		case gjson.Null:
+			switch originV.(type) {
+			case int:
+				newValue = originV
+			case string:
+				newValue = value
+			default:
+				newValue = gjson.Parse(value).Value()
+			}
+
+		default:
+			log.Errorf("unknown type: %v", originalValue.Type)
+			continue
 		}
+
 		modifiedBody, err := sjson.SetBytes(rawBody, key, newValue)
 		if err != nil {
 			break

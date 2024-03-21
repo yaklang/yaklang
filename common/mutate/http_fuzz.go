@@ -477,40 +477,44 @@ func (f *FuzzHTTPRequest) GetGetQueryParams() []*FuzzHTTPRequestParam {
 		return nil
 	}
 
-	var params []*FuzzHTTPRequestParam
-	for key, param := range req.URL.Query() {
+	fuzzParams := make([]*FuzzHTTPRequestParam, 0)
+
+	for key, values := range req.URL.Query() {
 		if !strVisible(key) {
 			continue
 		}
 
-		if val, ok := utils.IsJSON(param[0]); ok {
-			for _, j := range jsonpath.RecursiveDeepJsonPath(val) {
-				params = append(params, &FuzzHTTPRequestParam{
-					position: posGetQueryJson,
-					param:    key,
-					raw:      param,
-					path:     j,
-					origin:   f,
+		if raw, ok := utils.IsJSON(values[0]); ok {
+			call := func(jk, jv gjson.Result, gPath, jPath string) {
+				fuzzParams = append(fuzzParams, &FuzzHTTPRequestParam{
+					position:   posGetQueryJson,
+					param:      key,
+					raw:        strings.TrimSpace(raw),
+					paramValue: jv.String(),
+					path:       jPath,
+					gpath:      gPath,
+					origin:     f,
 				})
 			}
+			walk([]byte(raw), gjson.ParseBytes([]byte(raw)), "", "$", call)
 		}
 
-		if val, ok := isStrictBase64(param[0]); ok && govalidator.IsPrintableASCII(val) {
+		if val, ok := isStrictBase64(values[0]); ok && govalidator.IsPrintableASCII(val) {
 			if val, ok := utils.IsJSON(val); ok {
 				for _, j := range jsonpath.RecursiveDeepJsonPath(val) {
-					params = append(params, &FuzzHTTPRequestParam{
+					fuzzParams = append(fuzzParams, &FuzzHTTPRequestParam{
 						position: posGetQueryBase64Json,
 						param:    key,
-						raw:      param,
+						raw:      values,
 						path:     j,
 						origin:   f,
 					})
 				}
 			} else {
-				params = append(params, &FuzzHTTPRequestParam{
+				fuzzParams = append(fuzzParams, &FuzzHTTPRequestParam{
 					position: posGetQueryBase64,
 					param:    key,
-					raw:      param,
+					raw:      values,
 					origin:   f,
 				})
 			}
@@ -519,12 +523,14 @@ func (f *FuzzHTTPRequest) GetGetQueryParams() []*FuzzHTTPRequestParam {
 		param := &FuzzHTTPRequestParam{
 			position: posGetQuery,
 			param:    key,
-			raw:      param,
-			origin:   f,
+			// TODO
+			raw:        values,
+			paramValue: values,
+			origin:     f,
 		}
-		params = append(params, param)
+		fuzzParams = append(fuzzParams, param)
 	}
-	return params
+	return fuzzParams
 }
 
 func (f *FuzzHTTPRequest) GetPostCommonParams() []*FuzzHTTPRequestParam {
@@ -551,6 +557,33 @@ func httpRequestReadBody(r *http.Request) []byte {
 	return buf.Bytes()
 }
 
+func walk(raw []byte, value gjson.Result, gPrefix string, jPrefix string, call func(key, val gjson.Result, gPath, jPath string)) {
+	// 遍历当前层级的所有键
+	value.ForEach(func(key, val gjson.Result) bool {
+		var jPath string
+		// json path syntax
+		if key.Type == gjson.Number {
+			jPath = fmt.Sprintf("%s[%d]", jPrefix, key.Int())
+		} else {
+			jPath = fmt.Sprintf("%s.%s", jPrefix, key.String())
+		}
+		// gjson path syntax
+		gPath := key.String()
+		if gPrefix != "" {
+			gPath = gPrefix + "." + key.String()
+		}
+
+		call(key, val, gPath, jPath)
+
+		// 如果当前值是对象或数组，递归遍历
+		if val.IsObject() || val.IsArray() {
+			walk(raw, val, gPath, jPath, call)
+		}
+
+		return true
+	})
+}
+
 func (f *FuzzHTTPRequest) GetPostJsonParams() []*FuzzHTTPRequestParam {
 	req, err := f.GetOriginHTTPRequest()
 	if err != nil {
@@ -558,38 +591,22 @@ func (f *FuzzHTTPRequest) GetPostJsonParams() []*FuzzHTTPRequestParam {
 	}
 	bodyRaw := httpRequestReadBody(req)
 
-	var fuzzParams []*FuzzHTTPRequestParam
+	fuzzParams := make([]*FuzzHTTPRequestParam, 0)
 
-	var walk func([]byte, gjson.Result, string)
-	walk = func(raw []byte, value gjson.Result, prefix string) {
-		// 遍历当前层级的所有键
-		value.ForEach(func(key, val gjson.Result) bool {
-			// 构建当前键的完整路径
-			fullPath := key.String()
-			if prefix != "" {
-				fullPath = prefix + "." + key.String()
-			}
-
-			fuzzParams = append(fuzzParams, &FuzzHTTPRequestParam{
-				position:   posPostJson,
-				param:      key.String(),
-				raw:        string(bytes.TrimSpace(raw)),
-				paramValue: val.String(),
-				path:       fullPath,
-				origin:     f,
-			})
-
-			// 如果当前值是对象或数组，递归遍历
-			if val.IsObject() || val.IsArray() {
-				walk(raw, val, fullPath)
-			}
-
-			return true // 继续遍历
+	call := func(key, val gjson.Result, gPath, jPath string) {
+		fuzzParams = append(fuzzParams, &FuzzHTTPRequestParam{
+			position:   posPostJson,
+			param:      key.String(),
+			raw:        string(bytes.TrimSpace(bodyRaw)),
+			paramValue: val.String(),
+			path:       jPath,
+			gpath:      gPath,
+			origin:     f,
 		})
 	}
 
 	// 从根对象开始遍历
-	walk(bodyRaw, gjson.ParseBytes(bodyRaw), "")
+	walk(bodyRaw, gjson.ParseBytes(bodyRaw), "", "$", call)
 	return fuzzParams
 }
 
@@ -624,64 +641,69 @@ func (f *FuzzHTTPRequest) GetPostParams() []*FuzzHTTPRequestParam {
 		return nil
 	}
 
-	queryRaw := httpRequestReadBody(req)
-	r, err := url.ParseQuery(string(queryRaw))
+	body := httpRequestReadBody(req)
+	r, err := url.ParseQuery(string(body))
 	if err != nil {
 		return nil
 	}
 
-	var params []*FuzzHTTPRequestParam
-	for key, param := range r {
+	fuzzParams := make([]*FuzzHTTPRequestParam, 0)
+	for key, values := range r {
 		if !strVisible(key) {
 			continue
 		}
 
-		if len(param) <= 0 {
+		if len(values) <= 0 {
 			continue
 		}
 
-		if val, ok := utils.IsJSON(param[0]); ok {
-			for _, j := range jsonpath.RecursiveDeepJsonPath(val) {
-				params = append(params, &FuzzHTTPRequestParam{
-					position: posPostQueryJson,
-					param:    key,
-					raw:      param,
-					path:     j,
-					origin:   f,
+		if raw, ok := utils.IsJSON(values[0]); ok {
+			call := func(jk, jv gjson.Result, gPath, jPath string) {
+				fuzzParams = append(fuzzParams, &FuzzHTTPRequestParam{
+					position:   posPostQueryJson,
+					param:      key,
+					param2nd:   jk.String(),
+					paramValue: jv.String(),
+					raw:        strings.TrimSpace(raw),
+					path:       jPath,
+					gpath:      gPath,
+					origin:     f,
 				})
 			}
+			walk([]byte(raw), gjson.ParseBytes([]byte(raw)), "", "$", call)
 		}
 
-		if val, ok := isStrictBase64(param[0]); ok && govalidator.IsPrintableASCII(val) {
-			if val, ok := utils.IsJSON(val); ok {
-				for _, j := range jsonpath.RecursiveDeepJsonPath(val) {
-					params = append(params, &FuzzHTTPRequestParam{
-						position: posPostQueryBase64Json,
-						param:    key,
-						raw:      param,
-						path:     j,
-						origin:   f,
-					})
-				}
-			} else {
-				params = append(params, &FuzzHTTPRequestParam{
-					position: posPostQueryBase64,
-					param:    key,
-					raw:      param,
-					origin:   f,
-				})
-			}
-		}
+		//if val, ok := isStrictBase64(param[0]); ok && govalidator.IsPrintableASCII(val) {
+		//	if val, ok := utils.IsJSON(val); ok {
+		//		for _, j := range jsonpath.RecursiveDeepJsonPath(val) {
+		//			params = append(params, &FuzzHTTPRequestParam{
+		//				position: posPostQueryBase64Json,
+		//				param:    key,
+		//				raw:      param,
+		//				path:     j,
+		//				origin:   f,
+		//			})
+		//		}
+		//	} else {
+		//		params = append(params, &FuzzHTTPRequestParam{
+		//			position: posPostQueryBase64,
+		//			param:    key,
+		//			raw:      param,
+		//			origin:   f,
+		//		})
+		//	}
+		//}
 
 		param := &FuzzHTTPRequestParam{
-			position: posPostQuery,
-			param:    key,
-			raw:      param,
-			origin:   f,
+			position:   posPostQuery,
+			param:      key,
+			paramValue: values,
+			raw:        string(body),
+			origin:     f,
 		}
-		params = append(params, param)
+		fuzzParams = append(fuzzParams, param)
 	}
-	return params
+	return fuzzParams
 }
 
 func (f *FuzzHTTPRequest) GetCookieParams() []*FuzzHTTPRequestParam {
