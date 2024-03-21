@@ -77,9 +77,9 @@ func (w *WebsocketController) handle(br *bufio.Reader, bw *bufio.Writer) error {
 		isDeflate = true
 	}
 
-	if lowhttp.GetHTTPRequestQueryParam(raw, "token") != w.Token {
-		return utils.Error("token is not right")
-	}
+	//if lowhttp.GetHTTPRequestQueryParam(raw, "token") != w.Token {
+	//	return utils.Error("token is not right")
+	//}
 
 	fmt.Println(string(raw))
 

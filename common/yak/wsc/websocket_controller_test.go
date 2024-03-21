@@ -8,6 +8,6 @@ import (
 func TestNewWebsocketController(t *testing.T) {
 	t.SkipNow()
 
-	err := NewWebsocketController("a", 8881).Run()
+	err := NewWebsocketController("", 8881).Run()
 	assert.Nil(t, err)
 }
