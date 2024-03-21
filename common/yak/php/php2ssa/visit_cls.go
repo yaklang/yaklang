@@ -19,12 +19,17 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 		return nil
 	}
 
-	t := y.VisitTypeRef(i.TypeRef())
-	_ = t
+	constructor := y.ir.GetClassConstructor(i.TypeRef().GetText())
+
+	args := make([]ssa.Value, 0)
+	ellipsis := false
 	if i.Arguments() != nil {
-		return nil
+		args, ellipsis = y.VisitArguments(i.Arguments())
 	}
-	return nil
+	c := y.ir.NewCall(constructor, args)
+	c.IsEllipsis = ellipsis
+	y.ir.EmitCall(c)
+	return c
 }
 
 func (y *builder) VisitTypeRef(raw phpparser.ITypeRefContext) ssa.Type {
@@ -178,20 +183,15 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 		return
 	}
 
-	i, _ := raw.(*phpparser.ClassStatementContext)
-	if i == nil {
-		return
-	}
+	// i, _ := raw.(*phpparser.ClassStatementContext)
+	// if i == nil {
+	// 	return
+	// }
 
-	// note: PHP8 #[...] attributes
-	if i.Attributes() != nil {
-		// handle php8
-	}
-
-	var memberDecorationVerbose string
-	if modifiers := i.PropertyModifiers(); modifiers != nil { // variable
-		_ = modifiers
-		modifiers := y.VisitPropertyModifiers(i.PropertyModifiers())
+	switch ret := raw.(type) {
+	case *phpparser.PropertyModifiersVariableContext:
+		// variable
+		modifiers := y.VisitPropertyModifiers(ret.PropertyModifiers())
 
 		setMember := class.BuildMember
 		if _, ok := modifiers[ssa.Static]; ok {
@@ -199,56 +199,52 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 		}
 
 		// handle variable
-		if i.TypeHint() != nil {
+		if ret.TypeHint() != nil {
 			// handle type hint
-			y.VisitTypeHint(i.TypeHint())
+			y.VisitTypeHint(ret.TypeHint())
 		}
 
 		// handle variable name
-		for _, va := range i.AllVariableInitializer() {
+		for _, va := range ret.AllVariableInitializer() {
 			name, value := y.VisitVariableInitializer(va)
+			if strings.HasPrefix(name, "$") {
+				name = name[1:]
+			}
 			setMember(name, value)
 		}
 
 		return
-	} else if i.MemberModifiers() != nil {
-		memberDecorationVerbose = i.MemberModifiers().GetText()
-		// const / function
-		if i.Const() != nil {
-			// handle const
-			if i.TypeHint() != nil {
-				varType := y.VisitTypeHint(i.TypeHint())
-				_ = varType
-			}
-			for _, c := range i.AllIdentifierInitializer() {
-				y.VisitIdentifierInitializer(c)
-			}
-		} else if i.Function_() != nil {
-			isFuncRef := i.Ampersand() != nil
-			var funcName = i.Identifier()
-			if i.FormalParameterList() != nil {
-				// handle formal parameter list
-				y.VisitFormalParameterList(i.FormalParameterList())
-			}
-			_, _ = isFuncRef, funcName
 
-			// baseCtorCall
-			if i.BaseCtorCall() != nil {
-				// handle base ctor call
-				y.VisitBaseCtorCall(i.BaseCtorCall())
-			} else if i.ReturnTypeDecl() != nil {
-				// handle return type decl
-				y.VisitReturnTypeDecl(i.ReturnTypeDecl())
-			}
+	case *phpparser.FunctionContext:
+		// function
+		// TODO: ret.Attributes() // php8
+		memberModifiers := y.VisitMemberModifiers(ret.MemberModifiers())
+		_ = memberModifiers
+		isRef := ret.Ampersand()
+		_ = isRef
 
-			y.VisitMethodBody(i.MethodBody())
+		funcName := ret.Identifier().GetText()
+		y.ir.SetMarkedFunction(funcName)
+		newFunction := y.ir.NewFunc(funcName)
+		y.ir = y.ir.PushFunction(newFunction)
+		{
+			this := y.ir.NewParam("$this")
+			_ = this
+			y.VisitFormalParameterList(ret.FormalParameterList())
+			y.VisitMethodBody(ret.MethodBody())
+			y.ir.Finish()
 		}
-	} else if i.Use() != nil {
-		y.VisitQualifiedNamespaceNameList(i.QualifiedNamespaceNameList())
-		y.VisitTraitAdaptations(i.TraitAdaptations())
-	}
-	_ = memberDecorationVerbose
+		y.ir = y.ir.PopFunction()
+		class.AddMarkedField(funcName, newFunction, 0)
 
+	case *phpparser.ConstContext:
+		// TODO: ret.Attributes() // php8
+		memberModifiers := y.VisitMemberModifiers(ret.MemberModifiers())
+		_ = memberModifiers
+	case *phpparser.TraitUseContext:
+	default:
+
+	}
 	return
 }
 
@@ -346,102 +342,12 @@ func (y *builder) VisitMethodBody(raw phpparser.IMethodBodyContext) interface{} 
 	defer recoverRange()
 
 	i, _ := raw.(*phpparser.MethodBodyContext)
-	if i == nil {
-		return nil
+	if i.BlockStatement() != nil {
+		y.ir.BuildSyntaxBlock(func() {
+			y.VisitBlockStatement(i.BlockStatement())
+		})
 	}
 
-	return nil
-}
-
-func (y *builder) VisitReturnTypeDecl(raw phpparser.IReturnTypeDeclContext) interface{} {
-	if y == nil || raw == nil {
-		return nil
-	}
-	recoverRange := y.SetRange(raw)
-	defer recoverRange()
-
-	i, _ := raw.(*phpparser.ReturnTypeDeclContext)
-	if i == nil {
-		return nil
-	}
-
-	allowNull := i.QuestionMark() != nil
-	t := y.VisitTypeHint(i.TypeHint())
-	_ = allowNull
-	// t.Union(Null)
-
-	return t
-}
-
-func (y *builder) VisitBaseCtorCall(raw phpparser.IBaseCtorCallContext) interface{} {
-	if y == nil || raw == nil {
-		return nil
-	}
-	recoverRange := y.SetRange(raw)
-	defer recoverRange()
-
-	i, _ := raw.(*phpparser.BaseCtorCallContext)
-	if i == nil {
-		return nil
-	}
-
-	return nil
-}
-
-func (y *builder) VisitFormalParameterList(raw phpparser.IFormalParameterListContext) interface{} {
-	if y == nil || raw == nil {
-		return nil
-	}
-	recoverRange := y.SetRange(raw)
-	defer recoverRange()
-
-	i, _ := raw.(*phpparser.FormalParameterListContext)
-	if i == nil {
-		return nil
-	}
-
-	for _, param := range i.AllFormalParameter() {
-		y.VisitFormalParameter(param)
-	}
-
-	return nil
-}
-
-func (y *builder) VisitFormalParameter(raw phpparser.IFormalParameterContext) interface{} {
-	if y == nil || raw == nil {
-		return nil
-	}
-	recoverRange := y.SetRange(raw)
-	defer recoverRange()
-
-	i, _ := raw.(*phpparser.FormalParameterContext)
-	if i == nil {
-		return nil
-	}
-
-	// PHP8 annotation
-	if i.Attributes() != nil {
-		_ = i.Attributes().GetText()
-	}
-	// member modifier cannot be used in function formal params
-	allowNull := i.QuestionMark() != nil
-	_ = allowNull
-
-	typeHint := y.VisitTypeHint(i.TypeHint())
-	isRef := i.Ampersand() != nil
-	isVariadic := i.Ellipsis()
-	_, _, _ = typeHint, isRef, isVariadic
-	formalParams, defaultValue := y.VisitVariableInitializer(i.VariableInitializer())
-	param := y.ir.NewParam(formalParams)
-	if defaultValue != nil {
-		param.SetDefault(defaultValue)
-		if t := defaultValue.GetType(); t != nil {
-			param.SetType(t)
-		}
-	}
-	if typeHint != nil {
-		param.SetType(typeHint)
-	}
 	return nil
 }
 
@@ -477,7 +383,6 @@ func (y *builder) VisitVariableInitializer(raw phpparser.IVariableInitializerCon
 	} else {
 		val = y.ir.EmitConstInstAny()
 	}
-
 	return i.VarName().GetText(), val
 }
 
@@ -525,6 +430,9 @@ func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) (s
 		key = i.VarName().GetText()
 	default:
 		_ = i
+	}
+	if strings.HasPrefix(key, "$") {
+		key = key[1:]
 	}
 
 	return class, key

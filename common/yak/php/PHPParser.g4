@@ -399,17 +399,11 @@ staticVariableStatement
     ;
 
 classStatement
-    : attributes? (
-        propertyModifiers typeHint? variableInitializer (',' variableInitializer)* SemiColon
-        | memberModifiers? (
-            Const typeHint? identifierInitializer (',' identifierInitializer)* SemiColon
-            | Function_ '&'? identifier /*typeParameterListInBrackets?*/ '(' formalParameterList ')' (
-                baseCtorCall
-                | returnTypeDecl
-            )? methodBody
-        )
-    )
-    | Use qualifiedNamespaceNameList traitAdaptations
+    : Use qualifiedNamespaceNameList traitAdaptations #TraitUse
+    | attributes? propertyModifiers typeHint? variableInitializer (',' variableInitializer)* SemiColon  #propertyModifiersVariable
+    | attributes? memberModifiers? Const typeHint? identifierInitializer (',' identifierInitializer)* SemiColon #Const
+    | attributes? memberModifiers? Function_ '&'? identifier /*typeParameterListInBrackets?*/ '(' formalParameterList ')' (baseCtorCall | returnTypeDecl)? methodBody #Function
+    
     ;
 
 traitAdaptations

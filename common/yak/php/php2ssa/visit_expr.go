@@ -104,9 +104,9 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		y.ir.AssignVariable(member, rightValue)
 		return rightValue
 	case *phpparser.FunctionCallExpressionContext:
-		caller := y.VisitExpression(ret.Expression())
+		callee := y.VisitExpression(ret.Expression())
 		args, ellipsis := y.VisitArguments(ret.Arguments())
-		callInst := y.ir.NewCall(caller, args)
+		callInst := y.ir.NewCall(callee, args)
 		if ellipsis {
 			callInst.IsEllipsis = true
 		}
@@ -662,7 +662,8 @@ func (y *builder) VisitFunctionCallName(raw phpparser.IFunctionCallNameContext) 
 	}
 
 	if ret := i.QualifiedNamespaceName(); ret != nil {
-		return y.VisitQualifiedNamespaceName(ret)
+		text := y.VisitQualifiedNamespaceName(ret)
+		return y.ir.ReadValue(text)
 	} else if ret := i.ChainBase(); ret != nil {
 		return y.VisitChainBase(ret)
 	} else if ret := i.ClassConstant(); ret != nil {

@@ -205,8 +205,17 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#staticVariableStatement.
 	VisitStaticVariableStatement(ctx *StaticVariableStatementContext) interface{}
 
-	// Visit a parse tree produced by PHPParser#classStatement.
-	VisitClassStatement(ctx *ClassStatementContext) interface{}
+	// Visit a parse tree produced by PHPParser#TraitUse.
+	VisitTraitUse(ctx *TraitUseContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#propertyModifiersVariable.
+	VisitPropertyModifiersVariable(ctx *PropertyModifiersVariableContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#Const.
+	VisitConst(ctx *ConstContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#Function.
+	VisitFunction(ctx *FunctionContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#traitAdaptations.
 	VisitTraitAdaptations(ctx *TraitAdaptationsContext) interface{}

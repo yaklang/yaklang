@@ -3,7 +3,6 @@ package php2ssa
 import (
 	"github.com/yaklang/yaklang/common/log"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
-	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 func (y *builder) VisitQualifiedNamespaceNameList(raw phpparser.IQualifiedNamespaceNameListContext) interface{} {
@@ -23,13 +22,13 @@ func (y *builder) VisitQualifiedNamespaceNameList(raw phpparser.IQualifiedNamesp
 	return nil
 }
 
-func (y *builder) VisitQualifiedNamespaceName(raw phpparser.IQualifiedNamespaceNameContext) ssa.Value {
+func (y *builder) VisitQualifiedNamespaceName(raw phpparser.IQualifiedNamespaceNameContext) string {
 	if y == nil || raw == nil {
-		return nil
+		return ""
 	}
 	i, _ := raw.(*phpparser.QualifiedNamespaceNameContext)
 	if i == nil {
-		return nil
+		return ""
 	}
 
 	if i.Namespace() != nil {
@@ -38,7 +37,8 @@ func (y *builder) VisitQualifiedNamespaceName(raw phpparser.IQualifiedNamespaceN
 		if ret := list.NamespaceNameTail(); ret != nil {
 
 		}
-		return y.ir.EmitConstInst(nil)
+		// return y.ir.EmitConstInst(nil)
+		return ""
 	}
 
 	if nameList := i.NamespaceNameList(); nameList != nil {
@@ -46,33 +46,35 @@ func (y *builder) VisitQualifiedNamespaceName(raw phpparser.IQualifiedNamespaceN
 		return y.VisitNamespaceNameList(nameList.(*phpparser.NamespaceNameListContext))
 	}
 
-	return nil
+	return ""
 }
 
-func (y *builder) VisitNamespaceNameList(raw phpparser.INamespaceNameListContext) ssa.Value {
+func (y *builder) VisitNamespaceNameList(raw phpparser.INamespaceNameListContext) string {
 	if y == nil || raw == nil {
-		return nil
+		return ""
 	}
 
 	i, _ := raw.(*phpparser.NamespaceNameListContext)
 	if i == nil {
-		return nil
+		return ""
 	}
 
-	ir := y.ir
-	var lastValue ssa.Value
-	for _, id := range i.AllIdentifier() {
-		name := id.GetText()
-		val := ir.ReadOrCreateVariable(name)
-		if lastValue != nil {
-			lastValue = ir.CreateMemberCallVariable(lastValue, val).GetValue()
-		} else {
-			lastValue = val
-		}
-	}
-	if i.NamespaceNameTail() != nil {
-		log.Warn("namespace tail build unfinished")
-	}
+	// ir := y.ir
+	var lastValue string
+	lastValue = i.GetText()
+	// for _, id := range i.AllIdentifier() {
+	// name := id.GetText()
+	// val := ir.ReadOrCreateVariable(name)
+	// if lastValue != nil {
+	// lastValue = ir.CreateMemberCallVariable(lastValue, val).GetValue()
+	// lastValue =
+	// } else {
+	// 	lastValue = val
+	// }
+	// }
+	// if i.NamespaceNameTail() != nil {
+	// 	log.Warn("namespace tail build unfinished")
+	// }
 	return lastValue
 }
 

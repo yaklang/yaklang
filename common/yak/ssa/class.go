@@ -13,6 +13,7 @@ type method struct {
 
 // ClassBluePrint is a class blue print, it is used to create a new class
 type ClassBluePrint struct {
+	Name string
 	This Value
 
 	MarkedField map[string]*method // key -> value
@@ -141,7 +142,7 @@ func (c *ClassBluePrint) Apply(obj Value) Type {
 /// ============= implement type interface
 
 func (c *ClassBluePrint) String() string {
-	str := fmt.Sprintf("ClassBluePrint: %s", c.This.GetName())
+	str := fmt.Sprintf("ClassBluePrint: %s", c.Name)
 	return str
 }
 func (c *ClassBluePrint) PkgPathString() string {
