@@ -498,6 +498,17 @@ staticClassExpr
     ;
 
 
+memberCallKey
+    : identifier
+    | string
+    | variable
+    ;
+
+indexMemberCallKey
+    : memberCallKey
+    | numericConstant
+    ;
+
 // Expressions
 // Grouped by priorities: http://php.net/manual/en/language.operators.precedence.php
 expression
@@ -530,8 +541,8 @@ expression
     | ('++' | '--') leftVariable                                   # PrefixIncDecExpression
     | leftVariable ('++' | '--')                                   # PostfixIncDecExpression
     | expression arguments                                        # FunctionCallExpression
-    | expression '[' expression ']'                               # IndexCallExpression
-    | expression '->' expression                                  # MemberCallExpression
+    | expression '[' indexMemberCallKey ']'                               # IndexCallExpression
+    | expression '->' memberCallKey                                  # MemberCallExpression
     | <assoc = right> expression op = '**' expression             # ArithmeticExpression
     | expression InstanceOf typeRef                               # InstanceOfExpression
     | expression op = ('*' | Divide | '%') expression             # ArithmeticExpression
@@ -550,8 +561,8 @@ expression
     | Throw expression                                            # SpecialWordExpression
     //  assign 
     | leftArrayCreation Eq expression                             # ArrayCreationUnpackExpression
-    | expression '[' expression ']' assignmentOperator expression # SliceCallAssignmentExpression
-    | expression '->' expression assignmentOperator expression    # FieldMemberCallAssignmentExpression
+    | expression '[' indexMemberCallKey ']' assignmentOperator expression # SliceCallAssignmentExpression
+    | expression '->' memberCallKey assignmentOperator expression    # FieldMemberCallAssignmentExpression
     | staticClassExpr assignmentOperator expression               # StaticClassMemberCallAssignmentExpression 
     | leftVariable assignmentOperator expression                  # OrdinaryAssignmentExpression
     // logical 
