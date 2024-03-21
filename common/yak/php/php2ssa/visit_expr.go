@@ -415,7 +415,14 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		return y.ir.ReadValue(id)
 
 	case *phpparser.ShortQualifiedNameExpressionContext:
-		return y.ir.ReadOrCreateVariable(y.VisitIdentifier(ret.Identifier()))
+		//因为涉及到函数，先peek 如果没有读取到说明是一个常量 （define定义的常量会出现问题）
+		identifier := y.VisitIdentifier(ret.Identifier())
+		if value := y.ir.PeekValue(identifier); value != nil {
+			return value
+		} else {
+			return y.ir.EmitConstInst(identifier)
+		}
+		//return y.ir.ReadOrCreateVariable(y.VisitIdentifier(ret.Identifier()))
 
 	case *phpparser.StaticClassAccessExpressionContext:
 		class, key := y.VisitStaticClassExpr(ret.StaticClassExpr())

@@ -3,6 +3,7 @@ package tests
 import (
 	"testing"
 
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 )
 
@@ -156,14 +157,17 @@ switch($a){;
 }`)
 	})
 	t.Run("switch-mock2-type2", func(t *testing.T) {
-		ssatest.MockSSA(t, `<?php
+		code := `<?php
 switch($a):;
    case 1:
        echo 1;
    default:
        echo 1;
-endswitch;
-`)
+endswitch;`
+		ssatest.CheckError(t, ssatest.TestCase{
+			Code: code,
+			Want: []string{ssa.ValueUndefined("$a")},
+		})
 	})
 	t.Run("custom-switch-only-case", func(t *testing.T) {
 		code := `<?php

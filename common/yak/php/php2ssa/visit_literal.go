@@ -165,7 +165,6 @@ func (y *builder) VisitIdentifier(raw phpparser.IIdentifierContext) string {
 	if y == nil || raw == nil {
 		return ""
 	}
-
 	return raw.GetText()
 	//i, _ := raw.(*phpparser.IdentifierContext)
 	//if i == nil {
