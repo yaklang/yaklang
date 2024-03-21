@@ -2,6 +2,7 @@ package mutate
 
 import (
 	"fmt"
+	"github.com/tidwall/gjson"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -84,16 +85,17 @@ func PositionTypeVerbose(pos httpParamPositionType) string {
 }
 
 type FuzzHTTPRequestParam struct {
-	typePosition     httpParamPositionType
-	param            interface{}
-	param2nd         interface{}
-	paramOriginValue interface{}
-	path             string
-	origin           *FuzzHTTPRequest
+	position   httpParamPositionType
+	param      interface{}
+	param2nd   interface{}
+	paramValue interface{}
+	raw        interface{}
+	path       string
+	origin     *FuzzHTTPRequest
 }
 
 func (p *FuzzHTTPRequestParam) IsPostParams() bool {
-	switch p.typePosition {
+	switch p.position {
 	case posPostJson, posPostQuery, posPostQueryBase64, posPostQueryJson, posPostQueryBase64Json, posPostXML:
 		return true
 	}
@@ -101,7 +103,7 @@ func (p *FuzzHTTPRequestParam) IsPostParams() bool {
 }
 
 func (p *FuzzHTTPRequestParam) IsGetParams() bool {
-	switch p.typePosition {
+	switch p.position {
 	case posGetQuery, posGetQueryBase64, posGetQueryJson, posGetQueryBase64Json:
 		return true
 	}
@@ -113,7 +115,7 @@ func (p *FuzzHTTPRequestParam) IsGetValueJSON() bool {
 		return false
 	}
 
-	switch p.typePosition {
+	switch p.position {
 	case posGetQueryJson, posGetQueryBase64Json:
 		return true
 	}
@@ -121,7 +123,7 @@ func (p *FuzzHTTPRequestParam) IsGetValueJSON() bool {
 }
 
 func (p *FuzzHTTPRequestParam) IsCookieParams() bool {
-	switch p.typePosition {
+	switch p.position {
 	case posCookie, posCookieJson, posCookieBase64, posCookieBase64Json:
 		return true
 	}
@@ -136,11 +138,15 @@ func (p *FuzzHTTPRequestParam) Name() string {
 }
 
 func (p *FuzzHTTPRequestParam) Position() string {
-	return string(p.typePosition)
+	return string(p.position)
+}
+
+func (p *FuzzHTTPRequestParam) Path() string {
+	return p.path
 }
 
 func (p *FuzzHTTPRequestParam) PositionVerbose() string {
-	return PositionTypeVerbose(p.typePosition)
+	return PositionTypeVerbose(p.position)
 }
 
 func (p *FuzzHTTPRequestParam) GetFirstValue() string {
@@ -151,10 +157,14 @@ func (p *FuzzHTTPRequestParam) GetFirstValue() string {
 	return ""
 }
 
+func (p *FuzzHTTPRequestParam) OriginValue() interface{} {
+	return p.raw
+}
+
 func (p *FuzzHTTPRequestParam) Value() interface{} {
-	switch p.typePosition {
+	switch p.position {
 	case posGetQueryBase64, posPostQueryBase64, posCookieBase64:
-		switch paramOriginValue := p.paramOriginValue.(type) {
+		switch paramOriginValue := p.raw.(type) {
 		case []string:
 			if len(paramOriginValue) > 0 {
 				decoded, err := codec.DecodeBase64Url(paramOriginValue[0])
@@ -173,10 +183,10 @@ func (p *FuzzHTTPRequestParam) Value() interface{} {
 			return utils.InterfaceToStringSlice(string(decoded))
 		default:
 			log.Error("unrecognized param value type")
-			return p.paramOriginValue
+			return p.raw
 		}
 	case posGetQueryJson, posPostJson, posCookieJson:
-		switch paramOriginValue := p.paramOriginValue.(type) {
+		switch paramOriginValue := p.raw.(type) {
 		case []string:
 			if len(paramOriginValue) > 0 {
 				return utils.InterfaceToStringSlice(jsonpath.Find(paramOriginValue[0], p.path))
@@ -184,14 +194,14 @@ func (p *FuzzHTTPRequestParam) Value() interface{} {
 				return utils.InterfaceToStringSlice("")
 			}
 		case string:
-			return utils.InterfaceToStringSlice(jsonpath.Find(paramOriginValue, p.path))
+			return utils.InterfaceToStringSlice(gjson.Get(paramOriginValue, p.path))
 		default:
 			log.Error("unrecognized param value type")
-			return p.paramOriginValue
+			return p.raw
 		}
 
 	case posGetQueryBase64Json, posPostQueryBase64Json, posCookieBase64Json:
-		switch paramOriginValue := p.paramOriginValue.(type) {
+		switch paramOriginValue := p.raw.(type) {
 		case []string:
 			if len(paramOriginValue) > 0 {
 				decoded, err := codec.DecodeBase64Url(paramOriginValue[0])
@@ -211,11 +221,11 @@ func (p *FuzzHTTPRequestParam) Value() interface{} {
 
 		default:
 			log.Error("unrecognized param value type")
-			return p.paramOriginValue
+			return p.raw
 		}
 
 	}
-	return p.paramOriginValue
+	return p.raw
 }
 
 func (p *FuzzHTTPRequestParam) Repeat(i int) FuzzHTTPRequestIf {
@@ -228,7 +238,7 @@ func (p *FuzzHTTPRequestParam) DisableAutoEncode(b bool) *FuzzHTTPRequestParam {
 }
 
 func (p *FuzzHTTPRequestParam) Fuzz(i ...interface{}) FuzzHTTPRequestIf {
-	switch p.typePosition {
+	switch p.position {
 	case posMethod:
 		return p.origin.FuzzMethod(InterfaceToFuzzResults(i)...)
 	case posGetQuery:
@@ -300,7 +310,7 @@ func (p *FuzzHTTPRequestParam) Fuzz(i ...interface{}) FuzzHTTPRequestIf {
 func (p *FuzzHTTPRequestParam) String() string {
 	if p.path != "" {
 		pathName := "JsonPath"
-		if p.typePosition == posPostXML {
+		if p.position == posPostXML {
 			pathName = "XPath"
 		}
 		return fmt.Sprintf("Name:%-20s %s: %-12s Position:[%v(%v)]\n", p.Name(), pathName, p.path, p.PositionVerbose(), p.Position())
