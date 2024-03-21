@@ -37,7 +37,9 @@ type FunctionBuilder struct {
 	ExternLib      map[string]map[string]any
 	DefineFunc     map[string]any
 
-	MarkedFunc       *FunctionType
+	MarkedFuncType  *FunctionType
+	MarkedFunctions []*Function
+
 	MarkedVariable   *Variable
 	MarkedThisObject Value
 
@@ -129,9 +131,9 @@ func (b *FunctionBuilder) SetMarkedFunction(name string) {
 		return
 	}
 	funTyp := b.CoverReflectFunctionType(typ, 0)
-	b.MarkedFunc = funTyp
+	b.MarkedFuncType = funTyp
 }
 
 func (b *FunctionBuilder) GetMarkedFunction() *FunctionType {
-	return b.MarkedFunc
+	return b.MarkedFuncType
 }

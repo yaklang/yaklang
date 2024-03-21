@@ -33,6 +33,17 @@ func (r *Return) calcType() Type {
 
 // Finish current function builder
 func (b *FunctionBuilder) Finish() {
+	for _, fun := range b.MarkedFunctions {
+		for name, fv := range fun.FreeValues {
+			if fv.GetDefault() != nil {
+				continue
+			}
+			if b.PeekValue(name) == nil {
+				fv.NewError(Error, SSATAG, ValueUndefined(name))
+			}
+		}
+	}
+
 	// set defer function
 	if deferLen := len(b.deferExpr); deferLen > 0 {
 		endBlock := b.CurrentBlock
