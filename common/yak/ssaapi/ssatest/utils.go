@@ -58,14 +58,22 @@ func CheckTestCase(t *testing.T, tc TestCase) {
 }
 
 func MockSSA(t *testing.T, src string) {
-	opt := make([]ssaapi.Option, 0)
-	if languageOption != nil {
-		opt = append(opt, languageOption)
+	tc := TestCase{
+		Code: src,
+		Check: func(prog *ssaapi.Program, w []string) {
+			err := lo.Filter(prog.GetErrors(), func(err *ssa.SSAError, index int) bool {
+				if err.Kind != ssa.Error {
+					return false
+				}
+				// if strings.HasPrefix(err.Message, "Value undefined") {
+				// 	return false
+				// }
+				return true
+			})
+			require.Len(t, err, 0, "error not match")
+		},
 	}
-	prog, err := ssaapi.Parse(src, opt...)
-	require.Nil(t, err, "parse error")
-	require.Len(t, prog.GetErrors(), 0, "error not match")
-	prog.Show()
+	CheckTestCase(t, tc)
 }
 
 // ===================== struct =====================

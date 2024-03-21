@@ -7,6 +7,21 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 )
 
+func TestExpression_PHP_Name(t *testing.T) {
+	t.Run("$", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		<?php
+		function a() {
+		}
+		$a = 1;
+		println(a());
+		println($a);
+		`, []string{
+			"Function-a()", "1",
+		}, t)
+	})
+}
+
 func TestExpression_BitwiseExpression(t *testing.T) {
 	t.Run("&&", func(t *testing.T) {
 		code := `<?php
@@ -24,15 +39,11 @@ println($a);`
 	})
 }
 func TestExpression_NullCoalescingExpression(t *testing.T) {
-	code := `<?php
+	t.Run("check no variables declare", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`<?php
 $a = $a??12312;
 println($a);
-`
-	t.Run("mock", func(t *testing.T) {
-		ssatest.MockSSA(t, code)
-	})
-	t.Run("check no variables declare", func(t *testing.T) {
-		ssatest.CheckPrintlnValue(code, []string{"12312"}, t)
+`, []string{"12312"}, t)
 	})
 	t.Run("check has variables declare", func(t *testing.T) {
 		code := `<?php
@@ -280,25 +291,37 @@ $a-=1;
 	})
 }
 func TestExpression_DynamicVariable(t *testing.T) {
-	code := `<?php
-// Variable expression and dynamic variable expression
-$identifier = "dynamicVar";
-$$identifier = "Hello, dynamic!";
-println($dynamicVar);
-`
-	ssatest.CheckPrintlnValue(code, []string{"\"Hello, dynamic!\""}, t)
-}
+	t.Run("check $$a", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(
+			`<?php
+$a = "b";
+$$a = 2; 
+println($$a);
+`,
+			[]string{"2"}, t)
+	})
 
-func TestExpression_DynamicVariable_2(t *testing.T) {
-	code := `<?php
+	t.Run("check $b", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(
+			`<?php
+$a = "b";
+$$a = 2; 
+println($b);
+`,
+			[]string{"2"}, t)
+	})
+
+	t.Run("check $$$", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`<?php
 // Variable expression and dynamic variable expression
 $identifier = "dynamicVar";
 $dynamicVar = "test";
 $test="1";
 $$$identifier=123;
 
-echo $test;`
-	ssatest.MockSSA(t, code)
+println($test);`,
+			[]string{"123"}, t)
+	})
 }
 
 func TestAssignVariables(t *testing.T) {

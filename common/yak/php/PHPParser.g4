@@ -506,9 +506,7 @@ expression
     | fullyQualifiedNamespaceExpr                                 # FullyQualifiedNamespaceExpression
     | identifier                                                  # ShortQualifiedNameExpression
     | staticClassExpr                                               # StaticClassAccessExpression
-    | VarName                                                     # VariableNameExpression
-    | Dollar+ identifier                                          # VariableExpression
-    | Dollar+ OpenCurlyBracket expression CloseCurlyBracket       # DynamicVariableExpression
+    | variable                                                  # VariableExpression
     | arrayCreation                                               # ArrayCreationExpression
     | Print expression                                            # PrintExpression
     | constant                                                    # ScalarExpression
@@ -564,9 +562,13 @@ expression
 
 
 leftVariable
-    : Dollar+ VarName                                       # DynamicVariable// $$a= 1; or $$$a=1;
-    | VarName                                               # Variable// $a=3
-    | Dollar+ OpenCurlyBracket expression CloseCurlyBracket # MemberCallVariable// ${"a"."b"}=3
+    : variable
+    ;
+
+variable
+    : VarName                                               # NormalVariable// $a=3
+    | Dollar+ VarName                                       # DynamicVariable// $$a= 1; or $$$a=1;
+    | Dollar+ OpenCurlyBracket expression CloseCurlyBracket # MemberCallVariable// ${ expr }=3
     ;
 
 leftArrayCreation // PHP7.1+
