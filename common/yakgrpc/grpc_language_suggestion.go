@@ -122,12 +122,13 @@ func getSliceBuiltinMethodSuggestions() []*ypb.SuggestionDescription {
 	// 懒加载
 	if len(sliceBuiltinMethodSuggestionMap) == 0 {
 		for methodName, method := range sliceBuiltinMethod {
-			snippets, _ := method.VSCodeSnippets()
+			snippets, verbose := method.VSCodeSnippets()
 			sug := &ypb.SuggestionDescription{
-				Label:       methodName,
-				Description: method.Description,
-				InsertText:  snippets,
-				Kind:        "Method",
+				Label:             methodName,
+				DefinitionVerbose: verbose,
+				Description:       method.Description,
+				InsertText:        snippets,
+				Kind:              "Method",
 			}
 			sliceBuiltinMethodSuggestionMap[methodName] = sug
 			sliceBuiltinMethodSuggestions = append(sliceBuiltinMethodSuggestions, sug)
@@ -353,7 +354,11 @@ func getBuiltinFuncDeclAndDoc(name string, bareTyp ssa.Type) (desc string, doc s
 	}
 	sug, ok := m[name]
 	if ok {
-		return sug.Label, sug.Description
+		desc := sug.Label
+		if sug.DefinitionVerbose != "" {
+			desc = sug.DefinitionVerbose
+		}
+		return desc, sug.Description
 	}
 	return
 }
