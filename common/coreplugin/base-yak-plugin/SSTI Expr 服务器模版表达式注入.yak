@@ -109,7 +109,7 @@ checkReq = (isHttps, req) => {
         try {
             checkCase(instance, isHttps, req)
         } catch err {
-            yakit.Error(err)
+            yakit.Error("check case error: ", err)
         }
     }
 }

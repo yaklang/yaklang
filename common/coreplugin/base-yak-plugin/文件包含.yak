@@ -39,7 +39,7 @@ mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte
         firstPayload = x`php://filter/{{repeat:str(convert.base64-encode/|10)}}/resource=`[0] + originValue
         response, err := param.Fuzz(firstPayload).ExecFirst()
         if err != nil {
-            log.error(err)
+            log.error("Fuzz Exec error: ", err)
             continue
         }
         if p in response.ResponseRaw {
