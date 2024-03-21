@@ -216,7 +216,7 @@ func Test_ObjectFactor_SideEffect(t *testing.T) {
 		a.set(2)
 		println(a.key)
 		`, []string{
-			"Undefined-a.key(valid)",
+			"1",
 			"side-effect(Parameter-i, this.key)",
 		}, t)
 	})
@@ -236,7 +236,7 @@ func Test_ObjectFactor_SideEffect(t *testing.T) {
 		a.set(2)
 		println(a.key)
 		`, []string{
-			"Undefined-a.key(valid)",
+			"1",
 			"side-effect(Parameter-i, this.key)",
 		}, t)
 	})
@@ -256,7 +256,7 @@ func Test_ObjectFactor_SideEffect(t *testing.T) {
 		a.set(2)
 		println(a.key)
 		`, []string{
-			"Undefined-a.key(valid)",
+			"1",
 			"side-effect(Parameter-i, this.key)",
 		}, t)
 	})
@@ -281,7 +281,7 @@ func Test_ObjectFactor_FreeValue(t *testing.T) {
 
 		`,
 			Want: []string{
-				"Undefined-a.get(valid)(Function-f(),Undefined-a.key(valid))",
+				"Function-.get(Function-f(),1)",
 			},
 		})
 	})
@@ -305,7 +305,7 @@ func Test_ObjectFactor_FreeValue(t *testing.T) {
 
 		`,
 			Want: []string{
-				"Undefined-b.get(valid)(Function-f(),Undefined-b.key(valid))",
+				"Function-.get(Function-f(),1)",
 			},
 		})
 	})
@@ -328,7 +328,7 @@ func Test_ObjectFactor_FreeValue(t *testing.T) {
 
 		`,
 			Want: []string{
-				"Undefined-a.get(valid)(Function-f(),Undefined-a.key(valid))",
+				"Function-.get(Function-f(),1)",
 			},
 		})
 	})
@@ -363,10 +363,10 @@ func Test_ObjectFactor_ALL(t *testing.T) {
 			println(b.get())
 			`,
 			Want: []string{
-				"Undefined-a.get(valid)(Function-f(),side-effect(Parameter-i, a.key))",
-				"Undefined-b.get(valid)(Function-f(),side-effect(Parameter-i, b.key))",
-				"Undefined-a.get(valid)(Function-f(),side-effect(Parameter-i, a.key))",
-				"Undefined-b.get(valid)(Function-f(),side-effect(Parameter-i, this.key))",
+				"Function-.get(Function-f(),side-effect(Parameter-i, a.key))",
+				"Function-.get(Function-f(),side-effect(Parameter-i, b.key))",
+				"Function-.get(Function-f(),side-effect(Parameter-i, a.key))",
+				"Function-.get(Function-f(),side-effect(Parameter-i, this.key))",
 			},
 		})
 	})

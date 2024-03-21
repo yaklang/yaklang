@@ -170,10 +170,8 @@ func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
 		return
 	}
 
-	sideEffect := funcTyp.SideEffects
-
 	// handle FreeValue
-	if len(funcTyp.FreeValue) != 0 || len(sideEffect) != 0 {
+	if len(funcTyp.FreeValue) != 0 {
 		c.HandleFreeValue(funcTyp.FreeValue)
 	}
 

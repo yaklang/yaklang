@@ -6,40 +6,55 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
+type method struct {
+	function *Function
+	index    int
+}
+
 // ClassBluePrint is a class blue print, it is used to create a new class
 type ClassBluePrint struct {
 	This Value
-	*ObjectType
-	// this field, is function pin to this object,
-	// when set type to a new object, it will be set to the new object
-	MarkedField map[Value]*FunctionType // key -> value
-	NormalField map[Value]Type          // key -> value
 
-	// Static Member
+	MarkedField map[string]*method // key -> value
+
 	NormalMember map[string]Value
 	StaticMember map[string]Value
+
+	// magic method
+	Copy        Value
+	Constructor Value
+	Destructor  Value
 }
 
 func NewClassBluePrint() *ClassBluePrint {
 	class := &ClassBluePrint{
 		This:         nil,
-		ObjectType:   nil,
-		MarkedField:  make(map[Value]*FunctionType),
-		NormalField:  make(map[Value]Type),
+		MarkedField:  make(map[string]*method),
 		NormalMember: make(map[string]Value),
 		StaticMember: make(map[string]Value),
 	}
+
+	class.Constructor = NewFunctionWithType("__constructor_normal",
+		NewFunctionType("__constructor_normal", nil, class, false),
+	)
+	// class.Copy = NewFunctionType("__copy", nil, class, false)
+	// class.Constructor =
+	// class.Destructor = NewFunctionType("__destructor", []Type{class}, nil, false)
 	return class
 }
+
+var _ Type = (*ClassBluePrint)(nil)
 
 func (c *ClassBluePrint) SetThis(v Value) {
 	c.This = v
 }
-func (c *ClassBluePrint) SetObjectType(t *ObjectType) {
-	c.ObjectType = t
-}
 
-var _ Type = (*ClassBluePrint)(nil)
+func (c *ClassBluePrint) AddMarkedField(name string, fun *Function, index int) {
+	c.MarkedField[name] = &method{
+		function: fun,
+		index:    index,
+	}
+}
 
 // ParseClassBluePrint  parse get classBluePrint if the ObjectType is a ClassFactor
 func ParseClassBluePrint(this Value, objectTyp *ObjectType) (ret Type) {
@@ -50,13 +65,13 @@ func ParseClassBluePrint(this Value, objectTyp *ObjectType) (ret Type) {
 	}
 	blue := NewClassBluePrint()
 	blue.SetThis(this)
-	blue.SetObjectType(objectTyp)
+	// blue.SetObjectType(objectTyp)
 
 	for key, member := range this.GetAllMember() {
 		// if not function , just append this field to normal field
 		typ := member.GetType()
 		if typ.GetTypeKind() != FunctionTypeKind {
-			blue.NormalField[key] = typ
+			blue.NormalMember[key.String()] = member
 			continue
 		}
 
@@ -67,17 +82,20 @@ func ParseClassBluePrint(this Value, objectTyp *ObjectType) (ret Type) {
 		}
 
 		has := false
-		for _, fv := range funcType.ParameterValue {
+		for index, fv := range funcType.ParameterValue {
 			if fv.GetDefault() == this {
 				has = true
+				blue.MarkedField[key.String()] = &method{
+					function: member.(*Function),
+					index:    index,
+				}
 			}
 		}
 
 		if has {
-			blue.MarkedField[key] = funcType
-		} else {
-			blue.NormalField[key] = typ
+			continue
 		}
+		blue.NormalMember[key.String()] = member
 	}
 
 	if len(blue.MarkedField) != 0 {
@@ -91,25 +109,30 @@ func (c *ClassBluePrint) Apply(obj Value) Type {
 	builder := obj.GetFunc().builder
 	_ = builder
 	this := c.This
+	_ = this
 
 	objTyp := NewObjectType()
 
-	for key, typ := range c.NormalField {
-		objTyp.AddField(key, typ)
+	for rawKey, member := range c.NormalMember {
+		key := NewConst(rawKey)
+		log.Infof("apply key: %s, member: %s", key, member)
+
+		objTyp.AddField(key, member.GetType())
+		builder.AssignVariable(
+			builder.CreateMemberCallVariable(obj, key),
+			member,
+		)
 	}
 
-	for key, funTyp := range c.MarkedField {
-		new := funTyp.Copy()
+	for rawKey, method := range c.MarkedField {
+		key := NewConst(rawKey)
 
-		for index, para := range new.ParameterValue {
-			if v := para.GetDefault(); v == this {
-				newPara := para.Copy()
-				newPara.SetDefault(obj)
-				new.ParameterValue[index] = newPara
-			}
-		}
-
-		objTyp.AddField(key, new)
+		objTyp.AddField(key, method.function.GetType())
+		builder.AssignVariable(
+			builder.CreateMemberCallVariable(obj, key),
+			// function,
+			NewClassMethod(method.function, obj, method.index),
+		)
 	}
 
 	return objTyp
