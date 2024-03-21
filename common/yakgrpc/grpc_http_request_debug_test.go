@@ -4,13 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/stretchr/testify/assert"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"io"
 	"net/http"
 	netURL "net/url"
 	"reflect"
@@ -19,6 +15,13 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_TestFlow(t *testing.T) {
@@ -30,9 +33,9 @@ func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_TestFlow(t *testing.T) {
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(1000))
 	defer cancel()
 
-	var count = 0
+	count := 0
 	host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
-		var raw, _ = utils.HttpDumpWithBody(request, true)
+		raw, _ := utils.HttpDumpWithBody(request, true)
 		spew.Dump(raw)
 		writer.Write(raw)
 		count++
@@ -40,11 +43,11 @@ func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_TestFlow(t *testing.T) {
 
 	stream, err := client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
 		Code: `mirrorHTTPFlow = (tls, url, req, rsp, body) => {
-	// 3
-	fuzz.HTTPRequest(req)~.ExecFirst()
-	fuzz.HTTPRequest(req)~.ExecFirst()
-	fuzz.HTTPRequest(req)~.ExecFirst()
-	for result in fuzz.HTTPRequest(req)~.Repeat(5).Exec()~ {}
+    // 3
+    fuzz.HTTPRequest(req)~.ExecFirst()
+    fuzz.HTTPRequest(req)~.ExecFirst()
+    fuzz.HTTPRequest(req)~.ExecFirst()
+    for result in fuzz.HTTPRequest(req)~.Repeat(5).Exec()~ {}
 }`,
 		PluginType:          "mitm",
 		Input:               "http://" + utils.HostPort(host, port) + "/",
@@ -89,7 +92,7 @@ func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_MITM_WithRawPacketAndPaths(t *test
 	ctx, cancel := context.WithCancel(context.Background())
 	host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("hello"))
-		var raw, _ = utils.HttpDumpWithBody(request, true)
+		raw, _ := utils.HttpDumpWithBody(request, true)
 		spew.Dump(raw)
 		if strings.Contains(string(raw), "POST /a?b=1&a=1") {
 			aPass = true
@@ -105,19 +108,19 @@ func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_MITM_WithRawPacketAndPaths(t *test
 			}()
 		}
 	})
-	var targetUrl = "http://" + utils.HostPort(host, port) + "/a?a=1"
+	targetUrl := "http://" + utils.HostPort(host, port) + "/a?a=1"
 
-	var token = utils.RandStringBytes(20)
+	token := utils.RandStringBytes(20)
 	stream, err := client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
 		Code: `token = ` + strconv.Quote(token) + `;
 var count = 0;
 lock = sync.NewMutex()
 mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
-	lock.Lock()
-	defer lock.Unlock()
-	count++
-	db.SetKey(token, count)
-	dump(req)
+    lock.Lock()
+    defer lock.Unlock()
+    count++
+    db.SetKey(token, count)
+    dump(req)
 }`,
 		PluginType: "mitm",
 		HTTPRequestTemplate: &ypb.HTTPRequestBuilderParams{
@@ -154,79 +157,79 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
 }
 
 //func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_MITM_WithRawPacket(t *testing.T) {
-//	client, err := NewLocalClient()
-//	if err != nil {
-//		panic(err)
-//	}
+//    client, err := NewLocalClient()
+//    if err != nil {
+//        panic(err)
+//    }
 //
-//	aPass := false
-//	bPass := false
-//	ctx, cancel := context.WithCancel(context.Background())
-//	host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
-//		writer.Write([]byte("hello"))
-//		var raw, _ = utils.HttpDumpWithBody(request, true)
-//		spew.Dump(raw)
-//		if strings.Contains(string(raw), "GET /a?a=1") {
-//			aPass = true
-//		}
-//		if strings.Contains(string(raw), "POST /b?b=1") {
-//			bPass = true
-//		}
+//    aPass := false
+//    bPass := false
+//    ctx, cancel := context.WithCancel(context.Background())
+//    host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+//        writer.Write([]byte("hello"))
+//        var raw, _ = utils.HttpDumpWithBody(request, true)
+//        spew.Dump(raw)
+//        if strings.Contains(string(raw), "GET /a?a=1") {
+//            aPass = true
+//        }
+//        if strings.Contains(string(raw), "POST /b?b=1") {
+//            bPass = true
+//        }
 //
-//		if aPass && bPass {
-//			go func() {
-//				time.Sleep(2 * time.Second)
-//				cancel()
-//			}()
-//		}
-//	})
-//	var targetUrl = "http://" + utils.HostPort(host, port) + "/a?a=1"
+//        if aPass && bPass {
+//            go func() {
+//                time.Sleep(2 * time.Second)
+//                cancel()
+//            }()
+//        }
+//    })
+//    var targetUrl = "http://" + utils.HostPort(host, port) + "/a?a=1"
 //
-//	var token = utils.RandStringBytes(20)
-//	stream, err := client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
-//		Code: `token = ` + strconv.Quote(token) + `;
+//    var token = utils.RandStringBytes(20)
+//    stream, err := client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
+//        Code: `token = ` + strconv.Quote(token) + `;
 //var count = 0;
 //lock = sync.NewMutex()
 //mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
-//	lock.Lock()
-//	defer lock.Unlock()
-//	count++
-//	db.SetKey(token, count)
-//	dump(req)
+//    lock.Lock()
+//    defer lock.Unlock()
+//    count++
+//    db.SetKey(token, count)
+//    dump(req)
 //}`,
-//		PluginType: "mitm",
-//		HTTPRequestTemplate: &ypb.HTTPRequestBuilderParams{
-//			IsRawHTTPRequest: true,
-//			RawHTTPRequest: []byte(`POST /b?b=1 HTTP/1.1
+//        PluginType: "mitm",
+//        HTTPRequestTemplate: &ypb.HTTPRequestBuilderParams{
+//            IsRawHTTPRequest: true,
+//            RawHTTPRequest: []byte(`POST /b?b=1 HTTP/1.1
 //Host: www.example.com
 //User-Agent: xxx
 //
 //`),
-//		},
-//		Input: targetUrl,
-//	})
-//	if err != nil {
-//		panic(err)
-//	}
-//	for {
-//		rsp, err := stream.Recv()
-//		if err != nil {
-//			break
-//		}
-//		spew.Dump(rsp)
-//	}
-//	count := codec.Atoi(yakit.Get(token))
-//	t.Logf("count: %d", count)
-//	if count != 1 {
-//		panic("count should be 1")
-//	}
-//	if aPass {
-//		panic("a should not pass")
-//	}
+//        },
+//        Input: targetUrl,
+//    })
+//    if err != nil {
+//        panic(err)
+//    }
+//    for {
+//        rsp, err := stream.Recv()
+//        if err != nil {
+//            break
+//        }
+//        spew.Dump(rsp)
+//    }
+//    count := codec.Atoi(yakit.Get(token))
+//    t.Logf("count: %d", count)
+//    if count != 1 {
+//        panic("count should be 1")
+//    }
+//    if aPass {
+//        panic("a should not pass")
+//    }
 //
-//	if !bPass {
-//		panic("b should pass")
-//	}
+//    if !bPass {
+//        panic("b should pass")
+//    }
 //}
 
 func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_MITM(t *testing.T) {
@@ -244,7 +247,7 @@ func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_MITM(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("hello"))
-		var raw, _ = utils.HttpDumpWithBody(request, true)
+		raw, _ := utils.HttpDumpWithBody(request, true)
 		spew.Dump(raw)
 		if strings.Contains(string(raw), "a?a=1") {
 			aPass = true
@@ -260,19 +263,19 @@ func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_MITM(t *testing.T) {
 			}()
 		}
 	})
-	var targetUrl = "http://" + utils.HostPort(host, port)
+	targetUrl := "http://" + utils.HostPort(host, port)
 
-	var token = utils.RandStringBytes(20)
+	token := utils.RandStringBytes(20)
 	stream, err := client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
 		Code: `token = ` + strconv.Quote(token) + `;
 var count = 0;
 lock = sync.NewMutex()
 mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
-	lock.Lock()
-	defer lock.Unlock()
-	count++
-	db.SetKey(token, count)
-	dump(url)
+    lock.Lock()
+    defer lock.Unlock()
+    count++
+    db.SetKey(token, count)
+    dump(url)
 }`,
 		PluginType: "mitm",
 		HTTPRequestTemplate: &ypb.HTTPRequestBuilderParams{
@@ -316,7 +319,7 @@ func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_MITM_WithURLTARGET(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte("hello"))
-		var raw, _ = utils.HttpDumpWithBody(request, true)
+		raw, _ := utils.HttpDumpWithBody(request, true)
 		spew.Dump(raw)
 		if strings.Contains(string(raw), "a?a=1") {
 			aPass = true
@@ -335,19 +338,19 @@ func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_MITM_WithURLTARGET(t *testing.T) {
 			}()
 		}
 	})
-	var targetUrl = "http://" + utils.HostPort(host, port) + "/c?c=1"
+	targetUrl := "http://" + utils.HostPort(host, port) + "/c?c=1"
 
-	var token = utils.RandStringBytes(20)
+	token := utils.RandStringBytes(20)
 	stream, err := client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
 		Code: `token = ` + strconv.Quote(token) + `;
 var count = 0;
 lock = sync.NewMutex()
 mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
-	lock.Lock()
-	defer lock.Unlock()
-	count++
-	db.SetKey(token, count)
-	dump(url)
+    lock.Lock()
+    defer lock.Unlock()
+    count++
+    db.SetKey(token, count)
+    dump(url)
 }`,
 		PluginType: "mitm",
 		HTTPRequestTemplate: &ypb.HTTPRequestBuilderParams{
@@ -457,14 +460,14 @@ func TestGRPCMUSTPASS_HTTP_FuzzPacket(t *testing.T) {
 		return string(raw)
 	}
 	// path 合并
-	var targetUrl = "http://" + utils.HostPort(host, port) + "/aa"
+	targetUrl := "http://" + utils.HostPort(host, port) + "/aa"
 	res := fuzz(targetUrl, &ypb.DebugPluginRequest{
 		Code: `
 mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
-	res = {}
-	res["ok"] = 1
-	res["data"] = {"req":string(req),"https":isHttps}
-	yakit.Output(res)
+    res = {}
+    res["ok"] = 1
+    res["data"] = {"req":string(req),"https":isHttps}
+    yakit.Output(res)
 }
 `,
 		PluginType: "mitm",
@@ -490,10 +493,10 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 	res = fuzz(targetUrl, &ypb.DebugPluginRequest{
 		Code: `
 mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
-	res = {}
-	res["ok"] = 1
-	res["data"] = {"req":string(req),"https":isHttps}
-	yakit.Output(res)
+    res = {}
+    res["ok"] = 1
+    res["data"] = {"req":string(req),"https":isHttps}
+    yakit.Output(res)
 }
 `,
 		PluginType: "mitm",
@@ -519,10 +522,10 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 	res = fuzz(targetUrl, &ypb.DebugPluginRequest{
 		Code: `
 mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
-	res = {}
-	res["ok"] = 1
-	res["data"] = {"req":string(req),"https":isHttps}
-	yakit.Output(res)
+    res = {}
+    res["ok"] = 1
+    res["data"] = {"req":string(req),"https":isHttps}
+    yakit.Output(res)
 }
 `,
 		PluginType: "mitm",
@@ -564,7 +567,7 @@ return codec.EncodeBase64(a)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var checked = false
+	checked := false
 	for {
 		exec, err := stream.Recv()
 		if err != nil {
@@ -608,7 +611,7 @@ yakit.Output(codec.EncodeBase64(s))
 	if err != nil {
 		t.Fatal(err)
 	}
-	var checked = false
+	checked := false
 	for {
 		exec, err := stream.Recv()
 		if err != nil {
@@ -768,5 +771,51 @@ yakit.Output("%s")
 	}
 	if !ok {
 		t.Fatal("bool param check err")
+	}
+}
+
+func TestGRPCMUSTPASS_DebugPlugin_Nuclei(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ok := false
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		ok = true
+		return []byte("HTTP/1.1 200 OK\nContent-Length: 5\n\nHello")
+	})
+	// randStr := utils.RandStringBytes(10)
+	stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
+		Code: fmt.Sprintf(`id: basic-example
+info:
+    name: Test HTTP Template
+http:
+  - method: GET
+    path:
+        - "{{BaseURL}}"
+    matchers:
+        - type: status
+          status:
+            - 200`),
+		PluginType: "nuclei",
+		ExecParams: []*ypb.KVPair{},
+		Input:      utils.HostPort(host, port),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			t.Errorf("recv Error: %v", err)
+		}
+		spew.Dump(rsp)
+	}
+	if !ok {
+		t.Fatal("nuclei check error")
 	}
 }
