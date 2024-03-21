@@ -24,6 +24,9 @@ func GenerateClass(options ...GenClassOptionFun) (*javaclassparser.ClassObject, 
 		if err != nil {
 			return nil, utils.Errorf("parse template failed: %v", err)
 		}
+		if config.ClassName != "" {
+			obj.SetClassName(config.ClassName)
+		}
 		return obj, nil
 	}
 	name := config.ClassType
@@ -41,6 +44,9 @@ func GenerateClass(options ...GenClassOptionFun) (*javaclassparser.ClassObject, 
 		}
 		if config.MajorVersion > 0 {
 			obj.MajorVersion = config.MajorVersion
+		}
+		if config.ClassName != "" {
+			obj.SetClassName(config.ClassName)
 		}
 		builder := javaclassparser.NewClassObjectBuilder(obj)
 		for _, param := range classTmplCfg.Params {
