@@ -323,7 +323,7 @@ mirrorNewWebsitePath = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rs
                 log.debug("发现位于 %v 的 json 参数 `%v:%v`", p.Position(),p.Name(),value)
                 needToFuzzParams.Append({"value":value,"fuzz":(payload)=>{
                     return p.Fuzz(payload)
-                },"name":p.name(),"rsp":originRsp})
+                },"name":p.Name(),"rsp":originRsp})
             }
         }
     }else{ // fuzz body

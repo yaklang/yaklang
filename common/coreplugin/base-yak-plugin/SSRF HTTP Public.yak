@@ -52,9 +52,9 @@ NewThreadPool = func(size){
             return threadPool
         },
         "wait":()=>{
-            productorWG.wait()
+            productorWG.Wait()
             close(inputChan)
-            consumerWG.wait()
+            consumerWG.Wait()
         }
     }
     return threadPool
@@ -181,7 +181,7 @@ mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte
             }
             originValue,err = codec.DecodeUrl(sprint(originValue))
             if err{
-                log.Error(err)
+                log.Error("codec DecodeUrl error:", err)
                 continue
             }
             if str.MatchAllOfRegexp(originValue,"^\\w+://")  || str.StringSliceContains(availableSSRFParamNames, str.ToLower(param.Name())) {
