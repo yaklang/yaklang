@@ -1,4 +1,4 @@
-package crep
+package wsc
 
 import (
 	"bufio"
