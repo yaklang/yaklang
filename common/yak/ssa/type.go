@@ -261,6 +261,7 @@ const (
 	FunctionTypeKind
 
 	ClassBluePrintTypeKind
+	ClassMethodTypeKind
 )
 
 type BasicType struct {

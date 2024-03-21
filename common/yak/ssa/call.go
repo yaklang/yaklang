@@ -5,6 +5,15 @@ import (
 )
 
 func NewCall(target Value, args, binding []Value, block *BasicBlock) *Call {
+	if method, ok := ToMethod(target); ok {
+		if len(args) == 0 {
+			args = append(args, method.This)
+		} else {
+			args = utils.InsertSliceItem(args, method.This, method.Index)
+		}
+		target = method.Function
+	}
+
 	c := &Call{
 		anValue:     NewValue(),
 		Method:      target,

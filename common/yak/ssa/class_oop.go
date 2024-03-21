@@ -28,18 +28,42 @@ func (b *FunctionBuilder) GetStaticMember(class, key string) Value {
 		log.Errorf("VisitStaticClass: not this class: %s", class)
 		return nil
 	}
-	v := c.GetStaticMember(key)
-	if v == nil {
+	v, ok := c.StaticMember[key]
+	if !ok {
 		log.Errorf("VisitStaticClass: this class: %s no this member %s", class, key)
 		return nil
 	}
 	return v
 }
 
+func (b *FunctionBuilder) GetNormalMember(class, key string) Value {
+	c := b.GetClass(class)
+	if c == nil {
+		log.Errorf("VisitStaticClass: not this class: %s", class)
+		return nil
+	}
+	v, ok := c.NormalMember[key]
+	if !ok {
+		log.Errorf("VisitStaticClass: this class: %s no this member %s", class, key)
+		return nil
+	}
+	return v
+}
+
+func (b *FunctionBuilder) GetClassConstructor(class string) Value {
+	c := b.GetClass(class)
+	if c == nil {
+		log.Errorf("VisitStaticClass: not this class: %s", class)
+		return nil
+	}
+	return c.Constructor
+}
+
 func (b *FunctionBuilder) SetStaticMember(class, key string, value Value) {
 	c := b.GetClass(class)
 	if c == nil {
 		log.Errorf("VisitStaticClass: not this class: %s", class)
+		c = b.CreateClass(class)
 	}
 
 	c.BuildStaticMember(key, value)
@@ -60,12 +84,4 @@ func (c *ClassBluePrint) BuildMember(name string, value Value) {
 
 func (c *ClassBluePrint) BuildStaticMember(name string, value Value) {
 	c.StaticMember[name] = value
-}
-
-// ============= class member
-func (c *ClassBluePrint) GetStaticMember(member string) Value {
-	if v, ok := c.StaticMember[member]; ok {
-		return v
-	}
-	return nil
 }
