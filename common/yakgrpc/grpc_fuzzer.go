@@ -720,6 +720,100 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_EtcHosts(req.GetEtcHosts()),
 			mutate.WithPoolOpt_NoSystemProxy(req.GetNoSystemProxy()),
 			mutate.WithPoolOpt_RequestCountLimiter(requestCount),
+			mutate.WithPoolOpt_MutateHook(func(raw []byte) [][]byte {
+				freq, err := mutate.NewFuzzHTTPRequest(raw)
+				if err != nil {
+					log.Errorf("parse request failed: %s", err)
+					return nil
+				}
+				var results [][]byte
+
+				results = append(results, lowhttp.FixHTTPRequest(raw))
+
+				//var newFReq mutate.FuzzHTTPRequestIf
+				//newFReq = freq
+				//_ = newFReq
+
+				for _, mm := range req.GetMutateMethods() {
+					if len(mm.GetValue()) == 0 {
+						continue
+					}
+					switch mm.GetType() {
+					case "Headers":
+						for _, kv := range mm.GetValue() {
+							var check bool
+							// fuzz 原有请求中存在的 key value 的情况
+							for _, v := range freq.GetHeaderParams() {
+								if v.Name() == kv.GetKey() {
+									check = true
+									v.Fuzz(kv.GetValue()).RequestMap(func(i []byte) {
+										results = append(results, i)
+									})
+								}
+							}
+							// 追加 key value 的情况
+							if !check {
+								freq.FuzzHTTPHeader(kv.GetKey(), kv.GetValue()).RequestMap(func(i []byte) {
+									results = append(results, i)
+								})
+							}
+						}
+					case "Cookie":
+						for _, kv := range mm.GetValue() {
+							var check bool
+							for _, v := range freq.GetCookieParams() {
+								if v.Name() == kv.GetKey() {
+									check = true
+									v.Fuzz(kv.GetValue()).RequestMap(func(i []byte) {
+										results = append(results, i)
+									})
+								}
+							}
+							if !check {
+								freq.FuzzCookie(kv.GetKey(), kv.GetValue()).RequestMap(func(i []byte) {
+									results = append(results, i)
+								})
+							}
+						}
+					case "Get":
+						for _, kv := range mm.GetValue() {
+							var check bool
+							for _, v := range freq.GetGetQueryParams() {
+								if v.Name() == kv.GetKey() {
+									check = true
+									v.Fuzz(kv.GetValue()).RequestMap(func(i []byte) {
+										results = append(results, i)
+									})
+								}
+							}
+							if !check {
+								freq.FuzzGetParams(kv.GetKey(), kv.GetValue()).RequestMap(func(i []byte) {
+									results = append(results, i)
+								})
+							}
+						}
+
+					case "Post":
+						for _, kv := range mm.GetValue() {
+							var check bool
+							for _, v := range freq.GetPostCommonParams() {
+								if v.Name() == kv.GetKey() {
+									check = true
+									v.Fuzz(kv.GetValue()).RequestMap(func(i []byte) {
+										results = append(results, i)
+									})
+								}
+							}
+							if !check {
+								freq.FuzzPostParams(kv.GetKey(), kv.GetValue()).RequestMap(func(i []byte) {
+									results = append(results, i)
+								})
+							}
+						}
+					}
+				}
+				return results
+			}),
 		}
 
 		fuzzMode := req.GetFuzzTagMode() // ""/"close"/"standard"/"legacy"
