@@ -69,53 +69,10 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 			y.ir.EmitCall(calling)
 		}).Build()
 		return nil
-	case *phpparser.VariableNameExpressionContext:
-		return y.ir.ReadOrCreateVariable(ret.GetText())
 	case *phpparser.VariableExpressionContext:
-		//解析$$的右值
-		var result ssa.Value
-		var variable *ssa.Variable
-		dollarCount := len(ret.AllDollar())
+		id := y.VisitVariable(ret.Variable())
+		return y.ir.ReadValue(id)
 
-		//读取到了 "$xx" 就直接返回这个值
-		if value := y.ir.ReadValue("$" + ret.Identifier().GetText()); !value.IsUndefined() {
-			result = value
-			variable = y.ir.GetVariable("$" + ret.Identifier().GetText())
-		} else {
-			//如果没有读取到就创建Undefined的变量
-			result = y.ir.EmitUndefined("$" + ret.Identifier().GetText())
-			variable = y.ir.CreateVariable("$" + ret.Identifier().GetText())
-			y.ir.AssignVariable(variable, y.ir.EmitUndefined("$"+ret.Identifier().GetText()))
-		}
-
-		for i := 0; i < dollarCount-1; i++ {
-			//如果能从variable获取到值，那么我们更新variable （2）看是否能从 $variables.values中读取到
-			if !variable.GetValue().IsUndefined() {
-				if value := y.ir.ReadValue("$" + variable.GetValue().String()); !value.IsUndefined() {
-					result = value
-					variable = y.ir.GetVariable("$" + variable.GetValue().String())
-				} else {
-					result = y.ir.EmitUndefined("$" + variable.GetValue().String())
-					variable = y.ir.CreateVariable("$" + variable.GetName())
-				}
-			} else {
-				result = y.ir.EmitUndefined("$" + variable.GetName())
-				variable = y.ir.CreateVariable("$" + variable.GetName())
-			}
-			y.ir.AssignVariable(variable, result)
-		}
-		return result
-	case *phpparser.DynamicVariableExpressionContext:
-		//todo:
-		dollarCount := len(ret.AllDollar())
-		val := y.VisitExpression(ret.Expression())
-		if dollarCount > 1 {
-			for i := 0; i < dollarCount-1; i++ {
-				// ref handling
-			}
-		}
-		log.Errorf("DyanmicVariableExpressionContext error")
-		return val
 	case *phpparser.KeywordNewExpressionContext:
 		return y.VisitNewExpr(ret.NewExpr())
 	case *phpparser.IndexCallExpressionContext:
@@ -539,35 +496,6 @@ func (y *builder) VisitMemberAccess(origin ssa.Value, raw phpparser.IMemberAcces
 	}
 
 	return origin
-}
-
-func (y *builder) VisitActualArguments(raw phpparser.IActualArgumentsContext) ([]ssa.Value, bool) {
-	if y == nil || raw == nil {
-		return nil, false
-	}
-
-	i, _ := raw.(*phpparser.ActualArgumentsContext)
-	if i == nil {
-		return nil, false
-	}
-
-	// PHP8 annotation
-	argStmt := i.AllArguments()
-	var args []ssa.Value
-	ellipsis := false
-	for _, a := range argStmt {
-		vals, ellipsisCurrent := y.VisitArguments(a)
-		args = append(args, vals...)
-		if ellipsisCurrent {
-			ellipsis = true
-		}
-	}
-
-	for _, a := range i.AllSquareCurlyExpression() {
-		y.VisitSquareCurlyExpression(a)
-	}
-
-	return args, ellipsis
 }
 
 func (y *builder) VisitKeyedFieldName(raw phpparser.IKeyedFieldNameContext) ssa.Value {
@@ -1103,53 +1031,47 @@ func (y *builder) VisitLeftVariable(raw phpparser.ILeftVariableContext) *ssa.Var
 	if y == nil || raw == nil {
 		return nil
 	}
-	switch stmt := raw.(type) {
-	case *phpparser.VariableContext:
-		if value := y.ir.ReadValue(stmt.VarName().GetText()); !value.IsUndefined() {
-			variable := y.ir.CreateVariable(stmt.VarName().GetText())
-			variable.Value = value
-			return variable
-		}
-		createVariable := y.ir.CreateVariable(stmt.VarName().GetText())
-		createVariable.Value = y.ir.EmitUndefined(stmt.VarName().GetText())
-		return createVariable
-	case *phpparser.DynamicVariableContext:
-		var variable *ssa.Variable
-		if value := y.ir.ReadValue(stmt.VarName().GetText()); !value.IsUndefined() {
-			// 读取到 $xx 的内容,variable的内容就将，我们就将variable赋值到$xx
-			variable = y.ir.CreateVariable(stmt.VarName().GetText())
-			y.ir.AssignVariable(variable, value)
-		} else {
-			//	没有读取到$xx 的内容，我们就将上面的进行赋值
-			variable = y.ir.CreateVariable(stmt.VarName().GetText())
-			y.ir.AssignVariable(variable, y.ir.EmitUndefined(stmt.VarName().GetText()))
-		}
-		//遍历$
-		for i := 0; i < len(stmt.AllDollar()); i++ {
-			//如果原来的值就是undefined，直接将variable更新
-			if variable.GetValue().IsUndefined() {
-				//更新成这种
-				variable = y.ir.CreateVariable("$" + variable.GetName())
-				y.ir.AssignVariable(variable, y.ir.EmitUndefined(variable.GetName()))
-				continue
-			}
-			tmpVariable := y.ir.CreateVariable("$" + variable.GetValue().String())
-			//如果原来有值，我们就尝试是否能读取到
-			if value := y.ir.ReadValue("$" + variable.GetValue().String()); !value.IsUndefined() {
-				//	说明能读取到值
-				y.ir.AssignVariable(tmpVariable, value)
-			} else {
-				// 如果不能读取到值，那么我们就将设置成undefined
-				y.ir.AssignVariable(tmpVariable, y.ir.EmitUndefined(tmpVariable.GetName()))
-			}
-			variable = tmpVariable
-		}
-		return variable
-	case *phpparser.MemberCallVariableContext:
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
+	i, ok := raw.(*phpparser.LeftVariableContext)
+	if !ok {
 		return nil
-		//val := y.VisitExpression(stmt.Expression())
-		//variable = y.ir.ReadOrCreateVariable(val.GetVerboseName())
 	}
-	return nil
-	//return variable.GetLastVariable()
+
+	return y.ir.CreateVariable(
+		y.VisitVariable(i.Variable()),
+	)
+}
+
+func (y *builder) VisitVariable(raw phpparser.IVariableContext) string {
+	if y == nil || raw == nil {
+		return ""
+	}
+	switch ret := raw.(type) {
+
+	case *phpparser.NormalVariableContext:
+		return ret.VarName().GetText()
+		// log.Infof("NormalVariable: %v", name)
+
+	case *phpparser.DynamicVariableContext:
+		id := ret.VarName().GetText()
+		var value ssa.Value
+		for i := range ret.AllDollar() {
+			_ = i
+			value = y.ir.ReadValue(id)
+			id = "$" + value.String()
+		}
+		// log.Infof("DynamicVariable: %v", value)
+		return "$" + value.String()
+	case *phpparser.MemberCallVariableContext:
+		value := y.VisitExpression(ret.Expression())
+		// TODO: handler this
+		return value.String()
+	default:
+		raw.GetText()
+		log.Errorf("unhandled expression: %v(T: %T)", raw.GetText(), raw)
+		log.Errorf("-------------unhandled expression: %v(%T)", raw.GetText(), raw)
+		return ""
+	}
 }

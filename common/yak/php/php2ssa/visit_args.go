@@ -5,6 +5,34 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
+func (y *builder) VisitActualArguments(raw phpparser.IActualArgumentsContext) ([]ssa.Value, bool) {
+	if y == nil || raw == nil {
+		return nil, false
+	}
+
+	i, _ := raw.(*phpparser.ActualArgumentsContext)
+	if i == nil {
+		return nil, false
+	}
+
+	// PHP8 annotation
+	argStmt := i.AllArguments()
+	var args []ssa.Value
+	ellipsis := false
+	for _, a := range argStmt {
+		vals, ellipsisCurrent := y.VisitArguments(a)
+		args = append(args, vals...)
+		if ellipsisCurrent {
+			ellipsis = true
+		}
+	}
+
+	for _, a := range i.AllSquareCurlyExpression() {
+		y.VisitSquareCurlyExpression(a)
+	}
+
+	return args, ellipsis
+}
 func (y *builder) VisitArguments(raw phpparser.IArgumentsContext) ([]ssa.Value, bool) {
 	if y == nil || raw == nil {
 		return nil, false
