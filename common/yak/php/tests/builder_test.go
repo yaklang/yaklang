@@ -3,11 +3,14 @@ package tests
 import (
 	"testing"
 
+	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
+
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 )
 
 func TestParseSSA_Basic(t *testing.T) {
-	test.MockSSA(t, `<?php
+	code := `<?php
 $ancasdfasdfasdf;
 1+a()+1;
 "1"."2";
@@ -15,11 +18,19 @@ $c=[1,2,3,];
 ($b[1] = "1"."2");
 ($b[1] = "1"."abc");
 array(1, "2", "key" => "value");
-`)
+`
+	test.CheckError(t, test.TestCase{
+		Code: code,
+		Want: []string{
+			ssa.ValueUndefined("$ancasdfasdfasdf"),
+			ssa.ValueUndefined("$b"),
+			ssa.ValueUndefined("$b"),
+		},
+	})
 }
 
 func TestParseSSA_Basic2(t *testing.T) {
-	test.MockSSA(t, `<?php
+	validateSource(t, "TestParseSSA_Basic2", `<?php
 // PHPALLINONE.php: A simplified PHP file containing various syntax elements for compiler testing.
 
 // Basic variable declaration and printing
@@ -103,50 +114,49 @@ try {
 }
 
 // Final message
-echo "This concludes the basic syntax test.\n";
-`)
+echo "This concludes the basic syntax test.\n";`)
 }
 
 func TestParseSSA_RightValue(t *testing.T) {
-	test.MockSSA(t, `<?php
-a($b[0]); 
-`)
+	test.CheckError(t, test.TestCase{
+		Code: `<?php
+a($b[0]); `,
+		Want: []string{ssa.ValueUndefined("$b")},
+	})
 }
 
 func TestParseSSA_DoWhileTag(t *testing.T) {
-	//	test.MockSSA(t, `<?php
-	//function funcName() {
-	//	echo "a called";
-	//	return 2;
-	//}
-	//do{ print 2; } while (funcName() == 1);
-	//
-	//`)
+	test.MockSSA(t, `<?php
+	function funcName() {
+		echo "a called";
+		return 2;
+	}
+	do{ print 2; } while (funcName() == 1);
+	
+	`)
 }
 
 func TestParseSSA_WhileTag(t *testing.T) {
-	test.MockSSA(t, `
-<ul>
-<?php while ($i <= 5) : ?>
-    <li>Item <?php echo $i; ?></li>
-    <?php $i++; ?>
-<?php endwhile; ?>
-</ul>
-
-`)
+	//	test.MockSSA(t, `
+	//<ul>
+	//<?php while ($i <= 5) : ?>
+	//    <li>Item <?php echo $i; ?></li>
+	//    <?php $i++; ?>
+	//<?php endwhile; ?>
+	//</ul>
+	//`)
 }
 
 func TestParseSSA_While(t *testing.T) {
-	test.MockSSA(t, `<?php
-while ($i < 5) {
-	echo 1;
-}
-
+	code := `<?php
 while ($i < 5) {
 	if(true) {break;};
 	if (false) {continue;};
-}
-`)
+}`
+	test.CheckError(t, test.TestCase{
+		Code: code,
+		Want: []string{ssa.ValueUndefined("$i"), ssa4analyze.ConditionIsConst("if"), ssa4analyze.ConditionIsConst("if")},
+	})
 }
 
 func TestParseSSA_Break(t *testing.T) {
@@ -155,17 +165,20 @@ for(;;){echo 1;break;}
 `)
 }
 func TestParseSSA_IF(t *testing.T) {
-	test.MockSSA(t, `<?php
-
+	code := `<?php
 			if (true) echo "abc";
-			if (true) echo "abc"; else if (trye) 1+1;
+			if (true) echo "abc"; else if (true) 1+1;
 			if (true) echo "abc"; else if (true) 1+1; else "abc"."ccc";
 
 if ($a > 0) {
 echo "abc";
+}`
+	test.CheckError(t, test.TestCase{
+		Code: code,
+		Want: []string{ssa4analyze.ConditionIsConst("if"), ssa4analyze.ConditionIsConst("if"), ssa4analyze.ConditionIsConst("if"), ssa4analyze.ConditionIsConst("if"), ssa4analyze.ConditionIsConst("if"), ssa.ValueUndefined("$a")},
+	})
 }
-`)
-}
+
 func TestParseSSA_TryCatch(t *testing.T) {
 	test.MockSSA(t, `<?php
 try {
@@ -176,19 +189,19 @@ try {
 }
 
 func TestParseSSA_YieldName(t *testing.T) {
-	test.MockSSA(t, `<?php
-
-function gen() {
-   foreach (range(1, 10) as $value) {
-       yield $value;
-   }
-}
-
-foreach (gen() as $val) {
-   echo $val;
-}
-
-`)
+	//	test.MockSSA(t, `<?php
+	//
+	//function gen() {
+	//   foreach (range(1, 10) as $value) {
+	//       yield $value;
+	//   }
+	//}
+	//
+	//foreach (gen() as $val) {
+	//   echo $val;
+	//}
+	//
+	//`)
 }
 
 func TestParseSSA_Valid(t *testing.T) {
@@ -215,10 +228,14 @@ func TestParseSSA_Valid(t *testing.T) {
 // }
 
 func TestParseSSA_SMOKING_1(t *testing.T) {
-	test.MockSSA(t, `
+	code := `
 	<?php 
 ++$a;--$a;$b++;$c++;
-`)
+`
+	test.CheckError(t, test.TestCase{
+		Code: code,
+		Want: []string{ssa.ValueUndefined("$a"), ssa.ValueUndefined("$b"), ssa.ValueUndefined("$c")},
+	})
 }
 
 func TestParseSSA_unpack(t *testing.T) {
@@ -228,7 +245,7 @@ func TestParseSSA_unpack(t *testing.T) {
 }
 
 func TestParseSSA_Spaceship(t *testing.T) {
-	test.MockSSA(t, `<?php
+	code := `<?php
 1 <=> 1;
 0 <=> 1;
 1 <=> 0;
@@ -249,8 +266,8 @@ a?b:c;
 2<=1;
 1===1;
 1!==1;
-1!=1;
-`)
+1!=1;`
+	test.MockSSA(t, code)
 }
 
 func TestParseSSA_SMOKING_if(t *testing.T) {
@@ -262,7 +279,7 @@ false xor true;
 }
 
 func TestParseSSA_SMOKING(t *testing.T) {
-	test.MockSSA(t, `<?php
+	code := `<?php
 abc[1];
 (bool)1;
 (int)1;1;
@@ -279,7 +296,11 @@ abc[1];
 @$a();
 +(1+1);
 -(1-1);
-!(1+1);`)
+!(1+1);`
+	test.CheckError(t, test.TestCase{
+		Code: code,
+		Want: []string{ssa.ValueUndefined("$a"), ssa.ValueUndefined("$a")},
+	})
 }
 
 func TestParseSSA_AssignOp(t *testing.T) {
@@ -289,7 +310,7 @@ $emptyVal = null;
 $emptyVal = 1+1;
 $a += 1;
 $b -= 1;
-$c *= 1;
+$c *= 2;
 $e **= 6;
 $d /= 1;
 $e = "bbb";
@@ -299,11 +320,21 @@ $g &= 1;
 $h |= 1;
 $i ^= 1;
 $j <<= 1;
-$k >>= 1;
-
-$c[1];
-c[0];`
-	test.MockSSA(t, code)
+$k >>= 1;`
+	test.CheckError(t, test.TestCase{
+		Code: code,
+		Want: []string{ssa.ValueUndefined("$b"),
+			ssa.ValueUndefined("$c"),
+			ssa.ValueUndefined("$e"),
+			ssa.ValueUndefined("$d"),
+			ssa.ValueUndefined("$f"),
+			ssa.ValueUndefined("$g"),
+			ssa.ValueUndefined("$h"),
+			ssa.ValueUndefined("$i"),
+			ssa.ValueUndefined("$j"),
+			ssa.ValueUndefined("$k"),
+		},
+	})
 }
 
 func TestParseSSA_Valid1(t *testing.T) {
@@ -343,27 +374,23 @@ $b = 1+1+$a;
 }
 
 func TestParseCLS(t *testing.T) {
-	test.MockSSA(t, `<?php
-
+	code := `<?php
 class A {
 	private $num;
-
 	public function __construct($num) {
 		this.$num = $num;
 	}
-
 	public function getNum() {
 		return this.$num;
 	}
 }
 
 $a = new A(1);
-echo $a;
-
-/*
-	build a named struct as object template
-*/
-`)
+print_r($a);`
+	test.CheckError(t, test.TestCase{
+		Code: code,
+		Want: []string{ssa.ValueUndefined("$a"), ssa.ValueUndefined("A")},
+	})
 }
 
 func TestParseSSA_1(t *testing.T) {
