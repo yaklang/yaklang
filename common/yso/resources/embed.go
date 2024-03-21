@@ -6,7 +6,7 @@ import (
 	"encoding/binary"
 	"github.com/yaklang/yaklang/common/log"
 	"io"
-	"path/filepath"
+	"path"
 )
 
 //go:embed *
@@ -77,7 +77,7 @@ func NewCompressFS(fs *embed.FS, compressDirs map[string]string) *CompressFS {
 				log.Errorf("readDataBlock failed: %v", err)
 				continue
 			}
-			cfs.cacheFile[filepath.Join(dir, fileName)] = data
+			cfs.cacheFile[path.Join(dir, fileName)] = data
 			cfs.compressFileDir[dir] = compressFileName
 		}
 	}
@@ -95,5 +95,5 @@ func (c *CompressFS) ReadFile(name string) ([]byte, error) {
 var YsoResourceFS *CompressFS
 
 func init() {
-	YsoResourceFS = NewCompressFS(&resourceFS, map[string]string{"gadgets": filepath.Join("gadgets", "gadgets.bin")})
+	YsoResourceFS = NewCompressFS(&resourceFS, map[string]string{"gadgets": path.Join("gadgets", "gadgets.bin")})
 }
