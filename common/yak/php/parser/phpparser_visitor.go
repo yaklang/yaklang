@@ -322,12 +322,6 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#IndexCallExpression.
 	VisitIndexCallExpression(ctx *IndexCallExpressionContext) interface{}
 
-	// Visit a parse tree produced by PHPParser#DynamicVariableExpression.
-	VisitDynamicVariableExpression(ctx *DynamicVariableExpressionContext) interface{}
-
-	// Visit a parse tree produced by PHPParser#VariableNameExpression.
-	VisitVariableNameExpression(ctx *VariableNameExpressionContext) interface{}
-
 	// Visit a parse tree produced by PHPParser#CloneExpression.
 	VisitCloneExpression(ctx *CloneExpressionContext) interface{}
 
@@ -388,11 +382,14 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#StaticClassAccessExpression.
 	VisitStaticClassAccessExpression(ctx *StaticClassAccessExpressionContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#leftVariable.
+	VisitLeftVariable(ctx *LeftVariableContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#NormalVariable.
+	VisitNormalVariable(ctx *NormalVariableContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#DynamicVariable.
 	VisitDynamicVariable(ctx *DynamicVariableContext) interface{}
-
-	// Visit a parse tree produced by PHPParser#Variable.
-	VisitVariable(ctx *VariableContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#MemberCallVariable.
 	VisitMemberCallVariable(ctx *MemberCallVariableContext) interface{}
