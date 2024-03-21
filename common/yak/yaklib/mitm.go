@@ -2,6 +2,7 @@ package yaklib
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/yaklang/yaklang/common/crep"
@@ -353,20 +354,20 @@ func startBridge(
 				return
 			}
 
-			println("RECV request:", urlIns.String())
-			println("REQUEST: ")
+			fmt.Println("RECV request:", urlIns.String())
+			fmt.Println("REQUEST: ")
 			raw, err := utils.HttpDumpWithBody(r, false)
 			if err != nil {
-				println("Parse Request Failed: %s")
+				log.Errorf("Parse Request Failed: %v", err)
 			}
-			println(string(raw))
-			println("RESPONSE: ")
+			fmt.Println(string(raw))
+			fmt.Println("RESPONSE: ")
 			raw, err = utils.HttpDumpWithBody(rsp, false)
 			if err != nil {
-				println("Parse Response Failed: %s")
+				log.Errorf("Parse Request Failed: %v", err)
 			}
-			println(string(raw))
-			println("-----------------------------")
+			fmt.Println(string(raw))
+			fmt.Println("-----------------------------")
 		}),
 		crep.MITM_SetDownstreamProxy(downstreamProxy),
 		crep.MITM_SetCaCertAndPrivKey(config.mitmCert, config.mitmPkey),
@@ -384,14 +385,18 @@ func startBridge(
 			after := req
 			isDropped := utils.NewBool(false)
 			config.hijackRequest(isHttps, urlStrIns.String(), req, func(bytes []byte) {
-				after = bytes
+				after = lowhttp.FixHTTPRequest(bytes)
+				httpctx.SetRequestModified(reqIns, "user")
+				httpctx.SetHijackedRequestBytes(reqIns, after)
 			}, func() {
 				isDropped.Set()
 			})
 			if isDropped.IsSet() {
+				httpctx.SetContextValueInfoFromRequest(reqIns, httpctx.REQUEST_CONTEXT_KEY_IsDropped, true)
 				return nil
 			}
-			return lowhttp.FixHTTPRequest(after)
+
+			return after
 		}),
 		crep.MITM_SetHTTPResponseHijackRaw(func(isHttps bool, req *http.Request, rspInstance *http.Response, rsp []byte, remoteAddr string) []byte {
 			if config.hijackResponse == nil && config.hijackResponseEx == nil {
@@ -429,15 +434,17 @@ func startBridge(
 					}
 				}
 				config.hijackResponseEx(isHttps, urlStrIns.String(), reqRaw, fixedResp, func(bytes []byte) {
-					after = bytes
+					after = lowhttp.FixHTTPRequest(bytes)
+					httpctx.SetResponseModified(req, "user")
+					httpctx.SetHijackedResponseBytes(req, after)
 				}, func() {
 					isDropped.Set()
 				})
 			}
 			if isDropped.IsSet() {
+				httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_IsDropped, true)
 				return nil
 			}
-
 			return after
 		}),
 	)
