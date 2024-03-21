@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func TestFuzzerFuzzParams(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFuzzerFuzzParams(t *testing.T) {
 	type testCase struct {
 		name          string
 		mutateMethods []*ypb.MutateMethod
