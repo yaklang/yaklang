@@ -19,7 +19,7 @@ println(Foo::$my_static . PHP_EOL);
 
 ?>    
 	`, []string{
-			"add(\"foo\", Undefined-PHP_EOL)",
+			"add(\"foo\", Parameter-PHP_EOL)",
 		}, t)
 
 	})
@@ -35,7 +35,7 @@ println(Foo::$my_static . PHP_EOL);
 
 ?>    
 	`, []string{
-			"add(any, Undefined-PHP_EOL)",
+			"add(any, Parameter-PHP_EOL)",
 		}, t)
 	})
 
@@ -53,8 +53,13 @@ println(Foo::$my_static . PHP_EOL);
 	`
 		ssatest.CheckPrintlnValue(
 			code, []string{
-				"add(\"foo\", Undefined-PHP_EOL)",
+				"add(\"foo\", Parameter-PHP_EOL)",
 			}, t)
 	})
+	t.Run("defined variable", func(t *testing.T) {
+		code := `<?php
+$PHP_EOL=1;
+println($PHP_EOL);`
+		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
+	})
 }
-
