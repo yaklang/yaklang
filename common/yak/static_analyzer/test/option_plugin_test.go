@@ -47,3 +47,41 @@ func TestPluginOptionDefineFunc(t *testing.T) {
 		)
 	})
 }
+
+func TestPluginOption_MarkedFunction(t *testing.T) {
+	t.Run("normal", func(t *testing.T) {
+		check(t, `
+		f = () => {
+			println("a")
+		}
+		hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
+			f()
+			a = 1
+		}
+		`, []string{}, "mitm")
+	})
+
+	t.Run("mark error", func(t *testing.T) {
+		check(t, `
+		hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
+			f()
+			a = 1
+		}
+		`, []string{
+			ssa.ValueUndefined("f"),
+		}, "mitm")
+	})
+
+	t.Run("mark success", func(t *testing.T) {
+		check(t, `
+		hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
+			f()
+			a = 1
+		}
+		f = () => {
+			println("a")
+		}
+		`, []string{}, "mitm")
+	})
+
+}
