@@ -309,37 +309,62 @@ func checkGadget(payload []byte, failNow func(writer http.ResponseWriter, reques
 		}
 
 		javaClasss := findByteCodes(item)
-
-		for _, class := range javaClasss {
-			obj, err := javaclassparser.ParseFromBase64(class)
-			if err != nil {
-				failNow(writer, request, err)
-				return
-			}
+		var checkClass func(object *javaclassparser.ClassObject) error
+		checkClass = func(obj *javaclassparser.ClassObject) error {
 			flag := obj.FindConstStringFromPool("EchoHeader")
 
 			if flag == nil {
-				continue
+				return utils.Errorf("not found EchoHeader")
 			}
 			javaJson, err := obj.Json()
 			if err != nil {
-				failNow(writer, request, err)
-				return
+				return err
 			}
 			v := findSetHeaderValue(javaJson)
 			if len(v) == 0 {
-				failNow(writer, request, err)
-				return
+				return err
 			}
 			if strings.Contains(v, "|") {
 				vs := strings.Split(v, "|")
 				writer.Header().Set(vs[0], vs[1])
 				writer.Header().Set("Gadget", randGadget)
-				failNow(writer, request, nil)
-				return
+				return nil
 			}
 
+			return utils.Errorf("not found class")
 		}
+		var checkAllSubClass func(base64Class string) error
+		checkAllSubClass = func(base64Class string) error {
+			obj, err := javaclassparser.ParseFromBase64(base64Class)
+			if err != nil {
+				return err
+			}
+			if err = checkClass(obj); err != nil {
+				for _, constantInfo := range obj.ConstantPool {
+					if v, ok := constantInfo.(*javaclassparser.ConstantUtf8Info); ok {
+						if strings.HasPrefix(v.Value, "yv") { // maybe a class
+							if checkAllSubClass(v.Value) == nil {
+								return nil
+							}
+						}
+					}
+				}
+			} else {
+				return nil
+			}
+			return utils.Errorf("not found class")
+		}
+		var lastErr error
+		for _, class := range javaClasss {
+			if err := checkAllSubClass(class); err == nil {
+				successNow(writer, request)
+				return
+			} else {
+				lastErr = err
+			}
+		}
+		failNow(writer, request, lastErr)
+		return
 	}
 }
 

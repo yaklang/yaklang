@@ -19,6 +19,13 @@ func GenerateClassWithType(typ ClassType, options ...GenClassOptionFun) (*javacl
 }
 func GenerateClass(options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
 	config := NewClassConfig(options...)
+	if config.ClassType == ClassRaw {
+		obj, err := javaclassparser.Parse(config.CustomTemplate)
+		if err != nil {
+			return nil, utils.Errorf("parse template failed: %v", err)
+		}
+		return obj, nil
+	}
 	name := config.ClassType
 	if name == "" {
 		return nil, utils.Errorf("class type is empty")
@@ -57,13 +64,16 @@ func GenerateClass(options ...GenClassOptionFun) (*javaclassparser.ClassObject, 
 	}
 }
 
+const ClassRaw ClassType = "raw"
+
 type ClassGenConfig struct {
-	ClassType     ClassType
-	MajorVersion  uint16
-	ClassName     string
-	IsObfuscation bool
-	IsConstruct   bool
-	Params        map[ClassParamType]string
+	ClassType      ClassType
+	MajorVersion   uint16
+	ClassName      string
+	CustomTemplate []byte
+	IsObfuscation  bool
+	IsConstruct    bool
+	Params         map[ClassParamType]string
 }
 
 func (c *ClassGenConfig) SetParam(k ClassParamType, v string) {
@@ -84,6 +94,11 @@ func NewClassConfig(options ...GenClassOptionFun) *ClassGenConfig {
 func SetClassType(t ClassType) GenClassOptionFun {
 	return func(config *ClassGenConfig) {
 		config.ClassType = t
+	}
+}
+func SetCustomTemplate(customBytes []byte) GenClassOptionFun {
+	return func(config *ClassGenConfig) {
+		config.CustomTemplate = customBytes
 	}
 }
 
@@ -262,9 +277,7 @@ func LoadClassFromJson(jsonData string, options ...GenClassOptionFun) (*javaclas
 // classObject, _ := yso.LoadClassFromBytes(bytesCode) // 从字节中加载并配置类对象
 // ```
 func GenerateClassObjectFromBytes(bytes []byte, options ...GenClassOptionFun) (*javaclassparser.ClassObject, error) {
-	config := NewClassConfig(append(options, SetClassBytes(bytes))...)
-	config.ClassType = ClassTemplateImplClassLoader
-	return GenerateClass()
+	return GenerateClassWithType(ClassRaw, append(options, SetCustomTemplate(bytes))...)
 }
 
 // SetExecCommand
