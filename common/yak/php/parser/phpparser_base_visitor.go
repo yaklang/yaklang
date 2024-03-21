@@ -371,6 +371,14 @@ func (v *BasePHPParserVisitor) VisitStringAsIndirectClassStaticVariable(ctx *Str
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitMemberCallKey(ctx *MemberCallKeyContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitIndexMemberCallKey(ctx *IndexMemberCallKeyContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitSpecialWordExpression(ctx *SpecialWordExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
