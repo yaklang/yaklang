@@ -1193,7 +1193,18 @@ func TestErrorHandler(t *testing.T) {
 			ExternValue: map[string]any{"getError1": func() error { return errors.New("err") }, "die": func(error) {}},
 		})
 	})
-
+	t.Run("error handler check - if", func(t *testing.T) {
+		test.CheckError(t, test.TestCase{
+			Code: `
+			a, err = getError2()
+			if err {
+				panic("error ")
+			}
+			`,
+			Want:        []string{},
+			ExternValue: map[string]any{"getError2": func() (int, error) { return 1, errors.New("err") }},
+		})
+	})
 	t.Run("error handler check - panic", func(t *testing.T) {
 		test.CheckError(t, test.TestCase{
 			Code: `

@@ -192,6 +192,7 @@ func NewSideEffect(variable string, call *Call, value Value) *SideEffect {
 
 func (i *If) SetCondition(t Value) {
 	i.Cond = t
+	fixupUseChain(i)
 }
 
 func (i *If) AddTrue(t *BasicBlock) {
