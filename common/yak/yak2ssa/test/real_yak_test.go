@@ -69,6 +69,42 @@ Rawfuzz = func(p, fuzzPayload) {
 }
 		`)
 	})
+
+	t.Run("function free-value not found, ", func(t *testing.T) {
+		// should mark error inner callee function
+		ssatest.CheckTestCase(t, ssatest.TestCase{
+			Code: `
+			f = (a ) =>{
+				println(a.b)
+			}
+			a = 1
+			f(a)
+			`,
+			Check: func(prog *ssaapi.Program, a []string) {
+				errs := prog.GetErrors()
+				require.Len(t, errs, 2)
+				err := errs[0]
+				require.Equal(t, "a.b", *err.Pos.SourceCode)
+			},
+		})
+	})
+
+	t.Run("function free-value not found, ", func(t *testing.T) {
+		// should mark error inner callee function
+		ssatest.CheckNoError(t,
+			`
+			f = (a ) =>{
+				println(a.b)
+			}
+			a = {
+				"b": 1, 
+			}
+			f(a)
+			`,
+		)
+	})
+
+
 }
 func Test_RealYak_ObjectType(t *testing.T) {
 	t.Run("map[string]any", func(t *testing.T) {
