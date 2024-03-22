@@ -1,7 +1,6 @@
 package ssa
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -105,7 +104,25 @@ func (c *Call) handleCalleeFunction() {
 					continue
 				}
 				if p.MemberCallObjectIndex >= len(c.Args) {
-					log.Errorf("handleCalleeFunction: memberCallObjectIndex out of range %d vs len: %d", p.MemberCallObjectIndex, len(c.Args))
+					// log.Errorf("handleCalleeFunction: memberCallObjectIndex out of range %d vs len: %d", p.MemberCallObjectIndex, len(c.Args))
+					continue
+				}
+
+				if _, typ := checkCanMemberCall(c.Args[p.MemberCallObjectIndex], p.MemberCallKey); typ == nil {
+					builder.NewErrorWithPos(Error, SSATAG,
+						p.GetRange(),
+						FreeValueNotMember(
+							c.Args[p.MemberCallObjectIndex].GetName(),
+							p.MemberCallKey.String(),
+							c.GetRange(),
+						),
+					)
+					c.NewError(Error, SSATAG,
+						FreeValueNotMemberInCall(
+							c.Args[p.MemberCallObjectIndex].GetName(),
+							p.MemberCallKey.String(),
+						),
+					)
 					continue
 				}
 				c.Args = append(c.Args,
@@ -120,7 +137,7 @@ func (c *Call) handleCalleeFunction() {
 			var variable *Variable
 			if se.IsMemberCall {
 				if se.ParameterIndex >= len(c.Args) {
-					log.Errorf("handleCalleeFunction: ParameterIndex out of range %d", se.ParameterIndex)
+					// log.Errorf("handleCalleeFunction: ParameterIndex out of range %d", se.ParameterIndex)
 					continue
 				}
 				// if side-effect is member call, create member call variable
