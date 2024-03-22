@@ -130,9 +130,6 @@ type JavaParserVisitor interface {
 	// Visit a parse tree produced by JavaParser#arrayInitializer.
 	VisitArrayInitializer(ctx *ArrayInitializerContext) interface{}
 
-	// Visit a parse tree produced by JavaParser#twoDimArraryInitializer.
-	VisitTwoDimArraryInitializer(ctx *TwoDimArraryInitializerContext) interface{}
-
 	// Visit a parse tree produced by JavaParser#classOrInterfaceType.
 	VisitClassOrInterfaceType(ctx *ClassOrInterfaceTypeContext) interface{}
 

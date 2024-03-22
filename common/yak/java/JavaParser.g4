@@ -255,17 +255,12 @@ variableDeclaratorId
     ;
 
 variableInitializer
-    : arrayInitializer
-    | expression
-    | twoDimArraryInitializer //二维数组
+    : expression
+    | arrayInitializer
     ;
 
 arrayInitializer
-    : '{' (expression (',' expression)* ','?)? '}'
-    ;
- // 二维数组
-twoDimArraryInitializer
-    : '{' (arrayInitializer (',' arrayInitializer)* ','?)? '}'
+    : '{' (variableInitializer (',' variableInitializer)* ','?)? '}'
     ;
 
 classOrInterfaceType
@@ -463,7 +458,7 @@ elseBlock
     :ELSE block
     ;
 elseIfBlock
-    :ELSEIF parExpression block
+    :ELSE IF parExpression block
     ;
 blockStatement
     : localVariableDeclaration ';'
@@ -728,7 +723,7 @@ primary
 
 // Java17
 switchExpression
-    : SWITCH parExpression '{' switchLabeledRule* '}'
+    :SWITCH  parExpression '{' switchLabeledRule* '}'
     ;
 
 // Java17

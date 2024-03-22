@@ -686,7 +686,7 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 		// 处理表达式语句
 		return y.VisitExpression(ret.Expression())
 	case *javaparser.SwitchArrowExpressionContext:
-		// 处理 switch 语句
+		// 处理 switch 箭头语句
 		return nil
 	case *javaparser.IdentifierLabelStatementContext:
 		// 处理标识符标签语句
@@ -775,8 +775,6 @@ func (y *builder) VisitVariableInitializer(raw javaparser.IVariableInitializerCo
 		return y.VisitExpression(ret)
 	} else if ret := i.ArrayInitializer(); ret != nil {
 		return y.VisitArrayInitializer(ret)
-	} else if ret := i.TwoDimArraryInitializer(); ret != nil {
-		return y.VisitTwoDimArrayInitializer(ret)
 	}
 	return nil
 }
