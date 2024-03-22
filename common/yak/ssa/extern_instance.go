@@ -187,11 +187,7 @@ func (f *FunctionBuilder) CoverReflectFunctionType(itype reflect.Type, level int
 }
 
 func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
-	if level >= MAXTYPELEVEL {
-		return NewObjectType()
-	} else {
-		level += 1
-	}
+
 	Name := typ.String()
 	if Name == "[]uint8" {
 		Name = "bytes"
@@ -224,6 +220,14 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 	if t := GetTypeByStr(typ.Kind().String()); t != nil {
 		ret = NewAliasType(Name, PkgPath, t)
 	}
+
+	// before this check, code will not recursive.
+	// check level
+	if level >= MAXTYPELEVEL {
+		return GetAnyType()
+	}
+	level++
+	// below this code, will recursive
 
 	isInterface := false
 	// complex type
