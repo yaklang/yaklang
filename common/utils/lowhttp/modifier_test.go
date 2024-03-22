@@ -2202,6 +2202,16 @@ func TestGetParamsFromBody(t *testing.T) {
 			},
 		},
 		{
+			name:        "form-urlencoded-with-encode",
+			contentType: "application/x-www-form-urlencoded",
+			body:        "a=%76%61%6c%75%65",
+			expected: &Excepted{
+				params: map[string]string{"a": "%76%61%6c%75%65"},
+				useRaw: false,
+				err:    nil,
+			},
+		},
+		{
 			name:        "form-data",
 			contentType: "multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW",
 			body: `------WebKitFormBoundary7MA4YWxkTrZu0gW

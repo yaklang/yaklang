@@ -3222,7 +3222,7 @@ func TestNewExecutor_ClosureScopeCopy(t *testing.T) {
 	code := `
 f = () => 0
 set = (a)=>{
-	return () => {
+	return () => { 
 		return a
 	}
 }
@@ -3234,7 +3234,7 @@ f1 = set(2)
 assert f1() == 2
 
 assert f0() == 1 // !!
-	`
+`
 	_marshallerTest(code)
 	_formattest(code)
 }

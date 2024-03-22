@@ -27,6 +27,8 @@ type QueryParamItem struct {
 	Raw          string
 	Key          string
 	Value        string
+	RawKey       string
+	RawValue     string
 }
 
 func (item *QueryParamItem) Encode() string {
@@ -75,9 +77,11 @@ func ParseQueryParams(s string) *QueryParams {
 		key, val, ok := bytes.Cut(pair, []byte{'='})
 		if ok {
 			items = append(items, &QueryParamItem{
-				Raw:   codec.ForceQueryUnescape(string(pair)),
-				Key:   codec.ForceQueryUnescape(string(key)),
-				Value: codec.ForceQueryUnescape(string(val)),
+				Raw:      codec.ForceQueryUnescape(string(pair)),
+				RawKey:   string(key),
+				RawValue: string(val),
+				Key:      codec.ForceQueryUnescape(string(key)),
+				Value:    codec.ForceQueryUnescape(string(val)),
 			})
 		} else {
 			items = append(items, &QueryParamItem{

@@ -1327,15 +1327,12 @@ func GetParamsFromBody(contentType string, body []byte) (params map[string]strin
 	}
 	// try post values
 	if len(params) == 0 {
-		var values url.Values
-		values, err = url.ParseQuery(utils.UnsafeBytesToString(body))
-		if err == nil {
-			for k, v := range values {
-				if len(v) == 0 {
-					continue
-				}
-				params[k] = v[len(v)-1]
+		p := ParseQueryParams(utils.UnsafeBytesToString(body))
+		for _, item := range p.Items {
+			if item.RawKey == "" {
+				continue
 			}
+			params[item.RawKey] = item.RawValue
 		}
 	}
 
@@ -1770,12 +1767,15 @@ func GetAllHTTPRequestQueryParams(packet []byte) (params map[string]string) {
 	if err != nil {
 		return nil
 	}
-	vals := u.Query()
-	ret := make(map[string]string)
-	for k, v := range vals {
-		ret[k] = v[len(v)-1]
+	p := ParseQueryParams(u.RawQuery)
+	params = make(map[string]string)
+	for _, item := range p.Items {
+		if item.RawKey == "" {
+			continue
+		}
+		params[item.RawKey] = item.RawValue
 	}
-	return ret
+	return
 }
 
 // GetStatusCodeFromResponse 是一个辅助函数，用于获取响应报文中的状态码，其返回值为int
