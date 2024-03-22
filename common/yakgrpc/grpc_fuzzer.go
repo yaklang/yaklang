@@ -300,6 +300,25 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		Plugins
 	*/
 	var pocs []*yakit.YakScript
+	if req.GetYamlPoCNames() == nil {
+		req.YamlPoCNames = []string{
+			"Yaml Poc Test",
+			"致远OAwpsAssistServlet任意文件上传",
+			"通达OA_Video_file任意文件下载",
+			"泛微OA_HrmCareerApplyPerView.文件存在SQL注入",
+			"红帆OAioFileExport.aspx任意文件读取",
+			"泛微OA E-Cology jqueryFileTree.jsp 目录遍历",
+			"致远OA webmail.do 任意文件下载",
+			"D-LINK DAP-2020 webproc 任意文件读取漏洞",
+			"Alibaba AnyProxy fetchBody 任意文件读取漏洞",
+			"[Alibaba-Nacos-weakpass]: Alibaba Nacos 控制台存在默认弱口令 nacos/nacos，可登录后台查看敏感信息",
+			"[CVE-2023-23752]: CVE-2023-23752-joomla",
+			"泛微任意文件读取",
+			"Go-fastdfs GetClientIp 未授权访问漏洞检测",
+			"金和 OA GetTreeDate.aspx 未授权访问漏洞",
+			"蓝凌EKP 未授权访问漏洞",
+		}
+	}
 	for _, i := range req.GetYamlPoCNames() {
 		poc, err := yakit.GetYakScriptByName(consts.GetGormProfileDatabase(), i)
 		if err != nil {
