@@ -147,8 +147,19 @@ func Test_RealYak_Undefine(t *testing.T) {
 		`)
 	})
 
-
 }
+
+func Test_RealYak_Error(t *testing.T) {
+	t.Run("function return error", func(t *testing.T) {
+		ssatest.CheckNoError(t, `
+		encodePayload,err = codec.AESCBCEncrypt("", "", "")
+		if err {
+			panic("codec AES CBC Encrypt error")
+		}
+		`)
+	})
+}
+
 func Test_RealYak_ObjectType(t *testing.T) {
 	t.Run("map[string]any", func(t *testing.T) {
 		ssatest.CheckNoError(t, `
