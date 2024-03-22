@@ -723,13 +723,17 @@ primary
 
 // Java17
 switchExpression
-    :SWITCH  parExpression '{' switchLabeledRule* '}'
+    :SWITCH  parExpression '{' switchLabeledRule* defaultLabeledRule? '}'
     ;
 
 // Java17
 switchLabeledRule
     : CASE (expressionList | NULL_LITERAL | guardedPattern) (ARROW | COLON) switchRuleOutcome
-    | DEFAULT (ARROW | COLON) switchRuleOutcome
+    ;
+
+// Java17
+defaultLabeledRule
+    : DEFAULT (ARROW | COLON) switchRuleOutcome
     ;
 
 // Java17
