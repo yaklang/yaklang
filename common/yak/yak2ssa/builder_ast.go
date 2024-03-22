@@ -607,6 +607,15 @@ func (b *astbuilder) AssignList(forceAssign bool, stmt assignlist) []ssa.Value {
 					return
 				}
 			}
+			if c.GetType().GetTypeKind() == ssa.AnyTypeKind {
+				for i := range leftVariables {
+					b.AssignVariable(
+						leftVariables[i],
+						b.ReadMemberCallVariable(c, b.EmitConstInst(i)),
+					)
+				}
+				return
+			}
 
 			if c.IsDropError {
 				c.NewError(ssa.Error, TAG,
@@ -617,21 +626,23 @@ func (b *astbuilder) AssignList(forceAssign bool, stmt assignlist) []ssa.Value {
 					ssa.CallAssignmentMismatch(len(leftVariables), c.GetType().String()),
 				)
 			}
+
 			for i := range leftVariables {
-				if i < length {
-					if length == 1 {
-						// this call type not tuple type, can't read member
-						// in this case `i = 0`
-						b.AssignVariable(leftVariables[i], c)
-					} else {
-						// this call type is tuple type, can read member
-						value := b.ReadMemberCallVariable(c, b.EmitConstInst(i))
-						b.AssignVariable(leftVariables[i], value)
-					}
-				} else {
+				if i >= length {
 					value := b.EmitUndefined(leftVariables[i].GetName())
 					b.AssignVariable(leftVariables[i], value)
+					continue
 				}
+
+				if length == 1 {
+					// this call type not tuple type, can't read member
+					// in this case `i = 0`
+					b.AssignVariable(leftVariables[i], c)
+					continue
+				}
+				// this call type is tuple type, can read member
+				value := b.ReadMemberCallVariable(c, b.EmitConstInst(i))
+				b.AssignVariable(leftVariables[i], value)
 			}
 			return
 		}

@@ -67,17 +67,16 @@ func (b *FunctionBuilder) Finish() {
 
 // calculate all return instruction in function, get return type
 func handlerReturnType(rs []*Return) Type {
-	tmp := make(map[string]Type, len(rs))
+	tmp := make(map[Type]struct{}, len(rs))
 	for _, r := range rs {
-		id := ""
 		typs := r.calcType()
 
-		if _, ok := tmp[id]; !ok {
-			tmp[id] = typs
+		if _, ok := tmp[typs]; !ok {
+			tmp[typs] = struct{}{}
 		}
 	}
 
-	typs := lo.Values(tmp)
+	typs := lo.Keys(tmp)
 	if len(typs) == 0 {
 		return BasicTypes[NullTypeKind]
 	} else if len(typs) == 1 {
@@ -86,7 +85,7 @@ func handlerReturnType(rs []*Return) Type {
 		//TODO: how handler this? multiple return with different type
 		// should set Warn!!
 		// and ?? Type ??
-		return nil
+		return GetAnyType()
 	}
 }
 
