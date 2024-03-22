@@ -475,6 +475,9 @@ type JavaParserVisitor interface {
 	// Visit a parse tree produced by JavaParser#switchLabeledRule.
 	VisitSwitchLabeledRule(ctx *SwitchLabeledRuleContext) interface{}
 
+	// Visit a parse tree produced by JavaParser#defaultLabeledRule.
+	VisitDefaultLabeledRule(ctx *DefaultLabeledRuleContext) interface{}
+
 	// Visit a parse tree produced by JavaParser#guardedPattern.
 	VisitGuardedPattern(ctx *GuardedPatternContext) interface{}
 

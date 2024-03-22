@@ -106,4 +106,93 @@ func TestJava_Expression(t *testing.T) {
 		a(b());
 		`, t)
 	})
+	t.Run("test simple switch expression", func(t *testing.T) {
+		CheckJavaPrintlnValue(` 
+		int a = 1;
+		int b = switch(a){
+		case 1 -> 2;
+		case 2 -> 10;
+};
+		println(b);
+		`, []string{"2"}, t)
+	})
+	t.Run("test switch expression with muti-cases", func(t *testing.T) {
+		CheckJavaPrintlnValue(` 
+		int a = 1;
+		int b = switch(a){
+		case 5 -> 2;
+		case 2 -> 10;
+		case 1,2 -> 11;
+};
+		println(b);
+		`, []string{"11"}, t)
+	})
+	t.Run("test switch expression with yield", func(t *testing.T) {
+		CheckJavaPrintlnValue(` 
+		int a = 2;
+		int  b = switch(a){
+		case 1 -> 11;
+		case 2 -> {
+			c = 33 ;
+			println(c);
+			yield 22;
+}};
+		println(b);
+		`, []string{"33", "22"}, t)
+	})
+	t.Run("test switch expression ", func(t *testing.T) {
+		CheckJavaPrintlnValue(` 
+		int a = 2;
+		int c =2;
+		int  b = switch(a){
+		case 1 -> {
+			b=11;
+			println(b);
+			yield 111;
+}
+		case c,3 -> {
+			b = 22 ;
+			println(b);
+			yield 222;
+}};
+		println(b);
+		`, []string{"11", "22", "222"}, t)
+	})
+
+	t.Run("test switch expression with default  1", func(t *testing.T) {
+		CheckJavaPrintlnValue(` 
+		int a = 2;
+		int c =2;
+		int  b = switch(a){
+		case 1 -> {
+			b=11;
+			println(b);
+			yield 111;
+}
+		case 3 ->33  ;
+		default -> 22 ;
+};
+		println(b);
+		`, []string{"11", "22"}, t)
+	})
+	t.Run("test switch expression with default  2", func(t *testing.T) {
+		CheckJavaPrintlnValue(` 
+		int a = 2;
+		int c =2;
+		int  b = switch(a){
+		case 1 -> {
+			b=11;
+			println(b);
+			yield 111;
+}
+		case 3 ->33  ;
+		default -> {
+		b = 222 ;
+		println(222);
+		yield 22;
+}
+};
+		println(b);
+		`, []string{"11", "222", "22"}, t)
+	})
 }

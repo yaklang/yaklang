@@ -122,8 +122,8 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		return nil
 	case *javaparser.Java17SwitchExpressionContext:
 		// 处理 Java 17 的 switch 表达式
-		// todo: Java 17 的 switch 表达式
-		return nil
+		value := y.VisitSwitchExpression(ret.SwitchExpression(), true)
+		return value
 	case *javaparser.PostfixExpressionContext:
 		// 处理后缀表达式，如自增、自减操作
 		if s := ret.LeftExpression(); s != nil {
@@ -681,12 +681,13 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 		return nil
 	case *javaparser.YieldStatementContext:
 		// 处理 yield 语句
-		return nil
+		return y.VisitExpression(ret.Expression())
 	case *javaparser.ExpressionStatementContext:
 		// 处理表达式语句
 		return y.VisitExpression(ret.Expression())
 	case *javaparser.SwitchArrowExpressionContext:
 		// 处理 switch 箭头语句
+		_ = y.VisitSwitchExpression(ret.SwitchExpression(), false)
 		return nil
 	case *javaparser.IdentifierLabelStatementContext:
 		// 处理标识符标签语句
@@ -992,4 +993,195 @@ func (y *builder) VisitIfStmt(raw javaparser.IIfstmtContext) interface{} {
 	builder.SetElse(elseBlock)
 	builder.Build()
 	return nil
+}
+
+func (y *builder) VisitSwitchExpression(raw javaparser.ISwitchExpressionContext, isExpression bool) ssa.Value {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*javaparser.SwitchExpressionContext)
+	if i == nil {
+		return nil
+	}
+
+	switchBuilder := y.BuildSwitch()
+	switchBuilder.AutoBreak = false
+
+	parExpr := i.ParExpression().(*javaparser.ParExpressionContext)
+	expr := parExpr.Expression()
+	if expr != nil {
+		switchBuilder.BuildCondition(func() ssa.Value {
+			return y.VisitExpression(expr)
+		})
+	} else {
+		y.NewError(ssa.Error, "javaast", "switch expression is nil")
+	}
+
+	switchLabels := i.AllSwitchLabeledRule()
+	caseNum := len(switchLabels)
+	//得到case后面参数的value
+	getCaseValue := func(i int) []ssa.Value {
+		switchStmt := switchLabels[i].(*javaparser.SwitchLabeledRuleContext)
+		if switchStmt.ExpressionList() != nil {
+			return y.VisitExpressionList(switchStmt.ExpressionList())
+		} else if switchStmt.NULL_LITERAL() != nil {
+			return []ssa.Value{y.EmitConstInstNil()}
+		} else if switchStmt.GuardedPattern() != nil {
+			return y.VisitGuardedPattern(switchStmt.GuardedPattern())
+		} else {
+			return nil
+		}
+	}
+
+	switchBuilder.BuildCaseSize(caseNum)
+	switchBuilder.SetCase(func(i int) []ssa.Value {
+		return getCaseValue(i)
+	})
+
+	switchBuilder.BuildBody(func(i int) {
+		switchStmt := switchLabels[i].(*javaparser.SwitchLabeledRuleContext)
+		if switchRuleOutCome := switchStmt.SwitchRuleOutcome(); switchRuleOutCome != nil {
+			s := switchRuleOutCome.(*javaparser.SwitchRuleOutcomeContext)
+			if s.Block() != nil {
+				y.VisitBlock(s.Block())
+			}
+			for _, stmt := range s.AllBlockStatement() {
+				y.VisitBlockStatement(stmt)
+			}
+		}
+	})
+
+	if i.DefaultLabeledRule() != nil {
+		switchBuilder.BuildDefault(func() {
+			if defaultStmt := i.DefaultLabeledRule().(*javaparser.DefaultLabeledRuleContext); defaultStmt != nil {
+				switchRuleOutCome := defaultStmt.SwitchRuleOutcome()
+				s := switchRuleOutCome.(*javaparser.SwitchRuleOutcomeContext)
+				if s.Block() != nil {
+					y.VisitBlock(s.Block())
+				}
+				for _, stmt := range s.AllBlockStatement() {
+					y.VisitBlockStatement(stmt)
+				}
+			}
+		})
+	}
+
+	switchBuilder.Finish()
+	// switch 作为expression
+	if isExpression {
+		// 当switch作为expression的时候需要返回ssa.Value
+		// 得到blockStatement的ssa.Value
+		// 因为blockStatement并不所有的语句都会返回ssa.Value
+		// 而switch作为expression的时候需要返回ssa.Value
+		getBlockValue := func(stmt javaparser.IBlockContext) []ssa.Value {
+			if stmt == nil {
+				return nil
+			}
+			block := stmt.(*javaparser.BlockContext)
+			for _, s := range block.AllBlockStatement() {
+				blockStatement := s.(*javaparser.BlockStatementContext)
+				if blockStatement.Statement() != nil {
+					statement := blockStatement.Statement()
+					switch ret := statement.(type) {
+					case *javaparser.YieldStatementContext:
+						return []ssa.Value{y.VisitExpression(ret.Expression())}
+					}
+				}
+			}
+
+			return nil
+		}
+
+		getBlockStmtValue := func(stmt javaparser.IBlockStatementContext) []ssa.Value {
+			if stmt == nil {
+				return nil
+			}
+			blockStatement := stmt.(*javaparser.BlockStatementContext)
+			if blockStatement.Statement() != nil {
+				statement := blockStatement.Statement()
+				switch ret := statement.(type) {
+				case *javaparser.ExpressionStatementContext:
+					return []ssa.Value{y.VisitExpression(ret.Expression())}
+				}
+			}
+			return nil
+		}
+		// 遍历case的switchRuleOutcome的block和blockStatement
+		getSwitchOutcomeValue := func(i int) ssa.Value {
+			var value []ssa.Value
+			switchStmt := switchLabels[i].(*javaparser.SwitchLabeledRuleContext)
+			if switchRuleOutCome := switchStmt.SwitchRuleOutcome(); switchRuleOutCome != nil {
+				s := switchRuleOutCome.(*javaparser.SwitchRuleOutcomeContext)
+				if s.Block() != nil {
+					block := s.Block().(*javaparser.BlockContext)
+					value = append(value, getBlockValue(block)...)
+
+				}
+				for _, blockStmt := range s.AllBlockStatement() {
+					value = append(value, getBlockStmtValue(blockStmt)...)
+				}
+			}
+			// switch 作为参数的时候只能返回一个value
+			if len(value) > 1 {
+				y.NewError(ssa.Warn, "javaast", "switch as expression can only return one value")
+				return nil
+			} else {
+				return value[0]
+			}
+		}
+		// 遍历default的switchRuleOutcome的block和blockStatement
+		getDefalutOutCome := func() ssa.Value {
+			var value []ssa.Value
+			defaultStmt := i.DefaultLabeledRule().(*javaparser.DefaultLabeledRuleContext)
+			if switchRuleOutCome := defaultStmt.SwitchRuleOutcome(); switchRuleOutCome != nil {
+				s := switchRuleOutCome.(*javaparser.SwitchRuleOutcomeContext)
+				if s.Block() != nil {
+					block := s.Block().(*javaparser.BlockContext)
+					value = append(value, getBlockValue(block)...)
+
+				}
+				for _, blockStmt := range s.AllBlockStatement() {
+					value = append(value, getBlockStmtValue(blockStmt)...)
+				}
+			}
+			if len(value) > 1 {
+				y.NewError(ssa.Warn, "javaast", "switch as expression can only return one value")
+				return nil
+			} else {
+				return value[0]
+			}
+		}
+		// switch参数的value
+		value1 := y.VisitExpression(expr)
+		for i := 0; i < caseNum; i++ {
+			// case参数的value
+			value2 := getCaseValue(i)
+			for _, v := range value2 {
+				if value1.String() == v.String() {
+					return getSwitchOutcomeValue(i)
+				}
+			}
+		}
+		if i.DefaultLabeledRule() != nil {
+			return getDefalutOutCome()
+		} else {
+			return nil
+		}
+	}
+	return nil
+
+}
+
+func (y *builder) VisitGuardedPattern(raw javaparser.IGuardedPatternContext) []ssa.Value {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*javaparser.GuardedPatternContext)
+	if i == nil {
+		return nil
+	}
+	return nil
+
 }
