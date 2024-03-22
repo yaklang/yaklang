@@ -591,8 +591,8 @@ func main() {
 	// 启动 bridge
 	tunnelServerCliApp := cybertunnel.GetTunnelServerCommandCli()
 	tunnelServerCommand := cli.Command{
-		Name:    "brige",
-		Usage:   "Create Yak-Bridge Server",
+		Name:    "bridge",
+		Usage:   "Create Yak-Bridge Server for OOB",
 		Aliases: []string{"tunnel-server"},
 		Flags:   tunnelServerCliApp.Flags,
 		Before:  tunnelServerCliApp.Before,
