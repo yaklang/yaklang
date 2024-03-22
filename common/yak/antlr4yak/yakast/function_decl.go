@@ -81,6 +81,7 @@ func (y *YakCompiler) VisitAnonymousFunctionDecl(raw yak.IAnonymousFunctionDeclC
 
 		// 编译好的 FuncCode 配合符号表，一般来说就可以供执行和调用了
 		fun = yakvm.NewFunction(y.codes, y.currentSymtbl)
+		fun.FreeValue = y.FreeValues
 		if y.sourceCodePointer != nil {
 			fun.SetSourceCode(*y.sourceCodePointer)
 		}
@@ -102,6 +103,7 @@ func (y *YakCompiler) VisitAnonymousFunctionDecl(raw yak.IAnonymousFunctionDeclC
 		funcCode := y.codes
 		// 编译好的 FuncCode 配合符号表，一般来说就可以供执行和调用了
 		fun = yakvm.NewFunction(funcCode, y.currentSymtbl)
+		fun.FreeValue = y.FreeValues
 		if y.sourceCodePointer != nil {
 			fun.SetSourceCode(*y.sourceCodePointer)
 		}
@@ -124,15 +126,21 @@ func (y *YakCompiler) VisitAnonymousFunctionDecl(raw yak.IAnonymousFunctionDeclC
 		TypeVerbose: "anonymous-function",
 		Value:       fun,
 	}
+
+	push := y.pushValue
+	if len(fun.FreeValue) > 0 {
+		push = y.pushValueWithCopy
+	}
+
 	if funcName != "" {
 		// 如果有函数名的话，进行快速赋值
 		funcVal.TypeVerbose = "named-function"
 		y.pushLeftRef(fun.GetSymbolId())
-		y.pushValue(funcVal)
+		push(funcVal)
 		y.pushOperator(yakvm.OpFastAssign)
 	} else {
 		// 闭包函数，直接push到栈中
-		y.pushValueWithCopy(funcVal)
+		push(funcVal)
 	}
 
 	return nil

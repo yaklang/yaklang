@@ -20,6 +20,7 @@ type Function struct {
 	uuid                      string
 	paramSymbols              []int
 	isVariableParameter       bool
+	FreeValue                 []int
 	defineFrame               *Frame
 }
 

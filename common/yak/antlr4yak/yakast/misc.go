@@ -91,9 +91,12 @@ func (y *YakCompiler) SwitchSymbolTable(name ...string) func() {
 
 func (y *YakCompiler) SwitchCodes() func() {
 	origin := y.codes
+	originRefName := y.FreeValues
 	y.codes = []*yakvm.Code{}
+	y.FreeValues = make([]int, 0)
 	return func() {
 		y.codes = origin
+		y.FreeValues = originRefName
 	}
 }
 

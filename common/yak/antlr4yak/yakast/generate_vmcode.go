@@ -200,6 +200,7 @@ func (s *YakCompiler) pushCallWithWavy(argCount int) {
 // }
 
 func (s *YakCompiler) pushRef(i int) {
+	s.FreeValues = append(s.FreeValues, i)
 	s._pushOpcodeWithCurrentCodeContext(&yakvm.Code{
 		Opcode: yakvm.OpPushRef,
 		Unary:  i,
