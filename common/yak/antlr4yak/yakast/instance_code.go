@@ -30,11 +30,16 @@ func (y *YakCompiler) VisitInstanceCode(raw yak.IInstanceCodeContext) interface{
 
 	y.VisitBlock(i.Block(), true)
 	y.pushOperator(yakvm.OpReturn)
+
 	funcCode := make([]*yakvm.Code, len(y.codes))
 	copy(funcCode, y.codes)
+	freeValues := y.FreeValues
+
 	recoverFunc()
 
 	yakFn = yakvm.NewFunction(funcCode, y.currentSymtbl)
+	yakFn.FreeValue = freeValues
+
 	if y.sourceCodePointer != nil {
 		yakFn.SetSourceCode(*y.sourceCodePointer)
 	}
@@ -42,12 +47,17 @@ func (y *YakCompiler) VisitInstanceCode(raw yak.IInstanceCodeContext) interface{
 		y.panicCompilerError(compileError, "cannot create yak function from compiler")
 	}
 
-	// 配置函数
-	//y.pushScope(yakvm.GetCurrentTableCount())
-	y.pushValue(&yakvm.Value{
+	value := &yakvm.Value{
 		TypeVerbose: "anonymous-function",
 		Value:       yakFn,
-	})
+	}
+	// 配置函数
+	//y.pushScope(yakvm.GetCurrentTableCount())
+	if len(yakFn.FreeValue) == 0 {
+		y.pushValue(value)
+	} else {
+		y.pushValueWithCopy(value)
+	}
 	y.pushCall(0)
 	return nil
 }

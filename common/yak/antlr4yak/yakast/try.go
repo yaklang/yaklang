@@ -89,9 +89,11 @@ func (y *YakCompiler) _VisitTryStmt(raw yak.ITryStmtContext) interface{} {
 
 	funcCode := make([]*yakvm.Code, len(y.codes))
 	copy(funcCode, y.codes)
+	freeValues := y.FreeValues
 	recoverCodeFunc()
 
 	yakFn := yakvm.NewFunction(funcCode, y.currentSymtbl)
+	yakFn.FreeValue = freeValues
 	if y.sourceCodePointer != nil {
 		yakFn.SetSourceCode(*y.sourceCodePointer)
 	}

@@ -68,6 +68,7 @@ func (v *Frame) CheckExit() error {
 		return nil
 	}
 	if v.stack.Len() > 0 {
+		err := utils.Errorf("Runtime Stack Unbalanced: %v ", v.stack.Len())
 		for v.stack.Len() > 0 {
 			value := v.stack.Pop().(*Value).Value
 			switch vv := value.(type) {
@@ -79,7 +80,7 @@ func (v *Frame) CheckExit() error {
 				fmt.Printf("stack : %#v\n", value)
 			}
 		}
-		return utils.Errorf("Runtime Stack Unbalanced: %v ", v.stack.Len())
+		return err
 	}
 
 	if v.iteratorStack.Len() > 0 {
@@ -659,6 +660,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			if c.Unary == 1 {
 				c.Op1.Value = fun.Copy(v.scope)
 			} else if c.Unary == 0 {
+				// check(v.scope)
 				fun.scope = v.scope
 			}
 		}

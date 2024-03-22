@@ -36,6 +36,7 @@ type YakCompiler struct {
 	indent                                       int
 	sourceCodeFilePathPointer, sourceCodePointer *string
 	codes                                        []*yakvm.Code
+	FreeValues                                   []int
 	rootSymtbl                                   *yakvm.SymbolTable
 	currentSymtbl                                *yakvm.SymbolTable
 	programCounter                               int
