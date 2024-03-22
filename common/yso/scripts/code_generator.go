@@ -1,18 +1,42 @@
-package scripts
+package main
 
 import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
+	"github.com/urfave/cli"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yserx"
 	"github.com/yaklang/yaklang/common/yso"
 	"os"
+	"path"
 	"strings"
-	"testing"
 )
 
-func TestGenConst(t *testing.T) {
+func main() {
+	app := cli.NewApp()
+	app.Name = "code_generator"
+	app.Description = "用于生成配置文件中的常量，压缩payload"
+	app.Flags = []cli.Flag{
+		cli.StringFlag{
+			Name:  "compress,c",
+			Usage: "压缩文件",
+		},
+		cli.StringFlag{
+			Name:  "output,o",
+			Usage: "保存位置",
+		},
+	}
+	app.Action = func(c *cli.Context) {
+		if c.String("compress") != "" {
+			compress(c.String("compress"), c.String("output"))
+		} else {
+			genConst()
+		}
+	}
+}
+func genConst() {
 	case2Camel := func(name string) string {
 		name = strings.Replace(name, "-", " ", -1)
 		name = strings.Title(name)
@@ -61,22 +85,28 @@ func TestGenConst(t *testing.T) {
 	code += newConstantsCode("GadgetType", allGadgetNameKV)
 	println(code)
 }
-func TestCompress(t *testing.T) {
+func compress(src string, out string) {
+	if out == "" {
+		out = "gadgets.bin"
+	}
 	var buf bytes.Buffer
 	zw := gzip.NewWriter(&buf)
-	fileInfos, err := utils.ReadDir("/tmp/ser-file")
+	fileInfos, err := utils.ReadDir(src)
 	if err != nil {
-		t.Fatal(err)
+		log.Errorf("read dir %s failed: %v", src, err)
+		return
 	}
 	writeDataBlock := func(content []byte) {
 		l := yserx.IntTo4Bytes(len(content))
 		_, err := zw.Write(l)
 		if err != nil {
-			t.Fatal(err)
+			log.Errorf("write len failed: %v", err)
+			return
 		}
 		_, err = zw.Write(content)
 		if err != nil {
-			t.Fatal(err)
+			log.Errorf("write content failed: %v", err)
+			return
 		}
 	}
 	for _, info := range fileInfos {
@@ -86,18 +116,20 @@ func TestCompress(t *testing.T) {
 		if !strings.HasSuffix(info.Name, ".ser") {
 			continue
 		}
-		content, err := os.ReadFile("/tmp/ser-file/" + info.Name)
+		content, err := os.ReadFile(path.Join(src, info.Name))
 		if err != nil {
-			t.Fatal(err)
+			log.Errorf("read file %s failed: %v", info.Name, err)
+			return
 		}
 		writeDataBlock([]byte(info.Name))
 		writeDataBlock(content)
 	}
 	if err := zw.Close(); err != nil {
-		t.Fatal(err)
+		log.Errorf("gzip close failed: %v", err)
+		return
 	}
-	err = os.WriteFile("/tmp/gadgets.bin", buf.Bytes(), 0777)
+	err = os.WriteFile(out, buf.Bytes(), 0777)
 	if err != nil {
-		t.Fatal(err)
+		log.Errorf("write file failed: %v", err)
 	}
 }
