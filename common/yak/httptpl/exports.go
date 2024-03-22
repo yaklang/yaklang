@@ -334,11 +334,15 @@ func httpPayloadsToString(payloads *YakPayloads) (string, error) {
 func WithOnRisk(target string, onRisk func(i *yakit.Risk)) ConfigOption {
 	vCh := make(chan *tools.PocVul)
 	filterVul := filter.NewFilter()
-	defer filterVul.Close()
 	i := processVulnerability(target, filterVul, vCh, onRisk)
+
 	return func(config *Config) {
 		_callback(i)(config)
 		_tcpCallback(i)(config)
+		go func() {
+			defer filterVul.Close()
+			<-vCh
+		}()
 	}
 }
 
