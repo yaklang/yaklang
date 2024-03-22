@@ -33,4 +33,14 @@ for true {
 }
 `)
 	})
+
+}
+func Test_RealYak_ObjectType(t *testing.T) {
+	t.Run("map[string]any", func(t *testing.T) {
+		ssatest.CheckNoError(t, `
+		fuzz.HTTPRequest("reqBytes")~
+		exprDetails = fuzz.FuzzCalcExpr()
+		result = exprDetails.result
+		`)
+	})
 }
