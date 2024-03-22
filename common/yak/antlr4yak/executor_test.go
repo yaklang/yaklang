@@ -3239,6 +3239,30 @@ assert f0() == 1 // !!
 	_formattest(code)
 }
 
+func TestNewExecutor_Closure_Instance(t *testing.T) {
+	code := `
+	for i in 16 {
+		go func {
+			a = 0
+			go func {
+				sleep(0.5)
+				a ++
+				assert a == 1
+				// println(a)
+				// if a > 1{
+				// 	println("nononono")
+				// }
+			}
+		}
+	}
+	sleep(1)
+	`
+	for i := 0; i < 3; i++ {
+		_marshallerTest(code)
+		_formatCodeTest(code)
+	}
+}
+
 // 测试 assert/字符串索引、拼接/结构体、和map调用成员
 func TestNewExecutor_MemberCall(t *testing.T) {
 	u := &user{
