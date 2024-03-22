@@ -57,4 +57,5 @@ func TestJava_LocalType_Declaration(t *testing.T) {
 				"2",
 			}, t)
 	})
+
 }

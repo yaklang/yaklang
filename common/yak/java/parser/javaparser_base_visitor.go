@@ -631,6 +631,10 @@ func (v *BaseJavaParserVisitor) VisitSwitchLabeledRule(ctx *SwitchLabeledRuleCon
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseJavaParserVisitor) VisitDefaultLabeledRule(ctx *DefaultLabeledRuleContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseJavaParserVisitor) VisitGuardedPattern(ctx *GuardedPatternContext) interface{} {
 	return v.VisitChildren(ctx)
 }
