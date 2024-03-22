@@ -55,6 +55,10 @@ func (f *Function) GetProgram() *Program {
 	return f.Package.Prog
 }
 
+func (f *Function) GetFunc() *Function {
+	return f
+}
+
 func (f *Function) GetReferenceFiles() []string {
 	return f.referenceFiles.Keys()
 }

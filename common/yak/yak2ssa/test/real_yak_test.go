@@ -104,6 +104,47 @@ Rawfuzz = func(p, fuzzPayload) {
 		)
 	})
 
+}
+
+func Test_Real_FunctionReturn(t *testing.T) {
+	t.Run("function return", func(t *testing.T) {
+		ssatest.CheckNoError(t, `
+		f = param =>{
+			if param == 1 {
+				return nil
+			}
+			return 1
+		}
+
+		check = scope =>{
+			if len(scope) == 0{
+				return
+			}
+			println(scope[0])
+		}
+
+		a = f(1)
+		check(a)
+		`)
+	})
+}
+
+func Test_RealYak_Undefine(t *testing.T) {
+	t.Run("normal", func(t *testing.T) {
+		ssatest.CheckNoError(t, `
+		() => {
+			for _, i := range [1,2]{
+				if i == 1 {
+					f()
+				}
+			}
+		}
+		f = () => {
+			println("f")
+		}
+		`)
+	})
+
 
 }
 func Test_RealYak_ObjectType(t *testing.T) {
