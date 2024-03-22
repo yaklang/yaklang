@@ -73,6 +73,8 @@ jobs:
               go test -timeout 15s ./common/utils/bruteutils/.
               go test -timeout 15s ./common/pcapx/pcaputil/...
               go test -timeout 15s ./common/yak/yakurl/...
+              # yso
+              go test -timeout 20s ./common/yso/...
 
           - name: Test NetX
             run: |
@@ -161,8 +163,6 @@ jobs:
             run: |
               # vulinbox agent client
               go test -timeout 1m -run TestMUSTPASS* ./common/vulinboxagentclient
-              # yso
-              go test -timeout 20s -run TestMUSTPASS* ./common/yso
 
           - name: Test Suricata Generate && Match / pcapx
             run: |
