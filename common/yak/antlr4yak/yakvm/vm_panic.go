@@ -1,12 +1,12 @@
 package yakvm
 
 import (
-	"bufio"
 	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 
 	"github.com/kataras/pio"
@@ -25,9 +25,11 @@ type PanicInfo struct {
 func newPanicInfo(code *Code, codeReview string) *PanicInfo {
 	return &PanicInfo{code: code, codeReview: codeReview}
 }
+
 func (p *PanicInfo) SetPositionVerbose(s string) {
 	p.positionVerbose = s
 }
+
 func (p *PanicInfo) String() string {
 	if p.code.SourceCodeFilePath == nil {
 		return p.positionVerbose
@@ -93,46 +95,67 @@ func (v *Frame) getCodeReview(sourceCode *string, code *Code, i *VMPanic) string
 			}
 		}
 	}()
-	scanner := bufio.NewScanner(strings.NewReader(codeOrigin))
-	scanner.Split(bufio.ScanLines)
-	flag := 0
-	for nowLine := 1; scanner.Scan() && nowLine <= code.EndLineNumber; nowLine++ {
-		text := scanner.Text()
-		runeText := []rune(text)
-		lenOfText := len(runeText)
-
-		if nowLine == code.StartLineNumber {
-			flag = 1 // 后面的行全红
-			if code.EndColumnNumber >= lenOfText && lenOfText > 0 {
-				codeReview += pio.Red(string(runeText[code.StartColumnNumber:]) + "\n")
-				continue
-			} else {
-				// 右闭区间
-				code.EndColumnNumber++
-			}
-			codeReview += string(runeText[:code.StartColumnNumber])
-			if code.EndLineNumber == code.StartLineNumber {
-				codeReview += pio.Red(string(runeText[code.StartColumnNumber:code.EndColumnNumber])) + string(runeText[code.EndColumnNumber:]) + "\n"
-				break
-			} else {
-				codeReview += pio.Red(string(runeText[code.StartColumnNumber:]) + "\n")
-			}
-
-			continue
-		}
-		if nowLine == code.EndLineNumber {
-			flag = 2 // 最后一行，影响范围的红
-		}
-		if flag == 1 {
-			codeReview += pio.Red(text + "\n")
-		}
-		if flag == 2 {
-			codeReview += pio.Red(string(runeText[:code.EndColumnNumber]))
-			codeReview += string(runeText[code.EndColumnNumber:])
-			break
-		}
+	editor := utils.NewVirtualEditor(codeOrigin)
+	startOffset, err := editor.GetStartOffsetByLine(code.StartLineNumber)
+	if err != nil {
+		panic(err)
 	}
+	startErrorOffset, err := editor.GetOffsetByPosition(code.StartLineNumber, code.StartColumnNumber)
+	if err != nil {
+		panic(err)
+	}
+	endOffset, err := editor.GetEndOffsetByLine(code.EndLineNumber)
+	if err != nil {
+		panic(err)
+	}
+	endErrorOffset, err := editor.GetOffsetByPosition(code.EndLineNumber, code.EndColumnNumber)
+	if err != nil {
+		panic(err)
+	}
+	// 修正偏移量
+	endErrorOffset++
+	codeReview = string([]rune(codeOrigin[startOffset:startErrorOffset])) + pio.Red(string([]rune(codeOrigin[startErrorOffset:endErrorOffset]))) + string([]rune(codeOrigin[endErrorOffset:endOffset]))
 	codeReview = strings.TrimSpace(codeReview)
+	// scanner := bufio.NewScanner(strings.NewReader(codeOrigin))
+	// scanner.Split(bufio.ScanLines)
+	// flag := 0
+	// for nowLine := 1; scanner.Scan() && nowLine <= code.EndLineNumber; nowLine++ {
+	// 	text := scanner.Text()
+	// 	runeText := []rune(text)
+	// 	lenOfText := len(runeText)
+
+	// 	if nowLine == code.StartLineNumber {
+	// 		flag = 1 // 后面的行全红
+	// 		if code.EndColumnNumber >= lenOfText && lenOfText > 0 {
+	// 			codeReview += pio.Red(string(runeText[code.StartColumnNumber:]) + "\n")
+	// 			continue
+	// 		} else {
+	// 			// 右闭区间
+	// 			code.EndColumnNumber++
+	// 		}
+	// 		codeReview += string(runeText[:code.StartColumnNumber])
+	// 		if code.EndLineNumber == code.StartLineNumber {
+	// 			codeReview += pio.Red(string(runeText[code.StartColumnNumber:code.EndColumnNumber])) + string(runeText[code.EndColumnNumber:]) + "\n"
+	// 			break
+	// 		} else {
+	// 			codeReview += pio.Red(string(runeText[code.StartColumnNumber:]) + "\n")
+	// 		}
+
+	// 		continue
+	// 	}
+	// 	if nowLine == code.EndLineNumber {
+	// 		flag = 2 // 最后一行，影响范围的红
+	// 	}
+	// 	if flag == 1 {
+	// 		codeReview += pio.Red(text + "\n")
+	// 	}
+	// 	if flag == 2 {
+	// 		codeReview += pio.Red(string(runeText[:code.EndColumnNumber]))
+	// 		codeReview += string(runeText[code.EndColumnNumber:])
+	// 		break
+	// 	}
+	// }
+	// codeReview = strings.TrimSpace(codeReview)
 	return codeReview
 }
 
