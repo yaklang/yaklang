@@ -34,6 +34,41 @@ for true {
 `)
 	})
 
+	t.Run("function parameter", func(t *testing.T) {
+		ssatest.CheckNoError(t, `
+		f = () => {
+			for _, i := range [1, 2,3] {
+				if i==1{
+					a()
+				}
+			}
+		}
+
+		a = () => {
+			println("a")
+		}
+		`)
+	})
+
+	t.Run("function free-value", func(t *testing.T) {
+		ssatest.CheckNoError(t, `
+	
+Rawfuzz = func(p, fuzzPayload) {
+    p.Fuzz(fuzzPayload)
+}
+
+() => {
+    p = 1
+    datas = [{"a": "B"}]
+    for data in datas {
+        Rawfuzz(p,data.payload)
+        for 1 {
+            return data.payload
+        }
+    }
+}
+		`)
+	})
 }
 func Test_RealYak_ObjectType(t *testing.T) {
 	t.Run("map[string]any", func(t *testing.T) {

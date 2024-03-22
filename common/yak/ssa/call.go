@@ -92,6 +92,9 @@ func (c *Call) handleCalleeFunction() {
 		currentScope := c.GetBlock().ScopeTable
 
 		for true {
+			if len(c.Args) == len(funcTyp.ParameterValue) {
+				break
+			}
 			for _, p := range funcTyp.ParameterValue {
 				if len(c.Args) == p.FormalParameterIndex {
 					if p.GetDefault() != nil {
@@ -154,7 +157,13 @@ func (c *Call) handleCalleeFunction() {
 
 	// get object
 	obj := c.Method.GetObject()
-	c.Args = utils.InsertSliceItem(c.Args, obj, 0)
+	if len(c.Args) != 0 {
+		if c.Args[0] != obj {
+			c.Args = utils.InsertSliceItem(c.Args, obj, 0)
+		}
+	} else {
+		c.Args = append(c.Args, obj)
+	}
 }
 
 func (c *Call) HandleFreeValue(fvs []*Parameter) {
