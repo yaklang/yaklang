@@ -52,7 +52,6 @@ DEFAULT      : 'default';
 DO           : 'do';
 DOUBLE       : 'double';
 ELSE         : 'else';
-ELSEIF       : 'else if';
 ENUM         : 'enum';
 EXTENDS      : 'extends';
 FINAL        : 'final';

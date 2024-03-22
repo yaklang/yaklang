@@ -46,4 +46,15 @@ func TestJava_LocalType_Declaration(t *testing.T) {
 				"6",
 				"\"hello\""}, t)
 	})
+	t.Run("test array declaration", func(t *testing.T) {
+		CheckJavaPrintlnValue(`
+		Object a[][][] = {{{1,2,3}}};
+		println(a[0][0][0]);
+		Object b[][] = {{1,2},3};
+		println(b[0][1]);
+		`,
+			[]string{"1",
+				"2",
+			}, t)
+	})
 }
