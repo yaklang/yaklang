@@ -171,10 +171,6 @@ func (v *BaseJavaParserVisitor) VisitArrayInitializer(ctx *ArrayInitializerConte
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaParserVisitor) VisitTwoDimArraryInitializer(ctx *TwoDimArraryInitializerContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BaseJavaParserVisitor) VisitClassOrInterfaceType(ctx *ClassOrInterfaceTypeContext) interface{} {
 	return v.VisitChildren(ctx)
 }
