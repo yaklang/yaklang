@@ -2,8 +2,10 @@ package yakgrpc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -14,6 +16,66 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+func TestGRPCMUSTPASS_HTTP_DebugPlugin_NoMatcherNExtractors_YamlPOC(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stream, err := client.DebugPlugin(utils.TimeoutContextSeconds(300), &ypb.DebugPluginRequest{
+		Code: `id: WebFuzzer-Template-gPdWZhvP
+
+info:
+  name: WebFuzzer Template gPdWZhvP
+  author: god
+  severity: low
+  description: write your description here
+  reference:
+  - https://github.com/
+  - https://cve.mitre.org/
+  metadata:
+    max-request: 1
+    shodan-query: ""
+    verified: true
+  yakit-info:
+    sign: a948d87b1972d786c871bb68ef43b6b6
+
+http:
+- method: POST
+  path:
+  - '{{RootURL}}/'
+  headers:
+    Content-Type: application/json
+  body: '{"key": "value"}'
+
+  max-redirects: 3
+  matchers-condition: and
+
+# Generated From WebFuzzer on 2024-03-23 09:36:56
+`,
+		PluginType: "nuclei",
+		HTTPRequestTemplate: &ypb.HTTPRequestBuilderParams{
+			IsRawHTTPRequest: true,
+			RawHTTPRequest: []byte(`GET / HTTP/1.1
+Host: ` + "www.example.com" + `
+`),
+		},
+	})
+	if err != nil {
+		return
+	}
+	for {
+		_, err := stream.Recv()
+		if err != io.EOF && !errors.Is(err, io.ErrUnexpectedEOF) {
+			spew.Dump(err)
+			return
+		} else {
+			t.Fatal("bad error, must not be the eof")
+			return
+		}
+	}
+}
 
 func TestGRPCMUSTPASS_HTTP_DebugPlugin_SmockingWithEmptyInput(t *testing.T) {
 	client, err := NewLocalClient()

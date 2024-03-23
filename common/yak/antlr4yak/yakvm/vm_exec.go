@@ -763,7 +763,9 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 			return
 		}
 
-		id, ok := v.CurrentScope().symtbl.GetSymbolByVariableName(name)
+		currentScope := v.CurrentScope()
+		tbl := currentScope.symtbl
+		id, ok := tbl.GetSymbolByVariableName(name)
 		if ok {
 			val, ok := v.CurrentScope().GetValueByID(id)
 			if ok {

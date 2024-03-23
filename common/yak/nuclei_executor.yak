@@ -11,7 +11,7 @@ execNuclei = func(target) {
 		yakit.Error("failed to scan[%v]: %s", target, err)
 		return
 	}
-    log.Info("waiting results for: %v to: %v", nucleiPoCName, target)
+    log.Info("waiting results for: %v to: %v", nucleiPocName, target)
 	for pocVul = range res {
 		yakit.Output(pocVul)
 		yakit.Output(nuclei.PocVulToRisk(pocVul))
