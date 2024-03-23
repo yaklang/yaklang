@@ -23,7 +23,7 @@ func TestGRPCMUSTPASS_HTTP_DebugPlugin_NoMatcherNExtractors_YamlPOC(t *testing.T
 		t.Fatal(err)
 	}
 
-	stream, err := client.DebugPlugin(utils.TimeoutContextSeconds(300), &ypb.DebugPluginRequest{
+	stream, err := client.DebugPlugin(utils.TimeoutContextSeconds(4), &ypb.DebugPluginRequest{
 		Code: `id: WebFuzzer-Template-gPdWZhvP
 
 info:
