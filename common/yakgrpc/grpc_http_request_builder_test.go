@@ -2,10 +2,8 @@ package yakgrpc
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -22,6 +20,12 @@ func TestGRPCMUSTPASS_HTTP_DebugPlugin_NoMatcherNExtractors_YamlPOC(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
+	check := false
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Write([]byte("a"))
+		check = true
+	})
+	target := utils.HostPort(host, port)
 
 	stream, err := client.DebugPlugin(utils.TimeoutContextSeconds(4), &ypb.DebugPluginRequest{
 		Code: `id: WebFuzzer-Template-gPdWZhvP
@@ -58,7 +62,7 @@ http:
 		HTTPRequestTemplate: &ypb.HTTPRequestBuilderParams{
 			IsRawHTTPRequest: true,
 			RawHTTPRequest: []byte(`GET / HTTP/1.1
-Host: ` + "www.example.com" + `
+Host: ` + target + `
 `),
 		},
 	})
@@ -66,14 +70,14 @@ Host: ` + "www.example.com" + `
 		return
 	}
 	for {
-		_, err := stream.Recv()
-		if err != io.EOF && !errors.Is(err, io.ErrUnexpectedEOF) {
-			spew.Dump(err)
-			return
-		} else {
-			t.Fatal("bad error, must not be the eof")
-			return
+		data, err := stream.Recv()
+		if err != nil {
+			break
 		}
+		spew.Dump(data)
+	}
+	if !check {
+		t.Fatal("failed to default matchers")
 	}
 }
 
