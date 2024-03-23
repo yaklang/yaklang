@@ -267,6 +267,38 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 	//}
 	yakTemp.HTTPRequestSequences = reqSeq
 	//extractConfig(&yakTemp.RequestConfig, mid)
+	if yakTemp.NoMatcherAndExtractor() {
+		for _, i := range yakTemp.HTTPRequestSequences {
+			if i.Matcher == nil {
+				i.Matcher = &YakMatcher{
+					SubMatcherCondition: "and",
+				}
+			}
+			if len(i.Matcher.SubMatchers) <= 0 {
+				i.Matcher.SubMatchers = []*YakMatcher{
+					{
+						MatcherType: "status",
+						Group:       []string{"200"},
+					},
+				}
+			}
+		}
+		for _, i := range yakTemp.TCPRequestSequences {
+			if i.Matcher == nil {
+				i.Matcher = &YakMatcher{
+					SubMatcherCondition: "and",
+				}
+			}
+			if len(i.Matcher.SubMatchers) <= 0 {
+				i.Matcher.SubMatchers = []*YakMatcher{
+					{
+						MatcherType: "dsl",
+						Group:       []string{"true"},
+					},
+				}
+			}
+		}
+	}
 	return yakTemp, nil
 }
 
