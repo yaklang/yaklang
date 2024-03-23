@@ -463,6 +463,7 @@ http:
 		if err == nil {
 			continue
 		}
+		t.Fatal("no extractor and matcher should not panic")
 		//
 		//if testCase.expect && err != nil && strings.Contains(err.Error(), "签名错误") {
 		//	t.Fatal(fmt.Sprintf("expect no signature error, got: %s", err.Error()))
@@ -494,7 +495,7 @@ info:
     shodan-query: ""
     verified: true
   yakit-info:
-    sign: 273d34bc38497dacb0b2dcacc403093c
+    sign: 14b1cc1e454465de897bad573d53c69c
 
 http:
 - method: POST
@@ -567,7 +568,7 @@ http:
 		}
 		err = tmp.CheckTemplateRisks()
 		if testCase.expect && err != nil && strings.Contains(err.Error(), "签名错误") {
-			t.Fatal(fmt.Sprintf("expect no signature error, got: %s", err.Error()))
+			t.Fatal(fmt.Sprintf("expect no signature error, got: %s, should: %v", err.Error(), tmp.SignMainParams()))
 		}
 		if !testCase.expect && (err == nil || !strings.Contains(err.Error(), "签名错误")) {
 			t.Fatal(fmt.Sprintf("expect signature error: not nil, got: %s", err.Error()))
