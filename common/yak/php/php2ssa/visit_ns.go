@@ -17,7 +17,9 @@ func (y *builder) VisitQualifiedNamespaceNameList(raw phpparser.IQualifiedNamesp
 	if i == nil {
 		return nil
 	}
-
+	for _, namespaceName := range i.AllQualifiedNamespaceName() {
+		y.VisitQualifiedNamespaceName(namespaceName)
+	}
 	return nil
 }
 
@@ -25,7 +27,6 @@ func (y *builder) VisitQualifiedNamespaceName(raw phpparser.IQualifiedNamespaceN
 	if y == nil || raw == nil {
 		return nil
 	}
-
 	i, _ := raw.(*phpparser.QualifiedNamespaceNameContext)
 	if i == nil {
 		return nil
