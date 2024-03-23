@@ -202,6 +202,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		}
 		return y.ir.EmitConstInstNil()
 	case *phpparser.LambdaFunctionExpressionContext:
+		return y.VisitLambdaFunctionExpr(ret.LambdaFunctionExpr())
 	case *phpparser.MatchExpressionContext:
 	case *phpparser.ArithmeticExpressionContext:
 		exprs := ret.AllExpression()
@@ -671,7 +672,6 @@ func (y *builder) VisitFunctionCallName(raw phpparser.IFunctionCallNameContext) 
 		return y.VisitParentheses(ret)
 	} else if ret := i.Label(); ret != nil {
 		return y.ir.ReadValue(i.Label().GetText())
-		//return y.ir.ReadVariable(i.Label().GetText(), true)
 	}
 	log.Errorf("BUG: unknown function call name: %v", i.GetText())
 	return nil
