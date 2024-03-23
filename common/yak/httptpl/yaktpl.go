@@ -160,21 +160,21 @@ func (y *YakTemplate) CheckTemplateRisks() error {
 	addErrorMsg := func(msg string) {
 		errs = utils.JoinErrors(errs, errors.New(msg))
 	}
-	hasMatcherOrExtractor := false
-	for _, sequence := range y.HTTPRequestSequences {
-		if sequence.Matcher != nil && len(sequence.Matcher.SubMatchers) != 0 {
-			hasMatcherOrExtractor = true
-			break
-		}
-		if sequence.Extractor != nil && len(sequence.Extractor) != 0 {
-			hasMatcherOrExtractor = true
-			break
-		}
-	}
-	if !hasMatcherOrExtractor {
-		//addErrorMsg("matcher and extractor are both empty, may be the script is invalid")
-		addErrorMsg("匹配器和数据提取器都未配置，当前可能脚本是无效的")
-	}
+	//hasMatcherOrExtractor := false
+	//for _, sequence := range y.HTTPRequestSequences {
+	//	if sequence.Matcher != nil && len(sequence.Matcher.SubMatchers) != 0 {
+	//		hasMatcherOrExtractor = true
+	//		break
+	//	}
+	//	if sequence.Extractor != nil && len(sequence.Extractor) != 0 {
+	//		hasMatcherOrExtractor = true
+	//		break
+	//	}
+	//}
+	//if !hasMatcherOrExtractor {
+	//	//addErrorMsg("matcher and extractor are both empty, may be the script is invalid")
+	//	addErrorMsg("匹配器和数据提取器都未配置，当前可能脚本是无效的")
+	//}
 	if y.Sign != "" {
 		if y.Sign != y.SignMainParams() {
 			//addErrorMsg("signature error, may be the script is invalid")
