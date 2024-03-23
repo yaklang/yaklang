@@ -298,6 +298,7 @@ func CreateYakTemplateFromNucleiTemplateRaw(tplRaw string) (*YakTemplate, error)
 				}
 			}
 		}
+		yakTemp.Sign = yakTemp.SignMainParams()
 	}
 	return yakTemp, nil
 }

@@ -3,7 +3,6 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/yak/httptpl"
 	"net/url"
 	"os"
 	"strings"
@@ -287,12 +286,6 @@ func (s *Server) execScriptEx(
 	case "yak", "codec":
 		return s.execScriptWithExecParam(script, input, stream, execParams)
 	case "mitm", "nuclei", "port-scan":
-		if scriptType == "nuclei" {
-			_, err := httptpl.CreateYakTemplateFromNucleiTemplateRaw(script.Content)
-			if err != nil {
-				return utils.Errorf("parse yak template failed: %s", err)
-			}
-		}
 		return s.execScriptWithRequest(script, input, stream, execParams, params...)
 	}
 	return utils.Error("unsupported plugin type: " + scriptType)
