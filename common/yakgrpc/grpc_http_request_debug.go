@@ -288,12 +288,9 @@ func (s *Server) execScriptEx(
 		return s.execScriptWithExecParam(script, input, stream, execParams)
 	case "mitm", "nuclei", "port-scan":
 		if scriptType == "nuclei" {
-			temp, err := httptpl.CreateYakTemplateFromNucleiTemplateRaw(script.Content)
+			_, err := httptpl.CreateYakTemplateFromNucleiTemplateRaw(script.Content)
 			if err != nil {
 				return utils.Errorf("parse yak template failed: %s", err)
-			}
-			if temp.NoMatcherAndExtractor() {
-				return utils.Errorf("the template: %s has no matcher and extractor", script.ScriptName)
 			}
 		}
 		return s.execScriptWithRequest(script, input, stream, execParams, params...)
