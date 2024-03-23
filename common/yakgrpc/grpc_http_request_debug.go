@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/yak/httptpl"
 	"net/url"
 	"os"
 	"strings"
@@ -286,6 +287,15 @@ func (s *Server) execScriptEx(
 	case "yak", "codec":
 		return s.execScriptWithExecParam(script, input, stream, execParams)
 	case "mitm", "nuclei", "port-scan":
+		if scriptType == "nuclei" {
+			temp, err := httptpl.CreateYakTemplateFromNucleiTemplateRaw(script.Content)
+			if err != nil {
+				return utils.Errorf("parse yak template failed: %s", err)
+			}
+			if temp.NoMatcherAndExtractor() {
+				return utils.Errorf("the template: %s has no matcher and extractor", script.ScriptName)
+			}
+		}
 		return s.execScriptWithRequest(script, input, stream, execParams, params...)
 	}
 	return utils.Error("unsupported plugin type: " + scriptType)

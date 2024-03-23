@@ -69,6 +69,32 @@ type YakTemplate struct {
 	Variables      *YakVariables
 }
 
+func (y *YakTemplate) NoMatcherAndExtractor() bool {
+	if y == nil {
+		return true
+	}
+
+	for _, seq := range y.HTTPRequestSequences {
+		if seq.Matcher != nil && len(seq.Matcher.SubMatchers) > 0 {
+			return false
+		}
+		if len(seq.Extractor) > 0 {
+			return false
+		}
+	}
+
+	for _, seq := range y.TCPRequestSequences {
+		if len(seq.Extractor) > 0 {
+			return false
+		}
+		if seq.Matcher != nil && len(seq.Matcher.SubMatchers) > 0 {
+			return false
+		}
+	}
+
+	return true
+}
+
 // SignMainParams 对 method, paths, headers, body、raw、matcher、extractor、payloads 签名
 func (y *YakTemplate) SignMainParams() string {
 	signData := []any{}
