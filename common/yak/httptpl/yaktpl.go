@@ -75,7 +75,7 @@ func (y *YakTemplate) NoMatcherAndExtractor() bool {
 	}
 
 	for _, seq := range y.HTTPRequestSequences {
-		if seq.Matcher != nil && len(seq.Matcher.SubMatchers) > 0 {
+		if seq.Matcher != nil {
 			return false
 		}
 		if len(seq.Extractor) > 0 {
@@ -87,7 +87,7 @@ func (y *YakTemplate) NoMatcherAndExtractor() bool {
 		if len(seq.Extractor) > 0 {
 			return false
 		}
-		if seq.Matcher != nil && len(seq.Matcher.SubMatchers) > 0 {
+		if seq.Matcher != nil {
 			return false
 		}
 	}
