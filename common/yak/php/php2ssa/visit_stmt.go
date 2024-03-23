@@ -257,6 +257,7 @@ func (y *builder) VisitTypeHint(raw phpparser.ITypeHintContext) ssa.Type {
 		return nil
 	}
 	if r := i.QualifiedStaticTypeRef(); r != nil {
+		//这里类型就行修复
 		_ = y.VisitQualifiedStaticTypeRef(r)
 	} else if i.Callable() != nil {
 		_ = i.Callable().GetText()

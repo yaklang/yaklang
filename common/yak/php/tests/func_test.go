@@ -13,6 +13,7 @@ func TestParseSSA_functionDecl(t *testing.T) {
 function A(int $a){
 	println($a);
 }
+A();
 `, []string{
 			"Parameter-$a",
 		}, t)
@@ -40,6 +41,15 @@ func TestParseSSA_FuncCall_DefaultParameter(t *testing.T) {
 	t.Run("no default", func(t *testing.T) {
 		test.MockSSA(t, `<?php
 function a1($a, $b) {return "2";}
+`)
+	})
+	t.Run("variable in outside", func(t *testing.T) {
+		test.MockSSA(t, `<?php
+$a = 1;
+function Test(){
+$a=3;
+println($a);
+}
 `)
 	})
 
@@ -88,4 +98,40 @@ $a[1]=1;
 println($a[1]);
 `
 	test.CheckPrintlnValue(code, []string{"1"}, t)
+}
+
+func TestParseSSA_Closure(t *testing.T) {
+	t.Run("syntax_Closure", func(t *testing.T) {
+		code := `<?php
+$a = function(){return 1;};`
+		test.MockSSA(t, code)
+	})
+	t.Run("variable is inner for Closure", func(t *testing.T) {
+		code := `<?php
+$a = function(){
+   $d = 1;
+   println($d);
+};
+$a();`
+		test.CheckPrintlnValue(code, []string{"1"}, t)
+	})
+	t.Run("variable is outside for Closure", func(t *testing.T) {
+		code := `<?php
+$d = 1;
+$a = function()use($d){
+    println($d);
+};
+`
+		test.CheckPrintlnValue(code, []string{"Undefined-$d"}, t)
+	})
+	t.Run("use Closure", func(t *testing.T) {
+		code := `<?php
+$a = function()use($d){
+    return "1";
+};
+$d = $a();
+println($d);
+`
+		test.CheckPrintlnValue(code, []string{"Function-$a()"}, t)
+	})
 }
