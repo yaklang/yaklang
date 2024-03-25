@@ -74,17 +74,21 @@ pluginProgress = {
 }
 
 
-updateProgress = func(progressIns,lock,delta){
-    if hostTotal*portTotal <= 0 {
+updateProgress = func(progressIns,lock,delta,total...){
+    allTasks = hostTotal*portTotal
+    if len(total) > 0 {
+        allTasks = total[0]
+    }
+    if allTasks <= 0 {
         yakit.SetProgressEx(progressIns.title,1)
     }
     lock.Lock()
     defer lock.Unlock()
     progressIns.doneTasks += delta
-    if hostTotal*portTotal < progressIns.doneTasks {
-        progressIns.doneTasks = hostTotal*portTotal
+    if allTasks < progressIns.doneTasks {
+        progressIns.doneTasks = allTasks
     }
-    yakit.SetProgressEx(progressIns.title,(float(progressIns.doneTasks) / float(hostTotal*portTotal) ))
+    yakit.SetProgressEx(progressIns.title,(float(progressIns.doneTasks) / float(allTasks) ))
 }
 
 if !skippedHostAliveScan{
@@ -310,8 +314,6 @@ getPingScan = func() {
         ping.timeout(hostAliveTimeout), ping.concurrent(hostAliveConcurrent), ping.onResult(func(i){
             if !(i.Ok) {
                 hostTotal--
-                updateProgress(pingProgress,pingProgressLock, 0)
-                return
             }
             if i.Reason == "skipped"{
                 return
