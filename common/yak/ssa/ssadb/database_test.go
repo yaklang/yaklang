@@ -15,10 +15,8 @@ import (
 
 func TestSqliteID(t *testing.T) {
 	db := consts.GetGormProjectDatabase().Debug()
-	projectName := uuid.NewString()
-	id, _ := ssadb.RequireIrCode(db, projectName)
-	id2, _ := ssadb.RequireIrCode(db, projectName)
-	defer ssadb.DeleteProgram(db, projectName)
+	id, _ := ssadb.RequireIrCode(db)
+	id2, _ := ssadb.RequireIrCode(db)
 
 	require.Equal(t, id+1, id2)
 }
@@ -48,6 +46,7 @@ func TestBuild(t *testing.T) {
 
 	spew.Dump(ircode)
 	require.Equal(t, ssa.SSAOpcode2Name[ssa.SSAOpcodeConstInst], ircode.OpcodeName)
+	require.Equal(t, "1", ircode.ConstantValue)
 
 	v := ircode.Variable
 	sort.Strings(v)
