@@ -55,7 +55,7 @@ func (v *Value) String() string      { return ssa.LineDisasm(v.node) }
 func (v *Value) ShortString() string { return ssa.LineShortDisasm(v.node) }
 func (i *Value) StringWithSource() string {
 	if i.disasmLine == "" {
-		i.disasmLine = fmt.Sprintf("[%-6s] %s\t%s", i.node.GetOpcode(), ssa.LineDisasm(i.node), i.node.GetRange())
+		i.disasmLine = fmt.Sprintf("[%-6s] %s\t%s", ssa.SSAOpcode2Name[i.node.GetOpcode()], ssa.LineDisasm(i.node), i.node.GetRange())
 	}
 	return i.disasmLine
 }
@@ -233,7 +233,7 @@ func (v *Value) GetSelf() *Value {
 // // Instruction Opcode
 func (v *Value) getOpcode() ssa.Opcode {
 	if v.node == nil {
-		return ssa.OpUnknown
+		return ssa.SSAOpcodeUnKnow
 	}
 	return v.node.GetOpcode()
 }
@@ -246,29 +246,29 @@ func (v *Value) getOpcode() ssa.Opcode {
 	fmt := prog.Ref("fmt") // extern-lib
 	fmt.GetOperands() // Values // [Function-Println]
 */
-func (v *Value) IsExternLib() bool    { return v.getOpcode() == ssa.OpExternLib }
-func (v *Value) IsFunction() bool     { return v.getOpcode() == ssa.OpFunction }
-func (v *Value) IsBasicBlock() bool   { return v.getOpcode() == ssa.OpBasicBlock }
-func (v *Value) IsParameter() bool    { return v.getOpcode() == ssa.OpParameter }
-func (v *Value) IsPhi() bool          { return v.getOpcode() == ssa.OpPhi }
-func (v *Value) IsConstInst() bool    { return v.getOpcode() == ssa.OpConstInst }
-func (v *Value) IsUndefined() bool    { return v.getOpcode() == ssa.OpUndefined }
-func (v *Value) IsBinOp() bool        { return v.getOpcode() == ssa.OpBinOp }
-func (v *Value) IsUnOp() bool         { return v.getOpcode() == ssa.OpUnOp }
-func (v *Value) IsCall() bool         { return v.getOpcode() == ssa.OpCall }
-func (v *Value) IsReturn() bool       { return v.getOpcode() == ssa.OpReturn }
-func (v *Value) IsMake() bool         { return v.getOpcode() == ssa.OpMake }
-func (v *Value) IsNext() bool         { return v.getOpcode() == ssa.OpNext }
-func (v *Value) IsAssert() bool       { return v.getOpcode() == ssa.OpAssert }
-func (v *Value) IsTypeCast() bool     { return v.getOpcode() == ssa.OpTypeCast }
-func (v *Value) IsTypeValue() bool    { return v.getOpcode() == ssa.OpTypeValue }
-func (v *Value) IsErrorHandler() bool { return v.getOpcode() == ssa.OpErrorHandler }
-func (v *Value) IsPanic() bool        { return v.getOpcode() == ssa.OpPanic }
-func (v *Value) IsRecover() bool      { return v.getOpcode() == ssa.OpRecover }
-func (v *Value) IsJump() bool         { return v.getOpcode() == ssa.OpJump }
-func (v *Value) IsIf() bool           { return v.getOpcode() == ssa.OpIf }
-func (v *Value) IsLoop() bool         { return v.getOpcode() == ssa.OpLoop }
-func (v *Value) IsSwitch() bool       { return v.getOpcode() == ssa.OpSwitch }
+func (v *Value) IsExternLib() bool    { return v.getOpcode() == ssa.SSAOpcodeExternLib }
+func (v *Value) IsFunction() bool     { return v.getOpcode() == ssa.SSAOpcodeFunction }
+func (v *Value) IsBasicBlock() bool   { return v.getOpcode() == ssa.SSAOpcodeBasicBlock }
+func (v *Value) IsParameter() bool    { return v.getOpcode() == ssa.SSAOpcodeParameter }
+func (v *Value) IsPhi() bool          { return v.getOpcode() == ssa.SSAOpcodePhi }
+func (v *Value) IsConstInst() bool    { return v.getOpcode() == ssa.SSAOpcodeConstInst }
+func (v *Value) IsUndefined() bool    { return v.getOpcode() == ssa.SSAOpcodeUndefined }
+func (v *Value) IsBinOp() bool        { return v.getOpcode() == ssa.SSAOpcodeBinOp }
+func (v *Value) IsUnOp() bool         { return v.getOpcode() == ssa.SSAOpcodeUnOp }
+func (v *Value) IsCall() bool         { return v.getOpcode() == ssa.SSAOpcodeCall }
+func (v *Value) IsReturn() bool       { return v.getOpcode() == ssa.SSAOpcodeReturn }
+func (v *Value) IsMake() bool         { return v.getOpcode() == ssa.SSAOpcodeMake }
+func (v *Value) IsNext() bool         { return v.getOpcode() == ssa.SSAOpcodeNext }
+func (v *Value) IsAssert() bool       { return v.getOpcode() == ssa.SSAOpcodeAssert }
+func (v *Value) IsTypeCast() bool     { return v.getOpcode() == ssa.SSAOpcodeTypeCast }
+func (v *Value) IsTypeValue() bool    { return v.getOpcode() == ssa.SSAOpcodeTypeValue }
+func (v *Value) IsErrorHandler() bool { return v.getOpcode() == ssa.SSAOpcodeErrorHandler }
+func (v *Value) IsPanic() bool        { return v.getOpcode() == ssa.SSAOpcodePanic }
+func (v *Value) IsRecover() bool      { return v.getOpcode() == ssa.SSAOpcodeRecover }
+func (v *Value) IsJump() bool         { return v.getOpcode() == ssa.SSAOpcodeJump }
+func (v *Value) IsIf() bool           { return v.getOpcode() == ssa.SSAOpcodeIf }
+func (v *Value) IsLoop() bool         { return v.getOpcode() == ssa.SSAOpcodeLoop }
+func (v *Value) IsSwitch() bool       { return v.getOpcode() == ssa.SSAOpcodeSwitch }
 
 // // MemberCall : Object
 
@@ -356,7 +356,7 @@ func (v Values) StringEx(flag int) string {
 	for i, v := range v {
 		switch flag {
 		case 0:
-			ret += fmt.Sprintf("\t%d: %5s: %s\n", i, v.node.GetOpcode(), v)
+			ret += fmt.Sprintf("\t%d: %5s: %s\n", i, ssa.SSAOpcode2Name[v.node.GetOpcode()], v)
 		case 1:
 			ret += fmt.Sprintf("\t%d: %s\n", i, v.StringWithSource())
 		}

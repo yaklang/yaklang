@@ -2,67 +2,95 @@ package ssa
 
 import "golang.org/x/exp/slices"
 
-type Opcode string
+type Opcode int
 
 const (
-	OpUnknown      Opcode = "unknown"
-	OpFunction     Opcode = "Function"
-	OpBasicBlock   Opcode = "BasicBlock"
-	OpParameter    Opcode = "Parameter"
-	OpFreeValue    Opcode = "FreeValue"
-	OpExternLib    Opcode = "ExternLib"
-	OpPhi          Opcode = "Phi"
-	OpConstInst    Opcode = "ConstInst"
-	OpUndefined    Opcode = "Undefined"
-	OpBinOp        Opcode = "BinOp"
-	OpUnOp         Opcode = "UnOp"
-	OpCall         Opcode = "Call"
-	OpSideEffect   Opcode = "SideEffect"
-	OpReturn       Opcode = "Return"
-	OpMake         Opcode = "Make"
-	OpNext         Opcode = "Next"
-	OpAssert       Opcode = "Assert"
-	OpTypeCast     Opcode = "TypeCast"
-	OpTypeValue    Opcode = "TypeValue"
-	OpErrorHandler Opcode = "ErrorHandler"
-	OpPanic        Opcode = "Panic"
-	OpRecover      Opcode = "Recover"
-	OpJump         Opcode = "Jump"
-	OpIf           Opcode = "If"
-	OpLoop         Opcode = "Loop"
-	OpSwitch       Opcode = "Switch"
+	SSAOpcodeUnKnow Opcode = iota
+	SSAOpcodeAssert
+	SSAOpcodeBasicBlock
+	SSAOpcodeBinOp
+	SSAOpcodeCall
+	SSAOpcodeConstInst
+	SSAOpcodeErrorHandler
+	SSAOpcodeExternLib
+	SSAOpcodeIf
+	SSAOpcodeJump
+	SSAOpcodeLoop
+	SSAOpcodeMake
+	SSAOpcodeNext
+	SSAOpcodePanic
+	SSAOpcodeParameter
+	SSAOpcodeFreeValue
+	SSAOpcodePhi
+	SSAOpcodeRecover
+	SSAOpcodeReturn
+	SSAOpcodeSideEffect
+	SSAOpcodeSwitch
+	SSAOpcodeTypeCast
+	SSAOpcodeTypeValue
+	SSAOpcodeUnOp
+	SSAOpcodeUndefined
+	SSAOpcodeFunction
 )
 
-func (i *Function) GetOpcode() Opcode   { return OpFunction }
-func (i *BasicBlock) GetOpcode() Opcode { return OpBasicBlock }
+var SSAOpcode2Name = map[Opcode]string{
+	SSAOpcodeAssert:       "Assert",
+	SSAOpcodeBasicBlock:   "BasicBlock",
+	SSAOpcodeBinOp:        "BinOp",
+	SSAOpcodeCall:         "Call",
+	SSAOpcodeConstInst:    "ConstInst",
+	SSAOpcodeErrorHandler: "ErrorHandler",
+	SSAOpcodeExternLib:    "ExternLib",
+	SSAOpcodeIf:           "If",
+	SSAOpcodeJump:         "Jump",
+	SSAOpcodeLoop:         "Loop",
+	SSAOpcodeMake:         "Make",
+	SSAOpcodeNext:         "Next",
+	SSAOpcodePanic:        "Panic",
+	SSAOpcodeParameter:    "Parameter",
+	SSAOpcodeFreeValue:    "FreeValue",
+	SSAOpcodePhi:          "Phi",
+	SSAOpcodeRecover:      "Recover",
+	SSAOpcodeReturn:       "Return",
+	SSAOpcodeSideEffect:   "SideEffect",
+	SSAOpcodeSwitch:       "Switch",
+	SSAOpcodeTypeCast:     "TypeCast",
+	SSAOpcodeTypeValue:    "TypeValue",
+	SSAOpcodeUnOp:         "UnOp",
+	SSAOpcodeUndefined:    "Undefined",
+	SSAOpcodeFunction:     "Function",
+}
+
+func (i *Function) GetOpcode() Opcode   { return SSAOpcodeFunction }
+func (i *BasicBlock) GetOpcode() Opcode { return SSAOpcodeBasicBlock }
 func (i *Parameter) GetOpcode() Opcode {
 	if i.IsFreeValue {
-		return OpFreeValue
+		return SSAOpcodeFreeValue
 	}
-	return OpParameter
+	return SSAOpcodeParameter
 }
-func (i *ExternLib) GetOpcode() Opcode    { return OpExternLib }
-func (i *Phi) GetOpcode() Opcode          { return OpPhi }
-func (i *ConstInst) GetOpcode() Opcode    { return OpConstInst }
-func (i *Undefined) GetOpcode() Opcode    { return OpUndefined }
-func (i *BinOp) GetOpcode() Opcode        { return OpBinOp }
-func (i *UnOp) GetOpcode() Opcode         { return OpUnOp }
-func (i *Call) GetOpcode() Opcode         { return OpCall }
-func (i *SideEffect) GetOpcode() Opcode   { return OpSideEffect }
-func (i *Return) GetOpcode() Opcode       { return OpReturn }
-func (i *Make) GetOpcode() Opcode         { return OpMake }
-func (i *Next) GetOpcode() Opcode         { return OpNext }
-func (i *Assert) GetOpcode() Opcode       { return OpAssert }
-func (i *TypeCast) GetOpcode() Opcode     { return OpTypeCast }
-func (i *TypeValue) GetOpcode() Opcode    { return OpTypeValue }
-func (i *ErrorHandler) GetOpcode() Opcode { return OpErrorHandler }
-func (i *Panic) GetOpcode() Opcode        { return OpPanic }
-func (i *Recover) GetOpcode() Opcode      { return OpRecover }
-func (i *Jump) GetOpcode() Opcode         { return OpJump }
-func (i *If) GetOpcode() Opcode           { return OpIf }
-func (i *Loop) GetOpcode() Opcode         { return OpLoop }
-func (i *Switch) GetOpcode() Opcode       { return OpSwitch }
+func (i *ExternLib) GetOpcode() Opcode    { return SSAOpcodeExternLib }
+func (i *Phi) GetOpcode() Opcode          { return SSAOpcodePhi }
+func (i *ConstInst) GetOpcode() Opcode    { return SSAOpcodeConstInst }
+func (i *Undefined) GetOpcode() Opcode    { return SSAOpcodeUndefined }
+func (i *BinOp) GetOpcode() Opcode        { return SSAOpcodeBinOp }
+func (i *UnOp) GetOpcode() Opcode         { return SSAOpcodeUnOp }
+func (i *Call) GetOpcode() Opcode         { return SSAOpcodeCall }
+func (i *SideEffect) GetOpcode() Opcode   { return SSAOpcodeSideEffect }
+func (i *Return) GetOpcode() Opcode       { return SSAOpcodeReturn }
+func (i *Make) GetOpcode() Opcode         { return SSAOpcodeMake }
+func (i *Next) GetOpcode() Opcode         { return SSAOpcodeNext }
+func (i *Assert) GetOpcode() Opcode       { return SSAOpcodeAssert }
+func (i *TypeCast) GetOpcode() Opcode     { return SSAOpcodeTypeCast }
+func (i *TypeValue) GetOpcode() Opcode    { return SSAOpcodeTypeValue }
+func (i *ErrorHandler) GetOpcode() Opcode { return SSAOpcodeErrorHandler }
+func (i *Panic) GetOpcode() Opcode        { return SSAOpcodePanic }
+func (i *Recover) GetOpcode() Opcode      { return SSAOpcodeRecover }
+func (i *Jump) GetOpcode() Opcode         { return SSAOpcodeJump }
+func (i *If) GetOpcode() Opcode           { return SSAOpcodeIf }
+func (i *Loop) GetOpcode() Opcode         { return SSAOpcodeLoop }
+func (i *Switch) GetOpcode() Opcode       { return SSAOpcodeSwitch }
 
 func IsControlInstruction(i Instruction) bool {
-	return slices.Index([]Opcode{OpErrorHandler, OpJump, OpIf, OpLoop, OpSwitch}, i.GetOpcode()) != -1
+	return slices.Index([]Opcode{SSAOpcodeErrorHandler, SSAOpcodeJump, SSAOpcodeIf, SSAOpcodeLoop, SSAOpcodeSwitch}, i.GetOpcode()) != -1
 }

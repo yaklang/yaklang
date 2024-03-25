@@ -19,6 +19,7 @@ type IrCode struct {
 	SourceCodeEndCol    int    `json:"source_code_end_col"`
 	SourceCodeHash      string `json:"source_code_hash"`
 
+	// opcode
 	Opcode         int64  `json:"opcode"`
 	OpcodeName     string `json:"opcode_name"`
 	OpcodeOperator string `json:"opcode_operator"`

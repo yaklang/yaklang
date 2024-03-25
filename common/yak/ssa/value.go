@@ -119,7 +119,7 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 	scope.AssignVariable(variable, value)
 	checkAssign := func() {
 		if value.GetName() == variable.GetName() {
-			if value.GetOpcode() == OpFreeValue || value.GetOpcode() == OpParameter {
+			if value.GetOpcode() == SSAOpcodeFreeValue || value.GetOpcode() == SSAOpcodeParameter {
 				return
 			}
 		}

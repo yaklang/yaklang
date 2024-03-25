@@ -4,33 +4,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
-	"reflect"
-)
-
-const (
-	SSAOpcodeAssert       = 1
-	SSAOpcodeBasicBlock   = 2
-	SSAOpcodeBinOp        = 3
-	SSAOpcodeCall         = 4
-	SSAOpcodeConstInst    = 5
-	SSAOpcodeErrorHandler = 6
-	SSAOpcodeExternLib    = 7
-	SSAOpcodeIf           = 8
-	SSAOpcodeJump         = 9
-	SSAOpcodeLoop         = 10
-	SSAOpcodeMake         = 11
-	SSAOpcodeNext         = 12
-	SSAOpcodePanic        = 13
-	SSAOpcodeParameter    = 14
-	SSAOpcodePhi          = 15
-	SSAOpcodeRecover      = 16
-	SSAOpcodeReturn       = 17
-	SSAOpcodeSideEffect   = 18
-	SSAOpcodeSwitch       = 19
-	SSAOpcodeTypeCast     = 20
-	SSAOpcodeTypeValue    = 21
-	SSAOpcodeUnOp         = 22
-	SSAOpcodeUndefined    = 23
 )
 
 func FitIRCode(c *ssadb.IrCode, r Instruction) error {
@@ -129,13 +102,17 @@ func FitIRCode(c *ssadb.IrCode, r Instruction) error {
 		c.IsMasked = v.Masked()
 	}
 
+	c.Opcode = int64(r.GetOpcode())
+	c.OpcodeName = SSAOpcode2Name[r.GetOpcode()]
+
 	switch i := r.(type) {
-	case *Assert:
-		c.OpcodeName = "assert"
-		c.Opcode = SSAOpcodeAssert
+	case *ConstInst:
+		if bin, ok := i.Origin.(*BinOp); ok {
+			c.OpcodeOperator = BinaryOpcodeName[(*bin).Op]
+		} else if un, ok := i.Origin.(*UnOp); ok {
+			c.OpcodeOperator = UnaryOpcodeName[(*un).Op]
+		}
 	case *BasicBlock:
-		c.OpcodeName = "block"
-		c.Opcode = SSAOpcodeBasicBlock
 		c.IsBlock = true
 		for _, pred := range i.Preds {
 			c.PredBlock = append(c.PredBlock, int64(pred.GetId()))
@@ -147,74 +124,15 @@ func FitIRCode(c *ssadb.IrCode, r Instruction) error {
 			c.Phis = append(c.Phis, int64(p.GetId()))
 		}
 	case *BinOp:
-		c.OpcodeName = "binop"
-		c.Opcode = SSAOpcodeBinOp
-		c.OpcodeOperator = string(i.GetOpcode())
+		c.OpcodeOperator = BinaryOpcodeName[i.Op]
+	case *UnOp:
+		c.OpcodeOperator = UnaryOpcodeName[i.Op]
 	case *Call:
-		c.OpcodeName = "call"
-		c.Opcode = SSAOpcodeCall
 		for _, arg := range i.Args {
 			c.ActualArgs = append(c.ActualArgs, int64(arg.GetId()))
 		}
-	case *ConstInst:
-		c.OpcodeName = "const"
-		c.Opcode = SSAOpcodeConstInst
-	case *ErrorHandler:
-		c.OpcodeName = "error"
-		c.Opcode = SSAOpcodeErrorHandler
-	case *ExternLib:
-		c.OpcodeName = "extern"
-		c.Opcode = SSAOpcodeExternLib
-	case *If:
-		c.OpcodeName = "if"
-		c.Opcode = SSAOpcodeIf
-	case *Jump:
-		c.OpcodeName = "jump"
-		c.Opcode = SSAOpcodeJump
-	case *Loop:
-		c.OpcodeName = "loop"
-		c.Opcode = SSAOpcodeLoop
-	case *Make:
-		c.OpcodeName = "make"
-		c.Opcode = SSAOpcodeMake
-	case *Next:
-		c.OpcodeName = "next"
-		c.Opcode = SSAOpcodeNext
-	case *Panic:
-		c.OpcodeName = "panic"
-		c.Opcode = SSAOpcodePanic
-	case *Parameter:
-		c.OpcodeName = "param"
-		c.Opcode = SSAOpcodeParameter
-	case *Phi:
-		c.OpcodeName = "phi"
-		c.Opcode = SSAOpcodePhi
-	case *Recover:
-		c.OpcodeName = "recover"
-		c.Opcode = SSAOpcodeRecover
-	case *Return:
-		c.OpcodeName = "return"
-		c.Opcode = SSAOpcodeReturn
-	case *SideEffect:
-		c.OpcodeName = "sideeffect"
-		c.Opcode = SSAOpcodeSideEffect
-	case *Switch:
-		c.OpcodeName = "switch"
-		c.Opcode = SSAOpcodeSwitch
-	case *TypeCast:
-		c.OpcodeName = "typecast"
-		c.Opcode = SSAOpcodeTypeCast
-	case *TypeValue:
-		c.OpcodeName = "typevalue"
-		c.Opcode = SSAOpcodeTypeValue
-	case *UnOp:
-		c.OpcodeName = "unop"
-		c.Opcode = SSAOpcodeUnOp
-	case *Undefined:
-		c.OpcodeName = "undefined"
-		c.Opcode = SSAOpcodeUndefined
-	default:
-		return utils.Errorf("BUG: UNRECOGNIZED INSTRUCTION TYPE: %v", reflect.TypeOf(i).String())
+		// default:
+		// 	return utils.Errorf("BUG: UNRECOGNIZED INSTRUCTION TYPE: %v", reflect.TypeOf(i).String())
 	}
 	afterId := c.ID
 	if originId != afterId {
