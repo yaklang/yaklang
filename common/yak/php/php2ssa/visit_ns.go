@@ -31,7 +31,6 @@ func (y *builder) VisitQualifiedNamespaceName(raw phpparser.IQualifiedNamespaceN
 	if i == nil {
 		return nil
 	}
-
 	if i.Namespace() != nil {
 		// declare namespace mode
 		list := i.NamespaceNameList().(*phpparser.NamespaceNameListContext)

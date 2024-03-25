@@ -2,6 +2,7 @@ package php2ssa
 
 import (
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 func (y *builder) VisitHtmlDocument(raw phpparser.IHtmlDocumentContext) interface{} {
@@ -39,7 +40,6 @@ func (y *builder) VisitHtmlDocumentElement(raw phpparser.IHtmlDocumentElementCon
 	if i == nil {
 		return nil
 	}
-
 	if ret := i.InlineHtml(); ret != nil {
 		y.VisitInlineHtml(ret)
 	} else if ret := i.PhpBlock(); ret != nil {
@@ -60,7 +60,10 @@ func (y *builder) VisitInlineHtml(raw phpparser.IInlineHtmlContext) interface{} 
 	if i == nil {
 		return nil
 	}
-
+	for _, elementContext := range i.AllHtmlElement() {
+		y.VisitHtmlElement(elementContext)
+	}
+	y.VisitScriptText(i.ScriptText())
 	return nil
 }
 
@@ -75,6 +78,33 @@ func (y *builder) VisitInlineHtmlStatement(raw phpparser.IInlineHtmlStatementCon
 	if i == nil {
 		return nil
 	}
+	echoFunc := y.ir.ReadOrCreateVariable("echo")
+	call := y.ir.NewCall(echoFunc, []ssa.Value{y.ir.EmitConstInst(raw.GetText())})
+	y.ir.EmitCall(call)
+	return nil
+}
+func (y *builder) VisitHtmlElement(raw phpparser.IHtmlElementContext) interface{} {
+	if y == nil || raw == nil {
+		return nil
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+	i, _ := raw.(*phpparser.HtmlElementContext)
+	if i == nil {
+		return nil
+	}
 
+	return nil
+}
+func (y *builder) VisitScriptText(raw phpparser.IScriptTextContext) interface{} {
+	if y == nil || raw == nil {
+		return nil
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+	i, _ := raw.(*phpparser.ScriptTextContext)
+	if i == nil {
+		return nil
+	}
 	return nil
 }
