@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -122,8 +123,8 @@ func (a *anInstruction) GetId() int {
 func (a *anInstruction) LineDisasm() string { return "" }
 
 // opcode
-func (a *anInstruction) GetOpcode() Opcode      { return OpUnknown } // cover by instruction
-func (a *anInstruction) GetOperands() Values    { return nil }       // cover by instruction
+func (a *anInstruction) GetOpcode() Opcode      { return SSAOpcodeUnKnow } // cover by instruction
+func (a *anInstruction) GetOperands() Values    { return nil }             // cover by instruction
 func (a *anInstruction) GetOperand(i int) Value { return a.GetOperands()[i] }
 func (a *anInstruction) GetOperandNum() int     { return len(a.GetOperands()) }
 

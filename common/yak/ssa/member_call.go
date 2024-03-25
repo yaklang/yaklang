@@ -42,7 +42,7 @@ func ReplaceMemberCall(v, to Value) map[string]Value {
 			toMember := builder.ReadMemberCallVariable(to, key)
 
 			// then, we will replace value, `member` to `toMember`
-			if member.GetOpcode() != OpUndefined {
+			if member.GetOpcode() != SSAOpcodeUndefined {
 				member.SetName(name)
 				member.SetType(typ)
 				SetMemberCall(to, key, member)
