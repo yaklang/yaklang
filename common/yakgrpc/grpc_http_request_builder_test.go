@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"net/http"
 	"strings"
@@ -615,5 +616,45 @@ cli.check()
 
 	if !checkedFilter {
 		t.Fatal("load plugin by filter failed")
+	}
+}
+
+func TestBuild_Http_Request_Packet(t *testing.T) {
+	targetInput := "baidu.com"
+	p := &ypb.HTTPRequestBuilderParams{
+		IsHttps:          false,
+		IsRawHTTPRequest: false,
+		Method:           "GET",
+	}
+	packets, err := BuildHttpRequestPacket(consts.GetGormProjectDatabase(), p, targetInput)
+	if err != nil {
+		t.Fatal(err)
+	}
+	count := 0
+	for packet := range packets {
+		spew.Dump(packet)
+		count++
+	}
+	if count != 1 {
+		t.Fatal("build packet error")
+	}
+
+	p = &ypb.HTTPRequestBuilderParams{
+		IsHttps:          false,
+		IsRawHTTPRequest: false,
+		Method:           "GET",
+		Path:             []string{"/xyz", "/abc"},
+	}
+	packets, err = BuildHttpRequestPacket(consts.GetGormProjectDatabase(), p, targetInput)
+	if err != nil {
+		t.Fatal(err)
+	}
+	count = 0
+	for packet := range packets {
+		spew.Dump(packet)
+		count++
+	}
+	if count != 3 {
+		t.Fatal("build packet error")
 	}
 }
