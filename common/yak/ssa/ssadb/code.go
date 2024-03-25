@@ -75,6 +75,9 @@ type IrCode struct {
 
 	// Variable
 	Variable StringSlice `json:"variable" gorm:"type:text"`
+
+	// Constant
+	ConstantValue string `json:"constant_value" gorm:"type:text"`
 }
 
 func emptyIrCode() *IrCode {
