@@ -3,10 +3,11 @@ package ssadb
 import (
 	"database/sql/driver"
 	"errors"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 type Int64Map map[int64]int64
@@ -62,6 +63,10 @@ func (us *Int64Slice) Scan(value interface{}) error {
 		strValue = v
 	default:
 		return errors.New("unsupported type: " + reflect.TypeOf(value).String() + " for Int64Slice.Scan")
+	}
+	if strValue == "" {
+		*us = nil
+		return nil
 	}
 
 	// 分割字符串并转换为 int64

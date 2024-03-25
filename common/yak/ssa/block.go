@@ -61,6 +61,7 @@ func addToBlocks(block *BasicBlock) {
 
 	block.Index = index
 	f.Blocks = append(f.Blocks, block)
+	block.GetProgram().SetVirtualRegister(block)
 }
 
 /*
