@@ -44,7 +44,7 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 
 	handleIfEdge := func(i *ssa.If) {
 		from := i.GetBlock()
-		if cond := i.Cond; cond.GetOpcode() == ssa.OpConstInst {
+		if cond := i.Cond; cond.GetOpcode() == ssa.SSAOpcodeConstInst {
 			cond.NewError(ssa.Warn, BCTag, ConditionIsConst("if"))
 		}
 		newEdge(i.True, from, i.Cond)
@@ -87,7 +87,7 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 
 	handleSwitchEdge := func(sw *ssa.Switch) {
 		from := sw.GetBlock()
-		if cond := sw.Cond; cond.GetOpcode() == ssa.OpConstInst {
+		if cond := sw.Cond; cond.GetOpcode() == ssa.SSAOpcodeConstInst {
 			cond.NewError(ssa.Warn, BCTag, ConditionIsConst("switch"))
 		}
 		var defaultCond ssa.Value

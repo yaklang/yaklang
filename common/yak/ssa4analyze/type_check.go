@@ -44,7 +44,7 @@ func (t *TypeCheck) CheckOnInstruction(inst ssa.Instruction) {
 		case ssa.ErrorTypeKind:
 			if len(v.GetUsers()) == 0 {
 				vs := v.GetAllVariables()
-				if len(vs) == 0 && v.GetOpcode() != ssa.OpCall {
+				if len(vs) == 0 && v.GetOpcode() != ssa.SSAOpcodeCall {
 					// if `a()//return err` just ignore,
 					// but `a()[1] //return int,err` add handler
 					if *v.GetRange().SourceCode != "_" {
