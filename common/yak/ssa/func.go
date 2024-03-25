@@ -48,6 +48,7 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 	} else {
 		p.Funcs[name] = f
 	}
+	p.Prog.SetVirtualRegister(f)
 	f.EnterBlock = f.NewBasicBlock("entry")
 	return f
 }
