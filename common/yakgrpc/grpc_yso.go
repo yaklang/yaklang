@@ -2,8 +2,10 @@ package yakgrpc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -392,16 +394,36 @@ func (s *Server) GenerateYsoCode(ctx context.Context, req *ypb.YsoOptionsRequers
 }
 func (s *Server) GenerateYsoBytes(ctx context.Context, req *ypb.YsoOptionsRequerstWithVerbose) (*ypb.YsoBytesResponse, error) {
 	var fileName string
+	var opts []yso.GenClassOptionFun
+	opts = append(opts, yso.SetClassType(yso.ClassType(req.Class)))
+	for _, option := range req.Options {
+		if option.Key == string(JavaClassGeneraterOption_ClassName) {
+			fileName = fmt.Sprintf("%s.class", option.Value)
+			opts = append(opts, yso.SetClassName(option.Value))
+			continue
+		}
+		if option.Key == string(JavaClassGeneraterOption_IsObfuscation) && option.Value == "true" {
+			opts = append(opts, yso.SetObfuscation())
+			continue
+		}
+		if option.Key == string(JavaClassGeneraterOption_Version) {
+			n, err := strconv.Atoi(option.Value)
+			if err != nil {
+				return nil, err
+			}
+			opts = append(opts, yso.SetMajorVersion(uint16(n)))
+			continue
+		}
+		opts = append(opts, yso.SetClassParam(option.Key, option.Value))
+	}
+
+	if fileName == "" {
+		return nil, errors.New("not set className")
+	}
 	if req.Gadget == "None" {
-		fileName = fmt.Sprintf("%s.class", req.Class)
 		_, ok := yso.YsoConfigInstance.Classes[yso.ClassType(req.Class)]
 		if !ok {
 			return nil, utils.Errorf("not support class: %s", req.Class)
-		}
-		var opts []yso.GenClassOptionFun
-		opts = append(opts, yso.SetClassType(yso.ClassType(req.Class)))
-		for _, option := range req.Options {
-			opts = append(opts, yso.SetClassParam(option.Key, option.Value))
 		}
 		classIns, err := yso.GenerateClass(opts...)
 		if err != nil {
@@ -413,24 +435,20 @@ func (s *Server) GenerateYsoBytes(ctx context.Context, req *ypb.YsoOptionsRequer
 		}
 		return &ypb.YsoBytesResponse{Bytes: byts, FileName: fileName}, nil
 	} else {
-		fileName = fmt.Sprintf("%s_%s.ser", req.Gadget, req.Class)
 		cfg, ok := yso.YsoConfigInstance.Gadgets[yso.GadgetType(req.Gadget)]
 		if !ok {
 			return nil, utils.Errorf("not support gadget: %s", req.Gadget)
 		}
-		var opts []any
 		var gadgetIns *yso.JavaObject
 		if cfg.IsTemplateImpl {
 			opts = append(opts, yso.SetClassType(yso.ClassType(req.Class)))
-			for _, option := range req.Options {
-				opts = append(opts, yso.SetClassParam(option.Key, option.Value))
-			}
-			o, err := yso.GenerateGadget(req.Gadget, opts...)
+			o, err := yso.GenerateGadget(req.Gadget, utils.InterfaceToSliceInterface(opts)...)
 			if err != nil {
 				return nil, err
 			}
 			gadgetIns = o
 		} else {
+			opts := []any{}
 			opts = append(opts, req.Class)
 			params := map[string]string{}
 			opts = append(opts, params)
