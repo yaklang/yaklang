@@ -296,6 +296,7 @@ func BuildHttpRequestPacket(db *gorm.DB, baseBuilderParams *ypb.HTTPRequestBuild
 			}
 			if utils.IsValidHost(target) { // 处理没有单独一个host情况 不含port
 				targets <- &url.URL{Host: target, Path: "/"}
+				continue
 			}
 			urlIns := utils.ParseStringToUrl(target)
 			if urlIns.Host == "" {
@@ -340,7 +341,11 @@ func BuildHttpRequestPacket(db *gorm.DB, baseBuilderParams *ypb.HTTPRequestBuild
 			} else {
 				for _, result := range results {
 					packet := bytes.ReplaceAll(result.HTTPRequest, []byte(`{{Hostname}}`), []byte(target.Host))
-					builderRes <- &HTTPRequestBuilderRes{IsHttps: result.IsHttps, Request: packet, Url: target.String()}
+					tUrl, err := lowhttp.ExtractURLFromHTTPRequestRaw(packet, result.IsHttps)
+					if err != nil {
+						log.Error("build request make url error:", err)
+					}
+					builderRes <- &HTTPRequestBuilderRes{IsHttps: result.IsHttps, Request: packet, Url: tUrl.String()}
 				}
 			}
 		}
