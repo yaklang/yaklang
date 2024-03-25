@@ -266,6 +266,7 @@ x.Foreach(
         err = manager.LoadPlugin(name)
         if err != nil {
             loadPluginFailed++
+            log.Error("Load Plugin [%s] Failed: %s",name,err)
             yakit.Error("Load Plugin Failed: %s", err)
             return
         }
