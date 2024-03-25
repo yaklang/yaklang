@@ -72,6 +72,9 @@ type IrCode struct {
 	// Called
 	IsCalled   bool       `json:"is_called"`
 	ActualArgs Int64Slice `json:"actual_args" gorm:"type:text"`
+
+	// Variable
+	Variable StringSlice `json:"variable" gorm:"type:text"`
 }
 
 func emptyIrCode() *IrCode {
