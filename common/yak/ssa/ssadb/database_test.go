@@ -15,8 +15,10 @@ import (
 
 func TestSqliteID(t *testing.T) {
 	db := consts.GetGormProjectDatabase().Debug()
-	id, _ := ssadb.RequireIrCode(db)
-	id2, _ := ssadb.RequireIrCode(db)
+	projectName := uuid.NewString()
+	id, _ := ssadb.RequireIrCode(db, projectName)
+	id2, _ := ssadb.RequireIrCode(db, projectName)
+	defer ssadb.DeleteProgram(db, projectName)
 
 	require.Equal(t, id+1, id2)
 }
@@ -34,6 +36,7 @@ func TestBuild(t *testing.T) {
 	prog, err := ssaapi.Parse(
 		code,
 		ssaapi.WithLanguage(ssaapi.Yak),
+		ssaapi.WithDataBase(programName),
 	)
 	defer ssadb.DeleteProgram(db, programName)
 
@@ -51,4 +54,33 @@ func TestBuild(t *testing.T) {
 	v := ircode.Variable
 	sort.Strings(v)
 	require.Equal(t, ssadb.StringSlice{"a", "b", "c"}, v)
+}
+
+func TestBuild_Multiple_Program(t *testing.T) {
+	db := consts.GetGormProjectDatabase().Debug()
+
+	check := func(code, want string) {
+		programName := uuid.NewString()
+
+		prog, err := ssaapi.Parse(
+			code,
+			ssaapi.WithLanguage(ssaapi.Yak),
+			ssaapi.WithDataBase(programName),
+		)
+		defer ssadb.DeleteProgram(db, programName)
+
+		require.NoError(t, err)
+		prog.Program.ShowWithSource()
+
+		ircode := ssadb.GetIrByVariable(db, programName, "a")
+
+		require.NotNil(t, ircode)
+
+		spew.Dump(ircode)
+		require.Equal(t, ssa.SSAOpcode2Name[ssa.SSAOpcodeConstInst], ircode.OpcodeName)
+		require.Equal(t, want, ircode.ConstantValue)
+	}
+
+	check(`a = 1`, "1")
+	check(`a = 2`, "2")
 }

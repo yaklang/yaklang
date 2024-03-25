@@ -18,6 +18,8 @@ type config struct {
 	externValue  map[string]any
 	defineFunc   map[string]any
 	externMethod ssa.MethodBuilder
+
+	DataBaseProgramName string
 	// for hash
 	externInfo string
 }
@@ -109,6 +111,13 @@ func WithFeedCode(b ...bool) Option {
 	}
 }
 
+// save to database, please set the program name
+func WithDataBase(name string) Option {
+	return func(c *config) {
+		c.DataBaseProgramName = name
+	}
+}
+
 var ttlSSAParseCache = utils.NewTTLCache[*Program](30 * time.Minute)
 
 func Parse(code string, opts ...Option) (*Program, error) {
@@ -153,6 +162,7 @@ var Exports = map[string]any{
 	"withLanguage":    WithLanguage,
 	"withExternLib":   WithExternLib,
 	"withExternValue": WithExternValue,
+	"withDataBase":    WithDataBase,
 	// language:
 	"Javascript": JS,
 	"Yak":        Yak,
