@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -15,14 +16,14 @@ func FitIRCode(c *ssadb.IrCode, r Instruction) error {
 	c.ShortVerboseName = r.GetShortVerboseName()
 
 	if ret := r.GetFunc(); ret != nil {
-		c.ParentFunction = int64(ret.GetId())
+		c.CurrentFunction = int64(ret.GetId())
 	}
 	if ret := r.GetBlock(); ret != nil {
 		c.CurrentBlock = int64(ret.GetId())
 	}
 
 	// handle func
-	if f := r.GetFunc(); f != nil {
+	if f, ok := r.(*Function); ok {
 		c.IsFunction = true
 		c.IsVariadic = f.hasEllipsis
 		for _, formArg := range f.Param {
@@ -102,6 +103,14 @@ func FitIRCode(c *ssadb.IrCode, r Instruction) error {
 		c.IsMasked = v.Masked()
 	}
 
+	// source code
+	if r := r.GetRange(); r != nil {
+		c.SourceCodeStartLine = r.Start.Line
+		c.SourceCodeStartCol = r.Start.Column
+		c.SourceCodeEndLine = r.End.Line
+		c.SourceCodeEndCol = r.End.Column
+	}
+
 	c.Opcode = int64(r.GetOpcode())
 	c.OpcodeName = SSAOpcode2Name[r.GetOpcode()]
 
@@ -138,5 +147,18 @@ func FitIRCode(c *ssadb.IrCode, r Instruction) error {
 	if originId != afterId {
 		return utils.Error("BUG: Fit IRCode failed, must not change code id")
 	}
+	return nil
+}
+
+func UpdateIRCode(r Instruction) error {
+	db := consts.GetGormProjectDatabase()
+	code := ssadb.GetIrCodeById(db, uint(r.GetId()))
+	if code == nil {
+		log.Warnf("IrCode not found: %d", r.GetId())
+		return nil
+	}
+
+	FitIRCode(code, r)
+	db.Save(code)
 	return nil
 }

@@ -50,6 +50,16 @@ func (b *FunctionBuilder) Finish() {
 
 		b.CurrentBlock = endBlock
 	}
+
+	if b.GetProgram().persistentBackend != nil {
+		for _, b := range b.Blocks {
+			// b.Finish()
+			for _, i := range b.Insts {
+				UpdateIRCode(i)
+			}
+		}
+	}
+
 	// function finish
 	b.Function.Finish()
 }
