@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -69,4 +70,59 @@ func TestServer_StartFacades(t *testing.T) {
 		return
 	}
 	stream.Recv()
+}
+func TestGenClass(t *testing.T) {
+	c, err := NewLocalClient()
+	if err != nil {
+		return
+	}
+	randClassName := utils.RandStringBytes(8)
+	port := utils.GetRandomAvailableTCPPort()
+	stream, err := c.StartFacadesWithYsoObject(
+		context.Background(),
+		&ypb.StartFacadesWithYsoParams{
+			Token:               "xxx",
+			ReversePort:         int32(port),
+			ReverseHost:         "127.0.0.1",
+			GenerateClassParams: &ypb.YsoOptionsRequerst{},
+		},
+	)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	go func() {
+		for {
+			stream.Recv()
+		}
+	}()
+	utils.WaitConnect(fmt.Sprintf("127.0.0.1:%d", port), 3)
+	_, err = c.ApplyClassToFacades(context.Background(), &ypb.ApplyClassToFacadesParamsWithVerbose{
+		Token: "xxx",
+		GenerateClassParams: &ypb.YsoOptionsRequerstWithVerbose{
+			Gadget: "None",
+			Class:  "DNSLog",
+			Options: []*ypb.YsoClassGeneraterOptionsWithVerbose{
+				{
+					Key:   "className",
+					Value: randClassName,
+				},
+				{
+					Key:   "domain",
+					Value: "aaa",
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rsp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/%s.class", port, randClassName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := utils.HttpDumpWithBody(rsp, true)
+	if !bytes.Contains(raw, []byte(randClassName)) {
+		t.Fatal("not found")
+	}
 }
