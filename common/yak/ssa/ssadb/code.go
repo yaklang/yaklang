@@ -86,13 +86,14 @@ func emptyIrCode() *IrCode {
 
 var verifyExisted = new(sync.Once)
 
-func RequireIrCode(db *gorm.DB) (uint, *IrCode) {
+func RequireIrCode(db *gorm.DB, program string) (uint, *IrCode) {
 	verifyExisted.Do(func() {
 		db.AutoMigrate(&IrCode{})
 	})
 	db = db.Model(&IrCode{})
 	// save new ircode
 	ircode := emptyIrCode()
+	ircode.ProgramName = program
 	db.Create(ircode)
 	return ircode.ID, ircode
 }

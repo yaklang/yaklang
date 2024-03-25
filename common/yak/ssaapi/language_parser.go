@@ -1,6 +1,8 @@
 package ssaapi
 
 import (
+	"runtime/debug"
+
 	"github.com/yaklang/yaklang/common/utils"
 	js2ssa "github.com/yaklang/yaklang/common/yak/JS2ssa"
 	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
@@ -8,7 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 	"github.com/yaklang/yaklang/common/yak/yak2ssa"
-	"runtime/debug"
 )
 
 type Language string
@@ -41,7 +42,7 @@ func parse(c *config, prog *ssa.Program) (ret *ssa.Program, err error) {
 	}()
 
 	if prog == nil {
-		prog = ssa.NewProgram()
+		prog = ssa.NewProgram(c.DataBaseProgramName)
 	}
 
 	builder := prog.GetAndCreateMainFunctionBuilder()
