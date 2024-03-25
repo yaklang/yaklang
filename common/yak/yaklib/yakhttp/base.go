@@ -303,8 +303,7 @@ func Do(i interface{}) (*http.Response, error) {
 		return nil, err
 	}
 
-	rsp, _, err := poc.HTTP(rawRequest,
-		poc.WithForceHTTPS(isHttps),
+	opts := []poc.PocConfigOption{
 		poc.WithTimeout(config.Timeout),
 		poc.WithProxy(config.Proxies...),
 		poc.WithRedirectHandler(func(isHttps bool, req, rsp []byte) bool {
@@ -316,11 +315,21 @@ func Do(i interface{}) (*http.Response, error) {
 			}
 			return true
 		}),
+		poc.WithForceHTTPS(isHttps),
 		poc.WithSession(config.Session),
-		poc.WithReplaceAllHttpPacketQueryParams(config.GetParams),
-		poc.WithReplaceHttpPacketBody(config.Body, false),
-		poc.WithReplaceAllHttpPacketHeaders(config.Headers),
-	)
+	}
+
+	for k, v := range config.Headers {
+		opts = append(opts, poc.WithReplaceHttpPacketHeader(k, v))
+	}
+	for k, v := range config.GetParams {
+		opts = append(opts, poc.WithReplaceHttpPacketQueryParam(k, v))
+	}
+	if len(config.Body) > 0 {
+		opts = append(opts, poc.WithReplaceHttpPacketBody(config.Body, false))
+	}
+
+	rsp, _, err := poc.HTTP(rawRequest, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -479,7 +488,7 @@ func httpRequest(method, url string, options ...http_struct.HttpOption) (*http_s
 		op(config)
 	}
 
-	lowhttpRspInst, _, err := poc.Do(method, url,
+	opts := []poc.PocConfigOption{
 		poc.WithTimeout(config.Timeout),
 		poc.WithProxy(config.Proxies...),
 		poc.WithRedirectHandler(func(isHttps bool, req, rsp []byte) bool {
@@ -492,10 +501,19 @@ func httpRequest(method, url string, options ...http_struct.HttpOption) (*http_s
 			return true
 		}),
 		poc.WithSession(config.Session),
-		poc.WithReplaceAllHttpPacketQueryParams(config.GetParams),
-		poc.WithReplaceHttpPacketBody(config.Body, false),
-		poc.WithReplaceAllHttpPacketHeaders(config.Headers),
-	)
+	}
+
+	for k, v := range config.Headers {
+		opts = append(opts, poc.WithReplaceHttpPacketHeader(k, v))
+	}
+	for k, v := range config.GetParams {
+		opts = append(opts, poc.WithReplaceHttpPacketQueryParam(k, v))
+	}
+	if len(config.Body) > 0 {
+		opts = append(opts, poc.WithReplaceHttpPacketBody(config.Body, false))
+	}
+
+	lowhttpRspInst, _, err := poc.Do(method, url, opts...)
 	if err != nil {
 		return nil, err
 	}
