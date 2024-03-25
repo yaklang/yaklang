@@ -140,14 +140,14 @@ func lineDisasm(v Instruction, liner DisasmLiner) (ret string) {
 
 	switch v := v.(type) {
 	case *Parameter:
-		return fmt.Sprintf("%s-%s", v.GetOpcode(), v.GetName())
+		return fmt.Sprintf("%s-%s", SSAOpcode2Name[v.GetOpcode()], v.GetName())
 	case *Function, *BasicBlock, *ExternLib:
-		return fmt.Sprintf("%s-%s", v.GetOpcode(), v.GetVerboseName())
+		return fmt.Sprintf("%s-%s", SSAOpcode2Name[v.GetOpcode()], v.GetVerboseName())
 	case *Undefined:
 		if v.Kind == UndefinedMemberValid {
-			return fmt.Sprintf("%s-%s(valid)", v.GetOpcode(), v.GetVerboseName())
+			return fmt.Sprintf("%s-%s(valid)", SSAOpcode2Name[v.GetOpcode()], v.GetVerboseName())
 		}
-		return fmt.Sprintf("%s-%s", v.GetOpcode(), v.GetVerboseName())
+		return fmt.Sprintf("%s-%s", SSAOpcode2Name[v.GetOpcode()], v.GetVerboseName())
 	case *Phi:
 		liner.SetName(v, v.GetVerboseName())
 		ret = fmt.Sprintf("phi(%s)[%s]", v.GetVerboseName(), DisasmValues(v.Edge))
