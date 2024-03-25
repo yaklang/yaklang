@@ -80,6 +80,26 @@ println($a);`
 			Code: code,
 		})
 	})
+	t.Run("html-if", func(t *testing.T) {
+		code := `<?php if ($a == 5) { ?>
+<sample></sample>
+<?php }; ?>`
+		ssatest.CheckError(t, ssatest.TestCase{
+			Code: code,
+			Want: []string{ssa.ValueUndefined("$a")},
+		})
+	})
+	t.Run("html-if-else", func(t *testing.T) {
+		code := `<?php if ($a == 5) { ?>
+<sample></sample>
+<?php }else{ ?>
+    <script>1</script>
+<?php }?>`
+		ssatest.CheckError(t, ssatest.TestCase{
+			Code: code,
+			Want: []string{ssa.ValueUndefined("$a")},
+		})
+	})
 }
 
 func TestExpression_If(t *testing.T) {
@@ -268,6 +288,22 @@ println($a); // phi[2, 5]
 				"phi($a)[2,5]",
 			},
 			t)
+	})
+	t.Run("html-switch", func(t *testing.T) {
+		code := `<?php switch($a): case 1: // without semicolon?>
+        1;
+    <?php break ?>
+    <?php case 2: ?>
+        2;
+    <?php break;?>
+    <?php case 3: ?>
+        3;
+    <?php break;?>
+<?php endswitch; ?>`
+		ssatest.CheckError(t, ssatest.TestCase{
+			Code: code,
+			Want: []string{ssa.ValueUndefined("$a")},
+		})
 	})
 }
 func TestExpression_Loop(t *testing.T) {
