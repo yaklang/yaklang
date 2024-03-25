@@ -30,6 +30,7 @@ func (s *Server) execScriptWithExecParam(script *yakit.YakScript, input string, 
 		scriptName = script.ScriptName
 		scriptType = script.Type
 	)
+	streamCtx, cancel := context.WithCancel(stream.Context())
 	runtimeId := uuid.New().String()
 	stream.Send(&ypb.ExecResult{IsMessage: false, RuntimeID: runtimeId}) // 触发前端切换结果页面
 	defer func() {
@@ -49,10 +50,10 @@ func (s *Server) execScriptWithExecParam(script *yakit.YakScript, input string, 
 		app := cli.DefaultCliApp
 		// 额外处理 cli，新建 cli app
 		if strings.ToLower(scriptType) == "yak" {
-			tempArgs := makeArgs(stream.Context(), params, script.Content)
+			tempArgs := makeArgs(streamCtx, params, script.Content)
 			app = yak.HookCliArgs(engine, tempArgs)
 		}
-		yak.BindYakitPluginContextToEngine(engine, yak.CreateYakitPluginContext(runtimeId).WithPluginName(scriptName).WithContext(stream.Context()).WithCliApp(app))
+		yak.BindYakitPluginContextToEngine(engine, yak.CreateYakitPluginContext(runtimeId).WithPluginName(scriptName).WithContext(streamCtx).WithCliApp(app).WithContextCancel(cancel))
 
 		return nil
 	})
@@ -68,14 +69,14 @@ func (s *Server) execScriptWithExecParam(script *yakit.YakScript, input string, 
 	switch strings.ToLower(scriptType) {
 	case "codec":
 		tabName := "Codec结果"
-		subEngine, err := engine.ExecuteExWithContext(stream.Context(), script.Content, map[string]any{
-			"CTX":         stream.Context(),
+		subEngine, err := engine.ExecuteExWithContext(streamCtx, script.Content, map[string]any{
+			"CTX":         streamCtx,
 			"PLUGIN_NAME": scriptName,
 		})
 		if err != nil {
 			return utils.Errorf("execute file %s code failed: %s", scriptName, err.Error())
 		}
-		result, err := subEngine.CallYakFunction(stream.Context(), "handle", []interface{}{input})
+		result, err := subEngine.CallYakFunction(streamCtx, "handle", []interface{}{input})
 		if err != nil {
 			return utils.Errorf("import %v' s handle failed: %s", scriptName, err)
 		}
@@ -104,9 +105,9 @@ func (s *Server) execScriptWithExecParam(script *yakit.YakScript, input string, 
 		})
 		return nil
 	case "yak":
-		_, err := engine.ExecuteExWithContext(stream.Context(), script.Content, map[string]any{
+		_, err := engine.ExecuteExWithContext(streamCtx, script.Content, map[string]any{
 			"RUNTIME_ID":  runtimeId,
-			"CTX":         stream.Context(),
+			"CTX":         streamCtx,
 			"PLUGIN_NAME": scriptName,
 		})
 		if err != nil {
@@ -126,6 +127,7 @@ func (s *Server) execScriptWithRequest(scriptInstance *yakit.YakScript, targetIn
 		scriptType = scriptInstance.Type
 		isTemp     = scriptInstance.Ignored && (strings.HasPrefix(scriptInstance.ScriptName, "[TMP]") || strings.HasPrefix(scriptInstance.ScriptName, "]"))
 	)
+	streamCtx, cancel := context.WithCancel(stream.Context())
 	if scriptName == "" {
 		return utils.Error("script name is empty")
 	}
@@ -221,12 +223,12 @@ func (s *Server) execScriptWithRequest(scriptInstance *yakit.YakScript, targetIn
 	log.Infof("engine.ExecuteExWithContext(stream.Context(), debugScript ... \n")
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
 		engine.SetVar("RUNTIME_ID", runtimeId)
-		yak.BindYakitPluginContextToEngine(engine, yak.CreateYakitPluginContext(runtimeId).WithPluginName(scriptName).WithContext(stream.Context()))
+		yak.BindYakitPluginContextToEngine(engine, yak.CreateYakitPluginContext(runtimeId).WithPluginName(scriptName).WithContext(streamCtx).WithContextCancel(cancel))
 		return nil
 	})
-	subEngine, err := engine.ExecuteExWithContext(stream.Context(), debugScriptCode, map[string]any{
+	subEngine, err := engine.ExecuteExWithContext(streamCtx, debugScriptCode, map[string]any{
 		"REQUESTS":     reqs,
-		"CTX":          stream.Context(),
+		"CTX":          streamCtx,
 		"PLUGIN":       scriptInstance,
 		"PLUGIN_CODE":  scriptCode,
 		"PLUGIN_NAME":  scriptName,

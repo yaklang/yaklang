@@ -12,7 +12,13 @@ type YakitPluginContext struct {
 	Proxy         string
 	Ctx           context.Context
 	CliApp        *cli.CliApp
+	Cancel        context.CancelFunc
 	defaultFilter *filter.StringFilter
+}
+
+func (y *YakitPluginContext) WithContextCancel(cancel context.CancelFunc) *YakitPluginContext {
+	y.Cancel = cancel
+	return y
 }
 
 func (y *YakitPluginContext) WithPluginName(id string) *YakitPluginContext {

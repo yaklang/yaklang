@@ -130,7 +130,6 @@ func FetchFunctionFromSourceCode(ctx context.Context, pluginContext *YakitPlugin
 		if id != "" {
 			pluginContext.PluginName = id
 		}
-		pluginContext.Ctx = ctx
 		BindYakitPluginContextToEngine(engine, pluginContext)
 		return nil
 	})
@@ -346,7 +345,14 @@ func (y *YakToCallerManager) getYakitPluginContext(ctx ...context.Context) *Yaki
 	if len(ctx) > 0 {
 		finalCtx = ctx[0]
 	}
-	return CreateYakitPluginContext(y.runtimeId).WithProxy(y.proxy).WithContext(finalCtx).WithDefaultFilter(y.getDefaultFilter())
+
+	canFunc, ok := finalCtx.Value("cancel").(context.CancelFunc)
+	if !ok {
+		finalCtx, canFunc = context.WithCancel(finalCtx)
+		finalCtx = context.WithValue(finalCtx, "cancel", canFunc) // 维护一个 cancel
+	}
+
+	return CreateYakitPluginContext(y.runtimeId).WithProxy(y.proxy).WithContext(finalCtx).WithDefaultFilter(y.getDefaultFilter()).WithContextCancel(canFunc)
 }
 
 func (y *YakToCallerManager) Set(ctx context.Context, code string, hook func(engine *antlr4yak.Engine) error, funcName ...string) (retError error) {
@@ -866,7 +872,10 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 	// context hook
 
 	// new context
-	streamContext, cancel := context.WithCancel(streamContext)
+	cancel := pluginContext.Cancel
+	if cancel == nil {
+		streamContext, cancel = context.WithCancel(streamContext)
+	}
 	nIns.GetVM().RegisterMapMemberCallHandler("context", "Seconds", func(f interface{}) interface{} {
 		funcValue := reflect.ValueOf(f)
 		funcType := funcValue.Type()
@@ -1075,7 +1084,7 @@ func (y *YakToCallerManager) AddForYakit(
 			}
 			return caller(result)
 		}))
-		BindYakitPluginContextToEngine(engine, y.getYakitPluginContext().WithPluginName(id))
+		BindYakitPluginContextToEngine(engine, y.getYakitPluginContext(ctx).WithPluginName(id))
 		return nil
 	}, hooks...)
 }
