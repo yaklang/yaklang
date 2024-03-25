@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -110,6 +111,9 @@ func FitIRCode(c *ssadb.IrCode, r Instruction) error {
 		c.SourceCodeEndLine = r.End.Line
 		c.SourceCodeEndCol = r.End.Column
 	}
+
+	// variable
+	c.Variable = lo.Keys(r.GetAllVariables())
 
 	c.Opcode = int64(r.GetOpcode())
 	c.OpcodeName = SSAOpcode2Name[r.GetOpcode()]
