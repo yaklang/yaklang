@@ -91,3 +91,30 @@ func (us Int64Slice) Value() (driver.Value, error) {
 	}
 	return strings.Join(parts, ","), nil
 }
+
+type StringSlice []string
+
+func (ss *StringSlice) Scan(value interface{}) error {
+	if value == nil {
+		*ss = nil
+		return nil
+	}
+	var strValue string
+
+	switch v := value.(type) {
+	case []byte:
+		strValue = string(v)
+	case string:
+		strValue = v
+	default:
+		return errors.New("unsupported type: " + reflect.TypeOf(value).String() + " for Int64Slice.Scan")
+	}
+
+	parts := strings.Split(strValue, ",")
+	*ss = parts
+	return nil
+}
+
+func (us StringSlice) Value() (driver.Value, error) {
+	return strings.Join(us, ","), nil
+}
