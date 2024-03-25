@@ -9,6 +9,35 @@ import (
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 )
 
+func TestParseSSA_SyntaxPhp(t *testing.T) {
+	t.Run("test-1", func(t *testing.T) {
+		code := `<?php { ?> echo 1; <?php } ?>`
+		test.MockSSA(t, code)
+	})
+	t.Run("test-2", func(t *testing.T) {
+		code := `<script>
+    <?php  ?>
+</script>`
+		test.MockSSA(t, code)
+	})
+	t.Run("test-3", func(t *testing.T) {
+		code := `<html><?php ?></html>`
+		test.MockSSA(t, code)
+	})
+	t.Run("test-4", func(t *testing.T) {
+		code := `<?php for ($i=0; $i < 5; $i++) { ?>
+<script>echo 1;</script>
+<?php echo $i;}?>`
+		test.CheckError(t, test.TestCase{
+			Code: code,
+		})
+		test.MockSSA(t, code)
+	})
+	t.Run("test-5", func(t *testing.T) {
+		code := `<?php for ($i=0; $i < 5; $i++){ ?><?php }?>`
+		test.MockSSA(t, code)
+	})
+}
 func TestParseSSA_Basic(t *testing.T) {
 	code := `<?php
 $ancasdfasdfasdf;
