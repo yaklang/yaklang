@@ -120,6 +120,7 @@ func FitIRCode(c *ssadb.IrCode, r Instruction) error {
 
 	switch i := r.(type) {
 	case *ConstInst:
+		c.ConstantValue = i.str
 		if bin, ok := i.Origin.(*BinOp); ok {
 			c.OpcodeOperator = BinaryOpcodeName[(*bin).Op]
 		} else if un, ok := i.Origin.(*UnOp); ok {
