@@ -755,8 +755,8 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							rsp = rspInstance.RawPacket
 							if !rspInstance.MultiResponse {
 								if ret := lowhttp.GetHTTPPacketHeader(rspInstance.RawPacket, "Content-Encoding"); ret != "" {
-									rspFixed, _, _ := lowhttp.FixHTTPResponse(rspInstance.RawPacket)
-									if len(rspFixed) > 0 {
+									rspFixed, _, err := lowhttp.FixHTTPResponse(rspInstance.RawPacket)
+									if len(rspFixed) > 0 && err == nil {
 										rsp = rspFixed
 									}
 								}
