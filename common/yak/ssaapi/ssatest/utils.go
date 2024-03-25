@@ -230,7 +230,7 @@ func CheckParameter(t *testing.T, tc TestCase) {
 		funTyp, ok := ssa.ToFunctionType(typ)
 		require.True(t, ok)
 
-		parameters := lo.Map(funTyp.ParameterValue, func(v *ssa.Parameter, _ int) string { return v.GetName() })
+		parameters := lo.Map(funTyp.ParameterValue, func(v *ssa.Parameter, _ int) string { return v.GetVerboseName() })
 		require.Equal(t, want, parameters)
 	}
 	CheckTestCase(t, tc)

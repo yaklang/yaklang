@@ -139,7 +139,7 @@ func TestClosure_FreeValue_Function(t *testing.T) {
 			`,
 			Want: []string{
 				"a",
-				"#6.key",
+				"b",
 			},
 		})
 	})
@@ -155,7 +155,7 @@ func TestClosure_FreeValue_Function(t *testing.T) {
 			}
 			target = b.get
 			`,
-			Want: []string{"a", "#8.key"},
+			Want: []string{"a", "a.key"},
 		})
 	})
 
@@ -169,7 +169,7 @@ func TestClosure_FreeValue_Function(t *testing.T) {
 			target = a.get
 			`,
 			Want: []string{
-				"a", "#6.key",
+				"a", "a.key",
 			},
 		})
 	})
