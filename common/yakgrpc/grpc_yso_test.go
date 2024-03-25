@@ -102,6 +102,10 @@ func TestGRPCMUSTPASS_GenerateYakCode(t *testing.T) {
 			}
 			options := paramsOption.GetOptions()
 			for _, option := range options {
+				if option.Key == string(JavaClassGeneraterOption_DirtyData) {
+					option.Value = "100"
+					continue
+				}
 				switch option.Type {
 				case string(String):
 					option.Value = utils.GetRandomIPAddress()
