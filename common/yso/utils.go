@@ -3,8 +3,10 @@ package yso
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/javaclassparser"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yserx"
@@ -547,6 +549,7 @@ func Dump(i interface{}) (string, error) {
 		return "", utils.Errorf("cannot support %v to dump string", reflect.TypeOf(ret))
 	}
 }
+
 func JavaSerializableObjectDumper(javaObject *JavaObject) (string, error) {
 	serializableObj := javaObject.JavaSerializable
 
@@ -814,4 +817,31 @@ func runWorkFlow(works ...func() error) error {
 		}
 	}
 	return nil
+}
+
+var dirtyDataHeader []byte
+
+func init() {
+	bs, err := codec.DecodeBase64("rO0ABXVyABNbTGphdmEubGFuZy5PYmplY3Q7kM5YnxBzKWwCAAB4cA==")
+	if err != nil {
+		log.Errorf("init dirtyDataHeader failed: %v", err)
+	}
+	dirtyDataHeader = bs
+}
+
+// WarpSerializeDataByDirtyData 通过脏数据包装序列化数据
+// Example: warpedSerData = WarpByDirtyData(serData,1000)~
+func WarpSerializeDataByDirtyData(serBytes []byte, length int) ([]byte, error) {
+	buf := bytes.Buffer{}
+	buf.Write(dirtyDataHeader)
+	buf.Write(yserx.IntTo4Bytes(2))
+	buf.Write([]byte{0x7C})
+	buf.Write(yserx.Uint64To8Bytes(uint64(length)))
+	buf.Write([]byte(utils.RandStringBytes(length)))
+	buf.Write([]byte{0x7b})
+	if len(serBytes) < 4 {
+		return nil, errors.New("invalid serialize data")
+	}
+	buf.Write(serBytes[4:])
+	return buf.Bytes(), nil
 }
