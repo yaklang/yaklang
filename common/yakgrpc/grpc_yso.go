@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"github.com/yaklang/yaklang/common/yso"
@@ -23,6 +23,7 @@ const (
 	JavaClassGeneraterOption_ClassName     JavaClassGeneraterOption = "className"
 	JavaClassGeneraterOption_IsObfuscation JavaClassGeneraterOption = "isObfuscation"
 	JavaClassGeneraterOption_Version       JavaClassGeneraterOption = "version"
+	JavaClassGeneraterOption_DirtyData     JavaClassGeneraterOption = "dirtyData"
 )
 
 type JavaClassGeneraterOptionTypeVerbose string
@@ -148,6 +149,9 @@ func (s *Server) GetAllYsoClassGeneraterOptions(ctx context.Context, req *ypb.Ys
 			return nil, utils.Errorf("not support gadget: %s", req.Gadget)
 		}
 	}
+	if isNone {
+		commonOptions = append(commonOptions, &ypb.YsoClassGeneraterOptionsWithVerbose{Key: string(JavaClassGeneraterOption_DirtyData), Type: string(StringPort), KeyVerbose: "脏数据", Help: "填写脏数据大小"})
+	}
 	if isNone || gadgetCfg.IsTemplateImpl {
 		if cfg, ok := yso.YsoConfigInstance.Classes[yso.ClassType(req.Class)]; ok {
 			gadgetOptions = paramsToOptInfo(cfg.Params)
@@ -216,7 +220,7 @@ if err {
     log.error("%v",err)
     return
 }
-
+$dirtyData
 // 16进制展示payload
 hexPayload = codec.EncodeToHex(gadgetBytes)    
 //(hexPayload)
@@ -302,12 +306,22 @@ hexPayload = codec.EncodeToHex(classBytes)
 // log.info("发送Payload成功")
 // log.info("响应包: %s",string(rsp))
 `
+	dirtyData := 0
 	optionsToCode := func(options []*ypb.YsoClassGeneraterOptionsWithVerbose) string {
 		optionsMapTemplate := `{
 %s}`
 		tmpStr := ""
 		for _, option := range req.Options {
 			if option.Key == string(JavaClassGeneraterOption_ClassName) || option.Key == string(JavaClassGeneraterOption_IsObfuscation) || option.Key == string(JavaClassGeneraterOption_Version) {
+				continue
+			}
+			if option.Key == string(JavaClassGeneraterOption_DirtyData) {
+				if v, err := strconv.Atoi(option.Value); err == nil {
+					dirtyData = v
+				} else {
+					log.Errorf("invalid dirty data: %s", option.Value)
+				}
+
 				continue
 			}
 			tmpStr += fmt.Sprintf("\t\"%s\":\"%s\",\n", option.Key, option.Value)
@@ -345,9 +359,14 @@ hexPayload = codec.EncodeToHex(classBytes)
 			optionsCode := []string{}
 			optionsCode = append(optionsCode, fmt.Sprintf(`"%s"`, req.Gadget))
 			optionsCode = append(optionsCode, fmt.Sprintf(`yso.useTemplate("%s")`, req.Class))
+			var dirtyOpt string
 			for _, option := range req.Options {
 				if option.Key == string(JavaClassGeneraterOption_ClassName) {
 					optionsCode = append(optionsCode, fmt.Sprintf(`yso.evilClassName("%s")`, option.Value))
+					continue
+				}
+				if option.Key == string(JavaClassGeneraterOption_DirtyData) {
+					dirtyOpt = fmt.Sprintf("gadgetBytes = yso.WarpByDirtyData(gadgetBytes,%d)", dirtyData)
 					continue
 				}
 				if option.Key == string(JavaClassGeneraterOption_IsObfuscation) && option.Value == "true" {
@@ -361,16 +380,8 @@ hexPayload = codec.EncodeToHex(classBytes)
 				optionsCode = append(optionsCode, fmt.Sprintf(`yso.useClassParam("%s","%s")`, option.Key, option.Value))
 			}
 			classCode := utils.Format(gadgetCodeTmp, map[string]string{
-				"options": strings.Join(optionsCode, ","),
-			})
-			return classCode, nil
-		} else if cfg.Template != nil {
-			optionsCode := []string{}
-			optionsCode = append(optionsCode, fmt.Sprintf(`"%s"`, req.Gadget))
-			optionsCode = append(optionsCode, fmt.Sprintf(`"%s"`, req.Class))
-			optionsCode = append(optionsCode, optionsToCode(req.Options))
-			classCode := utils.Format(gadgetCodeTmp, map[string]string{
-				"options": strings.Join(optionsCode, ","),
+				"options":   strings.Join(optionsCode, ","),
+				"dirtyData": dirtyOpt,
 			})
 			return classCode, nil
 		} else {
@@ -378,8 +389,13 @@ hexPayload = codec.EncodeToHex(classBytes)
 			optionsCode = append(optionsCode, fmt.Sprintf(`"%s"`, req.Gadget))
 			optionsCode = append(optionsCode, fmt.Sprintf(`"%s"`, req.Class))
 			optionsCode = append(optionsCode, optionsToCode(req.Options))
+			var dirtyOpt string
+			if dirtyData > 0 {
+				dirtyOpt = fmt.Sprintf("gadgetBytes = yso.WarpByDirtyData(gadgetBytes,%d)", dirtyData)
+			}
 			classCode := utils.Format(gadgetCodeTmp, map[string]string{
-				"options": strings.Join(optionsCode, ","),
+				"options":   strings.Join(optionsCode, ","),
+				"dirtyData": dirtyOpt,
 			})
 			return classCode, nil
 		}
@@ -471,45 +487,6 @@ func (s *Server) GenerateYsoBytes(ctx context.Context, req *ypb.YsoOptionsRequer
 		}
 		return &ypb.YsoBytesResponse{Bytes: byts, FileName: fileName}, nil
 	}
-}
-func (s *Server) _GenerateYsoBytes(ctx context.Context, req *ypb.YsoOptionsRequerstWithVerbose) (*ypb.YsoBytesResponse, error) {
-	if req == nil {
-		return nil, utils.Error("request params is nil")
-	}
-	codeRsp, err := generateYsoCode(req)
-	if err != nil {
-		return nil, utils.Errorf("GenerateYsoCode error: %v", err)
-	}
-	var code, className, fileName string
-	for _, option := range req.Options {
-		if strings.ToLower(option.Key) == strings.ToLower(string(JavaClassGeneraterOption_ClassName)) {
-			className = option.Value
-		}
-	}
-	if isTemplateSupported(req.Gadget) && className == "" {
-		return nil, utils.Error("not set className")
-	}
-	if req.Gadget == "None" {
-		fileName = fmt.Sprintf("%s.class", className)
-		code = codeRsp + "\nout(classBytes)"
-	} else {
-		fileName = fmt.Sprintf("%s_%s.ser", req.Gadget, req.Class)
-		code = codeRsp + "\nout(gadgetBytes)"
-	}
-	engin := yaklang.New()
-	//for k, v := range params {
-	//	engin.SetVar(k, v)
-	//}
-	var bytes []byte
-	out := func(b []byte) {
-		bytes = b
-	}
-	engin.SetVar("out", out)
-	err = engin.SafeEval(ctx, code)
-	if err != nil {
-		return nil, utils.Errorf("Eval error: %v", err)
-	}
-	return &ypb.YsoBytesResponse{Bytes: bytes, FileName: fileName}, nil
 }
 func (s *Server) BytesToBase64(ctx context.Context, req *ypb.BytesToBase64Request) (*ypb.BytesToBase64Response, error) {
 	return &ypb.BytesToBase64Response{Base64: codec.EncodeBase64(req.Bytes)}, nil
