@@ -195,4 +195,28 @@ func TestJava_Expression(t *testing.T) {
 		println(b);
 		`, []string{"11", "222", "22"}, t)
 	})
+
+	t.Run("test switch expression with default  3", func(t *testing.T) {
+		CheckJavaPrintlnValue(`
+		var n = 1;
+		 m = switch (n) {
+            case 2:
+                yield 2;
+            default:
+                yield 3;
+        };
+		`, []string{}, t)
+	})
+
+	t.Run("test assign expression", func(t *testing.T) {
+		CheckJavaPrintlnValue(`int a =1 ;
+		a=2;
+		println(a);
+		int b=4;
+		a=b;
+		println(a);
+		`, []string{"2",
+			"4"}, t)
+	})
+
 }
