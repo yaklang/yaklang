@@ -58,4 +58,23 @@ func TestJava_LocalType_Declaration(t *testing.T) {
 			}, t)
 	})
 
+	t.Run("test return", func(t *testing.T) {
+		CheckAllJavaCode(`
+public class HelloWorld {
+    public static void main(String[] args) {
+        int result = a + b;
+        return result;
+        int a=2;
+    }
+}
+
+`, t)
+	})
+	t.Run("test switch break", func(t *testing.T) {
+		CheckJavaCode(`
+		result= switch(e){
+		default : break;
+};
+`, t)
+	})
 }
