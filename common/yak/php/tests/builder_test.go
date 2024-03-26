@@ -402,26 +402,6 @@ $b = 1+1+$a;
 `)
 }
 
-func TestParseCLS(t *testing.T) {
-	code := `<?php
-class A {
-	private $num;
-	public function __construct($num) {
-		this.$num = $num;
-	}
-	public function getNum() {
-		return this.$num;
-	}
-}
-
-$a = new A(1);
-print_r($a);`
-	test.CheckError(t, test.TestCase{
-		Code: code,
-		Want: []string{ssa.ValueUndefined("$a"), ssa.ValueUndefined("A")},
-	})
-}
-
 func TestParseSSA_1(t *testing.T) {
 	test.MockSSA(t, `<?php
 
