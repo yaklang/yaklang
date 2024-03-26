@@ -18,11 +18,11 @@ type JavaFieldValue struct {
 	Object JavaSerializable `json:"object,omitempty"`
 }
 
-func (v *JavaFieldValue) Marshal() []byte {
+func (v *JavaFieldValue) Marshal(cfg *MarshalContext) []byte {
 	var raw []byte
 	//raw = append(raw, v.FieldType)
 	if v.FieldType == JT_OBJECT || v.FieldType == JT_ARRAY {
-		return append(raw, v.Object.Marshal()...)
+		return append(raw, v.Object.Marshal(cfg)...)
 	}
 	raw = append(raw, v.Bytes...)
 	return raw
