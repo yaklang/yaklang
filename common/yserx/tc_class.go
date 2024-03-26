@@ -7,9 +7,9 @@ type JavaClass struct {
 	Handle      uint64           `json:"handle"`
 }
 
-func (j *JavaClass) Marshal() []byte {
+func (j *JavaClass) Marshal(cfg *MarshalContext) []byte {
 	raw := []byte{TC_CLASS}
-	raw = append(raw, j.Desc.Marshal()...)
+	raw = append(raw, j.Desc.Marshal(cfg)...)
 	return raw
 }
 

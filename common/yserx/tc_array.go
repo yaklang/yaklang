@@ -16,19 +16,19 @@ type JavaArray struct {
 	Bytes       []byte            `json:"bytes,omitempty"`
 }
 
-func (j *JavaArray) Marshal() []byte {
+func (j *JavaArray) Marshal(cfg *MarshalContext) []byte {
 	var rawBuffer bytes.Buffer
 	rawBuffer.WriteByte(TC_ARRAY)
-	rawBuffer.Write(j.ClassDesc.Marshal())
+	rawBuffer.Write(j.ClassDesc.Marshal(cfg))
 	rawBuffer.Write(IntTo4Bytes(j.Size))
 	if j.Bytescode {
 		funk.ForEach(j.Bytes, func(i byte) {
-			rawBuffer.Write(NewJavaFieldByteValue(i).Marshal())
+			rawBuffer.Write(NewJavaFieldByteValue(i).Marshal(cfg))
 		})
 		return rawBuffer.Bytes()
 	}
 	funk.ForEach(j.Values, func(i JavaSerializable) {
-		rawBuffer.Write(i.Marshal())
+		rawBuffer.Write(i.Marshal(cfg))
 	})
 	return rawBuffer.Bytes()
 }

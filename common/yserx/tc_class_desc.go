@@ -9,8 +9,8 @@ type JavaClassDesc struct {
 	Map map[uint64]*JavaClassDetails `json:"-"`
 }
 
-func (j *JavaClassDesc) Marshal() []byte {
-	return j.Detail.Marshal()
+func (j *JavaClassDesc) Marshal(cfg *MarshalContext) []byte {
+	return j.Detail.Marshal(cfg)
 	//var raw []byte
 	//for _, i := range j.Items {
 	//	raw = append(raw, i.MarshalJavaObjects()...)
