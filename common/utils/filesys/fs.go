@@ -3,6 +3,7 @@ package filesys
 import (
 	"github.com/gobwas/glob"
 	"github.com/kr/fs"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -31,6 +32,7 @@ func recursive(visited map[string]struct{}, raw string, opts ...Option) (retErr 
 	}
 
 	if _, isVisisted := visited[base]; isVisisted {
+		log.Info("repeated visit: ", base)
 		return nil
 	} else {
 		visited[base] = struct{}{}
