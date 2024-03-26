@@ -1,27 +1,28 @@
-name = db.CreateTemporaryYakScript("mitm", `
-
+token = str.RandStr(16)
+prefix = "token=%#v" % token
+name = db.CreateTemporaryYakScript("mitm", prefix + `
 for index in 4 {
-    db.SetKey(f"zaFOUFeiLA_${index+1}", 0)
+    db.SetKey(f"${token}_${index+1}", 0)
 }
 
 yakit.AutoInitYakit();
 mirrorHTTPFlow = (isHttps, url, req, rsp, body) => {
-    var key = "zaFOUFeiLA_1"
+    var key = f"${token}_1"
     db.SetKey(key, atoi(db.GetKey(key))~ + 1)
 }
 
 mirrorNewWebsite = (https, url, req, rsp, body) => {
-    var key = "zaFOUFeiLA_2"
+    var key = f"${token}_2"
     db.SetKey(key, atoi(db.GetKey(key))~ + 1)
 }
 
 mirrorNewWebsitePath = (https, url, req, rsp, body) => {
-    var key = "zaFOUFeiLA_3"
+    var key = f"${token}_3"
     db.SetKey(key, atoi(db.GetKey(key))~ + 1)
 }
 
 mirrorNewWebsitePathParams = (https, url, req, rsp, body) => {
-    var key = "zaFOUFeiLA_4"
+    var key = f"${token}_4"
     dump(url)
     db.SetKey(key, atoi(db.GetKey(key))~ + 1)
 }
@@ -50,9 +51,9 @@ for url in [
 
 caller.Wait()
 
-assert atoi(db.GetKey(f`zaFOUFeiLA_1`))~ == 10,f"mirrorHTTPFlow: ${atoi(db.GetKey(f`zaFOUFeiLA_1`))~}"
-assert atoi(db.GetKey(f`zaFOUFeiLA_2`))~ == 2,f"mirrorHTTPFlow: ${atoi(db.GetKey(f`zaFOUFeiLA_2`))~}"
-assert atoi(db.GetKey(f`zaFOUFeiLA_3`))~ == 5
-v = atoi(db.GetKey(f`zaFOUFeiLA_4`))~
+assert atoi(db.GetKey(f`${token}_1`))~ == 10,f"mirrorHTTPFlow: ${atoi(db.GetKey(f`${token}_1`))~}"
+assert atoi(db.GetKey(f`${token}_2`))~ == 2,f"mirrorHTTPFlow: ${atoi(db.GetKey(f`${token}_2`))~}"
+assert atoi(db.GetKey(f`${token}_3`))~ == 5,f"mirrorHTTPFlow: ${atoi(db.GetKey(f`${token}_3`))~}"
+v = atoi(db.GetKey(f`${token}_4`))~
 dump(v)
 assert v == 7, f"mirrorNewWebsitePathParams trigger ${v}"

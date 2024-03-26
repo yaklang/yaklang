@@ -1,14 +1,13 @@
 targetUrl = f`${VULINBOX}/gitserver/sca-testcase.git/`
 dump(targetUrl)
-localReposDir = `/tmp/sca-testcase.git/`
+localReposDir = file.Join(os.TempDir(), str.RandStr(16))
 os.RemoveAll(localReposDir)
 git.Clone(targetUrl, localReposDir)~
-ret := string(file.ReadFile(`/tmp/sca-testcase.git/testdata/node_npm/positive_file/package.json`)~)
+ret := string(file.ReadFile(file.Join(localReposDir, `testdata`,`node_npm`,`positive_file`,`package.json`))~)
 dump(ret)
 assert `unopinionated, minimalist web framework` in ret
 checked = false
-for result in sca.ScanFilesystem(`/tmp/sca-testcase.git/testdata/`)~ {
-    dump(result)
+for result in sca.ScanFilesystem(file.Join(localReposDir, `testdata`))~ {
     if `53733d3ba4843f2efb79e7c70ef0615f2aa22581` in sdump(result) { checked = true}
 }
 if !checked {
