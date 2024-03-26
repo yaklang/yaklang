@@ -1,6 +1,9 @@
 package ssa
 
-import "github.com/yaklang/yaklang/common/log"
+import (
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+)
 
 // --------------- Read
 
@@ -105,7 +108,7 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 	// log.Infof("AssignVariable: %v, %v typ %s", variable.GetName(), value.GetName(), value.GetType())
 	name := variable.GetName()
 	_ = name
-	if value == nil {
+	if utils.IsNil(value) {
 		log.Warnf("assign nil value to variable: %v", name)
 		return
 	}

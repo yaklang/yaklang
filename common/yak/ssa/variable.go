@@ -27,7 +27,7 @@ func NewVariable(globalIndex int, name string, local bool, scope ssautil.ScopedV
 }
 
 func (variable *Variable) Assign(value Value) error {
-	if value == nil {
+	if utils.IsNil(value) {
 		return utils.Error("assign empty")
 	}
 	value.AddVariable(variable)
