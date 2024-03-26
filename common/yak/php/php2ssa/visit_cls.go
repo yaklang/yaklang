@@ -18,18 +18,27 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 	if i == nil {
 		return nil
 	}
+	className := i.TypeRef().GetText()
+	class := y.ir.GetClass(className)
+	obj := y.ir.EmitMakeWithoutType(nil, nil)
+	obj.SetType(class)
 
-	constructor := y.ir.GetClassConstructor(i.TypeRef().GetText())
+	constructor := y.ir.GetClassConstructor(className)
+	if constructor == nil {
+		return obj
+	}
 
-	args := make([]ssa.Value, 0)
+	args := []ssa.Value{obj}
 	ellipsis := false
 	if i.Arguments() != nil {
-		args, ellipsis = y.VisitArguments(i.Arguments())
+		tmp, hasEllipsis := y.VisitArguments(i.Arguments())
+		ellipsis = hasEllipsis
+		args = append(args, tmp...)
 	}
 	c := y.ir.NewCall(constructor, args)
 	c.IsEllipsis = ellipsis
 	y.ir.EmitCall(c)
-	return c
+	return obj
 }
 
 func (y *builder) VisitTypeRef(raw phpparser.ITypeRefContext) ssa.Type {
@@ -228,19 +237,29 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 		_ = isRef
 
 		funcName := ret.Identifier().GetText()
-		y.ir.SetMarkedFunction(funcName)
-		newFunction := y.ir.NewFunc(funcName)
-		y.ir = y.ir.PushFunction(newFunction)
-		{
-			this := y.ir.NewParam("$this")
-			_ = this
-			y.VisitFormalParameterList(ret.FormalParameterList())
-			y.VisitMethodBody(ret.MethodBody())
-			y.ir.Finish()
-		}
-		y.ir = y.ir.PopFunction()
-		class.AddMarkedField(funcName, newFunction, 0)
 
+		createFunction := func() *ssa.Function {
+			newFunction := y.ir.NewFunc(funcName)
+			y.ir = y.ir.PushFunction(newFunction)
+			{
+				this := y.ir.NewParam("$this")
+				_ = this
+				y.VisitFormalParameterList(ret.FormalParameterList())
+				y.VisitMethodBody(ret.MethodBody())
+				y.ir.Finish()
+			}
+			y.ir = y.ir.PopFunction()
+			return newFunction
+		}
+
+		switch funcName {
+		case "__construct":
+			newFunction := createFunction()
+			class.Constructor = newFunction
+		default:
+			newFunction := createFunction()
+			class.AddMarkedField(funcName, newFunction, 0)
+		}
 	case *phpparser.ConstContext:
 		// TODO: ret.Attributes() // php8
 		memberModifiers := y.VisitMemberModifiers(ret.MemberModifiers())

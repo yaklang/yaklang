@@ -37,12 +37,6 @@ func NewClassBluePrint() *ClassBluePrint {
 		StaticMember: make(map[string]Value),
 	}
 
-	class.Constructor = NewFunctionWithType("__constructor_normal",
-		NewFunctionType("__constructor_normal", nil, class, false),
-	)
-	// class.Copy = NewFunctionType("__copy", nil, class, false)
-	// class.Constructor =
-	// class.Destructor = NewFunctionType("__destructor", []Type{class}, nil, false)
 	return class
 }
 
