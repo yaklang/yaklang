@@ -52,8 +52,8 @@ for url in [
 caller.Wait()
 
 assert atoi(db.GetKey(f`${token}_1`))~ == 10,f"mirrorHTTPFlow: ${atoi(db.GetKey(f`${token}_1`))~}"
-assert atoi(db.GetKey(f`${token}_2`))~ == 2,f"mirrorHTTPFlow: ${atoi(db.GetKey(f`${token}_2`))~}"
-assert atoi(db.GetKey(f`${token}_3`))~ == 5,f"mirrorHTTPFlow: ${atoi(db.GetKey(f`${token}_3`))~}"
+assert atoi(db.GetKey(f`${token}_2`))~ == 2,f"mirrorNewWebsite: ${atoi(db.GetKey(f`${token}_2`))~}"
+assert atoi(db.GetKey(f`${token}_3`))~ == 5,f"mirrorNewWebsitePath: ${atoi(db.GetKey(f`${token}_3`))~}"
 v = atoi(db.GetKey(f`${token}_4`))~
 dump(v)
 assert v == 7, f"mirrorNewWebsitePathParams trigger ${v}"

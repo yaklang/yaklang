@@ -15,10 +15,18 @@ func SetUnexportedField(field reflect.Value, value interface{}) {
 		Set(reflect.ValueOf(value))
 }
 
+// func UnsafeStringToBytes(s string) []byte {
+// 	return unsafe.Slice(unsafe.StringData(s), len(s))
+// }
+
+// func UnsafeBytesToString(b []byte) string {
+// 	return unsafe.String(&b[0], len(b))
+// }
+
 func UnsafeStringToBytes(s string) []byte {
-	return *(*[]byte)(unsafe.Pointer(&s))
+	return []byte(s)
 }
 
 func UnsafeBytesToString(b []byte) string {
-	return *(*string)(unsafe.Pointer(&b))
+	return string(b)
 }
