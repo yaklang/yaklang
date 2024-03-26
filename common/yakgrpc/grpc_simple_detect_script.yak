@@ -4,6 +4,7 @@ loglevel("info")
 
 runtimeID = getParams("RUNTIME_ID")
 yakit.StatusCard("RuntimeIDFromRisks", runtimeID)
+CTX = getParams("CTX")
 
 # Input your code!
 updateStatus = s => yakit.StatusCard("当前状态", s)
@@ -639,7 +640,7 @@ func handleTCP(target) {
             yakit.Output({"host": "TCP-" + result.Target, "port": result.Port, "fingerprint": result.GetServiceName(), "htmlTitle": "" + result.GetHtmlTitle(), "isOpen": true})
             portRes,_ = yakit.ObjToPort(result)
             portRes.TaskName = taskName
-            yakit.SavePortFromResult(result)
+            yakit.SavePortFromResult(portRes)
             addOpenPortCount()
             handleServiceScanResult(result)
         }
@@ -652,7 +653,7 @@ func handleTCP(target) {
     }
 }
 
-synWg = sync.NewSizedWaitGroup(2)
+synWg = sync.NewSizedWaitGroup(2) // 约束 syn 扫描
 
 func handleSYN(target) {
     synWg.Add()
@@ -692,7 +693,7 @@ func handleSYN(target) {
     }(target)
 }
 
-swg = sync.NewSizedWaitGroup(20)
+swg = sync.NewSizedWaitGroup(20) // 约束 TCP 扫描端口
 
 fileReader, err = file.NewMultiFileLineReader(files...)
 if err != nil {
@@ -718,27 +719,11 @@ for fileReader.Next(){
     swg.Add()
     go func {
         defer swg.Done()
-
         addScanHostCount()
-        wg = sync.NewWaitGroup()
-        wg.Add(1)
-        go func {
-            defer wg.Done()
-
-
-            handleTCP(currentTarget)
-        }
-
         if synscanEnable {
-            wg.Add(1)
-            go func {
-                defer wg.Done()
-
-                handleSYN(currentTarget)
-            }
+            handleSYN(currentTarget)
         }
-
-        wg.Wait()
+        handleTCP(currentTarget)
     }
 }
 
@@ -782,6 +767,6 @@ if hostCountSec != 0 {
 
 bruteWg.Wait()
 yakit.Info("brute end success!")
-manager.Wait()
+manager.Wait(CTX)
 yakit.SetProgress(1)
 yakit.Info("本次扫描任务已完成。")

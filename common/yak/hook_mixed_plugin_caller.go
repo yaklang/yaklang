@@ -278,13 +278,18 @@ func (c *MixPluginCaller) SetConcurrent(i int) error {
 	return c.GetNativeCaller().SetConcurrent(i)
 }
 
-func (c *MixPluginCaller) Wait() {
-	wg := new(sync.WaitGroup)
-	wg.Add(1)
+func (c *MixPluginCaller) Wait(ctxs ...context.Context) {
 	defer c.websiteFilter.Close()
+	ctx := context.Background()
+	if len(ctxs) > 0 {
+		ctx = ctxs[0]
+	}
 
+	waitOk := make(chan struct{}, 1)
 	go func() {
-		defer wg.Done()
+		defer func() {
+			close(waitOk)
+		}()
 
 		log.Debugf("start to wait local mix caller...")
 		c.swg.Wait()
@@ -294,7 +299,11 @@ func (c *MixPluginCaller) Wait() {
 		c.GetNativeCaller().Wait()
 		log.Debugf("native caller all done")
 	}()
-	wg.Wait()
+	select {
+	case <-ctx.Done():
+	case <-waitOk:
+
+	}
 }
 
 func (c *MixPluginCaller) ResetFilter() {

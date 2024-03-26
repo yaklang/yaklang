@@ -39,10 +39,20 @@ func (s *Server) execScriptWithExecParam(script *yakit.YakScript, input string, 
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
+
+	var feedbackTimer *time.Timer
+
 	feedbackClient := yaklib.NewVirtualYakitClient(func(result *ypb.ExecResult) error {
+		feedbackTimer.Reset(5 * time.Minute)
 		result.RuntimeID = runtimeId
 		return stream.Send(result)
 	})
+
+	feedbackTimer = time.AfterFunc(5*time.Minute, func() {
+		feedbackClient.YakitSetProgress(1)
+		cancel()
+	})
+
 	engine := yak.NewYakitVirtualClientScriptEngine(feedbackClient)
 	log.Infof("engine.ExecuteExWithContext(stream.Context(), debugScript ... \n")
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
