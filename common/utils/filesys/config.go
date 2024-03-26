@@ -7,23 +7,8 @@ import (
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"io/ioutil"
 	"os"
-	"path"
-	"path/filepath"
-	"time"
 )
-
-type dirChain struct {
-	dirGlob string
-	globIns glob.Glob
-	opts    []Option
-}
-
-type exactChain struct {
-	dirpath string
-	opts    []Option
-}
 
 func NewConfig() *Config {
 	return &Config{
@@ -124,6 +109,15 @@ func WithDirMatch(globDir string, opts ...Option) Option {
 	}
 }
 
+func WithDir(i any, opts ...Option) Option {
+	switch i.(type) {
+	case []byte, string, []rune:
+		return WithDirMatch(utils.InterfaceToString(i), opts...)
+	default:
+		return WithDirMatches(utils.InterfaceToStringSlice(i), opts...)
+	}
+}
+
 func WithFileSystem(f fs.FileSystem) Option {
 	return func(config *Config) {
 		config.fileSystem = f
@@ -136,78 +130,54 @@ func WithEmbedFS(f embed.FS) Option {
 	}
 }
 
-type embedFs struct {
-	f embed.FS
+// onReady will be called when the walker is ready to start walking.
+func withYaklangOnStart(h func(name string, isDir bool)) Option {
+	return WithOnStart(func(basename string, isDir bool) (err error) {
+		defer func() {
+			if e := recover(); e != nil {
+				err = utils.Errorf("onStart failed: %v", e)
+			}
+		}()
+		h(basename, isDir)
+		return nil
+	})
 }
 
-func (e embedFs) ReadDir(dirname string) ([]os.FileInfo, error) {
-	ns, err := e.f.ReadDir(dirname)
-	if err != nil {
-		return nil, err
-	}
-	var infos = make([]os.FileInfo, 0, len(ns))
-	for _, n := range ns {
-		info, err := n.Info()
-		if err != nil {
-			return nil, err
-		}
-		infos = append(infos, info)
-	}
-	return infos, nil
+// onStat will be called when the walker met one file description.
+func withYaklangStat(h func(isDir bool, pathname string, info os.FileInfo)) Option {
+	return WithStat(func(isDir bool, pathname string, info os.FileInfo) (err error) {
+		defer func() {
+			if e := recover(); e != nil {
+				err = utils.Errorf("onStat failed: %v", e)
+			}
+		}()
+		h(isDir, pathname, info)
+		return nil
+	})
 }
 
-/*
-// A FileInfo describes a file and is returned by Stat.
-type FileInfo interface {
-	Name() string       // base name of the file
-	Size() int64        // length in bytes for regular files; system-dependent for others
-	Mode() FileMode     // file mode bits
-	ModTime() time.Time // modification time
-	IsDir() bool        // abbreviation for Mode().IsDir()
-	Sys() any           // underlying data source (can return nil)
-}
-*/
-
-type embedDirInfo string
-
-func (e embedDirInfo) Name() string {
-	_, n := path.Split(string(e))
-	return n
+// onFileStat will be called when the walker met one file.
+func withYaklangFileStat(h func(pathname string, info os.FileInfo)) Option {
+	return WithFileStat(func(pathname string, info os.FileInfo) (err error) {
+		defer func() {
+			if e := recover(); e != nil {
+				err = utils.Errorf("onFileStat failed: %v", e)
+			}
+		}()
+		h(pathname, info)
+		return nil
+	})
 }
 
-func (e embedDirInfo) Size() int64        { return 0 }
-func (e embedDirInfo) Mode() os.FileMode  { return os.ModeDir }
-func (e embedDirInfo) ModTime() time.Time { return time.Time{} }
-func (e embedDirInfo) IsDir() bool        { return true }
-func (e embedDirInfo) Sys() interface{}   { return nil }
-
-func (e embedFs) Lstat(name string) (os.FileInfo, error) {
-	f, err := e.f.Open(name)
-	if err != nil {
-		//_, err := e.f.ReadDir(name)
-		//if err != nil {
-		//	return nil, err
-		//}
-		//var i os.FileInfo = embedDirInfo(name)
-		//return i, nil
-		return nil, err
-	}
-	return f.Stat()
+// onDirStat will be called when the walker met one directory.
+func withYaklangDirStat(h func(pathname string, info os.FileInfo)) Option {
+	return WithDirStat(func(pathname string, info os.FileInfo) (err error) {
+		defer func() {
+			if e := recover(); e != nil {
+				err = utils.Errorf("onDirStat failed: %v", e)
+			}
+		}()
+		h(pathname, info)
+		return nil
+	})
 }
-
-func (e embedFs) Join(elem ...string) string {
-	return path.Join(elem...)
-}
-
-func fromEmbedFS(fs2 embed.FS) fs.FileSystem {
-	return &embedFs{fs2}
-}
-
-// local filesystem
-type localFs struct{}
-
-func (f *localFs) ReadDir(dirname string) ([]os.FileInfo, error) { return ioutil.ReadDir(dirname) }
-
-func (f *localFs) Lstat(name string) (os.FileInfo, error) { return os.Lstat(name) }
-
-func (f *localFs) Join(elem ...string) string { return filepath.Join(elem...) }

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"os"
 	"path/filepath"
 	"strings"
@@ -108,6 +109,7 @@ func initYaklangLib() {
 	yaklang.Import("math", yaklib.MathExport)
 	yaklang.Import("os", yaklib.SystemExports)
 	yaklang.Import("file", yaklib.FileExport)
+	yaklang.Import("filesys", filesys.Exports)
 	yaklang.Import("re", yaklib.RegexpExport)
 	yaklang.Import("re2", yaklib.RegexpExport)
 	yaklang.Import("regen", yaklib.RegenExports)
