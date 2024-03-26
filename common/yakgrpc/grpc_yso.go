@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/javaclassparser"
 	"github.com/yaklang/yaklang/common/log"
 	"sort"
 	"strconv"
@@ -34,17 +35,6 @@ const (
 	StringBool  JavaClassGeneraterOptionTypeVerbose = "StringBool"
 	StringPort  JavaClassGeneraterOptionTypeVerbose = "StringPort"
 )
-
-func isTemplateSupported(gadget string) bool {
-	if gadget == "None" {
-		return false
-	}
-	cfg, ok := yso.YsoConfigInstance.Gadgets[yso.GadgetType(gadget)]
-	if !ok {
-		return false
-	}
-	return cfg.IsTemplateImpl
-}
 
 func (s *Server) GetAllYsoGadgetOptions(ctx context.Context, _ *ypb.Empty) (*ypb.YsoOptionsWithVerbose, error) {
 	allGadget := []*yso.GadgetConfig{}
@@ -111,13 +101,26 @@ func (s *Server) GetAllYsoClassOptions(ctx context.Context, req *ypb.YsoOptionsR
 	}, nil
 }
 func (s *Server) GetAllYsoClassGeneraterOptions(ctx context.Context, req *ypb.YsoOptionsRequerstWithVerbose) (*ypb.YsoClassOptionsResponseWithVerbose, error) {
+	gadgetCfg, ok := yso.YsoConfigInstance.Gadgets[yso.GadgetType(req.Gadget)]
+	var isNone bool
+	if !ok {
+		if req.Gadget == "None" {
+			isNone = true
+		} else {
+			return nil, utils.Errorf("not support gadget: %s", req.Gadget)
+		}
+	}
 	versionOptions := []*ypb.YsoClassGeneraterOptionsWithVerbose{
 		{Key: string(JavaClassGeneraterOption_Version), Value: "52", Type: string(StringPort), KeyVerbose: "Java 版本", Help: "Class 使用的Java 版本"},
 	}
 	commonOptions := []*ypb.YsoClassGeneraterOptionsWithVerbose{
 		{Key: string(JavaClassGeneraterOption_IsObfuscation), Value: "true", Type: string(StringBool), KeyVerbose: "混淆", Help: "开启则混淆，否则不混淆"},
-		{Key: string(JavaClassGeneraterOption_ClassName), Value: utils.RandStringBytes(8), Type: string(String), KeyVerbose: "类名", Help: "类名"},
 	}
+	if !isNone {
+		commonOptions = append(commonOptions, &ypb.YsoClassGeneraterOptionsWithVerbose{Key: string(JavaClassGeneraterOption_DirtyData), Type: string(StringPort), KeyVerbose: "脏数据", Help: "填写脏数据大小"})
+	}
+	commonOptions =
+		append(commonOptions, &ypb.YsoClassGeneraterOptionsWithVerbose{Key: string(JavaClassGeneraterOption_ClassName), Value: utils.RandStringBytes(8), Type: string(String), KeyVerbose: "类名", Help: "类名"})
 	commonOptions = append(commonOptions, versionOptions...)
 	var gadgetOptions []*ypb.YsoClassGeneraterOptionsWithVerbose
 	paramsToOptInfo := func(params []*yso.ParamConfig) []*ypb.YsoClassGeneraterOptionsWithVerbose {
@@ -140,18 +143,7 @@ func (s *Server) GetAllYsoClassGeneraterOptions(ctx context.Context, req *ypb.Ys
 		}
 		return res
 	}
-	gadgetCfg, ok := yso.YsoConfigInstance.Gadgets[yso.GadgetType(req.Gadget)]
-	var isNone bool
-	if !ok {
-		if req.Gadget == "None" {
-			isNone = true
-		} else {
-			return nil, utils.Errorf("not support gadget: %s", req.Gadget)
-		}
-	}
-	if isNone {
-		commonOptions = append(commonOptions, &ypb.YsoClassGeneraterOptionsWithVerbose{Key: string(JavaClassGeneraterOption_DirtyData), Type: string(StringPort), KeyVerbose: "脏数据", Help: "填写脏数据大小"})
-	}
+
 	if isNone || gadgetCfg.IsTemplateImpl {
 		if cfg, ok := yso.YsoConfigInstance.Classes[yso.ClassType(req.Class)]; ok {
 			gadgetOptions = paramsToOptInfo(cfg.Params)
@@ -412,6 +404,7 @@ func (s *Server) GenerateYsoBytes(ctx context.Context, req *ypb.YsoOptionsRequer
 	var fileName string
 	var opts []yso.GenClassOptionFun
 	opts = append(opts, yso.SetClassType(yso.ClassType(req.Class)))
+	var dirtyDataLength int
 	for _, option := range req.Options {
 		if option.Key == string(JavaClassGeneraterOption_ClassName) {
 			fileName = fmt.Sprintf("%s.class", option.Value)
@@ -420,6 +413,14 @@ func (s *Server) GenerateYsoBytes(ctx context.Context, req *ypb.YsoOptionsRequer
 		}
 		if option.Key == string(JavaClassGeneraterOption_IsObfuscation) && option.Value == "true" {
 			opts = append(opts, yso.SetObfuscation())
+			continue
+		}
+		if option.Key == string(JavaClassGeneraterOption_DirtyData) {
+			if v, err := strconv.Atoi(option.Value); err == nil {
+				dirtyDataLength = v
+			} else {
+				log.Errorf("invalid dirty data: %s", option.Value)
+			}
 			continue
 		}
 		if option.Key == string(JavaClassGeneraterOption_Version) {
@@ -469,7 +470,7 @@ func (s *Server) GenerateYsoBytes(ctx context.Context, req *ypb.YsoOptionsRequer
 			params := map[string]string{}
 			opts = append(opts, params)
 			for _, option := range req.Options {
-				if option.Key == string(JavaClassGeneraterOption_ClassName) || option.Key == string(JavaClassGeneraterOption_IsObfuscation) || option.Key == string(JavaClassGeneraterOption_Version) {
+				if option.Key == string(JavaClassGeneraterOption_ClassName) || option.Key == string(JavaClassGeneraterOption_IsObfuscation) || option.Key == string(JavaClassGeneraterOption_Version) || option.Key == string(JavaClassGeneraterOption_DirtyData) {
 					continue
 				}
 				params[option.Key] = option.Value
@@ -482,6 +483,13 @@ func (s *Server) GenerateYsoBytes(ctx context.Context, req *ypb.YsoOptionsRequer
 		}
 
 		byts, err := yso.ToBytes(gadgetIns)
+		if dirtyDataLength > 0 {
+			bs, err := yso.WarpSerializeDataByDirtyData(byts, dirtyDataLength)
+			if err != nil {
+				return nil, utils.Errorf("dirty data error: %v", err)
+			}
+			byts = bs
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -499,7 +507,7 @@ func (s *Server) YsoDump(ctx context.Context, req *ypb.YsoBytesObject) (*ypb.Yso
 	var result string
 	obj1, err := yso.GetJavaObjectFromBytes(req.Data)
 	if err != nil {
-		obj2, err := yso.GenerateClassObjectFromBytes(req.Data)
+		obj2, err := javaclassparser.Parse(req.Data)
 		if err != nil {
 			return nil, utils.Errorf("dump error: %v", err)
 		}
