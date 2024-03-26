@@ -56,8 +56,11 @@ assert count == 10
 
 count = 0
 filesys.Recursive(
-    "/tmp/aa/",
+    file.Join(tempDir, "aa"),
     filesys.dir("ff", filesys.onFileStat((name, info) => {
+
+println(name)
+
                               count++
                           }))
 )~
@@ -67,7 +70,7 @@ assert count == 20
 
 count = 0
 filesys.Recursive(
-    "/tmp/",
+    tempDir,
     filesys.dir(["a*", "f*"], filesys.onFileStat((name, info) => {
                               count++
                           }))
