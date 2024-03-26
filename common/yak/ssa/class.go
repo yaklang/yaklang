@@ -25,6 +25,8 @@ type ClassBluePrint struct {
 	Copy        Value
 	Constructor Value
 	Destructor  Value
+
+	ParentClass []*ClassBluePrint
 }
 
 func NewClassBluePrint() *ClassBluePrint {
@@ -113,6 +115,9 @@ func (c *ClassBluePrint) Apply(obj Value) Type {
 	_ = this
 
 	objTyp := NewObjectType()
+	for _, parent := range c.ParentClass {
+		parent.Apply(obj)
+	}
 
 	for rawKey, member := range c.NormalMember {
 		key := NewConst(rawKey)

@@ -19,35 +19,44 @@ func (b *FunctionBuilder) GetClass(name string) *ClassBluePrint {
 	if c, ok := b.ClassBluePrint[name]; ok {
 		return c
 	}
+	log.Errorf("VisitClass: not this class: %s", name)
 	return nil
 }
 
 func (b *FunctionBuilder) GetStaticMember(class, key string) Value {
 	c := b.GetClass(class)
 	if c == nil {
-		log.Errorf("VisitStaticClass: not this class: %s", class)
 		return nil
 	}
-	v, ok := c.StaticMember[key]
-	if !ok {
-		log.Errorf("VisitStaticClass: this class: %s no this member %s", class, key)
-		return nil
-	}
-	return v
+	return c.GetMember(key, func(class *ClassBluePrint) (Value, bool) {
+		v, ok := class.StaticMember[key]
+		return v, ok
+	})
 }
 
-func (b *FunctionBuilder) GetNormalMember(class, key string) Value {
-	c := b.GetClass(class)
-	if c == nil {
-		log.Errorf("VisitStaticClass: not this class: %s", class)
-		return nil
+// func (b *FunctionBuilder) GetNormalMember(class, key string) Value {
+// 	c := b.GetClass(class)
+// 	if c == nil {
+// 		log.Errorf("VisitStaticClass: not this class: %s", class)
+// 		return nil
+// 	}
+// 	return c.GetMember(key, func(cbp *ClassBluePrint) (Value, bool) {
+// 		v, ok := cbp.NormalMember[key]
+// 		return v, ok
+// 	})
+// }
+
+func (c *ClassBluePrint) GetMember(key string, get func(*ClassBluePrint) (Value, bool)) Value {
+	if v, ok := get(c); ok {
+		return v
 	}
-	v, ok := c.NormalMember[key]
-	if !ok {
-		log.Errorf("VisitStaticClass: this class: %s no this member %s", class, key)
-		return nil
+	for _, p := range c.ParentClass {
+		if v := p.GetMember(key, get); v != nil {
+			return v
+		}
 	}
-	return v
+	log.Errorf("VisitClassMember: this class: %s no this member %s", c.String(), key)
+	return nil
 }
 
 func (b *FunctionBuilder) GetClassConstructor(class string) Value {
@@ -78,6 +87,8 @@ func (b *FunctionBuilder) CreateClass(name string) *ClassBluePrint {
 	c.Name = name
 	return c
 }
+
+//======================= class blue print
 
 func (c *ClassBluePrint) BuildMember(name string, value Value) {
 	c.NormalMember[name] = value

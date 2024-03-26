@@ -145,3 +145,87 @@ func TestOOP_var_member(t *testing.T) {
 	})
 }
 
+func TestOOP_Extend_Class(t *testing.T) {
+
+	t.Run("normal", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		<?php
+		class O {
+			var $a = 0; 
+		}
+		class A extends O{}
+		$a = new A; 
+		println($a->a); // 0
+
+		$b = "a";
+		println($a->$b); // 0
+
+		$c = "b";
+		println($a->$$c); // 0
+		`, []string{
+			"0", "0", "0",
+		}, t)
+	})
+
+	t.Run("side effect", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		<?php
+		class O {
+			var $a = 0; 
+			function setA($par){
+				$this->a = $par; 
+			}
+		}
+		class A extends O{}
+		$a = new A; 
+		println($a->a);
+		$a->setA(1);
+		println($a->a);
+		`, []string{
+			"0", "side-effect(Parameter-$par, $this.a)",
+		}, t)
+	})
+
+	t.Run("free-value", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		<?php
+		class O {
+			var $a = 0; 
+			function getA() {
+				return $this->a;
+			}
+		}
+		class A extends O{}
+		$a = new A; 
+		println($a->getA());
+		$a->a = 1;
+		println($a->getA());
+		`, []string{
+			"Function-.getA(Function-__constructor_normal(),0)",
+			"Function-.getA(Function-__constructor_normal(),1)",
+		}, t)
+	})
+
+	t.Run("just use method", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		<?php
+		class O {
+			var $a = 0; 
+			function getA() {
+				return $this->a;
+			}
+			function setA($par){
+				$this->a = $par; 
+			}
+		}
+		class A extends O{}
+		$a = new A; 
+		println($a->getA());
+		$a->setA(1);
+		println($a->getA());
+		`, []string{
+			"Function-.getA(Function-__constructor_normal(),0)",
+			"Function-.getA(Function-__constructor_normal(),side-effect(Parameter-$par, $this.a))",
+		}, t)
+	})
+}
