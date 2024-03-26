@@ -447,7 +447,15 @@ func (v *BasePHPParserVisitor) VisitIndexCallExpression(ctx *IndexCallExpression
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitCodeExecExpression(ctx *CodeExecExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitCloneExpression(ctx *CloneExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitIncludeExpreesion(ctx *IncludeExpreesionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -540,6 +548,10 @@ func (v *BasePHPParserVisitor) VisitDynamicVariable(ctx *DynamicVariableContext)
 }
 
 func (v *BasePHPParserVisitor) VisitMemberCallVariable(ctx *MemberCallVariableContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitInclude(ctx *IncludeContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

@@ -134,4 +134,48 @@ println($d);
 `
 		test.CheckPrintlnValue(code, []string{"Function-$a()"}, t)
 	})
+
+	//	t.Run("static variable in function inner", func(t *testing.T) {
+	//		code := `<?php
+	//function test_static(){
+	//    static $a=1;
+	//    $a++;
+	//    return $a;
+	//}
+	//echo test_static();
+	//echo test_static();`
+	//		test.MockSSA(t, code)
+	//	})
+}
+func TestParseSSA_DefinedFunc(t *testing.T) {
+	t.Run("include", func(t *testing.T) {
+		code := `<?php
+include "syntax/for.php";`
+		test.MockSSA(t, code)
+	})
+	t.Run("include-2", func(t *testing.T) {
+		code := `<?php
+include("syntax/for.php");`
+		test.MockSSA(t, code)
+	})
+	t.Run("include_once", func(t *testing.T) {
+		code := `<?php
+include_once("syntax/for.php");`
+		test.MockSSA(t, code)
+	})
+	t.Run("require_once", func(t *testing.T) {
+		code := `<?php
+require_once("syntax/for.php");`
+		test.MockSSA(t, code)
+	})
+	t.Run("eval_execute", func(t *testing.T) {
+		code := `<?php
+$a =eval("echo 1");`
+		test.MockSSA(t, code)
+	})
+	t.Run("assert_execute", func(t *testing.T) {
+		code := `<?php
+$a =assert("echo 1");`
+		test.MockSSA(t, code)
+	})
 }

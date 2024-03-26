@@ -510,8 +510,8 @@ expression
     | newExpr                                                     # KeywordNewExpression
     | fullyQualifiedNamespaceExpr                                 # FullyQualifiedNamespaceExpression
     | identifier                                                  # ShortQualifiedNameExpression
-    | staticClassExpr                                               # StaticClassAccessExpression
-    | variable                                                  # VariableExpression
+    | staticClassExpr                                             # StaticClassAccessExpression
+    | variable                                                    # VariableExpression
     | arrayCreation                                               # ArrayCreationExpression
     | Print expression                                            # PrintExpression
     | constant                                                    # ScalarExpression
@@ -519,21 +519,21 @@ expression
     | Label                                                       # ScalarExpression
     | BackQuoteString                                             # BackQuoteStringExpression
     | '(' expression ')'                                          # ParenthesisExpression
+    | include                                                     # IncludeExpreesion
     | Yield                                                       # SpecialWordExpression
     | List '(' assignmentList ')' Eq expression                   # SpecialWordExpression
     | IsSet '(' chainList ')'                                     # SpecialWordExpression
     | Empty '(' chain ')'                                         # SpecialWordExpression
-    | Eval '(' expression ')'                                     # SpecialWordExpression
-    | Exit  '(' expression? ')'                                   # SpecialWordExpression
-    | (Include | IncludeOnce) expression                          # SpecialWordExpression
-    | (Require | RequireOnce) expression                          # SpecialWordExpression
+    | (Exit|Die)  '(' expression? ')'                             # SpecialWordExpression
+    | (Eval|Assert) expression                                    # CodeExecExpression
+    | Throw expression                                            # SpecialWordExpression
     | lambdaFunctionExpr                                          # LambdaFunctionExpression
     | matchExpr                                                   # MatchExpression
     | '(' castOperation ')' expression                            # CastExpression
     | ('~' | '@') expression                                      # UnaryOperatorExpression
     | ('!' | '+' | '-') expression                                # UnaryOperatorExpression
-    | ('++' | '--') leftVariable                                   # PrefixIncDecExpression
-    | leftVariable ('++' | '--')                                   # PostfixIncDecExpression
+    | ('++' | '--') leftVariable                                  # PrefixIncDecExpression
+    | leftVariable ('++' | '--')                                  # PostfixIncDecExpression
     | expression arguments                                        # FunctionCallExpression
     | expression '[' indexMemberCallKey ']'                               # IndexCallExpression
     | expression '->' memberCallKey                                  # MemberCallExpression
@@ -552,7 +552,6 @@ expression
     | expression op = QuestionMark expression? ':' expression     # ConditionalExpression
     | expression op = '??' expression                             # NullCoalescingExpression
     | expression op = '<=>' expression                            # SpaceshipExpression
-    | Throw expression                                            # SpecialWordExpression
     //  assign 
     | leftArrayCreation Eq expression                             # ArrayCreationUnpackExpression
     | expression '[' indexMemberCallKey ']' assignmentOperator expression # SliceCallAssignmentExpression
@@ -574,6 +573,10 @@ variable
     : VarName                                               # NormalVariable// $a=3
     | Dollar+ VarName                                       # DynamicVariable// $$a= 1; or $$$a=1;
     | Dollar+ OpenCurlyBracket expression CloseCurlyBracket # MemberCallVariable// ${ expr }=3
+    ;
+
+include
+    :(Include | IncludeOnce | Require | RequireOnce) expression
     ;
 
 leftArrayCreation // PHP7.1+
@@ -880,8 +883,8 @@ key
     | EndIf
     | EndSwitch
     | EndWhile
-    | Eval
-    | Exit
+//    | Eval
+//    | Exit
     | Extends
     | Final
     | Finally
@@ -894,8 +897,8 @@ key
     | If
     | Implements
     | Import
-    | Include
-    | IncludeOnce
+//    | Include
+//    | IncludeOnce
     | InstanceOf
     | InsteadOf
     | Int16Cast
@@ -903,7 +906,7 @@ key
     | Int8Cast
     | Interface
     | IntType
-    | IsSet
+//    | IsSet
     | LambdaFn
     | List
     | LogicalAnd
@@ -920,14 +923,14 @@ key
     | Protected
     | Public
     | Readonly
-    | Require
-    | RequireOnce
+//    | Require
+//    | RequireOnce
     | Resource
     | Return
     | Static
     | StringType
     | Switch
-    | Throw
+//    | Throw
     | Trait
     | Try
     | Typeof
