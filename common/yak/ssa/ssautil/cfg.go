@@ -377,12 +377,15 @@ func (s *SwitchStmt[T]) Build(merge func(string, []T) T) ScopedVersionedTableIF[
 		)
 	} else {
 		DefaultBody := s.mergeToNextBody
-		if len(s.mergeToSwitchEnd) == 0 {
-			// has default, no break, just cover by default
-			end.CoverBy(DefaultBody)
-		} else {
-			// has default, has break, merge
+		if DefaultBody != nil {
 			s.mergeToSwitchEnd = append(s.mergeToSwitchEnd, DefaultBody)
+		}
+		switch len(s.mergeToSwitchEnd) {
+		case 0:
+		case 1:
+			// has default, no break, just cover by default
+			end.CoverBy(s.mergeToSwitchEnd[0])
+		default:
 			end.Merge(false, merge, s.mergeToSwitchEnd...)
 		}
 	}

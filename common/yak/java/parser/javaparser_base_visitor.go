@@ -331,6 +331,10 @@ func (v *BaseJavaParserVisitor) VisitElseIfBlock(ctx *ElseIfBlockContext) interf
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseJavaParserVisitor) VisitBlockStatementList(ctx *BlockStatementListContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseJavaParserVisitor) VisitBlockStatement(ctx *BlockStatementContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -515,11 +519,15 @@ func (v *BaseJavaParserVisitor) VisitConstructorReferenceExpression(ctx *Constru
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseJavaParserVisitor) VisitPrefixBinayExpression2(ctx *PrefixBinayExpression2Context) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseJavaParserVisitor) VisitBitwiseORExpression(ctx *BitwiseORExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaParserVisitor) VisitAssignmentExpression(ctx *AssignmentExpressionContext) interface{} {
+func (v *BaseJavaParserVisitor) VisitPrefixBinayExpression1(ctx *PrefixBinayExpression1Context) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -531,15 +539,19 @@ func (v *BaseJavaParserVisitor) VisitInstanceofExpression(ctx *InstanceofExpress
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaParserVisitor) VisitAssignmentEqExpression(ctx *AssignmentEqExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BaseJavaParserVisitor) VisitEqualityExpression(ctx *EqualityExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
 func (v *BaseJavaParserVisitor) VisitMultiplicativeExpression(ctx *MultiplicativeExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitAssignmentEqExpression1(ctx *AssignmentEqExpression1Context) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitAssignmentEqExpression2(ctx *AssignmentEqExpression2Context) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -559,11 +571,15 @@ func (v *BaseJavaParserVisitor) VisitNewCreatorExpression(ctx *NewCreatorExpress
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaParserVisitor) VisitPrefixBinayExpression(ctx *PrefixBinayExpressionContext) interface{} {
+func (v *BaseJavaParserVisitor) VisitAssignmentExpression2(ctx *AssignmentExpression2Context) interface{} {
 	return v.VisitChildren(ctx)
 }
 
 func (v *BaseJavaParserVisitor) VisitShiftExpression(ctx *ShiftExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitAssignmentExpression1(ctx *AssignmentExpression1Context) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -583,7 +599,11 @@ func (v *BaseJavaParserVisitor) VisitJava8LambdaExpression(ctx *Java8LambdaExpre
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaParserVisitor) VisitPostfixExpression(ctx *PostfixExpressionContext) interface{} {
+func (v *BaseJavaParserVisitor) VisitPostfixExpression1(ctx *PostfixExpression1Context) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJavaParserVisitor) VisitPostfixExpression2(ctx *PostfixExpression2Context) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -595,11 +615,11 @@ func (v *BaseJavaParserVisitor) VisitBitwiseXORExpression(ctx *BitwiseXORExpress
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaParserVisitor) VisitLeftExpression(ctx *LeftExpressionContext) interface{} {
+func (v *BaseJavaParserVisitor) VisitLeftMemberCall(ctx *LeftMemberCallContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseJavaParserVisitor) VisitLeftVariable(ctx *LeftVariableContext) interface{} {
+func (v *BaseJavaParserVisitor) VisitLeftSliceCall(ctx *LeftSliceCallContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

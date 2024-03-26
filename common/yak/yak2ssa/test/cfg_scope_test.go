@@ -245,9 +245,9 @@ func TestYaklangBasic_Variable_InIf(t *testing.T) {
 		if c {
 			a = 2
 			println(a)
-		}elif   c == 2{
+		}else if  c == 2{
 			a = 3
-			println(a+d)
+			println(a)
 		}
 		println(a)
 		`,
