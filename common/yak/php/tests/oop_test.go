@@ -117,8 +117,8 @@ func TestOOP_var_member(t *testing.T) {
 		$a->a = 1;
 		println($a->getA());
 		`, []string{
-			"Function-.getA(Function-__constructor_normal(),0)",
-			"Function-.getA(Function-__constructor_normal(),1)",
+			"Function-.getA(make(object{}),0)",
+			"Function-.getA(make(object{}),1)",
 		}, t)
 	})
 
@@ -139,8 +139,8 @@ func TestOOP_var_member(t *testing.T) {
 		$a->setA(1);
 		println($a->getA());
 		`, []string{
-			"Function-.getA(Function-__constructor_normal(),0)",
-			"Function-.getA(Function-__constructor_normal(),side-effect(Parameter-$par, $this.a))",
+			"Function-.getA(make(object{}),0)",
+			"Function-.getA(make(object{}),side-effect(Parameter-$par, $this.a))",
 		}, t)
 	})
 }
@@ -201,8 +201,8 @@ func TestOOP_Extend_Class(t *testing.T) {
 		$a->a = 1;
 		println($a->getA());
 		`, []string{
-			"Function-.getA(Function-__constructor_normal(),0)",
-			"Function-.getA(Function-__constructor_normal(),1)",
+			"Function-.getA(make(object{}),0)",
+			"Function-.getA(make(object{}),1)",
 		}, t)
 	})
 
@@ -224,8 +224,44 @@ func TestOOP_Extend_Class(t *testing.T) {
 		$a->setA(1);
 		println($a->getA());
 		`, []string{
-			"Function-.getA(Function-__constructor_normal(),0)",
-			"Function-.getA(Function-__constructor_normal(),side-effect(Parameter-$par, $this.a))",
+			"Function-.getA(make(object{}),0)",
+			"Function-.getA(make(object{}),side-effect(Parameter-$par, $this.a))",
+		}, t)
+	})
+}
+
+func TestParseCLS_Construct(t *testing.T) {
+	t.Run("no construct", func(t *testing.T) {
+		code := `<?php
+		class A {
+			var $num = 0;
+			public function getNum() {
+				return $this->num;
+			}
+		}
+		$a = new A(); 
+		println($a->getNum());
+		`
+		ssatest.CheckPrintlnValue(code, []string{
+			"Function-.getNum(make(object{}),0)",
+		}, t)
+	})
+
+	t.Run("normal construct", func(t *testing.T) {
+		code := `<?php
+class A {
+	private $num = 0;
+	public function __construct($num) {
+		$this->num = $num;
+	}
+	public function getNum() {
+		return $this->num;
+	}
+}
+$a = new A(1);
+println($a->getNum());`
+		ssatest.CheckPrintlnValue(code, []string{
+			"Function-.getNum(make(object{}),side-effect(Parameter-$num, $this.num))",
 		}, t)
 	})
 }
