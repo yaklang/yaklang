@@ -48,7 +48,7 @@ func init() {
 }
 
 func TestMustPassDebug(t *testing.T) {
-	debugName := "mock_tcp_probe.yak"
+	debugName := "filesys.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {
