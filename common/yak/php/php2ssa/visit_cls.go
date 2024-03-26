@@ -159,9 +159,13 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 	class := y.ir.CreateClass(className)
 	for _, statement := range i.AllClassStatement() {
 		y.VisitClassStatement(statement, class)
-
 	}
 
+	for _, parentClass := range mergedTemplate {
+		if parent := y.ir.GetClass(parentClass); parent != nil {
+			class.ParentClass = append(class.ParentClass, parent)
+		}
+	}
 	// class.AddMethod()
 	//template := y.ir.BuildObjectTemplate(objectTemplate)    // 注册一个对象模版（有构造和析构方法的对象）
 	//template.SetDecorationVerbose(...)                        // 记录一下修饰词
