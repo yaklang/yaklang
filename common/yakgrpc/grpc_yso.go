@@ -358,7 +358,7 @@ hexPayload = codec.EncodeToHex(classBytes)
 					continue
 				}
 				if option.Key == string(JavaClassGeneraterOption_DirtyData) {
-					dirtyOpt = fmt.Sprintf("gadgetBytes = yso.WarpByDirtyData(gadgetBytes,%d)", dirtyData)
+					dirtyOpt = fmt.Sprintf("gadgetBytes = yso.WrapByDirtyData(gadgetBytes,%d)", dirtyData)
 					continue
 				}
 				if option.Key == string(JavaClassGeneraterOption_IsObfuscation) && option.Value == "true" {
@@ -383,7 +383,7 @@ hexPayload = codec.EncodeToHex(classBytes)
 			optionsCode = append(optionsCode, optionsToCode(req.Options))
 			var dirtyOpt string
 			if dirtyData > 0 {
-				dirtyOpt = fmt.Sprintf("gadgetBytes = yso.WarpByDirtyData(gadgetBytes,%d)", dirtyData)
+				dirtyOpt = fmt.Sprintf("gadgetBytes = yso.WrapByDirtyData(gadgetBytes,%d)", dirtyData)
 			}
 			classCode := utils.Format(gadgetCodeTmp, map[string]string{
 				"options":   strings.Join(optionsCode, ","),
@@ -484,7 +484,7 @@ func (s *Server) GenerateYsoBytes(ctx context.Context, req *ypb.YsoOptionsRequer
 
 		byts, err := yso.ToBytes(gadgetIns)
 		if dirtyDataLength > 0 {
-			bs, err := yso.WarpSerializeDataByDirtyData(byts, dirtyDataLength)
+			bs, err := yso.WrapSerializeDataByDirtyData(byts, dirtyDataLength)
 			if err != nil {
 				return nil, utils.Errorf("dirty data error: %v", err)
 			}

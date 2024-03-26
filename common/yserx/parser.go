@@ -38,12 +38,21 @@ func (j *JavaSerializationParser) debug(tmp string, item ...interface{}) {
 		_, _ = fmt.Fprintln(j.output, strings.Repeat(INDENT, j.indent)+fmt.Sprintf(tmp, item...))
 	}
 }
-
+func MarshalJavaObjectWithConfig(serIns JavaSerializable, cfg *MarshalContext) []byte {
+	if cfg == nil {
+		cfg = &MarshalContext{}
+	}
+	raw := MAGIC_BANNER
+	raw = append(raw, 0x00, 0x05)
+	raw = append(raw, serIns.Marshal(cfg)...)
+	return raw
+}
 func MarshalJavaObjects(res ...JavaSerializable) []byte {
+	cfg := &MarshalContext{}
 	raw := MAGIC_BANNER
 	raw = append(raw, 0x00, 0x05)
 	for _, i := range res {
-		raw = append(raw, i.Marshal()...)
+		raw = append(raw, i.Marshal(cfg)...)
 	}
 	return raw
 }

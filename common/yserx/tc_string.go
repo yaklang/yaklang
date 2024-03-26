@@ -1,5 +1,7 @@
 package yserx
 
+import "github.com/yaklang/yaklang/common/utils"
+
 type JavaString struct {
 	Type        byte   `json:"type"`
 	TypeVerbose string `json:"type_verbose"`
@@ -10,7 +12,7 @@ type JavaString struct {
 	Handle      uint64 `json:"handle"`
 }
 
-func (s *JavaString) Marshal() []byte {
+func (s *JavaString) Marshal(cfg *MarshalContext) []byte {
 	if s.IsLong {
 		raw := []byte{TC_LONGSTRING}
 		raw = append(raw, Uint64To8Bytes(s.Size)...)
@@ -18,8 +20,9 @@ func (s *JavaString) Marshal() []byte {
 		return raw
 	}
 	raw := []byte{TC_STRING}
-	raw = append(raw, IntTo2Bytes(int(s.Size))...)
-	raw = append(raw, s.Raw...)
+	byts := utils.ToJavaOverLongString(s.Raw, cfg.StringCharLength)
+	raw = append(raw, IntTo2Bytes(len(byts))...)
+	raw = append(raw, byts...)
 	return raw
 }
 

@@ -31,7 +31,7 @@ func (j *JavaClassDetails) IsJavaNull() bool {
 	return false
 }
 
-func (j *JavaClassDetails) Marshal() []byte {
+func (j *JavaClassDetails) Marshal(cfg *MarshalContext) []byte {
 	nullRaw := []byte{TC_NULL}
 	if j == nil {
 		return nullRaw
@@ -45,36 +45,36 @@ func (j *JavaClassDetails) Marshal() []byte {
 		raw := []byte{TC_PROXYCLASSDESC}
 		raw = append(raw, IntTo4Bytes(j.DynamicProxyClassInterfaceCount)...)
 		for _, i := range j.DynamicProxyClassInterfaceNames {
-			raw = append(raw, marshalString(i)...)
+			raw = append(raw, marshalString(i, cfg.StringCharLength)...)
 		}
 		for _, i := range j.DynamicProxyAnnotation {
-			raw = append(raw, i.Marshal()...)
+			raw = append(raw, i.Marshal(cfg)...)
 		}
 		raw = append(raw, TC_ENDBLOCKDATA)
 		if j.SuperClass == nil {
 			return raw
 		} else {
-			raw = append(raw, j.SuperClass.Marshal()...)
+			raw = append(raw, j.SuperClass.Marshal(cfg)...)
 			return raw
 		}
 	}
 
 	raw := []byte{TC_CLASSDESC}
-	raw = append(raw, marshalString(j.ClassName)...)
+	raw = append(raw, marshalString(j.ClassName, cfg.StringCharLength)...)
 	raw = append(raw, j.SerialVersion...)
 	raw = append(raw, j.DescFlag)
-	raw = append(raw, j.Fields.Marshal()...)
+	raw = append(raw, j.Fields.Marshal(cfg)...)
 
 	// annotation
 	for _, i := range j.Annotations {
-		raw = append(raw, i.Marshal()...)
+		raw = append(raw, i.Marshal(cfg)...)
 	}
 	raw = append(raw, TC_ENDBLOCKDATA)
 
 	if j.SuperClass == nil {
 		raw = append(raw, TC_NULL)
 	} else {
-		raw = append(raw, j.SuperClass.Marshal()...)
+		raw = append(raw, j.SuperClass.Marshal(cfg)...)
 	}
 	return raw
 }
