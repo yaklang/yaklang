@@ -52,7 +52,10 @@ func _saveFile(fileName string, i interface{}) error {
 		}
 	case []string:
 		for _, line := range ret {
-			_, _ = file.WriteString(fmt.Sprintf("%v\n", line))
+			_, err = file.WriteString(fmt.Sprintf("%v\n", line))
+			if err != nil {
+				return err
+			}
 		}
 	default:
 		return utils.Errorf("not support type: %v", reflect.TypeOf(ret))
