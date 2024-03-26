@@ -1,5 +1,6 @@
 targetUrl = f`${VULINBOX}/git/website/`
-localReposDir = `/tmp/test_githack`
+localReposDir = file.Join(os.TempDir(), str.RandStr(16))
+defer os.RemoveAll(localReposDir)
 assert !file.IsExisted(file.Join(localReposDir, `flag.txt`)), `flag.txt should not exist before githack`
 os.RemoveAll(localReposDir)
 time.sleep(1)

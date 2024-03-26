@@ -6,11 +6,9 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/vulinbox"
 	"github.com/yaklang/yaklang/common/yak"
@@ -50,7 +48,7 @@ func init() {
 }
 
 func TestMustPassDebug(t *testing.T) {
-	debugName := "mitm_downstream_modified_request.yak"
+	debugName := "mock_tcp_probe.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {
@@ -70,7 +68,8 @@ func TestMustPassDebug(t *testing.T) {
 	for _, i := range debugCases {
 		t.Run(i[0], func(t *testing.T) {
 			_, err := yak.Execute(i[1], map[string]any{
-				"VULINBOX": vulinboxAddr,
+				"VULINBOX":      vulinboxAddr,
+				"VULINBOX_HOST": utils.ExtractHostPort(vulinboxAddr),
 			})
 			if err != nil {
 				t.Fatalf("[%v] error: %v", i[0], err)
@@ -94,27 +93,18 @@ func TestMustPass(t *testing.T) {
 		panic("VULINBOX START ERROR")
 	}
 
-	var totalErr error
-	var wg sync.WaitGroup
 	for _, i := range cases {
-		wg.Add(1)
-		go func(caseName string, caseContent string) {
-			defer wg.Done()
+		caseName, caseContent := i[0], i[1]
+		t.Run(caseName, func(t *testing.T) {
+			t.Parallel()
+
 			_, err := yak.Execute(caseContent, map[string]interface{}{
 				"VULINBOX":      vulinboxAddr,
 				"VULINBOX_HOST": utils.ExtractHostPort(vulinboxAddr),
 			})
 			if err != nil {
-				err := utils.Errorf("run script: %s : %v", caseName, err)
-				log.Error(err)
-				totalErr = utils.JoinErrors(totalErr)
+				t.Fatalf("run script[%s] error: %v", caseName, err)
 			}
-		}(i[0], i[1])
-	}
-
-	wg.Wait()
-
-	if totalErr != nil {
-		t.Fatalf("total error: %v", totalErr.Error())
+		})
 	}
 }
