@@ -7,6 +7,18 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+// Recursive recursively walk through the file system
+// raw: the root path
+// opts: options
+// return: error
+//
+// Example:
+// ```
+// err := filesys.Recursive( //
+//	"testdata",
+//	filesys.dir(["cc", "dd"], filesys.onFileStat((name, info) => {})),
+// )
+// ```
 func Recursive(raw string, opts ...Option) error {
 	return recursive(make(map[string]struct{}), raw, opts...)
 }
