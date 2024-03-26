@@ -1164,3 +1164,18 @@ func Format(raw string, data map[string]string) string {
 func ReplaceLastSubString(s, sub, new string) string {
 	return strings.Replace(s, sub, new, strings.LastIndex(s, sub))
 }
+
+// ToJavaOverLongString convert string
+func ToJavaOverLongString(str string) []byte {
+	// 3 byte format: 1110xxxx 10xxxxxx 10xxxxxx
+	// 2 byte format: 110xxxxx 10xxxxxx
+	// 1 byte format: 0xxxxxxx
+	// convert to 3 bytes
+	buf := bytes.Buffer{}
+	for _, ch := range str {
+		buf.WriteByte(0xe0 | byte(ch>>12))
+		buf.WriteByte(0x80 | byte((ch>>6)&0x3f))
+		buf.WriteByte(0x80 | byte(ch&0x3f))
+	}
+	return buf.Bytes()
+}
