@@ -452,14 +452,20 @@ recordBody
 // STATEMENTS / BLOCKS
 
 block
-    : '{' blockStatement* '}'
+    : '{' blockStatementList? '}'
     ;
+
 elseBlock
     :ELSE block
     ;
 elseIfBlock
     :ELSE IF parExpression block
     ;
+
+blockStatementList
+    : blockStatement +
+    ;
+
 blockStatement
     : localVariableDeclaration ';'
     | localTypeDeclaration
@@ -622,11 +628,12 @@ expression
     | switchExpression                                              # Java17SwitchExpression
 
     // Level 15 Post-increment/decrement operators
-    | leftExpression postfix = ('++' | '--')                            # PostfixExpression
-
+    | leftExpression= expression (leftMemberCall | leftSliceCall)  postfix = ('++' | '--')                            # PostfixExpression1
+    | identifier  postfix = ('++' | '--')                            # PostfixExpression2
     // Level 14, Unary operators
     | prefix = ('+' | '-'  | '~' | '!') expression                   # PrefixUnaryExpression
-    | prefix = ('++' | '--') leftExpression                           # PrefixBinayExpression
+    | prefix = ('++' | '--') leftExpression= expression (leftMemberCall | leftSliceCall)                     # PrefixBinayExpression1
+    | prefix = ('++' | '--') identifier                              # PrefixBinayExpression2
     // Level 13 Cast and object creation
     | '(' annotation* typeType ('&' typeType)* ')' expression       # CastExpression
     | NEW creator                                                   # NewCreatorExpression
@@ -656,7 +663,7 @@ expression
     // Level 2, Ternary (Conditional) operator
     | <assoc = right> expression bop = '?' expression ':' expression# TernaryExpression
     // Level 1, Assignment
-    | <assoc = right> leftExpression bop = (
+    | <assoc = right>leftExpression= expression (leftMemberCall | leftSliceCall)  bop = (
          '+='
         | '-='
         | '*='
@@ -668,24 +675,35 @@ expression
         | '>>>='
         | '<<='
         | '%='
-    ) expression                                                    # AssignmentExpression
-    | <assoc = right> leftExpression bop = '=' (identifier|expression)            # AssignmentEqExpression
+    ) expression                                                    # AssignmentExpression1
+    |<assoc = right>identifier  bop = (
+              '+='
+             | '-='
+             | '*='
+             | '/='
+             | '&='
+             | '|='
+             | '^='
+             | '>>='
+             | '>>>='
+             | '<<='
+             | '%='
+         ) expression                                              # AssignmentExpression2
+    | <assoc = right>leftExpression= expression (leftMemberCall | leftSliceCall)  bop = '=' (expression|identifier)            # AssignmentEqExpression1
+    | <assoc = right>identifier bop = '=' (expression|identifier)          # AssignmentEqExpression2
     // Level 0, Lambda Expression Java8
     | lambdaExpression                                              # Java8LambdaExpression
     ;
 
-// 暂时使用，等弄类的时候再换掉
 
-leftExpression
-    :leftVariable ('[' expression ']')*
+
+leftMemberCall
+    :'.' identifier
     ;
 
-leftVariable
-    : identifier ('.' identifier)*
-    | THIS ('.' identifier)*
-    | SUPER ('.' identifier)*
+leftSliceCall
+    : '[' expression ']'
     ;
-
 
 // Java17
 pattern

@@ -250,6 +250,9 @@ type JavaParserVisitor interface {
 	// Visit a parse tree produced by JavaParser#elseIfBlock.
 	VisitElseIfBlock(ctx *ElseIfBlockContext) interface{}
 
+	// Visit a parse tree produced by JavaParser#blockStatementList.
+	VisitBlockStatementList(ctx *BlockStatementListContext) interface{}
+
 	// Visit a parse tree produced by JavaParser#blockStatement.
 	VisitBlockStatement(ctx *BlockStatementContext) interface{}
 
@@ -388,11 +391,14 @@ type JavaParserVisitor interface {
 	// Visit a parse tree produced by JavaParser#ConstructorReferenceExpression.
 	VisitConstructorReferenceExpression(ctx *ConstructorReferenceExpressionContext) interface{}
 
+	// Visit a parse tree produced by JavaParser#PrefixBinayExpression2.
+	VisitPrefixBinayExpression2(ctx *PrefixBinayExpression2Context) interface{}
+
 	// Visit a parse tree produced by JavaParser#BitwiseORExpression.
 	VisitBitwiseORExpression(ctx *BitwiseORExpressionContext) interface{}
 
-	// Visit a parse tree produced by JavaParser#AssignmentExpression.
-	VisitAssignmentExpression(ctx *AssignmentExpressionContext) interface{}
+	// Visit a parse tree produced by JavaParser#PrefixBinayExpression1.
+	VisitPrefixBinayExpression1(ctx *PrefixBinayExpression1Context) interface{}
 
 	// Visit a parse tree produced by JavaParser#MethodReferenceExpression.
 	VisitMethodReferenceExpression(ctx *MethodReferenceExpressionContext) interface{}
@@ -400,14 +406,17 @@ type JavaParserVisitor interface {
 	// Visit a parse tree produced by JavaParser#InstanceofExpression.
 	VisitInstanceofExpression(ctx *InstanceofExpressionContext) interface{}
 
-	// Visit a parse tree produced by JavaParser#AssignmentEqExpression.
-	VisitAssignmentEqExpression(ctx *AssignmentEqExpressionContext) interface{}
-
 	// Visit a parse tree produced by JavaParser#EqualityExpression.
 	VisitEqualityExpression(ctx *EqualityExpressionContext) interface{}
 
 	// Visit a parse tree produced by JavaParser#MultiplicativeExpression.
 	VisitMultiplicativeExpression(ctx *MultiplicativeExpressionContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#AssignmentEqExpression1.
+	VisitAssignmentEqExpression1(ctx *AssignmentEqExpression1Context) interface{}
+
+	// Visit a parse tree produced by JavaParser#AssignmentEqExpression2.
+	VisitAssignmentEqExpression2(ctx *AssignmentEqExpression2Context) interface{}
 
 	// Visit a parse tree produced by JavaParser#AdditiveExpression.
 	VisitAdditiveExpression(ctx *AdditiveExpressionContext) interface{}
@@ -421,11 +430,14 @@ type JavaParserVisitor interface {
 	// Visit a parse tree produced by JavaParser#NewCreatorExpression.
 	VisitNewCreatorExpression(ctx *NewCreatorExpressionContext) interface{}
 
-	// Visit a parse tree produced by JavaParser#PrefixBinayExpression.
-	VisitPrefixBinayExpression(ctx *PrefixBinayExpressionContext) interface{}
+	// Visit a parse tree produced by JavaParser#AssignmentExpression2.
+	VisitAssignmentExpression2(ctx *AssignmentExpression2Context) interface{}
 
 	// Visit a parse tree produced by JavaParser#ShiftExpression.
 	VisitShiftExpression(ctx *ShiftExpressionContext) interface{}
+
+	// Visit a parse tree produced by JavaParser#AssignmentExpression1.
+	VisitAssignmentExpression1(ctx *AssignmentExpression1Context) interface{}
 
 	// Visit a parse tree produced by JavaParser#LogicANDExpression.
 	VisitLogicANDExpression(ctx *LogicANDExpressionContext) interface{}
@@ -439,8 +451,11 @@ type JavaParserVisitor interface {
 	// Visit a parse tree produced by JavaParser#Java8LambdaExpression.
 	VisitJava8LambdaExpression(ctx *Java8LambdaExpressionContext) interface{}
 
-	// Visit a parse tree produced by JavaParser#PostfixExpression.
-	VisitPostfixExpression(ctx *PostfixExpressionContext) interface{}
+	// Visit a parse tree produced by JavaParser#PostfixExpression1.
+	VisitPostfixExpression1(ctx *PostfixExpression1Context) interface{}
+
+	// Visit a parse tree produced by JavaParser#PostfixExpression2.
+	VisitPostfixExpression2(ctx *PostfixExpression2Context) interface{}
 
 	// Visit a parse tree produced by JavaParser#CastExpression.
 	VisitCastExpression(ctx *CastExpressionContext) interface{}
@@ -448,11 +463,11 @@ type JavaParserVisitor interface {
 	// Visit a parse tree produced by JavaParser#BitwiseXORExpression.
 	VisitBitwiseXORExpression(ctx *BitwiseXORExpressionContext) interface{}
 
-	// Visit a parse tree produced by JavaParser#leftExpression.
-	VisitLeftExpression(ctx *LeftExpressionContext) interface{}
+	// Visit a parse tree produced by JavaParser#leftMemberCall.
+	VisitLeftMemberCall(ctx *LeftMemberCallContext) interface{}
 
-	// Visit a parse tree produced by JavaParser#leftVariable.
-	VisitLeftVariable(ctx *LeftVariableContext) interface{}
+	// Visit a parse tree produced by JavaParser#leftSliceCall.
+	VisitLeftSliceCall(ctx *LeftSliceCallContext) interface{}
 
 	// Visit a parse tree produced by JavaParser#pattern.
 	VisitPattern(ctx *PatternContext) interface{}
