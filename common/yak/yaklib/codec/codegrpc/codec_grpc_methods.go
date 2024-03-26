@@ -35,8 +35,9 @@ var CodecLibsDoc []*ypb.CodecMethod // 记录函数的数据，参数类型等�
 type outputType = string
 
 var (
-	OUTPUT_RAW = "raw"
-	OUTPUT_HEX = "hex"
+	OUTPUT_RAW    = "raw"
+	OUTPUT_HEX    = "hex"
+	OUTPUT_BASE64 = "base64"
 )
 
 func init() {
@@ -100,6 +101,8 @@ func convertOutput(text []byte, output outputType) []byte {
 		return text
 	case OUTPUT_HEX:
 		return []byte(codec.EncodeToHex(text))
+	case OUTPUT_BASE64:
+		return []byte(codec.EncodeBase64(text))
 	default:
 		return text
 	}
@@ -111,6 +114,12 @@ func covertInput(text []byte, input outputType) []byte {
 		return text
 	case OUTPUT_HEX:
 		data, err := codec.DecodeHex(string(text))
+		if err != nil {
+			return text
+		}
+		return data
+	case OUTPUT_BASE64:
+		data, err := codec.DecodeBase64(string(text))
 		if err != nil {
 			return text
 		}
@@ -132,7 +141,7 @@ func covertInput(text []byte, input outputType) []byte {
 // { Name = "hexKey", Type = "input", Required = true, Regex = "^[a-fA-F0-9]{32}|[a-fA-F0-9]{48}|[a-fA-F0-9]{64}$",Label = "Key"},
 // { Name = "hexIV", Type = "input", Required = false, Regex = "^[a-fA-F0-9]{32}$",Label = "IV"},
 // { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "GCM"], Required = true, Label = "Mode"},
-// { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw"], Required = true ,Label = "输出格式"}
+// { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "输出格式"}
 // ]
 func (flow *CodecExecFlow) AESEncrypt(hexKey string, hexIV string, mode string, output outputType) error {
 	var data []byte
@@ -168,7 +177,7 @@ func (flow *CodecExecFlow) AESEncrypt(hexKey string, hexIV string, mode string, 
 // { Name = "hexKey", Type = "input", Required = true, Regex = "^[a-fA-F0-9]{32}|[a-fA-F0-9]{48}|[a-fA-F0-9]{64}$",Label = "Key"},
 // { Name = "hexIV", Type = "input", Required = false, Regex = "^[a-fA-F0-9]{32}$",Label = "IV"},
 // { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "GCM"], Required = true, Label = "Mode"},
-// { Name = "input", Type = "select", DefaultValue = "hex", Options = ["hex", "raw"], Required = true,Label = "输入格式"}
+// { Name = "input", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true,Label = "输入格式"}
 // ]
 func (flow *CodecExecFlow) AESDecrypt(hexKey string, hexIV string, mode string, input outputType) error {
 	var data []byte
@@ -201,7 +210,7 @@ func (flow *CodecExecFlow) AESDecrypt(hexKey string, hexIV string, mode string, 
 // { Name = "hexKey", Type = "input", Required = true, Regex = "^[a-fA-F0-9]{32}$",Label = "Key"},
 // { Name = "hexIV", Type = "input", Required = false, Regex = "^[a-fA-F0-9]{32}$",Label = "IV"},
 // { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "GCM", "CFB", "OFB"], Required = true, Label = "Mode"},
-// { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw"], Required = true,Label = "输出格式"}
+// { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw","base64"], Required = true,Label = "输出格式"}
 // ]
 func (flow *CodecExecFlow) SM4Encrypt(hexKey string, hexIV string, mode string, output outputType) error {
 	var data []byte
@@ -237,7 +246,7 @@ func (flow *CodecExecFlow) SM4Encrypt(hexKey string, hexIV string, mode string, 
 // { Name = "hexKey", Type = "input", Required = true, Regex = "^[a-fA-F0-9]{32}$",Label = "Key"},
 // { Name = "hexIV", Type = "input", Required = false, Regex = "^[a-fA-F0-9]{32}$",Label = "IV"},
 // { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB", "GCM", "CFB", "OFB"], Required = true, Label = "Mode"},
-// { Name = "input", Type = "select", DefaultValue = "hex", Options = ["hex", "raw"], Required = true ,Label = "输入格式"}
+// { Name = "input", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "输入格式"}
 // ]
 func (flow *CodecExecFlow) SM4Decrypt(hexKey string, hexIV string, mode string, input outputType) error {
 	var data []byte
@@ -274,7 +283,7 @@ func (flow *CodecExecFlow) SM4Decrypt(hexKey string, hexIV string, mode string, 
 // { Name = "hexKey", Type = "input", Required = true, Regex = "^[a-fA-F0-9]{16}$",	Label = "Key"},
 // { Name = "hexIV", Type = "input", Required = false, Regex = "^[a-fA-F0-9]{16}$",Label = "IV"},
 // { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB"], Required = true , Label = "Mode"},
-// { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw"], Required = true,Label = "输出格式"}
+// { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw","base64"], Required = true,Label = "输出格式"}
 // ]
 func (flow *CodecExecFlow) DESEncrypt(hexKey string, hexIV string, mode string, output outputType) error {
 	var data []byte
@@ -305,7 +314,7 @@ func (flow *CodecExecFlow) DESEncrypt(hexKey string, hexIV string, mode string, 
 // { Name = "hexKey", Type = "input", Required = true, Regex = "^[a-fA-F0-9]{16}$",	Label = "Key"},
 // { Name = "hexIV", Type = "input", Required = false, Regex = "^[a-fA-F0-9]{16}$",Label = "IV"},
 // { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB"], Required = true , Label = "Mode"},
-// { Name = "input", Type = "select", DefaultValue = "hex", Options = ["hex", "raw"], Required = true ,Label = "输入格式"}
+// { Name = "input", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "输入格式"}
 // ]
 func (flow *CodecExecFlow) DESDecrypt(hexKey string, hexIV string, mode string, input outputType) error {
 	var data []byte
@@ -336,7 +345,7 @@ func (flow *CodecExecFlow) DESDecrypt(hexKey string, hexIV string, mode string, 
 // { Name = "hexKey", Type = "input", Required = true, Regex = "^[a-fA-F0-9]{48}$",Label = "Key"},
 // { Name = "hexIV", Type = "input", Required = false, Regex = "^[a-fA-F0-9]{16}$",Label = "IV"},
 // { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB"], Required = true, Label = "Mode"},
-// { Name = "output", Type = "select",DefaultValue = "hex", Options = ["hex", "raw"], Required = true ,Label = "输出格式"}
+// { Name = "output", Type = "select",DefaultValue = "hex", Options = ["hex", "raw","base64"], Required = true ,Label = "输出格式"}
 // ]
 func (flow *CodecExecFlow) TripleDESEncrypt(hexKey string, hexIV string, mode string, output outputType) error {
 	var data []byte
@@ -366,7 +375,7 @@ func (flow *CodecExecFlow) TripleDESEncrypt(hexKey string, hexIV string, mode st
 // { Name = "hexKey", Type = "input", Required = true, Regex = "^[a-fA-F0-9]{48}$",Label = "Key"},
 // { Name = "hexIV", Type = "input", Required = false, Regex = "^[a-fA-F0-9]{16}$",Label = "IV" },
 // { Name = "mode", Type = "select",DefaultValue = "CBC",  Options = ["CBC", "ECB"], Required = true , Label = "Mode"},
-// { Name = "input", Type = "select",DefaultValue = "hex",  Options = ["hex", "raw"], Required = true ,Label = "输入格式"}
+// { Name = "input", Type = "select",DefaultValue = "hex",  Options = ["hex", "raw", "base64"], Required = true ,Label = "输入格式"}
 // ]
 func (flow *CodecExecFlow) TripleDESDecrypt(hexKey string, hexIV string, mode string, input outputType) error {
 	var data []byte
