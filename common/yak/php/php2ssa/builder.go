@@ -49,6 +49,7 @@ var PHPBuildIn = map[string]any{
 	"PHP_EOL": "",
 	"echo":    func(...any) {},
 	"println": func(...any) {},
+	"phpinfo": func() {},
 	"strrev": func(value string) string {
 		return ""
 	},

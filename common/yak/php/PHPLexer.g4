@@ -157,7 +157,9 @@ EndSwitch  : 'endswitch';
 EndWhile   : 'endwhile';
 
 Eval        : 'eval';
-Exit        : 'die';
+Assert      : 'assert';
+Die         : 'die';
+Exit        : 'exit';
 Extends     : 'extends';
 Final       : 'final';
 Finally     : 'finally';

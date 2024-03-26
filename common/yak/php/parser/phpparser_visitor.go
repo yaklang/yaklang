@@ -337,8 +337,14 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#IndexCallExpression.
 	VisitIndexCallExpression(ctx *IndexCallExpressionContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#CodeExecExpression.
+	VisitCodeExecExpression(ctx *CodeExecExpressionContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#CloneExpression.
 	VisitCloneExpression(ctx *CloneExpressionContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#IncludeExpreesion.
+	VisitIncludeExpreesion(ctx *IncludeExpreesionContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#StaticClassMemberCallAssignmentExpression.
 	VisitStaticClassMemberCallAssignmentExpression(ctx *StaticClassMemberCallAssignmentExpressionContext) interface{}
@@ -408,6 +414,9 @@ type PHPParserVisitor interface {
 
 	// Visit a parse tree produced by PHPParser#MemberCallVariable.
 	VisitMemberCallVariable(ctx *MemberCallVariableContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#include.
+	VisitInclude(ctx *IncludeContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#leftArrayCreation.
 	VisitLeftArrayCreation(ctx *LeftArrayCreationContext) interface{}
