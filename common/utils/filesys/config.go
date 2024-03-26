@@ -4,13 +4,14 @@ import (
 	"embed"
 	"github.com/gobwas/glob"
 	"github.com/kr/fs"
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
+	"time"
 )
 
 type dirChain struct {
@@ -90,8 +91,9 @@ func WithOnStart(f func(basename string, isDir bool) error) Option {
 	}
 }
 
-func WithDirMatches(dirs []string, opts ...Option) Option {
+func WithDirMatches(raw any, opts ...Option) Option {
 	return func(config *Config) {
+		dirs := utils.InterfaceToStringSlice(raw)
 		dirs = funk.ReverseStrings(dirs)
 		var opt Option
 		for _, dir := range dirs {
@@ -102,11 +104,7 @@ func WithDirMatches(dirs []string, opts ...Option) Option {
 			}
 		}
 		if opt != nil {
-			last, err := lo.Last(dirs)
-			if err != nil {
-				return
-			}
-			WithDirMatch(last, opt)
+			opt(config)
 		}
 	}
 }
@@ -149,7 +147,6 @@ func (e embedFs) ReadDir(dirname string) ([]os.FileInfo, error) {
 	}
 	var infos = make([]os.FileInfo, 0, len(ns))
 	for _, n := range ns {
-		log.Infof("name: %v", n.Name())
 		info, err := n.Info()
 		if err != nil {
 			return nil, err
@@ -159,9 +156,40 @@ func (e embedFs) ReadDir(dirname string) ([]os.FileInfo, error) {
 	return infos, nil
 }
 
+/*
+// A FileInfo describes a file and is returned by Stat.
+type FileInfo interface {
+	Name() string       // base name of the file
+	Size() int64        // length in bytes for regular files; system-dependent for others
+	Mode() FileMode     // file mode bits
+	ModTime() time.Time // modification time
+	IsDir() bool        // abbreviation for Mode().IsDir()
+	Sys() any           // underlying data source (can return nil)
+}
+*/
+
+type embedDirInfo string
+
+func (e embedDirInfo) Name() string {
+	_, n := path.Split(string(e))
+	return n
+}
+
+func (e embedDirInfo) Size() int64        { return 0 }
+func (e embedDirInfo) Mode() os.FileMode  { return os.ModeDir }
+func (e embedDirInfo) ModTime() time.Time { return time.Time{} }
+func (e embedDirInfo) IsDir() bool        { return true }
+func (e embedDirInfo) Sys() interface{}   { return nil }
+
 func (e embedFs) Lstat(name string) (os.FileInfo, error) {
 	f, err := e.f.Open(name)
 	if err != nil {
+		//_, err := e.f.ReadDir(name)
+		//if err != nil {
+		//	return nil, err
+		//}
+		//var i os.FileInfo = embedDirInfo(name)
+		//return i, nil
 		return nil, err
 	}
 	return f.Stat()
@@ -172,7 +200,7 @@ func (e embedFs) Join(elem ...string) string {
 }
 
 func fromEmbedFS(fs2 embed.FS) fs.FileSystem {
-	return &embedFs{}
+	return &embedFs{fs2}
 }
 
 // local filesystem
