@@ -3,8 +3,12 @@ package php2ssa
 import (
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"os"
+	"path/filepath"
+	"strconv"
 )
 
 func (y *builder) VisitExpressionStatement(raw phpparser.IExpressionStatementContext) interface{} {
@@ -72,7 +76,20 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 	case *phpparser.VariableExpressionContext:
 		id := y.VisitVariable(ret.Variable())
 		return y.ir.ReadValue(id)
-
+	case *phpparser.CodeExecExpressionContext:
+		var code string
+		value := y.VisitExpression(ret.Expression())
+		if unquote, err := strconv.Unquote(value.String()); err != nil {
+			code = value.String()
+		} else {
+			code = unquote
+		}
+		//应该考虑更多情况
+		code = `<?php ` + code + ";"
+		if err := Build(code, false, y.ir); err != nil {
+			log.Errorf("execute code %v failed", code)
+		}
+		return y.ir.EmitConstInstNil()
 	case *phpparser.KeywordNewExpressionContext:
 		return y.VisitNewExpr(ret.NewExpr())
 	case *phpparser.IndexCallExpressionContext: // $a[1]
@@ -198,29 +215,23 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		if i := ret.Yield(); i != nil {
 			return y.ir.EmitConstInstNil()
 		} else if i := ret.List(); i != nil {
-
 		} else if i := ret.IsSet(); i != nil {
-
+			for _, chain := range ret.ChainList().(*phpparser.ChainListContext).AllChain() {
+				if visitChain := y.VisitChain(chain); visitChain.IsUndefined() {
+					return y.ir.EmitConstInst(false)
+				}
+			}
+			return y.ir.EmitConstInst(true)
 		} else if i := ret.Empty(); i != nil {
-
-		} else if i := ret.Eval(); i != nil {
-
-		} else if i := ret.Exit(); i != nil {
-
-		} else if i := ret.Include(); i != nil {
-
-		} else if i := ret.IncludeOnce(); i != nil {
-
-		} else if i := ret.Require(); i != nil {
-
-		} else if i := ret.RequireOnce(); i != nil {
-
+			return y.VisitChain(ret.Chain())
 		} else if i := ret.Throw(); i != nil {
-
-		} else {
-			log.Errorf("unhandled special word: %v", ret.GetText())
+			return y.VisitExpression(ret.Expression())
+		} else if ret.Die() != nil || ret.Exit() != nil {
+			return y.VisitExpression(ret.Expression())
 		}
 		return y.ir.EmitConstInstNil()
+	case *phpparser.IncludeExpreesionContext:
+		return y.VisitIncludeExpression(ret.Include())
 	case *phpparser.LambdaFunctionExpressionContext:
 		return y.VisitLambdaFunctionExpr(ret.LambdaFunctionExpr())
 	case *phpparser.MatchExpressionContext:
@@ -464,6 +475,23 @@ func (y *builder) VisitAssignable(raw phpparser.IAssignableContext) ssa.Value {
 	}
 }
 
+func (y *builder) VisitChainList(raw phpparser.IChainListContext) []ssa.Value {
+	if y == nil || raw == nil {
+		return nil
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
+	i, _ := raw.(*phpparser.ChainListContext)
+	if i == nil {
+		return nil
+	}
+	var tmpValue []ssa.Value
+	for _, chain := range i.AllChain() {
+		tmpValue = append(tmpValue, y.VisitChain(chain))
+	}
+	return tmpValue
+}
 func (y *builder) VisitChain(raw phpparser.IChainContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
@@ -477,7 +505,6 @@ func (y *builder) VisitChain(raw phpparser.IChainContext) ssa.Value {
 	}
 
 	origin := y.VisitChainOrigin(i.ChainOrigin())
-
 	for _, m := range i.AllMemberAccess() {
 		origin = y.VisitMemberAccess(origin, m)
 	}
@@ -989,6 +1016,7 @@ func (y *builder) reduceAssignCalcExpression(operator string, variable *ssa.Vari
 	if operator == "=" {
 		return value
 	}
+	//y.ir.GetReferenceFiles()
 	return y.reduceAssignCalcExpressionEx(operator, y.ir.ReadValueByVariable(variable), value)
 }
 
@@ -1081,4 +1109,52 @@ func (y *builder) VisitVariable(raw phpparser.IVariableContext) string {
 		log.Errorf("-------------unhandled expression: %v(%T)", raw.GetText(), raw)
 		return ""
 	}
+}
+
+func (y *builder) VisitIncludeExpression(raw phpparser.IIncludeContext) ssa.Value {
+	if y == nil || raw == nil {
+		return nil
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
+	i, ok := raw.(*phpparser.IncludeContext)
+	if !ok {
+		return nil
+	}
+	/*
+			不支持
+		<?php
+		$b = "231.php";
+		$a = include("$b");
+		var_dump($a);
+	*/
+	var flag, check bool
+	if i.IncludeOnce() != nil || i.RequireOnce() != nil {
+		check = true
+	}
+	if value := y.VisitExpression(i.Expression()); value.IsUndefined() {
+	} else {
+		if absPath, err := filepath.Abs(value.String()); err != nil {
+			log.Warnf("include file: %v failed: %v", value.String(), err)
+		} else {
+			if code, err := os.ReadFile(absPath); err != nil {
+				log.Warnf("read file %v failed: %v", value.String(), err)
+			} else {
+				if check {
+					if utils.StringSliceContain(y.ir.GetReferenceFiles(), value.String()) {
+						log.Warnf("file %v has contains", value.String())
+						return y.ir.EmitConstInst(false)
+					}
+				}
+				y.ir.PushReferenceFile(value.String(), string(code)) //记录
+				if err := Build(string(code), false, y.ir); err != nil {
+					log.Errorf("include: %v failed: %v", value.String(), err)
+				} else {
+					flag = true
+				}
+			}
+		}
+	}
+	return y.ir.EmitConstInst(flag)
 }
