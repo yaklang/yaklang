@@ -20,6 +20,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils/mfreader"
 )
 
+var SEP = string(filepath.Separator)
+
 type _yakFile struct {
 	file *os.File
 	rw   *bufio.ReadWriter
@@ -352,10 +354,10 @@ func _fileGetDirPath(path string) string {
 	if dirPath == "" {
 		return dirPath
 	}
-	if strings.HasSuffix(dirPath, "/") {
+	if strings.HasSuffix(dirPath, SEP) {
 		return dirPath
 	} else {
-		return dirPath + "/"
+		return dirPath + SEP
 	}
 }
 
@@ -678,14 +680,15 @@ var FileExport = map[string]interface{}{
 	"Join":                  _fileJoin,
 
 	// flags
-	"O_RDWR":   os.O_RDWR,
-	"O_CREATE": os.O_CREATE,
-	"O_APPEND": os.O_APPEND,
-	"O_EXCL":   os.O_EXCL,
-	"O_RDONLY": os.O_RDONLY,
-	"O_SYNC":   os.O_SYNC,
-	"O_TRUNC":  os.O_TRUNC,
-	"O_WRONLY": os.O_WRONLY,
+	"O_RDWR":    os.O_RDWR,
+	"O_CREATE":  os.O_CREATE,
+	"O_APPEND":  os.O_APPEND,
+	"O_EXCL":    os.O_EXCL,
+	"O_RDONLY":  os.O_RDONLY,
+	"O_SYNC":    os.O_SYNC,
+	"O_TRUNC":   os.O_TRUNC,
+	"O_WRONLY":  os.O_WRONLY,
+	"SEPARATOR": SEP,
 
 	// 文件打开
 	"ReadAll":      _fileReadAll,

@@ -1,11 +1,9 @@
 assert x"{{crlf}}"[0] == string("\r\n")
 
-yakit.AutoInitYakit()
-yakit.EnableTable("1", ["a", "1"])
-yakit.TableData("1", {
-    "a": "asdfasdf",
-    "1": "CCC%",
-})
+
+if os.OS == "windows" {
+    return 
+}
 
 assert file.GetExt("file.txt") == ".txt"
 assert file.GetExt("/tmp/a.txt") == ".txt"

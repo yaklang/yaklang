@@ -1,9 +1,9 @@
 targetUrl = f`${VULINBOX}/gitserver/website-repository.git/`
 dump(targetUrl)
-localReposDir = `/tmp/website-repository.git/`
-os.RemoveAll(localReposDir)
+localReposDir = file.Join(os.TempDir(), str.RandStr(16))
+defer os.RemoveAll(localReposDir)
 git.Clone(targetUrl, localReposDir)~
-ret := string(file.ReadFile(`/tmp/website-repository.git/index.html`)~)
+ret := string(file.ReadFile(file.Join(localReposDir, "index.html"))~)
 dump(ret)
 assert `<title>AAABBBCCC</title>` in ret
 
@@ -21,9 +21,9 @@ if refCount < 3 { die("REF IS TOO LESS") }
 
 targetUrl = f`${VULINBOX}/gitserver/sca-testcase.git/`
 dump(targetUrl)
-localReposDir = `/tmp/sca-testcase.git/`
+localReposDir = file.Join(os.TempDir(), str.RandStr(16))
 os.RemoveAll(localReposDir)
 git.Clone(targetUrl, localReposDir)~
-ret := string(file.ReadFile(`/tmp/sca-testcase.git/testdata/node_npm/positive_file/package.json`)~)
+ret := string(file.ReadFile(file.Join(localReposDir, `testdata`,`node_npm`,`positive_file`,`package.json`))~)
 dump(ret)
 assert `unopinionated, minimalist web framework` in ret
