@@ -47,7 +47,10 @@ type ClassObject struct {
 //		return json.MarshalIndent(js, "", " ")
 //	}
 func (this *ClassObject) Bytes() []byte {
-	return _MarshalJavaClass(this)
+	return _MarshalJavaClass(this,1)
+}
+func (this *ClassObject) ToBytesByCustomStringChar(charLength int) []byte {
+	return _MarshalJavaClass(this,charLength)
 }
 func (this *ClassObject) Json() (string, error) {
 	s, err := _MarshalToJson(this)

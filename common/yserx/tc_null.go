@@ -6,7 +6,7 @@ type JavaNull struct {
 	IsEmpty     bool   `json:"is_empty,omitempty"`
 }
 
-func (s *JavaNull) Marshal() []byte {
+func (s *JavaNull) Marshal(cfg *MarshalContext) []byte {
 	if s.IsEmpty {
 		return nil
 	}
