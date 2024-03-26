@@ -130,6 +130,22 @@ func TestJavaBasic_Variable_InIf(t *testing.T) {
 		println(a);
 		`, []string{"Undefined-a"}, t)
 	})
+
+	t.Run("test if mutli parexpression", func(t *testing.T) {
+		CheckJavaPrintlnValue(`
+		var a = 1;
+		println(a);
+		if ((x>10) && (y>20)) {
+			a = 2;
+			println(a);
+		}
+		println(a);
+		`, []string{
+			"1",
+			"2",
+			"phi(a)[2,1]",
+		}, t)
+	})
 }
 
 func TestJavaBasic_Variable_Switch(t *testing.T) {
@@ -138,7 +154,7 @@ func TestJavaBasic_Variable_Switch(t *testing.T) {
 		var a=1;
 		switch(a){
 		case 2:
-			 a= 22;
+			a = 22;
 			println(a);
 		case 3,4:
 			 a=33;
@@ -187,9 +203,49 @@ func TestJavaBasic_Variable_Switch(t *testing.T) {
 			"22", "33", "44", "44",
 		}, t)
 	})
+
 }
 
-func TestYaklangBasic_Variable_Loop(t *testing.T) {
+func TestJavaBasic_Variable_SwitchArrow(t *testing.T) {
+	t.Run("test switch arrow stmt", func(t *testing.T) {
+		CheckJavaPrintlnValue(`
+		var a=1;
+		switch(a){
+		case 1 -> println(a);
+		case 2 -> {
+		a = 22;
+		println(a);}
+		case null -> println(a);
+}
+	    println(a);
+		`, []string{
+			"1",
+			"22",
+			"phi(a)[22,1]",
+			"phi(a)[phi(a)[22,1],1]",
+		},
+			t)
+	})
+	t.Run("test switch arrow stmt with default", func(t *testing.T) {
+		CheckJavaPrintlnValue(`
+		var a=1;
+		switch(a){
+		case 1 -> println(a);
+		case 22,33 -> a = 22;
+		default -> println(a);
+}
+	    println(a);
+		`, []string{
+			"1",
+			"phi(a)[22,1]",
+			"phi(a)[22,1]",
+		},
+			t)
+	})
+
+}
+
+func TestYaklangBasic_Variable_ForLoop(t *testing.T) {
 	t.Run("simple loop not change", func(t *testing.T) {
 		CheckJavaPrintlnValue(`
 		int a = 1;
@@ -310,6 +366,24 @@ func TestYaklangBasic_CFG_Break(t *testing.T) {
 			a = 4;
 		case 2:
 			a = 3;
+		}
+		println(a) ;
+		`, []string{
+			"phi(a)[2,phi(a)[3,1]]",
+		}, t)
+	})
+
+	t.Run("simple break in switch arrow stmt", func(t *testing.T) {
+		CheckJavaPrintlnValue(`
+		int a = 1;
+		switch (a) {
+		case 1 -> {
+		   		if (c) {
+                    a = 2;
+					break;
+                  }
+               	a = 4;}
+		case 2-> a = 3;
 		}
 		println(a) ;
 		`, []string{

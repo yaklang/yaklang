@@ -53,7 +53,7 @@ class SwitchExpressions {
 
     String fn2(String s) {
         return switch (s) {
-            //case null -> "n";
+            case null -> "n";
             case "a" -> "";
             case "b", "c" -> "a";
             default -> "o";
@@ -80,7 +80,7 @@ class SwitchExpressions {
         E1 e = E1.ONE;
         return switch (e) {
             case ONE -> 0;
-            //default -> 1;
+            default -> 1;
         };
     }
 
