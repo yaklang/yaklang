@@ -108,6 +108,7 @@ func (f *Matcher) match(r *HTTPResponseInfo, options ...ConfigOption) ([]*CPE, e
 }
 
 var faviconCache sync.Map
+var failedFaviconCache sync.Map
 var currentTarget = ""
 var previousTarget = ""
 
@@ -154,38 +155,44 @@ func (f *Matcher) matchByRule(r *HTTPResponseInfo, ruleToUse *WebRule, config *C
 	}
 	if config.ActiveMode && len(ruleToUse.Path) > 1 && !strings.HasSuffix(ruleToUse.Path, path) {
 		value, ok := faviconCache.Load(r.URL.Host)
-		if !ok {
-			log.Debugf("sending active web-fingerprint request to: %s origin: %v", ruleToUse.Path, path)
-
-			rsp, req, err := poc.HTTP(r.RequestRaw, poc.WithReplaceHttpPacketPath(ruleToUse.Path), poc.WithNoRedirect(false), poc.WithForceHTTPS(r.IsHttps))
-			if err != nil {
-				log.Errorf("poc.HTTP failed: %s", err)
-				return nil
-			}
-			httpRsp, err := lowhttp.ParseBytesToHTTPResponse(rsp)
-			if err != nil {
-				log.Errorf("poc.HTTP failed: %s", err)
-				return nil
-			}
-			httpReq, err := lowhttp.ParseBytesToHttpRequest(req)
-			if err != nil {
-				log.Errorf("poc.HTTP failed: %s", err)
-				return nil
-			}
-			httpRsp.Request = httpReq
-			info := ExtractHTTPResponseInfoFromHTTPResponse(httpRsp)
-			byteFavicon := info.Body
-			faviconCache.Store(r.URL.Host, byteFavicon)
-		} else {
+		if ok {
 			favicon, ok := value.([]byte)
 			if !ok {
 				log.Errorf("Expected []byte but got %T", value)
 				return nil
 			}
 			r.Body = favicon
+		} else {
+			if _, ok := failedFaviconCache.Load(r.URL.Host); !ok {
+				log.Debugf("sending active web-fingerprint request to: %s origin: %v", ruleToUse.Path, path)
+				rsp, req, err := poc.HTTP(r.RequestRaw, poc.WithTimeout(3), poc.WithReplaceHttpPacketPath(ruleToUse.Path), poc.WithNoRedirect(false), poc.WithForceHTTPS(r.IsHttps))
+				if err != nil {
+					log.Errorf("poc.HTTP failed: %s", err)
+					failedFaviconCache.Store(r.URL.Host, true)
+					return nil
+				}
+				httpRsp, err := lowhttp.ParseBytesToHTTPResponse(rsp)
+				if err != nil {
+					log.Errorf("poc.HTTP failed: %s", err)
+					failedFaviconCache.Store(r.URL.Host, true)
+					return nil
+				}
+				httpReq, err := lowhttp.ParseBytesToHttpRequest(req)
+				if err != nil {
+					log.Errorf("poc.HTTP failed: %s", err)
+					failedFaviconCache.Store(r.URL.Host, true)
+					return nil
+				}
+				httpRsp.Request = httpReq
+				info := ExtractHTTPResponseInfoFromHTTPResponse(httpRsp)
+				byteFavicon := info.Body
+				faviconCache.Store(r.URL.Host, byteFavicon)
+			} else {
+				log.Debugf("Previous request for favicon failed; skipping to avoid unnecessary retries")
+				return nil
+			}
 		}
 	}
-
 	for _, m := range ruleToUse.Methods {
 		if m.Condition == "and" {
 			allMatched := true
