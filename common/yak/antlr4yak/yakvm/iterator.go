@@ -1,6 +1,7 @@
 package yakvm
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -135,10 +136,11 @@ func (i *MapIterator) Next() (data []interface{}, hadEnd bool) {
 type ChannelIterator struct {
 	BaseIterator
 
-	p reflect.Value
+	ctx context.Context
+	p   reflect.Value
 }
 
-func newChannelIterator(i interface{}) *ChannelIterator {
+func newChannelIterator(i interface{}, ctx context.Context) *ChannelIterator {
 	p := reflect.ValueOf(i)
 	kind := p.Kind()
 	if kind != reflect.Chan {
@@ -151,13 +153,26 @@ func newChannelIterator(i interface{}) *ChannelIterator {
 			N:       2,
 			typ:     ChannelIteratorType,
 		},
-		p: p,
+		ctx: ctx,
+		p:   p,
 	}
 }
 
 func (i *ChannelIterator) Next() (data []interface{}, hadEnd bool) {
 	_, hadEnd = i.nextStep()
-	cv, ok := i.p.Recv()
+	chosen, cv, ok := reflect.Select([]reflect.SelectCase{
+		{
+			Dir:  reflect.SelectRecv,
+			Chan: reflect.ValueOf(i.ctx.Done()),
+		}, {
+			Dir:  reflect.SelectRecv,
+			Chan: i.p,
+		},
+	})
+	if chosen == 0 {
+		ok = false
+	}
+
 	if ok {
 		i.Current = 0
 		data = []interface{}{cv.Interface()}
@@ -194,7 +209,7 @@ func (i *RepeatIterator) Next() (data []interface{}, hadEnd bool) {
 	return
 }
 
-func NewIterator(i interface{}) (IteratorInterface, error) {
+func NewIterator(i interface{}, v *Frame) (IteratorInterface, error) {
 	if i == nil {
 		return nil, nil
 	}
@@ -213,7 +228,7 @@ func NewIterator(i interface{}) (IteratorInterface, error) {
 	case reflect.Map:
 		return newMapIterator(i), nil
 	case reflect.Chan:
-		return newChannelIterator(i), nil
+		return newChannelIterator(i, v.ctx), nil
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return newRepeatIterator(reflect.ValueOf(i).Int()), nil
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
