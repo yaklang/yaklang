@@ -1,6 +1,7 @@
 package java2ssa
 
 import (
+	"github.com/yaklang/yaklang/common/utils"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -26,6 +27,9 @@ func (y *builder) VisitArrayInitializer(raw javaparser.IArrayInitializerContext)
 		func(i int) ssa.Value {
 			return y.VisitVariableInitializer(allVariableInitializer[i])
 		})
+	if utils.IsNil(obj) {
+		return nil
+	}
 	obj.GetType().(*ssa.ObjectType).Kind = ssa.SliceTypeKind
 	return obj
 
