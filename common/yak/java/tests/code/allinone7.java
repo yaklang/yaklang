@@ -84,8 +84,8 @@ public class LexerTest {
         this.prePost--;
         super.prePost++;
         super.prePost--;
-
-
+        someMethod()[0];
+        someMethod()[0];
         ++LexerTest.prePost;
         --LexerTest.prePost;
         ++myapplication.mylibrary.LexerTest.prePost;
@@ -94,7 +94,8 @@ public class LexerTest {
         --this.prePost;
         ++super.prePost;
         --super.prePost;
-
+        ++someMethod()[0];
+        --someMethod()[0];
 
         // Relational operators
         result = x == y;
@@ -337,26 +338,26 @@ public class HelloWorld {
 
         // Reference types -------------------
         // Arrays
-//         int[] numbers = new int[5];
-//         numbers[0] = 2;
-//         int x = numbers[0];
-//
-//         // Initializers -------------------
-//         // Long syntax
-//         int[] numbers = new int[] {20, 1, 42, 15, 34};
-//         // Short syntax
-//         int[] numbers2 = {20, 1, 42, 15, 34};
-//
-//         // Multi-dimensional arrays
-//         int[][] numbers = new int[3][3];
-//         numbers[1][2] = 2;
-//         int[][] numbers2 = {{2, 3, 2}, {1, 2, 6}, {2, 4, 5}};
-//
-//         int[][] numbers = new int[2][]; //Initialization of the first dimension only
-//         numbers[0] = new int[3];
-//         numbers[1] = new int[2];
+        int[] numbers = new int[5];
+        numbers[0] = 2;
+        int x = numbers[0];
 
-        // Prefix & postfix
+        // Initializers -------------------
+        // Long syntax
+        int[] numbers = new int[] {20, 1, 42, 15, 34};
+        // Short syntax
+        int[] numbers2 = {20, 1, 42, 15, 34};
+
+        // Multi-dimensional arrays
+        int[][] numbers = new int[3][3];
+        numbers[1][2] = 2;
+        int[][] numbers2 = {{2, 3, 2}, {1, 2, 6}, {2, 4, 5}};
+
+        int[][] numbers = new int[2][]; //Initialization of the first dimension only
+        numbers[0] = new int[3];
+        numbers[1] = new int[2];
+
+//         Prefix & postfix
         numbers[0][0]++;
         numbers[0][0]--;
         ++numbers[0][0];
