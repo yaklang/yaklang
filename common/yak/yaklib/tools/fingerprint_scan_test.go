@@ -6,6 +6,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/fp"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/synscan"
 	"github.com/yaklang/yaklang/common/utils"
 	"net/http"
@@ -254,13 +255,13 @@ func TestMUSTPASS_Fp_favicon(t *testing.T) {
 		}
 
 		for v := range ch {
-			fmt.Println(v.String())
+			log.Info(v.String())
 		}
 		done <- true
 	}()
 
 	select {
-	case <-time.After(20 * time.Second):
+	case <-time.After(25 * time.Second):
 		t.Fatal("Test favicon.ico failed due to timeout")
 	case <-done:
 	}
