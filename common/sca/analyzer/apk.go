@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/base64"
 	"encoding/hex"
+	"path"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
@@ -15,6 +16,7 @@ const (
 
 	// installed file
 	installFile           = "lib/apk/db/installed"
+	installFileName       = "installed"
 	statusInstallFile int = 1
 )
 
@@ -136,7 +138,7 @@ func (a apkAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) {
 }
 
 func (a apkAnalyzer) Match(info MatchInfo) int {
-	if info.path == installFile {
+	if info.path == installFile || path.Base(info.path) == installFileName {
 		return statusInstallFile
 	}
 	return 0
