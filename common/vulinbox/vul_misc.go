@@ -2,9 +2,11 @@ package vulinbox
 
 import (
 	"bytes"
+	"net/http"
+	"strconv"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"net/http"
 )
 
 func (s *VulinServer) registerMiscRoute() {
@@ -30,11 +32,25 @@ func (s *VulinServer) registerMiscRoute() {
 }
 
 func (s *VulinServer) registerMiscResponse() {
-	var router = s.router
+	router := s.router
 
 	r := router.PathPrefix("/misc/response").Name("一些精心构造的畸形/异常/测试响应").Subrouter()
 	addRouteWithVulInfo(r, &VulInfo{
 		Handler: expect100handle, Title: "100-Continue", Path: "/expect100",
+	})
+	addRouteWithVulInfo(r, &VulInfo{
+		Handler: func(writer http.ResponseWriter, request *http.Request) {
+			redirectTimes := codec.Atoi(request.URL.Query().Get("times"))
+			if redirectTimes > 0 {
+				http.Redirect(writer, request, "/misc/response/redirect?times="+strconv.Itoa(redirectTimes-1), http.StatusFound)
+			} else {
+				writer.WriteHeader(http.StatusOK)
+				writer.Write([]byte("finished"))
+			}
+		},
+		Title:        "redirect-test",
+		DefaultQuery: "times=5",
+		Path:         "/redirect",
 	})
 	addRouteWithVulInfo(r, &VulInfo{
 		Handler: func(writer http.ResponseWriter, request *http.Request) {
@@ -79,7 +95,7 @@ func (s *VulinServer) registerMiscResponse() {
 		Path: "/fetch/basic.action",
 	})
 
-	var crawlerRoutes = []*VulInfo{
+	crawlerRoutes := []*VulInfo{
 		{
 			Path: "/javascript-ssa-ir-basic/1.js",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
