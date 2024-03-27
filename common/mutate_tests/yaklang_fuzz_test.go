@@ -291,9 +291,12 @@ Host: www.baidu.com
 
 c={"abc":{"c":{"d":true}}}
 `,
-				code:                        ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzPath(`/acc.t1`).FuzzPathAppend(`12`).FuzzPostJsonPathParams(`c`, `$.abc.c.d`, 123)",
-				expectKeywordInOutputPacket: []string{"ABC: CCC\r\n", "XXX /acc.t112?ccccccccccccccc", `%7B%22abc%22%3A%7B%22c%22%3A%7B%22d%22%3A123%7D%7D%7D`},
-				debug:                       true,
+				code: ".FuzzHTTPHeader(\"ABC\", \"CCC\").FuzzGetParamsRaw(`ccccccccccccccc`).FuzzMethod(`XXX`).FuzzPath(`/acc.t1`).FuzzPathAppend(`12`).FuzzPostJsonPathParams(`c`, `abc.c.d`, false)",
+				expectKeywordInOutputPacket: []string{
+					"ABC: CCC\r\n", "XXX /acc.t112?ccccccccccccccc",
+					`c={{urlescape({"abc":{"c":{"d":false}}})}}`,
+				},
+				debug: true,
 			},
 		},
 		{
@@ -488,6 +491,21 @@ Host: www.baidu.com
 					`"bbb":"123456789"`,
 					`"ccc":{"cd":"1"}`,
 				},
+			},
+		},
+		{
+			name: "临时",
+			base: base{
+				inputPacket: `GET /acc.t1?a=eyJrZXkiOjExMTExMTF9 HTTP/1.1
+Host: www.baidu.com
+
+`,
+
+				code: ".FuzzGetBase64JsonPath(`a`, `$.key`, 2222)",
+				expectKeywordInOutputPacket: []string{
+					`GET /acc.t1?a={{base64({"key":2222})}}`,
+				},
+				debug: true,
 			},
 		},
 	}

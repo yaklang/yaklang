@@ -2,14 +2,11 @@ package mutate
 
 import (
 	"fmt"
-	"github.com/tidwall/gjson"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/go-funk"
-	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 type httpParamPositionType string
@@ -133,9 +130,9 @@ func (p *FuzzHTTPRequestParam) IsCookieParams() bool {
 }
 
 func (p *FuzzHTTPRequestParam) Name() string {
-	if p.param2nd != nil {
-		return ""
-	}
+	//if p.param2nd != nil {
+	//	return ""
+	//}
 	return fmt.Sprintf("%v", p.param)
 }
 
@@ -171,75 +168,75 @@ func (p *FuzzHTTPRequestParam) OriginValue() interface{} {
 }
 
 func (p *FuzzHTTPRequestParam) Value() interface{} {
-	switch p.position {
-	case posGetQueryBase64, posPostQueryBase64, posCookieBase64:
-		switch paramOriginValue := p.raw.(type) {
-		case []string:
-			if len(paramOriginValue) > 0 {
-				decoded, err := codec.DecodeBase64Url(paramOriginValue[0])
-				if err != nil {
-					break
-				}
-				return utils.InterfaceToStringSlice(decoded)
-			} else {
-				return utils.InterfaceToStringSlice("")
-			}
-		case string:
-			decoded, err := codec.DecodeBase64Url(paramOriginValue)
-			if err != nil {
-				break
-			}
-			return utils.InterfaceToStringSlice(decoded)
-		default:
-			log.Error("unrecognized param value type")
-			return p.raw
-		}
-	case posGetQueryJson, posPostJson, posCookieJson:
-		var path string
-		if p.gpath == "" {
-			path = p.path
-		} else {
-			path = p.gpath
-		}
-		switch paramOriginValue := p.raw.(type) {
-		case []string:
-			if len(paramOriginValue) > 0 {
-				return utils.InterfaceToStringSlice(jsonpath.Find(paramOriginValue[0], path))
-			} else {
-				return utils.InterfaceToStringSlice("")
-			}
-		case string:
-			return utils.InterfaceToStringSlice(gjson.Get(paramOriginValue, path))
-		default:
-			log.Error("unrecognized param value type")
-			return p.raw
-		}
-
-	case posGetQueryBase64Json, posPostQueryBase64Json, posCookieBase64Json:
-		switch paramOriginValue := p.raw.(type) {
-		case []string:
-			if len(paramOriginValue) > 0 {
-				jsonStr, err := codec.DecodeBase64Url(paramOriginValue[0])
-				if err != nil {
-					break
-				}
-				return utils.InterfaceToStringSlice(jsonpath.Find(jsonStr, p.path))
-			} else {
-				return utils.InterfaceToStringSlice("")
-			}
-		case string:
-			jsonStr, err := codec.DecodeBase64Url(paramOriginValue)
-			if err != nil {
-				break
-			}
-			return utils.InterfaceToStringSlice(jsonpath.Find(jsonStr, p.path))
-
-		default:
-			log.Error("unrecognized param value type")
-			return p.paramValue
-		}
-
-	}
+	//switch p.position {
+	//case posGetQueryBase64, posPostQueryBase64, posCookieBase64:
+	//	switch paramOriginValue := p.raw.(type) {
+	//	case []string:
+	//		if len(paramOriginValue) > 0 {
+	//			decoded, err := codec.DecodeBase64Url(paramOriginValue[0])
+	//			if err != nil {
+	//				break
+	//			}
+	//			return utils.InterfaceToStringSlice(decoded)
+	//		} else {
+	//			return utils.InterfaceToStringSlice("")
+	//		}
+	//	case string:
+	//		decoded, err := codec.DecodeBase64Url(paramOriginValue)
+	//		if err != nil {
+	//			break
+	//		}
+	//		return utils.InterfaceToStringSlice(decoded)
+	//	default:
+	//		log.Error("unrecognized param value type")
+	//		return p.raw
+	//	}
+	//case posGetQueryJson, posPostJson, posCookieJson:
+	//	var path string
+	//	if p.gpath == "" {
+	//		path = p.path
+	//	} else {
+	//		path = p.gpath
+	//	}
+	//	switch paramOriginValue := p.raw.(type) {
+	//	case []string:
+	//		if len(paramOriginValue) > 0 {
+	//			return utils.InterfaceToStringSlice(jsonpath.Find(paramOriginValue[0], path))
+	//		} else {
+	//			return utils.InterfaceToStringSlice("")
+	//		}
+	//	case string:
+	//		return utils.InterfaceToStringSlice(gjson.Get(paramOriginValue, path))
+	//	default:
+	//		log.Error("unrecognized param value type")
+	//		return p.raw
+	//	}
+	//
+	//case posGetQueryBase64Json, posPostQueryBase64Json, posCookieBase64Json:
+	//	switch paramOriginValue := p.raw.(type) {
+	//	case []string:
+	//		if len(paramOriginValue) > 0 {
+	//			jsonStr, err := codec.DecodeBase64Url(paramOriginValue[0])
+	//			if err != nil {
+	//				break
+	//			}
+	//			return utils.InterfaceToStringSlice(jsonpath.Find(jsonStr, p.path))
+	//		} else {
+	//			return utils.InterfaceToStringSlice("")
+	//		}
+	//	case string:
+	//		jsonStr, err := codec.DecodeBase64Url(paramOriginValue)
+	//		if err != nil {
+	//			break
+	//		}
+	//		return utils.InterfaceToStringSlice(jsonpath.Find(jsonStr, p.path))
+	//
+	//	default:
+	//		log.Error("unrecognized param value type")
+	//		return p.paramValue
+	//	}
+	//
+	//}
 	return p.paramValue
 }
 
