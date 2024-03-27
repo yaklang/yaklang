@@ -3,6 +3,10 @@ package codegrpc
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
+	"crypto/sha1"
+	"crypto/sha256"
+	"crypto/sha512"
 	_ "embed"
 	"encoding/gob"
 	"encoding/json"
@@ -16,12 +20,14 @@ import (
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yakdoc"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"github.com/yaklang/yaklang/common/yserx"
+	"hash"
 	"regexp"
 	"strings"
 )
@@ -129,7 +135,7 @@ func decodeData(text []byte, input outputType) []byte {
 	}
 }
 
-// Tag = "对称加密"
+// Tag = "加密"
 // CodecName = "AES对称加密"
 // Desc ="""高级加密标准（AES）是美国联邦信息处理标准（FIPS）。它是在一个历时5年的过程中，从15个竞争设计中选出的。
 // Key：根据密钥的大小，将使用以下算法：
@@ -165,7 +171,7 @@ func (flow *CodecExecFlow) AESEncrypt(key string, keyType string, IV string, ivT
 	return err
 }
 
-// Tag = "对称解密"
+// Tag = "解密"
 // CodecName = "AES对称解密"
 // Desc = """高级加密标准（AES）是美国联邦信息处理标准（FIPS）。它是在一个历时5年的过程中，从15个竞争设计中选出的。
 // Key：根据密钥的大小，将使用以下算法：
@@ -200,7 +206,7 @@ func (flow *CodecExecFlow) AESDecrypt(key string, keyType string, IV string, ivT
 	return err
 }
 
-// Tag = "对称加密"
+// Tag = "加密"
 // CodecName = "SM4对称加密"
 // Desc = """SM4是一个128位的块密码，目前被确定为中国的国家标准（GB/T 32907-2016）。支持多种块密码模式。"""
 // Params = [
@@ -234,7 +240,7 @@ func (flow *CodecExecFlow) SM4Encrypt(key string, keyType string, IV string, ivT
 	return err
 }
 
-// Tag = "对称解密"
+// Tag = "解密"
 // CodecName = "SM4对称解密"
 // Desc = """SM4是一个128位的块密码，目前被确定为中国的国家标准（GB/T 32907-2016）。支持多种块密码模式。"""
 // Params = [
@@ -269,7 +275,7 @@ func (flow *CodecExecFlow) SM4Decrypt(key string, keyType string, IV string, ivT
 	return err
 }
 
-// Tag = "对称加密"
+// Tag = "加密"
 // CodecName = "DES对称加密"
 // Desc = """DES（Data Encryption Standard）是一种对称密钥加密算法，使用固定有效长度为56位的密钥对数据进行64位的分组加密。尽管曾广泛使用，但由于密钥太短，现已被认为不够安全。"""
 // Params = [
@@ -298,7 +304,7 @@ func (flow *CodecExecFlow) DESEncrypt(key string, keyType string, IV string, ivT
 
 }
 
-// Tag = "对称解密"
+// Tag = "解密"
 // CodecName = "DES对称解密"
 // Desc = """DES（Data Encryption Standard）是一种对称密钥加密算法，使用固定有效长度为56位的密钥对数据进行64位的分组加密。尽管曾广泛使用，但由于密钥太短，现已被认为不够安全。"""
 // Params = [
@@ -327,7 +333,7 @@ func (flow *CodecExecFlow) DESDecrypt(key string, keyType string, IV string, ivT
 	return err
 }
 
-// Tag = "对称加密"
+// Tag = "加密"
 // CodecName = "TripleDES对称加密"
 // Desc = """TripleDES（3DES）是DES的改进版，通过连续三次应用DES算法（可以使用三个不同的密钥）来增加加密的强度，提供了更高的安全性。"""
 // Params = [
@@ -355,7 +361,7 @@ func (flow *CodecExecFlow) TripleDESEncrypt(key string, keyType string, IV strin
 	return err
 }
 
-// Tag = "对称解密"
+// Tag = "解密"
 // CodecName = "TripleDES对称解密"
 // Desc = """TripleDES（3DES）是DES的改进版，通过连续三次应用DES算法（可以使用三个不同的密钥）来增加加密的强度，提供了更高的安全性。"""
 // Params = [
@@ -377,6 +383,90 @@ func (flow *CodecExecFlow) TripleDESDecrypt(key string, keyType string, IV strin
 		data, err = codec.TripleDES_ECBDec(decodeKey, inputText)
 	default:
 		return utils.Error("AESEncryptEx: unknown mode")
+	}
+	if err == nil {
+		flow.Text = data
+	}
+	return err
+}
+
+// Tag = "加密"
+// CodecName = "RSA加密"
+// Desc = """RSA加密算法是一种非对称加密算法，在公开密钥加密和电子商业中被广泛使用。RSA是被研究得最广泛的公钥算法，从提出后经历了各种攻击的考验，逐渐为人们接受，普遍认为是目前最优秀的公钥方案之一。"""
+// Params = [
+// { Name = "pubKey", Type = "text", Required = true,Label = "pem公钥"},
+// { Name = "encryptSchema", Type = "select",DefaultValue = "RSA-OAEP", Options = ["RSA-OAEP", "PKCS1v15"], Required = true, Label = "填充方式"},
+// { Name = "algorithm", Type = "select",DefaultValue = "SHA-256", Options = ["SHA-1", "SHA-256","SHA-384","SHA-512","MD5"], Required = true ,Label = "hash算法"}
+// ]
+func (flow *CodecExecFlow) RSAEncrypt(pubKey string, encryptSchema string, algorithm string) error {
+	var data []byte
+	var err error
+	var hashFunc hash.Hash
+
+	switch algorithm { // choose alg
+	case "SHA-256":
+		hashFunc = sha256.New()
+	case "SHA-384":
+		hashFunc = sha512.New384()
+	case "SHA-512":
+		hashFunc = sha512.New()
+	case "MD5":
+		hashFunc = md5.New()
+	case "SHA-1":
+		fallthrough
+	default:
+		hashFunc = sha1.New()
+	}
+
+	switch encryptSchema {
+	case "RSA-OAEP":
+		data, err = tlsutils.PemPkcsOAEPEncryptWithHash([]byte(pubKey), flow.Text, hashFunc)
+	case "PKCS1v15":
+		data, err = tlsutils.PemPkcs1v15Encrypt([]byte(pubKey), flow.Text)
+	default:
+		return utils.Error("RSA encrypt error: 未知的填充方式")
+	}
+	if err == nil {
+		flow.Text = data
+	}
+	return err
+}
+
+// Tag = "解密"
+// CodecName = "RSA解密"
+// Desc = """RSA加密算法是一种非对称加密算法，在公开密钥加密和电子商业中被广泛使用。RSA是被研究得最广泛的公钥算法，从提出后经历了各种攻击的考验，逐渐为人们接受，普遍认为是目前最优秀的公钥方案之一。"""
+// Params = [
+// { Name = "priKey", Type = "text", Required = true,Label = "pem私钥"},
+// { Name = "decryptSchema", Type = "select",DefaultValue = "RSA-OAEP", Options = ["RSA-OAEP", "PKCS1v15"], Required = true, Label = "填充方式"},
+// { Name = "algorithm", Type = "select",DefaultValue = "SHA-256", Options = ["SHA-1", "SHA-256","SHA-384","SHA-512","MD5"], Required = true ,Label = "hash算法"}
+// ]
+func (flow *CodecExecFlow) RSADecrypt(priKey string, decryptSchema string, algorithm string) error {
+	var data []byte
+	var err error
+	var hashFunc hash.Hash
+
+	switch algorithm { // choose alg
+	case "SHA-256":
+		hashFunc = sha256.New()
+	case "SHA-384":
+		hashFunc = sha512.New384()
+	case "SHA-512":
+		hashFunc = sha512.New()
+	case "MD5":
+		hashFunc = md5.New()
+	case "SHA-1":
+		fallthrough
+	default:
+		hashFunc = sha1.New()
+	}
+
+	switch decryptSchema {
+	case "RSA-OAEP":
+		data, err = tlsutils.PemPkcsOAEPDecryptWithHash([]byte(priKey), flow.Text, hashFunc)
+	case "PKCS1v15":
+		data, err = tlsutils.PemPkcs1v15Decrypt([]byte(priKey), flow.Text)
+	default:
+		return utils.Error("RSA decrypt error: 未知的填充方式")
 	}
 	if err == nil {
 		flow.Text = data

@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
+	"hash"
 	"reflect"
 	"strings"
 
@@ -160,6 +161,10 @@ func PemPkcs1v15Encrypt(pemBytes []byte, data interface{}) ([]byte, error) {
 }
 
 func PemPkcsOAEPEncrypt(pemBytes []byte, data interface{}) ([]byte, error) {
+	return PemPkcsOAEPEncryptWithHash(pemBytes, data, sha256.New())
+}
+
+func PemPkcsOAEPEncryptWithHash(pemBytes []byte, data interface{}, hashFunc hash.Hash) ([]byte, error) {
 	dataBytes := utils.InterfaceToBytes(data)
 	block, _ := pem.Decode(pemBytes)
 	if block == nil {
@@ -177,7 +182,7 @@ func PemPkcsOAEPEncrypt(pemBytes []byte, data interface{}) ([]byte, error) {
 	}
 	_, _ = dataBytes, pub
 
-	results, err := rsa.EncryptOAEP(sha256.New(), cryptorand.Reader, pubKey, dataBytes, nil)
+	results, err := rsa.EncryptOAEP(hashFunc, cryptorand.Reader, pubKey, dataBytes, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, `rsa.EncryptOAEP(cryptorand.Reader, pubKey, dataBytes) error`)
 	}
@@ -185,6 +190,10 @@ func PemPkcsOAEPEncrypt(pemBytes []byte, data interface{}) ([]byte, error) {
 }
 
 func PemPkcsOAEPDecrypt(pemPriBytes []byte, data interface{}) ([]byte, error) {
+	return PemPkcsOAEPDecryptWithHash(pemPriBytes, data, sha256.New())
+}
+
+func PemPkcsOAEPDecryptWithHash(pemPriBytes []byte, data interface{}, hashFunc hash.Hash) ([]byte, error) {
 	dataBytes := utils.InterfaceToBytes(data)
 	b, _ := pem.Decode(pemPriBytes)
 	pri, err := x509.ParsePKCS1PrivateKey(b.Bytes)
@@ -205,7 +214,7 @@ func PemPkcsOAEPDecrypt(pemPriBytes []byte, data interface{}) ([]byte, error) {
 		}
 	}
 
-	results, err := rsa.DecryptOAEP(sha256.New(), cryptorand.Reader, pri, dataBytes, nil)
+	results, err := rsa.DecryptOAEP(hashFunc, cryptorand.Reader, pri, dataBytes, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, `rsa.PemPkcsOAEPDecrypt(cryptorand.Reader, pri, dataBytes) error`)
 	}
