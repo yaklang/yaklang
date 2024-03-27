@@ -87,7 +87,7 @@ var MITMAndPortScanHooks = []string{
 }
 
 type MixPluginCaller struct {
-	ctx context.Context
+	ctx context.Context // 整个 mix plugin caller 的上下文
 
 	websiteFilter       *filter.StringFilter
 	websitePathFilter   *filter.StringFilter
@@ -235,6 +235,7 @@ func NewMixPluginCaller() (*MixPluginCaller, error) {
 		ctx: context.Background(),
 	}
 	c.SetLoadPluginTimeout(10)
+	c.SetCallPluginTimeout(60)
 	var err error
 	c.fingerprintMatcher, err = fp.NewDefaultFingerprintMatcher(fp.NewConfig(fp.WithDatabaseCache(true), fp.WithCache(true)))
 	if err != nil {
@@ -261,6 +262,7 @@ func NewMixPluginCallerWithFilter(webFilter *filter.StringFilter) (*MixPluginCal
 		ctx: context.Background(),
 	}
 	c.SetLoadPluginTimeout(10)
+	c.SetCallPluginTimeout(60)
 	var err error
 	c.fingerprintMatcher, err = fp.NewDefaultFingerprintMatcher(fp.NewConfig(fp.WithDatabaseCache(true), fp.WithCache(true)))
 	if err != nil {
@@ -271,7 +273,11 @@ func NewMixPluginCallerWithFilter(webFilter *filter.StringFilter) (*MixPluginCal
 }
 
 func (c *MixPluginCaller) SetLoadPluginTimeout(i float64) {
-	c.callers.timeout = time.Duration(i * float64(time.Second))
+	c.callers.SetLoadPluginTimeout(i)
+}
+
+func (c *MixPluginCaller) SetCallPluginTimeout(i float64) {
+	c.callers.SetCallPluginTimeout(i)
 }
 
 func (c *MixPluginCaller) SetConcurrent(i int) error {
@@ -279,12 +285,12 @@ func (c *MixPluginCaller) SetConcurrent(i int) error {
 }
 
 func (c *MixPluginCaller) Wait() {
-	wg := new(sync.WaitGroup)
-	wg.Add(1)
 	defer c.websiteFilter.Close()
 
+	waitChan := make(chan struct{})
+
 	go func() {
-		defer wg.Done()
+		defer close(waitChan)
 
 		log.Debugf("start to wait local mix caller...")
 		c.swg.Wait()
@@ -294,7 +300,10 @@ func (c *MixPluginCaller) Wait() {
 		c.GetNativeCaller().Wait()
 		log.Debugf("native caller all done")
 	}()
-	wg.Wait()
+	select {
+	case <-c.ctx.Done():
+	case <-waitChan:
+	}
 }
 
 func (c *MixPluginCaller) ResetFilter() {
