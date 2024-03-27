@@ -2,9 +2,13 @@ package mutate
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
+	"github.com/tidwall/gjson"
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/jsonpath"
@@ -195,15 +199,56 @@ func (f *FuzzHTTPRequest) fuzzGetBase64JsonPath(key any, jsonPath string, val an
 		{keyStr}, InterfaceToFuzzResults(val),
 	}, func(result []string) error {
 		value := result[1]
-		var replaced = valueToJsonValue(value)
-		for _, i := range replaced {
-			_req := lowhttp.CopyRequest(req)
-			newVals := _req.URL.Query()
-			newVals.Set(keyStr, codec.EncodeBase64(jsonpath.ReplaceString(originValue, jsonPath, i)))
-			_req.URL.RawQuery = newVals.Encode()
-			_req.RequestURI = _req.URL.RequestURI()
-			reqs = append(reqs, _req)
+		//var replaced = valueToJsonValue(value)
+
+		originalValue := jsonpath.Find(originValue, jsonPath)
+
+		var newValue interface{} = value
+
+		switch originalValue.(type) {
+		case float64:
+			if floatVal, err := strconv.ParseFloat(value, 64); err == nil {
+				newValue = floatVal
+			}
+		case bool:
+			if boolVal, err := strconv.ParseBool(value); err == nil {
+				newValue = boolVal
+			}
+		case string:
+			newValue = value
+		case map[string]interface{}, []interface{}:
+			if gjson.Valid(value) {
+				newValue = gjson.Parse(value).Value()
+			}
+		default:
+			return utils.Wrap(errors.New("unrecognized json value type"), "json value type")
 		}
+
+		modifiedParams := jsonpath.ReplaceString(originValue, jsonPath, newValue)
+		if err != nil {
+			return err
+		}
+
+		//for _, i := range replaced {
+		_req := lowhttp.CopyRequest(req)
+		newVals := _req.URL.Query()
+		var parts []string
+		for k, v := range newVals {
+			for _, singleV := range v {
+				if k == keyStr {
+					singleV = modifiedParams
+				}
+				part := fmt.Sprintf("%s={{base64(%s)}}", k, singleV)
+				parts = append(parts, part)
+			}
+		}
+		unencodedQuery := strings.Join(parts, "&")
+		_req.URL.RawQuery = unencodedQuery
+		//newVals.Set(keyStr, codec.EncodeBase64(jsonpath.ReplaceString(originValue, jsonPath, i)))
+		//	_req.URL.RawQuery = newVals.Encode()
+		_req.RequestURI = _req.URL.RequestURI()
+		reqs = append(reqs, _req)
+		//}
 		return nil
 	})
 	if err != nil {

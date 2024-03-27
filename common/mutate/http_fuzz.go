@@ -16,7 +16,6 @@ import (
 
 	"github.com/antchfx/xmlquery"
 	"github.com/asaskevich/govalidator"
-	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -499,31 +498,37 @@ func (f *FuzzHTTPRequest) GetGetQueryParams() []*FuzzHTTPRequestParam {
 			walk([]byte(raw), gjson.ParseBytes([]byte(raw)), "", "$", call)
 		}
 
-		if val, ok := isStrictBase64(values[0]); ok && govalidator.IsPrintableASCII(val) {
-			if val, ok := utils.IsJSON(val); ok {
-				for _, j := range jsonpath.RecursiveDeepJsonPath(val) {
+		if bs64Raw, ok := isStrictBase64(values[0]); ok && govalidator.IsPrintableASCII(bs64Raw) {
+			if raw, ok := utils.IsJSON(bs64Raw); ok {
+				call := func(jk, jv gjson.Result, gPath, jPath string) {
 					fuzzParams = append(fuzzParams, &FuzzHTTPRequestParam{
-						position: posGetQueryBase64Json,
-						param:    key,
-						raw:      values,
-						path:     j,
-						origin:   f,
+						position:   posGetQueryBase64Json,
+						param:      key,
+						param2nd:   jk.String(),
+						paramValue: jv.String(),
+						raw:        strings.TrimSpace(raw),
+						path:       jPath,
+						gpath:      gPath,
+						origin:     f,
 					})
 				}
-			} else {
-				fuzzParams = append(fuzzParams, &FuzzHTTPRequestParam{
-					position: posGetQueryBase64,
-					param:    key,
-					raw:      values,
-					origin:   f,
-				})
+				walk([]byte(raw), gjson.ParseBytes([]byte(raw)), "", "$", call)
+
 			}
+			// 优化显示效果
+			fuzzParams = append(fuzzParams, &FuzzHTTPRequestParam{
+				position:   posGetQueryBase64,
+				param:      key,
+				paramValue: bs64Raw,
+				raw:        values,
+				origin:     f,
+			})
+
 		}
 
 		param := &FuzzHTTPRequestParam{
-			position: posGetQuery,
-			param:    key,
-			// TODO
+			position:   posGetQuery,
+			param:      key,
 			raw:        values,
 			paramValue: values,
 			origin:     f,
@@ -673,26 +678,31 @@ func (f *FuzzHTTPRequest) GetPostParams() []*FuzzHTTPRequestParam {
 			walk([]byte(raw), gjson.ParseBytes([]byte(raw)), "", "$", call)
 		}
 
-		//if val, ok := isStrictBase64(param[0]); ok && govalidator.IsPrintableASCII(val) {
-		//	if val, ok := utils.IsJSON(val); ok {
-		//		for _, j := range jsonpath.RecursiveDeepJsonPath(val) {
-		//			params = append(params, &FuzzHTTPRequestParam{
-		//				position: posPostQueryBase64Json,
-		//				param:    key,
-		//				raw:      param,
-		//				path:     j,
-		//				origin:   f,
-		//			})
-		//		}
-		//	} else {
-		//		params = append(params, &FuzzHTTPRequestParam{
-		//			position: posPostQueryBase64,
-		//			param:    key,
-		//			raw:      param,
-		//			origin:   f,
-		//		})
-		//	}
-		//}
+		if bs64Raw, ok := isStrictBase64(values[0]); ok && govalidator.IsPrintableASCII(bs64Raw) {
+			if raw, ok := utils.IsJSON(bs64Raw); ok {
+				call := func(jk, jv gjson.Result, gPath, jPath string) {
+					fuzzParams = append(fuzzParams, &FuzzHTTPRequestParam{
+						position:   posPostQueryJson,
+						param:      key,
+						param2nd:   jk.String(),
+						paramValue: jv.String(),
+						raw:        strings.TrimSpace(raw),
+						path:       jPath,
+						gpath:      gPath,
+						origin:     f,
+					})
+				}
+				walk([]byte(raw), gjson.ParseBytes([]byte(raw)), "", "$", call)
+			}
+			fuzzParams = append(fuzzParams, &FuzzHTTPRequestParam{
+				position:   posPostQueryBase64,
+				param:      key,
+				paramValue: bs64Raw,
+				raw:        values,
+				origin:     f,
+			})
+
+		}
 
 		param := &FuzzHTTPRequestParam{
 			position:   posPostQuery,
@@ -712,53 +722,63 @@ func (f *FuzzHTTPRequest) GetCookieParams() []*FuzzHTTPRequestParam {
 		return nil
 	}
 
-	var params []*FuzzHTTPRequestParam
+	fuzzParams := make([]*FuzzHTTPRequestParam, 0)
 	for _, k := range req.Cookies() {
 		if shouldIgnoreCookie(k.Name) {
 			continue
 		}
 
-		if val, ok := utils.IsJSON(k.Value); ok {
-			for _, j := range jsonpath.RecursiveDeepJsonPath(val) {
-				params = append(params, &FuzzHTTPRequestParam{
-					position: posCookieJson,
-					param:    k.Name,
-					raw:      []string{k.Value},
-					path:     j,
-					origin:   f,
+		if raw, ok := utils.IsJSON(k.Value); ok {
+			call := func(jk, jv gjson.Result, gPath, jPath string) {
+				fuzzParams = append(fuzzParams, &FuzzHTTPRequestParam{
+					position:   posCookieJson,
+					param:      k.Name,
+					param2nd:   jk.String(),
+					paramValue: jv.String(),
+					raw:        strings.TrimSpace(raw),
+					path:       jPath,
+					gpath:      gPath,
+					origin:     f,
 				})
 			}
+			walk([]byte(raw), gjson.ParseBytes([]byte(raw)), "", "$", call)
 		}
 
-		if val, ok := isStrictBase64(k.Value); ok && govalidator.IsPrintableASCII(val) {
-			if val, ok := utils.IsJSON(val); ok {
-				for _, j := range jsonpath.RecursiveDeepJsonPath(val) {
-					params = append(params, &FuzzHTTPRequestParam{
-						position: posCookieBase64Json,
-						param:    k.Name,
-						raw:      []string{k.Value},
-						path:     j,
-						origin:   f,
+		if bs64Raw, ok := isStrictBase64(k.Value); ok && govalidator.IsPrintableASCII(bs64Raw) {
+			if raw, ok := utils.IsJSON(bs64Raw); ok {
+				call := func(jk, jv gjson.Result, gPath, jPath string) {
+					fuzzParams = append(fuzzParams, &FuzzHTTPRequestParam{
+						position:   posCookieBase64Json,
+						param:      k.Name,
+						param2nd:   jk.String(),
+						paramValue: jv.String(),
+						raw:        strings.TrimSpace(raw),
+						path:       jPath,
+						gpath:      gPath,
+						origin:     f,
 					})
 				}
-			} else {
-				params = append(params, &FuzzHTTPRequestParam{
-					position: posCookieBase64,
-					param:    k.Name,
-					raw:      []string{k.Value},
-					origin:   f,
-				})
+				walk([]byte(raw), gjson.ParseBytes([]byte(raw)), "", "$", call)
+
 			}
+			fuzzParams = append(fuzzParams, &FuzzHTTPRequestParam{
+				position:   posCookieBase64,
+				param:      k.Name,
+				paramValue: bs64Raw,
+				raw:        k.Value,
+				origin:     f,
+			})
 		}
 
-		params = append(params, &FuzzHTTPRequestParam{
-			position: posCookie,
-			param:    k.Name,
-			raw:      []string{k.Value},
-			origin:   f,
+		fuzzParams = append(fuzzParams, &FuzzHTTPRequestParam{
+			position:   posCookie,
+			param:      k.Name,
+			paramValue: []string{k.Value},
+			raw:        []string{k.Value},
+			origin:     f,
 		})
 	}
-	return params
+	return fuzzParams
 }
 
 func (f *FuzzHTTPRequest) GetCookieParamsByName(name string) *FuzzHTTPRequestParam {

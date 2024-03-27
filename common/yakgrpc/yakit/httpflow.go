@@ -3,7 +3,6 @@ package yakit
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -288,26 +287,18 @@ func FuzzParamsToGRPCFuzzableParam(r *mutate.FuzzHTTPRequestParam, isHttps bool)
 		IsHTTPS:   isHttps,
 	}
 
-	fallback := func() {
-		originValueRaw, err := json.Marshal(r.Value())
-		if err != nil {
-			p.OriginValue = []byte(fmt.Sprintf("%#v", r.Value()))
-		} else {
-			p.OriginValue = originValueRaw
-		}
-	}
 	switch ret := r.Value().(type) {
 	case []string:
 		if len(ret) == 1 {
 			p.OriginValue = []byte(ret[0])
-			break
+		} else {
+			p.OriginValue = utils.InterfaceToBytes(r.Value())
 		}
-		fallback()
 	default:
-		fallback()
+		p.OriginValue = utils.InterfaceToBytes(r.Value())
 	}
 
-	flag := utils.RandStringBytes(40)
+	flag := utils.RandNumberStringBytes(6)
 	res, err := r.Fuzz(flag).Results()
 	if err != nil {
 		return p
@@ -321,7 +312,11 @@ func FuzzParamsToGRPCFuzzableParam(r *mutate.FuzzHTTPRequestParam, isHttps bool)
 		}
 	}
 	if raw != nil {
-		p.AutoTemplate = bytes.ReplaceAll(raw, []byte(flag), []byte("{{randstr(10,10,1)}}"))
+		if bytes.Contains(raw, []byte(flag)) {
+			p.AutoTemplate = bytes.ReplaceAll(raw, []byte(flag), []byte("{{randstr(10,10,1)}}"))
+		} else if bytes.Contains(raw, []byte(codec.EncodeBase64(flag))) {
+			p.AutoTemplate = bytes.ReplaceAll(raw, []byte(codec.EncodeBase64(flag)), []byte("{{base64({{randstr(10,10,1)}})}}"))
+		}
 	}
 	return p
 }

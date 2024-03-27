@@ -431,41 +431,122 @@ func (f *FuzzHTTPRequest) fuzzPostParamsJsonPath(key any, jsonPath string, val a
 	keys, values := []string{keyStr}, InterfaceToFuzzResults(val)
 	valueOrigin := vals.Get(keyStr)
 	if valueOrigin == "" {
-		return nil, utils.Errorf("empty HTTP Get Params[%v] Values", key)
+		return nil, utils.Errorf("empty HTTP Post Params[%v] Values", key)
 	}
 	rawJson, isJsonOk := utils.IsJSON(valueOrigin)
 	if !isJsonOk {
-		return nil, utils.Errorf("HTTP Get Params[%v] Values is not json", key)
+		return nil, utils.Errorf("HTTP Post Params[%v] Values is not json", key)
 	}
 
 	err = cartesian.ProductEx([][]string{keys, values}, func(result []string) error {
 		key, value := result[0], result[1]
-		var replacedValue []string
-		if govalidator.IsInt(value) {
-			replacedValue = append(replacedValue, jsonpath.ReplaceString(rawJson, jsonPath, codec.Atoi(value)))
-		}
-		if govalidator.IsFloat(value) {
-			replacedValue = append(replacedValue, jsonpath.ReplaceString(rawJson, jsonPath, codec.Atof(value)))
-		}
-		if value == `true` || value == `false` {
-			replacedValue = append(replacedValue, jsonpath.ReplaceString(rawJson, jsonPath, codec.Atob(value)))
-		}
-		replacedValue = append(replacedValue, jsonpath.ReplaceString(rawJson, jsonPath, value))
+		//var replacedValue []string
+		//if govalidator.IsInt(value) {
+		//	replacedValue = append(replacedValue, jsonpath.ReplaceString(rawJson, jsonPath, codec.Atoi(value)))
+		//}
+		//if govalidator.IsFloat(value) {
+		//	replacedValue = append(replacedValue, jsonpath.ReplaceString(rawJson, jsonPath, codec.Atof(value)))
+		//}
+		//if value == `true` || value == `false` {
+		//	replacedValue = append(replacedValue, jsonpath.ReplaceString(rawJson, jsonPath, codec.Atob(value)))
+		//}
+		//replacedValue = append(replacedValue, jsonpath.ReplaceString(rawJson, jsonPath, value))
+		//
+		//for _, i := range replacedValue {
+		//	newReq := lowhttp.CopyRequest(req)
+		//	if newReq == nil {
+		//		continue
+		//	}
+		//
+		//	newVals, err := deepCopyUrlValues(vals)
+		//	if err != nil {
+		//		continue
+		//	}
+		//	newVals.Set(key, i)
+		//	newReq.Body = ioutil.NopCloser(bytes.NewBufferString(newVals.Encode()))
+		//	reqs = append(reqs, newReq)
+		//}
 
-		for _, i := range replacedValue {
-			newReq := lowhttp.CopyRequest(req)
-			if newReq == nil {
-				continue
-			}
+		originalValue := jsonpath.Find(rawJson, jsonPath)
 
-			newVals, err := deepCopyUrlValues(vals)
-			if err != nil {
-				continue
+		var newValue interface{} = value
+
+		switch originalValue.(type) {
+		case float64:
+			if floatVal, err := strconv.ParseFloat(value, 64); err == nil {
+				newValue = floatVal
 			}
-			newVals.Set(key, i)
-			newReq.Body = ioutil.NopCloser(bytes.NewBufferString(newVals.Encode()))
-			reqs = append(reqs, newReq)
+		case bool:
+			if boolVal, err := strconv.ParseBool(value); err == nil {
+				newValue = boolVal
+			}
+		case string:
+			newValue = value
+		case map[string]interface{}, []interface{}:
+			if gjson.Valid(value) {
+				newValue = gjson.Parse(value).Value()
+			}
+		default:
+			return utils.Wrap(errors.New("unrecognized json value type"), "json value type")
 		}
+
+		//originalValue := gjson.Get(rawJson, jsonPath)
+		//
+		//var newValue interface{} = value
+		//
+		//// 根据原始值的类型决定如何转换 value
+		//switch originalValue.Type {
+		//case gjson.True, gjson.False:
+		//	if boolVal, err := strconv.ParseBool(value); err == nil {
+		//		newValue = boolVal
+		//	} else {
+		//		newValue = value
+		//	}
+		//case gjson.Number:
+		//	if floatVal, err := strconv.ParseFloat(value, 64); err == nil {
+		//		newValue = floatVal
+		//	} else {
+		//		newValue = value
+		//	}
+		//case gjson.String:
+		//	newValue = value
+		//case gjson.JSON:
+		//	if gjson.Valid(value) {
+		//		newValue = gjson.Parse(value).Value()
+		//	}
+		//default:
+		//	return utils.Wrap(errors.New("unrecognized json value type"), "json value type")
+		//}
+		//modifiedParams, err := sjson.Set(rawJson, jsonPath, newValue)
+		modifiedParams := jsonpath.ReplaceString(rawJson, jsonPath, newValue)
+		if err != nil {
+			return err
+		}
+		newReq := lowhttp.CopyRequest(req)
+
+		newVals, err := deepCopyUrlValues(vals)
+		if err != nil {
+			return err
+		}
+		var parts []string
+		for k, v := range newVals {
+			for _, singleV := range v {
+				if k == key {
+					singleV = modifiedParams
+				}
+				var part string
+				if utils.NeedsURLEncoding(singleV) {
+					part = fmt.Sprintf("%s={{urlescape(%s)}}", k, singleV)
+				} else {
+					part = fmt.Sprintf("%s=%s", k, singleV)
+				}
+				parts = append(parts, part)
+			}
+		}
+		unencodedQuery := strings.Join(parts, "&")
+		newReq.Body = ioutil.NopCloser(bytes.NewBufferString(unencodedQuery))
+		reqs = append(reqs, newReq)
+
 		return nil
 	})
 	if err != nil {
