@@ -94,16 +94,16 @@ func (y *builder) VisitFormalParameterList(raw phpparser.IFormalParameterListCon
 	return nil
 }
 
-func (y *builder) VisitFormalParameter(raw phpparser.IFormalParameterContext) interface{} {
+func (y *builder) VisitFormalParameter(raw phpparser.IFormalParameterContext) {
 	if y == nil || raw == nil {
-		return nil
+		return
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 
 	i, _ := raw.(*phpparser.FormalParameterContext)
 	if i == nil {
-		return nil
+		return
 	}
 
 	// PHP8 annotation
@@ -129,7 +129,10 @@ func (y *builder) VisitFormalParameter(raw phpparser.IFormalParameterContext) in
 	if typeHint != nil {
 		param.SetType(typeHint)
 	}
-	return nil
+	if isRef {
+		y.ir.ReferenceParameter(formalParams)
+	}
+	return
 }
 
 func (y *builder) VisitLambdaFunctionExpr(raw phpparser.ILambdaFunctionExprContext) ssa.Value {
