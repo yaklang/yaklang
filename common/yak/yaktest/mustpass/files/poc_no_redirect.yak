@@ -1,0 +1,14 @@
+target = getParam("VULINBOX")
+// redirect times = 0
+rsp, req = poc.Get(f"${target}/misc/response/redirect?times=5", poc.redirectTimes(0))~
+_, code, _ = poc.GetHTTPPacketFirstLine(rsp.RawPacket)
+redirectHeader = poc.GetHTTPPacketHeader(rsp.RawPacket, "Location")
+assert int(code) == 302, f"no redirect failed! code=${code}"
+assert redirectHeader.Contains("times=4"), f"no redirect failed! redirectHeader=${redirectHeader}"
+
+// no redirect
+rsp, req = poc.Get(f"${target}/misc/response/redirect?times=5", poc.noRedirect(true))~
+redirectHeader = poc.GetHTTPPacketHeader(rsp.RawPacket, "Location")
+assert redirectHeader.Contains("times=4"), f"no redirect failed! redirectHeader=${redirectHeader}"
+_, code, _ = poc.GetHTTPPacketFirstLine(rsp.RawPacket)
+assert int(code) == 302, f"no redirect failed! code=${code}"
