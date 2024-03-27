@@ -3,6 +3,8 @@ package tests
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/yak/php/php2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 )
 
@@ -15,10 +17,21 @@ class Foo {
 	public static $my_static = 'foo';
 }
 
-println(Foo::$my_static . PHP_EOL);
+println(Foo::$my_static . PHP_EOL); // normal
+
+println("Foo"::$my_static . PHP_EOL); // string
+
+$a = "Foo";
+println($a::$my_static . PHP_EOL); // variable
+
+$b = "a";
+println($$b::$my_static . PHP_EOL); // dynamic variable
 
 ?>    
 	`, []string{
+			"add(\"foo\", Parameter-PHP_EOL)",
+			"add(\"foo\", Parameter-PHP_EOL)",
+			"add(\"foo\", Parameter-PHP_EOL)",
 			"add(\"foo\", Parameter-PHP_EOL)",
 		}, t)
 
@@ -85,11 +98,35 @@ func TestOOP_static_method(t *testing.T) {
 				return "foo";
 			}
 		}
-		Foo::aStaticMethod();
+		println(Foo::aStaticMethod());
+		println("Foo"::aStaticMethod());
+		$a = "Foo";
+		println($a::aStaticMethod());
+		$b = "a";
+		println($$b::aStaticMethod());
 		?>
-		`, []string{}, t)
+		`, []string{
+			"Function-Foo_aStaticMethod()",
+			"Function-Foo_aStaticMethod()",
+			"Function-Foo_aStaticMethod()",
+			"Function-Foo_aStaticMethod()",
+		}, t)
 	})
 
+	t.Run("static method should't assign ", func(t *testing.T) {
+		code := `
+		<?php
+		class Foo {
+			public static function aStaticMethod() {
+				return "foo";
+			}
+		}
+		Foo::aStaticMethod = "bar";
+		?>
+		`
+		_, err := php2ssa.FrondEnd(code, false)
+		require.Error(t, err)
+	})
 }
 
 func TestOOP_var_member(t *testing.T) {

@@ -271,23 +271,32 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#fullyQualifiedNamespaceExpr.
 	VisitFullyQualifiedNamespaceExpr(ctx *FullyQualifiedNamespaceExprContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#staticClassExpr.
+	VisitStaticClassExpr(ctx *StaticClassExprContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#ClassStaticFunctionMember.
 	VisitClassStaticFunctionMember(ctx *ClassStaticFunctionMemberContext) interface{}
-
-	// Visit a parse tree produced by PHPParser#ClassStaticVariable.
-	VisitClassStaticVariable(ctx *ClassStaticVariableContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#ClassDirectFunctionMember.
 	VisitClassDirectFunctionMember(ctx *ClassDirectFunctionMemberContext) interface{}
 
-	// Visit a parse tree produced by PHPParser#ClassDirectStaticVariable.
-	VisitClassDirectStaticVariable(ctx *ClassDirectStaticVariableContext) interface{}
-
 	// Visit a parse tree produced by PHPParser#StringAsIndirectClassStaticFunctionMember.
 	VisitStringAsIndirectClassStaticFunctionMember(ctx *StringAsIndirectClassStaticFunctionMemberContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#VariableAsIndirectClassStaticFunctionMember.
+	VisitVariableAsIndirectClassStaticFunctionMember(ctx *VariableAsIndirectClassStaticFunctionMemberContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#ClassStaticVariable.
+	VisitClassStaticVariable(ctx *ClassStaticVariableContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#ClassDirectStaticVariable.
+	VisitClassDirectStaticVariable(ctx *ClassDirectStaticVariableContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#StringAsIndirectClassStaticVariable.
 	VisitStringAsIndirectClassStaticVariable(ctx *StringAsIndirectClassStaticVariableContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#VariableAsIndirectClassStaticVariable.
+	VisitVariableAsIndirectClassStaticVariable(ctx *VariableAsIndirectClassStaticVariableContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#memberCallKey.
 	VisitMemberCallKey(ctx *MemberCallKeyContext) interface{}
