@@ -169,9 +169,16 @@ func generalMainDomainRange(targetUrl string) []string {
 func generalSubDomainRange(targetUrl string) []string {
 	url, _ := u.Parse(targetUrl)
 	ranges := make([]string, 0)
-	ranges = append(ranges, url.Scheme+"://"+url.Host+url.Path)
+	var path string
+	if strings.HasSuffix(url.Path, "/") {
+		path = url.Path
+	} else {
+		tempPaths := strings.Split(url.Path, "/")
+		path = strings.Join(tempPaths[0:len(tempPaths)-1], "/")
+	}
+	ranges = append(ranges, url.Scheme+"://"+url.Host+path)
 	if !strings.HasPrefix(url.Host, "www.") {
-		ranges = append(ranges, url.Scheme+"://www."+url.Host+url.Path)
+		ranges = append(ranges, url.Scheme+"://www."+url.Host+path)
 	}
 	return ranges
 }
