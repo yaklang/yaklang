@@ -820,7 +820,7 @@ http:
 	}
 }
 
-func TestDebug_Plugin_Cancel_Check(t *testing.T) {
+func TestDebug_Plugin_Cancel_Check_ForChan(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
@@ -830,9 +830,51 @@ func TestDebug_Plugin_Cancel_Check(t *testing.T) {
 		println("Exit ok")
 		os.Exit(0)
 	})
-	for{
-	sleep(0.5)
+	ch = make(chan var)
+	for i in ch{
 }
+`
+
+	var okChan = make(chan struct{})
+	go func() {
+		stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
+			Code:       code,
+			PluginType: "yak",
+			ExecParams: []*ypb.KVPair{},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for {
+			rsp, err := stream.Recv()
+			if err != nil {
+				break
+			}
+			spew.Dump(rsp)
+		}
+		okChan <- struct{}{}
+	}()
+
+	select {
+	case <-time.After(5 * time.Second):
+		t.Fatal("cancel fail")
+	case <-okChan:
+	}
+}
+
+func TestDebug_Plugin_Cancel_Check_Chan(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	code := `
+	time.AfterFunc(1, func(){
+		println("Exit ok")
+		os.Exit(0)
+	})
+	ch = make(chan var)
+	<- ch
 `
 
 	var okChan = make(chan struct{})
