@@ -48,7 +48,7 @@ func init() {
 }
 
 func TestMustPassDebug(t *testing.T) {
-	debugName := "poc_params_fuzz.yak"
+	debugName := "poc_no_redirect.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {
