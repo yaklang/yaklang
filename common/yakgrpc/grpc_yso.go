@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/javaclassparser"
-	"github.com/yaklang/yaklang/common/log"
 	"sort"
 	"strconv"
 	"strings"
@@ -25,6 +24,7 @@ const (
 	JavaClassGeneraterOption_IsObfuscation JavaClassGeneraterOption = "isObfuscation"
 	JavaClassGeneraterOption_Version       JavaClassGeneraterOption = "version"
 	JavaClassGeneraterOption_DirtyData     JavaClassGeneraterOption = "dirtyData"
+	JavaClassGeneraterOption_twoByteChar   JavaClassGeneraterOption = "two byte char"
 )
 
 type JavaClassGeneraterOptionTypeVerbose string
@@ -36,6 +36,25 @@ const (
 	StringPort  JavaClassGeneraterOptionTypeVerbose = "StringPort"
 )
 
+var allExtOptions = []*ypb.YsoClassGeneraterOptionsWithVerbose{
+	{Key: string(JavaClassGeneraterOption_IsObfuscation), Value: "true", Type: string(StringBool), KeyVerbose: "混淆", Help: "开启混淆后可以防止被反编译，并加密字符串常量"},
+	{Key: string(JavaClassGeneraterOption_DirtyData), Type: string(StringPort), KeyVerbose: "脏数据", Help: "填写脏数据大小"},
+	{Key: string(JavaClassGeneraterOption_twoByteChar), Value: "true", Type: string(StringBool), KeyVerbose: "双字节字符", Help: "开启双字节字符后，在序列化时会使用双字节字符的方式对String类型对象编码，在编码后所有字符串常量不会以明文形式展示，可以绕过一些WAF检测"},
+	{Key: string(JavaClassGeneraterOption_ClassName), Value: utils.RandStringBytes(8), Type: string(String), KeyVerbose: "类名", Help: "类名"},
+	{Key: string(JavaClassGeneraterOption_Version), Value: "52", Type: string(StringPort), KeyVerbose: "Java 版本", Help: "Class 使用的Java 版本"},
+}
+var classExtOptionsIndex = []int{0, 2, 3, 4}
+var gadgetTemplateImplExtOptionsIndex = []int{0, 2, 1, 3, 4}
+var gadgetTransformChainExtOptionsIndex = []int{1, 2}
+
+func IsExtOption(key string) bool {
+	for _, v := range allExtOptions {
+		if v.Key == key {
+			return true
+		}
+	}
+	return false
+}
 func (s *Server) GetAllYsoGadgetOptions(ctx context.Context, _ *ypb.Empty) (*ypb.YsoOptionsWithVerbose, error) {
 	allGadget := []*yso.GadgetConfig{}
 	names := []string{}
@@ -110,18 +129,28 @@ func (s *Server) GetAllYsoClassGeneraterOptions(ctx context.Context, req *ypb.Ys
 			return nil, utils.Errorf("not support gadget: %s", req.Gadget)
 		}
 	}
-	versionOptions := []*ypb.YsoClassGeneraterOptionsWithVerbose{
-		{Key: string(JavaClassGeneraterOption_Version), Value: "52", Type: string(StringPort), KeyVerbose: "Java 版本", Help: "Class 使用的Java 版本"},
+	var extOptions []*ypb.YsoClassGeneraterOptionsWithVerbose
+	if isNone {
+		for _, i := range classExtOptionsIndex {
+			if i < len(allExtOptions) {
+				extOptions = append(extOptions, allExtOptions[i])
+			}
+		}
+	} else {
+		if gadgetCfg.IsTemplateImpl {
+			for _, i := range gadgetTemplateImplExtOptionsIndex {
+				if i < len(allExtOptions) {
+					extOptions = append(extOptions, allExtOptions[i])
+				}
+			}
+		} else {
+			for _, i := range gadgetTransformChainExtOptionsIndex {
+				if i < len(allExtOptions) {
+					extOptions = append(extOptions, allExtOptions[i])
+				}
+			}
+		}
 	}
-	commonOptions := []*ypb.YsoClassGeneraterOptionsWithVerbose{
-		{Key: string(JavaClassGeneraterOption_IsObfuscation), Value: "true", Type: string(StringBool), KeyVerbose: "混淆", Help: "开启则混淆，否则不混淆"},
-	}
-	if !isNone {
-		commonOptions = append(commonOptions, &ypb.YsoClassGeneraterOptionsWithVerbose{Key: string(JavaClassGeneraterOption_DirtyData), Type: string(StringPort), KeyVerbose: "脏数据", Help: "填写脏数据大小"})
-	}
-	commonOptions =
-		append(commonOptions, &ypb.YsoClassGeneraterOptionsWithVerbose{Key: string(JavaClassGeneraterOption_ClassName), Value: utils.RandStringBytes(8), Type: string(String), KeyVerbose: "类名", Help: "类名"})
-	commonOptions = append(commonOptions, versionOptions...)
 	var gadgetOptions []*ypb.YsoClassGeneraterOptionsWithVerbose
 	paramsToOptInfo := func(params []*yso.ParamConfig) []*ypb.YsoClassGeneraterOptionsWithVerbose {
 		var res []*ypb.YsoClassGeneraterOptionsWithVerbose
@@ -147,34 +176,6 @@ func (s *Server) GetAllYsoClassGeneraterOptions(ctx context.Context, req *ypb.Ys
 	if isNone || gadgetCfg.IsTemplateImpl {
 		if cfg, ok := yso.YsoConfigInstance.Classes[yso.ClassType(req.Class)]; ok {
 			gadgetOptions = paramsToOptInfo(cfg.Params)
-
-			//if req.Class == string(yso.ClassSpringEcho) && param.Name == "isSpringEchoBody" {
-			//	gadgetOptions = append(gadgetOptions, &ypb.YsoClassGeneraterOptionsWithVerbose{
-			//
-			//	})
-			//}
-			//return &ypb.YsoClassOptionsResponseWithVerbose{
-			//	Options: append(commonOptions, []*ypb.YsoClassGeneraterOptionsWithVerbose{
-			//		{Key: string(JavaClassGeneraterOption_IsSpringEchoBody), Value: "false", Type: string(StringBool), KeyVerbose: "Body输出", Help: "开启则在Body输出，否则在Header输出", BindOptions: map[string]*ypb.YsoClassOptionsResponseWithVerbose{
-			//			"false": {
-			//				Options: []*ypb.YsoClassGeneraterOptionsWithVerbose{
-			//					{Key: string(JavaClassGeneraterOption_SpringHeaderKey), Value: "", Type: string(String), KeyVerbose: "HeaderKey", Help: "在Header回显的Key"},
-			//					{Key: string(JavaClassGeneraterOption_SpringHeaderValue), Value: "", Type: string(String), KeyVerbose: "HeaderValue", Help: "在Header回显的Value"},
-			//				},
-			//			},
-			//			"true": {
-			//				Options: []*ypb.YsoClassGeneraterOptionsWithVerbose{
-			//					{Key: string(JavaClassGeneraterOption_SpringParam), Value: "", Type: string(String), KeyVerbose: "命令", Help: "在Body回显的命令"},
-			//				},
-			//			},
-			//		}},
-			//		{Key: string(JavaClassGeneraterOption_IsSpringRuntimeExecAction), Value: "false", Type: string(StringBool), KeyVerbose: "执行命令", Help: "开启则执行命令并回显结果，否则只回显命令"},
-			//		{Key: string(JavaClassGeneraterOption_SpringHeaderKey), Value: "", Type: string(String), KeyVerbose: "HeaderKey", Help: "在Header回显的Key"},
-			//		{Key: string(JavaClassGeneraterOption_SpringHeaderValue), Value: "", Type: string(String), KeyVerbose: "HeaderValue", Help: "在Header回显的Value"},
-			//		{Key: string(JavaClassGeneraterOption_SpringParam), Value: "", Type: string(String), KeyVerbose: "命令", Help: "在Body回显的命令"},
-			//	}...),
-			//}, nil
-
 		} else {
 			return nil, utils.Errorf("not support class: %s", req.Class)
 		}
@@ -191,7 +192,7 @@ func (s *Server) GetAllYsoClassGeneraterOptions(ctx context.Context, req *ypb.Ys
 			gadgetOptions = paramsToOptInfo(cfg.Args)
 		}
 	}
-	return &ypb.YsoClassOptionsResponseWithVerbose{Options: append(commonOptions, gadgetOptions...)}, nil
+	return &ypb.YsoClassOptionsResponseWithVerbose{Options: append(extOptions, gadgetOptions...)}, nil
 }
 
 func generateYsoCode(req *ypb.YsoOptionsRequerstWithVerbose) (string, error) {
@@ -207,12 +208,12 @@ if err {
     log.error("%v",err)
 	return
 }
-gadgetBytes,err = yso.ToBytes(gadgetObj)
+gadgetBytes,err = yso.ToBytes(gadgetObj,$toBytesOptions)
 if err {
     log.error("%v",err)
     return
 }
-$dirtyData
+
 // 16进制展示payload
 hexPayload = codec.EncodeToHex(gadgetBytes)    
 //(hexPayload)
@@ -298,48 +299,31 @@ hexPayload = codec.EncodeToHex(classBytes)
 // log.info("发送Payload成功")
 // log.info("响应包: %s",string(rsp))
 `
-	dirtyData := 0
-	optionsToCode := func(options []*ypb.YsoClassGeneraterOptionsWithVerbose) string {
-		optionsMapTemplate := `{
-%s}`
-		tmpStr := ""
-		for _, option := range req.Options {
-			if option.Key == string(JavaClassGeneraterOption_ClassName) || option.Key == string(JavaClassGeneraterOption_IsObfuscation) || option.Key == string(JavaClassGeneraterOption_Version) {
-				continue
-			}
-			if option.Key == string(JavaClassGeneraterOption_DirtyData) {
-				if v, err := strconv.Atoi(option.Value); err == nil {
-					dirtyData = v
-				} else {
-					log.Errorf("invalid dirty data: %s", option.Value)
-				}
-
-				continue
-			}
-			tmpStr += fmt.Sprintf("\t\"%s\":\"%s\",\n", option.Key, option.Value)
-		}
-		return fmt.Sprintf(optionsMapTemplate, tmpStr)
-	}
 	if req.Gadget == "None" { // generate class
 		optionsCode := []string{}
 		optionsCode = append(optionsCode, fmt.Sprintf(`yso.useTemplate("%s")`, req.Class))
+		toBytesOptions := []string{}
 		for _, option := range req.Options {
 			if option.Key == string(JavaClassGeneraterOption_ClassName) {
 				optionsCode = append(optionsCode, fmt.Sprintf(`yso.evilClassName("%s")`, option.Value))
-				continue
 			}
 			if option.Key == string(JavaClassGeneraterOption_IsObfuscation) && option.Value == "true" {
 				optionsCode = append(optionsCode, "yso.obfuscationClassConstantPool()")
-				continue
+			}
+			if option.Key == string(JavaClassGeneraterOption_twoByteChar) && option.Value == "true" {
+				toBytesOptions = append(toBytesOptions, "yso.twoBytesCharString()")
 			}
 			if option.Key == string(JavaClassGeneraterOption_Version) {
 				optionsCode = append(optionsCode, fmt.Sprintf(`yso.majorVersion(%s)`, option.Value))
+			}
+			if IsExtOption(option.Key) {
 				continue
 			}
 			optionsCode = append(optionsCode, fmt.Sprintf(`yso.useClassParam("%s","%s")`, option.Key, option.Value))
 		}
 		classCode := utils.Format(classCodeTmp, map[string]string{
-			"options": strings.Join(optionsCode, ","),
+			"options":        strings.Join(optionsCode, ","),
+			"toBytesOptions": strings.Join(toBytesOptions, ","),
 		})
 		return classCode, nil
 	} else { // generate gadget
@@ -351,43 +335,65 @@ hexPayload = codec.EncodeToHex(classBytes)
 			optionsCode := []string{}
 			optionsCode = append(optionsCode, fmt.Sprintf(`"%s"`, req.Gadget))
 			optionsCode = append(optionsCode, fmt.Sprintf(`yso.useTemplate("%s")`, req.Class))
-			var dirtyOpt string
+			toBytesOptions := []string{}
 			for _, option := range req.Options {
 				if option.Key == string(JavaClassGeneraterOption_ClassName) {
 					optionsCode = append(optionsCode, fmt.Sprintf(`yso.evilClassName("%s")`, option.Value))
-					continue
 				}
 				if option.Key == string(JavaClassGeneraterOption_DirtyData) {
-					dirtyOpt = fmt.Sprintf("gadgetBytes = yso.WrapByDirtyData(gadgetBytes,%d)", dirtyData)
-					continue
+					n, err := strconv.Atoi(option.Value)
+					if err != nil {
+						return "", utils.Errorf("invalid dirty data: %s", option.Value)
+					}
+					toBytesOptions = append(toBytesOptions, fmt.Sprintf("yso.dirtyDataLength(%d)", n))
+				}
+				if option.Key == string(JavaClassGeneraterOption_twoByteChar) && option.Value == "true" {
+					toBytesOptions = append(toBytesOptions, "yso.twoBytesCharString()")
 				}
 				if option.Key == string(JavaClassGeneraterOption_IsObfuscation) && option.Value == "true" {
 					optionsCode = append(optionsCode, "yso.obfuscationClassConstantPool()")
-					continue
 				}
 				if option.Key == string(JavaClassGeneraterOption_Version) {
 					optionsCode = append(optionsCode, fmt.Sprintf(`yso.majorVersion(%s)`, option.Value))
+				}
+				if IsExtOption(option.Key) {
 					continue
 				}
 				optionsCode = append(optionsCode, fmt.Sprintf(`yso.useClassParam("%s","%s")`, option.Key, option.Value))
 			}
 			classCode := utils.Format(gadgetCodeTmp, map[string]string{
-				"options":   strings.Join(optionsCode, ","),
-				"dirtyData": dirtyOpt,
+				"options":        strings.Join(optionsCode, ","),
+				"toBytesOptions": strings.Join(toBytesOptions, ","),
 			})
 			return classCode, nil
 		} else {
 			optionsCode := []string{}
 			optionsCode = append(optionsCode, fmt.Sprintf(`"%s"`, req.Gadget))
 			optionsCode = append(optionsCode, fmt.Sprintf(`"%s"`, req.Class))
-			optionsCode = append(optionsCode, optionsToCode(req.Options))
-			var dirtyOpt string
-			if dirtyData > 0 {
-				dirtyOpt = fmt.Sprintf("gadgetBytes = yso.WrapByDirtyData(gadgetBytes,%d)", dirtyData)
+			optionsMapTemplate := `{
+%s}`
+			tmpStr := ""
+			toBytesOptions := []string{}
+			for _, option := range req.Options {
+				if option.Key == string(JavaClassGeneraterOption_DirtyData) {
+					n, err := strconv.Atoi(option.Value)
+					if err != nil {
+						return "", utils.Errorf("invalid dirty data: %s", option.Value)
+					}
+					toBytesOptions = append(toBytesOptions, fmt.Sprintf("yso.dirtyDataLength(%d)", n))
+				}
+				if option.Key == string(JavaClassGeneraterOption_twoByteChar) && option.Value == "true" {
+					toBytesOptions = append(toBytesOptions, "yso.twoBytesCharString()")
+				}
+				if IsExtOption(option.Key) {
+					continue
+				}
+				tmpStr += fmt.Sprintf("\t\"%s\":\"%s\",\n", option.Key, option.Value)
 			}
+			optionsCode = append(optionsCode, fmt.Sprintf(optionsMapTemplate, tmpStr))
 			classCode := utils.Format(gadgetCodeTmp, map[string]string{
-				"options":   strings.Join(optionsCode, ","),
-				"dirtyData": dirtyOpt,
+				"options":        strings.Join(optionsCode, ","),
+				"toBytesOptions": strings.Join(toBytesOptions, ","),
 			})
 			return classCode, nil
 		}
@@ -401,52 +407,46 @@ func (s *Server) GenerateYsoCode(ctx context.Context, req *ypb.YsoOptionsRequers
 	return &ypb.YsoCodeResponse{Code: code}, nil
 }
 func (s *Server) GenerateYsoBytes(ctx context.Context, req *ypb.YsoOptionsRequerstWithVerbose) (*ypb.YsoBytesResponse, error) {
-	var fileName string
-	var opts []yso.GenClassOptionFun
-	opts = append(opts, yso.SetClassType(yso.ClassType(req.Class)))
-	var dirtyDataLength int
-	for _, option := range req.Options {
-		if option.Key == string(JavaClassGeneraterOption_ClassName) {
-			fileName = fmt.Sprintf("%s.class", option.Value)
-			opts = append(opts, yso.SetClassName(option.Value))
-			continue
-		}
-		if option.Key == string(JavaClassGeneraterOption_IsObfuscation) && option.Value == "true" {
-			opts = append(opts, yso.SetObfuscation())
-			continue
-		}
-		if option.Key == string(JavaClassGeneraterOption_DirtyData) {
-			if v, err := strconv.Atoi(option.Value); err == nil {
-				dirtyDataLength = v
-			} else {
-				log.Errorf("invalid dirty data: %s", option.Value)
-			}
-			continue
-		}
-		if option.Key == string(JavaClassGeneraterOption_Version) {
-			n, err := strconv.Atoi(option.Value)
-			if err != nil {
-				return nil, err
-			}
-			opts = append(opts, yso.SetMajorVersion(uint16(n)))
-			continue
-		}
-		opts = append(opts, yso.SetClassParam(option.Key, option.Value))
-	}
-
-	if fileName == "" {
-		return nil, errors.New("not set className")
-	}
 	if req.Gadget == "None" {
 		_, ok := yso.YsoConfigInstance.Classes[yso.ClassType(req.Class)]
 		if !ok {
 			return nil, utils.Errorf("not support class: %s", req.Class)
 		}
+		var opts []yso.GenClassOptionFun
+		opts = append(opts, yso.SetClassType(yso.ClassType(req.Class)))
+		toBytesOpt := []yso.MarshalOptionFun{}
+		var fileName string
+		for _, option := range req.Options {
+			if option.Key == string(JavaClassGeneraterOption_ClassName) {
+				fileName = fmt.Sprintf("%s.class", option.Value)
+				opts = append(opts, yso.SetClassName(option.Value))
+			}
+			if option.Key == string(JavaClassGeneraterOption_IsObfuscation) && option.Value == "true" {
+				opts = append(opts, yso.SetObfuscation())
+			}
+			if option.Key == string(JavaClassGeneraterOption_Version) {
+				n, err := strconv.Atoi(option.Value)
+				if err != nil {
+					return nil, err
+				}
+				opts = append(opts, yso.SetMajorVersion(uint16(n)))
+			}
+			if option.Key == string(JavaClassGeneraterOption_twoByteChar) && option.Value == "true" {
+				toBytesOpt = append(toBytesOpt, yso.SetToBytesTwoBytesString())
+			}
+			if IsExtOption(option.Key) {
+				continue
+			}
+			opts = append(opts, yso.SetClassParam(option.Key, option.Value))
+		}
+		if fileName == "" {
+			return nil, errors.New("not set className")
+		}
 		classIns, err := yso.GenerateClass(opts...)
 		if err != nil {
 			return nil, err
 		}
-		byts, err := yso.ToBytes(classIns)
+		byts, err := yso.ToBytes(classIns, toBytesOpt...)
 		if err != nil {
 			return nil, err
 		}
@@ -456,21 +456,65 @@ func (s *Server) GenerateYsoBytes(ctx context.Context, req *ypb.YsoOptionsRequer
 		if !ok {
 			return nil, utils.Errorf("not support gadget: %s", req.Gadget)
 		}
-		var gadgetIns *yso.JavaObject
 		if cfg.IsTemplateImpl {
+			var opts []yso.GenClassOptionFun
+			opts = append(opts, yso.SetClassType(yso.ClassType(req.Class)))
+			toBytesOpt := []yso.MarshalOptionFun{}
+			var fileName string
+			for _, option := range req.Options {
+				if option.Key == string(JavaClassGeneraterOption_ClassName) {
+					fileName = fmt.Sprintf("%s.class", option.Value)
+					opts = append(opts, yso.SetClassName(option.Value))
+				}
+				if option.Key == string(JavaClassGeneraterOption_IsObfuscation) && option.Value == "true" {
+					opts = append(opts, yso.SetObfuscation())
+				}
+				if option.Key == string(JavaClassGeneraterOption_DirtyData) {
+					v, err := strconv.Atoi(option.Value)
+					if err != nil {
+						return nil, utils.Errorf("dirty data error: %v", err)
+					}
+					toBytesOpt = append(toBytesOpt, yso.SetToBytesDirtyDataLength(v))
+				}
+				if option.Key == string(JavaClassGeneraterOption_Version) {
+					n, err := strconv.Atoi(option.Value)
+					if err != nil {
+						return nil, err
+					}
+					opts = append(opts, yso.SetMajorVersion(uint16(n)))
+				}
+				if option.Key == string(JavaClassGeneraterOption_twoByteChar) && option.Value == "true" {
+					toBytesOpt = append(toBytesOpt, yso.SetToBytesTwoBytesString())
+				}
+				if IsExtOption(option.Key) {
+					continue
+				}
+				opts = append(opts, yso.SetClassParam(option.Key, option.Value))
+			}
+			if fileName == "" {
+				return nil, errors.New("not set className")
+			}
 			opts = append(opts, yso.SetClassType(yso.ClassType(req.Class)))
 			o, err := yso.GenerateGadget(req.Gadget, utils.InterfaceToSliceInterface(opts)...)
 			if err != nil {
 				return nil, err
 			}
-			gadgetIns = o
+			byts, err := yso.ToBytes(o, toBytesOpt...)
+			if err != nil {
+				return nil, err
+			}
+			return &ypb.YsoBytesResponse{Bytes: byts, FileName: fileName}, nil
 		} else {
 			opts := []any{}
 			opts = append(opts, req.Class)
 			params := map[string]string{}
 			opts = append(opts, params)
+			toBytesOpt := []yso.MarshalOptionFun{}
 			for _, option := range req.Options {
-				if option.Key == string(JavaClassGeneraterOption_ClassName) || option.Key == string(JavaClassGeneraterOption_IsObfuscation) || option.Key == string(JavaClassGeneraterOption_Version) || option.Key == string(JavaClassGeneraterOption_DirtyData) {
+				if option.Key == string(JavaClassGeneraterOption_twoByteChar) && option.Value == "true" {
+					toBytesOpt = append(toBytesOpt, yso.SetToBytesTwoBytesString())
+				}
+				if IsExtOption(option.Key) {
 					continue
 				}
 				params[option.Key] = option.Value
@@ -479,21 +523,12 @@ func (s *Server) GenerateYsoBytes(ctx context.Context, req *ypb.YsoOptionsRequer
 			if err != nil {
 				return nil, err
 			}
-			gadgetIns = o
-		}
-
-		byts, err := yso.ToBytes(gadgetIns)
-		if dirtyDataLength > 0 {
-			bs, err := yso.WrapSerializeDataByDirtyData(byts, dirtyDataLength)
+			byts, err := yso.ToBytes(o, toBytesOpt...)
 			if err != nil {
-				return nil, utils.Errorf("dirty data error: %v", err)
+				return nil, err
 			}
-			byts = bs
+			return &ypb.YsoBytesResponse{Bytes: byts, FileName: ""}, nil
 		}
-		if err != nil {
-			return nil, err
-		}
-		return &ypb.YsoBytesResponse{Bytes: byts, FileName: fileName}, nil
 	}
 }
 func (s *Server) BytesToBase64(ctx context.Context, req *ypb.BytesToBase64Request) (*ypb.BytesToBase64Response, error) {
