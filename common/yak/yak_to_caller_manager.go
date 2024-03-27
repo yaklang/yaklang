@@ -122,7 +122,7 @@ func Fuzz_WithHotPatch(ctx context.Context, code string) mutate.FuzzConfigOpt {
 	})
 }
 
-func FetchFunctionFromSourceCode(ctx context.Context, pluginContext *YakitPluginContext, timeout time.Duration, id string, code string, hook func(e *antlr4yak.Engine) error, functionNames ...string) (map[string]*YakFunctionCaller, error) {
+func FetchFunctionFromSourceCode(y *YakToCallerManager, pluginContext *YakitPluginContext, id string, code string, hook func(e *antlr4yak.Engine) error, functionNames ...string) (map[string]*YakFunctionCaller, error) {
 	fTable := map[string]*YakFunctionCaller{}
 	engine := NewScriptEngine(1) // 因为需要在 hook 里传回执行引擎, 所以这里不能并发
 	engine.RegisterEngineHooks(hook)
@@ -133,11 +133,13 @@ func FetchFunctionFromSourceCode(ctx context.Context, pluginContext *YakitPlugin
 		BindYakitPluginContextToEngine(engine, pluginContext)
 		return nil
 	})
-	engine.HookOsExit()
-	// timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
+	// engine.HookOsExit()
+	// timeoutCtx, cancel := context.WithTimeout(ctx, loadTimeout)
 	// defer func() { cancel() }()
-	ins, err := engine.ExecuteExWithContext(ctx, code, map[string]interface{}{
-		"ROOT_CONTEXT": ctx,
+	loadCtx, cancel := context.WithTimeout(pluginContext.Ctx, y.loadTimeout)
+	defer cancel()
+	ins, err := engine.ExecuteExWithContext(loadCtx, code, map[string]interface{}{
+		"ROOT_CONTEXT": loadCtx,
 		"YAK_FILENAME": id,
 	})
 	if err != nil {
@@ -173,7 +175,9 @@ func FetchFunctionFromSourceCode(ctx context.Context, pluginContext *YakitPlugin
 					}
 				}()
 
-				_, err = nIns.CallYakFunctionNative(ctx, f, args...)
+				subCtx, _ := context.WithTimeout(pluginContext.Ctx, y.callTimeout)
+				subCtx = context.WithValue(subCtx, "pluginName", id)
+				_, err = nIns.CallYakFunctionNative(subCtx, f, args...)
 				if err != nil && !errors.Is(err, context.Canceled) {
 					log.Errorf("call YakFunction (DividedCTX) error: \n%v", err)
 				}
@@ -198,7 +202,8 @@ type YakToCallerManager struct {
 	swg                *utils.SizedWaitGroup
 	baseWaitGroup      *sync.WaitGroup
 	dividedContext     bool
-	timeout            time.Duration
+	loadTimeout        time.Duration
+	callTimeout        time.Duration
 	runtimeId          string
 	proxy              string
 	defaultFilter      *filter.StringFilter
@@ -206,7 +211,11 @@ type YakToCallerManager struct {
 }
 
 func (c *YakToCallerManager) SetLoadPluginTimeout(i float64) {
-	c.timeout = time.Duration(i * float64(time.Second))
+	c.loadTimeout = time.Duration(i * float64(time.Second))
+}
+
+func (c *YakToCallerManager) SetCallPluginTimeout(i float64) {
+	c.callTimeout = time.Duration(i * float64(time.Second))
 }
 
 func (y *YakToCallerManager) SetDividedContext(b bool) {
@@ -217,7 +226,8 @@ func NewYakToCallerManager() *YakToCallerManager {
 	caller := &YakToCallerManager{
 		table:              new(sync.Map),
 		baseWaitGroup:      new(sync.WaitGroup),
-		timeout:            10 * time.Second,
+		loadTimeout:        10 * time.Second,
+		callTimeout:        1 * time.Second,
 		ContextCancelFuncs: new(sync.Map),
 	}
 	return caller
@@ -365,7 +375,7 @@ func (y *YakToCallerManager) Set(ctx context.Context, code string, hook func(eng
 	}()
 
 	var engine *antlr4yak.Engine
-	cTable, err := FetchFunctionFromSourceCode(ctx, y.getYakitPluginContext(ctx), y.timeout, "", code, func(e *antlr4yak.Engine) error {
+	cTable, err := FetchFunctionFromSourceCode(y, y.getYakitPluginContext(ctx), "", code, func(e *antlr4yak.Engine) error {
 		if engine == nil {
 			engine = e
 		}
@@ -1123,10 +1133,11 @@ func (y *YakToCallerManager) Add(ctx context.Context, id string, paramMap map[st
 	if y.dividedContext {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithCancel(ctx)
+		ctx = context.WithValue(ctx, "cancel", cancel)
 		y.ContextCancelFuncs.Store(id, cancel)
 	}
 
-	cTable, err := FetchFunctionFromSourceCode(ctx, y.getYakitPluginContext(ctx), y.timeout, id, code, func(e *antlr4yak.Engine) error {
+	cTable, err := FetchFunctionFromSourceCode(y, y.getYakitPluginContext(ctx), id, code, func(e *antlr4yak.Engine) error {
 		if engine == nil {
 			engine = e
 		}
