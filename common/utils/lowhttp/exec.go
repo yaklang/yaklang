@@ -75,9 +75,7 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		Response:   response.RawPacket,
 		RespRecord: response,
 	}
-	if raw != nil {
-		redirectRawPackets = append(redirectRawPackets, raw)
-	}
+	redirectRawPackets = append(redirectRawPackets, raw)
 
 	if redirectTimes > 0 {
 		lastPacket := raw
@@ -121,7 +119,7 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 				Response:   response.RawPacket,
 				RespRecord: response,
 			}
-			if responseRaw == nil {
+			if response == nil {
 				response.RawPacket = lastPacket.Response // 保留原始报文
 				return response, nil
 			}
