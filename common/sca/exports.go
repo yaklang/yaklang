@@ -6,6 +6,7 @@ var Exports = map[string]interface{}{
 	"ScanImageFromContext":     ScanDockerImageFromContext,
 	"ScanContainerFromContext": ScanDockerContainerFromContext,
 	"ScanImageFromFile":        ScanDockerImageFromFile,
+	"ScanGitRepo":              ScanGitRepo,
 	"ScanFilesystem":           ScanFilesystem,
 
 	// options
