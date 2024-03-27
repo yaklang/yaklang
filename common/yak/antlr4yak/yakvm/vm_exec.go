@@ -609,7 +609,7 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		return
 	case OpEnterFR:
 		op := v.peek()
-		iterator, err := NewIterator(op.Value)
+		iterator, err := NewIterator(op.Value, v)
 		if err != nil {
 			panic(fmt.Sprintf("%#v is not rangeable", op.TypeVerbose))
 		} else if rv := reflect.ValueOf(iterator); !rv.IsValid() || rv.IsNil() {
@@ -993,7 +993,21 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 		op := v.pop()
 		if op.IsChannel() {
 			rv := reflect.ValueOf(op.Value)
-			if val, ok := rv.Recv(); ok {
+
+			chosen, val, ok := reflect.Select([]reflect.SelectCase{
+				{
+					Dir:  reflect.SelectRecv,
+					Chan: reflect.ValueOf(v.ctx.Done()),
+				}, {
+					Dir:  reflect.SelectRecv,
+					Chan: rv,
+				},
+			})
+			if chosen == 0 {
+				ok = false
+			}
+
+			if ok {
 				v.push(&Value{
 					TypeVerbose: "__channel__opcode_list__",
 					Value: []interface{}{
