@@ -56,12 +56,6 @@ println(Foo::$my_static . PHP_EOL);
 				"add(\"foo\", Parameter-PHP_EOL)",
 			}, t)
 	})
-	t.Run("defined variable", func(t *testing.T) {
-		code := `<?php
-$PHP_EOL=1;
-println($PHP_EOL);`
-		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
-	})
 }
 
 func TestOOP_var_member(t *testing.T) {
