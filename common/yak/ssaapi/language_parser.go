@@ -1,6 +1,8 @@
 package ssaapi
 
 import (
+	"runtime/debug"
+
 	"github.com/yaklang/yaklang/common/utils"
 	js2ssa "github.com/yaklang/yaklang/common/yak/JS2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -27,14 +29,14 @@ var (
 func parse(c *config, prog *ssa.Program) (ret *ssa.Program, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			//debug.PrintStack()
 			ret = nil
 			err = utils.Errorf("parse error with panic : %v", r)
+			debug.PrintStack()
 		}
 	}()
 
 	if prog == nil {
-		prog = ssa.NewProgram()
+		prog = ssa.NewProgram(c.DataBaseProgramName)
 	}
 
 	builder := prog.GetAndCreateMainFunctionBuilder()

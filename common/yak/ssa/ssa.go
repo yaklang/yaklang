@@ -27,6 +27,7 @@ type Instruction interface {
 	GetName() string
 	SetName(variable string)
 	GetVerboseName() string
+	GetShortVerboseName() string
 	SetVerboseName(string)
 
 	GetId() int // for identify
@@ -48,7 +49,6 @@ type Instruction interface {
 	GetLastVariable() *Variable
 	GetAllVariables() map[string]*Variable
 	AddVariable(*Variable)
-	ReplaceValue(Value, Value)
 	SelfDelete()
 }
 
@@ -129,6 +129,9 @@ type Program struct {
 	ConstInstruction   *omap.OrderedMap[int, *ConstInst]
 	NameToInstructions *omap.OrderedMap[string, []Instruction]
 	IdToInstructionMap *omap.OrderedMap[int, Instruction]
+
+	persistentBackendMutex *sync.Mutex
+	persistentBackend      func() (int, func(Instruction) error)
 
 	errors SSAErrors
 

@@ -32,7 +32,7 @@ func ReplaceMemberCall(v, to Value) map[string]Value {
 			name, typ := checkCanMemberCall(to, key)
 			origin := builder.getOriginMember(name, typ, to, key)
 
-			if member.GetOpcode() != OpUndefined {
+			if member.GetOpcode() != SSAOpcodeUndefined {
 				member.SetName(name)
 				member.SetType(typ)
 				SetMemberCall(to, key, member)

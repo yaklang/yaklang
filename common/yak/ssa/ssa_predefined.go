@@ -1,6 +1,8 @@
 package ssa
 
 import (
+	"fmt"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -48,6 +50,13 @@ func (i *anInstruction) GetVerboseName() string {
 		return i.name
 	}
 	return ""
+}
+
+func (i *anInstruction) GetShortVerboseName() string {
+	if i.name != "" {
+		return i.name
+	}
+	return "t" + fmt.Sprint(i.GetId())
 }
 
 func (i *anInstruction) SetVerboseName(verbose string) {
@@ -104,13 +113,18 @@ func (a *anInstruction) GetName() string  { return a.name }
 
 // id
 func (a *anInstruction) SetId(id int) { a.id = id }
-func (a *anInstruction) GetId() int   { return a.id }
+func (a *anInstruction) GetId() int {
+	if a == nil {
+		return 0
+	}
+	return a.id
+}
 
 func (a *anInstruction) LineDisasm() string { return "" }
 
 // opcode
-func (a *anInstruction) GetOpcode() Opcode      { return OpUnknown } // cover by instruction
-func (a *anInstruction) GetOperands() Values    { return nil }       // cover by instruction
+func (a *anInstruction) GetOpcode() Opcode      { return SSAOpcodeUnKnow } // cover by instruction
+func (a *anInstruction) GetOperands() Values    { return nil }             // cover by instruction
 func (a *anInstruction) GetOperand(i int) Value { return a.GetOperands()[i] }
 func (a *anInstruction) GetOperandNum() int     { return len(a.GetOperands()) }
 

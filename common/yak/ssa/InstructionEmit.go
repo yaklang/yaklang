@@ -329,6 +329,7 @@ func (f *FunctionBuilder) EmitConstInstNil() *ConstInst {
 func (f *FunctionBuilder) EmitConstInstWithUnary(i any, un int) *ConstInst {
 	ci := f.EmitConstInst(i)
 	ci.Unary = un
+	f.emit(ci)
 	return ci
 }
 
@@ -337,9 +338,7 @@ func (f *FunctionBuilder) EmitConstInst(i any) *ConstInst {
 		return nil
 	}
 	ci := NewConst(i)
-	f.emitEx(ci, func(i Instruction) {
-		// pass
-	})
+	f.emit(ci)
 	return ci
 }
 
