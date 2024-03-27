@@ -9,6 +9,9 @@ import (
 
 // ReadValueByVariable get value by variable
 func (b *FunctionBuilder) ReadValueByVariable(v *Variable) Value {
+	if v == nil {
+		return nil
+	}
 	if ret := v.GetValue(); ret != nil {
 		return ret
 	}
