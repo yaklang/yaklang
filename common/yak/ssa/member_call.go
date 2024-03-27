@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -118,6 +119,9 @@ func (b *FunctionBuilder) CreateInterfaceWithMap(keys []Value, vs []Value) *Make
 func (b *FunctionBuilder) InterfaceAddFieldBuild(size int, keys func(int) Value, value func(int) Value) *Make {
 	lValueLen := NewConst(size)
 	itf := b.EmitMakeWithoutType(lValueLen, lValueLen)
+	if utils.IsNil(itf) {
+		return nil
+	}
 	if b.MarkedVariable != nil {
 		itf.SetName(b.MarkedVariable.GetName())
 		b.MarkedThisObject = itf

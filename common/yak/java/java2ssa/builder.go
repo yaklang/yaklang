@@ -23,6 +23,7 @@ func Build(src string, force bool, b *ssa.FunctionBuilder) error {
 		FunctionBuilder: b,
 		ast:             ast,
 	}
+	b.DisableFreeValue = false
 	build.VisitCompilationUnit(ast)
 	return nil
 }
