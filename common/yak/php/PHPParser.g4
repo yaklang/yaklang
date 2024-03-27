@@ -483,12 +483,22 @@ parentheses
 fullyQualifiedNamespaceExpr: identifier '\\' (identifier '\\')* identifier;
 
 staticClassExpr
+    : staticClassExprFunctionMember
+    | staticClassExprVariableMember
+    ;
+
+staticClassExprFunctionMember
     : fullyQualifiedNamespaceExpr '::' identifier # ClassStaticFunctionMember
-    | fullyQualifiedNamespaceExpr '::' VarName    # ClassStaticVariable
     | identifier '::' identifier                  # ClassDirectFunctionMember
-    | identifier '::' VarName                     # ClassDirectStaticVariable
     | string '::' identifier                      # StringAsIndirectClassStaticFunctionMember
+    | variable '::' identifier                    # VariableAsIndirectClassStaticFunctionMember
+    ;
+
+staticClassExprVariableMember
+    : fullyQualifiedNamespaceExpr '::' VarName    # ClassStaticVariable
+    | identifier '::' VarName                     # ClassDirectStaticVariable
     | string '::' VarName                         # StringAsIndirectClassStaticVariable
+    | variable '::' VarName                       # VariableAsIndirectClassStaticVariable
     ;
 
 
@@ -558,7 +568,7 @@ expression
     | leftArrayCreation Eq expression                             # ArrayCreationUnpackExpression
     | expression '[' indexMemberCallKey ']' assignmentOperator expression # SliceCallAssignmentExpression
     | expression '->' memberCallKey assignmentOperator expression    # FieldMemberCallAssignmentExpression
-    | staticClassExpr assignmentOperator expression               # StaticClassMemberCallAssignmentExpression 
+    | staticClassExprVariableMember assignmentOperator expression               # StaticClassMemberCallAssignmentExpression 
     | leftVariable assignmentOperator expression                  # OrdinaryAssignmentExpression
     // logical 
     | expression op = LogicalAnd expression                       # LogicalExpression

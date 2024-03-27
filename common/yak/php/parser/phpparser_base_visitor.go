@@ -359,11 +359,11 @@ func (v *BasePHPParserVisitor) VisitFullyQualifiedNamespaceExpr(ctx *FullyQualif
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitClassStaticFunctionMember(ctx *ClassStaticFunctionMemberContext) interface{} {
+func (v *BasePHPParserVisitor) VisitStaticClassExpr(ctx *StaticClassExprContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitClassStaticVariable(ctx *ClassStaticVariableContext) interface{} {
+func (v *BasePHPParserVisitor) VisitClassStaticFunctionMember(ctx *ClassStaticFunctionMemberContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -371,15 +371,27 @@ func (v *BasePHPParserVisitor) VisitClassDirectFunctionMember(ctx *ClassDirectFu
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitClassDirectStaticVariable(ctx *ClassDirectStaticVariableContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BasePHPParserVisitor) VisitStringAsIndirectClassStaticFunctionMember(ctx *StringAsIndirectClassStaticFunctionMemberContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitVariableAsIndirectClassStaticFunctionMember(ctx *VariableAsIndirectClassStaticFunctionMemberContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitClassStaticVariable(ctx *ClassStaticVariableContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitClassDirectStaticVariable(ctx *ClassDirectStaticVariableContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitStringAsIndirectClassStaticVariable(ctx *StringAsIndirectClassStaticVariableContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitVariableAsIndirectClassStaticVariable(ctx *VariableAsIndirectClassStaticVariableContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

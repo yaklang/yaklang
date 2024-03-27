@@ -476,12 +476,11 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 
 	// TODO: static class member
 	case *phpparser.StaticClassAccessExpressionContext:
-		varibale := y.VisitStaticClassExpr(ret.StaticClassExpr())
-		// 	return y.ir.GetStaticMember(class, key)
-		return y.ir.ReadValueByVariable(varibale)
+		variable := y.VisitStaticClassExpr(ret.StaticClassExpr())
+		return y.ir.ReadValueByVariable(variable)
 
 	case *phpparser.StaticClassMemberCallAssignmentExpressionContext:
-		variable := y.VisitStaticClassExpr(ret.StaticClassExpr())
+		variable := y.VisitStaticClassExprVariableMember(ret.StaticClassExprVariableMember())
 		rightValue := y.VisitExpression(ret.Expression())
 		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), variable, rightValue)
 		y.ir.AssignVariable(variable, rightValue)
