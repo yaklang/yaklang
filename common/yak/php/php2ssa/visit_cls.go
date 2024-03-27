@@ -1,9 +1,10 @@
 package php2ssa
 
 import (
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
-	"strings"
 
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -25,7 +26,7 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 	obj := y.ir.EmitMakeWithoutType(nil, nil)
 	obj.SetType(class)
 
-	constructor := y.ir.GetClassConstructor(className)
+	constructor := class.Constructor
 	if constructor == nil {
 		return obj
 	}
@@ -141,14 +142,17 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 		case "class":
 			className = i.Identifier().GetText()
 
+			parentClassName := ""
 			if i.Extends() != nil {
-				mergedTemplate = append(mergedTemplate, i.QualifiedStaticTypeRef().GetText())
+				parentClassName = i.QualifiedStaticTypeRef().GetText()
 			}
 
-			if i.Implements() != nil {
-				for _, impl := range i.InterfaceList().(*phpparser.InterfaceListContext).AllQualifiedStaticTypeRef() {
-					mergedTemplate = append(mergedTemplate, impl.GetText())
-				}
+			class := y.ir.CreateClass(className)
+			if parentClass := y.ir.GetClass(parentClassName); parentClass != nil {
+				class.AddParentClass(parentClass)
+			}
+			for _, statement := range i.AllClassStatement() {
+				y.VisitClassStatement(statement, class)
 			}
 		}
 	} else {
@@ -160,33 +164,6 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 			}
 		}
 	}
-	_ = className
-	_ = mergedTemplate
-
-	//// how to build a template?
-	//// y.ir is a SSA.Function
-	class := y.ir.CreateClass(className)
-	for _, statement := range i.AllClassStatement() {
-		y.VisitClassStatement(statement, class)
-	}
-
-	for _, parentClass := range mergedTemplate {
-		if parent := y.ir.GetClass(parentClass); parent != nil {
-			class.ParentClass = append(class.ParentClass, parent)
-		}
-	}
-	// class.AddMethod()
-	//template := y.ir.BuildObjectTemplate(objectTemplate)    // 注册一个对象模版（有构造和析构方法的对象）
-	//template.SetDecorationVerbose(...)                        // 记录一下修饰词
-	//for _, i := range mergedTemplate {
-	//	y.ir.FindObjectTemplate(i).MergeTo(template)        // 合并模版（inherit / trait / extend 都一样）
-	//}
-	//template.BuildField(func() {                              // 编译字段
-	//	for _, field := range i.AllClassStatement() {
-	//		y.VisitClassStatement(field)
-	//	}
-	//})
-	//template.Finish()                                         // 宣告完成
 
 	return nil
 }
@@ -205,9 +182,14 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 	case *phpparser.PropertyModifiersVariableContext:
 		// variable
 		modifiers := y.VisitPropertyModifiers(ret.PropertyModifiers())
-		setMember := class.BuildMember
+
+		setMember := class.AddNormalMember
 		if _, ok := modifiers[ssa.Static]; ok {
-			setMember = class.BuildStaticMember
+			setMember = func(name string, value ssa.Value) {
+				variable := y.ir.GetStaticMember(class.Name, name)
+				y.ir.AssignVariable(variable, value)
+				class.AddStaticMember(name, value)
+			}
 		}
 		// handle variable
 		if ret.TypeHint() != nil {
@@ -255,7 +237,7 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 			class.Constructor = newFunction
 		default:
 			newFunction := createFunction()
-			class.AddMarkedField(funcName, newFunction, 0)
+			class.AddNormalMethod(funcName, newFunction, 0)
 		}
 	case *phpparser.ConstContext:
 		// TODO: ret.Attributes() // php8
@@ -435,9 +417,9 @@ func (y *builder) VisitClassConstant(raw phpparser.IClassConstantContext) ssa.Va
 	return nil
 }
 
-func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) (string, string) {
+func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) *ssa.Variable {
 	if y == nil || raw == nil {
-		return "", ""
+		return nil
 	}
 	var class, key string
 	switch i := raw.(type) {
@@ -466,7 +448,7 @@ func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) (s
 		key = key[1:]
 	}
 
-	return class, key
+	return y.ir.GetStaticMember(class, key)
 }
 
 /// class modifier
