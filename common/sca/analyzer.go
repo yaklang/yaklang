@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"github.com/yaklang/yaklang/common/sca/lazyfile"
@@ -127,7 +129,7 @@ func getContainerMountFSSource(c *client.Client, containerID string) ([]string, 
 type walkFunc func(string, fs.FileInfo, io.Reader) error
 
 func walkFS(pathStr string, handler walkFunc) error {
-	var startPath = pathStr
+	startPath := pathStr
 	var err error
 	if !filepath.IsAbs(pathStr) {
 		startPath, err = filepath.Abs(pathStr)
@@ -155,6 +157,43 @@ func walkFS(pathStr string, handler walkFunc) error {
 		defer f.Close()
 		return handler(filePath, statsInfo, f)
 	})
+}
+
+func walkGitCommit(repoDir string, handler walkFunc) error {
+	r, err := git.PlainOpen(repoDir)
+	if err != nil {
+		return utils.Wrap(err, "failed to open the git repository")
+	}
+
+	iter, err := r.CommitObjects()
+	if err != nil {
+		return utils.Wrap(err, "failed to get the commit objects")
+	}
+
+	iter.ForEach(func(c *object.Commit) error {
+		files, err := c.Files()
+		if err != nil {
+			return utils.Wrapf(err, "failed to get commit[%s] file", c.Hash)
+		}
+
+		files.ForEach(func(f *object.File) error {
+			r, err := f.Reader()
+			if err != nil {
+				return utils.Wrap(err, "failed to get the reader")
+			}
+			defer r.Close()
+			fileMode, err := f.Mode.ToOSFileMode()
+			if err != nil {
+				return utils.Wrap(err, "failed to convert file mode")
+			}
+
+			return handler(f.Name, lazyfile.NewFileInfo(f.Name, f.Size, fileMode), r)
+		})
+
+		return nil
+	})
+
+	return nil
 }
 
 func walkImage(image *os.File, handler walkFunc) error {
@@ -216,7 +255,34 @@ func walkLayer(rc io.ReadCloser, handler walkFunc) error {
 	return nil
 }
 
-func scanDockerImage(imageFile *os.File, config ScanConfig) ([]*dxtypes.Package, error) {
+func scanGitRepo(repoDir string, config *ScanConfig) ([]*dxtypes.Package, error) {
+	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode, config.usedAnalyzers)
+
+	// match file
+	err := walkGitCommit(repoDir, func(path string, fi fs.FileInfo, r io.Reader) error {
+		if err := ag.Match(path, fi, r); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	wg := new(sync.WaitGroup)
+
+	// analyzer-consumer
+	ag.Consume(wg)
+
+	// analyzer-productor
+	ag.Analyze()
+
+	wg.Wait()
+	ag.Clear()
+	return ag.Packages(), nil
+}
+
+func scanDockerImage(imageFile *os.File, config *ScanConfig) ([]*dxtypes.Package, error) {
 	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode, config.usedAnalyzers)
 
 	// match file
@@ -230,7 +296,7 @@ func scanDockerImage(imageFile *os.File, config ScanConfig) ([]*dxtypes.Package,
 		return nil, err
 	}
 
-	var wg = new(sync.WaitGroup)
+	wg := new(sync.WaitGroup)
 
 	// analyzer-consumer
 	ag.Consume(wg)
@@ -243,7 +309,7 @@ func scanDockerImage(imageFile *os.File, config ScanConfig) ([]*dxtypes.Package,
 	return ag.Packages(), nil
 }
 
-func scanContainer(rc io.ReadCloser, config ScanConfig) ([]*dxtypes.Package, error) {
+func scanContainer(rc io.ReadCloser, config *ScanConfig) ([]*dxtypes.Package, error) {
 	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode, config.usedAnalyzers)
 
 	// match file
@@ -257,7 +323,7 @@ func scanContainer(rc io.ReadCloser, config ScanConfig) ([]*dxtypes.Package, err
 		return nil, err
 	}
 
-	var wg = new(sync.WaitGroup)
+	wg := new(sync.WaitGroup)
 
 	// analyzer-consumer
 	ag.Consume(wg)
@@ -270,7 +336,7 @@ func scanContainer(rc io.ReadCloser, config ScanConfig) ([]*dxtypes.Package, err
 	return ag.Packages(), nil
 }
 
-func scanFS(fsPath string, config ScanConfig) ([]*dxtypes.Package, error) {
+func scanFS(fsPath string, config *ScanConfig) ([]*dxtypes.Package, error) {
 	ag := analyzer.NewAnalyzerGroup(config.numWorkers, config.scanMode, config.usedAnalyzers)
 
 	// match file
@@ -284,7 +350,7 @@ func scanFS(fsPath string, config ScanConfig) ([]*dxtypes.Package, error) {
 		return nil, err
 	}
 
-	var wg = new(sync.WaitGroup)
+	wg := new(sync.WaitGroup)
 
 	// analyzer-consumer
 	ag.Consume(wg)
@@ -302,7 +368,15 @@ func ScanFilesystem(p string, opts ...ScanOption) ([]*dxtypes.Package, error) {
 	for _, opt := range opts {
 		opt(config)
 	}
-	return scanFS(p, *config)
+	return scanFS(p, config)
+}
+
+func ScanGitRepo(repoDir string, opts ...ScanOption) ([]*dxtypes.Package, error) {
+	config := NewConfig()
+	for _, opt := range opts {
+		opt(config)
+	}
+	return scanGitRepo(repoDir, config)
 }
 
 func ScanDockerContainerFromContext(containerID string, opts ...ScanOption) (pkgs []*dxtypes.Package, err error) {
@@ -323,7 +397,7 @@ func ScanDockerContainerFromContext(containerID string, opts ...ScanOption) (pkg
 		return nil, err
 	}
 	for _, source := range sources {
-		fsPkgs, err := scanFS(source, *config)
+		fsPkgs, err := scanFS(source, config)
 		if err != nil {
 			continue // ?
 		}
@@ -335,8 +409,7 @@ func ScanDockerContainerFromContext(containerID string, opts ...ScanOption) (pkg
 	if err != nil {
 		return nil, err
 	}
-	containerPkgs, err := scanContainer(rc, *config)
-
+	containerPkgs, err := scanContainer(rc, config)
 	if err != nil {
 		return pkgs, err
 	}
@@ -370,7 +443,7 @@ func ScanDockerImageFromContext(imageID string, opts ...ScanOption) ([]*dxtypes.
 		return nil, err
 	}
 
-	pkgs, err := scanDockerImage(f, *config)
+	pkgs, err := scanDockerImage(f, config)
 	if err != nil {
 		return nil, utils.Errorf("failed to scan image[%s] : %v", imageID, err)
 	}
@@ -390,7 +463,7 @@ func ScanDockerImageFromFile(path string, opts ...ScanOption) ([]*dxtypes.Packag
 	}
 	defer f.Close()
 
-	pkgs, err := scanDockerImage(f, *config)
+	pkgs, err := scanDockerImage(f, config)
 	if err != nil {
 		return nil, utils.Errorf("failed to scan image from filepath[%s] : %v", path, err)
 	}
