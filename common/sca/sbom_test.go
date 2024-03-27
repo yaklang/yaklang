@@ -3,17 +3,18 @@ package sca
 import (
 	"bytes"
 	"compress/gzip"
-	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"io"
 	"os"
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/sca/dxtypes"
 )
 
 func TestLoadDockerImageFromFile_ToCycloneDX(t *testing.T) {
-	check(t, "docker", wantpkgs)
-	br := bytes.NewReader(gzipFile)
+	check(t, "docker", DockerWantpkgs)
+	br := bytes.NewReader(dockerGzipFile)
 
 	r, err := gzip.NewReader(br)
 	if err != nil {
@@ -37,8 +38,8 @@ func TestLoadDockerImageFromFile_ToCycloneDX(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(pkgs) != len(wantpkgs) {
-		t.Fatalf("pkgs length error: %d(got) != %d(want)", len(pkgs), len(wantpkgs))
+	if len(pkgs) != len(DockerWantpkgs) {
+		t.Fatalf("pkgs length error: %d(got) != %d(want)", len(pkgs), len(DockerWantpkgs))
 	}
 	sort.Slice(pkgs, func(i, j int) bool {
 		c := strings.Compare(pkgs[i].Name, pkgs[j].Name)
@@ -47,20 +48,20 @@ func TestLoadDockerImageFromFile_ToCycloneDX(t *testing.T) {
 		}
 		return c > 0
 	})
-	sort.Slice(wantpkgs, func(i, j int) bool {
-		c := strings.Compare(wantpkgs[i].Name, wantpkgs[j].Name)
+	sort.Slice(DockerWantpkgs, func(i, j int) bool {
+		c := strings.Compare(DockerWantpkgs[i].Name, DockerWantpkgs[j].Name)
 		if c == 0 {
-			return strings.Compare(wantpkgs[i].Version, wantpkgs[j].Version) > 0
+			return strings.Compare(DockerWantpkgs[i].Version, DockerWantpkgs[j].Version) > 0
 		}
 		return c > 0
 	})
 
 	for i := 0; i < len(pkgs); i++ {
-		if pkgs[i].Name != wantpkgs[i].Name {
-			t.Fatalf("pkgs %d name error: %s(got) != %s(want)", i, pkgs[i].Name, wantpkgs[i].Name)
+		if pkgs[i].Name != DockerWantpkgs[i].Name {
+			t.Fatalf("pkgs %d name error: %s(got) != %s(want)", i, pkgs[i].Name, DockerWantpkgs[i].Name)
 		}
-		if pkgs[i].Version != wantpkgs[i].Version {
-			t.Fatalf("pkgs %d(%s) version error: %s(got) != %s(want)", i, pkgs[i].Name, pkgs[i].Version, wantpkgs[i].Version)
+		if pkgs[i].Version != DockerWantpkgs[i].Version {
+			t.Fatalf("pkgs %d(%s) version error: %s(got) != %s(want)", i, pkgs[i].Name, pkgs[i].Version, DockerWantpkgs[i].Version)
 		}
 	}
 
@@ -72,5 +73,4 @@ func TestLoadDockerImageFromFile_ToCycloneDX(t *testing.T) {
 	if !strings.Contains(string(raw), `bom-1.5.schema.json`) {
 		t.Fatal("not contains bom-1.5.schema.json")
 	}
-
 }
