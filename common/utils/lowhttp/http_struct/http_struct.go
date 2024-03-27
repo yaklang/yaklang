@@ -12,21 +12,17 @@ import (
 )
 
 type HTTPConfig struct {
-	Timeout    float64
-	Proxies    []string
-	Redirector func(i *http.Request, reqs []*http.Request) bool
-	Session    interface{}
-	GetParams  map[string]string
-	Body       []byte
-	Headers    map[string]string
+	PocOpts []any // poc.PocConfigOption
 }
 
 func NewHTTPConfig() *HTTPConfig {
 	return &HTTPConfig{
-		Timeout:   15,
-		GetParams: make(map[string]string),
-		Headers:   make(map[string]string),
+		PocOpts: make([]any, 0),
 	}
+}
+
+func (c *HTTPConfig) AppendPocOpts(opt any) {
+	c.PocOpts = append(c.PocOpts, opt)
 }
 
 type HttpOption func(req *HTTPConfig)

@@ -2,6 +2,7 @@ package yakhttp
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,6 +12,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -131,14 +133,14 @@ func showhead(i interface{}) {
 	fmt.Println(string(rsp))
 }
 
-// timeout 是一个请求选项参数，用于设置请求超时时间，单位是秒
+// WithTimeout 是一个请求选项参数，用于设置请求超时时间，单位是秒
 // Example:
 // ```
-// rsp, err = http.Get("http://www.yaklang.com", http.timeout(10))
+// rsp, err = http.Get("http://www.yaklang.com", http.WithTimeout(10))
 // ```
-func timeout(f float64) http_struct.HttpOption {
+func WithTimeout(f float64) http_struct.HttpOption {
 	return func(config *http_struct.HTTPConfig) {
-		config.Timeout = f
+		config.AppendPocOpts(poc.WithTimeout(f))
 	}
 }
 
@@ -178,14 +180,7 @@ func rawRequest(i interface{}) (*http.Request, error) {
 // ```
 func WithProxy(values ...string) http_struct.HttpOption {
 	return func(config *http_struct.HTTPConfig) {
-		values = utils.StringArrayFilterEmpty(values)
-		if len(values) <= 0 {
-			return
-		}
-		if len(config.Proxies) == 0 {
-			config.Proxies = make([]string, 0)
-		}
-		config.Proxies = append(config.Proxies, values...)
+		config.AppendPocOpts(poc.WithProxy(values...))
 	}
 }
 
@@ -245,15 +240,16 @@ func GetAllBody(raw interface{}) []byte {
 // ```
 // rsp, err = http.Get("http://www.yaklang.com", http.params("a=b"), http.params("c=d"))
 // ```
-func GetParams(i interface{}) http_struct.HttpOption {
+func WithGetParams(i interface{}) http_struct.HttpOption {
 	return func(config *http_struct.HTTPConfig) {
 		params := utils.InterfaceToString(i)
 		values, _ := url.ParseQuery(params)
 
 		for k, v := range values {
-			if len(v) > 0 {
-				config.GetParams[k] = v[len(v)-1]
+			if len(v) == 0 {
+				continue
 			}
+			config.AppendPocOpts(poc.WithReplaceHttpPacketQueryParam(k, v[0]))
 		}
 	}
 }
@@ -263,8 +259,8 @@ func GetParams(i interface{}) http_struct.HttpOption {
 // ```
 // rsp, err = http.Post("http://www.yaklang.com", http.postparams("a=b"), http.postparams("c=d"))
 // ```
-func PostParams(i interface{}) http_struct.HttpOption {
-	return Body(utils.UrlJoinParams("", i))
+func WithPostParams(i interface{}) http_struct.HttpOption {
+	return WithBody(utils.UrlJoinParams("", i))
 }
 
 // Do 根据构造好的请求结构体引用发送请求，返回响应结构体引用与错误
@@ -303,31 +299,11 @@ func Do(i interface{}) (*http.Response, error) {
 		return nil, err
 	}
 
-	opts := []poc.PocConfigOption{
-		poc.WithTimeout(config.Timeout),
-		poc.WithProxy(config.Proxies...),
-		poc.WithRedirectHandler(func(isHttps bool, req, rsp []byte) bool {
-			if config.Redirector != nil {
-				reqInstance, err := lowhttp.ParseBytesToHttpRequest(req)
-				if err != nil {
-					return config.Redirector(reqInstance, []*http.Request{reqInstance})
-				}
-			}
-			return true
-		}),
-		poc.WithForceHTTPS(isHttps),
-		poc.WithSession(config.Session),
-	}
-
-	for k, v := range config.Headers {
-		opts = append(opts, poc.WithReplaceHttpPacketHeader(k, v))
-	}
-	for k, v := range config.GetParams {
-		opts = append(opts, poc.WithReplaceHttpPacketQueryParam(k, v))
-	}
-	if len(config.Body) > 0 {
-		opts = append(opts, poc.WithReplaceHttpPacketBody(config.Body, false))
-	}
+	opts := lo.FilterMap(config.PocOpts, func(item any, _ int) (poc.PocConfigOption, bool) {
+		opt, ok := item.(poc.PocConfigOption)
+		return opt, ok
+	})
+	opts = append(opts, poc.WithForceHTTPS(isHttps))
 
 	rsp, _, err := poc.HTTP(rawRequest, opts...)
 	if err != nil {
@@ -354,9 +330,9 @@ func _getuarand() string {
 // ```
 // rsp, err = http.Get("http://www.yaklang.com", http.header("AAA", "BBB"))
 // ```
-func Header(key, value interface{}) http_struct.HttpOption {
+func WithHeader(key, value interface{}) http_struct.HttpOption {
 	return func(config *http_struct.HTTPConfig) {
-		config.Headers[utils.InterfaceToString(key)] = utils.InterfaceToString(value)
+		config.AppendPocOpts(poc.WithReplaceHttpPacketHeader(utils.InterfaceToString(key), utils.InterfaceToString(value)))
 	}
 }
 
@@ -365,9 +341,9 @@ func Header(key, value interface{}) http_struct.HttpOption {
 // ```
 // rsp, err = http.Get("http://www.yaklang.com", http.ua("yaklang-http"))
 // ```
-func UserAgent(value interface{}) http_struct.HttpOption {
+func WithUserAgent(value interface{}) http_struct.HttpOption {
 	return func(config *http_struct.HTTPConfig) {
-		config.Headers["UserAgent"] = utils.InterfaceToString(value)
+		config.AppendPocOpts(poc.WithReplaceHttpPacketUserAgent(utils.InterfaceToString(value)))
 	}
 }
 
@@ -376,9 +352,9 @@ func UserAgent(value interface{}) http_struct.HttpOption {
 // ```
 // rsp, err = http.Get("http://www.yaklang.com", http.fakeua())
 // ```
-func FakeUserAgent() http_struct.HttpOption {
+func WithFakeUserAgent() http_struct.HttpOption {
 	return func(config *http_struct.HTTPConfig) {
-		config.Headers["UserAgent"] = _getuarand()
+		config.AppendPocOpts(poc.WithReplaceHttpPacketUserAgent(_getuarand()))
 	}
 }
 
@@ -388,9 +364,15 @@ func FakeUserAgent() http_struct.HttpOption {
 // ```
 // rsp, err = http.Get("http://pie.dev/redirect/3", http.redirect(func(r, vias) bool { return true })
 // ```
-func RedirectHandler(c func(r *http.Request, vias []*http.Request) bool) http_struct.HttpOption {
+func WithRedirectHandler(c func(r *http.Request, vias []*http.Request) bool) http_struct.HttpOption {
 	return func(config *http_struct.HTTPConfig) {
-		config.Redirector = c
+		config.AppendPocOpts(poc.WithRedirectHandler(func(isHttps bool, req, rsp []byte) bool {
+			reqInstance, err := lowhttp.ParseBytesToHttpRequest(req)
+			if err != nil {
+				return c(reqInstance, []*http.Request{reqInstance})
+			}
+			return true
+		}))
 	}
 }
 
@@ -399,40 +381,40 @@ func RedirectHandler(c func(r *http.Request, vias []*http.Request) bool) http_st
 // ```
 // rsp, err = http.Get("http://pie.dev/redirect/3", http.noredirect())
 // ```
-func NoRedirect() http_struct.HttpOption {
+func WithNoRedirect() http_struct.HttpOption {
 	return func(config *http_struct.HTTPConfig) {
-		config.Redirector = func(r *http.Request, vias []*http.Request) bool {
+		config.AppendPocOpts(poc.WithRedirectHandler(func(isHttps bool, req, rsp []byte) bool {
 			return false
-		}
+		}))
 	}
 }
 
-// header 是一个请求选项参数，用于设置 Cookie
+// header 是一个请求选项参数，用于设置完整的 Cookie 字段
 // Example:
 // ```
-// rsp, err = http.Get("http://www.yaklang.com", http.Cookie("a=b; c=d"))
+// rsp, err = http.Get("http://www.yaklang.com", http.WithCookie("a=b; c=d"))
 // ```
-func Cookie(value interface{}) http_struct.HttpOption {
+func WithCookie(value interface{}) http_struct.HttpOption {
 	return func(config *http_struct.HTTPConfig) {
-		config.Headers["Cookie"] = utils.InterfaceToString(value)
+		config.AppendPocOpts(poc.WithReplaceHttpPacketHeader("Cookie", utils.InterfaceToString(value)))
 	}
 }
 
-// body 是一个请求选项参数，用于指定 JSON 格式的请求体
+// json 是一个请求选项参数，用于指定 JSON 格式的请求体
 // 它会将传入的值进行 JSON 序列化，然后设置序列化后的值为请求体
 // Example:
 // ```
 // rsp, err = http.Post("https://pie.dev/post", http.header("Content-Type", "application/json"), http.json({"a": "b", "c": "d"}))
 // ```
-func JsonBody(value interface{}) http_struct.HttpOption {
+func WithJsonBody(value interface{}) http_struct.HttpOption {
 	return func(config *http_struct.HTTPConfig) {
 		body, err := json.Marshal(value)
 		if err != nil {
 			log.Errorf("yak http.json cannot marshal json: %v\n  ORIGIN: %v\n", err, string(spew.Sdump(value)))
 			return
 		}
-		config.Body = body
-		config.Headers["Content-Type"] = "application/json"
+		config.AppendPocOpts(poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"))
+		config.AppendPocOpts(poc.WithReplaceHttpPacketBody(body, false))
 	}
 }
 
@@ -441,7 +423,7 @@ func JsonBody(value interface{}) http_struct.HttpOption {
 // ```
 // rsp, err = http.Post("https://pie.dev/post", http.body("a=b&c=d"))
 // ```
-func Body(value interface{}) http_struct.HttpOption {
+func WithBody(value interface{}) http_struct.HttpOption {
 	return func(config *http_struct.HTTPConfig) {
 		var rc *bytes.Buffer
 		switch ret := value.(type) {
@@ -459,8 +441,54 @@ func Body(value interface{}) http_struct.HttpOption {
 			rc = bytes.NewBufferString(fmt.Sprint(ret))
 		}
 		if rc != nil {
-			config.Body = rc.Bytes()
+			config.AppendPocOpts(poc.WithReplaceHttpPacketBody(rc.Bytes(), false))
 		}
+	}
+}
+
+// source 是一个请求选项参数，用于在请求记录保存到数据库时标识此次请求的来源
+// Example:
+// ```
+// rsp, err = http.Get("https://exmaple.com", http.save(true), http.source("test")) // 向 example.com 发起请求，会将此次请求保存到数据库中，指示此次请求的来源为test
+// ```
+func WithSource(value string) http_struct.HttpOption {
+	return func(config *http_struct.HTTPConfig) {
+		config.AppendPocOpts(poc.WithSource(value))
+	}
+}
+
+func WithFromPlugin(value string) http_struct.HttpOption {
+	return func(config *http_struct.HTTPConfig) {
+		config.AppendPocOpts(poc.WithFromPlugin(value))
+	}
+}
+
+func WithRuntimeID(value string) http_struct.HttpOption {
+	return func(config *http_struct.HTTPConfig) {
+		config.AppendPocOpts(poc.WithRuntimeId(value))
+	}
+}
+
+// save 是一个请求选项参数，用于指定是否将此次请求的记录保存在数据库中，默认为true即会保存到数据库
+// Example:
+// ```
+// http.Get("https://exmaple.com", http.save(true)) // 向 example.com 发起请求，会将此次请求保存到数据库中
+// ```
+func WithSave(value bool) http_struct.HttpOption {
+	return func(config *http_struct.HTTPConfig) {
+		config.AppendPocOpts(poc.WithSave(value))
+	}
+}
+
+// context 是一个请求选项参数，用于设置请求的上下文
+// Example:
+// ```
+// ctx = context.New()
+// rsp, err = http.Get("http://www.example.com", http.context(ctx)) // 向 example.com 发起请求，使用指定的上下文
+// ```
+func WithContext(ctx context.Context) http_struct.HttpOption {
+	return func(config *http_struct.HTTPConfig) {
+		config.AppendPocOpts(poc.WithContext(ctx))
 	}
 }
 
@@ -469,9 +497,9 @@ func Body(value interface{}) http_struct.HttpOption {
 // ```
 // rsp, err = http.Get("http://www.yaklang.com", http.session("request1"))
 // ```
-func Session(value interface{}) http_struct.HttpOption {
-	return func(session *http_struct.HTTPConfig) {
-		session.Session = value
+func WithSession(value interface{}) http_struct.HttpOption {
+	return func(config *http_struct.HTTPConfig) {
+		config.AppendPocOpts(poc.WithSession(utils.InterfaceToString(value)))
 	}
 }
 
@@ -488,30 +516,10 @@ func httpRequest(method, url string, options ...http_struct.HttpOption) (*http_s
 		op(config)
 	}
 
-	opts := []poc.PocConfigOption{
-		poc.WithTimeout(config.Timeout),
-		poc.WithProxy(config.Proxies...),
-		poc.WithRedirectHandler(func(isHttps bool, req, rsp []byte) bool {
-			if config.Redirector != nil {
-				reqInstance, err := lowhttp.ParseBytesToHttpRequest(req)
-				if err != nil {
-					return config.Redirector(reqInstance, []*http.Request{reqInstance})
-				}
-			}
-			return true
-		}),
-		poc.WithSession(config.Session),
-	}
-
-	for k, v := range config.Headers {
-		opts = append(opts, poc.WithReplaceHttpPacketHeader(k, v))
-	}
-	for k, v := range config.GetParams {
-		opts = append(opts, poc.WithReplaceHttpPacketQueryParam(k, v))
-	}
-	if len(config.Body) > 0 {
-		opts = append(opts, poc.WithReplaceHttpPacketBody(config.Body, false))
-	}
+	opts := lo.FilterMap(config.PocOpts, func(item any, _ int) (poc.PocConfigOption, bool) {
+		opt, ok := item.(poc.PocConfigOption)
+		return opt, ok
+	})
 
 	lowhttpRspInst, _, err := poc.Do(method, url, opts...)
 	if err != nil {
@@ -569,40 +577,47 @@ var HttpExports = map[string]interface{}{
 	"showhead": showhead,
 
 	// ua
-	"ua":        UserAgent,
-	"useragent": UserAgent,
-	"fakeua":    FakeUserAgent,
+	"ua":        WithUserAgent,
+	"useragent": WithUserAgent,
+	"fakeua":    WithFakeUserAgent,
 
 	// header
-	"header": Header,
+	"header": WithHeader,
 
 	// cookie
-	"cookie": Cookie,
+	"cookie": WithCookie,
 
 	// body
-	"body": Body,
+	"body": WithBody,
 
 	// json
-	"json": JsonBody,
+	"json": WithJsonBody,
 
 	// urlencode params 区别于 body，这个会编码
 	// params 针对 get 请求
 	// data 针对 post 请求
-	"params":     GetParams,
-	"postparams": PostParams,
+	"params":     WithGetParams,
+	"postparams": WithPostParams,
 
 	// proxy
 	"proxy": WithProxy,
 
 	// timeout
-	"timeout": timeout,
+	"timeout": WithTimeout,
 
 	// redirect
-	"redirect":   RedirectHandler,
-	"noredirect": NoRedirect,
+	"redirect":   WithRedirectHandler,
+	"noredirect": WithNoRedirect,
 
 	// session
-	"session": Session,
+	"session": WithSession,
+
+	// context
+	"source":     WithSource,
+	"fromPlugin": WithFromPlugin,
+	"runtimeID":  WithRuntimeID,
+	"save":       WithSave,
+	"context":    WithContext,
 
 	"uarand": _getuarand,
 }

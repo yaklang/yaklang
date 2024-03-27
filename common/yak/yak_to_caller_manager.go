@@ -24,7 +24,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/utils/pingutil"
 	"github.com/yaklang/yaklang/common/utils/yakgit"
-	"github.com/yaklang/yaklang/common/yak/yaklib/yakhttp"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -36,6 +35,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
+	"github.com/yaklang/yaklang/common/yak/yaklib/yakhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
@@ -633,24 +633,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 	if pluginContext.CliApp != nil {
 		cliApp = pluginContext.CliApp
 	}
-	// inject meta vars
-	for _, method := range []string{
-		"Get", "Post",
-	} {
-		nIns.GetVM().RegisterMapMemberCallHandler("http", method, func(i interface{}) interface{} {
-			if proxy == "" {
-				return i
-			}
-			originFunc, ok := i.(func(u string, opts ...http_struct.HttpOption) (*http_struct.YakHttpResponse, error))
-			if ok {
-				return func(u string, opts ...http_struct.HttpOption) (*http_struct.YakHttpResponse, error) {
-					opts = append(opts, yakhttp.WithProxy(proxy))
-					return originFunc(u, opts...)
-				}
-			}
-			return i
-		})
-	}
+
 	for _, mod := range []string{"db", "yakit"} {
 		nIns.GetVM().RegisterMapMemberCallHandler(mod, "SavePortFromResult", func(i interface{}) interface{} {
 			originFunc, ok := i.(func(u any, runtimeIds ...string) error)
@@ -700,33 +683,38 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 		nIns.GetVM().RegisterMapMemberCallHandler("poc", funcName, hookPocFunc)
 	}
 
-	nIns.GetVM().RegisterMapMemberCallHandler("http", "Request", func(i interface{}) interface{} {
-		if proxy == "" {
-			return i
-		}
-		originFunc, ok := i.(func(method, u string, opts ...http_struct.HttpOption) (*http_struct.YakHttpResponse, error))
-		if ok {
-			return func(method, u string, opts ...http_struct.HttpOption) (*http_struct.YakHttpResponse, error) {
-				opts = append(opts, yakhttp.WithProxy(proxy))
-				return originFunc(method, u, opts...)
+	// http
+	hookHTTPFunc := func(f interface{}) interface{} {
+		funcValue := reflect.ValueOf(f)
+		funcType := funcValue.Type()
+		hookFunc := reflect.MakeFunc(funcType, func(args []reflect.Value) (results []reflect.Value) {
+			httpContextOpt := []http_struct.HttpOption{
+				yakhttp.WithSource(pluginName),
+				yakhttp.WithFromPlugin(pluginName),
+				yakhttp.WithRuntimeID(runtimeId),
+				yakhttp.WithSave(true),
+				yakhttp.WithProxy(proxy),
+				yakhttp.WithContext(streamContext),
 			}
-		}
-		return i
-	})
-
-	nIns.GetVM().RegisterMapMemberCallHandler("http", "NewRequest", func(i interface{}) interface{} {
-		if proxy == "" {
-			return i
-		}
-		originFunc, ok := i.(func(method, u string, opts ...http_struct.HttpOption) (*http_struct.YakHttpRequest, error))
-		if ok {
-			return func(method, u string, opts ...http_struct.HttpOption) (*http_struct.YakHttpRequest, error) {
-				opts = append(opts, yakhttp.WithProxy(proxy))
-				return originFunc(method, u, opts...)
+			index := len(args) - 1 // 获取 option 参数的 index
+			interfaceValue := args[index].Interface()
+			args = args[:index]
+			httpExtraOpts, ok := interfaceValue.([]http_struct.HttpOption)
+			if ok {
+				httpExtraOpts = append(httpContextOpt, httpExtraOpts...)
 			}
-		}
-		return i
-	})
+			for _, p := range httpExtraOpts {
+				args = append(args, reflect.ValueOf(p))
+			}
+			res := funcValue.Call(args)
+			return res
+		})
+		return hookFunc.Interface()
+	}
+	httpFuncList := []string{"Get", "Post", "Request", "NewRequest"}
+	for _, funcName := range httpFuncList {
+		nIns.GetVM().RegisterMapMemberCallHandler("http", funcName, hookHTTPFunc)
+	}
 
 	nIns.GetVM().RegisterMapMemberCallHandler("nuclei", "Scan", func(i interface{}) interface{} {
 		originFunc, ok := i.(func(target any, opts ...any) (chan *tools.PocVul, error))
