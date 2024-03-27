@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net"
@@ -494,6 +495,10 @@ func (s *Server) ApplyClassToFacades(ctx context.Context, req *ypb.ApplyClassToF
 	if !ok {
 		return nil, utils.Errorf("Server is not exist for token: %s", token)
 	}
+	if req.GetGenerateClassParams() == nil {
+		return nil, errors.New("not set class params")
+	}
+	isClass := req.GetGenerateClassParams().GetGadget() == "None"
 	bytesRsp, err := s.GenerateYsoBytes(ctx, req.GetGenerateClassParams())
 	if err != nil {
 		return nil, utils.Errorf("generate class error: %v", err)
@@ -506,10 +511,19 @@ func (s *Server) ApplyClassToFacades(ctx context.Context, req *ypb.ApplyClassToF
 		return nil, utils.Error("facade server need class")
 	}
 	httpAddr := server.ReverseAddr
-	server.Config(
-		facades.SetHttpResource(classPath, bytesRsp.GetBytes()),
-		facades.SetLdapResourceAddr(className, httpAddr),
-		facades.SetRmiResourceAddr(className, httpAddr),
-	)
+	if isClass {
+		server.Config(
+			facades.SetHttpResource(classPath, bytesRsp.GetBytes()),
+			facades.SetLdapResourceAddr(className, httpAddr),
+			facades.SetRmiResourceAddr(className, httpAddr),
+		)
+	} else {
+		server.Config(
+			facades.SetLdapResponseEntry(className, map[string]any{
+				"javaSerializedData": bytesRsp.GetBytes(),
+				"javaClassName":      utils.RandStringBytes(5),
+			}),
+		)
+	}
 	return &ypb.Empty{}, nil
 }
