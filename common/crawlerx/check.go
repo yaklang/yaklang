@@ -174,7 +174,7 @@ func generalSubDomainRange(targetUrl string) []string {
 		path = url.Path
 	} else {
 		tempPaths := strings.Split(url.Path, "/")
-		path = strings.Join(tempPaths[0:len(tempPaths)-1], "/")
+		path = strings.Join(tempPaths[0:len(tempPaths)-1], "/") + "/"
 	}
 	ranges = append(ranges, url.Scheme+"://"+url.Host+path)
 	if !strings.HasPrefix(url.Host, "www.") {

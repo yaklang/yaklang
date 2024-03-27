@@ -75,3 +75,22 @@ func TestUrlQuery(t *testing.T) {
 	}
 	test.Equal("id=3&value=4&test=5&data=xxx", strings.Join(queryItem, "&"))
 }
+
+func TestGeneralSubDomainRange(t *testing.T) {
+	type args struct {
+		targetUrl string
+	}
+	tests := []struct {
+		name string
+		args args
+		want []string
+	}{
+		{"case1", args{targetUrl: "https://www.test.com/abc/def/"}, []string{"https://www.test.com/abc/def/"}},
+		{"case2", args{targetUrl: "https://www.test.com/abc/def"}, []string{"https://www.test.com/abc/"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want, generalSubDomainRange(tt.args.targetUrl), "generalSubDomainRange(%v)", tt.args.targetUrl)
+		})
+	}
+}
