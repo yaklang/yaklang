@@ -1,6 +1,10 @@
 package ssa
 
-import "github.com/yaklang/yaklang/common/log"
+import (
+	"fmt"
+
+	"github.com/yaklang/yaklang/common/log"
+)
 
 type ClassModifier int
 
@@ -15,6 +19,16 @@ const (
 	Readonly
 )
 
+func (b *FunctionBuilder) CreateClass(name string) *ClassBluePrint {
+	c := NewClassBluePrint()
+	if _, ok := b.ClassBluePrint[name]; ok {
+		log.Errorf("CreateClass: this class redeclare")
+	}
+	b.ClassBluePrint[name] = c
+	c.Name = name
+	return c
+}
+
 func (b *FunctionBuilder) GetClass(name string) *ClassBluePrint {
 	if c, ok := b.ClassBluePrint[name]; ok {
 		return c
@@ -23,28 +37,9 @@ func (b *FunctionBuilder) GetClass(name string) *ClassBluePrint {
 	return nil
 }
 
-func (b *FunctionBuilder) GetStaticMember(class, key string) Value {
-	c := b.GetClass(class)
-	if c == nil {
-		return nil
-	}
-	return c.GetMember(key, func(class *ClassBluePrint) (Value, bool) {
-		v, ok := class.StaticMember[key]
-		return v, ok
-	})
+func (b *FunctionBuilder) GetStaticMember(class, key string) *Variable {
+	return b.CreateVariable(fmt.Sprintf("%s_%s", class, key))
 }
-
-// func (b *FunctionBuilder) GetNormalMember(class, key string) Value {
-// 	c := b.GetClass(class)
-// 	if c == nil {
-// 		log.Errorf("VisitStaticClass: not this class: %s", class)
-// 		return nil
-// 	}
-// 	return c.GetMember(key, func(cbp *ClassBluePrint) (Value, bool) {
-// 		v, ok := cbp.NormalMember[key]
-// 		return v, ok
-// 	})
-// }
 
 func (c *ClassBluePrint) GetMember(key string, get func(*ClassBluePrint) (Value, bool)) Value {
 	if v, ok := get(c); ok {
@@ -59,41 +54,33 @@ func (c *ClassBluePrint) GetMember(key string, get func(*ClassBluePrint) (Value,
 	return nil
 }
 
-func (b *FunctionBuilder) GetClassConstructor(class string) Value {
-	c := b.GetClass(class)
-	if c == nil {
-		log.Errorf("VisitStaticClass: not this class: %s", class)
-		return nil
-	}
-	return c.Constructor
-}
-
-func (b *FunctionBuilder) SetStaticMember(class, key string, value Value) {
-	c := b.GetClass(class)
-	if c == nil {
-		log.Errorf("VisitStaticClass: not this class: %s", class)
-		c = b.CreateClass(class)
-	}
-
-	c.BuildStaticMember(key, value)
-}
-
-func (b *FunctionBuilder) CreateClass(name string) *ClassBluePrint {
-	c := NewClassBluePrint()
-	if _, ok := b.ClassBluePrint[name]; ok {
-		log.Errorf("CreateClass: this class redeclare")
-	}
-	b.ClassBluePrint[name] = c
-	c.Name = name
-	return c
-}
-
 //======================= class blue print
 
-func (c *ClassBluePrint) BuildMember(name string, value Value) {
+// AddNormalMethod is used to add a method to the class,
+// parameters: name, function of the method, function, index of the this object in parameter
+func (c *ClassBluePrint) AddNormalMethod(name string, fun *Function, index int) {
+	c.NormalMethod[name] = &method{
+		function: fun,
+		index:    index,
+	}
+}
+
+// AddNormalMember is used to add a normal member to the class,
+func (c *ClassBluePrint) AddNormalMember(name string, value Value) {
 	c.NormalMember[name] = value
 }
 
-func (c *ClassBluePrint) BuildStaticMember(name string, value Value) {
+// AddStaticMember is used to add a static member to the class,
+func (c *ClassBluePrint) AddStaticMember(name string, value Value) {
 	c.StaticMember[name] = value
+}
+
+// AddStaticMethod is used to add a static method to the class,
+func (c *ClassBluePrint) AddStaticMethod(name string, value *Function) {
+	c.StaticMethod[name] = value
+}
+
+// AddParentClass is used to add a parent class to the class,
+func (c *ClassBluePrint) AddParentClass(parent *ClassBluePrint) {
+	c.ParentClass = append(c.ParentClass, parent)
 }

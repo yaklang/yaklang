@@ -16,10 +16,11 @@ type ClassBluePrint struct {
 	Name string
 	This Value
 
-	MarkedField map[string]*method // key -> value
-
 	NormalMember map[string]Value
+	NormalMethod map[string]*method // key -> value
+
 	StaticMember map[string]Value
+	StaticMethod map[string]*Function
 
 	// magic method
 	Copy        Value
@@ -32,9 +33,10 @@ type ClassBluePrint struct {
 func NewClassBluePrint() *ClassBluePrint {
 	class := &ClassBluePrint{
 		This:         nil,
-		MarkedField:  make(map[string]*method),
 		NormalMember: make(map[string]Value),
+		NormalMethod: make(map[string]*method),
 		StaticMember: make(map[string]Value),
+		StaticMethod: make(map[string]*Function),
 	}
 
 	return class
@@ -44,13 +46,6 @@ var _ Type = (*ClassBluePrint)(nil)
 
 func (c *ClassBluePrint) SetThis(v Value) {
 	c.This = v
-}
-
-func (c *ClassBluePrint) AddMarkedField(name string, fun *Function, index int) {
-	c.MarkedField[name] = &method{
-		function: fun,
-		index:    index,
-	}
 }
 
 // ParseClassBluePrint  parse get classBluePrint if the ObjectType is a ClassFactor
@@ -82,7 +77,7 @@ func ParseClassBluePrint(this Value, objectTyp *ObjectType) (ret Type) {
 		for index, fv := range funcType.ParameterValue {
 			if fv.GetDefault() == this {
 				has = true
-				blue.MarkedField[key.String()] = &method{
+				blue.NormalMethod[key.String()] = &method{
 					function: member.(*Function),
 					index:    index,
 				}
@@ -95,7 +90,7 @@ func ParseClassBluePrint(this Value, objectTyp *ObjectType) (ret Type) {
 		blue.NormalMember[key.String()] = member
 	}
 
-	if len(blue.MarkedField) != 0 {
+	if len(blue.NormalMethod) != 0 {
 		return blue
 	}
 
@@ -124,7 +119,7 @@ func (c *ClassBluePrint) Apply(obj Value) Type {
 		)
 	}
 
-	for rawKey, method := range c.MarkedField {
+	for rawKey, method := range c.NormalMethod {
 		key := NewConst(rawKey)
 
 		objTyp.AddField(key, method.function.GetType())
