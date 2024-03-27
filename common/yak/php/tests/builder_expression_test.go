@@ -19,6 +19,34 @@ func TestExpression_PHP_Name(t *testing.T) {
 			"Function-a()", "1",
 		}, t)
 	})
+	t.Run("defined variable", func(t *testing.T) {
+		code := `<?php
+$PHP_EOL=1;
+println($PHP_EOL);`
+		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
+	})
+}
+
+func TestExperssion_PHP_Scope(t *testing.T) {
+	t.Run("block scope capture a", func(t *testing.T) {
+		code := `<?php
+$a = 1;
+{
+	$a = 2;
+}
+println($a);`
+		ssatest.CheckPrintlnValue(code, []string{"2"}, t)
+	})
+
+	t.Run("block scope, con't capture a", func(t *testing.T) {
+		code := `<?php
+{
+	$a = 2;
+}
+println($a);`
+		ssatest.CheckPrintlnValue(code, []string{"2"}, t)
+	})
+
 }
 
 func TestExpression_BitwiseExpression(t *testing.T) {

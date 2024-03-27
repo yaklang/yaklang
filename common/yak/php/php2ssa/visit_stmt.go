@@ -197,9 +197,7 @@ func (y *builder) VisitBlockStatement(raw phpparser.IBlockStatementContext) inte
 		return nil
 	}
 
-	y.ir.BuildSyntaxBlock(func() {
-		y.VisitInnerStatementList(i.InnerStatementList())
-	})
+	y.VisitInnerStatementList(i.InnerStatementList())
 
 	return nil
 }
