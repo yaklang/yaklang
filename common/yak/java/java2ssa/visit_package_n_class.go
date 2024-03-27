@@ -107,17 +107,25 @@ func (y *builder) VisitClassBody(raw javaparser.IClassBodyContext) interface{} {
 	return nil
 }
 
-func (y *builder) VisitFormalParameters(raw javaparser.IFormalParametersContext) interface{} {
+func (y *builder) VisitFormalParameters(raw javaparser.IFormalParametersContext) {
 	if y == nil || raw == nil {
-		return nil
+		return
 	}
 
 	i, _ := raw.(*javaparser.FormalParametersContext)
 	if i == nil {
-		return nil
+		return
 	}
 
-	return nil
+	if i.ReceiverParameter() != nil && i.COMMA() == nil {
+		y.VisitReceiverParameter(i.ReceiverParameter())
+	} else if i.ReceiverParameter() != nil && i.COMMA() != nil {
+		y.VisitReceiverParameter(i.ReceiverParameter())
+		y.VisitFormalParameterList(i.FormalParameterList())
+	} else if i.FormalParameterList() != nil && i.COMMA() == nil {
+		y.VisitFormalParameterList(i.FormalParameterList())
+	}
+
 }
 
 func (y *builder) VisitMemberDeclaration(klass *ssa.ClassBluePrint, raw javaparser.IMemberDeclarationContext) interface{} {
@@ -130,18 +138,10 @@ func (y *builder) VisitMemberDeclaration(klass *ssa.ClassBluePrint, raw javapars
 		return nil
 	}
 
-	ir := y
 	if ret := i.RecordDeclaration(); ret != nil {
 		log.Infof("todo: java17: %v", ret.GetText())
 	} else if ret := i.MethodDeclaration(); ret != nil {
-		log.Infof("method declearation: %v", ret.GetText())
-		// create function
-		method := ret.(*javaparser.MethodDeclarationContext)
-		funcName := method.Identifier().GetText()
-		ir.NewFunc(funcName)
-		// TODO : handle OOP
-		methodBody := method.MethodBody().(*javaparser.MethodBodyContext)
-		ir.VisitBlock(methodBody.Block())
+		y.VisitMethodDeclaration(ret)
 	} else if ret := i.GenericMethodDeclaration(); ret != nil {
 	} else if ret := i.FieldDeclaration(); ret != nil {
 		// 声明成员变量
@@ -181,21 +181,22 @@ func (y *builder) VisitTypeType(raw javaparser.ITypeTypeContext) ssa.Type {
 	if i == nil {
 		return nil
 	}
-
+	// todo annotation
+	var t ssa.Type
 	if ret := i.ClassOrInterfaceType(); ret != nil {
-		y.VisitClassOrInterfaceType(ret)
+		t = y.VisitClassOrInterfaceType(ret)
 	} else {
-		y.VisitPrimitiveType(i.PrimitiveType())
+		t = y.VisitPrimitiveType(i.PrimitiveType())
 	}
 
-	return nil
+	return t
 }
 
-func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceTypeContext) interface{} {
+func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceTypeContext) ssa.Type {
 	if y == nil || raw == nil {
 		return nil
 	}
-
+	// todo 类和接口的类型声明
 	i, _ := raw.(*javaparser.ClassOrInterfaceTypeContext)
 	if i == nil {
 		return nil
@@ -275,4 +276,193 @@ func (y *builder) VisitRecordDeclaration(raw javaparser.IRecordDeclarationContex
 	}
 
 	return nil
+}
+
+func (y *builder) VisitMethodDeclaration(raw javaparser.IMethodDeclarationContext) {
+	if y == nil || raw == nil {
+		return
+	}
+	i, _ := raw.(*javaparser.MethodDeclarationContext)
+	if i == nil {
+		return
+	}
+
+	funcName := i.Identifier().GetText()
+
+	y.SetMarkedFunction(funcName)
+	newFunction := y.NewFunc(funcName)
+	var ir *ssa.FunctionBuilder
+	ir = y.PushFunction(newFunction)
+	{
+		y.VisitFormalParameters(i.FormalParameters())
+		y.VisitMethodBody(i.MethodBody())
+		ir.SetType(y.VisitTypeTypeOrVoid(i.TypeTypeOrVoid()))
+		ir.Finish()
+	}
+	ir = ir.PopFunction()
+	variable := ir.CreateVariable(funcName)
+	ir.AssignVariable(variable, newFunction)
+	if i.THROWS() != nil {
+		if qualifiedNameList := i.QualifiedNameList(); qualifiedNameList != nil {
+			y.VisitQualifiedNameList(qualifiedNameList)
+		}
+
+	}
+	return
+}
+
+func (y *builder) VisitMethodBody(raw javaparser.IMethodBodyContext) {
+	if y == nil || raw == nil {
+		return
+	}
+	i, _ := raw.(*javaparser.MethodBodyContext)
+	if i == nil {
+		return
+	}
+
+	y.VisitBlock(i.Block())
+}
+
+func (y *builder) VisitTypeTypeOrVoid(raw javaparser.ITypeTypeOrVoidContext) ssa.Type {
+	if y == nil || raw == nil {
+		return nil
+	}
+	i, _ := raw.(*javaparser.TypeTypeOrVoidContext)
+	if i == nil {
+		return nil
+	}
+	if ret := i.TypeType(); ret != nil {
+		return y.VisitTypeType(ret)
+	} else {
+		return ssa.GetAnyType()
+	}
+
+}
+
+func (y *builder) VisitFormalParameterList(raw javaparser.IFormalParameterListContext) {
+	if y == nil || raw == nil {
+		return
+	}
+
+	i, _ := raw.(*javaparser.FormalParameterListContext)
+	if i == nil {
+		return
+	}
+
+	if allFormalParam := i.AllFormalParameter(); allFormalParam != nil {
+		for _, param := range allFormalParam {
+			y.VisitFormalParameter(param)
+		}
+		if lastFormalParam := i.LastFormalParameter(); lastFormalParam != nil {
+			y.VisitLastFormalParameter(lastFormalParam)
+		}
+	} else {
+		if lastFormalParam := i.LastFormalParameter(); lastFormalParam != nil {
+			y.VisitLastFormalParameter(lastFormalParam)
+		}
+	}
+
+}
+
+func (y *builder) VisitReceiverParameter(raw javaparser.IReceiverParameterContext) {
+	if y == nil || raw == nil {
+		return
+	}
+	i, _ := raw.(*javaparser.ReceiverParameterContext)
+	if i == nil {
+		return
+	}
+
+	typeType := y.VisitTypeType(i.TypeType())
+	_ = typeType
+	// todo 接口的形参
+}
+
+func (y *builder) VisitFormalParameter(raw javaparser.IFormalParameterContext) {
+	if y == nil || raw == nil {
+		return
+	}
+
+	i, _ := raw.(*javaparser.FormalParameterContext)
+	if i == nil {
+		return
+	}
+	for _, modifier := range i.AllVariableModifier() {
+		y.VisitVariableModifier(modifier)
+	}
+	typeType := y.VisitTypeType(i.TypeType())
+	formalParams := y.VisitVariableDeclaratorId(i.VariableDeclaratorId())
+	param := y.NewParam(formalParams)
+	if typeType != nil {
+		param.SetType(typeType)
+	}
+
+}
+
+func (y *builder) VisitVariableDeclaratorId(raw javaparser.IVariableDeclaratorIdContext) string {
+	if y == nil || raw == nil {
+		return ""
+	}
+	i, _ := raw.(*javaparser.VariableDeclaratorIdContext)
+	if i == nil {
+		return ""
+	}
+	text := i.Identifier().GetText()
+	if text == "" {
+		return ""
+	}
+	y.CreateVariable(text)
+	return text
+}
+
+func (y *builder) VisitLastFormalParameter(raw javaparser.ILastFormalParameterContext) {
+	if y == nil || raw == nil {
+		return
+	}
+
+	i, _ := raw.(*javaparser.LastFormalParameterContext)
+	if i == nil {
+		return
+	}
+
+	for _, modifier := range i.AllVariableModifier() {
+		y.VisitVariableModifier(modifier)
+	}
+
+	for _, annotation := range i.AllAnnotation() {
+		//todo annotation
+		_ = annotation
+		//y.VisitAnnotation(annotation)
+	}
+	formalParams := y.VisitVariableDeclaratorId(i.VariableDeclaratorId())
+	typeType := y.VisitTypeType(i.TypeType())
+	isVariadic := i.ELLIPSIS()
+	_ = isVariadic
+	param := y.NewParam(formalParams)
+	if typeType != nil {
+		param.SetType(typeType)
+	}
+}
+
+func (y *builder) VisitVariableModifier(raw javaparser.IVariableModifierContext) {
+	if y == nil || raw == nil {
+		return
+	}
+
+	i, _ := raw.(*javaparser.VariableModifierContext)
+	if i == nil {
+		return
+	}
+}
+
+func (y *builder) VisitQualifiedNameList(raw javaparser.IQualifiedNameListContext) {
+	if y == nil || raw == nil {
+		return
+	}
+
+	i, _ := raw.(*javaparser.QualifiedNameListContext)
+	if i == nil {
+		return
+	}
+
 }

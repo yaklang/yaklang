@@ -134,12 +134,12 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			if s := sliceCall.(*javaparser.LeftSliceCallContext).Expression(); s != nil {
 				index := y.VisitExpression(s)
 				variable = y.CreateMemberCallVariable(expr, index)
-			} else if memberCall := ret.LeftMemberCall(); memberCall != nil {
-				if id := memberCall.(*javaparser.LeftMemberCallContext).Identifier(); id != nil {
-					idText := id.GetText()
-					callee := y.EmitConstInst(idText)
-					variable = y.CreateMemberCallVariable(expr, callee)
-				}
+			}
+		} else if memberCall := ret.LeftMemberCall(); memberCall != nil {
+			if id := memberCall.(*javaparser.LeftMemberCallContext).Identifier(); id != nil {
+				idText := id.GetText()
+				callee := y.EmitConstInst(idText)
+				variable = y.CreateMemberCallVariable(expr, callee)
 			}
 		}
 
@@ -199,18 +199,20 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 	case *javaparser.PrefixBinayExpression1Context:
 		// 处理前缀表达式中的"--"和"++"
 		expr := y.VisitExpression(ret.Expression())
+
 		if sliceCall := ret.LeftSliceCall(); sliceCall != nil {
 			if s := sliceCall.(*javaparser.LeftSliceCallContext).Expression(); s != nil {
 				index := y.VisitExpression(s)
 				variable = y.CreateMemberCallVariable(expr, index)
-			} else if memberCall := ret.LeftMemberCall(); memberCall != nil {
-				if id := memberCall.(*javaparser.LeftMemberCallContext).Identifier(); id != nil {
-					idText := id.GetText()
-					callee := y.EmitConstInst(idText)
-					variable = y.CreateMemberCallVariable(expr, callee)
-				}
+			}
+		} else if memberCall := ret.LeftMemberCall(); memberCall != nil {
+			if id := memberCall.(*javaparser.LeftMemberCallContext).Identifier(); id != nil {
+				idText := id.GetText()
+				callee := y.EmitConstInst(idText)
+				variable = y.CreateMemberCallVariable(expr, callee)
 			}
 		}
+
 		if variable == nil {
 			y.NewError(ssa.Error, "javaast", yak2ssa.AssignLeftSideEmpty())
 			return nil
@@ -436,14 +438,15 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			if s := sliceCall.(*javaparser.LeftSliceCallContext).Expression(); s != nil {
 				index := y.VisitExpression(s)
 				variable = y.CreateMemberCallVariable(expr, index)
-			} else if memberCall := ret.LeftMemberCall(); memberCall != nil {
-				if id := memberCall.(*javaparser.LeftMemberCallContext).Identifier(); id != nil {
-					idText := id.GetText()
-					callee := y.EmitConstInst(idText)
-					variable = y.CreateMemberCallVariable(expr, callee)
-				}
+			}
+		} else if memberCall := ret.LeftMemberCall(); memberCall != nil {
+			if id := memberCall.(*javaparser.LeftMemberCallContext).Identifier(); id != nil {
+				idText := id.GetText()
+				callee := y.EmitConstInst(idText)
+				variable = y.CreateMemberCallVariable(expr, callee)
 			}
 		}
+
 		if variable == nil {
 			y.NewError(ssa.Error, "javaast", yak2ssa.AssignLeftSideEmpty())
 			return nil
@@ -526,14 +529,15 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			if s := sliceCall.(*javaparser.LeftSliceCallContext).Expression(); s != nil {
 				index := y.VisitExpression(s)
 				variable = y.CreateMemberCallVariable(expr, index)
-			} else if memberCall := ret.LeftMemberCall(); memberCall != nil {
-				if id := memberCall.(*javaparser.LeftMemberCallContext).Identifier(); id != nil {
-					idText := id.GetText()
-					callee := y.EmitConstInst(idText)
-					variable = y.CreateMemberCallVariable(expr, callee)
-				}
+			}
+		} else if memberCall := ret.LeftMemberCall(); memberCall != nil {
+			if id := memberCall.(*javaparser.LeftMemberCallContext).Identifier(); id != nil {
+				idText := id.GetText()
+				callee := y.EmitConstInst(idText)
+				variable = y.CreateMemberCallVariable(expr, callee)
 			}
 		}
+
 		if id := ret.Identifier(); id != nil {
 			value = y.ReadValue(id.GetText())
 		} else if expr := ret.Expression(1); expr != nil {
@@ -619,6 +623,12 @@ func (y *builder) VisitPrimary(raw javaparser.IPrimaryContext) ssa.Value {
 		}
 		v := y.ReadValue(text)
 		return v
+	}
+	if ret := i.THIS(); ret != nil {
+		return y.ReadValue(ret.GetText())
+	}
+	if ret := i.SUPER(); ret != nil {
+		return y.ReadValue(ret.GetText())
 	}
 	return nil
 }
@@ -885,28 +895,30 @@ func (y *builder) VisitLocalVariableDeclaration(raw javaparser.ILocalVariableDec
 	return nil
 }
 
-func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorContext) interface{} {
+func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorContext) {
 	if y == nil || raw == nil {
-		return nil
+		return
 	}
 
 	i, _ := raw.(*javaparser.VariableDeclaratorContext)
 	if i == nil {
-		return nil
+		return
 	}
 
 	if i.VariableInitializer() != nil {
 		text := i.VariableDeclaratorId().(*javaparser.VariableDeclaratorIdContext).Identifier().GetText()
 		variable := y.CreateVariable(text)
 		value := y.VisitVariableInitializer(i.VariableInitializer())
-		y.AssignVariable(variable, value)
+		if utils.IsNil(value) {
+			return
+		} else {
+			y.AssignVariable(variable, value)
+		}
 	} else {
 		text := i.VariableDeclaratorId().(*javaparser.VariableDeclaratorIdContext).Identifier().GetText()
 		y.CreateVariable(text)
 	}
-
-	return nil
-
+	return
 }
 
 func (y *builder) VisitVariableInitializer(raw javaparser.IVariableInitializerContext) ssa.Value {
@@ -1399,8 +1411,13 @@ func (y *builder) VisitArrayCreatorRest(raw javaparser.IArrayCreatorRestContext,
 		func(i int) ssa.Value { return ssa.NewConst(i) },
 		func(i int) ssa.Value { return y.VisitExpression(allExpr[i]) },
 	)
-	slice.SetType(p)
-	return slice
+	if utils.IsNil(slice) {
+		return nil
+	} else {
+		slice.SetType(p)
+		return slice
+	}
+
 }
 
 func (y *builder) VisitCreatedName(raw javaparser.ICreatedNameContext) ssa.Type {
