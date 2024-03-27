@@ -1,6 +1,7 @@
 package php2ssa
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -212,6 +213,11 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 		// TODO: ret.Attributes() // php8
 		memberModifiers := y.VisitMemberModifiers(ret.MemberModifiers())
 		_ = memberModifiers
+		isStatic := false
+		if _, ok := memberModifiers[ssa.Static]; ok {
+			isStatic = true
+		}
+
 		isRef := ret.Ampersand()
 		_ = isRef
 
@@ -237,7 +243,13 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 			class.Constructor = newFunction
 		default:
 			newFunction := createFunction()
-			class.AddNormalMethod(funcName, newFunction, 0)
+			if isStatic {
+				variable := y.ir.GetStaticMember(class.Name, newFunction.GetName())
+				y.ir.AssignVariable(variable, newFunction)
+				class.AddStaticMethod(funcName, newFunction)
+			} else {
+				class.AddNormalMethod(funcName, newFunction, 0)
+			}
 		}
 	case *phpparser.ConstContext:
 		// TODO: ret.Attributes() // php8
@@ -417,7 +429,7 @@ func (y *builder) VisitClassConstant(raw phpparser.IClassConstantContext) ssa.Va
 	return nil
 }
 
-func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) *ssa.Variable {
+func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassExprFunctionMemberContext) *ssa.Variable {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -426,29 +438,91 @@ func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) *s
 	case *phpparser.ClassStaticFunctionMemberContext:
 		// TODO: class
 		key = i.Identifier().GetText()
-	case *phpparser.ClassStaticVariableContext:
-		// TODO class
-		key = i.VarName().GetText()
 	case *phpparser.ClassDirectFunctionMemberContext:
 		class = i.Identifier(0).GetText()
 		key = i.Identifier(1).GetText()
+	case *phpparser.StringAsIndirectClassStaticFunctionMemberContext:
+		str, err := strconv.Unquote(i.String_().GetText())
+		if err != nil {
+			class = i.String_().GetText()
+		} else {
+			class = str
+		}
+		key = i.Identifier().GetText()
+	case *phpparser.VariableAsIndirectClassStaticFunctionMemberContext:
+		exprName := y.VisitVariable(i.Variable())
+		class = y.ir.ReadValue(exprName).String()
+		key = i.Identifier().GetText()
+	default:
+		_ = i
+	}
+	if class == "" {
+		return nil
+	}
+
+	if strings.HasPrefix(key, "$") {
+		// variable
+		key = key[1:]
+		return y.ir.GetStaticMember(class, key)
+	}
+	// function
+	return y.ir.GetStaticMember(class, key)
+}
+
+func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassExprVariableMemberContext) *ssa.Variable {
+	if y == nil || raw == nil {
+		return nil
+	}
+	var class, key string
+	switch i := raw.(type) {
+	case *phpparser.ClassStaticVariableContext:
+		// TODO class
+		key = i.VarName().GetText()
 	case *phpparser.ClassDirectStaticVariableContext:
 		class = i.Identifier().GetText()
 		key = i.VarName().GetText()
-	case *phpparser.StringAsIndirectClassStaticFunctionMemberContext:
-		class = i.String_().GetText()
-		key = i.Identifier().GetText()
 	case *phpparser.StringAsIndirectClassStaticVariableContext:
-		class = i.String_().GetText()
+		str, err := strconv.Unquote(i.String_().GetText())
+		if err != nil {
+			class = i.String_().GetText()
+		} else {
+			class = str
+		}
+		key = i.VarName().GetText()
+	case *phpparser.VariableAsIndirectClassStaticVariableContext:
+		exprName := y.VisitVariable(i.Variable())
+		class = y.ir.ReadValue(exprName).String()
 		key = i.VarName().GetText()
 	default:
 		_ = i
 	}
-	if strings.HasPrefix(key, "$") {
-		key = key[1:]
+	if class == "" {
+		return nil
 	}
 
+	if strings.HasPrefix(key, "$") {
+		// variable
+		key = key[1:]
+		return y.ir.GetStaticMember(class, key)
+	}
+	// function
 	return y.ir.GetStaticMember(class, key)
+}
+
+func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) *ssa.Variable {
+	if y == nil || raw == nil {
+		return nil
+	}
+	if i, ok := raw.(*phpparser.StaticClassExprContext); ok {
+		if i.StaticClassExprFunctionMember() != nil {
+			return y.VisitStaticClassExprFunctionMember(i.StaticClassExprFunctionMember())
+		}
+		if i.StaticClassExprVariableMember() != nil {
+			return y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember())
+		}
+	}
+
+	return nil
 }
 
 /// class modifier
