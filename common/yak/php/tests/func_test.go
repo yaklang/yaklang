@@ -37,6 +37,61 @@ function test() {
 	})
 }
 
+func TestParseSSA_Function_SideEffect(t *testing.T) {
+	t.Run("normal", func(t *testing.T) {
+		test.CheckPrintlnValue(`<?php 
+		function A($a){
+			$a = 33;
+		}
+		$a = 1;
+		println($a);
+		A($a);
+		println($a);
+		`, []string{"1", "1"}, t)
+	})
+
+	t.Run("reference", func(t *testing.T) {
+		test.CheckPrintlnValue(`<?php
+		function A(&$a){
+			$a = 33;
+		}
+		$a = 1;
+		println($a);
+		A($a);
+		println($a);
+		`, []string{
+			"1",
+			"side-effect(33, $a)",
+		}, t)
+	})
+
+	t.Run("multiple mix reference parameter", func(t *testing.T) {
+		test.CheckPrintlnValue(`<?php
+		function A(&$a, $b, &$c){
+			$a = 33;
+			$b = 33;
+			$c = 33;
+		}
+		$a = 1;
+		$b = 1;
+		$c = 1;
+		println($a);
+		println($b);
+		println($c);
+		A($a, $b, $c);
+		println($a);
+		println($b);
+		println($c);
+		`, []string{
+			"1", "1", "1",
+			"side-effect(33, $a)",
+			"1",
+			"side-effect(33, $c)",
+		}, t)
+	})
+
+}
+
 func TestParseSSA_FuncCall_DefaultParameter(t *testing.T) {
 	t.Run("no default", func(t *testing.T) {
 		test.MockSSA(t, `<?php

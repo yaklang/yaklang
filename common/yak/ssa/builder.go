@@ -25,6 +25,8 @@ type FunctionBuilder struct {
 	// disable free-value
 	DisableFreeValue bool
 
+	RefParameter map[string]struct{}
+
 	target *target // for break and continue
 	labels map[string]*BasicBlock
 	// defer function call
@@ -61,6 +63,7 @@ func NewBuilder(f *Function, parent *FunctionBuilder) *FunctionBuilder {
 		CurrentBlock:  nil,
 		CurrentRange:  nil,
 		parentBuilder: parent,
+		RefParameter:  make(map[string]struct{}),
 	}
 	if parent != nil {
 		b.ExternInstance = parent.ExternInstance
@@ -146,4 +149,8 @@ func (b *FunctionBuilder) SetMarkedFunction(name string) {
 
 func (b *FunctionBuilder) GetMarkedFunction() *FunctionType {
 	return b.MarkedFuncType
+}
+
+func (b *FunctionBuilder) ReferenceParameter(name string) {
+	b.RefParameter[name] = struct{}{}
 }
