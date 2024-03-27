@@ -215,3 +215,53 @@ func TestMUSTPASS_Fp_ScanHttpFlow(t *testing.T) {
 		}
 	}
 }
+
+func mockTimeoutServer() *httptest.Server {
+	mux := http.NewServeMux()
+
+	// 模拟超时的处理函数
+	timeoutHandler := func(w http.ResponseWriter, r *http.Request) {
+		// 通过sleep模拟长时间运行的处理，这里的时间应该长于测试中设置的HTTP请求超时时间
+		time.Sleep(20 * time.Second) // 假设客户端的超时设置小于2分钟
+	}
+
+	// 注册处理函数到路由器，对favicon.ico请求模拟超时
+	mux.HandleFunc("/favicon.ico", timeoutHandler)
+
+	// 创建并返回一个httptest.Server
+	server := httptest.NewServer(mux)
+
+	return server
+}
+func TestMUSTPASS_Fp_favicon(t *testing.T) {
+
+	server := mockTimeoutServer()
+
+	defer server.Close()
+
+	host, port, err := utils.ParseStringToHostPort(server.URL)
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	done := make(chan bool)
+
+	go func() {
+		ch, err := scanFingerprint(host, fmt.Sprintf("%d", port), fp.WithActiveMode(true))
+		if err != nil {
+			t.Error(err)
+		}
+
+		for v := range ch {
+			fmt.Println(v.String())
+		}
+		done <- true
+	}()
+
+	select {
+	case <-time.After(20 * time.Second):
+		t.Fatal("Test favicon.ico failed due to timeout")
+	case <-done:
+	}
+}
