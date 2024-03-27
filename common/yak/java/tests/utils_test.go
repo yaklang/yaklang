@@ -32,6 +32,10 @@ func CheckJavaPrintlnValue(code string, want []string, t *testing.T) {
 	test.CheckPrintlnValue(code, want, t)
 }
 
+func CheckAllJavaPrintlnValue(code string, want []string, t *testing.T) {
+	test.CheckPrintlnValue(code, want, t)
+}
+
 func CheckJavaCode(code string, t *testing.T) {
 	code = CreateJavaProgram(code)
 	CheckJavaTestCase(t, test.TestCase{Code: code})
