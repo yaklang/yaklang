@@ -15,12 +15,21 @@ type FunctionSideEffect struct {
 	// Scope *Scope
 	Variable *Variable
 
+	forceCreate bool
+
 	// is modify parameter field
 	IsMemberCall   bool
 	ParameterIndex int
 	Key            Value
 }
 
+func (f *Function) AddForceSideEffect(name string, v Value) {
+	f.SideEffects = append(f.SideEffects, &FunctionSideEffect{
+		Name:        name,
+		Modify:      v,
+		forceCreate: true,
+	})
+}
 func (f *Function) AddSideEffect(name *Variable, v Value) {
 	f.SideEffects = append(f.SideEffects, &FunctionSideEffect{
 		Name:     name.GetName(),
