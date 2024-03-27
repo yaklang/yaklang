@@ -56,6 +56,40 @@ println(Foo::$my_static . PHP_EOL);
 				"add(\"foo\", Parameter-PHP_EOL)",
 			}, t)
 	})
+
+	t.Run("test phi static member", func(t *testing.T) {
+		code := `
+	<?php
+class Foo {
+	public static $my_static = "start";
+}
+if ($a) {
+	Foo::$my_static = "foo";
+}else {
+	Foo::$my_static = "bar";
+}
+println(Foo::$my_static);
+`
+		ssatest.CheckPrintlnValue(code, []string{
+			"phi(Foo_my_static)[\"foo\",\"bar\"]",
+		}, t)
+	})
+}
+
+func TestOOP_static_method(t *testing.T) {
+	t.Run("normal static method", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		<?php
+		class Foo {
+			public static function aStaticMethod() {
+				return "foo";
+			}
+		}
+		Foo::aStaticMethod();
+		?>
+		`, []string{}, t)
+	})
+
 }
 
 func TestOOP_var_member(t *testing.T) {
