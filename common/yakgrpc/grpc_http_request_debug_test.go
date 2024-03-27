@@ -47,7 +47,13 @@ func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_TestFlow(t *testing.T) {
     fuzz.HTTPRequest(req)~.ExecFirst()
     fuzz.HTTPRequest(req)~.ExecFirst()
     fuzz.HTTPRequest(req)~.ExecFirst()
+	// 5
     for result in fuzz.HTTPRequest(req)~.Repeat(5).Exec()~ {}
+	// 4
+	http.Get(url)~
+    http.Post(url)~
+    http.Request("DELETE", url)~
+    http.Do(http.NewRequest("PUT", url)~)
 }`,
 		PluginType:          "mitm",
 		Input:               "http://" + utils.HostPort(host, port) + "/",
@@ -76,7 +82,7 @@ func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_TestFlow(t *testing.T) {
 	}
 	total := rsp.GetTotal()
 	t.Log("total: ", total)
-	if total != int64(count) && total >= 8 {
+	if total != int64(count) && total >= 3+5+4 {
 		t.Errorf("total: %d != count: %d", total, count)
 	}
 }
@@ -835,7 +841,7 @@ func TestDebug_Plugin_Cancel_Check_ForChan(t *testing.T) {
 }
 `
 
-	var okChan = make(chan struct{})
+	okChan := make(chan struct{})
 	go func() {
 		stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
 			Code:       code,
