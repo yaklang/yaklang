@@ -24,9 +24,10 @@ import (
 	"github.com/davecgh/go-spew/spew"
 )
 
-const (
+var (
 	defaultWaitTime    = time.Duration(100) * time.Millisecond
 	defaultMaxWaitTime = time.Duration(2000) * time.Millisecond
+	defaultTimeout     = time.Duration(1500) * time.Millisecond
 )
 
 type PocConfig struct {
@@ -34,15 +35,15 @@ type PocConfig struct {
 	Port                 int
 	ForceHttps           *bool
 	ForceHttp2           *bool
-	SNI                  string
-	Timeout              time.Duration
-	ConnectTimeout       time.Duration
-	RetryTimes           int
+	SNI                  *string
+	Timeout              *time.Duration
+	ConnectTimeout       *time.Duration
+	RetryTimes           *int
 	RetryInStatusCode    []int
 	RetryNotInStatusCode []int
-	RetryWaitTime        time.Duration
-	RetryMaxWaitTime     time.Duration
-	RedirectTimes        int
+	RetryWaitTime        *time.Duration
+	RetryMaxWaitTime     *time.Duration
+	RedirectTimes        *int
 	NoRedirect           *bool
 	Proxy                []string
 	FuzzParams           map[string][]string
@@ -102,12 +103,14 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 	if c.ForceHttp2 != nil {
 		opts = append(opts, lowhttp.WithHttp2(*c.ForceHttp2))
 	}
-	opts = append(opts, lowhttp.WithSNI(c.SNI))
-	if c.Timeout > 0 {
-		opts = append(opts, lowhttp.WithTimeout(c.Timeout))
+	if c.SNI != nil {
+		opts = append(opts, lowhttp.WithSNI(*c.SNI))
 	}
-	if c.RetryTimes > 0 {
-		opts = append(opts, lowhttp.WithRetryTimes(c.RetryTimes))
+	if c.Timeout != nil {
+		opts = append(opts, lowhttp.WithTimeout(*c.Timeout))
+	}
+	if c.RetryTimes != nil {
+		opts = append(opts, lowhttp.WithRetryTimes(*c.RetryTimes))
 	}
 	if len(c.RetryInStatusCode) > 0 {
 		opts = append(opts, lowhttp.WithRetryInStatusCode(c.RetryInStatusCode))
@@ -115,14 +118,14 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 	if len(c.RetryNotInStatusCode) > 0 {
 		opts = append(opts, lowhttp.WithRetryNotInStatusCode(c.RetryNotInStatusCode))
 	}
-	if c.RetryWaitTime > 0 {
-		opts = append(opts, lowhttp.WithRetryWaitTime(c.RetryWaitTime))
+	if c.RetryWaitTime != nil {
+		opts = append(opts, lowhttp.WithRetryWaitTime(*c.RetryWaitTime))
 	}
-	if c.RetryMaxWaitTime > 0 {
-		opts = append(opts, lowhttp.WithRetryMaxWaitTime(c.RetryMaxWaitTime))
+	if c.RetryMaxWaitTime != nil {
+		opts = append(opts, lowhttp.WithRetryMaxWaitTime(*c.RetryMaxWaitTime))
 	}
-	if c.RedirectTimes > 0 {
-		opts = append(opts, lowhttp.WithRedirectTimes(c.RedirectTimes))
+	if c.RedirectTimes != nil {
+		opts = append(opts, lowhttp.WithRedirectTimes(*c.RedirectTimes))
 	}
 	if c.NoRedirect != nil && *c.NoRedirect {
 		opts = append(opts, lowhttp.WithRedirectTimes(0))
@@ -160,8 +163,8 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 		opts = append(opts, lowhttp.WithFromPlugin(c.FromPlugin))
 	}
 	opts = append(opts, lowhttp.WithConnPool(c.ConnectionPool))
-	if c.ConnectTimeout > 0 {
-		opts = append(opts, lowhttp.WithConnectTimeout(c.ConnectTimeout))
+	if c.ConnectTimeout != nil {
+		opts = append(opts, lowhttp.WithConnectTimeout(*c.ConnectTimeout))
 	}
 	if c.Context != nil {
 		opts = append(opts, lowhttp.WithContext(c.Context))
@@ -182,17 +185,18 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 
 func NewDefaultPoCConfig() *PocConfig {
 	saveHTTPFlow := consts.GLOBAL_HTTP_FLOW_SAVE.IsSet()
+
 	config := &PocConfig{
 		Host:                   "",
 		Port:                   0,
-		Timeout:                15 * time.Second,
-		ConnectTimeout:         15 * time.Second,
-		RetryTimes:             0,
+		Timeout:                &defaultTimeout,
+		ConnectTimeout:         &defaultTimeout,
+		RetryTimes:             nil,
 		RetryInStatusCode:      []int{},
 		RetryNotInStatusCode:   []int{},
-		RetryWaitTime:          defaultWaitTime,
-		RetryMaxWaitTime:       defaultMaxWaitTime,
-		RedirectTimes:          5,
+		RetryWaitTime:          &defaultWaitTime,
+		RetryMaxWaitTime:       &defaultMaxWaitTime,
+		RedirectTimes:          nil,
 		Proxy:                  nil,
 		FuzzParams:             nil,
 		RedirectHandler:        nil,
@@ -248,7 +252,7 @@ func WithRedirectHandler(i func(isHttps bool, req, rsp []byte) bool) PocConfigOp
 // ```
 func WithRetryTimes(t int) PocConfigOption {
 	return func(c *PocConfig) {
-		c.RetryTimes = t
+		c.RetryTimes = &t
 	}
 }
 
@@ -281,7 +285,8 @@ func WithRetryNotInStausCode(codes ...int) PocConfigOption {
 // ```
 func WithRetryWaitTime(f float64) PocConfigOption {
 	return func(c *PocConfig) {
-		c.RetryWaitTime = utils.FloatSecondDuration(f)
+		t := utils.FloatSecondDuration(f)
+		c.RetryWaitTime = &t
 	}
 }
 
@@ -292,7 +297,8 @@ func WithRetryWaitTime(f float64) PocConfigOption {
 // ```
 func WithRetryMaxWaitTime(f float64) PocConfigOption {
 	return func(c *PocConfig) {
-		c.RetryMaxWaitTime = utils.FloatSecondDuration(f)
+		t := utils.FloatSecondDuration(f)
+		c.RetryMaxWaitTime = &t
 	}
 }
 
@@ -303,7 +309,7 @@ func WithRetryMaxWaitTime(f float64) PocConfigOption {
 // ```
 func WithRedirectTimes(t int) PocConfigOption {
 	return func(c *PocConfig) {
-		c.RedirectTimes = t
+		c.RedirectTimes = &t
 	}
 }
 
@@ -372,7 +378,7 @@ func WithForceHTTP2(isHttp2 bool) PocConfigOption {
 // ```
 func WithSNI(sni string) PocConfigOption {
 	return func(c *PocConfig) {
-		c.SNI = sni
+		c.SNI = &sni
 	}
 }
 
@@ -383,7 +389,8 @@ func WithSNI(sni string) PocConfigOption {
 // ```
 func WithTimeout(f float64) PocConfigOption {
 	return func(c *PocConfig) {
-		c.Timeout = utils.FloatSecondDuration(f)
+		t := utils.FloatSecondDuration(f)
+		c.Timeout = &t
 	}
 }
 
@@ -394,7 +401,8 @@ func WithTimeout(f float64) PocConfigOption {
 // ```
 func WithConnectTimeout(f float64) PocConfigOption {
 	return func(c *PocConfig) {
-		c.ConnectTimeout = utils.FloatSecondDuration(f)
+		t := utils.FloatSecondDuration(f)
+		c.ConnectTimeout = &t
 	}
 }
 
@@ -1139,11 +1147,7 @@ func handleUrlAndConfig(urlStr string, opts ...PocConfigOption) (*PocConfig, err
 	}
 
 	if config.NoRedirect != nil && *config.NoRedirect {
-		config.RedirectTimes = 0
-	}
-
-	if config.RetryTimes < 0 {
-		config.RetryTimes = 0
+		config.RedirectTimes = nil
 	}
 	return config, nil
 }
@@ -1229,11 +1233,7 @@ func handleRawPacketAndConfig(i interface{}, opts ...PocConfigOption) ([]byte, *
 	}
 
 	if config.NoRedirect != nil && *config.NoRedirect {
-		config.RedirectTimes = 0
-	}
-
-	if config.RetryTimes < 0 {
-		config.RetryTimes = 0
+		config.RedirectTimes = nil
 	}
 
 	return packet, config, nil
@@ -1241,10 +1241,10 @@ func handleRawPacketAndConfig(i interface{}, opts ...PocConfigOption) ([]byte, *
 
 func pochttp(packet []byte, config *PocConfig) (*lowhttp.LowhttpResponse, error) {
 	if config.Websocket {
-		if config.Timeout <= 0 {
-			config.Timeout = 15 * time.Second
+		if config.Timeout == nil || *config.Timeout <= 0 {
+			config.Timeout = &defaultTimeout
 		}
-		wsCtx, cancel := context.WithTimeout(context.Background(), config.Timeout)
+		wsCtx, cancel := context.WithTimeout(context.Background(), *config.Timeout)
 		defer cancel()
 
 		https := config.IsHTTPS()
