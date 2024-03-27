@@ -204,7 +204,7 @@ func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceType
 	return nil
 }
 
-func (y *builder) VisitPrimitiveType(raw javaparser.IPrimitiveTypeContext) interface{} {
+func (y *builder) VisitPrimitiveType(raw javaparser.IPrimitiveTypeContext) ssa.Type {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -213,8 +213,16 @@ func (y *builder) VisitPrimitiveType(raw javaparser.IPrimitiveTypeContext) inter
 	if i == nil {
 		return nil
 	}
-
-	return nil
+	switch i.GetText() {
+	case "boolean":
+		return ssa.GetBooleanType()
+	case "char", "short", "int", "long", "float", "double":
+		return ssa.GetNumberType()
+	case "byte":
+		return ssa.GetBytesType()
+	default:
+		return ssa.GetAnyType()
+	}
 }
 
 func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext) interface{} {
