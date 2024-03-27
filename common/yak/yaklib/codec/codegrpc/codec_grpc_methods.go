@@ -95,7 +95,7 @@ func decodeHexKeyAndIV(k string, i string) ([]byte, []byte, error) {
 	return key, iv, nil
 }
 
-func convertOutput(text []byte, output outputType) []byte {
+func encodeData(text []byte, output outputType) []byte {
 	switch output {
 	case OUTPUT_RAW:
 		return text
@@ -108,7 +108,7 @@ func convertOutput(text []byte, output outputType) []byte {
 	}
 }
 
-func covertInput(text []byte, input outputType) []byte {
+func decodeData(text []byte, input outputType) []byte {
 	switch input {
 	case OUTPUT_RAW:
 		return text
@@ -138,30 +138,29 @@ func covertInput(text []byte, input outputType) []byte {
 // 32字节 = AES-256
 // 你可以使用其中一个KDF操作生成基于密码的密钥。"""
 // Params = [
-// { Name = "hexKey", Type = "input", Required = true, Regex = "^[a-fA-F0-9]{32}|[a-fA-F0-9]{48}|[a-fA-F0-9]{64}$",Label = "Key"},
-// { Name = "hexIV", Type = "input", Required = false, Regex = "^[a-fA-F0-9]{32}$",Label = "IV"},
+// { Name = "key", Type = "inputSelect", Required = true,Label = "Key", select ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
+// { Name = "IV", Type = "inputSelect", Required = false ,Label = "IV", select ={ Name = "ivType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "IV格式"} },
 // { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "GCM"], Required = true, Label = "Mode"},
 // { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "输出格式"}
 // ]
-func (flow *CodecExecFlow) AESEncrypt(hexKey string, hexIV string, mode string, output outputType) error {
+func (flow *CodecExecFlow) AESEncrypt(key string, keyType string, IV string, ivType string, mode string, output outputType) error {
 	var data []byte
 	var err error
-	key, iv, err := decodeHexKeyAndIV(hexKey, hexIV)
-	if err != nil {
-		return err
-	}
+
+	decodeKey := decodeData([]byte(key), keyType)
+	decodeIV := decodeData([]byte(IV), ivType)
 	switch mode {
 	case "CBC":
-		data, err = codec.AESCBCEncrypt(key, flow.Text, iv)
+		data, err = codec.AESCBCEncrypt(decodeKey, flow.Text, decodeIV)
 	case "ECB":
-		data, err = codec.AESECBEncrypt(key, flow.Text, iv)
+		data, err = codec.AESECBEncrypt(decodeKey, flow.Text, decodeIV)
 	case "GCM":
-		data, err = codec.AESGCMEncrypt(key, flow.Text, iv)
+		data, err = codec.AESGCMEncrypt(decodeKey, flow.Text, decodeIV)
 	default:
 		return utils.Error("AESEncryptEx: unknown mode")
 	}
 	if err == nil {
-		flow.Text = convertOutput(data, output)
+		flow.Text = encodeData(data, output)
 	}
 	return err
 }
@@ -174,26 +173,24 @@ func (flow *CodecExecFlow) AESEncrypt(hexKey string, hexIV string, mode string, 
 // 24字节 = AES-192
 // 32字节 = AES-256"""
 // Params = [
-// { Name = "hexKey", Type = "input", Required = true, Regex = "^[a-fA-F0-9]{32}|[a-fA-F0-9]{48}|[a-fA-F0-9]{64}$",Label = "Key"},
-// { Name = "hexIV", Type = "input", Required = false, Regex = "^[a-fA-F0-9]{32}$",Label = "IV"},
+// { Name = "key", Type = "inputSelect", Required = true,Label = "Key", select ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
+// { Name = "IV", Type = "inputSelect", Required = false ,Label = "IV", select ={ Name = "ivType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "IV格式"} },
 // { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "GCM"], Required = true, Label = "Mode"},
 // { Name = "input", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true,Label = "输入格式"}
 // ]
-func (flow *CodecExecFlow) AESDecrypt(hexKey string, hexIV string, mode string, input outputType) error {
+func (flow *CodecExecFlow) AESDecrypt(key string, keyType string, IV string, ivType string, mode string, input outputType) error {
 	var data []byte
 	var err error
-	key, iv, err := decodeHexKeyAndIV(hexKey, hexIV)
-	if err != nil {
-		return err
-	}
-	inputText := covertInput(flow.Text, input)
+	decodeKey := decodeData([]byte(key), keyType)
+	decodeIV := decodeData([]byte(IV), ivType)
+	inputText := decodeData(flow.Text, input)
 	switch mode {
 	case "CBC":
-		data, err = codec.AESCBCDecrypt(key, inputText, iv)
+		data, err = codec.AESCBCDecrypt(decodeKey, inputText, decodeIV)
 	case "ECB":
-		data, err = codec.AESECBDecrypt(key, inputText, iv)
+		data, err = codec.AESECBDecrypt(decodeKey, inputText, decodeIV)
 	case "GCM":
-		data, err = codec.AESGCMDecrypt(key, inputText, iv)
+		data, err = codec.AESGCMDecrypt(decodeKey, inputText, decodeIV)
 	default:
 		return utils.Error("AESEncryptEx: unknown mode")
 	}
@@ -207,34 +204,32 @@ func (flow *CodecExecFlow) AESDecrypt(hexKey string, hexIV string, mode string, 
 // CodecName = "SM4对称加密"
 // Desc = """SM4是一个128位的块密码，目前被确定为中国的国家标准（GB/T 32907-2016）。支持多种块密码模式。"""
 // Params = [
-// { Name = "hexKey", Type = "input", Required = true, Regex = "^[a-fA-F0-9]{32}$",Label = "Key"},
-// { Name = "hexIV", Type = "input", Required = false, Regex = "^[a-fA-F0-9]{32}$",Label = "IV"},
+// { Name = "key", Type = "inputSelect", Required = true,Label = "Key", select ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
+// { Name = "IV", Type = "inputSelect", Required = false ,Label = "IV", select ={ Name = "ivType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "IV格式"} },
 // { Name = "mode", Type = "select", DefaultValue = "CBC",Options = ["CBC", "ECB", "GCM", "CFB", "OFB"], Required = true, Label = "Mode"},
 // { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw","base64"], Required = true,Label = "输出格式"}
 // ]
-func (flow *CodecExecFlow) SM4Encrypt(hexKey string, hexIV string, mode string, output outputType) error {
+func (flow *CodecExecFlow) SM4Encrypt(key string, keyType string, IV string, ivType string, mode string, output outputType) error {
 	var data []byte
 	var err error
-	key, iv, err := decodeHexKeyAndIV(hexKey, hexIV)
-	if err != nil {
-		return err
-	}
+	decodeKey := decodeData([]byte(key), keyType)
+	decodeIV := decodeData([]byte(IV), ivType)
 	switch mode {
 	case "CBC":
-		data, err = codec.SM4CBCEnc(key, flow.Text, iv)
+		data, err = codec.SM4CBCEnc(decodeKey, flow.Text, decodeIV)
 	case "ECB":
-		data, err = codec.SM4ECBEnc(key, flow.Text, iv)
+		data, err = codec.SM4ECBEnc(decodeKey, flow.Text, decodeIV)
 	case "GCM":
-		data, err = codec.SM4GCMEnc(key, flow.Text, iv)
+		data, err = codec.SM4GCMEnc(decodeKey, flow.Text, decodeIV)
 	case "CFB":
-		data, err = codec.SM4CFBEnc(key, flow.Text, iv)
+		data, err = codec.SM4CFBEnc(decodeKey, flow.Text, decodeIV)
 	case "OFB":
-		data, err = codec.SM4OFBEnc(key, flow.Text, iv)
+		data, err = codec.SM4OFBEnc(decodeKey, flow.Text, decodeIV)
 	default:
 		return utils.Error("AESEncryptEx: unknown mode")
 	}
 	if err == nil {
-		flow.Text = convertOutput(data, output)
+		flow.Text = encodeData(data, output)
 	}
 	return err
 }
@@ -243,30 +238,28 @@ func (flow *CodecExecFlow) SM4Encrypt(hexKey string, hexIV string, mode string, 
 // CodecName = "SM4对称解密"
 // Desc = """SM4是一个128位的块密码，目前被确定为中国的国家标准（GB/T 32907-2016）。支持多种块密码模式。"""
 // Params = [
-// { Name = "hexKey", Type = "input", Required = true, Regex = "^[a-fA-F0-9]{32}$",Label = "Key"},
-// { Name = "hexIV", Type = "input", Required = false, Regex = "^[a-fA-F0-9]{32}$",Label = "IV"},
+// { Name = "key", Type = "inputSelect", Required = true,Label = "Key", select ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
+// { Name = "IV", Type = "inputSelect", Required = false ,Label = "IV", select ={ Name = "ivType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "IV格式"} },
 // { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB", "GCM", "CFB", "OFB"], Required = true, Label = "Mode"},
 // { Name = "input", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "输入格式"}
 // ]
-func (flow *CodecExecFlow) SM4Decrypt(hexKey string, hexIV string, mode string, input outputType) error {
+func (flow *CodecExecFlow) SM4Decrypt(key string, keyType string, IV string, ivType string, mode string, input outputType) error {
 	var data []byte
 	var err error
-	key, iv, err := decodeHexKeyAndIV(hexKey, hexIV)
-	if err != nil {
-		return err
-	}
-	inputText := covertInput(flow.Text, input)
+	decodeKey := decodeData([]byte(key), keyType)
+	decodeIV := decodeData([]byte(IV), ivType)
+	inputText := decodeData(flow.Text, input)
 	switch mode {
 	case "CBC":
-		data, err = codec.SM4CBCDec(key, inputText, iv)
+		data, err = codec.SM4CBCDec(decodeKey, inputText, decodeIV)
 	case "ECB":
-		data, err = codec.SM4ECBDec(key, inputText, iv)
+		data, err = codec.SM4ECBDec(decodeKey, inputText, decodeIV)
 	case "GCM":
-		data, err = codec.SM4GCMDec(key, inputText, iv)
+		data, err = codec.SM4GCMDec(decodeKey, inputText, decodeIV)
 	case "CFB":
-		data, err = codec.SM4CFBDec(key, inputText, iv)
+		data, err = codec.SM4CFBDec(decodeKey, inputText, decodeIV)
 	case "OFB":
-		data, err = codec.SM4OFBDec(key, inputText, iv)
+		data, err = codec.SM4OFBDec(decodeKey, inputText, decodeIV)
 	default:
 		return utils.Error("AESEncryptEx: unknown mode")
 	}
@@ -280,28 +273,26 @@ func (flow *CodecExecFlow) SM4Decrypt(hexKey string, hexIV string, mode string, 
 // CodecName = "DES对称加密"
 // Desc = """DES（Data Encryption Standard）是一种对称密钥加密算法，使用固定有效长度为56位的密钥对数据进行64位的分组加密。尽管曾广泛使用，但由于密钥太短，现已被认为不够安全。"""
 // Params = [
-// { Name = "hexKey", Type = "input", Required = true, Regex = "^[a-fA-F0-9]{16}$",	Label = "Key"},
-// { Name = "hexIV", Type = "input", Required = false, Regex = "^[a-fA-F0-9]{16}$",Label = "IV"},
+// { Name = "key", Type = "inputSelect", Required = true,Label = "Key", select ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
+// { Name = "IV", Type = "inputSelect", Required = false ,Label = "IV", select ={ Name = "ivType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "IV格式"} },
 // { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB"], Required = true , Label = "Mode"},
 // { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw","base64"], Required = true,Label = "输出格式"}
 // ]
-func (flow *CodecExecFlow) DESEncrypt(hexKey string, hexIV string, mode string, output outputType) error {
+func (flow *CodecExecFlow) DESEncrypt(key string, keyType string, IV string, ivType string, mode string, output outputType) error {
 	var data []byte
 	var err error
-	key, iv, err := decodeHexKeyAndIV(hexKey, hexIV)
-	if err != nil {
-		return err
-	}
+	decodeKey := decodeData([]byte(key), keyType)
+	decodeIV := decodeData([]byte(IV), ivType)
 	switch mode {
 	case "CBC":
-		data, err = codec.DESCBCEnc(key, flow.Text, iv)
+		data, err = codec.DESCBCEnc(decodeKey, flow.Text, decodeIV)
 	case "ECB":
-		data, err = codec.DESECBEnc(key, flow.Text)
+		data, err = codec.DESECBEnc(decodeKey, flow.Text)
 	default:
 		return utils.Error("AESEncryptEx: unknown mode")
 	}
 	if err == nil {
-		flow.Text = convertOutput(data, output)
+		flow.Text = encodeData(data, output)
 	}
 	return err
 
@@ -311,24 +302,22 @@ func (flow *CodecExecFlow) DESEncrypt(hexKey string, hexIV string, mode string, 
 // CodecName = "DES对称解密"
 // Desc = """DES（Data Encryption Standard）是一种对称密钥加密算法，使用固定有效长度为56位的密钥对数据进行64位的分组加密。尽管曾广泛使用，但由于密钥太短，现已被认为不够安全。"""
 // Params = [
-// { Name = "hexKey", Type = "input", Required = true, Regex = "^[a-fA-F0-9]{16}$",	Label = "Key"},
-// { Name = "hexIV", Type = "input", Required = false, Regex = "^[a-fA-F0-9]{16}$",Label = "IV"},
+// { Name = "key", Type = "inputSelect", Required = true,Label = "Key", select ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
+// { Name = "IV", Type = "inputSelect", Required = false ,Label = "IV", select ={ Name = "ivType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "IV格式"} },
 // { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB"], Required = true , Label = "Mode"},
 // { Name = "input", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "输入格式"}
 // ]
-func (flow *CodecExecFlow) DESDecrypt(hexKey string, hexIV string, mode string, input outputType) error {
+func (flow *CodecExecFlow) DESDecrypt(key string, keyType string, IV string, ivType string, mode string, input outputType) error {
 	var data []byte
 	var err error
-	key, iv, err := decodeHexKeyAndIV(hexKey, hexIV)
-	if err != nil {
-		return err
-	}
-	inputText := covertInput(flow.Text, input)
+	decodeKey := decodeData([]byte(key), keyType)
+	decodeIV := decodeData([]byte(IV), ivType)
+	inputText := decodeData(flow.Text, input)
 	switch mode {
 	case "CBC":
-		data, err = codec.DESCBCDec(key, inputText, iv)
+		data, err = codec.DESCBCDec(decodeKey, inputText, decodeIV)
 	case "ECB":
-		data, err = codec.DESECBDec(key, inputText)
+		data, err = codec.DESECBDec(decodeKey, inputText)
 	default:
 		return utils.Error("AESEncryptEx: unknown mode")
 	}
@@ -342,28 +331,26 @@ func (flow *CodecExecFlow) DESDecrypt(hexKey string, hexIV string, mode string, 
 // CodecName = "TripleDES对称加密"
 // Desc = """TripleDES（3DES）是DES的改进版，通过连续三次应用DES算法（可以使用三个不同的密钥）来增加加密的强度，提供了更高的安全性。"""
 // Params = [
-// { Name = "hexKey", Type = "input", Required = true, Regex = "^[a-fA-F0-9]{48}$",Label = "Key"},
-// { Name = "hexIV", Type = "input", Required = false, Regex = "^[a-fA-F0-9]{16}$",Label = "IV"},
+// { Name = "key", Type = "inputSelect", Required = true,Label = "Key", select ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
+// { Name = "IV", Type = "inputSelect", Required = false ,Label = "IV", select ={ Name = "ivType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "IV格式"} },
 // { Name = "mode", Type = "select",DefaultValue = "CBC", Options = ["CBC", "ECB"], Required = true, Label = "Mode"},
 // { Name = "output", Type = "select",DefaultValue = "hex", Options = ["hex", "raw","base64"], Required = true ,Label = "输出格式"}
 // ]
-func (flow *CodecExecFlow) TripleDESEncrypt(hexKey string, hexIV string, mode string, output outputType) error {
+func (flow *CodecExecFlow) TripleDESEncrypt(key string, keyType string, IV string, ivType string, mode string, output outputType) error {
 	var data []byte
 	var err error
-	key, iv, err := decodeHexKeyAndIV(hexKey, hexIV)
-	if err != nil {
-		return err
-	}
+	decodeKey := decodeData([]byte(key), keyType)
+	decodeIV := decodeData([]byte(IV), ivType)
 	switch mode {
 	case "CBC":
-		data, err = codec.TripleDES_CBCEnc(key, flow.Text, iv)
+		data, err = codec.TripleDES_CBCEnc(decodeKey, flow.Text, decodeIV)
 	case "ECB":
-		data, err = codec.TripleDES_ECBEnc(key, flow.Text)
+		data, err = codec.TripleDES_ECBEnc(decodeKey, flow.Text)
 	default:
 		return utils.Error("AESEncryptEx: unknown mode")
 	}
 	if err == nil {
-		flow.Text = convertOutput(data, output)
+		flow.Text = encodeData(data, output)
 	}
 	return err
 }
@@ -372,24 +359,22 @@ func (flow *CodecExecFlow) TripleDESEncrypt(hexKey string, hexIV string, mode st
 // CodecName = "TripleDES对称解密"
 // Desc = """TripleDES（3DES）是DES的改进版，通过连续三次应用DES算法（可以使用三个不同的密钥）来增加加密的强度，提供了更高的安全性。"""
 // Params = [
-// { Name = "hexKey", Type = "input", Required = true, Regex = "^[a-fA-F0-9]{48}$",Label = "Key"},
-// { Name = "hexIV", Type = "input", Required = false, Regex = "^[a-fA-F0-9]{16}$",Label = "IV" },
+// { Name = "key", Type = "inputSelect", Required = true,Label = "Key", select ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
+// { Name = "IV", Type = "inputSelect", Required = false ,Label = "IV", select ={ Name = "ivType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "IV格式"} },
 // { Name = "mode", Type = "select",DefaultValue = "CBC",  Options = ["CBC", "ECB"], Required = true , Label = "Mode"},
 // { Name = "input", Type = "select",DefaultValue = "hex",  Options = ["hex", "raw", "base64"], Required = true ,Label = "输入格式"}
 // ]
-func (flow *CodecExecFlow) TripleDESDecrypt(hexKey string, hexIV string, mode string, input outputType) error {
+func (flow *CodecExecFlow) TripleDESDecrypt(key string, keyType string, IV string, ivType string, mode string, input outputType) error {
 	var data []byte
 	var err error
-	key, iv, err := decodeHexKeyAndIV(hexKey, hexIV)
-	if err != nil {
-		return err
-	}
-	inputText := covertInput(flow.Text, input)
+	decodeKey := decodeData([]byte(key), keyType)
+	decodeIV := decodeData([]byte(IV), ivType)
+	inputText := decodeData(flow.Text, input)
 	switch mode {
 	case "CBC":
-		data, err = codec.TripleDES_CBCDec(key, inputText, iv)
+		data, err = codec.TripleDES_CBCDec(decodeKey, inputText, decodeIV)
 	case "ECB":
-		data, err = codec.TripleDES_ECBDec(key, inputText)
+		data, err = codec.TripleDES_ECBDec(decodeKey, inputText)
 	default:
 		return utils.Error("AESEncryptEx: unknown mode")
 	}
