@@ -18,6 +18,7 @@ var Exports = map[string]any{
 	"onMemProfileStarted":  WithOnMemProfileStarted,
 	"onMemProfileFinished": WithOnMemProfileFinished,
 	"timeout":              WithTimeout,
+	"callback":             WithFinished,
 }
 
 func StartCPUAndMemoryProfile(opts ...Option) error {
