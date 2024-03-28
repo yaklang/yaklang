@@ -20,11 +20,7 @@ func (s *SerParser) Parse(data *base.BitReader, node *base.Node) error {
 	if err != nil {
 		return err
 	}
-	if len(res) == 0 {
-		node.Cfg.SetItem("ser_res", nil)
-	} else {
-		node.Cfg.SetItem("ser_res", res[0])
-	}
+	node.Cfg.SetItem("ser_res", res)
 	return nil
 }
 func (s *SerParser) Generate(data any, node *base.Node) error {

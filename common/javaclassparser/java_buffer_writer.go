@@ -2,16 +2,18 @@ package javaclassparser
 
 import (
 	"bytes"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 type JavaBufferWriter struct {
-	data *bytes.Buffer
+	data       *bytes.Buffer
+	charLength int
 }
 
 func NewJavaBufferWrite() *JavaBufferWriter {
 	var data bytes.Buffer
-	return &JavaBufferWriter{data: &data}
+	return &JavaBufferWriter{data: &data, charLength: 1}
 }
 
 func (j *JavaBufferWriter) WriteHex(v interface{}) error {
@@ -84,8 +86,9 @@ func (j *JavaBufferWriter) Write1Byte(v interface{}) error {
 }
 
 func (j *JavaBufferWriter) WriteString(v string) error {
-	j.Write2Byte(len(v))
-	j.data.Write([]byte(v))
+	bs := utils.ToJavaOverLongString([]byte(v), j.charLength)
+	j.Write2Byte(len(bs))
+	j.data.Write(bs)
 	return nil
 }
 

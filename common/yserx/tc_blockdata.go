@@ -8,7 +8,7 @@ type JavaBlockData struct {
 	Contents    []byte `json:"contents"`
 }
 
-func (j *JavaBlockData) Marshal() []byte {
+func (j *JavaBlockData) Marshal(cfg *MarshalContext) []byte {
 	var header []byte
 	if !j.IsLong {
 		header = append(header, TC_BLOCKDATA)

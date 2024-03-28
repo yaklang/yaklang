@@ -3,6 +3,7 @@ package yserx
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -38,12 +39,21 @@ func (j *JavaSerializationParser) debug(tmp string, item ...interface{}) {
 		_, _ = fmt.Fprintln(j.output, strings.Repeat(INDENT, j.indent)+fmt.Sprintf(tmp, item...))
 	}
 }
-
+func MarshalJavaObjectWithConfig(serIns JavaSerializable, cfg *MarshalContext) []byte {
+	if cfg == nil {
+		cfg = NewMarshalContext()
+	}
+	raw := MAGIC_BANNER
+	raw = append(raw, 0x00, 0x05)
+	raw = append(raw, serIns.Marshal(cfg)...)
+	return raw
+}
 func MarshalJavaObjects(res ...JavaSerializable) []byte {
+	cfg := NewMarshalContext()
 	raw := MAGIC_BANNER
 	raw = append(raw, 0x00, 0x05)
 	for _, i := range res {
-		raw = append(raw, i.Marshal()...)
+		raw = append(raw, i.Marshal(cfg)...)
 	}
 	return raw
 }
@@ -75,12 +85,28 @@ func JavaSerializedDumper(raw []byte) string {
 	}
 	return buf.String()
 }
-
+func ParseJavaObject(r io.Reader) (*JavaObject, error) {
+	ser, err := ParseSingleJavaSerializedFromReader(r)
+	if err != nil {
+		return nil, err
+	}
+	if objIns, ok := ser.(*JavaObject); ok {
+		return objIns, nil
+	}
+	return nil, errors.New("invalid serialize data")
+}
 func ParseJavaSerializedFromReader(r io.Reader, callback ...func(serializable JavaSerializable)) ([]JavaSerializable, error) {
 	return ParseJavaSerializedEx(r, ioutil.Discard, callback...)
 }
-func ParseSingleJavaSerializedFromReader(r io.Reader, callback ...func(serializable JavaSerializable)) ([]JavaSerializable, error) {
-	return ParseMultiJavaSerializedEx(r, ioutil.Discard, 1, callback...)
+func ParseSingleJavaSerializedFromReader(r io.Reader, callback ...func(serializable JavaSerializable)) (JavaSerializable, error) {
+	serInses, err := ParseMultiJavaSerializedEx(r, ioutil.Discard, 1, callback...)
+	if err != nil {
+		return nil, err
+	}
+	if len(serInses) != 1 {
+		return nil, utils.Error("invalid serialize data")
+	}
+	return serInses[0], err
 }
 func ParseMultiJavaSerializedEx(r io.Reader, writer io.Writer, n int, callback ...func(j JavaSerializable)) ([]JavaSerializable, error) {
 	magicBanner, err := ReadBytesLengthInt(r, 2)

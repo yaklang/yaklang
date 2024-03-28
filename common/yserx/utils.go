@@ -27,8 +27,9 @@ func ToJson(i interface{}) ([]byte, error) {
 	return json.MarshalIndent(i, "", "  ")
 }
 
-func marshalString(str string) []byte {
-	return append(IntTo2Bytes(len(str)), []byte(str)...)
+func marshalString(str string, l int) []byte {
+	byts := utils.ToJavaOverLongString([]byte(str), l)
+	return append(IntTo2Bytes(len(byts)), byts...)
 }
 
 // utils method

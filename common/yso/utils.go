@@ -3,8 +3,10 @@ package yso
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/javaclassparser"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yserx"
@@ -497,16 +499,54 @@ func ToBcel(i interface{}) (string, error) {
 // Example:
 // ```
 // gadgetObj,_ = yso.GetCommonsBeanutils1JavaObject(yso.useBytesEvilClass(bytesCode),yso.obfuscationClassConstantPool(),yso.evilClassName(className),yso.majorVersion(version))
-// gadgetBytes,_ = yso.ToBytes(gadgetObj)
+// gadgetBytes,_ = yso.ToBytes(gadgetObj,yso.dirtyDataLength(10000),yso.twoBytesCharString())
 // ```
-func ToBytes(i interface{}) ([]byte, error) {
+func ToBytes(i interface{}, opts ...MarshalOptionFun) ([]byte, error) {
+	cfg := yserx.NewMarshalContext()
+	for _, opt := range opts {
+		opt(cfg)
+	}
 	switch ret := i.(type) {
 	case *javaclassparser.ClassObject:
-		return ret.Bytes(), nil
+		return ret.ToBytesByCustomStringChar(cfg.StringCharLength), nil
 	case yserx.JavaSerializable:
-		return yserx.MarshalJavaObjects(ret), nil
+		res := yserx.MarshalJavaObjectWithConfig(ret, cfg)
+		if cfg.DirtyDataLength > 0 {
+			return WrapSerializeDataByDirtyData(res, cfg.DirtyDataLength)
+		}
+		return res, nil
 	default:
 		return nil, utils.Errorf("cannot support %v to bytes", reflect.TypeOf(ret))
+	}
+}
+
+type MarshalOptionFun func(ctx *yserx.MarshalContext)
+
+func SetToBytesDirtyDataLength(length int) MarshalOptionFun {
+	return func(ctx *yserx.MarshalContext) {
+		ctx.DirtyDataLength = length
+	}
+}
+func SetToBytesJRMPMarshalerWithCodeBase(cb string) MarshalOptionFun {
+	return func(ctx *yserx.MarshalContext) {
+		ctx.JavaMarshaler = &yserx.JRMPMarshaler{
+			CodeBase: cb,
+		}
+	}
+}
+func SetToBytesJRMPMarshaler() MarshalOptionFun {
+	return func(ctx *yserx.MarshalContext) {
+		ctx.JavaMarshaler = &yserx.JRMPMarshaler{}
+	}
+}
+func SetToBytesThreeBytesString() MarshalOptionFun {
+	return func(ctx *yserx.MarshalContext) {
+		ctx.StringCharLength = 3
+	}
+}
+func SetToBytesTwoBytesString() MarshalOptionFun {
+	return func(ctx *yserx.MarshalContext) {
+		ctx.StringCharLength = 2
 	}
 }
 
@@ -547,6 +587,7 @@ func Dump(i interface{}) (string, error) {
 		return "", utils.Errorf("cannot support %v to dump string", reflect.TypeOf(ret))
 	}
 }
+
 func JavaSerializableObjectDumper(javaObject *JavaObject) (string, error) {
 	serializableObj := javaObject.JavaSerializable
 
@@ -814,4 +855,50 @@ func runWorkFlow(works ...func() error) error {
 		}
 	}
 	return nil
+}
+
+func GetJavaObjectArrayIns() (yserx.JavaSerializable, error) {
+	data := "rO0ABXVyABNbTGphdmEubGFuZy5PYmplY3Q7kM5YnxBzKWwCAAB4cAAAAAA="
+	byts, err := codec.DecodeBase64(data)
+	if err != nil {
+		return nil, err
+	}
+	objIns, err := yserx.ParseJavaSerialized(byts)
+	if len(objIns) != 1 {
+		return nil, errors.New("generate object array failed")
+	}
+	return objIns[0], nil
+}
+
+var dirtyDataHeader []byte
+var dirtyDataHeaderByOverLongString []byte
+
+func init() {
+	bs, err := codec.DecodeBase64("rO0ABXVyABNbTGphdmEubGFuZy5PYmplY3Q7kM5YnxBzKWwCAAB4cA==")
+	if err != nil {
+		log.Errorf("init dirtyDataHeader failed: %v", err)
+	}
+	dirtyDataHeader = bs
+	bs, err = codec.DecodeBase64("rO0ABXVyACbBm8GMwarBocG2waHArsGswaHBrsGnwK7Bj8GiwarBpcGjwbTAu5DOWJ8QcylsAgAAeHA=")
+	if err != nil {
+		log.Errorf("init dirtyDataHeader failed: %v", err)
+	}
+	dirtyDataHeaderByOverLongString = bs
+}
+
+// WrapSerializeDataByDirtyData 通过脏数据包装序列化数据
+// Example: wrapSerData = WrapByDirtyData(serData,1000)~
+func WrapSerializeDataByDirtyData(serBytes []byte, length int) ([]byte, error) {
+	buf := bytes.Buffer{}
+	buf.Write(dirtyDataHeaderByOverLongString)
+	buf.Write(yserx.IntTo4Bytes(2))
+	buf.Write([]byte{0x7C})
+	buf.Write(yserx.Uint64To8Bytes(uint64(length)))
+	buf.Write([]byte(utils.RandStringBytes(length)))
+	buf.Write([]byte{0x7b})
+	if len(serBytes) < 4 {
+		return nil, errors.New("invalid serialize data")
+	}
+	buf.Write(serBytes[4:])
+	return buf.Bytes(), nil
 }

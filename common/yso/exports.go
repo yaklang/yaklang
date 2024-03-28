@@ -32,7 +32,10 @@ var Exports = map[string]interface{}{
 	"GetFindGadgetByDNSJavaObject":         GetFindGadgetByDNSJavaObject,
 
 	// 通过gadget名称获取gadget
-	"GetGadget": GenerateGadget,
+	"GetGadget":            GenerateGadget,
+	"twoBytesCharString":   SetToBytesTwoBytesString,
+	"threeBytesCharString": SetToBytesThreeBytesString,
+	"dirtyDataLength":      SetToBytesDirtyDataLength,
 
 	//"GetJRMPClientJavaObject":              GetJRMPClientJavaObject,
 	"GetJSON1JavaObject":          GetJSON1JavaObject,
