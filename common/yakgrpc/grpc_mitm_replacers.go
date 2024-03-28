@@ -621,6 +621,7 @@ func (m *mitmReplacer) matchAndRenderColor(flow *yakit.HTTPFlow, r *regexp2.Rege
 		stringForSettingColor(rule.Color, rule.ExtraTag, flow)
 		return yakit.ExtractedDataFromHTTPFlow(
 			flow.CalcHash(), rule.VerboseName,
+			match,
 			ret,
 			r.String(),
 		)
@@ -667,7 +668,8 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 			matchRes = append(matchRes, res...)
 		}
 		for _, match := range matchRes {
-			var ret string
+			ret := ""
+
 			if match.GroupCount() > 1 {
 				extractGroup := match.GroupByNumber(1)
 				if extractGroup != nil {
@@ -683,6 +685,7 @@ func (m *mitmReplacer) hookColor(request, response []byte, req *http.Request, fl
 			stringForSettingColor(rule.Color, rule.ExtraTag, flow)
 			extracted = append(extracted, yakit.ExtractedDataFromHTTPFlow(
 				flow.CalcHash(), rule.VerboseName,
+				match,
 				ret,
 				rule.String(),
 			))
