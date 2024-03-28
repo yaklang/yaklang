@@ -75,7 +75,7 @@ func ConvertLowhttpResponseToFuzzerResponseBase(r *lowhttp.LowhttpResponse) *ypb
 	)
 	host = utils.ExtractHost(r.RemoteAddr)
 
-	lowhttp.SplitHTTPPacket(r.RawPacket, func(m string, requestUri string, proto string) error {
+	lowhttp.SplitHTTPPacket(r.RawRequest, func(m string, requestUri string, proto string) error {
 		method = m
 		return nil
 	}, nil)
