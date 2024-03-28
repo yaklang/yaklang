@@ -1,4 +1,4 @@
-name: ManualBuildWithTarget
+name: ManualBuildEEWithTarget
 
 on:
   workflow_dispatch:
