@@ -3,7 +3,13 @@ package yakgrpc
 import (
 	"bytes"
 	"context"
+	"os"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
@@ -11,10 +17,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"os"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TestGRPCMUSTPASS_Brute(t *testing.T) {
@@ -96,4 +98,27 @@ func TestGRPCMUSTPASS_Brute(t *testing.T) {
 	if !unAuthOk {
 		t.Fatal("brute unAuth failed")
 	}
+}
+
+func TestA(t *testing.T) {
+	BuildInBruteTypeTree := GetBuildinAvailableBruteTypeTree([]struct {
+		Name string
+		Data string
+	}{
+		{Name: "ssh", Data: "ssh"},
+		{Name: "ftp", Data: "ftp"},
+		{Name: "parent/v1", Data: "parent-v1"},
+		{Name: "parent/v2", Data: "parent-v2"},
+		{Name: "parent/v3", Data: "parent-v3"},
+	})
+	require.Len(t, BuildInBruteTypeTree, 3)
+	require.Equal(t, "ssh", BuildInBruteTypeTree[0].Name)
+	require.Equal(t, "ssh", BuildInBruteTypeTree[0].Data)
+
+	require.Len(t, BuildInBruteTypeTree[2].Children, 3)
+	require.Equal(t, BuildInBruteTypeTree[2].Children[0].Name, "v1")
+	require.Equal(t, BuildInBruteTypeTree[2].Children[0].Data, "parent-v1")
+
+	require.Equal(t, BuildInBruteTypeTree[2].Children[2].Name, "v3")
+	require.Equal(t, BuildInBruteTypeTree[2].Children[2].Data, "parent-v3")
 }
