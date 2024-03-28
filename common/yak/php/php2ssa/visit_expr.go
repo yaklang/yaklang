@@ -4,6 +4,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"os"
@@ -22,7 +23,6 @@ func (y *builder) VisitExpressionStatement(raw phpparser.IExpressionStatementCon
 	if i == nil {
 		return nil
 	}
-
 	va := y.VisitExpression(i.Expression())
 	return va
 }
@@ -121,7 +121,16 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		y.ir.AssignVariable(member, rightValue)
 		return rightValue
 	case *phpparser.FunctionCallExpressionContext:
+		tmp := y.isFunction
+		y.isFunction = true
+		defer func() {
+			y.isFunction = tmp
+		}()
 		callee := y.VisitExpression(ret.Expression())
+		//for _, callKeyContext := range ret.AllMemberCallKey() {
+		//	_ = callKeyContext
+		//doSomethings
+		//}
 		args, ellipsis := y.VisitArguments(ret.Arguments())
 		callInst := y.ir.NewCall(callee, args)
 		if ellipsis {
@@ -360,6 +369,8 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		} else {
 			return nil
 		}
+	case *phpparser.DefinedOrScanDefinedExpressionContext:
+		return y.VisitDefineExpr(ret.DefineExpr())
 	case *phpparser.SpaceshipExpressionContext:
 		var result ssa.Value
 		y.ir.CreateIfBuilder().SetCondition(func() ssa.Value {
@@ -427,13 +438,27 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 
 	case *phpparser.ShortQualifiedNameExpressionContext:
 		//因为涉及到函数，先peek 如果没有读取到说明是一个常量 （define定义的常量会出现问题）
-		identifier := y.VisitIdentifier(ret.Identifier())
-		if value := y.ir.PeekValue(identifier); value != nil {
+		var unquote string
+		_unquote, err := yakunquote.Unquote(ret.Identifier().GetText())
+		if err != nil {
+			unquote = ret.Identifier().GetText()
+		} else {
+			unquote = _unquote
+		}
+		//先在常量表中查询
+		if !y.isFunction {
+			s, ok := y.constMap[unquote]
+			if ok {
+				return y.ir.EmitConstInst(s)
+			} else {
+				log.Warnf("const map not found %v", unquote)
+			}
+		}
+		if value := y.ir.PeekValue(y.VisitIdentifier(ret.Identifier())); value != nil {
 			return value
 		} else {
-			return y.ir.EmitConstInst(identifier)
+			return y.ir.EmitConstInst(y.VisitIdentifier(ret.Identifier()))
 		}
-		//return y.ir.ReadOrCreateVariable(y.VisitIdentifier(ret.Identifier()))
 
 	case *phpparser.StaticClassAccessExpressionContext:
 		class, key := y.VisitStaticClassExpr(ret.StaticClassExpr())
@@ -1084,10 +1109,8 @@ func (y *builder) VisitVariable(raw phpparser.IVariableContext) string {
 		return ""
 	}
 	switch ret := raw.(type) {
-
 	case *phpparser.NormalVariableContext:
 		return ret.VarName().GetText()
-		// log.Infof("NormalVariable: %v", name)
 
 	case *phpparser.DynamicVariableContext:
 		id := ret.VarName().GetText()
@@ -1097,12 +1120,12 @@ func (y *builder) VisitVariable(raw phpparser.IVariableContext) string {
 			value = y.ir.ReadValue(id)
 			id = "$" + value.String()
 		}
-		// log.Infof("DynamicVariable: %v", value)
 		return "$" + value.String()
 	case *phpparser.MemberCallVariableContext:
 		value := y.VisitExpression(ret.Expression())
 		// TODO: handler this
 		return value.String()
+
 	default:
 		raw.GetText()
 		log.Errorf("unhandled expression: %v(T: %T)", raw.GetText(), raw)
@@ -1154,6 +1177,39 @@ func (y *builder) VisitIncludeExpression(raw phpparser.IIncludeContext) ssa.Valu
 					flag = true
 				}
 			}
+		}
+	}
+	return y.ir.EmitConstInst(flag)
+}
+
+func (y *builder) VisitDefineExpr(raw phpparser.IDefineExprContext) ssa.Value {
+	if y == nil || raw == nil {
+		return nil
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
+	i, ok := raw.(*phpparser.DefineExprContext)
+	if !ok {
+		return nil
+	}
+	var flag bool
+	if i.Defined() != nil {
+		if value := y.ir.PeekValue(i.ConstantString().GetText()); value == nil || value.IsUndefined() {
+			flag = false
+		} else {
+			flag = true
+		}
+	}
+	if i.Define() != nil {
+		value := y.VisitExpression(i.Expression())
+		constantString := y.VisitConstantString(i.ConstantString())
+		if constValue, ok := y.constMap[constantString.String()]; ok {
+			log.Warnf("const %v has been defined value is %v", constantString.String(), constValue)
+		} else {
+			//y.ir.AssignVariable(y.ir.CreateVariable(constantString.String()), value)
+			y.constMap[constantString.String()] = value.String()
+			flag = true
 		}
 	}
 	return y.ir.EmitConstInst(flag)

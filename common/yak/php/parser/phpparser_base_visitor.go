@@ -487,6 +487,10 @@ func (v *BasePHPParserVisitor) VisitNullCoalescingExpression(ctx *NullCoalescing
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitDefinedOrScanDefinedExpression(ctx *DefinedOrScanDefinedExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitArithmeticExpression(ctx *ArithmeticExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -536,6 +540,10 @@ func (v *BasePHPParserVisitor) VisitStaticClassAccessExpression(ctx *StaticClass
 }
 
 func (v *BasePHPParserVisitor) VisitLeftVariable(ctx *LeftVariableContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitDefineExpr(ctx *DefineExprContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

@@ -367,6 +367,9 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#NullCoalescingExpression.
 	VisitNullCoalescingExpression(ctx *NullCoalescingExpressionContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#DefinedOrScanDefinedExpression.
+	VisitDefinedOrScanDefinedExpression(ctx *DefinedOrScanDefinedExpressionContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#ArithmeticExpression.
 	VisitArithmeticExpression(ctx *ArithmeticExpressionContext) interface{}
 
@@ -405,6 +408,9 @@ type PHPParserVisitor interface {
 
 	// Visit a parse tree produced by PHPParser#leftVariable.
 	VisitLeftVariable(ctx *LeftVariableContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#defineExpr.
+	VisitDefineExpr(ctx *DefineExprContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#NormalVariable.
 	VisitNormalVariable(ctx *NormalVariableContext) interface{}
