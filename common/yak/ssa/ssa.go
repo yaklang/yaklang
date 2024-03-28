@@ -157,6 +157,9 @@ type Function struct {
 	ParamLength int
 	Return      []*Return
 
+	// Type
+	Type *FunctionType
+
 	// BasicBlock list
 	Blocks []*BasicBlock
 	// First and End block
