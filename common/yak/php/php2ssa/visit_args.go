@@ -42,7 +42,11 @@ func (y *builder) VisitArguments(raw phpparser.IArgumentsContext) ([]ssa.Value, 
 	if i == nil {
 		return nil, false
 	}
-
+	tmp := y.isFunction
+	y.isFunction = false
+	defer func() {
+		y.isFunction = tmp
+	}()
 	var ret []ssa.Value
 
 	var ellipsis bool

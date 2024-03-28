@@ -289,6 +289,12 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#StringAsIndirectClassStaticVariable.
 	VisitStringAsIndirectClassStaticVariable(ctx *StringAsIndirectClassStaticVariableContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#DirectConstVariable.
+	VisitDirectConstVariable(ctx *DirectConstVariableContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#ClassConstVariable.
+	VisitClassConstVariable(ctx *ClassConstVariableContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#memberCallKey.
 	VisitMemberCallKey(ctx *MemberCallKeyContext) interface{}
 
@@ -328,9 +334,6 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#SliceCallAssignmentExpression.
 	VisitSliceCallAssignmentExpression(ctx *SliceCallAssignmentExpressionContext) interface{}
 
-	// Visit a parse tree produced by PHPParser#PrintExpression.
-	VisitPrintExpression(ctx *PrintExpressionContext) interface{}
-
 	// Visit a parse tree produced by PHPParser#PostfixIncDecExpression.
 	VisitPostfixIncDecExpression(ctx *PostfixIncDecExpressionContext) interface{}
 
@@ -366,6 +369,9 @@ type PHPParserVisitor interface {
 
 	// Visit a parse tree produced by PHPParser#NullCoalescingExpression.
 	VisitNullCoalescingExpression(ctx *NullCoalescingExpressionContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#DefinedOrScanDefinedExpression.
+	VisitDefinedOrScanDefinedExpression(ctx *DefinedOrScanDefinedExpressionContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#ArithmeticExpression.
 	VisitArithmeticExpression(ctx *ArithmeticExpressionContext) interface{}
@@ -405,6 +411,9 @@ type PHPParserVisitor interface {
 
 	// Visit a parse tree produced by PHPParser#leftVariable.
 	VisitLeftVariable(ctx *LeftVariableContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#defineExpr.
+	VisitDefineExpr(ctx *DefineExprContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#NormalVariable.
 	VisitNormalVariable(ctx *NormalVariableContext) interface{}
