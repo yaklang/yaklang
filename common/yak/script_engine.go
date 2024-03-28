@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/utils/pprofutils"
 	"os"
 	"path/filepath"
 	"strings"
@@ -297,6 +298,9 @@ func initYaklangLib() {
 	yaklang.Import("sandbox", SandboxExports)
 
 	yaklang.Import("ai", ai.Exports)
+
+	// pprof utils
+	yaklang.Import("profile", pprofutils.Exports)
 
 	// 处理 yakit 库的一些函数名
 	yakdoc.RegisterHook(func(h *yakdoc.DocumentHelper) {
