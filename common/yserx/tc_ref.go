@@ -20,7 +20,7 @@ func (j *JavaReference) GetHandle() uint64 {
 	return r
 }
 
-func (j *JavaReference) Marshal() []byte {
+func (j *JavaReference) Marshal(cfg *MarshalContext) []byte {
 	return append([]byte{TC_REFERENCE}, j.Value...)
 }
 

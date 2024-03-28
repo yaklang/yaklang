@@ -15,13 +15,13 @@ func NewJavaClassData(fields []JavaSerializable, blockData []JavaSerializable) *
 	return c
 }
 
-func (d *JavaClassData) Marshal() []byte {
+func (d *JavaClassData) Marshal(cfg *MarshalContext) []byte {
 	var raw []byte
 	for _, f := range d.Fields {
-		raw = append(raw, f.Marshal()...)
+		raw = append(raw, f.Marshal(cfg)...)
 	}
 	for _, b := range d.BlockData {
-		raw = append(raw, b.Marshal()...)
+		raw = append(raw, b.Marshal(cfg)...)
 	}
 	return raw
 }

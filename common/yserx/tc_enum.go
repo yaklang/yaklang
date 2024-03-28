@@ -8,10 +8,10 @@ type JavaEnumDesc struct {
 	Handle        uint64           `json:"handle"`
 }
 
-func (desc *JavaEnumDesc) Marshal() []byte {
+func (desc *JavaEnumDesc) Marshal(cfg *MarshalContext) []byte {
 	raw := []byte{TC_ENUM}
-	raw = append(raw, desc.TypeClassDesc.Marshal()...)
-	raw = append(raw, desc.ConstantName.Marshal()...)
+	raw = append(raw, desc.TypeClassDesc.Marshal(cfg)...)
+	raw = append(raw, desc.ConstantName.Marshal(cfg)...)
 	return raw
 }
 

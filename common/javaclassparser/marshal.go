@@ -36,7 +36,7 @@ const (
 	UnparsedAttributeType        = "UnparsedAttribute"
 )
 
-func _MarshalJavaClass(cp *ClassObject) []byte {
+func _MarshalJavaClass(cp *ClassObject, charLength int) []byte {
 	defer func() {
 		if err1 := recover(); err1 != nil {
 			log.Error(err1)
@@ -44,6 +44,7 @@ func _MarshalJavaClass(cp *ClassObject) []byte {
 		}
 	}()
 	writer := NewJavaBufferWrite()
+	writer.charLength = charLength
 	//var buf bytes.Buffer
 	writer.WriteHex("CAFEBABE")
 	writer.Write2Byte(cp.MinorVersion)
