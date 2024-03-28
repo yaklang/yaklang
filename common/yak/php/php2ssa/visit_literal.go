@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -147,18 +146,31 @@ func (y *builder) VisitString_(raw phpparser.IStringContext) ssa.Value {
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
-
 	i, _ := raw.(*phpparser.StringContext)
 	if i == nil {
 		return nil
 	}
-
-	str, err := yakunquote.Unquote(raw.GetText())
-	if err != nil {
-		str = raw.GetText()
+	var constValue string
+	if len(i.AllInterpolatedStringPart()) != 0 {
+		for _, part := range i.AllInterpolatedStringPart() {
+			constValue += y.VisitInterpolatedStringPart(part)
+		}
+	} else {
+		constValue = i.GetText()
+	}
+	constValue = strings.Trim(constValue, "'")
+	if unquote, err := strconv.Unquote(constValue); err != nil {
+		return y.ir.EmitConstInst(constValue)
+	} else {
+		return y.ir.EmitConstInst(unquote)
 	}
 
-	return y.ir.EmitConstInst(str)
+	//return y.ir.EmitConstInst(constValue)
+	//y.ir.EmitConstInst(constValue)
+	//if unquote, err := yakunquote.Unquote(constValue); err != nil {
+	//	return y.ir.EmitConstInst(constValue)
+	//} else {
+	//	return y.ir.EmitConstInst(unquote)
 }
 
 func (y *builder) VisitIdentifier(raw phpparser.IIdentifierContext) string {
@@ -166,10 +178,20 @@ func (y *builder) VisitIdentifier(raw phpparser.IIdentifierContext) string {
 		return ""
 	}
 	return raw.GetText()
-	//i, _ := raw.(*phpparser.IdentifierContext)
-	//if i == nil {
-	//	return
-	//}
-	//
-	//return nil
+}
+
+func (y *builder) VisitInterpolatedStringPart(raw phpparser.IInterpolatedStringPartContext) string {
+	if y == nil || raw == nil {
+		return ""
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+	i, _ := raw.(*phpparser.InterpolatedStringPartContext)
+	if i == nil {
+		return ""
+	}
+	if i.Chain() != nil {
+		return y.VisitChain(i.Chain()).String()
+	}
+	return i.GetText()
 }
