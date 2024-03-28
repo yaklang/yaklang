@@ -383,14 +383,6 @@ func (v *BasePHPParserVisitor) VisitStringAsIndirectClassStaticVariable(ctx *Str
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitDirectConstVariable(ctx *DirectConstVariableContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BasePHPParserVisitor) VisitClassConstVariable(ctx *ClassConstVariableContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BasePHPParserVisitor) VisitMemberCallKey(ctx *MemberCallKeyContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -440,6 +432,10 @@ func (v *BasePHPParserVisitor) VisitLogicalExpression(ctx *LogicalExpressionCont
 }
 
 func (v *BasePHPParserVisitor) VisitSliceCallAssignmentExpression(ctx *SliceCallAssignmentExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitPrintExpression(ctx *PrintExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

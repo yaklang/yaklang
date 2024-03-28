@@ -4,6 +4,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"os"
@@ -22,7 +23,6 @@ func (y *builder) VisitExpressionStatement(raw phpparser.IExpressionStatementCon
 	if i == nil {
 		return nil
 	}
-
 	va := y.VisitExpression(i.Expression())
 	return va
 }
@@ -127,10 +127,10 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 			y.isFunction = tmp
 		}()
 		callee := y.VisitExpression(ret.Expression())
-		for _, callKeyContext := range ret.AllMemberCallKey() {
-			_ = callKeyContext
-			//doSomethings
-		}
+		//for _, callKeyContext := range ret.AllMemberCallKey() {
+		//	_ = callKeyContext
+		//doSomethings
+		//}
 		args, ellipsis := y.VisitArguments(ret.Arguments())
 		callInst := y.ir.NewCall(callee, args)
 		if ellipsis {
@@ -194,11 +194,11 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 			return val
 		}
 		return y.ir.EmitConstInstNil()
-	//case *phpparser.PrintExpressionContext:
-	//	caller := y.ir.ReadValue("print")
-	//	args := y.VisitExpression(ret.Expression())
-	//	callInst := y.ir.NewCall(caller, []ssa.Value{args})
-	//	return y.ir.EmitCall(callInst)
+	case *phpparser.PrintExpressionContext:
+		caller := y.ir.ReadValue("print")
+		args := y.VisitExpression(ret.Expression())
+		callInst := y.ir.NewCall(caller, []ssa.Value{args})
+		return y.ir.EmitCall(callInst)
 	case *phpparser.ArrayCreationExpressionContext:
 		// arrayCreation
 		return y.VisitArrayCreation(ret.ArrayCreation())
@@ -438,20 +438,26 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 
 	case *phpparser.ShortQualifiedNameExpressionContext:
 		//因为涉及到函数，先peek 如果没有读取到说明是一个常量 （define定义的常量会出现问题）
-		identifier := y.VisitIdentifier(ret.Identifier())
+		var unquote string
+		_unquote, err := yakunquote.Unquote(ret.Identifier().GetText())
+		if err != nil {
+			unquote = ret.Identifier().GetText()
+		} else {
+			unquote = _unquote
+		}
 		//先在常量表中查询
 		if !y.isFunction {
-			s, ok := y.constMap[identifier]
+			s, ok := y.constMap[unquote]
 			if ok {
 				return y.ir.EmitConstInst(s)
 			} else {
-				log.Warnf("const map not found %v", identifier)
+				log.Warnf("const map not found %v", unquote)
 			}
 		}
-		if value := y.ir.PeekValue(identifier); value != nil {
+		if value := y.ir.PeekValue(y.VisitIdentifier(ret.Identifier())); value != nil {
 			return value
 		} else {
-			return y.ir.EmitConstInst(identifier)
+			return y.ir.EmitConstInst(y.VisitIdentifier(ret.Identifier()))
 		}
 
 	case *phpparser.StaticClassAccessExpressionContext:

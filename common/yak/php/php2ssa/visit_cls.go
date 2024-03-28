@@ -2,6 +2,7 @@ package php2ssa
 
 import (
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"strings"
 
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
@@ -381,11 +382,18 @@ func (y *builder) VisitIdentifierInitializer(raw phpparser.IIdentifierInitialize
 	if i == nil {
 		return nil
 	}
-	if ConstValue, ok := y.constMap[i.Identifier().GetText()]; ok {
-		log.Warnf("const %v has been defined value is %v", i.Identifier().GetText(), ConstValue)
+	var unquote string
+	_unquote, err := yakunquote.Unquote(i.Identifier().GetText())
+	if err != nil {
+		unquote = i.Identifier().GetText()
+	} else {
+		unquote = _unquote
+	}
+	if ConstValue, ok := y.constMap[unquote]; ok {
+		log.Warnf("const %v has been defined value is %v", unquote, ConstValue)
 	} else {
 		//y.ir.AssignVariable(y.ir.CreateVariable(i.Identifier().GetText()), y.VisitConstantInitializer(i.ConstantInitializer()))
-		y.constMap[i.Identifier().GetText()] = i.ConstantInitializer().GetText()
+		y.constMap[unquote] = y.VisitConstantInitializer(i.ConstantInitializer()).String()
 	}
 	return nil
 }
