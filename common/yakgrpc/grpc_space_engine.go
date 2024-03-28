@@ -3,8 +3,8 @@ package yakgrpc
 import (
 	"context"
 	_ "embed"
-	"encoding/json"
 	uuid "github.com/google/uuid"
+	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -15,6 +15,8 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"regexp"
+	"strconv"
 )
 
 const (
@@ -89,7 +91,7 @@ func (s *Server) GetSpaceEngineAccountStatus(ctx context.Context, req *ypb.GetSp
 			info = "Hunter API Key为空"
 			break
 		}
-		url := "https://hunter.qianxin.com/openApi/search?api-key=" + key + "&search=apache&page=1&page_size=1&is_web=1&start_time=2021-01-01&end_time=2021-03-01"
+		url := "https://hunter.qianxin.com/openApi/search?api-key=" + key + "&search=YXBhY2hl&page=1&page_size=1&is_web=1&start_time=2021-01-01&end_time=2021-03-01"
 		isHttps, reqRaw, err := lowhttp.ParseUrlToHttpRequestRaw("GET", url)
 		if err != nil {
 			status = SPACE_ENGINE_STATUS_ERROR
@@ -102,16 +104,31 @@ func (s *Server) GetSpaceEngineAccountStatus(ctx context.Context, req *ypb.GetSp
 			info = err.Error()
 		}
 		body := lowhttp.GetHTTPPacketBody(resp.RawPacket)
-		var result map[string]interface{}
-		err = json.Unmarshal(body, &result)
-		if err != nil {
+		if gjson.ValidBytes(body) {
+			if gjson.GetBytes(body, "code").Int() == 401 {
+				status = SPACE_ENGINE_STATUS_ERROR
+				info = "Hunter API Key无效"
+				break
+			}
+			remainStr := gjson.GetBytes(body, "data.rest_quota").String()
+			re := regexp.MustCompile(`\d+`)
+			match := re.FindStringSubmatch(remainStr)
+			if len(match) > 0 {
+				remain, err = strconv.ParseInt(match[0], 10, 64)
+				if err != nil {
+					// 处理转换失败的情况
+					status = SPACE_ENGINE_STATUS_ERROR
+					info = "解析剩余积分失败"
+					break
+				}
+			} else {
+				status = SPACE_ENGINE_STATUS_ERROR
+				info = "解析剩余积分失败"
+				break
+			}
+		} else {
 			status = SPACE_ENGINE_STATUS_ERROR
-			info = err.Error()
-			break
-		}
-		if utils.InterfaceToInt(result["code"]) == 401 {
-			status = SPACE_ENGINE_STATUS_ERROR
-			info = "Hunter API Key无效"
+			info = "返回值不是有效的JSON"
 			break
 		}
 	case SPACE_ENGINE_QUAKE:
