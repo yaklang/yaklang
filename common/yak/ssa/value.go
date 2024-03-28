@@ -9,6 +9,9 @@ import (
 
 // ReadValueByVariable get value by variable
 func (b *FunctionBuilder) ReadValueByVariable(v *Variable) Value {
+	if v == nil {
+		return nil
+	}
 	if ret := v.GetValue(); ret != nil {
 		return ret
 	}
@@ -130,6 +133,9 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 			parentValue.AddMask(value)
 			v := parentValue.GetVariable(variable.GetName())
 			b.AddSideEffect(v, value)
+		}
+		if _, ok := b.RefParameter[variable.GetName()]; ok {
+			b.AddForceSideEffect(variable.GetName(), value)
 		}
 		b.CheckAndSetSideEffect(variable, value)
 	}

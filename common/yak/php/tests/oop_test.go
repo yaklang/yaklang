@@ -3,6 +3,8 @@ package tests
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/yak/php/php2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 )
 
@@ -15,10 +17,21 @@ class Foo {
 	public static $my_static = 'foo';
 }
 
-println(Foo::$my_static . PHP_EOL);
+println(Foo::$my_static . PHP_EOL); // normal
+
+println("Foo"::$my_static . PHP_EOL); // string
+
+$a = "Foo";
+println($a::$my_static . PHP_EOL); // variable
+
+$b = "a";
+println($$b::$my_static . PHP_EOL); // dynamic variable
 
 ?>    
 	`, []string{
+			"add(\"foo\", Parameter-PHP_EOL)",
+			"add(\"foo\", Parameter-PHP_EOL)",
+			"add(\"foo\", Parameter-PHP_EOL)",
 			"add(\"foo\", Parameter-PHP_EOL)",
 		}, t)
 
@@ -56,11 +69,63 @@ println(Foo::$my_static . PHP_EOL);
 				"add(\"foo\", Parameter-PHP_EOL)",
 			}, t)
 	})
-	t.Run("defined variable", func(t *testing.T) {
-		code := `<?php
-$PHP_EOL=1;
-println($PHP_EOL);`
-		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
+
+	t.Run("test phi static member", func(t *testing.T) {
+		code := `
+	<?php
+class Foo {
+	public static $my_static = "start";
+}
+if ($a) {
+	Foo::$my_static = "foo";
+}else {
+	Foo::$my_static = "bar";
+}
+println(Foo::$my_static);
+`
+		ssatest.CheckPrintlnValue(code, []string{
+			"phi(Foo_my_static)[\"foo\",\"bar\"]",
+		}, t)
+	})
+}
+
+func TestOOP_static_method(t *testing.T) {
+	t.Run("normal static method", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		<?php
+		class Foo {
+			public static function aStaticMethod() {
+				return "foo";
+			}
+		}
+		println(Foo::aStaticMethod());
+		println("Foo"::aStaticMethod());
+		$a = "Foo";
+		println($a::aStaticMethod());
+		$b = "a";
+		println($$b::aStaticMethod());
+		?>
+		`, []string{
+			"Function-Foo_aStaticMethod()",
+			"Function-Foo_aStaticMethod()",
+			"Function-Foo_aStaticMethod()",
+			"Function-Foo_aStaticMethod()",
+		}, t)
+	})
+
+	t.Run("static method should't assign ", func(t *testing.T) {
+		code := `
+		<?php
+		class Foo {
+			public static function aStaticMethod() {
+				return "foo";
+			}
+		}
+		Foo::aStaticMethod = "bar";
+		?>
+		`
+		_, err := php2ssa.FrondEnd(code, false)
+		require.Error(t, err)
 	})
 }
 

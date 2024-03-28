@@ -1,6 +1,7 @@
 package php2ssa
 
 import (
+	"strconv"
 	"strings"
 
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
@@ -23,7 +24,7 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 	obj := y.ir.EmitMakeWithoutType(nil, nil)
 	obj.SetType(class)
 
-	constructor := y.ir.GetClassConstructor(className)
+	constructor := class.Constructor
 	if constructor == nil {
 		return obj
 	}
@@ -141,14 +142,17 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 		case "class":
 			className = i.Identifier().GetText()
 
+			parentClassName := ""
 			if i.Extends() != nil {
-				mergedTemplate = append(mergedTemplate, i.QualifiedStaticTypeRef().GetText())
+				parentClassName = i.QualifiedStaticTypeRef().GetText()
 			}
 
-			if i.Implements() != nil {
-				for _, impl := range i.InterfaceList().(*phpparser.InterfaceListContext).AllQualifiedStaticTypeRef() {
-					mergedTemplate = append(mergedTemplate, impl.GetText())
-				}
+			class := y.ir.CreateClass(className)
+			if parentClass := y.ir.GetClass(parentClassName); parentClass != nil {
+				class.AddParentClass(parentClass)
+			}
+			for _, statement := range i.AllClassStatement() {
+				y.VisitClassStatement(statement, class)
 			}
 		}
 	} else {
@@ -160,33 +164,6 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 			}
 		}
 	}
-	_ = className
-	_ = mergedTemplate
-
-	//// how to build a template?
-	//// y.ir is a SSA.Function
-	class := y.ir.CreateClass(className)
-	for _, statement := range i.AllClassStatement() {
-		y.VisitClassStatement(statement, class)
-	}
-
-	for _, parentClass := range mergedTemplate {
-		if parent := y.ir.GetClass(parentClass); parent != nil {
-			class.ParentClass = append(class.ParentClass, parent)
-		}
-	}
-	// class.AddMethod()
-	//template := y.ir.BuildObjectTemplate(objectTemplate)    // 注册一个对象模版（有构造和析构方法的对象）
-	//template.SetDecorationVerbose(...)                        // 记录一下修饰词
-	//for _, i := range mergedTemplate {
-	//	y.ir.FindObjectTemplate(i).MergeTo(template)        // 合并模版（inherit / trait / extend 都一样）
-	//}
-	//template.BuildField(func() {                              // 编译字段
-	//	for _, field := range i.AllClassStatement() {
-	//		y.VisitClassStatement(field)
-	//	}
-	//})
-	//template.Finish()                                         // 宣告完成
 
 	return nil
 }
@@ -206,9 +183,13 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 		// variable
 		modifiers := y.VisitPropertyModifiers(ret.PropertyModifiers())
 
-		setMember := class.BuildMember
+		setMember := class.AddNormalMember
 		if _, ok := modifiers[ssa.Static]; ok {
-			setMember = class.BuildStaticMember
+			setMember = func(name string, value ssa.Value) {
+				variable := y.ir.GetStaticMember(class.Name, name)
+				y.ir.AssignVariable(variable, value)
+				class.AddStaticMember(name, value)
+			}
 		}
 
 		// handle variable
@@ -233,6 +214,11 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 		// TODO: ret.Attributes() // php8
 		memberModifiers := y.VisitMemberModifiers(ret.MemberModifiers())
 		_ = memberModifiers
+		isStatic := false
+		if _, ok := memberModifiers[ssa.Static]; ok {
+			isStatic = true
+		}
+
 		isRef := ret.Ampersand()
 		_ = isRef
 
@@ -258,7 +244,13 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 			class.Constructor = newFunction
 		default:
 			newFunction := createFunction()
-			class.AddMarkedField(funcName, newFunction, 0)
+			if isStatic {
+				variable := y.ir.GetStaticMember(class.Name, newFunction.GetName())
+				y.ir.AssignVariable(variable, newFunction)
+				class.AddStaticMethod(funcName, newFunction)
+			} else {
+				class.AddNormalMethod(funcName, newFunction, 0)
+			}
 		}
 	case *phpparser.ConstContext:
 		// TODO: ret.Attributes() // php8
@@ -426,9 +418,9 @@ func (y *builder) VisitClassConstant(raw phpparser.IClassConstantContext) ssa.Va
 	return nil
 }
 
-func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) (string, string) {
+func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassExprFunctionMemberContext) *ssa.Variable {
 	if y == nil || raw == nil {
-		return "", ""
+		return nil
 	}
 
 	var class, key string
@@ -436,29 +428,91 @@ func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) (s
 	case *phpparser.ClassStaticFunctionMemberContext:
 		// TODO: class
 		key = i.Identifier().GetText()
-	case *phpparser.ClassStaticVariableContext:
-		// TODO class
-		key = i.VarName().GetText()
 	case *phpparser.ClassDirectFunctionMemberContext:
 		class = i.Identifier(0).GetText()
 		key = i.Identifier(1).GetText()
+	case *phpparser.StringAsIndirectClassStaticFunctionMemberContext:
+		str, err := strconv.Unquote(i.String_().GetText())
+		if err != nil {
+			class = i.String_().GetText()
+		} else {
+			class = str
+		}
+		key = i.Identifier().GetText()
+	case *phpparser.VariableAsIndirectClassStaticFunctionMemberContext:
+		exprName := y.VisitVariable(i.Variable())
+		class = y.ir.ReadValue(exprName).String()
+		key = i.Identifier().GetText()
+	default:
+		_ = i
+	}
+	if class == "" {
+		return nil
+	}
+
+	if strings.HasPrefix(key, "$") {
+		// variable
+		key = key[1:]
+		return y.ir.GetStaticMember(class, key)
+	}
+	// function
+	return y.ir.GetStaticMember(class, key)
+}
+
+func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassExprVariableMemberContext) *ssa.Variable {
+	if y == nil || raw == nil {
+		return nil
+	}
+	var class, key string
+	switch i := raw.(type) {
+	case *phpparser.ClassStaticVariableContext:
+		// TODO class
+		key = i.VarName().GetText()
 	case *phpparser.ClassDirectStaticVariableContext:
 		class = i.Identifier().GetText()
 		key = i.VarName().GetText()
-	case *phpparser.StringAsIndirectClassStaticFunctionMemberContext:
-		class = i.String_().GetText()
-		key = i.Identifier().GetText()
 	case *phpparser.StringAsIndirectClassStaticVariableContext:
-		class = i.String_().GetText()
+		str, err := strconv.Unquote(i.String_().GetText())
+		if err != nil {
+			class = i.String_().GetText()
+		} else {
+			class = str
+		}
+		key = i.VarName().GetText()
+	case *phpparser.VariableAsIndirectClassStaticVariableContext:
+		exprName := y.VisitVariable(i.Variable())
+		class = y.ir.ReadValue(exprName).String()
 		key = i.VarName().GetText()
 	default:
 		_ = i
 	}
-	if strings.HasPrefix(key, "$") {
-		key = key[1:]
+	if class == "" {
+		return nil
 	}
 
-	return class, key
+	if strings.HasPrefix(key, "$") {
+		// variable
+		key = key[1:]
+		return y.ir.GetStaticMember(class, key)
+	}
+	// function
+	return y.ir.GetStaticMember(class, key)
+}
+
+func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) *ssa.Variable {
+	if y == nil || raw == nil {
+		return nil
+	}
+	if i, ok := raw.(*phpparser.StaticClassExprContext); ok {
+		if i.StaticClassExprFunctionMember() != nil {
+			return y.VisitStaticClassExprFunctionMember(i.StaticClassExprFunctionMember())
+		}
+		if i.StaticClassExprVariableMember() != nil {
+			return y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember())
+		}
+	}
+
+	return nil
 }
 
 /// class modifier

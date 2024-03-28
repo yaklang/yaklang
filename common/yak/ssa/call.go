@@ -152,8 +152,9 @@ func (c *Call) handleCalleeFunction() {
 				// if side-effect is member call, create member call variable
 				variable = builder.CreateMemberCallVariable(c.Args[se.ParameterIndex], se.Key)
 			} else {
+
 				// side-effect only create in scope that lower or same than modify's scope
-				if !currentScope.IsSameOrSubScope(se.Variable.GetScope()) {
+				if !se.forceCreate && !currentScope.IsSameOrSubScope(se.Variable.GetScope()) {
 					continue
 				}
 				variable = builder.CreateVariable(se.Name)

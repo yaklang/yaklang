@@ -430,21 +430,20 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		identifier := y.VisitIdentifier(ret.Identifier())
 		if value := y.ir.PeekValue(identifier); value != nil {
 			return value
-		} else {
-			return y.ir.EmitConstInst(identifier)
 		}
-		//return y.ir.ReadOrCreateVariable(y.VisitIdentifier(ret.Identifier()))
+		return y.ir.EmitConstInst(identifier)
+	//return y.ir.ReadOrCreateVariable(y.VisitIdentifier(ret.Identifier()))
 
+	// TODO: static class member
 	case *phpparser.StaticClassAccessExpressionContext:
-		class, key := y.VisitStaticClassExpr(ret.StaticClassExpr())
-		return y.ir.GetStaticMember(class, key)
+		variable := y.VisitStaticClassExpr(ret.StaticClassExpr())
+		return y.ir.ReadValueByVariable(variable)
 
 	case *phpparser.StaticClassMemberCallAssignmentExpressionContext:
-		class, key := y.VisitStaticClassExpr(ret.StaticClassExpr())
-		leftValue := y.ir.GetStaticMember(class, key)
+		variable := y.VisitStaticClassExprVariableMember(ret.StaticClassExprVariableMember())
 		rightValue := y.VisitExpression(ret.Expression())
-		rightValue = y.reduceAssignCalcExpressionEx(ret.AssignmentOperator().GetText(), leftValue, rightValue)
-		y.ir.SetStaticMember(class, key, rightValue)
+		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), variable, rightValue)
+		y.ir.AssignVariable(variable, rightValue)
 		return rightValue
 	}
 	raw.GetText()
