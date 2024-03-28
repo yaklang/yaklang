@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bruteutils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -120,36 +119,50 @@ func GetBuildinAvailableBruteTypeTree(typeMap []struct {
 	Data string
 }) []*ypb.Tree {
 	res := make(map[string]*ypb.Tree)
+	ret := make([]*ypb.Tree, 0)
+
+	newTopLevel := func(name, data string) *ypb.Tree {
+		// create top level
+		item := &ypb.Tree{
+			Name: name,
+			Data: data,
+		}
+		// append to result, just return top-level tree
+		ret = append(ret, item)
+		// mark in map, for second level
+		res[name] = item
+		return item
+	}
+
+	newSecondLevel := func(group, name, data string) {
+		// get parent node from top level
+		tree, ok := res[group]
+		if !ok {
+			// create parent node
+			tree = newTopLevel(group, "")
+		}
+		// create child node, append to parent node's children
+		tree.Children = append(tree.Children, &ypb.Tree{
+			Name: name,
+			Data: data,
+		})
+
+	}
+
 	for _, item := range typeMap {
 		data := item.Data
 		name := item.Name
 		names := strings.Split(name, "/")
 		if len(names) == 1 {
-			// no '/', just append this item
-			res[names[0]] = &ypb.Tree{
-				Name: names[0],
-				Data: data,
-			}
+			// top level
+			newTopLevel(name, data)
 			continue
 		}
 
-		// has "/"
-
-		// get parent node
-		tree, ok := res[names[0]]
-		if !ok {
-			// create parent node
-			tree = &ypb.Tree{
-				Name: names[0],
-				Data: "",
-			}
-			res[names[0]] = tree
-		}
-		// create child node
-		tree.Children = append(tree.Children, &ypb.Tree{
-			Name: names[1],
-			Data: data,
-		})
+		// second level
+		groupName := names[0]
+		itemName := names[1]
+		newSecondLevel(groupName, itemName, data)
 	}
-	return lo.Values(res)
+	return ret
 }
