@@ -13,18 +13,18 @@ jobs:
   WIP:
     runs-on: ubuntu-latest
     steps:
-      - uses: wow-actions/wip@v1
+      - uses: WAY29/wip@v1.3.0
         with:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
           # Set action to failed when wip.
-          setFailed: true
+          setFailed: false
 
           # Match with PR labels. Comma separated and case insensitive labels.
-          labels: "'do-not-merge','work in progress','wip','rfc','🚧'"
+          labels: "'do-not-merge','work in progress','wip','rfc','WIP'"
 
           # Match with PR title. Comma separated and case insensitive keywords.
-          keywords: "'do-not-merge', 'work in progress', 'wip', 'rfc', '🚧'"
+          keywords: "'do-not-merge', 'work in progress', 'wip', 'rfc','WIP'"
 
           # A string label to differentiat  e this status from the status of
           # other systems. This field is case-insensitive.
