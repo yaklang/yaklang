@@ -61,6 +61,5 @@ func TestFacadeServerYsoSerialize(t *testing.T) {
 			"javaClassName":      utils.RandStringBytes(5),
 		}),
 	)
-	server.
 	server.Serve()
 }
