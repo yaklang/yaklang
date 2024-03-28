@@ -300,7 +300,7 @@ func initYaklangLib() {
 	yaklang.Import("ai", ai.Exports)
 
 	// pprof utils
-	yaklang.Import("profile", pprofutils.Exports)
+	yaklang.Import("pprof", pprofutils.Exports)
 
 	// 处理 yakit 库的一些函数名
 	yakdoc.RegisterHook(func(h *yakdoc.DocumentHelper) {

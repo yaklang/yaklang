@@ -2,6 +2,7 @@ package pprofutils
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -47,6 +48,27 @@ func WithTimeout(i float64) Option {
 			i = 15
 		}
 		c.ctx = utils.TimeoutContextSeconds(i)
+	}
+}
+
+func WithFinished(h func(string)) Option {
+	return func(config *Config) {
+		config.onMemProfileFinished = func(s string, err error) {
+			if err != nil {
+				log.Errorf("memory profile finished: %s, error: %v", s, err)
+			}
+			if s != "" {
+				h(s)
+			}
+		}
+		config.onCPUProfileFinished = func(s string, err error) {
+			if err != nil {
+				log.Errorf("cpu profile finished: %s, error: %v", s, err)
+			}
+			if s != "" {
+				h(s)
+			}
+		}
 	}
 }
 
