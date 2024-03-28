@@ -100,7 +100,7 @@ func TestGRPCMUSTPASS_Brute(t *testing.T) {
 	}
 }
 
-func TestA(t *testing.T) {
+func TestGRPCMUSTPASS_GetBruteType(t *testing.T) {
 	BuildInBruteTypeTree := GetBuildinAvailableBruteTypeTree([]struct {
 		Name string
 		Data string
