@@ -22,6 +22,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+type fuzzTagHandler struct {
+	tag     string
+	handler func(string) []string
+}
+
 var EmptyBytesSlice = make([][]byte, 0)
 
 // utils
@@ -32,6 +37,13 @@ func strVisible(key string) bool {
 		}
 	}
 	return true
+}
+
+func _buildFuzzTagHandler(tag string, handler func(string) []string) *fuzzTagHandler {
+	return &fuzzTagHandler{
+		tag:     tag,
+		handler: handler,
+	}
 }
 
 // fuzz
@@ -65,7 +77,7 @@ func _urlToFuzzRequest(method string, i interface{}) (*mutate.FuzzHTTPRequest, e
 }
 
 func _fuzzFunc(i interface{}, cb func(i *mutate.MutateResult), params ...interface{}) error {
-	var res = make(map[string][]string)
+	res := make(map[string][]string)
 	for _, i := range params {
 		if i == nil {
 			continue
@@ -85,6 +97,27 @@ func _fuzzFunc(i interface{}, cb func(i *mutate.MutateResult), params ...interfa
 		return err
 	}
 	return nil
+}
+
+func _fuzzWithCustomHandlers(i interface{}, handlers ...*fuzzTagHandler) ([]string, error) {
+	var opts []mutate.FuzzConfigOpt
+	handlersMap := make(map[string]func(string) []string)
+	for _, h := range handlers {
+		handlersMap[h.tag] = h.handler
+	}
+	opts = append(opts,
+		mutate.Fuzz_WithExtraFuzzTagHandler("yak", func(s string) []string {
+			f, s, ok := strings.Cut(s, "|")
+			if !ok {
+				return []string{s}
+			}
+			if handler, ok := handlersMap[f]; ok {
+				return handler(s)
+			}
+			return []string{s}
+		}))
+
+	return mutate.FuzzTagExec(i, opts...)
 }
 
 // protobuf
@@ -586,9 +619,12 @@ func _protobufRecordsFromYAML(i interface{}) *ProtobufRecords {
 }
 
 var FuzzExports = map[string]interface{}{
-	"Strings":            _fuzz,
-	"StringsWithParam":   _fuzzFuncEx,
-	"StringsFunc":        _fuzzFunc,
+	"Strings":                   _fuzz,
+	"StringsWithParam":          _fuzzFuncEx,
+	"StringsFunc":               _fuzzFunc,
+	"StringsWithCustomHandlers": _fuzzWithCustomHandlers,
+	"handler":                   _buildFuzzTagHandler,
+
 	"HTTPRequest":        mutate.NewFuzzHTTPRequest,
 	"MustHTTPRequest":    mutate.NewMustFuzzHTTPRequest,
 	"https":              mutate.OptHTTPS,
