@@ -99,7 +99,6 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 	if i == nil {
 		return nil
 	}
-
 	return nil
 }
 
