@@ -11,13 +11,7 @@ type JavaObject struct {
 const INDENT = "  "
 
 func (j *JavaObject) Marshal(cfg *MarshalContext) []byte {
-	var raw = []byte{TC_OBJECT}
-
-	raw = append(raw, j.Class.Marshal(cfg)...)
-	for _, i := range j.ClassData {
-		raw = append(raw, i.Marshal(cfg)...)
-	}
-	return raw
+	return cfg.JavaMarshaler.ObjectMarshaler(j, cfg)
 }
 
 func NewJavaObject(class *JavaClassDesc, classData ...*JavaClassData) *JavaObject {

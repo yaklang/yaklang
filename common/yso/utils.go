@@ -502,10 +502,7 @@ func ToBcel(i interface{}) (string, error) {
 // gadgetBytes,_ = yso.ToBytes(gadgetObj,yso.dirtyDataLength(10000),yso.twoBytesCharString())
 // ```
 func ToBytes(i interface{}, opts ...MarshalOptionFun) ([]byte, error) {
-	cfg := &yserx.MarshalContext{
-		DirtyDataLength:  0,
-		StringCharLength: 1,
-	}
+	cfg := yserx.NewMarshalContext()
 	for _, opt := range opts {
 		opt(cfg)
 	}
@@ -528,6 +525,18 @@ type MarshalOptionFun func(ctx *yserx.MarshalContext)
 func SetToBytesDirtyDataLength(length int) MarshalOptionFun {
 	return func(ctx *yserx.MarshalContext) {
 		ctx.DirtyDataLength = length
+	}
+}
+func SetToBytesJRMPMarshalerWithCodeBase(cb string) MarshalOptionFun {
+	return func(ctx *yserx.MarshalContext) {
+		ctx.JavaMarshaler = &yserx.JRMPMarshaler{
+			CodeBase: cb,
+		}
+	}
+}
+func SetToBytesJRMPMarshaler() MarshalOptionFun {
+	return func(ctx *yserx.MarshalContext) {
+		ctx.JavaMarshaler = &yserx.JRMPMarshaler{}
 	}
 }
 func SetToBytesThreeBytesString() MarshalOptionFun {
@@ -846,6 +855,19 @@ func runWorkFlow(works ...func() error) error {
 		}
 	}
 	return nil
+}
+
+func GetJavaObjectArrayIns() (yserx.JavaSerializable, error) {
+	data := "rO0ABXVyABNbTGphdmEubGFuZy5PYmplY3Q7kM5YnxBzKWwCAAB4cAAAAAA="
+	byts, err := codec.DecodeBase64(data)
+	if err != nil {
+		return nil, err
+	}
+	objIns, err := yserx.ParseJavaSerialized(byts)
+	if len(objIns) != 1 {
+		return nil, errors.New("generate object array failed")
+	}
+	return objIns[0], nil
 }
 
 var dirtyDataHeader []byte

