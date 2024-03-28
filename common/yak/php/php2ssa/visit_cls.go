@@ -1,6 +1,7 @@
 package php2ssa
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"strings"
 
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
@@ -112,9 +113,7 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 
 	// notes #[...] for dec
 	if i.Attributes() != nil {
-
 	}
-
 	// access / private?
 	if i.Private() != nil {
 		// handle priv
@@ -205,12 +204,10 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 	case *phpparser.PropertyModifiersVariableContext:
 		// variable
 		modifiers := y.VisitPropertyModifiers(ret.PropertyModifiers())
-
 		setMember := class.BuildMember
 		if _, ok := modifiers[ssa.Static]; ok {
 			setMember = class.BuildStaticMember
 		}
-
 		// handle variable
 		if ret.TypeHint() != nil {
 			// handle type hint
@@ -227,7 +224,6 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 		}
 
 		return
-
 	case *phpparser.FunctionContext:
 		// function
 		// TODO: ret.Attributes() // php8
@@ -385,7 +381,12 @@ func (y *builder) VisitIdentifierInitializer(raw phpparser.IIdentifierInitialize
 	if i == nil {
 		return nil
 	}
-
+	if ConstValue, ok := y.constMap[i.Identifier().GetText()]; ok {
+		log.Warnf("const %v has been defined value is %v", i.Identifier().GetText(), ConstValue)
+	} else {
+		//y.ir.AssignVariable(y.ir.CreateVariable(i.Identifier().GetText()), y.VisitConstantInitializer(i.ConstantInitializer()))
+		y.constMap[i.Identifier().GetText()] = i.ConstantInitializer().GetText()
+	}
 	return nil
 }
 
@@ -430,7 +431,6 @@ func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) (s
 	if y == nil || raw == nil {
 		return "", ""
 	}
-
 	var class, key string
 	switch i := raw.(type) {
 	case *phpparser.ClassStaticFunctionMemberContext:

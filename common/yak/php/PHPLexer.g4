@@ -138,6 +138,8 @@ Class           : 'class';
 Clone           : 'clone';
 Const           : 'const';
 Continue        : 'continue';
+Define          : 'define';
+Defined         : 'defined';
 Declare         : 'declare';
 Default         : 'default';
 Do              : 'do';

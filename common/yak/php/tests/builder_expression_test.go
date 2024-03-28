@@ -361,3 +361,70 @@ println($b);`
 		ssatest.CheckPrintlnValue(code, []string{"true"}, t)
 	})
 }
+
+func TestParseSSA_DeclareConst(t *testing.T) {
+	t.Run("global const declare", func(t *testing.T) {
+		code := `<?php
+const NAME = 1,DJAOP=2;
+println(NAME);
+println(DJAOP);`
+		ssatest.CheckPrintlnValue(code, []string{"1", "2"}, t)
+	})
+	t.Run("global const declare redefined", func(t *testing.T) {
+		code := `<?php
+const NAME = 1;
+const NAME = 2;
+println(NAME);`
+		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
+	})
+	t.Run("defined const", func(t *testing.T) {
+		code := `<?php define('a',1); println(a);`
+		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
+	})
+	t.Run("define function const redefined", func(t *testing.T) {
+		code := `<?php
+
+define('a','2');
+define('a',1);
+println(a);`
+		ssatest.CheckPrintlnValue(code, []string{"\"2\""}, t)
+	})
+	t.Run("const and definded function", func(t *testing.T) {
+		code := `<?php
+const a = 3;
+define('a','2');
+println(a);`
+		ssatest.CheckPrintlnValue(code, []string{"3"}, t)
+	})
+	t.Run("const and function, use const", func(t *testing.T) {
+		code := `<?php
+const a = 1;
+function a(){
+    echo "ada";
+}
+println(a);`
+		ssatest.CheckPrintlnValue(code, []string{"\"1\""}, t)
+	})
+	t.Run("const and function,use function", func(t *testing.T) {
+		code := `<?php
+const a = 1;
+function a(){
+    echo "ada";
+}
+println(a());`
+		ssatest.CheckPrintlnValue(code, []string{"Function-a()"}, t)
+	})
+	t.Run("function and const", func(t *testing.T) {
+		code := `<?php
+const a = 1;
+function a(int $c){
+    echo "ada";
+}
+function b(int $a){
+    echo $a;
+}
+
+a(b(a));`
+		ssatest.MockSSA(t, code)
+	})
+}

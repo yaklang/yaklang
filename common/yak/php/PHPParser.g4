@@ -489,6 +489,8 @@ staticClassExpr
     | identifier '::' VarName                     # ClassDirectStaticVariable
     | string '::' identifier                      # StringAsIndirectClassStaticFunctionMember
     | string '::' VarName                         # StringAsIndirectClassStaticVariable
+    | variable '::' identifier                    # DirectConstVariable //$a::a;
+    | variable '::' variable                      # ClassConstVariable //$a::$b;
     ;
 
 
@@ -513,9 +515,9 @@ expression
     | staticClassExpr                                             # StaticClassAccessExpression
     | variable                                                    # VariableExpression
     | arrayCreation                                               # ArrayCreationExpression
-    | Print expression                                            # PrintExpression
     | constant                                                    # ScalarExpression
     | string                                                      # ScalarExpression
+    | defineExpr                                                  # DefinedOrScanDefinedExpression
     | Label                                                       # ScalarExpression
     | BackQuoteString                                             # BackQuoteStringExpression
     | '(' expression ')'                                          # ParenthesisExpression
@@ -534,9 +536,9 @@ expression
     | ('!' | '+' | '-') expression                                # UnaryOperatorExpression
     | ('++' | '--') leftVariable                                  # PrefixIncDecExpression
     | leftVariable ('++' | '--')                                  # PostfixIncDecExpression
-    | expression arguments                                        # FunctionCallExpression
-    | expression '[' indexMemberCallKey ']'                               # IndexCallExpression
-    | expression '->' memberCallKey                                  # MemberCallExpression
+    | expression ('->' memberCallKey)* arguments                  # FunctionCallExpression
+    | expression '[' indexMemberCallKey ']'                       # IndexCallExpression
+    | expression '->' memberCallKey                               # MemberCallExpression
     | <assoc = right> expression op = '**' expression             # ArithmeticExpression
     | expression InstanceOf typeRef                               # InstanceOfExpression
     | expression op = ('*' | Divide | '%') expression             # ArithmeticExpression
@@ -569,6 +571,11 @@ leftVariable
     : variable
     ;
 
+
+defineExpr
+    : Define '(' constantString ',' expression ')'
+    | Defined '(' constantString ')'
+    ;
 variable
     : VarName                                               # NormalVariable// $a=3
     | Dollar+ VarName                                       # DynamicVariable// $$a= 1; or $$$a=1;

@@ -1,17 +1,18 @@
 package php2ssa
 
 import (
-	"os"
-
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"os"
 )
 
 type builder struct {
-	ir *ssa.FunctionBuilder
+	ir         *ssa.FunctionBuilder
+	constMap   map[string]string
+	isFunction bool
 }
 
 func Build(src string, force bool, b *ssa.FunctionBuilder) error {
@@ -20,10 +21,11 @@ func Build(src string, force bool, b *ssa.FunctionBuilder) error {
 		return err
 	}
 	b.DisableFreeValue = true
-	b.WithExternValue(PHPBuildIn)
 	build := builder{
-		ir: b,
+		constMap: make(map[string]string),
+		ir:       b,
 	}
+	b.WithExternValue(phpBuildIn)
 	build.VisitHtmlDocument(ast)
 	return nil
 }
@@ -45,7 +47,7 @@ func FrondEnd(src string, force bool) (phpparser.IHtmlDocumentContext, error) {
 	return nil, utils.Errorf("parse AST FrontEnd error : %v", errListener.GetErrors())
 }
 
-var PHPBuildIn = map[string]any{
+var phpBuildIn = map[string]any{
 	"PHP_EOL": "",
 	"echo":    func(...any) {},
 	"println": func(...any) {},
