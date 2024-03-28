@@ -105,13 +105,19 @@ func HunterQuery(name, key, query string, maxPage, pageSize, maxRecord int) (cha
 				log.Errorf("hunter client query next failed: %s", err)
 				break
 			}
-
+			total := gjson.Get(result.Raw, "data.total").Int()
 			for _, record := range resultToSpacengineList(query, result) {
 				if nextFinished {
 					break
 				}
 				ch <- record
+
 				count++
+				if count >= int(total) {
+					nextFinished = true
+					break
+				}
+
 				if maxRecord > 0 && count >= maxRecord {
 					nextFinished = true
 					break
