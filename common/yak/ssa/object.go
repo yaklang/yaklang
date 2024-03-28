@@ -155,7 +155,7 @@ func checkCanMemberCall(value, key Value) (string, Type) {
 
 	// check is method
 	if ret := GetMethod(value.GetType(), key.String()); ret != nil {
-		return name, ret
+		return name, ret.GetType()
 	}
 
 	switch value.GetType().GetTypeKind() {

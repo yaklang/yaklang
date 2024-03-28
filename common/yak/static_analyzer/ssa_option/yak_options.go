@@ -53,7 +53,7 @@ type Builder struct{}
 
 var _ (ssa.MethodBuilder) = (*Builder)(nil)
 
-func (b *Builder) Build(t ssa.Type, s string) *ssa.FunctionType {
+func (b *Builder) Build(t ssa.Type, s string) *ssa.Function {
 	var (
 		arg          = []ssa.Type{t}
 		ret          = []ssa.Type{}
@@ -298,9 +298,9 @@ func (b *Builder) Build(t ssa.Type, s string) *ssa.FunctionType {
 		}
 	}
 	if name != "" {
-		f := ssa.NewFunctionTypeDefine(name, arg, ret, IsVariadic)
-		f.SetModifySelf(IsModifySelf)
-		return f
+		funcType := ssa.NewFunctionTypeDefine(name, arg, ret, IsVariadic)
+		funcType.SetModifySelf(IsModifySelf)
+		return ssa.NewFunctionWithType(name, funcType)
 	} else {
 		return nil
 	}

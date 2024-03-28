@@ -11,12 +11,12 @@ import (
 )
 
 func init() {
-	BasicTypes[ErrorTypeKind].method["Error"] = NewFunctionTypeDefine(
+	BasicTypes[ErrorTypeKind].method["Error"] = NewFunctionWithType("error.Error", NewFunctionTypeDefine(
 		"error.Error",
 		[]Type{BasicTypes[ErrorTypeKind]},
 		[]Type{BasicTypes[StringTypeKind]},
 		false,
-	)
+	))
 }
 
 const MAXTypeCompareDepth = 10
@@ -102,14 +102,14 @@ func typeCompareEx(t1, t2 Type, depth int) bool {
 }
 
 type MethodBuilder interface {
-	Build(Type, string) *FunctionType
+	Build(Type, string) *Function
 	GetMethodNames(Type) []string
 }
 
 var ExternMethodBuilder MethodBuilder
 
-func GetMethod(t Type, id string) *FunctionType {
-	var f *FunctionType
+func GetMethod(t Type, id string) *Function {
+	var f *Function
 	if fun, ok := t.GetMethod()[id]; ok {
 		f = fun
 	}
@@ -121,7 +121,7 @@ func GetMethod(t Type, id string) *FunctionType {
 		}
 	}
 	if f != nil {
-		f.IsMethod = true
+		f.SetMethod(true)
 	}
 	return f
 }
@@ -168,16 +168,16 @@ func IsObjectType(t Type) bool {
 type Type interface {
 	String() string        // only string
 	PkgPathString() string // package path string
-	RawString() string
-	GetTypeKind() TypeKind
+	RawString() string     // string contain inner information
+	GetTypeKind() TypeKind // type kind
 
-	// set/get method
-	SetMethod(map[string]*FunctionType)
-	AddMethod(string, *FunctionType)
-	GetMethod() map[string]*FunctionType
-	// GetAllKey() []string
+	// set/get method, method is a function
+	SetMethod(map[string]*Function)
+	AddMethod(string, *Function)
+	GetMethod() map[string]*Function
 }
-type Types []Type // each value can have multiple type possible
+
+type Types []Type
 
 // return true  if org != typs
 // return false if org == typs
@@ -237,10 +237,11 @@ func (t Types) IsType(kind TypeKind) bool {
 	return false
 }
 
-// basic type
+// TypeKind is a Kind of ssa.type
 type TypeKind int
 
 const (
+	// NumberTypeKind is all number type, int*/uint*/float/double/complex
 	NumberTypeKind TypeKind = iota
 	StringTypeKind
 	BytesTypeKind
@@ -261,7 +262,6 @@ const (
 	FunctionTypeKind
 
 	ClassBluePrintTypeKind
-	ClassMethodTypeKind
 )
 
 type BasicType struct {
@@ -269,7 +269,7 @@ type BasicType struct {
 	name    string
 	pkgPath string
 
-	method map[string]*FunctionType
+	method map[string]*Function
 }
 
 func NewBasicType(kind TypeKind, name string) *BasicType {
@@ -277,9 +277,11 @@ func NewBasicType(kind TypeKind, name string) *BasicType {
 		Kind:    kind,
 		name:    name,
 		pkgPath: name,
-		method:  map[string]*FunctionType{},
+		method:  make(map[string]*Function),
 	}
 }
+
+var _ Type = (*BasicType)(nil)
 
 func (b *BasicType) String() string {
 	return b.name
@@ -301,17 +303,17 @@ func (b *BasicType) GetTypeKind() TypeKind {
 	return b.Kind
 }
 
-func (b *BasicType) GetMethod() map[string]*FunctionType {
+func (b *BasicType) GetMethod() map[string]*Function {
 	return b.method
 }
 
-func (b *BasicType) SetMethod(method map[string]*FunctionType) {
+func (b *BasicType) SetMethod(method map[string]*Function) {
 	b.method = method
 }
 
-func (b *BasicType) AddMethod(id string, f *FunctionType) {
+func (b *BasicType) AddMethod(id string, f *Function) {
 	if b.method == nil {
-		b.method = make(map[string]*FunctionType)
+		b.method = make(map[string]*Function)
 	}
 	b.method[id] = f
 }
@@ -319,8 +321,6 @@ func (b *BasicType) AddMethod(id string, f *FunctionType) {
 // func (b *BasicType) GetAllKey() []string {
 // 	return lo.Keys(b.method)
 // }
-
-var _ Type = (*BasicType)(nil)
 
 var BasicTypes = map[TypeKind]*BasicType{
 	NumberTypeKind:    NewBasicType(NumberTypeKind, "number"),
@@ -397,7 +397,7 @@ func GetTypeByStr(typ string) Type {
 // ====================== alias type
 type AliasType struct {
 	elem    Type
-	method  map[string]*FunctionType
+	method  map[string]*Function
 	Name    string
 	pkgPath string
 }
@@ -407,24 +407,24 @@ var _ Type = (*AliasType)(nil)
 func NewAliasType(name, pkg string, elem Type) *AliasType {
 	return &AliasType{
 		elem:    elem,
-		method:  make(map[string]*FunctionType),
+		method:  make(map[string]*Function),
 		Name:    name,
 		pkgPath: pkg,
 	}
 }
 
-func (a *AliasType) SetMethod(m map[string]*FunctionType) {
+func (a *AliasType) SetMethod(m map[string]*Function) {
 	a.method = m
 }
 
-func (b *AliasType) AddMethod(id string, f *FunctionType) {
+func (b *AliasType) AddMethod(id string, f *Function) {
 	if b.method == nil {
-		b.method = make(map[string]*FunctionType)
+		b.method = make(map[string]*Function)
 	}
 	b.method[id] = f
 }
 
-func (a *AliasType) GetMethod() map[string]*FunctionType {
+func (a *AliasType) GetMethod() map[string]*Function {
 	return a.method
 }
 
@@ -458,14 +458,14 @@ func (a *AliasType) GetTypeKind() TypeKind {
 
 // ====================== interface type
 type InterfaceType struct {
-	method  map[string]*FunctionType
+	method  map[string]*Function
 	name    string
 	pkgPath string
 }
 
 func NewInterfaceType(name, pkgPath string) *InterfaceType {
 	return &InterfaceType{
-		method:  make(map[string]*FunctionType),
+		method:  make(map[string]*Function),
 		name:    name,
 		pkgPath: pkgPath,
 	}
@@ -473,18 +473,18 @@ func NewInterfaceType(name, pkgPath string) *InterfaceType {
 
 var _ Type = (*InterfaceType)(nil)
 
-func (i *InterfaceType) SetMethod(m map[string]*FunctionType) {
+func (i *InterfaceType) SetMethod(m map[string]*Function) {
 	i.method = m
 }
 
-func (b *InterfaceType) AddMethod(id string, f *FunctionType) {
+func (b *InterfaceType) AddMethod(id string, f *Function) {
 	if b.method == nil {
-		b.method = make(map[string]*FunctionType)
+		b.method = make(map[string]*Function)
 	}
 	b.method[id] = f
 }
 
-func (i *InterfaceType) GetMethod() map[string]*FunctionType {
+func (i *InterfaceType) GetMethod() map[string]*Function {
 	return i.method
 }
 
@@ -519,23 +519,23 @@ func (i *InterfaceType) RawString() string {
 // ====================== chan type
 type ChanType struct {
 	Elem   Type
-	method map[string]*FunctionType
+	method map[string]*Function
 }
 
 var _ (Type) = (*ChanType)(nil)
 
-func (c *ChanType) SetMethod(m map[string]*FunctionType) {
+func (c *ChanType) SetMethod(m map[string]*Function) {
 	c.method = m
 }
 
-func (b *ChanType) AddMethod(id string, f *FunctionType) {
+func (b *ChanType) AddMethod(id string, f *Function) {
 	if b.method == nil {
-		b.method = make(map[string]*FunctionType)
+		b.method = make(map[string]*Function)
 	}
 	b.method[id] = f
 }
 
-func (c *ChanType) GetMethod() map[string]*FunctionType {
+func (c *ChanType) GetMethod() map[string]*Function {
 	return c.method
 }
 
@@ -581,11 +581,13 @@ type ObjectType struct {
 	Combination bool // function multiple return will combined to struct
 	// VariadicPara bool // function last variadic parameter will become slice
 
-	method map[string]*FunctionType
+	method map[string]*Function
 
 	KeyTyp    Type
 	FieldType Type
 }
+
+var _ (Type) = (*ObjectType)(nil)
 
 func (i *ObjectType) GetTypeKind() TypeKind {
 	return i.Kind
@@ -595,26 +597,20 @@ func (i *ObjectType) SetTypeKind(t TypeKind) {
 	i.Kind = t
 }
 
-func (i *ObjectType) GetMethod() map[string]*FunctionType {
+func (i *ObjectType) GetMethod() map[string]*Function {
 	return i.method
 }
 
-func (i *ObjectType) SetMethod(m map[string]*FunctionType) {
+func (i *ObjectType) SetMethod(m map[string]*Function) {
 	i.method = m
 }
 
-func (b *ObjectType) AddMethod(id string, f *FunctionType) {
+func (b *ObjectType) AddMethod(id string, f *Function) {
 	if b.method == nil {
-		b.method = make(map[string]*FunctionType)
+		b.method = make(map[string]*Function)
 	}
 	b.method[id] = f
 }
-
-// func (b *ObjectType) GetAllKey() []string {
-// 	return append(lo.Keys(b.method), lo.Map(b.Key, func(v Value, _ int) string { return v.String() })...)
-// }
-
-var _ (Type) = (*ObjectType)(nil)
 
 func (i *ObjectType) SetName(name string) {
 	i.Name = name
@@ -627,7 +623,7 @@ func NewObjectType() *ObjectType {
 		keymap:     make(map[string]int),
 		keyTypes:   make([]Type, 0),
 		FieldTypes: make([]Type, 0),
-		method:     make(map[string]*FunctionType, 0),
+		method:     make(map[string]*Function, 0),
 	}
 }
 
@@ -805,12 +801,12 @@ type FunctionType struct {
 
 var _ Type = (*FunctionType)(nil)
 
-func (f *FunctionType) GetMethod() map[string]*FunctionType {
+func (f *FunctionType) GetMethod() map[string]*Function {
 	return nil
 }
 
-func (f *FunctionType) SetMethod(m map[string]*FunctionType) {}
-func (b *FunctionType) AddMethod(id string, f *FunctionType) {}
+func (f *FunctionType) SetMethod(m map[string]*Function) {}
+func (b *FunctionType) AddMethod(id string, f *Function) {}
 
 func (f *FunctionType) SetModifySelf(b bool) { f.IsModifySelf = b }
 

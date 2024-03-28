@@ -276,7 +276,7 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 
 	// handler method
 	pTyp := reflect.PointerTo(typ)
-	Methods := make(map[string]*FunctionType, typ.NumMethod()+pTyp.NumMethod())
+	Methods := make(map[string]*Function, typ.NumMethod()+pTyp.NumMethod())
 	handlerMethod := func(typ reflect.Type) {
 		for i := 0; i < typ.NumMethod(); i++ {
 			method := typ.Method(i)
@@ -286,7 +286,7 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 			}
 			funTyp.SetName(fmt.Sprintf("%s.%s", PkgPath, method.Name))
 			// funTyp.SetName(PkgPath)
-			Methods[method.Name] = funTyp
+			Methods[method.Name] = NewFunctionWithType(method.Name, funTyp)
 		}
 	}
 

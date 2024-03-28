@@ -148,10 +148,10 @@ func (c *ClassBluePrint) RawString() string {
 func (c *ClassBluePrint) GetTypeKind() TypeKind {
 	return ClassBluePrintTypeKind
 }
-func (c *ClassBluePrint) SetMethod(map[string]*FunctionType) {
+func (c *ClassBluePrint) SetMethod(map[string]*Function) {
 }
-func (c *ClassBluePrint) AddMethod(string, *FunctionType) {
+func (c *ClassBluePrint) AddMethod(string, *Function) {
 }
-func (c *ClassBluePrint) GetMethod() map[string]*FunctionType {
+func (c *ClassBluePrint) GetMethod() map[string]*Function {
 	return nil
 }
