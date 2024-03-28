@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -31,6 +32,8 @@ func (s *Server) QueryMITMRuleExtractedData(ctx context.Context, req *ypb.QueryM
 				Regexp:     utils.EscapeInvalidUTF8Byte([]byte(i.Regexp)),
 				RuleName:   utils.EscapeInvalidUTF8Byte([]byte(i.RuleVerbose)),
 				Data:       utils.EscapeInvalidUTF8Byte([]byte(i.Data)),
+				Index:      int64(i.DataIndex),
+				Length:     int64(i.Length),
 			}
 		}).([]*ypb.MITMRuleExtractedData),
 		Total:      int64(p.TotalRecord),
