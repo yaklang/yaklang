@@ -2,12 +2,14 @@ package yakit
 
 import (
 	"context"
+	"strings"
+
+	"github.com/dlclark/regexp2"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
 )
 
 type ExtractedData struct {
@@ -27,6 +29,12 @@ type ExtractedData struct {
 
 	// UTF8 safe escape
 	Data string
+
+	// DataIndex 表示数据的位置
+	DataIndex int
+
+	// Length 表示数据的长度
+	Length int
 }
 
 func CreateOrUpdateExtractedData(db *gorm.DB, mainId int64, i interface{}) error {
@@ -79,7 +87,7 @@ func QueryExtractedData(db *gorm.DB, req *ypb.QueryMITMRuleExtractedDataRequest)
 	return paging, ret, nil
 }
 
-func ExtractedDataFromHTTPFlow(flowHash string, ruleName string, data string, regexpStr ...string) *ExtractedData {
+func ExtractedDataFromHTTPFlow(flowHash string, ruleName string, matched *regexp2.Match, data string, regexpStr ...string) *ExtractedData {
 	var r string
 	if len(regexpStr) > 0 {
 		r = strings.Join(regexpStr, ", ")
@@ -90,6 +98,8 @@ func ExtractedDataFromHTTPFlow(flowHash string, ruleName string, data string, re
 		Regexp:      r,
 		RuleVerbose: ruleName,
 		Data:        data,
+		DataIndex:   matched.Index,
+		Length:      matched.Length,
 	}
 	return extractData
 }
@@ -99,7 +109,7 @@ func BatchExtractedData(db *gorm.DB, ctx context.Context) chan *ExtractedData {
 	go func() {
 		defer close(outC)
 
-		var page = 1
+		page := 1
 		for {
 			var items []*ExtractedData
 			if _, b := bizhelper.NewPagination(&bizhelper.Param{
