@@ -489,8 +489,8 @@ staticClassExpr
     | identifier '::' VarName                     # ClassDirectStaticVariable
     | string '::' identifier                      # StringAsIndirectClassStaticFunctionMember
     | string '::' VarName                         # StringAsIndirectClassStaticVariable
-    | variable '::' identifier                    # DirectConstVariable //$a::a;
-    | variable '::' variable                      # ClassConstVariable //$a::$b;
+//    | variable '::' identifier                    # DirectConstVariable //$a::a;
+//    | variable '::' variable                      # ClassConstVariable //$a::$b;
     ;
 
 
@@ -518,6 +518,7 @@ expression
     | constant                                                    # ScalarExpression
     | string                                                      # ScalarExpression
     | defineExpr                                                  # DefinedOrScanDefinedExpression
+    | Print expression                                            # PrintExpression
     | Label                                                       # ScalarExpression
     | BackQuoteString                                             # BackQuoteStringExpression
     | '(' expression ')'                                          # ParenthesisExpression
@@ -536,7 +537,8 @@ expression
     | ('!' | '+' | '-') expression                                # UnaryOperatorExpression
     | ('++' | '--') leftVariable                                  # PrefixIncDecExpression
     | leftVariable ('++' | '--')                                  # PostfixIncDecExpression
-    | expression ('->' memberCallKey)* arguments                  # FunctionCallExpression
+//    | expression ('->' memberCallKey)* arguments                  # FunctionCallExpression
+    | expression arguments                                        # FunctionCallExpression
     | expression '[' indexMemberCallKey ']'                       # IndexCallExpression
     | expression '->' memberCallKey                               # MemberCallExpression
     | <assoc = right> expression op = '**' expression             # ArithmeticExpression
@@ -943,7 +945,7 @@ key
     | Typeof
     | UintCast
     | UnicodeCast
-    | Unset
+//    | Unset
     | Use
     | Var
     | While

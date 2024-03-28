@@ -368,18 +368,18 @@ func TestParseSSA_DeclareConst(t *testing.T) {
 const NAME = 1,DJAOP=2;
 println(NAME);
 println(DJAOP);`
-		ssatest.CheckPrintlnValue(code, []string{"1", "2"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"\"1\"", "\"2\""}, t)
 	})
 	t.Run("global const declare redefined", func(t *testing.T) {
 		code := `<?php
-const NAME = 1;
+const NAME = "1";
 const NAME = 2;
 println(NAME);`
-		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"\"1\""}, t)
 	})
 	t.Run("defined const", func(t *testing.T) {
 		code := `<?php define('a',1); println(a);`
-		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"\"1\""}, t)
 	})
 	t.Run("define function const redefined", func(t *testing.T) {
 		code := `<?php
@@ -394,7 +394,7 @@ println(a);`
 const a = 3;
 define('a','2');
 println(a);`
-		ssatest.CheckPrintlnValue(code, []string{"3"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"\"3\""}, t)
 	})
 	t.Run("const and function, use const", func(t *testing.T) {
 		code := `<?php
@@ -426,5 +426,21 @@ function b(int $a){
 
 a(b(a));`
 		ssatest.MockSSA(t, code)
+	})
+}
+func TestStringPart(t *testing.T) {
+	t.Run("double quote", func(t *testing.T) {
+		code := `<?php
+$a=1;
+$b=2;
+println("$a+$b");`
+		ssatest.CheckPrintlnValue(code, []string{"\"1+2\""}, t)
+	})
+	t.Run("signal quote", func(t *testing.T) {
+		code := `<?php
+$a=1;
+$b=2;
+println('$a+$b');`
+		ssatest.CheckPrintlnValue(code, []string{"\"$a+$b\""}, t)
 	})
 }
