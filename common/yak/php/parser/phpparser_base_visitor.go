@@ -383,6 +383,14 @@ func (v *BasePHPParserVisitor) VisitStringAsIndirectClassStaticVariable(ctx *Str
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitDirectConstVariable(ctx *DirectConstVariableContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitClassConstVariable(ctx *ClassConstVariableContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitMemberCallKey(ctx *MemberCallKeyContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -435,10 +443,6 @@ func (v *BasePHPParserVisitor) VisitSliceCallAssignmentExpression(ctx *SliceCall
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitPrintExpression(ctx *PrintExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BasePHPParserVisitor) VisitPostfixIncDecExpression(ctx *PostfixIncDecExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -484,6 +488,10 @@ func (v *BasePHPParserVisitor) VisitVariableExpression(ctx *VariableExpressionCo
 }
 
 func (v *BasePHPParserVisitor) VisitNullCoalescingExpression(ctx *NullCoalescingExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitDefinedOrScanDefinedExpression(ctx *DefinedOrScanDefinedExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -536,6 +544,10 @@ func (v *BasePHPParserVisitor) VisitStaticClassAccessExpression(ctx *StaticClass
 }
 
 func (v *BasePHPParserVisitor) VisitLeftVariable(ctx *LeftVariableContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitDefineExpr(ctx *DefineExprContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

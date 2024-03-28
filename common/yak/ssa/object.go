@@ -93,7 +93,6 @@ func (b *FunctionBuilder) InterfaceAddFieldBuild(size int, keys func(int) Value,
 	if b.MarkedVariable != nil {
 		itf.SetName(b.MarkedVariable.GetName())
 		b.MarkedThisObject = itf
-
 		defer func() {
 			b.MarkedThisObject = nil
 		}()
