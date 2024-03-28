@@ -3,6 +3,7 @@ package ssa
 import (
 	"fmt"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
@@ -49,6 +50,22 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 	}
 	f.EnterBlock = f.NewBasicBlock("entry")
 	return f
+}
+
+func (f *Function) GetType() Type {
+	if f.Type != nil {
+		return f.Type
+	} else {
+		return GetAnyType()
+	}
+}
+func (f *Function) SetType(t Type) {
+	if funTyp, ok := ToFunctionType(t); ok {
+		f.Type = funTyp
+	} else {
+		log.Errorf("Function type is not FunctionType")
+	}
+
 }
 
 func (f *Function) GetProgram() *Program {
@@ -105,4 +122,12 @@ func NewFunctionWithType(name string, typ *FunctionType) *Function {
 	f.SetType(typ)
 	f.SetName(name)
 	return f
+}
+
+func (f *Function) IsMethod() bool {
+	return f.Type.IsMethod
+}
+
+func (f *Function) SetMethod(is bool) {
+	f.Type.IsMethod = is
 }
