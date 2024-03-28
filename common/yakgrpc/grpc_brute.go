@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bruteutils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -106,5 +107,49 @@ func (s *Server) StartBrute(params *ypb.StartBruteParams, stream ypb.Yak_StartBr
 }
 
 func (s *Server) GetAvailableBruteTypes(ctx context.Context, req *ypb.Empty) (*ypb.GetAvailableBruteTypesResponse, error) {
-	return &ypb.GetAvailableBruteTypesResponse{Types: bruteutils.GetBuildinAvailableBruteType()}, nil
+	return &ypb.GetAvailableBruteTypesResponse{
+		Types:          bruteutils.GetBuildinAvailableBruteType(),
+		TypesWithChild: BuildInBruteTypeTree,
+	}, nil
+}
+
+var BuildInBruteTypeTree = GetBuildinAvailableBruteTypeTree(bruteutils.AuthFunctionMap)
+
+func GetBuildinAvailableBruteTypeTree(typeMap []struct {
+	Name string
+	Data string
+}) []*ypb.Tree {
+	res := make(map[string]*ypb.Tree)
+	for _, item := range typeMap {
+		data := item.Data
+		name := item.Name
+		names := strings.Split(name, "/")
+		if len(names) == 1 {
+			// no '/', just append this item
+			res[names[0]] = &ypb.Tree{
+				Name: names[0],
+				Data: data,
+			}
+			continue
+		}
+
+		// has "/"
+
+		// get parent node
+		tree, ok := res[names[0]]
+		if !ok {
+			// create parent node
+			tree = &ypb.Tree{
+				Name: names[0],
+				Data: "",
+			}
+			res[names[0]] = tree
+		}
+		// create child node
+		tree.Children = append(tree.Children, &ypb.Tree{
+			Name: names[1],
+			Data: data,
+		})
+	}
+	return lo.Values(res)
 }
