@@ -155,7 +155,7 @@ func TestClosure_FreeValue_Function(t *testing.T) {
 			}
 			target = b.get
 			`,
-			Want: []string{"a", "#7.key"},
+			Want: []string{"a", "#8.key"},
 		})
 	})
 

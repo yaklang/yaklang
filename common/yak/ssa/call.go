@@ -5,13 +5,27 @@ import (
 )
 
 func NewCall(target Value, args, binding []Value, block *BasicBlock) *Call {
-	if method, ok := ToMethod(target); ok {
-		if len(args) == 0 {
-			args = append(args, method.This)
-		} else {
-			args = utils.InsertSliceItem(args, method.This, method.Index)
+	// handler "this" in parameter
+	{
+		AddThis := func(this Value) {
+			if len(args) == 0 {
+				args = append(args, this)
+			} else {
+				args = utils.InsertSliceItem(args, this, 0)
+			}
 		}
-		target = method.Function
+		switch t := target.(type) {
+		case *ClassMethod: // for class instance
+			AddThis(t.This)
+			target = t.Func
+		case *Function: // for object inner function
+			if len(t.Param) > 0 {
+				if para := t.Param[0]; para != nil && para.IsObject() && para.GetDefault() != nil {
+					AddThis(para.GetDefault())
+				}
+			}
+		default:
+		}
 	}
 
 	c := &Call{
@@ -94,6 +108,7 @@ func (c *Call) handleCalleeFunction() {
 	if !ok {
 		return
 	}
+
 	{
 		builder := c.GetFunc().builder
 		recoverBuilder := builder.SetCurrent(c)
@@ -104,7 +119,10 @@ func (c *Call) handleCalleeFunction() {
 				break
 			}
 			for _, p := range funcTyp.ParameterValue {
+				//TODO:  i don't know why this condition, it should be clearer
 				if len(c.Args) == p.FormalParameterIndex {
+					// free-value member-call will be set to parameter,
+					// this parameter will contain default value, use this.
 					if p.GetDefault() != nil {
 						c.Args = append(c.Args, p.GetDefault())
 					}
@@ -160,7 +178,8 @@ func (c *Call) handleCalleeFunction() {
 				variable = builder.CreateVariable(se.Name)
 			}
 
-			// TODO: handle side effect in loop scope, will replace value in scope and create new phi
+			// TODO: handle side effect in loop scope,
+			// will replace value in scope and create new phi
 			sideEffect := builder.EmitSideEffect(se.Name, c, se.Modify)
 			if sideEffect != nil {
 				builder.AssignVariable(variable, sideEffect)
@@ -182,15 +201,6 @@ func (c *Call) handleCalleeFunction() {
 		return
 	}
 
-	// get object
-	obj := c.Method.GetObject()
-	if len(c.Args) != 0 {
-		if c.Args[0] != obj {
-			c.Args = utils.InsertSliceItem(c.Args, obj, 0)
-		}
-	} else {
-		c.Args = append(c.Args, obj)
-	}
 }
 
 func (c *Call) HandleFreeValue(fvs []*Parameter) {

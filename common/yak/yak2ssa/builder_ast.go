@@ -1362,6 +1362,10 @@ func (b *astbuilder) buildAnonymousFunctionDecl(stmt *yak.AnonymousFunctionDeclC
 		recoverRange := b.SetRange(stmt.BaseParserRuleContext)
 
 		b.FunctionBuilder = b.PushFunction(newFunc)
+		if b.MarkedThisObject != nil {
+			this := b.NewParam(b.MarkedThisObject.GetName())
+			this.SetDefault(b.MarkedThisObject)
+		}
 
 		if stmt.EqGt() != nil {
 			if stmt.LParen() != nil && stmt.RParen() != nil {

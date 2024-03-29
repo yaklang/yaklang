@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // value
@@ -14,6 +15,8 @@ func SetMemberCall(obj, key, member Value) {
 	member.SetKey(key)
 }
 
+// ReplaceMemberCall replace all member or object relationship
+// and will fixup method function call
 func ReplaceMemberCall(v, to Value) map[string]Value {
 	ret := make(map[string]Value)
 	builder := v.GetFunc().builder
@@ -26,35 +29,60 @@ func ReplaceMemberCall(v, to Value) map[string]Value {
 		for _, member := range v.GetAllMember() {
 			// replace this member object to to
 			key := member.GetKey()
+			// remove this member from v
 			v.DeleteMember(key)
 
+			// create member of `to` value with key
+			// if fun := GetMethod(value.GetType(), key.String()); fun != nil {
+			// 	return NewClassMethod(fun, value)
+			// }
 			// re-set type
 			name, typ := checkCanMemberCall(to, key)
-			origin := builder.getOriginMember(name, typ, to, key)
+			// toMember := builder.getOriginMember(name, typ, to, key)
+			toMember := builder.ReadMemberCallVariable(to, key)
 
+			// then, we will replace value, `member` to `toMember`
 			if member.GetOpcode() != OpUndefined {
 				member.SetName(name)
 				member.SetType(typ)
 				SetMemberCall(to, key, member)
-				ret[name] = createPhi(name, []Value{origin, member})
+				ret[name] = createPhi(name, []Value{toMember, member})
 				continue
 			}
 
-			ReplaceAllValue(member, origin)
+			ReplaceAllValue(member, toMember)
 			DeleteInst(member)
 
-			origin.GetUsers().RunOnCall(func(c *Call) {
-				c.handleCalleeFunction()
-				c.handlerReturnType()
-			})
+			if method, ok := ToMethod(toMember); ok {
+				_ = method
+				// fixup function call
+				toMember.GetUsers().RunOnCall(func(c *Call) {
+					// hand method
+					c.Method = method.Func
+					this := method.This
 
-			ret[name] = origin
+					// hand argument
+					args := c.Args
+					if len(args) == 0 {
+						args = append(args, this)
+					} else {
+						args = utils.InsertSliceItem(args, this, 0)
+					}
+					c.Args = args
+
+					c.handleCalleeFunction()
+					c.handlerReturnType()
+				})
+				continue
+			}
+
+			ret[name] = toMember
 		}
 	}
 
+	// TODO : this need more test, i think this code error
 	if v.IsMember() {
 		obj := v.GetObject()
-		// obj.AddMember(v.GetKey(), to)
 		SetMemberCall(obj, v.GetKey(), v)
 	}
 	return ret
@@ -246,6 +274,7 @@ func (b *FunctionBuilder) getExternLibMemberCall(value, key Value) string {
 }
 
 func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
+	// to extern lib
 	if extern, ok := ToExternLib(value); ok {
 		// write to extern Lib
 		name := b.getExternLibMemberCall(value, key)
@@ -268,7 +297,11 @@ func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
 		p.SetExtern(true)
 		return p
 	}
+	if fun := GetMethod(value.GetType(), key.String()); fun != nil {
+		return NewClassMethod(fun, value)
+	}
 
+	// parameter or freeValue, this member-call mark as Parameter
 	if para, ok := ToParameter(value); ok {
 		if para.IsFreeValue {
 			b.appendParam(para)

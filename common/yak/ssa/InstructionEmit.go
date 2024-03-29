@@ -308,8 +308,7 @@ func (f *FunctionBuilder) EmitNewClassBluePrint(memberCount int) *ClassBluePrint
 	c := NewClassBluePrint()
 	containerLen := f.EmitConstInst(memberCount)
 	containerCap := f.EmitConstInst(memberCount)
-	this := f.EmitMakeBuildWithType(NewObjectType(), containerLen, containerCap)
-	c.SetThis(this)
+	f.EmitMakeBuildWithType(NewObjectType(), containerLen, containerCap)
 	return c
 }
 
