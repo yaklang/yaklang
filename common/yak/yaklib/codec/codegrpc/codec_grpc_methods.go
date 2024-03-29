@@ -845,8 +845,9 @@ func (flow *CodecExecFlow) Find(find string, findType string, Global, Multiline,
 	}
 
 	match, err := reg.FindStringMatch(string(flow.Text))
-	if err != nil {
-		return err
+	if err != nil || match == nil { // match fail return []byte("")
+		flow.Text = []byte("")
+		return nil
 	}
 	text := match.String()
 	if Global {
