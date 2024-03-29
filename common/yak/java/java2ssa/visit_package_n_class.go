@@ -198,7 +198,7 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 	if ret := i.RecordDeclaration(); ret != nil {
 		log.Infof("todo: java17: %v", ret.GetText())
 	} else if ret := i.MethodDeclaration(); ret != nil {
-		y.VisitMethodDeclaration(ret)
+		y.VisitMethodDeclaration(ret, class, isStatic)
 	} else if ret := i.GenericMethodDeclaration(); ret != nil {
 	} else if ret := i.FieldDeclaration(); ret != nil {
 		// 声明成员变量
@@ -346,7 +346,7 @@ func (y *builder) VisitRecordDeclaration(raw javaparser.IRecordDeclarationContex
 	return nil
 }
 
-func (y *builder) VisitMethodDeclaration(raw javaparser.IMethodDeclarationContext) {
+func (y *builder) VisitMethodDeclaration(raw javaparser.IMethodDeclarationContext, class *ssa.ClassBluePrint, isStatic bool) {
 	if y == nil || raw == nil {
 		return
 	}
@@ -357,26 +357,52 @@ func (y *builder) VisitMethodDeclaration(raw javaparser.IMethodDeclarationContex
 
 	funcName := i.Identifier().GetText()
 
-	y.SetMarkedFunction(funcName)
-	newFunction := y.NewFunc(funcName)
-	var ir *ssa.FunctionBuilder
-	ir = y.PushFunction(newFunction)
-	{
-		y.VisitFormalParameters(i.FormalParameters())
-		y.VisitMethodBody(i.MethodBody())
-		ir.SetType(y.VisitTypeTypeOrVoid(i.TypeTypeOrVoid()))
-		ir.Finish()
-	}
-	ir = ir.PopFunction()
-	variable := ir.CreateVariable(funcName)
-	ir.AssignVariable(variable, newFunction)
-	if i.THROWS() != nil {
-		if qualifiedNameList := i.QualifiedNameList(); qualifiedNameList != nil {
-			y.VisitQualifiedNameList(qualifiedNameList)
+	if isStatic {
+		y.SetMarkedFunction(funcName)
+		newFunction := y.NewFunc(funcName)
+
+		y.PushFunction(newFunction)
+		{
+			y.VisitFormalParameters(i.FormalParameters())
+			y.VisitMethodBody(i.MethodBody())
+			y.SetType(y.VisitTypeTypeOrVoid(i.TypeTypeOrVoid()))
+			y.Finish()
+		}
+		y.PopFunction()
+		variable := y.CreateVariable(funcName)
+		y.AssignVariable(variable, newFunction)
+		if i.THROWS() != nil {
+			if qualifiedNameList := i.QualifiedNameList(); qualifiedNameList != nil {
+				y.VisitQualifiedNameList(qualifiedNameList)
+			}
+
+		}
+	} else {
+		createFunction := func() *ssa.Function {
+			newFunction := y.NewFunc(funcName)
+			y.FunctionBuilder = y.PushFunction(newFunction)
+			{
+				this := y.NewParam("this")
+				_ = this
+				y.VisitFormalParameters(i.FormalParameters())
+				y.VisitMethodBody(i.MethodBody())
+				y.Finish()
+			}
+			y.FunctionBuilder = y.PopFunction()
+			return newFunction
 		}
 
+		if i.THROWS() != nil {
+			if qualifiedNameList := i.QualifiedNameList(); qualifiedNameList != nil {
+				y.VisitQualifiedNameList(qualifiedNameList)
+			}
+
+		}
+		newFunction := createFunction()
+		class.AddMarkedField(funcName, newFunction, 0)
+
 	}
-	return
+
 }
 
 func (y *builder) VisitMethodBody(raw javaparser.IMethodBodyContext) {
