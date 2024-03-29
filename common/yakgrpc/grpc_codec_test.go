@@ -102,7 +102,7 @@ func TestGRPCNewCodec_YakScript(t *testing.T) {
 			CodecType: "CustomCodecPlugin",
 			Params: []*ypb.ExecParamItem{
 				{
-					Key: "pluginContext",
+					Key: "pluginContent",
 					Value: `
 handle = func(origin /*string*/) {
     if type(origin).String() != "string"{
@@ -134,5 +134,143 @@ handle = func(origin /*string*/) {
 	fmt.Println(rsp.GetResult())
 	if rsp.GetResult() != "ok" {
 		t.Fatal("check yak script input type fail")
+	}
+}
+
+func TestGRPCNewCodec_Find(t *testing.T) {
+	workFlow := []*ypb.CodecWork{
+		{
+			CodecType: "Find",
+			Params: []*ypb.ExecParamItem{
+				{
+					Key:   "find",
+					Value: "a.*",
+				}, {
+					Key:   "findType",
+					Value: "regexp",
+				}, {
+					Key:   "Global",
+					Value: "",
+				}, {
+					Key:   "Multiline",
+					Value: "",
+				}, {
+					Key:   "IgnoreCase",
+					Value: "",
+				},
+			},
+		},
+	}
+	client, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+	rsp, err := client.NewCodec(utils.TimeoutContextSeconds(1),
+		&ypb.CodecRequestFlow{
+			Text:       "acccccc",
+			Auto:       false,
+			WorkFlow:   workFlow,
+			InputBytes: nil,
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(rsp.GetResult())
+	if rsp.GetResult() != "acccccc" {
+		t.Fatal("check find method fail")
+	}
+	client, err = NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+	rsp, err = client.NewCodec(utils.TimeoutContextSeconds(1),
+		&ypb.CodecRequestFlow{
+			Text:       "cccccc",
+			Auto:       false,
+			WorkFlow:   workFlow,
+			InputBytes: nil,
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	if rsp.GetResult() != "" {
+		t.Fatal("check find method fail")
+	}
+}
+
+func TestGRPCNewCodec_Replace(t *testing.T) {
+	workFlow := []*ypb.CodecWork{
+		{
+			CodecType: "Replace",
+			Params: []*ypb.ExecParamItem{
+				{
+					Key:   "find",
+					Value: "a.*",
+				},
+				{
+					Key:   "replace",
+					Value: "c",
+				}, {
+					Key:   "findType",
+					Value: "regexp",
+				}, {
+					Key:   "Global",
+					Value: "true",
+				}, {
+					Key:   "Multiline",
+					Value: "",
+				}, {
+					Key:   "IgnoreCase",
+					Value: "",
+				},
+			},
+		},
+	}
+	client, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+	rsp, err := client.NewCodec(utils.TimeoutContextSeconds(1),
+		&ypb.CodecRequestFlow{
+			Text: `abc
+acb
+aaa
+bbb
+`,
+			Auto:       false,
+			WorkFlow:   workFlow,
+			InputBytes: nil,
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(rsp.GetResult())
+	if rsp.GetResult() != `c
+c
+c
+bbb
+` {
+		t.Fatal("check replace method fail")
+	}
+	client, err = NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+	rsp, err = client.NewCodec(utils.TimeoutContextSeconds(1),
+		&ypb.CodecRequestFlow{
+			Text:       "cccccc",
+			Auto:       false,
+			WorkFlow:   workFlow,
+			InputBytes: nil,
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	if rsp.GetResult() != "cccccc" {
+		t.Fatal("check find method fail")
 	}
 }
