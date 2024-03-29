@@ -1075,7 +1075,7 @@ func (s *Server) NewCodec(ctx context.Context, req *ypb.CodecRequestFlow) (resp 
 		case reflect.Float64:
 			return strconv.ParseFloat(param, 64)
 		case reflect.Bool:
-			return strconv.ParseBool(param)
+			return codec.Atob(param), nil
 		case reflect.Slice:
 			if fieldType.Elem().Kind() == reflect.Uint8 {
 				return utils.UnsafeStringToBytes(param), nil

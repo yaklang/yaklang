@@ -893,10 +893,10 @@ func (flow *CodecExecFlow) CodecPlugin(pluginName string) error {
 // CodecName = "临时Codec插件"
 // Desc = """自定义临时Codec插件"""
 // Params = [
-// { Name = "pluginContext", Type = "monaco", Required = true , Label = "插件内容"},
+// { Name = "pluginContent", Type = "monaco", Required = true , Label = "插件内容"},
 // ]
-func (flow *CodecExecFlow) CustomCodecPlugin(pluginContext string) error {
-	engine, err := yak.NewScriptEngine(1000).ExecuteEx(pluginContext, map[string]interface{}{
+func (flow *CodecExecFlow) CustomCodecPlugin(pluginContent string) error {
+	engine, err := yak.NewScriptEngine(1000).ExecuteEx(pluginContent, map[string]interface{}{
 		"YAK_FILENAME": "temp-codec",
 	})
 	if err != nil {
