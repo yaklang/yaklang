@@ -210,7 +210,7 @@ func (c *WebsocketClient) WritePong(r []byte) error {
 }
 
 func (c *WebsocketClient) WriteClose() error {
-	data := FormatCloseMessage(CloseNormalClosure, "正常关闭了")
+	data := FormatCloseMessage(CloseNormalClosure, "")
 	if err := c.fw.write(data, CloseMessage, true); err != nil {
 		return errors.Wrap(err, "write close frame failed")
 	}
@@ -262,12 +262,12 @@ func NewWebsocketClient(packet []byte, opt ...WebsocketClientOpt) (*WebsocketCli
 	var addr = utils.HostPort(host, port)
 	var conn net.Conn
 	if config.TLS {
-		conn, err = netx.DialTLSTimeout(1*time.Second, addr, nil, config.Proxy)
+		conn, err = netx.DialTLSTimeout(10*time.Second, addr, nil, config.Proxy)
 		if err != nil {
 			return nil, utils.Errorf("dial tls-conn failed: %s", err)
 		}
 	} else {
-		conn, err = netx.DialTCPTimeout(1*time.Second, addr, config.Proxy)
+		conn, err = netx.DialTCPTimeout(10*time.Second, addr, config.Proxy)
 		if err != nil {
 			return nil, utils.Errorf("dial conn failed: %s", err)
 		}
