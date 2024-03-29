@@ -248,7 +248,7 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 				y.ir.AssignVariable(variable, newFunction)
 				class.AddStaticMethod(funcName, newFunction)
 			} else {
-				class.AddNormalMethod(funcName, newFunction, 0)
+				class.AddMethod(funcName, newFunction)
 			}
 		}
 	case *phpparser.ConstContext:

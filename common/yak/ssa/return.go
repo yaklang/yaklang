@@ -31,8 +31,41 @@ func (r *Return) calcType() Type {
 	}
 }
 
+func (b *FunctionBuilder) fixupParameterWithThis() {
+	// has this value, in first parameter
+	if b.MarkedThisObject == nil {
+		return
+	}
+	if len(b.Param) <= 0 {
+		return
+	}
+	// if this value is not object, and not user, should remove it.
+	para := b.Param[0]
+	if para == nil || para.IsObject() || para.HasUsers() {
+		return
+	}
+
+	// remove from param
+	b.Param = utils.RemoveSliceItem(b.Param, para)
+	// fix other field in function
+	b.ParamLength--
+	// fix other parameter index
+	for i, p := range b.Param {
+		p.FormalParameterIndex = i
+	}
+	// fixup side effect,
+	// if this side-effect is member call, the index just "--"
+	for _, se := range b.SideEffects {
+		if se.IsMemberCall {
+			se.ParameterIndex--
+		}
+	}
+}
+
 // Finish current function builder
 func (b *FunctionBuilder) Finish() {
+	b.fixupParameterWithThis()
+
 	for _, fun := range b.MarkedFunctions {
 		for name, fv := range fun.FreeValues {
 			if fv.GetDefault() != nil {

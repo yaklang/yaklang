@@ -18,49 +18,63 @@ func NewPhi(block *BasicBlock, variable string, create bool) *Phi {
 	return p
 }
 
-func SpinHandle(name string, phiValue, origin, latch Value) map[string]Value {
-	ret := make(map[string]Value)
-	handler := func() {
+func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
+	/*
+		loop-header:
+			init
 
+		loop-condition:
+			loop[init, condition,] jump loop-body
+
+		loop-body:
+			...
+			jump loop-latch;
+
+		loop-latch:
+			...
+			jump loop-header;
+	*/
+	ret := make(map[string]Value)
+	for true {
 		// step 1
-		// this  value not change in this loop, should replace phi-value to origin value
+		// this  value not change in this loop, should replace phi-value to header value
 		if phiValue == latch {
-			ReplaceAllValue(phiValue, origin)
+			ReplaceAllValue(phiValue, header)
 			DeleteInst(phiValue)
 
-			for name, v := range ReplaceMemberCall(phiValue, origin) {
+			for name, v := range ReplaceMemberCall(phiValue, header) {
 				ret[name] = v
 			}
 
-			ret[name] = origin
-			return
+			ret[name] = header
+			break
 		}
 
 		// only this value change, create a Phi
 		phi, ok := ToPhi(phiValue)
 		if !ok {
 			log.Errorf("phiValue is not a phi %s: %v", name, phiValue)
-			return
+			break
 		}
 
 		// step 2
 		if phi2, ok := ToPhi(latch); ok {
 			if index := slices.Index(phi2.Edge, phiValue); index != -1 {
-				phi2.Edge[index] = origin
+				phi2.Edge[index] = header
 				ret[name] = phi2
 				DeleteInst(phiValue)
-				return
+				break
 			}
 		}
 
 		// step 3
-		phi.Edge = append(phi.Edge, origin)
+		phi.Edge = append(phi.Edge, header)
 		phi.Edge = append(phi.Edge, latch)
 		phi.SetName(name)
 		phi.GetProgram().SetVirtualRegister(phi)
 		ret[name] = phiValue
+		break
 	}
-	handler()
 	return ret
 }
 
