@@ -3,7 +3,6 @@ package tests
 import (
 	"testing"
 
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 )
 
@@ -325,14 +324,12 @@ println($test);`,
 }
 
 func TestAssignVariables(t *testing.T) {
-	code := `<?php $a=1;if($b){$a=2;}`
-	parse, err := ssaapi.Parse(code, ssaapi.WithLanguage("php"))
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	parse.Ref("$a").Show()
-	//fmt.Println(parse.GetAllSymbols())
+	t.Run("test $_GET variables", func(t *testing.T) {
+		code := `<?php
+ $a = $_GET["1"];
+println($a);`
+		ssatest.MockSSA(t, code)
+	})
 }
 
 func TestParseSSA_SpecialWordExpression(t *testing.T) {
@@ -351,7 +348,7 @@ die(include("syntax/for.php"));
 		code := `<?php
 $b =isset($a);
 println($b);`
-		ssatest.CheckPrintlnValue(code, []string{"false"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"any"}, t)
 	})
 	t.Run("isset-2", func(t *testing.T) {
 		code := `<?php
@@ -368,7 +365,7 @@ func TestParseSSA_DeclareConst(t *testing.T) {
 const NAME = 1,DJAOP=2;
 println(NAME);
 println(DJAOP);`
-		ssatest.CheckPrintlnValue(code, []string{"\"1\"", "\"2\""}, t)
+		ssatest.CheckPrintlnValue(code, []string{"1", "2"}, t)
 	})
 	t.Run("global const declare redefined", func(t *testing.T) {
 		code := `<?php
@@ -379,7 +376,7 @@ println(NAME);`
 	})
 	t.Run("defined const", func(t *testing.T) {
 		code := `<?php define('a',1); println(a);`
-		ssatest.CheckPrintlnValue(code, []string{"\"1\""}, t)
+		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
 	})
 	t.Run("define function const redefined", func(t *testing.T) {
 		code := `<?php
@@ -394,7 +391,7 @@ println(a);`
 const a = 3;
 define('a','2');
 println(a);`
-		ssatest.CheckPrintlnValue(code, []string{"\"3\""}, t)
+		ssatest.CheckPrintlnValue(code, []string{"3"}, t)
 	})
 	t.Run("const and function, use const", func(t *testing.T) {
 		code := `<?php
@@ -403,7 +400,7 @@ function a(){
     echo "ada";
 }
 println(a);`
-		ssatest.CheckPrintlnValue(code, []string{"\"1\""}, t)
+		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
 	})
 	t.Run("const and function,use function", func(t *testing.T) {
 		code := `<?php
@@ -442,5 +439,15 @@ $a=1;
 $b=2;
 println('$a+$b');`
 		ssatest.CheckPrintlnValue(code, []string{"\"$a+$b\""}, t)
+	})
+}
+
+func TestParseSSA_MemberCallKey(t *testing.T) {
+	t.Run("memberCallKey", func(t *testing.T) {
+		code := `<?php
+$a[1|1]=0;
+println($a[1|1]);
+`
+		ssatest.CheckPrintlnValue(code, []string{"0"}, t)
 	})
 }

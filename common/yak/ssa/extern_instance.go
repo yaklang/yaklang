@@ -151,11 +151,6 @@ func (b *FunctionBuilder) BuildValueFromAny(id string, v any) (value Value) {
 	if itype == nil {
 		return nil
 	}
-
-	if strings.HasPrefix(id, "$") || strings.HasPrefix(id, "_") {
-		return nil
-	}
-
 	str := id
 	switch itype.Kind() {
 	case reflect.Func:
