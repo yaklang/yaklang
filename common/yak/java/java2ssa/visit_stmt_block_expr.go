@@ -99,6 +99,10 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		// 处理切片调用表达式
 		expr := y.VisitExpression(ret.Expression(0))
 		key := y.VisitExpression(ret.Expression(1))
+		if expr == nil {
+			y.NewError(ssa.Error, "javaast", "slice call expression left side is empty")
+			return nil
+		}
 		if utils.IsNil(key) {
 			y.NewError(ssa.Error, "javaast", yak2ssa.AssignRightSideEmpty())
 			return nil
@@ -106,9 +110,28 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		return y.ReadMemberCallVariable(expr, key)
 	case *javaparser.MemberCallExpressionContext:
 		// 处理成员调用表达式，如通过点操作符访问成员
-		// todo: 成员调用表达式
-		value = y.ReadValue(ret.GetText())
-		return value
+		obj := y.VisitExpression(ret.Expression())
+		if obj == nil {
+			return nil
+		}
+		var key ssa.Value
+		if id := ret.Identifier(); id != nil {
+			key = y.EmitConstInst(id.GetText())
+		} else if method := ret.MethodCall(); method != nil {
+			key = y.VisitMethodCall(method)
+		} else if this := ret.THIS(); this != nil {
+			key = y.EmitConstInst(this.GetText())
+		} else if super := ret.SUPER(); super != nil {
+			// todo: 访问父类成员
+			key = y.EmitConstInst(super.GetText())
+		} else if creator := ret.InnerCreator(); creator != nil {
+			//todo : 内部类创建
+			key = y.EmitConstInst(creator.GetText())
+		} else if explicit := ret.ExplicitGenericInvocation(); explicit != nil {
+			//todo : 显式泛型调用
+			key = y.EmitConstInst(explicit.GetText())
+		}
+		return y.ReadMemberCallVariable(obj, key)
 	case *javaparser.FunctionCallExpressionContext:
 		// 处理函数调用表达式
 		if s := ret.MethodCall(); s != nil {
@@ -249,9 +272,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		return nil
 	case *javaparser.NewCreatorExpressionContext:
 		// 处理创建对象的表达式
-		// todo: 创建对象的表达式
-		y.VisitCreator(ret.Creator())
-		return nil
+		return y.VisitCreator(ret.Creator())
 	case *javaparser.MultiplicativeExpressionContext:
 		// 处理乘法、除法、模运算表达式
 		op1 := y.VisitExpression(ret.Expression(0))
@@ -560,8 +581,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		return nil
 	case *javaparser.Java8LambdaExpressionContext:
 		// 处理 Java 8 的 lambda 表达式
-		// todo: Java 8 的 lambda 表达式
-		return y.EmitConstInstNil()
+		return y.VisitLambdaExpression(ret.LambdaExpression())
 	default:
 		// 默认情况，可能是不支持的表达式类型
 		log.Errorf("unsupported expression type: %T", ret)
@@ -895,7 +915,7 @@ func (y *builder) VisitLocalVariableDeclaration(raw javaparser.ILocalVariableDec
 	return nil
 }
 
-func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorContext) {
+func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorContext) (name string, value ssa.Value) {
 	if y == nil || raw == nil {
 		return
 	}
@@ -906,19 +926,21 @@ func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorCont
 	}
 
 	if i.VariableInitializer() != nil {
-		text := i.VariableDeclaratorId().(*javaparser.VariableDeclaratorIdContext).Identifier().GetText()
-		variable := y.CreateVariable(text)
+		name := i.VariableDeclaratorId().(*javaparser.VariableDeclaratorIdContext).Identifier().GetText()
+		variable := y.CreateVariable(name)
 		value := y.VisitVariableInitializer(i.VariableInitializer())
 		if utils.IsNil(value) {
-			return
+			return name, nil
 		} else {
 			y.AssignVariable(variable, value)
+			return name, value
 		}
 	} else {
-		text := i.VariableDeclaratorId().(*javaparser.VariableDeclaratorIdContext).Identifier().GetText()
-		y.CreateVariable(text)
+		name := i.VariableDeclaratorId().(*javaparser.VariableDeclaratorIdContext).Identifier().GetText()
+		y.CreateVariable(name)
+		return name, value
 	}
-	return
+
 }
 
 func (y *builder) VisitVariableInitializer(raw javaparser.IVariableInitializerContext) ssa.Value {
@@ -953,7 +975,10 @@ func (y *builder) VisitArguments(raw javaparser.IArgumentsContext) []ssa.Value {
 	if ret := i.ExpressionList(); ret != nil {
 		exprs := ret.(*javaparser.ExpressionListContext)
 		for _, expr := range exprs.AllExpression() {
-			args = append(args, y.VisitExpression(expr))
+			a := y.VisitExpression(expr)
+			if a != nil {
+				args = append(args, a)
+			}
 		}
 	}
 	return args
@@ -1376,16 +1401,68 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) ssa.Value {
 	if i == nil {
 		return nil
 	}
+
+	// todo 类声明的泛型
+	if nonWildcard := i.NonWildcardTypeArguments(); nonWildcard != nil {
+	}
+
 	var p ssa.Type
 	if ret := i.CreatedName(); ret != nil {
 		p = y.VisitCreatedName(ret)
 	}
-	// todo new声明类的方式
+	//class init
+	if ret := i.ClassCreatorRest(); ret != nil {
+		className := i.CreatedName().GetText()
+		// todo 泛型
+		class := y.GetClass(className)
+		if class == nil {
+			return nil
+		}
+		obj := y.EmitMakeWithoutType(nil, nil)
+		obj.SetType(class)
+		constructor := y.GetClassConstructor(className)
+		if constructor == nil {
+			return obj
+		}
+		args := []ssa.Value{obj}
+		arguments := y.VisitClassCreatorRest(ret, className)
+		args = append(args, arguments...)
+		c := y.NewCall(constructor, args)
+		y.EmitCall(c)
+		return obj
+	}
+	//array init
 	if ret := i.ArrayCreatorRest(); ret != nil {
 		return y.VisitArrayCreatorRest(ret, p)
 	}
 
 	return nil
+}
+
+func (y *builder) VisitClassCreatorRest(raw javaparser.IClassCreatorRestContext, oldClassName string) []ssa.Value {
+	if y == nil || raw == nil {
+		return nil
+	}
+	i, _ := raw.(*javaparser.ClassCreatorRestContext)
+	if i == nil {
+		return nil
+	}
+
+	var args []ssa.Value
+	if i.Arguments() != nil {
+		exprList := i.Arguments().(*javaparser.ArgumentsContext).ExpressionList()
+		args = y.VisitExpressionList(exprList)
+	}
+	if i.ClassBody() != nil {
+		// 匿名类
+		className := uuid.NewString()
+		class := y.CreateClass(className)
+		if oldClassName != "" {
+			class.ParentClass = append(class.ParentClass, y.GetClass(oldClassName))
+		}
+		y.VisitClassBody(i.ClassBody(), class)
+	}
+	return args
 }
 
 func (y *builder) VisitArrayCreatorRest(raw javaparser.IArrayCreatorRestContext, p ssa.Type) ssa.Value {
@@ -1436,4 +1513,17 @@ func (y *builder) VisitCreatedName(raw javaparser.ICreatedNameContext) ssa.Type 
 		return ssa.GetAnyType()
 	}
 
+}
+
+func (y *builder) VisitLambdaExpression(raw javaparser.ILambdaExpressionContext) ssa.Value {
+	if y == nil || raw == nil {
+		return nil
+	}
+
+	i, _ := raw.(*javaparser.LambdaExpressionContext)
+	if i == nil {
+		return nil
+	}
+	return y.EmitConstInstNil()
+	// todo lambda表达式
 }
