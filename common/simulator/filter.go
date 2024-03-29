@@ -12,6 +12,9 @@ import (
 
 func CalculateRelevanceMatrix(elements rod.Elements, elementTypes []string) (map[string]*rod.Element, error) {
 	result := make(map[string]*rod.Element)
+	if len(elementTypes) == 0 {
+		return result, utils.Error("uncheck element types null")
+	}
 	keys := maps.Keys(KeywordDict)
 	if !ArrayInArray(elementTypes, keys) {
 		return result, utils.Error(`detect type more than exist type`)
