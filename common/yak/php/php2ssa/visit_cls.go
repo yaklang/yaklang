@@ -390,10 +390,10 @@ func (y *builder) VisitIdentifierInitializer(raw phpparser.IIdentifierInitialize
 		unquote = _unquote
 	}
 	if ConstValue, ok := y.constMap[unquote]; ok {
-		log.Warnf("const %v has been defined value is %v", unquote, ConstValue)
+		log.Warnf("const %v has been defined value is %v", unquote, ConstValue.String())
 	} else {
 		//y.ir.AssignVariable(y.ir.CreateVariable(i.Identifier().GetText()), y.VisitConstantInitializer(i.ConstantInitializer()))
-		y.constMap[unquote] = y.VisitConstantInitializer(i.ConstantInitializer()).String()
+		y.constMap[unquote] = y.VisitConstantInitializer(i.ConstantInitializer())
 	}
 	return nil
 }
@@ -539,6 +539,10 @@ func (y *builder) VisitIndexMemberCallKey(raw phpparser.IIndexMemberCallKeyConte
 		return y.VisitMemberCallKey(i.MemberCallKey())
 	}
 
+	//冗余 后续修改
+	if i.Expression() != nil {
+		return y.VisitExpression(i.Expression())
+	}
 	return nil
 
 }

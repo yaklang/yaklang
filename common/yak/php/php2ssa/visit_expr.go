@@ -1,15 +1,16 @@
 package php2ssa
 
 import (
+	"os"
+	"path/filepath"
+	"strconv"
+
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"os"
-	"path/filepath"
-	"strconv"
 )
 
 func (y *builder) VisitExpressionStatement(raw phpparser.IExpressionStatementContext) interface{} {
@@ -79,15 +80,27 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 	case *phpparser.CodeExecExpressionContext:
 		var code string
 		value := y.VisitExpression(ret.Expression())
-		if unquote, err := strconv.Unquote(value.String()); err != nil {
-			code = value.String()
+		if value.GetType().GetTypeKind() == ssa.StringTypeKind {
+			if unquote, err := strconv.Unquote(value.String()); err != nil {
+				code = value.String()
+			} else {
+				code = unquote
+			}
+			//应该考虑更多情况
+			code = `<?php ` + code + ";"
+			if err := Build(code, false, y.ir); err != nil {
+				log.Errorf("execute code %v failed", code)
+			}
 		} else {
-			code = unquote
-		}
-		//应该考虑更多情况
-		code = `<?php ` + code + ";"
-		if err := Build(code, false, y.ir); err != nil {
-			log.Errorf("execute code %v failed", code)
+			var execFunction string
+			if ret.Assert() != nil {
+				execFunction = "assert"
+			} else {
+				execFunction = "eval"
+			}
+			readValue := y.ir.ReadValue(execFunction)
+			call := y.ir.NewCall(readValue, []ssa.Value{value})
+			return y.ir.EmitCall(call)
 		}
 		return y.ir.EmitConstInstNil()
 	case *phpparser.KeywordNewExpressionContext:
@@ -227,7 +240,8 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		} else if i := ret.IsSet(); i != nil {
 			for _, chain := range ret.ChainList().(*phpparser.ChainListContext).AllChain() {
 				if visitChain := y.VisitChain(chain); visitChain.IsUndefined() {
-					return y.ir.EmitConstInst(false)
+					return y.ir.EmitConstInstAny()
+					//return y.ir.EmitConstInst(false)
 				}
 			}
 			return y.ir.EmitConstInst(true)
@@ -449,7 +463,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		if !y.isFunction {
 			s, ok := y.constMap[unquote]
 			if ok {
-				return y.ir.EmitConstInst(s)
+				return s
 			} else {
 				log.Warnf("const map not found %v", unquote)
 			}
@@ -1208,7 +1222,7 @@ func (y *builder) VisitDefineExpr(raw phpparser.IDefineExprContext) ssa.Value {
 			log.Warnf("const %v has been defined value is %v", constantString.String(), constValue)
 		} else {
 			//y.ir.AssignVariable(y.ir.CreateVariable(constantString.String()), value)
-			y.constMap[constantString.String()] = value.String()
+			y.constMap[constantString.String()] = value
 			flag = true
 		}
 	}

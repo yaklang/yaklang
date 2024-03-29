@@ -38,6 +38,7 @@ func TestAllSyntaxForPHP_G4(t *testing.T) {
 		if err != nil {
 			t.Fatalf("cannot found syntax fs: %v", path)
 		}
+		//ssatest.MockSSA(t, string(raw))
 		validateSource(t, path, string(raw))
 	}
 }

@@ -489,8 +489,6 @@ staticClassExpr
     | identifier '::' VarName                     # ClassDirectStaticVariable
     | string '::' identifier                      # StringAsIndirectClassStaticFunctionMember
     | string '::' VarName                         # StringAsIndirectClassStaticVariable
-//    | variable '::' identifier                    # DirectConstVariable //$a::a;
-//    | variable '::' variable                      # ClassConstVariable //$a::$b;
     ;
 
 
@@ -503,6 +501,7 @@ memberCallKey
 indexMemberCallKey
     : memberCallKey
     | numericConstant
+    | expression
     ;
 
 // Expressions
@@ -537,7 +536,6 @@ expression
     | ('!' | '+' | '-') expression                                # UnaryOperatorExpression
     | ('++' | '--') leftVariable                                  # PrefixIncDecExpression
     | leftVariable ('++' | '--')                                  # PostfixIncDecExpression
-//    | expression ('->' memberCallKey)* arguments                  # FunctionCallExpression
     | expression arguments                                        # FunctionCallExpression
     | expression '[' indexMemberCallKey ']'                       # IndexCallExpression
     | expression '->' memberCallKey                               # MemberCallExpression
