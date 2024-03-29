@@ -227,8 +227,11 @@ func (bruteForce *HttpBruteForceCore) inputElementDetect() error {
 			return utils.Errorf("find captcha element error: %v", err)
 		}
 		removeElements = append(removeElements, captchaElement)
-	} else {
+	} else if bruteForce.config.captchaUrl != "" {
 		toCheckTags = append(toCheckTags, "Captcha")
+	}
+	if len(toCheckTags) == 0 {
+		return nil
 	}
 	inputElements := ElementsMinus(originInputElements, removeElements)
 	// calculate

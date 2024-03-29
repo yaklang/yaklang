@@ -51,10 +51,19 @@ func (matrix *DataMatrix[T]) GetResult() (map[string]T, error) {
 			if row == maxRow {
 				continue
 			}
+			if len(rows) <= maxColumn {
+				return result, utils.Errorf("matrix size error on tempData")
+			}
 			temp := append(rows[:maxColumn], rows[maxColumn+1:]...)
 			if len(temp) != 0 {
 				afterRemove = append(afterRemove, temp)
 			}
+		}
+		if len(tempTag) <= maxColumn {
+			return result, utils.Errorf("matrix size error on tempTag")
+		}
+		if len(tempItem) <= maxRow {
+			return result, utils.Errorf("matrix size error on tempItem")
 		}
 		if maxData <= 0 {
 			var null T
