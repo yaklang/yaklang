@@ -7,6 +7,7 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"github.com/BurntSushi/toml"
+	"github.com/dlclark/regexp2"
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/authhack"
 	"github.com/yaklang/yaklang/common/consts"
@@ -21,6 +22,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"github.com/yaklang/yaklang/common/yserx"
+	"regexp"
 	"strings"
 )
 
@@ -766,6 +768,98 @@ func (flow *CodecExecFlow) Fuzz() error {
 		return err
 	}
 	flow.Text = []byte(strings.Join(res, "\n"))
+	return nil
+}
+
+// Tag = "其他"
+// CodecName = "Replace"
+// Desc = """替换字符串处理本文"""
+// Params = [
+// { Name = "find", Type = "input", Required = true , Label = "Find"},
+// { Name = "replace", Type = "input", Required = false , Label = "Replace"},
+// { Name = "findType", Type = "select",DefaultValue = "regexp",Options = ["regexp","raw"], Required = true , Label = "查找方式"},
+// { Name = "Global", Type = "checkbox", Required = true , Label = "全部匹配"},
+// { Name = "IgnoreCase", Type = "checkbox", Required = true , Label = "忽略大小写"},
+// { Name = "Multiline", Type = "checkbox", Required = true , Label = "多行匹配"},
+// ]
+func (flow *CodecExecFlow) Replace(find string, replace string, findType string, Global, Multiline, IgnoreCase bool) error {
+
+	count := 1
+	if Global {
+		count = -1
+	}
+
+	if findType == "raw" {
+		find = regexp.QuoteMeta(find)
+	}
+
+	regFlag := regexp2.None
+	if Multiline {
+		regFlag = regFlag | regexp2.Multiline
+	}
+	if IgnoreCase {
+		regFlag = regFlag | regexp2.IgnoreCase
+	}
+
+	reg, err := regexp2.Compile(find, regFlag)
+	if err != nil {
+		return err
+	}
+
+	text, err := reg.Replace(string(flow.Text), replace, -1, count)
+
+	if err != nil {
+		return err
+	}
+
+	flow.Text = []byte(text)
+	return nil
+}
+
+// Tag = "其他"
+// CodecName = "Find"
+// Desc = """替换字符串处理本文"""
+// Params = [
+// { Name = "find", Type = "input", Required = true , Label = "Find"},
+// { Name = "findType", Type = "select",DefaultValue = "regexp",Options = ["regexp","raw"], Required = true , Label = "查找方式"},
+// { Name = "Global", Type = "checkbox", Required = true , Label = "全部匹配"},
+// { Name = "IgnoreCase", Type = "checkbox", Required = true , Label = "忽略大小写"},
+// { Name = "Multiline", Type = "checkbox", Required = true , Label = "多行匹配"},
+// ]
+func (flow *CodecExecFlow) Find(find string, findType string, Global, Multiline, IgnoreCase bool) error {
+	if findType == "raw" {
+		find = regexp.QuoteMeta(find)
+	}
+
+	regFlag := regexp2.None
+	if Multiline {
+		regFlag = regFlag | regexp2.Multiline
+	}
+	if IgnoreCase {
+		regFlag = regFlag | regexp2.IgnoreCase
+	}
+
+	reg, err := regexp2.Compile(find, regFlag)
+	if err != nil {
+		return err
+	}
+
+	match, err := reg.FindStringMatch(string(flow.Text))
+	if err != nil {
+		return err
+	}
+	text := match.String()
+	if Global {
+		for {
+			match, err = reg.FindNextMatch(match)
+			if err != nil || match == nil {
+				break
+			}
+			text = strings.Join([]string{text, match.String()}, "\n")
+		}
+	}
+
+	flow.Text = []byte(text)
 	return nil
 }
 
