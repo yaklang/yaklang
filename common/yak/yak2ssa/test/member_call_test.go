@@ -245,9 +245,9 @@ func TestMemberCall_Method(t *testing.T) {
 	t.Run("normal", func(t *testing.T) {
 		check(t, `
 		a = getExample()
-		println(a.ExampleMethod)
+		println(a.ExampleMethod())
 		`, []string{
-			"Undefined-a.ExampleMethod(valid)",
+			"Function-ExampleMethod(Function-getExample())",
 		})
 	})
 }
@@ -320,7 +320,7 @@ func Test_CallMember_Make(t *testing.T) {
 		}, t)
 	})
 
-	t.Run("test make self method ", func(t *testing.T) {
+	t.Run("test make self method", func(t *testing.T) {
 		test.CheckPrintlnValue(`
 		a = "this string"
 		a = {
@@ -329,7 +329,7 @@ func Test_CallMember_Make(t *testing.T) {
 				return a
 			}
 		}
-		`, []string{"FreeValue-a"}, t)
+		`, []string{"Parameter-a"}, t)
 	})
 
 }

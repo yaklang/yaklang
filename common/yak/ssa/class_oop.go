@@ -58,12 +58,12 @@ func (c *ClassBluePrint) GetMember(key string, get func(*ClassBluePrint) (Value,
 
 // AddNormalMethod is used to add a method to the class,
 // parameters: name, function of the method, function, index of the this object in parameter
-func (c *ClassBluePrint) AddNormalMethod(name string, fun *Function, index int) {
-	c.NormalMethod[name] = &method{
-		function: fun,
-		index:    index,
-	}
-}
+// func (c *ClassBluePrint) AddNormalMethod(name string, fun *Function, index int) {
+// 	c.NormalMethod[name] = &method{
+// 		function: fun,
+// 		index:    index,
+// 	}
+// }
 
 // AddNormalMember is used to add a normal member to the class,
 func (c *ClassBluePrint) AddNormalMember(name string, value Value) {

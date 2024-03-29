@@ -285,7 +285,6 @@ func (f *FunctionBuilder) handlerType(typ reflect.Type, level int) Type {
 				funTyp.Parameter = utils.InsertSliceItem(funTyp.Parameter, ret, 0)
 			}
 			funTyp.SetName(fmt.Sprintf("%s.%s", PkgPath, method.Name))
-			// funTyp.SetName(PkgPath)
 			Methods[method.Name] = NewFunctionWithType(method.Name, funTyp)
 		}
 	}

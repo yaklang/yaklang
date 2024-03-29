@@ -74,6 +74,7 @@ func NewBuilder(f *Function, parent *FunctionBuilder) *FunctionBuilder {
 		b.parentScope = parent.parentScope.Create(parent.CurrentBlock.ScopeTable)
 		b.ClassBluePrint = parent.ClassBluePrint
 		b.DisableFreeValue = parent.DisableFreeValue
+		b.MarkedThisObject = parent.MarkedThisObject
 	} else {
 		b.ClassBluePrint = make(map[string]*ClassBluePrint)
 	}

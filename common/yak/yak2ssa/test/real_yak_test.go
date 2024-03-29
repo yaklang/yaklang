@@ -8,6 +8,24 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 )
 
+func TestYakBuildInMethod(t *testing.T) {
+	t.Run("slice insert", func(t *testing.T) {
+		ssatest.CheckNoError(t, `
+		a = [] 
+		a.Insert(0, 1)
+	`)
+	})
+
+	t.Run("slice append in loop", func(t *testing.T) {
+		ssatest.CheckNoError(t, `
+		a = [] 
+		for i in [1, 2]{
+			a.Append(i)
+		}
+		`)
+	})
+}
+
 func Test_RealYak_Function(t *testing.T) {
 	t.Run("object", func(t *testing.T) {
 		ssatest.CheckNoError(t, `
@@ -168,4 +186,23 @@ func Test_RealYak_ObjectType(t *testing.T) {
 		result = exprDetails.result
 		`)
 	})
+}
+
+func Test_RealYak_Object_Factor(t *testing.T) {
+	t.Run("test pool", func(t *testing.T) {
+		ssatest.CheckNoError(t, `
+		getA = func(size){
+			a = {
+				"f":c =>{
+					return a
+				},
+			}
+			return a
+		}
+
+		obj = getA(10)
+		obj.f(1)
+		`)
+	})
+
 }

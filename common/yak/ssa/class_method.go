@@ -3,22 +3,25 @@ package ssa
 import "fmt"
 
 type ClassMethod struct {
-	*Function
-	This  Value
-	Index int // index of function parameter
+	anValue
+	Func *Function
+	This Value
 }
 
-func NewClassMethod(fun *Function, this Value, index int) *ClassMethod {
+func NewClassMethod(fun *Function, this Value) *ClassMethod {
 	return &ClassMethod{
-		Function: fun,
-		This:     this,
-		Index:    index,
+		anValue: NewValue(),
+		Func:    fun,
+		This:    this,
 	}
 }
+
+func (f *ClassMethod) HasValues() bool   { return false }
+func (f *ClassMethod) GetValues() Values { return nil }
 
 var _ Value = (*ClassMethod)(nil)
 
 func (c *ClassMethod) String() string {
-	str := fmt.Sprintf("ClassMethod: %s", c.Function.GetName())
+	str := fmt.Sprintf("ClassMethod: %s", c.Func.GetName())
 	return str
 }

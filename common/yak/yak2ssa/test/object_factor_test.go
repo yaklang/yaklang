@@ -281,7 +281,7 @@ func Test_ObjectFactor_FreeValue(t *testing.T) {
 
 		`,
 			Want: []string{
-				"Function-.get(Function-f(),1)",
+				"Function-this.get(Function-f(),1)",
 			},
 		})
 	})
@@ -305,7 +305,7 @@ func Test_ObjectFactor_FreeValue(t *testing.T) {
 
 		`,
 			Want: []string{
-				"Function-.get(Function-f(),1)",
+				"Function-this.get(Function-f(),1)",
 			},
 		})
 	})
@@ -328,7 +328,7 @@ func Test_ObjectFactor_FreeValue(t *testing.T) {
 
 		`,
 			Want: []string{
-				"Function-.get(Function-f(),1)",
+				"Function-this.get(Function-f(),1)",
 			},
 		})
 	})
@@ -363,10 +363,10 @@ func Test_ObjectFactor_ALL(t *testing.T) {
 			println(b.get())
 			`,
 			Want: []string{
-				"Function-.get(Function-f(),side-effect(Parameter-i, a.key))",
-				"Function-.get(Function-f(),side-effect(Parameter-i, b.key))",
-				"Function-.get(Function-f(),side-effect(Parameter-i, a.key))",
-				"Function-.get(Function-f(),side-effect(Parameter-i, this.key))",
+				"Function-this.get(Function-f(),side-effect(Parameter-i, a.key))",
+				"Function-this.get(Function-f(),side-effect(Parameter-i, b.key))",
+				"Function-this.get(Function-f(),side-effect(Parameter-i, a.key))",
+				"Function-this.get(Function-f(),side-effect(Parameter-i, this.key))",
 			},
 		})
 	})
