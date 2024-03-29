@@ -88,7 +88,7 @@ var CVEUtilCommands = []*cli.Command{
 			cli.BoolFlag{Name: "cwe"},
 			cli.BoolFlag{Name: "cache"},
 			cli.StringFlag{Name: "output,o"},
-			cli.StringFlag{Name: "description-db", Value: consts.GetCVEDatabasePath()},
+			cli.StringFlag{Name: "description-db"},
 			cli.IntFlag{Name: "year"},
 			cli.BoolFlag{Name: "no-gzip"},
 		},
