@@ -46,41 +46,43 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext)
 	if i == nil {
 		return nil
 	}
+	var mergedTemplate []string
 
 	className := i.Identifier().GetText()
-	log.Infof("building class: %v", className)
+	class := y.CreateClass(className)
 
-	// Generic Type
 	if ret := i.TypeParameters(); ret != nil {
-		log.Infof("class: %v 's (generic type) type is %v, ignore for ssa building", className, ret.GetText())
+		//log.Infof("class: %v 's (generic type) type is %v, ignore for ssa building", className, ret.GetText())
 	}
 
-	// Extend Type
 	if extend := i.TypeType(); extend != nil {
-		log.Infof("class: %v extend: %s", className, extend.GetText())
-		y.VisitTypeType(extend)
+		mergedTemplate = append(mergedTemplate, extend.GetText())
 	}
 
-	haveImplements := false
+	//haveImplements := false
 	if i.IMPLEMENTS() != nil {
-		haveImplements = true
-		log.Infof("class: %v implemented %v is ignored", className, i.TypeList(0).GetText())
+		//haveImplements = true
+		mergedTemplate = append(mergedTemplate, i.TypeList(0).GetText())
 	}
 
-	if i.PERMITS() != nil {
-		idx := 1
-		if !haveImplements {
-			idx = 0
+	//if i.PERMITS() != nil {
+	//	idx := 1
+	//	if !haveImplements {
+	//		idx = 0
+	//	}
+	//	log.Infof("class: %v java17 permits: %v", className, i.TypeList(idx).GetText())
+	//}
+
+	for _, parentClass := range mergedTemplate {
+		if parent := y.GetClass(parentClass); parent != nil {
+			class.ParentClass = append(class.ParentClass, parent)
 		}
-		log.Infof("class: %v java17 permits: %v", className, i.TypeList(idx).GetText())
 	}
-
-	y.VisitClassBody(i.ClassBody())
-
+	y.VisitClassBody(i.ClassBody(), class)
 	return nil
 }
 
-func (y *builder) VisitClassBody(raw javaparser.IClassBodyContext) interface{} {
+func (y *builder) VisitClassBody(raw javaparser.IClassBodyContext, class *ssa.ClassBluePrint) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -90,21 +92,76 @@ func (y *builder) VisitClassBody(raw javaparser.IClassBodyContext) interface{} {
 		return nil
 	}
 
-	ir := y
 	allMembers := i.AllClassBodyDeclaration()
-	pb := ir.EmitNewClassBluePrint(len(allMembers))
 	for _, decl := range allMembers {
 		instance := decl.(*javaparser.ClassBodyDeclarationContext)
 		if ret := instance.Block(); ret != nil {
 			isStatic := instance.STATIC() != nil
 			log.Infof("handle class static code: %v", isStatic)
 			y.VisitBlock(instance.Block())
+			// todo static block
 		} else if ret := instance.MemberDeclaration(); ret != nil {
-			y.VisitMemberDeclaration(pb, ret)
+			var modifiers = make(map[ssa.ClassModifier]struct{})
+			for _, modifier := range instance.AllModifier() {
+				m := y.VisitModifier(modifier)
+				modifiers[m] = struct{}{}
+			}
+			isStatic := false
+			if _, ok := modifiers[ssa.Static]; ok {
+				isStatic = true
+			}
+			if class != nil {
+				y.VisitMemberDeclaration(ret, class, isStatic)
+			}
+
 		}
 	}
 
 	return nil
+}
+func (y *builder) VisitModifier(raw javaparser.IModifierContext) ssa.ClassModifier {
+	var m ssa.ClassModifier
+	if y == nil || raw == nil {
+		return m
+	}
+	i, _ := raw.(*javaparser.ModifierContext)
+	if i == nil {
+		return m
+	}
+
+	if i.ClassOrInterfaceModifier() == nil {
+		return m
+	} else {
+		return y.VisitClassOrInterfaceModifier(i.ClassOrInterfaceModifier())
+	}
+
+}
+
+func (y *builder) VisitClassOrInterfaceModifier(raw javaparser.IClassOrInterfaceModifierContext) ssa.ClassModifier {
+	var m ssa.ClassModifier
+	if y == nil || raw == nil {
+		return m
+	}
+	i, _ := raw.(*javaparser.ClassOrInterfaceModifierContext)
+	if i == nil {
+		return m
+	}
+
+	if i.PUBLIC() != nil {
+		return ssa.Public
+	} else if i.PROTECTED() != nil {
+		return ssa.Protected
+	} else if i.PRIVATE() != nil {
+		return ssa.Private
+	} else if i.STATIC() != nil {
+		return ssa.Static
+	} else if i.ABSTRACT() != nil {
+		return ssa.Abstract
+	} else if i.FINAL() != nil {
+		return ssa.Final
+	} else {
+		return ssa.NoneModifier
+	}
 }
 
 func (y *builder) VisitFormalParameters(raw javaparser.IFormalParametersContext) {
@@ -128,14 +185,14 @@ func (y *builder) VisitFormalParameters(raw javaparser.IFormalParametersContext)
 
 }
 
-func (y *builder) VisitMemberDeclaration(klass *ssa.ClassBluePrint, raw javaparser.IMemberDeclarationContext) interface{} {
+func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContext, class *ssa.ClassBluePrint, isStatic bool) {
 	if y == nil || raw == nil {
-		return nil
+		return
 	}
 
 	i, _ := raw.(*javaparser.MemberDeclarationContext)
 	if i == nil {
-		return nil
+		return
 	}
 
 	if ret := i.RecordDeclaration(); ret != nil {
@@ -145,12 +202,23 @@ func (y *builder) VisitMemberDeclaration(klass *ssa.ClassBluePrint, raw javapars
 	} else if ret := i.GenericMethodDeclaration(); ret != nil {
 	} else if ret := i.FieldDeclaration(); ret != nil {
 		// 声明成员变量
-		field := ret.(*javaparser.FieldDeclarationContext)
-		variables := field.VariableDeclarators().(*javaparser.VariableDeclaratorsContext).AllVariableDeclarator()
-		for _, variable := range variables {
-			y.CreateLocalVariable(variable.GetText())
-			log.Infof("create member declaration%v", variable.GetText())
+		setMember := class.BuildMember
+		if isStatic {
+			setMember = class.BuildStaticMember
 		}
+		field := ret.(*javaparser.FieldDeclarationContext)
+
+		if field.TypeType() == nil {
+			y.VisitTypeType(field.TypeType())
+		}
+
+		variableDeclarators := field.VariableDeclarators().(*javaparser.VariableDeclaratorsContext).AllVariableDeclarator()
+		for _, variableDeclarator := range variableDeclarators {
+			v := variableDeclarator.(*javaparser.VariableDeclaratorContext)
+			name, value := y.VisitVariableDeclarator(v)
+			setMember(name, value)
+		}
+		return
 
 	} else if ret := i.ConstructorDeclaration(); ret != nil {
 
@@ -166,10 +234,10 @@ func (y *builder) VisitMemberDeclaration(klass *ssa.ClassBluePrint, raw javapars
 
 	} else {
 		log.Errorf("no member declaration found: %v", i.GetText())
-		return nil
+		return
 	}
 
-	return nil
+	return
 }
 
 func (y *builder) VisitTypeType(raw javaparser.ITypeTypeContext) ssa.Type {
