@@ -8,7 +8,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 	"testing"
@@ -18,7 +17,7 @@ import (
 func TestGRPCMUSTPASS_MITM_WebSocket(t *testing.T) {
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(20))
 	defer cancel()
-	token := utils.RandNumberStringBytes(20)
+	token := utils.RandStringBytes(60)
 
 	host, port := utils.DebugMockEchoWs("enPayload")
 	log.Infof("addr:  %s:%d", host, port)
@@ -28,7 +27,7 @@ func TestGRPCMUSTPASS_MITM_WebSocket(t *testing.T) {
 	}
 	var mitmPort = utils.GetRandomAvailableTCPPort()
 	var proxy = "http://" + utils.HostPort("127.0.0.1", mitmPort)
-
+	count := 0
 	RunMITMTestServer(client, ctx, &ypb.MITMRequest{
 		Port: uint32(mitmPort),
 		Host: "127.0.0.1",
@@ -48,29 +47,37 @@ Sec-WebSocket-Version: 13
 Connection: keep-alive, Upgrade
 User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0
 Accept: */*
-`, utils.HostPort(host, port))), lowhttp.WithWebsocketProxy(proxy))
+`, utils.HostPort(host, port))), lowhttp.WithWebsocketProxy(proxy), lowhttp.WithWebsocketFromServerHandler(func(bytes []byte) {
+			if string(bytes) == "server: "+token {
+				count++
+			}
+			if count == 3 {
+				cancel()
+			}
+		}))
+
 		if err != nil {
 			t.Fatalf("send websocket request err: %v", err)
 		}
+		wsClient.StartFromServer()
 		for i := 0; i < 3; i++ {
-			err = wsClient.Write([]byte(token))
+			err = wsClient.WriteText([]byte(token))
+			if err != nil {
+				t.Fatalf("send websocket request err: %v", err)
+			}
 		}
-		if err != nil {
-			t.Fatalf("send websocket request err: %v", err)
-		}
-		time.Sleep(1 * time.Second)
-		count := yakit.SearchWebsocketFlow("server: " + token)
-		fmt.Println(count)
-		if count != 3 {
-			t.Errorf("search httpflow by token failed: yakit.QuickSearchMITMHTTPFlowCount(token)")
-		}
+		defer wsClient.WriteClose()
 	})
+
+	if count != 3 {
+		t.Fatalf("TestGRPCMUSTPASS_MITM_WebSocket count(%d) != 3", count)
+	}
 }
 
 func TestGRPCMUSTPASS_MITM_WebSocket_Payload(t *testing.T) {
-	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(15))
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(20))
 	defer cancel()
-	token := utils.RandNumberStringBytes(20)
+	token := utils.RandStringBytes(60)
 
 	host, port := utils.DebugMockEchoWs("payload")
 
@@ -93,7 +100,8 @@ func TestGRPCMUSTPASS_MITM_WebSocket_Payload(t *testing.T) {
 	})
 
 	stream.Send(&ypb.MITMRequest{SetAutoForward: true, AutoForwardValue: false})
-	tokenCount := 0
+	hijackClientPayload := false
+	hijackServerPayload := false
 	for {
 		rcpResponse, err := stream.Recv()
 		if err != nil {
@@ -114,9 +122,13 @@ func TestGRPCMUSTPASS_MITM_WebSocket_Payload(t *testing.T) {
 				if rcpResponse.GetRequest() == nil {
 					t.Fatalf("websocket rcpResponse.GetRequest() is nil")
 				}
-				if strings.Contains(string(rcpResponse.GetPayload()), token) {
-					tokenCount++
+				if string(rcpResponse.GetPayload()) == token {
+					hijackClientPayload = true
 				}
+				if string(rcpResponse.GetPayload()) == "server: "+token {
+					hijackServerPayload = true
+				}
+
 				stream.Send(&ypb.MITMRequest{
 					Id:         rcpResponse.GetId(),
 					ResponseId: rcpResponse.GetResponseId(),
@@ -147,20 +159,25 @@ Sec-WebSocket-Version: 13
 Connection: keep-alive, Upgrade
 User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0
 Accept: */*
-`, utils.HostPort(host, port))), lowhttp.WithWebsocketProxy(proxy))
+`, utils.HostPort(host, port))), lowhttp.WithWebsocketProxy(proxy), lowhttp.WithWebsocketFromServerHandler(func(bytes []byte) {
+					if string(bytes) == "server: "+token {
+						cancel()
+					}
+				}))
 				if err != nil {
 					t.Fatal(err)
 				}
-				time.Sleep(2 * time.Second)
+				wsClient.StartFromServer()
 				err = wsClient.Write([]byte(token))
 				if err != nil {
 					t.Fatal(err)
 				}
+				defer wsClient.WriteClose()
 			}()
 		}
 	}
 
-	if tokenCount != 2 {
-		t.Fatalf("tokenCount != 2")
+	if !hijackClientPayload || !hijackServerPayload {
+		t.Fatalf("TestGRPCMUSTPASS_MITM_WebSocket_Payload hijackClientPayload(%v) hijackServerPayload(%v)", hijackClientPayload, hijackServerPayload)
 	}
 }

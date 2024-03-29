@@ -32,6 +32,8 @@ const (
 
 	DEFAULT_TEXT_MESSAGE_FISRT_BYTE = 0b10000001
 
+	DEFAULT_CLOSE_MESSAGE_FIRST_BYTE = 0b10001000
+
 	TextMessage     = 1
 	BinaryMessage   = 2
 	CloseMessage    = 8
@@ -39,6 +41,37 @@ const (
 	PongMessage     = 10
 	ContinueMessage = 0
 )
+
+// Close codes defined in RFC 6455, section 11.7.
+const (
+	CloseNormalClosure           = 1000
+	CloseGoingAway               = 1001
+	CloseProtocolError           = 1002
+	CloseUnsupportedData         = 1003
+	CloseNoStatusReceived        = 1005
+	CloseAbnormalClosure         = 1006
+	CloseInvalidFramePayloadData = 1007
+	ClosePolicyViolation         = 1008
+	CloseMessageTooBig           = 1009
+	CloseMandatoryExtension      = 1010
+	CloseInternalServerErr       = 1011
+	CloseServiceRestart          = 1012
+	CloseTryAgainLater           = 1013
+	CloseTLSHandshake            = 1015
+)
+
+func FormatCloseMessage(closeCode int, text string) []byte {
+	if closeCode == CloseNoStatusReceived {
+		// Return empty message because it's illegal to send
+		// CloseNoStatusReceived. Return non-nil value in case application
+		// checks for nil.
+		return []byte{}
+	}
+	buf := make([]byte, 2+len(text))
+	binary.BigEndian.PutUint16(buf, uint16(closeCode))
+	copy(buf[2:], text)
+	return buf
+}
 
 var (
 	keyGUID = []byte("258EAFA5-E914-47DA-95CA-C5AB0DC85B11")
@@ -388,7 +421,11 @@ func (fw *FrameWriter) WriteRaw(raw []byte) (err error) {
 func (fw *FrameWriter) write(data []byte, messageType int, mask bool, headerBytes ...byte) error {
 	headerBytesLength := len(headerBytes)
 	if headerBytesLength == 0 {
-		headerBytes = []byte{DEFAULT_TEXT_MESSAGE_FISRT_BYTE, 0}
+		if messageType == TextMessage {
+			headerBytes = []byte{DEFAULT_TEXT_MESSAGE_FISRT_BYTE, 0}
+		} else if messageType == CloseMessage {
+			headerBytes = []byte{DEFAULT_CLOSE_MESSAGE_FIRST_BYTE, 0}
+		}
 	} else if headerBytesLength == 1 {
 		headerBytes = append(headerBytes, 0)
 	}
@@ -411,7 +448,7 @@ func (fw *FrameWriter) writeControl(data []byte, messageType int, mask bool) err
 
 func WebsocketFrameToData(frame *Frame) (data []byte) {
 
-	return frame.payload
+	return frame.GetData()
 }
 
 func DataToWebsocketControlFrame(messageType int, data []byte, mask bool) (frame *Frame, err error) {

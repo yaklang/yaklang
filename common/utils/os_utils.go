@@ -612,7 +612,12 @@ func DebugMockEchoWs(point string) (string, int) {
 		for {
 			mt, message, err := conn.ReadMessage()
 			if err != nil && message == nil {
-				log.Errorf("read: %v", err)
+				// 检查WebSocket是否正常关闭
+				if ws.IsCloseError(err, ws.CloseNormalClosure, ws.CloseGoingAway) {
+					log.Infof("Websocket closed normally: %v", err)
+				} else {
+					log.Errorf("read: %v", err)
+				}
 				return
 			}
 			serverMessage := []byte("server: " + string(message))
