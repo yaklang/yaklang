@@ -11,7 +11,7 @@ import (
 
 type builder struct {
 	ir         *ssa.FunctionBuilder
-	constMap   map[string]any
+	constMap   map[string]ssa.Value
 	isFunction bool
 }
 
@@ -22,7 +22,7 @@ func Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	}
 	b.DisableFreeValue = true
 	build := builder{
-		constMap: make(map[string]any),
+		constMap: make(map[string]ssa.Value),
 		ir:       b,
 	}
 	b.WithExternValue(phpBuildIn)
@@ -48,10 +48,16 @@ func FrondEnd(src string, force bool) (phpparser.IHtmlDocumentContext, error) {
 }
 
 var phpBuildIn = map[string]any{
-	"PHP_EOL": "",
-	"echo":    func(...any) {},
-	"println": func(...any) {},
-	"phpinfo": func() {},
+	"$_COOKIE":  map[interface{}]interface{}{},
+	"$_SESSION": map[interface{}]interface{}{},
+	"$_SERVER":  map[interface{}]interface{}{},
+	"$_POST":    map[interface{}]interface{}{},
+	"$_GET":     map[interface{}]interface{}{},
+	"$_REQUEST": map[interface{}]interface{}{},
+	"PHP_EOL":   "",
+	"echo":      func(...any) {},
+	"println":   func(...any) {},
+	"phpinfo":   func() {},
 	"strrev": func(value string) string {
 		return ""
 	},
@@ -245,11 +251,15 @@ var phpBuildIn = map[string]any{
 	"parse_ini_file": func(filename string, processSections bool) (map[string]map[string]interface{}, error) {
 		return nil, nil
 	},
-	"pathinfo":    func(path string) (map[string]string, error) { return nil, nil },
-	"realpath":    func(path string) (string, error) { return "", nil },
-	"rename":      func(oldName string, newName string) error { return nil },
-	"rmdir":       func(path string) error { return nil },
-	"scandir":     func(path string) ([]os.FileInfo, error) { return nil, nil },
-	"serialize":   func(value ssa.Value) string { return "" },
-	"unserialize": func(raw string) ssa.Value { return ssa.NewNil() },
+	"pathinfo":  func(path string) (map[string]string, error) { return nil, nil },
+	"realpath":  func(path string) (string, error) { return "", nil },
+	"rename":    func(oldName string, newName string) error { return nil },
+	"rmdir":     func(path string) error { return nil },
+	"scandir":   func(path string) ([]os.FileInfo, error) { return nil, nil },
+	"serialize": func(value ssa.Value) string { return "" },
+	"unserialize": func(raw string) ssa.Value {
+		return ssa.NewNil()
+	},
+	"eval":   func(code interface{}) {},
+	"assert": func(code interface{}) {},
 }
