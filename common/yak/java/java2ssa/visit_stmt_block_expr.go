@@ -118,7 +118,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		if id := ret.Identifier(); id != nil {
 			key = y.EmitConstInst(id.GetText())
 		} else if method := ret.MethodCall(); method != nil {
-			key = y.VisitMethodCall(method)
+			return y.VisitMethodCall(method, obj)
 		} else if this := ret.THIS(); this != nil {
 			key = y.EmitConstInst(this.GetText())
 		} else if super := ret.SUPER(); super != nil {
@@ -135,7 +135,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 	case *javaparser.FunctionCallExpressionContext:
 		// 处理函数调用表达式
 		if s := ret.MethodCall(); s != nil {
-			return y.VisitMethodCall(s)
+			return y.VisitMethodCall(s, nil)
 		}
 		return nil
 	case *javaparser.MethodReferenceExpressionContext:
@@ -553,9 +553,16 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			}
 		} else if memberCall := ret.LeftMemberCall(); memberCall != nil {
 			if id := memberCall.(*javaparser.LeftMemberCallContext).Identifier(); id != nil {
-				idText := id.GetText()
-				callee := y.EmitConstInst(idText)
-				variable = y.CreateMemberCallVariable(expr, callee)
+				object := expr
+				key := y.VisitLeftMemberCall(memberCall)
+				member := y.CreateMemberCallVariable(object, key)
+				if id := ret.Identifier(); id != nil {
+					value = y.ReadValue(id.GetText())
+				} else if ret.Expression(1) != nil {
+					value = y.VisitExpression(ret.Expression(1))
+				}
+				y.AssignVariable(member, value)
+				return value
 			}
 		}
 
@@ -565,7 +572,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			value = y.VisitExpression(expr)
 		}
 		y.AssignVariable(variable, value)
-		return nil
+		return value
 
 	case *javaparser.AssignmentEqExpression2Context:
 		// 处理赋值表达式的等于号
@@ -591,7 +598,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 	return y.EmitUndefined("_")
 }
 
-func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext) ssa.Value {
+func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext, object ssa.Value) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -601,20 +608,39 @@ func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext) ssa.Value {
 		return nil
 	}
 
-	var v ssa.Value
-	if ret := i.Identifier(); ret != nil {
-		v = y.ReadValue(ret.GetText())
-	} else if ret := i.THIS(); ret != nil {
-		v = y.ReadValue(ret.GetText())
-	} else if ret = i.SUPER(); ret != nil {
-		v = y.ReadValue(ret.GetText())
+	if object == nil {
+		var v ssa.Value
+		if ret := i.Identifier(); ret != nil {
+			v = y.ReadValue(ret.GetText())
+		} else if ret := i.THIS(); ret != nil {
+			v = y.ReadValue(ret.GetText())
+		} else if ret = i.SUPER(); ret != nil {
+			v = y.ReadValue(ret.GetText())
+		}
+		var args []ssa.Value
+		if argument := i.Arguments(); argument != nil {
+			args = y.VisitArguments(i.Arguments())
+			c := y.NewCall(v, args)
+			return y.EmitCall(c)
+		}
+	} else {
+		var memberKey ssa.Value
+		if ret := i.Identifier(); ret != nil {
+			memberKey = y.EmitConstInst(ret.GetText())
+		} else if ret := i.THIS(); ret != nil {
+			memberKey = y.EmitConstInst(ret.GetText())
+		} else if ret = i.SUPER(); ret != nil {
+			memberKey = y.EmitConstInst(ret.GetText())
+		}
+		methodCall := y.ReadMemberCallVariable(object, memberKey)
+		var args []ssa.Value
+		if argument := i.Arguments(); argument != nil {
+			args = y.VisitArguments(i.Arguments())
+			c := y.NewCall(methodCall, args)
+			return y.EmitCall(c)
+		}
 	}
-	var args []ssa.Value
-	if argument := i.Arguments(); argument != nil {
-		args = y.VisitArguments(i.Arguments())
-		c := y.NewCall(v, args)
-		return y.EmitCall(c)
-	}
+
 	return nil
 }
 
@@ -645,10 +671,36 @@ func (y *builder) VisitPrimary(raw javaparser.IPrimaryContext) ssa.Value {
 		return v
 	}
 	if ret := i.THIS(); ret != nil {
-		return y.ReadValue(ret.GetText())
+		//return y.ReadValue(ret.GetText())
+		text := ret.GetText()
+		if value := y.PeekValue(text); value != nil {
+			return value
+		} else {
+			return y.EmitConstInst(text)
+		}
 	}
 	if ret := i.SUPER(); ret != nil {
-		return y.ReadValue(ret.GetText())
+		//return y.ReadValue(ret.GetText())
+		text := ret.GetText()
+		if value := y.PeekValue(text); value != nil {
+			return value
+		} else {
+			return y.EmitConstInst(text)
+		}
+	}
+	return nil
+}
+
+func (y *builder) VisitLeftMemberCall(raw javaparser.ILeftMemberCallContext) ssa.Value {
+	if y == nil || raw == nil {
+		return nil
+	}
+	i, _ := raw.(*javaparser.LeftMemberCallContext)
+	if i == nil {
+		return nil
+	}
+	if i.Identifier() != nil {
+		return y.EmitConstInst(i.Identifier().GetText())
 	}
 	return nil
 }
@@ -1420,10 +1472,12 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) ssa.Value {
 		}
 		obj := y.EmitMakeWithoutType(nil, nil)
 		obj.SetType(class)
+
 		constructor := y.GetClassConstructor(className)
 		if constructor == nil {
 			return obj
 		}
+
 		args := []ssa.Value{obj}
 		arguments := y.VisitClassCreatorRest(ret, className)
 		args = append(args, arguments...)
