@@ -9,7 +9,12 @@ on:
       - ".github/workflows/essential-tests.yml"
 
 jobs:
+  wip:
+    uses: ./.github/workflows/wip.yml 
+    secrets: inherit
+
   setup:
+    needs: wip
     runs-on: ubuntu-20.04
     steps:
       - name: Cache YakLang Project
