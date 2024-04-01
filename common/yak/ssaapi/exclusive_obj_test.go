@@ -391,6 +391,97 @@ c()
 
 }
 
+func TestObject_OOP_ClassAndObject(t *testing.T) {
+	prog, err := Parse(`
+klass = (name) => {
+	this = {
+		"name": name,
+		"getName": () => this.name,
+		"setName": i => {this.name = i}
+	}
+	return this
+}
+
+obj1 := klass("abc")
+obj1.setName("def")
+c = obj1.name
+dump(c)
+
+
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checked := false
+	prog.Ref("c").GetTopDefs().Show().ForEach(func(value *Value) {
+		if value.GetConstValue() == "def" {
+			checked = true
+		}
+	})
+	if !checked {
+		t.Fatal("oop trace failed")
+	}
+
+}
+
+func TestObject_OOP_ClassAndObject_Dup2(t *testing.T) {
+	prog, err := Parse(`
+klass = (name) => {
+	this = {
+		"name": name,
+		"getName": () => this.name,
+		"setName": i => {this.name = i}
+	}
+	return this
+}
+
+obj1 := klass("abc")
+obj1.setName("def")
+c = obj1.name
+
+obj2 := klass("cccc")
+obj2.setName("dddd")
+d = obj2.name
+
+obj2 := klass("cccc")
+e = obj2.name
+
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	check_C := false
+	check_D := false
+	check_E := false
+	prog.Ref("c").GetTopDefs().Show().ForEach(func(value *Value) {
+		if value.GetConstValue() == "def" {
+			check_C = true
+		}
+	})
+	prog.Ref("d").GetTopDefs().Show().ForEach(func(value *Value) {
+		if value.GetConstValue() == "dddd" {
+			check_D = true
+		}
+	})
+	prog.Ref("e").GetTopDefs().ForEach(func(value *Value) {
+		if value.GetConstValue() == "cccc" {
+			check_E = true
+		}
+	})
+
+	if !check_C {
+		t.Fatal("oop trace failed for C")
+	}
+
+	if !check_D {
+		t.Fatal("oop trace failed for D")
+	}
+
+	if !check_E {
+		t.Fatal("oop trace failed for E")
+	}
+}
+
 func TestObject_OOP_class(t *testing.T) {
 	prog, err := Parse(`
 a = () => {
