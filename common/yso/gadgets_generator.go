@@ -187,7 +187,7 @@ func GenerateGadget(name string, opts ...any) (*JavaObject, error) {
 		}
 		obj := objs[0]
 		if defaultParam != "" {
-			err = ReplaceStringInJavaSerilizable(obj, "{{param0}}", defaultParam, 1)
+			err = ReplaceStringInJavaSerilizable(obj, "{{param0}}", defaultParam, -1)
 			if err != nil {
 				return nil, err
 			}
@@ -203,7 +203,7 @@ func GenerateGadget(name string, opts ...any) (*JavaObject, error) {
 				if !ok {
 					return nil, errors.New("missing param: " + string(p.Name))
 				}
-				err = ReplaceStringInJavaSerilizable(obj, fmt.Sprintf("{{param%d}}", i), val, 1)
+				err = ReplaceStringInJavaSerilizable(obj, fmt.Sprintf("{{param%d}}", i), val, -1)
 				if err != nil {
 					return nil, err
 				}
@@ -260,7 +260,7 @@ func GenerateGadget(name string, opts ...any) (*JavaObject, error) {
 				if !ok {
 					return nil, errors.New("missing param: " + string(param.Name))
 				}
-				err = ReplaceStringInJavaSerilizable(obj, fmt.Sprintf("{{param%d}}", i), val, 1)
+				err = ReplaceStringInJavaSerilizable(obj, fmt.Sprintf("{{param%d}}", i), val, -1)
 				if err != nil {
 					return nil, err
 				}

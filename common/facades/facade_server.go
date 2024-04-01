@@ -3,6 +3,7 @@ package facades
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/lor00x/goldap/message"
 	"github.com/yaklang/yaklang/common/facades/ldap/ldapserver"
@@ -19,16 +20,91 @@ import (
 	"time"
 )
 
+const (
+	LDAPMsgFlag         = "ldap_flag"
+	RMIMsgFlag          = "rmi"
+	RMIHandshakeMsgFlag = "rmi-handshake"
+)
+
+const emptyVerbose = "<empty>"
+const getInfoFailedVerbose = "<get info failed>"
+
+type FacadeResourceType interface {
+	[]byte | map[string]any | *HttpResource
+}
+type resourceAndVerbose[T FacadeResourceType] struct {
+	Resource T
+	Verbose  string
+}
+type FacadeServerResource[T FacadeResourceType] struct {
+	lock      sync.Mutex
+	Resources map[string]*resourceAndVerbose[T]
+}
+
+func NewFacadeServerResource[T FacadeResourceType]() *FacadeServerResource[T] {
+	return &FacadeServerResource[T]{
+		Resources: map[string]*resourceAndVerbose[T]{},
+	}
+}
+func (f *FacadeServerResource[T]) ForEachResource(fun func(token string, resource T, verbose string) error) error {
+	f.lock.Lock()
+	defer func() {
+		f.lock.Unlock()
+	}()
+	for k, r := range f.Resources {
+		err := fun(k, r.Resource, r.Verbose)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+func (f *FacadeServerResource[T]) DeleteResource(token string) {
+	f.lock.Lock()
+	defer func() {
+		f.lock.Unlock()
+	}()
+	delete(f.Resources, token)
+
+}
+func (f *FacadeServerResource[T]) GetResource(token string) (T, string, bool) {
+	f.lock.Lock()
+	defer func() {
+		f.lock.Unlock()
+	}()
+	if v, ok := f.Resources[token]; ok {
+		verbose := v.Verbose
+		if v.Verbose == "" {
+			verbose = getInfoFailedVerbose
+		}
+		return v.Resource, verbose, true
+	}
+	return nil, "", false
+}
+
+func (f *FacadeServerResource[T]) SetResource(token string, data T, verbose string) {
+	f.lock.Lock()
+	defer func() {
+		f.lock.Unlock()
+	}()
+	f.Resources[token] = &resourceAndVerbose[T]{
+		Resource: data,
+		Verbose:  verbose,
+	}
+}
+
 type FacadeServer struct {
+	cancel func()
+
 	Host         string
 	Port         int
 	ExternalHost string
 	//反连地址
 	ReverseAddr string
 
-	rmiResourceAddrs           map[string][]byte
-	ldapResourceAddrs          map[string]map[string]any
-	httpResource               map[string]*HttpResource
+	rmiResourceAddrs           *FacadeServerResource[[]byte]
+	ldapResourceAddrs          *FacadeServerResource[map[string]any]
+	httpResource               *FacadeServerResource[*HttpResource]
 	handlers                   []func(notification *Notification)
 	RemoteAddrConvertorHandler func(string) string
 	//resourceName               string
@@ -36,12 +112,53 @@ type FacadeServer struct {
 	httpMux   *sync.Mutex
 }
 
+type ResourcesInfo struct {
+	Protocol    string
+	Url         string
+	Data        any
+	DataVerbose string
+}
+
+func (f *FacadeServer) GetAllResourcesInfo() []*ResourcesInfo {
+	var res []*ResourcesInfo
+	f.rmiResourceAddrs.ForEachResource(func(token string, resource []byte, verbose string) error {
+		res = append(res, &ResourcesInfo{
+			Protocol:    "rmi",
+			Url:         fmt.Sprintf("rmi://%s/%s", f.ReverseAddr, token),
+			Data:        resource,
+			DataVerbose: verbose,
+		})
+		return nil
+	})
+
+	f.ldapResourceAddrs.ForEachResource(func(token string, resource map[string]any, verbose string) error {
+		res = append(res, &ResourcesInfo{
+			Protocol:    "ldap",
+			Url:         fmt.Sprintf("ldap://%s/%s", f.ReverseAddr, token),
+			Data:        resource,
+			DataVerbose: verbose,
+		})
+		return nil
+	})
+
+	f.httpResource.ForEachResource(func(token string, resource *HttpResource, verbose string) error {
+		res = append(res, &ResourcesInfo{
+			Protocol:    "http",
+			Url:         fmt.Sprintf("http://%s/%s", f.ReverseAddr, token),
+			Data:        resource,
+			DataVerbose: verbose,
+		})
+		return nil
+	})
+	return res
+}
+
 type FactoryFun func() string
 type FacadeServerConfig func(f *FacadeServer)
 
-func SetLdapResponseEntry(token string, data map[string]any) FacadeServerConfig {
+func SetLdapResponseEntry(token string, data map[string]any, verbose string) FacadeServerConfig {
 	return func(f *FacadeServer) {
-		f.ldapResourceAddrs[token] = data
+		f.ldapResourceAddrs.SetResource(token, data, verbose)
 	}
 }
 func SetJavaClassName(name string) FacadeServerConfig {
@@ -52,12 +169,12 @@ func SetJavaClassName(name string) FacadeServerConfig {
 
 func SetLdapResourceAddr(name string, addr string) FacadeServerConfig {
 	return func(f *FacadeServer) {
-		f.ldapResourceAddrs[name] = map[string]any{
+		f.ldapResourceAddrs.SetResource(name, map[string]any{
 			"javaClassName": name,
 			"javaCodeBase":  addr,
 			"javaFactory":   name,
 			"objectClass":   "javaNamingReference",
-		}
+		}, fmt.Sprintf("codebase: %s", addr))
 	}
 }
 func SetJavaCodeBase(codeBase string) FacadeServerConfig {
@@ -86,9 +203,9 @@ func (f *FacadeServer) Config(configs ...FacadeServerConfig) {
 		config(f)
 	}
 }
-func SetRmiResource(name string, resource []byte) FacadeServerConfig {
+func SetRmiResource(name string, resource []byte, verbose string) FacadeServerConfig {
 	return func(f *FacadeServer) {
-		f.rmiResourceAddrs[name] = resource
+		f.rmiResourceAddrs.SetResource(name, resource, verbose)
 	}
 }
 func SetRmiResourceAddr(name string, rmiResourceAddr string) FacadeServerConfig {
@@ -108,13 +225,13 @@ func SetRmiResourceAddr(name string, rmiResourceAddr string) FacadeServerConfig 
 		payloadBuf.Write(yserx.IntTo2Bytes(0))           //count
 		payloadBuf.Write(payload[4:])
 		rmiPayload := payloadBuf.Bytes()
-		f.rmiResourceAddrs[name] = rmiPayload
+		f.rmiResourceAddrs.SetResource(name, rmiPayload, fmt.Sprintf("codebase: %s", rmiResourceAddr))
 	}
 }
 
 func SetHttpResource(name string, resource []byte) FacadeServerConfig {
 	return func(f *FacadeServer) {
-		f.OverwriteFileResource("/"+name, resource)
+		f.SetHttpRawResource("/"+name, resource)
 	}
 }
 
@@ -172,11 +289,14 @@ func NewFacadeServer(host string, port int, configs ...FacadeServerConfig) *Faca
 		Host:              host,
 		Port:              port,
 		ldapEntry:         make(map[string]interface{}),
-		httpResource:      make(map[string]*HttpResource),
-		rmiResourceAddrs:  make(map[string][]byte),
-		ldapResourceAddrs: make(map[string]map[string]any),
+		httpResource:      NewFacadeServerResource[*HttpResource](),
+		rmiResourceAddrs:  NewFacadeServerResource[[]byte](),
+		ldapResourceAddrs: NewFacadeServerResource[map[string]any](),
 		httpMux:           &sync.Mutex{},
 	}
+	facadeServer.rmiResourceAddrs.SetResource("", nil, emptyVerbose)
+	facadeServer.httpResource.SetResource("", NewHttpRawResource([]byte(defaultHTTPFallback)), emptyVerbose)
+	facadeServer.ldapResourceAddrs.SetResource("", nil, emptyVerbose)
 	for _, config := range configs {
 		config(facadeServer)
 	}
@@ -221,7 +341,15 @@ func (f *FacadeServer) triggerNotificationEx(t string, conn net.Conn, token stri
 func (f *FacadeServer) Serve() error {
 	return f.ServeWithContext(context.Background())
 }
+
+func (f *FacadeServer) CancelServe() {
+	if f.cancel != nil {
+		f.cancel()
+	}
+}
 func (f *FacadeServer) ServeWithContext(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
+	f.cancel = cancel
 	log.Debugf("start to handle facade server: for %v", utils.HostPort(f.Host, f.Port))
 	lis, err := net.Listen("tcp", utils.HostPort(f.Host, f.Port))
 	if err != nil {
@@ -229,10 +357,8 @@ func (f *FacadeServer) ServeWithContext(ctx context.Context) error {
 	}
 
 	go func() {
-		select {
-		case <-ctx.Done():
-			lis.Close()
-		}
+		<-ctx.Done()
+		lis.Close()
 	}()
 
 	for {
@@ -326,7 +452,7 @@ WRAPPER:
 			log.Errorf("not set ldap entry")
 			return
 		}
-		f.triggerNotification("ldap_flag", conn, "", nil)
+		f.triggerNotification(LDAPMsgFlag, conn, "", nil)
 		server := ldapserver.NewServer()
 		routes := ldapserver.NewRouteMux()
 		routes.Bind(func(writer ldapserver.ResponseWriter, message *ldapserver.Message) {
@@ -340,11 +466,9 @@ WRAPPER:
 			//className := "cmd_" + randStr(8)
 			//addr := fmt.Sprintf("http://%s/%s.class", peekableConn.RemoteAddr(), f.resourceName)
 			e := ldapserver.NewSearchResultEntry(fmt.Sprintf("dc=%s,dc=com", "tmp"))
-			var entry map[string]any
-			if v, ok := f.ldapResourceAddrs[reqResource]; ok {
-				entry = v
-			} else {
-				f.triggerNotificationEx("ldap_flag", conn, reqResource, nil, "<empty>")
+			entry, entryVerbose, ok := f.ldapResourceAddrs.GetResource(reqResource)
+			if !ok {
+				f.triggerNotificationEx(LDAPMsgFlag, conn, reqResource, nil, emptyVerbose)
 				return
 			}
 			for k, v := range entry {
@@ -353,11 +477,11 @@ WRAPPER:
 			writer.Write(e)
 			res := ldapserver.NewSearchResultDoneResponse(ldapserver.LDAPResultSuccess)
 			writer.Write(res)
-			if v, ok := entry["javaCodeBase"]; ok {
-				f.triggerNotificationEx("ldap_flag", conn, reqResource, nil, fmt.Sprintf("javaCodeBase: %v", v))
-			} else {
-				f.triggerNotificationEx("ldap_flag", conn, reqResource, nil, fmt.Sprintf("%v", entry))
+			marshalData, err := json.Marshal(entry)
+			if err != nil {
+				log.Errorf("marshal ldap entry error: %v", err)
 			}
+			f.triggerNotificationEx(LDAPMsgFlag, conn, reqResource, marshalData, entryVerbose)
 		})
 		server.Handle(routes)
 		cli, err := server.NewClient(peekableConn)
@@ -369,7 +493,7 @@ WRAPPER:
 		peekableConn.Close()
 	default:
 		log.Infof("start to fallback http handlers for: %s", conn.RemoteAddr())
-		err = f.GetHTTPHandler(isTls.IsSet())(peekableConn)
+		err = f.getHTTPHandler(isTls.IsSet())(peekableConn)
 		if err != nil {
 			log.Errorf("handle http failed: %s", err)
 			return
