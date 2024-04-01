@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"sort"
 	"strconv"
 	"strings"
@@ -122,7 +123,7 @@ func ChatExBase(url string, model string, details []ChatDetail, function []Funct
 
 func ExtractDataBase(
 	url string, model string, input string,
-	description string, param map[string]string,
+	description string, paramRaw map[string]any,
 	opt func() ([]poc.PocConfigOption, error),
 ) (map[string]any, error) {
 	parameters := &Parameters{
@@ -131,9 +132,9 @@ func ExtractDataBase(
 		Required:   make([]string, 0),
 	}
 	var requiredName []string
-	for name, v := range param {
+	for name, v := range paramRaw {
 		parameters.Properties[name] = Property{
-			Type: `string`, Description: v,
+			Type: `string`, Description: codec.AnyToString(v),
 		}
 		requiredName = append(requiredName, name)
 	}

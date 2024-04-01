@@ -8,7 +8,7 @@ type Chatter interface {
 }
 
 type FunctionCaller interface {
-	ExtractData(data string, desc string, fields map[string]string) (map[string]any, error)
+	ExtractData(data string, desc string, fields map[string]any) (map[string]any, error)
 }
 
 type Configurable interface {
