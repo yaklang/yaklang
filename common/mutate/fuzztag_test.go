@@ -3,23 +3,23 @@ package mutate
 import (
 	"bytes"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"sort"
 	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/davecgh/go-spew/spew"
 )
 
 func TestLower(t *testing.T) {
-	var a = fuzzLowerNUpper("zhangsan")
+	a := fuzzLowerNUpper("zhangsan")
 	spew.Dump(a)
 }
 
 func TestMutateDoc(t *testing.T) {
-
-	var GetFuzztagMarkdownDoc = func() string {
+	GetFuzztagMarkdownDoc := func() string {
 		/*
 			表格内
 			|标签名|标签别名|标签描述|
@@ -141,10 +141,12 @@ func TestMutateQuick(t *testing.T) {
 		panic(len(results))
 	}
 }
+
 func TestAlias(t *testing.T) {
 	results := MutateQuick(`{{rs(2)}}`)
 	spew.Dump(results)
 }
+
 func TestYsoFuzzTag(t *testing.T) {
 	result := MutateQuick(`{{yso:exec(whoami)}}`)
 	println(len(result))
@@ -208,6 +210,7 @@ func TestRepeatTag(t *testing.T) {
 	println(len(result))
 	spew.Dump(result)
 }
+
 func TestFuzzTagExec(t *testing.T) {
 	expect := []string{
 		"a", "a,1,1",
@@ -230,7 +233,7 @@ func TestFuzzTagExec(t *testing.T) {
 	}), Fuzz_WithExtraFuzzTagHandler("a", func(s string) []string {
 		return []string{"a"}
 	}))
-	//res, err := FuzzTagExec("{{uuid(a)}}")
+	// res, err := FuzzTagExec("{{uuid(a)}}")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -273,11 +276,12 @@ func TestDynFuzzTag(t *testing.T) {
 		resi++
 		return true
 	}))
-	//res, err := FuzzTagExec("{{uuid(a)}}")
+	// res, err := FuzzTagExec("{{uuid(a)}}")
 	if err != nil {
 		t.Fatal(err)
 	}
 }
+
 func TestFuzzTagBug(t *testing.T) {
 	times := 0
 	_, err := FuzzTagExec("{{ri(0,9,3)}}{{ri(0,9,3)}}", Fuzz_WithResultHandler(func(s string, payloads []string) bool {
@@ -288,7 +292,7 @@ func TestFuzzTagBug(t *testing.T) {
 		times++
 		return true
 	}))
-	//res, err := FuzzTagExec("{{uuid(a)}}")
+	// res, err := FuzzTagExec("{{uuid(a)}}")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,9 +307,14 @@ func TestFuzzTagBug(t *testing.T) {
 		times++
 		return true
 	}))
-	//res, err := FuzzTagExec("{{uuid(a)}}")
+	// res, err := FuzzTagExec("{{uuid(a)}}")
 	if err != nil {
 		t.Fatal(err)
 	}
 	assert.Equal(t, 9, times)
+}
+
+func TestDateRangeFuzzTag(t *testing.T) {
+	result := MutateQuick(`{{date:range(20080101,20090101)}}`)
+	spew.Dump(result)
 }

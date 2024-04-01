@@ -15,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/fuzztagx/parser"
+	"github.com/yaklang/yaklang/common/utils/dateparse"
 	"github.com/yaklang/yaklang/common/utils/regen"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yso"
@@ -245,6 +246,36 @@ func init() {
 		},
 		Alias:       []string{"time"},
 		Description: "生成一个时间，格式为YYYY-MM-dd HH:mm:ss，如果指定了格式，将按照指定的格式生成时间",
+	})
+
+	AddFuzzTagToGlobal(&FuzzTagDescription{
+		TagName: "date:range",
+		Handler: func(s string) []string {
+			start, end := sepToEnd(s, ",")
+			layout, err := dateparse.ParseFormat(start)
+			if err != nil {
+				return []string{}
+			}
+			startTime, err := dateparse.ParseAny(start)
+			if err != nil {
+				return []string{}
+			}
+			endTime, err := dateparse.ParseAny(end)
+			if err != nil {
+				return []string{}
+			}
+			if startTime.After(endTime) {
+				return []string{}
+			}
+
+			var results []string
+			for startTime.Compare(endTime) <= 0 {
+				results = append(results, startTime.Format(layout))
+				startTime = startTime.AddDate(0, 0, 1)
+			}
+			return results
+		},
+		Description: "以逗号为分隔，尝试根据输入的两个时间生成一个时间段，如：{{date:range(20080101,20090101)}}",
 	})
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{
