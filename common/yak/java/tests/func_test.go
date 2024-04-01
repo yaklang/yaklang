@@ -97,7 +97,7 @@ public static void main(String[] args) {
 }
 
 func TestJava_FuncCall(t *testing.T) {
-	t.Run("test  function use", func(t *testing.T) {
+	t.Run("test  function use 1", func(t *testing.T) {
 		CheckAllJavaPrintlnValue(`
 public class Main {
     public static int A(int... a) {
@@ -111,21 +111,5 @@ public class Main {
 			"Function-A",
 		}, t)
 	})
-}
 
-func TestJava_Lambda(t *testing.T) {
-	t.Run("test  function use", func(t *testing.T) {
-		CheckAllJavaPrintlnValue(`
-public class Main {
-    public static int A(int... a) {
-        return a[0];
-    }
-
-    public static void main(String[] args) {
-        println(A);
-    }
-}`, []string{
-			"Function-A",
-		}, t)
-	})
 }
