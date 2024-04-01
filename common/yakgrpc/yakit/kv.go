@@ -438,6 +438,7 @@ func ConfigureNetWork(c *ypb.GlobalNetworkConfig) {
 	for _, r := range c.GetAppConfigs() {
 		consts.UpdateThirdPartyApplicationConfig(r)
 	}
+	consts.SetAIPrimaryType(c.GetPrimaryAIType())
 
 	netx.SetDefaultDNSOptions(
 		netx.WithDNSFallbackDoH(c.DNSFallbackDoH),
