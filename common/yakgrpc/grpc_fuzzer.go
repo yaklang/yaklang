@@ -264,6 +264,14 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
+	// runtimeID
+	var runtimeID string
+	if fallback, ok := stream.(*httpFuzzerFallback); ok {
+		// runtimeID from webfuzzer sequence
+		runtimeID = fallback.runtimeID
+	} else {
+		runtimeID = uuid.NewString()
+	}
 	// retry
 	isRetry := req.GetRetryTaskID() > 0
 	// pause
@@ -330,6 +338,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		batchTarget = string(req.GetBatchTarget())
 	}
 
+	// feedback
 	swg := utils.NewSizedWaitGroup(int(req.GetConcurrent()))
 	defer swg.Wait()
 	feedbackWg := new(sync.WaitGroup)
@@ -337,6 +346,9 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		feedbackWg.Wait()
 	}()
 	feedbackResponse := func(rsp *ypb.FuzzerResponse, skipPoC bool) error {
+		// 设置 runtimeID
+		rsp.RuntimeID = runtimeID
+
 		sw.WaitUntilOpen()
 
 		err := stream.Send(rsp)
@@ -721,6 +733,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_NoSystemProxy(req.GetNoSystemProxy()),
 			mutate.WithPoolOpt_RequestCountLimiter(requestCount),
 			mutate.WithPoolOpt_MutateWithMethods(req.GetMutateMethods()),
+			mutate.WithPoolOpt_RuntimeId(runtimeID),
 		}
 
 		fuzzMode := req.GetFuzzTagMode() // ""/"close"/"standard"/"legacy"
