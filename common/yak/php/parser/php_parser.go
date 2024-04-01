@@ -706,7 +706,7 @@ func phpparserParserInit() {
 		0, 0, 962, 963, 1, 0, 0, 0, 963, 965, 1, 0, 0, 0, 964, 966, 5, 197, 0,
 		0, 965, 964, 1, 0, 0, 0, 965, 966, 1, 0, 0, 0, 966, 967, 1, 0, 0, 0, 967,
 		968, 3, 154, 77, 0, 968, 121, 1, 0, 0, 0, 969, 970, 6, 61, -1, 0, 970,
-		974, 3, 222, 111, 0, 971, 974, 5, 51, 0, 0, 972, 974, 3, 302, 151, 0, 973,
+		974, 5, 51, 0, 0, 971, 974, 3, 302, 151, 0, 972, 974, 3, 222, 111, 0, 973,
 		969, 1, 0, 0, 0, 973, 971, 1, 0, 0, 0, 973, 972, 1, 0, 0, 0, 974, 980,
 		1, 0, 0, 0, 975, 976, 10, 1, 0, 0, 976, 977, 5, 201, 0, 0, 977, 979, 3,
 		122, 61, 2, 978, 975, 1, 0, 0, 0, 979, 982, 1, 0, 0, 0, 980, 978, 1, 0,
@@ -12947,22 +12947,6 @@ func NewTypeHintContext(parser antlr.Parser, parent antlr.ParserRuleContext, inv
 
 func (s *TypeHintContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *TypeHintContext) QualifiedStaticTypeRef() IQualifiedStaticTypeRefContext {
-	var t antlr.RuleContext
-	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IQualifiedStaticTypeRefContext); ok {
-			t = ctx.(antlr.RuleContext)
-			break
-		}
-	}
-
-	if t == nil {
-		return nil
-	}
-
-	return t.(IQualifiedStaticTypeRefContext)
-}
-
 func (s *TypeHintContext) Callable() antlr.TerminalNode {
 	return s.GetToken(PHPParserCallable, 0)
 }
@@ -12981,6 +12965,22 @@ func (s *TypeHintContext) PrimitiveType() IPrimitiveTypeContext {
 	}
 
 	return t.(IPrimitiveTypeContext)
+}
+
+func (s *TypeHintContext) QualifiedStaticTypeRef() IQualifiedStaticTypeRefContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IQualifiedStaticTypeRefContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IQualifiedStaticTypeRefContext)
 }
 
 func (s *TypeHintContext) AllTypeHint() []ITypeHintContext {
@@ -13087,19 +13087,19 @@ func (p *PHPParser) typeHint(_p int) (localctx ITypeHintContext) {
 	case 1:
 		{
 			p.SetState(970)
-			p.QualifiedStaticTypeRef()
+			p.Match(PHPParserCallable)
 		}
 
 	case 2:
 		{
 			p.SetState(971)
-			p.Match(PHPParserCallable)
+			p.PrimitiveType()
 		}
 
 	case 3:
 		{
 			p.SetState(972)
-			p.PrimitiveType()
+			p.QualifiedStaticTypeRef()
 		}
 
 	}

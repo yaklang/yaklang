@@ -9,15 +9,20 @@ type method struct {
 	index    int
 }
 
+type BluePrintMember struct {
+	Value Value
+	Type  Type
+}
+
 // ClassBluePrint is a class blue print, it is used to create a new class
 type ClassBluePrint struct {
 	Name string
 
-	NormalMember map[string]Value
 	Method       map[string]*Function
-
-	StaticMember map[string]Value
 	StaticMethod map[string]*Function
+
+	NormalMember map[string]BluePrintMember
+	StaticMember map[string]Value
 
 	// magic method
 	Copy        Value
@@ -29,9 +34,10 @@ type ClassBluePrint struct {
 
 func NewClassBluePrint() *ClassBluePrint {
 	class := &ClassBluePrint{
-		NormalMember: make(map[string]Value),
-		Method:       make(map[string]*Function),
+		NormalMember: make(map[string]BluePrintMember),
 		StaticMember: make(map[string]Value),
+
+		Method:       make(map[string]*Function),
 		StaticMethod: make(map[string]*Function),
 	}
 

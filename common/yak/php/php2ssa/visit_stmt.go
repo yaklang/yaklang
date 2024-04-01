@@ -1,10 +1,8 @@
 package php2ssa
 
 import (
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
-	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 func (y *builder) VisitTopStatement(raw phpparser.ITopStatementContext) interface{} {
@@ -240,56 +238,6 @@ func (y *builder) VisitInnerStatement(raw phpparser.IInnerStatementContext) inte
 		y.VisitClassDeclaration(i.ClassDeclaration())
 	} else {
 		log.Infof("unknown inner statement: %v", i.GetText())
-	}
-
-	return nil
-}
-
-func (y *builder) VisitTypeHint(raw phpparser.ITypeHintContext) ssa.Type {
-	if y == nil || raw == nil {
-		return nil
-	}
-	recoverRange := y.SetRange(raw)
-	defer recoverRange()
-
-	i, _ := raw.(*phpparser.TypeHintContext)
-	if i == nil {
-		return nil
-	}
-	if r := i.QualifiedStaticTypeRef(); r != nil {
-		//这里类型就行修复
-		_ = y.VisitQualifiedStaticTypeRef(r)
-	} else if i.Callable() != nil {
-		_ = i.Callable().GetText()
-	} else if i.PrimitiveType() != nil {
-		return y.VisitPrimitiveType(i.PrimitiveType())
-	} else if i.Pipe() != nil {
-		types := lo.Map(i.AllTypeHint(), func(item phpparser.ITypeHintContext, index int) ssa.Type {
-			return y.VisitTypeHint(i)
-		})
-		_ = types
-		// need a
-		// return ssa.NewUnionType(types)
-	}
-	return ssa.GetAnyType()
-}
-
-func (y *builder) VisitQualifiedStaticTypeRef(raw phpparser.IQualifiedStaticTypeRefContext) interface{} {
-	if y == nil || raw == nil {
-		return nil
-	}
-	recoverRange := y.SetRange(raw)
-	defer recoverRange()
-
-	i, _ := raw.(*phpparser.QualifiedStaticTypeRefContext)
-	if i == nil {
-		return nil
-	}
-
-	if i.Static() != nil {
-		return i.Static().GetText()
-	} else if i.QualifiedNamespaceName() != nil {
-		return y.VisitQualifiedNamespaceName(i.QualifiedNamespaceName())
 	}
 
 	return nil

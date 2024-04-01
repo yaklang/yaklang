@@ -1,6 +1,9 @@
 package ssa
 
-import "github.com/yaklang/yaklang/common/log"
+import (
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+)
 
 // ParseClassBluePrint  parse get classBluePrint if the ObjectType is a ClassFactor
 func ParseClassBluePrint(this Value, objectTyp *ObjectType) (ret Type) {
@@ -16,7 +19,8 @@ func ParseClassBluePrint(this Value, objectTyp *ObjectType) (ret Type) {
 		// if not function , just append this field to normal field
 		typ := member.GetType()
 		if typ.GetTypeKind() != FunctionTypeKind {
-			blue.NormalMember[key.String()] = member
+			// blue.NormalMember[key.String()] = member
+			blue.AddNormalMember(key.String(), member)
 			continue
 		}
 
@@ -28,7 +32,7 @@ func ParseClassBluePrint(this Value, objectTyp *ObjectType) (ret Type) {
 			}
 		}
 
-		blue.NormalMember[key.String()] = member
+		blue.AddNormalMember(key.String(), member)
 	}
 
 	if len(blue.GetMethod()) != 0 {
@@ -52,14 +56,22 @@ func (c *ClassBluePrint) Apply(obj Value) Type {
 	}
 
 	for rawKey, member := range c.NormalMember {
+		typ := member.Type
+		value := member.Value
 		key := NewConst(rawKey)
-		log.Infof("apply key: %s, member: %s", key, member)
+		log.Infof("apply key: %s, member: %v", key, member)
 
-		objTyp.AddField(key, member.GetType())
-		builder.AssignVariable(
-			builder.CreateMemberCallVariable(obj, key),
-			member,
-		)
+		objTyp.AddField(key, typ)
+
+		if utils.IsNil(value) {
+			value := builder.ReadMemberCallVariable(obj, key)
+			value.SetType(typ)
+		} else {
+			builder.AssignVariable(
+				builder.CreateMemberCallVariable(obj, key),
+				value,
+			)
+		}
 	}
 
 	return objTyp

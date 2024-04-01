@@ -324,13 +324,13 @@ func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
 	return b.getFieldValue(value, key)
 }
 
-func (b *FunctionBuilder) CreateMemberCallVariable(value, key Value) *Variable {
-	if _, ok := ToExternLib(value); ok {
-		name := b.getExternLibMemberCall(value, key)
+func (b *FunctionBuilder) CreateMemberCallVariable(object, key Value) *Variable {
+	if _, ok := ToExternLib(object); ok {
+		name := b.getExternLibMemberCall(object, key)
 		return b.CreateVariable(name)
 	}
 
-	if para, ok := ToParameter(value); ok {
+	if para, ok := ToParameter(object); ok {
 		if para.IsFreeValue {
 			b.appendParam(para)
 			delete(b.FreeValues, para.GetName())
@@ -342,25 +342,25 @@ func (b *FunctionBuilder) CreateMemberCallVariable(value, key Value) *Variable {
 		return ret
 	}
 
-	name := b.getFieldName(value, key)
+	name := b.getFieldName(object, key)
 	// log.Infof("CreateMemberCallVariable: %v, %v", retValue.GetName(), key)
 	ret := b.CreateVariable(name)
-	ret.SetMemberCall(value, key)
+	ret.SetMemberCall(object, key)
 	return ret
 }
 
-func (b *FunctionBuilder) getFieldName(value, key Value) string {
-	name, typ := checkCanMemberCall(value, key)
-	b.getOriginMember(name, typ, value, key) // create undefine member
+func (b *FunctionBuilder) getFieldName(object, key Value) string {
+	name, typ := checkCanMemberCall(object, key)
+	b.getOriginMember(name, typ, object, key) // create undefine member
 	return name
 }
 
-func (b *FunctionBuilder) getFieldValue(value, key Value) Value {
-	name, typ := checkCanMemberCall(value, key)
+func (b *FunctionBuilder) getFieldValue(object, key Value) Value {
+	name, typ := checkCanMemberCall(object, key)
 	if ret := b.PeekValueInThisFunction(name); ret != nil {
 		return ret
 	}
-	return b.getOriginMember(name, typ, value, key)
+	return b.getOriginMember(name, typ, object, key)
 }
 
 func (b *FunctionBuilder) getOriginMember(name string, typ Type, value, key Value) Value {

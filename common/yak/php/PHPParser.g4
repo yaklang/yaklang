@@ -374,9 +374,9 @@ formalParameter
     ;
 
 typeHint
-    : qualifiedStaticTypeRef
-    | Callable
+    : Callable
     | primitiveType
+    | qualifiedStaticTypeRef
     | typeHint '|' typeHint
     ;
 

@@ -19,17 +19,17 @@ const (
 	Readonly
 )
 
-func (b *FunctionBuilder) CreateClass(name string) *ClassBluePrint {
+func (b *FunctionBuilder) CreateClassBluePrint(name string) *ClassBluePrint {
 	c := NewClassBluePrint()
 	if _, ok := b.ClassBluePrint[name]; ok {
-		log.Errorf("CreateClass: this class redeclare")
+		log.Errorf("CreateClassBluePrint: this class redeclare")
 	}
 	b.ClassBluePrint[name] = c
 	c.Name = name
 	return c
 }
 
-func (b *FunctionBuilder) GetClass(name string) *ClassBluePrint {
+func (b *FunctionBuilder) GetClassBluePrint(name string) *ClassBluePrint {
 	if c, ok := b.ClassBluePrint[name]; ok {
 		return c
 	}
@@ -67,7 +67,17 @@ func (c *ClassBluePrint) GetMember(key string, get func(*ClassBluePrint) (Value,
 
 // AddNormalMember is used to add a normal member to the class,
 func (c *ClassBluePrint) AddNormalMember(name string, value Value) {
-	c.NormalMember[name] = value
+	c.NormalMember[name] = BluePrintMember{
+		Value: value,
+		Type:  value.GetType(),
+	}
+}
+
+func (c *ClassBluePrint) AddNormalMemberOnlyType(name string, typ Type) {
+	c.NormalMember[name] = BluePrintMember{
+		Value: nil,
+		Type:  typ,
+	}
 }
 
 // AddStaticMember is used to add a static member to the class,
