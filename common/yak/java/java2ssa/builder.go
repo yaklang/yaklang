@@ -15,7 +15,7 @@ type builder struct {
 }
 
 func Build(src string, force bool, b *ssa.FunctionBuilder) error {
-	ast, err := frontend(src, force)
+	ast, err := Frontend(src, force)
 	if err != nil {
 		return err
 	}
@@ -28,7 +28,7 @@ func Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	return nil
 }
 
-func frontend(src string, force bool) (javaparser.ICompilationUnitContext, error) {
+func Frontend(src string, force bool) (javaparser.ICompilationUnitContext, error) {
 	errListener := antlr4util.NewErrorListener()
 	lexer := javaparser.NewJavaLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()
