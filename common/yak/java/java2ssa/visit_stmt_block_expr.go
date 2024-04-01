@@ -13,7 +13,8 @@ func (y *builder) VisitBlock(raw javaparser.IBlockContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.BlockContext)
 	if i == nil {
 		return nil
@@ -33,7 +34,8 @@ func (y *builder) VisitBlockStatement(raw javaparser.IBlockStatementContext) int
 	if y == nil || raw == nil {
 		return nil
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.BlockStatementContext)
 	if i == nil {
 		return nil
@@ -54,6 +56,8 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	var opcode ssa.BinaryOpcode
 	var unaryOpcode ssa.UnaryOpcode
@@ -601,6 +605,8 @@ func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext, object ssa.
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*javaparser.MethodCallContext)
 	if i == nil {
@@ -647,6 +653,8 @@ func (y *builder) VisitPrimary(raw javaparser.IPrimaryContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*javaparser.PrimaryContext)
 	if i == nil {
@@ -694,6 +702,9 @@ func (y *builder) VisitLeftMemberCall(raw javaparser.ILeftMemberCallContext) ssa
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
 	i, _ := raw.(*javaparser.LeftMemberCallContext)
 	if i == nil {
 		return nil
@@ -931,7 +942,8 @@ func (y *builder) VisitLocalTypeDeclaration(raw javaparser.ILocalTypeDeclaration
 	if y == nil || raw == nil {
 		return nil
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.LocalTypeDeclarationContext)
 	if i == nil {
 		return nil
@@ -944,7 +956,8 @@ func (y *builder) VisitLocalVariableDeclaration(raw javaparser.ILocalVariableDec
 	if y == nil || raw == nil {
 		return nil
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.LocalVariableDeclarationContext)
 	if i == nil {
 		return nil
@@ -970,6 +983,8 @@ func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorCont
 	if y == nil || raw == nil {
 		return
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*javaparser.VariableDeclaratorContext)
 	if i == nil {
@@ -998,6 +1013,8 @@ func (y *builder) VisitVariableInitializer(raw javaparser.IVariableInitializerCo
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*javaparser.VariableInitializerContext)
 	if i == nil {
@@ -1016,6 +1033,8 @@ func (y *builder) VisitArguments(raw javaparser.IArgumentsContext) []ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*javaparser.ArgumentsContext)
 	if i == nil {
@@ -1039,6 +1058,9 @@ func (y *builder) VisitExpressionList(raw javaparser.IExpressionListContext) []s
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
 	i, _ := raw.(*javaparser.ExpressionListContext)
 	if i == nil {
 		return nil
@@ -1060,6 +1082,9 @@ func (y *builder) VisitStatementList(raw javaparser.IStatementListContext) inter
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
 	i, _ := raw.(*javaparser.StatementListContext)
 	if i == nil {
 		return nil
@@ -1077,6 +1102,9 @@ func (y *builder) VisitForControl(raw javaparser.IForControlContext) *ssa.LoopBu
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
 	i, _ := raw.(*javaparser.ForControlContext)
 	if i == nil {
 		return nil
@@ -1136,6 +1164,9 @@ func (y *builder) VisitForInit(raw javaparser.IForInitContext) []ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
 	i, _ := raw.(*javaparser.ForInitContext)
 	if i == nil {
 		return nil
@@ -1170,6 +1201,8 @@ func (y *builder) VisitIfStmt(raw javaparser.IIfstmtContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	builder := y.CreateIfBuilder()
 
@@ -1419,6 +1452,8 @@ func (y *builder) VisitGuardedPattern(raw javaparser.IGuardedPatternContext) []s
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*javaparser.GuardedPatternContext)
 	if i == nil {
@@ -1432,6 +1467,8 @@ func (y *builder) VisitBlockStatementList(raw javaparser.IBlockStatementListCont
 	if y == nil || raw == nil {
 		return
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*javaparser.BlockStatementListContext)
 	if i == nil {
@@ -1448,6 +1485,9 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
 	i, _ := raw.(*javaparser.CreatorContext)
 	if i == nil {
 		return nil
@@ -1496,6 +1536,9 @@ func (y *builder) VisitClassCreatorRest(raw javaparser.IClassCreatorRestContext,
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
 	i, _ := raw.(*javaparser.ClassCreatorRestContext)
 	if i == nil {
 		return nil
@@ -1522,6 +1565,8 @@ func (y *builder) VisitArrayCreatorRest(raw javaparser.IArrayCreatorRestContext,
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*javaparser.ArrayCreatorRestContext)
 	if i == nil {
@@ -1554,6 +1599,8 @@ func (y *builder) VisitCreatedName(raw javaparser.ICreatedNameContext) ssa.Type 
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*javaparser.CreatedNameContext)
 	if i == nil {
@@ -1572,6 +1619,8 @@ func (y *builder) VisitLambdaExpression(raw javaparser.ILambdaExpressionContext)
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 
 	i, _ := raw.(*javaparser.LambdaExpressionContext)
 	if i == nil {

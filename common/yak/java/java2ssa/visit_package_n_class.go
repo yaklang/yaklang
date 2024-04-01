@@ -10,7 +10,8 @@ func (y *builder) VisitTypeDeclaration(raw javaparser.ITypeDeclarationContext) i
 	if y == nil || raw == nil {
 		return nil
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.TypeDeclarationContext)
 	if i == nil {
 		return nil
@@ -24,7 +25,7 @@ func (y *builder) VisitTypeDeclaration(raw javaparser.ITypeDeclarationContext) i
 	if ret := i.ClassDeclaration(); ret != nil {
 		return y.VisitClassDeclaration(ret)
 	} else if ret := i.EnumDeclaration(); ret != nil {
-		return y.VisitEnumDeclaration(ret)
+		return y.VisitEnumDeclaration(ret, nil)
 	} else if ret := i.InterfaceDeclaration(); ret != nil {
 		return y.VisitInterfaceDeclaration(ret)
 	} else if ret := i.AnnotationTypeDeclaration(); ret != nil {
@@ -41,7 +42,8 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext)
 	if y == nil || raw == nil {
 		return nil
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.ClassDeclarationContext)
 	if i == nil {
 		return nil
@@ -86,7 +88,8 @@ func (y *builder) VisitClassBody(raw javaparser.IClassBodyContext, class *ssa.Cl
 	if y == nil || raw == nil {
 		return nil
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.ClassBodyContext)
 	if i == nil {
 		return nil
@@ -124,6 +127,8 @@ func (y *builder) VisitModifier(raw javaparser.IModifierContext) ssa.ClassModifi
 	if y == nil || raw == nil {
 		return m
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.ModifierContext)
 	if i == nil {
 		return m
@@ -142,6 +147,8 @@ func (y *builder) VisitClassOrInterfaceModifier(raw javaparser.IClassOrInterface
 	if y == nil || raw == nil {
 		return m
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.ClassOrInterfaceModifierContext)
 	if i == nil {
 		return m
@@ -168,7 +175,8 @@ func (y *builder) VisitFormalParameters(raw javaparser.IFormalParametersContext)
 	if y == nil || raw == nil {
 		return
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.FormalParametersContext)
 	if i == nil {
 		return
@@ -189,7 +197,8 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 	if y == nil || raw == nil {
 		return
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.MemberDeclarationContext)
 	if i == nil {
 		return
@@ -233,6 +242,8 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 	} else if ret := i.ClassDeclaration(); ret != nil {
 
 	} else if ret := i.EnumDeclaration(); ret != nil {
+		// 声明枚举类型
+		y.VisitEnumDeclaration(ret, class)
 
 	} else {
 		log.Errorf("no member declaration found: %v", i.GetText())
@@ -246,7 +257,8 @@ func (y *builder) VisitTypeType(raw javaparser.ITypeTypeContext) ssa.Type {
 	if y == nil || raw == nil {
 		return nil
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.TypeTypeContext)
 	if i == nil {
 		return nil
@@ -267,6 +279,8 @@ func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceType
 		return nil
 	}
 	// todo 类和接口的类型声明
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.ClassOrInterfaceTypeContext)
 	if i == nil {
 		return nil
@@ -279,7 +293,8 @@ func (y *builder) VisitPrimitiveType(raw javaparser.IPrimitiveTypeContext) ssa.T
 	if y == nil || raw == nil {
 		return nil
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.PrimitiveTypeContext)
 	if i == nil {
 		return nil
@@ -296,24 +311,79 @@ func (y *builder) VisitPrimitiveType(raw javaparser.IPrimitiveTypeContext) ssa.T
 	}
 }
 
-func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext) interface{} {
+func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, class *ssa.ClassBluePrint) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.EnumDeclarationContext)
 	if i == nil {
 		return nil
 	}
 
+	var mergedTemplate []string
+
+	enumName := i.Identifier().GetText()
+	if class == nil {
+		class = y.CreateClass(enumName)
+	}
+
+	if i.IMPLEMENTS() != nil {
+		mergedTemplate = append(mergedTemplate, i.TypeList().GetText())
+	}
+
+	for _, parentClass := range mergedTemplate {
+		if parent := y.GetClass(parentClass); parent != nil {
+			class.ParentClass = append(class.ParentClass, parent)
+		}
+	}
+
+	if i.EnumConstants() != nil {
+		y.VisitEnumConstants(i.EnumConstants(), class)
+	}
 	return nil
+}
+
+func (y *builder) VisitEnumConstants(raw javaparser.IEnumConstantsContext, class *ssa.ClassBluePrint) {
+	if y == nil || raw == nil {
+		return
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+	i, _ := raw.(*javaparser.EnumConstantsContext)
+	if i == nil {
+		return
+	}
+
+	for _, enumConstant := range i.AllEnumConstant() {
+		y.VisitEnumConstant(enumConstant, class)
+	}
+}
+
+func (y *builder) VisitEnumConstant(raw javaparser.IEnumConstantContext, class *ssa.ClassBluePrint) {
+	if y == nil || raw == nil {
+		return
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+	i, _ := raw.(*javaparser.EnumConstantContext)
+	if i == nil {
+		return
+	}
+
+	for _, annotation := range i.AllAnnotation() {
+		_ = annotation
+	}
+
 }
 
 func (y *builder) VisitInterfaceDeclaration(raw javaparser.IInterfaceDeclarationContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.InterfaceDeclarationContext)
 	if i == nil {
 		return nil
@@ -326,7 +396,8 @@ func (y *builder) VisitAnnotationTypeDeclaration(raw javaparser.IAnnotationTypeD
 	if y == nil || raw == nil {
 		return nil
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.AnnotationTypeDeclarationContext)
 	if i == nil {
 		return nil
@@ -339,7 +410,8 @@ func (y *builder) VisitRecordDeclaration(raw javaparser.IRecordDeclarationContex
 	if y == nil || raw == nil {
 		return nil
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.RecordDeclarationContext)
 	if i == nil {
 		return nil
@@ -352,6 +424,8 @@ func (y *builder) VisitMethodDeclaration(raw javaparser.IMethodDeclarationContex
 	if y == nil || raw == nil {
 		return
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.MethodDeclarationContext)
 	if i == nil {
 		return
@@ -411,6 +485,8 @@ func (y *builder) VisitMethodBody(raw javaparser.IMethodBodyContext) {
 	if y == nil || raw == nil {
 		return
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.MethodBodyContext)
 	if i == nil {
 		return
@@ -423,6 +499,8 @@ func (y *builder) VisitTypeTypeOrVoid(raw javaparser.ITypeTypeOrVoidContext) ssa
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.TypeTypeOrVoidContext)
 	if i == nil {
 		return nil
@@ -439,7 +517,8 @@ func (y *builder) VisitFormalParameterList(raw javaparser.IFormalParameterListCo
 	if y == nil || raw == nil {
 		return
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.FormalParameterListContext)
 	if i == nil {
 		return
@@ -464,6 +543,8 @@ func (y *builder) VisitReceiverParameter(raw javaparser.IReceiverParameterContex
 	if y == nil || raw == nil {
 		return
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.ReceiverParameterContext)
 	if i == nil {
 		return
@@ -478,7 +559,8 @@ func (y *builder) VisitFormalParameter(raw javaparser.IFormalParameterContext) {
 	if y == nil || raw == nil {
 		return
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.FormalParameterContext)
 	if i == nil {
 		return
@@ -499,6 +581,8 @@ func (y *builder) VisitVariableDeclaratorId(raw javaparser.IVariableDeclaratorId
 	if y == nil || raw == nil {
 		return ""
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.VariableDeclaratorIdContext)
 	if i == nil {
 		return ""
@@ -515,7 +599,8 @@ func (y *builder) VisitLastFormalParameter(raw javaparser.ILastFormalParameterCo
 	if y == nil || raw == nil {
 		return
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.LastFormalParameterContext)
 	if i == nil {
 		return
@@ -544,7 +629,8 @@ func (y *builder) VisitVariableModifier(raw javaparser.IVariableModifierContext)
 	if y == nil || raw == nil {
 		return
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.VariableModifierContext)
 	if i == nil {
 		return
@@ -555,7 +641,8 @@ func (y *builder) VisitQualifiedNameList(raw javaparser.IQualifiedNameListContex
 	if y == nil || raw == nil {
 		return
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.QualifiedNameListContext)
 	if i == nil {
 		return
@@ -567,6 +654,8 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 	if y == nil || raw == nil {
 		return
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.ConstructorDeclarationContext)
 	if i == nil {
 		return
