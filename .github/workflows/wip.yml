@@ -8,6 +8,7 @@ on:
       - labeled
       - unlabeled
       - synchronize
+  workflow_call:
 
 jobs:
   WIP:
