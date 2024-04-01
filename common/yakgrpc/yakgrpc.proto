@@ -1067,6 +1067,10 @@ message GlobalNetworkConfig {
 
   repeated string ExcludePluginScanURIs = 15;
   repeated string IncludePluginScanURIs = 16;
+
+  // AI Primary Config 首选 AI 配置项
+  // openai / chatglm
+  string PrimaryAIType = 17;
 }
 
 message AuthInfo {
