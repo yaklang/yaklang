@@ -10,6 +10,8 @@ func (y *builder) VisitArrayInitializer(raw javaparser.IArrayInitializerContext)
 	if y == nil || raw == nil {
 		return nil
 	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.ArrayInitializerContext)
 	if i == nil {
 		return nil

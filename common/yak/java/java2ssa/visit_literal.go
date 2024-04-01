@@ -13,7 +13,8 @@ func (y *builder) VisitLiteral(raw javaparser.ILiteralContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.LiteralContext)
 	if i == nil {
 		return nil
@@ -77,7 +78,8 @@ func (y *builder) VisitIntegerLiteral(raw javaparser.IIntegerLiteralContext) ssa
 	if y == nil || raw == nil {
 		return nil
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.IntegerLiteralContext)
 	if i == nil {
 		return nil
@@ -114,7 +116,8 @@ func (y *builder) VisitFloatLiteral(raw javaparser.IFloatLiteralContext) ssa.Val
 	if y == nil || raw == nil {
 		return nil
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.FloatLiteralContext)
 	if i == nil {
 		return nil

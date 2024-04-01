@@ -10,6 +10,8 @@ func (y *builder) VisitCompilationUnit(raw javaparser.ICompilationUnitContext) i
 		return nil
 	}
 
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.CompilationUnitContext)
 	if i == nil {
 		return nil
@@ -39,7 +41,8 @@ func (y *builder) VisitImportDeclaration(raw javaparser.IImportDeclarationContex
 	if y == nil || raw == nil {
 		return nil, false, false
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.ImportDeclarationContext)
 	if i == nil {
 		return nil, false, false
@@ -74,7 +77,8 @@ func (y *builder) VisitPackageQualifiedName(raw javaparser.IQualifiedNameContext
 	if y == nil || raw == nil {
 		return nil
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.QualifiedNameContext)
 	if i == nil {
 		return nil

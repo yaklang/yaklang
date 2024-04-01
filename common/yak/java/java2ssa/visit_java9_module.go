@@ -6,7 +6,8 @@ func (y *builder) VisitModuleDeclaration(raw javaparser.IModuleDeclarationContex
 	if y == nil || raw == nil {
 		return nil
 	}
-
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
 	i, _ := raw.(*javaparser.ModuleDeclarationContext)
 	if i == nil {
 		return nil
