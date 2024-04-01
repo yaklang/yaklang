@@ -64,7 +64,7 @@ func TestNewDNSServer(t *testing.T) {
 			}
 
 			log.Infof("start to fallback http handlers for: %s", conn.RemoteAddr())
-			//err = GetHTTPHandler(isTls.IsSet())(peekableConn)
+			//err = getHTTPHandler(isTls.IsSet())(peekableConn)
 			//if err != nil {
 			//	log.Errorf("handle http failed: %s", err)
 			//	return

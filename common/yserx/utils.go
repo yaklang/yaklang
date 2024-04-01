@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -691,4 +692,26 @@ func initTCType(j JavaSerializable) {
 		ret.TypeVerbose = tcToVerbose(TC_ENDBLOCKDATA)
 		ret.Type = TC_ENDBLOCKDATA
 	}
+}
+
+var dirtyDataHeaderByOverLongString []byte
+
+func init() {
+	bs, err := codec.DecodeBase64("rO0ABXVyACbBm8GMwarBocG2waHArsGswaHBrsGnwK7Bj8GiwarBpcGjwbTAu5DOWJ8QcylsAgAAeHA=")
+	if err != nil {
+		log.Errorf("init dirtyDataHeader failed: %v", err)
+	}
+	dirtyDataHeaderByOverLongString = bs
+}
+func GetJavaObjectArrayIns() (JavaSerializable, error) {
+	data := "rO0ABXVyABNbTGphdmEubGFuZy5PYmplY3Q7kM5YnxBzKWwCAAB4cAAAAAA="
+	byts, err := codec.DecodeBase64(data)
+	if err != nil {
+		return nil, err
+	}
+	objIns, err := ParseJavaSerialized(byts)
+	if len(objIns) != 1 {
+		return nil, errors.New("generate object array failed")
+	}
+	return objIns[0], nil
 }

@@ -133,7 +133,7 @@ func (f *FacadeServer) rmiShakeHands(peekConn *utils.BufferedPeekableConn) error
 		CIP, _ := jreader.ReadBytesLengthInt(conn, n)
 		CPort, _ := jreader.Read4ByteToInt(conn)
 		log.Infof("client rmi addr: %v", utils.HostPort(string(CIP), CPort))
-		f.triggerNotification("rmi-handshake", peekConn.GetOriginConn(), "", nil)
+		f.triggerNotification(RMIHandshakeMsgFlag, peekConn.GetOriginConn(), "", nil)
 		//conn.w
 	case rmiConnectionSingleOpProtocol:
 		log.Infof("%v's protocol: single-op (Unsupported)", conn.RemoteAddr())
@@ -182,9 +182,12 @@ func (f *FacadeServer) rmiServe(peekConn *utils.BufferedPeekableConn) error {
 		} else {
 			return errors.New("invalid request")
 		}
-		if v, ok := f.rmiResourceAddrs[className]; ok {
-			conn.Write(v)
+		data, verbose, ok := f.rmiResourceAddrs.GetResource(className)
+		if !ok {
+			return nil
 		}
+		conn.Write(data)
+		f.triggerNotificationEx(RMIMsgFlag, peekConn.GetOriginConn(), className, data, verbose)
 		return nil
 		//log.Infof("conn[%s]'s call command received", conn.RemoteAddr())
 		//conn.SetReadDeadline(time.Now().Add(2 * time.Second))
