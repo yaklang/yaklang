@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 
+	"github.com/yaklang/yaklang/common/utils"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -23,7 +24,7 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 		return nil
 	}
 	className := i.TypeRef().GetText()
-	class := y.ir.GetClass(className)
+	class := y.ir.GetClassBluePrint(className)
 	obj := y.ir.EmitMakeWithoutType(nil, nil)
 	obj.SetType(class)
 
@@ -43,63 +44,6 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 	c.IsEllipsis = ellipsis
 	y.ir.EmitCall(c)
 	return obj
-}
-
-func (y *builder) VisitTypeRef(raw phpparser.ITypeRefContext) ssa.Type {
-	if y == nil || raw == nil {
-		return nil
-	}
-	recoverRange := y.SetRange(raw)
-	defer recoverRange()
-
-	i, _ := raw.(*phpparser.TypeRefContext)
-	if i == nil {
-		return nil
-	}
-
-	if i.QualifiedNamespaceName() != nil {
-		y.VisitQualifiedNamespaceName(i.QualifiedNamespaceName())
-	} else if i.IndirectTypeRef() != nil {
-
-	} else if i.PrimitiveType() != nil {
-		return y.VisitPrimitiveType(i.PrimitiveType())
-	} else if i.Static() != nil {
-		// as class name
-	}
-
-	return nil
-}
-
-func (y *builder) VisitPrimitiveType(raw phpparser.IPrimitiveTypeContext) ssa.Type {
-	if y == nil || raw == nil {
-		return nil
-	}
-	recoverRange := y.SetRange(raw)
-	defer recoverRange()
-
-	i, _ := raw.(*phpparser.PrimitiveTypeContext)
-	if i == nil {
-		return nil
-	}
-
-	if i.BoolType() != nil {
-		return ssa.GetTypeByStr("bool")
-	} else if i.IntType() != nil {
-		return ssa.GetTypeByStr("int")
-	} else if i.Int64Type() != nil {
-		return ssa.GetTypeByStr("int64")
-	} else if i.DoubleType() != nil {
-		return ssa.GetTypeByStr("float64")
-	} else if i.StringType() != nil {
-		return ssa.GetTypeByStr("string")
-	} else if i.Resource() != nil {
-		return ssa.GetTypeByStr("any")
-	} else if i.ObjectType() != nil {
-		return ssa.GetTypeByStr("any")
-	} else if i.Array() != nil {
-		return ssa.NewMapType(ssa.GetTypeByStr("any"), ssa.GetTypeByStr("any"))
-	}
-	return ssa.GetTypeByStr("any")
 }
 
 func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) interface{} {
@@ -148,8 +92,8 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 				parentClassName = i.QualifiedStaticTypeRef().GetText()
 			}
 
-			class := y.ir.CreateClass(className)
-			if parentClass := y.ir.GetClass(parentClassName); parentClass != nil {
+			class := y.ir.CreateClassBluePrint(className)
+			if parentClass := y.ir.GetClassBluePrint(parentClassName); parentClass != nil {
 				class.AddParentClass(parentClass)
 			}
 			for _, statement := range i.AllClassStatement() {
@@ -183,19 +127,32 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 	case *phpparser.PropertyModifiersVariableContext:
 		// variable
 		modifiers := y.VisitPropertyModifiers(ret.PropertyModifiers())
+		// handle type hint
+		typ := y.VisitTypeHint(ret.TypeHint())
 
-		setMember := class.AddNormalMember
-		if _, ok := modifiers[ssa.Static]; ok {
-			setMember = func(name string, value ssa.Value) {
+		setMember := func(name string, value ssa.Value) {
+			_, isStatic := modifiers[ssa.Static]
+			isNilValue := utils.IsNil(value)
+
+			// if typ != nil && typ.GetTypeKind() != ssa.AnyTypeKind {
+			// 	value.SetType(typ)
+			// }
+
+			switch {
+			case isStatic && isNilValue:
+				// static member only type
+			case isStatic && !isNilValue:
+				// static member
 				variable := y.ir.GetStaticMember(class.Name, name)
 				y.ir.AssignVariable(variable, value)
 				class.AddStaticMember(name, value)
+			case !isStatic && isNilValue:
+				// normal member only type
+				class.AddNormalMemberOnlyType(name, typ)
+			case !isStatic && !isNilValue:
+				// normal member
+				class.AddNormalMember(name, value)
 			}
-		}
-		// handle variable
-		if ret.TypeHint() != nil {
-			// handle type hint
-			y.VisitTypeHint(ret.TypeHint())
 		}
 
 		// handle variable name
@@ -403,13 +360,17 @@ func (y *builder) VisitVariableInitializer(raw phpparser.IVariableInitializerCon
 		return "", nil
 	}
 
+	name := i.VarName().GetText()
 	var val ssa.Value
 	if constInit := i.ConstantInitializer(); constInit != nil {
 		val = y.VisitConstantInitializer(i.ConstantInitializer())
-	} else {
-		val = y.ir.EmitConstInstAny()
 	}
-	return i.VarName().GetText(), val
+	// if utils.IsNil(val) {
+	// 	undefined := y.ir.EmitUndefined(name)
+	// 	undefined.Kind = ssa.UndefinedMemberValid
+	// 	val = undefined
+	// }
+	return name, val
 }
 
 func (y *builder) VisitClassConstant(raw phpparser.IClassConstantContext) ssa.Value {

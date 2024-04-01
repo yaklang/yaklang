@@ -449,8 +449,8 @@ function b(int $a){
     echo $a;
 }
 
-a(b(a));`
-		ssatest.MockSSA(t, code)
+println(a(b(a)));`
+		ssatest.CheckPrintlnValue(code, []string{"Function-a(Function-b(1))"}, t)
 	})
 }
 func TestStringPart(t *testing.T) {
