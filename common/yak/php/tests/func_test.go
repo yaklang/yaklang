@@ -234,3 +234,36 @@ $a =assert("echo 1");`
 		test.MockSSA(t, code)
 	})
 }
+
+func Test_Function_WithMemberCall(t *testing.T) {
+	t.Run("normal", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+		<?php
+		class A {
+			function fun1() {
+				return "1";
+			}
+		}
+		$a = new A();
+		$b = $a->fun1();
+		println($b);
+		`, []string{"Function-fun1(make(object{}))"}, t)
+	})
+
+	t.Run("multiple member call", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+		<?php
+		class A {
+			function fun1() {
+				return "1";
+			}
+		}
+		class B {
+			var A $a;
+		}
+		$b = new B();
+		$call = $b->a->fun1();
+		println($call);
+		`, []string{"Function-fun1(Undefined-.a(valid))"}, t)
+	})
+}

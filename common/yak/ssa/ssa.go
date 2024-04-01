@@ -343,15 +343,15 @@ var (
 
 // ----------- Undefined
 
-// mark undefined value type
+// UndefinedKind : mark undefined value type
 type UndefinedKind int
 
 const (
-	// normal undefined value
+	// UndefinedValue normal undefined value
 	UndefinedValue UndefinedKind = iota
-	// member call but not this key
+	// UndefinedMemberInValid member call but not this key
 	UndefinedMemberInValid
-	// member call, has this key, but not this value, this shouldn't mark error
+	// UndefinedMemberValid member call, has this key, but not this value, this shouldn't mark error
 	UndefinedMemberValid
 )
 
