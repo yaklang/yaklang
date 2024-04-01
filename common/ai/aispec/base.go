@@ -168,6 +168,14 @@ func ExtractDataBase(
 	result := make(map[string]any)
 	err = json.Unmarshal([]byte(choiceMsg), &result)
 	if err != nil {
+		results := jsonextractor.ExtractStandardJSON(choiceMsg)
+		if len(results) > 0 {
+			err = json.Unmarshal([]byte(results[0]), &result)
+			if err != nil {
+				return nil, utils.Errorf("unmarshal choice message[%v] failed: %v", string(choiceMsg), err)
+			}
+			return result, nil
+		}
 		return nil, utils.Errorf("unmarshal choice message[%v] failed: %v", string(choiceMsg), err)
 	}
 	return result, nil
