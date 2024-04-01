@@ -182,7 +182,7 @@ func (origin *Storage) DecoratedByOpenAI(t string, opts ...aispec.AIConfigOption
 			log.Errorf("cannot get ai type: %s", t)
 			return
 		}
-		raw, err := agent.ExtractData(clearData, "从规则内的流量特征中提取关键信息", map[string]string{
+		raw, err := agent.ExtractData(clearData, "从规则内的流量特征中提取关键信息", map[string]any{
 			"keywords":       "所有规则中的特征关键字，数量大概5个，关键字长度不要超过4个词，注意要去除引用，以','分隔", //  gpt4不需要这个提示 `一定要重点注意不要提取suricata语法的关键字，如alert, content, sid等（英文）`
 			"keywords_zh":    "keywords的中文翻译",
 			"description":    "描述这个规则的作用，必须要说清楚此规则描述了什么样的规则，尽量详细（英文）",

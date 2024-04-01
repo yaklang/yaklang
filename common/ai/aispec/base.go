@@ -40,7 +40,7 @@ func ChatBase(url string, model string, msg string, fs []Function, opt func() ([
 	return compl.Choices[0].Message.Content, nil
 }
 
-func ChatBasedExtractData(url string, model string, msg string, fields map[string]string, opt func() ([]poc.PocConfigOption, error)) (map[string]any, error) {
+func ChatBasedExtractData(url string, model string, msg string, fields map[string]any, opt func() ([]poc.PocConfigOption, error)) (map[string]any, error) {
 	if len(fields) <= 0 {
 		return nil, utils.Error("no fields config for extract")
 	}

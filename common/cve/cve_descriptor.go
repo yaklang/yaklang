@@ -193,7 +193,7 @@ func MakeOpenAIWorking(src *cveresources.CVE, gateway aispec.AIGateway) error {
 	if err != nil {
 		return utils.Errorf("marshal cve failed: %s", err)
 	}
-	raw, err := gateway.ExtractData(strconv.Quote(string(data)), "请你提炼其中有用的信息，中文标题，解决方案和描述信息", map[string]string{
+	raw, err := gateway.ExtractData(strconv.Quote(string(data)), "请你提炼其中有用的信息，中文标题，解决方案和描述信息", map[string]any{
 		"title":          "从数据源中提取成一个精炼的英文标题",
 		"title_zh":       "从数据源提炼一个精炼的中文标题",
 		"solution":       "从数据源中提取出一个修复方案（中文）",
