@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/davecgh/go-spew/spew"
 )
@@ -315,6 +316,19 @@ func TestFuzzTagBug(t *testing.T) {
 }
 
 func TestDateRangeFuzzTag(t *testing.T) {
-	result := MutateQuick(`{{date:range(20080101,20090101)}}`)
-	spew.Dump(result)
+	require.Equal(
+		t,
+		[]string{
+			"20080101", "20080102", "20080103", "20080104", "20080105", "20080106", "20080107", "20080108", "20080109", "20080110", "20080111",
+		},
+		MutateQuick(`{{date:range(20080101,20080111)}}`),
+	)
+
+	require.Equal(
+		t,
+		[]string{
+			"01/01/2008", "01/02/2008", "01/03/2008", "01/04/2008", "01/05/2008", "01/06/2008", "01/07/2008", "01/08/20	08", "01/09/2008", "01/10/2008", "01/11/2008",
+		},
+		MutateQuick(`{{date:range(01/01/2008,01/11/2008)}}`),
+	)
 }
