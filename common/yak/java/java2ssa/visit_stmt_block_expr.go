@@ -94,7 +94,6 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		if ret.Primary() != nil {
 			return y.VisitPrimary(ret.Primary())
 		}
-		return nil
 	case *javaparser.SliceCallExpressionContext:
 		// 处理切片调用表达式
 		expr := y.VisitExpression(ret.Expression(0))
@@ -160,9 +159,9 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			}
 		} else if memberCall := ret.LeftMemberCall(); memberCall != nil {
 			if id := memberCall.(*javaparser.LeftMemberCallContext).Identifier(); id != nil {
-				idText := id.GetText()
-				callee := y.EmitConstInst(idText)
-				variable = y.CreateMemberCallVariable(expr, callee)
+				object := expr
+				key := y.VisitLeftMemberCall(memberCall)
+				variable = y.CreateMemberCallVariable(object, key)
 			}
 		}
 
@@ -230,9 +229,9 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			}
 		} else if memberCall := ret.LeftMemberCall(); memberCall != nil {
 			if id := memberCall.(*javaparser.LeftMemberCallContext).Identifier(); id != nil {
-				idText := id.GetText()
-				callee := y.EmitConstInst(idText)
-				variable = y.CreateMemberCallVariable(expr, callee)
+				object := expr
+				key := y.VisitLeftMemberCall(memberCall)
+				variable = y.CreateMemberCallVariable(object, key)
 			}
 		}
 
@@ -462,9 +461,9 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			}
 		} else if memberCall := ret.LeftMemberCall(); memberCall != nil {
 			if id := memberCall.(*javaparser.LeftMemberCallContext).Identifier(); id != nil {
-				idText := id.GetText()
-				callee := y.EmitConstInst(idText)
-				variable = y.CreateMemberCallVariable(expr, callee)
+				object := expr
+				key := y.VisitLeftMemberCall(memberCall)
+				variable = y.CreateMemberCallVariable(object, key)
 			}
 		}
 

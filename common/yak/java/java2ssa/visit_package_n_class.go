@@ -221,6 +221,8 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 		return
 
 	} else if ret := i.ConstructorDeclaration(); ret != nil {
+		//声明构造函数
+		y.VisitConstructorDeclaration(ret, class)
 
 	} else if ret := i.GenericConstructorDeclaration(); ret != nil {
 
@@ -558,5 +560,38 @@ func (y *builder) VisitQualifiedNameList(raw javaparser.IQualifiedNameListContex
 	if i == nil {
 		return
 	}
+
+}
+
+func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclarationContext, class *ssa.ClassBluePrint) {
+	if y == nil || raw == nil {
+		return
+	}
+	i, _ := raw.(*javaparser.ConstructorDeclarationContext)
+	if i == nil {
+		return
+	}
+
+	funcName := i.Identifier().GetText()
+
+	createFunction := func() *ssa.Function {
+		newFunction := y.NewFunc(funcName)
+		y.FunctionBuilder = y.PushFunction(newFunction)
+		{
+			this := y.NewParam("this")
+			_ = this
+			y.VisitFormalParameters(i.FormalParameters())
+			y.VisitBlock(i.Block())
+			y.Finish()
+		}
+		y.FunctionBuilder = y.PopFunction()
+		return newFunction
+	}
+
+	if i.THROWS() != nil {
+		y.VisitQualifiedNameList(i.QualifiedNameList())
+	}
+	newFunction := createFunction()
+	class.Constructor = newFunction
 
 }
