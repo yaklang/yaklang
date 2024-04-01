@@ -68,6 +68,6 @@ func (g *GLMClient) ChatEx(details []aispec.ChatDetail, function ...aispec.Funct
 	return aispec.ChatExBase(g.targetUrl, g.config.Model, details, function, g.BuildHTTPOptions)
 }
 
-func (g *GLMClient) ExtractData(msg string, desc string, fields map[string]string) (map[string]any, error) {
+func (g *GLMClient) ExtractData(msg string, desc string, fields map[string]any) (map[string]any, error) {
 	return aispec.ChatBasedExtractData(g.targetUrl, g.config.Model, msg, fields, g.BuildHTTPOptions)
 }
