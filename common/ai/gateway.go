@@ -63,7 +63,7 @@ func Moonshot(opts ...aispec.AIConfigOption) aispec.AIGateway {
 	return agent
 }
 
-func Chat(msg string, opts ...aispec.AIConfigOption) (string, error) {
+func GetPrimaryAgent() aispec.AIGateway {
 	var agent aispec.AIGateway
 
 	t := consts.GetAIPrimaryType()
@@ -80,42 +80,24 @@ func Chat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 	} else {
 		agent = createAIGateway(t)
 	}
-
+	return agent
+}
+func Chat(msg string, opts ...aispec.AIConfigOption) (string, error) {
+	agent := GetPrimaryAgent()
 	if agent == nil {
-		if t == "" {
-			return "", utils.Error("no primary and configged ai agent found")
-		}
-		return "", utils.Errorf("primary type: %v is not config", t)
+		return "", utils.Error("no primary and configured ai agent found")
 	}
 	agent.LoadOption(opts...)
 	return agent.Chat(msg)
 }
 
-func FunctionCall(input string, funcs map[string]any, opts ...aispec.AIConfigOption) (map[string]any, error) {
-	var agent aispec.AIGateway
-	t := consts.GetAIPrimaryType()
-	if t == "" {
-		for _, defaultType := range []string{
-			"openai", "chatglm",
-		} {
-			agent = createAIGateway(defaultType)
-			if agent == nil {
-				continue
-			}
-			break
-		}
-	} else {
-		agent = createAIGateway(t)
-	}
-
+func FunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[string]any, error) {
+	agent := GetPrimaryAgent()
 	if agent == nil {
-		if t == "" {
-			return nil, utils.Error("no primary and configged ai agent found")
-		}
-		return nil, utils.Errorf("primary type: %v is not config", t)
+		return nil, utils.Error("no primary and configged ai agent found")
 	}
 	agent.LoadOption(opts...)
-	return agent.ExtractData(input, "", funcs)
+	return agent.ExtractData(input, "", utils.InterfaceToGeneralMap(funcs))
 }
 
 var Exports = map[string]any{
