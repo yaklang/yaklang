@@ -45,7 +45,7 @@ var allExtOptions = []*ypb.YsoClassGeneraterOptionsWithVerbose{
 }
 var classExtOptionsIndex = []int{0, 2, 3, 4}
 var gadgetTemplateImplExtOptionsIndex = []int{0, 2, 1, 3, 4}
-var gadgetTransformChainExtOptionsIndex = []int{1, 2}
+var gadgetTransformChainExtOptionsIndex = []int{2, 1, 3}
 
 func IsExtOption(key string) bool {
 	for _, v := range allExtOptions {
@@ -406,11 +406,13 @@ func (s *Server) GenerateYsoCode(ctx context.Context, req *ypb.YsoOptionsRequers
 	}
 	return &ypb.YsoCodeResponse{Code: code}, nil
 }
-func (s *Server) GenerateYsoBytes(ctx context.Context, req *ypb.YsoOptionsRequerstWithVerbose) (*ypb.YsoBytesResponse, error) {
+
+// GenerateYsoPayload a utils for generate yso payload, return value is: token(className),Gadget or Class Instance,payload toByte fun,error
+func GenerateYsoPayload(req *ypb.YsoOptionsRequerstWithVerbose) (string, func(opts ...yso.MarshalOptionFun) ([]byte, error), error) {
 	if req.Gadget == "None" {
 		_, ok := yso.YsoConfigInstance.Classes[yso.ClassType(req.Class)]
 		if !ok {
-			return nil, utils.Errorf("not support class: %s", req.Class)
+			return "", nil, utils.Errorf("not support class: %s", req.Class)
 		}
 		var opts []yso.GenClassOptionFun
 		opts = append(opts, yso.SetClassType(yso.ClassType(req.Class)))
@@ -427,7 +429,7 @@ func (s *Server) GenerateYsoBytes(ctx context.Context, req *ypb.YsoOptionsRequer
 			if option.Key == string(JavaClassGeneraterOption_Version) {
 				n, err := strconv.Atoi(option.Value)
 				if err != nil {
-					return nil, err
+					return "", nil, err
 				}
 				opts = append(opts, yso.SetMajorVersion(uint16(n)))
 			}
@@ -440,21 +442,20 @@ func (s *Server) GenerateYsoBytes(ctx context.Context, req *ypb.YsoOptionsRequer
 			opts = append(opts, yso.SetClassParam(option.Key, option.Value))
 		}
 		if fileName == "" {
-			return nil, errors.New("not set className")
+			return "", nil, errors.New("not set className")
 		}
 		classIns, err := yso.GenerateClass(opts...)
 		if err != nil {
-			return nil, err
+			return "", nil, err
 		}
-		byts, err := yso.ToBytes(classIns, toBytesOpt...)
-		if err != nil {
-			return nil, err
-		}
-		return &ypb.YsoBytesResponse{Bytes: byts, FileName: fileName}, nil
+
+		return fileName, func(opts ...yso.MarshalOptionFun) ([]byte, error) {
+			return yso.ToBytes(classIns, append(toBytesOpt, opts...)...)
+		}, nil
 	} else {
 		cfg, ok := yso.YsoConfigInstance.Gadgets[yso.GadgetType(req.Gadget)]
 		if !ok {
-			return nil, utils.Errorf("not support gadget: %s", req.Gadget)
+			return "", nil, utils.Errorf("not support gadget: %s", req.Gadget)
 		}
 		if cfg.IsTemplateImpl {
 			var opts []yso.GenClassOptionFun
@@ -472,14 +473,14 @@ func (s *Server) GenerateYsoBytes(ctx context.Context, req *ypb.YsoOptionsRequer
 				if option.Key == string(JavaClassGeneraterOption_DirtyData) {
 					v, err := strconv.Atoi(option.Value)
 					if err != nil {
-						return nil, utils.Errorf("dirty data error: %v", err)
+						return "", nil, utils.Errorf("dirty data error: %v", err)
 					}
 					toBytesOpt = append(toBytesOpt, yso.SetToBytesDirtyDataLength(v))
 				}
 				if option.Key == string(JavaClassGeneraterOption_Version) {
 					n, err := strconv.Atoi(option.Value)
 					if err != nil {
-						return nil, err
+						return "", nil, err
 					}
 					opts = append(opts, yso.SetMajorVersion(uint16(n)))
 				}
@@ -492,27 +493,30 @@ func (s *Server) GenerateYsoBytes(ctx context.Context, req *ypb.YsoOptionsRequer
 				opts = append(opts, yso.SetClassParam(option.Key, option.Value))
 			}
 			if fileName == "" {
-				return nil, errors.New("not set className")
+				return "", nil, errors.New("not set className")
 			}
 			opts = append(opts, yso.SetClassType(yso.ClassType(req.Class)))
 			o, err := yso.GenerateGadget(req.Gadget, utils.InterfaceToSliceInterface(opts)...)
 			if err != nil {
-				return nil, err
+				return "", nil, err
 			}
-			byts, err := yso.ToBytes(o, toBytesOpt...)
-			if err != nil {
-				return nil, err
-			}
-			return &ypb.YsoBytesResponse{Bytes: byts, FileName: fileName}, nil
+
+			return fileName, func(opts ...yso.MarshalOptionFun) ([]byte, error) {
+				return yso.ToBytes(o, append(toBytesOpt, opts...)...)
+			}, nil
 		} else {
 			opts := []any{}
 			opts = append(opts, req.Class)
 			params := map[string]string{}
 			opts = append(opts, params)
 			toBytesOpt := []yso.MarshalOptionFun{}
+			var fileName string
 			for _, option := range req.Options {
 				if option.Key == string(JavaClassGeneraterOption_twoByteChar) && option.Value == "true" {
 					toBytesOpt = append(toBytesOpt, yso.SetToBytesTwoBytesString())
+				}
+				if option.Key == string(JavaClassGeneraterOption_ClassName) {
+					fileName = fmt.Sprintf("%s.class", option.Value)
 				}
 				if IsExtOption(option.Key) {
 					continue
@@ -521,15 +525,27 @@ func (s *Server) GenerateYsoBytes(ctx context.Context, req *ypb.YsoOptionsRequer
 			}
 			o, err := yso.GenerateGadget(req.Gadget, opts...)
 			if err != nil {
-				return nil, err
+				return "", nil, err
 			}
-			byts, err := yso.ToBytes(o, toBytesOpt...)
-			if err != nil {
-				return nil, err
-			}
-			return &ypb.YsoBytesResponse{Bytes: byts, FileName: ""}, nil
+			return fileName, func(opts ...yso.MarshalOptionFun) ([]byte, error) {
+				return yso.ToBytes(o, append(toBytesOpt, opts...)...)
+			}, nil
 		}
 	}
+}
+func (s *Server) GenerateYsoBytes(ctx context.Context, req *ypb.YsoOptionsRequerstWithVerbose) (*ypb.YsoBytesResponse, error) {
+	token, payloadGetter, err := GenerateYsoPayload(req)
+	if err != nil {
+		return nil, err
+	}
+	payload, err := payloadGetter()
+	if err != nil {
+		return nil, err
+	}
+	return &ypb.YsoBytesResponse{
+		FileName: token,
+		Bytes:    payload,
+	}, nil
 }
 func (s *Server) BytesToBase64(ctx context.Context, req *ypb.BytesToBase64Request) (*ypb.BytesToBase64Response, error) {
 	return &ypb.BytesToBase64Response{Base64: codec.EncodeBase64(req.Bytes)}, nil

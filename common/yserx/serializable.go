@@ -23,7 +23,7 @@ func (j *CommonMarshaler) ObjectMarshaler(obj *JavaObject, ctx *MarshalContext) 
 }
 func (j *CommonMarshaler) ClassDescMarshaler(obj *JavaClassDetails, ctx *MarshalContext) []byte {
 	nullRaw := []byte{TC_NULL}
-	if j == nil {
+	if obj == nil {
 		return nullRaw
 	}
 
@@ -80,7 +80,7 @@ func (j *JRMPMarshaler) ClassDescMarshaler(obj *JavaClassDetails, ctx *MarshalCo
 		j.descTimes++
 	}()
 	nullRaw := []byte{TC_NULL}
-	if j == nil {
+	if obj == nil {
 		return nullRaw
 	}
 
@@ -96,6 +96,11 @@ func (j *JRMPMarshaler) ClassDescMarshaler(obj *JavaClassDetails, ctx *MarshalCo
 		}
 		for _, i := range obj.DynamicProxyAnnotation {
 			raw = append(raw, i.Marshal(ctx)...)
+		}
+		if j.CodeBase != "" && j.descTimes == 0 {
+			raw = append(raw, NewJavaString(j.CodeBase).Marshal(ctx)...) // annotation that used for set codebase
+		} else {
+			raw = append(raw, TC_NULL) // annotation that used for set codebase
 		}
 		raw = append(raw, TC_ENDBLOCKDATA)
 		if obj.SuperClass == nil {

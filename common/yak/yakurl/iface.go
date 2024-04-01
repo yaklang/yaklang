@@ -71,6 +71,8 @@ func (s *ActionService) CreateAction(schema string) Action {
 		return &fuzzTagDocAction{}
 	case "yakdocument":
 		return &documentAction{}
+	case "facades":
+		return newFacadeServerAction()
 	default:
 		return nil
 	}

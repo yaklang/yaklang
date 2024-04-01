@@ -510,11 +510,7 @@ func ToBytes(i interface{}, opts ...MarshalOptionFun) ([]byte, error) {
 	case *javaclassparser.ClassObject:
 		return ret.ToBytesByCustomStringChar(cfg.StringCharLength), nil
 	case yserx.JavaSerializable:
-		res := yserx.MarshalJavaObjectWithConfig(ret, cfg)
-		if cfg.DirtyDataLength > 0 {
-			return WrapSerializeDataByDirtyData(res, cfg.DirtyDataLength)
-		}
-		return res, nil
+		return yserx.MarshalJavaObjectWithConfig(ret, cfg), nil
 	default:
 		return nil, utils.Errorf("cannot support %v to bytes", reflect.TypeOf(ret))
 	}

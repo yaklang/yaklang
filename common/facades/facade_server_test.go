@@ -59,7 +59,7 @@ func TestFacadeServerYsoSerialize(t *testing.T) {
 		SetLdapResponseEntry("aaa", map[string]any{
 			"javaSerializedData": byts,
 			"javaClassName":      utils.RandStringBytes(5),
-		}),
+		}, "gadget"),
 	)
 	server.Serve()
 }

