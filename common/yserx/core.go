@@ -873,7 +873,10 @@ func (p *JavaSerializationParser) readStringUTF(r io.Reader) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
+	raw, err = utils.ParseJavaOverLongString(raw)
+	if err != nil {
+		return "", err
+	}
 	p.debug("Length - %v", stringLen)
 	p.debug("Value  - %v", strconv.Quote(string(raw)))
 	// https://github.com/NickstaDB/SerializationDumper/blob/49dbece69f0b8230aaed4a0c50ca56fecc9376c0/src/nb/deser/SerializationDumper.java#L1295
