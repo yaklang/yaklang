@@ -7,6 +7,7 @@ import (
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/yak2ssa"
+	"strings"
 )
 
 func (y *builder) VisitBlock(raw javaparser.IBlockContext) interface{} {
@@ -128,8 +129,10 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 			// todo: 访问父类成员
 			key = y.EmitConstInst(super.GetText())
 		} else if creator := ret.InnerCreator(); creator != nil {
-			//todo : 内部类创建
-			key = y.EmitConstInst(creator.GetText())
+			if ret.NonWildcardTypeArguments() != nil {
+				// todo:泛型
+			}
+			return y.VisitInnerCreator(ret.InnerCreator(), ret.Expression().GetText())
 		} else if explicit := ret.ExplicitGenericInvocation(); explicit != nil {
 			//todo : 显式泛型调用
 			key = y.EmitConstInst(explicit.GetText())
@@ -1484,6 +1487,46 @@ func (y *builder) VisitBlockStatementList(raw javaparser.IBlockStatementListCont
 			y.VisitBlockStatement(stmt)
 		}
 	}
+}
+
+func (y *builder) VisitInnerCreator(raw javaparser.IInnerCreatorContext, outClassName string) ssa.Value {
+	if y == nil || raw == nil {
+		return nil
+	}
+	i, _ := raw.(*javaparser.InnerCreatorContext)
+	if i == nil {
+		return nil
+	}
+	// todo 类声明的泛型
+	if nonWildcard := i.NonWildcardTypeArgumentsOrDiamond(); nonWildcard != nil {
+	}
+
+	var builder strings.Builder
+	builder.WriteString(outClassName)
+	builder.WriteString(".")
+	builder.WriteString(i.Identifier().GetText())
+	className := builder.String()
+
+	class := y.CreateClass(className)
+	if class == nil {
+		return nil
+	}
+
+	obj := y.EmitMakeWithoutType(nil, nil)
+	obj.SetType(class)
+
+	constructor := y.GetClassConstructor(className)
+	if constructor == nil {
+		return obj
+	}
+
+	args := []ssa.Value{obj}
+	arguments := y.VisitClassCreatorRest(i.ClassCreatorRest(), className)
+	args = append(args, arguments...)
+	c := y.NewCall(constructor, args)
+	y.EmitCall(c)
+	return obj
+
 }
 
 func (y *builder) VisitCreator(raw javaparser.ICreatorContext) ssa.Value {

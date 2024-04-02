@@ -4,17 +4,18 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"strings"
 )
 
-func (y *builder) VisitTypeDeclaration(raw javaparser.ITypeDeclarationContext) interface{} {
+func (y *builder) VisitTypeDeclaration(raw javaparser.ITypeDeclarationContext) {
 	if y == nil || raw == nil {
-		return nil
+		return
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 	i, _ := raw.(*javaparser.TypeDeclarationContext)
 	if i == nil {
-		return nil
+		return
 	}
 
 	var modifier []string
@@ -23,36 +24,43 @@ func (y *builder) VisitTypeDeclaration(raw javaparser.ITypeDeclarationContext) i
 	}
 
 	if ret := i.ClassDeclaration(); ret != nil {
-		return y.VisitClassDeclaration(ret)
+		y.VisitClassDeclaration(ret, nil)
 	} else if ret := i.EnumDeclaration(); ret != nil {
-		return y.VisitEnumDeclaration(ret, nil)
+		y.VisitEnumDeclaration(ret, nil)
 	} else if ret := i.InterfaceDeclaration(); ret != nil {
-		return y.VisitInterfaceDeclaration(ret)
+		y.VisitInterfaceDeclaration(ret)
 	} else if ret := i.AnnotationTypeDeclaration(); ret != nil {
-		return y.VisitAnnotationTypeDeclaration(ret)
+		y.VisitAnnotationTypeDeclaration(ret)
 	} else if ret := i.RecordDeclaration(); ret != nil {
-		return y.VisitRecordDeclaration(ret)
+		y.VisitRecordDeclaration(ret)
 	}
 
-	log.Errorf("visit type decl failed: %s", "unknown type")
-	return nil
 }
 
-func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext) interface{} {
+func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext, outClass *ssa.ClassBluePrint) {
 	if y == nil || raw == nil {
-		return nil
+		return
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 	i, _ := raw.(*javaparser.ClassDeclarationContext)
 	if i == nil {
-		return nil
+		return
 	}
 	var mergedTemplate []string
-
-	className := i.Identifier().GetText()
-	class := y.CreateClass(className)
-
+	// 声明的类为外部类情况
+	var class *ssa.ClassBluePrint
+	if outClass == nil {
+		className := i.Identifier().GetText()
+		class = y.CreateClass(className)
+	} else {
+		var builder strings.Builder
+		builder.WriteString(outClass.Name)
+		builder.WriteString(".")
+		builder.WriteString(i.Identifier().GetText())
+		className := builder.String()
+		class = y.CreateClass(className)
+	}
 	if ret := i.TypeParameters(); ret != nil {
 		//log.Infof("class: %v 's (generic type) type is %v, ignore for ssa building", className, ret.GetText())
 	}
@@ -81,7 +89,7 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext)
 		}
 	}
 	y.VisitClassBody(i.ClassBody(), class)
-	return nil
+
 }
 
 func (y *builder) VisitClassBody(raw javaparser.IClassBodyContext, class *ssa.ClassBluePrint) interface{} {
@@ -220,7 +228,7 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 	} else if ret := i.AnnotationTypeDeclaration(); ret != nil {
 
 	} else if ret := i.ClassDeclaration(); ret != nil {
-
+		y.VisitClassDeclaration(ret, class)
 	} else if ret := i.EnumDeclaration(); ret != nil {
 		// 声明枚举类型
 		y.VisitEnumDeclaration(ret, class)
