@@ -271,4 +271,50 @@ func TestJava_OOP_Enum(t *testing.T) {
 			"Function-.getNum2(make(object{}),side-effect(Parameter-par2, this.num2))",
 		}, t)
 	})
+
+	t.Run("test nested enum", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		class Enum{
+		 enum A {
+			A,B,C;
+		}
+}
+		class Main{
+		public class Main{
+			public static void main(String[] args) {
+			Enum.A a = Enum.A.A;
+			println(a);
+			}
+		}}
+		`, []string{
+			"make(object{})",
+		}, t)
+	})
+
+}
+
+func TestJava_OOP_MemberClass(t *testing.T) {
+	t.Run("test no-static inner class ", func(t *testing.T) {
+		code := `
+public class Outer {
+    public  class Inner{
+        int a = 1;
+        public Inner(int par){
+            this.a=par;
+        }
+        public int getA(){
+            return this.a;
+        }
+    }
+}
+
+public class Main{
+    public static void main(String[] args) {
+        Outer outer = new Outer();
+        Outer.Inner inner =outer.new Inner(5);
+        println(inner.a);
+    }
+}`
+		ssatest.CheckPrintlnValue(code, []string{""}, t)
+	})
 }
