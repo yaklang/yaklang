@@ -8,6 +8,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strconv"
 	"testing"
@@ -219,4 +220,31 @@ func TestParseHexJavaSerialized(t *testing.T) {
 		target := 0x40 + byte(i)
 		fmt.Printf("%02x: %v\n", target, string([]byte{target}))
 	}
+}
+func TestParseTwoByteCharUtf(t *testing.T) {
+	s := utils.RandStringBytes(8)
+	javaString := NewJavaString(s)
+	cfg := NewMarshalContext()
+	cfg.StringCharLength = 2
+	sers, err := ParseJavaSerialized(MarshalJavaObjectWithConfig(javaString, cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sers) != 1 {
+		t.Fatal("parse failed")
+	}
+	javaString = sers[0].(*JavaString)
+	assert.Equal(t, javaString.Value, s)
+
+	cfg.StringCharLength = 3
+	sers, err = ParseJavaSerialized(MarshalJavaObjectWithConfig(javaString, cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sers) != 1 {
+		t.Fatal("parse failed")
+	}
+	javaString = sers[0].(*JavaString)
+	assert.Equal(t, javaString.Value, s)
+
 }

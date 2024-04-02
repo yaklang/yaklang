@@ -246,7 +246,7 @@ func (s *VulinServer) registerMockVulShiro() {
 
 func checkGadget(payload []byte, failNow func(writer http.ResponseWriter, request *http.Request, err error), successNow func(writer http.ResponseWriter, request *http.Request), writer http.ResponseWriter, request *http.Request) {
 	javaSerializables, err := yserx.ParseJavaSerialized(payload)
-	if err != nil {
+	if javaSerializables == nil {
 		failNow(writer, request, err)
 		return
 	}

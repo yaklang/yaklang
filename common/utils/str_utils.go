@@ -1164,6 +1164,42 @@ func Format(raw string, data map[string]string) string {
 func ReplaceLastSubString(s, sub, new string) string {
 	return strings.Replace(s, sub, new, strings.LastIndex(s, sub))
 }
+func ParseJavaOverLongString(raw []byte) ([]byte, error) {
+	reader := bytes.NewReader(raw)
+	var res []byte
+	for i := 0; i < len(raw); {
+		b, err := reader.ReadByte()
+		if err != nil {
+			return nil, err
+		}
+		byteFlag := b >> 4
+		if byteFlag <= 7 {
+			res = append(res, b)
+			i += 1
+		} else if byteFlag <= 13 {
+			b1, err := reader.ReadByte()
+			if err != nil {
+				return nil, err
+			}
+			res = append(res, ((b&0x1F)<<6)|(b1&0x3F))
+			i += 2
+		} else if byteFlag <= 14 {
+			b1, err := reader.ReadByte()
+			if err != nil {
+				return nil, err
+			}
+			b2, err := reader.ReadByte()
+			if err != nil {
+				return nil, err
+			}
+			res = append(res, ((b1&0x3F)<<6)|(b2&0x3F))
+			i += 3
+		} else {
+			return nil, errors.New("utf data format is invalid")
+		}
+	}
+	return res, nil
+}
 
 // ToJavaOverLongString convert string
 func ToJavaOverLongString(str []byte, l int) []byte {
