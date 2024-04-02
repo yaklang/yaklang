@@ -670,12 +670,16 @@ func (y *builder) VisitPrimary(raw javaparser.IPrimaryContext) ssa.Value {
 
 	if ret := i.Identifier(); ret != nil {
 		text := ret.GetText()
+		value, ok := y.constMap[text]
+		if ok {
+			return value
+		}
 		if text == "_" {
 			y.NewError(ssa.Warn, "javaast", "cannot use _ as value")
 			return nil
 		}
-		v := y.ReadValue(text)
-		return v
+		value = y.ReadValue(text)
+		return value
 	}
 	if ret := i.THIS(); ret != nil {
 		//return y.ReadValue(ret.GetText())
@@ -1004,6 +1008,7 @@ func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorCont
 	} else {
 		name := i.VariableDeclaratorId().(*javaparser.VariableDeclaratorIdContext).Identifier().GetText()
 		y.CreateVariable(name)
+		value := y.EmitConstInstAny()
 		return name, value
 	}
 

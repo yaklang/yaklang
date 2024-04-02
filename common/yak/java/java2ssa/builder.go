@@ -10,8 +10,8 @@ import (
 
 type builder struct {
 	*ssa.FunctionBuilder
-
-	ast javaparser.ICompilationUnitContext
+	ast      javaparser.ICompilationUnitContext
+	constMap map[string]ssa.Value
 }
 
 func Build(src string, force bool, b *ssa.FunctionBuilder) error {
@@ -22,6 +22,7 @@ func Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	build := &builder{
 		FunctionBuilder: b,
 		ast:             ast,
+		constMap:        make(map[string]ssa.Value),
 	}
 	b.DisableFreeValue = false
 	build.VisitCompilationUnit(ast)
