@@ -409,3 +409,14 @@ println($class::CONSTANT);
 		}, t)
 	})
 }
+func TestOOP_Class_closure(t *testing.T) {
+	code := `<?php
+$c = new class("2"){
+    public $a=1;
+    public function __construct($a){
+        $this->a=$a;
+    }
+};
+println($c->a);`
+	ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, $this.a)"}, t)
+}

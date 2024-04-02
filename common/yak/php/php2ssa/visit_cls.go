@@ -1,6 +1,7 @@
 package php2ssa
 
 import (
+	"github.com/google/uuid"
 	"strconv"
 	"strings"
 
@@ -22,6 +23,9 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 	i, _ := raw.(*phpparser.NewExprContext)
 	if i == nil {
 		return nil
+	}
+	if i.AnonymousClass() != nil {
+		return y.VisitAnonymousClass(i.AnonymousClass())
 	}
 	className := i.TypeRef().GetText()
 	class := y.ir.GetClassBluePrint(className)
@@ -605,4 +609,46 @@ func (y *builder) VisitMemberCallKey(raw phpparser.IMemberCallKeyContext) ssa.Va
 	}
 
 	return nil
+}
+
+func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.Value {
+	if y == nil || raw == nil {
+		return nil
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
+	i, _ := raw.(*phpparser.AnonymousClassContext)
+	if i == nil {
+		return nil
+	}
+	cname := uuid.NewString()
+	bluePrint := y.ir.CreateClassBluePrint(cname)
+	if i.QualifiedStaticTypeRef() != nil {
+		ref := y.VisitQualifiedStaticTypeRef(i.QualifiedStaticTypeRef())
+		if classBluePrint := y.ir.GetClassBluePrint(ref); classBluePrint != nil {
+			bluePrint.AddParentClass(classBluePrint)
+		}
+	}
+	for _, statement := range i.AllClassStatement() {
+		y.VisitClassStatement(statement, bluePrint)
+	}
+	obj := y.ir.EmitMakeWithoutType(nil, nil)
+	obj.SetType(bluePrint)
+	constructor := bluePrint.Constructor
+	if constructor == nil {
+		return obj
+	}
+
+	args := []ssa.Value{obj}
+	ellipsis := false
+	if i.Arguments() != nil {
+		tmp, hasEllipsis := y.VisitArguments(i.Arguments())
+		ellipsis = hasEllipsis
+		args = append(args, tmp...)
+	}
+	c := y.ir.NewCall(constructor, args)
+	c.IsEllipsis = ellipsis
+	y.ir.EmitCall(c)
+	return obj
 }
