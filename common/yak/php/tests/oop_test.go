@@ -104,8 +104,11 @@ func TestOOP_static_method(t *testing.T) {
 		println($a::aStaticMethod());
 		$b = "a";
 		println($$b::aStaticMethod());
+		$instance = new Foo();
+		println($instance::aStaticMethod())
 		?>
 		`, []string{
+			"Function-Foo_aStaticMethod()",
 			"Function-Foo_aStaticMethod()",
 			"Function-Foo_aStaticMethod()",
 			"Function-Foo_aStaticMethod()",
@@ -182,8 +185,8 @@ func TestOOP_var_member(t *testing.T) {
 		$a->a = 1;
 		println($a->getA());
 		`, []string{
-			"Function-getA(make(object{}),0)",
-			"Function-getA(make(object{}),1)",
+			"Function-getA(make(A),0)",
+			"Function-getA(make(A),1)",
 		}, t)
 	})
 
@@ -204,8 +207,8 @@ func TestOOP_var_member(t *testing.T) {
 		$a->setA(1);
 		println($a->getA());
 		`, []string{
-			"Function-getA(make(object{}),0)",
-			"Function-getA(make(object{}),side-effect(Parameter-$par, $this.a))",
+			"Function-getA(make(A),0)",
+			"Function-getA(make(A),side-effect(Parameter-$par, $this.a))",
 		}, t)
 	})
 }
@@ -266,8 +269,8 @@ func TestOOP_Extend_Class(t *testing.T) {
 		$a->a = 1;
 		println($a->getA());
 		`, []string{
-			"Function-getA(make(object{}),0)",
-			"Function-getA(make(object{}),1)",
+			"Function-getA(make(A),0)",
+			"Function-getA(make(A),1)",
 		}, t)
 	})
 
@@ -289,8 +292,8 @@ func TestOOP_Extend_Class(t *testing.T) {
 		$a->setA(1);
 		println($a->getA());
 		`, []string{
-			"Function-getA(make(object{}),0)",
-			"Function-getA(make(object{}),side-effect(Parameter-$par, $this.a))",
+			"Function-getA(make(A),0)",
+			"Function-getA(make(A),side-effect(Parameter-$par, $this.a))",
 		}, t)
 	})
 }
@@ -308,7 +311,7 @@ func TestParseCLS_Construct(t *testing.T) {
 		println($a->getNum());
 		`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Function-getNum(make(object{}),0)",
+			"Function-getNum(make(A),0)",
 		}, t)
 	})
 
@@ -326,7 +329,7 @@ class A {
 $a = new A(1);
 println($a->getNum());`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Function-getNum(make(object{}),side-effect(Parameter-$num, $this.num))",
+			"Function-getNum(make(A),side-effect(Parameter-$num, $this.num))",
 		}, t)
 	})
 }
@@ -382,4 +385,27 @@ func TestOOP_NoDefaultName(t *testing.T) {
 		}, t)
 	})
 
+}
+
+func TestOOP_Class_Const(t *testing.T) {
+	t.Run("test const value", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+<?php
+class MyClass
+{
+    const CONSTANT = 1; 
+}
+
+println(MyClass::CONSTANT);
+
+$classname = "MyClass";
+println($classname::CONSTANT);
+
+$class = new MyClass();
+println($class::CONSTANT);
+
+	`, []string{
+			"1", "1", "1",
+		}, t)
+	})
 }

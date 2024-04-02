@@ -1,12 +1,15 @@
 package php2ssa
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"os"
 )
 
 type builder struct {
@@ -45,6 +48,30 @@ func FrondEnd(src string, force bool) (phpparser.IHtmlDocumentContext, error) {
 		return ast, nil
 	}
 	return nil, utils.Errorf("parse AST FrontEnd error : %v", errListener.GetErrors())
+}
+
+func (b *builder) AssignConst(name string, value ssa.Value) bool {
+	if ConstValue, ok := b.constMap[name]; ok {
+		log.Warnf("const %v has been defined value is %v", name, ConstValue.String())
+		return false
+	}
+
+	b.constMap[name] = value
+	return true
+}
+
+func (b *builder) ReadConst(name string) (ssa.Value, bool) {
+	v, ok := b.constMap[name]
+	return v, ok
+}
+
+func (b *builder) AssignClassConst(className, key string, value ssa.Value) {
+	name := fmt.Sprintf("%s_%s", className, key)
+	b.AssignConst(name, value)
+}
+func (b *builder) ReadClassConst(className, key string) (ssa.Value, bool) {
+	name := fmt.Sprintf("%s_%s", className, key)
+	return b.ReadConst(name)
 }
 
 var phpBuildIn = map[string]any{
