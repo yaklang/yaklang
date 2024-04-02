@@ -113,7 +113,9 @@ var hybridScanCommand = &cli.Command{
 			plugins = utils.RemoveRepeatStringSlice(plugins)
 		}
 
-		if len(plugins) == 0 {
+		var pluginName = c.String("plugin")
+
+		if len(plugins) == 0 || len(pluginName) != 0 {
 			plugins = []string{"mitm", "nuclei", "port-scan"}
 		}
 
@@ -143,6 +145,7 @@ var hybridScanCommand = &cli.Command{
 				yakMITM = append(yakMITM, string(raw))
 				return nil
 			}
+			log.Fatalf("unsupported file type: %s", filename)
 			return nil
 		}
 		for _, file := range utils.PrettifyListFromStringSplitEx(c.String("templates"), ",", "|", "\n") {
@@ -198,8 +201,7 @@ var hybridScanCommand = &cli.Command{
 			log.Warn("mitm plugin is unfinished supporting")
 		}
 
-		db = db.Model(&yakit.YakScript{})
-		db.Where("type IN ?", plugins)
+		db = db.Model(&yakit.YakScript{}).Where("type IN (?)", plugins)
 		if handledUUID {
 			db = db.Where("script_name LIKE ?", "%"+uid)
 		}
@@ -212,6 +214,9 @@ var hybridScanCommand = &cli.Command{
 
 		pluginList := omap.NewOrderedMap(map[string]*yakit.YakScript{})
 		for result := range yakit.YieldYakScripts(db, context.Background()) {
+			if pluginName != "" && pluginName != result.ScriptName {
+				continue
+			}
 			log.Infof("start to load plugin: %s", result.ScriptName)
 			pluginList.Set(result.ScriptName, result)
 		}
@@ -312,7 +317,7 @@ var hybridScanCommand = &cli.Command{
 			return utils.Errorf("create local client failed: %s", err)
 		}
 		for target := range gen {
-			log.Infof("start to scan target: %p with plugins list cap: %v", target, pluginList.Len())
+			log.Infof("start to scan target: %v with plugins list cap: %v", target.Url, pluginList.Len())
 			for _, plugin := range pluginList.Values() {
 				log.Debugf("prepare target: %p in: %v", target, plugin.ScriptName)
 				swg.Add()
