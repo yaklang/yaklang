@@ -2561,6 +2561,7 @@ message ExecuteBatchPacketYakScriptParams {
 enum ShellType {
   Behinder = 0;
   Godzilla = 1;
+  YakShell = 2;
 }
 enum ShellScript {
   JSP = 0;
@@ -2597,7 +2598,20 @@ message WebShell {
   int64 UpdatedAt = 15;
   string PacketCodecName = 16;
   string PayloadCodecName = 17;
+  map<string, string> Posts = 18;
+  ShellOptions ShellOptions = 19;
+  string Os = 20;
 }
+
+message ShellOptions{
+  int64 RetryCount = 1; //重新时间
+  int64 Timeout = 2; //超时时间
+  int64 BlockSize = 3; //分块大小
+  int64 MaxSize = 4; //上传的最大包（M）
+  int64 UpdateTime = 5; //更新时间，当是session-mode的时候涉及到session过期的问题
+  bool IsSession = 6; //是否是session类型
+}
+
 message WebShellRequest {
   int64 Id = 1;
 }
