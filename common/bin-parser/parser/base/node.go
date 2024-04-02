@@ -388,7 +388,7 @@ func newNodeTree(parentCfg *Config, name string, data any, ctx *NodeContext) (*N
 		for _, item := range ret {
 			keyStr := utils.InterfaceToString(item.Key)
 			if len(keyStr) > 0 && unicode.IsLower(rune(keyStr[0])) { // 小写开头是 config字段
-				cfg.SetItem(keyStr, item.Value)
+				cfg.SetItem(keyStr, item.Value) // eg : operator, length
 				continue
 			}
 			childNode, err := newNodeTree(cfg, keyStr, item.Value, ctx)
@@ -420,7 +420,7 @@ func newNodeTree(parentCfg *Config, name string, data any, ctx *NodeContext) (*N
 				} else if len(splits) == 1 {
 					typeName = splits[0]
 				} else if len(splits) >= 2 {
-					typeName = splits[0]
+					typeName = splits[0] // get node type
 					splits[1] = strings.Join(splits[1:], ",")
 					lstr := ""
 					isBit := false
