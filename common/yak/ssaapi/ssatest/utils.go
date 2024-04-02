@@ -27,10 +27,10 @@ type TestCase struct {
 var languageOption ssaapi.Option = nil
 var language ssaapi.Language
 
-func SetLanguage(language ssaapi.Language, build ssaapi.Build) {
-	ssaapi.LanguageBuilders[language] = build
-	languageOption = ssaapi.WithLanguage(language)
-	language = language
+func SetLanguage(lang ssaapi.Language, build ssaapi.Build) {
+	ssaapi.LanguageBuilders[lang] = build
+	languageOption = ssaapi.WithLanguage(lang)
+	language = lang
 }
 
 func CheckTestCase(t *testing.T, tc TestCase) {
