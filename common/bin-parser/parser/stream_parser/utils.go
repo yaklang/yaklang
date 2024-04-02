@@ -409,8 +409,8 @@ func parseLengthByLengthConfig(node *base.Node) (uint64, bool, error) {
 	//parentRemaininigLength := uint64(0)
 	var length uint64
 	getLengthOK := false
-	if node.Cfg.Has("length") {
-		length = node.Cfg.GetUint64("length")
+	if node.Cfg.Has(CfgLength) {
+		length = node.Cfg.GetUint64(CfgLength)
 		getLengthOK = true
 	} else {
 		if node.Cfg.Has(CfgType) {
@@ -445,60 +445,58 @@ func parseLengthByLengthConfig(node *base.Node) (uint64, bool, error) {
 			}
 		}
 		if !getLengthOK {
+			// 从field 读取length
 			if node.Cfg.Has("length-from-field") {
-				// 从field 读取length
-				if node.Cfg.Has("length-from-field") {
-					fieldName := node.Cfg.GetString("length-from-field")
-					target := getNodeByPath(node, fieldName)
-					if target.Cfg.Has(CfgNodeResult) {
-						res := GetResultByNode(target)
-						if v, ok := base.InterfaceToUint64(res); ok {
-							total := v
-							total = total * getMulti(node)
-							if node.Cfg.Has("length-from-field-multiply") {
-								imulti := node.Cfg.GetItem("length-from-field-multiply")
-								var multi uint64
-								switch imulti.(type) {
-								case string:
-									n, err := strconv.Atoi(imulti.(string))
-									if err != nil {
-										return 0, false, fmt.Errorf("length-from-field-multiply type error")
-									}
-									multi = uint64(n)
-								default:
-									mul, ok := base.InterfaceToUint64(node.Cfg.GetItem("length-from-field-multiply"))
-									if !ok {
-										return 0, false, fmt.Errorf("length-from-field-multiply type error")
-									}
-									multi = mul
+				fieldName := node.Cfg.GetString("length-from-field")
+				target := getNodeByPath(node, fieldName)
+				if target.Cfg.Has(CfgNodeResult) {
+					res := GetResultByNode(target)
+					if v, ok := base.InterfaceToUint64(res); ok {
+						total := v
+						total = total * getMulti(node)
+						if node.Cfg.Has("length-from-field-multiply") {
+							imulti := node.Cfg.GetItem("length-from-field-multiply")
+							var multi uint64
+							switch imulti.(type) {
+							case string:
+								n, err := strconv.Atoi(imulti.(string))
+								if err != nil {
+									return 0, false, fmt.Errorf("length-from-field-multiply type error")
 								}
-								total *= multi
+								multi = uint64(n)
+							default:
+								mul, ok := base.InterfaceToUint64(node.Cfg.GetItem("length-from-field-multiply"))
+								if !ok {
+									return 0, false, fmt.Errorf("length-from-field-multiply type error")
+								}
+								multi = mul
 							}
-							length = total
-							getLengthOK = true
-							//if node.Cfg.Has("length-for-field") { // 当存在字段限制，且当前节点在限制范围内时，更新parentRemaininigLength
-							//	fieldsStr := node.Cfg.GetString("length-for-field")
-							//	fieldsInScope = strings.Split(fieldsStr, ",")
-							//	for _, field := range fieldsInScope {
-							//		if field == node.Name {
-							//			length = total
-							//			break
-							//		}
-							//	}
-							//} else {
-							//	length = total
-							//}
-						} else {
-							return 0, false, fmt.Errorf("field %s type error", fieldName)
+							total *= multi
 						}
+						length = total
+						getLengthOK = true
+						//if node.Cfg.Has("length-for-field") { // 当存在字段限制，且当前节点在限制范围内时，更新parentRemaininigLength
+						//	fieldsStr := node.Cfg.GetString("length-for-field")
+						//	fieldsInScope = strings.Split(fieldsStr, ",")
+						//	for _, field := range fieldsInScope {
+						//		if field == node.Name {
+						//			length = total
+						//			break
+						//		}
+						//	}
+						//} else {
+						//	length = total
+						//}
+					} else {
+						return 0, false, fmt.Errorf("field %s type error", fieldName)
 					}
-
 				}
+
 			}
 		}
 	}
 	var currentNodeLength uint64
-	for _, sub := range parentNode.Children {
+	for _, sub := range parentNode.Children { // calc other node which has current length, check length
 		if sub == node {
 			break
 		}
