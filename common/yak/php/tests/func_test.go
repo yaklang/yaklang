@@ -127,6 +127,19 @@ function a3($a, $b=["1", "2"], $dd=array(1,2,3), $e=1) {return "2";}
 	})
 }
 
+func TestParseSSA_Function(t *testing.T) {
+	code := `<?php
+function a(string $a){
+$a = "1";
+}
+$a = "2";
+println($a);
+a($a);
+println($a);
+`
+	test.MockSSA(t, code)
+}
+
 func TestParseSSA_FuncCall(t *testing.T) {
 	t.Run("test-1", func(t *testing.T) {
 		code := `<?php

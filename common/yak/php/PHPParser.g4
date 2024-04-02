@@ -639,7 +639,8 @@ matchItem
     ;
 
 newExpr
-    : New typeRef arguments?
+    : New anonymousClass
+    | New typeRef arguments?
     ;
 
 assignmentOperator
@@ -698,7 +699,7 @@ anonymousClass
             Implements interfaceList
         )?
         | Interface identifier /*typeParameterListInBrackets?*/ (Extends interfaceList)?
-    ) OpenCurlyBracket classStatement* CloseCurlyBracket
+    ) arguments? OpenCurlyBracket classStatement* CloseCurlyBracket
     ;
 
 indirectTypeRef
@@ -711,7 +712,7 @@ qualifiedNamespaceName
 
 namespaceNameList
     : identifier
-    | identifier ('\\' identifier)* ('\\' namespaceNameTail)?
+    | identifier ('\\' identifier)+ ('\\' namespaceNameTail)?
     ;
 
 namespaceNameTail
