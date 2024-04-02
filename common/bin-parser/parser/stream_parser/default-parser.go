@@ -273,6 +273,7 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 					return fmt.Errorf("get remaining space error: %w", err)
 				}
 				if l == 0 {
+					node.Children = node.Children[:len(node.Children)-1]
 					break
 				}
 				//cfgDeleteItem(element, CfgNodeResult)
@@ -514,7 +515,7 @@ func (d *DefParser) Parse(data *base.BitReader, node *base.Node) error {
 			} else {
 				delimiter := utils.InterfaceToString(node.Cfg.GetItem(CfgDelimiter))
 				if len(delimiter) == 0 {
-					delimiter = utils.InterfaceToString(node.Cfg.GetItem("del"))
+					delimiter = utils.InterfaceToString(node.Cfg.GetItem(CfgDel))
 					if len(delimiter) == 0 {
 						return errors.New("delimiter length must be greater than 0")
 					}
