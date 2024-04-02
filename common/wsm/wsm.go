@@ -74,6 +74,16 @@ func NewGodzillaManager(url string, opts ...ShellConfig) (*Godzilla, error) {
 	return NewGodzilla(info)
 }
 
+func NewYakShellManager(url string, opts ...ShellConfig) (*YakShell, error) {
+	info := &ypb.WebShell{
+		Url: url,
+	}
+	opts = append(opts, SetYakShellTool())
+	for _, opt := range opts {
+		opt(info)
+	}
+	return NewYakShell(info)
+}
 func SaveShell(manager BaseShellManager) {
 
 }
@@ -97,6 +107,11 @@ func SetBeinderTool() ShellConfig {
 func SetGodzillaTool() ShellConfig {
 	return func(info *ypb.WebShell) {
 		info.ShellType = ypb.ShellType_Godzilla.String()
+	}
+}
+func SetYakShellTool() ShellConfig {
+	return func(info *ypb.WebShell) {
+		info.ShellType = ypb.ShellType_YakShell.String()
 	}
 }
 

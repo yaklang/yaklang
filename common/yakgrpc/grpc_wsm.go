@@ -56,7 +56,7 @@ func (s *Server) CreateWebShell(ctx context.Context, req *ypb.WebShell) (*ypb.We
 		log.Error("empty database")
 		return nil, utils.Errorf("no database connection")
 	}
-	var headers string
+	var headers, posts string
 	if req.GetHeaders() != nil {
 		b, err := json.Marshal(req.GetHeaders())
 		if err != nil {
@@ -64,7 +64,13 @@ func (s *Server) CreateWebShell(ctx context.Context, req *ypb.WebShell) (*ypb.We
 		}
 		headers = string(b)
 	}
-
+	if req.Posts != nil {
+		if marshal, err := json.Marshal(req.GetPosts()); err != nil {
+			return nil, utils.Errorf("posts marshal error: %v", err)
+		} else {
+			posts = string(marshal)
+		}
+	}
 	shell := &yakit.WebShell{
 		Url:              req.GetUrl(),
 		Pass:             req.GetPass(),
@@ -74,11 +80,17 @@ func (s *Server) CreateWebShell(ctx context.Context, req *ypb.WebShell) (*ypb.We
 		ShellType:        req.GetShellType(),
 		ShellScript:      req.GetShellScript(),
 		Headers:          headers,
+		Posts:            posts,
 		Tag:              req.GetTag(),
 		Proxy:            req.GetProxy(),
 		Remark:           req.GetRemark(),
 		PayloadCodecName: req.GetPayloadCodecName(),
 		PacketCodecName:  req.GetPacketCodecName(),
+		IsSession:        req.GetShellOptions().IsSession,
+		Retry:            req.GetShellOptions().RetryCount,
+		BlockSize:        req.GetShellOptions().BlockSize,
+		Timeout:          req.GetShellOptions().Timeout,
+		MaxSize:          req.GetShellOptions().MaxSize,
 	}
 	webShell, err := yakit.CreateOrUpdateWebShell(db, shell.CalcHash(), shell)
 	if err != nil {
@@ -113,7 +125,7 @@ func (s *Server) UpdateWebShell(ctx context.Context, req *ypb.WebShell) (*ypb.We
 		log.Error("empty database")
 		return nil, utils.Errorf("no database connection")
 	}
-	var headers string
+	var headers, posts string
 	if req.GetHeaders() != nil {
 		b, err := json.Marshal(req.GetHeaders())
 		if err != nil {
@@ -121,7 +133,13 @@ func (s *Server) UpdateWebShell(ctx context.Context, req *ypb.WebShell) (*ypb.We
 		}
 		headers = string(b)
 	}
-
+	if req.GetPosts() != nil {
+		if marshal, err := json.Marshal(req.GetPosts()); err != nil {
+			return nil, utils.Errorf("posts marshal error: %v", err)
+		} else {
+			posts = string(marshal)
+		}
+	}
 	shellMap := map[string]interface{}{
 		"url":                req.GetUrl(),
 		"pass":               req.GetPass(),
@@ -131,12 +149,18 @@ func (s *Server) UpdateWebShell(ctx context.Context, req *ypb.WebShell) (*ypb.We
 		"shell_type":         req.GetShellType(),
 		"shell_script":       req.GetShellScript(),
 		"headers":            headers,
+		"posts":              posts,
 		"status":             req.GetStatus(),
 		"tag":                req.GetTag(),
 		"proxy":              req.GetProxy(),
 		"remark":             req.GetRemark(),
 		"payload_codec_name": req.GetPayloadCodecName(),
 		"packet_codec_name":  req.GetPacketCodecName(),
+		"timeout":            req.GetShellOptions().Timeout,
+		"retry":              req.GetShellOptions().RetryCount,
+		"block_size":         req.GetShellOptions().BlockSize,
+		"max_size":           req.GetShellOptions().MaxSize,
+		"is_session":         req.GetShellOptions().IsSession,
 	}
 	webShell, err := yakit.UpdateWebShellById(db, req.GetId(), shellMap)
 	if err != nil {
