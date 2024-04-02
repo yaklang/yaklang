@@ -122,7 +122,9 @@ var hybridScanCommand = &cli.Command{
 		keyword := c.String("k")
 
 		// remove temporary plugin
-		log.Infof("start to load templates: %v", c.String("templates"))
+		if c.String("templates") != "" {
+			log.Infof("start to load templates: %v", c.String("templates"))
+		}
 		uid := ksuid.New().String()
 		var templatesCodes []string
 		var yakMITM []string
@@ -217,7 +219,9 @@ var hybridScanCommand = &cli.Command{
 			if pluginName != "" && pluginName != result.ScriptName {
 				continue
 			}
-			log.Infof("start to load plugin: %s", result.ScriptName)
+			if !c.Bool("list") {
+				log.Infof("start to load plugin: %s", result.ScriptName)
+			}
 			pluginList.Set(result.ScriptName, result)
 		}
 
