@@ -97,27 +97,7 @@ func (y *builder) VisitClassBody(raw javaparser.IClassBodyContext, class *ssa.Cl
 
 	allMembers := i.AllClassBodyDeclaration()
 	for _, decl := range allMembers {
-		instance := decl.(*javaparser.ClassBodyDeclarationContext)
-		if ret := instance.Block(); ret != nil {
-			isStatic := instance.STATIC() != nil
-			log.Infof("handle class static code: %v", isStatic)
-			y.VisitBlock(instance.Block())
-			// todo static block
-		} else if ret := instance.MemberDeclaration(); ret != nil {
-			var modifiers = make(map[ssa.ClassModifier]struct{})
-			for _, modifier := range instance.AllModifier() {
-				m := y.VisitModifier(modifier)
-				modifiers[m] = struct{}{}
-			}
-			isStatic := false
-			if _, ok := modifiers[ssa.Static]; ok {
-				isStatic = true
-			}
-			if class != nil {
-				y.VisitMemberDeclaration(ret, class, isStatic)
-			}
-
-		}
+		y.VisitClassBodyDeclaration(decl, class)
 	}
 
 	return nil
@@ -339,9 +319,20 @@ func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, c
 		}
 	}
 
+	if i.EnumBodyDeclarations() != nil {
+		y.VisitEnumBodyDeclarations(i.EnumBodyDeclarations(), class)
+	}
+
 	if i.EnumConstants() != nil {
 		y.VisitEnumConstants(i.EnumConstants(), class)
 	}
+	// 将enum实例化并设置为全局变量
+	obj := y.EmitMakeWithoutType(nil, nil)
+	obj.SetType(class)
+	variable := y.CreateVariable(enumName)
+	y.AssignVariable(variable, obj)
+	y.constMap[enumName] = obj
+
 	return nil
 }
 
@@ -355,10 +346,33 @@ func (y *builder) VisitEnumConstants(raw javaparser.IEnumConstantsContext, class
 	if i == nil {
 		return
 	}
-
-	for _, enumConstant := range i.AllEnumConstant() {
+	allEnumConstant := i.AllEnumConstant()
+	for _, enumConstant := range allEnumConstant {
 		y.VisitEnumConstant(enumConstant, class)
 	}
+
+	// 实例化enum里的常量
+	obj := y.EmitMakeWithoutType(nil, nil)
+	obj.SetType(class)
+	setMember := class.BuildMember
+	for _, enumConstant := range allEnumConstant {
+		constant := enumConstant.(*javaparser.EnumConstantContext)
+		enumName := constant.Identifier().GetText()
+		arguments := constant.Arguments()
+		constructor := y.GetClassConstructor(class.Name)
+		if constructor == nil {
+			setMember(enumName, obj)
+		} else {
+			args := []ssa.Value{obj}
+			arguments := y.VisitArguments(arguments)
+			args = append(args, arguments...)
+			c := y.NewCall(constructor, args)
+			y.EmitCall(c)
+			setMember(enumName, obj)
+		}
+
+	}
+
 }
 
 func (y *builder) VisitEnumConstant(raw javaparser.IEnumConstantContext, class *ssa.ClassBluePrint) {
@@ -376,8 +390,57 @@ func (y *builder) VisitEnumConstant(raw javaparser.IEnumConstantContext, class *
 		_ = annotation
 	}
 
+	setMember := class.BuildStaticMember
+
+	name := i.Identifier().GetText()
+	variable := y.CreateVariable(name)
+	_ = variable
+	setMember(name, y.EmitConstInstAny())
+	return
 }
 
+func (y *builder) VisitEnumBodyDeclarations(raw javaparser.IEnumBodyDeclarationsContext, class *ssa.ClassBluePrint) {
+	if y == nil || raw == nil {
+		return
+	}
+	i, _ := raw.(*javaparser.EnumBodyDeclarationsContext)
+	if i == nil {
+		return
+	}
+
+	for _, ret := range i.AllClassBodyDeclaration() {
+		y.VisitClassBodyDeclaration(ret, class)
+	}
+}
+
+func (y *builder) VisitClassBodyDeclaration(raw javaparser.IClassBodyDeclarationContext, class *ssa.ClassBluePrint) {
+	if y == nil || raw == nil {
+		return
+	}
+
+	i, _ := raw.(*javaparser.ClassBodyDeclarationContext)
+	if i == nil {
+		return
+	}
+
+	if ret := i.Block(); ret != nil {
+		y.VisitBlock(i.Block())
+	} else if ret := i.MemberDeclaration(); ret != nil {
+		var modifiers = make(map[ssa.ClassModifier]struct{})
+		for _, modifier := range i.AllModifier() {
+			m := y.VisitModifier(modifier)
+			modifiers[m] = struct{}{}
+		}
+		isStatic := false
+		if _, ok := modifiers[ssa.Static]; ok {
+			isStatic = true
+		}
+		if class != nil {
+			y.VisitMemberDeclaration(ret, class, isStatic)
+		}
+
+	}
+}
 func (y *builder) VisitInterfaceDeclaration(raw javaparser.IInterfaceDeclarationContext) interface{} {
 	if y == nil || raw == nil {
 		return nil

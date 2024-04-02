@@ -190,23 +190,85 @@ public class Main{
 	t.Run("normal construct", func(t *testing.T) {
 		code := `
 public class A {
-	private int  num = 0;
-	public A(int num) {
-		this.num = num;
+	private int num1=0;
+	private int num2=0;
+	
+	public A(int num1,int num2) {
+		this.num1 = num1;
+		this.num2 = num2;
+
 	}
-	public int getNum() {
-		return this.num;
+	public int getNum1() {
+		return this.num1;
 	}
+	public int getNum2(){
+	return this.num2;
+}
 }
 public class Main{
 		public static void main(String[] args) {
-		A a = new A(1);
-		println(a.getNum());
+		A a = new A(1,2);
+		println(a.getNum1());
+		println(a.getNum2());
 		}
 }
 `
 		ssatest.CheckPrintlnValue(code, []string{
-			"Function-.getNum(make(object{}),side-effect(Parameter-num, this.num))",
+			"Function-.getNum1(make(object{}),side-effect(Parameter-num1, this.num1))",
+			"Function-.getNum2(make(object{}),side-effect(Parameter-num2, this.num2))",
+		}, t)
+	})
+}
+
+func TestJava_OOP_Enum(t *testing.T) {
+	t.Run("test simple top-level enum", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		public enum A {
+			A,B,C;
+		}
+		public class Main{
+			public static void main(String[] args) {
+			A a = A.A;
+			println(a);
+			}
+		}
+		`, []string{
+			"make(object{})",
+		}, t)
+	})
+
+	t.Run("test  top-level enum with constructor", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+		public enum A {
+			A(1,2),
+			B(3,4),
+			C(4,5);
+			private final int num1;
+			private final int num2;
+
+			A(int par1,int par2){
+			this.num1=par1;
+			this.num2=par2;
+		}
+
+		public int getNum1(){
+		return this.num1;
+		}
+
+		public int getNum2(){
+		return this.num2;
+		}
+}
+		public class Main{
+			public static void main(String[] args) {
+			A a = A.B;
+			println(a.getNum1());
+			println(a.getNum2());
+			}
+		}
+		`, []string{
+			"Function-.getNum1(make(object{}),side-effect(Parameter-par1, this.num1))",
+			"Function-.getNum2(make(object{}),side-effect(Parameter-par2, this.num2))",
 		}, t)
 	})
 }
