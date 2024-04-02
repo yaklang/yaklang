@@ -461,12 +461,10 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		}
 		//先在常量表中查询
 		if !y.isFunction {
-			s, ok := y.constMap[unquote]
-			if ok {
+			if s, ok := y.ReadConst(unquote); ok {
 				return s
-			} else {
-				log.Warnf("const map not found %v", unquote)
 			}
+			log.Warnf("const map not found %v", unquote)
 		}
 		if value := y.ir.PeekValue(y.VisitIdentifier(ret.Identifier())); value != nil {
 			return value
@@ -476,8 +474,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 
 	// TODO: static class member
 	case *phpparser.StaticClassAccessExpressionContext:
-		variable := y.VisitStaticClassExpr(ret.StaticClassExpr())
-		return y.ir.ReadValueByVariable(variable)
+		return y.VisitStaticClassExpr(ret.StaticClassExpr())
 
 	case *phpparser.StaticClassMemberCallAssignmentExpressionContext:
 		variable := y.VisitStaticClassExprVariableMember(ret.StaticClassExprVariableMember())
@@ -1218,11 +1215,7 @@ func (y *builder) VisitDefineExpr(raw phpparser.IDefineExprContext) ssa.Value {
 	if i.Define() != nil {
 		value := y.VisitExpression(i.Expression())
 		constantString := y.VisitConstantString(i.ConstantString())
-		if constValue, ok := y.constMap[constantString.String()]; ok {
-			log.Warnf("const %v has been defined value is %v", constantString.String(), constValue)
-		} else {
-			//y.ir.AssignVariable(y.ir.CreateVariable(constantString.String()), value)
-			y.constMap[constantString.String()] = value
+		if y.AssignConst(constantString.String(), value) {
 			flag = true
 		}
 	}

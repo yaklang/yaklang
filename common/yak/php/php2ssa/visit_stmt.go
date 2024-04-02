@@ -66,7 +66,8 @@ func (y *builder) VisitGlobalConstantDeclaration(raw phpparser.IGlobalConstantDe
 	}
 	y.VisitAttributes(i.Attributes())
 	for _, initializerContext := range i.AllIdentifierInitializer() {
-		y.VisitIdentifierInitializer(initializerContext)
+		name, value := y.VisitIdentifierInitializer(initializerContext)
+		y.AssignConst(name, value)
 	}
 	return nil
 }

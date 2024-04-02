@@ -247,7 +247,7 @@ func Test_Function_WithMemberCall(t *testing.T) {
 		$a = new A();
 		$b = $a->fun1();
 		println($b);
-		`, []string{"Function-fun1(make(object{}))"}, t)
+		`, []string{"Function-fun1(make(A))"}, t)
 	})
 
 	t.Run("multiple member call", func(t *testing.T) {
