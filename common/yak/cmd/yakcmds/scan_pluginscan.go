@@ -271,7 +271,9 @@ var hybridScanCommand = &cli.Command{
 				RawHTTPRequest:   raw,
 			}
 		}
-
+		if targets.GetInput() == "" && targets.GetInputFile() == nil && targets.GetHTTPRequestTemplate() == nil {
+			log.Fatal("no target/target-file/raw-packet-file input")
+		}
 		gen, err := yakgrpc.TargetGenerator(context.Background(), consts.GetGormProjectDatabase(), targets)
 		if err != nil {
 			return utils.Errorf("generate target failed: %s", err)
