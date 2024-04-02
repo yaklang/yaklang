@@ -13,13 +13,14 @@ func TestNewJavaString(t *testing.T) {
 		return
 	}
 	println(string(raw))
+	cfg := NewMarshalContext()
 	println(codec.EncodeToHex(tcString.Marshal(cfg)))
 	objs, err := FromJson(raw)
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	println(codec.EncodeToHex(objs[0].Marshal()))
+	println(codec.EncodeToHex(objs[0].Marshal(cfg)))
 
 	println(codec.EncodeToHex(MarshalJavaObjects(NewJavaString("hello"))))
 }
