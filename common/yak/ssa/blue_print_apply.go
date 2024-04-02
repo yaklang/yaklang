@@ -47,6 +47,7 @@ func (c *ClassBluePrint) Apply(obj Value) Type {
 	_ = builder
 
 	objTyp := NewObjectType()
+	objTyp.SetName(c.Name)
 	objTyp.SetMethod(c.GetMethod())
 	for _, parent := range c.ParentClass {
 		parentObjectType := parent.Apply(obj)

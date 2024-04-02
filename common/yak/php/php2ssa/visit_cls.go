@@ -134,10 +134,6 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 			_, isStatic := modifiers[ssa.Static]
 			isNilValue := utils.IsNil(value)
 
-			// if typ != nil && typ.GetTypeKind() != ssa.AnyTypeKind {
-			// 	value.SetType(typ)
-			// }
-
 			switch {
 			case isStatic && isNilValue:
 				// static member only type
@@ -212,6 +208,18 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 		// TODO: ret.Attributes() // php8
 		memberModifiers := y.VisitMemberModifiers(ret.MemberModifiers())
 		_ = memberModifiers
+		// handle type hint
+		// typ := y.VisitTypeHint(ret.TypeHint())
+
+		for _, init := range ret.AllIdentifierInitializer() {
+			name, value := y.VisitIdentifierInitializer(init)
+			if value == nil && name == "" {
+				log.Errorf("const %v has been defined value is %v", name, value)
+				continue
+			}
+			y.AssignClassConst(class.Name, name, value)
+		}
+
 	case *phpparser.TraitUseContext:
 	default:
 
@@ -322,16 +330,16 @@ func (y *builder) VisitMethodBody(raw phpparser.IMethodBodyContext) interface{} 
 	return nil
 }
 
-func (y *builder) VisitIdentifierInitializer(raw phpparser.IIdentifierInitializerContext) interface{} {
+func (y *builder) VisitIdentifierInitializer(raw phpparser.IIdentifierInitializerContext) (string, ssa.Value) {
 	if y == nil || raw == nil {
-		return nil
+		return "", nil
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 
 	i, _ := raw.(*phpparser.IdentifierInitializerContext)
 	if i == nil {
-		return nil
+		return "", nil
 	}
 	var unquote string
 	_unquote, err := yakunquote.Unquote(i.Identifier().GetText())
@@ -340,13 +348,8 @@ func (y *builder) VisitIdentifierInitializer(raw phpparser.IIdentifierInitialize
 	} else {
 		unquote = _unquote
 	}
-	if ConstValue, ok := y.constMap[unquote]; ok {
-		log.Warnf("const %v has been defined value is %v", unquote, ConstValue.String())
-	} else {
-		//y.ir.AssignVariable(y.ir.CreateVariable(i.Identifier().GetText()), y.VisitConstantInitializer(i.ConstantInitializer()))
-		y.constMap[unquote] = y.VisitConstantInitializer(i.ConstantInitializer())
-	}
-	return nil
+
+	return unquote, y.VisitConstantInitializer(i.ConstantInitializer())
 }
 
 // VisitVariableInitializer read ast and return varName and ssaValue
@@ -390,44 +393,59 @@ func (y *builder) VisitClassConstant(raw phpparser.IClassConstantContext) ssa.Va
 	return nil
 }
 
-func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassExprFunctionMemberContext) *ssa.Variable {
+func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassExprFunctionMemberContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
-	var class, key string
+
+	getValue := func(class, key string) ssa.Value {
+		// class const  variable
+		if !y.isFunction {
+			if v, ok := y.ReadClassConst(class, key); ok {
+				return v
+			}
+		}
+		// function
+		variable := y.ir.GetStaticMember(class, key)
+		return y.ir.ReadValueByVariable(variable)
+	}
+
+	// var class, key string
 	switch i := raw.(type) {
 	case *phpparser.ClassStaticFunctionMemberContext:
 		// TODO: class
-		key = i.Identifier().GetText()
+		key := i.Identifier().GetText()
+		_ = key
 	case *phpparser.ClassDirectFunctionMemberContext:
-		class = i.Identifier(0).GetText()
-		key = i.Identifier(1).GetText()
+		class := i.Identifier(0).GetText()
+		key := i.Identifier(1).GetText()
+		return getValue(class, key)
 	case *phpparser.StringAsIndirectClassStaticFunctionMemberContext:
+		class := ""
 		str, err := strconv.Unquote(i.String_().GetText())
 		if err != nil {
 			class = i.String_().GetText()
 		} else {
 			class = str
 		}
-		key = i.Identifier().GetText()
+		key := i.Identifier().GetText()
+		return getValue(class, key)
 	case *phpparser.VariableAsIndirectClassStaticFunctionMemberContext:
 		exprName := y.VisitVariable(i.Variable())
-		class = y.ir.ReadValue(exprName).String()
-		key = i.Identifier().GetText()
+		value := y.ir.ReadValue(exprName)
+		key := i.Identifier().GetText()
+
+		// if value is instance of class, check this class static function or const member
+		if typ, ok := ssa.ToObjectType(value.GetType()); ok {
+			if v := getValue(typ.Name, key); v != nil {
+				return v
+			}
+		}
+		return getValue(value.String(), key)
 	default:
 		_ = i
 	}
-	if class == "" {
-		return nil
-	}
-
-	if strings.HasPrefix(key, "$") {
-		// variable
-		key = key[1:]
-		return y.ir.GetStaticMember(class, key)
-	}
-	// function
-	return y.ir.GetStaticMember(class, key)
+	return nil
 }
 
 func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassExprVariableMemberContext) *ssa.Variable {
@@ -470,7 +488,7 @@ func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassE
 	return y.ir.GetStaticMember(class, key)
 }
 
-func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) *ssa.Variable {
+func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -479,7 +497,8 @@ func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) *s
 			return y.VisitStaticClassExprFunctionMember(i.StaticClassExprFunctionMember())
 		}
 		if i.StaticClassExprVariableMember() != nil {
-			return y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember())
+			variable := y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember())
+			return y.ir.ReadValueByVariable(variable)
 		}
 	}
 
