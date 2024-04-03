@@ -2,6 +2,7 @@ package bruteutils
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/emersion/go-imap/v2/imapclient"
 	"github.com/emersion/go-sasl"
@@ -28,15 +29,19 @@ func IMAPAuth(target, username, password string, needAuth bool) (bool, error) {
 				switch ext {
 				case "CRAM-MD5":
 					authClient = NewCramMD5Client(username, password)
-					break
 				case "LOGIN":
 					authClient = sasl.NewLoginClient(username, password)
-					break
 				case "PLAIN":
 					// use empty identity instead of random string because maybe some server will occur error
 					authClient = sasl.NewPlainClient("", username, password)
-					break
 				}
+				if strings.Contains(ext, "SCRAM") {
+					authClient, err = NewScramClient(ext, username, password)
+					if err != nil {
+						return false, err
+					}
+				}
+
 				if authClient != nil {
 					break
 				}
