@@ -661,12 +661,10 @@ func TestCHAPMessage(t *testing.T) {
 		"Code":       1,
 		"Identifier": 3,
 		"Length":     34,
-		"Info": map[string]any{
-			"Data": map[string]any{
-				"Value Size": 16,
-				"Value":      "\x5c\x36\xe2\xc2\xee\x83\xc3\x39\xe9\x79\x93\x44\xe9\xec\x85\xd3",
-				"Name":       "\x48\x69\x50\x65\x72\x2e\x61\x74\x74\x2e\x6e\x65\x74",
-			},
+		"Data": map[string]any{
+			"Value Size": 16,
+			"Value":      "\x5c\x36\xe2\xc2\xee\x83\xc3\x39\xe9\x79\x93\x44\xe9\xec\x85\xd3",
+			"Name":       "\x48\x69\x50\x65\x72\x2e\x61\x74\x74\x2e\x6e\x65\x74",
 		},
 	}
 	res, err = parser.GenerateBinary(mapData, "challenge_handshake_authentication_protocol", "CHAP")
@@ -693,13 +691,11 @@ func TestPAPMessage(t *testing.T) {
 		"Code":       1,
 		"Identifier": 0,
 		"Length":     14,
-		"Data": map[string]any{
-			"Request": map[string]any{
-				"Peer ID Length":  4,
-				"Peer ID":         "ixia",
-				"Password Length": 4,
-				"Password":        "ixia",
-			},
+		"Request": map[string]any{
+			"Peer ID Length":  4,
+			"Peer ID":         "ixia",
+			"Password Length": 4,
+			"Password":        "ixia",
 		},
 	}
 	res, err = parser.GenerateBinary(mapData, "password_authentication_protocol", "PAP")
@@ -726,22 +722,10 @@ func TestPPPMessage(t *testing.T) {
 		"Address":  0xff,
 		"Control":  0x03,
 		"Protocol": 0xc023,
-		"Information": map[string]any{
-			//"PAP": "\x01\x00\x00\x0e\x04\x69\x78\x69\x61\x04\x69\x78\x69\x61",
-			"PAP": map[string]any{
-				"Code":       1,
-				"Identifier": 0,
-				"Length":     14,
-				"Data": map[string]any{
-					"Request": map[string]any{
-						"Peer ID Length":  4,
-						"Peer ID":         "ixia",
-						"Password Length": 4,
-						"Password":        "ixia",
-					},
-				},
-			},
-		},
+		//"Information": map[string]any{
+		"PAP": "\x01\x00\x00\x0e\x04\x69\x78\x69\x61\x04\x69\x78\x69\x61",
+		//
+		//},
 	}
 	res, err = parser.GenerateBinary(mapData, "ppp", "PPP")
 	if err != nil {
