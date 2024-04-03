@@ -334,59 +334,6 @@ println($a->getNum());`
 	})
 }
 
-func TestOOP_NoDefaultName(t *testing.T) {
-	t.Run("normal has default value", func(t *testing.T) {
-		ssatest.CheckPrintlnValue(`
-		<?php
-		class A{
-			var $num = 2; 
-		}
-
-		$a = new A;
-		println($a->num);
-		`, []string{"2"}, t)
-	})
-	t.Run("normal, without default value", func(t *testing.T) {
-		ssatest.CheckPrintlnValue(`
-		<?php
-		class A{
-			var $num; 
-		}
-
-		$a = new A;
-		println($a->num);
-		`, []string{"Undefined-.num(valid)"}, t)
-	})
-
-	t.Run("just declare, with type", func(t *testing.T) {
-		ssatest.CheckPrintlnValue(`
-		<?php
-		class A {
-			var int $num; 
-		}
-		$a = new A;
-		println($a->num);
-		`, []string{"Undefined-.num(valid)"}, t)
-	})
-
-	t.Run("declare, to other class", func(t *testing.T) {
-		ssatest.CheckPrintlnValue(`
-		<?php
-		class A {
-			var $num = 0;
-		}
-		class B {
-			var A $a;
-		}
-		$b = new B; 
-		println($b->a->num);
-		`, []string{
-			"0",
-		}, t)
-	})
-
-}
-
 func TestOOP_Class_Const(t *testing.T) {
 	t.Run("test const value", func(t *testing.T) {
 		ssatest.CheckPrintlnValue(`

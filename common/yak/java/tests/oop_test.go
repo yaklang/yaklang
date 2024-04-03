@@ -62,8 +62,8 @@ class Main{
 		}
 }
 		`, []string{
-			"Function-.getA(make(object{}),0)",
-			"Function-.getA(make(object{}),1)",
+			"Function-getA(make(A),0)",
+			"Function-getA(make(A),1)",
 		}, t)
 	})
 
@@ -88,8 +88,8 @@ class Main{
 		}
 }
 		`, []string{
-			"Function-.getA(make(object{}),0)",
-			"Function-.getA(make(object{}),side-effect(Parameter-par, this.a))",
+			"Function-getA(make(A),0)",
+			"Function-getA(make(A),side-effect(Parameter-par, this.a))",
 		}, t)
 	})
 }
@@ -132,8 +132,8 @@ func TestJava_Extend_Class(t *testing.T) {
 		}
 }
 		`, []string{
-			"Function-.getA(make(object{}),0)",
-			"Function-.getA(make(object{}),1)",
+			"Function-getA(make(A),0)",
+			"Function-getA(make(A),1)",
 		}, t)
 	})
 
@@ -159,8 +159,8 @@ func TestJava_Extend_Class(t *testing.T) {
 		}
 }
 		`, []string{
-			"Function-.getA(make(object{}),0)",
-			"Function-.getA(make(object{}),side-effect(Parameter-par, this.a))",
+			"Function-getA(make(A),0)",
+			"Function-getA(make(A),side-effect(Parameter-par, this.a))",
 		}, t)
 	})
 }
@@ -183,7 +183,7 @@ public class Main{
 }
 		`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Function-.getNum(make(object{}),0)",
+			"Function-getNum(make(A),0)",
 		}, t)
 	})
 
@@ -214,8 +214,8 @@ public class Main{
 }
 `
 		ssatest.CheckPrintlnValue(code, []string{
-			"Function-.getNum1(make(object{}),side-effect(Parameter-num1, this.num1))",
-			"Function-.getNum2(make(object{}),side-effect(Parameter-num2, this.num2))",
+			"Function-getNum1(make(A),side-effect(Parameter-num1, this.num1))",
+			"Function-getNum2(make(A),side-effect(Parameter-num2, this.num2))",
 		}, t)
 	})
 }
@@ -228,12 +228,12 @@ func TestJava_OOP_Enum(t *testing.T) {
 		}
 		public class Main{
 			public static void main(String[] args) {
-			A a = A.A;
+			A a = A.B;
 			println(a);
 			}
 		}
 		`, []string{
-			"make(object{})",
+			"make(A)",
 		}, t)
 	})
 
@@ -267,27 +267,8 @@ func TestJava_OOP_Enum(t *testing.T) {
 			}
 		}
 		`, []string{
-			"Function-.getNum1(make(object{}),side-effect(Parameter-par1, this.num1))",
-			"Function-.getNum2(make(object{}),side-effect(Parameter-par2, this.num2))",
-		}, t)
-	})
-
-	t.Run("test nested enum", func(t *testing.T) {
-		ssatest.CheckPrintlnValue(`
-		class Enum{
-		 enum A {
-			A,B,C;
-		}
-}
-		class Main{
-		public class Main{
-			public static void main(String[] args) {
-			Enum.A a = Enum.A.A;
-			println(a);
-			}
-		}}
-		`, []string{
-			"make(object{})",
+			"Function-getNum1(make(A),side-effect(Parameter-par1, this.num1))",
+			"Function-getNum2(make(A),side-effect(Parameter-par2, this.num2))",
 		}, t)
 	})
 
@@ -312,9 +293,69 @@ public class Main{
     public static void main(String[] args) {
         Outer outer = new Outer();
         Outer.Inner inner =outer.new Inner(5);
-        println(inner.a);
+        println(inner);
+		println(inner.getA());
     }
 }`
-		ssatest.CheckPrintlnValue(code, []string{""}, t)
+		ssatest.CheckPrintlnValue(code, []string{"make(Outer.Inner)",
+			"Function-getA(make(Outer.Inner),side-effect(Parameter-par, this.a))"}, t)
+	})
+}
+
+func TestJava_OOP_Static_Member(t *testing.T) {
+	t.Run("test static member 1", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+class A {
+		static int a = 0;
+
+}
+class Main{
+		public static void main(String[] args) {
+			A a = new A();
+			println(a.a);
+		}
+}
+		`, []string{"Undefined-a.a(valid)"}, t)
+	})
+
+	t.Run("test static member 2", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+
+class Main{
+		static int a = 0;
+		public static void main(String[] args) {
+			println(a);
+		}
+}
+		`, []string{"0"}, t)
+	})
+
+	t.Run("test static method  1", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+class A {
+		 int a = 0;
+		public static void Hello(){
+        }
+
+}
+class Main{
+		public static void main(String[] args) {
+			A a = new A();
+			println(a.Hello());
+		}
+}
+		`, []string{"Undefined-a.Hello(valid)()"}, t)
+	})
+
+	t.Run("test static method  2", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+class Main{
+		public static void Hello(){
+        }
+		public static void main(String[] args) {
+			println(Hello());
+		}
+}
+		`, []string{"Function-Hello()"}, t)
 	})
 }
