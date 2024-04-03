@@ -1,13 +1,14 @@
 package java2ssa
 
 import (
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/yak2ssa"
-	"strings"
 )
 
 func (y *builder) VisitBlock(raw javaparser.IBlockContext) interface{} {
@@ -20,8 +21,8 @@ func (y *builder) VisitBlock(raw javaparser.IBlockContext) interface{} {
 	if i == nil {
 		return nil
 	}
-	block := i.GetText()
-	log.Info("block", block)
+	// block := i.GetText()
+	// log.Info("block", block)
 	if ret := i.BlockStatementList(); ret != nil {
 		y.BuildSyntaxBlock(func() {
 			y.VisitBlockStatementList(ret)
@@ -619,12 +620,13 @@ func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext, object ssa.
 	if object == nil {
 		var v ssa.Value
 		if ret := i.Identifier(); ret != nil {
-			v = y.ReadValue(ret.GetText())
+			v = y.VisitIdentifier(ret.GetText())
 		} else if ret := i.THIS(); ret != nil {
 			v = y.ReadValue(ret.GetText())
 		} else if ret = i.SUPER(); ret != nil {
 			v = y.ReadValue(ret.GetText())
 		}
+
 		var args []ssa.Value
 		if argument := i.Arguments(); argument != nil {
 			args = y.VisitArguments(i.Arguments())
@@ -673,16 +675,7 @@ func (y *builder) VisitPrimary(raw javaparser.IPrimaryContext) ssa.Value {
 
 	if ret := i.Identifier(); ret != nil {
 		text := ret.GetText()
-		value, ok := y.constMap[text]
-		if ok {
-			return value
-		}
-		if text == "_" {
-			y.NewError(ssa.Warn, "javaast", "cannot use _ as value")
-			return nil
-		}
-		value = y.ReadValue(text)
-		return value
+		return y.VisitIdentifier(text)
 	}
 	if ret := i.THIS(); ret != nil {
 		//return y.ReadValue(ret.GetText())
@@ -1679,4 +1672,26 @@ func (y *builder) VisitLambdaExpression(raw javaparser.ILambdaExpressionContext)
 	}
 	return y.EmitConstInstNil()
 	// todo lambda表达式
+}
+
+func (y *builder) VisitIdentifier(name string) ssa.Value {
+	if value := y.PeekValue(name); value != nil {
+		// found
+		return value
+	}
+	// if in this class, return
+	if class := y.MarkedThisClassBlueprint; class != nil {
+		if value, ok := y.ReadClassConst(class.Name, name); ok {
+			return value
+		}
+		variable := y.GetStaticMember(class.Name, name)
+		if value := y.PeekValueByVariable(variable); value != nil {
+			return value
+		}
+	}
+	if value, ok := y.ReadConst(name); ok {
+		return value
+	}
+	// just undefine
+	return y.ReadValue(name)
 }

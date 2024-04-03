@@ -1,8 +1,9 @@
 package tests
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 )
 
 func TestJava_OOP_Var_member(t *testing.T) {
@@ -30,15 +31,15 @@ class Main{
 		public void setA(int par) { 
 			this.a = par;
 		}
-}
-		class Main{
+	}
+	class Main{
 		public static void main(String[] args) {
 			A a = new A();
 			println(a.a);
 			a.setA(1);
 			println(a.a);
 		}
-}
+	}
 		`, []string{
 			"0", "side-effect(Parameter-par, this.a)",
 		}, t)
@@ -62,8 +63,8 @@ class Main{
 		}
 }
 		`, []string{
-			"Function-getA(make(A),0)",
-			"Function-getA(make(A),1)",
+			"Function-A_getA(make(A),0)",
+			"Function-A_getA(make(A),1)",
 		}, t)
 	})
 
@@ -88,8 +89,8 @@ class Main{
 		}
 }
 		`, []string{
-			"Function-getA(make(A),0)",
-			"Function-getA(make(A),side-effect(Parameter-par, this.a))",
+			"Function-A_getA(make(A),0)",
+			"Function-A_getA(make(A),side-effect(Parameter-par, this.a))",
 		}, t)
 	})
 }
@@ -132,8 +133,8 @@ func TestJava_Extend_Class(t *testing.T) {
 		}
 }
 		`, []string{
-			"Function-getA(make(A),0)",
-			"Function-getA(make(A),1)",
+			"Function-Q_getA(make(A),0)",
+			"Function-Q_getA(make(A),1)",
 		}, t)
 	})
 
@@ -159,8 +160,8 @@ func TestJava_Extend_Class(t *testing.T) {
 		}
 }
 		`, []string{
-			"Function-getA(make(A),0)",
-			"Function-getA(make(A),side-effect(Parameter-par, this.a))",
+			"Function-Q_getA(make(A),0)",
+			"Function-Q_getA(make(A),side-effect(Parameter-par, this.a))",
 		}, t)
 	})
 }
@@ -183,7 +184,7 @@ public class Main{
 }
 		`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Function-getNum(make(A),0)",
+			"Function-A_getNum(make(A),0)",
 		}, t)
 	})
 
@@ -214,8 +215,8 @@ public class Main{
 }
 `
 		ssatest.CheckPrintlnValue(code, []string{
-			"Function-getNum1(make(A),side-effect(Parameter-num1, this.num1))",
-			"Function-getNum2(make(A),side-effect(Parameter-num2, this.num2))",
+			"Function-A_getNum1(make(A),side-effect(Parameter-num1, this.num1))",
+			"Function-A_getNum2(make(A),side-effect(Parameter-num2, this.num2))",
 		}, t)
 	})
 }
@@ -267,8 +268,8 @@ func TestJava_OOP_Enum(t *testing.T) {
 			}
 		}
 		`, []string{
-			"Function-getNum1(make(A),side-effect(Parameter-par1, this.num1))",
-			"Function-getNum2(make(A),side-effect(Parameter-par2, this.num2))",
+			"Function-A_getNum1(make(A),side-effect(Parameter-par1, this.num1))",
+			"Function-A_getNum2(make(A),side-effect(Parameter-par2, this.num2))",
 		}, t)
 	})
 
@@ -297,8 +298,10 @@ public class Main{
 		println(inner.getA());
     }
 }`
-		ssatest.CheckPrintlnValue(code, []string{"make(Outer.Inner)",
-			"Function-getA(make(Outer.Inner),side-effect(Parameter-par, this.a))"}, t)
+		ssatest.CheckPrintlnValue(code, []string{
+			"make(Outer.Inner)",
+			"Function-Outer.Inner_getA(make(Outer.Inner),side-effect(Parameter-par, this.a))",
+		}, t)
 	})
 }
 
@@ -333,7 +336,7 @@ class Main{
 	t.Run("test static method  1", func(t *testing.T) {
 		ssatest.CheckPrintlnValue(`
 class A {
-		 int a = 0;
+		int a = 0;
 		public static void Hello(){
         }
 
@@ -356,6 +359,6 @@ class Main{
 			println(Hello());
 		}
 }
-		`, []string{"Function-Hello()"}, t)
+		`, []string{"Function-Main_Hello()"}, t)
 	})
 }
