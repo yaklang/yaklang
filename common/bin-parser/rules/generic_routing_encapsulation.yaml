@@ -1,0 +1,30 @@
+Package:
+  GRE:
+    Flags And Version: uint16
+    Protocol Type: uint16
+    Payload Length: uint16
+    Call ID: uint16
+    Number: uint32
+    Payload:
+      length-from-field: "../Payload Length"
+      operator: |
+        type = getNodeResult("../Protocol Type").Value
+        switch type {
+          case 0x0800:
+            this.ProcessByType("IP")
+          case 0x86dd:
+            this.ProcessByType("IPv6")
+          case 0x0806:
+            this.ProcessByType("ARP")
+          case 0x888e:
+            this.ProcessByType("EAPOL")
+          case 0x880b:
+            this.ProcessByType("PPP")
+          default:
+            this.NewUnknownNode()
+        }
+IP: "import:internet_protocol.yaml;node:Internet Protocol"
+IPv6: "import:internet_protocol_version_6.yaml;node:Internet Protocol Version 6"
+ARP: "import:address_resolution_protocol.yaml;node:Address Resolution Protocol"
+PPP: "import:ppp.yaml;node:PPP"
+EAPOL: "import:eapol.yaml;node:EAPOL"

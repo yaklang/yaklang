@@ -735,6 +735,35 @@ func TestPPPMessage(t *testing.T) {
 	assert.Equal(t, "ff03c0230100000e04697869610469786961", codec.EncodeToHex(NodeToBytes(res)))
 }
 
+func TestGRE_PPP_Message(t *testing.T) {
+	data := `3001880b000e001800000000ff03c0210100000a05060a94c166`
+	payload, err := codec.DecodeHex(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader := bytes.NewReader(payload)
+	res, err := parser.ParseBinary(reader, "generic_routing_encapsulation")
+	if err != nil {
+		t.Fatal(err)
+	}
+	DumpNode(res)
+	//mapData := map[string]any{
+	//	"Address":  0xff,
+	//	"Control":  0x03,
+	//	"Protocol": 0xc023,
+	//	//"Information": map[string]any{
+	//	"PAP": "\x01\x00\x00\x0e\x04\x69\x78\x69\x61\x04\x69\x78\x69\x61",
+	//	//
+	//	//},
+	//}
+	//res, err = parser.GenerateBinary(mapData, "ppp", "PPP")
+	//if err != nil {
+	//	t.Fatal(err)
+	//}
+	//DumpNode(res)
+	//assert.Equal(t, "ff03c0230100000e04697869610469786961", codec.EncodeToHex(NodeToBytes(res)))
+}
+
 func TestLCPMessage(t *testing.T) {
 	data := `01010024010405ea0206000000000305c223050506dfc53f2f07020802110405ea130300`
 	payload, err := codec.DecodeHex(data)
