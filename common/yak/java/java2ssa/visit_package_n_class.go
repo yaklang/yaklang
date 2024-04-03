@@ -343,7 +343,7 @@ func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, c
 	obj.SetType(class)
 	variable := y.CreateVariable(enumName)
 	y.AssignVariable(variable, obj)
-	y.constMap[enumName] = obj
+	y.AssignConst(enumName, obj)
 
 	return nil
 }
