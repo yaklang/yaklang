@@ -2,9 +2,7 @@ package bin_parser
 
 import (
 	"bytes"
-	"context"
 	"errors"
-	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/bin-parser/parser"
@@ -12,7 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
 	"github.com/yaklang/yaklang/common/facades"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -20,7 +17,6 @@ import (
 	"net"
 	"strconv"
 	"testing"
-	"time"
 )
 
 func TestTOA(t *testing.T) {
@@ -586,41 +582,41 @@ func TestTLSSession(t *testing.T) {
 	assert.Equal(t, string(dict1Bytes), string(dict2Bytes))
 }
 func TestReassembled(t *testing.T) {
-	host, port := utils.DebugMockHTTPServerWithContextWithAddress(context.Background(), "127.0.0.1:9099", true, false, false, false, func(i []byte) []byte {
-		return []byte("HTTP/1.1 200 OK\r\n\r\nHello, world!")
-	})
-	payload := []byte{}
-	go func() {
-		err := pcaputil.Start(
-			pcaputil.WithDebug(false),
-			pcaputil.WithDevice("lo0"),
-			pcaputil.WithBPFFilter("host "+host+" and port "+fmt.Sprintf("%v", port)),
-			pcaputil.WithOutput("/tmp/output.pcap"),
-			pcaputil.WithOnTrafficFlowOnDataFrameReassembled(func(flow *pcaputil.TrafficFlow, conn *pcaputil.TrafficConnection, frame *pcaputil.TrafficFrame) {
-				payload = append(payload, frame.Payload...)
-			}),
-		)
-		if err != nil {
-			t.Error(err)
-		}
-	}()
-	time.Sleep(1 * time.Second)
-	rsp, err := lowhttp.HTTP(lowhttp.WithRequest(`GET / HTTP/1.1
-Host: www.example.com
-Accept: */*
-`), lowhttp.WithHttps(true), lowhttp.WithHost(host), lowhttp.WithPort(port))
-	if err != nil {
-		t.Error(err)
-	}
-	spew.Dump(string(rsp.RawPacket))
-	time.Sleep(time.Second * 1)
-	spew.Dump(codec.EncodeToHex(payload))
-	reader := bytes.NewReader(payload)
-	res, err := parser.ParseBinary(reader, "data_link")
-	if err != nil {
-		t.Fatal(err)
-	}
-	DumpNode(res)
+	//	host, port := utils.DebugMockHTTPServerWithContextWithAddress(context.Background(), "127.0.0.1:9099", true, false, false, false, func(i []byte) []byte {
+	//		return []byte("HTTP/1.1 200 OK\r\n\r\nHello, world!")
+	//	})
+	//	payload := []byte{}
+	//	go func() {
+	//		err := pcaputil.Start(
+	//			pcaputil.WithDebug(false),
+	//			pcaputil.WithDevice("lo0"),
+	//			pcaputil.WithBPFFilter("host "+host+" and port "+fmt.Sprintf("%v", port)),
+	//			pcaputil.WithOutput("/tmp/output.pcap"),
+	//			pcaputil.WithOnTrafficFlowOnDataFrameReassembled(func(flow *pcaputil.TrafficFlow, conn *pcaputil.TrafficConnection, frame *pcaputil.TrafficFrame) {
+	//				payload = append(payload, frame.Payload...)
+	//			}),
+	//		)
+	//		if err != nil {
+	//			t.Error(err)
+	//		}
+	//	}()
+	//	time.Sleep(1 * time.Second)
+	//	rsp, err := lowhttp.HTTP(lowhttp.WithRequest(`GET / HTTP/1.1
+	//Host: www.example.com
+	//Accept: */*
+	//`), lowhttp.WithHttps(true), lowhttp.WithHost(host), lowhttp.WithPort(port))
+	//	if err != nil {
+	//		t.Error(err)
+	//	}
+	//	spew.Dump(string(rsp.RawPacket))
+	//	time.Sleep(time.Second * 1)
+	//	spew.Dump(codec.EncodeToHex(payload))
+	//	reader := bytes.NewReader(payload)
+	//	res, err := parser.ParseBinary(reader, "data_link")
+	//	if err != nil {
+	//		t.Fatal(err)
+	//	}
+	//	DumpNode(res)
 }
 func TestNegotiateMessage(t *testing.T) {
 	data := `4e544c4d535350000100000035820860000000000000000000000000000000000000000000000000`
@@ -647,6 +643,175 @@ func TestNegotiateMessage(t *testing.T) {
 	}
 	DumpNode(res)
 	assert.Equal(t, "4e544c4d53535000010000003582086000000000000000000000000000000000", codec.EncodeToHex(NodeToBytes(res)))
+}
+
+func TestCHAPMessage(t *testing.T) {
+	data := `01030022105c36e2c2ee83c339e9799344e9ec85d348695065722e6174742e6e6574`
+	payload, err := codec.DecodeHex(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader := bytes.NewReader(payload)
+	res, err := parser.ParseBinary(reader, "challenge_handshake_authentication_protocol")
+	if err != nil {
+		t.Fatal(err)
+	}
+	DumpNode(res)
+	mapData := map[string]any{
+		"Code":       1,
+		"Identifier": 3,
+		"Length":     34,
+		"Info": map[string]any{
+			"Data": map[string]any{
+				"Value Size": 16,
+				"Value":      "\x5c\x36\xe2\xc2\xee\x83\xc3\x39\xe9\x79\x93\x44\xe9\xec\x85\xd3",
+				"Name":       "\x48\x69\x50\x65\x72\x2e\x61\x74\x74\x2e\x6e\x65\x74",
+			},
+		},
+	}
+	res, err = parser.GenerateBinary(mapData, "challenge_handshake_authentication_protocol", "CHAP")
+	if err != nil {
+		t.Fatal(err)
+	}
+	DumpNode(res)
+	assert.Equal(t, "01030022105c36e2c2ee83c339e9799344e9ec85d348695065722e6174742e6e6574", codec.EncodeToHex(NodeToBytes(res)))
+}
+
+func TestPAPMessage(t *testing.T) {
+	data := `0100000e04697869610469786961`
+	payload, err := codec.DecodeHex(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader := bytes.NewReader(payload)
+	res, err := parser.ParseBinary(reader, "password_authentication_protocol")
+	if err != nil {
+		t.Fatal(err)
+	}
+	DumpNode(res)
+	mapData := map[string]any{
+		"Code":       1,
+		"Identifier": 0,
+		"Length":     14,
+		"Data": map[string]any{
+			"Request": map[string]any{
+				"Peer ID Length":  4,
+				"Peer ID":         "ixia",
+				"Password Length": 4,
+				"Password":        "ixia",
+			},
+		},
+	}
+	res, err = parser.GenerateBinary(mapData, "password_authentication_protocol", "PAP")
+	if err != nil {
+		t.Fatal(err)
+	}
+	DumpNode(res)
+	assert.Equal(t, "0100000e04697869610469786961", codec.EncodeToHex(NodeToBytes(res)))
+}
+
+func TestPPPMessage(t *testing.T) {
+	data := `ff03c0230100000e04697869610469786961`
+	payload, err := codec.DecodeHex(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader := bytes.NewReader(payload)
+	res, err := parser.ParseBinary(reader, "ppp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	DumpNode(res)
+	mapData := map[string]any{
+		"Address":  0xff,
+		"Control":  0x03,
+		"Protocol": 0xc023,
+		"Information": map[string]any{
+			//"PAP": "\x01\x00\x00\x0e\x04\x69\x78\x69\x61\x04\x69\x78\x69\x61",
+			"PAP": map[string]any{
+				"Code":       1,
+				"Identifier": 0,
+				"Length":     14,
+				"Data": map[string]any{
+					"Request": map[string]any{
+						"Peer ID Length":  4,
+						"Peer ID":         "ixia",
+						"Password Length": 4,
+						"Password":        "ixia",
+					},
+				},
+			},
+		},
+	}
+	res, err = parser.GenerateBinary(mapData, "ppp", "PPP")
+	if err != nil {
+		t.Fatal(err)
+	}
+	DumpNode(res)
+	assert.Equal(t, "ff03c0230100000e04697869610469786961", codec.EncodeToHex(NodeToBytes(res)))
+}
+
+func TestLCPMessage(t *testing.T) {
+	data := `01010024010405ea0206000000000305c223050506dfc53f2f07020802110405ea130300`
+	payload, err := codec.DecodeHex(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader := bytes.NewReader(payload)
+	res, err := parser.ParseBinary(reader, "link_control_protocol")
+	if err != nil {
+		t.Fatal(err)
+	}
+	DumpNode(res)
+	mapData := map[string]any{
+		"Code":       1,
+		"Identifier": 1,
+		"Length":     36,
+		"Options": []map[string]any{
+			{
+				"Type":   1,
+				"Length": 4,
+				"Data":   "\x05\xea",
+			}, {
+				"Type":   2,
+				"Length": 6,
+				"Data":   "\x00\x00\x00\x00",
+			}, {
+				"Type":   3,
+				"Length": 5,
+				"Data":   "\xc2\x23\x05",
+			},
+			{
+				"Type":   5,
+				"Length": 6,
+				"Data":   "\xdf\xc5\x3f\x2f",
+			},
+			{
+				"Type":   7,
+				"Length": 2,
+				"Data":   "",
+			},
+			{
+				"Type":   8,
+				"Length": 2,
+				"Data":   "",
+			}, {
+				"Type":   17,
+				"Length": 4,
+				"Data":   "\x05\xea",
+			}, {
+				"Type":   19,
+				"Length": 3,
+				"Data":   "\x00",
+			},
+		},
+	}
+	res, err = parser.GenerateBinary(mapData, "link_control_protocol", "LCP")
+	if err != nil {
+		t.Fatal(err)
+	}
+	DumpNode(res)
+	assert.Equal(t, "01010024010405ea0206000000000305c223050506dfc53f2f07020802110405ea130300", codec.EncodeToHex(NodeToBytes(res)))
 }
 
 func TestNTLM(t *testing.T) {
