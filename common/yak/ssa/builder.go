@@ -48,8 +48,9 @@ type FunctionBuilder struct {
 	MarkedFuncType  *FunctionType
 	MarkedFunctions []*Function
 
-	MarkedVariable   *Variable
-	MarkedThisObject Value
+	MarkedVariable           *Variable
+	MarkedThisObject         Value
+	MarkedThisClassBlueprint *ClassBluePrint
 
 	parentBuilder *FunctionBuilder
 }

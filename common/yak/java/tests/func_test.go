@@ -12,13 +12,31 @@ func TestJava_Func_Params(t *testing.T) {
     }
 
     public static void main(String[] args) {
-        A(0); 
+        println(A(0));
     }
 }
 `, []string{
 			"Parameter-a",
+			"Function-Main_A(0)",
 		}, t)
 	})
+
+	t.Run("test  function params, callee function behind caller function", func(t *testing.T) {
+		CheckAllJavaPrintlnValue(`public class Main {
+    public static void main(String[] args) {
+        println(A(0));
+    }
+
+    public static void A(int a) {
+        println(a);
+    }
+}
+`, []string{
+			"Function-Main_A(0)",
+			"Parameter-a",
+		}, t)
+	})
+
 	t.Run("test  function params 2", func(t *testing.T) {
 		CheckAllJavaPrintlnValue(`
 public class Main {
@@ -108,7 +126,7 @@ public class Main {
         println(A);
     }
 }`, []string{
-			"Function-A",
+			"Function-Main_A",
 		}, t)
 	})
 
