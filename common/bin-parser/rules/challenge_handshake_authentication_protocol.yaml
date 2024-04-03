@@ -1,0 +1,25 @@
+Package:
+  CHAP:
+    Code: uint8
+    Identifier: uint8
+    Length: uint16
+    length-from-field: "Length"
+    Info:
+      operator: |
+        type = getNodeResult("@CHAP/Code").Value
+        switch type {
+           case 0x01:
+              this.ProcessByType("Data")
+           case 0x02:
+              this.ProcessByType("Data")
+           default:
+              this.ProcessByType("Message")
+        }
+Data:
+  Value Size: uint8
+  Value:
+    type: raw
+    length-from-field: "../Value Size"
+  Name: raw
+
+Message: raw
