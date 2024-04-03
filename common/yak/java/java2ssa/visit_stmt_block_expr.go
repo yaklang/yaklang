@@ -1489,7 +1489,7 @@ func (y *builder) VisitBlockStatementList(raw javaparser.IBlockStatementListCont
 	}
 }
 
-func (y *builder) VisitInnerCreator(raw javaparser.IInnerCreatorContext, outClassName string) ssa.Value {
+func (y *builder) VisitInnerCreator(raw javaparser.IInnerCreatorContext, outClassVariable string) ssa.Value {
 	if y == nil || raw == nil {
 		return nil
 	}
@@ -1500,14 +1500,16 @@ func (y *builder) VisitInnerCreator(raw javaparser.IInnerCreatorContext, outClas
 	// todo 类声明的泛型
 	if nonWildcard := i.NonWildcardTypeArgumentsOrDiamond(); nonWildcard != nil {
 	}
-
+	outClassObj := y.ReadOrCreateVariable(outClassVariable)
+	outClassType := outClassObj.GetType()
+	outClassName := outClassType.String()
 	var builder strings.Builder
 	builder.WriteString(outClassName)
 	builder.WriteString(".")
 	builder.WriteString(i.Identifier().GetText())
 	className := builder.String()
 
-	class := y.CreateClass(className)
+	class := y.GetClassBluePrint(className)
 	if class == nil {
 		return nil
 	}
@@ -1515,7 +1517,7 @@ func (y *builder) VisitInnerCreator(raw javaparser.IInnerCreatorContext, outClas
 	obj := y.EmitMakeWithoutType(nil, nil)
 	obj.SetType(class)
 
-	constructor := y.GetClassConstructor(className)
+	constructor := class.Constructor
 	if constructor == nil {
 		return obj
 	}
@@ -1553,14 +1555,14 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) ssa.Value {
 	if ret := i.ClassCreatorRest(); ret != nil {
 		className := i.CreatedName().GetText()
 		// todo 泛型
-		class := y.GetClass(className)
+		class := y.GetClassBluePrint(className)
 		if class == nil {
 			return nil
 		}
 		obj := y.EmitMakeWithoutType(nil, nil)
 		obj.SetType(class)
 
-		constructor := y.GetClassConstructor(className)
+		constructor := class.Constructor
 		if constructor == nil {
 			return obj
 		}
@@ -1570,6 +1572,7 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) ssa.Value {
 		args = append(args, arguments...)
 		c := y.NewCall(constructor, args)
 		y.EmitCall(c)
+
 		return obj
 	}
 	//array init
@@ -1600,9 +1603,9 @@ func (y *builder) VisitClassCreatorRest(raw javaparser.IClassCreatorRestContext,
 	if i.ClassBody() != nil {
 		// 匿名类
 		className := uuid.NewString()
-		class := y.CreateClass(className)
+		class := y.CreateClassBluePrint(className)
 		if oldClassName != "" {
-			class.ParentClass = append(class.ParentClass, y.GetClass(oldClassName))
+			class.AddParentClass(y.GetClassBluePrint(oldClassName))
 		}
 		y.VisitClassBody(i.ClassBody(), class)
 	}

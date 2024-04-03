@@ -52,14 +52,14 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 	var class *ssa.ClassBluePrint
 	if outClass == nil {
 		className := i.Identifier().GetText()
-		class = y.CreateClass(className)
+		class = y.CreateClassBluePrint(className)
 	} else {
 		var builder strings.Builder
 		builder.WriteString(outClass.Name)
 		builder.WriteString(".")
 		builder.WriteString(i.Identifier().GetText())
 		className := builder.String()
-		class = y.CreateClass(className)
+		class = y.CreateClassBluePrint(className)
 	}
 	if ret := i.TypeParameters(); ret != nil {
 		//log.Infof("class: %v 's (generic type) type is %v, ignore for ssa building", className, ret.GetText())
@@ -84,8 +84,10 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 	//}
 
 	for _, parentClass := range mergedTemplate {
-		if parent := y.GetClass(parentClass); parent != nil {
-			class.ParentClass = append(class.ParentClass, parent)
+		if parent := y.GetClassBluePrint(parentClass); parent != nil {
+			class.AddParentClass(parent)
+		} else {
+			class.AddParentClass(y.CreateClassBluePrint(parentClass))
 		}
 	}
 	y.VisitClassBody(i.ClassBody(), class)
@@ -199,9 +201,9 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 	} else if ret := i.GenericMethodDeclaration(); ret != nil {
 	} else if ret := i.FieldDeclaration(); ret != nil {
 		// 声明成员变量
-		setMember := class.BuildMember
+		setMember := class.AddNormalMember
 		if isStatic {
-			setMember = class.BuildStaticMember
+			setMember = class.AddStaticMember
 		}
 		field := ret.(*javaparser.FieldDeclarationContext)
 
@@ -314,7 +316,7 @@ func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, c
 
 	enumName := i.Identifier().GetText()
 	if class == nil {
-		class = y.CreateClass(enumName)
+		class = y.CreateClassBluePrint(enumName)
 	}
 
 	if i.IMPLEMENTS() != nil {
@@ -322,8 +324,10 @@ func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, c
 	}
 
 	for _, parentClass := range mergedTemplate {
-		if parent := y.GetClass(parentClass); parent != nil {
-			class.ParentClass = append(class.ParentClass, parent)
+		if parent := y.GetClassBluePrint(parentClass); parent != nil {
+			class.AddParentClass(parent)
+		} else {
+			class.AddParentClass(y.CreateClassBluePrint(parentClass))
 		}
 	}
 
@@ -362,12 +366,12 @@ func (y *builder) VisitEnumConstants(raw javaparser.IEnumConstantsContext, class
 	// 实例化enum里的常量
 	obj := y.EmitMakeWithoutType(nil, nil)
 	obj.SetType(class)
-	setMember := class.BuildMember
+	setMember := class.AddNormalMember
 	for _, enumConstant := range allEnumConstant {
 		constant := enumConstant.(*javaparser.EnumConstantContext)
 		enumName := constant.Identifier().GetText()
 		arguments := constant.Arguments()
-		constructor := y.GetClassConstructor(class.Name)
+		constructor := class.Constructor
 		if constructor == nil {
 			setMember(enumName, obj)
 		} else {
@@ -398,7 +402,7 @@ func (y *builder) VisitEnumConstant(raw javaparser.IEnumConstantContext, class *
 		_ = annotation
 	}
 
-	setMember := class.BuildStaticMember
+	setMember := class.AddStaticMember
 
 	name := i.Identifier().GetText()
 	variable := y.CreateVariable(name)
@@ -546,7 +550,7 @@ func (y *builder) VisitMethodDeclaration(raw javaparser.IMethodDeclarationContex
 
 		}
 		newFunction := createFunction()
-		class.AddMarkedField(funcName, newFunction, 0)
+		class.AddMethod(funcName, newFunction)
 
 	}
 
