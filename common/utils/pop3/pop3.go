@@ -144,6 +144,7 @@ func (c *Client) NewConn() (*Conn, error) {
 
 // Send sends a POP3 command to the server. The given comand is suffixed with "\r\n".
 func (c *Conn) Send(b string) error {
+	c.conn.SetWriteDeadline(time.Now().Add(time.Second * 5))
 	if _, err := c.w.WriteString(b + "\r\n"); err != nil {
 		return err
 	}
@@ -211,6 +212,8 @@ func (c *Conn) Cmd(cmd string, isMulti bool, args ...interface{}) (*bytes.Buffer
 
 // ReadOne reads a single line response from the conn.
 func (c *Conn) ReadOne() ([]byte, error) {
+	c.conn.SetReadDeadline(time.Now().Add(time.Second * 5))
+
 	b, _, err := c.r.ReadLine()
 	if err != nil {
 		return nil, err
@@ -222,6 +225,8 @@ func (c *Conn) ReadOne() ([]byte, error) {
 
 // ReadOne reads a single line response from the conn.
 func (c *Conn) ReadOneWithChallenge() ([]byte, bool, error) {
+	c.conn.SetReadDeadline(time.Now().Add(time.Second * 5))
+
 	b, _, err := c.r.ReadLine()
 	if err != nil {
 		return nil, false, err
@@ -236,6 +241,7 @@ func (c *Conn) ReadAll() (*bytes.Buffer, error) {
 	buf := &bytes.Buffer{}
 
 	for {
+		c.conn.SetReadDeadline(time.Now().Add(time.Second * 5))
 		b, _, err := c.r.ReadLine()
 		if err != nil {
 			return nil, err
@@ -559,18 +565,15 @@ func (c *Conn) CAPA() (map[string]string, error) {
 
 func (c *Conn) StartTLS(cfg *tls.Config) error {
 	b, err := c.Cmd("STLS", false)
+	_ = b
 	if err != nil {
 		return err
 	}
 
-	if len(b.Bytes()) == 0 {
-		// Upgrade the connection to TLS.
-		c.conn = tls.Client(c.conn, cfg)
-		c.r = bufio.NewReader(c.conn)
-		c.w = bufio.NewWriter(c.conn)
-	} else {
-		return fmt.Errorf("unexpected response from server: %s", b.String())
-	}
+	// Upgrade the connection to TLS.
+	c.conn = tls.Client(c.conn, cfg)
+	c.r = bufio.NewReader(c.conn)
+	c.w = bufio.NewWriter(c.conn)
 
 	return nil
 }
