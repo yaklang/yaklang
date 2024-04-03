@@ -30,6 +30,8 @@ func NewWebShellManager(s *ypb.WebShell) (BaseShellManager, error) {
 		return NewBehinder(s)
 	case ypb.ShellType_Godzilla.String():
 		return NewGodzilla(s)
+	case ypb.ShellType_YakShell.String():
+		return NewYakShell(s)
 	default:
 		return nil, utils.Errorf("unsupported shell type %s", s.GetShellType())
 	}
@@ -47,6 +49,8 @@ func NewWebShell(url string, opts ...ShellConfig) (BaseShellManager, error) {
 		return NewBehinder(info)
 	case ypb.ShellType_Godzilla.String():
 		return NewGodzilla(info)
+	case ypb.ShellType_YakShell.String():
+		return NewYakShell(info)
 	default:
 		return nil, utils.Errorf("unsupported shell type %s", info.GetShellType())
 	}
@@ -137,6 +141,12 @@ func SetPass(pass string) ShellConfig {
 func SetBase64Aes() ShellConfig {
 	return func(info *ypb.WebShell) {
 		info.EncMode = ypb.EncMode_Base64.String()
+	}
+}
+
+func SetBase64Xor() ShellConfig {
+	return func(info *ypb.WebShell) {
+		info.EncMode = ypb.EncMode_XorBase64.String()
 	}
 }
 

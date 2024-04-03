@@ -41,10 +41,10 @@ func GetRawClass(binPayload string, params map[string]string) ([]byte, error) {
 	return clsObj.Bytes(), nil
 }
 
-func GetRawPHP(binPayload string, params map[string]string) ([]byte, error) {
+func GetRawPHP(binPayload string, params map[string]string) ([]byte, []byte, error) {
 	payloadBytes, err := hex.DecodeString(binPayload)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	code := strings.Replace(string(payloadBytes), "<?", "", 1)
 	if v, ok := params["customEncoderFromText"]; ok {
@@ -61,8 +61,9 @@ func GetRawPHP(binPayload string, params map[string]string) ([]byte, error) {
 		}
 		paramsList[i] = "$" + paraName
 	}
+	var addContent = "\r\nmain(" + strings.Trim(strings.Join(paramsList, ","), ",") + ");"
 	code += "\r\nmain(" + strings.Trim(strings.Join(paramsList, ","), ",") + ");"
-	return []byte(code), nil
+	return []byte(code), []byte(addContent), nil
 }
 
 // 获取 php 代码中需要更改的 params
@@ -74,7 +75,6 @@ func getPhpParams(phpPayload []byte) []string {
 
 	if mainMatch && len(mainStr) > 0 {
 		paramRegex := regexp.MustCompile(`\$([a-zA-Z]*)`)
-		//paramMatch := paramRegex.FindStringSubmatch(mainStr[0])
 		paramMatch := paramRegex.FindAllStringSubmatch(mainStr[0], -1)
 		if len(paramMatch) > 0 {
 			for _, v := range paramMatch {
