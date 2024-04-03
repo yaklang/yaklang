@@ -1,0 +1,27 @@
+endian: big
+Package:
+  PPP:
+    Address: uint8
+    Control: uint8
+    Protocol: uint16
+    Information:
+      unpack: true
+      operator: |
+         type = getNodeResult("@PPP/Protocol").Value
+         switch type {
+            case 0x0021:
+               this.ProcessByType("IP")
+            case 0xc021:
+               this.ProcessByType("LCP")
+            case 0xc023:
+               this.ProcessByType("PAP")
+            case 0xc223:
+               this.ProcessByType("CHAP")
+            default:
+               this.NewUnknownNode()
+         }
+IP: "import:internet_protocol.yaml;node:Internet Protocol"
+PAP: "import:password_authentication_protocol.yaml;node:PAP"
+CHAP: "import:challenge_handshake_authentication_protocol.yaml;node:CHAP"
+LCP: "import:link_control_protocol.yaml;node:LCP"
+Unknown: raw

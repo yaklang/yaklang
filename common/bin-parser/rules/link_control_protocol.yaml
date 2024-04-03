@@ -1,0 +1,42 @@
+endian: big
+Package:
+  LCP:
+    Code: uint8
+    Identifier: uint8
+    Length: uint16
+    length-from-field: "Length"
+    Info:
+      operator: |
+        type = getNodeResult("@LCP/Code").Value
+        switch type {
+          case 0x01,0x02,0x03,0x04:
+              this.ProcessByType("Options")
+          case 0x05,0x06:
+              this.ProcessByType("Data")
+          case 0x07:
+              this.ProcessByType("CodeReject")
+          case 0x08:
+              this.ProcessByType("ProtocolReject")
+          case 0x09,0x0a:
+              this.ProcessByType("Echo")
+        }
+
+Data: raw
+
+Options:
+  list: true
+  Option:
+    Type: uint8
+    Length: uint8
+    length-from-field: "Length"
+    Data: raw
+
+CodeReject: raw
+
+ProtocolReject:
+  Rejected Protocol: uint16
+  Rejected Information: raw
+
+Echo:
+  Magic Number: uint32
+  Data: raw
