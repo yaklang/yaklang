@@ -7,6 +7,8 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+type EncryptOptions func(str, key []byte) ([]byte, error)
+
 func Base64Encode(raw []byte) ([]byte, error) {
 	return []byte(base64.StdEncoding.EncodeToString(raw)), nil
 }
