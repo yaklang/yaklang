@@ -1,10 +1,12 @@
 package java2ssa
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"strings"
 )
 
 func (y *builder) VisitTypeDeclaration(raw javaparser.ITypeDeclarationContext) {
@@ -105,11 +107,13 @@ func (y *builder) VisitClassBody(raw javaparser.IClassBodyContext, class *ssa.Cl
 		return nil
 	}
 
-	allMembers := i.AllClassBodyDeclaration()
-	for _, decl := range allMembers {
-		y.VisitClassBodyDeclaration(decl, class)
+	builders := make([]func(), len(i.AllClassBodyDeclaration()))
+	for i, ret := range i.AllClassBodyDeclaration() {
+		builders[i] = y.VisitClassBodyDeclaration(ret, class)
 	}
-
+	for _, build := range builders {
+		build()
+	}
 	return nil
 }
 func (y *builder) VisitModifier(raw javaparser.IModifierContext) ssa.ClassModifier {
@@ -183,21 +187,21 @@ func (y *builder) VisitFormalParameters(raw javaparser.IFormalParametersContext)
 
 }
 
-func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContext, class *ssa.ClassBluePrint, isStatic bool) {
+func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContext, class *ssa.ClassBluePrint, isStatic bool) func() {
 	if y == nil || raw == nil {
-		return
+		return func() {}
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 	i, _ := raw.(*javaparser.MemberDeclarationContext)
 	if i == nil {
-		return
+		return func() {}
 	}
 
 	if ret := i.RecordDeclaration(); ret != nil {
 		log.Infof("todo: java17: %v", ret.GetText())
 	} else if ret := i.MethodDeclaration(); ret != nil {
-		y.VisitMethodDeclaration(ret, class, isStatic)
+		return y.VisitMethodDeclaration(ret, class, isStatic)
 	} else if ret := i.GenericMethodDeclaration(); ret != nil {
 	} else if ret := i.FieldDeclaration(); ret != nil {
 		// 声明成员变量
@@ -217,7 +221,6 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 			name, value := y.VisitVariableDeclarator(v)
 			setMember(name, value)
 		}
-		return
 
 	} else if ret := i.ConstructorDeclaration(); ret != nil {
 		//声明构造函数
@@ -237,10 +240,9 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 
 	} else {
 		log.Errorf("no member declaration found: %v", i.GetText())
-		return
 	}
 
-	return
+	return func() {}
 }
 
 func (y *builder) VisitTypeType(raw javaparser.ITypeTypeContext) ssa.Type {
@@ -420,19 +422,23 @@ func (y *builder) VisitEnumBodyDeclarations(raw javaparser.IEnumBodyDeclarations
 		return
 	}
 
-	for _, ret := range i.AllClassBodyDeclaration() {
-		y.VisitClassBodyDeclaration(ret, class)
+	builders := make([]func(), len(i.AllClassBodyDeclaration()))
+	for i, ret := range i.AllClassBodyDeclaration() {
+		builders[i] = y.VisitClassBodyDeclaration(ret, class)
+	}
+	for _, build := range builders {
+		build()
 	}
 }
 
-func (y *builder) VisitClassBodyDeclaration(raw javaparser.IClassBodyDeclarationContext, class *ssa.ClassBluePrint) {
+func (y *builder) VisitClassBodyDeclaration(raw javaparser.IClassBodyDeclarationContext, class *ssa.ClassBluePrint) func() {
 	if y == nil || raw == nil {
-		return
+		return func() {}
 	}
 
 	i, _ := raw.(*javaparser.ClassBodyDeclarationContext)
 	if i == nil {
-		return
+		return func() {}
 	}
 
 	if ret := i.Block(); ret != nil {
@@ -448,10 +454,11 @@ func (y *builder) VisitClassBodyDeclaration(raw javaparser.IClassBodyDeclaration
 			isStatic = true
 		}
 		if class != nil {
-			y.VisitMemberDeclaration(ret, class, isStatic)
+			return y.VisitMemberDeclaration(ret, class, isStatic)
 		}
 
 	}
+	return func() {}
 }
 func (y *builder) VisitInterfaceDeclaration(raw javaparser.IInterfaceDeclarationContext) interface{} {
 	if y == nil || raw == nil {
@@ -495,65 +502,61 @@ func (y *builder) VisitRecordDeclaration(raw javaparser.IRecordDeclarationContex
 	return nil
 }
 
-func (y *builder) VisitMethodDeclaration(raw javaparser.IMethodDeclarationContext, class *ssa.ClassBluePrint, isStatic bool) {
+func (y *builder) VisitMethodDeclaration(raw javaparser.IMethodDeclarationContext, class *ssa.ClassBluePrint, isStatic bool) func() {
 	if y == nil || raw == nil {
-		return
+		return func() {}
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 	i, _ := raw.(*javaparser.MethodDeclarationContext)
 	if i == nil {
-		return
+		return func() {}
 	}
 
-	funcName := i.Identifier().GetText()
+	key := i.Identifier().GetText()
+	funcName := fmt.Sprintf("%s_%s", class.Name, key)
 
 	if isStatic {
-		y.SetMarkedFunction(funcName)
 		newFunction := y.NewFunc(funcName)
 
-		y.PushFunction(newFunction)
-		{
+		build := func() {
+			y.FunctionBuilder = y.PushFunction(newFunction)
+			y.MarkedThisClassBlueprint = class
 			y.VisitFormalParameters(i.FormalParameters())
 			y.VisitMethodBody(i.MethodBody())
 			y.SetType(y.VisitTypeTypeOrVoid(i.TypeTypeOrVoid()))
 			y.Finish()
-		}
-		y.PopFunction()
-		variable := y.CreateVariable(funcName)
-		y.AssignVariable(variable, newFunction)
-		if i.THROWS() != nil {
-			if qualifiedNameList := i.QualifiedNameList(); qualifiedNameList != nil {
-				y.VisitQualifiedNameList(qualifiedNameList)
-			}
-
-		}
-	} else {
-		createFunction := func() *ssa.Function {
-			newFunction := y.NewFunc(funcName)
-			y.FunctionBuilder = y.PushFunction(newFunction)
-			{
-				this := y.NewParam("this")
-				_ = this
-				y.VisitFormalParameters(i.FormalParameters())
-				y.VisitMethodBody(i.MethodBody())
-				y.Finish()
-			}
 			y.FunctionBuilder = y.PopFunction()
-			return newFunction
 		}
 
+		y.AssignClassConst(class.Name, key, newFunction)
 		if i.THROWS() != nil {
 			if qualifiedNameList := i.QualifiedNameList(); qualifiedNameList != nil {
 				y.VisitQualifiedNameList(qualifiedNameList)
 			}
-
 		}
-		newFunction := createFunction()
-		class.AddMethod(funcName, newFunction)
-
+		return build
+	}
+	newFunction := y.NewFunc(funcName)
+	build := func() {
+		y.FunctionBuilder = y.PushFunction(newFunction)
+		y.MarkedThisClassBlueprint = class
+		this := y.NewParam("this")
+		_ = this
+		y.VisitFormalParameters(i.FormalParameters())
+		y.VisitMethodBody(i.MethodBody())
+		y.Finish()
+		y.FunctionBuilder = y.PopFunction()
 	}
 
+	if i.THROWS() != nil {
+		if qualifiedNameList := i.QualifiedNameList(); qualifiedNameList != nil {
+			y.VisitQualifiedNameList(qualifiedNameList)
+		}
+
+	}
+	class.AddMethod(key, newFunction)
+	return build
 }
 
 func (y *builder) VisitMethodBody(raw javaparser.IMethodBodyContext) {
