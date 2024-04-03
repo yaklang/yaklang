@@ -45,7 +45,7 @@ func (b *FunctionBuilder) PeekValueByVariable(v *Variable) Value {
 }
 
 func (b *FunctionBuilder) PeekValue(name string) Value {
-	return b.readValueEx(name, false, false)
+	return b.readValueEx(name, false, false || b.DisableFreeValue)
 }
 
 func (b *FunctionBuilder) PeekValueInThisFunction(name string) Value {
