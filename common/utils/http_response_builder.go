@@ -92,6 +92,12 @@ func ReadHTTPResponseFromBytes(raw []byte, req *http.Request) (*http.Response, e
 
 func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bool, req *http.Request, conn net.Conn) (*http.Response, error) {
 	var rawPacket = new(bytes.Buffer)
+	var nobodyReqMethod bool
+	if req != nil { // some request method will not have body
+		nobodyReqMethod = strings.EqualFold(req.Method, http.MethodHead) ||
+			strings.EqualFold(req.Method, http.MethodOptions) ||
+			strings.EqualFold(req.Method, http.MethodConnect)
+	}
 
 	var headerReader = originReader
 	var rsp = new(http.Response)
@@ -262,7 +268,7 @@ HandleExpect100Continue:
 			}
 		} else {
 			// handle content-length as default
-			if contentLengthInt > 0 || hasEntityHeader {
+			if !nobodyReqMethod && (contentLengthInt > 0 || hasEntityHeader) {
 				if contentLengthInt <= 0 {
 					contentLengthInt = 100 * 1000
 				}
