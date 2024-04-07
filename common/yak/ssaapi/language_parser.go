@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"github.com/yaklang/yaklang/common/utils"
 	js2ssa "github.com/yaklang/yaklang/common/yak/JS2ssa"
+	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
 	"github.com/yaklang/yaklang/common/yak/php/php2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
@@ -12,18 +13,20 @@ import (
 type Language string
 
 const (
-	Yak Language = "yak"
-	JS  Language = "js"
-	PHP Language = "php"
+	Yak  Language = "yak"
+	JS   Language = "js"
+	PHP  Language = "php"
+	JAVA Language = "java"
 )
 
 type Build func(string, bool, *ssa.FunctionBuilder) error
 
 var (
 	LanguageBuilders = map[Language]Build{
-		Yak: yak2ssa.Build,
-		JS:  js2ssa.Build,
-		PHP: php2ssa.Build,
+		Yak:  yak2ssa.Build,
+		JS:   js2ssa.Build,
+		PHP:  php2ssa.Build,
+		JAVA: java2ssa.Build,
 	}
 )
 
