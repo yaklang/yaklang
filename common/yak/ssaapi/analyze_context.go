@@ -14,6 +14,8 @@ type objectItem struct {
 }
 
 type AnalyzeContext struct {
+	// Self
+	Self *Value
 	// function call stack
 	_callStack *utils.Stack[*Value]
 	// object visit stack

@@ -9,8 +9,10 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-func (v *Value) GetBottomUses() Values {
-	return v.getBottomUses(nil)
+func (v *Value) GetBottomUses(opt ...OperationOption) Values {
+	actx := NewAnalyzeContext(opt...)
+	actx.Self = v
+	return v.getBottomUses(actx)
 }
 
 func (v *Value) visitUserFallback(actx *AnalyzeContext) Values {
@@ -50,6 +52,10 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		}
 	}
 
+	if ValueCompare(v, actx.Self) {
+		return v.visitUserFallback(actx)
+	}
+
 	switch ins := v.node.(type) {
 	case *ssa.Phi:
 		// enter function via phi
@@ -77,6 +83,11 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			return v.visitUserFallback(actx)
 		}
 
+		funcValue := NewValue(f).AppendDependOn(v)
+		if ValueCompare(funcValue, actx.Self) {
+			return v.visitUserFallback(actx)
+		}
+
 		// push call
 		err := actx.PushCall(v)
 		if err != nil {
@@ -86,8 +97,6 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		} else {
 			defer actx.PopCall()
 		}
-
-		funcValue := NewValue(f).AppendDependOn(v)
 
 		// try to find formal param index from call
 		// v is calling instruction

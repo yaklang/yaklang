@@ -75,3 +75,27 @@ func TestYaklang_SideEffect(t *testing.T) {
 	})
 
 }
+
+func Test_Yaklang_BottomUser(t *testing.T) {
+	code := `
+		f = () =>{
+			a = 11
+			return a
+		}
+		f2 = (i) => {
+			println(i)
+		}
+		t = f()
+		f2(t)
+		`
+	t.Run("from return to other function", func(t *testing.T) {
+		Check(t, code,
+			CheckBottomUser_Contain("a", []string{"println("}),
+		)
+	})
+	t.Run("from function", func(t *testing.T) {
+		Check(t, code,
+			CheckBottomUser_Contain("f", []string{"println("}),
+		)
+	})
+}
