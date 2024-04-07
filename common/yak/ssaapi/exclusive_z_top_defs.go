@@ -10,84 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
-// GetContextValue can handle context
-func (v *Value) GetContextValue(i string) (*Value, bool) {
-	return v.runtimeCtx.Get(i)
-}
-
-func (v *Value) SetContextValue(i string, values *Value) *Value {
-	v.runtimeCtx.Set(i, values)
-	return v
-}
-
-func (v *Value) SetDepth(i int) {
-	v.runtimeCtx.Set("depth", NewValue(ssa.NewConst(i)))
-}
-
-func (v *Value) GetDepth() int {
-	i, ok := v.runtimeCtx.Get("depth")
-	if ok {
-		return codec.Atoi(i.node.String())
-	}
-	return 0
-}
-
-func (v *Value) AppendDependOn(i *Value) *Value {
-	if v.GetId() == i.GetId() {
-		return v
-	}
-
-	var existed bool
-	for _, node := range v.DependOn {
-		if node.GetId() == i.GetId() {
-			existed = true
-			break
-		}
-	}
-	if !existed {
-		v.DependOn = append(v.DependOn, i)
-	}
-	existed = false
-	for _, node := range i.EffectOn {
-		if node.GetId() == v.GetId() {
-			existed = true
-			break
-		}
-	}
-	if !existed {
-		i.EffectOn = append(i.EffectOn, v)
-	}
-	return v
-}
-
-func (v *Value) AppendEffectOn(i *Value) *Value {
-	if v.GetId() == i.GetId() {
-		return v
-	}
-
-	var existed bool
-	for _, node := range v.EffectOn {
-		if node.GetId() == i.GetId() {
-			existed = true
-			break
-		}
-	}
-	if !existed {
-		v.EffectOn = append(v.EffectOn, i)
-	}
-	existed = false
-	for _, node := range i.DependOn {
-		if node.GetId() == v.GetId() {
-			existed = true
-			break
-		}
-	}
-	if !existed {
-		i.DependOn = append(i.DependOn, v)
-	}
-	return v
-}
-
 // GetTopDefs desc all of 'Defs' is not used by any other value
 func (i *Value) GetTopDefs(opt ...OperationOption) Values {
 	return i.getTopDefs(nil, opt...)
@@ -147,11 +69,6 @@ func (i *Value) visitedDefsDefault(actx *AnalyzeContext) Values {
 	return vals
 }
 
-var (
-	ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY             = "call_entry"
-	ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX = "call_entry_trace_idx"
-)
-
 func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values {
 	if i == nil {
 		return nil
@@ -181,17 +98,37 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 	}
 
+	{
+		obj, key, member := actx.GetCurrentObject()
+		_ = obj
+		_ = key
+		_ = member
+		if obj != nil && i.IsObject() && i != obj {
+			if m := i.GetMember(key); m != nil {
+				actx.PopObject()
+				return m.getTopDefs(actx, opt...)
+			}
+		}
+	}
+
 	switch ret := i.node.(type) {
 	case *ssa.Undefined:
 		// ret[n]
 		if ret.IsMemberCallVariable() {
-			callIns, fromCallReturn := ret.GetObject().(*ssa.Call)
-			if fromCallReturn {
-				return NewValue(callIns).AppendEffectOn(i).SetContextValue(
-					ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX,
-					NewValue(ret.GetKey()),
-				).getTopDefs(actx, opt...)
-			}
+			obj := NewValue(ret.GetObject())
+			key := NewValue(ret.GetKey())
+			actx.PushObject(obj, key, i)
+			// defer actx.PopObject()
+
+			return obj.getTopDefs(actx, opt...)
+
+			// callIns, fromCallReturn := ret.GetObject().(*ssa.Call)
+			// if fromCallReturn {
+			// 	return NewValue(callIns).AppendEffectOn(i).SetContextValue(
+			// ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX,
+			// 		NewValue(ret.GetKey()),
+			// 	).getTopDefs(actx, opt...)
+			// }
 		}
 		return i.visitedDefsDefault(actx)
 	case *ssa.Phi:
