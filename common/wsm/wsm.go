@@ -79,14 +79,12 @@ func NewGodzillaManager(url string, opts ...ShellConfig) (*Godzilla, error) {
 }
 
 func NewYakShellManager(url string, opts ...ShellConfig) (*YakShell, error) {
-	info := &ypb.WebShell{
-		Url: url,
-	}
+	shell := getDefaultYpbShell(url)
 	opts = append(opts, SetYakShellTool())
 	for _, opt := range opts {
-		opt(info)
+		opt(shell)
 	}
-	return NewYakShell(info)
+	return NewYakShell(shell)
 }
 func SaveShell(manager BaseShellManager) {
 
@@ -137,8 +135,48 @@ func SetPass(pass string) ShellConfig {
 		info.Pass = pass
 	}
 }
+func SetSession() ShellConfig {
+	return func(info *ypb.WebShell) {
+		info.ShellOptions.IsSession = true
+	}
+}
+
+func SetTimeout(timeout int64) ShellConfig {
+	return func(info *ypb.WebShell) {
+		info.ShellOptions.Timeout = timeout
+	}
+}
+func SetBlockSize(size int64) ShellConfig {
+	return func(info *ypb.WebShell) {
+		info.ShellOptions.BlockSize = size
+	}
+}
 
 func SetBase64Aes() ShellConfig {
+	return func(info *ypb.WebShell) {
+		info.EncMode = ypb.EncMode_AesBase64.String()
+	}
+}
+
+func SetBase64Dec() ShellConfig {
+	return func(info *ypb.WebShell) {
+		info.ResDecMOde = ypb.EncMode_Base64.String()
+	}
+}
+
+// SetBase64AesDec 当为Jsp的时候，需要满足Key为16或者32，todo：
+func SetBase64AesDec() ShellConfig {
+	return func(info *ypb.WebShell) {
+		info.ResDecMOde = ypb.EncMode_AesBase64.String()
+	}
+}
+func SetBase64xorDec() ShellConfig {
+	return func(info *ypb.WebShell) {
+		info.ResDecMOde = ypb.EncMode_XorBase64.String()
+	}
+}
+
+func SetBase64() ShellConfig {
 	return func(info *ypb.WebShell) {
 		info.EncMode = ypb.EncMode_Base64.String()
 	}
@@ -163,9 +201,29 @@ func SetHeaders(headers map[string]string) ShellConfig {
 	}
 }
 
-// SetProxy TODO
+func SetPosts(posts map[string]string) ShellConfig {
+	return func(info *ypb.WebShell) {
+		info.Posts = posts
+	}
+}
+
 func SetProxy(p string) ShellConfig {
 	return func(info *ypb.WebShell) {
 		info.Proxy = p
+	}
+}
+
+func getDefaultYpbShell(url string) *ypb.WebShell {
+	return &ypb.WebShell{
+		Url:     url,
+		Charset: "utf-8",
+		ShellOptions: &ypb.ShellOptions{
+			RetryCount: 3,
+			Timeout:    10,
+			BlockSize:  1024 * 8,
+			MaxSize:    0,
+			UpdateTime: 20,
+			IsSession:  false,
+		},
 	}
 }

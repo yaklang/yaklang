@@ -13,7 +13,7 @@ func Base64Encode(raw []byte) ([]byte, error) {
 	return []byte(base64.StdEncoding.EncodeToString(raw)), nil
 }
 
-func AesEncode(raw, key []byte) ([]byte, error) {
+func AesRawEncode(raw, key []byte) ([]byte, error) {
 	return openssl.AesECBEncrypt(raw, key, openssl.PKCS5_PADDING)
 }
 
@@ -34,6 +34,14 @@ func AesDecode(raw, key []byte) ([]byte, error) {
 	return openssl.AesECBDecrypt(raw, key, openssl.PKCS5_PADDING)
 }
 
+func Base64AesDecode(raw, key []byte) ([]byte, error) {
+	if decodeString, err := base64.StdEncoding.DecodeString(string(raw)); err != nil {
+		return nil, err
+	} else {
+		return openssl.AesECBDecrypt(decodeString, key, openssl.PKCS5_PADDING)
+	}
+}
+
 func XorBase64Decode(raw, key []byte) ([]byte, error) {
 	var result []byte
 	decodeString, err := base64.StdEncoding.DecodeString(string(raw))
@@ -50,12 +58,16 @@ func XorBase64Decode(raw, key []byte) ([]byte, error) {
 
 func Encryption(data, key []byte, encMode string) ([]byte, error) {
 	switch encMode {
+	case ypb.EncMode_Raw.String():
+		return data, nil
 	case ypb.EncMode_XorBase64.String():
 		return XorBase64Encode(data, key)
 	case ypb.EncMode_Base64.String():
 		return Base64Encode(data)
 	case ypb.EncMode_AesRaw.String():
-		return AesEncode(data, key)
+		return AesRawEncode(data, key)
+	case ypb.EncMode_AesBase64.String():
+		fallthrough
 	default:
 		return nil, utils.Errorf("encode mode not found")
 	}
@@ -69,7 +81,12 @@ func Decryption(data, key []byte, deMode string) ([]byte, error) {
 		return Base64Decode(data)
 	case ypb.EncMode_AesRaw.String():
 		return AesDecode(data, key)
+	case ypb.EncMode_AesBase64.String():
+		return Base64AesDecode(data, key)
+	case ypb.EncMode_Raw.String():
+		fallthrough
 	default:
-		return nil, utils.Errorf("decode mode not found")
+		//log.Warn("decode mode not found")
+		return data, nil
 	}
 }
