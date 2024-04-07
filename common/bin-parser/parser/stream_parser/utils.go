@@ -390,6 +390,18 @@ func getNodeAttrByPath(node *base.Node, key string) (*base.Node, string) {
 	node = getNodeByPath(node, strings.Join(splits[:len(splits)-1], "."))
 	return node, splits[len(splits)-1]
 }
+func SetParentLengthCache(parentNode *base.Node, childName string, l uint64) {
+	if !parentNode.Cfg.Has(CfgLengthCacheMap) {
+		parentNode.Cfg.SetItem(CfgLengthCacheMap, map[string]uint64{})
+	}
+	parentNode.Cfg.GetItem(CfgLengthCacheMap).(map[string]uint64)[childName] = l
+}
+func GetParentLengthCache(parentNode *base.Node, childName string) (uint64, bool) {
+	if parentNode.Cfg.Has(CfgLengthCacheMap) {
+		return parentNode.Cfg.GetItem(CfgLengthCacheMap).(map[string]uint64)[childName], true
+	}
+	return 0, false
+}
 func parseLengthByLengthConfig(node *base.Node) (uint64, bool, error) {
 	if node.Name == "root" {
 		return math.MaxUint64, false, nil
@@ -402,10 +414,19 @@ func parseLengthByLengthConfig(node *base.Node) (uint64, bool, error) {
 	if !ok {
 		return 0, false, errors.New("get parent failed")
 	}
-	parentLength, parentLengthOK, err := parseLengthByLengthConfig(parentNode)
-	if err != nil {
-		return 0, false, fmt.Errorf("parse parent length error: %v", err)
+	var parentLength uint64
+	var parentLengthOK bool
+	if v, ok := GetParentLengthCache(parentNode, node.Name); ok {
+		parentLength = v
+		parentLengthOK = true
+	} else {
+		var err error
+		parentLength, parentLengthOK, err = parseLengthByLengthConfig(parentNode)
+		if err != nil {
+			return 0, false, fmt.Errorf("parse parent length error: %v", err)
+		}
 	}
+
 	//parentRemaininigLength := uint64(0)
 	var length uint64
 	getLengthOK := false
