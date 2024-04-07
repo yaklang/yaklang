@@ -46,6 +46,8 @@ func (c *ClassBluePrint) Apply(obj Value) Type {
 	builder := obj.GetFunc().builder
 	_ = builder
 
+	call, isCall := ToCall(obj)
+
 	objTyp := NewObjectType()
 	objTyp.SetName(c.Name)
 	objTyp.SetMethod(c.GetMethod())
@@ -64,6 +66,22 @@ func (c *ClassBluePrint) Apply(obj Value) Type {
 
 		objTyp.AddField(key, typ)
 
+		// if in yaklang code, classBluePrint only create by function,
+		// and Apply only called by function'call (call instruction)
+		// and only this language, member can be set by `Parameter`,
+		// we just create side-effect
+		if para, ok := ToParameter(value); ok && isCall {
+			sideEffect := builder.EmitSideEffect(key.String(), call, para)
+			builder.AssignVariable(
+				builder.CreateMemberCallVariable(obj, key),
+				sideEffect,
+			)
+			continue
+		}
+
+		// in other language supported class,
+		// classBluePrint only create by `class` keyword.
+		// in this case, member can be set nil, just declare the type.
 		if utils.IsNil(value) {
 			value := builder.ReadMemberCallVariable(obj, key)
 			value.SetType(typ)
