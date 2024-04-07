@@ -2601,6 +2601,7 @@ message WebShell {
   map<string, string> Posts = 18;
   ShellOptions ShellOptions = 19;
   string Os = 20;
+  string ResDecMOde = 21; //解密方式
 }
 
 message ShellOptions{

@@ -12,6 +12,12 @@ import (
 //go:embed behinder/static/*
 var Payloads embed.FS
 
+//go:embed yakshell/static/*
+var YakPayloads embed.FS
+
+//go:embed yakshell/encrypt/*
+var YakEncrypt embed.FS
+
 //go:embed godzilla/static/payload_test.dll
 var CshrapPayload []byte
 
@@ -84,60 +90,62 @@ func init() {
 	}
 
 	//将Yakit_payload
-	//dirs, err = Payloads.ReadDir("yakshell/static")
-	//if err != nil {
-	//	panic(err)
-	//}
-	//for _, i := range dirs {
-	//	script := ""
-	//	fileName := i.Name()
-	//	if strings.HasSuffix(strings.ToLower(fileName), ".class") {
-	//		script = ypb.ShellScript_JSP.String()
-	//	} else if strings.HasSuffix(strings.ToLower(fileName), ".php") {
-	//		script = ypb.ShellScript_PHP.String()
-	//	} else if strings.HasSuffix(strings.ToLower(fileName), ".asp") {
-	//		script = ypb.ShellScript_ASP.String()
-	//	} else if strings.HasSuffix(strings.ToLower(fileName), ".dll") {
-	//		script = ypb.ShellScript_ASPX.String()
-	//	}
-	//	payloadType := Payload(strings.Split(fileName, ".")[0])
-	//	// https://github.com/golang/go/issues/45230
-	//	raw, err := Payloads.ReadFile(fmt.Sprintf("yakshell/static/%s", i.Name()))
-	//	if err != nil {
-	//		panic(err)
-	//	}
-	//	if _, exists := YakShellPayload[script]; !exists {
-	//		YakShellPayload[script] = make(map[Payload]string)
-	//	}
-	//	// 添加到 HexPayload
-	//	YakShellPayload[script][payloadType] = hex.EncodeToString(raw)
-	//}
-	//
-	////将加密方式加入
-	//dir, err := Payloads.ReadDir("yakshell/encrypt")
-	//if err != nil {
-	//	panic(err)
-	//}
-	//for _, entry := range dir {
-	//	script := ""
-	//	fileName := entry.Name()
-	//	if strings.HasSuffix(strings.ToLower(fileName), ".class") {
-	//		script = ypb.ShellScript_JSP.String()
-	//	} else if strings.HasSuffix(strings.ToLower(fileName), ".php") {
-	//		script = ypb.ShellScript_PHP.String()
-	//	} else if strings.HasSuffix(strings.ToLower(fileName), ".asp") {
-	//		script = ypb.ShellScript_ASP.String()
-	//	} else if strings.HasSuffix(strings.ToLower(fileName), ".dll") {
-	//		script = ypb.ShellScript_ASPX.String()
-	//	}
-	//	enryptType := strings.Split(fileName, ".")[0]
-	//	file, err := Payloads.ReadFile(fmt.Sprintf("yakshell/encrypt/%s", entry.Name()))
-	//	if err != nil {
-	//		panic(err)
-	//	}
-	//	if _, exists := EncryptPayload[script]; !exists {
-	//		EncryptPayload[script] = make(map[string]string)
-	//	}
-	//	EncryptPayload[script][enryptType] = hex.EncodeToString(file)
-	//}
+	dirs, err = YakPayloads.ReadDir("yakshell/static")
+	if err != nil {
+		panic(err)
+	}
+	for _, i := range dirs {
+		script := ""
+		fileName := i.Name()
+		if strings.HasSuffix(strings.ToLower(fileName), ".class") {
+			script = ypb.ShellScript_JSP.String()
+		} else if strings.HasSuffix(strings.ToLower(fileName), ".php") {
+			script = ypb.ShellScript_PHP.String()
+		} else if strings.HasSuffix(strings.ToLower(fileName), ".asp") {
+			script = ypb.ShellScript_ASP.String()
+		} else if strings.HasSuffix(strings.ToLower(fileName), ".dll") {
+			script = ypb.ShellScript_ASPX.String()
+		}
+		payloadType := Payload(strings.Split(fileName, ".")[0])
+		// https://github.com/golang/go/issues/45230
+		raw, err := YakPayloads.ReadFile(fmt.Sprintf("yakshell/static/%s", i.Name()))
+		if err != nil {
+			panic(err)
+		}
+		if _, exists := YakShellPayload[script]; !exists {
+			YakShellPayload[script] = make(map[Payload]string)
+		}
+		// 添加到 HexPayload
+		YakShellPayload[script][payloadType] = hex.EncodeToString(raw)
+	}
+
+	//将加密方式加入
+	dir, err := YakEncrypt.ReadDir("yakshell/encrypt")
+	if err != nil {
+		panic(err)
+	}
+	for _, entry := range dir {
+		script := ""
+		fileName := entry.Name()
+		if strings.HasSuffix(strings.ToLower(fileName), ".class") {
+			script = ypb.ShellScript_JSP.String()
+		} else if strings.HasSuffix(strings.ToLower(fileName), ".php") {
+			script = ypb.ShellScript_PHP.String()
+		} else if strings.HasSuffix(strings.ToLower(fileName), ".asp") {
+			script = ypb.ShellScript_ASP.String()
+		} else if strings.HasSuffix(strings.ToLower(fileName), ".dll") {
+			script = ypb.ShellScript_ASPX.String()
+		}
+		enryptType := strings.Split(fileName, ".")[0]
+		file, err := YakEncrypt.ReadFile(fmt.Sprintf("yakshell/encrypt/%s", entry.Name()))
+		if err != nil {
+			panic(err)
+		}
+		if _, exists := EncryptPayload[script]; !exists {
+			EncryptPayload[script] = make(map[string]string)
+		}
+		all := strings.ReplaceAll(string(file), "<?", "")
+		//读取进去的时候，是完整的php文件
+		EncryptPayload[script][enryptType] = all
+	}
 }
