@@ -130,6 +130,9 @@ type Program struct {
 	NameToInstructions *omap.OrderedMap[string, []Instruction]
 	IdToInstructionMap *omap.OrderedMap[int, Instruction]
 
+	// class blue print
+	ClassBluePrint map[string]*ClassBluePrint
+
 	errors SSAErrors
 
 	// for build

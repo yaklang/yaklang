@@ -12,6 +12,7 @@ func NewProgram() *Program {
 		ConstInstruction:   omap.NewEmptyOrderedMap[int, *ConstInst](),
 		NameToInstructions: omap.NewEmptyOrderedMap[string, []Instruction](),
 		IdToInstructionMap: omap.NewEmptyOrderedMap[int, Instruction](),
+		ClassBluePrint:     make(map[string]*ClassBluePrint),
 		errors:             make([]*SSAError, 0),
 		buildOnce:          sync.Once{},
 	}

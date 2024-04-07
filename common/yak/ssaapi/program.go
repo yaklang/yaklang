@@ -71,6 +71,22 @@ func (p *Program) Ref(name string) Values {
 	)
 }
 
+func (p *Program) GetClassMember(className string, key string) *Value {
+	if class, ok := p.Program.ClassBluePrint[className]; ok {
+		if method, ok := class.Method[key]; ok {
+			return NewValue(method)
+		}
+		if member, ok := class.NormalMember[key]; ok {
+			return NewValue(member.Value)
+		}
+		if member, ok := class.StaticMember[key]; ok {
+			return NewValue(member)
+		}
+	}
+
+	return nil
+}
+
 func (p *Program) GetAllSymbols() map[string]Values {
 	ret := make(map[string]Values, 0)
 	p.Program.NameToInstructions.ForEach(func(name string, insts []ssa.Instruction) bool {
