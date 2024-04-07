@@ -20,17 +20,19 @@ const (
 )
 
 func (b *FunctionBuilder) CreateClassBluePrint(name string) *ClassBluePrint {
+	p := b.GetProgram()
 	c := NewClassBluePrint()
-	if _, ok := b.ClassBluePrint[name]; ok {
+	if _, ok := p.ClassBluePrint[name]; ok {
 		log.Errorf("CreateClassBluePrint: this class redeclare")
 	}
-	b.ClassBluePrint[name] = c
+	p.ClassBluePrint[name] = c
 	c.Name = name
 	return c
 }
 
 func (b *FunctionBuilder) GetClassBluePrint(name string) *ClassBluePrint {
-	if c, ok := b.ClassBluePrint[name]; ok {
+	p := b.GetProgram()
+	if c, ok := p.ClassBluePrint[name]; ok {
 		return c
 	}
 	log.Errorf("VisitClass: not this class: %s", name)
