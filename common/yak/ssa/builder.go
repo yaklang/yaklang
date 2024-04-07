@@ -42,9 +42,6 @@ type FunctionBuilder struct {
 	ExternLib      map[string]map[string]any
 	DefineFunc     map[string]any
 
-	// class blue print
-	ClassBluePrint map[string]*ClassBluePrint
-
 	MarkedFuncType  *FunctionType
 	MarkedFunctions []*Function
 
@@ -73,11 +70,8 @@ func NewBuilder(f *Function, parent *FunctionBuilder) *FunctionBuilder {
 		// sub scope
 		// b.parentScope = parent.CurrentBlock.ScopeTable
 		b.parentScope = parent.parentScope.Create(parent.CurrentBlock.ScopeTable)
-		b.ClassBluePrint = parent.ClassBluePrint
 		b.DisableFreeValue = parent.DisableFreeValue
 		b.MarkedThisObject = parent.MarkedThisObject
-	} else {
-		b.ClassBluePrint = make(map[string]*ClassBluePrint)
 	}
 
 	// b.ScopeStart()
