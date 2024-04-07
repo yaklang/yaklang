@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"regexp"
 	"strings"
 	"testing"
@@ -518,4 +519,50 @@ func TestInjectWebappComponent(t *testing.T) {
 	spew.Dump(plugin)
 	assert.True(t, strings.Contains(string(plugin), "success"))
 
+}
+func TestYakShellPhp(t *testing.T) {
+	url := "http://10.211.55.2:8093/1.php"
+	manager, err := NewYakShellManager(url,
+		SetYakShellTool(),
+		SetPass("1"),
+		SetBase64(),
+		SetShellScript("php"),
+		SetProxy("socks5://127.0.0.1:8083"),
+		SetTimeout(10),
+		SetHeaders(map[string]string{
+			"test": "test",
+		}),
+		SetPosts(map[string]string{
+			"test": "test",
+		}),
+		SetBase64AesDec())
+	if err != nil {
+		panic(err)
+	}
+	ping, err := manager.BasicInfo()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(string(ping))
+}
+
+func TestYakShellJsp(t *testing.T) {
+	url := "http://localhost:8080/tomcat_war_exploded/el.jsp"
+	manager, err := NewYakShellManager(url,
+		SetYakShellTool(),
+		SetPass("1231231212312312"),
+		SetBase64(),
+		SetShellScript(ypb.ShellScript_JSP.String()),
+		SetProxy("socks5://127.0.0.1:8083"),
+		SetTimeout(10),
+		SetBase64AesDec(),
+	)
+	if err != nil {
+		panic(err)
+	}
+	ping, err := manager.BasicInfo()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(string(ping))
 }

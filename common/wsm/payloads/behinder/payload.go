@@ -37,8 +37,9 @@ func GetRawClass(binPayload string, params map[string]string) ([]byte, error) {
 		return nil, err
 	}
 	// 修改为Jdk 1.5 冰蝎原版是 50(1.6),测了几下发现 49(1.5) 也行
-	clsObj.MajorVersion = 49
+	//clsObj.MajorVersion = 49
 	return clsObj.Bytes(), nil
+	//return clsObj.Bytes(), nil
 }
 
 func GetRawPHP(binPayload string, params map[string]string) ([]byte, []byte, error) {
