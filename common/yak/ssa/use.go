@@ -34,14 +34,12 @@ func ReplaceValue(v Value, to Value, skip func(Instruction) bool) {
 	}
 }
 
-func GetValues(n Node) Values {
-	return lo.Filter(n.GetValues(), func(v Value, _ int) bool {
-		if utils.IsNil(v) {
-			return false
-		} else {
-			return true
-		}
-	})
+func filterNilValue(v Value, _ int) bool {
+	if utils.IsNil(v) {
+		return false
+	} else {
+		return true
+	}
 }
 
 // ----------- Function
@@ -191,8 +189,11 @@ func (r *Return) HasUsers() bool  { return false }
 func (r *Return) GetUsers() Users { return nil }
 
 // // ----------- Make
-func (i *Make) HasValues() bool   { return true }
-func (i *Make) GetValues() Values { return []Value{i.Cap, i.Len, i.high, i.low, i.step, i.parentI} }
+func (i *Make) HasValues() bool { return true }
+func (i *Make) GetValues() Values {
+	vs := []Value{i.Cap, i.Len, i.high, i.low, i.step, i.parentI}
+	return lo.Filter(vs, filterNilValue)
+}
 func (i *Make) ReplaceValue(v, to Value) {
 	if i.Cap == v {
 		i.Cap = to
@@ -270,7 +271,7 @@ func (r *Recover) GetValues() Values { return nil }
 
 // ----------- IF
 func (i *If) HasValues() bool   { return true }
-func (i *If) GetValues() Values { return []Value{i.Cond} }
+func (i *If) GetValues() Values { return lo.Filter([]Value{i.Cond}, filterNilValue) }
 func (i *If) ReplaceValue(v Value, to Value) {
 	if i.Cond == v {
 		i.Cond = to
@@ -282,8 +283,10 @@ func (r *If) HasUsers() bool  { return false }
 func (r *If) GetUsers() Users { return nil }
 
 // ----------- Loop
-func (l *Loop) HasValues() bool   { return true }
-func (l *Loop) GetValues() Values { return []Value{l.Cond, l.Init, l.Step, l.Key} }
+func (l *Loop) HasValues() bool { return true }
+func (l *Loop) GetValues() Values {
+	return lo.Filter([]Value{l.Cond, l.Init, l.Step, l.Key}, filterNilValue)
+}
 func (l *Loop) ReplaceValue(v Value, to Value) {
 	if l.Cond == v {
 		l.Cond = to
