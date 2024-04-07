@@ -10,7 +10,7 @@ import (
 )
 
 type Value struct {
-	runtimeCtx *omap.OrderedMap[string, *Value]
+	runtimeCtx *omap.OrderedMap[ContextID, *Value]
 	EffectOn   Values
 	DependOn   Values
 
@@ -27,7 +27,7 @@ func ValueCompare(v1, v2 *Value) bool {
 
 func NewValue(n ssa.Value) *Value {
 	return &Value{
-		runtimeCtx: omap.NewEmptyOrderedMap[string, *Value](),
+		runtimeCtx: omap.NewEmptyOrderedMap[ContextID, *Value](),
 		node:       n,
 	}
 }
@@ -272,10 +272,13 @@ func (v *Value) IsSwitch() bool       { return v.getOpcode() == ssa.OpSwitch }
 func (v *Value) IsObject() bool { return v.node.IsObject() }
 
 // GetMember get member of object by key
-func (v *Value) GetMember(key Value) *Value {
+func (v *Value) GetMember(value *Value) *Value {
+	key := value.node.String()
 	node := v.node
-	if ret, ok := node.GetMember(key.node); ok {
-		return NewValue(ret)
+	for name, member := range node.GetAllMember() {
+		if name.String() == key {
+			return NewValue(member)
+		}
 	}
 	return nil
 }

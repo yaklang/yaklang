@@ -7,9 +7,21 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
+type objectItem struct {
+	object *Value
+	key    *Value
+	member *Value
+}
+
 type AnalyzeContext struct {
-	_callStack  *utils.Stack[*Value]
-	_callTable  *omap.OrderedMap[int, *omap.OrderedMap[int, *Value]]
+	// function call stack
+	_callStack *utils.Stack[*Value]
+	// object visit stack
+	_objectStack *utils.Stack[objectItem]
+
+	// for PHI, create  visitedPhi map for  echo call stack
+	_callTable *omap.OrderedMap[int, *omap.OrderedMap[int, *Value]]
+	// in main function, no call stack, we need a global visitedPhi map
 	_visitedPhi *omap.OrderedMap[int, *Value]
 
 	config *OperationConfig
@@ -19,13 +31,16 @@ type AnalyzeContext struct {
 
 func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
 	return &AnalyzeContext{
-		_callStack:  utils.NewStack[*Value](),
-		_callTable:  omap.NewOrderedMap[int, *omap.OrderedMap[int, *Value]](map[int]*omap.OrderedMap[int, *Value]{}),
-		_visitedPhi: omap.NewOrderedMap[int, *Value](map[int]*Value{}),
-		config:      NewOperations(opt...),
-		depth:       -1,
+		_callStack:   utils.NewStack[*Value](),
+		_objectStack: utils.NewStack[objectItem](),
+		_callTable:   omap.NewOrderedMap[int, *omap.OrderedMap[int, *Value]](map[int]*omap.OrderedMap[int, *Value]{}),
+		_visitedPhi:  omap.NewOrderedMap[int, *Value](map[int]*Value{}),
+		config:       NewOperations(opt...),
+		depth:        -1,
 	}
 }
+
+// ========================================== CALL STACK ==========================================
 
 func (a *AnalyzeContext) PushCall(i *Value) error {
 	_, ok := i.node.(*ssa.Call)
@@ -55,6 +70,43 @@ func (a *AnalyzeContext) PopCall() *Value {
 	val := a._callStack.Pop()
 	a._callTable.Delete(val.GetId())
 	return val
+}
+
+func (g *AnalyzeContext) GetCurrentCall() *Value {
+	if g._callStack.Len() <= 0 {
+		return nil
+	}
+	return g._callStack.Peek()
+}
+
+// ========================================== OBJECT STACK ==========================================
+
+func (g *AnalyzeContext) PushObject(obj, key, member *Value) error {
+	if !obj.IsObject() {
+		return utils.Errorf("BUG: (objectStack is not clean!) ObjectStack cannot recv %T", obj.node)
+	}
+	g._objectStack.Push(objectItem{
+		object: obj,
+		key:    key,
+		member: member,
+	})
+	return nil
+}
+
+func (g *AnalyzeContext) PopObject() (*Value, *Value, *Value) {
+	if g._objectStack.Len() <= 0 {
+		return nil, nil, nil
+	}
+	item := g._objectStack.Pop()
+	return item.object, item.key, item.member
+}
+
+func (g *AnalyzeContext) GetCurrentObject() (*Value, *Value, *Value) {
+	if g._objectStack.Len() <= 0 {
+		return nil, nil, nil
+	}
+	item := g._objectStack.Peek()
+	return item.object, item.key, item.member
 }
 
 // ThePhiShouldBeVisited is used to check whether the phi should be visited
@@ -88,11 +140,4 @@ func (a *AnalyzeContext) VisitPhi(i *Value) {
 		return
 	}
 	visited.Set(i.GetId(), i)
-}
-
-func (g *AnalyzeContext) GetCurrentCall() *Value {
-	if g._callStack.Len() <= 0 {
-		return nil
-	}
-	return g._callStack.Peek()
 }
