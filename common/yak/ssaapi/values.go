@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"fmt"
 
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 
 	"github.com/samber/lo"
@@ -26,6 +27,9 @@ func ValueCompare(v1, v2 *Value) bool {
 }
 
 func NewValue(n ssa.Value) *Value {
+	if utils.IsNil(n) {
+		return nil
+	}
 	return &Value{
 		runtimeCtx: omap.NewEmptyOrderedMap[ContextID, *Value](),
 		node:       n,
@@ -100,7 +104,7 @@ func (i *Value) HasOperands() bool {
 
 func (i *Value) GetOperands() Values {
 	if i.operands == nil {
-		i.operands = lo.Map(ssa.GetValues(i.node), func(v ssa.Value, _ int) *Value { return NewValue(v) })
+		i.operands = lo.Map(i.node.GetValues(), func(v ssa.Value, _ int) *Value { return NewValue(v) })
 	}
 	return i.operands
 }

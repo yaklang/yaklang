@@ -8,7 +8,7 @@ import (
 
 func fixupUseChain(node Node) {
 	if u, ok := ToUser(node); ok {
-		for _, v := range GetValues(u) {
+		for _, v := range u.GetValues() {
 			v.AddUser(u)
 		}
 	}
