@@ -15,10 +15,17 @@ type ASTWalkerResult struct {
 	BadSyntax      []string
 }
 
+// ASTWalk 对传入的JS代码进行AST遍历，返回遍历后的结果(包含字面量，标识符，语法错误)和错误
+// Example:
+// ```
+// code = `function add(a, b) { return a + b; }`
+// res = javascript.ASTWalk(code)~
+// dump(res)
+// ```
 func BasicJavaScriptASTWalker(code string) (*ASTWalkerResult, error) {
 	walker := NewJavaScriptWalker()
 	walker.code = code
-	var results = &ASTWalkerResult{}
+	results := &ASTWalkerResult{}
 	walker.OnStringLiteral = func(i string) {
 		results.StringLiteral = append(results.StringLiteral, i)
 	}
@@ -57,31 +64,26 @@ type walker struct {
 func (w *walker) init() {
 	if w.OnStringLiteral == nil {
 		w.OnStringLiteral = func(i string) {
-
 		}
 	}
 
 	if w.OnInt64Literal == nil {
 		w.OnInt64Literal = func(i int64) {
-
 		}
 	}
 
 	if w.OnFloat64Literal == nil {
 		w.OnFloat64Literal = func(i float64) {
-
 		}
 	}
 
 	if w.OnIdentifier == nil {
 		w.OnIdentifier = func(i string, N ast.Node) {
-
 		}
 	}
 
 	if w.OnSyntaxError == nil {
 		w.OnSyntaxError = func(i string, lastNode ast.Node) {
-
 		}
 	}
 }
@@ -139,5 +141,4 @@ func (w *walker) Enter(n ast.Node) ast.Visitor {
 }
 
 func (w *walker) Exit(n ast.Node) {
-
 }
