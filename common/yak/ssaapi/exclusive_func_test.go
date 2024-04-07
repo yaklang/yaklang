@@ -1,89 +1,71 @@
 package ssaapi
 
 import (
-	"fmt"
-	"github.com/yaklang/yaklang/common/utils/dot"
 	"regexp"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/utils/dot"
 )
 
-func TestFunctionTrace(t *testing.T) {
-	prog, err := Parse(`c =((i,i1)=>i)(1,2);a = {};a.b=c;e=a.b;dump(e)`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	prog.Ref("e").GetTopDefs().Show()
+func Test_Function_Parameter(t *testing.T) {
+	t.Run("multiple parameter", func(t *testing.T) {
+		code := `
+	f = (i,i1)=>i
+	c = f(1,2);
+	a = {};
+	a.b=c;
+	e=a.b;
+	dump(e)
+	`
+		Check(t, code,
+			CheckTopDef_Equal("e", []string{"1"}),
+		)
+	})
 }
 
-func TestFunction_DoubleReturn(t *testing.T) {
-	prog, err := Parse(`c = () => {return 1,2}; a,b=c();`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	val := prog.Ref("a").GetTopDefs()[0].GetConstValue()
-	if fmt.Sprint(val) != `1` {
-		t.Fatal("the literal 1 trace failed")
-	}
+func Test_Function_Return(t *testing.T) {
+	t.Run("multiple return first", func(t *testing.T) {
+		Check(t, `
+		c = () => {return 1,2}; 
+		a,b=c();
+		`,
+			CheckTopDef_Equal("a", []string{"1"}),
+		)
+	})
+
+	t.Run("multiple return second", func(t *testing.T) {
+		Check(t, `
+		c = () => {return 1,2}
+		a,b=c();
+		`,
+			CheckTopDef_Equal("b", []string{"2"}),
+		)
+	})
+
+	t.Run("multiple return unpack", func(t *testing.T) {
+		Check(t, `
+		c = () => {return 1,2}
+		f=c();
+		a,b=f;
+		dump(b)
+		`,
+			CheckTopDef_Equal("b", []string{"2"}),
+		)
+	})
 }
 
-func TestFunction_DoubleReturn2(t *testing.T) {
-	prog, err := Parse(`c = () => {return 1,2}; a,b=c();`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	val := prog.Ref("b").GetTopDefs()[0].GetConstValue()
-	if fmt.Sprint(val) != `2` {
-		t.Fatal("the literal 2 trace failed")
-	}
-}
-
-func TestFunction_DoubleReturn_Unpack(t *testing.T) {
-	prog, err := Parse(`c=()=>{return 1,2}; f=c();a,b=f;dump(b)`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	prog.Show()
-	val := prog.Ref("b").GetTopDefs()[0].GetConstValue()
-	if fmt.Sprint(val) != `2` {
-		t.Fatal("the literal 2 trace failed")
-	}
-}
-
-func TestFunctionTrace_FormalParametersCheck(t *testing.T) {
-	prog, err := Parse(`
+func Test_Function_FreeValue(t *testing.T) {
+	t.Run("simple", func(t *testing.T) {
+		Check(t, `
 a = 1
 b = (c, d) => {
 	a = c + d
 	return d, c
 }
 f = b(2,3)
-`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	prog.Show()
-
-	check2 := false
-	check3 := false
-	prog.Ref("f").Show().ForEach(func(value *Value) {
-		value.GetTopDefs().ForEach(func(value *Value) {
-			if value.IsConstInst() {
-				if value.GetConstValue() == 2 {
-					check2 = true
-				}
-				if value.GetConstValue() == 3 {
-					check3 = true
-				}
-			}
-		})
+		`, CheckTopDef_Equal("f", []string{"2", "3"}))
 	})
 
-	if !check2 {
-		t.Fatal("the literal 2 trace failed")
-	}
-	if !check3 {
-		t.Fatal("the literal 3 trace failed")
-	}
 }
 
 func TestFunctionTrace_FormalParametersCheck_2(t *testing.T) {
