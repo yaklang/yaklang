@@ -460,3 +460,18 @@ func TestLowhttp_HTTP_ProxyTimeout(t *testing.T) {
 	}
 
 }
+
+func TestLowhttp_RESP_WithoutContentLength_WithContent(t *testing.T) {
+	target := utils.HostPort(utils.DebugMockTCPEx(func(ctx context.Context, lis net.Listener, conn net.Conn) {
+		conn.Write([]byte("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nX-Content-Type-Options: nosniff\r\n\r\n"))
+		time.Sleep(50 * time.Millisecond)
+		conn.Write([]byte("abcd"))
+	}))
+	rsp, err := HTTPWithoutRedirect(WithPacketBytes([]byte("GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n")))
+	if err != nil {
+		panic(err)
+	}
+	if !bytes.Contains(rsp.RawPacket, []byte("abcd")) {
+		panic("Response has content")
+	}
+}
