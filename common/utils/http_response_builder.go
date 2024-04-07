@@ -134,6 +134,7 @@ HandleExpect100Continue:
 	// header
 	var header = make(http.Header)
 	var useContentLength = false
+	var hasEntityHeader = false
 	var contentLengthInt = 0
 	var useTransferEncodingChunked = false
 	var defaultClose = (rsp.ProtoMajor == 1 && rsp.ProtoMinor == 0) || rsp.ProtoMajor < 1
@@ -182,6 +183,8 @@ HandleExpect100Continue:
 			} else if strings.EqualFold(valStr, "keep-alive") {
 				defaultClose = false
 			}
+		case "x-content-type-options", "content-type", "content-encoding", "content-range", "expires", "content-language":
+			hasEntityHeader = true
 		}
 		// add header
 		if keyStr == "" {
@@ -259,7 +262,10 @@ HandleExpect100Continue:
 			}
 		} else {
 			// handle content-length as default
-			if contentLengthInt > 0 {
+			if contentLengthInt > 0 || hasEntityHeader {
+				if contentLengthInt <= 0 {
+					contentLengthInt = 100 * 1000
+				}
 				var bodyRaw, err = io.ReadAll(io.NopCloser(io.LimitReader(bodyReader, int64(contentLengthInt))))
 				rawPacket.Write(bodyRaw)
 				if err != nil && err != io.EOF {
