@@ -736,7 +736,7 @@ func TestPPPMessage(t *testing.T) {
 }
 
 func TestGRE_PPP_Message(t *testing.T) {
-	data := `3001880b000e001800000000ff03c0210100000a05060a94c166`
+	data := `3081880b0012000100000001ffffffffff03c0210101000e0304c02305060f3f117c`
 	payload, err := codec.DecodeHex(data)
 	if err != nil {
 		t.Fatal(err)
@@ -747,21 +747,29 @@ func TestGRE_PPP_Message(t *testing.T) {
 		t.Fatal(err)
 	}
 	DumpNode(res)
-	//mapData := map[string]any{
-	//	"Address":  0xff,
-	//	"Control":  0x03,
-	//	"Protocol": 0xc023,
-	//	//"Information": map[string]any{
-	//	"PAP": "\x01\x00\x00\x0e\x04\x69\x78\x69\x61\x04\x69\x78\x69\x61",
-	//	//
-	//	//},
-	//}
-	//res, err = parser.GenerateBinary(mapData, "ppp", "PPP")
-	//if err != nil {
-	//	t.Fatal(err)
-	//}
-	//DumpNode(res)
-	//assert.Equal(t, "ff03c0230100000e04697869610469786961", codec.EncodeToHex(NodeToBytes(res)))
+	LCPDate, _ := codec.DecodeHex("0100000a05060a94c166")
+
+	mapData := map[string]any{
+		"Flags And Version": 0x3081,
+		"Protocol Type":     0x880b,
+		"Payload Length":    14,
+		"Call ID":           24,
+		"Number":            0,
+		"Payload": map[string]any{
+			"PPP": map[string]any{
+				"Address":  0xff,
+				"Control":  0x03,
+				"Protocol": 0xc021,
+				"LCP":      LCPDate,
+			},
+		},
+	}
+	res, err = parser.GenerateBinary(mapData, "generic_routing_encapsulation", "GRE")
+	if err != nil {
+		t.Fatal(err)
+	}
+	DumpNode(res)
+	assert.Equal(t, "3081880b000e001800000000ff03c0210100000a05060a94c166", codec.EncodeToHex(NodeToBytes(res)))
 }
 
 func TestLCPMessage(t *testing.T) {
