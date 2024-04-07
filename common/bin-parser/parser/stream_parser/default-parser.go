@@ -183,6 +183,9 @@ func (d *DefParser) Operate(operator *Operator, node *base.Node) error {
 		name := node.Name
 		//rootNode.Cfg.SetItem(CfgNodeResult, nodeResult)
 		*node = *rootNode
+		for _, child := range node.Children {
+			child.Cfg.SetItem(CfgParent, node)
+		}
 		node.Name = name
 		//InitNode(node)
 		//node.Cfg.SetItem("unpack", true)
