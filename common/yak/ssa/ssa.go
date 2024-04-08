@@ -408,7 +408,7 @@ type Call struct {
 	// for call function
 	Method  Value
 	Args    []Value
-	binding []Value
+	Binding map[string]Value
 
 	// go function
 	Async  bool

@@ -4,7 +4,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func NewCall(target Value, args, binding []Value, block *BasicBlock) *Call {
+func NewCall(target Value, args []Value, binding map[string]Value, block *BasicBlock) *Call {
 	// handler "this" in parameter
 	{
 		AddThis := func(this Value) {
@@ -28,11 +28,15 @@ func NewCall(target Value, args, binding []Value, block *BasicBlock) *Call {
 		}
 	}
 
+	if binding == nil {
+		binding = make(map[string]Value)
+	}
+
 	c := &Call{
 		anValue:     NewValue(),
 		Method:      target,
 		Args:        args,
-		binding:     binding,
+		Binding:     binding,
 		Async:       false,
 		Unpack:      false,
 		IsDropError: false,
@@ -217,7 +221,7 @@ func (c *Call) HandleFreeValue(fvs []*Parameter) {
 		v := builder.PeekValue(fv.GetName())
 
 		if v != nil {
-			c.binding = append(c.binding, v)
+			c.Binding[fv.GetName()] = v
 		} else {
 			// mark error in freeValue.Variable
 			// get freeValue

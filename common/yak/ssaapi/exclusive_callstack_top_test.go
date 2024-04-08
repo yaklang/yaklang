@@ -131,7 +131,7 @@ func Test_CallStack_Normal_Parameter(t *testing.T) {
 	})
 }
 
-func Test_CallStack_Normal_FreeValue(t *testing.T) {
+func Test_CallStack_FreeValue_WithDefault(t *testing.T) {
 	t.Run("test level1", func(t *testing.T) {
 		Check(t, `
 		i = 333333
@@ -252,7 +252,101 @@ func Test_CallStack_Normal_FreeValue(t *testing.T) {
 	})
 }
 
-func Test_CallStack_FreeValue(t *testing.T) {
+func Test_CallStack_FreeValue_WithoutDefault(t *testing.T) {
+
+	t.Run("test level1", func(t *testing.T) {
+		Check(t, `
+		f = () => {
+			return i
+		}
+		i = 333333
+		a = f()
+		`, CheckTopDef_Equal("a", []string{"333333"}),
+		)
+	})
+
+	t.Run("test level1 object", func(t *testing.T) {
+		Check(t, `
+		f = () => {
+			return {
+				"i": i,
+			}
+		}
+		i = 333333
+		obj = f()
+		a = obj.i
+		`, CheckTopDef_Equal("a", []string{"333333"}))
+	})
+
+	t.Run("test level2", func(t *testing.T) {
+		Check(t, `
+		f = () => {
+			return () => {
+				return i + j
+			}
+		}
+		i = 333333
+		j = 444444
+		f1 = f()
+		a = f1()
+		`, CheckTopDef_Equal("a", []string{"333333", "444444"}))
+	})
+
+	t.Run("test level2 object", func(t *testing.T) {
+		Check(t, `
+		f = () => {
+			return () => {
+				return {
+					"i": i + j,
+				}
+			}
+		}
+		i = 333333
+		j = 444444
+		f1 = f()
+		obj = f1()
+		a = obj.i
+		`, CheckTopDef_Equal("a", []string{"333333", "444444"}))
+	})
+
+	t.Run("test level3", func(t *testing.T) {
+		Check(t, `
+		f = () => {
+			return () => {
+				return () => {
+					return i + j + k
+				}
+			}
+		}
+		i = 333333
+		j = 444444
+		k = 555555
+		f1 = f()
+		f2 = f1()
+		a = f2()
+		`, CheckTopDef_Equal("a", []string{"333333", "444444", "555555"}))
+	})
+
+	t.Run("test level3 object", func(t *testing.T) {
+		Check(t, `
+		f = () => {
+			return () => {
+				return () => {
+					return {
+						"i": i + j + k
+					}
+				}
+			}
+		}
+		i = 333333
+		j = 444444
+		k = 555555
+		f1 = f()
+		f2 = f1()
+		obj = f2()
+		a = obj.i
+		`, CheckTopDef_Equal("a", []string{"333333", "444444", "555555"}))
+	})
 
 }
 
@@ -280,7 +374,7 @@ func Test_CallStack_Normal_SideEffect(t *testing.T) {
 		`
 
 		Check(t, code,
-			CheckTopDef_Contain("c", []string{"Function-b(", "333333"}, true),
+			CheckTopDef_Contain("c", []string{"Function-b(", "333333"}),
 		)
 	})
 
