@@ -3821,13 +3821,14 @@ message CodecMethod {
 
 message CodecParam {
   string Name = 1;
-  string Type = 2; // input | select | checkbox | search | monaco
+  string Type = 2; // input | select | checkbox | search | monaco | inputSelect
   repeated string Options = 3; // 可选值
   bool  Required = 4; // 就算是false也需要传
   string Desc = 5; // 描述
   string Regex = 6; // 正则
   string Label = 7; // 参数文本标签
   string DefaultValue = 8; // 默认值
+  CodecParam connector = 9; // 连接组件
 }
 
 // Yak Invoker
