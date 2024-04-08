@@ -168,8 +168,12 @@ func lineDisasm(v Instruction, liner DisasmLiner) (ret string) {
 			arg = DisasmValues(v.Args)
 		}
 		binding := ""
-		if len(v.binding) != 0 {
-			binding = ", binding(" + DisasmValues(v.binding) + ")"
+		if len(v.Binding) != 0 {
+			binding = ", binding(" + DisasmValues(
+				lo.MapToSlice(
+					v.Binding,
+					func(key string, item Value) Value { return item }),
+			) + ")"
 		}
 		return fmt.Sprintf("%s(%s%s)", liner.DisasmValue(v.Method), arg, binding)
 	case *SideEffect:

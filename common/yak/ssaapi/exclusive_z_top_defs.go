@@ -111,35 +111,30 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 	}
 
-	switch ret := i.node.(type) {
-	case *ssa.Undefined:
-		// ret[n]
-		if ret.IsMemberCallVariable() {
-			obj := NewValue(ret.GetObject())
-			key := NewValue(ret.GetKey())
+	getMemberCall := func(value ssa.Value, actx *AnalyzeContext) Values {
+		if !value.HasValues() && value.IsMember() {
+			obj := NewValue(value.GetObject())
+			key := NewValue(value.GetKey())
 			actx.PushObject(obj, key, i)
-			// defer actx.PopObject()
 
-			return obj.getTopDefs(actx, opt...)
-
-			// callIns, fromCallReturn := ret.GetObject().(*ssa.Call)
-			// if fromCallReturn {
-			// 	return NewValue(callIns).AppendEffectOn(i).SetContextValue(
-			// ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX,
-			// 		NewValue(ret.GetKey()),
-			// 	).getTopDefs(actx, opt...)
-			// }
+			return append(obj.getTopDefs(actx, opt...), i)
 		}
 		return i.visitedDefsDefault(actx)
+	}
+
+	switch inst := i.node.(type) {
+	case *ssa.Undefined:
+		// ret[n]
+		return getMemberCall(inst, actx)
 	case *ssa.Phi:
 		if !actx.ThePhiShouldBeVisited(i) {
 			// phi is visited...
 			return Values{}
 		}
 		actx.VisitPhi(i)
-		return i.visitedDefsDefault(actx)
+		return getMemberCall(inst, actx)
 	case *ssa.Call:
-		caller := ret.Method
+		caller := inst.Method
 		if caller == nil {
 			return Values{i} // return self
 		}
@@ -157,8 +152,13 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		if !isFunc {
 			i.AppendDependOn(callerValue)
 			var nodes = Values{callerValue}
-			for _, val := range ret.Args {
+			for _, val := range inst.Args {
 				arg := NewValue(val)
+				i.AppendDependOn(arg)
+				nodes = append(nodes, arg)
+			}
+			for _, value := range inst.Binding {
+				arg := NewValue(value)
 				i.AppendDependOn(arg)
 				nodes = append(nodes, arg)
 			}
@@ -190,7 +190,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			if utils.IsValidInteger(retIndexRawStr) {
 				targetIdx := codec.Atoi(retIndexRawStr)
 				var traceRets Values
-				for _, retIns := range ret.Return {
+				for _, retIns := range inst.Return {
 					for idx, traceVal := range retIns.Results {
 						if idx == targetIdx {
 							traceRets = append(traceRets, NewValue(traceVal).AppendEffectOn(i))
@@ -203,16 +203,16 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			} else {
 				// string literal member
 				var traceRets Values
-				for _, retIns := range ret.Return {
+				for _, retIns := range inst.Return {
 					for _, traceVal := range retIns.Results {
 						val, ok := traceVal.GetStringMember(retIndexRawStr)
 						if ok {
 							traceRets = append(traceRets, NewValue(val).AppendEffectOn(i))
 							// trace mask ?
-							if len(ret.Blocks) > 0 {
+							if len(inst.Blocks) > 0 {
 								name, ok := ssa.CombineMemberCallVariableName(traceVal, ssa.NewConst(retIndexRawStr))
 								if ok {
-									lastBlock, _ := lo.Last(ret.Blocks)
+									lastBlock, _ := lo.Last(inst.Blocks)
 									variableInstance := lastBlock.ScopeTable.ReadVariable(name)
 									_ = variableInstance.String()
 								}
@@ -226,7 +226,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			}
 		}
 
-		for _, r := range ret.Return {
+		for _, r := range inst.Return {
 			for _, subVal := range r.GetValues() {
 				if ret := NewValue(subVal).AppendEffectOn(i).getTopDefs(actx); len(ret) > 0 {
 					vals = append(vals, ret...)
@@ -238,8 +238,8 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 		return vals.AppendEffectOn(i)
 	case *ssa.Parameter:
-		if ret.GetDefault() != nil {
-			return Values{NewValue(ret.GetDefault())}
+		if inst.GetDefault() != nil {
+			return Values{NewValue(inst.GetDefault())}
 		}
 		called := actx.GetCurrentCall()
 		if called == nil {
@@ -252,29 +252,37 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 		var vals Values
 		calledInstance := called.node.(*ssa.Call)
-		for idx, i := range calledInstance.Args {
-			if ret.IsFreeValue {
-				log.Warn("TODO: Free ssa.Parameters is need to be handled.")
-				continue
-			}
 
-			if idx != ret.FormalParameterIndex {
-				continue
-			}
-
-			traced := NewValue(i).AppendEffectOn(called)
-			if ret := traced.getTopDefs(actx); len(ret) > 0 {
-				vals = append(vals, ret...)
+		var actualParam ssa.Value
+		if inst.IsFreeValue {
+			// free value
+			if tmp, ok := calledInstance.Binding[inst.GetName()]; ok {
+				actualParam = tmp
 			} else {
-				vals = append(vals, traced)
+				log.Errorf("free value: %v is not found in binding", inst.GetName())
+				return getMemberCall(i.node, actx)
 			}
+		} else {
+			// parameter
+			if inst.FormalParameterIndex >= len(calledInstance.Args) {
+				log.Infof("formal parameter index: %d is out of range", inst.FormalParameterIndex)
+				return getMemberCall(i.node, actx)
+			}
+			actualParam = calledInstance.Args[inst.FormalParameterIndex]
 		}
+		traced := NewValue(actualParam).AppendEffectOn(called)
+		if ret := traced.getTopDefs(actx); len(ret) > 0 {
+			vals = append(vals, ret...)
+		} else {
+			vals = append(vals, traced)
+		}
+
 		if len(vals) == 0 {
 			return Values{NewValue(ssa.NewUndefined("_")).AppendEffectOn(i)} // no return, use undefined
 		}
 		return vals.AppendEffectOn(i)
 	case *ssa.SideEffect:
-		callIns := ret.CallSite
+		callIns := inst.CallSite
 		if callIns != nil {
 			err := actx.PushCall(NewValue(callIns).AppendEffectOn(i))
 			if err != nil {
@@ -286,14 +294,14 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				callInsVal := NewValue(callIns).AppendEffectOn(i)
 				filter := make(map[int64]struct{})
 				results = append(results, callInsVal)
-				for _, val := range ret.GetValues() {
+				for _, val := range inst.GetValues() {
 					filter[val.GetId()] = struct{}{}
 					if val.GetId() == callIns.GetId() {
 						continue
 					}
 					results = append(results, NewValue(val).AppendEffectOn(callInsVal).getTopDefs(actx)...)
 				}
-				masks := ret.GetMask()
+				masks := inst.GetMask()
 				for _, val := range masks {
 					_, ok := filter[val.GetId()]
 					if !ok {
@@ -307,5 +315,5 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 
 	}
-	return i.visitedDefsDefault(actx)
+	return getMemberCall(i.node, actx)
 }

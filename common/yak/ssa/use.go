@@ -131,12 +131,12 @@ func (u *UnOp) ReplaceValue(v Value, to Value) {
 // ----------- Call
 func (c *Call) HasValues() bool { return true }
 func (c *Call) GetValues() Values {
-	ret := make(Values, 0, len(c.Args)+len(c.binding)+1)
+	ret := make(Values, 0, len(c.Args)+len(c.Binding)+1)
 	ret = append(ret, c.Method)
 	for _, v := range c.Args {
 		ret = append(ret, v)
 	}
-	for _, v := range c.binding {
+	for _, v := range c.Binding {
 		ret = append(ret, v)
 	}
 	return ret
@@ -148,8 +148,8 @@ func (c *Call) ReplaceValue(v Value, to Value) {
 		c.handlerReturnType()
 	} else if index := slices.Index(c.Args, v); index > -1 {
 		c.Args[index] = to
-	} else if index := slices.Index(c.binding, v); index > -1 {
-		c.binding[index] = to
+	} else if binding, ok := c.Binding[v.GetName()]; ok && binding == v {
+		c.Binding[v.GetName()] = to
 	} else {
 		panic("call not use this value")
 	}
