@@ -247,7 +247,7 @@ func (c *Call) String() string {
 		", ",
 	)
 	binding := strings.Join(
-		lo.Map(c.binding, func(v Value, _ int) string {
+		lo.MapToSlice(c.Binding, func(name string, v Value) string {
 			return getStr(v)
 		}),
 		", ",

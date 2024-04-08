@@ -175,7 +175,7 @@ func NewValue() anValue {
 }
 
 func (n *anValue) IsMember() bool {
-	return n.object != nil
+	return n.object != nil && n.key != nil
 }
 func (n *anValue) SetObject(v Value) {
 	n.object = v
@@ -195,10 +195,6 @@ func (n *anValue) GetKey() Value {
 
 func (n *anValue) IsObject() bool {
 	return n.member.Len() != 0
-}
-
-func (n *anValue) IsMemberCallVariable() bool {
-	return n.object != nil && n.key != nil
 }
 
 func (n *anValue) AddMember(k, v Value) {
