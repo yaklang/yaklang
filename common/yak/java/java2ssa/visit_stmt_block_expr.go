@@ -884,7 +884,6 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) interface{} {
 		if ret.DEFAULT() != nil {
 			if stmtlist := ret.StatementList(len(allcase)); stmtlist != nil {
 				SwitchBuilder.BuildDefault(func() {
-					log.Infof("aaa:%v", stmtlist.GetText())
 					y.VisitStatementList(stmtlist)
 				})
 			}
@@ -964,12 +963,12 @@ func (y *builder) VisitLocalVariableDeclaration(raw javaparser.ILocalVariableDec
 	}
 
 	if ret := i.Identifier(); ret != nil {
-		log.Infof("visit local variable declaration: %v", ret.GetText())
+		//log.Infof("visit local variable declaration: %v", ret.GetText())
 		variable := y.CreateLocalVariable(ret.GetText())
 		value := y.VisitExpression(i.Expression())
 		y.AssignVariable(variable, value)
 	} else if ret := i.VariableDeclarators(); ret != nil {
-		log.Infof("visit local variable declaration: %v", ret.GetText())
+		//log.Infof("visit local variable declaration: %v", ret.GetText())
 		decls := ret.(*javaparser.VariableDeclaratorsContext)
 		for _, decl := range decls.AllVariableDeclarator() {
 			y.VisitVariableDeclarator(decl)
