@@ -93,14 +93,260 @@ type github.com/yaklang/yaklang/common/mutate.(FuzzHTTPRequest) struct {
 }
 */
 
-func TestYaklangFuzzHTTPRequestBaseCase(t *testing.T) {
-	type base struct {
-		inputPacket                 string
-		code                        string
-		expectKeywordInOutputPacket []string
-		expectRegexpInOutputPacket  []string
-		debug                       bool
+type base struct {
+	inputPacket                 string
+	code                        string
+	expectPacketNum             int
+	expectKeywordInOutputPacket []string
+	expectRegexpInOutputPacket  []string
+	debug                       bool
+}
+
+func testCaseCheck(base base) func(t *testing.T) {
+	return func(t *testing.T) {
+		test := assert.New(t)
+		ctx := context.Background()
+		engine := yaklang.New()
+		data := base
+
+		engine.SetVar("request", data.inputPacket)
+		engine.SetVar("keywords", data.expectKeywordInOutputPacket)
+		engine.SetVar("regexps", data.expectRegexpInOutputPacket)
+		engine.SetVar("debug", data.debug)
+
+		if data.code != "" {
+			data.code = "." + strings.TrimLeft(data.code, ".")
+		}
+		initCode := `result = fuzz.HTTPRequest(request)~` + data.code
+		if data.debug {
+			fmt.Println("----------------OP CODE-----------------")
+			fmt.Println(initCode)
+			fmt.Println("----------------------------------------")
+		}
+		err := engine.EvalInline(ctx, initCode)
+		test.NoError(err, "eval code should not fail")
+
+		if data.debug {
+			fmt.Println("----------------KEYWORD-----------------")
+			engine.EvalInline(ctx, "dump(keywords)")
+			fmt.Println("----------------REGEXPS-----------------")
+			engine.EvalInline(ctx, "dump(regexps)")
+			fmt.Println()
+		}
+
+		err = engine.EvalInline(context.Background(), `raw = result.GetFirstFuzzHTTPRequest()~.GetBytes()
+if debug { println(string(raw)) }
+check = str.MatchAllOfSubString(raw, keywords...) || str.MatchAllOfRegexp(raw, regexps...)
+expectPacketNum = result.Results()~.Len()
+`)
+		test.NoError(err, "eval code should not fail")
+
+		checked, ok := engine.GetVar("check")
+		test.True(ok, "should get 'check' variable")
+		test.True(checked.(bool), "check should be true")
+
+		if data.expectPacketNum > 0 {
+			packetNum, ok := engine.GetVar("expectPacketNum")
+			test.True(ok, "should get 'expectPacketNum' variable")
+			test.Equal(data.expectPacketNum, packetNum.(int), "packet num should be equal")
+		}
 	}
+
+}
+
+func TestFuzzMethod(t *testing.T) {
+	tests := []struct {
+		name string
+		base base
+	}{
+		{
+			name: "Fuzz Method",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com`,
+				code:                        `.FuzzMethod("ABC")`,
+				expectKeywordInOutputPacket: []string{"ABC / HTTP/1.1\r\n"},
+			},
+		},
+		{
+			name: "Fuzz Method with multiple methods",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com`,
+				code:                        `.FuzzMethod(["a","b","c"]...)`,
+				expectKeywordInOutputPacket: []string{"a / HTTP/1.1\r\n"},
+				expectPacketNum:             3,
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, testCaseCheck(tc.base))
+	}
+
+}
+
+func TestFuzzGetParams(t *testing.T) {
+	tests := []struct {
+		name string
+		base base
+	}{
+		{
+			name: "Fuzz Get Params",
+			base: base{
+				inputPacket: `GET /?a=ab HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzGetParams("a", "$.abc").FuzzGetParams("ccc", "12")`,
+				expectKeywordInOutputPacket: []string{
+					"a=%24.abc", "ccc=12",
+				},
+			},
+		},
+		{
+			name: "Fuzz Get Params Raw",
+			base: base{
+				inputPacket: `GET /?a=ab HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzGetParamsRaw("ccccccccccccccc")`,
+				expectKeywordInOutputPacket: []string{
+					"/?ccccccccccccccc",
+				},
+			},
+		},
+		{
+			name: "Fuzz Get Params Raw",
+			base: base{
+				inputPacket: `GET /?a=ab HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzGetParamsRaw("{{int(1-3)}}")`,
+				expectKeywordInOutputPacket: []string{
+					"/?1",
+				},
+				expectPacketNum: 3,
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, testCaseCheck(tc.base))
+	}
+}
+
+func TestFuzzGetJsonPathParams(t *testing.T) {
+	// json path 逻辑是先解析json，然后再根据json path获取值，根据原值的类型进行 fuzz
+	// 如果原值与 Fuzz 值不匹配，默认使用字符串类型
+	tests := []struct {
+		name string
+		base base
+	}{
+		{
+			name: "GET 参数(JSON)",
+			base: base{
+				inputPacket: `GET /?a={"abc": 123} HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzGetJsonPathParams("a", "$.abc", "string")`,
+				expectKeywordInOutputPacket: []string{
+					`a={{urlescape({"abc":"string"})}}`,
+				},
+				debug: true,
+			},
+		},
+		{
+			name: "GET 参数(JSON) string type",
+			base: base{
+				inputPacket: `GET /?a={"abc": "123"} HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzGetJsonPathParams("a", "$.abc", "99999")`,
+				expectKeywordInOutputPacket: []string{
+					`a={{urlescape({"abc":"99999"})}}`,
+				},
+				debug: true,
+			},
+		},
+		{
+			name: "GET 参数(JSON) number type",
+			base: base{
+				inputPacket: `GET /?a={"abc": 123} HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzGetJsonPathParams("a", "$.abc", 99999)`,
+				expectKeywordInOutputPacket: []string{
+					`a={{urlescape({"abc":99999})}}`,
+				},
+				debug: true,
+			},
+		},
+		{
+			name: "GET 参数(JSON) json type",
+			base: base{
+				inputPacket: `GET /?a={"abc": {"c":"d"}} HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzGetJsonPathParams("a", "$.abc", {"zz":123})`,
+				expectKeywordInOutputPacket: []string{
+					`a={{urlescape({"abc":{"zz":123}})}}`,
+				},
+				debug: true,
+			},
+		},
+		{
+			name: "GET 参数(JSON) array type",
+			base: base{
+				inputPacket: `GET /?a=[{"id": 1},{"id": 2}] HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzGetJsonPathParams("a", "$.[0]", {"id":111})`,
+				expectKeywordInOutputPacket: []string{
+					`a={{urlescape([{"id":111},{"id":2}])}}`,
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, testCaseCheck(tc.base))
+	}
+}
+
+func TestFuzzGetBase64Params(t *testing.T) {
+	tests := []struct {
+		name string
+		base base
+	}{
+		{
+			name: "GET参数(Base64)",
+			base: base{
+				inputPacket: `GET /?a=MTIzNA==&b=2  HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzGetBase64Params("a", 99999)`,
+				expectKeywordInOutputPacket: []string{
+					`a=OTk5OTk%3D`,
+				},
+				debug: true,
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, testCaseCheck(tc.base))
+	}
+}
+
+func TestYaklangFuzzHTTPRequestBaseCase(t *testing.T) {
+
 	tests := []struct {
 		name string
 		base base
@@ -496,12 +742,13 @@ Host: www.baidu.com
 		{
 			name: "临时",
 			base: base{
-				inputPacket: `GET /acc.t1?a=eyJrZXkiOjExMTExMTF9 HTTP/1.1
+				inputPacket: `GET /acc.t1 HTTP/1.1
 Host: www.baidu.com
 
+a={"key":1111111}
 `,
 
-				code: ".FuzzGetBase64JsonPath(`a`, `$.key`, 2222)",
+				code: ".FuzzPostJsonPathParams(`a`, `$.key`, 2222)",
 				expectKeywordInOutputPacket: []string{
 					`GET /acc.t1?a={{base64({"key":2222})}}`,
 				},
