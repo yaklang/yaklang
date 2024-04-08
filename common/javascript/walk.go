@@ -1,7 +1,9 @@
-package ast
+package javascript
 
 import (
 	"fmt"
+
+	"github.com/dop251/goja/ast"
 	"github.com/yaklang/yaklang/common/log"
 )
 
@@ -9,8 +11,8 @@ import (
 // If the result visitor w is not nil, Walk visits each of the children
 // of node with the visitor v, followed by a call of the Exit method.
 type Visitor interface {
-	Enter(n Node) (v Visitor)
-	Exit(n Node)
+	Enter(n ast.Node) (v Visitor)
+	Exit(n ast.Node)
 }
 
 // Walk traverses an AST in depth-first order: It starts by calling
@@ -18,7 +20,7 @@ type Visitor interface {
 // v.Enter(node) is not nil, Walk is invoked recursively with visitor
 // v for each of the non-nil children of node, followed by a call
 // of v.Exit(node).
-func Walk(v Visitor, n Node) {
+func Walk(v Visitor, n ast.Node) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Debugf("js.ast.walk error: %s", err)
@@ -35,95 +37,94 @@ func Walk(v Visitor, n Node) {
 	defer v.Exit(n)
 
 	switch n := n.(type) {
-	case *ArrayLiteral:
+	case *ast.ArrayLiteral:
 		if n != nil {
 			for _, ex := range n.Value {
 				Walk(v, ex)
 			}
 		}
-	case *AssignExpression:
+	case *ast.AssignExpression:
 		if n != nil {
 			Walk(v, n.Left)
 			Walk(v, n.Right)
 		}
-	case *BadExpression:
-	case *BinaryExpression:
+	case *ast.BadExpression:
+	case *ast.BinaryExpression:
 		if n != nil {
 			Walk(v, n.Left)
 			Walk(v, n.Right)
 		}
-	case *BlockStatement:
+	case *ast.BlockStatement:
 		if n != nil {
 			for _, s := range n.List {
 				Walk(v, s)
 			}
 		}
-	case *BooleanLiteral:
-	case *BracketExpression:
+	case *ast.BooleanLiteral:
+	case *ast.BracketExpression:
 		if n != nil {
 			Walk(v, n.Left)
 			Walk(v, n.Member)
 		}
-	case *BranchStatement:
+	case *ast.BranchStatement:
 		if n != nil {
 			Walk(v, n.Label)
 		}
-	case *CallExpression:
+	case *ast.CallExpression:
 		if n != nil {
 			Walk(v, n.Callee)
 			for _, a := range n.ArgumentList {
 				Walk(v, a)
 			}
 		}
-	case *CaseStatement:
+	case *ast.CaseStatement:
 		if n != nil {
 			Walk(v, n.Test)
 			for _, c := range n.Consequent {
 				Walk(v, c)
 			}
 		}
-	case *CatchStatement:
+	case *ast.CatchStatement:
 		if n != nil {
 			Walk(v, n.Parameter)
 			Walk(v, n.Body)
 		}
-	case *ConditionalExpression:
+	case *ast.ConditionalExpression:
 		if n != nil {
 			Walk(v, n.Test)
 			Walk(v, n.Consequent)
 			Walk(v, n.Alternate)
 		}
-	case *DebuggerStatement:
-	case *DoWhileStatement:
+	case *ast.DebuggerStatement:
+	case *ast.DoWhileStatement:
 		if n != nil {
 			Walk(v, n.Test)
 			Walk(v, n.Body)
 		}
-	case *DotExpression:
+	case *ast.DotExpression:
 		if n != nil {
 			Walk(v, n.Left)
-			Walk(v, n.Identifier)
+			Walk(v, &n.Identifier)
 		}
-	case *EmptyExpression:
-	case *EmptyStatement:
-	case *ExpressionStatement:
+	case *ast.EmptyStatement:
+	case *ast.ExpressionStatement:
 		if n != nil {
 			Walk(v, n.Expression)
 		}
-	case *ForInStatement:
+	case *ast.ForInStatement:
 		if n != nil {
 			Walk(v, n.Into)
 			Walk(v, n.Source)
 			Walk(v, n.Body)
 		}
-	case *ForStatement:
+	case *ast.ForStatement:
 		if n != nil {
 			Walk(v, n.Initializer)
 			Walk(v, n.Update)
 			Walk(v, n.Test)
 			Walk(v, n.Body)
 		}
-	case *FunctionLiteral:
+	case *ast.FunctionLiteral:
 		if n != nil {
 			Walk(v, n.Name)
 			for _, p := range n.ParameterList.List {
@@ -131,92 +132,94 @@ func Walk(v Visitor, n Node) {
 			}
 			Walk(v, n.Body)
 		}
-	case *FunctionStatement:
+	case *ast.FunctionDeclaration:
 		if n != nil {
 			Walk(v, n.Function)
 		}
-	case *Identifier:
-	case *IfStatement:
+	case *ast.Identifier:
+	case *ast.IfStatement:
 		if n != nil {
 			Walk(v, n.Test)
 			Walk(v, n.Consequent)
 			Walk(v, n.Alternate)
 		}
-	case *LabelledStatement:
+	case *ast.LabelledStatement:
 		if n != nil {
 			Walk(v, n.Statement)
 		}
-	case *NewExpression:
+	case *ast.NewExpression:
 		if n != nil {
 			Walk(v, n.Callee)
 			for _, a := range n.ArgumentList {
 				Walk(v, a)
 			}
 		}
-	case *NullLiteral:
-	case *NumberLiteral:
-	case *ObjectLiteral:
+	case *ast.NullLiteral:
+	case *ast.NumberLiteral:
+	case *ast.ObjectLiteral:
 		if n != nil {
 			for _, p := range n.Value {
-				Walk(v, p.Value)
+				Walk(v, p)
 			}
 		}
-	case *Program:
+	case *ast.Program:
 		if n != nil {
 			for _, b := range n.Body {
 				Walk(v, b)
 			}
 		}
-	case *RegExpLiteral:
-	case *ReturnStatement:
+	case *ast.RegExpLiteral:
+	case *ast.ReturnStatement:
 		if n != nil {
 			Walk(v, n.Argument)
 		}
-	case *SequenceExpression:
+	case *ast.SequenceExpression:
 		if n != nil {
 			for _, e := range n.Sequence {
 				Walk(v, e)
 			}
 		}
-	case *StringLiteral:
-	case *SwitchStatement:
+	case *ast.StringLiteral:
+	case *ast.SwitchStatement:
 		if n != nil {
 			Walk(v, n.Discriminant)
 			for _, c := range n.Body {
 				Walk(v, c)
 			}
 		}
-	case *ThisExpression:
-	case *ThrowStatement:
+	case *ast.ThisExpression:
+	case *ast.ThrowStatement:
 		if n != nil {
 			Walk(v, n.Argument)
 		}
-	case *TryStatement:
+	case *ast.TryStatement:
 		if n != nil {
 			Walk(v, n.Body)
 			Walk(v, n.Catch)
 			Walk(v, n.Finally)
 		}
-	case *UnaryExpression:
+	case *ast.UnaryExpression:
 		if n != nil {
 			Walk(v, n.Operand)
 		}
-	case *VariableExpression:
+	case *ast.VariableDeclaration:
 		if n != nil {
-			Walk(v, n.Initializer)
+			for _, d := range n.List {
+				Walk(v, d)
+			}
 		}
-	case *VariableStatement:
+	case *ast.VariableStatement:
 		if n != nil {
 			for _, e := range n.List {
 				Walk(v, e)
 			}
 		}
-	case *WhileStatement:
+	case *ast.WhileStatement:
 		if n != nil {
 			Walk(v, n.Test)
 			Walk(v, n.Body)
 		}
-	case *WithStatement:
+	case *ast.WithStatement:
 		if n != nil {
 			Walk(v, n.Object)
 			Walk(v, n.Body)

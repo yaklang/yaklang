@@ -1,40 +1,57 @@
 package yaklib
 
-// otto
 import (
+	"reflect"
+	"strings"
+
+	"github.com/dop251/goja"
+	"github.com/dop251/goja/ast"
+	"github.com/dop251/goja/parser"
 	"github.com/yaklang/yaklang/common/javascript"
-	"github.com/yaklang/yaklang/common/javascript/otto"
-	"github.com/yaklang/yaklang/common/javascript/otto/ast"
-	"github.com/yaklang/yaklang/common/javascript/otto/parser"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/embed"
 )
 
+var defaultJSRuntime = goja.New()
+
 var JSOttoExports = map[string]interface{}{
-	"PoweredBy":            "github.com/robertkrimen/otto",
+	"PoweredBy":            "github.com/dop251/goja",
 	"New":                  _jsNewEngine,
 	"Run":                  _run,
 	"CallFunctionFromCode": _jsCallFuncFromCode,
 
 	// RunOptions
 	"libCryptoJSV3": _libCryptoJSV3,
+	"libCryptoJSV4": _libCryptoJSV4,
+	"libJSRSASign":  _libJSRSASign,
 
 	// AST
 	"ASTWalk":   javascript.BasicJavaScriptASTWalker,
 	"Parse":     _Parse,
-	"GetSTType": javascript.GetStatementType,
+	"GetSTType": GetStatementType,
 
 	// Value
-	"NullValue":      otto.NullValue,
-	"UndefinedValue": otto.UndefinedValue,
-	"FalseValue":     otto.FalseValue,
-	"ToValue":        otto.ToValue,
-	"NaNValue":       otto.NaNValue,
-	"TrueValue":      otto.TrueValue,
+	"NullValue":      goja.Null(),
+	"UndefinedValue": goja.Undefined(),
+	"FalseValue":     defaultJSRuntime.ToValue(false),
+	"ToValue":        defaultJSRuntime.ToValue,
+	"NaNValue":       goja.NaN(),
+	"TrueValue":      defaultJSRuntime.ToValue(true),
+}
+
+func GetStatementType(st interface{}) string {
+	typ := strings.Replace(reflect.TypeOf(st).String(), "*ast.", "", 1)
+	return typ
+}
+
+type jsLibrary struct {
+	name    string
+	version string
+	program *goja.Program
 }
 
 type JsRunConfig struct {
-	libs []string
+	libs []*jsLibrary
 }
 
 func newJsRunConfig() *JsRunConfig {
@@ -43,11 +60,13 @@ func newJsRunConfig() *JsRunConfig {
 
 type jsRunOpts func(*JsRunConfig)
 
-func jsRunWithLibs(libs ...string) jsRunOpts {
+func jsRunWithLibs(libs ...*jsLibrary) jsRunOpts {
 	return func(c *JsRunConfig) {
 		c.libs = append(c.libs, libs...)
 	}
 }
+
+var jsRunOptsCache = utils.NewTTLCache[jsRunOpts]()
 
 // libCryptoJSV3 是一个JS运行选项参数，用于在运行JS代码时嵌入CryptoJS 3.3.0库
 // Example:
@@ -56,8 +75,39 @@ func jsRunWithLibs(libs ...string) jsRunOpts {
 // println(value.String())
 // ```
 func _libCryptoJSV3() jsRunOpts {
-	src, _ := embed.Asset("data/js-libs/cryptojs/3.3.0/cryptojs.min.js")
-	return jsRunWithLibs(string(src))
+	var (
+		opt jsRunOpts
+		ok  bool
+	)
+
+	if opt, ok = jsRunOptsCache.Get("libCryptoJSV3"); !ok {
+		src, _ := embed.Asset("data/js-libs/cryptojs/3.3.0/cryptojs.min.js")
+		prog, _ := goja.Compile("CryptoJS-3.3.0", string(src), false)
+		opt = jsRunWithLibs(&jsLibrary{"CryptoJS", "3.3.0", prog})
+		jsRunOptsCache.Set("libCryptoJSV3", opt)
+	}
+	return opt
+}
+
+// libCryptoJSV4 是一个JS运行选项参数，用于在运行JS代码时嵌入CryptoJS 4.2.0库
+// Example:
+// ```
+// _, value = js.Run(`CryptoJS.HmacSHA256("Message", "secret").toString();`, js.libCryptoJSV4())~
+// println(value.String())
+// ```
+func _libCryptoJSV4() jsRunOpts {
+	var (
+		opt jsRunOpts
+		ok  bool
+	)
+
+	if opt, ok = jsRunOptsCache.Get("libCryptoJSV4"); !ok {
+		src, _ := embed.Asset("data/js-libs/cryptojs/4.2.0/cryptojs.min.js")
+		prog, _ := goja.Compile("CryptoJS-4.2.0", string(src), false)
+		opt = jsRunWithLibs(&jsLibrary{"CryptoJS", "4.2.0", prog})
+		jsRunOptsCache.Set("libCryptoJSV4", opt)
+	}
+	return opt
 }
 
 // libJSRSASign 是一个JS运行选项参数，用于在运行JS代码时嵌入jsrsasign 10.8.6库
@@ -67,8 +117,18 @@ func _libCryptoJSV3() jsRunOpts {
 // println(value.String())
 // ```
 func _libJSRSASign() jsRunOpts {
-	src, _ := embed.Asset("data/js-libs/jsrsasign/10.8.6/jsrsasign-all-min.js")
-	return jsRunWithLibs(string(src))
+	var (
+		opt jsRunOpts
+		ok  bool
+	)
+
+	if opt, ok = jsRunOptsCache.Get("libJSRSASign"); !ok {
+		src, _ := embed.Asset("data/js-libs/jsrsasign/10.8.6/jsrsasign-all-min.js")
+		prog, _ := goja.Compile("jsrsasign-10.8.6", string(src), false)
+		opt = jsRunWithLibs(&jsLibrary{"jsrsasign", "10.8.6", prog})
+		jsRunOptsCache.Set("libJSRSASign", opt)
+	}
+	return opt
 }
 
 // Parse 对传入的JS代码进行解析并返回解析后的AST树和错误
@@ -93,8 +153,8 @@ func _Parse(code string) (*ast.Program, error) {
 // val = engine.Eval("1+1")~.ToInteger()~
 // println(val)
 // ```
-func _jsNewEngine() *otto.Otto {
-	return otto.New()
+func _jsNewEngine() *goja.Runtime {
+	return goja.New()
 }
 
 // Run 创建新的JS引擎并运行传入的代码并返回JS引擎结构体引用，运行值和错误
@@ -105,20 +165,20 @@ func _jsNewEngine() *otto.Otto {
 // _, value = js.Run(`CryptoJS.HmacSHA256("Message", "secret").toString();`, js.libCryptoJSV3())~
 // println(value.String())
 // ```
-func _run(src any, opts ...jsRunOpts) (*otto.Otto, otto.Value, error) {
+func _run(src any, opts ...jsRunOpts) (*goja.Runtime, goja.Value, error) {
 	config := newJsRunConfig()
 	for _, opt := range opts {
 		opt(config)
 	}
 	vm := _jsNewEngine()
-	for _, src := range config.libs {
-		_, err := vm.Run(src)
+	for _, lib := range config.libs {
+		_, err := vm.RunProgram(lib.program)
 		if err != nil {
-			return vm, otto.UndefinedValue(), err
+			return vm, goja.Undefined(), err
 		}
 	}
 
-	value, err := vm.Run(src)
+	value, err := vm.RunString(utils.InterfaceToString(src))
 	return vm, value, err
 }
 
@@ -131,24 +191,25 @@ func _run(src any, opts ...jsRunOpts) (*otto.Otto, otto.Value, error) {
 // value = js.CallFunctionFromCode(`function add(a, b) { return a + b; }`, "add", 1, 2)~
 // println(value.String())
 // ```
-func _jsCallFuncFromCode(src any, funcName string, params ...interface{}) (otto.Value, error) {
+func _jsCallFuncFromCode(src any, funcName string, params ...interface{}) (goja.Value, error) {
 	vm := _jsNewEngine()
-	script, err := vm.Compile("", src)
+	prog, err := goja.Compile("", utils.InterfaceToString(src), false)
 	if err != nil {
-		return otto.UndefinedValue(), err
+		return goja.Undefined(), err
 	}
-	_, err = vm.Run(script)
+	_, err = vm.RunProgram(prog)
 	if err != nil {
-		return otto.UndefinedValue(), err
+		return goja.Undefined(), err
 	}
-	vName, err := vm.Get(funcName)
-	if err != nil {
-		return otto.UndefinedValue(), err
-	}
+	v := vm.Get(funcName)
 
-	if !vName.IsFunction() {
-		return otto.UndefinedValue(), utils.Errorf("[%v] is not a valid js function", funcName)
+	if f, ok := goja.AssertFunction(v); !ok {
+		return goja.Undefined(), utils.Errorf("[%v] is not a valid js function", funcName)
+	} else {
+		vmParams := make([]goja.Value, len(params))
+		for i, p := range params {
+			vmParams[i] = vm.ToValue(p)
+		}
+		return f(goja.Undefined(), vmParams...)
 	}
-
-	return vName.Call(otto.UndefinedValue(), params...)
 }
