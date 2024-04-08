@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/javascript/otto/parser"
+	"github.com/dop251/goja/parser"
 )
 
 func TestWalk(t *testing.T) {
@@ -32,9 +32,18 @@ if (a == b){
 	}
 }
 
-func TestRunWithCryptoJS(t *testing.T) {
+func TestRunWithCryptoJSV3(t *testing.T) {
 	code := `CryptoJS.HmacSHA256("Message", "secret").toString();`
 	_, value, err := _run(code, _libCryptoJSV3())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log(value.String())
+}
+
+func TestRunWithCryptoJSV4(t *testing.T) {
+	code := `CryptoJS.HmacSHA256("Message", "secret").toString();`
+	_, value, err := _run(code, _libCryptoJSV4())
 	if err != nil {
 		t.Fatal(err)
 	}
