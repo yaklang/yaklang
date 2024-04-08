@@ -2,12 +2,13 @@ package javascript
 
 import (
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/go-funk"
-	"github.com/yaklang/yaklang/common/javascript/otto/ast"
-	"github.com/yaklang/yaklang/common/javascript/otto/parser"
 	"strings"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/dop251/goja/ast"
+	"github.com/dop251/goja/parser"
+	"github.com/yaklang/yaklang/common/go-funk"
 )
 
 const code = `
@@ -56,8 +57,8 @@ func TestJS_AST(t *testing.T) {
 		ids = append(ids, i)
 	}
 
-	ast.Walk(w, astInstance)
-	var res = funk.Map(ints, func(i int64) string {
+	Walk(w, astInstance)
+	res := funk.Map(ints, func(i int64) string {
 		return fmt.Sprint(i)
 	}).([]string)
 	println(strings.Join(res, "-"))

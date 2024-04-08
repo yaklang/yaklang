@@ -1,11 +1,12 @@
 package javascript
 
 import (
-	"github.com/yaklang/yaklang/common/javascript/otto/ast"
-	"github.com/yaklang/yaklang/common/javascript/otto/parser"
+	"github.com/dop251/goja/ast"
+	"github.com/dop251/goja/parser"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 )
+
+var _ Visitor = (*walker)(nil)
 
 type ASTWalkerResult struct {
 	StringLiteral  []string
@@ -41,11 +42,12 @@ func BasicJavaScriptASTWalker(code string) (*ASTWalkerResult, error) {
 	walker.OnSyntaxError = func(i string, lastNode ast.Node) {
 		results.BadSyntax = append(results.BadSyntax, i)
 	}
-	astProgram, _ := parser.ParseFile(nil, "", code, 0)
-	if astProgram == nil {
-		return nil, utils.Error("ast program empty")
+	astProgram, err := parser.ParseFile(nil, "", code, 0)
+	if err != nil {
+		return nil, err
 	}
-	ast.Walk(walker, astProgram)
+
+	Walk(walker, astProgram)
 	return results, nil
 }
 
@@ -94,7 +96,7 @@ func NewJavaScriptWalker(handlers ...func(ast.Node)) *walker {
 	return w
 }
 
-func (w *walker) Enter(n ast.Node) ast.Visitor {
+func (w *walker) Enter(n ast.Node) Visitor {
 	defer func() {
 		w.lastNode = n
 
@@ -121,7 +123,7 @@ func (w *walker) Enter(n ast.Node) ast.Visitor {
 			}
 		}
 	case *ast.StringLiteral:
-		w.OnStringLiteral(ret.Value)
+		w.OnStringLiteral(ret.Value.String())
 	case *ast.NumberLiteral:
 		switch number := ret.Value.(type) {
 		case float64:
@@ -135,7 +137,7 @@ func (w *walker) Enter(n ast.Node) ast.Visitor {
 		if ret == nil {
 			return w
 		}
-		w.OnIdentifier(ret.Name, w.lastNode)
+		w.OnIdentifier(ret.Name.String(), w.lastNode)
 	}
 	return w
 }
