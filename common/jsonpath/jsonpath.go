@@ -80,13 +80,19 @@ func Read(value interface{}, path string) (interface{}, error) {
 }
 
 // Prepare a path for reuse with multiple JSON values.
-func Replace(origin any, path string, replaceValue interface{}) (map[string]interface{}, error) {
+func Replace(origin any, path string, replaceValue interface{}) (any, error) {
 	result, err := ReplaceEx(origin, path, replaceValue)
-	m, ok := result.(map[string]any)
-	if ok {
-		return m, nil
+	if err != nil {
+		return nil, err
 	}
-	return nil, err
+	switch result.(type) {
+	case map[string]interface{}:
+		return result, nil
+	case []interface{}:
+		return result, nil
+	default:
+		return nil, utils.Errorf("replace result type[%v] not supported", spew.Sdump(result))
+	}
 }
 
 // ReplaceEx replace the value of the path in origin

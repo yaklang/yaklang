@@ -7,15 +7,15 @@ import (
 	"reflect"
 )
 
-func ReplaceAll(j interface{}, jpath string, replaceValue interface{}) map[string]interface{} {
+func ReplaceAll(j interface{}, jpath string, replaceValue interface{}) any {
 	raw := utils.InterfaceToBytes(j)
-	var m map[string]interface{}
+	var m interface{}
 	err := json.Unmarshal(raw, &m)
 	if err != nil {
 		log.Errorf("unmarshal json failed: %s", err)
 		return nil
 	}
-	result, err := Replace(m, jpath, replaceValue)
+	result, err := Replace(j, jpath, replaceValue)
 	if err != nil {
 		log.Errorf("replace jsonpath failed: %s", err)
 		return nil

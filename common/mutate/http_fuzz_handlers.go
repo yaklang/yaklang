@@ -16,9 +16,6 @@ import (
 	"github.com/antchfx/xmlquery"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-
-	"github.com/asaskevich/govalidator"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/jsonpath"
@@ -570,32 +567,67 @@ func (f *FuzzHTTPRequest) fuzzGetParamsJsonPath(key any, jsonPath string, val an
 	if valueOrigin == "" {
 		return nil, utils.Errorf("empty HTTP Get Params[%v] Values", key)
 	}
-	rawJson, isJsonOk := utils.IsJSON(valueOrigin)
+	_, isJsonOk := utils.IsJSON(valueOrigin)
 	if !isJsonOk {
 		return nil, utils.Errorf("HTTP Get Params[%v] Values is not json", key)
 	}
+	rawJson := valueOrigin
 
 	var reqs []*http.Request
 	keys, values := []string{keyStr}, InterfaceToFuzzResults(val)
 	err = cartesian.ProductEx([][]string{keys, values}, func(result []string) error {
 		key, value := result[0], result[1]
-		replacedValue := []string{
-			jsonpath.ReplaceString(rawJson, jsonPath, value),
-		}
-		if govalidator.IsInt(value) {
-			replacedValue = append(replacedValue, jsonpath.ReplaceString(rawJson, jsonPath, codec.Atoi(value)))
-		}
-		for _, i := range replacedValue {
-			newReq := lowhttp.CopyRequest(req)
-			if newReq == nil {
-				continue
+		originalValue := jsonpath.Find(rawJson, jsonPath)
+
+		var newValue interface{} = value
+
+		switch originalValue.(type) {
+		case float64:
+			if floatVal, err := strconv.ParseFloat(value, 64); err == nil {
+				newValue = floatVal
 			}
-			newVals := newReq.URL.Query()
-			newVals.Set(key, i)
-			newReq.URL.RawQuery = newVals.Encode()
-			newReq.RequestURI = newReq.URL.RequestURI()
-			reqs = append(reqs, newReq)
+		case bool:
+			if boolVal, err := strconv.ParseBool(value); err == nil {
+				newValue = boolVal
+			}
+		case string:
+			newValue = value
+		case map[string]interface{}, []interface{}:
+			if gjson.Valid(value) {
+				newValue = gjson.Parse(value).Value()
+			}
+		default:
+			return utils.Wrap(errors.New("unrecognized json value type"), "json value type")
 		}
+
+		modifiedParams := jsonpath.ReplaceString(rawJson, jsonPath, newValue)
+
+		newReq := lowhttp.CopyRequest(req)
+
+		newVals, err := deepCopyUrlValues(vals)
+		if err != nil {
+			return err
+		}
+		var parts []string
+		for k, v := range newVals {
+			for _, singleV := range v {
+				if k == key {
+					singleV = modifiedParams
+				}
+				var part string
+				if utils.NeedsURLEncoding(singleV) {
+					part = fmt.Sprintf("%s={{urlescape(%s)}}", k, singleV)
+				} else {
+					part = fmt.Sprintf("%s=%s", k, singleV)
+				}
+				parts = append(parts, part)
+			}
+		}
+		unencodedQuery := strings.Join(parts, "&")
+		newReq.URL.RawQuery = unencodedQuery
+		newReq.RequestURI = newReq.URL.RequestURI()
+		reqs = append(reqs, newReq)
+
 		return nil
 	})
 	if err != nil {

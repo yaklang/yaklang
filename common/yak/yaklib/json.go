@@ -252,7 +252,7 @@ func _jsonpathFindPath(json interface{}, jsonPath string) interface{} {
 // ```
 // v = json.ReplaceAll(`{"a":"a1","c":{"a":"a2"}}`, "$..a", "b") // v = {"a":"b","c":{"a":"b"}}
 // ```
-func _jsonpathReplaceAll(json interface{}, jsonPath string, replaceValue interface{}) map[string]interface{} {
+func _jsonpathReplaceAll(json interface{}, jsonPath string, replaceValue interface{}) any {
 	return jsonpath.ReplaceAll(json, jsonPath, replaceValue)
 }
 

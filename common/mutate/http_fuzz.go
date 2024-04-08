@@ -658,7 +658,7 @@ func (f *FuzzHTTPRequest) GetPostParams() []*FuzzHTTPRequestParam {
 			continue
 		}
 
-		if len(values) <= 0 {
+		if len(values) <= 0 || len(r.Get(key)) == 0 {
 			continue
 		}
 
@@ -845,17 +845,10 @@ func (f *FuzzHTTPRequest) GetPathParams() []*FuzzHTTPRequestParam {
 }
 
 func (f *FuzzHTTPRequest) GetCommonParams() []*FuzzHTTPRequestParam {
-	postParams := f.GetPostJsonParams()
-	if len(postParams) <= 0 {
-		postParams = f.GetPostXMLParams()
-	}
-	if len(postParams) <= 0 {
-		postParams = f.GetPostParams()
-	}
-	ret := append(f.GetGetQueryParams(), postParams...)
-	ret = append(ret, f.GetCookieParams()...)
-
-	return ret
+	var params []*FuzzHTTPRequestParam
+	params = append(params, f.GetGetQueryParams()...)
+	params = append(params, f.GetPostCommonParams()...)
+	return params
 }
 
 func (f *FuzzHTTPRequest) GetPostCommonParams() []*FuzzHTTPRequestParam {
