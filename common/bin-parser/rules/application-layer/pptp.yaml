@@ -1,0 +1,69 @@
+Package:
+  PPTP:
+    Length: uint16
+    length-from-field: Length
+    length-from-field-multiply: 8
+    MessageType: uint16
+    MagicCookie: uint32
+    ControlMessageType: uint16
+    Reserved: uint16
+    Message:
+      unpack: true
+      operator: |
+        type = getNodeResult("../ControlMessageType").Value
+        switch type{
+          case 1:
+            this.ProcessByType("Start Control Conn Req")
+          case 2:
+            this.ProcessByType("Start Control Conn Reply")
+          case 7:
+            this.ProcessByType("Outgoing Call Req")
+          case 8:
+            this.ProcessByType("Outgoing Call Reply")
+        }
+
+Start Control Conn Req:
+    ProtocolVersion: uint16
+    Reserved: uint16
+    FramingCapabilities: uint32
+    BearerCapabilities: uint32
+    MaxChannels: uint16
+    FirmwareRevision: uint16
+    Hostname: string,64
+    Vendor: string,64
+
+Start Control Conn Reply:
+    ProtocolVersion: uint16
+    ResultCode: uint8
+    ErrorCode: uint8
+    FramingCapabilities: uint32
+    BearerCapabilities: uint32
+    MaxChannels: uint16
+    FirmwareRevision: uint16
+    Hostname: string,64
+    Vendor: string,64
+
+Outgoing Call Req:
+    CallId: uint16
+    CallSerialNumber: uint16
+    MinimumBPS: uint32
+    MaximumBPS: uint32
+    BearerType: uint32
+    FramingType: uint32
+    RecvWindowSize: uint16
+    ProcessingDelay: uint16
+    PhoneNumberLength: uint16
+    Reserved: uint16
+    PhoneNumber: string,64
+    SubAddress: string,64
+
+Outgoing Call Reply:
+    CallId: uint16
+    PeerCallId: uint16
+    ResultCode: uint8
+    ErrorCode: uint8
+    CauseCode: uint16
+    ConnectSpeed: uint32
+    RecvWindowSize: uint16
+    ProcessingDelay: uint16
+    PhysicalChannelId: uint32
