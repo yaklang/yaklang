@@ -484,10 +484,12 @@ func TestPayload(t *testing.T) {
 
 	t.Run("File_CRUD", func(t *testing.T) {
 		group := uuid.NewString()
+		bigGroup := uuid.NewString()
 		want := "asd\nqwe\nzxc\n"
 
 		// save file
 		save2file(local, t, group, "", want)
+		save2file(local, t, bigGroup, "", strings.Repeat("123\n456\n", 10000))
 		// delete group
 		defer deleteGroup(local, t, group)
 
@@ -511,6 +513,17 @@ func TestPayload(t *testing.T) {
 
 		// remove duplicate
 		removeDuplicatePayloads(local, t, group)
+		want = "123\n456\n"
+
+		// query file
+		rsp = queryFromFile(local, t, group, "")
+
+		// compare payload
+		got = utils.UnsafeBytesToString(rsp.Data)
+		comparePayload(got, want, t)
+
+		// remove duplicate big
+		removeDuplicatePayloads(local, t, bigGroup)
 		want = "123\n456\n"
 
 		// query file
