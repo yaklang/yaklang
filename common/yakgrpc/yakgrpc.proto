@@ -481,13 +481,17 @@ service Yak {
   // Online
   rpc GetOnlineProfile(Empty) returns (OnlineProfile);
   rpc SetOnlineProfile(OnlineProfile) returns (Empty);
+  // 废弃接口
   rpc DownloadOnlinePluginById(DownloadOnlinePluginByIdRequest) returns (Empty);
+  // 废弃接口
   rpc DownloadOnlinePluginByIds(DownloadOnlinePluginByIdsRequest) returns (Empty);
+  // 废弃接口
   rpc DownloadOnlinePluginAll(DownloadOnlinePluginByTokenRequest) returns (stream DownloadOnlinePluginProgress);
   rpc DeletePluginByUserID(DeletePluginByUserIDRequest) returns (Empty);
   rpc DeleteAllLocalPlugins(Empty) returns (Empty);
   rpc GetYakScriptTagsAndType(Empty) returns (GetYakScriptTagsAndTypeResponse);
   rpc DeleteLocalPluginsByWhere(DeleteLocalPluginsByWhereRequest) returns (Empty);
+  // 废弃接口
   rpc DownloadOnlinePluginByScriptNames(DownloadOnlinePluginByScriptNamesRequest) returns (DownloadOnlinePluginByScriptNamesResponse);
   // NewOnline 插件下载
   rpc DownloadOnlinePlugins(DownloadOnlinePluginsRequest) returns(stream DownloadOnlinePluginProgress);

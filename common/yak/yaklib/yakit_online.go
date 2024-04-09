@@ -547,7 +547,7 @@ func (s *OnlineClient) DownloadOnlinePluginsBatch(
 
 func (s *OnlineClient) DownloadOnlinePluginByPluginName(
 	ctx context.Context, token string, scriptName []string) *OnlineDownloadStream {
-	return s.DownloadNewOnlinePlugins(ctx, token, nil, "", nil, nil, "", 0, "", nil, "", nil, nil, scriptName)
+	return s.DownloadNewOnlinePlugins(ctx, token, nil, "", nil, nil, "", 0, "", nil, "other", nil, nil, scriptName)
 }
 
 func (s *OnlineClient) DownloadNewOnlinePlugins(
