@@ -22,6 +22,7 @@ type StringFilter struct {
 }
 
 var DefaultFilterManager = NewFilterManager(12, 1<<15, 80)
+var BigFilterManager = NewFilterManager(18, 1<<18, 300)
 
 type FilterManager struct {
 	size                       int
@@ -104,6 +105,10 @@ func NewStringFilter(config *Config, container *cuckoo.Filter) *StringFilter {
 
 func NewFilter() *StringFilter {
 	return DefaultFilterManager.DequeueFilter()
+}
+
+func NewBigFilter() *StringFilter {
+	return BigFilterManager.DequeueFilter()
 }
 
 func (f *StringFilter) Close() {

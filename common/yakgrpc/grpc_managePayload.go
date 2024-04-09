@@ -377,7 +377,7 @@ func (s *Server) SavePayloadToFileStream(req *ypb.SavePayloadRequest, stream ypb
 		data     string
 		hitCount int64
 	}, 0)
-	dataFilter := filter.NewFilter()
+	dataFilter := filter.NewBigFilter()
 	defer dataFilter.Close()
 
 	saveDataByFilter := func(s string, hitCount int64) error {
@@ -606,7 +606,7 @@ func (s *Server) RemoveDuplicatePayloads(req *ypb.NameRequest, stream ypb.Yak_Re
 		return err
 	}
 
-	dataFilter := filter.NewFilter()
+	dataFilter := filter.NewBigFilter()
 	defer dataFilter.Close()
 
 	ProjectFolder := consts.GetDefaultYakitPayloadsDir()
