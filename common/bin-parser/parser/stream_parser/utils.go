@@ -122,6 +122,24 @@ func NewNodeByType(node *base.Node, typeName string) (*base.Node, error) {
 }
 
 func getSubData(d any, key string) (any, bool) {
+	switch reflect.TypeOf(d).Kind() {
+	case reflect.Map, reflect.Slice, reflect.Array:
+		return getMapOrSliceSubData(d, key)
+	case reflect.Func:
+		return getGetterSubData(d, key)
+	default:
+		return getMapOrSliceSubData(d, key)
+	}
+}
+func getGetterSubData(getter any, key string) (any, bool) {
+	v, ok := getter.(func(key string) (any, bool))
+	if !ok {
+		return nil, false
+	}
+	return v(key)
+}
+
+func getMapOrSliceSubData(d any, key string) (any, bool) {
 	p := strings.Split(key, ".")
 	for _, ele := range p {
 		refV := reflect.ValueOf(d)
@@ -144,6 +162,13 @@ func getSubData(d any, key string) (any, bool) {
 				return nil, false
 			}
 			d = refV.Index(index).Interface()
+		} else if refV.Kind() == reflect.Struct || (refV.Kind() == reflect.Ptr && refV.Elem().Kind() == reflect.Struct) {
+			v := refV.FieldByName(ele)
+			if !v.IsValid() {
+				return nil, false
+			} else {
+				d = v.Interface()
+			}
 		} else {
 			return nil, false
 		}
@@ -183,6 +208,29 @@ func GetNodePath(node *base.Node) string {
 	return p
 }
 func ConvertToVar(v []byte, length uint64, endian, typeName string) any {
+	val := _ConvertToVar(v, length, endian, typeName)
+	switch typeName {
+	case "int":
+		return int(val.(int64))
+	case "int8":
+		return int8(val.(int64))
+	case "int16":
+		return int16(val.(int64))
+	case "int32":
+		return int32(val.(int64))
+	case "uint":
+		return uint(val.(uint64))
+	case "uint8":
+		return uint8(val.(uint64))
+	case "uint16":
+		return uint16(val.(uint64))
+	case "uint32":
+		return uint32(val.(uint64))
+	default:
+		return val
+	}
+}
+func _ConvertToVar(v []byte, length uint64, endian, typeName string) any {
 	if endian == "big" {
 		switch typeName {
 		case "int", "int8", "int16", "int32", "int64":
@@ -271,27 +319,45 @@ func AnyToUint64(d any) uint64 {
 		return 0
 	}
 }
-func ConvertToBytes(v any, length uint64) []byte {
+func ConvertToBytes(v any, length uint64, endian string) []byte {
+	if endian == "" {
+		endian = "big"
+	}
 	switch ret := v.(type) {
 	case int, int8, int16, int32, int64:
-		l := math.Ceil(float64(length) / 8)
-		res := make([]byte, 0)
-		for i := 0; i < int(l); i++ {
-			res = append(res, byte(AnyToInt64(ret)>>uint(8*(int(l)-1-i))))
-		}
-		return res
+		tmp := uint64(AnyToInt64(ret))
+		return ConvertToBytes(tmp, length, endian)
 	case uint, uint8, uint16, uint32, uint64:
-		l := math.Ceil(float64(length) / 8)
-		res := make([]byte, 0)
-		for i := 0; i < int(l); i++ {
-			res = append(res, byte(AnyToUint64(ret)>>uint(8*(int(l)-1-i))))
+		val := AnyToUint64(ret)
+		l := int(math.Ceil(float64(length) / 8))
+		res := []byte{}
+		if endian == "big" {
+			tmp := val
+			for i := 0; i < l; i++ {
+				res = append(res, byte(tmp>>((l-i-1)*8)))
+			}
+			return res
+		} else {
+			tmp := val
+			for i := 0; i < l; i++ {
+				res = append(res, byte(tmp>>((i)*8)))
+			}
+			return res
 		}
-		return res
 	case string:
 		return []byte(v.(string))
 	case []byte:
 		return v.([]byte)
 	default:
+		retType := reflect.TypeOf(ret)
+		refV := reflect.ValueOf(ret)
+		if retType.Kind() == reflect.Array && retType.Elem().Kind() == reflect.Uint8 {
+			var res []byte
+			for i := 0; i < retType.Len(); i++ {
+				res = append(res, refV.Index(i).Interface().(byte))
+			}
+			return res
+		}
 		return []byte{}
 	}
 }
@@ -466,9 +532,10 @@ func parseLengthByLengthConfig(node *base.Node) (uint64, bool, error) {
 			}
 		}
 		if !getLengthOK {
+			if node.Cfg.Has(CfgLengthFromField) {
 			// 从field 读取length
-			if node.Cfg.Has("length-from-field") {
-				fieldName := node.Cfg.GetString("length-from-field")
+				if node.Cfg.Has(CfgLengthFromField) {
+					fieldName := node.Cfg.GetString(CfgLengthFromField)
 				target := getNodeByPath(node, fieldName)
 				if target.Cfg.Has(CfgNodeResult) {
 					res := GetResultByNode(target)
@@ -513,13 +580,26 @@ func parseLengthByLengthConfig(node *base.Node) (uint64, bool, error) {
 					}
 				}
 
+				}
 			}
 		}
 	}
+
 	var currentNodeLength uint64
-	for _, sub := range parentNode.Children { // calc other node which has current length, check length
+	startField := parentNode.Cfg.GetString(CfgLengthForStartField)
+	var startN = -1
+	for i, sub := range parentNode.Children {
+		if sub.Name == startField {
+			startN = i
+			break
+		}
+	}
+	for i, sub := range parentNode.Children {
 		if sub == node {
 			break
+		}
+		if i < startN {
+			continue
 		}
 		currentNodeLength += CalcNodeResultLength(sub)
 	}
