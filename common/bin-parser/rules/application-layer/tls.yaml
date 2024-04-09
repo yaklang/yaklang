@@ -4,7 +4,6 @@ Package:
   Transport Layer Security:
     Record Layer:
       length-from-field: Length
-      length-for-field: Payload
       operator: |
         this.ProcessSubNode("ContentType")
         version = this.ProcessSubNode("Version").Value
