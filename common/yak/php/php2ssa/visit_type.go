@@ -20,7 +20,7 @@ func (y *builder) VisitTypeHint(raw phpparser.ITypeHintContext) ssa.Type {
 	if r := i.QualifiedStaticTypeRef(); r != nil {
 		//这里类型就行修复
 		className := y.VisitQualifiedStaticTypeRef(r)
-		return y.ir.GetClassBluePrint(className)
+		return y.GetClassBluePrint(className)
 	} else if i.Callable() != nil {
 		_ = i.Callable().GetText()
 	} else if i.PrimitiveType() != nil {

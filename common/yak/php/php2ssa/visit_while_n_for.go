@@ -16,7 +16,7 @@ func (y *builder) VisitWhileStatement(raw phpparser.IWhileStatementContext) inte
 	if i == nil {
 		return nil
 	}
-	loopBuilder := y.ir.CreateLoopBuilder()
+	loopBuilder := y.CreateLoopBuilder()
 	loopBuilder.SetCondition(func() ssa.Value {
 		return y.VisitParentheses(i.Parentheses())
 	})
@@ -42,17 +42,17 @@ func (y *builder) VisitDoWhileStatement(raw phpparser.IDoWhileStatementContext) 
 	if i == nil {
 		return nil
 	}
-	loopBuilder := y.ir.CreateLoopBuilder()
+	loopBuilder := y.CreateLoopBuilder()
 	_ = loopBuilder
 	loopBuilder.SetCondition(func() ssa.Value {
-		return y.ir.EmitConstInst(true)
+		return y.EmitConstInst(true)
 	})
 	loopBuilder.SetBody(func() {
 		y.VisitStatement(i.Statement())
-		y.ir.CreateIfBuilder().SetCondition(func() ssa.Value {
+		y.CreateIfBuilder().SetCondition(func() ssa.Value {
 			return y.VisitParentheses(i.Parentheses())
 		}, func() {}).SetElse(func() {
-			y.ir.Break()
+			y.Break()
 		}).Build()
 	})
 	loopBuilder.Finish()
@@ -70,7 +70,7 @@ func (y *builder) VisitForStatement(raw phpparser.IForStatementContext) interfac
 	if i == nil {
 		return nil
 	}
-	loopBuilder := y.ir.CreateLoopBuilder()
+	loopBuilder := y.CreateLoopBuilder()
 	if i.ForInit() != nil {
 		loopBuilder.SetFirst(func() []ssa.Value {
 			return y.VisitForInit(i.ForInit())
@@ -78,7 +78,7 @@ func (y *builder) VisitForStatement(raw phpparser.IForStatementContext) interfac
 	}
 	//先设置为true，在if-body前面做匹配
 	loopBuilder.SetCondition(func() ssa.Value {
-		return y.ir.EmitConstInst(true)
+		return y.EmitConstInst(true)
 	})
 	if i.ForUpdate() != nil {
 		loopBuilder.SetThird(func() []ssa.Value {
@@ -90,11 +90,11 @@ func (y *builder) VisitForStatement(raw phpparser.IForStatementContext) interfac
 			list := y.VisitExpressionList(i.ExpressionList())
 			for _, value := range list {
 				value1 := value
-				y.ir.CreateIfBuilder().SetCondition(func() ssa.Value {
+				y.CreateIfBuilder().SetCondition(func() ssa.Value {
 					return value1
 				}, func() {
 				}).SetElse(func() {
-					y.ir.Break()
+					y.Break()
 				})
 			}
 		}
@@ -147,8 +147,8 @@ func (y *builder) VisitContinueStatement(raw phpparser.IContinueStatementContext
 	if i == nil {
 		return nil
 	}
-	//if t := y.ir.GetContinue(); t != nil {
-	//	return y.ir.EmitJump(t)
+	//if t := y.GetContinue(); t != nil {
+	//	return y.EmitJump(t)
 	//}
 	return nil
 }
