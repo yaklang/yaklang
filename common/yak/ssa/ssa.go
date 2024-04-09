@@ -1,10 +1,11 @@
 package ssa
 
 import (
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"sync"
 
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
 type ErrorLogger interface {
@@ -122,6 +123,8 @@ type User interface {
 	ReplaceValue(Value, Value)
 }
 
+type Build func(string, *FunctionBuilder) error
+
 // both instruction and value
 type Program struct {
 	// package list
@@ -133,6 +136,10 @@ type Program struct {
 
 	// class blue print
 	ClassBluePrint map[string]*ClassBluePrint
+
+	// package loader
+	loader *ssautil.PackageLoader
+	Build  Build
 
 	errors SSAErrors
 

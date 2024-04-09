@@ -1163,31 +1163,17 @@ func (y *builder) VisitIncludeExpression(raw phpparser.IIncludeContext) ssa.Valu
 		$a = include("$b");
 		var_dump($a);
 	*/
-	var flag, check bool
+	var flag, once bool
 	if i.IncludeOnce() != nil || i.RequireOnce() != nil {
-		check = true
+		once = true
 	}
 	if value := y.VisitExpression(i.Expression()); value.IsUndefined() {
 	} else {
-		if absPath, err := filepath.Abs(value.String()); err != nil {
-			log.Warnf("include file: %v failed: %v", value.String(), err)
+		file := value.String()
+		if err := y.ir.BuildFilePackage(file, once); err != nil {
+			log.Errorf("include: %v failed: %v", file, err)
 		} else {
-			if code, err := os.ReadFile(absPath); err != nil {
-				log.Warnf("read file %v failed: %v", value.String(), err)
-			} else {
-				if check {
-					if utils.StringSliceContain(y.ir.GetReferenceFiles(), value.String()) {
-						log.Warnf("file %v has contains", value.String())
-						return y.ir.EmitConstInst(false)
-					}
-				}
-				y.ir.PushReferenceFile(value.String(), string(code)) //记录
-				if err := Build(string(code), false, y.ir); err != nil {
-					log.Errorf("include: %v failed: %v", value.String(), err)
-				} else {
-					flag = true
-				}
-			}
+			flag = true
 		}
 	}
 	return y.ir.EmitConstInst(flag)

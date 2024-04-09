@@ -49,6 +49,9 @@ func parse(c *config, prog *ssa.Program) (ret *ssa.Program, err error) {
 	prog.PushEditor(editor)
 	prog.WithProgramBuilderCacheHitter(c.DatabaseProgramCacheHitter)
 
+	prog.Build = func(s string, fb *ssa.FunctionBuilder) error {
+		return c.Build(s, c.ignoreSyntaxErr, fb)
+	}
 	builder := prog.GetAndCreateMainFunctionBuilder()
 	if builder.GetEditor() == nil {
 		builder.SetEditor(editor)
@@ -58,7 +61,7 @@ func parse(c *config, prog *ssa.Program) (ret *ssa.Program, err error) {
 	builder.WithExternMethod(c.externMethod)
 	builder.WithDefineFunction(c.defineFunc)
 
-	if err := c.Build(c.code, c.ignoreSyntaxErr, builder); err != nil {
+	if err := prog.Build(c.code, builder); err != nil {
 		return nil, err
 	}
 
