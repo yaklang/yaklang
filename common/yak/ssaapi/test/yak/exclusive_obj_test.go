@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 )
 
 /*
@@ -37,15 +39,15 @@ func topDefCheckMust(t *testing.T, code string, varName string, want ...any) {
 	topDefCheckMustWithOpts(t, code, varName, want)
 }
 
-func topDefCheckMustWithOpts(t *testing.T, code string, varName string, want []any, opts ...OperationOption) {
-	prog, err := Parse(code)
+func topDefCheckMustWithOpts(t *testing.T, code string, varName string, want []any, opts ...ssaapi.OperationOption) {
+	prog, err := ssaapi.Parse(code)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	om := omap.NewOrderedMap(make(map[string]bool))
 	prog.Show()
-	prog.Ref(varName).GetTopDefs(opts...).ForEach(func(value *Value) {
+	prog.Ref(varName).GetTopDefs(opts...).ForEach(func(value *ssaapi.Value) {
 		value.Show()
 		for _, w := range want {
 			if strings.Contains(value.String(), fmt.Sprint(w)) {
@@ -66,24 +68,24 @@ func topDefCheckMustWithOpts(t *testing.T, code string, varName string, want []a
 }
 
 func TestBasic_BasicObject(t *testing.T) {
-	Check(t, `
+	ssatest.Check(t, `
 	a = {}; 
 	a.b = 1; 
 	a.c = 3; 
 	d = a.c + a.b
 	`,
-		CheckTopDef_Equal("d", []string{"3", "1", "make(map[any]any)"}),
+		ssatest.CheckTopDef_Equal("d", []string{"3", "1", "make(map[any]any)"}),
 	)
 }
 
 func TestBasic_BasicObject2(t *testing.T) {
-	Check(t, `
+	ssatest.Check(t, `
 	a = ()=>{return {}}; 
 	a.b = 1; 
 	a.c = 3; 
 	d = a.c + a.b
 	`,
-		CheckTopDef_Equal("d", []string{"3", "1", "make(map[any]any)"}),
+		ssatest.CheckTopDef_Equal("d", []string{"3", "1", "make(map[any]any)"}),
 	)
 }
 
@@ -96,7 +98,7 @@ func TestBasic_BasicObject_Trace(t *testing.T) {
 		[]any{
 			"3", "1",
 		},
-		WithHookEveryNode(func(value *Value) error {
+		ssaapi.WithHookEveryNode(func(value *ssaapi.Value) error {
 			if value.IsPhi() {
 				havePhi = true
 			}
@@ -117,7 +119,7 @@ func TestBasic_BasicObject_Trace2(t *testing.T) {
 		[]any{
 			"3", "1",
 		},
-		WithHookEveryNode(func(value *Value) error {
+		ssaapi.WithHookEveryNode(func(value *ssaapi.Value) error {
 			if value.IsPhi() {
 				havePhi = true
 			}
@@ -138,7 +140,7 @@ func TestBasic_BasicObject_Trace3(t *testing.T) {
 		[]any{
 			"3", "1",
 		},
-		WithHookEveryNode(func(value *Value) error {
+		ssaapi.WithHookEveryNode(func(value *ssaapi.Value) error {
 			if value.IsPhi() {
 				havePhi = true
 			}
@@ -159,7 +161,7 @@ func TestBasic_BasicObject_Trace4(t *testing.T) {
 		[]any{
 			"3", "1",
 		},
-		WithHookEveryNode(func(value *Value) error {
+		ssaapi.WithHookEveryNode(func(value *ssaapi.Value) error {
 			if value.IsPhi() {
 				havePhi = true
 			}
@@ -172,39 +174,39 @@ func TestBasic_BasicObject_Trace4(t *testing.T) {
 }
 
 func TestBasic_Phi(t *testing.T) {
-	prog, err := Parse(`a = 0; if b {a = 1;} else if e {a = 2} else {a=4}; c = a`)
+	prog, err := ssaapi.Parse(`a = 0; if b {a = 1;} else if e {a = 2} else {a=4}; c = a`)
 	if err != nil {
 		t.Fatal(err)
 	}
 	prog.Show()
-	prog.Ref("d").ForEach(func(value *Value) {
-		value.GetTopDefs().ForEach(func(value *Value) {
+	prog.Ref("d").ForEach(func(value *ssaapi.Value) {
+		value.GetTopDefs().ForEach(func(value *ssaapi.Value) {
 			t.Log(value.String())
 		})
 	})
 }
 
 func TestOOP_Basic_Phi(t *testing.T) {
-	prog, err := Parse(`a = {}; if b {aa = a; aa.b = 1;} else {a.b = 2}; c = a.b`)
+	prog, err := ssaapi.Parse(`a = {}; if b {aa = a; aa.b = 1;} else {a.b = 2}; c = a.b`)
 	if err != nil {
 		t.Fatal(err)
 	}
 	prog.Show()
-	prog.Ref("d").ForEach(func(value *Value) {
-		value.GetTopDefs().ForEach(func(value *Value) {
+	prog.Ref("d").ForEach(func(value *ssaapi.Value) {
+		value.GetTopDefs().ForEach(func(value *ssaapi.Value) {
 			t.Log(value.String())
 		})
 	})
 }
 
 func TestOOP_Basic_DotTrace(t *testing.T) {
-	prog, err := Parse(`a = {}; a.b = 1; a.c = h ? 3 : 2; d := a.c`)
+	prog, err := ssaapi.Parse(`a = {}; a.b = 1; a.c = h ? 3 : 2; d := a.c`)
 	if err != nil {
 		t.Fatal(err)
 	}
 	prog.Show()
-	prog.Ref("d").ForEach(func(value *Value) {
-		value.GetTopDefs().ForEach(func(value *Value) {
+	prog.Ref("d").ForEach(func(value *ssaapi.Value) {
+		value.GetTopDefs().ForEach(func(value *ssaapi.Value) {
 			t.Log(value.String())
 		})
 	})
@@ -212,7 +214,7 @@ func TestOOP_Basic_DotTrace(t *testing.T) {
 
 func TestObjectTest_Basic_Phi(t *testing.T) {
 	// a.b can be as "phi and masked"
-	prog, err := Parse(`a = {"b": 1}
+	prog, err := ssaapi.Parse(`a = {"b": 1}
 if f {
 	a.b = 2
 }
@@ -239,8 +241,8 @@ c = a.b
 
 		->make(map[string]number).b
 	*/
-	prog.Ref("c").ForEach(func(value *Value) {
-		value.GetTopDefs().ForEach(func(value *Value) {
+	prog.Ref("c").ForEach(func(value *ssaapi.Value) {
+		value.GetTopDefs().ForEach(func(value *ssaapi.Value) {
 			value.ShowBacktrack()
 		})
 	})
@@ -248,13 +250,13 @@ c = a.b
 
 func TestObjectTest_Basic_LeftValue(t *testing.T) {
 	// a.b can be as "phi and masked"
-	prog, err := Parse(`a = {}; if f {a.b = 2;}; e = a.b`)
+	prog, err := ssaapi.Parse(`a = {}; if f {a.b = 2;}; e = a.b`)
 	if err != nil {
 		t.Fatal(err)
 	}
 	prog.Show()
-	prog.Ref("c").ForEach(func(value *Value) {
-		value.GetTopDefs().ForEach(func(value *Value) {
+	prog.Ref("c").ForEach(func(value *ssaapi.Value) {
+		value.GetTopDefs().ForEach(func(value *ssaapi.Value) {
 			value.ShowBacktrack()
 		})
 	})
@@ -262,7 +264,7 @@ func TestObjectTest_Basic_LeftValue(t *testing.T) {
 
 func TestObjectTest_Basic_Phi2(t *testing.T) {
 	// a.b can be as "phi and masked"
-	prog, err := Parse(`a = {"b": 1}
+	prog, err := ssaapi.Parse(`a = {"b": 1}
 c = e ? "b" : j
 if f {
 	a[c] = 2
@@ -301,8 +303,8 @@ i = a.b
 		  ->phi(b111cee6-384b-4f0b-b346-daa35f00f9e3)["b",j]
 		    ->j
 	*/
-	prog.Ref("g").ForEach(func(value *Value) {
-		value.GetTopDefs().ForEach(func(value *Value) {
+	prog.Ref("g").ForEach(func(value *ssaapi.Value) {
+		value.GetTopDefs().ForEach(func(value *ssaapi.Value) {
 			value.ShowBacktrack()
 		})
 	})
@@ -310,7 +312,7 @@ i = a.b
 
 func TestObjectTest(t *testing.T) {
 	// a.b can be as "phi and masked"
-	prog, err := Parse(`a = {}
+	prog, err := ssaapi.Parse(`a = {}
 a.b = 2;
 if f(3) {
 a.b = a.b + 1;
@@ -330,8 +332,8 @@ dump("DONE")
 		t.Fatal(err)
 	}
 	prog.Show()
-	prog.Ref("c").ForEach(func(value *Value) {
-		value.GetTopDefs().ForEach(func(value *Value) {
+	prog.Ref("c").ForEach(func(value *ssaapi.Value) {
+		value.GetTopDefs().ForEach(func(value *ssaapi.Value) {
 			t.Log(value.String())
 		})
 	})
@@ -339,7 +341,7 @@ dump("DONE")
 
 func TestObjectTest_2(t *testing.T) {
 	// a.b can be as "phi and masked"
-	prog, err := Parse(`a = {}
+	prog, err := ssaapi.Parse(`a = {}
 a.b = 2;
 if f(3) {
 a.b = a.b + 1;
@@ -363,15 +365,15 @@ dump("DONE")
 	}
 
 	prog.Show()
-	prog.Ref("c").ForEach(func(value *Value) {
-		value.GetTopDefs().ForEach(func(value *Value) {
+	prog.Ref("c").ForEach(func(value *ssaapi.Value) {
+		value.GetTopDefs().ForEach(func(value *ssaapi.Value) {
 			t.Log(value.String())
 		})
 	})
 }
 
 func TestObject_Basic(t *testing.T) {
-	prog, err := Parse(`
+	prog, err := ssaapi.Parse(`
 	a = {}
 	if c {
 		a.d = 1
@@ -388,7 +390,7 @@ func TestObject_Basic(t *testing.T) {
 }
 
 func TestObject_Basic_Mask(t *testing.T) {
-	prog, err := Parse(`
+	prog, err := ssaapi.Parse(`
 	a = {};
 c = ()=>{
  dump(a.b)
@@ -400,7 +402,7 @@ c()
 
 `)
 	if err != nil {
-		t.Fatalf("parse failed: %s", err)
+		t.Fatalf("ssaapi.Parse failed: %s", err)
 	}
 	prog.Show()
 	prog.Ref("a").ShowWithSource()
@@ -408,7 +410,7 @@ c()
 }
 
 func TestObject_OOP_ClassAndObject(t *testing.T) {
-	prog, err := Parse(`
+	prog, err := ssaapi.Parse(`
 klass = (name) => {
 	this = {
 		"name": name,
@@ -429,7 +431,7 @@ dump(c)
 		t.Fatal(err)
 	}
 	checked := false
-	prog.Ref("c").GetTopDefs().Show().ForEach(func(value *Value) {
+	prog.Ref("c").GetTopDefs().Show().ForEach(func(value *ssaapi.Value) {
 		if value.GetConstValue() == "def" {
 			checked = true
 		}
@@ -441,7 +443,7 @@ dump(c)
 }
 
 func TestObject_OOP_ClassAndObject_Dup2(t *testing.T) {
-	prog, err := Parse(`
+	prog, err := ssaapi.Parse(`
 klass = (name) => {
 	this = {
 		"name": name,
@@ -469,17 +471,17 @@ e = obj2.name
 	check_C := false
 	check_D := false
 	check_E := false
-	prog.Ref("c").GetTopDefs().Show().ForEach(func(value *Value) {
+	prog.Ref("c").GetTopDefs().Show().ForEach(func(value *ssaapi.Value) {
 		if value.GetConstValue() == "def" {
 			check_C = true
 		}
 	})
-	prog.Ref("d").GetTopDefs().Show().ForEach(func(value *Value) {
+	prog.Ref("d").GetTopDefs().Show().ForEach(func(value *ssaapi.Value) {
 		if value.GetConstValue() == "dddd" {
 			check_D = true
 		}
 	})
-	prog.Ref("e").GetTopDefs().ForEach(func(value *Value) {
+	prog.Ref("e").GetTopDefs().ForEach(func(value *ssaapi.Value) {
 		if value.GetConstValue() == "cccc" {
 			check_E = true
 		}
@@ -499,7 +501,7 @@ e = obj2.name
 }
 
 func TestObject_OOP_class(t *testing.T) {
-	prog, err := Parse(`
+	prog, err := ssaapi.Parse(`
 a = () => {
 	return {
 		"key": "value"
@@ -513,7 +515,7 @@ dump(c)
 		t.Fatal(err)
 	}
 	checkDotKey := false
-	prog.Show().Ref("c").GetTopDefs().ForEach(func(value *Value) {
+	prog.Show().Ref("c").GetTopDefs().ForEach(func(value *ssaapi.Value) {
 		if value.GetConstValue() == "value" {
 			checkDotKey = true
 		}
@@ -524,7 +526,7 @@ dump(c)
 }
 
 func TestObject_OOP_class_2(t *testing.T) {
-	prog, err := Parse(`
+	prog, err := ssaapi.Parse(`
 klass = () => {
 	this = {
 		"key": "value",
@@ -543,7 +545,7 @@ dump(c)
 	}
 	checkDotKey := false
 	checkMaskedKey := false
-	prog.Show().Ref("c").GetTopDefs().ForEach(func(value *Value) {
+	prog.Show().Ref("c").GetTopDefs().ForEach(func(value *ssaapi.Value) {
 		// if value.GetConstValue() == "value" { // will cover by side-effect
 		// 	checkDotKey = true
 		// }

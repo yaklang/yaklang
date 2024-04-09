@@ -1,31 +1,32 @@
 package ssaapi
 
 import (
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 	"testing"
 )
 
 func TestYaklang_BottomUses_Basic(t *testing.T) {
 	t.Run("normal assign", func(t *testing.T) {
-		Check(t,
+		ssatest.Check(t,
 			`var c = bbb
 	var a = 55 + c
 	myFunctionName(a)`,
-			CheckBottomUser_Contain("c", []string{"myFunctionName("}),
+			ssatest.CheckBottomUser_Contain("c", []string{"myFunctionName("}),
 		)
 	})
 
 	t.Run("const collapsed", func(t *testing.T) {
-		Check(t,
+		ssatest.Check(t,
 			`var c = 1
 	var a = 55 + c
 	myFunctionName(a)`,
-			CheckBottomUser_Contain("c", []string{"myFunctionName("}),
+			ssatest.CheckBottomUser_Contain("c", []string{"myFunctionName("}),
 		)
 	})
 }
 
 func TestYaklangExplore_BottomUses_BasicCallStack(t *testing.T) {
-	Check(t, `
+	ssatest.Check(t, `
 	var a = 1;
 	b = i => i+1
 
@@ -38,12 +39,12 @@ func TestYaklangExplore_BottomUses_BasicCallStack(t *testing.T) {
 
 	sink(e)
 	`,
-		CheckBottomUser_Contain("a", []string{"println("}),
+		ssatest.CheckBottomUser_Contain("a", []string{"println("}),
 	)
 }
 
 func TestYaklangExplore_BottomUses_CFG(t *testing.T) {
-	Check(t, `
+	ssatest.Check(t, `
 var c
 var a = 1
 if cond {
@@ -54,7 +55,7 @@ if cond {
 
 d = a;
 myFunctionName(d)`,
-		CheckBottomUser_Contain("c", []string{"myFunctionName("}),
+		ssatest.CheckBottomUser_Contain("c", []string{"myFunctionName("}),
 	)
 }
 
@@ -69,8 +70,8 @@ func TestYaklang_SideEffect(t *testing.T) {
 		if e {b()}
 		c = a+1;
 		`
-		Check(t, code,
-			CheckBottomUser_Contain("o", []string{"phi(a)["}, true),
+		ssatest.Check(t, code,
+			ssatest.CheckBottomUser_Contain("o", []string{"phi(a)["}, true),
 		)
 	})
 
@@ -89,13 +90,13 @@ func Test_Yaklang_BottomUser(t *testing.T) {
 		f2(t)
 		`
 	t.Run("from return to other function", func(t *testing.T) {
-		Check(t, code,
-			CheckBottomUser_Contain("a", []string{"println("}),
+		ssatest.Check(t, code,
+			ssatest.CheckBottomUser_Contain("a", []string{"println("}),
 		)
 	})
 	t.Run("from function", func(t *testing.T) {
-		Check(t, code,
-			CheckBottomUser_Contain("f", []string{"println("}),
+		ssatest.Check(t, code,
+			ssatest.CheckBottomUser_Contain("f", []string{"println("}),
 		)
 	})
 }
