@@ -131,6 +131,10 @@ func (e *YakError) Is(rerr error) bool {
 	return false
 }
 
+func (e *YakError) ErrorWithStack() string {
+	return fmt.Sprintf("%s\n%+v", e.Error(), e.stack)
+}
+
 func (err *YakError) Format(s fmt.State, verb rune) {
 	switch verb {
 	case 'v':
