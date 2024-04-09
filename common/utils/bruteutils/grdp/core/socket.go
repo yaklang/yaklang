@@ -3,6 +3,7 @@ package core
 import (
 	"crypto/rsa"
 	"math/big"
+	"os"
 
 	"github.com/huin/asn1ber"
 
@@ -51,7 +52,12 @@ func (s *SocketLayer) Close() error {
 }
 
 func (s *SocketLayer) StartTLS() error {
+	file, err := os.OpenFile("/Users/z3/Downloads/gotlskey.log", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+	if err != nil {
+		return err
+	}
 	config := &tls.Config{
+		KeyLogWriter:             file,
 		InsecureSkipVerify:       true,
 		MinVersion:               tls.VersionTLS10,
 		MaxVersion:               tls.VersionTLS13,

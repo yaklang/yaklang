@@ -1,0 +1,41 @@
+endian: big
+unit: byte
+Package:
+  TPKT:
+    Version: uint8
+    Reserved: uint8
+    PacketLength: uint16
+    length-from-field: PacketLength
+    TPDU: raw
+  X224:
+    Length: uint8
+    Flag: uint8
+    Destination: uint16
+    Source: uint16
+    Class: uint8
+    length-from-field: Length
+    length-for-start-field: Flag
+    VariableData: raw
+  Challenge: Challenge
+  Authentication: Authentication
+  AV_PAIR:
+    operator: |
+      stop = false
+      this.ForEachChild((child)=>{
+        if stop{
+          return
+        }
+        res = child.Process()
+        if child.Name == "AvId" && res == 0{
+          stop = true
+        }
+      })
+    endian: little
+    AvId: uint16
+    AvLen: uint16
+    length-from-field: AvLen
+    length-for-start-field: Value
+    Value: raw
+
+Challenge: "import:application-layer/ntlm.yaml;node:ChallengeMessage"
+Authentication: "import:application-layer/ntlm.yaml;node:AuthenticationMessage"

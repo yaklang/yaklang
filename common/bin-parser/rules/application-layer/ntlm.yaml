@@ -6,13 +6,7 @@ Package:
     NegotiateFlags: uint32
     DomainNameFields: Field
     WorkstationFields: Field
-    Version:
-      exception-plan: skip
-      ProductMajorVersion: uint8
-      ProductMinorVersion: uint8
-      ProductBuild: uint16
-      Reserved: raw,3
-      NTLMRevisionCurrent: uint8
+    Version: Version
   ChallengeMessage:
     Signature: raw,8
     MessageType: uint32
@@ -21,7 +15,7 @@ Package:
     ServerChallenge: raw,8
     Reserved: raw,8
     TargetInfoFields: Field
-    Version: raw,8
+    Version: Version
   AuthenticationMessage:
     Signature: raw,8
     MessageType: uint32
@@ -31,6 +25,15 @@ Package:
     UserNameFields: Field
     WorkstationFields: Field
     EncryptedRandomSessionKeyFields: Field
+    NegotiateFlags: raw,4
+    Version: Version
+    MIC: raw,16
+Version:
+  ProductMajorVersion: uint8
+  ProductMinorVersion: uint8
+  ProductBuild: uint16
+  Reserved: raw,3
+  NTLMRevisionCurrent: uint8
 Field:
   Length: uint16
   MaxLength: uint16

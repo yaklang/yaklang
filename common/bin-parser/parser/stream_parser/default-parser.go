@@ -35,6 +35,10 @@ const (
 	CtxGenReaders     = "readers in generator"
 	CfgIsRefType      = "is ref type"
 	CfgRefType        = "ref-type"
+	CfgLengthFromField     = "length-from-field"
+	CfgLengthForStartField = "length-for-start-field"
+	CfgLengthForField      = "length-for-field"
+	CfgStopValue           = "stop-value"
 	CfgLengthCacheMap = "length-cache-map"
 )
 
@@ -423,7 +427,7 @@ func (d *DefParser) Generate(data any, node *base.Node) error {
 					case "bytes":
 						typeName = "raw"
 					}
-					buf := ConvertToBytes(data, length)
+					buf := ConvertToBytes(data, length, node.Cfg.GetString(CfgEndian))
 					rawRes, err := d.write(buf, length)
 					if err != nil {
 						return fmt.Errorf("write error: %w", err)
