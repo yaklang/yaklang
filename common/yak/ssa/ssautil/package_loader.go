@@ -68,9 +68,12 @@ func (p *PackageLoader) getPath(want string, once bool, f func(string) bool) (st
 	for _, path := range p.includePath {
 		filePath := p.join(path, want)
 		if f(filePath) {
-			if _, ok := p.includedPath[filePath]; ok && once {
-				// only check included, in once = true
-				return "", utils.Errorf("file or directory %s already included", want)
+			if once {
+				if _, ok := p.includedPath[filePath]; ok {
+					// only check included, in once = true
+					return "", utils.Errorf("file or directory %s already included", want)
+				}
+				p.includedPath[filePath] = struct{}{}
 			}
 			return filePath, nil
 		}
