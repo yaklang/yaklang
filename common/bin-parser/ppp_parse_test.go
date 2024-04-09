@@ -197,3 +197,123 @@ func TestLCPMessage(t *testing.T) {
 	DumpNode(res)
 	assert.Equal(t, "01010024010405ea0206000000000305c223050506dfc53f2f07020802110405ea130300", codec.EncodeToHex(NodeToBytes(res)))
 }
+
+type PPTPTest struct {
+	data    string
+	mapData map[string]any
+}
+
+func TestPPTPMessage(t *testing.T) {
+	testCases := []PPTPTest{
+		{
+			data: `009c00011a2b3c4d00010000010000000000000100000001ffff01006c6f63616c000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000069786961000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000`,
+			mapData: map[string]any{
+				"Length":             156,
+				"MessageType":        1,
+				"MagicCookie":        0x1a2b3c4d,
+				"ControlMessageType": 1,
+				"Reserved":           0,
+				"Start Control Conn Req": map[string]any{
+					"ProtocolVersion":     0x0100,
+					"Reserved":            0,
+					"FramingCapabilities": 0x1,
+					"BearerCapabilities":  0x1,
+					"MaxChannels":         65535,
+					"FirmwareRevision":    0x0100,
+					"Hostname":            "local\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000",
+					"Vendor":              "ixia\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000",
+				},
+			},
+		},
+		{
+			data: `009c00011a2b3c4d00020000010001000000000300000003000012006978726f2d736d6465762d7231000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000436973636f2053797374656d732c20496e632e000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000`,
+			mapData: map[string]any{
+				"Length":             156,
+				"MessageType":        1,
+				"MagicCookie":        0x1a2b3c4d,
+				"ControlMessageType": 2,
+				"Reserved":           0,
+				"Start Control Conn Reply": map[string]any{
+					"ProtocolVersion":     0x0100,
+					"ResultCode":          1,
+					"ErrorCode":           0,
+					"FramingCapabilities": 0x3,
+					"BearerCapabilities":  0x3,
+					"MaxChannels":         0,
+					"FirmwareRevision":    0x1200,
+					"Hostname":            "ixro-smdev-r1\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000",
+					"Vendor":              "Cisco Systems, Inc.\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000",
+				},
+			},
+		},
+		{
+			data: `00a800011a2b3c4d000700000001000000008000800000000000000100000001000a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000`,
+			mapData: map[string]any{
+				"Length":             168,
+				"MessageType":        1,
+				"MagicCookie":        0x1a2b3c4d,
+				"ControlMessageType": 7,
+				"Reserved":           0,
+				"Outgoing Call Req": map[string]any{
+					"CallId":            1,
+					"CallSerialNumber":  0,
+					"MinimumBPS":        0x8000,
+					"MaximumBPS":        0x80000000,
+					"BearerType":        0x1,
+					"FramingType":       0x1,
+					"RecvWindowSize":    0x0a,
+					"ProcessingDelay":   0,
+					"PhoneNumberLength": 0,
+					"Reserved":          0,
+					"PhoneNumber":       "\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000",
+					"SubAddress":        "\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000",
+				},
+			},
+		},
+		{
+			data: `002000011a2b3c4d0008000000180001010000000000fa000010000000000000`,
+			mapData: map[string]any{
+				"Length":             32,
+				"MessageType":        1,
+				"MagicCookie":        0x1a2b3c4d,
+				"ControlMessageType": 8,
+				"Reserved":           0,
+				"Outgoing Call Reply": map[string]any{
+					"CallId":            24,
+					"PeerCallId":        1,
+					"ResultCode":        1,
+					"ErrorCode":         0,
+					"CauseCode":         0,
+					"ConnectSpeed":      64000,
+					"RecvWindowSize":    16,
+					"ProcessingDelay":   0,
+					"PhysicalChannelId": 0,
+				},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		testPPTP(t, testCase)
+	}
+
+}
+
+func testPPTP(t *testing.T, item PPTPTest) {
+	payload, err := codec.DecodeHex(item.data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader := bytes.NewReader(payload)
+	res, err := parser.ParseBinary(reader, "application-layer.pptp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	DumpNode(res)
+	res, err = parser.GenerateBinary(item.mapData, "application-layer.pptp", "PPTP")
+	if err != nil {
+		t.Fatal(err)
+	}
+	DumpNode(res)
+	assert.Equal(t, item.data, codec.EncodeToHex(NodeToBytes(res)))
+}
