@@ -7,10 +7,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/dot"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
 func TestFullChain(t *testing.T) {
-	prog, err := Parse(`a = b+c
+	prog, err := ssaapi.Parse(`a = b+c
 d = a + e
 f = d + g
 h = f + i
@@ -24,16 +25,16 @@ p = n + q
 	}
 	prog.Show()
 
-	prog.Ref("h").FullUseDefChain(func(value *Value) {
+	prog.Ref("h").FullUseDefChain(func(value *ssaapi.Value) {
 		value.ShowDot()
 	})
-	prog.Ref("p").ForEach(func(value *Value) {
-		FullUseDefChain(value)
+	prog.Ref("p").ForEach(func(value *ssaapi.Value) {
+		ssaapi.FullUseDefChain(value)
 	})
 }
 
 func TestChain_Basic(t *testing.T) {
-	prog, err := Parse(`a=b+c;d=e(a);`)
+	prog, err := ssaapi.Parse(`a=b+c;d=e(a);`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +53,7 @@ func TestChain_Basic(t *testing.T) {
 }
 
 func TestChain_Basic2(t *testing.T) {
-	prog, err := Parse(`a=b+c;d=e+a;`)
+	prog, err := ssaapi.Parse(`a=b+c;d=e+a;`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +72,7 @@ func TestChain_Basic2(t *testing.T) {
 }
 
 func TestChain_Phi_If(t *testing.T) {
-	prog, err := Parse(`
+	prog, err := ssaapi.Parse(`
 d = 1
 a=b+c;
 if(a){
@@ -88,8 +89,8 @@ g=d+a;`)
 	checkPhi := false
 	checkDotPhi := false
 	prog.Show()
-	prog.Ref("g").FullUseDefChain(func(value *Value) {
-		value.DependOn.ForEach(func(value *Value) {
+	prog.Ref("g").FullUseDefChain(func(value *ssaapi.Value) {
+		value.DependOn.ForEach(func(value *ssaapi.Value) {
 			if value.IsPhi() {
 				checkPhi = true
 			}
@@ -126,7 +127,7 @@ g=d+a;`)
 }
 
 func TestChain_Phi_ForSelfSpin(t *testing.T) {
-	prog, err := Parse(`a=b+c;
+	prog, err := ssaapi.Parse(`a=b+c;
 for i=0;i<10;i++ {
 	a = a + i
 }
@@ -138,8 +139,8 @@ g=d+a;`)
 	checkPhi := false
 	checkDotPhi := false
 	prog.Show()
-	prog.Ref("g").FullUseDefChain(func(value *Value) {
-		value.DependOn.ForEach(func(value *Value) {
+	prog.Ref("g").FullUseDefChain(func(value *ssaapi.Value) {
+		value.DependOn.ForEach(func(value *ssaapi.Value) {
 			if value.IsPhi() {
 				checkPhi = true
 			}
@@ -165,17 +166,17 @@ b = (c, d, e) => {
 	return d, c
 }
 f = b(2,3,4)`
-	prog, err := Parse(text)
+	prog, err := ssaapi.Parse(text)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	check2 := false
 	check3 := false
-	prog.Ref("f").FullUseDefChain(func(value *Value) {
+	prog.Ref("f").FullUseDefChain(func(value *ssaapi.Value) {
 		value.ShowDot()
 		dot.ShowDotGraphToAsciiArt(value.Dot())
-		value.GetTopDefs().ForEach(func(value *Value) {
+		value.GetTopDefs().ForEach(func(value *ssaapi.Value) {
 			ret := value.GetConstValue()
 			if ret == 2 && len(value.EffectOn) == 3 {
 				check2 = true
@@ -200,22 +201,22 @@ b = (c, d, e) => {
 	return d, c
 }
 f = b(2,3,4)`
-	prog, err := Parse(text)
+	prog, err := ssaapi.Parse(text)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var checkC, checkD bool
 	var checkA bool
-	prog.Ref("f").FullUseDefChain(func(value *Value) {
+	prog.Ref("f").FullUseDefChain(func(value *ssaapi.Value) {
 		value.ShowDot()
 		var results = prog.Ref("c")
 		results = append(results, prog.Ref("d")...)
 		results = append(results, value)
-		ret := FindStrictCommonDepends(results)
+		ret := ssaapi.FindStrictCommonDepends(results)
 		if len(ret) != 2 {
 			t.Fatal("the literal 2 trace failed")
 		}
-		ret.ForEach(func(value *Value) {
+		ret.ForEach(func(value *ssaapi.Value) {
 			if value.GetName() == "c" {
 				checkC = true
 			}
@@ -241,21 +242,21 @@ b = (c, d, e) => {
 	return d, c
 }
 f = b(2,3,4)`
-	prog, err := Parse(text)
+	prog, err := ssaapi.Parse(text)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var checkC, checkD bool = true, true
 	var checkA bool
-	prog.Ref("f").FullUseDefChain(func(value *Value) {
+	prog.Ref("f").FullUseDefChain(func(value *ssaapi.Value) {
 		value.ShowDot()
 		var results = prog.Ref("c")
 		results = append(results, prog.Ref("d")...)
-		ret := FindStrictCommonDepends(results)
+		ret := ssaapi.FindStrictCommonDepends(results)
 		if len(ret) != 0 {
 			t.Fatal("b & c is not common depends")
 		}
-		ret.ForEach(func(value *Value) {
+		ret.ForEach(func(value *ssaapi.Value) {
 			if value.GetName() == "c" {
 				checkC = false
 			}
@@ -281,12 +282,12 @@ b = (c, d, e) => {
 	return d, c
 }
 f = b(2,3,4)`
-	prog, err := Parse(text)
+	prog, err := ssaapi.Parse(text)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	results := FindFlexibleCommonDepends(append(prog.Ref("a"), prog.Ref("f")...))
+	results := ssaapi.FindFlexibleCommonDepends(append(prog.Ref("a"), prog.Ref("f")...))
 	if len(results) <= 0 {
 		t.Fatal("f & a is common depends (flexible)")
 	}
@@ -299,12 +300,12 @@ b = (c, d, e) => {
 	return d, c
 }
 f = b(2,3,4)`
-	prog, err := Parse(text)
+	prog, err := ssaapi.Parse(text)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	results := FindFlexibleCommonDepends(append(prog.Ref("c"), prog.Ref("d")...))
+	results := ssaapi.FindFlexibleCommonDepends(append(prog.Ref("c"), prog.Ref("d")...))
 	if len(results) <= 0 {
 		t.Fatal("common depends (flexible)")
 	}
@@ -317,12 +318,12 @@ b = (c, d, e) => {
 	return d, c
 }
 f = b(2,3,4)`
-	prog, err := Parse(text)
+	prog, err := ssaapi.Parse(text)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	results := FindStrictCommonDepends(append(prog.Ref("c"), prog.Ref("d")...))
+	results := ssaapi.FindStrictCommonDepends(append(prog.Ref("c"), prog.Ref("d")...))
 	if len(results) > 0 {
 		t.Fatal("common depends (flexible)")
 	}
@@ -336,14 +337,14 @@ f = d + h
 z = f + g
 y = x + z
 `
-	prog, err := Parse(text)
+	prog, err := ssaapi.Parse(text)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	vals := prog.Ref("d").FlexibleDepends().ShowDot()
 	var d string
-	vals.ForEach(func(value *Value) {
+	vals.ForEach(func(value *ssaapi.Value) {
 		d = value.Dot()
 	})
 	if !utils.MatchAllOfSubString(d, `label="c"`, `label="e"`, `label="h"`, `label="g"`, `label="x"`) {

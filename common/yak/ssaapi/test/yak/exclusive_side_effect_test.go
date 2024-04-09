@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 	"testing"
 )
 
@@ -14,19 +15,19 @@ b = () => {
 b()
 c = a;
 `
-		Check(t, code,
-			CheckTopDef_Contain("c", []string{"Function-b(", "2"}, true),
+		ssatest.Check(t, code,
+			ssatest.CheckTopDef_Contain("c", []string{"Function-b(", "2"}, true),
 		)
 	})
 
 	t.Run("phi side-effect", func(t *testing.T) {
-		Check(t, `
+		ssatest.Check(t, `
 a = 1
 b = () => {
 	a = 2
 }
 if e {b()}
 c = a;
-		`, CheckTopDef_Contain("c", []string{"Function-b(", "2", "1"}, true))
+		`, ssatest.CheckTopDef_Contain("c", []string{"Function-b(", "2", "1"}, true))
 	})
 }
