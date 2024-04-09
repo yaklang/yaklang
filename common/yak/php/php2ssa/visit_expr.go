@@ -250,7 +250,12 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 			return y.VisitExpression(ret.Expression())
 		}
 		return y.EmitConstInstNil()
-	case *phpparser.IncludeExpreesionContext:
+	case *phpparser.IncludeExpressionContext:
+		if ret.Expression() != nil {
+			value := y.VisitExpression(ret.Expression())
+			y.AddIncludePath(value.String())
+			return y.EmitConstInst(true)
+		}
 		return y.VisitIncludeExpression(ret.Include())
 	case *phpparser.LambdaFunctionExpressionContext:
 		return y.VisitLambdaFunctionExpr(ret.LambdaFunctionExpr())
@@ -1165,6 +1170,7 @@ func (y *builder) VisitIncludeExpression(raw phpparser.IIncludeContext) ssa.Valu
 		once = true
 	}
 	if value := y.VisitExpression(i.Expression()); value.IsUndefined() {
+
 	} else {
 		file := value.String()
 		if err := y.BuildFilePackage(file, once); err != nil {
