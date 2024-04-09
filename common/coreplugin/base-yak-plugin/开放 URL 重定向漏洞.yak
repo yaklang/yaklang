@@ -99,7 +99,8 @@ expressionCheck = func(stat,payload){
                     return true
                 }
             }else if js.GetSTType(node.Callee) == "Identifier"{
-                if node.Callee.Name == "setTimeout"{
+                if node.Callee.Name.String() == "setTimeout"{
+                    dump(node.Callee)
                     if js.GetSTType(node.ArgumentList[0]) == "FunctionLiteral"{
                         if jsAstCheck(node.ArgumentList[0].Body.List,payload){
                             return true
@@ -149,9 +150,9 @@ AssignExprCheck = func(stat,expect){
 
 DotExprGeter = func(expr){
     if js.GetSTType(expr.Left) == "Identifier"{
-        return expr.Left.Name+"."+expr.Identifier.Name
+        return expr.Left.Name.String()+"."+expr.Identifier.Name.String()
     }else if js.GetSTType(expr.Left) == "DotExpression"{
-        return DotExprGeter(expr.Left) +"."+ expr.Identifier.Name
+        return DotExprGeter(expr.Left) +"."+ expr.Identifier.Name.String()
     }else{
         return ""
     }
