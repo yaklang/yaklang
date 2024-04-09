@@ -531,7 +531,8 @@ expression
     | Label                                                       # ScalarExpression
     | BackQuoteString                                             # BackQuoteStringExpression
     | '(' expression ')'                                          # ParenthesisExpression
-    | include                                                     # IncludeExpreesion
+    | include                                                     # IncludeExpression
+    | Set_Include_Path expression                                 # IncludeExpression
     | Yield                                                       # SpecialWordExpression
     | List '(' assignmentList ')' Eq expression                   # SpecialWordExpression
     | IsSet '(' chainList ')'                                     # SpecialWordExpression

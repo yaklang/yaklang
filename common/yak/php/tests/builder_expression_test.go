@@ -479,3 +479,24 @@ println($a[1|1]);
 		ssatest.CheckPrintlnValue(code, []string{"0"}, t)
 	})
 }
+
+func TestParseSSA_NothingBody(t *testing.T) {
+	code := `<?php`
+	ssatest.MockSSA(t, code)
+}
+
+func TestParseSSA_Include(t *testing.T) {
+	t.Run("set_include_path", func(t *testing.T) {
+		code := `<?php
+set_include_path("./syntax");
+include('for.php');
+`
+		ssatest.MockSSA(t, code)
+	})
+	t.Run("include", func(t *testing.T) {
+		code := `<?php
+include('syntax/include/include.php');
+`
+		ssatest.MockSSA(t, code)
+	})
+}

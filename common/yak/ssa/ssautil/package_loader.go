@@ -25,16 +25,22 @@ func WithIncludePath(paths ...string) PackageLoaderOption {
 		loader.includePath = paths
 	}
 }
+func WithCurrentPath(path string) PackageLoaderOption {
+	return func(loader *PackageLoader) {
+		loader.currentPath = path //当前路径
+	}
+}
 
 type PackageLoader struct {
-	embedFS     *embed.FS
-	includePath []string
-
+	embedFS      *embed.FS
+	currentPath  string
+	includePath  []string
 	includedPath map[string]struct{} // for include once
 }
 
 func NewPackageLoader(opts ...PackageLoaderOption) *PackageLoader {
 	loader := &PackageLoader{
+		currentPath:  "",
 		includePath:  make([]string, 0),
 		includedPath: make(map[string]struct{}),
 	}
@@ -42,6 +48,10 @@ func NewPackageLoader(opts ...PackageLoaderOption) *PackageLoader {
 		i(loader)
 	}
 	return loader
+}
+
+func (p *PackageLoader) SetCurrentPath(currentPath string) {
+	p.currentPath = currentPath
 }
 
 func (p *PackageLoader) join(s ...string) string {
@@ -65,7 +75,9 @@ func (p *PackageLoader) DirPath(wantPath string, once bool) (string, error) {
 }
 
 func (p *PackageLoader) getPath(want string, once bool, f func(string) bool) (string, error) {
-	for _, path := range p.includePath {
+	// found path in current path
+	tmpPath := append([]string{p.currentPath}, p.includePath...)
+	for _, path := range tmpPath {
 		filePath := p.join(path, want)
 		if f(filePath) {
 			if once {
