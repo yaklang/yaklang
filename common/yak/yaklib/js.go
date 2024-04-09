@@ -7,6 +7,9 @@ import (
 	"github.com/dop251/goja"
 	"github.com/dop251/goja/ast"
 	"github.com/dop251/goja/parser"
+	"github.com/dop251/goja_nodejs/buffer"
+	"github.com/dop251/goja_nodejs/console"
+	"github.com/dop251/goja_nodejs/require"
 	"github.com/yaklang/yaklang/common/javascript"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/embed"
@@ -154,7 +157,14 @@ func _Parse(code string) (*ast.Program, error) {
 // println(val)
 // ```
 func _jsNewEngine() *goja.Runtime {
-	return goja.New()
+	vm := goja.New()
+	// enable require function and console and buffer module
+	new(require.Registry).Enable(vm)
+	// use custom printer
+	require.RegisterCoreModule(console.ModuleName, console.RequireWithPrinter(defaultStdPrinter))
+	console.Enable(vm)
+	buffer.Enable(vm)
+	return vm
 }
 
 // Run 创建新的JS引擎并运行传入的代码并返回JS引擎结构体引用，运行值和错误
