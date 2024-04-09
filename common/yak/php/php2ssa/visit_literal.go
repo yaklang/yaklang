@@ -24,12 +24,12 @@ func (y *builder) VisitConstant(raw phpparser.IConstantContext) ssa.Value {
 	}
 
 	if i.Null() != nil {
-		return y.ir.EmitConstInst(nil)
+		return y.EmitConstInst(nil)
 	} else if i.LiteralConstant() != nil {
 		return y.VisitLiteralConstant(i.LiteralConstant())
 	} else if i.MagicConstant() != nil {
 		// magic __dir__ / __file__
-		return y.ir.EmitUndefined(i.MagicConstant().GetText())
+		return y.EmitUndefined(i.MagicConstant().GetText())
 	} else {
 		log.Warnf("unknown constant: %s", i.GetText())
 	}
@@ -84,20 +84,20 @@ func (y *builder) VisitLiteralConstant(raw phpparser.ILiteralConstantContext) ss
 			}
 			preFloat = exponentInt * preFloat
 		}
-		return y.ir.EmitConstInst(preFloat)
+		return y.EmitConstInst(preFloat)
 	} else if i.BooleanConstant() != nil {
 		switch strings.ToLower(i.BooleanConstant().GetText()) {
 		case `true`:
-			return y.ir.EmitConstInst(true)
+			return y.EmitConstInst(true)
 		default: // case `false`:
-			return y.ir.EmitConstInst(false)
+			return y.EmitConstInst(false)
 		}
 	} else if i.NumericConstant() != nil {
 		return y.VisitNumericConstant(i.NumericConstant())
 	} else if i.StringConstant() != nil {
 		// log.Infof("string constant: %s", i.GetText())
 		// magic! php string literal constant is not need any quote!
-		return y.ir.EmitConstInst(i.GetText())
+		return y.EmitConstInst(i.GetText())
 	}
 
 	return nil
@@ -137,7 +137,7 @@ func (y *builder) VisitNumericConstant(raw phpparser.INumericConstantContext) ss
 		return nil
 	}
 
-	return y.ir.EmitConstInst(result)
+	return y.EmitConstInst(result)
 }
 
 func (y *builder) VisitString_(raw phpparser.IStringContext) ssa.Value {
@@ -160,17 +160,17 @@ func (y *builder) VisitString_(raw phpparser.IStringContext) ssa.Value {
 	}
 	constValue = strings.Trim(constValue, "'")
 	if unquote, err := strconv.Unquote(constValue); err != nil {
-		return y.ir.EmitConstInst(constValue)
+		return y.EmitConstInst(constValue)
 	} else {
-		return y.ir.EmitConstInst(unquote)
+		return y.EmitConstInst(unquote)
 	}
 
-	//return y.ir.EmitConstInst(constValue)
-	//y.ir.EmitConstInst(constValue)
+	//return y.EmitConstInst(constValue)
+	//y.EmitConstInst(constValue)
 	//if unquote, err := yakunquote.Unquote(constValue); err != nil {
-	//	return y.ir.EmitConstInst(constValue)
+	//	return y.EmitConstInst(constValue)
 	//} else {
-	//	return y.ir.EmitConstInst(unquote)
+	//	return y.EmitConstInst(unquote)
 }
 
 func (y *builder) VisitIdentifier(raw phpparser.IIdentifierContext) string {

@@ -16,7 +16,7 @@ func (y *builder) VisitTryCatchFinally(raw phpparser.ITryCatchFinallyContext) in
 		return nil
 	}
 	//todo: try-catch-finally不支持多catch情况
-	tryBuilder := y.ir.BuildTry()
+	tryBuilder := y.BuildTry()
 	tryBuilder.BuildTryBlock(func() {
 		y.VisitBlockStatement(stmt.BlockStatement())
 	})

@@ -1,21 +1,26 @@
-package antlr4util
+package ssa
 
 import (
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"strings"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
-	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
-// type Token interface {
-// 	GetStart() int
-// 	GetStop() int
-// 	GetLine() int
-// 	GetColumn() int
+func (b *FunctionBuilder) SetRangeFromTerminalNode(node antlr.TerminalNode) func() {
+	return b.SetRange(NewToken(node))
+}
+func (b *FunctionBuilder) SetRange(token CanStartStopToken) func() {
+	r := GetRange(b.GetEditor(), token)
+	backup := b.CurrentRange
+	b.CurrentRange = r
 
-//		GetText() string
-//	}
+	return func() {
+		b.CurrentRange = backup
+	}
+}
+
+// / ============================== Token ==============================
 type CanStartStopToken interface {
 	GetStop() antlr.Token
 	GetStart() antlr.Token
@@ -35,18 +40,18 @@ func GetEndPosition(t antlr.Token) (int, int) {
 	return line, column
 }
 
-func GetRange(editor *memedit.MemEditor, token CanStartStopToken) *ssa.Range {
+func GetRange(editor *memedit.MemEditor, token CanStartStopToken) *Range {
 	startToken := token.GetStart()
 	endToken := token.GetStop()
 	if startToken == nil || endToken == nil {
 		return nil
 	}
 
-	start := ssa.NewPosition(int64(startToken.GetLine()), int64(startToken.GetColumn()))
+	start := NewPosition(int64(startToken.GetLine()), int64(startToken.GetColumn()))
 
 	endLine, endColumn := GetEndPosition(endToken)
-	end := ssa.NewPosition(int64(endLine), int64(endColumn))
-	return ssa.NewRange(editor, start, end)
+	end := NewPosition(int64(endLine), int64(endColumn))
+	return NewRange(editor, start, end)
 }
 
 type Token struct {

@@ -16,9 +16,9 @@ func (y *builder) VisitEchoStatement(raw phpparser.IEchoStatementContext) interf
 		return nil
 	}
 
-	caller := y.ir.ReadOrCreateVariable("echo")
+	caller := y.ReadOrCreateVariable("echo")
 	args := y.VisitExpressionList(i.ExpressionList())
-	call := y.ir.NewCall(caller, args)
-	y.ir.EmitCall(call)
+	call := y.NewCall(caller, args)
+	y.EmitCall(call)
 	return nil
 }

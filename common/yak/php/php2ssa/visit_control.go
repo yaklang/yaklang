@@ -16,8 +16,8 @@ func (y *builder) VisitBreakStatement(raw phpparser.IBreakStatementContext) inte
 	if i == nil {
 		return nil
 	}
-	if !y.ir.Break() {
-		y.ir.NewError(ssa.Error, "break statement not in loop or switch: raw %v", i.GetText())
+	if !y.Break() {
+		y.NewError(ssa.Error, "break statement not in loop or switch: raw %v", i.GetText())
 	}
 	return nil
 }
@@ -35,9 +35,9 @@ func (y *builder) VisitReturnStatement(raw phpparser.IReturnStatementContext) in
 	}
 
 	if r := i.Expression(); r != nil {
-		return y.ir.EmitReturn([]ssa.Value{y.VisitExpression(r)})
+		return y.EmitReturn([]ssa.Value{y.VisitExpression(r)})
 	}
-	return y.ir.EmitReturn([]ssa.Value{y.ir.EmitConstInstNil()})
+	return y.EmitReturn([]ssa.Value{y.EmitConstInstNil()})
 }
 
 func (y *builder) VisitYieldExpression(raw phpparser.IYieldExpressionContext) ssa.Value {
