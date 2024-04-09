@@ -2,36 +2,49 @@ package ssautil
 
 import (
 	"embed"
-	"errors"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/filesys"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 )
 
+type PackageLoaderOption func(*PackageLoader)
+
+func WithEmbedFS(fs embed.FS) PackageLoaderOption {
+	return func(loader *PackageLoader) {
+		loader.embedFS = &fs
+	}
+}
+
+func WithIncludePath(paths ...string) PackageLoaderOption {
+	return func(loader *PackageLoader) {
+		loader.includePath = paths
+	}
+}
+
 type PackageLoader struct {
-	// PackageName is the name of the package to load
-	basePath    string
 	embedFS     *embed.FS
-	ruleHandler func(operator PackageLoaderOperator, packageName string) error
 	includePath []string
+
+	includedPath map[string]struct{} // for include once
 }
 
-func (p *PackageLoader) GetCurrentBasePathDirectory() string {
-	if p.basePath == "" {
-		return ""
+func NewPackageLoader(opts ...PackageLoaderOption) *PackageLoader {
+	loader := &PackageLoader{
+		includePath:  make([]string, 0),
+		includedPath: make(map[string]struct{}),
 	}
-	if p.embedFS != nil {
-		return path.Dir(p.basePath)
-	} else {
-		return filepath.Dir(p.basePath)
+	for _, i := range opts {
+		i(loader)
 	}
+	return loader
 }
 
-func (p *PackageLoader) Join(s ...string) string {
+func (p *PackageLoader) join(s ...string) string {
 	if p.embedFS != nil {
 		return path.Join(s...)
 	} else {
@@ -39,33 +52,43 @@ func (p *PackageLoader) Join(s ...string) string {
 	}
 }
 
-func (p *PackageLoader) IncludePathJoin(s ...string) []string {
-	var dirs []string
-	if name := p.GetCurrentBasePathDirectory(); name != "" {
-		dirs = append([]string{name}, p.includePath...)
-	} else {
-		dirs = p.includePath
-	}
-
-	var paths = make([]string, 0, len(dirs))
-	for _, dir := range dirs {
-		paths = append(paths, p.Join(append([]string{dir}, s...)...))
-	}
-	return paths
+func (p *PackageLoader) AddIncludePath(s ...string) {
+	p.includePath = append(p.includePath, s...)
 }
 
-func (p *PackageLoader) GetFirstExistedPath(paths ...string) string {
-	return utils.GetFirstExistedFile(paths...)
+func (p *PackageLoader) FilePath(wantPath string, once bool) (string, error) {
+	return p.getPath(wantPath, once, utils.IsFile)
 }
 
-func (p *PackageLoader) LoadFilePackage(filepathName string) ([]byte, error) {
-	if p.embedFS == nil && !filepath.IsAbs(filepathName) {
-		return nil, utils.Error("file path must be absolute")
+func (p *PackageLoader) DirPath(wantPath string, once bool) (string, error) {
+	return p.getPath(wantPath, once, utils.IsDir)
+}
+
+func (p *PackageLoader) getPath(want string, once bool, f func(string) bool) (string, error) {
+	for _, path := range p.includePath {
+		filePath := p.join(path, want)
+		if f(filePath) {
+			if _, ok := p.includedPath[filePath]; ok && once {
+				// only check included, in once = true
+				return "", utils.Errorf("file or directory %s already included", want)
+			}
+			return filePath, nil
+		}
+	}
+	return "", utils.Errorf("file or directory %s not found in include path", want)
+}
+
+func (p *PackageLoader) LoadFilePackage(packageName string, once bool) (string, []byte, error) {
+	path, err := p.FilePath(packageName, once)
+	if err != nil {
+		return "", nil, err
 	}
 	if p.embedFS != nil {
-		return p.embedFS.ReadFile(filepathName)
+		data, err := p.embedFS.ReadFile(path)
+		return path, data, err
 	}
-	return os.ReadFile(filepathName)
+	data, err := os.ReadFile(path)
+	return path, data, err
 }
 
 type FileDescriptor struct {
@@ -74,18 +97,14 @@ type FileDescriptor struct {
 	Data     []byte
 }
 
-func (p *PackageLoader) LoadDirectoryPackage(directory string) (chan FileDescriptor, error) {
+func (p *PackageLoader) LoadDirectoryPackage(packageName string, once bool) (chan FileDescriptor, error) {
 	ch := make(chan FileDescriptor)
-
-	if p.embedFS == nil && !filepath.IsAbs(directory) {
-		return nil, utils.Error("directory path must be absolute")
-	}
 
 	go func() {
 		defer close(ch)
 		if p.embedFS != nil {
-			err := filesys.Recursive(directory, filesys.WithEmbedFS(*p.embedFS), filesys.WithFileStat(func(pathname string, info os.FileInfo) error {
-				if ret := path.Dir(pathname); ret == directory || strings.TrimRight(ret, "/") == strings.TrimRight(directory, "/") {
+			err := filesys.Recursive(packageName, filesys.WithEmbedFS(*p.embedFS), filesys.WithFileStat(func(pathname string, info os.FileInfo) error {
+				if ret := path.Dir(pathname); ret == packageName || strings.TrimRight(ret, "/") == strings.TrimRight(packageName, "/") {
 					data, err := p.embedFS.ReadFile(pathname)
 					if err != nil {
 						return err
@@ -99,14 +118,15 @@ func (p *PackageLoader) LoadDirectoryPackage(directory string) (chan FileDescrip
 				return nil
 			}))
 			if err != nil {
-				log.Errorf("load directory package %s failed: %v", directory, err)
+				log.Errorf("load directory package %s failed: %v", packageName, err)
 			}
 		} else {
-			absDir, _ := filepath.Abs(directory)
-			if absDir == "" {
-				absDir = directory
+			absDir, err := p.DirPath(packageName, once)
+			if err != nil {
+				log.Errorf("load directory package %s failed: %v", packageName, err)
+				return
 			}
-			err := filesys.Recursive(directory, filesys.WithFileStat(func(pathname string, info os.FileInfo) error {
+			err = filesys.Recursive(absDir, filesys.WithFileStat(func(pathname string, info os.FileInfo) error {
 				if ret := path.Dir(pathname); filepath.Clean(ret) == filepath.Clean(absDir) {
 					data, err := os.ReadFile(pathname)
 					if err != nil {
@@ -121,68 +141,9 @@ func (p *PackageLoader) LoadDirectoryPackage(directory string) (chan FileDescrip
 				return nil
 			}))
 			if err != nil {
-				log.Errorf("load directory package %s failed: %v", directory, err)
+				log.Errorf("load directory package %s failed: %v", packageName, err)
 			}
 		}
 	}()
 	return ch, nil
-}
-
-type PackageLoaderOption func(*PackageLoader)
-
-type PackageLoaderOperator interface {
-	GetCurrentBasePathDirectory() string
-	IncludePathJoin(s ...string) []string
-	GetFirstExistedPath(paths ...string) string
-	LoadFilePackage(filepath string) ([]byte, error)
-	LoadDirectoryPackage(directory string) (chan FileDescriptor, error)
-}
-
-func WithPackageLoaderHandler(handler func(operator PackageLoaderOperator, packageName string) error) PackageLoaderOption {
-	return func(loader *PackageLoader) {
-		loader.ruleHandler = handler
-	}
-}
-
-func WithEmbedFS(fs embed.FS) PackageLoaderOption {
-	return func(loader *PackageLoader) {
-		loader.embedFS = &fs
-	}
-}
-
-func NewPackageLoader(currentBasePath string, opts ...PackageLoaderOption) (*PackageLoader, error) {
-	if currentBasePath == "" {
-		return nil, utils.Error("base path is required")
-	}
-
-	loader := &PackageLoader{
-		basePath:    currentBasePath,
-		ruleHandler: nil,
-		includePath: nil,
-	}
-	for _, i := range opts {
-		i(loader)
-	}
-
-	if loader.ruleHandler == nil {
-		return nil, errors.New("rule handler is required")
-	}
-
-	if len(loader.includePath) <= 0 && loader.basePath == "" {
-		return nil, errors.New("include path or base path is required")
-	}
-
-	return loader, nil
-}
-
-func (p *PackageLoader) LoadPackageByName(f string) error {
-	if p.ruleHandler == nil {
-		return errors.New("rule handler is required")
-	}
-
-	err := p.ruleHandler(p, f)
-	if err != nil {
-		return utils.Errorf("load package %s failed: %v", f, err)
-	}
-	return nil
 }

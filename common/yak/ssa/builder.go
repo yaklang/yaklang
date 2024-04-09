@@ -39,6 +39,7 @@ type FunctionBuilder struct {
 	// for build
 	CurrentBlock *BasicBlock // current block to build
 	CurrentRange *Range      // current position in source code
+	CurrentFile  string      // current file name
 
 	parentScope *ParentScope
 
