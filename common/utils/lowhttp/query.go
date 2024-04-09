@@ -3,12 +3,12 @@ package lowhttp
 import (
 	"bufio"
 	"bytes"
-	"net/url"
-	"strings"
-
+	"fmt"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"net/url"
+	"strings"
 )
 
 func ForceStringToUrl(i string) *url.URL {
@@ -55,8 +55,48 @@ func (item *QueryParamItem) Encode() string {
 	return buf.String()
 }
 
+func (item *QueryParamItem) fuzzEncode() string {
+	var buf bytes.Buffer
+	format := "{{urlescape(%s)}}"
+	if item.Key == "" && item.Value == "" {
+		if item.NoAutoEncode {
+			buf.WriteString(item.Raw)
+		} else {
+			//buf.WriteString(codec.QueryEscape(item.Raw))
+			if utils.NeedsURLEncoding(item.Raw) {
+				buf.WriteString(fmt.Sprintf(format, item.Raw))
+			} else {
+				buf.WriteString(item.Raw)
+			}
+		}
+		return buf.String()
+	}
+
+	if item.NoAutoEncode {
+		buf.WriteString(item.Key)
+	} else {
+		if utils.NeedsURLEncoding(item.Key) {
+			buf.WriteString(fmt.Sprintf(format, item.Key))
+		} else {
+			buf.WriteString(item.Key)
+		}
+	}
+	buf.WriteByte('=')
+	if item.NoAutoEncode {
+		buf.WriteString(item.Value)
+	} else {
+		if utils.NeedsURLEncoding(item.Value) {
+			buf.WriteString(fmt.Sprintf(format, item.Value))
+		} else {
+			buf.WriteString(item.Value)
+		}
+	}
+	return buf.String()
+}
+
 type QueryParams struct {
 	NoAutoEncode bool
+	friendlyDisplay bool
 	Items        []*QueryParamItem
 }
 
@@ -75,6 +115,14 @@ func ParseQueryParams(s string) *QueryParams {
 		pair = strings.Trim(pair, "&")
 		key, val, ok := strings.Cut(pair, "=")
 		if ok {
+			if strings.HasPrefix(key, "{{urlescape(") ||
+				strings.HasPrefix(val, "{{urlescape(") {
+				key = strings.TrimPrefix(key, "{{urlescape(")
+				key = strings.TrimSuffix(key, ")}}")
+				val = strings.TrimPrefix(val, "{{urlescape(")
+				val = strings.TrimSuffix(val, ")}}")
+				pair = fmt.Sprintf("%s=%s", key, val)
+			}
 			items = append(items, &QueryParamItem{
 				Raw:      codec.ForceQueryUnescape(pair),
 				Key:      codec.ForceQueryUnescape(key),
@@ -99,11 +147,18 @@ func ParseQueryParams(s string) *QueryParams {
 	return &QueryParams{Items: items}
 }
 
-func (d *QueryParams) DisableAutoEncode(b bool) *QueryParams {
-	if d != nil {
-		d.NoAutoEncode = b
+func (q *QueryParams) DisableAutoEncode(b bool) *QueryParams {
+	if q != nil {
+		q.NoAutoEncode = b
 	}
-	return d
+	return q
+}
+
+func (q *QueryParams) SetFriendlyDisplay(b bool) *QueryParams {
+	if q != nil {
+		q.friendlyDisplay = b
+	}
+	return q
 }
 
 func (q *QueryParams) Add(key, val string) {
@@ -181,7 +236,11 @@ func (q *QueryParams) Encode() string {
 		if buf.Len() > 0 {
 			buf.WriteByte('&')
 		}
-		buf.WriteString(item.Encode())
+		if q.friendlyDisplay {
+			buf.WriteString(item.fuzzEncode())
+		} else {
+			buf.WriteString(item.Encode())
+		}
 	}
 	return buf.String()
 }

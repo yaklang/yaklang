@@ -249,6 +249,11 @@ func (p *FuzzHTTPRequestParam) DisableAutoEncode(b bool) *FuzzHTTPRequestParam {
 	return p
 }
 
+func (p *FuzzHTTPRequestParam) FriendlyDisplay() *FuzzHTTPRequestParam {
+	p.origin.FriendlyDisplay()
+	return p
+}
+
 func (p *FuzzHTTPRequestParam) Fuzz(i ...interface{}) FuzzHTTPRequestIf {
 	switch p.position {
 	case posMethod:

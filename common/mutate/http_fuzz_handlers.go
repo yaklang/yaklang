@@ -437,32 +437,6 @@ func (f *FuzzHTTPRequest) fuzzPostParamsJsonPath(key any, jsonPath string, val a
 
 	err = cartesian.ProductEx([][]string{keys, values}, func(result []string) error {
 		key, value := result[0], result[1]
-		//var replacedValue []string
-		//if govalidator.IsInt(value) {
-		//	replacedValue = append(replacedValue, jsonpath.ReplaceString(rawJson, jsonPath, codec.Atoi(value)))
-		//}
-		//if govalidator.IsFloat(value) {
-		//	replacedValue = append(replacedValue, jsonpath.ReplaceString(rawJson, jsonPath, codec.Atof(value)))
-		//}
-		//if value == `true` || value == `false` {
-		//	replacedValue = append(replacedValue, jsonpath.ReplaceString(rawJson, jsonPath, codec.Atob(value)))
-		//}
-		//replacedValue = append(replacedValue, jsonpath.ReplaceString(rawJson, jsonPath, value))
-		//
-		//for _, i := range replacedValue {
-		//	newReq := lowhttp.CopyRequest(req)
-		//	if newReq == nil {
-		//		continue
-		//	}
-		//
-		//	newVals, err := deepCopyUrlValues(vals)
-		//	if err != nil {
-		//		continue
-		//	}
-		//	newVals.Set(key, i)
-		//	newReq.Body = ioutil.NopCloser(bytes.NewBufferString(newVals.Encode()))
-		//	reqs = append(reqs, newReq)
-		//}
 
 		originalValue := jsonpath.Find(rawJson, jsonPath)
 
@@ -486,35 +460,6 @@ func (f *FuzzHTTPRequest) fuzzPostParamsJsonPath(key any, jsonPath string, val a
 		default:
 			return utils.Wrap(errors.New("unrecognized json value type"), "json value type")
 		}
-
-		//originalValue := gjson.Get(rawJson, jsonPath)
-		//
-		//var newValue interface{} = value
-		//
-		//// 根据原始值的类型决定如何转换 value
-		//switch originalValue.Type {
-		//case gjson.True, gjson.False:
-		//	if boolVal, err := strconv.ParseBool(value); err == nil {
-		//		newValue = boolVal
-		//	} else {
-		//		newValue = value
-		//	}
-		//case gjson.Number:
-		//	if floatVal, err := strconv.ParseFloat(value, 64); err == nil {
-		//		newValue = floatVal
-		//	} else {
-		//		newValue = value
-		//	}
-		//case gjson.String:
-		//	newValue = value
-		//case gjson.JSON:
-		//	if gjson.Valid(value) {
-		//		newValue = gjson.Parse(value).Value()
-		//	}
-		//default:
-		//	return utils.Wrap(errors.New("unrecognized json value type"), "json value type")
-		//}
-		//modifiedParams, err := sjson.Set(rawJson, jsonPath, newValue)
 		modifiedParams := jsonpath.ReplaceString(rawJson, jsonPath, newValue)
 		if err != nil {
 			return err
@@ -558,23 +503,21 @@ func (f *FuzzHTTPRequest) fuzzGetParamsJsonPath(key any, jsonPath string, val an
 		return nil, err
 	}
 
-	vals := req.URL.Query()
-	if vals == nil {
-		vals = make(url.Values)
-	}
+	vals := lowhttp.ParseQueryParams(f.GetQueryRaw())
 	keyStr := utils.InterfaceToString(key)
 	valueOrigin := vals.Get(keyStr)
 	if valueOrigin == "" {
 		return nil, utils.Errorf("empty HTTP Get Params[%v] Values", key)
 	}
-	_, isJsonOk := utils.IsJSON(valueOrigin)
+	rawJson, isJsonOk := utils.IsJSON(valueOrigin)
 	if !isJsonOk {
 		return nil, utils.Errorf("HTTP Get Params[%v] Values is not json", key)
 	}
-	rawJson := valueOrigin
+
+	keys, values := []string{keyStr}, InterfaceToFuzzResults(val)
 
 	var reqs []*http.Request
-	keys, values := []string{keyStr}, InterfaceToFuzzResults(val)
+	origin := httpctx.GetBareRequestBytes(req)
 	err = cartesian.ProductEx([][]string{keys, values}, func(result []string) error {
 		key, value := result[0], result[1]
 		originalValue := jsonpath.Find(rawJson, jsonPath)
@@ -601,32 +544,16 @@ func (f *FuzzHTTPRequest) fuzzGetParamsJsonPath(key any, jsonPath string, val an
 		}
 
 		modifiedParams := jsonpath.ReplaceString(rawJson, jsonPath, newValue)
-
-		newReq := lowhttp.CopyRequest(req)
-
-		newVals, err := deepCopyUrlValues(vals)
+		vals.DisableAutoEncode(f.NoAutoEncode())
+		vals.SetFriendlyDisplay(f.friendlyDisplay)
+		vals.Set(key, modifiedParams)
+		reqIns, err := lowhttp.ParseBytesToHttpRequest(lowhttp.ReplaceHTTPPacketQueryParamRaw(origin, vals.Encode()))
 		if err != nil {
-			return err
+			log.Infof("parse (in FuzzGetParams) request failed: %v", err)
+			return nil
 		}
-		var parts []string
-		for k, v := range newVals {
-			for _, singleV := range v {
-				if k == key {
-					singleV = modifiedParams
-				}
-				var part string
-				if utils.NeedsURLEncoding(singleV) {
-					part = fmt.Sprintf("%s={{urlescape(%s)}}", k, singleV)
-				} else {
-					part = fmt.Sprintf("%s=%s", k, singleV)
-				}
-				parts = append(parts, part)
-			}
-		}
-		unencodedQuery := strings.Join(parts, "&")
-		newReq.URL.RawQuery = unencodedQuery
-		newReq.RequestURI = newReq.URL.RequestURI()
-		reqs = append(reqs, newReq)
+
+		reqs = append(reqs, reqIns)
 
 		return nil
 	})
@@ -641,10 +568,7 @@ func (f *FuzzHTTPRequest) fuzzGetParams(key interface{}, value interface{}, enco
 	if err != nil {
 		return nil, err
 	}
-	vals := req.URL.Query()
-	if vals == nil {
-		vals = make(url.Values)
-	}
+	vals := lowhttp.ParseQueryParams(f.GetQueryRaw())
 
 	keys, values := InterfaceToFuzzResults(key), InterfaceToFuzzResults(value)
 	if len(keys) <= 0 || len(values) <= 0 {
@@ -664,13 +588,11 @@ func (f *FuzzHTTPRequest) fuzzGetParams(key interface{}, value interface{}, enco
 			value = e(value)
 		}
 
-		var rawBytes []byte
-		if f.NoAutoEncode() {
-			rawBytes = lowhttp.ReplaceHTTPPacketQueryParamWithoutEncoding(origin, key, value)
-		} else {
-			rawBytes = lowhttp.ReplaceHTTPPacketQueryParam(origin, key, value)
-		}
-		reqIns, err := lowhttp.ParseBytesToHttpRequest(rawBytes)
+		vals.DisableAutoEncode(f.NoAutoEncode())
+		vals.SetFriendlyDisplay(f.friendlyDisplay)
+		vals.Set(key, value)
+
+		reqIns, err := lowhttp.ParseBytesToHttpRequest(lowhttp.ReplaceHTTPPacketQueryParamRaw(origin, vals.Encode()))
 		if err != nil {
 			log.Infof("parse (in FuzzGetParams) request failed: %v", err)
 			return nil
