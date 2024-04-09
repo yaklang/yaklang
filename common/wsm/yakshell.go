@@ -185,7 +185,7 @@ func (y *YakShell) getPayload(binCode payloads.Payload, params map[string]string
 	case ypb.ShellScript_JSP.String():
 		rawPayload, err = behinder.GetRawClass(hexCode, params)
 	case ypb.ShellScript_ASPX.String():
-		//todo
+		rawPayload, err = behinder.GetRawAssembly(hexCode, params)
 	}
 	if err != nil {
 		return nil, err
@@ -265,7 +265,7 @@ func (y *YakShell) processParams(params map[string]string) {
 	switch y.ShellScript {
 	case ypb.ShellScript_ASPX.String():
 		// todo
-		params["decoderAssemblyBase64"] = base64.StdEncoding.EncodeToString([]byte(value))
+		params["customEncoderFromAssembly"] = base64.StdEncoding.EncodeToString([]byte(value))
 	case ypb.ShellScript_JSP.String(), ypb.ShellScript_JSPX.String():
 		params["customEncoderFromClass"] = base64.StdEncoding.EncodeToString([]byte(value))
 	case ypb.ShellScript_PHP.String(), ypb.ShellScript_ASP.String():
