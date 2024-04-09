@@ -232,6 +232,9 @@ func getInstanceByName(name string) *yakdoc.LibInstance {
 
 func getGolangTypeStringBySSAType(typ ssa.Type) string {
 	typStr := typ.PkgPathString()
+	if typStr == "" {
+		typStr = typ.String()
+	}
 	return getGolangTypeStringByTypeStr(typStr)
 }
 
@@ -529,7 +532,7 @@ func getDescFromSSAValue(name string, v *ssaapi.Value) string {
 	}
 
 	if desc == "" && !nameContainsPoint {
-		desc = fmt.Sprintf("```go\n%s %s\n```", name, typStr)
+		desc = fmt.Sprintf("```go\ntype %s %s\n```", name, typStr)
 	}
 	return desc
 }
@@ -666,6 +669,10 @@ func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionReques
 			if _, ok := doc.DefaultDocumentHelper.Libs[id]; ok {
 				continue
 			}
+			// 不应该再补全包含.的符号
+			if strings.Contains(id, ".") {
+				continue
+			}
 			// todo: 需要更严谨的过滤
 			values = values.Filter(func(value *ssaapi.Value) bool {
 				position2 := value.GetRange()
@@ -735,12 +742,9 @@ func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionReques
 	}
 	bareTyp := ssaapi.GetBareType(v.GetType())
 	typStr := getGolangTypeStringBySSAType(bareTyp)
-	typName := typStr
-	if strings.Contains(typName, ".") {
-		typName = typName[strings.LastIndex(typName, ".")+1:]
-	}
-	switch bareTyp.GetTypeKind() {
-	case ssa.SliceTypeKind:
+	typKind := bareTyp.GetTypeKind()
+	switch typKind {
+	case ssa.SliceTypeKind, ssa.TupleTypeKind:
 		// []byte / [] 内置方法
 		rTyp, ok := bareTyp.(*ssa.ObjectType)
 		if !ok {

@@ -708,6 +708,14 @@ func (itype *ObjectType) RawString() string {
 		)
 	case ObjectTypeKind:
 		ret += "object{}"
+	case TupleTypeKind:
+		// [T,U,V]
+		ret += fmt.Sprintf(
+			"[%s]", strings.Join(
+				lo.Map(itype.FieldTypes, func(field Type, _ int) string { return field.String() }),
+				",",
+			),
+		)
 	}
 	itype.Name = ""
 	return ret
@@ -843,6 +851,7 @@ func NewFunctionType(name string, Parameter []Type, ReturnType Type, IsVariadic 
 func NewFunctionTypeDefine(name string, Parameter []Type, ReturnType []Type, IsVariadic bool) *FunctionType {
 	return NewFunctionType(name, Parameter, CalculateType(ReturnType), IsVariadic)
 }
+
 func (s *FunctionType) SetName(name string) {
 	s.Name = name
 }
