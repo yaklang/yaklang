@@ -3,6 +3,7 @@ package parser
 import (
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
 	"io"
+	"path"
 	"path/filepath"
 	"strings"
 )
@@ -43,7 +44,7 @@ func ParseBinary(data io.Reader, rule string, keys ...string) (*base.Node, error
 	if len(splits) > 0 {
 		splits[len(splits)-1] = splits[len(splits)-1] + ".yaml"
 	}
-	p := filepath.Join(splits...)
+	p := path.Join(splits...)
 	rootNode, err := base.ParseRule(p)
 	if err != nil {
 		return nil, err
@@ -68,7 +69,7 @@ func GenerateBinary(data any, rule string, keys ...string) (*base.Node, error) {
 	if len(splits) > 0 {
 		splits[len(splits)-1] = splits[len(splits)-1] + ".yaml"
 	}
-	p := filepath.Join(splits...)
+	p := path.Join(splits...)
 	rootNode, err := base.ParseRule(p)
 	if err != nil {
 		return nil, err
