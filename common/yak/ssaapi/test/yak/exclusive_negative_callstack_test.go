@@ -1,12 +1,13 @@
 package ssaapi
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssa"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
 func TestNegativeCallStack_Basic(t *testing.T) {
-	prog, err := Parse(`
+	prog, err := ssaapi.Parse(`
 a = () => {
 	b = dddd;
 	return b
@@ -22,13 +23,13 @@ e = f + 1
 	prog.Show()
 	bRef := prog.Ref("b")
 	result := bRef.GetBottomUses()[0]
-	if _, ok := result.node.(*ssa.BinOp); !ok {
+	if !result.IsBinOp() {
 		t.Fatal("expect binop, got " + result.String())
 	}
 }
 
 func TestNegativeCallStack_Basic2(t *testing.T) {
-	prog, err := Parse(`
+	prog, err := ssaapi.Parse(`
 a = () => {
 	b = dddd;
 	return b
@@ -48,13 +49,11 @@ h = a()("abc")
 	result := bRef.GetBottomUses()
 	checkAdd := false
 	checkCall := false
-	result.ForEach(func(va *Value) {
-		_, ok := va.node.(*ssa.BinOp)
-		if ok {
+	result.ForEach(func(va *ssaapi.Value) {
+		if va.IsBinOp() {
 			checkAdd = true
 		}
-		_, ok = va.node.(*ssa.Call)
-		if ok {
+		if va.IsCall() {
 			checkCall = true
 		}
 	})

@@ -4,10 +4,11 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
 func TestYaklangMask(t *testing.T) {
-	p, err := Parse(`
+	p, err := ssaapi.Parse(`
 var a = 3
 b = () => {
 	a ++
@@ -18,11 +19,11 @@ if c {
 e = a
 `) // .Show()
 	if err != nil {
-		t.Fatal("prog parse error", err)
+		t.Fatal("prog ssaapi.Parse error", err)
 	}
 
-	p.Ref("e").ForEach(func(value *Value) {
-		value.GetTopDefs().ForEach(func(value *Value) {
+	p.Ref("e").ForEach(func(value *ssaapi.Value) {
+		value.GetTopDefs().ForEach(func(value *ssaapi.Value) {
 			t.Log(value.String())
 		})
 	})
@@ -30,7 +31,7 @@ e = a
 }
 
 func TestYakChanExplore_SideEffect_SelfAdd(t *testing.T) {
-	prog, err := Parse(`
+	prog, err := ssaapi.Parse(`
 originValue = 4
 b = ()=>{
 	originValue++
@@ -39,7 +40,7 @@ b()
 g = originValue
 `)
 	if err != nil {
-		t.Fatal("prog parse error", err)
+		t.Fatal("prog ssaapi.Parse error", err)
 	}
 
 	/*
@@ -48,17 +49,17 @@ g = originValue
 			0: ConstInst: 4
 
 	*/
-	prog.Ref("originValue").ForEach(func(value *Value) {
+	prog.Ref("originValue").ForEach(func(value *ssaapi.Value) {
 		log.Infof("originValue value[%v]: %v", value.GetId(), value.String())
 	})
 
 	check1 := false
 	check4 := false
 	// g not phi
-	prog.Ref("g").ForEach(func(value *Value) {
+	prog.Ref("g").ForEach(func(value *ssaapi.Value) {
 		log.Infof("g value[%v]: %v", value.GetId(), value.String()) // phi? why
 		// g value: phi(d)[d,add(add(1, phi(i-2)[3,add(i-2, 1)]), outter())]
-		value.GetTopDefs().ShowWithSource().ForEach(func(value *Value) {
+		value.GetTopDefs().ShowWithSource().ForEach(func(value *ssaapi.Value) {
 			if value.GetConstValue() == 1 {
 				check1 = true
 			}
@@ -78,7 +79,7 @@ g = originValue
 }
 
 func TestYakChanExplore_SideEffect(t *testing.T) {
-	prog, err := Parse(`
+	prog, err := ssaapi.Parse(`
 originValue = 4
 b = ()=>{
 	originValue = 5
@@ -87,7 +88,7 @@ b()
 g = originValue
 `) // .Show()
 	if err != nil {
-		t.Fatal("prog parse error", err)
+		t.Fatal("prog ssaapi.Parse error", err)
 	}
 
 	/*
@@ -100,9 +101,9 @@ g = originValue
 	check4 := false
 
 	// g not phi
-	prog.Ref("g").ForEach(func(value *Value) {
+	prog.Ref("g").ForEach(func(value *ssaapi.Value) {
 		log.Infof("g value[%v]: %v", value.GetId(), value.String()) // phi? why
-		value.GetTopDefs().ForEach(func(value *Value) {
+		value.GetTopDefs().ForEach(func(value *ssaapi.Value) {
 			if value.GetConstValue() == 5 {
 				check5 = true
 			}
@@ -115,7 +116,7 @@ g = originValue
 }
 
 func TestMask_Rough(t *testing.T) {
-	prog, err := Parse(`
+	prog, err := ssaapi.Parse(`
 var a=222;
 c = () => {a = 333}
 if b {c()}
@@ -127,11 +128,11 @@ dump(a)
 
 	check222 := false
 	check333 := false
-	masked := prog.Ref("a").ForEach(func(value *Value) {
-		ins := value.node
+	masked := prog.Ref("a").ForEach(func(value *ssaapi.Value) {
+		ins := ssaapi.GetBareNode(value)
 		_ = ins
 		ins.GetName()
-	}).Get(0).GetTopDefs().Show().ForEach(func(value *Value) {
+	}).Get(0).GetTopDefs().Show().ForEach(func(value *ssaapi.Value) {
 		if value.GetConstValue() == 222 {
 			check222 = true
 		}

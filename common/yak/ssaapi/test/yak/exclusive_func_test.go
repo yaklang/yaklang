@@ -4,6 +4,9 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
+
 	"github.com/yaklang/yaklang/common/utils/dot"
 )
 
@@ -17,59 +20,59 @@ func Test_Function_Parameter(t *testing.T) {
 	e=a.b;
 	dump(e)
 	`
-		Check(t, code,
-			CheckTopDef_Equal("e", []string{"1"}),
+		ssatest.Check(t, code,
+			ssatest.CheckTopDef_Equal("e", []string{"1"}),
 		)
 	})
 }
 
 func Test_Function_Return(t *testing.T) {
 	t.Run("multiple return first", func(t *testing.T) {
-		Check(t, `
+		ssatest.Check(t, `
 		c = () => {return 1,2}; 
 		a,b=c();
 		`,
-			CheckTopDef_Equal("a", []string{"1"}),
+			ssatest.CheckTopDef_Equal("a", []string{"1"}),
 		)
 	})
 
 	t.Run("multiple return second", func(t *testing.T) {
-		Check(t, `
+		ssatest.Check(t, `
 		c = () => {return 1,2}
 		a,b=c();
 		`,
-			CheckTopDef_Equal("b", []string{"2"}),
+			ssatest.CheckTopDef_Equal("b", []string{"2"}),
 		)
 	})
 
 	t.Run("multiple return unpack", func(t *testing.T) {
-		Check(t, `
+		ssatest.Check(t, `
 		c = () => {return 1,2}
 		f=c();
 		a,b=f;
 		dump(b)
 		`,
-			CheckTopDef_Equal("b", []string{"2"}),
+			ssatest.CheckTopDef_Equal("b", []string{"2"}),
 		)
 	})
 }
 
 func Test_Function_FreeValue(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
-		Check(t, `
+		ssatest.Check(t, `
 a = 1
 b = (c, d) => {
 	a = c + d
 	return d, c
 }
 f = b(2,3)
-		`, CheckTopDef_Equal("f", []string{"2", "3"}))
+		`, ssatest.CheckTopDef_Equal("f", []string{"2", "3"}))
 	})
 
 }
 
 func TestFunctionTrace_FormalParametersCheck_2(t *testing.T) {
-	prog, err := Parse(`
+	prog, err := ssaapi.Parse(`
 a = 1
 b = (c, d, e) => {
 	a = c + d
@@ -85,8 +88,8 @@ f = b(2,3,4)
 	check2 := false
 	check3 := false
 	noCheck4 := true
-	prog.Ref("f").Show().ForEach(func(value *Value) {
-		value.GetTopDefs().ForEach(func(value *Value) {
+	prog.Ref("f").Show().ForEach(func(value *ssaapi.Value) {
+		value.GetTopDefs().ForEach(func(value *ssaapi.Value) {
 			d := value.Dot()
 			_ = d
 			value.ShowDot()
@@ -117,7 +120,7 @@ f = b(2,3,4)
 }
 
 func TestDepthLimit(t *testing.T) {
-	prog, err := Parse(`var a;
+	prog, err := ssaapi.Parse(`var a;
 b = a+1
 c = b + e;
 d = c + f;
@@ -129,9 +132,9 @@ g = d
 
 	depth2check := false
 	depthAllcheck := false
-	prog.Ref("g").ForEach(func(value *Value) {
+	prog.Ref("g").ForEach(func(value *ssaapi.Value) {
 		var count int
-		value.GetTopDefs(WithDepthLimit(2)).ForEach(func(value *Value) {
+		value.GetTopDefs(ssaapi.WithDepthLimit(2)).ForEach(func(value *ssaapi.Value) {
 			count++
 		})
 		if count == 2 {
@@ -139,7 +142,7 @@ g = d
 		}
 
 		count = 0
-		value.GetTopDefs(WithMaxDepth(0)).ForEach(func(value *Value) {
+		value.GetTopDefs(ssaapi.WithMaxDepth(0)).ForEach(func(value *ssaapi.Value) {
 			count++
 		})
 		if count == 4 {
@@ -157,7 +160,7 @@ g = d
 }
 
 func TestDominatorTree(t *testing.T) {
-	prog, err := Parse(`var a;
+	prog, err := ssaapi.Parse(`var a;
 b = a+1
 c = b + e;
 d = c + f;
@@ -169,9 +172,9 @@ g = d
 
 	depth2check := false
 	depthAllcheck := false
-	prog.Ref("g").ForEach(func(value *Value) {
+	prog.Ref("g").ForEach(func(value *ssaapi.Value) {
 		var count int
-		value.GetTopDefs(WithDepthLimit(2)).ForEach(func(value *Value) {
+		value.GetTopDefs(ssaapi.WithDepthLimit(2)).ForEach(func(value *ssaapi.Value) {
 			count++
 			value.Show()
 		})
@@ -180,7 +183,7 @@ g = d
 		}
 
 		count = 0
-		value.GetTopDefs(WithMaxDepth(0)).ForEach(func(value *Value) {
+		value.GetTopDefs(ssaapi.WithMaxDepth(0)).ForEach(func(value *ssaapi.Value) {
 			count++
 		})
 		if count == 4 {
@@ -198,7 +201,7 @@ g = d
 }
 
 func TestBottomUse(t *testing.T) {
-	prog, err := Parse(`var a;
+	prog, err := ssaapi.Parse(`var a;
 b = a+1
 c = b + e;
 d = c + f;	
@@ -207,11 +210,11 @@ d = c + f;
 		t.Fatal(err)
 	}
 	checkAdef := false
-	prog.Ref("a").GetBottomUses().ForEach(func(value *Value) {
+	prog.Ref("a").GetBottomUses().ForEach(func(value *ssaapi.Value) {
 		if value.GetDepth() == 3 {
 			checkAdef = true
 		}
-	}).FullUseDefChain(func(value *Value) {
+	}).FullUseDefChain(func(value *ssaapi.Value) {
 		dot.ShowDotGraphToAsciiArt(value.Dot())
 	})
 	if !checkAdef {
@@ -220,7 +223,7 @@ d = c + f;
 }
 
 func TestBottomUse_Func(t *testing.T) {
-	prog, err := Parse(`var a;
+	prog, err := ssaapi.Parse(`var a;
 b = (i, j) => i
 c = b(a,2)
 e = c + 3
@@ -229,7 +232,7 @@ e = c + 3
 		t.Fatal(err)
 	}
 	var vals string
-	prog.Ref("a").GetBottomUses().ForEach(func(value *Value) {
+	prog.Ref("a").GetBottomUses().ForEach(func(value *ssaapi.Value) {
 		value.ShowDot()
 		vals = value.Dot()
 	})
@@ -244,7 +247,7 @@ e = c + 3
 }
 
 func TestBottomUse_ReturnUnpack(t *testing.T) {
-	prog, err := Parse(`a = (i, j, k) => {
+	prog, err := ssaapi.Parse(`a = (i, j, k) => {
 	return i, j, k
 }
 c,d,e = a(f,2,3);
@@ -258,7 +261,7 @@ c,d,e = a(f,2,3);
 	}
 	vals.Show()
 	var cId int64 = -1
-	prog.Ref("c").ForEach(func(value *Value) {
+	prog.Ref("c").ForEach(func(value *ssaapi.Value) {
 		cId = value.GetId()
 	})
 	if ret := vals[0].GetId(); ret != cId {
@@ -267,7 +270,7 @@ c,d,e = a(f,2,3);
 }
 
 func TestBottomUse_ReturnUnpack2(t *testing.T) {
-	prog, err := Parse(`a = (i, j, k) => {
+	prog, err := ssaapi.Parse(`a = (i, j, k) => {
 	return i, i+1, k
 }
 c,d,e = a(f,2,3);

@@ -6,10 +6,11 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
 func TestYakChanExplore_ForPhi(t *testing.T) {
-	prog, err := Parse(`
+	prog, err := ssaapi.Parse(`
 i = 0
 b = 3
 
@@ -23,18 +24,18 @@ for i < 10 {
 c = b
 `)
 	if err != nil {
-		t.Fatal("prog parse error", err)
+		t.Fatal("prog ssaapi.Parse error", err)
 	}
 
 	prog.GetValueByIdMust(0).Show()
 	prog.GetValueByIdMust(1).Show()
-	prog.Ref("c").ForEach(func(value *Value) {
+	prog.Ref("c").ForEach(func(value *ssaapi.Value) {
 		log.Infof("%v: %v", value.GetId(), value.String())
 	})
 }
 
 func TestYakChanExplore_Phi_For_Negative(t *testing.T) {
-	prog, err := Parse(`
+	prog, err := ssaapi.Parse(`
 originValue = 1
 var f = outter()
 for i := 3; i < f; i++ {
@@ -44,11 +45,11 @@ for i := 3; i < f; i++ {
 g = d 
 `)
 	if err != nil {
-		t.Fatal("prog parse error", err)
+		t.Fatal("prog ssaapi.Parse error", err)
 	}
 
 	// g not phi
-	prog.Ref("g").ForEach(func(value *Value) {
+	prog.Ref("g").ForEach(func(value *ssaapi.Value) {
 		log.Infof("g value: %v", value.String()) // phi? why
 		if strings.Contains(value.String(), "phi(d)") {
 			t.Errorf("g should not be phi, but got %v", value.String())
@@ -62,7 +63,7 @@ g = d
 }
 
 func TestYakChanExplore_Phi_For_Negative_2(t *testing.T) {
-	prog, err := Parse(`
+	prog, err := ssaapi.Parse(`
 originValue = 1
 var f = outter()
 for i := 3; i < f; i++ {
@@ -72,11 +73,11 @@ for i := 3; i < f; i++ {
 g = d 
 `)
 	if err != nil {
-		t.Fatal("prog parse error", err)
+		t.Fatal("prog ssaapi.Parse error", err)
 	}
 
 	// g not phi
-	prog.Ref("g").ForEach(func(value *Value) {
+	prog.Ref("g").ForEach(func(value *ssaapi.Value) {
 		log.Infof("g value: %v", value.String()) // phi? why
 		if strings.Contains(value.String(), "phi(d)") {
 			t.Errorf("g should not be phi, but got %v", value.String())
@@ -90,7 +91,7 @@ g = d
 }
 
 func TestYakChanExplore_Phi_For(t *testing.T) {
-	prog, err := Parse(`
+	prog, err := ssaapi.Parse(`
 originValue = 1
 var f = outter()
 var d = 2
@@ -101,14 +102,14 @@ for i := 3; i < f; i++ {
 g = d
 `)
 	if err != nil {
-		t.Fatal("prog parse error", err)
+		t.Fatal("prog ssaapi.Parse error", err)
 	}
 
 	c1 := false
 	c2 := false
 	c3 := false
 	prog.Ref("d").Show()
-	prog.Ref("g").ForEach(func(value *Value) {
+	prog.Ref("g").ForEach(func(value *ssaapi.Value) {
 		defs := value.GetTopDefs()
 		for _, i := range defs {
 			if i.GetConstValue() == 1 {
@@ -137,7 +138,7 @@ g = d
 }
 
 func TestYakChanExplore_4(t *testing.T) {
-	prog, err := Parse(`
+	prog, err := ssaapi.Parse(`
 originValue = 1
 var f = outter()
 a = e => {
@@ -152,13 +153,13 @@ if (f) {
 g = d
 `)
 	if err != nil {
-		t.Fatal("prog parse error", err)
+		t.Fatal("prog ssaapi.Parse error", err)
 	}
 
 	lenCheck := false
 	valCheck := false
 	valCheck_eq3 := false
-	prog.Ref("g").ForEach(func(value *Value) {
+	prog.Ref("g").ForEach(func(value *ssaapi.Value) {
 		defs := value.GetTopDefs()
 		log.Infof("defs: %v", defs)
 		if len(defs) == 2 {
@@ -188,7 +189,7 @@ g = d
 }
 
 func TestYakChanExplore_3(t *testing.T) {
-	prog, err := Parse(`
+	prog, err := ssaapi.Parse(`
 originValue = 1
 var f = outter()
 a = e => {
@@ -203,13 +204,13 @@ if (f) {
 g = d
 `)
 	if err != nil {
-		t.Fatal("prog parse error", err)
+		t.Fatal("prog ssaapi.Parse error", err)
 	}
 
 	valCheck := false
 	valCheck_eq3 := false
 	var topDefsCount = 0
-	prog.Ref("d").ForEach(func(value *Value) {
+	prog.Ref("d").ForEach(func(value *ssaapi.Value) {
 		defs := value.GetTopDefs()
 		spew.Dump(len(defs))
 		topDefsCount += len(defs)
@@ -237,7 +238,7 @@ g = d
 }
 
 func TestYakChanExplore_2(t *testing.T) {
-	prog, err := Parse(`
+	prog, err := ssaapi.Parse(`
 originValue = 1
 a = e => {
 	return e
@@ -245,12 +246,12 @@ a = e => {
 d = a(originValue)
 `)
 	if err != nil {
-		t.Fatal("prog parse error", err)
+		t.Fatal("prog ssaapi.Parse error", err)
 	}
 
 	lenCheck := false
 	valCheck := false
-	prog.Ref("d").ForEach(func(value *Value) {
+	prog.Ref("d").ForEach(func(value *ssaapi.Value) {
 		defs := value.GetTopDefs()
 		if len(defs) == 1 {
 			lenCheck = true
@@ -268,7 +269,7 @@ d = a(originValue)
 }
 
 func TestYakChanExplore(t *testing.T) {
-	prog, err := Parse(`
+	prog, err := ssaapi.Parse(`
 a = () => {
 	var c = 1
 	return c
@@ -277,12 +278,12 @@ a = () => {
 d = a()
 `)
 	if err != nil {
-		t.Fatal("prog parse error", err)
+		t.Fatal("prog ssaapi.Parse error", err)
 	}
 
 	lenCheck := false
 	valCheck := false
-	prog.Ref("d").ForEach(func(value *Value) {
+	prog.Ref("d").ForEach(func(value *ssaapi.Value) {
 		defs := value.GetTopDefs()
 		if len(defs) == 1 {
 			lenCheck = true
