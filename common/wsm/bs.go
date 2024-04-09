@@ -501,7 +501,6 @@ func (b *BehidnerResourceSystemAction) Do(params *ypb.RequestYakURLParams) (*ypb
 		res = append(res, resource)
 
 	case "db":
-
 	default:
 		return nil, utils.Errorf("unsupported op %s", query.Get("op"))
 	}

