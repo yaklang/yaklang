@@ -30,8 +30,8 @@ type Instruction interface {
 	GetShortVerboseName() string
 	SetVerboseName(string)
 
-	GetId() int // for identify
-	SetId(int)
+	GetId() int64 // for identify
+	SetId(int64)
 
 	// position
 	GetRange() *Range
@@ -126,15 +126,10 @@ type Program struct {
 	// package list
 	Packages map[string]*Package
 
-	ConstInstruction   *omap.OrderedMap[int, *ConstInst]
-	NameToInstructions *omap.OrderedMap[string, []Instruction]
-	IdToInstructionMap *omap.OrderedMap[int, Instruction]
+	Cache *Cache
 
 	// class blue print
 	ClassBluePrint map[string]*ClassBluePrint
-
-	persistentBackendMutex *sync.Mutex
-	persistentBackend      func() (int, func(Instruction) error)
 
 	errors SSAErrors
 

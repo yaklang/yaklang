@@ -57,6 +57,7 @@ func parse(c *config, prog *ssa.Program) (ret *ssa.Program, err error) {
 
 	builder.Finish()
 	ssa4analyze.RunAnalyzer(prog)
+	prog.Finish()
 	return prog, nil
 }
 

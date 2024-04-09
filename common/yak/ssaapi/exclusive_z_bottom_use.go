@@ -101,7 +101,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 		// try to find formal param index from call
 		// v is calling instruction
 		// funcValue is the function
-		existed := map[int]struct{}{}
+		existed := map[int64]struct{}{}
 		v.DependOn.ForEach(func(value *Value) {
 			existed[value.GetId()] = struct{}{}
 		})
@@ -111,7 +111,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 				formalParamsIndex = append(formalParamsIndex, argIndex)
 			}
 		}
-		var params = omap.NewOrderedMap(map[int]*ssa.Parameter{})
+		var params = omap.NewOrderedMap(map[int64]*ssa.Parameter{})
 		lo.ForEach(f.Param, func(param *ssa.Parameter, index int) {
 			for _, i := range formalParamsIndex {
 				if index == i {
@@ -169,7 +169,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			return results
 		}
 		if actx._callStack.Len() > 0 {
-			existed := make(map[int]struct{})
+			existed := make(map[int64]struct{})
 			v.DependOn.ForEach(func(value *Value) {
 				existedId := value.GetId()
 				existed[existedId] = struct{}{}

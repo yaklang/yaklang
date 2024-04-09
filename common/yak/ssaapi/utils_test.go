@@ -91,7 +91,7 @@ func checkFunctionEx(
 	}
 	value := values[0]
 	vs := get(value)
-	vs = lo.UniqBy(vs, func(v *Value) int { return v.GetId() })
+	vs = lo.UniqBy(vs, func(v *Value) int64 { return v.GetId() })
 	if checkLength {
 		if len(vs) != len(want) {
 			return fmt.Errorf("variable[%s] not want len(%d): %d: %v", variable, len(want), len(vs), vs)

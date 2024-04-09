@@ -34,7 +34,7 @@ func (p *Program) GetErrors() ssa.SSAErrors {
 	return p.Program.GetErrors()
 }
 
-func (p *Program) GetValueById(id int) (*Value, error) {
+func (p *Program) GetValueById(id int64) (*Value, error) {
 	val, ok := p.Program.GetInstructionById(id).(ssa.Value)
 	if val == nil {
 		return nil, utils.Errorf("instruction not found: %d", id)
@@ -46,7 +46,7 @@ func (p *Program) GetValueById(id int) (*Value, error) {
 	return NewValue(val), nil
 }
 
-func (p *Program) GetValueByIdMust(id int) *Value {
+func (p *Program) GetValueByIdMust(id int64) *Value {
 	v, err := p.GetValueById(id)
 	if err != nil {
 		log.Errorf("GetValueByIdMust: %v", err)
@@ -54,7 +54,7 @@ func (p *Program) GetValueByIdMust(id int) *Value {
 	return v
 }
 
-func (p *Program) GetInstructionById(id int) ssa.Instruction {
+func (p *Program) GetInstructionById(id int64) ssa.Instruction {
 	return p.Program.GetInstructionById(id)
 }
 
@@ -89,18 +89,13 @@ func (p *Program) GetClassMember(className string, key string) *Value {
 
 func (p *Program) GetAllSymbols() map[string]Values {
 	ret := make(map[string]Values, 0)
-	p.Program.NameToInstructions.ForEach(func(name string, insts []ssa.Instruction) bool {
-		ret[name] = lo.FilterMap(
-			insts,
-			func(i ssa.Instruction, _ int) (*Value, bool) {
-				if v, ok := i.(ssa.Value); ok {
-					return NewValue(v), true
-				} else {
-					return nil, false
-				}
-			},
-		)
-		return true
+	p.Program.Cache.ForEachVariable(func(s string, insts []ssa.Instruction) {
+		ret[s] = lo.FilterMap(insts, func(i ssa.Instruction, _ int) (*Value, bool) {
+			if v, ok := i.(ssa.Value); ok {
+				return NewValue(v), true
+			}
+			return nil, false
+		})
 	})
 	return ret
 }
