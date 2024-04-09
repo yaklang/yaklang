@@ -32,6 +32,14 @@ if (a == b){
 	}
 }
 
+func TestConsole(t *testing.T) {
+	code := `console.log("Hello, World.");`
+	_, _, err := _run(code)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestRunWithCryptoJSV3(t *testing.T) {
 	code := `CryptoJS.HmacSHA256("Message", "secret").toString();`
 	_, value, err := _run(code, _libCryptoJSV3())
