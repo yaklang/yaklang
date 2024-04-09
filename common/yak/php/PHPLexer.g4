@@ -314,6 +314,7 @@ SemiColon          : ';';
 Eq                 : '=';
 Quote              : '\'';
 BackQuote          : '`';
+Set_Include_Path   : 'set_include_path';
 
 VarName : '$' NameString;
 Label   : [a-z_][a-z_0-9]*;
