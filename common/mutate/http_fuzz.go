@@ -29,6 +29,7 @@ type FuzzHTTPRequest struct {
 	source                 string
 	runtimeId              string
 	noAutoEncode           bool
+	friendlyDisplay        bool
 	proxy                  string
 	originRequest          []byte
 	_originRequestInstance *http.Request
@@ -50,6 +51,13 @@ func (r *FuzzHTTPRequest) DisableAutoEncode(b bool) FuzzHTTPRequestIf {
 	return r
 }
 
+func (r *FuzzHTTPRequest) FriendlyDisplay() FuzzHTTPRequestIf {
+	if r != nil {
+		r.friendlyDisplay = true
+	}
+	return r
+}
+
 type FuzzHTTPRequestIf interface {
 	// Repeat 重复数据包
 	// Example:
@@ -60,6 +68,8 @@ type FuzzHTTPRequestIf interface {
 
 	// 模糊测试参数时不进行自动编码
 	DisableAutoEncode(bool) FuzzHTTPRequestIf
+
+	FriendlyDisplay() FuzzHTTPRequestIf
 
 	// 标注是否进行自动编码
 	NoAutoEncode() bool
@@ -213,12 +223,13 @@ func (f *FuzzHTTPRequest) IsBodyFormEncoded() bool {
 }
 
 type buildFuzzHTTPRequestConfig struct {
-	IsHttps      bool
-	Source       string
-	RuntimeId    string
-	NoAutoEncode bool
-	Proxy        string
-	Ctx          context.Context
+	IsHttps         bool
+	Source          string
+	RuntimeId       string
+	NoAutoEncode    bool
+	FriendlyDisplay bool
+	Proxy           string
+	Ctx             context.Context
 }
 
 type BuildFuzzHTTPRequestOption func(config *buildFuzzHTTPRequestConfig)
@@ -232,6 +243,12 @@ func OptProxy(i string) BuildFuzzHTTPRequestOption {
 func OptDisableAutoEncode(i bool) BuildFuzzHTTPRequestOption {
 	return func(config *buildFuzzHTTPRequestConfig) {
 		config.NoAutoEncode = i
+	}
+}
+
+func OptFriendlyDisplay() BuildFuzzHTTPRequestOption {
+	return func(config *buildFuzzHTTPRequestConfig) {
+		config.FriendlyDisplay = true
 	}
 }
 
@@ -426,6 +443,7 @@ func NewFuzzHTTPRequest(i interface{}, opts ...BuildFuzzHTTPRequestOption) (*Fuz
 	req.runtimeId = config.RuntimeId
 	req.proxy = config.Proxy
 	req.noAutoEncode = config.NoAutoEncode
+	req.friendlyDisplay = config.FriendlyDisplay
 	req.ctx = config.Ctx
 	req.opts = opts
 	return req, nil
@@ -447,6 +465,10 @@ func (f *FuzzHTTPRequest) GetCurrentOptions() []BuildFuzzHTTPRequestOption {
 	}
 	if f.noAutoEncode {
 		result = append(result, OptDisableAutoEncode(f.noAutoEncode))
+	}
+
+	if f.friendlyDisplay {
+		result = append(result, OptFriendlyDisplay())
 	}
 	return result
 }

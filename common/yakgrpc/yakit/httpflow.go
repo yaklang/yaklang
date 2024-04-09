@@ -299,7 +299,7 @@ func FuzzParamsToGRPCFuzzableParam(r *mutate.FuzzHTTPRequestParam, isHttps bool)
 	}
 
 	flag := utils.RandNumberStringBytes(6)
-	res, err := r.DisableAutoEncode(true).Fuzz(flag).Results()
+	res, err := r.FriendlyDisplay().Fuzz(flag).Results()
 	if err != nil {
 		return p
 	}

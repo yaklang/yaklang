@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/tidwall/gjson"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"io"
 	"net/http"
 	"net/url"
@@ -180,7 +182,7 @@ func (f *FuzzHTTPRequest) fuzzGetBase64JsonPath(key any, jsonPath string, val an
 	}
 
 	keyStr := utils.InterfaceToString(key)
-	vals := req.URL.Query()
+	vals := lowhttp.ParseQueryParams(f.GetQueryRaw())
 	originValue := vals.Get(keyStr)
 	if strings.Contains(originValue, "%") {
 		unescaped, err := url.QueryUnescape(originValue)
@@ -195,9 +197,9 @@ func (f *FuzzHTTPRequest) fuzzGetBase64JsonPath(key any, jsonPath string, val an
 	}
 
 	var reqs []*http.Request
-	err = cartesian.ProductEx([][]string{
-		{keyStr}, InterfaceToFuzzResults(val),
-	}, func(result []string) error {
+	origin := httpctx.GetBareRequestBytes(req)
+
+	err = cartesian.ProductEx([][]string{{keyStr}, InterfaceToFuzzResults(val)}, func(result []string) error {
 		value := result[1]
 		//var replaced = valueToJsonValue(value)
 
@@ -228,27 +230,21 @@ func (f *FuzzHTTPRequest) fuzzGetBase64JsonPath(key any, jsonPath string, val an
 		if err != nil {
 			return err
 		}
-
-		//for _, i := range replaced {
-		_req := lowhttp.CopyRequest(req)
-		newVals := _req.URL.Query()
-		var parts []string
-		for k, v := range newVals {
-			for _, singleV := range v {
-				if k == keyStr {
-					singleV = modifiedParams
-				}
-				part := fmt.Sprintf("%s={{base64(%s)}}", k, singleV)
-				parts = append(parts, part)
-			}
+		if f.friendlyDisplay {
+			modifiedParams = fmt.Sprintf("{{base64(%s)}}", modifiedParams)
+		} else {
+			modifiedParams = codec.EncodeBase64(modifiedParams)
 		}
-		unencodedQuery := strings.Join(parts, "&")
-		_req.URL.RawQuery = unencodedQuery
-		//newVals.Set(keyStr, codec.EncodeBase64(jsonpath.ReplaceString(originValue, jsonPath, i)))
-		//	_req.URL.RawQuery = newVals.Encode()
-		_req.RequestURI = _req.URL.RequestURI()
-		reqs = append(reqs, _req)
-		//}
+
+		vals.DisableAutoEncode(f.NoAutoEncode())
+		vals.SetFriendlyDisplay(f.friendlyDisplay)
+		vals.Set(keyStr, modifiedParams)
+		reqIns, err := lowhttp.ParseBytesToHttpRequest(lowhttp.ReplaceHTTPPacketQueryParamRaw(origin, vals.Encode()))
+		if err != nil {
+			log.Errorf("parse (in FuzzGetParams) request failed: %v", err)
+			return nil
+		}
+		reqs = append(reqs, reqIns)
 		return nil
 	})
 	if err != nil {
@@ -262,7 +258,14 @@ func (f *FuzzHTTPRequest) toFuzzHTTPRequestBatch() *FuzzHTTPRequestBatch {
 }
 
 func (f *FuzzHTTPRequest) FuzzGetBase64Params(key, val any) FuzzHTTPRequestIf {
-	reqs, err := f.fuzzGetParams(key, val, codec.EncodeBase64)
+	encode := func(v any) string {
+		if f.friendlyDisplay {
+			return fmt.Sprintf("{{base64(%s)}}", v)
+		}
+		return codec.EncodeBase64(v)
+	}
+
+	reqs, err := f.fuzzGetParams(key, val, encode)
 	if err != nil {
 		return f.toFuzzHTTPRequestBatch()
 	}

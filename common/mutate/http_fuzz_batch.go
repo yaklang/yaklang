@@ -48,6 +48,23 @@ func (r *FuzzHTTPRequestBatch) DisableAutoEncode(b bool) FuzzHTTPRequestIf {
 	return r
 }
 
+func (r *FuzzHTTPRequestBatch) FriendlyDisplay() FuzzHTTPRequestIf {
+	if r != nil {
+		if r.fallback != nil && r.fallback != r {
+			r.fallback.FriendlyDisplay()
+		}
+		if r.originRequest != nil {
+			r.originRequest.FriendlyDisplay()
+		}
+		for _, nreq := range r.nextFuzzRequests {
+			if nreq != nil {
+				nreq.FriendlyDisplay()
+			}
+		}
+	}
+	return r
+}
+
 func (f *FuzzHTTPRequestBatch) NoAutoEncode() bool {
 	if f == nil {
 		return false
