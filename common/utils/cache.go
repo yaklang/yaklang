@@ -307,20 +307,26 @@ func (cache *CacheWithKey[U, T]) Get(key U) (value T, exists bool) {
 	return item.data, exists
 }
 
-func (cache *CacheWithKey[U, T]) GetAll() []T {
+func (cache *CacheWithKey[U, T]) GetAll() map[U]T {
+	items := make(map[U]T, len(cache.items))
+	cache.ForEach(func(u U, t T) {
+		items[u] = t
+	})
+	return items
+}
+
+func (cache *CacheWithKey[U, T]) ForEach(handler func(U, T)) {
 	cache.mutex.Lock()
-	items := make([]T, 0, len(cache.items))
 	for key := range cache.items {
 		item, exists, triggerExpirationNotification := cache.getItem(key)
 		if triggerExpirationNotification {
 			cache.expirationNotification <- true
 		}
 		if exists {
-			items = append(items, item.data)
+			handler(item.key, item.data)
 		}
 	}
 	cache.mutex.Unlock()
-	return items
 }
 
 func (cache *CacheWithKey[U, T]) Remove(key U) bool {

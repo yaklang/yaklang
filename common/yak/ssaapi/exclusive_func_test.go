@@ -257,7 +257,7 @@ c,d,e = a(f,2,3);
 		t.Fatal("bottom use failed")
 	}
 	vals.Show()
-	cId := -1
+	var cId int64 = -1
 	prog.Ref("c").ForEach(func(value *Value) {
 		cId = value.GetId()
 	})

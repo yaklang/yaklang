@@ -284,7 +284,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 				var results Values
 
 				callInsVal := NewValue(callIns).AppendEffectOn(i)
-				filter := make(map[int]struct{})
+				filter := make(map[int64]struct{})
 				results = append(results, callInsVal)
 				for _, val := range ret.GetValues() {
 					filter[val.GetId()] = struct{}{}

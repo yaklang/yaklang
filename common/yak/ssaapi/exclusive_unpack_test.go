@@ -36,7 +36,7 @@ func TestUnpack_Basic3(t *testing.T) {
 	prog.Show()
 	values := lo.UniqBy(
 		prog.Ref("e").GetTopDefs(),
-		func(v *Value) int { return v.GetId() },
+		func(v *Value) int64 { return v.GetId() },
 	)
 	assert.Equal(t, 1, len(values))
 }

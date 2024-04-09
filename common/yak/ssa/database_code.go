@@ -157,7 +157,7 @@ func FitIRCode(c *ssadb.IrCode, r Instruction) error {
 
 func UpdateIRCode(r Instruction) error {
 	db := consts.GetGormProjectDatabase()
-	code := ssadb.GetIrCodeById(db, uint(r.GetId()))
+	code := ssadb.GetIrCodeById(db, r.GetId())
 	if code == nil {
 		log.Warnf("IrCode not found: %d", r.GetId())
 		return nil

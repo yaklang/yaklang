@@ -17,7 +17,7 @@ type anInstruction struct {
 
 	name        string
 	verboseName string // verbose name for output or debug or tag
-	id          int
+	id          int64
 
 	isExtern  bool
 	variables *omap.OrderedMap[string, *Variable] // map[string]*Variable
@@ -112,10 +112,10 @@ func (a *anInstruction) SetName(v string) { a.name = v }
 func (a *anInstruction) GetName() string  { return a.name }
 
 // id
-func (a *anInstruction) SetId(id int) { a.id = id }
-func (a *anInstruction) GetId() int {
+func (a *anInstruction) SetId(id int64) { a.id = id }
+func (a *anInstruction) GetId() int64 {
 	if a == nil {
-		return 0
+		return -1
 	}
 	return a.id
 }

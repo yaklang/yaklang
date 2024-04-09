@@ -36,10 +36,7 @@ func NewValue(n ssa.Value) *Value {
 	}
 }
 
-func (v *Value) GetId() int {
-	if v.node == nil {
-		return -1
-	}
+func (v *Value) GetId() int64 {
 	return v.node.GetId()
 }
 
