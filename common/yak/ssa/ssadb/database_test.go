@@ -43,15 +43,17 @@ func TestBuild(t *testing.T) {
 	require.NoError(t, err)
 	prog.Program.ShowWithSource()
 
-	ircode := ssadb.GetIrByVariable(db, programName, "a")
+	irCodes := ssadb.GetIrByVariable(db, programName, "a")
+	require.Len(t, irCodes, 1, "a instruction count should be 1")
 
-	require.NotNil(t, ircode)
+	irCode := irCodes[0]
+	require.NotNil(t, irCode)
 
-	spew.Dump(ircode)
-	require.Equal(t, ssa.SSAOpcode2Name[ssa.SSAOpcodeConstInst], ircode.OpcodeName)
-	require.Equal(t, "1", ircode.ConstantValue)
+	spew.Dump(irCode)
+	require.Equal(t, ssa.SSAOpcode2Name[ssa.SSAOpcodeConstInst], irCode.OpcodeName)
+	require.Equal(t, "1", irCode.ConstantValue)
 
-	v := ircode.Variable
+	v := irCode.Variable
 	sort.Strings(v)
 	require.Equal(t, ssadb.StringSlice{"a", "b", "c"}, v)
 }
@@ -72,13 +74,17 @@ func TestBuild_Multiple_Program(t *testing.T) {
 		require.NoError(t, err)
 		prog.Program.ShowWithSource()
 
-		ircode := ssadb.GetIrByVariable(db, programName, "a")
+		irCodes := ssadb.GetIrByVariable(db, programName, "a")
+		require.Len(t, irCodes, 1, "a instruction count should be 1")
 
-		require.NotNil(t, ircode)
+		irCode := irCodes[0]
+		require.NotNil(t, irCode)
 
-		spew.Dump(ircode)
-		require.Equal(t, ssa.SSAOpcode2Name[ssa.SSAOpcodeConstInst], ircode.OpcodeName)
-		require.Equal(t, want, ircode.ConstantValue)
+		require.NotNil(t, irCode)
+
+		spew.Dump(irCode)
+		require.Equal(t, ssa.SSAOpcode2Name[ssa.SSAOpcodeConstInst], irCode.OpcodeName)
+		require.Equal(t, want, irCode.ConstantValue)
 	}
 
 	check(`a = 1`, "1")
