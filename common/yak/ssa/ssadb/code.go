@@ -98,18 +98,28 @@ func RequireIrCode(db *gorm.DB, program string) (uint, *IrCode) {
 	return ircode.ID, ircode
 }
 
-func GetIrCodeById(db *gorm.DB, id uint) *IrCode {
+func GetIrCodeById(db *gorm.DB, id int64) *IrCode {
+	if id == -1 {
+		return nil
+	}
 	return db.Model(&IrCode{}).Where("id = ?", id).First(&IrCode{}).Value.(*IrCode)
 }
 
-func GetIrByVariable(db *gorm.DB, program, name string) *IrCode {
-	var r IrCode
-	if err := db.Model(&IrCode{}).Where("program_name = ?", program).Where("variable like ?", "%"+name+"%").First(&r).Error; err != nil {
+func GetIrByVariable(db *gorm.DB, program, name string) []*IrCode {
+	var irVariable IrVariable
+	if err := db.Model(&IrVariable{}).Where("variable_name = ? AND program_name = ?", name, program).First(&irVariable).Error; err != nil {
 		if gorm.IsRecordNotFoundError(err) {
 			return nil
 		}
 	}
-	return &r
+
+	ret := make([]*IrCode, 0, len(irVariable.InstructionID))
+	for _, id := range irVariable.InstructionID {
+		r := GetIrCodeById(db, id)
+		ret = append(ret, r)
+	}
+
+	return ret
 }
 
 func DeleteProgram(db *gorm.DB, program string) {
