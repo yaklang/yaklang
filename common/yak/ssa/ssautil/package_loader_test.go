@@ -1,81 +1,63 @@
 package ssautil
 
 import (
-	"embed"
-	"github.com/davecgh/go-spew/spew"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
-//go:embed testdata/***
-var testFS embed.FS
+func Test_PackageLoader(t *testing.T) {
 
-func TestPackageLoaderEmbedFS(t *testing.T) {
-	currentCheck := false
-	aCheck := false
-	cCheck := false
-	dCheck := false
-	loader, err := NewPackageLoader(
-		"testdata/index.txt",
-		WithEmbedFS(testFS),
-		WithPackageLoaderHandler(func(operator PackageLoaderOperator, packageName string) error {
-			spew.Dump(packageName)
-			switch packageName {
-			case ".":
-				raw, err := operator.LoadFilePackage("testdata/index.txt")
-				if err != nil {
-					return err
-				}
-				if string(raw) == "index" {
-					currentCheck = true
-				}
-			case "a":
-				raw, err := operator.LoadFilePackage("testdata/a.txt")
-				if err != nil {
-					return err
-				}
-				if string(raw) == "a" {
-					aCheck = true
-				}
-			case "c":
-				raw, err := operator.LoadFilePackage("testdata/b/c/c.txt")
-				if err != nil {
-					return err
-				}
-				if string(raw) == "c" {
-					cCheck = true
-				}
-			case "d":
-				raw, err := operator.LoadFilePackage("testdata/b/c/d/d.txt")
-				if err != nil {
-					return err
-				}
-				if string(raw) == "d" {
-					dCheck = true
-				}
-			}
-			return nil
-		}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = loader.LoadPackageByName(".")
-	if err != nil {
-		t.Fatal(err)
-	}
+	// init package loader
+	loader := NewPackageLoader(
+		WithIncludePath("testdata"),
+	)
 
-	if err = loader.LoadPackageByName("a"); err != nil {
-		t.Fatal(err)
-	}
+	t.Run("check file in include path", func(t *testing.T) {
+		// check file in include path
+		if _, data, err := loader.LoadFilePackage("index.txt", false); err != nil {
+			t.Fatal(err)
+		} else {
+			require.Equalf(t, "index", string(data), "LoadFilePackage failed for index.txt, got: %s", string(data))
+		}
+	})
 
-	if err = loader.LoadPackageByName("c"); err != nil {
-		t.Fatal(err)
-	}
+	t.Run("check file in include path once", func(t *testing.T) {
+		// check file in include path
+		if _, data, err := loader.LoadFilePackage("index.txt", true); err != nil {
+			t.Fatal(err)
+		} else {
+			require.Equalf(t, "index", string(data), "LoadFilePackage failed for index.txt, got: %s", string(data))
+		}
+		if _, _, err := loader.LoadFilePackage("index.txt", true); err == nil {
+			t.Fatalf("LoadFilePackage should failed for index.txt")
+		}
+	})
 
-	if err = loader.LoadPackageByName("d"); err != nil {
-		t.Fatal(err)
-	}
+	t.Run("check file not in include path", func(t *testing.T) {
+		// check file not in include path
+		if _, _, err := loader.LoadFilePackage("notexist.txt", false); err == nil {
+			t.Fatal("LoadFilePackage should failed for notexist.txt")
+		}
 
-	if !currentCheck || !aCheck || !cCheck || !dCheck {
-		t.Fatal("load package failed")
-	}
+	})
+	t.Run("add include path test", func(t *testing.T) {
+		// add include path
+		loader.AddIncludePath("testdata/b/c")
+		if _, data, err := loader.LoadFilePackage("c.txt", false); err != nil {
+			t.Fatal(err)
+		} else {
+			require.Equalf(t, "c", string(data), "LoadFilePackage failed for c.txt, got: %s", string(data))
+		}
+	})
+
+	t.Run("check directory in include path", func(t *testing.T) {
+		ch, err := loader.LoadDirectoryPackage("b", false)
+		require.NoError(t, err, "LoadDirectoryPackage failed for c", err)
+		filepath := make([]string, 0)
+		for v := range ch {
+			filepath = append(filepath, v.PathName)
+		}
+		require.Equal(t, []string{"testdata/b/b.txt"}, filepath, "LoadDirectoryPackage failed for b")
+	})
 }
