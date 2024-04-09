@@ -12,6 +12,9 @@ func (b *FunctionBuilder) SetRangeFromTerminalNode(node antlr.TerminalNode) func
 }
 func (b *FunctionBuilder) SetRange(token CanStartStopToken) func() {
 	r := GetRange(b.GetEditor(), token)
+	if r == nil {
+		return func() {}
+	}
 	backup := b.CurrentRange
 	b.CurrentRange = r
 

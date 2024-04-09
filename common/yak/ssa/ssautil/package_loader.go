@@ -54,6 +54,10 @@ func (p *PackageLoader) SetCurrentPath(currentPath string) {
 	p.currentPath = currentPath
 }
 
+func (p *PackageLoader) GetCurrentPath() string {
+	return p.currentPath
+}
+
 func (p *PackageLoader) join(s ...string) string {
 	if p.embedFS != nil {
 		return path.Join(s...)
