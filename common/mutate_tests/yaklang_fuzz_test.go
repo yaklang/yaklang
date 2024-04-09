@@ -100,6 +100,8 @@ type base struct {
 	expectKeywordInOutputPacket []string
 	expectRegexpInOutputPacket  []string
 	debug                       bool
+	disableEncode               bool
+	friendlyDisplay             bool
 }
 
 func testCaseCheck(base base) func(t *testing.T) {
@@ -117,7 +119,17 @@ func testCaseCheck(base base) func(t *testing.T) {
 		if data.code != "" {
 			data.code = "." + strings.TrimLeft(data.code, ".")
 		}
-		initCode := `result = fuzz.HTTPRequest(request)~` + data.code
+		var initCode string
+		if data.disableEncode && data.friendlyDisplay {
+			initCode = `result = fuzz.HTTPRequest(request,fuzz.noEncode(true),fuzz.showTag())~` + data.code
+		} else if data.disableEncode {
+			initCode = `result = fuzz.HTTPRequest(request,fuzz.noEncode(true))~` + data.code
+		} else if data.friendlyDisplay {
+			initCode = `result = fuzz.HTTPRequest(request,fuzz.showTag())~` + data.code
+		} else {
+			initCode = `result = fuzz.HTTPRequest(request)~` + data.code
+		}
+
 		if data.debug {
 			fmt.Println("----------------OP CODE-----------------")
 			fmt.Println(initCode)
@@ -127,11 +139,10 @@ func testCaseCheck(base base) func(t *testing.T) {
 		test.NoError(err, "eval code should not fail")
 
 		if data.debug {
-			fmt.Println("----------------KEYWORD-----------------")
+			t.Log("----------------KEYWORD-----------------")
 			engine.EvalInline(ctx, "dump(keywords)")
-			fmt.Println("----------------REGEXPS-----------------")
+			t.Log("----------------REGEXPS-----------------")
 			engine.EvalInline(ctx, "dump(regexps)")
-			fmt.Println()
 		}
 
 		err = engine.EvalInline(context.Background(), `raw = result.GetFirstFuzzHTTPRequest()~.GetBytes()
@@ -191,20 +202,80 @@ func TestFuzzGetParams(t *testing.T) {
 		base base
 	}{
 		{
-			name: "Fuzz Get Params",
+			name: "GET参数 默认",
+			base: base{
+				inputPacket: `GET /?a=MTIzNA== HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzGetParams("b", "%25%25").FuzzGetParams("c", "123")`,
+				expectKeywordInOutputPacket: []string{
+					"a=MTIzNA%3D%3D",
+					"b=%2525%2525",
+					"c=123",
+				},
+			},
+		},
+		{
+			name: "GET参数 友好显示",
 			base: base{
 				inputPacket: `GET /?a=ab HTTP/1.1
 Host: www.baidu.com
 
 `,
-				code: `.FuzzGetParams("a", "$.abc").FuzzGetParams("ccc", "12")`,
+				code: `.FuzzGetParams("a", "$.abc").FuzzGetParams("b", "%25%25")`,
 				expectKeywordInOutputPacket: []string{
-					"a=%24.abc", "ccc=12",
+					"a={{urlescape($.abc)}}", "b={{urlescape(%25%25)}}",
 				},
+				friendlyDisplay: true,
 			},
 		},
 		{
-			name: "Fuzz Get Params Raw",
+			name: "GET参数 禁止指定参数自动编码",
+			base: base{
+				inputPacket: `GET /?a=MTIzNA== HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzGetParams("b", "%25%25")`,
+				expectKeywordInOutputPacket: []string{
+					"a=MTIzNA%3D%3D", "b=%25%25",
+				},
+				disableEncode: true,
+			},
+		},
+		{
+			name: "GET参数 禁止编码 & 友好显示",
+			base: base{
+				inputPacket: `GET /?a=MTIzNA== HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzGetParams("b", "%25%25")`,
+				expectKeywordInOutputPacket: []string{
+					"a={{urlescape(MTIzNA==)}}", "b=%25%25",
+				},
+				disableEncode:   true,
+				friendlyDisplay: true,
+				debug:           true,
+			},
+		},
+		{
+			name: "GET参数 友好显示 2",
+			base: base{
+				inputPacket: `GET /?a=MTIzNA==&b=2 HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzGetParams("b", "12")`,
+				expectKeywordInOutputPacket: []string{
+					"a={{urlescape(MTIzNA==)}}", "b=12",
+				},
+				friendlyDisplay: true,
+			},
+		},
+		{
+			name: "GET参数 Raw",
 			base: base{
 				inputPacket: `GET /?a=ab HTTP/1.1
 Host: www.baidu.com
@@ -217,7 +288,7 @@ Host: www.baidu.com
 			},
 		},
 		{
-			name: "Fuzz Get Params Raw",
+			name: "GET参数 Packet Num",
 			base: base{
 				inputPacket: `GET /?a=ab HTTP/1.1
 Host: www.baidu.com
@@ -237,14 +308,15 @@ Host: www.baidu.com
 }
 
 func TestFuzzGetJsonPathParams(t *testing.T) {
-	// json path 逻辑是先解析json，然后再根据json path获取值，根据原值的类型进行 fuzz
+	// 现在的处理逻辑是先解析json，根据json path获取值
+	// 根据原值的类型进行 fuzz
 	// 如果原值与 Fuzz 值不匹配，默认使用字符串类型
 	tests := []struct {
 		name string
 		base base
 	}{
 		{
-			name: "GET 参数(JSON)",
+			name: "GET 参数(JSON) 友好显示 类型不匹配",
 			base: base{
 				inputPacket: `GET /?a={"abc": 123} HTTP/1.1
 Host: www.baidu.com
@@ -254,11 +326,11 @@ Host: www.baidu.com
 				expectKeywordInOutputPacket: []string{
 					`a={{urlescape({"abc":"string"})}}`,
 				},
-				debug: true,
+				friendlyDisplay: true,
 			},
 		},
 		{
-			name: "GET 参数(JSON) string type",
+			name: "GET 参数(JSON) string type 友好显示",
 			base: base{
 				inputPacket: `GET /?a={"abc": "123"} HTTP/1.1
 Host: www.baidu.com
@@ -268,11 +340,11 @@ Host: www.baidu.com
 				expectKeywordInOutputPacket: []string{
 					`a={{urlescape({"abc":"99999"})}}`,
 				},
-				debug: true,
+				friendlyDisplay: true,
 			},
 		},
 		{
-			name: "GET 参数(JSON) number type",
+			name: "GET 参数(JSON) number type 友好显示",
 			base: base{
 				inputPacket: `GET /?a={"abc": 123} HTTP/1.1
 Host: www.baidu.com
@@ -282,11 +354,11 @@ Host: www.baidu.com
 				expectKeywordInOutputPacket: []string{
 					`a={{urlescape({"abc":99999})}}`,
 				},
-				debug: true,
+				friendlyDisplay: true,
 			},
 		},
 		{
-			name: "GET 参数(JSON) json type",
+			name: "GET 参数(JSON) json type 友好显示",
 			base: base{
 				inputPacket: `GET /?a={"abc": {"c":"d"}} HTTP/1.1
 Host: www.baidu.com
@@ -296,11 +368,11 @@ Host: www.baidu.com
 				expectKeywordInOutputPacket: []string{
 					`a={{urlescape({"abc":{"zz":123}})}}`,
 				},
-				debug: true,
+				friendlyDisplay: true,
 			},
 		},
 		{
-			name: "GET 参数(JSON) array type",
+			name: "GET 参数(JSON) array type 友好显示",
 			base: base{
 				inputPacket: `GET /?a=[{"id": 1},{"id": 2}] HTTP/1.1
 Host: www.baidu.com
@@ -310,6 +382,49 @@ Host: www.baidu.com
 				expectKeywordInOutputPacket: []string{
 					`a={{urlescape([{"id":111},{"id":2}])}}`,
 				},
+				friendlyDisplay: true,
+			},
+		},
+		{
+			name: "GET 参数(JSON) 默认显示",
+			base: base{
+				inputPacket: `GET /?a={"abc": 123} HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzGetJsonPathParams("a", "$.abc", "string")`,
+				expectKeywordInOutputPacket: []string{
+					`a=%7B%22abc%22%3A%22string%22%7D`, // {"abc":"string"}
+				},
+			},
+		},
+		{
+			name: "GET 参数(JSON) 禁止编码",
+			base: base{
+				inputPacket: `GET /?a={"abc": 123} HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzGetJsonPathParams("a", "$.abc", "string")`,
+				expectKeywordInOutputPacket: []string{
+					`a={"abc":"string"}`,
+				},
+				disableEncode: true,
+			},
+		},
+		{
+			name: "GET 参数(JSON) 禁止编码 & 友好显示",
+			base: base{
+				inputPacket: `GET /?a={"abc": 123} HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzGetJsonPathParams("a", "$.abc", "string")`,
+				expectKeywordInOutputPacket: []string{
+					`a={"abc":"string"}`,
+				},
+				disableEncode:   true,
+				friendlyDisplay: true,
 			},
 		},
 	}
@@ -327,7 +442,7 @@ func TestFuzzGetBase64Params(t *testing.T) {
 		{
 			name: "GET参数(Base64)",
 			base: base{
-				inputPacket: `GET /?a=MTIzNA==&b=2  HTTP/1.1
+				inputPacket: `GET /?a=MTIzNA==&b=2 HTTP/1.1
 Host: www.baidu.com
 
 `,
@@ -335,11 +450,141 @@ Host: www.baidu.com
 				expectKeywordInOutputPacket: []string{
 					`a=OTk5OTk%3D`,
 				},
-				debug: true,
+			},
+		},
+		{
+			name: "GET参数(Base64) 友好显示",
+			base: base{
+				inputPacket: `GET /?a=MTIzNA==&b=2 HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzGetBase64Params("a", 99999)`,
+				expectKeywordInOutputPacket: []string{
+					`a={{urlescape({{base64(99999)}})}}&b=2`,
+				},
+				friendlyDisplay: true,
+			},
+		},
+		{
+			name: "GET参数(Base64) 禁止编码",
+			base: base{
+				inputPacket: `GET /?a=MTIzNA==&b=2 HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzGetBase64Params("a", 99999)`,
+				expectKeywordInOutputPacket: []string{
+					`a=OTk5OTk=&b=2`,
+				},
+				disableEncode: true,
+			},
+		},
+		{
+			name: "GET参数(Base64) 禁止编码 & 友好显示",
+			base: base{
+				inputPacket: `GET /?a=MTIzNA==&b=2 HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzGetBase64Params("a", 99999)`,
+				expectKeywordInOutputPacket: []string{
+					`a={{base64(99999)}}`,
+					`b=2`,
+				},
+				disableEncode:   true,
+				friendlyDisplay: true,
+			},
+		},
+		{
+			name: "GET参数(Base64) 禁止编码 & 友好显示 & Packet Num",
+			base: base{
+				inputPacket: `GET /?a=MTIzNA==&b=2 HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzGetBase64Params("a", "{{int(1-3)}}")`,
+				expectKeywordInOutputPacket: []string{
+					`a={{base64(1)}}`,
+					`b=2`,
+				},
+				expectPacketNum: 3,
+				disableEncode:   true,
+				friendlyDisplay: true,
 			},
 		},
 	}
 
+	for _, tc := range tests {
+		t.Run(tc.name, testCaseCheck(tc.base))
+	}
+}
+
+func TestFuzzGetBase64JsonPath(t *testing.T) {
+	tests := []struct {
+		name string
+		base base
+	}{
+		{
+			name: "GET参数(Base64+JSON) 默认",
+			base: base{
+				inputPacket: `GET /acc.t1?a=ab&c=eyJkZCI6MTI1fQ%3D%3D HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzGetBase64JsonPath("c", "$.dd", 1234)`,
+				expectKeywordInOutputPacket: []string{
+					`a=ab`,
+					`c=eyJkZCI6MTIzNH0%3D`, // {"dd":1234}
+				},
+			},
+		},
+		{
+			name: "GET参数(Base64+JSON) 禁止编码",
+			base: base{
+				inputPacket: `GET /acc.t1?a=ab&c=eyJkZCI6MTI1fQ%3D%3D HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzGetBase64JsonPath("c", "$.dd", 1234)`,
+				expectKeywordInOutputPacket: []string{
+					`a=ab`,
+					`c=eyJkZCI6MTIzNH0=`, // {"dd":1234}
+				},
+				disableEncode: true,
+			},
+		},
+		{
+			name: "GET参数(Base64+JSON) 友好显示",
+			base: base{
+				inputPacket: `GET /acc.t1?a=ab&c=eyJkZCI6MTI1fQ%3D%3D HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzGetBase64JsonPath("c", "$.dd", 1234)`,
+				expectKeywordInOutputPacket: []string{
+					`a=ab`,
+					`c={{urlescape({{base64({"dd":1234})}})}}`,
+				},
+				friendlyDisplay: true,
+			},
+		},
+		{
+			name: "GET参数(Base64+JSON) 友好显示 2",
+			base: base{
+				inputPacket: `GET /acc.t1?a=ab&c=W3siaWQiOiAxfSx7ImlkIjogMn1d HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzGetBase64JsonPath("c", "$.[0]", {"xx":"bb"})`,
+				expectKeywordInOutputPacket: []string{
+					`a=ab`,
+					`c={{urlescape({{base64([{"xx":"bb"},{"id":2}])}})}}`,
+				},
+				friendlyDisplay: true,
+			},
+		},
+	}
 	for _, tc := range tests {
 		t.Run(tc.name, testCaseCheck(tc.base))
 	}

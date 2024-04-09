@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"github.com/tidwall/gjson"
 	"math/big"
 	"math/rand"
 	"net"
@@ -430,6 +431,17 @@ func IsWebsocketUrl(raw string) bool {
 }
 
 func IsJSON(raw string) (string, bool) {
+	unescapeJson, err := codec.QueryUnescape(raw)
+	if err != nil {
+		return raw, false
+	}
+	if gjson.Valid(unescapeJson) {
+		return unescapeJson, true
+	}
+	return "", false
+}
+
+func ContainsJSON(raw string) (string, bool) {
 	unescapeJson, err := codec.QueryUnescape(raw)
 	if err != nil {
 		return raw, false
