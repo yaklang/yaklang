@@ -25,18 +25,18 @@ func (y *builder) VisitFunctionDeclaration(raw phpparser.IFunctionDeclarationCon
 	isRef := i.Ampersand() != nil
 	_ = isRef
 	funcName := i.Identifier().GetText()
-	y.ir.SetMarkedFunction(funcName)
-	newFunction := y.ir.NewFunc(funcName)
-	y.ir = y.ir.PushFunction(newFunction)
+	y.SetMarkedFunction(funcName)
+	newFunction := y.NewFunc(funcName)
+	y.FunctionBuilder = y.PushFunction(newFunction)
 	{
 		y.VisitFormalParameterList(i.FormalParameterList())
 		y.VisitBlockStatement(i.BlockStatement())
-		y.ir.SetType(y.VisitTypeHint(i.TypeHint()))
-		y.ir.Finish()
+		y.SetType(y.VisitTypeHint(i.TypeHint()))
+		y.Finish()
 	}
-	y.ir = y.ir.PopFunction()
-	variable := y.ir.CreateVariable(funcName)
-	y.ir.AssignVariable(variable, newFunction)
+	y.FunctionBuilder = y.PopFunction()
+	variable := y.CreateVariable(funcName)
+	y.AssignVariable(variable, newFunction)
 	return nil
 }
 
@@ -119,7 +119,7 @@ func (y *builder) VisitFormalParameter(raw phpparser.IFormalParameterContext) {
 	isVariadic := i.Ellipsis()
 	_, _, _ = typeHint, isRef, isVariadic
 	formalParams, defaultValue := y.VisitVariableInitializer(i.VariableInitializer())
-	param := y.ir.NewParam(formalParams)
+	param := y.NewParam(formalParams)
 	if defaultValue != nil {
 		param.SetDefault(defaultValue)
 		if t := defaultValue.GetType(); t != nil {
@@ -130,7 +130,7 @@ func (y *builder) VisitFormalParameter(raw phpparser.IFormalParameterContext) {
 		param.SetType(typeHint)
 	}
 	if isRef {
-		y.ir.ReferenceParameter(formalParams)
+		y.ReferenceParameter(formalParams)
 	}
 	return
 }
@@ -150,16 +150,16 @@ func (y *builder) VisitLambdaFunctionExpr(raw phpparser.ILambdaFunctionExprConte
 		//	doSomethings 在闭包中，不需要做其他特殊处理
 	}
 	funcName := ""
-	newFunc := y.ir.NewFunc(funcName)
-	y.ir = y.ir.PushFunction(newFunc)
+	newFunc := y.NewFunc(funcName)
+	y.FunctionBuilder = y.PushFunction(newFunc)
 	{
 		y.VisitFormalParameterList(i.FormalParameterList())
-		y.ir.SetType(y.VisitTypeHint(i.TypeHint()))
+		y.SetType(y.VisitTypeHint(i.TypeHint()))
 		y.VisitBlockStatement(i.BlockStatement())
 		y.VisitExpression(i.Expression())
-		y.ir.Finish()
+		y.Finish()
 	}
-	y.ir = y.ir.PopFunction()
+	y.FunctionBuilder = y.PopFunction()
 	return newFunc
 }
 

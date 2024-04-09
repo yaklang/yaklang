@@ -79,9 +79,9 @@ func (y *builder) VisitInlineHtmlStatement(raw phpparser.IInlineHtmlStatementCon
 	if i == nil {
 		return nil
 	}
-	echoFunc := y.ir.ReadOrCreateVariable("echo")
-	call := y.ir.NewCall(echoFunc, []ssa.Value{y.ir.EmitConstInst(raw.GetText())})
-	y.ir.EmitCall(call)
+	echoFunc := y.ReadOrCreateVariable("echo")
+	call := y.NewCall(echoFunc, []ssa.Value{y.EmitConstInst(raw.GetText())})
+	y.EmitCall(call)
 	return nil
 }
 

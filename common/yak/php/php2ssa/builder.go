@@ -13,7 +13,7 @@ import (
 )
 
 type builder struct {
-	ir         *ssa.FunctionBuilder
+	*ssa.FunctionBuilder
 	constMap   map[string]ssa.Value
 	isFunction bool
 }
@@ -25,8 +25,8 @@ func Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	}
 	b.DisableFreeValue = true
 	build := builder{
-		constMap: make(map[string]ssa.Value),
-		ir:       b,
+		constMap:        make(map[string]ssa.Value),
+		FunctionBuilder: b,
 	}
 	b.WithExternValue(phpBuildIn)
 	build.VisitHtmlDocument(ast)

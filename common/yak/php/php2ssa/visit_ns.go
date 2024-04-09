@@ -37,7 +37,7 @@ func (y *builder) VisitQualifiedNamespaceName(raw phpparser.IQualifiedNamespaceN
 		if ret := list.NamespaceNameTail(); ret != nil {
 
 		}
-		// return y.ir.EmitConstInst(nil)
+		// return y.EmitConstInst(nil)
 		return ""
 	}
 
@@ -59,7 +59,7 @@ func (y *builder) VisitNamespaceNameList(raw phpparser.INamespaceNameListContext
 		return ""
 	}
 
-	// ir := y.ir
+	// ir := y
 	var lastValue string
 	lastValue = i.GetText()
 	// for _, id := range i.AllIdentifier() {

@@ -19,7 +19,7 @@ func (y *builder) VisitIfStatement(raw phpparser.IIfStatementContext) interface{
 	}
 	stmt := i
 	handlerIfStatement := func(elseBody func(), items ...ssa.IfBuilderItem) interface{} {
-		ifBuilder := y.ir.CreateIfBuilder()
+		ifBuilder := y.CreateIfBuilder()
 		for _, item := range items {
 			ifBuilder.AppendItem(item.Condition, item.Body)
 		}
@@ -165,7 +165,7 @@ func (y *builder) VisitSwitchStatement(raw phpparser.ISwitchStatementContext) in
 		log.Printf("switch default number illegal")
 		return nil
 	}
-	ir := y.ir.BuildSwitch()
+	ir := y.BuildSwitch()
 	ir.AutoBreak = false
 	ir.BuildCondition(func() ssa.Value {
 		return y.VisitParentheses(stmt.Parentheses())

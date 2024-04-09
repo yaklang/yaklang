@@ -1,9 +1,10 @@
 package php2ssa
 
 import (
-	"github.com/google/uuid"
 	"strconv"
 	"strings"
+
+	"github.com/google/uuid"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
@@ -28,8 +29,8 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 		return y.VisitAnonymousClass(i.AnonymousClass())
 	}
 	className := i.TypeRef().GetText()
-	class := y.ir.GetClassBluePrint(className)
-	obj := y.ir.EmitMakeWithoutType(nil, nil)
+	class := y.GetClassBluePrint(className)
+	obj := y.EmitMakeWithoutType(nil, nil)
 	obj.SetType(class)
 
 	constructor := class.Constructor
@@ -44,9 +45,9 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 		ellipsis = hasEllipsis
 		args = append(args, tmp...)
 	}
-	c := y.ir.NewCall(constructor, args)
+	c := y.NewCall(constructor, args)
 	c.IsEllipsis = ellipsis
-	y.ir.EmitCall(c)
+	y.EmitCall(c)
 	return obj
 }
 
@@ -96,8 +97,8 @@ func (y *builder) VisitClassDeclaration(raw phpparser.IClassDeclarationContext) 
 				parentClassName = i.QualifiedStaticTypeRef().GetText()
 			}
 
-			class := y.ir.CreateClassBluePrint(className)
-			if parentClass := y.ir.GetClassBluePrint(parentClassName); parentClass != nil {
+			class := y.CreateClassBluePrint(className)
+			if parentClass := y.GetClassBluePrint(parentClassName); parentClass != nil {
 				class.AddParentClass(parentClass)
 			}
 			for _, statement := range i.AllClassStatement() {
@@ -143,8 +144,8 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 				// static member only type
 			case isStatic && !isNilValue:
 				// static member
-				variable := y.ir.GetStaticMember(class.Name, name)
-				y.ir.AssignVariable(variable, value)
+				variable := y.GetStaticMember(class.Name, name)
+				y.AssignVariable(variable, value)
 				class.AddStaticMember(name, value)
 			case !isStatic && isNilValue:
 				// normal member only type
@@ -181,16 +182,16 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 		funcName := ret.Identifier().GetText()
 
 		createFunction := func() *ssa.Function {
-			newFunction := y.ir.NewFunc(funcName)
-			y.ir = y.ir.PushFunction(newFunction)
+			newFunction := y.NewFunc(funcName)
+			y.FunctionBuilder = y.PushFunction(newFunction)
 			{
-				this := y.ir.NewParam("$this")
+				this := y.NewParam("$this")
 				_ = this
 				y.VisitFormalParameterList(ret.FormalParameterList())
 				y.VisitMethodBody(ret.MethodBody())
-				y.ir.Finish()
+				y.Finish()
 			}
-			y.ir = y.ir.PopFunction()
+			y.FunctionBuilder = y.PopFunction()
 			return newFunction
 		}
 
@@ -201,8 +202,8 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 		default:
 			newFunction := createFunction()
 			if isStatic {
-				variable := y.ir.GetStaticMember(class.Name, newFunction.GetName())
-				y.ir.AssignVariable(variable, newFunction)
+				variable := y.GetStaticMember(class.Name, newFunction.GetName())
+				y.AssignVariable(variable, newFunction)
 				class.AddStaticMethod(funcName, newFunction)
 			} else {
 				class.AddMethod(funcName, newFunction)
@@ -268,7 +269,7 @@ func (y *builder) VisitTraitAdaptationStatement(raw phpparser.ITraitAdaptationSt
 		// trait alias
 		y.VisitTraitAlias(i.TraitAlias())
 	} else {
-		y.ir.NewError(ssa.Warn, "trait.adaptation", "unknown trait adaptation statement")
+		y.NewError(ssa.Warn, "trait.adaptation", "unknown trait adaptation statement")
 	}
 
 	return nil
@@ -326,7 +327,7 @@ func (y *builder) VisitMethodBody(raw phpparser.IMethodBodyContext) interface{} 
 
 	i, _ := raw.(*phpparser.MethodBodyContext)
 	if i.BlockStatement() != nil {
-		y.ir.BuildSyntaxBlock(func() {
+		y.BuildSyntaxBlock(func() {
 			y.VisitBlockStatement(i.BlockStatement())
 		})
 	}
@@ -373,7 +374,7 @@ func (y *builder) VisitVariableInitializer(raw phpparser.IVariableInitializerCon
 		val = y.VisitConstantInitializer(i.ConstantInitializer())
 	}
 	// if utils.IsNil(val) {
-	// 	undefined := y.ir.EmitUndefined(name)
+	// 	undefined := y.EmitUndefined(name)
 	// 	undefined.Kind = ssa.UndefinedMemberValid
 	// 	val = undefined
 	// }
@@ -410,8 +411,8 @@ func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassE
 			}
 		}
 		// function
-		variable := y.ir.GetStaticMember(class, key)
-		return y.ir.ReadValueByVariable(variable)
+		variable := y.GetStaticMember(class, key)
+		return y.ReadValueByVariable(variable)
 	}
 
 	// var class, key string
@@ -436,7 +437,7 @@ func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassE
 		return getValue(class, key)
 	case *phpparser.VariableAsIndirectClassStaticFunctionMemberContext:
 		exprName := y.VisitVariable(i.Variable())
-		value := y.ir.ReadValue(exprName)
+		value := y.ReadValue(exprName)
 		key := i.Identifier().GetText()
 
 		// if value is instance of class, check this class static function or const member
@@ -474,7 +475,7 @@ func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassE
 		key = i.VarName().GetText()
 	case *phpparser.VariableAsIndirectClassStaticVariableContext:
 		exprName := y.VisitVariable(i.Variable())
-		class = y.ir.ReadValue(exprName).String()
+		class = y.ReadValue(exprName).String()
 		key = i.VarName().GetText()
 	default:
 		_ = i
@@ -486,10 +487,10 @@ func (y *builder) VisitStaticClassExprVariableMember(raw phpparser.IStaticClassE
 	if strings.HasPrefix(key, "$") {
 		// variable
 		key = key[1:]
-		return y.ir.GetStaticMember(class, key)
+		return y.GetStaticMember(class, key)
 	}
 	// function
-	return y.ir.GetStaticMember(class, key)
+	return y.GetStaticMember(class, key)
 }
 
 func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) ssa.Value {
@@ -502,7 +503,7 @@ func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) ss
 		}
 		if i.StaticClassExprVariableMember() != nil {
 			variable := y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember())
-			return y.ir.ReadValueByVariable(variable)
+			return y.ReadValueByVariable(variable)
 		}
 	}
 
@@ -595,17 +596,17 @@ func (y *builder) VisitMemberCallKey(raw phpparser.IMemberCallKeyContext) ssa.Va
 
 	_ = i
 	if i.Identifier() != nil {
-		return y.ir.EmitConstInst(i.Identifier().GetText())
+		return y.EmitConstInst(i.Identifier().GetText())
 	}
 
 	if i.Variable() != nil {
 		name := y.VisitVariable(i.Variable())
-		value := y.ir.ReadValue(name)
-		return y.ir.EmitConstInst(value.String())
+		value := y.ReadValue(name)
+		return y.EmitConstInst(value.String())
 	}
 
 	if i.String_() != nil {
-		return y.ir.EmitConstInst(i.String_().GetText())
+		return y.EmitConstInst(i.String_().GetText())
 	}
 
 	return nil
@@ -623,17 +624,17 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 		return nil
 	}
 	cname := uuid.NewString()
-	bluePrint := y.ir.CreateClassBluePrint(cname)
+	bluePrint := y.CreateClassBluePrint(cname)
 	if i.QualifiedStaticTypeRef() != nil {
 		ref := y.VisitQualifiedStaticTypeRef(i.QualifiedStaticTypeRef())
-		if classBluePrint := y.ir.GetClassBluePrint(ref); classBluePrint != nil {
+		if classBluePrint := y.GetClassBluePrint(ref); classBluePrint != nil {
 			bluePrint.AddParentClass(classBluePrint)
 		}
 	}
 	for _, statement := range i.AllClassStatement() {
 		y.VisitClassStatement(statement, bluePrint)
 	}
-	obj := y.ir.EmitMakeWithoutType(nil, nil)
+	obj := y.EmitMakeWithoutType(nil, nil)
 	obj.SetType(bluePrint)
 	constructor := bluePrint.Constructor
 	if constructor == nil {
@@ -647,8 +648,8 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 		ellipsis = hasEllipsis
 		args = append(args, tmp...)
 	}
-	c := y.ir.NewCall(constructor, args)
+	c := y.NewCall(constructor, args)
 	c.IsEllipsis = ellipsis
-	y.ir.EmitCall(c)
+	y.EmitCall(c)
 	return obj
 }

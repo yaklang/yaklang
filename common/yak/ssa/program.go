@@ -1,11 +1,14 @@
 package ssa
 
+import "github.com/yaklang/yaklang/common/yak/ssa/ssautil"
+
 func NewProgram(dbProgramName string) *Program {
 	prog := &Program{
 		Packages:       make(map[string]*Package),
 		errors:         make([]*SSAError, 0),
 		ClassBluePrint: make(map[string]*ClassBluePrint),
 		Cache:          NewDBCache(dbProgramName),
+		loader:         ssautil.NewPackageLoader(),
 	}
 	return prog
 }
