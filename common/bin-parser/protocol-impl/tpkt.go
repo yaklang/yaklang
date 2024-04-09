@@ -1,7 +1,6 @@
 package protocol_impl
 
 import (
-	"bytes"
 	"errors"
 	"github.com/yaklang/yaklang/common/bin-parser/parser"
 	"github.com/yaklang/yaklang/common/bin-parser/utils"
@@ -13,6 +12,14 @@ type TpktPacket struct {
 	Version  uint8
 	Reserved uint8
 	TPDU     []byte
+}
+
+func NewTpktPacket(data []byte) *TpktPacket {
+	return &TpktPacket{
+		Version:  3,
+		Reserved: 0,
+		TPDU:     data,
+	}
 }
 
 func (t *TpktPacket) WriteTo(writer io.Writer) (int, error) {
@@ -30,26 +37,22 @@ func (t *TpktPacket) Marshal() ([]byte, error) {
 		"PacketLength": len(t.TPDU) + 4,
 		"TPDU":         t.TPDU,
 	}
-	node, err := parser.GenerateBinary(data, "application-layer.tpkt", "TPKT")
+	node, err := parser.GenerateBinary(data, "application-layer.msrdp", "TPKT")
 	if err != nil {
 		return nil, err
 	}
 	return utils.NodeToBytes(node), nil
 }
 
-func ParseTpkt(data []byte) (*TpktPacket, error) {
-	node, err := parser.ParseBinary(bytes.NewReader(data), "application-layer.tpkt")
+func ParseTpkt(r io.Reader) (*TpktPacket, error) {
+	node, err := parser.ParseBinary(r, "application-layer.msrdp", "TPKT")
 	if err != nil {
 		return nil, err
 	}
-	node = utils.GetSubNode(node, "TPKT")
-	if node == nil {
-		return nil, errors.New("not found TPKT node")
-	}
 	ires := utils.NodeToData(node)
 	if v, ok := ires.(map[string]any); ok {
-		version := uint8(utils.GetUint64FromMap(v, "Version"))
-		reserved := uint8(utils.GetUint64FromMap(v, "Reserved"))
+		version := v["Version"].(byte)
+		reserved := v["Reserved"].(byte)
 		payload := utils2.InterfaceToBytes(utils2.MapGetRaw(v, "TPDU"))
 		return &TpktPacket{
 			Version:  version,
