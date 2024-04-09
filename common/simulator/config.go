@@ -3,6 +3,9 @@
 package simulator
 
 import (
+	"encoding/json"
+	"github.com/yaklang/yaklang/common/crawlerx/preaction"
+	"github.com/yaklang/yaklang/common/log"
 	"net/url"
 )
 
@@ -32,6 +35,14 @@ type BrowserConfig struct {
 	sourceType string
 	fromPlugin string
 	runtimeID  string
+}
+
+var actionDict = map[string]preaction.ActionType{
+	"hover":   preaction.HoverAction,
+	"click":   preaction.ClickAction,
+	"input":   preaction.InputAction,
+	"select":  preaction.SelectAction,
+	"setFile": preaction.SetFileAction,
 }
 
 type BrowserConfigOpt func(*BrowserConfig)
@@ -122,9 +133,13 @@ type BruteConfig struct {
 	sourceType string
 	fromPlugin string
 	runtimeID  string
+
+	preActions []*preaction.PreAction
 }
 
 type BruteConfigOpt func(*BruteConfig)
+
+var NullBruteConfigOpt = func(*BruteConfig) {}
 
 func NewBruteConfig() *BruteConfig {
 	return &BruteConfig{
@@ -272,5 +287,30 @@ func WithFromPlugin(fromPlugin string) BruteConfigOpt {
 func WithRuntimeID(runtimeID string) BruteConfigOpt {
 	return func(config *BruteConfig) {
 		config.runtimeID = runtimeID
+	}
+}
+
+func WithPreActions(actionsJs string) BruteConfigOpt {
+	var actions []preaction.PreActionJson
+	err := json.Unmarshal([]byte(actionsJs), &actions)
+	if err != nil {
+		log.Errorf("unmarshal preaction json string error: %v", err)
+		return NullBruteConfigOpt
+	}
+	return func(config *BruteConfig) {
+		tempActions := make([]*preaction.PreAction, 0)
+		for _, action := range actions {
+			actionType, ok := actionDict[action.Action]
+			if !ok {
+				log.Errorf("invalid action string: %v", action.Action)
+				continue
+			}
+			tempActions = append(tempActions, &preaction.PreAction{
+				Action:   actionType,
+				Selector: action.Selector,
+				Params:   action.Params,
+			})
+		}
+		config.preActions = tempActions
 	}
 }

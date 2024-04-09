@@ -5,6 +5,7 @@ package simulator
 import (
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
+	"github.com/yaklang/yaklang/common/crawlerx/preaction"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"net/url"
@@ -78,6 +79,12 @@ func (bruteForce *HttpBruteForceCore) init() (err error) {
 	err = bruteForce.pageCreate()
 	if err != nil {
 		return
+	}
+	if len(bruteForce.config.preActions) > 0 {
+		err = preaction.PreActs(bruteForce.page, bruteForce.config.preActions)
+		if err != nil {
+			return
+		}
 	}
 	html, err := bruteForce.page.HTML()
 	if err != nil {
@@ -188,6 +195,7 @@ func (bruteForce *HttpBruteForceCore) inputElementDetect() error {
 				"password",
 				"number",
 				"tel",
+				"",
 			},
 		},
 	}
@@ -392,6 +400,12 @@ func (bruteForce *HttpBruteForceCore) login(username, password string) (bool, er
 	}
 	if bruteForce.config.extraWaitLoadTime != 0 {
 		time.Sleep(time.Duration(bruteForce.config.extraWaitLoadTime) * time.Millisecond)
+	}
+	if len(bruteForce.config.preActions) > 0 {
+		err = preaction.PreActs(bruteForce.page, bruteForce.config.preActions)
+		if err != nil {
+			return false, err
+		}
 	}
 	err = ElementInput(bruteForce.page, bruteForce.UsernameSelector, username)
 	if err != nil {
