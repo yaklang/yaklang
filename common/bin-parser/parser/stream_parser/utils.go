@@ -121,7 +121,7 @@ func NewNodeByType(node *base.Node, typeName string) (*base.Node, error) {
 	return newNode.Copy(), nil
 }
 
-func getSubData(d any, key string) (any, bool) {
+func getSubData(d any, key string) (any, error) {
 	switch reflect.TypeOf(d).Kind() {
 	case reflect.Map, reflect.Slice, reflect.Array:
 		return getMapOrSliceSubData(d, key)
@@ -131,49 +131,57 @@ func getSubData(d any, key string) (any, bool) {
 		return getMapOrSliceSubData(d, key)
 	}
 }
-func getGetterSubData(getter any, key string) (any, bool) {
-	v, ok := getter.(func(key string) (any, bool))
+func getGetterSubData(getter any, key string) (any, error) {
+	v, ok := getter.(func(key string) (any, error))
 	if !ok {
-		return nil, false
+		return nil, errors.New("invalid type of data getter")
 	}
 	return v(key)
 }
 
-func getMapOrSliceSubData(d any, key string) (any, bool) {
+func getMapOrSliceSubData(d any, key string) (any, error) {
 	p := strings.Split(key, ".")
-	for _, ele := range p {
+	currentKey := ""
+	for i, ele := range p {
+		if i != 0 {
+			currentKey += "."
+		}
+		currentKey += ele
 		refV := reflect.ValueOf(d)
 		if refV.Kind() == reflect.Map {
 			v := refV.MapIndex(reflect.ValueOf(ele))
 			if !v.IsValid() {
-				return nil, false
+				return nil, utils.Errorf("get element `%s` failed", currentKey)
 			} else {
 				d = v.Interface()
 			}
 		} else if refV.Kind() == reflect.Slice || refV.Kind() == reflect.Array {
 			if !strings.HasPrefix(ele, "#") {
-				return nil, false
+				return nil, utils.Errorf("get element `%s` failed", currentKey)
 			}
 			index, err := strconv.Atoi(ele[1:])
 			if err != nil {
-				return nil, false
+				return nil, utils.Errorf("get element `%s` failed", currentKey)
 			}
 			if index >= refV.Len() {
-				return nil, false
+				return nil, utils.Errorf("get element `%s` failed", currentKey)
 			}
 			d = refV.Index(index).Interface()
 		} else if refV.Kind() == reflect.Struct || (refV.Kind() == reflect.Ptr && refV.Elem().Kind() == reflect.Struct) {
+			if refV.Kind() == reflect.Ptr {
+				refV = refV.Elem()
+			}
 			v := refV.FieldByName(ele)
 			if !v.IsValid() {
-				return nil, false
+				return nil, utils.Errorf("get element `%s` failed", currentKey)
 			} else {
 				d = v.Interface()
 			}
 		} else {
-			return nil, false
+			return nil, utils.Errorf("get element `%s` failed", currentKey)
 		}
 	}
-	return d, true
+	return d, nil
 }
 func GetNodePath(node *base.Node) string {
 	p := ""

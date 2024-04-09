@@ -7,34 +7,35 @@ import (
 )
 
 type NegotiateMessage struct {
-	Signature       [8]byte
-	MessageType     uint32
-	NegotiateFlags  uint32
-	DomainNameField *Field
-	Version         *Version
+	Signature         [8]byte
+	MessageType       uint32
+	NegotiateFlags    uint32
+	DomainNameFields  Field
+	WorkstationFields Field
+	Version           Version
 }
 type ChallengeMessage struct {
-	Signature       [8]byte
-	MessageType     uint32
-	TargetNameField *Field
-	NegotiateFlags  uint32
-	ServerChallenge [8]byte
-	Reserved        [8]byte
-	TargetInfoField *Field
-	Version         *Version
+	Signature        [8]byte
+	MessageType      uint32
+	TargetNameFields Field
+	NegotiateFlags   uint32
+	ServerChallenge  [8]byte
+	Reserved         [8]byte
+	TargetInfoFields Field
+	Version          Version
 }
 type AuthenticationMessage struct {
-	Signature                      [8]byte
-	MessageType                    uint32
-	LmChallengeResponseFields      *Field
-	NtChallengeResponseFields      *Field
-	DomainNameFields               *Field
-	UserNameFields                 *Field
-	WorkstationFields              *Field
-	EncryptedRandomSessionKeyField *Field
-	NegotiateFlags                 [4]byte
-	Version                        *Version
-	MIC                            [16]byte
+	Signature                       [8]byte
+	MessageType                     uint32
+	LmChallengeResponseFields       Field
+	NtChallengeResponseFields       Field
+	DomainNameFields                Field
+	UserNameFields                  Field
+	WorkstationFields               Field
+	EncryptedRandomSessionKeyFields Field
+	NegotiateFlags                  [4]byte
+	Version                         Version
+	MIC                             [16]byte
 }
 type Version struct {
 	ProductMajorVersion uint8
