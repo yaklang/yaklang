@@ -188,7 +188,7 @@ func TestMemberCall_CheckField(t *testing.T) {
 					return ssaapi.Values{v.GetOperand(1)}
 				}).ShowWithSource()
 
-				argUniqed := lo.UniqBy(arg, func(v *ssaapi.Value) int {
+				argUniqed := lo.UniqBy(arg, func(v *ssaapi.Value) int64 {
 					return v.GetId()
 				})
 

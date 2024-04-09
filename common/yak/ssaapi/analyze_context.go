@@ -22,9 +22,9 @@ type AnalyzeContext struct {
 	_objectStack *utils.Stack[objectItem]
 
 	// for PHI, create  visitedPhi map for  echo call stack
-	_callTable *omap.OrderedMap[int, *omap.OrderedMap[int, *Value]]
+	_callTable *omap.OrderedMap[int64, *omap.OrderedMap[int64, *Value]]
 	// in main function, no call stack, we need a global visitedPhi map
-	_visitedPhi *omap.OrderedMap[int, *Value]
+	_visitedPhi *omap.OrderedMap[int64, *Value]
 
 	config *OperationConfig
 
@@ -35,8 +35,8 @@ func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
 	return &AnalyzeContext{
 		_callStack:   utils.NewStack[*Value](),
 		_objectStack: utils.NewStack[objectItem](),
-		_callTable:   omap.NewOrderedMap[int, *omap.OrderedMap[int, *Value]](map[int]*omap.OrderedMap[int, *Value]{}),
-		_visitedPhi:  omap.NewOrderedMap[int, *Value](map[int]*Value{}),
+		_callTable:   omap.NewOrderedMap[int64, *omap.OrderedMap[int64, *Value]](map[int64]*omap.OrderedMap[int64, *Value]{}),
+		_visitedPhi:  omap.NewOrderedMap[int64, *Value](map[int64]*Value{}),
 		config:       NewOperations(opt...),
 		depth:        -1,
 	}
@@ -53,7 +53,7 @@ func (a *AnalyzeContext) PushCall(i *Value) error {
 		return utils.Errorf("call[%v] is existed on s-runtime call stack %v", i.GetId(), i.String())
 	}
 	a._callStack.Push(i)
-	a._callTable.Set(i.GetId(), omap.NewOrderedMap[int, *Value](map[int]*Value{}))
+	a._callTable.Set(i.GetId(), omap.NewOrderedMap[int64, *Value](map[int64]*Value{}))
 	return nil
 }
 

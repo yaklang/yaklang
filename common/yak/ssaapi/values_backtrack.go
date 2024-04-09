@@ -3,11 +3,12 @@ package ssaapi
 import (
 	"bytes"
 	"fmt"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/cartesian"
-	"strings"
 )
 
 func (v *Value) recursive(visited map[*Value]struct{}, itemGetter func(value *Value) []*Value, h func(*Value) error) {
@@ -110,7 +111,7 @@ func (v *Value) Backtrack() *omap.OrderedMap[string, *Value] {
 	var count = 1
 	var current = v
 	vals.Push(v)
-	visited := make(map[int]bool)
+	visited := make(map[int64]bool)
 	for current != nil {
 		deps := current.DependOn
 		var p *Value
