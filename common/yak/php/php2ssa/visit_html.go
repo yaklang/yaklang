@@ -11,12 +11,10 @@ func (y *builder) VisitHtmlDocument(raw phpparser.IHtmlDocumentContext) interfac
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
-
 	i, _ := raw.(*phpparser.HtmlDocumentContext)
 	if i == nil {
 		return nil
 	}
-
 	if i.Shebang() != nil {
 		// handle shebang
 	}
