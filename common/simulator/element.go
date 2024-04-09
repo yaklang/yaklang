@@ -48,9 +48,9 @@ func customizedCheckTagElements(page *rod.Page, tagName string, tagInfo map[stri
 func customizedCheckElementAttribute(element *rod.Element, attributeInfo map[string][]string) bool {
 	for attribute, attributeList := range attributeInfo {
 		info, _ := GetAttribute(element, attribute)
-		if info == "" {
-			continue
-		}
+		//if info == "" {
+		//	continue
+		//}
 		info = strings.ToLower(info)
 		if StringArrayContains(attributeList, info) {
 			return true

@@ -24,6 +24,7 @@ var Exports = map[string]interface{}{
 	"exePath":              WithExePath,
 	"extraWaitLoadTime":    WithExtraWaitLoadTime,
 	"leaklessStatus":       WithLeakless,
+	"preAction":            WithPreActions,
 
 	"urlChangeMode":     UrlChangeMode,
 	"htmlChangeMode":    HtmlChangeMode,
