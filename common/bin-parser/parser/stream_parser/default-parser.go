@@ -367,8 +367,8 @@ func (d *DefParser) Generate(data any, node *base.Node) error {
 			if GetNodePath(node) == "" {
 				return false, nil
 			}
-			data, ok := getSubData(rootData, GetNodePath(node))
-			if ok {
+			data, err := getSubData(rootData, GetNodePath(node))
+			if err == nil {
 				switch ret := data.(type) {
 				case []byte, string:
 					err := d.Parse(base.NewBitReader(bytes.NewBuffer(utils.InterfaceToBytes(ret))), node)
@@ -384,8 +384,8 @@ func (d *DefParser) Generate(data any, node *base.Node) error {
 				return fmt.Errorf("node %s is not terminal", node.Name)
 			}
 			p := GetNodePath(node)
-			data, ok := getSubData(rootData, p)
-			if !ok {
+			data, err := getSubData(rootData, p)
+			if err != nil {
 				//return nil
 				length, err := getNodeLength(node)
 				if err != nil {
