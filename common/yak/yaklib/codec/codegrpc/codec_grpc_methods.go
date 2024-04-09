@@ -115,24 +115,28 @@ func encodeData(text []byte, output outputType) []byte {
 }
 
 func decodeData(text []byte, input outputType) []byte {
+	var data []byte
+	var err error
 	switch input {
 	case OUTPUT_RAW:
 		return text
 	case OUTPUT_HEX:
-		data, err := codec.DecodeHex(string(text))
+		data, err = codec.DecodeHex(string(text))
 		if err != nil {
 			return text
 		}
-		return data
 	case OUTPUT_BASE64:
-		data, err := codec.DecodeBase64(string(text))
+		data, err = codec.DecodeBase64(string(text))
 		if err != nil {
 			return text
 		}
-		return data
 	default:
 		return text
 	}
+	if funk.IsEmpty(data) {
+		return nil
+	}
+	return data
 }
 
 // Tag = "加密"
