@@ -40,6 +40,7 @@ type BaseConfig struct {
 	sensitiveWords    []string
 	leakless          string
 	localStorage      map[string]string
+	sessionStorage    map[string]string
 	invalidSuffix     []string
 	stealth           bool
 	saveToDB          bool
@@ -105,6 +106,7 @@ func NewConfig() *Config {
 			ch:                make(chan ReqInfo),
 			leakless:          "default",
 			localStorage:      make(map[string]string),
+			sessionStorage:    make(map[string]string),
 			invalidSuffix:     make([]string, 0),
 			stealth:           false,
 			saveToDB:          false,
@@ -319,6 +321,14 @@ func WithLocalStorage(storage map[string]string) ConfigOpt {
 	return func(config *Config) {
 		for k, v := range storage {
 			config.baseConfig.localStorage[k] = v
+		}
+	}
+}
+
+func WithSessionStorage(storage map[string]string) ConfigOpt {
+	return func(config *Config) {
+		for k, v := range storage {
+			config.baseConfig.sessionStorage[k] = v
 		}
 	}
 }

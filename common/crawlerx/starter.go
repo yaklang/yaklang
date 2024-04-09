@@ -336,6 +336,17 @@ func (starter *BrowserStarter) scanCreatedTarget(targetID proto.TargetTargetID) 
 	if starter.extraWaitLoadTime != 0 {
 		time.Sleep(time.Duration(starter.extraWaitLoadTime) * time.Millisecond)
 	}
+	// session storage
+	if len(starter.baseConfig.sessionStorage) > 0 {
+		for key, value := range starter.baseConfig.sessionStorage {
+			setSessionStorage := fmt.Sprintf(`()=>window.sessionStorage.setItem("%s", "%s")`, key, value)
+			_, err := page.Eval(setSessionStorage)
+			if err != nil {
+				log.Errorf("session storage save data error: %v", err)
+				return
+			}
+		}
+	}
 	// eval js
 	for _, item := range starter.evalJs {
 		if item.targetUrl.MatchString(urlStr) {
@@ -343,6 +354,7 @@ func (starter *BrowserStarter) scanCreatedTarget(targetID proto.TargetTargetID) 
 				resultObj, err := page.Eval(js)
 				if err != nil {
 					log.Errorf(`page eval custom js error: %v`, err)
+					continue
 				}
 				jsResult := resultObj.Value.String()
 				result := JsResultSave{

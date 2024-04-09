@@ -29,6 +29,7 @@ var CrawlerXExports = map[string]interface{}{
 	"sensitiveWords":    WithSensitiveWords,
 	"leakless":          WithLeakless,
 	"localStorage":      WithLocalStorage,
+	"sessionStorage":    WithSessionStorage,
 	"invalidSuffix":     WithInvalidSuffix,
 	"stealth":           WithStealth,
 	"runtimeID":         WithRuntimeID,
