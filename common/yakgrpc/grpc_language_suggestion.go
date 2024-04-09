@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -832,6 +833,7 @@ func (s *Server) YaklangLanguageSuggestion(ctx context.Context, req *ypb.Yaklang
 	opt = append(opt, ssaapi.WithIgnoreSyntaxError(true))
 	prog, err := ssaapi.Parse(req.YakScriptCode, opt...)
 	if err != nil {
+		log.Error(err)
 		return nil, errors.New("ssa parse error")
 	}
 	// todo: 处理YakScriptType，不同语言的补全、提示可能有不同
