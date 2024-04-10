@@ -723,7 +723,32 @@ RECONNECT:
 		if option.DefaultBufferSize <= 0 {
 			option.DefaultBufferSize = 4096
 		}
-		httpResponseReader := bufio.NewReaderSize(io.TeeReader(conn, &responseRaw), option.DefaultBufferSize)
+
+		var mirrorWriter io.Writer = &responseRaw
+
+		// BodyStreamReaderHandler is only effect non-pool connection
+		if option != nil && option.BodyStreamReaderHandler != nil {
+			reader, writer := utils.NewBufPipe(nil)
+			defer func() {
+				writer.Close()
+			}()
+			go func() {
+				defer func() {
+					if err := recover(); err != nil {
+						log.Errorf("BodyStreamReaderHandler panic: %v", err)
+					}
+				}()
+				nativeResponse, err := http.ReadResponse(bufio.NewReader(reader), nil)
+				if err != nil {
+					log.Warnf("BodyStreamReaderHandler read response failed: %s", err)
+				} else {
+					option.BodyStreamReaderHandler(nativeResponse, reader)
+				}
+			}()
+			mirrorWriter = io.MultiWriter(&responseRaw, writer)
+		}
+
+		httpResponseReader := bufio.NewReaderSize(io.TeeReader(conn, mirrorWriter), option.DefaultBufferSize)
 
 		// 服务器响应第一个字节
 	READ:
@@ -739,7 +764,7 @@ RECONNECT:
 			// 尝试读取更多字节以确认是否是特定的 TLS 错误
 			tlsHeader, err := httpResponseReader.Peek(6)
 			if err == nil && bytes.Equal(tlsHeader, []byte("\x15\x03\x01\x00\x02\x02")) {
-				return response, utils.Errorf("tls record header error detected")
+				return response, utils.Errorf("tls record header error detected... raw: %v", spew.Sdump(tlsHeader))
 			}
 		}
 
@@ -750,7 +775,7 @@ RECONNECT:
 		}
 		firstResponse, err = utils.ReadHTTPResponseFromBufioReader(httpResponseReader, stashedRequest)
 		if err != nil {
-			log.Infof("[lowhttp] read response failed: %s", err)
+			log.Warnf("[lowhttp] read response failed: %s", err)
 		}
 
 		if firstAuth && firstResponse != nil && firstResponse.StatusCode == http.StatusUnauthorized {

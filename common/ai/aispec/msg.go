@@ -13,6 +13,7 @@ type ChatMessage struct {
 	Model    string       `json:"model"`
 	Messages []ChatDetail `json:"messages"`
 	Tools    []Tool       `json:"tools,omitempty"`
+	Stream   bool         `json:"stream"`
 }
 
 type ChatDetail struct {

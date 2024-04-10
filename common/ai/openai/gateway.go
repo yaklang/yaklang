@@ -3,7 +3,9 @@ package openai
 import (
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"io"
 )
 
 func init() {
@@ -34,6 +36,11 @@ func (g *GetawayClient) ExtractData(msg string, desc string, fields map[string]a
 		msg, desc, fields,
 		g.BuildHTTPOptions,
 	)
+}
+
+func (g *GetawayClient) ChatStream(s string) (io.ReadCloser, error) {
+	aispec.ChatWithStream(g.targetUrl, g.config.Model, s, g.BuildHTTPOptions)
+	return nil, utils.Error("not implemented")
 }
 
 func (g *GetawayClient) LoadOption(opt ...aispec.AIConfigOption) {

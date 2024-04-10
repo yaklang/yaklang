@@ -3,7 +3,9 @@ package moonshot
 import (
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"io"
 )
 
 func init() {
@@ -16,6 +18,10 @@ type GatewayClient struct {
 	config *aispec.AIConfig
 
 	targetUrl string
+}
+
+func (g *GatewayClient) ChatStream(s string) (io.ReadCloser, error) {
+	return nil, utils.Error("not implemented")
 }
 
 func (g *GatewayClient) Chat(s string, function ...aispec.Function) (string, error) {
