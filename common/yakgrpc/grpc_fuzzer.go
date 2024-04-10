@@ -48,7 +48,7 @@ func Chardet(raw []byte) string {
 }
 
 func (s *Server) ExtractUrl(ctx context.Context, req *ypb.FuzzerRequest) (*ypb.ExtractedUrl, error) {
-	res, err := mutate.FuzzTagExec(req.GetRequest(), mutate.Fuzz_WithEnableFiletag())
+	res, err := mutate.FuzzTagExec(req.GetRequest(), mutate.Fuzz_WithEnableDangerousTag())
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func (s *Server) StringFuzzer(rootCtx context.Context, req *ypb.StringFuzzerRequ
 			return true
 		}),
 		yak.Fuzz_WithHotPatch(rootCtx, req.GetHotPatchCode()),
-		mutate.Fuzz_WithEnableFiletag(),
+		mutate.Fuzz_WithEnableDangerousTag(),
 	)
 	return &ypb.StringFuzzerResponse{Results: res}, nil
 }
@@ -732,7 +732,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				fuzzMode = "close"
 			}
 		}
-		mutate.WithPoolOpt_ForceFuzzfile(req.GetForceFuzz())
+		mutate.WithPoolOpt_ForceFuzzDangerous(req.GetForceFuzz())
 		if isRetry {
 			// 重试的时候，不需要渲染fuzztag
 			fuzzMode = "close"
@@ -742,10 +742,10 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ForceFuzz(false))
 		case "standard":
 			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ForceFuzz(true))
-			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ForceFuzzfile(true))
+			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ForceFuzzDangerous(true))
 		case "simple", "legacy":
 			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ForceFuzz(true))
-			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ForceFuzzfile(true))
+			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ForceFuzzDangerous(true))
 			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ExtraFuzzOptions(mutate.Fuzz_WithSimple(true)))
 		}
 		if req.GetFuzzTagSyncIndex() {

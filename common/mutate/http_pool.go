@@ -39,7 +39,7 @@ type httpPoolConfig struct {
 	PayloadsTable                    *sync.Map
 	Ctx                              context.Context
 	ForceFuzz                        bool
-	ForceFuzzfile                    bool
+	ForceFuzzDangerous               bool
 	ExtraFuzzOption                  []FuzzConfigOpt
 	FuzzParams                       map[string][]string
 	RequestCountLimiter              int
@@ -324,9 +324,9 @@ func _httpPool_SetForceFuzz(b bool) HttpPoolConfigOption {
 	}
 }
 
-func _httpPool_SetForceFuzzfile(b bool) HttpPoolConfigOption {
+func _httpPool_SetForceFuzzDangerous(b bool) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
-		config.ForceFuzzfile = b
+		config.ForceFuzzDangerous = b
 	}
 }
 
@@ -516,17 +516,17 @@ type HttpResult struct {
 
 func NewDefaultHttpPoolConfig(opts ...HttpPoolConfigOption) *httpPoolConfig {
 	base := &httpPoolConfig{
-		Size:              50,
-		PerRequestTimeout: 10 * time.Second,
-		IsHttps:           false,
-		IsGmTLS:           false,
-		NoFollowRedirect:  true,
-		UseRawMode:        true,
-		RedirectTimes:     0,
-		FollowJSRedirect:  false,
-		Ctx:               context.Background(),
-		ForceFuzz:         true,
-		ForceFuzzfile:     false,
+		Size:               50,
+		PerRequestTimeout:  10 * time.Second,
+		IsHttps:            false,
+		IsGmTLS:            false,
+		NoFollowRedirect:   true,
+		UseRawMode:         true,
+		RedirectTimes:      0,
+		FollowJSRedirect:   false,
+		Ctx:                context.Background(),
+		ForceFuzz:          true,
+		ForceFuzzDangerous: false,
 	}
 	for _, opt := range opts {
 		if opt == nil {
@@ -923,8 +923,8 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							return []string{v}
 						}))
 					}
-					if config.ForceFuzzfile {
-						opts = append(opts, FuzzFileOptions()...)
+					if config.ForceFuzzDangerous {
+						opts = append(opts, Fuzz_WithEnableDangerousTag())
 					}
 					if config.FuzzParams != nil && len(config.FuzzParams) > 0 {
 						opts = append(opts, Fuzz_WithParams(config.FuzzParams))
@@ -994,7 +994,7 @@ var (
 	WithPoolOpt_FollowJSRedirect           = _httpPool_SetFollowJSRedirect
 	WithPoolOpt_Context                    = _httpPool_SetContext
 	WithPoolOpt_ForceFuzz                  = _httpPool_SetForceFuzz
-	WithPoolOpt_ForceFuzzfile              = _httpPool_SetForceFuzzfile
+	WithPoolOpt_ForceFuzzDangerous         = _httpPool_SetForceFuzzDangerous
 	WithPoolOpt_FuzzParams                 = _httpPool_SetFuzzParams
 	WithPoolOpt_ExtraMutateCondition       = _httpPool_extraMutateCondition
 	WithPoolOpt_ExtraMutateConditionGetter = _httpPool_extraMutateConditionGetter
