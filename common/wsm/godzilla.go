@@ -566,6 +566,10 @@ func (g *Godzilla) CommandExec(cmd string, opts ...behinder.ExecParamsConfig) ([
 	return g.EvalFunc("", "execCommand", parameter)
 }
 
+func (g *Godzilla) ExecutePluginOrCache(param map[string]string) ([]byte, error) {
+	panic("impl me")
+}
+
 func (g *Godzilla) FileManagement() {
 
 }

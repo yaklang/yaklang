@@ -22,9 +22,9 @@ func GetRawClass(binPayload string, params map[string]string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	builder := javaclassparser.NewClassObjectBuilder(clsObj)
 	for k, v := range params {
-		fields := clsObj.FindConstStringFromPool(k)
-		fields.Value = v
+		builder.SetParam(k, v)
 	}
 	// 随机更换类名 原始类名是这样的 net/behinder/payload/java/xxx
 	err = clsObj.SetClassName(payloads.RandomClassName())
