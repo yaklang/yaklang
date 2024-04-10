@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"go.uber.org/atomic"
 )
 
 type instructionIrCode struct {
@@ -25,6 +26,7 @@ type instructionIrCode struct {
 type Cache struct {
 	ProgramName      string // mark which program handled
 	DB               *gorm.DB
+	id               *atomic.Int64
 	InstructionCache *utils.CacheWithKey[int64, instructionIrCode] // instructionID to instruction
 	VariableCache    *utils.CacheWithKey[string, []Instruction]    // variable(name:string) to []instruction
 }
@@ -54,6 +56,8 @@ func NewDBCache(programName string, ConfigTTL ...time.Duration) *Cache {
 		variableCache.SetExpirationCallback(func(key string, insts []Instruction) {
 			cache.saveVariable(key, insts)
 		})
+	} else {
+		cache.id = atomic.NewInt64(0)
 	}
 
 	return cache
@@ -79,8 +83,7 @@ func (c *Cache) SetInstruction(inst Instruction) {
 		}
 	} else {
 		// not use database
-		// in this case, database disabled, c.InstructionCache will never expire
-		id = int64(c.InstructionCache.Count() + 1)
+		id = c.id.Inc()
 		instIr = instructionIrCode{
 			inst:   inst,
 			irCode: nil,
