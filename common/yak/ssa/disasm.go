@@ -100,6 +100,9 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 				ret += fmt.Sprintf("\t%s\n", p)
 			}
 			for _, i := range b.Insts {
+				if _, ok := ToConst(i); ok {
+					continue
+				}
 				ret += fmt.Sprintf("\t%s\n", i)
 			}
 		} else {
