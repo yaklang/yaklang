@@ -350,6 +350,23 @@ func Test_CallStack_FreeValue_WithoutDefault(t *testing.T) {
 
 }
 
+func Test_CallStack_FreeVale_Parameter(t *testing.T) {
+	// TODO : implement this testcase,
+	// function and call-site should be alignment.
+	// t.Run("test level2 with parameter", func(t *testing.T) {
+	// 	Check(t, `
+	// 	f = (i) => {
+	// 		return () => {
+	// 			return i + j
+	// 		}
+	// 	}
+	// 	j = 444444
+	// 	f1 = f(333333)
+	// 	a = f1()
+	// 	`, CheckTopDef_Equal("a", []string{"333333", "444444"}))
+	// })
+}
+
 func Test_CallStack_Normal_SideEffect(t *testing.T) {
 	t.Run("test level1", func(t *testing.T) {
 		Check(t, `
