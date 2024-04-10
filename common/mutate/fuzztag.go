@@ -167,6 +167,30 @@ func init() {
 	})
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{
+		TagName: "unicode:encode",
+		Handler: func(s string) []string {
+			res := codec.JsonUnicodeEncode(s)
+			return []string{
+				string(res),
+			}
+		},
+		Alias:       []string{"unicode", "unicode:enc"},
+		Description: "Unicode 编码，把标签内容进行 Unicode 编码",
+	})
+
+	AddFuzzTagToGlobal(&FuzzTagDescription{
+		TagName: "unicode:decode",
+		Handler: func(s string) []string {
+			res := codec.JsonUnicodeDecode(s)
+			return []string{
+				string(res),
+			}
+		},
+		Alias:       []string{"unicode:dec"},
+		Description: "Unicode 解码，把标签内的内容进行 Unicode 解码",
+	})
+
+	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "zlib:encode",
 		Handler: func(s string) []string {
 			res, _ := utils.ZlibCompress(s)

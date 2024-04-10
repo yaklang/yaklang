@@ -332,3 +332,17 @@ func TestDateRangeFuzzTag(t *testing.T) {
 		MutateQuick(`{{date:range(01/01/2008,01/11/2008)}}`),
 	)
 }
+
+func TestUnicodeTag(t *testing.T) {
+	require.Equal(
+		t,
+		[]string{`\u0031\u0032\u0033\u0034`},
+		MutateQuick(`{{unicode:encode(1234)}}`),
+	)
+
+	require.Equal(
+		t,
+		[]string{`1234`},
+		MutateQuick(`{{unicode:decode(\u0031\u0032\u0033\u0034)}}`),
+	)
+}
