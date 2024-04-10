@@ -166,4 +166,6 @@ var Exports = map[string]any{
 	// language:
 	"Javascript": JS,
 	"Yak":        Yak,
+	"PHP":        PHP,
+	"Java":       JAVA,
 }
