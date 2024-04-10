@@ -60,7 +60,7 @@ func CheckBottomUserCall_Contain(variable string, want []string, forceCheckLengt
 				if lastIndex != -1 {
 					member := variable[:lastIndex]
 					key := variable[lastIndex+1:]
-					return p.Ref(member).Ref(fmt.Sprintf("\"%s\"", key))
+					return p.Ref(member).Ref(key)
 				} else {
 					return p.Ref(variable)
 				}
@@ -92,6 +92,7 @@ func CheckTopDef_Contain(variable string, want []string, forceCheckLength ...boo
 		)
 	}
 }
+
 func CheckTopDef_Equal(variable string, want []string, forceCheckLength ...bool) checkFunction {
 	return func(p *ssaapi.Program) error {
 		checkLength := false

@@ -39,7 +39,7 @@ func TestUnpack_Basic3(t *testing.T) {
 		prog.Ref("e").GetTopDefs().Show(),
 		func(v *ssaapi.Value) int64 { return v.GetId() },
 	)
-	assert.Equal(t, 2, len(values))
+	assert.Equal(t, 3, len(values))
 }
 
 func TestUnpack_BasicFunctionUnpack(t *testing.T) {
