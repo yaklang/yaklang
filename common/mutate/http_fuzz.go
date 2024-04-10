@@ -35,6 +35,7 @@ type FuzzHTTPRequest struct {
 	_originRequestInstance *http.Request
 	chunked                bool
 	ctx                    context.Context
+	queryParams            *lowhttp.QueryParams
 }
 
 func (r *FuzzHTTPRequest) NoAutoEncode() bool {
@@ -228,6 +229,7 @@ type buildFuzzHTTPRequestConfig struct {
 	RuntimeId       string
 	NoAutoEncode    bool
 	FriendlyDisplay bool
+	QueryParams     *lowhttp.QueryParams
 	Proxy           string
 	Ctx             context.Context
 }
@@ -249,6 +251,12 @@ func OptDisableAutoEncode(i bool) BuildFuzzHTTPRequestOption {
 func OptFriendlyDisplay() BuildFuzzHTTPRequestOption {
 	return func(config *buildFuzzHTTPRequestConfig) {
 		config.FriendlyDisplay = true
+	}
+}
+
+func OptQueryParams(i *lowhttp.QueryParams) BuildFuzzHTTPRequestOption {
+	return func(config *buildFuzzHTTPRequestConfig) {
+		config.QueryParams = i
 	}
 }
 
@@ -444,6 +452,7 @@ func NewFuzzHTTPRequest(i interface{}, opts ...BuildFuzzHTTPRequestOption) (*Fuz
 	req.proxy = config.Proxy
 	req.noAutoEncode = config.NoAutoEncode
 	req.friendlyDisplay = config.FriendlyDisplay
+	req.queryParams = config.QueryParams
 	req.ctx = config.Ctx
 	req.opts = opts
 	return req, nil
@@ -470,6 +479,11 @@ func (f *FuzzHTTPRequest) GetCurrentOptions() []BuildFuzzHTTPRequestOption {
 	if f.friendlyDisplay {
 		result = append(result, OptFriendlyDisplay())
 	}
+
+	if f.queryParams != nil {
+		result = append(result, OptQueryParams(f.queryParams))
+	}
+
 	return result
 }
 

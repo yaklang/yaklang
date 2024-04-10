@@ -208,24 +208,26 @@ func TestFuzzGetParams(t *testing.T) {
 Host: www.baidu.com
 
 `,
-				code: `.FuzzGetParams("b", "%25%25").FuzzGetParams("c", "123")`,
+				code: `.FuzzGetParams("b", "%25%25").FuzzGetParams("c", "$")`,
 				expectKeywordInOutputPacket: []string{
 					"a=MTIzNA%3D%3D",
 					"b=%2525%2525",
-					"c=123",
+					"c=%24",
 				},
 			},
 		},
 		{
 			name: "GET参数 友好显示",
 			base: base{
-				inputPacket: `GET /?a=ab HTTP/1.1
+				inputPacket: `GET /?a=MTIzNA== HTTP/1.1
 Host: www.baidu.com
 
 `,
-				code: `.FuzzGetParams("a", "$.abc").FuzzGetParams("b", "%25%25")`,
+				code: `.FuzzGetParams("b", "%25%25").FuzzGetParams("c", "$")`,
 				expectKeywordInOutputPacket: []string{
-					"a={{urlescape($.abc)}}", "b={{urlescape(%25%25)}}",
+					"a={{urlescape(MTIzNA==)}}",
+					"b={{urlescape(%25%25)}}",
+					"c={{urlescape($)}}",
 				},
 				friendlyDisplay: true,
 			},
@@ -237,9 +239,11 @@ Host: www.baidu.com
 Host: www.baidu.com
 
 `,
-				code: `.FuzzGetParams("b", "%25%25")`,
+				code: `.FuzzGetParams("b", "%25%25").FuzzGetParams("c", "$")`,
 				expectKeywordInOutputPacket: []string{
-					"a=MTIzNA%3D%3D", "b=%25%25",
+					"a=MTIzNA%3D%3D",
+					"b=%25%25",
+					"c=$",
 				},
 				disableEncode: true,
 			},
@@ -257,7 +261,23 @@ Host: www.baidu.com
 				},
 				disableEncode:   true,
 				friendlyDisplay: true,
-				debug:           true,
+			},
+		},
+		{
+			name: "GET参数 禁止编码 & 友好显示 2",
+			base: base{
+				inputPacket: `GET /?a=MTIzNA== HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzGetParams("b", "$").FuzzGetParams("c", "$")`,
+				expectKeywordInOutputPacket: []string{
+					"a={{urlescape(MTIzNA==)}}",
+					"b=$",
+					"c=$",
+				},
+				disableEncode:   true,
+				friendlyDisplay: true,
 			},
 		},
 		{
@@ -427,6 +447,21 @@ Host: www.baidu.com
 				friendlyDisplay: true,
 			},
 		},
+		{
+			name: "GET 参数(JSON) 禁止编码 & 友好显示",
+			base: base{
+				inputPacket: `GET /?a={"abc": 123} HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzGetJsonPathParams("a", "$.d", "dd").FuzzGetJsonPathParams("a", "$.e", 123).FuzzGetJsonPathParams("a", "$.f", {"xx":123})`,
+				expectKeywordInOutputPacket: []string{
+					`a={"abc":123,"d":"dd","e":123,"f":{"xx":123}}`,
+				},
+				disableEncode: true,
+				//debug:         true,
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -585,6 +620,93 @@ Host: www.baidu.com
 			},
 		},
 	}
+	for _, tc := range tests {
+		t.Run(tc.name, testCaseCheck(tc.base))
+	}
+}
+
+func TestFuzzHTTPHeader(t *testing.T) {
+	tests := []struct {
+		name string
+		base base
+	}{
+		{
+			name: "Header 覆盖/追加",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+
+123456
+`,
+				code: `.FuzzHTTPHeader("c", "123").FuzzHTTPHeader("a", "ab").FuzzHTTPHeader("a", "$")`,
+				expectKeywordInOutputPacket: []string{
+					`c: 123`,
+					`a: $`,
+					`123456`,
+				},
+				debug: true,
+			},
+		},
+		{
+			name: "Header 修改",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+
+123456
+`,
+				code: `.FuzzHTTPHeader("host", "123")`,
+				expectKeywordInOutputPacket: []string{
+					`host: 123`,
+				},
+				debug: true,
+			},
+		},
+		{
+			name: "Header chunked",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+
+123456
+`,
+				code: `.FuzzHTTPHeader("transfer-encoding", "chunked")`,
+				expectKeywordInOutputPacket: []string{
+					`transfer-encoding: chunked`,
+				},
+				debug: true,
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, testCaseCheck(tc.base))
+	}
+}
+
+func TestFuzzPath(t *testing.T) {
+	tests := []struct {
+		name string
+		base base
+	}{
+		{
+			name: "URL路径 ",
+			base: base{
+				inputPacket: `GET /?a=ab HTTP/1.1
+Host: www.baidu.com
+
+123456
+`,
+				code: `.FuzzPath("a")`,
+				expectKeywordInOutputPacket: []string{
+					`/a?a=ab`,
+				},
+				debug:         true,
+				disableEncode: true,
+			},
+		},
+	}
+
 	for _, tc := range tests {
 		t.Run(tc.name, testCaseCheck(tc.base))
 	}
