@@ -12,7 +12,10 @@ import (
 
 // GetTopDefs desc all of 'Defs' is not used by any other value
 func (i *Value) GetTopDefs(opt ...OperationOption) Values {
-	return i.getTopDefs(nil, opt...)
+	actx := NewAnalyzeContext(opt...)
+	actx.Self = i
+	ret := i.getTopDefs(actx, opt...)
+	return ret
 }
 
 func (v Values) GetTopDefs(opts ...OperationOption) Values {
@@ -117,12 +120,19 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			key := NewValue(value.GetKey())
 			actx.PushObject(obj, key, i)
 
-			return append(obj.getTopDefs(actx, opt...), i)
+			ret := obj.getTopDefs(actx, opt...)
+			if !ValueCompare(i, actx.Self) {
+				ret = append(ret, i)
+			}
+			return ret
 		}
 		return i.visitedDefsDefault(actx)
 	}
 
 	switch inst := i.node.(type) {
+	case *ssa.Make:
+		return Values{i}
+
 	case *ssa.Undefined:
 		// ret[n]
 		return getMemberCall(inst, actx)
