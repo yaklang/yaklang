@@ -76,10 +76,6 @@ func (y *YakShell) setContentType() {
 	y.Headers["Content-type"] = "application/x-www-form-urlencoded"
 }
 
-func (y *YakShell) getParams() *yakshell.Param {
-	return yakshell.NewParameter()
-}
-
 func (y *YakShell) getOrCrateSession() string {
 	if value, exists := y.cache.Get("session"); !exists {
 		tmpSession := uuid.NewString()
@@ -91,14 +87,14 @@ func (y *YakShell) getOrCrateSession() string {
 }
 
 // encryptAndSendPayload 加密并且发送请求
-func (y *YakShell) encryptAndSendPayload(payload []byte) ([]byte, error) {
+func (y *YakShell) encryptAndSendPayload(payload []byte, check bool) ([]byte, error) {
 	encryption, err := yakshell.Encryption(payload, []byte(y.Pass), y.ReqCipherMode)
 	if err != nil {
 		return nil, err
 	}
 	post, err := y.post(encryption)
-	if err != nil {
-		return nil, err
+	if !check {
+		return post, err
 	}
 	return y.handleResponse(post)
 }
@@ -127,9 +123,9 @@ func (y *YakShell) post(data []byte) ([]byte, error) {
 		return nil, utils.Errorf("http request error: %v", err)
 	}
 	_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(resp.RawPacket)
-	if len(body) == 0 {
-		return nil, utils.Errorf("empty response")
-	}
+	//if len(body) == 0 {
+	//	return nil, utils.Errorf("empty response")
+	//}
 	body = bytes.TrimSuffix(body, []byte("\r\n\r\n"))
 	return body, nil
 }
@@ -139,19 +135,18 @@ func (y *YakShell) injectPayload() error {
 	var data []byte
 	var err error
 	var tmpMap = make(map[string]string, 2)
-	y.processParams(tmpMap)
 	switch y.ShellScript {
 	case ypb.ShellScript_PHP.String():
 		fallthrough
 	case ypb.ShellScript_ASPX.String():
 		fallthrough
 	case ypb.ShellScript_JSP.String():
-		data, err = y.getPayload(payloads.AllPayload, tmpMap)
+		data, err = y.getPayload(payloads.AllPayload, tmpMap, true)
 	default:
 		log.Errorf("webshell类型错误")
 		return utils.Errorf("not found this script")
 	}
-	if _, err = y.encryptAndSendPayload(data); err != nil {
+	if _, err = y.encryptAndSendPayload(data, false); err != nil {
 		return err
 	}
 	return nil
@@ -167,11 +162,15 @@ func (y *YakShell) InjectPayloadIfNoCookie() error {
 	return nil
 }
 
-func (y *YakShell) getPayload(binCode payloads.Payload, params map[string]string) ([]byte, error) {
+func (y *YakShell) getPayload(binCode payloads.Payload, params yakshell.Param, first bool) ([]byte, error) {
 	var rawPayload []byte
-	var partAddPayload []byte
 	var err error
 	var hexCode string
+	if y.IsSession && !first {
+		//可以搞在这块来进行session mode的动态加密
+		return []byte(params.Serialize()), nil
+	}
+	//按照正常流程来处理参数
 	y.processParams(params)
 	if y.IsSession {
 		//如果是session就每次都获取到AllPayload去做解析
@@ -179,23 +178,20 @@ func (y *YakShell) getPayload(binCode payloads.Payload, params map[string]string
 	} else {
 		hexCode = payloads.YakShellPayload[y.ShellScript][binCode]
 	}
+	//if y.IsSession && first && y.ShellScript == ypb.ShellScript_PHP.String() {
+	//	return hex.DecodeString(hexCode)
+	//}
 	switch y.ShellScript {
 	case ypb.ShellScript_PHP.String():
-		rawPayload, partAddPayload, err = behinder.GetRawPHP(hexCode, params)
+		rawPayload, _, err = behinder.GetRawPHP(hexCode, params)
 	case ypb.ShellScript_JSP.String():
 		rawPayload, err = behinder.GetRawClass(hexCode, params)
 	case ypb.ShellScript_ASPX.String():
 		rawPayload, err = behinder.GetRawAssembly(hexCode, params)
 	}
-	if err != nil {
-		return nil, err
-	}
-	if y.IsSession {
-		return partAddPayload, nil
-	} else {
-		return rawPayload, nil
-	}
+	return rawPayload, err
 }
+
 func (y *YakShell) ClientRequestEncode(raw []byte) ([]byte, error) {
 	//TODO implement me
 	return nil, nil
@@ -207,9 +203,6 @@ func (y *YakShell) ServerResponseDecode(raw []byte) ([]byte, error) {
 }
 
 func (y *YakShell) handleResponse(data []byte) ([]byte, error) {
-	//if y.decode != nil {
-	//	//	todo
-	//}
 	decryption, err := yakshell.Decryption(data, []byte(y.Pass), y.ResCipherMode)
 	if err != nil {
 		return nil, err
@@ -281,14 +274,18 @@ func (y *YakShell) processParams(params map[string]string) {
 }
 
 func (y *YakShell) Ping(opts ...behinder.ExecParamsConfig) (bool, error) {
+	var argsMap = make(map[string]string, 2)
 	if err := y.InjectPayloadIfNoCookie(); err != nil {
 		return false, err
 	}
-	payload, err := y.getPayload(payloads.EchoGo, map[string]string{})
+	if y.IsSession {
+		argsMap["action"] = "ping"
+	}
+	payload, err := y.getPayload(payloads.EchoGo, argsMap, false)
 	if err != nil {
 		return false, err
 	}
-	_, err = y.encryptAndSendPayload(payload)
+	_, err = y.encryptAndSendPayload(payload, true)
 	if err != nil {
 		return false, err
 	}
@@ -300,25 +297,31 @@ func (y *YakShell) BasicInfo(opts ...behinder.ExecParamsConfig) ([]byte, error) 
 	if err := y.InjectPayloadIfNoCookie(); err != nil {
 		return nil, err
 	}
-	payload, err := y.getPayload(payloads.BasicInfoGo, map[string]string{})
+	var argsMap = make(map[string]string, 2)
+	if y.IsSession {
+		argsMap["action"] = "info"
+	}
+	payload, err := y.getPayload(payloads.BasicInfoGo, argsMap, false)
 	if err != nil {
 		return nil, err
 	}
-	return y.encryptAndSendPayload(payload)
-	//panic("implement me")
+	return y.encryptAndSendPayload(payload, true)
 }
 
 func (y *YakShell) CommandExec(cmd string, opts ...behinder.ExecParamsConfig) ([]byte, error) {
 	if err := y.InjectPayloadIfNoCookie(); err != nil {
 		return nil, err
 	}
-	payload, err := y.getPayload(payloads.CmdGo, map[string]string{
-		"command": cmd,
-	})
+	var argsMap = make(map[string]string, 2)
+	if y.IsSession {
+		argsMap["action"] = "cmd"
+	}
+	argsMap["command"] = cmd
+	payload, err := y.getPayload(payloads.CmdGo, argsMap, false)
 	if err != nil {
 		return nil, err
 	}
-	return y.encryptAndSendPayload(payload)
+	return y.encryptAndSendPayload(payload, true)
 }
 
 func (y *YakShell) String() string {
