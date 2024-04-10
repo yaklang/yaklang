@@ -177,7 +177,7 @@ jobs:
           - name: Test Crawler / Crawlerx (chromium based crawler)
             run: |
               # crawlerx
-              go test --timeout 5m ./common/crawlerx
+              go test --timeout 5m ./common/crawlerx/...
               # crawler
               go test -timeout 20s -run TestMUSTPASS ./common/crawler
 
