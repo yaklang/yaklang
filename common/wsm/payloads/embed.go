@@ -28,7 +28,7 @@ type Payload string
 
 // 目前将fileOperation payload 全部放在一起会造成数据包太大
 var (
-	AllPayload          Payload = "AllPayload"
+	AllPayload          Payload = "AllPayloadGo"
 	EchoGo              Payload = "EchoGo"
 	BasicInfoGo         Payload = "BasicInfoGo"
 	CmdGo               Payload = "CmdGo"
