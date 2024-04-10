@@ -66,11 +66,27 @@ func topDefCheckMustWithOpts(t *testing.T, code string, varName string, want []a
 }
 
 func TestBasic_BasicObject(t *testing.T) {
-	topDefCheckMust(t, `a = {}; a.b = 1; a.c = 3; d = a.c`, "d", "3")
+	Check(t, `
+	a = {}; 
+	a.b = 1; 
+	a.c = 3; 
+	d = a.c + a.b
+	`,
+		CheckTopDef_Equal("d", []string{"3", "1", "make(map[any]any)"}),
+	)
 }
+
 func TestBasic_BasicObject2(t *testing.T) {
-	topDefCheckMust(t, `a = ()=>{return {}}; a.b = 1; a.c = 3; d = a.c`, "d", "3")
+	Check(t, `
+	a = ()=>{return {}}; 
+	a.b = 1; 
+	a.c = 3; 
+	d = a.c + a.b
+	`,
+		CheckTopDef_Equal("d", []string{"3", "1", "make(map[any]any)"}),
+	)
 }
+
 func TestBasic_BasicObject_Trace(t *testing.T) {
 	havePhi := false
 	topDefCheckMustWithOpts(
