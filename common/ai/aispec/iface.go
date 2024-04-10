@@ -1,10 +1,14 @@
 package aispec
 
-import "github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+import (
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"io"
+)
 
 type Chatter interface {
 	Chat(string, ...Function) (string, error)
 	ChatEx([]ChatDetail, ...Function) ([]ChatChoice, error)
+	ChatStream(string) (io.ReadCloser, error)
 }
 
 type FunctionCaller interface {

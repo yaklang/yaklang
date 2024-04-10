@@ -64,11 +64,10 @@ type LowhttpExecConfig struct {
 	EnableMaxContentLength bool
 	MaxContentLength       int
 
-	// ResponseBodyMirrorWriter will be not effected by MaxContentLength
-	// response body will be TeeReader to ResponseBodyMirrorWriter
-	ResponseBodyMirrorWriter io.Writer
-
 	DNSNoCache bool
+
+	// BodyStreamReaderHandler is a callback function to handle the body stream reader
+	BodyStreamReaderHandler func(response *http.Response, closer io.ReadCloser)
 
 	// SNI
 	SNI string
@@ -176,15 +175,15 @@ func WithMaxContentLength(m int) LowhttpOpt {
 	}
 }
 
-func WithResponseBodyMirrorWriter(w io.Writer) LowhttpOpt {
-	return func(o *LowhttpExecConfig) {
-		o.ResponseBodyMirrorWriter = w
-	}
-}
-
 func WithETCHosts(hosts map[string]string) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.EtcHosts = hosts
+	}
+}
+
+func WithBodyStreamReaderHandler(t func(*http.Response, io.ReadCloser)) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.BodyStreamReaderHandler = t
 	}
 }
 

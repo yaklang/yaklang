@@ -3,13 +3,19 @@ package chatglm
 import (
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"io"
 )
 
 type GLMClient struct {
 	config *aispec.AIConfig
 
 	targetUrl string
+}
+
+func (g *GLMClient) ChatStream(msg string) (io.ReadCloser, error) {
+	return nil, utils.Error("not implemented")
 }
 
 func (g *GLMClient) LoadOption(opt ...aispec.AIConfigOption) {

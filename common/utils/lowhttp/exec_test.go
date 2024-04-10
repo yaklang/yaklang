@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"io"
 	"net"
 	"net/http"
@@ -472,6 +473,48 @@ func TestLowhttp_RESP_WithoutContentLength_WithContent(t *testing.T) {
 		panic(err)
 	}
 	if !bytes.Contains(rsp.RawPacket, []byte("abcd")) {
+		panic("Response has content")
+	}
+}
+
+func TestLowhttp_RESP_StreamBody(t *testing.T) {
+	target := utils.HostPort(utils.DebugMockTCPEx(func(ctx context.Context, lis net.Listener, conn net.Conn) {
+		conn.Write([]byte("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 16\r\nX-Content-Type-Options: nosniff\r\n\r\n"))
+		time.Sleep(200 * time.Millisecond)
+		conn.Write([]byte("abcd"))
+		spew.Dump(1)
+		time.Sleep(200 * time.Millisecond)
+		conn.Write([]byte("abcd"))
+		spew.Dump(1)
+		time.Sleep(200 * time.Millisecond)
+		conn.Write([]byte("abcd"))
+		spew.Dump(1)
+		conn.Write([]byte("abcd"))
+		spew.Dump(1)
+		conn.Close()
+	}))
+
+	var results []byte
+	var timePassed bool
+	_, err := HTTPWithoutRedirect(
+		WithPacketBytes([]byte("GET / HTTP/1.1\r\nHost: "+target+"\r\n\r\n")),
+		WithBodyStreamReaderHandler(func(response *http.Response, closer io.ReadCloser) {
+			start := time.Now()
+			all, _ := io.ReadAll(closer)
+			results = all
+			if ret := time.Now().Sub(start).Milliseconds(); ret > 500 && 700 > ret {
+				timePassed = true
+			}
+		}),
+	)
+	if err != nil {
+		panic(err)
+	}
+	if !timePassed {
+		t.Fatal("time not right")
+	}
+	spew.Dump(results)
+	if !bytes.Contains(results, []byte("abcdabcdabcdabcd")) {
 		panic("Response has content")
 	}
 }
