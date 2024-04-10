@@ -130,9 +130,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 	}
 
 	switch inst := i.node.(type) {
-	case *ssa.Make:
-		return Values{i}
-
 	case *ssa.Undefined:
 		// ret[n]
 		return getMemberCall(inst, actx)
@@ -323,7 +320,15 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		} else {
 			log.Errorf("side effect: %v is not created from call instruction", i.String())
 		}
-
+	case *ssa.Make:
+		var values Values
+		values = append(values, i)
+		for _, member := range inst.GetAllMember() {
+			value := NewValue(member)
+			topDef := append(value.getTopDefs(actx, opt...), i)
+			values = append(values, topDef...)
+		}
+		return values
 	}
 	return getMemberCall(i.node, actx)
 }

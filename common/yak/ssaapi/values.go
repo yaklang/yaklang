@@ -339,9 +339,12 @@ func (value Values) Ref(name string) Values {
 	ret := make(Values, 0, len(value))
 	for _, v := range value {
 		v.GetAllMember().ForEach(func(v *Value) {
-			if v.GetKey().String() == name {
-				ret = append(ret, v)
+			if v.GetKey().node != nil {
+				if v.GetKey().node.String() == name {
+					ret = append(ret, v)
+				}
 			}
+
 		})
 	}
 	return ret
