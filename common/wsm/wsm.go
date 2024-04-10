@@ -16,6 +16,7 @@ type BaseShellManager interface {
 	Ping(opts ...behinder.ExecParamsConfig) (bool, error)
 	BasicInfo(opts ...behinder.ExecParamsConfig) ([]byte, error)
 	CommandExec(cmd string, opts ...behinder.ExecParamsConfig) ([]byte, error)
+	ExecutePluginOrCache(param map[string]string) ([]byte, error)
 	String() string
 	GenWebShell() string
 }

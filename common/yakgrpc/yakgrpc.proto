@@ -2603,7 +2603,6 @@ message WebShell {
   string Os = 20;
   string ResDecMOde = 21; //解密方式
 }
-
 message ShellOptions{
   int64 RetryCount = 1; //重新时间
   int64 Timeout = 2; //超时时间
@@ -2612,7 +2611,6 @@ message ShellOptions{
   int64 UpdateTime = 5; //更新时间，当是session-mode的时候涉及到session过期的问题
   bool IsSession = 6; //是否是session类型
 }
-
 message WebShellRequest {
   int64 Id = 1;
 }
