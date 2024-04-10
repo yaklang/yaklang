@@ -1,13 +1,13 @@
 package fp
 
 import (
+	"path"
+	"sync"
+
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/embed"
-	"path"
-	"sync"
 )
 
 var (
@@ -21,11 +21,6 @@ func loadDefaultNmapServiceProbeRules() (map[*NmapProbe][]*NmapMatch, error) {
 	content, err := embed.Asset("data/nfp.gz")
 	if err != nil {
 		return nil, errors.Errorf("get local service probe failed: %s", err)
-	}
-
-	content, err = utils.GzipDeCompress(content)
-	if err != nil {
-		return nil, utils.Errorf("decompress probe failed: %s", err)
 	}
 
 	rules, err := ParseNmapServiceProbeToRuleMap(content)
