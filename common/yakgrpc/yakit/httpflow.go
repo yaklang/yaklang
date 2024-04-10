@@ -14,10 +14,9 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/google/uuid"
+	uuid "github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
-	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/domainextractor"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -45,7 +44,7 @@ func yakitColor(i string) string {
 
 func init() {
 	RegisterPostInitDatabaseFunction(func() error {
-		lowhttp.RegisterSaveHTTPFlowHandler(func(https bool, req []byte, rsp []byte, url string, remoteAddr string, reqSource string, runtimeId string, fromPlugin string) {
+		lowhttp.RegisterSaveHTTPFlowHandler(func(https bool, req []byte, rsp []byte, url string, remoteAddr string, reqSource string, runtimeId string, fromPlugin string, hiddenIndex string) {
 			if rsp == nil || len(rsp) == 0 {
 				return
 			}
@@ -73,7 +72,7 @@ func init() {
 			}
 			flow.FromPlugin = fromPlugin
 			flow.RuntimeId = runtimeId
-			flow.HiddenIndex = uuid.New().String()
+			flow.HiddenIndex = hiddenIndex
 			err = InsertHTTPFlow(db, flow)
 			if err != nil {
 				log.Errorf("save httpflow failed: %s", err)
@@ -126,20 +125,26 @@ type HTTPFlow struct {
 	TooLargeResponseBodyFile   string
 }
 
+type HTTPFlowWithPayloads struct {
+	*HTTPFlow
+	Payloads []string
+}
+
 type TagAndStatusCode struct {
 	Value string
 	Count int
 }
 
 type CreateHTTPFlowConfig struct {
-	isHttps    bool
-	reqRaw     []byte
-	rspRaw     []byte
-	fixRspRaw  []byte // 如果设置了，则不会再修复rspRaw
-	source     string
-	url        string
-	remoteAddr string
-	reqIns     *http.Request // 如果设置了，则不会再解析reqRaw
+	isHttps     bool
+	reqRaw      []byte
+	rspRaw      []byte
+	fixRspRaw   []byte // 如果设置了，则不会再修复rspRaw
+	source      string
+	url         string
+	remoteAddr  string
+	reqIns      *http.Request // 如果设置了，则不会再解析reqRaw
+	hiddenIndex string
 }
 
 type CreateHTTPFlowOptions func(c *CreateHTTPFlowConfig)
@@ -322,6 +327,18 @@ func FuzzParamsToGRPCFuzzableParam(r *mutate.FuzzHTTPRequestParam, isHttps bool)
 		p.AutoTemplate = bytes.ReplaceAll(raw, []byte(flag), []byte("{{randstr(10,10,1)}}"))
 	}
 	return p
+}
+
+func (f *HTTPFlowWithPayloads) ToGRPCModel(full bool) (*ypb.HTTPFlow, error) {
+	flow, err := f.toGRPCModel(full)
+	flow.Payloads = f.Payloads
+	return flow, err
+}
+
+func (f *HTTPFlowWithPayloads) ToGRPCModelFull() (*ypb.HTTPFlow, error) {
+	flow, err := f.toGRPCModel(true)
+	flow.Payloads = f.Payloads
+	return flow, err
 }
 
 func (f *HTTPFlow) ToGRPCModel(full bool) (*ypb.HTTPFlow, error) {
@@ -718,7 +735,7 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*HTTPFlow, error) {
 		Request:     requestRaw,
 		Response:    responseRaw,
 		RemoteAddr:  remoteAddr,
-		HiddenIndex: ksuid.New().String(),
+		HiddenIndex: uuid.NewString(),
 	}
 	ip, _, _ := utils.ParseStringToHostPort(remoteAddr)
 	if ip != "" {
@@ -1001,8 +1018,8 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 	if params.GetHaveBody() {
 		db = db.Where("body_length > 0")
 	}
-
 	db = bizhelper.ExactQueryString(db, "runtime_id", params.GetRuntimeId())
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "runtime_id", params.GetRuntimeIDs())
 	db = bizhelper.ExactQueryString(db, "from_plugin", params.GetFromPlugin())
 
 	// 搜索是否有对应的参数
@@ -1203,35 +1220,59 @@ too_large_response_header_file, too_large_response_body_file
 	return db
 }
 
-func QueryHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) (paging *bizhelper.Paginator, ret []*HTTPFlow, err error) {
+func QueryHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) (paging *bizhelper.Paginator, httpflows []*HTTPFlowWithPayloads, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Error(r)
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
-	queryDB := BuildHTTPFlowQuery(db.Model(&HTTPFlow{}), params)
+	rawDB := db
+	queryDB := BuildHTTPFlowQuery(rawDB.Model(&HTTPFlow{}), params)
 
-	var rets []*HTTPFlow
+	var limitFlows, fullFlows []*HTTPFlow
 
 	if params.OffsetId > 0 {
-		db1 := queryDB
+		offsetDB := queryDB
 		if params.Pagination.Order == "desc" {
-			db1 = db.Where("id < ?", params.OffsetId)
+			offsetDB = db.Where("id < ?", params.OffsetId)
 		} else {
-			db1 = db.Where("id > ?", params.OffsetId)
+			offsetDB = db.Where("id > ?", params.OffsetId)
 		}
-		db1.Limit(int(params.Pagination.Limit)).Offset(0).Scan(&ret)
-		paging, db = bizhelper.Paging(queryDB, int(params.Pagination.Page), int(params.Pagination.Limit), &rets)
+		offsetDB.Limit(int(params.Pagination.Limit)).Offset(0).Scan(&limitFlows)
+		paging, queryDB = bizhelper.Paging(queryDB, int(params.Pagination.Page), int(params.Pagination.Limit), &fullFlows)
 	} else {
-		paging, db = bizhelper.Paging(queryDB, int(params.Pagination.Page), int(params.Pagination.Limit), &ret)
+		paging, queryDB = bizhelper.Paging(queryDB, int(params.Pagination.Page), int(params.Pagination.Limit), &limitFlows)
 	}
 
-	if db.Error != nil {
+	if queryDB.Error != nil {
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
 	}
 
-	return paging, ret, nil
+	// 以下为WithPayload的额外处理逻辑，因此将返回值使用新的结构体封装了一层，带上了Payloads
+	httpflows = make([]*HTTPFlowWithPayloads, 0, len(limitFlows))
+	for _, flow := range limitFlows {
+		httpflows = append(httpflows, &HTTPFlowWithPayloads{
+			HTTPFlow: flow,
+		})
+	}
+
+	// 从 web_fuzzer_responses 表中根据 HiddenIndex 找到 Payload
+	if params.WithPayload {
+		hiddenIndexToPayloadsMap, err := queryWebFuzzerResponsePayloadsFromHTTPFlow(rawDB, limitFlows)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// 将 Payloads 附加到 HTTPFlowWithPayloads 结构体中
+		for _, r := range httpflows {
+			if v, ok := hiddenIndexToPayloadsMap[r.HiddenIndex]; ok {
+				r.Payloads = v
+			}
+		}
+	}
+
+	return paging, httpflows, nil
 }
 
 type HTTPFlowUrl struct {

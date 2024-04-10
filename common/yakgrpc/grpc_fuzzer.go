@@ -802,6 +802,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			}
 
 			if result.Error != nil {
+				hiddenIndex := ""
 				rsp := &ypb.FuzzerResponse{}
 				rsp.RequestRaw = result.RequestRaw
 				rsp.UUID = uuid.New().String()
@@ -817,10 +818,14 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					rsp.DNSDurationMs = result.LowhttpResponse.TraceInfo.DNSTime.Milliseconds()
 					rsp.Proxy = result.LowhttpResponse.Proxy
 					rsp.RemoteAddr = result.LowhttpResponse.RemoteAddr
+					hiddenIndex = result.LowhttpResponse.HiddenIndex
+				}
+				if hiddenIndex == "" {
+					hiddenIndex = uuid.NewString()
 				}
 
 				task.HTTPFlowFailedCount++
-				yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), rsp)
+				yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), hiddenIndex, rsp)
 				_ = feedbackResponse(rsp, false)
 				continue
 			}
@@ -1031,6 +1036,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 
 				for i := 0; i < len(redirectPacket)-1; i++ {
 					redirectRes := redirectPacket[i].RespRecord
+
 					method, _, _ := lowhttp.GetHTTPPacketFirstLine(redirectRes.RawRequest)
 					redirectRsp := &ypb.FuzzerResponse{
 						Url:                   utils.EscapeInvalidUTF8Byte([]byte(redirectRes.Url)),
@@ -1100,8 +1106,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 							}
 						}
 					}
-					yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), redirectRsp)
-					rsp.TaskId = int64(taskID)
+					yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), redirectRes.HiddenIndex, redirectRsp)
+					redirectRsp.TaskId = int64(taskID)
 					err := feedbackResponse(redirectRsp, false)
 					if err != nil {
 						log.Errorf("send to client failed: %s", err)
@@ -1113,7 +1119,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					rsp.RequestRaw = redirectPacket[len(redirectPacket)-1].Request
 				}
 			}
-			yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), rsp)
+			yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), result.LowhttpResponse.HiddenIndex, rsp)
 			rsp.TaskId = int64(taskID)
 			err := feedbackResponse(rsp, false)
 			if err != nil {
