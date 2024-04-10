@@ -186,6 +186,26 @@ func Test_RealYak_ObjectType(t *testing.T) {
 		result = exprDetails.result
 		`)
 	})
+
+	t.Run("member call form extern function call", func(t *testing.T) {
+		ssatest.CheckNoError(t, `
+			rsp, req = poc.Get("123123",)~ 
+		`,
+		)
+	})
+	t.Run("member call form extern function", func(t *testing.T) {
+		ssatest.CheckParse(t, `
+			rsp, req = poc.Get
+		`,
+		)
+	})
+	t.Run("member call form extern function call , ignore syntax error", func(t *testing.T) {
+		ssatest.CheckParse(t, `
+			rsp, req = poc.Get("123123", poc.)~
+		`,
+			ssaapi.WithIgnoreSyntaxError(true),
+		)
+	})
 }
 
 func Test_RealYak_Object_Factor(t *testing.T) {
