@@ -447,6 +447,10 @@ func ExactQueryStringArrayOr(db *gorm.DB, field string, s []string) *gorm.DB {
 }
 
 func ExactOrQueryStringArrayOr(db *gorm.DB, field string, s []string) *gorm.DB {
+	if len(s) <= 0 {
+		return db
+	}
+
 	raw := make([]interface{}, len(s))
 	for index, sub := range s {
 		raw[index] = sub

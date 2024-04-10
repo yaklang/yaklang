@@ -95,6 +95,9 @@ type LowhttpResponse struct {
 	TooLarge         bool
 	TooLargeLimit    int64
 	ResponseBodySize int64
+
+	// HiddenIndex associate between http_flows and web_fuzzer_response table
+	HiddenIndex string
 }
 
 func (l *LowhttpResponse) GetBody() []byte {

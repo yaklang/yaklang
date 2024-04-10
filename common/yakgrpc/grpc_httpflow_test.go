@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/samber/lo"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -458,5 +460,52 @@ rsp, req = poc.HTTP(packet, poc.proxy(mitmProxy))~
 	if !strings.Contains(fixFlow.Tags, "YAKIT_COLOR_BLUE") {
 		t.Fatal("flow preset tag failed")
 	}
+}
 
+func TestGRPCMUSTPASS_HTTP_WithPayload(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	token := utils.RandStringBytes(20)
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.WriteHeader(http.StatusOK)
+		fmt.Fprint(writer, token)
+	})
+	target := utils.HostPort(host, port)
+
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(5))
+	defer cancel()
+	stream, err := client.HTTPFuzzer(ctx, &ypb.FuzzerRequest{
+		Request: fmt.Sprintf(`GET /?a={{int(1-2)}} HTTP/1.1
+Host: %s
+`, target),
+		ForceFuzz: true,
+	})
+	require.NoError(t, err)
+	runtimeID := ""
+	// wait until webfuzzer done
+	for {
+		resp, err := stream.Recv()
+		if runtimeID == "" {
+			runtimeID = resp.RuntimeID
+		}
+		if err != nil {
+			break
+		}
+	}
+
+	responses, err := client.QueryHTTPFlows(context.Background(), &ypb.QueryHTTPFlowRequest{
+		Pagination: &ypb.Paging{
+			Page:  1,
+			Limit: 100,
+		},
+		RuntimeId:   runtimeID,
+		WithPayload: true,
+	})
+	require.Len(t, responses.Data, 2, "should have 2 httpflows")
+	require.ElementsMatch(t,
+		lo.Map(responses.Data, func(f *ypb.HTTPFlow, _ int) []string {
+			return f.Payloads
+		}),
+		[][]string{{"1"}, {"2"}})
 }

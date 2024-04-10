@@ -257,6 +257,7 @@ type WebFuzzerResponse struct {
 	StatusCode      int    `json:"status_code"`
 	DurationMs      int    `json:"duration_ms"`
 	Timestamp       int64  `json:"timestamp"`
+	HiddenIndex     string `json:"hidden_index"`
 }
 
 func (w *WebFuzzerResponse) CalcCacheHash() string {
@@ -299,6 +300,25 @@ func DeleteWebFuzzerResponseByTaskID(db *gorm.DB, id int64) error {
 	return nil
 }
 
+func queryWebFuzzerResponsePayloadsFromHTTPFlow(db *gorm.DB, httpflows []*HTTPFlow) (hiddenIndexToPayloadsMap map[string][]string, err error) {
+	var responses []*WebFuzzerResponse
+	hiddenIndexs := lo.Map(httpflows, func(i *HTTPFlow, _ int) string {
+		return i.HiddenIndex
+	})
+	db = db.Model(&WebFuzzerResponse{})
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "hidden_index", hiddenIndexs)
+	err = db.Select("payload, hidden_index").Find(&responses).Error
+	if err != nil {
+		return nil, err
+	}
+
+	hiddenIndexToPayloadsMap = make(map[string][]string)
+	for _, r := range responses {
+		hiddenIndexToPayloadsMap[r.HiddenIndex] = strings.Split(r.Payload, ",")
+	}
+	return hiddenIndexToPayloadsMap, nil
+}
+
 func QueryWebFuzzerResponse(db *gorm.DB, params *ypb.QueryHTTPFuzzerResponseByTaskIdRequest) (*bizhelper.Paginator, []*WebFuzzerResponse, error) {
 	db = db.Model(&WebFuzzerResponse{})
 
@@ -329,7 +349,7 @@ func YieldWebFuzzerResponseByTaskIDs(db *gorm.DB, ctx context.Context, taskIDs [
 	return outC
 }
 
-func SaveWebFuzzerResponse(db *gorm.DB, taskId int, rsp *ypb.FuzzerResponse) {
+func SaveWebFuzzerResponse(db *gorm.DB, taskId int, hiddenIndex string, rsp *ypb.FuzzerResponse) {
 	raw, err := json.Marshal(rsp)
 	if err != nil {
 		log.Errorf("marshal FuzzerResponse failed: %s", err)
@@ -345,6 +365,7 @@ func SaveWebFuzzerResponse(db *gorm.DB, taskId int, rsp *ypb.FuzzerResponse) {
 		StatusCode:      int(rsp.StatusCode),
 		DurationMs:      int(rsp.DurationMs),
 		Timestamp:       rsp.GetTimestamp(),
+		HiddenIndex:     hiddenIndex,
 	}
 	if db := db.Save(r); db.Error != nil {
 		log.Errorf("save web fuzzer response to database failed: %s", db.Error)
