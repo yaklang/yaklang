@@ -10,6 +10,10 @@ import (
 	_ "embed"
 	"encoding/gob"
 	"encoding/json"
+	"hash"
+	"regexp"
+	"strings"
+
 	"github.com/BurntSushi/toml"
 	"github.com/dlclark/regexp2"
 	"github.com/tidwall/gjson"
@@ -27,16 +31,15 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"github.com/yaklang/yaklang/common/yserx"
-	"hash"
-	"regexp"
-	"strings"
 )
 
 //go:embed codec.gob.gzip
 var codecDoc []byte
 
-var CodecLibs *yakdoc.ScriptLib
-var CodecLibsDoc []*ypb.CodecMethod // 记录函数的数据，参数类型等，用于前端生成样式
+var (
+	CodecLibs    *yakdoc.ScriptLib
+	CodecLibsDoc []*ypb.CodecMethod // 记录函数的数据，参数类型等，用于前端生成样式
+)
 
 type outputType = string
 
@@ -305,7 +308,6 @@ func (flow *CodecExecFlow) DESEncrypt(key string, keyType string, IV string, ivT
 		flow.Text = encodeData(data, output)
 	}
 	return err
-
 }
 
 // Tag = "解密"
@@ -557,7 +559,6 @@ func (flow *CodecExecFlow) JavaSerialize(output string) error {
 // { Name = "Alphabet", Type = "select",DefaultValue = "standard", Options = ["standard", "urlsafe"], Required = true,Label = "Alphabet"}
 // ]
 func (flow *CodecExecFlow) Base64Encode(Alphabet string) error {
-
 	switch Alphabet {
 	case "standard":
 		flow.Text = []byte(codec.EncodeBase64(flow.Text))
@@ -827,7 +828,7 @@ func (flow *CodecExecFlow) JwtSign(algorithm string, key []byte, isBase64 bool) 
 	if !gjson.Valid(string(flow.Text)) {
 		return utils.Error("codec JWT签名失败: json格式错误")
 	}
-	var data = make(map[string]interface{})
+	data := make(map[string]interface{})
 	var err error
 	gjson.Parse(string(flow.Text)).ForEach(func(key, value gjson.Result) bool {
 		data[key.String()] = value.Value()
@@ -851,7 +852,7 @@ func (flow *CodecExecFlow) JwtSign(algorithm string, key []byte, isBase64 bool) 
 // CodecName = "fuzztag渲染"
 // Desc = """渲染fuzztag"""
 func (flow *CodecExecFlow) Fuzz() error {
-	res, err := mutate.FuzzTagExec(flow.Text, mutate.Fuzz_WithEnableFiletag())
+	res, err := mutate.FuzzTagExec(flow.Text, mutate.Fuzz_WithEnableDangerousTag())
 	if err != nil {
 		return err
 	}
@@ -871,7 +872,6 @@ func (flow *CodecExecFlow) Fuzz() error {
 // { Name = "Multiline", Type = "checkbox", Required = true , Label = "多行匹配"},
 // ]
 func (flow *CodecExecFlow) Replace(find string, replace string, findType string, Global, Multiline, IgnoreCase bool) error {
-
 	count := 1
 	if Global {
 		count = -1
@@ -895,7 +895,6 @@ func (flow *CodecExecFlow) Replace(find string, replace string, findType string,
 	}
 
 	text, err := reg.Replace(string(flow.Text), replace, -1, count)
-
 	if err != nil {
 		return err
 	}
