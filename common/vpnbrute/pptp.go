@@ -18,9 +18,9 @@ import (
 
 type PPTPAuth struct {
 	ppp       ppp.PPPAuth
-	PNSCallID uint16 // c -> s gre call id
-	PASCallID uint16 // s -> c gre call id
-	target    string
+	PNSCallID uint64 // c -> s gre call id
+	PASCallID uint64 // s -> c gre call id
+	Target    string
 }
 
 func GetStartControlConnReq() map[string]any {
@@ -68,7 +68,7 @@ func GetOutgoingCallReq() map[string]any {
 }
 
 func (pptp *PPTPAuth) Auth() error {
-	conn, err := netx.DialX(pptp.target, netx.DialX_WithTimeout(5*time.Second))
+	conn, err := netx.DialX(pptp.Target, netx.DialX_WithTimeout(5*time.Second))
 	if err != nil {
 		return err
 	}
@@ -94,9 +94,9 @@ func (pptp *PPTPAuth) Auth() error {
 		}
 
 		messageMap := binparser.NodeToMap(messageNode).(map[string]any)
-		pptpType := messageMap["ControlMessageType"].(uint16)
+		pptpType := messageMap["ControlMessageType"]
 		switch pptpType {
-		case 2:
+		case uint64(2):
 			outgoingReq, err := parser.GenerateBinary(GetOutgoingCallReq(), "application-layer.pptp", "PPTP")
 			if err != nil {
 				return err
@@ -105,16 +105,18 @@ func (pptp *PPTPAuth) Auth() error {
 			if err != nil {
 				return err
 			}
-		case 4:
-			pptp.PNSCallID = messageMap["Outgoing Call Reply"].(map[string]any)["CallId"].(uint16)
+		case uint64(8):
+			pptp.PNSCallID = messageMap["Message"].(map[string]any)["Outgoing Call Reply"].(map[string]any)["CallId"].(uint64)
 			// gre
+			println("ok")
+			return nil
 		}
 	}
 }
 
 func (pptp *PPTPAuth) Tunnel(ctx context.Context) {
 
-	target := utils.ExtractHost(pptp.target)
+	target := utils.ExtractHost(pptp.Target)
 	iface, _, _, err := netutil.Route(5*time.Second, target)
 	if err != nil {
 
@@ -178,7 +180,7 @@ func (pptp *PPTPAuth) ProcessGre(messageNode *base.Node) (map[string]any, error)
 	}
 
 	messageMap := binparser.NodeToMap(messageNode).(map[string]any)
-	if messageMap["Call ID"].(uint16) != pptp.PASCallID {
+	if messageMap["Call ID"].(uint64) != pptp.PASCallID {
 		return nil, nil
 	}
 	pppNode := base.GetNodeByPath(messageNode, "@GRE.Payload.PPP")
