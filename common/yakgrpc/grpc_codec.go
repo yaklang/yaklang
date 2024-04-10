@@ -4,6 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
+	"reflect"
+	"strconv"
+	"strings"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/h2non/filetype"
 	"github.com/yaklang/yaklang/common/authhack"
@@ -19,10 +24,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"github.com/yaklang/yaklang/common/yserx"
-	"net/url"
-	"reflect"
-	"strconv"
-	"strings"
 )
 
 func (s *Server) AutoDecode(ctx context.Context, req *ypb.AutoDecodeRequest) (*ypb.AutoDecodeResponse, error) {
@@ -110,7 +111,7 @@ func (s *Server) Codec(ctx context.Context, req *ypb.CodecRequest) (*ypb.CodecRe
 	var err error = nil
 	var raw []byte
 
-	var params = make(map[string]string)
+	params := make(map[string]string)
 	for _, item := range req.GetParams() {
 		params[item.Key] = item.Value
 	}
@@ -165,7 +166,7 @@ func (s *Server) Codec(ctx context.Context, req *ypb.CodecRequest) (*ypb.CodecRe
 	switch req.Type {
 	case "json-unicode":
 		// string => unicode => \u0000
-		var buffer = ""
+		buffer := ""
 		for _, r := range []rune(text) {
 			buffer += strings.ReplaceAll(fmt.Sprintf("%U", r), "U+", "\\u")
 		}
@@ -218,7 +219,7 @@ func (s *Server) Codec(ctx context.Context, req *ypb.CodecRequest) (*ypb.CodecRe
 		}
 		result = string(raw)
 	case "fuzz":
-		res, err := mutate.FuzzTagExec(text, mutate.Fuzz_WithEnableFiletag())
+		res, err := mutate.FuzzTagExec(text, mutate.Fuzz_WithEnableDangerousTag())
 		if err != nil {
 			result = text
 		} else {
@@ -248,7 +249,7 @@ func (s *Server) Codec(ctx context.Context, req *ypb.CodecRequest) (*ypb.CodecRe
 	case "urlunescape-path":
 		result, err = codec.PathUnescape(text)
 	case "htmlencode":
-		//result = codec.EncodeHtmlEntity(text)
+		// result = codec.EncodeHtmlEntity(text)
 	case "htmlencode-hex":
 		result = codec.EncodeHtmlEntityHex(text)
 	case "htmlescape":
@@ -1090,7 +1091,7 @@ func (s *Server) NewCodec(ctx context.Context, req *ypb.CodecRequestFlow) (resp 
 		methodValue := flowValue.MethodByName(work.CodecType)
 		methodType := methodValue.Type()
 
-		var params = make(map[string]string)
+		params := make(map[string]string)
 		for _, param := range work.Params {
 			params[param.Key] = param.Value
 		}

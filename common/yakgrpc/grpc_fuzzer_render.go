@@ -12,7 +12,7 @@ import (
 // ! 已弃用
 func (s *Server) RenderHTTPFuzzerPacket(ctx context.Context, req *ypb.RenderHTTPFuzzerPacketRequest) (*ypb.RenderHTTPFuzzerPacketResponse, error) {
 	packet := req.GetPacket()
-	res, err := mutate.FuzzTagExec(packet, mutate.Fuzz_WithEnableFiletag())
+	res, err := mutate.FuzzTagExec(packet, mutate.Fuzz_WithEnableDangerousTag())
 	if err != nil || len(res) == 0 {
 		return nil, utils.Wrapf(err, "cannot render fuzztag: %v", packet)
 	}

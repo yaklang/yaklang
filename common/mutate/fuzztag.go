@@ -1000,63 +1000,6 @@ func init() {
 	})
 
 	AddFuzzTagToGlobal(&FuzzTagDescription{
-		TagName: "codec",
-		Handler: func(s string) []string {
-			s = strings.Trim(s, " ()")
-
-			if codecCaller == nil {
-				return []string{s}
-			}
-
-			lastDividerIndex := strings.LastIndexByte(s, '|')
-			if lastDividerIndex < 0 {
-				script, err := codecCaller(s, "")
-				if err != nil {
-					log.Errorf("codec caller error: %s", err)
-					return []string{s}
-				}
-				// log.Errorf("fuzz.codec no plugin / param specific")
-				return []string{script}
-			}
-			name, params := s[:lastDividerIndex], s[lastDividerIndex+1:]
-			script, err := codecCaller(name, params)
-			if err != nil {
-				log.Errorf("codec caller error: %s", err)
-				return []string{s}
-			}
-			return []string{script}
-		},
-		Description: "调用 Yakit Codec 插件",
-	})
-
-	AddFuzzTagToGlobal(&FuzzTagDescription{
-		TagName: "codec:line",
-		Handler: func(s string) []string {
-			if codecCaller == nil {
-				return fuzztagfallback
-			}
-
-			s = strings.Trim(s, " ()")
-			lastDividerIndex := strings.LastIndexByte(s, '|')
-			if lastDividerIndex < 0 {
-				log.Errorf("fuzz.codec no plugin / param specific")
-				return fuzztagfallback
-			}
-			name, params := s[:lastDividerIndex], s[lastDividerIndex+1:]
-			script, err := codecCaller(name, params)
-			if err != nil {
-				log.Errorf("codec caller error: %s", err)
-				return fuzztagfallback
-			}
-			var results []string
-			for line := range utils.ParseLines(script) {
-				results = append(results, line)
-			}
-			return results
-		},
-		Description: "调用 Yakit Codec 插件，把结果解析成行",
-	})
-	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "unquote",
 		Handler: func(s string) []string {
 			raw, err := strconv.Unquote(s)
@@ -1535,9 +1478,20 @@ func init() {
 	})
 }
 
-func FuzzFileOptions() []FuzzConfigOpt {
+func Fuzz_WithEnableDangerousTag() FuzzConfigOpt {
+	return func(config *FuzzTagConfig) {
+		for _, opt := range FuzzFileOptions() {
+			opt(config)
+		}
+		for _, opt := range FuzzCodecOptions() {
+			opt(config)
+		}
+	}
+}
+
+func FuzzCodecOptions() []FuzzConfigOpt {
 	var opt []FuzzConfigOpt
-	for _, t := range Filetag() {
+	for _, t := range CodecTag() {
 		opt = append(opt, Fuzz_WithExtraFuzzTagHandler(t.TagName, t.Handler))
 		for _, a := range t.Alias {
 			opt = append(opt, Fuzz_WithExtraFuzzTagHandler(a, t.Handler))
@@ -1546,7 +1500,26 @@ func FuzzFileOptions() []FuzzConfigOpt {
 	return opt
 }
 
-func Fuzz_WithEnableFiletag() FuzzConfigOpt {
+func Fuzz_WithEnableCodectag() FuzzConfigOpt {
+	return func(config *FuzzTagConfig) {
+		for _, opt := range FuzzCodecOptions() {
+			opt(config)
+		}
+	}
+}
+
+func FuzzFileOptions() []FuzzConfigOpt {
+	var opt []FuzzConfigOpt
+	for _, t := range FileTag() {
+		opt = append(opt, Fuzz_WithExtraFuzzTagHandler(t.TagName, t.Handler))
+		for _, a := range t.Alias {
+			opt = append(opt, Fuzz_WithExtraFuzzTagHandler(a, t.Handler))
+		}
+	}
+	return opt
+}
+
+func Fuzz_WithEnableFileTag() FuzzConfigOpt {
 	return func(config *FuzzTagConfig) {
 		for _, opt := range FuzzFileOptions() {
 			opt(config)
@@ -1554,7 +1527,68 @@ func Fuzz_WithEnableFiletag() FuzzConfigOpt {
 	}
 }
 
-func Filetag() []*FuzzTagDescription {
+func CodecTag() []*FuzzTagDescription {
+	return []*FuzzTagDescription{
+		{
+			TagName: "codec",
+			Handler: func(s string) []string {
+				s = strings.Trim(s, " ()")
+
+				if codecCaller == nil {
+					return []string{s}
+				}
+
+				lastDividerIndex := strings.LastIndexByte(s, '|')
+				if lastDividerIndex < 0 {
+					script, err := codecCaller(s, "")
+					if err != nil {
+						log.Errorf("codec caller error: %s", err)
+						return []string{s}
+					}
+					// log.Errorf("fuzz.codec no plugin / param specific")
+					return []string{script}
+				}
+				name, params := s[:lastDividerIndex], s[lastDividerIndex+1:]
+				script, err := codecCaller(name, params)
+				if err != nil {
+					log.Errorf("codec caller error: %s", err)
+					return []string{s}
+				}
+				return []string{script}
+			},
+			Description: "调用 Yakit Codec 插件",
+		},
+		{
+			TagName: "codec:line",
+			Handler: func(s string) []string {
+				if codecCaller == nil {
+					return fuzztagfallback
+				}
+
+				s = strings.Trim(s, " ()")
+				lastDividerIndex := strings.LastIndexByte(s, '|')
+				if lastDividerIndex < 0 {
+					log.Errorf("fuzz.codec no plugin / param specific")
+					return fuzztagfallback
+				}
+				name, params := s[:lastDividerIndex], s[lastDividerIndex+1:]
+				script, err := codecCaller(name, params)
+				if err != nil {
+					log.Errorf("codec caller error: %s", err)
+					return fuzztagfallback
+				}
+				var results []string
+				for line := range utils.ParseLines(script) {
+					results = append(results, line)
+				}
+				return results
+			},
+			Description: "调用 Yakit Codec 插件，把结果解析成行",
+		},
+	}
+}
+
+func FileTag() []*FuzzTagDescription {
 	return []*FuzzTagDescription{
 		{
 			TagName: "file:line",
