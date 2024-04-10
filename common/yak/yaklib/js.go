@@ -84,7 +84,7 @@ func _libCryptoJSV3() jsRunOpts {
 	)
 
 	if opt, ok = jsRunOptsCache.Get("libCryptoJSV3"); !ok {
-		src, _ := embed.Asset("data/js-libs/cryptojs/3.3.0/cryptojs.min.js")
+		src, _ := embed.Asset("data/js-libs/cryptojs/3.3.0/cryptojs.min.js.gz")
 		prog, _ := goja.Compile("CryptoJS-3.3.0", string(src), false)
 		opt = jsRunWithLibs(&jsLibrary{"CryptoJS", "3.3.0", prog})
 		jsRunOptsCache.Set("libCryptoJSV3", opt)
@@ -105,7 +105,7 @@ func _libCryptoJSV4() jsRunOpts {
 	)
 
 	if opt, ok = jsRunOptsCache.Get("libCryptoJSV4"); !ok {
-		src, _ := embed.Asset("data/js-libs/cryptojs/4.2.0/cryptojs.min.js")
+		src, _ := embed.Asset("data/js-libs/cryptojs/4.2.0/cryptojs.min.js.gz")
 		prog, _ := goja.Compile("CryptoJS-4.2.0", string(src), false)
 		opt = jsRunWithLibs(&jsLibrary{"CryptoJS", "4.2.0", prog})
 		jsRunOptsCache.Set("libCryptoJSV4", opt)
@@ -126,7 +126,7 @@ func _libJSRSASign() jsRunOpts {
 	)
 
 	if opt, ok = jsRunOptsCache.Get("libJSRSASign"); !ok {
-		src, _ := embed.Asset("data/js-libs/jsrsasign/10.8.6/jsrsasign-all-min.js")
+		src, _ := embed.Asset("data/js-libs/jsrsasign/10.8.6/jsrsasign-all-min.js.gz")
 		prog, _ := goja.Compile("jsrsasign-10.8.6", string(src), false)
 		opt = jsRunWithLibs(&jsLibrary{"jsrsasign", "10.8.6", prog})
 		jsRunOptsCache.Set("libJSRSASign", opt)
