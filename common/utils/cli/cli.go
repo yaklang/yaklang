@@ -658,6 +658,10 @@ func (c *CliApp) YakitPlugin(options ...SetCliExtraParam) []string {
 	filename, p := c._cliFromString(paramName, options...)
 	p._type = "yakit-plugin"
 
+	if filename == "" {
+		return []string{}
+	}
+
 	raw, err := ioutil.ReadFile(filename)
 	if err != nil {
 		c.paramInvalid.Set()
