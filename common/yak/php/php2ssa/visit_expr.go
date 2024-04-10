@@ -2,6 +2,7 @@ package php2ssa
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
@@ -136,13 +137,10 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 		defer func() {
 			y.isFunction = tmp
 		}()
-		callee := y.VisitExpression(ret.Expression())
-		//for _, callKeyContext := range ret.AllMemberCallKey() {
-		//	_ = callKeyContext
-		//doSomethings
-		//}
+
+		fname := y.VisitExpression(ret.Expression())
 		args, ellipsis := y.VisitArguments(ret.Arguments())
-		callInst := y.NewCall(callee, args)
+		callInst := y.NewCall(fname, args)
 		if ellipsis {
 			callInst.IsEllipsis = true
 		}
@@ -468,7 +466,11 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) ssa.Value {
 			}
 			log.Warnf("const map not found %v", unquote)
 		}
-		if value := y.PeekValue(y.VisitIdentifier(ret.Identifier())); value != nil {
+		var _value = y.VisitIdentifier(ret.Identifier())
+		if _, exit := y.ExternInstance[strings.ToLower(y.VisitIdentifier(ret.Identifier()))]; exit {
+			_value = strings.ToLower(_value)
+			return y.ReadValue(_value)
+		} else if value := y.PeekValue(y.VisitIdentifier(ret.Identifier())); value != nil {
 			return value
 		} else {
 			return y.EmitConstInst(y.VisitIdentifier(ret.Identifier()))
@@ -707,9 +709,13 @@ func (y *builder) VisitFunctionCall(raw phpparser.IFunctionCallContext) ssa.Valu
 	}
 
 	v := y.VisitFunctionCallName(i.FunctionCallName())
-
+	var c *ssa.Call
 	args, ellipsis := y.VisitActualArguments(i.ActualArguments())
-	c := y.NewCall(v, args)
+	if _, exit := y.ExternInstance[strings.ToLower(v.String())]; exit {
+		c = y.NewCall(y.EmitConstInst(strings.ToLower(v.String())), args)
+	} else {
+		c = y.NewCall(v, args)
+	}
 	c.IsEllipsis = ellipsis
 	return y.EmitCall(c)
 }

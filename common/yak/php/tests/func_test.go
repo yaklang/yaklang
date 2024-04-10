@@ -280,3 +280,19 @@ func Test_Function_WithMemberCall(t *testing.T) {
 		`, []string{"Function-fun1(Undefined-.a(valid))"}, t)
 	})
 }
+
+func Test_InnerFunctionCall(t *testing.T) {
+	t.Run("test-1", func(t *testing.T) {
+		var code = `<?php
+Phpinfo();
+`
+		test.MockSSA(t, code)
+	})
+	t.Run("test-2", func(t *testing.T) {
+		var code = `<?php
+$a = PHPINFO;
+$a();
+`
+		test.MockSSA(t, code)
+	})
+}
