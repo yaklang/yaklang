@@ -910,3 +910,35 @@ func TestDebug_Plugin_Cancel_Check_Chan(t *testing.T) {
 	case <-okChan:
 	}
 }
+
+func TestDebug_Plugin_cli_Yakitplugin(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	code := `
+scriptNames = cli.YakitPlugin()
+cli.check()
+`
+
+	stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
+		Code:       code,
+		PluginType: "yak",
+		ExecParams: []*ypb.KVPair{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			if !errors.Is(err, io.EOF) {
+				t.Fatalf("check YakitPlugin param error:%s", err)
+			}
+			break
+		}
+		spew.Dump(rsp)
+	}
+
+}
