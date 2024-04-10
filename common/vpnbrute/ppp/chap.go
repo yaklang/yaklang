@@ -1,24 +1,23 @@
 package ppp
 
-var (
-	CHAP_AUTH             = "CHAP"
-	CHAP_AUTH_CODE uint16 = 0xC223
+import (
+	"crypto/md5"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
-type CHAPAuth struct {
-	Username string
-	Password string
+func GenerateCHAPResponse(id, challenge, username, password, autype []byte) ([]byte, error) {
+	switch autype {
+	case CHAP_MD5:
+		return GenerateCHAPMD5Response(id, password, challenge), nil
+	case MS_CHAP_V2:
+		resp, err := GenerateMSChapV2Response(challenge, username, password)
+		return resp, err
+	}
+	return nil, utils.Error("no support auth type")
 }
 
-func (auth *CHAPAuth) Auth() bool {
-	//todo CHAP auth
-	return false
-}
-
-func (auth *CHAPAuth) AuthType() string {
-	return CHAP_AUTH
-}
-
-func (auth *CHAPAuth) AuthCode() uint16 {
-	return CHAP_AUTH_CODE
+func GenerateCHAPMD5Response(id, password, challenge []byte) []byte {
+	toBuf := append(id, password...)
+	toBuf = append(toBuf, challenge...)
+	return utils.InterfaceToBytes(md5.Sum(toBuf))
 }
