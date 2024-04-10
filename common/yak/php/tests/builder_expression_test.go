@@ -486,9 +486,16 @@ func TestParseSSA_NothingBody(t *testing.T) {
 }
 
 func TestParseSSA_Include(t *testing.T) {
-	t.Run("set_include_path", func(t *testing.T) {
+	t.Run("set_include_path_lower", func(t *testing.T) {
 		code := `<?php
 set_include_path("./syntax");
+include('for.php');
+`
+		ssatest.MockSSA(t, code)
+	})
+	t.Run("set_include_path_union", func(t *testing.T) {
+		code := `<?php
+set_INclude_path("./syntax");
 include('for.php');
 `
 		ssatest.MockSSA(t, code)
@@ -499,4 +506,5 @@ include('syntax/include/include.php');
 `
 		ssatest.MockSSA(t, code)
 	})
+
 }
