@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"io"
+	"net/http"
+	"os"
 )
 
 func ChatWithStream(url string, model string, msg string, opt func() ([]poc.PocConfigOption, error)) error {
@@ -21,6 +24,14 @@ func ChatWithStream(url string, model string, msg string, opt func() ([]poc.PocC
 	}
 
 	opts = append(opts, poc.WithReplaceHttpPacketBody(raw, false))
+	opts = append(opts, poc.WithBodyStreamReaderHandler(func(r *http.Response, closer io.ReadCloser) {
+		io.Copy(os.Stdout, closer)
+		//scanner := bufio.NewScanner(httputil.NewChunkedReader(utils.NewTrimLeftReader(closer)))
+		//scanner.Split(bufio.ScanLines)
+		//for scanner.Scan() {
+		//	spew.Dump(scanner.Text())
+		//}
+	}))
 	rsp, _, err := poc.DoPOST(url, opts...)
 	if err != nil {
 		return utils.Wrap(err, "failed to post request")
