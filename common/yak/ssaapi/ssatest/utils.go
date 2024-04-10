@@ -22,6 +22,7 @@ type TestCase struct {
 	ExternValue map[string]any
 	ExternLib   map[string]map[string]any
 	Check       func(*ssaapi.Program, []string)
+	Option      []ssaapi.Option
 }
 
 var languageOption ssaapi.Option = nil
@@ -44,6 +45,7 @@ func CheckTestCase(t *testing.T, tc TestCase) {
 	}
 	opt = append(opt, ssaapi.WithExternValue(tc.ExternValue))
 	opt = append(opt, static_analyzer.GetPluginSSAOpt(string(language))...)
+	opt = append(opt, tc.Option...)
 	prog, err := ssaapi.Parse(tc.Code, opt...)
 	require.Nil(t, err, "parse error")
 
@@ -125,12 +127,21 @@ func CheckPrintf(t *testing.T, tc TestCase) {
 	CheckTestCase(t, tc)
 }
 
-func CheckNoError(t *testing.T, code string) {
+func CheckParse(t *testing.T, code string, opt ...ssaapi.Option) {
+	tc := TestCase{
+		Code:   code,
+		Check:  func(prog *ssaapi.Program, _ []string) {},
+		Option: opt,
+	}
+	CheckTestCase(t, tc)
+}
+func CheckNoError(t *testing.T, code string, opt ...ssaapi.Option) {
 	tc := TestCase{
 		Code: code,
 		Check: func(prog *ssaapi.Program, _ []string) {
 			require.Len(t, prog.GetErrors(), 0, "error not match")
 		},
+		Option: opt,
 	}
 	CheckTestCase(t, tc)
 }

@@ -84,6 +84,10 @@ func DeleteInst(i Instruction) {
 //	}
 
 func (f *FunctionBuilder) SetCurrent(i Instruction) func() {
+	if i.IsExtern() {
+		return func() {}
+	}
+
 	currentBlock := f.CurrentBlock
 	Range := f.CurrentRange
 	fun := f.Function
@@ -99,7 +103,6 @@ func (f *FunctionBuilder) SetCurrent(i Instruction) func() {
 		f.CurrentBlock = currentBlock
 		f.CurrentRange = Range
 		f.Function = fun
-
 		f.parentScope = parentScope
 	}
 }
