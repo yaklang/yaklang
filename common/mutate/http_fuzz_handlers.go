@@ -8,7 +8,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -166,86 +165,32 @@ func (f *FuzzHTTPRequest) fuzzPath(paths ...string) ([]*http.Request, error) {
 	}
 
 	pathTotal := QuickMutateSimple(paths...)
-	if f.NoAutoEncode() {
-		results := make([]*http.Request, 0, len(pathTotal))
-		for i := 0; i < len(pathTotal); i++ {
-			rawRequest := httpctx.GetBareRequestBytes(req)
-			proto := req.Proto
-			if !strings.HasPrefix(proto, "HTTP/") {
-				proto = "HTTP/1.1"
-			}
-			reqIns, err := lowhttp.ParseBytesToHttpRequest(lowhttp.ReplaceHTTPPacketFirstLine(
-				rawRequest, fmt.Sprintf("%v %v %v", req.Method, pathTotal[i], proto),
-			))
-			if err != nil {
-				log.Infof("parse (in FuzzPath) request failed: %v", err)
-				continue
-			}
-			results = append(results, reqIns)
-		}
-		if len(results) == 0 {
-			return []*http.Request{req}, nil
-		}
-		return results, nil
-	}
 
-	var reqs []*http.Request
-	originUrl := req.URL
-	req.RequestURI = ""
+	results := make([]*http.Request, 0, len(pathTotal))
+	rawRequest := httpctx.GetBareRequestBytes(req)
 
-	for _, targetPath := range pathTotal {
-		if !strings.HasPrefix(targetPath, "/") {
-			targetPath = "/" + targetPath
+	for i := 0; i < len(pathTotal); i++ {
+		proto := req.Proto
+		if !strings.HasPrefix(proto, "HTTP/") {
+			proto = "HTTP/1.1"
 		}
-		var _req *http.Request
-		if strings.HasPrefix(targetPath, "https://") || strings.HasPrefix(targetPath, "http://") {
-			targetUrl, err := url.Parse(targetPath)
-			if err != nil {
-				log.Errorf("parse url[%v] failed: %s", targetPath, err)
-				continue
-			}
-
-			req.URL = targetUrl
-			_req, err = rebuildHTTPRequest(req, 0)
-			if err != nil {
-				log.Errorf("rebuild http request[%s] failed: %s", req.URL, err)
-				continue
-			}
-			reqs = append(reqs, _req)
-			req.URL = originUrl
-			continue
+		var replaced []byte
+		if f.NoAutoEncode() {
+			replaced = lowhttp.ReplaceHTTPPacketPathWithoutEncode(rawRequest, pathTotal[i])
 		} else {
-			_req, err = rebuildHTTPRequest(req, 0)
-			if err != nil {
-				log.Errorf("rebuild http request path[%s] failed: %s", req.URL, err)
-				continue
-			}
-			vals := _req.URL.Query()
-			if vals == nil || len(vals) <= 0 {
-				vals = make(url.Values)
-			}
-			if strings.Contains(targetPath, "?") {
-				path, query, _ := strings.Cut(targetPath, "?")
-				if query != "" {
-					if newVals, err := url.ParseQuery(query); err == nil {
-						for k, v := range newVals {
-							if len(v) > 0 {
-								vals.Set(k, v[0])
-							}
-						}
-					}
-				}
-				_req.URL.Path = path
-				_req.URL.RawQuery = vals.Encode()
-			} else {
-				_req.URL.Path = targetPath
-			}
-			_req.RequestURI = ""
-			reqs = append(reqs, _req)
+			replaced = lowhttp.ReplaceHTTPPacketPath(rawRequest, pathTotal[i])
+		}
+		reqIns, err := lowhttp.ParseBytesToHttpRequest(replaced)
+		if err != nil {
+			log.Infof("parse (in FuzzPath) request failed: %v", err)
 			continue
 		}
+		results = append(results, reqIns)
 	}
-	return reqs, nil
+	if len(results) == 0 {
+		return []*http.Request{req}, nil
+	}
+	return results, nil
 }
 
 func (f *FuzzHTTPRequest) FuzzPath(paths ...string) FuzzHTTPRequestIf {
