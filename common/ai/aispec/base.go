@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
@@ -232,7 +231,6 @@ func ExtractDataBase(
 		}
 	}
 	if choiceMsg == "" {
-		spew.Dump(choice)
 		return nil, utils.Error("no choice message")
 	}
 
