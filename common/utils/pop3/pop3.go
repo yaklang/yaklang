@@ -575,7 +575,8 @@ func (c *Conn) StartTLS(cfg *tls.Config) error {
 	c.r = bufio.NewReader(c.conn)
 	c.w = bufio.NewWriter(c.conn)
 
-	return nil
+	_, err = c.CAPA()
+	return err
 }
 
 // parseResp checks if the response is an error that starts with `-ERR`
