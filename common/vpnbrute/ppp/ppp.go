@@ -28,6 +28,8 @@ type PPPAuth struct {
 	AuthTypeCode       []byte
 	AuthTypeName       string
 	CanUseAuthTypeList map[string][]byte
+	AuthOk             chan bool
+	MagicNumber        []byte
 }
 
 func GetDefaultPPPAuth() *PPPAuth {
@@ -35,6 +37,8 @@ func GetDefaultPPPAuth() *PPPAuth {
 		AuthTypeCode:       CHAP_MD5,
 		CanUseAuthTypeList: SupportAuthTypeMap,
 		AuthTypeName:       "CHAP",
+		AuthOk:             make(chan bool, 2),
+		MagicNumber:        []byte(utils.RandSecret(4)),
 	}
 }
 
@@ -76,27 +80,34 @@ func (p *PPPAuth) ChangeAuthType(rejectType []byte) error {
 }
 
 func (p *PPPAuth) GetPPPReqParams() map[string]any {
+	//lcpByte, _ := codec.DecodeHex("0100001501040578050626a73d32070208020d0306")
 	return map[string]any{
 		"Address":  0xff,
 		"Control":  0x03,
 		"Protocol": 0xc021,
-		"Information": map[string]any{
-			"LCP": p.GetLCPConfigReqParams(),
-		},
+		//"Information": map[string]any{
+		"LCP": p.GetLCPConfigReqParams(0),
+		//"LCP": lcpByte,
+		//},
 	}
 }
 
-func (p *PPPAuth) GetLCPConfigReqParams() map[string]any {
+func (p *PPPAuth) GetLCPConfigReqParams(id int) map[string]any {
 	return map[string]any{ // just negotiate Auth Type
 		"Code":       1,
-		"Identifier": 1,
-		"Length":     6 + len(p.AuthTypeCode),
+		"Identifier": id,
+		"Length":     12 + len(p.AuthTypeCode),
 		"Info": map[string]any{
 			"Options": []map[string]any{
 				{
 					"Type":   3,
 					"Length": len(p.AuthTypeCode) + 2,
 					"Data":   p.AuthTypeCode,
+				},
+				{
+					"Type":   5,
+					"Length": 6,
+					"Data":   p.MagicNumber,
 				},
 			},
 		},
@@ -123,7 +134,7 @@ func (p *PPPAuth) ProcessMessage(messageNode *base.Node) (map[string]any, error)
 	//	resultParams["PAP"] = res
 	case 0xc223:
 		res, err = p.ProcessCHAPMessage(base.GetNodeByPath(messageNode, "Information.CHAP"))
-		resultParams["PAP"] = res
+		resultParams["CHAP"] = res
 	}
 	if len(resultParams) == 0 {
 		return nil, err
@@ -143,6 +154,7 @@ func (p *PPPAuth) ProcessLCPMessage(messageNode *base.Node) (map[string]any, err
 	if lcpType == LCPTypeAck { // ack
 		return nil, nil
 	}
+	lcpId := messageMap["Identifier"].(uint8)
 
 	options := messageMap["Info"].(map[string]any)["Options"].([]any)
 
@@ -160,7 +172,7 @@ func (p *PPPAuth) ProcessLCPMessage(messageNode *base.Node) (map[string]any, err
 		if err != nil {
 			return nil, err
 		}
-		return p.GetLCPConfigReqParams(), nil
+		return p.GetLCPConfigReqParams(int(lcpId) + 1), nil
 	}
 
 	if hasAuthCode {
@@ -209,8 +221,10 @@ func (p *PPPAuth) ProcessCHAPMessage(messageNode *base.Node) (map[string]any, er
 		}
 		return messageMap, nil
 	case 3: // success
+		p.AuthOk <- true
 		return nil, nil
 	case 4: // failure
+		p.AuthOk <- false
 		return nil, nil
 	}
 
