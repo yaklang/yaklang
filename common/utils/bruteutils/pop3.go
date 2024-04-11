@@ -1,6 +1,7 @@
 package bruteutils
 
 import (
+	"crypto/tls"
 	"errors"
 	"net/smtp"
 	"strings"
@@ -24,17 +25,17 @@ func POP3Auth(target, username, password string, needAuth bool) (bool, error) {
 	}
 	defer c.Quit()
 	caps, err := c.CAPA()
-	// if _, ok := caps["STLS"]; ok {
-	// 	if err := c.StartTLS(&tls.Config{
-	// 		ServerName:         host,
-	// 		MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
-	// 		MaxVersion:         tls.VersionTLS13,
-	// 		InsecureSkipVerify: true,
-	// 		Renegotiation:      tls.RenegotiateFreelyAsClient,
-	// 	}); err != nil {
-	// 		return false, dialError
-	// 	}
-	// }
+	if _, ok := caps["STLS"]; ok {
+		if err := c.StartTLS(&tls.Config{
+			ServerName:         host,
+			MinVersion:         tls.VersionSSL30, // nolint[:staticcheck]
+			MaxVersion:         tls.VersionTLS13,
+			InsecureSkipVerify: true,
+			Renegotiation:      tls.RenegotiateFreelyAsClient,
+		}); err != nil {
+			return false, dialError
+		}
+	}
 
 	if needAuth {
 		// use smtp.Auth interface, because some pop3 server may use sasl auth
