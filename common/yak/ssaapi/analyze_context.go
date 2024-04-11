@@ -111,6 +111,17 @@ func (g *AnalyzeContext) GetCurrentObject() (*Value, *Value, *Value) {
 	return item.object, item.key, item.member
 }
 
+func (g *AnalyzeContext) TheMemberShouldBeVisited(member *Value) bool {
+	for i := 0; i < g._objectStack.Len(); i++ {
+		item := g._objectStack.PeekN(i)
+		if ValueCompare(item.member, member) {
+			return false
+		}
+	}
+	// should visited
+	return true
+}
+
 // ThePhiShouldBeVisited is used to check whether the phi should be visited
 func (a *AnalyzeContext) ThePhiShouldBeVisited(i *Value) bool {
 	if a._callStack.Len() <= 0 {
