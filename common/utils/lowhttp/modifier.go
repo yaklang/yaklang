@@ -1327,14 +1327,14 @@ func GetParamsFromBody(contentType string, body []byte) (params map[string]strin
 	}
 	// try post values
 	if len(params) == 0 {
-		var values url.Values
-		values, err = url.ParseQuery(utils.UnsafeBytesToString(body))
-		if err == nil {
-			for k, v := range values {
-				if len(v) == 0 {
+		queryParams := ParseQueryParams(string(body))
+		if len(queryParams.Items) > 0 {
+			for _, item := range queryParams.Items {
+				if len(item.Key) == 0 {
 					continue
 				}
-				params[k] = v[len(v)-1]
+				// use raw values
+				params[item.Key] = item.ValueRaw
 			}
 		}
 	}
