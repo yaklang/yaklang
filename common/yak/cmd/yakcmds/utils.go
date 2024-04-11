@@ -11,6 +11,8 @@ import (
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/spec"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/dap"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakast"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
@@ -20,6 +22,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 )
 
 var UtilsCommands = []*cli.Command{
@@ -215,6 +218,65 @@ var UtilsCommands = []*cli.Command{
 			}
 		},
 	},
+
+	// file tree size
+	{
+		Name:  "weight",
+		Usage: "weight dir with depth",
+		Flags: []cli.Flag{
+			cli.StringFlag{Name: "dir,d", Usage: "dir to weight"},
+			cli.IntFlag{Name: "depth", Usage: "depth to weight", Value: 1},
+			cli.BoolFlag{Name: "asc", Usage: "sort asc"},
+		},
+		Action: func(c *cli.Context) error {
+			m := omap.NewOrderedMap(map[string]int64{})
+			err := filesys.Recursive(c.String("dir"), filesys.WithFileStat(func(pathname string, info os.FileInfo) error {
+				m.Set(pathname, info.Size())
+				return nil
+			}))
+			if err != nil {
+				return err
+			}
+			forest, err := utils.GeneratePathTrees(m.Keys()...)
+			if err != nil {
+				return err
+			}
+
+			results := omap.NewOrderedMap(make(map[string]int64))
+			forest.Recursive(func(node2 *utils.PathNode) {
+				if node2.GetDepth() > c.Int("depth") {
+					return
+				}
+				count := int64(0)
+				for _, child := range node2.AllChildren() {
+					size, ok := m.Get(child.Path)
+					if !ok {
+						continue
+					}
+					count += size
+				}
+				results.Set(node2.Path, count)
+			})
+
+			var desc []*sizeDescription
+			results.ForEach(func(i string, v int64) bool {
+				desc = append(desc, &sizeDescription{Name: i, Size: uint64(v)})
+				return true
+			})
+
+			sort.Slice(desc, func(i, j int) bool {
+				if c.Bool("asc") {
+					return desc[i].Size < desc[j].Size
+				}
+				return desc[i].Size > desc[j].Size
+			})
+
+			for _, i := range desc {
+				fmt.Printf("[%6s]: %v\n", utils.ByteSize(i.Size), i.Name)
+			}
+			return nil
+		},
+	},
 }
 
 var DistributionCommands = []*cli.Command{
@@ -323,4 +385,9 @@ var DistributionCommands = []*cli.Command{
 			return nil
 		},
 	},
+}
+
+type sizeDescription struct {
+	Name string
+	Size uint64
 }
