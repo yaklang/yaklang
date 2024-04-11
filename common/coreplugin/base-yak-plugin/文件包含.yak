@@ -34,7 +34,7 @@ mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte
     benchmarkResponse = string(benchmarkResponse)
 
     for param in freq.GetCommonParams() {
-        originValue = param.GetFirstValue()
+        originValue = f`${param.GetFirstValue()}`
         p = "Vm0w"
         firstPayload = x`php://filter/{{repeat:str(convert.base64-encode/|10)}}/resource=`[0] + originValue
         response, err := param.Fuzz(firstPayload).ExecFirst()
