@@ -2,6 +2,7 @@ package mutate
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -143,12 +144,24 @@ func (p *FuzzHTTPRequestParam) PositionVerbose() string {
 	return PositionTypeVerbose(p.typePosition)
 }
 
-func (p *FuzzHTTPRequestParam) GetFirstValue() string {
+func (p *FuzzHTTPRequestParam) GetFirstValue() any {
 	vals := utils.InterfaceToSliceInterface(p.Value())
 	if len(vals) > 0 {
-		return utils.InterfaceToString(vals[0])
+		return vals[0]
+	}
+	return vals
+}
+
+func (p *FuzzHTTPRequestParam) GetPostJsonPath() string {
+	if p.Position() == string(posPostJson) {
+		return p.path
 	}
 	return ""
+}
+
+func (p *FuzzHTTPRequestParam) FirstValueIsNumber() bool {
+	ret := p.GetFirstValue()
+	return utils.IsInt(ret) || utils.IsFloat(ret)
 }
 
 func (p *FuzzHTTPRequestParam) Value() interface{} {
@@ -179,12 +192,20 @@ func (p *FuzzHTTPRequestParam) Value() interface{} {
 		switch paramOriginValue := p.paramOriginValue.(type) {
 		case []string:
 			if len(paramOriginValue) > 0 {
-				return utils.InterfaceToStringSlice(jsonpath.Find(paramOriginValue[0], p.path))
+				raw := jsonpath.Find(paramOriginValue[0], p.path)
+				if reflect.TypeOf(raw).Kind() == reflect.Slice {
+					return []any{raw}
+				}
+				return utils.InterfaceToSliceInterface(raw)
 			} else {
 				return utils.InterfaceToStringSlice("")
 			}
 		case string:
-			return utils.InterfaceToStringSlice(jsonpath.Find(paramOriginValue, p.path))
+			raw := jsonpath.Find(paramOriginValue, p.path)
+			if reflect.TypeOf(raw).Kind() == reflect.Slice {
+				return []any{raw}
+			}
+			return utils.InterfaceToSliceInterface(raw)
 		default:
 			log.Error("unrecognized param value type")
 			return p.paramOriginValue

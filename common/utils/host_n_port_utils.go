@@ -441,6 +441,23 @@ func IsJSON(raw string) (string, bool) {
 	return raws[0], true
 }
 
+func IsInt(v interface{}) bool {
+	switch v.(type) {
+	case int, int64, int8, int16, int32,
+		uint, uint8, uint16, uint32, uint64:
+		return true
+	}
+	return false
+}
+
+func IsFloat(v interface{}) bool {
+	switch v.(type) {
+	case float64, float32:
+		return true
+	}
+	return false
+}
+
 func IsGzip(raw []byte) bool {
 	return bytes.HasPrefix(raw, []byte{0x1f, 0x8b, 0x08})
 }

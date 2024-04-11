@@ -816,3 +816,44 @@ func TestGetXpathFromNode(t *testing.T) {
 		}
 	}
 }
+
+func TestFuzzRequestParam_JSON(t *testing.T) {
+	freq, err := NewFuzzHTTPRequest(`GET / HTTP/1.1
+Host: www.example.com
+
+{"a": {"b": 1, "c": [1, {"d": 222}]}}`)
+	if err != nil {
+		t.FailNow()
+		return
+	}
+	/*
+
+	   === RUN   TestFuzzRequestParam_JSON
+	   (string) (len=3) "$.a"
+	   (string) (len=5) "$.a.b"
+	   (string) (len=5) "$.a.c"
+	   (string) (len=8) "$.a.c[0]"
+	   (string) (len=8) "$.a.c[1]"
+	   (string) (len=10) "$.a.c[1].d"
+
+	*/
+	numCount := 0
+	otherCount := 0
+	for _, o := range freq.GetCommonParams() {
+		p := o.GetPostJsonPath()
+		if p == "" {
+			continue
+		}
+		if o.FirstValueIsNumber() {
+			fmt.Printf("NUMBER: %v", o.String())
+			numCount++
+		} else {
+			fmt.Printf("EXCLUDE %v", o.String())
+			otherCount++
+		}
+	}
+	spew.Dump(numCount, otherCount)
+	test := assert.New(t)
+	test.Equal(numCount, 3)
+	test.Equal(otherCount, 3)
+}
