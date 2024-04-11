@@ -729,10 +729,15 @@ RECONNECT:
 		// BodyStreamReaderHandler is only effect non-pool connection
 		if option != nil && option.BodyStreamReaderHandler != nil {
 			reader, writer := utils.NewBufPipe(nil)
+			bodyReader, bodyWriter := utils.NewBufPipe(nil)
 			defer func() {
+				log.Infof("close reader and writer")
 				writer.Close()
 				reader.Close()
+				bodyWriter.Close()
+				bodyReader.Close()
 			}()
+
 			go func() {
 				defer func() {
 					if err := recover(); err != nil {
@@ -740,17 +745,22 @@ RECONNECT:
 					}
 				}()
 
-				packetReader := bufio.NewReader(utils.NewTrimLeftReader(reader))
-				bodyReader, bodyWriter := utils.NewBufPipe(nil)
+				packetReader := bufio.NewReader(reader)
 				responseHeader := bytes.NewBufferString("")
 				for {
 					line, err := utils.BufioReadLine(packetReader)
 					if err != nil {
+						log.Errorf("BodyStreamReaderHandler read response failed: %s", err)
+						bodyWriter.Close()
 						break
 					}
+
 					responseHeader.WriteString(string(line) + "\r\n")
 					if len(line) == 0 {
-						go io.Copy(bodyWriter, packetReader)
+						go func() {
+							io.Copy(bodyWriter, packetReader)
+							bodyWriter.Close()
+						}()
 						break
 					}
 				}

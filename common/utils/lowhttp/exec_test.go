@@ -482,34 +482,44 @@ func TestLowhttp_RESP_StreamBody(t *testing.T) {
 		conn.Write([]byte("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 16\r\nX-Content-Type-Options: nosniff\r\n\r\n"))
 		time.Sleep(200 * time.Millisecond)
 		conn.Write([]byte("abcd"))
-		spew.Dump(1)
 		time.Sleep(200 * time.Millisecond)
 		conn.Write([]byte("abcd"))
-		spew.Dump(1)
 		time.Sleep(200 * time.Millisecond)
 		conn.Write([]byte("abcd"))
-		spew.Dump(1)
 		conn.Write([]byte("abcd"))
-		spew.Dump(1)
+		conn.Write([]byte("abcd"))
+		log.Info("start to close stream")
 		conn.Close()
 	}))
 
 	var results []byte
 	var timePassed bool
+	wg := utils.NewSizedWaitGroup(1)
+	wg.Add(1)
 	_, err := HTTPWithoutRedirect(
 		WithPacketBytes([]byte("GET / HTTP/1.1\r\nHost: "+target+"\r\n\r\n")),
 		WithBodyStreamReaderHandler(func(response []byte, closer io.ReadCloser) {
+			defer wg.Done()
+
+			log.Info("start to handle closer")
 			start := time.Now()
 			all, _ := io.ReadAll(closer)
+			log.Info("finished")
 			results = all
-			if ret := time.Now().Sub(start).Milliseconds(); ret > 500 && 700 > ret {
+			end := time.Now()
+			if ret := end.Sub(start).Milliseconds(); ret > 500 && 700 > ret {
 				timePassed = true
+			} else {
+				spew.Dump(end.Sub(start))
 			}
 		}),
 	)
 	if err != nil {
 		panic(err)
 	}
+
+	log.Info("start to wait stream")
+	wg.Wait()
 	if !timePassed {
 		t.Fatal("time not right")
 	}
