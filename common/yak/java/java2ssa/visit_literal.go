@@ -96,6 +96,8 @@ func (y *builder) VisitIntegerLiteral(raw javaparser.IIntegerLiteralContext) ssa
 		resultInt64, err = strconv.ParseInt(intStr[2:], 16, 64)
 	case strings.HasPrefix(intStr, "0o"): // 八进制
 		resultInt64, err = strconv.ParseInt(intStr[2:], 8, 64)
+	case strings.HasSuffix(intStr, "l"): //长整型
+		resultInt64, err = strconv.ParseInt(intStr[:len(intStr)-1], 8, 64)
 	case len(intStr) > 1 && intStr[0] == '0':
 		resultInt64, err = strconv.ParseInt(intStr[1:], 8, 64)
 	default:
