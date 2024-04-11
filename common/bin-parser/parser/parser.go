@@ -37,6 +37,7 @@ func ParseBinaryWithConfig(data io.Reader, rule string, config map[string]any, k
 		return base.GetNodeByPath(rootNode, "@"+strings.Join(keys, ".")), nil
 	}
 }
+
 func ParseBinary(data io.Reader, rule string, keys ...string) (*base.Node, error) {
 	splits := strings.Split(rule, ".")
 	if len(splits) > 0 {
