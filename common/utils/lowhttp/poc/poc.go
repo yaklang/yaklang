@@ -82,7 +82,7 @@ type PocConfig struct {
 	DNSServers []string
 	DNSNoCache bool
 
-	BodyStreamHandler func(*http.Response, io.ReadCloser)
+	BodyStreamHandler func([]byte, io.ReadCloser)
 }
 
 func (c *PocConfig) IsHTTPS() bool {
@@ -253,7 +253,7 @@ func WithRedirectHandler(i func(isHttps bool, req, rsp []byte) bool) PocConfigOp
 }
 
 // stream 是一个请求选项参数，可以设置一个回调函数，如果 body 读取了，将会复制一份给这个流，在这个流中处理 body 是不会影响最终结果的，一般用于处理较长的 chunk 数据
-func WithBodyStreamReaderHandler(i func(r *http.Response, closer io.ReadCloser)) PocConfigOption {
+func WithBodyStreamReaderHandler(i func(r []byte, closer io.ReadCloser)) PocConfigOption {
 	return func(c *PocConfig) {
 		c.BodyStreamHandler = i
 	}

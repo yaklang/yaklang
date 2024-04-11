@@ -8,7 +8,7 @@ import (
 type Chatter interface {
 	Chat(string, ...Function) (string, error)
 	ChatEx([]ChatDetail, ...Function) ([]ChatChoice, error)
-	ChatStream(string) (io.ReadCloser, error)
+	ChatStream(string) (io.Reader, error)
 }
 
 type FunctionCaller interface {

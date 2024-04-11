@@ -498,7 +498,7 @@ func TestLowhttp_RESP_StreamBody(t *testing.T) {
 	var timePassed bool
 	_, err := HTTPWithoutRedirect(
 		WithPacketBytes([]byte("GET / HTTP/1.1\r\nHost: "+target+"\r\n\r\n")),
-		WithBodyStreamReaderHandler(func(response *http.Response, closer io.ReadCloser) {
+		WithBodyStreamReaderHandler(func(response []byte, closer io.ReadCloser) {
 			start := time.Now()
 			all, _ := io.ReadAll(closer)
 			results = all

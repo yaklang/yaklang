@@ -1,18 +1,69 @@
 package aispec
 
 import (
+	"bufio"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/jsonextractor"
+	"github.com/yaklang/yaklang/common/jsonpath"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
-	"net/http"
-	"os"
+	"net/http/httputil"
+	"strings"
 )
 
-func ChatWithStream(url string, model string, msg string, opt func() ([]poc.PocConfigOption, error)) error {
+func appendStreamHandlerPoCOption(opts []poc.PocConfigOption) (io.Reader, []poc.PocConfigOption) {
+	pr, pw := utils.NewBufPipe(nil)
+	opts = append(opts, poc.WithBodyStreamReaderHandler(func(r []byte, closer io.ReadCloser) {
+		defer func() {
+			pw.Write([]byte{'\n'})
+			defer pw.Close()
+		}()
+		lineReader := bufio.NewReader(httputil.NewChunkedReader(utils.NewTrimLeftReader(closer)))
+		for {
+			line, err := utils.BufioReadLine(lineReader)
+			if err != nil {
+				if err != io.EOF {
+					log.Warnf("failed to read line: %v", err)
+				}
+				return
+			}
+			lineStr := string(line)
+			jsonIdentifiers := jsonextractor.ExtractStandardJSON(lineStr)
+			for _, j := range jsonIdentifiers {
+				results := jsonpath.Find(j, `$..choices[*].delta.content`)
+				wordList := utils.InterfaceToSliceInterface(results)
+				if len(wordList) <= 0 {
+					log.Debugf("cannot identifier delta content, try to fetch arguments for: %v", j)
+					wordList = utils.InterfaceToSliceInterface(jsonpath.Find(j, `$..choices[*].delta.tool_calls[*].function.arguments`))
+				}
+				handled := false
+				for _, raw := range wordList {
+					handled = true
+					data := codec.AnyToBytes(raw)
+					pw.Write(data)
+				}
+				if !handled {
+					if ret := codec.AnyToString(jsonpath.Find(j, `$..finish_reason`)); utils.IContains(ret, "stop") {
+						log.Info("finished normal")
+					} else if strings.TrimRight(codec.AnyToString(jsonpath.Find(j, `$..error`)), "[]\"'") != "" {
+						log.Errorf("error for stream fetching: %v", j)
+					} else {
+						log.Infof("extra ai stream json: %v", j)
+					}
+				}
+			}
+		}
+	}))
+	return pr, opts
+}
+
+func ChatWithStream(url string, model string, msg string, opt func() ([]poc.PocConfigOption, error)) (io.Reader, error) {
 	opts, err := opt()
 	if err != nil {
-		return utils.Wrap(err, "failed to get options")
+		return nil, utils.Wrap(err, "failed to get options")
 	}
 
 	msgIns := NewChatMessage(model, []ChatDetail{NewUserChatDetail(msg)})
@@ -20,22 +71,19 @@ func ChatWithStream(url string, model string, msg string, opt func() ([]poc.PocC
 
 	raw, err := json.Marshal(msgIns)
 	if err != nil {
-		return utils.Wrap(err, "json.Marshal failed")
+		return nil, utils.Wrap(err, "json.Marshal failed")
 	}
 
 	opts = append(opts, poc.WithReplaceHttpPacketBody(raw, false))
-	opts = append(opts, poc.WithBodyStreamReaderHandler(func(r *http.Response, closer io.ReadCloser) {
-		io.Copy(os.Stdout, closer)
-		//scanner := bufio.NewScanner(httputil.NewChunkedReader(utils.NewTrimLeftReader(closer)))
-		//scanner.Split(bufio.ScanLines)
-		//for scanner.Scan() {
-		//	spew.Dump(scanner.Text())
-		//}
-	}))
-	rsp, _, err := poc.DoPOST(url, opts...)
-	if err != nil {
-		return utils.Wrap(err, "failed to post request")
-	}
-	_ = rsp
-	return nil
+
+	pr, opts := appendStreamHandlerPoCOption(opts)
+	go func() {
+		rsp, _, err := poc.DoPOST(url, opts...)
+		if err != nil {
+			log.Errorf("failed to post stream request: %v", err)
+			return
+		}
+		_ = rsp
+	}()
+	return pr, nil
 }
