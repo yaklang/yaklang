@@ -11,23 +11,54 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"io"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 )
 
-func ChatBase(url string, model string, msg string, fs []Function, opt func() ([]poc.PocConfigOption, error)) (string, error) {
+func ChatBase(url string, model string, msg string, fs []Function, opt func() ([]poc.PocConfigOption, error), streamHandler func(io.Reader)) (string, error) {
 	opts, err := opt()
 	if err != nil {
 		return "", utils.Errorf("build config failed: %v", err)
 	}
 	msgIns := NewChatMessage(model, []ChatDetail{NewUserChatDetail(msg)})
 
+	handleStream := streamHandler != nil
+	if handleStream {
+		msgIns.Stream = true
+	}
+
 	raw, err := json.Marshal(msgIns)
 	if err != nil {
 		return "", utils.Errorf("build msg[%v] to json failed: %s", string(raw), err)
 	}
 	opts = append(opts, poc.WithReplaceHttpPacketBody(raw, false))
+
+	if streamHandler != nil {
+		var pr io.Reader
+		var body = bytes.NewBufferString("")
+		pr, opts = appendStreamHandlerPoCOption(opts)
+		wg := new(sync.WaitGroup)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			defer func() {
+				if err := recover(); err != nil {
+					log.Warnf("streamHandler panic: %v", err)
+				}
+			}()
+			streamHandler(io.TeeReader(pr, body))
+		}()
+		_, _, err := poc.DoPOST(url, opts...)
+		if err != nil {
+			return "", utils.Errorf("request post to %v：%v", url, err)
+		}
+		wg.Wait()
+		return body.String(), nil
+	}
+
 	rsp, _, err := poc.DoPOST(url, opts...)
 	if err != nil {
 		return "", utils.Errorf("request post to %v：%v", url, err)
@@ -40,7 +71,7 @@ func ChatBase(url string, model string, msg string, fs []Function, opt func() ([
 	return compl.Choices[0].Message.Content, nil
 }
 
-func ChatBasedExtractData(url string, model string, msg string, fields map[string]any, opt func() ([]poc.PocConfigOption, error)) (map[string]any, error) {
+func ChatBasedExtractData(url string, model string, msg string, fields map[string]any, opt func() ([]poc.PocConfigOption, error), streamHandler func(io.Reader)) (map[string]any, error) {
 	if len(fields) <= 0 {
 		return nil, utils.Error("no fields config for extract")
 	}
@@ -60,7 +91,7 @@ func ChatBasedExtractData(url string, model string, msg string, fields map[strin
 
 	var text = `我在完成数据精炼和提取任务，数据源是：` + strconv.Quote(msg) + "，如要提取一系列字段，请提取内容，输出成JSON格式，对JSON对象需求的字段列表为: \n" + buf.String()
 	msg = text + "\n\n注意：尽量不要输出和JSON的东西 尽量少提出意见"
-	result, err := ChatBase(url, model, msg, nil, opt)
+	result, err := ChatBase(url, model, msg, nil, opt, streamHandler)
 	if err != nil {
 		log.Errorf("chatbase error: %s", err)
 		return nil, err
@@ -99,16 +130,55 @@ func ChatBasedExtractData(url string, model string, msg string, fields map[strin
 	return nil, utils.Errorf("cannot extractjson: \n%v\n", string(result))
 }
 
-func ChatExBase(url string, model string, details []ChatDetail, function []Function, opt func() ([]poc.PocConfigOption, error)) ([]ChatChoice, error) {
+func ChatExBase(url string, model string, details []ChatDetail, function []Function, opt func() ([]poc.PocConfigOption, error), streamHandler func(closer io.Reader)) ([]ChatChoice, error) {
+	handleStream := streamHandler != nil
 	opts, err := opt()
 	if err != nil {
 		return nil, err
 	}
-	raw, err := json.Marshal(NewChatMessage(model, details, function...))
+	msg := NewChatMessage(model, details, function...)
+	if handleStream {
+		msg.Stream = true
+	}
+	raw, err := json.Marshal(msg)
 	if err != nil {
 		return nil, utils.Errorf("marshal message failed: %v", err)
 	}
 	opts = append(opts, poc.WithReplaceHttpPacketBody(raw, false))
+
+	if handleStream {
+		var pr io.Reader
+		var body = bytes.NewBufferString("")
+		pr, opts = appendStreamHandlerPoCOption(opts)
+		wg := new(sync.WaitGroup)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			defer func() {
+				if err := recover(); err != nil {
+					log.Warnf("streamHandler panic: %v", err)
+				}
+			}()
+			streamHandler(io.TeeReader(pr, body))
+		}()
+		_, _, err := poc.DoPOST(url, opts...)
+		if err != nil {
+			return nil, utils.Errorf("request post to %v：%v", url, err)
+		}
+		wg.Wait()
+		return []ChatChoice{
+			{
+				Index: 0,
+				Message: ChatDetail{
+					Role:    "system",
+					Name:    "",
+					Content: body.String(),
+				},
+				FinishReason: "stop",
+			},
+		}, nil
+	}
+
 	rsp, _, err := poc.DoPOST(url, opts...)
 	if err != nil {
 		return nil, utils.Errorf("request post to %v：%v", url, err)
@@ -125,6 +195,7 @@ func ExtractDataBase(
 	url string, model string, input string,
 	description string, paramRaw map[string]any,
 	opt func() ([]poc.PocConfigOption, error),
+	streamHandler func(io.Reader),
 ) (map[string]any, error) {
 	parameters := &Parameters{
 		Type:       "object",
@@ -145,7 +216,7 @@ func ExtractDataBase(
 		Description: description,
 		Parameters:  *parameters,
 	}
-	choice, err := ChatExBase(url, model, []ChatDetail{NewUserChatDetail(input)}, []Function{main}, opt)
+	choice, err := ChatExBase(url, model, []ChatDetail{NewUserChatDetail(input)}, []Function{main}, opt, streamHandler)
 	if err != nil {
 		return nil, err
 	}
@@ -172,11 +243,12 @@ func ExtractDataBase(
 		if len(results) > 0 {
 			err = json.Unmarshal([]byte(results[0]), &result)
 			if err != nil {
-				return nil, utils.Errorf("unmarshal choice message[%v] failed: %v", string(choiceMsg), err)
+				return ChatBasedExtractData(url, model, input, result, opt, streamHandler)
+				//return nil, utils.Errorf("unmarshal choice message[%v] failed: %v", string(choiceMsg), err)
 			}
 			return result, nil
 		}
-		return nil, utils.Errorf("unmarshal choice message[%v] failed: %v", string(choiceMsg), err)
+		return ChatBasedExtractData(url, model, input, paramRaw, opt, streamHandler)
 	}
 	return result, nil
 }

@@ -3,7 +3,6 @@ package chatglm
 import (
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"io"
 )
@@ -14,8 +13,8 @@ type GLMClient struct {
 	targetUrl string
 }
 
-func (g *GLMClient) ChatStream(msg string) (io.ReadCloser, error) {
-	return nil, utils.Error("not implemented")
+func (g *GLMClient) ChatStream(msg string) (io.Reader, error) {
+	return aispec.ChatWithStream(g.targetUrl, g.config.Model, msg, g.BuildHTTPOptions)
 }
 
 func (g *GLMClient) LoadOption(opt ...aispec.AIConfigOption) {
@@ -67,13 +66,13 @@ func (g *GLMClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 }
 
 func (g *GLMClient) Chat(s string, f ...aispec.Function) (string, error) {
-	return aispec.ChatBase(g.targetUrl, g.config.Model, s, f, g.BuildHTTPOptions)
+	return aispec.ChatBase(g.targetUrl, g.config.Model, s, f, g.BuildHTTPOptions, g.config.StreamHandler)
 }
 
 func (g *GLMClient) ChatEx(details []aispec.ChatDetail, function ...aispec.Function) ([]aispec.ChatChoice, error) {
-	return aispec.ChatExBase(g.targetUrl, g.config.Model, details, function, g.BuildHTTPOptions)
+	return aispec.ChatExBase(g.targetUrl, g.config.Model, details, function, g.BuildHTTPOptions, g.config.StreamHandler)
 }
 
 func (g *GLMClient) ExtractData(msg string, desc string, fields map[string]any) (map[string]any, error) {
-	return aispec.ChatBasedExtractData(g.targetUrl, g.config.Model, msg, fields, g.BuildHTTPOptions)
+	return aispec.ChatBasedExtractData(g.targetUrl, g.config.Model, msg, fields, g.BuildHTTPOptions, g.config.StreamHandler)
 }

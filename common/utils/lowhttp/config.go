@@ -67,7 +67,7 @@ type LowhttpExecConfig struct {
 	DNSNoCache bool
 
 	// BodyStreamReaderHandler is a callback function to handle the body stream reader
-	BodyStreamReaderHandler func(response *http.Response, closer io.ReadCloser)
+	BodyStreamReaderHandler func(responseHeader []byte, closer io.ReadCloser)
 
 	// SNI
 	SNI string
@@ -181,7 +181,7 @@ func WithETCHosts(hosts map[string]string) LowhttpOpt {
 	}
 }
 
-func WithBodyStreamReaderHandler(t func(*http.Response, io.ReadCloser)) LowhttpOpt {
+func WithBodyStreamReaderHandler(t func([]byte, io.ReadCloser)) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.BodyStreamReaderHandler = t
 	}
