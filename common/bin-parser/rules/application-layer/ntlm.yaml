@@ -28,6 +28,24 @@ Package:
     NegotiateFlags: raw,4
     Version: Version
     MIC: raw,16
+  AV_PAIR:
+    operator: |
+      stop = false
+      this.ForEachChild((child)=>{
+        if stop{
+          return
+        }
+        res = child.Process()
+        if child.Name == "AvId" && res == 0{
+          stop = true
+        }
+      })
+    endian: little
+    AvId: uint16
+    AvLen: uint16
+    length-from-field: AvLen
+    length-for-start-field: Value
+    Value: raw
 Version:
   ProductMajorVersion: uint8
   ProductMinorVersion: uint8

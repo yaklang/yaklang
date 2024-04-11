@@ -7,7 +7,7 @@ import (
 func TestNewLdapServer(t *testing.T) {
 	//server := ldapserver.NewLdapServer()
 	//server := ldapserver.NewLdapServerWithPort(9092, 9091)
-	//server.SetPayload(yso.GetTomcatEcho("id"))
+	//server.setPayload(yso.GetTomcatEcho("id"))
 	//ctx, cancel := context.WithCancel(context.Background())
 	//defer cancel()
 	//go server.Run(ctx)

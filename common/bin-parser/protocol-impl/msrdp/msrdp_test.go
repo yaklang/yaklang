@@ -8,16 +8,18 @@ import (
 )
 
 func TestMsrdp(t *testing.T) {
-	_, err := Login("47.120.44.219", 3389, "", "Administrator", "xL47r3@bw9.g7E8")
+	_, err := Login("129.153.219.71", 3389, "123456", "Administrator", "")
 	if err != nil {
 		t.Fatal(err)
+	} else {
+		println("login successful")
 	}
 }
 func TestGrdp(t *testing.T) {
-	host := "47.120.44.219"
+	host := "129.153.219.71"
 	port := 3389
 	client := grdp.NewClient(utils.HostPort(host, port), glog.DEBUG)
-	err := client.Login("", "Administrator", "xL47r3@bw9.g7E8")
+	err := client.Login("", "Administrator", "123456")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/core"
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/emission"
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/glog"
@@ -84,12 +83,14 @@ func (t *TPKT) recvChallenge(data []byte) error {
 	glog.Debugf("tsreq:%+v", tsreq)
 	// get pubkey
 	pubkey, err := t.Conn.TlsPubKey()
+
 	glog.Debugf("pubkey=%+v", pubkey)
 
 	authMsg, ntlmSec := t.ntlm.GetAuthenticateMessage(tsreq.NegoTokens[0].Data)
 	t.ntlmSec = ntlmSec
 
 	encryptPubkey := ntlmSec.GssEncrypt(pubkey)
+	//println(codec.EncodeToHex(encryptPubkey))
 	req := nla.EncodeDERTRequest([]nla.Message{authMsg}, nil, encryptPubkey)
 	_, err = t.Conn.Write(req)
 	if err != nil {
