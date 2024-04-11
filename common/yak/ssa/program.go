@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
@@ -121,6 +122,16 @@ func (prog *Program) GetFrontValueByOffset(searchOffset int) (value Value) {
 		value = item.GetValue()
 	}
 	return value
+}
+
+func (prog *Program) IsPackagePathInList(pkgName string) bool {
+	for _, pkgPath := range prog.packagePathList {
+		name := strings.Join(pkgPath, ".")
+		if name == pkgName {
+			return true
+		}
+	}
+	return false
 }
 
 func NewPackage(name string) *Package {
