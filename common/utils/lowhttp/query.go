@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"net/url"
+	"strings"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
@@ -23,10 +24,10 @@ func ExtractQueryFromRequestURI(i string) *QueryParams {
 }
 
 type QueryParamItem struct {
-	NoAutoEncode bool
-	Raw          string
-	Key          string
-	Value        string
+	NoAutoEncode    bool
+	Raw             string
+	Key             string
+	Value, ValueRaw string
 }
 
 func (item *QueryParamItem) Encode() string {
@@ -67,27 +68,28 @@ func ParseQueryParams(s string) *QueryParams {
 	scanner := bufio.NewReaderSize(bytes.NewBufferString(s), len(s))
 	var items []*QueryParamItem
 
-	handle := func(pair []byte) {
+	handle := func(pair string) {
 		if len(pair) <= 0 {
 			return
 		}
-		pair = bytes.Trim(pair, "&")
-		key, val, ok := bytes.Cut(pair, []byte{'='})
+		pair = strings.Trim(pair, "&")
+		key, val, ok := strings.Cut(pair, "=")
 		if ok {
 			items = append(items, &QueryParamItem{
-				Raw:   codec.ForceQueryUnescape(string(pair)),
-				Key:   codec.ForceQueryUnescape(string(key)),
-				Value: codec.ForceQueryUnescape(string(val)),
+				Raw:      codec.ForceQueryUnescape(pair),
+				Key:      codec.ForceQueryUnescape(key),
+				Value:    codec.ForceQueryUnescape(val),
+				ValueRaw: val,
 			})
 		} else {
 			items = append(items, &QueryParamItem{
-				Raw: codec.ForceQueryUnescape(string(pair)),
+				Raw: codec.ForceQueryUnescape(pair),
 			})
 		}
 	}
 
 	for {
-		pair, err := scanner.ReadBytes('&')
+		pair, err := scanner.ReadString('&')
 		if err != nil {
 			handle(pair)
 			break
