@@ -113,6 +113,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			}
 		}
 	}
+	if i.IsMember() && !actx.TheMemberShouldBeVisited(i) {
+		return Values{}
+	}
 
 	getMemberCall := func(value ssa.Value, actx *AnalyzeContext) Values {
 		if !value.HasValues() && value.IsMember() {
