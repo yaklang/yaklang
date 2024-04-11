@@ -1,51 +1,77 @@
 package yakgrpc
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func TestGRPCMUSTPASS_HTTPFuzzer_RenderFileFuzztag(t *testing.T) {
-	var testFile []byte
-	for i := 0; i < 10; i++ {
-		testFile = append(testFile, 255)
-	}
-
-	fileName, err := utils.SaveTempFile(testFile, "fuzztag-test-file")
+func TestGRPCMUSTPASS_HTTPFuzzer_RenderDangerousFuzztag(t *testing.T) {
+	// create a temporary file to test
+	token1 := utils.RandStringBytes(16)
+	fileName, err := utils.SaveTempFile(token1, "fuzztag-test-file")
 	if err != nil {
 		panic(err)
 	}
+	// create a codec script to test
+	token2 := utils.RandStringBytes(16)
+	scriptName, err := yakit.CreateTemporaryYakScript("codec", fmt.Sprintf(`
+	handle = func(origin)  {
+		return "%s"
+	}`, token2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer yakit.DeleteYakScriptByName(consts.GetGormProjectDatabase(), scriptName)
 
-	fmt.Println(fileName)
+	pass := false
+
+	// create a debug server
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		sBody := string(body)
+		if strings.Contains(sBody, token1) && strings.Contains(sBody, token2) {
+			pass = true
+		}
+	})
 
 	packet := fmt.Sprintf(`POST /post HTTP/1.1
-Content-Type: application/json
-Host: pie.dev
+Host: %s
 	
-{{file(%s)}}`, fileName)
+{{file(%s)}}|{{codec(%s)}}`, utils.HostPort(host, port), fileName, scriptName)
 
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
 	}
 	ctx, _ := context.WithTimeout(context.Background(), 80*time.Second)
-	fuzzerPacket, err := client.RenderHTTPFuzzerPacket(ctx, &ypb.RenderHTTPFuzzerPacketRequest{
-		Packet: []byte(packet),
+
+	stream, err := client.HTTPFuzzer(ctx, &ypb.FuzzerRequest{
+		Request:   packet,
+		ForceFuzz: true,
 	})
-	if err != nil {
-		panic(err)
+
+	// wait for the stream to finish
+	for {
+		_, err := stream.Recv()
+		if err != nil {
+			break
+		}
 	}
 
-	spew.Dump(fuzzerPacket.GetPacket())
-	body := lowhttp.GetHTTPPacketBody(fuzzerPacket.GetPacket())
-	if bytes.Compare(body, []byte("{{unquote(\"\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\\xff\")}}")) != 0 {
-		t.Fatal("not equal")
+	if !pass {
+		t.Fatal("HTTPFuzzer failed to render dangerous fuzztag")
 	}
 }
