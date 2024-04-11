@@ -20,6 +20,8 @@ Package:
             this.ProcessByType("Outgoing Call Req")
           case 8:
             this.ProcessByType("Outgoing Call Reply")
+          case 15:
+            this.ProcessByType("Set Link Info")
         }
 
 Start Control Conn Req:
@@ -67,3 +69,9 @@ Outgoing Call Reply:
     RecvWindowSize: uint16
     ProcessingDelay: uint16
     PhysicalChannelId: uint32
+
+Set Link Info:
+    PeerCallId: uint16
+    Reserved: uint16
+    Send Accm: uint32
+    Recv Accm: uint32

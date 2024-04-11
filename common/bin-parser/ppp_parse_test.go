@@ -318,3 +318,17 @@ func testPPTP(t *testing.T, item PPTPTest) {
 	DumpNode(res)
 	assert.Equal(t, item.data, codec.EncodeToHex(NodeToBytes(res)))
 }
+
+func TestANCCC(t *testing.T) {
+	dataHex := "3066d026811bf84d8991af5208004500010b00004000400662c6c0a8031677609c08cea0370db485ff921c6fdee680180808235200000101080a929a15075619e69f474554202f20485454502f312e310d0a486f73743a20373664643164383362372e69716979692e636f6d3a31343039330d0a557365722d4167656e743a206375726c2f372e34382e300d0a436f6e74656e742d4c656e6774683a2033320d0a436f6e6e656374696f6e3a20557067726164650d0a5365632d576562736f636b65742d4b65793a204f45692d724e56326c3443754264347a567a664c6a673d3d0d0a557067726164653a20776562736f636b65740d0a0d0a2acc9cc819e51ccf44bdee6f4e26f45f63038a6cfddf86a550a6ff9b5d1f875b"
+	data, err := codec.DecodeHex(dataHex)
+	if err != nil {
+		t.Fatal(err)
+	}
+	node, err := parser.ParseBinary(bytes.NewReader(data), "ethernet")
+	if err != nil {
+		t.Fatal(err)
+	}
+	//resMap, err := node.Result()
+	DumpNode(node)
+}
