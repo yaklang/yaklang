@@ -12,13 +12,16 @@ func (y *builder) VisitCompilationUnit(raw javaparser.ICompilationUnitContext) i
 
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
+
 	i, _ := raw.(*javaparser.CompilationUnitContext)
 	if i == nil {
 		return nil
 	}
 
 	if ret := i.PackageDeclaration(); ret != nil {
-		y.VisitPackageDeclaration(ret)
+
+		pkgPath := y.VisitPackageDeclaration(ret)
+		y.AddCurrentPackagePath(pkgPath)
 	}
 
 	for _, pkgImport := range i.AllImportDeclaration() {
@@ -69,7 +72,6 @@ func (y *builder) VisitPackageDeclaration(raw javaparser.IPackageDeclarationCont
 	}
 
 	packagePath := y.VisitPackageQualifiedName(i.QualifiedName())
-	log.Warnf("waiting for setting package path: %v", packagePath)
 	return packagePath
 }
 

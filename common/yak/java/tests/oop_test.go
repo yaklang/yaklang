@@ -360,7 +360,64 @@ class Main{
 			println(Hello());
 		}
 }
-		`, []string{"Function-Main_Hello()"}, t)
+		`, []string{"Function-_Main_Hello()"}, t)
+	})
+}
+
+func TestJava_Package(t *testing.T) {
+	t.Run("simple test", func(t *testing.T) {
+		code := `
+	package org.example.A;
+	public	class A {
+			int num = 0;
+			public int getNum() {
+				super();
+				return this.num;
+			}
+		}
+public class Main{
+		public static void main(String[] args) {
+		A a = new A(); 
+		println(a.getNum());
+		}
+}
+		`
+		ssatest.CheckPrintlnValue(code, []string{
+			"Function-org_example_A_A_getNum(make(A),0)",
+		}, t)
+	})
+
+	t.Run("test package with constructor", func(t *testing.T) {
+		code := `
+	package com.example.A;
+	public class A {
+	private int num1=0;
+	private int num2=0;
+	
+	public A(int num1,int num2) {
+		this.num1 = num1;
+		this.num2 = num2;
+
+	}
+	public int getNum1() {
+		return this.num1;
+	}
+	public int getNum2(){
+	return this.num2;
+}
+}
+public class Main{
+		public static void main(String[] args) {
+		A a = new A(1,2);
+		println(a.getNum1());
+		println(a.getNum2());
+		}
+}
+		`
+		ssatest.CheckPrintlnValue(code, []string{
+			"Function-com_example_A_A_getNum1(make(A),side-effect(Parameter-num1, this.num1))",
+			"Function-com_example_A_A_getNum2(make(A),side-effect(Parameter-num2, this.num2))",
+		}, t)
 	})
 }
 

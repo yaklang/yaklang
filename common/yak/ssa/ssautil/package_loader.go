@@ -36,6 +36,7 @@ type PackageLoader struct {
 	currentPath  string
 	includePath  []string
 	includedPath map[string]struct{} // for include once
+	packagePath  []string
 }
 
 func NewPackageLoader(opts ...PackageLoaderOption) *PackageLoader {
@@ -64,6 +65,14 @@ func (p *PackageLoader) join(s ...string) string {
 	} else {
 		return filepath.Join(s...)
 	}
+}
+
+func (p *PackageLoader) AddPackagePath(path []string) {
+	p.packagePath = path
+}
+
+func (p *PackageLoader) GetPackagePath() []string {
+	return p.packagePath
 }
 
 func (p *PackageLoader) AddIncludePath(s ...string) {

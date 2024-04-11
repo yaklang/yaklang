@@ -514,7 +514,9 @@ func (y *builder) VisitMethodDeclaration(raw javaparser.IMethodDeclarationContex
 	}
 
 	key := i.Identifier().GetText()
-	funcName := fmt.Sprintf("%s_%s", class.Name, key)
+	pkgPath := y.GetCurrentPackagePath()
+	pkgName := strings.Join(pkgPath, "_")
+	funcName := fmt.Sprintf("%s_%s_%s", pkgName, class.Name, key)
 
 	if isStatic {
 		newFunction := y.NewFunc(funcName)
@@ -527,6 +529,7 @@ func (y *builder) VisitMethodDeclaration(raw javaparser.IMethodDeclarationContex
 			y.SetType(y.VisitTypeTypeOrVoid(i.TypeTypeOrVoid()))
 			y.Finish()
 			y.FunctionBuilder = y.PopFunction()
+			y.AddToPackage(funcName)
 		}
 
 		y.AssignClassConst(class.Name, key, newFunction)
@@ -547,6 +550,7 @@ func (y *builder) VisitMethodDeclaration(raw javaparser.IMethodDeclarationContex
 		y.VisitMethodBody(i.MethodBody())
 		y.Finish()
 		y.FunctionBuilder = y.PopFunction()
+		y.AddToPackage(funcName)
 	}
 
 	if i.THROWS() != nil {
@@ -739,7 +743,10 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 		return
 	}
 
-	funcName := i.Identifier().GetText()
+	key := i.Identifier().GetText()
+	pkgPath := y.GetCurrentPackagePath()
+	pkgName := strings.Join(pkgPath, "_")
+	funcName := fmt.Sprintf("%s_%s_%s", pkgName, class.Name, key)
 
 	createFunction := func() *ssa.Function {
 		newFunction := y.NewFunc(funcName)
@@ -750,6 +757,7 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 			y.VisitFormalParameters(i.FormalParameters())
 			y.VisitBlock(i.Block())
 			y.Finish()
+			y.AddToPackage(funcName)
 		}
 		y.FunctionBuilder = y.PopFunction()
 		return newFunction
