@@ -227,10 +227,19 @@ var UtilsCommands = []*cli.Command{
 			cli.StringFlag{Name: "dir,d", Usage: "dir to weight"},
 			cli.IntFlag{Name: "depth", Usage: "depth to weight", Value: 1},
 			cli.BoolFlag{Name: "asc", Usage: "sort asc"},
+			cli.StringFlag{Name: "blacklist,exclude", Usage: "ignore blacklist", Value: "*_test.go|.git*|*testdata*"},
+			cli.StringFlag{Name: "show-exclude", Usage: "filter result", Value: "*.md|*.yak|*.DS_Store|*License|*.g4"},
+			cli.IntFlag{Name: "show-min-size", Usage: "show min size", Value: 100000},
 		},
 		Action: func(c *cli.Context) error {
 			m := omap.NewOrderedMap(map[string]int64{})
 			err := filesys.Recursive(c.String("dir"), filesys.WithFileStat(func(pathname string, info os.FileInfo) error {
+				if c.String("blacklist") != "" {
+					if utils.MatchAnyOfGlob(pathname, utils.PrettifyListFromStringSplitEx(c.String("blacklist"), "|")...) {
+						return nil
+					}
+				}
+				log.Infof("path: %v, size: %v verbose: %v", pathname, info.Size(), utils.ByteSize(uint64(info.Size())))
 				m.Set(pathname, info.Size())
 				return nil
 			}))
@@ -251,6 +260,7 @@ var UtilsCommands = []*cli.Command{
 				for _, child := range node2.AllChildren() {
 					size, ok := m.Get(child.Path)
 					if !ok {
+						log.Warnf("path: %v, name: %v not found", child.Path, child.Name)
 						continue
 					}
 					count += size
@@ -260,6 +270,11 @@ var UtilsCommands = []*cli.Command{
 
 			var desc []*sizeDescription
 			results.ForEach(func(i string, v int64) bool {
+				if c.String("show-exclude") != "" {
+					if utils.MatchAnyOfGlob(i, utils.PrettifyListFromStringSplitEx(c.String("show-exclude"), "|")...) {
+						return true
+					}
+				}
 				desc = append(desc, &sizeDescription{Name: i, Size: uint64(v)})
 				return true
 			})
