@@ -363,3 +363,35 @@ class Main{
 		`, []string{"Function-Main_Hello()"}, t)
 	})
 }
+
+func TestJava_Instantiation(t *testing.T) {
+	t.Run("Instantiate a non-existent object", func(t *testing.T) {
+		code := `
+public class Main{
+    public static void main(String[] args) {
+        File tempFile = new File();
+		println(tempFile);
+    }
+}`
+		ssatest.CheckPrintlnValue(code, []string{
+			"Undefined-tempFile",
+		}, t)
+	})
+
+	t.Run("instantiate an existing object ", func(t *testing.T) {
+		code := `
+public class File{
+}
+
+public class Main{
+    public static void main(String[] args) {
+        File tempFile = new File();
+		println(tempFile);
+    }
+}`
+		ssatest.CheckPrintlnValue(code, []string{
+			"make(File)",
+		}, t)
+	})
+
+}
