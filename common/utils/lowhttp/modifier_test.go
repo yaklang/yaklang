@@ -2249,6 +2249,16 @@ Content-Disposition: form-data; name="b"
 				err:    nil,
 			},
 		},
+		{
+			name:        "form-urlencoded-with-complex-symbol",
+			contentType: "application/x-www-form-urlencoded",
+			body:        `x=1';%0d%0aWAITFOR%0d%0aDELAY%0d%0a'0:0:5'--+-`,
+			expected: &Excepted{
+				params: map[string]string{"x": `1';%0d%0aWAITFOR%0d%0aDELAY%0d%0a'0:0:5'--+-`},
+				useRaw: false,
+				err:    nil,
+			},
+		},
 	}
 	for _, testcase := range testcases {
 		actualParams, actualUseRaw, actualError := GetParamsFromBody(testcase.contentType, []byte(testcase.body))
