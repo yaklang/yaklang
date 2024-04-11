@@ -4,7 +4,16 @@ Package:
     Protocol Type: uint16
     Payload Length: uint16
     Call ID: uint16
-    Number: uint32
+    Optional:
+      unpack: true
+      operator: |
+        flag := getNodeResult("../Flags And Version").Value
+        if (flag & 0x1000) == 0x1000 {
+          this.ProcessByType("Sequence Number")
+        }
+        if (flag & 0x0080) == 0x0080 {
+          this.ProcessByType("Acknowledgment Number")
+        }
     Payload:
       length-from-field: "../Payload Length"
       operator: |
@@ -28,3 +37,5 @@ IPv6: "import:internet_protocol_version_6.yaml;node:Internet Protocol Version 6"
 ARP: "import:address_resolution_protocol.yaml;node:Address Resolution Protocol"
 PPP: "import:ppp.yaml;node:PPP"
 EAPOL: "import:eapol.yaml;node:EAPOL"
+Sequence Number: uint32
+Acknowledgment Number: uint32
