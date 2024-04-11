@@ -111,6 +111,7 @@ require (
 	github.com/xdg-go/scram v1.1.2
 	github.com/ysmood/gson v0.7.3
 	go.mongodb.org/mongo-driver v1.12.1
+	go.uber.org/atomic v1.7.0
 	golang.org/x/crypto v0.17.0
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
 	golang.org/x/net v0.19.0
@@ -216,7 +217,6 @@ require (
 	go.opentelemetry.io/otel/metric v1.22.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.22.0 // indirect
 	go.opentelemetry.io/otel/trace v1.22.0 // indirect
-	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
 	golang.org/x/image v0.0.0-20210628002857-a66eb6448b8d // indirect
