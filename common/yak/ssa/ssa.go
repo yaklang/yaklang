@@ -125,6 +125,9 @@ type User interface {
 
 type Build func(string, *FunctionBuilder) error
 
+type packagePath []string
+type packagePathList []packagePath
+
 // both instruction and value
 type Program struct {
 	// package list
@@ -152,6 +155,7 @@ type Program struct {
 
 	// cache hitter
 	programBuilderCachedHit func(a any)
+	packagePathList         packagePathList
 }
 
 func (p *Program) PushEditor(e *memedit.MemEditor) {

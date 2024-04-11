@@ -23,6 +23,8 @@ type config struct {
 	DatabaseProgramCacheHitter func(any)
 	// for hash
 	externInfo string
+	isFilePath bool
+	filePath   []string
 }
 
 func defaultConfig(code string) *config {
@@ -50,6 +52,12 @@ func WithLanguage(language Language) Option {
 		} else {
 			c.Build = nil
 		}
+	}
+}
+
+func WithIsFilePath(isFilePath bool) Option {
+	return func(c *config) {
+		c.isFilePath = isFilePath
 	}
 }
 
@@ -131,8 +139,8 @@ func ClearCache() {
 	ttlSSAParseCache.Purge()
 }
 
-func Parse(code string, opts ...Option) (*Program, error) {
-	config := defaultConfig(code)
+func Parse(input string, opts ...Option) (*Program, error) {
+	config := defaultConfig(input)
 	for _, opt := range opts {
 		opt(config)
 	}
