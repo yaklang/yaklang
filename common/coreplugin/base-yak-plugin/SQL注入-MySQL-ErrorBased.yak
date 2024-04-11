@@ -37,7 +37,7 @@ fixDesc = `
 mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
     freq = fuzz.HTTPRequest(req, fuzz.https(isHttps))~
     for param in freq.GetCommonParams() {
-        val := param.GetFirstValue()
+        val := f`${param.GetFirstValue()}`
         isNum = str.IsDigit(val)
         var suffix = [" -- ", "#"]
         var prefix = []
