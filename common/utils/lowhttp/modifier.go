@@ -175,6 +175,14 @@ func ReplaceHTTPPacketMethod(packet []byte, newMethod string) []byte {
 // poc.ReplaceHTTPPacketPath(poc.BasicRequest(), "/get") // 修改请求路径为/get
 // ```
 func ReplaceHTTPPacketPath(packet []byte, p string) []byte {
+	return handleHTTPPacketPath(packet, false, p)
+}
+
+func ReplaceHTTPPacketPathWithoutEncode(packet []byte, p string) []byte {
+	return handleHTTPPacketPath(packet, true, p)
+}
+
+func handleHTTPPacketPath(packet []byte, noAutoEncode bool, p string) []byte {
 	var isChunked bool
 	var buf bytes.Buffer
 	var header []string
@@ -197,7 +205,10 @@ func ReplaceHTTPPacketPath(packet []byte, p string) []byte {
 			}
 			u.Path = p
 			requestUri = u.String()
-
+			if noAutoEncode {
+				// 如果解码失败使用原始 path
+				requestUri, _ = codec.PathUnescape(requestUri)
+			}
 			return nil
 		},
 		nil,

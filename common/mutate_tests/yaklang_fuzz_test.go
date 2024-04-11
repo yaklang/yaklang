@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strings"
 	"testing"
 )
@@ -690,19 +691,86 @@ func TestFuzzPath(t *testing.T) {
 		base base
 	}{
 		{
-			name: "URL路径 ",
+			name: "URL路径 禁止编码",
+			base: base{
+				inputPacket: `GET /a/b/c/?a=ab&b=aa== HTTP/1.1
+Host: www.baidu.com
+
+123456
+`,
+				code: `.FuzzPath("/%24/$")`,
+				expectKeywordInOutputPacket: []string{
+					`/$/$?a=ab`,
+					`b=aa==`,
+				},
+				debug:         true,
+				disableEncode: true,
+			},
+		},
+		{
+			name: "URL路径 禁止编码 2",
+			base: base{
+				inputPacket: `GET /a/b/c/?a=ab&b=aa== HTTP/1.1
+Host: www.baidu.com
+
+123456
+`,
+				code: `.FuzzPath("/%25/$")`,
+				expectKeywordInOutputPacket: []string{
+					`/%25/$?a=ab&b=aa==`,
+					`b=aa==`,
+				},
+				debug:         true,
+				disableEncode: true,
+			},
+		},
+		{
+			name: "URL路径 禁止编码 3",
+			base: base{
+				inputPacket: `GET /a/b/c/?a=ab&b=aa== HTTP/1.1
+Host: www.baidu.com
+
+123456
+`,
+				code: `.FuzzPath("/%25/你好")`,
+				expectKeywordInOutputPacket: []string{
+					`/%25/`,
+					codec.PathEscape("你好"), // 这个地方应该是编码后的值么?
+					`a=ab&b=aa==`,
+				},
+				debug:         true,
+				disableEncode: true,
+			},
+		},
+		{
+			name: "URL路径 默认",
 			base: base{
 				inputPacket: `GET /?a=ab HTTP/1.1
 Host: www.baidu.com
 
 123456
 `,
-				code: `.FuzzPath("a")`,
+				code: `.FuzzPath("%25%25")`,
 				expectKeywordInOutputPacket: []string{
-					`/a?a=ab`,
+					`/%2525%2525?a=ab`,
 				},
-				debug:         true,
-				disableEncode: true,
+				debug: true,
+			},
+		},
+		{
+			name: "URL路径 默认",
+			base: base{
+				inputPacket: `GET /?a=ab HTTP/1.1
+Host: www.baidu.com
+
+123456
+`,
+				code: `.FuzzPath("$/你好")`,
+				expectKeywordInOutputPacket: []string{
+					`/$/`,
+					codec.PathEscape("你好"),
+				},
+				debug: true,
 			},
 		},
 	}
