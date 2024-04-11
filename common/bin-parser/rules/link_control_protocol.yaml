@@ -6,7 +6,6 @@ Package:
     Length: uint16
     length-from-field: "Length"
     Info:
-      unpack: true
       operator: |
         type = getNodeResult("@LCP/Code").Value
         switch type {

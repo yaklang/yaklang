@@ -28,6 +28,8 @@ Package:
             node = this.NewSubNode("UDP")
           case 1:
             node = this.NewSubNode("ICMP")
+          case 0x2f:
+            node = this.NewSubNode("GRE")
           default:
             node = this.NewUnknownNode()
         }
@@ -37,4 +39,5 @@ Package:
 TCP: "import:transmission_control_protocol.yaml;node:TCP"
 UDP: "import:user_datagram_protocol.yaml;node:UDP"
 ICMP: "import:internet_control_message_protocol.yaml;node:ICMP"
+GRE: "import:generic_routing_encapsulation.yaml;node:GRE"
 Unknown: raw
