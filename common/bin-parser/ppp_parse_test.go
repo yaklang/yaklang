@@ -99,7 +99,7 @@ func TestPPPMessage(t *testing.T) {
 }
 
 func TestGRE_PPP_Message(t *testing.T) {
-	data := `3081880b0012000100000001ffffffffff03c0210101000e0304c02305060f3f117c`
+	data := `3081880b001610000000000100000004ff03c021010100120104057805061ab411c107020802`
 	payload, err := codec.DecodeHex(data)
 	if err != nil {
 		t.Fatal(err)
@@ -110,14 +110,15 @@ func TestGRE_PPP_Message(t *testing.T) {
 		t.Fatal(err)
 	}
 	DumpNode(res)
-	LCPDate, _ := codec.DecodeHex("0100000a05060a94c166")
+	LCPDate, _ := codec.DecodeHex("010100120104057805061ab411c107020802")
 
 	mapData := map[string]any{
-		"Flags And Version": 0x3081,
-		"Protocol Type":     0x880b,
-		"Payload Length":    14,
-		"Call ID":           24,
-		"Number":            0,
+		"Flags And Version":     0x3081,
+		"Protocol Type":         0x880b,
+		"Payload Length":        22,
+		"Call ID":               4096,
+		"Sequence Number":       1,
+		"Acknowledgment Number": 4,
 		"Payload": map[string]any{
 			"PPP": map[string]any{
 				"Address":  0xff,
@@ -132,7 +133,7 @@ func TestGRE_PPP_Message(t *testing.T) {
 		t.Fatal(err)
 	}
 	DumpNode(res)
-	assert.Equal(t, "3081880b000e001800000000ff03c0210100000a05060a94c166", codec.EncodeToHex(NodeToBytes(res)))
+	assert.Equal(t, "3081880b001610000000000100000004ff03c021010100120104057805061ab411c107020802", codec.EncodeToHex(NodeToBytes(res)))
 }
 
 func TestLCPMessage(t *testing.T) {

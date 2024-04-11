@@ -3,24 +3,25 @@ package vpnbrute
 import (
 	"bytes"
 	"context"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/pcap"
+	"github.com/davecgh/go-spew/spew"
 	binparser "github.com/yaklang/yaklang/common/bin-parser"
 	"github.com/yaklang/yaklang/common/bin-parser/parser"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
-	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/netutil"
 	"github.com/yaklang/yaklang/common/vpnbrute/ppp"
+	"io"
+	"net"
 	"time"
 )
 
 type PPTPAuth struct {
-	ppp       ppp.PPPAuth
-	PNSCallID uint64 // c -> s gre call id
-	PASCallID uint64 // s -> c gre call id
+	ppp       *ppp.PPPAuth
+	PNSCallID uint16 // c -> s gre call id
+	PASCallID uint16 // s -> c gre call id
 	Target    string
+	LocalAddr net.Addr
 }
 
 func GetStartControlConnReq() map[string]any {
@@ -73,6 +74,8 @@ func (pptp *PPTPAuth) Auth() error {
 		return err
 	}
 
+	pptp.LocalAddr = conn.LocalAddr()
+
 	startReq, err := parser.GenerateBinary(GetStartControlConnReq(), "application-layer.pptp", "PPTP")
 	if err != nil {
 		return err
@@ -96,7 +99,8 @@ func (pptp *PPTPAuth) Auth() error {
 		messageMap := binparser.NodeToMap(messageNode).(map[string]any)
 		pptpType := messageMap["ControlMessageType"]
 		switch pptpType {
-		case uint64(2):
+		case uint16(2):
+			pptp.PASCallID = 1
 			outgoingReq, err := parser.GenerateBinary(GetOutgoingCallReq(), "application-layer.pptp", "PPTP")
 			if err != nil {
 				return err
@@ -105,54 +109,77 @@ func (pptp *PPTPAuth) Auth() error {
 			if err != nil {
 				return err
 			}
-		case uint64(8):
-			pptp.PNSCallID = messageMap["Message"].(map[string]any)["Outgoing Call Reply"].(map[string]any)["CallId"].(uint64)
+		case uint16(8):
+			pptp.PNSCallID = messageMap["Message"].(map[string]any)["Outgoing Call Reply"].(map[string]any)["CallId"].(uint16)
+			go func() {
+				for {
+					time.Sleep(1)
+					conn.Read(make([]byte, 1024))
+				}
+			}()
 			// gre
-			println("ok")
+			pptp.Tunnel(context.Background())
+
 			return nil
 		}
 	}
 }
 
 func (pptp *PPTPAuth) Tunnel(ctx context.Context) {
-
-	target := utils.ExtractHost(pptp.Target)
-	iface, _, _, err := netutil.Route(5*time.Second, target)
+	targetHost := utils.ExtractHost(pptp.Target)
+	raddr, err := net.ResolveIPAddr("ip", targetHost)
 	if err != nil {
-
+		return
 	}
 
-	sendChan := make(chan []byte, 10)
-	//recvChan := make(chan []byte, 10)
+	laddr, err := net.ResolveIPAddr("ip", utils.ExtractHost(pptp.LocalAddr.String()))
+	if err != nil {
+		return
+	}
 
-	go func() {
-		_ = pcaputil.Start(
-			pcaputil.WithDevice(iface.Name),
-			pcaputil.WithEnableCache(true),
-			pcaputil.WithBPFFilter("GRE"),
-			pcaputil.WithContext(ctx),
-			pcaputil.WithNetInterfaceCreated(func(handle *pcap.Handle) {
-				go func() {
-					for {
-						select {
-						case <-ctx.Done():
-						case packet, ok := <-sendChan:
-							if !ok {
-								continue
-							}
-							packet = append([]byte{0x0, 0x0, 0x0, 0x0}, packet...)
+	ipConn, err := net.DialIP("ip:47", laddr, raddr)
+	if err != nil {
+		return
+	}
+	defer ipConn.Close()
 
-						}
-					}
-				}()
-			}),
-			pcaputil.WithEveryPacket(func(packet gopacket.Packet) {
+	for {
+		var buffer []byte
+		data := bytes.NewBuffer(buffer)
+		go func() {
+			time.Sleep(10 * time.Millisecond)
+			spew.Dump(data.Bytes())
+		}()
+		messageNode, err := parser.ParseBinary(io.TeeReader(ipConn, data), "internet_protocol")
+		if err != nil {
+			return
+		}
 
-			}),
-		)
+		go func(processNode *base.Node) {
+			respMap, err := pptp.ProcessGre(base.GetNodeByPath(processNode, "@Internet Protocol.Payload.GRE"))
+			if err != nil {
+				return
+			}
+			pptp.SendPPPByGRE(respMap, ipConn)
+		}(messageNode)
+	}
 
-	}()
+}
 
+func (pptp *PPTPAuth) SendPPPByGRE(pppMap map[string]any, ipConn net.Conn) {
+	reqMap, err := pptp.encapsulateGRE(pppMap)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	resNode, err := parser.GenerateBinary(reqMap, "generic_routing_encapsulation", "GRE")
+	if err != nil {
+		log.Error(err)
+	}
+	_, err = ipConn.Write(binparser.NodeToBytes(resNode))
+	if err != nil {
+		log.Error(err)
+	}
 }
 
 func (pptp *PPTPAuth) encapsulateGRE(payload map[string]any) (map[string]any, error) {
@@ -162,11 +189,11 @@ func (pptp *PPTPAuth) encapsulateGRE(payload map[string]any) (map[string]any, er
 	}
 	payloadByte := binparser.NodeToBytes(res)
 	return map[string]any{
-		"Flags And Version": 0x3081,
+		"Flags And Version": 0x3001,
 		"Protocol Type":     0x880b,
 		"Payload Length":    len(payloadByte),
 		"Call ID":           pptp.PNSCallID,
-		"Number":            0,
+		"Sequence Number":   0,
 		"Payload": map[string]any{
 			"PPP": payloadByte,
 		},
@@ -180,7 +207,7 @@ func (pptp *PPTPAuth) ProcessGre(messageNode *base.Node) (map[string]any, error)
 	}
 
 	messageMap := binparser.NodeToMap(messageNode).(map[string]any)
-	if messageMap["Call ID"].(uint64) != pptp.PASCallID {
+	if messageMap["Call ID"].(uint16) != pptp.PASCallID {
 		return nil, nil
 	}
 	pppNode := base.GetNodeByPath(messageNode, "@GRE.Payload.PPP")
@@ -188,5 +215,5 @@ func (pptp *PPTPAuth) ProcessGre(messageNode *base.Node) (map[string]any, error)
 	if err != nil || pppParamMap == nil {
 		return nil, err
 	}
-	return pptp.encapsulateGRE(pppParamMap)
+	return pppParamMap, nil
 }

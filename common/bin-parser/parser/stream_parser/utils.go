@@ -182,7 +182,32 @@ func GetNodePath(node *base.Node) string {
 	}
 	return p
 }
+
 func ConvertToVar(v []byte, length uint64, endian, typeName string) any {
+	val := _ConvertToVar(v, length, endian, typeName)
+	switch typeName {
+	case "int":
+		return int(val.(int64))
+	case "int8":
+		return int8(val.(int64))
+	case "int16":
+		return int16(val.(int64))
+	case "int32":
+		return int32(val.(int64))
+	case "uint":
+		return uint(val.(uint64))
+	case "uint8":
+		return uint8(val.(uint64))
+	case "uint16":
+		return uint16(val.(uint64))
+	case "uint32":
+		return uint32(val.(uint64))
+	default:
+		return val
+	}
+}
+
+func _ConvertToVar(v []byte, length uint64, endian, typeName string) any {
 	if endian == "big" {
 		switch typeName {
 		case "int", "int8", "int16", "int32", "int64":
