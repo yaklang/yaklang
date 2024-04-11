@@ -2,7 +2,7 @@ package tests
 
 import "testing"
 
-func TestJava_Expression(t *testing.T) {
+func TestJava_Simple_Expression(t *testing.T) {
 	t.Run("test PostfixExpression", func(t *testing.T) {
 		CheckJavaCode(`
 		a++;
@@ -219,4 +219,21 @@ func TestJava_Expression(t *testing.T) {
 			"4"}, t)
 	})
 
+}
+
+func TestJava_Literal(t *testing.T) {
+	t.Run("test simple num", func(t *testing.T) {
+		CheckJavaPrintlnValue(`int a = 1;	
+				int b = 3;
+				c= a+b;
+				println(c);`,
+			[]string{"4"}, t)
+	})
+
+	t.Run("test long int", func(t *testing.T) {
+		CheckJavaPrintlnValue(`	
+				FILE_MAX_SIZE = 100L*1024*1024;
+				println(FILE_MAX_SIZE);`,
+			[]string{"67108864"}, t)
+	})
 }
