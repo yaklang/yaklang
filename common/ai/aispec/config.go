@@ -1,6 +1,10 @@
 package aispec
 
-import "time"
+import (
+	"io"
+	"os"
+	"time"
+)
 
 type AIConfig struct {
 	// gateway network config
@@ -13,8 +17,10 @@ type AIConfig struct {
 	Timeout  float64
 	Deadline time.Time
 
-	APIKey string
-	Proxy  string
+	APIKey        string
+	Proxy         string
+	StreamHandler func(io.Reader)
+	Type          string
 }
 
 func NewDefaultAIConfig(opts ...AIConfigOption) *AIConfig {
@@ -35,6 +41,28 @@ func WithBaseURL(baseURL string) AIConfigOption {
 	}
 }
 
+func WithStreamHandler(h func(io.Reader)) AIConfigOption {
+	return func(c *AIConfig) {
+		c.StreamHandler = h
+	}
+}
+
+func WithDebugStream(h ...bool) AIConfigOption {
+	return func(c *AIConfig) {
+		if len(h) <= 0 {
+			c.StreamHandler = func(r io.Reader) {
+				io.Copy(os.Stdout, r)
+			}
+			return
+		}
+		if h[0] {
+			c.StreamHandler = func(r io.Reader) {
+				io.Copy(os.Stdout, r)
+			}
+		}
+	}
+}
+
 func WithDomain(domain string) AIConfigOption {
 	return func(c *AIConfig) {
 		c.Domain = domain
@@ -44,6 +72,12 @@ func WithDomain(domain string) AIConfigOption {
 func WithModel(model string) AIConfigOption {
 	return func(c *AIConfig) {
 		c.Model = model
+	}
+}
+
+func WithType(t string) AIConfigOption {
+	return func(config *AIConfig) {
+		config.Type = t
 	}
 }
 

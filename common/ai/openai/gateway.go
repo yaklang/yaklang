@@ -3,7 +3,6 @@ package openai
 import (
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"io"
 )
@@ -21,11 +20,11 @@ type GetawayClient struct {
 }
 
 func (g *GetawayClient) Chat(s string, function ...aispec.Function) (string, error) {
-	return aispec.ChatBase(g.targetUrl, g.config.Model, s, function, g.BuildHTTPOptions)
+	return aispec.ChatBase(g.targetUrl, g.config.Model, s, function, g.BuildHTTPOptions, g.config.StreamHandler)
 }
 
 func (g *GetawayClient) ChatEx(details []aispec.ChatDetail, function ...aispec.Function) ([]aispec.ChatChoice, error) {
-	return aispec.ChatExBase(g.targetUrl, g.config.Model, details, function, g.BuildHTTPOptions)
+	return aispec.ChatExBase(g.targetUrl, g.config.Model, details, function, g.BuildHTTPOptions, g.config.StreamHandler)
 
 }
 
@@ -35,12 +34,12 @@ func (g *GetawayClient) ExtractData(msg string, desc string, fields map[string]a
 		g.config.Model,
 		msg, desc, fields,
 		g.BuildHTTPOptions,
+		g.config.StreamHandler,
 	)
 }
 
-func (g *GetawayClient) ChatStream(s string) (io.ReadCloser, error) {
-	aispec.ChatWithStream(g.targetUrl, g.config.Model, s, g.BuildHTTPOptions)
-	return nil, utils.Error("not implemented")
+func (g *GetawayClient) ChatStream(s string) (io.Reader, error) {
+	return aispec.ChatWithStream(g.targetUrl, g.config.Model, s, g.BuildHTTPOptions)
 }
 
 func (g *GetawayClient) LoadOption(opt ...aispec.AIConfigOption) {

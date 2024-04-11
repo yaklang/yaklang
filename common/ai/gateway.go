@@ -82,8 +82,21 @@ func GetPrimaryAgent() aispec.AIGateway {
 	}
 	return agent
 }
+
 func Chat(msg string, opts ...aispec.AIConfigOption) (string, error) {
-	agent := GetPrimaryAgent()
+	config := &aispec.AIConfig{}
+	for _, p := range opts {
+		p(config)
+	}
+
+	var agent aispec.AIGateway
+	if config.Type != "" {
+		agent = createAIGateway(config.Type)
+	}
+	if agent == nil {
+		agent = GetPrimaryAgent()
+	}
+
 	if agent == nil {
 		return "", utils.Error("no primary and configured ai agent found")
 	}
@@ -92,7 +105,18 @@ func Chat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 }
 
 func FunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[string]any, error) {
-	agent := GetPrimaryAgent()
+	config := &aispec.AIConfig{}
+	for _, p := range opts {
+		p(config)
+	}
+	var agent aispec.AIGateway
+	if config.Type != "" {
+		agent = createAIGateway(config.Type)
+	}
+	if agent == nil {
+		agent = GetPrimaryAgent()
+	}
+
 	if agent == nil {
 		return nil, utils.Error("no primary and configged ai agent found")
 	}
@@ -101,17 +125,21 @@ func FunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[s
 }
 
 var Exports = map[string]any{
-	"OpenAI":       OpenAI,
-	"ChatGLM":      ChatGLM,
-	"Moonshot":     Moonshot,
+	"OpenAI":   OpenAI,
+	"ChatGLM":  ChatGLM,
+	"Moonshot": Moonshot,
+
 	"Chat":         Chat,
 	"FunctionCall": FunctionCall,
 
-	"timeout": aispec.WithTimeout,
-	"proxy":   aispec.WithProxy,
-	"model":   aispec.WithModel,
-	"apiKey":  aispec.WithAPIKey,
-	"noHttps": aispec.WithNoHttps,
-	"domain":  aispec.WithDomain,
-	"baseURL": aispec.WithBaseURL,
+	"timeout":     aispec.WithTimeout,
+	"proxy":       aispec.WithProxy,
+	"model":       aispec.WithModel,
+	"apiKey":      aispec.WithAPIKey,
+	"noHttps":     aispec.WithNoHttps,
+	"domain":      aispec.WithDomain,
+	"baseURL":     aispec.WithBaseURL,
+	"onStream":    aispec.WithStreamHandler,
+	"debugStream": aispec.WithDebugStream,
+	"type":        aispec.WithType,
 }

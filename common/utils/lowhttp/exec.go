@@ -731,6 +731,7 @@ RECONNECT:
 			reader, writer := utils.NewBufPipe(nil)
 			defer func() {
 				writer.Close()
+				reader.Close()
 			}()
 			go func() {
 				defer func() {
@@ -738,11 +739,25 @@ RECONNECT:
 						log.Errorf("BodyStreamReaderHandler panic: %v", err)
 					}
 				}()
-				nativeResponse, err := http.ReadResponse(bufio.NewReader(reader), nil)
+
+				packetReader := bufio.NewReader(utils.NewTrimLeftReader(reader))
+				bodyReader, bodyWriter := utils.NewBufPipe(nil)
+				responseHeader := bytes.NewBufferString("")
+				for {
+					line, err := utils.BufioReadLine(packetReader)
+					if err != nil {
+						break
+					}
+					responseHeader.WriteString(string(line) + "\r\n")
+					if len(line) == 0 {
+						go io.Copy(bodyWriter, packetReader)
+						break
+					}
+				}
 				if err != nil {
 					log.Warnf("BodyStreamReaderHandler read response failed: %s", err)
 				} else {
-					option.BodyStreamReaderHandler(nativeResponse, reader)
+					option.BodyStreamReaderHandler(responseHeader.Bytes(), bodyReader)
 				}
 			}()
 			mirrorWriter = io.MultiWriter(&responseRaw, writer)
