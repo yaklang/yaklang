@@ -8,11 +8,13 @@ import (
 	"crypto/tls"
 	"encoding/asn1"
 	"encoding/binary"
+	"fmt"
 	"github.com/huin/asn1ber"
 	"github.com/lunixbochs/struc"
 	"github.com/yaklang/yaklang/common/bin-parser/parser"
 	"github.com/yaklang/yaklang/common/bin-parser/protocol-impl"
 	utils2 "github.com/yaklang/yaklang/common/bin-parser/utils"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -20,11 +22,7 @@ import (
 	"time"
 )
 
-func Login(host string, port int, domainRaw string, userRaw string, passwordRaw string) (bool, error) {
-	domain := toWindowsString(domainRaw)
-	user := toWindowsString(userRaw)
-	password := toWindowsString(passwordRaw)
-
+func Login(host string, port int, password string, user string, domain string) (bool, error) {
 	conn, err := netx.DialTimeout(3*time.Second, utils.HostPort(host, port))
 	if err != nil {
 		return false, err
@@ -57,7 +55,12 @@ func Login(host string, port int, domainRaw string, userRaw string, passwordRaw 
 			return false, err
 		}
 		defer file.Close()
+		cert, err := tls.LoadX509KeyPair("/Users/z3/yakit-projects/yak-mitm-ca.crt", "/Users/z3/yakit-projects/yak-mitm-ca.key")
+		if err != nil {
+			log.Fatal(err)
+		}
 		tlsConfig := &tls.Config{
+			Certificates:       []tls.Certificate{cert},
 			KeyLogWriter:       file,
 			InsecureSkipVerify: true,
 			MinVersion:         tls.VersionSSL30,
@@ -65,7 +68,10 @@ func Login(host string, port int, domainRaw string, userRaw string, passwordRaw 
 			Renegotiation:      tls.RenegotiateFreelyAsClient,
 		}
 		tlsConn := tls.Client(conn, tlsConfig)
-		negoMsg := NewNegotiateMessage()
+		negoMsg := protocol_impl.NewNegotiateMessage()
+		signature := [8]byte{'N', 'T', 'L', 'M', 'S', 'S', 'P', 0x00}
+		negoMsg.Signature = signature
+		negoMsg.MessageType = 0x00000001
 		negoMsg.NegotiateFlags = NTLMSSP_NEGOTIATE_KEY_EXCH |
 			NTLMSSP_NEGOTIATE_128 |
 			NTLMSSP_NEGOTIATE_EXTENDED_SESSIONSECURITY |
@@ -75,10 +81,15 @@ func Login(host string, port int, domainRaw string, userRaw string, passwordRaw 
 			NTLMSSP_NEGOTIATE_SIGN |
 			NTLMSSP_REQUEST_TARGET |
 			NTLMSSP_NEGOTIATE_UNICODE
+		negPayload, err := negoMsg.Marshal()
+		if err != nil {
+			return false, err
+		}
 		tsReq := TSRequest{
 			Version:    2,
-			NegoTokens: []NegoToken{{Data: negoMsg.Serialize()}},
+			NegoTokens: []NegoToken{{Data: negPayload}},
 		}
+
 		payload, err := asn1.Marshal(tsReq)
 		if err != nil {
 			return false, err
@@ -94,104 +105,131 @@ func Login(host string, port int, domainRaw string, userRaw string, passwordRaw 
 		if err != nil {
 			return false, err
 		}
-		reader := bytes.NewReader(treq.NegoTokens[0].Data)
-		challengeMsgData, err := ParseRdpSubProtocol(reader, "Challenge")
+		//challengeData, _ := codec.DecodeHex("4e544c4d53535000020000001e001e003800000035828a6261b162cdad9087fc000000000000000098009800560000000a0039380000000f69005a003700770034006e00310069006f0075006d003600340035005a0002001e0069005a003700770034006e00310069006f0075006d003600340035005a0001001e0069005a003700770034006e00310069006f0075006d003600340035005a0004001e0069005a003700770034006e00310069006f0075006d003600340035005a0003001e0069005a003700770034006e00310069006f0075006d003600340035005a0007000800d9f5b97edd8bda0100000000")
+		//challengeMsg, err := protocol_impl.ParseChallengeMessage(challengeData)
+		//challengeDataBytes, _ := challengeMsg.Marshal()
+		//println(codec.EncodeToHex(challengeDataBytes))
+		challengeMsg, err := protocol_impl.ParseChallengeMessage(treq.NegoTokens[0].Data)
 		if err != nil {
 			return false, err
 		}
+		nt := protocol_impl.NTOWFv2(password, user, domain)
+		lm := protocol_impl.LMOWFv2(password, user, domain)
+		//clientChallenge := []byte(utils.RandStringBytes(8))
+		clientChallenge := []byte("12345678")
+		serverInfo := challengeMsg.TargetInfoFields.Value()
+		pairs := protocol_impl.ParseAVPAIRs(serverInfo)
+		var serverName, timestamp []byte
+		_ = serverName
+		for _, pair := range pairs {
+			if pair.AvId == 0x0007 {
+				timestamp = pair.Value
+			}
+		}
+		//clientChallenge, _ = codec.DecodeHex("594d646174713673")
+		//serverChallenge, _ := codec.DecodeHex("ee1ac04dce23620f")
+		netNt, netLm, sessionBaseKey := protocol_impl.NetNTLMv2(nt, lm, challengeMsg.ServerChallenge[:], clientChallenge, timestamp, serverInfo)
+		//netNt, netLm, sessionBaseKey := protocol_impl.NetNTLMv2(nt, lm, serverChallenge, clientChallenge, timestamp, serverInfo)
+		exportedSessionKey := []byte("1234567812345678")
+		EncryptedRandomSessionKey := make([]byte, len(exportedSessionKey))
+		rc, _ := rc4.NewCipher(sessionBaseKey)
+		rc.XORKeyStream(EncryptedRandomSessionKey, exportedSessionKey)
 
-		n, err = reader.Read(bs)
+		authMsg := protocol_impl.NewAuthenticationMessage()
+		authMsg.Signature = signature
+		authMsg.MessageType = 3
+		authMsg.LmChallengeResponseFields = authMsg.NewField(netLm)
+		authMsg.NtChallengeResponseFields = authMsg.NewField(netNt)
+		authMsg.DomainNameFields = authMsg.NewField(protocol_impl.UnicodeEncode(domain))
+		authMsg.UserNameFields = authMsg.NewField(protocol_impl.UnicodeEncode(user))
+		authMsg.WorkstationFields = authMsg.NewField(protocol_impl.UnicodeEncode(""))
+		authMsg.EncryptedRandomSessionKeyFields = authMsg.NewField(EncryptedRandomSessionKey)
+		bsFlag := make([]byte, 4)
+		binary.LittleEndian.PutUint32(bsFlag, challengeMsg.NegotiateFlags)
+		for i := 0; i < len(authMsg.NegotiateFlags); i++ {
+			authMsg.NegotiateFlags[i] = bsFlag[i]
+		}
+		authMsg.Version = protocol_impl.Version{
+			ProductMajorVersion: 6,
+			ProductMinorVersion: 0,
+			ProductBuild:        6002,
+			Reserved:            [3]byte{},
+			NTLMRevisionCurrent: 0x0F,
+		}
+		challengePayload, err := challengeMsg.Marshal()
 		if err != nil {
 			return false, err
 		}
-		nt, lm := CalcNTLMHash(string(password), string(user), string(domain))
-		block := bs[:n]
-		challengeMsgDataMap := challengeMsgData.(map[string]any)
-		netNt, netLm, key := CalcNetNTLMHash(challengeMsgDataMap, block, nt, lm)
-		builder := NewNTLMFieldBuilder()
-
-		AuMessageMap := map[string]any{
-			"Signature":                       [8]byte{'N', 'T', 'L', 'M', 'S', 'S', 'P', 0x00},
-			"MessageType":                     3,
-			"LmChallengeResponseFields":       builder.WriteField(netLm),
-			"NtChallengeResponseFields":       builder.WriteField(netNt),
-			"DomainNameFields":                builder.WriteField([]byte(domain)),
-			"UserNameFields":                  builder.WriteField([]byte(user)),
-			"WorkstationFields":               builder.WriteField([]byte("")),
-			"EncryptedRandomSessionKeyFields": builder.WriteField(key),
-			"NegotiateFlags":                  challengeMsgDataMap["NegotiateFlags"],
-			"Version": map[string]any{
-				"ProductMajorVersion": 6,
-				"ProductMinorVersion": 0,
-				"ProductBuild":        6002,
-				"Reserved":            [3]byte{},
-				"NTLMRevisionCurrent": 0x0F,
-			},
-			"MIC": [16]byte{},
-		}
-		auPayload, err := GenRdpSubProtocol(AuMessageMap, "Authentication")
+		authPayload, err := authMsg.Marshal()
 		if err != nil {
 			return false, err
 		}
-		auPayload = append(auPayload, builder.GetPayload()...)
-
+		fmt.Printf("au1: %s", codec.EncodeToHex(authPayload))
 		micBuf := bytes.Buffer{}
-		micBuf.Write(negoMsg.Serialize())
-		micBuf.Write(treq.NegoTokens[0].Data)
-		micBuf.Write(auPayload)
-		mic := codec.HmacMD5(key, micBuf.Bytes())[:16]
-		AuMessageMap["MIC"] = mic
+		micBuf.Write(negPayload)
+		fmt.Printf("rawNt: %s\n", codec.EncodeToHex(nt))
+		fmt.Printf("rawLm: %s\n", codec.EncodeToHex(lm))
+		fmt.Printf("timestamp: %s\n", codec.EncodeToHex(timestamp))
+		fmt.Printf("clientChallenge: %s\n", codec.EncodeToHex(clientChallenge))
+		fmt.Printf("serverChallenge: %s\n", codec.EncodeToHex(challengeMsg.ServerChallenge[:]))
+		fmt.Printf("nt: %s\n", codec.EncodeToHex(netNt))
+		fmt.Printf("lm: %s\n", codec.EncodeToHex(netLm))
+		fmt.Printf("key: %s\n", codec.EncodeToHex(sessionBaseKey))
+		fmt.Printf("serverInfo: %s\n", codec.EncodeToHex(serverInfo))
 
-		auPayload, err = GenRdpSubProtocol(AuMessageMap, "Authentication")
+		fmt.Printf("negPayload: %s\n", codec.EncodeToHex(negPayload))
+		fmt.Printf("challenge: %s\n", codec.EncodeToHex(challengePayload))
+		fmt.Printf("authPayload: %s\n", codec.EncodeToHex(authPayload))
+		fmt.Printf("key: %s\n", codec.EncodeToHex(sessionBaseKey))
+
+		micBuf.Write(challengePayload)
+		micBuf.Write(authPayload)
+		mic := codec.HmacMD5(sessionBaseKey, micBuf.Bytes())[:16]
+		for i := 0; i < 16; i++ {
+			authMsg.MIC[i] = mic[i]
+		}
+		fmt.Printf("mic: %s\n", codec.EncodeToHex(authMsg.MIC[:]))
+		authPayload, err = authMsg.Marshal()
 		if err != nil {
 			return false, err
 		}
-		auPayload = append(auPayload, builder.GetPayload()...)
 
 		pub := tlsConn.ConnectionState().PeerCertificates[0].PublicKey.(*rsa.PublicKey)
-		cert, err := asn1ber.Marshal(*pub)
+		certContent, err := asn1ber.Marshal(*pub)
+
 		if err != nil {
 			return false, err
 		}
 		var (
 			clientSigning = append([]byte("session key to client-to-server signing key magic constant"), 0x00)
-			serverSigning = append([]byte("session key to server-to-client signing key magic constant"), 0x00)
+			//serverSigning = append([]byte("session key to server-to-client signing key magic constant"), 0x00)
 			clientSealing = append([]byte("session key to client-to-server sealing key magic constant"), 0x00)
-			serverSealing = append([]byte("session key to server-to-client sealing key magic constant"), 0x00)
+			//serverSealing = append([]byte("session key to server-to-client sealing key magic constant"), 0x00)
 		)
-		exportedSessionKey := []byte(utils.RandStringBytes(16))
-		md := md5.New()
-		//ClientSigningKey
-		a := append(exportedSessionKey, clientSigning...)
-		md.Write(a)
-		ClientSigningKey := md.Sum(nil)
-		//ServerSigningKey
-		md.Reset()
-		a = append(exportedSessionKey, serverSigning...)
-		md.Write(a)
-		//ServerSigningKey := md.Sum(nil)
-		//ClientSealingKey
-		md.Reset()
-		a = append(exportedSessionKey, clientSealing...)
-		md.Write(a)
-		ClientSealingKey := md.Sum(nil)
-		//ServerSealingKey
-		md.Reset()
-		a = append(exportedSessionKey, serverSealing...)
-		md.Write(a)
-		//ServerSealingKey := md.Sum(nil)
+
+		//exportedSessionKey := []byte(utils.RandStringBytes(16))
+
+		md5Enc := func(i any) []byte {
+			res := md5.Sum(utils.InterfaceToBytes(i))
+			return res[:]
+		}
+		ClientSigningKey := md5Enc(append(exportedSessionKey, clientSigning...))
+		ClientSealingKey := md5Enc(append(exportedSessionKey, clientSealing...))
+		//ServerSigningKey := md5Enc(append(exportedSessionKey, serverSigning...))
+		//ServerSealingKey := md5Enc(append(exportedSessionKey, serverSealing...))
+
 		encryptRC4, _ := rc4.NewCipher(ClientSealingKey)
 		//decryptRC4, _ := rc4.NewCipher(ServerSealingKey)
 
-		p := make([]byte, len(cert))
-		encryptRC4.XORKeyStream(p, cert)
+		p := make([]byte, len(certContent))
+		encryptRC4.XORKeyStream(p, certContent)
 		b := &bytes.Buffer{}
 
 		//signature
 		bs = make([]byte, 4)
 		binary.LittleEndian.PutUint32(bs, 0)
 		b.Write(bs)
-		b.Write(cert)
+		b.Write(certContent)
 		s1 := codec.HmacMD5(ClientSigningKey, b.Bytes())[:8]
 		checksum := make([]byte, 8)
 		encryptRC4.XORKeyStream(checksum, s1)
@@ -207,11 +245,12 @@ func Login(host string, port int, domainRaw string, userRaw string, passwordRaw 
 		//b.Write(cert)
 		b.Write(p)
 
-		cert = b.Bytes()
+		certContent = b.Bytes()
+		fmt.Printf("certEncrypt: %s\n", codec.EncodeToHex(certContent))
 		tsReq = TSRequest{
 			Version:    2,
-			NegoTokens: []NegoToken{{Data: auPayload}},
-			PubKeyAuth: cert,
+			NegoTokens: []NegoToken{{Data: authPayload}},
+			PubKeyAuth: certContent,
 		}
 		payload, err = asn1.Marshal(tsReq)
 		if err != nil {
@@ -223,6 +262,7 @@ func Login(host string, port int, domainRaw string, userRaw string, passwordRaw 
 		if err != nil {
 			return false, err
 		}
+		return true, nil
 	}
 	//tsReqByte,err := asn1.Marshal(tsReq)
 	//if err != nil{

@@ -35,7 +35,6 @@ func CalcNetNTLMHash(challengeData map[string]any, block []byte, nt, lm []byte) 
 		} else {
 			serverInfoMap[pair["AvId"].(uint16)] = []byte{}
 		}
-
 	}
 
 	tempBuff := &bytes.Buffer{}

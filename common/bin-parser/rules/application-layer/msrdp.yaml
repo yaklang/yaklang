@@ -18,24 +18,6 @@ Package:
     VariableData: raw
   Challenge: Challenge
   Authentication: Authentication
-  AV_PAIR:
-    operator: |
-      stop = false
-      this.ForEachChild((child)=>{
-        if stop{
-          return
-        }
-        res = child.Process()
-        if child.Name == "AvId" && res == 0{
-          stop = true
-        }
-      })
-    endian: little
-    AvId: uint16
-    AvLen: uint16
-    length-from-field: AvLen
-    length-for-start-field: Value
-    Value: raw
 
 Challenge: "import:application-layer/ntlm.yaml;node:ChallengeMessage"
 Authentication: "import:application-layer/ntlm.yaml;node:AuthenticationMessage"

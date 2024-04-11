@@ -2,6 +2,7 @@ package core
 
 import (
 	"crypto/rsa"
+	"github.com/yaklang/yaklang/common/log"
 	"math/big"
 	"os"
 
@@ -56,7 +57,12 @@ func (s *SocketLayer) StartTLS() error {
 	if err != nil {
 		return err
 	}
+	cert, err := tls.LoadX509KeyPair("/Users/z3/yakit-projects/yak-mitm-ca.crt", "/Users/z3/yakit-projects/yak-mitm-ca.key")
+	if err != nil {
+		log.Fatal(err)
+	}
 	config := &tls.Config{
+		Certificates:             []tls.Certificate{cert},
 		KeyLogWriter:             file,
 		InsecureSkipVerify:       true,
 		MinVersion:               tls.VersionTLS10,

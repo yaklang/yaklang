@@ -18,6 +18,7 @@ require (
 	github.com/aquasecurity/go-dep-parser v0.0.0-20230627073354-fb7eb3159bd5
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d
 	github.com/bcicen/jstream v0.0.0-20190220045926-16c1f8af81c2
+	github.com/bodgit/ntlmssp v0.0.0-20240405225621-bc7a66a52237
 	github.com/corpix/uarand v0.2.0
 	github.com/dave/jennifer v1.4.1
 	github.com/davecgh/go-spew v1.1.1
@@ -26,14 +27,9 @@ require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13
 	github.com/disintegration/imaging v1.6.2
-	github.com/dlclark/regexp2 v1.10.0
+	github.com/dlclark/regexp2 v1.2.0
 	github.com/docker/docker v25.0.2+incompatible
 	github.com/docker/go-connections v0.4.0
-	github.com/dop251/goja v0.0.0-20240220182346-e401ed450204
-	github.com/dop251/goja_nodejs v0.0.0-20240221231712-27eeffc9c235
-	github.com/emersion/go-imap/v2 v2.0.0-beta.2
-	github.com/emersion/go-message v0.18.0
-	github.com/emersion/go-sasl v0.0.0-20231106173351-e73c9f7bad43
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/fxsjy/RF.go v0.0.0-20140710024358-46700521f302
 	github.com/gilliek/go-opml v1.0.0
@@ -100,7 +96,7 @@ require (
 	github.com/sijms/go-ora/v2 v2.7.19
 	github.com/stacktitan/smb v0.0.0-20190531122847-da9a425dceb8
 	github.com/steambap/captcha v1.4.1
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.9.0
 	github.com/tatsushid/go-fastping v0.0.0-20160109021039-d7bb493dee3e
 	github.com/tevino/abool v0.0.0-20170917061928-9b9efcf221b5
 	github.com/tidwall/gjson v1.14.4
@@ -108,20 +104,19 @@ require (
 	github.com/urfave/cli v1.22.12
 	github.com/valyala/bytebufferpool v1.0.0
 	github.com/vjeantet/grok v1.0.0
-	github.com/xdg-go/scram v1.1.2
 	github.com/ysmood/gson v0.7.3
 	go.mongodb.org/mongo-driver v1.12.1
-	go.uber.org/atomic v1.7.0
-	golang.org/x/crypto v0.17.0
+	golang.org/x/crypto v0.22.0
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
-	golang.org/x/net v0.19.0
-	golang.org/x/sys v0.16.0
+	golang.org/x/net v0.21.0
+	golang.org/x/sys v0.19.0
 	golang.org/x/text v0.14.0
 	google.golang.org/grpc v1.60.1
 	google.golang.org/protobuf v1.32.0
 	gopkg.in/fatih/set.v0 v0.2.1
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
+	gopkg.in/sourcemap.v1 v1.0.5
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
 	rsc.io/qr v0.2.0
@@ -135,6 +130,7 @@ require (
 	github.com/andybalholm/cascadia v1.1.0 // indirect
 	github.com/aquasecurity/go-pep440-version v0.0.0-20210121094942-22b2f8951d46 // indirect
 	github.com/aquasecurity/go-version v0.0.0-20210121072130-637058cfe492 // indirect
+	github.com/bodgit/windows v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/cloudflare/circl v1.3.3 // indirect
 	github.com/containerd/log v0.1.0 // indirect
@@ -144,8 +140,6 @@ require (
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/distribution/reference v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
-	github.com/dop251/base64dec v0.0.0-20231022112746-c6c9f9a96217 // indirect
-	github.com/emersion/go-textwrapper v0.0.0-20200911093747-65d896831594 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/erikstmartin/go-testdb v0.0.0-20160219214506-8d10e4a1bae5 // indirect
 	github.com/fastly/go-utils v0.0.0-20180712184237-d95a45783239 // indirect
@@ -156,13 +150,11 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/go-pg/zerochecker v0.2.0 // indirect
-	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/gofrs/uuid v4.0.0+incompatible // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-sql/civil v0.0.0-20190719163853-cb61b32ac6fe // indirect
 	github.com/golang-sql/sqlexp v0.1.0 // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
-	github.com/google/pprof v0.0.0-20230926050212-f7f687d19a98 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/itchyny/timefmt-go v0.1.3 // indirect
@@ -205,6 +197,7 @@ require (
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
+	github.com/xdg-go/scram v1.1.2 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
 	github.com/ysmood/fetchup v0.2.2 // indirect
@@ -217,6 +210,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.22.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.22.0 // indirect
 	go.opentelemetry.io/otel/trace v1.22.0 // indirect
+	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
 	golang.org/x/image v0.0.0-20210628002857-a66eb6448b8d // indirect
