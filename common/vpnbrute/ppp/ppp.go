@@ -30,11 +30,20 @@ type PPPAuth struct {
 	CanUseAuthTypeList map[string][]byte
 }
 
-func (p *PPPAuth) SetAuthType(authType []byte) error {
-	if p.AuthTypeCanUse(authType) {
-		p.AuthTypeCode = authType
+func GetDefaultPPPAuth() *PPPAuth {
+	return &PPPAuth{
+		AuthTypeCode:       CHAP_MD5,
+		CanUseAuthTypeList: SupportAuthTypeMap,
+		AuthTypeName:       "CHAP",
 	}
-	return utils.Error("no support auth type")
+}
+
+func (p *PPPAuth) SetAuthType(authType []byte) error {
+	if !p.AuthTypeCanUse(authType) {
+		return utils.Error("no support auth type")
+	}
+	p.AuthTypeCode = authType
+	return nil
 }
 
 func (p *PPPAuth) AuthTypeCanUse(authType []byte) bool {
@@ -66,16 +75,29 @@ func (p *PPPAuth) ChangeAuthType(rejectType []byte) error {
 	return nil
 }
 
+func (p *PPPAuth) GetPPPReqParams() map[string]any {
+	return map[string]any{
+		"Address":  0xff,
+		"Control":  0x03,
+		"Protocol": 0xc021,
+		"Information": map[string]any{
+			"LCP": p.GetLCPConfigReqParams(),
+		},
+	}
+}
+
 func (p *PPPAuth) GetLCPConfigReqParams() map[string]any {
 	return map[string]any{ // just negotiate Auth Type
 		"Code":       1,
 		"Identifier": 1,
-		"Length":     36,
-		"Options": []map[string]any{
-			{
-				"Code":   3,
-				"Length": len(p.AuthTypeCode) + 2,
-				"Data":   p.AuthTypeCode,
+		"Length":     6 + len(p.AuthTypeCode),
+		"Info": map[string]any{
+			"Options": []map[string]any{
+				{
+					"Type":   3,
+					"Length": len(p.AuthTypeCode) + 2,
+					"Data":   p.AuthTypeCode,
+				},
 			},
 		},
 	}
@@ -89,18 +111,18 @@ func (p *PPPAuth) ProcessMessage(messageNode *base.Node) (map[string]any, error)
 	messageMap := binparser.NodeToMap(messageNode).(map[string]any)
 	pppType := messageMap["Protocol"].(uint16)
 
-	var resultParams map[string]any
+	var resultParams = make(map[string]any)
 	var err error
 	var res any
 	switch pppType {
 	case 0xc021:
-		res, err = p.ProcessLCPMessage(base.GetNodeByPath(messageNode, "@PPP.LCP"))
+		res, err = p.ProcessLCPMessage(base.GetNodeByPath(messageNode, "Information.LCP"))
 		resultParams["LCP"] = res
 	//case 0xc023:
 	//	res, err = p.ProcessPAPMessage(base.GetNodeByPath(messageNode, "@PPP.PAP"))
 	//	resultParams["PAP"] = res
 	case 0xc223:
-		res, err = p.ProcessCHAPMessage(base.GetNodeByPath(messageNode, "@PPP.CHAP"))
+		res, err = p.ProcessCHAPMessage(base.GetNodeByPath(messageNode, "Information.CHAP"))
 		resultParams["PAP"] = res
 	}
 	if len(resultParams) == 0 {
@@ -122,12 +144,13 @@ func (p *PPPAuth) ProcessLCPMessage(messageNode *base.Node) (map[string]any, err
 		return nil, nil
 	}
 
-	options := messageMap["Options"].([]map[string]any)
+	options := messageMap["Info"].(map[string]any)["Options"].([]any)
 
 	var authCode []byte
 	var hasAuthCode bool
 	for _, option := range options {
-		if option["Type"] == 3 {
+		option := option.(map[string]any)
+		if option["Type"] == uint8(3) {
 			hasAuthCode = true
 			authCode = option["Data"].([]byte)
 		}

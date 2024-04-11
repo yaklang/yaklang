@@ -215,6 +215,7 @@ func GetNodePath(node *base.Node) string {
 	}
 	return p
 }
+
 func ConvertToVar(v []byte, length uint64, endian, typeName string) any {
 	val := _ConvertToVar(v, length, endian, typeName)
 	switch typeName {
