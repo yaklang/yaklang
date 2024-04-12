@@ -29,6 +29,26 @@ type Engine struct {
 	sandboxMode   bool
 }
 
+func (e *Engine) RuntimeInfo(infoType string, params ...any) (res any, err error) {
+	defer func() {
+		if e := recover(); e != nil {
+			err = fmt.Errorf("%v", e)
+		}
+	}()
+	frame := e.GetVM().VMStack.Peek()
+	if frame == nil {
+		return nil, fmt.Errorf("not found runtime.GetInfo")
+	}
+	runtimeLib := frame.(*yakvm.Frame).GlobalVariables["runtime"]
+	if runtimeLib == nil {
+		return nil, fmt.Errorf("current frame not import runtime lib")
+	}
+	getInfoFun := runtimeLib.(map[string]any)["GetInfo"]
+	if getInfoFun == nil {
+		return nil, fmt.Errorf("not found runtime.GetInfo")
+	}
+	return getInfoFun.(func(string, ...any) (any, error))(infoType, params...)
+}
 func (e *Engine) SetStrictMode(b bool) {
 	if e == nil {
 		return

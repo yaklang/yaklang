@@ -7,14 +7,35 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/jsonpath"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func TestOUTPUT_AiChat(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	yaklib.InitYakit(yaklib.NewVirtualYakitClient(func(i *ypb.ExecResult) error {
+		println(string(i.Raw))
+		return nil
+	}))
+	yaklib.AutoInitYakit()
+	_, err = client.Exec(context.Background(), &ypb.ExecRequest{
+		NoDividedEngine: true,
+		Script:          `ai.Chat("你好",ai.debugStream(),ai.type("chatglm"))~`,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(3 * time.Second)
+}
 func TestOUTPUT_STREAMYakitStream(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {

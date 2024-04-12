@@ -10,6 +10,8 @@ var runtimeLib = map[string]func(frame *Frame) interface{}{
 			switch infoType {
 			case "line":
 				return frame.CurrentCode().StartLineNumber, nil
+			case "runtimeId":
+				return frame.GlobalVariables["runtimeId"], nil
 			default:
 				return nil, fmt.Errorf("unknown info type: %s", infoType)
 			}

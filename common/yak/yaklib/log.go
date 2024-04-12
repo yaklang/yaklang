@@ -10,7 +10,6 @@ import (
 	"github.com/kataras/golog"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
-	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 // loglevel 根据传入的字符串设置日志级别
@@ -79,17 +78,7 @@ func CreateYakLogger(yakFiles ...string) *YakLogger {
 
 func (y *YakLogger) SetEngine(engine *antlr4yak.Engine) {
 	y.Logger.SetVMRuntimeInfoGetter(func(infoType string) (res any, err error) {
-		defer func() {
-			if e := recover(); e != nil {
-				err = fmt.Errorf("%v", e)
-			}
-		}()
-		frame := engine.GetVM().VMStack.Peek()
-		if frame == nil {
-			return nil, fmt.Errorf("not found runtime.GetInfo")
-		}
-		f := frame.(*yakvm.Frame).GlobalVariables["runtime"].(map[string]any)["GetInfo"].(func(string, ...any) (any, error))
-		return f(infoType)
+		return engine.RuntimeInfo("infoType")
 	})
 }
 
