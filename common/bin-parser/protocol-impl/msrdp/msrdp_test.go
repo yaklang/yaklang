@@ -8,7 +8,11 @@ import (
 )
 
 func TestMsrdp(t *testing.T) {
-	_, err := Login("129.153.219.71", 3389, "123456", "Administrator", "")
+	client, err := NewRDPClient("47.120.44.219:3389")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = client.Login("", "Administrator", "g.cXgKg.hjh1RY]*R1>s")
 	if err != nil {
 		t.Fatal(err)
 	} else {
@@ -16,12 +20,11 @@ func TestMsrdp(t *testing.T) {
 	}
 }
 func TestGrdp(t *testing.T) {
-	host := "129.153.219.71"
+	host := "47.120.44.219"
 	port := 3389
 	client := grdp.NewClient(utils.HostPort(host, port), glog.DEBUG)
-	err := client.Login("", "Administrator", "123456")
+	err := client.Login("", "Administrator", "g.cXgKg.hjh1RY]*R1>s")
 	if err != nil {
 		t.Fatal(err)
 	}
-
 }

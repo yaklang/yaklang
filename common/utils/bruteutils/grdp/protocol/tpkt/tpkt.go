@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/emission"
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/glog"
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/protocol/nla"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 // take idea from https://github.com/Madnikulin50/gordp
@@ -120,6 +121,7 @@ func (t *TPKT) recvPubKeyInc(data []byte) error {
 	//pubkey := t.ntlmSec.GssDecrypt([]byte(tsreq.PubKeyAuth))
 	domain, username, password := t.ntlm.GetEncodedCredentials()
 	credentials := nla.EncodeDERTCredentials(domain, username, password)
+	println(codec.EncodeToHex(credentials))
 	authInfo := t.ntlmSec.GssEncrypt(credentials)
 	req := nla.EncodeDERTRequest(nil, authInfo, nil)
 	_, err = t.Conn.Write(req)

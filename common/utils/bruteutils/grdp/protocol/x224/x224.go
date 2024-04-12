@@ -152,7 +152,7 @@ func New(t core.Transport) *X224 {
 	x := &X224{
 		*emission.NewEmitter(),
 		t,
-		PROTOCOL_RDP | PROTOCOL_SSL | PROTOCOL_HYBRID,
+		PROTOCOL_RDP | PROTOCOL_SSL | PROTOCOL_HYBRID | PROTOCOL_HYBRID_EX,
 		PROTOCOL_SSL,
 		NewDataHeader(),
 	}
@@ -228,10 +228,10 @@ func (x *X224) recvConnectionConfirm(s []byte) {
 		x.selectedProtocol = message.ProtocolNeg.Result
 	}
 
-	if x.selectedProtocol == PROTOCOL_HYBRID_EX {
-		glog.Error("NODE_RDP_PROTOCOL_HYBRID_EX_NOT_SUPPORTED")
-		return
-	}
+	//if x.selectedProtocol == PROTOCOL_HYBRID_EX {
+	//	glog.Error("NODE_RDP_PROTOCOL_HYBRID_EX_NOT_SUPPORTED")
+	//	return
+	//}
 
 	x.transport.On("data", x.recvData)
 
@@ -252,7 +252,7 @@ func (x *X224) recvConnectionConfirm(s []byte) {
 		return
 	}
 
-	if x.selectedProtocol == PROTOCOL_HYBRID {
+	if x.selectedProtocol == PROTOCOL_HYBRID_EX {
 		glog.Info("*** NLA Security selected ***")
 		err := x.transport.(*tpkt.TPKT).StartNLA()
 		if err != nil {
