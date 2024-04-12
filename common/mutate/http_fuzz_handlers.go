@@ -8,7 +8,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -404,33 +403,52 @@ func (f *FuzzHTTPRequest) fuzzPostParamsJsonPath(key any, jsonPath string, val a
 }
 
 func modifyJSONValue(rawJson, jsonPath, value string, val any) (string, error) {
-	originalValue := jsonpath.Find(rawJson, jsonPath)
+	if !strings.HasPrefix(jsonPath, "$.") {
+		jsonPath = "$." + jsonPath
+	}
 	var newValue interface{} = value
+	//originalValue := jsonpath.Find(rawJson, jsonPath)
 
-	switch originalValue.(type) {
-	case float64:
-		if floatVal, err := strconv.ParseFloat(value, 64); err == nil {
-			newValue = floatVal
-		}
-	case bool:
-		if boolVal, err := strconv.ParseBool(value); err == nil {
-			newValue = boolVal
-		}
+	// 如果原始值为空，或者原始值类型和新值类型一致，或者原始值是float64类型，新值是int类型就进入下面的逻辑
+	//if originalValue == nil ||
+	//	reflect.TypeOf(originalValue) == reflect.TypeOf(val) ||
+	//	(reflect.TypeOf(originalValue).AssignableTo(reflect.TypeOf(0.0)) &&
+	//		reflect.TypeOf(val).AssignableTo(reflect.TypeOf(0))) {
+	//	switch originalValue.(type) {
+	//	case float64:
+	//		if floatVal, err := strconv.ParseFloat(value, 64); err == nil {
+	//			newValue = floatVal
+	//		}
+	//	case bool:
+	//		if boolVal, err := strconv.ParseBool(value); err == nil {
+	//			newValue = boolVal
+	//		}
+	//	case string:
+	//		newValue = value
+	//	case map[string]interface{}, []interface{}:
+	//		if gjson.Valid(value) {
+	//			newValue = gjson.Parse(value).Value()
+	//		}
+	//	case nil:
+	//		switch val.(type) {
+	//		case string:
+	//			newValue = value
+	//		default:
+	//			newValue = gjson.Parse(value).Value()
+	//		}
+	//	default:
+	//		return "", utils.Wrap(errors.New("unrecognized json value type"), "json value type")
+	//	}
+	//} else {
+	//	log.Errorf("original value type: %v, new value type: %v", reflect.TypeOf(originalValue), reflect.TypeOf(val))
+	// 该不该 fuzz 类型
+	// newValue = originalValue
+	//}
+	switch val.(type) {
 	case string:
 		newValue = value
-	case map[string]interface{}, []interface{}:
-		if gjson.Valid(value) {
-			newValue = gjson.Parse(value).Value()
-		}
-	case nil:
-		switch val.(type) {
-		case string:
-			newValue = value
-		default:
-			newValue = gjson.Parse(value).Value()
-		}
 	default:
-		return "", utils.Wrap(errors.New("unrecognized json value type"), "json value type")
+		newValue = gjson.Parse(value).Value()
 	}
 
 	return jsonpath.ReplaceString(rawJson, jsonPath, newValue), nil
@@ -757,8 +775,6 @@ func (f *FuzzHTTPRequest) fuzzPostJsonParamsWithRaw(k, v interface{}) ([]*http.R
 	}
 
 	originBody := rawBody
-	originV := v
-	//_ = originV
 	keys, values := InterfaceToFuzzResults(k), InterfaceToFuzzResults(v)
 	if keys == nil || values == nil {
 		return nil, utils.Wrapf(err, "keys or Values is empty...")
@@ -769,64 +785,21 @@ func (f *FuzzHTTPRequest) fuzzPostJsonParamsWithRaw(k, v interface{}) ([]*http.R
 		return nil, err
 	}
 
+	origin := httpctx.GetBareRequestBytes(req)
 	var reqs []*http.Request
 	for {
 		pair := m.Value()
 		key, value := pair[0], pair[1]
 
-		originalValue := gjson.GetBytes(originBody, key)
-
-		var newValue interface{} = value
-
-		// 根据原始值的类型决定如何转换 value
-		switch originalValue.Type {
-		case gjson.True, gjson.False:
-			if boolVal, err := strconv.ParseBool(value); err == nil {
-				newValue = boolVal
-			} else {
-				continue
-			}
-		case gjson.Number:
-			if floatVal, err := strconv.ParseFloat(value, 64); err == nil {
-				newValue = floatVal
-			} else {
-				continue
-			}
-		case gjson.String:
-			newValue = value
-		case gjson.JSON:
-			if gjson.Valid(value) {
-				newValue = gjson.Parse(value).Value()
-			} else {
-				continue
-			}
-		// 如果类型是 Null 则代表是向 json 中添加新的 kv ,需要根据传入值的类型决定如何添加
-		case gjson.Null:
-			switch originV.(type) {
-			case int:
-				newValue = originV
-			case string:
-				newValue = value
-			default:
-				newValue = gjson.Parse(value).Value()
-			}
-
-		default:
-			log.Errorf("unknown type: %v", originalValue.Type)
-			continue
-		}
-
-		modifiedBody, err := sjson.SetBytes(rawBody, key, newValue)
+		modifiedBody, err := modifyJSONValue(string(originBody), key, value, v)
 		if err != nil {
 			break
 		}
-
-		_req, err := rebuildHTTPRequest(req, int64(len(modifiedBody)))
+		reqIns, err := lowhttp.ParseBytesToHttpRequest(lowhttp.ReplaceHTTPPacketBodyFast(origin, []byte(modifiedBody)))
 		if err != nil {
 			break
 		}
-		_req.Body = ioutil.NopCloser(bytes.NewBuffer(modifiedBody))
-		reqs = append(reqs, _req)
+		reqs = append(reqs, reqIns)
 
 		if err = m.Next(); err != nil {
 			break
