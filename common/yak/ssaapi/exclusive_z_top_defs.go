@@ -15,6 +15,9 @@ func (i *Value) GetTopDefs(opt ...OperationOption) Values {
 	actx := NewAnalyzeContext(opt...)
 	actx.Self = i
 	ret := i.getTopDefs(actx, opt...)
+	ret = lo.UniqBy(ret, func(item *Value) int64 {
+		return item.GetId()
+	})
 	return ret
 }
 

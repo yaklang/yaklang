@@ -134,10 +134,10 @@ g = d
 	depthAllcheck := false
 	prog.Ref("g").ForEach(func(value *ssaapi.Value) {
 		var count int
-		value.GetTopDefs(ssaapi.WithDepthLimit(2)).ForEach(func(value *ssaapi.Value) {
+		value.GetTopDefs(ssaapi.WithDepthLimit(2)).Show().ForEach(func(value *ssaapi.Value) {
 			count++
 		})
-		if count == 2 {
+		if count == 1 {
 			depth2check = true
 		}
 
@@ -178,7 +178,7 @@ g = d
 			count++
 			value.Show()
 		})
-		if count == 2 {
+		if count == 1 {
 			depth2check = true
 		}
 
@@ -247,7 +247,8 @@ e = c + 3
 }
 
 func TestBottomUse_ReturnUnpack(t *testing.T) {
-	prog, err := ssaapi.Parse(`a = (i, j, k) => {
+	prog, err := ssaapi.Parse(`
+a = (i, j, k) => {
 	return i, j, k
 }
 c,d,e = a(f,2,3);
@@ -255,13 +256,14 @@ c,d,e = a(f,2,3);
 	if err != nil {
 		t.Fatal(err)
 	}
+	prog.Show()
 	vals := prog.Ref("f").GetBottomUses()
 	if len(vals) != 1 {
 		t.Fatal("bottom use failed")
 	}
 	vals.Show()
 	var cId int64 = -1
-	prog.Ref("c").ForEach(func(value *ssaapi.Value) {
+	prog.Ref("c").Show().ForEach(func(value *ssaapi.Value) {
 		cId = value.GetId()
 	})
 	if ret := vals[0].GetId(); ret != cId {
