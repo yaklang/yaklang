@@ -36,7 +36,7 @@ func TestBuild(t *testing.T) {
 	prog, err := ssaapi.Parse(
 		code,
 		ssaapi.WithLanguage(ssaapi.Yak),
-		ssaapi.WithDataBase(programName),
+		ssaapi.WithDatabaseProgramName(programName),
 	)
 	defer ssadb.DeleteProgram(db, programName)
 
@@ -67,7 +67,7 @@ func TestBuild_Multiple_Program(t *testing.T) {
 		prog, err := ssaapi.Parse(
 			code,
 			ssaapi.WithLanguage(ssaapi.Yak),
-			ssaapi.WithDataBase(programName),
+			ssaapi.WithDatabaseProgramName(programName),
 		)
 		defer ssadb.DeleteProgram(db, programName)
 

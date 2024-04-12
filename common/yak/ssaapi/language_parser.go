@@ -42,8 +42,9 @@ func parse(c *config, prog *ssa.Program) (ret *ssa.Program, err error) {
 	}()
 
 	if prog == nil {
-		prog = ssa.NewProgram(c.DataBaseProgramName)
+		prog = ssa.NewProgram(c.DatabaseProgramName)
 	}
+	prog.SourceCode = c.code
 
 	builder := prog.GetAndCreateMainFunctionBuilder()
 	builder.WithExternLib(c.externLib)
