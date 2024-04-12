@@ -1,14 +1,96 @@
 package yakgrpc
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/jsonpath"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strings"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+func TestOUTPUT_STREAMYakitStream(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	uid := uuid.New().String()
+
+	stream, err := client.Exec(context.Background(), &ypb.ExecRequest{
+		NoDividedEngine: true,
+		Script: `yakit.AutoInitYakit()
+
+# Input your code!
+pr, pw = io.Pipe()~
+go func{
+    count = 0
+    for {
+        count++
+        pw.Write("Hello1")
+        sleep(0.3)
+        if count > 5 {
+            pw.Close()
+            pr.Close()
+            return
+        }
+    }
+}
+yakit.Stream("ai", "` + uid + `", pr)
+sleep(2)
+`,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var dataBuf bytes.Buffer
+	haveStart := false
+	haveStop := false
+	for {
+		data, err := stream.Recv()
+		if err != nil {
+			break
+		}
+
+		if data.IsMessage {
+			data := string(data.Message)
+			if data == "" {
+				continue
+			}
+			data = codec.AnyToString(jsonpath.Find(data, "$.content.data"))
+			id := jsonpath.Find(data, "$.streamId")
+			if id != uid {
+				t.Fatal("streamId is not right")
+			}
+			if codec.AnyToString(jsonpath.Find(data, "$.action")) == "start" {
+				haveStart = true
+			}
+			if codec.AnyToString(jsonpath.Find(data, "$.action")) == "stop" {
+				haveStop = true
+			}
+			if codec.AnyToString(jsonpath.Find(data, "$.action")) == "data" {
+				dataBuf.WriteString(codec.AnyToString(jsonpath.Find(data, "$.data")))
+			}
+			spew.Dump(data)
+		}
+	}
+	if !haveStart {
+		t.Fatal("stream start not found")
+	}
+	if !haveStop {
+		t.Fatal("stream stop not found")
+	}
+	if dataBuf.String() != "Hello1Hello1Hello1Hello1Hello1Hello1" {
+		t.Fatal("stream data not found")
+	}
+}
 
 func TestGRPCMUSTPASS_LANGUAGE_YakitLog(t *testing.T) {
 	testCase1 := [][]string{

@@ -28,6 +28,7 @@ func (c *YakitClient) Stream(streamType string, streamId string, stream io.Reade
 	}
 
 	err := c.YakitLog("stream", string(utils.Jsonify(map[string]any{
+		"type":       "stream",
 		"action":     "start",
 		"streamType": streamType,
 		"streamId":   streamId,
@@ -45,6 +46,7 @@ func (c *YakitClient) Stream(streamType string, streamId string, stream io.Reade
 				log.Errorf("stream panic: %v", err)
 			}
 			err := c.YakitLog("stream", string(utils.Jsonify(map[string]any{
+				"type":     "stream",
 				"action":   "stop",
 				"streamId": streamId,
 			})))
@@ -58,33 +60,35 @@ func (c *YakitClient) Stream(streamType string, streamId string, stream io.Reade
 		var buf = bytes.NewBufferString("")
 		lastTimeMS := time.Now().UnixMilli()
 		for bstream.Scan() {
-			if bstream.Err() != nil {
-				break
-			}
+			buf.WriteString(bstream.Text())
 
 			if time.Now().UnixMilli()-lastTimeMS > 200 {
 				err := c.YakitLog("stream", string(utils.Jsonify(map[string]any{
-					"action": "data",
-					"data":   buf.String(),
+					"type":     "stream",
+					"streamId": streamId,
+					"action":   "data",
+					"data":     buf.String(),
 				})))
 				if err != nil {
 					log.Warnf("stream send failed: %s", err)
-					return
+					continue
 				}
 				buf.Reset()
 				lastTimeMS = time.Now().UnixMilli()
 				continue
 			}
-
-			buf.WriteString(bstream.Text())
 		}
-		err := c.YakitLog("stream", string(utils.Jsonify(map[string]any{
-			"action": "data",
-			"data":   bstream.Text(),
-		})))
-		if err != nil {
-			log.Warnf("stream send failed: %s", err)
-			return
+		if buf.Len() > 0 {
+			err := c.YakitLog("stream", string(utils.Jsonify(map[string]any{
+				"action":   "data",
+				"data":     buf.String(),
+				"streamId": streamId,
+				"type":     "stream",
+			})))
+			if err != nil {
+				log.Warnf("stream send failed: %s", err)
+				return
+			}
 		}
 	}()
 }
