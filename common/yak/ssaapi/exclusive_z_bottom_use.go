@@ -12,7 +12,11 @@ import (
 func (v *Value) GetBottomUses(opt ...OperationOption) Values {
 	actx := NewAnalyzeContext(opt...)
 	actx.Self = v
-	return v.getBottomUses(actx)
+	ret := v.getBottomUses(actx)
+	lo.UniqBy(ret, func(item *Value) int64 {
+		return item.GetId()
+	})
+	return ret
 }
 
 func (v *Value) visitUserFallback(actx *AnalyzeContext) Values {
