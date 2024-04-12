@@ -1,6 +1,7 @@
 package antlr4util
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"strings"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
@@ -34,7 +35,9 @@ func GetEndPosition(t antlr.Token) (int, int) {
 	return line, column
 }
 
-func GetRange(token CanStartStopToken) *ssa.Range {
+var _fallbackStrPtr string
+
+func GetRange(originSourceCode string, token CanStartStopToken) *ssa.Range {
 	startToken := token.GetStart()
 	endToken := token.GetStop()
 	if startToken == nil || endToken == nil {
@@ -46,7 +49,11 @@ func GetRange(token CanStartStopToken) *ssa.Range {
 	endLine, endColumn := GetEndPosition(endToken)
 	end := ssa.NewPosition(int64(endToken.GetStop()), int64(endLine), int64(endColumn))
 
-	return ssa.NewRange(start, end, token.GetText())
+	if originSourceCode == "" && token.GetText() != "" {
+		log.Error("[BUG]: ssa.Range.OriginSourceCode is empty, fullback to token.GetText().")
+		originSourceCode = token.GetText()
+	}
+	return ssa.NewRange(start, end, token.GetText(), originSourceCode)
 }
 
 type Token struct {

@@ -19,7 +19,7 @@ type config struct {
 	defineFunc   map[string]any
 	externMethod ssa.MethodBuilder
 
-	DataBaseProgramName string
+	DatabaseProgramName string
 	// for hash
 	externInfo string
 }
@@ -112,9 +112,9 @@ func WithFeedCode(b ...bool) Option {
 }
 
 // save to database, please set the program name
-func WithDataBase(name string) Option {
+func WithDatabaseProgramName(name string) Option {
 	return func(c *config) {
-		c.DataBaseProgramName = name
+		c.DatabaseProgramName = name
 	}
 }
 
@@ -162,7 +162,7 @@ var Exports = map[string]any{
 	"withLanguage":    WithLanguage,
 	"withExternLib":   WithExternLib,
 	"withExternValue": WithExternValue,
-	"withDataBase":    WithDataBase,
+	"withDataBase":    WithDatabaseProgramName,
 	// language:
 	"Javascript": JS,
 	"Yak":        Yak,

@@ -1,17 +1,31 @@
 package ssa
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
+)
 
 type Range struct {
-	SourceCode *string
-	Start, End *Position
+	originSourceCodeHash string
+
+	SourceCode       *string
+	OriginSourceCode *string
+	Start, End       *Position
 }
 
-func NewRange(start, end *Position, source string) *Range {
+func (r *Range) GetOriginSourceCodeHash() string {
+	if r.originSourceCodeHash == "" {
+		r.originSourceCodeHash = utils.CalcMd5(*r.OriginSourceCode)
+	}
+	return r.originSourceCodeHash
+}
+
+func NewRange(start, end *Position, source string, origin string) *Range {
 	return &Range{
-		SourceCode: &source,
-		Start:      start,
-		End:        end,
+		OriginSourceCode: &origin,
+		SourceCode:       &source,
+		Start:            start,
+		End:              end,
 	}
 }
 

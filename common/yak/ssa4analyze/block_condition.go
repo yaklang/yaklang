@@ -135,7 +135,10 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 		if end == nil {
 			end = start
 		}
-		return ssa.NewRange(start, end, "")
+
+		r := ssa.NewRange(start, end, "", "")
+		r.OriginSourceCode = b.GetFunc().GetRange().OriginSourceCode
+		return r
 	}
 
 	deleteInst := make([]ssa.Instruction, 0)
