@@ -5,8 +5,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/pprofutils"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -553,11 +555,26 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 		"Error":    logger.Errorf,
 	}) // 设置 log 库
 	(*e.logger).SetEngine(engine)
+	engine.SetVar("Ch", map[string]any{})
 	clientIns := *yaklib.GetYakitClientInstance()
 	client := &clientIns // 设置全局 client 的 log
 	client.SetYakLog(*e.logger)
 	yaklib.SetEngineClient(engine, client)
-
+	if iaiLib, ok := engine.GetVar("ai"); ok {
+		if aiLib, ok := iaiLib.(map[string]interface{}); ok {
+			aiLib["Chat"] = func(msg string, opts ...aispec.AIConfigOption) (string, error) {
+				iruntimeId, err := engine.RuntimeInfo("runtimeId")
+				if err != nil {
+					return "", utils.Errorf("build output stream failed: get runtime id failed: %s", err)
+				}
+				runtimeId := utils.InterfaceToString(iruntimeId)
+				opts = append([]aispec.AIConfigOption{aispec.WithStreamHandler(func(reader io.Reader) {
+					client.Stream("ai", runtimeId, reader)
+				})}, opts...)
+				return ai.Chat(msg, opts...)
+			}
+		}
+	}
 	for _, hook := range e.engineHooks {
 		err = hook(engine)
 		if err != nil {
