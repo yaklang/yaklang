@@ -26,6 +26,12 @@ func (v *Value) visitUserFallback(actx *AnalyzeContext) Values {
 			vals = append(vals, ret...)
 		}
 	})
+	if v.IsMember() && actx.TheMemberShouldBeVisited(v) {
+		obj := v.GetObject()
+		actx.PushObject(obj, v.GetKey(), v)
+		vals = append(vals, obj.getBottomUses(actx)...)
+		actx.PopObject()
+	}
 	if len(vals) <= 0 {
 		return Values{v}
 	}
@@ -185,11 +191,11 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 				}
 			}
 
-			val := actx.GetCurrentCall()
-			if val == nil {
+			currentCallValue := actx.GetCurrentCall()
+			if currentCallValue == nil {
 				return fallback()
 			}
-			call := val.node.(*ssa.Call)
+			call := currentCallValue.node.(*ssa.Call)
 			fun, ok := call.Method.(*ssa.Function)
 			if !ok {
 				log.Warnf("BUG: (call's fun is not clean!) unknown function: %v", v.String())
@@ -200,7 +206,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 			var vals Values
 			if !call.IsObject() || len(indexes) <= 0 {
 				NewValue(call).GetUsers().ForEach(func(user *Value) {
-					if ret := user.AppendDependOn(val).AppendDependOn(v).getBottomUses(actx); len(ret) > 0 {
+					if ret := user.AppendDependOn(currentCallValue).AppendDependOn(v).getBottomUses(actx); len(ret) > 0 {
 						vals = append(vals, ret...)
 					}
 				})
@@ -219,9 +225,12 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) Valu
 				if !ok {
 					continue
 				}
-				if newVals := NewValue(indexedReturn).AppendDependOn(val).AppendDependOn(v).getBottomUses(actx); len(newVals) > 0 {
+				returnReceiver := NewValue(indexedReturn)
+				actx.PushObject(currentCallValue, returnReceiver.GetKey(), returnReceiver)
+				if newVals := returnReceiver.AppendDependOn(returnReceiver).AppendDependOn(v).getBottomUses(actx); len(newVals) > 0 {
 					vals = append(vals, newVals...)
 				}
+				actx.PopObject()
 			}
 			if len(vals) > 0 {
 				return vals
