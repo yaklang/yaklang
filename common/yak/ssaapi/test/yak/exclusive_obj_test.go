@@ -562,3 +562,26 @@ dump(c)
 		t.Fatal("oop trace masked failed")
 	}
 }
+
+func TestObject_Make(t *testing.T) {
+	t.Run("make bottom user", func(t *testing.T) {
+		ssatest.Check(t, `
+		m = []string{"i", j}
+		print(m)
+		`,
+			ssatest.CheckBottomUser_Contain("j", []string{"print("}),
+		)
+	})
+
+	t.Run("function return, bottom user", func(t *testing.T) {
+		ssatest.Check(t, ` 
+		f = (j, i, k) => {
+			return j, i, k
+		}
+		a, b, c = f(source, 2, 3)
+		print(a)
+		`,
+			ssatest.CheckBottomUser_Contain("source", []string{"print("}),
+		)
+	})
+}
