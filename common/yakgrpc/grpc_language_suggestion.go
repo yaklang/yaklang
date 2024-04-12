@@ -670,8 +670,8 @@ func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionReques
 			if _, ok := doc.DefaultDocumentHelper.Libs[id]; ok {
 				continue
 			}
-			// 不应该再补全包含.的符号
-			if strings.Contains(id, ".") {
+			// 不应该再补全包含.或#的符号
+			if strings.Contains(id, ".") || strings.Contains(id, "#") {
 				continue
 			}
 			// todo: 需要更严谨的过滤
