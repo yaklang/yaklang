@@ -407,15 +407,6 @@ func (n *NTLMv2) GetAuthenticateMessage(s []byte) (*AuthenticateMessage, *NTLMv2
 	clientChallenge := core.Random(8)
 	ntChallengeResponse, lmChallengeResponse, SessionBaseKey := n.ComputeResponseV2(
 		n.respKeyNT, n.respKeyLM, serverChallenge, clientChallenge, timestamp, serverInfo)
-	fmt.Printf("rawNt: %s\n", codec.EncodeToHex(n.respKeyNT))
-	fmt.Printf("rawLm: %s\n", codec.EncodeToHex(n.respKeyLM))
-	fmt.Printf("timestamp: %s\n", codec.EncodeToHex(timestamp))
-	fmt.Printf("clientChallenge: %s\n", codec.EncodeToHex(clientChallenge))
-	fmt.Printf("serverChallenge: %s\n", codec.EncodeToHex(serverChallenge))
-	fmt.Printf("nt: %s\n", codec.EncodeToHex(ntChallengeResponse))
-	fmt.Printf("lm: %s\n", codec.EncodeToHex(lmChallengeResponse))
-	fmt.Printf("key: %s\n", codec.EncodeToHex(SessionBaseKey))
-	fmt.Printf("serverInfo: %s\n", codec.EncodeToHex(serverInfo))
 	exchangeKey := SessionBaseKey
 	exportedSessionKey := []byte("1234567812345678")
 

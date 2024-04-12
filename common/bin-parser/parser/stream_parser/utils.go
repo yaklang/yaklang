@@ -288,15 +288,11 @@ func _ConvertToVar(v []byte, length uint64, endian, typeName string) any {
 	}
 }
 func AnyToInt64(d any) int64 {
-	switch ret := d.(type) {
-	case int, int8, int16, int32, int64:
-		return int64(reflect.ValueOf(ret).Int())
-	case uint, uint8, uint16, uint32, uint64:
-		return int64(reflect.ValueOf(ret).Uint())
-	case string:
-		return int64(len(ret))
-	case []byte:
-		return int64(len(ret))
+	switch reflect.TypeOf(d).Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return int64(reflect.ValueOf(d).Int())
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return int64(reflect.ValueOf(d).Uint())
 	default:
 		return 0
 	}
@@ -314,29 +310,26 @@ func IsNumber(d any) bool {
 	}
 }
 func AnyToUint64(d any) uint64 {
-	switch ret := d.(type) {
-	case int, int8, int16, int32, int64:
-		return uint64(reflect.ValueOf(ret).Int())
-	case uint, uint8, uint16, uint32, uint64:
-		return uint64(reflect.ValueOf(ret).Uint())
-	case string:
-		return uint64(len(ret))
-	case []byte:
-		return uint64(len(ret))
+	switch reflect.TypeOf(d).Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return uint64(reflect.ValueOf(d).Int())
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return uint64(reflect.ValueOf(d).Uint())
 	default:
 		return 0
 	}
 }
-func ConvertToBytes(v any, length uint64, endian string) []byte {
+
+func ConvertToBytes(v any, length uint64, endian string) ([]byte, error) {
 	if endian == "" {
 		endian = "big"
 	}
-	switch ret := v.(type) {
-	case int, int8, int16, int32, int64:
-		tmp := uint64(AnyToInt64(ret))
+	switch reflect.TypeOf(v).Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		tmp := uint64(AnyToInt64(v))
 		return ConvertToBytes(tmp, length, endian)
-	case uint, uint8, uint16, uint32, uint64:
-		val := AnyToUint64(ret)
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		val := AnyToUint64(v)
 		l := int(math.Ceil(float64(length) / 8))
 		res := []byte{}
 		if endian == "big" {
@@ -344,29 +337,28 @@ func ConvertToBytes(v any, length uint64, endian string) []byte {
 			for i := 0; i < l; i++ {
 				res = append(res, byte(tmp>>((l-i-1)*8)))
 			}
-			return res
+			return res, nil
 		} else {
 			tmp := val
 			for i := 0; i < l; i++ {
 				res = append(res, byte(tmp>>((i)*8)))
 			}
-			return res
+			return res, nil
 		}
-	case string:
-		return []byte(v.(string))
-	case []byte:
-		return v.([]byte)
-	default:
-		retType := reflect.TypeOf(ret)
-		refV := reflect.ValueOf(ret)
-		if retType.Kind() == reflect.Array && retType.Elem().Kind() == reflect.Uint8 {
+	case reflect.String:
+		return []byte(reflect.ValueOf(v).String()), nil
+	case reflect.Slice, reflect.Array:
+		if reflect.TypeOf(v).Elem().Kind() == reflect.Uint8 {
 			var res []byte
-			for i := 0; i < retType.Len(); i++ {
-				res = append(res, refV.Index(i).Interface().(byte))
+			for i := 0; i < reflect.ValueOf(v).Len(); i++ {
+				res = append(res, reflect.ValueOf(v).Index(i).Interface().(byte))
 			}
-			return res
+			return res, nil
+		} else {
+			return nil, errors.New("not support type")
 		}
-		return []byte{}
+	default:
+		return nil, errors.New("not support type")
 	}
 }
 func appendNode(parent *base.Node, child *base.Node) error {

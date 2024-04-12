@@ -427,7 +427,10 @@ func (d *DefParser) Generate(data any, node *base.Node) error {
 					case "bytes":
 						typeName = "raw"
 					}
-					buf := ConvertToBytes(data, length, node.Cfg.GetString(CfgEndian))
+					buf, err := ConvertToBytes(data, length, node.Cfg.GetString(CfgEndian))
+					if err != nil {
+						return fmt.Errorf("convert to bytes error: %w", err)
+					}
 					rawRes, err := d.write(buf, length)
 					if err != nil {
 						return fmt.Errorf("write error: %w", err)

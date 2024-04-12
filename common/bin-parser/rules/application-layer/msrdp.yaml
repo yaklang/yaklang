@@ -16,6 +16,12 @@ Package:
     length-from-field: Length
     length-for-start-field: Flag
     VariableData: raw
+  Negotiation:
+    endian: little
+    Type: uint8
+    Flag: uint8
+    Length: uint16
+    Protocol: uint32
   Challenge: Challenge
   Authentication: Authentication
 
