@@ -1230,14 +1230,18 @@ func QueryHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) (paging *bizhe
 	rawDB := db
 	queryDB := BuildHTTPFlowQuery(rawDB.Model(&HTTPFlow{}), params)
 
+	return SelectHTTPFlowFromDB(rawDB, queryDB, params)
+}
+
+func SelectHTTPFlowFromDB(rawDB, queryDB *gorm.DB, params *ypb.QueryHTTPFlowRequest) (paging *bizhelper.Paginator, httpflows []*HTTPFlowWithPayloads, err error) {
 	var limitFlows, fullFlows []*HTTPFlow
 
 	if params.OffsetId > 0 {
 		offsetDB := queryDB
 		if params.Pagination.Order == "desc" {
-			offsetDB = db.Where("id < ?", params.OffsetId)
+			offsetDB = offsetDB.Where("id < ?", params.OffsetId)
 		} else {
-			offsetDB = db.Where("id > ?", params.OffsetId)
+			offsetDB = offsetDB.Where("id > ?", params.OffsetId)
 		}
 		offsetDB.Limit(int(params.Pagination.Limit)).Offset(0).Scan(&limitFlows)
 		paging, queryDB = bizhelper.Paging(queryDB, int(params.Pagination.Page), int(params.Pagination.Limit), &fullFlows)
@@ -1246,7 +1250,7 @@ func QueryHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) (paging *bizhe
 	}
 
 	if queryDB.Error != nil {
-		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
+		return nil, nil, utils.Errorf("paging failed: %s", queryDB.Error)
 	}
 
 	// 以下为WithPayload的额外处理逻辑，因此将返回值使用新的结构体封装了一层，带上了Payloads
@@ -1446,20 +1450,20 @@ func QueryWebsocketFlowsByHTTPFlowHash(db *gorm.DB, req *ypb.DeleteHTTPFlowReque
 	return db
 }
 
-func ExportHTTPFlow(db *gorm.DB, params *ypb.ExportHTTPFlowsRequest) (paging *bizhelper.Paginator, ret []*HTTPFlow, err error) {
+func ExportHTTPFlow(db *gorm.DB, params *ypb.ExportHTTPFlowsRequest) (paging *bizhelper.Paginator, ret []*HTTPFlowWithPayloads, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Error(r)
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
-	db = BuildHTTPFlowQuery(db.Model(&HTTPFlow{}), params.ExportWhere)
-	db = db.Select(strings.Join(params.FieldName, ","))
-	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", params.Ids)
-	paging, db = bizhelper.Paging(db, int(params.ExportWhere.Pagination.Page), int(params.ExportWhere.Pagination.Limit), &ret)
+	queryParams := params.ExportWhere
+	queryParams.IncludeId = params.Ids
 
-	if db.Error != nil {
-		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
-	}
-	return paging, ret, nil
+	db = db.Model(&HTTPFlow{})
+	rawDB := db
+	// overwrite Select Field
+	queryDB := BuildHTTPFlowQuery(db, queryParams).Select(strings.Join(params.FieldName, ","))
+
+	return SelectHTTPFlowFromDB(rawDB, queryDB, queryParams)
 }
