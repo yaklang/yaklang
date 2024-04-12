@@ -335,7 +335,7 @@ func ExactOrQueryArrayOr(db *gorm.DB, field string, s []interface{}) *gorm.DB {
 		items = append(items, sub)
 	}
 
-	return db.Or(strings.Join(querys, " OR "), items...)
+	return db.Where(strings.Join(querys, " OR "), items...)
 }
 
 func ExactQueryExcludeArrayOr(db *gorm.DB, field string, s []interface{}) *gorm.DB {
@@ -1046,7 +1046,7 @@ func OrFuzzQueryArrayOrLike(db *gorm.DB, field string, s []interface{}) *gorm.DB
 		items = append(items, fmt.Sprintf("%%%v%%", sub))
 	}
 
-	return db.Or(strings.Join(querys, " or "), items...)
+	return db.Where(strings.Join(querys, " or "), items...)
 }
 
 func FuzzSearchWithStringArrayOrAf(db *gorm.DB, fields []string, targets []string, ilike bool) *gorm.DB {
