@@ -379,6 +379,20 @@ Host: www.baidu.com
 			},
 		},
 		{
+			name: "GET 参数(JSON) boolean type 友好显示",
+			base: base{
+				inputPacket: `GET /?a={"abc": false} HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzGetJsonPathParams("a", "$.abc", true)`,
+				expectKeywordInOutputPacket: []string{
+					`a={{urlescape({"abc":true})}}`,
+				},
+				friendlyDisplay: true,
+			},
+		},
+		{
 			name: "GET 参数(JSON) json type 友好显示",
 			base: base{
 				inputPacket: `GET /?a={"abc": {"c":"d"}} HTTP/1.1
@@ -775,6 +789,120 @@ Host: www.baidu.com
 		},
 	}
 
+	for _, tc := range tests {
+		t.Run(tc.name, testCaseCheck(tc.base))
+	}
+}
+
+func TestFuzzPostJsonParams(t *testing.T) {
+	tests := []struct {
+		name string
+		base base
+	}{
+		{
+			name: "JSON-Body参数",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+
+{"a": 222}
+`,
+				code: `.FuzzPostJsonParams("a", 123).FuzzPostJsonParams("b", 123).FuzzPostJsonParams("c", true).FuzzPostJsonParams("d", {"dd":123})`,
+				expectKeywordInOutputPacket: []string{
+					`{"a":123,"b":123,"c":true,"d":{"dd":123}}`,
+				},
+				//debug: true,
+			},
+		},
+		{
+			name: "JSON-Body参数 类型不匹配",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+
+{"number": 123,"boolean": true,"string": "123","json": {"a":"b"}}
+`,
+				code: `.FuzzPostJsonParams("number", true).FuzzPostJsonParams("boolean", 123).FuzzPostJsonParams("string", {"a":"b"}).FuzzPostJsonParams("json", "aaaa")`,
+				expectKeywordInOutputPacket: []string{
+					`"number":true`,
+					`"boolean":123`,
+					`"json":"aaaa"`,
+					`"string":{"a":"b"}`,
+				},
+				debug: true,
+			},
+		},
+		{
+			name: "JSON-Body参数 string type",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+
+{"bc": "222"}
+`,
+				code: `.FuzzPostJsonParams("bc", "123")`,
+				expectKeywordInOutputPacket: []string{
+					`{"bc":"123"`,
+				},
+			},
+		},
+		{
+			name: "JSON-Body参数 number type",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+
+{"bc": 123}
+`,
+				code: `.FuzzPostJsonParams("bc", 345)`,
+				expectKeywordInOutputPacket: []string{
+					`{"bc":345}`,
+				},
+			},
+		},
+		{
+			name: "JSON-Body参数 boolean type",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+
+{"bc": false}
+`,
+				code: `.FuzzPostJsonParams("bc", true)`,
+				expectKeywordInOutputPacket: []string{
+					`{"bc":true}`,
+				},
+			},
+		},
+		{
+			name: "JSON-Body参数 json type",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+
+{"bc": {"c":"d"}}
+`,
+				code: `.FuzzPostJsonParams("bc", {"zz":123})`,
+				expectKeywordInOutputPacket: []string{
+					`{"bc":{"zz":123}}`,
+				},
+			},
+		},
+		{
+			name: "JSON-Body参数 json type",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+
+[{"id": 1},{"id": 2}]
+`,
+				code: `.FuzzPostJsonParams("[0]", {"id":111})`,
+				expectKeywordInOutputPacket: []string{
+					`[{"id":111},{"id":2}]`,
+				},
+			},
+		},
+	}
 	for _, tc := range tests {
 		t.Run(tc.name, testCaseCheck(tc.base))
 	}
