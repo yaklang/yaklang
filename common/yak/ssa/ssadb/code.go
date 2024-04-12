@@ -6,6 +6,13 @@ import (
 	"github.com/jinzhu/gorm"
 )
 
+type IrSourceCodeResource struct {
+	gorm.Model
+	SourceCodeHash     string `json:"source_code_hash" gorm:"index"`
+	SourceCodeFilename string `json:"source_code_file"`
+	QuotedSourceCode   string `json:"quoted_source_code"`
+}
+
 type IrCode struct {
 	gorm.Model
 
@@ -13,7 +20,6 @@ type IrCode struct {
 	PackageName string `json:"package_name" gorm:"index"`
 
 	// source code
-	SourceCodeFile      string `json:"source_code_file"`
 	SourceCodeStartLine int64  `json:"source_code_start_line"`
 	SourceCodeEndLine   int64  `json:"source_code_end_line"`
 	SourceCodeStartCol  int64  `json:"source_code_start_col"`
@@ -78,6 +84,9 @@ type IrCode struct {
 
 	// Constant
 	ConstantValue string `json:"constant_value" gorm:"type:text"`
+
+	// compile hash means: hash[ (file-content)+(program-name)+(package-name)+(program-index) ]
+	ProgramCompileHash string `json:"program_compile_hash" gorm:"index"`
 }
 
 func emptyIrCode() *IrCode {

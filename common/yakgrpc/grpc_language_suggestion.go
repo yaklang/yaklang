@@ -823,7 +823,7 @@ func GrpcRangeToPosition(r *ypb.Range) *ssa.Range {
 	return ssa.NewRange(
 		ssa.NewPosition(0, r.StartLine, r.StartColumn-1),
 		ssa.NewPosition(0, r.EndLine, r.EndColumn-1),
-		r.Code,
+		r.Code, r.Code,
 	)
 }
 

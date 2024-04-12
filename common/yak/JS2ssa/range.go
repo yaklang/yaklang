@@ -5,7 +5,7 @@ import (
 )
 
 func (b *astbuilder) SetRange(token antlr4util.CanStartStopToken) func() {
-	r := antlr4util.GetRange(token)
+	r := antlr4util.GetRange(b.SourceCode, token)
 	backup := b.CurrentRange
 	b.CurrentRange = r
 

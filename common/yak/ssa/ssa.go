@@ -126,6 +126,8 @@ type Program struct {
 	// package list
 	Packages map[string]*Package
 
+	SourceCode string
+
 	Cache *Cache
 
 	// class blue print

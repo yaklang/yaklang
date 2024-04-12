@@ -8,6 +8,19 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
+func fitRange(c *ssadb.IrCode, rangeIns *Range) {
+	c.SourceCodeHash = rangeIns.GetOriginSourceCodeHash()
+
+	if rangeIns.Start != nil {
+		c.SourceCodeStartLine = rangeIns.Start.Line
+		c.SourceCodeStartCol = rangeIns.Start.Column
+	}
+	if rangeIns.End != nil {
+		c.SourceCodeEndLine = rangeIns.End.Line
+		c.SourceCodeEndCol = rangeIns.End.Column
+	}
+}
+
 func FitIRCode(c *ssadb.IrCode, r Instruction) error {
 	originId := c.ID
 
@@ -15,6 +28,15 @@ func FitIRCode(c *ssadb.IrCode, r Instruction) error {
 	c.Name = r.GetName()
 	c.VerboseName = r.GetVerboseName()
 	c.ShortVerboseName = r.GetShortVerboseName()
+
+	if rangeIns := r.GetRange(); rangeIns != nil {
+		// set range from code
+		fitRange(c, rangeIns)
+	} else if f := r.GetFunc(); f != nil {
+		fitRange(c, f.GetRange())
+	} else {
+		log.Warnf("Range not found for %s", c.Name)
+	}
 
 	if ret := r.GetFunc(); ret != nil {
 		c.CurrentFunction = int64(ret.GetId())
