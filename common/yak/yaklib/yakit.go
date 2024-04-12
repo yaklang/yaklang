@@ -63,6 +63,7 @@ var YakitExports = map[string]interface{}{
 	"Markdown":      emptyVirtualClient.YakitMarkdown,
 	"Report":        emptyVirtualClient.YakitReport,
 	"File":          emptyVirtualClient.YakitFile,
+	"Stream":        emptyVirtualClient.Stream,
 	"Output":        emptyVirtualClient.Output,
 	"SetProgress":   emptyVirtualClient.YakitSetProgress,
 	"SetProgressEx": emptyVirtualClient.YakitSetProgressEx,
@@ -122,6 +123,7 @@ func GetExtYakitLibByClient(client *YakitClient) map[string]interface{} {
 		"Output":        client.Output,
 		"SetProgress":   client.YakitSetProgress,
 		"SetProgressEx": client.YakitSetProgressEx,
+		"Stream":        client.Stream,
 	}
 	if os.Getenv("YAK_DISABLE") == "output" {
 		// YakitExports["Info"] = func(a string, b ...interface{}) {}
