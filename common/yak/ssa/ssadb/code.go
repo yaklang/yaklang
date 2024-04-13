@@ -20,11 +20,9 @@ type IrCode struct {
 	PackageName string `json:"package_name" gorm:"index"`
 
 	// source code
-	SourceCodeStartLine int64  `json:"source_code_start_line"`
-	SourceCodeEndLine   int64  `json:"source_code_end_line"`
-	SourceCodeStartCol  int64  `json:"source_code_start_col"`
-	SourceCodeEndCol    int64  `json:"source_code_end_col"`
-	SourceCodeHash      string `json:"source_code_hash"`
+	SourceCodeStartOffset int64  `json:"source_code_start_offset"`
+	SourceCodeEndOffset   int64  `json:"source_code_end_offset"`
+	SourceCodeHash        string `json:"source_code_hash"`
 
 	// opcode
 	Opcode         int64  `json:"opcode"`

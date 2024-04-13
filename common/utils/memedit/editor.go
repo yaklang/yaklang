@@ -8,6 +8,9 @@ import (
 )
 
 type MemEditor struct {
+	sourceCodeMd5      string
+	sourceCodeSha1     string
+	sourceCodeSha256   string
 	sourceCode         string
 	lineLensMap        map[int]int
 	lineStartOffsetMap map[int]int
@@ -246,6 +249,10 @@ func (ve *MemEditor) UpdateTextByRange(r RangeIf, newText string) error {
 
 // recalculateLineMappings 重新计算行映射
 func (ve *MemEditor) recalculateLineMappings() {
+	ve.sourceCodeMd5 = utils.CalcMd5(ve.sourceCode)
+	ve.sourceCodeSha1 = utils.CalcSha1(ve.sourceCode)
+	ve.sourceCodeSha256 = utils.CalcSha256(ve.sourceCode)
+
 	ve.lineLensMap = make(map[int]int)
 	ve.lineStartOffsetMap = make(map[int]int)
 	currentOffset := 0
@@ -393,4 +400,29 @@ func (ve *MemEditor) GetTextFromRangeContext(i RangeIf, lineNum int) string {
 	endPos := i.GetEnd()
 	context, _ := ve.GetContextAroundRange(startPos, endPos, lineNum)
 	return context
+}
+
+func (ve *MemEditor) SourceCodeMd5() string {
+	if ve.sourceCodeMd5 == "" {
+		ve.sourceCodeMd5 = utils.CalcMd5(ve.sourceCode)
+	}
+	return ve.sourceCodeMd5
+}
+
+func (ve *MemEditor) SourceCodeSha1() string {
+	if ve.sourceCodeSha1 == "" {
+		ve.sourceCodeSha1 = utils.CalcSha1(ve.sourceCode)
+	}
+	return ve.sourceCodeSha1
+}
+
+func (ve *MemEditor) SourceCodeSha256() string {
+	if ve.sourceCodeSha256 == "" {
+		ve.sourceCodeSha256 = utils.CalcSha256(ve.sourceCode)
+	}
+	return ve.sourceCodeSha256
+}
+
+func (ve *MemEditor) GetSourceCode() string {
+	return ve.sourceCode
 }
