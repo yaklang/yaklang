@@ -9,6 +9,10 @@ import (
 )
 
 func fitRange(c *ssadb.IrCode, rangeIns *Range) {
+	c.SourceCodeHash = rangeIns.GetEditor().SourceCodeMd5()
+	start, end := rangeIns.GetOffsetRange()
+	c.SourceCodeStartOffset = int64(start)
+	c.SourceCodeEndOffset = int64(end)
 }
 
 func FitIRCode(c *ssadb.IrCode, r Instruction) error {
