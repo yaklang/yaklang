@@ -2,6 +2,8 @@ package memedit
 
 import (
 	"errors"
+	"github.com/yaklang/yaklang/common/utils"
+	"regexp"
 	"strings"
 )
 
@@ -20,35 +22,44 @@ func NewMemEditor(sourceCode string) *MemEditor {
 		cursor:             0,
 	}
 
-	currentOffset := 0
-	editor.lineStartOffsetMap[0] = 0
-	lines := strings.Split(sourceCode, "\n")
-
-	for lineNumber, line := range lines {
-		lineLen := len(line)
-		editor.lineLensMap[lineNumber] = lineLen
-		editor.lineStartOffsetMap[lineNumber+1] = currentOffset + lineLen + 1
-		currentOffset += lineLen + 1
-	}
-
+	editor.recalculateLineMappings()
 	return editor
 }
 
-func (ve *MemEditor) GetOffsetByPosition(x, y int) (int, error) {
-	if x < 1 || y < 0 {
-		return 0, errors.New("line number and column number should be positive")
+func (ve *MemEditor) GetOffsetByPositionRaw(line, col int) int {
+	offset, _ := ve.GetOffsetByPositionWithError(line, col)
+	return offset
+}
+
+func (ve *MemEditor) GetOffsetByPositionWithError(line, col int) (int, error) {
+	if line < 1 || col < 0 {
+		return 0, errors.New("line number and column number must be positive")
 	}
 
-	x = x - 1
-	if _, exists := ve.lineStartOffsetMap[x]; !exists {
-		return 0, errors.New("line number out of range")
+	// 调整line为内部索引使用，从0开始
+	adjustedLine := line - 1
+
+	// 检查行号是否超出范围
+	if adjustedLine >= len(ve.lineStartOffsetMap) {
+		return len(ve.sourceCode), errors.New("line number out of range")
 	}
 
-	if y > ve.lineLensMap[x] {
-		return 0, errors.New("column number out of range")
+	// 检查列号是否超出当前行的长度
+	if col > ve.lineLensMap[adjustedLine] {
+		col = ve.lineLensMap[adjustedLine] // Clamp the column to the maximum length of the line
 	}
 
-	return ve.lineStartOffsetMap[x] + y, nil
+	lineStartOffset := ve.lineStartOffsetMap[adjustedLine]
+	if adjustedLine < len(ve.lineLensMap)-1 {
+		return lineStartOffset + col, nil
+	} else {
+		// For the last line, we need to ensure we do not exceed the length of the source code
+		if lineStartOffset+col >= len(ve.sourceCode) {
+			return len(ve.sourceCode), nil
+		} else {
+			return lineStartOffset + col, nil
+		}
+	}
 }
 
 func (ve *MemEditor) GetStartOffsetByLine(x int) (int, error) {
@@ -126,49 +137,110 @@ func (ve *MemEditor) GetCurrentLine() (string, error) {
 	return "", errors.New("current position is out of the source code range")
 }
 
-// GetPositionByOffset 获取给定偏移量的位置信息
-func (ve *MemEditor) GetPositionByOffset(offset int) (PositionIf, error) {
-	if offset < 0 || offset >= len(ve.sourceCode) {
-		return nil, errors.New("offset out of bounds")
+func (ve *MemEditor) GetPositionByOffset(offset int) PositionIf {
+	result, _ := ve.GetPositionByOffsetWithError(offset)
+	return result
+}
+func (ve *MemEditor) GetPositionByOffsetWithError(offset int) (PositionIf, error) {
+	if offset < 0 {
+		// 偏移量为负，返回最初位置
+		return NewPosition(1, 0), errors.New("offset is negative")
 	}
-	for line, startOffset := range ve.lineStartOffsetMap {
-		if startOffset > offset {
-			continue
+	if offset >= len(ve.sourceCode) {
+		// 偏移量超出最大范围，返回最后位置
+		lastLine := len(ve.lineStartOffsetMap) - 1 // 最后一行的索引（从0开始）
+		lastLineStart := ve.lineStartOffsetMap[lastLine]
+		lastLineLen := ve.lineLensMap[lastLine]
+		outOfRange := utils.Errorf("offset %d is out of range", offset)
+		if offset == len(ve.sourceCode) && lastLineLen == 0 {
+			// 特殊情况，最后一行无内容
+			return NewPosition(lastLine+1, 0), outOfRange
 		}
-		lineLength := ve.lineLensMap[line]
-		if offset < startOffset+lineLength+1 {
-			column := offset - startOffset
-			return NewPosition(line+1, column+1, offset), nil
+		return NewPosition(lastLine+1, utils.Min(offset-lastLineStart, lastLineLen)), outOfRange
+	}
+
+	// 使用二分查找定位行
+	low, high := 0, len(ve.lineStartOffsetMap)-1
+	for low <= high {
+		mid := low + (high-low)/2
+		startOffset := ve.lineStartOffsetMap[mid]
+
+		if startOffset == offset {
+			return NewPosition(mid+1, 0), nil
+		} else if startOffset < offset {
+			if mid == high || ve.lineStartOffsetMap[mid+1] > offset {
+				column := offset - startOffset
+				return NewPosition(mid+1, column), nil
+			}
+			low = mid + 1
+		} else {
+			high = mid - 1
 		}
 	}
-	return nil, errors.New("position not found")
+
+	// 理论上不应该执行到这里
+	return NewPosition(1, 0), errors.New("position not found")
 }
 
-// GetTextByRange 根据Range获取文本
-func (ve *MemEditor) GetTextByRange(r RangeIf) (string, error) {
-	startOffset := r.GetStart().GetOffset()
-	endOffset := r.GetEnd().GetOffset()
+// GetTextFromRangeWithError 根据Range获取文本，优先使用Offset，其次使用Line和Column
+func (ve *MemEditor) GetTextFromRangeWithError(r RangeIf) (string, error) {
+	start := r.GetStart()
+	end := r.GetEnd()
+
+	var startOffset, endOffset int
+	// 使用Line和Column计算Offset
+	var err error
+	startOffset, err = ve.GetOffsetByPositionWithError(start.GetLine(), start.GetColumn())
+	if err != nil {
+		return "", err
+	}
+	endOffset, err = ve.GetOffsetByPositionWithError(end.GetLine(), end.GetColumn())
+	if err != nil {
+		return "", err
+	}
+
 	if startOffset > endOffset {
 		return "", errors.New("start position is after end position")
 	}
 	return ve.Select(startOffset, endOffset)
 }
 
-// UpdateTextByRange 根据Range更新文本
+// UpdateTextByRange 根据Range更新文本，优先使用Offset，其次使用Line和Column
 func (ve *MemEditor) UpdateTextByRange(r RangeIf, newText string) error {
-	startOffset := r.GetStart().GetOffset()
-	endOffset := r.GetEnd().GetOffset()
+	start := r.GetStart()
+	end := r.GetEnd()
+
+	var startOffset, endOffset int
+	var err error
+	// 使用Line和Column计算Offset
+	startOffset, err = ve.GetOffsetByPositionWithError(start.GetLine(), start.GetColumn())
+	if err != nil {
+		return err // 如果计算偏移出错，返回错误
+	}
+	endOffset, err = ve.GetOffsetByPositionWithError(end.GetLine(), end.GetColumn())
+	if err != nil {
+		return err // 如果计算偏移出错，返回错误
+	}
+
+	// 检查偏移范围是否有效
 	if startOffset > endOffset {
 		return errors.New("start position is after end position")
 	}
+	if endOffset > len(ve.sourceCode) {
+		return errors.New("end offset is out of bounds")
+	}
 
-	before := ve.sourceCode[:startOffset]
-	after := ve.sourceCode[endOffset:]
-	ve.sourceCode = before + newText + after
+	// 使用安全的字符串分割方式防止越界
+	before := ve.sourceCode[:startOffset] // 取起始偏移之前的文本
+	after := ""                           // 默认后续文本为空
+	if endOffset < len(ve.sourceCode) {
+		after = ve.sourceCode[endOffset:] // 取结束偏移之后的文本
+	}
 
-	// Update the lineLensMap and lineStartOffsetMap
+	ve.sourceCode = before + newText + after // 构造新的源代码
+
+	// 更新行信息映射
 	ve.recalculateLineMappings()
-
 	return nil
 }
 
@@ -182,7 +254,126 @@ func (ve *MemEditor) recalculateLineMappings() {
 	for lineNumber, line := range lines {
 		lineLen := len(line)
 		ve.lineLensMap[lineNumber] = lineLen
-		ve.lineStartOffsetMap[lineNumber+1] = currentOffset + lineLen + 1
+		if lineNumber+1 < len(lines) {
+			ve.lineStartOffsetMap[lineNumber+1] = currentOffset + lineLen + 1
+		}
 		currentOffset += lineLen + 1
 	}
+}
+
+func (ve *MemEditor) GetTextFromOffset(offset1, offset2 int) string {
+	start, end := utils.Min(offset1, offset2), utils.Max(offset1, offset2)
+	if start < 0 {
+		start = 0
+	}
+	if end > len(ve.sourceCode) {
+		end = len(ve.sourceCode)
+	}
+	if end <= 0 {
+		end = 0
+	}
+	return ve.sourceCode[start:end]
+}
+
+func (ve *MemEditor) GetOffsetByPosition(p PositionIf) int {
+	return ve.GetOffsetByPositionRaw(p.GetLine(), p.GetColumn())
+}
+
+func (ve *MemEditor) GetTextFromPosition(p1, p2 PositionIf) string {
+	return ve.GetTextFromOffset(ve.GetOffsetByPositionRaw(p1.GetLine(), p1.GetColumn()), ve.GetOffsetByPositionRaw(p2.GetLine(), p2.GetColumn()))
+}
+
+func (ve *MemEditor) GetTextFromRange(i RangeIf) string {
+	return ve.GetTextFromPosition(i.GetEnd(), i.GetStart())
+}
+
+func (ve *MemEditor) IsOffsetValid(offset int) bool {
+	return offset >= 0 && offset <= len(ve.sourceCode)
+}
+
+func (ve *MemEditor) IsValidPosition(line, col int) bool {
+	if line < 1 || col < 0 {
+		return false
+	}
+	adjustedLine := line - 1
+	if adjustedLine >= len(ve.lineStartOffsetMap) {
+		return false
+	}
+	return col <= ve.lineLensMap[adjustedLine]
+}
+
+func (ve *MemEditor) FindStringRange(feature string, callback func(RangeIf) error) error {
+	startIndex := 0
+	for {
+		index := strings.Index(ve.sourceCode[startIndex:], feature)
+		if index == -1 {
+			break // No more matches found
+		}
+
+		absoluteIndex := startIndex + index
+		startPos, _ := ve.GetPositionByOffsetWithError(absoluteIndex)
+		endPos, _ := ve.GetPositionByOffsetWithError(absoluteIndex + len(feature))
+		err := callback(NewRange(startPos, endPos))
+		if err != nil {
+			return err // Return error if callback fails
+		}
+
+		startIndex = absoluteIndex + len(feature) // Move past this feature occurrence
+	}
+	return nil
+}
+
+func (ve *MemEditor) FindRegexpRange(patternStr string, callback func(RangeIf) error) error {
+	pattern, err := regexp.Compile(patternStr)
+	if err != nil {
+		return err // 处理正则表达式编译错误
+	}
+
+	text := ve.sourceCode
+	offset := 0 // 维护当前的搜索起点，逐步推进
+
+	for {
+		matches := pattern.FindStringIndex(text[offset:])
+		if matches == nil {
+			break // 如果没有找到匹配项，退出循环
+		}
+
+		// 调整matches的索引，使其相对于整个文本
+		matchStart := offset + matches[0]
+		matchEnd := offset + matches[1]
+
+		startPos, _ := ve.GetPositionByOffsetWithError(matchStart)
+		endPos, _ := ve.GetPositionByOffsetWithError(matchEnd)
+		err = callback(NewRange(startPos, endPos))
+		if err != nil {
+			return err // 如果回调函数出错，提前退出
+		}
+
+		offset = matchEnd // 更新搜索起点，推进到当前找到的匹配项之后
+	}
+
+	return nil
+}
+
+func (ve *MemEditor) GetContextAroundRange(startPos, endPos PositionIf, n int) (string, error) {
+	start := ve.GetOffsetByPosition(startPos)
+	end := ve.GetOffsetByPosition(endPos)
+	if start < 0 || end > len(ve.sourceCode) || start > end {
+		return "", errors.New("invalid range")
+	}
+
+	startLine, _ := ve.GetPositionByOffsetWithError(start)
+	endLine, _ := ve.GetPositionByOffsetWithError(end)
+
+	startContextLine := utils.Max(startLine.GetLine()-n, 1)
+	endContextLine := utils.Min(endLine.GetLine()+n, len(ve.lineStartOffsetMap))
+
+	var contextBuilder strings.Builder
+	for i := startContextLine; i <= endContextLine; i++ {
+		lineText, _ := ve.GetLine(i)
+		contextBuilder.WriteString(lineText)
+		contextBuilder.WriteString("\n")
+	}
+
+	return contextBuilder.String(), nil
 }
