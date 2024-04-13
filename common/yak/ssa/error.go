@@ -35,7 +35,7 @@ func (ec ErrorComment) Skip(pos *Range) bool {
 		return true
 	}
 	for _, line := range ec.ignorePos {
-		if int(pos.Start.Line) == line+1 {
+		if int(pos.GetStart().GetLine()) == line+1 {
 			return true
 		}
 	}

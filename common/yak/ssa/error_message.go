@@ -3,7 +3,7 @@ package ssa
 import "fmt"
 
 func BindingNotFound(v string, r *Range) string {
-	return fmt.Sprintf("The closure function expects to capture variable [%s], but it was not found at the calling location [%s--%s].", v, r.Start, r.End)
+	return fmt.Sprintf("The closure function expects to capture variable [%s], but it was not found at the calling location [%s--%s].", v, r.GetStart(), r.GetEnd())
 }
 func BindingNotFoundInCall(v string) string {
 	return fmt.Sprintf("The closure function expects to capture variable [%s], but it was not found at the call", v)
@@ -11,7 +11,7 @@ func BindingNotFoundInCall(v string) string {
 func FreeValueNotMember(variable, key string, r *Range) string {
 	return fmt.Sprintf(
 		"The FreeValue %s unable to access the member with name or index {%s} at the calling location [%s--%s].",
-		variable, key, r.Start, r.End,
+		variable, key, r.GetStart(), r.GetEnd(),
 	)
 }
 func FreeValueNotMemberInCall(variable, key string) string {
