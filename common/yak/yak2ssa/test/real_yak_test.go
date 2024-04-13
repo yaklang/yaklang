@@ -104,7 +104,7 @@ Rawfuzz = func(p, fuzzPayload) {
 				errs := prog.GetErrors()
 				require.Len(t, errs, 2)
 				err := errs[0]
-				require.Equal(t, "a.b", *err.Pos.SourceCode)
+				require.Equal(t, "a.b", err.Pos.GetText())
 			},
 		})
 	})
