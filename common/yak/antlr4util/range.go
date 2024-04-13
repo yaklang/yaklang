@@ -42,11 +42,10 @@ func GetRange(editor *memedit.MemEditor, token CanStartStopToken) *ssa.Range {
 		return nil
 	}
 
-	start := ssa.NewPosition(editor, int64(startToken.GetLine()), int64(startToken.GetColumn()))
+	start := ssa.NewPosition(int64(startToken.GetLine()), int64(startToken.GetColumn()))
 
 	endLine, endColumn := GetEndPosition(endToken)
-	end := ssa.NewPosition(editor, int64(endLine), int64(endColumn))
-
+	end := ssa.NewPosition(int64(endLine), int64(endColumn))
 	return ssa.NewRange(editor, start, end)
 }
 

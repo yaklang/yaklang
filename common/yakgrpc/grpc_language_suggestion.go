@@ -826,8 +826,8 @@ func GrpcRangeToPosition(r *ypb.Range) *ssa.Range {
 	e := memedit.NewMemEditor(r.GetCode())
 	return ssa.NewRange(
 		e,
-		ssa.NewPosition(e, r.StartLine, r.StartColumn-1),
-		ssa.NewPosition(e, r.EndLine, r.EndColumn-1),
+		ssa.NewPosition(r.StartLine, r.StartColumn-1),
+		ssa.NewPosition(r.EndLine, r.EndColumn-1),
 	)
 }
 

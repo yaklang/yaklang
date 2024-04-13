@@ -27,6 +27,8 @@ func (p *Range) GetEnd() memedit.PositionIf {
 }
 
 func NewRange(editor *memedit.MemEditor, start, end *Position) *Range {
+	start.Editor = editor
+	end.Editor = editor
 	return &Range{
 		editor: editor,
 		start:  start,
@@ -48,9 +50,8 @@ func (p *Position) GetColumn() int {
 	return int(p.Column)
 }
 
-func NewPosition(editor *memedit.MemEditor, line, column int64) *Position {
+func NewPosition(line, column int64) *Position {
 	return &Position{
-		Editor: editor,
 		Line:   line,
 		Column: column,
 	}
