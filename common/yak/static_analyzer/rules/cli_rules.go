@@ -257,7 +257,7 @@ func RuleCliParamName(prog *ssaapi.Program) *result.StaticAnalyzeResults {
 				rawParamName = unquoted
 			}
 			if _, ok := paramLineMap[paramName]; !ok {
-				paramLineMap[paramName] = int(v.GetRange().Start.Line)
+				paramLineMap[paramName] = int(v.GetRange().GetStart().GetLine())
 				if !utils.MatchAllOfRegexp(rawParamName, `^[a-zA-Z0-9_-]+$`) {
 					ret.NewError(ErrorStrInvalidParamName(rawParamName), firstField)
 				}
@@ -309,7 +309,7 @@ func RuleCliCheck(prog *ssaapi.Program) *result.StaticAnalyzeResults {
 		prog.Ref(funcName).GetUsers().Filter(func(v *ssaapi.Value) bool {
 			return v.IsCall() && v.IsReachable() != -1
 		}).ForEach(func(v *ssaapi.Value) {
-			startLine := v.GetRange().Start.Line
+			startLine := int64(v.GetRange().GetStart().GetLine())
 			if startLine > lastCallPosition {
 				lastCallPosition = startLine
 				lastCallName = funcName

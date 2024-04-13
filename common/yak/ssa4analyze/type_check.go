@@ -47,7 +47,7 @@ func (t *TypeCheck) CheckOnInstruction(inst ssa.Instruction) {
 				if len(vs) == 0 && v.GetOpcode() != ssa.SSAOpcodeCall {
 					// if `a()//return err` just ignore,
 					// but `a()[1] //return int,err` add handler
-					if *v.GetRange().SourceCode != "_" {
+					if v.GetRange().GetText() != "_" {
 						v.NewError(ssa.Error, TypeCheckTAG, ErrorUnhandled())
 					}
 				}

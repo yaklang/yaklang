@@ -2,42 +2,51 @@ package ssa
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
 type Range struct {
-	originSourceCodeHash string
-
-	SourceCode       *string
-	OriginSourceCode *string
-	Start, End       *Position
+	editor     *memedit.MemEditor
+	start, end *Position
 }
 
-func (r *Range) GetOriginSourceCodeHash() string {
-	if r.originSourceCodeHash == "" {
-		r.originSourceCodeHash = utils.CalcMd5(*r.OriginSourceCode)
-	}
-	return r.originSourceCodeHash
+func (p *Range) GetEditor() *memedit.MemEditor {
+	return p.editor
 }
 
-func NewRange(start, end *Position, source string, origin string) *Range {
+func (p *Range) GetStart() memedit.PositionIf {
+	return p.start
+}
+
+func (p *Range) GetEnd() memedit.PositionIf {
+	return p.end
+}
+
+func NewRange(editor *memedit.MemEditor, start, end *Position) *Range {
 	return &Range{
-		OriginSourceCode: &origin,
-		SourceCode:       &source,
-		Start:            start,
-		End:              end,
+		editor: editor,
+		start:  start,
+		end:    end,
 	}
 }
 
 type Position struct {
-	Offset int64
+	Editor *memedit.MemEditor
 	Line   int64
 	Column int64
 }
 
-func NewPosition(offset, line, column int64) *Position {
+func (p *Position) GetLine() int {
+	return int(p.Line)
+}
+
+func (p *Position) GetColumn() int {
+	return int(p.Column)
+}
+
+func NewPosition(editor *memedit.MemEditor, line, column int64) *Position {
 	return &Position{
-		Offset: offset,
+		Editor: editor,
 		Line:   line,
 		Column: column,
 	}
@@ -47,20 +56,28 @@ func NewPosition(offset, line, column int64) *Position {
 // if ret == 0: p = other
 // if ret >  0: p after other
 func (p *Range) CompareStart(other *Range) int {
-	return p.Start.Compare(other.Start)
+	return p.start.Compare(other.start)
 }
 func (p *Range) CompareEnd(other *Range) int {
-	return p.End.Compare(other.End)
+	return p.end.Compare(other.end)
 }
 
 func (p *Position) Compare(other *Position) int {
-	return int(p.Offset - other.Offset)
+	return int(p.Editor.GetOffsetByPosition(p) - p.Editor.GetOffsetByPosition(other))
+}
+
+func (p *Range) GetOffset() int {
+	return p.editor.GetOffsetByPosition(p.GetStart())
+}
+
+func (p *Range) GetText() string {
+	return p.editor.GetTextFromRange(p)
 }
 
 func (p *Range) String() string {
 	return fmt.Sprintf(
 		"%s - %s: %s",
-		p.Start, p.End, *p.SourceCode,
+		p.start, p.start, p.GetText(),
 	)
 }
 

@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -126,7 +127,7 @@ type Program struct {
 	// package list
 	Packages map[string]*Package
 
-	SourceCode string
+	Editor *memedit.MemEditor
 
 	Cache *Cache
 

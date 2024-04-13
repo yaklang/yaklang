@@ -408,10 +408,17 @@ func GetKeyString(key Value) string {
 	}
 
 	if text == "" {
-		if r := key.GetRange(); r != nil && r.SourceCode != nil {
-			list := strings.Split(*r.SourceCode, ".")
-			text = list[len(list)-1]
+		rawText := key.GetRange().GetText()
+		idx := strings.LastIndex(rawText, ".")
+		if idx != -1 {
+			text = rawText[idx+1:]
+		} else {
+			text = rawText
 		}
+		//if r := key.GetRange(); r != nil && r.SourceCode != nil {
+		//	list := strings.Split(*r.SourceCode, ".")
+		//	text = list[len(list)-1]
+		//}
 	}
 	return text
 }
