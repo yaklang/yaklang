@@ -1,7 +1,7 @@
 package antlr4util
 
 import (
-	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"strings"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
@@ -35,25 +35,19 @@ func GetEndPosition(t antlr.Token) (int, int) {
 	return line, column
 }
 
-var _fallbackStrPtr string
-
-func GetRange(originSourceCode string, token CanStartStopToken) *ssa.Range {
+func GetRange(editor *memedit.MemEditor, token CanStartStopToken) *ssa.Range {
 	startToken := token.GetStart()
 	endToken := token.GetStop()
 	if startToken == nil || endToken == nil {
 		return nil
 	}
 
-	start := ssa.NewPosition(int64(startToken.GetStart()), int64(startToken.GetLine()), int64(startToken.GetColumn()))
+	start := ssa.NewPosition(editor, int64(startToken.GetLine()), int64(startToken.GetColumn()))
 
 	endLine, endColumn := GetEndPosition(endToken)
-	end := ssa.NewPosition(int64(endToken.GetStop()), int64(endLine), int64(endColumn))
+	end := ssa.NewPosition(editor, int64(endLine), int64(endColumn))
 
-	if originSourceCode == "" && token.GetText() != "" {
-		log.Error("[BUG]: ssa.Range.OriginSourceCode is empty, fullback to token.GetText().")
-		originSourceCode = token.GetText()
-	}
-	return ssa.NewRange(start, end, token.GetText(), originSourceCode)
+	return ssa.NewRange(editor, start, end)
 }
 
 type Token struct {

@@ -61,7 +61,10 @@ func (v *Variable) SetDefRange(r *Range) {
 }
 
 func (v *Variable) AddRange(p *Range, force bool) {
-	if force || len(*p.SourceCode) == len(v.GetName()) {
+	//if force || len(*p.SourceCode) == len(v.GetName()) {
+	//	v.UseRange[p] = struct{}{}
+	//}
+	if force || len(p.GetText()) == len(v.GetName()) {
 		v.UseRange[p] = struct{}{}
 	}
 }

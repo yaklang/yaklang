@@ -105,10 +105,10 @@ func New(tag MarkerTag, severity MarkerSeverity, message string, v *ssaapi.Value
 	} else {
 		r := v.GetRange()
 		ret = &StaticAnalyzeResult{
-			StartLineNumber: r.Start.Line,
-			StartColumn:     r.Start.Column + 1,
-			EndLineNumber:   r.End.Line,
-			EndColumn:       r.End.Column + 1,
+			StartLineNumber: int64(r.GetStart().GetLine()),
+			StartColumn:     int64(r.GetStart().GetColumn()) + 1,
+			EndLineNumber:   int64(r.GetEnd().GetLine()),
+			EndColumn:       int64(r.GetEnd().GetColumn()) + 1,
 		}
 	}
 	ret.Message = message

@@ -9,16 +9,6 @@ import (
 )
 
 func fitRange(c *ssadb.IrCode, rangeIns *Range) {
-	c.SourceCodeHash = rangeIns.GetOriginSourceCodeHash()
-
-	if rangeIns.Start != nil {
-		c.SourceCodeStartLine = rangeIns.Start.Line
-		c.SourceCodeStartCol = rangeIns.Start.Column
-	}
-	if rangeIns.End != nil {
-		c.SourceCodeEndLine = rangeIns.End.Line
-		c.SourceCodeEndCol = rangeIns.End.Column
-	}
 }
 
 func FitIRCode(c *ssadb.IrCode, r Instruction) error {
@@ -124,14 +114,6 @@ func FitIRCode(c *ssadb.IrCode, r Instruction) error {
 			c.MaskedCodes = append(c.MaskedCodes, int64(m.GetId()))
 		}
 		c.IsMasked = v.Masked()
-	}
-
-	// source code
-	if r := r.GetRange(); r != nil {
-		c.SourceCodeStartLine = r.Start.Line
-		c.SourceCodeStartCol = r.Start.Column
-		c.SourceCodeEndLine = r.End.Line
-		c.SourceCodeEndCol = r.End.Column
 	}
 
 	// variable

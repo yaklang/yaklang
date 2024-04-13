@@ -355,9 +355,19 @@ func (ve *MemEditor) FindRegexpRange(patternStr string, callback func(RangeIf) e
 	return nil
 }
 
+func (ve *MemEditor) GetMinAndMaxOffset(pos ...PositionIf) (int, int) {
+	minOffset := len(ve.sourceCode)
+	maxOffset := 0
+	for _, p := range pos {
+		offset := ve.GetOffsetByPosition(p)
+		minOffset = utils.Min(minOffset, offset)
+		maxOffset = utils.Max(maxOffset, offset)
+	}
+	return minOffset, maxOffset
+}
+
 func (ve *MemEditor) GetContextAroundRange(startPos, endPos PositionIf, n int) (string, error) {
-	start := ve.GetOffsetByPosition(startPos)
-	end := ve.GetOffsetByPosition(endPos)
+	start, end := ve.GetMinAndMaxOffset(startPos, endPos)
 	if start < 0 || end > len(ve.sourceCode) || start > end {
 		return "", errors.New("invalid range")
 	}
@@ -376,4 +386,11 @@ func (ve *MemEditor) GetContextAroundRange(startPos, endPos PositionIf, n int) (
 	}
 
 	return contextBuilder.String(), nil
+}
+
+func (ve *MemEditor) GetTextFromRangeContext(i RangeIf, lineNum int) string {
+	startPos := i.GetStart()
+	endPos := i.GetEnd()
+	context, _ := ve.GetContextAroundRange(startPos, endPos, lineNum)
+	return context
 }

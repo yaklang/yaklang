@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"reflect"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -22,7 +23,7 @@ func (p *ParentScope) Create(scope *Scope) *ParentScope {
 type FunctionBuilder struct {
 	*Function
 
-	SourceCode string
+	Editor *memedit.MemEditor
 
 	// disable free-value
 	DisableFreeValue bool
@@ -54,9 +55,9 @@ type FunctionBuilder struct {
 	parentBuilder *FunctionBuilder
 }
 
-func NewBuilder(sourceCode string, f *Function, parent *FunctionBuilder) *FunctionBuilder {
+func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder) *FunctionBuilder {
 	b := &FunctionBuilder{
-		SourceCode:    sourceCode,
+		Editor:        editor,
 		Function:      f,
 		target:        &target{},
 		labels:        make(map[string]*BasicBlock),
@@ -100,7 +101,7 @@ func (b *FunctionBuilder) NewFunc(name string) *Function {
 
 // function stack
 func (b *FunctionBuilder) PushFunction(newFunc *Function) *FunctionBuilder {
-	build := NewBuilder(b.SourceCode, newFunc, b)
+	build := NewBuilder(b.Editor, newFunc, b)
 	// build.MarkedThisObject = b.MarkedThisObject
 	if this := b.MarkedThisObject; this != nil {
 		newParentScopeLevel := build.parentScope.scope

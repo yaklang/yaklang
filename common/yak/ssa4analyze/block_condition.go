@@ -1,6 +1,7 @@
 package ssa4analyze
 
 import (
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
@@ -105,14 +106,15 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 	}
 
 	fixupBlockPos := func(b *ssa.BasicBlock) *ssa.Range {
-		var start *ssa.Position
+		var start memedit.PositionIf
+		var end memedit.PositionIf
 		for _, inst := range b.Insts {
 			// inst.GetPosition == nil, this inst is edge
 			if ssa.IsControlInstruction(inst) && inst.GetRange() != nil {
 				continue
 			}
 			if pos := inst.GetRange(); pos != nil {
-				start = pos.Start
+				start = pos.GetStart()
 			}
 			break
 		}
@@ -121,14 +123,13 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 			return nil
 		}
 
-		var end *ssa.Position
 		for i := len(b.Insts) - 1; i >= 0; i-- {
 			inst := b.Insts[i]
 			if ssa.IsControlInstruction(inst) && inst.GetRange() != nil {
 				continue
 			}
 			if pos := inst.GetRange(); pos != nil {
-				end = pos.Start
+				end = pos.GetStart()
 			}
 			break
 		}
@@ -136,8 +137,12 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 			end = start
 		}
 
-		r := ssa.NewRange(start, end, "", "")
-		r.OriginSourceCode = b.GetFunc().GetRange().OriginSourceCode
+		editor := b.GetFunc().GetRange().GetEditor()
+		r := ssa.NewRange(
+			editor,
+			ssa.NewPosition(editor, int64(start.GetLine()), int64(start.GetColumn())),
+			ssa.NewPosition(editor, int64(end.GetLine()), int64(end.GetColumn())),
+		)
 		return r
 	}
 
