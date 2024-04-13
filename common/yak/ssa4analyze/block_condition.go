@@ -137,7 +137,13 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 			end = start
 		}
 
-		editor := b.GetFunc().GetRange().GetEditor()
+		var editor *memedit.MemEditor
+		for _, inst := range b.Insts {
+			if pos := inst.GetRange(); pos != nil {
+				editor = pos.GetEditor()
+				break
+			}
+		}
 		r := ssa.NewRange(
 			editor,
 			ssa.NewPosition(editor, int64(start.GetLine()), int64(start.GetColumn())),

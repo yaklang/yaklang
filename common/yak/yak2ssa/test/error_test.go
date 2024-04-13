@@ -2,6 +2,7 @@ package test
 
 import (
 	"errors"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"reflect"
 	"testing"
 
@@ -70,15 +71,16 @@ func TestUndefineError(t *testing.T) {
 	})
 
 	t.Run("undefine in closure", func(t *testing.T) {
-		test.CheckError(t, test.TestCase{
-			Code: `
+		code := `
 			a = () => {
 				b = xxx
 			}
 			a()
-			`,
+			`
+		test.CheckError(t, test.TestCase{
+			Code: code,
 			Want: []string{
-				ssa.BindingNotFound("xxx", ssa.NewRange(ssa.NewPosition(0, 5, 3), ssa.NewPosition(0, 5, 6), "")),
+				ssa.BindingNotFound("xxx", ssa.NewRange(memedit.NewMemEditor(code), ssa.NewPosition(0, 5, 3), ssa.NewPosition(0, 5, 6), "")),
 				ssa.BindingNotFoundInCall("xxx"),
 			},
 			ExternValue: map[string]any{},
