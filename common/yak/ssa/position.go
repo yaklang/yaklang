@@ -14,6 +14,10 @@ func (p *Range) GetEditor() *memedit.MemEditor {
 	return p.editor
 }
 
+func (p *Range) GetOffsetRange() (int, int) {
+	return p.editor.GetOffsetByPosition(p.start), p.editor.GetOffsetByPosition(p.end)
+}
+
 func (p *Range) GetStart() memedit.PositionIf {
 	return p.start
 }
