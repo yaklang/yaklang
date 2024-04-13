@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"sort"
 	"strings"
 
@@ -545,15 +546,15 @@ func sortValuesByPosition(values ssaapi.Values, position *ssa.Range) ssaapi.Valu
 		if position2 == nil {
 			return false
 		}
-		if position2.Start.Line > position.Start.Line {
+		if position2.GetStart().GetLine() > position.GetStart().GetLine() {
 			return false
 		}
 		return true
 	})
 	sort.SliceStable(values, func(i, j int) bool {
-		line1, line2 := values[i].GetRange().Start.Line, values[j].GetRange().Start.Line
+		line1, line2 := values[i].GetRange().GetStart().GetLine(), values[j].GetRange().GetStart().GetLine()
 		if line1 == line2 {
-			return values[i].GetRange().Start.Column > values[j].GetRange().Start.Column
+			return values[i].GetRange().GetStart().GetColumn() > values[j].GetRange().GetStart().GetColumn()
 		} else {
 			return line1 > line2
 		}
@@ -568,7 +569,7 @@ func getSSAParentValueByPosition(prog *ssaapi.Program, sourceCode string, positi
 		if position2 == nil {
 			return false
 		}
-		if position2.Start.Line > position.Start.Line {
+		if position2.GetStart().GetLine() > position.GetStart().GetLine() {
 			return false
 		}
 		return true
@@ -613,7 +614,8 @@ func trimSourceCode(sourceCode string) (string, bool) {
 func OnHover(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionRequest) (ret []*ypb.SuggestionDescription) {
 	ret = make([]*ypb.SuggestionDescription, 0)
 	position := GrpcRangeToPosition(req.GetRange())
-	word, _ := trimSourceCode(*position.SourceCode)
+	//word, _ := trimSourceCode(*position.SourceCode)
+	word, _ := trimSourceCode(position.GetText())
 	v := getSSAParentValueByPosition(prog, word, position)
 	// fallback
 	if v == nil {
@@ -633,7 +635,8 @@ func OnHover(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionRequest) (r
 func OnSignature(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionRequest) (ret []*ypb.SuggestionDescription) {
 	ret = make([]*ypb.SuggestionDescription, 0)
 	position := GrpcRangeToPosition(req.GetRange())
-	word, _ := trimSourceCode(*position.SourceCode)
+	//word, _ := trimSourceCode(*position.SourceCode)
+	word, _ := trimSourceCode(position.GetText())
 	v := getSSAParentValueByPosition(prog, word, position)
 	// fallback
 	if v == nil {
@@ -657,7 +660,7 @@ func OnSignature(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionRequest
 func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionRequest) (ret []*ypb.SuggestionDescription) {
 	ret = make([]*ypb.SuggestionDescription, 0)
 	position := GrpcRangeToPosition(req.GetRange())
-	word, containPoint := trimSourceCode(*position.SourceCode)
+	word, containPoint := trimSourceCode(position.GetText())
 	v := getSSAParentValueByPosition(prog, word, position)
 	if !containPoint {
 		// 库补全
@@ -680,10 +683,10 @@ func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionReques
 				if position2 == nil {
 					return false
 				}
-				line := position2.Start.Line
-				if line < position.Start.Line {
+				line := position2.GetStart().GetLine()
+				if line < position.GetStart().GetLine() {
 					return true
-				} else if line == position.Start.Line {
+				} else if line == position.GetStart().GetLine() {
 					return id != word
 				}
 				return false
@@ -767,7 +770,7 @@ func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionReques
 			if position2 == nil {
 				return false
 			}
-			return u.IsMember() && position2.Start.Line <= position.Start.Line
+			return u.IsMember() && position2.GetStart().GetLine() <= position.GetStart().GetLine()
 		}).ForEach(func(v *ssaapi.Value) {
 			key := v.GetOperand(1)
 			if _, ok := filterMap[key.String()]; ok {
@@ -820,10 +823,11 @@ func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionReques
 
 func GrpcRangeToPosition(r *ypb.Range) *ssa.Range {
 	// TODO: ypb.Range should have `Offset`
+	e := memedit.NewMemEditor(r.GetCode())
 	return ssa.NewRange(
-		ssa.NewPosition(0, r.StartLine, r.StartColumn-1),
-		ssa.NewPosition(0, r.EndLine, r.EndColumn-1),
-		r.Code, r.Code,
+		e,
+		ssa.NewPosition(e, r.StartLine, r.StartColumn-1),
+		ssa.NewPosition(e, r.EndLine, r.EndColumn-1),
 	)
 }
 
