@@ -1,6 +1,7 @@
 package ssa4analyze
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -144,10 +145,13 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 				break
 			}
 		}
+		if editor == nil {
+			log.Warnf("BUG: block has no position (in instrs)")
+		}
 		r := ssa.NewRange(
 			editor,
-			ssa.NewPosition(editor, int64(start.GetLine()), int64(start.GetColumn())),
-			ssa.NewPosition(editor, int64(end.GetLine()), int64(end.GetColumn())),
+			ssa.NewPosition(int64(start.GetLine()), int64(start.GetColumn())),
+			ssa.NewPosition(int64(end.GetLine()), int64(end.GetColumn())),
 		)
 		return r
 	}
