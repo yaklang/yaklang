@@ -431,7 +431,7 @@ func TestYaklangParameter(t *testing.T) {
 		test.Nil(err)
 		as := prog.Ref("a").ShowWithSource()
 		test.Equal(1, len(as))
-		test.Equal("a", *as[0].GetRange().SourceCode)
+		test.Equal("a", as[0].GetRange().GetText())
 	}
 	t.Run("test parameter used", func(t *testing.T) {
 		check(
