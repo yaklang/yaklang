@@ -3,12 +3,17 @@ package yakgrpc
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/jsonpath"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -18,23 +23,137 @@ import (
 )
 
 func TestOUTPUT_AiChat(t *testing.T) {
+	rspStrTmp := `data: {"id":"1","created":1,"model":"1","choices":[{"index":0,"delta":{"role":"assistant","content":"%s"}}]}
+`
+	headerStr, _, _ := lowhttp.FixHTTPResponse([]byte("HTTP/1.1 200 OK\nContent-Type: application/json\nTransfer-Encoding: chunked\nConnection: Keep-Alive\n\n"))
+
+	port := utils.GetRandomAvailableTCPPort()
+	l, err := tls.Listen("tcp", spew.Sprintf(":%d", port), utils.GetDefaultTLSConfig(3))
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		for {
+			conn, err := l.Accept()
+			if err != nil {
+				t.Fatal(err)
+			}
+			genMsg := func(s string) []byte {
+				msg := []byte(fmt.Sprintf(rspStrTmp, s))
+				return []byte(fmt.Sprintf("%x\r\n%s\r\n", len(msg), msg))
+			}
+			go func() {
+				utils.StableReader(conn, 1, 10240)
+				conn.Write(headerStr)
+				conn.Write(genMsg("你好"))
+				time.Sleep(time.Millisecond * 500)
+				conn.Write(genMsg("我是人工智障"))
+				time.Sleep(time.Millisecond * 500)
+				conn.Write(genMsg("助手"))
+				conn.Write(genMsg(""))
+				conn.Write([]byte("\r\n"))
+				conn.Close()
+			}()
+		}
+	}()
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
 	}
 	yaklib.InitYakit(yaklib.NewVirtualYakitClient(func(i *ypb.ExecResult) error {
-		println(string(i.Raw))
+		print(string(i.Raw))
 		return nil
 	}))
-	yaklib.AutoInitYakit()
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
+	utils.WaitConnect(addr, 3)
+	stream, err := client.AttachCombinedOutput(context.Background(), &ypb.AttachCombinedOutputRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	debugStreamTestResult := false
+	go func() {
+		for {
+			v, err := stream.Recv()
+			if err != nil {
+				return
+			}
+			if strings.Contains(string(v.Raw), "你好我是人工智障助手") {
+				debugStreamTestResult = true
+			}
+		}
+	}()
 	_, err = client.Exec(context.Background(), &ypb.ExecRequest{
 		NoDividedEngine: true,
-		Script:          `ai.Chat("你好",ai.debugStream(),ai.type("chatglm"))~`,
+		Script:          fmt.Sprintf(`ai.Chat("你好",ai.type("chatglm"),ai.debugStream(),ai.domain("%s"))~`, addr),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(3 * time.Second)
+	time.Sleep(time.Second * 3)
+	assert.Equal(t, true, debugStreamTestResult)
+}
+func TestOUTPUT_AiChatOutputByDefaultStream(t *testing.T) {
+	rspStrTmp := `data: {"id":"1","created":1,"model":"1","choices":[{"index":0,"delta":{"role":"assistant","content":"%s"}}]}
+`
+	headerStr, _, _ := lowhttp.FixHTTPResponse([]byte("HTTP/1.1 200 OK\nContent-Type: application/json\nTransfer-Encoding: chunked\nConnection: Keep-Alive\n\n"))
+
+	port := utils.GetRandomAvailableTCPPort()
+	l, err := tls.Listen("tcp", spew.Sprintf(":%d", port), utils.GetDefaultTLSConfig(3))
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		for {
+			conn, err := l.Accept()
+			if err != nil {
+				t.Fatal(err)
+			}
+			genMsg := func(s string) []byte {
+				msg := []byte(fmt.Sprintf(rspStrTmp, s))
+				return []byte(fmt.Sprintf("%x\r\n%s\r\n", len(msg), msg))
+			}
+			go func() {
+				utils.StableReader(conn, 1, 10240)
+				conn.Write(headerStr)
+				conn.Write(genMsg("你好"))
+				time.Sleep(time.Millisecond * 500)
+				conn.Write(genMsg("我是人工智障"))
+				time.Sleep(time.Millisecond * 500)
+				conn.Write(genMsg("助手"))
+				conn.Write(genMsg(""))
+				conn.Write([]byte("\r\n"))
+				conn.Close()
+			}()
+		}
+	}()
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	re := regexp.MustCompile(`\\"data\\":\\"(.+?)\\",\\"streamId`)
+	subMsgN := 0
+	msg := ""
+	yaklib.InitYakit(yaklib.NewVirtualYakitClient(func(i *ypb.ExecResult) error {
+		s := re.FindAllStringSubmatch(string(i.Message), -1)
+		if len(s) > 0 {
+			subMsgN++
+			msg += s[0][1]
+		}
+		print(string(i.Raw))
+		return nil
+	}))
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
+	utils.WaitConnect(addr, 3)
+	_, err = client.Exec(context.Background(), &ypb.ExecRequest{
+		NoDividedEngine: true,
+		Script:          fmt.Sprintf(`ai.Chat("你好",ai.type("chatglm"),ai.domain("%s"))~`, addr),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(time.Second * 3)
+	assert.Equal(t, true, subMsgN > 3)
+	assert.Contains(t, msg, "你好我是人工智障助手")
 }
 func TestOUTPUT_STREAMYakitStream(t *testing.T) {
 	client, err := NewLocalClient()
