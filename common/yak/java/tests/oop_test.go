@@ -383,7 +383,7 @@ public class Main{
 }
 		`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Function-org_example_A_A_getNum(make(A),0)",
+			"Function-org_example_A_A_getNum(make(A),0, binding(FreeValue-super))",
 		}, t)
 	})
 

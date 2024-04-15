@@ -46,7 +46,7 @@ func CheckAllJavaCode(code string, t *testing.T) {
 }
 
 func CreateJavaProgram(code string) string {
-	template := `package org.example;
+	template := `
 
 public class Main {
     public static void main(String[] args) {

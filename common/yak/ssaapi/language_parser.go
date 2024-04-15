@@ -64,7 +64,7 @@ func parse(c *config, prog *ssa.Program) (ret *ssa.Program, err error) {
 		return c.Build(s, c.ignoreSyntaxErr, fb)
 	}
 
-	builder := prog.GetAndCreateMainFunctionBuilder()
+	builder := prog.GetAndCreateFunctionBuilder("main", "main")
 	if builder.GetEditor() == nil {
 		builder.SetEditor(editor)
 	}
@@ -106,7 +106,7 @@ func parse(c *config, prog *ssa.Program) (ret *ssa.Program, err error) {
 }
 
 func feed(c *config, prog *ssa.Program, code string) {
-	builder := prog.GetAndCreateMainFunctionBuilder()
+	builder := prog.GetAndCreateFunctionBuilder("main", "main")
 	if err := c.Build(code, c.ignoreSyntaxErr, builder); err != nil {
 		return
 	}
