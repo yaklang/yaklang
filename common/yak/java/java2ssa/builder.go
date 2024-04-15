@@ -27,7 +27,7 @@ func Build(src string, force bool, b *ssa.FunctionBuilder) error {
 		ast:             ast,
 		constMap:        make(map[string]ssa.Value),
 	}
-	b.DisableFreeValue = true
+	b.SupportClosure = true
 	build.VisitCompilationUnit(ast)
 	if mainMain, ok := build.ReadClassConst("Main", "main"); ok {
 		b.EmitCall(b.NewCall(
