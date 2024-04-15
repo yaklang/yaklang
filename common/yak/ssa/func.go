@@ -13,7 +13,7 @@ func (p *Package) NewFunction(name string) *Function {
 
 func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function {
 	index := len(p.Funcs)
-	if index == 0 {
+	if index == 0 && name == "" {
 		name = "main"
 	}
 	if name == "" {

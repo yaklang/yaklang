@@ -24,22 +24,22 @@ func (prog *Program) GetProgramName() string {
 	return prog.Cache.ProgramName
 }
 
-func (prog *Program) GetAndCreateMainFunction() *Function {
-	pkg := prog.GetPackage("main")
+func (prog *Program) GetAndCreateFunction(pkgName string, funcName string) *Function {
+	pkg := prog.GetPackage(pkgName)
 	if pkg == nil {
-		pkg = NewPackage("main")
+		pkg = NewPackage(pkgName)
 		prog.AddPackage(pkg)
 	}
-	fun := pkg.GetFunction("main")
+	fun := pkg.GetFunction(funcName)
 	if fun == nil {
-		fun = pkg.NewFunction("main")
+		fun = pkg.NewFunction(funcName)
 	}
 	return fun
 }
 
 // create or get main function builder
-func (prog *Program) GetAndCreateMainFunctionBuilder() *FunctionBuilder {
-	fun := prog.GetAndCreateMainFunction()
+func (prog *Program) GetAndCreateFunctionBuilder(pkgName string, funcName string) *FunctionBuilder {
+	fun := prog.GetAndCreateFunction(pkgName, funcName)
 	builder := fun.builder
 	if builder == nil {
 		builder = NewBuilder(prog.GetCurrentEditor(), fun, nil)

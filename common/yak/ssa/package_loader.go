@@ -54,7 +54,7 @@ func (b *FunctionBuilder) BuildDirectoryPackage(name string, once bool) error {
 	return nil
 }
 
-func (b *FunctionBuilder) AddCurrentPackagePath(path []string) {
+func (b *FunctionBuilder) AddCurrentPackagePath(path []string) *FunctionBuilder {
 	p := b.GetProgram()
 	p.loader.AddPackagePath(path)
 
@@ -64,29 +64,14 @@ func (b *FunctionBuilder) AddCurrentPackagePath(path []string) {
 			p.AddPackage(NewPackage(pkgName))
 			p.packagePathList = append(p.packagePathList, path)
 		}
+		return p.GetAndCreateFunctionBuilder(pkgName, "init")
 	}
+	return nil
+
 }
 
 func (b *FunctionBuilder) GetCurrentPackagePath() []string {
 	p := b.GetProgram()
 	pkgPath := p.loader.GetPackagePath()
 	return pkgPath
-}
-
-func (b *FunctionBuilder) AddToPackage(funcName string) {
-	p := b.GetProgram()
-	pkgPath := p.loader.GetPackagePath()
-	pkgName := strings.Join(pkgPath, ".")
-	pkg := p.GetPackage(pkgName)
-	if pkg != nil {
-		fun := b.Function
-		if pkg.GetFunction(funcName) == nil {
-			pkg.Funcs[funcName] = fun
-		}
-
-		initFunc := pkg.GetFunction("init")
-		if initFunc == nil {
-			pkg.NewFunction("init")
-		}
-	}
 }
