@@ -185,8 +185,8 @@ func TestOOP_var_member(t *testing.T) {
 		$a->a = 1;
 		println($a->getA());
 		`, []string{
-			"Function-getA(make(A),0)",
-			"Function-getA(make(A),1)",
+			"Function-getA(make(A)) member[0]",
+			"Function-getA(make(A)) member[1]",
 		}, t)
 	})
 
@@ -207,8 +207,8 @@ func TestOOP_var_member(t *testing.T) {
 		$a->setA(1);
 		println($a->getA());
 		`, []string{
-			"Function-getA(make(A),0)",
-			"Function-getA(make(A),side-effect(Parameter-$par, $this.a))",
+			"Function-getA(make(A)) member[0]",
+			"Function-getA(make(A)) member[side-effect(Parameter-$par, $this.a)]",
 		}, t)
 	})
 }
@@ -269,8 +269,8 @@ func TestOOP_Extend_Class(t *testing.T) {
 		$a->a = 1;
 		println($a->getA());
 		`, []string{
-			"Function-getA(make(A),0)",
-			"Function-getA(make(A),1)",
+			"Function-getA(make(A)) member[0]",
+			"Function-getA(make(A)) member[1]",
 		}, t)
 	})
 
@@ -292,8 +292,8 @@ func TestOOP_Extend_Class(t *testing.T) {
 		$a->setA(1);
 		println($a->getA());
 		`, []string{
-			"Function-getA(make(A),0)",
-			"Function-getA(make(A),side-effect(Parameter-$par, $this.a))",
+			"Function-getA(make(A)) member[0]",
+			"Function-getA(make(A)) member[side-effect(Parameter-$par, $this.a)]",
 		}, t)
 	})
 }
@@ -311,7 +311,7 @@ func TestParseCLS_Construct(t *testing.T) {
 		println($a->getNum());
 		`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Function-getNum(make(A),0)",
+			"Function-getNum(make(A)) member[0]",
 		}, t)
 	})
 
@@ -329,7 +329,7 @@ class A {
 $a = new A(1);
 println($a->getNum());`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Function-getNum(make(A),side-effect(Parameter-$num, $this.num))",
+			"Function-getNum(make(A)) member[side-effect(Parameter-$num, $this.num)]",
 		}, t)
 	})
 }

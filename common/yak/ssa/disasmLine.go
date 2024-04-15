@@ -139,6 +139,8 @@ func lineDisasm(v Instruction, liner DisasmLiner) (ret string) {
 	}()
 
 	switch v := v.(type) {
+	case *ParameterMember:
+		return fmt.Sprintf("%s-%s", SSAOpcode2Name[v.GetOpcode()], v.String())
 	case *Parameter:
 		return fmt.Sprintf("%s-%s", SSAOpcode2Name[v.GetOpcode()], v.GetName())
 	case *Function, *BasicBlock, *ExternLib:
@@ -169,13 +171,17 @@ func lineDisasm(v Instruction, liner DisasmLiner) (ret string) {
 		}
 		binding := ""
 		if len(v.Binding) != 0 {
-			binding = ", binding(" + DisasmValues(
+			binding = " binding[" + DisasmValues(
 				lo.MapToSlice(
 					v.Binding,
 					func(key string, item Value) Value { return item }),
-			) + ")"
+			) + "]"
 		}
-		return fmt.Sprintf("%s(%s%s)", liner.DisasmValue(v.Method), arg, binding)
+		member := ""
+		if len(v.ArgMember) != 0 {
+			member = " member[" + DisasmValues(v.ArgMember) + "]"
+		}
+		return fmt.Sprintf("%s(%s)%s%s", liner.DisasmValue(v.Method), arg, binding, member)
 	case *SideEffect:
 		return fmt.Sprintf("side-effect(%s, %s)", liner.DisasmValue(v.Value), v.GetVerboseName())
 	case *Make:

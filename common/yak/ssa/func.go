@@ -26,7 +26,6 @@ func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function
 		anValue:             NewValue(),
 		Package:             p,
 		Param:               make([]*Parameter, 0),
-		paramMap:            make(map[Value]int),
 		hasEllipsis:         false,
 		Blocks:              make([]*BasicBlock, 0),
 		EnterBlock:          nil,
@@ -92,9 +91,17 @@ func (f *FunctionBuilder) NewParam(name string) *Parameter {
 	return p
 }
 
+func (f *FunctionBuilder) NewParameterMember(name string, obj *Parameter, key Value) *ParameterMember {
+	new := &ParameterMember{
+		Parameter:       NewParam(name, false, f),
+		parameterMember: newParameterMember(obj, key),
+	}
+	f.ParameterMember = append(f.ParameterMember, new)
+	return new
+}
+
 func (f *FunctionBuilder) appendParam(p *Parameter) {
 	f.Param = append(f.Param, p)
-	f.paramMap[p] = len(f.Param) - 1
 	p.FormalParameterIndex = len(f.Param) - 1
 	p.IsFreeValue = false
 	variable := f.CreateVariable(p.GetName())

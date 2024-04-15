@@ -50,8 +50,6 @@ func (t *TypeInference) InferenceOnInstruction(inst ssa.Instruction) {
 	case *ssa.UnOp:
 	case *ssa.BinOp:
 		t.TypeInferenceBinOp(inst)
-	case *ssa.Call:
-		t.TypeInferenceCall(inst)
 	}
 }
 
@@ -159,44 +157,5 @@ func (t *TypeInference) TypeInferenceBinOp(bin *ssa.BinOp) {
 	} else {
 		bin.SetType(retTyp)
 		return
-	}
-}
-
-func (t *TypeInference) TypeInferenceCall(c *ssa.Call) {
-
-	// get function type
-	funcTyp, ok := ssa.ToFunctionType(c.Method.GetType())
-	if !ok {
-		return
-	}
-
-	// handle FreeValue
-	if len(funcTyp.FreeValue) != 0 {
-		c.HandleFreeValue(funcTyp.FreeValue)
-	}
-
-	// handle ellipsis, unpack argument
-	if c.IsEllipsis {
-		// getField := func(object ssa.User, key ssa.Value) *ssa.Field {
-		// 	var f *ssa.Field
-		// 	if f = ssa.GetField(object, key); f == nil {
-		// 		f = ssa.NewFieldOnly(key, object, c.Block)
-		// 		ssa.EmitBefore(c, f)
-		// 	}
-		// 	return f
-		// }
-		// obj := c.Args[len(c.Args)-1].(ssa.User)
-		// num := len(ssa.GetFields(obj))
-		// if t, ok := obj.GetType().(*ssa.ObjectType); ok {
-		// 	if t.Kind == ssa.Slice {
-		// 		num = len(t.Key)
-		// 	}
-		// }
-
-		// // fields := ssa.GetFields(obj)
-		// c.Args[len(c.Args)-1] = getField(obj, ssa.NewConst(0))
-		// for i := 1; i < num; i++ {
-		// 	c.Args = append(c.Args, getField(obj, ssa.NewConst(i)))
-		// }
 	}
 }

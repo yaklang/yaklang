@@ -21,6 +21,7 @@ const (
 	SSAOpcodePanic
 	SSAOpcodeParameter
 	SSAOpcodeFreeValue
+	SSAOpcodeParameterMember
 	SSAOpcodePhi
 	SSAOpcodeRecover
 	SSAOpcodeReturn
@@ -34,35 +35,37 @@ const (
 )
 
 var SSAOpcode2Name = map[Opcode]string{
-	SSAOpcodeAssert:       "Assert",
-	SSAOpcodeBasicBlock:   "BasicBlock",
-	SSAOpcodeBinOp:        "BinOp",
-	SSAOpcodeCall:         "Call",
-	SSAOpcodeConstInst:    "ConstInst",
-	SSAOpcodeErrorHandler: "ErrorHandler",
-	SSAOpcodeExternLib:    "ExternLib",
-	SSAOpcodeIf:           "If",
-	SSAOpcodeJump:         "Jump",
-	SSAOpcodeLoop:         "Loop",
-	SSAOpcodeMake:         "Make",
-	SSAOpcodeNext:         "Next",
-	SSAOpcodePanic:        "Panic",
-	SSAOpcodeParameter:    "Parameter",
-	SSAOpcodeFreeValue:    "FreeValue",
-	SSAOpcodePhi:          "Phi",
-	SSAOpcodeRecover:      "Recover",
-	SSAOpcodeReturn:       "Return",
-	SSAOpcodeSideEffect:   "SideEffect",
-	SSAOpcodeSwitch:       "Switch",
-	SSAOpcodeTypeCast:     "TypeCast",
-	SSAOpcodeTypeValue:    "TypeValue",
-	SSAOpcodeUnOp:         "UnOp",
-	SSAOpcodeUndefined:    "Undefined",
-	SSAOpcodeFunction:     "Function",
+	SSAOpcodeAssert:          "Assert",
+	SSAOpcodeBasicBlock:      "BasicBlock",
+	SSAOpcodeBinOp:           "BinOp",
+	SSAOpcodeCall:            "Call",
+	SSAOpcodeConstInst:       "ConstInst",
+	SSAOpcodeErrorHandler:    "ErrorHandler",
+	SSAOpcodeExternLib:       "ExternLib",
+	SSAOpcodeIf:              "If",
+	SSAOpcodeJump:            "Jump",
+	SSAOpcodeLoop:            "Loop",
+	SSAOpcodeMake:            "Make",
+	SSAOpcodeNext:            "Next",
+	SSAOpcodePanic:           "Panic",
+	SSAOpcodeParameter:       "Parameter",
+	SSAOpcodeFreeValue:       "FreeValue",
+	SSAOpcodeParameterMember: "ParameterMember",
+	SSAOpcodePhi:             "Phi",
+	SSAOpcodeRecover:         "Recover",
+	SSAOpcodeReturn:          "Return",
+	SSAOpcodeSideEffect:      "SideEffect",
+	SSAOpcodeSwitch:          "Switch",
+	SSAOpcodeTypeCast:        "TypeCast",
+	SSAOpcodeTypeValue:       "TypeValue",
+	SSAOpcodeUnOp:            "UnOp",
+	SSAOpcodeUndefined:       "Undefined",
+	SSAOpcodeFunction:        "Function",
 }
 
-func (i *Function) GetOpcode() Opcode   { return SSAOpcodeFunction }
-func (i *BasicBlock) GetOpcode() Opcode { return SSAOpcodeBasicBlock }
+func (i *Function) GetOpcode() Opcode        { return SSAOpcodeFunction }
+func (i *BasicBlock) GetOpcode() Opcode      { return SSAOpcodeBasicBlock }
+func (i *ParameterMember) GetOpcode() Opcode { return SSAOpcodeParameter }
 func (i *Parameter) GetOpcode() Opcode {
 	if i.IsFreeValue {
 		return SSAOpcodeFreeValue
