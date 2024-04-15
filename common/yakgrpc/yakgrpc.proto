@@ -1872,6 +1872,7 @@ message YaklangLanguageSuggestionRequest {
   string YakScriptType = 2;
   string YakScriptCode = 3;
   Range Range = 4;
+  string ModelID = 5;
 }
 
 
