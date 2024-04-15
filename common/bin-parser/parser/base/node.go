@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"gopkg.in/yaml.v2"
 	"strconv"
 	"strings"
@@ -65,18 +66,18 @@ func (n *NodeValue) Children() []*NodeValue {
 }
 
 type BaseKV struct {
-	data map[string]any
+	data *omap.OrderedMap[string, any]
 }
 
 func (c *BaseKV) DeleteItem(k string) {
-	delete(c.data, k)
+	c.data.Delete(k)
 }
 
 func (c *BaseKV) SetItem(k string, v any) {
-	c.data[k] = v
+	c.data.Set(k, v)
 }
 func (c *BaseKV) GetString(k string) string {
-	v, ok := c.data[k]
+	v, ok := c.data.Get(k)
 	if ok {
 		if v1, ok := v.(string); ok {
 			return v1
@@ -85,14 +86,15 @@ func (c *BaseKV) GetString(k string) string {
 	return ""
 }
 func (c *BaseKV) GetItem(k string) any {
-	return c.data[k]
+	v, _ := c.data.Get(k)
+	return v
 }
 func (c *BaseKV) Has(k string) bool {
-	_, ok := c.data[k]
+	_, ok := c.data.Get(k)
 	return ok
 }
 func (c *BaseKV) ConvertUint64(k string) uint64 {
-	v, ok := c.data[k]
+	v, ok := c.data.Get(k)
 	if ok {
 		v, err := strconv.ParseUint(utils.InterfaceToString(v), 10, 64)
 		if err != nil {
@@ -103,7 +105,7 @@ func (c *BaseKV) ConvertUint64(k string) uint64 {
 	return 0
 }
 func (c *BaseKV) GetUint64(k string) uint64 {
-	v, ok := c.data[k]
+	v, ok := c.data.Get(k)
 	if ok {
 		v1, ok := InterfaceToUint64(v)
 		if ok {
@@ -113,7 +115,7 @@ func (c *BaseKV) GetUint64(k string) uint64 {
 	return 0
 }
 func (c *BaseKV) GetBool(k string) bool {
-	v, ok := c.data[k]
+	v, ok := c.data.Get(k)
 	if ok {
 		if v1, ok := v.(bool); ok {
 			return v1
@@ -129,7 +131,7 @@ type Config struct {
 func NewEmptyConfig() *Config {
 	return &Config{
 		BaseKV: BaseKV{
-			make(map[string]any),
+			omap.NewEmptyOrderedMap[string, any](),
 		},
 	}
 }
@@ -139,11 +141,11 @@ func (c *Config) SetItem(k string, v any) {
 		newOptions := append(c.GetItem(CfgOptionFuns).([]NodeConfigFun), func(config *Config) {
 			config.SetItem(k, v)
 		})
-		c.data[CfgOptionFuns] = newOptions
+		c.data.Set(CfgOptionFuns, newOptions)
 	} else {
-		c.data[CfgOptionFuns] = []NodeConfigFun{func(config *Config) {
+		c.data.Set(CfgOptionFuns, []NodeConfigFun{func(config *Config) {
 			config.SetItem(k, v)
-		}}
+		}})
 	}
 }
 func AppendConfig(parent, config *Config) *Config {
@@ -157,15 +159,16 @@ func AppendConfig(parent, config *Config) *Config {
 }
 func CopyConfig(config *Config) *Config {
 	res := NewEmptyConfig()
-	for k, v := range config.data {
+	config.data.ForEach(func(k string, v any) bool {
 		res.SetItem(k, v)
-	}
+		return true
+	})
 	return res
 }
 func NewConfig(config *Config) *Config {
 	res := &Config{
 		BaseKV: BaseKV{
-			make(map[string]any),
+			omap.NewEmptyOrderedMap[string, any](),
 		},
 	}
 	copeFields := []string{"endian", "parser", "unit"}
@@ -356,14 +359,14 @@ func (n *Node) AppendNode(node *Node) error {
 func NewNodeTree(d yaml.MapSlice) (*Node, error) {
 	defaultConfig := &Config{
 		BaseKV: BaseKV{
-			make(map[string]any),
+			omap.NewEmptyOrderedMap[string, any](),
 		},
 	}
 	defaultConfig.SetItem("endian", "big")
 	defaultConfig.SetItem("parser", "default")
 	ctx := &NodeContext{
 		BaseKV: BaseKV{
-			make(map[string]any),
+			omap.NewEmptyOrderedMap[string, any](),
 		},
 	}
 	root, err := newNodeTree(defaultConfig, "root", d, ctx)
