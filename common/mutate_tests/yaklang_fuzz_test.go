@@ -712,9 +712,9 @@ Host: www.baidu.com
 
 123456
 `,
-				code: `.FuzzPath("/%24/$")`,
+				code: `.FuzzPath("/%24/$/%u002e")`,
 				expectKeywordInOutputPacket: []string{
-					`/$/$?a=ab`,
+					`/%24/$/%u002e?a=ab`,
 					`b=aa==`,
 				},
 				debug:         true,
@@ -748,9 +748,7 @@ Host: www.baidu.com
 `,
 				code: `.FuzzPath("/%25/你好")`,
 				expectKeywordInOutputPacket: []string{
-					`/%25/`,
-					codec.PathEscape("你好"), // 这个地方应该是编码后的值么?
-					`a=ab&b=aa==`,
+					`/%25/你好?a=ab&b=aa==`,
 				},
 				debug:         true,
 				disableEncode: true,
