@@ -98,6 +98,20 @@ func TestPPPMessage(t *testing.T) {
 	assert.Equal(t, "ff03c0230100000e04697869610469786961", codec.EncodeToHex(NodeToBytes(res)))
 }
 
+func TestEth(t *testing.T) {
+	for i := 0; i < 10; i++ {
+		packet := `00155df59df200155dd319dd080045000032322d4000402fe24cc0a8d4d0c0a8d0013081880b000e1d900000000100000000ff03c0210200000a050666537835`
+		payload, err := codec.DecodeHex(packet)
+		if err != nil {
+			t.Fatal(err)
+		}
+		reader := bytes.NewReader(payload)
+		res, err := parser.ParseBinary(reader, "ethernet")
+
+		DumpNode(res)
+	}
+}
+
 func TestGRE_PPP_Message(t *testing.T) {
 	data := `3081880b001610000000000100000004ff03c021010100120104057805061ab411c107020802`
 	payload, err := codec.DecodeHex(data)
