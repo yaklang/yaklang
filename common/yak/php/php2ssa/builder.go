@@ -23,7 +23,7 @@ func Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	if err != nil {
 		return err
 	}
-	b.DisableFreeValue = true
+	b.SupportClosure = true
 	build := builder{
 		constMap:        make(map[string]ssa.Value),
 		FunctionBuilder: b,
