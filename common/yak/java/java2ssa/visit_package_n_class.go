@@ -529,7 +529,7 @@ func (y *builder) VisitMethodDeclaration(raw javaparser.IMethodDeclarationContex
 			y.SetType(y.VisitTypeTypeOrVoid(i.TypeTypeOrVoid()))
 			y.Finish()
 			y.FunctionBuilder = y.PopFunction()
-			y.AddToPackage(funcName)
+			//y.AddToPackage(funcName)
 		}
 
 		y.AssignClassConst(class.Name, key, newFunction)
@@ -550,7 +550,7 @@ func (y *builder) VisitMethodDeclaration(raw javaparser.IMethodDeclarationContex
 		y.VisitMethodBody(i.MethodBody())
 		y.Finish()
 		y.FunctionBuilder = y.PopFunction()
-		y.AddToPackage(funcName)
+		//y.AddToPackage(funcName)
 	}
 
 	if i.THROWS() != nil {
@@ -757,7 +757,6 @@ func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclara
 			y.VisitFormalParameters(i.FormalParameters())
 			y.VisitBlock(i.Block())
 			y.Finish()
-			y.AddToPackage(funcName)
 		}
 		y.FunctionBuilder = y.PopFunction()
 		return newFunction
