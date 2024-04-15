@@ -33,9 +33,10 @@ type PPTPAuth struct {
 	RMac []byte
 	LMac []byte
 
-	SNumber int
-	ctx     context.Context
-	cancel  context.CancelFunc
+	AckNumber int
+	SNumber   int
+	ctx       context.Context
+	cancel    context.CancelFunc
 }
 
 func GetDefaultPPTPAuth() *PPTPAuth {
@@ -95,7 +96,7 @@ func GetOutgoingCallReq() map[string]any {
 
 func (pptp *PPTPAuth) GetSetLinkInfo() map[string]any {
 	return map[string]any{
-		"Length":             168,
+		"Length":             24,
 		"MessageType":        1,
 		"MagicCookie":        0x1a2b3c4d,
 		"ControlMessageType": 15,
@@ -153,22 +154,22 @@ func (pptp *PPTPAuth) Auth() (error, bool) {
 			}
 		case uint16(8):
 			pptp.PNSCallID = messageMap["Message"].(map[string]any)["Outgoing Call Reply"].(map[string]any)["CallId"].(uint16)
-			setInfo, err := parser.GenerateBinary(pptp.GetSetLinkInfo(), "application-layer.pptp", "PPTP")
-			if err != nil {
-				return err, false
-			}
-			_, err = conn.Write(binparser.NodeToBytes(setInfo))
-			if err != nil {
-				return err, false
-			}
 
 			go func() {
 				for {
 					select {
 					case <-pptp.ctx.Done():
 					default:
-						time.Sleep(1)
-						conn.Read(make([]byte, 1024))
+						setInfo, err := parser.GenerateBinary(pptp.GetSetLinkInfo(), "application-layer.pptp", "PPTP")
+						if err != nil {
+							log.Error(err)
+						}
+						_, err = conn.Write(binparser.NodeToBytes(setInfo))
+						if err != nil {
+							log.Error(err)
+							return
+						}
+						time.Sleep(7 * time.Second)
 					}
 				}
 			}()
@@ -224,38 +225,43 @@ func (pptp *PPTPAuth) Tunnel() (error, bool) {
 				}()
 			}),
 			pcaputil.WithEveryPacket(func(packet gopacket.Packet) {
-				go func(itemPacket gopacket.Packet) {
-					node, err := parser.ParseBinary(bytes.NewReader(packet.Data()), "ethernet")
-					if err != nil {
-						log.Error(err)
-						errorCh <- err
-						return
-					}
-					respMap, err := pptp.ProcessGre(base.GetNodeByPath(node, "@Ethernet.Payload.IP.Payload.GRE"))
-					if err != nil {
-						log.Error(err)
-						errorCh <- err
-						return
-					}
+				packetData := bytes.Clone(packet.Data())
+				packetReader := bytes.NewReader(packetData)
+				node, err := parser.ParseBinary(packetReader, "ethernet")
+				if err != nil {
+					log.Error(err)
+					errorCh <- err
+					return
+				}
 
-					if respMap == nil {
-						log.Infof("not need send resp")
-						return
-					}
+				GREnode := base.GetNodeByPath(node, "@Ethernet.Payload.IP.Payload.GRE")
+				if GREnode == nil {
+					log.Error("GRE node is nil")
+					return
+				}
+				respMap, err := pptp.ProcessGre(GREnode)
+				if err != nil {
+					log.Error(err)
+					errorCh <- err
+					return
+				}
 
-					sendPacket, err := pptp.getSendPacket(respMap)
-					if err != nil {
-						log.Error(err)
-						errorCh <- err
-						return
-					}
-					if sendPacket == nil {
-						log.Error("send packet is nil")
-						return
-					}
+				if respMap == nil {
+					log.Infof("not need send resp")
+					return
+				}
 
-					sendPacketCh <- sendPacket
-				}(packet)
+				sendPacket, err := pptp.getSendPacket(respMap)
+				if err != nil {
+					log.Error(err)
+					errorCh <- err
+					return
+				}
+				if sendPacket == nil {
+					log.Error("send packet is nil")
+					return
+				}
+				sendPacketCh <- sendPacket
 			}),
 		)
 		if err != nil {
@@ -344,13 +350,14 @@ func (pptp *PPTPAuth) encapsulateGRE(payload map[string]any) (map[string]any, er
 	}
 	payloadByte := binparser.NodeToBytes(res)
 	snumber := pptp.SNumber
-	pptp.SNumber++
+	pptp.SNumber = snumber + 2
 	return map[string]any{
-		"Flags And Version": 0x3001,
-		"Protocol Type":     0x880b,
-		"Payload Length":    len(payloadByte),
-		"Call ID":           pptp.PNSCallID,
-		"Sequence Number":   snumber,
+		"Flags And Version":     0x3081,
+		"Protocol Type":         0x880b,
+		"Payload Length":        len(payloadByte),
+		"Call ID":               pptp.PNSCallID,
+		"Sequence Number":       snumber,
+		"Acknowledgment Number": pptp.AckNumber,
 		"Payload": map[string]any{
 			"PPP": payloadByte,
 		},
@@ -367,7 +374,17 @@ func (pptp *PPTPAuth) ProcessGre(messageNode *base.Node) (map[string]any, error)
 	if messageMap["Call ID"].(uint16) != pptp.PASCallID {
 		return nil, nil
 	}
+
+	snumber, ok := messageMap["Optional"].(map[string]any)["Sequence Number"]
+	if ok {
+		pptp.AckNumber = int(snumber.(uint32))
+	}
+
 	pppNode := base.GetNodeByPath(messageNode, "@GRE.Payload.PPP")
+	if pppNode == nil {
+		log.Infof("not ppp gre message")
+		return nil, nil
+	}
 	pppParamMap, err := pptp.ppp.ProcessMessage(pppNode)
 	if err != nil || pppParamMap == nil {
 		return nil, err
@@ -380,7 +397,7 @@ func getDefaultIPV4Header() map[string]any {
 		"Version":                   4,
 		"Header Length":             5,
 		"Type of Service":           byte(0),
-		"Identification":            []byte{0x40, 0xb3},
+		"Identification":            []byte{0x00, 0x00},
 		"Flags And Fragment Offset": []byte{0x00, 0x00},
 		"Time to Live":              0x80,
 	}
@@ -416,11 +433,11 @@ func (pptp *PPTPAuth) encapsulateIPEthernet(payload map[string]any) (map[string]
 	}
 	payloadByte := binparser.NodeToBytes(res)
 	totalLength := uint16(20 + len(payloadByte))
-	//checkSum := ipChecksum(totalLength, 0x2f, pptp.LAddrByte, pptp.RAddrByte)
+	checkSum := ipChecksum(totalLength, 0x2f, pptp.LAddrByte, pptp.RAddrByte)
 
 	ipMap := getDefaultIPV4Header()
 	ipMap["Total Length"] = totalLength
-	ipMap["Header Checksum"] = 0x0
+	ipMap["Header Checksum"] = checkSum
 	ipMap["Protocol"] = 0x2f
 	ipMap["Source"] = pptp.LAddrByte
 	ipMap["Destination"] = pptp.RAddrByte

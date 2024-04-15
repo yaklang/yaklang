@@ -2,8 +2,10 @@ package ppp
 
 import (
 	"bytes"
+	"github.com/davecgh/go-spew/spew"
 	binparser "github.com/yaklang/yaklang/common/bin-parser"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
+	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -13,12 +15,12 @@ var (
 	LCPTypeNak         uint8 = 0x3
 	LCPTypeRej         uint8 = 0x4
 	CHAP_MD5                 = []byte{0xc2, 0x23, 0x05}
-	MS_CHAP_V2               = []byte{0xc2, 0x23, 0x80}
+	MS_CHAP_V2               = []byte{0xc2, 0x23, 0x81}
 	PAP                      = []byte{0xc0, 0x23}
 	SupportAuthTypeMap       = map[string][]byte{
-		"CHAP":     {0xc2, 0x23, 0x05},
-		"MSCHAPV2": {0xc2, 0x23, 0x80},
-		"PAP":      {0xc0, 0x23},
+		"CHAP":     CHAP_MD5,
+		"MSCHAPV2": MS_CHAP_V2,
+		"PAP":      PAP,
 	}
 )
 
@@ -96,14 +98,15 @@ func (p *PPPAuth) GetLCPConfigReqParams(id int) map[string]any {
 	return map[string]any{ // just negotiate Auth Type
 		"Code":       1,
 		"Identifier": id,
-		"Length":     12 + len(p.AuthTypeCode),
+		//"Length":     12 + len(p.AuthTypeCode),
+		"Length": 10,
 		"Info": map[string]any{
 			"Options": []map[string]any{
-				{
-					"Type":   3,
-					"Length": len(p.AuthTypeCode) + 2,
-					"Data":   p.AuthTypeCode,
-				},
+				//{
+				//	"Type":   3,
+				//	"Length": len(p.AuthTypeCode) + 2,
+				//	"Data":   p.AuthTypeCode,
+				//},
 				{
 					"Type":   5,
 					"Length": 6,
@@ -136,7 +139,7 @@ func (p *PPPAuth) ProcessMessage(messageNode *base.Node) (map[string]any, error)
 		res, err = p.ProcessCHAPMessage(base.GetNodeByPath(messageNode, "Information.CHAP"))
 		resultParams["CHAP"] = res
 	}
-	if len(resultParams) == 0 {
+	if funk.IsEmpty(res) {
 		return nil, err
 	}
 	resultParams["Address"] = 0xff
@@ -151,10 +154,15 @@ func (p *PPPAuth) ProcessLCPMessage(messageNode *base.Node) (map[string]any, err
 	}
 	messageMap := binparser.NodeToMap(messageNode).(map[string]any)
 	lcpType := messageMap["Code"].(uint8)
+	if lcpType > 0x4 {
+		return nil, nil
+	}
 	if lcpType == LCPTypeAck { // ack
 		return nil, nil
 	}
 	lcpId := messageMap["Identifier"].(uint8)
+
+	spew.Dump(messageMap)
 
 	options := messageMap["Info"].(map[string]any)["Options"].([]any)
 
@@ -205,21 +213,28 @@ func (p *PPPAuth) ProcessCHAPMessage(messageNode *base.Node) (map[string]any, er
 	messageMap := binparser.NodeToMap(messageNode).(map[string]any)
 
 	chapType := messageMap["Code"].(uint8)
-	id := messageMap["Identifier"].([]byte)
+	id := messageMap["Identifier"].(uint8)
 	switch chapType {
 	case 1: // req - challenge
-		challenge := messageMap["Data"].(map[string]any)["Value"].([]byte)
-		response, err := GenerateCHAPResponse(id, challenge, []byte(p.Username), []byte(p.Password), p.AuthTypeCode)
+		DataMap := messageMap["Info"].(map[string]any)["Data"]
+		if DataMap == nil {
+			return nil, nil
+		}
+		challenge := DataMap.(map[string]any)["Value"].([]byte)
+		response, err := GenerateCHAPResponse([]byte{id}, challenge, []byte(p.Username), []byte(p.Password), p.AuthTypeCode)
 		if err != nil {
 			return nil, err
 		}
-		messageMap["Code"] = 2
-		messageMap["Data"] = map[string]any{
-			"Value Size": len(response),
-			"Value":      response,
-			"Name":       []byte(p.Username),
-		}
-		return messageMap, nil
+		return map[string]any{
+			"Code":       2,
+			"Identifier": id,
+			"Length":     5 + len(response) + len(p.Username),
+			"Data": map[string]any{
+				"Value Size": len(response),
+				"Value":      response,
+				"Name":       []byte(p.Username),
+			},
+		}, nil
 	case 3: // success
 		p.AuthOk <- true
 		return nil, nil
