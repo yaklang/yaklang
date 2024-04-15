@@ -8,16 +8,16 @@ func BindingNotFound(v string, r *Range) string {
 func BindingNotFoundInCall(v string) string {
 	return fmt.Sprintf("The closure function expects to capture variable [%s], but it was not found at the call", v)
 }
-func FreeValueNotMember(variable, key string, r *Range) string {
+func FreeValueNotMember(name, key string, r *Range) string {
 	return fmt.Sprintf(
 		"The FreeValue %s unable to access the member with name or index {%s} at the calling location [%s--%s].",
-		variable, key, r.GetStart(), r.GetEnd(),
+		name, key, r.GetStart(), r.GetEnd(),
 	)
 }
-func FreeValueNotMemberInCall(variable, key string) string {
+func FreeValueNotMemberInCall(name, key string) string {
 	return fmt.Sprintf(
-		"The FreeValue %s unable to access the member with name or index {%s} at the call.",
-		variable, key,
+		"The value %s unable to access the member with name or index {%s} at the call.",
+		name, key,
 	)
 }
 

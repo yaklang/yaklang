@@ -56,8 +56,8 @@ func (b *FunctionBuilder) fixupParameterWithThis() {
 	// fixup side effect,
 	// if this side-effect is member call, the index just "--"
 	for _, se := range b.SideEffects {
-		if se.IsMemberCall {
-			se.ParameterIndex--
+		if se.MemberCallKind == ParameterMemberCall {
+			se.MemberCallObjectIndex--
 		}
 	}
 }
@@ -138,6 +138,7 @@ func (f *Function) Finish() {
 	)
 	funType.ParameterLen = f.ParamLength
 	funType.ParameterValue = f.Param
+	funType.ParameterMember = f.ParameterMember
 	funType.SetFreeValue(f.FreeValues)
 	funType.SetSideEffect(f.SideEffects)
 	f.SetType(funType)

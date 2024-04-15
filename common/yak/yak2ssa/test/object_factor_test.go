@@ -22,7 +22,7 @@ func Test_ObjectFactor_Closure(t *testing.T) {
 			println(f(a))
 			`,
 			Want: []string{
-				"Function-f(make(map[string]number),1)",
+				"Function-f(make(map[string]number)) member[1]",
 			},
 		})
 	})
@@ -37,7 +37,7 @@ func Test_ObjectFactor_Closure(t *testing.T) {
 			println(f())
 			`,
 			Want: []string{
-				"Function-f(make(map[any]any),Undefined-a.b(valid))",
+				"Function-f() binding[make(map[any]any)] member[Undefined-a.b(valid)]",
 			},
 		})
 	})
@@ -52,7 +52,7 @@ func Test_ObjectFactor_Closure(t *testing.T) {
 			println(a.get())
 			`,
 			Want: []string{
-				"Function-a.get(make(map[string]any),1)",
+				"Function-a.get(make(map[string]any)) member[1]",
 			},
 		})
 	})
@@ -281,7 +281,7 @@ func Test_ObjectFactor_FreeValue(t *testing.T) {
 
 		`,
 			Want: []string{
-				"Function-this.get(Function-f(),1)",
+				"Function-this.get(Function-f()) member[1]",
 			},
 		})
 	})
@@ -305,7 +305,7 @@ func Test_ObjectFactor_FreeValue(t *testing.T) {
 
 		`,
 			Want: []string{
-				"Function-this.get(Function-f(),1)",
+				"Function-this.get(Function-f()) member[1]",
 			},
 		})
 	})
@@ -328,7 +328,7 @@ func Test_ObjectFactor_FreeValue(t *testing.T) {
 
 		`,
 			Want: []string{
-				"Function-this.get(Function-f(),1)",
+				"Function-this.get(Function-f()) member[1]",
 			},
 		})
 	})
@@ -363,10 +363,10 @@ func Test_ObjectFactor_ALL(t *testing.T) {
 			println(b.get())
 			`,
 			Want: []string{
-				"Function-this.get(Function-f(),side-effect(Parameter-i, a.key))",
-				"Function-this.get(Function-f(),side-effect(Parameter-i, b.key))",
-				"Function-this.get(Function-f(),side-effect(Parameter-i, a.key))",
-				"Function-this.get(Function-f(),side-effect(Parameter-i, this.key))",
+				"Function-this.get(Function-f()) member[side-effect(Parameter-i, a.key)]",
+				"Function-this.get(Function-f()) member[side-effect(Parameter-i, b.key)]",
+				"Function-this.get(Function-f()) member[side-effect(Parameter-i, a.key)]",
+				"Function-this.get(Function-f()) member[side-effect(Parameter-i, this.key)]",
 			},
 		})
 	})

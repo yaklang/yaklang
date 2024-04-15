@@ -80,9 +80,24 @@ func (f *Function) DisAsm(flag FunctionAsmFlag) string {
 			// f.FreeValue,
 			", ") + "\n"
 	}
+	if len(f.ParameterMember) > 0 {
+		ret += "parameterMember: " + strings.Join(
+			lo.Map(f.ParameterMember, func(pm *ParameterMember, _ int) string {
+				return pm.String()
+			}),
+			", ") + "\n"
+	}
 	if len(f.SideEffects) > 0 {
 		ret += "sideEffects: " + strings.Join(
-			lo.Map(f.SideEffects, func(se *FunctionSideEffect, _ int) string { return se.Name }),
+			lo.Map(f.SideEffects, func(se *FunctionSideEffect, _ int) string {
+				switch se.MemberCallKind {
+				case ParameterMemberCall:
+					return fmt.Sprintf("parameter[%d].%s", se.MemberCallObjectIndex, se.MemberCallKey)
+				case FreeValueMemberCall:
+					return fmt.Sprintf("freeValue[%s].%s", se.MemberCallObjectName, se.MemberCallKey)
+				}
+				return se.Name
+			}),
 			",",
 		) + "\n"
 	}
@@ -204,6 +219,17 @@ func (p *Phi) String() string {
 }
 
 // ----------- Parameter
+func (p *ParameterMember) String() string {
+	switch p.MemberCallKind {
+	case NoMemberCall:
+		return "normal-member-call"
+	case ParameterMemberCall:
+		return fmt.Sprintf("parameter[%d].%s", p.MemberCallObjectIndex, p.MemberCallKey)
+	case FreeValueMemberCall:
+		return fmt.Sprintf("freeValue[%s].%s", p.MemberCallObjectName, p.MemberCallKey)
+	}
+	return ""
+}
 func (p *Parameter) String() string {
 	return p.GetName()
 }
@@ -243,15 +269,24 @@ func (r *Return) String() string {
 func (c *Call) String() string {
 	methodStr := getStr(c.Method)
 	argStr := strings.Join(
-		lo.Map(c.Args, func(v Value, _ int) string { return getStr(v) }),
-		", ",
-	)
-	binding := strings.Join(
-		lo.MapToSlice(c.Binding, func(name string, v Value) string {
+		lo.Map(c.Args, func(v Value, index int) string {
+			// return fmt.Sprintf("%d: %s", index, getStr(v))
 			return getStr(v)
 		}),
 		", ",
 	)
+	binding := "binding[" + strings.Join(
+		lo.MapToSlice(c.Binding, func(name string, v Value) string {
+			// return fmt.Sprintf("%s: %s", name, getStr(v))
+			return getStr(v)
+		}),
+		", ",
+	) + "]"
+	member := "member[" + strings.Join(
+		lo.Map(c.ArgMember, func(v Value, _ int) string {
+			return getStr(v)
+		}),
+		", ") + "]"
 	drop := ""
 	if c.IsDropError {
 		drop = "~"
@@ -259,14 +294,14 @@ func (c *Call) String() string {
 
 	if c.Async {
 		return fmt.Sprintf(
-			"go %s (%s) [%s]",
-			methodStr, argStr, binding,
+			"go %s (%s) %s %s",
+			methodStr, argStr, binding, member,
 		)
 	} else {
 		return fmt.Sprintf(
-			"%s = call %s (%s)%s [%s]",
+			"%s = call %s (%s)%s %s %s",
 			getStr(c),
-			methodStr, argStr, drop, binding,
+			methodStr, argStr, drop, binding, member,
 		)
 	}
 }

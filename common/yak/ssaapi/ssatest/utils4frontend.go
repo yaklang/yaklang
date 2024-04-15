@@ -237,6 +237,26 @@ func CheckParameter(t *testing.T, tc TestCase) {
 
 }
 
+func CheckParameterMember(t *testing.T, tc TestCase) {
+	tc.Check = func(p *ssaapi.Program, want []string) {
+		targets := p.Ref("target").ShowWithSource()
+		require.Len(t, targets, 1, "target len not match")
+
+		target := targets[0]
+
+		typ := ssaapi.GetBareType(target.GetType())
+		require.Equal(t, ssa.FunctionTypeKind, typ.GetTypeKind())
+
+		funTyp, ok := ssa.ToFunctionType(typ)
+		require.True(t, ok)
+
+		parameters := lo.Map(funTyp.ParameterMember, func(v *ssa.ParameterMember, _ int) string { return v.String() })
+		require.Equal(t, want, parameters)
+	}
+	CheckTestCase(t, tc)
+
+}
+
 func CheckFunctionReturnType(t *testing.T, code string, kind ssa.TypeKind) {
 	tc := TestCase{
 		Code: code,

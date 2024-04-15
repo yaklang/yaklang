@@ -308,20 +308,10 @@ func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
 
 	// parameter or freeValue, this member-call mark as Parameter
 	if para, ok := ToParameter(value); ok {
-		if para.IsFreeValue {
-			b.appendParam(para)
-			delete(b.FreeValues, para.GetName())
-		}
-
 		name, typ := checkCanMemberCall(para, key)
-		new := b.NewParam(name)
+		new := b.NewParameterMember(name, para, key)
 		new.SetType(typ)
-		new.IsMemberCall = true
-		new.MemberCallObjectIndex = para.FormalParameterIndex
-		new.MemberCallKey = key
-
 		SetMemberCall(para, key, new)
-
 		setMemberVerboseName(new)
 		return new
 	}
@@ -336,10 +326,6 @@ func (b *FunctionBuilder) CreateMemberCallVariable(object, key Value) *Variable 
 	}
 
 	if para, ok := ToParameter(object); ok {
-		if para.IsFreeValue {
-			b.appendParam(para)
-			delete(b.FreeValues, para.GetName())
-		}
 		name, _ := checkCanMemberCall(para, key)
 		ret := b.CreateVariable(name)
 		ret.object = para

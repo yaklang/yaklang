@@ -149,24 +149,6 @@ func Test_Real_FunctionReturn(t *testing.T) {
 	})
 }
 
-func Test_RealYak_Undefine(t *testing.T) {
-	t.Run("normal", func(t *testing.T) {
-		ssatest.CheckNoError(t, `
-		() => {
-			for _, i := range [1,2]{
-				if i == 1 {
-					f()
-				}
-			}
-		}
-		f = () => {
-			println("f")
-		}
-		`)
-	})
-
-}
-
 func Test_RealYak_Error(t *testing.T) {
 	t.Run("function return error", func(t *testing.T) {
 		ssatest.CheckNoError(t, `
@@ -225,4 +207,116 @@ func Test_RealYak_Object_Factor(t *testing.T) {
 		`)
 	})
 
+}
+
+func Test_RealYak_FreeValueMemberCall(t *testing.T) {
+	t.Run("simple", func(t *testing.T) {
+		ssatest.CheckError(t, ssatest.TestCase{
+			Code: `
+		a = {
+			"b": 1, 
+		}
+		f = (p,p2) => {
+			a.b = p 
+			b.c = p2
+		}
+
+		f(1, 2)
+		`,
+			Want: []string{
+				ssa.BindingNotFound("b", ssa.NewRange(
+					nil,
+					ssa.NewPosition(10, 2),
+					ssa.NewPosition(10, 9),
+				)),
+				ssa.BindingNotFoundInCall("b"),
+			},
+		},
+		)
+	})
+}
+
+func Test_RealYak_FreeValue_Error(t *testing.T) {
+
+	t.Run("mark freevalue with call: no found ", func(t *testing.T) {
+		ssatest.CheckError(t, ssatest.TestCase{
+			Code: `
+			f = () => {
+				b = a
+			}
+			f()
+			`,
+			Want: []string{
+				ssa.BindingNotFound("a", ssa.NewRange(
+					nil,
+					ssa.NewPosition(5, 3),
+					ssa.NewPosition(5, 6),
+				)),
+				ssa.BindingNotFoundInCall("a"),
+			},
+		})
+	})
+
+	t.Run("freevalue with call but found: none error", func(t *testing.T) {
+		ssatest.CheckNoError(t, `
+		f = () => {
+			b = a
+		}
+		a = 1
+		f()
+		`)
+	})
+
+
+	t.Run("freevalue  with member call with call: no found ", func(t *testing.T) {
+		ssatest.CheckError(t, ssatest.TestCase{
+			Code: `
+			f = () => {
+				b = a.b
+			}
+			f()
+			`,
+			Want: []string{
+				ssa.BindingNotFound("a", ssa.NewRange(
+					nil,
+					ssa.NewPosition(5, 3),
+					ssa.NewPosition(5, 6),
+				)),
+				ssa.BindingNotFoundInCall("a"),
+			},
+		})
+	})
+
+	t.Run("freevalue  with member call with call: no member ", func(t *testing.T) {
+		ssatest.CheckError(t, ssatest.TestCase{
+			Code: `
+			f = () => {
+				b = a.b
+			}
+			a = 1
+			f()
+			`,
+			Want: []string{
+				ssa.FreeValueNotMember("a", "b", ssa.NewRange(
+					nil,
+					ssa.NewPosition(6, 3),
+					ssa.NewPosition(6, 6),
+				)),
+				ssa.FreeValueNotMemberInCall("a", "b"),
+			},
+		})
+	})
+
+	t.Run("free value with member call, with call", func(t *testing.T) {
+		ssatest.CheckNoError(t, `
+		f = () => {
+			b = a.b
+		}
+		a = {
+			"b": 1,
+		}
+		f()
+		`,
+		)
+	})
 }

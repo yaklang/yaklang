@@ -102,6 +102,9 @@ func (c *Call) handlerReturnType() {
 	} else {
 		c.SetType(funcTyp.ReturnType)
 	}
+
+	// handler free value
+	c.HandleFreeValue(funcTyp.FreeValue)
 }
 
 // handler if method, set object for first argument
@@ -119,45 +122,37 @@ func (c *Call) handleCalleeFunction() {
 		currentScope := c.GetBlock().ScopeTable
 
 		for true {
-			if len(c.Args) == len(funcTyp.ParameterValue) {
+			if len(c.ArgMember) == len(funcTyp.ParameterMember) {
 				break
 			}
-			for _, p := range funcTyp.ParameterValue {
-				//TODO:  i don't know why this condition, it should be clearer
-				if len(c.Args) == p.FormalParameterIndex {
-					// free-value member-call will be set to parameter,
-					// this parameter will contain default value, use this.
-					if p.GetDefault() != nil {
-						c.Args = append(c.Args, p.GetDefault())
-					}
-				}
-				if !p.IsMemberCall {
-					continue
-				}
-				if p.MemberCallObjectIndex >= len(c.Args) {
-					// log.Errorf("handleCalleeFunction: memberCallObjectIndex out of range %d vs len: %d", p.MemberCallObjectIndex, len(c.Args))
+			for _, p := range funcTyp.ParameterMember {
+
+				objectName := p.ObjectName
+				key := p.MemberCallKey
+				object, ok := p.Get(c)
+				if !ok {
 					continue
 				}
 
-				if _, typ := checkCanMemberCall(c.Args[p.MemberCallObjectIndex], p.MemberCallKey); typ == nil {
+				if _, typ := checkCanMemberCall(object, key); typ == nil {
 					builder.NewErrorWithPos(Error, SSATAG,
 						p.GetRange(),
 						FreeValueNotMember(
-							c.Args[p.MemberCallObjectIndex].GetName(),
+							objectName,
 							p.MemberCallKey.String(),
 							c.GetRange(),
 						),
 					)
 					c.NewError(Error, SSATAG,
 						FreeValueNotMemberInCall(
-							c.Args[p.MemberCallObjectIndex].GetName(),
+							objectName,
 							p.MemberCallKey.String(),
 						),
 					)
 					continue
 				}
-				c.Args = append(c.Args,
-					builder.ReadMemberCallVariable(c.Args[p.MemberCallObjectIndex], p.MemberCallKey),
+				c.ArgMember = append(c.ArgMember,
+					builder.ReadMemberCallVariable(object, key),
 				)
 			}
 			break
@@ -166,20 +161,20 @@ func (c *Call) handleCalleeFunction() {
 		// handle side effect
 		for _, se := range funcTyp.SideEffects {
 			var variable *Variable
-			if se.IsMemberCall {
-				if se.ParameterIndex >= len(c.Args) {
-					// log.Errorf("handleCalleeFunction: ParameterIndex out of range %d", se.ParameterIndex)
-					continue
-				}
-				// if side-effect is member call, create member call variable
-				variable = builder.CreateMemberCallVariable(c.Args[se.ParameterIndex], se.Key)
-			} else {
-
+			if se.MemberCallKind == NoMemberCall {
 				// side-effect only create in scope that lower or same than modify's scope
 				if !se.forceCreate && !currentScope.IsSameOrSubScope(se.Variable.GetScope()) {
 					continue
 				}
+				// is normal side-effect
 				variable = builder.CreateVariable(se.Name)
+			} else {
+				// is object
+				obj, ok := se.Get(c)
+				if !ok {
+					continue
+				}
+				variable = builder.CreateMemberCallVariable(obj, se.MemberCallKey)
 			}
 
 			// TODO: handle side effect in loop scope,
@@ -215,6 +210,7 @@ func (c *Call) HandleFreeValue(fvs []*Parameter) {
 	for _, fv := range fvs {
 		// if freeValue has default value, skip
 		if fv.GetDefault() != nil {
+			c.Binding[fv.GetName()] = fv.GetDefault()
 			continue
 		}
 

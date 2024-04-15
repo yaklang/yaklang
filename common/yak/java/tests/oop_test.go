@@ -63,8 +63,8 @@ class Main{
 		}
 }
 		`, []string{
-			"Function-A_getA(make(A),0)",
-			"Function-A_getA(make(A),1)",
+			"Function-A_getA(make(A)) member[0]",
+			"Function-A_getA(make(A)) member[1]",
 		}, t)
 	})
 
@@ -89,8 +89,8 @@ class Main{
 		}
 }
 		`, []string{
-			"Function-A_getA(make(A),0)",
-			"Function-A_getA(make(A),side-effect(Parameter-par, this.a))",
+			"Function-A_getA(make(A)) member[0]",
+			"Function-A_getA(make(A)) member[side-effect(Parameter-par, this.a)]",
 		}, t)
 	})
 }
@@ -133,8 +133,8 @@ func TestJava_Extend_Class(t *testing.T) {
 		}
 }
 		`, []string{
-			"Function-Q_getA(make(A),0)",
-			"Function-Q_getA(make(A),1)",
+			"Function-Q_getA(make(A)) member[0]",
+			"Function-Q_getA(make(A)) member[1]",
 		}, t)
 	})
 
@@ -160,8 +160,8 @@ func TestJava_Extend_Class(t *testing.T) {
 		}
 }
 		`, []string{
-			"Function-Q_getA(make(A),0)",
-			"Function-Q_getA(make(A),side-effect(Parameter-par, this.a))",
+			"Function-Q_getA(make(A)) member[0]",
+			"Function-Q_getA(make(A)) member[side-effect(Parameter-par, this.a)]",
 		}, t)
 	})
 }
@@ -184,7 +184,7 @@ public class Main{
 }
 		`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Function-A_getNum(make(A),0)",
+			"Function-A_getNum(make(A)) member[0]",
 		}, t)
 	})
 
@@ -215,8 +215,8 @@ public class Main{
 }
 `
 		ssatest.CheckPrintlnValue(code, []string{
-			"Function-A_getNum1(make(A),side-effect(Parameter-num1, this.num1))",
-			"Function-A_getNum2(make(A),side-effect(Parameter-num2, this.num2))",
+			"Function-A_getNum1(make(A)) member[side-effect(Parameter-num1, this.num1)]",
+			"Function-A_getNum2(make(A)) member[side-effect(Parameter-num2, this.num2)]",
 		}, t)
 	})
 }
@@ -268,8 +268,8 @@ func TestJava_OOP_Enum(t *testing.T) {
 			}
 		}
 		`, []string{
-			"Function-A_getNum1(make(A),side-effect(Parameter-par1, a.num1))",
-			"Function-A_getNum2(make(A),side-effect(Parameter-par2, a.num2))",
+			"Function-A_getNum1(make(A)) member[side-effect(Parameter-par1, a.num1)]",
+			"Function-A_getNum2(make(A)) member[side-effect(Parameter-par2, a.num2)]",
 		}, t)
 	})
 
@@ -300,7 +300,7 @@ public class Main{
 }`
 		ssatest.CheckPrintlnValue(code, []string{
 			"make(Outer.Inner)",
-			"Function-Outer.Inner_getA(make(Outer.Inner),side-effect(Parameter-par, this.a))",
+			"Function-Outer.Inner_getA(make(Outer.Inner)) member[side-effect(Parameter-par, this.a)]",
 		}, t)
 	})
 }

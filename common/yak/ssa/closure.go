@@ -17,10 +17,7 @@ type FunctionSideEffect struct {
 
 	forceCreate bool
 
-	// is modify parameter field
-	IsMemberCall   bool
-	ParameterIndex int
-	Key            Value
+	*parameterMember
 }
 
 func (f *Function) AddForceSideEffect(name string, v Value) {
@@ -28,6 +25,9 @@ func (f *Function) AddForceSideEffect(name string, v Value) {
 		Name:        name,
 		Modify:      v,
 		forceCreate: true,
+		parameterMember: &parameterMember{
+			MemberCallKind: NoMemberCall,
+		},
 	})
 }
 func (f *Function) AddSideEffect(name *Variable, v Value) {
@@ -35,23 +35,28 @@ func (f *Function) AddSideEffect(name *Variable, v Value) {
 		Name:     name.GetName(),
 		Modify:   v,
 		Variable: name,
+		parameterMember: &parameterMember{
+			MemberCallKind: NoMemberCall,
+		},
 	})
 }
 
 func (f *Function) CheckAndSetSideEffect(variable *Variable, v Value) {
 	if variable.IsMemberCall() {
 		// if name is member call, it's modify parameter field
-		if index, ok := f.paramMap[variable.object]; ok {
-			f.SideEffects = append(f.SideEffects, &FunctionSideEffect{
-				Modify:         v,
-				Name:           variable.GetName(),
-				VerboseName:    getMemberVerboseName(variable.object, variable.key),
-				Variable:       variable,
-				IsMemberCall:   true,
-				ParameterIndex: index,
-				Key:            variable.key,
-			})
+		para, ok := ToParameter(variable.object)
+		if !ok {
+			return
 		}
+		sideEffect := &FunctionSideEffect{
+			Name:            variable.GetName(),
+			VerboseName:     getMemberVerboseName(variable.object, variable.key),
+			Modify:          v,
+			Variable:        variable,
+			forceCreate:     false,
+			parameterMember: newParameterMember(para, variable.key),
+		}
+		f.SideEffects = append(f.SideEffects, sideEffect)
 	}
 }
 
