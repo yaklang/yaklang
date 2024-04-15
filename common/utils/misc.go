@@ -21,7 +21,9 @@ func WaitConnect(addr string, timeout float64) error {
 					ch <- 1
 					return
 				}
-				conn.Close()
+				if conn == nil {
+					conn.Close()
+				}
 				//println("连接失败")
 				time.Sleep(100 * time.Microsecond)
 			}
