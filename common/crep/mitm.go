@@ -95,6 +95,42 @@ func InitMITMCert() {
 	}
 }
 
+func VerifySystemCertificate() error {
+	InitMITMCert()
+	certPEM, _, err := GetDefaultCaAndKey()
+	if err != nil {
+		return err
+	}
+
+	// 解码 PEM 格式的证书
+	block, _ := pem.Decode(certPEM)
+	if block == nil {
+		return err
+	}
+
+	// 解析证书
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return err
+	}
+
+	// 创建系统根证书池
+	pool, err := x509.SystemCertPool()
+	if err != nil {
+		return err
+	}
+
+	// 验证证书是否在系统根证书池中
+	opts := x509.VerifyOptions{
+		Roots: pool,
+	}
+	_, err = cert.Verify(opts)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func GetDefaultCaAndKey() ([]byte, []byte, error) {
 	if defaultCA == nil || defaultKey == nil {
 		return nil, nil, utils.Error("cannot set ca/key for mitm")

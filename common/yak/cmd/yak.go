@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/crep"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"io"
 	"io/ioutil"
@@ -626,6 +627,18 @@ func main() {
 					for k, v := range infoMap {
 						fmt.Printf("    %v: %v\n", k, v)
 					}
+				}
+			},
+		},
+		{
+			Name:    "verify-cert",
+			Aliases: []string{"vc"},
+			Usage:   "Verify that the Yakit MITM certificate is in the system root certificate pool",
+			Action: func(c *cli.Context) {
+				if err := crep.VerifySystemCertificate(); err == nil {
+					fmt.Println("mitm 证书在系统信任链中")
+				} else {
+					fmt.Println("mitm 证书不在系统信任链中!请重新安装证书")
 				}
 			},
 		},
