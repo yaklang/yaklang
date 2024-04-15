@@ -44,6 +44,7 @@ var (
 
 	standardLibrarySuggestions = make([]*ypb.SuggestionDescription, 0, len(doc.DefaultDocumentHelper.Libs))
 	yakKeywordSuggestions      = make([]*ypb.SuggestionDescription, 0)
+	progCacheMap               = utils.NewTTLCache[*ssaapi.Program](0)
 )
 
 func getLanguageKeywordSuggestions() []*ypb.SuggestionDescription {
@@ -828,14 +829,31 @@ func GrpcRangeToPosition(r *ypb.Range) *ssa.Range {
 }
 
 func (s *Server) YaklangLanguageSuggestion(ctx context.Context, req *ypb.YaklangLanguageSuggestionRequest) (*ypb.YaklangLanguageSuggestionResponse, error) {
+	var (
+		err  error
+		ok   bool
+		prog *ssaapi.Program
+	)
 	ret := &ypb.YaklangLanguageSuggestionResponse{}
 	opt := pta.GetPluginSSAOpt(req.YakScriptType)
-	opt = append(opt, ssaapi.WithIgnoreSyntaxError(true))
-	prog, err := ssaapi.Parse(req.YakScriptCode, opt...)
+
+	prog, err = ssaapi.Parse(req.YakScriptCode, opt...)
+	if err != nil {
+		// get cache code
+		if prog, ok = progCacheMap.Get(req.ModelID); ok {
+			err = nil
+		}
+	}
+
+	// opt = append(opt, ssaapi.WithIgnoreSyntaxError(true))
 	if err != nil {
 		log.Error(err)
 		return nil, errors.New("ssa parse error")
 	}
+
+	// set cache code
+	progCacheMap.Set(req.ModelID, prog)
+
 	// todo: 处理YakScriptType，不同语言的补全、提示可能有不同
 	switch req.InspectType {
 	case "completion":
