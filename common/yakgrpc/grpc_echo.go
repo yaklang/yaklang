@@ -2,8 +2,6 @@ package yakgrpc
 
 import (
 	"context"
-	"crypto/x509"
-	"encoding/pem"
 	"fmt"
 	"github.com/yaklang/yaklang/common/crep"
 	"github.com/yaklang/yaklang/common/utils"
@@ -92,38 +90,9 @@ func verifySystemCertificateByURL(u string) (*ypb.VerifySystemCertificateRespons
 }
 
 func verifySystemCertificate() (*ypb.VerifySystemCertificateResponse, error) {
-	crep.InitMITMCert()
-	certPEM, _, err := crep.GetDefaultCaAndKey()
+	err := crep.VerifySystemCertificate()
 	if err != nil {
-		return nil, err
+		return &ypb.VerifySystemCertificateResponse{Valid: false, Reason: err.Error()}, nil
 	}
-
-	// 解码 PEM 格式的证书
-	block, _ := pem.Decode(certPEM)
-	if block == nil {
-		return nil, err
-	}
-
-	// 解析证书
-	cert, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return nil, err
-	}
-
-	// 创建系统根证书池
-	pool, err := x509.SystemCertPool()
-	if err != nil {
-		return nil, err
-	}
-
-	// 验证证书是否在系统根证书池中
-	opts := x509.VerifyOptions{
-		Roots: pool,
-	}
-	_, err = cert.Verify(opts)
-	if err == nil {
-		return &ypb.VerifySystemCertificateResponse{Valid: true}, nil
-	}
-
-	return &ypb.VerifySystemCertificateResponse{Valid: false, Reason: err.Error()}, nil
+	return &ypb.VerifySystemCertificateResponse{Valid: true}, nil
 }
