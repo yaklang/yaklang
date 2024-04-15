@@ -155,14 +155,24 @@ type Function struct {
 	// package, double link
 	Package *Package
 
-	// just function parameter and all return instruction
-	Param       []*Parameter
-	paramMap    map[Value]int // for get parameter index
-	ParamLength int
-	Return      []*Return
-
 	// Type
 	Type *FunctionType
+
+	// just function parameter
+	Param       []*Parameter
+	ParamLength int
+	// for closure function
+	FreeValues map[string]*Parameter // store the captured variable form parent-function, just contain name, and type is Parameter
+	// parameter member call
+	ParameterMember []*ParameterMember
+	// function side effects
+	SideEffects []*FunctionSideEffect
+
+	// closure function double link. parentFunc <-> childFuncs
+	parent     *Function   // parent function;  can be nil if there is no parent function
+	ChildFuncs []*Function // child function within this function
+
+	Return []*Return
 
 	// BasicBlock list
 	Blocks []*BasicBlock
@@ -173,15 +183,6 @@ type Function struct {
 	// this block will always execute when the function exits,
 	// regardless of whether the function returns normally or exits due to a panic.
 	DeferBlock *BasicBlock
-
-	// for closure function
-	FreeValues map[string]*Parameter // store the captured variable form parent-function, just contain name, and type is Parameter
-	// closure function side effects
-	// TODO: currently, this value is not being used, but it should be utilized in the future.
-	SideEffects []*FunctionSideEffect
-	// closure function double link. parentFunc <-> childFuncs
-	parent     *Function   // parent function;  can be nil if there is no parent function
-	ChildFuncs []*Function // child function within this function
 
 	// extern lib
 	cacheExternInstance map[string]Value // lib and value
@@ -293,20 +294,78 @@ var (
 	_ User  = (*ExternLib)(nil)
 )
 
+type ParameterMemberCallKind int
+
+const (
+	NoMemberCall ParameterMemberCallKind = iota
+	ParameterMemberCall
+	FreeValueMemberCall
+)
+
+type parameterMember struct {
+	ObjectName            string
+	MemberCallKind        ParameterMemberCallKind
+	MemberCallObjectIndex int    // for Parameter
+	MemberCallObjectName  string // for FreeValue
+	MemberCallKey         Value
+}
+
+func newParameterMember(obj *Parameter, key Value) *parameterMember {
+	new := &parameterMember{
+		ObjectName:    obj.GetName(),
+		MemberCallKey: key,
+	}
+
+	if obj.IsFreeValue {
+		new.MemberCallKind = FreeValueMemberCall
+		new.MemberCallObjectName = obj.GetName()
+	} else {
+		new.MemberCallKind = ParameterMemberCall
+		new.MemberCallObjectIndex = obj.FormalParameterIndex
+	}
+	return new
+}
+
+func (p *parameterMember) Get(c *Call) (obj Value, ok bool) {
+	switch p.MemberCallKind {
+	case NoMemberCall:
+		return
+	case ParameterMemberCall:
+		if p.MemberCallObjectIndex >= len(c.Args) {
+			// log.Errorf("handleCalleeFunction: memberCallObjectIndex out of range %d vs len: %d", p.MemberCallObjectIndex, len(c.Args))
+			return
+		}
+		return c.Args[p.MemberCallObjectIndex], true
+	case FreeValueMemberCall:
+		obj, ok = c.Binding[p.MemberCallObjectName]
+		return obj, ok
+	}
+	return
+}
+
+type ParameterMember struct {
+	*Parameter
+	*parameterMember
+}
+
+func (p *ParameterMember) IsMember() bool { return true }
+func (p *ParameterMember) IsObject() bool { return false }
+
+var (
+	_ Node  = (*Parameter)(nil)
+	_ Value = (*Parameter)(nil)
+)
+
 // ----------- Parameter
 type Parameter struct {
 	anValue
 
-	IsFreeValue bool
+	// for FreeValue
+	IsFreeValue  bool
+	defaultValue Value
 
-	defaultValue         Value
+	// Parameter Index
 	FormalParameterIndex int
-
-	// if this flag set, this parameter will be set to member call,
-	// if pass a as parameter, it will be set to `a.Key` is parameter
-	IsMemberCall          bool
-	MemberCallObjectIndex int
-	MemberCallKey         Value
 }
 
 func (p *Parameter) GetDefault() Value {
@@ -409,9 +468,10 @@ type Call struct {
 	anValue
 
 	// for call function
-	Method  Value
-	Args    []Value
-	Binding map[string]Value
+	Method    Value
+	Args      []Value
+	Binding   map[string]Value
+	ArgMember []Value
 
 	// go function
 	Async  bool

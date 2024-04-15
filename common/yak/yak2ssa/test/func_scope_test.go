@@ -127,7 +127,7 @@ func TestClosure_FreeValue_Function(t *testing.T) {
 	})
 
 	t.Run("func capture member", func(t *testing.T) {
-		test.CheckParameter(t, test.TestCase{
+		test.CheckParameterMember(t, test.TestCase{
 			Code: ` 
 			a = {
 				"key": 1,
@@ -138,14 +138,13 @@ func TestClosure_FreeValue_Function(t *testing.T) {
 			target = f
 			`,
 			Want: []string{
-				"a",
-				"b",
+				"freeValue[a].key",
 			},
 		})
 	})
 
 	t.Run("member capture member", func(t *testing.T) {
-		test.CheckParameter(t, test.TestCase{
+		test.CheckParameterMember(t, test.TestCase{
 			Code: `
 			a = {
 				"key": 1, 
@@ -155,12 +154,14 @@ func TestClosure_FreeValue_Function(t *testing.T) {
 			}
 			target = b.get
 			`,
-			Want: []string{"a", "a.key"},
+			Want: []string{
+				"freeValue[a].key",
+			},
 		})
 	})
 
 	t.Run("member capture member, self", func(t *testing.T) {
-		test.CheckParameter(t, test.TestCase{
+		test.CheckParameterMember(t, test.TestCase{
 			Code: `
 			a = {
 				"key": 1, 
@@ -169,7 +170,7 @@ func TestClosure_FreeValue_Function(t *testing.T) {
 			target = a.get
 			`,
 			Want: []string{
-				"a", "a.key",
+				"parameter[0].key",
 			},
 		})
 	})
