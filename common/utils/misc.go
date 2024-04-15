@@ -16,11 +16,12 @@ func WaitConnect(addr string, timeout float64) error {
 			case <-ctx.Done():
 				return
 			default:
-				_, err := net.Dial("tcp", addr)
+				conn, err := net.Dial("tcp", addr)
 				if err == nil {
 					ch <- 1
 					return
 				}
+				conn.Close()
 				//println("连接失败")
 				time.Sleep(100 * time.Microsecond)
 			}
@@ -33,6 +34,7 @@ func WaitConnect(addr string, timeout float64) error {
 		//println("超时")
 		return errors.New("Connection attempt timed out")
 	case <-ch:
+		cancle()
 		return nil
 	}
 }

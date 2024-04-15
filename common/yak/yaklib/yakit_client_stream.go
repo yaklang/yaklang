@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"io"
+	"sync"
 	"time"
 )
 
@@ -57,38 +58,59 @@ func (c *YakitClient) Stream(streamType string, streamId string, stream io.Reade
 		}()
 		bstream := bufio.NewScanner(stream)
 		bstream.Split(bufio.ScanRunes)
-		var buf = bytes.NewBufferString("")
 		lastTimeMS := time.Now().UnixMilli()
-		for bstream.Scan() {
-			buf.WriteString(bstream.Text())
-
-			if time.Now().UnixMilli()-lastTimeMS > 200 {
-				err := c.YakitLog("stream", string(utils.Jsonify(map[string]any{
-					"type":     "stream",
-					"streamId": streamId,
-					"action":   "data",
-					"data":     buf.String(),
-				})))
-				if err != nil {
-					log.Warnf("stream send failed: %s", err)
-					continue
+		bufChannel := make(chan string, 0)
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		go func() {
+			var buf = bytes.NewBufferString("")
+			defer func() {
+				if buf.Len() > 0 {
+					err := c.YakitLog("stream", string(utils.Jsonify(map[string]any{
+						"action":   "data",
+						"data":     buf.String(),
+						"streamId": streamId,
+						"type":     "stream",
+					})))
+					if err != nil {
+						log.Warnf("stream send failed: %s", err)
+						return
+					}
+					buf.Reset()
 				}
-				buf.Reset()
-				lastTimeMS = time.Now().UnixMilli()
-				continue
+				wg.Done()
+			}()
+			for {
+				select {
+				case msg, ok := <-bufChannel:
+					if !ok {
+						return
+					}
+					buf.WriteString(msg)
+				default:
+					if buf.Len() > 0 && time.Now().UnixMilli()-lastTimeMS > 200 {
+						err := c.YakitLog("stream", string(utils.Jsonify(map[string]any{
+							"action":   "data",
+							"data":     buf.String(),
+							"streamId": streamId,
+							"type":     "stream",
+						})))
+						if err != nil {
+							log.Warnf("stream send failed: %s", err)
+							return
+						}
+						buf.Reset()
+						lastTimeMS = time.Now().UnixMilli()
+					} else {
+						time.Sleep(10 * time.Millisecond)
+					}
+				}
 			}
+		}()
+		for bstream.Scan() {
+			bufChannel <- bstream.Text()
 		}
-		if buf.Len() > 0 {
-			err := c.YakitLog("stream", string(utils.Jsonify(map[string]any{
-				"action":   "data",
-				"data":     buf.String(),
-				"streamId": streamId,
-				"type":     "stream",
-			})))
-			if err != nil {
-				log.Warnf("stream send failed: %s", err)
-				return
-			}
-		}
+		close(bufChannel)
+		wg.Wait()
 	}()
 }
