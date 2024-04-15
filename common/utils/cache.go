@@ -163,6 +163,40 @@ func (cache *CacheWithKey[U, T]) getItem(key U) (*item[U, T], bool, bool) {
 	return item, exists, expirationNotification
 }
 
+func (cache *CacheWithKey[U, T]) clearExpireItem() {
+	cache.mutex.Lock()
+	defer cache.mutex.Unlock()
+	if cache.priorityQueue.Len() == 0 {
+		return
+	}
+
+	// index will only be advanced if the current entry will not be evicted
+	i := 0
+	for item := cache.priorityQueue.items[i]; item.expired(); item = cache.priorityQueue.items[i] {
+
+		if cache.checkExpireCallback != nil {
+			if !cache.checkExpireCallback(item.key, item.data) {
+				item.touch()
+				cache.priorityQueue.update(item)
+				i++
+				if i == cache.priorityQueue.Len() {
+					break
+				}
+				continue
+			}
+		}
+
+		cache.priorityQueue.remove(item)
+		delete(cache.items, item.key)
+		if cache.expireCallback != nil {
+			go cache.expireCallback(item.key, item.data)
+		}
+		if cache.priorityQueue.Len() == 0 {
+			break
+		}
+	}
+}
+
 func (cache *CacheWithKey[U, T]) startExpirationProcessing() {
 	timer := time.NewTimer(time.Hour)
 	for {
@@ -196,43 +230,7 @@ func (cache *CacheWithKey[U, T]) startExpirationProcessing() {
 			return
 		case <-timer.C:
 			timer.Stop()
-			cache.mutex.Lock()
-			if cache.priorityQueue.Len() == 0 {
-				cache.mutex.Unlock()
-				continue
-			}
-
-			// index will only be advanced if the current entry will not be evicted
-			i := 0
-			for item := cache.priorityQueue.items[i]; item.expired(); item = cache.priorityQueue.items[i] {
-
-				if cache.checkExpireCallback != nil {
-					if !cache.checkExpireCallback(item.key, item.data) {
-						item.touch()
-						cache.priorityQueue.update(item)
-						i++
-						if i == cache.priorityQueue.Len() {
-							break
-						}
-						continue
-					}
-				}
-
-				cache.priorityQueue.remove(item)
-				delete(cache.items, item.key)
-				if cache.expireCallback != nil {
-					go cache.expireCallback(item.key, item.data)
-				}
-				if cache.priorityQueue.Len() == 0 {
-					goto done
-				}
-			}
-		done:
-			cache.mutex.Unlock()
-
-		case <-cache.expirationNotification:
-			timer.Stop()
-			continue
+			cache.clearExpireItem()
 		}
 	}
 }
@@ -289,7 +287,7 @@ func (cache *CacheWithKey[U, T]) SetWithTTL(key U, data T, ttl time.Duration) {
 	if !exists && cache.newItemCallback != nil {
 		cache.newItemCallback(key, data)
 	}
-	cache.expirationNotification <- true
+	cache.clearExpireItem()
 }
 
 // Get is a thread-safe way to lookup items
@@ -299,7 +297,7 @@ func (cache *CacheWithKey[U, T]) Get(key U) (value T, exists bool) {
 	item, exists, triggerExpirationNotification := cache.getItem(key)
 	cache.mutex.Unlock()
 	if triggerExpirationNotification {
-		cache.expirationNotification <- true
+		cache.clearExpireItem()
 	}
 	if !exists {
 		return
@@ -317,16 +315,20 @@ func (cache *CacheWithKey[U, T]) GetAll() map[U]T {
 
 func (cache *CacheWithKey[U, T]) ForEach(handler func(U, T)) {
 	cache.mutex.Lock()
+	needClear := false
 	for key := range cache.items {
 		item, exists, triggerExpirationNotification := cache.getItem(key)
 		if triggerExpirationNotification {
-			cache.expirationNotification <- true
+			needClear = true
 		}
 		if exists {
 			handler(item.key, item.data)
 		}
 	}
 	cache.mutex.Unlock()
+	if needClear {
+		cache.clearExpireItem()
+	}
 }
 
 func (cache *CacheWithKey[U, T]) Remove(key U) bool {
@@ -355,7 +357,7 @@ func (cache *CacheWithKey[U, T]) SetTTL(ttl time.Duration) {
 	cache.mutex.Lock()
 	cache.ttl = ttl
 	cache.mutex.Unlock()
-	cache.expirationNotification <- true
+	cache.clearExpireItem()
 }
 
 // SetExpirationCallback sets a callback that will be called when an item expires
