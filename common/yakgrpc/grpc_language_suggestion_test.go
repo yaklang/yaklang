@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
@@ -13,13 +14,14 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func GetSuggestion(local ypb.YakClient, typ, pluginType string, t *testing.T, code string, Range *ypb.Range) *ypb.YaklangLanguageSuggestionResponse {
+func GetSuggestion(local ypb.YakClient, typ, pluginType string, t *testing.T, code string, Range *ypb.Range, id string) *ypb.YaklangLanguageSuggestionResponse {
 	t.Log("========== get ", typ)
 	ret, err := local.YaklangLanguageSuggestion(context.Background(), &ypb.YaklangLanguageSuggestionRequest{
 		InspectType:   typ,
 		YakScriptType: pluginType,
 		YakScriptCode: code,
 		Range:         Range,
+		ModelID:       id,
 	})
 	log.Info(ret)
 	if err != nil {
@@ -35,13 +37,29 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionCompletion(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	getCompletion := func(t *testing.T, code string, Range *ypb.Range) *ypb.YaklangLanguageSuggestionResponse {
-		return GetSuggestion(local, "completion", "yak", t, code, Range)
+	getCompletion := func(t *testing.T, code string, Range *ypb.Range, ids ...string) *ypb.YaklangLanguageSuggestionResponse {
+		var id string
+		if len(ids) == 0 {
+			id = uuid.NewString()
+		} else {
+			id = ids[0]
+		}
+		if strings.HasSuffix(code, ".") {
+			tmpCode := strings.TrimSuffix(code, ".")
+			GetSuggestion(local, "completion", "yak", t, tmpCode, Range, id)
+		}
+		return GetSuggestion(local, "completion", "yak", t, code, Range, id)
 	}
-	checkCompletionContains := func(t *testing.T, code string, Range *ypb.Range, want []string) {
+	checkCompletionContains := func(t *testing.T, code string, Range *ypb.Range, want []string, ids ...string) {
 		t.Helper()
+		var id string
+		if len(ids) == 0 {
+			id = uuid.NewString()
+		} else {
+			id = ids[0]
+		}
 
-		res := getCompletion(t, code, Range)
+		res := getCompletion(t, code, Range, id)
 		if len(res.SuggestionMessage) == 0 {
 			t.Fatal("should get completion but not")
 		}
@@ -70,8 +88,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionCompletion(t *testing.T) {
 		t.Parallel()
 
 		res := getCompletion(t, `
-cli.
-	`, &ypb.Range{
+cli.`, &ypb.Range{
 			Code:        "",
 			StartLine:   2,
 			StartColumn: 4,
@@ -88,8 +105,7 @@ cli.
 
 		checkCompletionContains(t, `
 prog = ssa.Parse("")~
-prog.
-		`, &ypb.Range{
+prog.`, &ypb.Range{
 			Code:        "prog.",
 			StartLine:   3,
 			StartColumn: 0,
@@ -103,14 +119,40 @@ prog.
 
 		checkCompletionContains(t, `
 rsp, err = http.Request("GET", "https://baidu.com")
-rsp.
-		`, &ypb.Range{
+rsp.`, &ypb.Range{
 			Code:        "rsp.",
 			StartLine:   3,
 			StartColumn: 0,
 			EndLine:     3,
 			EndColumn:   4,
 		}, []string{"Response", "Body", "Status", "Data"})
+	})
+	t.Run("cache", func(t *testing.T) {
+		t.Parallel()
+		code := `asd = fuzz.HTTPRequest("")~
+for a in asd.GetCommonParams() {
+v = a 
+a
+}`
+		id := uuid.NewString()
+		// trigger cache
+		getCompletion(t, code, &ypb.Range{
+			Code:        "a",
+			StartLine:   4,
+			StartColumn: 0,
+			EndLine:     4,
+			EndColumn:   1,
+		}, id)
+
+		// check cache
+		code = strings.Replace(code, "\na\n", "\na.\n", 1)
+		checkCompletionContains(t, code, &ypb.Range{
+			Code:        "a.",
+			StartLine:   4,
+			StartColumn: 0,
+			EndLine:     4,
+			EndColumn:   2,
+		}, []string{"Fuzz", "Value", "Name"}, id)
 	})
 }
 
@@ -125,8 +167,14 @@ func CheckHover(t *testing.T) func(t *testing.T, code, typ string, Range *ypb.Ra
 		}
 	}
 
-	getHover := func(t *testing.T, code, typ string, Range *ypb.Range) *ypb.YaklangLanguageSuggestionResponse {
-		return GetSuggestion(local, "hover", typ, t, code, Range)
+	getHover := func(t *testing.T, code, typ string, Range *ypb.Range, ids ...string) *ypb.YaklangLanguageSuggestionResponse {
+		var id string
+		if len(ids) == 0 {
+			id = uuid.NewString()
+		} else {
+			id = ids[0]
+		}
+		return GetSuggestion(local, "hover", typ, t, code, Range, id)
 	}
 	check := func(t *testing.T, code, typ string, Range *ypb.Range, want string, sub ...bool) {
 		subStr := false
@@ -165,8 +213,14 @@ func CheckSignature(t *testing.T) func(t *testing.T, code, typ string, Range *yp
 		}
 	}
 
-	getHover := func(t *testing.T, code, typ string, Range *ypb.Range) *ypb.YaklangLanguageSuggestionResponse {
-		return GetSuggestion(local, "signature", typ, t, code, Range)
+	getHover := func(t *testing.T, code, typ string, Range *ypb.Range, ids ...string) *ypb.YaklangLanguageSuggestionResponse {
+		var id string
+		if len(ids) == 0 {
+			id = uuid.NewString()
+		} else {
+			id = ids[0]
+		}
+		return GetSuggestion(local, "signature", typ, t, code, Range, id)
 	}
 	check := func(t *testing.T, code, typ string, Range *ypb.Range, wantLabel string, wantDesc string, sub ...bool) {
 		subStr := false
