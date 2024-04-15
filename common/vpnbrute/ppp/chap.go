@@ -21,5 +21,6 @@ func GenerateCHAPResponse(id, challenge, username, password, autype []byte) ([]b
 func GenerateCHAPMD5Response(id, password, challenge []byte) []byte {
 	toBuf := append(id, password...)
 	toBuf = append(toBuf, challenge...)
-	return utils.InterfaceToBytes(md5.Sum(toBuf))
+	res := md5.Sum(toBuf)
+	return res[:]
 }
