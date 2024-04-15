@@ -4,6 +4,10 @@ import (
 	"fmt"
 )
 
+func FreeValueUndefine(name string) string {
+	return fmt.Sprintf("Can't find definition of this variable %s both inside and outside the function.", name)
+}
+
 func ErrorUnhandled() string {
 	return "Error Unhandled "
 }

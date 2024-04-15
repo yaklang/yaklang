@@ -157,7 +157,7 @@ func CheckError(t *testing.T, tc TestCase) {
 	CheckTestCase(t, tc)
 }
 
-func CheckType(t *testing.T, code string, kind ssa.TypeKind) {
+func CheckType(t *testing.T, code string, kind ssa.TypeKind, opt ...ssaapi.Option) {
 	tc := TestCase{
 		Code: code,
 		Check: func(prog *ssaapi.Program, _ []string) {
@@ -170,6 +170,7 @@ func CheckType(t *testing.T, code string, kind ssa.TypeKind) {
 			log.Info("type and kind: ", v.GetType(), v.GetTypeKind())
 			require.Equal(t, kind, v.GetTypeKind())
 		},
+		Option: opt,
 	}
 	CheckTestCase(t, tc)
 }

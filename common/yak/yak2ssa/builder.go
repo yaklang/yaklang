@@ -14,7 +14,7 @@ type astbuilder struct {
 }
 
 func Build(src string, force bool, builder *ssa.FunctionBuilder) error {
-	ast, err := frontEnd(src, force)
+	ast, err := FrontEnd(src, force)
 	if err != nil {
 		return err
 	}
@@ -32,7 +32,7 @@ func Build(src string, force bool, builder *ssa.FunctionBuilder) error {
 	return nil
 }
 
-func frontEnd(src string, must bool) (*yak.ProgramContext, error) {
+func FrontEnd(src string, must bool) (*yak.ProgramContext, error) {
 	errListener := antlr4util.NewErrorListener()
 	lexer := yak.NewYaklangLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()
