@@ -17,6 +17,10 @@ Package:
     Payload:
       length-from-field: "../Payload Length"
       operator: |
+        length = getNodeResult("../Payload Length").Value
+        if length <= 0 {
+          return
+        }
         type = getNodeResult("../Protocol Type").Value
         switch type {
           case 0x0800:
