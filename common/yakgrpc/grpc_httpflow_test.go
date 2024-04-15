@@ -353,6 +353,50 @@ func TestExportHTTPFlows(t *testing.T) {
 	_ = response
 }
 
+func TestExportHTTPFlowsWithPayload(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	host, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK
+Content-Length: 5
+
+hello`))
+
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	stream, err := client.HTTPFuzzer(ctx, &ypb.FuzzerRequest{
+		Request: fmt.Sprintf(`GET /a={{int(1-5)}} HTTP/1.1
+Host: %s
+
+`, utils.HostPort(host, port)),
+		ForceFuzz: true,
+	})
+	require.NoError(t, err)
+	runtimeIDs := make([]string, 0)
+
+	for {
+		resp, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		runtimeIDs = append(runtimeIDs, resp.RuntimeID)
+	}
+
+	responses, err := client.ExportHTTPFlows(context.Background(), &ypb.ExportHTTPFlowsRequest{
+		ExportWhere: &ypb.QueryHTTPFlowRequest{
+			Pagination: &ypb.Paging{
+				Page:  1,
+				Limit: 20,
+			},
+			Full:       true,
+			RuntimeIDs: runtimeIDs,
+		},
+		FieldName: []string{"url", "method", "status_code", "payloads"},
+	})
+	require.NoErrorf(t, err, "export httpFlows error")
+	for _, flow := range responses.Data {
+		require.NotEmpty(t, flow.Payloads)
+	}
+}
+
 func TestGRPCMUSTPASS_MITM_PreSetTags(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
