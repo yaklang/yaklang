@@ -771,6 +771,7 @@ func TestCallParamReturn(t *testing.T) {
 			`,
 			Want: []string{
 				"empty block",
+				ssa4analyze.FreeValueUndefine("f2"),
 			},
 		})
 	})
