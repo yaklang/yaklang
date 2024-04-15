@@ -22,6 +22,7 @@ func (p *Program) show(flag FunctionAsmFlag) {
 	}
 
 	for _, pkg := range p.Packages {
+		fmt.Println("==============================\npackage:", pkg.Name)
 		for _, i := range pkg.Funcs {
 			showFunc(i)
 		}
