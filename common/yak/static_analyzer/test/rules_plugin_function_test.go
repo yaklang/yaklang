@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/rules"
 )
 
@@ -91,7 +92,9 @@ func TestRulesDefineFunction(t *testing.T) {
 		hijackSaveHTTPFlow = func(flow /* *yakit.HTTPFlow */, modify /* func(modified *yakit.HTTPFlow) */, drop/* func() */) {
 			b = 1
 		}
-		`, []string{}, "mitm")
+		`, []string{
+			ssa4analyze.FreeValueUndefine("hijackSaveHTTPFlow"),
+		}, "mitm")
 
 		check(t, `
 		_test_ = () => {
@@ -100,7 +103,9 @@ func TestRulesDefineFunction(t *testing.T) {
 		handle = (s) => {
 			return s
 		}
-		`, []string{}, "codec")
+		`, []string{
+			ssa4analyze.FreeValueUndefine("handle"),
+		}, "codec")
 	})
 
 }
@@ -115,6 +120,7 @@ func TestRuleDefineFunctionWithFreeValue(t *testing.T) {
 	}
 		`,
 			[]string{
+				ssa4analyze.FreeValueUndefine("a"),
 				ssa.ValueUndefined("a"),
 			},
 			"codec",

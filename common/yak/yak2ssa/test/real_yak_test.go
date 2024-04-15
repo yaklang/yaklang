@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 )
@@ -67,6 +69,7 @@ for true {
 		a = () => {
 			println("a")
 		}
+		f()
 		`)
 	})
 
@@ -237,6 +240,18 @@ func Test_RealYak_FreeValueMemberCall(t *testing.T) {
 }
 
 func Test_RealYak_FreeValue_Error(t *testing.T) {
+	t.Run("mark freevalue without call: no default", func(t *testing.T) {
+		ssatest.CheckError(t, ssatest.TestCase{
+			Code: `
+		f = () => {
+			b = a
+		}
+		`,
+			Want: []string{
+				ssa4analyze.FreeValueUndefine("a"),
+			},
+		})
+	})
 
 	t.Run("mark freevalue with call: no found ", func(t *testing.T) {
 		ssatest.CheckError(t, ssatest.TestCase{
@@ -267,6 +282,18 @@ func Test_RealYak_FreeValue_Error(t *testing.T) {
 		`)
 	})
 
+	t.Run("freevalue with member call, without call", func(t *testing.T) {
+		ssatest.CheckError(t, ssatest.TestCase{
+			Code: `
+		f = () => {
+			b = a.b
+		}
+		`,
+			Want: []string{
+				ssa4analyze.FreeValueUndefine("a"),
+			},
+		})
+	})
 
 	t.Run("freevalue  with member call with call: no found ", func(t *testing.T) {
 		ssatest.CheckError(t, ssatest.TestCase{

@@ -68,6 +68,7 @@ func TestPluginOption_MarkedFunction(t *testing.T) {
 			a = 1
 		}
 		`, []string{
+			ssa4analyze.FreeValueUndefine("f"),
 			ssa.ValueUndefined("f"),
 		}, "mitm")
 	})
@@ -81,7 +82,9 @@ func TestPluginOption_MarkedFunction(t *testing.T) {
 		f = () => {
 			println("a")
 		}
-		`, []string{}, "mitm")
+		`, []string{
+			ssa4analyze.FreeValueUndefine("f"),
+		}, "mitm")
 	})
 
 }

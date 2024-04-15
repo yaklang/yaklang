@@ -34,6 +34,23 @@ func (t *TypeInference) RunOnFunction(fun *ssa.Function) {
 	for _, inst := range t.DeleteInst {
 		ssa.DeleteInst(inst)
 	}
+
+	hasCall := false
+	for _, user := range fun.GetUsers() {
+		if _, ok := ssa.ToCall(user); ok {
+			hasCall = true
+			break
+		}
+	}
+	if hasCall {
+		return
+	}
+	for name, fv := range fun.FreeValues {
+		if fv.GetDefault() != nil {
+			continue
+		}
+		fv.NewError(ssa.Warn, TITAG, FreeValueUndefine(name))
+	}
 }
 
 func (t *TypeInference) InferenceOnInstruction(inst ssa.Instruction) {
