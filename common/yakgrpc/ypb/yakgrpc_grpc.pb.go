@@ -22,10 +22,7 @@ const (
 	Yak_Version_FullMethodName                                    = "/ypb.Yak/Version"
 	Yak_YakVersionAtLeast_FullMethodName                          = "/ypb.Yak/YakVersionAtLeast"
 	Yak_Echo_FullMethodName                                       = "/ypb.Yak/Echo"
-<<<<<<< HEAD
 	Yak_VerifySystemCertificate_FullMethodName                    = "/ypb.Yak/VerifySystemCertificate"
-=======
->>>>>>> d1a59ce5 (feat(webfuzzer): add runtimeID for webfuzzer)
 	Yak_MITM_FullMethodName                                       = "/ypb.Yak/MITM"
 	Yak_SetMITMFilter_FullMethodName                              = "/ypb.Yak/SetMITMFilter"
 	Yak_GetMITMFilter_FullMethodName                              = "/ypb.Yak/GetMITMFilter"
@@ -841,7 +838,6 @@ func (c *yakClient) YakVersionAtLeast(ctx context.Context, in *YakVersionAtLeast
 func (c *yakClient) Echo(ctx context.Context, in *EchoRequest, opts ...grpc.CallOption) (*EchoResposne, error) {
 	out := new(EchoResposne)
 	err := c.cc.Invoke(ctx, Yak_Echo_FullMethodName, in, out, opts...)
-<<<<<<< HEAD
 	if err != nil {
 		return nil, err
 	}
@@ -851,8 +847,6 @@ func (c *yakClient) Echo(ctx context.Context, in *EchoRequest, opts ...grpc.Call
 func (c *yakClient) VerifySystemCertificate(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*VerifySystemCertificateResponse, error) {
 	out := new(VerifySystemCertificateResponse)
 	err := c.cc.Invoke(ctx, Yak_VerifySystemCertificate_FullMethodName, in, out, opts...)
-=======
->>>>>>> d1a59ce5 (feat(webfuzzer): add runtimeID for webfuzzer)
 	if err != nil {
 		return nil, err
 	}

@@ -1462,8 +1462,16 @@ func ExportHTTPFlow(db *gorm.DB, params *ypb.ExportHTTPFlowsRequest) (paging *bi
 
 	db = db.Model(&HTTPFlow{})
 	rawDB := db
-	// overwrite Select Field
-	queryDB := BuildHTTPFlowQuery(db, queryParams).Select(strings.Join(params.FieldName, ","))
+	// overwrite Select Field, fix payloads
+	params.FieldName = lo.Filter(params.FieldName, func(item string, index int) bool {
+		if item == "payloads" {
+			queryParams.WithPayload = true
+			return false
+		}
+		return true
+	})
+	params.FieldName = append(params.FieldName, "hidden_index")
 
+	queryDB := BuildHTTPFlowQuery(db, queryParams).Select(strings.Join(params.FieldName, ","))
 	return SelectHTTPFlowFromDB(rawDB, queryDB, queryParams)
 }
