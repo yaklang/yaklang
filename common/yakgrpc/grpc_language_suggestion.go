@@ -608,14 +608,15 @@ func trimSourceCode(sourceCode string) (string, bool) {
 	if strings.HasSuffix(sourceCode, ".") {
 		sourceCode = sourceCode[:len(sourceCode)-1]
 	}
-	return sourceCode, containPoint
+	return strings.TrimSpace(sourceCode), containPoint
 }
 
 func OnHover(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionRequest) (ret []*ypb.SuggestionDescription) {
 	ret = make([]*ypb.SuggestionDescription, 0)
-	position := GrpcRangeToPosition(req.GetRange())
+	position := GrpcRangeToPosition(req.GetYakScriptCode(), req.GetRange())
 	//word, _ := trimSourceCode(*position.SourceCode)
 	word, _ := trimSourceCode(position.GetText())
+	log.Infof("on-hover word: %s in %v", word, position.String())
 	v := getSSAParentValueByPosition(prog, word, position)
 	// fallback
 	if v == nil {
@@ -634,7 +635,7 @@ func OnHover(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionRequest) (r
 
 func OnSignature(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionRequest) (ret []*ypb.SuggestionDescription) {
 	ret = make([]*ypb.SuggestionDescription, 0)
-	position := GrpcRangeToPosition(req.GetRange())
+	position := GrpcRangeToPosition(req.GetYakScriptCode(), req.GetRange())
 	//word, _ := trimSourceCode(*position.SourceCode)
 	word, _ := trimSourceCode(position.GetText())
 	v := getSSAParentValueByPosition(prog, word, position)
@@ -659,8 +660,11 @@ func OnSignature(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionRequest
 
 func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionRequest) (ret []*ypb.SuggestionDescription) {
 	ret = make([]*ypb.SuggestionDescription, 0)
-	position := GrpcRangeToPosition(req.GetRange())
+	position := GrpcRangeToPosition(req.GetYakScriptCode(), req.GetRange())
 	word, containPoint := trimSourceCode(position.GetText())
+
+	log.Infof("word: %s in %v, containPoint: %v", word, position.String(), containPoint)
+
 	v := getSSAParentValueByPosition(prog, word, position)
 	if !containPoint {
 		// 库补全
@@ -821,13 +825,13 @@ func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionReques
 	return ret
 }
 
-func GrpcRangeToPosition(r *ypb.Range) *ssa.Range {
+func GrpcRangeToPosition(sourceCode string, r *ypb.Range) *ssa.Range {
 	// TODO: ypb.Range should have `Offset`
-	e := memedit.NewMemEditor(r.GetCode())
+	e := memedit.NewMemEditor(sourceCode)
 	return ssa.NewRange(
 		e,
-		ssa.NewPosition(r.StartLine, r.StartColumn-1),
-		ssa.NewPosition(r.EndLine, r.EndColumn-1),
+		ssa.NewPosition(r.StartLine, r.StartColumn),
+		ssa.NewPosition(r.EndLine, r.EndColumn),
 	)
 }
 
