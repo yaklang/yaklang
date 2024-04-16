@@ -615,7 +615,7 @@ func OnHover(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionRequest) (r
 	ret = make([]*ypb.SuggestionDescription, 0)
 	position := GrpcRangeToPosition(req.GetYakScriptCode(), req.GetRange())
 	//word, _ := trimSourceCode(*position.SourceCode)
-	word, _ := trimSourceCode(position.GetText())
+	word, _ := trimSourceCode(position.GetWordText())
 	log.Infof("on-hover word: %s in %v", word, position.String())
 	v := getSSAParentValueByPosition(prog, word, position)
 	// fallback
@@ -637,7 +637,7 @@ func OnSignature(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionRequest
 	ret = make([]*ypb.SuggestionDescription, 0)
 	position := GrpcRangeToPosition(req.GetYakScriptCode(), req.GetRange())
 	//word, _ := trimSourceCode(*position.SourceCode)
-	word, _ := trimSourceCode(position.GetText())
+	word, _ := trimSourceCode(position.GetWordText())
 	v := getSSAParentValueByPosition(prog, word, position)
 	// fallback
 	if v == nil {
@@ -661,9 +661,9 @@ func OnSignature(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionRequest
 func OnCompletion(prog *ssaapi.Program, req *ypb.YaklangLanguageSuggestionRequest) (ret []*ypb.SuggestionDescription) {
 	ret = make([]*ypb.SuggestionDescription, 0)
 	position := GrpcRangeToPosition(req.GetYakScriptCode(), req.GetRange())
-	word, containPoint := trimSourceCode(position.GetText())
+	word, containPoint := trimSourceCode(position.GetWordText())
 
-	log.Infof("word: %s in %v, containPoint: %v", word, position.String(), containPoint)
+	log.Infof("completion word: %#v in %v, containPoint: %v", word, position.String(), containPoint)
 
 	v := getSSAParentValueByPosition(prog, word, position)
 	if !containPoint {
