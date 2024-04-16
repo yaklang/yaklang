@@ -6,6 +6,7 @@ import (
 )
 
 type Range struct {
+	text       string
 	editor     *memedit.MemEditor
 	start, end *Position
 }
@@ -76,7 +77,11 @@ func (p *Range) GetOffset() int {
 }
 
 func (p *Range) GetText() string {
-	return p.editor.GetTextFromRange(p)
+	if p.text != "" {
+		return p.text
+	}
+	p.text = p.editor.GetTextFromRange(p)
+	return p.text
 }
 
 func (p *Range) String() string {
