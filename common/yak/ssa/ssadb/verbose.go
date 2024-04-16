@@ -7,7 +7,11 @@ import (
 
 func (i *IrCode) VerboseString() string {
 	buf := bytes.NewBufferString("")
-	buf.WriteString(fmt.Sprintf("%-5s: %v - %v", fmt.Sprint(i.ID), i.OpcodeName, i.ShortVerboseName))
+	hashShort := i.SourceCodeHash
+	if len(hashShort) > 5 {
+		hashShort = hashShort[:5]
+	}
+	buf.WriteString(fmt.Sprintf("%5s:%-5s: %v - %v", hashShort, fmt.Sprint(i.ID), i.OpcodeName, i.ShortVerboseName))
 	return buf.String()
 }
 
