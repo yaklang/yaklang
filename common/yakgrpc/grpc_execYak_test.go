@@ -24,6 +24,29 @@ import (
 )
 
 func TestOUTPUT_AiChat(t *testing.T) {
+	endCh := make(chan struct{})
+	endFlag := utils.RandStringBytes(20)
+	endFlagMsg := fmt.Sprintf("%s\n", endFlag)
+	sendEndMsg := func() {
+		println(endFlagMsg)
+	}
+	checkEndMsg := func(s string) {
+		if strings.Contains(s, endFlag) {
+			endCh <- struct{}{}
+		}
+	}
+	_ = sendEndMsg
+	_ = checkEndMsg
+	sendEndFlag := func() {
+		endCh <- struct{}{}
+	}
+	wait := func() {
+		select {
+		case <-endCh:
+		case <-time.After(time.Second * 10):
+		}
+	}
+	consts.ClearThirdPartyApplicationConfig()
 	consts.UpdateThirdPartyApplicationConfig(&ypb.ThirdPartyApplicationConfig{
 		APIKey: fmt.Sprintf("%s.%s", utils.RandStringBytes(32), utils.RandStringBytes(16)),
 		Type:   "chatglm",
@@ -76,14 +99,20 @@ func TestOUTPUT_AiChat(t *testing.T) {
 		t.Fatal(err)
 	}
 	debugStreamTestResult := false
+	stdOutputCh := ""
+	re := regexp.MustCompile("[\u4e00-\u9fa5]")
 	go func() {
 		for {
 			v, err := stream.Recv()
 			if err != nil {
 				return
 			}
-			if strings.Contains(string(v.Raw), "你好我是人工智障助手") {
+			for _, c := range re.FindAllString(string(v.Raw), -1) {
+				stdOutputCh += c
+			}
+			if stdOutputCh == "你好我是人工智障助手" {
 				debugStreamTestResult = true
+				sendEndFlag()
 			}
 		}
 	}()
@@ -94,10 +123,33 @@ func TestOUTPUT_AiChat(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(time.Second * 3)
+	wait()
 	assert.Equal(t, true, debugStreamTestResult)
 }
 func TestOUTPUT_AiChatOutputByDefaultStream(t *testing.T) {
+	endCh := make(chan struct{})
+	endFlag := utils.RandStringBytes(20)
+	endFlagMsg := fmt.Sprintf("%s\n", endFlag)
+	sendEndMsg := func() {
+		println(endFlagMsg)
+	}
+	checkEndMsg := func(s string) {
+		if strings.Contains(s, endFlag) {
+			endCh <- struct{}{}
+		}
+	}
+	_ = sendEndMsg
+	_ = checkEndMsg
+	sendEndFlag := func() {
+		endCh <- struct{}{}
+	}
+	wait := func() {
+		select {
+		case <-endCh:
+		case <-time.After(time.Second * 10):
+		}
+	}
+	consts.ClearThirdPartyApplicationConfig()
 	consts.UpdateThirdPartyApplicationConfig(&ypb.ThirdPartyApplicationConfig{
 		APIKey: fmt.Sprintf("%s.%s", utils.RandStringBytes(32), utils.RandStringBytes(16)),
 		Type:   "chatglm",
@@ -148,6 +200,9 @@ func TestOUTPUT_AiChatOutputByDefaultStream(t *testing.T) {
 			subMsgN++
 			msg += s[0][1]
 		}
+		if strings.Contains(msg, "你好我是人工智障助手") {
+			sendEndFlag()
+		}
 		print(string(i.Raw))
 		return nil
 	}))
@@ -160,8 +215,8 @@ func TestOUTPUT_AiChatOutputByDefaultStream(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(time.Second * 3)
-	assert.Equal(t, true, subMsgN > 3)
+	wait()
+	assert.Equal(t, true, subMsgN >= 3)
 	assert.Contains(t, msg, "你好我是人工智障助手")
 }
 func TestOUTPUT_STREAMYakitStream(t *testing.T) {
