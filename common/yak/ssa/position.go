@@ -84,6 +84,10 @@ func (p *Range) GetText() string {
 	return p.text
 }
 
+func (p *Range) GetWordText() string {
+	return p.editor.GetWordTextFromRange(p)
+}
+
 func (p *Range) String() string {
 	return fmt.Sprintf(
 		"%s - %s: %s",

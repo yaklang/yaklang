@@ -294,6 +294,38 @@ func (ve *MemEditor) GetTextFromRange(i RangeIf) string {
 	return ve.GetTextFromPosition(i.GetEnd(), i.GetStart())
 }
 
+func (ve *MemEditor) GetWordTextFromRange(i RangeIf) string {
+	startPos := i.GetStart()
+	endPos := i.GetEnd()
+
+	startOffset, _ := ve.GetOffsetByPositionWithError(startPos.GetLine(), startPos.GetColumn())
+	endOffset, _ := ve.GetOffsetByPositionWithError(endPos.GetLine(), endPos.GetColumn())
+
+	// 定义单词边界符，这里使用非字母数字作为分隔符，可根据实际需求调整
+	boundary := func(c rune) bool {
+		return !('a' <= c && c <= 'z') && !('A' <= c && c <= 'Z') && !('0' <= c && c <= '9')
+	}
+
+	// 扩展起始偏移到前一个单词边界
+	startWordOffset := startOffset
+	for startWordOffset > 0 && !boundary(rune(ve.sourceCode[startWordOffset-1])) {
+		startWordOffset--
+	}
+
+	// 扩展结束偏移到后一个单词边界
+	endWordOffset := endOffset
+	for endWordOffset < len(ve.sourceCode) && !boundary(rune(ve.sourceCode[endWordOffset])) {
+		endWordOffset++
+	}
+
+	// 获取并返回整个单词文本
+	if startWordOffset < endWordOffset {
+		return ve.sourceCode[startWordOffset:endWordOffset]
+	}
+
+	return "" // 如果起始偏移和结束偏移相等，返回空字符串
+}
+
 func (ve *MemEditor) IsOffsetValid(offset int) bool {
 	return offset >= 0 && offset <= len(ve.sourceCode)
 }
