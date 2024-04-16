@@ -2,91 +2,76 @@ package yakgrpc
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"github.com/yaklang/yaklang/common/crep"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
-	"net/url"
-	"strings"
 )
 
 func (s *Server) Echo(ctx context.Context, req *ypb.EchoRequest) (*ypb.EchoResposne, error) {
 	return &ypb.EchoResposne{Result: req.GetText()}, nil
 }
 
-func (s *Server) VerifySystemCertificate(ctx context.Context, req *ypb.VerifySystemCertificateRequest) (*ypb.VerifySystemCertificateResponse, error) {
+func (s *Server) VerifySystemCertificate(ctx context.Context, _ *ypb.Empty) (*ypb.VerifySystemCertificateResponse, error) {
 
-	//return verifySystemCertificateByURL(req.GetUrl())
+	//return verifySystemCertificateByURL()
 	return verifySystemCertificate()
 }
 
-func verifySystemCertificateByURL(u string) (*ypb.VerifySystemCertificateResponse, error) {
-	testUrl := "https://www.example.com"
-	if u != "" {
-		testUrl = u
-		u, err := url.Parse(testUrl)
-		if err != nil {
-			return nil, utils.Wrap(err, "failed to parse url")
-		}
-		if u.Scheme != "https" {
-			return nil, utils.Error("only support https url")
-		}
-	}
+func verifySystemCertificateByURL() (*ypb.VerifySystemCertificateResponse, error) {
+	crep.InitMITMCert()
+	caCert, caKey, _ := crep.GetDefaultCaAndKey()
+	port := utils.GetRandomAvailableTCPPort()
 
-	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(20))
-	defer cancel()
-	client, err := NewLocalClient()
-
-	stream, err := client.MITM(ctx)
+	cert, err := tls.X509KeyPair(caCert, caKey)
 	if err != nil {
-		return nil, utils.Wrap(err, "failed to create MITM stream")
-	}
-	mitmPort := utils.GetRandomAvailableTCPPort()
-
-	host, port := "127.0.0.1", mitmPort
-	stream.Send(&ypb.MITMRequest{
-		Host: host,
-		Port: uint32(port),
-	})
-
-	request := func() error {
-		proxyURL, err := url.Parse(fmt.Sprintf("http://%s:%d", host, port))
-		if err != nil {
-			return err
-		}
-		client := &http.Client{
-			Transport: &http.Transport{
-				Proxy: http.ProxyURL(proxyURL),
-			},
-		}
-		resp, err := client.Get(testUrl)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-		return nil
+		return nil, err
 	}
 
-	for {
-		rsp, err := stream.Recv()
-		if err != nil {
-			break
-		}
-		if rsp.GetHaveMessage() {
-			msg := rsp.GetMessage().GetMessage()
-			if strings.Contains(string(msg), `starting mitm server`) {
-				err := request()
-				if err != nil {
-					return &ypb.VerifySystemCertificateResponse{
-						Valid: false, Reason: err.Error(),
-					}, nil
-				}
-				return &ypb.VerifySystemCertificateResponse{Valid: true}, nil
-			}
-		}
+	log.Infof("Starting HTTPS server on port %d", port)
+	// 创建 HTTPS 服务器
+	server := &http.Server{
+		Addr: fmt.Sprintf("127.0.0.1:%d", port), // HTTPS 默认端口
+		TLSConfig: &tls.Config{
+			Certificates: []tls.Certificate{cert},
+		},
 	}
-	return &ypb.VerifySystemCertificateResponse{Valid: false}, nil
+
+	serverReady := make(chan struct{})
+
+	go func() {
+		close(serverReady)
+		err := server.ListenAndServeTLS("", "")
+		if err != nil {
+			log.Errorf("server.ListenAndServeTLS() failed: %v", err)
+		}
+	}()
+
+	<-serverReady
+
+	defer server.Shutdown(context.Background())
+
+	tlsConfig := &tls.Config{
+		ServerName: "mitmserver",
+		MinVersion: tls.VersionSSL30, // nolint[:staticcheck]
+		MaxVersion: tls.VersionTLS13,
+	}
+	conn, err := netx.DialX(fmt.Sprintf("127.0.0.1:%d", port),
+		netx.DialX_WithTLS(true),
+		netx.DialX_WithTLSConfig(tlsConfig),
+		netx.DialX_WithTimeout(3),
+	)
+
+	if err != nil {
+		return &ypb.VerifySystemCertificateResponse{Valid: false, Reason: err.Error()}, nil
+	}
+	defer conn.Close()
+
+	return &ypb.VerifySystemCertificateResponse{Valid: true}, nil
 }
 
 func verifySystemCertificate() (*ypb.VerifySystemCertificateResponse, error) {
