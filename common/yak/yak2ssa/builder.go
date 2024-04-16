@@ -3,6 +3,7 @@ package yak2ssa
 import (
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -17,10 +18,16 @@ func Build(src string, force bool, builder *ssa.FunctionBuilder) error {
 	if err != nil {
 		return err
 	}
+
+	originEditor := builder.Editor
+	defer func() {
+		builder.Editor = originEditor
+	}()
+
+	builder.Editor = memedit.NewMemEditor(src)
 	astBuilder := &astbuilder{
 		FunctionBuilder: builder,
 	}
-
 	astBuilder.build(ast)
 	return nil
 }
