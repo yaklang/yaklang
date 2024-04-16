@@ -9,6 +9,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
@@ -23,6 +24,10 @@ import (
 )
 
 func TestOUTPUT_AiChat(t *testing.T) {
+	consts.UpdateThirdPartyApplicationConfig(&ypb.ThirdPartyApplicationConfig{
+		APIKey: fmt.Sprintf("%s.%s", utils.RandStringBytes(32), utils.RandStringBytes(16)),
+		Type:   "chatglm",
+	})
 	rspStrTmp := `data: {"id":"1","created":1,"model":"1","choices":[{"index":0,"delta":{"role":"assistant","content":"%s"}}]}
 `
 	headerStr, _, _ := lowhttp.FixHTTPResponse([]byte("HTTP/1.1 200 OK\nContent-Type: application/json\nTransfer-Encoding: chunked\nConnection: Keep-Alive\n\n"))
@@ -93,6 +98,10 @@ func TestOUTPUT_AiChat(t *testing.T) {
 	assert.Equal(t, true, debugStreamTestResult)
 }
 func TestOUTPUT_AiChatOutputByDefaultStream(t *testing.T) {
+	consts.UpdateThirdPartyApplicationConfig(&ypb.ThirdPartyApplicationConfig{
+		APIKey: fmt.Sprintf("%s.%s", utils.RandStringBytes(32), utils.RandStringBytes(16)),
+		Type:   "chatglm",
+	})
 	rspStrTmp := `data: {"id":"1","created":1,"model":"1","choices":[{"index":0,"delta":{"role":"assistant","content":"%s"}}]}
 `
 	headerStr, _, _ := lowhttp.FixHTTPResponse([]byte("HTTP/1.1 200 OK\nContent-Type: application/json\nTransfer-Encoding: chunked\nConnection: Keep-Alive\n\n"))
