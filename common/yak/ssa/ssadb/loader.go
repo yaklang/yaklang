@@ -35,7 +35,7 @@ func YieldIrCodes(db *gorm.DB, ctx context.Context) chan *IrCode {
 				}
 			}
 
-			if len(items) < 1000 {
+			if len(items) < 100 {
 				return
 			}
 		}
