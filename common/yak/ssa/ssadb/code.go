@@ -1,6 +1,7 @@
 package ssadb
 
 import (
+	"github.com/yaklang/yaklang/common/utils"
 	"sync"
 
 	"github.com/jinzhu/gorm"
@@ -131,4 +132,23 @@ func GetIrByVariable(db *gorm.DB, program, name string) []*IrCode {
 
 func DeleteProgram(db *gorm.DB, program string) {
 	db.Model(&IrCode{}).Where("program_name = ?", program).Unscoped().Delete(&IrCode{})
+}
+
+func (r *IrCode) IsEmptySourceCodeHash() bool {
+	if r == nil {
+		return true
+	}
+	if r.SourceCodeHash == "" {
+		return true
+	}
+	for _, hash := range []func(...any) string{
+		utils.CalcMd5,
+		utils.CalcSha1,
+		utils.CalcSha256,
+	} {
+		if r.SourceCodeHash == hash("") {
+			return true
+		}
+	}
+	return false
 }
