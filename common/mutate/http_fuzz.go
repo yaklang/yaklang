@@ -887,17 +887,6 @@ func (f *FuzzHTTPRequest) GetCommonParams() []*FuzzHTTPRequestParam {
 	return params
 }
 
-func (f *FuzzHTTPRequest) GetPostCommonParams() []*FuzzHTTPRequestParam {
-	postParams := f.GetPostJsonParams()
-	if len(postParams) <= 0 {
-		postParams = f.GetPostXMLParams()
-	}
-	if len(postParams) <= 0 {
-		postParams = f.GetPostParams()
-	}
-	return postParams
-}
-
 func (f *FuzzHTTPRequest) GetPostCommonParamsByName(name string) *FuzzHTTPRequestParam {
 	postParams := f.GetPostCommonParams()
 	for _, param := range postParams {
