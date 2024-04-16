@@ -295,6 +295,8 @@ var (
 		"download-mitm-ca.com",
 		"download-mitm-cert.yaklang.io",
 		"mitm",
+		// 某些手机浏览器没办法访问非域名格式的地址，比如 mitm
+		"mitm.cert",
 	}
 	//go:embed static/navtab.html
 	// 返回HTML页面内容

@@ -112,9 +112,6 @@ message GetYakScriptByOnlineIDRequest {
   int64 OnlineID = 2;
 }
 
-message VerifySystemCertificateRequest {
-  string url = 1;
-}
 
 message VerifySystemCertificateResponse {
   bool valid = 1;
@@ -129,7 +126,7 @@ service Yak {
   // echo 通常用于测试服务是否通畅
   rpc Echo(EchoRequest) returns(EchoResposne);
 
-  rpc VerifySystemCertificate(VerifySystemCertificateRequest) returns (VerifySystemCertificateResponse);
+  rpc VerifySystemCertificate(Empty) returns (VerifySystemCertificateResponse);
 
   // 中间人劫持
   rpc MITM(stream MITMRequest) returns (stream MITMResponse);
