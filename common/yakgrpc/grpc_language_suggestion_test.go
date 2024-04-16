@@ -60,9 +60,9 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionCompletion(t *testing.T) {
 		checkCompletionContains(t, `r = poc.Get("123")~; r.`, &ypb.Range{
 			Code:        "r.",
 			StartLine:   1,
-			StartColumn: 20,
+			StartColumn: 21,
 			EndLine:     1,
-			EndColumn:   22,
+			EndColumn:   23,
 		}, []string{"Length", "Pop"})
 	})
 
@@ -213,9 +213,9 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 			Range: &ypb.Range{
 				Code:        "a",
 				StartLine:   2,
-				StartColumn: 5,
+				StartColumn: 0,
 				EndLine:     2,
-				EndColumn:   6,
+				EndColumn:   1,
 			},
 		},
 
@@ -225,9 +225,9 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 			Range: &ypb.Range{
 				Code:        "b",
 				StartLine:   3,
-				StartColumn: 5,
+				StartColumn: 0,
 				EndLine:     3,
-				EndColumn:   6,
+				EndColumn:   1,
 			},
 		},
 		{
@@ -236,9 +236,9 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 			Range: &ypb.Range{
 				Code:        "c",
 				StartLine:   4,
-				StartColumn: 5,
+				StartColumn: 0,
 				EndLine:     4,
-				EndColumn:   6,
+				EndColumn:   1,
 			},
 		},
 		{
@@ -247,9 +247,9 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 			Range: &ypb.Range{
 				Code:        "d",
 				StartLine:   5,
-				StartColumn: 5,
+				StartColumn: 0,
 				EndLine:     5,
-				EndColumn:   6,
+				EndColumn:   1,
 			},
 		},
 		{
@@ -258,9 +258,9 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 			Range: &ypb.Range{
 				Code:        "d2",
 				StartLine:   5,
-				StartColumn: 11,
+				StartColumn: 12,
 				EndLine:     5,
-				EndColumn:   13,
+				EndColumn:   14,
 			},
 		},
 		{
@@ -269,9 +269,9 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 			Range: &ypb.Range{
 				Code:        "e",
 				StartLine:   6,
-				StartColumn: 5,
+				StartColumn: 0,
 				EndLine:     6,
-				EndColumn:   6,
+				EndColumn:   1,
 			},
 		},
 		{
@@ -280,9 +280,9 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 			Range: &ypb.Range{
 				Code:        "f",
 				StartLine:   7,
-				StartColumn: 5,
+				StartColumn: 0,
 				EndLine:     7,
-				EndColumn:   6,
+				EndColumn:   1,
 			},
 		},
 		{
@@ -291,21 +291,21 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 			Range: &ypb.Range{
 				Code:        "g",
 				StartLine:   8,
-				StartColumn: 5,
+				StartColumn: 0,
 				EndLine:     8,
-				EndColumn:   6,
+				EndColumn:   1,
 			},
 		},
 	}
 	code := `
-				a = 1
-				b = 1.1
-				c = "asd"
-				d = b"asd"; d2 = []byte("asd")
-				e = {"a": 1}
-				f = [1, 2, 3]
-				g = make(chan int)
-				`
+a = 1
+b = 1.1
+c = "asd"
+d = b"asd"; d2 = []byte("asd")
+e = {"a": 1}
+f = [1, 2, 3]
+g = make(chan int)
+`
 
 	for _, item := range data {
 		item := item

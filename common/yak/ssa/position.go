@@ -87,7 +87,7 @@ func (p *Range) GetText() string {
 func (p *Range) String() string {
 	return fmt.Sprintf(
 		"%s - %s: %s",
-		p.start, p.start, p.GetText(),
+		p.start, p.end, p.GetText(),
 	)
 }
 
