@@ -321,10 +321,11 @@ var defaultFilter = filter.NewFilter()
 
 func NewConfig(opts ...ConfigOption) *Config {
 	c := &Config{
-		ConcurrentInTemplates: 20,
-		ConcurrentTemplates:   20,
-		ConcurrentTarget:      10,
-		Mode:                  "nuclei",
+		ConcurrentInTemplates:          20,
+		ConcurrentTemplates:            20,
+		ConcurrentTarget:               10,
+		Mode:                           "nuclei",
+		EnableReverseConnectionFeature: true,
 	}
 	for _, opt := range opts {
 		opt(c)
