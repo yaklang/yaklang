@@ -6,7 +6,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 
 	"github.com/kataras/pio"
@@ -95,12 +95,14 @@ func (v *Frame) getCodeReview(sourceCode *string, code *Code, i *VMPanic) string
 			}
 		}
 	}()
-	editor := utils.NewVirtualEditor(codeOrigin)
+
+	// todo: unicode support
+	editor := memedit.NewMemEditor(codeOrigin)
 	startOffset, err := editor.GetStartOffsetByLine(code.StartLineNumber)
 	if err != nil {
 		panic(err)
 	}
-	startErrorOffset, err := editor.GetOffsetByPosition(code.StartLineNumber, code.StartColumnNumber)
+	startErrorOffset, err := editor.GetOffsetByPositionWithError(code.StartLineNumber, code.StartColumnNumber)
 	if err != nil {
 		panic(err)
 	}
@@ -108,7 +110,7 @@ func (v *Frame) getCodeReview(sourceCode *string, code *Code, i *VMPanic) string
 	if err != nil {
 		panic(err)
 	}
-	endErrorOffset, err := editor.GetOffsetByPosition(code.EndLineNumber, code.EndColumnNumber)
+	endErrorOffset, err := editor.GetOffsetByPositionWithError(code.EndLineNumber, code.EndColumnNumber)
 	if err != nil {
 		panic(err)
 	}
