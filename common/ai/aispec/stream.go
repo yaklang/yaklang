@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
@@ -21,7 +22,15 @@ func appendStreamHandlerPoCOption(opts []poc.PocConfigOption) (io.Reader, []poc.
 			pw.Write([]byte{'\n'})
 			defer pw.Close()
 		}()
-		lineReader := bufio.NewReader(httputil.NewChunkedReader(utils.NewTrimLeftReader(closer)))
+		var chunked bool
+		if te := lowhttp.GetHTTPPacketHeader(r, "transfer-encoding"); utils.IContains(te, "chunked") {
+			chunked = true
+		}
+		var ioReader io.Reader = utils.NewTrimLeftReader(closer)
+		if chunked {
+			ioReader = httputil.NewChunkedReader(ioReader)
+		}
+		lineReader := bufio.NewReader(ioReader)
 		for {
 			line, err := utils.BufioReadLine(lineReader)
 			if err != nil {
