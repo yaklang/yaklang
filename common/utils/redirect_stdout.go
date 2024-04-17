@@ -2,12 +2,15 @@ package utils
 
 import (
 	"context"
+	"fmt"
 	"github.com/google/uuid"
 	"github.com/hpcloud/tail"
 	"github.com/yaklang/yaklang/common/log"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -39,6 +42,53 @@ func StartCacheLog(ctx context.Context, n int) {
 		}
 		isInCached.UnSet()
 	}()
+}
+
+func HandleStdoutBackgroundForTest(handle func(string)) (func(), func(), error) {
+	ctx := context.Background()
+	var l int32 = 0xffff - 0xfe00
+	n := rand.Int31n(l)
+	msg := string([]rune{n + 0xfe00})
+	endCh := make(chan struct{})
+	endFlagMsg := fmt.Sprintf("%s", msg)
+	sendEndMsg := func() {
+		println(endFlagMsg)
+	}
+	checkEndMsg := func(s string) {
+		if strings.Contains(s, msg) {
+			endCh <- struct{}{}
+		}
+	}
+	waitEnd := func() {
+		select {
+		case <-endCh:
+		case <-time.After(time.Second * 3):
+		}
+	}
+	startCh := make(chan struct{})
+	once := sync.Once{}
+	var err error
+	go func() {
+		err = HandleStdout(ctx, func(s string) {
+			once.Do(func() {
+				startCh <- struct{}{}
+			})
+			handle(s)
+			checkEndMsg(s)
+		})
+		once.Do(func() {
+			startCh <- struct{}{}
+		})
+	}()
+	for i := 0; i < 10; i++ {
+		select {
+		case <-startCh:
+			return sendEndMsg, waitEnd, err
+		case <-time.After(100 * time.Millisecond):
+			fmt.Println("waiting for mirror stdout start signal...")
+		}
+	}
+	return nil, nil, Errorf("wait for mirror stdout start signal timeout")
 }
 func HandleStdout(ctx context.Context, handle func(string)) error {
 	if isInAttached.IsSet() {
