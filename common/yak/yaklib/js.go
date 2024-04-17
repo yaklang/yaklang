@@ -42,6 +42,10 @@ var JSOttoExports = map[string]interface{}{
 	"TrueValue":      defaultJSRuntime.ToValue(true),
 }
 
+func init() {
+	require.RegisterCoreModule(console.ModuleName, console.RequireWithPrinter(defaultStdPrinter))
+}
+
 func GetStatementType(st interface{}) string {
 	typ := strings.Replace(reflect.TypeOf(st).String(), "*ast.", "", 1)
 	return typ
@@ -161,7 +165,6 @@ func _jsNewEngine() *goja.Runtime {
 	// enable require function and console and buffer module
 	new(require.Registry).Enable(vm)
 	// use custom printer
-	require.RegisterCoreModule(console.ModuleName, console.RequireWithPrinter(defaultStdPrinter))
 	console.Enable(vm)
 	buffer.Enable(vm)
 	return vm
