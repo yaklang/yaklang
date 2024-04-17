@@ -24,28 +24,6 @@ import (
 )
 
 func TestOUTPUT_AiChat(t *testing.T) {
-	endCh := make(chan struct{})
-	endFlag := utils.RandStringBytes(20)
-	endFlagMsg := fmt.Sprintf("%s\n", endFlag)
-	sendEndMsg := func() {
-		println(endFlagMsg)
-	}
-	checkEndMsg := func(s string) {
-		if strings.Contains(s, endFlag) {
-			endCh <- struct{}{}
-		}
-	}
-	_ = sendEndMsg
-	_ = checkEndMsg
-	sendEndFlag := func() {
-		endCh <- struct{}{}
-	}
-	wait := func() {
-		select {
-		case <-endCh:
-		case <-time.After(time.Second * 10):
-		}
-	}
 	consts.ClearThirdPartyApplicationConfig()
 	consts.UpdateThirdPartyApplicationConfig(&ypb.ThirdPartyApplicationConfig{
 		APIKey: fmt.Sprintf("%s.%s", utils.RandStringBytes(32), utils.RandStringBytes(16)),
@@ -89,40 +67,30 @@ func TestOUTPUT_AiChat(t *testing.T) {
 		t.Fatal(err)
 	}
 	yaklib.InitYakit(yaklib.NewVirtualYakitClient(func(i *ypb.ExecResult) error {
-		print(string(i.Raw))
 		return nil
 	}))
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
 	utils.WaitConnect(addr, 3)
-	stream, err := client.AttachCombinedOutput(context.Background(), &ypb.AttachCombinedOutputRequest{})
-	if err != nil {
-		t.Fatal(err)
-	}
 	debugStreamTestResult := false
 	stdOutputCh := ""
 	re := regexp.MustCompile("[\u4e00-\u9fa5]")
-	go func() {
-		for {
-			v, err := stream.Recv()
-			if err != nil {
-				return
-			}
-			for _, c := range re.FindAllString(string(v.Raw), -1) {
-				stdOutputCh += c
-			}
-			if stdOutputCh == "你好我是人工智障助手" {
-				debugStreamTestResult = true
-				sendEndFlag()
-			}
+	var cancel, wait func()
+	cancel, wait, err = utils.HandleStdoutBackgroundForTest(func(s string) {
+		for _, c := range re.FindAllString(s, -1) {
+			stdOutputCh += c
 		}
-	}()
-	_, err = client.Exec(context.Background(), &ypb.ExecRequest{
-		NoDividedEngine: true,
-		Script:          fmt.Sprintf(`ai.Chat("你好",ai.type("chatglm"),ai.debugStream(),ai.domain("%s"))~`, addr),
+		if stdOutputCh == "你好我是人工智障助手" {
+			debugStreamTestResult = true
+			cancel()
+		}
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
+	_, err = client.Exec(context.Background(), &ypb.ExecRequest{
+		NoDividedEngine: true,
+		Script:          fmt.Sprintf(`ai.Chat("你好",ai.type("chatglm"),ai.debugStream(),ai.domain("%s"))~`, addr),
+	})
 	wait()
 	assert.Equal(t, true, debugStreamTestResult)
 }

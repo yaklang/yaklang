@@ -216,6 +216,7 @@ func SetDefaultYakitProfileDatabaseName(i string) {
 }
 
 func GetDefaultYakitBaseDir() string {
+	return "/Users/z3/yakit-projects1"
 	OnceYakitHome.Do(GetRegistryYakitHome)
 	// 这个检测默认数据库
 	if os.Getenv("YAKIT_HOME") != "" {
