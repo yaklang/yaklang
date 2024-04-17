@@ -729,17 +729,16 @@ RECONNECT:
 		// BodyStreamReaderHandler is only effect non-pool connection
 		if option != nil && option.BodyStreamReaderHandler != nil {
 			reader, writer := utils.NewBufPipe(nil)
-			bodyReader, bodyWriter := utils.NewBufPipe(nil)
 			defer func() {
 				log.Infof("close reader and writer")
 				writer.Close()
 				reader.Close()
-				bodyWriter.Close()
-				bodyReader.Close()
 			}()
-
 			go func() {
+				bodyReader, bodyWriter := utils.NewBufPipe(nil)
 				defer func() {
+					bodyWriter.Close()
+					bodyReader.Close()
 					if err := recover(); err != nil {
 						log.Errorf("BodyStreamReaderHandler panic: %v", err)
 					}
