@@ -3,13 +3,12 @@ package antlr4yak
 import (
 	"context"
 	"fmt"
-	"os"
-	"sort"
-
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakast"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
+	"os"
+	"sort"
 
 	"github.com/davecgh/go-spew/spew"
 )
