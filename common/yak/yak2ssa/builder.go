@@ -19,16 +19,22 @@ func Build(src string, force bool, builder *ssa.FunctionBuilder) error {
 		return err
 	}
 
-	originEditor := builder.Editor
-	defer func() {
-		builder.Editor = originEditor
-	}()
+	// backup old editor (source code)
+	originEditor := builder.GetEditor()
 
 	// include source code will change the context of the origin editor
 	newCodeEditor := memedit.NewMemEditor(src)
+	builder.SetEditor(newCodeEditor) // set for current builder
 	originEditor.PushSourceCodeContext(newCodeEditor.SourceCodeMd5())
 
-	builder.Editor = newCodeEditor
+	// push into program for recording what code is compiling
+	builder.GetProgram().PushEditor(newCodeEditor)
+	defer func() {
+		// recover source code context
+		builder.SetEditor(originEditor)
+		builder.GetProgram().PopEditor()
+	}()
+
 	astBuilder := &astbuilder{
 		FunctionBuilder: builder,
 	}
