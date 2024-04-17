@@ -189,7 +189,9 @@ func (cache *CacheWithKey[U, T]) clearExpireItem() {
 		cache.priorityQueue.remove(item)
 		delete(cache.items, item.key)
 		if cache.expireCallback != nil {
-			go cache.expireCallback(item.key, item.data)
+			go func() {
+				cache.expireCallback(item.key, item.data)
+			}()
 		}
 		if cache.priorityQueue.Len() == 0 {
 			break
