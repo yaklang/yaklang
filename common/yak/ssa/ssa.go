@@ -127,7 +127,7 @@ type Program struct {
 	// package list
 	Packages map[string]*Package
 
-	Editor *memedit.MemEditor
+	editorStack *omap.OrderedMap[string, *memedit.MemEditor]
 
 	Cache *Cache
 
@@ -138,6 +138,38 @@ type Program struct {
 
 	// for build
 	buildOnce sync.Once
+
+	// cache hitter
+	programBuilderCachedHit func(a any)
+}
+
+func (p *Program) PushEditor(e *memedit.MemEditor) {
+	if p.editorStack == nil {
+		p.editorStack = omap.NewOrderedMap(make(map[string]*memedit.MemEditor))
+	}
+	p.editorStack.Push(e)
+}
+
+func (p *Program) GetCurrentEditor() *memedit.MemEditor {
+	if p.editorStack == nil || p.editorStack.Len() <= 0 {
+		return nil
+	}
+	_, v, ok := p.editorStack.Last()
+	if !ok {
+		return nil
+	}
+	return v
+}
+
+func (p *Program) PopEditor() {
+	if p.editorStack == nil || p.editorStack.Len() <= 0 {
+		return
+	}
+	p.editorStack.Pop()
+}
+
+func (p *Program) WithProgramBuilderCacheHitter(h func(any)) {
+	p.programBuilderCachedHit = h
 }
 
 type Package struct {

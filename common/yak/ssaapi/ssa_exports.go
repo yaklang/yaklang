@@ -159,10 +159,10 @@ func (p *Program) Feed(code string) {
 var Exports = map[string]any{
 	"Parse": Parse,
 
-	"withLanguage":    WithLanguage,
-	"withExternLib":   WithExternLib,
-	"withExternValue": WithExternValue,
-	"withDataBase":    WithDatabaseProgramName,
+	"withLanguage":            WithLanguage,
+	"withExternLib":           WithExternLib,
+	"withExternValue":         WithExternValue,
+	"withDatabaseProgramName": WithDatabaseProgramName,
 	// language:
 	"Javascript": JS,
 	"Yak":        Yak,
