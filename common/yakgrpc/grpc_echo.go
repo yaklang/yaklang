@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
+	"time"
 )
 
 func (s *Server) Echo(ctx context.Context, req *ypb.EchoRequest) (*ypb.EchoResposne, error) {
@@ -23,22 +24,32 @@ func (s *Server) VerifySystemCertificate(ctx context.Context, _ *ypb.Empty) (*yp
 }
 
 func verifySystemCertificateByURL() (*ypb.VerifySystemCertificateResponse, error) {
+	err := verify(nil, nil, "www.example.com")
+	if err != nil {
+		return &ypb.VerifySystemCertificateResponse{Valid: false, Reason: err.Error()}, nil
+	}
+	return &ypb.VerifySystemCertificateResponse{Valid: true}, nil
+}
+
+func verify(serConfig, cliConfig *tls.Config, domain string) error {
 	crep.InitMITMCert()
-	caCert, caKey, _ := crep.GetDefaultCaAndKey()
+	caCert, caKey, _ := crep.GetDefaultCAAndPriv()
+	fakeCert, err := crep.FakeCertificateByHost(caCert, caKey, domain)
+	if err != nil {
+		return err
+	}
 	port := utils.GetRandomAvailableTCPPort()
 
-	cert, err := tls.X509KeyPair(caCert, caKey)
-	if err != nil {
-		return nil, err
-	}
-
 	log.Infof("Starting HTTPS server on port %d", port)
-	// 创建 HTTPS 服务器
+
+	if serConfig == nil {
+		serConfig = &tls.Config{
+			Certificates: []tls.Certificate{fakeCert},
+		}
+	}
 	server := &http.Server{
-		Addr: fmt.Sprintf("127.0.0.1:%d", port), // HTTPS 默认端口
-		TLSConfig: &tls.Config{
-			Certificates: []tls.Certificate{cert},
-		},
+		Addr:      fmt.Sprintf("127.0.0.1:%d", port), // HTTPS 默认端口
+		TLSConfig: serConfig,
 	}
 
 	serverReady := make(chan struct{})
@@ -55,23 +66,25 @@ func verifySystemCertificateByURL() (*ypb.VerifySystemCertificateResponse, error
 
 	defer server.Shutdown(context.Background())
 
-	tlsConfig := &tls.Config{
-		ServerName: "mitmserver",
-		MinVersion: tls.VersionSSL30, // nolint[:staticcheck]
-		MaxVersion: tls.VersionTLS13,
+	if cliConfig == nil {
+		cliConfig = &tls.Config{
+			ServerName: domain,
+			MinVersion: tls.VersionSSL30, // nolint[:staticcheck]
+			MaxVersion: tls.VersionTLS13,
+		}
 	}
 	conn, err := netx.DialX(fmt.Sprintf("127.0.0.1:%d", port),
 		netx.DialX_WithTLS(true),
-		netx.DialX_WithTLSConfig(tlsConfig),
-		netx.DialX_WithTimeout(3),
+		netx.DialX_WithTLSConfig(cliConfig),
+		netx.DialX_WithTimeout(3*time.Second),
 	)
 
 	if err != nil {
-		return &ypb.VerifySystemCertificateResponse{Valid: false, Reason: err.Error()}, nil
+		return err
 	}
 	defer conn.Close()
 
-	return &ypb.VerifySystemCertificateResponse{Valid: true}, nil
+	return nil
 }
 
 func verifySystemCertificate() (*ypb.VerifySystemCertificateResponse, error) {

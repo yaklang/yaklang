@@ -2,8 +2,11 @@ package crep
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"embed"
 	_ "embed"
 	"encoding/pem"
@@ -16,12 +19,14 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 	"io/ioutil"
+	"math/big"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 )
 
 var (
@@ -50,7 +55,8 @@ func GetDefaultCAAndPrivRaw() ([]byte, []byte) {
 }
 
 func GetDefaultCAAndPriv() (*x509.Certificate, *rsa.PrivateKey, error) {
-	ca, key := GetDefaultCAAndPrivRaw()
+	//ca, key := GetDefaultCAAndPrivRaw()
+	ca, key, _ := GetDefaultCaAndKey()
 	p, _ := pem.Decode(ca)
 	caCert, err := x509.ParseCertificate(p.Bytes)
 	if err != nil {
@@ -95,21 +101,54 @@ func InitMITMCert() {
 	}
 }
 
+func FakeCertificateByHost(caCert *x509.Certificate, caKey *rsa.PrivateKey, domain string) (tls.Certificate, error) {
+	keys, _ := rsa.GenerateKey(rand.Reader, 2048)
+	template := x509.Certificate{
+		SerialNumber: big.NewInt(time.Now().UnixNano()),
+		Subject: pkix.Name{
+			CommonName:   domain,
+			Country:      []string{"Yak"},
+			Province:     []string{"Yak"},
+			Locality:     []string{"Yak"},
+			Organization: []string{"yaklang.io Project"},
+			OrganizationalUnit: []string{
+				"https://yaklang.com/",
+			},
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().AddDate(1, 0, 0),
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+		IsCA:                  false,
+		DNSNames:              []string{domain},
+	}
+
+	certBytes, _ := x509.CreateCertificate(rand.Reader, &template, caCert, &keys.PublicKey, caKey)
+
+	x509c, err := x509.ParseCertificate(certBytes)
+	if err != nil {
+		return tls.Certificate{}, err
+	}
+
+	tlsc := tls.Certificate{
+		Certificate: [][]byte{certBytes, caCert.Raw},
+		PrivateKey:  keys,
+		Leaf:        x509c,
+	}
+	return tlsc, nil
+}
+
 func VerifySystemCertificate() error {
 	InitMITMCert()
-	certPEM, _, err := GetDefaultCaAndKey()
+	caCert, caKey, _ := GetDefaultCAAndPriv()
+	fakeCert, err := FakeCertificateByHost(caCert, caKey, "yaklang.com")
 	if err != nil {
 		return err
 	}
 
-	// 解码 PEM 格式的证书
-	block, _ := pem.Decode(certPEM)
-	if block == nil {
-		return err
-	}
-
 	// 解析证书
-	cert, err := x509.ParseCertificate(block.Bytes)
+	cert, err := x509.ParseCertificate(fakeCert.Certificate[0])
 	if err != nil {
 		return err
 	}
