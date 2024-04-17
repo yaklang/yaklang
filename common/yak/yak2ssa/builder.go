@@ -24,7 +24,11 @@ func Build(src string, force bool, builder *ssa.FunctionBuilder) error {
 		builder.Editor = originEditor
 	}()
 
-	builder.Editor = memedit.NewMemEditor(src)
+	// include source code will change the context of the origin editor
+	newCodeEditor := memedit.NewMemEditor(src)
+	originEditor.PushSourceCodeContext(newCodeEditor.SourceCodeMd5())
+
+	builder.Editor = newCodeEditor
 	astBuilder := &astbuilder{
 		FunctionBuilder: builder,
 	}

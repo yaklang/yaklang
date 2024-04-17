@@ -3,11 +3,14 @@ package memedit
 import (
 	"errors"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"regexp"
 	"strings"
 )
 
 type MemEditor struct {
+	sourceCodeCtxStack []string
+
 	sourceCodeMd5      string
 	sourceCodeSha1     string
 	sourceCodeSha256   string
@@ -22,11 +25,16 @@ func NewMemEditor(sourceCode string) *MemEditor {
 		sourceCode:         sourceCode,
 		lineLensMap:        make(map[int]int),
 		lineStartOffsetMap: make(map[int]int),
-		cursor:             0,
 	}
 
 	editor.recalculateLineMappings()
 	return editor
+}
+
+func (ve *MemEditor) PushSourceCodeContext(i any) {
+	ve.ResetSourceCodeHash()
+
+	ve.sourceCodeCtxStack = append(ve.sourceCodeCtxStack, codec.AnyToString(i))
 }
 
 func (ve *MemEditor) GetOffsetByPositionRaw(line, col int) int {
@@ -247,11 +255,21 @@ func (ve *MemEditor) UpdateTextByRange(r RangeIf, newText string) error {
 	return nil
 }
 
+func (ve *MemEditor) ResetSourceCodeHash() {
+	if ve == nil {
+		return
+	}
+	ve.sourceCodeMd5 = ""
+	ve.sourceCodeSha1 = ""
+	ve.sourceCodeSha256 = ""
+}
+
 // recalculateLineMappings 重新计算行映射
 func (ve *MemEditor) recalculateLineMappings() {
-	ve.sourceCodeMd5 = utils.CalcMd5(ve.sourceCode)
-	ve.sourceCodeSha1 = utils.CalcSha1(ve.sourceCode)
-	ve.sourceCodeSha256 = utils.CalcSha256(ve.sourceCode)
+	ve.ResetSourceCodeHash()
+	ve.SourceCodeMd5()
+	ve.SourceCodeSha1()
+	ve.SourceCodeSha256()
 
 	ve.lineLensMap = make(map[int]int)
 	ve.lineStartOffsetMap = make(map[int]int)
@@ -434,23 +452,31 @@ func (ve *MemEditor) GetTextFromRangeContext(i RangeIf, lineNum int) string {
 	return context
 }
 
+func (ve *MemEditor) GetCurrentSourceCodeContextText() string {
+	var salt string
+	if len(ve.sourceCodeCtxStack) > 0 {
+		salt = strings.Join(ve.sourceCodeCtxStack, "\n")
+	}
+	return salt
+}
+
 func (ve *MemEditor) SourceCodeMd5() string {
 	if ve.sourceCodeMd5 == "" {
-		ve.sourceCodeMd5 = utils.CalcMd5(ve.sourceCode)
+		ve.sourceCodeMd5 = utils.CalcMd5(ve.sourceCode, ve.GetCurrentSourceCodeContextText())
 	}
 	return ve.sourceCodeMd5
 }
 
 func (ve *MemEditor) SourceCodeSha1() string {
 	if ve.sourceCodeSha1 == "" {
-		ve.sourceCodeSha1 = utils.CalcSha1(ve.sourceCode)
+		ve.sourceCodeSha1 = utils.CalcSha1(ve.sourceCode, ve.GetCurrentSourceCodeContextText())
 	}
 	return ve.sourceCodeSha1
 }
 
 func (ve *MemEditor) SourceCodeSha256() string {
 	if ve.sourceCodeSha256 == "" {
-		ve.sourceCodeSha256 = utils.CalcSha256(ve.sourceCode)
+		ve.sourceCodeSha256 = utils.CalcSha256(ve.sourceCode, ve.GetCurrentSourceCodeContextText())
 	}
 	return ve.sourceCodeSha256
 }
