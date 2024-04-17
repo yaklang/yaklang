@@ -367,3 +367,33 @@ $c = new class("2"){
 println($c->a);`
 	ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, $this.a)"}, t)
 }
+
+func TestOOP_Class_Instantiation(t *testing.T) {
+	t.Run("Instantiate a non-existent object", func(t *testing.T) {
+		code := `
+<?php
+		
+		$a = new A();
+		println($a);`
+		ssatest.CheckPrintlnValue(code, []string{
+			"make(any)",
+		}, t)
+	})
+
+	t.Run("instantiate an existing object ", func(t *testing.T) {
+		code := `
+<?php
+		class A {
+			var $num = 0;
+			public function getNum() {
+				return $this->num;
+			}
+		}
+		$a = new A(); 
+		println($a);`
+		ssatest.CheckPrintlnValue(code, []string{
+			"make(A)",
+		}, t)
+	})
+
+}

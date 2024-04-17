@@ -31,6 +31,11 @@ func (y *builder) VisitNewExpr(raw phpparser.INewExprContext) ssa.Value {
 	className := i.TypeRef().GetText()
 	class := y.GetClassBluePrint(className)
 	obj := y.EmitMakeWithoutType(nil, nil)
+	if class == nil {
+		log.Errorf("class %v instantiation failed", className)
+		obj.SetType(ssa.GetAnyType())
+		return obj
+	}
 	obj.SetType(class)
 
 	constructor := class.Constructor
