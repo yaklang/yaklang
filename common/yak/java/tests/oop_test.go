@@ -431,7 +431,7 @@ public class Main{
     }
 }`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-tempFile",
+			"make(any)",
 		}, t)
 	})
 
