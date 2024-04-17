@@ -121,3 +121,45 @@ dump(a(3))
 		t.Fatal("no result in ir code database")
 	}
 }
+
+func TestCompileWithDatabase_CacheHitter(t *testing.T) {
+	progName := uuid.New().String()
+	code := `
+a = () => {
+	dump("a is called now")
+}
+dump("Hello World")
+a()
+`
+	matchAtFirst := false
+	matchAtCached := false
+	prog, err := ssaapi.Parse(
+		code, ssaapi.WithDatabaseProgramName(progName),
+		ssaapi.WithDatabaseProgramCacheHitter(func(i any) {
+			matchAtFirst = true
+		}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = prog
+
+	ssaapi.ClearCache()
+	prog, err = ssaapi.Parse(
+		code,
+		ssaapi.WithDatabaseProgramName(progName),
+		ssaapi.WithDatabaseProgramCacheHitter(func(i any) {
+			matchAtCached = true
+		}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = prog
+	if matchAtFirst {
+		t.Fatal("match at first")
+	}
+	if !matchAtCached {
+		t.Fatal("not match at cached")
+	}
+}

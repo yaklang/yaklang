@@ -172,6 +172,12 @@ func (p *Program) WithProgramBuilderCacheHitter(h func(any)) {
 	p.programBuilderCachedHit = h
 }
 
+func (p *Program) HitBuilderCache(a any) {
+	if p.programBuilderCachedHit != nil {
+		p.programBuilderCachedHit(a)
+	}
+}
+
 type Package struct {
 	Name string
 	// point to program

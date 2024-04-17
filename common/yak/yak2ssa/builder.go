@@ -2,6 +2,7 @@ package yak2ssa
 
 import (
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
@@ -37,6 +38,17 @@ func Build(src string, force bool, builder *ssa.FunctionBuilder) error {
 
 	astBuilder := &astbuilder{
 		FunctionBuilder: builder,
+	}
+
+	if ret := builder.GetEditor(); ret != nil {
+		prog := builder.GetProgram()
+		cache := prog.Cache
+		progName, hash := prog.GetProgramName(), ret.SourceCodeMd5()
+		if cache.IsExistedSourceCodeHash(progName, hash) {
+			prog.HitBuilderCache(builder)
+		}
+	} else {
+		log.Warnf("(BUG or in DEBUG Mode)Range not found for %s", builder.GetName())
 	}
 	astBuilder.build(ast)
 	return nil

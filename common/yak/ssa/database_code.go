@@ -9,6 +9,10 @@ import (
 )
 
 func fitRange(c *ssadb.IrCode, rangeIns *Range) {
+	if rangeIns == nil {
+		log.Warnf("(BUG or in DEBUG MODE) Range not found for %s", c.Name)
+		return
+	}
 	c.SourceCodeHash = rangeIns.GetEditor().SourceCodeMd5()
 	start, end := rangeIns.GetOffsetRange()
 	c.SourceCodeStartOffset = int64(start)
