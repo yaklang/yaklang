@@ -20,6 +20,33 @@ import (
 	"time"
 )
 
+type PPTPConfig struct {
+	FramingCapabilities uint16
+	BearerCapabilities  uint16
+	MaxChannels         uint16
+	FirmwareRevision    uint32
+	Hostname            string
+	Vendor              string
+
+	CallId     uint16
+	PeerCallId uint16
+
+	CallSerialNumber  uint16
+	MinimumBPS        uint32
+	MaximumBPS        uint32
+	BearerType        uint32
+	FramingType       uint32
+	RecvWindowSize    uint16
+	ProcessingDelay   uint16
+	PhoneNumberLength uint16
+	Reserved          uint16
+	PhoneNumber       string
+	SubAddress        string
+
+	SendAccm uint32
+	RecvAccm uint32
+}
+
 type PPTPAuth struct {
 	ppp       *ppp.PPPAuth
 	PNSCallID uint16 // c -> s gre call id
@@ -50,6 +77,33 @@ func GetDefaultPPTPAuth() *PPTPAuth {
 	}
 }
 
+func PaddingBytes(data []byte, padding byte, size int) []byte {
+	if len(data) >= size {
+		return data
+	}
+	return append(data, bytes.Repeat([]byte{padding}, size-len(data))...)
+}
+
+func (c *PPTPConfig) GetStartControlConnReq() map[string]any {
+	return map[string]any{
+		"Length":             156,
+		"MessageType":        1,
+		"MagicCookie":        0x1a2b3c4d,
+		"ControlMessageType": 1,
+		"Reserved":           0,
+		"Start Control Conn Req": map[string]any{
+			"ProtocolVersion":     0x0100,
+			"Reserved":            0,
+			"FramingCapabilities": c.FramingCapabilities,
+			"BearerCapabilities":  c.BearerCapabilities,
+			"MaxChannels":         c.MaxChannels,
+			"FirmwareRevision":    c.FirmwareRevision,
+			"Hostname":            PaddingBytes([]byte(c.Hostname), 0x0, 64),
+			"Vendor":              PaddingBytes([]byte(c.Vendor), 0x0, 64),
+		},
+	}
+}
+
 func GetStartControlConnReq() map[string]any {
 	return map[string]any{
 		"Length":             156,
@@ -66,6 +120,30 @@ func GetStartControlConnReq() map[string]any {
 			"FirmwareRevision":    0x0,
 			"Hostname":            bytes.Repeat([]byte{0x0}, 64),
 			"Vendor":              append([]byte{0x4d, 0x69, 0x63, 0x72, 0x6f, 0x73, 0x6f, 0x66, 0x74}, bytes.Repeat([]byte{0x0}, 55)...),
+		},
+	}
+}
+
+func (c *PPTPConfig) GetOutgoingCallReq() map[string]any {
+	return map[string]any{
+		"Length":             168,
+		"MessageType":        1,
+		"MagicCookie":        0x1a2b3c4d,
+		"ControlMessageType": 7,
+		"Reserved":           0,
+		"Outgoing Call Req": map[string]any{
+			"CallId":            c.CallId,
+			"CallSerialNumber":  c.CallSerialNumber,
+			"MinimumBPS":        c.MinimumBPS,
+			"MaximumBPS":        c.MaximumBPS,
+			"BearerType":        c.BearerType,
+			"FramingType":       c.FramingType,
+			"RecvWindowSize":    c.RecvWindowSize,
+			"ProcessingDelay":   c.ProcessingDelay,
+			"PhoneNumberLength": c.PhoneNumberLength,
+			"Reserved":          0,
+			"PhoneNumber":       PaddingBytes([]byte(c.PhoneNumber), 0x0, 64),
+			"SubAddress":        PaddingBytes([]byte(c.SubAddress), 0x0, 64),
 		},
 	}
 }
@@ -90,6 +168,22 @@ func GetOutgoingCallReq() map[string]any {
 			"Reserved":          0,
 			"PhoneNumber":       bytes.Repeat([]byte{0x0}, 64),
 			"SubAddress":        bytes.Repeat([]byte{0x0}, 64),
+		},
+	}
+}
+
+func (c *PPTPConfig) GetSetLinkInfo() map[string]any {
+	return map[string]any{
+		"Length":             24,
+		"MessageType":        1,
+		"MagicCookie":        0x1a2b3c4d,
+		"ControlMessageType": 15,
+		"Reserved":           0,
+		"Set Link Info": map[string]any{
+			"PeerCallId": c.PeerCallId,
+			"Reserved":   0,
+			"Send Accm":  c.SendAccm,
+			"Recv Accm":  c.RecvAccm,
 		},
 	}
 }
