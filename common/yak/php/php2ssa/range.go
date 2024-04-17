@@ -10,7 +10,7 @@ func (b *builder) SetRangeFromTerminalNode(node antlr.TerminalNode) func() {
 }
 
 func (b *builder) SetRange(token antlr4util.CanStartStopToken) func() {
-	r := antlr4util.GetRange(b.ir.Editor, token)
+	r := antlr4util.GetRange(b.ir.GetEditor(), token)
 	if r == nil {
 		return func() {}
 	}

@@ -23,7 +23,8 @@ func (p *ParentScope) Create(scope *Scope) *ParentScope {
 type FunctionBuilder struct {
 	*Function
 
-	Editor *memedit.MemEditor
+	// do not use it directly
+	_editor *memedit.MemEditor
 
 	// disable free-value
 	DisableFreeValue bool
@@ -57,7 +58,7 @@ type FunctionBuilder struct {
 
 func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder) *FunctionBuilder {
 	b := &FunctionBuilder{
-		Editor:        editor,
+		_editor:       editor,
 		Function:      f,
 		target:        &target{},
 		labels:        make(map[string]*BasicBlock),
@@ -85,6 +86,14 @@ func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder)
 	return b
 }
 
+func (b *FunctionBuilder) SetEditor(editor *memedit.MemEditor) {
+	b._editor = editor
+}
+
+func (b *FunctionBuilder) GetEditor() *memedit.MemEditor {
+	return b._editor
+}
+
 // current block is finish?
 func (b *FunctionBuilder) IsBlockFinish() bool {
 	return b.CurrentBlock.finish
@@ -101,7 +110,7 @@ func (b *FunctionBuilder) NewFunc(name string) *Function {
 
 // function stack
 func (b *FunctionBuilder) PushFunction(newFunc *Function) *FunctionBuilder {
-	build := NewBuilder(b.Editor, newFunc, b)
+	build := NewBuilder(b.GetEditor(), newFunc, b)
 	// build.MarkedThisObject = b.MarkedThisObject
 	if this := b.MarkedThisObject; this != nil {
 		newParentScopeLevel := build.parentScope.scope

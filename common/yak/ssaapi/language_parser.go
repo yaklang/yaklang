@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"runtime/debug"
 
@@ -45,7 +46,10 @@ func parse(c *config, prog *ssa.Program) (ret *ssa.Program, err error) {
 	if prog == nil {
 		prog = ssa.NewProgram(c.DatabaseProgramName)
 	}
-	prog.Editor = memedit.NewMemEditor(c.code)
+	prog.PushEditor(memedit.NewMemEditor(c.code))
+	prog.WithProgramBuilderCacheHitter(func(items any) {
+		spew.Dump(items)
+	})
 
 	builder := prog.GetAndCreateMainFunctionBuilder()
 	builder.WithExternLib(c.externLib)

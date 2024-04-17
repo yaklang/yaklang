@@ -28,7 +28,7 @@ func (prog *Program) GetAndCreateMainFunctionBuilder() *FunctionBuilder {
 	fun := prog.GetAndCreateMainFunction()
 	builder := fun.builder
 	if builder == nil {
-		builder = NewBuilder(prog.Editor, fun, nil)
+		builder = NewBuilder(prog.GetCurrentEditor(), fun, nil)
 	}
 	return builder
 }

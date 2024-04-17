@@ -11,7 +11,7 @@ func (b *astbuilder) SetRangeFromTerminalNode(node antlr.TerminalNode) func() {
 
 func (b *astbuilder) SetRange(token antlr4util.CanStartStopToken) func() {
 	// token :=
-	r := antlr4util.GetRange(b.Editor, token)
+	r := antlr4util.GetRange(b.GetEditor(), token)
 	if r == nil {
 		return func() {}
 	}
