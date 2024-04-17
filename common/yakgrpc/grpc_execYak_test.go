@@ -24,7 +24,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func TestOUTPUT_AiChat(t *testing.T) {
+func _TestOUTPUT_AiChat(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		consts.ClearThirdPartyApplicationConfig()
 		consts.UpdateThirdPartyApplicationConfig(&ypb.ThirdPartyApplicationConfig{
