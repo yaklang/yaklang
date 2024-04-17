@@ -319,6 +319,7 @@ func initYaklangLib() {
 }
 
 type ScriptEngine struct {
+	client *yaklib.YakitClient
 	swg    *utils.SizedWaitGroup
 	logger **yaklib.YakLogger // 由于logger是要对client设置的，而client可以通过hook设置，所以这里用个二级指针，方便修改 logger
 	tasks  *sync.Map
@@ -406,6 +407,7 @@ func (e *ScriptEngine) RegisterEngineHooks(f func(engine *antlr4yak.Engine) erro
 }
 
 func (e *ScriptEngine) SetYakitClient(client *yaklib.YakitClient) {
+	e.client = client
 	e.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
 		client.SetYakLog(*e.logger)
 		log.Debugf("set yakit client: %v", client)
@@ -555,9 +557,13 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 		"Error":    logger.Errorf,
 	}) // 设置 log 库
 	(*e.logger).SetEngine(engine)
-	engine.SetVar("Ch", map[string]any{})
-	clientIns := *yaklib.GetYakitClientInstance()
-	client := &clientIns // 设置全局 client 的 log
+	var client *yaklib.YakitClient
+	if e.client != nil {
+		client = e.client
+	} else {
+		clientIns := *yaklib.GetYakitClientInstance()
+		client = &clientIns // 设置全局 client 的 log
+	}
 	client.SetYakLog(*e.logger)
 	yaklib.SetEngineClient(engine, client)
 	if iaiLib, ok := engine.GetVar("ai"); ok {
@@ -569,6 +575,7 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 				}
 				runtimeId := utils.InterfaceToString(iruntimeId)
 				opts = append([]aispec.AIConfigOption{aispec.WithStreamHandler(func(reader io.Reader) {
+					engine.GetVar("yakit")
 					client.Stream("ai", runtimeId, reader)
 				})}, opts...)
 				return ai.Chat(msg, opts...)
