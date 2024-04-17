@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"regexp"
@@ -24,105 +25,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func _TestOUTPUT_AiChat(t *testing.T) {
-	for i := 0; i < 100; i++ {
-		consts.ClearThirdPartyApplicationConfig()
-		consts.UpdateThirdPartyApplicationConfig(&ypb.ThirdPartyApplicationConfig{
-			APIKey: fmt.Sprintf("%s.%s", utils.RandStringBytes(32), utils.RandStringBytes(16)),
-			Type:   "chatglm",
-		})
-		rspStrTmp := `data: {"id":"1","created":1,"model":"1","choices":[{"index":0,"delta":{"role":"assistant","content":"%s"}}]}
-`
-		headerStr, _, _ := lowhttp.FixHTTPResponse([]byte("HTTP/1.1 200 OK\nContent-Type: application/json\nTransfer-Encoding: chunked\nConnection: Keep-Alive\n\n"))
-
-		port := utils.GetRandomAvailableTCPPort()
-		l, err := tls.Listen("tcp", spew.Sprintf(":%d", port), utils.GetDefaultTLSConfig(3))
-		if err != nil {
-			t.Fatal(err)
-		}
-		go func() {
-			for {
-				conn, err := l.Accept()
-				if err != nil {
-					t.Fatal(err)
-				}
-				genMsg := func(s string) []byte {
-					msg := []byte(fmt.Sprintf(rspStrTmp, s))
-					return []byte(fmt.Sprintf("%x\r\n%s\r\n", len(msg), msg))
-				}
-				log.Info("accept conn")
-				go func() {
-					utils.StableReader(conn, 1, 10240)
-					conn.Write(headerStr)
-					conn.Write(genMsg("你好"))
-					time.Sleep(time.Millisecond * 500)
-					conn.Write(genMsg("我是人工智障"))
-					time.Sleep(time.Millisecond * 500)
-					conn.Write(genMsg("助手"))
-					conn.Write(genMsg(""))
-					conn.Write([]byte("\r\n"))
-					conn.Close()
-					log.Info("close conn")
-				}()
-			}
-		}()
-		client, err := NewLocalClient()
-		if err != nil {
-			t.Fatal(err)
-		}
-		yaklib.InitYakit(yaklib.NewVirtualYakitClient(func(i *ypb.ExecResult) error {
-			return nil
-		}))
-		addr := fmt.Sprintf("127.0.0.1:%d", port)
-		utils.WaitConnect(addr, 3)
-		debugStreamTestResult := false
-		stdOutputCh := ""
-		re := regexp.MustCompile("[\u4e00-\u9fa5]")
-		var cancel, wait func()
-		cancel, wait, err = utils.HandleStdoutBackgroundForTest(func(s string) {
-			spew.Dump(s)
-			for _, c := range re.FindAllString(s, -1) {
-				stdOutputCh += c
-			}
-			if stdOutputCh == "你好我是人工智障助手" {
-				debugStreamTestResult = true
-				cancel()
-			}
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		_, err = client.Exec(context.Background(), &ypb.ExecRequest{
-			NoDividedEngine: true,
-			Script:          fmt.Sprintf(`ai.Chat("你好",ai.type("chatglm"),ai.debugStream(),ai.domain("%s"))~`, addr),
-		})
-		wait()
-		assert.Equal(t, true, debugStreamTestResult)
-	}
-}
-func TestOUTPUT_AiChatOutputByDefaultStream(t *testing.T) {
-	endCh := make(chan struct{})
-	endFlag := utils.RandStringBytes(20)
-	endFlagMsg := fmt.Sprintf("%s\n", endFlag)
-	sendEndMsg := func() {
-		println(endFlagMsg)
-	}
-	checkEndMsg := func(s string) {
-		if strings.Contains(s, endFlag) {
-			endCh <- struct{}{}
-		}
-	}
-	_ = sendEndMsg
-	_ = checkEndMsg
-	sendEndFlag := func() {
-		endCh <- struct{}{}
-	}
-	wait := func() {
-		select {
-		case <-endCh:
-		case <-time.After(time.Second * 10):
-		}
-	}
+func TestOUTPUT_AiChat(t *testing.T) {
 	consts.ClearThirdPartyApplicationConfig()
 	consts.UpdateThirdPartyApplicationConfig(&ypb.ThirdPartyApplicationConfig{
 		APIKey: fmt.Sprintf("%s.%s", utils.RandStringBytes(32), utils.RandStringBytes(16)),
@@ -131,7 +34,6 @@ func TestOUTPUT_AiChatOutputByDefaultStream(t *testing.T) {
 	rspStrTmp := `data: {"id":"1","created":1,"model":"1","choices":[{"index":0,"delta":{"role":"assistant","content":"%s"}}]}
 `
 	headerStr, _, _ := lowhttp.FixHTTPResponse([]byte("HTTP/1.1 200 OK\nContent-Type: application/json\nTransfer-Encoding: chunked\nConnection: Keep-Alive\n\n"))
-
 	port := utils.GetRandomAvailableTCPPort()
 	l, err := tls.Listen("tcp", spew.Sprintf(":%d", port), utils.GetDefaultTLSConfig(3))
 	if err != nil {
@@ -163,32 +65,63 @@ func TestOUTPUT_AiChatOutputByDefaultStream(t *testing.T) {
 			}()
 		}
 	}()
-	client, err := NewLocalClient()
+	yaklib.InitYakit(yaklib.NewVirtualYakitClient(func(i *ypb.ExecResult) error {
+		return nil
+	}))
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
+	time.Sleep(time.Second)
+	debugStreamTestResult := false
+	stdOutputCh := ""
+	re := regexp.MustCompile("[\u4e00-\u9fa5]")
+	var cancel, wait func()
+	cancel, wait, err = utils.HandleStdoutBackgroundForTest(func(s string) {
+		for _, c := range re.FindAllString(s, -1) {
+			stdOutputCh += c
+		}
+		if stdOutputCh == "你好我是人工智障助手" {
+			debugStreamTestResult = true
+			cancel()
+		}
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	re := regexp.MustCompile(`\\"data\\":\\"(.+?)\\",\\"streamId`)
+	engine := yak.NewYakitVirtualClientScriptEngine(yaklib.NewVirtualYakitClient(func(i *ypb.ExecResult) error {
+		return nil
+	}))
+	err = engine.Execute(fmt.Sprintf(`ai.Chat("你好",ai.type("chatglm"),ai.debugStream(),ai.domain("%s"))~`, addr))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wait()
+	assert.Equal(t, true, debugStreamTestResult)
+
 	subMsgN := 0
 	msg := ""
-	yaklib.InitYakit(yaklib.NewVirtualYakitClient(func(i *ypb.ExecResult) error {
-		fmt.Printf("recv msg: %s\n", string(i.Message))
-		s := re.FindAllStringSubmatch(string(i.Message), -1)
-		if len(s) > 0 {
-			subMsgN++
-			msg += s[0][1]
+	time.Sleep(time.Second)
+	endCh := make(chan struct{})
+	sendEndFlag := func() {
+		endCh <- struct{}{}
+	}
+	wait = func() {
+		select {
+		case <-endCh:
+		case <-time.After(time.Second * 10):
 		}
+	}
+	engine = yak.NewYakitVirtualClientScriptEngine(yaklib.NewVirtualYakitClient(func(i *ypb.ExecResult) error {
+		s := re.FindAllString(string(i.Message), -1)
+		for _, s2 := range s {
+			msg += s2
+		}
+		subMsgN++
 		if strings.Contains(msg, "你好我是人工智障助手") {
 			sendEndFlag()
 		}
 		print(string(i.Raw))
 		return nil
 	}))
-	addr := fmt.Sprintf("127.0.0.1:%d", port)
-	utils.WaitConnect(addr, 3)
-	_, err = client.Exec(context.Background(), &ypb.ExecRequest{
-		NoDividedEngine: true,
-		Script:          fmt.Sprintf(`ai.Chat("你好",ai.type("chatglm"),ai.domain("%s"))~`, addr),
-	})
+	err = engine.Execute(fmt.Sprintf(`ai.Chat("你好",ai.type("chatglm"),ai.domain("%s"))~`, addr))
 	if err != nil {
 		t.Fatal(err)
 	}
