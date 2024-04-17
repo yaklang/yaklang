@@ -1,6 +1,8 @@
 package yakgrpc
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 	"sync"
 	"testing"
@@ -51,16 +53,18 @@ func TestGRPCMUSTPASS_HTTPFuzzer_Pause(t *testing.T) {
 			count++
 			if count == 2 {
 				client.HTTPFuzzer(utils.TimeoutContextSeconds(10), &ypb.FuzzerRequest{
-					PauseTaskID: taskID,
-					IsPause:     true,
+					PauseTaskID:    taskID,
+					IsPause:        true,
+					SetPauseStatus: true,
 				})
 				log.Info("start pause")
 				inPause = true
 				go func() {
 					time.Sleep(1 * time.Second)
 					client.HTTPFuzzer(utils.TimeoutContextSeconds(10), &ypb.FuzzerRequest{
-						PauseTaskID: taskID,
-						IsPause:     false,
+						PauseTaskID:    taskID,
+						IsPause:        false,
+						SetPauseStatus: true,
 					})
 					log.Info("start continue")
 					inPause = false
@@ -78,4 +82,64 @@ func TestGRPCMUSTPASS_HTTPFuzzer_Pause(t *testing.T) {
 	if count != 10 {
 		t.Fatalf("expected 10 times, got %d", count)
 	}
+}
+
+func TestHTTPFuzzer_Pause_SetPauseStatus(t *testing.T) {
+	c, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	isPause := false
+	targetHost, targetPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		fmt.Println("send request")
+		if isPause {
+			panic("pause failed")
+		}
+		return []byte("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n")
+	})
+
+	client, err := c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+		RepeatTimes: 200000,
+		ForceFuzz:   true,
+		Concurrent:  1,
+		Request: `GET / HTTP/1.1
+Host: ` + utils.HostPort(targetHost, targetPort) + `
+
+`,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var taskID int64
+	rsp, err := client.Recv()
+	if err != nil {
+		t.Fatalf("recv failed: %v", err)
+	}
+	taskID = rsp.TaskId
+
+	_, err = c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+		PauseTaskID:    taskID,
+		IsPause:        true,
+		SetPauseStatus: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(1 * time.Second)
+
+	isPause = true
+
+	_, err = c.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
+		PauseTaskID:    taskID,
+		IsPause:        false,
+		SetPauseStatus: false,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(2 * time.Second)
+
 }
