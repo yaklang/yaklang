@@ -182,3 +182,19 @@ func (c *Cache) SaveToDatabase() {
 		c.saveVariable(variable, insts)
 	}
 }
+
+func (c *Cache) IsExistedSourceCodeHash(programName string, hashString string) bool {
+	if programName == "" {
+		return false
+	}
+
+	var count int
+	if ret := c.DB.Model(&ssadb.IrCode{}).Where(
+		"source_code_hash = ?", hashString,
+	).Where(
+		"program_name = ?", programName,
+	).Count(&count).Error; ret != nil {
+		log.Warnf("IsExistedSourceCodeHash error: %v", ret)
+	}
+	return count > 0
+}

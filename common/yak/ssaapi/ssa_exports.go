@@ -19,7 +19,8 @@ type config struct {
 	defineFunc   map[string]any
 	externMethod ssa.MethodBuilder
 
-	DatabaseProgramName string
+	DatabaseProgramName        string
+	DatabaseProgramCacheHitter func(any)
 	// for hash
 	externInfo string
 }
@@ -118,7 +119,17 @@ func WithDatabaseProgramName(name string) Option {
 	}
 }
 
+func WithDatabaseProgramCacheHitter(h func(i any)) Option {
+	return func(c *config) {
+		c.DatabaseProgramCacheHitter = h
+	}
+}
+
 var ttlSSAParseCache = utils.NewTTLCache[*Program](30 * time.Minute)
+
+func ClearCache() {
+	ttlSSAParseCache.Purge()
+}
 
 func Parse(code string, opts ...Option) (*Program, error) {
 	config := defaultConfig(code)

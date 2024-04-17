@@ -10,6 +10,10 @@ func NewProgram(dbProgramName string) *Program {
 	return prog
 }
 
+func (prog *Program) GetProgramName() string {
+	return prog.Cache.ProgramName
+}
+
 func (prog *Program) GetAndCreateMainFunction() *Function {
 	pkg := prog.GetPackage("main")
 	if pkg == nil {
