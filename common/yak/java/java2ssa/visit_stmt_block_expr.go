@@ -1544,14 +1544,18 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) ssa.Value {
 		p = y.VisitCreatedName(ret)
 	}
 	//class init
+	var className string
 	if ret := i.ClassCreatorRest(); ret != nil {
-		className := i.CreatedName().GetText()
+		className = i.CreatedName().GetText()
 		// todo 泛型
 		class := y.GetClassBluePrint(className)
-		if class == nil {
-			return nil
-		}
 		obj := y.EmitMakeWithoutType(nil, nil)
+		if class == nil {
+			log.Errorf("class  %v instantiation failed.", className)
+			obj.SetType(ssa.GetAnyType())
+			return obj
+		}
+
 		obj.SetType(class)
 
 		constructor := class.Constructor
@@ -1571,8 +1575,11 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) ssa.Value {
 	if ret := i.ArrayCreatorRest(); ret != nil {
 		return y.VisitArrayCreatorRest(ret, p)
 	}
+	log.Errorf("array  init failed.")
+	obj := y.EmitMakeWithoutType(nil, nil)
+	obj.SetType(ssa.GetAnyType())
+	return obj
 
-	return nil
 }
 
 func (y *builder) VisitClassCreatorRest(raw javaparser.IClassCreatorRestContext, oldClassName string) []ssa.Value {
