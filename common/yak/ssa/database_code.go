@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
@@ -17,6 +18,78 @@ func fitRange(c *ssadb.IrCode, rangeIns *Range) {
 	start, end := rangeIns.GetOffsetRange()
 	c.SourceCodeStartOffset = int64(start)
 	c.SourceCodeEndOffset = int64(end)
+}
+
+type cacheRecoveryContext struct {
+	cache *omap.OrderedMap[string, *ssadb.IrCode]
+}
+
+func newCacheRecoverContext() *cacheRecoveryContext {
+	return &cacheRecoveryContext{cache: omap.NewOrderedMap(make(map[string]*ssadb.IrCode))}
+}
+
+func irCodeToInstruction(ctx *cacheRecoveryContext, c *ssadb.IrCode) (Instruction, error) {
+	if ctx == nil {
+		ctx = newCacheRecoverContext()
+	}
+	switch c.Opcode {
+	case int64(SSAOpcodeUnKnow):
+		return nil, nil
+	case int64(SSAOpcodeAssert):
+		return nil, nil
+	case int64(SSAOpcodeBasicBlock):
+		return nil, nil
+	case int64(SSAOpcodeBinOp):
+		return nil, nil
+	case int64(SSAOpcodeCall):
+		return nil, nil
+	case int64(SSAOpcodeConstInst):
+		return nil, nil
+	case int64(SSAOpcodeErrorHandler):
+		return nil, nil
+	case int64(SSAOpcodeExternLib):
+		return nil, nil
+	case int64(SSAOpcodeIf):
+		return nil, nil
+	case int64(SSAOpcodeJump):
+		return nil, nil
+	case int64(SSAOpcodeLoop):
+		return nil, nil
+	case int64(SSAOpcodeMake):
+		return nil, nil
+	case int64(SSAOpcodeNext):
+		return nil, nil
+	case int64(SSAOpcodePanic):
+		return nil, nil
+	case int64(SSAOpcodeParameter):
+		return nil, nil
+	case int64(SSAOpcodeFreeValue):
+		return nil, nil
+	case int64(SSAOpcodeParameterMember):
+		return nil, nil
+	case int64(SSAOpcodePhi):
+		return nil, nil
+	case int64(SSAOpcodeRecover):
+		return nil, nil
+	case int64(SSAOpcodeReturn):
+		return nil, nil
+	case int64(SSAOpcodeSideEffect):
+		return nil, nil
+	case int64(SSAOpcodeSwitch):
+		return nil, nil
+	case int64(SSAOpcodeTypeCast):
+		return nil, nil
+	case int64(SSAOpcodeTypeValue):
+		return nil, nil
+	case int64(SSAOpcodeUnOp):
+		return nil, nil
+	case int64(SSAOpcodeUndefined):
+		return nil, nil
+	case int64(SSAOpcodeFunction):
+		return nil, nil
+	default:
+		return nil, utils.Errorf("unknown opcode: %v", c.VerboseString())
+	}
 }
 
 func FitIRCode(c *ssadb.IrCode, r Instruction) error {
