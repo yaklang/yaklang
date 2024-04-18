@@ -289,8 +289,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	}
 
 	//int beforeRequest afterRequest
-	var beforeRequest func([]byte) []byte = nil
-	var afterRequest func([]byte) []byte = nil
+	var beforeRequest func(https bool, originReq []byte, req []byte) []byte = nil
+	var afterRequest func(https bool, originReq []byte, req []byte, originRsp []byte, rsp []byte) []byte = nil
 
 	clearPluginHTTPFlowCache := func() {
 		if mitmPluginCaller != nil {
@@ -747,7 +747,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				utils.PrintCurrentGoroutineRuntimeStack()
 			}
 			if afterRequest != nil {
-				hijackRsp = afterRequest(hijackRsp)
+				hijackRsp = afterRequest(isHttps, httpctx.GetBareRequestBytes(req), httpctx.GetRequestBytes(req), httpctx.GetBareResponseBytes(req), httpctx.GetResponseBytes(req))
 				httpctx.SetResponseModified(req, "yaklang.hook(ex) afterRequest")
 				httpctx.SetHijackedResponseBytes(req, hijackRsp)
 			}
@@ -1147,7 +1147,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				utils.PrintCurrentGoroutineRuntimeStack()
 			}
 			if beforeRequest != nil {
-				hijackReq = beforeRequest(hijackReq)
+				hijackReq = beforeRequest(isHttps, httpctx.GetBareRequestBytes(originReqIns), hijackReq)
 				httpctx.SetRequestModified(originReqIns, "yaklang.hook beforeRequest")
 				httpctx.SetHijackedRequestBytes(originReqIns, hijackReq)
 			}
