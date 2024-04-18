@@ -1,6 +1,7 @@
 package yakgrpc
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -374,6 +375,48 @@ func TestGRPCMUSTPASS_HTTPFuzzer_FuzzWithHotPatch(t *testing.T) {
 		}
 		if len(res.Results) != 1 || string(res.Results[0]) != "ok" {
 			t.Fatal(spew.Sprintf("hotpatch fail: %v,%v", template, code))
+		}
+	}
+}
+
+func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_before_and_after_legacy(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		panic(err)
+	}
+
+	token1 := utils.RandStringBytes(16)
+	token2 := utils.RandStringBytes(16)
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		if !bytes.Contains(req, []byte(token1)) {
+			panic("token1 not found")
+		}
+		return []byte("HTTP/1.1 200 OK\r\n\r\nyes")
+	})
+	target := utils.HostPort(host, port)
+	recv, err := client.HTTPFuzzer(utils.TimeoutContextSeconds(10), &ypb.FuzzerRequest{
+		Request: "GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n{{yak(handle)}}",
+		HotPatchCode: fmt.Sprintf(`
+beforeRequest = func(req){
+    return poc.ReplaceHTTPPacketBody(req, "%s")
+}
+afterRequest = func(rsp){
+    return poc.ReplaceHTTPPacketBody(rsp, "%s")
+}
+`, token1, token2),
+		ForceFuzz: true,
+	})
+	if err != nil {
+		t.Fatalf("expect error is nil, got %v", err)
+	}
+	for {
+		rsp, err := recv.Recv()
+		if err != nil {
+			break
+		}
+		spew.Dump(rsp.ResponseRaw)
+		if !bytes.Contains(rsp.ResponseRaw, []byte(token2)) {
+			t.Fatal("afterRequest hotpatch failed")
 		}
 	}
 }
