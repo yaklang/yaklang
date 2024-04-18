@@ -633,9 +633,9 @@ RECONNECT:
 			requestPacket = option.BeforeDoRequest(requestPacket)
 		}
 
-		if haveNativeHTTPRequestInstance {
-			httpctx.SetBareRequestBytes(option.NativeHTTPRequestInstance, requestPacket)
-		}
+		//if haveNativeHTTPRequestInstance {
+		//	httpctx.SetBareRequestBytes(option.NativeHTTPRequestInstance, requestPacket)
+		//}
 
 		if oldVersionProxyChecking {
 			requestPacket, err = BuildLegacyProxyRequest(requestPacket)
