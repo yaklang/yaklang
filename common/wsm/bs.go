@@ -48,7 +48,6 @@ func behidnerResultToYakURLResource(originParam *ypb.YakURL, result []byte) ([]*
 		resources []*ypb.YakURLResource
 		err       error
 	}
-
 	resErr := &ResourceError{}
 	gjson.GetBytes(result, "msg").ForEach(func(_, v gjson.Result) bool {
 		var extra []*ypb.KVPair

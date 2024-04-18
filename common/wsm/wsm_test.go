@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/wsm/payloads"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"regexp"
@@ -524,14 +525,15 @@ func TestInjectWebappComponent(t *testing.T) {
 func TestYakShellJsp(t *testing.T) {
 	//url := "http://localhost:8080/tomcat_war_exploded/el.jsp"
 	//url := "http://127.0.0.1:8080/tomcat_war_exploded/sessionEvil2.jsp"
-	//url := "http://127.0.0.1:8093/123321.php"
-	url := "http://10.211.55.3:8076/testsession.aspx"
+	url := "http://127.0.0.1:8093/bypassdemo/123.php"
+	//url := "http://127.0.0.1:8093/1.php"
+	//url := "http://10.211.55.3:8076/testsession.aspx"
 	//url := "http://10.211.55.3:8076/shell.aspx"
 	manager, err := NewYakShellManager(url,
 		SetYakShellTool(),
 		SetPass("1"),
 		SetBase64(),
-		SetShellScript(ypb.ShellScript_ASPX.String()),
+		SetShellScript(ypb.ShellScript_PHP.String()),
 		SetProxy("http://127.0.0.1:8083"),
 		SetTimeout(10),
 		SetSession(),
@@ -541,25 +543,12 @@ func TestYakShellJsp(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	//ping, err := manager.("whoami")
-	//if err != nil {
-	//	panic(err)
-	//}
-	//fmt.Println(ping)
-	ping, err := manager.ExecutePluginOrCache(map[string]string{
-		"mode": "DirInfo",
-		"path": "C:\\",
+	cache, err := manager.ExecutePluginOrCache(map[string]string{
+		"mode": payloads.DirInfo.String(),
+		"path": "/var/www/html",
 	})
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(string(ping))
-	ping, err = manager.ExecutePluginOrCache(map[string]string{
-		"mode": "DirInfo",
-		"path": "C:\\",
-	})
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(string(ping))
+	fmt.Println(string(cache))
 }

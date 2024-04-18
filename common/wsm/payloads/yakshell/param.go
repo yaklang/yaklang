@@ -16,24 +16,3 @@ func (p Param) Serialize() string {
 	}
 	return strings.TrimRight(result, ",")
 }
-
-//type Param struct {
-//	Map map[string]interface{}
-//}
-//
-//func NewParameter() *Param {
-//	return &Param{
-//		Map: make(map[string]interface{}, 2),
-//	}
-//}
-//
-//func (p *Param) addParam(key string, value interface{}) {
-//	p.Map[key] = value
-//}
-//
-//func (p *Param) AddByteParam(key string, value []byte) {
-//	p.addParam(key, string(value))
-//}
-//
-//func (p *Param) Serialize() string {
-//}
