@@ -940,6 +940,9 @@ func (b *astbuilder) buildExpression(stmt *yak.ExpressionContext) ssa.Value {
 	}
 	// member call
 	if s, ok := stmt.MemberCall().(*yak.MemberCallContext); ok {
+		recoverRange := b.SetRange(s.BaseParserRuleContext)
+		defer recoverRange()
+
 		expr, ok := stmt.Expression(0).(*yak.ExpressionContext)
 		if !ok {
 			return nil
