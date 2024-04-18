@@ -939,15 +939,12 @@ func TestFuzzCookie(t *testing.T) {
 	}{
 		{
 			name: "Cookie参数",
-		},
-		{
-			name: "Cookie参数",
 			base: base{
 				inputPacket: `GET / HTTP/1.1
 Host: www.baidu.com
 
 `,
-				code: `.FuzzCookie("a", "123").FuzzCookie("b", 123).FuzzCookie("c", true).FuzzCookie("","HttpOnly")`,
+				code: `.FuzzCookie("a", "123").FuzzCookie("b", 123).FuzzCookie("c", true)`,
 				expectKeywordInOutputPacket: []string{
 					`a=123`,
 					`b=123`,
@@ -956,11 +953,88 @@ Host: www.baidu.com
 				debug: true,
 			},
 		},
+		{
+			name: "Cookie参数",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzCookieRaw("123").FuzzCookieRaw("456")`,
+				expectKeywordInOutputPacket: []string{
+					`Cookie: 456`,
+				},
+			},
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, testCaseCheck(tc.base))
 	}
+}
+
+func TestFuzzCookieBase64(t *testing.T) {
+	tests := []struct {
+		name string
+		base base
+	}{
+		{
+			name: "Cookie参数(Base64) Url编码",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+
+`,
+
+				code: `.FuzzCookieBase64("a", "%25").FuzzCookieBase64("b", "$")`,
+				expectKeywordInOutputPacket: []string{
+					`a=` + codec.EncodeBase64("%25"),
+					`b=` + codec.EncodeBase64("$"),
+				},
+				debug: true,
+			},
+		},
+		{
+			name: "Cookie参数(Base64) 默认",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+
+`,
+
+				code: `.FuzzCookieBase64("a", "123").FuzzCookieBase64("b", 123).FuzzCookieBase64("c", true).FuzzCookieBase64("d", "\"123\"")`,
+				expectKeywordInOutputPacket: []string{
+					`a=` + codec.EncodeBase64("123"),
+					`b=` + codec.EncodeBase64("123"),
+					`c=` + codec.EncodeBase64("true"),
+					`d=` + codec.EncodeBase64("123"),
+				},
+				debug: true,
+			},
+		},
+		{
+			name: "Cookie参数(Base64) 友好显示",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+
+`,
+
+				code: `.FuzzCookieBase64("a", "123").FuzzCookieBase64("b", 123).FuzzCookieBase64("c", true)`,
+				expectKeywordInOutputPacket: []string{
+					`a={{base64(123)}}`,
+					`b={{base64(123)}}`,
+					`c={{base64(true)}}`,
+				},
+				friendlyDisplay: true,
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, testCaseCheck(tc.base))
+	}
+
 }
 
 func TestYaklangFuzzHTTPRequestBaseCase(t *testing.T) {

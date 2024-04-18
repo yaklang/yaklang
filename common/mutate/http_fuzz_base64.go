@@ -2,15 +2,12 @@ package mutate
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
-	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"io"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/jsonpath"
@@ -203,30 +200,8 @@ func (f *FuzzHTTPRequest) fuzzGetBase64JsonPath(key any, jsonPath string, val an
 		value := result[1]
 		//var replaced = valueToJsonValue(value)
 
-		originalValue := jsonpath.Find(originValue, jsonPath)
+		modifiedParams, err := modifyJSONValue(originValue, jsonPath, value, val)
 
-		var newValue interface{} = value
-
-		switch originalValue.(type) {
-		case float64:
-			if floatVal, err := strconv.ParseFloat(value, 64); err == nil {
-				newValue = floatVal
-			}
-		case bool:
-			if boolVal, err := strconv.ParseBool(value); err == nil {
-				newValue = boolVal
-			}
-		case string:
-			newValue = value
-		case map[string]interface{}, []interface{}:
-			if gjson.Valid(value) {
-				newValue = gjson.Parse(value).Value()
-			}
-		default:
-			return utils.Wrap(errors.New("unrecognized json value type"), "json value type")
-		}
-
-		modifiedParams := jsonpath.ReplaceString(originValue, jsonPath, newValue)
 		if err != nil {
 			return err
 		}
@@ -273,7 +248,13 @@ func (f *FuzzHTTPRequest) FuzzGetBase64Params(key, val any) FuzzHTTPRequestIf {
 }
 
 func (f *FuzzHTTPRequest) FuzzPostBase64Params(key, val any) FuzzHTTPRequestIf {
-	reqs, err := f.fuzzPostParams(key, val, codec.EncodeBase64)
+	encode := func(v any) string {
+		if f.friendlyDisplay {
+			return fmt.Sprintf("{{base64(%s)}}", v)
+		}
+		return codec.EncodeBase64(v)
+	}
+	reqs, err := f.fuzzPostParams(key, val, encode)
 	if err != nil {
 		return f.toFuzzHTTPRequestBatch()
 	}
@@ -281,7 +262,13 @@ func (f *FuzzHTTPRequest) FuzzPostBase64Params(key, val any) FuzzHTTPRequestIf {
 }
 
 func (f *FuzzHTTPRequest) FuzzCookieBase64(key, val any) FuzzHTTPRequestIf {
-	reqs, err := f.fuzzCookie(key, val, codec.EncodeBase64)
+	encode := func(v any) string {
+		if f.friendlyDisplay {
+			return fmt.Sprintf("{{base64(%s)}}", v)
+		}
+		return codec.EncodeBase64(v)
+	}
+	reqs, err := f.fuzzCookie(key, val, encode)
 	if err != nil {
 		return f.toFuzzHTTPRequestBatch()
 	}

@@ -58,7 +58,7 @@ func (f *FuzzHTTPRequest) fuzzCookieBase64JsonPath(key any, jsonPath string, val
 	}
 
 	var cookies []*http.Cookie
-	cookies = lowhttp.ParseCookie(req.Header.Get("Cookie"))
+	cookies = lowhttp.ParseCookie("cookie", req.Header.Get("Cookie"))
 	if cookies == nil {
 		return nil, utils.Error("empty cookie")
 	}
@@ -116,7 +116,7 @@ func (f *FuzzHTTPRequest) fuzzCookieJsonPath(key any, jsonPath string, val any) 
 	}
 
 	var cookies []*http.Cookie
-	cookies = lowhttp.ParseCookie(req.Header.Get("Cookie"))
+	cookies = lowhttp.ParseCookie("cookie", req.Header.Get("Cookie"))
 	if cookies == nil {
 		return nil, utils.Error("empty cookie")
 	}

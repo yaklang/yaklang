@@ -212,7 +212,7 @@ func (m *MITMReplaceRule) splitPacket(packet []byte) (*PacketInfo, error) {
 					info.GzipHeader = key
 				}
 			case "cookie":
-				info.Cookies = append(info.Cookies, lowhttp.ParseCookie(value)...)
+				info.Cookies = append(info.Cookies, lowhttp.ParseCookie("cookie", value)...)
 			}
 		})
 	if info.ChunkedHeader != "" {
@@ -735,7 +735,7 @@ func (m *mitmReplacer) replaceHTTPHeader(rule *ypb.MITMContentReplacer, headerMe
 					buf.WriteString("Cookie: " + cookieHeaderPlaceHolder)
 					buf.WriteString(lowhttp.CRLF)
 				}
-				cookies = append(cookies, lowhttp.ParseCookie(value)...)
+				cookies = append(cookies, lowhttp.ParseCookie("cookie", value)...)
 			} else {
 				i, ok := keyHeader[key]
 				if ok {
