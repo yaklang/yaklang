@@ -919,7 +919,7 @@ func (f *FuzzHTTPRequest) fuzzCookie(k, v interface{}, encoded ...EncodedFunc) (
 			if c == nil {
 				return true
 			}
-
+			c.HttpOnly = true
 			_req.AddCookie(c)
 			return true
 		})

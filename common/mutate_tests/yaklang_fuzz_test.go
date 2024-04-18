@@ -329,9 +329,6 @@ Host: www.baidu.com
 }
 
 func TestFuzzGetJsonPathParams(t *testing.T) {
-	// 现在的处理逻辑是先解析json，根据json path获取值
-	// 根据原值的类型进行 fuzz
-	// 如果原值与 Fuzz 值不匹配，默认使用字符串类型
 	tests := []struct {
 		name string
 		base base
@@ -404,6 +401,35 @@ Host: www.baidu.com
 					`a={{urlescape({"abc":{"zz":123}})}}`,
 				},
 				friendlyDisplay: true,
+			},
+		},
+		{
+			name: "GET 参数(JSON) null type 友好显示",
+			base: base{
+				inputPacket: `GET /?a={"abc": null} HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzGetJsonPathParams("a", "$.abc", 123)`,
+				expectKeywordInOutputPacket: []string{
+					`a={{urlescape({"abc":123})}}`,
+				},
+				friendlyDisplay: true,
+			},
+		},
+		{
+			name: "GET 参数(JSON) null type 友好显示",
+			base: base{
+				inputPacket: `GET /?a={"abc": 123} HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzGetJsonPathParams("a", "$.abc", nil)`,
+				expectKeywordInOutputPacket: []string{
+					`a={{urlescape({"abc":null})}}`,
+				},
+				friendlyDisplay: true,
+				debug:           true,
 			},
 		},
 		{
@@ -901,6 +927,37 @@ Host: www.baidu.com
 			},
 		},
 	}
+	for _, tc := range tests {
+		t.Run(tc.name, testCaseCheck(tc.base))
+	}
+}
+
+func TestFuzzCookie(t *testing.T) {
+	tests := []struct {
+		name string
+		base base
+	}{
+		{
+			name: "Cookie参数",
+		},
+		{
+			name: "Cookie参数",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzCookie("a", "123").FuzzCookie("b", 123).FuzzCookie("c", true).FuzzCookie("","HttpOnly")`,
+				expectKeywordInOutputPacket: []string{
+					`a=123`,
+					`b=123`,
+					`c=true`,
+				},
+				debug: true,
+			},
+		},
+	}
+
 	for _, tc := range tests {
 		t.Run(tc.name, testCaseCheck(tc.base))
 	}
