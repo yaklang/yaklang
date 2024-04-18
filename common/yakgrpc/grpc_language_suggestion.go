@@ -2,19 +2,16 @@ package yakgrpc
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sort"
 	"strings"
 
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	pta "github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yak/yakdoc"
 	"github.com/yaklang/yaklang/common/yak/yakdoc/doc"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -331,6 +328,9 @@ func getFuncDescBytypeStr(typStr string, typName string, isStruct, tab bool) str
 
 func getBuiltinFuncDeclAndDoc(name string, bareTyp ssa.Type) (desc string, doc string) {
 	var m map[string]*ypb.SuggestionDescription
+	if utils.IsNil(bareTyp) {
+		return
+	}
 
 	switch bareTyp.GetTypeKind() {
 	case ssa.SliceTypeKind:
@@ -825,47 +825,18 @@ func GrpcRangeToSSARange(sourceCode string, r *ypb.Range) *ssa.Range {
 }
 
 func (s *Server) YaklangLanguageSuggestion(ctx context.Context, req *ypb.YaklangLanguageSuggestionRequest) (*ypb.YaklangLanguageSuggestionResponse, error) {
-	var (
-		err  error
-		ok   bool
-		prog *ssaapi.Program
-	)
 	ret := &ypb.YaklangLanguageSuggestionResponse{}
-	opt := pta.GetPluginSSAOpt(req.YakScriptType)
 
-	prog, err = ssaapi.Parse(req.YakScriptCode, opt...)
+	result, err := LanguageServerAnalyzeProgram(req.GetYakScriptCode(), req.GetYakScriptType(), req.GetRange())
+	defer result.Release()
+
 	if err != nil {
-		// get cache code
-		if prog, ok = progCacheMap.Get(req.ModelID); ok {
-			err = nil
-		}
+		return ret, err
 	}
+	prog, word, containPoint, ssaRange, v := result.Program, result.Word, result.ContainPoint, result.Range, result.Value
 
-	// opt = append(opt, ssaapi.WithIgnoreSyntaxError(true))
-	if err != nil {
-		log.Error(err)
-		return nil, errors.New("ssa parse error")
-	}
-
-	// set cache code
-	progCacheMap.Set(req.ModelID, prog)
-
-	ssaRange := GrpcRangeToSSARange(req.GetYakScriptCode(), req.GetRange())
-	editor := ssaRange.GetEditor()
-	defer editor.Release()
-
-	// todo: remove this
-	// prog.Program.ShowOffsetMap()
-
-	word, containPoint := trimSourceCode(ssaRange.GetWordText())
-	grpcRange := req.GetRange()
-	v := getFrontValueByOffset(prog, editor, grpcRange)
-	// fallback
 	if v == nil {
-		v = getSSAValueByPosition(prog, word, ssaRange)
-		if v == nil {
-			return ret, nil
-		}
+		return ret, nil
 	}
 
 	// todo: 处理YakScriptType，不同语言的补全、提示可能有不同
