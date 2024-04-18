@@ -25,7 +25,7 @@ type YakShell struct {
 	ResCipherMode string            //返回包解密方式
 	Proxy         string            //代理
 	Os            string            //系统
-	IsSession     bool              //是否启用session mode
+	IsSession     bool              //是否启用session mode  todo： 后续应该增加内存马
 	Retry         int64             //重试次数
 	Timeout       int64             //超时
 	BlockSize     int64             //分块大小
@@ -144,7 +144,7 @@ func (y *YakShell) injectPayload() error {
 	case ypb.ShellScript_ASPX.String():
 		fallthrough
 	case ypb.ShellScript_JSP.String():
-		data, err = y.getPayload(payloads.AllPayload, tmpMap, true, false)
+		data, err = y.getPayload(payloads.AllPayload, tmpMap, true, false, true)
 	default:
 		log.Errorf("webshell类型错误")
 		return utils.Errorf("not found this script")
@@ -165,7 +165,8 @@ func (y *YakShell) InjectPayloadIfNoCookie() error {
 	return nil
 }
 
-func (y *YakShell) getPayload(binCode payloads.Payload, params yakshell.Param, sessionInit, forceHandle bool) ([]byte, error) {
+// getPayload 获取payload，选择是否代码加密，加密仅当 forceHandle=true的时候，encrypt才进行判断，仅当PHP时生效
+func (y *YakShell) getPayload(binCode payloads.Payload, params yakshell.Param, sessionInit, forceHandle, encrypt bool) ([]byte, error) {
 	var rawPayload []byte
 	var err error
 	var hexCode string
@@ -175,23 +176,24 @@ func (y *YakShell) getPayload(binCode payloads.Payload, params yakshell.Param, s
 			return []byte(params.Serialize()), nil
 		}
 	}
-
-	//如果不是forceHandle就进行处理参数
-	if !forceHandle {
-		y.processParams(params)
-	}
 	if y.IsSession && !forceHandle {
 		//如果是session就每次都获取到AllPayload去做解析
 		hexCode = payloads.YakShellPayload[y.ShellScript][payloads.AllPayload]
 	} else {
 		hexCode = payloads.YakShellPayload[y.ShellScript][binCode]
 	}
-	//if y.IsSession && first && y.ShellScript == ypb.ShellScript_PHP.String() {
-	//	return hex.DecodeString(hexCode)
-	//}
+	//如果不是forceHandle就进行处理参数
+	if !forceHandle {
+		y.processParams(params)
+	} else if y.ShellScript == ypb.ShellScript_PHP.String() {
+		if !encrypt {
+			delete(params, "customEncoderFromText")
+		}
+		return behinder.GetRawPHP(hexCode, params, string(binCode), true)
+	}
 	switch y.ShellScript {
 	case ypb.ShellScript_PHP.String():
-		rawPayload, _, err = behinder.GetRawPHP(hexCode, params)
+		rawPayload, err = behinder.GetRawPHP(hexCode, params, string(binCode), false)
 	case ypb.ShellScript_JSP.String():
 		rawPayload, err = behinder.GetRawClass(hexCode, params)
 	case ypb.ShellScript_ASPX.String():
@@ -224,7 +226,7 @@ func (y *YakShell) handleResponse(data []byte) ([]byte, error) {
 		if status, exists := decodedMap["status"]; exists {
 			if status != "ok" {
 				decodeString, _ := base64.StdEncoding.DecodeString(decodedMap["msg"].(string))
-				return nil, utils.Errorf("execute fail: %v", decodeString)
+				return nil, utils.Errorf("execute fail: %v", string(decodeString))
 			}
 		} else {
 			return nil, utils.Error("status field not found in the JSON data")
@@ -282,7 +284,7 @@ func (y *YakShell) Ping(opts ...behinder.ExecParamsConfig) (bool, error) {
 	if y.IsSession {
 		argsMap["action"] = "ping"
 	}
-	payload, err := y.getPayload(payloads.EchoGo, argsMap, false, false)
+	payload, err := y.getPayload(payloads.EchoGo, argsMap, false, false, true)
 	if err != nil {
 		return false, err
 	}
@@ -302,7 +304,7 @@ func (y *YakShell) BasicInfo(opts ...behinder.ExecParamsConfig) ([]byte, error) 
 	if y.IsSession {
 		argsMap["action"] = "info"
 	}
-	payload, err := y.getPayload(payloads.BasicInfoGo, argsMap, false, false)
+	payload, err := y.getPayload(payloads.BasicInfoGo, argsMap, false, false, true)
 	if err != nil {
 		return nil, err
 	}
@@ -318,7 +320,7 @@ func (y *YakShell) CommandExec(cmd string, opts ...behinder.ExecParamsConfig) ([
 		argsMap["action"] = "cmd"
 	}
 	argsMap["command"] = cmd
-	payload, err := y.getPayload(payloads.CmdGo, argsMap, false, false)
+	payload, err := y.getPayload(payloads.CmdGo, argsMap, false, false, true)
 	if err != nil {
 		return nil, err
 	}
@@ -345,12 +347,12 @@ func (y *YakShell) ExecutePluginOrCache(param map[string]string) ([]byte, error)
 		codeMode = param["mode"]
 	)
 	delete(param, "mode")
-	delete(param, "action") //如果有的话，就删除
+	delete(param, "action")
 	if !y.IsSession {
-		_payload, _error = y.getPayload(payloads.Payload(codeMode), param, false, false)
+		_payload, _error = y.getPayload(payloads.Payload(codeMode), param, false, false, true)
 	} else {
 		//拿到参数集合
-		args, err := y.getPayload("", param, false, false)
+		args, err := y.getPayload("", param, false, false, true)
 		if err != nil {
 			return nil, err
 		}
@@ -359,16 +361,16 @@ func (y *YakShell) ExecutePluginOrCache(param map[string]string) ([]byte, error)
 		if _, exit := y.remoteFunc[codeMode]; exit {
 			data["action"] = "cache"
 			data["args"] = string(args)
-			_payload, _error = y.getPayload("", data, false, false)
+			_payload, _error = y.getPayload("", data, false, false, true)
 		} else {
 			data["action"] = "plugin"
 			data["args"] = string(args)
-			payload, err1 := y.getPayload(payloads.Payload(codeMode), map[string]string{}, false, true)
+			payload, err1 := y.getPayload(payloads.Payload(codeMode), map[string]string{}, false, true, false)
 			if err1 != nil {
 				return nil, err1
 			}
 			data["code"] = base64.StdEncoding.EncodeToString(payload) //拿到源码
-			_payload, _error = y.getPayload("", data, false, false)
+			_payload, _error = y.getPayload("", data, false, false, true)
 			y.remoteFunc[codeMode] = struct{}{}
 		}
 	}
@@ -377,6 +379,7 @@ func (y *YakShell) ExecutePluginOrCache(param map[string]string) ([]byte, error)
 	}
 	return y.encryptAndSendPayload(_payload, true)
 }
+
 func (y *YakShell) GenWebShell() string {
 	//TODO implement me
 	panic("implement me")
