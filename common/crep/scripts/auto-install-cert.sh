@@ -1,5 +1,6 @@
 #!/bin/bash
 
+cd $(dirname $0)
 # 证书文件路径
 CERT_FILE="yak-mitm-ca.crt"
 
@@ -17,7 +18,6 @@ elif [ "$OS" == "Linux" ]; then
     sudp update-ca-certificates
 else
     echo "Unsupported operating system: $OS"
-    exit 1
 fi
 
 # 检查安装结果
@@ -25,5 +25,6 @@ if [ $? -eq 0 ]; then
   echo -e "\033[32mCertificate successfully installed.\033[0m"
 else
   echo -e "\033[31mFailed to install certificate.\033[0m"
-  exit 1
 fi
+
+read -p "Press Enter to exit"
