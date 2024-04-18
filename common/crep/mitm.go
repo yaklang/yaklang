@@ -32,7 +32,6 @@ import (
 var (
 	initMITMCertOnce              = new(sync.Once)
 	defaultCAFile, defaultKeyFile = "yak-mitm-ca.crt", "yak-mitm-ca.key"
-	batScriptFile, shScriptFile   = "install-cert.bat", "install-cert.sh"
 	defaultCA, defaultKey         []byte
 )
 
@@ -45,9 +44,6 @@ func init() {
 	//_ = os.MkdirAll(homeDir, os.ModePerm)
 	defaultCAFile = filepath.Join(homeDir, defaultCAFile)
 	defaultKeyFile = filepath.Join(homeDir, defaultKeyFile)
-	batScriptFile = filepath.Join(homeDir, batScriptFile)
-	shScriptFile = filepath.Join(homeDir, shScriptFile)
-	genScriptFile()
 }
 
 func GetDefaultCAAndPrivRaw() ([]byte, []byte) {
