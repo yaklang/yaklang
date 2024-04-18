@@ -20,13 +20,6 @@ func NewLoop(cond Value) *Loop {
 	return l
 }
 
-func NewConstInst(c *Const) *ConstInst {
-	v := &ConstInst{
-		Const: c,
-	}
-	return v
-}
-
 func NewUndefined(name string) *Undefined {
 	u := &Undefined{
 		anValue: NewValue(),
