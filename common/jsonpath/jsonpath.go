@@ -283,14 +283,14 @@ func (p *parser) parseObjAccess() error {
 			return nil, fmt.Errorf("expected JSON object to access child '%s' at %d", ident, column)
 		}
 		// 如果指定的属性存在，则进行替换并继续执行后续操作
-		if _, exists := obj[ident]; exists && p.replaceValue != nil {
+		if _, exists := obj[ident]; exists {
 			obj[ident] = p.replaceValue
 			return a.next(r, obj[ident])
 		}
 
-		if p.replaceValue != nil {
-			obj[ident] = p.replaceValue
-		}
+		// 如果指定的属性不存在，追加
+		obj[ident] = p.replaceValue
+
 		return a.next(r, obj[ident])
 	})
 	return nil
