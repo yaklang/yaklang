@@ -32,6 +32,7 @@ import (
 var (
 	initMITMCertOnce              = new(sync.Once)
 	defaultCAFile, defaultKeyFile = "yak-mitm-ca.crt", "yak-mitm-ca.key"
+	batScriptFile, shScriptFile   = "install-cert.bat", "install-cert.sh"
 	defaultCA, defaultKey         []byte
 )
 
@@ -44,6 +45,9 @@ func init() {
 	//_ = os.MkdirAll(homeDir, os.ModePerm)
 	defaultCAFile = filepath.Join(homeDir, defaultCAFile)
 	defaultKeyFile = filepath.Join(homeDir, defaultKeyFile)
+	batScriptFile = filepath.Join(homeDir, batScriptFile)
+	shScriptFile = filepath.Join(homeDir, shScriptFile)
+	genScriptFile()
 }
 
 func GetDefaultCAAndPrivRaw() ([]byte, []byte) {
@@ -55,8 +59,28 @@ func GetDefaultCAAndPrivRaw() ([]byte, []byte) {
 }
 
 func GetDefaultCAAndPriv() (*x509.Certificate, *rsa.PrivateKey, error) {
-	//ca, key := GetDefaultCAAndPrivRaw()
-	ca, key, _ := GetDefaultCaAndKey()
+	ca, key := GetDefaultCAAndPrivRaw()
+	p, _ := pem.Decode(ca)
+	caCert, err := x509.ParseCertificate(p.Bytes)
+	if err != nil {
+		return nil, nil, utils.Errorf("default ca failed: %s", err)
+	}
+
+	priv, _ := pem.Decode(key)
+	privKey, err := x509.ParsePKCS1PrivateKey(priv.Bytes)
+	if err != nil {
+		return nil, nil, utils.Errorf("default private key failed: %s", err)
+	}
+
+	return caCert, privKey, nil
+}
+
+func GetDefaultMITMCAAndPriv() (*x509.Certificate, *rsa.PrivateKey, error) {
+	ca, key, err := GetDefaultCaAndKey()
+	if err != nil {
+		return nil, nil, err
+
+	}
 	p, _ := pem.Decode(ca)
 	caCert, err := x509.ParseCertificate(p.Bytes)
 	if err != nil {
@@ -141,7 +165,7 @@ func FakeCertificateByHost(caCert *x509.Certificate, caKey *rsa.PrivateKey, doma
 
 func VerifySystemCertificate() error {
 	InitMITMCert()
-	caCert, caKey, _ := GetDefaultCAAndPriv()
+	caCert, caKey, _ := GetDefaultMITMCAAndPriv()
 	fakeCert, err := FakeCertificateByHost(caCert, caKey, "yaklang.com")
 	if err != nil {
 		return err
