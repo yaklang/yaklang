@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"net/http"
 	"strings"
 	"testing"
@@ -163,16 +164,19 @@ func TestGRPCMUSTPASS_MITM_HotPatch_BeforeRequest_AfterRequest(t *testing.T) {
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(100000000))
 	defer cancel()
 
-	token1 := utils.RandStringBytes(16)
-	token2 := utils.RandStringBytes(16)
-	token3 := utils.RandStringBytes(16)
-	token4 := utils.RandStringBytes(16)
+	originReqToken := utils.RandStringBytes(16)
+	hijackReqToken := utils.RandStringBytes(16)
+	reqToken := utils.RandStringBytes(16)
+	originRspToken := utils.RandStringBytes(16)
+	hijackRspToken := utils.RandStringBytes(16)
+	rspToken := utils.RandStringBytes(16)
 
 	mockHost, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
-		if !bytes.Contains(req, []byte(token2)) {
-			panic("token2 not found")
+		spew.Dump(req)
+		if !bytes.Contains(req, []byte(reqToken)) {
+			panic("req token not found")
 		}
-		return []byte("HTTP/1.1 200 OK\r\n\r\nyes")
+		return []byte("HTTP/1.1 200 OK\r\nContent-Length: 16\r\n" + originRspToken + "\r\n\r\n")
 	})
 
 	mitmPort := utils.GetRandomAvailableTCPPort()
@@ -189,27 +193,49 @@ func TestGRPCMUSTPASS_MITM_HotPatch_BeforeRequest_AfterRequest(t *testing.T) {
 		Port: uint32(mitmPort),
 	})
 
-	hotPatchScript := fmt.Sprintf(`hijackHTTPRequest = func(isHttps, url, req, forward , drop) {
-    req = poc.ReplaceHTTPPacketBody(req,"%s")
+	hotPatchScript := `hijackHTTPRequest = func(isHttps, url, req, forward , drop) {
+    req = poc.ReplaceHTTPPacketBody(req,"` + hijackReqToken + `")
     forward(req)
 }
 
-beforeRequest = func(req){
-    return poc.ReplaceHTTPPacketBody(req, "%s")
+beforeRequest = func(ishttps,oreq,req){
+	if !oreq.Contains("` + originReqToken + `") { // check oreq correct
+		return req
+	}
+    return poc.ReplaceHTTPPacketBody(req, "` + reqToken + `")
 }
 
 hijackHTTPResponse = func(isHttps, url, rsp, forward, drop) {
-    rsp = poc.ReplaceHTTPPacketBody(rsp,"%s")
+    rsp = poc.ReplaceHTTPPacketBody(rsp,"` + hijackRspToken + `")
     forward(rsp)
 }
 
-afterRequest = func(rsp){
-    return poc.ReplaceHTTPPacketBody(rsp, "%s")
+afterRequest = func(ishttps,oreq,req,orsp,rsp){
+	if !oreq.Contains("` + originReqToken + `") { // check oreq correct
+		println("oreq error")
+		return rsp
+	}	
+	
+	if !req.Contains("` + reqToken + `") { // check req correct
+		println("req error")
+		return rsp
+	}
+
+	if !orsp.Contains("` + originRspToken + `") { // check orsp correct
+		println("orsp error")
+		return rsp
+	}
+
+	if !rsp.Contains("` + hijackRspToken + `") { // check hijack req correct
+		println("rsp error")
+		return rsp
+	}
+    return poc.ReplaceHTTPPacketBody(rsp, "` + rspToken + `")
 }
 
 
 
-`, token1, token2, token3, token4)
+`
 
 	for {
 		data, err := stream.Recv()
@@ -236,12 +262,13 @@ afterRequest = func(rsp){
 				packet := `GET / HTTP/1.1
 Host: ` + utils.HostPort(mockHost, mockPort) + `
 
+` + originReqToken + `
 `
 				packetBytes := lowhttp.FixHTTPRequest([]byte(packet))
 				_, err := yak.Execute(`
 rsp, req = poc.HTTPEx(packet, poc.proxy(mitmProxy))~
 dump(rsp.RawPacket)
-assert rsp.RawPacket.Contains("`+token4+`")
+assert rsp.RawPacket.Contains("`+rspToken+`")
 `, map[string]any{
 					"packet":    string(packetBytes),
 					"mitmProxy": `http://` + utils.HostPort("127.0.0.1", mitmPort),
@@ -253,8 +280,8 @@ assert rsp.RawPacket.Contains("`+token4+`")
 			}()
 		} else if data.Request != nil && !data.ForResponse {
 			// send packet
-			if !bytes.Contains(data.Request, []byte(token1)) {
-				t.Fatal("token1 not found")
+			if !bytes.Contains(data.Request, []byte(hijackReqToken)) {
+				t.Fatal("hijack req token not found")
 			}
 			stream.Send(&ypb.MITMRequest{
 				HijackResponse: true,
@@ -262,8 +289,8 @@ assert rsp.RawPacket.Contains("`+token4+`")
 			})
 		} else if data.Response != nil {
 			// send packet
-			if !bytes.Contains(data.Response, []byte(token3)) {
-				t.Fatal("token3 not found")
+			if !bytes.Contains(data.Response, []byte(hijackRspToken)) {
+				t.Fatal("hijack rsp token not found")
 			}
 
 			stream.Send(&ypb.MITMRequest{
