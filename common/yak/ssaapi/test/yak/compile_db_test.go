@@ -2,6 +2,10 @@ package ssaapi
 
 import (
 	"context"
+	"os"
+	"strconv"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
@@ -11,9 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"os"
-	"strconv"
-	"testing"
 )
 
 func TestCompileWithDatabase_Scope_Phi(t *testing.T) {

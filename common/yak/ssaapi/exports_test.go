@@ -239,8 +239,8 @@ func TestFeedCode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	prog.Feed(code2)
-	prog.Feed(code3)
+	prog.Feed(strings.NewReader(code2))
+	prog.Feed(strings.NewReader(code3))
 	// prog.Finish()
 	prog.Show()
 

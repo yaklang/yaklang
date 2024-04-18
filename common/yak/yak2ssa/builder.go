@@ -1,57 +1,37 @@
 package yak2ssa
 
 import (
+	"path/filepath"
+
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-type astbuilder struct {
-	*ssa.FunctionBuilder
-}
+type SSABuilder struct{}
 
-func Build(src string, force bool, builder *ssa.FunctionBuilder) error {
+var Builder = &SSABuilder{}
+
+func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	ast, err := FrontEnd(src, force)
 	if err != nil {
 		return err
 	}
-
-	// backup old editor (source code)
-	originEditor := builder.GetEditor()
-
-	// include source code will change the context of the origin editor
-	newCodeEditor := memedit.NewMemEditor(src)
-	builder.SetEditor(newCodeEditor) // set for current builder
-	originEditor.PushSourceCodeContext(newCodeEditor.SourceCodeMd5())
-
-	// push into program for recording what code is compiling
-	builder.GetProgram().PushEditor(newCodeEditor)
-	defer func() {
-		// recover source code context
-		builder.SetEditor(originEditor)
-		builder.GetProgram().PopEditor()
-	}()
-
 	astBuilder := &astbuilder{
-		FunctionBuilder: builder,
-	}
-
-	if ret := builder.GetEditor(); ret != nil {
-		prog := builder.GetProgram()
-		cache := prog.Cache
-		progName, hash := prog.GetProgramName(), ret.SourceCodeMd5()
-		if cache.IsExistedSourceCodeHash(progName, hash) {
-			prog.HitBuilderCache(builder)
-		}
-	} else {
-		log.Warnf("(BUG or in DEBUG Mode)Range not found for %s", builder.GetName())
+		FunctionBuilder: b,
 	}
 	astBuilder.build(ast)
 	return nil
+}
+
+func (*SSABuilder) FilterFile(path string) bool {
+	return filepath.Ext(path) == ".yak"
+}
+
+type astbuilder struct {
+	*ssa.FunctionBuilder
 }
 
 func FrontEnd(src string, must bool) (*yak.ProgramContext, error) {

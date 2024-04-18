@@ -1,18 +1,24 @@
 package ssaapi
 
 import (
+	"io"
+	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 type config struct {
 	language        Language
-	Build           Build
-	code            string
+	Builder         Builder
 	feedCode        bool
 	ignoreSyntaxErr bool
+
+	// input, code or project path
+	code io.Reader
+	fs   filesys.FileSystem
 
 	externLib    map[string]map[string]any
 	externValue  map[string]any
@@ -23,15 +29,14 @@ type config struct {
 	DatabaseProgramCacheHitter func(any)
 	// for hash
 	externInfo string
-	isFilePath bool
-	filePath   []string
 }
 
-func defaultConfig(code string) *config {
+func defaultConfig() *config {
 	return &config{
 		language:    Yak,
-		Build:       LanguageBuilders[Yak],
-		code:        code,
+		Builder:     LanguageBuilders[Yak],
+		code:        nil,
+		fs:          nil,
 		externLib:   make(map[string]map[string]any),
 		externValue: make(map[string]any),
 		defineFunc:  make(map[string]any),
@@ -48,16 +53,10 @@ func WithLanguage(language Language) Option {
 	return func(c *config) {
 		c.language = language
 		if parser, ok := LanguageBuilders[language]; ok {
-			c.Build = parser
+			c.Builder = parser
 		} else {
-			c.Build = nil
+			c.Builder = nil
 		}
-	}
-}
-
-func WithIsFilePath(isFilePath bool) Option {
-	return func(c *config) {
-		c.isFilePath = isFilePath
 	}
 }
 
@@ -133,27 +132,59 @@ func WithDatabaseProgramCacheHitter(h func(i any)) Option {
 	}
 }
 
+func ParseProjectFromPath(path string, opts ...Option) (*Program, error) {
+	fs := filesys.NewLocalFs(path)
+	return ParseProject(fs, opts...)
+}
+
+func ParseProject(fs filesys.FileSystem, opts ...Option) (*Program, error) {
+	config := defaultConfig()
+	for _, opt := range opts {
+		opt(config)
+	}
+	config.fs = fs
+	if config.Builder == nil {
+		return nil, utils.Errorf("not support language %s", config.language)
+	}
+	var ret *Program
+	prog, err := config.parse()
+	if err != nil {
+		return nil, utils.Wrapf(err, "parse error")
+	}
+	ret = NewProgram(prog)
+	ret.AddConfig(config)
+	return ret, nil
+}
+
 var ttlSSAParseCache = utils.NewTTLCache[*Program](30 * time.Minute)
 
 func ClearCache() {
 	ttlSSAParseCache.Purge()
 }
 
-func Parse(input string, opts ...Option) (*Program, error) {
-	config := defaultConfig(input)
+// Parse parse code to ssa.Program
+func Parse(code string, opts ...Option) (*Program, error) {
+	input := strings.NewReader(code)
+	return ParseFromReader(input, opts...)
+}
+
+// ParseFromReader parse simple file to ssa.Program
+func ParseFromReader(input io.Reader, opts ...Option) (*Program, error) {
+	config := defaultConfig()
 	for _, opt := range opts {
 		opt(config)
 	}
-	if config.Build == nil {
+	if config.Builder == nil {
 		return nil, utils.Errorf("not support language %s", config.language)
 	}
+	config.code = input
 	var ret *Program
 
 	hash := config.CaclHash()
 	if prog, ok := ttlSSAParseCache.Get(hash); ok {
 		ret = prog
 	} else {
-		prog, err := parseWithConfig(config)
+		prog, err := config.parse()
 		if err != nil {
 			return nil, utils.Wrapf(err, "parse error")
 		}
@@ -164,15 +195,11 @@ func Parse(input string, opts ...Option) (*Program, error) {
 	return ret, nil
 }
 
-func parseWithConfig(c *config) (*ssa.Program, error) {
-	return parse(c, nil)
-}
-
-func (p *Program) Feed(code string) {
-	if p.config == nil || !p.config.feedCode || p.config.Build == nil {
-		return
+func (p *Program) Feed(code io.Reader) error {
+	if p.config == nil || !p.config.feedCode || p.config.Builder == nil {
+		return utils.Errorf("not support language %s", p.config.language)
 	}
-	feed(p.config, p.Program, code)
+	return p.config.feed(p.Program, code)
 }
 
 var Exports = map[string]any{

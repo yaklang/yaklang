@@ -17,7 +17,7 @@ func TestJavaBasic_Variable_InIf(t *testing.T) {
 			"phi(a)[2,1]"}, t)
 	})
 
-	t.Run("test simple if with local vairable", func(t *testing.T) {
+	t.Run("test simple if with local variable", func(t *testing.T) {
 		CheckJavaPrintlnValue(`
 		var a=1;
 		println(a);

@@ -2,15 +2,16 @@ package tests
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
-	"testing"
 )
 
 func init() {
-	test.SetLanguage("java", java2ssa.Build)
+	test.SetLanguage("java", java2ssa.Builder)
 }
 
 func CheckJavaTestCase(t *testing.T, tc test.TestCase) {

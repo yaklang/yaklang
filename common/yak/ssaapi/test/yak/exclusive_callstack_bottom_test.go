@@ -1,8 +1,9 @@
 package ssaapi
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssatest"
 )
 
 func TestYaklang_BottomUses_Basic(t *testing.T) {
@@ -100,3 +101,19 @@ func Test_Yaklang_BottomUser(t *testing.T) {
 		)
 	})
 }
+
+// func TestA(t *testing.T) {
+// 	opt := static_analyzer.GetPluginSSAOpt("yak")
+// 	opt = append(opt, ssaapi.WithLanguage(ssaapi.Yak))
+// 	prog, err := ssaapi.ParseFromString(`
+// 	ssa.Parse("",ssa.withLanguage(ssa.Yak))
+// 	ssa.Parse("")
+// 	`,
+// 		opt...,
+// 	)
+// 	require.NoError(t, err)
+
+// 	// prog.Program.ShowWithSource()
+// 	prog.Show()
+// 	prog.Ref("ssa").GetOperands().ShowWithSource()
+// }
