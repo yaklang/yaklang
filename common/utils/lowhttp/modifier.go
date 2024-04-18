@@ -724,7 +724,7 @@ func ReplaceHTTPPacketCookie(packet []byte, key string, value any) []byte {
 
 		k, cookieRaw := SplitHTTPHeader(line)
 		if (strings.ToLower(k) == "cookie" && isReq) || (strings.ToLower(k) == "set-cookie" && isRsp) {
-			existed := ParseCookie(cookieRaw)
+			existed := ParseCookie(k, cookieRaw)
 			if len(existed) <= 0 {
 				return line
 			}
@@ -801,9 +801,8 @@ func AppendHTTPPacketCookie(packet []byte, key string, value any) []byte {
 		}
 
 		k, cookieRaw := SplitHTTPHeader(line)
-		k = strings.ToLower(k)
-		if (k == "cookie" && isReq) || (k == "set-cookie" && isRsp) {
-			existed := ParseCookie(cookieRaw)
+		if (strings.ToLower(k) == "cookie" && isReq) || (strings.ToLower(k) == "set-cookie" && isRsp) {
+			existed := ParseCookie(k, cookieRaw)
 			existed = append(existed, &http.Cookie{Name: key, Value: utils.InterfaceToString(value)})
 			added = true
 			return k + ": " + CookiesToString(existed)
@@ -858,7 +857,7 @@ func DeleteHTTPPacketCookie(packet []byte, key string) []byte {
 		k = strings.ToLower(k)
 
 		if (k == "cookie" && isReq) || (k == "set-cookie" && isRsp) {
-			existed := ParseCookie(cookieRaw)
+			existed := ParseCookie(k, cookieRaw)
 			existed = funk.Filter(existed, func(cookie *http.Cookie) bool {
 				return cookie.Name != key
 			}).([]*http.Cookie)
@@ -1417,7 +1416,7 @@ func GetHTTPPacketCookieValues(packet []byte, key string) (cookieValues []string
 	var val []string
 	SplitHTTPPacket(packet, nil, nil, func(line string) string {
 		if k, cookieRaw := SplitHTTPHeader(line); k == "Cookie" || k == "cookie" {
-			existed := ParseCookie(cookieRaw)
+			existed := ParseCookie(k, cookieRaw)
 			for _, e := range existed {
 				if e.Name == key {
 					val = append(val, e.Value)
@@ -1426,7 +1425,7 @@ func GetHTTPPacketCookieValues(packet []byte, key string) (cookieValues []string
 		}
 
 		if k, cookieRaw := SplitHTTPHeader(line); strings.ToLower(k) == "set-cookie" {
-			existed := ParseCookie(cookieRaw)
+			existed := ParseCookie(k, cookieRaw)
 			for _, e := range existed {
 				if e.Name == key {
 					val = append(val, e.Value)
@@ -1531,15 +1530,15 @@ func GetHTTPPacketContentType(packet []byte) (contentType string) {
 func GetHTTPPacketCookies(packet []byte) (cookies map[string]string) {
 	val := make(map[string]string)
 	SplitHTTPPacket(packet, nil, nil, func(line string) string {
-		if k, cookieRaw := SplitHTTPHeader(line); k == "Cookie" || k == "cookie" {
-			existed := ParseCookie(cookieRaw)
+		if k, cookieRaw := SplitHTTPHeader(line); strings.ToLower(k) == "cookie" {
+			existed := ParseCookie(k, cookieRaw)
 			for _, e := range existed {
 				val[e.Name] = e.Value
 			}
 		}
 
 		if k, cookieRaw := SplitHTTPHeader(line); strings.ToLower(k) == "set-cookie" {
-			existed := ParseCookie(cookieRaw)
+			existed := ParseCookie(k, cookieRaw)
 			for _, e := range existed {
 				val[e.Name] = e.Value
 			}
@@ -1563,8 +1562,8 @@ func GetHTTPPacketCookies(packet []byte) (cookies map[string]string) {
 func GetHTTPPacketCookiesFull(packet []byte) (cookies map[string][]string) {
 	val := make(map[string][]string)
 	SplitHTTPPacket(packet, nil, nil, func(line string) string {
-		if k, cookieRaw := SplitHTTPHeader(line); k == "Cookie" || k == "cookie" {
-			existed := ParseCookie(cookieRaw)
+		if k, cookieRaw := SplitHTTPHeader(line); strings.ToLower(k) == "cookie" {
+			existed := ParseCookie(k, cookieRaw)
 			for _, e := range existed {
 				if _, ok := val[e.Name]; !ok {
 					val[e.Name] = make([]string, 0)
@@ -1574,7 +1573,7 @@ func GetHTTPPacketCookiesFull(packet []byte) (cookies map[string][]string) {
 		}
 
 		if k, cookieRaw := SplitHTTPHeader(line); strings.ToLower(k) == "set-cookie" {
-			existed := ParseCookie(cookieRaw)
+			existed := ParseCookie(k, cookieRaw)
 			for _, e := range existed {
 				if _, ok := val[e.Name]; !ok {
 					val[e.Name] = make([]string, 0)
