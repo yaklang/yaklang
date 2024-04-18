@@ -215,7 +215,7 @@ func (b *Behinder) getPayload(binCode payloads.Payload, params map[string]string
 			return nil, err
 		}
 	case ypb.ShellScript_PHP.String():
-		rawPayload, _, err = behinder.GetRawPHP(hexCode, params)
+		rawPayload, err = behinder.GetRawPHP(hexCode, params, "main", false)
 		if err != nil {
 			return nil, err
 		}
