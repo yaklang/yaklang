@@ -1,12 +1,13 @@
 package ssareducer
 
 import (
+	"io/fs"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
-	"os"
-	"strings"
 )
 
 type ReducerCompiler struct {
@@ -35,7 +36,7 @@ func (r *ReducerCompiler) Compile() error {
 	defer visited.Close()
 
 	c := r.config
-	opts = append(opts, filesys.WithFileStat(func(pathname string, info os.FileInfo) error {
+	opts = append(opts, filesys.WithFileStat(func(pathname string, fd fs.File, info fs.FileInfo) error {
 		if len(c.exts) > 0 {
 			skipped := true
 			for _, ext := range c.exts {

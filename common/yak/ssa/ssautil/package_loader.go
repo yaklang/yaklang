@@ -1,11 +1,11 @@
 package ssautil
 
 import (
-	"embed"
+	"io"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -14,9 +14,9 @@ import (
 
 type PackageLoaderOption func(*PackageLoader)
 
-func WithEmbedFS(fs embed.FS) PackageLoaderOption {
+func WithFileSystem(fs filesys.FileSystem) PackageLoaderOption {
 	return func(loader *PackageLoader) {
-		loader.embedFS = &fs
+		loader.fs = fs
 	}
 }
 
@@ -32,7 +32,7 @@ func WithCurrentPath(path string) PackageLoaderOption {
 }
 
 type PackageLoader struct {
-	embedFS      *embed.FS
+	fs           filesys.FileSystem
 	currentPath  string
 	includePath  []string
 	includedPath map[string]struct{} // for include once
@@ -48,6 +48,9 @@ func NewPackageLoader(opts ...PackageLoaderOption) *PackageLoader {
 	for _, i := range opts {
 		i(loader)
 	}
+	if loader.fs == nil {
+		loader.fs = filesys.NewLocalFs(".")
+	}
 	return loader
 }
 
@@ -60,7 +63,7 @@ func (p *PackageLoader) GetCurrentPath() string {
 }
 
 func (p *PackageLoader) join(s ...string) string {
-	if p.embedFS != nil {
+	if p.fs != nil {
 		return path.Join(s...)
 	} else {
 		return filepath.Join(s...)
@@ -106,23 +109,23 @@ func (p *PackageLoader) getPath(want string, once bool, f func(string) bool) (st
 	return "", utils.Errorf("file or directory %s not found in include path", want)
 }
 
-func (p *PackageLoader) LoadFilePackage(packageName string, once bool) (string, []byte, error) {
+func (p *PackageLoader) LoadFilePackage(packageName string, once bool) (string, io.Reader, error) {
 	path, err := p.FilePath(packageName, once)
 	if err != nil {
 		return "", nil, err
 	}
-	if p.embedFS != nil {
-		data, err := p.embedFS.ReadFile(path)
+	if p.fs != nil {
+		data, err := p.fs.Open(path)
 		return path, data, err
 	}
-	data, err := os.ReadFile(path)
+	data, err := os.Open(path)
 	return path, data, err
 }
 
 type FileDescriptor struct {
 	PathName string
-	Info     os.FileInfo
-	Data     []byte
+	Info     fs.FileInfo
+	Data     io.Reader
 }
 
 func (p *PackageLoader) LoadDirectoryPackage(packageName string, once bool) (chan FileDescriptor, error) {
@@ -130,48 +133,22 @@ func (p *PackageLoader) LoadDirectoryPackage(packageName string, once bool) (cha
 
 	go func() {
 		defer close(ch)
-		if p.embedFS != nil {
-			err := filesys.Recursive(packageName, filesys.WithEmbedFS(*p.embedFS), filesys.WithFileStat(func(pathname string, info os.FileInfo) error {
-				if ret := path.Dir(pathname); ret == packageName || strings.TrimRight(ret, "/") == strings.TrimRight(packageName, "/") {
-					data, err := p.embedFS.ReadFile(pathname)
-					if err != nil {
-						return err
-					}
-					ch <- FileDescriptor{
-						PathName: pathname,
-						Info:     info,
-						Data:     data,
-					}
-				}
-				return nil
-			}))
-			if err != nil {
-				log.Errorf("load directory package %s failed: %v", packageName, err)
-			}
-		} else {
-			absDir, err := p.DirPath(packageName, once)
-			if err != nil {
-				log.Errorf("load directory package %s failed: %v", packageName, err)
-				return
-			}
-			err = filesys.Recursive(absDir, filesys.WithFileStat(func(pathname string, info os.FileInfo) error {
-				if ret := path.Dir(pathname); filepath.Clean(ret) == filepath.Clean(absDir) {
-					data, err := os.ReadFile(pathname)
-					if err != nil {
-						return err
-					}
-					ch <- FileDescriptor{
-						PathName: pathname,
-						Info:     info,
-						Data:     data,
-					}
-				}
-				return nil
-			}))
-			if err != nil {
-				log.Errorf("load directory package %s failed: %v", packageName, err)
-			}
+		absDir, err := p.DirPath(packageName, once)
+		if err != nil {
+			log.Errorf("load directory package %s failed: %v", packageName, err)
+			return
 		}
+		err = filesys.Recursive(
+			absDir,
+			filesys.WithFileStat(func(s string, f fs.File, info fs.FileInfo) error {
+				ch <- FileDescriptor{
+					PathName: s,
+					Info:     info,
+					Data:     f,
+				}
+				return fs.SkipDir
+			}),
+		)
 	}()
 	return ch, nil
 }
