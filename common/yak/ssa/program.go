@@ -101,11 +101,12 @@ func (prog *Program) SearchIndexAndOffsetByOffset(searchOffset int) (index int, 
 	index = sort.Search(len(prog.OffsetSortedSlice), func(i int) bool {
 		return prog.OffsetSortedSlice[i] >= searchOffset
 	})
-	if index >= len(prog.OffsetSortedSlice) {
+	if index >= len(prog.OffsetSortedSlice) && len(prog.OffsetSortedSlice) > 0 {
 		index = len(prog.OffsetSortedSlice) - 1
 	}
-
-	offset = prog.OffsetSortedSlice[index]
+	if len(prog.OffsetSortedSlice) > 0 {
+		offset = prog.OffsetSortedSlice[index]
+	}
 	return
 }
 

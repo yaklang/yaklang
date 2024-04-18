@@ -93,7 +93,7 @@ func (p *Program) GetClassMember(className string, key string) *Value {
 func (p *Program) GetAllOffsetItemsBefore(offset int) []*ssa.OffsetItem {
 	offsetSortedSlice := p.Program.OffsetSortedSlice
 	index := sort.SearchInts(offsetSortedSlice, offset)
-	if index < len(offsetSortedSlice) && offsetSortedSlice[index] > offset {
+	if index < len(offsetSortedSlice) && offsetSortedSlice[index] > offset && index > 0 {
 		index--
 	}
 	beforeSlice := offsetSortedSlice[:index]
