@@ -288,6 +288,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		mitmPluginCaller.SetProxy(downstreamProxy)
 	}
 
+	//int beforeRequest afterRequest
+	var beforeRequest func([]byte) []byte = nil
+	var afterRequest func([]byte) []byte = nil
+
 	clearPluginHTTPFlowCache := func() {
 		if mitmPluginCaller != nil {
 			mitmPluginCaller.ResetFilter()
@@ -510,8 +514,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				}
 
 				if script == nil && reqInstance.GetYakScriptContent() != "" {
+					hotPatchScript := reqInstance.GetYakScriptContent()
+					beforeRequest, afterRequest, _ = yak.MutateHookCaller(hotPatchScript)
+
 					log.Info("start to load yakScriptContent content")
-					err = mitmPluginCaller.LoadHotPatch(stream.Context(), reqInstance.GetYakScriptContent())
+					err = mitmPluginCaller.LoadHotPatch(stream.Context(), hotPatchScript)
 					_ = stream.Send(&ypb.MITMResponse{
 						GetCurrentHook: true,
 						Hooks:          mitmPluginCaller.GetNativeCaller().GetCurrentHooksGRPCModel(),
@@ -733,11 +740,16 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 	}
 
-	handleHijackResponse := func(isHttps bool, req *http.Request, rspInstance *http.Response, rsp []byte, remoteAddr string) []byte {
+	handleHijackResponse := func(isHttps bool, req *http.Request, rspInstance *http.Response, rsp []byte, remoteAddr string) (hijackRsp []byte) {
 		defer func() {
 			if err := recover(); err != nil {
 				log.Errorf("hijack response error: %s", err)
 				utils.PrintCurrentGoroutineRuntimeStack()
+			}
+			if afterRequest != nil {
+				hijackRsp = afterRequest(hijackRsp)
+				httpctx.SetResponseModified(req, "yaklang.hook(ex) afterRequest")
+				httpctx.SetHijackedResponseBytes(req, hijackRsp)
 			}
 		}()
 		originRspRaw := rsp[:]
@@ -1121,7 +1133,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 		}
 	}
-	handleHijackRequest := func(isHttps bool, originReqIns *http.Request, req []byte) []byte {
+	handleHijackRequest := func(isHttps bool, originReqIns *http.Request, req []byte) (hijackReq []byte) {
 		httpctx.SetResponseContentTypeFiltered(originReqIns, func(t string) bool {
 			ret := !filterManager.IsMIMEPassed(t)
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ResponseIsFiltered, ret)
@@ -1133,6 +1145,11 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			if err := recover(); err != nil {
 				log.Warnf("Hijack warning: %v", err)
 				utils.PrintCurrentGoroutineRuntimeStack()
+			}
+			if beforeRequest != nil {
+				hijackReq = beforeRequest(hijackReq)
+				httpctx.SetRequestModified(originReqIns, "yaklang.hook beforeRequest")
+				httpctx.SetHijackedRequestBytes(originReqIns, hijackReq)
 			}
 		}()
 
