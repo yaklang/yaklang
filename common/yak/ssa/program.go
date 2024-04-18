@@ -1,14 +1,20 @@
 package ssa
 
-import "github.com/yaklang/yaklang/common/yak/ssa/ssautil"
+import (
+	"sort"
+
+	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
+)
 
 func NewProgram(dbProgramName string) *Program {
 	prog := &Program{
-		Packages:       make(map[string]*Package),
-		errors:         make([]*SSAError, 0),
-		ClassBluePrint: make(map[string]*ClassBluePrint),
-		Cache:          NewDBCache(dbProgramName),
-		loader:         ssautil.NewPackageLoader(),
+		Packages:          make(map[string]*Package),
+		errors:            make([]*SSAError, 0),
+		ClassBluePrint:    make(map[string]*ClassBluePrint),
+		Cache:             NewDBCache(dbProgramName),
+		OffsetMap:         make(map[int]*OffsetItem),
+		OffsetSortedSlice: make([]int, 0),
+		loader:            ssautil.NewPackageLoader(),
 	}
 	return prog
 }
@@ -44,6 +50,7 @@ func (prog *Program) AddPackage(pkg *Package) {
 	pkg.Prog = prog
 	prog.Packages[pkg.Name] = pkg
 }
+
 func (prog *Program) GetPackage(name string) *Package {
 	if p, ok := prog.Packages[name]; ok {
 		return p
@@ -84,11 +91,35 @@ func (prog *Program) EachFunction(handler func(*Function)) {
 			handFunc(f)
 		}
 	}
-
 }
 
 func (prog *Program) Finish() {
 	prog.Cache.SaveToDatabase()
+}
+
+func (prog *Program) SearchIndexAndOffsetByOffset(searchOffset int) (index int, offset int) {
+	index = sort.Search(len(prog.OffsetSortedSlice), func(i int) bool {
+		return prog.OffsetSortedSlice[i] >= searchOffset
+	})
+	if index >= len(prog.OffsetSortedSlice) {
+		index = len(prog.OffsetSortedSlice) - 1
+	}
+
+	offset = prog.OffsetSortedSlice[index]
+	return
+}
+
+func (prog *Program) GetFrontValueByOffset(searchOffset int) (value Value) {
+	index, offset := prog.SearchIndexAndOffsetByOffset(searchOffset)
+	// 如果二分查找的结果是大于目标值的，那么就需要回退一个
+	if offset > searchOffset {
+		index -= 1
+		offset = prog.OffsetSortedSlice[index]
+	}
+	if item, ok := prog.OffsetMap[offset]; ok {
+		value = item.GetValue()
+	}
+	return value
 }
 
 func NewPackage(name string) *Package {

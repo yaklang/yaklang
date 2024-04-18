@@ -16,6 +16,10 @@ func (p *Range) GetEditor() *memedit.MemEditor {
 	return p.editor
 }
 
+func (p *Range) GetEndOffset() int {
+	return p.editor.GetOffsetByPosition(p.end)
+}
+
 func (p *Range) GetOffsetRange() (int, int) {
 	return p.editor.GetOffsetByPosition(p.start), p.editor.GetOffsetByPosition(p.end)
 }
@@ -65,6 +69,7 @@ func NewPosition(line, column int64) *Position {
 func (p *Range) CompareStart(other *Range) int {
 	return p.start.Compare(other.start)
 }
+
 func (p *Range) CompareEnd(other *Range) int {
 	return p.end.Compare(other.end)
 }

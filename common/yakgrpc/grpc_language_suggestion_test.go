@@ -72,7 +72,19 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionCompletion(t *testing.T) {
 		}
 	}
 
-	t.Run("check function returns", func(t *testing.T) {
+	t.Run("before symbols", func(t *testing.T) {
+		t.Parallel()
+
+		checkCompletionContains(t, `a = 1; b = 2; c = 3;`, &ypb.Range{
+			Code:        "",
+			StartLine:   1,
+			StartColumn: 20,
+			EndLine:     1,
+			EndColumn:   21,
+		}, []string{"a", "b", "c"})
+	})
+
+	t.Run("function returns", func(t *testing.T) {
 		t.Parallel()
 
 		checkCompletionContains(t, `r = poc.Get("123")~; r.`, &ypb.Range{
@@ -84,7 +96,20 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionCompletion(t *testing.T) {
 		}, []string{"Length", "Pop"})
 	})
 
-	t.Run("check basic extern-lib completion", func(t *testing.T) {
+	t.Run("type builtin methods", func(t *testing.T) {
+		t.Parallel()
+
+		checkCompletionContains(t, `a = "asd"
+a.`, &ypb.Range{
+			Code:        "a.",
+			StartLine:   2,
+			StartColumn: 0,
+			EndLine:     2,
+			EndColumn:   2,
+		}, []string{"Contains"})
+	})
+
+	t.Run("basic extern-lib completion", func(t *testing.T) {
 		t.Parallel()
 
 		res := getCompletion(t, `
@@ -100,7 +125,7 @@ cli.`, &ypb.Range{
 		}
 	})
 
-	t.Run("check extern struct completion", func(t *testing.T) {
+	t.Run("extern struct completion", func(t *testing.T) {
 		t.Parallel()
 
 		checkCompletionContains(t, `
@@ -113,8 +138,7 @@ prog.`, &ypb.Range{
 			EndColumn:   6,
 		}, []string{"Program", "Ref"})
 	})
-
-	t.Run("check anyonmous field struct completion", func(t *testing.T) {
+	t.Run("anonymous field struct completion", func(t *testing.T) {
 		t.Parallel()
 
 		checkCompletionContains(t, `
@@ -153,6 +177,31 @@ a
 			EndLine:     4,
 			EndColumn:   2,
 		}, []string{"Fuzz", "Value", "Name"}, id)
+	})
+
+	t.Run("chain function call", func(t *testing.T) {
+		t.Parallel()
+		checkCompletionContains(t, `
+fuzz.HTTPRequest("")~.FuzzCookie("a","b").`, &ypb.Range{
+			Code:        "",
+			StartLine:   2,
+			StartColumn: 41,
+			EndLine:     2,
+			EndColumn:   42,
+		}, []string{"Exec"})
+	})
+
+	t.Run("alias extern-lib", func(t *testing.T) {
+		t.Parallel()
+		checkCompletionContains(t, `
+a = cli
+a.`, &ypb.Range{
+			Code:        "a.",
+			StartLine:   3,
+			StartColumn: 0,
+			EndLine:     3,
+			EndColumn:   2,
+		}, []string{"check"})
 	})
 }
 
@@ -213,7 +262,7 @@ func CheckSignature(t *testing.T) func(t *testing.T, code, typ string, Range *yp
 		}
 	}
 
-	getHover := func(t *testing.T, code, typ string, Range *ypb.Range, ids ...string) *ypb.YaklangLanguageSuggestionResponse {
+	getSignature := func(t *testing.T, code, typ string, Range *ypb.Range, ids ...string) *ypb.YaklangLanguageSuggestionResponse {
 		var id string
 		if len(ids) == 0 {
 			id = uuid.NewString()
@@ -231,7 +280,7 @@ func CheckSignature(t *testing.T) func(t *testing.T, code, typ string, Range *yp
 			}
 		}
 
-		req := getHover(t, code, typ, Range)
+		req := getSignature(t, code, typ, Range)
 		log.Info(req.SuggestionMessage)
 		require.Equal(t, 1, len(req.SuggestionMessage), "should get 1 suggestion")
 		got := req.SuggestionMessage[0].Label
@@ -350,6 +399,39 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 				EndColumn:   1,
 			},
 		},
+		{
+			name: "h",
+			want: "```go\ntype h map[string]number\n```",
+			Range: &ypb.Range{
+				Code:        "h",
+				StartLine:   9,
+				StartColumn: 0,
+				EndLine:     9,
+				EndColumn:   1,
+			},
+		},
+		{
+			name: "i",
+			want: "```go\ntype i number\n```",
+			Range: &ypb.Range{
+				Code:        "i",
+				StartLine:   10,
+				StartColumn: 0,
+				EndLine:     10,
+				EndColumn:   1,
+			},
+		},
+		{
+			name: "i",
+			want: "```go\ntype i number\n```",
+			Range: &ypb.Range{
+				Code:        "i",
+				StartLine:   10,
+				StartColumn: 7,
+				EndLine:     10,
+				EndColumn:   8,
+			},
+		},
 	}
 	code := `
 a = 1
@@ -359,6 +441,8 @@ d = b"asd"; d2 = []byte("asd")
 e = {"a": 1}
 f = [1, 2, 3]
 g = make(chan int)
+h = {"i":1}
+i = h.i
 `
 
 	for _, item := range data {
@@ -399,7 +483,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_ExternLib(t *testing.T) {
 	check := CheckHover(t)
 	codeTemplate := `%s {
 prog  = ssa.Parse(
-    "", 
+    "code", 
     ssa.withLanguage(
         ssa.Javascript
     )
@@ -410,7 +494,7 @@ prog.Packages
 	data := []CheckItem{
 		{
 			name: "extern lib",
-			want: getExternLibDesc("ssa", "any"),
+			want: getExternLibDesc("ssa"),
 			Range: &ypb.Range{
 				Code:        "ssa",
 				StartLine:   2,
@@ -421,7 +505,7 @@ prog.Packages
 		},
 		{
 			name: "extern lib method",
-			want: getFuncDeclDesc(getFuncDeclByName("ssa.Parse"), "Parse"),
+			want: getFuncDeclDesc(getFuncDeclByName("ssa", "Parse"), "Parse"),
 			Range: &ypb.Range{
 				Code:        "ssa.Parse",
 				StartLine:   2,
@@ -432,7 +516,7 @@ prog.Packages
 		},
 		{
 			name: "extern lib instance",
-			want: getConstInstanceDesc(getInstanceByName("ssa.Javascript")),
+			want: getConstInstanceDesc(getInstanceByName("ssa", "Javascript")),
 			Range: &ypb.Range{
 				Code:        "ssa.Javascript",
 				StartLine:   5,
@@ -467,12 +551,71 @@ prog.Packages
 			item := item
 
 			t.Run(fmt.Sprintf("test %s %s", item.name, testName), func(t *testing.T) {
-				t.Parallel()
+				// t.Parallel()
 
 				check(t, code, "yak", item.Range, item.want, item.subString)
 			})
 		}
 	}
+}
+
+func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_AliasExternLib(t *testing.T) {
+	t.Run("alias lib", func(t *testing.T) {
+		t.Parallel()
+		check := CheckHover(t)
+
+		check(t, `
+a = ssa
+a`,
+			"yak",
+			&ypb.Range{
+				Code:        "a",
+				StartLine:   3,
+				StartColumn: 0,
+				EndLine:     3,
+				EndColumn:   1,
+			},
+			getExternLibDesc("ssa"),
+		)
+	})
+
+	t.Run("alias lib instance", func(t *testing.T) {
+		t.Parallel()
+		check := CheckHover(t)
+
+		check(t, `
+a = ssa
+a.Javascript`,
+			"yak",
+			&ypb.Range{
+				Code:        "a.Javascript",
+				StartLine:   3,
+				StartColumn: 0,
+				EndLine:     3,
+				EndColumn:   12,
+			},
+			getConstInstanceDesc(getInstanceByName("ssa", "Javascript")),
+		)
+	})
+
+	t.Run("alias lib function", func(t *testing.T) {
+		t.Parallel()
+		check := CheckHover(t)
+
+		check(t, `
+a = ssa
+a.Parse()`,
+			"yak",
+			&ypb.Range{
+				Code:        "a.Parse",
+				StartLine:   3,
+				StartColumn: 0,
+				EndLine:     3,
+				EndColumn:   7,
+			},
+			getFuncDeclDesc(getFuncDeclByName("ssa", "Parse"), "Parse"),
+		)
+	})
 }
 
 func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_StructMemberAndMethod(t *testing.T) {
@@ -532,9 +675,16 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionSignature(t *testing.T) {
 	code := `a = func(b, c...) {}
 a()
 poc.HTTP()
+c = poc.HTTP
+c()
+d = ""
+d.Contains("c")
 `
 
-	t.Run("check standard library function signature", func(t *testing.T) {
+	pocLabel := "HTTP(i any, opts ...PocConfigOption) (rsp []byte, req []byte, err error)"
+	pocDesc := "HTTP 发送请求并且返回原始响应报文，原始请求报文以及错误，它的第一个参数可以接收 []byte, string, http.Request 结构体，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如设置超时时间，或者修改请求报文等\n\nExample:\n```\npoc.HTTP(\"GET / HTTP/1.1\\r\\nHost: www.yaklang.com\\r\\n\\r\\n\", poc.https(true), poc.replaceHeader(\"AAA\", \"BBB\")) // yaklang.com发送一个基于HTTPS协议的GET请求，并且添加一个请求头AAA，它的值为BBB\n```\n"
+
+	t.Run("standard library function signature", func(t *testing.T) {
 		t.Parallel()
 
 		ssaRange := &ypb.Range{
@@ -544,11 +694,9 @@ poc.HTTP()
 			EndLine:     3,
 			EndColumn:   8,
 		}
-		wantLabel := "HTTP(i any, opts ...PocConfigOption) (rsp []byte, req []byte, err error)"
-		wantDesc := "HTTP 发送请求并且返回原始响应报文，原始请求报文以及错误，它的第一个参数可以接收 []byte, string, http.Request 结构体，接下来可以接收零个到多个请求选项，用于对此次请求进行配置，例如设置超时时间，或者修改请求报文等\n\nExample:\n```\npoc.HTTP(\"GET / HTTP/1.1\\r\\nHost: www.yaklang.com\\r\\n\\r\\n\", poc.https(true), poc.replaceHeader(\"AAA\", \"BBB\")) // yaklang.com发送一个基于HTTPS协议的GET请求，并且添加一个请求头AAA，它的值为BBB\n```\n"
-		check(t, code, "yak", ssaRange, wantLabel, wantDesc)
+		check(t, code, "yak", ssaRange, pocLabel, pocDesc)
 	})
-	t.Run("check user function signature", func(t *testing.T) {
+	t.Run("user function signature", func(t *testing.T) {
 		t.Parallel()
 
 		ssaRange := &ypb.Range{
@@ -562,16 +710,29 @@ poc.HTTP()
 		check(t, code, "yak", ssaRange, wantLabel, "")
 	})
 
-	// t.Run("check method hover", func(t *testing.T) {
-	// 	ssaParseRange := &ypb.Range{
-	// 		Code:        "rsp.Data",
-	// 		StartLine:   3,
-	// 		StartColumn: 0,
-	// 		EndLine:     3,
-	// 		EndColumn:   8,
-	// 	}
-	// 	// 标准库函数
-	// 	want := "```go\n" + `func Data() string` + "\n```"
-	// 	check(t, code, "yak", ssaParseRange, want)
-	// })
+	t.Run("alias function signature", func(t *testing.T) {
+		t.Parallel()
+
+		ssaRange := &ypb.Range{
+			Code:        "c",
+			StartLine:   5,
+			StartColumn: 0,
+			EndLine:     5,
+			EndColumn:   1,
+		}
+		check(t, code, "yak", ssaRange, pocLabel, pocDesc)
+	})
+
+	t.Run("type builtin method", func(t *testing.T) {
+		t.Parallel()
+
+		ssaRange := &ypb.Range{
+			Code:        "d.Contains",
+			StartLine:   7,
+			StartColumn: 0,
+			EndLine:     7,
+			EndColumn:   10,
+		}
+		check(t, code, "yak", ssaRange, "Contains", "判断字符串是否包含子串")
+	})
 }

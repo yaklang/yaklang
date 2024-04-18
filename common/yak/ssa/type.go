@@ -121,7 +121,7 @@ func GetMethod(t Type, id string) *Function {
 		}
 	}
 	if f != nil {
-		f.SetMethod(true)
+		f.SetMethod(true, t)
 	}
 	return f
 }
@@ -805,6 +805,7 @@ type FunctionType struct {
 	SideEffects     []*FunctionSideEffect
 	IsVariadic      bool
 	IsMethod        bool
+	ObjectType      Type
 	IsModifySelf    bool // if this is method function
 }
 

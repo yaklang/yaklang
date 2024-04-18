@@ -10,6 +10,7 @@ import (
 func (p *Package) NewFunction(name string) *Function {
 	return p.NewFunctionWithParent(name, nil)
 }
+
 func (p *Package) NewFunctionWithParent(name string, parent *Function) *Function {
 	index := len(p.Funcs)
 	if index == 0 {
@@ -59,13 +60,13 @@ func (f *Function) GetType() Type {
 		return GetAnyType()
 	}
 }
+
 func (f *Function) SetType(t Type) {
 	if funTyp, ok := ToFunctionType(t); ok {
 		f.Type = funTyp
 	} else {
 		log.Errorf("Function type is not FunctionType")
 	}
-
 }
 
 func (f *Function) GetProgram() *Program {
@@ -136,6 +137,7 @@ func (f *Function) IsMethod() bool {
 	return f.Type.IsMethod
 }
 
-func (f *Function) SetMethod(is bool) {
+func (f *Function) SetMethod(is bool, objType Type) {
 	f.Type.IsMethod = is
+	f.Type.ObjectType = objType
 }

@@ -142,3 +142,16 @@ println(a)
 		t.Error("trace failed: var cannot trace to call actual arguments")
 	}
 }
+
+func TestYaklangBasic(t *testing.T) {
+	prog, err := Parse(`
+a = 1
+a = 2
+a = 3
+b = a
+`)
+	if err != nil {
+		t.Fatal("prog parse error", err)
+	}
+	_ = prog
+}

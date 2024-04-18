@@ -1,6 +1,8 @@
 package ssaapi
 
 import (
+	"sort"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -22,6 +24,7 @@ func (p *Program) Show() *Program {
 	p.Program.Show()
 	return p
 }
+
 func (p *Program) AddConfig(c *config) {
 	p.config = c
 }
@@ -87,15 +90,20 @@ func (p *Program) GetClassMember(className string, key string) *Value {
 	return nil
 }
 
-func (p *Program) GetAllSymbols() map[string]Values {
-	ret := make(map[string]Values, 0)
-	p.Program.Cache.ForEachVariable(func(s string, insts []ssa.Instruction) {
-		ret[s] = lo.FilterMap(insts, func(i ssa.Instruction, _ int) (*Value, bool) {
-			if v, ok := i.(ssa.Value); ok {
-				return NewValue(v), true
-			}
-			return nil, false
-		})
-	})
-	return ret
+func (p *Program) GetAllOffsetItemsBefore(offset int) []*ssa.OffsetItem {
+	offsetSortedSlice := p.Program.OffsetSortedSlice
+	index := sort.SearchInts(offsetSortedSlice, offset)
+	if index < len(offsetSortedSlice) && offsetSortedSlice[index] > offset {
+		index--
+	}
+	beforeSlice := offsetSortedSlice[:index]
+
+	return lo.Filter(
+		lo.Map(beforeSlice, func(offset int, _ int) *ssa.OffsetItem {
+			return p.Program.OffsetMap[offset]
+		}),
+		func(v *ssa.OffsetItem, _ int) bool {
+			return v.GetVariable() != nil
+		},
+	)
 }
