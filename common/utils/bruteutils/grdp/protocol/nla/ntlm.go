@@ -6,9 +6,7 @@ import (
 	"crypto/rc4"
 	"encoding/binary"
 	"encoding/hex"
-	"fmt"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"time"
 
 	"github.com/lunixbochs/struc"
@@ -347,10 +345,6 @@ func (n *NTLMv2) ComputeResponseV2(respKeyNT, respKeyLM, serverChallenge, client
 
 func MIC(exportedSessionKey []byte, negotiateMessage, challengeMessage, authenticateMessage Message) []byte {
 	buff := bytes.Buffer{}
-	fmt.Printf("negotiateMessage: %s\n", codec.EncodeToHex(negotiateMessage.Serialize()))
-	fmt.Printf("challengeMessage: %s\n", codec.EncodeToHex(challengeMessage.Serialize()))
-	fmt.Printf("authenticateMessage: %s\n", codec.EncodeToHex(authenticateMessage.Serialize()))
-	fmt.Printf("exportedSessionKey: %s\n", codec.EncodeToHex(exportedSessionKey))
 	buff.Write(negotiateMessage.Serialize())
 	buff.Write(challengeMessage.Serialize())
 	buff.Write(authenticateMessage.Serialize())
@@ -369,7 +363,6 @@ var (
 )
 
 func (n *NTLMv2) GetAuthenticateMessage(s []byte) (*AuthenticateMessage, *NTLMv2Security) {
-	//s, _ = codec.DecodeHex("4e544c4d53535000020000001e001e003800000035828a6261b162cdad9087fc000000000000000098009800560000000a0039380000000f69005a003700770034006e00310069006f0075006d003600340035005a0002001e0069005a003700770034006e00310069006f0075006d003600340035005a0001001e0069005a003700770034006e00310069006f0075006d003600340035005a0004001e0069005a003700770034006e00310069006f0075006d003600340035005a0003001e0069005a003700770034006e00310069006f0075006d003600340035005a0007000800d9f5b97edd8bda0100000000")
 	challengeMsg := &ChallengeMessage{}
 	r := bytes.NewReader(s)
 	err := struc.Unpack(r, challengeMsg)
@@ -407,9 +400,9 @@ func (n *NTLMv2) GetAuthenticateMessage(s []byte) (*AuthenticateMessage, *NTLMv2
 	clientChallenge := core.Random(8)
 	ntChallengeResponse, lmChallengeResponse, SessionBaseKey := n.ComputeResponseV2(
 		n.respKeyNT, n.respKeyLM, serverChallenge, clientChallenge, timestamp, serverInfo)
-	exchangeKey := SessionBaseKey
-	exportedSessionKey := []byte("1234567812345678")
 
+	exchangeKey := SessionBaseKey
+	exportedSessionKey := core.Random(16)
 	EncryptedRandomSessionKey := make([]byte, len(exportedSessionKey))
 	rc, _ := rc4.NewCipher(exchangeKey)
 	rc.XORKeyStream(EncryptedRandomSessionKey, exportedSessionKey)
@@ -422,10 +415,11 @@ func (n *NTLMv2) GetAuthenticateMessage(s []byte) (*AuthenticateMessage, *NTLMv2
 
 	n.authenticateMessage = NewAuthenticateMessage(challengeMsg.NegotiateFlags,
 		domain, user, []byte(""), lmChallengeResponse, ntChallengeResponse, EncryptedRandomSessionKey)
+
 	if computeMIC {
 		copy(n.authenticateMessage.MIC[:], MIC(exportedSessionKey, n.negotiateMessage, n.challengeMessage, n.authenticateMessage)[:16])
 	}
-	fmt.Printf("mic: %s\n", codec.EncodeToHex(n.authenticateMessage.MIC[:]))
+
 	md := md5.New()
 	//ClientSigningKey
 	a := concat(exportedSessionKey, clientSigning)

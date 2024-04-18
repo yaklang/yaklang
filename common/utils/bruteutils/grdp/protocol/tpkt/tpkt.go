@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/core"
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/emission"
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/glog"
 	"github.com/yaklang/yaklang/common/utils/bruteutils/grdp/protocol/nla"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 // take idea from https://github.com/Madnikulin50/gordp
@@ -84,14 +84,12 @@ func (t *TPKT) recvChallenge(data []byte) error {
 	glog.Debugf("tsreq:%+v", tsreq)
 	// get pubkey
 	pubkey, err := t.Conn.TlsPubKey()
-
 	glog.Debugf("pubkey=%+v", pubkey)
 
 	authMsg, ntlmSec := t.ntlm.GetAuthenticateMessage(tsreq.NegoTokens[0].Data)
 	t.ntlmSec = ntlmSec
 
 	encryptPubkey := ntlmSec.GssEncrypt(pubkey)
-	//println(codec.EncodeToHex(encryptPubkey))
 	req := nla.EncodeDERTRequest([]nla.Message{authMsg}, nil, encryptPubkey)
 	_, err = t.Conn.Write(req)
 	if err != nil {
@@ -121,7 +119,6 @@ func (t *TPKT) recvPubKeyInc(data []byte) error {
 	//pubkey := t.ntlmSec.GssDecrypt([]byte(tsreq.PubKeyAuth))
 	domain, username, password := t.ntlm.GetEncodedCredentials()
 	credentials := nla.EncodeDERTCredentials(domain, username, password)
-	println(codec.EncodeToHex(credentials))
 	authInfo := t.ntlmSec.GssEncrypt(credentials)
 	req := nla.EncodeDERTRequest(nil, authInfo, nil)
 	_, err = t.Conn.Write(req)
