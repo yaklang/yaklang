@@ -675,7 +675,7 @@ func (b *astbuilder) AssignList(forceAssign bool, stmt assignlist) []ssa.Value {
 		case leftLen == 1 && rightLen == 0:
 			// (1) = (0)
 			// assign to  undefined
-			//TODO
+			// TODO
 			b.NewError(ssa.Error, TAG, AssignRightSideEmpty())
 			// b.AssignVariable(leftVariables[0], b.EmitUndefined(leftVariables[0].GetName()))
 			return nil
@@ -1419,6 +1419,9 @@ func (b *astbuilder) buildAnonymousFunctionDecl(stmt *yak.AnonymousFunctionDeclC
 	// b.AddSubFunction(buildFunc)
 
 	if funcName != "" {
+		recoverRange := b.SetRange(stmt.FunctionNameDecl())
+		defer recoverRange()
+
 		variable := b.CreateVariable(funcName)
 		b.AssignVariable(variable, newFunc)
 	}
