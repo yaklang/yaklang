@@ -13,6 +13,7 @@ func fixupUseChain(node Node) {
 		}
 	}
 }
+
 func DeleteInst(i Instruction) {
 	_, ok := i.(*anInstruction)
 	if ok {
@@ -83,9 +84,13 @@ func DeleteInst(i Instruction) {
 //		}
 //	}
 
-func (f *FunctionBuilder) SetCurrent(i Instruction) func() {
+func (f *FunctionBuilder) SetCurrent(i Instruction, noChangeRanges ...bool) func() {
 	if i.IsExtern() {
 		return func() {}
+	}
+	noChangeRange := false
+	if len(noChangeRanges) > 0 {
+		noChangeRange = noChangeRanges[0]
 	}
 
 	currentBlock := f.CurrentBlock
@@ -94,16 +99,20 @@ func (f *FunctionBuilder) SetCurrent(i Instruction) func() {
 	builder := i.GetFunc().builder
 	parentScope := f.parentScope
 
-	f.CurrentRange = i.GetRange()
 	f.CurrentBlock = i.GetBlock()
 	f.Function = i.GetFunc()
 	f.parentScope = builder.parentScope
+	if !noChangeRange {
+		f.CurrentRange = i.GetRange()
+	}
 
 	return func() {
 		f.CurrentBlock = currentBlock
-		f.CurrentRange = Range
 		f.Function = fun
 		f.parentScope = parentScope
+		if !noChangeRange {
+			f.CurrentRange = Range
+		}
 	}
 }
 
@@ -143,6 +152,7 @@ func (f *FunctionBuilder) EmitInstructionBefore(i, before Instruction) {
 		}
 	})
 }
+
 func (f *FunctionBuilder) EmitInstructionAfter(i, after Instruction) {
 	f.emitAroundInstruction(i, after, func(i Instruction) {
 		insts := f.CurrentBlock.Insts
@@ -273,6 +283,7 @@ func (f *FunctionBuilder) EmitSideEffect(name string, call *Call, value Value) *
 	f.emit(s)
 	return s
 }
+
 func (f *FunctionBuilder) EmitReturn(vs []Value) *Return {
 	if f.CurrentBlock.finish {
 		return nil
@@ -318,6 +329,7 @@ func (f *FunctionBuilder) EmitNewClassBluePrint(memberCount int) *ClassBluePrint
 func (f *FunctionBuilder) EmitMakeWithoutType(Len, Cap Value) *Make {
 	return f.emitMake(nil, BasicTypes[AnyTypeKind], nil, nil, nil, Len, Cap)
 }
+
 func (f *FunctionBuilder) EmitMakeSlice(i Value, low, high, max Value) *Make {
 	return f.emitMake(i, i.GetType(), low, high, max, nil, nil)
 }
@@ -325,9 +337,11 @@ func (f *FunctionBuilder) EmitMakeSlice(i Value, low, high, max Value) *Make {
 func (f *FunctionBuilder) EmitConstInstAny() *ConstInst {
 	return f.EmitConstInst(struct{}{})
 }
+
 func (f *FunctionBuilder) EmitConstInstNil() *ConstInst {
 	return f.EmitConstInst(nil)
 }
+
 func (f *FunctionBuilder) EmitConstInstWithUnary(i any, un int) *ConstInst {
 	ci := f.EmitConstInst(i)
 	ci.Unary = un

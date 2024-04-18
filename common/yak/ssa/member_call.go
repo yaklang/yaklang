@@ -109,6 +109,7 @@ func (b *FunctionBuilder) CreateInterfaceWithSlice(vs []Value) *Make {
 		func(i int) Value { return vs[i] },
 	)
 }
+
 func (b *FunctionBuilder) CreateInterfaceWithMap(keys []Value, vs []Value) *Make {
 	return b.InterfaceAddFieldBuild(len(vs),
 		func(i int) Value { return keys[i] },
@@ -174,7 +175,7 @@ func checkCanMemberCall(value, key Value) (string, Type) {
 	}
 
 	if kind == DynamicKind {
-		//TODO: check type
+		// TODO: check type
 		switch value.GetType().GetTypeKind() {
 		case SliceTypeKind, MapTypeKind:
 			typ, _ := ToObjectType(value.GetType())
@@ -279,6 +280,8 @@ func (b *FunctionBuilder) getExternLibMemberCall(value, key Value) string {
 }
 
 func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
+	program := b.GetProgram()
+
 	// to extern lib
 	if extern, ok := ToExternLib(value); ok {
 		// write to extern Lib
@@ -291,6 +294,11 @@ func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
 		}
 
 		if ret := extern.BuildField(key.String()); ret != nil {
+			// set program offsetMap for extern value
+			program.SetOffsetValue(ret, b.CurrentRange)
+
+			// set member call
+			SetMemberCall(value, key, ret)
 			return ret
 		}
 
@@ -303,6 +311,8 @@ func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
 		return p
 	}
 	if fun := GetMethod(value.GetType(), key.String()); fun != nil {
+		// set program offsetMap for method value
+		program.SetOffsetValue(fun, b.CurrentRange)
 		return NewClassMethod(fun, value)
 	}
 
@@ -355,7 +365,7 @@ func (b *FunctionBuilder) getFieldValue(object, key Value) Value {
 }
 
 func (b *FunctionBuilder) getOriginMember(name string, typ Type, value, key Value) Value {
-	recoverScope := b.SetCurrent(value)
+	recoverScope := b.SetCurrent(value, true)
 	origin := b.ReadValueInThisFunction(name)
 	recoverScope()
 	if undefine, ok := ToUndefined(origin); ok {
@@ -376,6 +386,7 @@ func (b *FunctionBuilder) getOriginMember(name string, typ Type, value, key Valu
 func getMemberVerboseName(obj, key Value) string {
 	return fmt.Sprintf("%s.%s", obj.GetVerboseName(), GetKeyString(key))
 }
+
 func setMemberVerboseName(member Value) {
 	if !member.IsMember() {
 		return

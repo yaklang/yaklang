@@ -134,6 +134,10 @@ type Program struct {
 
 	Cache *Cache
 
+	// offset
+	OffsetMap         map[int]*OffsetItem
+	OffsetSortedSlice []int
+
 	// class blue print
 	ClassBluePrint map[string]*ClassBluePrint
 
