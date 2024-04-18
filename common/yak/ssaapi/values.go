@@ -144,6 +144,15 @@ func (v *Value) ShowUseDefChain() {
 	showUseDefChain(v)
 }
 
+// for variable
+func (v *Value) GetVariable(name string) *ssa.Variable {
+	return v.node.GetVariable(name)
+}
+
+func (v *Value) GetAllVariables() map[string]*ssa.Variable {
+	return v.node.GetAllVariables()
+}
+
 // for function
 
 func (v *Value) GetReturn() Values {
