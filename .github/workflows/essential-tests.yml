@@ -187,6 +187,11 @@ jobs:
             run: |
               # cli
               go test --timeout 1m ./common/utils/cli
+          - name: Test BinParser
+            run: |
+              # binary parser
+              go test --timeout 1m ./common/bin-parser/...
+    
 
     steps:
       - name: Cache YakLang Project
