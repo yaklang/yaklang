@@ -1,12 +1,16 @@
 package ssa
 
 import (
+	"encoding/json"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"reflect"
 )
 
 func fitRange(c *ssadb.IrCode, rangeIns *Range) {
@@ -22,10 +26,18 @@ func fitRange(c *ssadb.IrCode, rangeIns *Range) {
 
 type cacheRecoveryContext struct {
 	cache *omap.OrderedMap[string, *ssadb.IrCode]
+	db    *gorm.DB
+}
+
+func (c *cacheRecoveryContext) LazyInstruction(id int64) *LazyInstruction {
+	return NewLazyInstruction(c.db, id)
 }
 
 func newCacheRecoverContext() *cacheRecoveryContext {
-	return &cacheRecoveryContext{cache: omap.NewOrderedMap(make(map[string]*ssadb.IrCode))}
+	return &cacheRecoveryContext{
+		cache: omap.NewOrderedMap(make(map[string]*ssadb.IrCode)),
+		db:    consts.GetGormProjectDatabase(),
+	}
 }
 
 func irCodeToInstruction(ctx *cacheRecoveryContext, c *ssadb.IrCode) (Instruction, error) {
@@ -34,11 +46,12 @@ func irCodeToInstruction(ctx *cacheRecoveryContext, c *ssadb.IrCode) (Instructio
 	}
 	switch c.Opcode {
 	case int64(SSAOpcodeUnKnow):
-		return nil, nil
+		return nil, utils.Errorf("BUG here: ir.OpCode cannot be the unknown opcode: %v", c.VerboseString())
 	case int64(SSAOpcodeAssert):
+		// assert should set cond as member
 		return nil, nil
 	case int64(SSAOpcodeBasicBlock):
-		return nil, nil
+		return nil, utils.Errorf("unhandled opcode: %v", c.VerboseString())
 	case int64(SSAOpcodeBinOp):
 		return nil, nil
 	case int64(SSAOpcodeCall):
@@ -99,6 +112,12 @@ func FitIRCode(c *ssadb.IrCode, r Instruction) error {
 	c.Name = r.GetName()
 	c.VerboseName = r.GetVerboseName()
 	c.ShortVerboseName = r.GetShortVerboseName()
+
+	extraInfo, err := marshalInformation(r)
+	if err != nil {
+		log.Warnf("BUG: cannot fetch instruction's extra info: %v", err)
+	}
+	c.ExtraInformation = string(extraInfo)
 
 	if rangeIns := r.GetRange(); rangeIns != nil {
 		// set range from code
@@ -240,15 +259,144 @@ func FitIRCode(c *ssadb.IrCode, r Instruction) error {
 	return nil
 }
 
-func UpdateIRCode(r Instruction) error {
-	db := consts.GetGormProjectDatabase()
-	code := ssadb.GetIrCodeById(db, r.GetId())
-	if code == nil {
-		log.Warnf("IrCode not found: %d", r.GetId())
-		return nil
+func fetchIds(origin any) any {
+	var ids []int64
+	switch ret := origin.(type) {
+	case []Instruction:
+		ids = make([]int64, len(ret))
+		for i := 0; i < len(ret); i++ {
+			ids[i] = ret[i].GetId()
+		}
+		return ids
+	case []Value:
+		ids = make([]int64, len(ret))
+		for i := 0; i < len(ret); i++ {
+			ids[i] = ret[i].GetId()
+		}
+		return ids
+	case map[string]Value:
+		params := make(map[string]any)
+		for k, v := range ret {
+			params[k] = v.GetId()
+		}
+		return params
+	case []SwitchLabel:
+		results := make([]map[string]int64, len(ret))
+		for i := 0; i < len(ret); i++ {
+			results[i] = map[string]int64{
+				"value": ret[i].Value.GetId(),
+				"dest":  ret[i].Dest.GetId(),
+			}
+		}
+		return results
+	case []*Parameter:
+		ids = make([]int64, len(ret))
+		for i := 0; i < len(ret); i++ {
+			ids[i] = ret[i].GetId()
+		}
+		return ids
+	default:
+		log.Warnf("fetchIds: unknown type: %v", reflect.TypeOf(origin).String())
 	}
+	return ids
+}
 
-	FitIRCode(code, r)
-	db.Save(code)
-	return nil
+func marshalInformation(raw Instruction) ([]byte, error) {
+	params := make(map[string]any)
+	switch ret := raw.(type) {
+	case *Assert:
+		params["assert_condition_id"] = ret.Cond.GetId()
+		params["assert_message_id"] = ret.MsgValue.GetId()
+		params["assert_message_string"] = ret.MsgValue.String()
+	case *BasicBlock:
+		params["block_id"] = ret.GetId()
+		params["block_name"] = ret.GetName()
+		params["block_preds"] = fetchIds(ret.Preds)
+		params["block_succs"] = fetchIds(ret.Succs)
+		params["block_condition"] = ret.Condition.GetId()
+		params["block_insts"] = fetchIds(ret.Insts)
+		params["block_phis"] = fetchIds(ret.Phis)
+	case *BinOp:
+		params["binop_op"] = ret.Op
+		params["binop_x"] = ret.X.GetId()
+		params["binop_y"] = ret.Y.GetId()
+	case *Call:
+		params["call_method"] = ret.GetFunc().GetId()
+		params["call_args"] = fetchIds(ret.Args)
+		params["call_binding"] = fetchIds(ret.Binding)
+		params["call_async"] = ret.Async
+		params["call_unpack"] = ret.Unpack
+		params["call_drop_error"] = ret.IsDropError
+		params["call_ellipsis"] = ret.IsEllipsis
+	case *ConstInst:
+		return nil, utils.Errorf("BUG: ConstInst should not be marshaled")
+	case *ErrorHandler:
+		// try-catch-finally-done
+		params["errorhandler_try"] = ret.try.GetId()
+		params["errorhandler_catch"] = ret.catch.GetId()
+		params["errorhandler_finally"] = ret.final.GetId()
+		params["errorhandler_done"] = ret.done.GetId()
+	case *ExternLib:
+		return nil, utils.Errorf("BUG: ConstInst should not be marshaled")
+	case *If:
+		params["if_cond"] = ret.Cond.GetId()
+		params["if_true"] = ret.True.GetId()
+		params["if_false"] = ret.False.GetId()
+	case *Jump:
+		params["jump_to"] = ret.To.GetId()
+	case *Loop:
+		params["loop_body"] = ret.Body.GetId()
+		params["loop_exit"] = ret.Exit.GetId()
+		params["loop_init"] = ret.Init.GetId()
+		params["loop_cond"] = ret.Cond.GetId()
+		params["loop_step"] = ret.Step.GetId()
+		params["loop_key"] = ret.Key.GetId()
+	case *Make:
+		params["make_low"] = ret.low.GetId()
+		params["make_high"] = ret.high.GetId()
+		params["make_step"] = ret.step.GetId()
+		params["make_len"] = ret.Len.GetId()
+		params["make_cap"] = ret.Cap.GetId()
+	case *Next:
+		params["next_iter"] = ret.Iter.GetId()
+		params["next_in_next"] = ret.InNext
+	case *Panic:
+		params["panic_value"] = ret.Info.GetId()
+	case *Parameter:
+		params["formalParam_is_freevalue"] = ret.IsFreeValue
+		params["formalParam_default"] = ret.defaultValue.GetId()
+		params["formalParam_index"] = ret.FormalParameterIndex
+	case *Phi:
+		params["phi_edges"] = fetchIds(ret.Edge)
+		params["phi_create"] = ret.create
+		params["phi_whi1"] = ret.wit1.GetId()
+		params["phi_whi2"] = ret.wit2.GetId()
+	case *Recover:
+		// nothing to do
+	case *Return:
+		params["return_results"] = fetchIds(ret.Results)
+	case *SideEffect:
+		params["sideEffect_call"] = ret.CallSite.GetId()
+		params["sideEffect_value"] = ret.GetId()
+	case *Switch:
+		params["switch_cond"] = ret.Cond.GetId()
+		params["switch_label"] = fetchIds(ret.Label)
+	case *TypeCast:
+		params["typecast_value"] = ret.Value.GetId()
+	case *TypeValue:
+		// nothing to do
+	case *UnOp:
+		params["unop_op"] = ret.Op
+		params["unop_x"] = ret.X.GetId()
+	case *Undefined:
+		params["undefined_kind"] = ret.Kind
+	case *Function:
+		// fill it later
+	}
+	results, err := json.Marshal(params)
+	if err != nil {
+		spew.Dump(params)
+		return nil, utils.Errorf("instruction json.Marshal failed: %v", err)
+	}
+	return results, nil
 }
