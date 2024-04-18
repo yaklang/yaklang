@@ -51,8 +51,8 @@ type httpPoolConfig struct {
 
 	// beforeRequest
 	// afterRequest
-	HookBeforeRequest func([]byte) []byte
-	HookAfterRequest  func([]byte) []byte
+	HookBeforeRequest func(https bool, originReq []byte, req []byte) []byte
+	HookAfterRequest  func(https bool, originReq []byte, req []byte, originRsp []byte, rsp []byte) []byte
 	MirrorHTTPFlow    func([]byte, []byte, map[string]string) map[string]string
 	MutateHook        func([]byte) [][]byte
 
@@ -178,7 +178,7 @@ func _httpPool_RetryNotInStatusCode(codes []int) HttpPoolConfigOption {
 	}
 }
 
-func _hoopPool_SetHookCaller(before func([]byte) []byte, after func([]byte) []byte, extractor func([]byte, []byte, map[string]string) map[string]string) HttpPoolConfigOption {
+func _hoopPool_SetHookCaller(before func(bool, []byte, []byte) []byte, after func(bool, []byte, []byte, []byte, []byte) []byte, extractor func([]byte, []byte, map[string]string) map[string]string) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.HookBeforeRequest = before
 		config.HookAfterRequest = after
@@ -665,8 +665,13 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							}
 						}()
 
+						https := config.IsHttps
+						if overrideHttps {
+							https = true
+						}
+
 						if config.HookBeforeRequest != nil {
-							newRequest := config.HookBeforeRequest(targetRequest)
+							newRequest := config.HookBeforeRequest(https, nil, targetRequest)
 							if len(newRequest) > 0 {
 								targetRequest = newRequest
 							}
@@ -708,10 +713,6 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							host, port = "", 0
 						}
 
-						https := config.IsHttps
-						if overrideHttps {
-							https = true
-						}
 						redictTimes := config.RedirectTimes
 						if config.NoFollowRedirect {
 							redictTimes = 0
@@ -764,7 +765,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 						}
 
 						if config.HookAfterRequest != nil {
-							newRsp := config.HookAfterRequest(rsp)
+							newRsp := config.HookAfterRequest(https, nil, targetRequest, nil, rsp)
 							if len(newRsp) > 0 {
 								rsp = newRsp
 							}

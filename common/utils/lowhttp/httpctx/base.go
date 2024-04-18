@@ -86,6 +86,23 @@ func GetRequestBytes(r *http.Request) []byte {
 	return GetBareRequestBytes(r)
 }
 
+func GetResponseBytes(r *http.Request) []byte {
+	if r == nil {
+		log.Warnf("GetRequestBytes: req is nil")
+		return nil
+	}
+
+	if ret := GetHijackedResponseBytes(r); len(ret) > 0 {
+		return ret
+	}
+
+	if ret := GetPlainResponseBytes(r); len(ret) > 0 {
+		return ret
+	}
+
+	return GetBareResponseBytes(r)
+}
+
 func GetRequestHTTPS(r *http.Request) bool {
 	return GetContextBoolInfoFromRequest(r, REQUEST_CONTEXT_KEY_IsHttps)
 }

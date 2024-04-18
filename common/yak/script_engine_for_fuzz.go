@@ -19,7 +19,7 @@ import (
 
 var _codeMutateRegexp = regexp.MustCompile(`(?s){{yak\d*(\(.*\))}}`)
 
-func MutateHookCaller(raw string) (func([]byte) []byte, func([]byte) []byte, func([]byte, []byte, map[string]string) map[string]string) {
+func MutateHookCaller(raw string) (func(https bool, originReq []byte, req []byte) []byte, func(https bool, originReq []byte, req []byte, originRsp []byte, rsp []byte) []byte, func([]byte, []byte, map[string]string) map[string]string) {
 	// 发送数据包之前的 hook
 	entry := NewScriptEngine(2)
 	entry.HookOsExit()
@@ -31,8 +31,27 @@ func MutateHookCaller(raw string) (func([]byte) []byte, func([]byte) []byte, fun
 		return nil, nil, nil
 	}
 
-	_, beforeRequestOk := engine.GetVar("beforeRequest")
-	_, afterRequestOk := engine.GetVar("afterRequest")
+	before, beforeRequestOk := engine.GetVar("beforeRequest")
+	after, afterRequestOk := engine.GetVar("afterRequest")
+
+	var legacyBeforeRequest bool
+	beforeFunction, ok := before.(*yakvm.Function)
+	if !ok {
+		log.Errorf("afterRequest hook is not a function")
+		beforeRequestOk = false
+	} else {
+		legacyBeforeRequest = beforeFunction.GetNumIn() == 1
+	}
+
+	var legacyAfterRequest bool
+	afterFunction, ok := after.(*yakvm.Function)
+	if !ok {
+		log.Errorf("afterRequest hook is not a function")
+		afterRequestOk = false
+	} else {
+		legacyAfterRequest = afterFunction.GetNumIn() == 1
+	}
+
 	mirrorHandlerInstance, mirrorFlowOK := engine.GetVar("mirrorHTTPFlow")
 	var mirrorHTTPFlowNumIn = 2
 	if ret, ok := mirrorHandlerInstance.(*yakvm.Function); ok {
@@ -41,12 +60,12 @@ func MutateHookCaller(raw string) (func([]byte) []byte, func([]byte) []byte, fun
 
 	var hookLock = new(sync.Mutex)
 
-	var hookBefore func([]byte) []byte = nil
-	var hookAfter func([]byte) []byte = nil
+	var hookBefore func(https bool, originReq []byte, req []byte) []byte = nil
+	var hookAfter func(https bool, originReq []byte, req []byte, originRsp []byte, rsp []byte) []byte = nil
 	var mirrorFlow func(req []byte, rsp []byte, handle map[string]string) map[string]string = nil
 
 	if beforeRequestOk {
-		hookBefore = func(bytes []byte) []byte {
+		hookBefore = func(https bool, originReq []byte, req []byte) []byte {
 			hookLock.Lock()
 			defer hookLock.Unlock()
 
@@ -56,7 +75,13 @@ func MutateHookCaller(raw string) (func([]byte) []byte, func([]byte) []byte, fun
 				}
 			}()
 			if engine != nil {
-				resultRequest, err := engine.CallYakFunction(context.Background(), "beforeRequest", []interface{}{bytes})
+				var resultRequest any
+				if legacyBeforeRequest {
+					resultRequest, err = engine.CallYakFunction(context.Background(), "beforeRequest", []interface{}{req})
+				} else {
+					resultRequest, err = engine.CallYakFunction(context.Background(), "beforeRequest", []interface{}{https, originReq, req})
+				}
+
 				if err != nil {
 					log.Infof("eval beforeRequest hook failed: %s", err)
 				}
@@ -69,12 +94,12 @@ func MutateHookCaller(raw string) (func([]byte) []byte, func([]byte) []byte, fun
 					return []byte(string(ret))
 				}
 			}
-			return bytes
+			return req
 		}
 	}
 
 	if afterRequestOk {
-		hookAfter = func(bytes []byte) []byte {
+		hookAfter = func(https bool, originReq []byte, req []byte, originRsp []byte, rsp []byte) []byte {
 			hookLock.Lock()
 			defer hookLock.Unlock()
 
@@ -85,7 +110,13 @@ func MutateHookCaller(raw string) (func([]byte) []byte, func([]byte) []byte, fun
 			}()
 
 			if engine != nil {
-				resultResponse, err := engine.CallYakFunction(context.Background(), "afterRequest", []interface{}{bytes})
+
+				var resultResponse any
+				if legacyAfterRequest {
+					resultResponse, err = engine.CallYakFunction(context.Background(), "afterRequest", []interface{}{rsp})
+				} else {
+					resultResponse, err = engine.CallYakFunction(context.Background(), "afterRequest", []interface{}{https, originReq, req, originRsp, rsp})
+				}
 				if err != nil {
 					log.Infof("eval afterRequest hook failed: %s", err)
 				}
@@ -98,7 +129,7 @@ func MutateHookCaller(raw string) (func([]byte) []byte, func([]byte) []byte, fun
 					return []byte(string(ret))
 				}
 			}
-			return bytes
+			return rsp
 		}
 	}
 
