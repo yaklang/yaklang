@@ -1,39 +1,38 @@
 package ssa
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"path"
 	"strings"
 )
 
 func (b *FunctionBuilder) AddIncludePath(path string) {
 	p := b.GetProgram()
-	p.loader.AddIncludePath(path)
+	p.Loader.AddIncludePath(path)
 }
 
 func (b *FunctionBuilder) BuildFilePackage(filename string, once bool) error {
 	p := b.GetProgram()
-	file, data, err := p.loader.LoadFilePackage(filename, once)
+	file, data, err := p.Loader.LoadFilePackage(filename, once)
 	if err != nil {
 		return err
 	}
 	_file := b.CurrentFile
-	_path := p.loader.GetCurrentPath()
+	_path := p.Loader.GetCurrentPath()
 
 	b.CurrentFile = file
-	p.loader.SetCurrentPath(path.Dir(file))
+	p.Loader.SetCurrentPath(path.Dir(file))
 
 	defer func() {
 		b.CurrentFile = _file
-		p.loader.SetCurrentPath(_path)
+		p.Loader.SetCurrentPath(_path)
 	}()
-	err = p.Build(utils.UnsafeBytesToString(data), b)
+	err = p.Build(data, b)
 	return err
 }
 
 func (b *FunctionBuilder) BuildDirectoryPackage(name string, once bool) error {
 	p := b.GetProgram()
-	ch, err := p.loader.LoadDirectoryPackage(name, once)
+	ch, err := p.Loader.LoadDirectoryPackage(name, once)
 	if err != nil {
 		return err
 	}
@@ -42,11 +41,11 @@ func (b *FunctionBuilder) BuildDirectoryPackage(name string, once bool) error {
 		_file := b.CurrentFile
 		b.CurrentFile = v.PathName
 
-		_path := p.loader.GetCurrentPath()
-		p.loader.SetCurrentPath(path.Dir(_file))
-		err := p.Build(utils.UnsafeBytesToString(v.Data), b)
+		_path := p.Loader.GetCurrentPath()
+		p.Loader.SetCurrentPath(path.Dir(_file))
+		err := p.Build(v.Data, b)
 		b.CurrentFile = _file
-		p.loader.SetCurrentPath(_path)
+		p.Loader.SetCurrentPath(_path)
 		if err != nil {
 			return err
 		}
@@ -56,7 +55,7 @@ func (b *FunctionBuilder) BuildDirectoryPackage(name string, once bool) error {
 
 func (b *FunctionBuilder) AddCurrentPackagePath(path []string) *FunctionBuilder {
 	p := b.GetProgram()
-	p.loader.AddPackagePath(path)
+	p.Loader.AddPackagePath(path)
 
 	pkgName := strings.Join(path, ".")
 	if pkgName != "" {
@@ -72,6 +71,6 @@ func (b *FunctionBuilder) AddCurrentPackagePath(path []string) *FunctionBuilder 
 
 func (b *FunctionBuilder) GetCurrentPackagePath() []string {
 	p := b.GetProgram()
-	pkgPath := p.loader.GetPackagePath()
+	pkgPath := p.Loader.GetPackagePath()
 	return pkgPath
 }

@@ -3,6 +3,7 @@ package php2ssa
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/log"
@@ -12,13 +13,11 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-type builder struct {
-	*ssa.FunctionBuilder
-	constMap   map[string]ssa.Value
-	isFunction bool
-}
+type SSABuild struct{}
 
-func Build(src string, force bool, b *ssa.FunctionBuilder) error {
+var Builder = &SSABuild{}
+
+func (*SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	ast, err := FrondEnd(src, force)
 	if err != nil {
 		return err
@@ -31,6 +30,16 @@ func Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	b.WithExternValue(phpBuildIn)
 	build.VisitHtmlDocument(ast)
 	return nil
+}
+
+func (*SSABuild) FilterFile(path string) bool {
+	return filepath.Ext(path) == ".php"
+}
+
+type builder struct {
+	*ssa.FunctionBuilder
+	constMap   map[string]ssa.Value
+	isFunction bool
 }
 
 func FrondEnd(src string, force bool) (phpparser.IHtmlDocumentContext, error) {

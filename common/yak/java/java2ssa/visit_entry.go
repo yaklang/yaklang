@@ -19,13 +19,11 @@ func (y *builder) VisitCompilationUnit(raw javaparser.ICompilationUnitContext) i
 	}
 
 	if ret := i.PackageDeclaration(); ret != nil {
-
 		pkgPath := y.VisitPackageDeclaration(ret)
 		builder := y.AddCurrentPackagePath(pkgPath)
 		if builder != nil {
 			y.FunctionBuilder = builder
 		}
-
 	}
 
 	for _, pkgImport := range i.AllImportDeclaration() {

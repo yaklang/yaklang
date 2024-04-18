@@ -1,8 +1,9 @@
 package ssa
 
 import (
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"reflect"
+
+	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/yaklang/yaklang/common/log"
 )

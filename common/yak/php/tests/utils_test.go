@@ -6,5 +6,5 @@ import (
 )
 
 func init() {
-	test.SetLanguage("php", php2ssa.Build)
+	test.SetLanguage("php", php2ssa.Builder)
 }

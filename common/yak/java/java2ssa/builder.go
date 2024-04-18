@@ -2,6 +2,7 @@ package java2ssa
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/log"
@@ -11,13 +12,13 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-type builder struct {
-	*ssa.FunctionBuilder
-	ast      javaparser.ICompilationUnitContext
-	constMap map[string]ssa.Value
-}
+// ========================================== For SSAAPI ==========================================
 
-func Build(src string, force bool, b *ssa.FunctionBuilder) error {
+type SSABuilder struct{}
+
+var Builder = &SSABuilder{}
+
+func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	ast, err := Frontend(src, force)
 	if err != nil {
 		return err
@@ -37,6 +38,18 @@ func Build(src string, force bool, b *ssa.FunctionBuilder) error {
 		log.Errorf("java2ssa: Main.main not found")
 	}
 	return nil
+}
+
+func (*SSABuilder) FilterFile(path string) bool {
+	return filepath.Ext(path) == ".java"
+}
+
+// ========================================== Build Front End ==========================================
+
+type builder struct {
+	*ssa.FunctionBuilder
+	ast      javaparser.ICompilationUnitContext
+	constMap map[string]ssa.Value
 }
 
 func Frontend(src string, force bool) (javaparser.ICompilationUnitContext, error) {

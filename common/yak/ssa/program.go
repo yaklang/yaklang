@@ -4,10 +4,11 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
-func NewProgram(dbProgramName string) *Program {
+func NewProgram(dbProgramName string, fs filesys.FileSystem) *Program {
 	prog := &Program{
 		Packages:          make(map[string]*Package),
 		errors:            make([]*SSAError, 0),
@@ -15,8 +16,8 @@ func NewProgram(dbProgramName string) *Program {
 		Cache:             NewDBCache(dbProgramName),
 		OffsetMap:         make(map[int]*OffsetItem),
 		OffsetSortedSlice: make([]int, 0),
-		loader:            ssautil.NewPackageLoader(),
 	}
+	prog.Loader = ssautil.NewPackageLoader(ssautil.WithFileSystem(fs))
 	return prog
 }
 
