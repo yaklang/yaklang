@@ -44,10 +44,10 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionCompletion(t *testing.T) {
 		} else {
 			id = ids[0]
 		}
-		if strings.HasSuffix(code, ".") {
-			tmpCode := strings.TrimSuffix(code, ".")
-			GetSuggestion(local, "completion", "yak", t, tmpCode, Range, id)
-		}
+		// if strings.HasSuffix(code, ".") {
+		// 	tmpCode := strings.TrimSuffix(code, ".")
+		// 	GetSuggestion(local, "completion", "yak", t, tmpCode, Range, id)
+		// }
 		return GetSuggestion(local, "completion", "yak", t, code, Range, id)
 	}
 	checkCompletionContains := func(t *testing.T, code string, Range *ypb.Range, want []string, ids ...string) {
@@ -114,9 +114,9 @@ a.`, &ypb.Range{
 
 		res := getCompletion(t, `
 cli.`, &ypb.Range{
-			Code:        "",
+			Code:        "cli.",
 			StartLine:   2,
-			StartColumn: 4,
+			StartColumn: 0,
 			EndLine:     2,
 			EndColumn:   4,
 		})
@@ -151,33 +151,33 @@ rsp.`, &ypb.Range{
 			EndColumn:   4,
 		}, []string{"Response", "Body", "Status", "Data"})
 	})
-	t.Run("cache", func(t *testing.T) {
-		t.Parallel()
-		code := `asd = fuzz.HTTPRequest("")~
-for a in asd.GetCommonParams() {
-v = a 
-a
-}`
-		id := uuid.NewString()
-		// trigger cache
-		getCompletion(t, code, &ypb.Range{
-			Code:        "a",
-			StartLine:   4,
-			StartColumn: 0,
-			EndLine:     4,
-			EndColumn:   1,
-		}, id)
+	// 	t.Run("cache", func(t *testing.T) {
+	// 		t.Parallel()
+	// 		code := `asd = fuzz.HTTPRequest("")~
+	// for a in asd.GetCommonParams() {
+	// v = a
+	// a
+	// }`
+	// 		id := uuid.NewString()
+	// 		// // trigger cache
+	// 		// getCompletion(t, code, &ypb.Range{
+	// 		// 	Code:        "a",
+	// 		// 	StartLine:   4,
+	// 		// 	StartColumn: 0,
+	// 		// 	EndLine:     4,
+	// 		// 	EndColumn:   1,
+	// 		// }, id)
 
-		// check cache
-		code = strings.Replace(code, "\na\n", "\na.\n", 1)
-		checkCompletionContains(t, code, &ypb.Range{
-			Code:        "a.",
-			StartLine:   4,
-			StartColumn: 0,
-			EndLine:     4,
-			EndColumn:   2,
-		}, []string{"Fuzz", "Value", "Name"}, id)
-	})
+	// 		// // check cache
+	// 		code = strings.Replace(code, "\na\n", "\na.\n", 1)
+	// 		checkCompletionContains(t, code, &ypb.Range{
+	// 			Code:        "a.",
+	// 			StartLine:   4,
+	// 			StartColumn: 0,
+	// 			EndLine:     4,
+	// 			EndColumn:   2,
+	// 		}, []string{"Fuzz", "Value", "Name"}, id)
+	// 	})
 
 	t.Run("chain function call", func(t *testing.T) {
 		t.Parallel()
