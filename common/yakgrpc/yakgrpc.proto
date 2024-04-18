@@ -305,7 +305,9 @@ service Yak {
   rpc StaticAnalyzeError(StaticAnalyzeErrorRequest) returns (StaticAnalyzeErrorResponse);
   rpc YaklangCompileAndFormat(YaklangCompileAndFormatRequest) returns (YaklangCompileAndFormatResponse);
 
+  // LSP
   rpc YaklangLanguageSuggestion(YaklangLanguageSuggestionRequest) returns (YaklangLanguageSuggestionResponse);
+  rpc YaklangLanguageFind(YaklangLanguageSuggestionRequest) returns (YaklangLanguageFindResponse);
   // 从代码中提取yaklang数据
   rpc YaklangInspectInformation(YaklangInspectInformationRequest) returns (YaklangInspectInformationResponse);
   // 进行数据迁移使用 
@@ -1880,7 +1882,7 @@ message YaklangInspectInformationRequest {
 }
 
 message YaklangLanguageSuggestionRequest {
-  string InspectType = 1;// completion(补全) / hover(提示) / signature(签名)
+  string InspectType = 1;// completion(补全) / hover(提示) / signature(签名) / definition(找定义) / reference(找引用)
   string YakScriptType = 2;
   string YakScriptCode = 3;
   Range Range = 4;
@@ -1909,6 +1911,11 @@ message YaklangInformation {
 
 message YaklangLanguageSuggestionResponse {
   repeated SuggestionDescription SuggestionMessage = 1;
+}
+
+message YaklangLanguageFindResponse {
+    string URI = 1;
+    repeated Range Ranges = 2;
 }
 
 message YaklangInspectInformationResponse {
