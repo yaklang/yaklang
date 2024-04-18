@@ -147,6 +147,7 @@ const (
 	Yak_StaticAnalyzeError_FullMethodName                         = "/ypb.Yak/StaticAnalyzeError"
 	Yak_YaklangCompileAndFormat_FullMethodName                    = "/ypb.Yak/YaklangCompileAndFormat"
 	Yak_YaklangLanguageSuggestion_FullMethodName                  = "/ypb.Yak/YaklangLanguageSuggestion"
+	Yak_YaklangLanguageFind_FullMethodName                        = "/ypb.Yak/YaklangLanguageFind"
 	Yak_YaklangInspectInformation_FullMethodName                  = "/ypb.Yak/YaklangInspectInformation"
 	Yak_YaklangGetCliCodeFromDatabase_FullMethodName              = "/ypb.Yak/YaklangGetCliCodeFromDatabase"
 	Yak_PortScan_FullMethodName                                   = "/ypb.Yak/PortScan"
@@ -527,7 +528,9 @@ type YakClient interface {
 	GetYakVMBuildInMethodCompletion(ctx context.Context, in *GetYakVMBuildInMethodCompletionRequest, opts ...grpc.CallOption) (*GetYakVMBuildInMethodCompletionResponse, error)
 	StaticAnalyzeError(ctx context.Context, in *StaticAnalyzeErrorRequest, opts ...grpc.CallOption) (*StaticAnalyzeErrorResponse, error)
 	YaklangCompileAndFormat(ctx context.Context, in *YaklangCompileAndFormatRequest, opts ...grpc.CallOption) (*YaklangCompileAndFormatResponse, error)
+	// LSP
 	YaklangLanguageSuggestion(ctx context.Context, in *YaklangLanguageSuggestionRequest, opts ...grpc.CallOption) (*YaklangLanguageSuggestionResponse, error)
+	YaklangLanguageFind(ctx context.Context, in *YaklangLanguageSuggestionRequest, opts ...grpc.CallOption) (*YaklangLanguageFindResponse, error)
 	// 从代码中提取yaklang数据
 	YaklangInspectInformation(ctx context.Context, in *YaklangInspectInformationRequest, opts ...grpc.CallOption) (*YaklangInspectInformationResponse, error)
 	// 进行数据迁移使用
@@ -2550,6 +2553,15 @@ func (c *yakClient) YaklangCompileAndFormat(ctx context.Context, in *YaklangComp
 func (c *yakClient) YaklangLanguageSuggestion(ctx context.Context, in *YaklangLanguageSuggestionRequest, opts ...grpc.CallOption) (*YaklangLanguageSuggestionResponse, error) {
 	out := new(YaklangLanguageSuggestionResponse)
 	err := c.cc.Invoke(ctx, Yak_YaklangLanguageSuggestion_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) YaklangLanguageFind(ctx context.Context, in *YaklangLanguageSuggestionRequest, opts ...grpc.CallOption) (*YaklangLanguageFindResponse, error) {
+	out := new(YaklangLanguageFindResponse)
+	err := c.cc.Invoke(ctx, Yak_YaklangLanguageFind_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5407,7 +5419,9 @@ type YakServer interface {
 	GetYakVMBuildInMethodCompletion(context.Context, *GetYakVMBuildInMethodCompletionRequest) (*GetYakVMBuildInMethodCompletionResponse, error)
 	StaticAnalyzeError(context.Context, *StaticAnalyzeErrorRequest) (*StaticAnalyzeErrorResponse, error)
 	YaklangCompileAndFormat(context.Context, *YaklangCompileAndFormatRequest) (*YaklangCompileAndFormatResponse, error)
+	// LSP
 	YaklangLanguageSuggestion(context.Context, *YaklangLanguageSuggestionRequest) (*YaklangLanguageSuggestionResponse, error)
+	YaklangLanguageFind(context.Context, *YaklangLanguageSuggestionRequest) (*YaklangLanguageFindResponse, error)
 	// 从代码中提取yaklang数据
 	YaklangInspectInformation(context.Context, *YaklangInspectInformationRequest) (*YaklangInspectInformationResponse, error)
 	// 进行数据迁移使用
@@ -6070,6 +6084,9 @@ func (UnimplementedYakServer) YaklangCompileAndFormat(context.Context, *YaklangC
 }
 func (UnimplementedYakServer) YaklangLanguageSuggestion(context.Context, *YaklangLanguageSuggestionRequest) (*YaklangLanguageSuggestionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method YaklangLanguageSuggestion not implemented")
+}
+func (UnimplementedYakServer) YaklangLanguageFind(context.Context, *YaklangLanguageSuggestionRequest) (*YaklangLanguageFindResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method YaklangLanguageFind not implemented")
 }
 func (UnimplementedYakServer) YaklangInspectInformation(context.Context, *YaklangInspectInformationRequest) (*YaklangInspectInformationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method YaklangInspectInformation not implemented")
@@ -9118,6 +9135,24 @@ func _Yak_YaklangLanguageSuggestion_Handler(srv interface{}, ctx context.Context
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(YakServer).YaklangLanguageSuggestion(ctx, req.(*YaklangLanguageSuggestionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_YaklangLanguageFind_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(YaklangLanguageSuggestionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).YaklangLanguageFind(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_YaklangLanguageFind_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).YaklangLanguageFind(ctx, req.(*YaklangLanguageSuggestionRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -13479,6 +13514,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "YaklangLanguageSuggestion",
 			Handler:    _Yak_YaklangLanguageSuggestion_Handler,
+		},
+		{
+			MethodName: "YaklangLanguageFind",
+			Handler:    _Yak_YaklangLanguageFind_Handler,
 		},
 		{
 			MethodName: "YaklangInspectInformation",

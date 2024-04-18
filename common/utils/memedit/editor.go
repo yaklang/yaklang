@@ -330,7 +330,11 @@ func (ve *MemEditor) GetTextFromRange(i RangeIf) string {
 	return ve.GetTextFromPosition(i.GetEnd(), i.GetStart())
 }
 
-func (ve *MemEditor) GetWordTextFromRange(i RangeIf) string {
+func (ve *MemEditor) boundary(c rune) bool {
+	return !('a' <= c && c <= 'z') && !('A' <= c && c <= 'Z') && !('0' <= c && c <= '9')
+}
+
+func (ve *MemEditor) ExpandWordTextRange(i RangeIf) RangeIf {
 	startPos := i.GetStart()
 	endPos := i.GetEnd()
 
@@ -353,13 +357,13 @@ func (ve *MemEditor) GetWordTextFromRange(i RangeIf) string {
 	for endWordOffset < len(ve.sourceCode) && !boundary(rune(ve.sourceCode[endWordOffset])) {
 		endWordOffset++
 	}
+	return NewRange(ve.GetPositionByOffset(startWordOffset), ve.GetPositionByOffset(endWordOffset))
+}
 
-	// 获取并返回整个单词文本
-	if startWordOffset < endWordOffset {
-		return ve.sourceCode[startWordOffset:endWordOffset]
-	}
+func (ve *MemEditor) GetWordTextFromRange(i RangeIf) string {
+	i = ve.ExpandWordTextRange(i)
 
-	return "" // 如果起始偏移和结束偏移相等，返回空字符串
+	return ve.GetTextFromRange(i)
 }
 
 func (ve *MemEditor) IsOffsetValid(offset int) bool {
