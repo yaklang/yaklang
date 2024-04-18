@@ -87,6 +87,9 @@ type IrCode struct {
 
 	// compile hash means: hash[ (file-content)+(program-name)+(package-name)+(program-index) ]
 	ProgramCompileHash string `json:"program_compile_hash" gorm:"index"`
+
+	// not important information
+	ExtraInformation string `json:"extra_information"`
 }
 
 func emptyIrCode() *IrCode {
@@ -152,4 +155,12 @@ func (r *IrCode) IsEmptySourceCodeHash() bool {
 		}
 	}
 	return false
+}
+
+func (r *IrCode) GetIdInt64() int64 {
+	return int64(r.ID)
+}
+
+func (r *IrCode) GetIdInt() int {
+	return int(r.ID)
 }
