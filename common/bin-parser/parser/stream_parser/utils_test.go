@@ -8,9 +8,9 @@ import (
 
 func TestAnyToBytes(t *testing.T) {
 	v := 0xaced
-	res := ConvertToBytes(v, 16, "big")
+	res, _ := ConvertToBytes(v, 16, "big")
 	assert.Equal(t, "aced", codec.EncodeToHex(res))
 
-	res = ConvertToBytes(v, 16, "little")
+	res, _ = ConvertToBytes(v, 16, "little")
 	assert.Equal(t, "edac", codec.EncodeToHex(res))
 }
