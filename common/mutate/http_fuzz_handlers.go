@@ -898,41 +898,32 @@ func (f *FuzzHTTPRequest) fuzzCookie(k, v interface{}, encoded ...EncodedFunc) (
 		return nil, err
 	}
 
-	var reqs []*http.Request
+	origin := httpctx.GetBareRequestBytes(req)
+	results := make([]*http.Request, 0, len(keys)*len(values))
 	for {
 		pair := m.Value()
 		key, value := pair[0], pair[1]
+		// 应该使用 parseCookieValue
+		value = strings.Trim(value, "\"")
 		for _, e := range encoded {
 			value = e(value)
 		}
-		newCookie, _ := deepCopySyncMapCookie(cookies)
-		if newCookie == nil {
-			newCookie = new(sync.Map)
-		}
-		newCookie.Store(key, &http.Cookie{Name: key, Value: value})
 
-		_req, _ := rebuildHTTPRequest(req, 0)
-		// 增加新的 Cookie
-		_req.Header.Del("Cookie")
-		newCookie.Range(func(key, value interface{}) bool {
-			c, _ := value.(*http.Cookie)
-			if c == nil {
-				return true
-			}
-			c.HttpOnly = true
-			_req.AddCookie(c)
-			return true
-		})
-		if _req != nil {
-			reqs = append(reqs, _req)
+		rspIns, err := lowhttp.ParseBytesToHttpRequest(
+			lowhttp.ReplaceHTTPPacketCookie(origin, key, value),
+		)
+		if err != nil {
+			log.Infof("parse (in FuzzCookie) request failed: %v", err)
+			continue
 		}
+		results = append(results, rspIns)
 
 		err = m.Next()
 		if err != nil {
 			break
 		}
 	}
-	return reqs, nil
+	return results, nil
 }
 
 func (f *FuzzHTTPRequest) Show() FuzzHTTPRequestIf {

@@ -246,6 +246,70 @@ func TestSplitHTTPPacket_BlankCharacterBody(t *testing.T) {
 	}
 }
 
+func TestParseCookie(t *testing.T) {
+	type args struct {
+		key string
+		raw string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "request cookie",
+			args: args{
+				key: "cookie",
+				raw: `a=b; c=d; e="f"`,
+			},
+			want: "a=b; c=d; e=f",
+		},
+		{
+			// RFC 6265
+			// cookie-value      = *cookie-octet / ( DQUOTE *cookie-octet DQUOTE )
+			// cookie-octet      = %x21 / %x23-2B / %x2D-3A / %x3C-5B / %x5D-7E
+			//                       ; US-ASCII characters excluding CTLs,
+			//                       ; whitespace DQUOTE, comma, semicolon,
+			//                       ; and backslash
+			name: "response cookie",
+			args: args{
+				key: "set-cookie",
+				raw: `a=b; c=d; e="f"`,
+			},
+			want: "a=b",
+		},
+		{
+			name: "response cookie 2",
+			args: args{
+				key: "set-cookie",
+				raw: `a=1; Expires=Sat, 18 Apr 2026 15:00:00 GMT; `,
+			},
+			want: "a=1; Expires=Sat, 18 Apr 2026 15:00:00 GMT",
+		},
+		{
+			name: "response cookie 3",
+			args: args{
+				key: "set-cookie",
+				raw: `a=1; Secure;`,
+			},
+			want: "a=1; Secure",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cookies := ParseCookie(tt.args.key, tt.args.raw)
+			var result = ""
+			for _, cookie := range cookies {
+				result += cookie.String() + "; "
+			}
+			result = strings.TrimRight(result, "; ")
+			if result != tt.want {
+				t.Errorf("result [%v], want [%v]", result, tt.want)
+			}
+		})
+	}
+}
+
 func TestMultipartHandleDupHeader(t *testing.T) {
 	origin := []byte(`GET / HTTP/1.1
 Host: www.example.com

@@ -347,10 +347,21 @@ func readCookies(h http.Header, filter string) []*http.Cookie {
 	return cookies
 }
 
-func ParseCookie(i string) []*http.Cookie {
-	header := http.Header{}
-	header.Add("Cookie", i)
-	return readCookies(header, "")
+// ParseCookie parse 请求包中的 Cookie 字符串
+func ParseCookie(key, raw string) []*http.Cookie {
+	var cookies []*http.Cookie
+	if strings.ToLower(key) == "cookie" {
+		header := http.Header{}
+		header.Add("Cookie", raw)
+		req := http.Request{Header: header}
+		cookies = req.Cookies()
+	} else if strings.ToLower(key) == "set-cookie" {
+		header := http.Header{}
+		header.Add("Set-Cookie", raw)
+		resp := http.Response{Header: header}
+		cookies = resp.Cookies()
+	}
+	return cookies
 }
 
 func MergeCookies(cookies ...*http.Cookie) string {
