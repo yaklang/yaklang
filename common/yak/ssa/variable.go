@@ -11,8 +11,9 @@ type Variable struct {
 	UseRange map[*Range]struct{}
 
 	// for object.member variable  access
-	object Value
-	key    Value
+	object      Value
+	key         Value
+	verboseName string
 }
 
 var _ ssautil.VersionedIF[Value] = (*Variable)(nil)
@@ -66,13 +67,14 @@ func (b *Variable) GetMemberCall() (Value, Value) {
 
 func (v *Variable) SetDefRange(r *Range) {
 	v.DefRange = r
+	v.verboseName = r.GetText()
 }
 
 func (v *Variable) AddRange(r *Range, force bool) {
 	//if force || len(*p.SourceCode) == len(v.GetName()) {
 	//	v.UseRange[p] = struct{}{}
 	//}
-	if force || len(r.GetText()) == len(v.GetName()) {
+	if force || r.GetText() == v.verboseName {
 		v.UseRange[r] = struct{}{}
 	}
 }
