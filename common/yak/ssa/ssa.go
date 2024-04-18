@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"io"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -123,7 +124,7 @@ type User interface {
 	ReplaceValue(Value, Value)
 }
 
-type Build func(string, *FunctionBuilder) error
+type Build func(io.Reader, *FunctionBuilder) error
 
 type packagePath []string
 type packagePathList []packagePath
@@ -144,8 +145,8 @@ type Program struct {
 	// class blue print
 	ClassBluePrint map[string]*ClassBluePrint
 
-	// package loader
-	loader *ssautil.PackageLoader
+	// package Loader
+	Loader *ssautil.PackageLoader
 	Build  Build
 
 	errors SSAErrors
@@ -154,8 +155,7 @@ type Program struct {
 	buildOnce sync.Once
 
 	// cache hitter
-	programBuilderCachedHit func(a any)
-	packagePathList         packagePathList
+	packagePathList packagePathList
 }
 
 func (p *Program) PushEditor(e *memedit.MemEditor) {
@@ -181,16 +181,6 @@ func (p *Program) PopEditor() {
 		return
 	}
 	p.editorStack.Pop()
-}
-
-func (p *Program) WithProgramBuilderCacheHitter(h func(any)) {
-	p.programBuilderCachedHit = h
-}
-
-func (p *Program) HitBuilderCache(a any) {
-	if p.programBuilderCachedHit != nil {
-		p.programBuilderCachedHit(a)
-	}
 }
 
 type Package struct {

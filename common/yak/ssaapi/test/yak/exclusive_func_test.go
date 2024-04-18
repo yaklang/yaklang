@@ -247,8 +247,7 @@ e = c + 3
 }
 
 func TestBottomUse_ReturnUnpack(t *testing.T) {
-	prog, err := ssaapi.Parse(`
-a = (i, j, k) => {
+	prog, err := ssaapi.Parse(`a = (i, j, k) => {
 	return i, j, k
 }
 c,d,e = a(f,2,3);

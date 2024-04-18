@@ -12,31 +12,26 @@ import (
 func (s *astbuilder) buildInclude(i *yak.IncludeStmtContext) {
 	targetFile := i.StringLiteral().GetText()
 	targetFile, _ = strconv.Unquote(targetFile)
-	var newCode string
+	// var newCode string
+	var fd *os.File
+	var err error
 	if filepath.IsAbs(targetFile) {
-		codeRaw, _ := os.ReadFile(targetFile)
-		newCode = string(codeRaw)
+		fd, err = os.Open(targetFile)
 	} else {
 		filename, err := filepath.Abs(targetFile)
 		if err != nil {
 			log.Warnf("yaklang builder include %v failed: %v", targetFile, err)
 		}
-		codeRaw, _ := os.ReadFile(filename)
-		newCode = string(codeRaw)
+		fd, err = os.Open(filename)
 	}
 
-	if newCode == "" {
+	if err != nil {
 		log.Warnf("yaklang builder include %v failed: %v", targetFile, "empty file")
 		return
 	}
 
-	s.recordIncludeFile(targetFile, newCode)
 	// TODO: here need more test-case
-	if err := Build(newCode, false, s.FunctionBuilder); err != nil {
+	if err := s.GetProgram().Build(fd, s.FunctionBuilder); err != nil {
 		log.Errorf("yaklang builder include %v failed: %v", targetFile, err)
 	}
-}
-
-func (v *astbuilder) recordIncludeFile(i string, code string) {
-	v.Function.PushReferenceFile(i, code)
 }

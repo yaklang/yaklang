@@ -1,10 +1,11 @@
 package ssaapi
 
 import (
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/consts"
 	"strconv"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/consts"
 )
 
 func TestMultiFile(t *testing.T) {

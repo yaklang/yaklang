@@ -28,7 +28,7 @@ type TestCase struct {
 var languageOption ssaapi.Option = nil
 var language ssaapi.Language
 
-func SetLanguage(lang ssaapi.Language, build ssaapi.Build) {
+func SetLanguage(lang ssaapi.Language, build ssaapi.Builder) {
 	ssaapi.LanguageBuilders[lang] = build
 	languageOption = ssaapi.WithLanguage(lang)
 	language = lang

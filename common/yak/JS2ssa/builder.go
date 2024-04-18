@@ -1,6 +1,8 @@
 package js2ssa
 
 import (
+	"path/filepath"
+
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -9,28 +11,32 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-type astbuilder struct {
-	*ssa.FunctionBuilder
-	lmap map[string]struct{}
-	cmap map[string]struct{}
-}
+type SSABuild struct{}
 
-func NewAstBuilder(functionBuilder *ssa.FunctionBuilder) *astbuilder {
-	return &astbuilder{
-		FunctionBuilder: functionBuilder,
-		lmap:            make(map[string]struct{}),
-		cmap:            make(map[string]struct{}),
-	}
-}
+var Builder = &SSABuild{}
 
-func Build(src string, force bool, builder *ssa.FunctionBuilder) error {
+func (*SSABuild) Build(src string, force bool, builder *ssa.FunctionBuilder) error {
 	ast, err := Frontend(src, force)
 	if err != nil {
 		return err
 	}
-	astBuilder := NewAstBuilder(builder)
+	astBuilder := &astbuilder{
+		FunctionBuilder: builder,
+		lmap:            make(map[string]struct{}),
+		cmap:            make(map[string]struct{}),
+	}
 	astBuilder.build(ast)
 	return nil
+}
+
+func (*SSABuild) FilterFile(path string) bool {
+	return filepath.Ext(path) == ".js"
+}
+
+type astbuilder struct {
+	*ssa.FunctionBuilder
+	lmap map[string]struct{}
+	cmap map[string]struct{}
 }
 
 func Frontend(src string, must bool) (*JS.ProgramContext, error) {
