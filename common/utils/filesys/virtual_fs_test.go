@@ -2,37 +2,52 @@ package filesys
 
 import (
 	"fmt"
+	"io"
+	"io/fs"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func Test_Virtual_FS_AddFile(t *testing.T) {
 	t.Run("simple add file", func(t *testing.T) {
-		vs := NewVirtualFs("C:\\windows\\project")
-		vf1 := NewVirtualFile("test.txt", "test")
-		vf2 := NewVirtualFile("Main.go", "package main")
+		vs := NewVirtualFs()
+		vs.AddFileByString("main.go", "package main")
 
-		vs.AddFile(vf1)
-		vs.AddFile(vf2)
-
-		file, err := vs.Open("Main.go")
-		if err != nil {
-			t.Fatalf("vs.Open want to get a file,but got [%v]", err)
-		}
-		fileInfo, err := file.Stat()
-		if err != nil {
-			t.Fatalf("file.Stat want to get fileinfo,but got [%v]", err)
-		}
-		fmt.Printf("virtualFs's  file info:%v\n", fileInfo)
+		file, err := vs.Open("main.go")
+		require.NoError(t, err)
+		_, err = file.Stat()
+		require.NoError(t, err)
+		data, err := io.ReadAll(file)
+		require.NoError(t, err)
+		require.Equal(t, []byte("package main"), data)
 	})
 
-	t.Run("force add file", func(t *testing.T) {
-		vs := NewVirtualFs("C:\\windows\\project")
-		vf1 := NewVirtualFile("Main.go", "test")
-		vf2 := NewVirtualFile("Main.go", "package main")
+	t.Run("simple read from file", func(t *testing.T) {
+		vs := NewVirtualFs()
+		vs.AddFileByString("main.go", "package main")
 
-		vs.AddFile(vf1)
-		vs.AddFileForce(vf2)
+		file, err := vs.Open("main.go")
+		require.NoError(t, err)
 
+		data := make([]byte, 2)
+
+		n, err := file.Read(data)
+		require.NoError(t, err)
+		require.Equal(t, 2, n)
+		require.Equal(t, []byte("pa"), data)
+
+		n, err = file.Read(data)
+		require.NoError(t, err)
+		require.Equal(t, 2, n)
+		require.Equal(t, []byte("ck"), data)
+	})
+
+	t.Run("overwrite file", func(t *testing.T) {
+		vs := NewVirtualFs()
+		vs.AddFileByString("Main.go", "test")
+		vs.AddFileByString("Main.go", "package main")
 		file, err := vs.Open("Main.go")
 		if err != nil {
 			t.Fatalf("vs.Open want to get a file,but got [%v]", err)
@@ -47,15 +62,11 @@ func Test_Virtual_FS_AddFile(t *testing.T) {
 }
 
 func Test_Virtual_FS_RemoveFile(t *testing.T) {
-	vs := NewVirtualFs("C:\\windows\\project")
+	vs := NewVirtualFs()
 	vf := NewVirtualFile("Main.java", "Class Main(){}")
 
 	vs.AddFile(vf)
-	err := vs.RemoveFile("Main.java")
-	if err != nil {
-		t.Fatalf("vs.RemoveFile want to remove file,but got [%v]", err)
-	}
-
+	vs.RemoveFile("Main.java")
 	file, _ := vs.Open("Main.java")
 	if file != nil {
 		fileInfo, _ := file.Stat()
@@ -63,29 +74,13 @@ func Test_Virtual_FS_RemoveFile(t *testing.T) {
 	}
 }
 
-func Test_Virtual_FS_GetContent(t *testing.T) {
-	vs := NewVirtualFs("C:\\windows\\project")
-	vf := NewVirtualFile("Main.java", "Class Main(){}")
-	vs.AddFile(vf)
-
-	content, err := vs.GetContent("Main.java")
-	if err != nil {
-		t.Fatalf("vs.GetContent want to get content,but got [%v]", err)
-	}
-	fmt.Printf("content:\n%v\n", content)
-}
-
 func Test_Virtual_Fs_Dir(t *testing.T) {
 	t.Run("add virtual dir", func(t *testing.T) {
-		vs := NewVirtualFs("C:\\windows\\project")
-		vf := NewVirtualFile("Main.java", "package main;\nClass Main(){}")
-		vs.AddFile(vf)
+		vs := NewVirtualFs()
+		vs.AddFileByString("Main.java", "package main;\nClass Main(){}")
 
-		dir := NewVirtualFs("C:\\windows\\project\\com")
-		fileInDir := NewVirtualFile("Test.java", "package com.test\nClass Main(){}")
-		dir.AddFile(fileInDir)
-
-		vs.AddDir("com", dir)
+		vs.AddDirByString("com")
+		vs.AddFileToDir("com", "test.java", "package com.test")
 
 		fileInfos, err := vs.ReadDir("com")
 		if err != nil {
@@ -94,49 +89,18 @@ func Test_Virtual_Fs_Dir(t *testing.T) {
 
 		for _, fileInfo := range fileInfos {
 			fmt.Printf("fileInfo:%v\n", fileInfo)
-			if fileInfo.Name() != "Test.java" {
-				t.Fatalf("want to get fileInfo [Test.java],but got [%v]", fileInfo.Name())
-			}
-		}
-	})
-
-	t.Run("force add virtual dir", func(t *testing.T) {
-		vs := NewVirtualFs("C:\\windows\\project")
-		vf := NewVirtualFile("Main.java", "package main;\nClass Main(){}")
-		vs.AddFile(vf)
-
-		dir1 := NewVirtualFs("C:\\windows\\project\\com")
-		fileInDir := NewVirtualFile("Test.java", "package com.test\nClass Main(){}")
-		dir1.AddFile(fileInDir)
-		dir2 := NewVirtualFs("C:\\windows\\project\\com")
-		dir2.AddFile(fileInDir)
-
-		vs.AddDir("com", dir1)
-		vs.AddDirForce("com", dir2)
-
-		fileInfos, err := vs.ReadDir("com")
-		if err != nil {
-			t.Fatalf("want to get fileInfos,but got [%v]", err)
-		}
-
-		for _, fileInfo := range fileInfos {
-			fmt.Printf("fileInfo:%v\n", fileInfo)
-			if fileInfo.Name() != "Test.java" {
+			if fileInfo.Name() != "test.java" {
 				t.Fatalf("want to get fileInfo [Test.java],but got [%v]", fileInfo.Name())
 			}
 		}
 	})
 
 	t.Run("remove virtual dir", func(t *testing.T) {
-		vs := NewVirtualFs("C:\\windows\\project")
-		vf := NewVirtualFile("Main.java", "package main;\nClass Main(){}")
-		vs.AddFile(vf)
+		vs := NewVirtualFs()
+		vs.AddFileByString("Main.java", "package main;\nClass Main(){}")
 
-		dir := NewVirtualFs("C:\\windows\\project\\com")
-		fileInDir := NewVirtualFile("Test.java", "package com.test\nClass Main(){}")
-		dir.AddFile(fileInDir)
-
-		vs.AddDir("com", dir)
+		vs.AddDirByString("com")
+		vs.AddFileToDir("com", "Test.java", "package com.test")
 
 		err := vs.RemoveDir("com")
 		if err != nil {
@@ -150,4 +114,44 @@ func Test_Virtual_Fs_Dir(t *testing.T) {
 
 	})
 
+}
+
+func Test_virtual_fs(t *testing.T) {
+	/*
+		project:
+			1.txt  "1"
+			a:
+				2.txt "2"
+			b:
+				3.txt "3"
+	*/
+	vs := NewVirtualFs()
+	vs.AddDirByString("project")
+	vs.AddFileToDir("project", "1.txt", "1")
+
+	vs.AddDirByString("project", "a")
+	vs.AddFileToDir("project/a", "2.txt", "2")
+
+	vs.AddDirByString("project", "b")
+	vs.AddFileToDir("project/b", "3.txt", "3")
+
+	dir := make([]string, 0, 3)
+	file := make([]string, 0, 3)
+
+	err := Recursive("project",
+		WithFileSystem(vs),
+		WithDirStat(func(s string, fi fs.FileInfo) error {
+			log.Infof("dir: %s", s)
+			dir = append(dir, s)
+			return nil
+		}),
+		WithFileStat(func(s string, f fs.File, fi fs.FileInfo) error {
+			log.Infof("file: %s", s)
+			file = append(file, s)
+			return nil
+		}),
+	)
+	require.NoError(t, err, err)
+	require.Equal(t, []string{"project/a", "project/b"}, dir)
+	require.Equal(t, []string{"project/1.txt", "project/a/2.txt", "project/b/3.txt"}, file)
 }

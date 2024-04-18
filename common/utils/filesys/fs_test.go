@@ -2,31 +2,57 @@ package filesys
 
 import (
 	"embed"
-	"github.com/yaklang/yaklang/common/log"
-	"os"
+	"io/fs"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 //go:embed testdata/***
 var testfs embed.FS
 
-func TestFS_1(t *testing.T) {
-	f := testfs
-	_ = f
+func TestFS_EmbedFS_SingleLevel(t *testing.T) {
 	count := 0
+
 	err := Recursive(
 		"testdata",
 		WithEmbedFS(testfs),
-		WithDirMatch("ta", WithFileStat(func(pathname string, info os.FileInfo) error {
-			log.Infof("match: %v", pathname)
+		WithRecursiveDirectory(false),
+		WithFileStat(func(s string, f fs.File, fi fs.FileInfo) error {
+			log.Infof("read file: %s", fi.Name())
 			count++
 			return nil
-		})))
+		}),
+	)
+
 	if err != nil {
 		t.Fatal(err)
 	}
-	if count != 4 {
-		t.Fatal("count != 4")
+
+	if count != 1 {
+		t.Fatal("count != 1")
+	}
+}
+
+func TestFS_EmbedFS_NotSingleLevel(t *testing.T) {
+	count := 0
+
+	err := Recursive(
+		"testdata",
+		WithEmbedFS(testfs),
+		WithFileStat(func(s string, f fs.File, fi fs.FileInfo) error {
+			log.Infof("read file: %s", fi.Name())
+			count++
+			return nil
+		}),
+	)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if count != 7 {
+		t.Fatal("count != 7")
 	}
 }
 
@@ -34,18 +60,20 @@ func TestFS_Chains(t *testing.T) {
 	count := 0
 	err := Recursive(
 		"testdata",
-		WithDirMatches([]string{
-			"cc", "dd",
-		}, WithFileStat(func(pathname string, info os.FileInfo) error {
-			count++
-			log.Infof("match: %v", pathname)
-			return nil
-		})), WithEmbedFS(testfs),
+		WithEmbedFS(testfs),
+		WithDir(
+			"testdata/ta",
+			WithFileStat(func(s string, f fs.File, fi fs.FileInfo) error {
+				count++
+				log.Infof("match: %v", s)
+				return nil
+			}),
+		),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if count != 2 {
-		t.Fatal("count != 4")
+	if count != 4 {
+		t.Fatalf("count[%d] != 4", count)
 	}
 }

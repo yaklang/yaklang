@@ -2,124 +2,87 @@ package filesys
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
+	"io"
 	"io/fs"
 	"os"
-	"path/filepath"
+	"path"
+	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type VirtualFS struct {
-	path  string
-	files map[string]*VirtualFile
+	files    map[string]*VirtualFile
+	dirEntry []fs.DirEntry
 }
 
-type VirtualFile struct {
-	name    string
-	content string
-	dir     *VirtualFS
-}
+var _ FileSystem = (*VirtualFS)(nil)
 
-type VirtualFileInfo struct {
-	name  string
-	size  int64
-	isDir bool
-}
-
-func NewVirtualFs(path string) *VirtualFS {
-	return &VirtualFS{
-		path:  path,
+func NewVirtualFs() *VirtualFS {
+	vs := &VirtualFS{
 		files: make(map[string]*VirtualFile),
 	}
-}
-
-func NewVirtualFile(name string, content string) *VirtualFile {
-	return &VirtualFile{
-		name:    name,
-		content: content,
-	}
-}
-
-func NewVirtualFileInfo(name string, size int64, isDir bool) *VirtualFileInfo {
-	return &VirtualFileInfo{name: name, size: size, isDir: isDir}
-}
-
-func NewVirtualFileDirectory(dirName string, dir *VirtualFS) *VirtualFile {
-	return &VirtualFile{
-		name: dirName,
-		dir:  dir,
-	}
-}
-
-func (vs *VirtualFS) ReadDir(dirName string) ([]os.FileInfo, error) {
-	var fileInfos []os.FileInfo
-	if dirName != "" {
-		dirFile, exist := vs.files[dirName]
-		if !exist {
-			return nil, fmt.Errorf("dir [%v] not exist", dirName)
-		}
-		if dirFile.dir == nil {
-			return nil, fmt.Errorf("file [%v] is not a dir", dirName)
-		}
-		for _, file := range dirFile.dir.files {
-			fileInfo, err := file.Stat()
-			if err != nil {
-				return nil, err
-			}
-			fileInfos = append(fileInfos, fileInfo)
-		}
-		return fileInfos, nil
-	}
-	return nil, fmt.Errorf("directory name is a null character")
-}
-
-func (vs *VirtualFS) Lstat(name string) (os.FileInfo, error) {
-	return NewVirtualFileInfo(name, 0, true), nil
-}
-
-func (vs *VirtualFS) Join(elem ...string) string {
-	return filepath.Join(elem...)
+	return vs
 }
 
 func (vs *VirtualFS) Open(name string) (fs.File, error) {
-	file, exist := vs.files[name]
+	vf, fileName, err := vs.get(vs.splite(name)...)
+	if err != nil {
+		return nil, err
+	}
+	file, exist := vf.files[fileName]
 	if !exist {
 		return nil, fmt.Errorf("file [%v] not exist", name)
 	}
-	if file.dir != nil {
+	if file.fs != nil {
 		return nil, fmt.Errorf("file [%v] is a dir", name)
 	}
 	return file, nil
 }
 
-func (vs *VirtualFS) AddFileForce(vf *VirtualFile) {
-	err := vs.addFile(vf, true)
+func (vs *VirtualFS) Stat(name string) (fs.FileInfo, error) {
+	vf, fileName, err := vs.get(vs.splite(name)...)
 	if err != nil {
-		log.Warn(err)
+		return nil, err
 	}
+	file, exist := vf.files[fileName]
+	if !exist {
+		return nil, fmt.Errorf("file [%v] not exist", name)
+	}
+	return file.Stat()
+}
+func (vs *VirtualFS) splite(name string) []string {
+	return strings.Split(name, string(vs.GetSeparators()))
 }
 
-func (vs *VirtualFS) AddFile(vf *VirtualFile) {
-	err := vs.addFile(vf, false)
+func (vs *VirtualFS) get(names ...string) (*VirtualFS, string, error) {
+	path := names[:len(names)-1]
+	filePath := names[len(names)-1]
+	vf, err := vs.getDir(path...)
 	if err != nil {
-		log.Error(err)
+		return nil, "", err
 	}
+	return vf, filePath, nil
 }
 
-func (vs *VirtualFS) addFile(vf *VirtualFile, forceAdd bool) error {
-	if vs.IsFileExist(vf.name) {
-		if forceAdd {
-			err := fmt.Errorf("file [%v] already exists,now forcefully overwrite.\n", vf.name)
-			vs.files[vf.name] = vf
-			return err
-		}
-		return fmt.Errorf("file [%s] already exists", vf.name)
+func (vs *VirtualFS) ReadDir(name string) ([]fs.DirEntry, error) {
+	fs, err := vs.getDir(strings.Split(name, "/")...)
+	if err != nil {
+		return nil, err
 	}
-	vs.files[vf.name] = vf
-	return nil
+	return fs.CurrentDir(), nil
 }
 
-func (vs *VirtualFS) IsFileExist(name string) bool {
+func (vs *VirtualFS) Join(name ...string) string { return path.Join(name...) }
+func (vs *VirtualFS) GetSeparators() rune        { return '/' }
+
+func (vs *VirtualFS) CurrentDir() []fs.DirEntry {
+	return vs.dirEntry
+}
+
+func (vs *VirtualFS) IsFileOrDirExist(name string) bool {
 	_, exist := vs.files[name]
 	if exist {
 		return true
@@ -127,90 +90,177 @@ func (vs *VirtualFS) IsFileExist(name string) bool {
 	return false
 }
 
-func (vs *VirtualFS) RemoveFile(name string) error {
-	if vs.IsFileExist(name) {
+func (vs *VirtualFS) AddFileByString(name, content string) {
+	vf := NewVirtualFile(name, content)
+	vs.AddFile(vf)
+}
+
+func (vs *VirtualFS) AddFile(vf *VirtualFile) {
+	if vs.IsFileOrDirExist(vf.name) {
+		log.Errorf("file [%v] already exists,now overwrite.\n", vf.name)
+	}
+	vs.files[vf.name] = vf
+	// info, _ := vf.Stat()
+	vs.dirEntry = append(vs.dirEntry, vf.info)
+}
+
+func (vs *VirtualFS) RemoveFile(name string) {
+	if vs.IsFileOrDirExist(name) {
 		delete(vs.files, name)
-		return nil
 	}
-	return fmt.Errorf("file [%s] does not exist", name)
+	log.Errorf("file [%s] does not exist", name)
 }
 
-func (vs *VirtualFS) GetContent(name string) (string, error) {
-	if vs.IsFileExist(name) {
-		if vs.files[name].dir != nil {
-			return "", fmt.Errorf("file [%s] is a directory", name)
-		}
-		return vs.files[name].content, nil
-	}
-	return "", fmt.Errorf("file [%s] does not exist", name)
-}
-
-func (vs *VirtualFS) AddDir(dirName string, dir *VirtualFS) {
-	err := vs.addDir(dirName, dir, false)
+func (v *VirtualFS) AddDirByString(dirNames ...string) error {
+	vf, current, err := v.get(dirNames...)
 	if err != nil {
-		log.Error(err)
+		return err
 	}
+	vf.AddDirByFS(current, NewVirtualFs())
+	return nil
 }
 
-func (vs *VirtualFS) AddDirForce(dirName string, dir *VirtualFS) {
-	err := vs.addDir(dirName, dir, true)
+func (v *VirtualFS) AddFileToDir(dir, file, content string) error {
+	vf, err := v.getDir(strings.Split(dir, "/")...)
 	if err != nil {
-		log.Warn(err)
+		return err
 	}
+	vf.AddFileByString(file, content)
+	return nil
+}
+
+func (vf *VirtualFS) AddDirByFS(dirName string, fs *VirtualFS) error {
+	dir := NewVirtualFileDirectory(dirName, fs)
+	vf.files[dirName] = dir
+	vf.dirEntry = append(vf.dirEntry, dir.info)
+	return nil
 }
 
 func (vs *VirtualFS) RemoveDir(dirName string) error {
-	if vs.IsFileExist(dirName) {
+	if vs.IsFileOrDirExist(dirName) {
 		delete(vs.files, dirName)
 		return nil
 	}
 	return fmt.Errorf("dir [%s] does not exist", dirName)
 }
 
-func (vs *VirtualFS) addDir(dirName string, dir *VirtualFS, isForce bool) error {
-	if !isForce {
-		if vs.IsFileExist(dirName) {
-			return fmt.Errorf("directory [%s] already exists,please use AddDirForce.", dirName)
+func (v *VirtualFS) getDir(dirs ...string) (*VirtualFS, error) {
+	get := func(v *VirtualFS, dir string) (*VirtualFS, error) {
+		vf, ok := v.files[dir]
+		if !ok {
+			return nil, utils.Errorf("directory [%s] not exists", dir)
 		}
-		vs.files[dirName] = NewVirtualFileDirectory(dirName, dir)
-		return nil
+		if vf.fs == nil {
+			return nil, utils.Errorf("this directory [%s] is not directory, just a file", dir)
+		}
+		return vf.fs, nil
 	}
-	err := fmt.Errorf("directory [%v] already exists,now forcefully overwrite.\n", dirName)
-	vs.files[dirName] = NewVirtualFileDirectory(dirName, dir)
-	return err
+	fs := v
+	var err error
+	for _, name := range dirs {
+		if fs, err = get(fs, name); err != nil {
+			return nil, err
+		}
+	}
+	return fs, nil
+}
+
+type VirtualFile struct {
+	name    string
+	content string
+	fs      *VirtualFS
+	info    *VirtualFileInfo
+	index   int
+}
+
+var _ fs.File = (*VirtualFile)(nil)
+
+func NewVirtualFile(name string, content string) *VirtualFile {
+	return &VirtualFile{
+		name:    name,
+		content: content,
+		info:    NewVirtualFileInfo(name, int64(len(content)), false),
+	}
+}
+
+func NewVirtualFileDirectory(dirName string, dir *VirtualFS) *VirtualFile {
+	return &VirtualFile{
+		name: dirName,
+		fs:   dir,
+		info: NewVirtualFileInfo(dirName, int64(0), true),
+	}
 }
 
 func (vf *VirtualFile) Stat() (fs.FileInfo, error) {
-	return NewVirtualFileInfo(vf.name, int64(len(vf.content)), false), nil
+	return vf.info, nil
 }
 
 func (vf *VirtualFile) Read(p []byte) (int, error) {
-	if vf.dir != nil {
+	if vf.fs != nil {
 		return 0, fs.ErrInvalid
 	}
-	n := copy(p, vf.content)
-	return n, nil
+
+	var err error
+	n := copy(p, vf.content[vf.index:])
+	vf.index += n
+	// if n <= len(vf.content) {
+	if vf.index == len(vf.content) {
+		err = io.EOF
+	}
+
+	return n, err
 }
 
 func (vf *VirtualFile) Close() error {
 	return nil
 }
 
+type VirtualFileInfo struct {
+	name string
+	size int64
+	mod  fs.FileMode
+}
+
+var _ fs.FileInfo = (*VirtualFileInfo)(nil)
+var _ fs.DirEntry = (*VirtualFileInfo)(nil)
+
+func NewVirtualFileInfo(name string, size int64, isDir bool) *VirtualFileInfo {
+	if isDir {
+		return &VirtualFileInfo{
+			name: name,
+			size: size,
+			mod:  fs.ModeDir,
+		}
+	}
+	return &VirtualFileInfo{
+		name: name,
+		size: size,
+		mod:  fs.ModeType,
+	}
+}
+
 func (vi *VirtualFileInfo) Name() string {
 	return vi.name
 }
 func (vi *VirtualFileInfo) Size() int64 {
-	return 0
+	return vi.size
 }
 func (vi *VirtualFileInfo) Mode() os.FileMode {
-	return os.ModeDevice
+	return vi.mod
 }
 func (vi *VirtualFileInfo) ModTime() time.Time {
 	return time.Time{}
 }
 func (vi *VirtualFileInfo) IsDir() bool {
-	return vi.isDir
+	return vi.mod == fs.ModeDir
 }
 func (vi *VirtualFileInfo) Sys() any {
 	return nil
+}
+
+func (vi *VirtualFileInfo) Info() (fs.FileInfo, error) {
+	return vi, nil
+}
+func (vi *VirtualFileInfo) Type() fs.FileMode {
+	return vi.mod
 }
