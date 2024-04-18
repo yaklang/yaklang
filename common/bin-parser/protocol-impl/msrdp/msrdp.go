@@ -18,7 +18,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"net"
-	"os"
 	"time"
 )
 
@@ -40,7 +39,12 @@ func NewRDPClient(addr string) (*RDPClient, error) {
 		Port: port,
 	}, nil
 }
-func (r *RDPClient) Login(domain, user, password string) error {
+func (r *RDPClient) Login(domain, user, password string) (err error) {
+	defer func() {
+		if e := recover(); e != nil {
+			err = utils.Errorf("login to %s:%d failed: %v", r.Host, r.Port, e)
+		}
+	}()
 	protocol, err := r.Connect()
 	if err != nil {
 		return err
@@ -49,37 +53,7 @@ func (r *RDPClient) Login(domain, user, password string) error {
 	isSet := func(flag uint32) bool {
 		return protocol&flag == flag
 	}
-	if isSet(PROTOCOL_RDP) {
-
-	}
-	if isSet(PROTOCOL_SSL) {
-		err := r.StartTLS()
-		if err != nil {
-			return err
-		}
-	}
-	if isSet(PROTOCOL_HYBRID) {
-		if r.rawTlsConn == nil {
-			err := r.StartTLS()
-			if err != nil {
-				return err
-			}
-		}
-		_, err := r.CsspAuthenticate(domain, user, password)
-		if err != nil {
-			return err
-		}
-	}
-	if isSet(PROTOCOL_RDSTLS) {
-
-	}
-	if isSet(PROTOCOL_HYBRID_EX) {
-		if r.rawTlsConn == nil {
-			err := r.StartTLS()
-			if err != nil {
-				return err
-			}
-		}
+	if isSet(PROTOCOL_HYBRID_EX) { // CredSSP 认证的基础上加了个 `Early User Authorization Result PDU` 也就是认证结果的确认
 		_, err := r.CsspAuthenticate(domain, user, password)
 		if err != nil {
 			return err
@@ -89,35 +63,35 @@ func (r *RDPClient) Login(domain, user, password string) error {
 		if err != nil {
 			return err
 		}
-		_ = n
+		packet := protocol_impl.NewTpktPacket(bs[:n])
+		var AUTHZ_SUCCESS uint32 = 0x00000000
+		//var AUTHZ_ACCESS_DENIED uint32 = 0x00000005
+		result := binary.LittleEndian.Uint32(packet.TPDU)
+		if result == AUTHZ_SUCCESS {
+			return nil
+		} else {
+			return errors.New("access denied")
+		}
+	} else if isSet(PROTOCOL_HYBRID) { // CredSSP 认证
+		_, err := r.CsspAuthenticate(domain, user, password)
+		if err != nil {
+			return err
+		}
 	}
-	if isSet(PROTOCOL_RDSAAD) {
+	if isSet(PROTOCOL_RDP) { // 桌面登录
+	}
+	if isSet(PROTOCOL_SSL) { // 使用SSL通信的桌面登录
 
 	}
+	if isSet(PROTOCOL_RDSTLS) { // PROTOCOL_RDP增强
+	}
+	if isSet(PROTOCOL_RDSAAD) { // PROTOCOL_RDSTLS增强
 
-	return nil
+	}
+	return utils.Errorf("unsupported protocol: %d", protocol)
 }
 func (r *RDPClient) StartTLS() error {
-	//r.rawTlsConn = utils.NewDefaultTLSClient(r.conn)
-	//r.conn = r.rawTlsConn
-	file, err := os.OpenFile("/Users/z3/Downloads/gotlskey.log", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
-	if err != nil {
-		return err
-	}
-	//defer file.Close()
-	cert, err := tls.LoadX509KeyPair("/Users/z3/yakit-projects/yak-mitm-ca.crt", "/Users/z3/yakit-projects/yak-mitm-ca.key")
-	if err != nil {
-		return err
-	}
-	tlsConfig := &tls.Config{
-		Certificates:       []tls.Certificate{cert},
-		KeyLogWriter:       file,
-		InsecureSkipVerify: true,
-		MinVersion:         tls.VersionSSL30,
-		MaxVersion:         tls.VersionTLS13,
-		Renegotiation:      tls.RenegotiateFreelyAsClient,
-	}
-	tlsConn := tls.Client(r.conn, tlsConfig)
+	tlsConn := utils.NewDefaultTLSClient(r.conn)
 	r.rawTlsConn = tlsConn
 	r.conn = tlsConn
 	return nil
@@ -129,7 +103,12 @@ func (r *RDPClient) Write(d []byte) (int, error) {
 	return r.conn.Write(d)
 }
 func (r *RDPClient) CsspAuthenticate(domain, user, password string) (bool, error) {
-	//user = strings.ToUpper(user)
+	// use tls to connect
+	err := r.StartTLS()
+	if err != nil {
+		return false, err
+	}
+	// send negotiate message
 	negoMsg := protocol_impl.NewNegotiateMessage()
 	signature := [8]byte{'N', 'T', 'L', 'M', 'S', 'S', 'P', 0x00}
 	negoMsg.Signature = signature
@@ -151,7 +130,6 @@ func (r *RDPClient) CsspAuthenticate(domain, user, password string) (bool, error
 		Version:    2,
 		NegoTokens: []NegoToken{{Data: negPayload}},
 	}
-
 	payload, err := asn1.Marshal(tsReq)
 	if err != nil {
 		return false, err
@@ -160,6 +138,7 @@ func (r *RDPClient) CsspAuthenticate(domain, user, password string) (bool, error
 	if err != nil {
 		return false, err
 	}
+	// receive challenge message
 	bs := make([]byte, 1024)
 	n, err := r.Read(bs)
 	if err != nil {
@@ -174,6 +153,7 @@ func (r *RDPClient) CsspAuthenticate(domain, user, password string) (bool, error
 	if err != nil {
 		return false, err
 	}
+	// calc nt and lm (v2)
 	nt := protocol_impl.NTOWFv2(password, user, domain)
 	lm := protocol_impl.LMOWFv2(password, user, domain)
 	clientChallenge := []byte(utils.RandStringBytes(8))
@@ -186,13 +166,16 @@ func (r *RDPClient) CsspAuthenticate(domain, user, password string) (bool, error
 			timestamp = pair.Value
 		}
 	}
+	// calc net ntlm hash and session base key
 	netNt, netLm, sessionBaseKey := protocol_impl.NetNTLMv2(nt, lm, challengeMsg.ServerChallenge[:], clientChallenge, timestamp, serverInfo)
-	//exportedSessionKey := []byte(utils.RandStringBytes(16))
-	exportedSessionKey := []byte("1234567812345678")
-	EncryptedRandomSessionKey := make([]byte, len(exportedSessionKey))
-	rc, _ := rc4.NewCipher(sessionBaseKey)
-	rc.XORKeyStream(EncryptedRandomSessionKey, exportedSessionKey)
 
+	// client rand a session key, use session base key xor it to send to server
+	exportedSessionKey := []byte(utils.RandStringBytes(16))
+	encryptedRandomSessionKey := make([]byte, len(exportedSessionKey))
+	rc, _ := rc4.NewCipher(sessionBaseKey)
+	rc.XORKeyStream(encryptedRandomSessionKey, exportedSessionKey)
+
+	// generate auth message
 	authMsg := protocol_impl.NewAuthenticationMessage()
 	authMsg.Signature = signature
 	authMsg.MessageType = 3
@@ -201,7 +184,7 @@ func (r *RDPClient) CsspAuthenticate(domain, user, password string) (bool, error
 	authMsg.DomainNameFields = authMsg.NewField(protocol_impl.UnicodeEncode(domain))
 	authMsg.UserNameFields = authMsg.NewField(protocol_impl.UnicodeEncode(user))
 	authMsg.WorkstationFields = authMsg.NewField(protocol_impl.UnicodeEncode(""))
-	authMsg.EncryptedRandomSessionKeyFields = authMsg.NewField(EncryptedRandomSessionKey)
+	authMsg.EncryptedRandomSessionKeyFields = authMsg.NewField(encryptedRandomSessionKey)
 	bsFlag := make([]byte, 4)
 	binary.LittleEndian.PutUint32(bsFlag, challengeMsg.NegotiateFlags)
 	for i := 0; i < len(authMsg.NegotiateFlags); i++ {
@@ -242,7 +225,7 @@ func (r *RDPClient) CsspAuthenticate(domain, user, password string) (bool, error
 		return false, err
 	}
 
-	//exportedSessionKey := []byte(utils.RandStringBytes(16))
+	// gen session encrypt and decrypt util by client session key
 	security := NewNTLMv2Security(exportedSessionKey)
 	certContent = security.GssEncrypt(certContent)
 	tsReq = TSRequest{
@@ -255,6 +238,7 @@ func (r *RDPClient) CsspAuthenticate(domain, user, password string) (bool, error
 		return false, err
 	}
 	r.Write(payload)
+	// receive pub key
 	resp := make([]byte, 1024)
 	n, err = r.Read(resp)
 	if err != nil {
@@ -270,7 +254,6 @@ func (r *RDPClient) CsspAuthenticate(domain, user, password string) (bool, error
 	if err != nil {
 		return false, err
 	}
-
 	credsPayload, err := asn1.Marshal(TSCredentials{
 		CredType:    1,
 		Credentials: passwordCredsPaylaod,
@@ -278,7 +261,6 @@ func (r *RDPClient) CsspAuthenticate(domain, user, password string) (bool, error
 	if err != nil {
 		return false, err
 	}
-	println(codec.EncodeToHex(credsPayload))
 	credsPayloadEnced := security.GssEncrypt(credsPayload)
 	tsReq = TSRequest{
 		Version:  2,
@@ -288,6 +270,7 @@ func (r *RDPClient) CsspAuthenticate(domain, user, password string) (bool, error
 	if err != nil {
 		return false, err
 	}
+	// send creds
 	r.Write(payload)
 	return true, nil
 }
@@ -328,7 +311,7 @@ func (r *RDPClient) Connect() (protocol uint32, e error) {
 		"Type":     TYPE_RDP_NEG_REQ,
 		"Flag":     0,
 		"Length":   0x0008,
-		"Protocol": PROTOCOL_RDP | PROTOCOL_SSL | PROTOCOL_HYBRID | PROTOCOL_HYBRID_EX | PROTOCOL_RDSAAD,
+		"Protocol": PROTOCOL_RDP | PROTOCOL_SSL | PROTOCOL_HYBRID | PROTOCOL_HYBRID_EX,
 	}, "Negotiation")
 	if err != nil {
 		return 0, err
@@ -389,7 +372,7 @@ func (n *NTLMv2Security) GssEncrypt(data []byte) []byte {
 	b := &bytes.Buffer{}
 
 	bs := make([]byte, 4)
-	binary.LittleEndian.PutUint32(bs, 0)
+	binary.LittleEndian.PutUint32(bs, n.SeqNum)
 	b.Write(bs)
 	b.Write(data)
 	s1 := codec.HmacMD5(n.clientSigningKey, b.Bytes())[:8]
