@@ -52,6 +52,14 @@ func (b *Variable) IsMemberCall() bool {
 	return b.object != nil
 }
 
+func (b *Variable) GetProgram() *Program {
+	value := b.GetValue()
+	if utils.IsNil(value) {
+		return nil
+	}
+	return value.GetProgram()
+}
+
 func (b *Variable) GetMemberCall() (Value, Value) {
 	return b.object, b.key
 }
@@ -60,12 +68,12 @@ func (v *Variable) SetDefRange(r *Range) {
 	v.DefRange = r
 }
 
-func (v *Variable) AddRange(p *Range, force bool) {
+func (v *Variable) AddRange(r *Range, force bool) {
 	//if force || len(*p.SourceCode) == len(v.GetName()) {
 	//	v.UseRange[p] = struct{}{}
 	//}
-	if force || len(p.GetText()) == len(v.GetName()) {
-		v.UseRange[p] = struct{}{}
+	if force || len(r.GetText()) == len(v.GetName()) {
+		v.UseRange[r] = struct{}{}
 	}
 }
 

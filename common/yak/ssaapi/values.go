@@ -272,6 +272,8 @@ func (v *Value) IsSwitch() bool       { return v.getOpcode() == ssa.SSAOpcodeSwi
 // IsObject desc if the value is object
 func (v *Value) IsObject() bool { return v.node.IsObject() }
 
+func (v *Value) IsExtern() bool { return v.node.IsExtern() }
+
 // GetMember get member of object by key
 func (v *Value) GetMember(value *Value) *Value {
 	key := value.node.String()
@@ -295,6 +297,22 @@ func (v *Value) GetAllMember() Values {
 }
 
 // // MemberCall : member
+
+func (v *Value) IsMethod() bool {
+	f, ok := ssa.ToFunction(v.node)
+	if !ok {
+		return false
+	}
+	return f.IsMethod()
+}
+
+func (v *Value) GetFunctionObjectType() ssa.Type {
+	f, ok := ssa.ToFunction(v.node)
+	if !ok {
+		return nil
+	}
+	return f.Type.ObjectType
+}
 
 // IsMember desc if the value is member of some object
 func (v *Value) IsMember() bool { return v.node.IsMember() }
@@ -344,7 +362,6 @@ func (value Values) Ref(name string) Values {
 					ret = append(ret, v)
 				}
 			}
-
 		})
 	}
 	return ret
@@ -372,6 +389,7 @@ func (v Values) Show(b ...bool) Values {
 	fmt.Println(v.StringEx(0))
 	return v
 }
+
 func (v Values) ShowWithSource(b ...bool) Values {
 	if len(b) > 0 && !b[0] {
 		return v

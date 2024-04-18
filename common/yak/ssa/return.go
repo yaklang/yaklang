@@ -95,6 +95,23 @@ func (b *FunctionBuilder) Finish() {
 		b.CurrentBlock = endBlock
 	}
 
+	// set program offsetMap for not const and not variable value
+	for _, block := range b.Blocks {
+		for _, inst := range block.Insts {
+			value, ok := ToValue(inst)
+			if !ok {
+				continue
+			}
+			if _, ok := ToConst(value); ok {
+				continue
+			}
+
+			if len(value.GetAllVariables()) == 0 {
+				b.GetProgram().SetOffsetValue(value, value.GetRange())
+			}
+		}
+	}
+
 	// function finish
 	b.Function.Finish()
 }
@@ -116,7 +133,7 @@ func handlerReturnType(rs []*Return) Type {
 	} else if len(typs) == 1 {
 		return typs[0]
 	} else {
-		//TODO: how handler this? multiple return with different type
+		// TODO: how handler this? multiple return with different type
 		// should set Warn!!
 		// and ?? Type ??
 		return GetAnyType()

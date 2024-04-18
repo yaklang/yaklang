@@ -2,11 +2,20 @@ package memedit
 
 import (
 	"errors"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"regexp"
 	"strings"
+	"sync"
+
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
+
+var defaultMemEditorPool sync.Pool = sync.Pool{
+	New: func() interface{} {
+		return new(MemEditor)
+	},
+}
 
 type MemEditor struct {
 	sourceCodeCtxStack []string
@@ -21,14 +30,22 @@ type MemEditor struct {
 }
 
 func NewMemEditor(sourceCode string) *MemEditor {
-	editor := &MemEditor{
-		sourceCode:         sourceCode,
-		lineLensMap:        make(map[int]int),
-		lineStartOffsetMap: make(map[int]int),
-	}
+	editor := defaultMemEditorPool.Get().(*MemEditor)
+
+	editor.sourceCode = sourceCode
+	editor.lineLensMap = make(map[int]int)
+	editor.lineStartOffsetMap = make(map[int]int)
 
 	editor.recalculateLineMappings()
 	return editor
+}
+
+func (ve *MemEditor) Release() {
+	ve.sourceCode = ""
+	ve.lineLensMap = nil
+	ve.lineStartOffsetMap = nil
+	ve.cursor = 0
+	defaultMemEditorPool.Put(ve)
 }
 
 func (ve *MemEditor) PushSourceCodeContext(i any) {
@@ -152,6 +169,7 @@ func (ve *MemEditor) GetPositionByOffset(offset int) PositionIf {
 	result, _ := ve.GetPositionByOffsetWithError(offset)
 	return result
 }
+
 func (ve *MemEditor) GetPositionByOffsetWithError(offset int) (PositionIf, error) {
 	if offset < 0 {
 		// 偏移量为负，返回最初位置
