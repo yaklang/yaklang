@@ -66,7 +66,7 @@ func Test_verify(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			crep.InitMITMCert()
-			caCert, caKey, _ := crep.GetDefaultCAAndPriv()
+			caCert, caKey, _ := crep.GetDefaultMITMCAAndPriv()
 			fakeCert, err := crep.FakeCertificateByHost(caCert, caKey, tt.args.domain)
 			if err != nil {
 				t.Fatal(err)

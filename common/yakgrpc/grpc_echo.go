@@ -33,7 +33,7 @@ func verifySystemCertificateByURL() (*ypb.VerifySystemCertificateResponse, error
 
 func verify(serConfig, cliConfig *tls.Config, domain string) error {
 	crep.InitMITMCert()
-	caCert, caKey, _ := crep.GetDefaultCAAndPriv()
+	caCert, caKey, _ := crep.GetDefaultMITMCAAndPriv()
 	fakeCert, err := crep.FakeCertificateByHost(caCert, caKey, domain)
 	if err != nil {
 		return err
