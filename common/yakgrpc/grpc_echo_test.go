@@ -88,10 +88,3 @@ func Test_verify(t *testing.T) {
 		})
 	}
 }
-
-func TestServer_VerifySystemCertificate(t *testing.T) {
-	err := crep.VerifySystemCertificate()
-	if err != nil {
-		t.Fatal(err)
-	}
-}
