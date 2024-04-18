@@ -3,12 +3,13 @@ package ssareducer
 import (
 	"embed"
 	"fmt"
+	"io/fs"
+	"strings"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
-	"os"
-	"strings"
-	"testing"
 )
 
 //go:embed testlib/***
@@ -17,7 +18,7 @@ var lib embed.FS
 func TestReducerCompiling_NORMAL(t *testing.T) {
 	count := 0
 	var existed []string
-	err := filesys.Recursive("testlib", filesys.WithEmbedFS(lib), filesys.WithFileStat(func(pathname string, info os.FileInfo) error {
+	err := filesys.Recursive("testlib", filesys.WithEmbedFS(lib), filesys.WithFileStat(func(pathname string, f fs.File, fi fs.FileInfo) error {
 		count++
 		if strings.HasSuffix(pathname, ".yak") {
 			existed = append(existed, pathname)
@@ -64,10 +65,12 @@ func TestReducerCompiling_NORMAL(t *testing.T) {
 
 func TestReducerCompiling2_CompileFailed(t *testing.T) {
 	count := 0
-	err := filesys.Recursive("testlib", filesys.WithEmbedFS(lib), filesys.WithFileStat(func(pathname string, info os.FileInfo) error {
-		count++
-		return nil
-	}))
+	err := filesys.Recursive("testlib",
+		filesys.WithEmbedFS(lib),
+		filesys.WithFileStat(func(s string, f fs.File, fi fs.FileInfo) error {
+			count++
+			return nil
+		}))
 	if err != nil {
 		panic(err)
 	}
@@ -91,10 +94,13 @@ func TestReducerCompiling2_CompileFailed(t *testing.T) {
 
 func TestReducerCompiling2_NOLIMIT(t *testing.T) {
 	count := 0
-	err := filesys.Recursive("testlib", filesys.WithEmbedFS(lib), filesys.WithFileStat(func(pathname string, info os.FileInfo) error {
-		count++
-		return nil
-	}))
+	err := filesys.Recursive("testlib",
+		filesys.WithEmbedFS(lib),
+		filesys.WithFileStat(func(s string, f fs.File, fi fs.FileInfo) error {
+			count++
+			return nil
+		}),
+	)
 	if err != nil {
 		panic(err)
 	}

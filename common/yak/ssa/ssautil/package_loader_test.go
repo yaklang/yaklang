@@ -1,10 +1,16 @@
 package ssautil
 
 import (
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+func ToString(r io.Reader) string {
+	raw, _ := io.ReadAll(r)
+	return string(raw)
+}
 
 func Test_PackageLoader(t *testing.T) {
 
@@ -18,7 +24,7 @@ func Test_PackageLoader(t *testing.T) {
 		if _, data, err := loader.LoadFilePackage("index.txt", false); err != nil {
 			t.Fatal(err)
 		} else {
-			require.Equalf(t, "index", string(data), "LoadFilePackage failed for index.txt, got: %s", string(data))
+			require.Equalf(t, "index", ToString(data), "LoadFilePackage failed for index.txt, got: %s", ToString(data))
 		}
 	})
 
@@ -27,7 +33,7 @@ func Test_PackageLoader(t *testing.T) {
 		if _, data, err := loader.LoadFilePackage("index.txt", true); err != nil {
 			t.Fatal(err)
 		} else {
-			require.Equalf(t, "index", string(data), "LoadFilePackage failed for index.txt, got: %s", string(data))
+			require.Equalf(t, "index", ToString(data), "LoadFilePackage failed for index.txt, got: %s", ToString(data))
 		}
 		if _, _, err := loader.LoadFilePackage("index.txt", true); err == nil {
 			t.Fatalf("LoadFilePackage should failed for index.txt")
@@ -47,7 +53,7 @@ func Test_PackageLoader(t *testing.T) {
 		if _, data, err := loader.LoadFilePackage("c.txt", false); err != nil {
 			t.Fatal(err)
 		} else {
-			require.Equalf(t, "c", string(data), "LoadFilePackage failed for c.txt, got: %s", string(data))
+			require.Equalf(t, "c", ToString(data), "LoadFilePackage failed for c.txt, got: %s", ToString(data))
 		}
 	})
 

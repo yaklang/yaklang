@@ -2,52 +2,55 @@ package filesys
 
 import (
 	"embed"
+	"io/fs"
+	"os"
+	"strings"
+
 	"github.com/gobwas/glob"
-	"github.com/kr/fs"
-	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"os"
 )
 
-func NewConfig() *Config {
-	return &Config{
-		onStart: func(base string, isDir bool) error {
-			return nil
-		},
-		onStat: func(isDir bool, pathname string, info os.FileInfo) error {
-			return nil
-		},
-		onDirStat: func(pathname string, info os.FileInfo) error {
-			return nil
-		},
-		onFileStat: func(pathname string, info os.FileInfo) error {
-			return nil
-		},
-		chains:        nil,
-		noStopWhenErr: false,
-		fileLimit:     100000,
-		dirLimit:      100000,
-		totalLimit:    100000,
-		fileSystem:    &localFs{},
-	}
+type dirResult struct {
+	dir  string
+	opts []Option
 }
 
+type dirMatch struct {
+	inst glob.Glob
+	opts []Option
+}
+
+type FileStat func(string, fs.File, fs.FileInfo) error
+type DirStat func(string, fs.FileInfo) error
 type Config struct {
 	onStart    func(base string, isDir bool) error
 	onStat     func(isDir bool, pathname string, info os.FileInfo) error
-	onDirStat  func(pathname string, info os.FileInfo) error
-	onFileStat func(pathname string, info os.FileInfo) error
-
-	chains []*dirChain
+	onDirStat  DirStat
+	onFileStat FileStat
 
 	noStopWhenErr bool
+
+	RecursiveDirectory bool
 
 	fileLimit  int64
 	dirLimit   int64
 	totalLimit int64
 
-	fileSystem fs.FileSystem
+	fileSystem FileSystem
+
+	dirMatch []*dirMatch
+}
+
+func NewConfig() *Config {
+	return &Config{
+		noStopWhenErr:      false,
+		RecursiveDirectory: true,
+		fileLimit:          100000,
+		dirLimit:           100000,
+		totalLimit:         100000,
+		fileSystem:         LocalFs(""),
+	}
 }
 
 type Option func(*Config)
@@ -58,13 +61,19 @@ func WithStat(f func(isDir bool, pathname string, info os.FileInfo) error) Optio
 	}
 }
 
-func WithDirStat(f func(pathname string, info os.FileInfo) error) Option {
+func WithRecursiveDirectory(b bool) Option {
+	return func(c *Config) {
+		c.RecursiveDirectory = b
+	}
+}
+
+func WithDirStat(f DirStat) Option {
 	return func(c *Config) {
 		c.onDirStat = f
 	}
 }
 
-func WithFileStat(f func(pathname string, info os.FileInfo) error) Option {
+func WithFileStat(f FileStat) Option {
 	return func(c *Config) {
 		c.onFileStat = f
 	}
@@ -76,49 +85,38 @@ func WithOnStart(f func(basename string, isDir bool) error) Option {
 	}
 }
 
-func WithDirMatches(raw any, opts ...Option) Option {
-	return func(config *Config) {
-		dirs := utils.InterfaceToStringSlice(raw)
-		dirs = funk.ReverseStrings(dirs)
-		var opt Option
-		for _, dir := range dirs {
-			if opt == nil {
-				opt = WithDirMatch(dir, opts...)
-			} else {
-				opt = WithDirMatch(dir, opt)
+func WithDir(globDir string, opts ...Option) Option {
+	return func(c *Config) {
+		if c.fileSystem == nil {
+			log.Errorf("file system is nil")
+			return
+		}
+
+		// if the separator is not the same as the file system, replace it
+		for _, separator := range []rune{'/', '\\'} {
+			if c.fileSystem.GetSeparators() == separator {
+				continue
+			}
+			if !strings.Contains(globDir, string(separator)) {
+				strings.ReplaceAll(globDir, string(separator), string(c.fileSystem.GetSeparators()))
 			}
 		}
-		if opt != nil {
-			opt(config)
-		}
-	}
-}
 
-func WithDirMatch(globDir string, opts ...Option) Option {
-	return func(c *Config) {
-		ins, err := glob.Compile(globDir, '/')
+		ins, err := glob.Compile(globDir, c.fileSystem.GetSeparators())
 		if err != nil {
 			log.Errorf("glob-dir: %v compile failed: %s", globDir, err.Error())
 			return
 		}
-		c.chains = append(c.chains, &dirChain{
-			dirGlob: globDir,
-			opts:    opts,
-			globIns: ins,
+		log.Infof("dir match: %v: inst: %v", globDir, ins)
+		c.dirMatch = append(c.dirMatch, &dirMatch{
+			// dir:  globDir,
+			inst: ins,
+			opts: opts,
 		})
 	}
 }
 
-func WithDir(i any, opts ...Option) Option {
-	switch i.(type) {
-	case []byte, string, []rune:
-		return WithDirMatch(utils.InterfaceToString(i), opts...)
-	default:
-		return WithDirMatches(utils.InterfaceToStringSlice(i), opts...)
-	}
-}
-
-func WithFileSystem(f fs.FileSystem) Option {
+func WithFileSystem(f FileSystem) Option {
 	return func(config *Config) {
 		config.fileSystem = f
 	}
@@ -158,7 +156,7 @@ func withYaklangStat(h func(isDir bool, pathname string, info os.FileInfo)) Opti
 
 // onFileStat will be called when the walker met one file.
 func withYaklangFileStat(h func(pathname string, info os.FileInfo)) Option {
-	return WithFileStat(func(pathname string, info os.FileInfo) (err error) {
+	return WithFileStat(func(pathname string, f fs.File, info fs.FileInfo) (err error) {
 		defer func() {
 			if e := recover(); e != nil {
 				err = utils.Errorf("onFileStat failed: %v", e)
@@ -171,7 +169,7 @@ func withYaklangFileStat(h func(pathname string, info os.FileInfo)) Option {
 
 // onDirStat will be called when the walker met one directory.
 func withYaklangDirStat(h func(pathname string, info os.FileInfo)) Option {
-	return WithDirStat(func(pathname string, info os.FileInfo) (err error) {
+	return WithDirStat(func(pathname string, info fs.FileInfo) (err error) {
 		defer func() {
 			if e := recover(); e != nil {
 				err = utils.Errorf("onDirStat failed: %v", e)

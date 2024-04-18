@@ -4,6 +4,13 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
+	"io"
+	"io/fs"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"sort"
+
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/cybertunnel"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
@@ -18,11 +25,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/scannode"
-	"io"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"sort"
 )
 
 var UtilsCommands = []*cli.Command{
@@ -233,7 +235,7 @@ var UtilsCommands = []*cli.Command{
 		},
 		Action: func(c *cli.Context) error {
 			m := omap.NewOrderedMap(map[string]int64{})
-			err := filesys.Recursive(c.String("dir"), filesys.WithFileStat(func(pathname string, info os.FileInfo) error {
+			err := filesys.Recursive(c.String("dir"), filesys.WithFileStat(func(pathname string, f fs.File, info fs.FileInfo) error {
 				if c.String("blacklist") != "" {
 					if utils.MatchAnyOfGlob(pathname, utils.PrettifyListFromStringSplitEx(c.String("blacklist"), "|")...) {
 						return nil
