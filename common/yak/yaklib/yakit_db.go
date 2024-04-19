@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -347,10 +348,11 @@ func queryAllUrls() chan string {
 	return queryUrlsByKeyword("")
 }
 
-func savePayloads(group string, payloads []string) error {
+func savePayloads(group string, payloadRaw any) error {
 	if consts.GetGormProfileDatabase() == nil {
 		return utils.Error("no database connections")
 	}
+	payloads := utils.InterfaceToStringSlice(payloadRaw)
 	return yakit.SavePayloadGroup(consts.GetGormProfileDatabase(), group, payloads)
 }
 
@@ -374,6 +376,33 @@ func getPayloadGroups(group string) []string {
 		return nil
 	}
 	return yakit.PayloadGroups(consts.GetGormProfileDatabase(), group)
+}
+
+// YieldPayload means
+func YieldPayload(raw any, extra ...any) chan string {
+	db := consts.GetGormProfileDatabase().Model(&yakit.Payload{})
+	results := make([]any, 0, 1+len(extra))
+	results = append(results, raw)
+	for _, e := range extra {
+		results = append(results, e)
+	}
+	db = bizhelper.ExactOrQueryArrayOr(db, "`group`", results)
+	c := make(chan string)
+	go func() {
+		defer close(c)
+		for p := range yakit.YieldPayloads(db, context.Background()) {
+			if content := p.Content; content == nil {
+				continue
+			} else {
+				res, err := strconv.Unquote(*p.Content)
+				if err != nil {
+					continue
+				}
+				c <- res
+			}
+		}
+	}()
+	return c
 }
 
 func init() {
