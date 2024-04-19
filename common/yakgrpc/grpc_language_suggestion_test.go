@@ -112,12 +112,11 @@ a.`, &ypb.Range{
 	t.Run("basic extern-lib completion", func(t *testing.T) {
 		t.Parallel()
 
-		res := getCompletion(t, `
-cli.`, &ypb.Range{
+		res := getCompletion(t, `cli.`, &ypb.Range{
 			Code:        "cli.",
-			StartLine:   2,
+			StartLine:   1,
 			StartColumn: 1,
-			EndLine:     2,
+			EndLine:     1,
 			EndColumn:   5,
 		})
 		if len(res.SuggestionMessage) == 0 {
