@@ -251,11 +251,51 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 		}
 		return vals.AppendEffectOn(i)
 	case *ssa.Parameter:
+		// 查找被调用函数的TopDef
+		getCalledByValue := func(called *Value) Values {
+			calledInstance := called.node.(*ssa.Call)
+
+			var actualParam ssa.Value
+			if inst.IsFreeValue {
+				// free value
+				if tmp, ok := calledInstance.Binding[inst.GetName()]; ok {
+					actualParam = tmp
+				} else {
+					log.Errorf("free value: %v is not found in binding", inst.GetName())
+					return getMemberCall(i.node, actx)
+				}
+			} else {
+				// parameter
+				if inst.FormalParameterIndex >= len(calledInstance.Args) {
+					log.Infof("formal parameter index: %d is out of range", inst.FormalParameterIndex)
+					return getMemberCall(i.node, actx)
+				}
+				actualParam = calledInstance.Args[inst.FormalParameterIndex]
+			}
+			traced := NewValue(actualParam).AppendEffectOn(called)
+			if ret := traced.getTopDefs(actx); len(ret) > 0 {
+				return ret
+			} else {
+				return Values{traced}
+			}
+		}
+
 		if inst.GetDefault() != nil {
 			return Values{NewValue(inst.GetDefault())}
 		}
+		var vals Values
 		called := actx.GetCurrentCall()
 		if called == nil {
+			// 允许跨类进行TopDef的查找
+			if actx.config.AllowCallStack {
+				fun := i.GetFunction()
+				call2fun := fun.GetCalledBy()
+				call2fun.ForEach(func(call *Value) {
+					val := getCalledByValue(call)
+					vals = append(vals, val...)
+				})
+				return append(vals, i)
+			}
 			log.Error("parent function is not called by any other function, skip")
 			return Values{i}
 		}
@@ -263,32 +303,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			log.Infof("parent function is not called by any other function, skip (%T)", called)
 			return Values{i}
 		}
-		var vals Values
-		calledInstance := called.node.(*ssa.Call)
 
-		var actualParam ssa.Value
-		if inst.IsFreeValue {
-			// free value
-			if tmp, ok := calledInstance.Binding[inst.GetName()]; ok {
-				actualParam = tmp
-			} else {
-				log.Errorf("free value: %v is not found in binding", inst.GetName())
-				return getMemberCall(i.node, actx)
-			}
-		} else {
-			// parameter
-			if inst.FormalParameterIndex >= len(calledInstance.Args) {
-				log.Infof("formal parameter index: %d is out of range", inst.FormalParameterIndex)
-				return getMemberCall(i.node, actx)
-			}
-			actualParam = calledInstance.Args[inst.FormalParameterIndex]
-		}
-		traced := NewValue(actualParam).AppendEffectOn(called)
-		if ret := traced.getTopDefs(actx); len(ret) > 0 {
-			vals = append(vals, ret...)
-		} else {
-			vals = append(vals, traced)
-		}
+		calledByValue := getCalledByValue(called)
+		vals = append(vals, calledByValue...)
 
 		if len(vals) == 0 {
 			return Values{NewValue(ssa.NewUndefined("_")).AppendEffectOn(i)} // no return, use undefined
@@ -334,6 +351,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			topDef := append(value.getTopDefs(actx, opt...), i)
 			values = append(values, topDef...)
 		}
+
 		return values
 	}
 	return getMemberCall(i.node, actx)
