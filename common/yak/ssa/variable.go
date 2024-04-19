@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
@@ -66,11 +67,18 @@ func (b *Variable) GetMemberCall() (Value, Value) {
 }
 
 func (v *Variable) SetDefRange(r *Range) {
+	if r == nil {
+		log.Error("SetDefRange: range is nil")
+		return
+	}
 	v.DefRange = r
 	v.verboseName = r.GetText()
 }
 
 func (v *Variable) AddRange(r *Range, force bool) {
+	if r == nil {
+		log.Error("AddRange: range is nil")
+	}
 	//if force || len(*p.SourceCode) == len(v.GetName()) {
 	//	v.UseRange[p] = struct{}{}
 	//}

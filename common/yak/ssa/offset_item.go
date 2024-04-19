@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/yaklang/yaklang/common/log"
 	"golang.org/x/exp/slices"
 )
 
@@ -48,6 +49,10 @@ func (prog *Program) ShowOffsetMap() {
 }
 
 func (prog *Program) SetOffsetVariable(v *Variable, r *Range) {
+	if r == nil {
+		log.Errorf("SetOffsetVariable: range is nil")
+		return
+	}
 	endOffset := r.GetEndOffset()
 	prog.OffsetSortedSlice = InsertSortedIntSlice(prog.OffsetSortedSlice, endOffset)
 
@@ -59,6 +64,10 @@ func (prog *Program) SetOffsetVariable(v *Variable, r *Range) {
 }
 
 func (prog *Program) SetOffsetValue(v Value, r *Range) {
+	if r == nil {
+		log.Errorf("SetOffsetValue: range is nil")
+		return
+	}
 	endOffset := r.GetEndOffset()
 	prog.OffsetSortedSlice = InsertSortedIntSlice(prog.OffsetSortedSlice, endOffset)
 	prog.OffsetMap[endOffset] = &OffsetItem{variable: nil, value: v}
