@@ -297,6 +297,14 @@ func (b *FunctionBuilder) ReadMemberCallVariable(value, key Value) Value {
 			// set program offsetMap for extern value
 			program.SetOffsetValue(ret, b.CurrentRange)
 
+			// create variable for extern value
+			variable := ret.GetVariable(name)
+			if variable == nil {
+				ret.AddVariable(b.CreateMemberCallVariable(value, key))
+			} else {
+				variable.AddRange(b.CurrentRange, true)
+			}
+
 			// set member call
 			SetMemberCall(value, key, ret)
 			return ret
