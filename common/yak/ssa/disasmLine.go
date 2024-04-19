@@ -212,7 +212,7 @@ func lineDisasm(v Instruction, liner DisasmLiner) (ret string) {
 			liner.DisasmValue(v.Cond),
 			strings.Join(
 				lo.Map(v.Label, func(label SwitchLabel, _ int) string {
-					return fmt.Sprintf("%s: %s", liner.DisasmValue(label.Value), liner.DisasmValue(label.Dest))
+					return fmt.Sprintf("%s-%s", liner.DisasmValue(label.Value), liner.DisasmValue(label.Dest))
 				}),
 				",",
 			),
