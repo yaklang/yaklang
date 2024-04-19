@@ -55,7 +55,6 @@ func MarshalJavaObjectsWithConfig(cfg *MarshalContext, res ...JavaSerializable) 
 			log.Errorf("generate java object array instance error: %v", err)
 		}
 		arrayObjDescSer := serIns.Marshal(cfg)
-		buf.WriteByte(0x75)
 		buf.Write(arrayObjDescSer)
 		buf.Write(IntTo4Bytes(2))
 		buf.Write([]byte{0x7C})
