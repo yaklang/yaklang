@@ -93,7 +93,8 @@ c("d")
 
 func TestCompileWithDatabase_MultiFile(t *testing.T) {
 	progName := uuid.New().String()
-	filename := consts.TempFileFast(`c = i => dump(i)`)
+	includeCode := `c = i => dump(i)`
+	filename := consts.TempFileFast(includeCode)
 	defer os.RemoveAll(filename)
 	prog, err := ssaapi.Parse(`
 include `+strconv.Quote(filename)+`
@@ -107,13 +108,15 @@ c("d")
 
 	haveIncluded := false
 	includeFile := omap.NewOrderedMap(make(map[string]any))
+	includeHash := utils.CalcMd5(includeCode)
 	for result := range ssadb.YieldIrCodesProgramName(consts.GetGormProjectDatabase(), context.Background(), progName) {
 		if result.IsEmptySourceCodeHash() {
 			panic("source code hash is empty")
 		}
 		includeFile.Set(result.SourceCodeHash, struct{}{})
 		result.Show()
-		if utils.IContains(result.SourceCodeHash, "e1457") {
+		// log.Infof("source code hash: %v vs %v", result.SourceCodeHash, includeHash)
+		if result.SourceCodeHash == includeHash {
 			haveIncluded = true
 		}
 	}
