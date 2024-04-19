@@ -197,20 +197,19 @@ a = Error()`
 	// 		)
 	// 	})
 
-	//	t.Run("stdlib function", func(t *testing.T) {
-	//		code := `ssa.Parse("")
-	//
-	// ssa.Parse("")`
-	//
-	//		checkReferences(t,
-	//			local,
-	//			code,
-	//			"yak",
-	//			newRangeFromText("1:0 1:9"),
-	//			[]memedit.RangeIf{
-	//				newRangeFromText("1:0 1:9"),
-	//				newRangeFromText("2:0 2:9"),
-	//			},
-	//		)
-	//	})
+	t.Run("stdlib function", func(t *testing.T) {
+		code := `ssa.Parse("")
+ssa.Parse("")`
+
+		checkReferences(t,
+			local,
+			code,
+			"yak",
+			newRangeFromText("1:1 1:9"),
+			[]memedit.RangeIf{
+				newRangeFromText("1:1 1:10"),
+				newRangeFromText("2:1 2:10"),
+			},
+		)
+	})
 }
