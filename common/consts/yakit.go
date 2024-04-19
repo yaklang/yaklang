@@ -1,6 +1,7 @@
 package consts
 
 import (
+	"bytes"
 	"compress/gzip"
 	"io"
 	"io/ioutil"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -229,17 +231,20 @@ func TempFile(pattern string) (*os.File, error) {
 	return ioutil.TempFile(GetDefaultYakitBaseTempDir(), pattern)
 }
 
-func TempFileFast(data ...any) string {
+func TempFileFast(datas ...any) string {
 	f, err := TempFile("yakit-*.tmp")
 	if err != nil {
 		log.Errorf("create temp file error: %v", err)
 		return ""
 	}
 	defer f.Close()
-	for _, d := range data {
-		_, _ = f.Write(codec.AnyToBytes(d))
-		f.WriteString("\r\n")
-	}
+	data := bytes.Join(
+		lo.Map(datas, func(item any, _ int) []byte {
+			return codec.AnyToBytes(item)
+		}),
+		[]byte("\r\n"),
+	)
+	f.Write(data)
 	return f.Name()
 }
 

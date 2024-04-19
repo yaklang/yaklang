@@ -1,9 +1,10 @@
 package memedit
 
 import (
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/utils"
-	"testing"
 )
 
 func TestNewMemEditor_SMOCKING(t *testing.T) {
@@ -256,11 +257,11 @@ func TestTextByRangeGetEditor(t *testing.T) {
 
 func TestSourceCodeContext(t *testing.T) {
 	e := NewMemEditor(`code1`)
-	if e.SourceCodeMd5() == utils.CalcMd5("code1", "") {
+	if e.SourceCodeMd5() == utils.CalcMd5("code1") {
 		t.Log("SourceCodeMd5() passed")
 	} else {
 		spew.Dump(e.SourceCodeMd5())
-		spew.Dump("code1: md5", utils.CalcMd5("code1", ""))
+		spew.Dump("code1: md5", utils.CalcMd5("code1"))
 		t.Fatal("SourceCodeMd5() failed")
 	}
 
