@@ -97,7 +97,7 @@ var DatabaseExports = map[string]interface{}{
 	"QueryDomainsByTitle":         queryDomainAssetByHTMLTitle,
 	"QueryPayloadGroups":          getPayloadGroups,
 	"DeletePayloadByGroup":        deletePayloadByGroup,
-
+	"YieldPayload":                YieldPayload,
 	"GetProjectKey": func(k any) string {
 		return yakit.GetProjectKey(consts.GetGormProjectDatabase(), k)
 	},
