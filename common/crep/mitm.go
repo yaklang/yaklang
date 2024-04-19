@@ -97,7 +97,7 @@ func InitMITMCert() {
 	defaultKey, _ = ioutil.ReadFile(defaultKeyFile)
 
 	if defaultCA != nil && defaultKey != nil {
-		log.Info("Successfully load cert and key from default files")
+		log.Debug("Successfully load cert and key from default files")
 		return
 	}
 
