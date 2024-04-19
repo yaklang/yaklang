@@ -12,27 +12,36 @@ type Range struct {
 	start, end *Position
 }
 
-func (p *Range) GetEditor() *memedit.MemEditor {
-	return p.editor
+func (r *Range) GetEditor() *memedit.MemEditor {
+	return r.editor
 }
 
-func (p *Range) GetEndOffset() int {
-	return p.editor.GetOffsetByPosition(p.end)
+func (r *Range) GetEndOffset() int {
+	return r.editor.GetOffsetByPosition(r.end)
 }
 
-func (p *Range) GetOffsetRange() (int, int) {
-	return p.editor.GetOffsetByPosition(p.start), p.editor.GetOffsetByPosition(p.end)
+func (r *Range) GetOffsetRange() (int, int) {
+	return r.editor.GetOffsetByPosition(r.start), r.editor.GetOffsetByPosition(r.end)
 }
 
-func (p *Range) GetStart() memedit.PositionIf {
-	return p.start
+func (r *Range) GetStart() memedit.PositionIf {
+	return r.start
 }
 
-func (p *Range) GetEnd() memedit.PositionIf {
-	return p.end
+func (r *Range) GetEnd() memedit.PositionIf {
+	return r.end
 }
 
-func NewRange(editor *memedit.MemEditor, start, end *Position) *Range {
+func NewRange(editor *memedit.MemEditor, startIf, endIf memedit.PositionIf) *Range {
+	start, ok := startIf.(*Position)
+	if !ok {
+		start = NewPosition(int64(startIf.GetLine()), int64(startIf.GetColumn()))
+	}
+	end, ok := endIf.(*Position)
+	if !ok {
+		end = NewPosition(int64(endIf.GetLine()), int64(endIf.GetColumn()))
+	}
+
 	start.Editor = editor
 	end.Editor = editor
 	return &Range{
