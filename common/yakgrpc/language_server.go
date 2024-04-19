@@ -46,6 +46,10 @@ func LanguageServerAnalyzeProgram(code string, inspectType, scriptType string, r
 		// try to remove content after point
 		if containPoint && inspectType == COMPLETION {
 			offset, endOffset := ssaRange.GetOffset()-1, ssaRange.GetEndOffset()
+			if offset < 0 {
+				offset = 0
+			}
+
 			before, after, _ := strings.Cut(rangeWordText, ".")
 			trimCode := code[:offset] + strings.Replace(code[offset:], rangeWordText, before, 1)
 
