@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 	"testing"
@@ -157,4 +158,23 @@ func TestHTTPRequestBuilderForConnect(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestHTTP_RESP_Process_ContentLength0(t *testing.T) {
+	respReader := bytes.NewReader([]byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nX-Content-Type-Options: nosniff\r\n\r\n123"))
+	respIns, err := ReadHTTPResponseFromBufioReader(respReader, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	respBytes, err := DumpHTTPResponse(respIns, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	spew.Dump(respBytes)
+	if bytes.Contains(respBytes, []byte("123")) {
+		t.Fatal("read resp error")
+	}
+
 }
