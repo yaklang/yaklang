@@ -269,7 +269,7 @@ HandleExpect100Continue:
 		} else {
 			// handle content-length as default
 			if !nobodyReqMethod && (contentLengthInt > 0 || hasEntityHeader) {
-				if contentLengthInt <= 0 {
+				if !useContentLength && contentLengthInt <= 0 {
 					contentLengthInt = 100 * 1000
 				}
 				var bodyRaw, err = io.ReadAll(io.NopCloser(io.LimitReader(bodyReader, int64(contentLengthInt))))
