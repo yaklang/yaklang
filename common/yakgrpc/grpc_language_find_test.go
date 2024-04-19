@@ -98,8 +98,8 @@ message`
 			local,
 			code,
 			"yak",
-			newRangeFromText("2:0 2:7"),
-			newRangeFromText("1:4 1:11"),
+			newRangeFromText("2:1 2:8"),
+			newRangeFromText("1:5 1:12"),
 		)
 	})
 
@@ -110,8 +110,8 @@ main()`
 			local,
 			code,
 			"yak",
-			newRangeFromText("2:0 2:4"),
-			newRangeFromText("1:5 1:9"),
+			newRangeFromText("2:1 2:4"),
+			newRangeFromText("1:6 1:10"),
 		)
 	})
 
@@ -124,8 +124,8 @@ m.a`
 			local,
 			code,
 			"yak",
-			newRangeFromText("3:0 3:3"),
-			newRangeFromText("2:0 2:3"),
+			newRangeFromText("3:1 3:4"),
+			newRangeFromText("2:1 2:4"),
 		)
 	})
 }
@@ -141,10 +141,10 @@ a`
 			local,
 			code,
 			"yak",
-			newRangeFromText("2:0 2:1"),
+			newRangeFromText("2:1 2:2"),
 			[]memedit.RangeIf{
-				newRangeFromText("1:4 1:5"),
-				newRangeFromText("2:0 2:1"),
+				newRangeFromText("1:5 1:6"),
+				newRangeFromText("2:1 2:2"),
 			},
 		)
 	})
@@ -157,10 +157,10 @@ println(m.a)`
 			local,
 			code,
 			"yak",
-			newRangeFromText("3:8 3:11"),
+			newRangeFromText("3:9 3:11"),
 			[]memedit.RangeIf{
-				newRangeFromText("2:0 2:3"),
-				newRangeFromText("3:8 3:11"),
+				newRangeFromText("2:1 2:4"),
+				newRangeFromText("3:9 3:12"),
 			},
 		)
 	})
@@ -174,10 +174,10 @@ a = Error()`
 			local,
 			code,
 			"yak",
-			newRangeFromText("4:4 4:9"),
+			newRangeFromText("4:5 4:9"),
 			[]memedit.RangeIf{
-				newRangeFromText("1:5 1:10"),
-				newRangeFromText("4:4 4:9"),
+				newRangeFromText("1:6 1:11"),
+				newRangeFromText("4:5 4:10"),
 			},
 		)
 	})
