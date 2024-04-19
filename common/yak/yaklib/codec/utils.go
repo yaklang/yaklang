@@ -14,3 +14,5 @@ func PKCS7PaddingFor8ByteBlock(src []byte) []byte {
 func PKCS7UnPaddingFor8ByteBlock(src []byte) []byte {
 	return PKCS5UnPadding(src)
 }
+
+type EncodedFunc func(any) string

@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -67,7 +68,7 @@ func CookieSafeUnquoteString(i string) string {
 // For parsing this time format, see ParseTime.
 const CookieTimeFormat = "Mon, 02 Jan 2006 15:04:05 GMT"
 
-func CookiesToString(cookies []*http.Cookie) string {
+func CookiesToString(cookies []*http.Cookie, encoded ...codec.EncodedFunc) string {
 	results := funk.Map(cookies, func(c *http.Cookie) string {
 		var b strings.Builder
 		b.Grow(len(c.Name) + len(c.Value) + len(c.Domain) + len(c.Path) + 110 /*RFC 6265 Sec 4.1. extraCookieLength*/)

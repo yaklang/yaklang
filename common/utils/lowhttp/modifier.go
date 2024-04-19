@@ -178,7 +178,7 @@ func ReplaceHTTPPacketPath(packet []byte, p string) []byte {
 	return handleHTTPPacketPath(packet, false, p)
 }
 
-func ReplaceHTTPPacketPathWithoutEncode(packet []byte, p string) []byte {
+func ReplaceHTTPPacketPathWithoutEncoding(packet []byte, p string) []byte {
 	return handleHTTPPacketPath(packet, true, p)
 }
 
@@ -694,12 +694,20 @@ func DeleteHTTPPacketHeader(packet []byte, headerKey string) []byte {
 	return ReplaceHTTPPacketBody(buf.Bytes(), body, false)
 }
 
+func ReplaceHTTPPacketCookieWithEncoding(packet []byte, key string, value any, encoded ...codec.EncodedFunc) []byte {
+	return handleHTTPPacketCookie(packet, key, value, encoded...)
+}
+
 // ReplaceHTTPPacketCookie 是一个辅助函数，用于改变请求报文，修改Cookie请求头中的值，如果不存在则会增加
 // Example:
 // ```
 // poc.ReplaceHTTPPacketCookie(poc.BasicRequest(), "aaa", "bbb") // 修改cookie值，由于这里没有aaa的cookie值，所以会增加
 // ```
 func ReplaceHTTPPacketCookie(packet []byte, key string, value any) []byte {
+	return handleHTTPPacketCookie(packet, key, value)
+}
+
+func handleHTTPPacketCookie(packet []byte, key string, value any, encoded ...codec.EncodedFunc) []byte {
 	var (
 		isReq     bool
 		isRsp     bool
@@ -736,7 +744,7 @@ func ReplaceHTTPPacketCookie(packet []byte, key string, value any) []byte {
 				}
 				cookie[index] = c
 			}
-			return k + ": " + CookiesToString(cookie)
+			return k + ": " + CookiesToString(cookie, encoded...)
 		}
 		return line
 	})
