@@ -676,13 +676,17 @@ type YakClient interface {
 	// Online
 	GetOnlineProfile(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*OnlineProfile, error)
 	SetOnlineProfile(ctx context.Context, in *OnlineProfile, opts ...grpc.CallOption) (*Empty, error)
+	// 废弃接口
 	DownloadOnlinePluginById(ctx context.Context, in *DownloadOnlinePluginByIdRequest, opts ...grpc.CallOption) (*Empty, error)
+	// 废弃接口
 	DownloadOnlinePluginByIds(ctx context.Context, in *DownloadOnlinePluginByIdsRequest, opts ...grpc.CallOption) (*Empty, error)
+	// 废弃接口
 	DownloadOnlinePluginAll(ctx context.Context, in *DownloadOnlinePluginByTokenRequest, opts ...grpc.CallOption) (Yak_DownloadOnlinePluginAllClient, error)
 	DeletePluginByUserID(ctx context.Context, in *DeletePluginByUserIDRequest, opts ...grpc.CallOption) (*Empty, error)
 	DeleteAllLocalPlugins(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
 	GetYakScriptTagsAndType(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetYakScriptTagsAndTypeResponse, error)
 	DeleteLocalPluginsByWhere(ctx context.Context, in *DeleteLocalPluginsByWhereRequest, opts ...grpc.CallOption) (*Empty, error)
+	// 废弃接口
 	DownloadOnlinePluginByScriptNames(ctx context.Context, in *DownloadOnlinePluginByScriptNamesRequest, opts ...grpc.CallOption) (*DownloadOnlinePluginByScriptNamesResponse, error)
 	// NewOnline 插件下载
 	DownloadOnlinePlugins(ctx context.Context, in *DownloadOnlinePluginsRequest, opts ...grpc.CallOption) (Yak_DownloadOnlinePluginsClient, error)
@@ -5567,13 +5571,17 @@ type YakServer interface {
 	// Online
 	GetOnlineProfile(context.Context, *Empty) (*OnlineProfile, error)
 	SetOnlineProfile(context.Context, *OnlineProfile) (*Empty, error)
+	// 废弃接口
 	DownloadOnlinePluginById(context.Context, *DownloadOnlinePluginByIdRequest) (*Empty, error)
+	// 废弃接口
 	DownloadOnlinePluginByIds(context.Context, *DownloadOnlinePluginByIdsRequest) (*Empty, error)
+	// 废弃接口
 	DownloadOnlinePluginAll(*DownloadOnlinePluginByTokenRequest, Yak_DownloadOnlinePluginAllServer) error
 	DeletePluginByUserID(context.Context, *DeletePluginByUserIDRequest) (*Empty, error)
 	DeleteAllLocalPlugins(context.Context, *Empty) (*Empty, error)
 	GetYakScriptTagsAndType(context.Context, *Empty) (*GetYakScriptTagsAndTypeResponse, error)
 	DeleteLocalPluginsByWhere(context.Context, *DeleteLocalPluginsByWhereRequest) (*Empty, error)
+	// 废弃接口
 	DownloadOnlinePluginByScriptNames(context.Context, *DownloadOnlinePluginByScriptNamesRequest) (*DownloadOnlinePluginByScriptNamesResponse, error)
 	// NewOnline 插件下载
 	DownloadOnlinePlugins(*DownloadOnlinePluginsRequest, Yak_DownloadOnlinePluginsServer) error

@@ -89,7 +89,6 @@ func (s *Server) YaklangLanguageFind(ctx context.Context, req *ypb.YaklangLangua
 	)
 
 	result, err := LanguageServerAnalyzeProgram(req.GetYakScriptCode(), req.GetInspectType(), req.GetYakScriptType(), req.GetRange())
-	defer result.Release()
 
 	prog, word, containPoint, ssaRange, v := result.Program, result.Word, result.ContainPoint, result.Range, result.Value
 

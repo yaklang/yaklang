@@ -828,8 +828,6 @@ func (s *Server) YaklangLanguageSuggestion(ctx context.Context, req *ypb.Yaklang
 	ret := &ypb.YaklangLanguageSuggestionResponse{}
 
 	result, err := LanguageServerAnalyzeProgram(req.GetYakScriptCode(), req.GetInspectType(), req.GetYakScriptType(), req.GetRange())
-	defer result.Release()
-
 	if err != nil {
 		return ret, err
 	}
