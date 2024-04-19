@@ -5,11 +5,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
-
 
 type MemEditor struct {
 	sourceCodeCtxStack []string
@@ -25,14 +23,13 @@ type MemEditor struct {
 
 func NewMemEditor(sourceCode string) *MemEditor {
 	editor := &MemEditor{
-		sourceCode: sourceCode,
-		lineLensMap: make(map[int]int),
+		sourceCode:         sourceCode,
+		lineLensMap:        make(map[int]int),
 		lineStartOffsetMap: make(map[int]int),
 	}
 	editor.recalculateLineMappings()
 	return editor
 }
-
 
 func (ve *MemEditor) PushSourceCodeContext(i any) {
 	ve.ResetSourceCodeHash()
@@ -460,31 +457,31 @@ func (ve *MemEditor) GetTextFromRangeContext(i RangeIf, lineNum int) string {
 	return context
 }
 
-func (ve *MemEditor) GetCurrentSourceCodeContextText() string {
-	var salt string
+func (ve *MemEditor) getCurrentSourceCodeContextText() string {
+	salt := ve.sourceCode
 	if len(ve.sourceCodeCtxStack) > 0 {
-		salt = strings.Join(ve.sourceCodeCtxStack, "\n")
+		salt += strings.Join(ve.sourceCodeCtxStack, "\n")
 	}
 	return salt
 }
 
 func (ve *MemEditor) SourceCodeMd5() string {
 	if ve.sourceCodeMd5 == "" {
-		ve.sourceCodeMd5 = utils.CalcMd5(ve.sourceCode, ve.GetCurrentSourceCodeContextText())
+		ve.sourceCodeMd5 = utils.CalcMd5(ve.getCurrentSourceCodeContextText())
 	}
 	return ve.sourceCodeMd5
 }
 
 func (ve *MemEditor) SourceCodeSha1() string {
 	if ve.sourceCodeSha1 == "" {
-		ve.sourceCodeSha1 = utils.CalcSha1(ve.sourceCode, ve.GetCurrentSourceCodeContextText())
+		ve.sourceCodeSha1 = utils.CalcSha1(ve.getCurrentSourceCodeContextText())
 	}
 	return ve.sourceCodeSha1
 }
 
 func (ve *MemEditor) SourceCodeSha256() string {
 	if ve.sourceCodeSha256 == "" {
-		ve.sourceCodeSha256 = utils.CalcSha256(ve.sourceCode, ve.GetCurrentSourceCodeContextText())
+		ve.sourceCodeSha256 = utils.CalcSha256(ve.getCurrentSourceCodeContextText())
 	}
 	return ve.sourceCodeSha256
 }

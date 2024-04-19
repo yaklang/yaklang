@@ -1,8 +1,9 @@
 package ssadb
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/jinzhu/gorm"
 )
