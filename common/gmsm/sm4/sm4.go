@@ -22,6 +22,7 @@ import (
 	"bytes"
 	"crypto/cipher"
 	"errors"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"strconv"
 )
 
@@ -274,6 +275,14 @@ func pkcs7Padding(src []byte) []byte {
 
 func PKCS7Padding(src []byte) []byte {
 	return pkcs7Padding(src)
+}
+
+func PKCS7PaddingFor8ByteBlock(src []byte) []byte {
+	return codec.PKCS5Padding(src, 8)
+}
+
+func PKCS7UnPaddingFor8ByteBlock(src []byte) []byte {
+	return codec.PKCS5UnPadding(src)
 }
 
 func PKCS7UnPadding(src []byte) []byte {
