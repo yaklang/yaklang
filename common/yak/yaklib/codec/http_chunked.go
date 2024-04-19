@@ -45,8 +45,10 @@ func ReadHTTPChunkedDataWithFixed(ret []byte) (data []byte, fixedChunked []byte,
 }
 
 func readHTTPChunkedData(ret []byte) (data []byte, rest []byte) {
-	blocks, _, reader, _ := readChunkedDataFromReader(bytes.NewReader(ret))
-	rest, err := io.ReadAll(reader)
+	blocks, fixed, reader, err := readChunkedDataFromReader(bytes.NewReader(ret))
+	_ = fixed
+	_ = err
+	rest, err = io.ReadAll(reader)
 	if err != nil {
 		log.Errorf("read chunked data error: %v", err)
 	}
@@ -93,10 +95,13 @@ func readChunkedDataFromReader(r io.Reader) ([]byte, []byte, io.Reader, error) {
 
 		var comment []byte
 		var commentExisted bool
-		lineBytes, comment, commentExisted = bytes.Cut(lineBytes, []byte{';'})
-		lineBytes = bytes.TrimSpace(lineBytes)
-		size, err := strconv.ParseInt(string(lineBytes), 16, 64)
+		handledLineBytes, comment, commentExisted := bytes.Cut(lineBytes, []byte{';'})
+		handledLineBytes = bytes.TrimSpace(handledLineBytes)
+		size, err := strconv.ParseInt(string(handledLineBytes), 16, 64)
 		if err != nil {
+			if len(handledLineBytes) == 0 {
+				return results.Bytes(), fixedResults.Bytes(), reader, nil
+			}
 			return nil, nil, io.MultiReader(bytes.NewReader(haveRead.Bytes()), reader), err
 		}
 
