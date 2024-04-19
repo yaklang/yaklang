@@ -119,11 +119,22 @@ func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 		// chunked body is very complex
 		// if multiRequest: extract and remove body suffix
 		var bodyDecode []byte
-		bodyDecode, restBody = codec.HTTPChunkedDecodeWithRestBytes(body)
-		if len(bodyDecode) > 0 {
-			readLen := len(body) - len(restBody)
-			body = body[:readLen]
+		var fixedBody []byte
+		var err error
+		bodyDecode, fixedBody, restBody, err = codec.ReadHTTPChunkedDataWithFixedError(body)
+		if err != nil {
+			restBody = nil
+		} else {
+			if len(bodyDecode) > 0 {
+				if len(restBody) > 0 {
+					readLen := len(body) - len(restBody)
+					body = body[:readLen]
+				} else {
+					body = fixedBody
+				}
+			}
 		}
+
 	}
 
 	/* boundary fix */
