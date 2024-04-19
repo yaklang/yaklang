@@ -78,9 +78,9 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionCompletion(t *testing.T) {
 		checkCompletionContains(t, `a = 1; b = 2; c = 3;`, &ypb.Range{
 			Code:        "",
 			StartLine:   1,
-			StartColumn: 20,
+			StartColumn: 21,
 			EndLine:     1,
-			EndColumn:   21,
+			EndColumn:   22,
 		}, []string{"a", "b", "c"})
 	})
 
@@ -90,9 +90,9 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionCompletion(t *testing.T) {
 		checkCompletionContains(t, `r = poc.Get("123")~; r.`, &ypb.Range{
 			Code:        "r.",
 			StartLine:   1,
-			StartColumn: 21,
+			StartColumn: 22,
 			EndLine:     1,
-			EndColumn:   23,
+			EndColumn:   24,
 		}, []string{"Length", "Pop"})
 	})
 
@@ -103,9 +103,9 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionCompletion(t *testing.T) {
 a.`, &ypb.Range{
 			Code:        "a.",
 			StartLine:   2,
-			StartColumn: 0,
+			StartColumn: 1,
 			EndLine:     2,
-			EndColumn:   2,
+			EndColumn:   3,
 		}, []string{"Contains"})
 	})
 
@@ -116,9 +116,9 @@ a.`, &ypb.Range{
 cli.`, &ypb.Range{
 			Code:        "cli.",
 			StartLine:   2,
-			StartColumn: 0,
+			StartColumn: 1,
 			EndLine:     2,
-			EndColumn:   4,
+			EndColumn:   5,
 		})
 		if len(res.SuggestionMessage) == 0 {
 			t.Fatal("code `cli.` should get completion but not")
@@ -133,9 +133,9 @@ prog = ssa.Parse("")~
 prog.`, &ypb.Range{
 			Code:        "prog.",
 			StartLine:   3,
-			StartColumn: 0,
+			StartColumn: 1,
 			EndLine:     3,
-			EndColumn:   6,
+			EndColumn:   7,
 		}, []string{"Program", "Ref"})
 	})
 	t.Run("anonymous field struct completion", func(t *testing.T) {
@@ -146,9 +146,9 @@ rsp, err = http.Request("GET", "https://baidu.com")
 rsp.`, &ypb.Range{
 			Code:        "rsp.",
 			StartLine:   3,
-			StartColumn: 0,
+			StartColumn: 1,
 			EndLine:     3,
-			EndColumn:   4,
+			EndColumn:   5,
 		}, []string{"Response", "Body", "Status", "Data"})
 	})
 	// 	t.Run("cache", func(t *testing.T) {
@@ -185,9 +185,9 @@ rsp.`, &ypb.Range{
 fuzz.HTTPRequest("")~.FuzzCookie("a","b").`, &ypb.Range{
 			Code:        "",
 			StartLine:   2,
-			StartColumn: 41,
+			StartColumn: 42,
 			EndLine:     2,
-			EndColumn:   42,
+			EndColumn:   43,
 		}, []string{"Exec"})
 	})
 
@@ -198,16 +198,16 @@ a = cli
 a.`, &ypb.Range{
 			Code:        "a.",
 			StartLine:   3,
-			StartColumn: 0,
+			StartColumn: 1,
 			EndLine:     3,
-			EndColumn:   2,
+			EndColumn:   3,
 		}, []string{"check"})
 	})
 }
 
 var local ypb.YakClient = nil
 
-func CheckHover(t *testing.T) func(t *testing.T, code, typ string, Range *ypb.Range, want string, subStr ...bool) {
+func CheckHover(t *testing.T) func(t *testing.T, code, scriptType string, Range *ypb.Range, want string, subStr ...bool) {
 	if local == nil {
 		var err error
 		local, err = NewLocalClient()
@@ -216,16 +216,16 @@ func CheckHover(t *testing.T) func(t *testing.T, code, typ string, Range *ypb.Ra
 		}
 	}
 
-	getHover := func(t *testing.T, code, typ string, Range *ypb.Range, ids ...string) *ypb.YaklangLanguageSuggestionResponse {
+	getHover := func(t *testing.T, code, scriptType string, Range *ypb.Range, ids ...string) *ypb.YaklangLanguageSuggestionResponse {
 		var id string
 		if len(ids) == 0 {
 			id = uuid.NewString()
 		} else {
 			id = ids[0]
 		}
-		return GetSuggestion(local, "hover", typ, t, code, Range, id)
+		return GetSuggestion(local, "hover", scriptType, t, code, Range, id)
 	}
-	check := func(t *testing.T, code, typ string, Range *ypb.Range, want string, sub ...bool) {
+	check := func(t *testing.T, code, scriptType string, Range *ypb.Range, want string, sub ...bool) {
 		subStr := false
 		for _, v := range sub {
 			if v {
@@ -234,7 +234,7 @@ func CheckHover(t *testing.T) func(t *testing.T, code, typ string, Range *ypb.Ra
 			}
 		}
 
-		req := getHover(t, code, typ, Range)
+		req := getHover(t, code, scriptType, Range)
 		log.Info(req.SuggestionMessage)
 		if len(req.SuggestionMessage) != 1 {
 			t.Fatal("should get 1 suggestion")
@@ -316,9 +316,9 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 			Range: &ypb.Range{
 				Code:        "a",
 				StartLine:   2,
-				StartColumn: 0,
+				StartColumn: 1,
 				EndLine:     2,
-				EndColumn:   1,
+				EndColumn:   2,
 			},
 		},
 
@@ -328,9 +328,9 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 			Range: &ypb.Range{
 				Code:        "b",
 				StartLine:   3,
-				StartColumn: 0,
+				StartColumn: 1,
 				EndLine:     3,
-				EndColumn:   1,
+				EndColumn:   2,
 			},
 		},
 		{
@@ -339,9 +339,9 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 			Range: &ypb.Range{
 				Code:        "c",
 				StartLine:   4,
-				StartColumn: 0,
+				StartColumn: 1,
 				EndLine:     4,
-				EndColumn:   1,
+				EndColumn:   2,
 			},
 		},
 		{
@@ -350,9 +350,9 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 			Range: &ypb.Range{
 				Code:        "d",
 				StartLine:   5,
-				StartColumn: 0,
+				StartColumn: 1,
 				EndLine:     5,
-				EndColumn:   1,
+				EndColumn:   2,
 			},
 		},
 		{
@@ -361,9 +361,9 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 			Range: &ypb.Range{
 				Code:        "d2",
 				StartLine:   5,
-				StartColumn: 12,
+				StartColumn: 13,
 				EndLine:     5,
-				EndColumn:   14,
+				EndColumn:   15,
 			},
 		},
 		{
@@ -372,9 +372,9 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 			Range: &ypb.Range{
 				Code:        "e",
 				StartLine:   6,
-				StartColumn: 0,
+				StartColumn: 1,
 				EndLine:     6,
-				EndColumn:   1,
+				EndColumn:   2,
 			},
 		},
 		{
@@ -383,9 +383,9 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 			Range: &ypb.Range{
 				Code:        "f",
 				StartLine:   7,
-				StartColumn: 0,
+				StartColumn: 1,
 				EndLine:     7,
-				EndColumn:   1,
+				EndColumn:   2,
 			},
 		},
 		{
@@ -394,9 +394,9 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 			Range: &ypb.Range{
 				Code:        "g",
 				StartLine:   8,
-				StartColumn: 0,
+				StartColumn: 1,
 				EndLine:     8,
-				EndColumn:   1,
+				EndColumn:   2,
 			},
 		},
 		{
@@ -405,9 +405,9 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 			Range: &ypb.Range{
 				Code:        "h",
 				StartLine:   9,
-				StartColumn: 0,
+				StartColumn: 1,
 				EndLine:     9,
-				EndColumn:   1,
+				EndColumn:   2,
 			},
 		},
 		{
@@ -416,9 +416,9 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 			Range: &ypb.Range{
 				Code:        "i",
 				StartLine:   10,
-				StartColumn: 0,
+				StartColumn: 1,
 				EndLine:     10,
-				EndColumn:   1,
+				EndColumn:   2,
 			},
 		},
 		{
@@ -427,9 +427,9 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Basic(t *testing.T) {
 			Range: &ypb.Range{
 				Code:        "i",
 				StartLine:   10,
-				StartColumn: 7,
+				StartColumn: 8,
 				EndLine:     10,
-				EndColumn:   8,
+				EndColumn:   9,
 			},
 		},
 	}
@@ -470,9 +470,9 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_Mitm(t *testing.T) {
 			&ypb.Range{
 				Code:        "modify",
 				StartLine:   2,
-				StartColumn: 56,
+				StartColumn: 57,
 				EndLine:     2,
-				EndColumn:   62,
+				EndColumn:   63,
 			},
 			"```go\nfunc modify(r1 yakit.HTTPFlow) null\n```",
 		)
@@ -498,9 +498,9 @@ prog.Packages
 			Range: &ypb.Range{
 				Code:        "ssa",
 				StartLine:   2,
-				StartColumn: 8,
+				StartColumn: 9,
 				EndLine:     2,
-				EndColumn:   11,
+				EndColumn:   12,
 			},
 		},
 		{
@@ -509,9 +509,9 @@ prog.Packages
 			Range: &ypb.Range{
 				Code:        "ssa.Parse",
 				StartLine:   2,
-				StartColumn: 8,
+				StartColumn: 9,
 				EndLine:     2,
-				EndColumn:   17,
+				EndColumn:   18,
 			},
 		},
 		{
@@ -520,9 +520,9 @@ prog.Packages
 			Range: &ypb.Range{
 				Code:        "ssa.Javascript",
 				StartLine:   5,
-				StartColumn: 8,
+				StartColumn: 9,
 				EndLine:     5,
-				EndColumn:   22,
+				EndColumn:   23,
 			},
 		},
 		{
@@ -531,9 +531,9 @@ prog.Packages
 			Range: &ypb.Range{
 				Code:        "prog",
 				StartLine:   2,
-				StartColumn: 0,
+				StartColumn: 1,
 				EndLine:     2,
-				EndColumn:   4,
+				EndColumn:   5,
 			},
 			subString: true,
 		},
@@ -571,9 +571,9 @@ a`,
 			&ypb.Range{
 				Code:        "a",
 				StartLine:   3,
-				StartColumn: 0,
+				StartColumn: 1,
 				EndLine:     3,
-				EndColumn:   1,
+				EndColumn:   2,
 			},
 			getExternLibDesc("ssa"),
 		)
@@ -590,9 +590,9 @@ a.Javascript`,
 			&ypb.Range{
 				Code:        "a.Javascript",
 				StartLine:   3,
-				StartColumn: 0,
+				StartColumn: 1,
 				EndLine:     3,
-				EndColumn:   12,
+				EndColumn:   13,
 			},
 			getConstInstanceDesc(getInstanceByName("ssa", "Javascript")),
 		)
@@ -609,9 +609,9 @@ a.Parse()`,
 			&ypb.Range{
 				Code:        "a.Parse",
 				StartLine:   3,
-				StartColumn: 0,
+				StartColumn: 1,
 				EndLine:     3,
-				EndColumn:   7,
+				EndColumn:   8,
 			},
 			getFuncDeclDesc(getFuncDeclByName("ssa", "Parse"), "Parse"),
 		)
@@ -629,9 +629,9 @@ rsp.Data()`
 		ssaRange := &ypb.Range{
 			Code:        "rsp.Status",
 			StartLine:   2,
-			StartColumn: 0,
+			StartColumn: 1,
 			EndLine:     2,
-			EndColumn:   10,
+			EndColumn:   11,
 		}
 		want := "```go\n" + `field Status string` + "\n```"
 		check(t, code, "yak", ssaRange, want)
@@ -643,9 +643,9 @@ rsp.Data()`
 		ssaParseRange := &ypb.Range{
 			Code:        "rsp.Data",
 			StartLine:   3,
-			StartColumn: 0,
+			StartColumn: 1,
 			EndLine:     3,
-			EndColumn:   8,
+			EndColumn:   9,
 		}
 		// 标准库函数
 		want := "```go\n" + `func Data() string` + "\n```"
@@ -657,14 +657,15 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionHover_FunctionReturns(t *testing.T) {
 	t.Parallel()
 
 	check := CheckHover(t)
-	check(t, `r = poc.Get("123")~`,
-		"r",
+	check(t,
+		`r = poc.Get("123")~`,
+		"yak",
 		&ypb.Range{
 			Code:        "r",
 			StartLine:   1,
-			StartColumn: 0,
+			StartColumn: 1,
 			EndLine:     1,
-			EndColumn:   1,
+			EndColumn:   2,
 		},
 		"```go\ntype r [lowhttp.LowhttpResponse,http.Request]\n```",
 	)
@@ -690,9 +691,9 @@ d.Contains("c")
 		ssaRange := &ypb.Range{
 			Code:        "poc.HTTP",
 			StartLine:   3,
-			StartColumn: 0,
+			StartColumn: 1,
 			EndLine:     3,
-			EndColumn:   8,
+			EndColumn:   9,
 		}
 		check(t, code, "yak", ssaRange, pocLabel, pocDesc)
 	})
@@ -702,9 +703,9 @@ d.Contains("c")
 		ssaRange := &ypb.Range{
 			Code:        "a",
 			StartLine:   2,
-			StartColumn: 0,
+			StartColumn: 1,
 			EndLine:     2,
-			EndColumn:   1,
+			EndColumn:   2,
 		}
 		wantLabel := "func a(r1 any, r2 ...any) null"
 		check(t, code, "yak", ssaRange, wantLabel, "")
@@ -716,9 +717,9 @@ d.Contains("c")
 		ssaRange := &ypb.Range{
 			Code:        "c",
 			StartLine:   5,
-			StartColumn: 0,
+			StartColumn: 1,
 			EndLine:     5,
-			EndColumn:   1,
+			EndColumn:   2,
 		}
 		check(t, code, "yak", ssaRange, pocLabel, pocDesc)
 	})
@@ -729,9 +730,9 @@ d.Contains("c")
 		ssaRange := &ypb.Range{
 			Code:        "d.Contains",
 			StartLine:   7,
-			StartColumn: 0,
+			StartColumn: 1,
 			EndLine:     7,
-			EndColumn:   10,
+			EndColumn:   11,
 		}
 		check(t, code, "yak", ssaRange, "Contains", "判断字符串是否包含子串")
 	})
