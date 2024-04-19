@@ -26,3 +26,15 @@ assert file.Split("/tmp/1.txt")[0] == "/tmp/" && file.Split("/tmp/1.txt")[1] == 
 assert file.Join("tmp", "1.txt") == "tmp/1.txt"
 assert file.Join("/tmp", "1.txt") == "/tmp/1.txt"
 assert file.Join("tmp", "a", "1.txt") == "tmp/a/1.txt"
+
+uid := uuid()
+uid2 := uuid()
+check := false
+db.SavePayload(uid, ["abc", "def", uid2])
+for i in db.YieldPayload(uid) {
+    dump(i)
+    if uid2 == i {
+        check = true
+    }
+}
+assert check, "payload api worked not as well"
