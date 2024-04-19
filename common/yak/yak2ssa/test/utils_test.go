@@ -6,5 +6,5 @@ import (
 )
 
 func init() {
-	test.SetLanguage("yak", yak2ssa.Build)
+	test.SetLanguage("yak", yak2ssa.Builder)
 }

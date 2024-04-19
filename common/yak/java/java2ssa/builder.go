@@ -30,13 +30,6 @@ func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	}
 	b.SupportClosure = true
 	build.VisitCompilationUnit(ast)
-	if mainMain, ok := build.ReadClassConst("Main", "main"); ok {
-		b.EmitCall(b.NewCall(
-			mainMain, []ssa.Value{},
-		))
-	} else {
-		log.Errorf("java2ssa: Main.main not found")
-	}
 	return nil
 }
 
