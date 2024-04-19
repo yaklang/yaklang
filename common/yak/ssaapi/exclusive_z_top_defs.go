@@ -344,14 +344,33 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) Values 
 			log.Errorf("side effect: %v is not created from call instruction", i.String())
 		}
 	case *ssa.Make:
+		// 根据make的参数查看TopDef
+		// 比如:new String(data)
+		// 会继续往上找data的TopDef
+		getMakeParamTopDef := func() Values {
+			var vals Values
+			params := i.GetFunction().GetParameters()
+			for _, param := range params {
+				if param.GetName() == "this" || param.GetName() == "$this" {
+					continue
+				}
+				vals = append(vals, param.getTopDefs(actx, opt...)...)
+			}
+			return vals
+		}
+
 		var values Values
 		values = append(values, i)
 		for _, member := range inst.GetAllMember() {
 			value := NewValue(member)
-			topDef := append(value.getTopDefs(actx, opt...), i)
-			values = append(values, topDef...)
-		}
+			// 沿着make类型的参数继续寻找topdef
+			paramVals := getMakeParamTopDef()
+			values = append(values, paramVals...)
+			values = append(values, value.getTopDefs(actx, opt...)...)
 
+		}
+		paramVals := getMakeParamTopDef()
+		values = append(values, paramVals...)
 		return values
 	}
 	return getMemberCall(i.node, actx)
