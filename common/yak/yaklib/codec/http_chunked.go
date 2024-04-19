@@ -36,18 +36,41 @@ func bufioReadLine(reader *bufio.Reader) ([]byte, []byte, error) {
 }
 
 func ReadHTTPChunkedDataWithFixed(ret []byte) (data []byte, fixedChunked []byte, rest []byte) {
-	blocks, fixed, reader, _ := readChunkedDataFromReader(bytes.NewReader(ret))
-	rest, err := io.ReadAll(reader)
+	blocks, fixed, reader, err := readChunkedDataFromReader(bytes.NewReader(ret))
+	if err != nil {
+		raw, _ := io.ReadAll(reader)
+		return nil, nil, raw
+	}
+	rest, err = io.ReadAll(reader)
 	if err != nil {
 		log.Errorf("read chunked data error: %v", err)
 	}
 	return blocks, fixed, rest
 }
 
+func ReadHTTPChunkedDataWithFixedError(ret []byte) (data []byte, fixedChunked []byte, rest []byte, _ error) {
+	blocks, fixed, reader, err := readChunkedDataFromReader(bytes.NewReader(ret))
+	if err != nil {
+		raw, _ := io.ReadAll(reader)
+		return nil, nil, raw, err
+	}
+	rest, err = io.ReadAll(reader)
+	if err != nil {
+		log.Errorf("read chunked data error: %v", err)
+	}
+	return blocks, fixed, rest, nil
+}
+
 func readHTTPChunkedData(ret []byte) (data []byte, rest []byte) {
 	blocks, fixed, reader, err := readChunkedDataFromReader(bytes.NewReader(ret))
+	if err != nil {
+		rest, err = io.ReadAll(reader)
+		if err != nil {
+			log.Errorf("read chunked data error: %v", err)
+		}
+		return rest, nil
+	}
 	_ = fixed
-	_ = err
 	rest, err = io.ReadAll(reader)
 	if err != nil {
 		log.Errorf("read chunked data error: %v", err)
@@ -70,7 +93,6 @@ func readChunkedDataFromReader(r io.Reader) ([]byte, []byte, io.Reader, error) {
 		if err != nil {
 			return nil, nil, io.MultiReader(bytes.NewReader(haveRead.Bytes()), reader), fmt.Errorf("read chunked (strip left space) data error: %v", err)
 		}
-		haveRead.WriteByte(spaceByte)
 		if unicode.IsSpace(rune(spaceByte)) {
 			continue
 		} else {
@@ -89,7 +111,7 @@ func readChunkedDataFromReader(r io.Reader) ([]byte, []byte, io.Reader, error) {
 		haveRead.Write(lineBytes)
 		haveRead.Write(delim)
 
-		if err != nil {
+		if err != nil && len(lineBytes) > 0 {
 			return nil, nil, io.MultiReader(bytes.NewReader(haveRead.Bytes()), reader), err
 		}
 
@@ -98,10 +120,7 @@ func readChunkedDataFromReader(r io.Reader) ([]byte, []byte, io.Reader, error) {
 		handledLineBytes, comment, commentExisted := bytes.Cut(lineBytes, []byte{';'})
 		handledLineBytes = bytes.TrimSpace(handledLineBytes)
 		size, err := strconv.ParseInt(string(handledLineBytes), 16, 64)
-		if err != nil {
-			if len(handledLineBytes) == 0 {
-				return results.Bytes(), fixedResults.Bytes(), reader, nil
-			}
+		if err != nil && len(handledLineBytes) > 0 {
 			return nil, nil, io.MultiReader(bytes.NewReader(haveRead.Bytes()), reader), err
 		}
 
@@ -109,14 +128,17 @@ func readChunkedDataFromReader(r io.Reader) ([]byte, []byte, io.Reader, error) {
 			lastLine, delim, err := bufioReadLine(reader)
 			haveRead.Write(lastLine)
 			haveRead.Write(delim)
-			if err != nil {
-				return nil, nil, io.MultiReader(bytes.NewReader(haveRead.Bytes()), reader), err
-			}
-
 			if len(lastLine) == 0 {
 				fixedResults.WriteString("0\r\n\r\n")
 			} else {
-				log.Warnf("last line of chunked data is not empty: %s", lastLine)
+				return nil, nil, io.MultiReader(bytes.NewReader(haveRead.Bytes()), reader), fmt.Errorf("last line of chunked data is not empty: %s", lastLine)
+			}
+
+			if err != nil {
+				if err == io.EOF {
+					return results.Bytes(), fixedResults.Bytes(), reader, nil
+				}
+				return nil, nil, io.MultiReader(bytes.NewReader(haveRead.Bytes()), reader), err
 			}
 			return results.Bytes(), fixedResults.Bytes(), reader, nil
 		}

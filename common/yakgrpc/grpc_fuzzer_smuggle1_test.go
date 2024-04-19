@@ -23,7 +23,7 @@ func TestFuzzer_LowhttpFixRequest(t *testing.T) {
 		"Accept-Encoding: gzip, deflate\r\n" +
 		"Accept: */*\r\n" +
 		"Transfer-Encoding: chunked\r\n\r\n" +
-		"60\r\nGET /flag HTTP/1.1\r\n" +
+		"60\r\nGET /flag HTTP/1.1\r\n" + // not 60, instead of 62
 		"Host: 127.0.0.1:8888\r\n" +
 		"Upgrade: h2c\r\n" +
 		"Http2-settings: AAMAAABkAARAAAAAAAIAAAAA\r\n\r\n" +
@@ -32,6 +32,86 @@ func TestFuzzer_LowhttpFixRequest(t *testing.T) {
 		t.Fatal("fix request failed")
 	} else {
 		spew.Dump(ret)
+		fmt.Println(string(ret))
+	}
+}
+
+func TestFuzzer_LowhttpFixRequest2(t *testing.T) {
+	req := []byte("POST / HTTP/1.1\r\n" +
+		"Host: 127.0.0.1:8888\r\n" +
+		"User-Agent: python-requests/2.31.0\r\n" +
+		"Accept-Encoding: gzip, deflate\r\n" +
+		"Accept: */*\r\n" +
+		"Transfer-Encoding: chunked\r\n\r\n" +
+		"3\r\naaa\r\n" +
+		"0\r\n")
+	if ret := lowhttp.FixHTTPRequest(req); bytes.Contains(ret, []byte("33")) {
+		t.Fatal("fix request failed")
+	} else {
+		spew.Dump(ret)
+		if !bytes.HasSuffix(ret, []byte("\r\n0\r\n\r\n")) {
+			t.Fatal("fix request failed")
+		}
+		fmt.Println(string(ret))
+	}
+}
+
+func TestFuzzer_LowhttpFixRequest3(t *testing.T) {
+	req := []byte("POST / HTTP/1.1\r\n" +
+		"Host: 127.0.0.1:8888\r\n" +
+		"User-Agent: python-requests/2.31.0\r\n" +
+		"Accept-Encoding: gzip, deflate\r\n" +
+		"Accept: */*\r\n" +
+		"Transfer-Encoding: chunked\r\n\r\n" +
+		"3\r\naaa\r\n" +
+		"0")
+	if ret := lowhttp.FixHTTPRequest(req); bytes.Contains(ret, []byte("33")) {
+		t.Fatal("fix request failed")
+	} else {
+		spew.Dump(ret)
+		if !bytes.HasSuffix(ret, []byte("\r\n0\r\n\r\n")) {
+			t.Fatal("fix request failed")
+		}
+		fmt.Println(string(ret))
+	}
+}
+
+func TestFuzzer_LowhttpFixRequest4(t *testing.T) {
+	req := []byte("POST / HTTP/1.1\r\n" +
+		"Host: 127.0.0.1:8888\r\n" +
+		"User-Agent: python-requests/2.31.0\r\n" +
+		"Accept-Encoding: gzip, deflate\r\n" +
+		"Accept: */*\r\n" +
+		"Transfer-Encoding: chunked\r\n\r\n" +
+		"3\r\naaa\r\n" +
+		"0\r\n\r\nabc")
+	if ret := lowhttp.FixHTTPRequest(req); bytes.Contains(ret, []byte("33")) {
+		t.Fatal("fix request failed")
+	} else {
+		spew.Dump(ret)
+		if !bytes.HasSuffix(ret, []byte("\r\n0\r\n\r\nabc")) {
+			t.Fatal("fix request failed")
+		}
+		fmt.Println(string(ret))
+	}
+}
+
+func TestFuzzer_LowhttpFixRequest5(t *testing.T) {
+	req := []byte("POST / HTTP/1.1\r\n" +
+		"Host: 127.0.0.1:8888\r\n" +
+		"User-Agent: python-requests/2.31.0\r\n" +
+		"Accept-Encoding: gzip, deflate\r\n" +
+		"Accept: */*\r\n" +
+		"Transfer-Encoding: chunked\r\n\r\n" +
+		"60\r\naaa\r\n" +
+		"0\r\n\r\nabc")
+	if ret := lowhttp.FixHTTPRequest(req); bytes.Contains(ret, []byte("33")) {
+		t.Fatal("fix request failed")
+	} else {
+		spew.Dump(ret)
+		if !bytes.HasSuffix(ret, []byte("\r\n60\r\naaa\r\n0\r\n\r\nabc")) {
+			t.Fatal("fix request failed")
+		}
 		fmt.Println(string(ret))
 	}
 }
