@@ -48,7 +48,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionCompletion(t *testing.T) {
 		// 	tmpCode := strings.TrimSuffix(code, ".")
 		// 	GetSuggestion(local, "completion", "yak", t, tmpCode, Range, id)
 		// }
-		return GetSuggestion(local, "completion", "yak", t, code, Range, id)
+		return GetSuggestion(local, COMPLETION, "yak", t, code, Range, id)
 	}
 	checkCompletionContains := func(t *testing.T, code string, Range *ypb.Range, want []string, ids ...string) {
 		t.Helper()
@@ -223,7 +223,7 @@ func CheckHover(t *testing.T) func(t *testing.T, code, scriptType string, Range 
 		} else {
 			id = ids[0]
 		}
-		return GetSuggestion(local, "hover", scriptType, t, code, Range, id)
+		return GetSuggestion(local, HOVER, scriptType, t, code, Range, id)
 	}
 	check := func(t *testing.T, code, scriptType string, Range *ypb.Range, want string, sub ...bool) {
 		subStr := false
@@ -269,7 +269,7 @@ func CheckSignature(t *testing.T) func(t *testing.T, code, typ string, Range *yp
 		} else {
 			id = ids[0]
 		}
-		return GetSuggestion(local, "signature", typ, t, code, Range, id)
+		return GetSuggestion(local, SIGNATURE, typ, t, code, Range, id)
 	}
 	check := func(t *testing.T, code, typ string, Range *ypb.Range, wantLabel string, wantDesc string, sub ...bool) {
 		subStr := false

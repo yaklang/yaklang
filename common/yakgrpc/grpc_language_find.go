@@ -88,7 +88,7 @@ func (s *Server) YaklangLanguageFind(ctx context.Context, req *ypb.YaklangLangua
 		ret = &ypb.YaklangLanguageFindResponse{}
 	)
 
-	result, err := LanguageServerAnalyzeProgram(req.GetYakScriptCode(), req.GetYakScriptType(), req.GetRange())
+	result, err := LanguageServerAnalyzeProgram(req.GetYakScriptCode(), req.GetInspectType(), req.GetYakScriptType(), req.GetRange())
 	defer result.Release()
 
 	prog, word, containPoint, ssaRange, v := result.Program, result.Word, result.ContainPoint, result.Range, result.Value
@@ -98,9 +98,9 @@ func (s *Server) YaklangLanguageFind(ctx context.Context, req *ypb.YaklangLangua
 	}
 
 	switch req.InspectType {
-	case "definition":
+	case DEFINITION:
 		ranges, err = OnFindDefinition(prog, word, containPoint, ssaRange, v)
-	case "reference":
+	case REFERENCES:
 		ranges, err = OnFindReferences(prog, word, containPoint, ssaRange, v)
 	}
 
