@@ -68,7 +68,7 @@ func LanguageServerAnalyzeProgram(code string, scriptType string, rng *ypb.Range
 	// todo: remove this
 	// prog.Program.ShowOffsetMap()
 
-	v := getFrontValueByOffset(prog, editor, rng)
+	v := getFrontValueByOffset(prog, editor, ssaRange)
 	// fallback
 	if v == nil {
 		v = getSSAValueByPosition(prog, word, ssaRange)
