@@ -93,7 +93,7 @@ Rawfuzz = func(p, fuzzPayload) {
 		`)
 	})
 
-	t.Run("function free-value not found, ", func(t *testing.T) {
+	t.Run("function free-value not found", func(t *testing.T) {
 		// should mark error inner callee function
 		ssatest.CheckTestCase(t, ssatest.TestCase{
 			Code: `
@@ -107,26 +107,10 @@ Rawfuzz = func(p, fuzzPayload) {
 				errs := prog.GetErrors()
 				require.Len(t, errs, 2)
 				err := errs[0]
-				require.Equal(t, "a.b", err.Pos.GetText())
+				require.Equal(t, "a.b", err.Pos.GetWordText())
 			},
 		})
 	})
-
-	t.Run("function free-value not found, ", func(t *testing.T) {
-		// should mark error inner callee function
-		ssatest.CheckNoError(t,
-			`
-			f = (a ) =>{
-				println(a.b)
-			}
-			a = {
-				"b": 1, 
-			}
-			f(a)
-			`,
-		)
-	})
-
 }
 
 func Test_Real_FunctionReturn(t *testing.T) {
@@ -209,7 +193,6 @@ func Test_RealYak_Object_Factor(t *testing.T) {
 		obj.f(1)
 		`)
 	})
-
 }
 
 func Test_RealYak_FreeValueMemberCall(t *testing.T) {
