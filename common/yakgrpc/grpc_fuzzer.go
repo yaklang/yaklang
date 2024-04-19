@@ -346,10 +346,9 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		feedbackWg.Wait()
 	}()
 	feedbackResponse := func(rsp *ypb.FuzzerResponse, skipPoC bool) error {
-		// 设置 runtimeID
-		rsp.RuntimeID = runtimeID
-
-		sw.WaitUntilOpen()
+		if !req.GetReMatch() {
+			sw.WaitUntilOpen()
+		}
 
 		err := stream.Send(rsp)
 		if err != nil {
@@ -811,6 +810,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				rsp.Reason = result.Error.Error()
 				rsp.TaskId = int64(taskID)
 				rsp.Payloads = payloads
+				rsp.RuntimeID = runtimeID
 				if result.LowhttpResponse != nil && result.LowhttpResponse.TraceInfo != nil {
 					rsp.TotalDurationMs = result.LowhttpResponse.TraceInfo.TotalTime.Milliseconds()
 					rsp.DurationMs = result.LowhttpResponse.TraceInfo.ServerTime.Milliseconds()
@@ -934,6 +934,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				TooLargeResponseBodyFile:   tooLargeBodyFile,
 				TooLargeResponseHeaderFile: tooLargeHeaderFile,
 				DisableRenderStyles:        len(body) > 1024*1024*2,
+				RuntimeID:                  runtimeID,
 			}
 
 			redirectPacket := result.LowhttpResponse.RedirectRawPackets
@@ -1048,6 +1049,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 						IsHTTPS:               redirectRes.Https,
 						MatchedByMatcher:      httpTPLmatchersResult,
 						HitColor:              req.GetHitColor(),
+						RuntimeID:             runtimeID,
 					}
 					if redirectRes != nil && redirectRes.TraceInfo != nil {
 						redirectRsp.TotalDurationMs = redirectRes.TraceInfo.TotalTime.Milliseconds()
