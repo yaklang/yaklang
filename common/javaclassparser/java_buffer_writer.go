@@ -2,7 +2,6 @@ package javaclassparser
 
 import (
 	"bytes"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
@@ -86,7 +85,8 @@ func (j *JavaBufferWriter) Write1Byte(v interface{}) error {
 }
 
 func (j *JavaBufferWriter) WriteString(v string) error {
-	bs := utils.ToJavaOverLongString([]byte(v), j.charLength)
+	//bs := utils.ToJavaOverLongString([]byte(v), j.charLength)
+	bs := []byte(v)
 	j.Write2Byte(len(bs))
 	j.data.Write(bs)
 	return nil

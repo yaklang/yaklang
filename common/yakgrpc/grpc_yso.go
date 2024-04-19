@@ -43,7 +43,7 @@ var allExtOptions = []*ypb.YsoClassGeneraterOptionsWithVerbose{
 	{Key: string(JavaClassGeneraterOption_ClassName), Value: utils.RandStringBytes(8), Type: string(String), KeyVerbose: "类名", Help: "类名"},
 	{Key: string(JavaClassGeneraterOption_Version), Value: "52", Type: string(StringPort), KeyVerbose: "Java 版本", Help: "Class 使用的Java 版本"},
 }
-var classExtOptionsIndex = []int{0, 2, 3, 4}
+var classExtOptionsIndex = []int{0, 3, 4}
 var gadgetTemplateImplExtOptionsIndex = []int{0, 2, 1, 3, 4}
 var gadgetTransformChainExtOptionsIndex = []int{2, 1, 3}
 
