@@ -60,8 +60,8 @@ var CodecExports = map[string]interface{}{
 	"PKCS5UnPadding":       codec.PKCS5UnPadding,
 	"PKCS7Padding":         sm4.PKCS7Padding,
 	"PKCS7UnPadding":       sm4.PKCS7UnPadding,
-	"PKCS7PaddingForDES":   sm4.PKCS7PaddingFor8ByteBlock,
-	"PKCS7UnPaddingForDES": sm4.PKCS7UnPaddingFor8ByteBlock,
+	"PKCS7PaddingForDES":   codec.PKCS7PaddingFor8ByteBlock,
+	"PKCS7UnPaddingForDES": codec.PKCS7UnPaddingFor8ByteBlock,
 	"ZeroPadding":          codec.ZeroPadding,
 	"ZeroUnPadding":        codec.ZeroUnPadding,
 
