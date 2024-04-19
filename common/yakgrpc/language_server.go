@@ -29,10 +29,6 @@ type LanguageServerAnalyzerResult struct {
 	Editor       *memedit.MemEditor
 }
 
-func (r *LanguageServerAnalyzerResult) Release() {
-	r.Editor.Release()
-}
-
 func LanguageServerAnalyzeProgram(code string, inspectType, scriptType string, rng *ypb.Range) (*LanguageServerAnalyzerResult, error) {
 	ssaRange := GrpcRangeToSSARange(code, rng)
 	editor := ssaRange.GetEditor()
@@ -49,12 +45,18 @@ func LanguageServerAnalyzeProgram(code string, inspectType, scriptType string, r
 
 		// try to remove content after point
 		if containPoint && inspectType == COMPLETION {
-			offset := ssaRange.GetOffset()
-			before, _, _ := strings.Cut(rangeWordText, ".")
+			offset, endOffset := ssaRange.GetOffset()-1, ssaRange.GetEndOffset()
+			before, after, _ := strings.Cut(rangeWordText, ".")
 			trimCode := code[:offset] + strings.Replace(code[offset:], rangeWordText, before, 1)
 
 			prog, err = ssaapi.Parse(trimCode, opt...)
 			if err == nil {
+				// reset ssaRange and editor
+				newEditor := prog.Program.GetCurrentEditor()
+				// end use old editor to get position
+				ssaRange = ssa.NewRange(newEditor, ssaRange.GetStart(), editor.GetPositionByOffset(endOffset-len(after)-1))
+				editor = newEditor
+
 				return prog, nil
 			}
 		}

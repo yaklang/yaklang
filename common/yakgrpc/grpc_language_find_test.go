@@ -62,9 +62,6 @@ func getFindDefinition(local ypb.YakClient, pluginType string, t *testing.T, cod
 func checkDefinition(t *testing.T, local ypb.YakClient, sourceCode, pluginType string, selectRange, wantRange memedit.RangeIf) {
 	t.Helper()
 
-	editor := memedit.NewMemEditor(sourceCode)
-	defer editor.Release()
-
 	rsp := getFindDefinition(local, pluginType, t, sourceCode, RangeIfToGrpcRange(selectRange), "")
 
 	require.NotNil(t, rsp)
@@ -74,9 +71,6 @@ func checkDefinition(t *testing.T, local ypb.YakClient, sourceCode, pluginType s
 
 func checkReferences(t *testing.T, local ypb.YakClient, sourceCode, pluginType string, selectRange memedit.RangeIf, wantRanges []memedit.RangeIf) {
 	t.Helper()
-
-	editor := memedit.NewMemEditor(sourceCode)
-	defer editor.Release()
 
 	rsp := getFindReferences(local, pluginType, t, sourceCode, RangeIfToGrpcRange(selectRange), "")
 

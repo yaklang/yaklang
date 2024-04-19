@@ -138,6 +138,7 @@ prog.`, &ypb.Range{
 			EndColumn:   7,
 		}, []string{"Program", "Ref"})
 	})
+
 	t.Run("anonymous field struct completion", func(t *testing.T) {
 		t.Parallel()
 
@@ -202,6 +203,19 @@ a.`, &ypb.Range{
 			EndLine:     3,
 			EndColumn:   3,
 		}, []string{"check"})
+	})
+
+	t.Run("trim code", func(t *testing.T) {
+		t.Parallel()
+		checkCompletionContains(t,
+			`ssa.Parse("1", ssa.)`,
+			&ypb.Range{
+				Code:        "ssa.",
+				StartLine:   1,
+				StartColumn: 17,
+				EndLine:     1,
+				EndColumn:   20,
+			}, []string{"Parse"})
 	})
 }
 

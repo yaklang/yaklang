@@ -4,18 +4,12 @@ import (
 	"errors"
 	"regexp"
 	"strings"
-	"sync"
 
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-var defaultMemEditorPool sync.Pool = sync.Pool{
-	New: func() interface{} {
-		return new(MemEditor)
-	},
-}
 
 type MemEditor struct {
 	sourceCodeCtxStack []string
@@ -30,23 +24,15 @@ type MemEditor struct {
 }
 
 func NewMemEditor(sourceCode string) *MemEditor {
-	editor := defaultMemEditorPool.Get().(*MemEditor)
-
-	editor.sourceCode = sourceCode
-	editor.lineLensMap = make(map[int]int)
-	editor.lineStartOffsetMap = make(map[int]int)
-
+	editor := &MemEditor{
+		sourceCode: sourceCode,
+		lineLensMap: make(map[int]int),
+		lineStartOffsetMap: make(map[int]int),
+	}
 	editor.recalculateLineMappings()
 	return editor
 }
 
-func (ve *MemEditor) Release() {
-	ve.sourceCode = ""
-	ve.lineLensMap = nil
-	ve.lineStartOffsetMap = nil
-	ve.cursor = 0
-	defaultMemEditorPool.Put(ve)
-}
 
 func (ve *MemEditor) PushSourceCodeContext(i any) {
 	ve.ResetSourceCodeHash()
