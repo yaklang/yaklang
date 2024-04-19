@@ -12,6 +12,14 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+const (
+	COMPLETION = "completion"
+	HOVER      = "hover"
+	SIGNATURE  = "signature"
+	DEFINITION = "definition"
+	REFERENCES = "reference"
+)
+
 type LanguageServerAnalyzerResult struct {
 	Program      *ssaapi.Program
 	Word         string
@@ -25,7 +33,7 @@ func (r *LanguageServerAnalyzerResult) Release() {
 	r.Editor.Release()
 }
 
-func LanguageServerAnalyzeProgram(code string, scriptType string, rng *ypb.Range) (*LanguageServerAnalyzerResult, error) {
+func LanguageServerAnalyzeProgram(code string, inspectType, scriptType string, rng *ypb.Range) (*LanguageServerAnalyzerResult, error) {
 	ssaRange := GrpcRangeToSSARange(code, rng)
 	editor := ssaRange.GetEditor()
 	rangeWordText := ssaRange.GetWordText()
@@ -40,12 +48,11 @@ func LanguageServerAnalyzeProgram(code string, scriptType string, rng *ypb.Range
 		}
 
 		// try to remove content after point
-		if containPoint {
-			endOffset := ssaRange.GetEndOffset()
-			_, after, _ := strings.Cut(rangeWordText, ".")
-			startOffset := endOffset - (len(after) + 1)
+		if containPoint && inspectType == COMPLETION {
+			offset := ssaRange.GetOffset()
+			before, _, _ := strings.Cut(rangeWordText, ".")
+			trimCode := code[:offset] + strings.Replace(code[offset:], rangeWordText, before, 1)
 
-			trimCode := code[:startOffset] + code[endOffset:]
 			prog, err = ssaapi.Parse(trimCode, opt...)
 			if err == nil {
 				return prog, nil

@@ -827,7 +827,7 @@ func GrpcRangeToSSARange(sourceCode string, r *ypb.Range) *ssa.Range {
 func (s *Server) YaklangLanguageSuggestion(ctx context.Context, req *ypb.YaklangLanguageSuggestionRequest) (*ypb.YaklangLanguageSuggestionResponse, error) {
 	ret := &ypb.YaklangLanguageSuggestionResponse{}
 
-	result, err := LanguageServerAnalyzeProgram(req.GetYakScriptCode(), req.GetYakScriptType(), req.GetRange())
+	result, err := LanguageServerAnalyzeProgram(req.GetYakScriptCode(), req.GetInspectType(), req.GetYakScriptType(), req.GetRange())
 	defer result.Release()
 
 	if err != nil {
@@ -841,11 +841,11 @@ func (s *Server) YaklangLanguageSuggestion(ctx context.Context, req *ypb.Yaklang
 
 	// todo: 处理YakScriptType，不同语言的补全、提示可能有不同
 	switch req.InspectType {
-	case "completion":
+	case COMPLETION:
 		ret.SuggestionMessage = OnCompletion(prog, word, containPoint, ssaRange, v)
-	case "hover":
+	case HOVER:
 		ret.SuggestionMessage = OnHover(prog, word, containPoint, ssaRange, v)
-	case "signature":
+	case SIGNATURE:
 		ret.SuggestionMessage = OnSignature(prog, word, containPoint, ssaRange, v)
 	}
 	return ret, nil
