@@ -275,8 +275,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 		return value
 	case *javaparser.CastExpressionContext:
 		// 处理类型转换表达式
-		// todo: 类型转换表达式
-		return nil
+		return y.VisitExpression(ret.Expression())
 	case *javaparser.NewCreatorExpressionContext:
 		// 处理创建对象的表达式
 		return y.VisitCreator(ret.Creator())
@@ -1553,11 +1552,18 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) ssa.Value {
 		if class == nil {
 			log.Errorf("class  %v instantiation failed.", className)
 			obj.SetType(ssa.GetAnyType())
+
+			args := []ssa.Value{obj}
+			arguments := y.VisitClassCreatorRest(ret, className)
+			args = append(args, arguments...)
+			// new一个类的时候，如果这个类不存在，为了方便跟踪数据流也给它一个默认构造函数
+			a := y.EmitUndefined(className)
+			c := y.NewCall(a, args)
+			y.EmitCall(c)
+
 			return obj
 		}
-
 		obj.SetType(class)
-
 		constructor := class.Constructor
 		if constructor == nil {
 			return obj
