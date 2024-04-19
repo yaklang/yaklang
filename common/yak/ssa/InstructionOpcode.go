@@ -65,7 +65,7 @@ var SSAOpcode2Name = map[Opcode]string{
 
 func (i *Function) GetOpcode() Opcode        { return SSAOpcodeFunction }
 func (i *BasicBlock) GetOpcode() Opcode      { return SSAOpcodeBasicBlock }
-func (i *ParameterMember) GetOpcode() Opcode { return SSAOpcodeParameter }
+func (i *ParameterMember) GetOpcode() Opcode { return SSAOpcodeParameterMember }
 func (i *Parameter) GetOpcode() Opcode {
 	if i.IsFreeValue {
 		return SSAOpcodeFreeValue
