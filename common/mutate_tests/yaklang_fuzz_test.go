@@ -938,21 +938,49 @@ func TestFuzzCookie(t *testing.T) {
 		base base
 	}{
 		{
-			name: "Cookie参数",
+			name: "Cookie参数 默认",
 			base: base{
 				inputPacket: `GET / HTTP/1.1
 Host: www.baidu.com
 
 `,
-				code: `.FuzzCookie("a", "123").FuzzCookie("a", "456").FuzzCookie("c", true).FuzzCookie("d", "\"123\"").FuzzCookie("e", "a,b")`,
+				code: `.FuzzCookie("a", "123").FuzzCookie("e", "a,b")`,
 				expectKeywordInOutputPacket: []string{
 					`a=123`,
-					`b=123`,
-					`c=true`,
-					`d=123`,
-					`e="a,b"`,
+					`e="a%2cb"`,
 				},
 				debug: true,
+			},
+		},
+		{
+			name: "Cookie参数 默认",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzCookie("a", "123").FuzzCookie("e", "a,b")`,
+				expectKeywordInOutputPacket: []string{
+					`a=123`,
+					`e="a%2cb"`,
+				},
+				debug: true,
+			},
+		},
+		{
+			name: "Cookie参数 禁止编码",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzCookie("a", "123").FuzzCookie("e", "a,b")`,
+				expectKeywordInOutputPacket: []string{
+					`a=123`,
+					`e="a,b"`,
+				},
+				debug:         true,
+				disableEncode: true,
 			},
 		},
 		{

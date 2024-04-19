@@ -899,13 +899,21 @@ func (f *FuzzHTTPRequest) fuzzCookie(k, v interface{}, encoded ...codec.EncodedF
 		key, value := pair[0], pair[1]
 		var rspIns *http.Request
 		var err error
-		if encoded != nil {
-			rspIns, err = lowhttp.ParseBytesToHttpRequest(
-				lowhttp.ReplaceHTTPPacketCookieWithEncoding(origin, key, value),
-			)
-		} else {
+		if f.NoAutoEncode() {
 			rspIns, err = lowhttp.ParseBytesToHttpRequest(
 				lowhttp.ReplaceHTTPPacketCookie(origin, key, value),
+			)
+		} else {
+			// 把 url 解码放到 encoded 最前
+			combinedEncoded := []codec.EncodedFunc{
+				func(value interface{}) string {
+					// cookie value 的特殊格式
+					return lowhttp.CookieSafeQuoteString(value.(string))
+				},
+			}
+			combinedEncoded = append(combinedEncoded, encoded...)
+			rspIns, err = lowhttp.ParseBytesToHttpRequest(
+				lowhttp.ReplaceHTTPPacketCookieWithEncoding(origin, key, value, combinedEncoded...),
 			)
 		}
 

@@ -69,20 +69,33 @@ func CookieSafeUnquoteString(i string) string {
 const CookieTimeFormat = "Mon, 02 Jan 2006 15:04:05 GMT"
 
 func CookiesToString(cookies []*http.Cookie, encoded ...codec.EncodedFunc) string {
+	// go 原生的处理方式
+	if encoded == nil {
+		var cookieStrings []string
+		for _, cookie := range cookies {
+			cookieStrings = append(cookieStrings, cookie.String())
+		}
+		return strings.Join(cookieStrings, "; ")
+	}
+
 	results := funk.Map(cookies, func(c *http.Cookie) string {
 		var b strings.Builder
 		b.Grow(len(c.Name) + len(c.Value) + len(c.Domain) + len(c.Path) + 110 /*RFC 6265 Sec 4.1. extraCookieLength*/)
-		b.WriteString(url.QueryEscape(c.Name))
+		b.WriteString(c.Name)
 		b.WriteRune('=')
-		b.WriteString(CookieSafeQuoteString(c.Value))
+		for _, encode := range encoded {
+			c.Value = encode(c.Value)
+		}
+		b.WriteString(c.Value)
 		if len(c.Path) > 0 {
 			b.WriteString("; Path=")
-			b.WriteString(CookieSafeQuoteString(c.Path))
+			b.WriteString(c.Path)
 		}
 
 		if len(c.Domain) > 0 {
 			b.WriteString("; Domain=")
-			b.WriteString(CookieSafeQuoteString(strings.TrimLeft(c.Domain, ".")))
+			// RFC 6265 requires leading dot for non-IP, non-localhost domains
+			b.WriteString(strings.TrimLeft(c.Domain, "."))
 		}
 
 		var buf [len(CookieTimeFormat)]byte
