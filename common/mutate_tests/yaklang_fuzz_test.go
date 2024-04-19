@@ -944,11 +944,13 @@ func TestFuzzCookie(t *testing.T) {
 Host: www.baidu.com
 
 `,
-				code: `.FuzzCookie("a", "123").FuzzCookie("b", 123).FuzzCookie("c", true)`,
+				code: `.FuzzCookie("a", "123").FuzzCookie("a", "456").FuzzCookie("c", true).FuzzCookie("d", "\"123\"").FuzzCookie("e", "a,b")`,
 				expectKeywordInOutputPacket: []string{
 					`a=123`,
 					`b=123`,
 					`c=true`,
+					`d=123`,
+					`e="a,b"`,
 				},
 				debug: true,
 			},

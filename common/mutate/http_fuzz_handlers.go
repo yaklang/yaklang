@@ -4,15 +4,14 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/antchfx/xmlquery"
 	"github.com/tidwall/gjson"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"strings"
-	"sync"
-
-	"github.com/antchfx/xmlquery"
-	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -175,7 +174,7 @@ func (f *FuzzHTTPRequest) fuzzPath(paths ...string) ([]*http.Request, error) {
 		}
 		var replaced []byte
 		if f.NoAutoEncode() {
-			replaced = lowhttp.ReplaceHTTPPacketPathWithoutEncode(rawRequest, pathTotal[i])
+			replaced = lowhttp.ReplaceHTTPPacketPathWithoutEncoding(rawRequest, pathTotal[i])
 		} else {
 			replaced = lowhttp.ReplaceHTTPPacketPath(rawRequest, pathTotal[i])
 		}
@@ -503,7 +502,7 @@ func (f *FuzzHTTPRequest) fuzzGetParamsJsonPath(key any, jsonPath string, val an
 	return reqs, nil
 }
 
-func (f *FuzzHTTPRequest) fuzzGetParams(key interface{}, value interface{}, encoded ...EncodedFunc) ([]*http.Request, error) {
+func (f *FuzzHTTPRequest) fuzzGetParams(key interface{}, value interface{}, encoded ...codec.EncodedFunc) ([]*http.Request, error) {
 	req, err := f.GetOriginHTTPRequest()
 	if err != nil {
 		return nil, err
@@ -588,7 +587,7 @@ func (f *FuzzHTTPRequest) FuzzPostRaw(body ...string) FuzzHTTPRequestIf {
 	return NewFuzzHTTPRequestBatch(f, reqs...)
 }
 
-func (f *FuzzHTTPRequest) fuzzPostParams(k, v interface{}, encoded ...EncodedFunc) ([]*http.Request, error) {
+func (f *FuzzHTTPRequest) fuzzPostParams(k, v interface{}, encoded ...codec.EncodedFunc) ([]*http.Request, error) {
 	req, err := f.GetOriginHTTPRequest()
 	if err != nil {
 		return nil, err
@@ -876,15 +875,10 @@ func (f *FuzzHTTPRequest) FuzzUploadFileName(k, v interface{}) FuzzHTTPRequestIf
 	return r
 }
 
-func (f *FuzzHTTPRequest) fuzzCookie(k, v interface{}, encoded ...EncodedFunc) ([]*http.Request, error) {
+func (f *FuzzHTTPRequest) fuzzCookie(k, v interface{}, encoded ...codec.EncodedFunc) ([]*http.Request, error) {
 	req, err := f.GetOriginHTTPRequest()
 	if err != nil {
 		return nil, err
-	}
-
-	cookies := new(sync.Map)
-	for _, c := range req.Cookies() {
-		cookies.Store(c.Name, c)
 	}
 
 	keys := InterfaceToFuzzResults(k)
@@ -903,15 +897,18 @@ func (f *FuzzHTTPRequest) fuzzCookie(k, v interface{}, encoded ...EncodedFunc) (
 	for {
 		pair := m.Value()
 		key, value := pair[0], pair[1]
-		// 应该使用 parseCookieValue
-		value = strings.Trim(value, "\"")
-		for _, e := range encoded {
-			value = e(value)
+		var rspIns *http.Request
+		var err error
+		if encoded != nil {
+			rspIns, err = lowhttp.ParseBytesToHttpRequest(
+				lowhttp.ReplaceHTTPPacketCookieWithEncoding(origin, key, value),
+			)
+		} else {
+			rspIns, err = lowhttp.ParseBytesToHttpRequest(
+				lowhttp.ReplaceHTTPPacketCookie(origin, key, value),
+			)
 		}
 
-		rspIns, err := lowhttp.ParseBytesToHttpRequest(
-			lowhttp.ReplaceHTTPPacketCookie(origin, key, value),
-		)
 		if err != nil {
 			log.Infof("parse (in FuzzCookie) request failed: %v", err)
 			continue

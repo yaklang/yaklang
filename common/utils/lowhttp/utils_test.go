@@ -260,9 +260,9 @@ func TestParseCookie(t *testing.T) {
 			name: "request cookie",
 			args: args{
 				key: "cookie",
-				raw: `a=b; c=d; e="f"`,
+				raw: `a=b; c=d; e="f"; g=h, z`,
 			},
-			want: "a=b; c=d; e=f",
+			want: `a=b; c=d; e=f; g="h, z"`,
 		},
 		{
 			// RFC 6265
