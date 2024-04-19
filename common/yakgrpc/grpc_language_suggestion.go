@@ -154,9 +154,9 @@ func getStandardLibrarySuggestions() []*ypb.SuggestionDescription {
 	return standardLibrarySuggestions
 }
 
-func getFrontValueByOffset(prog *ssaapi.Program, editor *memedit.MemEditor, rng *ypb.Range) *ssaapi.Value {
+func getFrontValueByOffset(prog *ssaapi.Program, editor *memedit.MemEditor, rng *ssa.Range) *ssaapi.Value {
 	// use editor instead of prog.Program.Editor because of ssa cache
-	offset := editor.GetOffsetByPositionRaw(int(rng.GetEndLine()), int(rng.GetEndColumn()))
+	offset := rng.GetEndOffset()
 	value := prog.Program.GetFrontValueByOffset(offset)
 	if !utils.IsNil(value) {
 		return ssaapi.NewValue(value)
@@ -819,8 +819,8 @@ func GrpcRangeToSSARange(sourceCode string, r *ypb.Range) *ssa.Range {
 	e := memedit.NewMemEditor(sourceCode)
 	return ssa.NewRange(
 		e,
-		ssa.NewPosition(r.StartLine, r.StartColumn),
-		ssa.NewPosition(r.EndLine, r.EndColumn),
+		ssa.NewPosition(r.StartLine, r.StartColumn-1),
+		ssa.NewPosition(r.EndLine, r.EndColumn-1),
 	)
 }
 
