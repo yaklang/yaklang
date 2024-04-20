@@ -191,7 +191,7 @@ a = Error()`
 	// 		)
 	// 	})
 
-	t.Run("stdlib function", func(t *testing.T) {
+	t.Run("standary library function", func(t *testing.T) {
 		code := `ssa.Parse("")
 ssa.Parse("")`
 
@@ -203,6 +203,22 @@ ssa.Parse("")`
 			[]memedit.RangeIf{
 				newRangeFromText("1:1 1:10"),
 				newRangeFromText("2:1 2:10"),
+			},
+		)
+	})
+
+	t.Run("standary function", func(t *testing.T) {
+		code := `println(1)
+println(2)`
+
+		checkReferences(t,
+			local,
+			code,
+			"yak",
+			newRangeFromText("1:1 1:7"),
+			[]memedit.RangeIf{
+				newRangeFromText("1:1 1:8"),
+				newRangeFromText("2:1 2:8"),
 			},
 		)
 	})
