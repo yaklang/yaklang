@@ -85,6 +85,15 @@ func (b *FunctionBuilder) readValueEx(
 	}
 
 	if ret := b.TryBuildExternValue(name); ret != nil {
+
+		// create variable for extern lib value
+		variable := ret.GetVariable(name)
+		if variable == nil {
+			variable = b.CreateVariable(name)
+			ret.AddVariable(variable)
+		} else {
+			variable.AddRange(b.CurrentRange, true)
+		}
 		// set offset value for extern value
 		if program != nil {
 			program.SetOffsetValue(ret, b.CurrentRange)
