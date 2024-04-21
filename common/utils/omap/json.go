@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/tidwall/gjson"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -13,6 +15,48 @@ func (v *OrderedMap[T, V]) Jsonify() []byte {
 		return nil
 	}
 	return raw
+}
+
+func (v *OrderedMap[T, V]) UnmarshalJSON(raw []byte) error {
+	gresult := gjson.ParseBytes(raw)
+
+	// as list
+	if gresult.IsArray() {
+		for _, r := range gresult.Array() {
+			var value V
+			err := json.Unmarshal([]byte(r.Raw), &value)
+			if err != nil {
+				// [WARN] 2024-04-22 00:38:35 [json:29] cannot unmarshal value: json: cannot unmarshal object into Go value of type ssautil.VersionedIF[github.com/yaklang/yaklang/common/yak/ssa.Value] to <nil>
+				log.Warnf("cannot unmarshal value: %v to %T", err, value)
+				continue
+			}
+			v.Push(value)
+		}
+		return nil
+	} else if gresult.IsObject() {
+		gresult.ForEach(func(key, value gjson.Result) bool {
+			var val V
+			err := json.Unmarshal([]byte(value.Raw), &val)
+			if err != nil {
+				log.Warnf("cannot unmarshal value: %v to %T", err, val)
+				return true
+			}
+			var keyResult T
+			err = json.Unmarshal([]byte(key.Raw), &key)
+			if err != nil {
+				return true
+			}
+			v.Set(keyResult, val)
+			return true
+		})
+		return nil
+	} else if gresult.IsBool() {
+		v.SetLiteralValue(gresult.Bool())
+		return nil
+	} else {
+		v.SetLiteralValue(gresult.Num)
+	}
+	return nil
 }
 
 func (v *OrderedMap[T, V]) MarshalJSON() ([]byte, error) {

@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -15,15 +16,14 @@ import (
 	"testing"
 )
 
-func TestCompileWithDatabase_Scope(t *testing.T) {
+func TestCompileWithDatabase_Scope_Phi(t *testing.T) {
 	uid := uuid.New()
 	prog, err := ssaapi.Parse(`
-f = a+b+c+d
-e = (i) => {
-return  i + 1
+a = 1
+if (c > 1) {
+	a = 2
 }
-dump("Hello")
-dump(e(5))
+d = a
 `, ssaapi.WithDatabaseProgramName(uid.String()))
 	if err != nil {
 		panic(err)
@@ -38,6 +38,13 @@ dump(e(5))
 	if scope.GetPersistentProgramName() != uid.String() {
 		t.Fatal("scope is not a persistent scope")
 	}
+
+	scopePersistent := ssa.GetScopeFromIrScopeId(scope.GetPersistentId())
+	if scopePersistent == nil {
+		t.Fatalf("failed to get scope from ir scope id: %d", scope.GetPersistentId())
+	}
+	verbose := scopePersistent.ReadVariable("a").String()
+	spew.Dump(verbose)
 }
 
 func TestCompileWithDatabase_Big(t *testing.T) {

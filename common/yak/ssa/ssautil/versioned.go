@@ -59,6 +59,7 @@ type VersionedIF[T versionedValue] interface {
 	IsRoot() bool
 	GetId() int64
 	MarshalJSON() ([]byte, error)
+	UnmarshalJSON([]byte) error
 }
 
 type Versioned[T versionedValue] struct {
@@ -82,6 +83,37 @@ func (v *Versioned[T]) GetId() int64 {
 		return 0
 	}
 	return v.Value.GetId()
+}
+
+func (v *Versioned[T]) UnmarshalJSON(raw []byte) error {
+	if v == nil {
+		return nil
+	}
+	params := make(map[string]any)
+	err := json.Unmarshal(raw, &params)
+	if err != nil {
+		return err
+	}
+	capId := v.versionIndex
+	_ = capId
+
+	v.versionIndex = utils.MapGetInt(params, "version_index")
+	v.globalIndex = utils.MapGetInt(params, "global_index")
+	v.lexicalName = utils.MapGetString(params, "lexical_name")
+	v.local = utils.MapGetBool(params, "local")
+	v.isAssigned = utils.NewAtomicBool()
+	v.isAssigned.SetTo(utils.MapGetBool(params, "is_assigned"))
+
+	valIdx := utils.MapGetInt(params, "value")
+	// lazy value for ssa.Value
+	_ = valIdx
+
+	// lazy scope, scope 可能是不需要的，
+	// 因为一般在反序列化这个结果的过程中，
+	// 都已经知道是谁的 Scope 了，
+	// 外部赋值即可满足需求
+
+	return nil
 }
 
 func (v *Versioned[T]) MarshalJSON() ([]byte, error) {
