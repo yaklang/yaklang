@@ -10,6 +10,7 @@ import (
 type IrScopeNode struct {
 	gorm.Model
 
+	ProgramName   string     `json:"program_name" gorm:"index"`
 	ParentNodeId  int64      `json:"parent_node_id" gorm:"index"`
 	ChildrenNodes Int64Slice `json:"children" gorm:"type:text"`
 	ExtraInfo     string     `json:"extraInfo"`
@@ -31,7 +32,7 @@ func RequireScopeNode() (int64, *IrScopeNode) {
 	return int64(treeNode.ID), treeNode
 }
 
-func GetTreeNode(id int64) (*IrScopeNode, error) {
+func GetIrScope(id int64) (*IrScopeNode, error) {
 	db := consts.GetGormProjectDatabase()
 	migrateTreeNode(db)
 	treeNode := &IrScopeNode{}

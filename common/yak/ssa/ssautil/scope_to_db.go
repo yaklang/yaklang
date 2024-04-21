@@ -12,7 +12,6 @@ func (s *ScopedVersionedTable[T]) SaveToDatabase() error {
 	if !s.ShouldSaveToDatabase() {
 		return nil
 	}
-
 	params := make(map[string]any)
 
 	// save to database
@@ -53,6 +52,7 @@ func (s *ScopedVersionedTable[T]) SaveToDatabase() error {
 	}
 	s.persistentNode.ExtraInfo = string(raw)
 
+	s.persistentNode.ProgramName = s.persistentProgramName
 	if err := consts.GetGormProjectDatabase().Save(s.persistentNode).Error; err != nil {
 		return utils.Error(err.Error())
 	}
@@ -65,7 +65,7 @@ func (s *ScopedVersionedTable[T]) SyncFromDatabase() error {
 	}
 
 	var err error
-	s.persistentNode, err = ssadb.GetTreeNode(s.persistentId)
+	s.persistentNode, err = ssadb.GetIrScope(s.persistentId)
 	if err != nil {
 		return utils.Wrapf(err, "failed to get tree node")
 	}
@@ -77,6 +77,48 @@ func (s *ScopedVersionedTable[T]) SyncFromDatabase() error {
 	}
 
 	// load to database
+	s.level = utils.MapGetInt(params, "level")
+
+	quotedValues := utils.MapGetString(params, "values")
+	quotedVariable := utils.MapGetString(params, "variable")
+	quotedCaptured := utils.MapGetString(params, "captured")
+	quotedIncomingPhi := utils.MapGetString(params, "incomingPhi")
+	s.spin = utils.MapGetBool(params, "spin")
+	s.parentId = utils.MapGetInt64(params, "parent")
+
+	values, err := strconv.Unquote(quotedValues)
+	if err != nil {
+		return utils.Wrapf(err, "unquote values error")
+	}
+	if err := s.values.UnmarshalJSON([]byte(values)); err != nil {
+		return utils.Wrapf(err, "unmarshal values error")
+	}
+
+	variable, err := strconv.Unquote(quotedVariable)
+	if err != nil {
+		return utils.Wrapf(err, "unquote variable error")
+	}
+	if err := s.variable.UnmarshalJSON([]byte(variable)); err != nil {
+		return utils.Wrapf(err, "unmarshal variable error")
+	}
+
+	captured, err := strconv.Unquote(quotedCaptured)
+	if err != nil {
+		return utils.Wrapf(err, "unquote captured error")
+	}
+
+	if err := s.captured.UnmarshalJSON([]byte(captured)); err != nil {
+		return utils.Wrapf(err, "unmarshal captured error")
+	}
+
+	incomingPhi, err := strconv.Unquote(quotedIncomingPhi)
+	if err != nil {
+		return utils.Wrapf(err, "unquote incomingPhi error")
+	}
+
+	if err := s.incomingPhi.UnmarshalJSON([]byte(incomingPhi)); err != nil {
+		return utils.Wrapf(err, "unmarshal incomingPhi error")
+	}
 
 	return nil
 }

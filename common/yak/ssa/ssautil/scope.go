@@ -67,10 +67,15 @@ type ScopedVersionedTableIF[T versionedValue] interface {
 	SyncFromDatabase() error
 	SaveToDatabase() error
 	GetPersistentId() int64
+	SetPersistentId(i int64)
 }
 
 func (s *ScopedVersionedTable[T]) GetPersistentId() int64 {
 	return s.persistentId
+}
+
+func (s *ScopedVersionedTable[T]) SetPersistentId(i int64) {
+	s.persistentId = i
 }
 
 func (s *ScopedVersionedTable[T]) GetPersistentProgramName() string {
