@@ -1,6 +1,8 @@
 package ssautil
 
 import (
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"reflect"
 	"sync"
 
@@ -46,6 +48,7 @@ type ScopedVersionedTableIF[T versionedValue] interface {
 	// get scope level, each scope has a level, the root scope is 0, the sub scope is {parent-scope.level + 1}
 	GetScopeLevel() int
 	GetParent() ScopedVersionedTableIF[T]
+	SetParent(ScopedVersionedTableIF[T])
 
 	IsSameOrSubScope(ScopedVersionedTableIF[T]) bool
 	Compare(ScopedVersionedTableIF[T]) bool
@@ -59,9 +62,21 @@ type ScopedVersionedTableIF[T versionedValue] interface {
 	Merge(bool, MergeHandle[T], ...ScopedVersionedTableIF[T])
 	Spin(ScopedVersionedTableIF[T], ScopedVersionedTableIF[T], SpinHandle[T])
 	SetSpin(func(string) T)
+
+	// db
+	SyncFromDatabase() error
+	SaveToDatabase() error
+	GetPersistentId() int64
+}
+
+func (s *ScopedVersionedTable[T]) GetPersistentId() int64 {
+	return s.persistentId
 }
 
 type ScopedVersionedTable[T versionedValue] struct {
+	persistentId   int64 // > 0 in db
+	persistentNode *ssadb.TreeNode
+
 	level         int
 	offsetFetcher GlobalIndexFetcher // fetch the next global index
 	// new versioned variable
@@ -76,39 +91,46 @@ type ScopedVersionedTable[T versionedValue] struct {
 
 	incomingPhi *omap.OrderedMap[string, VersionedIF[T]]
 
-	// global id to versioned variable
-	table map[int]VersionedIF[T]
-
 	// for loop
 	spin           bool
 	createEmptyPhi func(string) T
 
 	// relations
-	this   ScopedVersionedTableIF[T]
-	parent ScopedVersionedTableIF[T]
+	this     ScopedVersionedTableIF[T]
+	parentId int64
+
+	// do not use _parent direct access
+	// use GetParent
+	_parent ScopedVersionedTableIF[T]
 }
 
 func NewScope[T versionedValue](
 	fetcher func() int,
 	newVersioned VersionedBuilder[T],
-	table map[int]VersionedIF[T],
 	parent ScopedVersionedTableIF[T],
 ) *ScopedVersionedTable[T] {
+	treeNodeId, treeNode := ssadb.RequireTreeNode()
 	s := &ScopedVersionedTable[T]{
-		offsetFetcher: fetcher,
-		newVersioned:  newVersioned,
-		values:        omap.NewOrderedMap[string, *omap.OrderedMap[string, VersionedIF[T]]](map[string]*omap.OrderedMap[string, VersionedIF[T]]{}),
-		variable:      omap.NewOrderedMap[T, []VersionedIF[T]](map[T][]VersionedIF[T]{}),
-		captured:      omap.NewOrderedMap[string, VersionedIF[T]](map[string]VersionedIF[T]{}),
-		incomingPhi:   omap.NewOrderedMap[string, VersionedIF[T]](map[string]VersionedIF[T]{}),
-		table:         table,
+		persistentNode: treeNode,
+		persistentId:   treeNodeId,
+		offsetFetcher:  fetcher,
+		newVersioned:   newVersioned,
+		values:         omap.NewOrderedMap[string, *omap.OrderedMap[string, VersionedIF[T]]](map[string]*omap.OrderedMap[string, VersionedIF[T]]{}),
+		variable:       omap.NewOrderedMap[T, []VersionedIF[T]](map[T][]VersionedIF[T]{}),
+		captured:       omap.NewOrderedMap[string, VersionedIF[T]](map[string]VersionedIF[T]{}),
+		incomingPhi:    omap.NewOrderedMap[string, VersionedIF[T]](map[string]VersionedIF[T]{}),
 	}
 	s.SetThis(s)
 	if parent != nil {
 		s.level = parent.GetScopeLevel() + 1
-		s.parent = parent.GetThis()
+		//s.parent = parent.GetThis()
+		s.SetParent(parent.GetThis())
 	} else {
 		s.level = 0
+	}
+	err := s.SaveToDatabase()
+	if err != nil {
+		log.Warnf("save to database failed: %s", err)
 	}
 	return s
 }
@@ -136,20 +158,31 @@ func NewRootVersionedTable[T versionedValue](
 		}
 	}
 
-	return NewScope[T](finalFetcher, newVersioned, map[int]VersionedIF[T]{}, nil)
+	return NewScope[T](finalFetcher, newVersioned, nil)
 }
 
 func (v *ScopedVersionedTable[T]) CreateSubScope() ScopedVersionedTableIF[T] {
-	sub := NewScope[T](v.offsetFetcher, v.newVersioned, v.table, v)
+	sub := NewScope[T](v.offsetFetcher, v.newVersioned, v)
 	return sub
 }
 
 func (v *ScopedVersionedTable[T]) GetParent() ScopedVersionedTableIF[T] {
-	return v.parent
+	if v._parent == nil {
+		if v.parentId <= 0 {
+			return nil
+		}
+		panic("UNFINISHED for loading parent from database")
+	}
+	return v._parent
+}
+
+func (v *ScopedVersionedTable[T]) SetParent(parent ScopedVersionedTableIF[T]) {
+	v._parent = parent
+	v.parentId = parent.GetPersistentId()
 }
 
 func (v *ScopedVersionedTable[T]) IsRoot() bool {
-	return v.parent == nil
+	return v._parent == nil && v.parentId <= 0
 }
 
 func (v *ScopedVersionedTable[T]) SetThis(scope ScopedVersionedTableIF[T]) {
@@ -189,8 +222,8 @@ func (scope *ScopedVersionedTable[T]) ReadVariable(name string) VersionedIF[T] {
 	if result := scope.getLatestVersionInCurrentLexicalScope(name); result != nil {
 		ret = result
 	} else {
-		if scope.parent != nil {
-			ret = scope.parent.ReadVariable(name)
+		if scope.GetParent() != nil {
+			ret = scope.GetParent().ReadVariable(name)
 		} else {
 			ret = nil
 		}
@@ -202,6 +235,9 @@ func (scope *ScopedVersionedTable[T]) ReadVariable(name string) VersionedIF[T] {
 			scope.AssignVariable(t, scope.createEmptyPhi(name))
 			// t.origin = ret
 			scope.incomingPhi.Set(name, t)
+			if err := scope.SaveToDatabase(); err != nil {
+				log.Warnf("save to database failed: %s", err)
+			}
 			ret = t
 		}
 	}
@@ -224,6 +260,12 @@ func (v *ScopedVersionedTable[T]) CreateVariable(name string, isLocal bool) Vers
 
 // ---------------- Assign
 func (scope *ScopedVersionedTable[T]) AssignVariable(variable VersionedIF[T], value T) {
+	defer func() {
+		if err := scope.SaveToDatabase(); err != nil {
+			log.Warnf("sync scope to database failed: %s", err)
+		}
+	}()
+
 	ret, ok := scope.values.Get(variable.GetName())
 	if !ok {
 		scope.values.Set(variable.GetName(), omap.NewOrderedMap[string, VersionedIF[T]](map[string]VersionedIF[T]{}))
@@ -267,6 +309,9 @@ func (ps *ScopedVersionedTable[T]) ForEachCapturedVariable(handler CaptureVariab
 
 func (scope *ScopedVersionedTable[T]) SetCapturedVariable(name string, ver VersionedIF[T]) {
 	scope.captured.Set(name, ver)
+	if err := scope.SaveToDatabase(); err != nil {
+		log.Warnf("save to database failed: %s", err)
+	}
 }
 
 // CreateSymbolicVariable create a non-lexical and no named variable
@@ -296,7 +341,7 @@ func (v *ScopedVersionedTable[T]) tryRegisterCapturedVariable(name string, ver V
 		return
 	}
 	// get variable from parent
-	parentVariable := v.parent.ReadVariable(name)
+	parentVariable := v.GetParent().ReadVariable(name)
 	if parentVariable == nil {
 		return
 	}
@@ -311,7 +356,6 @@ func (v *ScopedVersionedTable[T]) newVar(lexName string, local bool) VersionedIF
 		global,
 		lexName, local, v.GetThis(),
 	)
-	v.table[global] = varIns
 	return varIns
 }
 

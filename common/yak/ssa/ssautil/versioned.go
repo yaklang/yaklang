@@ -1,6 +1,7 @@
 package ssautil
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 
@@ -16,6 +17,7 @@ type versionedValue interface {
 type SSAValue interface {
 	IsUndefined() bool
 	SelfDelete()
+	GetId() int64
 }
 
 // VersionedIF is an interface for versioned variable, scope will use this interface
@@ -55,6 +57,8 @@ type VersionedIF[T versionedValue] interface {
 	GetGlobalIndex() int // global id
 	GetRootVersion() VersionedIF[T]
 	IsRoot() bool
+	GetId() int64
+	MarshalJSON() ([]byte, error)
 }
 
 type Versioned[T versionedValue] struct {
@@ -71,6 +75,34 @@ type Versioned[T versionedValue] struct {
 
 	isAssigned *utils.AtomicBool
 	Value      T
+}
+
+func (v *Versioned[T]) GetId() int64 {
+	if v.Value == nil {
+		return 0
+	}
+	return v.Value.GetId()
+}
+
+func (v *Versioned[T]) MarshalJSON() ([]byte, error) {
+	params := make(map[string]any)
+	var capId int64 = 0
+	if v.captureVariable != nil {
+		capId = v.captureVariable.GetId()
+	}
+	params["capture_variable"] = capId
+	params["version_index"] = v.versionIndex
+	params["global_index"] = v.globalIndex
+	params["lexical_name"] = v.lexicalName
+	params["local"] = v.local
+	params["scope"] = v.scope.GetPersistentId()
+	params["is_assigned"] = v.isAssigned.IsSet()
+	var valIdx int64 = 0
+	if v.Value != nil {
+		valIdx = v.Value.GetId()
+	}
+	params["value"] = valIdx
+	return json.Marshal(params)
 }
 
 func NewVersioned[T versionedValue](globalIndex int, name string, local bool, scope ScopedVersionedTableIF[T]) VersionedIF[T] {
