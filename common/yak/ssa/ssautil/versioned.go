@@ -78,7 +78,7 @@ type Versioned[T versionedValue] struct {
 }
 
 func (v *Versioned[T]) GetId() int64 {
-	if v.Value == nil {
+	if isZeroValue(v.Value) {
 		return 0
 	}
 	return v.Value.GetId()
@@ -98,7 +98,7 @@ func (v *Versioned[T]) MarshalJSON() ([]byte, error) {
 	params["scope"] = v.scope.GetPersistentId()
 	params["is_assigned"] = v.isAssigned.IsSet()
 	var valIdx int64 = 0
-	if v.Value != nil {
+	if isZeroValue(v.Value) {
 		valIdx = v.Value.GetId()
 	}
 	params["value"] = valIdx

@@ -75,7 +75,7 @@ func (s *ScopedVersionedTable[T]) GetPersistentId() int64 {
 
 type ScopedVersionedTable[T versionedValue] struct {
 	persistentId   int64 // > 0 in db
-	persistentNode *ssadb.TreeNode
+	persistentNode *ssadb.ScopeNode
 
 	level         int
 	offsetFetcher GlobalIndexFetcher // fetch the next global index
@@ -109,7 +109,7 @@ func NewScope[T versionedValue](
 	newVersioned VersionedBuilder[T],
 	parent ScopedVersionedTableIF[T],
 ) *ScopedVersionedTable[T] {
-	treeNodeId, treeNode := ssadb.RequireTreeNode()
+	treeNodeId, treeNode := ssadb.RequireScopeNode()
 	s := &ScopedVersionedTable[T]{
 		persistentNode: treeNode,
 		persistentId:   treeNodeId,
