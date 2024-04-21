@@ -10,10 +10,13 @@ type value interface {
 	String() string
 	IsUndefined() bool
 	SelfDelete()
+	GetId() int64
 }
 
 type phi struct {
 	edge []value
+
+	visited bool
 }
 
 func NewPhi(edge ...value) *phi {
@@ -31,32 +34,48 @@ func (p *phi) Replace(old, new value) {
 }
 
 func (p *phi) String() string {
+	if p.visited {
+		return "self"
+	} else {
+		p.visited = true
+		defer func() {
+			p.visited = false
+		}()
+	}
 	return fmt.Sprintf("phi%s", p.edge)
 }
 
 func (p *phi) IsUndefined() bool { return false }
 func (p *phi) SelfDelete()       {}
 
-type consts struct {
+type constsIns struct {
 	value any
 }
 
-func NewConsts(value any) *consts {
-	return &consts{
+func (c *constsIns) GetId() int64 {
+	return 0
+}
+
+func NewConsts(value any) *constsIns {
+	return &constsIns{
 		value: value,
 	}
 }
 
-func (c *consts) Replace(old, new value) {}
+func (c *constsIns) Replace(old, new value) {}
 
-func (c *consts) String() string {
+func (c *constsIns) String() string {
 	return fmt.Sprintf("const(%v)", c.value)
 }
-func (p *consts) IsUndefined() bool { return false }
-func (p *consts) SelfDelete()       {}
+func (p *constsIns) IsUndefined() bool { return false }
+func (p *constsIns) SelfDelete()       {}
 
 type binary struct {
 	X, Y value
+}
+
+func (b *binary) GetId() int64 {
+	return 0
 }
 
 func NewBinary(x, y value) *binary {
@@ -112,3 +131,7 @@ var _ ScopedVersionedTableIF[value] = (*ScopedVersionedTable[value])(nil)
 
 var _ LabelTarget[value] = (*LoopStmt[value])(nil)
 var _ LabelTarget[value] = (*SwitchStmt[value])(nil)
+
+func (v *phi) GetId() int64 {
+	return 0
+}
