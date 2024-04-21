@@ -73,9 +73,14 @@ func (s *ScopedVersionedTable[T]) GetPersistentId() int64 {
 	return s.persistentId
 }
 
+func (s *ScopedVersionedTable[T]) GetPersistentProgramName() string {
+	return s.persistentProgramName
+}
+
 type ScopedVersionedTable[T versionedValue] struct {
-	persistentId   int64 // > 0 in db
-	persistentNode *ssadb.ScopeNode
+	persistentProgramName string
+	persistentId          int64 // > 0 in db
+	persistentNode        *ssadb.IrScopeNode
 
 	level         int
 	offsetFetcher GlobalIndexFetcher // fetch the next global index
@@ -104,21 +109,31 @@ type ScopedVersionedTable[T versionedValue] struct {
 	_parent ScopedVersionedTableIF[T]
 }
 
+func (s *ScopedVersionedTable[T]) ShouldSaveToDatabase() bool {
+	return s.persistentProgramName != "" && s.persistentId > 0
+}
+
 func NewScope[T versionedValue](
+	programName string,
 	fetcher func() int,
 	newVersioned VersionedBuilder[T],
 	parent ScopedVersionedTableIF[T],
 ) *ScopedVersionedTable[T] {
-	treeNodeId, treeNode := ssadb.RequireScopeNode()
+	var treeNodeId int64
+	var treeNode *ssadb.IrScopeNode
+	if programName != "" {
+		treeNodeId, treeNode = ssadb.RequireScopeNode()
+	}
 	s := &ScopedVersionedTable[T]{
-		persistentNode: treeNode,
-		persistentId:   treeNodeId,
-		offsetFetcher:  fetcher,
-		newVersioned:   newVersioned,
-		values:         omap.NewOrderedMap[string, *omap.OrderedMap[string, VersionedIF[T]]](map[string]*omap.OrderedMap[string, VersionedIF[T]]{}),
-		variable:       omap.NewOrderedMap[T, []VersionedIF[T]](map[T][]VersionedIF[T]{}),
-		captured:       omap.NewOrderedMap[string, VersionedIF[T]](map[string]VersionedIF[T]{}),
-		incomingPhi:    omap.NewOrderedMap[string, VersionedIF[T]](map[string]VersionedIF[T]{}),
+		persistentProgramName: programName,
+		persistentNode:        treeNode,
+		persistentId:          treeNodeId,
+		offsetFetcher:         fetcher,
+		newVersioned:          newVersioned,
+		values:                omap.NewOrderedMap[string, *omap.OrderedMap[string, VersionedIF[T]]](map[string]*omap.OrderedMap[string, VersionedIF[T]]{}),
+		variable:              omap.NewOrderedMap[T, []VersionedIF[T]](map[T][]VersionedIF[T]{}),
+		captured:              omap.NewOrderedMap[string, VersionedIF[T]](map[string]VersionedIF[T]{}),
+		incomingPhi:           omap.NewOrderedMap[string, VersionedIF[T]](map[string]VersionedIF[T]{}),
 	}
 	s.SetThis(s)
 	if parent != nil {
@@ -136,6 +151,7 @@ func NewScope[T versionedValue](
 }
 
 func NewRootVersionedTable[T versionedValue](
+	programName string,
 	newVersioned VersionedBuilder[T],
 	fetcher ...func() int,
 ) *ScopedVersionedTable[T] {
@@ -158,11 +174,11 @@ func NewRootVersionedTable[T versionedValue](
 		}
 	}
 
-	return NewScope[T](finalFetcher, newVersioned, nil)
+	return NewScope[T](programName, finalFetcher, newVersioned, nil)
 }
 
 func (v *ScopedVersionedTable[T]) CreateSubScope() ScopedVersionedTableIF[T] {
-	sub := NewScope[T](v.offsetFetcher, v.newVersioned, v)
+	sub := NewScope[T](v.persistentProgramName, v.offsetFetcher, v.newVersioned, v)
 	return sub
 }
 

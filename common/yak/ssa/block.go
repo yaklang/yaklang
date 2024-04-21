@@ -35,7 +35,7 @@ func (f *Function) newBasicBlockEx(name string, isSealed bool, nodAddToBlocks bo
 		Phis:        make([]*Phi, 0),
 		Handler:     nil,
 		finish:      false,
-		ScopeTable:  NewScope(),
+		ScopeTable:  NewScope(f.GetProgram().GetProgramName()),
 		symbolTable: make(map[string]Values),
 	}
 	b.SetName(name)
