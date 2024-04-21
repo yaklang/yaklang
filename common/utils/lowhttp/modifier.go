@@ -731,6 +731,7 @@ func handleHTTPPacketCookie(packet []byte, key string, value any, encoded ...cod
 		}
 
 		k, cookieRaw := SplitHTTPHeader(line)
+
 		if (strings.ToLower(k) == "cookie" && isReq) || (strings.ToLower(k) == "set-cookie" && isRsp) {
 			existed := ParseCookie(k, cookieRaw)
 			if len(existed) <= 0 {
@@ -744,6 +745,7 @@ func handleHTTPPacketCookie(packet []byte, key string, value any, encoded ...cod
 				}
 				cookies[index] = c
 			}
+			// TODO 只处理要替换的cookie
 			return k + ": " + CookiesToString(cookies, encoded...)
 		}
 		return line
@@ -815,11 +817,14 @@ func handleAppendHTTPPacketCookie(packet []byte, key string, value any, encoded 
 
 		k, cookieRaw := SplitHTTPHeader(line)
 		if (strings.ToLower(k) == "cookie" && isReq) || (strings.ToLower(k) == "set-cookie" && isRsp) {
-			existed := ParseCookie(k, cookieRaw)
-			existed = append(existed, &http.Cookie{Name: key, Value: utils.InterfaceToString(value)})
+			//existed := ParseCookie(k, cookieRaw)
+			//adds := []
+			cookies := make([]*http.Cookie, 0)
+			add := &http.Cookie{Name: key, Value: utils.InterfaceToString(value)}
 			added = true
-
-			return k + ": " + CookiesToString(existed, encoded...)
+			cookies = append(cookies, add)
+			// TODO 只处理要追加的cookie
+			return k + ": " + cookieRaw + "; " + CookiesToString(cookies, encoded...)
 		}
 
 		return line
@@ -828,12 +833,12 @@ func handleAppendHTTPPacketCookie(packet []byte, key string, value any, encoded 
 		if isReq {
 			header = strings.Trim(header, CRLF) + CRLF + "Cookie: " + CookiesToString([]*http.Cookie{
 				{Name: key, Value: utils.InterfaceToString(value)},
-			})
+			}, encoded...)
 		}
 		if isRsp {
 			header = strings.Trim(header, CRLF) + CRLF + "Set-Cookie: " + CookiesToString([]*http.Cookie{
 				{Name: key, Value: utils.InterfaceToString(value)},
-			})
+			}, encoded...)
 		}
 	}
 	return ReplaceHTTPPacketBody([]byte(header), body, isChunked)
