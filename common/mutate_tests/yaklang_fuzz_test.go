@@ -953,15 +953,15 @@ Host: www.baidu.com
 			},
 		},
 		{
-			name: "Cookie参数 默认",
+			name: "Cookie参数 默认2",
 			base: base{
 				inputPacket: `GET / HTTP/1.1
 Host: www.baidu.com
 
 `,
-				code: `.FuzzCookie("a", "123").FuzzCookie("e", "a,b")`,
+				code: `.FuzzCookie("a", "123").FuzzCookie("a", "345").FuzzCookie("e", "a,b")`,
 				expectKeywordInOutputPacket: []string{
-					`a=123`,
+					`a=345`,
 					`e="a%2cb"`,
 				},
 				debug: true,
@@ -979,8 +979,9 @@ Host: www.baidu.com
 					`a=123`,
 					`e="a,b"`,
 				},
-				debug:         true,
-				disableEncode: true,
+				debug: true,
+				//disableEncode: true,
+				friendlyDisplay: true,
 			},
 		},
 		{
