@@ -10,9 +10,9 @@ type ScopeIF ssautil.ScopedVersionedTableIF[Value]
 
 var _ ssautil.ScopedVersionedTableIF[Value] = (*Scope)(nil)
 
-func NewScope() *Scope {
+func NewScope(name string) *Scope {
 	s := &Scope{
-		ScopedVersionedTable: ssautil.NewRootVersionedTable[Value](NewVariable),
+		ScopedVersionedTable: ssautil.NewRootVersionedTable[Value](name, NewVariable),
 	}
 	s.SetThis(s)
 	return s

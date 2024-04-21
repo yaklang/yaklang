@@ -7,7 +7,7 @@ import (
 	"sync"
 )
 
-type ScopeNode struct {
+type IrScopeNode struct {
 	gorm.Model
 
 	ParentNodeId  int64      `json:"parent_node_id" gorm:"index"`
@@ -19,22 +19,22 @@ var migrateTreeNodeOnce = new(sync.Once)
 
 func migrateTreeNode(db *gorm.DB) {
 	migrateTreeNodeOnce.Do(func() {
-		db.AutoMigrate(&ScopeNode{})
+		db.AutoMigrate(&IrScopeNode{})
 	})
 }
 
-func RequireScopeNode() (int64, *ScopeNode) {
+func RequireScopeNode() (int64, *IrScopeNode) {
 	db := consts.GetGormProjectDatabase()
 	migrateTreeNode(db)
-	treeNode := &ScopeNode{}
+	treeNode := &IrScopeNode{}
 	db.Create(&treeNode)
 	return int64(treeNode.ID), treeNode
 }
 
-func GetTreeNode(id int64) (*ScopeNode, error) {
+func GetTreeNode(id int64) (*IrScopeNode, error) {
 	db := consts.GetGormProjectDatabase()
 	migrateTreeNode(db)
-	treeNode := &ScopeNode{}
+	treeNode := &IrScopeNode{}
 	if db := db.First(treeNode, id); db.Error != nil {
 		return nil, utils.Errorf("failed to get tree node: %v", db.Error)
 	}
