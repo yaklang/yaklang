@@ -31,7 +31,7 @@ func TestSyntaxBlock(t *testing.T) {
 		block BuilderReturnScopeFunc,
 		afterBlock BuilderFunc,
 	) {
-		global := NewRootVersionedTable[value](NewVersioned[value])
+		global := NewRootVersionedTable[value]("", NewVersioned[value])
 		/*
 			beforeBlock()
 			{
@@ -153,7 +153,7 @@ func TestIfScope_If(t *testing.T) {
 		a// phi(1, 2)
 		b// 1
 	*/
-	table := NewRootVersionedTable[value](NewVersioned[value])
+	table := NewRootVersionedTable[value]("", NewVersioned[value])
 	writeVariable(table, "a", NewConsts("1"))
 	writeVariable(table, "b", NewConsts("1"))
 
@@ -191,7 +191,7 @@ func TestIfScope_IfELse(t *testing.T) {
 		b// phi(2, 1)
 		c// 1
 	*/
-	table := NewRootVersionedTable[value](NewVersioned[value])
+	table := NewRootVersionedTable[value]("", NewVersioned[value])
 	writeVariable(table, "a", NewConsts("1"))
 	writeVariable(table, "b", NewConsts("1"))
 	writeVariable(table, "c", NewConsts("1"))
@@ -235,7 +235,7 @@ func TestIfScope_IfELseIf(t *testing.T) {
 		a // phi(1, 2, 3)
 	*/
 
-	global := NewRootVersionedTable[value](NewVersioned[value])
+	global := NewRootVersionedTable[value]("", NewVersioned[value])
 	writeVariable(global, "a", NewConsts("1"))
 
 	build := NewIfStmt[value](global)
@@ -277,7 +277,7 @@ func TestIfScope_If_condition_assign(t *testing.T) {
 			a // nil undefine
 	*/
 
-	global := NewRootVersionedTable[value](NewVersioned[value])
+	global := NewRootVersionedTable[value]("", NewVersioned[value])
 	one := NewConsts("1")
 	two := NewConsts("2")
 	// global.writeVariable("a", one)
@@ -333,7 +333,7 @@ func TestIfScope_If_condition_assign_checkMerge(t *testing.T) {
 		buildBody BuilderReturnScopeFunc,
 		afterIf BuilderFunc,
 	) {
-		global := NewRootVersionedTable[value](NewVersioned[value])
+		global := NewRootVersionedTable[value]("", NewVersioned[value])
 		beforeIf(global)
 		build := NewIfStmt[value](global)
 		build.BuildItem(
@@ -422,7 +422,7 @@ func TestIfScope_In_SyntaxBlock(t *testing.T) {
 			afterBlock()
 		*/
 
-		global := NewRootVersionedTable[value](NewVersioned[value])
+		global := NewRootVersionedTable[value]("", NewVersioned[value])
 		beforeBlock(global)
 		end := BuildSyntaxBlock[value](global, func(svt ScopedVersionedTableIF[value]) ScopedVersionedTableIF[value] {
 			beforeIf(svt)
@@ -525,7 +525,7 @@ func TestLoopScope_Basic(t *testing.T) {
 		body BuilderReturnScopeFunc,
 		loopThird, afterLoop BuilderFunc,
 	) {
-		global := NewRootVersionedTable[value](NewVersioned[value])
+		global := NewRootVersionedTable[value]("", NewVersioned[value])
 		beforeLoop(global)
 
 		builder := NewLoopStmt[value](global, NewPhiValue)
@@ -700,7 +700,7 @@ func TestIfLoopScope_Basic(t *testing.T) {
 
 	test := assert.New(t)
 
-	global := NewRootVersionedTable[value](NewVersioned[value])
+	global := NewRootVersionedTable[value]("", NewVersioned[value])
 	zero := NewConsts("0")
 	one := NewConsts("1")
 	two := NewConsts("2")
@@ -760,7 +760,7 @@ func TestIfLoopScope_Break(t *testing.T) {
 	*/
 
 	test := assert.New(t)
-	global := NewRootVersionedTable[value](NewVersioned[value])
+	global := NewRootVersionedTable[value]("", NewVersioned[value])
 	writeVariable(global, "i", zero)
 
 	var ConditionVariable, ThirdVariable1, TrueVariable, BinaryVariable value
@@ -815,7 +815,7 @@ func TestIfLoopScope_Continue(t *testing.T) {
 	*/
 
 	test := assert.New(t)
-	global := NewRootVersionedTable[value](NewVersioned[value])
+	global := NewRootVersionedTable[value]("", NewVersioned[value])
 	writeVariable(global, "i", zero)
 
 	var ConditionVariable, ThirdVariable1, TrueVariable, BinaryVariable value

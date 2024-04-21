@@ -9,8 +9,8 @@ import (
 )
 
 func (s *ScopedVersionedTable[T]) SaveToDatabase() error {
-	if s.persistentId <= 0 {
-		return utils.Error("persistentNode should not be nil")
+	if !s.ShouldSaveToDatabase() {
+		return nil
 	}
 
 	params := make(map[string]any)
@@ -60,8 +60,8 @@ func (s *ScopedVersionedTable[T]) SaveToDatabase() error {
 }
 
 func (s *ScopedVersionedTable[T]) SyncFromDatabase() error {
-	if s.persistentId <= 0 {
-		return utils.Error("persistentId should be greater than 0")
+	if !s.ShouldSaveToDatabase() {
+		return nil
 	}
 
 	var err error
