@@ -140,6 +140,7 @@ func (p *PackageLoader) LoadDirectoryPackage(packageName string, once bool) (cha
 		}
 		err = filesys.Recursive(
 			absDir,
+			filesys.WithRecursiveDirectory(false),
 			filesys.WithFileStat(func(s string, f fs.File, info fs.FileInfo) error {
 				ch <- FileDescriptor{
 					FileName: s,
