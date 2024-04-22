@@ -37,7 +37,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionCompletion(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	getCompletion := func(t *testing.T, code string, Range *ypb.Range, ids ...string) *ypb.YaklangLanguageSuggestionResponse {
+	getCompletion := func(t *testing.T, code string, r *ypb.Range, ids ...string) *ypb.YaklangLanguageSuggestionResponse {
 		var id string
 		if len(ids) == 0 {
 			id = uuid.NewString()
@@ -48,9 +48,9 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionCompletion(t *testing.T) {
 		// 	tmpCode := strings.TrimSuffix(code, ".")
 		// 	GetSuggestion(local, "completion", "yak", t, tmpCode, Range, id)
 		// }
-		return GetSuggestion(local, COMPLETION, "yak", t, code, Range, id)
+		return GetSuggestion(local, COMPLETION, "yak", t, code, r, id)
 	}
-	checkCompletionContains := func(t *testing.T, code string, Range *ypb.Range, want []string, ids ...string) {
+	checkCompletionWithCallback := func(t *testing.T, code string, r *ypb.Range, callback func(suggestions []*ypb.SuggestionDescription), ids ...string) {
 		t.Helper()
 		var id string
 		if len(ids) == 0 {
@@ -59,17 +59,24 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionCompletion(t *testing.T) {
 			id = ids[0]
 		}
 
-		res := getCompletion(t, code, Range, id)
+		res := getCompletion(t, code, r, id)
 		if len(res.SuggestionMessage) == 0 {
 			t.Fatal("should get completion but not")
 		}
-		got := lo.Map(res.SuggestionMessage, func(item *ypb.SuggestionDescription, _ int) string {
-			return item.Label
+		callback(res.SuggestionMessage)
+	}
+
+	checkCompletionContains := func(t *testing.T, code string, r *ypb.Range, want []string, ids ...string) {
+		t.Helper()
+		checkCompletionWithCallback(t, code, r, func(suggestions []*ypb.SuggestionDescription) {
+			labels := lo.Map(suggestions, func(item *ypb.SuggestionDescription, _ int) string {
+				return item.Label
+			})
+			log.Info("got: ", labels)
+			if !utils.StringSliceContainsAll(labels, want...) {
+				t.Fatalf("want %v, but got %v", want, labels)
+			}
 		})
-		log.Info("got: ", got)
-		if !utils.StringSliceContainsAll(got, want...) {
-			t.Fatalf("want %v, but got %v", want, got)
-		}
 	}
 
 	t.Run("before symbols", func(t *testing.T) {
@@ -82,6 +89,26 @@ func TestGRPCMUSTPASS_LANGUAGE_SuggestionCompletion(t *testing.T) {
 			EndLine:     1,
 			EndColumn:   22,
 		}, []string{"a", "b", "c"})
+	})
+
+	t.Run("before with repeated symbols", func(t *testing.T) {
+		t.Parallel()
+
+		checkCompletionWithCallback(t,
+			`a = 1; a = 2; `,
+			&ypb.Range{
+				Code:        "",
+				StartLine:   1,
+				StartColumn: 14,
+				EndLine:     1,
+				EndColumn:   15,
+			},
+			func(suggestions []*ypb.SuggestionDescription) {
+				labels := lo.Map(suggestions, func(item *ypb.SuggestionDescription, _ int) string {
+					return item.Label
+				})
+				require.Equal(t, 1, lo.Count(labels, "a"), `want only 1 "a" label but got 2`)
+			})
 	})
 
 	t.Run("function returns", func(t *testing.T) {
@@ -211,10 +238,24 @@ a.`, &ypb.Range{
 			&ypb.Range{
 				Code:        "ssa.",
 				StartLine:   1,
-				StartColumn: 17,
+				StartColumn: 16,
 				EndLine:     1,
 				EndColumn:   20,
 			}, []string{"Parse"})
+	})
+
+	t.Run("bytes builtin method", func(t *testing.T) {
+		t.Parallel()
+		checkCompletionContains(t,
+			`rsp, _ = poc.HTTP("")~
+rsp.`,
+			&ypb.Range{
+				Code:        "rsp.",
+				StartLine:   2,
+				StartColumn: 1,
+				EndLine:     2,
+				EndColumn:   5,
+			}, []string{"Contains"})
 	})
 }
 

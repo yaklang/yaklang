@@ -676,10 +676,15 @@ func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng *ssa
 		// 关键字补全
 		ret = append(ret, getLanguageKeywordSuggestions()...)
 		// 自定义变量补全
+		uniqMap := make(map[string]struct{})
+
 		for _, item := range prog.GetAllOffsetItemsBefore(rng.GetEndOffset()) {
 			variable := item.GetVariable()
 			varName := variable.GetName()
-
+			if _, ok := uniqMap[varName]; ok {
+				continue
+			}
+			uniqMap[varName] = struct{}{}
 			v := ssaapi.NewValue(item.GetValue())
 
 			// 不应该再补全标准库
@@ -742,17 +747,11 @@ func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng *ssa
 	typStr := getGolangTypeStringBySSAType(bareTyp)
 	typKind := bareTyp.GetTypeKind()
 	switch typKind {
+	case ssa.BytesTypeKind:
+		// []byte 内置方法
+		ret = append(ret, getBytesBuiltinMethodSuggestions()...)
 	case ssa.SliceTypeKind, ssa.TupleTypeKind:
-		// []byte / [] 内置方法
-		rTyp, ok := bareTyp.(*ssa.ObjectType)
-		if !ok {
-			break
-		}
-		if rTyp.KeyTyp.GetTypeKind() == ssa.BytesTypeKind {
-			ret = append(ret, getBytesBuiltinMethodSuggestions()...)
-		} else {
-			ret = append(ret, getSliceBuiltinMethodSuggestions()...)
-		}
+		ret = append(ret, getSliceBuiltinMethodSuggestions()...)
 	case ssa.MapTypeKind:
 		// map 内置方法
 		ret = append(ret, getMapBuiltinMethodSuggestions()...)
