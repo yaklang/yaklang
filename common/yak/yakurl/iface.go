@@ -73,6 +73,8 @@ func (s *ActionService) CreateAction(schema string) Action {
 		return &documentAction{}
 	case "facades":
 		return newFacadeServerAction()
+	case "yakshell":
+		return &wsm.YakShellResourceAction{}
 	default:
 		return nil
 	}
