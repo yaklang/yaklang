@@ -2,8 +2,11 @@ package ssautil
 
 import (
 	"encoding/json"
+	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"strconv"
 )
@@ -90,34 +93,75 @@ func (s *ScopedVersionedTable[T]) SyncFromDatabase() error {
 	if err != nil {
 		return utils.Wrapf(err, "unquote values error")
 	}
-	if err := s.values.UnmarshalJSON([]byte(values)); err != nil {
-		return utils.Wrapf(err, "unmarshal values error")
+	if gres := gjson.Parse(values); gres.IsObject() {
+		gres.ForEach(func(key, value gjson.Result) bool {
+			if element := gjson.Parse(value.Raw); element.IsArray() {
+				m := omap.NewOrderedMap(make(map[string]VersionedIF[T]))
+				for _, versioned := range element.Array() {
+					var v VersionedIF[T]
+					if err := v.UnmarshalJSON([]byte(versioned.Raw)); err != nil {
+						return false
+					}
+					m.Push(v)
+				}
+				s.values.Set(key.String(), m)
+			}
+			return true
+		})
 	}
 
 	variable, err := strconv.Unquote(quotedVariable)
 	if err != nil {
 		return utils.Wrapf(err, "unquote variable error")
 	}
-	if err := s.variable.UnmarshalJSON([]byte(variable)); err != nil {
-		return utils.Wrapf(err, "unmarshal variable error")
+	if gres := gjson.Parse(variable); gres.IsObject() {
+		gres.ForEach(func(key, value gjson.Result) bool {
+			var v []VersionedIF[T]
+			err := json.Unmarshal([]byte(value.Raw), &v)
+			if err != nil {
+				return false
+			}
+			var k T
+			err = json.Unmarshal([]byte(key.Raw), &k)
+			if err != nil {
+				log.Warnf("failed to unmarshal key(T): %v", err)
+				return false
+			}
+			s.variable.Set(k, v)
+			return true
+		})
 	}
 
 	captured, err := strconv.Unquote(quotedCaptured)
 	if err != nil {
 		return utils.Wrapf(err, "unquote captured error")
 	}
-
-	if err := s.captured.UnmarshalJSON([]byte(captured)); err != nil {
-		return utils.Wrapf(err, "unmarshal captured error")
+	if gres := gjson.Parse(captured); gres.IsObject() {
+		gres.ForEach(func(key, value gjson.Result) bool {
+			var v VersionedIF[T]
+			err := json.Unmarshal([]byte(value.Raw), &v)
+			if err != nil {
+				return false
+			}
+			s.captured.Set(key.String(), v)
+			return true
+		})
 	}
 
 	incomingPhi, err := strconv.Unquote(quotedIncomingPhi)
 	if err != nil {
 		return utils.Wrapf(err, "unquote incomingPhi error")
 	}
-
-	if err := s.incomingPhi.UnmarshalJSON([]byte(incomingPhi)); err != nil {
-		return utils.Wrapf(err, "unmarshal incomingPhi error")
+	if gres := gjson.Parse(incomingPhi); gres.IsObject() {
+		gres.ForEach(func(key, value gjson.Result) bool {
+			var v VersionedIF[T]
+			err := json.Unmarshal([]byte(value.Raw), &v)
+			if err != nil {
+				return false
+			}
+			s.incomingPhi.Set(key.String(), v)
+			return true
+		})
 	}
 
 	return nil
