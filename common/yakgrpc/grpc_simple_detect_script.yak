@@ -31,6 +31,10 @@ if progressData > 0 {
 yakit.SetProgress(baseProgress)
 
 taskName = cli.String("task-name")
+db.SetKey("simple_detect_"+runtimeID, json.dumps({"task_name":taskName}))
+
+
+
 
 tcpPorts = cli.String(
     "ports",
@@ -287,7 +291,7 @@ if loadPluginFinished > 0 || loadPluginFailed > 0 {
     onlyBrute = true
     yakit.StatusCard("加载插件", "弱口令检测")
 }
-db.SetKey("simple_detect_"+runtimeID, json.dumps({"plugins":loadPluginFinished}))
+db.SetKey("simple_detect_"+runtimeID, json.dumps({"plugins":loadPluginFinished,"task_name":taskName}))
 
 
 yakit.Info("扫描参数设置完成，准备扫描~")
@@ -351,7 +355,7 @@ if !skippedHostAliveScan && recordPtr == 0 {
 
     hostCount = ScanHostCount
     yakit.StatusCard("Ping存活主机数", aliveHostCount)
-    db.SetKey("simple_detect_"+runtimeID, json.dumps({"pingAliveHostTotal":aliveHostCount,"plugins":loadPluginFinished}))
+    db.SetKey("simple_detect_"+runtimeID, json.dumps({"pingAliveHostTotal":aliveHostCount,"plugins":loadPluginFinished,"task_name":taskName}))
     aliveHostStr = str.Trim(aliveHostStr, "\n")
 
     HostAliveFile = file.Join(yakit.GetHomeTempDir(), runtimeID)
@@ -386,7 +390,7 @@ portTotal = len(str.RemoveDuplicatePorts(tcpPorts, synPorts))
 yakit.StatusCard("扫描主机数", hostTotal)
 yakit.StatusCard("扫描端口数", portTotal)
 yakit.StatusCard("开放端口数/已扫主机数", "-/-")
-db.SetKey("simple_detect_"+runtimeID, json.dumps({"hostTotal":hostTotal,"portTotal":portTotal,"pingAliveHostTotal":aliveHostCount,"plugins":loadPluginFinished}))
+db.SetKey("simple_detect_"+runtimeID, json.dumps({"hostTotal":hostTotal,"portTotal":portTotal,"pingAliveHostTotal":aliveHostCount,"plugins":loadPluginFinished,"task_name":taskName}))
 
 totalTasks = hostTotal * portTotal
 portResultFinalTotal = 0
