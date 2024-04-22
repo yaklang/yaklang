@@ -28,13 +28,16 @@ filterExpr
     | regexpLiteral                           # RegexpLiteralFilter
     | numberLiteral                           # NumberIndexFilter
     | op = ('>>' | '<<') filterExpr           # DirectionFilter
-    | '.' filterExpr                          # FieldFilter
-    | filterExpr '.' filterExpr               # FieldCallFilter
-    | filterExpr '[' filterExpr ']'           # FieldIndexFilter
+    | '.' nameFilter                          # FieldFilter
+    | filterExpr '.' nameFilter               # FieldCallFilter
+    | filterExpr '(' (nameFilter? ',') * ')'  # FunctionCallFilter
+    | filterExpr '[' nameFilter ']'           # FieldIndexFilter
     | filterExpr '?' '('conditionExpression ')'     # OptionalFilter
     | filterExpr '=>' chainFilter             # AheadChainFilter
     | filterExpr '==>' chainFilter            # DeepChainFilter
     ;
+
+nameFilter: identifier | regexpLiteral | numberLiteral;
 
 chainFilter
     : '[' ((filters (',' filters)*) | '...') ']'          # Flat
