@@ -56,7 +56,11 @@ func LanguageServerAnalyzeProgram(code string, inspectType, scriptType string, r
 			prog, err = ssaapi.Parse(trimCode, opt...)
 			if err == nil {
 				// reset ssaRange and editor
-				newEditor := prog.Program.GetCurrentEditor()
+				newEditor, ok := prog.Program.GetEditor("")
+				if !ok {
+					newEditor = memedit.NewMemEditor(trimCode)
+				}
+				// newEditor := memedit.NewMemEditor(trimCode)
 				// end use old editor to get position
 				ssaRange = ssa.NewRange(newEditor, ssaRange.GetStart(), editor.GetPositionByOffset(endOffset-len(after)-1))
 				editor = newEditor

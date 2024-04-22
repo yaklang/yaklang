@@ -62,7 +62,7 @@ func Test_PackageLoader(t *testing.T) {
 		require.NoError(t, err, "LoadDirectoryPackage failed for c", err)
 		filepath := make([]string, 0)
 		for v := range ch {
-			filepath = append(filepath, v.PathName)
+			filepath = append(filepath, v.FileName)
 		}
 		require.Equal(t, []string{"testdata/b/b.txt"}, filepath, "LoadDirectoryPackage failed for b")
 	})

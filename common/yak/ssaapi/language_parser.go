@@ -54,7 +54,7 @@ func (c *config) parse() (ret *ssa.Program, err error) {
 	}()
 
 	prog := ssa.NewProgram(c.DatabaseProgramName, c.fs)
-	prog.Build = func(src io.Reader, fb *ssa.FunctionBuilder) error {
+	prog.Build = func(filePath string, src io.Reader, fb *ssa.FunctionBuilder) error {
 		// check builder
 		if c.Builder == nil {
 			return utils.Errorf("not support language %s", c.language)
@@ -75,6 +75,7 @@ func (c *config) parse() (ret *ssa.Program, err error) {
 
 		// include source code will change the context of the origin editor
 		newCodeEditor := memedit.NewMemEditor(code)
+		newCodeEditor.SetUrl(filePath)
 		fb.SetEditor(newCodeEditor) // set for current builder
 		if originEditor != nil {
 			originEditor.PushSourceCodeContext(newCodeEditor.SourceCodeMd5())
@@ -103,6 +104,7 @@ func (c *config) parse() (ret *ssa.Program, err error) {
 	}
 
 	builder := prog.GetAndCreateFunctionBuilder("main", "main")
+	// TODO: this extern info should be set in program
 	builder.WithExternLib(c.externLib)
 	builder.WithExternValue(c.externValue)
 	builder.WithExternMethod(c.externMethod)
@@ -115,7 +117,7 @@ func (c *config) parse() (ret *ssa.Program, err error) {
 				if !c.Builder.FilterFile(path) {
 					return nil
 				}
-				if err := prog.Build(f, builder); err != nil {
+				if err := prog.Build(path, f, builder); err != nil {
 					log.Errorf(
 						"ssaapi: build file %s with language %s error: %s",
 						path, c.language, err,
@@ -126,7 +128,7 @@ func (c *config) parse() (ret *ssa.Program, err error) {
 		)
 	} else if c.code != nil {
 		// parse code
-		if err := prog.Build(c.code, builder); err != nil {
+		if err := prog.Build("", c.code, builder); err != nil {
 			return nil, err
 		}
 	}
@@ -138,7 +140,7 @@ func (c *config) parse() (ret *ssa.Program, err error) {
 
 func (c *config) feed(prog *ssa.Program, code io.Reader) error {
 	builder := prog.GetAndCreateFunctionBuilder("main", "main")
-	if err := prog.Build(code, builder); err != nil {
+	if err := prog.Build("", code, builder); err != nil {
 		return err
 	}
 	builder.Finish()
