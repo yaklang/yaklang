@@ -62,7 +62,7 @@ func TestFS_Chains(t *testing.T) {
 		"testdata",
 		WithEmbedFS(testfs),
 		WithDir(
-			"testdata/ta",
+			"ta",
 			WithFileStat(func(s string, f fs.File, fi fs.FileInfo) error {
 				count++
 				log.Infof("match: %v", s)
