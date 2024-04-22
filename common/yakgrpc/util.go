@@ -104,7 +104,7 @@ func appendPluginNames(params []*ypb.ExecParamItem, plugins ...string) ([]*ypb.E
 }
 
 func KVPairToParamItem(params []*ypb.KVPair) []*ypb.ExecParamItem {
-	var res = []*ypb.ExecParamItem{}
+	res := []*ypb.ExecParamItem{}
 	for _, i := range params {
 		res = append(res, &ypb.ExecParamItem{Key: i.Key, Value: i.Value})
 	}
@@ -112,7 +112,7 @@ func KVPairToParamItem(params []*ypb.KVPair) []*ypb.ExecParamItem {
 }
 
 func ParamItemToKVPair(params []*ypb.ExecParamItem) []*ypb.KVPair {
-	var res = []*ypb.KVPair{}
+	res := []*ypb.KVPair{}
 	for _, i := range params {
 		res = append(res, &ypb.KVPair{Key: i.Key, Value: i.Value})
 	}
@@ -156,7 +156,15 @@ func appendPluginNamesEx(key string, splitStr string, params []*ypb.ExecParamIte
 	return params, callback, nil
 }
 
+func NewLocalClientWithReverseServer(locals ...bool) (ypb.YakClient, error) {
+	return newLocalClientEx(true, locals...)
+}
+
 func NewLocalClient(locals ...bool) (ypb.YakClient, error) {
+	return newLocalClientEx(false, locals...)
+}
+
+func newLocalClientEx(initFacadeServer bool, locals ...bool) (ypb.YakClient, error) {
 	var port int
 	var addr string
 	netx.UnsetProxyFromEnv()
@@ -176,7 +184,7 @@ func NewLocalClient(locals ...bool) (ypb.YakClient, error) {
 			grpc.MaxRecvMsgSize(100*1024*1024),
 			grpc.MaxSendMsgSize(100*1024*1024),
 		)
-		s, err := NewServerWithLogCache(false)
+		s, err := newServerEx(initFacadeServer, false)
 		if err != nil {
 			log.Errorf("build yakit server failed: %s", err)
 			return nil, err
@@ -223,9 +231,11 @@ type YamlArrayBuilder struct {
 func (a *YamlMapBuilder) SetDefaultField(fieldMap map[string]any) {
 	a.defaultField = fieldMap
 }
+
 func (a *YamlArrayBuilder) Add(slice *YamlMapBuilder) {
 	*a.slice = append(*a.slice, slice.slice)
 }
+
 func NewYamlMapBuilder() *YamlMapBuilder {
 	return &YamlMapBuilder{
 		keySet:       make(map[string]struct{}),
@@ -234,6 +244,7 @@ func NewYamlMapBuilder() *YamlMapBuilder {
 		forceKeySet:  make(map[string]struct{}),
 	}
 }
+
 func (m *YamlMapBuilder) FilterEmptyField() *yaml.MapSlice {
 	var res yaml.MapSlice
 	for _, item := range *m.slice {
@@ -268,6 +279,7 @@ func (m *YamlMapBuilder) FilterEmptyField() *yaml.MapSlice {
 	}
 	return &res
 }
+
 func (m *YamlMapBuilder) ForceSet(k string, v any) {
 	if _, ok := m.keySet[k]; ok {
 		return
@@ -279,6 +291,7 @@ func (m *YamlMapBuilder) ForceSet(k string, v any) {
 		Value: v,
 	})
 }
+
 func (m *YamlMapBuilder) Set(k string, v any) {
 	if _, ok := m.keySet[k]; ok {
 		return
@@ -296,23 +309,28 @@ func (m *YamlMapBuilder) Set(k string, v any) {
 		Value: v,
 	})
 }
+
 func (m *YamlMapBuilder) AddEmptyLine() {
 	m.emptyLineIndex++
 	m.Set("__empty_line__"+strconv.Itoa(m.emptyLineIndex), "__empty_line__")
 }
+
 func (m *YamlMapBuilder) AddComment(comment string) {
 	m.Set("__comment__", codec.EncodeToHex(comment))
 }
+
 func (m *YamlMapBuilder) NewSubMapBuilder(k string) *YamlMapBuilder {
 	newSliceUtil := NewYamlMapBuilder()
 	m.Set(k, newSliceUtil)
 	return newSliceUtil
 }
+
 func (m *YamlMapBuilder) NewSubArrayBuilder(k string) *YamlArrayBuilder {
 	var v []*yaml.MapSlice
 	m.Set(k, &v)
 	return &YamlArrayBuilder{slice: &v}
 }
+
 func (m *YamlMapBuilder) MarshalToString() (string, error) {
 	var res string
 	yamlContent, err := yaml.Marshal(m.FilterEmptyField())
