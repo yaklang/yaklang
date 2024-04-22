@@ -25,14 +25,14 @@ mirrorNewWebsite = (https, url, req, rsp, body) => {
 }
 
 mirrorNewWebsitePath = (https, url, req, rsp, body) => {
-l.Lock()
+    l.Lock()
     defer l.Unlock()
     var key = f"${token}_3"
     db.SetKey(key, atoi(db.GetKey(key))~ + 1)
 }
 
 mirrorNewWebsitePathParams = (https, url, req, rsp, body) => {
-l.Lock()
+    l.Lock()
     defer l.Unlock()
     var key = f"${token}_4"
     db.SetKey(key, atoi(db.GetKey(key))~ + 1)
