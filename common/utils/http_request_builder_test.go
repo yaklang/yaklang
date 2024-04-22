@@ -3,6 +3,7 @@ package utils
 import (
 	"bytes"
 	"fmt"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -160,21 +161,48 @@ func TestHTTPRequestBuilderForConnect(t *testing.T) {
 	}
 }
 
-func TestHTTP_RESP_Process_ContentLength0(t *testing.T) {
-	respReader := bytes.NewReader([]byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nX-Content-Type-Options: nosniff\r\n\r\n123"))
-	respIns, err := ReadHTTPResponseFromBufioReader(respReader, nil)
-	if err != nil {
-		t.Fatal(err)
+type respBodyTestCase struct {
+	packet  []byte
+	hasBody bool
+	req     *http.Request
+}
+
+func TestHTTP_RESP_ReadBody(t *testing.T) {
+	testCase := []respBodyTestCase{
+		{
+			packet:  []byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nX-Content-Type-Options: nosniff\r\n\r\n123"), // has cl
+			hasBody: false,
+		},
+		{
+			packet:  []byte("HTTP/1.1 200 OK\r\nX-Content-Type-Options: nosniff\r\n\r\n123"), // no cl , has entity header
+			hasBody: true,
+		},
+		{
+			packet:  []byte("HTTP/1.1 304 Not Modified\r\nX-Content-Type-Options: nosniff\r\n\r\n123"), // no cl, not 200 ok,has entity header
+			hasBody: false,
+		},
+		{
+			packet:  []byte("HTTP/1.1 200 OK\r\n\r\n123"), // no cl , no entity header , 200 ok
+			hasBody: false,
+		},
+		{
+			packet:  []byte("HTTP/1.1 200 OK\r\nContent-Length: 30\r\n\r\n123"), // head req, has cl
+			hasBody: false,
+			req: &http.Request{
+				Method: http.MethodHead,
+			},
+		},
 	}
 
-	respBytes, err := DumpHTTPResponse(respIns, true)
-	if err != nil {
-		t.Fatal(err)
+	for _, bodyTestCase := range testCase {
+		respReader := bytes.NewReader(bodyTestCase.packet)
+		respIns, err := ReadHTTPResponseFromBufioReader(respReader, bodyTestCase.req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if (respIns.Body != http.NoBody) != bodyTestCase.hasBody {
+			spew.Dump(bodyTestCase.packet)
+			t.Fatal("body not match, expect: ", bodyTestCase.hasBody, " got: ", respIns.Body != http.NoBody)
+		}
 	}
-
-	spew.Dump(respBytes)
-	if bytes.Contains(respBytes, []byte("123")) {
-		t.Fatal("read resp error")
-	}
-
 }
