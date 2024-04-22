@@ -27,6 +27,10 @@ func (v *BaseSyntaxFlowVisitor) VisitRefVariable(ctx *RefVariableContext) interf
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseSyntaxFlowVisitor) VisitRegexpLiteralFilter(ctx *RegexpLiteralFilterContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseSyntaxFlowVisitor) VisitDirectionFilter(ctx *DirectionFilterContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -35,11 +39,11 @@ func (v *BaseSyntaxFlowVisitor) VisitFieldFilter(ctx *FieldFilterContext) interf
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitAheadChainFilter(ctx *AheadChainFilterContext) interface{} {
+func (v *BaseSyntaxFlowVisitor) VisitFieldCallFilter(ctx *FieldCallFilterContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitParenFilter(ctx *ParenFilterContext) interface{} {
+func (v *BaseSyntaxFlowVisitor) VisitAheadChainFilter(ctx *AheadChainFilterContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -59,19 +63,11 @@ func (v *BaseSyntaxFlowVisitor) VisitPrimaryFilter(ctx *PrimaryFilterContext) in
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitListIndexFilter(ctx *ListIndexFilterContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BaseSyntaxFlowVisitor) VisitNumberIndexFilter(ctx *NumberIndexFilterContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseSyntaxFlowVisitor) VisitFieldChainFilter(ctx *FieldChainFilterContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseSyntaxFlowVisitor) VisitOptionalRootFilter(ctx *OptionalRootFilterContext) interface{} {
+func (v *BaseSyntaxFlowVisitor) VisitFieldIndexFilter(ctx *FieldIndexFilterContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -80,10 +76,6 @@ func (v *BaseSyntaxFlowVisitor) VisitFlat(ctx *FlatContext) interface{} {
 }
 
 func (v *BaseSyntaxFlowVisitor) VisitBuildMap(ctx *BuildMapContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseSyntaxFlowVisitor) VisitFilterFieldMember(ctx *FilterFieldMemberContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -132,10 +124,6 @@ func (v *BaseSyntaxFlowVisitor) VisitStringLiteral(ctx *StringLiteralContext) in
 }
 
 func (v *BaseSyntaxFlowVisitor) VisitRegexpLiteral(ctx *RegexpLiteralContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseSyntaxFlowVisitor) VisitTypeCast(ctx *TypeCastContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

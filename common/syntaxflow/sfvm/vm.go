@@ -1,11 +1,13 @@
 package sfvm
 
 import (
+	"fmt"
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	"sync"
 )
 
@@ -34,19 +36,44 @@ func (s *SyntaxFlowVirtualMachine) Debug(i ...bool) *SyntaxFlowVirtualMachine {
 	return s
 }
 
+func (s *SyntaxFlowVirtualMachine) Show() {
+	for _, i := range s.frames {
+		for _, c := range i.Codes {
+			fmt.Println(c.String())
+		}
+	}
+}
+
+func (s *SyntaxFlowVirtualMachine) ForEachFrame(h func(frame *SFFrame)) {
+	for _, i := range s.frames {
+		h(i)
+	}
+}
+
 func (s *SyntaxFlowVirtualMachine) Compile(text string) (ret error) {
 	defer func() {
 		if err := recover(); err != nil {
 			ret = utils.Wrapf(utils.Error(err), "Panic for SyntaxFlow compile")
 		}
 	}()
+	errLis := antlr4util.NewErrorListener()
+
 	lexer := sf.NewSyntaxFlowLexer(antlr.NewInputStream(text))
+	lexer.RemoveErrorListeners()
+	lexer.AddErrorListener(errLis)
 	astParser := sf.NewSyntaxFlowParser(antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel))
+	astParser.RemoveErrorListeners()
+	astParser.AddErrorListener(errLis)
+
 	result := NewSyntaxFlowVisitor()
 	result.text = text
 	result.VisitFlow(astParser.Flow())
 	var frame = result.CreateFrame(s.vars)
 	s.frames = append(s.frames, frame)
+
+	if len(errLis.GetErrors()) > 0 {
+		return utils.Errorf("SyntaxFlow compile error: %v", errLis.GetErrors())
+	}
 	return nil
 }
 

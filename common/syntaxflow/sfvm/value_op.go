@@ -5,6 +5,16 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+type ValueOperator interface {
+	ExactMatch() bool
+	GlobMatch() bool
+	RegexpMatch() bool
+	NumberEqual() bool
+
+	GetNextLevel() (Value, error)
+	GetNextMaxLevel() (Value, error)
+}
+
 func (op1 *Value) Exec(i SFVMOpCode, op2 *Value) (*Value, error) {
 	if op1.IsMap() {
 		return NewValue(op1.AsMap().Filter(func(s string, a any) (bool, error) {
