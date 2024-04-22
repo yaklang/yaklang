@@ -95,7 +95,7 @@ func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bo
 	var nobodyReqMethod bool
 	if req != nil { // some request method will not have body
 		nobodyReqMethod = strings.EqualFold(req.Method, http.MethodHead) ||
-			strings.EqualFold(req.Method, http.MethodOptions) ||
+			strings.EqualFold(req.Method, http.MethodTrace) ||
 			strings.EqualFold(req.Method, http.MethodConnect)
 	}
 
@@ -268,18 +268,20 @@ HandleExpect100Continue:
 			}
 		} else {
 			// handle content-length as default
-			if !nobodyReqMethod && (contentLengthInt > 0 || hasEntityHeader) {
-				if !useContentLength && contentLengthInt <= 0 {
-					contentLengthInt = 100 * 1000
+			if !nobodyReqMethod { // some request method will not have body
+				if !useContentLength && rsp.StatusCode == http.StatusOK && hasEntityHeader {
+					contentLengthInt = 100 * 1000 // no cl ,but maybe has body ,give 100k
 				}
-				var bodyRaw, err = io.ReadAll(io.NopCloser(io.LimitReader(bodyReader, int64(contentLengthInt))))
-				rawPacket.Write(bodyRaw)
-				if err != nil && err != io.EOF {
-					return nil, errors.Wrap(err, "read body error")
+				if contentLengthInt > 0 {
+					var bodyRaw, err = io.ReadAll(io.NopCloser(io.LimitReader(bodyReader, int64(contentLengthInt))))
+					rawPacket.Write(bodyRaw)
+					if err != nil && err != io.EOF {
+						return nil, errors.Wrap(err, "read body error")
+					}
+					bodyLen := len(bodyRaw)
+					bodyRawBuf.Write(bodyRaw)
+					bodyRawBuf.WriteString(strings.Repeat("\n", contentLengthInt-bodyLen))
 				}
-				bodyLen := len(bodyRaw)
-				bodyRawBuf.Write(bodyRaw)
-				bodyRawBuf.WriteString(strings.Repeat("\n", contentLengthInt-bodyLen))
 			}
 		}
 	}
