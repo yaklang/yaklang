@@ -107,7 +107,7 @@ func WithDir(globDir string, opts ...Option) Option {
 			log.Errorf("glob-dir: %v compile failed: %s", globDir, err.Error())
 			return
 		}
-		log.Infof("dir match: %v: inst: %v", globDir, ins)
+		// log.Infof("dir match: %v: inst: %v", globDir, ins)
 		c.dirMatch = append(c.dirMatch, &dirMatch{
 			// dir:  globDir,
 			inst: ins,
