@@ -8,13 +8,13 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-type saveHTTPFlowHandler func(https bool, req []byte, rsp []byte, url string, remoteAddr string, reqSource string, runtimeId string, fromPlugin string, hiddenIndex string)
+type saveHTTPFlowHandler func(https bool, req []byte, rsp []byte, url string, remoteAddr string, reqSource string, runtimeId string, fromPlugin string, hiddenIndex string, payloads []string)
 
 var saveHTTPFlowFunc saveHTTPFlowHandler
 
 func RegisterSaveHTTPFlowHandler(h saveHTTPFlowHandler) {
 	m := new(sync.Mutex)
-	saveHTTPFlowFunc = func(https bool, req []byte, rsp []byte, url string, remoteAddr string, reqSource string, runtimeId string, fromPlugin string, hiddenIndex string) {
+	saveHTTPFlowFunc = func(https bool, req []byte, rsp []byte, url string, remoteAddr string, reqSource string, runtimeId string, fromPlugin string, hiddenIndex string, payloads []string) {
 		m.Lock()
 		defer m.Unlock()
 
@@ -23,7 +23,7 @@ func RegisterSaveHTTPFlowHandler(h saveHTTPFlowHandler) {
 				log.Errorf("call lowhttp.saveHTTPFlowFunc panic: %s", err)
 			}
 		}()
-		h(https, req, rsp, url, remoteAddr, reqSource, runtimeId, fromPlugin, hiddenIndex)
+		h(https, req, rsp, url, remoteAddr, reqSource, runtimeId, fromPlugin, hiddenIndex, payloads)
 	}
 }
 
@@ -40,5 +40,5 @@ func SaveResponse(r *LowhttpResponse) {
 	if r.TooLarge {
 		rawPacket = ReplaceHTTPPacketBodyFast(rawPacket, []byte(`[[response too large(`+utils.ByteSize(uint64(r.TooLargeLimit))+`), truncated]] find more in web fuzzer history!`))
 	}
-	saveHTTPFlowFunc(r.Https, r.RawRequest, rawPacket, r.Url, r.RemoteAddr, r.Source, r.RuntimeId, r.FromPlugin, r.HiddenIndex)
+	saveHTTPFlowFunc(r.Https, r.RawRequest, rawPacket, r.Url, r.RemoteAddr, r.Source, r.RuntimeId, r.FromPlugin, r.HiddenIndex, r.Payloads)
 }

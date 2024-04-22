@@ -180,6 +180,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		connPool             = option.ConnPool
 		withConnPool         = option.WithConnPool
 		sni                  = option.SNI
+		payloads             = option.Payloads
 		firstAuth            = true
 	)
 
@@ -219,6 +220,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 				response.TooLarge = true
 				response.TooLargeLimit = int64(option.MaxContentLength)
 			}
+			response.Payloads = payloads
 			SaveResponse(response)
 		}()
 		select {

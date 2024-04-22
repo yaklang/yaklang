@@ -89,6 +89,9 @@ type httpPoolConfig struct {
 
 	// 外部开关，用于控制暂停与继续
 	ExternSwitch *utils.Switch
+
+	// withPayloads 是否查询 payloads
+	WithPayloads bool
 }
 
 // WithPoolOpt_DNSNoCache is not effective
@@ -491,6 +494,12 @@ func _httpPool_ExternSwitch(sw *utils.Switch) HttpPoolConfigOption {
 	}
 }
 
+func _httpPool_withPayloads(b bool) HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.WithPayloads = b
+	}
+}
+
 type HttpPoolConfigOption func(config *httpPoolConfig)
 
 type HttpResult struct {
@@ -747,6 +756,10 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 
 						if config.EnableMaxContentLength {
 							lowhttpOptions = append(lowhttpOptions, lowhttp.WithMaxContentLength(int(config.MaxContentLength)))
+						}
+
+						if config.WithPayloads {
+							lowhttpOptions = append(lowhttpOptions, lowhttp.WithPayloads(payloads))
 						}
 
 						rspInstance, err := lowhttp.HTTP(lowhttpOptions...)
@@ -1019,4 +1032,5 @@ var (
 	WithPoolOpt_RequestCountLimiter        = _httpPool_RequestCountLimiter
 	WithConnPool                           = _httpPool_withConnPool
 	WithPoolOpt_ExternSwitch               = _httpPool_ExternSwitch
+	WithPoolOpt_WithPayloads               = _httpPool_withPayloads
 )
