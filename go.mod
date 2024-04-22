@@ -72,7 +72,7 @@ require (
 	github.com/kataras/golog v0.0.10
 	github.com/kataras/pio v0.0.2
 	github.com/kevinburke/ssh_config v1.2.0
-	github.com/knqyf263/go-rpmdb v0.0.0-20230517124904-b97c85e63254
+	github.com/knqyf263/go-rpmdb v0.1.0
 	github.com/kr/fs v0.1.0
 	github.com/lestrrat/go-file-rotatelogs v0.0.0-20180223000712-d3151e2a480f
 	github.com/lor00x/goldap v0.0.0-20180618054307-a546dffdd1a3

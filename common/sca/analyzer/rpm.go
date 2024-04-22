@@ -26,24 +26,21 @@ func init() {
 	sql.Register("sqlite", &sqlite3.SQLiteDriver{})
 }
 
-var (
-	rpmRequiredFiles = []string{
-		// Berkeley DB
-		"usr/lib/sysimage/rpm/Packages",
-		"var/lib/rpm/Packages",
+var rpmRequiredFiles = []string{
+	// Berkeley DB
+	"usr/lib/sysimage/rpm/Packages",
+	"var/lib/rpm/Packages",
 
-		// NDB
-		"usr/lib/sysimage/rpm/Packages.db",
-		"var/lib/rpm/Packages.db",
+	// NDB
+	"usr/lib/sysimage/rpm/Packages.db",
+	"var/lib/rpm/Packages.db",
 
-		// SQLite3
-		"usr/lib/sysimage/rpm/rpmdb.sqlite",
-		"var/lib/rpm/rpmdb.sqlite",
-	}
-)
-
-type rpmAnalyzer struct {
+	// SQLite3
+	"usr/lib/sysimage/rpm/rpmdb.sqlite",
+	"var/lib/rpm/rpmdb.sqlite",
 }
+
+type rpmAnalyzer struct{}
 
 func NewRPMAnalyzer() *rpmAnalyzer {
 	return &rpmAnalyzer{}
@@ -107,6 +104,8 @@ func (a rpmAnalyzer) Analyze(afi AnalyzeFileInfo) ([]*dxtypes.Package, error) {
 		if err != nil {
 			return nil, utils.Errorf("failed to open RPM DB: %v", err)
 		}
+		defer db.Close()
+
 		pkgList, err := db.ListPackages()
 		if err != nil {
 			return nil, utils.Errorf("failed to list packages: %v", err)
