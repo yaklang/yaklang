@@ -124,7 +124,7 @@ type User interface {
 	ReplaceValue(Value, Value)
 }
 
-type Build func(io.Reader, *FunctionBuilder) error
+type Build func(string, io.Reader, *FunctionBuilder) error
 
 type packagePath []string
 type packagePathList []packagePath
@@ -135,6 +135,7 @@ type Program struct {
 	Packages map[string]*Package
 
 	editorStack *omap.OrderedMap[string, *memedit.MemEditor]
+	editorMap   *omap.OrderedMap[string, *memedit.MemEditor]
 
 	Cache *Cache
 
@@ -158,14 +159,15 @@ type Program struct {
 	packagePathList packagePathList
 }
 
+func (p *Program) GetEditor(url string) (*memedit.MemEditor, bool) {
+	return p.editorMap.Get(url)
+}
 func (p *Program) PushEditor(e *memedit.MemEditor) {
-	if p.editorStack == nil {
-		p.editorStack = omap.NewOrderedMap(make(map[string]*memedit.MemEditor))
-	}
 	p.editorStack.Push(e)
+	p.editorMap.Set(e.GetUrl(), e)
 }
 
-func (p *Program) GetCurrentEditor() *memedit.MemEditor {
+func (p *Program) getCurrentEditor() *memedit.MemEditor {
 	if p.editorStack == nil || p.editorStack.Len() <= 0 {
 		return nil
 	}

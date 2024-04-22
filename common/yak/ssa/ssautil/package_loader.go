@@ -123,7 +123,7 @@ func (p *PackageLoader) LoadFilePackage(packageName string, once bool) (string, 
 }
 
 type FileDescriptor struct {
-	PathName string
+	FileName string
 	Info     fs.FileInfo
 	Data     io.Reader
 }
@@ -142,7 +142,7 @@ func (p *PackageLoader) LoadDirectoryPackage(packageName string, once bool) (cha
 			absDir,
 			filesys.WithFileStat(func(s string, f fs.File, info fs.FileInfo) error {
 				ch <- FileDescriptor{
-					PathName: s,
+					FileName: s,
 					Info:     info,
 					Data:     f,
 				}

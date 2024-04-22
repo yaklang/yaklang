@@ -12,10 +12,16 @@ import (
 type MemEditor struct {
 	sourceCodeCtxStack []string
 
-	sourceCodeMd5      string
-	sourceCodeSha1     string
-	sourceCodeSha256   string
-	sourceCode         string
+	// hash
+	sourceCodeMd5    string
+	sourceCodeSha1   string
+	sourceCodeSha256 string
+
+	// fileUrl and source
+	fileUrl    string
+	sourceCode string
+
+	// editor
 	lineLensMap        map[int]int
 	lineStartOffsetMap map[int]int
 	cursor             int // 模拟光标位置（指针功能）
@@ -29,6 +35,14 @@ func NewMemEditor(sourceCode string) *MemEditor {
 	}
 	editor.recalculateLineMappings()
 	return editor
+}
+
+func (ve *MemEditor) SetUrl(url string) {
+	ve.fileUrl = url
+}
+
+func (ve *MemEditor) GetUrl() string {
+	return ve.fileUrl
 }
 
 func (ve *MemEditor) PushSourceCodeContext(i any) {

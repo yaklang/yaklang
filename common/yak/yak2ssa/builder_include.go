@@ -15,10 +15,12 @@ func (s *astbuilder) buildInclude(i *yak.IncludeStmtContext) {
 	// var newCode string
 	var fd *os.File
 	var err error
+	filename := ""
 	if filepath.IsAbs(targetFile) {
 		fd, err = os.Open(targetFile)
+		filename = targetFile
 	} else {
-		filename, err := filepath.Abs(targetFile)
+		filename, err = filepath.Abs(targetFile)
 		if err != nil {
 			log.Warnf("yaklang builder include %v failed: %v", targetFile, err)
 		}
@@ -31,7 +33,7 @@ func (s *astbuilder) buildInclude(i *yak.IncludeStmtContext) {
 	}
 
 	// TODO: here need more test-case
-	if err := s.GetProgram().Build(fd, s.FunctionBuilder); err != nil {
+	if err := s.GetProgram().Build(filename, fd, s.FunctionBuilder); err != nil {
 		log.Errorf("yaklang builder include %v failed: %v", targetFile, err)
 	}
 }

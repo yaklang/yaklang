@@ -16,17 +16,13 @@ func (b *FunctionBuilder) BuildFilePackage(filename string, once bool) error {
 	if err != nil {
 		return err
 	}
-	_file := b.CurrentFile
-	_path := p.Loader.GetCurrentPath()
 
-	b.CurrentFile = file
+	_path := p.Loader.GetCurrentPath()
 	p.Loader.SetCurrentPath(path.Dir(file))
 
-	defer func() {
-		b.CurrentFile = _file
-		p.Loader.SetCurrentPath(_path)
-	}()
-	err = p.Build(data, b)
+	err = p.Build(file, data, b)
+
+	p.Loader.SetCurrentPath(_path)
 	return err
 }
 
@@ -38,14 +34,13 @@ func (b *FunctionBuilder) BuildDirectoryPackage(name string, once bool) error {
 	}
 	for v := range ch {
 
-		_file := b.CurrentFile
-		b.CurrentFile = v.PathName
-
 		_path := p.Loader.GetCurrentPath()
-		p.Loader.SetCurrentPath(path.Dir(_file))
-		err := p.Build(v.Data, b)
-		b.CurrentFile = _file
+		p.Loader.SetCurrentPath(path.Dir(v.FileName))
+
+		err := p.Build(v.FileName, v.Data, b)
+
 		p.Loader.SetCurrentPath(_path)
+
 		if err != nil {
 			return err
 		}
