@@ -167,23 +167,34 @@ func (v *SyntaxFlowVisitor) EmitTypeCast(i string) {
 
 func (v *SyntaxFlowVisitor) EmitSearchExact(i string) {
 	v.codes = append(v.codes, &SFI{
-		OpCode:   OpPushMatchExact,
+		OpCode:   OpPushSearchExact,
 		UnaryStr: i,
 	})
 }
 
 func (v *SyntaxFlowVisitor) EmitSearchGlob(i string) {
 	v.codes = append(v.codes, &SFI{
-		OpCode:   OpPushMatchGlob,
+		OpCode:   OpPushSearchGlob,
 		UnaryStr: i,
 	})
 }
 
 func (v *SyntaxFlowVisitor) EmitSearchRegexp(i string) {
 	v.codes = append(v.codes, &SFI{
-		OpCode:   OpPushMatchRegexp,
+		OpCode:   OpPushSearchRegexp,
 		UnaryStr: i,
 	})
+}
+
+func (v *SyntaxFlowVisitor) EmitSearchMember(i string) {
+	v.codes = append(v.codes, &SFI{
+		OpCode:   OpPushSearchMember,
+		UnaryStr: i,
+	})
+}
+
+func (v *SyntaxFlowVisitor) EmitPushCallArgs() {
+	v.codes = append(v.codes, &SFI{OpCode: OpPushCallArgs})
 }
 
 func (v *SyntaxFlowVisitor) EmitPushIndex(i int) {

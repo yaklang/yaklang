@@ -33,8 +33,8 @@ filterExpr
     | filterExpr '(' (nameFilter? ',') * ')'  # FunctionCallFilter
     | filterExpr '[' nameFilter ']'           # FieldIndexFilter
     | filterExpr '?' '('conditionExpression ')'     # OptionalFilter
-    | filterExpr '=>' chainFilter             # AheadChainFilter
-    | filterExpr '==>' chainFilter            # DeepChainFilter
+    | filterExpr '=>' chainFilter             # NextFilter
+    | filterExpr '==>' chainFilter            # DeepNextFilter
     ;
 
 nameFilter: identifier | regexpLiteral | numberLiteral;

@@ -77,7 +77,7 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (ret error) {
 	return nil
 }
 
-func (s *SyntaxFlowVirtualMachine) Feed(i *omap.OrderedMap[string, any]) *omap.OrderedMap[string, any] {
+func (s *SyntaxFlowVirtualMachine) Feed(i ValueOperator) *omap.OrderedMap[string, any] {
 	s.frameMutex.Lock()
 	defer s.frameMutex.Unlock()
 
