@@ -3,10 +3,19 @@ targetUrl = getParam("VULINBOX")
 mitmPort = os.GetRandomAvailableTCPPort()
 mitmProxy = "http://127.0.0.1:" + string(mitmPort)
 var count = 0
-go func{
+finishCh = make(chan any)
+lock = sync.NewLock()
+go func {
     err = mitm.Start(mitmPort, mitm.hijackHTTPRequest((https, url, req, forwad, drop) =>{
         if string(req).Contains(token) {
+            lock.Lock()
+            defer lock.Unlock()
             count++
+            println("!!!! count:", count)
+        } else if string(req).Contains("finish") {
+            go func {
+                finishCh <- 0
+            }
         }
     }))
     die(err)
@@ -105,6 +114,9 @@ mirrorNewWebsite = (isHttps, url, req, rsp, body) => {
     for result in fuzz.HTTPRequest("GET /" + token +"?a=1 HTTP/1.1\r\n" + "Host: "+ str.HostPort(host, port) + "\r\nConnection: close\r\n", fuzz.https(isHttps))~.GetCommonParams() {
          for in result.Fuzz("c").Exec()~ {}
     }
+
+    // callback finish
+    http.Get(url + "?a=finish")~
 }
 `)~
 
@@ -116,13 +128,8 @@ die(a.LoadPlugin(name))
 _, body = poc.Split(response.RawPacket)
 a.MirrorHTTPFlow(true, targetUrl, response.RawRequest /*type: bytes*/, response.RawPacket, body)
 
-sleep(1)
-println("TOTAL EXPECT %v, GOT %v" % [25, count])
-if count == 20 + 4 + 1 {
-    println("PASSED")
-    return
-}
-die("BindYakitPluginContext ERROR! count: "+sprint(count))
+<-finishCh
+assert count == 25, "BindYakitPluginContext ERROR! TOTAL EXPECT %v, GOT %v" % [25, count]
 
 
 
