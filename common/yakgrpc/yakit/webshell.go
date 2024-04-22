@@ -54,9 +54,9 @@ func (w *WebShell) BeforeSave() error {
 	if w.ShellType == "" {
 		return utils.Error("webshell shell type is empty")
 	}
-	if w.SecretKey == "" {
-		return utils.Error("webshell secret key is empty")
-	}
+	//if w.SecretKey == "" {
+	//	return utils.Error("webshell secret key is empty")
+	//}
 	if w.ShellScript == "" {
 		return utils.Error("webshell shell script is empty")
 	}
