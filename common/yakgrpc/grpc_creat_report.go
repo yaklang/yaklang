@@ -16,10 +16,13 @@ func (s *Server) SimpleDetectCreatReport(req *ypb.CreatReportRequest, stream ypb
 	execRequest := &ypb.DebugPluginRequest{
 		Code: string(creat_report),
 		ExecParams: []*ypb.KVPair{
-			{Key: "hostTotal", Value: gjson.Get(reportMetaInfo, "hostTotal").String()},
-			{Key: "portTotal", Value: gjson.Get(reportMetaInfo, "portTotal").String()},
-			{Key: "pingAliveHostTotal", Value: gjson.Get(reportMetaInfo, "pingAliveHostTotal").String()},
+			{Key: "host_total", Value: gjson.Get(reportMetaInfo, "hostTotal").String()},
+			{Key: "port_total", Value: gjson.Get(reportMetaInfo, "portTotal").String()},
+			{Key: "ping_alive_host_total", Value: gjson.Get(reportMetaInfo, "pingAliveHostTotal").String()},
 			{Key: "plugins", Value: gjson.Get(reportMetaInfo, "plugins").String()},
+			{Key: "task_name", Value: req.GetRuntimeId()},
+			{Key: "report_name", Value: req.GetReportName()},
+			{Key: "runtime_id", Value: req.GetRuntimeId()},
 		},
 	}
 
