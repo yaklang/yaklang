@@ -353,8 +353,7 @@ func ParseCookie(key, raw string) []*http.Cookie {
 	if strings.ToLower(key) == "cookie" {
 		header := http.Header{}
 		header.Add("Cookie", raw)
-		req := http.Request{Header: header}
-		cookies = req.Cookies()
+		cookies = readCookies(header, "")
 	} else if strings.ToLower(key) == "set-cookie" {
 		header := http.Header{}
 		header.Add("Set-Cookie", raw)

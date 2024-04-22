@@ -435,7 +435,8 @@ func IsJSON(raw string) (string, bool) {
 	if err != nil {
 		return raw, false
 	}
-	if gjson.Valid(unescapeJson) {
+	// 检测是否是 json 对象
+	if gjson.Valid(unescapeJson) && gjson.Parse(unescapeJson).IsObject() {
 		return unescapeJson, true
 	}
 	return "", false

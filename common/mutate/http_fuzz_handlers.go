@@ -928,7 +928,7 @@ func (f *FuzzHTTPRequest) fuzzCookie(k, v interface{}, encoded ...codec.EncodedF
 					}
 				},
 			}
-		} else {
+		} else if !f.friendlyDisplay {
 			combinedEncoded = []codec.EncodedFunc{
 				func(value any) string {
 					return lowhttp.CookieSafeQuoteString(fmt.Sprintf("%v", value))
