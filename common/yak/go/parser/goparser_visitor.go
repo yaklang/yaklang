@@ -43,24 +43,6 @@ type GoParserVisitor interface {
 	// Visit a parse tree produced by GoParser#typeSpec.
 	VisitTypeSpec(ctx *TypeSpecContext) interface{}
 
-	// Visit a parse tree produced by GoParser#aliasDecl.
-	VisitAliasDecl(ctx *AliasDeclContext) interface{}
-
-	// Visit a parse tree produced by GoParser#typeDef.
-	VisitTypeDef(ctx *TypeDefContext) interface{}
-
-	// Visit a parse tree produced by GoParser#typeParameters.
-	VisitTypeParameters(ctx *TypeParametersContext) interface{}
-
-	// Visit a parse tree produced by GoParser#typeParameterDecl.
-	VisitTypeParameterDecl(ctx *TypeParameterDeclContext) interface{}
-
-	// Visit a parse tree produced by GoParser#typeElement.
-	VisitTypeElement(ctx *TypeElementContext) interface{}
-
-	// Visit a parse tree produced by GoParser#typeTerm.
-	VisitTypeTerm(ctx *TypeTermContext) interface{}
-
 	// Visit a parse tree produced by GoParser#functionDecl.
 	VisitFunctionDecl(ctx *FunctionDeclContext) interface{}
 
@@ -88,6 +70,9 @@ type GoParserVisitor interface {
 	// Visit a parse tree produced by GoParser#simpleStmt.
 	VisitSimpleStmt(ctx *SimpleStmtContext) interface{}
 
+	// Visit a parse tree produced by GoParser#terminatedSimpleStmt.
+	VisitTerminatedSimpleStmt(ctx *TerminatedSimpleStmtContext) interface{}
+
 	// Visit a parse tree produced by GoParser#expressionStmt.
 	VisitExpressionStmt(ctx *ExpressionStmtContext) interface{}
 
@@ -105,6 +90,9 @@ type GoParserVisitor interface {
 
 	// Visit a parse tree produced by GoParser#shortVarDecl.
 	VisitShortVarDecl(ctx *ShortVarDeclContext) interface{}
+
+	// Visit a parse tree produced by GoParser#emptyStmt.
+	VisitEmptyStmt(ctx *EmptyStmtContext) interface{}
 
 	// Visit a parse tree produced by GoParser#labeledStmt.
 	VisitLabeledStmt(ctx *LabeledStmtContext) interface{}
@@ -184,9 +172,6 @@ type GoParserVisitor interface {
 	// Visit a parse tree produced by GoParser#type_.
 	VisitType_(ctx *Type_Context) interface{}
 
-	// Visit a parse tree produced by GoParser#typeArgs.
-	VisitTypeArgs(ctx *TypeArgsContext) interface{}
-
 	// Visit a parse tree produced by GoParser#typeName.
 	VisitTypeName(ctx *TypeNameContext) interface{}
 
@@ -240,6 +225,9 @@ type GoParserVisitor interface {
 
 	// Visit a parse tree produced by GoParser#primaryExpr.
 	VisitPrimaryExpr(ctx *PrimaryExprContext) interface{}
+
+	// Visit a parse tree produced by GoParser#unaryExpr.
+	VisitUnaryExpr(ctx *UnaryExprContext) interface{}
 
 	// Visit a parse tree produced by GoParser#conversion.
 	VisitConversion(ctx *ConversionContext) interface{}
@@ -301,8 +289,8 @@ type GoParserVisitor interface {
 	// Visit a parse tree produced by GoParser#index.
 	VisitIndex(ctx *IndexContext) interface{}
 
-	// Visit a parse tree produced by GoParser#slice_.
-	VisitSlice_(ctx *Slice_Context) interface{}
+	// Visit a parse tree produced by GoParser#slice.
+	VisitSlice(ctx *SliceContext) interface{}
 
 	// Visit a parse tree produced by GoParser#typeAssertion.
 	VisitTypeAssertion(ctx *TypeAssertionContext) interface{}
@@ -312,6 +300,9 @@ type GoParserVisitor interface {
 
 	// Visit a parse tree produced by GoParser#methodExpr.
 	VisitMethodExpr(ctx *MethodExprContext) interface{}
+
+	// Visit a parse tree produced by GoParser#receiverType.
+	VisitReceiverType(ctx *ReceiverTypeContext) interface{}
 
 	// Visit a parse tree produced by GoParser#eos.
 	VisitEos(ctx *EosContext) interface{}

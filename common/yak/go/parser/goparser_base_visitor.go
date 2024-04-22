@@ -55,30 +55,6 @@ func (v *BaseGoParserVisitor) VisitTypeSpec(ctx *TypeSpecContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseGoParserVisitor) VisitAliasDecl(ctx *AliasDeclContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseGoParserVisitor) VisitTypeDef(ctx *TypeDefContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseGoParserVisitor) VisitTypeParameters(ctx *TypeParametersContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseGoParserVisitor) VisitTypeParameterDecl(ctx *TypeParameterDeclContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseGoParserVisitor) VisitTypeElement(ctx *TypeElementContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseGoParserVisitor) VisitTypeTerm(ctx *TypeTermContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BaseGoParserVisitor) VisitFunctionDecl(ctx *FunctionDeclContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -115,6 +91,10 @@ func (v *BaseGoParserVisitor) VisitSimpleStmt(ctx *SimpleStmtContext) interface{
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseGoParserVisitor) VisitTerminatedSimpleStmt(ctx *TerminatedSimpleStmtContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseGoParserVisitor) VisitExpressionStmt(ctx *ExpressionStmtContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -136,6 +116,10 @@ func (v *BaseGoParserVisitor) VisitAssign_op(ctx *Assign_opContext) interface{} 
 }
 
 func (v *BaseGoParserVisitor) VisitShortVarDecl(ctx *ShortVarDeclContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseGoParserVisitor) VisitEmptyStmt(ctx *EmptyStmtContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -243,10 +227,6 @@ func (v *BaseGoParserVisitor) VisitType_(ctx *Type_Context) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseGoParserVisitor) VisitTypeArgs(ctx *TypeArgsContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BaseGoParserVisitor) VisitTypeName(ctx *TypeNameContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -316,6 +296,10 @@ func (v *BaseGoParserVisitor) VisitExpression(ctx *ExpressionContext) interface{
 }
 
 func (v *BaseGoParserVisitor) VisitPrimaryExpr(ctx *PrimaryExprContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseGoParserVisitor) VisitUnaryExpr(ctx *UnaryExprContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -399,7 +383,7 @@ func (v *BaseGoParserVisitor) VisitIndex(ctx *IndexContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseGoParserVisitor) VisitSlice_(ctx *Slice_Context) interface{} {
+func (v *BaseGoParserVisitor) VisitSlice(ctx *SliceContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -412,6 +396,10 @@ func (v *BaseGoParserVisitor) VisitArguments(ctx *ArgumentsContext) interface{} 
 }
 
 func (v *BaseGoParserVisitor) VisitMethodExpr(ctx *MethodExprContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseGoParserVisitor) VisitReceiverType(ctx *ReceiverTypeContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

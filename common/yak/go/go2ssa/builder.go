@@ -9,8 +9,8 @@ import (
 )
 
 type builder struct {
-	ir         *ssa.FunctionBuilder
-	packageMap map[string]struct{}
+	ir       *ssa.FunctionBuilder
+	constMap map[string]ssa.Value
 }
 
 func (a *builder) Build(src string, force bool, b *ssa.FunctionBuilder) error {

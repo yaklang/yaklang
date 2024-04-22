@@ -8,8 +8,8 @@ func (y *builder) VisitSourceFile(raw goparser.ISourceFileContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(raw)
-	defer recoverRange()
+	//recoverRange := y.SetRange(raw)
+	//defer recoverRange()
 
 	i, _ := raw.(*goparser.SourceFileContext)
 	if i == nil {
@@ -27,8 +27,8 @@ func (y *builder) VisitPackageClause(raw goparser.IPackageClauseContext) interfa
 	if y == nil || raw == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(raw)
-	defer recoverRange()
+	//recoverRange := y.SetRange(raw)
+	//defer recoverRange()
 
 	i, _ := raw.(*goparser.PackageClauseContext)
 	if i == nil {
@@ -41,8 +41,8 @@ func (y *builder) VisitImportDecl(raw goparser.IImportDeclContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(raw)
-	defer recoverRange()
+	//recoverRange := y.SetRange(raw)
+	//defer recoverRange()
 
 	i, _ := raw.(*goparser.ImportDeclContext)
 	if i == nil {
@@ -56,9 +56,8 @@ func (y *builder) VisitImportSpec(raw goparser.IImportSpecContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
 	}
-	recoverRange := y.SetRange(raw)
-	defer recoverRange()
-
+	//recoverRange := y.SetRange(raw)
+	//defer recoverRange()
 	i, _ := raw.(*goparser.ImportSpecContext)
 	if i == nil {
 		return nil
@@ -73,8 +72,8 @@ func (y *builder) VisitString_(raw goparser.IString_Context) string {
 	if y == nil || raw == nil {
 		return ""
 	}
-	recoverRange := y.SetRange(raw)
-	defer recoverRange()
+	//recoverRange := y.SetRange(raw)
+	//defer recoverRange()
 
 	i, _ := raw.(*goparser.String_Context)
 	if i == nil {
