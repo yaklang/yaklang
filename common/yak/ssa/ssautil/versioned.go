@@ -52,6 +52,7 @@ type VersionedIF[T versionedValue] interface {
 
 	// scope
 	GetScope() ScopedVersionedTableIF[T]
+	SetScope(ScopedVersionedTableIF[T])
 
 	// version and root
 	GetGlobalIndex() int // global id
@@ -83,6 +84,10 @@ func (v *Versioned[T]) GetId() int64 {
 		return 0
 	}
 	return v.Value.GetId()
+}
+
+func (v *Versioned[T]) SetScope(s ScopedVersionedTableIF[T]) {
+	v.scope = s
 }
 
 func (v *Versioned[T]) UnmarshalJSON(raw []byte) error {

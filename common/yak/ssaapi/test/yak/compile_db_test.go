@@ -43,8 +43,13 @@ d = a
 	if scopePersistent == nil {
 		t.Fatalf("failed to get scope from ir scope id: %d", scope.GetPersistentId())
 	}
-	verbose := scopePersistent.ReadVariable("a").String()
-	spew.Dump(verbose)
+	variable := scopePersistent.ReadVariable("a")
+	verbose := variable.String()
+	if verbose == "" {
+		t.Fatal("failed to get variable a")
+	}
+	a := scopePersistent.GetIncomingPhi().Len()
+	spew.Dump(a)
 }
 
 func TestCompileWithDatabase_Big(t *testing.T) {

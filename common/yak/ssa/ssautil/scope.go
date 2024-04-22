@@ -64,10 +64,10 @@ type ScopedVersionedTableIF[T versionedValue] interface {
 	SetSpin(func(string) T)
 
 	// db
-	SyncFromDatabase() error
 	SaveToDatabase() error
 	GetPersistentId() int64
 	SetPersistentId(i int64)
+	SetPersistentNode(*ssadb.IrScopeNode)
 }
 
 func (s *ScopedVersionedTable[T]) GetPersistentId() int64 {
@@ -76,6 +76,10 @@ func (s *ScopedVersionedTable[T]) GetPersistentId() int64 {
 
 func (s *ScopedVersionedTable[T]) SetPersistentId(i int64) {
 	s.persistentId = i
+}
+
+func (s *ScopedVersionedTable[T]) SetPersistentNode(i *ssadb.IrScopeNode) {
+	s.persistentNode = i
 }
 
 func (s *ScopedVersionedTable[T]) GetPersistentProgramName() string {
