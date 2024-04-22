@@ -106,3 +106,7 @@ func (s *ScopedVersionedTable[T]) SetSpin(create func(string) T) {
 	s.spin = true
 	s.createEmptyPhi = create
 }
+
+func (s *ScopedVersionedTable[T]) SetSpinRaw(b bool) {
+	s.spin = b
+}
