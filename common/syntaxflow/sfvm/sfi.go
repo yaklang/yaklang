@@ -17,8 +17,10 @@ const (
 	OpPop
 	OpWithdraw
 
-	// OpPushMatch can push data from origin
-	OpPushMatch
+	// OpPushMatchExact can push data from origin
+	OpPushMatchExact
+	OpPushMatchGlob
+	OpPushMatchRegexp
 	// OpPushIndex can push data from index
 	OpPushIndex
 	// OpPushRef can push reference into stack
@@ -51,6 +53,7 @@ const (
 	OpLtEq
 	OpLogicAnd
 	OpLogicOr
+	OpLogicBang
 
 	/*
 		Unary Operator: Fetch ONE in STACK, calc result, push result into stack
@@ -88,8 +91,12 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v", "push", s.UnaryInt)
 	case OpPushRef:
 		return fmt.Sprintf(verboseLen+" %v", "push$ref", s.UnaryStr)
-	case OpPushMatch:
-		return fmt.Sprintf(verboseLen+" like %v", "push$match", s.UnaryStr)
+	case OpPushMatchGlob:
+		return fmt.Sprintf(verboseLen+" %v", "push$glob", s.UnaryStr)
+	case OpPushMatchExact:
+		return fmt.Sprintf(verboseLen+" %v", "push$exact", s.UnaryStr)
+	case OpPushMatchRegexp:
+		return fmt.Sprintf(verboseLen+" %v", "push$regexp", s.UnaryStr)
 	case OpPushIndex:
 		return fmt.Sprintf(verboseLen+" [%v]", "push$index", s.UnaryInt)
 	case OpNewRef:

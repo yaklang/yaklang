@@ -79,6 +79,8 @@ func (y *SyntaxFlowVisitor) EmitOperator(i string) {
 		y.codes = append(y.codes, &SFI{OpCode: OpLogicAnd})
 	case "||":
 		y.codes = append(y.codes, &SFI{OpCode: OpLogicOr})
+	case "!":
+		y.codes = append(y.codes, &SFI{OpCode: OpLogicBang})
 	default:
 		panic(fmt.Sprintf("unknown operator: %s", i))
 	}
@@ -163,9 +165,23 @@ func (v *SyntaxFlowVisitor) EmitTypeCast(i string) {
 	})
 }
 
-func (v *SyntaxFlowVisitor) EmitSearch(i string) {
+func (v *SyntaxFlowVisitor) EmitSearchExact(i string) {
 	v.codes = append(v.codes, &SFI{
-		OpCode:   OpPushMatch,
+		OpCode:   OpPushMatchExact,
+		UnaryStr: i,
+	})
+}
+
+func (v *SyntaxFlowVisitor) EmitSearchGlob(i string) {
+	v.codes = append(v.codes, &SFI{
+		OpCode:   OpPushMatchGlob,
+		UnaryStr: i,
+	})
+}
+
+func (v *SyntaxFlowVisitor) EmitSearchRegexp(i string) {
+	v.codes = append(v.codes, &SFI{
+		OpCode:   OpPushMatchRegexp,
 		UnaryStr: i,
 	})
 }

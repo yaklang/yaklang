@@ -25,16 +25,15 @@ refVariable
 filterExpr
     : '$'                                     # CurrentRootFilter
     | identifier                              # PrimaryFilter
+    | regexpLiteral                           # RegexpLiteralFilter
     | numberLiteral                           # NumberIndexFilter
     | op = ('>>' | '<<') filterExpr           # DirectionFilter
-    | '(' filterExpr ')'                      # ParenFilter
-    | '.' filterFieldMember                   # FieldFilter
-    | '[' numberLiteral ']'                   # ListIndexFilter
-    | '?' conditionExpression                 # OptionalRootFilter
-    | filterExpr '?' conditionExpression      # OptionalFilter
+    | '.' filterExpr                          # FieldFilter
+    | filterExpr '.' filterExpr               # FieldCallFilter
+    | filterExpr '[' filterExpr ']'           # FieldIndexFilter
+    | filterExpr '?' '('conditionExpression ')'     # OptionalFilter
     | filterExpr '=>' chainFilter             # AheadChainFilter
     | filterExpr '==>' chainFilter            # DeepChainFilter
-    | filterExpr '.' filterFieldMember        # FieldChainFilter
     ;
 
 chainFilter
@@ -42,10 +41,6 @@ chainFilter
     | '{' ((identifier ':') filters (';' (identifier ':') filters )*)? ';'? '}'  # BuildMap
     ;
 
-filterFieldMember
-    : identifier | numberLiteral | typeCast
-    | ( '(' conditionExpression ')')
-    ;
 conditionExpression
     : numberLiteral                               # FilterExpressionNumber
     | stringLiteral                               # FilterExpressionString
@@ -66,7 +61,6 @@ conditionExpression
 numberLiteral: Number | OctalNumber | BinaryNumber | HexNumber;
 stringLiteral: identifier;
 regexpLiteral: RegexpLiteral;
-typeCast: '(' types ')';
 identifier: Identifier | types;
 types: StringType | NumberType | ListType | DictType | BoolType;
 boolLiteral: BoolLiteral;
@@ -105,7 +99,7 @@ DollarOutput: '$';
 Colon: ':';
 Search: '%';
 Bang: '!';
-
+Star: '*';
 
 WhiteSpace: [ \r\n] -> skip;
 Number: Digit+;
@@ -121,8 +115,9 @@ BoolType: 'bool';
 BoolLiteral: 'true' | 'false';
 
 Identifier: IdentifierCharStart IdentifierChar*;
-fragment IdentifierCharStart: '%' | '_' | [a-z] | [A-Z] | '%%';
-fragment IdentifierChar: [0-9] | IdentifierCharStart;
+IdentifierChar: [0-9] | IdentifierCharStart;
+
+fragment IdentifierCharStart: '*' | '_' | [a-z] | [A-Z];
 fragment HexDigit: [a-fA-F0-9];
 fragment Digit: [0-9];
 fragment OctalDigit: [0-7];

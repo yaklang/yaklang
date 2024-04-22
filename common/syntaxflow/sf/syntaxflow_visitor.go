@@ -22,17 +22,20 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#refVariable.
 	VisitRefVariable(ctx *RefVariableContext) interface{}
 
+	// Visit a parse tree produced by SyntaxFlowParser#RegexpLiteralFilter.
+	VisitRegexpLiteralFilter(ctx *RegexpLiteralFilterContext) interface{}
+
 	// Visit a parse tree produced by SyntaxFlowParser#DirectionFilter.
 	VisitDirectionFilter(ctx *DirectionFilterContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#FieldFilter.
 	VisitFieldFilter(ctx *FieldFilterContext) interface{}
 
+	// Visit a parse tree produced by SyntaxFlowParser#FieldCallFilter.
+	VisitFieldCallFilter(ctx *FieldCallFilterContext) interface{}
+
 	// Visit a parse tree produced by SyntaxFlowParser#AheadChainFilter.
 	VisitAheadChainFilter(ctx *AheadChainFilterContext) interface{}
-
-	// Visit a parse tree produced by SyntaxFlowParser#ParenFilter.
-	VisitParenFilter(ctx *ParenFilterContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#DeepChainFilter.
 	VisitDeepChainFilter(ctx *DeepChainFilterContext) interface{}
@@ -46,26 +49,17 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#PrimaryFilter.
 	VisitPrimaryFilter(ctx *PrimaryFilterContext) interface{}
 
-	// Visit a parse tree produced by SyntaxFlowParser#ListIndexFilter.
-	VisitListIndexFilter(ctx *ListIndexFilterContext) interface{}
-
 	// Visit a parse tree produced by SyntaxFlowParser#NumberIndexFilter.
 	VisitNumberIndexFilter(ctx *NumberIndexFilterContext) interface{}
 
-	// Visit a parse tree produced by SyntaxFlowParser#FieldChainFilter.
-	VisitFieldChainFilter(ctx *FieldChainFilterContext) interface{}
-
-	// Visit a parse tree produced by SyntaxFlowParser#OptionalRootFilter.
-	VisitOptionalRootFilter(ctx *OptionalRootFilterContext) interface{}
+	// Visit a parse tree produced by SyntaxFlowParser#FieldIndexFilter.
+	VisitFieldIndexFilter(ctx *FieldIndexFilterContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#Flat.
 	VisitFlat(ctx *FlatContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#BuildMap.
 	VisitBuildMap(ctx *BuildMapContext) interface{}
-
-	// Visit a parse tree produced by SyntaxFlowParser#filterFieldMember.
-	VisitFilterFieldMember(ctx *FilterFieldMemberContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#FilterExpressionString.
 	VisitFilterExpressionString(ctx *FilterExpressionStringContext) interface{}
@@ -102,9 +96,6 @@ type SyntaxFlowVisitor interface {
 
 	// Visit a parse tree produced by SyntaxFlowParser#regexpLiteral.
 	VisitRegexpLiteral(ctx *RegexpLiteralContext) interface{}
-
-	// Visit a parse tree produced by SyntaxFlowParser#typeCast.
-	VisitTypeCast(ctx *TypeCastContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#identifier.
 	VisitIdentifier(ctx *IdentifierContext) interface{}
