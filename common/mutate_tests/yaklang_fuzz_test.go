@@ -979,22 +979,41 @@ Host: www.baidu.com
 					`a=123`,
 					`e="a,b"`,
 				},
-				debug: true,
-				//disableEncode: true,
-				friendlyDisplay: true,
+				debug:         true,
+				disableEncode: true,
 			},
 		},
 		{
-			name: "Cookie参数",
+			name: "Cookie参数 友好显示",
 			base: base{
 				inputPacket: `GET / HTTP/1.1
 Host: www.baidu.com
 
 `,
-				code: `.FuzzCookieRaw("123").FuzzCookieRaw("456")`,
+				code: `.FuzzCookie("a", "123").FuzzCookie("e", "a,b")`,
 				expectKeywordInOutputPacket: []string{
-					`Cookie: 456`,
+					`a=123`,
+					`e="{{urlescape(a,b)}}"`,
 				},
+				debug:           true,
+				friendlyDisplay: true,
+			},
+		},
+		{
+			name: "Cookie参数 禁止编码 && 友好显示",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+
+`,
+				code: `.FuzzCookie("a", "123").FuzzCookie("e", "a,b")`,
+				expectKeywordInOutputPacket: []string{
+					`a=123`,
+					`e="a,b"`,
+				},
+				debug:           true,
+				disableEncode:   true,
+				friendlyDisplay: true,
 			},
 		},
 	}
@@ -1010,7 +1029,7 @@ func TestFuzzCookieBase64(t *testing.T) {
 		base base
 	}{
 		{
-			name: "Cookie参数(Base64) Url编码",
+			name: "Cookie参数(Base64) 默认",
 			base: base{
 				inputPacket: `GET / HTTP/1.1
 Host: www.baidu.com
@@ -1026,19 +1045,21 @@ Host: www.baidu.com
 			},
 		},
 		{
-			name: "Cookie参数(Base64) 默认",
+			name: "Cookie参数(Base64) 默认 2",
 			base: base{
 				inputPacket: `GET / HTTP/1.1
 Host: www.baidu.com
 
 `,
 
-				code: `.FuzzCookieBase64("a", "123").FuzzCookieBase64("b", 123).FuzzCookieBase64("c", true).FuzzCookieBase64("d", "\"123\"")`,
+				code: `.FuzzCookieBase64("a", "123").FuzzCookieBase64("b", 123).FuzzCookieBase64("c", true).FuzzCookieBase64("d", "\"123\"").FuzzCookieBase64("e","a b").FuzzCookieBase64("f","c,d")`,
 				expectKeywordInOutputPacket: []string{
 					`a=` + codec.EncodeBase64("123"),
 					`b=` + codec.EncodeBase64("123"),
 					`c=` + codec.EncodeBase64("true"),
-					`d=` + codec.EncodeBase64("123"),
+					`d=` + codec.EncodeBase64("\"123\""),
+					`e=` + codec.EncodeBase64("\"a+b\""),
+					`f=` + codec.EncodeBase64("\"c%2Cd\""),
 				},
 				debug: true,
 			},
@@ -1051,13 +1072,80 @@ Host: www.baidu.com
 
 `,
 
-				code: `.FuzzCookieBase64("a", "123").FuzzCookieBase64("b", 123).FuzzCookieBase64("c", true)`,
+				code: `.FuzzCookieBase64("a", "123").FuzzCookieBase64("b", 123).FuzzCookieBase64("c", true).FuzzCookieBase64("d","\"123\"").FuzzCookieBase64("e","a b").FuzzCookieBase64("f","a,b")`,
 				expectKeywordInOutputPacket: []string{
 					`a={{base64(123)}}`,
 					`b={{base64(123)}}`,
 					`c={{base64(true)}}`,
+					`d={{base64("123")}}`,
+					`e={{base64("{{urlescape(a b)}}")}}`,
+					`f={{base64("{{urlescape(a,b)}}")}}`,
 				},
 				friendlyDisplay: true,
+				debug:           true,
+			},
+		},
+		{
+			name: "Cookie参数(Base64) 禁止编码",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+
+`,
+
+				code: `.FuzzCookieBase64("a", "123").FuzzCookieBase64("b", 123).FuzzCookieBase64("c", true).FuzzCookieBase64("d","\"123\"").FuzzCookieBase64("e","a b")`,
+				expectKeywordInOutputPacket: []string{
+					`a=` + codec.EncodeBase64("123"),
+					`b=` + codec.EncodeBase64("123"),
+					`c=` + codec.EncodeBase64("true"),
+					`d=` + codec.EncodeBase64("\"123\""),
+					`e=` + codec.EncodeBase64("\"a b\""),
+				},
+				disableEncode: true,
+				debug:         true,
+			},
+		},
+		{
+			name: "Cookie参数(Base64) 禁止编码 && 友好显示 append",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+
+`,
+
+				code: `.FuzzCookieBase64("a", "123").FuzzCookieBase64("b", 123).FuzzCookieBase64("c", true).FuzzCookieBase64("d","\"123\"").FuzzCookieBase64("e","a b")`,
+				expectKeywordInOutputPacket: []string{
+					`a={{base64(123)}}`,
+					`b={{base64(123)}}`,
+					`c={{base64(true)}}`,
+					`d={{base64("123")}}`,
+					`e={{base64("a b")}}`,
+				},
+				friendlyDisplay: true,
+				disableEncode:   true,
+				debug:           true,
+			},
+		},
+		{
+			name: "Cookie参数(Base64) 禁止编码 && 友好显示 replace",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+Cookie: a=1; b=2; c=3; d="4"; e="5"
+
+`,
+
+				code: `.FuzzCookieBase64("a", "123").FuzzCookieBase64("b", 123).FuzzCookieBase64("c", true).FuzzCookieBase64("d","\"123\"").FuzzCookieBase64("e","a b")`,
+				expectKeywordInOutputPacket: []string{
+					`a={{base64(123)}}`,
+					`b={{base64(123)}}`,
+					`c={{base64(true)}}`,
+					`d={{base64("123")}}`,
+					`e={{base64("a b")}}`,
+				},
+				friendlyDisplay: true,
+				disableEncode:   true,
+				debug:           true,
 			},
 		},
 	}
@@ -1066,6 +1154,34 @@ Host: www.baidu.com
 		t.Run(tc.name, testCaseCheck(tc.base))
 	}
 
+}
+
+func TestFuzzCookieJsonPath(t *testing.T) {
+	t.SkipNow()
+	tests := []struct {
+		name string
+		base base
+	}{
+		{
+			name: "Cookie参数(JSON) 默认",
+			base: base{
+				inputPacket: `GET / HTTP/1.1
+Host: www.baidu.com
+Cookie: a={"number": 123,"boolean": true,"string": "123","json": {"a":"b"}}
+
+`,
+
+				code: `.FuzzCookieJsonPath("a", "$.number", 999).FuzzCookieJsonPath("a", "$.boolean", false).FuzzCookieJsonPath("a", "$.string", "string").FuzzCookieJsonPath("a", "$.json", {"xx":123})`,
+				expectKeywordInOutputPacket: []string{
+					`a={"number":999,"boolean":false,"string":"string","json":{"xx":123}}`,
+				},
+				debug: true,
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, testCaseCheck(tc.base))
+	}
 }
 
 func TestYaklangFuzzHTTPRequestBaseCase(t *testing.T) {
