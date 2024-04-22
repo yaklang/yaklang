@@ -1324,134 +1324,6 @@ func (s *FunctionCallFilterContext) Accept(visitor antlr.ParseTreeVisitor) inter
 	}
 }
 
-type AheadChainFilterContext struct {
-	*FilterExprContext
-}
-
-func NewAheadChainFilterContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *AheadChainFilterContext {
-	var p = new(AheadChainFilterContext)
-
-	p.FilterExprContext = NewEmptyFilterExprContext()
-	p.parser = parser
-	p.CopyFrom(ctx.(*FilterExprContext))
-
-	return p
-}
-
-func (s *AheadChainFilterContext) GetRuleContext() antlr.RuleContext {
-	return s
-}
-
-func (s *AheadChainFilterContext) FilterExpr() IFilterExprContext {
-	var t antlr.RuleContext
-	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IFilterExprContext); ok {
-			t = ctx.(antlr.RuleContext)
-			break
-		}
-	}
-
-	if t == nil {
-		return nil
-	}
-
-	return t.(IFilterExprContext)
-}
-
-func (s *AheadChainFilterContext) Filter() antlr.TerminalNode {
-	return s.GetToken(SyntaxFlowParserFilter, 0)
-}
-
-func (s *AheadChainFilterContext) ChainFilter() IChainFilterContext {
-	var t antlr.RuleContext
-	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IChainFilterContext); ok {
-			t = ctx.(antlr.RuleContext)
-			break
-		}
-	}
-
-	if t == nil {
-		return nil
-	}
-
-	return t.(IChainFilterContext)
-}
-
-func (s *AheadChainFilterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowVisitor:
-		return t.VisitAheadChainFilter(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
-type DeepChainFilterContext struct {
-	*FilterExprContext
-}
-
-func NewDeepChainFilterContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *DeepChainFilterContext {
-	var p = new(DeepChainFilterContext)
-
-	p.FilterExprContext = NewEmptyFilterExprContext()
-	p.parser = parser
-	p.CopyFrom(ctx.(*FilterExprContext))
-
-	return p
-}
-
-func (s *DeepChainFilterContext) GetRuleContext() antlr.RuleContext {
-	return s
-}
-
-func (s *DeepChainFilterContext) FilterExpr() IFilterExprContext {
-	var t antlr.RuleContext
-	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IFilterExprContext); ok {
-			t = ctx.(antlr.RuleContext)
-			break
-		}
-	}
-
-	if t == nil {
-		return nil
-	}
-
-	return t.(IFilterExprContext)
-}
-
-func (s *DeepChainFilterContext) DeepFilter() antlr.TerminalNode {
-	return s.GetToken(SyntaxFlowParserDeepFilter, 0)
-}
-
-func (s *DeepChainFilterContext) ChainFilter() IChainFilterContext {
-	var t antlr.RuleContext
-	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IChainFilterContext); ok {
-			t = ctx.(antlr.RuleContext)
-			break
-		}
-	}
-
-	if t == nil {
-		return nil
-	}
-
-	return t.(IChainFilterContext)
-}
-
-func (s *DeepChainFilterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
-	switch t := visitor.(type) {
-	case SyntaxFlowVisitor:
-		return t.VisitDeepChainFilter(s)
-
-	default:
-		return t.VisitChildren(s)
-	}
-}
-
 type CurrentRootFilterContext struct {
 	*FilterExprContext
 }
@@ -1478,6 +1350,70 @@ func (s *CurrentRootFilterContext) Accept(visitor antlr.ParseTreeVisitor) interf
 	switch t := visitor.(type) {
 	case SyntaxFlowVisitor:
 		return t.VisitCurrentRootFilter(s)
+
+	default:
+		return t.VisitChildren(s)
+	}
+}
+
+type NextFilterContext struct {
+	*FilterExprContext
+}
+
+func NewNextFilterContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *NextFilterContext {
+	var p = new(NextFilterContext)
+
+	p.FilterExprContext = NewEmptyFilterExprContext()
+	p.parser = parser
+	p.CopyFrom(ctx.(*FilterExprContext))
+
+	return p
+}
+
+func (s *NextFilterContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *NextFilterContext) FilterExpr() IFilterExprContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IFilterExprContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IFilterExprContext)
+}
+
+func (s *NextFilterContext) Filter() antlr.TerminalNode {
+	return s.GetToken(SyntaxFlowParserFilter, 0)
+}
+
+func (s *NextFilterContext) ChainFilter() IChainFilterContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IChainFilterContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IChainFilterContext)
+}
+
+func (s *NextFilterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+	switch t := visitor.(type) {
+	case SyntaxFlowVisitor:
+		return t.VisitNextFilter(s)
 
 	default:
 		return t.VisitChildren(s)
@@ -1594,6 +1530,70 @@ func (s *PrimaryFilterContext) Accept(visitor antlr.ParseTreeVisitor) interface{
 	switch t := visitor.(type) {
 	case SyntaxFlowVisitor:
 		return t.VisitPrimaryFilter(s)
+
+	default:
+		return t.VisitChildren(s)
+	}
+}
+
+type DeepNextFilterContext struct {
+	*FilterExprContext
+}
+
+func NewDeepNextFilterContext(parser antlr.Parser, ctx antlr.ParserRuleContext) *DeepNextFilterContext {
+	var p = new(DeepNextFilterContext)
+
+	p.FilterExprContext = NewEmptyFilterExprContext()
+	p.parser = parser
+	p.CopyFrom(ctx.(*FilterExprContext))
+
+	return p
+}
+
+func (s *DeepNextFilterContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *DeepNextFilterContext) FilterExpr() IFilterExprContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IFilterExprContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IFilterExprContext)
+}
+
+func (s *DeepNextFilterContext) DeepFilter() antlr.TerminalNode {
+	return s.GetToken(SyntaxFlowParserDeepFilter, 0)
+}
+
+func (s *DeepNextFilterContext) ChainFilter() IChainFilterContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IChainFilterContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IChainFilterContext)
+}
+
+func (s *DeepNextFilterContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+	switch t := visitor.(type) {
+	case SyntaxFlowVisitor:
+		return t.VisitDeepNextFilter(s)
 
 	default:
 		return t.VisitChildren(s)
@@ -1952,7 +1952,7 @@ func (p *SyntaxFlowParser) filterExpr(_p int) (localctx IFilterExprContext) {
 				}
 
 			case 5:
-				localctx = NewAheadChainFilterContext(p, NewFilterExprContext(p, _parentctx, _parentState))
+				localctx = NewNextFilterContext(p, NewFilterExprContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, SyntaxFlowParserRULE_filterExpr)
 				p.SetState(96)
 
@@ -1969,7 +1969,7 @@ func (p *SyntaxFlowParser) filterExpr(_p int) (localctx IFilterExprContext) {
 				}
 
 			case 6:
-				localctx = NewDeepChainFilterContext(p, NewFilterExprContext(p, _parentctx, _parentState))
+				localctx = NewDeepNextFilterContext(p, NewFilterExprContext(p, _parentctx, _parentState))
 				p.PushNewRecursionContext(localctx, _startState, SyntaxFlowParserRULE_filterExpr)
 				p.SetState(99)
 

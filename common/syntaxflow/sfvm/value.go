@@ -1,67 +1,124 @@
 package sfvm
 
 import (
-	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/omap"
-	"strconv"
+	"github.com/gobwas/glob"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"regexp"
 )
 
 type Value struct {
-	v    any
-	data *omap.OrderedMap[string, any]
+	actual ValueOperator
 }
 
-func NewValue(v any) *Value {
-	switch v.(type) {
-	case *omap.OrderedMap[string, any]:
-		return &Value{v: "", data: v.(*omap.OrderedMap[string, any])}
+func (op1 *Value) IsList() bool {
+	if op1 == nil || op1.actual == nil {
+		return false
 	}
-	return &Value{v: v, data: nil}
+	return op1.actual.IsList()
+}
+
+func (op1 *Value) GetName() string {
+	if op1 == nil || op1.actual == nil {
+		return ""
+	}
+	return op1.actual.GetName()
+}
+
+func (op1 *Value) ExactMatch(s string) (bool, ValueOperator, error) {
+	if op1 == nil || op1.actual == nil {
+		return false, nil, nil
+	}
+	return op1.actual.ExactMatch(s)
+}
+
+func (op1 *Value) GlobMatch(s glob.Glob) (bool, ValueOperator, error) {
+	if op1 == nil || op1.actual == nil {
+		return false, nil, nil
+	}
+	return op1.actual.GlobMatch(s)
+}
+
+func (op1 *Value) RegexpMatch(regexp *regexp.Regexp) (bool, ValueOperator, error) {
+	if op1 == nil || op1.actual == nil {
+		return false, nil, nil
+	}
+	return op1.actual.RegexpMatch(regexp)
+}
+
+func (op1 *Value) NumberEqual(i any) (bool, ValueOperator, error) {
+	if op1 == nil || op1.actual == nil {
+		return false, nil, nil
+	}
+	return op1.actual.NumberEqual(i)
+}
+
+func (op1 *Value) GetFields() (ValueOperator, error) {
+	if op1 == nil || op1.actual == nil {
+		return nil, nil
+	}
+	return op1.actual.GetFields()
+}
+
+func (op1 *Value) GetMembers() (ValueOperator, error) {
+	if op1 == nil || op1.actual == nil {
+		return nil, nil
+	}
+	return op1.actual.GetMembers()
+}
+
+func (op1 *Value) GetFunctionCallArgs() (ValueOperator, error) {
+	if op1 == nil || op1.actual == nil {
+		return nil, nil
+	}
+	return op1.actual.GetFunctionCallArgs()
+}
+
+func (op1 *Value) GetSliceCallArgs() (ValueOperator, error) {
+	if op1 == nil || op1.actual == nil {
+		return nil, nil
+	}
+	return op1.actual.GetSliceCallArgs()
+}
+
+func (op1 *Value) Next() (ValueOperator, error) {
+	if op1 == nil || op1.actual == nil {
+		return nil, nil
+	}
+	return op1.actual.Next()
+}
+
+func (op1 *Value) DeepNext() (ValueOperator, error) {
+	if op1 == nil || op1.actual == nil {
+		return nil, nil
+	}
+	return op1.actual.DeepNext()
+}
+
+var _ ValueOperator = &Value{}
+
+func NewValue(v ValueOperator) *Value {
+	return &Value{actual: v}
 }
 
 func (v *Value) AsInt() int {
-	return utils.InterfaceToInt(v.v)
-}
-
-func (v *Value) AsMap() *omap.OrderedMap[string, any] {
-	return v.data
+	return codec.Atoi(v.GetName())
 }
 
 func (v *Value) AsString() string {
-	return utils.InterfaceToString(v.v)
+	return v.GetName()
 }
 
 func (v *Value) AsBool() bool {
-	return utils.InterfaceToBoolean(v.v)
+	return codec.Atob(v.GetName())
 }
 
 func (v *Value) IsMap() bool {
-	return v.data != nil
+	if v.actual == nil {
+		return false
+	}
+	return v.actual.IsMap()
 }
 
-func (v *Value) Value() any {
-	if v.IsMap() {
-		return v.data
-	}
-	return v.v
-}
-
-func (v *Value) VerboseString() string {
-	if v.IsMap() {
-		return fmt.Sprintf("(len: %v) omap: {...}", v.data.Len())
-	}
-
-	switch ret := v.v.(type) {
-	case string:
-		return strconv.Quote(ret)
-	case int:
-		return strconv.Itoa(ret)
-	case bool:
-		return strconv.FormatBool(ret)
-	}
-
-	//fallback
-	return fmt.Sprintf("verbose: %v", spew.Sdump(v.v))
+func (v *Value) Value() ValueOperator {
+	return v.actual
 }
