@@ -150,23 +150,23 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) interface
 		}
 		y.VisitFilterExpr(ret.FilterExpr())
 	case *sf.FieldFilterContext:
-		panic("TBD: *.filter")
-		// field filter
+		y.EmitSearchMember(ret.NameFilter().GetText())
 	case *sf.FieldCallFilterContext:
-		panic("TBD: foo.bar")
+		y.VisitFilterExpr(ret.FilterExpr())
+		y.EmitSearchMember(ret.NameFilter().GetText())
 	case *sf.FunctionCallFilterContext:
-		panic("TBD: function(args...)")
+		y.VisitFilterExpr(ret.FilterExpr())
+		y.EmitPushCallArgs()
 	case *sf.FieldIndexFilterContext:
-		panic("TBD: foo[bar]")
+		y.VisitFilterExpr(ret.FilterExpr())
+		y.EmitSearchMember(ret.NameFilter().GetText())
 	case *sf.OptionalFilterContext:
 		y.VisitFilterExpr(ret.FilterExpr())
 		y.VisitConditionExpression(ret.ConditionExpression())
-	case *sf.AheadChainFilterContext:
+	case *sf.NextFilterContext:
 		y.VisitFilterExpr(ret.FilterExpr())
 		y.VisitChainFilter(ret.ChainFilter())
-		// ahead push
-
-	case *sf.DeepChainFilterContext:
+	case *sf.DeepNextFilterContext:
 		y.VisitFilterExpr(ret.FilterExpr())
 		y.VisitChainFilter(ret.ChainFilter())
 	default:

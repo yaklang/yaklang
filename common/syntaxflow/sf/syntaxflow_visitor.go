@@ -37,20 +37,20 @@ type SyntaxFlowVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#FunctionCallFilter.
 	VisitFunctionCallFilter(ctx *FunctionCallFilterContext) interface{}
 
-	// Visit a parse tree produced by SyntaxFlowParser#AheadChainFilter.
-	VisitAheadChainFilter(ctx *AheadChainFilterContext) interface{}
-
-	// Visit a parse tree produced by SyntaxFlowParser#DeepChainFilter.
-	VisitDeepChainFilter(ctx *DeepChainFilterContext) interface{}
-
 	// Visit a parse tree produced by SyntaxFlowParser#CurrentRootFilter.
 	VisitCurrentRootFilter(ctx *CurrentRootFilterContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#NextFilter.
+	VisitNextFilter(ctx *NextFilterContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#OptionalFilter.
 	VisitOptionalFilter(ctx *OptionalFilterContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#PrimaryFilter.
 	VisitPrimaryFilter(ctx *PrimaryFilterContext) interface{}
+
+	// Visit a parse tree produced by SyntaxFlowParser#DeepNextFilter.
+	VisitDeepNextFilter(ctx *DeepNextFilterContext) interface{}
 
 	// Visit a parse tree produced by SyntaxFlowParser#NumberIndexFilter.
 	VisitNumberIndexFilter(ctx *NumberIndexFilterContext) interface{}
