@@ -3,12 +3,13 @@ package yak
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/yak/antlr4yak"
-	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"reflect"
 	"regexp"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/yak/antlr4yak"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
@@ -37,7 +38,6 @@ func MutateHookCaller(raw string) (func(https bool, originReq []byte, req []byte
 	var legacyBeforeRequest bool
 	beforeFunction, ok := before.(*yakvm.Function)
 	if !ok {
-		log.Errorf("afterRequest hook is not a function")
 		beforeRequestOk = false
 	} else {
 		legacyBeforeRequest = beforeFunction.GetNumIn() == 1
@@ -46,19 +46,18 @@ func MutateHookCaller(raw string) (func(https bool, originReq []byte, req []byte
 	var legacyAfterRequest bool
 	afterFunction, ok := after.(*yakvm.Function)
 	if !ok {
-		log.Errorf("afterRequest hook is not a function")
 		afterRequestOk = false
 	} else {
 		legacyAfterRequest = afterFunction.GetNumIn() == 1
 	}
 
 	mirrorHandlerInstance, mirrorFlowOK := engine.GetVar("mirrorHTTPFlow")
-	var mirrorHTTPFlowNumIn = 2
+	mirrorHTTPFlowNumIn := 2
 	if ret, ok := mirrorHandlerInstance.(*yakvm.Function); ok {
 		mirrorHTTPFlowNumIn = ret.GetNumIn()
 	}
 
-	var hookLock = new(sync.Mutex)
+	hookLock := new(sync.Mutex)
 
 	var hookBefore func(https bool, originReq []byte, req []byte) []byte = nil
 	var hookAfter func(https bool, originReq []byte, req []byte, originRsp []byte, rsp []byte) []byte = nil
@@ -144,9 +143,9 @@ func MutateHookCaller(raw string) (func(https bool, originReq []byte, req []byte
 				}
 			}()
 
-			var result = make(map[string]string)
+			result := make(map[string]string)
 			if engine != nil {
-				var params = []any{req, rsp}
+				params := []any{req, rsp}
 				if mirrorHTTPFlowNumIn > 2 {
 					params = []any{req, rsp, existed}
 				}
@@ -182,7 +181,7 @@ func MutateWithParamsGetter(raw string) func() *mutate.RegexpMutateCondition {
 		}
 		entry := NewScriptEngine(1)
 		entry.HookOsExit()
-		var engine, err = entry.ExecuteEx(raw, make(map[string]interface{}))
+		engine, err := entry.ExecuteEx(raw, make(map[string]interface{}))
 		if err != nil {
 			log.Errorf("execute yak hook failed: %s", err)
 			return nil
@@ -202,7 +201,7 @@ func MutateWithParamsGetter(raw string) func() *mutate.RegexpMutateCondition {
 func MutateWithYaklang(raw string) *mutate.RegexpMutateCondition {
 	entry := NewScriptEngine(10)
 	entry.HookOsExit()
-	var engine, err = entry.ExecuteEx(raw, make(map[string]interface{}))
+	engine, err := entry.ExecuteEx(raw, make(map[string]interface{}))
 	if err != nil {
 		log.Errorf("load yak hook failed: %s", err)
 		engine = nil
@@ -214,13 +213,13 @@ func MutateWithYaklang(raw string) *mutate.RegexpMutateCondition {
 	return &mutate.RegexpMutateCondition{
 		Verbose: "YAK_HOOK",
 		TagName: "yak",
-		//Regexp:  _codeMutateRegexp,
+		// Regexp:  _codeMutateRegexp,
 		Handle: func(db *gorm.DB, s string) (finalResult []string, finalError error) {
 			defer func() {
 				if err := recover(); err != nil {
 					log.Errorf("mutate.yaklang panic: %s", err)
-					//finalResult = []string{s}
-					//finalError = nil
+					// finalResult = []string{s}
+					// finalError = nil
 					finalError = fmt.Errorf("mutate.yaklang panic: %s", err)
 					finalResult = nil
 				}
@@ -232,7 +231,7 @@ func MutateWithYaklang(raw string) *mutate.RegexpMutateCondition {
 				return []string{s}, nil
 			}
 
-			var result = strings.Split(s, "|")
+			result := strings.Split(s, "|")
 			if len(result) <= 0 {
 				return []string{s}, nil
 			}

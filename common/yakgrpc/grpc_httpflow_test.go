@@ -389,7 +389,7 @@ Host: %s
 			Full:       true,
 			RuntimeIDs: runtimeIDs,
 		},
-		FieldName: []string{"url", "method", "status_code", "payloads"},
+		FieldName: []string{"payloads"},
 	})
 	require.NoErrorf(t, err, "export httpFlows error")
 	for _, flow := range responses.Data {
@@ -551,5 +551,6 @@ Host: %s
 		lo.Map(responses.Data, func(f *ypb.HTTPFlow, _ int) []string {
 			return f.Payloads
 		}),
-		[][]string{{"1"}, {"2"}})
+		[][]string{{"1"}, {"2"}},
+	)
 }
