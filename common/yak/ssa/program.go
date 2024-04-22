@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
@@ -16,6 +18,8 @@ func NewProgram(dbProgramName string, fs filesys.FileSystem) *Program {
 		Cache:             NewDBCache(dbProgramName),
 		OffsetMap:         make(map[int]*OffsetItem),
 		OffsetSortedSlice: make([]int, 0),
+		editorStack:       omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
+		editorMap:         omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
 	}
 	prog.Loader = ssautil.NewPackageLoader(ssautil.WithFileSystem(fs))
 	return prog
@@ -43,7 +47,7 @@ func (prog *Program) GetAndCreateFunctionBuilder(pkgName string, funcName string
 	fun := prog.GetAndCreateFunction(pkgName, funcName)
 	builder := fun.builder
 	if builder == nil {
-		builder = NewBuilder(prog.GetCurrentEditor(), fun, nil)
+		builder = NewBuilder(prog.getCurrentEditor(), fun, nil)
 	}
 	return builder
 }
