@@ -96,7 +96,7 @@ func (s *SFFrame) exec(input *omap.OrderedMap[string, any]) (ret error) {
 			s.stack.Push(NewValue(i.UnaryStr))
 		case OpPushBool:
 			s.stack.Push(NewValue(i.UnaryInt))
-		case OpPushMatch:
+		case OpPushMatchExact:
 			s.debugSubLog("<< pop search: %v", i.UnaryStr)
 			top := s.stack.Pop().AsMap()
 			res, err := top.WalkSearchGlobKey(i.UnaryStr)

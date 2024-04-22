@@ -2,6 +2,7 @@ package sfvm
 
 import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
+	"github.com/yaklang/yaklang/common/utils"
 	"regexp"
 	"strconv"
 	"strings"
@@ -117,10 +118,27 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) interface
 	switch ret := raw.(type) {
 	case *sf.CurrentRootFilterContext:
 		y.EmitCheckStackTop()
+		return nil
 	case *sf.PrimaryFilterContext:
 		filter, glob := y.FormatStringOrGlob(ret.Identifier().GetText()) // emit field
-		_ = glob
-		y.EmitSearch(filter)
+		if glob {
+			y.EmitSearchGlob(filter)
+		} else {
+			y.EmitSearchExact(filter)
+		}
+		return nil
+	case *sf.RegexpLiteralFilterContext:
+		regexpRaw := ret.RegexpLiteral().GetText()
+		if !(len(regexpRaw) > 2 && regexpRaw[0] == '/' && regexpRaw[len(regexpRaw)-1] == '/') {
+			return utils.Errorf("regexp format error: %v", regexpRaw)
+		}
+		regexpRaw = regexpRaw[1 : len(regexpRaw)-1]
+		r, err := regexp.Compile(regexpRaw)
+		if err != nil {
+			return utils.Errorf("regexp compile error: %v", err)
+		}
+		y.EmitRegexpMatch(r.String())
+		return nil
 	case *sf.NumberIndexFilterContext:
 		index := y.VisitNumberLiteral(ret.NumberLiteral()) // emit index number
 		y.EmitPushIndex(index)
@@ -131,15 +149,7 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) interface
 			y.EmitDirection(">>")
 		}
 		y.VisitFilterExpr(ret.FilterExpr())
-	case *sf.ParenFilterContext:
-		y.VisitFilterExpr(ret.FilterExpr())
 	case *sf.FieldFilterContext:
-		y.VisitFilterFieldMember(ret.FilterFieldMember()) // emit field or cast type
-	case *sf.ListIndexFilterContext:
-		index := y.VisitNumberLiteral(ret.NumberLiteral())
-		y.EmitFetchIndex(index)
-	case *sf.OptionalRootFilterContext:
-		y.VisitConditionExpression(ret.ConditionExpression())
 	case *sf.OptionalFilterContext:
 		y.VisitFilterExpr(ret.FilterExpr())
 		y.VisitConditionExpression(ret.ConditionExpression())
@@ -151,13 +161,8 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) interface
 	case *sf.DeepChainFilterContext:
 		y.VisitFilterExpr(ret.FilterExpr())
 		y.VisitChainFilter(ret.ChainFilter())
-		// head
-
-	case *sf.FieldChainFilterContext:
-		y.VisitFilterExpr(ret.FilterExpr())
-		y.VisitFilterFieldMember(ret.FilterFieldMember()) // emit field or cast type
 	default:
-		panic("BUG: in filterExpr")
+		//panic("BUG: in filterExpr")
 	}
 
 	return nil
@@ -298,29 +303,6 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 	return nil
 }
 
-func (y *SyntaxFlowVisitor) VisitFilterFieldMember(raw sf.IFilterFieldMemberContext) interface{} {
-	if y == nil || raw == nil {
-		return nil
-	}
-
-	i, _ := raw.(*sf.FilterFieldMemberContext)
-	if i == nil {
-		return nil
-	}
-
-	if i.Identifier() != nil {
-		y.EmitField(i.Identifier().GetText())
-	} else if i.NumberLiteral() != nil {
-		y.EmitPushIndex(y.VisitNumberLiteral(i.NumberLiteral()))
-	} else if i.TypeCast() != nil {
-		y.EmitTypeCast(strings.Trim(i.TypeCast().GetText(), "()"))
-	} else {
-		y.VisitConditionExpression(i.ConditionExpression())
-	}
-
-	return nil
-}
-
 const tmpPH = "__[[PLACEHOLDER]]__"
 
 func (y *SyntaxFlowVisitor) VisitStringLiteral(raw sf.IStringLiteralContext) (string, bool) {
@@ -338,16 +320,7 @@ func (y *SyntaxFlowVisitor) VisitStringLiteral(raw sf.IStringLiteralContext) (st
 }
 
 func (y *SyntaxFlowVisitor) FormatStringOrGlob(text string) (string, bool) {
-	if strings.Contains(text, "%%") {
-		text = strings.ReplaceAll(text, "%%", tmpPH)
-	}
-	text = strings.ReplaceAll(text, "*", "[*]")
-	isGlob := strings.Contains(text, "%")
-	if strings.Contains(text, "%") {
-		text = strings.ReplaceAll(text, "%", "*")
-	}
-	text = strings.ReplaceAll(text, tmpPH, "%")
-	return text, isGlob
+	return text, strings.Contains(text, "*")
 }
 
 func (y *SyntaxFlowVisitor) VisitNumberLiteral(raw sf.INumberLiteralContext) int {
