@@ -150,6 +150,14 @@ func (y *SyntaxFlowVisitor) VisitFilterExpr(raw sf.IFilterExprContext) interface
 		}
 		y.VisitFilterExpr(ret.FilterExpr())
 	case *sf.FieldFilterContext:
+		panic("TBD: *.filter")
+		// field filter
+	case *sf.FieldCallFilterContext:
+		panic("TBD: foo.bar")
+	case *sf.FunctionCallFilterContext:
+		panic("TBD: function(args...)")
+	case *sf.FieldIndexFilterContext:
+		panic("TBD: foo[bar]")
 	case *sf.OptionalFilterContext:
 		y.VisitFilterExpr(ret.FilterExpr())
 		y.VisitConditionExpression(ret.ConditionExpression())
