@@ -44,7 +44,7 @@ func yakitColor(i string) string {
 
 func init() {
 	RegisterPostInitDatabaseFunction(func() error {
-		lowhttp.RegisterSaveHTTPFlowHandler(func(https bool, req []byte, rsp []byte, url string, remoteAddr string, reqSource string, runtimeId string, fromPlugin string, hiddenIndex string) {
+		lowhttp.RegisterSaveHTTPFlowHandler(func(https bool, req []byte, rsp []byte, url string, remoteAddr string, reqSource string, runtimeId string, fromPlugin string, hiddenIndex string, payloads []string) {
 			if rsp == nil || len(rsp) == 0 {
 				return
 			}
@@ -73,6 +73,7 @@ func init() {
 			flow.FromPlugin = fromPlugin
 			flow.RuntimeId = runtimeId
 			flow.HiddenIndex = hiddenIndex
+			flow.Payload = strings.Join(payloads, ",")
 			err = InsertHTTPFlow(db, flow)
 			if err != nil {
 				log.Errorf("save httpflow failed: %s", err)
@@ -105,6 +106,7 @@ type HTTPFlow struct {
 	RemoteAddr         string
 	IPInteger          int
 	Tags               string // 用来打标！
+	Payload            string
 
 	// Websocket 相关字段
 	IsWebsocket bool
@@ -123,11 +125,6 @@ type HTTPFlow struct {
 	IsTooLargeResponse         bool
 	TooLargeResponseHeaderFile string
 	TooLargeResponseBodyFile   string
-}
-
-type HTTPFlowWithPayloads struct {
-	*HTTPFlow
-	Payloads []string
 }
 
 type TagAndStatusCode struct {
@@ -329,18 +326,6 @@ func FuzzParamsToGRPCFuzzableParam(r *mutate.FuzzHTTPRequestParam, isHttps bool)
 	return p
 }
 
-func (f *HTTPFlowWithPayloads) ToGRPCModel(full bool) (*ypb.HTTPFlow, error) {
-	flow, err := f.toGRPCModel(full)
-	flow.Payloads = f.Payloads
-	return flow, err
-}
-
-func (f *HTTPFlowWithPayloads) ToGRPCModelFull() (*ypb.HTTPFlow, error) {
-	flow, err := f.toGRPCModel(true)
-	flow.Payloads = f.Payloads
-	return flow, err
-}
-
 func (f *HTTPFlow) ToGRPCModel(full bool) (*ypb.HTTPFlow, error) {
 	return f.toGRPCModel(full)
 }
@@ -402,6 +387,7 @@ func (f *HTTPFlow) toGRPCModel(full bool) (*ypb.HTTPFlow, error) {
 		IsTooLargeResponse:         f.IsTooLargeResponse,
 		TooLargeResponseBodyFile:   f.TooLargeResponseBodyFile,
 		TooLargeResponseHeaderFile: f.TooLargeResponseHeaderFile,
+		Payloads:                   strings.Split(f.Payload, ","),
 	}
 	// 设置 title
 	var (
@@ -1101,6 +1087,10 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 		db = bizhelper.ExactExcludeQueryInt64Array(db, "id", params.GetExcludeId())
 	}
 
+	if len(params.GetIncludeHash()) > 0 {
+		db = bizhelper.ExactQueryStringArrayOr(db, "hash", params.GetIncludeHash())
+	}
+
 	if params.AfterBodyLength > 0 {
 		db = db.Where("body_length >= ?", params.AfterBodyLength)
 	}
@@ -1143,10 +1133,14 @@ func BuildHTTPFlowQuery(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB 
 	}
 
 	if !params.GetFull() {
+		extraSelectField := ""
+		if params.GetWithPayload() {
+			extraSelectField = "payload,"
+		}
 		// 只查询部分字段，主要是为了处理大的 response 和 request 的情况，同时告诉用户
 		// max request size is 200K -> 200 * 1024 -> 204800
 		// max response size is 500K -> 500 * 1024 -> 512000
-		db = db.Select(`id,created_at,updated_at,hidden_index, -- basic gorm fields
+		db = db.Select(fmt.Sprintf(`id,created_at,updated_at,hidden_index,%s -- basic gorm fields
 body_length, -- handle body length should be careful, if it's big, no return response
 
 -- metainfo
@@ -1168,7 +1162,7 @@ CASE WHEN LENGTH(response) > 512000 THEN '' ELSE response END as response,
 -- is response too large
 is_too_large_response, 
 too_large_response_header_file, too_large_response_body_file
-`)
+`, extraSelectField))
 	}
 
 	if params.Pagination == nil {
@@ -1220,20 +1214,21 @@ too_large_response_header_file, too_large_response_body_file
 	return db
 }
 
-func QueryHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) (paging *bizhelper.Paginator, httpflows []*HTTPFlowWithPayloads, err error) {
+func QueryHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) (paging *bizhelper.Paginator, httpflows []*HTTPFlow, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Error(r)
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
-	rawDB := db
-	queryDB := BuildHTTPFlowQuery(rawDB.Model(&HTTPFlow{}), params)
+	// todo: remove this
+	db = db.Debug()
+	queryDB := BuildHTTPFlowQuery(db.Model(&HTTPFlow{}), params)
 
-	return SelectHTTPFlowFromDB(rawDB, queryDB, params)
+	return SelectHTTPFlowFromDB(queryDB, params)
 }
 
-func SelectHTTPFlowFromDB(rawDB, queryDB *gorm.DB, params *ypb.QueryHTTPFlowRequest) (paging *bizhelper.Paginator, httpflows []*HTTPFlowWithPayloads, err error) {
+func SelectHTTPFlowFromDB(queryDB *gorm.DB, params *ypb.QueryHTTPFlowRequest) (paging *bizhelper.Paginator, httpflows []*HTTPFlow, err error) {
 	var limitFlows, fullFlows []*HTTPFlow
 
 	if params.OffsetId > 0 {
@@ -1253,30 +1248,7 @@ func SelectHTTPFlowFromDB(rawDB, queryDB *gorm.DB, params *ypb.QueryHTTPFlowRequ
 		return nil, nil, utils.Errorf("paging failed: %s", queryDB.Error)
 	}
 
-	// 以下为WithPayload的额外处理逻辑，因此将返回值使用新的结构体封装了一层，带上了Payloads
-	httpflows = make([]*HTTPFlowWithPayloads, 0, len(limitFlows))
-	for _, flow := range limitFlows {
-		httpflows = append(httpflows, &HTTPFlowWithPayloads{
-			HTTPFlow: flow,
-		})
-	}
-
-	// 从 web_fuzzer_responses 表中根据 HiddenIndex 找到 Payload
-	if params.WithPayload {
-		hiddenIndexToPayloadsMap, err := queryWebFuzzerResponsePayloadsFromHTTPFlow(rawDB, limitFlows)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		// 将 Payloads 附加到 HTTPFlowWithPayloads 结构体中
-		for _, r := range httpflows {
-			if v, ok := hiddenIndexToPayloadsMap[r.HiddenIndex]; ok {
-				r.Payloads = v
-			}
-		}
-	}
-
-	return paging, httpflows, nil
+	return paging, limitFlows, nil
 }
 
 type HTTPFlowUrl struct {
@@ -1450,7 +1422,7 @@ func QueryWebsocketFlowsByHTTPFlowHash(db *gorm.DB, req *ypb.DeleteHTTPFlowReque
 	return db
 }
 
-func ExportHTTPFlow(db *gorm.DB, params *ypb.ExportHTTPFlowsRequest) (paging *bizhelper.Paginator, ret []*HTTPFlowWithPayloads, err error) {
+func ExportHTTPFlow(db *gorm.DB, params *ypb.ExportHTTPFlowsRequest) (paging *bizhelper.Paginator, ret []*HTTPFlow, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Error(r)
@@ -1461,17 +1433,15 @@ func ExportHTTPFlow(db *gorm.DB, params *ypb.ExportHTTPFlowsRequest) (paging *bi
 	queryParams.IncludeId = params.Ids
 
 	db = db.Model(&HTTPFlow{})
-	rawDB := db
 	// overwrite Select Field, fix payloads
-	params.FieldName = lo.Filter(params.FieldName, func(item string, index int) bool {
-		if item == "payloads" {
-			queryParams.WithPayload = true
-			return false
+	for i, field := range params.FieldName {
+		if field != "payloads" {
+			continue
 		}
-		return true
-	})
-	params.FieldName = append(params.FieldName, "hidden_index")
+		queryParams.WithPayload = true
+		params.FieldName[i] = "payload"
+	}
 
-	queryDB := BuildHTTPFlowQuery(db, queryParams).Select(strings.Join(params.FieldName, ","))
-	return SelectHTTPFlowFromDB(rawDB, queryDB, queryParams)
+	queryDB := BuildHTTPFlowQuery(db, queryParams).Select(params.FieldName)
+	return SelectHTTPFlowFromDB(queryDB, queryParams)
 }

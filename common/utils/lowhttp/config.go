@@ -71,6 +71,9 @@ type LowhttpExecConfig struct {
 
 	// SNI
 	SNI string
+
+	// payloads (web fuzzer)
+	Payloads []string
 }
 
 type LowhttpResponse struct {
@@ -96,8 +99,12 @@ type LowhttpResponse struct {
 	TooLargeLimit    int64
 	ResponseBodySize int64
 
+	// !deprecated
 	// HiddenIndex associate between http_flows and web_fuzzer_response table
 	HiddenIndex string
+
+	// payloads (web fuzzer)
+	Payloads []string
 }
 
 func (l *LowhttpResponse) GetBody() []byte {
@@ -458,5 +465,11 @@ func WithConnPool(b bool) LowhttpOpt {
 func WithSNI(sni string) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.SNI = sni
+	}
+}
+
+func WithPayloads(payloads []string) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.Payloads = payloads
 	}
 }

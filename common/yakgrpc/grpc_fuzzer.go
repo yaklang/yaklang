@@ -733,6 +733,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_RequestCountLimiter(requestCount),
 			mutate.WithPoolOpt_MutateWithMethods(req.GetMutateMethods()),
 			mutate.WithPoolOpt_RuntimeId(runtimeID),
+			mutate.WithPoolOpt_WithPayloads(true),
 		}
 
 		fuzzMode := req.GetFuzzTagMode() // ""/"close"/"standard"/"legacy"
