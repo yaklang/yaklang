@@ -14,7 +14,8 @@ func (s *Server) SimpleDetectCreatReport(req *ypb.CreatReportRequest, stream ypb
 	reportMetaInfo := yakit.Get("simple_detect_" + req.GetRuntimeId())
 
 	execRequest := &ypb.DebugPluginRequest{
-		Code: string(creat_report),
+		PluginType: "yak",
+		Code:       string(creat_report),
 		ExecParams: []*ypb.KVPair{
 			{Key: "host_total", Value: gjson.Get(reportMetaInfo, "hostTotal").String()},
 			{Key: "port_total", Value: gjson.Get(reportMetaInfo, "portTotal").String()},
