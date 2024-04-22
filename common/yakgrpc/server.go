@@ -37,7 +37,15 @@ func NewServer() (*Server, error) {
 	return NewServerWithLogCache(true)
 }
 
-func NewServerWithLogCache(b bool) (*Server, error) {
+func NewTestServer(startCacheLog bool) (*Server, error) {
+	return newServerEx(false, startCacheLog)
+}
+
+func NewServerWithLogCache(startCacheLog bool) (*Server, error) {
+	return newServerEx(true, startCacheLog)
+}
+
+func newServerEx(initFacadeServer, startCacheLog bool) (*Server, error) {
 	yakitBase := consts.GetDefaultYakitBaseDir()
 	_ = os.MkdirAll(yakitBase, 0o777)
 	port, err := utils.GetRangeAvailableTCPPort(50000, 65535, 3)
@@ -45,47 +53,17 @@ func NewServerWithLogCache(b bool) (*Server, error) {
 		return nil, err
 	}
 	s := &Server{
-		cacheDir:      yakitBase,
-		reverseServer: facades.NewFacadeServer("0.0.0.0", port),
+		cacheDir: yakitBase,
+	}
+	if initFacadeServer {
+		s.reverseServer = facades.NewFacadeServer("0.0.0.0", port)
 	}
 
 	err = s.initDatabase()
 	if err != nil {
 		return nil, err
-		//log.Warnf("cannot fetch database connection: %v", err)
-		//log.Infof("checking your [%v] 's fs.permission", yakitBase)
-		//
-		//// 不存在数据
-		//if utils.GetFirstExistedPath(yakitBase) != yakitBase {
-		//	return nil, utils.Errorf("yakit-projects non-existed.")
-		//}
-		//
-		//f, err := os.Stat(yakitBase)
-		//if err != nil {
-		//	return nil, err
-		//}
-		//
-		//log.Info("数据库遭遇问题/ database met error")
-		//log.Infof("dir: %v mode: %v", yakitBase, f.Mode().String())
-		//log.Infof("尝试/try 0755. (至少对当前用户需要rwx权限 / chmod 0755 %v)", yakitBase)
-		//log.Infof(
-		//	"or... checking owner for %v (检查 *nix 系统下 %v 的 owner 是否为当前用户, 通过 chown -R [your-user] ~/yakit-projects)",
-		//	yakitBase, yakitBase,
-		//)
-		//
-		//err2 := os.RemoveAll(consts.GetDefaultYakitBaseDir(homeDir))
-		//if err2 != nil {
-		//	log.Error("remove %v failed: %s", yakitBase, err2)
-		//	return nil, err2
-		//}
-		//
-		//_ = os.MkdirAll(yakitBase, os.ModePerm)
-		//err = s.initDatabase()
-		//if err != nil {
-		//	return nil, err
-		//}
 	}
-	if b {
+	if startCacheLog {
 		utils.StartCacheLog(context.Background(), 200)
 	}
 	return s, nil
@@ -135,6 +113,10 @@ func (s *Server) initDatabase() error {
 }
 
 func (s *Server) initFacadeServer() error {
+	if s.reverseServer == nil {
+		return nil
+	}
+
 	s.reverseServer.OnHandle(func(n *facades.Notification) {
 		res, ok := remoteAddrConvertor.Get(n.RemoteAddr)
 		if ok {
