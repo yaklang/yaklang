@@ -111,7 +111,7 @@ func (v *Versioned[T]) UnmarshalJSON(raw []byte) error {
 	// lazy scope, scope 可能是不需要的，
 	// 因为一般在反序列化这个结果的过程中，
 	// 都已经知道是谁的 Scope 了，
-	// 外部赋值即可满足需求
+	//外部赋值即可满足需求
 
 	return nil
 }
