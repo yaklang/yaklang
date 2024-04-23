@@ -1161,9 +1161,11 @@ func Format(raw string, data map[string]string) string {
 	}
 	return raw
 }
+
 func ReplaceLastSubString(s, sub, new string) string {
 	return strings.Replace(s, sub, new, strings.LastIndex(s, sub))
 }
+
 func ParseJavaOverLongString(raw []byte) ([]byte, error) {
 	reader := bytes.NewReader(raw)
 	var res []byte
