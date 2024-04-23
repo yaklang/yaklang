@@ -9,27 +9,9 @@ import (
 	"regexp"
 )
 
-type mapCtx struct {
-	OriginDepth int
-	Current     int
-	Index       int
-	Value       []*omap.OrderedMap[string, any]
-	Root        *Value
-}
-
-type flatCtx struct {
-	OriginDepth int
-	Current     int
-	Index       int
-	Value       *omap.OrderedMap[string, any]
-	Root        *Value
-}
-
 type SFFrame struct {
 	symbolTable *omap.OrderedMap[string, any]
 	stack       *utils.Stack[ValueOperator]
-	mapStack    *utils.Stack[*mapCtx]
-	flatStack   *utils.Stack[*flatCtx]
 	Text        string
 	Codes       []*SFI
 	toLeft      bool
@@ -44,8 +26,6 @@ func NewSFFrame(vars *omap.OrderedMap[string, any], text string, codes []*SFI) *
 	return &SFFrame{
 		symbolTable: v,
 		stack:       utils.NewStack[ValueOperator](),
-		mapStack:    utils.NewStack[*mapCtx](),
-		flatStack:   utils.NewStack[*flatCtx](),
 		Text:        text,
 		Codes:       codes,
 	}
@@ -71,7 +51,7 @@ func (s *SFFrame) ToRight() bool {
 }
 
 func (s *SFFrame) exec(input ValueOperator) (ret error) {
-	s.stack.Push(NewValue(input))
+	s.stack.Push(input)
 	defer func() {
 		if err := recover(); err != nil {
 			ret = utils.Errorf("sft panic: %v", err)

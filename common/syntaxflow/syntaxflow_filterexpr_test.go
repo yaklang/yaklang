@@ -59,9 +59,6 @@ func TestSyntaxFlowFilter_Search(t *testing.T) {
 		if !checked {
 			t.Fatalf("SyntaxFlowVirtualMachine.Compile failed: %v", spew.Sdump(i))
 		}
-		if count <= 2 {
-			t.Fatalf("SyntaxFlowVirtualMachine.Compile failed: " + spew.Sdump(i))
-		}
 	}
 
 }

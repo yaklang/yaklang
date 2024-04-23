@@ -14,30 +14,34 @@ flow: filters EOF;
 filters: filterStatement+;
 
 filterStatement
-    : existedRef? (direction = ('>>' | '<<'))? filterExpr ('=>' refVariable)?
+    : filterExpr ('=>' refVariable)?
     ;
-
-existedRef: refVariable;
 
 refVariable
     :  '$' (identifier | ('(' identifier ')'));
 
 filterExpr
-    : '$'                                     # CurrentRootFilter
-    | identifier                              # PrimaryFilter
-    | regexpLiteral                           # RegexpLiteralFilter
-    | numberLiteral                           # NumberIndexFilter
-    | op = ('>>' | '<<') filterExpr           # DirectionFilter
-    | '.' nameFilter                          # FieldFilter
-    | filterExpr '.' nameFilter               # FieldCallFilter
-    | filterExpr '(' (nameFilter? ',') * ')'  # FunctionCallFilter
-    | filterExpr '[' nameFilter ']'           # FieldIndexFilter
-    | filterExpr '?' '('conditionExpression ')'     # OptionalFilter
-    | filterExpr '=>' chainFilter             # NextFilter
-    | filterExpr '==>' chainFilter            # DeepNextFilter
+    : '$'    identifier?                          # CurrentRootFilter
+    | identifier                                  # PrimaryFilter
+    | regexpLiteral                               # RegexpLiteralFilter
+    | '.' filterExpr                              # FieldFilter
+    | filterExpr '.' filterExpr                   # FieldCallFilter
+    | filterExpr '(' acutalParamFilter* ')'       # FunctionCallFilter
+    | filterExpr '[' sliceCallItem ']'            # FieldIndexFilter
+    | filterExpr '?' '('conditionExpression ')'   # OptionalFilter
+    | filterExpr '=>' chainFilter                 # NextFilter
+    | filterExpr '==>' chainFilter                # DeepNextFilter
     ;
 
-nameFilter: identifier | regexpLiteral | numberLiteral;
+acutalParamFilter
+    : '#'? /* # 获取的是顶级定义，应该自动跨越过程 */ (nameFilter | '-') ','? # NamedParam
+    | ','                                                               # EmptyParam
+    ;
+
+
+sliceCallItem: nameFilter | numberLiteral;
+
+nameFilter: identifier | regexpLiteral;
 
 chainFilter
     : '[' ((filters (',' filters)*) | '...') ']'          # Flat
@@ -65,6 +69,7 @@ numberLiteral: Number | OctalNumber | BinaryNumber | HexNumber;
 stringLiteral: identifier;
 regexpLiteral: RegexpLiteral;
 identifier: Identifier | types;
+
 types: StringType | NumberType | ListType | DictType | BoolType;
 boolLiteral: BoolLiteral;
 
@@ -75,7 +80,6 @@ Percent: '%%';
 DeepDot: '..';
 LtEq: '<=';
 GtEq: '>=';
-DoubleLt: '<<';
 DoubleGt: '>>';
 Filter: '=>';
 EqEq: '==';
@@ -103,6 +107,7 @@ Colon: ':';
 Search: '%';
 Bang: '!';
 Star: '*';
+Minus: '-';
 
 WhiteSpace: [ \r\n] -> skip;
 Number: Digit+;
