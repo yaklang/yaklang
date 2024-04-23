@@ -70,6 +70,9 @@ func (f *Function) SetType(t Type) {
 }
 
 func (f *Function) GetProgram() *Program {
+	if f.Package == nil {
+		return nil
+	}
 	return f.Package.Prog
 }
 
