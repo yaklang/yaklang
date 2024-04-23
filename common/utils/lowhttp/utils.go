@@ -335,6 +335,15 @@ func readCookies(h http.Header, filter string) []*http.Cookie {
 				continue
 			}
 
+			// 去掉友好显示的tag
+			if strings.HasPrefix(name, "{{urlescape(") ||
+				strings.HasPrefix(val, "{{urlescape(") {
+				name = strings.TrimPrefix(name, "{{urlescape(")
+				name = strings.TrimSuffix(name, ")}}")
+				val = strings.TrimPrefix(val, "{{urlescape(")
+				val = strings.TrimSuffix(val, ")}}")
+			}
+
 			if strings.Contains(val, "%") {
 				valUnesc, err := url.QueryUnescape(val)
 				if err == nil {
