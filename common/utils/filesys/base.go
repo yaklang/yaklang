@@ -29,14 +29,18 @@ func (f *embedFs) Join(name ...string) string {
 	return path.Join(name...)
 }
 
-func fromEmbedFS(fs2 embed.FS) FileSystem {
-	return &embedFs{fs2}
+func NewEmbedFS(fs embed.FS) FileSystem {
+	return &embedFs{fs}
 }
 
 // local filesystem
 type LocalFs string
 
-func NewLocalFs(path string) LocalFs {
+func NewLocalFs() LocalFs {
+	return LocalFs("")
+}
+
+func NewLocalFsWithPath(path string) LocalFs {
 	return LocalFs(path)
 }
 
