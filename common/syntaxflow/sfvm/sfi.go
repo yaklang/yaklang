@@ -21,30 +21,20 @@ const (
 	OpPushSearchExact
 	OpPushSearchGlob
 	OpPushSearchRegexp
-	OpPushSearchMember
 
 	// handle function call
-	OpPushCallArgs
+	OpGetCallArgs
+	OpGetMembers
 
-	// OpPushIndex can push data from index
-	OpPushIndex
-	// OpPushRef can push reference into stack
-	OpPushRef
-	// OpNewRef can create new symbol reference
+	OpTopDefs
+	OpBottomUse
+
+	// ListOperation
+	OpListIndex
+
+	// => variable
 	OpNewRef
 	OpUpdateRef
-
-	//
-	OpFetchField
-	OpFetchIndex
-	OpSetDirection
-	OpFlatStart
-	OpFlatDone
-	OpRestoreFlatContext
-	OpMapStart
-	OpMapDone
-	OpRestoreMapContext
-	OpTypeCast
 
 	/*
 		Binary Operator
@@ -94,36 +84,16 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" (len:%v) %v", "push", len(s.UnaryStr), strconv.Quote(s.UnaryStr))
 	case OpPushNumber:
 		return fmt.Sprintf(verboseLen+" %v", "push", s.UnaryInt)
-	case OpPushRef:
-		return fmt.Sprintf(verboseLen+" %v", "push$ref", s.UnaryStr)
 	case OpPushSearchGlob:
 		return fmt.Sprintf(verboseLen+" %v", "push$glob", s.UnaryStr)
 	case OpPushSearchExact:
 		return fmt.Sprintf(verboseLen+" %v", "push$exact", s.UnaryStr)
 	case OpPushSearchRegexp:
 		return fmt.Sprintf(verboseLen+" %v", "push$regexp", s.UnaryStr)
-	case OpPushIndex:
-		return fmt.Sprintf(verboseLen+" [%v]", "push$index", s.UnaryInt)
 	case OpNewRef:
 		return fmt.Sprintf(verboseLen+" %v", "new$ref", s.UnaryStr)
 	case OpUpdateRef:
 		return fmt.Sprintf(verboseLen+" %v", "update$ref", s.UnaryStr)
-	case OpFetchField:
-		return fmt.Sprintf(verboseLen+" .%v", "?field", s.UnaryStr)
-	case OpFetchIndex:
-		return fmt.Sprintf(verboseLen+" [%v]", "?=index", s.UnaryInt)
-	case OpSetDirection:
-		return fmt.Sprintf(verboseLen+" %v", "direction", s.UnaryStr)
-	case OpFlatStart:
-		return fmt.Sprintf(verboseLen+" (?len=%v) %v", "=>flat-start", s.UnaryInt, s.UnaryStr)
-	case OpFlatDone:
-		return fmt.Sprintf(verboseLen+" (?len=%v) %v", "=>flat-done", s.UnaryInt, s.UnaryStr)
-	case OpMapStart:
-		return fmt.Sprintf(verboseLen+" %v", "=>start-map", s.UnaryStr)
-	case OpMapDone:
-		return fmt.Sprintf(verboseLen+" %v - %v", "=>build-map", s.UnaryInt, s.Values)
-	case OpTypeCast:
-		return fmt.Sprintf(verboseLen+" %v", "type-cast", s.UnaryStr)
 	case OpEq:
 		return fmt.Sprintf(verboseLen+" %v", "(operator) ==", s.UnaryStr)
 	case OpNotEq:
@@ -146,16 +116,14 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v", "(operator) &&", s.UnaryStr)
 	case OpLogicOr:
 		return fmt.Sprintf(verboseLen+" %v", "(operator) ||", s.UnaryStr)
-	case OpRestoreMapContext:
-		return fmt.Sprintf(verboseLen+" %v", "restore map ctx", s.UnaryStr)
-	case OpRestoreFlatContext:
-		return fmt.Sprintf(verboseLen+" %v", "restore flat ctx", s.UnaryStr)
 	case OpPop:
 		return fmt.Sprintf(verboseLen+" %v", "pop", s.UnaryStr)
 	case OpWithdraw:
 		return fmt.Sprint("withdraw last stack value")
 	case OpCheckStackTop:
 		return fmt.Sprint("check stack top")
+	default:
+		panic("unhandled default case")
 	}
 	return ""
 }
