@@ -3,18 +3,17 @@ package ssaapi
 import (
 	"fmt"
 	"io"
-	"io/fs"
 	"runtime/debug"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	js2ssa "github.com/yaklang/yaklang/common/yak/JS2ssa"
 	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
 	"github.com/yaklang/yaklang/common/yak/php/php2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 	"github.com/yaklang/yaklang/common/yak/yak2ssa"
 )
 
@@ -41,10 +40,52 @@ var (
 	}
 )
 
-func (c *config) parse() (ret *ssa.Program, err error) {
+func (c *config) parseProject() ([]*Program, error) {
 	if c.Builder == nil {
 		return nil, utils.Errorf("not support language %s", c.language)
 	}
+	ret := make([]*Program, 0)
+	// parse project
+	ssareducer.ReducerCompile(
+		".", // base
+		ssareducer.WithFileSystem(c.fs),
+		ssareducer.WithFileFilter(c.Builder.FilterFile),
+		ssareducer.WithEntryFiles(c.entryFile...),
+		ssareducer.WithCompileMethod(func(path string, f io.Reader) (includeFiles []string, err error) {
+			prog, err := c.parseSimple(path, f)
+			_ = prog
+			if err != nil {
+				return nil, utils.Errorf("parse file %s error : %v", path, err)
+			}
+			ret = append(ret, NewProgram(prog, c))
+			return prog.GetIncludeFiles(), nil
+		}),
+	)
+	return ret, nil
+}
+
+func (c *config) parseFile() (ret *Program, err error) {
+	if c.Builder == nil {
+		return nil, utils.Errorf("not support language %s", c.language)
+	}
+	prog, err := c.parseSimple("", c.code)
+	if err != nil {
+		return nil, err
+	}
+	return NewProgram(prog, c), nil
+}
+
+func (c *config) feed(prog *ssa.Program, code io.Reader) error {
+	builder := prog.GetAndCreateFunctionBuilder("main", "main")
+	if err := prog.Build("", code, builder); err != nil {
+		return err
+	}
+	builder.Finish()
+	ssa4analyze.RunAnalyzer(prog)
+	return nil
+}
+
+func (c *config) parseSimple(path string, r io.Reader) (ret *ssa.Program, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			ret = nil
@@ -54,6 +95,18 @@ func (c *config) parse() (ret *ssa.Program, err error) {
 	}()
 
 	prog := ssa.NewProgram(c.DatabaseProgramName, c.fs)
+	builder := c.init(prog)
+	// parse code
+	if err := prog.Build(path, r, builder); err != nil {
+		return nil, err
+	}
+	builder.Finish()
+	ssa4analyze.RunAnalyzer(prog)
+	prog.Finish()
+	return prog, nil
+}
+
+func (c *config) init(prog *ssa.Program) *ssa.FunctionBuilder {
 	prog.Build = func(filePath string, src io.Reader, fb *ssa.FunctionBuilder) error {
 		// check builder
 		if c.Builder == nil {
@@ -109,41 +162,5 @@ func (c *config) parse() (ret *ssa.Program, err error) {
 	builder.WithExternValue(c.externValue)
 	builder.WithExternMethod(c.externMethod)
 	builder.WithDefineFunction(c.defineFunc)
-	if c.fs != nil {
-		// parse project
-		filesys.Recursive(".",
-			filesys.WithFileSystem(c.fs),
-			filesys.WithFileStat(func(path string, f fs.File, fi fs.FileInfo) error {
-				if !c.Builder.FilterFile(path) {
-					return nil
-				}
-				if err := prog.Build(path, f, builder); err != nil {
-					log.Errorf(
-						"ssaapi: build file %s with language %s error: %s",
-						path, c.language, err,
-					)
-				}
-				return nil
-			}),
-		)
-	} else if c.code != nil {
-		// parse code
-		if err := prog.Build("", c.code, builder); err != nil {
-			return nil, err
-		}
-	}
-	builder.Finish()
-	ssa4analyze.RunAnalyzer(prog)
-	prog.Finish()
-	return prog, nil
-}
-
-func (c *config) feed(prog *ssa.Program, code io.Reader) error {
-	builder := prog.GetAndCreateFunctionBuilder("main", "main")
-	if err := prog.Build("", code, builder); err != nil {
-		return err
-	}
-	builder.Finish()
-	ssa4analyze.RunAnalyzer(prog)
-	return nil
+	return builder
 }

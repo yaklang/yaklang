@@ -14,19 +14,16 @@ type Program struct {
 	config  *config
 }
 
-func NewProgram(prog *ssa.Program) *Program {
+func NewProgram(prog *ssa.Program, config *config) *Program {
 	return &Program{
 		Program: prog,
+		config:  config,
 	}
 }
 
 func (p *Program) Show() *Program {
 	p.Program.Show()
 	return p
-}
-
-func (p *Program) AddConfig(c *config) {
-	p.config = c
 }
 
 func (p *Program) IsNil() bool {

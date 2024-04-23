@@ -1,40 +1,68 @@
 package ssareducer
 
-import "embed"
+import (
+	"embed"
+	"io"
 
+	"github.com/yaklang/yaklang/common/utils/filesys"
+)
+
+type compileMethod func(string, io.Reader) ([]string, error)
 type Config struct {
 	// suffix
-	exts []string
+	filter func(string) bool
 
-	// embed fs for test generally
-	embedFS *embed.FS
+	entryFiles []string
 
-	compileMethods     func(*ReducerCompiler, string) ([]string, error)
+	fs filesys.FileSystem
+
+	compileMethod      compileMethod
 	stopAtCompileError bool
 }
 
-func NewConfig() *Config {
-	c := &Config{}
+func NewConfig(opt ...Option) *Config {
+	c := &Config{
+		filter: func(string) bool {
+			return true
+		},
+		entryFiles:         make([]string, 0),
+		fs:                 nil,
+		stopAtCompileError: false,
+	}
+	for _, o := range opt {
+		o(c)
+	}
 	return c
 }
 
 type Option func(config *Config)
 
-func WithFileExt(ext string, others ...string) Option {
+func WithFileFilter(h func(string) bool) Option {
 	return func(config *Config) {
-		config.exts = append(config.exts, ext)
-		config.exts = append(config.exts, others...)
+		config.filter = h
+	}
+}
+
+func WithFileSystem(fs filesys.FileSystem) Option {
+	return func(config *Config) {
+		config.fs = fs
 	}
 }
 
 func WithEmbedFS(fs embed.FS) Option {
 	return func(config *Config) {
-		config.embedFS = &fs
+		config.fs = filesys.NewEmbedFS(fs)
 	}
 }
 
-func WithCompileMethod(handler func(*ReducerCompiler, string) ([]string, error)) Option {
+func WithEntryFiles(filename ...string) Option {
 	return func(config *Config) {
-		config.compileMethods = handler
+		config.entryFiles = append(config.entryFiles, filename...)
+	}
+}
+
+func WithCompileMethod(handler compileMethod) Option {
+	return func(config *Config) {
+		config.compileMethod = handler
 	}
 }

@@ -3,11 +3,13 @@ package ssareducer
 import (
 	"embed"
 	"fmt"
+	"io"
 	"io/fs"
 	"strings"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 )
@@ -18,13 +20,17 @@ var lib embed.FS
 func TestReducerCompiling_NORMAL(t *testing.T) {
 	count := 0
 	var existed []string
-	err := filesys.Recursive("testlib", filesys.WithEmbedFS(lib), filesys.WithFileStat(func(pathname string, f fs.File, fi fs.FileInfo) error {
-		count++
-		if strings.HasSuffix(pathname, ".yak") {
-			existed = append(existed, pathname)
-		}
-		return nil
-	}))
+	err := filesys.Recursive(
+		"testlib",
+		filesys.WithEmbedFS(lib),
+		filesys.WithFileStat(func(pathname string, f fs.File, fi fs.FileInfo) error {
+			count++
+			if strings.HasSuffix(pathname, ".yak") {
+				existed = append(existed, pathname)
+			}
+			return nil
+		}),
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -33,28 +39,36 @@ func TestReducerCompiling_NORMAL(t *testing.T) {
 	}
 
 	count = 0
-	err = NewReducerCompiler("testlib", WithFileExt(".yak"), WithCompileMethod(func(compiler *ReducerCompiler, s string) ([]string, error) {
-		count++
+	err = ReducerCompile(
+		"testlib",
+		WithEmbedFS(lib),
+		// WithFileExt(".yak"),
+		WithFileFilter(func(s string) bool {
+			return strings.HasSuffix(s, ".yak")
+		}),
+		WithCompileMethod(func(s string, r io.Reader) ([]string, error) {
+			count++
 
-		var visited []string
-		visited = append(visited, s)
+			var visited []string
+			visited = append(visited, s)
 
-		checked := 0
-		for _, v := range existed {
-			if v == s {
-				continue
+			checked := 0
+			for _, v := range existed {
+				if v == s {
+					continue
+				}
+				checked++
+				visited = append(visited, v)
+				if checked == 2 {
+					break
+				}
 			}
-			checked++
-			visited = append(visited, v)
-			if checked == 2 {
-				break
-			}
-		}
 
-		log.Infof("start to Compile %s", s)
-		spew.Dump(visited)
-		return visited, nil
-	})).Compile()
+			log.Infof("start to Compile %s", s)
+			spew.Dump(visited)
+			return visited, nil
+		}),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,11 +93,14 @@ func TestReducerCompiling2_CompileFailed(t *testing.T) {
 	}
 
 	count = 0
-	err = NewReducerCompiler("testlib", WithCompileMethod(func(compiler *ReducerCompiler, s string) ([]string, error) {
-		count++
-		log.Infof("start to Compile %s", s)
-		return []string{"testlib/aa/a3.yak", "testlib/dd/a1.yak", "testlib/dd/a2.yak"}, nil
-	})).Compile()
+	err = ReducerCompile("testlib",
+		WithEmbedFS(lib),
+		WithCompileMethod(func(s string, r io.Reader) ([]string, error) {
+			count++
+			log.Infof("start to Compile %s", s)
+			return []string{"testlib/aa/a3.yak", "testlib/dd/a1.yak", "testlib/dd/a2.yak"}, nil
+		}),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,15 +126,53 @@ func TestReducerCompiling2_NOLIMIT(t *testing.T) {
 	}
 
 	count = 0
-	err = NewReducerCompiler("testlib", WithCompileMethod(func(compiler *ReducerCompiler, s string) ([]string, error) {
-		count++
-		log.Infof("start to Compile %s", s)
-		return []string{}, nil
-	})).Compile()
+	err = ReducerCompile("testlib",
+		WithEmbedFS(lib),
+		WithCompileMethod(func(s string, r io.Reader) ([]string, error) {
+			count++
+			log.Infof("start to Compile %s", s)
+			return []string{}, nil
+		}),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if count != 5 {
 		t.Fatal("count should be 5")
 	}
+}
+
+func TestReducerCompiling2_VirtualFile(t *testing.T) {
+	vfs := filesys.NewVirtualFs()
+	vfs.AddFile("a/b/c.txt", "c")
+	vfs.AddFile("a/b.txt", "b")
+	vfs.AddFile("a/c/b.txt", "b")
+
+	var count = 0
+
+	count = 0
+	err := ReducerCompile(
+		"a",
+		WithFileSystem(vfs),
+		WithCompileMethod(func(s string, r io.Reader) ([]string, error) {
+			log.Infof("start to Compile %s", s)
+			count++
+			return []string{}, nil
+		}),
+	)
+	require.NoError(t, err, "compile failed")
+	require.Equal(t, 3, count, "count should be 3")
+
+	count = 0
+	err = ReducerCompile(
+		"a",
+		WithFileSystem(vfs),
+		WithCompileMethod(func(s string, r io.Reader) ([]string, error) {
+			log.Infof("start to Compile %s", s)
+			count++
+			return []string{"a/b.txt"}, nil
+		}),
+	)
+	require.NoError(t, err, "compile failed")
+	require.Equal(t, 2, count, "count should be 2")
 }

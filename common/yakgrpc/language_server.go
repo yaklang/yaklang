@@ -60,7 +60,6 @@ func LanguageServerAnalyzeProgram(code string, inspectType, scriptType string, r
 				if !ok {
 					newEditor = memedit.NewMemEditor(trimCode)
 				}
-				// newEditor := memedit.NewMemEditor(trimCode)
 				// end use old editor to get position
 				ssaRange = ssa.NewRange(newEditor, ssaRange.GetStart(), editor.GetPositionByOffset(endOffset-len(after)-1))
 				editor = newEditor
