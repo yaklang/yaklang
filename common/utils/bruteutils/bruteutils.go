@@ -6,16 +6,17 @@ import (
 	"container/list"
 	"context"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/mutate"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/mixer"
 	"io/ioutil"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/pkg/errors"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/mixer"
 )
 
 type BruteItem struct {
@@ -123,21 +124,23 @@ type BruteItemResult struct {
 }
 
 func (r *BruteItemResult) String() string {
-	var result = "FAIL"
+	result := "FAIL"
 	if r.Ok {
 		result = "OK"
 	} else {
 		result = "FAIL"
 	}
-	return fmt.Sprintf("[%v]: %v:\\\\%v:%v@%v", result, r.Type, r.Username, r.Password, r.Target)
+	return fmt.Sprintf("[%v]: %v://%v:%v@%v", result, r.Type, r.Username, r.Password, r.Target)
 }
 
 func (r *BruteItemResult) Show() {
 	println(r.String())
 }
 
-type BruteCallback func(item *BruteItem) *BruteItemResult
-type BruteItemResultCallback func(b *BruteItemResult)
+type (
+	BruteCallback           func(item *BruteItem) *BruteItemResult
+	BruteItemResultCallback func(b *BruteItemResult)
+)
 
 func NewMultiTargetBruteUtil(targetsConcurrent, minDelay, maxDelay int, callback BruteCallback) (*BruteUtil, error) {
 	delayer, err := utils.NewDelayWaiter(int32(minDelay), int32(maxDelay))
@@ -267,7 +270,7 @@ func (b *BruteUtil) startProcessingTarget(target string, parentCtx context.Conte
 
 	var (
 		finishedCount int32 = 0
-		//finished               = utils.NewBool(false)
+		// finished               = utils.NewBool(false)
 		onlyNeedPassword = utils.NewBool(b.OnlyNeedPassword)
 		eliminatedUsers  = sync.Map{}
 		usedPassword     = sync.Map{}
@@ -344,7 +347,7 @@ func (b *BruteUtil) startProcessingTarget(target string, parentCtx context.Conte
 
 			// 是否遇到了爆破成功的情况？
 			if result.Ok && b.OkToStop {
-				//finished.Set()
+				// finished.Set()
 				cancel()
 			}
 
@@ -591,7 +594,7 @@ func autoSetFinishedByConnectionError(err error, result *BruteItemResult) *Brute
 		fallthrough
 	case utils.IContains(err.Error(), "network is unreachable"):
 		fallthrough
-	//case utils.IContains(err.Error(), "remote error: tls: access denied"):
+	// case utils.IContains(err.Error(), "remote error: tls: access denied"):
 	//	fallthrough
 	case utils.IContains(err.Error(), "no reachable servers"):
 		fallthrough

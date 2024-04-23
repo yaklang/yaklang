@@ -1,12 +1,13 @@
 package yaklib
 
 import (
-	"context"
-	"github.com/go-redis/redis/v8"
-	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"time"
+
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/redis"
 )
 
 type redisConfig struct {
@@ -39,6 +40,7 @@ func redisOpt_Addr(a string) redisConfigOpt {
 }
 
 func redisOpt_Username(a string) redisConfigOpt {
+	// TODO: redis ACL auth support
 	return func(i *redisConfig) {
 		i.Username = a
 	}
@@ -79,120 +81,67 @@ type redisClient struct {
 }
 
 func (r *redisClient) Get(i interface{}) (string, error) {
-	if r == nil || r.rawClient == nil {
-		return "", utils.Error("no client set")
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(r.config.TimeoutSeconds)*time.Second)
-	defer cancel()
-
-	data := r.rawClient.Get(ctx, utils.InterfaceToString(i))
-	if data.Err() != nil {
-		return "", utils.Errorf("redis `get(%v)` failed: %s", i, data.Err())
-	}
-	return data.String(), nil
+	b, err := r.rawClient.Get(utils.InterfaceToString(i))
+	return string(b), err
 }
 
 func (r *redisClient) GetEx(i interface{}, ttlSeconds int) (string, error) {
-	if r == nil || r.rawClient == nil {
-		return "", utils.Error("no client set")
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(r.config.TimeoutSeconds)*time.Second)
-	defer cancel()
-
-	data := r.rawClient.GetEx(ctx, utils.InterfaceToString(i), time.Duration(ttlSeconds)*time.Second)
-	if data.Err() != nil {
-		return "", utils.Errorf("redis `get(%v)` failed: %s", i, data.Err())
-	}
-	return data.String(), nil
+	b, err := r.rawClient.GetEx(utils.InterfaceToString(i), time.Duration(time.Second)*time.Duration(ttlSeconds))
+	return string(b), err
 }
 
 func (r *redisClient) Set(k interface{}, value interface{}) error {
-	if r == nil || r.rawClient == nil {
-		return utils.Error("no client set")
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(r.config.TimeoutSeconds)*time.Second)
-	defer cancel()
-
-	status := r.rawClient.Set(ctx, utils.InterfaceToString(k), utils.InterfaceToString(value), 0)
-	return status.Err()
+	return r.rawClient.Set(utils.InterfaceToString(k), utils.InterfaceToString(value))
 }
 
 func (r *redisClient) SetWithTTL(k interface{}, value interface{}, ttlSeconds int) error {
-	if r == nil || r.rawClient == nil {
-		return utils.Error("no client set")
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(r.config.TimeoutSeconds)*time.Second)
-	defer cancel()
-
-	status := r.rawClient.Set(ctx, utils.InterfaceToString(k), utils.InterfaceToString(value), time.Duration(ttlSeconds)*time.Second)
-	return status.Err()
+	return r.rawClient.SetEx(utils.InterfaceToString(k), utils.InterfaceToString(value), time.Duration(time.Second)*time.Duration(ttlSeconds))
 }
 
 func (r *redisClient) Publish(channel string, msg string) error {
-	if r == nil || r.rawClient == nil {
-		return utils.Error("no client set")
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(r.config.TimeoutSeconds)*time.Second)
-	defer cancel()
-
-	status := r.rawClient.Publish(ctx, "test", "test")
-	return status.Err()
+	return r.rawClient.Publish(channel, msg)
 }
 
-func (r *redisClient) Do(items ...interface{}) {
-	if r == nil || r.rawClient == nil {
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(r.config.TimeoutSeconds)*time.Second)
-	defer cancel()
-
-	status := r.rawClient.Do(ctx, items...)
-	if status.Err() != nil {
-		log.Errorf("redis do ... failed: %s", status.Err())
-	}
-}
-
-func (r *redisClient) Subscribe(channel string, cb func(msg *redis.Message)) (fe error) {
-	if r == nil || r.rawClient == nil {
-		return utils.Error("no client set")
-	}
-
-	defer func() {
-		if err := recover(); err != nil {
-			fe = errors.Errorf("subcribe[%v] panic: %v", channel, err)
-			log.Error(fe)
-			return
+func (r *redisClient) Subscribe(channel string, cb func(msg *redis.Message)) (closeFunc func()) {
+	subscribeCh := make(chan string)
+	messageCh := make(chan redis.Message)
+	go func() {
+		subscribeCh <- channel
+		for {
+			select {
+			case msg := <-messageCh:
+				if cb != nil {
+					cb(&msg)
+				}
+			case _, ok := <-subscribeCh:
+				if !ok {
+					close(messageCh)
+					return
+				}
+			}
 		}
 	}()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(r.config.TimeoutSeconds)*time.Second)
-	defer cancel()
-
-	subc := r.rawClient.Subscribe(ctx, channel)
-	defer subc.Close()
-
-	for {
-		msg, err := subc.ReceiveMessage(context.Background())
-		if err != nil {
-			return errors.Wrap(err, "subpub receive msg failed")
-		}
-
-		if msg != nil && cb != nil {
-			cb(msg)
-		}
+	go func() {
+		r.rawClient.Subscribe(subscribeCh, nil, nil, nil, messageCh)
+	}()
+	return func() {
+		close(subscribeCh)
 	}
 }
 
 func (r *redisClient) Close() error {
-	if r == nil || r.rawClient == nil {
-		return utils.Error("no client set")
-	}
-
 	return r.rawClient.Close()
+}
+
+func (r *redisClient) Do(items ...interface{}) {
+	if len(items) < 1 {
+		return
+	}
+	sItems := lo.Map(items, func(i any, _ int) string {
+		return utils.InterfaceToString(i)
+	})
+	r.rawClient.Do(sItems[0], sItems[1:]...)
 }
 
 func newRedis(r ...redisConfigOpt) *redisClient {
@@ -204,6 +153,7 @@ func newRedis(r ...redisConfigOpt) *redisClient {
 		TimeoutSeconds: 10,
 		MaxRetries:     3,
 	}
+
 	for _, opt := range r {
 		opt(config)
 	}
@@ -215,16 +165,11 @@ func newRedis(r ...redisConfigOpt) *redisClient {
 	}
 
 	timeout := time.Duration(config.TimeoutSeconds) * time.Second
-	redisConfig := &redis.Options{
-		Addr:         utils.HostPort(config.Host, config.Port),
-		Username:     config.Username,
-		Password:     config.Password,
-		MaxRetries:   config.MaxRetries,
-		DialTimeout:  timeout,
-		ReadTimeout:  timeout,
-		WriteTimeout: timeout,
-		// TLSConfig:    &tls.Config{InsecureSkipVerify: true},
+	conn, err := netx.DialX(utils.HostPort(config.Host, config.Port), netx.DialX_WithTimeout(timeout), netx.DialX_WithTimeoutRetry(3))
+	if err != nil {
+		log.Errorf("redis dial connection failed: %v", err)
 	}
-	client := redis.NewClient(redisConfig)
+
+	client := redis.NewClient(conn, timeout)
 	return &redisClient{rawClient: client, config: config}
 }
