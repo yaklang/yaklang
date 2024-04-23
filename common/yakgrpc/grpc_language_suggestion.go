@@ -679,8 +679,8 @@ func OnCompletion(prog *ssaapi.Program, word string, containPoint bool, rng *ssa
 		ret = append(ret, getLanguageKeywordSuggestions()...)
 		// 自定义变量补全
 		uniqMap := make(map[string]struct{})
-
-		for _, item := range prog.GetAllOffsetItemsBefore(rng.GetEndOffset()) {
+		// 需要反转，因为是按 offset 顺序排列的
+		for _, item := range lo.Reverse(prog.GetAllOffsetItemsBefore(rng.GetEndOffset())) {
 			variable := item.GetVariable()
 			varName := variable.GetName()
 			if _, ok := uniqMap[varName]; ok {
