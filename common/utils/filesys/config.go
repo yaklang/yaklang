@@ -124,7 +124,7 @@ func WithFileSystem(f FileSystem) Option {
 
 func WithEmbedFS(f embed.FS) Option {
 	return func(config *Config) {
-		config.fileSystem = fromEmbedFS(f)
+		config.fileSystem = NewEmbedFS(f)
 	}
 }
 
