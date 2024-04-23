@@ -2,7 +2,6 @@ package ssareducer
 
 import (
 	"io/fs"
-	"strings"
 
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/log"
@@ -10,67 +9,64 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 )
 
-type ReducerCompiler struct {
-	base   string
-	config *Config
-}
-
-func NewReducerCompiler(base string, opts ...Option) *ReducerCompiler {
-	c := NewConfig()
-	for _, opt := range opts {
-		opt(c)
+func ReducerCompile(base string, opts ...Option) error {
+	c := NewConfig(opts...)
+	if c.fs == nil {
+		return utils.Errorf("file system is nil")
 	}
-	return &ReducerCompiler{
-		base:   base,
-		config: c,
-	}
-}
 
-func (r *ReducerCompiler) Compile() error {
-	var opts []filesys.Option
-	if r.config.embedFS != nil {
-		opts = append(opts, filesys.WithEmbedFS(*r.config.embedFS))
+	if c.compileMethod == nil {
+		return utils.Errorf("compile method is nil")
 	}
 
 	var visited = filter.NewFilter()
 	defer visited.Close()
 
-	c := r.config
-	opts = append(opts, filesys.WithFileStat(func(pathname string, fd fs.File, info fs.FileInfo) error {
-		if len(c.exts) > 0 {
-			skipped := true
-			for _, ext := range c.exts {
-				if strings.HasSuffix(strings.ToLower(pathname), strings.ToLower(ext)) {
-					skipped = false
-					break
-				}
-			}
-			if skipped {
-				return nil
-			}
-		}
-
-		if visited.Exist(pathname) {
-			return nil
-		}
-		if r.config.compileMethods == nil {
-			return utils.Errorf("Compile method is nil for lib: %v", r.base)
-		}
-
-		results, err := r.config.compileMethods(r, pathname)
+	for _, entryFile := range c.entryFiles {
+		fd, err := c.fs.Open(entryFile)
 		if err != nil {
-			if r.config.stopAtCompileError {
-				return err
-			}
-			log.Warnf("Compile error: %v", err)
+			return err
+		}
+		results, err := c.compileMethod(entryFile, fd)
+		if err != nil {
+			return err
 		}
 		for _, result := range results {
 			visited.Insert(result)
 		}
-		return nil
-	}))
+	}
 
-	err := filesys.Recursive(r.base, opts...)
+	var fileopts []filesys.Option
+	fileopts = append(fileopts, filesys.WithFileSystem(c.fs))
+
+	fileopts = append(fileopts,
+		filesys.WithFileStat(func(pathname string, fd fs.File, info fs.FileInfo) error {
+			if !c.filter(pathname) {
+				return nil
+			}
+
+			if visited.Exist(pathname) {
+				return nil
+			}
+			if c.compileMethod == nil {
+				return utils.Errorf("Compile method is nil for lib: %v", base)
+			}
+
+			results, err := c.compileMethod(pathname, fd)
+			if err != nil {
+				if c.stopAtCompileError {
+					return err
+				}
+				log.Warnf("Compile error: %v", err)
+			}
+			for _, result := range results {
+				visited.Insert(result)
+			}
+			return nil
+		}),
+	)
+
+	err := filesys.Recursive(base, fileopts...)
 	if err != nil {
 		return err
 	}

@@ -8,11 +8,12 @@ import (
 )
 
 func Test_Multi_File(t *testing.T) {
-	prog, err := ssaapi.ParseProjectFromPath(
+	progs, err := ssaapi.ParseProjectFromPath(
 		"./code/mutiFileDemo",
 		ssaapi.WithLanguage(ssaapi.JAVA),
 	)
 	require.NoError(t, err)
-
-	prog.Show()
+	for _, prog := range progs {
+		prog.Show()
+	}
 }
